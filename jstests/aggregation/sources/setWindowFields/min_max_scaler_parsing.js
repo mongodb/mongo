@@ -22,7 +22,7 @@ function expectSuccessWithArgs(setWindowFieldsArgs) {
     coll.aggregate([{$setWindowFields: setWindowFieldsArgs}]);
 }
 function expectFailureWithArgs(setWindowFieldsArgs, errorCode) {
-    assert.throwsWithCode(function() {
+    assert.throwsWithCode(function () {
         coll.aggregate([{$setWindowFields: setWindowFieldsArgs}]);
     }, errorCode);
 }
@@ -40,9 +40,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", hello: "world"},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.IDLUnknownField);
+    ErrorCodes.IDLUnknownField,
+);
 expectFailureWithArgs(
     // 'input' cannot be missing.
     {
@@ -52,9 +53,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {min: 0, max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.IDLFailedToParse);
+    ErrorCodes.IDLFailedToParse,
+);
 expectFailureWithArgs(
     // 'min' must be a numerical type.
     {
@@ -64,9 +66,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: "hello", max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // 'max' must be a numerical type.
     {
@@ -76,9 +79,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: 0, max: "world"},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // Cannot specify 'min', but not 'max'.
     {
@@ -88,9 +92,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: 0},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // Cannot specify 'max' but not 'min'.
     {
@@ -100,9 +105,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // 'max' must be strictly greater than 'min'.
     {
@@ -112,9 +118,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: 10, max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // 'max' must be strictly greater than 'min'.
     {
@@ -124,9 +131,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: 11, max: 10},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // 'max' must be strictly greater than 'min', even as expressions.
     {
@@ -136,9 +144,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: {$multiply: [1, 20]}, max: {$divide: [20, 2]}},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // 'min' must be a constant
     {
@@ -148,9 +157,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: {$multiply: [1, "$x"]}, max: {$divide: [20, 2]}},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // 'max' must be a constant
     {
@@ -160,9 +170,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: {$multiply: [1, 1]}, max: {$divide: [20, "$x"]}},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // 'min' must be numeric
     {
@@ -172,9 +183,10 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: "hello", max: 2},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // 'max' must be numeric
     {
@@ -184,64 +196,70 @@ expectFailureWithArgs(
                 $minMaxScaler: {input: "$x", min: 1, max: "hi"},
                 window: {documents: ["current", "unbounded"]},
             },
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // Inclusivity bounds check: document based bounds cannot have lower bound greater than 0.
     {
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [1, "unbounded"]}},
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // Inclusivity bounds check: document based bounds cannot have upper bound less than 0.
     {
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [-2, -1]}},
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // Inclusivity bounds check: document based bounds cannot have upper bound less than 0.
     {
         sortBy: {_id: 1},
         output: {
-            "relativeXValue":
-                {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", -1]}},
-        }
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", -1]}},
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // Inclusivity bounds check: range based bounds cannot have lower bound greater than 0.
     {
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [1.5, "unbounded"]}},
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // Inclusivity bounds check: range based bounds cannot have upper bound less than 0.
     {
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [-1.5, -0.5]}},
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 expectFailureWithArgs(
     // Inclusivity bounds check: range based bounds cannot have upper bound less than 0.
     {
         sortBy: {_id: 1},
         output: {
             "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", -0.5]}},
-        }
+        },
     },
-    ErrorCodes.FailedToParse);
+    ErrorCodes.FailedToParse,
+);
 
 // Tests to assert that input arg must evaluate to a numeric.
 expectFailureWithArgs(
@@ -251,11 +269,12 @@ expectFailureWithArgs(
         output: {
             "relativeXValue": {
                 $minMaxScaler: {"input": {"$const": "foo"}, min: 0, max: 10},
-                window: {documents: [0, "unbounded"]}
+                window: {documents: [0, "unbounded"]},
             },
-        }
+        },
     },
-    10487000);
+    10487000,
+);
 
 expectFailureWithArgs(
     // Removable document based bounds, input evaluates to a string (from document field).
@@ -264,11 +283,12 @@ expectFailureWithArgs(
         output: {
             "relativeXValue": {
                 $minMaxScaler: {"input": "$str", min: 0, max: 10},
-                window: {documents: [0, "unbounded"]}
+                window: {documents: [0, "unbounded"]},
             },
-        }
+        },
     },
-    10487000);
+    10487000,
+);
 
 expectFailureWithArgs(
     // Removable range based bounds, input evaluates to a string (from a constant).
@@ -277,11 +297,12 @@ expectFailureWithArgs(
         output: {
             "relativeXValue": {
                 $minMaxScaler: {"input": {"$const": "foo"}, min: 0, max: 10},
-                window: {range: [0, "unbounded"]}
+                window: {range: [0, "unbounded"]},
             },
-        }
+        },
     },
-    10487000);
+    10487000,
+);
 
 expectFailureWithArgs(
     // Removable range based bounds, input evaluates to a string (from document field).
@@ -290,11 +311,12 @@ expectFailureWithArgs(
         output: {
             "relativeXValue": {
                 $minMaxScaler: {"input": "$str", min: 0, max: 10},
-                window: {range: [0, "unbounded"]}
+                window: {range: [0, "unbounded"]},
             },
-        }
+        },
     },
-    10487000);
+    10487000,
+);
 
 expectFailureWithArgs(
     // Non-removable document based bounds, input evaluates to a string (from a constant).
@@ -303,11 +325,12 @@ expectFailureWithArgs(
         output: {
             "relativeXValue": {
                 $minMaxScaler: {"input": {"$const": "foo"}, min: 0, max: 10},
-                window: {documents: ["unbounded", "unbounded"]}
+                window: {documents: ["unbounded", "unbounded"]},
             },
-        }
+        },
     },
-    10487001);
+    10487001,
+);
 
 expectFailureWithArgs(
     // Non-removable document based bounds, input evaluates to a string (from document field).
@@ -316,11 +339,12 @@ expectFailureWithArgs(
         output: {
             "relativeXValue": {
                 $minMaxScaler: {"input": "$str", min: 0, max: 10},
-                window: {documents: ["unbounded", "unbounded"]}
+                window: {documents: ["unbounded", "unbounded"]},
             },
-        }
+        },
     },
-    10487001);
+    10487001,
+);
 
 expectFailureWithArgs(
     // Non-removable range based bounds, input evaluates to a string (from a constant).
@@ -329,11 +353,12 @@ expectFailureWithArgs(
         output: {
             "relativeXValue": {
                 $minMaxScaler: {"input": {"$const": "foo"}, min: 0, max: 10},
-                window: {range: ["unbounded", "unbounded"]}
+                window: {range: ["unbounded", "unbounded"]},
             },
-        }
+        },
     },
-    10487004);
+    10487004,
+);
 
 expectFailureWithArgs(
     // Non-removable range based bounds, input evaluates to a string (from document field).
@@ -342,33 +367,34 @@ expectFailureWithArgs(
         output: {
             "relativeXValue": {
                 $minMaxScaler: {"input": "$str", min: 0, max: 10},
-                window: {range: ["unbounded", "unbounded"]}
+                window: {range: ["unbounded", "unbounded"]},
             },
-        }
+        },
     },
-    10487004);
+    10487004,
+);
 
 expectFailureWithArgs(
     // Range based bounds cannot have a descending sortBy field.
     {
         sortBy: {y: -1},
         output: {
-            "relativeXValue":
-                {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
-        }
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+        },
     },
-    8947401);
+    8947401,
+);
 
 expectFailureWithArgs(
     // Range based bounds cannot have a descending sortBy field.
     {
         sortBy: {_id: -1},
         output: {
-            "relativeXValue":
-                {$minMaxScaler: {input: "$x"}, window: {range: ["current", "unbounded"]}},
-        }
+            "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", "unbounded"]}},
+        },
     },
-    8947401);
+    8947401,
+);
 
 expectFailureWithArgs(
     // Range based bounds cannot have a descending sortBy field.
@@ -376,9 +402,10 @@ expectFailureWithArgs(
         sortBy: {_id: -1},
         output: {
             "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", 1]}},
-        }
+        },
     },
-    8947401);
+    8947401,
+);
 
 expectFailureWithArgs(
     // Range based bounds require a single sortBy field.
@@ -386,9 +413,10 @@ expectFailureWithArgs(
         sortBy: {x: 1, _id: -1},
         output: {
             "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", 1]}},
-        }
+        },
     },
-    5339902);
+    5339902,
+);
 
 expectFailureWithArgs(
     // Range based bounds require a single sortBy field.
@@ -396,45 +424,44 @@ expectFailureWithArgs(
         sortBy: {y: -1, _id: 1},
         output: {
             "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", 1]}},
-        }
+        },
     },
-    5339902);
+    5339902,
+);
 
 // $setWindowFields args that should succeed.
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
-        "relativeXValue":
-            {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
-    }
+        "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
         "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [0, "unbounded"]}},
-    }
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
         "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", 0]}},
-    }
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
         "relativeXValue": {
             $minMaxScaler: {input: "$x", min: 0, max: 10},
-            window: {documents: ["current", "unbounded"]}
+            window: {documents: ["current", "unbounded"]},
         },
-    }
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
-        "relativeXValue":
-            {$minMaxScaler: {input: "$x", min: 0, max: 10}, window: {range: [0, "unbounded"]}},
-    }
+        "relativeXValue": {$minMaxScaler: {input: "$x", min: 0, max: 10}, window: {range: [0, "unbounded"]}},
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
@@ -442,7 +469,7 @@ expectSuccessWithArgs({
         "relativeXValue": {
             $minMaxScaler: {input: "$x"},
         },
-    }
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
@@ -450,34 +477,34 @@ expectSuccessWithArgs({
         "relativeXValue": {
             $minMaxScaler: {input: "$x", min: 0, max: 10},
         },
-    }
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
         "relativeXValue": {
             $minMaxScaler: {input: "$x", min: 0, max: 10},
-            window: {documents: ["unbounded", "unbounded"]}
+            window: {documents: ["unbounded", "unbounded"]},
         },
-    }
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
         "relativeXValue": {
             $minMaxScaler: {input: "$x", min: 0, max: 10},
-            window: {range: ["unbounded", "unbounded"]}
+            window: {range: ["unbounded", "unbounded"]},
         },
-    }
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
     output: {
         "relativeXValue": {
             $minMaxScaler: {input: "$x", min: {$multiply: [5, 0]}, max: {$subtract: [5, 4]}},
-            window: {range: ["unbounded", "unbounded"]}
+            window: {range: ["unbounded", "unbounded"]},
         },
-    }
+    },
 });
 expectSuccessWithArgs({
     sortBy: {_id: 1},
@@ -486,9 +513,9 @@ expectSuccessWithArgs({
             $minMaxScaler: {
                 input: {$multiply: ["$x", "$x"]},
                 min: {$multiply: [5, 0]},
-                max: {$subtract: [5, 4]}
+                max: {$subtract: [5, 4]},
             },
-            window: {range: ["unbounded", "unbounded"]}
+            window: {range: ["unbounded", "unbounded"]},
         },
-    }
+    },
 });

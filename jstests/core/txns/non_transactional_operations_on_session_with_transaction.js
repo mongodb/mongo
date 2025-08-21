@@ -20,7 +20,7 @@ testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -44,10 +44,10 @@ function assertCursorBatchContents(result, expectedContents, isExhausted) {
 }
 
 const doc1 = {
-    _id: "insert-1"
+    _id: "insert-1",
 };
 const doc2 = {
-    _id: "insert-2"
+    _id: "insert-2",
 };
 
 // Insert a document in a transaction.
@@ -56,14 +56,16 @@ const doc2 = {
 // TransientTransactionError. After SERVER-39704 is completed the
 // retryOnceOnTransientOnMongos can be removed
 retryOnceOnTransientOnMongos(session, () => {
-    assert.commandWorked(sessionDb.runCommand({
-        insert: collName,
-        documents: [doc1],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(++txnNumber),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        sessionDb.runCommand({
+            insert: collName,
+            documents: [doc1],
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(++txnNumber),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 });
 
 // Test that we cannot observe the insert outside of the transaction.
@@ -74,10 +76,12 @@ assert.eq(null, sessionColl.findOne(doc2));
 
 // Test that we observe the insert inside of the transaction.
 assertCursorBatchContents(
-    assert.commandWorked(sessionDb.runCommand(
-        {find: collName, batchSize: 10, txnNumber: NumberLong(txnNumber), autocommit: false})),
+    assert.commandWorked(
+        sessionDb.runCommand({find: collName, batchSize: 10, txnNumber: NumberLong(txnNumber), autocommit: false}),
+    ),
     [doc1],
-    false);
+    false,
+);
 
 // Insert a document on the session outside of the transaction.
 assert.commandWorked(sessionDb.runCommand({insert: collName, documents: [doc2]}));
@@ -90,18 +94,22 @@ assert.docEq(doc2, sessionColl.findOne(doc2));
 
 // Test that we do not observe the new insert inside of the transaction.
 assertCursorBatchContents(
-    assert.commandWorked(sessionDb.runCommand(
-        {find: collName, batchSize: 10, txnNumber: NumberLong(txnNumber), autocommit: false})),
+    assert.commandWorked(
+        sessionDb.runCommand({find: collName, batchSize: 10, txnNumber: NumberLong(txnNumber), autocommit: false}),
+    ),
     [doc1],
-    false);
+    false,
+);
 
 // Commit the transaction.
-assert.commandWorked(sessionDb.adminCommand({
-    commitTransaction: 1,
-    writeConcern: {w: "majority"},
-    txnNumber: NumberLong(txnNumber),
-    autocommit: false
-}));
+assert.commandWorked(
+    sessionDb.adminCommand({
+        commitTransaction: 1,
+        writeConcern: {w: "majority"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
+);
 
 // Test that we see both documents outside of the transaction.
 assert.docEq(doc1, testColl.findOne(doc1));

@@ -6,8 +6,8 @@ import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const conn = MongoRunner.runMongod();
-const dbName = 'test';
-const collName = 'foo';
+const dbName = "test";
+const collName = "foo";
 const testDB = conn.getDB(dbName);
 const testColl = testDB[collName];
 
@@ -28,8 +28,7 @@ const runTest = (config) => {
     const indexName = "test_index";
     let indexOptions = config.indexOptions || {};
     indexOptions.name = indexName;
-    const awaitIndex = IndexBuildTest.startIndexBuild(
-        conn, testColl.getFullName(), config.indexSpec, indexOptions);
+    const awaitIndex = IndexBuildTest.startIndexBuild(conn, testColl.getFullName(), config.indexSpec, indexOptions);
     IndexBuildTest.waitForIndexBuildToStart(testDB, collName, indexName);
 
     // Perform writes while the index build is in progress.
@@ -54,7 +53,8 @@ const runTest = (config) => {
     assert.eq(
         config.expectMultikey,
         plan.inputStage.isMultiKey,
-        `Index multikey state "${plan.inputStage.isMultiKey}" was not "${config.expectMultikey}"`);
+        `Index multikey state "${plan.inputStage.isMultiKey}" was not "${config.expectMultikey}"`,
+    );
 
     const validateRes = assert.commandWorked(testColl.validate());
     assert(validateRes.valid, validateRes);
@@ -62,34 +62,32 @@ const runTest = (config) => {
 
 // Hashed indexes should never be multikey.
 runTest({
-    indexSpec: {x: 'hashed'},
+    indexSpec: {x: "hashed"},
     expectMultikey: false,
 });
 
 // Wildcard indexes are not multikey unless they have multikey documents.
 runTest({
-    indexSpec: {'$**': 1},
+    indexSpec: {"$**": 1},
     expectMultikey: false,
 });
 runTest({
-    indexSpec: {'$**': 1},
+    indexSpec: {"$**": 1},
     expectMultikey: true,
     extraDocs: [{x: [1, 2, 3]}],
 });
 
 // '2dsphere' indexes are not multikey unless they have multikey documents.
 runTest({
-    indexSpec: {x: 1, b: '2dsphere'},
+    indexSpec: {x: 1, b: "2dsphere"},
     expectMultikey: false,
 });
 
 // '2dsphere' indexes are automatically sparse. If we insert a document where 'x' is multikey, even
 // though 'b' is omitted, the index is still considered multikey. See SERVER-39705.
 runTest({
-    indexSpec: {x: 1, b: '2dsphere'},
-    extraDocs: [
-        {x: [1, 2]},
-    ],
+    indexSpec: {x: 1, b: "2dsphere"},
+    extraDocs: [{x: [1, 2]}],
     expectMultikey: true,
 });
 
@@ -97,9 +95,7 @@ runTest({
 runTest({
     indexSpec: {x: 1},
     indexOptions: {partialFilterExpression: {a: {$gt: 0}}},
-    extraDocs: [
-        {x: [0, 1, 2], a: 0},
-    ],
+    extraDocs: [{x: [0, 1, 2], a: 0}],
     expectMultikey: false,
 });
 
@@ -107,27 +103,21 @@ runTest({
 runTest({
     indexSpec: {x: 1},
     indexOptions: {partialFilterExpression: {a: {$gt: 0}}},
-    extraDocs: [
-        {x: [0, 1, 2], a: 1},
-    ],
+    extraDocs: [{x: [0, 1, 2], a: 1}],
     expectMultikey: true,
 });
 
 // Text indexes are not multikey unless documents make them multikey.
 runTest({
-    indexSpec: {x: 'text'},
-    extraDocs: [
-        {x: 'hello'},
-    ],
+    indexSpec: {x: "text"},
+    extraDocs: [{x: "hello"}],
     expectMultikey: false,
 });
 
 // Text indexes can be multikey if a field has multiple words.
 runTest({
-    indexSpec: {x: 'text'},
-    extraDocs: [
-        {x: 'hello world'},
-    ],
+    indexSpec: {x: "text"},
+    extraDocs: [{x: "hello world"}],
     expectMultikey: true,
 });
 

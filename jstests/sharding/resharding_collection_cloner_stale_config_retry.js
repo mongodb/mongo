@@ -20,12 +20,10 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(inputCollection, {oldKey: 
     {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: st.shard1.shardName},
 ]);
 
-const inputCollectionUUID =
-    getUUIDFromListCollections(inputCollection.getDB(), inputCollection.getName());
+const inputCollectionUUID = getUUIDFromListCollections(inputCollection.getDB(), inputCollection.getName());
 const inputCollectionUUIDString = extractUUIDFromObject(inputCollectionUUID);
 
-const temporaryReshardingCollection =
-    st.s.getCollection(`reshardingDb.system.resharding.${inputCollectionUUIDString}`);
+const temporaryReshardingCollection = st.s.getCollection(`reshardingDb.system.resharding.${inputCollectionUUIDString}`);
 
 CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollection, {newKey: 1}, [
     {min: {newKey: MinKey}, max: {newKey: 0}, shard: st.shard0.shardName},
@@ -37,8 +35,11 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollect
 // to guarantee they have been written and are visible with the atClusterTime used by the
 // testReshardCloneCollection command.
 for (const shard of [st.shard0, st.shard1]) {
-    assert.commandWorked(shard.rs.getPrimary().adminCommand(
-        {_flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName()}));
+    assert.commandWorked(
+        shard.rs
+            .getPrimary()
+            .adminCommand({_flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName()}),
+    );
 }
 
 const documents = [
@@ -55,7 +56,8 @@ assert.commandWorked(inputCollection.insert(documents));
 const originalInsertsTs = inputCollection.getDB().getSession().getOperationTime();
 
 for (const shard of [st.shard0, st.shard1]) {
-    shard.rs.getPrimary()
+    shard.rs
+        .getPrimary()
         .getDB(inputCollection.getDB().getName())
         .getSession()
         .advanceClusterTime(inputCollection.getDB().getSession().getClusterTime());
@@ -63,33 +65,36 @@ for (const shard of [st.shard0, st.shard1]) {
 
 const shard0Primary = st.shard0.rs.getPrimary();
 const outerLoop = configureFailPoint(
-    shard0Primary, "reshardingCollectionClonerPauseBeforeWriteNaturalOrder", {}, {skip: 1});
+    shard0Primary,
+    "reshardingCollectionClonerPauseBeforeWriteNaturalOrder",
+    {},
+    {skip: 1},
+);
 
-const staleConfigFP =
-    configureFailPoint(shard0Primary, "reshardingCollectionClonerShouldFailWithStaleConfig");
+const staleConfigFP = configureFailPoint(shard0Primary, "reshardingCollectionClonerShouldFailWithStaleConfig");
 
-const reshardShell =
-    startParallelShell(funWithArgs(
-                           (inputCollectionFullName,
-                            inputCollectionUUID,
-                            shardName,
-                            atClusterTime,
-                            tempCollectionFullName) => {
-                               assert.commandWorked(db.adminCommand({
-                                   testReshardCloneCollection: inputCollectionFullName,
-                                   shardKey: {newKey: 1},
-                                   uuid: inputCollectionUUID,
-                                   shardId: shardName,
-                                   atClusterTime: atClusterTime,
-                                   outputNs: tempCollectionFullName,
-                               }));
-                           },
-                           inputCollection.getFullName(),
-                           inputCollectionUUID,
-                           st.shard0.shardName,
-                           originalInsertsTs,
-                           temporaryReshardingCollection.getFullName()),
-                       shard0Primary.port);
+const reshardShell = startParallelShell(
+    funWithArgs(
+        (inputCollectionFullName, inputCollectionUUID, shardName, atClusterTime, tempCollectionFullName) => {
+            assert.commandWorked(
+                db.adminCommand({
+                    testReshardCloneCollection: inputCollectionFullName,
+                    shardKey: {newKey: 1},
+                    uuid: inputCollectionUUID,
+                    shardId: shardName,
+                    atClusterTime: atClusterTime,
+                    outputNs: tempCollectionFullName,
+                }),
+            );
+        },
+        inputCollection.getFullName(),
+        inputCollectionUUID,
+        st.shard0.shardName,
+        originalInsertsTs,
+        temporaryReshardingCollection.getFullName(),
+    ),
+    shard0Primary.port,
+);
 
 // Wait until the retry of _writeOnceWithNaturalOrder to turn off the staleConfig fp.
 outerLoop.wait();
@@ -98,8 +103,7 @@ outerLoop.off();
 
 reshardShell();
 
-assert.eq(documents.length,
-          st.s.getCollection(temporaryReshardingCollection.getFullName()).countDocuments({}));
+assert.eq(documents.length, st.s.getCollection(temporaryReshardingCollection.getFullName()).countDocuments({}));
 
 // The temporary reshard collection must be dropped before checking metadata integrity.
 assert(temporaryReshardingCollection.drop());

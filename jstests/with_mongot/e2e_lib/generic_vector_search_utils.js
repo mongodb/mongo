@@ -23,7 +23,7 @@ const kGenericIndexName = "vector_search";
  */
 export function generateRandomVectorEmbedding(n) {
     // Generates array of random values from [-1, 1)
-    let embedding = Array.from({length: n}, function() {
+    let embedding = Array.from({length: n}, function () {
         return Math.random() * 2 - 1;
     });
     return embedding;
@@ -42,14 +42,14 @@ export function createGenericVectorSearchIndex() {
     // Returning the existing collection if it already has an index.
     if (checkForExistingIndex(coll, kGenericIndexName)) {
         return coll;
-    };
+    }
 
     let docs = [];
     for (let i = 0; i < kGenericNumDocs; i++) {
         docs.push({
             _id: i,
             a: i % kGenericNumDimensions,
-            embedding: generateRandomVectorEmbedding(kGenericNumDimensions)
+            embedding: generateRandomVectorEmbedding(kGenericNumDimensions),
         });
     }
     assert.commandWorked(coll.insertMany(docs));
@@ -57,13 +57,15 @@ export function createGenericVectorSearchIndex() {
         name: kGenericIndexName,
         type: "vectorSearch",
         definition: {
-            "fields": [{
-                "type": "vector",
-                "numDimensions": kGenericNumDimensions,
-                "path": "embedding",
-                "similarity": "euclidean"
-            }]
-        }
+            "fields": [
+                {
+                    "type": "vector",
+                    "numDimensions": kGenericNumDimensions,
+                    "path": "embedding",
+                    "similarity": "euclidean",
+                },
+            ],
+        },
     };
     createSearchIndex(coll, index);
     return coll;
@@ -83,6 +85,6 @@ export function getGenericVectorSearchQuery(limit) {
             numCandidates: limit * 2,
             index: kGenericIndexName,
             limit: limit,
-        }
+        },
     };
 }

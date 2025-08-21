@@ -29,7 +29,7 @@ const replSet = new ReplSetTest({
             // Lower these values from the defaults to speed up the test.
             temporarilyUnavailableMaxRetries: maxRetries,
             temporarilyUnavailableBackoffBaseMs: 10,
-        }
+        },
     },
 });
 replSet.startSet();
@@ -46,8 +46,7 @@ for (let j = 0; j < 200000; j++) {
 assert.commandWorked(db.c.insertOne(doc));
 
 // Shrink the WiredTiger cache so as to reliably get a TemporarilyUnavailableException.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": "cache_size=32M"}));
+assert.commandWorked(db.adminCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": "cache_size=32M"}));
 
 function temporarilyUnavailableNonTransaction(op) {
     jsTestLog("Temporarily unavailable error on non-transactional " + op);
@@ -64,10 +63,14 @@ function temporarilyUnavailableNonTransaction(op) {
     const serverStatusAfter = db.serverStatus();
     // temporarilyUnavailableErrors is incremented by maxRetries + 1, because the last time the
     // exception is not retried.
-    assert.gte(serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
-               serverStatusBefore.metrics.operation.temporarilyUnavailableErrors + maxRetries + 1);
-    assert.gte(serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
-               serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped + 1);
+    assert.gte(
+        serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrors + maxRetries + 1,
+    );
+    assert.gte(
+        serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped + 1,
+    );
 }
 
 function temporarilyUnavailableInTransactionIsConvertedToWriteConflict(op) {
@@ -91,11 +94,16 @@ function temporarilyUnavailableInTransactionIsConvertedToWriteConflict(op) {
     const serverStatusAfter = db.serverStatus();
     assert.gt(
         serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsConvertedToWriteConflict,
-        serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsConvertedToWriteConflict);
-    assert.eq(serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
-              serverStatusBefore.metrics.operation.temporarilyUnavailableErrors);
-    assert.eq(serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
-              serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped);
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsConvertedToWriteConflict,
+    );
+    assert.eq(
+        serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrors,
+    );
+    assert.eq(
+        serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped,
+    );
 }
 
 for (const op of ["delete", "update"]) {

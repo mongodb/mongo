@@ -11,8 +11,7 @@ const st = new ShardingTest({name: "union_with_read_pref", mongos: 1, shards: 2,
 const dbName = jsTestName() + "_db";
 st.s0.setCausalConsistency(true);
 const mongosDB = st.s0.getDB(dbName);
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 
 const mongosColl = mongosDB[jsTestName()];
 const unionedColl = mongosDB.union_target;
@@ -28,26 +27,44 @@ for (let rs of [st.rs0, st.rs1]) {
     const primary = rs.getPrimary();
     const secondary = rs.getSecondary();
     assert.commandWorked(primary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(
-        primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
     assert.commandWorked(secondary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(
-        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(secondary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
 }
 
 // Write a document to each chunk.
-assert.commandWorked(mongosColl.insert([{_id: -1, docNum: 0}, {_id: 1, docNum: 1}],
-                                       {writeConcern: {w: "majority"}}));
-assert.commandWorked(unionedColl.insert([{_id: -1, docNum: 2}, {_id: 1, docNum: 3}],
-                                        {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    mongosColl.insert(
+        [
+            {_id: -1, docNum: 0},
+            {_id: 1, docNum: 1},
+        ],
+        {writeConcern: {w: "majority"}},
+    ),
+);
+assert.commandWorked(
+    unionedColl.insert(
+        [
+            {_id: -1, docNum: 2},
+            {_id: 1, docNum: 3},
+        ],
+        {writeConcern: {w: "majority"}},
+    ),
+);
 
 // Test that $unionWith goes to the primary by default.
 let unionWithComment = "union against primary";
-assert.eq(mongosColl
-              .aggregate([{$unionWith: unionedColl.getName()}, {$sort: {docNum: 1}}],
-                         {comment: unionWithComment})
-              .toArray(),
-          [{_id: -1, docNum: 0}, {_id: 1, docNum: 1}, {_id: -1, docNum: 2}, {_id: 1, docNum: 3}]);
+assert.eq(
+    mongosColl
+        .aggregate([{$unionWith: unionedColl.getName()}, {$sort: {docNum: 1}}], {comment: unionWithComment})
+        .toArray(),
+    [
+        {_id: -1, docNum: 0},
+        {_id: 1, docNum: 1},
+        {_id: -1, docNum: 2},
+        {_id: 1, docNum: 3},
+    ],
+);
 
 // Test that the union's sub-pipelines go to the primary.
 for (let rs of [st.rs0, st.rs1]) {
@@ -58,21 +75,28 @@ for (let rs of [st.rs0, st.rs1]) {
             ns: unionedColl.getFullName(),
             op: {$ne: "getmore"},
             "command.comment": unionWithComment,
-        }
+        },
     });
 }
 
 // Test that $unionWith subpipelines go to the secondary when the readPreference is {mode:
 // "secondary"}.
-unionWithComment = 'union against secondary';
-assert.eq(mongosColl
-              .aggregate([{$unionWith: unionedColl.getName()}, {$sort: {docNum: 1}}], {
-                  comment: unionWithComment,
-                  $readPreference: {mode: "secondary"},
-                  readConcern: {level: "majority"}
-              })
-              .toArray(),
-          [{_id: -1, docNum: 0}, {_id: 1, docNum: 1}, {_id: -1, docNum: 2}, {_id: 1, docNum: 3}]);
+unionWithComment = "union against secondary";
+assert.eq(
+    mongosColl
+        .aggregate([{$unionWith: unionedColl.getName()}, {$sort: {docNum: 1}}], {
+            comment: unionWithComment,
+            $readPreference: {mode: "secondary"},
+            readConcern: {level: "majority"},
+        })
+        .toArray(),
+    [
+        {_id: -1, docNum: 0},
+        {_id: 1, docNum: 1},
+        {_id: -1, docNum: 2},
+        {_id: 1, docNum: 3},
+    ],
+);
 
 // Test that the union's sub-pipelines go to the secondary.
 for (let rs of [st.rs0, st.rs1]) {
@@ -86,8 +110,8 @@ for (let rs of [st.rs0, st.rs1]) {
             // We need to filter out any profiler entries with a stale config - this is the first
             // read on this secondary with a readConcern specified, so it is the first read on this
             // secondary that will enforce shard version.
-            errCode: {$ne: ErrorCodes.StaleConfig}
-        }
+            errCode: {$ne: ErrorCodes.StaleConfig},
+        },
     });
 }
 
@@ -95,30 +119,40 @@ for (let rs of [st.rs0, st.rs1]) {
 // any sub-operation always goes to the secondary if the read preference is secondary.
 const secondTargetColl = mongosDB.second_union_target;
 st.shardColl(secondTargetColl, {_id: 1}, {_id: 0}, {_id: -1});
-assert.commandWorked(secondTargetColl.insert([{_id: -1, docNum: 4}, {_id: 1, docNum: 5}],
-                                             {writeConcern: {w: "majority"}}));
-unionWithComment = 'complex union against secondary';
-let runAgg = () => mongosColl
-                       .aggregate(
-                           [
-                               {
-                                   $unionWith: {
-                                       coll: unionedColl.getName(),
-                                       pipeline: [
-                                           {$unionWith: secondTargetColl.getName()},
-                                       ]
-                                   }
-                               },
-                               {$group: {_id: "$_id", docNum: {$push: "$docNum"}}},
-                               {$sort: {_id: 1}},
-                           ],
-                           {
-                               comment: unionWithComment,
-                               $readPreference: {mode: "secondary"},
-                               readConcern: {level: "majority"}
-                           })
-                       .toArray();
-assert.eq(runAgg(), [{_id: -1, docNum: [0, 2, 4]}, {_id: 1, docNum: [1, 3, 5]}]);
+assert.commandWorked(
+    secondTargetColl.insert(
+        [
+            {_id: -1, docNum: 4},
+            {_id: 1, docNum: 5},
+        ],
+        {writeConcern: {w: "majority"}},
+    ),
+);
+unionWithComment = "complex union against secondary";
+let runAgg = () =>
+    mongosColl
+        .aggregate(
+            [
+                {
+                    $unionWith: {
+                        coll: unionedColl.getName(),
+                        pipeline: [{$unionWith: secondTargetColl.getName()}],
+                    },
+                },
+                {$group: {_id: "$_id", docNum: {$push: "$docNum"}}},
+                {$sort: {_id: 1}},
+            ],
+            {
+                comment: unionWithComment,
+                $readPreference: {mode: "secondary"},
+                readConcern: {level: "majority"},
+            },
+        )
+        .toArray();
+assert.eq(runAgg(), [
+    {_id: -1, docNum: [0, 2, 4]},
+    {_id: 1, docNum: [1, 3, 5]},
+]);
 
 // Test that the union's sub-pipelines go to the secondary.
 for (let rs of [st.rs0, st.rs1]) {
@@ -133,8 +167,8 @@ for (let rs of [st.rs0, st.rs1]) {
             // We need to filter out any profiler entries with a stale config - this is the first
             // read on this secondary with a readConcern specified, so it is the first read on this
             // secondary that will enforce shard version.
-            errCode: {$ne: ErrorCodes.StaleConfig}
-        }
+            errCode: {$ne: ErrorCodes.StaleConfig},
+        },
     });
     profilerHasAtLeastOneMatchingEntryOrThrow({
         profileDB: secondaryDB,
@@ -145,8 +179,8 @@ for (let rs of [st.rs0, st.rs1]) {
             // We need to filter out any profiler entries with a stale config - this is the first
             // read on this secondary with a readConcern specified, so it is the first read on this
             // secondary that will enforce shard version.
-            errCode: {$ne: ErrorCodes.StaleConfig}
-        }
+            errCode: {$ne: ErrorCodes.StaleConfig},
+        },
     });
 }
 

@@ -16,18 +16,16 @@
  * ]
  */
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
 
-const nonReplicatedDB = conn.getDB('local');
-const collName = 'clustered_collection';
+const nonReplicatedDB = conn.getDB("local");
+const collName = "clustered_collection";
 const nonReplicatedColl = nonReplicatedDB[collName];
 
 nonReplicatedColl.drop();
 
-ClusteredCollectionUtil.testBasicClusteredCollection(nonReplicatedDB, collName, 'ts');
+ClusteredCollectionUtil.testBasicClusteredCollection(nonReplicatedDB, collName, "ts");
 
 MongoRunner.stopMongod(conn);

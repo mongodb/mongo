@@ -18,9 +18,9 @@ const rst = new ReplSetTest({
     nodeOptions: {
         // Disable background checkpoints: a zero value disables checkpointing.
         syncdelay: 0,
-        setParameter: {logComponentVerbosity: tojson({storage: 2})}
+        setParameter: {logComponentVerbosity: tojson({storage: 2})},
     },
-    useBridge: true
+    useBridge: true,
 });
 rst.startSet();
 rst.initiate();

@@ -12,7 +12,7 @@
  */
 
 let counter = 0;
-const counter_fun = function() {
+const counter_fun = function () {
     return `APIV1-${counter}`;
 };
 
@@ -25,7 +25,9 @@ function runTest({cmd, apiVersion1, apiStrict, apiDeprecationErrors}) {
     let copy = cmd();
     jsTestLog(
         `Test ${tojson(copy)}, which is ${apiVersion1 ? "in" : "not in"} API V1, with apiStrict = ${
-            apiStrict} and apiDeprecationErrors = ${apiDeprecationErrors}`);
+            apiStrict
+        } and apiDeprecationErrors = ${apiDeprecationErrors}`,
+    );
     copy.apiVersion = "1";
     copy.apiStrict = apiStrict;
     copy.apiDeprecationErrors = apiDeprecationErrors;
@@ -33,7 +35,8 @@ function runTest({cmd, apiVersion1, apiStrict, apiDeprecationErrors}) {
         assert.commandFailedWithCode(
             testDB.runCommand(copy),
             ErrorCodes.APIStrictError,
-            "Provided apiStrict: true, but the invoked command's apiVersions() does not include \"1\"");
+            'Provided apiStrict: true, but the invoked command\'s apiVersions() does not include "1"',
+        );
     } else {
         assert.commandWorked(testDB.runCommand(copy));
     }
@@ -51,20 +54,20 @@ const commands = [
     {cmd: () => ({find: counter_fun()}), apiVersion1: true},
     {
         cmd: () => ({insert: "APIV1-0", documents: [{_id: counter_fun(), cast: "jonSnow"}]}),
-        apiVersion1: true
+        apiVersion1: true,
     },
     {
         cmd: () => ({
             update: "APIV1-0",
-            updates: [{q: {_id: counter_fun()}, u: {$set: {cast: "aryaStark"}}}]
+            updates: [{q: {_id: counter_fun()}, u: {$set: {cast: "aryaStark"}}}],
         }),
         apiVersion1: true,
     },
     {
         cmd: () => ({delete: "APIV1-0", deletes: [{q: {_id: counter_fun()}, limit: 1}]}),
-        apiVersion1: true
+        apiVersion1: true,
     },
-    {cmd: () => ({drop: counter_fun()}), apiVersion1: true}
+    {cmd: () => ({drop: counter_fun()}), apiVersion1: true},
 ];
 
 for (let {cmd, apiVersion1} of commands) {
@@ -75,7 +78,7 @@ for (let {cmd, apiVersion1} of commands) {
                 cmd: cmd,
                 apiVersion1: apiVersion1,
                 apiStrict: apiStrict,
-                apiDeprecationErrors: apiDeprecationErrors
+                apiDeprecationErrors: apiDeprecationErrors,
             });
             counter += 1;
         }

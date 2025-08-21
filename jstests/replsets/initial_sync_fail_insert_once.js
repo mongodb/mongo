@@ -6,22 +6,20 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = 'initial_sync_fail_insert_once';
-var replSet = new ReplSetTest(
-    {name: name, nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=3"}});
+var name = "initial_sync_fail_insert_once";
+var replSet = new ReplSetTest({name: name, nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=3"}});
 
 replSet.startSet();
 replSet.initiate();
 var primary = replSet.getPrimary();
 var secondary = replSet.getSecondary();
 
-var coll = primary.getDB('test').getCollection(name);
+var coll = primary.getDB("test").getCollection(name);
 assert.commandWorked(coll.insert({_id: 0, x: 1}, {writeConcern: {w: 2}}));
 
 jsTest.log("Re-syncing " + tojson(secondary));
 const params = {
-    'failpoint.failCollectionInserts':
-        tojson({mode: {times: 2}, data: {collectionNS: coll.getFullName()}})
+    "failpoint.failCollectionInserts": tojson({mode: {times: 2}, data: {collectionNS: coll.getFullName()}}),
 };
 
 secondary = replSet.restart(secondary, {startClean: true, setParameter: params});

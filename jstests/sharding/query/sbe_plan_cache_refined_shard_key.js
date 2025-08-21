@@ -9,10 +9,7 @@
  * ]
  */
 
-import {
-    getPlanCacheKeyFromPipeline,
-    getPlanCacheShapeHashFromObject
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanCacheKeyFromPipeline, getPlanCacheShapeHashFromObject} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "testdb";
@@ -38,8 +35,7 @@ function runTest({documents, indexes, pipeline, shardKeyBefore, shardKeyAfter}) 
 
     coll.aggregate(pipeline);
     const planCacheStatsBefore = coll.aggregate([{$planCacheStats: {}}]).toArray();
-    const planCacheEntryBefore =
-        planCacheStatsBefore.find(entry => entry["planCacheKey"] === planCacheKeyBefore);
+    const planCacheEntryBefore = planCacheStatsBefore.find((entry) => entry["planCacheKey"] === planCacheKeyBefore);
     assert.eq(planCacheEntryBefore["version"], 2, "before entry should be cached as SBE plan");
 
     st.adminCommand({refineCollectionShardKey: ns, key: shardKeyAfter});
@@ -48,25 +44,30 @@ function runTest({documents, indexes, pipeline, shardKeyBefore, shardKeyAfter}) 
 
     coll.aggregate(pipeline);
     const planCacheStatsAfter = coll.aggregate([{$planCacheStats: {}}]).toArray();
-    const planCacheEntryAfter =
-        planCacheStatsAfter.find(entry => entry["planCacheKey"] === planCacheKeyAfter);
+    const planCacheEntryAfter = planCacheStatsAfter.find((entry) => entry["planCacheKey"] === planCacheKeyAfter);
     assert.eq(planCacheEntryAfter["version"], 2, "after entry should be cached as SBE plan");
 
     // After calling "refineCollectionShardKey", the queries should have the same
     // 'planCacheShapeHash' but different 'planCacheKey'.
-    assert.eq(getPlanCacheShapeHashFromObject(planCacheEntryBefore),
-              getPlanCacheShapeHashFromObject(planCacheEntryAfter),
-              "plan cache shape hash should be the same after refining");
-    assert.neq(
-        planCacheKeyBefore, planCacheKeyAfter, "plan cache key should be different after refining");
+    assert.eq(
+        getPlanCacheShapeHashFromObject(planCacheEntryBefore),
+        getPlanCacheShapeHashFromObject(planCacheEntryAfter),
+        "plan cache shape hash should be the same after refining",
+    );
+    assert.neq(planCacheKeyBefore, planCacheKeyAfter, "plan cache key should be different after refining");
 }
 
 runTest({
-    documents: [{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 1}, {a: 2, b: 2}],
+    documents: [
+        {a: 1, b: 1},
+        {a: 1, b: 2},
+        {a: 2, b: 1},
+        {a: 2, b: 2},
+    ],
     indexes: [{a: 1}, {b: 1}, {a: 1, b: 1}],
     pipeline: [{$match: {a: 1}}, {$group: {_id: "$b", sum: {$sum: "$a"}}}],
     shardKeyBefore: {a: 1},
-    shardKeyAfter: {a: 1, b: 1}
+    shardKeyAfter: {a: 1, b: 1},
 });
 
 st.stop();

@@ -21,11 +21,11 @@ for (let recursiveObjectDepth = 10; recursiveObjectDepth < 150; recursiveObjectD
                     "$reduce": {
                         "input": "$entries",
                         "initialValue": {"array": []},
-                        "in": {"array": [recursiveObject]}
-                    }
-                }
-            }
-        }
+                        "in": {"array": [recursiveObject]},
+                    },
+                },
+            },
+        },
     ];
 
     for (let numDocs = 10; numDocs < 500; numDocs *= 2) {

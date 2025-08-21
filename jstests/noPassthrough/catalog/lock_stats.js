@@ -10,21 +10,17 @@ function testBlockTime(blockTimeMillis) {
     var minBlockedMillis = blockTimeMillis;
 
     let awaitSleepCmd = startParallelShell(() => {
-        assert.commandWorked(
-            db.adminCommand({sleep: 1, millis: 100, lock: "w", $comment: "Lock sleep"}));
+        assert.commandWorked(db.adminCommand({sleep: 1, millis: 100, lock: "w", $comment: "Lock sleep"}));
     }, conn.port);
 
     // Wait until we see somebody waiting to acquire the lock, defend against unset stats.
-    assert.soon((function() {
+    assert.soon(function () {
         var stats = db.serverStatus().locks.MultiDocumentTransactionsBarrier;
-        if (!stats.acquireWaitCount || !stats.acquireWaitCount.W)
-            return false;
-        if (!stats.timeAcquiringMicros || !stats.timeAcquiringMicros.W)
-            return false;
-        if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W)
-            return true;
+        if (!stats.acquireWaitCount || !stats.acquireWaitCount.W) return false;
+        if (!stats.timeAcquiringMicros || !stats.timeAcquiringMicros.W) return false;
+        if (!startStats.acquireWaitCount || !startStats.acquireWaitCount.W) return true;
         return stats.acquireWaitCount.W > startStats.acquireWaitCount.W;
-    }));
+    });
 
     // Sleep for minBlockedMillis, so the acquirer would have to wait at least that long.
     sleep(minBlockedMillis);
@@ -45,21 +41,20 @@ function testBlockTime(blockTimeMillis) {
     }
 
     var acquireWaitCount = endStats.acquireWaitCount.W - startStats.acquireWaitCount.W;
-    var blockedMillis =
-        Math.floor((endStats.timeAcquiringMicros.W - startStats.timeAcquiringMicros.W) / 1000);
+    var blockedMillis = Math.floor((endStats.timeAcquiringMicros.W - startStats.timeAcquiringMicros.W) / 1000);
 
     // Require that no other commands run (and maybe acquire locks) in parallel.
     assert.eq(acquireWaitCount, 1, "other commands ran in parallel, can't check timing");
     assert.gte(blockedMillis, minBlockedMillis, "reported time acquiring lock is too low");
     assert.lte(blockedMillis, maxBlockedMillis, "reported time acquiring lock is too high");
-    return ({
+    return {
         blockedMillis: blockedMillis,
         minBlockedMillis: minBlockedMillis,
-        maxBlockedMillis: maxBlockedMillis
-    });
+        maxBlockedMillis: maxBlockedMillis,
+    };
 }
 
 var conn = MongoRunner.runMongod();
-var db = conn.getDB('test');
+var db = conn.getDB("test");
 printjson([1, 10, 100, 500, 1000, 1500].map(testBlockTime));
 MongoRunner.stopMongod(conn);

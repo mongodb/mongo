@@ -16,8 +16,8 @@ rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const timeFieldName = 'time';
-const metaFieldName = 'tag';
+const timeFieldName = "time";
+const metaFieldName = "tag";
 const dateTime = ISODate("2023-06-29T16:00:00Z");
 const testDB = primary.getDB("test");
 let collCount = 0;
@@ -29,11 +29,12 @@ const initialMeasurement = [
     {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: 1},
 ];
 
-const runTest = function({cmdBuilderFn, validateFn, retryableWrite = false}) {
-    const coll = testDB.getCollection('timeseries_update_oplog' + collCount++);
+const runTest = function ({cmdBuilderFn, validateFn, retryableWrite = false}) {
+    const coll = testDB.getCollection("timeseries_update_oplog" + collCount++);
     coll.drop();
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
     assert.commandWorked(coll.insertMany(initialMeasurement));
     // The above insert may generate an applyOps, so we use startTime to avoid examining it
     // in the validateFn.
@@ -58,43 +59,44 @@ function partialBucketMultiUpdateBuilderFn(coll) {
 function fullBucketMultiUpdateBuilderFn(coll) {
     return {
         update: coll.getName(),
-        updates: [{q: {[metaFieldName]: 0}, u: {$inc: {updated: 1}}, multi: true}]
+        updates: [{q: {[metaFieldName]: 0}, u: {$inc: {updated: 1}}, multi: true}],
     };
 }
 function partialBucketSingletonUpdateBuilderFn(coll) {
     return {
         update: coll.getName(),
-        updates: [{q: {[metaFieldName]: 0}, u: {$inc: {updated: 1}}, multi: false}]
+        updates: [{q: {[metaFieldName]: 0}, u: {$inc: {updated: 1}}, multi: false}],
     };
 }
 function fullBucketSingletonUpdateBuilderFn(coll) {
     return {
         update: coll.getName(),
-        updates: [{q: {[metaFieldName]: 1}, u: {$inc: {updated: 1}}, multi: false}]
+        updates: [{q: {[metaFieldName]: 1}, u: {$inc: {updated: 1}}, multi: false}],
     };
 }
 function upsertBuilderFn(coll) {
     return {
         update: coll.getName(),
-        updates: [{
-            q: {[timeFieldName]: dateTime, [metaFieldName]: 2},
-            u: {$inc: {updated: 1}},
-            multi: false,
-            upsert: true
-        }]
+        updates: [
+            {
+                q: {[timeFieldName]: dateTime, [metaFieldName]: 2},
+                u: {$inc: {updated: 1}},
+                multi: false,
+                upsert: true,
+            },
+        ],
     };
 }
 
 // Full bucket update's oplog entry is an ApplyOps[delete, insert].
 function fullBucketValidateFn(testDB, coll, retryableWrite, startTime) {
-    const opEntries =
-        testDB.getSiblingDB("local")
-            .oplog.rs
-            .find({
-                "o.applyOps.ns": getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
-                ts: {$gt: startTime}
-            })
-            .toArray();
+    const opEntries = testDB
+        .getSiblingDB("local")
+        .oplog.rs.find({
+            "o.applyOps.ns": getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
+            ts: {$gt: startTime},
+        })
+        .toArray();
     assert.eq(opEntries.length, 1);
     const opEntry = opEntries[0];
     assert.eq(opEntry["o"]["applyOps"].length, 2);
@@ -103,14 +105,13 @@ function fullBucketValidateFn(testDB, coll, retryableWrite, startTime) {
 }
 // Partial bucket update's oplog entry is an ApplyOps[update, insert].
 function partialBucketValidateFn(testDB, coll, retryableWrite, startTime) {
-    const opEntries =
-        testDB.getSiblingDB("local")
-            .oplog.rs
-            .find({
-                "o.applyOps.ns": getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
-                ts: {$gt: startTime}
-            })
-            .toArray();
+    const opEntries = testDB
+        .getSiblingDB("local")
+        .oplog.rs.find({
+            "o.applyOps.ns": getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
+            ts: {$gt: startTime},
+        })
+        .toArray();
     assert.eq(opEntries.length, 1);
     const opEntry = opEntries[0];
     assert.eq(opEntry["o"]["applyOps"].length, 2);
@@ -120,14 +121,13 @@ function partialBucketValidateFn(testDB, coll, retryableWrite, startTime) {
 // When inserting a new measurement, an Upsert's oplog entry is an ApplyOps[insert] if it's a
 // retryable write. Otherwise, it generates a regular insert oplog entry.
 function upsertValidateFn(testDB, coll, retryableWrite, startTime) {
-    const opEntries =
-        testDB.getSiblingDB("local")
-            .oplog.rs
-            .find({
-                "o.applyOps.ns": getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
-                ts: {$gt: startTime}
-            })
-            .toArray();
+    const opEntries = testDB
+        .getSiblingDB("local")
+        .oplog.rs.find({
+            "o.applyOps.ns": getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
+            ts: {$gt: startTime},
+        })
+        .toArray();
     if (retryableWrite) {
         assert.eq(opEntries.length, 1);
         const opEntry = opEntries[0];
@@ -145,8 +145,7 @@ function upsertValidateFn(testDB, coll, retryableWrite, startTime) {
     runTest({cmdBuilderFn: fullBucketMultiUpdateBuilderFn, validateFn: fullBucketValidateFn});
 })();
 (function testPartialBucketSingletonUpdate() {
-    runTest(
-        {cmdBuilderFn: partialBucketSingletonUpdateBuilderFn, validateFn: partialBucketValidateFn});
+    runTest({cmdBuilderFn: partialBucketSingletonUpdateBuilderFn, validateFn: partialBucketValidateFn});
 })();
 (function testPartialBucketSingletonUpdate() {
     runTest({cmdBuilderFn: fullBucketSingletonUpdateBuilderFn, validateFn: fullBucketValidateFn});
@@ -155,14 +154,14 @@ function upsertValidateFn(testDB, coll, retryableWrite, startTime) {
     runTest({
         cmdBuilderFn: partialBucketSingletonUpdateBuilderFn,
         validateFn: partialBucketValidateFn,
-        retryableWrite: true
+        retryableWrite: true,
     });
 })();
 (function testPartialBucketRetryableSingletonUpdate() {
     runTest({
         cmdBuilderFn: fullBucketSingletonUpdateBuilderFn,
         validateFn: fullBucketValidateFn,
-        retryableWrite: true
+        retryableWrite: true,
     });
 })();
 (function testUpsert() {

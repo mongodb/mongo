@@ -12,18 +12,15 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/timeseries/insert_ttl_timeseries.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/timeseries/insert_ttl_timeseries.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.getCollectionName = function getCollectionName(collName) {
         return "insert_ttl_retry_writes_timeseries_" + collName;
     };
 
     $config.data.getCollection = function getCollectionName(db, collName) {
-        return $config.data.session.getDatabase(db.getName())
-            .getCollection($config.data.getCollectionName(collName));
+        return $config.data.session.getDatabase(db.getName()).getCollection($config.data.getCollectionName(collName));
     };
 
     $config.states.init = function init(db, collName) {

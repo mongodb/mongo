@@ -5,12 +5,11 @@
  *
  * @tags: [assumes_balancer_off]
  */
-export const $config = (function() {
+export const $config = (function () {
     var states = {
         remove: function remove(db, collName) {
             // try removing a random document
-            var res = assert.commandWorked(
-                this.doRemove(db, collName, {rand: {$gte: Random.rand()}}, {justOne: true}));
+            var res = assert.commandWorked(this.doRemove(db, collName, {rand: {$gte: Random.rand()}}, {justOne: true}));
 
             assert.lte(res.nRemoved, 1, res);
             if (res.nRemoved === 0) {
@@ -21,7 +20,7 @@ export const $config = (function() {
                 assert.lte(res.nRemoved, 1, res);
             }
             this.assertResult(res);
-        }
+        },
     };
 
     var transitions = {remove: {remove: 1}};
@@ -50,8 +49,8 @@ export const $config = (function() {
                 // when running on its own collection,
                 // this iteration should remove exactly one document
                 assert.eq(1, res.nRemoved, tojson(res));
-            }
+            },
         },
-        startState: 'remove'
+        startState: "remove",
     };
 })();

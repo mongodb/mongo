@@ -8,17 +8,17 @@ const coll = db.getCollection(collName);
 
 // How many works it takes to yield.
 const yieldIterations = 2;
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: yieldIterations}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: yieldIterations}));
 const nDocs = yieldIterations + 2;
 
 /**
  * Asserts that 'commandResult' indicates a command failure, and returns the error message.
  */
 function assertContainsErrorMessage(commandResult) {
-    assert(commandResult.ok === 0 ||
-               (commandResult.ok === 1 && commandResult.writeErrors !== undefined),
-           'expected command to fail: ' + tojson(commandResult));
+    assert(
+        commandResult.ok === 0 || (commandResult.ok === 1 && commandResult.writeErrors !== undefined),
+        "expected command to fail: " + tojson(commandResult),
+    );
     if (commandResult.ok === 0) {
         return commandResult.errmsg;
     } else {
@@ -42,16 +42,15 @@ function setupCollection() {
  */
 function assertCommandPropogatesPlanExecutorFailure(cmdObj) {
     // Make sure the command propagates failure messages.
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "alwaysOn"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "alwaysOn"}));
     let res = db.runCommand(cmdObj);
     let errorMessage = assertContainsErrorMessage(res);
-    assert.neq(errorMessage.indexOf("planExecutorAlwaysFails"),
-               -1,
-               "Expected error message to include 'planExecutorAlwaysFails', instead found: " +
-                   errorMessage);
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "off"}));
+    assert.neq(
+        errorMessage.indexOf("planExecutorAlwaysFails"),
+        -1,
+        "Expected error message to include 'planExecutorAlwaysFails', instead found: " + errorMessage,
+    );
+    assert.commandWorked(db.adminCommand({configureFailPoint: "planExecutorAlwaysFails", mode: "off"}));
 }
 
 /**
@@ -78,20 +77,19 @@ function assertCommandPropogatesPlanExecutorKillReason(cmdObj, options) {
     if (!curOpFilter) {
         curOpFilter = {};
         for (var arg in cmdObj) {
-            curOpFilter['command.' + arg] = {$eq: cmdObj[arg]};
+            curOpFilter["command." + arg] = {$eq: cmdObj[arg]};
         }
     }
 
     // These are commands that will cause all running PlanExecutors to be invalidated, and the
     // error messages that should be propagated when that happens.
     const invalidatingCommands = [
-        {command: {dropDatabase: 1}, message: 'collection dropped'},
-        {command: {drop: collName}, message: 'collection dropped'},
+        {command: {dropDatabase: 1}, message: "collection dropped"},
+        {command: {drop: collName}, message: "collection dropped"},
     ];
 
     if (options.usesIndex) {
-        invalidatingCommands.push(
-            {command: {dropIndexes: collName, index: {a: 1}}, message: 'index \'a_1\' dropped'});
+        invalidatingCommands.push({command: {dropIndexes: collName, index: {a: 1}}, message: "index 'a_1' dropped"});
     }
 
     for (let invalidatingCommand of invalidatingCommands) {
@@ -101,59 +99,66 @@ function assertCommandPropogatesPlanExecutorKillReason(cmdObj, options) {
         }
 
         // Enable a failpoint that causes PlanExecutors to hang during execution.
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
 
         const canYield = options.commandYields === undefined || options.commandYields;
         // Start a parallel shell to run the command. This should hang until we unset the
         // failpoint.
-        let awaitCmdFailure = startParallelShell(`
-let assertContainsErrorMessage = ${ assertContainsErrorMessage.toString() };
-let res = db.runCommand(${ tojson(cmdObj) });
-if (${ canYield }) {
+        let awaitCmdFailure = startParallelShell(
+            `
+let assertContainsErrorMessage = ${assertContainsErrorMessage.toString()};
+let res = db.runCommand(${tojson(cmdObj)});
+if (${canYield}) {
     let errorMessage = assertContainsErrorMessage(res);
-    assert.neq(errorMessage.indexOf(${ tojson(invalidatingCommand.message) }),
+    assert.neq(errorMessage.indexOf(${tojson(invalidatingCommand.message)}),
                -1,
                 "Expected error message to include '" +
-                    ${ tojson(invalidatingCommand.message) } +
+                    ${tojson(invalidatingCommand.message)} +
                     "', instead found: " + errorMessage);
 } else {
     assert.commandWorked(
         res,
-        'expected non-yielding command to succeed: ' + tojson(${ tojson(cmdObj) })
+        'expected non-yielding command to succeed: ' + tojson(${tojson(cmdObj)})
     );
 }
 `,
-                                                     mongod.port);
+            mongod.port,
+        );
 
         // Wait until we can see the command running.
         assert.soon(
-            function() {
+            function () {
                 if (!canYield) {
                     // The command won't yield, so we won't necessarily see it in currentOp.
                     return true;
                 }
-                return db.currentOp({
-                             $and: [
-                                 {
-                                     ns: coll.getFullName(),
-                                     numYields: {$gt: 0},
-                                 },
-                                 curOpFilter,
-                             ]
-                         }).inprog.length > 0;
+                return (
+                    db.currentOp({
+                        $and: [
+                            {
+                                ns: coll.getFullName(),
+                                numYields: {$gt: 0},
+                            },
+                            curOpFilter,
+                        ],
+                    }).inprog.length > 0
+                );
             },
-            function() {
-                return 'expected to see command yielded in currentOp output. Command: ' +
-                    tojson(cmdObj) + '\n, currentOp output: ' + tojson(db.currentOp().inprog);
-            });
+            function () {
+                return (
+                    "expected to see command yielded in currentOp output. Command: " +
+                    tojson(cmdObj) +
+                    "\n, currentOp output: " +
+                    tojson(db.currentOp().inprog)
+                );
+            },
+        );
 
         // Run the command that invalidates the PlanExecutor, then allow the PlanExecutor to
         // proceed.
         jsTestLog("Running invalidating command: " + tojson(invalidatingCommand.command));
         assert.commandWorked(db.runCommand(invalidatingCommand.command));
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
         awaitCmdFailure();
     }
 
@@ -166,50 +171,57 @@ if (${ canYield }) {
 
 // Disable aggregation's batching behavior, since that can prevent the PlanExecutor from being
 // active during the command that would have caused it to be killed.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
 assertCommandPropogatesPlanExecutorKillReason({aggregate: collName, pipeline: [], cursor: {}});
 assertCommandPropogatesPlanExecutorKillReason(
-    {aggregate: collName, pipeline: [{$match: {a: {$gte: 0}}}], cursor: {}}, {usesIndex: true});
+    {aggregate: collName, pipeline: [{$match: {a: {$gte: 0}}}], cursor: {}},
+    {usesIndex: true},
+);
 
-assertCommandPropogatesPlanExecutorKillReason({dataSize: coll.getFullName()},
-                                              {commandYields: false});
+assertCommandPropogatesPlanExecutorKillReason({dataSize: coll.getFullName()}, {commandYields: false});
 
 assertCommandPropogatesPlanExecutorKillReason("dbHash", {commandYields: false});
 
-assertCommandPropogatesPlanExecutorKillReason({count: collName, query: {a: {$gte: 0}}},
-                                              {usesIndex: true});
+assertCommandPropogatesPlanExecutorKillReason({count: collName, query: {a: {$gte: 0}}}, {usesIndex: true});
 
 assertCommandPropogatesPlanExecutorKillReason(
-    {distinct: collName, key: "_id", query: {a: {$gte: 0}}}, {usesIndex: true});
+    {distinct: collName, key: "_id", query: {a: {$gte: 0}}},
+    {usesIndex: true},
+);
 
-assertCommandPropogatesPlanExecutorKillReason(
-    {findAndModify: collName, query: {fakeField: {$gt: 0}}, update: {$inc: {a: 1}}});
+assertCommandPropogatesPlanExecutorKillReason({
+    findAndModify: collName,
+    query: {fakeField: {$gt: 0}},
+    update: {$inc: {a: 1}},
+});
 
 assertCommandPropogatesPlanExecutorKillReason(
     {
         aggregate: collName,
         cursor: {},
-        pipeline: [{
-            $geoNear:
-                {near: {type: "Point", coordinates: [0, 0]}, spherical: true, distanceField: "dis"}
-        }]
+        pipeline: [
+            {
+                $geoNear: {near: {type: "Point", coordinates: [0, 0]}, spherical: true, distanceField: "dis"},
+            },
+        ],
     },
     {
-        customSetup: function() {
+        customSetup: function () {
             assert.commandWorked(coll.createIndex({geoField: "2dsphere"}));
-        }
-    });
+        },
+    },
+);
 
 assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {}});
-assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {a: {$gte: 0}}},
-                                              {usesIndex: true});
+assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {a: {$gte: 0}}}, {usesIndex: true});
 
 assertCommandPropogatesPlanExecutorKillReason(
     {update: coll.getName(), updates: [{q: {a: {$gte: 0}}, u: {$set: {a: 1}}, multi: true}]},
-    {curOpFilter: {op: 'update'}, usesIndex: true});
+    {curOpFilter: {op: "update"}, usesIndex: true},
+);
 
 assertCommandPropogatesPlanExecutorKillReason(
     {delete: coll.getName(), deletes: [{q: {a: {$gte: 0}}, limit: 0}]},
-    {curOpFilter: {op: 'remove'}, usesIndex: true});
+    {curOpFilter: {op: "remove"}, usesIndex: true},
+);
 MongoRunner.stopMongod(mongod);

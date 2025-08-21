@@ -7,15 +7,12 @@ import {getPlanStage, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 export function isIdIndexScan(db, root, expectedParentStageForIxScan) {
     const parentStage = getPlanStage(root, expectedParentStageForIxScan);
-    if (!parentStage)
-        return false;
+    if (!parentStage) return false;
 
     const ixscan = parentStage.inputStage;
-    if (!ixscan)
-        return false;
+    if (!ixscan) return false;
 
-    return ixscan.stage === "IXSCAN" && !ixscan.hasOwnProperty("filter") &&
-        ixscan.indexName === "_id_";
+    return ixscan.stage === "IXSCAN" && !ixscan.hasOwnProperty("filter") && ixscan.indexName === "_id_";
 }
 
 /**
@@ -50,9 +47,13 @@ export function getQueryInfoAtTopLevelOrFirstStage(explainOutputV2) {
         return explainOutputV2;
     }
 
-    if (explainOutputV2.hasOwnProperty("stages") && Array.isArray(explainOutputV2.stages) &&
-        explainOutputV2.stages.length > 0 && explainOutputV2.stages[0].hasOwnProperty("$cursor") &&
-        explainOutputV2.stages[0].$cursor.hasOwnProperty("queryPlanner")) {
+    if (
+        explainOutputV2.hasOwnProperty("stages") &&
+        Array.isArray(explainOutputV2.stages) &&
+        explainOutputV2.stages.length > 0 &&
+        explainOutputV2.stages[0].hasOwnProperty("$cursor") &&
+        explainOutputV2.stages[0].$cursor.hasOwnProperty("queryPlanner")
+    ) {
         return explainOutputV2.stages[0].$cursor;
     }
 

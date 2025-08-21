@@ -13,19 +13,19 @@
  */
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         shardKey: {tid: 1},
     };
 
-    var states = (function() {
+    var states = (function () {
         // Use the workload name as the field name (since it is assumed
         // to be unique) to avoid any potential issues with large keys
         // and indexes on the collection.
-        var uniqueFieldName = 'findAndModify_update_grow';
+        var uniqueFieldName = "findAndModify_update_grow";
 
         function makeStringOfLength(length) {
-            return 'x'.repeat(length);
+            return "x".repeat(length);
         }
 
         function makeDoc(tid) {
@@ -55,15 +55,15 @@ export const $config = (function() {
 
             // Get the DiskLoc of the document before its potential move
             var before = db[collName]
-                             .find({tid: this.tid})
-                             .showDiskLoc()
-                             .sort({length: 1})  // fetch document of smallest size
-                             .limit(1)
-                             .next();
+                .find({tid: this.tid})
+                .showDiskLoc()
+                .sort({length: 1}) // fetch document of smallest size
+                .limit(1)
+                .next();
 
             // Increase the length of the 'findAndModify_update_grow' string
             // to double the size of the overall document
-            var factor = Math.ceil(2 * this.bsonsize / this.length);
+            var factor = Math.ceil((2 * this.bsonsize) / this.length);
             var updatedLength = factor * this.length;
             var updatedValue = makeStringOfLength(updatedLength);
 
@@ -73,15 +73,14 @@ export const $config = (function() {
             var res = db.runCommand({
                 findandmodify: db[collName].getName(),
                 query: {tid: this.tid},
-                sort: {length: 1},  // fetch document of smallest size
+                sort: {length: 1}, // fetch document of smallest size
                 update: update,
-                new: true
+                new: true,
             });
             assert.commandWorked(res);
 
             var doc = res.value;
-            assert(doc !== null,
-                   'query spec should have matched a document, returned ' + tojson(res));
+            assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
 
             if (doc === null) {
                 return;
@@ -100,7 +99,7 @@ export const $config = (function() {
             if (isMongod(db)) {
                 // Even though the document has at least doubled in size, the document
                 // must never move.
-                assert.eq(before.$recordId, after.$recordId, 'document should not have moved');
+                assert.eq(before.$recordId, after.$recordId, "document should not have moved");
             }
         }
 
@@ -117,7 +116,7 @@ export const $config = (function() {
         iterations: 20,
         data: data,
         states: states,
-        startState: 'insert',
-        transitions: transitions
+        startState: "insert",
+        transitions: transitions,
     };
 })();

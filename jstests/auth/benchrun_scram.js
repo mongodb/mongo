@@ -1,11 +1,11 @@
 // Ensure that benchRun tests are able to use either SCRAM-SHA-1 or SCRAM-SHA-256 via mech
 // negotiation from server
 function benchRunnerAuthWithProvidedMech(mechanism) {
-    var m = MongoRunner.runMongod({setParameter: 'authenticationMechanisms=' + mechanism});
+    var m = MongoRunner.runMongod({setParameter: "authenticationMechanisms=" + mechanism});
 
-    const db = 'admin';
-    const user = 'scram_test';
-    const pwd = 'something';
+    const db = "admin";
+    const user = "scram_test";
+    const pwd = "something";
 
     const admin = m.getDB(db);
     admin.createUser({user: user, pwd: pwd, roles: [], mechanisms: [mechanism]});
@@ -21,11 +21,14 @@ function benchRunnerAuthWithProvidedMech(mechanism) {
         host: m.host,
         db: db,
         username: user,
-        password: pwd
+        password: pwd,
     };
 
     const res = assert.doesNotThrow(
-        benchRun, [benchArgs], "BenchRun attempted SASL negotiation. Server supports " + mechanism);
+        benchRun,
+        [benchArgs],
+        "BenchRun attempted SASL negotiation. Server supports " + mechanism,
+    );
 
     printjson(res);
 

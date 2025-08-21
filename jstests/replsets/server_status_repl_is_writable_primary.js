@@ -10,6 +10,5 @@ const primary = replTest.getPrimary();
 
 const serverStatusMetricsRepl = primary.adminCommand({serverStatus: 1}).repl;
 assert.eq(serverStatusMetricsRepl.isWritablePrimary, true, "repl.isWritablePrimary should be true");
-assert.eq(
-    serverStatusMetricsRepl.hasOwnProperty('ismaster'), false, "repl.ismaster should be undefined");
+assert.eq(serverStatusMetricsRepl.hasOwnProperty("ismaster"), false, "repl.ismaster should be undefined");
 replTest.stopSet();

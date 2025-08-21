@@ -41,8 +41,7 @@ assert.eq(t.count({"_id": 4}), 1);
 assert(t.drop());
 var doc = makeDocument(16 * 1024);
 var docs = [];
-for (var i = 0; i < 1000; i++)
-    docs.push(Object.extend({}, doc));
+for (var i = 0; i < 1000; i++) docs.push(Object.extend({}, doc));
 assert.commandWorked(t.insert(docs));
 assert.eq(t.count(), docs.length);
 

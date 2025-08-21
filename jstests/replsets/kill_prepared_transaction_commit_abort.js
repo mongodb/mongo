@@ -42,13 +42,13 @@ function killOpThread(host, dbName, collName, shutdownLatch) {
         let filter = {
             "$or": [
                 {"command.commitTransaction": 1, active: true},
-                {"command.abortTransaction": 1, active: true}
-            ]
+                {"command.abortTransaction": 1, active: true},
+            ],
         };
         let ops = nodeDB.currentOp(filter).inprog;
-        ops.forEach(op => {
+        ops.forEach((op) => {
             // Let some operations survive so the test terminates.
-            const shouldKill = (Math.random() < 0.8);
+            const shouldKill = Math.random() < 0.8;
             if (op.opid && shouldKill) {
                 nodeDB.killOp(op.opid);
             }
@@ -72,8 +72,7 @@ function createPreparedTransactions(num) {
         priSession.startTransaction();
         assert.commandWorked(priSessionColl.insert({_id: i}));
         const prepareTimestamp = PrepareHelpers.prepareTransaction(priSession);
-        sessions.push(
-            {session: priSession, commitTs: prepareTimestamp, state: TxnState.InProgress});
+        sessions.push({session: priSession, commitTs: prepareTimestamp, state: TxnState.InProgress});
     }
     return sessions;
 }
@@ -85,7 +84,7 @@ function createPreparedTransactions(num) {
 function commitOrAbortAllTransactions(sessions) {
     // Until all transactions have definitively completed, try to abort/commit the open,
     // prepared transactions.
-    while (sessions.find(s => (s.state === TxnState.InProgress)) !== undefined) {
+    while (sessions.find((s) => s.state === TxnState.InProgress) !== undefined) {
         for (let i = 0; i < sessions.length; i++) {
             // We don't need to commit an already completed transaction.
             if (sessions[i].state !== TxnState.InProgress) {
@@ -96,9 +95,10 @@ function commitOrAbortAllTransactions(sessions) {
             let sess = sessions[i];
             let terminalStates = [TxnState.Committed, TxnState.Aborted];
             let terminalState = terminalStates[Math.round(Math.random())];
-            let cmd = (terminalState === TxnState.Committed)
-                ? {commitTransaction: 1, commitTimestamp: sess.commitTs}
-                : {abortTransaction: 1};
+            let cmd =
+                terminalState === TxnState.Committed
+                    ? {commitTransaction: 1, commitTimestamp: sess.commitTs}
+                    : {abortTransaction: 1};
             let res = sess.session.getDatabase("admin").adminCommand(cmd);
 
             if (res.ok === 1) {
@@ -133,7 +133,7 @@ jsTestLog("Committing/aborting all transactions.");
 commitOrAbortAllTransactions(sessions);
 
 // Make sure all transactions were completed.
-assert(sessions.every(s => (s.state === TxnState.Committed) || (s.state === TxnState.Aborted)));
+assert(sessions.every((s) => s.state === TxnState.Committed || s.state === TxnState.Aborted));
 
 jsTestLog("Stopping the killOp thread.");
 shutdownLatch.countDown();
@@ -144,10 +144,9 @@ jsTestLog("Checking visibility of all transaction operations.");
 // If a transaction committed then its document should be visible. If it aborted then its document
 // should not be visible.
 let docs = testDB[collName].find().toArray();
-let committedTxnIds =
-    sessions.reduce((acc, s, i) => (s.state === TxnState.Committed ? acc.concat(i) : acc), []);
+let committedTxnIds = sessions.reduce((acc, s, i) => (s.state === TxnState.Committed ? acc.concat(i) : acc), []);
 let commitCount = committedTxnIds.length;
-let abortCount = (sessions.length - committedTxnIds.length);
+let abortCount = sessions.length - committedTxnIds.length;
 jsTestLog("Committed " + commitCount + " transactions, Aborted " + abortCount + " transactions.");
 
 // Verify that the correct documents exist.
@@ -157,12 +156,10 @@ assert.sameMembers(docs, expectedDocs);
 // Assert that no prepared transactions are open on any of the sessions we started, and then end
 // each session.
 for (let i = 0; i < sessions.length; i++) {
-    const ops = testDB
-                    .currentOp({
-                        "lsid.id": sessions[i].session.getSessionId().id,
-                        "transaction.timePreparedMicros": {$exists: true}
-                    })
-                    .inprog;
+    const ops = testDB.currentOp({
+        "lsid.id": sessions[i].session.getSessionId().id,
+        "transaction.timePreparedMicros": {$exists: true},
+    }).inprog;
     assert.eq(ops.length, 0);
     sessions[i].session.endSession();
 }

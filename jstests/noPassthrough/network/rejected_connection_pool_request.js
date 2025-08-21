@@ -16,7 +16,7 @@ const fullCollectionName = databaseName + "." + collectionName;
 const st = new ShardingTest({
     shards: 1,
     mongos: 1,
-    other: {mongosOptions: {setParameter: {logComponentVerbosity: {network: 5}}}}
+    other: {mongosOptions: {setParameter: {logComponentVerbosity: {network: 5}}}},
 });
 
 const mongos = st.s0;
@@ -32,8 +32,7 @@ function getPendingCount() {
 function threadFunc(host, dbName, collName) {
     const mongos = new Mongo(host);
     const database = mongos.getDB(dbName);
-    assert.commandWorked(
-        database.runCommand({update: collName, updates: [{q: {_id: 1}, u: {name: "Mongo"}}]}));
+    assert.commandWorked(database.runCommand({update: collName, updates: [{q: {_id: 1}, u: {name: "Mongo"}}]}));
 }
 
 assert.commandWorked(database.runCommand({create: collectionName, writeConcern: {w: "majority"}}));
@@ -47,9 +46,9 @@ admin.runCommand({setParameter: 1, ShardingTaskExecutorPoolMaxQueueDepth: kMaxQu
 admin.runCommand({setParameter: 1, ShardingTaskExecutorPoolMaxSize: kMaxPoolSize});
 
 // Make sure both connections are checked out and blocked, so new requests have to enqueue.
-const primaryFP = configureFailPoint(st.rs0.getPrimary().getDB("admin"),
-                                     "waitAfterCommandFinishesExecution",
-                                     {ns: fullCollectionName});
+const primaryFP = configureFailPoint(st.rs0.getPrimary().getDB("admin"), "waitAfterCommandFinishesExecution", {
+    ns: fullCollectionName,
+});
 
 let blockedThreads = [];
 for (let i = 0; i < kMaxPoolSize; ++i) {
@@ -68,10 +67,12 @@ for (let i = 0; i < kMaxQueueDepth; ++i) {
 }
 
 // Wait until new requests populate the queue.
-assert.soon(() => getPendingCount() == kMaxQueueDepth,
-            "Failed to wait for the queue size to reach the limit",
-            1000 * kMaxWaitTimeInSeconds,
-            1000);
+assert.soon(
+    () => getPendingCount() == kMaxQueueDepth,
+    "Failed to wait for the queue size to reach the limit",
+    1000 * kMaxWaitTimeInSeconds,
+    1000,
+);
 
 const res = database.runCommand({find: collectionName});
 assert(res.code == ErrorCodes.PooledConnectionAcquisitionRejected);

@@ -31,7 +31,7 @@ export function tojsonMaybeTruncate(jsonObj) {
  * streams to explicitly exempt themselves from being modified by the passthrough.
  */
 export function isChangeStreamPassthrough() {
-    return typeof changeStreamPassthroughAwareRunCommand != 'undefined';
+    return typeof changeStreamPassthroughAwareRunCommand != "undefined";
 }
 
 /**
@@ -39,7 +39,7 @@ export function isChangeStreamPassthrough() {
  * test is being run. If no passthrough is active, this method returns the kCollection watch mode.
  */
 export function changeStreamPassthroughType() {
-    return typeof globalThis.ChangeStreamPassthroughHelpers === 'undefined'
+    return typeof globalThis.ChangeStreamPassthroughHelpers === "undefined"
         ? ChangeStreamWatchMode.kCollection
         : globalThis.ChangeStreamPassthroughHelpers.passthroughType();
 }
@@ -61,8 +61,10 @@ export function runCommandChangeStreamPassthroughAware(db, cmdObj, noPassthrough
  * Returns the invalidate document if there was one, or null otherwise.
  */
 export function assertInvalidateOp({cursor, opType}) {
-    if (!isChangeStreamPassthrough() ||
-        (changeStreamPassthroughType() == ChangeStreamWatchMode.kDb && opType == "dropDatabase")) {
+    if (
+        !isChangeStreamPassthrough() ||
+        (changeStreamPassthroughType() == ChangeStreamWatchMode.kDb && opType == "dropDatabase")
+    ) {
         assert.soon(() => cursor.hasNext());
         const invalidate = cursor.next();
         assert.eq(invalidate.operationType, "invalidate");
@@ -75,16 +77,18 @@ export function assertInvalidateOp({cursor, opType}) {
 }
 
 export function canonicalizeEventForTesting(event, expected) {
-    for (let fieldName of ["_id",
-                           "clusterTime",
-                           "txnNumber",
-                           "lsid",
-                           "collectionUUID",
-                           "wallTime",
-                           "operationDescription",
-                           "updateDescription",
-                           "commitTimestamp",
-                           "nsType"]) {
+    for (let fieldName of [
+        "_id",
+        "clusterTime",
+        "txnNumber",
+        "lsid",
+        "collectionUUID",
+        "wallTime",
+        "operationDescription",
+        "updateDescription",
+        "commitTimestamp",
+        "nsType",
+    ]) {
         if (!expected.hasOwnProperty(fieldName)) {
             delete event[fieldName];
         }
@@ -94,9 +98,11 @@ export function canonicalizeEventForTesting(event, expected) {
     // event. This is necessary because from 8.2 onwards, we expose this field by default, but in
     // previous versions it is only exposed when the change stream was opened with
     // '{showExpandedEvents: true}'.
-    if (expected.hasOwnProperty("updateDescription") &&
+    if (
+        expected.hasOwnProperty("updateDescription") &&
         !expected.updateDescription.hasOwnProperty("disambiguatedPaths") &&
-        event.hasOwnProperty("updateDescription")) {
+        event.hasOwnProperty("updateDescription")
+    ) {
         delete event.updateDescription.disambiguatedPaths;
     }
 
@@ -122,8 +128,7 @@ function runInFixture(callback) {
  * the resume token, clusterTime, and other unknowable fields unless they are explicitly listed in
  * the expected event.
  */
-function isChangeStreamEventEq(
-    actualEvent, expectedEvent, eventModifier = canonicalizeEventForTesting) {
+function isChangeStreamEventEq(actualEvent, expectedEvent, eventModifier = canonicalizeEventForTesting) {
     const testEvent = eventModifier(Object.assign({}, actualEvent), expectedEvent);
     return friendlyEqual(sortDoc(testEvent), sortDoc(expectedEvent));
 }
@@ -133,9 +138,14 @@ function isChangeStreamEventEq(
  * if change events do not match.
  */
 export function assertChangeStreamEventEq(actualEvent, expectedEvent, eventModifier) {
-    assert(isChangeStreamEventEq(actualEvent, expectedEvent, eventModifier),
-           () => "Change events did not match. Expected: " + tojsonMaybeTruncate(expectedEvent) +
-               ", Actual: " + tojsonMaybeTruncate(actualEvent));
+    assert(
+        isChangeStreamEventEq(actualEvent, expectedEvent, eventModifier),
+        () =>
+            "Change events did not match. Expected: " +
+            tojsonMaybeTruncate(expectedEvent) +
+            ", Actual: " +
+            tojsonMaybeTruncate(actualEvent),
+    );
 }
 
 /**
@@ -153,17 +163,21 @@ export function assertNoChanges(cursor) {
 export function assertEndOfTransaction(changes) {
     const finishedTransactions = new Set();
     for (const change of changes) {
-        assert.eq(change.hasOwnProperty("lsid"),
-                  change.hasOwnProperty("txnNumber"),
-                  "Found change eventy with inconsistent lsid and txnNumber: " + tojson(change));
+        assert.eq(
+            change.hasOwnProperty("lsid"),
+            change.hasOwnProperty("txnNumber"),
+            "Found change eventy with inconsistent lsid and txnNumber: " + tojson(change),
+        );
         if (change.hasOwnProperty("lsid")) {
             const txnId = tojsononeline({lsid: change.lsid, txnNumber: change.txnNumber});
             if (change.operationType == "endOfTransaction") {
                 finishedTransactions.add(txnId);
             } else {
-                assert.eq(finishedTransactions.has(txnId),
-                          false,
-                          "Found change event past endOfTransaction: " + tojson(change));
+                assert.eq(
+                    finishedTransactions.has(txnId),
+                    false,
+                    "Found change event past endOfTransaction: " + tojson(change),
+                );
             }
         }
     }
@@ -192,8 +206,7 @@ export function ChangeStreamTest(_db, options) {
         const cursorInfo = _cursorData.get(cursorId);
 
         if (changeEvents && changeEvents.length > 0) {
-            cursorInfo.resumeToken =
-                changeEvents[changeEvents.length - 1]._id || cursor.postBatchResumeToken;
+            cursorInfo.resumeToken = changeEvents[changeEvents.length - 1]._id || cursor.postBatchResumeToken;
         } else if (cursor.postBatchResumeToken) {
             cursorInfo.resumeToken = cursor.postBatchResumeToken;
         }
@@ -215,26 +228,27 @@ export function ChangeStreamTest(_db, options) {
      *
      * Returns the cursor returned by the 'aggregate' command.
      */
-    self.startWatchingChanges = function(
-        {pipeline, collection, aggregateOptions, doNotModifyInPassthroughs}) {
+    self.startWatchingChanges = function ({pipeline, collection, aggregateOptions, doNotModifyInPassthroughs}) {
         aggregateOptions = aggregateOptions || {};
         aggregateOptions.cursor = aggregateOptions.cursor || {batchSize: 1};
 
         // The 'collection' argument may be a collection name, DBCollection object, or '1' which
         // indicates all collections in _db.
-        assert(collection instanceof DBCollection || typeof collection === "string" ||
-               collection === 1);
-        const collName = (collection instanceof DBCollection ? collection.getName() : collection);
+        assert(collection instanceof DBCollection || typeof collection === "string" || collection === 1);
+        const collName = collection instanceof DBCollection ? collection.getName() : collection;
 
         return runInFixture(() => {
             let maxRetries = 3;
             let res;
             for (let attemptNumber = 1; attemptNumber <= maxRetries; attemptNumber++) {
                 try {
-                    res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
-                        _db,
-                        Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions),
-                        doNotModifyInPassthroughs));
+                    res = assert.commandWorked(
+                        runCommandChangeStreamPassthroughAware(
+                            _db,
+                            Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions),
+                            doNotModifyInPassthroughs,
+                        ),
+                    );
                     break;
                 } catch (e) {
                     if (attemptNumber === maxRetries || !isResumableChangeStreamError(e)) {
@@ -246,7 +260,7 @@ export function ChangeStreamTest(_db, options) {
             _cursorData.set(String(res.cursor.id), {
                 pipeline: pipeline,
                 collName: collName,
-                doNotModifyInPassthroughs: doNotModifyInPassthroughs
+                doNotModifyInPassthroughs: doNotModifyInPassthroughs,
             });
             updateResumeToken(res.cursor, res.cursor.firstBatch);
             _allCursors.push({db: _db.getName(), coll: collName, cursorId: res.cursor.id});
@@ -259,13 +273,12 @@ export function ChangeStreamTest(_db, options) {
      * ChangeStreamTest has been created on the 'admin' db, and will assert if not. It uses the
      * 'aggregateOptions' if provided and saves the cursor so that it can be cleaned up later.
      */
-    self.startWatchingAllChangesForCluster = function(aggregateOptions, changeStreamOptions = {}) {
+    self.startWatchingAllChangesForCluster = function (aggregateOptions, changeStreamOptions = {}) {
         assert.eq(_db.getName(), "admin");
         return self.startWatchingChanges({
-            pipeline:
-                [{$changeStream: Object.assign({allChangesForCluster: true}, changeStreamOptions)}],
+            pipeline: [{$changeStream: Object.assign({allChangesForCluster: true}, changeStreamOptions)}],
             collection: 1,
-            aggregateOptions: aggregateOptions
+            aggregateOptions: aggregateOptions,
         });
     };
 
@@ -273,7 +286,7 @@ export function ChangeStreamTest(_db, options) {
      * Restarts the change stream and modify 'cursor' by replacing it's contents thus updating it's
      * cursor ID.
      */
-    self.restartChangeStream = function(cursor) {
+    self.restartChangeStream = function (cursor) {
         const cursorId = String(cursor.id);
         const cursorInfo = _cursorData.get(cursorId);
         if (!cursorInfo || !cursorInfo.resumeToken) {
@@ -284,7 +297,7 @@ export function ChangeStreamTest(_db, options) {
             pipeline: pipeline,
             collection: cursorInfo.collName,
             aggregateOptions: {cursor: {batchSize: 0}},
-            doNotModifyInPassthroughs: cursorInfo.doNotModifyInPassthroughs
+            doNotModifyInPassthroughs: cursorInfo.doNotModifyInPassthroughs,
         });
         Object.assign(cursor, newCursor);
     };
@@ -294,13 +307,14 @@ export function ChangeStreamTest(_db, options) {
      * interrupted with a ResumableChangeStreamError. We restart the changeStream pipeline and retry
      * getMore 3 times.
      */
-    self.getNextBatch = function(cursor) {
+    self.getNextBatch = function (cursor) {
         const maxRetries = 3;
         for (let attemptNumber = 1; attemptNumber <= maxRetries; attemptNumber++) {
             try {
                 let collName = getCollectionNameFromFullNamespace(cursor.ns);
                 const res = assert.commandWorked(
-                    _db.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}));
+                    _db.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}),
+                );
                 cursor = res.cursor;
                 updateResumeToken(cursor, getBatchFromCursorDocument(cursor));
                 return cursor;
@@ -319,7 +333,7 @@ export function ChangeStreamTest(_db, options) {
      * if it's the first batch or another batch afterwards.
      */
     function getBatchFromCursorDocument(cursor) {
-        return (cursor.nextBatch === undefined) ? cursor.firstBatch : cursor.nextBatch;
+        return cursor.nextBatch === undefined ? cursor.firstBatch : cursor.nextBatch;
     }
 
     /**
@@ -331,8 +345,7 @@ export function ChangeStreamTest(_db, options) {
         if (nextBatch.length === 0) {
             return null;
         }
-        assert.eq(
-            nextBatch.length, 1, "Batch length wasn't 0 or 1: " + tojsonMaybeTruncate(cursor));
+        assert.eq(nextBatch.length, 1, "Batch length wasn't 0 or 1: " + tojsonMaybeTruncate(cursor));
 
         // Reset the nextBatch, as the document is consumed.
         delete cursor.firstBatch;
@@ -341,7 +354,7 @@ export function ChangeStreamTest(_db, options) {
         return nextBatch[0];
     }
 
-    self.getNextChanges = function(cursor, numChanges, skipFirst) {
+    self.getNextChanges = function (cursor, numChanges, skipFirst) {
         let changes = [];
 
         for (let i = 0; i < numChanges; i++) {
@@ -359,17 +372,23 @@ export function ChangeStreamTest(_db, options) {
                     assert.neq(
                         cursor.id,
                         NumberLong(0),
-                        () => (
+                        () =>
                             "Cursor has been closed unexpectedly. Observed change stream events: " +
-                            tojsonMaybeTruncate(changes)));
+                            tojsonMaybeTruncate(changes),
+                    );
                     cursor = self.getNextBatch(cursor);
                     changes[i] = getNextDocFromCursor(cursor);
                     return changes[i] !== null;
                 },
                 () => {
-                    return "timed out waiting for another result from the change stream, observed changes: " +
-                        tojsonMaybeTruncate(changes) + ", expected changes: " + numChanges;
-                });
+                    return (
+                        "timed out waiting for another result from the change stream, observed changes: " +
+                        tojsonMaybeTruncate(changes) +
+                        ", expected changes: " +
+                        numChanges
+                    );
+                },
+            );
         }
         return changes;
     };
@@ -388,17 +407,19 @@ export function ChangeStreamTest(_db, options) {
      * unless the expected change explicitly lists an '_id' or 'clusterTime' field to compare
      * against.
      */
-    function assertChangeIsExpected(
-        expectedChanges, numChangesSeen, observedChanges, expectInvalidate) {
+    function assertChangeIsExpected(expectedChanges, numChangesSeen, observedChanges, expectInvalidate) {
         if (expectedChanges) {
-            assertChangeStreamEventEq(
-                observedChanges[numChangesSeen], expectedChanges[numChangesSeen], eventModifier);
+            assertChangeStreamEventEq(observedChanges[numChangesSeen], expectedChanges[numChangesSeen], eventModifier);
         } else if (!expectInvalidate) {
-            assert(!isInvalidated(observedChanges[numChangesSeen]),
-                   "Change was invalidated when it should not have been. Number of changes seen: " +
-                       numChangesSeen +
-                       ", observed changes: " + tojsonMaybeTruncate(observedChanges) +
-                       ", expected changes: " + tojsonMaybeTruncate(expectedChanges));
+            assert(
+                !isInvalidated(observedChanges[numChangesSeen]),
+                "Change was invalidated when it should not have been. Number of changes seen: " +
+                    numChangesSeen +
+                    ", observed changes: " +
+                    tojsonMaybeTruncate(observedChanges) +
+                    ", expected changes: " +
+                    tojsonMaybeTruncate(expectedChanges),
+            );
         }
     }
 
@@ -410,27 +431,29 @@ export function ChangeStreamTest(_db, options) {
      *
      * Returns a list of the changes seen.
      */
-    self.assertNextChangesEqual = function({
+    self.assertNextChangesEqual = function ({
         cursor,
         expectedChanges,
         expectedNumChanges,
         expectInvalidate,
         skipFirstBatch,
-        ignoreOrder
+        ignoreOrder,
     }) {
         expectInvalidate = expectInvalidate || false;
         skipFirstBatch = skipFirstBatch || false;
 
         // Assert that the expected length matches the length of the expected batch.
         if (expectedChanges !== undefined && expectedNumChanges !== undefined) {
-            assert.eq(expectedChanges.length,
-                      expectedNumChanges,
-                      "Expected change's size must match expected number of changes");
+            assert.eq(
+                expectedChanges.length,
+                expectedNumChanges,
+                "Expected change's size must match expected number of changes",
+            );
         }
 
         // Convert 'expectedChanges' to an array, even if it contains just a single element.
         if (expectedChanges !== undefined && !(expectedChanges instanceof Array)) {
-            let arrayVersion = new Array;
+            let arrayVersion = new Array();
             arrayVersion.push(expectedChanges);
             expectedChanges = arrayVersion;
         }
@@ -443,14 +466,15 @@ export function ChangeStreamTest(_db, options) {
 
         let changes = self.getNextChanges(cursor, expectedNumChanges, skipFirstBatch);
         if (ignoreOrder) {
-            const errMsgFunc = () =>
-                `${tojsonMaybeTruncate(changes)} != ${tojsonMaybeTruncate(expectedChanges)}`;
+            const errMsgFunc = () => `${tojsonMaybeTruncate(changes)} != ${tojsonMaybeTruncate(expectedChanges)}`;
             assert.eq(changes.length, expectedNumChanges, errMsgFunc);
             for (let i = 0; i < changes.length; i++) {
-                assert(expectedChanges.some(expectedChange => {
-                    return isChangeStreamEventEq(changes[i], expectedChange, eventModifier);
-                }),
-                       errMsgFunc);
+                assert(
+                    expectedChanges.some((expectedChange) => {
+                        return isChangeStreamEventEq(changes[i], expectedChange, eventModifier);
+                    }),
+                    errMsgFunc,
+                );
             }
         } else {
             for (let i = 0; i < changes.length; i++) {
@@ -460,15 +484,14 @@ export function ChangeStreamTest(_db, options) {
 
         // If we expect invalidation, the final change should have operation type "invalidate".
         if (expectInvalidate) {
-            assert(isInvalidated(changes[changes.length - 1]),
-                   "Last change was not invalidated when it was expected: " +
-                       tojsonMaybeTruncate(changes));
+            assert(
+                isInvalidated(changes[changes.length - 1]),
+                "Last change was not invalidated when it was expected: " + tojsonMaybeTruncate(changes),
+            );
 
             // We make sure that the next batch kills the cursor after an invalidation entry.
             let finalCursor = self.getNextBatch(cursor);
-            assert.eq(finalCursor.id,
-                      0,
-                      "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor));
+            assert.eq(finalCursor.id, 0, "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor));
         }
 
         return changes;
@@ -481,15 +504,20 @@ export function ChangeStreamTest(_db, options) {
      *
      * Returns a list of the changes seen.
      */
-    self.assertNextChangesEqualUnordered = function(
-        {cursor, expectedChanges, expectedNumChanges, expectInvalidate, skipFirstBatch}) {
+    self.assertNextChangesEqualUnordered = function ({
+        cursor,
+        expectedChanges,
+        expectedNumChanges,
+        expectInvalidate,
+        skipFirstBatch,
+    }) {
         return self.assertNextChangesEqual({
             cursor: cursor,
             expectedChanges: expectedChanges,
             expectedNumChanges: expectedNumChanges,
             expectInvalidate: expectInvalidate,
             skipFirstBatch: skipFirstBatch,
-            ignoreOrder: true
+            ignoreOrder: true,
         });
     };
 
@@ -500,19 +528,19 @@ export function ChangeStreamTest(_db, options) {
      * clusters, due to the possibility of interleaved events across shards, the order is not
      * strictly enforced, allowing for flexibility in the sequence of events.
      */
-    self.assertNextChangesEqualWithDeploymentAwareness = function(...args) {
-        const assertEqualFunc = FixtureHelpers.isMongos(db) ? self.assertNextChangesEqualUnordered
-                                                            : self.assertNextChangesEqual;
+    self.assertNextChangesEqualWithDeploymentAwareness = function (...args) {
+        const assertEqualFunc = FixtureHelpers.isMongos(db)
+            ? self.assertNextChangesEqualUnordered
+            : self.assertNextChangesEqual;
         return assertEqualFunc(...args);
     };
 
     /**
      * Retrieves the next batch in the change stream and confirms that it is empty.
      */
-    self.assertNoChange = function(cursor) {
+    self.assertNoChange = function (cursor) {
         cursor = self.getNextBatch(cursor);
-        assert.eq(
-            0, cursor.nextBatch.length, () => "Cursor had changes: " + tojsonMaybeTruncate(cursor));
+        assert.eq(0, cursor.nextBatch.length, () => "Cursor had changes: " + tojsonMaybeTruncate(cursor));
         return cursor;
     };
 
@@ -520,19 +548,18 @@ export function ChangeStreamTest(_db, options) {
      * Gets the next document in the change stream. This always executes a 'getMore' first.
      * If the current batch has a document in it, that one will be ignored.
      */
-    self.getOneChange = function(cursor, expectInvalidate = false) {
+    self.getOneChange = function (cursor, expectInvalidate = false) {
         const changes = self.getNextChanges(cursor, 1, true);
 
         if (expectInvalidate) {
-            assert(isInvalidated(changes[changes.length - 1]),
-                   "Last change was not invalidated when it was expected: " +
-                       tojsonMaybeTruncate(changes));
+            assert(
+                isInvalidated(changes[changes.length - 1]),
+                "Last change was not invalidated when it was expected: " + tojsonMaybeTruncate(changes),
+            );
 
             // We make sure that the next batch kills the cursor after an invalidation entry.
             let finalCursor = self.getNextBatch(cursor);
-            assert.eq(finalCursor.id,
-                      0,
-                      "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor));
+            assert.eq(finalCursor.id, 0, "Final cursor was not killed: " + tojsonMaybeTruncate(finalCursor));
         }
 
         return changes[0];
@@ -541,20 +568,24 @@ export function ChangeStreamTest(_db, options) {
     /**
      * Kills all outstanding cursors.
      */
-    self.cleanUp = function() {
+    self.cleanUp = function () {
         for (let testCursor of _allCursors) {
             if (typeof testCursor.coll === "string") {
-                assert.commandWorked(_db.getSiblingDB(testCursor.db).runCommand({
-                    killCursors: testCursor.coll,
-                    cursors: [testCursor.cursorId]
-                }));
+                assert.commandWorked(
+                    _db.getSiblingDB(testCursor.db).runCommand({
+                        killCursors: testCursor.coll,
+                        cursors: [testCursor.cursorId],
+                    }),
+                );
             } else if (testCursor.coll == 1) {
                 // Collection '1' indicates that the change stream was opened against an entire
                 // database and is considered 'collectionless'.
-                assert.commandWorked(_db.getSiblingDB(testCursor.db).runCommand({
-                    killCursors: "$cmd.aggregate",
-                    cursors: [testCursor.cursorId]
-                }));
+                assert.commandWorked(
+                    _db.getSiblingDB(testCursor.db).runCommand({
+                        killCursors: "$cmd.aggregate",
+                        cursors: [testCursor.cursorId],
+                    }),
+                );
             }
         }
     };
@@ -563,7 +594,7 @@ export function ChangeStreamTest(_db, options) {
      * Returns the document to be used for the value of a $changeStream stage, given a watchMode
      * of type ChangeStreamWatchMode and optional resumeAfter value.
      */
-    self.getChangeStreamStage = function(watchMode, resumeAfter) {
+    self.getChangeStreamStage = function (watchMode, resumeAfter) {
         const changeStreamDoc = {};
         if (resumeAfter) {
             changeStreamDoc.resumeAfter = resumeAfter;
@@ -579,10 +610,10 @@ export function ChangeStreamTest(_db, options) {
      * Create a change stream of the given watch mode (see ChangeStreamWatchMode) on the given
      * collection. Will resume from a given point if resumeAfter is specified.
      */
-    self.getChangeStream = function({watchMode, coll, resumeAfter}) {
+    self.getChangeStream = function ({watchMode, coll, resumeAfter}) {
         return self.startWatchingChanges({
             pipeline: [{$changeStream: self.getChangeStreamStage(watchMode, resumeAfter)}],
-            collection: (watchMode == ChangeStreamWatchMode.kCollection ? coll : 1),
+            collection: watchMode == ChangeStreamWatchMode.kCollection ? coll : 1,
             // Use a batch size of 0 to prevent any notifications from being returned in the first
             // batch. These would be ignored by ChangeStreamTest.getOneChange().
             aggregateOptions: {cursor: {batchSize: 0}},
@@ -599,7 +630,7 @@ export function ChangeStreamTest(_db, options) {
      * Returns an array of documents which includes all drop events consumed and the expected change
      * itself.
      */
-    self.consumeDropUpTo = function({cursor, dropType, expectedNext, expectInvalidate}) {
+    self.consumeDropUpTo = function ({cursor, dropType, expectedNext, expectInvalidate}) {
         expectInvalidate = expectInvalidate || false;
 
         let results = [];
@@ -620,11 +651,11 @@ export function ChangeStreamTest(_db, options) {
      *
      * Returns the list of notifications.
      */
-    self.assertDatabaseDrop = function({cursor, db}) {
+    self.assertDatabaseDrop = function ({cursor, db}) {
         return self.consumeDropUpTo({
             cursor: cursor,
             dropType: "drop",
-            expectedNext: {operationType: "dropDatabase", ns: {db: db.getName()}}
+            expectedNext: {operationType: "dropDatabase", ns: {db: db.getName()}},
         });
     };
 }
@@ -637,15 +668,23 @@ export function ChangeStreamTest(_db, options) {
  * passthrough, then this stream will not be modified and will run as though no passthrough were
  * active.
  */
-ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrowsCode(
-    {db, collName, pipeline, expectedCode, doNotModifyInPassthroughs}) {
+ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrowsCode({
+    db,
+    collName,
+    pipeline,
+    expectedCode,
+    doNotModifyInPassthroughs,
+}) {
     try {
         runInFixture(() => {
             // Run a passthrough-aware initial 'aggregate' command to open the change stream.
-            const res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
-                db,
-                {aggregate: collName, pipeline: pipeline, cursor: {batchSize: 1}},
-                doNotModifyInPassthroughs));
+            const res = assert.commandWorked(
+                runCommandChangeStreamPassthroughAware(
+                    db,
+                    {aggregate: collName, pipeline: pipeline, cursor: {batchSize: 1}},
+                    doNotModifyInPassthroughs,
+                ),
+            );
 
             // Create a cursor using the command response, and begin issuing getMores. We expect
             // csCursor.hasNext() to throw the expected code before assert.soon() times out.
@@ -654,8 +693,7 @@ ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrow
             assert(false, `Unexpected result from cursor: ${tojsonMaybeTruncate(csCursor.next())}`);
         });
     } catch (error) {
-        assert.eq(
-            error.code, expectedCode, `Caught unexpected error: ${tojsonMaybeTruncate(error)}`);
+        assert.eq(error.code, expectedCode, `Caught unexpected error: ${tojsonMaybeTruncate(error)}`);
         return true;
     }
     assert(false, "expected this to be unreachable");
@@ -665,7 +703,7 @@ ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrow
  * Static method for determining which database to run the change stream aggregation on based on
  * the watchMode.
  */
-ChangeStreamTest.getDBForChangeStream = function(watchMode, dbObj) {
+ChangeStreamTest.getDBForChangeStream = function (watchMode, dbObj) {
     if (watchMode == ChangeStreamWatchMode.kCluster) {
         return dbObj.getSiblingDB("admin");
     }
@@ -677,27 +715,28 @@ ChangeStreamTest.getDBForChangeStream = function(watchMode, dbObj) {
  */
 export function assertChangeStreamNssBehaviour(dbName, collName = "test", options, assertFunc) {
     const testDb = db.getSiblingDB(dbName);
-    options = (options || {});
+    options = options || {};
     return runInFixture(() => {
         const res = testDb.runCommand(
-            Object.assign({aggregate: collName, pipeline: [{$changeStream: options}], cursor: {}}));
+            Object.assign({aggregate: collName, pipeline: [{$changeStream: options}], cursor: {}}),
+        );
         return assertFunc(res);
     });
 }
 
 export function assertValidChangeStreamNss(dbName, collName = "test", options) {
     const res = assertChangeStreamNssBehaviour(dbName, collName, options, assert.commandWorked);
-    assert.commandWorked(db.getSiblingDB(dbName).runCommand(
-        {killCursors: (collName == 1 ? "$cmd.aggregate" : collName), cursors: [res.cursor.id]}));
+    assert.commandWorked(
+        db
+            .getSiblingDB(dbName)
+            .runCommand({killCursors: collName == 1 ? "$cmd.aggregate" : collName, cursors: [res.cursor.id]}),
+    );
 }
 
 export function assertInvalidChangeStreamNss(dbName, collName = "test", options) {
-    assertChangeStreamNssBehaviour(
-        dbName,
-        collName,
-        options,
-        (res) => assert.commandFailedWithCode(
-            res, [ErrorCodes.InvalidNamespace, ErrorCodes.InvalidOptions]));
+    assertChangeStreamNssBehaviour(dbName, collName, options, (res) =>
+        assert.commandFailedWithCode(res, [ErrorCodes.InvalidNamespace, ErrorCodes.InvalidOptions]),
+    );
 }
 
 export const kPreImagesCollectionDatabase = "config";
@@ -709,10 +748,13 @@ export const kPreImagesCollectionName = "system.preimages";
  */
 export function assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(db, collName) {
     const collectionInfos = db.getCollectionInfos({name: collName});
-    assert(collectionInfos.length === 1 && collectionInfos[0].hasOwnProperty("options") &&
-               collectionInfos[0].options.hasOwnProperty("changeStreamPreAndPostImages") &&
-               collectionInfos[0].options["changeStreamPreAndPostImages"]["enabled"] === true,
-           collectionInfos);
+    assert(
+        collectionInfos.length === 1 &&
+            collectionInfos[0].hasOwnProperty("options") &&
+            collectionInfos[0].options.hasOwnProperty("changeStreamPreAndPostImages") &&
+            collectionInfos[0].options["changeStreamPreAndPostImages"]["enabled"] === true,
+        collectionInfos,
+    );
 }
 
 /**
@@ -735,24 +777,23 @@ export function preImagesForOps(db, writeOps) {
     // Determine the id of the last pre-image document written to be able to determine the pre-image
     // documents written by 'writeOps()'. The pre-image purging job may concurrently remove some
     // pre-image documents while this function is executing.
-    const preImageIdsBefore =
-        preImagesColl.find({}, {}).sort(preImagesCollSortSpec).allowDiskUse().toArray();
-    const lastPreImageId = (preImageIdsBefore.length > 0)
-        ? preImageIdsBefore[preImageIdsBefore.length - 1]._id
-        : undefined;
+    const preImageIdsBefore = preImagesColl.find({}, {}).sort(preImagesCollSortSpec).allowDiskUse().toArray();
+    const lastPreImageId =
+        preImageIdsBefore.length > 0 ? preImageIdsBefore[preImageIdsBefore.length - 1]._id : undefined;
 
     // Perform the write operations.
     writeOps();
 
     // Return only newly written pre-images.
     const preImageFilter = lastPreImageId ? {"_id.ts": {$gt: lastPreImageId.ts}} : {};
-    const result =
-        preImagesColl.find(preImageFilter).sort(preImagesCollSortSpec).allowDiskUse().toArray();
+    const result = preImagesColl.find(preImageFilter).sort(preImagesCollSortSpec).allowDiskUse().toArray();
 
     // Verify that the result is correct by checking if the last pre-image still exists. However, if
     // no pre-image document existed before 'writeOps()' invocation, the result may be incorrect.
-    assert(lastPreImageId === undefined || preImagesColl.find({_id: lastPreImageId}).itcount() == 1,
-           "Last pre-image document has been removed by the pre-image purging job.");
+    assert(
+        lastPreImageId === undefined || preImagesColl.find({_id: lastPreImageId}).itcount() == 1,
+        "Last pre-image document has been removed by the pre-image purging job.",
+    );
     return result;
 }
 
@@ -770,7 +811,7 @@ export function getPreImages(connection) {
 
 export function findPreImagesCollectionDescriptions(db) {
     return db.getSiblingDB(kPreImagesCollectionDatabase).runCommand("listCollections", {
-        filter: {name: kPreImagesCollectionName}
+        filter: {name: kPreImagesCollectionName},
     });
 }
 
@@ -792,10 +833,8 @@ export function assertPreImagesCollectionExists(db) {
     assert.eq(preImagesCollectionDescription.name, "system.preimages");
 
     // Verifies that the pre-images collection is clustered by _id.
-    assert(preImagesCollectionDescription.hasOwnProperty("options"),
-           preImagesCollectionDescription);
-    assert(preImagesCollectionDescription.options.hasOwnProperty("clusteredIndex"),
-           preImagesCollectionDescription);
+    assert(preImagesCollectionDescription.hasOwnProperty("options"), preImagesCollectionDescription);
+    assert(preImagesCollectionDescription.options.hasOwnProperty("clusteredIndex"), preImagesCollectionDescription);
     const clusteredIndexDescription = preImagesCollectionDescription.options.clusteredIndex;
     assert(clusteredIndexDescription, preImagesCollectionDescription);
 }

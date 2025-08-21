@@ -5,8 +5,8 @@
 // Tests that combine $geoNear and tailable cursors.
 //
 let cmdRes;
-const collName = 'geo_near_tailable';
-const cappedCollName = 'geo_near_tailable_capped';
+const collName = "geo_near_tailable";
+const cappedCollName = "geo_near_tailable_capped";
 
 // Avoid using the drop() shell helper here in order to avoid "implicit collection recreation"
 // which can happen when this test runs in certain passthroughs. For details, see

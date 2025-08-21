@@ -5,24 +5,23 @@
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {
     sendCommandToInitialSyncNodeInReplSet,
-    shouldSkipCommand
+    shouldSkipCommand,
 } from "jstests/libs/override_methods/send_command_to_initial_sync_node_lib.js";
 
-function maybeSendCommandToInitialSyncNodes(
-    conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
+function maybeSendCommandToInitialSyncNodes(conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
     // Skip forwarding incompatible commands to initial sync node.
     if (shouldSkipCommand(_commandName, commandObj)) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 
-    sendCommandToInitialSyncNodeInReplSet(
-        conn, _commandName, commandObj, func, makeFuncArgs, "replica set");
+    sendCommandToInitialSyncNodeInReplSet(conn, _commandName, commandObj, func, makeFuncArgs, "replica set");
 
     // Finally, send the command as normal to the primary/mongos.
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/send_command_to_initial_sync_node_replica_set.js");
+    "jstests/libs/override_methods/send_command_to_initial_sync_node_replica_set.js",
+);
 
 OverrideHelpers.overrideRunCommand(maybeSendCommandToInitialSyncNodes);

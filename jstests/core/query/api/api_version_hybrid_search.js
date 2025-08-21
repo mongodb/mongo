@@ -13,14 +13,11 @@ const coll = db[collName];
 coll.drop();
 assert.commandWorked(coll.insert({a: [1]}));
 
-const unstableHybridSearchPipelines = [
-    [{$project: {output: {$sigmoid: 0}}}],
-];
+const unstableHybridSearchPipelines = [[{$project: {output: {$sigmoid: 0}}}]];
 
 for (const pipeline of unstableHybridSearchPipelines) {
     // Assert error thrown when running a pipeline with syntax not in API Version 1.
-    APIVersionHelpers.assertAggregateFailsWithAPIStrict(
-        pipeline, collName, ErrorCodes.APIStrictError);
+    APIVersionHelpers.assertAggregateFailsWithAPIStrict(pipeline, collName, ErrorCodes.APIStrictError);
 
     // If we don't specify apiStrict then the pipeline succeeds.
     APIVersionHelpers.assertAggregateSucceedsAPIVersionWithoutAPIStrict(pipeline, collName);

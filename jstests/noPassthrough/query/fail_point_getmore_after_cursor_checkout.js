@@ -17,14 +17,18 @@ for (let i = 0; i < 10; ++i) {
 }
 
 // Perform the test for both 'find' and 'aggregate' cursors.
-for (let testCursor of [coll.find({}).sort({_id: 1}).batchSize(2),
-                        coll.aggregate([{$sort: {_id: 1}}], {cursor: {batchSize: 2}})]) {
+for (let testCursor of [
+    coll.find({}).sort({_id: 1}).batchSize(2),
+    coll.aggregate([{$sort: {_id: 1}}], {cursor: {batchSize: 2}}),
+]) {
     // Activate the failpoint and set the exception that it will throw.
-    assert.commandWorked(testDB.adminCommand({
-        configureFailPoint: "failGetMoreAfterCursorCheckout",
-        mode: "alwaysOn",
-        data: {"errorCode": ErrorCodes.ShutdownInProgress}
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            configureFailPoint: "failGetMoreAfterCursorCheckout",
+            mode: "alwaysOn",
+            data: {"errorCode": ErrorCodes.ShutdownInProgress},
+        }),
+    );
 
     // Consume the documents from the first batch, leaving the cursor open.
     assert.docEq({_id: 0}, testCursor.next());
@@ -36,8 +40,7 @@ for (let testCursor of [coll.find({}).sort({_id: 1}).batchSize(2),
     assert.commandFailedWithCode(getMoreRes, ErrorCodes.ShutdownInProgress);
 
     // Disable the failpoint.
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
 }
 
 rst.stopSet();

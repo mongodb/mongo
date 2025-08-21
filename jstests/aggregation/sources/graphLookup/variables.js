@@ -10,23 +10,23 @@ foreign.insert({from: "b", to: "a", _id: 0});
 local.insert({});
 
 const basicGraphLookup = {
-        $graphLookup: {
-            from: "graph_lookup_var_foreign",
-            startWith: "$$var1",
-            connectFromField: "from",
-            connectToField: "to",
-            as: "resultsFromGraphLookup"
-        }
-    };
+    $graphLookup: {
+        from: "graph_lookup_var_foreign",
+        startWith: "$$var1",
+        connectFromField: "from",
+        connectToField: "to",
+        as: "resultsFromGraphLookup",
+    },
+};
 
 const lookup = {
-        $lookup: {
-            from: "graph_lookup_var_local",
-            let : {var1: "a"},
-            pipeline: [basicGraphLookup],
-            as: "resultsFromLookup"
-        }
-    };
+    $lookup: {
+        from: "graph_lookup_var_local",
+        let: {var1: "a"},
+        pipeline: [basicGraphLookup],
+        as: "resultsFromLookup",
+    },
+};
 
 // Verify that $graphLookup can use the variable 'var1' which is defined in parent $lookup.
 let res = local.aggregate([lookup]).toArray();

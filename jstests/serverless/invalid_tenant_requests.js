@@ -1,16 +1,16 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const tenant = '636d957b2646ddfaf9b5e13f';
-const kVTSKey = 'secret';
+const tenant = "636d957b2646ddfaf9b5e13f";
+const kVTSKey = "secret";
 
 const insertCmd = {
-    insert: 'some_collection',
-    documents: [{_id: 0}]
+    insert: "some_collection",
+    documents: [{_id: 0}],
 };
 
 function createnewReplSetTest(param) {
-    const rst = new ReplSetTest({nodes: 1, nodeOptions: {auth: '', setParameter: param}});
-    rst.startSet({keyFile: 'jstests/libs/key1'});
+    const rst = new ReplSetTest({nodes: 1, nodeOptions: {auth: "", setParameter: param}});
+    rst.startSet({keyFile: "jstests/libs/key1"});
     rst.initiate();
     return rst;
 }
@@ -18,15 +18,15 @@ function createnewReplSetTest(param) {
 function setupNewReplSetWithParam(param) {
     let rst = createnewReplSetTest(param);
     let primary = rst.getPrimary();
-    let adminDb = primary.getDB('admin');
-    assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-    assert(adminDb.auth('admin', 'pwd'));
+    let adminDb = primary.getDB("admin");
+    assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["root"]}));
+    assert(adminDb.auth("admin", "pwd"));
     return rst;
 }
 
 function createAndSetSecurityToken(primary) {
     const kTenantID = ObjectId(tenant);
-    if (typeof primary._securityToken == 'undefined') {
+    if (typeof primary._securityToken == "undefined") {
         const tenantToken = _createTenantToken({tenant: kTenantID, expectPrefix: true});
         primary._setSecurityToken(tenantToken);
     }
@@ -43,13 +43,13 @@ function tenantPrefixMissing(primary) {
 }
 
 function unmatchedTenantInfo(primary) {
-    const unmatchingTenant = '636d957b2646ddfaf9b5e13a';
+    const unmatchingTenant = "636d957b2646ddfaf9b5e13a";
     const db = primary.getDB(unmatchingTenant + "_UnmatchedTenantInfo");
     assert.commandFailedWithCode(db.runCommand(insertCmd), 8423384);
 }
 
 function invalidTenantPrefix(primary) {
-    const invalidTenant = '636d95';
+    const invalidTenant = "636d95";
     const db = primary.getDB(invalidTenant + "_InvalidTenantPrefix");
     assert.commandFailedWithCode(db.runCommand(insertCmd), 8423386);
 }

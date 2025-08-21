@@ -3,7 +3,7 @@ import {includesErrorCode} from "jstests/libs/error_code_utils.js";
 import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
-export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnError} = (function() {
+export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnError} = (function () {
     /**
      * Calls 'func' with the print() function overridden to be a no-op.
      *
@@ -39,8 +39,11 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
         // network_error_and_txn_override.js or commitTransactionWithRetries()), so any
         // error that reached here must not be transient.
         if (hasCommitTxnError) {
-            print("-=-=-=- Cannot retry entire transaction on commit transaction error without" +
-                  " transient transaction error label, error: " + tojsononeline(e));
+            print(
+                "-=-=-=- Cannot retry entire transaction on commit transaction error without" +
+                    " transient transaction error label, error: " +
+                    tojsononeline(e),
+            );
             return false;
         }
 
@@ -88,22 +91,29 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
             // If commit fails with a killed session code, the commit must be retried because it is
             // unknown if the interrupted commit succeeded. This is safe because commitTransaction
             // is a retryable write.
-            const failedWithInterruption =
-                !commitRes.ok && KilledSessionUtil.isKilledSessionCode(commitRes.code);
+            const failedWithInterruption = !commitRes.ok && KilledSessionUtil.isKilledSessionCode(commitRes.code);
             const wcFailedWithInterruption = KilledSessionUtil.hasKilledSessionWCError(commitRes);
             if (retryOnKilledSession && (failedWithInterruption || wcFailedWithInterruption)) {
-                print("-=-=-=- Retrying commit after killed session code, sessionId: " +
-                      tojsononeline(session.getSessionId()) +
-                      ", txnNumber: " + tojsononeline(session.getTxnNumber_forTesting()) +
-                      ", res: " + tojsononeline(commitRes));
+                print(
+                    "-=-=-=- Retrying commit after killed session code, sessionId: " +
+                        tojsononeline(session.getSessionId()) +
+                        ", txnNumber: " +
+                        tojsononeline(session.getTxnNumber_forTesting()) +
+                        ", res: " +
+                        tojsononeline(commitRes),
+                );
                 continue;
             }
 
             if (commitRes.code === ErrorCodes.FailedToSatisfyReadPreference) {
-                print("-=-=-=- Retrying commit due to FailedToSatisfyReadPreference, sessionId: " +
-                      tojsononeline(session.getSessionId()) +
-                      ", txnNumber: " + tojsononeline(session.getTxnNumber_forTesting()) +
-                      ", res: " + tojsononeline(commitRes));
+                print(
+                    "-=-=-=- Retrying commit due to FailedToSatisfyReadPreference, sessionId: " +
+                        tojsononeline(session.getSessionId()) +
+                        ", txnNumber: " +
+                        tojsononeline(session.getTxnNumber_forTesting()) +
+                        ", res: " +
+                        tojsononeline(commitRes),
+                );
                 continue;
             }
 
@@ -135,20 +145,26 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
      * transaction started by the withTxnAndAutoRetry() function is only known to have committed
      * after the withTxnAndAutoRetry() function returns.
      */
-    function withTxnAndAutoRetry(session, func, {
-        txnOptions: txnOptions = {
-            readConcern: {level: TestData.defaultTransactionReadConcernLevel || 'snapshot'},
-            writeConcern: TestData.hasOwnProperty("defaultTransactionWriteConcernW")
-                ? {w: TestData.defaultTransactionWriteConcernW, wtimeout: kDefaultWtimeout}
-                : undefined
-        },
-        retryOnKilledSession: retryOnKilledSession = false,
-        prepareProbability: prepareProbability = 0.0
-    } = {}) {
+    function withTxnAndAutoRetry(
+        session,
+        func,
+        {
+            txnOptions: txnOptions = {
+                readConcern: {level: TestData.defaultTransactionReadConcernLevel || "snapshot"},
+                writeConcern: TestData.hasOwnProperty("defaultTransactionWriteConcernW")
+                    ? {w: TestData.defaultTransactionWriteConcernW, wtimeout: kDefaultWtimeout}
+                    : undefined,
+            },
+            retryOnKilledSession: retryOnKilledSession = false,
+            prepareProbability: prepareProbability = 0.0,
+        } = {},
+    ) {
         // Committing a manually prepared transaction isn't currently supported when sessions might
         // be killed.
-        assert(!retryOnKilledSession || prepareProbability === 0.0,
-               "retrying on killed session error codes isn't supported with prepareProbability");
+        assert(
+            !retryOnKilledSession || prepareProbability === 0.0,
+            "retrying on killed session error codes isn't supported with prepareProbability",
+        );
 
         let hasTransientError;
         let iterations = 0;
@@ -176,7 +192,6 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
                     hasCommitTxnError = true;
                     throw e;
                 }
-
             } catch (e) {
                 if (!hasCommitTxnError) {
                     // We need to call abortTransaction_forTesting() in order to update the mongo
@@ -192,7 +207,7 @@ export var {withTxnAndAutoRetry, isKilledSessionCode, shouldRetryEntireTxnOnErro
                         ErrorCodes.TemporarilyUnavailable,
                         // Ignore errors that can occur when shards are removed in the background
                         ErrorCodes.HostUnreachable,
-                        ErrorCodes.ShardNotFound
+                        ErrorCodes.ShardNotFound,
                     ]);
                 }
 

@@ -11,7 +11,8 @@ const kCollName = "testColl";
 const kNs = kDbName + "." + kCollName;
 
 (() => {
-    if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test case
+    if (jsTestOptions().useAutoBootstrapProcedure) {
+        // TODO: SERVER-80318 Delete test case
         return;
     }
 
@@ -31,7 +32,7 @@ const kNs = kDbName + "." + kCollName;
         txnNumber: NumberLong(1),
         startTransaction: true,
         autocommit: false,
-        txnRetryCounter: NumberInt(0)
+        txnRetryCounter: NumberInt(0),
     };
     assert.commandFailedWithCode(testDB.runCommand(insertCmdObj), ErrorCodes.InvalidOptions);
     rst.stopSet();
@@ -49,16 +50,18 @@ const kNs = kDbName + "." + kCollName;
         txnNumber: NumberLong(0),
         startTransaction: true,
         autocommit: false,
-        txnRetryCounter: NumberInt(0)
+        txnRetryCounter: NumberInt(0),
     };
     assert.commandWorked(shard0Primary.getDB(kDbName).runCommand(insertCmdObjShardSvr));
-    assert.commandWorked(shard0Primary.adminCommand({
-        abortTransaction: 1,
-        lsid: insertCmdObjShardSvr.lsid,
-        txnNumber: insertCmdObjShardSvr.txnNumber,
-        autocommit: false,
-        txnRetryCounter: NumberInt(0)
-    }));
+    assert.commandWorked(
+        shard0Primary.adminCommand({
+            abortTransaction: 1,
+            lsid: insertCmdObjShardSvr.lsid,
+            txnNumber: insertCmdObjShardSvr.txnNumber,
+            autocommit: false,
+            txnRetryCounter: NumberInt(0),
+        }),
+    );
 
     jsTest.log("Verify that txnRetryCounter is supported on configsvr");
     const configRSPrimary = st.configRS.getPrimary();
@@ -69,15 +72,17 @@ const kNs = kDbName + "." + kCollName;
         txnNumber: NumberLong(0),
         startTransaction: true,
         autocommit: false,
-        txnRetryCounter: NumberInt(0)
+        txnRetryCounter: NumberInt(0),
     };
     assert.commandWorked(configRSPrimary.getDB("config").runCommand(deleteCmdObjConfigSvr));
-    assert.commandWorked(configRSPrimary.adminCommand({
-        abortTransaction: 1,
-        lsid: deleteCmdObjConfigSvr.lsid,
-        txnNumber: deleteCmdObjConfigSvr.txnNumber,
-        autocommit: false,
-    }));
+    assert.commandWorked(
+        configRSPrimary.adminCommand({
+            abortTransaction: 1,
+            lsid: deleteCmdObjConfigSvr.lsid,
+            txnNumber: deleteCmdObjConfigSvr.txnNumber,
+            autocommit: false,
+        }),
+    );
 
     jsTest.log("Test that the client cannot specify txnRetryCounter in a retryable write command");
     const mongosTestDB = st.s.getDB(kDbName);
@@ -87,7 +92,7 @@ const kNs = kDbName + "." + kCollName;
         documents: [{x: 0}],
         lsid: {id: UUID()},
         txnNumber: NumberLong(0),
-        txnRetryCounter: NumberInt(0)
+        txnRetryCounter: NumberInt(0),
     };
     assert.commandFailedWithCode(mongosTestDB.runCommand(insertCmdObj), ErrorCodes.InvalidOptions);
 

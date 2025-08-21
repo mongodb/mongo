@@ -100,13 +100,13 @@ t.insert([{_id: 0}, {_id: 1}]);
 opCounters = newdb.serverStatus().opcounters;
 res = t.remove({_id: 0});
 assert.commandWorked(res);
-assert.eq(opCounters.delete +1, newdb.serverStatus().opcounters.delete);
+assert.eq(opCounters.delete + 1, newdb.serverStatus().opcounters.delete);
 
 // Delete, with error.
 opCounters = newdb.serverStatus().opcounters;
 res = t.remove({_id: {$invalidOp: 1}});
 assert.writeError(res);
-assert.eq(opCounters.delete +1, newdb.serverStatus().opcounters.delete);
+assert.eq(opCounters.delete + 1, newdb.serverStatus().opcounters.delete);
 
 //
 // 4. Query.
@@ -124,7 +124,7 @@ assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 
 // Query, with error.
 opCounters = newdb.serverStatus().opcounters;
-assert.throws(function() {
+assert.throws(function () {
     t.findOne({_id: {$invalidOp: 1}});
 });
 assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
@@ -138,7 +138,7 @@ assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 
 // Query, with error.
 opCounters = newdb.serverStatus().opcounters;
-assert.throws(function() {
+assert.throws(function () {
     t.aggregate({$match: {$invalidOp: 1}});
 });
 assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
@@ -154,7 +154,7 @@ t.insert([{_id: 0}, {_id: 1}, {_id: 2}]);
 
 // Getmore, no error.
 opCounters = newdb.serverStatus().opcounters;
-t.find().batchSize(2).toArray();  // 3 documents, batchSize=2 => 1 query + 1 getmore
+t.find().batchSize(2).toArray(); // 3 documents, batchSize=2 => 1 query + 1 getmore
 assert.eq(opCounters.query + 1, newdb.serverStatus().opcounters.query);
 assert.eq(opCounters.getmore + 1, newdb.serverStatus().opcounters.getmore);
 
@@ -162,7 +162,8 @@ assert.eq(opCounters.getmore + 1, newdb.serverStatus().opcounters.getmore);
 opCounters = newdb.serverStatus().opcounters;
 assert.commandFailedWithCode(
     t.getDB().runCommand({getMore: NumberLong(123), collection: t.getName()}),
-    ErrorCodes.CursorNotFound);
+    ErrorCodes.CursorNotFound,
+);
 assert.eq(opCounters.getmore + 1, newdb.serverStatus().opcounters.getmore);
 
 //
@@ -184,37 +185,42 @@ assert.commandWorked(newdb.runCommand({listCollections: 1}));
 var serverStatus = newdb.runCommand({serverStatus: 1});
 opCounters = serverStatus.opcounters;
 var metricsObj = serverStatus.metrics.commands;
-assert.eq(opCounters.command + 1,
-          newdb.serverStatus().opcounters.command);  // "serverStatus" counted
+assert.eq(opCounters.command + 1, newdb.serverStatus().opcounters.command); // "serverStatus" counted
 // Count this and the last run of "serverStatus"
-assert.eq(metricsObj.serverStatus.total + 2,
-          newdb.serverStatus().metrics.commands.serverStatus.total,
-          "total ServerStatus command counter did not increment");  // "serverStatus" counted
-assert.eq(metricsObj.serverStatus.failed,
-          newdb.serverStatus().metrics.commands.serverStatus.failed,
-          "failed ServerStatus command counter incremented!");  // "serverStatus" counted
+assert.eq(
+    metricsObj.serverStatus.total + 2,
+    newdb.serverStatus().metrics.commands.serverStatus.total,
+    "total ServerStatus command counter did not increment",
+); // "serverStatus" counted
+assert.eq(
+    metricsObj.serverStatus.failed,
+    newdb.serverStatus().metrics.commands.serverStatus.failed,
+    "failed ServerStatus command counter incremented!",
+); // "serverStatus" counted
 
 // Command, recognized, with error.
 var countVal = {"total": 0, "failed": 0};
 if (metricsObj.count != null) {
     countVal = metricsObj.count;
 }
-res = t.runCommand("count", {query: {$invalidOp: 1}});  // "count command" counted
+res = t.runCommand("count", {query: {$invalidOp: 1}}); // "count command" counted
 assert.eq(0, res.ok);
-assert.eq(opCounters.command + 5,
-          newdb.serverStatus().opcounters.command);  // "serverStatus", "count" counted
+assert.eq(opCounters.command + 5, newdb.serverStatus().opcounters.command); // "serverStatus", "count" counted
 
-assert.eq(countVal.total + 1,
-          newdb.serverStatus().metrics.commands.count.total,
-          "total count command counter did not incremented");  // "serverStatus", "count" counted
-assert.eq(countVal.failed + 1,
-          newdb.serverStatus().metrics.commands.count.failed,
-          "failed count command counter did not increment");  // "serverStatus", "count" counted
+assert.eq(
+    countVal.total + 1,
+    newdb.serverStatus().metrics.commands.count.total,
+    "total count command counter did not incremented",
+); // "serverStatus", "count" counted
+assert.eq(
+    countVal.failed + 1,
+    newdb.serverStatus().metrics.commands.count.failed,
+    "failed count command counter did not increment",
+); // "serverStatus", "count" counted
 
 // Command, unrecognized.
 res = t.runCommand("invalid");
 assert.eq(0, res.ok);
-assert.eq(opCounters.command + 8,
-          newdb.serverStatus().opcounters.command);  // "serverStatus" counted
+assert.eq(opCounters.command + 8, newdb.serverStatus().opcounters.command); // "serverStatus" counted
 assert.eq(null, newdb.serverStatus().metrics.commands.invalid);
-assert.eq(metricsObj['<UNKNOWN>'] + 1, newdb.serverStatus().metrics.commands['<UNKNOWN>']);
+assert.eq(metricsObj["<UNKNOWN>"] + 1, newdb.serverStatus().metrics.commands["<UNKNOWN>"]);

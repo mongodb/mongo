@@ -4,9 +4,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-import {
-    withRetryOnTransientTxnErrorIncrementTxnNum
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnErrorIncrementTxnNum} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
@@ -19,12 +17,17 @@ const kCollName = "testColl";
 const mongosTestDB = st.s.getDB(kDbName);
 const mongosTestColl = mongosTestDB.getCollection(kCollName);
 
-assert.commandWorked(mongosTestColl.insert([{_id: -1, x: -1}, {_id: -2, x: -2}]));
+assert.commandWorked(
+    mongosTestColl.insert([
+        {_id: -1, x: -1},
+        {_id: -2, x: -2},
+    ]),
+);
 
 const lsid = {
     id: UUID(),
     txnNumber: NumberLong(35),
-    txnUUID: UUID()
+    txnUUID: UUID(),
 };
 
 {
@@ -54,8 +57,7 @@ const lsid = {
             stmtId: NumberInt(stmtId++),
             autocommit: false,
         });
-        assert.commandFailedWithCode(
-            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)), 6054001);
+        assert.commandFailedWithCode(mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)), 6054001);
     });
 }
 
@@ -71,12 +73,11 @@ const lsid = {
                 lsid: lsid,
                 txnNumber: NumberLong(txnNum),
                 stmtId: NumberInt(stmtId++),
-                autocommit: false
+                autocommit: false,
             };
         };
 
-        mongosTestDB.runCommand(
-            Object.assign(makeInsertCmdObj({_id: -100, x: 100}), {startTransaction: true}));
+        mongosTestDB.runCommand(Object.assign(makeInsertCmdObj({_id: -100, x: 100}), {startTransaction: true}));
         // findAndModify with pre-image.
         mongosTestDB.runCommand({
             findAndModify: kCollName,
@@ -99,8 +100,7 @@ const lsid = {
             stmtId: NumberInt(stmtId++),
             autocommit: false,
         });
-        assert.commandFailedWithCode(
-            mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)), 6054002);
+        assert.commandFailedWithCode(mongosTestDB.adminCommand(makeCommitTransactionCmdObj(lsid, txnNum)), 6054002);
     });
 }
 

@@ -15,35 +15,34 @@ const st = new ShardingTest({
     shards: 2,
     other: {
         rsOptions: {setParameter: {rangeDeleterBatchSize: rangeDeleterBatchSize}},
-    }
+    },
 });
 
 function assertCollStatsHasCorrectOrphanCount(coll, shardName, numOrphans) {
     const pipeline = [
-        {'$collStats': {'storageStats': {}}},
-        {'$project': {'shard': true, 'storageStats': {'numOrphanDocs': true}}}
+        {"$collStats": {"storageStats": {}}},
+        {"$project": {"shard": true, "storageStats": {"numOrphanDocs": true}}},
     ];
     const storageStats = coll.aggregate(pipeline).toArray();
     storageStats.forEach((stat) => {
-        if (stat['shard'] === shardName) {
+        if (stat["shard"] === shardName) {
             assert.eq(stat.storageStats.numOrphanDocs, numOrphans);
         }
     });
 }
 
 // Setup database
-const dbName = 'db';
+const dbName = "db";
 const db = st.getDB(dbName);
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 // Test non-existing collection
-const noColl = db['unusedColl'];
-let res = db.runCommand({'collStats': noColl.getFullName()});
+const noColl = db["unusedColl"];
+let res = db.runCommand({"collStats": noColl.getFullName()});
 assert.eq(res.shards[st.shard0.shardName].numOrphanDocs, 0);
 
 // Setup collection for test with orphans
-const coll = db['test'];
+const coll = db["test"];
 const nss = coll.getFullName();
 assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
 
@@ -77,8 +76,7 @@ const numBatches = numDocs / rangeDeleterBatchSize;
 for (let i = 0; i < numBatches; i++) {
     // Wait for failpoint and check num orphans
     beforeDeletionFailpoint.wait();
-    assertCollStatsHasCorrectOrphanCount(
-        coll, st.shard0.shardName, numDocs - rangeDeleterBatchSize * i);
+    assertCollStatsHasCorrectOrphanCount(coll, st.shard0.shardName, numDocs - rangeDeleterBatchSize * i);
     // Unset and reset failpoint without allowing any batches deleted in the meantime
     afterDeletionFailpoint = configureFailPoint(st.shard0, "hangAfterDoingDeletion");
     beforeDeletionFailpoint.off();

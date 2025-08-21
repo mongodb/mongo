@@ -6,10 +6,7 @@
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    restartReplicationOnSecondaries,
-    stopReplicationOnSecondaries
-} from "jstests/libs/write_concern_util.js";
+import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
 
 const rst = new ReplSetTest({nodes: 2});
 
@@ -25,16 +22,16 @@ const cst = new ChangeStreamTest(db);
 // Attempts to get a document from the cursor with awaitData disabled, and asserts if a
 // document is present.
 function assertNextBatchIsEmpty(cursor) {
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
-    let res = assert.commandWorked(db.runCommand({
-        getMore: cursor.id,
-        collection: getCollectionNameFromFullNamespace(cursor.ns),
-        batchSize: 1
-    }));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
+    let res = assert.commandWorked(
+        db.runCommand({
+            getMore: cursor.id,
+            collection: getCollectionNameFromFullNamespace(cursor.ns),
+            batchSize: 1,
+        }),
+    );
     assert.eq(res.cursor.nextBatch.length, 0);
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
 }
 
 // Test read concerns other than "majority" are not supported.

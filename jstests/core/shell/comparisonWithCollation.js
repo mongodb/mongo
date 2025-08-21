@@ -24,10 +24,8 @@ assert.eq(_compareStringsWithCollation("a", "a\0", {locale: "en_US"}), 0);
 assert.eq(_compareStringsWithCollation("abc", "ABC", {locale: "en_US", strength: 1}), 0);
 assert.eq(_compareStringsWithCollation("abc", "ABC", {locale: "en_US", strength: 2}), 0);
 assert.lt(_compareStringsWithCollation("abc", "ABC", {locale: "en_US", strength: 3}), 0);
-assert.lt(
-    _compareStringsWithCollation("abc", "ABC", {locale: "en_US", strength: 1, caseLevel: true}), 0);
-assert.lt(
-    _compareStringsWithCollation("abc", "ABC", {locale: "en_US", strength: 2, caseLevel: true}), 0);
+assert.lt(_compareStringsWithCollation("abc", "ABC", {locale: "en_US", strength: 1, caseLevel: true}), 0);
+assert.lt(_compareStringsWithCollation("abc", "ABC", {locale: "en_US", strength: 2, caseLevel: true}), 0);
 
 assert.eq(_compareStringsWithCollation("eaio", "éáïô", {locale: "en_US", strength: 1}), 0);
 assert.lt(_compareStringsWithCollation("eaio", "éáïô", {locale: "en_US", strength: 2}), 0);
@@ -40,20 +38,20 @@ assert.gt(_compareStringsWithCollation("10", "2", {locale: "en_US", numericOrder
 assert.lt(_compareStringsWithCollation("10", "2", {locale: "en_US", numericOrdering: false}), 0);
 
 // Ignore whitespace and punctuation
-assert.eq(_compareStringsWithCollation("a b, c", "abc", {locale: "en_US", alternate: "shifted"}),
-          0);
-assert.neq(_compareStringsWithCollation(
-               "a b, c", "abc", {locale: "en_US", strength: 4, alternate: "shifted"}),
-           0);
-assert.eq(_compareStringsWithCollation(
-              "a b, c", "abc", {locale: "en_US", alternate: "shifted", maxVariable: "punct"}),
-          0);
-assert.neq(_compareStringsWithCollation(
-               "a b, c", "abc", {locale: "en_US", alternate: "shifted", maxVariable: "space"}),
-           0);
-assert.eq(_compareStringsWithCollation(
-              "a b c", "abc", {locale: "en_US", alternate: "shifted", maxVariable: "space"}),
-          0);
+assert.eq(_compareStringsWithCollation("a b, c", "abc", {locale: "en_US", alternate: "shifted"}), 0);
+assert.neq(_compareStringsWithCollation("a b, c", "abc", {locale: "en_US", strength: 4, alternate: "shifted"}), 0);
+assert.eq(
+    _compareStringsWithCollation("a b, c", "abc", {locale: "en_US", alternate: "shifted", maxVariable: "punct"}),
+    0,
+);
+assert.neq(
+    _compareStringsWithCollation("a b, c", "abc", {locale: "en_US", alternate: "shifted", maxVariable: "space"}),
+    0,
+);
+assert.eq(
+    _compareStringsWithCollation("a b c", "abc", {locale: "en_US", alternate: "shifted", maxVariable: "space"}),
+    0,
+);
 
 // error cases
 assert.throwsWithCode(() => _compareStringsWithCollation("", ""), 9367804);

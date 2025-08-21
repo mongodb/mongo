@@ -14,7 +14,7 @@ import {
     runTestReplSet,
     runTestShardedCluster,
     runTestStandaloneParamsSetAtRuntime,
-    runTestStandaloneParamsSetAtStartup
+    runTestStandaloneParamsSetAtStartup,
 } from "jstests/noPassthrough/network/libs/conn_establishment_rate_limiter_helpers.js";
 
 const nonExemptIP = get_ipaddr();
@@ -31,10 +31,12 @@ const testExemptIPsFromRateLimit = (conn) => {
             new Mongo(`mongodb://${nonExemptIP}:${conn.port}`);
         } catch (e) {
             jsTestLog(e);
-            return e.message.includes("Connection closed by peer") ||
+            return (
+                e.message.includes("Connection closed by peer") ||
                 e.message.includes("Connection reset by peer") ||
                 e.message.includes("established connection was aborted") ||
-                e.message.includes("Broken pipe");
+                e.message.includes("Broken pipe")
+            );
         }
 
         return false;

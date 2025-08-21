@@ -6,16 +6,18 @@
  *   requires_fcv_71,
  * ]
  */
-import {
-    getQueryStatsFindCmd,
-    getQueryStatsServerParameters
-} from "jstests/libs/query/query_stats_utils.js";
+import {getQueryStatsFindCmd, getQueryStatsServerParameters} from "jstests/libs/query/query_stats_utils.js";
 
 // Test that no query stats entry is written when (1) dispatching an initial find query, (2)
 // disabling query stats, then (3) completing the command. Below, we run variations of this test
 // with combinations of different strategies to disable query stats and to end the command.
-function testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion(
-    {conn, coll, disableQueryStatsFn, endCommandFn, enableQueryStatsFn}) {
+function testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion({
+    conn,
+    coll,
+    disableQueryStatsFn,
+    endCommandFn,
+    enableQueryStatsFn,
+}) {
     // Issue a find commannd with a batchSize of 1 so that the query is not exhausted.
     const cursor = coll.find({foo: 1}).batchSize(1);
     // Must run .next() to make sure the initial request is executed now.
@@ -35,7 +37,7 @@ function testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion(
 let options = getQueryStatsServerParameters();
 
 const conn = MongoRunner.runMongod(options);
-const testDB = conn.getDB('test');
+const testDB = conn.getDB("test");
 var coll = testDB[jsTestName()];
 coll.drop();
 
@@ -58,7 +60,7 @@ testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion({
     coll,
     disableQueryStatsFn: () => setQueryStatsCacheSize("0MB"),
     endCommandFn: (cursor) => cursor.itcount(),
-    enableQueryStatsFn: () => setQueryStatsCacheSize("10MB")
+    enableQueryStatsFn: () => setQueryStatsCacheSize("10MB"),
 });
 
 // Tests the scenario of disabling query stats by setting internalQueryStatsCacheSize to 0 and
@@ -67,9 +69,9 @@ testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion({
     conn: testDB,
     coll,
     disableQueryStatsFn: () => setQueryStatsCacheSize("0MB"),
-    endCommandFn: (cursor) => assert.commandWorked(
-        testDB.runCommand({killCursors: coll.getName(), cursors: [cursor.getId()]})),
-    enableQueryStatsFn: () => setQueryStatsCacheSize("10MB")
+    endCommandFn: (cursor) =>
+        assert.commandWorked(testDB.runCommand({killCursors: coll.getName(), cursors: [cursor.getId()]})),
+    enableQueryStatsFn: () => setQueryStatsCacheSize("10MB"),
 });
 
 MongoRunner.stopMongod(conn);

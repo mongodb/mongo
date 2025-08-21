@@ -9,7 +9,7 @@ const kShellPrefixOperations = 3;
 const kShellSuffixOperations = 1;
 
 function evalCmd(uri, evalstr, ok = true, asyncCb = null) {
-    const args = ['mongo', uri, '--eval', evalstr];
+    const args = ["mongo", uri, "--eval", evalstr];
 
     let exitCode = undefined;
     if (asyncCb) {
@@ -27,7 +27,7 @@ function evalCmd(uri, evalstr, ok = true, asyncCb = null) {
 }
 
 function runCmd(uri, runOnDB, cmd, ok = true) {
-    const evalFunc = function(dbname, cmd) {
+    const evalFunc = function (dbname, cmd) {
         jsTest.log(assert.commandWorked(db.getSiblingDB(dbname).runCommand(cmd)));
     };
     const evalstr = `(${evalFunc})(${tojson(runOnDB)}, ${tojson(cmd)});`;
@@ -39,10 +39,10 @@ function checkGRPCStats(conn, expect) {
     jsTest.log(grpcStats);
 
     function search(prefix, obj, expect) {
-        return function(key) {
+        return function (key) {
             assert(obj[key] !== undefined, `Missing '${prefix}.${key}' field`);
-            if (typeof expect[key] == 'object') {
-                assert.eq(typeof obj[key], 'object', `'${prefix}.${key}' expected object`);
+            if (typeof expect[key] == "object") {
+                assert.eq(typeof obj[key], "object", `'${prefix}.${key}' expected object`);
                 Object.keys(expect[key]).forEach(search(`${prefix}.${key}`, obj[key], expect[key]));
             } else {
                 assert.gte(obj[key], expect[key], `'${prefix}.${key}' value mismatch`);
@@ -50,21 +50,21 @@ function checkGRPCStats(conn, expect) {
         };
     }
 
-    Object.keys(expect).forEach(search('serverStatus.gRPC.ingress', grpcStats, expect));
+    Object.keys(expect).forEach(search("serverStatus.gRPC.ingress", grpcStats, expect));
 }
 
 function runTest(conn) {
     let expect = {
-        'streams': {
-            'total': 0,
-            'current': 0,
-            'successful': 0,
+        "streams": {
+            "total": 0,
+            "current": 0,
+            "successful": 0,
         },
-        'operations': {
-            'total': 0,
-            'active': 0,
+        "operations": {
+            "total": 0,
+            "active": 0,
         },
-        'uniqueClientsSeen': 0,
+        "uniqueClientsSeen": 0,
     };
 
     // Test currently makes assumption that connections via Mongo objects are using ASIO
@@ -89,15 +89,14 @@ function runTest(conn) {
     const uri = `mongodb://localhost:${conn.fullOptions.grpcPort}/?gRPC=true`;
 
     // Connect with {failureURI} to have the server abort the connection during the reply cycle.
-    const failureURI = uri + '&appName=Failure%20Client';
-    configureFailPoint(
-        conn, 'sessionWorkflowDelayOrFailSendMessage', {appName: 'Failure Client'}, 'alwaysOn');
+    const failureURI = uri + "&appName=Failure%20Client";
+    configureFailPoint(conn, "sessionWorkflowDelayOrFailSendMessage", {appName: "Failure Client"}, "alwaysOn");
 
-    runCmd(uri, 'admin', {ping: 1});
+    runCmd(uri, "admin", {ping: 1});
     expectSuccess();
     checkGRPCStats(conn, expect);
 
-    runCmd(uri, 'admin', {noSuchCommand: 1}, false);
+    runCmd(uri, "admin", {noSuchCommand: 1}, false);
     // Althrough the execution of the command failed,
     // the stream itself, and the operation lifetime, succeeded.
     expectSuccess();
@@ -105,7 +104,7 @@ function runTest(conn) {
 
     // The server fails to send its response via the stream, so it cancels the RPC,
     // thus not marking it as successful.
-    runCmd(failureURI, 'admin', {ping: 1}, false);
+    runCmd(failureURI, "admin", {ping: 1}, false);
     expectFailed(1);
     checkGRPCStats(conn, expect);
 
@@ -117,13 +116,15 @@ function runTest(conn) {
     const kShellShutdownDelay = kShellStartTimeout * 2;
     const kShellStartInterval = 500;
     clearRawMongoProgramOutput();
-    evalCmd(uri, `print("Kill Test\\n"); sleep(${kShellShutdownDelay});`, false, function(pid) {
+    evalCmd(uri, `print("Kill Test\\n"); sleep(${kShellShutdownDelay});`, false, function (pid) {
         // Wait for the output from the eval string so that we know prefix ops have completed,
         // then kill the shell so that the stream shuts down unsuccessfully.
-        assert.soon(() => rawMongoProgramOutput("Kill Test").includes("Kill Test"),
-                    "Shell start failure",
-                    kShellStartTimeout,
-                    kShellStartInterval);
+        assert.soon(
+            () => rawMongoProgramOutput("Kill Test").includes("Kill Test"),
+            "Shell start failure",
+            kShellStartTimeout,
+            kShellStartInterval,
+        );
         stopMongoProgramByPid(pid, kSIGKILL);
     });
     expectFailed(kShellPrefixOperations);

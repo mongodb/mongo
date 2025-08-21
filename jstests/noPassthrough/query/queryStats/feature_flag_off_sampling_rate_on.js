@@ -9,8 +9,8 @@ let options = {
     setParameter: {internalQueryStatsRateLimit: -1, featureFlagQueryStats: false},
 };
 const conn = MongoRunner.runMongod(options);
-assert.neq(null, conn, 'failed to start mongod');
-const testdb = conn.getDB('test');
+assert.neq(null, conn, "failed to start mongod");
+const testdb = conn.getDB("test");
 
 var coll = testdb[jsTestName()];
 coll.drop();
@@ -26,15 +26,18 @@ assert.commandWorked(bulk.execute());
 // rate is > 0.
 assert.commandFailedWithCode(
     testdb.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
-    ErrorCodes.QueryFeatureNotAllowed);
+    ErrorCodes.QueryFeatureNotAllowed,
+);
 
 // Pipeline, with a filter, to read queryStats store fails without feature flag turned on even
 // though sampling rate is > 0.
-assert.commandFailedWithCode(testdb.adminCommand({
-    aggregate: 1,
-    pipeline: [{$queryStats: {}}, {$match: {"key.queryShape.find": {$eq: "###"}}}],
-    cursor: {}
-}),
-                             ErrorCodes.QueryFeatureNotAllowed);
+assert.commandFailedWithCode(
+    testdb.adminCommand({
+        aggregate: 1,
+        pipeline: [{$queryStats: {}}, {$match: {"key.queryShape.find": {$eq: "###"}}}],
+        cursor: {},
+    }),
+    ErrorCodes.QueryFeatureNotAllowed,
+);
 
 MongoRunner.stopMongod(conn);

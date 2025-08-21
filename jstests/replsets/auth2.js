@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // it has been signed with a dummy key results in an authorization error.
 TestData.skipGossipingClusterTime = true;
 
-var testInvalidAuthStates = function(replSetTest) {
+var testInvalidAuthStates = function (replSetTest) {
     jsTestLog("check that 0 is in recovering");
     replSetTest.waitForState(replSetTest.nodes[0], ReplSetTest.State.RECOVERING);
 
@@ -35,22 +35,25 @@ var key2 = path + "key2";
 var replSetTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
 var nodes = replSetTest.startSet();
 var hostnames = replSetTest.nodeList();
-replSetTest.initiate({
-    "_id": name,
-    "members": [
-        {"_id": 0, "host": hostnames[0], "priority": 2},
-        {"_id": 1, "host": hostnames[1], priority: 0},
-        {"_id": 2, "host": hostnames[2], priority: 0}
-    ]
-},
-                     null,
-                     {initiateWithDefaultElectionTimeout: true});
+replSetTest.initiate(
+    {
+        "_id": name,
+        "members": [
+            {"_id": 0, "host": hostnames[0], "priority": 2},
+            {"_id": 1, "host": hostnames[1], priority: 0},
+            {"_id": 2, "host": hostnames[2], priority: 0},
+        ],
+    },
+    null,
+    {initiateWithDefaultElectionTimeout: true},
+);
 
 var primary = replSetTest.getPrimary();
 
 jsTestLog("add an admin user");
-primary.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
-                                  {w: 3, wtimeout: replSetTest.timeoutMS});
+primary
+    .getDB("admin")
+    .createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles}, {w: 3, wtimeout: replSetTest.timeoutMS});
 
 jsTestLog("starting 1 and 2 with key file");
 replSetTest.stop(1);

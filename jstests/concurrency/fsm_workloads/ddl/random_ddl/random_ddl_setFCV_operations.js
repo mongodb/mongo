@@ -14,39 +14,29 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    handleRandomSetFCVErrors
-} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
-import {
-    assertSetFCVSoon
-} from "jstests/concurrency/fsm_workload_helpers/query/assert_fcv_reset_soon.js";
-import {
-    uniformDistTransitions
-} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_operations.js";
+import {handleRandomSetFCVErrors} from "jstests/concurrency/fsm_workload_helpers/fcv/handle_setFCV_errors.js";
+import {assertSetFCVSoon} from "jstests/concurrency/fsm_workload_helpers/query/assert_fcv_reset_soon.js";
+import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_operations.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.states.setFCV = function(db, collName, connCache) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.states.setFCV = function (db, collName, connCache) {
         const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
         const targetFCV = fcvValues[Random.randInt(3)];
-        jsTestLog('Executing FCV state, setting to:' + targetFCV);
+        jsTestLog("Executing FCV state, setting to:" + targetFCV);
         try {
-            assert.commandWorked(
-                db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
         } catch (e) {
-            if (handleRandomSetFCVErrors(e, targetFCV))
-                return;
+            if (handleRandomSetFCVErrors(e, targetFCV)) return;
             throw e;
         }
 
-        jsTestLog('setFCV state finished');
+        jsTestLog("setFCV state finished");
     };
 
     $config.transitions = uniformDistTransitions($config.states);
 
-    $config.teardown = function(db, collName, cluster) {
+    $config.teardown = function (db, collName, cluster) {
         assertSetFCVSoon(db, latestFCV);
     };
 

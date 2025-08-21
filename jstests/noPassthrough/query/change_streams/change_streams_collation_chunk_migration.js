@@ -20,25 +20,26 @@ const st = new ShardingTest({
 const testDB = st.s.getDB(jsTestName());
 
 // Enable sharding on the test database and ensure that the primary is shard0.
-assert.commandWorked(
-    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 const caseInsensitiveCollectionName = "change_stream_case_insensitive";
 const caseInsensitive = {
     locale: "en_US",
-    strength: 2
+    strength: 2,
 };
 
 // Create the collection with a case-insensitive collation, then shard it on {shardKey: 1}.
-const caseInsensitiveCollection = assertDropAndRecreateCollection(
-    testDB, caseInsensitiveCollectionName, {collation: caseInsensitive});
+const caseInsensitiveCollection = assertDropAndRecreateCollection(testDB, caseInsensitiveCollectionName, {
+    collation: caseInsensitive,
+});
+assert.commandWorked(caseInsensitiveCollection.createIndex({shardKey: 1}, {collation: {locale: "simple"}}));
 assert.commandWorked(
-    caseInsensitiveCollection.createIndex({shardKey: 1}, {collation: {locale: "simple"}}));
-assert.commandWorked(testDB.adminCommand({
-    shardCollection: caseInsensitiveCollection.getFullName(),
-    key: {shardKey: 1},
-    collation: {locale: "simple"}
-}));
+    testDB.adminCommand({
+        shardCollection: caseInsensitiveCollection.getFullName(),
+        key: {shardKey: 1},
+        collation: {locale: "simple"},
+    }),
+);
 
 // Verify that the collection does not exist on shard1.
 assert(!st.shard1.getCollection(caseInsensitiveCollection.getFullName()).exists());
@@ -47,7 +48,7 @@ assert(!st.shard1.getCollection(caseInsensitiveCollection.getFullName()).exists(
 const cst = new ChangeStreamTest(testDB);
 const csCursor = cst.startWatchingChanges({
     pipeline: [{$changeStream: {}}, {$project: {docId: "$documentKey.shardKey"}}],
-    collection: caseInsensitiveCollection
+    collection: caseInsensitiveCollection,
 });
 
 // Insert some documents into the collection.
@@ -55,12 +56,14 @@ assert.commandWorked(caseInsensitiveCollection.insert({shardKey: 0, text: "aBc"}
 assert.commandWorked(caseInsensitiveCollection.insert({shardKey: 1, text: "abc"}));
 
 // Move a chunk from shard0 to shard1. This will create the collection on shard1.
-assert.commandWorked(testDB.adminCommand({
-    moveChunk: caseInsensitiveCollection.getFullName(),
-    find: {shardKey: 1},
-    to: st.rs1.getURL(),
-    _waitForDelete: false
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        moveChunk: caseInsensitiveCollection.getFullName(),
+        find: {shardKey: 1},
+        to: st.rs1.getURL(),
+        _waitForDelete: false,
+    }),
+);
 
 // Attempt to read from the change stream. We should see both inserts, without an invalidation.
 cst.assertNextChangesEqual({cursor: csCursor, expectedChanges: [{docId: 0}, {docId: 1}]});

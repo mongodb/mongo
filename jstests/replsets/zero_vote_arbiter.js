@@ -27,7 +27,7 @@ TestData.skipCheckDBHashes = true;
     conf.members.push({_id: 3, host: arbiterConn.host, arbiterOnly: true, votes: 0});
     conf.version++;
 
-    jsTestLog('Add arbiter with zero votes:');
+    jsTestLog("Add arbiter with zero votes:");
     var response = admin.runCommand({replSetReconfig: conf});
     assert.commandFailed(response);
     assert.eq(response.code, InvalidReplicaSetConfig);
@@ -50,7 +50,7 @@ TestData.skipCheckDBHashes = true;
     var admin = replTest.getPrimary().getDB("admin");
     var conf = admin.runCommand({replSetGetConfig: 1}).config;
 
-    jsTestLog('Reconfig arbiter with zero votes:');
+    jsTestLog("Reconfig arbiter with zero votes:");
     conf.members[3].votes = 0;
     conf.version++;
     var response = admin.runCommand({replSetReconfig: conf});
@@ -74,7 +74,7 @@ TestData.skipCheckDBHashes = true;
 
     var admin = conns[0].getDB("admin");
 
-    jsTestLog('replSetInitiate with 0-vote arbiter:');
+    jsTestLog("replSetInitiate with 0-vote arbiter:");
     var response = admin.runCommand({replSetInitiate: config});
     printjson(response);
     assert.commandFailed(response);
@@ -100,7 +100,7 @@ TestData.skipCheckDBHashes = true;
     conf.members.push({_id: 7, host: arbiterConn.host, arbiterOnly: true, votes: 0});
     conf.version++;
 
-    jsTestLog('Add arbiter with zero votes:');
+    jsTestLog("Add arbiter with zero votes:");
     var response = admin.runCommand({replSetReconfig: conf});
     assert.commandFailed(response);
     assert.eq(response.code, InvalidReplicaSetConfig);

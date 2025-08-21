@@ -13,9 +13,9 @@ export function ValidationTest(conn, _dbName) {
     const testBasicCollName = "testBasicColl";
     assert.commandWorked(db.createCollection(testBasicCollName));
     const listCollectionRes = assert.commandWorked(
-        db.runCommand({listCollections: 1, filter: {name: testBasicCollName}}));
-    const isClusteredColl =
-        listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
+        db.runCommand({listCollections: 1, filter: {name: testBasicCollName}}),
+    );
+    const isClusteredColl = listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
 
     // Create an FLE collection.
     if (isEnterpriseShell()) {
@@ -27,18 +27,18 @@ export function ValidationTest(conn, _dbName) {
                     "path": "firstName",
                     "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
                     "bsonType": "string",
-                    "queries": {"queryType": "equality"}  // allow single object or array
+                    "queries": {"queryType": "equality"}, // allow single object or array
                 },
-            ]
+            ],
         };
-        assert.commandWorked(client.createEncryptionCollection(
-            testFLECollName, {encryptedFields: sampleEncryptedFields}));
+        assert.commandWorked(
+            client.createEncryptionCollection(testFLECollName, {encryptedFields: sampleEncryptedFields}),
+        );
     }
 
     // Create a view.
     const testViewName = "testView";
-    assert.commandWorked(
-        db.runCommand({create: testViewName, viewOn: testBasicCollName, pipeline: []}));
+    assert.commandWorked(db.runCommand({create: testViewName, viewOn: testBasicCollName, pipeline: []}));
 
     // Make the regular collection the default test collection.
     const collName = testBasicCollName;
@@ -61,12 +61,12 @@ export function ValidationTest(conn, _dbName) {
         {
             // On a sharded cluster, this has the config server as the primary shard.
             dbName: "config",
-            collName: "chunks"
+            collName: "chunks",
         },
         {
             // On a sharded cluster, this is a sharded collection.
             dbName: "config",
-            collName: "system.sessions"
+            collName: "system.sessions",
         },
         // Cannot analyze a shard key or queries for a collection is the local database.
         {dbName: "local", collName: "rs.oplog"},
@@ -74,18 +74,16 @@ export function ValidationTest(conn, _dbName) {
         {dbName: "admin", collName: "users"},
         // Cannot analyze a shard key or queries for a system collection.
         {dbName: dbName, collName: "system.profile"},
-        ...(
-            isEnterpriseShell()
-                ? [
-                    // Cannot analyze a shard key or queries for an FLE state collection.
-                    {dbName: dbName, collName: "enxcol_.basic.esc"},
-                    {dbName: dbName, collName: "enxcol_.basic.ecoc"},
-                    // Cannot analyze a shard key or queries for a collection with FLE enabled.
-                    {dbName: dbName, collName: "testFLEColl"},
-                    {dbName: dbName, collName: testViewName, isView: true}
-                  ]
-                : []
-        )
+        ...(isEnterpriseShell()
+            ? [
+                  // Cannot analyze a shard key or queries for an FLE state collection.
+                  {dbName: dbName, collName: "enxcol_.basic.esc"},
+                  {dbName: dbName, collName: "enxcol_.basic.ecoc"},
+                  // Cannot analyze a shard key or queries for a collection with FLE enabled.
+                  {dbName: dbName, collName: "testFLEColl"},
+                  {dbName: dbName, collName: testViewName, isView: true},
+              ]
+            : []),
     ];
     const invalidShardKeyTestCases = [
         // Cannot analyze an empty shard key.
@@ -120,15 +118,14 @@ export function ValidationTest(conn, _dbName) {
             shardKey: {a: 1},
         },
         {
-            indexOptions:
-                {key: {"a": 1}, name: "a_partial", partialFilterExpression: {c: {$gt: 5}}},
+            indexOptions: {key: {"a": 1}, name: "a_partial", partialFilterExpression: {c: {$gt: 5}}},
             shardKey: {a: 1},
         },
         {
             indexOptions: {
                 key: {"a": 1},
                 name: "a_non_simple_collation",
-                collation: {locale: "en_US", strength: 1, caseLevel: false}
+                collation: {locale: "en_US", strength: 1, caseLevel: false},
             },
             shardKey: {a: 1},
         },
@@ -140,7 +137,7 @@ export function ValidationTest(conn, _dbName) {
         makeDocuments,
         invalidNamespaceTestCases,
         invalidShardKeyTestCases,
-        noCompatibleIndexTestCases
+        noCompatibleIndexTestCases,
     };
 }
 
@@ -151,15 +148,19 @@ export function runInvalidNamespaceTestsForConfigure(conn, optionalDbName) {
     const validationTest = ValidationTest(conn, optionalDbName);
     for (let {dbName, collName, isView} of validationTest.invalidNamespaceTestCases) {
         jsTest.log(
-            `Testing that the configureQueryAnalyzer command fails if the namespace is invalid ${
-                tojson({dbName, collName})}`);
+            `Testing that the configureQueryAnalyzer command fails if the namespace is invalid ${tojson({
+                dbName,
+                collName,
+            })}`,
+        );
         const aggCmdObj = {
             configureQueryAnalyzer: dbName + "." + collName,
             mode: "full",
-            samplesPerSecond: 1
+            samplesPerSecond: 1,
         };
         assert.commandFailedWithCode(
             conn.adminCommand(aggCmdObj),
-            isView ? ErrorCodes.CommandNotSupportedOnView : ErrorCodes.IllegalOperation);
+            isView ? ErrorCodes.CommandNotSupportedOnView : ErrorCodes.IllegalOperation,
+        );
     }
 }

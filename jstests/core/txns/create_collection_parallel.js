@@ -11,10 +11,10 @@ import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {createCollAndCRUDInTxn} from "jstests/libs/txns/create_collection_txn_helpers.js";
 
-const dbName = 'test_txns_create_collection_parallel';
+const dbName = "test_txns_create_collection_parallel";
 
 function runParallelCollectionCreateTest(command, explicitCreate) {
-    const dbName = 'test_txns_create_collection_parallel';
+    const dbName = "test_txns_create_collection_parallel";
     const collName = "create_new_collection";
     const distinctCollName = collName + "_second";
     const session = db.getMongo().getDB(dbName).getMongo().startSession();
@@ -30,35 +30,36 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     jsTest.log("Testing duplicate createCollections, second createCollection fails");
     withRetryOnTransientTxnError(
         () => {
-            session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
-            secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+            session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
+            secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
             createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
             jsTest.log("Committing transaction 1");
             session.commitTransaction();
             assert.eq(sessionColl.find({}).itcount(), 1);
 
-            assert.commandFailedWithCode(secondSessionDB.runCommand({create: collName}),
-                                         ErrorCodes.NamespaceExists);
+            assert.commandFailedWithCode(secondSessionDB.runCommand({create: collName}), ErrorCodes.NamespaceExists);
 
-            assert.commandFailedWithCode(secondSession.abortTransaction_forTesting(),
-                                         ErrorCodes.NoSuchTransaction);
+            assert.commandFailedWithCode(secondSession.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
         },
         () => {
             session.abortTransaction();
             secondSession.abortTransaction();
             sessionColl.drop({writeConcern: {w: "majority"}});
-        });
+        },
+    );
 
     sessionColl.drop({writeConcern: {w: "majority"}});
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log("Testing duplicate createCollections, where failing createCollection performs a " +
-               "successful operation earlier in the transaction.");
+    jsTest.log(
+        "Testing duplicate createCollections, where failing createCollection performs a " +
+            "successful operation earlier in the transaction.",
+    );
 
     withRetryOnTransientTxnError(
         () => {
-            session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
-            secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+            session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
+            secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
             createCollAndCRUDInTxn(secondSessionDB, distinctCollName, command, explicitCreate);
             createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
             jsTest.log("Committing transaction 1");
@@ -69,15 +70,15 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
             // will succeed and we will instead throw WCE when trying to commit the transaction.
             assert.commandWorked(secondSessionDB.runCommand({create: collName}));
 
-            assert.commandFailedWithCode(secondSession.commitTransaction_forTesting(),
-                                         ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(secondSession.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
         },
         () => {
             session.abortTransaction();
             secondSession.abortTransaction();
             sessionColl.drop({writeConcern: {w: "majority"}});
             distinctSessionColl.drop({writeConcern: {w: "majority"}});
-        });
+        },
+    );
 
     assert.eq(distinctSessionColl.find({}).itcount(), 0);
     sessionColl.drop({writeConcern: {w: "majority"}});
@@ -93,40 +94,36 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
             () => {
                 session.startTransaction({writeConcern: {w: "majority"}});
                 createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
-                assert.commandWorked(
-                    secondSessionDB.runCommand({create: collName}));  // outside txn
+                assert.commandWorked(secondSessionDB.runCommand({create: collName})); // outside txn
                 assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
 
                 jsTest.log("Committing transaction (SHOULD FAIL)");
-                assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                             ErrorCodes.WriteConflict);
+                assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
                 assert.eq(sessionColl.find({}).itcount(), 1);
             },
             () => {
                 session.abortTransaction();
                 sessionColl.drop({writeConcern: {w: "majority"}});
-            });
+            },
+        );
     }
 
     sessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log(
-        "Testing duplicate createCollections in parallel, both attempt to commit, second to commit fails");
+    jsTest.log("Testing duplicate createCollections in parallel, both attempt to commit, second to commit fails");
 
     withRetryOnTransientTxnError(
         () => {
-            secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-            createCollAndCRUDInTxn(
-                secondSession.getDatabase(dbName), collName, command, explicitCreate);
+            secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
+            createCollAndCRUDInTxn(secondSession.getDatabase(dbName), collName, command, explicitCreate);
 
-            session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
+            session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
             createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
 
             jsTest.log("Committing transaction 2");
             secondSession.commitTransaction();
             jsTest.log("Committing transaction 1 (SHOULD FAIL)");
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                         ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
             assert.eq(sessionColl.find({}).itcount(), 1);
         },
         () => {
@@ -137,28 +134,29 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
                 // ignore
             }
             sessionColl.drop({writeConcern: {w: "majority"}});
-        });
+        },
+    );
 
     sessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log("Testing duplicate createCollections which implicitly create databases in parallel" +
-               ", both attempt to commit, second to commit fails");
+    jsTest.log(
+        "Testing duplicate createCollections which implicitly create databases in parallel" +
+            ", both attempt to commit, second to commit fails",
+    );
 
     assert.commandWorked(sessionDB.dropDatabase());
     withRetryOnTransientTxnError(
         () => {
-            secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-            createCollAndCRUDInTxn(
-                secondSession.getDatabase(dbName), collName, command, explicitCreate);
+            secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
+            createCollAndCRUDInTxn(secondSession.getDatabase(dbName), collName, command, explicitCreate);
 
-            session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
+            session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
             createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
 
             jsTest.log("Committing transaction 2");
             secondSession.commitTransaction();
             jsTest.log("Committing transaction 1 (SHOULD FAIL)");
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                         ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
             assert.eq(sessionColl.find({}).itcount(), 1);
         },
         () => {
@@ -169,29 +167,29 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
                 // ignore
             }
             sessionDB.dropDatabase();
-        });
+        },
+    );
     sessionColl.drop({writeConcern: {w: "majority"}});
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log("Testing createCollection conflict during commit, where the conflict rolls back a " +
-               "previously committed collection.");
+    jsTest.log(
+        "Testing createCollection conflict during commit, where the conflict rolls back a " +
+            "previously committed collection.",
+    );
 
     withRetryOnTransientTxnError(
         () => {
-            secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-            createCollAndCRUDInTxn(
-                secondSession.getDatabase(dbName), collName, command, explicitCreate);
+            secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
+            createCollAndCRUDInTxn(secondSession.getDatabase(dbName), collName, command, explicitCreate);
 
-            session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-            createCollAndCRUDInTxn(
-                sessionDB, distinctCollName, command, explicitCreate);  // does not conflict
-            createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);  // conflicts
+            session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
+            createCollAndCRUDInTxn(sessionDB, distinctCollName, command, explicitCreate); // does not conflict
+            createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate); // conflicts
 
             jsTest.log("Committing transaction 2");
             secondSession.commitTransaction();
             jsTest.log("Committing transaction 1 (SHOULD FAIL)");
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                         ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
             assert.eq(sessionColl.find({}).itcount(), 1);
             assert.eq(distinctSessionColl.find({}).itcount(), 0);
         },
@@ -204,7 +202,8 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
             }
             sessionColl.drop({writeConcern: {w: "majority"}});
             distinctSessionColl.drop({writeConcern: {w: "majority"}});
-        });
+        },
+    );
 
     sessionColl.drop({writeConcern: {w: "majority"}});
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
@@ -212,10 +211,10 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     jsTest.log("Testing distinct createCollections in parallel, both successfully commit.");
     withRetryOnTransientTxnError(
         () => {
-            session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
+            session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
             createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
 
-            secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+            secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
             createCollAndCRUDInTxn(secondSessionDB, distinctCollName, command, explicitCreate);
 
             session.commitTransaction();
@@ -230,7 +229,8 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
             }
             sessionColl.drop({writeConcern: {w: "majority"}});
             distinctSessionColl.drop({writeConcern: {w: "majority"}});
-        });
+        },
+    );
 
     secondSession.endSession();
     session.endSession();

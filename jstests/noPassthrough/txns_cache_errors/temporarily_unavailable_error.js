@@ -21,7 +21,7 @@ const replSet = new ReplSetTest({
             // Lower these values from the defaults to speed up the test.
             temporarilyUnavailableMaxRetries: 3,
             temporarilyUnavailableBackoffBaseMs: 10,
-        }
+        },
     },
 });
 replSet.startSet();
@@ -33,8 +33,7 @@ const db = replSet.getPrimary().getDB("test");
 // SERVER-61909 ticket description.
 assert.commandWorked(db.c.createIndex({x: "text"}));
 let doc = {x: []};
-for (let j = 0; j < 50000; j++)
-    doc.x.push("" + Math.random() + Math.random());
+for (let j = 0; j < 50000; j++) doc.x.push("" + Math.random() + Math.random());
 
 (function temporarilyUnavailableNonTransaction() {
     const serverStatusBefore = db.serverStatus();
@@ -55,14 +54,19 @@ for (let j = 0; j < 50000; j++)
         break;
     }
 
-    assert(caughtTUerror,
-           "did not return the expected TemporarilyUnavailable error after " + (attempts - 1) +
-               " attempts");
+    assert(
+        caughtTUerror,
+        "did not return the expected TemporarilyUnavailable error after " + (attempts - 1) + " attempts",
+    );
     const serverStatusAfter = db.serverStatus();
-    assert.gt(serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
-              serverStatusBefore.metrics.operation.temporarilyUnavailableErrors);
-    assert.gt(serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
-              serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped);
+    assert.gt(
+        serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrors,
+    );
+    assert.gt(
+        serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped,
+    );
 })();
 
 (function temporarilyUnavailableInTransactionIsConvertedToWriteConflict() {
@@ -93,18 +97,24 @@ for (let j = 0; j < 50000; j++)
         break;
     }
 
-    assert(caughtWriteConflict,
-           "did not return the expected WriteConflict error after " + (attempts - 1) +
-               " attempts. Result: " + tojson(ret));
+    assert(
+        caughtWriteConflict,
+        "did not return the expected WriteConflict error after " + (attempts - 1) + " attempts. Result: " + tojson(ret),
+    );
 
     const serverStatusAfter = db.serverStatus();
     assert.gt(
         serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsConvertedToWriteConflict,
-        serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsConvertedToWriteConflict);
-    assert.eq(serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
-              serverStatusBefore.metrics.operation.temporarilyUnavailableErrors);
-    assert.eq(serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
-              serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped);
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsConvertedToWriteConflict,
+    );
+    assert.eq(
+        serverStatusAfter.metrics.operation.temporarilyUnavailableErrors,
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrors,
+    );
+    assert.eq(
+        serverStatusAfter.metrics.operation.temporarilyUnavailableErrorsEscaped,
+        serverStatusBefore.metrics.operation.temporarilyUnavailableErrorsEscaped,
+    );
 })();
 
 replSet.stopSet();

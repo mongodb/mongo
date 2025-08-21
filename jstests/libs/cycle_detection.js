@@ -22,9 +22,9 @@ export function Graph() {
     };
 
     const State = {
-        kNotYetVisited: Symbol('not yet visited'),
-        kVisitingInProgress: Symbol('visiting in progress'),
-        kAlreadyVisited: Symbol('already visited'),
+        kNotYetVisited: Symbol("not yet visited"),
+        kVisitingInProgress: Symbol("visiting in progress"),
+        kAlreadyVisited: Symbol("already visited"),
     };
 
     /**
@@ -53,8 +53,9 @@ export function Graph() {
             {
                 const nodeState = state.get(node);
                 if (nodeState !== State.kNotYetVisited) {
-                    throw new Error('Found node ' + tojsononeline(node) +
-                                    ' unexpectedly in state ' + nodeState.toString());
+                    throw new Error(
+                        "Found node " + tojsononeline(node) + " unexpectedly in state " + nodeState.toString(),
+                    );
                 }
             }
 

@@ -9,7 +9,7 @@ const clientOptions = [
     "--tlsCAFile",
     "jstests/libs/ca.pem",
     "--eval",
-    ";"
+    ";",
 ];
 
 function runTest(serverDisabledProtos, clientDisabledProtos) {
@@ -25,7 +25,6 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
             expectedRegex =
                 /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: .*stream truncated/;
         }
-
     } else if (implementation === "windows") {
         expectedRegex =
             /Error: couldn't connect to server .*:[0-9]*, connection attempt failed: SocketException: .*The function requested is not supported/;
@@ -45,17 +44,23 @@ function runTest(serverDisabledProtos, clientDisabledProtos) {
 
     let mongoOutput;
 
-    assert.soon(function() {
-        clearRawMongoProgramOutput();
-        runMongoProgram("mongo",
-                        "--port",
-                        md.port,
-                        ...clientOptions,
-                        "--tlsDisabledProtocols",
-                        clientDisabledProtos);
-        mongoOutput = rawMongoProgramOutput(".*");
-        return mongoOutput.match(expectedRegex);
-    }, "Mongo shell output was as follows:\n" + mongoOutput + "\n************", 60 * 1000);
+    assert.soon(
+        function () {
+            clearRawMongoProgramOutput();
+            runMongoProgram(
+                "mongo",
+                "--port",
+                md.port,
+                ...clientOptions,
+                "--tlsDisabledProtocols",
+                clientDisabledProtos,
+            );
+            mongoOutput = rawMongoProgramOutput(".*");
+            return mongoOutput.match(expectedRegex);
+        },
+        "Mongo shell output was as follows:\n" + mongoOutput + "\n************",
+        60 * 1000,
+    );
 
     MongoRunner.stopMongod(md);
 }

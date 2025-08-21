@@ -32,17 +32,21 @@ function executeTest(db, isMongos) {
     (function simplePositiveCase() {
         const t = db.max_time_ms_simple_positive;
 
-        assert.commandWorked(t.insert(Array.from({length: 1000}, _ => ({}))));
+        assert.commandWorked(t.insert(Array.from({length: 1000}, (_) => ({}))));
         cursor = t.find({
-            $where: function() {
+            $where: function () {
                 sleep(100);
                 return true;
-            }
+            },
         });
         cursor.maxTimeMS(100);
-        error = assert.throws(function() {
-            cursor.itcount();
-        }, [], "expected query to abort due to time limit");
+        error = assert.throws(
+            function () {
+                cursor.itcount();
+            },
+            [],
+            "expected query to abort due to time limit",
+        );
         assert.commandFailedWithCode(error, ErrorCodes.MaxTimeMSExpired);
     })();
 
@@ -55,15 +59,19 @@ function executeTest(db, isMongos) {
 
         assert.commandWorked(t.insert([{}, {}, {}]));
         cursor = t.find({
-            $where: function() {
+            $where: function () {
                 sleep(100);
                 return true;
-            }
+            },
         });
         cursor.maxTimeMS(10 * 1000);
-        assert.doesNotThrow(function() {
-            cursor.itcount();
-        }, [], "expected query to not hit the time limit");
+        assert.doesNotThrow(
+            function () {
+                cursor.itcount();
+            },
+            [],
+            "expected query to not hit the time limit",
+        );
     })();
 
     //
@@ -76,29 +84,44 @@ function executeTest(db, isMongos) {
     (function simplePositiveGetMore() {
         const t = db.max_time_ms_simple_positive_get_more;
 
-        assert.commandWorked(t.insert([{_id: 0}, {_id: 1}, {_id: 2}]));  // fast batch
-        assert.commandWorked(t.insert(
-            [{_id: 3, slow: true}, {_id: 4, slow: true}, {_id: 5, slow: true}]));  // slow batch
-        cursor = t.find({
-                      $where: function() {
-                          if (this.slow) {
-                              sleep(5 * 1000);
-                          }
-                          return true;
-                      }
-                  }).sort({_id: 1});
+        assert.commandWorked(t.insert([{_id: 0}, {_id: 1}, {_id: 2}])); // fast batch
+        assert.commandWorked(
+            t.insert([
+                {_id: 3, slow: true},
+                {_id: 4, slow: true},
+                {_id: 5, slow: true},
+            ]),
+        ); // slow batch
+        cursor = t
+            .find({
+                $where: function () {
+                    if (this.slow) {
+                        sleep(5 * 1000);
+                    }
+                    return true;
+                },
+            })
+            .sort({_id: 1});
         cursor.batchSize(3);
         cursor.maxTimeMS(4 * 1000);
-        assert.doesNotThrow(function() {
-            cursor.next();
-            cursor.next();
-            cursor.next();
-        }, [], "expected batch 1 (query) to not hit the time limit");
-        error = assert.throws(function() {
-            cursor.next();
-            cursor.next();
-            cursor.next();
-        }, [], "expected batch 2 (getmore) to abort due to time limit");
+        assert.doesNotThrow(
+            function () {
+                cursor.next();
+                cursor.next();
+                cursor.next();
+            },
+            [],
+            "expected batch 1 (query) to not hit the time limit",
+        );
+        error = assert.throws(
+            function () {
+                cursor.next();
+                cursor.next();
+                cursor.next();
+            },
+            [],
+            "expected batch 2 (getmore) to abort due to time limit",
+        );
         assert.commandFailedWithCode(error, ErrorCodes.MaxTimeMSExpired);
     })();
 
@@ -112,28 +135,38 @@ function executeTest(db, isMongos) {
     (function simpleNegativeGetMore() {
         const t = db.max_time_ms_simple_negative_get_more;
 
-        assert.commandWorked(t.insert([{_id: 0}, {_id: 1}, {_id: 2}]));              // fast batch
-        assert.commandWorked(t.insert([{_id: 3}, {_id: 4}, {_id: 5, slow: true}]));  // slow batch
-        cursor = t.find({
-                      $where: function() {
-                          if (this.slow) {
-                              sleep(2 * 1000);
-                          }
-                          return true;
-                      }
-                  }).sort({_id: 1});
+        assert.commandWorked(t.insert([{_id: 0}, {_id: 1}, {_id: 2}])); // fast batch
+        assert.commandWorked(t.insert([{_id: 3}, {_id: 4}, {_id: 5, slow: true}])); // slow batch
+        cursor = t
+            .find({
+                $where: function () {
+                    if (this.slow) {
+                        sleep(2 * 1000);
+                    }
+                    return true;
+                },
+            })
+            .sort({_id: 1});
         cursor.batchSize(3);
         cursor.maxTimeMS(10 * 1000);
-        assert.doesNotThrow(function() {
-            cursor.next();
-            cursor.next();
-            cursor.next();
-        }, [], "expected batch 1 (query) to not hit the time limit");
-        assert.doesNotThrow(function() {
-            cursor.next();
-            cursor.next();
-            cursor.next();
-        }, [], "expected batch 2 (getmore) to not hit the time limit");
+        assert.doesNotThrow(
+            function () {
+                cursor.next();
+                cursor.next();
+                cursor.next();
+            },
+            [],
+            "expected batch 1 (query) to not hit the time limit",
+        );
+        assert.doesNotThrow(
+            function () {
+                cursor.next();
+                cursor.next();
+                cursor.next();
+            },
+            [],
+            "expected batch 2 (getmore) to not hit the time limit",
+        );
     })();
 
     //
@@ -145,22 +178,27 @@ function executeTest(db, isMongos) {
         const t = db.max_time_ms_many_batch_positive_get_more;
 
         for (let i = 0; i < 5; i++) {
-            assert.commandWorked(
-                t.insert([{_id: 3 * i}, {_id: (3 * i) + 1}, {_id: (3 * i) + 2, slow: true}]));
+            assert.commandWorked(t.insert([{_id: 3 * i}, {_id: 3 * i + 1}, {_id: 3 * i + 2, slow: true}]));
         }
-        cursor = t.find({
-                      $where: function() {
-                          if (this.slow) {
-                              sleep(2 * 1000);
-                          }
-                          return true;
-                      }
-                  }).sort({_id: 1});
+        cursor = t
+            .find({
+                $where: function () {
+                    if (this.slow) {
+                        sleep(2 * 1000);
+                    }
+                    return true;
+                },
+            })
+            .sort({_id: 1});
         cursor.batchSize(3);
         cursor.maxTimeMS(6 * 1000);
-        error = assert.throws(function() {
-            cursor.itcount();
-        }, [], "expected find() to abort due to time limit");
+        error = assert.throws(
+            function () {
+                cursor.itcount();
+            },
+            [],
+            "expected find() to abort due to time limit",
+        );
         assert.commandFailedWithCode(error, ErrorCodes.MaxTimeMSExpired);
     })();
 
@@ -172,26 +210,31 @@ function executeTest(db, isMongos) {
     (function manyBatchNegativeGetMore() {
         const t = db.many_batch_negative_get_more;
         for (var i = 0; i < 5; i++) {
-            assert.commandWorked(
-                t.insert([{_id: 3 * i}, {_id: (3 * i) + 1}, {_id: (3 * i) + 2, slow: true}]));
+            assert.commandWorked(t.insert([{_id: 3 * i}, {_id: 3 * i + 1}, {_id: 3 * i + 2, slow: true}]));
         }
-        cursor = t.find({
-                      $where: function() {
-                          if (this.slow) {
-                              sleep(2 * 1000);
-                          }
-                          return true;
-                      }
-                  }).sort({_id: 1});
+        cursor = t
+            .find({
+                $where: function () {
+                    if (this.slow) {
+                        sleep(2 * 1000);
+                    }
+                    return true;
+                },
+            })
+            .sort({_id: 1});
         cursor.batchSize(3);
         cursor.maxTimeMS(20 * 1000);
-        assert.doesNotThrow(function() {
-            // SERVER-40305: Add some additional logging here in case this fails to help us track
-            // down why it failed.
-            assert.commandWorked(db.adminCommand({setParameter: 1, traceExceptions: 1}));
-            cursor.itcount();
-            assert.commandWorked(db.adminCommand({setParameter: 1, traceExceptions: 0}));
-        }, [], "expected find() to not hit the time limit");
+        assert.doesNotThrow(
+            function () {
+                // SERVER-40305: Add some additional logging here in case this fails to help us track
+                // down why it failed.
+                assert.commandWorked(db.adminCommand({setParameter: 1, traceExceptions: 1}));
+                cursor.itcount();
+                assert.commandWorked(db.adminCommand({setParameter: 1, traceExceptions: 0}));
+            },
+            [],
+            "expected find() to not hit the time limit",
+        );
     })();
 
     //
@@ -205,7 +248,8 @@ function executeTest(db, isMongos) {
         }
         assert.commandFailedWithCode(
             db.adminCommand({sleep: 1, millis: 300, maxTimeMS: 100, lock: "none"}),
-            ErrorCodes.MaxTimeMSExpired);
+            ErrorCodes.MaxTimeMSExpired,
+        );
     })();
 
     //
@@ -217,8 +261,7 @@ function executeTest(db, isMongos) {
             // Test-only sleep command is not supported on mongos.
             return;
         }
-        assert.commandWorked(
-            db.adminCommand({sleep: 1, millis: 300, maxTimeMS: 10 * 1000, lock: "none"}));
+        assert.commandWorked(db.adminCommand({sleep: 1, millis: 300, maxTimeMS: 10 * 1000, lock: "none"}));
     })();
 
     //
@@ -229,97 +272,113 @@ function executeTest(db, isMongos) {
         assert.commandWorked(t.insert({}));
 
         // Verify lower boundary for acceptable input (0 is acceptable, 1 isn't).
-        assert.doesNotThrow(function() {
+        assert.doesNotThrow(function () {
             t.find().maxTimeMS(0).itcount();
         });
-        assert.doesNotThrow(function() {
+        assert.doesNotThrow(function () {
             t.find().maxTimeMS(NumberInt(0)).itcount();
         });
-        assert.doesNotThrow(function() {
+        assert.doesNotThrow(function () {
             t.find().maxTimeMS(NumberLong(0)).itcount();
         });
         assert.commandWorked(db.runCommand({ping: 1, maxTimeMS: 0}));
         assert.commandWorked(db.runCommand({ping: 1, maxTimeMS: NumberInt(0)}));
         assert.commandWorked(db.runCommand({ping: 1, maxTimeMS: NumberLong(0)}));
 
-        assert.throws(function() {
+        assert.throws(function () {
             t.find().maxTimeMS(-1).itcount();
         });
-        assert.throws(function() {
+        assert.throws(function () {
             t.find().maxTimeMS(NumberInt(-1)).itcount();
         });
-        assert.throws(function() {
+        assert.throws(function () {
             t.find().maxTimeMS(NumberLong(-1)).itcount();
         });
         assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: -1}), ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberInt(-1)}),
-                                     ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberLong(-1)}),
-                                     ErrorCodes.BadValue);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberInt(-1)}), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberLong(-1)}), ErrorCodes.BadValue);
 
         // Verify upper boundary for acceptable input (2^31-1 is acceptable, 2^31 isn't).
 
         var maxValue = Math.pow(2, 31) - 1;
 
-        assert.doesNotThrow(function() {
+        assert.doesNotThrow(function () {
             t.find().maxTimeMS(maxValue).itcount();
         });
-        assert.doesNotThrow(function() {
+        assert.doesNotThrow(function () {
             t.find().maxTimeMS(NumberInt(maxValue)).itcount();
         });
-        assert.doesNotThrow(function() {
+        assert.doesNotThrow(function () {
             t.find().maxTimeMS(NumberLong(maxValue)).itcount();
         });
         assert.commandWorked(db.runCommand({ping: 1, maxTimeMS: maxValue}));
         assert.commandWorked(db.runCommand({ping: 1, maxTimeMS: NumberInt(maxValue)}));
         assert.commandWorked(db.runCommand({ping: 1, maxTimeMS: NumberLong(maxValue)}));
 
-        assert.throws(function() {
-            t.find().maxTimeMS(maxValue + 1).itcount();
+        assert.throws(function () {
+            t.find()
+                .maxTimeMS(maxValue + 1)
+                .itcount();
         });
-        assert.throws(function() {
-            t.find().maxTimeMS(NumberInt(maxValue + 1)).itcount();
+        assert.throws(function () {
+            t.find()
+                .maxTimeMS(NumberInt(maxValue + 1))
+                .itcount();
         });
-        assert.throws(function() {
-            t.find().maxTimeMS(NumberLong(maxValue + 1)).itcount();
+        assert.throws(function () {
+            t.find()
+                .maxTimeMS(NumberLong(maxValue + 1))
+                .itcount();
         });
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: maxValue + 1}),
-                                     ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberInt(maxValue + 1)}),
-                                     ErrorCodes.BadValue);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberLong(maxValue + 1)}),
-                                     ErrorCodes.BadValue);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: maxValue + 1}), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: NumberInt(maxValue + 1)}), ErrorCodes.BadValue);
+        assert.commandFailedWithCode(
+            db.runCommand({ping: 1, maxTimeMS: NumberLong(maxValue + 1)}),
+            ErrorCodes.BadValue,
+        );
 
         // Verify invalid values are rejected.
-        assert.throws(function() {
+        assert.throws(function () {
             t.find().maxTimeMS(0.1).itcount();
         });
-        assert.throws(function() {
+        assert.throws(function () {
             t.find().maxTimeMS(-0.1).itcount();
         });
-        assert.throws(function() {
+        assert.throws(function () {
             t.find().maxTimeMS("").itcount();
         });
-        assert.throws(function() {
+        assert.throws(function () {
             t.find().maxTimeMS(true).itcount();
         });
-        assert.throws(function() {
+        assert.throws(function () {
             t.find().maxTimeMS({}).itcount();
         });
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: 0.1}),
-                                     [ErrorCodes.FailedToParse, ErrorCodes.BadValue]);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: -0.1}),
-                                     [ErrorCodes.FailedToParse, ErrorCodes.BadValue]);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: ""}),
-                                     [ErrorCodes.TypeMismatch, ErrorCodes.BadValue]);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: true}),
-                                     [ErrorCodes.TypeMismatch, ErrorCodes.BadValue]);
-        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: {}}),
-                                     [ErrorCodes.TypeMismatch, ErrorCodes.BadValue]);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: 0.1}), [
+            ErrorCodes.FailedToParse,
+            ErrorCodes.BadValue,
+        ]);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: -0.1}), [
+            ErrorCodes.FailedToParse,
+            ErrorCodes.BadValue,
+        ]);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: ""}), [
+            ErrorCodes.TypeMismatch,
+            ErrorCodes.BadValue,
+        ]);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: true}), [
+            ErrorCodes.TypeMismatch,
+            ErrorCodes.BadValue,
+        ]);
+        assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: {}}), [
+            ErrorCodes.TypeMismatch,
+            ErrorCodes.BadValue,
+        ]);
 
         // Verify that the server rejects invalid command argument $maxTimeMS.
-        assert.commandFailed(t.getDB().runCommand({ping: 1, $maxTimeMS: 0}),
-                             [ErrorCodes.InvalidOptions, ErrorCodes.IDLUnknownField]);
+        assert.commandFailed(t.getDB().runCommand({ping: 1, $maxTimeMS: 0}), [
+            ErrorCodes.InvalidOptions,
+            ErrorCodes.IDLUnknownField,
+        ]);
     })();
 
     //
@@ -329,26 +388,20 @@ function executeTest(db, isMongos) {
         // maxTimeAlwaysTimeOut positive test for command.
         const t = db.max_time_ms_always_time_out_fp;
         try {
-            assert.commandWorked(
-                db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
-            assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: 10 * 1000}),
-                                         ErrorCodes.MaxTimeMSExpired);
+            assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
+            assert.commandFailedWithCode(db.runCommand({ping: 1, maxTimeMS: 10 * 1000}), ErrorCodes.MaxTimeMSExpired);
         } finally {
-            assert.commandWorked(
-                db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
+            assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
         }
 
         // maxTimeNeverTimeOut positive test for command. Don't run on mongos because there's no
         // sleep command.
         if (!isMongos) {
             try {
-                assert.commandWorked(
-                    db.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
-                assert.commandWorked(
-                    db.adminCommand({sleep: 1, millis: 300, maxTimeMS: 100, lock: "none"}));
+                assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
+                assert.commandWorked(db.adminCommand({sleep: 1, millis: 300, maxTimeMS: 100, lock: "none"}));
             } finally {
-                assert.commandWorked(
-                    db.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}));
+                assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}));
             }
         }
 
@@ -356,9 +409,15 @@ function executeTest(db, isMongos) {
         try {
             setFailPoint({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"});
 
-            assert.throws(function() {
-                t.find().maxTimeMS(10 * 1000).itcount();
-            }, [], "expected query to trigger maxTimeAlwaysTimeOut fail point");
+            assert.throws(
+                function () {
+                    t.find()
+                        .maxTimeMS(10 * 1000)
+                        .itcount();
+                },
+                [],
+                "expected query to trigger maxTimeAlwaysTimeOut fail point",
+            );
         } finally {
             setFailPoint({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"});
         }
@@ -369,15 +428,19 @@ function executeTest(db, isMongos) {
             const coll = db.max_time_ms_never_time_out_positive_query;
             assert.commandWorked(coll.insert([{}, {}, {}]));
             cursor = coll.find({
-                $where: function() {
+                $where: function () {
                     sleep(100);
                     return true;
-                }
+                },
             });
             cursor.maxTimeMS(100);
-            assert.doesNotThrow(function() {
-                cursor.itcount();
-            }, [], "expected query to trigger maxTimeNeverTimeOut fail point");
+            assert.doesNotThrow(
+                function () {
+                    cursor.itcount();
+                },
+                [],
+                "expected query to trigger maxTimeNeverTimeOut fail point",
+            );
         } finally {
             setFailPoint({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"});
         }
@@ -387,16 +450,23 @@ function executeTest(db, isMongos) {
     (function alwaysTimeOutPositiveTest() {
         const coll = db.max_time_ms_always_time_out_positive_get_more;
         assert.commandWorked(coll.insert([{}, {}, {}]));
-        cursor = coll.find().maxTimeMS(10 * 1000).batchSize(2);
-        assert.doesNotThrow(function() {
+        cursor = coll
+            .find()
+            .maxTimeMS(10 * 1000)
+            .batchSize(2);
+        assert.doesNotThrow(function () {
             cursor.next();
             cursor.next();
         });
         try {
             setFailPoint({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"});
-            assert.throws(function() {
-                cursor.next();
-            }, [], "expected getmore to trigger maxTimeAlwaysTimeOut fail point");
+            assert.throws(
+                function () {
+                    cursor.next();
+                },
+                [],
+                "expected getmore to trigger maxTimeAlwaysTimeOut fail point",
+            );
         } finally {
             setFailPoint({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"});
         }
@@ -405,33 +475,47 @@ function executeTest(db, isMongos) {
     // maxTimeNeverTimeOut positive test for getmore.
     (function neverTimeOutPositiveTest() {
         const coll = db.max_time_ms_never_time_out_fp;
-        assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}, {_id: 2}]));  // fast batch
-        assert.commandWorked(coll.insert(
-            [{_id: 3, slow: true}, {_id: 4, slow: true}, {_id: 5, slow: true}]));  // slow batch
-        cursor = coll.find({
-                         $where: function() {
-                             if (this.slow) {
-                                 sleep(2 * 1000);
-                             }
-                             return true;
-                         }
-                     })
-                     .sort({_id: 1});
+        assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}, {_id: 2}])); // fast batch
+        assert.commandWorked(
+            coll.insert([
+                {_id: 3, slow: true},
+                {_id: 4, slow: true},
+                {_id: 5, slow: true},
+            ]),
+        ); // slow batch
+        cursor = coll
+            .find({
+                $where: function () {
+                    if (this.slow) {
+                        sleep(2 * 1000);
+                    }
+                    return true;
+                },
+            })
+            .sort({_id: 1});
         cursor.batchSize(3);
         cursor.maxTimeMS(2 * 1000);
-        assert.doesNotThrow(function() {
-            cursor.next();
-            cursor.next();
-            cursor.next();
-        }, [], "expected batch 1 (query) to not hit the time limit");
+        assert.doesNotThrow(
+            function () {
+                cursor.next();
+                cursor.next();
+                cursor.next();
+            },
+            [],
+            "expected batch 1 (query) to not hit the time limit",
+        );
         try {
             setFailPoint({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"});
 
-            assert.doesNotThrow(function() {
-                cursor.next();
-                cursor.next();
-                cursor.next();
-            }, [], "expected batch 2 (getmore) to trigger maxTimeNeverTimeOut fail point");
+            assert.doesNotThrow(
+                function () {
+                    cursor.next();
+                    cursor.next();
+                    cursor.next();
+                },
+                [],
+                "expected batch 2 (getmore) to trigger maxTimeNeverTimeOut fail point",
+            );
         } finally {
             setFailPoint({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"});
         }
@@ -446,15 +530,15 @@ function executeTest(db, isMongos) {
         assert.commandWorked(t.insert({x: 1}));
 
         // "aggregate" command.
-        assert.commandWorked(
-            t.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}));
+        assert.commandWorked(t.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}));
 
         // "collMod" command.
         assert.commandWorked(t.runCommand("collMod", {maxTimeMS: 60 * 1000}));
 
         // "createIndexes" command.
-        assert.commandWorked(t.runCommand(
-            "createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}], maxTimeMS: 60 * 1000}));
+        assert.commandWorked(
+            t.runCommand("createIndexes", {indexes: [{key: {x: 1}, name: "x_1"}], maxTimeMS: 60 * 1000}),
+        );
     })();
 
     //
@@ -465,7 +549,7 @@ function executeTest(db, isMongos) {
         try {
             setFailPoint({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"});
 
-            assert.doesNotThrow(function() {
+            assert.doesNotThrow(function () {
                 t.find({}).maxTimeMS(1).count();
             });
         } finally {
@@ -475,7 +559,7 @@ function executeTest(db, isMongos) {
 }
 
 const enableTestCmd = {
-    setParameter: {enableTestCommands: 1}
+    setParameter: {enableTestCommands: 1},
 };
 (function runOnStandalone() {
     const conn = MongoRunner.runMongod(enableTestCmd);
@@ -489,8 +573,7 @@ const enableTestCmd = {
 
 (function runSharded() {
     const enableTestCmd = {setParameter: {enableTestCommands: 1}};
-    const st = new ShardingTest(
-        {shards: 2, other: {rsOptions: enableTestCmd, mongosOptions: enableTestCmd}});
+    const st = new ShardingTest({shards: 2, other: {rsOptions: enableTestCmd, mongosOptions: enableTestCmd}});
     try {
         executeTest(st.s.getDB("test"), true);
     } finally {

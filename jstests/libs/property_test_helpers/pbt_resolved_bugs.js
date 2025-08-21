@@ -16,19 +16,21 @@ const partialIndexExample102825 = {
     collSpec: {
         isTS: false,
         docs: [{_id: 0, a: 0}],
-        indexes: [{
-            def: {a: 1},
-            options: {partialFilterExpression: {$or: [{a: 1}, {a: {$lte: 'a string'}}]}}
-        }]
+        indexes: [
+            {
+                def: {a: 1},
+                options: {partialFilterExpression: {$or: [{a: 1}, {a: {$lte: "a string"}}]}},
+            },
+        ],
     },
     queries: [
-        [{$match: {$or: [{a: 1}, {a: {$lte: 'a string'}}], _id: {$lte: 5}}}],
-        [{$match: {$or: [{a: 1}, {a: {$lte: 10}}], _id: {$lte: 5}}}]
-    ]
+        [{$match: {$or: [{a: 1}, {a: {$lte: "a string"}}], _id: {$lte: 5}}}],
+        [{$match: {$or: [{a: 1}, {a: {$lte: 10}}], _id: {$lte: 5}}}],
+    ],
 };
 
 const partialIndexExample2_partialFilter = {
-    $or: [{a: {$lt: ""}}, {_id: {$eq: 0}, a: {$eq: 0}}]
+    $or: [{a: {$lt: ""}}, {_id: {$eq: 0}, a: {$eq: 0}}],
 };
 const partialIndexExample2 = {
     collSpec: {
@@ -38,18 +40,18 @@ const partialIndexExample2 = {
             {def: {a: 1}, options: {partialFilterExpression: partialIndexExample2_partialFilter}},
             {
                 def: {a: 1, m: 1},
-                options: {partialFilterExpression: partialIndexExample2_partialFilter}
+                options: {partialFilterExpression: partialIndexExample2_partialFilter},
             },
             {
                 def: {b: 1, a: 1},
-                options: {partialFilterExpression: partialIndexExample2_partialFilter}
-            }
-        ]
+                options: {partialFilterExpression: partialIndexExample2_partialFilter},
+            },
+        ],
     },
     queries: [
         [{$match: {$or: [{a: {$lt: ""}}, {_id: {$eq: 0}, a: {$eq: -1}}]}}, {$sort: {b: 1}}],
-        [{$match: {$or: [{a: {$lt: 1}}, {_id: {$eq: 0}, a: {$eq: 0}}]}}, {$sort: {b: 1}}]
-    ]
+        [{$match: {$or: [{a: {$lt: 1}}, {_id: {$eq: 0}, a: {$eq: 0}}]}}, {$sort: {b: 1}}],
+    ],
 };
 
 export const partialIndexCounterexamples = [
@@ -66,16 +68,20 @@ const planStabilityExample106983 = {
         isTS: false,
         docs: [
             {_id: 187, t: ISODate("1970-01-01T00:00:00Z"), array: [], a: 0},
-            {_id: 83, t: ISODate("1970-01-01T00:00:00Z"), array: "", a: 0}
+            {_id: 83, t: ISODate("1970-01-01T00:00:00Z"), array: "", a: 0},
         ],
-        indexes: [{def: {t: 1, array: 1}, options: {}}]
+        indexes: [{def: {t: 1, array: 1}, options: {}}],
     },
-    queries: [[{
-        $match: {
-            $or: [{t: {$exists: true}}, {_id: 0, a: 0}],
-            $and: [{array: {$nin: [0]}}, {array: {$eq: ""}}]
-        }
-    }]]
+    queries: [
+        [
+            {
+                $match: {
+                    $or: [{t: {$exists: true}}, {_id: 0, a: 0}],
+                    $and: [{array: {$nin: [0]}}, {array: {$eq: ""}}],
+                },
+            },
+        ],
+    ],
 };
 
 export const planStabilityCounterexamples = [[planStabilityExample106983]];

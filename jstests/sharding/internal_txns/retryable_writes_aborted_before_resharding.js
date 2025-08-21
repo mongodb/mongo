@@ -5,11 +5,11 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence, exclude_from_large_txns]
  */
-import {
-    InternalTransactionReshardingTest
-} from "jstests/sharding/internal_txns/libs/resharding_test.js";
+import {InternalTransactionReshardingTest} from "jstests/sharding/internal_txns/libs/resharding_test.js";
 
 const transactionTest = new InternalTransactionReshardingTest({reshardInPlace: false});
 transactionTest.runTestForInsertUpdateDeleteBeforeResharding(
-    transactionTest.InternalTxnType.kRetryable, true /* abortOnInitialTry */);
+    transactionTest.InternalTxnType.kRetryable,
+    true /* abortOnInitialTry */,
+);
 transactionTest.stop();

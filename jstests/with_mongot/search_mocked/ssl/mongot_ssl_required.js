@@ -19,7 +19,7 @@ const conn = MongoRunner.runMongod({
     sslPEMKeyFile: "jstests/libs/password_protected.pem",
     sslPEMKeyPassword: "qwerty",
     setParameter: {mongotHost: mongotConn.host, searchTLSMode: "disabled"},
-    sslCAFile: "jstests/libs/ca.pem"
+    sslCAFile: "jstests/libs/ca.pem",
 });
 
 const db = conn.getDB("test");
@@ -30,7 +30,7 @@ assert.commandWorked(db[collName].insert({"_id": 1, "title": "cakes"}));
 const collUUID = getUUIDFromListCollections(db, collName);
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 // Give mongotmock some stuff to return.
@@ -44,23 +44,20 @@ const searchQuery = {
                 cursor: {
                     id: NumberLong(0),
                     ns: "test." + collName,
-                    nextBatch: [{_id: 1, $searchScore: 0.321}]
+                    nextBatch: [{_id: 1, $searchScore: 0.321}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 // Perform a $search query.
 let cursor = db[collName].aggregate([{$search: searchQuery}]);
 
-const expected = [
-    {"_id": 1, "title": "cakes"},
-];
+const expected = [{"_id": 1, "title": "cakes"}];
 assert.eq(expected, cursor.toArray());
 
 MongoRunner.stopMongod(conn);

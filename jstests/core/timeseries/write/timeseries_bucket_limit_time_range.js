@@ -15,9 +15,9 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const collNamePrefix = jsTestName() + '_';
+    const collNamePrefix = jsTestName() + "_";
 
-    const timeFieldName = 'time';
+    const timeFieldName = "time";
 
     // Assumes the measurements in each bucket span at most one hour (based on the time field).
     // Make sure we have three measurements to trigger compression if enabled. The data types in
@@ -26,22 +26,21 @@ TimeseriesTest.run((insert) => {
         ISODate("2020-11-13T01:00:00Z"),
         ISODate("2020-11-13T01:00:01Z"),
         ISODate("2020-11-13T01:00:02Z"),
-        ISODate("2020-11-13T03:00:00Z")
+        ISODate("2020-11-13T03:00:00Z"),
     ];
     const numDocs = 4;
 
-    const runTest = function(numDocsPerInsert) {
+    const runTest = function (numDocsPerInsert) {
         const coll = db.getCollection(collNamePrefix + numDocsPerInsert);
         coll.drop();
 
-        assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+        assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
         let docs = [];
         for (let i = 0; i < numDocs; i++) {
             docs.push({_id: i, [timeFieldName]: docTimes[i], x: i});
             if ((i + 1) % numDocsPerInsert === 0) {
-                assert.commandWorked(insert(coll, docs), 'failed to insert docs: ' + tojson(docs));
+                assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
                 docs = [];
             }
         }
@@ -51,19 +50,13 @@ TimeseriesTest.run((insert) => {
         assert.eq(numDocs, userDocs.length, userDocs);
         for (let i = 0; i < numDocs; i++) {
             const viewDoc = userDocs[i];
-            assert.eq(i, viewDoc._id, 'unexpected _id in doc: ' + i + ': ' + tojson(viewDoc));
-            assert.eq(i, viewDoc.x, 'unexpected field x in doc: ' + i + ': ' + tojson(viewDoc));
-            assert.eq(docTimes[i],
-                      viewDoc[timeFieldName],
-                      'unexpected time in doc: ' + i + ': ' + tojson(viewDoc));
+            assert.eq(i, viewDoc._id, "unexpected _id in doc: " + i + ": " + tojson(viewDoc));
+            assert.eq(i, viewDoc.x, "unexpected field x in doc: " + i + ": " + tojson(viewDoc));
+            assert.eq(docTimes[i], viewDoc[timeFieldName], "unexpected time in doc: " + i + ": " + tojson(viewDoc));
         }
 
         // Check buckets.
-        const bucketDocs = getTimeseriesCollForRawOps(coll)
-                               .find()
-                               .rawData()
-                               .sort({'control.min._id': 1})
-                               .toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
 
         // Check both buckets.
         // First bucket should be not contain both documents because the time of the second
@@ -73,68 +66,85 @@ TimeseriesTest.run((insert) => {
             assert.eq(
                 0,
                 bucketDocs[0].control.min._id,
-                'invalid control.min for _id in first bucket: ' + tojson(bucketDocs[0].control));
+                "invalid control.min for _id in first bucket: " + tojson(bucketDocs[0].control),
+            );
             assert.eq(
                 0,
                 bucketDocs[0].control.min.x,
-                'invalid control.min for x in first bucket: ' + tojson(bucketDocs[0].control));
+                "invalid control.min for x in first bucket: " + tojson(bucketDocs[0].control),
+            );
             assert.eq(
                 docTimes[0],
                 bucketDocs[0].control.min[timeFieldName],
-                'invalid control.min for time in first bucket: ' + tojson(bucketDocs[0].control));
+                "invalid control.min for time in first bucket: " + tojson(bucketDocs[0].control),
+            );
             assert.eq(
                 2,
                 bucketDocs[0].control.max._id,
-                'invalid control.max for _id in first bucket: ' + tojson(bucketDocs[0].control));
+                "invalid control.max for _id in first bucket: " + tojson(bucketDocs[0].control),
+            );
             assert.eq(
                 2,
                 bucketDocs[0].control.max.x,
-                'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
+                "invalid control.max for x in first bucket: " + tojson(bucketDocs[0].control),
+            );
             assert.eq(
                 docTimes[2],
                 bucketDocs[0].control.max[timeFieldName],
-                'invalid control.max for time in first bucket: ' + tojson(bucketDocs[0].control));
-            assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
-                   'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+                "invalid control.max for time in first bucket: " + tojson(bucketDocs[0].control),
+            );
+            assert(
+                TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
+                "unexpected control.version in first bucket: " + tojson(bucketDocs),
+            );
 
             // Second bucket should contain the remaining document.
             assert.eq(
                 numDocs - 1,
                 bucketDocs[1].control.min._id,
-                'invalid control.min for _id in second bucket: ' + tojson(bucketDocs[1].control));
+                "invalid control.min for _id in second bucket: " + tojson(bucketDocs[1].control),
+            );
             assert.eq(
                 numDocs - 1,
                 bucketDocs[1].control.min.x,
-                'invalid control.min for x in second bucket: ' + tojson(bucketDocs[1].control));
+                "invalid control.min for x in second bucket: " + tojson(bucketDocs[1].control),
+            );
             assert.eq(
                 docTimes[numDocs - 1],
                 bucketDocs[1].control.min[timeFieldName],
-                'invalid control.min for time in second bucket: ' + tojson(bucketDocs[1].control));
+                "invalid control.min for time in second bucket: " + tojson(bucketDocs[1].control),
+            );
             assert.eq(
                 numDocs - 1,
                 bucketDocs[1].control.max._id,
-                'invalid control.max for _id in second bucket: ' + tojson(bucketDocs[1].control));
+                "invalid control.max for _id in second bucket: " + tojson(bucketDocs[1].control),
+            );
             assert.eq(
                 numDocs - 1,
                 bucketDocs[1].control.max.x,
-                'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
+                "invalid control.max for x in second bucket: " + tojson(bucketDocs[1].control),
+            );
             assert.eq(
                 docTimes[numDocs - 1],
                 bucketDocs[1].control.max[timeFieldName],
-                'invalid control.max for time in second bucket: ' + tojson(bucketDocs[1].control));
-            assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
-                   'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+                "invalid control.max for time in second bucket: " + tojson(bucketDocs[1].control),
+            );
+            assert(
+                TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
+                "unexpected control.version in second bucket: " + tojson(bucketDocs),
+            );
         } else {
             // In suites running moveCollection in the background, it is possible to hit the issue
             // described by SERVER-89349 which will result in more bucket documents being created.
             // However, we should still guarantee the time limit range for buckets.
             assert.lte(2, bucketDocs.length, bucketDocs);
             bucketDocs.forEach((bucketDoc) => {
-                let bucketRangeMillis =
-                    bucketDoc.control.max[timeFieldName] - bucketDoc.control.min[timeFieldName];
+                let bucketRangeMillis = bucketDoc.control.max[timeFieldName] - bucketDoc.control.min[timeFieldName];
                 assert.gte(1000 * 60 * 60, bucketRangeMillis);
-                assert(TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
-                       'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+                assert(
+                    TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
+                    "unexpected control.version in second bucket: " + tojson(bucketDocs),
+                );
             });
         }
     };

@@ -11,7 +11,7 @@ const mongodHasIpv6 = MongoRunner.runMongod({
     tlsCertificateKeyFile: SERVER1_CERT,
     tlsCAFile: CA_CERT,
     ipv6: "",
-    bind_ip: "::1,127.0.0.1"
+    bind_ip: "::1,127.0.0.1",
 });
 if (mongodHasIpv6 == null) {
     jsTest.log("Unable to run all tests because ipv6 is not on machine, see BF-10990");
@@ -34,7 +34,7 @@ function authAndTest(cert_option) {
             "--tlsCertificateKeyFile",
             CLIENT_CERT,
             "--eval",
-            ";"
+            ";",
         ];
 
         if (hasIpv6) {

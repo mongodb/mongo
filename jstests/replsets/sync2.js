@@ -4,9 +4,9 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var replTest = new ReplSetTest({
-    name: 'sync2',
+    name: "sync2",
     nodes: [{rsConfig: {priority: 5}}, {arbiter: true}, {}, {}, {}],
-    useBridge: true
+    useBridge: true,
 });
 var conns = replTest.startSet();
 replTest.initiate();
@@ -26,10 +26,14 @@ conns[3].disconnect(conns[1]);
 conns[4].disconnect(conns[1]);
 conns[4].disconnect(conns[3]);
 
-assert.soon(function() {
-    primary = replTest.getPrimary();
-    return primary === conns[0];
-}, "node 0 should become primary before timeout", replTest.timeoutMS);
+assert.soon(
+    function () {
+        primary = replTest.getPrimary();
+        return primary === conns[0];
+    },
+    "node 0 should become primary before timeout",
+    replTest.timeoutMS,
+);
 
 replTest.awaitReplication();
 jsTestLog("Checking that ops still replicate correctly");

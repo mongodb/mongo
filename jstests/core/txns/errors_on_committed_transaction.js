@@ -23,7 +23,7 @@ const sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
 
 const doc = {
-    x: 1
+    x: 1,
 };
 
 session.startTransaction();
@@ -36,42 +36,51 @@ const txnNumber = NumberLong(session.getTxnNumber_forTesting());
 jsTestLog("Test that calling prepare on a committed transaction fails.");
 assert.commandFailedWithCode(
     sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber, autocommit: false}),
-    ErrorCodes.TransactionCommitted);
+    ErrorCodes.TransactionCommitted,
+);
 
-jsTestLog("Test the error precedence when calling prepare on a committed transaction but not " +
-          "providing txnNumber to prepareTransaction.");
-assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1, autocommit: false}),
-                             ErrorCodes.InvalidOptions);
-
-jsTestLog("Test the error precedence when calling prepare on a committed transaction but not " +
-          "providing autocommit to prepareTransaction.");
-assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber}),
-                             50768);
-
-jsTestLog("Test the error precedence when calling prepare on a committed transaction and " +
-          "providing startTransaction to prepareTransaction.");
+jsTestLog(
+    "Test the error precedence when calling prepare on a committed transaction but not " +
+        "providing txnNumber to prepareTransaction.",
+);
 assert.commandFailedWithCode(
-    sessionDB.adminCommand(
-        {prepareTransaction: 1, txnNumber: txnNumber, autocommit: false, startTransaction: true}),
-    ErrorCodes.OperationNotSupportedInTransaction);
+    sessionDB.adminCommand({prepareTransaction: 1, autocommit: false}),
+    ErrorCodes.InvalidOptions,
+);
+
+jsTestLog(
+    "Test the error precedence when calling prepare on a committed transaction but not " +
+        "providing autocommit to prepareTransaction.",
+);
+assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber}), 50768);
+
+jsTestLog(
+    "Test the error precedence when calling prepare on a committed transaction and " +
+        "providing startTransaction to prepareTransaction.",
+);
+assert.commandFailedWithCode(
+    sessionDB.adminCommand({prepareTransaction: 1, txnNumber: txnNumber, autocommit: false, startTransaction: true}),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 
 // Call commit on committed transaction without shell helper.
 jsTestLog("Test that calling commit with invalid fields on a committed transaction fails.");
 assert.commandFailedWithCode(
-    sessionDB.adminCommand(
-        {commitTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
-    ErrorCodes.IDLUnknownField);
+    sessionDB.adminCommand({commitTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
+    ErrorCodes.IDLUnknownField,
+);
 
 // Call abort on committed transaction without shell helper.
 jsTestLog("Test that calling abort on a committed transaction fails.");
 assert.commandFailedWithCode(
     sessionDB.adminCommand({abortTransaction: 1, txnNumber: txnNumber, autocommit: false}),
-    ErrorCodes.TransactionCommitted);
+    ErrorCodes.TransactionCommitted,
+);
 
 jsTestLog("Test that calling abort with invalid fields on a committed transaction fails.");
 assert.commandFailedWithCode(
-    sessionDB.adminCommand(
-        {abortTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
-    ErrorCodes.IDLUnknownField);
+    sessionDB.adminCommand({abortTransaction: 1, invalidField: 1, txnNumber: txnNumber, autocommit: false}),
+    ErrorCodes.IDLUnknownField,
+);
 
 session.endSession();

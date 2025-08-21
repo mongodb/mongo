@@ -20,7 +20,14 @@ assert.eq(found, {_id: 0, y: 1});
 
 // Test that pipeline-style update supports the 'fields' argument.
 assert(coll.drop());
-assert.commandWorked(coll.insert([{_id: 0, x: 0}, {_id: 1, x: 1}, {_id: 2, x: 2}, {_id: 3, x: 3}]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, x: 0},
+        {_id: 1, x: 1},
+        {_id: 2, x: 2},
+        {_id: 3, x: 3},
+    ]),
+);
 found = coll.findAndModify({query: {_id: 0}, update: [{$set: {y: 0}}], fields: {x: 0}});
 assert.eq(found, {_id: 0});
 
@@ -37,8 +44,7 @@ assert.eq(found, {_id: 3, x: 3});
 // Tests for explain using findAndModify with an _id equality query.
 //
 {
-    let explain =
-        coll.explain("queryPlanner").findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
+    let explain = coll.explain("queryPlanner").findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
     // post 8.0, EXPRESS will handle update-by-id
     if (!planHasStage(db, explain.queryPlanner.winningPlan, "EXPRESS_UPDATE")) {
         assert(planHasStage(db, explain.queryPlanner.winningPlan, "IDHACK"));
@@ -46,8 +52,7 @@ assert.eq(found, {_id: 3, x: 3});
     }
 
     // Run explain with execution-level verbosity.
-    explain =
-        coll.explain("executionStats").findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
+    explain = coll.explain("executionStats").findAndModify({query: {_id: 3}, update: [{$set: {y: 999}}]});
     assert.eq(explain.executionStats.nReturned, 1);
     // UPDATE stage would modify one document.
     let updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");
@@ -66,14 +71,12 @@ if (!FixtureHelpers.isMongos(db)) {
     //
     // Tests for explain with a query that requires a COLLSCAN.
     //
-    let explain =
-        coll.explain("queryPlanner").findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
+    let explain = coll.explain("queryPlanner").findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"));
 
     // Run explain with execution-level verbosity.
-    explain =
-        coll.explain("executionStats").findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
+    explain = coll.explain("executionStats").findAndModify({query: {y: 3}, update: [{$set: {y: 999}}]});
     assert.eq(explain.executionStats.nReturned, 1);
     // UPDATE stage would modify one document.
     const updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");
@@ -87,13 +90,19 @@ if (!FixtureHelpers.isMongos(db)) {
     //
     assert(coll.drop());
     assert.commandWorked(
-        coll.insert([{_id: 0, x: 'b'}, {_id: 1, x: 'd'}, {_id: 2, x: 'a'}, {_id: 3, x: 'c'}]));
+        coll.insert([
+            {_id: 0, x: "b"},
+            {_id: 1, x: "d"},
+            {_id: 2, x: "a"},
+            {_id: 3, x: "c"},
+        ]),
+    );
     found = coll.findAndModify({update: [{$set: {foo: "bar"}}], sort: {x: -1}, new: true});
-    assert.eq(found, {_id: 1, x: 'd', foo: "bar"});
+    assert.eq(found, {_id: 1, x: "d", foo: "bar"});
 }
 
 // Test that it rejects the combination of arrayFilters and a pipeline-style update.
-let err =
-    assert.throws(() => coll.findAndModify(
-                      {query: {_id: 1}, update: [{$set: {y: 1}}], arrayFilters: [{"i.x": 4}]}));
+let err = assert.throws(() =>
+    coll.findAndModify({query: {_id: 1}, update: [{$set: {y: 1}}], arrayFilters: [{"i.x": 4}]}),
+);
 assert.eq(err.code, ErrorCodes.FailedToParse);

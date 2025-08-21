@@ -7,15 +7,18 @@
 const coll = db[jsTestName()];
 coll.drop();
 
-assert.commandWorked(coll.insertMany([
-    {_id: 1, "obj": {"obj": {}}},
-    {_id: 2},
-]));
+assert.commandWorked(coll.insertMany([{_id: 1, "obj": {"obj": {}}}, {_id: 2}]));
 
 // Update a field to scalar
-let results =
-    coll.aggregate([{$addFields: {"obj": null}}, {$sort: {"obj.obj": 1, _id: 1}}]).toArray();
-assert.eq(results, [{_id: 1, "obj": null}, {_id: 2, "obj": null}], results);
+let results = coll.aggregate([{$addFields: {"obj": null}}, {$sort: {"obj.obj": 1, _id: 1}}]).toArray();
+assert.eq(
+    results,
+    [
+        {_id: 1, "obj": null},
+        {_id: 2, "obj": null},
+    ],
+    results,
+);
 
 // Remove a field
 results = coll.aggregate([{$project: {"obj": 0}}, {$sort: {"obj.obj": 1, _id: 1}}]).toArray();

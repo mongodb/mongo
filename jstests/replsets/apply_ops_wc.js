@@ -10,13 +10,10 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    restartReplicationOnSecondaries,
-    stopServerReplication
-} from "jstests/libs/write_concern_util.js";
+import {restartReplicationOnSecondaries, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var nodeCount = 3;
-var replTest = new ReplSetTest({name: 'applyOpsWCSet', nodes: nodeCount});
+var replTest = new ReplSetTest({name: "applyOpsWCSet", nodes: nodeCount});
 replTest.startSet();
 var cfg = replTest.getReplSetConfig();
 cfg.settings = {};
@@ -29,8 +26,9 @@ var testDB = "applyOps-wc-test";
 var primary = replTest.getPrimary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 replTest.awaitReplication();
 
 var db = primary.getDB(testDB);
@@ -49,7 +47,7 @@ var applyOpsReq = {
         {op: "i", ns: coll.getFullName(), o: {_id: 2, x: "b"}},
         {op: "i", ns: coll.getFullName(), o: {_id: 3, x: "c"}},
         {op: "i", ns: coll.getFullName(), o: {_id: 4, x: "d"}},
-    ]
+    ],
 };
 
 function assertApplyOpsCommandWorked(res) {
@@ -64,7 +62,7 @@ function assertWriteConcernError(res) {
     assert(res.writeConcernError.errmsg);
 }
 
-var invalidWriteConcerns = [{w: 'invalid'}, {w: nodeCount + 1}];
+var invalidWriteConcerns = [{w: "invalid"}, {w: nodeCount + 1}];
 
 function testInvalidWriteConcern(wc) {
     jsTest.log("Testing invalid write concern " + tojson(wc));
@@ -85,7 +83,7 @@ var secondaries = replTest.getSecondaries();
 
 var majorityWriteConcerns = [
     {w: 2, wtimeout: 30000},
-    {w: 'majority', wtimeout: 30000},
+    {w: "majority", wtimeout: 30000},
 ];
 
 function testMajorityWriteConcerns(wc) {
@@ -104,8 +102,10 @@ function testMajorityWriteConcerns(wc) {
     var res = db.runCommand(applyOpsReq);
 
     assertApplyOpsCommandWorked(res);
-    assert(!res.writeConcernError,
-           'applyOps on a full replicaset had writeConcern error ' + tojson(res.writeConcernError));
+    assert(
+        !res.writeConcernError,
+        "applyOps on a full replicaset had writeConcern error " + tojson(res.writeConcernError),
+    );
 
     dropTestCollection();
 
@@ -117,9 +117,10 @@ function testMajorityWriteConcerns(wc) {
     res = db.runCommand(applyOpsReq);
 
     assertApplyOpsCommandWorked(res);
-    assert(!res.writeConcernError,
-           'applyOps on a replicaset with 2 working nodes had writeConcern error ' +
-               tojson(res.writeConcernError));
+    assert(
+        !res.writeConcernError,
+        "applyOps on a replicaset with 2 working nodes had writeConcern error " + tojson(res.writeConcernError),
+    );
 
     dropTestCollection();
 

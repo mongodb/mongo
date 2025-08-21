@@ -22,17 +22,14 @@ import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
-export const $config = (function() {
+export const $config = (function () {
     // This test manually shards the collection.
     TestData.shardCollectionProbability = 0;
 
-    const timeField = 'ts';
-    const metaField = 'meta';
+    const timeField = "ts";
+    const metaField = "meta";
 
-    const shardKeys = [
-        {'meta.x': 1},
-        {'meta.y': 1},
-    ];
+    const shardKeys = [{"meta.x": 1}, {"meta.y": 1}];
 
     const data = {
         shardKey: shardKeys[0],
@@ -48,14 +45,12 @@ export const $config = (function() {
     const kMaxReshardingExecutions = 4;
 
     function executeReshardTimeseries(db, collName, newShardKey) {
-        print(`Started Resharding Timeseries Collection ${collName}. New Shard Key ${
-            tojson(newShardKey)}`);
+        print(`Started Resharding Timeseries Collection ${collName}. New Shard Key ${tojson(newShardKey)}`);
 
         let ns = db + "." + collName;
         let reshardCollectionCmd = {reshardCollection: ns, key: newShardKey, numInitialChunks: 1};
         if (TestData.runningWithShardStepdowns) {
-            const isVerificationFeatureFlagEnabled =
-                FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
+            const isVerificationFeatureFlagEnabled = FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
             if (isVerificationFeatureFlagEnabled) {
                 // TODO (SERVER-101249): Re-enable resharding verification in
                 // timeseries_reshard_with_inserts.js when running in stepdown suites
@@ -64,14 +59,14 @@ export const $config = (function() {
                 // verification.
                 reshardCollectionCmd.performVerification = false;
             }
-            assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd),
-                                                 [ErrorCodes.SnapshotUnavailable]);
+            assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd), [
+                ErrorCodes.SnapshotUnavailable,
+            ]);
         } else {
             assert.commandWorked(db.adminCommand(reshardCollectionCmd));
         }
 
-        print(`Finished Resharding Timeseries Collection ${collName}. New Shard Key ${
-            tojson(newShardKey)}`);
+        print(`Finished Resharding Timeseries Collection ${collName}. New Shard Key ${tojson(newShardKey)}`);
     }
 
     const states = {
@@ -85,9 +80,14 @@ export const $config = (function() {
                 });
             }
 
-            retryOnRetryableError(() => {
-                TimeseriesTest.assertInsertWorked(db[collName].insert(docs));
-            }, 100 /* numRetries */, undefined /* sleepMs */, [ErrorCodes.NoProgressMade]);
+            retryOnRetryableError(
+                () => {
+                    TimeseriesTest.assertInsertWorked(db[collName].insert(docs));
+                },
+                100 /* numRetries */,
+                undefined /* sleepMs */,
+                [ErrorCodes.NoProgressMade],
+            );
 
             print(`Finished Inserting documents.`);
         },
@@ -110,28 +110,30 @@ export const $config = (function() {
 
     const transitions = {
         reshardTimeseries: {insert: 1},
-        insert: {insert: .85, reshardTimeseries: .15},
+        insert: {insert: 0.85, reshardTimeseries: 0.15},
     };
 
     function setup(db, collName, cluster) {
         db[collName].drop();
 
-        assert.commandWorked(db.createCollection(
-            collName, {timeseries: {metaField: metaField, timeField: timeField}}));
-        cluster.shardCollection(db[collName], {'meta.x': 1}, false);
+        assert.commandWorked(db.createCollection(collName, {timeseries: {metaField: metaField, timeField: timeField}}));
+        cluster.shardCollection(db[collName], {"meta.x": 1}, false);
 
         const shards = Object.keys(cluster.getSerializedCluster().shards);
-        ChunkHelper.splitChunkAt(
-            db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {'meta.x': 5});
+        ChunkHelper.splitChunkAt(db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {"meta.x": 5});
 
-        ChunkHelper.moveChunk(db,
-                              getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-                              [{'meta.x': MinKey}, {'meta.x': 5}],
-                              shards[0]);
-        ChunkHelper.moveChunk(db,
-                              getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-                              [{'meta.x': 5}, {'meta.x': MaxKey}],
-                              shards[1]);
+        ChunkHelper.moveChunk(
+            db,
+            getTimeseriesCollForDDLOps(db, db[collName]).getName(),
+            [{"meta.x": MinKey}, {"meta.x": 5}],
+            shards[0],
+        );
+        ChunkHelper.moveChunk(
+            db,
+            getTimeseriesCollForDDLOps(db, db[collName]).getName(),
+            [{"meta.x": 5}, {"meta.x": MaxKey}],
+            shards[1],
+        );
 
         const bulk = db[collName].initializeUnorderedBulkOp();
         for (let i = 0; i < numInitialDocs; ++i) {
@@ -145,18 +147,16 @@ export const $config = (function() {
         let res = bulk.execute();
         assert.commandWorked(res);
         assert.eq(numInitialDocs, res.nInserted);
-        assert.eq(100,
-                  getTimeseriesCollForRawOps(db, db[collName])
-                      .countDocuments({}, getRawOperationSpec(db)));
+        assert.eq(100, getTimeseriesCollForRawOps(db, db[collName]).countDocuments({}, getRawOperationSpec(db)));
     }
 
     return {
         threadCount: 20,
         iterations: iterations,
-        startState: 'reshardTimeseries',
+        startState: "reshardTimeseries",
         states: states,
         transitions: transitions,
         setup: setup,
-        data: data
+        data: data,
     };
 })();

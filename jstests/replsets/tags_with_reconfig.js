@@ -17,14 +17,14 @@ var conf = {
     members: [
         {_id: 0, host: host + ":" + ports[0], tags: {"dc": "bbb"}},
         {_id: 1, host: host + ":" + ports[1], tags: {"dc": "bbb"}},
-        {_id: 2, host: host + ":" + ports[2], tags: {"dc": "ccc"}}
+        {_id: 2, host: host + ":" + ports[2], tags: {"dc": "ccc"}},
     ],
     settings: {
         getLastErrorModes: {
             anydc: {dc: 1},
             alldc: {dc: 2},
-        }
-    }
+        },
+    },
 };
 
 replTest.initiate(conf);
@@ -35,10 +35,10 @@ var primary = replTest.getPrimary();
 var db = primary.getDB("test");
 
 // Insert a document with write concern : anydc
-assert.commandWorked(db.foo.insert({x: 1}, {writeConcern: {w: 'anydc', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 1}, {writeConcern: {w: "anydc", wtimeout: wtimeout}}));
 
 // Insert a document with write concern : alldc
-assert.commandWorked(db.foo.insert({x: 2}, {writeConcern: {w: 'alldc', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 2}, {writeConcern: {w: "alldc", wtimeout: wtimeout}}));
 
 // Add a new tag to the replica set
 var config = primary.getDB("local").system.replset.findOne();
@@ -63,9 +63,9 @@ primary = replTest.getPrimary();
 var db = primary.getDB("test");
 
 // Insert a document with write concern : anydc
-assert.commandWorked(db.foo.insert({x: 3}, {writeConcern: {w: 'anydc', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 3}, {writeConcern: {w: "anydc", wtimeout: wtimeout}}));
 
 // Insert a document with write concern : alldc
-assert.commandWorked(db.foo.insert({x: 4}, {writeConcern: {w: 'alldc', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 4}, {writeConcern: {w: "alldc", wtimeout: wtimeout}}));
 
 replTest.stopSet();

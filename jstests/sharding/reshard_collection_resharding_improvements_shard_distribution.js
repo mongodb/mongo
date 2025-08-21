@@ -13,19 +13,21 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 5});
-const kDbName = 'db';
-const collName = 'foo';
-const ns = kDbName + '.' + collName;
+const kDbName = "db";
+const collName = "foo";
+const ns = kDbName + "." + collName;
 const mongos = st.s0;
 const kNumInitialDocs = 500;
-const reshardCmdTest =
-    new ReshardCollectionCmdTest({st, dbName: kDbName, collName, numInitialDocs: kNumInitialDocs});
+const reshardCmdTest = new ReshardCollectionCmdTest({st, dbName: kDbName, collName, numInitialDocs: kNumInitialDocs});
 
 const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000; /* 1 day */
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const coordinator = new Mongo(topology.configsvr.nodes[0]);
-assert.commandWorked(coordinator.getDB("admin").adminCommand(
-    {setParameter: 1, reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}));
+assert.commandWorked(
+    coordinator
+        .getDB("admin")
+        .adminCommand({setParameter: 1, reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}),
+);
 
 const testCompoundShardKey = (mongos) => {
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {num: 1, str: 1}}));
@@ -42,8 +44,8 @@ const testCompoundShardKey = (mongos) => {
         forceRedistribution: true,
         shardDistribution: [
             {shard: st.shard0.shardName, min: {num: MinKey}, max: {num: 1}},
-            {shard: st.shard1.shardName, min: {num: 1}, max: {num: MaxKey}}
-        ]
+            {shard: st.shard1.shardName, min: {num: 1}, max: {num: MaxKey}},
+        ],
     };
     assert.commandFailedWithCode(mongos.adminCommand(missSecondKeyCmd), ErrorCodes.InvalidOptions);
 
@@ -53,9 +55,9 @@ const testCompoundShardKey = (mongos) => {
         key: {num: 1, str: 1},
         forceRedistribution: true,
         shardDistribution: [
-            {shard: st.shard0.shardName, min: {num: MinKey, str: MinKey}, max: {num: 1, str: '1'}},
-            {shard: st.shard1.shardName, min: {num: 2, str: '1'}, max: {num: MaxKey, str: MaxKey}}
-        ]
+            {shard: st.shard0.shardName, min: {num: MinKey, str: MinKey}, max: {num: 1, str: "1"}},
+            {shard: st.shard1.shardName, min: {num: 2, str: "1"}, max: {num: MaxKey, str: MaxKey}},
+        ],
     };
     assert.commandFailedWithCode(mongos.adminCommand(notContinuousCmd), ErrorCodes.InvalidOptions);
 
@@ -65,9 +67,9 @@ const testCompoundShardKey = (mongos) => {
         key: {num: 1, str: 1},
         forceRedistribution: true,
         shardDistribution: [
-            {shard: st.shard0.shardName, min: {num: MinKey, str: MinKey}, max: {num: 1, str: '2'}},
-            {shard: st.shard1.shardName, min: {num: 1, str: '1'}, max: {num: MaxKey, str: MaxKey}}
-        ]
+            {shard: st.shard0.shardName, min: {num: MinKey, str: MinKey}, max: {num: 1, str: "2"}},
+            {shard: st.shard1.shardName, min: {num: 1, str: "1"}, max: {num: MaxKey, str: MaxKey}},
+        ],
     };
     assert.commandFailedWithCode(mongos.adminCommand(overlapCmd), ErrorCodes.InvalidOptions);
 
@@ -77,9 +79,9 @@ const testCompoundShardKey = (mongos) => {
         key: {num: 1, str: 1},
         forceRedistribution: true,
         shardDistribution: [
-            {shard: st.shard0.shardName, min: {num: MinKey, str: '1'}, max: {num: 1, str: '2'}},
-            {shard: st.shard1.shardName, min: {num: 1, str: '1'}, max: {num: MaxKey, str: MaxKey}}
-        ]
+            {shard: st.shard0.shardName, min: {num: MinKey, str: "1"}, max: {num: 1, str: "2"}},
+            {shard: st.shard1.shardName, min: {num: 1, str: "1"}, max: {num: MaxKey, str: MaxKey}},
+        ],
     };
     assert.commandFailedWithCode(mongos.adminCommand(missingMinCmd), ErrorCodes.InvalidOptions);
 
@@ -89,9 +91,9 @@ const testCompoundShardKey = (mongos) => {
         key: {num: 1, str: 1},
         forceRedistribution: true,
         shardDistribution: [
-            {shard: st.shard0.shardName, min: {num: MinKey, str: MinKey}, max: {num: 1, str: '2'}},
-            {shard: st.shard1.shardName, min: {num: 1, str: '1'}, max: {num: MaxKey, str: '2'}}
-        ]
+            {shard: st.shard0.shardName, min: {num: MinKey, str: MinKey}, max: {num: 1, str: "2"}},
+            {shard: st.shard1.shardName, min: {num: 1, str: "1"}, max: {num: MaxKey, str: "2"}},
+        ],
     };
     assert.commandFailedWithCode(mongos.adminCommand(missingMaxCmd), ErrorCodes.InvalidOptions);
 
@@ -101,9 +103,9 @@ const testCompoundShardKey = (mongos) => {
         key: {num: 1, str: 1},
         forceRedistribution: true,
         shardDistribution: [
-            {shard: st.shard0.shardName, min: {num: MinKey, str: MinKey}, max: {num: 1, str: '1'}},
-            {shard: st.shard1.shardName, min: {num: 1, str: '1'}, max: {num: MaxKey, str: MaxKey}}
-        ]
+            {shard: st.shard0.shardName, min: {num: MinKey, str: MinKey}, max: {num: 1, str: "1"}},
+            {shard: st.shard1.shardName, min: {num: 1, str: "1"}, max: {num: MaxKey, str: MaxKey}},
+        ],
     };
     assert.commandWorked(mongos.adminCommand(correctCmd));
     mongos.getDB(kDbName)[collName].drop();
@@ -126,41 +128,38 @@ const testMoreShardsAndZones = (mongos) => {
      */
     jsTestLog("ReshardCollection should succeed when shardDistribution and zones mix together");
 
-    const additionalSetup = function(test) {
+    const additionalSetup = function (test) {
         const st = test._st;
         const ns = test._ns;
-        const zoneName1 = 'z1';
-        const zoneName2 = 'z2';
-        const zoneName3 = 'z3';
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName1}));
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName2}));
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName3}));
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName2}));
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: zoneName2}));
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: zoneName3}));
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard3.shardName, zone: zoneName3}));
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: st.shard4.shardName, zone: zoneName3}));
+        const zoneName1 = "z1";
+        const zoneName2 = "z2";
+        const zoneName3 = "z3";
+        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName1}));
+        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName2}));
+        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: zoneName3}));
+        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName2}));
+        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: zoneName2}));
+        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: zoneName3}));
+        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard3.shardName, zone: zoneName3}));
+        assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard4.shardName, zone: zoneName3}));
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
-        assert.commandWorked(st.s.adminCommand({
-            updateZoneKeyRange: ns,
-            min: {oldKey: MinKey},
-            max: {oldKey: -1000},
-            zone: zoneName1
-        }));
-        assert.commandWorked(st.s.adminCommand(
-            {updateZoneKeyRange: ns, min: {oldKey: 1000}, max: {oldKey: MaxKey}, zone: zoneName1}));
-        assert.commandWorked(st.s.adminCommand(
-            {updateZoneKeyRange: ns, min: {oldKey: -1000}, max: {oldKey: -1}, zone: zoneName2}));
-        assert.commandWorked(st.s.adminCommand(
-            {updateZoneKeyRange: ns, min: {oldKey: -1}, max: {oldKey: 1000}, zone: zoneName3}));
+        assert.commandWorked(
+            st.s.adminCommand({
+                updateZoneKeyRange: ns,
+                min: {oldKey: MinKey},
+                max: {oldKey: -1000},
+                zone: zoneName1,
+            }),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({updateZoneKeyRange: ns, min: {oldKey: 1000}, max: {oldKey: MaxKey}, zone: zoneName1}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({updateZoneKeyRange: ns, min: {oldKey: -1000}, max: {oldKey: -1}, zone: zoneName2}),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({updateZoneKeyRange: ns, min: {oldKey: -1}, max: {oldKey: 1000}, zone: zoneName3}),
+        );
     };
 
     reshardCmdTest.assertReshardCollOk(
@@ -175,7 +174,7 @@ const testMoreShardsAndZones = (mongos) => {
                 {shard: st.shard3.shardName, min: {oldKey: 0}, max: {oldKey: 10}},
                 {shard: st.shard4.shardName, min: {oldKey: 10}, max: {oldKey: 100}},
                 {shard: st.shard0.shardName, min: {oldKey: 100}, max: {oldKey: MaxKey}},
-            ]
+            ],
         },
         9,
         [
@@ -193,9 +192,10 @@ const testMoreShardsAndZones = (mongos) => {
             {zone: "z1", min: {oldKey: MinKey}, max: {oldKey: -1000}},
             {zone: "z1", min: {oldKey: 1000}, max: {oldKey: MaxKey}},
             {zone: "z2", min: {oldKey: -1000}, max: {oldKey: -1}},
-            {zone: "z3", min: {oldKey: -1}, max: {oldKey: 1000}}
+            {zone: "z3", min: {oldKey: -1}, max: {oldKey: 1000}},
         ],
-        additionalSetup);
+        additionalSetup,
+    );
 };
 
 testCompoundShardKey(mongos);

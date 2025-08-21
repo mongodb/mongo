@@ -4,17 +4,15 @@
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     expectedSearchMeta,
     expectPlanShardedSearch,
-    searchQuery
+    searchQuery,
 } from "jstests/with_mongot/search_mocked/lib/server_85694_query_constants.js";
 
 let nodeOptions = {
-    setParameter: {enableTestCommands: 1, logComponentVerbosity: tojson({query: 0})}
+    setParameter: {enableTestCommands: 1, logComponentVerbosity: tojson({query: 0})},
 };
 
 function runTest(customStOpts) {
@@ -23,7 +21,7 @@ function runTest(customStOpts) {
         shards: {rs0: {nodes: 1}},
         config: 1,
         mongos: 1,
-        other: {rsOptions: nodeOptions, mongosOptions: nodeOptions}
+        other: {rsOptions: nodeOptions, mongosOptions: nodeOptions},
     };
     const stWithMock = new ShardingTestWithMongotMock({...defaultOpts, ...customStOpts});
 
@@ -35,17 +33,16 @@ function runTest(customStOpts) {
 
     const dbName = "test";
     const testDB = conn.getDB(dbName);
-    assert.commandWorked(
-        testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
     const collName = jsTestName();
     const coll = testDB.getCollection(collName);
 
     const shard0ResultId = 2;
 
-    assert.commandWorked(coll.insert([
-        {_id: shard0ResultId, openfda: {manufacturer_name: 'Factory', route: ['ORAL']}},
-    ]));
+    assert.commandWorked(
+        coll.insert([{_id: shard0ResultId, openfda: {manufacturer_name: "Factory", route: ["ORAL"]}}]),
+    );
     // Shard the collection by '_id', but do not split it or move any chunks off the primary shard
     // (shard 0).
     st.shardColl(coll, {_id: 1}, false, false);
@@ -55,8 +52,7 @@ function runTest(customStOpts) {
         expectPlanShardedSearch({mongotConn: mongotForTheMongos, coll: coll});
         const mongotQuery = searchQuery;
         {
-            const collUUID0 =
-                getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
+            const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
             const mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
             const resultsId = NumberLong(2);
             mongot.setMockResponses(
@@ -68,8 +64,7 @@ function runTest(customStOpts) {
                             collName: collName,
                             db: dbName,
                             collectionUUID: collUUID0,
-                            optimizationFlags: isSearchMeta ? {omitSearchDocumentResults: true}
-                                                            : null
+                            optimizationFlags: isSearchMeta ? {omitSearchDocumentResults: true} : null,
                         }),
                         response: {
                             "cursor": {
@@ -78,11 +73,12 @@ function runTest(customStOpts) {
                                 "ns": coll.getFullName(),
                             },
                             "vars": {"SEARCH_META": expectedSearchMeta},
-                            "ok": 1
-                        }
+                            "ok": 1,
+                        },
                     },
                 ],
-                resultsId);
+                resultsId,
+            );
         }
     }
 
@@ -90,10 +86,8 @@ function runTest(customStOpts) {
     // returned by mongot(mock).
     function testSearchQuery() {
         setQueryMockResponses(false);
-        let queryResult =
-            coll.aggregate([{$search: searchQuery}, {$project: {"var": "$$SEARCH_META"}}])
-                .toArray();
-        assert.eq([{_id: shard0ResultId, var : expectedSearchMeta}], queryResult);
+        let queryResult = coll.aggregate([{$search: searchQuery}, {$project: {"var": "$$SEARCH_META"}}]).toArray();
+        assert.eq([{_id: shard0ResultId, var: expectedSearchMeta}], queryResult);
     }
 
     // Test that a $searchMeta query properly computes the metadata value according to the pipeline

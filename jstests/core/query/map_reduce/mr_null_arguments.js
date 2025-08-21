@@ -23,37 +23,45 @@ function reduceFunc(k, v) {
 }
 
 // Test that finalize can be explicit null.
-assert.commandWorked(db.runCommand({
-    mapReduce: coll.getName(),
-    map: mapFunc,
-    reduce: reduceFunc,
-    finalize: null,
-    out: {merge: outColl.getName()}
-}));
+assert.commandWorked(
+    db.runCommand({
+        mapReduce: coll.getName(),
+        map: mapFunc,
+        reduce: reduceFunc,
+        finalize: null,
+        out: {merge: outColl.getName()},
+    }),
+);
 
 // Test that query can be explicit null.
-assert.commandWorked(db.runCommand({
-    mapReduce: coll.getName(),
-    map: mapFunc,
-    reduce: reduceFunc,
-    query: null,
-    out: {merge: outColl.getName()}
-}));
+assert.commandWorked(
+    db.runCommand({
+        mapReduce: coll.getName(),
+        map: mapFunc,
+        reduce: reduceFunc,
+        query: null,
+        out: {merge: outColl.getName()},
+    }),
+);
 
 // Test that sort can be explicit null.
-assert.commandWorked(db.runCommand({
-    mapReduce: coll.getName(),
-    map: mapFunc,
-    reduce: reduceFunc,
-    sort: null,
-    out: {merge: outColl.getName()}
-}));
+assert.commandWorked(
+    db.runCommand({
+        mapReduce: coll.getName(),
+        map: mapFunc,
+        reduce: reduceFunc,
+        sort: null,
+        out: {merge: outColl.getName()},
+    }),
+);
 
 // Test that scope can be explicit null.
-assert.commandWorked(db.runCommand({
-    mapReduce: coll.getName(),
-    map: mapFunc,
-    reduce: reduceFunc,
-    scope: null,
-    out: {merge: outColl.getName()}
-}));
+assert.commandWorked(
+    db.runCommand({
+        mapReduce: coll.getName(),
+        map: mapFunc,
+        reduce: reduceFunc,
+        scope: null,
+        out: {merge: outColl.getName()},
+    }),
+);

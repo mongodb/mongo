@@ -10,13 +10,15 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 TestData.disableImplicitSessions = true;
 
 let replTest = new ReplSetTest({
-    name: 'reaping',
+    name: "reaping",
     nodes: [
-        {/* primary */},
+        {
+            /* primary */
+        },
         {/* secondary */ rsConfig: {priority: 0}},
-        {/* arbiter */ rsConfig: {arbiterOnly: true}}
+        {/* arbiter */ rsConfig: {arbiterOnly: true}},
     ],
-    nodeOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: 0}}
+    nodeOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: 0}},
 });
 let nodes = replTest.startSet();
 
@@ -32,17 +34,15 @@ let arbiter = replTest.getArbiter();
 
 const dbName = jsTestName();
 const collName = "test";
-const reapErrorMsgRegex =
-    new RegExp("Sessions collection is not set up.*waiting until next sessions reap interval");
+const reapErrorMsgRegex = new RegExp("Sessions collection is not set up.*waiting until next sessions reap interval");
 
 // Set up a session with a retryable insert and findAndModify.
 let session = primary.startSession({retryWrites: 1});
 assert.commandWorked(session.getDatabase(dbName)[collName].save({x: 1}));
-let result =
-    session.getDatabase(dbName)[collName].findAndModify({query: {x: 1}, update: {$set: {y: 1}}});
+let result = session.getDatabase(dbName)[collName].findAndModify({query: {x: 1}, update: {$set: {y: 1}}});
 // The findAndModify helper returns the document and not the whole response. Assert on the value of
 // `x`. Though it's expected a command error would become an exception that fails the test.
-assert.eq(1, result['x'], "Whole result: " + result);
+assert.eq(1, result["x"], "Whole result: " + result);
 assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
 assert.eq(1, sessionsCollOnPrimary.find().itcount());
 assert.eq(1, transactionsCollOnPrimary.find().itcount());
@@ -55,7 +55,7 @@ assert.commandWorked(sessionsCollOnPrimary.remove({}));
 // since the session does not exist in the secondary's session catalog.
 {
     replTest.awaitReplication();
-    assert.commandWorked(secondary.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(secondary.adminCommand({clearLog: "global"}));
     assert.commandWorked(secondary.adminCommand({reapLogicalSessionCacheNow: 1}));
 
     assert.eq(1, transactionsCollOnPrimary.find().itcount());
@@ -64,7 +64,7 @@ assert.commandWorked(sessionsCollOnPrimary.remove({}));
 
 // Test that a reap on an arbiter does not lead to reaping of the session.
 {
-    assert.commandWorked(arbiter.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(arbiter.adminCommand({clearLog: "global"}));
     assert.commandWorked(arbiter.adminCommand({reapLogicalSessionCacheNow: 1}));
 
     assert.eq(1, transactionsCollOnPrimary.find().itcount());
@@ -77,7 +77,7 @@ assert.commandWorked(sessionsCollOnPrimary.remove({}));
 
 // Test that a reap on the primary works as expected.
 {
-    assert.commandWorked(primary.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(primary.adminCommand({clearLog: "global"}));
     assert.commandWorked(primary.adminCommand({reapLogicalSessionCacheNow: 1}));
 
     assert.eq(0, transactionsCollOnPrimary.find().itcount());

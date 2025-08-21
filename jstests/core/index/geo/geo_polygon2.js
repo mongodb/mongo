@@ -23,7 +23,7 @@ for (var test = 0; test < numTests; test++) {
 
     printjson({test: test, rotation: rotation, bits: bits});
 
-    var rotatePoint = function(x, y) {
+    var rotatePoint = function (x, y) {
         if (y == undefined) {
             y = x[1];
             x = x[0];
@@ -46,16 +46,13 @@ for (var test = 0; test < numTests; test++) {
         grid.push(new Array(gridSize[1]));
     }
 
-    grid.toString = function() {
+    grid.toString = function () {
         var gridStr = "";
         for (var j = grid[0].length - 1; j >= -1; j--) {
             for (var i = 0; i < grid.length; i++) {
-                if (i == 0)
-                    gridStr += (j == -1 ? " " : (j % 10)) + ": ";
-                if (j != -1)
-                    gridStr += "[" + (grid[i][j] != undefined ? grid[i][j] : " ") + "]";
-                else
-                    gridStr += " " + (i % 10) + " ";
+                if (i == 0) gridStr += (j == -1 ? " " : j % 10) + ": ";
+                if (j != -1) gridStr += "[" + (grid[i][j] != undefined ? grid[i][j] : " ") + "]";
+                else gridStr += " " + (i % 10) + " ";
             }
             gridStr += "\n";
         }
@@ -65,12 +62,12 @@ for (var test = 0; test < numTests; test++) {
 
     var turtles = [];
     for (var i = 0; i < numTurtles; i++) {
-        var up = (i % 2 == 0) ? i - 1 : 0;
-        var left = (i % 2 == 1) ? (i - 1) - 1 : 0;
+        var up = i % 2 == 0 ? i - 1 : 0;
+        var left = i % 2 == 1 ? i - 1 - 1 : 0;
 
         turtles[i] = [
             [Math.floor(gridSize[0] / 2), Math.floor(gridSize[1] / 2)],
-            [Math.floor(gridSize[0] / 2) + left, Math.floor(gridSize[1] / 2) + up]
+            [Math.floor(gridSize[0] / 2) + left, Math.floor(gridSize[1] / 2) + up],
         ];
 
         grid[turtles[i][1][0]][turtles[i][1][1]] = i;
@@ -80,17 +77,14 @@ for (var test = 0; test < numTests; test++) {
 
     // print( grid.toString() )
 
-    var pickDirections = function() {
+    var pickDirections = function () {
         var up = Math.floor(Random.rand() * 3);
-        if (up == 2)
-            up = -1;
+        if (up == 2) up = -1;
 
         if (up == 0) {
             var left = Math.floor(Random.rand() * 3);
-            if (left == 2)
-                left = -1;
-        } else
-            left = 0;
+            if (left == 2) left = -1;
+        } else left = 0;
 
         if (Random.rand() < 0.5) {
             var swap = left;
@@ -110,8 +104,7 @@ for (var test = 0; test < numTests; test++) {
             var lastTurtle = turtles[t][turtles[t].length - 1];
             var nextTurtle = [lastTurtle[0] + left, lastTurtle[1] + up];
 
-            if (nextTurtle[0] >= gridSize[0] || nextTurtle[1] >= gridSize[1] || nextTurtle[0] < 0 ||
-                nextTurtle[1] < 0)
+            if (nextTurtle[0] >= gridSize[0] || nextTurtle[1] >= gridSize[1] || nextTurtle[0] < 0 || nextTurtle[1] < 0)
                 continue;
 
             if (grid[nextTurtle[0]][nextTurtle[1]] == undefined) {
@@ -125,7 +118,7 @@ for (var test = 0; test < numTests; test++) {
     for (var t = 0; t < numTurtles; t++) {
         let turtlePath = [];
 
-        var nextSeg = function(currTurtle, prevTurtle) {
+        var nextSeg = function (currTurtle, prevTurtle) {
             var pathX = currTurtle[0];
             let pathY;
 
@@ -172,14 +165,13 @@ for (var test = 0; test < numTests; test++) {
 
         let fixedTurtlePath = [];
         for (var s = 1; s < turtlePath.length; s++) {
-            if (turtlePath[s - 1][0] == turtlePath[s][0] &&
-                turtlePath[s - 1][1] == turtlePath[s][1]) {
+            if (turtlePath[s - 1][0] == turtlePath[s][0] && turtlePath[s - 1][1] == turtlePath[s][1]) {
                 continue;
             }
 
             var up = turtlePath[s][1] - turtlePath[s - 1][1];
             var right = turtlePath[s][0] - turtlePath[s - 1][0];
-            var addPoint = (up != 0 && right != 0);
+            var addPoint = up != 0 && right != 0;
 
             if (addPoint && up != right) {
                 fixedTurtlePath.push([turtlePath[s][0], turtlePath[s - 1][1]]);

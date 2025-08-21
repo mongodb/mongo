@@ -10,7 +10,7 @@ import {
     setParameterOpts,
     testExistingShardedCollection,
     testExistingUnshardedCollection,
-    testNonExistingCollection
+    testNonExistingCollection,
 } from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_common_tests.js";
 
 const dbNameBase = "testDb";
@@ -29,36 +29,35 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
         FixtureHelpers.awaitReplication(db);
     }
 
-    testCases.forEach(testCase => {
+    testCases.forEach((testCase) => {
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand(
-                {analyzeShardKey: ns, key: candidateKey, readConcern: {level: "available"}}),
-            ErrorCodes.InvalidOptions);
+            testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey, readConcern: {level: "available"}}),
+            ErrorCodes.InvalidOptions,
+        );
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand(
-                {analyzeShardKey: ns, key: candidateKey, writeConcern: {w: "majority"}}),
-            ErrorCodes.InvalidOptions);
+            testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey, writeConcern: {w: "majority"}}),
+            ErrorCodes.InvalidOptions,
+        );
     });
 }
 
 {
     const st = new ShardingTest({shards: 2, rs: {nodes: 2, setParameter: setParameterOpts}});
 
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbNameBase, primaryShard: st.shard0.name}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbNameBase, primaryShard: st.shard0.name}));
 
     const testCases = [];
     // The analyzeShardKey command is supported on mongos and all shardsvr mongods (both primary and
     // secondary).
     testCases.push({conn: st.s, isSupported: true, isMongos: true});
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         testCases.push({conn: node, isSupported: true, isPrimaryShardMongod: true});
     });
-    st.rs1.nodes.forEach(node => {
+    st.rs1.nodes.forEach((node) => {
         testCases.push({conn: node, isSupported: true, isPrimaryShardMongod: false});
     });
 
-    st.configRS.nodes.forEach(node => {
+    st.configRS.nodes.forEach((node) => {
         // If config shard mode isn't enabled, don't expect a sharded collection since the config
         // server isn't enabled as a shard and won't have chunks.
         testCases.push({
@@ -66,7 +65,7 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
             isSupported: true,
             // The config server is shard0 in config shard mode.
             isPrimaryShardMongod: TestData.configShard,
-            doNotExpectColl: !TestData.configShard
+            doNotExpectColl: !TestData.configShard,
         });
     });
 
@@ -78,7 +77,8 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
     st.stop();
 }
 
-if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove tests below
+if (jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove tests below
     quit();
 }
 
@@ -86,7 +86,7 @@ if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove t
     const rst = new ReplSetTest({
         name: jsTest.name() + "_non_multitenant",
         nodes: 2,
-        nodeOptions: {setParameter: setParameterOpts}
+        nodeOptions: {setParameter: setParameterOpts},
     });
     rst.startSet();
     rst.initiate();
@@ -94,7 +94,7 @@ if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove t
 
     const testCases = [];
     // The analyzeShardKey command is supported on all mongods (both primary and secondary).
-    rst.nodes.forEach(node => {
+    rst.nodes.forEach((node) => {
         testCases.push({conn: node, isSupported: true, isReplSetMongod: true});
     });
 
@@ -111,8 +111,8 @@ if (!TestData.auth) {
         nodes: 1,
         nodeOptions: {
             auth: "",
-            setParameter: Object.assign({}, setParameterOpts, {multitenancySupport: true})
-        }
+            setParameter: Object.assign({}, setParameterOpts, {multitenancySupport: true}),
+        },
     });
     rst.startSet({keyFile: "jstests/libs/key1"});
     rst.initiate();
@@ -121,8 +121,7 @@ if (!TestData.auth) {
 
     // Prepare an authenticated user for testing.
     // Must be authenticated as a user with ActionType::useTenant in order to use security token
-    assert.commandWorked(
-        adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}));
+    assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}));
     assert(adminDb.auth("admin", "pwd"));
 
     // The analyzeShardKey command is not supported in multitenancy.

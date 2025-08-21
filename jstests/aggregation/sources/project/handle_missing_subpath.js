@@ -14,8 +14,7 @@ assert.commandWorked(coll.insert({_id: 1, foo: 2}));
 assert.commandWorked(coll.insert({_id: 2, foo: {bar: 3}}));
 
 // Aggregate checking the field foo and the path foo.bar.
-const cursor = coll.aggregate(
-    [{$sort: {_id: 1}}, {$project: {_id: 0, "foo.bar": 1, field: "$foo", path: "$foo.bar"}}]);
+const cursor = coll.aggregate([{$sort: {_id: 1}}, {$project: {_id: 0, "foo.bar": 1, field: "$foo", path: "$foo.bar"}}]);
 
 // The first document should contain nothing as neither field exists, the second document should
 // contain only field as it has a value in foo, but foo does not have a field bar so it cannot

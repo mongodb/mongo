@@ -1,4 +1,3 @@
-
 // Test replication of collection renaming
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -14,19 +13,20 @@ let s = secondaries[0];
 s.setSecondaryOk();
 let admin = p.getDB("admin");
 
-let debug = function(foo) {};  // print( foo ); }
+let debug = function (foo) {}; // print( foo ); }
 
 // rename within db
 
 p.getDB(baseName).one.save({a: 1});
-assert.soon(function() {
+assert.soon(function () {
     let v = s.getDB(baseName).one.findOne();
     return v && 1 == v.a;
 });
 
-assert.commandWorked(admin.runCommand(
-    {renameCollection: "jstests_replsets_replset6.one", to: "jstests_replsets_replset6.two"}));
-assert.soon(function() {
+assert.commandWorked(
+    admin.runCommand({renameCollection: "jstests_replsets_replset6.one", to: "jstests_replsets_replset6.two"}),
+);
+assert.soon(function () {
     if (-1 == s.getDB(baseName).getCollectionNames().indexOf("two")) {
         debug("no two coll");
         debug(tojson(s.getDB(baseName).getCollectionNames()));
@@ -46,14 +46,16 @@ let first = baseName + "_first";
 let second = baseName + "_second";
 
 p.getDB(first).one.save({a: 1});
-assert.soon(function() {
+assert.soon(function () {
     return s.getDB(first).one.findOne() && 1 == s.getDB(first).one.findOne().a;
 });
 
-assert.commandWorked(admin.runCommand({
-    renameCollection: "jstests_replsets_replset6_first.one",
-    to: "jstests_replsets_replset6_second.two"
-}));
+assert.commandWorked(
+    admin.runCommand({
+        renameCollection: "jstests_replsets_replset6_first.one",
+        to: "jstests_replsets_replset6_second.two",
+    }),
+);
 
 // Wait for the command to replicate to the secondary.
 rt.awaitReplication();

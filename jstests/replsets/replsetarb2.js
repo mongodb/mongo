@@ -2,26 +2,28 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({name: 'unicomplex', nodes: 3});
+var replTest = new ReplSetTest({name: "unicomplex", nodes: 3});
 var nodes = replTest.nodeList();
 
 var conns = replTest.startSet();
-var r = replTest.initiate({
-    "_id": "unicomplex",
-    "members": [
-        {"_id": 0, "host": nodes[0]},
-        {"_id": 1, "host": nodes[1], "arbiterOnly": true, "votes": 1},
-        {"_id": 2, "host": nodes[2]}
-    ]
-},
-                          null,
-                          {initiateWithDefaultElectionTimeout: true});
+var r = replTest.initiate(
+    {
+        "_id": "unicomplex",
+        "members": [
+            {"_id": 0, "host": nodes[0]},
+            {"_id": 1, "host": nodes[1], "arbiterOnly": true, "votes": 1},
+            {"_id": 2, "host": nodes[2]},
+        ],
+    },
+    null,
+    {initiateWithDefaultElectionTimeout: true},
+);
 
 // Make sure we have a primary
 var primary = replTest.getPrimary();
 
 // Make sure we have an arbiter
-assert.soon(function() {
+assert.soon(function () {
     var res = conns[1].getDB("admin").runCommand({replSetGetStatus: 1});
     printjson(res);
     return res.myState === 7;

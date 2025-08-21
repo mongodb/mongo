@@ -40,8 +40,9 @@ primaryDB.runCommand({drop: collName});
 assert.commandWorked(primaryDB.runCommand({create: collName}));
 
 // Create a unique index on the collection in the foreground.
-assert.commandWorked(primaryDB.runCommand(
-    {createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}));
+assert.commandWorked(
+    primaryDB.runCommand({createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}),
+);
 
 let replSet = secondaryReadsTest.getReplset();
 replSet.awaitReplication();
@@ -56,14 +57,16 @@ const nReaders = 16;
 
 // Do a bunch of reads using the 'x' index on the secondary.
 // No errors should be encountered on the secondary.
-let readFn = function() {
+let readFn = function () {
     for (let x = 0; x < TestData.nOps; x++) {
-        assert.commandWorked(db.runCommand({
-            find: TestData.collName,
-            filter: {x: x},
-            projection: {x: 1},
-            readConcern: {level: "local"},
-        }));
+        assert.commandWorked(
+            db.runCommand({
+                find: TestData.collName,
+                filter: {x: x},
+                projection: {x: 1},
+                readConcern: {level: "local"},
+            }),
+        );
         // Sleep a bit to make these reader threads less CPU intensive.
         sleep(60);
     }
@@ -74,8 +77,7 @@ secondaryReadsTest.startSecondaryReaders(nReaders, readFn);
 
 // Write the initial documents. Ensure they have been replicated.
 for (let i = 0; i < nOps; i++) {
-    assert.commandWorked(
-        primaryDB.runCommand({insert: collName, documents: [{_id: i, x: i, iter: 0}]}));
+    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: i, x: i, iter: 0}]}));
 }
 replSet.awaitReplication();
 

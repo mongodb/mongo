@@ -3,17 +3,24 @@ import {Thread} from "jstests/libs/parallelTester.js";
 export function launchFinds(conn, threads, {times, readPref, shouldFail}) {
     jsTestLog("Starting " + times + " connections");
     for (var i = 0; i < times; i++) {
-        var thread = new Thread(function(connStr, readPref, dbName, shouldFail) {
-            var client = new Mongo(connStr);
-            const ret = client.getDB(dbName).runCommand(
-                {find: "test", limit: 1, "$readPreference": {mode: readPref}});
+        var thread = new Thread(
+            function (connStr, readPref, dbName, shouldFail) {
+                var client = new Mongo(connStr);
+                const ret = client
+                    .getDB(dbName)
+                    .runCommand({find: "test", limit: 1, "$readPreference": {mode: readPref}});
 
-            if (shouldFail) {
-                assert.commandFailed(ret);
-            } else {
-                assert.commandWorked(ret);
-            }
-        }, conn.host, readPref, 'test', shouldFail);
+                if (shouldFail) {
+                    assert.commandFailed(ret);
+                } else {
+                    assert.commandWorked(ret);
+                }
+            },
+            conn.host,
+            readPref,
+            "test",
+            shouldFail,
+        );
         thread.start();
         threads.push(thread);
     }
@@ -40,15 +47,15 @@ export function launchFinds(conn, threads, {times, readPref, shouldFail}) {
  * @param {string} connPoolStatsCmd - Optionally supplies a command to run instead of connPoolStats.
  * @returns {number} - The updated check number.
  */
-export function assertHasConnPoolStats(
-    conn, allHosts, args, checkNum, connPoolStatsCmd = undefined) {
+export function assertHasConnPoolStats(conn, allHosts, args, checkNum, connPoolStatsCmd = undefined) {
     checkNum++;
     jsTestLog("Check #" + checkNum + ": " + tojson(args));
     let {ready = 0, pending = 0, active = 0, hosts = allHosts, isAbsent, checkStatsFunc} = args;
-    checkStatsFunc = checkStatsFunc ? checkStatsFunc : function(stats) {
-        return stats.available == ready && stats.refreshing == pending &&
-            (stats.inUse + stats.leased) == active;
-    };
+    checkStatsFunc = checkStatsFunc
+        ? checkStatsFunc
+        : function (stats) {
+              return stats.available == ready && stats.refreshing == pending && stats.inUse + stats.leased == active;
+          };
 
     function checkStats(res, host) {
         let stats = res.hosts[host];
@@ -64,7 +71,7 @@ export function assertHasConnPoolStats(
     function checkAllStats() {
         let cmdName = connPoolStatsCmd ? connPoolStatsCmd : "connPoolStats";
         let res = conn.adminCommand({[cmdName]: 1});
-        return hosts.map(host => checkStats(res, host)).every(x => x);
+        return hosts.map((host) => checkStats(res, host)).every((x) => x);
     }
 
     assert.soon(checkAllStats, "Check #" + checkNum + " failed", 10000);
@@ -79,9 +86,13 @@ export function assertHasConnPoolStats(
  * @returns {boolean} - True if the host has open connections, false otherwise.
  */
 export function checkHostHasOpenConnections(connPoolHostStats) {
-    return connPoolHostStats.inUse + connPoolHostStats.available + connPoolHostStats.leased +
-        connPoolHostStats.refreshing >
-        0;
+    return (
+        connPoolHostStats.inUse +
+            connPoolHostStats.available +
+            connPoolHostStats.leased +
+            connPoolHostStats.refreshing >
+        0
+    );
 }
 
 /**

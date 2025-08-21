@@ -14,18 +14,18 @@ import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 const databaseName = "reshardingDb";
 const collectionName = "coll";
 
-const otherDatabaseName = 'reshardingDb2';
-const otherCollectionName = 'coll2';
+const otherDatabaseName = "reshardingDb2";
+const otherCollectionName = "coll2";
 const otherNamespace = `${otherDatabaseName}.${otherCollectionName}`;
 
-const donorOperationNamespace = 'config.localReshardingOperations.donor';
+const donorOperationNamespace = "config.localReshardingOperations.donor";
 
 const indexCreatedByTest = {
     newKey: 1,
-    oldKey: 1
+    oldKey: 1,
 };
 const indexDroppedByTest = {
-    x: 1
+    x: 1,
 };
 
 // TODO SERVER-108241 Re-enable dropIndexes once investigation is done.
@@ -42,8 +42,7 @@ const prohibitedCommands = [
  */
 const assertCommandsSucceedAfterReshardingOpFinishes = (database) => {
     prohibitedCommands.forEach((command) => {
-        jsTest.log(
-            `Testing that ${tojson(command)} succeeds after the resharding operation finishes.`);
+        jsTest.log(`Testing that ${tojson(command)} succeeds after the resharding operation finishes.`);
         assert.commandWorked(database.runCommand(command));
     });
 };
@@ -62,13 +61,14 @@ const assertCommandsFailDuringReshardingOp = (database) => {
         jsTest.log(`Testing that ${tojson(command)} fails during resharding operation`);
         // The collMod is serialized with the resharding command, so we explicitly add an timeout to
         // the command so that it doesn't get blocked and timeout the test.
-        if (command.hasOwnProperty('collMod') || command.hasOwnProperty('dropIndexes')) {
+        if (command.hasOwnProperty("collMod") || command.hasOwnProperty("dropIndexes")) {
             command = Object.assign({}, command);
             command.maxTimeMS = 5000;
         }
-        assert.commandFailedWithCode(
-            database.runCommand(command),
-            [ErrorCodes.ReshardCollectionInProgress, ErrorCodes.MaxTimeMSExpired]);
+        assert.commandFailedWithCode(database.runCommand(command), [
+            ErrorCodes.ReshardCollectionInProgress,
+            ErrorCodes.MaxTimeMSExpired,
+        ]);
     });
 };
 
@@ -83,7 +83,7 @@ const sourceCollection = reshardingTest.createShardedCollection({
     shardKeyPattern: {oldKey: 1},
     chunks: [
         {min: {oldKey: MinKey}, max: {oldKey: 0}, shard: donorShardNames[0]},
-        {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[1]}
+        {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: donorShardNames[1]},
     ],
 });
 
@@ -116,74 +116,81 @@ const waitUntilReshardingInitializedOnDonor = () => {
  * @param {AfterReshardingCallback} afterReshardingFn
  */
 
-const withReshardingInBackground =
-    (duringReshardingFn,
-     {setup = () => {}, expectedErrorCode, afterReshardingFn = () => {}} = {}) => {
-        assert.commandWorked(sourceCollection.createIndex(indexDroppedByTest));
-        setup();
+const withReshardingInBackground = (
+    duringReshardingFn,
+    {setup = () => {}, expectedErrorCode, afterReshardingFn = () => {}} = {},
+) => {
+    assert.commandWorked(sourceCollection.createIndex(indexDroppedByTest));
+    setup();
 
-        reshardingTest.withReshardingInBackground(
-            {
-                newShardKeyPattern: {newKey: 1},
-                newChunks:
-                    [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
-            },
-            duringReshardingFn,
-            {expectedErrorCode: expectedErrorCode, afterReshardingFn: afterReshardingFn});
-        assertCommandsSucceedAfterReshardingOpFinishes(mongos.getDB(databaseName));
-        assert.commandWorked(sourceCollection.dropIndex(indexCreatedByTest));
-    };
+    reshardingTest.withReshardingInBackground(
+        {
+            newShardKeyPattern: {newKey: 1},
+            newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+        },
+        duringReshardingFn,
+        {expectedErrorCode: expectedErrorCode, afterReshardingFn: afterReshardingFn},
+    );
+    assertCommandsSucceedAfterReshardingOpFinishes(mongos.getDB(databaseName));
+    assert.commandWorked(sourceCollection.dropIndex(indexCreatedByTest));
+};
 
 // Tests that the prohibited commands work if the resharding operation is aborted.
 let awaitAbort;
-withReshardingInBackground(() => {
-    waitUntilReshardingInitializedOnDonor();
-    assert.neq(null,
-               mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace}));
-    awaitAbort = startParallelShell(funWithArgs(function(sourceNamespace) {
-                                        db.adminCommand({abortReshardCollection: sourceNamespace});
-                                    }, sourceNamespace), mongos.port);
-    // Wait for the coordinator to remove coordinator document from config.reshardingOperations
-    // as a result of the recipients and donors transitioning to done due to abort.
-    assert.soon(() => {
-        const coordinatorDoc =
-            mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace});
+withReshardingInBackground(
+    () => {
+        waitUntilReshardingInitializedOnDonor();
+        assert.neq(null, mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace}));
+        awaitAbort = startParallelShell(
+            funWithArgs(function (sourceNamespace) {
+                db.adminCommand({abortReshardCollection: sourceNamespace});
+            }, sourceNamespace),
+            mongos.port,
+        );
+        // Wait for the coordinator to remove coordinator document from config.reshardingOperations
+        // as a result of the recipients and donors transitioning to done due to abort.
+        assert.soon(() => {
+            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace});
 
-        return coordinatorDoc === null || coordinatorDoc.state === "aborting";
-    });
-}, {
-    expectedErrorCode: ErrorCodes.ReshardCollectionAborted,
-});
+            return coordinatorDoc === null || coordinatorDoc.state === "aborting";
+        });
+    },
+    {
+        expectedErrorCode: ErrorCodes.ReshardCollectionAborted,
+    },
+);
 awaitAbort();
 
 // Tests that the prohibited commands succeed if the resharding operation succeeds. During the
 // operation it makes sure that the prohibited commands are rejected during the resharding
 // operation.
-withReshardingInBackground(() => {
-    waitUntilReshardingInitializedOnDonor();
+withReshardingInBackground(
+    () => {
+        waitUntilReshardingInitializedOnDonor();
 
-    jsTest.log(
-        "About to test that the admin commands do not work while the resharding operation is in progress.");
+        jsTest.log("About to test that the admin commands do not work while the resharding operation is in progress.");
 
-    assert.commandFailedWithCode(
-        mongos.adminCommand(
-            {moveChunk: sourceNamespace, find: {oldKey: -10}, to: donorShardNames[1]}),
-        [ErrorCodes.ConflictingOperationInProgress]);
-    assert.commandFailedWithCode(
-        mongos.adminCommand({reshardCollection: otherNamespace, key: {newKey: 1}}),
-        ErrorCodes.ReshardCollectionInProgress);
+        assert.commandFailedWithCode(
+            mongos.adminCommand({moveChunk: sourceNamespace, find: {oldKey: -10}, to: donorShardNames[1]}),
+            [ErrorCodes.ConflictingOperationInProgress],
+        );
+        assert.commandFailedWithCode(
+            mongos.adminCommand({reshardCollection: otherNamespace, key: {newKey: 1}}),
+            ErrorCodes.ReshardCollectionInProgress,
+        );
 
-    assertCommandsFailDuringReshardingOp(sourceCollection.getDB());
-}, {
-    setup: () => {
-        assert.commandWorked(mongos.adminCommand({enableSharding: otherDatabaseName}));
-        assert.commandWorked(
-            mongos.adminCommand({shardCollection: otherNamespace, key: {oldKey: 1}}));
+        assertCommandsFailDuringReshardingOp(sourceCollection.getDB());
     },
-    afterReshardingFn: () => {
-        jsTest.log("Join possible ongoing collMod command");
-        assert.commandWorked(sourceCollection.runCommand("collMod"));
+    {
+        setup: () => {
+            assert.commandWorked(mongos.adminCommand({enableSharding: otherDatabaseName}));
+            assert.commandWorked(mongos.adminCommand({shardCollection: otherNamespace, key: {oldKey: 1}}));
+        },
+        afterReshardingFn: () => {
+            jsTest.log("Join possible ongoing collMod command");
+            assert.commandWorked(sourceCollection.runCommand("collMod"));
+        },
     },
-});
+);
 
 reshardingTest.teardown();

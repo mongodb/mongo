@@ -17,8 +17,8 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 // Create a times-series collection.
 let coll = db.getCollection(jsTestName());
-coll.drop();  // Ensure that the namespace does not already exist, which can occur in some
-              // burn_in suites.
+coll.drop(); // Ensure that the namespace does not already exist, which can occur in some
+// burn_in suites.
 
 const timeField = "time";
 assert.commandWorked(db.createCollection(jsTestName(), {timeseries: {timeField: timeField}}));
@@ -33,8 +33,10 @@ coll = db.getCollection(jsTestName());
     assert.commandWorked(coll.insert({[timeField]: ISODate(), x: 0}));
 
     const bucketDoc = getTimeseriesCollForRawOps(coll).find().rawData().toArray()[0];
-    assert(TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
-           'Expected bucket to be compressed' + tojson(bucketDoc));
+    assert(
+        TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
+        "Expected bucket to be compressed" + tojson(bucketDoc),
+    );
 
     jsTestLog("Exiting insertingDocCompressesBucket.");
 })();
@@ -55,18 +57,18 @@ coll = db.getCollection(jsTestName());
 
     // The buckets should be compressed if we are always using the compressed format for
     // time-series writes.
-    assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
-           'Expected first bucket to be compressed' + tojson(bucketDocs));
-    assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
-           'Expected second bucket to be compressed' + tojson(bucketDocs));
+    assert(
+        TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
+        "Expected first bucket to be compressed" + tojson(bucketDocs),
+    );
+    assert(
+        TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
+        "Expected second bucket to be compressed" + tojson(bucketDocs),
+    );
 
     // Both buckets should contain 1 measurement.
-    assert.eq(1,
-              bucketDocs[0].control.count,
-              "Expected 1 measurement in first bucket " + tojson(bucketDocs));
-    assert.eq(1,
-              bucketDocs[1].control.count,
-              "Expected 1 measurement in second bucket " + tojson(bucketDocs));
+    assert.eq(1, bucketDocs[0].control.count, "Expected 1 measurement in first bucket " + tojson(bucketDocs));
+    assert.eq(1, bucketDocs[1].control.count, "Expected 1 measurement in second bucket " + tojson(bucketDocs));
 
     jsTestLog("Exiting targetNewBucketAndCheckCompressed.");
 })();

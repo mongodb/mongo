@@ -10,17 +10,16 @@ const docs = smallDocs();
 const coll = db.query_golden_eq;
 coll.drop();
 
-let output = '';
+let output = "";
 
-jsTestLog('Inserting docs:');
+jsTestLog("Inserting docs:");
 show(docs);
 coll.insert(docs);
 print(`Collection count: ${coll.find().itcount()}`);
 
 for (const leaf of leafs()) {
     // Direct comparisons against undefined ({$eq: undefined}) are not allowed.
-    if (tojson(leaf).match(/undefined/))
-        continue;
+    if (tojson(leaf).match(/undefined/)) continue;
 
     const query = coll.find({a: {$eq: leaf}}, {_id: 0});
     jsTestLog(`Query: ${tojsononeline(query._convertToCommand())}`);

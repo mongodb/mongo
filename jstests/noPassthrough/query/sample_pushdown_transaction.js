@@ -12,8 +12,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
-const collName = 'sample_pushdown';
-const dbName = 'test';
+const collName = "sample_pushdown";
+const dbName = "test";
 const testDB = rst.getPrimary().getDB(dbName);
 const coll = testDB[collName];
 
@@ -21,7 +21,7 @@ const coll = testDB[collName];
 // than 100 records in our collection, we also need the sample size to be less than 5% of the
 // number of documents in our collection.
 const numDocs = 1000;
-const sampleSize = numDocs * .03;
+const sampleSize = numDocs * 0.03;
 let docs = [];
 for (let i = 0; i < numDocs; ++i) {
     docs.push({a: i});

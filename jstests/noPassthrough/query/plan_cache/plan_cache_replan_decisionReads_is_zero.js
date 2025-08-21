@@ -43,8 +43,7 @@ assert.commandWorked(coll.insert(docs1));
 // will return boost::none when MongoDB attempts to seek x=2 and x=3 in the {x: 1} index. This
 // ensures that "totalKeysExamined" will be 0 (which is important to ensure this test covers the
 // code paths relevant to SERVER-109309).
-const pipeline =
-    [{$match: {x: {$in: [2, 3]}, y: 47}}, {$group: {_id: null, num: {$sum: NumberInt(1)}}}];
+const pipeline = [{$match: {x: {$in: [2, 3]}, y: 47}}, {$group: {_id: null, num: {$sum: NumberInt(1)}}}];
 
 // Run the aggregate() command twice so that it's entry in the plan cache gets marked as "active".
 for (let i = 0; i < 2; ++i) {
@@ -84,8 +83,7 @@ let entry = getLatestProfilerEntry(db, {op: "command", ns: coll.getFullName()});
 // inserted hundreds of documents with x=2 and x=3) and the plan using index {y: 1} should be the
 // winning plan now.
 assert.eq(entry.replanned, true, () => tojson(entry));
-assert.includes(
-    entry.replanReason, "cached plan was less efficient than expected", () => tojson(entry));
+assert.includes(entry.replanReason, "cached plan was less efficient than expected", () => tojson(entry));
 
 // Verify that the query examined fewer than 100 keys and 100 docs. In the event that re-planning
 // hasn't happened yet, we don't want to force it to happen by running explain("allPlansExecution"),

@@ -13,11 +13,9 @@
  */
 import {
     areViewlessTimeseriesEnabled,
-    getTimeseriesBucketsColl
+    getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
-import {
-    assertCatalogListOperationsConsistencyForCollection
-} from "jstests/libs/catalog_list_operations_consistency_validator.js";
+import {assertCatalogListOperationsConsistencyForCollection} from "jstests/libs/catalog_list_operations_consistency_validator.js";
 
 // Validate catalog list operations consistency after each command,
 // so that if an inconsistency is introduced, we fail immediately.
@@ -49,8 +47,7 @@ createCollectionAndCheckConsistency(db, "collection_capped", {
     max: 1024,
 });
 
-createCollectionAndCheckConsistency(
-    db, "collection_images", {changeStreamPreAndPostImages: {enabled: true}});
+createCollectionAndCheckConsistency(db, "collection_images", {changeStreamPreAndPostImages: {enabled: true}});
 
 createCollectionAndCheckConsistency(db, "collection_clustered", {
     clusteredIndex: {"key": {_id: 1}, "unique": true, "name": "clustered index"},
@@ -58,7 +55,7 @@ createCollectionAndCheckConsistency(db, "collection_clustered", {
 });
 
 createCollectionAndCheckConsistency(db, "collection_wiredtiger", {
-    storageEngine: {wiredTiger: {configString: "block_compressor=zlib"}}
+    storageEngine: {wiredTiger: {configString: "block_compressor=zlib"}},
 });
 
 createCollectionAndCheckConsistency(db, "collection_validator", {
@@ -66,7 +63,7 @@ createCollectionAndCheckConsistency(db, "collection_validator", {
         $jsonSchema: {
             bsonType: "object",
             required: ["a", "b", "c"],
-        }
+        },
     },
     validationLevel: "moderate",
 });
@@ -75,13 +72,14 @@ createCollectionAndCheckConsistency(db, "collection_validator", {
  * View test cases.
  */
 createViewAndCheckConsistency(db, "view_simple", "collection_simple", [{$match: {a: 100}}]);
-createViewAndCheckConsistency(
-    db, "view_collation", "collection_simple", [{$match: {a: 100}}], {collation: {locale: "fr"}});
+createViewAndCheckConsistency(db, "view_collation", "collection_simple", [{$match: {a: 100}}], {
+    collation: {locale: "fr"},
+});
 
 /**
  * Timeseries test cases.
  */
-createCollectionAndCheckConsistency(db, "timeseries_simple", {timeseries: {timeField: 't'}});
+createCollectionAndCheckConsistency(db, "timeseries_simple", {timeseries: {timeField: "t"}});
 
 createCollectionAndCheckConsistency(db, "timeseries_complex", {
     timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
@@ -89,17 +87,15 @@ createCollectionAndCheckConsistency(db, "timeseries_complex", {
         locale: "fr",
     },
     expireAfterSeconds: 600,
-    storageEngine: {wiredTiger: {configString: "block_compressor=snappy"}}
+    storageEngine: {wiredTiger: {configString: "block_compressor=snappy"}},
 });
 
-assert.commandWorked(
-    db.runCommand({collMod: "timeseries_complex", timeseriesBucketsMayHaveMixedSchemaData: true}));
+assert.commandWorked(db.runCommand({collMod: "timeseries_complex", timeseriesBucketsMayHaveMixedSchemaData: true}));
 assertCatalogListOperationsConsistencyForCollection(db.timeseries_complex);
 
 if (!areViewlessTimeseriesEnabled(db)) {
     // TODO(SERVER-68439): Remove once the view and buckets are atomically created by DDLs.
-    createViewAndCheckConsistency(
-        db, "timeseries_no_buckets", getTimeseriesBucketsColl("timeseries_no_buckets"), []);
+    createViewAndCheckConsistency(db, "timeseries_no_buckets", getTimeseriesBucketsColl("timeseries_no_buckets"), []);
     db.timeseries_no_buckets.drop();
 }
 
@@ -111,17 +107,20 @@ createIndexAndCheckConsistency(db.collection_simple, {fCompound1: -1, fCompound2
 createIndexAndCheckConsistency(db.collection_simple, {fUnique: 1}, {unique: true});
 createIndexAndCheckConsistency(db.collection_simple, {fSparse: 1}, {sparse: true});
 createIndexAndCheckConsistency(db.collection_simple, {fSparseNonBool: 1}, {sparse: 123.45});
-createIndexAndCheckConsistency(
-    db.collection_simple, {fSparseNumberLong: 1}, {sparse: NumberLong('1234567891011')});
+createIndexAndCheckConsistency(db.collection_simple, {fSparseNumberLong: 1}, {sparse: NumberLong("1234567891011")});
 createIndexAndCheckConsistency(db.collection_simple, {fUnique: 1}, {unique: true});
 createIndexAndCheckConsistency(db.collection_simple, {fTtl: 1}, {expireAfterSeconds: 123});
 createIndexAndCheckConsistency(db.collection_simple, {fTtlNumber: 1}, {expireAfterSeconds: 123.45});
-createIndexAndCheckConsistency(db.collection_simple, {fWiredTiger: 1}, {
-    storageEngine: {wiredTiger: {configString: "app_metadata=(test=123)"}}
-});
+createIndexAndCheckConsistency(
+    db.collection_simple,
+    {fWiredTiger: 1},
+    {
+        storageEngine: {wiredTiger: {configString: "app_metadata=(test=123)"}},
+    },
+);
 createIndexAndCheckConsistency(db.collection_simple, {fHidden: 1}, {hidden: true});
 createIndexAndCheckConsistency(db.collection_simple, {fNamed: 1}, {name: "namedindex"});
-createIndexAndCheckConsistency(db.collection_simple, {fCollation: 1}, {collation: {locale: 'es'}});
+createIndexAndCheckConsistency(db.collection_simple, {fCollation: 1}, {collation: {locale: "es"}});
 createIndexAndCheckConsistency(db.collection_simple, {"$**": 1});
 createIndexAndCheckConsistency(db.collection_simple, {fText: "text"});
 createIndexAndCheckConsistency(db.collection_simple, {fHashed: "hashed"});
@@ -131,12 +130,16 @@ createIndexAndCheckConsistency(db.collection_simple, {f2dSphere: "2dsphere"});
 createIndexAndCheckConsistency(db.timeseries_simple, {"timestamp": 1});
 
 // TODO(SERVER-97084): Remove when options for index plugins are denied in basic indexes.
-createIndexAndCheckConsistency(db.collection_simple, {fUnrelatedIndexPluginOptions: 1}, {
-    textIndexVersion: 3,
-    '2dsphereIndexVersion': 3,
-    bits: 26,
-    min: -180,
-    max: 180,
-    coarsestIndexedLevel: 20,
-    finestIndexedLevel: 25,
-});
+createIndexAndCheckConsistency(
+    db.collection_simple,
+    {fUnrelatedIndexPluginOptions: 1},
+    {
+        textIndexVersion: 3,
+        "2dsphereIndexVersion": 3,
+        bits: 26,
+        min: -180,
+        max: 180,
+        coarsestIndexedLevel: 20,
+        finestIndexedLevel: 25,
+    },
+);

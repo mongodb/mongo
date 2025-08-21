@@ -15,34 +15,36 @@ for (var i = 0; i < 100; i++) {
 }
 
 const predicate = {
-    x: {$gt: 50}
+    x: {$gt: 50},
 };
 
 function checkFind() {
-    assert.eq(49,
-              coll.find(predicate).count(),
-              "Expected count() with predicate to return correct result");
-    assert.eq(49,
-              coll.find(predicate).itcount(),
-              "Expected find() used with itcount() to return correct result");
-    assert.eq(20,
-              coll.find(predicate).limit(20).itcount(),
-              "Expected find() with limit to return correct result");
+    assert.eq(49, coll.find(predicate).count(), "Expected count() with predicate to return correct result");
+    assert.eq(49, coll.find(predicate).itcount(), "Expected find() used with itcount() to return correct result");
+    assert.eq(20, coll.find(predicate).limit(20).itcount(), "Expected find() with limit to return correct result");
 }
 
 function checkExplainWithExecutionStats() {
-    assert.eq(49,
-              coll.find(predicate).explain("executionStats").executionStats.nReturned,
-              "nReturned on simple find() with predicate");
-    assert.eq(20,
-              coll.find(predicate).limit(20).explain("executionStats").executionStats.nReturned,
-              "Incorrect nReturned on find() with predicate and limit");
-    assert.eq(20,
-              coll.find(predicate).limit(-20).explain("executionStats").executionStats.nReturned,
-              "Incorrect nReturned on find() with predicate and negative limit");
-    assert.eq(49,
-              coll.find(predicate).batchSize(20).explain("executionStats").executionStats.nReturned,
-              "Incorrect nReturned on find() with predicate and non-default batch size");
+    assert.eq(
+        49,
+        coll.find(predicate).explain("executionStats").executionStats.nReturned,
+        "nReturned on simple find() with predicate",
+    );
+    assert.eq(
+        20,
+        coll.find(predicate).limit(20).explain("executionStats").executionStats.nReturned,
+        "Incorrect nReturned on find() with predicate and limit",
+    );
+    assert.eq(
+        20,
+        coll.find(predicate).limit(-20).explain("executionStats").executionStats.nReturned,
+        "Incorrect nReturned on find() with predicate and negative limit",
+    );
+    assert.eq(
+        49,
+        coll.find(predicate).batchSize(20).explain("executionStats").executionStats.nReturned,
+        "Incorrect nReturned on find() with predicate and non-default batch size",
+    );
 }
 
 function runTest() {

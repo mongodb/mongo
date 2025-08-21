@@ -22,7 +22,8 @@ const sourceCollection = reshardingTest.createShardedCollection({
 });
 
 const recipientShardNames = reshardingTest.recipientShardNames;
-reshardingTest.withUnshardCollectionInBackground(  //
+reshardingTest.withUnshardCollectionInBackground(
+    //
     {toShard: recipientShardNames[0]},
     () => {
         // We wait until cloneTimestamp has been chosen to guarantee that any subsequent writes will
@@ -41,6 +42,7 @@ reshardingTest.withUnshardCollectionInBackground(  //
 
         reshardingTest.stepUpNewPrimaryOnShard(recipientShardNames[0]);
         assert.commandWorked(sourceCollection.remove({oldKey: 1}, {justOne: true}));
-    });
+    },
+);
 
 reshardingTest.teardown();

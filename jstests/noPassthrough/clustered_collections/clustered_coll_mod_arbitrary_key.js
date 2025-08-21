@@ -10,8 +10,7 @@ import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 // Run TTL monitor constantly to speed up this test.
-const conn = MongoRunner.runMongod(
-    {setParameter: {ttlMonitorSleepSecs: 1, supportArbitraryClusterKeyIndex: true}});
+const conn = MongoRunner.runMongod({setParameter: {ttlMonitorSleepSecs: 1, supportArbitraryClusterKeyIndex: true}});
 
 function testCollMod(coll, clusterKey, clusterKeyName) {
     const collName = coll.getName();
@@ -20,8 +19,11 @@ function testCollMod(coll, clusterKey, clusterKeyName) {
     const expireAfterSeconds = 60 * 60 * 24;
 
     assertDropCollection(coll.getDB(), collName);
-    assert.commandWorked(coll.getDB().createCollection(
-        coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, expireAfterSeconds}));
+    assert.commandWorked(
+        coll
+            .getDB()
+            .createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}, expireAfterSeconds}),
+    );
 
     // Insert documents less than a day old so they don't automatically expire.
     const batchSize = 10;
@@ -62,13 +64,14 @@ function testCollMod(coll, clusterKey, clusterKeyName) {
     assert.eq(coll.find().itcount(), 1);
 
     assert.commandFailedWithCode(
-        coll.getDB().runCommand(
-            {collMod: collName, index: {keyPattern: {[clusterKeyFieldName]: 1}, hidden: true}}),
-        6011800);
+        coll.getDB().runCommand({collMod: collName, index: {keyPattern: {[clusterKeyFieldName]: 1}, hidden: true}}),
+        6011800,
+    );
 
     assert.commandFailedWithCode(
         coll.getDB().runCommand({collMod: collName, index: {name: clusterKeyName, hidden: true}}),
-        6011800);
+        6011800,
+    );
 }
 
 testCollMod(conn.getDB("local")["coll"], {ts: 1}, "ts_1");

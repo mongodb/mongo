@@ -14,7 +14,7 @@ const replTest = new ReplSetTest({
     name: testName,
     nodes: 2,
     nodeOptions: {setParameter: {internalInsertMaxBatchSize: 3}},
-    settings: {chainingAllowed: false}
+    settings: {chainingAllowed: false},
 });
 replTest.startSet();
 replTest.initiate();
@@ -29,13 +29,13 @@ const collName2 = "testcoll2";
 const bbCollName = "bbtestcoll";
 
 const singleBatchLSID = {
-    id: UUID()
+    id: UUID(),
 };
 const singleBatchCommand = {
     insert: collName1,
     lsid: singleBatchLSID,
     txnNumber: NumberLong(0),
-    documents: [{_id: "s1"}, {_id: "s2"}, {_id: "s3"}]
+    documents: [{_id: "s1"}, {_id: "s2"}, {_id: "s3"}],
 };
 // First try
 assert.commandWorked(primaryDB.runCommand(singleBatchCommand));
@@ -43,13 +43,13 @@ assert.commandWorked(primaryDB.runCommand(singleBatchCommand));
 assert.commandWorked(primaryDB.runCommand(singleBatchCommand));
 
 const multiBatchLSID = {
-    id: UUID()
+    id: UUID(),
 };
 const multiBatchCommand = {
     insert: collName2,
     lsid: multiBatchLSID,
     txnNumber: NumberLong(0),
-    documents: [{_id: "m1"}, {_id: "m2"}, {_id: "m3"}, {_id: "m4"}, {_id: "m5"}, {_id: "m6"}]
+    documents: [{_id: "m1"}, {_id: "m2"}, {_id: "m3"}, {_id: "m4"}, {_id: "m5"}, {_id: "m6"}],
 };
 // First try
 assert.commandWorked(primaryDB.runCommand(multiBatchCommand));
@@ -58,43 +58,47 @@ assert.commandWorked(primaryDB.runCommand(multiBatchCommand));
 
 // Make sure we can retry when the command failed somewhere in the middle.
 const brokenBatchLSID = {
-    id: UUID()
+    id: UUID(),
 };
 const brokenBatchCommandNoSession = {
     insert: bbCollName,
-    documents: [{_id: "b1"}, {_id: "b2"}, {_id: "b3"}, {_id: "b4"}, {_id: "b5"}, {_id: "b6"}]
+    documents: [{_id: "b1"}, {_id: "b2"}, {_id: "b3"}, {_id: "b4"}, {_id: "b5"}, {_id: "b6"}],
 };
-const brokenBatchCommand =
-    Object.merge(brokenBatchCommandNoSession, {lsid: brokenBatchLSID, txnNumber: NumberLong(0)});
+const brokenBatchCommand = Object.merge(brokenBatchCommandNoSession, {lsid: brokenBatchLSID, txnNumber: NumberLong(0)});
 const brokenBatchFirstBatch = [{_id: "b1"}, {_id: "b2"}, {_id: "b3"}];
 
 jsTestLog("Starting a vectored insert blocked between batches");
-let failPoint =
-    configureFailPoint(primaryDB,
-                       "hangAfterCollectionInserts",
-                       {collectionNS: primaryDB[bbCollName].getFullName(), first_id: "b4"});
+let failPoint = configureFailPoint(primaryDB, "hangAfterCollectionInserts", {
+    collectionNS: primaryDB[bbCollName].getFullName(),
+    first_id: "b4",
+});
 let insertThread = new Thread(
     (host, dbName, collName, brokenBatchCommandNoSession, sessuuid) => {
         const db = new Mongo(host).getDB(dbName);
-        const brokenBatchCommand = Object.merge(
-            brokenBatchCommandNoSession, {lsid: {id: UUID(sessuuid)}, txnNumber: NumberLong(0)});
-        assert.commandFailedWithCode(db.runCommand(brokenBatchCommand),
-                                     ErrorCodes.InterruptedDueToReplStateChange);
+        const brokenBatchCommand = Object.merge(brokenBatchCommandNoSession, {
+            lsid: {id: UUID(sessuuid)},
+            txnNumber: NumberLong(0),
+        });
+        assert.commandFailedWithCode(db.runCommand(brokenBatchCommand), ErrorCodes.InterruptedDueToReplStateChange);
     },
     primary.host,
     dbName,
     bbCollName,
     brokenBatchCommandNoSession,
-    extractUUIDFromObject(brokenBatchLSID.id));
+    extractUUIDFromObject(brokenBatchLSID.id),
+);
 insertThread.start();
 failPoint.wait();
 
-assert.soon(() =>
-                bsonUnorderedFieldsCompare(primaryDB[bbCollName].find({}).sort({_id: 1}).toArray(),
-                                           brokenBatchFirstBatch) == 0);
 assert.soon(
-    () => bsonUnorderedFieldsCompare(secondaryDB[bbCollName].find({}).sort({_id: 1}).toArray(),
-                                     brokenBatchFirstBatch) == 0);
+    () =>
+        bsonUnorderedFieldsCompare(primaryDB[bbCollName].find({}).sort({_id: 1}).toArray(), brokenBatchFirstBatch) == 0,
+);
+assert.soon(
+    () =>
+        bsonUnorderedFieldsCompare(secondaryDB[bbCollName].find({}).sort({_id: 1}).toArray(), brokenBatchFirstBatch) ==
+        0,
+);
 
 // Failover
 replTest.stepUp(secondary);
@@ -110,31 +114,31 @@ function checkRetries() {
     // Retry single batch command on new primary and make sure documents match after.
     jsTestLog("Retrying single batch insert.");
     assert.commandWorked(retryDB.runCommand(singleBatchCommand));
-    assert.docEq(secondaryDB[singleBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 singleBatchCommand.documents);
-    assert.docEq(primaryDB[singleBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 singleBatchCommand.documents);
+    assert.docEq(
+        secondaryDB[singleBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
+        singleBatchCommand.documents,
+    );
+    assert.docEq(primaryDB[singleBatchCommand.insert].find({}).sort({_id: 1}).toArray(), singleBatchCommand.documents);
 
     // Retry multi batch command on new primary and make sure documents match after.
     jsTestLog("Retrying multi batch insert.");
     assert.commandWorked(retryDB.runCommand(multiBatchCommand));
-    assert.docEq(secondaryDB[multiBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 multiBatchCommand.documents);
-    assert.docEq(primaryDB[multiBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 multiBatchCommand.documents);
+    assert.docEq(secondaryDB[multiBatchCommand.insert].find({}).sort({_id: 1}).toArray(), multiBatchCommand.documents);
+    assert.docEq(primaryDB[multiBatchCommand.insert].find({}).sort({_id: 1}).toArray(), multiBatchCommand.documents);
 
     // Retry broken batch command on new primary and ensure the whole insert worked.
     jsTestLog("Retrying broken batch insert.");
     assert.commandWorked(retryDB.runCommand(brokenBatchCommand));
-    assert.docEq(secondaryDB[brokenBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 brokenBatchCommand.documents);
+    assert.docEq(
+        secondaryDB[brokenBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
+        brokenBatchCommand.documents,
+    );
     // Since this didn't work the first time, we need to await replication for it to work on the old
     // primary.
     if (retryNode == secondary) {
         replTest.awaitReplication();
     }
-    assert.docEq(primaryDB[brokenBatchCommand.insert].find({}).sort({_id: 1}).toArray(),
-                 brokenBatchCommand.documents);
+    assert.docEq(primaryDB[brokenBatchCommand.insert].find({}).sort({_id: 1}).toArray(), brokenBatchCommand.documents);
 }
 
 // The new primary (old secondary) should only have the first batch.

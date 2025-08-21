@@ -16,7 +16,7 @@ const qsutils = new QuerySettingsUtils(db, collName);
 qsutils.removeAllQuerySettings();
 
 const settings = {
-    queryFramework: "classic"
+    queryFramework: "classic",
 };
 
 // Creating the collection, because some sharding passthrough suites are failing when explain
@@ -29,22 +29,17 @@ function runTest({queryInstance, expectedDebugQueryShape, shouldRunExplain = tru
 
     // Set some settings for the desired query instance, so we can later query for the debug query
     // shape.
-    assert.commandWorked(
-        db.adminCommand({setQuerySettings: queryInstance, settings}),
-    );
+    assert.commandWorked(db.adminCommand({setQuerySettings: queryInstance, settings}));
     qsutils.assertQueryShapeConfiguration(
-        [
-            qsutils.makeQueryShapeConfiguration(settings, queryInstance),
-        ],
-        shouldRunExplain);
+        [qsutils.makeQueryShapeConfiguration(settings, queryInstance)],
+        shouldRunExplain,
+    );
 
     // Compare the actual debug query shape against the expected one. Using 'assert.docEq()' has the
     // added bonus of ensuring that the 'tenantId' does not get leaked within the 'cmdNs' property.
-    const actualDebugQueryShape = qsutils
-                                      .getQuerySettings({
-                                          showDebugQueryShape: true,
-                                      })[0]
-                                      .debugQueryShape;
+    const actualDebugQueryShape = qsutils.getQuerySettings({
+        showDebugQueryShape: true,
+    })[0].debugQueryShape;
     assert.docEq(expectedDebugQueryShape, actualDebugQueryShape);
 
     // Remove the newly added query settings, so the rest of the tests can be executed from a fresh
@@ -64,85 +59,87 @@ runTest({
 
 // Test the aggregate command case.
 runTest({
-  queryInstance: qsutils.makeAggregateQueryInstance({
-      pipeline: [
-          {
-            $lookup: {
-              from: "inventory",
-              localField: "item",
-              foreignField: "sku",
-              as: "inventory_docs",
-            },
-          },
-          {
-            $match: {
-              qty: { $lt: 5 },
-              manufacturer: {
-                $in: ["Acme Corporation", "Umbrella Corporation"],
-              },
-            },
-          },
-          {
-            $count: "itemsLowOnStock",
-          },
-      ],
-  }),
-  expectedDebugQueryShape: {
-    cmdNs: {db: db.getName(), coll: collName},
-    command: "aggregate",
-    pipeline: [
-      {
-        $lookup: {
-          from: "inventory",
-          as: "inventory_docs",
-          localField: "item",
-          foreignField: "sku",
-        },
-      },
-      {
-        $match: {
-          $and: [
+    queryInstance: qsutils.makeAggregateQueryInstance({
+        pipeline: [
             {
-              qty: {
-                $lt: "?number",
-              },
+                $lookup: {
+                    from: "inventory",
+                    localField: "item",
+                    foreignField: "sku",
+                    as: "inventory_docs",
+                },
             },
             {
-              manufacturer: {
-                $in: "?array<?string>",
-              },
+                $match: {
+                    qty: {$lt: 5},
+                    manufacturer: {
+                        $in: ["Acme Corporation", "Umbrella Corporation"],
+                    },
+                },
             },
-          ],
-        },
-      },
-      {
-        $group: {
-          _id: "?null",
-          itemsLowOnStock: {
-            $sum: "?number",
-          },
-        },
-      },
-      {
-        $project: {
-          itemsLowOnStock: true,
-          _id: false,
-        },
-      },
-    ],
-  },
+            {
+                $count: "itemsLowOnStock",
+            },
+        ],
+    }),
+    expectedDebugQueryShape: {
+        cmdNs: {db: db.getName(), coll: collName},
+        command: "aggregate",
+        pipeline: [
+            {
+                $lookup: {
+                    from: "inventory",
+                    as: "inventory_docs",
+                    localField: "item",
+                    foreignField: "sku",
+                },
+            },
+            {
+                $match: {
+                    $and: [
+                        {
+                            qty: {
+                                $lt: "?number",
+                            },
+                        },
+                        {
+                            manufacturer: {
+                                $in: "?array<?string>",
+                            },
+                        },
+                    ],
+                },
+            },
+            {
+                $group: {
+                    _id: "?null",
+                    itemsLowOnStock: {
+                        $sum: "?number",
+                    },
+                },
+            },
+            {
+                $project: {
+                    itemsLowOnStock: true,
+                    _id: false,
+                },
+            },
+        ],
+    },
 });
 
 // Test the inception case: setting query settings on '$querySettings'.
 runTest({
-    queryInstance: qsutils.makeAggregateQueryInstance({
-        pipeline: [{$querySettings: {showDebugQueryShape: true}}],
-    },
-                                                      /* collectionless */ true),
+    queryInstance: qsutils.makeAggregateQueryInstance(
+        {
+            pipeline: [{$querySettings: {showDebugQueryShape: true}}],
+        },
+        /* collectionless */ true,
+    ),
     expectedDebugQueryShape: {
         cmdNs: {db: db.getName(), coll: "$cmd.aggregate"},
         command: "aggregate",
-        pipeline: [{$querySettings: {showDebugQueryShape: true}}]
+        pipeline: [{$querySettings: {showDebugQueryShape: true}}],
     },
     // Since it's a collectionless aggregate, the explain does not contain the 'queryPlanner' field.
     shouldRunExplain: false,

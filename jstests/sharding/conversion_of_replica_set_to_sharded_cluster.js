@@ -30,23 +30,23 @@ if (jsTestOptions().useAutoBootstrapProcedure) {
 TestData.skipCheckOrphans = true;
 
 const expectedDocs = 1000;
-const dbName = 'test';
-const collName = 'foo';
+const dbName = "test";
+const collName = "foo";
 const otherCollName = "bar";
-const DDLDbName = 'DDLTest';
-const DDLCollName = 'DDLFoo';
-let str = 'a';
+const DDLDbName = "DDLTest";
+const DDLCollName = "DDLFoo";
+let str = "a";
 while (str.length < 8000) {
     str += str;
 }
 
-let map = function() {
+let map = function () {
     emit(this.i, this.j);
 };
 
-let reduce = function(key, values) {
+let reduce = function (key, values) {
     let jCount = 0;
-    values.forEach(function(j) {
+    values.forEach(function (j) {
         jCount += j;
     });
     return jCount;
@@ -58,26 +58,26 @@ const CRUDCommands = {
         assertFunc: (res, testDB) => {
             assert.commandWorked(res);
             assert.eq(expectedDocs, new DBCommandCursor(testDB, res).itcount());
-        }
+        },
     },
     count: {
         command: {count: collName},
         assertFunc: (res) => {
             assert.commandWorked(res);
             assert.eq(expectedDocs, res.n);
-        }
+        },
     },
     dbstats: {
         command: {dbstats: 1},
         assertFunc: (res) => {
             assert.commandWorked(res);
-        }
+        },
     },
     collstats: {
         command: {collstats: collName},
         assertFunc: (res) => {
             assert.commandWorked(res);
-        }
+        },
     },
     mapreduce: {
         command: {mapreduce: collName, map: map, reduce: reduce, out: {inline: 1}},
@@ -85,32 +85,32 @@ const CRUDCommands = {
             assert.commandWorked(res);
             assert.eq(100, res.results.length);
             assert.eq(45, res.results[0].value);
-        }
+        },
     },
     aggregate: {
         command: {
             aggregate: collName,
-            pipeline: [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}],
-            cursor: {}
+            pipeline: [{$project: {j: 1}}, {$group: {_id: "j", sum: {$sum: "$j"}}}],
+            cursor: {},
         },
         assertFunc: (res) => {
             assert.commandWorked(res);
             assert.eq(4500, res.cursor.firstBatch[0].sum);
-        }
+        },
     },
     aggregateWithLookup: {
         command: {
             aggregate: collName,
             pipeline: [
                 {$sort: {j: 1}},
-                {$lookup: {from: otherCollName, localField: "j", foreignField: "i", as: "lookedUp"}}
+                {$lookup: {from: otherCollName, localField: "j", foreignField: "i", as: "lookedUp"}},
             ],
-            cursor: {}
+            cursor: {},
         },
         assertFunc: (res) => {
             assert.commandWorked(res);
             assert.eq(res.cursor.firstBatch[0].lookedUp.length, 10);
-        }
+        },
     },
     aggregateWithGraphLookup: {
         command: {
@@ -124,23 +124,23 @@ const CRUDCommands = {
                         connectFromField: "j",
                         connectToField: "i",
                         as: "graphLookedUp",
-                        maxDepth: 10
-                    }
-                }
+                        maxDepth: 10,
+                    },
+                },
             ],
-            cursor: {}
+            cursor: {},
         },
         assertFunc: (res) => {
             assert.commandWorked(res);
             assert.eq(res.cursor.firstBatch[0].graphLookedUp.length, 100);
-        }
+        },
     },
     insert: {
         command: {insert: collName, documents: [{a: 1, i: 1, j: 1}]},
         assertFunc: (res) => {
             assert.commandWorked(res);
             assert.eq(1, res.n);
-        }
+        },
     },
     update: {
         command: {update: collName, updates: [{q: {a: 1, i: 1, j: 1}, u: {$set: {u: 1}}}]},
@@ -148,7 +148,7 @@ const CRUDCommands = {
             assert.commandWorked(res);
             assert.eq(1, res.n);
             assert.eq(1, testDB.foo.findOne({a: 1}).u);
-        }
+        },
     },
     findAndModify: {
         command: {findAndModify: collName, query: {a: 1, i: 1, j: 1}, update: {$set: {b: 1}}},
@@ -157,17 +157,17 @@ const CRUDCommands = {
             assert.eq(1, res.value.a);
             assert.eq(null, res.value.b);
             assert.eq(1, testDB.foo.findOne({a: 1}).b);
-        }
+        },
     },
     remove: {
         command: {delete: collName, deletes: [{q: {a: 1}, limit: 1}]},
         assertFunc: (res) => {
             assert.commandWorked(res);
             assert.eq(1, res.n);
-        }
+        },
     },
     mapreduceWithWrite: {
-        command: {mapreduce: collName, map: map, reduce: reduce, out: 'mrOutput'},
+        command: {mapreduce: collName, map: map, reduce: reduce, out: "mrOutput"},
         assertFunc: (res, testDB) => {
             assert.commandWorked(res);
             assert.eq(100, testDB.mrOutput.count());
@@ -175,14 +175,13 @@ const CRUDCommands = {
         },
         post: (testDB) => {
             testDB.mrOutput.remove({});
-        }
+        },
     },
     aggregateWithOut: {
         command: {
             aggregate: collName,
-            pipeline:
-                [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}, {$out: 'aggOutput'}],
-            cursor: {}
+            pipeline: [{$project: {j: 1}}, {$group: {_id: "j", sum: {$sum: "$j"}}}, {$out: "aggOutput"}],
+            cursor: {},
         },
         assertFunc: (res, testDB) => {
             assert.commandWorked(res);
@@ -190,25 +189,27 @@ const CRUDCommands = {
         },
         post: (testDB) => {
             testDB.aggOutput.remove({});
-        }
+        },
     },
     aggregateWithMerge: {
         command: {
             aggregate: collName,
-            pipeline: [{
-                $merge: {
-                    into: otherCollName,
-                    whenMatched: [{$set: {merged: true}}],
-                    whenNotMatched: "fail"
-                }
-            }],
-            cursor: {}
+            pipeline: [
+                {
+                    $merge: {
+                        into: otherCollName,
+                        whenMatched: [{$set: {merged: true}}],
+                        whenNotMatched: "fail",
+                    },
+                },
+            ],
+            cursor: {},
         },
         assertFunc: (res, testDB) => {
             assert.commandWorked(res);
             assert.eq(testDB[otherCollName].findOne().merged, true);
-        }
-    }
+        },
+    },
 };
 
 const DDLCommands = {
@@ -217,7 +218,7 @@ const DDLCommands = {
         assertFunc: (res, testDB) => {
             assert.commandWorked(res);
             assert.eq(0, testDB.runCommand({count: DDLCollName}).n);
-        }
+        },
     },
     createIndex: {
         pre: (testDB) => {
@@ -225,67 +226,66 @@ const DDLCommands = {
             assert.commandWorked(res);
             assert.eq(1, res.n);
         },
-        command: {createIndexes: DDLCollName, indexes: [{key: {a: 1}, name: 'a_1'}]},
+        command: {createIndexes: DDLCollName, indexes: [{key: {a: 1}, name: "a_1"}]},
         assertFunc: (res) => {
             assert.commandWorked(res);
-        }
+        },
     },
     dropIndex: {
-        command: {dropIndexes: DDLCollName, index: ['a_1']},
+        command: {dropIndexes: DDLCollName, index: ["a_1"]},
         assertFunc: (res) => {
             assert.commandWorked(res);
-        }
+        },
     },
     dropCollection: {
         command: {drop: DDLCollName},
         assertFunc: (res, testDB) => {
             assert.commandWorked(res);
             assert.eq(0, testDB.runCommand({count: DDLCollName}).n);
-        }
+        },
     },
     dropDatabase: {
         command: {dropDatabase: 1},
         assertFunc: (res, testDB) => {
             assert.commandWorked(res);
             assert.eq(0, testDB.runCommand({count: DDLCollName}).n);
-        }
-    }
+        },
+    },
 };
 
-let assertAddShardSucceeded = function(res, shardName) {
+let assertAddShardSucceeded = function (res, shardName) {
     assert.commandWorked(res);
 
     // If a shard name was specified, make sure that the name the addShard command reports the
     // shard was added with matches the specified name.
     if (shardName) {
-        assert.eq(shardName,
-                  res.shardAdded,
-                  "name returned by addShard does not match name specified in addShard");
+        assert.eq(shardName, res.shardAdded, "name returned by addShard does not match name specified in addShard");
     }
 
     // Make sure the shard shows up in config.shards with the shardName reported by the
     // addShard command.
-    assert.neq(null,
-               st.s.getDB('config').shards.findOne({_id: res.shardAdded}),
-               "newly added shard " + res.shardAdded + " not found in config.shards");
+    assert.neq(
+        null,
+        st.s.getDB("config").shards.findOne({_id: res.shardAdded}),
+        "newly added shard " + res.shardAdded + " not found in config.shards",
+    );
 };
 
 let removeShardWithName = removeShard;
 
-let checkCRUDCommands = function(testDB) {
+let checkCRUDCommands = function (testDB) {
     for (let command in CRUDCommands) {
-        jsTestLog('Testing CRUD command: ' + command);
+        jsTestLog("Testing CRUD command: " + command);
         assert.soonNoExcept(() => {
-            CRUDCommands[command].assertFunc(testDB.runCommand(CRUDCommands[command].command),
-                                             testDB);
+            CRUDCommands[command].assertFunc(testDB.runCommand(CRUDCommands[command].command), testDB);
             return true;
         });
     }
 };
 
-let checkDDLCommands = function(testDB) {
+let checkDDLCommands = function (testDB) {
     for (let command in DDLCommands) {
-        jsTestLog('Testing DDL command: ' + command);
+        jsTestLog("Testing DDL command: " + command);
         if (DDLCommands[command].pre) {
             DDLCommands[command].pre(testDB);
         }
@@ -294,7 +294,7 @@ let checkDDLCommands = function(testDB) {
 };
 
 jsTest.log("Creating replica set.");
-let rst0 = new ReplSetTest({name: 'rs0', nodes: 2});
+let rst0 = new ReplSetTest({name: "rs0", nodes: 2});
 rst0.startSet();
 rst0.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 waitForAllMembers(rst0.getPrimary().getDB(dbName));
@@ -322,16 +322,15 @@ let st = new ShardingTest({
 });
 
 // TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(),
-                                        "ShardAuthoritativeDbMetadataDDL")) {
+if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
     st.stop();
     rst0.stopSet();
     quit();
 }
 
 jsTest.log("Second test: restart the replica set as a shardsvr but don't add it to a cluster.");
-rst0.restart(0, {shardsvr: ''});
-rst0.restart(1, {shardsvr: ''});
+rst0.restart(0, {shardsvr: ""});
+rst0.restart(1, {shardsvr: ""});
 rst0.awaitReplication();
 
 checkCRUDCommands(rst0.getPrimary().getDB(dbName));

@@ -25,14 +25,14 @@ primaryDB.createCollection(collName);
 const dropDatabaseOp = {
     op: "c",
     ns: cmdNss,
-    o: {dropDatabase: 1}
+    o: {dropDatabase: 1},
 };
 
 // Verify that dropDatabase is only supported if it's the only op entry.
 assert.commandFailedWithCode(
-    primaryDB.adminCommand(
-        {applyOps: [{op: "c", ns: cmdNss, o: {create: "collection"}}, dropDatabaseOp]}),
-    6275900);
+    primaryDB.adminCommand({applyOps: [{op: "c", ns: cmdNss, o: {create: "collection"}}, dropDatabaseOp]}),
+    6275900,
+);
 
 assert.contains(dbName, rst.getPrimary().getDBNames());
 assert.sameMembers(primaryDB.getCollectionNames(), [collName]);
@@ -44,12 +44,14 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "
     const createApplyOpsOplogEntry = (ops) => ({op: "c", ns: "admin.$cmd", o: {applyOps: ops}});
 
     assert.commandFailedWithCode(
-        primaryDB.adminCommand({applyOps: [createApplyOpsOplogEntry([dropDatabaseOp])]}), 9585500);
+        primaryDB.adminCommand({applyOps: [createApplyOpsOplogEntry([dropDatabaseOp])]}),
+        9585500,
+    );
 
     assert.commandFailedWithCode(
-        primaryDB.adminCommand(
-            {applyOps: [createApplyOpsOplogEntry([createApplyOpsOplogEntry([dropDatabaseOp])])]}),
-        9585500);
+        primaryDB.adminCommand({applyOps: [createApplyOpsOplogEntry([createApplyOpsOplogEntry([dropDatabaseOp])])]}),
+        9585500,
+    );
 
     assert.contains(dbName, rst.getPrimary().getDBNames());
     assert.sameMembers(primaryDB.getCollectionNames(), [collName]);

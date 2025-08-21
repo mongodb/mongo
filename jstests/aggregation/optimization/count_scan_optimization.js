@@ -11,12 +11,7 @@
 //   assumes_unsharded_collection,
 //   do_not_wrap_aggregations_in_facets,
 // ]
-import {
-    aggPlanHasStage,
-    getAggPlanStage,
-    getQueryPlanner,
-    planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+import {aggPlanHasStage, getAggPlanStage, getQueryPlanner, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 var coll = db.countscan;
 coll.drop();
@@ -36,22 +31,23 @@ assert.eq(simpleGroup[0]["count"], 15);
 
 // Retrieve the query plain from explain, whose shape varies depending on the query and the
 // engines used (classic/sbe).
-const getQueryPlan = function(explain) {
+const getQueryPlan = function (explain) {
     const queryPlanner = getQueryPlanner(explain);
     let winningPlan = queryPlanner.winningPlan;
     return winningPlan.queryPlan ? winningPlan.queryPlan : winningPlan;
 };
 
-var explained =
-    coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
+var explained = coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
 
 assert(planHasStage(db, getQueryPlan(explained), "COUNT_SCAN"));
 
-explained = coll.explain().aggregate([
-    {$match: {foo: {$gt: 0}}},
-    {$project: {_id: 0, a: {$literal: null}}},
-    {$group: {_id: null, count: {$sum: 1}}}
-]);
+explained = coll
+    .explain()
+    .aggregate([
+        {$match: {foo: {$gt: 0}}},
+        {$project: {_id: 0, a: {$literal: null}}},
+        {$group: {_id: null, count: {$sum: 1}}},
+    ]);
 
 assert(planHasStage(db, getQueryPlan(explained), "COUNT_SCAN"));
 
@@ -79,8 +75,7 @@ assert.eq(true, countScan.indexBounds.endKeyInclusive, explained);
 
 // Test that the inclusivity/exclusivity of the index bounds for COUNT_SCAN are correct when
 // there is a $sort in the opposite direction of the index.
-explained = coll.explain().aggregate(
-    [{$match: {foo: {$gte: 0, $lt: 10}}}, {$sort: {foo: -1}}, {$count: "count"}]);
+explained = coll.explain().aggregate([{$match: {foo: {$gte: 0, $lt: 10}}}, {$sort: {foo: -1}}, {$count: "count"}]);
 countScan = getAggPlanStage(explained, "COUNT_SCAN");
 assert.neq(null, countScan, explained);
 assert.eq({foo: 0}, countScan.indexBounds.startKey, explained);

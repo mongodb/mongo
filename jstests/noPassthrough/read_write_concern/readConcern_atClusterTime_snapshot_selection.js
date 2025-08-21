@@ -17,32 +17,33 @@ rst.startSet();
 rst.initiate();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(rst.getPrimary().adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 rst.awaitReplication();
 
-const primarySession =
-    rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+const primarySession = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
 const primaryDB = primarySession.getDatabase(dbName);
 
 const secondaryConns = rst.getSecondaries();
 const secondaryConn0 = secondaryConns[0];
 const secondaryConn1 = secondaryConns[1];
-const secondarySession =
-    secondaryConn0.getDB(dbName).getMongo().startSession({causalConsistency: false});
+const secondarySession = secondaryConn0.getDB(dbName).getMongo().startSession({causalConsistency: false});
 const secondaryDB0 = secondarySession.getDatabase(dbName);
 
 // Create the collection and insert one document. Get the op time of the write.
-let res = assert.commandWorked(primaryDB.runCommand(
-    {insert: collName, documents: [{_id: "before"}], writeConcern: {w: "majority"}}));
+let res = assert.commandWorked(
+    primaryDB.runCommand({insert: collName, documents: [{_id: "before"}], writeConcern: {w: "majority"}}),
+);
 const clusterTimePrimaryBefore = res.opTime.ts;
 
 // Wait for the majority commit point on 'secondaryDB0' to include the {_id: "before"} write.
-assert.soonNoExcept(function() {
-    return assert
-               .commandWorked(secondaryDB0.runCommand(
-                   {find: collName, readConcern: {level: "majority"}, maxTimeMS: 10000}))
-               .cursor.firstBatch.length === 1;
+assert.soonNoExcept(function () {
+    return (
+        assert.commandWorked(
+            secondaryDB0.runCommand({find: collName, readConcern: {level: "majority"}, maxTimeMS: 10000}),
+        ).cursor.firstBatch.length === 1
+    );
 });
 
 // Stop replication on both secondaries.
@@ -56,8 +57,7 @@ assert(res.opTime.hasOwnProperty("ts"), tojson(res));
 let clusterTimeAfter = res.opTime.ts;
 
 // A read on the primary at the old cluster time should not include the write.
-primarySession.startTransaction(
-    {readConcern: {level: "snapshot", atClusterTime: clusterTimePrimaryBefore}});
+primarySession.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTimePrimaryBefore}});
 res = assert.commandWorked(primaryDB.runCommand({find: collName}));
 assert.commandWorked(primarySession.commitTransaction_forTesting());
 assert.eq(res.cursor.firstBatch.length, 1, printjson(res));
@@ -68,17 +68,16 @@ assert.eq(res.cursor.firstBatch[0]._id, "before", printjson(res));
 // the transaction to be majority committed.
 primarySession.startTransaction({
     readConcern: {level: "snapshot", atClusterTime: clusterTimeAfter},
-    writeConcern: {w: "majority", wtimeout: 1000}
+    writeConcern: {w: "majority", wtimeout: 1000},
 });
 res = assert.commandWorked(primaryDB.runCommand({find: collName}));
 assert.eq(res.cursor.firstBatch.length, 2, printjson(res));
-assert.commandFailedWithCode(primarySession.commitTransaction_forTesting(),
-                             ErrorCodes.WriteConcernTimeout);
+assert.commandFailedWithCode(primarySession.commitTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
 
 // A read on the primary at the new cluster time succeeds.
 primarySession.startTransaction({
     readConcern: {level: "snapshot", atClusterTime: clusterTimeAfter},
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 });
 res = assert.commandWorked(primaryDB.runCommand({find: collName}));
 assert.eq(res.cursor.firstBatch.length, 2, printjson(res));
@@ -93,7 +92,6 @@ restartServerReplication(secondaryConn0);
 // A read at a time that is too old fails.
 primarySession.startTransaction({readConcern: {level: "snapshot", atClusterTime: Timestamp(1, 1)}});
 assert.commandFailedWithCode(primaryDB.runCommand({find: collName}), ErrorCodes.SnapshotTooOld);
-assert.commandFailedWithCode(primarySession.abortTransaction_forTesting(),
-                             ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(primarySession.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 rst.stopSet();

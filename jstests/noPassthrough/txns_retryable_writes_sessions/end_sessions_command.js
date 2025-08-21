@@ -37,9 +37,7 @@ assert.commandWorked(res, "failed to end sessions");
 res = admin.runCommand(refresh);
 assert.commandWorked(res, "failed to refresh");
 
-assert.eq(config.system.sessions.count(),
-          10,
-          "endSessions and refresh should result in 10 remaining sessions");
+assert.eq(config.system.sessions.count(), 10, "endSessions and refresh should result in 10 remaining sessions");
 
 // double delete the remaining 10
 endSessionsIds = [];
@@ -54,16 +52,14 @@ assert.commandWorked(res, "failed to end sessions");
 res = admin.runCommand(refresh);
 assert.commandWorked(res, "failed to refresh");
 
-assert.eq(config.system.sessions.count(),
-          0,
-          "endSessions and refresh should result in 0 remaining sessions");
+assert.eq(config.system.sessions.count(), 0, "endSessions and refresh should result in 0 remaining sessions");
 
 // delete some sessions that were never created
 res = admin.runCommand({
     endSessions: [
         {"id": UUID("bacb219c-214c-47f9-a94a-6c7f434b3bae")},
-        {"id": UUID("bacb219c-214c-47f9-a94a-6c7f434b3baf")}
-    ]
+        {"id": UUID("bacb219c-214c-47f9-a94a-6c7f434b3baf")},
+    ],
 });
 
 res = admin.runCommand(refresh);
@@ -73,16 +69,13 @@ assert.commandWorked(res, "failed to refresh");
 {
     var session = conn.startSession();
 
-    assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}),
-                         "do something to tickle the session");
+    assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}), "do something to tickle the session");
     assert.commandWorked(session.getDatabase("admin").runCommand(refresh), "failed to refresh");
     assert.eq(config.system.sessions.count(), 1, "usersInfo should have written 1 session record");
 
     session.endSession();
     assert.commandWorked(admin.runCommand(refresh), "failed to refresh");
-    assert.eq(config.system.sessions.count(),
-              0,
-              "endSessions and refresh should result in 0 remaining sessions");
+    assert.eq(config.system.sessions.count(), 0, "endSessions and refresh should result in 0 remaining sessions");
 }
 
 MongoRunner.stopMongod(conn);

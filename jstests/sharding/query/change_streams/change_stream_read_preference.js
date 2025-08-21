@@ -18,7 +18,7 @@ const st = new ShardingTest({
     rs: {
         nodes: 2,
         // Use a higher frequency for periodic noops to speed up the test.
-        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}
+        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
     },
 });
 
@@ -27,19 +27,16 @@ const mongosDB = st.s0.getDB(dbName);
 const mongosColl = mongosDB[jsTestName()];
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard the test collection on _id.
-assert.commandWorked(
-    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
 
 // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey].
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
 
 // Move the [0, MaxKey] chunk to st.shard1.shardName.
-assert.commandWorked(mongosDB.adminCommand(
-    {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
 // Turn on the profiler.
 for (let rs of [st.rs0, st.rs1]) {
@@ -75,19 +72,20 @@ for (let rs of [st.rs0, st.rs1]) {
     // we needed multiple getMores to retrieve the changes.
     // TODO SERVER-31650 We have to use 'originatingCommand' here and look for the getMore
     // because the initial aggregate will not show up.
-    profilerHasAtLeastOneMatchingEntryOrThrow(
-        {profileDB: primaryDB, filter: {'originatingCommand.comment': changeStreamComment}});
+    profilerHasAtLeastOneMatchingEntryOrThrow({
+        profileDB: primaryDB,
+        filter: {"originatingCommand.comment": changeStreamComment},
+    });
 
     // Test that the update lookup goes to the primary as well.
-    const localReadCount =
-        getLocalReadCount(primaryDB, mongosColl.getFullName(), changeStreamComment);
+    const localReadCount = getLocalReadCount(primaryDB, mongosColl.getFullName(), changeStreamComment);
     if (localReadCount === 0) {
         let filter = {
             op: "command",
             ns: mongosColl.getFullName(),
             "command.comment": changeStreamComment,
             "command.aggregate": mongosColl.getName(),
-            "errName": {$ne: "StaleConfig"}
+            "errName": {$ne: "StaleConfig"},
         };
 
         profilerHasSingleMatchingEntryOrThrow({profileDB: primaryDB, filter: filter});
@@ -98,7 +96,7 @@ primaryStreamTest.cleanUp();
 
 // Test that change streams go to the secondary when the readPreference is {mode: "secondary"}.
 let secondaryStreamTest = new ChangeStreamTest(mongosDB);
-changeStreamComment = 'change stream against secondary';
+changeStreamComment = "change stream against secondary";
 let secondaryStream = secondaryStreamTest.startWatchingChanges({
     pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
     collection: mongosColl,
@@ -118,12 +116,13 @@ for (let rs of [st.rs0, st.rs1]) {
     // we needed multiple getMores to retrieve the changes.
     // TODO SERVER-31650 We have to use 'originatingCommand' here and look for the getMore
     // because the initial aggregate will not show up.
-    profilerHasAtLeastOneMatchingEntryOrThrow(
-        {profileDB: secondaryDB, filter: {'originatingCommand.comment': changeStreamComment}});
+    profilerHasAtLeastOneMatchingEntryOrThrow({
+        profileDB: secondaryDB,
+        filter: {"originatingCommand.comment": changeStreamComment},
+    });
 
     // Test that the update lookup goes to the secondary as well.
-    const localReadCount =
-        getLocalReadCount(secondaryDB, mongosColl.getFullName(), changeStreamComment);
+    const localReadCount = getLocalReadCount(secondaryDB, mongosColl.getFullName(), changeStreamComment);
     if (localReadCount === 0) {
         let filter = {
             op: "command",
@@ -133,7 +132,7 @@ for (let rs of [st.rs0, st.rs1]) {
             // first read on this secondary with a readConcern specified, so it is the first
             // read on this secondary that will enforce shard version.
             errCode: {$ne: ErrorCodes.StaleConfig},
-            "command.aggregate": mongosColl.getName()
+            "command.aggregate": mongosColl.getName(),
         };
         profilerHasSingleMatchingEntryOrThrow({profileDB: secondaryDB, filter: filter});
     }

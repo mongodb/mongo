@@ -7,7 +7,7 @@ import {
     asVarRef,
     getQueryStats,
     getQueryStatsAggCmd,
-    kShellApplicationName
+    kShellApplicationName,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -30,27 +30,19 @@ function runTest(conn) {
     db.otherColl.drop();
     assert.commandWorked(db.test.insert({a: "foobar", b: 15}));
     assert.commandWorked(db.test.insert({a: "foobar", b: 20}));
-    assert.commandWorked(db.otherColl.insert({a: "foobar", price: 2.50}));
+    assert.commandWorked(db.otherColl.insert({a: "foobar", price: 2.5}));
 
     // First checks proper tokenization on a basic pipeline.
     {
-        db.test
-            .aggregate([
-                {$sort: {a: -1}},
-                {$match: {a: {$regex: "foo(.*)"}, b: {$gt: 10}}},
-                {$skip: 5},
-            ])
-            .toArray();
+        db.test.aggregate([{$sort: {a: -1}}, {$match: {a: {$regex: "foo(.*)"}, b: {$gt: 10}}}, {$skip: 5}]).toArray();
 
         const stats = getQueryStatsAggCmd(admin, {transformIdentifiers: true});
 
-        assert.eq(1,
-                  stats.length,
-                  {allStats: getQueryStats(admin), metrics: db.serverStatus().metrics.queryStats});
+        assert.eq(1, stats.length, {allStats: getQueryStats(admin), metrics: db.serverStatus().metrics.queryStats});
         const key = stats[0].key;
         verifyConsistentFields(key);
         // Make sure there is no otherNss field when there are no secondary namespaces.
-        assert(!key.hasOwnProperty('otherNss'), key);
+        assert(!key.hasOwnProperty("otherNss"), key);
         // Ensure the query stats key pipeline holds the raw input without optimization (e.g., the
         // $sort stays before the $match, as in the raw query).
         assert.eq(
@@ -58,16 +50,14 @@ function runTest(conn) {
                 {"$sort": {[kHashedFieldA]: -1}},
                 {
                     "$match": {
-                        "$and": [
-                            {[kHashedFieldA]: {"$regex": "?string"}},
-                            {[kHashedFieldB]: {"$gt": "?number"}}
-                        ]
-                    }
+                        "$and": [{[kHashedFieldA]: {"$regex": "?string"}}, {[kHashedFieldB]: {"$gt": "?number"}}],
+                    },
                 },
-                {"$skip": "?number"}
+                {"$skip": "?number"},
             ],
             key.queryShape.pipeline,
-            key.queryShape.pipeline);
+            key.queryShape.pipeline,
+        );
     }
 
     // Checks proper tokenization on another basic pipeline that is a subset of the original
@@ -80,17 +70,18 @@ function runTest(conn) {
         const key = stats[0].key;
         verifyConsistentFields(key);
         // Make sure there is no otherNss field when there are no secondary namespaces.
-        assert(!key.hasOwnProperty('otherNss'), key);
-        assert.eq([{
-                      "$match": {
-                          "$and": [
-                              {[kHashedFieldA]: {"$regex": "?string"}},
-                              {[kHashedFieldB]: {"$gt": "?number"}}
-                          ]
-                      }
-                  }],
-                  key.queryShape.pipeline,
-                  key.queryShape.pipeline);
+        assert(!key.hasOwnProperty("otherNss"), key);
+        assert.eq(
+            [
+                {
+                    "$match": {
+                        "$and": [{[kHashedFieldA]: {"$regex": "?string"}}, {[kHashedFieldB]: {"$gt": "?number"}}],
+                    },
+                },
+            ],
+            key.queryShape.pipeline,
+            key.queryShape.pipeline,
+        );
     }
     // Checks proper tokenization on a pipeline that involves a let variable and a $lookup stage
     // that has its own subpipeline and references another namespace.
@@ -102,25 +93,32 @@ function runTest(conn) {
         const kHashedFieldMaxPrice = "lFzklZZ6KbbYMBTi8KtTTp1GZCcPaUKUmOe3iko+IF8=";
         const kHashedFieldRole = "SGZr91N1v3SFufKI5ww9WSZ4krOXKRpxpS+QshHwyUk=";
 
-        db.test.aggregate([{
-            $lookup: {
-                from: "otherColl",
-                let: { order_name: "$a", price: "$price"},
-                pipeline: [{
-                    $match: {
-                        $expr: {
-                            $and: [
-                                { $eq: ["$a", "$$order_name"] },
-                                { $lte: ["$$price", "$$max_price"] }
-                            ]
-                        }
-                    }
-                }],
-                as: "my_output"
-            }},
-        {
-            $match: {$expr: {$eq: ["$role", "$$USER_ROLES.role"]}}
-        }], {let: {max_price: 3.00}}).toArray();
+        db.test
+            .aggregate(
+                [
+                    {
+                        $lookup: {
+                            from: "otherColl",
+                            let: {order_name: "$a", price: "$price"},
+                            pipeline: [
+                                {
+                                    $match: {
+                                        $expr: {
+                                            $and: [{$eq: ["$a", "$$order_name"]}, {$lte: ["$$price", "$$max_price"]}],
+                                        },
+                                    },
+                                },
+                            ],
+                            as: "my_output",
+                        },
+                    },
+                    {
+                        $match: {$expr: {$eq: ["$role", "$$USER_ROLES.role"]}},
+                    },
+                ],
+                {let: {max_price: 3.0}},
+            )
+            .toArray();
         const stats = getQueryStatsAggCmd(admin, {transformIdentifiers: true});
 
         assert.eq(3, stats.length);
@@ -135,43 +133,37 @@ function runTest(conn) {
                         "as": `${kHashedAsOutputName}`,
                         "let": {
                             [kHashedFieldOrderName]: asFieldPath(kHashedFieldA),
-                            [kHashedFieldPrice]: asFieldPath(kHashedFieldPrice)
+                            [kHashedFieldPrice]: asFieldPath(kHashedFieldPrice),
                         },
-                        "pipeline": [{
-                            "$match": {
-                                "$expr": {
-                                    "$and": [
-                                        {
-                                            "$eq": [
-                                                asFieldPath(kHashedFieldA),
-                                                asVarRef(kHashedFieldOrderName)
-                                            ],
-                                        },
-                                        {
-                                            "$lte": [
-                                                asVarRef(kHashedFieldPrice),
-                                                asVarRef(kHashedFieldMaxPrice)
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }
-                        }]
-                    }
+                        "pipeline": [
+                            {
+                                "$match": {
+                                    "$expr": {
+                                        "$and": [
+                                            {
+                                                "$eq": [asFieldPath(kHashedFieldA), asVarRef(kHashedFieldOrderName)],
+                                            },
+                                            {
+                                                "$lte": [asVarRef(kHashedFieldPrice), asVarRef(kHashedFieldMaxPrice)],
+                                            },
+                                        ],
+                                    },
+                                },
+                            },
+                        ],
+                    },
                 },
                 {
                     "$match": {
                         "$expr": {
-                            "$eq": [
-                                asFieldPath(kHashedFieldRole),
-                                asVarRef("USER_ROLES." + kHashedFieldRole)
-                            ]
-                        }
-                    }
-                }
+                            "$eq": [asFieldPath(kHashedFieldRole), asVarRef("USER_ROLES." + kHashedFieldRole)],
+                        },
+                    },
+                },
             ],
             key.queryShape.pipeline,
-            key.queryShape.pipeline);
+            key.queryShape.pipeline,
+        );
         assert.eq({[kHashedFieldMaxPrice]: "?number"}, key.queryShape.let);
         assert.eq([{"db": `${kHashedDbName}`, "coll": `${kHashedOtherCollName}`}], key.otherNss);
     }
@@ -180,7 +172,7 @@ function runTest(conn) {
 const conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsRateLimit: -1,
-    }
+    },
 });
 runTest(conn);
 MongoRunner.stopMongod(conn);
@@ -193,8 +185,8 @@ const st = new ShardingTest({
     mongosOptions: {
         setParameter: {
             internalQueryStatsRateLimit: -1,
-            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-        }
+            "failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}",
+        },
     },
 });
 runTest(st.s);

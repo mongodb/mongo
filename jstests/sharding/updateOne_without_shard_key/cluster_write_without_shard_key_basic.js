@@ -4,9 +4,7 @@
  *
  * @tags: [requires_fcv_71]
  */
-import {
-    withRetryOnTransientTxnErrorIncrementTxnNum
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnErrorIncrementTxnNum} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 2, rs: {nodes: 1}});
@@ -18,11 +16,9 @@ let shardConn = st.shard0.getDB(dbName);
 let shard0Name = st.shard0.shardName;
 const testColl = mongosConn.getCollection(collName);
 let _id = 0;
-const aFieldValue = 50;  // Arbitrary field value used for testing.
-let xFieldValueShard0 =
-    -1;  // Shard key value to place document on shard0, which has chunks x:(-inf, 0).
-let xFieldValueShard1 =
-    0;  // Shard key value to place document on shard1, which has chunks x: [0,inf).
+const aFieldValue = 50; // Arbitrary field value used for testing.
+let xFieldValueShard0 = -1; // Shard key value to place document on shard0, which has chunks x:(-inf, 0).
+let xFieldValueShard1 = 0; // Shard key value to place document on shard1, which has chunks x: [0,inf).
 let unshardedCollName = "unshardedCollection";
 
 // Shard collection
@@ -42,38 +38,42 @@ function runAndVerifyCommand(testCase) {
     withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
         testCase.cmdObj.txnNumber = NumberLong(txnNum);
         res = assert.commandWorked(mongosConn.runCommand(testCase.cmdObj));
-        assert.commandWorked(mongosConn.adminCommand({
-            commitTransaction: 1,
-            lsid: testCase.cmdObj.lsid,
-            txnNumber: testCase.cmdObj.txnNumber,
-            autocommit: false
-        }));
+        assert.commandWorked(
+            mongosConn.adminCommand({
+                commitTransaction: 1,
+                lsid: testCase.cmdObj.lsid,
+                txnNumber: testCase.cmdObj.txnNumber,
+                autocommit: false,
+            }),
+        );
     });
 
     switch (Object.keys(testCase.cmdObj.writeCmd)[0]) {
         case "update":
             assert.eq(1, res.response.nModified, res.response);
             assert.eq(res.shardId, testCase.cmdObj.shardId);
-            assert.eq(testCase.expectedResultDoc,
-                      mongosConn.getCollection(collName).findOne(testCase.expectedResultDoc));
+            assert.eq(
+                testCase.expectedResultDoc,
+                mongosConn.getCollection(collName).findOne(testCase.expectedResultDoc),
+            );
 
             // Remove document.
             assert.commandWorked(testColl.deleteOne(testCase.cmdObj.targetDocId));
-            assert.eq(null,
-                      mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
+            assert.eq(null, mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
             break;
         case "delete":
             assert.eq(1, res.response.n, res.response);
             assert.eq(res.shardId, testCase.cmdObj.shardId);
-            assert.eq(null,
-                      mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
+            assert.eq(null, mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
             break;
         case "findAndModify":
         case "findandmodify":
             assert.eq(1, res.response.lastErrorObject.n, res.response);
             assert.eq(res.shardId, testCase.cmdObj.shardId);
-            assert.eq(testCase.expectedModifiedDoc,
-                      mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
+            assert.eq(
+                testCase.expectedModifiedDoc,
+                mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId),
+            );
 
             // Check for pre/post image in command response.
             if (testCase.cmdObj.writeCmd.new) {
@@ -84,8 +84,7 @@ function runAndVerifyCommand(testCase) {
 
             // Remove document.
             assert.commandWorked(testColl.deleteOne(testCase.cmdObj.targetDocId));
-            assert.eq(null,
-                      mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
+            assert.eq(null, mongosConn.getCollection(collName).findOne(testCase.cmdObj.targetDocId));
             break;
     }
 }
@@ -114,9 +113,9 @@ function runAndVerifyCommand(testCase) {
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
                 startTransaction: true,
-                autocommit: false
+                autocommit: false,
             },
-            expectedResultDoc: {_id: _id, x: xFieldValueShard0, a: aFieldValue}
+            expectedResultDoc: {_id: _id, x: xFieldValueShard0, a: aFieldValue},
         },
         {
             docToInsert: {_id: _id, x: xFieldValueShard1, a: aFieldValue},
@@ -134,9 +133,9 @@ function runAndVerifyCommand(testCase) {
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
                 startTransaction: true,
-                autocommit: false
+                autocommit: false,
             },
-            expectedResultDoc: {_id: _id, x: xFieldValueShard1, a: aFieldValue + 1}
+            expectedResultDoc: {_id: _id, x: xFieldValueShard1, a: aFieldValue + 1},
         },
         {
             docToInsert: {_id: _id, x: xFieldValueShard1, a: aFieldValue},
@@ -148,7 +147,7 @@ function runAndVerifyCommand(testCase) {
                         {
                             q: {},
                             // Testing replacement style updates.
-                            u: {_id: _id, x: xFieldValueShard1, a: aFieldValue + 2}
+                            u: {_id: _id, x: xFieldValueShard1, a: aFieldValue + 2},
                         },
                     ],
                 },
@@ -157,9 +156,9 @@ function runAndVerifyCommand(testCase) {
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
                 startTransaction: true,
-                autocommit: false
+                autocommit: false,
             },
-            expectedResultDoc: {_id: _id, x: xFieldValueShard1, a: aFieldValue + 2}
+            expectedResultDoc: {_id: _id, x: xFieldValueShard1, a: aFieldValue + 2},
         },
         {
             docToInsert: {_id: _id, x: xFieldValueShard1, a: 0},
@@ -171,7 +170,7 @@ function runAndVerifyCommand(testCase) {
                         {
                             q: {},
                             // Testing aggregation pipeline style updates.
-                            u: [{$set: {a: aFieldValue}}, {$set: {a: 5}}]
+                            u: [{$set: {a: aFieldValue}}, {$set: {a: 5}}],
                         },
                     ],
                 },
@@ -180,9 +179,9 @@ function runAndVerifyCommand(testCase) {
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
                 startTransaction: true,
-                autocommit: false
+                autocommit: false,
             },
-            expectedResultDoc: {_id: _id, x: xFieldValueShard1, a: 5}
+            expectedResultDoc: {_id: _id, x: xFieldValueShard1, a: 5},
         },
         {
             docToInsert: {_id: _id, x: xFieldValueShard0},
@@ -190,22 +189,24 @@ function runAndVerifyCommand(testCase) {
                 _clusterWriteWithoutShardKey: 1,
                 writeCmd: {
                     delete: collName,
-                    deletes: [{
-                        q: {},
-                        limit: 1,
-                    }],
+                    deletes: [
+                        {
+                            q: {},
+                            limit: 1,
+                        },
+                    ],
                 },
                 shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
                 startTransaction: true,
-                autocommit: false
-            }
+                autocommit: false,
+            },
         },
     ];
 
-    testCases.forEach(testCase => {
+    testCases.forEach((testCase) => {
         jsTest.log(tojson(testCase));
         runAndVerifyCommand(testCase);
     });
@@ -222,16 +223,14 @@ function runAndVerifyCommand(testCase) {
                 writeCmd: {
                     findAndModify: collName,
                     query: {},
-                    update: [
-                        {$set: {a: aFieldValue}},
-                    ]
+                    update: [{$set: {a: aFieldValue}}],
                 },
                 shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
                 startTransaction: true,
-                autocommit: false
+                autocommit: false,
             },
             expectedModifiedDoc: {_id: _id, x: xFieldValueShard0, a: aFieldValue},
         },
@@ -242,18 +241,16 @@ function runAndVerifyCommand(testCase) {
                 writeCmd: {
                     findAndModify: collName,
                     query: {},
-                    update: [
-                        {$set: {a: aFieldValue}},
-                    ],
+                    update: [{$set: {a: aFieldValue}}],
                     // Testing post-image.
-                    new: true
+                    new: true,
                 },
                 shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
                 startTransaction: true,
-                autocommit: false
+                autocommit: false,
             },
             expectedModifiedDoc: {_id: _id, x: xFieldValueShard0, a: aFieldValue},
         },
@@ -264,16 +261,14 @@ function runAndVerifyCommand(testCase) {
                 writeCmd: {
                     findandmodify: collName,
                     query: {},
-                    update: [
-                        {$set: {a: aFieldValue}},
-                    ]
+                    update: [{$set: {a: aFieldValue}}],
                 },
                 shardId: shard0Name,
                 targetDocId: {_id: _id},
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
                 startTransaction: true,
-                autocommit: false
+                autocommit: false,
             },
             expectedModifiedDoc: {_id: _id, x: xFieldValueShard0, a: aFieldValue},
         },
@@ -292,13 +287,13 @@ function runAndVerifyCommand(testCase) {
                 txnNumber: NumberLong(1),
                 lsid: {id: UUID()},
                 startTransaction: true,
-                autocommit: false
+                autocommit: false,
             },
             expectedModifiedDoc: null,
         },
     ];
 
-    testCases.forEach(testCase => {
+    testCases.forEach((testCase) => {
         jsTest.log(tojson(testCase));
         runAndVerifyCommand(testCase);
     });
@@ -313,22 +308,19 @@ function runAndVerifyCommand(testCase) {
             writeCmd: {
                 findandmodify: collName,
                 query: {a: 0},
-                update: [
-                    {$set: {a: aFieldValue}},
-                ]
+                update: [{$set: {a: aFieldValue}}],
             },
             shardId: shard0Name,
             targetDocId: {_id: 1},
             txnNumber: NumberLong(1),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
         expectedModifiedDoc: {_id: 1, x: xFieldValueShard0, a: aFieldValue},
     };
     runAndVerifyCommand(confirmOnlyOneDocUpdatedObj);
-    assert.eq({_id: 0, x: xFieldValueShard0, a: 0},
-              mongosConn.getCollection(collName).findOne({_id: 0}));
+    assert.eq({_id: 0, x: xFieldValueShard0, a: 0}, mongosConn.getCollection(collName).findOne({_id: 0}));
 })();
 
 (() => {
@@ -344,7 +336,7 @@ function runAndVerifyCommand(testCase) {
         txnNumber: NumberLong(1),
         lsid: {id: UUID()},
         startTransaction: true,
-        autocommit: false
+        autocommit: false,
     };
     assert.commandFailedWithCode(shardConn.runCommand(cmdObj), ErrorCodes.CommandNotFound);
 
@@ -353,16 +345,14 @@ function runAndVerifyCommand(testCase) {
         _clusterWriteWithoutShardKey: 1,
         writeCmd: {
             update: unshardedCollName,
-            updates: [
-                {q: {}, u: {$set: {a: 90}}},
-            ],
+            updates: [{q: {}, u: {$set: {a: 90}}}],
         },
         shardId: shard0Name,
         targetDocId: {_id: _id},
         txnNumber: NumberLong(1),
         lsid: {id: UUID()},
         startTransaction: true,
-        autocommit: false
+        autocommit: false,
     };
     mongosConn.getCollection(unshardedCollName).insert([{_id: _id, a: aFieldValue}]);
     assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.NamespaceNotSharded);
@@ -388,8 +378,7 @@ function runAndVerifyCommand(testCase) {
         ],
         $_originalQuery: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
 
     // Cannot pass $_originalCollation as an external client in an update command.
     cmdObj = {
@@ -404,8 +393,7 @@ function runAndVerifyCommand(testCase) {
         ],
         $_originalCollation: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
 
     // Cannot pass $_originalQuery as an external client in a delete command.
     cmdObj = {
@@ -419,8 +407,7 @@ function runAndVerifyCommand(testCase) {
         ],
         $_originalQuery: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
 
     // Cannot pass $_originalCollation as an external client in a delete command.
     cmdObj = {
@@ -435,8 +422,7 @@ function runAndVerifyCommand(testCase) {
         ],
         $_originalCollation: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
 
     // Cannot pass $_originalQuery as an external client in a findandmodify command.
     cmdObj = {
@@ -446,8 +432,7 @@ function runAndVerifyCommand(testCase) {
         sampleId: UUID(),
         $_originalQuery: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
 
     // Cannot pass $_originalCollation as an external client in a findandmodify command.
     cmdObj = {
@@ -457,8 +442,7 @@ function runAndVerifyCommand(testCase) {
         sampleId: UUID(),
         $_originalCollation: {},
     };
-    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(shardConn.getCollection(collName).runCommand(cmdObj), ErrorCodes.InvalidOptions);
 })();
 
 st.stop();

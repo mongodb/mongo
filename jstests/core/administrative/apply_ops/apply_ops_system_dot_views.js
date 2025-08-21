@@ -20,23 +20,24 @@ view.drop();
 
 // Make sure system.views exists before we try to insert to it with applyOps.
 db["unused_apply_ops_view"].drop();
-assert.commandWorked(
-    db.runCommand({create: "unused_apply_ops_view", viewOn: backingColl.getName(), pipeline: []}));
+assert.commandWorked(db.runCommand({create: "unused_apply_ops_view", viewOn: backingColl.getName(), pipeline: []}));
 
 assert.commandWorked(backingColl.insert([{a: 0}, {a: 1}]));
-const ops = [{
-    "ts": new Timestamp(1585942982, 2),
-    "t": new NumberLong("1"),
-    "v": new NumberInt("2"),
-    "op": "i",
-    "ns": db["system.views"].getFullName(),
-    "wall": new Date(1585942982442),
-    "o": {
-        "_id": view.getFullName(),
-        "viewOn": backingColl.getName(),
-        "pipeline": [{"$match": {"a": 0}}]
-    }
-}];
+const ops = [
+    {
+        "ts": new Timestamp(1585942982, 2),
+        "t": new NumberLong("1"),
+        "v": new NumberInt("2"),
+        "op": "i",
+        "ns": db["system.views"].getFullName(),
+        "wall": new Date(1585942982442),
+        "o": {
+            "_id": view.getFullName(),
+            "viewOn": backingColl.getName(),
+            "pipeline": [{"$match": {"a": 0}}],
+        },
+    },
+];
 
 assert.commandWorked(db.adminCommand({applyOps: ops}));
 assert.eq(view.find({}, {_id: 0, a: 1}).toArray(), [{a: 0}]);

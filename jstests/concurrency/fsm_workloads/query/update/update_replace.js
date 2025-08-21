@@ -7,7 +7,7 @@
 
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     // explicitly pass db to avoid accidentally using the global `db`
     function assertResult(db, res) {
         assert.eq(0, res.nUpserted, tojson(res));
@@ -46,7 +46,7 @@ export const $config = (function() {
             // apply the update
             var res = db[collName].update({_id: docIndex}, updateDoc);
             assertResult(db, res);
-        }
+        },
     };
 
     var transitions = {update: {update: 1}};
@@ -62,7 +62,7 @@ export const $config = (function() {
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 3);
-        assert.gt(this.numDocs, 0, 'numDocs should be a positive number');
+        assert.gt(this.numDocs, 0, "numDocs should be a positive number");
 
         for (var i = 0; i < this.numDocs; ++i) {
             var res = db[collName].insert({_id: i});
@@ -76,9 +76,9 @@ export const $config = (function() {
     return {
         threadCount: 10,
         iterations: 10,
-        startState: 'update',
+        startState: "update",
         states: states,
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

@@ -6,7 +6,7 @@
 import {
     getIdProjectionDocs,
     getProjectionDocs,
-    runProjectionsAgainstColl
+    runProjectionsAgainstColl,
 } from "jstests/query_golden/libs/projection_helpers.js";
 
 const coll = db.cqf_inclusion_project;
@@ -35,11 +35,6 @@ runProjectionsAgainstColl(coll, getProjectionDocs(), indexes, inclusionProjSpecs
 
 // Show that inclusion of subpaths of _id is not special; it works the same way.
 // Test without indexes this time.
-const idInclusionProjSpecs = [
-    {_id: 1},
-    {"_id.a": 1},
-    {"_id.a": 1, "_id.b": 1},
-    {"_id.a.b": 1},
-];
+const idInclusionProjSpecs = [{_id: 1}, {"_id.a": 1}, {"_id.a": 1, "_id.b": 1}, {"_id.a.b": 1}];
 const idIndexes = [{"_id.a": 1}, {"_id.a": 1, "_id.b": 1}, {"_id.a.b": 1}];
 runProjectionsAgainstColl(coll, getIdProjectionDocs(), idIndexes, idInclusionProjSpecs);

@@ -27,23 +27,23 @@ function testConnectionTimeoutMetric(fpName, expectedNumOps, errorCode, networkT
     for (let i = 0; i < numOps; i++) {
         jsTestLog(`Issuing find command #${i}`);
         // Run a long query to make sure the network fail points fail the command.
-        assert.commandFailedWithCode(testDB.runCommand({
-            find: collName,
-            filter: {
-                $where:
-                    "function() { const start = new Date().getTime(); while (new Date().getTime() - start < 100000); return true;}"
-            }
-        }),
-                                     errorCode);
+        assert.commandFailedWithCode(
+            testDB.runCommand({
+                find: collName,
+                filter: {
+                    $where: "function() { const start = new Date().getTime(); while (new Date().getTime() - start < 100000); return true;}",
+                },
+            }),
+            errorCode,
+        );
         if (networkTimeoutLog) {
             checkLog.containsJson(st.s, networkTimeoutLogID);
         }
-        const opMetrics =
-            assert.commandWorked(st.s.getDB("admin").serverStatus()).metrics.operation;
+        const opMetrics = assert.commandWorked(st.s.getDB("admin").serverStatus()).metrics.operation;
         let curTime = opMetrics.totalTimeWaitingBeforeConnectionTimeoutMillis;
         assert.gte(curTime, prevTime);
         prevTime = curTime;
-        assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
+        assert.commandWorked(st.s.adminCommand({clearLog: "global"}));
     }
 
     const opMetrics = assert.commandWorked(st.s.getDB("admin").serverStatus()).metrics.operation;
@@ -60,10 +60,12 @@ let expectedNumOps = numOps * (1 + maxRetries);
 // PooledConnectionAcquisitionExceededTimeLimit to be returned. We test that connection
 // acquisition timeout related metrics are recorded.
 jsTestLog(`Using 'forceConnectionNetworkTimeout'.`);
-testConnectionTimeoutMetric("forceConnectionNetworkTimeout",
-                            expectedNumOps,
-                            ErrorCodes.PooledConnectionAcquisitionExceededTimeLimit,
-                            true);
+testConnectionTimeoutMetric(
+    "forceConnectionNetworkTimeout",
+    expectedNumOps,
+    ErrorCodes.PooledConnectionAcquisitionExceededTimeLimit,
+    true,
+);
 
 // Test that a timeout not related to acquiring a connection will not cause the metrics to
 // increment.
@@ -71,9 +73,11 @@ testConnectionTimeoutMetric("forceConnectionNetworkTimeout",
 // error code is not retriable, and will not increment connection network timeout metrics.
 // Therefore, the `numConnectionNetworkTimeouts` metric should not change.
 jsTestLog(`Using 'triggerSendRequestNetworkTimeout'.`);
-testConnectionTimeoutMetric("triggerSendRequestNetworkTimeout",
-                            expectedNumOps,
-                            ErrorCodes.NetworkInterfaceExceededTimeLimit,
-                            false);
+testConnectionTimeoutMetric(
+    "triggerSendRequestNetworkTimeout",
+    expectedNumOps,
+    ErrorCodes.NetworkInterfaceExceededTimeLimit,
+    false,
+);
 
 st.stop();

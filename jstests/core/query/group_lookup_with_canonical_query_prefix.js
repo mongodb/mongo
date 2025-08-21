@@ -43,16 +43,14 @@ function runAndVerifyQuery(coll, pipeline, [expectedDocsGroup, expectedDocsLooku
     // Run the query and explain.
     pipeline.push({$group: {_id: "$x"}});
     let res = coll.aggregate(pipeline);
-    assert(arrayEq(res.toArray(), expectedDocsGroup),
-           buildErrorString(res.toArray(), expectedDocsGroup));
+    assert(arrayEq(res.toArray(), expectedDocsGroup), buildErrorString(res.toArray(), expectedDocsGroup));
     let explain = assert.commandWorked(coll.explain().aggregate(pipeline));
     assert.eq(getEngine(explain), "sbe", tojson(explain));
 
     pipeline.pop();
     pipeline.push({$lookup: {from: coll2Name, localField: "y", foreignField: "z", as: "xx"}});
     res = coll.aggregate(pipeline);
-    assert(arrayEq(res.toArray(), expectedDocsLookup),
-           buildErrorString(res.toArray(), expectedDocsLookup));
+    assert(arrayEq(res.toArray(), expectedDocsLookup), buildErrorString(res.toArray(), expectedDocsLookup));
     explain = assert.commandWorked(coll.explain().aggregate(pipeline));
     assert.eq(getEngine(explain), "sbe", tojson(explain));
 }
@@ -78,7 +76,8 @@ function runQueries(coll, withIndex = false) {
     runAndVerifyQuery(
         coll,
         [{$match: {x: {$lte: 20}}}, {$sort: {x: 1}}, {$skip: 8}, {$limit: 5}, {$project: {x: 1}}],
-        makeExpectedDocs(8, 13, true /*isProject*/));
+        makeExpectedDocs(8, 13, true /*isProject*/),
+    );
 
     if (!withIndex) {
         // $sort queries.
@@ -109,8 +108,7 @@ coll2.drop();
 
 try {
     originalParamValue = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeRestricted"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeRestricted"}));
 
     const docs = [];
     for (let i = 0; i < 100; i++) {
@@ -122,8 +120,10 @@ try {
     runQueries(coll);
     testIndexed(coll);
 } finally {
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQueryFrameworkControl: originalParamValue.internalQueryFrameworkControl
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryFrameworkControl: originalParamValue.internalQueryFrameworkControl,
+        }),
+    );
 }

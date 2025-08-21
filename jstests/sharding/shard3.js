@@ -42,12 +42,14 @@ assert.eq(0, secondary.count(), "s1");
 assert.eq(1, s.onNumShards("test", "foo"), "on 1 shards");
 
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {num: 2}}));
-assert.commandWorked(s.s0.adminCommand({
-    movechunk: "test.foo",
-    find: {num: 3},
-    to: s.getOther(s.getPrimaryShard("test")).name,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    s.s0.adminCommand({
+        movechunk: "test.foo",
+        find: {num: 3},
+        to: s.getOther(s.getPrimaryShard("test")).name,
+        _waitForDelete: true,
+    }),
+);
 
 assert(primary.find().toArray().length > 0, "blah 1");
 assert(secondary.find().toArray().length > 0, "blah 2");
@@ -61,9 +63,8 @@ printjson(primary._db._adminCommand("shardingState"));
 // --- filtering ---
 
 function doCounts(name, total, onlyItCounts) {
-    total = total || (primary.count() + secondary.count());
-    if (!onlyItCounts)
-        assert.eq(total, a.count(), name + " count");
+    total = total || primary.count() + secondary.count();
+    if (!onlyItCounts) assert.eq(total, a.count(), name + " count");
     assert.eq(total, a.find().sort({n: 1}).itcount(), name + " itcount - sort n");
     assert.eq(total, a.find().itcount(), name + " itcount");
     assert.eq(total, a.find().sort({_id: 1}).itcount(), name + " itcount - sort _id");
@@ -103,8 +104,7 @@ s.printCollectionInfo("test.foo");
 
 const myto = s.getOther(s.getPrimaryShard("test")).name;
 print("counts before move: " + tojson(s.shardCounts("test,", "foo")));
-assert.commandWorked(
-    s.s0.adminCommand({movechunk: "test.foo", find: {num: 1}, to: myto, _waitForDelete: true}));
+assert.commandWorked(s.s0.adminCommand({movechunk: "test.foo", find: {num: 1}, to: myto, _waitForDelete: true}));
 print("counts after move: " + tojson(s.shardCounts("test", "foo")));
 s.printCollectionInfo("test.foo");
 assert.eq(1, s.onNumShards("test", "foo"), "on 1 shard again");
@@ -127,8 +127,7 @@ assert.eq(0, secondary.count(), "s count after drop");
 
 // ---- retry commands SERVER-1471 ----
 
-assert.commandWorked(
-    s.s0.adminCommand({enablesharding: "test2", primaryShard: s.shard0.shardName}));
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test2", primaryShard: s.shard0.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test2.foo", key: {num: 1}}));
 
 const dba = s.getDB("test2");
@@ -142,12 +141,14 @@ assert.eq(3, dba.foo.count(), "Ba");
 assert.eq(3, dbb.foo.count(), "Bb");
 
 assert.commandWorked(s.s0.adminCommand({split: "test2.foo", middle: {num: 2}}));
-assert.commandWorked(s.s0.adminCommand({
-    movechunk: "test2.foo",
-    find: {num: 3},
-    to: s.getOther(s.getPrimaryShard("test2")).name,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    s.s0.adminCommand({
+        movechunk: "test2.foo",
+        find: {num: 3},
+        to: s.getOther(s.getPrimaryShard("test2")).name,
+        _waitForDelete: true,
+    }),
+);
 
 assert.eq(2, s.onNumShards("test2", "foo"), "B on 2 shards");
 printjson(dba.foo.stats());

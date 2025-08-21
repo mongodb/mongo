@@ -18,8 +18,8 @@ const skipTest = true;
 // const buildInfo = getBuildInfo();
 // const skipTest = buildInfo.debug && buildInfo.buildEnvironment.target_os == "windows";
 
-export const $config = (function() {
-    var states = (function() {
+export const $config = (function () {
+    var states = (function () {
         function init(db, collName) {
             insertDocuments.call(this, db, collName);
         }
@@ -65,7 +65,7 @@ export const $config = (function() {
             compact: compact,
             createIndex: createIndex,
             dropIndex: dropIndex,
-            validate: validate
+            validate: validate,
         };
     })();
 
@@ -75,7 +75,7 @@ export const $config = (function() {
         compact: {insertDocuments: 0.3, createIndex: 0.3, validate: 0.2, dropIndex: 0.2},
         createIndex: {compact: 0.3, insertDocuments: 0.3, validate: 0.2, dropIndex: 0.2},
         dropIndex: {compact: 0.2, createIndex: 0.7, validate: 0.1},
-        validate: {dropIndex: 0.1, compact: 0.3, createIndex: 0.3, insertDocuments: 0.3}
+        validate: {dropIndex: 0.1, compact: 0.3, createIndex: 0.3, insertDocuments: 0.3},
     };
 
     return {

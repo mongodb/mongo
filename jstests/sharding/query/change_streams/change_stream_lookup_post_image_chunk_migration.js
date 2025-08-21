@@ -10,7 +10,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     shards: 3,
-    rs: {nodes: 1, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
+    rs: {nodes: 1, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}},
 });
 
 const dbName = jsTestName();
@@ -58,7 +58,7 @@ function checkUpdateEvents(changeStream, csComment, idShardPairs) {
             "command.comment": csComment,
             errCode: {$ne: ErrorCodes.StaleConfig},
             "command.aggregate": collName,
-            "command.pipeline.0.$match._id": id
+            "command.pipeline.0.$match._id": id,
         };
 
         profilerHasSingleMatchingEntryOrThrow({profileDB: shard.getDB(dbName), filter: filter});
@@ -86,10 +86,12 @@ assert.commandWorked(mongos.adminCommand({split: ns, middle: {_id: 2}}));
 
 jsTestLog("Migrating [MinKey, 2) to shard1 and [2, MaxKey] to shard2.");
 
-for (const [id, shard] of [[0, shard1], [2, shard2]]) {
+for (const [id, shard] of [
+    [0, shard1],
+    [2, shard2],
+]) {
     const dest = shard.shardName;
-    assert.commandWorked(
-        mongos.adminCommand({moveChunk: ns, find: {_id: id}, to: dest, _waitForDelete: true}));
+    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: id}, to: dest, _waitForDelete: true}));
 }
 
 // After sharding the collection and moving the documents to different shards, create a change
@@ -98,11 +100,14 @@ const commentAfterSharding = "change stream after sharding";
 const csAfterSharding = mongosColl.watch([], {
     resumeAfter: resumeTokenBeforeUpdates,
     fullDocument: "updateLookup",
-    comment: commentAfterSharding
+    comment: commentAfterSharding,
 });
 
 // Next two events in csAfterSharding should be the two 'update' operations.
-checkUpdateEvents(csAfterSharding, commentAfterSharding, [[0, shard1], [2, shard2]]);
+checkUpdateEvents(csAfterSharding, commentAfterSharding, [
+    [0, shard1],
+    [2, shard2],
+]);
 
 csAfterSharding.close();
 
@@ -114,9 +119,9 @@ assert.commandWorked(mongosColl.update({_id: 3}, {$set: {updated: true}}));
 const rs3 = new ReplSetTest({
     name: "shard3",
     nodes: 1,
-    setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}
+    setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
 });
-rs3.startSet({shardsvr: ''});
+rs3.startSet({shardsvr: ""});
 rs3.initiate();
 const shard3 = rs3.getPrimary();
 shard3.shardName = "shard3";
@@ -132,10 +137,12 @@ for (const shard of [shard0, shard1, shard2, shard3]) {
 
 jsTestLog("Migrating [MinKey, 2) to shard2 and [2, MaxKey] to shard3.");
 
-for (const [id, shard] of [[0, shard2], [2, shard3]]) {
+for (const [id, shard] of [
+    [0, shard2],
+    [2, shard3],
+]) {
     const dest = shard.shardName;
-    assert.commandWorked(
-        mongos.adminCommand({moveChunk: ns, find: {_id: id}, to: dest, _waitForDelete: true}));
+    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: id}, to: dest, _waitForDelete: true}));
 }
 
 // After adding the new shard and migrating the documents to the new shard, create a change stream
@@ -144,12 +151,16 @@ const commentAfterAddShard = "change stream after addShard";
 const csAfterAddShard = mongosColl.watch([], {
     resumeAfter: resumeTokenBeforeUpdates,
     fullDocument: "updateLookup",
-    comment: commentAfterAddShard
+    comment: commentAfterAddShard,
 });
 
 // Next four events in csAfterAddShard should be the four 'update' operations.
-checkUpdateEvents(
-    csAfterAddShard, commentAfterAddShard, [[0, shard2], [2, shard3], [1, shard2], [3, shard3]]);
+checkUpdateEvents(csAfterAddShard, commentAfterAddShard, [
+    [0, shard2],
+    [2, shard3],
+    [1, shard2],
+    [3, shard3],
+]);
 
 csAfterAddShard.close();
 

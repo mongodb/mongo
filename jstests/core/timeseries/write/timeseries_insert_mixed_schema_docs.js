@@ -19,8 +19,7 @@ const collName = "ts";
  */
 TimeseriesTest.run((insert) => {
     assert.commandWorked(testDB.runCommand({drop: collName}));
-    assert.commandWorked(
-        testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
     const coll = testDB[collName];
 
     var doc = {
@@ -36,17 +35,14 @@ TimeseriesTest.run((insert) => {
     doc.a = "bar";
     assert.commandWorked(insert(coll, doc));
     assert.eq(2, coll.find({"m": "meta"}).toArray().length);
-    assert.eq(1,
-              getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length);
+    assert.eq(1, getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length);
 
     // new measurement, because schema changed, we have a new bucket
     doc.a = 1;
     assert.commandWorked(insert(coll, doc));
     assert.eq(3, coll.find({"m": "meta"}).toArray().length);
-    assert.eq(2,
-              getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length);
-    var schemaChangedBucket =
-        getTimeseriesCollForRawOps(coll).find({"control.min.a": 1}).rawData().toArray();
+    assert.eq(2, getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length);
+    var schemaChangedBucket = getTimeseriesCollForRawOps(coll).find({"control.min.a": 1}).rawData().toArray();
     assert.eq(1, schemaChangedBucket.length);
     var schemaChangedBucketId = schemaChangedBucket[0]._id;
 
@@ -56,8 +52,7 @@ TimeseriesTest.run((insert) => {
     assert.eq(4, coll.find({"m": "meta"}).toArray().length);
     // New measurement may go into new bucket, or prev bucket (reopened), but should not go into
     // the recently created bucket.
-    schemaChangedBucket =
-        getTimeseriesCollForRawOps(coll).find({"_id": schemaChangedBucketId}).rawData().toArray();
+    schemaChangedBucket = getTimeseriesCollForRawOps(coll).find({"_id": schemaChangedBucketId}).rawData().toArray();
     assert.eq(1, schemaChangedBucket.length);
     assert.eq(1, schemaChangedBucket[0].control.count);
 });
@@ -67,8 +62,7 @@ TimeseriesTest.run((insert) => {
  */
 TimeseriesTest.run((insert) => {
     assert.commandWorked(testDB.runCommand({drop: collName}));
-    assert.commandWorked(
-        testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
     const coll = testDB[collName];
 
     var doc = {t: ISODate(), m: "meta", a: 1, payload: "small"};
@@ -79,13 +73,11 @@ TimeseriesTest.run((insert) => {
     // new measurement, because schema changed, we have a new bucket
     // previous bug would skip mixed schema check due to handling of large measurements
     doc.a = "foo";
-    doc.payload = 'A'.repeat(130000);
+    doc.payload = "A".repeat(130000);
     assert.commandWorked(insert(coll, doc));
     assert.eq(2, coll.find({"m": "meta"}).toArray().length);
-    assert.eq(2,
-              getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length);
-    var schemaChangedBucket =
-        getTimeseriesCollForRawOps(coll).find({"control.min.a": "foo"}).rawData().toArray();
+    assert.eq(2, getTimeseriesCollForRawOps(coll).find({"meta": "meta"}).rawData().toArray().length);
+    var schemaChangedBucket = getTimeseriesCollForRawOps(coll).find({"control.min.a": "foo"}).rawData().toArray();
     assert.eq(1, schemaChangedBucket.length);
     var schemaChangedBucketId = schemaChangedBucket[0]._id;
 
@@ -96,8 +88,7 @@ TimeseriesTest.run((insert) => {
     assert.eq(3, coll.find({"m": "meta"}).toArray().length);
     // New measurement may go into new bucket, or prev bucket (reopened), but should not go into
     // the recently created bucket.
-    schemaChangedBucket =
-        getTimeseriesCollForRawOps(coll).find({"_id": schemaChangedBucketId}).rawData().toArray();
+    schemaChangedBucket = getTimeseriesCollForRawOps(coll).find({"_id": schemaChangedBucketId}).rawData().toArray();
     assert.eq(1, schemaChangedBucket.length);
     assert.eq(1, schemaChangedBucket[0].control.count);
 });

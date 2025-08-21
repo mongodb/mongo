@@ -21,13 +21,12 @@ function getLastOplogEntry() {
     return primary.getDB("local").oplog.rs.find().limit(1).sort({$natural: -1}).next();
 }
 
-const assertLastOplog = function(o, o2, msg) {
+const assertLastOplog = function (o, o2, msg) {
     const last = getLastOplogEntry();
 
     assert.eq(last.ns, coll.getFullName(), "ns bad : " + msg);
     assert.docEq(last.o, o, "o bad : " + msg);
-    if (o2)
-        assert.docEq(last.o2, o2, "o2 bad : " + msg);
+    if (o2) assert.docEq(last.o2, o2, "o2 bad : " + msg);
     return last.ts;
 };
 
@@ -37,48 +36,58 @@ assertLastOplog({_id: 1}, null, "insert -- setup");
 
 {
     const msg = "Explicitly versioned v1 entry: $set";
-    const res = assert.commandWorked(primary.adminCommand({
-        "applyOps": [{
-            "op": "u",
-            "ns": coll.getFullName(),
-            "o2": {"_id": 1},
-            "o": {"$v": 1, "$set": {"a": 1}}
-        }]
-    }));
+    const res = assert.commandWorked(
+        primary.adminCommand({
+            "applyOps": [
+                {
+                    "op": "u",
+                    "ns": coll.getFullName(),
+                    "o2": {"_id": 1},
+                    "o": {"$v": 1, "$set": {"a": 1}},
+                },
+            ],
+        }),
+    );
     assert.eq(res.results, [true], msg);
     assertLastOplog({"$v": 2, "diff": {"i": {"a": 1}}}, {"_id": 1}, msg);
 }
 
 {
     const msg = "Explicitly versioned v1 entry: $unset";
-    const res = assert.commandWorked(primary.adminCommand({
-        "applyOps": [{
-            "op": "u",
-            "ns": coll.getFullName(),
-            "o2": {"_id": 1},
-            "o": {"$v": 1, "$unset": {"a": ""}}
-        }]
-    }));
+    const res = assert.commandWorked(
+        primary.adminCommand({
+            "applyOps": [
+                {
+                    "op": "u",
+                    "ns": coll.getFullName(),
+                    "o2": {"_id": 1},
+                    "o": {"$v": 1, "$unset": {"a": ""}},
+                },
+            ],
+        }),
+    );
     assert.eq(res.results, [true], msg);
     assertLastOplog({"$v": 2, "diff": {"d": {"a": false}}}, {"_id": 1}, msg);
 }
 
 {
     const msg = "Implicitly versioned v1 entry: $set";
-    const res = assert.commandWorked(primary.adminCommand({
-        "applyOps":
-            [{"op": "u", "ns": coll.getFullName(), "o2": {"_id": 1}, "o": {"$set": {"b": 1}}}]
-    }));
+    const res = assert.commandWorked(
+        primary.adminCommand({
+            "applyOps": [{"op": "u", "ns": coll.getFullName(), "o2": {"_id": 1}, "o": {"$set": {"b": 1}}}],
+        }),
+    );
     assert.eq(res.results, [true], msg);
     assertLastOplog({"$v": 2, "diff": {"i": {"b": 1}}}, {"_id": 1}, msg);
 }
 
 {
     const msg = "Implicitly versioned v1 entry: $unset";
-    const res = assert.commandWorked(primary.adminCommand({
-        "applyOps":
-            [{"op": "u", "ns": coll.getFullName(), "o2": {"_id": 1}, "o": {"$unset": {"b": ""}}}]
-    }));
+    const res = assert.commandWorked(
+        primary.adminCommand({
+            "applyOps": [{"op": "u", "ns": coll.getFullName(), "o2": {"_id": 1}, "o": {"$unset": {"b": ""}}}],
+        }),
+    );
     assert.eq(res.results, [true], msg);
     assertLastOplog({"$v": 2, "diff": {"d": {"b": false}}}, {"_id": 1}, msg);
 }

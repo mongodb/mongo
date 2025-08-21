@@ -11,7 +11,7 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     createSearchIndexesAndExecuteTests,
-    validateSearchExplain
+    validateSearchExplain,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
@@ -29,34 +29,35 @@ bulk.insert({_id: "monitor", stock: 880, num_orders: 581});
 assert.commandWorked(bulk.execute());
 
 const viewName = "match";
-const viewPipeline =
-    [{"$match": {"$expr": {"$gt": [{"$subtract": ["$stock", "$num_orders"]}, 300]}}}];
-assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', viewPipeline));
+const viewPipeline = [{"$match": {"$expr": {"$gt": [{"$subtract": ["$stock", "$num_orders"]}, 300]}}}];
+assert.commandWorked(testDb.createView(viewName, "underlyingSourceCollection", viewPipeline));
 const matchView = testDb[viewName];
 
 const indexConfig = {
     coll: matchView,
-    definition: {name: "default", definition: {"mappings": {"dynamic": true}}}
+    definition: {name: "default", definition: {"mappings": {"dynamic": true}}},
 };
 
 const matchBaseCaseTestCases = (isStoredSource) => {
     // ===============================================================================
     // Case 1: Basic $search pipeline.
     // ===============================================================================
-    const searchPipeline = [{
-        $search: {
-            index: "default",
-            exists: {
-                path: "_id",
+    const searchPipeline = [
+        {
+            $search: {
+                index: "default",
+                exists: {
+                    path: "_id",
+                },
+                returnStoredSource: isStoredSource,
             },
-            returnStoredSource: isStoredSource
-        }
-    }];
+        },
+    ];
 
     const expectedResults = [
         {"_id": "android", "stock": 500, "num_orders": 99},
         {"_id": "charger", "stock": 456, "num_orders": 100},
-        {"_id": "keyboard", "stock": 928, "num_orders": 102}
+        {"_id": "keyboard", "stock": 928, "num_orders": 102},
     ];
 
     validateSearchExplain(matchView, searchPipeline, isStoredSource, viewPipeline);
@@ -74,10 +75,10 @@ const matchBaseCaseTestCases = (isStoredSource) => {
                 exists: {
                     path: "_id",
                 },
-                returnStoredSource: isStoredSource
-            }
+                returnStoredSource: isStoredSource,
+            },
         },
-        {$project: {_id: 1}}
+        {$project: {_id: 1}},
     ];
 
     validateSearchExplain(matchView, projectionPipeline, isStoredSource, viewPipeline);

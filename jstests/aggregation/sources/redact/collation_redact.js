@@ -12,10 +12,7 @@ assert.commandWorked(coll.insert({a: "a"}));
 
 // Test that $redact respects an explicit collation. Since the top-level of the document gets
 // pruned, we end up redacting the entire document and returning no results.
-assert.eq(
-    0,
-    coll.aggregate([{$redact: {$cond: [{$eq: ["A", "a"]}, "$$PRUNE", "$$KEEP"]}}], caseInsensitive)
-        .itcount());
+assert.eq(0, coll.aggregate([{$redact: {$cond: [{$eq: ["A", "a"]}, "$$PRUNE", "$$KEEP"]}}], caseInsensitive).itcount());
 
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
@@ -23,8 +20,7 @@ assert.commandWorked(coll.insert({a: "a"}));
 
 // Test that $redact respects the inherited collation. Since the top-level of the document gets
 // pruned, we end up redacting the entire document and returning no results.
-assert.eq(0,
-          coll.aggregate([{$redact: {$cond: [{$eq: ["A", "a"]}, "$$PRUNE", "$$KEEP"]}}]).itcount());
+assert.eq(0, coll.aggregate([{$redact: {$cond: [{$eq: ["A", "a"]}, "$$PRUNE", "$$KEEP"]}}]).itcount());
 
 // Test that a $match which can be optimized to be pushed before the $redact respects the
 // collation.

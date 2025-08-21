@@ -31,9 +31,11 @@ function checkClusterParameterInitialSync(rst) {
 
     // Check that the new values are visible on the majority of the nodes.
     rst.awaitReplication();
-    runGetClusterParameterReplicaSet(rst,
-                                     ["testIntClusterParameter", "testStrClusterParameter"],
-                                     [newIntParameter, newStrParameter]);
+    runGetClusterParameterReplicaSet(
+        rst,
+        ["testIntClusterParameter", "testStrClusterParameter"],
+        [newIntParameter, newStrParameter],
+    );
 
     // Add a new node to the replica set, reinitiate the set, and wait for it to become a secondary
     // with all data fully replicated to it.
@@ -43,9 +45,13 @@ function checkClusterParameterInitialSync(rst) {
     rst.awaitReplication();
 
     // Check that the new node has the latest cluster parameter values.
-    assert(runGetClusterParameterNode(newNode,
-                                      ["testIntClusterParameter", "testStrClusterParameter"],
-                                      [newIntParameter, newStrParameter]));
+    assert(
+        runGetClusterParameterNode(
+            newNode,
+            ["testIntClusterParameter", "testStrClusterParameter"],
+            [newIntParameter, newStrParameter],
+        ),
+    );
 
     // Check that setClusterParameter properly works with the reconfigured replica set.
     newIntParameter.intData = 30;
@@ -54,9 +60,11 @@ function checkClusterParameterInitialSync(rst) {
     runSetClusterParameter(rst.getPrimary(), newStrParameter);
 
     // Check that the new values are visible on the majority of the nodes.
-    runGetClusterParameterReplicaSet(rst,
-                                     ["testIntClusterParameter", "testStrClusterParameter"],
-                                     [newIntParameter, newStrParameter]);
+    runGetClusterParameterReplicaSet(
+        rst,
+        ["testIntClusterParameter", "testStrClusterParameter"],
+        [newIntParameter, newStrParameter],
+    );
 }
 
 // Checks that restarted replica sets start with the most recent majority-written cluster parameter
@@ -76,9 +84,11 @@ function checkClusterParameterRestart(rst) {
 
     // Check that the new values are visible on the majority of the nodes.
     rst.awaitReplication();
-    runGetClusterParameterReplicaSet(rst,
-                                     ["testIntClusterParameter", "testStrClusterParameter"],
-                                     [newIntParameter, newStrParameter]);
+    runGetClusterParameterReplicaSet(
+        rst,
+        ["testIntClusterParameter", "testStrClusterParameter"],
+        [newIntParameter, newStrParameter],
+    );
 
     // Bounce restart all of the nodes.
     rst.nodeList().forEach((_, index) => {
@@ -86,9 +96,11 @@ function checkClusterParameterRestart(rst) {
     });
 
     // Check that restarted replica set still has the most recent setClusterParameter values.
-    runGetClusterParameterReplicaSet(rst,
-                                     ["testIntClusterParameter", "testStrClusterParameter"],
-                                     [newIntParameter, newStrParameter]);
+    runGetClusterParameterReplicaSet(
+        rst,
+        ["testIntClusterParameter", "testStrClusterParameter"],
+        [newIntParameter, newStrParameter],
+    );
 }
 
 const rst = new ReplSetTest({

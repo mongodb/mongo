@@ -33,7 +33,9 @@ const numQueriesPerRun = 30;
 
 const experimentColl = db[jsTestName()];
 assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
-testProperty(createPlanStabilityProperty(experimentColl, true /* assertCeExists */),
-             {experimentColl},
-             createStabilityWorkload(numQueriesPerRun),
-             numRuns);
+testProperty(
+    createPlanStabilityProperty(experimentColl, true /* assertCeExists */),
+    {experimentColl},
+    createStabilityWorkload(numQueriesPerRun),
+    numRuns,
+);

@@ -11,9 +11,7 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    flushRoutersAndRefreshShardMetadata
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const shardedDbName = "shardedDB";
 const shardedCollName = "sharded";
@@ -26,15 +24,18 @@ const unshardedViewName = "unsharded_view";
 const viewOnShardedViewName = "sharded_view_view";
 
 function setUpUnshardedCollectionAndView(st, session, primaryShard) {
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: unshardedDbName, primaryShard: primaryShard}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: unshardedDbName, primaryShard: primaryShard}));
 
-    assert.commandWorked(st.s.getDB(unshardedDbName)[unshardedCollName].insert(
-        {_id: 1, x: "unsharded"}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        st.s
+            .getDB(unshardedDbName)
+            [unshardedCollName].insert({_id: 1, x: "unsharded"}, {writeConcern: {w: "majority"}}),
+    );
 
     const unshardedView = session.getDatabase(unshardedDbName)[unshardedViewName];
-    assert.commandWorked(unshardedView.runCommand(
-        "create", {viewOn: unshardedCollName, pipeline: [], writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        unshardedView.runCommand("create", {viewOn: unshardedCollName, pipeline: [], writeConcern: {w: "majority"}}),
+    );
 
     return unshardedView;
 }
@@ -42,21 +43,22 @@ function setUpUnshardedCollectionAndView(st, session, primaryShard) {
 function setUpShardedCollectionAndView(st, session, primaryShard) {
     const ns = shardedDbName + "." + shardedCollName;
 
+    assert.commandWorked(st.s.adminCommand({enableSharding: shardedDbName, primaryShard: primaryShard}));
     assert.commandWorked(
-        st.s.adminCommand({enableSharding: shardedDbName, primaryShard: primaryShard}));
-    assert.commandWorked(st.s.getDB(shardedDbName)[shardedCollName].insert(
-        {_id: -1, x: "sharded -1"}, {writeConcern: {w: "majority"}}));
-    assert.commandWorked(st.s.getDB(shardedDbName)[shardedCollName].insert(
-        {_id: 1, x: "sharded +1"}, {writeConcern: {w: "majority"}}));
+        st.s.getDB(shardedDbName)[shardedCollName].insert({_id: -1, x: "sharded -1"}, {writeConcern: {w: "majority"}}),
+    );
+    assert.commandWorked(
+        st.s.getDB(shardedDbName)[shardedCollName].insert({_id: 1, x: "sharded +1"}, {writeConcern: {w: "majority"}}),
+    );
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.shard1.shardName}));
 
     const shardedView = session.getDatabase(shardedDbName)[shardedViewName];
-    assert.commandWorked(shardedView.runCommand(
-        "create", {viewOn: shardedCollName, pipeline: [], writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        shardedView.runCommand("create", {viewOn: shardedCollName, pipeline: [], writeConcern: {w: "majority"}}),
+    );
 
     flushRoutersAndRefreshShardMetadata(st, {ns, dbNames: [shardedDbName, unshardedDbName]});
 
@@ -75,8 +77,9 @@ const shardedView = setUpShardedCollectionAndView(st, session, st.shard0.shardNa
 
 // Set up a view on the sharded view, in the same database.
 const viewOnShardedView = session.getDatabase(shardedDbName)[viewOnShardedViewName];
-assert.commandWorked(viewOnShardedView.runCommand(
-    "create", {viewOn: shardedViewName, pipeline: [], writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    viewOnShardedView.runCommand("create", {viewOn: shardedViewName, pipeline: [], writeConcern: {w: "majority"}}),
+);
 
 //
 // The first statement a participant shard receives reading from a view should succeed.
@@ -89,37 +92,82 @@ function readFromViewOnFirstParticipantStatement(session, view, viewFunc, numDoc
 }
 
 // Unsharded view.
-readFromViewOnFirstParticipantStatement(session, unshardedView, (view) => {
-    return view.aggregate({$match: {}}).itcount();
-}, 1);
-readFromViewOnFirstParticipantStatement(session, unshardedView, (view) => {
-    return view.distinct("_id").length;
-}, 1);
-readFromViewOnFirstParticipantStatement(session, unshardedView, (view) => {
-    return view.find().itcount();
-}, 1);
+readFromViewOnFirstParticipantStatement(
+    session,
+    unshardedView,
+    (view) => {
+        return view.aggregate({$match: {}}).itcount();
+    },
+    1,
+);
+readFromViewOnFirstParticipantStatement(
+    session,
+    unshardedView,
+    (view) => {
+        return view.distinct("_id").length;
+    },
+    1,
+);
+readFromViewOnFirstParticipantStatement(
+    session,
+    unshardedView,
+    (view) => {
+        return view.find().itcount();
+    },
+    1,
+);
 
 // Sharded view.
-readFromViewOnFirstParticipantStatement(session, shardedView, (view) => {
-    return view.aggregate({$match: {}}).itcount();
-}, 2);
-readFromViewOnFirstParticipantStatement(session, shardedView, (view) => {
-    return view.distinct("_id").length;
-}, 2);
-readFromViewOnFirstParticipantStatement(session, shardedView, (view) => {
-    return view.find().itcount();
-}, 2);
+readFromViewOnFirstParticipantStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.aggregate({$match: {}}).itcount();
+    },
+    2,
+);
+readFromViewOnFirstParticipantStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.distinct("_id").length;
+    },
+    2,
+);
+readFromViewOnFirstParticipantStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.find().itcount();
+    },
+    2,
+);
 
 // View on sharded view.
-readFromViewOnFirstParticipantStatement(session, viewOnShardedView, (view) => {
-    return view.aggregate({$match: {}}).itcount();
-}, 2);
-readFromViewOnFirstParticipantStatement(session, viewOnShardedView, (view) => {
-    return view.distinct("_id").length;
-}, 2);
-readFromViewOnFirstParticipantStatement(session, viewOnShardedView, (view) => {
-    return view.find().itcount();
-}, 2);
+readFromViewOnFirstParticipantStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.aggregate({$match: {}}).itcount();
+    },
+    2,
+);
+readFromViewOnFirstParticipantStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.distinct("_id").length;
+    },
+    2,
+);
+readFromViewOnFirstParticipantStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.find().itcount();
+    },
+    2,
+);
 
 //
 // A later statement a participant shard receives reading from a view should succeed.
@@ -133,37 +181,82 @@ function readFromViewOnLaterParticipantStatement(session, view, viewFunc, numDoc
 }
 
 // Unsharded view.
-readFromViewOnLaterParticipantStatement(session, unshardedView, (view) => {
-    return view.aggregate({$match: {}}).itcount();
-}, 1);
-readFromViewOnLaterParticipantStatement(session, unshardedView, (view) => {
-    return view.distinct("_id").length;
-}, 1);
-readFromViewOnLaterParticipantStatement(session, unshardedView, (view) => {
-    return view.find().itcount();
-}, 1);
+readFromViewOnLaterParticipantStatement(
+    session,
+    unshardedView,
+    (view) => {
+        return view.aggregate({$match: {}}).itcount();
+    },
+    1,
+);
+readFromViewOnLaterParticipantStatement(
+    session,
+    unshardedView,
+    (view) => {
+        return view.distinct("_id").length;
+    },
+    1,
+);
+readFromViewOnLaterParticipantStatement(
+    session,
+    unshardedView,
+    (view) => {
+        return view.find().itcount();
+    },
+    1,
+);
 
 // Sharded view.
-readFromViewOnLaterParticipantStatement(session, shardedView, (view) => {
-    return view.aggregate({$match: {}}).itcount();
-}, 2);
-readFromViewOnLaterParticipantStatement(session, shardedView, (view) => {
-    return view.distinct("_id").length;
-}, 2);
-readFromViewOnLaterParticipantStatement(session, shardedView, (view) => {
-    return view.find().itcount();
-}, 2);
+readFromViewOnLaterParticipantStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.aggregate({$match: {}}).itcount();
+    },
+    2,
+);
+readFromViewOnLaterParticipantStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.distinct("_id").length;
+    },
+    2,
+);
+readFromViewOnLaterParticipantStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.find().itcount();
+    },
+    2,
+);
 
 // View on sharded view.
-readFromViewOnLaterParticipantStatement(session, viewOnShardedView, (view) => {
-    return view.aggregate({$match: {}}).itcount();
-}, 2);
-readFromViewOnLaterParticipantStatement(session, viewOnShardedView, (view) => {
-    return view.distinct("_id").length;
-}, 2);
-readFromViewOnLaterParticipantStatement(session, viewOnShardedView, (view) => {
-    return view.find().itcount();
-}, 2);
+readFromViewOnLaterParticipantStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.aggregate({$match: {}}).itcount();
+    },
+    2,
+);
+readFromViewOnLaterParticipantStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.distinct("_id").length;
+    },
+    2,
+);
+readFromViewOnLaterParticipantStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.find().itcount();
+    },
+    2,
+);
 
 //
 // Transactions on shards that return a view resolution error on the first statement remain
@@ -180,47 +273,87 @@ function primaryShardNotReTargeted_FirstStatement(session, view, viewFunc, numDo
     assert.eq(viewFunc(view), numDocsExpected);
 
     // There should not be an in-progress transaction on the primary shard.
-    assert.commandFailedWithCode(st.rs0.getPrimary().getDB("foo").runCommand({
-        find: "bar",
-        lsid: session.getSessionId(),
-        txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-        autocommit: false,
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        st.rs0
+            .getPrimary()
+            .getDB("foo")
+            .runCommand({
+                find: "bar",
+                lsid: session.getSessionId(),
+                txnNumber: NumberLong(session.getTxnNumber_forTesting()),
+                autocommit: false,
+            }),
+        ErrorCodes.NoSuchTransaction,
+    );
 
     assert.commandWorked(session.commitTransaction_forTesting());
 
     // The transaction should not have been committed on the primary shard.
-    assert.commandFailedWithCode(st.rs0.getPrimary().getDB("foo").runCommand({
-        find: "bar",
-        lsid: session.getSessionId(),
-        txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-        autocommit: false,
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        st.rs0
+            .getPrimary()
+            .getDB("foo")
+            .runCommand({
+                find: "bar",
+                lsid: session.getSessionId(),
+                txnNumber: NumberLong(session.getTxnNumber_forTesting()),
+                autocommit: false,
+            }),
+        ErrorCodes.NoSuchTransaction,
+    );
 }
 
 // This is only possible against sharded views.
-primaryShardNotReTargeted_FirstStatement(session, shardedView, (view) => {
-    return view.aggregate({$match: {_id: 1}}).itcount();
-}, 1);
-primaryShardNotReTargeted_FirstStatement(session, shardedView, (view) => {
-    return view.distinct("_id", {_id: {$gte: 1}}).length;
-}, 1);
-primaryShardNotReTargeted_FirstStatement(session, shardedView, (view) => {
-    return view.find({_id: 1}).itcount();
-}, 1);
+primaryShardNotReTargeted_FirstStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.aggregate({$match: {_id: 1}}).itcount();
+    },
+    1,
+);
+primaryShardNotReTargeted_FirstStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.distinct("_id", {_id: {$gte: 1}}).length;
+    },
+    1,
+);
+primaryShardNotReTargeted_FirstStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.find({_id: 1}).itcount();
+    },
+    1,
+);
 
 // View on sharded view.
-primaryShardNotReTargeted_FirstStatement(session, viewOnShardedView, (view) => {
-    return view.aggregate({$match: {_id: 1}}).itcount();
-}, 1);
-primaryShardNotReTargeted_FirstStatement(session, viewOnShardedView, (view) => {
-    return view.distinct("_id", {_id: {$gte: 1}}).length;
-}, 1);
-primaryShardNotReTargeted_FirstStatement(session, viewOnShardedView, (view) => {
-    return view.find({_id: 1}).itcount();
-}, 1);
+primaryShardNotReTargeted_FirstStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.aggregate({$match: {_id: 1}}).itcount();
+    },
+    1,
+);
+primaryShardNotReTargeted_FirstStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.distinct("_id", {_id: {$gte: 1}}).length;
+    },
+    1,
+);
+primaryShardNotReTargeted_FirstStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.find({_id: 1}).itcount();
+    },
+    1,
+);
 
 //
 // Shards do not abort on a view resolution error if they have already completed a statement for
@@ -238,26 +371,56 @@ function primaryShardNotReTargeted_LaterStatement(session, view, viewFunc, numDo
 }
 
 // This is only possible against sharded views.
-primaryShardNotReTargeted_LaterStatement(session, shardedView, (view) => {
-    return view.aggregate({$match: {_id: 1}}).itcount();
-}, 1);
-primaryShardNotReTargeted_LaterStatement(session, shardedView, (view) => {
-    return view.distinct("_id", {_id: {$gte: 1}}).length;
-}, 1);
-primaryShardNotReTargeted_LaterStatement(session, shardedView, (view) => {
-    return view.find({_id: 1}).itcount();
-}, 1);
+primaryShardNotReTargeted_LaterStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.aggregate({$match: {_id: 1}}).itcount();
+    },
+    1,
+);
+primaryShardNotReTargeted_LaterStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.distinct("_id", {_id: {$gte: 1}}).length;
+    },
+    1,
+);
+primaryShardNotReTargeted_LaterStatement(
+    session,
+    shardedView,
+    (view) => {
+        return view.find({_id: 1}).itcount();
+    },
+    1,
+);
 
 // View on sharded view.
-primaryShardNotReTargeted_LaterStatement(session, viewOnShardedView, (view) => {
-    return view.aggregate({$match: {_id: 1}}).itcount();
-}, 1);
-primaryShardNotReTargeted_LaterStatement(session, viewOnShardedView, (view) => {
-    return view.distinct("_id", {_id: {$gte: 1}}).length;
-}, 1);
-primaryShardNotReTargeted_LaterStatement(session, viewOnShardedView, (view) => {
-    return view.find({_id: 1}).itcount();
-}, 1);
+primaryShardNotReTargeted_LaterStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.aggregate({$match: {_id: 1}}).itcount();
+    },
+    1,
+);
+primaryShardNotReTargeted_LaterStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.distinct("_id", {_id: {$gte: 1}}).length;
+    },
+    1,
+);
+primaryShardNotReTargeted_LaterStatement(
+    session,
+    viewOnShardedView,
+    (view) => {
+        return view.find({_id: 1}).itcount();
+    },
+    1,
+);
 
 //
 // Reading from a view using $lookup and $graphLookup should succeed.
@@ -271,14 +434,15 @@ function assertAggResultEqInTransaction(coll, pipeline, expected) {
 }
 
 // TODO SERVER-88936 Remove this check once last-lts has the feature flag enabled.
-const areAdditionalParticipantsAllowed =
-    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "AllowAdditionalParticipants");
+const areAdditionalParticipantsAllowed = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB("admin"),
+    "AllowAdditionalParticipants",
+);
 if (areAdditionalParticipantsAllowed) {
     // Test unsharded collection lookup.
     let lookupDbName = unshardedDbName;
     const lookupCollName = "collForLookup";
-    assert.commandWorked(
-        st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
     let lookupColl = session.getDatabase(lookupDbName)[lookupCollName];
 
     // Lookup the document in the unsharded collection with _id: 1 through the unsharded view.
@@ -287,75 +451,83 @@ if (areAdditionalParticipantsAllowed) {
         [
             {$match: {_id: 1}},
             {
-                $lookup:
-                    {from: unshardedViewName, localField: "_id", foreignField: "_id", as: "matched"}
+                $lookup: {from: unshardedViewName, localField: "_id", foreignField: "_id", as: "matched"},
             },
             {$unwind: "$matched"},
-            {$project: {_id: 1, matchedX: "$matched.x"}}
+            {$project: {_id: 1, matchedX: "$matched.x"}},
         ],
-        [{_id: 1, matchedX: "unsharded"}]);
+        [{_id: 1, matchedX: "unsharded"}],
+    );
 
     // Find the same document through the view using $graphLookup.
-    assertAggResultEqInTransaction(lookupColl,
-                                   [
-                                     {$match: {_id: 1}},
-                                     {
-                                       $graphLookup: {
-                                           from: unshardedViewName,
-                                           startWith: "$_id",
-                                           connectFromField: "_id",
-                                           connectToField: "_id",
-                                           as: "matched"
-                                       }
-                                     },
-                                     {$unwind: "$matched"},
-                                     {$project: {_id: 1, matchedX: "$matched.x"}}
-                                   ],
-                                   [{_id: 1, matchedX: "unsharded"}]);
+    assertAggResultEqInTransaction(
+        lookupColl,
+        [
+            {$match: {_id: 1}},
+            {
+                $graphLookup: {
+                    from: unshardedViewName,
+                    startWith: "$_id",
+                    connectFromField: "_id",
+                    connectToField: "_id",
+                    as: "matched",
+                },
+            },
+            {$unwind: "$matched"},
+            {$project: {_id: 1, matchedX: "$matched.x"}},
+        ],
+        [{_id: 1, matchedX: "unsharded"}],
+    );
 
     // We now proceed to test sharded collection lookup. We do this by reusing the same collection
     // here but sharding it first.
     lookupDbName = shardedDbName;
     lookupColl = session.getDatabase(lookupDbName)[lookupCollName];
-    assert.commandWorked(
-        st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
-    assert.commandWorked(st.s.getDB(lookupDbName)[lookupCollName].insert(
-        {_id: -1}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(st.s.getDB(lookupDbName)[lookupCollName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
 
-    assert.commandWorked(
-        st.s.adminCommand({shardCollection: lookupColl.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: lookupColl.getFullName(), key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: lookupColl.getFullName(), middle: {_id: 0}}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: lookupColl.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: lookupColl.getFullName(), find: {_id: 1}, to: st.shard1.shardName}),
+    );
 
     // Lookup the documents in the now sharded collection through the sharded view.
     assertAggResultEqInTransaction(
         lookupColl,
         [
             {
-                $lookup:
-                    {from: shardedViewName, localField: "_id", foreignField: "_id", as: "matched"}
+                $lookup: {from: shardedViewName, localField: "_id", foreignField: "_id", as: "matched"},
             },
             {$unwind: "$matched"},
-            {$project: {_id: 1, matchedX: "$matched.x"}}
+            {$project: {_id: 1, matchedX: "$matched.x"}},
         ],
-        [{_id: 1, matchedX: "sharded +1"}, {_id: -1, matchedX: "sharded -1"}]);
+        [
+            {_id: 1, matchedX: "sharded +1"},
+            {_id: -1, matchedX: "sharded -1"},
+        ],
+    );
 
     // Find the same documents through the view using $graphLookup.
-    assertAggResultEqInTransaction(lookupColl,
-                                   [
-                                     {
-                                       $graphLookup: {
-                                           from: shardedViewName,
-                                           startWith: "$_id",
-                                           connectFromField: "_id",
-                                           connectToField: "_id",
-                                           as: "matched"
-                                       }
-                                     },
-                                     {$unwind: "$matched"},
-                                     {$project: {_id: 1, matchedX: "$matched.x"}}
-                                   ],
-                                   [{_id: 1, matchedX: "sharded +1"}, {_id: -1, matchedX: "sharded -1"}]);
+    assertAggResultEqInTransaction(
+        lookupColl,
+        [
+            {
+                $graphLookup: {
+                    from: shardedViewName,
+                    startWith: "$_id",
+                    connectFromField: "_id",
+                    connectToField: "_id",
+                    as: "matched",
+                },
+            },
+            {$unwind: "$matched"},
+            {$project: {_id: 1, matchedX: "$matched.x"}},
+        ],
+        [
+            {_id: 1, matchedX: "sharded +1"},
+            {_id: -1, matchedX: "sharded -1"},
+        ],
+    );
 }
 st.stop();

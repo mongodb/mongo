@@ -11,22 +11,19 @@
  */
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const mongos = st.s0;
 const primaryShard = st.shard0.shardName;
 const kDbName = jsTestName();
-const kCollName = 'coll';
-const kNsName = kDbName + '.' + kCollName;
+const kCollName = "coll";
+const kNsName = kDbName + "." + kCollName;
 const numDocs = 1;
 
 const db = mongos.getDB(kDbName);
@@ -39,7 +36,7 @@ function getCollectionUuid(coll) {
 
 const ns = {
     db: kDbName,
-    coll: kCollName
+    coll: kCollName,
 };
 
 function prepareCollection() {
@@ -65,14 +62,16 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
 
     let pipeline = [
         {$changeStream: {showExpandedEvents: true}},
-        {$match: {operationType: {$nin: ["create", "createIndexes"]}}}
+        {$match: {operationType: {$nin: ["create", "createIndexes"]}}},
     ];
 
-    let cursor = test.startWatchingChanges(
-        {pipeline: pipeline, collection: collParam, aggregateOptions: {cursor: {batchSize: 0}}});
+    let cursor = test.startWatchingChanges({
+        pipeline: pipeline,
+        collection: collParam,
+        aggregateOptions: {cursor: {batchSize: 0}},
+    });
 
-    assert.commandWorked(
-        mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, akey: 1}}));
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, akey: 1}}));
 
     // Confirm that we observe the refineCollectionShardKey event, and obtain its resume token.
     const refineResumeToken = assertExpectedEventObserved(cursor, expectedOutput);
@@ -92,7 +91,7 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
             ns: ns,
             fullDocument: {_id: numDocs + 1},
             documentKey: {_id: numDocs + 1},
-        }
+        },
     });
 }
 
@@ -102,14 +101,14 @@ assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard:
 validateExpectedEventAndConfirmResumability(kCollName, {
     operationType: "refineCollectionShardKey",
     ns: ns,
-    operationDescription: {shardKey: {_id: 1, akey: 1}, oldShardKey: {_id: 1}}
+    operationDescription: {shardKey: {_id: 1, akey: 1}, oldShardKey: {_id: 1}},
 });
 
 // Test the behaviour of refineCollectionShardKey for a whole-DB stream.
 validateExpectedEventAndConfirmResumability(1, {
     operationType: "refineCollectionShardKey",
     ns: ns,
-    operationDescription: {shardKey: {_id: 1, akey: 1}, oldShardKey: {_id: 1}}
+    operationDescription: {shardKey: {_id: 1, akey: 1}, oldShardKey: {_id: 1}},
 });
 
 st.stop();

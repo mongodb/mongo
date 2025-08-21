@@ -12,11 +12,13 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 function runTest(metadataSortFieldName) {
     const coll = db.sort_by_search_score;
     coll.drop();
-    assert.commandWorked(coll.insert([
-        {_id: 0, size: "small"},
-        {_id: 1, size: "medium", mood: "content hippo"},
-        {_id: 2, size: "large", mood: "very hungry hippo"}
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 0, size: "small"},
+            {_id: 1, size: "medium", mood: "content hippo"},
+            {_id: 2, size: "large", mood: "very hungry hippo"},
+        ]),
+    );
 
     createSearchIndex(coll, {name: "test-dynamic", definition: {"mappings": {"dynamic": true}}});
     var searchIndexes = coll.aggregate([{"$listSearchIndexes": {}}]).toArray();
@@ -26,21 +28,22 @@ function runTest(metadataSortFieldName) {
         $search: {
             index: "test-dynamic",
             text: {query: "hungry hippo", path: ["mood"]},
-        }
+        },
     };
 
     // Test basic ranking, with no 'partitionBy'.
     {
-        const results = coll.aggregate([
-                                searchForHungryHippo,
-                                {
-                                    $setWindowFields: {
-                                        sortBy: {score: {$meta: metadataSortFieldName}},
-                                        output: {rank: {$rank: {}}}
-                                    }
-                                },
-                            ])
-                            .toArray();
+        const results = coll
+            .aggregate([
+                searchForHungryHippo,
+                {
+                    $setWindowFields: {
+                        sortBy: {score: {$meta: metadataSortFieldName}},
+                        output: {rank: {$rank: {}}},
+                    },
+                },
+            ])
+            .toArray();
 
         // We should see that the document matching both search terms scores higher than the one
         // matching only a single term.
@@ -51,26 +54,27 @@ function runTest(metadataSortFieldName) {
     {
         // Test ranking with ties.
         const scoreForAnyMatch = 1;
-        const results = coll.aggregate([
-                                {
-                                    $search: {
-                                        index: "test-dynamic",
-                                        text: {
-                                            query: "hungry hippo",
-                                            path: ["mood"],
-                                            score: {constant: {value: scoreForAnyMatch}}
-                                        },
-                                    }
-                                },
-                                {
-                                    $setWindowFields: {
-                                        sortBy: {score: {$meta: metadataSortFieldName}},
-                                        output: {rank: {$rank: {}}}
-                                    }
-                                },
-                                {$sort: {_id: 1}}
-                            ])
-                            .toArray();
+        const results = coll
+            .aggregate([
+                {
+                    $search: {
+                        index: "test-dynamic",
+                        text: {
+                            query: "hungry hippo",
+                            path: ["mood"],
+                            score: {constant: {value: scoreForAnyMatch}},
+                        },
+                    },
+                },
+                {
+                    $setWindowFields: {
+                        sortBy: {score: {$meta: metadataSortFieldName}},
+                        output: {rank: {$rank: {}}},
+                    },
+                },
+                {$sort: {_id: 1}},
+            ])
+            .toArray();
 
         assert.eq(results.length, 2);
         // Because we manually override the score by passing the 'score' option, these should tie.
@@ -81,18 +85,19 @@ function runTest(metadataSortFieldName) {
 
     {
         // Test with a 'partitionBy' argument.
-        const results = coll.aggregate([
-                                searchForHungryHippo,
-                                {
-                                    $setWindowFields: {
-                                        sortBy: {score: {$meta: metadataSortFieldName}},
-                                        partitionBy: '$size',
-                                        output: {rank: {$rank: {}}}
-                                    }
-                                },
-                                {$sort: {_id: 1}},
-                            ])
-                            .toArray();
+        const results = coll
+            .aggregate([
+                searchForHungryHippo,
+                {
+                    $setWindowFields: {
+                        sortBy: {score: {$meta: metadataSortFieldName}},
+                        partitionBy: "$size",
+                        output: {rank: {$rank: {}}},
+                    },
+                },
+                {$sort: {_id: 1}},
+            ])
+            .toArray();
         // Now that we have partitioned by size, each document is in first place within their size
         // category. The results are still in a deteministic order due to the sort on _id.
         assert.eq(results.length, 2);

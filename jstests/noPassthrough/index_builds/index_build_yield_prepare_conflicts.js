@@ -22,7 +22,7 @@ const collName = "coll";
 
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
-const primaryAdmin = primary.getDB('admin');
+const primaryAdmin = primary.getDB("admin");
 const primaryColl = primaryDB[collName];
 const collNss = primaryColl.getFullName();
 
@@ -35,8 +35,9 @@ rst.awaitReplication();
 assert.commandWorked(primary.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 2}));
 
 jsTestLog("Enable setYieldAllLocksHang fail point");
-let res = assert.commandWorked(primaryAdmin.runCommand(
-    {configureFailPoint: "setYieldAllLocksHang", data: {namespace: collNss}, mode: "alwaysOn"}));
+let res = assert.commandWorked(
+    primaryAdmin.runCommand({configureFailPoint: "setYieldAllLocksHang", data: {namespace: collNss}, mode: "alwaysOn"}),
+);
 let timesEntered = res.count;
 
 jsTestLog("Create index");
@@ -44,11 +45,13 @@ const awaitIndex = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullNa
 
 // Wait until index build (collection scan phase) yields.
 jsTestLog("Wait for the index build to yield and hang");
-assert.commandWorked(primaryAdmin.runCommand({
-    waitForFailPoint: "setYieldAllLocksHang",
-    timesEntered: timesEntered + 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    primaryAdmin.runCommand({
+        waitForFailPoint: "setYieldAllLocksHang",
+        timesEntered: timesEntered + 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Start a txn");
 const session = primary.startSession();
@@ -61,8 +64,7 @@ jsTestLog("Prepare txn");
 PrepareHelpers.prepareTransaction(session);
 
 // This will make the hybrid build previously started resume.
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
 
 jsTestLog("Wait for index build to complete collection scanning phase");
 checkLog.containsJson(primary, 20391);

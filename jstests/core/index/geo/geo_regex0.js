@@ -4,8 +4,8 @@
 let t = db.regex0;
 t.drop();
 
-t.createIndex({point: '2d', words: 1});
-t.insert({point: [1, 1], words: ['foo', 'bar']});
+t.createIndex({point: "2d", words: 1});
+t.insert({point: [1, 1], words: ["foo", "bar"]});
 
 let regex = {words: /^f/};
 let geo = {point: {$near: [1, 1]}};

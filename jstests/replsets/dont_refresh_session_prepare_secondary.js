@@ -38,14 +38,15 @@ const sessionID = session.getSessionId();
 
 let failPoint = configureFailPoint(primary, "hangBeforeSessionCheckOut");
 
-const txnFunc = async function(sessionID) {
+const txnFunc = async function (sessionID) {
     const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
     const session = PrepareHelpers.createSessionWithGivenId(db.getMongo(), sessionID);
     const sessionDB = session.getDatabase("test");
     session.startTransaction({writeConcern: {w: "majority"}});
     assert.commandFailedWithCode(
         sessionDB.runCommand({find: "test", readConcern: {level: "snapshot"}}),
-        ErrorCodes.InterruptedDueToReplStateChange);
+        ErrorCodes.InterruptedDueToReplStateChange,
+    );
 };
 const waitForTxnShell = startParallelShell(funWithArgs(txnFunc, sessionID), primary.port);
 failPoint.wait();
@@ -53,30 +54,33 @@ failPoint.wait();
 replTest.stepUp(newPrimary);
 assert.eq(replTest.getPrimary(), newPrimary, "Primary didn't change.");
 
-const prepareTxnFunc = async function(sessionID) {
+const prepareTxnFunc = async function (sessionID) {
     const newPrimaryDB = db.getMongo().getDB("test");
 
     // Start a transaction on the same session as before, but with a higher transaction number.
-    assert.commandWorked(newPrimaryDB.runCommand({
-        insert: "coll",
-        documents: [{c: 1}],
-        lsid: sessionID,
-        txnNumber: NumberLong(10),
-        startTransaction: true,
-        autocommit: false
-    }));
-    assert.commandWorked(newPrimaryDB.adminCommand({
-        prepareTransaction: 1,
-        lsid: sessionID,
-        txnNumber: NumberLong(10),
-        autocommit: false,
-        writeConcern: {w: "majority"}
-    }));
+    assert.commandWorked(
+        newPrimaryDB.runCommand({
+            insert: "coll",
+            documents: [{c: 1}],
+            lsid: sessionID,
+            txnNumber: NumberLong(10),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(
+        newPrimaryDB.adminCommand({
+            prepareTransaction: 1,
+            lsid: sessionID,
+            txnNumber: NumberLong(10),
+            autocommit: false,
+            writeConcern: {w: "majority"},
+        }),
+    );
 };
 
 let applyFailPoint = configureFailPoint(primary, "hangBeforeSessionCheckOutForApplyPrepare");
-const waitForPrepareTxnShell =
-    startParallelShell(funWithArgs(prepareTxnFunc, sessionID), newPrimary.port);
+const waitForPrepareTxnShell = startParallelShell(funWithArgs(prepareTxnFunc, sessionID), newPrimary.port);
 applyFailPoint.wait();
 
 // Wait so that the update to the config.transactions table from the newly prepared transaction
@@ -97,15 +101,16 @@ waitForPrepareTxnShell();
 waitForTxnShell();
 
 let newPrimaryDB = replTest.getPrimary().getDB("test");
-const commitTimestamp =
-    assert.commandWorked(newPrimaryDB.runCommand({insert: collName, documents: [{}]})).opTime.ts;
+const commitTimestamp = assert.commandWorked(newPrimaryDB.runCommand({insert: collName, documents: [{}]})).opTime.ts;
 
-assert.commandWorked(newPrimaryDB.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: commitTimestamp,
-    lsid: sessionID,
-    txnNumber: NumberLong(10),
-    autocommit: false
-}));
+assert.commandWorked(
+    newPrimaryDB.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: commitTimestamp,
+        lsid: sessionID,
+        txnNumber: NumberLong(10),
+        autocommit: false,
+    }),
+);
 
 replTest.stopSet();

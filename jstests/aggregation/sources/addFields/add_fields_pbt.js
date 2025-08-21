@@ -16,7 +16,7 @@ import {getCollectionModel} from "jstests/libs/property_test_helpers/models/coll
 import {
     addFieldsConstArb,
     addFieldsVarArb,
-    getAggPipelineModel
+    getAggPipelineModel,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
@@ -37,14 +37,17 @@ const experimentColl = db.add_fields_pbt_experiment;
 const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
 
 const addFieldsArb = fc.oneof(addFieldsConstArb, addFieldsVarArb);
-const aggModel = fc.record({addFieldsStage: addFieldsArb, restOfPipeline: getAggPipelineModel()})
-                     .map(({addFieldsStage, restOfPipeline}) => {
-                         return [addFieldsStage, ...restOfPipeline];
-                     });
+const aggModel = fc
+    .record({addFieldsStage: addFieldsArb, restOfPipeline: getAggPipelineModel()})
+    .map(({addFieldsStage, restOfPipeline}) => {
+        return [addFieldsStage, ...restOfPipeline];
+    });
 
-testProperty(correctnessProperty,
-             {controlColl, experimentColl},
-             makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
-             numRuns);
+testProperty(
+    correctnessProperty,
+    {controlColl, experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
+    numRuns,
+);
 
 // TODO SERVER-103381 implement time-series PBT testing.

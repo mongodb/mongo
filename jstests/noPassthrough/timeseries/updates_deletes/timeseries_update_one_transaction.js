@@ -24,10 +24,11 @@ let testColl = testDB[collectionNamePrefix + collectionCounter];
 assert.commandWorked(testDB.dropDatabase());
 
 const docsPerMetaField = 3;
-const initializeData = function() {
+const initializeData = function () {
     testColl = testDB[collectionNamePrefix + ++collectionCounter];
-    assert.commandWorked(testDB.createCollection(
-        testColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(testColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     let docs = [];
     for (let i = 0; i < docsPerMetaField; ++i) {
@@ -84,8 +85,7 @@ const initializeData = function() {
     session.startTransaction();
 
     for (let i = 0; i < docsPerMetaField; ++i) {
-        assert.commandWorked(
-            sessionColl.updateOne({_id: i, [metaFieldName]: 0}, {$inc: {updated: 1}}));
+        assert.commandWorked(sessionColl.updateOne({_id: i, [metaFieldName]: 0}, {$inc: {updated: 1}}));
     }
 
     assert.commandWorked(session.commitTransaction_forTesting());
@@ -106,10 +106,8 @@ const initializeData = function() {
 
     // Update all documents for meta values 0, 1.
     for (let i = 0; i < docsPerMetaField; ++i) {
-        assert.commandWorked(
-            sessionColl.updateOne({_id: i, [metaFieldName]: 0}, {$inc: {updated: 1}}));
-        assert.commandWorked(
-            sessionColl.updateOne({_id: i, [metaFieldName]: 1}, {$inc: {updated: 1}}));
+        assert.commandWorked(sessionColl.updateOne({_id: i, [metaFieldName]: 0}, {$inc: {updated: 1}}));
+        assert.commandWorked(sessionColl.updateOne({_id: i, [metaFieldName]: 1}, {$inc: {updated: 1}}));
     }
 
     // Outside of the session and transaction, perform an updateOne.
@@ -137,14 +135,11 @@ const initializeData = function() {
 
     for (let i = 0; i < docsPerMetaField; ++i) {
         // Within the transaction.
-        assert.commandWorked(
-            sessionColl.updateOne({_id: i, [metaFieldName]: 0}, {$inc: {updated: 1}}));
-        assert.commandWorked(
-            sessionColl.updateOne({_id: i, [metaFieldName]: 1}, {$inc: {updated: 1}}));
+        assert.commandWorked(sessionColl.updateOne({_id: i, [metaFieldName]: 0}, {$inc: {updated: 1}}));
+        assert.commandWorked(sessionColl.updateOne({_id: i, [metaFieldName]: 1}, {$inc: {updated: 1}}));
 
         // Outside of the session and transaction, perform updateOne.
-        assert.commandWorked(
-            testColl.updateOne({_id: i, [metaFieldName]: 2}, {$inc: {updated: 1}}));
+        assert.commandWorked(testColl.updateOne({_id: i, [metaFieldName]: 2}, {$inc: {updated: 1}}));
     }
 
     assert.commandWorked(session.commitTransaction_forTesting());
@@ -170,13 +165,20 @@ const initializeData = function() {
     // Note: there is a change the parallel shell runs after the transaction is committed and that
     // is fine as both interleavings should succeed.
     const awaitTestUpdate = startParallelShell(
-        funWithArgs(function(dbName, collName, filter) {
-            const testDB = db.getSiblingDB(dbName);
-            const coll = testDB.getCollection(collName);
+        funWithArgs(
+            function (dbName, collName, filter) {
+                const testDB = db.getSiblingDB(dbName);
+                const coll = testDB.getCollection(collName);
 
-            // Outside of the session and transaction, perform updateOne.
-            assert.commandWorked(coll.updateOne(filter, {$set: {_id: 10}}));
-        }, testDB.getName(), testColl.getName(), updateFilter), testDB.getMongo().port);
+                // Outside of the session and transaction, perform updateOne.
+                assert.commandWorked(coll.updateOne(filter, {$set: {_id: 10}}));
+            },
+            testDB.getName(),
+            testColl.getName(),
+            updateFilter,
+        ),
+        testDB.getMongo().port,
+    );
 
     assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();
@@ -200,8 +202,7 @@ const initializeData = function() {
     assert.eq(sessionColl.find({[metaFieldName]: 101}).toArray().length, 0);
 
     // Outside of the session and transaction, update document.
-    assert.commandWorked(
-        testColl.updateOne({[metaFieldName]: 0, _id: 0}, {$set: {[metaFieldName]: 101}}));
+    assert.commandWorked(testColl.updateOne({[metaFieldName]: 0, _id: 0}, {$set: {[metaFieldName]: 101}}));
 
     // Double check the document is still not visible from within the transaction.
     assert.eq(sessionColl.find({[metaFieldName]: 101}).toArray().length, 0);
@@ -243,18 +244,19 @@ const initializeData = function() {
 
     const updateCommand = {
         update: collB.getName(),
-        updates: [{
-            q: docToUpdate,
-            u: {$inc: {updated: 1}},
-            multi: false,
-        }]
+        updates: [
+            {
+                q: docToUpdate,
+                u: {$inc: {updated: 1}},
+                multi: false,
+            },
+        ],
     };
 
     // We expect the updateOne on transaction B to fail, causing the transaction to abort.
     // Sidenote: avoiding the updateOne method from 'crud_api.js' because it throws.
     assert.commandFailedWithCode(collB.runCommand(updateCommand), ErrorCodes.WriteConflict);
-    assert.commandFailedWithCode(sessionB.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(sessionB.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     sessionB.endSession();
 
     // Ensure the document is updated in the snapshot of transaction A.

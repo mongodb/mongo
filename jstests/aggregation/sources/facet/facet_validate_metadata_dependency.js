@@ -16,11 +16,13 @@ const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 
-assert.commandWorked(coll.insertMany([
-    {_id: 0, textField: "three blind mice", geoField: [23, 51]},
-    {_id: 1, textField: "the three stooges", geoField: [25, 49]},
-    {_id: 2, textField: "we three kings", geoField: [30, 51]}
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {_id: 0, textField: "three blind mice", geoField: [23, 51]},
+        {_id: 1, textField: "the three stooges", geoField: [25, 49]},
+        {_id: 2, textField: "we three kings", geoField: [30, 51]},
+    ]),
+);
 assert.commandWorked(coll.createIndex({textField: "text"}));
 assert.commandWorked(coll.createIndex({geoField: "2d"}));
 
@@ -36,13 +38,10 @@ const validatedMetaFields = [
 
 // Test that each of the meta fields throws an error if referenced under a $facet without a
 // preceding stage that generates that metadata.
-validatedMetaFields.forEach(metaField => {
+validatedMetaFields.forEach((metaField) => {
     jsTestLog("Testing meta field " + metaField.fieldName);
     // First test $project.
-    let pipeline = [
-        {$match: {_id: {$gte: 0}}},
-        {$facet: {pipe1: [{$project: {score: {$meta: metaField.fieldName}}}]}}
-    ];
+    let pipeline = [{$match: {_id: {$gte: 0}}}, {$facet: {pipe1: [{$project: {score: {$meta: metaField.fieldName}}}]}}];
     let errMsg = "requires " + metaField.debugName + " metadata";
     assertErrCodeAndErrMsgContains(coll, pipeline, kUnavailableMetadataErrCode, errMsg);
 
@@ -51,10 +50,7 @@ validatedMetaFields.forEach(metaField => {
         return;
     }
 
-    pipeline = [
-        {$match: {_id: {$gte: 0}}},
-        {$facet: {pipe1: [{$sort: {a: {$meta: metaField.fieldName}}}]}}
-    ];
+    pipeline = [{$match: {_id: {$gte: 0}}}, {$facet: {pipe1: [{$sort: {a: {$meta: metaField.fieldName}}}]}}];
     errMsg = "requires " + metaField.debugName + " metadata";
     assertErrCodeAndErrMsgContains(coll, pipeline, kUnavailableMetadataErrCode, errMsg);
 });
@@ -63,17 +59,23 @@ validatedMetaFields.forEach(metaField => {
 {
     let pipeline = [
         {$match: {$text: {$search: "three"}}},
-        {$facet: {pipe1: [{$project: {score: {$meta: "textScore"}}}, {$sort: {_id: 1}}]}}
+        {$facet: {pipe1: [{$project: {score: {$meta: "textScore"}}}, {$sort: {_id: 1}}]}},
     ];
     let res = coll.aggregate(pipeline).toArray();
     assert.eq(res, [
-        {pipe1: [{_id: 0, score: 0.6666666666666666}, {_id: 1, score: 0.75}, {_id: 2, score: 0.75}]}
+        {
+            pipe1: [
+                {_id: 0, score: 0.6666666666666666},
+                {_id: 1, score: 0.75},
+                {_id: 2, score: 0.75},
+            ],
+        },
     ]);
 
     pipeline = [
         {$match: {$text: {$search: "three"}}},
         {$project: {_id: 1}},
-        {$facet: {pipe1: [{$sort: {a: {$meta: "textScore"}, _id: 1}}]}}
+        {$facet: {pipe1: [{$sort: {a: {$meta: "textScore"}, _id: 1}}]}},
     ];
     res = coll.aggregate(pipeline).toArray();
     assert.eq(res, [{pipe1: [{_id: 1}, {_id: 2}, {_id: 0}]}]);
@@ -83,17 +85,23 @@ validatedMetaFields.forEach(metaField => {
 {
     let pipeline = [
         {$match: {$text: {$search: "three"}}},
-        {$facet: {pipe1: [{$project: {score: {$meta: "score"}}}, {$sort: {_id: 1}}]}}
+        {$facet: {pipe1: [{$project: {score: {$meta: "score"}}}, {$sort: {_id: 1}}]}},
     ];
     let res = coll.aggregate(pipeline).toArray();
     assert.eq(res, [
-        {pipe1: [{_id: 0, score: 0.6666666666666666}, {_id: 1, score: 0.75}, {_id: 2, score: 0.75}]}
+        {
+            pipe1: [
+                {_id: 0, score: 0.6666666666666666},
+                {_id: 1, score: 0.75},
+                {_id: 2, score: 0.75},
+            ],
+        },
     ]);
 
     pipeline = [
         {$match: {$text: {$search: "three"}}},
         {$project: {_id: 1}},
-        {$facet: {pipe1: [{$sort: {a: {$meta: "score"}, _id: 1}}]}}
+        {$facet: {pipe1: [{$sort: {a: {$meta: "score"}, _id: 1}}]}},
     ];
     res = coll.aggregate(pipeline).toArray();
     assert.eq(res, [{pipe1: [{_id: 1}, {_id: 2}, {_id: 0}]}]);
@@ -109,19 +117,21 @@ validatedMetaFields.forEach(metaField => {
                 pipe1: [
                     {$project: {scoreDetails: {$meta: "scoreDetails"}}},
                     {$project: {scoreDetailsVal: "$scoreDetails.value"}},
-                    {$sort: {_id: 1}}
-                ]
-            }
-        }
+                    {$sort: {_id: 1}},
+                ],
+            },
+        },
     ];
     let res = coll.aggregate(pipeline).toArray();
-    assert.eq(res, [{
-                  pipe1: [
-                      {_id: 0, scoreDetailsVal: 0.016129032258064516},
-                      {_id: 1, scoreDetailsVal: 0.015873015873015872},
-                      {_id: 2, scoreDetailsVal: 0.01639344262295082}
-                  ]
-              }]);
+    assert.eq(res, [
+        {
+            pipe1: [
+                {_id: 0, scoreDetailsVal: 0.016129032258064516},
+                {_id: 1, scoreDetailsVal: 0.015873015873015872},
+                {_id: 2, scoreDetailsVal: 0.01639344262295082},
+            ],
+        },
+    ]);
 }
 
 // Test that {$meta: "geoNearDistance"} and {$meta: "geoNearPoint"} work within $facet when it is a
@@ -129,30 +139,36 @@ validatedMetaFields.forEach(metaField => {
 {
     let pipeline = [
         {$geoNear: {near: [20, 40]}},
-        {$facet: {pipe1: [{$project: {distance: {$meta: "geoNearDistance"}}}]}}
+        {$facet: {pipe1: [{$project: {distance: {$meta: "geoNearDistance"}}}]}},
     ];
     let res = coll.aggregate(pipeline).toArray();
-    assert.eq(res, [{
-                  pipe1: [
-                      {_id: 1, distance: 10.295630140987},
-                      {_id: 0, distance: 11.40175425099138},
-                      {_id: 2, distance: 14.866068747318506}
-                  ]
-              }]);
+    assert.eq(res, [
+        {
+            pipe1: [
+                {_id: 1, distance: 10.295630140987},
+                {_id: 0, distance: 11.40175425099138},
+                {_id: 2, distance: 14.866068747318506},
+            ],
+        },
+    ]);
 
     pipeline = [
         {$geoNear: {near: [20, 40]}},
         {$project: {_id: 1}},
-        {$facet: {pipe1: [{$sort: {a: {$meta: "geoNearDistance"}}}]}}
+        {$facet: {pipe1: [{$sort: {a: {$meta: "geoNearDistance"}}}]}},
     ];
     res = coll.aggregate(pipeline).toArray();
     assert.eq(res, [{pipe1: [{_id: 2}, {_id: 0}, {_id: 1}]}]);
 
-    pipeline = [
-        {$geoNear: {near: [20, 40]}},
-        {$facet: {pipe1: [{$project: {pt: {$meta: "geoNearPoint"}}}]}}
-    ];
+    pipeline = [{$geoNear: {near: [20, 40]}}, {$facet: {pipe1: [{$project: {pt: {$meta: "geoNearPoint"}}}]}}];
     res = coll.aggregate(pipeline).toArray();
-    assert.eq(res,
-              [{pipe1: [{_id: 1, pt: [25, 49]}, {_id: 0, pt: [23, 51]}, {_id: 2, pt: [30, 51]}]}]);
+    assert.eq(res, [
+        {
+            pipe1: [
+                {_id: 1, pt: [25, 49]},
+                {_id: 0, pt: [23, 51]},
+                {_id: 2, pt: [30, 51]},
+            ],
+        },
+    ]);
 }

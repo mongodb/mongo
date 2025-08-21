@@ -10,14 +10,13 @@
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-describe("stopShardDraining correct functionality test", function() {
+describe("stopShardDraining correct functionality test", function () {
     before(() => {
         this.st = new ShardingTest({shards: 2, other: {enableBalancer: true}});
     });
 
     beforeEach(() => {
-        assert.commandWorked(
-            this.st.s.adminCommand({startShardDraining: this.st.shard1.shardName}));
+        assert.commandWorked(this.st.s.adminCommand({startShardDraining: this.st.shard1.shardName}));
     });
 
     after(() => {
@@ -25,12 +24,12 @@ describe("stopShardDraining correct functionality test", function() {
     });
 
     it("check that draining is stopped correctly", () => {
-        const config = this.st.s.getDB('config');
+        const config = this.st.s.getDB("config");
 
         assert.commandWorked(this.st.s.adminCommand({stopShardDraining: this.st.shard1.shardName}));
 
         // Check that draining has stopped successfully
-        const notDrainingShards = config.shards.find({'draining': true}).toArray();
+        const notDrainingShards = config.shards.find({"draining": true}).toArray();
 
         assert.eq(0, notDrainingShards.length);
     });
@@ -43,7 +42,6 @@ describe("stopShardDraining correct functionality test", function() {
     });
 
     it("can't stop draining a non existent shard", () => {
-        assert.commandFailedWithCode(this.st.s.adminCommand({stopShardDraining: "shard1"}),
-                                     ErrorCodes.ShardNotFound);
+        assert.commandFailedWithCode(this.st.s.adminCommand({stopShardDraining: "shard1"}), ErrorCodes.ShardNotFound);
     });
 });

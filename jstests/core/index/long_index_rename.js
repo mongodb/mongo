@@ -10,7 +10,7 @@ for (let i = 1; i < 10; i++) {
 }
 
 // Beginning with 4.2, index namespaces longer than 127 characters are acceptable.
-assert.commandWorked(coll.createIndex({b: 1}, {name: 'a'.repeat(8192)}));
+assert.commandWorked(coll.createIndex({b: 1}, {name: "a".repeat(8192)}));
 
 // Before 4.2, index namespace lengths were checked while renaming collections.
 const dest = db.long_index_rename2;

@@ -40,42 +40,45 @@ function checkSlowLogTimeFieldsWithUserCacheAttrs(conn, command, userCacheAttrs)
     }
 
     let messagesOrig = checkLog.getFilteredLogMessages(conn, slowLogID, expectedLog, null, true);
-    assert.eq(messagesOrig.length,
-              1,
-              "We should get one matched slow log with filter :" + tojson(expectedLog));
+    assert.eq(messagesOrig.length, 1, "We should get one matched slow log with filter :" + tojson(expectedLog));
 
     let message = messagesOrig[0];
     assert(message.attr.authorization.hasOwnProperty("userCacheWaitTimeMicros"));
-    let userCacheWaitTimeMillis =
-        Math.floor(message.attr.authorization.userCacheWaitTimeMicros / 1000);
+    let userCacheWaitTimeMillis = Math.floor(message.attr.authorization.userCacheWaitTimeMicros / 1000);
     let durationMillis = message.attr.durationMillis;
     let workingMillis = message.attr.workingMillis;
 
-    assert.gte(durationMillis,
-               userCacheWaitTimeMillis,
-               "durationMillis should cover the wait time of accessing user cache.");
-    assert.gte(durationMillis,
-               userCacheWaitTimeMillis + workingMillis,
-               "durationMillis should also cover workingMillis");
+    assert.gte(
+        durationMillis,
+        userCacheWaitTimeMillis,
+        "durationMillis should cover the wait time of accessing user cache.",
+    );
+    assert.gte(
+        durationMillis,
+        userCacheWaitTimeMillis + workingMillis,
+        "durationMillis should also cover workingMillis",
+    );
 }
 
 function runTest(conn, mode) {
     // Set the authUserCacheSleep failpoint. This causes the server to sleep for 1 second
     // every time it accesses the user cache, which provides a lower bound when checking the stats'
     // accuracy.
-    const adminDB = conn.getDB('admin');
-    assert.commandWorked(adminDB.runCommand({
-        configureFailPoint: 'authUserCacheSleep',
-        mode: 'alwaysOn',
-    }));
+    const adminDB = conn.getDB("admin");
+    assert.commandWorked(
+        adminDB.runCommand({
+            configureFailPoint: "authUserCacheSleep",
+            mode: "alwaysOn",
+        }),
+    );
 
     // Create an admin user and authenticate as the admin user.
-    assert.commandWorked(adminDB.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-    assert(adminDB.auth('admin', 'pwd'));
+    assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "pwd", roles: ["root"]}));
+    assert(adminDB.auth("admin", "pwd"));
 
     // Check that authenticating as admin results in the expected log lines with the user cache
     // acquisition stats.
-    const waitTimeRegex = new RegExp('^[1-9][0-9]{6,}$', 'i');
+    const waitTimeRegex = new RegExp("^[1-9][0-9]{6,}$", "i");
     // let expectedIsMasterCommandLog = {isMaster: 1.0};
     let expectedCommandWithUserCacheAttrs = {
         authorization: {
@@ -90,35 +93,37 @@ function runTest(conn, mode) {
 
     // Create another database to write to and a new user with the "readWrite" and "userAdmin" roles
     // on that database.
-    const testDB = conn.getDB('test');
+    const testDB = conn.getDB("test");
     // Set profiling level to 2 so that profiling is enabled for the standalone test.
-    if (mode === 'Standalone') {
+    if (mode === "Standalone") {
         testDB.setProfilingLevel(0);
         testDB.system.profile.drop();
         testDB.setProfilingLevel(2);
     }
 
-    assert.commandWorked(
-        testDB.runCommand({createUser: 'testUser', pwd: 'pwd', roles: ['readWrite', 'userAdmin']}));
+    assert.commandWorked(testDB.runCommand({createUser: "testUser", pwd: "pwd", roles: ["readWrite", "userAdmin"]}));
 
     // Launch a parallel shell to perform an insert operation while authenticated as 'testUser'.
-    let awaitOps = startParallelShell(function() {
-        const testDB = db.getSiblingDB('test');
-        assert(testDB.auth('testUser', 'pwd'));
+    let awaitOps = startParallelShell(function () {
+        const testDB = db.getSiblingDB("test");
+        assert(testDB.auth("testUser", "pwd"));
         // Insert a document into testCollection and then run a find command on it. These should
         // both succeed due to testUser's readWrite role and should not require user cache accesses.
-        assert.writeOK(testDB.coll.insert({x: 1}, {writeConcern: {w: 'majority'}}));
-        assert.commandWorked(testDB.runCommand({find: 'coll'}));
+        assert.writeOK(testDB.coll.insert({x: 1}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(testDB.runCommand({find: "coll"}));
 
         // Replace testUser's 'readWrite' role with a 'read' role and try a find operation.
-        assert.commandWorked(testDB.runCommand({
-            revokeRolesFromUser: 'testUser',
-            roles: ['readWrite'],
-            writeConcern: {w: 'majority'}
-        }));
-        assert.commandWorked(testDB.runCommand(
-            {grantRolesToUser: 'testUser', roles: ['read'], writeConcern: {w: 'majority'}}));
-        assert.commandWorked(testDB.runCommand({find: 'coll'}));
+        assert.commandWorked(
+            testDB.runCommand({
+                revokeRolesFromUser: "testUser",
+                roles: ["readWrite"],
+                writeConcern: {w: "majority"},
+            }),
+        );
+        assert.commandWorked(
+            testDB.runCommand({grantRolesToUser: "testUser", roles: ["read"], writeConcern: {w: "majority"}}),
+        );
+        assert.commandWorked(testDB.runCommand({find: "coll"}));
     }, conn.port);
 
     awaitOps();
@@ -145,17 +150,16 @@ function runTest(conn, mode) {
     // Check that there's a log for the successful find command that had to access to the user
     // cache.
     hasCommandLogEntry(conn, expectedFindCommandLog, expectedCommandWithUserCacheAttrs);
-    checkSlowLogTimeFieldsWithUserCacheAttrs(
-        conn, expectedFindCommandLog, expectedCommandWithUserCacheAttrs);
+    checkSlowLogTimeFieldsWithUserCacheAttrs(conn, expectedFindCommandLog, expectedCommandWithUserCacheAttrs);
 
     // Check that there is also a document for the successful find command with authorization stats
     // in system.profile when profiling is enabled on standalones.
-    if (mode === 'Standalone') {
+    if (mode === "Standalone") {
         const query = {
             "command.find": "coll",
             "authorization.startedUserCacheAcquisitionAttempts": 1,
             "authorization.completedUserCacheAcquisitionAttempts": 1,
-            "authorization.userCacheWaitTimeMicros": {"$gte": 1000000}
+            "authorization.userCacheWaitTimeMicros": {"$gte": 1000000},
         };
         assert.eq(1, testDB.system.profile.find(query).toArray().length);
     }
@@ -163,18 +167,18 @@ function runTest(conn, mode) {
 
 // Standalone
 {
-    const mongod = MongoRunner.runMongod({auth: ''});
-    jsTest.log('Starting user_cache_acquisition_stats.js Standalone');
-    runTest(mongod, 'Standalone');
-    jsTest.log('SUCCESS user_cache_acquisition_stats.js Standalone');
+    const mongod = MongoRunner.runMongod({auth: ""});
+    jsTest.log("Starting user_cache_acquisition_stats.js Standalone");
+    runTest(mongod, "Standalone");
+    jsTest.log("SUCCESS user_cache_acquisition_stats.js Standalone");
     MongoRunner.stopMongod(mongod);
 }
 
 // Sharded Cluster
 {
     const st = new ShardingTest({mongos: [{auth: null}], config: [{auth: null}], shards: 1});
-    jsTest.log('Starting user_cache_acquisition_stats.js Sharding');
-    runTest(st.s0, 'Sharded');
-    jsTest.log('SUCCESS user_cache_acquisition_stats.js Sharding');
+    jsTest.log("Starting user_cache_acquisition_stats.js Sharding");
+    runTest(st.s0, "Sharded");
+    jsTest.log("SUCCESS user_cache_acquisition_stats.js Sharding");
     st.stop();
 }

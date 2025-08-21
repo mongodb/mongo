@@ -22,10 +22,12 @@ assert.commandWorked(testDB.runCommand({create: collName}));
 
 // Make sure there is no lag between the oldest timestamp and the stable timestamp so we can
 // test that committing a prepared transaction behind the oldest timestamp succeeds.
-assert.commandWorked(primary.adminCommand({
-    "configureFailPoint": 'WTSetOldestTSToStableTS',
-    "mode": 'alwaysOn',
-}));
+assert.commandWorked(
+    primary.adminCommand({
+        "configureFailPoint": "WTSetOldestTSToStableTS",
+        "mode": "alwaysOn",
+    }),
+);
 
 const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);
@@ -38,8 +40,7 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 jsTestLog("Do a majority write to advance the stable timestamp past the prepareTimestamp");
 // Doing a majority write after preparing the transaction ensures that the stable timestamp is
 // past the prepare timestamp because this write must be in the committed snapshot.
-assert.commandWorked(
-    testColl.runCommand("insert", {documents: [{_id: 2}]}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 2}]}, {writeConcern: {w: "majority"}}));
 
 jsTestLog("Committing the transaction before the stable timestamp");
 
@@ -50,7 +51,6 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp)
 // Make sure we can see the insert from the prepared transaction.
 assert.sameMembers(sessionColl.find().toArray(), [{_id: 1}, {_id: 2}]);
 
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: 'WTSetOldestTSToStableTS', mode: 'off'}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "WTSetOldestTSToStableTS", mode: "off"}));
 
 replTest.stopSet();

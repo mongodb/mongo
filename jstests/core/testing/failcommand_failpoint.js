@@ -15,15 +15,14 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 const testDB = db.getSiblingDB("test_failcommand");
 const adminDB = db.getSiblingDB("admin");
 
-const getCurOpMetadata = function() {
+const getCurOpMetadata = function () {
     let myUri = adminDB.runCommand({whatsmyuri: 1}).you;
-    return adminDB.aggregate([{$currentOp: {localOps: true}}, {$match: {client: myUri}}])
-        .toArray()[0];
+    return adminDB.aggregate([{$currentOp: {localOps: true}}, {$match: {client: myUri}}]).toArray()[0];
 };
-const getThreadName = function() {
+const getThreadName = function () {
     return getCurOpMetadata().desc;
 };
-const getAppName = function() {
+const getAppName = function () {
     return getCurOpMetadata().appName;
 };
 
@@ -31,65 +30,75 @@ let threadName = getThreadName();
 const appName = getAppName();
 
 // Test idempotent configureFailPoint.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 // Configure failCommand again and verify that it still works correctly.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test switching command sets.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["hello"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["hello"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test failpoint with extraErrorInfo
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.CannotImplicitlyCreateCollection,
-        failCommands: ["create"],
-        threadName: threadName,
-        errorExtraInfo: {
-            "ns": "namespace",
-        }
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.CannotImplicitlyCreateCollection,
+            failCommands: ["create"],
+            threadName: threadName,
+            errorExtraInfo: {
+                "ns": "namespace",
+            },
+        },
+    }),
+);
 
 {
     let result = testDB.runCommand({create: "collection"});
@@ -100,61 +109,67 @@ assert.commandWorked(adminDB.runCommand({
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test failpoint with extraErrorInfo and no error code
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        failCommands: ["ping"],
-        threadName: threadName,
-        errorExtraInfo: {
-            "desc": "some description",
-        }
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            failCommands: ["ping"],
+            threadName: threadName,
+            errorExtraInfo: {
+                "desc": "some description",
+            },
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test failpoint for command aliases
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.BadValue,
-        failCommands: ["dropIndexes"],
-        threadName: threadName,
-    }
-}));
-assert.commandFailedWithCode(testDB.runCommand({dropIndexes: 'collection', index: '*'}),
-                             ErrorCodes.BadValue);
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.BadValue,
+            failCommands: ["dropIndexes"],
+            threadName: threadName,
+        },
+    }),
+);
+assert.commandFailedWithCode(testDB.runCommand({dropIndexes: "collection", index: "*"}), ErrorCodes.BadValue);
 assert.commandWorked(testDB.runCommand({buildInfo: 1}));
-assert.commandFailedWithCode(testDB.runCommand({deleteIndexes: 'collection', index: '*'}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(testDB.runCommand({deleteIndexes: "collection", index: "*"}), ErrorCodes.BadValue);
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test failing with a particular error code.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test that only commands specified in failCommands fail.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.BadValue,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.BadValue,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.BadValue);
 assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
@@ -163,60 +178,68 @@ assert.commandWorked(testDB.runCommand({find: "collection"}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test failing with multiple commands specified in failCommands.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.BadValue,
-        failCommands: ["ping", "hello", "isMaster"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.BadValue,
+            failCommands: ["ping", "hello", "isMaster"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.BadValue);
 assert.commandFailedWithCode(testDB.runCommand({hello: 1}), ErrorCodes.BadValue);
 assert.commandFailedWithCode(testDB.runCommand({isMaster: 1}), ErrorCodes.BadValue);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test skip when failing with a particular error code.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {skip: 2},
-    data: {
-        errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {skip: 2},
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test times when failing with a particular error code.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 2},
-    data: {
-        errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 2},
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Commands not specified in failCommands are not counted for skip.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {skip: 1},
-    data: {
-        errorCode: ErrorCodes.BadValue,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {skip: 1},
+        data: {
+            errorCode: ErrorCodes.BadValue,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
@@ -226,15 +249,17 @@ assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.BadValue);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Commands not specified in failCommands are not counted for times.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        errorCode: ErrorCodes.BadValue,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            errorCode: ErrorCodes.BadValue,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
@@ -244,30 +269,34 @@ assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test closing connection.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        closeConnection: true,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            closeConnection: true,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.throws(() => testDB.runCommand({ping: 1}));
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 threadName = getThreadName();
 
 // Test that only commands specified in failCommands fail when closing the connection.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        closeConnection: true,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            closeConnection: true,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
@@ -278,15 +307,17 @@ assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode
 threadName = getThreadName();
 
 // Test skip when closing connection.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {skip: 2},
-    data: {
-        closeConnection: true,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {skip: 2},
+        data: {
+            closeConnection: true,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.commandWorked(testDB.runCommand({ping: 1}));
 assert.throws(() => testDB.runCommand({ping: 1}));
@@ -295,15 +326,17 @@ assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode
 threadName = getThreadName();
 
 // Commands not specified in failCommands are not counted for skip.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {skip: 1},
-    data: {
-        closeConnection: true,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {skip: 1},
+        data: {
+            closeConnection: true,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
@@ -315,15 +348,17 @@ assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode
 threadName = getThreadName();
 
 // Commands not specified in failCommands are not counted for times.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        closeConnection: true,
-        failCommands: ["ping"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            closeConnection: true,
+            failCommands: ["ping"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({hello: 1}));
 assert.commandWorked(testDB.runCommand({isMaster: 1}));
 assert.commandWorked(testDB.runCommand({buildinfo: 1}));
@@ -335,27 +370,31 @@ assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode
 threadName = getThreadName();
 
 // Cannot fail on "configureFailPoint" command.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        errorCode: ErrorCodes.BadValue,
-        failCommands: ["configureFailPoint"],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            errorCode: ErrorCodes.BadValue,
+            failCommands: ["configureFailPoint"],
+            threadName: threadName,
+        },
+    }),
+);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test with success and writeConcernError.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        writeConcernError: {code: 12345, errmsg: "hello"},
-        failCommands: ['insert', 'ping'],
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            writeConcernError: {code: 12345, errmsg: "hello"},
+            failCommands: ["insert", "ping"],
+            threadName: threadName,
+        },
+    }),
+);
 // Commands that don't support writeConcern don't tick counter.
 assert.commandWorked(testDB.runCommand({ping: 1}));
 // Unlisted commands don't tick counter.
@@ -363,43 +402,47 @@ assert.commandWorked(testDB.runCommand({update: "c", updates: [{q: {}, u: {}, up
 var res = testDB.runCommand({insert: "c", documents: [{}]});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
-assert.commandWorked(testDB.runCommand({insert: "c", documents: [{}]}));  // Works again.
+assert.commandWorked(testDB.runCommand({insert: "c", documents: [{}]})); // Works again.
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test with natural failure and writeConcernError.
 
 // This document is removed before testing the following insert to prevent a DuplicateKeyError
 // if the failcommand_failpoint test is run multiple times on the same fixture.
-testDB.c.remove({_id: 'dup'});
+testDB.c.remove({_id: "dup"});
 
-assert.commandWorked(testDB.runCommand({insert: "c", documents: [{_id: 'dup'}]}));
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        writeConcernError: {code: 12345, errmsg: "hello"},
-        failCommands: ['insert'],
-        threadName: threadName,
-    }
-}));
-var res = testDB.runCommand({insert: "c", documents: [{_id: 'dup'}]});
+assert.commandWorked(testDB.runCommand({insert: "c", documents: [{_id: "dup"}]}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            writeConcernError: {code: 12345, errmsg: "hello"},
+            failCommands: ["insert"],
+            threadName: threadName,
+        },
+    }),
+);
+var res = testDB.runCommand({insert: "c", documents: [{_id: "dup"}]});
 assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
 assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
-assert.commandWorked(testDB.runCommand({insert: "c", documents: [{}]}));  // Works again.
+assert.commandWorked(testDB.runCommand({insert: "c", documents: [{}]})); // Works again.
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test that specifying both writeConcernError and closeConnection : false will not make
 // `times` decrement twice per operation
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 2},
-    data: {
-        failCommands: ["insert"],
-        closeConnection: false,
-        writeConcernError: {code: 12345, errmsg: "hello"},
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 2},
+        data: {
+            failCommands: ["insert"],
+            closeConnection: false,
+            writeConcernError: {code: 12345, errmsg: "hello"},
+            threadName: threadName,
+        },
+    }),
+);
 
 var res = testDB.runCommand({insert: "test", documents: [{a: "something"}]});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
@@ -412,16 +455,18 @@ assert.commandWorked(testDB.runCommand({insert: "test", documents: [{b: "or_othe
 //
 // Test that the namespace parameter is obeyed.
 //
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        errorCode: ErrorCodes.InternalError,
-        failCommands: ["find"],
-        namespace: testDB.getName() + ".foo",
-        threadName: threadName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            errorCode: ErrorCodes.InternalError,
+            failCommands: ["find"],
+            namespace: testDB.getName() + ".foo",
+            threadName: threadName,
+        },
+    }),
+);
 
 // A find against a different namespace should not trigger the failpoint.
 assert.commandWorked(testDB.runCommand({find: "test"}));
@@ -432,93 +477,105 @@ assert.commandFailedWithCode(testDB.runCommand({find: "foo"}), ErrorCodes.Intern
 //
 // Test that the namespace parameter is obeyed for write concern errors.
 //
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        failCommands: ["insert"],
-        namespace: testDB.getName() + ".foo",
-        threadName: threadName,
-        writeConcernError: {code: ErrorCodes.InternalError, errmsg: "foo"},
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            failCommands: ["insert"],
+            namespace: testDB.getName() + ".foo",
+            threadName: threadName,
+            writeConcernError: {code: ErrorCodes.InternalError, errmsg: "foo"},
+        },
+    }),
+);
 
 // An insert to a different namespace should not trigger the failpoint.
-assert.commandWorked(
-    testDB.runCommand({insert: "test", documents: [{x: "doc_for_namespace_no_wce"}]}));
+assert.commandWorked(testDB.runCommand({insert: "test", documents: [{x: "doc_for_namespace_no_wce"}]}));
 
 // An insert to the namespace given to the failpoint should trigger the failpoint.
-res = assert.commandWorkedIgnoringWriteConcernErrors(testDB.runCommand(
-    {insert: "foo", documents: [{x: "doc_for_namespace_case_should_trigger_wce"}]}));
+res = assert.commandWorkedIgnoringWriteConcernErrors(
+    testDB.runCommand({insert: "foo", documents: [{x: "doc_for_namespace_case_should_trigger_wce"}]}),
+);
 assert.eq(res.writeConcernError, {code: ErrorCodes.InternalError, errmsg: "foo"});
 
 // Test failing with error labels will not make `times` decrement twice.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        errorCode: ErrorCodes.BadValue,
-        failCommands: ["ping"],
-        errorLabels: ["Foo", "Bar"],
-        threadName: threadName
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            errorCode: ErrorCodes.BadValue,
+            failCommands: ["ping"],
+            errorLabels: ["Foo", "Bar"],
+            threadName: threadName,
+        },
+    }),
+);
 res = assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.BadValue);
 assert.eq(res.errorLabels, ["Foo", "Bar"], res);
 assert.commandWorked(testDB.runCommand({ping: 1}));
 
 // Test specifying both writeConcernError and errorLabels.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        writeConcernError: {code: 12345, errmsg: "hello"},
-        failCommands: ["insert"],
-        errorLabels: ["Foo", "Bar"],
-        threadName: threadName
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            writeConcernError: {code: 12345, errmsg: "hello"},
+            failCommands: ["insert"],
+            errorLabels: ["Foo", "Bar"],
+            threadName: threadName,
+        },
+    }),
+);
 res = testDB.runCommand({insert: "c", documents: [{}]});
 assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
 assert.eq(res.errorLabels, ["Foo", "Bar"], res);
 
 // Test failCommand with empty errorLabels.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        errorCode: ErrorCodes.BadValue,
-        failCommands: ["ping"],
-        errorLabels: [],
-        threadName: threadName
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            errorCode: ErrorCodes.BadValue,
+            failCommands: ["ping"],
+            errorLabels: [],
+            threadName: threadName,
+        },
+    }),
+);
 res = assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.BadValue);
 // There should be no errorLabels field if no error labels provided in failCommand.
 assert(!res.hasOwnProperty("errorLabels"));
 
 // Test specifying both writeConcernError and empty errorLabels.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        writeConcernError: {code: 12345, errmsg: "hello"},
-        failCommands: ["insert"],
-        errorLabels: [],
-        threadName: threadName
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            writeConcernError: {code: 12345, errmsg: "hello"},
+            failCommands: ["insert"],
+            errorLabels: [],
+            threadName: threadName,
+        },
+    }),
+);
 res = testDB.runCommand({insert: "c", documents: [{}]});
 assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
 // There should be no errorLabels field if no error labels provided in failCommand.
 assert(!res.hasOwnProperty("errorLabels"));
 
 // Test specifying errorLabels without errorCode or writeConcernError.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {failCommands: ["ping"], errorLabels: ["Foo", "Bar"], threadName: threadName}
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {failCommands: ["ping"], errorLabels: ["Foo", "Bar"], threadName: threadName},
+    }),
+);
 // The command should not fail if no errorCode or writeConcernError specified.
 res = assert.commandWorked(testDB.runCommand({ping: 1}));
 // As the command does not fail, there should not be any error labels even if errorLabels is
@@ -527,28 +584,32 @@ assert(!res.hasOwnProperty("errorLabels"), res);
 assert.commandWorked(adminDB.runCommand({configureFailPoint: "failCommand", mode: "off"}));
 
 // Test support for "appName" arg to failCommand
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        failCommands: ["ping"],
-        errorCode: ErrorCodes.NotWritablePrimary,
-        threadName: threadName,
-        appName: appName,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            failCommands: ["ping"],
+            errorCode: ErrorCodes.NotWritablePrimary,
+            threadName: threadName,
+            appName: appName,
+        },
+    }),
+);
 assert.commandFailedWithCode(testDB.runCommand({ping: 1}), ErrorCodes.NotWritablePrimary);
 
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        failCommands: ["ping"],
-        errorCode: ErrorCodes.NotWritablePrimary,
-        threadName: threadName,
-        appName: "made up app name",
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            failCommands: ["ping"],
+            errorCode: ErrorCodes.NotWritablePrimary,
+            threadName: threadName,
+            appName: "made up app name",
+        },
+    }),
+);
 assert.commandWorked(testDB.runCommand({ping: 1}));
 
 // Only run error labels override tests for replica set because the tests require retryable writes.
@@ -559,75 +620,81 @@ if (!FixtureHelpers.isReplSet(adminDB)) {
 }
 
 // Test error labels override.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["insert"],
-        errorLabels: ["Foo"],
-        threadName: threadName
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["insert"],
+            errorLabels: ["Foo"],
+            threadName: threadName,
+        },
+    }),
+);
 // This normally fails with RetryableWriteError label.
 res = assert.commandFailedWithCode(
-    testDB.runCommand(
-        {insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)}),
-    ErrorCodes.NotWritablePrimary);
+    testDB.runCommand({insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)}),
+    ErrorCodes.NotWritablePrimary,
+);
 // Test that failCommand overrides the error label to "Foo".
 assert.eq(res.errorLabels, ["Foo"], res);
 
 // Test error labels override while specifying writeConcernError.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        writeConcernError: {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"},
-        failCommands: ["insert"],
-        errorLabels: ["Foo"],
-        threadName: threadName
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            writeConcernError: {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"},
+            failCommands: ["insert"],
+            errorLabels: ["Foo"],
+            threadName: threadName,
+        },
+    }),
+);
 // This normally fails with RetryableWriteError label.
-res = testDB.runCommand(
-    {insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)});
+res = testDB.runCommand({insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)});
 assert.eq(res.writeConcernError, {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"});
 // Test that failCommand overrides the error label to "Foo".
 assert.eq(res.errorLabels, ["Foo"], res);
 
 // Test error labels override with empty errorLabels.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        errorCode: ErrorCodes.NotWritablePrimary,
-        failCommands: ["insert"],
-        errorLabels: [],
-        threadName: threadName
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            errorCode: ErrorCodes.NotWritablePrimary,
+            failCommands: ["insert"],
+            errorLabels: [],
+            threadName: threadName,
+        },
+    }),
+);
 // This normally fails with RetryableWriteError label.
 res = assert.commandFailedWithCode(
-    testDB.runCommand(
-        {insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)}),
-    ErrorCodes.NotWritablePrimary);
+    testDB.runCommand({insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)}),
+    ErrorCodes.NotWritablePrimary,
+);
 // There should be no errorLabels field if no error labels provided in failCommand.
 assert(!res.hasOwnProperty("errorLabels"), res);
 
 // Test error labels override with empty errorLabels while specifying writeConcernError.
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 1},
-    data: {
-        writeConcernError: {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"},
-        failCommands: ["insert"],
-        errorLabels: [],
-        threadName: threadName
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            writeConcernError: {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"},
+            failCommands: ["insert"],
+            errorLabels: [],
+            threadName: threadName,
+        },
+    }),
+);
 // This normally fails with RetryableWriteError label.
-res = testDB.runCommand(
-    {insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)});
+res = testDB.runCommand({insert: "test", documents: [{x: "retryable_write"}], txnNumber: NumberLong(0)});
 assert.eq(res.writeConcernError, {code: ErrorCodes.NotWritablePrimary, errmsg: "hello"});
 // There should be no errorLabels field if no error labels provided in failCommand.
 assert(!res.hasOwnProperty("errorLabels"), res);

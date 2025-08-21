@@ -14,36 +14,38 @@ const st = new ShardingTest({
     rs: {
         nodes: 1,
         // Use a higher frequency for periodic noops to speed up the test.
-        setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
-    }
+        setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
+    },
 });
 
 const mongosDB = st.s0.getDB(jsTestName());
-const mongosColl = mongosDB['coll'];
+const mongosColl = mongosDB["coll"];
 
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard the test collection on the field "shardKey".
-assert.commandWorked(
-    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: "hashed"}}));
+assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: "hashed"}}));
 
 // Make sure the negative chunk is on shard 0.
-assert.commandWorked(mongosDB.adminCommand({
-    moveChunk: mongosColl.getFullName(),
-    bounds: [{shardKey: MinKey}, {shardKey: NumberLong("0")}],
-    to: st.rs0.getURL()
-}));
+assert.commandWorked(
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        bounds: [{shardKey: MinKey}, {shardKey: NumberLong("0")}],
+        to: st.rs0.getURL(),
+    }),
+);
 
 // Make sure the positive chunk is on shard 1.
-assert.commandWorked(mongosDB.adminCommand({
-    moveChunk: mongosColl.getFullName(),
-    bounds: [{shardKey: NumberLong("0")}, {shardKey: MaxKey}],
-    to: st.rs1.getURL()
-}));
+assert.commandWorked(
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        bounds: [{shardKey: NumberLong("0")}, {shardKey: MaxKey}],
+        to: st.rs1.getURL(),
+    }),
+);
 
 assert.soon(() => {
     let lastInserted = -1;
@@ -56,8 +58,7 @@ assert.soon(() => {
     while (!finished) {
         try {
             const changeStream = resumeToken
-                ? mongosColl.aggregate(
-                      [{$changeStream: {fullDocument: "updateLookup", resumeAfter: resumeToken}}])
+                ? mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup", resumeAfter: resumeToken}}])
                 : mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}]);
             resumeToken = changeStream._resumeToken;
 
@@ -69,8 +70,7 @@ assert.soon(() => {
                     lastInserted = id;
                 }
                 if (id > lastUpdated) {
-                    assert.commandWorked(
-                        mongosColl.update({shardKey: id}, {$set: {updatedCount: 1}}));
+                    assert.commandWorked(mongosColl.update({shardKey: id}, {$set: {updatedCount: 1}}));
                     lastUpdated = id;
                 }
             }
@@ -99,7 +99,7 @@ assert.soon(() => {
         } catch (e) {
             // In a step down the changeStream may return QueryPlanKilled, which can be recovered
             if (!(ErrorCodes.isCursorInvalidatedError(e) || isRetryableError(e))) {
-                throw (e);
+                throw e;
             }
         }
         return true;

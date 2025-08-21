@@ -19,24 +19,23 @@ const collName = "test";
 let testDb, testColl;
 
 const setFailpoint = () => {
-    assert.commandWorked(testDb.adminCommand(
-        {configureFailPoint: "hangDuringValidationInitialization", mode: "alwaysOn"}));
+    assert.commandWorked(
+        testDb.adminCommand({configureFailPoint: "hangDuringValidationInitialization", mode: "alwaysOn"}),
+    );
 };
 
 const unsetFailpoint = () => {
-    assert.commandWorked(testDb.adminCommand(
-        {configureFailPoint: "hangDuringValidationInitialization", mode: "off"}));
+    assert.commandWorked(testDb.adminCommand({configureFailPoint: "hangDuringValidationInitialization", mode: "off"}));
 };
 
 const waitUntilFailpoint = () => {
-    checkLog.contains(testDb.getMongo(),
-                      "Hanging on fail point 'hangDuringValidationInitialization'");
+    checkLog.contains(testDb.getMongo(), "Hanging on fail point 'hangDuringValidationInitialization'");
 };
 
 const resetCollection = () => {
     // Clear the log to get rid of any existing fail point logging that will be used to hang on.
     testDb = primary.getDB(dbName);
-    assert.commandWorked(testDb.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(testDb.adminCommand({clearLog: "global"}));
 
     testColl = testDb.getCollection(collName);
     testColl.drop();
@@ -64,9 +63,10 @@ resetCollection();
 let awaitValidation;
 try {
     setFailpoint();
-    awaitValidation = startParallelShell(function() {
-        let res = assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
-                                           .runCommand({validate: "test", background: true}));
+    awaitValidation = startParallelShell(function () {
+        let res = assert.commandWorked(
+            db.getSiblingDB("background_validation_with_ddl_ops").runCommand({validate: "test", background: true}),
+        );
         assert(res.valid);
     }, primary.port);
 
@@ -85,9 +85,10 @@ resetCollection();
 
 try {
     setFailpoint();
-    awaitValidation = startParallelShell(function() {
-        let res = assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
-                                           .runCommand({validate: "test", background: true}));
+    awaitValidation = startParallelShell(function () {
+        let res = assert.commandWorked(
+            db.getSiblingDB("background_validation_with_ddl_ops").runCommand({validate: "test", background: true}),
+        );
         assert(res.valid);
     }, primary.port);
 
@@ -106,18 +107,21 @@ resetCollection();
 
 try {
     setFailpoint();
-    awaitValidation = startParallelShell(function() {
-        let res = assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
-                                           .runCommand({validate: "test", background: true}));
+    awaitValidation = startParallelShell(function () {
+        let res = assert.commandWorked(
+            db.getSiblingDB("background_validation_with_ddl_ops").runCommand({validate: "test", background: true}),
+        );
         assert(res.valid);
     }, primary.port);
 
     waitUntilFailpoint();
-    assert.commandWorked(testDb.adminCommand({
-        renameCollection: dbName + "." + collName,
-        to: dbNameRename + "." + collName,
-        dropTarget: true
-    }));
+    assert.commandWorked(
+        testDb.adminCommand({
+            renameCollection: dbName + "." + collName,
+            to: dbNameRename + "." + collName,
+            dropTarget: true,
+        }),
+    );
 } finally {
     unsetFailpoint();
 }
@@ -132,9 +136,10 @@ resetCollection();
 
 try {
     setFailpoint();
-    awaitValidation = startParallelShell(function() {
-        let res = assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
-                                           .runCommand({validate: "test", background: true}));
+    awaitValidation = startParallelShell(function () {
+        let res = assert.commandWorked(
+            db.getSiblingDB("background_validation_with_ddl_ops").runCommand({validate: "test", background: true}),
+        );
         assert(res.valid);
     }, primary.port);
 
@@ -154,9 +159,10 @@ resetCollection();
 
 try {
     setFailpoint();
-    awaitValidation = startParallelShell(function() {
-        assert.commandWorked(db.getSiblingDB("background_validation_with_ddl_ops")
-                                 .runCommand({validate: "test", background: true}));
+    awaitValidation = startParallelShell(function () {
+        assert.commandWorked(
+            db.getSiblingDB("background_validation_with_ddl_ops").runCommand({validate: "test", background: true}),
+        );
     }, primary.port);
 
     waitUntilFailpoint();
@@ -165,20 +171,23 @@ try {
     assert.commandWorked(testColl.createIndex({y: 1}));
     assert.commandWorked(testColl.insert({x: 1, y: 1}));
     assert.commandWorked(testDb.createCollection("newCollection"));
-    assert.commandWorked(testDb.adminCommand({
-        renameCollection: dbName + "." +
-            "newCollection",
-        to: dbName + ".renamedCollection",
-        dropTarget: true
-    }));
+    assert.commandWorked(
+        testDb.adminCommand({
+            renameCollection: dbName + "." + "newCollection",
+            to: dbName + ".renamedCollection",
+            dropTarget: true,
+        }),
+    );
     assert.commandWorked(testColl.dropIndex({y: 1}));
 
     // Rename the collection being validated across the same database.
-    assert.commandWorked(testDb.adminCommand({
-        renameCollection: dbName + "." + collName,
-        to: dbName + ".testRenamed",
-        dropTarget: true
-    }));
+    assert.commandWorked(
+        testDb.adminCommand({
+            renameCollection: dbName + "." + collName,
+            to: dbName + ".testRenamed",
+            dropTarget: true,
+        }),
+    );
 } finally {
     unsetFailpoint();
 }

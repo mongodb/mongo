@@ -85,7 +85,7 @@ const conversionTestDocs = [
         input: "0123456789abcdef01234567",
         target: "objectId",
         base: 2,
-        expected: ObjectId("0123456789abcdef01234567")
+        expected: ObjectId("0123456789abcdef01234567"),
     },
     {_id: 53, input: ObjectId("0123456789abcdef01234567"), target: "bool", expected: true},
     {
@@ -93,7 +93,7 @@ const conversionTestDocs = [
         input: ObjectId("0123456789abcdef01234567"),
         target: "objectId",
         base: 2,
-        expected: ObjectId("0123456789abcdef01234567")
+        expected: ObjectId("0123456789abcdef01234567"),
     },
     {_id: 55, input: false, target: "double", base: 2, expected: 0.0},
     {_id: 56, input: false, target: "bool", base: 2, expected: false},
@@ -102,14 +102,14 @@ const conversionTestDocs = [
         input: ISODate("1970-01-01T00:00:00.123Z"),
         target: "date",
         base: 2,
-        expected: ISODate("1970-01-01T00:00:00.123Z")
+        expected: ISODate("1970-01-01T00:00:00.123Z"),
     },
     {
         _id: 58,
         input: ISODate("1970-01-01T00:00:00.123Z"),
         target: "long",
         base: 2,
-        expected: NumberLong(123)
+        expected: NumberLong(123),
     },
     {_id: 59, input: NumberInt(1), target: "int", base: 2, expected: NumberInt(1)},
     {_id: 60, input: NumberInt(1), target: "long", base: 2, expected: NumberLong(1)},
@@ -122,7 +122,7 @@ const conversionTestDocs = [
         input: NumberDecimal("1.9"),
         target: "decimal",
         base: 2,
-        expected: NumberDecimal("1.9")
+        expected: NumberDecimal("1.9"),
     },
 
     // Complementary examples of illegal conversions.
@@ -152,28 +152,28 @@ const conversionTestDocs = [
         input: NumberInt(2147483647),
         target: "string",
         base: 2,
-        expected: "1111111111111111111111111111111"
+        expected: "1111111111111111111111111111111",
     },
     {
         _id: 81,
         input: NumberInt(-2147483648),
         target: "string",
         base: 2,
-        expected: "-10000000000000000000000000000000"
+        expected: "-10000000000000000000000000000000",
     },
     {
         _id: 82,
         input: NumberLong("9223372036854775807"),
         target: "string",
         base: 2,
-        expected: "111111111111111111111111111111111111111111111111111111111111111"
+        expected: "111111111111111111111111111111111111111111111111111111111111111",
     },
     {
         _id: 83,
         input: NumberLong("-9223372036854775808"),
         target: "string",
         base: 2,
-        expected: "-1000000000000000000000000000000000000000000000000000000000000000"
+        expected: "-1000000000000000000000000000000000000000000000000000000000000000",
     },
 
     {_id: 84, input: NumberInt(2147483647), target: "string", base: 8, expected: "17777777777"},
@@ -183,14 +183,14 @@ const conversionTestDocs = [
         input: NumberLong("9223372036854775807"),
         target: "string",
         base: 8,
-        expected: "777777777777777777777"
+        expected: "777777777777777777777",
     },
     {
         _id: 87,
         input: NumberLong("-9223372036854775808"),
         target: "string",
         base: 8,
-        expected: "-1000000000000000000000"
+        expected: "-1000000000000000000000",
     },
 
     {_id: 88, input: NumberInt(2147483647), target: "string", base: 10, expected: "2147483647"},
@@ -200,14 +200,14 @@ const conversionTestDocs = [
         input: NumberLong("9223372036854775807"),
         target: "string",
         base: 10,
-        expected: "9223372036854775807"
+        expected: "9223372036854775807",
     },
     {
         _id: 91,
         input: NumberLong("-9223372036854775808"),
         target: "string",
         base: 10,
-        expected: "-9223372036854775808"
+        expected: "-9223372036854775808",
     },
 
     {_id: 92, input: NumberInt(2147483647), target: "string", base: 16, expected: "7FFFFFFF"},
@@ -217,14 +217,14 @@ const conversionTestDocs = [
         input: NumberLong("9223372036854775807"),
         target: "string",
         base: 16,
-        expected: "7FFFFFFFFFFFFFFF"
+        expected: "7FFFFFFFFFFFFFFF",
     },
     {
         _id: 95,
         input: NumberLong("-9223372036854775808"),
         target: "string",
         base: 16,
-        expected: "-8000000000000000"
+        expected: "-8000000000000000",
     },
 ];
 
@@ -259,38 +259,38 @@ const illegalConversionTestDocs = [
         _id: 16,
         input: "1000000000000000000000000000000000000000000000000000000000000000",
         target: "double",
-        base: 2
+        base: 2,
     },
     {
         _id: 17,
         input: "1000000000000000000000000000000000000000000000000000000000000000",
         target: "long",
-        base: 2
+        base: 2,
     },
     {
         _id: 18,
         input: "1000000000000000000000000000000000000000000000000000000000000000",
         target: "decimal",
-        base: 2
+        base: 2,
     },
     {_id: 19, input: "-10000000000000000000000000000001", target: "int", base: 2},
     {
         _id: 20,
         input: "-1000000000000000000000000000000000000000000000000000000000000001",
         target: "double",
-        base: 2
+        base: 2,
     },
     {
         _id: 21,
         input: "-1000000000000000000000000000000000000000000000000000000000000001",
         target: "long",
-        base: 2
+        base: 2,
     },
     {
         _id: 22,
         input: "-1000000000000000000000000000000000000000000000000000000000000001",
         target: "decimal",
-        base: 2
+        base: 2,
     },
 
     {_id: 23, input: "20000000000", target: "int", base: 8},
@@ -363,7 +363,7 @@ const invalidArgumentValueDocs = [
         input: ObjectId("0123456789abcdef01234567"),
         target: "objectId",
         base: 2.1,
-        expectedCode: 3501300
+        expectedCode: 3501300,
     },
     {_id: 56, input: false, target: "bool", base: 3, expectedCode: 3501301},
     {
@@ -371,7 +371,7 @@ const invalidArgumentValueDocs = [
         input: ISODate("1970-01-01T00:00:00.123Z"),
         target: "date",
         base: 2.1,
-        expectedCode: 3501300
+        expectedCode: 3501300,
     },
     {_id: 59, input: NumberInt(1), target: "int", base: 3, expectedCode: 3501301},
     {_id: 62, input: NumberLong(1), target: "long", base: 2.1, expectedCode: 3501300},
@@ -386,5 +386,5 @@ runConvertTests({
     runRoundTripTests: true,
     conversionTestDocs,
     illegalConversionTestDocs,
-    invalidArgumentValueDocs
+    invalidArgumentValueDocs,
 });

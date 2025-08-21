@@ -24,7 +24,7 @@ const kRetryableErrors = [
     {code: ErrorCodes.ReshardCollectionInProgress},
     {
         code: ErrorCodes.ConflictingOperationInProgress,
-        errmsg: "Another ConfigsvrCoordinator with different arguments is already running"
+        errmsg: "Another ConfigsvrCoordinator with different arguments is already running",
     },
     // A query can be killed if it is still selecting a query plan after a config transition has
     // completed range deletion and drops the collection. Since orphanCleanUpDelaySecs is set to be
@@ -41,7 +41,7 @@ const kRetryableErrors = [
     {code: ErrorCodes.HostUnreachable},
     {code: ErrorCodes.ShutdownInProgress},
     {code: ErrorCodes.ShardNotFound},
-    {code: ErrorCodes.AddOrRemoveShardInProgress}
+    {code: ErrorCodes.AddOrRemoveShardInProgress},
 ];
 
 const kCommandRetryableOnShardNotFoundError = {
@@ -82,7 +82,7 @@ const kCommandRetryableOnShardNotFoundError = {
         // if we have one target, only retryable if the target is the config shard (as eventually it
         // will show up again)
         return command.shardDistribution[0].shard == "config";
-    }
+    },
 };
 
 function matchesRetryableError(error, retryableError) {
@@ -139,8 +139,10 @@ function shouldRetry(cmdObj, res) {
         // errors for inserts in runCommandWithRetries below - this doesn't necessarily guarantee
         // that the inserts aren't double applied, but allows for more tests to run in suites that
         // use this override (and has not proven a problem thus far).
-        if (!isRetryableWrite && (cmdObj.update && cmdObj.updates.length > 1) ||
-            (cmdObj.delete && cmdObj.deletes.length > 1)) {
+        if (
+            (!isRetryableWrite && cmdObj.update && cmdObj.updates.length > 1) ||
+            (cmdObj.delete && cmdObj.deletes.length > 1)
+        ) {
             return false;
         }
 
@@ -152,8 +154,7 @@ function shouldRetry(cmdObj, res) {
     }
 
     if (res.hasOwnProperty("cursor") && res.cursor.hasOwnProperty("firstBatch")) {
-        if (!isRetryableWrite)
-            return false;
+        if (!isRetryableWrite) return false;
 
         for (let opRes of res.cursor.firstBatch) {
             if (isRetryableError(cmdObj, opRes)) {
@@ -176,9 +177,10 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
             res = func.apply(conn, makeFuncArgs(cmdObj));
 
             if (shouldRetry(cmdObj, res)) {
-                jsTest.log.info("Retrying on error from " + cmdName +
-                                    " with transitioning shard. Attempt: " + attempt,
-                                {res});
+                jsTest.log.info(
+                    "Retrying on error from " + cmdName + " with transitioning shard. Attempt: " + attempt,
+                    {res},
+                );
                 return kRetry;
             }
 
@@ -192,19 +194,20 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
                     res.n += res.writeErrors.length;
                     delete res.writeErrors;
                 }
-                jsTest.log("No longer retrying " + cmdName +
-                           " due to non-retryable error: " + tojson(res));
+                jsTest.log("No longer retrying " + cmdName + " due to non-retryable error: " + tojson(res));
             }
 
             return kNoRetry;
         },
         () => "Timed out while retrying command '" + tojson(cmdObj) + "', response: " + tojson(res),
         kTimeout,
-        kInterval);
+        kInterval,
+    );
     return res;
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js");
+    "jstests/libs/override_methods/implicitly_retry_on_shard_transition_errors.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandWithRetries);

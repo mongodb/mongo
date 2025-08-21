@@ -17,11 +17,10 @@ coll.drop();
 assert.commandWorked(testDB.createCollection(coll.getName(), {capped: true, size: 1024}));
 assert.commandWorked(coll.insert({_id: 1}));
 
-let cmdRes = assert.commandWorked(
-    testDB.runCommand({find: coll.getName(), tailable: true, awaitData: true}));
+let cmdRes = assert.commandWorked(testDB.runCommand({find: coll.getName(), tailable: true, awaitData: true}));
 
 TestData.commandResult = cmdRes;
-let cleanupShell = startParallelShell(function() {
+let cleanupShell = startParallelShell(function () {
     db.getSiblingDB("test").runCommand({
         getMore: TestData.commandResult.cursor.id,
         collection: "currentop_includes_await_time",
@@ -29,7 +28,7 @@ let cleanupShell = startParallelShell(function() {
     });
 }, conn.port);
 
-assert.soon(function() {
+assert.soon(function () {
     // This filter ensures that the getMore 'secs_running' and 'microsecs_running' fields are
     // sufficiently large that they appear to include time spent blocking waiting for capped
     // inserts.
@@ -37,7 +36,7 @@ assert.soon(function() {
         "command.getMore": {$exists: true},
         "ns": coll.getFullName(),
         secs_running: {$gte: 2},
-        microsecs_running: {$gte: 2 * 1000 * 1000}
+        microsecs_running: {$gte: 2 * 1000 * 1000},
     });
     return ops.inprog.length === 1;
 }, printjson(testDB.currentOp()));

@@ -15,21 +15,18 @@ replSet.startSet();
 replSet.initiate();
 
 const primary = replSet.getPrimary();
-const primaryDB = primary.getDB('config');
+const primaryDB = primary.getDB("config");
 
-const operationTime =
-    assert.commandWorked(primaryDB.runCommand({find: "transactions"})).operationTime;
-assert.commandWorked(
-    primaryDB.runCommand({find: "transactions", readConcern: {level: "majority"}}));
+const operationTime = assert.commandWorked(primaryDB.runCommand({find: "transactions"})).operationTime;
+assert.commandWorked(primaryDB.runCommand({find: "transactions", readConcern: {level: "majority"}}));
 assert.commandFailedWithCode(
-    primaryDB.runCommand(
-        {find: "transactions", readConcern: {level: "majority", afterClusterTime: operationTime}}),
-    5557800);
+    primaryDB.runCommand({find: "transactions", readConcern: {level: "majority", afterClusterTime: operationTime}}),
+    5557800,
+);
+assert.commandFailedWithCode(primaryDB.runCommand({find: "transactions", readConcern: {level: "snapshot"}}), 5557800);
 assert.commandFailedWithCode(
-    primaryDB.runCommand({find: "transactions", readConcern: {level: "snapshot"}}), 5557800);
-assert.commandFailedWithCode(
-    primaryDB.runCommand(
-        {find: "transactions", readConcern: {level: "snapshot", atClusterTime: operationTime}}),
-    5557800);
+    primaryDB.runCommand({find: "transactions", readConcern: {level: "snapshot", atClusterTime: operationTime}}),
+    5557800,
+);
 
 replSet.stopSet();

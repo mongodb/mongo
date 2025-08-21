@@ -15,17 +15,17 @@ TimeseriesTest.run((insert) => {
     coll.drop();
 
     const timeFieldName = "time";
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
     for (let i = 0; i < 10; i++) {
-        assert.commandWorked(insert(coll, {
-            _id: i,
-            measurement: "measurement",
-            time: ISODate(),
-        }));
+        assert.commandWorked(
+            insert(coll, {
+                _id: i,
+                measurement: "measurement",
+                time: ISODate(),
+            }),
+        );
     }
 
-    assert.commandFailedWithCode(createRawTimeseriesIndex(coll, {"control.min.time": "2dsphere"}),
-                                 16755);
+    assert.commandFailedWithCode(createRawTimeseriesIndex(coll, {"control.min.time": "2dsphere"}), 16755);
 });

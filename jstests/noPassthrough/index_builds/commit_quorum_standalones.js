@@ -8,8 +8,8 @@ const db = standalone.getDB("test");
 
 jsTestLog("Create index");
 assert.commandFailedWithCode(
-    db.runCommand(
-        {createIndexes: "coll", indexes: [{name: "x_1", key: {x: 1}}], commitQuorum: "majority"}),
-    ErrorCodes.BadValue);
+    db.runCommand({createIndexes: "coll", indexes: [{name: "x_1", key: {x: 1}}], commitQuorum: "majority"}),
+    ErrorCodes.BadValue,
+);
 
 MongoRunner.stopMongod(standalone);

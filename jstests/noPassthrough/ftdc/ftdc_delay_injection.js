@@ -8,16 +8,15 @@ let conn = MongoRunner.runMongod({
     setParameter: {
         featureFlagGaplessFTDC: true,
         diagnosticDataCollectionSampleTimeoutMillis: 200,
-    }
+    },
 });
-let adminDb = conn.getDB('admin');
+let adminDb = conn.getDB("admin");
 
 let data = verifyGetDiagnosticData(adminDb);
 assert(data.hasOwnProperty("transportLayerStats"));
 assert(data.hasOwnProperty("serverStatus"));
 
-const fp =
-    configureFailPoint(conn, "injectFTDCServerStatusCollectionDelay", {sleepTimeMillis: 10000});
+const fp = configureFailPoint(conn, "injectFTDCServerStatusCollectionDelay", {sleepTimeMillis: 10000});
 fp.waitWithTimeout(2000);
 
 // Since there is no guarantee on the order we run collectors, this sleep lets us test that we can

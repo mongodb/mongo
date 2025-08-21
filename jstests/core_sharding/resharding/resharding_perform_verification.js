@@ -19,9 +19,7 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
-import {
-    getShardNamesForCollection,
-} from "jstests/sharding/libs/sharding_util.js";
+import {getShardNamesForCollection} from "jstests/sharding/libs/sharding_util.js";
 
 const topology = DiscoverTopology.findConnectedNodes(db);
 const isVerificationEnabled = FeatureFlagUtil.isEnabled(db, "ReshardingVerification");
@@ -115,8 +113,7 @@ function waitForFailPointOrCountDownLatch(fp, countDownLatch) {
 
 function validateStateDocuments(topology, collNS, performVerification) {
     const configRSPrimary = new Mongo(topology.configsvr.primary);
-    const coordinatorDoc =
-        configRSPrimary.getCollection("config.reshardingOperations").findOne({ns: collNS});
+    const coordinatorDoc = configRSPrimary.getCollection("config.reshardingOperations").findOne({ns: collNS});
 
     if (performVerification === null && isVerificationEnabled) {
         // The command didn't specify 'performVerification'. If the feature flag was enabled when
@@ -124,22 +121,19 @@ function validateStateDocuments(topology, collNS, performVerification) {
         // get set.
         performVerification = true;
     }
-    jsTest.log("Validating state documents " +
-               tojson({expectedPerformVerification: performVerification}));
+    jsTest.log("Validating state documents " + tojson({expectedPerformVerification: performVerification}));
 
     assert.eq(coordinatorDoc.performVerification, performVerification, coordinatorDoc);
 
-    coordinatorDoc.donorShards.forEach(donorEntry => {
+    coordinatorDoc.donorShards.forEach((donorEntry) => {
         const shardRSPrimary = new Mongo(topology.shards[donorEntry.id].primary);
-        const donorDoc =
-            shardRSPrimary.getCollection("config.localReshardingOperations.donor").findOne();
+        const donorDoc = shardRSPrimary.getCollection("config.localReshardingOperations.donor").findOne();
         assert.eq(donorDoc.performVerification, performVerification, donorDoc);
     });
 
-    coordinatorDoc.recipientShards.forEach(recipientEntry => {
+    coordinatorDoc.recipientShards.forEach((recipientEntry) => {
         const shardRSPrimary = new Mongo(topology.shards[recipientEntry.id].primary);
-        const recipientDoc =
-            shardRSPrimary.getCollection("config.localReshardingOperations.recipient").findOne();
+        const recipientDoc = shardRSPrimary.getCollection("config.localReshardingOperations.recipient").findOne();
         assert.eq(recipientDoc.performVerification, performVerification, recipientDoc);
     });
 }
@@ -166,9 +160,13 @@ function testResharding(thread, countDownLatch, collNS, performVerification) {
             // specifies 'performVerification' to true, and the resharding command runs only on
             // configsvr or shardsvr nodes that know about the this field.
             assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
-            assert(res.errmsg.includes("Cannot set 'performVerification' to true when " +
-                                       "featureFlagReshardingVerification is not enabled"),
-                   res);
+            assert(
+                res.errmsg.includes(
+                    "Cannot set 'performVerification' to true when " +
+                        "featureFlagReshardingVerification is not enabled",
+                ),
+                res,
+            );
             assert.eq(performVerification, true, res);
             assert.eq(isVerificationEnabled, false);
         }
@@ -184,21 +182,25 @@ function testReshardCollection(performVerification) {
     assert.commandWorked(testDB.getCollection(collName).insert(docs));
     assert.commandWorked(db.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(db.adminCommand({split: ns, middle: {_id: 0}}));
-    assert.commandWorked(db.adminCommand({
-        moveChunk: ns,
-        find: {_id: 0},
-        to: getNonOwningShardName(dbName, collName),
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            moveChunk: ns,
+            find: {_id: 0},
+            to: getNonOwningShardName(dbName, collName),
+            _waitForDelete: true,
+        }),
+    );
 
     jsTest.log("Testing reshardCollection with " + tojson({performVerification}));
     const reshardCountDownLatch = new CountDownLatch(1);
-    const reshardThread = new Thread(runReshardCollection,
-                                     db.getMongo().host,
-                                     ns,
-                                     {x: 1} /* key */,
-                                     performVerification,
-                                     reshardCountDownLatch);
+    const reshardThread = new Thread(
+        runReshardCollection,
+        db.getMongo().host,
+        ns,
+        {x: 1} /* key */,
+        performVerification,
+        reshardCountDownLatch,
+    );
     testResharding(reshardThread, reshardCountDownLatch, ns, performVerification);
 }
 
@@ -213,12 +215,14 @@ function testUnshardCollection(performVerification) {
 
     jsTest.log("Testing unshardCollection with " + tojson({performVerification}));
     const unshardCountDownLatch = new CountDownLatch(1);
-    const unshardThread = new Thread(runUnshardCollection,
-                                     db.getMongo().host,
-                                     ns,
-                                     getNonOwningShardName(dbName, collName),
-                                     performVerification,
-                                     unshardCountDownLatch);
+    const unshardThread = new Thread(
+        runUnshardCollection,
+        db.getMongo().host,
+        ns,
+        getNonOwningShardName(dbName, collName),
+        performVerification,
+        unshardCountDownLatch,
+    );
     testResharding(unshardThread, unshardCountDownLatch, ns, performVerification);
 }
 
@@ -232,12 +236,14 @@ function testMoveCollection(performVerification) {
 
     jsTest.log("Testing moveCollection with " + tojson({performVerification}));
     const moveCountDownLatch = new CountDownLatch(1);
-    const moveThread = new Thread(runMoveCollection,
-                                  db.getMongo().host,
-                                  ns,
-                                  getNonOwningShardName(dbName, collName),
-                                  performVerification,
-                                  moveCountDownLatch);
+    const moveThread = new Thread(
+        runMoveCollection,
+        db.getMongo().host,
+        ns,
+        getNonOwningShardName(dbName, collName),
+        performVerification,
+        moveCountDownLatch,
+    );
     testResharding(moveThread, moveCountDownLatch, ns, performVerification);
 }
 

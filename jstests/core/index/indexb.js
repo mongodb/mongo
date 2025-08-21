@@ -22,7 +22,7 @@ t.save(x);
 
     x.a = 1;
     x.filler = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    t.save(x);  // should fail, not unique.
+    t.save(x); // should fail, not unique.
 
     assert(t.count() == 2, "count wrong");
     assert(t.find({a: 1}).count() == 1, "bfail1");

@@ -19,14 +19,12 @@ function runCommonTests(db, expectedNumDocs) {
     if (!FeatureFlagUtil.isPresentAndEnabled(db, "CursorBasedTop")) {
         assert.commandFailedWithCode(
             db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {}}),
-            ErrorCodes.FailedToParse);
+            ErrorCodes.FailedToParse,
+        );
     } else {
-        const aggResult = assert.commandWorked(
-            db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {}}));
+        const aggResult = assert.commandWorked(db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {}}));
         const res = aggResult.cursor.firstBatch;
-        assert.eq(res.length,
-                  expectedNumDocs,
-                  "Expected " + expectedNumDocs + " docs, but got " + res.length + ".");
+        assert.eq(res.length, expectedNumDocs, "Expected " + expectedNumDocs + " docs, but got " + res.length + ".");
     }
 }
 
@@ -37,7 +35,7 @@ const mongos = st.s;
 const admin = mongos.getDB("admin");
 const config = mongos.getDB("config");
 const shards = config.shards.find().toArray();
-const namespace = dbName + '.' + collName;
+const namespace = dbName + "." + collName;
 assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: shards[0]._id}));
 assert.commandWorked(admin.adminCommand({shardCollection: namespace, key: {a: 1}}));
 
@@ -48,8 +46,9 @@ runCommonTests(mongos.getDB(dbName), 1);
 // Shard the collection.
 for (let i = 0; i < numShards; i++) {
     assert.commandWorked(st.splitAt(namespace, {a: i + 1}));
-    assert.commandWorked(admin.runCommand(
-        {moveChunk: namespace, find: {a: i + 2}, to: shards[(i + 1) % numShards]._id}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: namespace, find: {a: i + 2}, to: shards[(i + 1) % numShards]._id}),
+    );
 }
 
 // Run tests on mongos.
@@ -67,8 +66,7 @@ runCommonTests(conn.getDB(dbName), 1);
 
 // $collStats with operationStats option should return usage statistic fields.
 if (FeatureFlagUtil.isPresentAndEnabled(standaloneColl, "CursorBasedTop")) {
-    const aggResult = assert.commandWorked(
-        standaloneColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}));
+    const aggResult = assert.commandWorked(standaloneColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}));
     const res = aggResult.cursor.firstBatch[0];
     const statFields = [
         "total",
@@ -79,12 +77,14 @@ if (FeatureFlagUtil.isPresentAndEnabled(standaloneColl, "CursorBasedTop")) {
         "insert",
         "update",
         "remove",
-        "commands"
+        "commands",
     ];
 
     for (let i = 0; i < statFields.length; i++) {
-        assert(res.operationStats.hasOwnProperty(statFields[i]),
-               "Error: " + tojson(statFields[i]) + " field not present in operationStats output.");
+        assert(
+            res.operationStats.hasOwnProperty(statFields[i]),
+            "Error: " + tojson(statFields[i]) + " field not present in operationStats output.",
+        );
     }
 }
 

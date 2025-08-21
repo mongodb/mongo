@@ -12,35 +12,31 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const rst = new ReplSetTest({
-    nodes: [
-        {},
-        {},
-    ]
+    nodes: [{}, {}],
 });
 rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
 
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const testDB = primary.getDB("test");
+const coll = testDB.getCollection("test");
 
-const failPoint = configureFailPoint(testDB, 'dropDatabaseHangAfterWaitingForIndexBuilds');
+const failPoint = configureFailPoint(testDB, "dropDatabaseHangAfterWaitingForIndexBuilds");
 
 assert.commandWorked(coll.insert({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(primary);
 
 let awaitIndexBuild = startParallelShell(() => {
-    const coll = db.getSiblingDB('test').getCollection('test');
+    const coll = db.getSiblingDB("test").getCollection("test");
     assert.commandFailedWithCode(coll.createIndex({a: 1}), ErrorCodes.IndexBuildAborted);
 }, primary.port);
 
 IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), "a_1");
 
 let awaitDropDatabase = startParallelShell(() => {
-    assert.commandFailedWithCode(db.getSiblingDB('test').dropDatabase(),
-                                 ErrorCodes.InterruptedDueToReplStateChange);
+    assert.commandFailedWithCode(db.getSiblingDB("test").dropDatabase(), ErrorCodes.InterruptedDueToReplStateChange);
 }, primary.port);
 
 failPoint.wait();
@@ -63,5 +59,5 @@ rst.awaitReplication();
 
 // Have the new primary try to drop the database. The stepped down node must successfully replicate
 // this dropDatabase command.
-assert.commandWorked(rst.getPrimary().getDB('test').dropDatabase());
+assert.commandWorked(rst.getPrimary().getDB("test").dropDatabase());
 rst.stopSet();

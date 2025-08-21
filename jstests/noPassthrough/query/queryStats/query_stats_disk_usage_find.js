@@ -14,15 +14,17 @@ import {
 function makeUnshardedCollection(conn) {
     const coll = conn.getDB("test")[jsTestName()];
     coll.drop();
-    assert.commandWorked(coll.insert([
-        {v: 1, y: -3},
-        {v: 2, y: -2},
-        {v: 3, y: -1},
-        {v: 4, y: 1},
-        {v: 5, y: 2},
-        {v: 6, y: 3},
-        {v: 7, y: 4}
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {v: 1, y: -3},
+            {v: 2, y: -2},
+            {v: 3, y: -1},
+            {v: 4, y: 1},
+            {v: 5, y: 2},
+            {v: 6, y: 3},
+            {v: 7, y: 4},
+        ]),
+    );
     assert.commandWorked(coll.createIndex({y: 1}));
     return coll;
 }
@@ -30,12 +32,14 @@ function makeUnshardedCollection(conn) {
 function makeShardedCollection(st) {
     const conn = st.s;
     const coll = makeUnshardedCollection(conn);
-    st.shardColl(coll,
-                 /* key */ {y: 1},
-                 /* split at */ {y: 0},
-                 /* move chunk containing */ {y: 1},
-                 /* db */ coll.getDB().getName(),
-                 /* waitForDelete */ true);
+    st.shardColl(
+        coll,
+        /* key */ {y: 1},
+        /* split at */ {y: 0},
+        /* move chunk containing */ {y: 1},
+        /* db */ coll.getDB().getName(),
+        /* waitForDelete */ true,
+    );
     return coll;
 }
 
@@ -43,8 +47,7 @@ function runUnindexedFindTest(conn, coll) {
     const expectedDocs = 4;
     const shape = {filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}, sort: {v: 1}};
 
-    const queryStatsKey =
-        getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -53,11 +56,15 @@ function runUnindexedFindTest(conn, coll) {
             find: coll.getName(),
             filter: {v: {$gt: 0, $lt: 5}},
             sort: {v: 1},
-            batchSize: batchSize
+            batchSize: batchSize,
         };
 
-        const queryStats = exhaustCursorAndGetQueryStats(
-            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
+        const queryStats = exhaustCursorAndGetQueryStats({
+            conn: conn,
+            cmd: cmd,
+            key: queryStatsKey,
+            expectedDocs: expectedDocs,
+        });
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 0,
@@ -65,7 +72,7 @@ function runUnindexedFindTest(conn, coll) {
             hasSortStage: true,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 }
@@ -76,8 +83,7 @@ function runIndexedFindTest(conn, coll) {
     const expectedDocs = 4;
     const shape = {filter: {y: {$gt: "?number"}}, sort: {v: 1}};
 
-    const queryStatsKey =
-        getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getFindQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     // Results should be the same independent of batch size. We need to reach a batch size of
     // docsReturned + 1 for the initial find command to return an exhausted cursor.
@@ -85,10 +91,13 @@ function runIndexedFindTest(conn, coll) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
 
         // In the sharded case, this will target only one shard.
-        const cmd =
-            {find: coll.getName(), filter: {y: {$gt: 0}}, sort: {v: 1}, batchSize: batchSize};
-        const queryStats = exhaustCursorAndGetQueryStats(
-            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
+        const cmd = {find: coll.getName(), filter: {y: {$gt: 0}}, sort: {v: 1}, batchSize: batchSize};
+        const queryStats = exhaustCursorAndGetQueryStats({
+            conn: conn,
+            cmd: cmd,
+            key: queryStatsKey,
+            expectedDocs: expectedDocs,
+        });
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 4,
@@ -96,7 +105,7 @@ function runIndexedFindTest(conn, coll) {
             hasSortStage: true,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 }
@@ -112,8 +121,7 @@ function runFindAgainstViewTest(conn, coll) {
     const expectedDocs = 3;
     const shape = {filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}, sort: {v: 1}};
 
-    const queryStatsKey =
-        getFindQueryStatsKey({conn: conn, collName: view.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getFindQueryStatsKey({conn: conn, collName: view.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -122,11 +130,15 @@ function runFindAgainstViewTest(conn, coll) {
             find: view.getName(),
             filter: {v: {$gt: 0, $lt: 5}},
             sort: {v: 1},
-            batchSize: batchSize
+            batchSize: batchSize,
         };
 
-        const queryStats = exhaustCursorAndGetQueryStats(
-            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
+        const queryStats = exhaustCursorAndGetQueryStats({
+            conn: conn,
+            cmd: cmd,
+            key: queryStatsKey,
+            expectedDocs: expectedDocs,
+        });
 
         // The view only contains 6 documents, but the query still ends up being a collection
         // scan of all docs in the collection.
@@ -136,7 +148,7 @@ function runFindAgainstViewTest(conn, coll) {
             hasSortStage: true,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 }

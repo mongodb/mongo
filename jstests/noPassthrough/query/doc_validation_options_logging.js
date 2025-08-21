@@ -31,15 +31,19 @@ function checkLogsForFailedValidation(db, logId) {
             operatorName: "$eq",
             specifiedAs: {a: 1},
             reason: "comparison failed",
-            consideredValue: 2
-        }
+            consideredValue: 2,
+        },
     };
 
-    assert(nodesToCheck.some((conn) => checkLog.checkContainsOnceJson(conn, logId, {
-        "errInfo": function(obj) {
-            return documentEq(obj, errInfo);
-        }
-    })));
+    assert(
+        nodesToCheck.some((conn) =>
+            checkLog.checkContainsOnceJson(conn, logId, {
+                "errInfo": function (obj) {
+                    return documentEq(obj, errInfo);
+                },
+            }),
+        ),
+    );
 }
 
 function runTest(db) {
@@ -54,7 +58,9 @@ function runTest(db) {
 
     if (FeatureFlagUtil.isPresentAndEnabled(db, "ErrorAndLogValidationAction")) {
         const res = assert.commandWorkedOrFailedWithCode(
-            t.runCommand("collMod", {validationAction: "errorAndLog"}), ErrorCodes.InvalidOptions);
+            t.runCommand("collMod", {validationAction: "errorAndLog"}),
+            ErrorCodes.InvalidOptions,
+        );
         if (res.ok) {
             assertFailsValidation(t.update({}, {$set: {a: 2}}));
             checkLogsForFailedValidation(db, errorAndLogId);

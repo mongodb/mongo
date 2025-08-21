@@ -14,11 +14,9 @@
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.commentStr = "agg_unionWith_interrupt_cleanup";
 
     $config.states.aggregate = function aggregate(db, collName) {
@@ -31,7 +29,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             comment: this.commentStr,
             // Use a small batch size to ensure these operations open up a cursor and use multiple
             // getMores. We want to give coverage to interrupting the getMores as well.
-            cursor: {batchSize: this.numDocs / 4}
+            cursor: {batchSize: this.numDocs / 4},
         });
         // Keep iterating the cursor until we exhaust it or we are interrupted.
         while (response.ok && response.cursor.id != 0) {
@@ -53,12 +51,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             $and: [
                 {active: true},
                 {
-                    $or: [
-                        {"command.comment": this.commentStr},
-                        {"cursor.originatingCommand.comment": this.commentStr},
-                    ]
-                }
-            ]
+                    $or: [{"command.comment": this.commentStr}, {"cursor.originatingCommand.comment": this.commentStr}],
+                },
+            ],
         });
     };
 
@@ -74,12 +69,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             $and: [
                 {active: true},
                 {
-                    $or: [
-                        {"command.comment": this.commentStr},
-                        {"cursor.originatingCommand.comment": this.commentStr},
-                    ]
-                }
-            ]
+                    $or: [{"command.comment": this.commentStr}, {"cursor.originatingCommand.comment": this.commentStr}],
+                },
+            ],
         });
 
         const killCursors = (db) => {
@@ -96,8 +88,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 if (result.cursor) {
                     const cursorId = result.cursor.cursorId;
                     jsTestLog(`Killing cursor: ${cursorId}, database ${db.getName()}`);
-                    assert.commandWorked(
-                        db.runCommand({killCursors: collName, cursors: [cursorId]}));
+                    assert.commandWorked(db.runCommand({killCursors: collName, cursors: [cursorId]}));
                 }
             }
         };
@@ -109,7 +100,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
 
         const remainingOps = () =>
-            db.getSiblingDB("admin")
+            db
+                .getSiblingDB("admin")
                 .aggregate([
                     {$currentOp: {idleCursors: true}},
                     // Look for any trace of state that wasn't cleaned up.
@@ -119,15 +111,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                                 // The originating aggregation or a sub-aggregation still active.
                                 {"command.comment": this.commentStr},
                                 // An idle cursor left around.
-                                {"cursor.originatingCommand.comment": this.commentStr}
-                            ]
-                        }
-                    }
+                                {"cursor.originatingCommand.comment": this.commentStr},
+                            ],
+                        },
+                    },
                 ])
                 .toArray();
         assert.soon(
             () => remainingOps().length == 0,
-            () => "tried to kill cursors but they're still alive\n" + tojson(remainingOps()));
+            () => "tried to kill cursors but they're still alive\n" + tojson(remainingOps()),
+        );
     };
 
     return $config;

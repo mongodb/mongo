@@ -17,7 +17,7 @@
  */
 import {
     areViewlessTimeseriesEnabled,
-    getTimeseriesBucketsColl
+    getTimeseriesBucketsColl,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -30,21 +30,20 @@ assert.commandWorked(collSimple.createIndex({a: 1}));
 assert.commandWorked(collSimple.insert({_id: 0, a: 0}));
 
 // Simple view.
-const viewSimpleName = 'simple_view';
+const viewSimpleName = "simple_view";
 assert.commandWorked(testDB.createView(viewSimpleName, collSimple.getName(), [{$project: {a: 0}}]));
 
 // Time-series collection.
-assert.commandWorked(testDB.createCollection('ts', {timeseries: {timeField: 'tt'}}));
+assert.commandWorked(testDB.createCollection("ts", {timeseries: {timeField: "tt"}}));
 const collTimeseries = testDB.ts;
 assert.commandWorked(collTimeseries.insert({_id: 1, tt: ISODate(), x: 123}));
 
 // Collection with clustered index.
-assert.commandWorked(
-    testDB.createCollection('clustered', {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(testDB.createCollection("clustered", {clusteredIndex: {key: {_id: 1}, unique: true}}));
 const collClustered = testDB.clustered;
-assert.commandWorked(collClustered.insert({_id: 2, y: 'abc'}));
+assert.commandWorked(collClustered.insert({_id: 2, y: "abc"}));
 
-const numIndexes = function(coll, entry, numSecondaryIndexes) {
+const numIndexes = function (coll, entry, numSecondaryIndexes) {
     let numIndexes = numSecondaryIndexes + 1;
     if (entry.md.options.clusteredIndex) {
         --numIndexes;
@@ -55,8 +54,8 @@ const numIndexes = function(coll, entry, numSecondaryIndexes) {
     return numIndexes;
 };
 
-const checkEntries = function(collName, entries, type, {numSecondaryIndexes, viewOn}) {
-    const ns = testDB.getName() + '.' + collName;
+const checkEntries = function (collName, entries, type, {numSecondaryIndexes, viewOn}) {
+    const ns = testDB.getName() + "." + collName;
     assert(entries.some((entry) => entry.ns === ns));
     for (const entry of entries) {
         if (entry.ns !== ns) {
@@ -70,11 +69,11 @@ const checkEntries = function(collName, entries, type, {numSecondaryIndexes, vie
             assert(entry.shard);
         }
 
-        if (!areViewlessTimeseriesEnabled(testDB) && type === 'timeseries') {
+        if (!areViewlessTimeseriesEnabled(testDB) && type === "timeseries") {
             assert.eq(entry.viewOn, viewOn);
         }
 
-        if (type === 'view') {
+        if (type === "view") {
             assert.eq(entry.viewOn, viewOn);
         }
 
@@ -83,59 +82,60 @@ const checkEntries = function(collName, entries, type, {numSecondaryIndexes, vie
         // owning shard local catalog, but createIndexes will only contact the owning shard.
         let checkIndexes = true;
         if (FixtureHelpers.isMongos(testDB)) {
-            const configDB = db.getSiblingDB('config');
+            const configDB = db.getSiblingDB("config");
             const coll = configDB.collections.findOne({_id: entry.ns});
             if (coll && coll.unsplittable) {
                 const chunk = configDB.chunks.findOne({uuid: coll.uuid});
                 checkIndexes = chunk.shard == entry.shard;
             }
         }
-        if (checkIndexes && type === 'collection') {
-            assert.eq(entry.md.indexes.length,
-                      numIndexes(testDB[collName], entry, numSecondaryIndexes));
+        if (checkIndexes && type === "collection") {
+            assert.eq(entry.md.indexes.length, numIndexes(testDB[collName], entry, numSecondaryIndexes));
         }
     }
 };
 
 let result = collSimple.aggregate([{$listCatalog: {}}]).toArray();
-jsTestLog(collSimple.getFullName() + ' $listCatalog: ' + tojson(result));
-checkEntries(collSimple.getName(), result, 'collection', {numSecondaryIndexes: 1});
+jsTestLog(collSimple.getFullName() + " $listCatalog: " + tojson(result));
+checkEntries(collSimple.getName(), result, "collection", {numSecondaryIndexes: 1});
 
 result = collClustered.aggregate([{$listCatalog: {}}]).toArray();
-jsTestLog(collClustered.getFullName() + ' $listCatalog: ' + tojson(result));
-checkEntries(collClustered.getName(), result, 'collection', {numSecondaryIndexes: 0});
+jsTestLog(collClustered.getFullName() + " $listCatalog: " + tojson(result));
+checkEntries(collClustered.getName(), result, "collection", {numSecondaryIndexes: 0});
 
 if (areViewlessTimeseriesEnabled(testDB)) {
     result = collTimeseries.aggregate([{$listCatalog: {}}]).toArray();
-    jsTestLog(collTimeseries.getFullName() + ' $listCatalog: ' + tojson(result));
-    checkEntries(collTimeseries.getName(), result, 'timeseries', {numSecondaryIndexes: 0});
+    jsTestLog(collTimeseries.getFullName() + " $listCatalog: " + tojson(result));
+    checkEntries(collTimeseries.getName(), result, "timeseries", {numSecondaryIndexes: 0});
 } else {
     assert.commandFailedWithCode(
-        testDB.runCommand(
-            {aggregate: collTimeseries.getName(), pipeline: [{$listCatalog: {}}], cursor: {}}),
-        40602);
+        testDB.runCommand({aggregate: collTimeseries.getName(), pipeline: [{$listCatalog: {}}], cursor: {}}),
+        40602,
+    );
 }
 
 assert.commandFailedWithCode(
     testDB.runCommand({aggregate: viewSimpleName, pipeline: [{$listCatalog: {}}], cursor: {}}),
-    40602);
+    40602,
+);
 
 assert.commandFailedWithCode(
     testDB.runCommand({aggregate: 1, pipeline: [{$listCatalog: {}}], cursor: {}}),
-    ErrorCodes.InvalidNamespace);
+    ErrorCodes.InvalidNamespace,
+);
 
-const adminDB = testDB.getSiblingDB('admin');
+const adminDB = testDB.getSiblingDB("admin");
 result = adminDB.aggregate([{$listCatalog: {}}]).toArray();
-jsTestLog('Collectionless $listCatalog: ' + tojson(result));
+jsTestLog("Collectionless $listCatalog: " + tojson(result));
 
-checkEntries(collSimple.getName(), result, 'collection', {numSecondaryIndexes: 1});
-checkEntries(collClustered.getName(), result, 'collection', {numSecondaryIndexes: 0});
-checkEntries(viewSimpleName, result, 'view', {viewOn: collSimple.getName()});
+checkEntries(collSimple.getName(), result, "collection", {numSecondaryIndexes: 1});
+checkEntries(collClustered.getName(), result, "collection", {numSecondaryIndexes: 0});
+checkEntries(viewSimpleName, result, "view", {viewOn: collSimple.getName()});
 
 if (areViewlessTimeseriesEnabled(testDB)) {
-    checkEntries(collTimeseries.getName(), result, 'timeseries', {numSecondaryIndexes: 0});
+    checkEntries(collTimeseries.getName(), result, "timeseries", {numSecondaryIndexes: 0});
 } else {
-    checkEntries(collTimeseries.getName(), result, 'timeseries', {
-        viewOn: getTimeseriesBucketsColl(collTimeseries).getName()
+    checkEntries(collTimeseries.getName(), result, "timeseries", {
+        viewOn: getTimeseriesBucketsColl(collTimeseries).getName(),
     });
 }

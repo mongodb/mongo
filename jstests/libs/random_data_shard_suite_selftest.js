@@ -8,7 +8,7 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-const testDb = db.getSiblingDB('random_data_shard_suite_selftest_' + Random.srand());
+const testDb = db.getSiblingDB("random_data_shard_suite_selftest_" + Random.srand());
 
 assert(FixtureHelpers.isMongos(db), "Must run mongos");
 assert(FixtureHelpers.getAllReplicas(db).length > 1, "Needs more than one shard");

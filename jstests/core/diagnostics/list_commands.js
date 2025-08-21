@@ -8,7 +8,7 @@ assert.commandWorked(commands);
 function isSorted(obj) {
     var previousProperty;
     for (var property in obj["commands"]) {
-        if (previousProperty && (previousProperty > property)) {
+        if (previousProperty && previousProperty > property) {
             return false;
         }
         previousProperty = property;

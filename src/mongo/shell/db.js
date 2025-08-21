@@ -1,33 +1,35 @@
 // db.js
 
-let _defaultWriteConcern = {w: 'majority', wtimeout: 10 * 60 * 1000};
+let _defaultWriteConcern = {w: "majority", wtimeout: 10 * 60 * 1000};
 const kWireVersionSupportingScramSha256Fallback = 15;
 
-const DB = globalThis.DB ?? function(mongo, name) {
-    this._mongo = mongo;
-    this._name = name;
-};
+const DB =
+    globalThis.DB ??
+    function (mongo, name) {
+        this._mongo = mongo;
+        this._name = name;
+    };
 
 /**
  * Rotate certificates, CRLs, and CA files.
  * @param {String} message optional message for server to log at rotation time
  */
-DB.prototype.rotateCertificates = function(message) {
+DB.prototype.rotateCertificates = function (message) {
     return this._adminCommand({rotateCertificates: 1, message: message});
 };
 
-DB.prototype.getMongo = function() {
+DB.prototype.getMongo = function () {
     assert(this._mongo, "why no mongo!");
     return this._mongo;
 };
 
-DB.prototype.getSiblingDB = function(name) {
+DB.prototype.getSiblingDB = function (name) {
     return this.getSession().getDatabase(name);
 };
 
 DB.prototype.getSisterDB = DB.prototype.getSiblingDB;
 
-DB.prototype.getName = function() {
+DB.prototype.getName = function () {
     return this._name;
 };
 
@@ -35,28 +37,25 @@ DB.prototype.getName = function() {
  * Gets DB level statistics. opt can be a number representing the scale for backwards compatibility
  * or a document with options passed along to the dbstats command.
  */
-DB.prototype.stats = function(opt) {
+DB.prototype.stats = function (opt) {
     let cmd = {dbstats: 1};
 
-    if (opt === undefined)
-        return this.runCommand(cmd);
-    if (typeof (opt) !== "object")
-        return this.runCommand(Object.extend(cmd, {scale: opt}));
+    if (opt === undefined) return this.runCommand(cmd);
+    if (typeof opt !== "object") return this.runCommand(Object.extend(cmd, {scale: opt}));
 
     return this.runCommand(Object.extend(cmd, opt));
 };
 
-DB.prototype.getCollection = function(name) {
+DB.prototype.getCollection = function (name) {
     return new DBCollection(this._mongo, this, name, this._name + "." + name);
 };
 
-DB.prototype.commandHelp = function(name) {
+DB.prototype.commandHelp = function (name) {
     let c = {};
     c[name] = 1;
     c.help = true;
     let res = this.runCommand(c);
-    if (!res.ok)
-        throw _getErrorWithCode(res, res.errmsg);
+    if (!res.ok) throw _getErrorWithCode(res, res.errmsg);
     return res.help;
 };
 
@@ -67,10 +66,10 @@ const kAggStagesThatNotSupportSecondaryReadPreference = new Set([
 ]);
 
 // Utility to attach readPreference if needed.
-DB.prototype._attachReadPreferenceToCommand = function(cmdObj, readPref) {
+DB.prototype._attachReadPreferenceToCommand = function (cmdObj, readPref) {
     "use strict";
     // If the user has not set a read pref, return the original 'cmdObj'.
-    if ((readPref === null) || typeof (readPref) !== "object") {
+    if (readPref === null || typeof readPref !== "object") {
         return cmdObj;
     }
 
@@ -82,9 +81,14 @@ DB.prototype._attachReadPreferenceToCommand = function(cmdObj, readPref) {
     const cmdName = Object.keys(cmdObj)[0];
 
     // Prevent setting `secondary` read preference if it's not allowed on specific aggregate stages.
-    if (cmdName === "aggregate" && readPref?.mode === "secondary" && cmdObj.pipeline &&
-        Array.isArray(cmdObj.pipeline) && cmdObj.pipeline.length !== 0) {
-        const stages = cmdObj.pipeline.map(obj => obj instanceof Object ? Object.keys(obj)[0] : "");
+    if (
+        cmdName === "aggregate" &&
+        readPref?.mode === "secondary" &&
+        cmdObj.pipeline &&
+        Array.isArray(cmdObj.pipeline) &&
+        cmdObj.pipeline.length !== 0
+    ) {
+        const stages = cmdObj.pipeline.map((obj) => (obj instanceof Object ? Object.keys(obj)[0] : ""));
         if (stages.some((stage) => kAggStagesThatNotSupportSecondaryReadPreference.has(stage))) {
             return cmdObj;
         }
@@ -105,18 +109,24 @@ DB.prototype._attachReadPreferenceToCommand = function(cmdObj, readPref) {
  * runCommand({foo: 1, bar: 1}).
  * This helper abstracts that logic.
  */
-DB.prototype._mergeCommandOptions = function(obj, extraKeys) {
+DB.prototype._mergeCommandOptions = function (obj, extraKeys) {
     "use strict";
 
-    if (typeof (obj) === "object") {
+    if (typeof obj === "object") {
         if (Object.keys(extraKeys || {}).length > 0) {
-            throw Error("Unexpected second argument to DB.runCommand(): (type: " +
-                        typeof (extraKeys) + "): " + tojson(extraKeys));
+            throw Error(
+                "Unexpected second argument to DB.runCommand(): (type: " + typeof extraKeys + "): " + tojson(extraKeys),
+            );
         }
         return obj;
-    } else if (typeof (obj) !== "string") {
-        throw Error("First argument to DB.runCommand() must be either an object or a string: " +
-                    "(type: " + typeof (obj) + "): " + tojson(obj));
+    } else if (typeof obj !== "string") {
+        throw Error(
+            "First argument to DB.runCommand() must be either an object or a string: " +
+                "(type: " +
+                typeof obj +
+                "): " +
+                tojson(obj),
+        );
     }
 
     let commandName = obj;
@@ -125,16 +135,21 @@ DB.prototype._mergeCommandOptions = function(obj, extraKeys) {
 
     if (!extraKeys) {
         return mergedCmdObj;
-    } else if (typeof (extraKeys) === "object") {
+    } else if (typeof extraKeys === "object") {
         // this will traverse the prototype chain of extra, but keeping
         // to maintain legacy behavior
         for (let key in extraKeys) {
             mergedCmdObj[key] = extraKeys[key];
         }
     } else {
-        throw Error("Second argument to DB.runCommand(" + commandName +
-                    ") must be an object: (type: " + typeof (extraKeys) +
-                    "): " + tojson(extraKeys));
+        throw Error(
+            "Second argument to DB.runCommand(" +
+                commandName +
+                ") must be an object: (type: " +
+                typeof extraKeys +
+                "): " +
+                tojson(extraKeys),
+        );
     }
 
     return mergedCmdObj;
@@ -142,7 +157,7 @@ DB.prototype._mergeCommandOptions = function(obj, extraKeys) {
 
 // Like runCommand but applies readPreference if one has been set
 // on the connection. Also sets slaveOk if a (non-primary) readPref has been set.
-DB.prototype.runReadCommand = function(obj, extra, queryOptions) {
+DB.prototype.runReadCommand = function (obj, extra, queryOptions) {
     "use strict";
 
     // Support users who call this function with a string commandName, e.g.
@@ -170,12 +185,12 @@ DB.prototype.runReadCommand = function(obj, extra, queryOptions) {
 };
 
 // runCommand uses this impl to actually execute the command
-DB.prototype._runCommandImpl = function(name, obj, options) {
+DB.prototype._runCommandImpl = function (name, obj, options) {
     const session = this.getSession();
     return session._getSessionAwareClient().runCommand(session, name, obj, options);
 };
 
-DB.prototype.runCommand = function(obj, extra, queryOptions) {
+DB.prototype.runCommand = function (obj, extra, queryOptions) {
     "use strict";
 
     // Support users who call this function with a string commandName, e.g.
@@ -184,7 +199,7 @@ DB.prototype.runCommand = function(obj, extra, queryOptions) {
 
     // if options were passed (i.e. because they were overridden on a collection), use them.
     // Otherwise use getQueryOptions.
-    let options = (typeof (queryOptions) !== "undefined") ? queryOptions : this.getQueryOptions();
+    let options = typeof queryOptions !== "undefined" ? queryOptions : this.getQueryOptions();
 
     try {
         return this._runCommandImpl(this._name, mergedObj, options);
@@ -203,15 +218,14 @@ DB.prototype.runCommand = function(obj, extra, queryOptions) {
 DB.prototype._dbCommand = DB.prototype.runCommand;
 DB.prototype._dbReadCommand = DB.prototype.runReadCommand;
 
-DB.prototype.adminCommand = function(obj, extra) {
-    if (this._name == "admin")
-        return this.runCommand(obj, extra);
+DB.prototype.adminCommand = function (obj, extra) {
+    if (this._name == "admin") return this.runCommand(obj, extra);
     return this.getSiblingDB("admin").runCommand(obj, extra);
 };
 
-DB.prototype._adminCommand = DB.prototype.adminCommand;  // alias old name
+DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
 
-DB.prototype._helloOrLegacyHello = function(args) {
+DB.prototype._helloOrLegacyHello = function (args) {
     let cmd = this.getMongo().getApiParameters().version ? {hello: 1} : {isMaster: 1};
     if (args) {
         Object.assign(cmd, args);
@@ -219,7 +233,7 @@ DB.prototype._helloOrLegacyHello = function(args) {
     return this.runCommand(cmd);
 };
 
-DB.prototype._runCommandWithoutApiStrict = function(command) {
+DB.prototype._runCommandWithoutApiStrict = function (command) {
     let commandWithoutApiStrict = Object.assign({}, command);
     if (this.getMongo().getApiParameters().strict) {
         // Permit this command invocation, even if it's not in the requested API version.
@@ -229,11 +243,13 @@ DB.prototype._runCommandWithoutApiStrict = function(command) {
     return this.runCommand(commandWithoutApiStrict);
 };
 
-DB.prototype._runAggregate = function(cmdObj, aggregateOptions) {
+DB.prototype._runAggregate = function (cmdObj, aggregateOptions) {
     assert(cmdObj.pipeline instanceof Array, "cmdObj must contain a 'pipeline' array");
     assert(cmdObj.aggregate !== undefined, "cmdObj must contain 'aggregate' field");
-    assert(aggregateOptions === undefined || aggregateOptions instanceof Object,
-           "'aggregateOptions' argument must be an object");
+    assert(
+        aggregateOptions === undefined || aggregateOptions instanceof Object,
+        "'aggregateOptions' argument must be an object",
+    );
 
     // Disallow explicit API parameters on the aggregate shell helper; callers should use runCommand
     // directly if they want to test this.
@@ -243,21 +259,21 @@ DB.prototype._runAggregate = function(cmdObj, aggregateOptions) {
     cmdObj = Object.extend({}, cmdObj);
 
     // Make a copy of the aggregation options.
-    let optcpy = Object.extend({}, (aggregateOptions || {}));
+    let optcpy = Object.extend({}, aggregateOptions || {});
 
-    if ('batchSize' in optcpy) {
+    if ("batchSize" in optcpy) {
         if (optcpy.cursor == null) {
             optcpy.cursor = {};
         }
 
-        optcpy.cursor.batchSize = optcpy['batchSize'];
-        delete optcpy['batchSize'];
-    } else if ('useCursor' in optcpy) {
+        optcpy.cursor.batchSize = optcpy["batchSize"];
+        delete optcpy["batchSize"];
+    } else if ("useCursor" in optcpy) {
         if (optcpy.cursor == null) {
             optcpy.cursor = {};
         }
 
-        delete optcpy['useCursor'];
+        delete optcpy["useCursor"];
     }
 
     const maxAwaitTimeMS = optcpy.maxAwaitTimeMS;
@@ -269,7 +285,7 @@ DB.prototype._runAggregate = function(cmdObj, aggregateOptions) {
     // Add the options to the command object.
     Object.extend(cmdObj, aggregateOptions);
 
-    if (!('cursor' in cmdObj)) {
+    if (!("cursor" in cmdObj)) {
         cmdObj.cursor = {};
     }
 
@@ -289,11 +305,11 @@ DB.prototype._runAggregate = function(cmdObj, aggregateOptions) {
     return res;
 };
 
-DB.prototype.aggregate = function(pipeline, aggregateOptions) {
+DB.prototype.aggregate = function (pipeline, aggregateOptions) {
     assert(pipeline instanceof Array, "pipeline argument must be an array");
     const cmdObj = this._mergeCommandOptions("aggregate", {pipeline: pipeline});
 
-    return this._runAggregate(cmdObj, (aggregateOptions || {}));
+    return this._runAggregate(cmdObj, aggregateOptions || {});
 };
 
 /**
@@ -337,7 +353,7 @@ DB.prototype.aggregate = function(pipeline, aggregateOptions) {
  * @param {Object} options Object with options for call.  Options are listed above.
  * @return {Object} returned has member ok set to true if operation succeeds, false otherwise.
 */
-DB.prototype.createCollection = function(name, opt) {
+DB.prototype.createCollection = function (name, opt) {
     let options = opt || {};
 
     let cmd = {create: name};
@@ -355,7 +371,7 @@ DB.prototype.createCollection = function(name, opt) {
  *  @param pipeline [{ $operator: {...}}, ... ] - the aggregation pipeline that defines the view
  *  @param options { } - options on the view, e.g., collations
  */
-DB.prototype.createView = function(name, viewOn, pipeline, opt) {
+DB.prototype.createView = function (name, viewOn, pipeline, opt) {
     let options = opt || {};
 
     let cmd = {create: name};
@@ -384,7 +400,7 @@ DB.prototype.createView = function(name, viewOn, pipeline, opt) {
  *  Returns the current profiling level of this database
  *  @return SOMETHING_FIXME or null on error
  */
-DB.prototype.getProfilingLevel = function() {
+DB.prototype.getProfilingLevel = function () {
     let res = assert.commandWorked(this._dbCommand({profile: -1}));
     return res ? res.was : null;
 };
@@ -394,10 +410,9 @@ DB.prototype.getProfilingLevel = function() {
  *  example { was : 0, slowms : 100 }
  *  @return SOMETHING_FIXME or null on error
  */
-DB.prototype.getProfilingStatus = function() {
+DB.prototype.getProfilingStatus = function () {
     let res = this._dbCommand({profile: -1});
-    if (!res.ok)
-        throw _getErrorWithCode(res, "profile command failed: " + tojson(res));
+    if (!res.ok) throw _getErrorWithCode(res, "profile command failed: " + tojson(res));
     delete res.ok;
     return res;
 };
@@ -407,9 +422,8 @@ DB.prototype.getProfilingStatus = function() {
  * @params writeConcern: (document) expresses the write concern of the drop command.
  * @return Object returned has member ok set to true if operation succeeds, false otherwise.
  */
-DB.prototype.dropDatabase = function(writeConcern) {
-    return this._dbCommand(
-        {dropDatabase: 1, writeConcern: writeConcern ? writeConcern : _defaultWriteConcern});
+DB.prototype.dropDatabase = function (writeConcern) {
+    return this._dbCommand({dropDatabase: 1, writeConcern: writeConcern ? writeConcern : _defaultWriteConcern});
 };
 
 /**
@@ -420,12 +434,12 @@ DB.prototype.dropDatabase = function(writeConcern) {
  *   - timeoutSecs: (number) the server will continue checking over timeoutSecs
  *     if any other servers have caught up enough for it to shut down.
  */
-DB.prototype.shutdownServer = function(opts) {
+DB.prototype.shutdownServer = function (opts) {
     if ("admin" != this._name) {
         return "shutdown command only works with the admin database; try 'use admin'";
     }
 
-    let cmd = {'shutdown': 1};
+    let cmd = {"shutdown": 1};
     opts = opts || {};
     for (let o in opts) {
         cmd[o] = opts[o];
@@ -434,26 +448,28 @@ DB.prototype.shutdownServer = function(opts) {
     try {
         let res = this.runCommand(cmd);
         if (!res.ok) {
-            throw _getErrorWithCode(res, 'shutdownServer failed: ' + tojson(res));
+            throw _getErrorWithCode(res, "shutdownServer failed: " + tojson(res));
         }
-        throw Error('shutdownServer failed: server is still up.');
+        throw Error("shutdownServer failed: server is still up.");
     } catch (e) {
         // we expect the command to not return a response, as the server will shut down
         // immediately.
         if (isNetworkError(e)) {
-            print('server should be down...');
+            print("server should be down...");
             return;
         }
         throw e;
     }
 };
 
-DB.prototype.help = function() {
+DB.prototype.help = function () {
     print("DB methods:");
     print(
-        "\tdb.adminCommand(nameOrDocument) - switches to 'admin' db, and runs command [just calls db.runCommand(...)]");
+        "\tdb.adminCommand(nameOrDocument) - switches to 'admin' db, and runs command [just calls db.runCommand(...)]",
+    );
     print(
-        "\tdb.aggregate([pipeline], {options}) - performs a collectionless aggregation on this database; returns a cursor");
+        "\tdb.aggregate([pipeline], {options}) - performs a collectionless aggregation on this database; returns a cursor",
+    );
     print("\tdb.auth(username, password)");
     print("\tdb.commandHelp(name) returns the help for the command");
     print("\tdb.createUser(userDocument)");
@@ -466,8 +482,10 @@ DB.prototype.help = function() {
     print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
     print("\tdb.checkMetadataConsistency() checks the consistency of the metadata in the db");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
-    print("\tdb.getCollectionInfos([filter]) - returns a list that contains the names and options" +
-          " of the db's collections");
+    print(
+        "\tdb.getCollectionInfos([filter]) - returns a list that contains the names and options" +
+            " of the db's collections",
+    );
     print("\tdb.getCollectionNames()");
     print("\tdb.getLogComponents()");
     print("\tdb.getMongo() get the server connection object");
@@ -478,7 +496,8 @@ DB.prototype.help = function() {
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSiblingDB(name) get the db at the same server as this one");
     print(
-        "\tdb.getWriteConcern() - returns the write concern used for any operations on this db, inherited from server object if set");
+        "\tdb.getWriteConcern() - returns the write concern used for any operations on this db, inherited from server object if set",
+    );
     print("\tdb.hostInfo() get details about the server's host");
     print("\tdb.isMaster() check replica primary status");
     print("\tdb.hello() check replica primary status");
@@ -490,33 +509,31 @@ DB.prototype.help = function() {
     print("\tdb.printReplicationInfo()");
     print("\tdb.printShardingStatus()");
     print("\tdb.printSecondaryReplicationInfo()");
-    print(
-        "\tdb.rotateCertificates(message) - rotates certificates, CRLs, and CA files and logs an optional message");
-    print(
-        "\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into {cmdObj: 1}");
+    print("\tdb.rotateCertificates(message) - rotates certificates, CRLs, and CA files and logs an optional message");
+    print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into {cmdObj: 1}");
     print("\tdb.serverStatus()");
     print("\tdb.setLogLevel(level,<component>)");
     print("\tdb.setProfilingLevel(level,slowms) 0=off 1=slow 2=all");
     print("\tdb.setVerboseShell(flag) display extra information in shell output");
-    print(
-        "\tdb.setWriteConcern(<write concern doc>) - sets the write concern for writes to the db");
+    print("\tdb.setWriteConcern(<write concern doc>) - sets the write concern for writes to the db");
     print("\tdb.shutdownServer()");
     print("\tdb.stats()");
-    print(
-        "\tdb.unsetWriteConcern(<write concern doc>) - unsets the write concern for writes to the db");
+    print("\tdb.unsetWriteConcern(<write concern doc>) - unsets the write concern for writes to the db");
     print("\tdb.version() current version of the server");
-    print("\tdb.watch() - opens a change stream cursor for a database to report on all " +
-          " changes to its non-system collections.");
+    print(
+        "\tdb.watch() - opens a change stream cursor for a database to report on all " +
+            " changes to its non-system collections.",
+    );
     return __magicNoPrint;
 };
 
-DB.prototype.printCollectionStats = function(scale) {
+DB.prototype.printCollectionStats = function (scale) {
     if (arguments.length > 1) {
         print("printCollectionStats() has a single optional argument (scale)");
         return;
     }
-    if (typeof scale != 'undefined') {
-        if (typeof scale != 'number') {
+    if (typeof scale != "undefined") {
+        if (typeof scale != "number") {
             print("scale has to be a number >= 1");
             return;
         }
@@ -526,7 +543,7 @@ DB.prototype.printCollectionStats = function(scale) {
         }
     }
     let mydb = this;
-    this.getCollectionNames().forEach(function(z) {
+    this.getCollectionNames().forEach(function (z) {
         print(z);
         printjson(mydb.getCollection(z).stats(scale));
         print("---");
@@ -552,11 +569,11 @@ DB.prototype.printCollectionStats = function(scale) {
  * to get passed to the server. For example, db.setProfilingLevel(2, {foo: "bar"}) will issue
  * the command {profile: 2, foo: "bar"} to the server.
  */
-DB.prototype.setProfilingLevel = function(level, options) {
+DB.prototype.setProfilingLevel = function (level, options) {
     if (level < 0 || level > 2) {
         let errorText = "input level " + level + " is out of range [0..2]";
         let errorObject = new Error(errorText);
-        errorObject['dbSetProfilingException'] = errorText;
+        errorObject["dbSetProfilingException"] = errorText;
         throw errorObject;
     }
 
@@ -593,7 +610,7 @@ DB.prototype.setProfilingLevel = function(level, options) {
  * @return result of your function, or null if error
  *
  */
-DB.prototype.eval = function(jsfunction) {
+DB.prototype.eval = function (jsfunction) {
     print("WARNING: db.eval is deprecated");
 
     let cmd = {$eval: jsfunction};
@@ -603,8 +620,7 @@ DB.prototype.eval = function(jsfunction) {
 
     let res = this._dbCommand(cmd);
 
-    if (!res.ok)
-        throw _getErrorWithCode(res, tojson(res));
+    if (!res.ok) throw _getErrorWithCode(res, tojson(res));
 
     return res.retval;
 };
@@ -625,9 +641,9 @@ DB.prototype.dbEval = DB.prototype.eval;
  keyf (not both).
  * </p>
  */
-DB.prototype.groupeval = function(parmsObj) {
-    let groupFunction = function() {
-        var parms = args[0];  // eslint-disable-line
+DB.prototype.groupeval = function (parmsObj) {
+    let groupFunction = function () {
+        var parms = args[0]; // eslint-disable-line
         let c = globalThis.db[parms.ns].find(parms.cond || {});
         let map = new BSONAwareMap();
         let pks = parms.key ? Object.keySet(parms.key) : null;
@@ -647,7 +663,7 @@ DB.prototype.groupeval = function(parmsObj) {
 
             let aggObj = map.get(key);
             if (aggObj == null) {
-                let newObj = Object.extend({}, key);  // clone
+                let newObj = Object.extend({}, key); // clone
                 aggObj = Object.extend(newObj, parms.initial);
                 map.put(key, aggObj);
             }
@@ -660,11 +676,11 @@ DB.prototype.groupeval = function(parmsObj) {
     return this.eval(groupFunction, this._groupFixParms(parmsObj));
 };
 
-DB.prototype._groupFixParms = function(parmsObj) {
+DB.prototype._groupFixParms = function (parmsObj) {
     let parms = Object.extend({}, parmsObj);
 
     if (parms.reduce) {
-        parms.$reduce = parms.reduce;  // must have $ to pass to db
+        parms.$reduce = parms.reduce; // must have $ to pass to db
         delete parms.reduce;
     }
 
@@ -676,18 +692,22 @@ DB.prototype._groupFixParms = function(parmsObj) {
     return parms;
 };
 
-DB.prototype.forceError = function() {
+DB.prototype.forceError = function () {
     return this.runCommand({forceerror: 1});
 };
 
-DB.prototype._getCollectionInfosCommand = function(
-    filter, nameOnly = false, authorizedCollections = false, options = {}) {
+DB.prototype._getCollectionInfosCommand = function (
+    filter,
+    nameOnly = false,
+    authorizedCollections = false,
+    options = {},
+) {
     filter = filter || {};
     const cmd = {
         listCollections: 1,
         filter: filter,
         nameOnly: nameOnly,
-        authorizedCollections: authorizedCollections
+        authorizedCollections: authorizedCollections,
     };
 
     const res = this.runCommand(Object.merge(cmd, options));
@@ -698,7 +718,7 @@ DB.prototype._getCollectionInfosCommand = function(
     return new DBCommandCursor(this, res).toArray().sort(compareOn("name"));
 };
 
-DB.prototype._getCollectionInfosFromPrivileges = function() {
+DB.prototype._getCollectionInfosFromPrivileges = function () {
     let ret = this.runCommand({connectionStatus: 1, showPrivileges: 1});
     if (!ret.ok) {
         throw _getErrorWithCode(ret, "Failed to acquire collection information from privileges");
@@ -712,7 +732,7 @@ DB.prototype._getCollectionInfosFromPrivileges = function() {
         return result;
     }
 
-    privileges.forEach(privilege => {
+    privileges.forEach((privilege) => {
         let resource = privilege.resource;
         if (resource === undefined) {
             return;
@@ -737,8 +757,7 @@ DB.prototype._getCollectionInfosFromPrivileges = function() {
  * by collection name. An optional filter can be specified to match only collections with
  * certain metadata.
  */
-DB.prototype.getCollectionInfos = function(
-    filter, nameOnly = false, authorizedCollections = false) {
+DB.prototype.getCollectionInfos = function (filter, nameOnly = false, authorizedCollections = false) {
     try {
         return this._getCollectionInfosCommand(filter, nameOnly, authorizedCollections);
     } catch (ex) {
@@ -752,10 +771,15 @@ DB.prototype.getCollectionInfos = function(
         // to authorization, we must be attempting to recover the names of our own collections,
         // and no filter can have been provided.
 
-        if (nameOnly && authorizedCollections && Object.getOwnPropertyNames(filter).length === 0 &&
-            ex.code === ErrorCodes.Unauthorized) {
+        if (
+            nameOnly &&
+            authorizedCollections &&
+            Object.getOwnPropertyNames(filter).length === 0 &&
+            ex.code === ErrorCodes.Unauthorized
+        ) {
             print(
-                "Warning: unable to run listCollections, attempting to approximate collection names by parsing connectionStatus");
+                "Warning: unable to run listCollections, attempting to approximate collection names by parsing connectionStatus",
+            );
             return this._getCollectionInfosFromPrivileges();
         }
 
@@ -763,8 +787,8 @@ DB.prototype.getCollectionInfos = function(
     }
 };
 
-DB.prototype._getCollectionNamesInternal = function(options) {
-    return this._getCollectionInfosCommand({}, true, true, options).map(function(infoObj) {
+DB.prototype._getCollectionNamesInternal = function (options) {
+    return this._getCollectionInfosCommand({}, true, true, options).map(function (infoObj) {
         return infoObj.name;
     });
 };
@@ -772,35 +796,36 @@ DB.prototype._getCollectionNamesInternal = function(options) {
 /**
  * Returns this database's list of collection names in sorted order.
  */
-DB.prototype.getCollectionNames = function() {
+DB.prototype.getCollectionNames = function () {
     return this._getCollectionNamesInternal({});
 };
 
-DB.prototype.tojson = function() {
+DB.prototype.tojson = function () {
     return this._name;
 };
 
-DB.prototype.toString = function() {
+DB.prototype.toString = function () {
     return this._name;
 };
 
-DB.prototype.isMaster = function() {
+DB.prototype.isMaster = function () {
     return this.runCommand("isMaster");
 };
 
-DB.prototype.hello = function() {
+DB.prototype.hello = function () {
     return this.runCommand("hello");
 };
 
-DB.prototype.currentOp = function(arg) {
+DB.prototype.currentOp = function (arg) {
     try {
         const results = this.currentOpCursor(arg).toArray();
         let res = {"inprog": results.length > 0 ? results : [], "ok": 1};
         Object.defineProperty(res, "fsyncLock", {
-            get: function() {
+            get: function () {
                 throw Error(
-                    "fsyncLock is no longer included in the currentOp shell helper, run db.runCommand({currentOp: 1}) instead.");
-            }
+                    "fsyncLock is no longer included in the currentOp shell helper, run db.runCommand({currentOp: 1}) instead.",
+                );
+            },
         });
         return res;
     } catch (e) {
@@ -808,13 +833,11 @@ DB.prototype.currentOp = function(arg) {
     }
 };
 
-DB.prototype.currentOpCursor = function(arg) {
+DB.prototype.currentOpCursor = function (arg) {
     let q = {};
     if (arg) {
-        if (typeof (arg) == "object")
-            Object.extend(q, arg);
-        else if (arg)
-            q["$all"] = true;
+        if (typeof arg == "object") Object.extend(q, arg);
+        else if (arg) q["$all"] = true;
     }
 
     // Convert the incoming currentOp command into an equivalent aggregate command
@@ -843,21 +866,18 @@ DB.prototype.currentOpCursor = function(arg) {
     // The legacy db.currentOp() shell helper ignored any explicitly set read preference and used
     // the default, with the ability to also run on secondaries. To preserve this behavior we will
     // run the aggregate with read preference "primaryPreferred".
-    return this.getSiblingDB("admin").aggregate(pipeline,
-                                                {"$readPreference": {"mode": "primaryPreferred"}});
+    return this.getSiblingDB("admin").aggregate(pipeline, {"$readPreference": {"mode": "primaryPreferred"}});
 };
 
-DB.prototype.killOp = function(op) {
-    if (!op)
-        throw Error("no opNum to kill specified");
-    return this.adminCommand({'killOp': 1, 'op': op});
+DB.prototype.killOp = function (op) {
+    if (!op) throw Error("no opNum to kill specified");
+    return this.adminCommand({"killOp": 1, "op": op});
 };
 DB.prototype.killOP = DB.prototype.killOp;
 
-DB.tsToSeconds = function(x) {
-    if (x.t && x.i)
-        return x.t;
-    return x / 4294967296;  // low 32 bits are ordinal #s within a second
+DB.tsToSeconds = function (x) {
+    if (x.t && x.i) return x.t;
+    return x / 4294967296; // low 32 bits are ordinal #s within a second
 };
 
 /**
@@ -872,14 +892,14 @@ DB.tsToSeconds = function(x) {
   * @return Object timeSpan: time span of the oplog from start to end  if secondary is more out
   *                          of date than that, it can't recover without a complete resync
 */
-DB.prototype.getReplicationInfo = function() {
+DB.prototype.getReplicationInfo = function () {
     let localdb = this.getSiblingDB("local");
 
     let result = {};
     let oplog;
     let localCollections = localdb.getCollectionNames();
-    if (localCollections.indexOf('oplog.rs') >= 0) {
-        oplog = 'oplog.rs';
+    if (localCollections.indexOf("oplog.rs") >= 0) {
+        oplog = "oplog.rs";
     } else {
         result.errmsg = "replication not detected";
         return result;
@@ -890,8 +910,8 @@ DB.prototype.getReplicationInfo = function() {
     if (ol_stats && ol_stats.maxSize) {
         result.logSizeMB = ol_stats.maxSize / (1024 * 1024);
     } else {
-        result.errmsg = "Could not get stats for local." + oplog + " collection. " +
-            "collstats returned: " + tojson(ol_stats);
+        result.errmsg =
+            "Could not get stats for local." + oplog + " collection. " + "collstats returned: " + tojson(ol_stats);
         return result;
     }
 
@@ -901,8 +921,7 @@ DB.prototype.getReplicationInfo = function() {
     let firstc = ol.find().sort({$natural: 1}).limit(1);
     let lastc = ol.find().sort({$natural: -1}).limit(1);
     if (!firstc.hasNext() || !lastc.hasNext()) {
-        result.errmsg =
-            "objects not found in local.oplog.$main -- is this a new and empty db instance?";
+        result.errmsg = "objects not found in local.oplog.$main -- is this a new and empty db instance?";
         result.oplogMainRowCount = ol.count();
         return result;
     }
@@ -917,8 +936,8 @@ DB.prototype.getReplicationInfo = function() {
         tlast = DB.tsToSeconds(tlast);
         result.timeDiff = tlast - tfirst;
         result.timeDiffHours = Math.round(result.timeDiff / 36) / 100;
-        result.tFirst = (new Date(tfirst * 1000)).toString();
-        result.tLast = (new Date(tlast * 1000)).toString();
+        result.tFirst = new Date(tfirst * 1000).toString();
+        result.tLast = new Date(tlast * 1000).toString();
         result.now = Date();
     } else {
         result.errmsg = "ts element not found in oplog objects";
@@ -927,7 +946,7 @@ DB.prototype.getReplicationInfo = function() {
     return result;
 };
 
-DB.prototype.printReplicationInfo = function() {
+DB.prototype.printReplicationInfo = function () {
     let result = this.getReplicationInfo();
     if (result.errmsg) {
         let reply, isPrimary;
@@ -957,13 +976,14 @@ DB.prototype.printReplicationInfo = function() {
     print("now:                     " + result.now);
 };
 
-DB.prototype.printSlaveReplicationInfo = function() {
+DB.prototype.printSlaveReplicationInfo = function () {
     print(
-        "WARNING: printSlaveReplicationInfo is deprecated and may be removed in the next major release. Please use printSecondaryReplicationInfo instead.");
+        "WARNING: printSlaveReplicationInfo is deprecated and may be removed in the next major release. Please use printSecondaryReplicationInfo instead.",
+    );
     this.printSecondaryReplicationInfo();
 };
 
-DB.prototype.printSecondaryReplicationInfo = function() {
+DB.prototype.printSecondaryReplicationInfo = function () {
     let startOptimeDate = null;
     let primary = null;
 
@@ -994,7 +1014,8 @@ DB.prototype.printSecondaryReplicationInfo = function() {
 
     function printNodeReplicationInfo(node) {
         assert(node);
-        if (node.state === 1 || node.state === 7) {  // ignore primaries (1) and arbiters (7)
+        if (node.state === 1 || node.state === 7) {
+            // ignore primaries (1) and arbiters (7)
             return;
         }
 
@@ -1010,15 +1031,13 @@ DB.prototype.printSecondaryReplicationInfo = function() {
         print("\tInitialSyncSyncSource: " + syncSourceString);
         let minutes = Math.floor((remainingMillis / (1000 * 60)) % 60);
         let hours = Math.floor(remainingMillis / (1000 * 60 * 60));
-        print("\tInitialSyncRemainingEstimatedDuration: " + hours + " hour(s) " + minutes +
-              " minute(s)");
+        print("\tInitialSyncRemainingEstimatedDuration: " + hours + " hour(s) " + minutes + " minute(s)");
     }
 
     let L = this.getSiblingDB("local");
 
     if (L.system.replset.count() != 0) {
-        const status =
-            this.getSiblingDB('admin')._runCommandWithoutApiStrict({'replSetGetStatus': 1});
+        const status = this.getSiblingDB("admin")._runCommandWithoutApiStrict({"replSetGetStatus": 1});
         primary = getPrimary(status.members);
         if (primary) {
             startOptimeDate = primary.optimeDate;
@@ -1043,7 +1062,8 @@ DB.prototype.printSecondaryReplicationInfo = function() {
                 // Print initial sync info if node is in the STARTUP2 state.
                 printNodeInitialSyncInfo(
                     status.members[i].syncSourceHost,
-                    status.initialSyncStatus.remainingInitialSyncEstimatedMillis);
+                    status.initialSyncStatus.remainingInitialSyncEstimatedMillis,
+                );
             } else {
                 printNodeReplicationInfo(status.members[i]);
             }
@@ -1053,12 +1073,11 @@ DB.prototype.printSecondaryReplicationInfo = function() {
 
 // Checking the server buildinfo requires the client to be authenticated
 // This is the deprecated version used by the jstest fuzzer, prefer using the getServerBuildInfo.
-DB.prototype.serverBuildInfo = function() {
-    return assert.commandWorked(
-        this.getSiblingDB("admin")._runCommandWithoutApiStrict({buildinfo: 1}));
+DB.prototype.serverBuildInfo = function () {
+    return assert.commandWorked(this.getSiblingDB("admin")._runCommandWithoutApiStrict({buildinfo: 1}));
 };
 
-DB.prototype.serverStatus = function(options) {
+DB.prototype.serverStatus = function (options) {
     let cmd = {serverStatus: 1};
     if (options) {
         Object.extend(cmd, options);
@@ -1067,109 +1086,108 @@ DB.prototype.serverStatus = function(options) {
     return this._adminCommand(cmd);
 };
 
-DB.prototype.hostInfo = function() {
+DB.prototype.hostInfo = function () {
     return this._adminCommand("hostInfo");
 };
 
-DB.prototype.serverCmdLineOpts = function() {
+DB.prototype.serverCmdLineOpts = function () {
     return this._adminCommand("getCmdLineOpts");
 };
 
 // Throws if client connection is not authenticated.
-DB.prototype.version = function() {
+DB.prototype.version = function () {
     return this.getServerBuildInfo().getVersion();
 };
 
 // Throws if client connection is not authenticated.
-DB.prototype.serverBits = function() {
+DB.prototype.serverBits = function () {
     return this.getServerBuildInfo().getBits();
 };
 
-DB.prototype.listCommands = function() {
+DB.prototype.listCommands = function () {
     let x = this.runCommand("listCommands");
     for (let name in x.commands) {
         let c = x.commands[name];
 
         let s = name + ": ";
 
-        if (c.adminOnly)
-            s += " adminOnly ";
-        if (c.secondaryOk)
-            s += " secondaryOk ";
+        if (c.adminOnly) s += " adminOnly ";
+        if (c.secondaryOk) s += " secondaryOk ";
 
         s += "\n  ";
-        s += c.help.replace(/\n/g, '\n  ');
+        s += c.help.replace(/\n/g, "\n  ");
         s += "\n";
 
         print(s);
     }
 };
 
-DB.prototype.printShardingStatus = function(verbose) {
+DB.prototype.printShardingStatus = function (verbose) {
     printShardingStatus(this.getSiblingDB("config"), verbose);
 };
 
-DB.prototype.fsyncLock = function() {
+DB.prototype.fsyncLock = function () {
     return this.adminCommand({fsync: 1, lock: true});
 };
 
-DB.prototype.fsyncUnlock = function() {
+DB.prototype.fsyncUnlock = function () {
     return this.adminCommand({fsyncUnlock: 1});
 };
 
-DB.autocomplete = function(obj) {
+DB.autocomplete = function (obj) {
     // In interactive mode, time out if a transaction or other op holds locks we need. Caller
     // suppresses exceptions. In non-interactive mode, don't specify a timeout, because in an
     // automated test we prefer consistent results over quick feedback.
     let colls = obj._getCollectionNamesInternal(isInteractive() ? {maxTimeMS: 1000} : {});
     let ret = [];
     for (let i = 0; i < colls.length; i++) {
-        if (colls[i].match(/^[a-zA-Z0-9_.\$]+$/))
-            ret.push(colls[i]);
+        if (colls[i].match(/^[a-zA-Z0-9_.\$]+$/)) ret.push(colls[i]);
     }
     return ret;
 };
 
-DB.prototype.setSlaveOk = function(value = true) {
+DB.prototype.setSlaveOk = function (value = true) {
     print(
-        "WARNING: setSlaveOk() is deprecated and may be removed in the next major release. Please use setSecondaryOk() instead.");
+        "WARNING: setSlaveOk() is deprecated and may be removed in the next major release. Please use setSecondaryOk() instead.",
+    );
     this.setSecondaryOk(value);
 };
 
-DB.prototype.getSlaveOk = function() {
+DB.prototype.getSlaveOk = function () {
     print(
-        "WARNING: getSlaveOk() is deprecated and may be removed in the next major release. Please use getSecondaryOk() instead.");
+        "WARNING: getSlaveOk() is deprecated and may be removed in the next major release. Please use getSecondaryOk() instead.",
+    );
     return this.getSecondaryOk();
 };
 
-DB.prototype.setSecondaryOk = function(value = true) {
+DB.prototype.setSecondaryOk = function (value = true) {
     this._secondaryOk = value;
 };
 
-DB.prototype.getSecondaryOk = function() {
-    if (this._secondaryOk != undefined)
-        return this._secondaryOk;
+DB.prototype.getSecondaryOk = function () {
+    if (this._secondaryOk != undefined) return this._secondaryOk;
     return this._mongo.getSecondaryOk();
 };
 
-DB.prototype.getQueryOptions = function() {
+DB.prototype.getQueryOptions = function () {
     let options = 0;
-    if (this.getSecondaryOk())
-        options |= 4;
+    if (this.getSecondaryOk()) options |= 4;
     return options;
 };
 
 /* Loads any scripts contained in system.js into the client shell.
  */
-DB.prototype.loadServerScripts = function() {
-    let global = Function('return this')();
-    this.getCollection('system.js').find().forEach(function(u) {
-        if (u.value.constructor === Code) {
-            global[u._id] = eval("(" + u.value.code + ")");
-        } else {
-            global[u._id] = u.value;
-        }
-    });
+DB.prototype.loadServerScripts = function () {
+    let global = Function("return this")();
+    this.getCollection("system.js")
+        .find()
+        .forEach(function (u) {
+            if (u.value.constructor === Code) {
+                global[u._id] = eval("(" + u.value.code + ")");
+            } else {
+                global[u._id] = u.value;
+            }
+        });
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1185,13 +1203,15 @@ function getUserObjString(userObj) {
     return toreturn;
 }
 
-DB.prototype._modifyCommandToDigestPasswordIfNecessary = function(cmdObj, username) {
+DB.prototype._modifyCommandToDigestPasswordIfNecessary = function (cmdObj, username) {
     if (!cmdObj["pwd"]) {
         return;
     }
     if (cmdObj.hasOwnProperty("digestPassword")) {
-        throw Error("Cannot specify 'digestPassword' through the user management shell helpers, " +
-                    "use 'passwordDigestor' instead");
+        throw Error(
+            "Cannot specify 'digestPassword' through the user management shell helpers, " +
+                "use 'passwordDigestor' instead",
+        );
     }
     let passwordDigestor = cmdObj["passwordDigestor"] ? cmdObj["passwordDigestor"] : "server";
     if (passwordDigestor == "server") {
@@ -1200,13 +1220,12 @@ DB.prototype._modifyCommandToDigestPasswordIfNecessary = function(cmdObj, userna
         cmdObj["pwd"] = _hashPassword(username, cmdObj["pwd"]);
         cmdObj["digestPassword"] = false;
     } else {
-        throw Error("'passwordDigestor' must be either 'server' or 'client', got: '" +
-                    passwordDigestor + "'");
+        throw Error("'passwordDigestor' must be either 'server' or 'client', got: '" + passwordDigestor + "'");
     }
     delete cmdObj["passwordDigestor"];
 };
 
-DB.prototype.createUser = function(userObj, writeConcern) {
+DB.prototype.createUser = function (userObj, writeConcern) {
     let name = userObj["user"];
     if (name === undefined) {
         throw Error("no 'user' field provided to 'createUser' function");
@@ -1232,30 +1251,33 @@ DB.prototype.createUser = function(userObj, writeConcern) {
     }
 
     if (res.errmsg == "no such cmd: createUser") {
-        throw Error("'createUser' command not found.  This is most likely because you are " +
-                    "talking to an old (pre v2.6) MongoDB server");
+        throw Error(
+            "'createUser' command not found.  This is most likely because you are " +
+                "talking to an old (pre v2.6) MongoDB server",
+        );
     }
 
     if (res.errmsg == "timeout") {
-        throw Error("timed out while waiting for user authentication to replicate - " +
-                    "database will not be fully secured until replication finishes");
+        throw Error(
+            "timed out while waiting for user authentication to replicate - " +
+                "database will not be fully secured until replication finishes",
+        );
     }
 
     throw _getErrorWithCode(res, "couldn't add user: " + res.errmsg);
 };
 
 function _hashPassword(username, password) {
-    if (typeof password != 'string') {
-        throw Error("User passwords must be of type string. Was given password with type: " +
-                    typeof (password));
+    if (typeof password != "string") {
+        throw Error("User passwords must be of type string. Was given password with type: " + typeof password);
     }
     return hex_md5(username + ":mongo:" + password);
 }
 
-DB.prototype.updateUser = function(name, updateObject, writeConcern) {
+DB.prototype.updateUser = function (name, updateObject, writeConcern) {
     let cmdObj = {updateUser: name};
     cmdObj = Object.extend(cmdObj, updateObject);
-    cmdObj['writeConcern'] = writeConcern ? writeConcern : _defaultWriteConcern;
+    cmdObj["writeConcern"] = writeConcern ? writeConcern : _defaultWriteConcern;
     this._modifyCommandToDigestPasswordIfNecessary(cmdObj, name);
 
     let res = this.runCommand(cmdObj);
@@ -1266,25 +1288,25 @@ DB.prototype.updateUser = function(name, updateObject, writeConcern) {
     throw _getErrorWithCode(res, "Updating user failed: " + res.errmsg);
 };
 
-DB.prototype.changeUserPassword = function(username, password, writeConcern) {
+DB.prototype.changeUserPassword = function (username, password, writeConcern) {
     this.updateUser(username, {pwd: password}, writeConcern);
 };
 
-DB.prototype.logout = function() {
+DB.prototype.logout = function () {
     // Logging out doesn't require a session since it manipulates connection state.
     return this.getMongo().logout(this.getName());
 };
 
 // For backwards compatibility
-DB.prototype.removeUser = function(username, writeConcern) {
+DB.prototype.removeUser = function (username, writeConcern) {
     print("WARNING: db.removeUser has been deprecated, please use db.dropUser instead");
     return this.dropUser(username, writeConcern);
 };
 
-DB.prototype.dropUser = function(username, writeConcern) {
+DB.prototype.dropUser = function (username, writeConcern) {
     let cmdObj = {
         dropUser: username,
-        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern
+        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
 
@@ -1292,17 +1314,18 @@ DB.prototype.dropUser = function(username, writeConcern) {
         return true;
     }
 
-    if (res.code == 11) {  // Code 11 = UserNotFound
+    if (res.code == 11) {
+        // Code 11 = UserNotFound
         return false;
     }
 
     throw _getErrorWithCode(res, res.errmsg);
 };
 
-DB.prototype.dropAllUsers = function(writeConcern) {
+DB.prototype.dropAllUsers = function (writeConcern) {
     let res = this.runCommand({
         dropAllUsersFromDatabase: 1,
-        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern
+        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     });
 
     if (!res.ok) {
@@ -1312,31 +1335,33 @@ DB.prototype.dropAllUsers = function(writeConcern) {
     return res.n;
 };
 
-DB.prototype.__pwHash = function(nonce, username, pass) {
+DB.prototype.__pwHash = function (nonce, username, pass) {
     return hex_md5(nonce + username + _hashPassword(username, pass));
 };
 
 DB.prototype._defaultAuthenticationMechanism = null;
 
 function _fallbackToScramSha256(helloResult) {
-    return helloResult && isNumber(helloResult.maxWireVersion) &&
-        helloResult.maxWireVersion >= kWireVersionSupportingScramSha256Fallback;
+    return (
+        helloResult &&
+        isNumber(helloResult.maxWireVersion) &&
+        helloResult.maxWireVersion >= kWireVersionSupportingScramSha256Fallback
+    );
 }
 
-DB.prototype._getDefaultAuthenticationMechanism = function(username, database) {
+DB.prototype._getDefaultAuthenticationMechanism = function (username, database) {
     let result = null;
     if (username !== undefined) {
         const userid = database + "." + username;
         result = this._helloOrLegacyHello({saslSupportedMechs: userid});
 
-        if (result.ok && (result.saslSupportedMechs !== undefined)) {
+        if (result.ok && result.saslSupportedMechs !== undefined) {
             const mechs = result.saslSupportedMechs;
             if (!Array.isArray(mechs)) {
                 throw Error("Server replied with invalid saslSupportedMechs response");
             }
 
-            if ((this._defaultAuthenticationMechanism != null) &&
-                mechs.includes(this._defaultAuthenticationMechanism)) {
+            if (this._defaultAuthenticationMechanism != null && mechs.includes(this._defaultAuthenticationMechanism)) {
                 return this._defaultAuthenticationMechanism;
             }
 
@@ -1366,22 +1391,21 @@ DB.prototype._getDefaultAuthenticationMechanism = function(username, database) {
 
 DB.prototype._defaultGssapiServiceName = null;
 
-DB.prototype._authOrThrow = function() {
+DB.prototype._authOrThrow = function () {
     let params;
     if (arguments.length == 2) {
         params = {user: arguments[0], pwd: arguments[1]};
     } else if (arguments.length == 1) {
-        if (typeof (arguments[0]) === "string") {
+        if (typeof arguments[0] === "string") {
             let password = passwordPrompt();
             params = {user: arguments[0], pwd: password};
-        } else if (typeof (arguments[0]) === "object") {
+        } else if (typeof arguments[0] === "object") {
             params = Object.extend({}, arguments[0]);
         } else {
             throw Error("Single-argument form of auth expects a parameter object");
         }
     } else {
-        throw Error(
-            "auth expects (username), (username, password), or ({ user: username, pwd: password })");
+        throw Error("auth expects (username), (username, password), or ({ user: username, pwd: password })");
     }
 
     if (params.mechanism === undefined) {
@@ -1392,8 +1416,7 @@ DB.prototype._authOrThrow = function() {
         throw Error("Do not override db field on db.auth(). Use getMongo().auth(), instead.");
     }
 
-    if (params.mechanism == "GSSAPI" && params.serviceName == null &&
-        this._defaultGssapiServiceName != null) {
+    if (params.mechanism == "GSSAPI" && params.serviceName == null && this._defaultGssapiServiceName != null) {
         params.serviceName = this._defaultGssapiServiceName;
     }
 
@@ -1408,7 +1431,7 @@ DB.prototype._authOrThrow = function() {
     return good;
 };
 
-DB.prototype.auth = function() {
+DB.prototype.auth = function () {
     try {
         this._authOrThrow.apply(this, arguments);
     } catch (ex) {
@@ -1418,11 +1441,11 @@ DB.prototype.auth = function() {
     return 1;
 };
 
-DB.prototype.grantRolesToUser = function(username, roles, writeConcern) {
+DB.prototype.grantRolesToUser = function (username, roles, writeConcern) {
     let cmdObj = {
         grantRolesToUser: username,
         roles: roles,
-        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern
+        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
     if (!res.ok) {
@@ -1430,11 +1453,11 @@ DB.prototype.grantRolesToUser = function(username, roles, writeConcern) {
     }
 };
 
-DB.prototype.revokeRolesFromUser = function(username, roles, writeConcern) {
+DB.prototype.revokeRolesFromUser = function (username, roles, writeConcern) {
     let cmdObj = {
         revokeRolesFromUser: username,
         roles: roles,
-        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern
+        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
     if (!res.ok) {
@@ -1442,7 +1465,7 @@ DB.prototype.revokeRolesFromUser = function(username, roles, writeConcern) {
     }
 };
 
-DB.prototype.getUser = function(username, args) {
+DB.prototype.getUser = function (username, args) {
     if (typeof username != "string") {
         throw Error("User name for getUser shell helper must be a string");
     }
@@ -1460,14 +1483,13 @@ DB.prototype.getUser = function(username, args) {
     return res.users[0];
 };
 
-DB.prototype.getUsers = function(args) {
+DB.prototype.getUsers = function (args) {
     let cmdObj = {usersInfo: 1};
     Object.extend(cmdObj, args);
     let res = this.runCommand(cmdObj);
     if (!res.ok) {
         let authSchemaIncompatibleCode = 69;
-        if (res.code == authSchemaIncompatibleCode ||
-            (res.code == null && res.errmsg == "no such cmd: usersInfo")) {
+        if (res.code == authSchemaIncompatibleCode || (res.code == null && res.errmsg == "no such cmd: usersInfo")) {
             // Working with 2.4 schema user data
             return this.system.users.find({}).toArray();
         }
@@ -1478,7 +1500,7 @@ DB.prototype.getUsers = function(args) {
     return res.users;
 };
 
-DB.prototype.createRole = function(roleObj, writeConcern) {
+DB.prototype.createRole = function (roleObj, writeConcern) {
     let name = roleObj["role"];
     let cmdObj = {createRole: name};
     cmdObj = Object.extend(cmdObj, roleObj);
@@ -1493,17 +1515,17 @@ DB.prototype.createRole = function(roleObj, writeConcern) {
     printjson(roleObj);
 };
 
-DB.prototype.updateRole = function(name, updateObject, writeConcern) {
+DB.prototype.updateRole = function (name, updateObject, writeConcern) {
     let cmdObj = {updateRole: name};
     cmdObj = Object.extend(cmdObj, updateObject);
-    cmdObj['writeConcern'] = writeConcern ? writeConcern : _defaultWriteConcern;
+    cmdObj["writeConcern"] = writeConcern ? writeConcern : _defaultWriteConcern;
     let res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw _getErrorWithCode(res, res.errmsg);
     }
 };
 
-DB.prototype.dropRole = function(name, writeConcern) {
+DB.prototype.dropRole = function (name, writeConcern) {
     let cmdObj = {dropRole: name, writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
     let res = this.runCommand(cmdObj);
 
@@ -1511,17 +1533,18 @@ DB.prototype.dropRole = function(name, writeConcern) {
         return true;
     }
 
-    if (res.code == 31) {  // Code 31 = RoleNotFound
+    if (res.code == 31) {
+        // Code 31 = RoleNotFound
         return false;
     }
 
     throw _getErrorWithCode(res, res.errmsg);
 };
 
-DB.prototype.dropAllRoles = function(writeConcern) {
+DB.prototype.dropAllRoles = function (writeConcern) {
     let res = this.runCommand({
         dropAllRolesFromDatabase: 1,
-        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern
+        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     });
 
     if (!res.ok) {
@@ -1531,11 +1554,11 @@ DB.prototype.dropAllRoles = function(writeConcern) {
     return res.n;
 };
 
-DB.prototype.grantRolesToRole = function(rolename, roles, writeConcern) {
+DB.prototype.grantRolesToRole = function (rolename, roles, writeConcern) {
     let cmdObj = {
         grantRolesToRole: rolename,
         roles: roles,
-        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern
+        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
     if (!res.ok) {
@@ -1543,11 +1566,11 @@ DB.prototype.grantRolesToRole = function(rolename, roles, writeConcern) {
     }
 };
 
-DB.prototype.revokeRolesFromRole = function(rolename, roles, writeConcern) {
+DB.prototype.revokeRolesFromRole = function (rolename, roles, writeConcern) {
     let cmdObj = {
         revokeRolesFromRole: rolename,
         roles: roles,
-        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern
+        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
     if (!res.ok) {
@@ -1555,11 +1578,11 @@ DB.prototype.revokeRolesFromRole = function(rolename, roles, writeConcern) {
     }
 };
 
-DB.prototype.grantPrivilegesToRole = function(rolename, privileges, writeConcern) {
+DB.prototype.grantPrivilegesToRole = function (rolename, privileges, writeConcern) {
     let cmdObj = {
         grantPrivilegesToRole: rolename,
         privileges: privileges,
-        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern
+        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
     if (!res.ok) {
@@ -1567,11 +1590,11 @@ DB.prototype.grantPrivilegesToRole = function(rolename, privileges, writeConcern
     }
 };
 
-DB.prototype.revokePrivilegesFromRole = function(rolename, privileges, writeConcern) {
+DB.prototype.revokePrivilegesFromRole = function (rolename, privileges, writeConcern) {
     let cmdObj = {
         revokePrivilegesFromRole: rolename,
         privileges: privileges,
-        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern
+        writeConcern: writeConcern ? writeConcern : _defaultWriteConcern,
     };
     let res = this.runCommand(cmdObj);
     if (!res.ok) {
@@ -1579,7 +1602,7 @@ DB.prototype.revokePrivilegesFromRole = function(rolename, privileges, writeConc
     }
 };
 
-DB.prototype.getRole = function(rolename, args) {
+DB.prototype.getRole = function (rolename, args) {
     if (typeof rolename != "string") {
         throw Error("Role name for getRole shell helper must be a string");
     }
@@ -1596,7 +1619,7 @@ DB.prototype.getRole = function(rolename, args) {
     return res.roles[0];
 };
 
-DB.prototype.getRoles = function(args) {
+DB.prototype.getRoles = function (args) {
     let cmdObj = {rolesInfo: 1};
     Object.extend(cmdObj, args);
     let res = this.runCommand(cmdObj);
@@ -1607,7 +1630,7 @@ DB.prototype.getRoles = function(args) {
     return res.roles;
 };
 
-DB.prototype.setWriteConcern = function(wc) {
+DB.prototype.setWriteConcern = function (wc) {
     if (wc instanceof WriteConcern) {
         this._writeConcern = wc;
     } else {
@@ -1615,9 +1638,8 @@ DB.prototype.setWriteConcern = function(wc) {
     }
 };
 
-DB.prototype.getWriteConcern = function() {
-    if (this._writeConcern)
-        return this._writeConcern;
+DB.prototype.getWriteConcern = function () {
+    if (this._writeConcern) return this._writeConcern;
 
     {
         const session = this.getSession();
@@ -1625,45 +1647,45 @@ DB.prototype.getWriteConcern = function() {
     }
 };
 
-DB.prototype.unsetWriteConcern = function() {
+DB.prototype.unsetWriteConcern = function () {
     delete this._writeConcern;
 };
 
-DB.prototype.getLogComponents = function() {
+DB.prototype.getLogComponents = function () {
     return this.getMongo().getLogComponents(this.getSession());
 };
 
-DB.prototype.setLogLevel = function(logLevel, component) {
+DB.prototype.setLogLevel = function (logLevel, component) {
     return this.getMongo().setLogLevel(logLevel, component, this.getSession());
 };
 
-DB.prototype.watch = function(pipeline, options) {
+DB.prototype.watch = function (pipeline, options) {
     pipeline = pipeline || [];
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
 
     const [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
-    return this._runAggregate({aggregate: 1, pipeline: [changeStreamStage, ...pipeline]},
-                              aggOptions);
+    return this._runAggregate({aggregate: 1, pipeline: [changeStreamStage, ...pipeline]}, aggOptions);
 };
 
 // Writing `this.hasOwnProperty` would cause DB.prototype.getCollection() to be called since the
 // DB's getProperty() handler in C++ takes precedence when a property isn't defined on the DB
 // instance directly. The "hasOwnProperty" property is defined on Object.prototype, so we must
 // resort to using the function explicitly ourselves.
-(function(hasOwnProperty) {
-DB.prototype.getSession = function() {
-    if (!hasOwnProperty.call(this, "_session")) {
-        this._session = this.getMongo()._getDefaultSession();
-    }
-    return this._session;
-};
+(function (hasOwnProperty) {
+    DB.prototype.getSession = function () {
+        if (!hasOwnProperty.call(this, "_session")) {
+            this._session = this.getMongo()._getDefaultSession();
+        }
+        return this._session;
+    };
 })(Object.prototype.hasOwnProperty);
 
-DB.prototype.createEncryptedCollection = function(name, opts) {
-    assert.neq(
-        opts, undefined, `createEncryptedCollection expected an opts object, it is undefined`);
-    assert(opts.hasOwnProperty("encryptedFields") && typeof opts.encryptedFields == "object",
-           `opts must contain an encryptedFields document'`);
+DB.prototype.createEncryptedCollection = function (name, opts) {
+    assert.neq(opts, undefined, `createEncryptedCollection expected an opts object, it is undefined`);
+    assert(
+        opts.hasOwnProperty("encryptedFields") && typeof opts.encryptedFields == "object",
+        `opts must contain an encryptedFields document'`,
+    );
 
     const res = assert.commandWorked(this.createCollection(name, opts));
 
@@ -1673,21 +1695,18 @@ DB.prototype.createEncryptedCollection = function(name, opts) {
     const ci = cis[0];
     assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
     const options = ci.options;
-    assert(options.hasOwnProperty("encryptedFields"),
-           `Expected collection '${name}' to have 'encryptedFields'`);
+    assert(options.hasOwnProperty("encryptedFields"), `Expected collection '${name}' to have 'encryptedFields'`);
     const ef = options.encryptedFields;
 
     assert.commandWorked(this.getCollection(name).createIndex({__safeContent__: 1}));
 
-    assert.commandWorked(
-        this.createCollection(ef.escCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
-    assert.commandWorked(
-        this.createCollection(ef.ecocCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    assert.commandWorked(this.createCollection(ef.escCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    assert.commandWorked(this.createCollection(ef.ecocCollection, {clusteredIndex: {key: {_id: 1}, unique: true}}));
 
     return res;
 };
 
-DB.prototype.dropEncryptedCollection = function(name) {
+DB.prototype.dropEncryptedCollection = function (name) {
     const ci = globalThis.db.getCollectionInfos({name: name})[0];
     if (ci == undefined) {
         throw `Encrypted Collection '${name}' not found`;
@@ -1703,17 +1722,15 @@ DB.prototype.dropEncryptedCollection = function(name) {
     return this.getCollection(name).drop();
 };
 
-DB.prototype.checkMetadataConsistency = function(options = {}) {
-    assert(options instanceof Object,
-           `'options' parameter expected to be type object but found: ${typeof options}`);
-    const res = assert.commandWorked(
-        this.runCommand(Object.extend({checkMetadataConsistency: 1}, options)));
+DB.prototype.checkMetadataConsistency = function (options = {}) {
+    assert(options instanceof Object, `'options' parameter expected to be type object but found: ${typeof options}`);
+    const res = assert.commandWorked(this.runCommand(Object.extend({checkMetadataConsistency: 1}, options)));
     return new DBCommandCursor(this, res);
 };
 
-DB.prototype.getDatabasePrimaryShardId = function() {
+DB.prototype.getDatabasePrimaryShardId = function () {
     // TODO SERVER-92098 user $listDatabases to retrieve primary shard
-    let x = this.getSiblingDB('config').databases.findOne({_id: this.getName()});
+    let x = this.getSiblingDB("config").databases.findOne({_id: this.getName()});
     if (!x) {
         throw Error(`Database '${this.getName()}' not found`);
     }
@@ -1721,11 +1738,10 @@ DB.prototype.getDatabasePrimaryShardId = function() {
 };
 
 // Checking the server buildinfo requires the client to be authenticated
-DB.prototype.getServerBuildInfo = function() {
-    let BuildInfo = function(buildInfo) {
-        let _sanitizeMatch = function(flag) {
-            const sanitizeMatch =
-                /-fsanitize=([^\s]+) /.exec(buildInfo["buildEnvironment"]["ccflags"]);
+DB.prototype.getServerBuildInfo = function () {
+    let BuildInfo = function (buildInfo) {
+        let _sanitizeMatch = function (flag) {
+            const sanitizeMatch = /-fsanitize=([^\s]+) /.exec(buildInfo["buildEnvironment"]["ccflags"]);
             if (flag && sanitizeMatch && RegExp(flag).exec(sanitizeMatch[1])) {
                 return true;
             } else {
@@ -1734,43 +1750,42 @@ DB.prototype.getServerBuildInfo = function() {
         };
 
         return {
-            rawData: function() {
+            rawData: function () {
                 return buildInfo;
             },
 
-            getVersion: function() {
+            getVersion: function () {
                 return buildInfo.version;
             },
 
-            getBits: function() {
+            getBits: function () {
                 return buildInfo.bits;
             },
 
-            isOptimizationsEnabled: function() {
-                const optimizationsMatch =
-                    /(\s|^)-O2(\s|$)/.exec(buildInfo["buildEnvironment"]["ccflags"]);
+            isOptimizationsEnabled: function () {
+                const optimizationsMatch = /(\s|^)-O2(\s|$)/.exec(buildInfo["buildEnvironment"]["ccflags"]);
                 return Boolean(optimizationsMatch);
             },
 
-            isAddressSanitizerActive: function() {
+            isAddressSanitizerActive: function () {
                 return _sanitizeMatch("address");
             },
 
-            isLeakSanitizerActive: function() {
+            isLeakSanitizerActive: function () {
                 return _sanitizeMatch("leak");
             },
 
-            isThreadSanitizerActive: function() {
+            isThreadSanitizerActive: function () {
                 return _sanitizeMatch("thread");
             },
 
-            isUndefinedBehaviorSanitizerActive: function() {
+            isUndefinedBehaviorSanitizerActive: function () {
                 return _sanitizeMatch("undefined");
             },
 
-            isDebug: function() {
+            isDebug: function () {
                 return buildInfo.debug;
-            }
+            },
         };
     };
 

@@ -16,9 +16,7 @@ assert.commandWorked(res);
 res = coll.insert({content: "some data"});
 assert.commandWorked(res);
 
-const explain =
-    coll.find({$text: {$search: "\"a\" -b -\"c\""}}, {content: 1, score: {$meta: "textScore"}})
-        .explain(true);
+const explain = coll.find({$text: {$search: '"a" -b -"c"'}}, {content: 1, score: {$meta: "textScore"}}).explain(true);
 let stage = explain.executionStats.executionStages;
 if ("SINGLE_SHARD" === stage.stage) {
     stage = stage.shards[0].executionStages;

@@ -60,7 +60,7 @@ assert.commandWorked(testColl.createIndex({x: 1}, {unique: true}));
 // DuplicateKey error on replacement-style upsert, where the unique index key value to be
 // written does not match the value of the query predicate.
 assert.commandWorked(testColl.createIndex({x: 1}, {unique: true}));
-assert.commandWorked(testColl.insert({_id: 1, 'a': 12345}));
+assert.commandWorked(testColl.insert({_id: 1, "a": 12345}));
 assert.commandFailedWithCode(testColl.update({x: 3}, {}, {upsert: true}), ErrorCodes.DuplicateKey);
 
 // DuplicateKey error on update-style upsert, where the unique index key value to be written
@@ -68,7 +68,6 @@ assert.commandFailedWithCode(testColl.update({x: 3}, {}, {upsert: true}), ErrorC
 assert.commandWorked(testColl.remove({}));
 assert.commandWorked(testColl.insert({x: 3}));
 assert.commandWorked(testColl.insert({x: 4}));
-assert.commandFailedWithCode(testColl.update({x: 3}, {$inc: {x: 1}}, {upsert: true}),
-                             ErrorCodes.DuplicateKey);
+assert.commandFailedWithCode(testColl.update({x: 3}, {$inc: {x: 1}}, {upsert: true}), ErrorCodes.DuplicateKey);
 
 rst.stopSet();

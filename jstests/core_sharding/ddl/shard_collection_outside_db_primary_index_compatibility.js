@@ -19,7 +19,7 @@
  * ]
  */
 
-import {getRandomShardName} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
 const primaryShard = db.getDatabasePrimaryShardId();
@@ -31,19 +31,18 @@ let testId = 0;
 {
     const coll = db.getCollection(jsTestName() + "_" + testId++);
     assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
-    assert.commandWorked(
-        db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}));
+    assert.commandWorked(db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}));
     assert.commandFailedWithCode(
         db.adminCommand({shardCollection: coll.getFullName(), key: {sk: 1}}),
-        ErrorCodes.InvalidOptions);
+        ErrorCodes.InvalidOptions,
+    );
 }
 
 // Sharding a collection moved to a non primary shard works when dropping the incompatible index
 {
     const coll = db.getCollection(jsTestName() + "_" + testId++);
     assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
-    assert.commandWorked(
-        db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}));
+    assert.commandWorked(db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}));
     assert.commandWorked(coll.dropIndex({a: 1}));
     assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {sk: 1}}));
 }
@@ -54,8 +53,7 @@ let testId = 0;
     const coll = db.getCollection(jsTestName() + "_" + testId++);
     assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {sk1: 1}}));
     assert.commandWorked(coll.createIndex({sk1: 1, a: 1}, {unique: true}));
-    assert.commandWorked(
-        db.adminCommand({unshardCollection: coll.getFullName(), toShard: anotherShard}));
+    assert.commandWorked(db.adminCommand({unshardCollection: coll.getFullName(), toShard: anotherShard}));
     assert.commandWorked(coll.dropIndex({sk1: 1, a: 1}));
     assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {sk2: 1}}));
 }
@@ -65,12 +63,12 @@ let testId = 0;
 {
     const coll = db.getCollection(jsTestName() + "_" + testId++);
     assert.commandWorked(db.runCommand({create: coll.getName()}));
-    assert.commandWorked(
-        db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}));
+    assert.commandWorked(db.adminCommand({moveCollection: coll.getFullName(), toShard: anotherShard}));
     assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
     assert.commandFailedWithCode(
         db.adminCommand({shardCollection: coll.getFullName(), key: {sk: 1}}),
-        ErrorCodes.InvalidOptions);
+        ErrorCodes.InvalidOptions,
+    );
     assert.commandWorked(coll.dropIndex({a: 1}));
     assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {sk: 1}}));
 }

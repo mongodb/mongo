@@ -11,8 +11,11 @@ testDb.article.save({
     posted: new Date(1079895594000),
     pageViews: 5,
     tags: ["fun", "good", "fun"],
-    comments: [{author: "joe", text: "this is cool"}, {author: "sam", text: "this is bad"}],
-    other: {foo: 5}
+    comments: [
+        {author: "joe", text: "this is cool"},
+        {author: "sam", text: "this is bad"},
+    ],
+    other: {foo: 5},
 });
 
 testDb.article.save({
@@ -24,9 +27,9 @@ testDb.article.save({
     tags: ["fun", "nasty"],
     comments: [
         {author: "barbara", text: "this is interesting"},
-        {author: "jenny", text: "i like to play pinball", votes: 10}
+        {author: "jenny", text: "i like to play pinball", votes: 10},
     ],
-    other: {bar: 14}
+    other: {bar: 14},
 });
 
 testDb.article.save({
@@ -38,7 +41,7 @@ testDb.article.save({
     tags: ["nasty", "filthy"],
     comments: [
         {author: "will", text: "i don't like the color"},
-        {author: "jenny", text: "can i get that in green?"}
+        {author: "jenny", text: "can i get that in green?"},
     ],
-    other: {bar: 14}
+    other: {bar: 14},
 });

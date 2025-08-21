@@ -20,53 +20,68 @@ function runTest(downgradeFCV) {
     const primary = rst.getPrimary();
     const primaryDB = primary.getDB("test");
 
-    for (let versions
-             of [{from: downgradeFCV, to: latestFCV}, {from: latestFCV, to: downgradeFCV}]) {
-        jsTestLog("Changing FeatureCompatibilityVersion from " + versions.from + " to " +
-                  versions.to + " while creating a collection");
-        assert.commandWorked(
-            primaryDB.adminCommand({setFeatureCompatibilityVersion: versions.from, confirm: true}));
+    for (let versions of [
+        {from: downgradeFCV, to: latestFCV},
+        {from: latestFCV, to: downgradeFCV},
+    ]) {
+        jsTestLog(
+            "Changing FeatureCompatibilityVersion from " +
+                versions.from +
+                " to " +
+                versions.to +
+                " while creating a collection",
+        );
+        assert.commandWorked(primaryDB.adminCommand({setFeatureCompatibilityVersion: versions.from, confirm: true}));
 
-        assert.commandWorked(primaryDB.adminCommand(
-            {configureFailPoint: "hangBeforeLoggingCreateCollection", mode: "alwaysOn"}));
+        assert.commandWorked(
+            primaryDB.adminCommand({configureFailPoint: "hangBeforeLoggingCreateCollection", mode: "alwaysOn"}),
+        );
         primaryDB.mycoll.drop();
 
         let awaitCreateCollection;
         let awaitUpgradeFCV;
 
         try {
-            awaitCreateCollection = startParallelShell(function() {
+            awaitCreateCollection = startParallelShell(function () {
                 assert.commandWorked(db.runCommand({create: "mycoll"}));
             }, primary.port);
 
-            assert.soon(function() {
-                return rawMongoProgramOutput("\"id\":20320")
-                    .match(/\"id\":20320.*test.mycoll/);  // Create Collection log
+            assert.soon(function () {
+                return rawMongoProgramOutput('"id":20320').match(/\"id\":20320.*test.mycoll/); // Create Collection log
             });
 
             awaitUpgradeFCV = startParallelShell(
-                funWithArgs(function(version) {
-                    assert.commandWorked(
-                        db.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}));
-                }, versions.to), primary.port);
+                funWithArgs(function (version) {
+                    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: version, confirm: true}));
+                }, versions.to),
+                primary.port,
+            );
 
             {
                 let res;
                 assert.soon(
-                    function() {
-                        res = assert.commandWorked(primaryDB.adminCommand(
-                            {getParameter: 1, featureCompatibilityVersion: 1}));
-                        return res.featureCompatibilityVersion.version === versions.from &&
-                            res.featureCompatibilityVersion.targetVersion === versions.new;
+                    function () {
+                        res = assert.commandWorked(
+                            primaryDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+                        );
+                        return (
+                            res.featureCompatibilityVersion.version === versions.from &&
+                            res.featureCompatibilityVersion.targetVersion === versions.new
+                        );
                     },
-                    function() {
-                        return "targetVersion of featureCompatibilityVersion document wasn't " +
-                            "updated on primary: " + tojson(res);
-                    });
+                    function () {
+                        return (
+                            "targetVersion of featureCompatibilityVersion document wasn't " +
+                            "updated on primary: " +
+                            tojson(res)
+                        );
+                    },
+                );
             }
         } finally {
-            assert.commandWorked(primaryDB.adminCommand(
-                {configureFailPoint: "hangBeforeLoggingCreateCollection", mode: "off"}));
+            assert.commandWorked(
+                primaryDB.adminCommand({configureFailPoint: "hangBeforeLoggingCreateCollection", mode: "off"}),
+            );
         }
 
         awaitCreateCollection();

@@ -6,7 +6,7 @@
 // Max user BSON depth is 20 less than the max absolute BSON depth.
 const conn = MongoRunner.runMongod({setParameter: {maxBSONDepth: 21}});
 
-const coll = conn.getDB('test')[jsTestName()];
+const coll = conn.getDB("test")[jsTestName()];
 
 // Can insert a document with depth equal to the max user BSON depth.
 assert.commandWorked(coll.insert({a: {}}));

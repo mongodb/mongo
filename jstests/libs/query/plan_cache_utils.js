@@ -7,7 +7,7 @@ import {
     getCachedPlan,
     getEngine,
     getPlanCacheShapeHashFromObject,
-    getPlanStage
+    getPlanStage,
 } from "jstests/libs/query/analyze_plan.js";
 
 export function getPlanCacheSize(db) {
@@ -20,15 +20,17 @@ export function getPlanCacheNumEntries(db) {
 
 function getPlansForCacheEntry(coll, match) {
     const matchingCacheEntries = coll.getPlanCache().list([{$match: match}]);
-    assert.eq(matchingCacheEntries.length,
-              1,
-              () => tojson(match) + " Contents of cache: " + tojson(coll.getPlanCache().list()));
+    assert.eq(
+        matchingCacheEntries.length,
+        1,
+        () => tojson(match) + " Contents of cache: " + tojson(coll.getPlanCache().list()),
+    );
     return matchingCacheEntries[0];
 }
 
 function planHasIxScanStageForIndex(planStats, indexName) {
     const stage = getPlanStage(planStats, "IXSCAN");
-    return (stage === null) ? false : indexName === stage.indexName;
+    return stage === null ? false : indexName === stage.indexName;
 }
 
 /**
@@ -45,14 +47,16 @@ export function assertCacheUsage({
     cacheEntryVersion,
     cacheEntryIsActive,
     cachedIndexName,
-    aggOptions = {}
+    aggOptions = {},
 }) {
     if (!planCacheColl) {
         planCacheColl = queryColl;
     }
 
-    const profileObj = getLatestProfilerEntry(
-        queryColl.getDB(), {op: {$in: ["command", "getmore"]}, ns: queryColl.getFullName()});
+    const profileObj = getLatestProfilerEntry(queryColl.getDB(), {
+        op: {$in: ["command", "getmore"]},
+        ns: queryColl.getFullName(),
+    });
     const planCacheShapeHash = getPlanCacheShapeHashFromObject(profileObj);
     const planCacheKey = profileObj.planCacheKey;
     assert.eq(fromMultiPlanning, !!profileObj.fromMultiPlanner, profileObj);
@@ -90,15 +94,13 @@ export function assertCacheUsage({
         if (cacheEntryVersion === 2) {
             assert(entry.cachedPlan.stages.includes(cachedIndexName), entry);
         } else {
-            assert(planHasIxScanStageForIndex(getCachedPlan(entry.cachedPlan), cachedIndexName),
-                   entry);
+            assert(planHasIxScanStageForIndex(getCachedPlan(entry.cachedPlan), cachedIndexName), entry);
         }
     }
     return entry;
 }
 
-export function setUpActiveCacheEntry(
-    coll, pipeline, cacheEntryVersion, cachedIndexName, assertFn) {
+export function setUpActiveCacheEntry(coll, pipeline, cacheEntryVersion, cachedIndexName, assertFn) {
     // For the first run, the query should go through multiplanning and create inactive cache entry.
     assertFn(coll.aggregate(pipeline));
     assertCacheUsage({
@@ -107,7 +109,7 @@ export function setUpActiveCacheEntry(
         fromMultiPlanning: true,
         cacheEntryVersion,
         cacheEntryIsActive: false,
-        cachedIndexName
+        cachedIndexName,
     });
 
     // After the second run, the inactive cache entry should be promoted to an active entry.
@@ -118,7 +120,7 @@ export function setUpActiveCacheEntry(
         fromMultiPlanning: true,
         cacheEntryVersion,
         cacheEntryIsActive: true,
-        cachedIndexName
+        cachedIndexName,
     });
 
     // For the third run, the active cached query should be used.
@@ -129,6 +131,6 @@ export function setUpActiveCacheEntry(
         fromMultiPlanning: false,
         cacheEntryVersion,
         cacheEntryIsActive: true,
-        cachedIndexName
+        cachedIndexName,
     });
 }

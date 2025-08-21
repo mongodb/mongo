@@ -9,7 +9,7 @@ import {isConfigCommitted, reconfig, syncFrom} from "jstests/replsets/rslib.js";
 const replSet = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
     settings: {chainingAllowed: true},
-    nodeOptions: {setParameter: {writePeriodicNoops: true}}
+    nodeOptions: {setParameter: {writePeriodicNoops: true}},
 });
 replSet.startSet();
 replSet.initiate();

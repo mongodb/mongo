@@ -25,17 +25,17 @@ function assertPlanSummary(collection, expected) {
 
     const match = {type: "idleCursor", ns};
 
-    const currOpResult = assert.commandWorked(db.adminCommand({
-        aggregate: 1,
-        cursor: {},
-        pipeline: [{$currentOp: {idleCursors: true}}, {$match: match}]
-    }));
+    const currOpResult = assert.commandWorked(
+        db.adminCommand({
+            aggregate: 1,
+            cursor: {},
+            pipeline: [{$currentOp: {idleCursors: true}}, {$match: match}],
+        }),
+    );
 
     const batch = currOpResult.cursor.firstBatch;
     assert.eq(1, batch.length, `Expected only one operation in batch: \n${tojson(batch)}`);
-    assert.eq(batch[0].planSummary,
-              expected,
-              `Response included incorrect planSummary:\n${tojson(batch)}`);
+    assert.eq(batch[0].planSummary, expected, `Response included incorrect planSummary:\n${tojson(batch)}`);
 }
 
 const coll = assertDropAndRecreateCollection(testDB, "coll");
@@ -92,7 +92,7 @@ if (!TestData.isHintsToQuerySettingsSuite) {
 // Tests that an index intersection plan shows both indexes in the plan summary. Also tests
 // compound indexes, dotted paths, and an index w/ descending order.
 {
-    assert.commandWorked(coll2.createIndexes([{x: 1}, {y: 1, 'a.b.c': -1}]));
+    assert.commandWorked(coll2.createIndexes([{x: 1}, {y: 1, "a.b.c": -1}]));
     const curs = coll2.find({$or: [{x: 1001}, {y: 1001}]}).batchSize(2);
     curs.next();
 
@@ -106,7 +106,10 @@ if (!TestData.isHintsToQuerySettingsSuite) {
 // involved (i.e. when one field in the collection has arrays).
 {
     assert.commandWorked(coll2.createIndex({y: 1}));
-    const curs = coll2.find({y: [1, 2, 3]}).hint({y: 1}).batchSize(2);
+    const curs = coll2
+        .find({y: [1, 2, 3]})
+        .hint({y: 1})
+        .batchSize(2);
     curs.next();
 
     assertPlanSummary(coll2, "IXSCAN { y: 1 }");

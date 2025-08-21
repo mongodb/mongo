@@ -28,7 +28,7 @@ export function planEstimatedWithHistogram(plan) {
  * fallback to multiplanning for this plan.
  */
 export function assertPlanNotCosted(plan) {
-    assert(!plan.hasOwnProperty('costEstimate'), plan);
+    assert(!plan.hasOwnProperty("costEstimate"), plan);
 }
 
 export function getPlanRankerMode(db) {
@@ -38,10 +38,8 @@ export function getPlanRankerMode(db) {
             planRankerMode: 1,
         });
 
-        return getParam.hasOwnProperty("planRankerMode") ? getParam.planRankerMode
-                                                         : "multiPlanning";
+        return getParam.hasOwnProperty("planRankerMode") ? getParam.planRankerMode : "multiPlanning";
     } else {
-        return TestData.setParameters.planRankerMode ? TestData.setParameters.planRankerMode
-                                                     : "multiPlanning";
+        return TestData.setParameters.planRankerMode ? TestData.setParameters.planRankerMode : "multiPlanning";
     }
 }

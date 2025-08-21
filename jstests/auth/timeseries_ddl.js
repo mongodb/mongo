@@ -27,15 +27,17 @@ db.createUser({user: "rw", pwd: pass, roles: ["readWrite"]});
 db.createUser({
     user: "c2c",
     pwd: pass,
-    roles: [{db: "admin", role: "restore"}, {db: "admin", role: "backup"}]
+    roles: [
+        {db: "admin", role: "restore"},
+        {db: "admin", role: "backup"},
+    ],
 });
 st.admin.logout();
 
 function createCollectionsAsRegularUser() {
     assert(db.auth("rw", pass));
     assert.commandWorked(db.createCollection(normalCollName));
-    assert.commandWorked(
-        db.createCollection(timeseriesCollName, {timeseries: {timeField: "time"}}));
+    assert.commandWorked(db.createCollection(timeseriesCollName, {timeseries: {timeField: "time"}}));
     assert.commandFailedWithCode(db.createCollection(bucketCollName), ErrorCodes.Unauthorized);
     db.logout();
 }

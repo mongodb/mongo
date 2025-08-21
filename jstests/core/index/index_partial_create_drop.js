@@ -16,11 +16,11 @@
 
 var coll = db.index_partial_create_drop;
 
-var getNumKeys = function(idxName) {
+var getNumKeys = function (idxName) {
     var res = assert.commandWorked(coll.validate({full: true}));
     var kpi;
 
-    var isShardedNS = res.hasOwnProperty('raw');
+    var isShardedNS = res.hasOwnProperty("raw");
     if (isShardedNS) {
         kpi = res.raw[Object.getOwnPropertyNames(res.raw)[0]].keysPerIndex;
     } else {
@@ -38,20 +38,19 @@ assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {$and: 5
 assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {x: /abc/}}));
 
 // Use of $expr is banned in a partial index filter.
+assert.commandFailed(coll.createIndex({x: 1}, {partialFilterExpression: {$expr: {$eq: ["$x", 5]}}}));
 assert.commandFailed(
-    coll.createIndex({x: 1}, {partialFilterExpression: {$expr: {$eq: ["$x", 5]}}}));
-assert.commandFailed(coll.createIndex(
-    {x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}));
+    coll.createIndex({x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}),
+);
 
 // Tree depth cannot exceed `internalPartialFilterExpressionMaxDepth`, which defaults to 4.
 assert.commandFailedWithCode(
-    coll.createIndex({x: 1},
-                     {partialFilterExpression: {$and: [{$and: [{$and: [{$and: [{x: 3}]}]}]}]}}),
-    ErrorCodes.CannotCreateIndex);
+    coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{$and: [{x: 3}]}]}]}]}}),
+    ErrorCodes.CannotCreateIndex,
+);
 
 // A tree depth of `internalPartialFilterExpressionMaxDepth` is allowed.
-assert.commandWorked(
-    coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{x: 3}]}]}]}}));
+assert.commandWorked(coll.createIndex({x: 1}, {partialFilterExpression: {$and: [{$and: [{$and: [{x: 3}]}]}]}}));
 assert(coll.drop());
 
 for (var i = 0; i < 10; i++) {
@@ -93,13 +92,11 @@ assert.eq(1, coll.find({x: 0, a: 0}).itcount());
 assert.commandWorked(coll.dropIndexes());
 
 let numIndexesBefore = coll.getIndexes().length;
-assert.commandWorked(
-    coll.createIndex({x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}));
+assert.commandWorked(coll.createIndex({x: 1}, {name: "partialIndex1", partialFilterExpression: {a: {$lt: 5}}}));
 assert.eq(coll.getIndexes().length, numIndexesBefore + 1);
 
 numIndexesBefore = coll.getIndexes().length;
-assert.commandWorked(
-    coll.createIndex({x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}));
+assert.commandWorked(coll.createIndex({x: 1}, {name: "partialIndex2", partialFilterExpression: {a: {$gte: 5}}}));
 assert.eq(coll.getIndexes().length, numIndexesBefore + 1);
 
 // Index drop by key pattern fails when more than one index exists with the given key.

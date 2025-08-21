@@ -13,8 +13,8 @@
 const testDB = db.getSiblingDB(jsTestName());
 const cappedColl = testDB["capped_coll"];
 
-const maxSize = 25 * 1024;        // 25 KB.
-const doubleMaxSize = 50 * 1024;  // 50 KB.
+const maxSize = 25 * 1024; // 25 KB.
+const doubleMaxSize = 50 * 1024; // 50 KB.
 const maxDocs = 2;
 const doubleMaxDocs = 2 * maxDocs;
 const initialDocSize = 2;
@@ -22,7 +22,7 @@ const initialDocSize = 2;
 const maxDocumentCeiling = 0x7fffffff;
 const maxSizeCeiling = 0x4000000000000;
 
-let insertDocs = function() {
+let insertDocs = function () {
     // Insert ~50KB of data.
     const doc = {key: "a".repeat(10 * 1024)};
     for (let i = 0; i < 5; i++) {
@@ -30,7 +30,7 @@ let insertDocs = function() {
     }
 };
 
-let resetCappedCollection = function(extra) {
+let resetCappedCollection = function (extra) {
     const options = Object.assign({}, {capped: true}, extra);
     cappedColl.drop();
     assert.commandWorked(testDB.createCollection(cappedColl.getName(), options));
@@ -48,7 +48,7 @@ let resetCappedCollection = function(extra) {
     }
 };
 
-let verifyLimitUpdate = function(updates) {
+let verifyLimitUpdate = function (updates) {
     const fullCmd = Object.assign({}, {collMod: cappedColl.getName()}, updates);
     assert.commandWorked(testDB.runCommand(fullCmd));
     const stats = assert.commandWorked(cappedColl.stats());
@@ -57,7 +57,7 @@ let verifyLimitUpdate = function(updates) {
         assert.eq(stats.maxSize, updates.cappedSize);
     }
     if (updates.cappedMax) {
-        const expectedMax = (updates.cappedMax <= 0) ? maxDocumentCeiling : updates.cappedMax;
+        const expectedMax = updates.cappedMax <= 0 ? maxDocumentCeiling : updates.cappedMax;
         assert.eq(stats.max, expectedMax);
     }
     // Insert documents after updating the capped collection limits. If the actual size is above the
@@ -93,11 +93,9 @@ let verifyLimitUpdate = function(updates) {
     // We expect the resizing of a capped collection to fail when maxSize <= 0 and maxSize >
     // maxSizeCeiling.
     const negativeSize = -1 * maxSize;
-    assert.commandFailed(
-        testDB.runCommand({collMod: cappedColl.getName(), cappedSize: maxSizeCeiling + 1}));
+    assert.commandFailed(testDB.runCommand({collMod: cappedColl.getName(), cappedSize: maxSizeCeiling + 1}));
     assert.commandFailed(testDB.runCommand({collMod: cappedColl.getName(), cappedSize: 0}));
-    assert.commandFailed(
-        testDB.runCommand({collMod: cappedColl.getName(), cappedSize: negativeSize}));
+    assert.commandFailed(testDB.runCommand({collMod: cappedColl.getName(), cappedSize: negativeSize}));
 
     // The maximum size can be a non-multiple of 256 bytes.
     // We modify the collection to have a size multiple of 256, then

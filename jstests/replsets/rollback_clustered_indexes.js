@@ -10,12 +10,11 @@ import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 // Operations that will be present on both nodes, before the common point.
 const dbName = jsTestName();
-const collName = 'testColl';
+const collName = "testColl";
 const fullCollName = `${dbName}.${collName}`;
 let commonOps = (node) => {
     const db = node.getDB(dbName);
-    assert.commandWorked(
-        db.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    assert.commandWorked(db.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
     const coll = node.getCollection(fullCollName);
     assert.commandWorked(coll.createIndex({a: 1, b: -1}));
     assert.commandWorked(coll.insert({a: 0, b: 0}));

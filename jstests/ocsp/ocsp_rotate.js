@@ -21,8 +21,11 @@ function tryRotate(fault) {
     return success;
 }
 
-mongod = MongoRunner.runMongod(
-    {tlsMode: "requireTLS", tlsCertificateKeyFile: OCSP_SERVER_CERT, tlsCAFile: OCSP_CA_PEM});
+mongod = MongoRunner.runMongod({
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: OCSP_SERVER_CERT,
+    tlsCAFile: OCSP_CA_PEM,
+});
 
 // Positive: test with positive OCSP response
 assert(tryRotate());

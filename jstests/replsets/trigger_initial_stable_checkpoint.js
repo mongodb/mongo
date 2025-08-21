@@ -12,8 +12,8 @@ const rst = new ReplSetTest({
     nodeOptions: {
         // Disable background checkpoints: a zero value disables checkpointing.
         syncdelay: 0,
-        setParameter: {logComponentVerbosity: tojson({storage: 2})}
-    }
+        setParameter: {logComponentVerbosity: tojson({storage: 2})},
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -23,7 +23,7 @@ rst.initiate();
 // checkpoint.
 let primary = rst.getPrimary();
 const subStr = "Triggering the first stable checkpoint";
-assert.soon(() => (rawMongoProgramOutput(subStr).search(subStr) >= 0));
+assert.soon(() => rawMongoProgramOutput(subStr).search(subStr) >= 0);
 
 jsTestLog("Kill and restart the node.");
 rst.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});

@@ -27,7 +27,7 @@ const testColl = testDB.getCollection(collName);
 // 16MB limit, but that three such arrays in the same document are greater than 16MB. This will
 // be helpful in recreating an idempotency issue that exists when applying the operations from
 // a transaction after the data already reflects the transaction.
-const largeArray = 'x'.repeat(7 * 1024 * 1024);
+const largeArray = "x".repeat(7 * 1024 * 1024);
 assert.commandWorked(testColl.insert([{_id: 1, "a": largeArray}]));
 
 // Start a transaction in a session that will be prepared and committed before rollback.
@@ -40,25 +40,25 @@ assert.commandWorked(sessionColl.update({_id: 1}, {$unset: {"b": 1}}));
 assert.commandWorked(sessionColl.update({_id: 1}, {$set: {"c": largeArray}}));
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-const recoveryTimestamp =
-    assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 2}]})).operationTime;
+const recoveryTimestamp = assert.commandWorked(testColl.runCommand("insert", {documents: [{_id: 2}]})).operationTime;
 
 jsTestLog("Holding back the stable timestamp to right after the prepareTimestamp");
 
 // Hold back the stable timestamp to be right after the prepareTimestamp, but before the
 // commitTransaction oplog entry so that the transaction will be replayed during rollback
 // recovery.
-assert.commandWorked(testDB.adminCommand({
-    "configureFailPoint": 'holdStableTimestampAtSpecificTimestamp',
-    "mode": 'alwaysOn',
-    "data": {"timestamp": recoveryTimestamp}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        "configureFailPoint": "holdStableTimestampAtSpecificTimestamp",
+        "mode": "alwaysOn",
+        "data": {"timestamp": recoveryTimestamp},
+    }),
+);
 
 // Enable fail point "WTSetOldestTSToStableTS" to prevent lag between stable timestamp and
 // oldest timestamp during rollback recovery. We avoid this lag to test if we can prepare
 // and commit a transaction older than oldest timestamp.
-assert.commandWorked(
-    testDB.adminCommand({"configureFailPoint": 'WTSetOldestTSToStableTS', "mode": 'alwaysOn'}));
+assert.commandWorked(testDB.adminCommand({"configureFailPoint": "WTSetOldestTSToStableTS", "mode": "alwaysOn"}));
 
 jsTestLog("Committing the transaction");
 
@@ -75,8 +75,7 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();
 
 // Now that the system is stable, release the pin on the stable timestamp.
-assert.commandWorked(primary.adminCommand(
-    {configureFailPoint: 'holdStableTimestampAtSpecificTimestamp', mode: 'off'}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "holdStableTimestampAtSpecificTimestamp", mode: "off"}));
 
 primary = rollbackTest.getPrimary();
 

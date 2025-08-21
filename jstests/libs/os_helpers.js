@@ -20,7 +20,7 @@ export function readOsRelease() {
         let tags = {};
 
         for (let line of lines) {
-            let vp = line.replaceAll("\"", "").split("=");
+            let vp = line.replaceAll('"', "").split("=");
             tags[vp[0]] = vp[1];
         }
 
@@ -54,8 +54,12 @@ export function isDistro(distro) {
  */
 export function isDistroVersion(distro, version) {
     let tags = readOsRelease();
-    return tags.hasOwnProperty("ID") && tags["ID"] === distro &&
-        tags.hasOwnProperty("VERSION_ID") && tags["VERSION_ID"] === version;
+    return (
+        tags.hasOwnProperty("ID") &&
+        tags["ID"] === distro &&
+        tags.hasOwnProperty("VERSION_ID") &&
+        tags["VERSION_ID"] === version
+    );
 }
 
 /**
@@ -65,8 +69,12 @@ export function isDistroVersion(distro, version) {
  */
 export function isRHELMajorVerison(majorVersion) {
     let tags = readOsRelease();
-    return tags.hasOwnProperty("ID") && tags["ID"] === "rhel" &&
-        tags.hasOwnProperty("VERSION_ID") && tags["VERSION_ID"].startsWith(majorVersion);
+    return (
+        tags.hasOwnProperty("ID") &&
+        tags["ID"] === "rhel" &&
+        tags.hasOwnProperty("VERSION_ID") &&
+        tags["VERSION_ID"].startsWith(majorVersion)
+    );
 }
 
 /**
@@ -100,7 +108,7 @@ export function isSUSE15SPVersion(servicePack) {
         return false;
     }
 
-    const grep_result = runProgram('grep', '15-SP' + servicePack, '/etc/os-release');
+    const grep_result = runProgram("grep", "15-SP" + servicePack, "/etc/os-release");
     if (grep_result == 0) {
         return true;
     }

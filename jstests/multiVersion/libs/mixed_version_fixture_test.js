@@ -1,14 +1,13 @@
-
 import "jstests/multiVersion/libs/multi_rs.js";
 
 import {copyJSON} from "jstests/libs/json_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const latestVersion = {
-    binVersion: "latest"
+    binVersion: "latest",
 };
 const lastLTSVersion = {
-    binVersion: "last-lts"
+    binVersion: "last-lts",
 };
 
 /**
@@ -78,14 +77,12 @@ export function testPerformReplSetRollingRestart({
         const getAdminDB = () => primaryConnection.getDB("admin");
 
         // Upgrade the FCV.
-        assert.commandWorked(
-            getAdminDB().runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(getAdminDB().runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
         afterFCVBump(primaryConnection);
 
         // Downgrade FCV without restarting.
-        assert.commandWorked(
-            getAdminDB().runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(getAdminDB().runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
         afterPrimariesHaveRestarted(primaryConnection);
     }

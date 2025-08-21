@@ -10,9 +10,7 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
+import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // Make sure we're testing with no implicit session.
 TestData.disableImplicitSessions = true;
@@ -24,12 +22,21 @@ const collectionName = "testColl";
 const nss = dbName + "." + collectionName;
 const testColl = st.getDB(dbName).getCollection(collectionName);
 const splitPoint = 0;
-const insertDocs = [{_id: 0, x: -2, y: 5}, {_id: 1, x: 2, y: 5}, {_id: 2, x: 3, y: 5}];
+const insertDocs = [
+    {_id: 0, x: -2, y: 5},
+    {_id: 1, x: 2, y: 5},
+    {_id: 2, x: 3, y: 5},
+];
 
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 0.
 WriteWithoutShardKeyTestUtil.setupShardedCollection(
-    st, nss, {x: 1}, [{x: splitPoint}], [{query: {x: splitPoint}, shard: st.shard1.shardName}]);
+    st,
+    nss,
+    {x: 1},
+    [{x: splitPoint}],
+    [{query: {x: splitPoint}, shard: st.shard1.shardName}],
+);
 
 // Insert initial data.
 assert.commandWorked(testColl.insert(insertDocs));
@@ -43,7 +50,7 @@ function runCommandAndCheckError(testCase, additionalCmdFields = {}) {
 
     // FindAndModify is not a batch command, thus will not have a writeErrors field.
     if (!testCase.cmdObj.findAndModify) {
-        res.writeErrors.forEach(writeError => {
+        res.writeErrors.forEach((writeError) => {
             assert(testCase.errorCode.includes(writeError.code));
             assert(testCase.index.includes(writeError.index));
         });
@@ -58,7 +65,7 @@ const testCases = [
             findAndModify: collectionName,
             query: {y: 5},
             update: {$match: {y: 3}},
-        }
+        },
     },
     {
         logMessage: "Unknown modifier in batch update, FailedToParse expected.",
@@ -67,7 +74,7 @@ const testCases = [
         cmdObj: {
             update: collectionName,
             updates: [{q: {y: 5}, u: {$match: {z: 0}}}],
-        }
+        },
     },
     {
         logMessage: "Incorrect query in delete, BadValue expected.",
@@ -76,7 +83,7 @@ const testCases = [
         cmdObj: {
             delete: collectionName,
             deletes: [{q: {y: {$match: 5}}, limit: 1}],
-        }
+        },
     },
     {
         logMessage: "Two updates in a batch, one successful, one FailedToParse expected.",
@@ -84,8 +91,11 @@ const testCases = [
         index: [0],
         cmdObj: {
             update: collectionName,
-            updates: [{q: {y: 5}, u: {$match: {z: 0}}}, {q: {y: 5}, u: {$set: {a: 0}}}],
-        }
+            updates: [
+                {q: {y: 5}, u: {$match: {z: 0}}},
+                {q: {y: 5}, u: {$set: {a: 0}}},
+            ],
+        },
     },
     {
         logMessage:
@@ -98,10 +108,10 @@ const testCases = [
             updates: [
                 {q: {y: {$match: 5}}, u: {$set: {z: 0}}},
                 {q: {y: 5}, u: {$match: {z: 0}}},
-                {q: {y: 5}, u: {$match: {z: 0}}}
+                {q: {y: 5}, u: {$match: {z: 0}}},
             ],
-            ordered: false
-        }
+            ordered: false,
+        },
     },
     {
         logMessage: "Two deletes in a batch, one successful, one BadValue expected.",
@@ -109,8 +119,11 @@ const testCases = [
         index: [1],
         cmdObj: {
             delete: collectionName,
-            deletes: [{q: {y: 5}, limit: 1}, {q: {y: {$match: 5}}, limit: 1}],
-        }
+            deletes: [
+                {q: {y: 5}, limit: 1},
+                {q: {y: {$match: 5}}, limit: 1},
+            ],
+        },
     },
     {
         logMessage:
@@ -123,35 +136,30 @@ const testCases = [
             deletes: [
                 {q: {y: {$match: 5}}, limit: 1},
                 {q: {y: 5}, limit: 1},
-                {q: {y: {$match: 5}}, limit: 1}
+                {q: {y: {$match: 5}}, limit: 1},
             ],
-            ordered: false
-        }
+            ordered: false,
+        },
     },
 ];
 
-testCases.forEach(testCase => {
-    jsTest.log(testCase.logMessage + "\n" +
-               "Running as non-retryable write.");
+testCases.forEach((testCase) => {
+    jsTest.log(testCase.logMessage + "\n" + "Running as non-retryable write.");
     runCommandAndCheckError(testCase);
 
-    jsTest.log(testCase.logMessage + "\n" +
-               "Running as non-retryable write in a session.");
+    jsTest.log(testCase.logMessage + "\n" + "Running as non-retryable write in a session.");
     const logicalSessionFields = {lsid: {id: UUID()}};
     runCommandAndCheckError(testCase, logicalSessionFields);
 
-    jsTest.log(testCase.logMessage + "\n" +
-               "Running as retryable write.");
+    jsTest.log(testCase.logMessage + "\n" + "Running as retryable write.");
     const retryableWriteFields = {
         lsid: {id: UUID()},
         txnNumber: NumberLong(0),
     };
     runCommandAndCheckError(testCase, retryableWriteFields);
 
-    jsTest.log(testCase.logMessage + "\n" +
-               "Running in a transaction.");
-    const transactionFields =
-        {lsid: {id: UUID()}, txnNumber: NumberLong(0), startTransaction: true, autocommit: false};
+    jsTest.log(testCase.logMessage + "\n" + "Running in a transaction.");
+    const transactionFields = {lsid: {id: UUID()}, txnNumber: NumberLong(0), startTransaction: true, autocommit: false};
     runCommandAndCheckError(testCase, transactionFields);
 });
 

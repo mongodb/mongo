@@ -38,11 +38,12 @@ assert.commandWorked(rollbackNode.getDB(dbName)["beforeRollback"].insert({"num":
 
 // Set a failpoint on the original primary, so that it blocks after it commits the last
 // 'dropCollection' entry but before the 'dropDatabase' entry is logged.
-assert.commandWorked(rollbackNode.adminCommand(
-    {configureFailPoint: "dropDatabaseHangBeforeInMemoryDrop", mode: "alwaysOn"}));
+assert.commandWorked(
+    rollbackNode.adminCommand({configureFailPoint: "dropDatabaseHangBeforeInMemoryDrop", mode: "alwaysOn"}),
+);
 
 // Issue a 'dropDatabase' command.
-let dropDatabaseFn = function() {
+let dropDatabaseFn = function () {
     const rollbackDb = "olddatabase";
     var primary = db.getMongo();
     jsTestLog("Dropping database " + rollbackDb + " on primary node " + primary.host);
@@ -52,15 +53,18 @@ let dropDatabaseFn = function() {
 let waitForDropDatabaseToFinish = startParallelShell(dropDatabaseFn, rollbackNode.port);
 
 // Ensure that we've hit the failpoint before moving on.
-checkLog.contains(rollbackNode,
-                  "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
+checkLog.contains(rollbackNode, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
 
 // Wait for the secondary to finish dropping the collection (the last replicated entry).
 // We use the default 10-minute timeout for this.
-assert.soon(function() {
-    let res = syncSourceNode.getDB(dbName).getCollectionNames().includes("beforeRollback");
-    return !res;
-}, "Sync source did not finish dropping collection beforeRollback", 10 * 60 * 1000);
+assert.soon(
+    function () {
+        let res = syncSourceNode.getDB(dbName).getCollectionNames().includes("beforeRollback");
+        return !res;
+    },
+    "Sync source did not finish dropping collection beforeRollback",
+    10 * 60 * 1000,
+);
 
 rollbackTest.transitionToRollbackOperations();
 
@@ -69,8 +73,9 @@ assert(!checkLog.checkContainsOnceJson(rollbackNode, 7360105));
 
 // Allow the final 'dropDatabase' entry to be logged on the now isolated primary.
 // This is the rollback node's divergent oplog entry.
-assert.commandWorked(rollbackNode.adminCommand(
-    {configureFailPoint: "dropDatabaseHangBeforeInMemoryDrop", mode: "off"}));
+assert.commandWorked(
+    rollbackNode.adminCommand({configureFailPoint: "dropDatabaseHangBeforeInMemoryDrop", mode: "off"}),
+);
 waitForDropDatabaseToFinish();
 
 // Check that the dropDatabase oplog entry has now been written.
@@ -98,7 +103,6 @@ assert(checkLog.checkContainsOnceJson(rollbackNode, 21612));
 // with a new database name that conflicts with the original.
 rollbackTest.stepUpNode(rollbackNode);
 // Using only w:2 because the third node is frozen / not replicating.
-assert.commandWorked(rollbackNode.getDB(conflictingDbName)["afterRollback"].insert(
-    {"num": 2}, {writeConcern: {w: 2}}));
+assert.commandWorked(rollbackNode.getDB(conflictingDbName)["afterRollback"].insert({"num": 2}, {writeConcern: {w: 2}}));
 
 rollbackTest.stop();

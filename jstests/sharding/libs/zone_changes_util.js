@@ -11,14 +11,13 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 export function assertChunksOnShards(configDB, ns, shardChunkBounds) {
     for (let [shardName, chunkBounds] of Object.entries(shardChunkBounds)) {
         for (let bounds of chunkBounds) {
-            const chunkEntry =
-                findChunksUtil.findOneChunkByNs(configDB, ns, {min: bounds[0], max: bounds[1]});
-            assert(chunkEntry,
-                   "expected to find chunk " + tojson(bounds) + " on shard \"" + shardName + "\"");
+            const chunkEntry = findChunksUtil.findOneChunkByNs(configDB, ns, {min: bounds[0], max: bounds[1]});
+            assert(chunkEntry, "expected to find chunk " + tojson(bounds) + ' on shard "' + shardName + '"');
             assert.eq(
                 shardName,
                 chunkEntry.shard,
-                "expected to find chunk " + tojson(bounds) + " on shard \"" + shardName + "\"");
+                "expected to find chunk " + tojson(bounds) + ' on shard "' + shardName + '"',
+            );
         }
     }
 }
@@ -38,12 +37,14 @@ export function assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey) {
     for (let doc of docs) {
         let docShardKey = {};
         for (const [k, v] of Object.entries(shardKey)) {
-            docShardKey[k] = (v == "hashed") ? convertShardKeyToHashed(doc[k]) : doc[k];
+            docShardKey[k] = v == "hashed" ? convertShardKeyToHashed(doc[k]) : doc[k];
         }
         let shard = chunkBoundsUtil.findShardForShardKey(st, shardChunkBounds, docShardKey);
-        assert.eq(1,
-                  shard.getCollection(ns).count(doc),
-                  "expected to find doc " + tojson(doc) + " on shard \"" + shard.shardName + "\"");
+        assert.eq(
+            1,
+            shard.getCollection(ns).count(doc),
+            "expected to find doc " + tojson(doc) + ' on shard "' + shard.shardName + '"',
+        );
     }
 }
 
@@ -56,13 +57,17 @@ export function assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey) {
 export function assertShardTags(configDB, shardTags) {
     for (let [shardName, tags] of Object.entries(shardTags)) {
         if (tags.length !== 0) {
-            assert.eq(tags.sort(),
-                      configDB.shards.findOne({_id: shardName}).tags.sort(),
-                      "expected shard \"" + shardName + "\" to have tags " + tojson(tags.sort()));
+            assert.eq(
+                tags.sort(),
+                configDB.shards.findOne({_id: shardName}).tags.sort(),
+                'expected shard "' + shardName + '" to have tags ' + tojson(tags.sort()),
+            );
         } else {
             const shardEntry = configDB.shards.findOne({_id: shardName});
-            assert(shardEntry.tags === undefined || shardEntry.tags.length === 0,
-                   "expected shard \"" + shardName + "\" to have no tags.");
+            assert(
+                shardEntry.tags === undefined || shardEntry.tags.length === 0,
+                'expected shard "' + shardName + '" to have no tags.',
+            );
         }
     }
 }
@@ -72,8 +77,7 @@ export function assertShardTags(configDB, shardTags) {
  */
 export function moveZoneToShard(st, zoneName, fromShard, toShard) {
     assert.commandWorked(st.s.adminCommand({addShardToZone: toShard.shardName, zone: zoneName}));
-    assert.commandWorked(
-        st.s.adminCommand({removeShardFromZone: fromShard.shardName, zone: zoneName}));
+    assert.commandWorked(st.s.adminCommand({removeShardFromZone: fromShard.shardName, zone: zoneName}));
 }
 
 /**
@@ -85,8 +89,7 @@ export function runBalancer(st, minNumRounds) {
 
     // We add 1 to the number of rounds to avoid a race condition
     // where the first round is a no-op round
-    for (let i = 0; i < minNumRounds + 1; ++i)
-        st.awaitBalancerRound();
+    for (let i = 0; i < minNumRounds + 1; ++i) st.awaitBalancerRound();
 
     st.stopBalancer();
 }
@@ -95,8 +98,6 @@ export function runBalancer(st, minNumRounds) {
  * Updates the zone key range for the given namespace.
  */
 export function updateZoneKeyRange(st, ns, zoneName, fromRange, toRange) {
-    assert.commandWorked(st.s.adminCommand(
-        {updateZoneKeyRange: ns, min: fromRange[0], max: fromRange[1], zone: null}));
-    assert.commandWorked(st.s.adminCommand(
-        {updateZoneKeyRange: ns, min: toRange[0], max: toRange[1], zone: zoneName}));
+    assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: fromRange[0], max: fromRange[1], zone: null}));
+    assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: toRange[0], max: toRange[1], zone: zoneName}));
 }

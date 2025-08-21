@@ -6,9 +6,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
-import {
-    enableCoordinateCommitReturnImmediatelyAfterPersistingDecision
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {enableCoordinateCommitReturnImmediatelyAfterPersistingDecision} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({
     mongos: 1,
@@ -21,9 +19,9 @@ const st = new ShardingTest({
         // writeConcern "majority" disables replication on one of the secondaries, with chaining
         // that would effectively disable replication on both secondaries, causing the testcase to
         // to fail since writeConcern is unsatsifiable.
-        settings: {chainingAllowed: false}
+        settings: {chainingAllowed: false},
     },
-    causallyConsistent: true
+    causallyConsistent: true,
 });
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 
@@ -32,15 +30,15 @@ const kCollName = "test";
 const kNs = kDbName + "." + kCollName;
 
 const lsid = {
-    id: UUID()
+    id: UUID(),
 };
 let txnNumber = 0;
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(st.s.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 assert.commandWorked(st.s.adminCommand({shardCollection: kNs, key: {x: 1}}));
 
@@ -55,13 +53,20 @@ assert.commandWorked(st.s.getCollection(kNs).insert({x: 0}));
  * Runs commitTransaction on the mongos in a parallel shell, and asserts that it works.
  */
 function runCommitThroughMongosInParallelShellExpectSuccess(writeConcern) {
-    const runCommitExpectSuccessCode = "assert.commandWorked(db.adminCommand({" +
+    const runCommitExpectSuccessCode =
+        "assert.commandWorked(db.adminCommand({" +
         "commitTransaction: 1," +
-        "lsid: " + tojson(lsid) + "," +
-        "txnNumber: NumberLong(" + txnNumber + ")," +
+        "lsid: " +
+        tojson(lsid) +
+        "," +
+        "txnNumber: NumberLong(" +
+        txnNumber +
+        ")," +
         "stmtId: NumberInt(0)," +
         "autocommit: false," +
-        "writeConcern: " + tojson(writeConcern) + "}));";
+        "writeConcern: " +
+        tojson(writeConcern) +
+        "}));";
     return startParallelShell(runCommitExpectSuccessCode, st.s.port);
 }
 
@@ -69,15 +74,17 @@ function runCommitThroughMongosInParallelShellExpectSuccess(writeConcern) {
  * Runs a transaction to inserts the given docs.
  */
 function runInsertCmdInTxn(docs) {
-    assert.commandWorked(st.s.getDB(kDbName).runCommand({
-        insert: kCollName,
-        documents: docs,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-    }));
+    assert.commandWorked(
+        st.s.getDB(kDbName).runCommand({
+            insert: kCollName,
+            documents: docs,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 }
 
 /*
@@ -86,8 +93,9 @@ function runInsertCmdInTxn(docs) {
  * the 'decision' field.
  */
 function getDecision(nodeConn, lsid, txnNumber) {
-    const coordDoc = nodeConn.getCollection("config.transaction_coordinators")
-                         .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
+    const coordDoc = nodeConn
+        .getCollection("config.transaction_coordinators")
+        .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
     return coordDoc ? coordDoc.decision : null;
 }
 
@@ -171,20 +179,21 @@ function testCommitDecisionWriteConcern(writeConcern) {
     persistDecisionFailPoint.off();
 
     jsTest.log(
-        `Verify that commitTransaction returns once the decision is written with client's writeConcern ${
-            tojson(writeConcern)}`);
+        `Verify that commitTransaction returns once the decision is written with client's writeConcern ${tojson(
+            writeConcern,
+        )}`,
+    );
     awaitResult();
     if (writeConcern.w == "majority") {
         // When using majority write concern, secondaries acknowledge/make durable writes
         // independently from applying them, so before checking for the commit decision we need to
         // ensure lastApplied is caught up on the relevant node(s).
-        const nodesToAwait = st.rs0.getSecondaries().slice(-1 * st.rs0.nodes.length / 2);
+        const nodesToAwait = st.rs0.getSecondaries().slice((-1 * st.rs0.nodes.length) / 2);
         st.rs0.awaitReplication(null, null, nodesToAwait);
     }
     assertDecisionCommittedOnNodes(st.rs0, st.rs0.nodes.length - nodesToStopReplication.length);
 
-    jsTest.log(
-        "Verify that the coordinator doc is majority committed regardless of the client's writeConcern");
+    jsTest.log("Verify that the coordinator doc is majority committed regardless of the client's writeConcern");
     // Re-enable replication to allow the decision to be majority committed and two-phase
     // commit to finish.
     if (nodesToStopReplication.length > 0) {
@@ -196,8 +205,7 @@ function testCommitDecisionWriteConcern(writeConcern) {
     deleteCoordDocFailPoint.off();
 
     jsTest.log("Verify the insert operation was committed successfully");
-    let res = assert.commandWorked(
-        st.s.getDB(kDbName).runCommand({find: kCollName, filter: {$or: docs}, lsid: lsid}));
+    let res = assert.commandWorked(st.s.getDB(kDbName).runCommand({find: kCollName, filter: {$or: docs}, lsid: lsid}));
     assert.eq(2, res.cursor.firstBatch.length);
 
     txnNumber++;

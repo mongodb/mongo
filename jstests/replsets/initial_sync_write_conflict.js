@@ -23,7 +23,7 @@ replSet.stop(secondary);
 jsTest.log("Re-starting secondary ");
 secondary = replSet.start(secondary, {
     startClean: true,
-    setParameter: {"failpoint.failAfterBulkLoadDocInsert": "{'mode': {'times': 1}}"}
+    setParameter: {"failpoint.failAfterBulkLoadDocInsert": "{'mode': {'times': 1}}"},
 });
 
 // Wait for everything to be synced.

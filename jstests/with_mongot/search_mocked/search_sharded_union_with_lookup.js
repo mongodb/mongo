@@ -3,21 +3,15 @@
  * explain results.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {
-    getAggPlanStage,
-    getAggPlanStages,
-    getUnionWithStage
-} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStage, getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     getDefaultProtocolVersionForPlanShardedSearch,
     mongotCommandForQuery,
-    mongotMultiCursorResponseForBatch
+    mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     getDefaultLastExplainContents,
     getMongotStagesAndValidateExplainExecutionStats,
@@ -30,7 +24,7 @@ const stWithMock = new ShardingTestWithMongotMock({
         rs0: {nodes: 1},
         rs1: {nodes: 1},
     },
-    mongos: 1
+    mongos: 1,
 });
 stWithMock.start();
 const st = stWithMock.st;
@@ -41,8 +35,7 @@ const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 // Ensure db's primary shard is shard1 so we only set the correct mongot to have history.
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 
 const shardedSearchColl = testDB.getCollection("search_sharded");
 const unshardedSearchColl = testDB.getCollection("search_unsharded");
@@ -110,7 +103,7 @@ d1Mongot.disableOrderCheck();
 
 const mongotQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 const expectedExplainContents = getDefaultLastExplainContents();
 
@@ -132,21 +125,21 @@ function searchQueryExpectedByMock(searchColl, protocolVersion = null, explainVe
 function shard1HistorySharded(explainVerbosity = null) {
     return [
         {
-            expectedCommand:
-                searchQueryExpectedByMock(shardedSearchColl, protocolVersion, explainVerbosity),
+            expectedCommand: searchQueryExpectedByMock(shardedSearchColl, protocolVersion, explainVerbosity),
             response: mongotMultiCursorResponseForBatch(
-                [{_id: 0, $searchScore: 0.99}, {_id: 1, $searchScore: 0.20}],
+                [
+                    {_id: 0, $searchScore: 0.99},
+                    {_id: 1, $searchScore: 0.2},
+                ],
                 NumberLong(0),
                 // Unmerged search metadata.  There are a total of 2 docs from this mongot.
-                [
-                    {count: 1},
-                    {count: 1}
-                ],  // mongot can return any number of metadata docs to merge.
+                [{count: 1}, {count: 1}], // mongot can return any number of metadata docs to merge.
                 NumberLong(0),
                 shardedSearchColl.getFullName(),
                 true,
                 explainVerbosity ? expectedExplainContents : null,
-                explainVerbosity ? expectedExplainContents : null)
+                explainVerbosity ? expectedExplainContents : null,
+            ),
         },
     ];
 }
@@ -154,13 +147,12 @@ function shard1HistorySharded(explainVerbosity = null) {
 function shard0HistorySharded(explainVerbosity = null) {
     return [
         {
-            expectedCommand:
-                searchQueryExpectedByMock(shardedSearchColl, protocolVersion, explainVerbosity),
+            expectedCommand: searchQueryExpectedByMock(shardedSearchColl, protocolVersion, explainVerbosity),
             response: mongotMultiCursorResponseForBatch(
                 [
                     {_id: 4, $searchScore: 0.33},
                     {_id: 5, $searchScore: 0.38},
-                    {_id: 7, $searchScore: 0.45}
+                    {_id: 7, $searchScore: 0.45},
                 ],
                 NumberLong(0),
                 // Unmerged search metadata.  There are a total of 3 docs from this mongot.
@@ -169,7 +161,8 @@ function shard0HistorySharded(explainVerbosity = null) {
                 shardedSearchColl.getFullName(),
                 true,
                 explainVerbosity ? expectedExplainContents : null,
-                explainVerbosity ? expectedExplainContents : null)
+                explainVerbosity ? expectedExplainContents : null,
+            ),
         },
     ];
 }
@@ -181,21 +174,23 @@ function shard1HistoryUnsharded(explainVerbosity = null) {
             ns: unshardedSearchColl.getFullName(),
             nextBatch: [
                 {_id: 0, $searchScore: 0.99},
-                {_id: 1, $searchScore: 0.20},
+                {_id: 1, $searchScore: 0.2},
                 {_id: 4, $searchScore: 0.33},
                 {_id: 5, $searchScore: 0.38},
-                {_id: 7, $searchScore: 0.45}
-            ]
+                {_id: 7, $searchScore: 0.45},
+            ],
         },
         vars: {SEARCH_META: {count: 5}},
     };
     if (explainVerbosity != null) {
         response.explain = expectedExplainContents;
     }
-    return [{
-        expectedCommand: searchQueryExpectedByMock(unshardedSearchColl, null, explainVerbosity),
-        response
-    }];
+    return [
+        {
+            expectedCommand: searchQueryExpectedByMock(unshardedSearchColl, null, explainVerbosity),
+            response,
+        },
+    ];
 }
 
 //--------------
@@ -206,28 +201,29 @@ const makeLookupPipeline = (searchColl) => [
     {
         $lookup: {
             from: searchColl.getName(),
-            let: { local_title: "$localField" },
+            let: {local_title: "$localField"},
             pipeline: [
                 {
-                    $search: mongotQuery
+                    $search: mongotQuery,
                 },
                 {
                     $match: {
                         $expr: {
-                            $eq: ["$title", "$$local_title"]
-                        }
-                    }
+                            $eq: ["$title", "$$local_title"],
+                        },
+                    },
                 },
                 {
                     $project: {
                         "_id": 0,
                         "ref_id": "$_id",
                         "searchMeta": "$$SEARCH_META",
-                    }
-                }],
-            as: "cake_data"
-        }
-    }
+                    },
+                },
+            ],
+            as: "cake_data",
+        },
+    },
 ];
 
 const expectedLookupResults = [
@@ -235,8 +231,8 @@ const expectedLookupResults = [
     {
         "localField": "cakes and kale",
         "weird": true,
-        "cake_data": [{"ref_id": 7, "searchMeta": {count: 5}}]
-    }
+        "cake_data": [{"ref_id": 7, "searchMeta": {count: 5}}],
+    },
 ];
 
 const kPlan = "planSearch";
@@ -257,26 +253,32 @@ function setupMockRequest(searchColl, mongot, requestType, explainVerbosity = nu
         if (explainVerbosity != null) {
             expectedCommand.explain = explainVerbosity;
         }
-        const mergingPipelineHistory = [{
-            expectedCommand,
-            response: {
-                ok: 1,
-                protocolVersion: protocolVersion,
-                metaPipeline:  // Sum counts in the shard metadata.
-                    [{$group: {_id: null, count: {$sum: "$count"}}}, {$project: {_id: 0, count: 1}}]
+        const mergingPipelineHistory = [
+            {
+                expectedCommand,
+                response: {
+                    ok: 1,
+                    protocolVersion: protocolVersion,
+                    // Sum counts in the shard metadata.
+                    metaPipeline: [{$group: {_id: null, count: {$sum: "$count"}}}, {$project: {_id: 0, count: 1}}],
+                },
+                maybeUnused: requestType == kPlanMaybe,
             },
-            maybeUnused: requestType == kPlanMaybe,
-        }];
+        ];
         mongot.setMockResponses(mergingPipelineHistory, cursorId);
     } else {
         assert(requestType == kSearch, "invalid request type");
         assert(mongot != sMongot, "only plan requests should go to mongoS");
-        assert(!(searchColl == unshardedSearchColl && mongot == d0Mongot),
-               "unsharded requests should not go to secondary");
-        const history = (mongot == d1Mongot ? (searchColl == shardedSearchColl
-                                                   ? shard1HistorySharded(explainVerbosity)
-                                                   : shard1HistoryUnsharded(explainVerbosity))
-                                            : shard0HistorySharded(explainVerbosity));
+        assert(
+            !(searchColl == unshardedSearchColl && mongot == d0Mongot),
+            "unsharded requests should not go to secondary",
+        );
+        const history =
+            mongot == d1Mongot
+                ? searchColl == shardedSearchColl
+                    ? shard1HistorySharded(explainVerbosity)
+                    : shard1HistoryUnsharded(explainVerbosity)
+                : shard0HistorySharded(explainVerbosity);
         if (searchColl === shardedSearchColl) {
             mongot.setMockResponses(history, cursorId, NumberLong(cursorId + 1001));
         } else {
@@ -303,17 +305,14 @@ function lookupTest(baseColl, searchColl, mockResponses) {
     baseColl.aggregate([{$lookup: {from: searchColl.getName(), pipeline: [], as: "out"}}]);
 
     setupAllMockRequests(searchColl, mockResponses);
-    assert.sameMembers(expectedLookupResults,
-                       baseColl.aggregate(makeLookupPipeline(searchColl)).toArray());
+    assert.sameMembers(expectedLookupResults, baseColl.aggregate(makeLookupPipeline(searchColl)).toArray());
     stWithMock.assertEmptyMocks();
 }
 
 // Test all combinations of sharded/unsharded base/search collection.
 lookupTest(unshardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
-lookupTest(unshardedBaseColl,
-           shardedSearchColl,
-           {mongos: [], primary: [kPlan, kSearch], secondary: [kSearch]});
+lookupTest(unshardedBaseColl, shardedSearchColl, {mongos: [], primary: [kPlan, kSearch], secondary: [kSearch]});
 
 lookupTest(shardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
@@ -321,28 +320,30 @@ lookupTest(shardedBaseColl, shardedSearchColl, {
     mongos: [],
     // There's one doc per shard, but each shard will dispatch the $search to all shards.
     primary: [kPlan, kSearch, kSearch],
-    secondary: [kPlan, kSearch, kSearch]
+    secondary: [kPlan, kSearch, kSearch],
 });
 
 // ----------------
 // $unionWith tests
 // ----------------
-const makeUnionWithPipeline = (searchColl) => [{
-    $unionWith: {
-        coll: searchColl.getName(),
-        pipeline: [
-            {$search: mongotQuery},
-            {
-                $project: {
-                    "_id": 0,
-                    "ref_id": "$_id",
-                    "title": "$title",
-                    "searchMeta": "$$SEARCH_META",
-                }
-            }
-        ]
-    }
-}];
+const makeUnionWithPipeline = (searchColl) => [
+    {
+        $unionWith: {
+            coll: searchColl.getName(),
+            pipeline: [
+                {$search: mongotQuery},
+                {
+                    $project: {
+                        "_id": 0,
+                        "ref_id": "$_id",
+                        "title": "$title",
+                        "searchMeta": "$$SEARCH_META",
+                    },
+                },
+            ],
+        },
+    },
+];
 
 const expectedUnionWithResult = [
     {_id: 100, "localField": "cakes", "weird": false},
@@ -351,35 +352,35 @@ const expectedUnionWithResult = [
     {"ref_id": 1, "title": "cookies and cakes", "searchMeta": {"count": 5}},
     {"ref_id": 4, "title": "cakes and oranges", "searchMeta": {"count": 5}},
     {"ref_id": 5, "title": "cakes and apples", "searchMeta": {"count": 5}},
-    {"ref_id": 7, "title": "cakes and kale", "searchMeta": {"count": 5}}
+    {"ref_id": 7, "title": "cakes and kale", "searchMeta": {"count": 5}},
 ];
 
 function unionTest(baseColl, searchColl, mockResponses) {
     setupAllMockRequests(searchColl, mockResponses);
-    assert.sameMembers(baseColl.aggregate(makeUnionWithPipeline(searchColl)).toArray(),
-                       expectedUnionWithResult);
+    assert.sameMembers(baseColl.aggregate(makeUnionWithPipeline(searchColl)).toArray(), expectedUnionWithResult);
     stWithMock.assertEmptyMocks();
 }
 
 // Test all combinations of sharded/unsharded base/search collection.
 unionTest(unshardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
-unionTest(unshardedBaseColl,
-          shardedSearchColl,
-          {mongos: [], primary: [kPlan, kSearch], secondary: [kSearch]});
+unionTest(unshardedBaseColl, shardedSearchColl, {mongos: [], primary: [kPlan, kSearch], secondary: [kSearch]});
 
 unionTest(shardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
 // The $unionWith is dispatched to shards randomly instead of always primary, so planShardedSearch
 // may be issued in either shard.
-unionTest(shardedBaseColl,
-          shardedSearchColl,
-          {mongos: [], primary: [kPlanMaybe, kSearch], secondary: [kPlanMaybe, kSearch]});
+unionTest(shardedBaseColl, shardedSearchColl, {
+    mongos: [],
+    primary: [kPlanMaybe, kSearch],
+    secondary: [kPlanMaybe, kSearch],
+});
 
 // TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
-if (!FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchExplainExecutionStats')) {
+if (!FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchExplainExecutionStats")) {
     jsTestLog(
-        "Skipping explain tests with $lookup and $unionWith because search explain execution stats must be enabled.");
+        "Skipping explain tests with $lookup and $unionWith because search explain execution stats must be enabled.",
+    );
     stWithMock.stop();
     quit();
 }
@@ -392,8 +393,7 @@ if (!FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchExplainExecut
 
 // We can't mock all responses with the explain verbosity since $lookup doesn't propogate the
 // explain to its pipeline if run on a sharded collection.
-function lookupWithExplainExecStatsDoesNotThrow(
-    baseColl, searchColl, mockResponsesWithExplain, mockResponses) {
+function lookupWithExplainExecStatsDoesNotThrow(baseColl, searchColl, mockResponsesWithExplain, mockResponses) {
     setupAllMockRequests(searchColl, mockResponsesWithExplain, {verbosity: "executionStats"});
     setupAllMockRequests(searchColl, mockResponses);
     let result = baseColl.explain("executionStats").aggregate(makeLookupPipeline(searchColl));
@@ -402,10 +402,12 @@ function lookupWithExplainExecStatsDoesNotThrow(
 }
 
 // Query is run to completion, so $lookup should return two documents.
-let result = lookupWithExplainExecStatsDoesNotThrow(unshardedBaseColl,
-                                                    unshardedSearchColl,
-                                                    {mongos: [], primary: [kSearch], secondary: []},
-                                                    {mongos: [], primary: [], secondary: []});
+let result = lookupWithExplainExecStatsDoesNotThrow(
+    unshardedBaseColl,
+    unshardedSearchColl,
+    {mongos: [], primary: [kSearch], secondary: []},
+    {mongos: [], primary: [], secondary: []},
+);
 
 let lookupStage = getAggPlanStage(result, "$lookup");
 assert.neq(lookupStage, null, result);
@@ -413,28 +415,32 @@ assert(lookupStage.hasOwnProperty("nReturned"));
 assert.eq(NumberLong(2), lookupStage["nReturned"]);
 
 // Query is fully executed on primary shard and $lookup should return two documents.
-result =
-    lookupWithExplainExecStatsDoesNotThrow(unshardedBaseColl,
-                                           shardedSearchColl,
-                                           {mongos: [], primary: [kPlan], secondary: []},
-                                           {mongos: [], primary: [kSearch], secondary: [kSearch]});
+result = lookupWithExplainExecStatsDoesNotThrow(
+    unshardedBaseColl,
+    shardedSearchColl,
+    {mongos: [], primary: [kPlan], secondary: []},
+    {mongos: [], primary: [kSearch], secondary: [kSearch]},
+);
 lookupStage = getAggPlanStage(result, "$lookup");
 assert.neq(lookupStage, null, result);
 assert(lookupStage.hasOwnProperty("nReturned"));
 assert.eq(NumberLong(2), lookupStage["nReturned"]);
 
 //$lookup is on the merging shard, so $search should not query mongot.
-result = lookupWithExplainExecStatsDoesNotThrow(shardedBaseColl,
-                                                unshardedSearchColl,
-                                                {mongos: [], primary: [], secondary: []},
-                                                {mongos: [], primary: [], secondary: []});
+result = lookupWithExplainExecStatsDoesNotThrow(
+    shardedBaseColl,
+    unshardedSearchColl,
+    {mongos: [], primary: [], secondary: []},
+    {mongos: [], primary: [], secondary: []},
+);
 
 // Each shard will run $lookup, and $lookup should return one doc for each shard.
 result = lookupWithExplainExecStatsDoesNotThrow(
     shardedBaseColl,
     shardedSearchColl,
     {mongos: [], primary: [kPlan], secondary: [kPlan]},
-    {mongos: [], primary: [kSearch, kSearch], secondary: [kSearch, kSearch]});
+    {mongos: [], primary: [kSearch, kSearch], secondary: [kSearch, kSearch]},
+);
 let lookupStages = getAggPlanStages(result, "$lookup");
 for (let stage of lookupStages) {
     assert.neq(stage, null, result);
@@ -442,10 +448,8 @@ for (let stage of lookupStages) {
     assert.eq(NumberLong(1), stage["nReturned"]);
 }
 
-if (checkSbeRestrictedOrFullyEnabled(testDB) &&
-    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchInSbe')) {
-    jsTestLog(
-        "Skipping explain $unionWith tests because it only applies to $search in classic engine.");
+if (checkSbeRestrictedOrFullyEnabled(testDB) && FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe")) {
+    jsTestLog("Skipping explain $unionWith tests because it only applies to $search in classic engine.");
     stWithMock.stop();
     quit();
 }
@@ -454,7 +458,11 @@ if (checkSbeRestrictedOrFullyEnabled(testDB) &&
 // ----------------------
 
 function unionWithExplainExecStatsDoesNotThrow(
-    baseColl, searchColl, mockResponsesWithExplain, mockResponsesWithoutExplain) {
+    baseColl,
+    searchColl,
+    mockResponsesWithExplain,
+    mockResponsesWithoutExplain,
+) {
     setupAllMockRequests(searchColl, mockResponsesWithExplain, {verbosity: "executionStats"});
     setupAllMockRequests(searchColl, mockResponsesWithoutExplain);
     let result = baseColl.explain("executionStats").aggregate(makeUnionWithPipeline(searchColl));
@@ -464,11 +472,12 @@ function unionWithExplainExecStatsDoesNotThrow(
 
 // $unionWith will run the subpipeline twice for explain. Once to obtain results for the rest of the
 // pipeline, and once to gather explain results. We send two search requests because of this.
-let explainResult =
-    unionWithExplainExecStatsDoesNotThrow(unshardedBaseColl,
-                                          unshardedSearchColl,
-                                          {mongos: [], primary: [kSearch, kSearch], secondary: []},
-                                          {mongos: [], primary: [], secondary: []});
+let explainResult = unionWithExplainExecStatsDoesNotThrow(
+    unshardedBaseColl,
+    unshardedSearchColl,
+    {mongos: [], primary: [kSearch, kSearch], secondary: []},
+    {mongos: [], primary: [], secondary: []},
+);
 let unionWithStage = getUnionWithStage(explainResult);
 let pipeline = unionWithStage["$unionWith"]["pipeline"];
 getMongotStagesAndValidateExplainExecutionStats({
@@ -476,7 +485,7 @@ getMongotStagesAndValidateExplainExecutionStats({
     stageType: "$_internalSearchMongotRemote",
     verbosity: "executionStats",
     nReturned: NumberLong(5),
-    explainObject: expectedExplainContents
+    explainObject: expectedExplainContents,
 });
 getMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
@@ -491,7 +500,8 @@ explainResult = unionWithExplainExecStatsDoesNotThrow(
     unshardedBaseColl,
     shardedSearchColl,
     {mongos: [], primary: [kPlan, kPlan, kSearch], secondary: [kSearch]},
-    {mongos: [], primary: [kSearch], secondary: [kSearch]});
+    {mongos: [], primary: [kSearch], secondary: [kSearch]},
+);
 
 unionWithStage = getUnionWithStage(explainResult);
 pipeline = unionWithStage["$unionWith"]["pipeline"];
@@ -509,17 +519,18 @@ getShardedMongotStagesAndValidateExplainExecutionStats({
     stageType: "$_internalSearchIdLookup",
     expectedNumStages: 2,
     verbosity: "executionStats",
-    nReturnedList: [NumberLong(3), NumberLong(2)]
+    nReturnedList: [NumberLong(3), NumberLong(2)],
 });
 
 // The $unionWith stage is part of the merging pipeline and does not execute during the initial
 // query execution. However, the subpipeline is executed when the query is serialized for the
 // explain (See SERVER-93380), so we need one search call.
-explainResult =
-    unionWithExplainExecStatsDoesNotThrow(shardedBaseColl,
-                                          unshardedSearchColl,
-                                          {mongos: [], primary: [kSearch], secondary: []},
-                                          {mongos: [], primary: [], secondary: []});
+explainResult = unionWithExplainExecStatsDoesNotThrow(
+    shardedBaseColl,
+    unshardedSearchColl,
+    {mongos: [], primary: [kSearch], secondary: []},
+    {mongos: [], primary: [], secondary: []},
+);
 
 unionWithStage = getUnionWithStage(explainResult);
 pipeline = unionWithStage["$unionWith"]["pipeline"];
@@ -529,7 +540,7 @@ getMongotStagesAndValidateExplainExecutionStats({
     stageType: "$_internalSearchMongotRemote",
     verbosity: "executionStats",
     nReturned: NumberLong(5),
-    explainObject: expectedExplainContents
+    explainObject: expectedExplainContents,
 });
 getMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
@@ -545,7 +556,8 @@ explainResult = unionWithExplainExecStatsDoesNotThrow(
     shardedBaseColl,
     shardedSearchColl,
     {mongos: [kPlan], primary: [kSearch], secondary: [kSearch]},
-    {mongos: [], primary: [], secondary: []});
+    {mongos: [], primary: [], secondary: []},
+);
 
 unionWithStage = getUnionWithStage(explainResult);
 pipeline = unionWithStage["$unionWith"]["pipeline"];
@@ -563,7 +575,7 @@ getShardedMongotStagesAndValidateExplainExecutionStats({
     stageType: "$_internalSearchIdLookup",
     expectedNumStages: 2,
     verbosity: "executionStats",
-    nReturnedList: [NumberLong(3), NumberLong(2)]
+    nReturnedList: [NumberLong(3), NumberLong(2)],
 });
 
 stWithMock.stop();

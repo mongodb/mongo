@@ -35,7 +35,8 @@ const configPrimary = new Mongo(topology.configsvr.primary);
 const fp = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeCloning");
 
 const recipientShardNames = reshardingTest.recipientShardNames;
-reshardingTest.withReshardingInBackground(  //
+reshardingTest.withReshardingInBackground(
+    //
     {
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
@@ -49,6 +50,7 @@ reshardingTest.withReshardingInBackground(  //
         triggerShardVersionRefreshOnSecondary(tempColl);
 
         fp.off();
-    });
+    },
+);
 
 reshardingTest.teardown();

@@ -7,7 +7,7 @@ import {
     assertExpectedResults,
     getLatestQueryStatsEntry,
     getQueryStats,
-    getQueryStatsFindCmd
+    getQueryStatsFindCmd,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -19,8 +19,8 @@ const st = new ShardingTest({
     mongosOptions: {
         setParameter: {
             internalQueryStatsRateLimit: -1,
-            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-        }
+            "failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}",
+        },
     },
 });
 const mongos = st.s;
@@ -40,10 +40,10 @@ coll.insert({v: 4});
         },
         readConcern: {level: "local", provenance: "implicitDefault"},
         batchSize: "?number",
-        client: {application: {name: "MongoDB Shell"}}
+        client: {application: {name: "MongoDB Shell"}},
     };
 
-    const cursor = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc
+    const cursor = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1); // returns 1 doc
 
     // Since the cursor hasn't been exhausted yet, ensure no query stats results have been written
     // yet.
@@ -52,11 +52,13 @@ coll.insert({v: 4});
 
     // Run a getMore to exhaust the cursor, then ensure query stats results have been written
     // accurately. batchSize must be 2 so the cursor recognizes exhaustion.
-    assert.commandWorked(db.runCommand({
-        getMore: cursor.getId(),
-        collection: coll.getName(),
-        batchSize: 2
-    }));  // returns 1 doc, exhausts the cursor
+    assert.commandWorked(
+        db.runCommand({
+            getMore: cursor.getId(),
+            collection: coll.getName(),
+            batchSize: 2,
+        }),
+    ); // returns 1 doc, exhausts the cursor
     queryStats = getQueryStatsFindCmd(db);
     assert.eq(1, queryStats.length, queryStats);
     assertExpectedResults({
@@ -67,14 +69,20 @@ coll.insert({v: 4});
         expectedDocsReturnedMax: 2,
         expectedDocsReturnedMin: 2,
         expectedDocsReturnedSumOfSq: 4,
-        getMores: true
+        getMores: true,
     });
 
     // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
     // are accurate.
-    coll.find({v: {$gt: 2, $lt: 3}}).batchSize(10).toArray();  // returns 0 docs
-    coll.find({v: {$gt: 0, $lt: 1}}).batchSize(10).toArray();  // returns 0 docs
-    coll.find({v: {$gt: 0, $lt: 2}}).batchSize(10).toArray();  // return 1 doc
+    coll.find({v: {$gt: 2, $lt: 3}})
+        .batchSize(10)
+        .toArray(); // returns 0 docs
+    coll.find({v: {$gt: 0, $lt: 1}})
+        .batchSize(10)
+        .toArray(); // returns 0 docs
+    coll.find({v: {$gt: 0, $lt: 2}})
+        .batchSize(10)
+        .toArray(); // return 1 doc
     queryStats = getQueryStatsFindCmd(db);
     assert.eq(1, queryStats.length, queryStats);
     assertExpectedResults({
@@ -85,7 +93,7 @@ coll.insert({v: 4});
         expectedDocsReturnedMax: 2,
         expectedDocsReturnedMin: 0,
         expectedDocsReturnedSumOfSq: 5,
-        getMores: true
+        getMores: true,
     });
 }
 
@@ -103,14 +111,13 @@ coll.insert({v: 4});
         },
         readConcern: {level: "local", provenance: "implicitDefault"},
         batchSize: "?number",
-        client: {application: {name: "MongoDB Shell"}}
+        client: {application: {name: "MongoDB Shell"}},
     };
 
-    const cursor1 = coll2.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc
-    const cursor2 = coll2.find({v: {$gt: 0, $lt: 2}}).batchSize(1);  // returns 1 doc
+    const cursor1 = coll2.find({v: {$gt: 0, $lt: 5}}).batchSize(1); // returns 1 doc
+    const cursor2 = coll2.find({v: {$gt: 0, $lt: 2}}).batchSize(1); // returns 1 doc
 
-    assert.commandWorked(
-        db.runCommand({killCursors: coll2.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
+    assert.commandWorked(db.runCommand({killCursors: coll2.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
     const queryStats = getLatestQueryStatsEntry(db);
     assertExpectedResults({
         results: queryStats,
@@ -120,7 +127,7 @@ coll.insert({v: 4});
         expectedDocsReturnedMax: 1,
         expectedDocsReturnedMin: 1,
         expectedDocsReturnedSumOfSq: 2,
-        getMores: false
+        getMores: false,
     });
 }
 

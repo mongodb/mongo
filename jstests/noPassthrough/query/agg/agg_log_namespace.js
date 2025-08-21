@@ -1,10 +1,7 @@
 // Tests that a source collection namespace is correctly logged in the global log for an aggregate
 // command when a pipeline contains a stage that can write into an output collection.
 // @tags: [requires_profiling]
-import {
-    withEachKindOfWriteStage,
-    withEachMergeMode
-} from "jstests/aggregation/extras/merge_helpers.js";
+import {withEachKindOfWriteStage, withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 
 // Runs the given 'pipeline' and verifies that the namespace is correctly logged in the global
 // log for the aggregate command. The 'comment' parameter is used to match a log entry against
@@ -13,15 +10,19 @@ function verifyLoggedNamespace({pipeline, comment}) {
     function regexLiteral(string) {
         return string.replace(/[.*+$^()\[\]{}\\]/g, "\\$&");
     }
-    assert.commandWorked(db.runCommand(
-        {aggregate: source.getName(), comment: comment, pipeline: pipeline, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: source.getName(), comment: comment, pipeline: pipeline, cursor: {}}),
+    );
     checkLog.containsWithCount(
         conn,
-        RegExp(`"appName"\:"MongoDB Shell",` +
-               '.*' +  // leave some space for other keys
-               `"command"\:{"aggregate"\:"${regexLiteral(source.getName())}",` +
-               `"comment"\:"${regexLiteral(comment)}"`),
-        1);
+        RegExp(
+            `"appName"\:"MongoDB Shell",` +
+                ".*" + // leave some space for other keys
+                `"command"\:{"aggregate"\:"${regexLiteral(source.getName())}",` +
+                `"comment"\:"${regexLiteral(comment)}"`,
+        ),
+        1,
+    );
 }
 
 const mongodOptions = {};
@@ -38,19 +39,22 @@ target.drop();
 assert.commandWorked(db.setProfilingLevel(1, {slowms: 0}));
 
 // Test stages that can write into an output collection.
-withEachKindOfWriteStage(
-    target, (stage) => verifyLoggedNamespace({pipeline: [stage], comment: Object.keys(stage)[0]}));
+withEachKindOfWriteStage(target, (stage) => verifyLoggedNamespace({pipeline: [stage], comment: Object.keys(stage)[0]}));
 
 // Test each $merge mode.
-withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => verifyLoggedNamespace({
-                      pipeline: [{
-                          $merge: {
-                              into: target.getName(),
-                              whenMatched: whenMatchedMode,
-                              whenNotMatched: whenNotMatchedMode
-                          }
-                      }],
-                      comment: `merge_${whenMatchedMode}_${whenNotMatchedMode}`
-                  }));
+withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) =>
+    verifyLoggedNamespace({
+        pipeline: [
+            {
+                $merge: {
+                    into: target.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                },
+            },
+        ],
+        comment: `merge_${whenMatchedMode}_${whenNotMatchedMode}`,
+    }),
+);
 
 MongoRunner.stopMongod(conn);

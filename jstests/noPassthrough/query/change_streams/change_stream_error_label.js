@@ -34,36 +34,38 @@ function testFailGetMoreAfterCursorCheckoutFailpoint({errorCode, expectedLabel})
     testDB.getMongo().setSecondaryOk();
 
     // Activate the failpoint and set the exception that it will throw.
-    assert.commandWorked(testDB.adminCommand({
-        configureFailPoint: "failGetMoreAfterCursorCheckout",
-        mode: "alwaysOn",
-        data: {"errorCode": errorCode}
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            configureFailPoint: "failGetMoreAfterCursorCheckout",
+            mode: "alwaysOn",
+            data: {"errorCode": errorCode},
+        }),
+    );
 
     // Now open a valid $changeStream cursor...
-    const aggCmdRes = assert.commandWorked(
-        coll.runCommand("aggregate", {pipeline: [{$changeStream: {}}], cursor: {}}));
+    const aggCmdRes = assert.commandWorked(coll.runCommand("aggregate", {pipeline: [{$changeStream: {}}], cursor: {}}));
 
     // ... run a getMore using the cursorID from the original command response, and confirm that the
     // expected error was thrown...
     const getMoreRes = assert.commandFailedWithCode(
-        testDB.runCommand({getMore: aggCmdRes.cursor.id, collection: coll.getName()}), errorCode);
+        testDB.runCommand({getMore: aggCmdRes.cursor.id, collection: coll.getName()}),
+        errorCode,
+    );
 
     /// ... and confirm that the label is present or absent depending on the "expectedLabel" value.
-    const errorLabels = (getMoreRes.errorLabels || []);
+    const errorLabels = getMoreRes.errorLabels || [];
     assert.eq("errorLabels" in getMoreRes, expectedLabel, getMoreRes);
     assert.eq(errorLabels.includes("ResumableChangeStreamError"), expectedLabel, getMoreRes);
 
     // Finally, disable the failpoint.
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
 }
 // Test the expected output for both resumable and non-resumable error codes.
-testFailGetMoreAfterCursorCheckoutFailpoint(
-    {errorCode: ErrorCodes.ShutdownInProgress, expectedLabel: true});
-testFailGetMoreAfterCursorCheckoutFailpoint(
-    {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet, expectedLabel: true});
-testFailGetMoreAfterCursorCheckoutFailpoint(
-    {errorCode: ErrorCodes.FailedToParse, expectedLabel: false});
+testFailGetMoreAfterCursorCheckoutFailpoint({errorCode: ErrorCodes.ShutdownInProgress, expectedLabel: true});
+testFailGetMoreAfterCursorCheckoutFailpoint({
+    errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet,
+    expectedLabel: true,
+});
+testFailGetMoreAfterCursorCheckoutFailpoint({errorCode: ErrorCodes.FailedToParse, expectedLabel: false});
 
 rst.stopSet();

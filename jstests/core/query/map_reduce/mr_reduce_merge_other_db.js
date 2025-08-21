@@ -20,26 +20,28 @@ const outDbStr = "mr_db_" + testName;
 const outDb = db.getMongo().getDB(outDbStr);
 const outColl = outDb[outCollStr];
 
-const mapFn = function() {
-    for (let i = 0; i < this.a.length; i++)
-        emit(this.a[i], 1);
+const mapFn = function () {
+    for (let i = 0; i < this.a.length; i++) emit(this.a[i], 1);
 };
-const reduceFn = function(k, vs) {
+const reduceFn = function (k, vs) {
     return Array.sum(vs);
 };
 
 (function testMerge() {
     outColl.drop();
     assert.commandWorked(
-        outColl.insert([{_id: 1, value: "something else"}, {_id: 5, value: "existing"}]));
-    let res = assert.commandWorked(
-        coll.mapReduce(mapFn, reduceFn, {out: {merge: outCollStr, db: outDbStr}}));
+        outColl.insert([
+            {_id: 1, value: "something else"},
+            {_id: 5, value: "existing"},
+        ]),
+    );
+    let res = assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {merge: outCollStr, db: outDbStr}}));
     const expected = [
         {_id: 1, value: 1},
         {_id: 2, value: 2},
         {_id: 3, value: 2},
         {_id: 4, value: 1},
-        {_id: 5, value: "existing"}
+        {_id: 5, value: "existing"},
     ];
     let actual = outColl.find().sort({_id: 1}).toArray();
     assert.eq(expected, actual);
@@ -47,15 +49,19 @@ const reduceFn = function(k, vs) {
 
 (function testReduce() {
     outColl.drop();
-    assert.commandWorked(outColl.insert([{_id: 1, value: 100}, {_id: 5, value: 0}]));
-    let res = assert.commandWorked(
-        coll.mapReduce(mapFn, reduceFn, {out: {reduce: outCollStr, db: outDbStr}}));
+    assert.commandWorked(
+        outColl.insert([
+            {_id: 1, value: 100},
+            {_id: 5, value: 0},
+        ]),
+    );
+    let res = assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {reduce: outCollStr, db: outDbStr}}));
     const expected = [
         {_id: 1, value: 101},
         {_id: 2, value: 2},
         {_id: 3, value: 2},
         {_id: 4, value: 1},
-        {_id: 5, value: 0}
+        {_id: 5, value: 0},
     ];
     let actual = outColl.find().sort({_id: 1}).toArray();
     assert.eq(expected, actual);

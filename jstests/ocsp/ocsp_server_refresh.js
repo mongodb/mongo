@@ -54,8 +54,7 @@ assertClientConnectFails(conn, OCSP_REVOKED);
 MongoRunner.stopMongod(conn);
 
 // have the server refresh its response every 10 seconds
-Object.extend(ocsp_options,
-              {setParameter: {ocspEnabled: true, ocspValidationRefreshPeriodSecs: 10}});
+Object.extend(ocsp_options, {setParameter: {ocspEnabled: true, ocspValidationRefreshPeriodSecs: 10}});
 assert.doesNotThrow(() => {
     conn = MongoRunner.runMongod(ocsp_options);
 });

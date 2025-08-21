@@ -29,16 +29,13 @@ assert.commandWorked(coll.insertOne({date: new Date()}));
 assertErrorCode(coll, {$project: {add: {$add: ["$date", "$date"]}}}, 16612);
 
 // Divide
-assertErrorCode(
-    coll, {$project: {divide: {$divide: ["$date", 2]}}}, [16609, ErrorCodes.TypeMismatch]);
+assertErrorCode(coll, {$project: {divide: {$divide: ["$date", 2]}}}, [16609, ErrorCodes.TypeMismatch]);
 
 // Mod
 assertErrorCode(coll, {$project: {mod: {$mod: ["$date", 2]}}}, 16611);
 
 // Multiply
-assertErrorCode(
-    coll, {$project: {multiply: {$multiply: ["$date", 2]}}}, [16555, ErrorCodes.TypeMismatch]);
+assertErrorCode(coll, {$project: {multiply: {$multiply: ["$date", 2]}}}, [16555, ErrorCodes.TypeMismatch]);
 
 // Subtract
-assertErrorCode(
-    coll, {$project: {subtract: {$subtract: [2, "$date"]}}}, [16556, ErrorCodes.TypeMismatch]);
+assertErrorCode(coll, {$project: {subtract: {$subtract: [2, "$date"]}}}, [16556, ErrorCodes.TypeMismatch]);

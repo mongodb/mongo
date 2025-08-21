@@ -21,10 +21,9 @@ assert.commandWorked(coll.createIndex({location: "2dsphere"}));
  */
 function compareResults(nearArgument) {
     const pipeline = [{$geoNear: {near: "$$pt", distanceField: "distance"}}];
-    const res = coll.aggregate(pipeline, {let : {pt: nearArgument}}).toArray();
+    const res = coll.aggregate(pipeline, {let: {pt: nearArgument}}).toArray();
 
-    const constRes =
-        coll.aggregate([{$geoNear: {near: nearArgument, distanceField: "distance"}}]).toArray();
+    const constRes = coll.aggregate([{$geoNear: {near: nearArgument, distanceField: "distance"}}]).toArray();
 
     assert.eq(res.length, constRes.length);
     for (let i = 0; i < res.length; i++) {
@@ -41,12 +40,15 @@ assert.commandWorked(geo2.insert({_id: 5, location: {type: "Point", coordinates:
 assert.commandWorked(geo2.insert({_id: 6, location: {type: "Point", coordinates: [11, 21]}}));
 
 let pipelineLookup = [
-	{$lookup: {
+    {
+        $lookup: {
             from: coll.getName(),
             let: {pt: "$location"},
             pipeline: [{$geoNear: {near: "$$pt", distanceField: "distance"}}, {$match: {_id: 0}}],
-            as: "joinedField"
-	}}];
+            as: "joinedField",
+        },
+    },
+];
 
 const lookupRes = geo2.aggregate(pipelineLookup).toArray();
 assert.eq(lookupRes.length, 2);
@@ -64,10 +66,8 @@ coll.createIndex({location: "2d"});
 compareResults([10, 22]);
 
 // Error checks.
-let err = assert.throws(
-    () => coll.aggregate([{$geoNear: {near: "$$pt", distanceField: "distance"}}], {let : {pt: 5}}));
+let err = assert.throws(() => coll.aggregate([{$geoNear: {near: "$$pt", distanceField: "distance"}}], {let: {pt: 5}}));
 assert.commandFailedWithCode(err, 5860401);
 
-err = assert.throws(() => coll.aggregate([{$geoNear: {near: "$$pt", distanceField: "distance"}}],
-                                         {let : {pt: "abc"}}));
+err = assert.throws(() => coll.aggregate([{$geoNear: {near: "$$pt", distanceField: "distance"}}], {let: {pt: "abc"}}));
 assert.commandFailedWithCode(err, 5860401);

@@ -12,11 +12,11 @@
  */
 
 {
-    jsTest.log('[C2C] Rename of existing collection with extra UUID parameter must succeed');
-    const dbName = 'testRenameCollectionWithSourceUUID';
+    jsTest.log("[C2C] Rename of existing collection with extra UUID parameter must succeed");
+    const dbName = "testRenameCollectionWithSourceUUID";
     const testDB = db.getSiblingDB(dbName);
-    const fromCollName = 'from';
-    const toCollName = 'to';
+    const fromCollName = "from";
+    const toCollName = "to";
     assert.commandWorked(testDB.dropDatabase());
 
     const fromColl = testDB.getCollection(fromCollName);
@@ -25,15 +25,17 @@
     const toColl = testDB.getCollection(toCollName);
     toColl.insert({b: 0});
 
-    const sourceUUID = assert.commandWorked(testDB.runCommand({listCollections: 1}))
-                           .cursor.firstBatch.find(c => c.name === fromCollName)
-                           .info.uuid;
+    const sourceUUID = assert
+        .commandWorked(testDB.runCommand({listCollections: 1}))
+        .cursor.firstBatch.find((c) => c.name === fromCollName).info.uuid;
 
     // The command succeeds when the correct UUID is provided.
-    assert.commandWorked(testDB.adminCommand({
-        renameCollection: fromColl.getFullName(),
-        to: toColl.getFullName(),
-        dropTarget: true,
-        collectionUUID: sourceUUID,
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            renameCollection: fromColl.getFullName(),
+            to: toColl.getFullName(),
+            dropTarget: true,
+            collectionUUID: sourceUUID,
+        }),
+    );
 }

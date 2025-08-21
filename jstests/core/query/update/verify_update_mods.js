@@ -232,7 +232,10 @@ const testCases = [
         query: {_id: 2},
         update: {$setOnInsert: {a: 1}},
         inputDocuments: [{_id: 1, a: 1}],
-        expectedResults: [{_id: 1, a: 1}, {_id: 2, a: 1}],
+        expectedResults: [
+            {_id: 1, a: 1},
+            {_id: 2, a: 1},
+        ],
     },
     {
         query: {_id: 1},

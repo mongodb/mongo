@@ -16,13 +16,16 @@ st.s.adminCommand({enableSharding: "test"});
 
 const db = st.getDB("test");
 // Create the collection as a clustered collection.
-const coll = assertDropAndRecreateCollection(
-    db, jsTestName(), {clusteredIndex: {key: {_id: 1}, unique: true}});
+const coll = assertDropAndRecreateCollection(db, jsTestName(), {clusteredIndex: {key: {_id: 1}, unique: true}});
 st.shardColl(coll, {a: 1});
 // First of all check that we can execute the query.
-assert.commandWorked(coll.insertMany([...Array(10).keys()].map(i => {
-    return {_id: i, a: i};
-})));
+assert.commandWorked(
+    coll.insertMany(
+        [...Array(10).keys()].map((i) => {
+            return {_id: i, a: i};
+        }),
+    ),
+);
 
 {
     var explain = coll.find({_id: 2}).explain();
@@ -33,8 +36,7 @@ assert.commandWorked(coll.insertMany([...Array(10).keys()].map(i => {
     var explain = coll.find({_id: 2}, {"foo.bar": 3}).explain();
     assert(isClusteredIxscan(db, explain));
 
-    assert.commandWorked(
-        st.getPrimaryShard("test").adminCommand({setParameter: 1, notablescan: 1}));
+    assert.commandWorked(st.getPrimaryShard("test").adminCommand({setParameter: 1, notablescan: 1}));
     // Do the same thing only with notablescan enabled.
     explain = coll.find({_id: 2}).explain();
     assert(isExpress(db, explain));

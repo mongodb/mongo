@@ -29,7 +29,8 @@ function runTests(ServerType) {
     // the reported query error code is the cryptic 'BadValue'.
     assert.commandFailedWithCode(
         primaryDB.runCommand({find: collName, filter: {any_nonexistent_field: {$exists: true}}}),
-        ErrorCodes.NoQueryExecutionPlans);
+        ErrorCodes.NoQueryExecutionPlans,
+    );
 
     s.stop();
 }
@@ -40,16 +41,16 @@ function Sharding() {
         config: 1,
         other: {
             rsOptions: {setParameter: {notablescan: true}},
-            configOptions: {setParameter: {notablescan: true}}
-        }
+            configOptions: {setParameter: {notablescan: true}},
+        },
     });
 }
 
-Sharding.prototype.stop = function() {
+Sharding.prototype.stop = function () {
     this.st.stop();
 };
 
-Sharding.prototype.getConn = function() {
+Sharding.prototype.getConn = function () {
     return this.st.s0;
 };
 
@@ -59,11 +60,11 @@ function ReplSet() {
     this.rst.initiate();
 }
 
-ReplSet.prototype.stop = function() {
+ReplSet.prototype.stop = function () {
     this.rst.stopSet();
 };
 
-ReplSet.prototype.getConn = function() {
+ReplSet.prototype.getConn = function () {
     return this.rst.getPrimary();
 };
 

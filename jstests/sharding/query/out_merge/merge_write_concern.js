@@ -12,8 +12,7 @@ const shard0 = st.rs0;
 const shard1 = st.rs1;
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 function testWriteConcernError(rs) {
     // Split the target collection at {_id: 10} so that there'll be doc $merge-ed to both shards.
@@ -33,13 +32,15 @@ function testWriteConcernError(rs) {
         }
         const res = mongosDB.runCommand({
             aggregate: "source",
-            pipeline: [{
-                $merge: {
-                    into: "target",
-                    whenMatched: whenMatchedMode,
-                    whenNotMatched: whenNotMatchedMode
-                }
-            }],
+            pipeline: [
+                {
+                    $merge: {
+                        into: "target",
+                        whenMatched: whenMatchedMode,
+                        whenNotMatched: whenNotMatchedMode,
+                    },
+                },
+            ],
             writeConcern: {w: 3, wtimeout: 100},
             cursor: {},
         });
@@ -47,15 +48,17 @@ function testWriteConcernError(rs) {
         jsTestLog("Testing Mode: " + tojson(whenMatchedMode) + tojson(whenNotMatchedMode));
         jsTestLog("Target collection after $merge: " + tojson(target.find().toArray()));
 
-        let oplogEntries = shard0.getPrimary()
-                               .getDB("local")
-                               .oplog.rs.find({"ns": {$regex: "merge_write_concern.*"}})
-                               .toArray();
+        let oplogEntries = shard0
+            .getPrimary()
+            .getDB("local")
+            .oplog.rs.find({"ns": {$regex: "merge_write_concern.*"}})
+            .toArray();
         jsTestLog("Shard0 oplog entries: " + tojson(oplogEntries));
-        oplogEntries = shard1.getPrimary()
-                           .getDB("local")
-                           .oplog.rs.find({"ns": {$regex: "merge_write_concern.*"}})
-                           .toArray();
+        oplogEntries = shard1
+            .getPrimary()
+            .getDB("local")
+            .oplog.rs.find({"ns": {$regex: "merge_write_concern.*"}})
+            .toArray();
         jsTestLog("Shard1 oplog entries: " + tojson(oplogEntries));
 
         // $merge writeConcern errors are handled differently from normal writeConcern
@@ -71,18 +74,19 @@ function testWriteConcernError(rs) {
     withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         // Skip the combination of merge modes which will fail depending on the contents of the
         // source and target collection, as this will cause the assertion below to trip.
-        if (whenNotMatchedMode == "fail")
-            return;
+        if (whenNotMatchedMode == "fail") return;
 
         const res = mongosDB.runCommand({
             aggregate: "source",
-            pipeline: [{
-                $merge: {
-                    into: "target",
-                    whenMatched: whenMatchedMode,
-                    whenNotMatched: whenNotMatchedMode
-                }
-            }],
+            pipeline: [
+                {
+                    $merge: {
+                        into: "target",
+                        whenMatched: whenMatchedMode,
+                        whenNotMatched: whenNotMatchedMode,
+                    },
+                },
+            ],
             writeConcern: {w: 3},
             cursor: {},
         });
@@ -117,8 +121,8 @@ testWriteConcernError(shard0);
 testWriteConcernError(shard1);
 
 // Verify that either shard can produce a WriteConcernError when the CatalogCache is empty.
-[shard0, shard1].forEach(function(shard) {
-    shard.nodes.forEach(function(node) {
+[shard0, shard1].forEach(function (shard) {
+    shard.nodes.forEach(function (node) {
         assert.commandWorked(node.adminCommand({flushRouterConfig: target.getFullName()}));
     });
 });

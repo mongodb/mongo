@@ -10,20 +10,20 @@ import {
     actionMoviesViewPipeline,
     createMoviesViewAndIndex,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery
+    makeMovieVectorQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
     buildExpectedResults,
     datasets,
-    validateSearchExplain
+    validateSearchExplain,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const view = createMoviesViewAndIndex(datasets.ACTION_MOVIES);
 const vectorSearchQuery = makeMovieVectorQuery({
     queryVector: getMoviePlotEmbeddingById(6),
     limit: 5,
-    indexName: datasets.ACTION_MOVIES.indexName
+    indexName: datasets.ACTION_MOVIES.indexName,
 });
 
 // ===============================================================================

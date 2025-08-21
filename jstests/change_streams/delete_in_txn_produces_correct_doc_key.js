@@ -21,12 +21,14 @@ function testDeleteInMultiDocTxn({collName, deleteCommand, expectedChanges}) {
     // Initialize the collection.
     const coll = assertDropAndRecreateCollection(db, collName);
 
-    assert.commandWorked(coll.insertMany([
-        {_id: 1, a: 0, fullDoc: "It's a full document!"},
-        {_id: 2, a: 0},
-        {_id: 3, a: 0},
-        {_id: 4, a: 1}
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            {_id: 1, a: 0, fullDoc: "It's a full document!"},
+            {_id: 2, a: 0},
+            {_id: 3, a: 0},
+            {_id: 4, a: 1},
+        ]),
+    );
 
     // Open a change stream on the test collection.
     const cst = new ChangeStreamTest(db);
@@ -50,7 +52,7 @@ function testDeleteInMultiDocTxn({collName, deleteCommand, expectedChanges}) {
     // Test the change stream can be resumed after a delete event from within the transaction.
     cursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: changes[changes.length - 1]._id}}],
-        collection: coll
+        collection: coll,
     });
     assert.commandWorked(coll.insert({_id: 5}));
     assert.docEq({_id: 5}, cst.getOneChange(cursor).documentKey);
@@ -61,7 +63,7 @@ function testDeleteInMultiDocTxn({collName, deleteCommand, expectedChanges}) {
 jsTestLog("Testing deleteOne() in a transaction.");
 testDeleteInMultiDocTxn({
     collName: collName,
-    deleteCommand: function(sessionColl) {
+    deleteCommand: function (sessionColl) {
         assert.commandWorked(sessionColl.deleteOne({_id: 1}));
     },
     expectedChanges: [
@@ -76,7 +78,7 @@ testDeleteInMultiDocTxn({
 jsTestLog("Testing deleteMany() in a transaction.");
 testDeleteInMultiDocTxn({
     collName: collName,
-    deleteCommand: function(sessionColl) {
+    deleteCommand: function (sessionColl) {
         assert.commandWorked(sessionColl.deleteMany({a: 0, _id: {$gt: 0}}));
     },
     expectedChanges: [
@@ -102,7 +104,7 @@ testDeleteInMultiDocTxn({
 jsTestLog("Testing findAndModify() in a transaction.");
 testDeleteInMultiDocTxn({
     collName: collName,
-    deleteCommand: function(sessionColl) {
+    deleteCommand: function (sessionColl) {
         sessionColl.findAndModify({query: {a: 0}, sort: {_id: 1}, remove: true});
     },
     expectedChanges: [

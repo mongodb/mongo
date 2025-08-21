@@ -1,11 +1,11 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var doTest = function(signal) {
+var doTest = function (signal) {
     // Test replica set step down
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
-    var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
+    var replTest = new ReplSetTest({name: "testSet", nodes: 3});
 
     // call startSet() to start each mongod in the replica set
     // this returns a list of nodes
@@ -34,7 +34,7 @@ var doTest = function(signal) {
     try {
         var newPrimary = replTest.getPrimary();
     } catch (err) {
-        throw ("Could not elect new primary before timeout.");
+        throw "Could not elect new primary before timeout.";
     }
 
     print(phase++);
@@ -45,26 +45,24 @@ var doTest = function(signal) {
 
     // Make sure that secondaries are still up
     var result = newPrimary.getDB("admin").runCommand({replSetGetStatus: 1});
-    assert(result['ok'] == 1, "Could not verify that secondaries were still up:" + result);
+    assert(result["ok"] == 1, "Could not verify that secondaries were still up:" + result);
 
     print(phase++);
 
     var secondaries = replTest.getSecondaries();
-    assert.soon(function() {
+    assert.soon(function () {
         try {
             var res = secondaries[0].getDB("admin").runCommand({replSetGetStatus: 1});
-        } catch (err) {
-        }
+        } catch (err) {}
         return res.myState == 2;
     }, "Secondary 0 state not ready.");
 
     print(phase++);
 
-    assert.soon(function() {
+    assert.soon(function () {
         try {
             var res = secondaries[1].getDB("admin").runCommand({replSetGetStatus: 1});
-        } catch (err) {
-        }
+        } catch (err) {}
         return res.myState == 2;
     }, "Secondary 1 state not ready.");
 

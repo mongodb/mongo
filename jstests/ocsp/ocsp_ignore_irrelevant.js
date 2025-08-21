@@ -20,7 +20,7 @@ import {
     OCSP_SERVER_MUSTSTAPLE_CERT,
     OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
     supportsStapling,
-    waitForServer
+    waitForServer,
 } from "jstests/ocsp/lib/ocsp_helpers.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
@@ -39,8 +39,7 @@ function testClient(serverCert, caCert, responderCertPair, issuerDigest) {
 
     clearOCSPCache();
 
-    let mock_ocsp =
-        new MockOCSPServer("", 1, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
+    let mock_ocsp = new MockOCSPServer("", 1, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
 
     let ocsp_options = {
         tlsMode: "requireTLS",
@@ -57,8 +56,7 @@ function testClient(serverCert, caCert, responderCertPair, issuerDigest) {
     const conn = MongoRunner.runMongod(ocsp_options);
     waitForServer(conn);
 
-    jsTestLog(
-        "Testing client can connect if OCSP response has extraneous statuses and the matching CertID is Good");
+    jsTestLog("Testing client can connect if OCSP response has extraneous statuses and the matching CertID is Good");
     mock_ocsp.start();
 
     assertClientConnectSucceeds(conn);
@@ -66,9 +64,9 @@ function testClient(serverCert, caCert, responderCertPair, issuerDigest) {
     mock_ocsp.stop();
 
     jsTestLog(
-        "Testing client can't connect if OCSP response has extraneous statuses and the matching CertID is Revoked");
-    mock_ocsp = new MockOCSPServer(
-        FAULT_REVOKED, 1, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
+        "Testing client can't connect if OCSP response has extraneous statuses and the matching CertID is Revoked",
+    );
+    mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
     mock_ocsp.start();
 
     assertClientConnectFails(conn);
@@ -93,8 +91,7 @@ function testStapling(serverCert, caCert, responderCertPair, issuerDigest) {
 
     clearOCSPCache();
 
-    let mock_ocsp =
-        new MockOCSPServer("", 32400, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
+    let mock_ocsp = new MockOCSPServer("", 32400, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
 
     let ocsp_options = {
         tlsMode: "requireTLS",
@@ -110,7 +107,8 @@ function testStapling(serverCert, caCert, responderCertPair, issuerDigest) {
     let conn = null;
 
     jsTestLog(
-        "Testing server staples a Good status if OCSP response has extraneous statuses and the matching CertID is Good");
+        "Testing server staples a Good status if OCSP response has extraneous statuses and the matching CertID is Good",
+    );
     mock_ocsp.start();
 
     conn = MongoRunner.runMongod(ocsp_options);
@@ -123,10 +121,10 @@ function testStapling(serverCert, caCert, responderCertPair, issuerDigest) {
     mock_ocsp.stop();
 
     jsTestLog(
-        "Testing server staples a revoked status if OCSP response has extraneous statuses and the matching CertID is Revoked");
+        "Testing server staples a revoked status if OCSP response has extraneous statuses and the matching CertID is Revoked",
+    );
     Object.extend(ocsp_options, {waitForConnect: false});
-    mock_ocsp = new MockOCSPServer(
-        FAULT_REVOKED, 32400, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
+    mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 32400, responderCertPair, 0, INCLUDE_EXTRA_STATUS, issuerDigest);
     mock_ocsp.start();
 
     conn = MongoRunner.runMongod(ocsp_options);
@@ -143,24 +141,23 @@ function testStapling(serverCert, caCert, responderCertPair, issuerDigest) {
     mock_ocsp.stop();
 }
 
-let digests = ['sha1'];
+let digests = ["sha1"];
 if (determineSSLProvider() !== "windows") {
     // windows can't handle issuer names & keys hashed
     // using sha256, so this is only tested on openssl.
-    digests.push('sha256');
+    digests.push("sha256");
 }
 
 for (const digest of digests) {
     testClient(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_DELEGATE_RESPONDER, digest);
     testClient(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_CA_RESPONDER, digest);
-    testClient(OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
-               OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
-               OCSP_INTERMEDIATE_RESPONDER,
-               digest);
-    testClient(OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM,
-               OCSP_CA_PEM,
-               OCSP_INTERMEDIATE_RESPONDER,
-               digest);
+    testClient(
+        OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
+        OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
+        OCSP_INTERMEDIATE_RESPONDER,
+        digest,
+    );
+    testClient(OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM, OCSP_CA_PEM, OCSP_INTERMEDIATE_RESPONDER, digest);
 }
 
 if (!supportsStapling()) {

@@ -19,8 +19,9 @@ const secondary = rst.getSecondary();
 const testDB = primary.getDB(dbName);
 const coll = testDB[collName];
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 function runTest(sessionOptions) {
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
@@ -44,16 +45,13 @@ function runTest(sessionOptions) {
 
     // TODO (SERVER-100669): Remove version check once 9.0 becomes last LTS.
     const versionSupportsAbortWaitingForWC =
-        MongoRunner.compareBinVersions(testDB.getMongo().adminCommand({serverStatus: 1}).version,
-                                       "8.0") >= 0;
+        MongoRunner.compareBinVersions(testDB.getMongo().adminCommand({serverStatus: 1}).version, "8.0") >= 0;
     if (versionSupportsAbortWaitingForWC) {
         // Abort waits for write concern.
         jsTestLog("Starting majority-abort transaction");
-        session.startTransaction(
-            {readConcern: {level: "snapshot"}, writeConcern: {w: "majority", wtimeout: 1000}});
+        session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority", wtimeout: 1000}});
         assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 1});
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.WriteConcernTimeout);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
     } else {
         // Abort does not wait for write concern.
         jsTestLog("Starting majority-abort transaction");
@@ -71,11 +69,9 @@ function runTest(sessionOptions) {
     // This transaction should not complete because it uses snapshot read concern, majority
     // write concern and the commit point is not advancing.
     jsTestLog("Starting majority-commit snapshot-read transaction");
-    session.startTransaction(
-        {readConcern: {level: "snapshot"}, writeConcern: {w: "majority", wtimeout: 5000}});
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority", wtimeout: 5000}});
     assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 1});
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
 
     // Allow the majority commit point to advance to allow the failed write concern to clear.
     restartServerReplication(secondary);
@@ -90,11 +86,9 @@ function runTest(sessionOptions) {
     // TODO(SERVER-34881): Once default read concern is speculative majority, local read
     //                     concern should not wait for the majority commit point to advance.
     jsTestLog("Starting majority-commit local-read transaction");
-    session.startTransaction(
-        {readConcern: {level: "local"}, writeConcern: {w: "majority", wtimeout: 5000}});
+    session.startTransaction({readConcern: {level: "local"}, writeConcern: {w: "majority", wtimeout: 5000}});
     assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 2});
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
 
     // Allow the majority commit point to advance to allow the failed write concern to clear.
     restartServerReplication(secondary);
@@ -107,11 +101,9 @@ function runTest(sessionOptions) {
     // This transaction should not complete because it uses majority read concern, majority
     // write concern, and the commit point is not advancing.
     jsTestLog("Starting majority-commit majority-read transaction");
-    session.startTransaction(
-        {readConcern: {level: "majority"}, writeConcern: {w: "majority", wtimeout: 5000}});
+    session.startTransaction({readConcern: {level: "majority"}, writeConcern: {w: "majority", wtimeout: 5000}});
     assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 3});
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
 
     // Restart server replication to allow majority commit point to advance.
     restartServerReplication(secondary);

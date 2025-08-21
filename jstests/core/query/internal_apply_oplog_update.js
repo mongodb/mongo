@@ -20,23 +20,25 @@ let documents1 = [
     {_id: 3, a: 5, b: 1},
     {_id: 4, a: 0, b: 1},
     {_id: 5, a: 0, b: 1},
-    {_id: 8, a: 2, b: {c: 1}}
+    {_id: 8, a: 2, b: {c: 1}},
 ];
 
 assert.commandWorked(db.t1.insert(documents1));
 
-const kGiantStr = '*'.repeat(1024);
-const kMediumStr = '*'.repeat(128);
-const kSmallStr = '*'.repeat(32);
+const kGiantStr = "*".repeat(1024);
+const kMediumStr = "*".repeat(128);
+const kSmallStr = "*".repeat(32);
 
-let documents2 = [{
-    _id: 100,
-    "a": 1,
-    "b": 2,
-    "arrayForSubdiff": [kGiantStr, {a: kMediumStr}, 1, 2, 3],
-    "arrayForReplacement": [0, 1, 2, 3],
-    "giantStr": kGiantStr
-}];
+let documents2 = [
+    {
+        _id: 100,
+        "a": 1,
+        "b": 2,
+        "arrayForSubdiff": [kGiantStr, {a: kMediumStr}, 1, 2, 3],
+        "arrayForReplacement": [0, 1, 2, 3],
+        "giantStr": kGiantStr,
+    },
+];
 
 assert.commandWorked(db.t2.insert(documents2));
 
@@ -47,12 +49,13 @@ assert.commandWorked(db.t2.insert(documents2));
 
 function testUpdate(expected, coll, filter, oplogUpdate, opts = {}) {
     for (let i = 0; i < 2; ++i) {
-        assert.commandWorked(
-            coll.update(filter, [{$_internalApplyOplogUpdate: {oplogUpdate: oplogUpdate}}], opts));
+        assert.commandWorked(coll.update(filter, [{$_internalApplyOplogUpdate: {oplogUpdate: oplogUpdate}}], opts));
 
         let actual = coll.find().toArray();
-        assert(arrayEq(expected, actual),
-               () => "i: " + i + "  actual: " + tojson(actual) + "  expected: " + tojson(expected));
+        assert(
+            arrayEq(expected, actual),
+            () => "i: " + i + "  actual: " + tojson(actual) + "  expected: " + tojson(expected),
+        );
     }
 }
 
@@ -62,7 +65,7 @@ testUpdate(documents1, db.t1, {_id: 3}, oplogUpdate);
 
 oplogUpdate = {
     "$v": NumberInt(1),
-    "$set": {b: 2}
+    "$set": {b: 2},
 };
 documents1[2].b = 2;
 documents1[3].b = 2;
@@ -70,7 +73,7 @@ testUpdate(documents1, db.t1, {a: 0}, oplogUpdate, {multi: true});
 
 oplogUpdate = {
     "$v": NumberInt(1),
-    "$unset": {b: true}
+    "$unset": {b: true},
 };
 delete documents1[1].b;
 testUpdate(documents1, db.t1, {_id: 3}, oplogUpdate);
@@ -79,14 +82,14 @@ testUpdate(documents1, db.t1, {_id: 3}, oplogUpdate);
 documents1[1].b = 3;
 oplogUpdate = {
     "$v": NumberInt(2),
-    diff: {d: {b: false}}
+    diff: {d: {b: false}},
 };
 delete documents1[1].b;
 testUpdate(documents1, db.t1, {_id: 3}, oplogUpdate);
 
 oplogUpdate = {
     "$v": NumberInt(1),
-    "$set": {"b.d": 2}
+    "$set": {"b.d": 2},
 };
 documents1[4].b.d = 2;
 testUpdate(documents1, db.t1, {_id: 8}, oplogUpdate);
@@ -94,7 +97,7 @@ testUpdate(documents1, db.t1, {_id: 8}, oplogUpdate);
 // Test an update with upsert=true where no documents match the filter prior to the update.
 oplogUpdate = {
     "$v": NumberInt(2),
-    diff: {u: {b: 3}}
+    diff: {u: {b: 3}},
 };
 documents1.push({_id: 9, b: 3});
 testUpdate(documents1, db.t1, {_id: 9}, oplogUpdate, {upsert: true});
@@ -104,8 +107,8 @@ oplogUpdate = {
     diff: {
         u: {a: 2, arrayForReplacement: [0]},
         i: {c: 3},
-        sarrayForSubdiff: {a: true, l: NumberInt(2), s1: {i: {b: 3}}}
-    }
+        sarrayForSubdiff: {a: true, l: NumberInt(2), s1: {i: {b: 3}}},
+    },
 };
 documents2[0].a = 2;
 documents2[0].arrayForSubdiff = [kGiantStr, {a: kMediumStr, b: 3}];
@@ -115,18 +118,18 @@ testUpdate(documents2, db.t2, {_id: 100}, oplogUpdate);
 
 oplogUpdate = {
     "$v": NumberInt(2),
-    diff: {d: {a: false}}
+    diff: {d: {a: false}},
 };
 delete documents2[0].a;
 testUpdate(documents2, db.t2, {_id: 100}, oplogUpdate);
 
 oplogUpdate = {
     "$v": NumberInt(2),
-    diff: {d: {c: false, arrayForReplacement: false, arrayForSubdiff: false, b: false}}
+    diff: {d: {c: false, arrayForReplacement: false, arrayForSubdiff: false, b: false}},
 };
 documents2[0] = {
     _id: 100,
-    "giantStr": kGiantStr
+    "giantStr": kGiantStr,
 };
 testUpdate(documents2, db.t2, {_id: 100}, oplogUpdate);
 
@@ -140,9 +143,9 @@ oplogUpdate = {
             arr_c: [[kSmallStr, 1, 2, 3], kMediumStr],
             obj: {x: {a: 1, b: 1, c: [kMediumStr, 1, 2, 3], str: kMediumStr}},
             a: "updated",
-            doc: {a: {0: "foo"}}
-        }
-    }
+            doc: {a: {0: "foo"}},
+        },
+    },
 };
 documents2[0] = {
     _id: 100,
@@ -153,7 +156,7 @@ documents2[0] = {
     arr_c: [[kSmallStr, 1, 2, 3], kMediumStr],
     obj: {x: {a: 1, b: 1, c: [kMediumStr, 1, 2, 3], str: kMediumStr}},
     a: "updated",
-    doc: {a: {0: "foo"}}
+    doc: {a: {0: "foo"}},
 };
 testUpdate(documents2, db.t2, {_id: 100}, oplogUpdate);
 
@@ -165,8 +168,8 @@ oplogUpdate = {
         sarr_a: {a: true, u0: 2},
         sarr_b: {a: true, s0: {a: true, u0: 2}},
         sarr_c: {a: true, s0: {a: true, l: NumberInt(1)}},
-        sobj: {sx: {d: {a: false}, u: {b: 2}, sc: {a: true, l: NumberInt(1)}}}
-    }
+        sobj: {sx: {d: {a: false}, u: {b: 2}, sc: {a: true, l: NumberInt(1)}}},
+    },
 };
 documents2[0] = {
     _id: 100,

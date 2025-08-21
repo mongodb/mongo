@@ -10,18 +10,21 @@ const conn = MongoRunner.runMongod(mongodOptions);
 let db = conn.getDB("test_where_function_interrupt");
 let coll = db.getCollection("foo");
 
-let expensiveFunction = function() {
+let expensiveFunction = function () {
     sleep(1000);
     return true;
 };
-assert.commandWorked(coll.insert(Array.from({length: 1000}, _ => ({}))));
+assert.commandWorked(coll.insert(Array.from({length: 1000}, (_) => ({}))));
 
-let checkInterrupt = function(cursor) {
-    let err = assert.throws(function() {
-        cursor.itcount();
-    }, [], "expected interrupt error due to maxTimeMS being exceeded");
-    assert.commandFailedWithCode(
-        err, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError]);
+let checkInterrupt = function (cursor) {
+    let err = assert.throws(
+        function () {
+            cursor.itcount();
+        },
+        [],
+        "expected interrupt error due to maxTimeMS being exceeded",
+    );
+    assert.commandFailedWithCode(err, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.Interrupted, ErrorCodes.InternalError]);
 };
 
 let tests = [
@@ -39,33 +42,31 @@ let tests = [
                 $function: {
                     body: expensiveFunction,
                     args: [],
-                    lang: 'js',
-                }
-            }
+                    lang: "js",
+                },
+            },
         },
-        err: checkInterrupt
+        err: checkInterrupt,
     },
     {
-
         // Test that $function can be interrupted by a query knob of 100 ms.
-        pre: function() {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}));
+        pre: function () {
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}));
         },
         query: {
             $expr: {
                 $function: {
                     body: expensiveFunction,
                     args: [],
-                    lang: 'js',
-                }
-            }
+                    lang: "js",
+                },
+            },
         },
-        err: checkInterrupt
+        err: checkInterrupt,
     },
 ];
 
-tests.forEach(function(testCase) {
+tests.forEach(function (testCase) {
     if (testCase.pre) {
         testCase.pre();
     }

@@ -22,17 +22,18 @@
  * ]
  */
 
-import {
-    getPlanStages,
-    getWinningPlanFromExplain,
-    isCollscan
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain, isCollscan} from "jstests/libs/query/analyze_plan.js";
 
-const collName = 'hidden_indexes_remain_visible_in_index_filters';
+const collName = "hidden_indexes_remain_visible_in_index_filters";
 db[collName].drop();
 const coll = db[collName];
 
-assert.commandWorked(coll.insert([{a: 1, b: 1, c: 1}, {a: 2, b: 2, c: 2}]));
+assert.commandWorked(
+    coll.insert([
+        {a: 1, b: 1, c: 1},
+        {a: 2, b: 2, c: 2},
+    ]),
+);
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 assert.commandWorked(coll.createIndex({a: 1, b: 1, c: 1}));
@@ -40,17 +41,19 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1, c: 1}));
 const queryShape = {
     query: {a: {$gt: 0}, b: {$gt: 0}},
     sort: {a: -1, b: -1},
-    projection: {_id: 0, a: 1}
+    projection: {_id: 0, a: 1},
 };
 
 // Ensure the filters for the given query shape exist.
 function ensureFilterExistsByQueryShape(queryShape) {
-    const res = assert.commandWorked(coll.runCommand('planCacheListFilters'));
-    assert(res.hasOwnProperty('filters'), 'filters missing from planCacheListFilters result');
-    const filter = res.filters.find(function(obj) {
-        return tojson(obj.query) === tojson(queryShape.query) &&
+    const res = assert.commandWorked(coll.runCommand("planCacheListFilters"));
+    assert(res.hasOwnProperty("filters"), "filters missing from planCacheListFilters result");
+    const filter = res.filters.find(function (obj) {
+        return (
+            tojson(obj.query) === tojson(queryShape.query) &&
             tojson(obj.projection) === tojson(queryShape.projection) &&
-            tojson(obj.sort) === tojson(queryShape.sort);
+            tojson(obj.sort) === tojson(queryShape.sort)
+        );
     });
 
     assert(filter, `Index filter not found for query shape ${tojson(queryShape)}`);
@@ -60,7 +63,8 @@ function ensureFilterExistsByQueryShape(queryShape) {
 // 'queryShape'. Otherwise, a COLLSCAN stage is expected.
 function validateIxscanOrCollscanUsed(queryShape, idxName) {
     const explain = assert.commandWorked(
-        coll.find(queryShape.query, queryShape.projection).sort(queryShape.sort).explain());
+        coll.find(queryShape.query, queryShape.projection).sort(queryShape.sort).explain(),
+    );
 
     if (idxName) {
         // Expect the given index was used.
@@ -74,12 +78,14 @@ function validateIxscanOrCollscanUsed(queryShape, idxName) {
 }
 
 // Add index filters for simple query.
-assert.commandWorked(coll.runCommand('planCacheSetFilter', {
-    query: queryShape.query,
-    sort: queryShape.sort,
-    projection: queryShape.projection,
-    indexes: [{a: 1}, {a: 1, b: 1}]
-}));
+assert.commandWorked(
+    coll.runCommand("planCacheSetFilter", {
+        query: queryShape.query,
+        sort: queryShape.sort,
+        projection: queryShape.projection,
+        indexes: [{a: 1}, {a: 1, b: 1}],
+    }),
+);
 ensureFilterExistsByQueryShape(queryShape);
 
 // The index should be used as usual if it's not hidden.
@@ -109,12 +115,14 @@ validateIxscanOrCollscanUsed(queryShape, "a_1_b_1");
 assert.commandWorked(coll.hideIndex("a_1"));
 
 // Set index filters on a hidden index.
-assert.commandWorked(coll.runCommand('planCacheSetFilter', {
-    query: queryShape.query,
-    sort: queryShape.sort,
-    projection: queryShape.projection,
-    indexes: [{a: 1}]
-}));
+assert.commandWorked(
+    coll.runCommand("planCacheSetFilter", {
+        query: queryShape.query,
+        sort: queryShape.sort,
+        projection: queryShape.projection,
+        indexes: [{a: 1}],
+    }),
+);
 ensureFilterExistsByQueryShape(queryShape);
 
 // The hidden index 'a_1' cannot be used even though it's in the index filter.

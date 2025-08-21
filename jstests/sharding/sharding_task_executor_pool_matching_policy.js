@@ -30,7 +30,7 @@ function checkGetParameterOutputIsAuto(dbConn) {
 // Setup test fixture; get connection to mongos and each mongod.
 let paramsDoc = {
     mongosOptions: {setParameter: {ShardingTaskExecutorPoolReplicaSetMatching: "automatic"}},
-    rsOptions: {setParameter: {ShardingTaskExecutorPoolReplicaSetMatching: "automatic"}}
+    rsOptions: {setParameter: {ShardingTaskExecutorPoolReplicaSetMatching: "automatic"}},
 };
 let st = new ShardingTest({shards: 2, mongos: 1, other: paramsDoc});
 let mongos = st.s;

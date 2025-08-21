@@ -9,18 +9,17 @@
  * ]
  */
 
-import {getRandomShardName} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 function getDbMetadata(db) {
-    return db.getSiblingDB('config').databases.findOne({_id: db.getName()});
+    return db.getSiblingDB("config").databases.findOne({_id: db.getName()});
 }
 
 // TODO remove once SERVER-98049 is fixed.
 db.dropDatabase();
 
 const originalPrimary = getRandomShardName(db);
-assert.commandWorked(
-    db.adminCommand({enableSharding: db.getName(), primaryShard: originalPrimary}));
+assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: originalPrimary}));
 
 const originalMetadata = getDbMetadata(db);
 assert.eq(originalPrimary, originalMetadata.primary);

@@ -16,7 +16,7 @@ function runTests(needAuth) {
         rs1: {nodes: 3},
     };
     if (needAuth) {
-        other.keyFile = 'jstests/libs/key1';
+        other.keyFile = "jstests/libs/key1";
     }
 
     var st = new ShardingTest({shards: 2, mongos: 1, other: other});

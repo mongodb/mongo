@@ -23,16 +23,15 @@ const collName = "user";
 const staticMongod = MongoRunner.runMongod({});
 
 const TestMode = {
-    kBasic: 'basic',
-    kWithStepUp: 'with stepUp',
-    kWithRestart: 'with restart',
+    kBasic: "basic",
+    kWithStepUp: "with stepUp",
+    kWithRestart: "with restart",
 };
 
-let runTest = function(testMode) {
+let runTest = function (testMode) {
     jsTest.log(`Running test in mode ${testMode}`);
 
-    const st = new ShardingTest(
-        {shards: {rs0: {nodes: testMode == TestMode.kWithStepUp ? 2 : 1}, rs1: {nodes: 1}}});
+    const st = new ShardingTest({shards: {rs0: {nodes: testMode == TestMode.kWithStepUp ? 2 : 1}, rs1: {nodes: 1}}});
     const collection = st.s.getDB(dbName).getCollection(collName);
 
     CreateShardedCollectionUtil.shardCollectionWithChunks(collection, {x: 1}, [
@@ -41,57 +40,65 @@ let runTest = function(testMode) {
         {min: {x: 1000}, max: {x: MaxKey}, shard: st.shard1.shardName},
     ]);
 
-    assert.commandWorked(collection.insert([
-        {_id: 1, x: -1, note: "move into chunk range being migrated"},
-        {_id: 2, x: -2, note: "keep out of chunk range being migrated"},
-        {_id: 3, x: 50, note: "move out of chunk range being migrated"},
-        {_id: 4, x: 100, note: "keep in chunk range being migrated"},
-    ]));
+    assert.commandWorked(
+        collection.insert([
+            {_id: 1, x: -1, note: "move into chunk range being migrated"},
+            {_id: 2, x: -2, note: "keep out of chunk range being migrated"},
+            {_id: 3, x: 50, note: "move out of chunk range being migrated"},
+            {_id: 4, x: 100, note: "keep in chunk range being migrated"},
+        ]),
+    );
 
     const lsid = {id: UUID()};
     const txnNumber = 0;
     let stmtId = 0;
 
-    assert.commandWorked(st.s0.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [
-            {_id: 5, x: -1.01, note: "move into chunk range being migrated"},
-            {_id: 6, x: -2.01, note: "keep out of chunk range being migrated"},
-            {_id: 7, x: 50.01, note: "move out of chunk range being migrated"},
-            {_id: 8, x: 100.01, note: "keep in chunk range being migrated"},
-        ],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        startTransaction: true,
-        autocommit: false,
-    }));
+    assert.commandWorked(
+        st.s0.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [
+                {_id: 5, x: -1.01, note: "move into chunk range being migrated"},
+                {_id: 6, x: -2.01, note: "keep out of chunk range being migrated"},
+                {_id: 7, x: 50.01, note: "move out of chunk range being migrated"},
+                {_id: 8, x: 100.01, note: "keep in chunk range being migrated"},
+            ],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(stmtId++),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
-    assert.commandWorked(st.s.getDB(dbName).runCommand({
-        update: collName,
-        updates: [
-            {q: {x: -1}, u: {$set: {x: 5}}},
-            {q: {x: -2}, u: {$set: {x: -10}}},
-            {q: {x: 50}, u: {$set: {x: -20}}},
-            {q: {x: 100}, u: {$set: {x: 500}}},
-            {q: {x: -1.01}, u: {$set: {x: 5.01}}},
-            {q: {x: -2.01}, u: {$set: {x: -10.01}}},
-            {q: {x: 50.01}, u: {$set: {x: -20.01}}},
-            {q: {x: 100.01}, u: {$set: {x: 500.01}}},
-        ],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        autocommit: false,
-    }));
+    assert.commandWorked(
+        st.s.getDB(dbName).runCommand({
+            update: collName,
+            updates: [
+                {q: {x: -1}, u: {$set: {x: 5}}},
+                {q: {x: -2}, u: {$set: {x: -10}}},
+                {q: {x: 50}, u: {$set: {x: -20}}},
+                {q: {x: 100}, u: {$set: {x: 500}}},
+                {q: {x: -1.01}, u: {$set: {x: 5.01}}},
+                {q: {x: -2.01}, u: {$set: {x: -10.01}}},
+                {q: {x: 50.01}, u: {$set: {x: -20.01}}},
+                {q: {x: 100.01}, u: {$set: {x: 500.01}}},
+            ],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(stmtId++),
+            autocommit: false,
+        }),
+    );
 
-    const res = assert.commandWorked(st.shard0.getDB(dbName).adminCommand({
-        prepareTransaction: 1,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: {w: "majority"},
-    }));
+    const res = assert.commandWorked(
+        st.shard0.getDB(dbName).adminCommand({
+            prepareTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            writeConcern: {w: "majority"},
+        }),
+    );
 
     let prepareTimestamp = res.prepareTimestamp;
 
@@ -114,8 +121,7 @@ let runTest = function(testMode) {
         });
     }
 
-    const joinMoveChunk =
-        moveChunkParallel(staticMongod, st.s.host, {x: 1}, null, 'test.user', st.shard1.shardName);
+    const joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {x: 1}, null, "test.user", st.shard1.shardName);
 
     pauseMigrateAtStep(st.shard1, migrateStepNames.catchup);
 
@@ -130,13 +136,18 @@ let runTest = function(testMode) {
     waitForMoveChunkStep(st.shard0, moveChunkStepNames.startedMoveChunk);
 
     assert.commandWorked(
-        st.shard0.getDB(dbName).adminCommand(Object.assign({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false,
-        },
-                                                           {commitTimestamp: prepareTimestamp})));
+        st.shard0.getDB(dbName).adminCommand(
+            Object.assign(
+                {
+                    commitTransaction: 1,
+                    lsid: lsid,
+                    txnNumber: NumberLong(txnNumber),
+                    autocommit: false,
+                },
+                {commitTimestamp: prepareTimestamp},
+            ),
+        ),
+    );
 
     unpauseMigrateAtStep(st.shard1, migrateStepNames.catchup);
 
@@ -170,8 +181,10 @@ let runTest = function(testMode) {
 
     const diff = ((diff) => {
         return {
-            docsWithDifferentContents: diff.docsWithDifferentContents.map(
-                ({first, second}) => ({expected: first, actual: second})),
+            docsWithDifferentContents: diff.docsWithDifferentContents.map(({first, second}) => ({
+                expected: first,
+                actual: second,
+            })),
             docsExtraAfterMigration: diff.docsMissingOnFirst,
             docsMissingAfterMigration: diff.docsMissingOnSecond,
         };

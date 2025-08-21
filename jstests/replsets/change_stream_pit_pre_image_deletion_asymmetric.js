@@ -17,8 +17,8 @@ const replTest = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],
     nodeOptions: {
         setParameter: {logComponentVerbosity: tojsononeline({replication: {initialSync: 5}})},
-        oplogSize: oplogSizeMB
-    }
+        oplogSize: oplogSizeMB,
+    },
 });
 replTest.startSet();
 replTest.initiate();
@@ -28,8 +28,7 @@ const collectionName = "coll";
 const testDB = primaryNode.getDB(jsTestName());
 
 // Create a collection with change stream pre- and post-images enabled.
-assert.commandWorked(
-    testDB.createCollection(collectionName, {changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(testDB.createCollection(collectionName, {changeStreamPreAndPostImages: {enabled: true}}));
 const coll = testDB[collectionName];
 
 // Insert a document for the test.
@@ -41,24 +40,27 @@ assert.commandWorked(coll.insert({_id: 1, v: 1}, {writeConcern: {w: 2}}));
 // data situation during oplog application.
 const initialSyncNode = replTest.add({
     rsConfig: {priority: 0},
-    setParameter: {'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'})},
-    oplogSize: oplogSizeMB
+    setParameter: {"failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"})},
+    oplogSize: oplogSizeMB,
 });
 
 // Wait until the new node starts and pauses on the fail point.
 replTest.reInitiate();
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
-    timesEntered: 1,
-    maxTimeMS: 60000
-}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        timesEntered: 1,
+        maxTimeMS: 60000,
+    }),
+);
 
 // Update the document on the primary node.
 assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {v: 1}}, {writeConcern: {w: 2}}));
 
 // Resume the initial sync process.
-assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 // Wait until the initial sync process is complete and the new node becomes a fully
 // functioning secondary.
@@ -73,15 +75,16 @@ assert.eq(preImageDocuments.length, 0, preImageDocuments);
 // Roll over all current oplog entries.
 const lastOplogEntryToBeRemoved = getLatestOp(primaryNode);
 assert.neq(lastOplogEntryToBeRemoved, null);
-const largeString = 'a'.repeat(256 * 1024);
+const largeString = "a".repeat(256 * 1024);
 const otherColl = primaryNode.getDB(jsTestName())["otherCollection"];
 
 // Checks if the oplog has been rolled over from the timestamp of
 // 'lastOplogEntryToBeRemoved', ie. the timestamp of the first entry in the oplog is greater
 // than 'lastOplogEntryToBeRemoved'.
 function oplogIsRolledOver() {
-    return timestampCmp(lastOplogEntryToBeRemoved.ts,
-                        getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) <= 0;
+    return (
+        timestampCmp(lastOplogEntryToBeRemoved.ts, getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) <= 0
+    );
 }
 
 while (!oplogIsRolledOver()) {

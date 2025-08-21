@@ -9,7 +9,7 @@ import {
     latestFCV,
     numVersionsSinceLastLTS,
     removeFCVDocument,
-    runFeatureFlagMultiversionTest
+    runFeatureFlagMultiversionTest,
 } from "src/mongo/shell/feature_compatibility_version.js";
 
 globalThis.binVersionToFCV = binVersionToFCV;

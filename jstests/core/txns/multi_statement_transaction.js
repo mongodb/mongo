@@ -19,7 +19,7 @@ testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -72,8 +72,15 @@ assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
 jsTest.log("Update documents in a transaction");
 
 // Insert the docs to be updated.
-assert.commandWorked(sessionColl.insert([{_id: "update-1", a: 0}, {_id: "update-2", a: 0}],
-                                        {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    sessionColl.insert(
+        [
+            {_id: "update-1", a: 0},
+            {_id: "update-2", a: 0},
+        ],
+        {writeConcern: {w: "majority"}},
+    ),
+);
 
 // Update the docs in a new transaction.
 
@@ -124,7 +131,13 @@ withTxnAndAutoRetryOnMongos(session, () => {
 
     // But read in the same transaction returns the docs.
     let docs = sessionColl.find({$or: [{_id: "doc-1"}, {_id: "doc-2"}]}).toArray();
-    assert.sameMembers([{_id: "doc-1", a: 1}, {_id: "doc-2", a: 1}], docs);
+    assert.sameMembers(
+        [
+            {_id: "doc-1", a: 1},
+            {_id: "doc-2", a: 1},
+        ],
+        docs,
+    );
 });
 
 // Read with default read concern sees the committed transaction.
@@ -135,8 +148,7 @@ jsTest.log("Insert and delete documents in a transaction");
 
 assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
 
-assert.commandWorked(
-    testColl.insert([{_id: "doc-1"}, {_id: "doc-2"}], {writeConcern: {w: "majority"}}));
+assert.commandWorked(testColl.insert([{_id: "doc-1"}, {_id: "doc-2"}], {writeConcern: {w: "majority"}}));
 
 // TODO(SERVER-39704): We use the withTxnAndAutoRetryOnMongos
 // function to handle how MongoS will propagate a StaleShardVersion error as a

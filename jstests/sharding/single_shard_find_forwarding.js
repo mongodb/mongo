@@ -26,8 +26,7 @@ const shardedColl = testDB.coll;
 const singleShardColl = testDB.singleShard;
 const shard0DB = st.shard0.getDB(testName);
 
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Shard shardedColl using hashed sharding
 st.shardColl(shardedColl, {_id: "hashed"}, false);
@@ -58,14 +57,18 @@ shard0DB.system.profile.drop();
 shard0DB.setProfilingLevel(2);
 
 let shardedCursor = shardedColl.find();
-let singleShardCursor = singleShardColl.find().skip(1).limit(nDocs - 1).comment(testName);
+let singleShardCursor = singleShardColl
+    .find()
+    .skip(1)
+    .limit(nDocs - 1)
+    .comment(testName);
 assert.eq(shardedCursor.itcount(), nDocs);
 assert.eq(singleShardCursor.itcount(), nDocs - 1);
 
 // Query profiler on the singleShardColl shardDB and check if limit and skip get forwarded.
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shard0DB,
-    filter: {"command.skip": 1, "command.limit": nDocs - 1, "command.comment": testName}
+    filter: {"command.skip": 1, "command.limit": nDocs - 1, "command.comment": testName},
 });
 
 // Skip past all of the documents
@@ -93,8 +96,29 @@ for (let i = 0; i < nDocs; i++) {
 assert.commandWorked(bulk.execute());
 
 assert.eq(singleShardColl2.find().skip(1).limit(nDocs).itcount(), nDocs - 1);
-assert.eq(singleShardColl2.find().skip(nDocs / 2).limit(nDocs).itcount(), nDocs / 2);
-assert.eq(singleShardColl2.find().skip(nDocs - 1).limit(nDocs).itcount(), 1);
-assert.eq(singleShardColl2.find().skip(nDocs + 1000).limit(nDocs).itcount(), 0);
+assert.eq(
+    singleShardColl2
+        .find()
+        .skip(nDocs / 2)
+        .limit(nDocs)
+        .itcount(),
+    nDocs / 2,
+);
+assert.eq(
+    singleShardColl2
+        .find()
+        .skip(nDocs - 1)
+        .limit(nDocs)
+        .itcount(),
+    1,
+);
+assert.eq(
+    singleShardColl2
+        .find()
+        .skip(nDocs + 1000)
+        .limit(nDocs)
+        .itcount(),
+    0,
+);
 
 st.stop();

@@ -13,13 +13,10 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_sharded.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_sharded.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     if (TestData.killShards || TestData.terminateShards) {
         // The transaction API does not abort internal transactions that are interrupted (by
         // kill or terminate) after they have started to commit. The initial retry of that
@@ -34,7 +31,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // enabled. Therefore, when a write is interrupted due to stepdown/kill/terminate, they
         // cannot retry the write to verify if it has been executed or not.
         [$super.data.executionContextTypes.kNoClientSession]: TestData.runningWithShardStepdowns,
-        [$super.data.executionContextTypes.kClientSession]: TestData.runningWithShardStepdowns
+        [$super.data.executionContextTypes.kClientSession]: TestData.runningWithShardStepdowns,
     };
 
     $config.data.useClusterClient = true;
@@ -51,9 +48,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Make the mongos do an insert against both shards to make bump its clusterTime.
         const docs = [
             this.generateRandomDocument(this.tid, {isLowerChunkDoc: true}),
-            this.generateRandomDocument(this.tid, {isUpperChunkDoc: true})
+            this.generateRandomDocument(this.tid, {isUpperChunkDoc: true}),
         ];
-        docs.forEach(doc => {
+        docs.forEach((doc) => {
             this.expectedCounters[doc._id] = doc.counter;
         });
         const session = db.getMongo().startSession({retryWrites: true});
@@ -61,12 +58,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         assert.commandWorked(collection.insert(docs));
     };
 
-    $config.data.getCollectionForDocumentChecks = function getCollectionForDocumentChecks(
-        defaultDb, txnDb, collName) {
+    $config.data.getCollectionForDocumentChecks = function getCollectionForDocumentChecks(defaultDb, txnDb, collName) {
         assert(isMongos(defaultDb));
         assert(!isMongos(txnDb));
-        print(tojsononeline(
-            {defaultHost: defaultDb.getMongo().host, txnHost: txnDb.getMongo().host}));
+        print(tojsononeline({defaultHost: defaultDb.getMongo().host, txnHost: txnDb.getMongo().host}));
         // Bump the clusterTime on the mongos so that when causal consistency is required, the reads
         // performed by the document checks will have afterClusterTime greater than the timestamp of
         // the writes done by the transaction.
@@ -84,10 +79,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const randomShardPrimary = this.randomShardRst.getPrimary();
 
         this.mongo = randomShardPrimary;
-        this.nonRetryableWriteSession = this.mongo.startSession(
-            {causalConsistency: this.shouldUseCausalConsistency, retryWrites: false});
-        this.retryableWriteSession = this.mongo.startSession(
-            {causalConsistency: this.shouldUseCausalConsistency, retryWrites: true});
+        this.nonRetryableWriteSession = this.mongo.startSession({
+            causalConsistency: this.shouldUseCausalConsistency,
+            retryWrites: false,
+        });
+        this.retryableWriteSession = this.mongo.startSession({
+            causalConsistency: this.shouldUseCausalConsistency,
+            retryWrites: true,
+        });
         if (this.sessions === undefined) {
             this.sessions = [];
         }
@@ -97,16 +96,24 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.insertSessionDoc(db, this.retryableWriteSession.getSessionId().id);
 
         const randomShardInfo = {shard: this.randomShardRst.name, primary: randomShardPrimary};
-        print(`Started a non-retryable write session ${
-            tojsononeline(this.nonRetryableWriteSession.getSessionId())} against shard ${
-            tojsononeline(randomShardInfo)}}`);
-        print(`Started a retryable write session ${
-            tojsononeline(this.retryableWriteSession.getSessionId())} against shard ${
-            tojsononeline(randomShardInfo)}}`);
+        print(
+            `Started a non-retryable write session ${tojsononeline(
+                this.nonRetryableWriteSession.getSessionId(),
+            )} against shard ${tojsononeline(randomShardInfo)}}`,
+        );
+        print(
+            `Started a retryable write session ${tojsononeline(
+                this.retryableWriteSession.getSessionId(),
+            )} against shard ${tojsononeline(randomShardInfo)}}`,
+        );
     };
 
     $config.data.runInternalTransaction = function runInternalTransaction(
-        defaultDb, collName, executionCtxType, crudOp) {
+        defaultDb,
+        collName,
+        executionCtxType,
+        crudOp,
+    ) {
         assert.neq(executionCtxType, this.executionContextTypes.kClientRetryableWrite);
         assert.neq(executionCtxType, this.executionContextTypes.kClientTransaction);
 
@@ -114,13 +121,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             $super.data.runInternalTransaction.apply(this, arguments);
         } catch (e) {
             if (isNetworkError(e) || isRetryableError(e)) {
-                print("Starting new sessions after internal transaction error: " +
-                      tojsononeline(e));
+                print("Starting new sessions after internal transaction error: " + tojsononeline(e));
                 this.startSessions(defaultDb);
                 return;
             }
-            if (e.code == ErrorCodes.IncompleteTransactionHistory &&
-                e.errmsg.includes("Incomplete history detected for transaction")) {
+            if (
+                e.code == ErrorCodes.IncompleteTransactionHistory &&
+                e.errmsg.includes("Incomplete history detected for transaction")
+            ) {
                 // This test sets a low transactionLifeTimeLimit so a retry may hit this error.
                 print("Ignoring retry error" + tojsononeline(e));
                 return;
@@ -148,7 +156,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.init = function init(db, collName, connCache) {
         const retryableErrorMessages = [
             "The server is in quiesce mode and will shut down",
-            "can't connect to new replica set primary"
+            "can't connect to new replica set primary",
         ];
 
         let shardRsts;
@@ -157,7 +165,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 shardRsts = FixtureHelpers.getAllReplicas(db);
                 break;
             } catch (e) {
-                if (retryableErrorMessages.some(msg => e.message.includes(msg))) {
+                if (retryableErrorMessages.some((msg) => e.message.includes(msg))) {
                     print("Retry getting all shard replica sets after error: " + tojson(e));
                     continue;
                 }
@@ -179,31 +187,31 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             internalTransactionForInsert: 0.25,
             internalTransactionForUpdate: 0.25,
             internalTransactionForDelete: 0.25,
-            verifyDocuments: 0.25
+            verifyDocuments: 0.25,
         },
         internalTransactionForUpdate: {
             internalTransactionForInsert: 0.25,
             internalTransactionForUpdate: 0.25,
             internalTransactionForDelete: 0.25,
-            verifyDocuments: 0.25
+            verifyDocuments: 0.25,
         },
         internalTransactionForDelete: {
             internalTransactionForInsert: 0.25,
             internalTransactionForUpdate: 0.25,
             internalTransactionForDelete: 0.25,
-            verifyDocuments: 0.25
+            verifyDocuments: 0.25,
         },
         internalTransactionForFindAndModify: {
             internalTransactionForInsert: 0.25,
             internalTransactionForUpdate: 0.25,
             internalTransactionForDelete: 0.25,
-            verifyDocuments: 0.25
+            verifyDocuments: 0.25,
         },
         verifyDocuments: {
             internalTransactionForInsert: 0.4,
             internalTransactionForUpdate: 0.3,
             internalTransactionForDelete: 0.3,
-        }
+        },
     };
 
     return $config;

@@ -28,7 +28,7 @@ const indexSpec = {
     d: 1,
     c: 1,
     b: 1,
-    a: 1
+    a: 1,
 };
 
 let docs = [];
@@ -36,8 +36,8 @@ let foreignDocs = [];
 
 function tojsoncompact(obj) {
     let str = tojsononeline(obj);
-    str = str.replaceAll(' ', '').replaceAll('"', '');
-    str = str.replaceAll(',', ', ').replaceAll(':', ': ');
+    str = str.replaceAll(" ", "").replaceAll('"', "");
+    str = str.replaceAll(",", ", ").replaceAll(":", ": ");
     return str;
 }
 
@@ -112,7 +112,7 @@ function addInclusion(pipeline, allowDottedPaths) {
     for (let j = 0; j < n; ++j) {
         let c = possibleIntFields[j];
 
-        if (Random.rand() < 0.70) {
+        if (Random.rand() < 0.7) {
             projectionDoc[c] = 1;
         } else if (Random.rand() < 0.85) {
             let d = String.fromCharCode(97 + Random.randInt(12));
@@ -368,40 +368,40 @@ function generateTestcase({
     allowSort,
     allowSortWithLimit,
     allowSetWindowFields,
-    allowDottedPaths
+    allowDottedPaths,
 }) {
     // Initialize 'pipeline'.
     let pipeline = [];
     let numStages = Random.randInt(9) + 4;
 
-    for (let i = 0; i < numStages;) {
+    for (let i = 0; i < numStages; ) {
         let r = Random.rand();
         shuffleArray(possibleIntFields);
         shuffleArray(possibleObjFields);
 
-        if (r < 0.10) {
+        if (r < 0.1) {
             if (allowInclusion !== true) {
                 continue;
             }
             pipeline = addInclusion(pipeline, allowDottedPaths === true);
-        } else if (r < 0.20) {
+        } else if (r < 0.2) {
             pipeline = addExclusion(pipeline, allowDottedPaths === true);
-        } else if (r < 0.40) {
+        } else if (r < 0.4) {
             pipeline = addAddFields(pipeline, allowDottedPaths === true);
         } else if (r < 0.55) {
             pipeline = addMatch(pipeline, allowDottedPaths === true);
-        } else if (r < 0.70) {
+        } else if (r < 0.7) {
             if (allowGroup !== true) {
                 continue;
             }
 
             pipeline = addGroup(pipeline);
-        } else if (r < 0.80) {
+        } else if (r < 0.8) {
             if (allowSetWindowFields !== true) {
                 continue;
             }
             pipeline = addSetWindowFields(pipeline, allowDottedPaths === true);
-        } else if (r < 0.90) {
+        } else if (r < 0.9) {
             if (allowLookup !== true) {
                 continue;
             }
@@ -436,10 +436,10 @@ for (let k = 0; k < 2; ++k) {
         let allowSortWithLimit = j >= 2;
 
         for (let i = 0; i < 12; ++i) {
-            let allowInclusion = (i >= 3 && i < 6) || (i >= 9);
+            let allowInclusion = (i >= 3 && i < 6) || i >= 9;
             let allowGroup = i >= 6;
             let allowLookup = i >= 9;
-            let allowSetWindowFields = (i % 5 === 0);
+            let allowSetWindowFields = i % 5 === 0;
 
             let testcase = generateTestcase({
                 allowInclusion,
@@ -448,7 +448,7 @@ for (let k = 0; k < 2; ++k) {
                 allowSort,
                 allowSortWithLimit,
                 allowSetWindowFields,
-                allowDottedPaths
+                allowDottedPaths,
             });
 
             testcases.push({id: testcaseId, pipeline: testcase});
@@ -478,7 +478,7 @@ print("\n\n");
 function compareResultEntries(lhs, rhs) {
     const lhsJson = tojsononeline(lhs);
     const rhsJson = tojsononeline(rhs);
-    return lhsJson < rhsJson ? -1 : (lhsJson > rhsJson ? 1 : 0);
+    return lhsJson < rhsJson ? -1 : lhsJson > rhsJson ? 1 : 0;
 }
 
 function runTest(testcase, useIndex) {

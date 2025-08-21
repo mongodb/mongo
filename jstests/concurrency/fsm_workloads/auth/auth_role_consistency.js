@@ -6,12 +6,12 @@
  */
 import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";
 
-export const $config = (function() {
-    const kRoleNamePrefix = 'auth_role_consistency';
+export const $config = (function () {
+    const kRoleNamePrefix = "auth_role_consistency";
 
-    const states = (function() {
-        let roleA = kRoleNamePrefix + '_A_';
-        let roleB = kRoleNamePrefix + '_B_';
+    const states = (function () {
+        let roleA = kRoleNamePrefix + "_A_";
+        let roleB = kRoleNamePrefix + "_B_";
         let roleAwDB = {};
         let roleBwDB = {};
 
@@ -41,7 +41,7 @@ export const $config = (function() {
     })();
 
     function teardown(db, collName, cluster) {
-        const pattern = new RegExp('^' + kRoleNamePrefix + '_[AB]_\\d+$');
+        const pattern = new RegExp("^" + kRoleNamePrefix + "_[AB]_\\d+$");
         dropRoles(db, pattern);
     }
 

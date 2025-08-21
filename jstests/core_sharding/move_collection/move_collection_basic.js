@@ -24,7 +24,7 @@ if (shards.length < 2) {
 
 const collName = jsTestName();
 const dbName = db.getName();
-const ns = dbName + '.' + collName;
+const ns = dbName + "." + collName;
 
 let shard0 = shards[0];
 let shard1 = shards[1];
@@ -43,7 +43,7 @@ jsTestLog("Fail if collection is sharded.");
 assert.commandFailedWithCode(db.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
 
 const unsplittableCollName = "foo_unsplittable";
-const unsplittableCollNs = dbName + '.' + unsplittableCollName;
+const unsplittableCollNs = dbName + "." + unsplittableCollName;
 assert.commandWorked(db.runCommand({create: unsplittableCollName}));
 
 const coll = db.getCollection(unsplittableCollName);
@@ -56,30 +56,31 @@ for (let i = -numDocuments / 2; i < numDocuments / 2; ++i) {
 }
 
 jsTestLog("Fail if missing required field toShard.");
-assert.commandFailedWithCode(db.adminCommand({moveCollection: unsplittableCollNs}),
-                             ErrorCodes.IDLFailedToParse);
+assert.commandFailedWithCode(db.adminCommand({moveCollection: unsplittableCollNs}), ErrorCodes.IDLFailedToParse);
 
 jsTestLog("Directly calling reshardCollection on the unsplittable collection should fail.");
-assert.commandFailedWithCode(db.adminCommand({
-    reshardCollection: unsplittableCollNs,
-    key: {_id: 1},
-    forceRedistribution: true,
-    shardDistribution: [{shard: shardName1, min: {_id: MinKey}, max: {_id: MaxKey}}]
-}),
-                             [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound]);
+assert.commandFailedWithCode(
+    db.adminCommand({
+        reshardCollection: unsplittableCollNs,
+        key: {_id: 1},
+        forceRedistribution: true,
+        shardDistribution: [{shard: shardName1, min: {_id: MinKey}, max: {_id: MaxKey}}],
+    }),
+    [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
+);
 
 // Should fail to move to a shard with url instead of shard name
 assert.commandFailedWithCode(
     db.adminCommand({moveCollection: unsplittableCollNs, toShard: shard0.host}),
-    ErrorCodes.ShardNotFound);
+    ErrorCodes.ShardNotFound,
+);
 
-const configDb = db.getSiblingDB('config');
+const configDb = db.getSiblingDB("config");
 const primaryShard = getPrimaryShardNameForDB(db);
-const nonPrimaryShard = (shardName0 == primaryShard) ? shardName1 : shardName0;
+const nonPrimaryShard = shardName0 == primaryShard ? shardName1 : shardName0;
 
 jsTestLog("Move to non-primary shard (" + nonPrimaryShard + ")");
-assert.commandWorked(
-    db.adminCommand({moveCollection: unsplittableCollNs, toShard: nonPrimaryShard}));
+assert.commandWorked(db.adminCommand({moveCollection: unsplittableCollNs, toShard: nonPrimaryShard}));
 
 // Should have unsplittable set to true
 let unshardedColl = configDb.collections.findOne({_id: unsplittableCollNs});

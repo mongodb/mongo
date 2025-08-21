@@ -22,12 +22,14 @@ function initializeTestCollection() {
 
     // Set up the collection.
     let coll = db.collection;
-    assert.commandWorked(coll.insertMany([
-        {_id: 0, a: 1, b: 1, c: 1},
-        {_id: 1, a: 2, b: 1, c: 2},
-        {_id: 2, a: 3, b: 1, c: 3},
-        {_id: 3, a: 4, b: 2, c: 4}
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            {_id: 0, a: 1, b: 1, c: 1},
+            {_id: 1, a: 2, b: 1, c: 2},
+            {_id: 2, a: 3, b: 1, c: 3},
+            {_id: 3, a: 4, b: 2, c: 4},
+        ]),
+    );
 
     return coll;
 }
@@ -39,25 +41,27 @@ const framework = {
         classicHybrid: "classicHybrid",
         sbeOnly: "sbeOnly",
         classicOnly: "classicOnly",
-    }
+    },
 };
 
 // Ensure the slow query log contains the correct information about the queryFramework used.
 function verifySlowQueryLog(db, expectedComment, queryFramework) {
-    const logId = 51803;  // ID for 'Slow Query' commands
+    const logId = 51803; // ID for 'Slow Query' commands
     const expectedLog = {command: {comment: expectedComment}};
     if (queryFramework) {
         expectedLog.queryFramework = queryFramework;
     }
-    assert(checkLog.checkContainsWithCountJson(db, logId, expectedLog, 1, null, true),
-           "failed to find [" + tojson(expectedLog) + "] in the slow query log");
+    assert(
+        checkLog.checkContainsWithCountJson(db, logId, expectedLog, 1, null, true),
+        "failed to find [" + tojson(expectedLog) + "] in the slow query log",
+    );
 }
 
 // Ensure the profile filter contains the correct information about the queryFramework used.
 function verifyProfiler(expectedComment, queryFramework) {
     const profileEntryFilter = {
         ns: "query_engine_stats.collection",
-        "command.comment": expectedComment
+        "command.comment": expectedComment,
     };
     const profileObj = getLatestProfilerEntry(db, profileEntryFilter);
     assert.eq(profileObj.queryFramework, queryFramework);
@@ -102,8 +106,7 @@ function compareQueryEngineCounters(expectedCounters) {
 let coll = initializeTestCollection();
 
 // Start with SBE off.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 
 // Run a find command.
 let expectedCounters = generateExpectedCounters(framework.find.classic);
@@ -124,38 +127,40 @@ verifyProfiler(queryComment, framework.find.classic);
 // Run an aggregation that uses DocumentSource.
 expectedCounters = generateExpectedCounters(framework.aggregate.classicHybrid);
 queryComment = "docSourceSbeOff";
-assert.eq(coll.aggregate(
-                  [
-                      {$_internalInhibitOptimization: {}},
-                      {$group: {_id: "$a", acc: {$sum: "$b"}}},
-                      {$match: {acc: 42}}
-                  ],
-                  {comment: queryComment})
-              .itcount(),
-          0);
+assert.eq(
+    coll
+        .aggregate(
+            [{$_internalInhibitOptimization: {}}, {$group: {_id: "$a", acc: {$sum: "$b"}}}, {$match: {acc: 42}}],
+            {comment: queryComment},
+        )
+        .itcount(),
+    0,
+);
 verifySlowQueryLog(db, queryComment, framework.find.classic);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, framework.find.classic);
 
 // Find with getMore.
 queryComment = "findClassicGetMore";
-let cursor = coll.find({a: {$gt: 2}}).comment(queryComment).batchSize(1);
-cursor.next();  // initial query
+let cursor = coll
+    .find({a: {$gt: 2}})
+    .comment(queryComment)
+    .batchSize(1);
+cursor.next(); // initial query
 verifyProfiler(queryComment, framework.find.classic);
-cursor.next();  // getMore performed
+cursor.next(); // getMore performed
 verifyProfiler(queryComment, framework.find.classic);
 
 // Aggregation with getMore.
 queryComment = "aggClassicGetMore";
 cursor = coll.aggregate([{$match: {a: {$gt: 2}}}], {comment: queryComment, batchSize: 1});
-cursor.next();  // initial query
+cursor.next(); // initial query
 verifyProfiler(queryComment, framework.find.classic);
-cursor.next();  // getMore performed
+cursor.next(); // getMore performed
 verifyProfiler(queryComment, framework.find.classic);
 
 // Turn SBE on.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 
 // Run a find command.
 expectedCounters = generateExpectedCounters(framework.find.sbe);
@@ -176,39 +181,39 @@ verifyProfiler(queryComment, framework.find.sbe);
 // Run an aggregation that uses DocumentSource.
 expectedCounters = generateExpectedCounters(framework.aggregate.sbeHybrid);
 queryComment = "docSourceSbeOn";
-assert.eq(coll.aggregate(
-                  [
-                      {$_internalInhibitOptimization: {}},
-                      {$group: {_id: "$a", acc: {$sum: "$b"}}},
-                      {$match: {acc: 42}}
-                  ],
-                  {comment: queryComment})
-              .itcount(),
-          0);
+assert.eq(
+    coll
+        .aggregate(
+            [{$_internalInhibitOptimization: {}}, {$group: {_id: "$a", acc: {$sum: "$b"}}}, {$match: {acc: 42}}],
+            {comment: queryComment},
+        )
+        .itcount(),
+    0,
+);
 verifySlowQueryLog(db, queryComment, framework.find.sbe);
 compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, framework.find.sbe);
 
 // SBE find with getMore.
 queryComment = "findSBEGetMore";
-cursor = coll.find({a: {$gt: 2}}).comment(queryComment).batchSize(1);
-cursor.next();  // initial query
+cursor = coll
+    .find({a: {$gt: 2}})
+    .comment(queryComment)
+    .batchSize(1);
+cursor.next(); // initial query
 verifyProfiler(queryComment, framework.find.sbe);
-cursor.next();  // getMore performed
+cursor.next(); // getMore performed
 verifyProfiler(queryComment, framework.find.sbe);
 
 // SBE aggregation with getMore.
 queryComment = "aggSBEGetMore";
 cursor = coll.aggregate(
-    [
-        {$_internalInhibitOptimization: {}},
-        {$group: {_id: "$a", acc: {$sum: "$b"}}},
-        {$match: {acc: {$gt: 0}}}
-    ],
-    {comment: queryComment, batchSize: 1});
-cursor.next();  // initial query
+    [{$_internalInhibitOptimization: {}}, {$group: {_id: "$a", acc: {$sum: "$b"}}}, {$match: {acc: {$gt: 0}}}],
+    {comment: queryComment, batchSize: 1},
+);
+cursor.next(); // initial query
 verifyProfiler(queryComment, framework.find.sbe);
-cursor.next();  // getMore performed
+cursor.next(); // getMore performed
 verifyProfiler(queryComment, framework.find.sbe);
 
 MongoRunner.stopMongod(conn);

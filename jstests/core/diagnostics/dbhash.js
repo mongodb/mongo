@@ -10,7 +10,7 @@ a.drop();
 b.drop();
 
 // debug SERVER-761
-db.getCollectionNames().forEach(function(x) {
+db.getCollectionNames().forEach(function (x) {
     let v = db[x].validate();
     if (!v.valid) {
         print(x);
@@ -25,11 +25,9 @@ function dbhash(mydb) {
 }
 
 function gh(coll, mydb) {
-    if (!mydb)
-        mydb = db;
+    if (!mydb) mydb = db;
     var x = dbhash(mydb).collections[coll.getName()];
-    if (!x)
-        return "";
+    if (!x) return "";
     return x;
 }
 

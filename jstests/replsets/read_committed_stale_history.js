@@ -15,12 +15,8 @@ var collName = "stepdown";
 
 var rst = new ReplSetTest({
     name: name,
-    nodes: [
-        {},
-        {},
-        {rsConfig: {priority: 0}},
-    ],
-    useBridge: true
+    nodes: [{}, {}, {rsConfig: {priority: 0}}],
+    useBridge: true,
 });
 
 rst.startSet();
@@ -32,15 +28,14 @@ rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
  * be available for writes.
  */
 function waitForPrimary(node) {
-    assert.soon(function() {
-        return node.adminCommand('hello').isWritablePrimary;
+    assert.soon(function () {
+        return node.adminCommand("hello").isWritablePrimary;
     });
 }
 
 // Asserts that the given document is not visible in the committed snapshot on the given node.
 function checkDocNotCommitted(node, doc) {
-    var docs =
-        node.getDB(dbName).getCollection(collName).find(doc).readConcern('majority').toArray();
+    var docs = node.getDB(dbName).getCollection(collName).find(doc).readConcern("majority").toArray();
     assert.eq(0, docs.length, tojson(docs));
 }
 
@@ -51,18 +46,23 @@ var primary = rst.getPrimary();
 var secondaries = rst.getSecondaries();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 rst.awaitReplication();
 assert.eq(nodes[0], primary);
 // Wait for all data bearing nodes to get up to date.
-assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert(
-    {a: 1}, {writeConcern: {w: 3, wtimeout: rst.timeoutMS}}));
+assert.commandWorked(
+    nodes[0]
+        .getDB(dbName)
+        .getCollection(collName)
+        .insert({a: 1}, {writeConcern: {w: 3, wtimeout: rst.timeoutMS}}),
+);
 
 // Stop the secondaries from replicating.
 stopServerReplication(secondaries);
 // Stop the primary from being able to complete stepping down.
-var blockHeartbeatStepdownFailPoint = configureFailPoint(nodes[0], 'blockHeartbeatStepdown');
+var blockHeartbeatStepdownFailPoint = configureFailPoint(nodes[0], "blockHeartbeatStepdown");
 
 jsTestLog("Do a write that won't ever reach a majority of nodes");
 assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert({a: 2}));
@@ -71,7 +71,7 @@ assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert({a: 2
 checkDocNotCommitted(nodes[0], {a: 2});
 
 // Prevent the primary from rolling back later on.
-var rollbackHangBeforeStartFailPoint = configureFailPoint(nodes[0], 'rollbackHangBeforeStart');
+var rollbackHangBeforeStartFailPoint = configureFailPoint(nodes[0], "rollbackHangBeforeStart");
 
 jsTest.log("Disconnect primary from all secondaries");
 nodes[0].disconnect(nodes[1]);
@@ -87,8 +87,12 @@ restartServerReplication(secondaries);
 waitForPrimary(nodes[1]);
 
 jsTest.log("Do a write to the new primary");
-assert.commandWorked(nodes[1].getDB(dbName).getCollection(collName).insert(
-    {a: 3}, {writeConcern: {w: 2, wtimeout: rst.timeoutMS}}));
+assert.commandWorked(
+    nodes[1]
+        .getDB(dbName)
+        .getCollection(collName)
+        .insert({a: 3}, {writeConcern: {w: 2, wtimeout: rst.timeoutMS}}),
+);
 
 // Ensure the new primary still cannot see the write from the old primary.
 assert.eq(null, nodes[1].getDB(dbName).getCollection(collName).findOne({a: 2}));
@@ -127,15 +131,13 @@ checkDocNotCommitted(nodes[0], {a: 2});
 jsTest.log("Allow the original primary to roll back its write and catch up to the new primary");
 rollbackHangBeforeStartFailPoint.off();
 
-assert.soonNoExcept(function() {
+assert.soonNoExcept(function () {
     return null == nodes[0].getDB(dbName).getCollection(collName).findOne({a: 2});
 }, "Original primary never rolled back its write");
 
 rst.awaitLastOpCommitted();
 
 // Ensure that the old primary got the write that the new primary did and sees it as committed.
-assert.neq(
-    null,
-    nodes[0].getDB(dbName).getCollection(collName).find({a: 3}).readConcern('majority').next());
+assert.neq(null, nodes[0].getDB(dbName).getCollection(collName).find({a: 3}).readConcern("majority").next());
 
 rst.stopSet();

@@ -14,13 +14,11 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const numMostCommonValues = 5;
 const setParameterOpts = {
-    analyzeShardKeyNumMostCommonValues: numMostCommonValues
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
 };
 
 function runTest(conn, {rst, st}) {
@@ -34,20 +32,22 @@ function runTest(conn, {rst, st}) {
     // Make each document in the collection have two fields "x" and "y" where "x" is not unique and
     // "y" is. Verify the metrics for the shard key {x: 1} and {y: 1} before and after an unclean
     // shutdown which results in inaccurate fast data statistics.
-    assert.commandWorked(db.runCommand({
-        createIndexes: collName,
-        indexes: [
-            {
-                name: "x_1",
-                key: {x: 1},
-            },
-            {
-                name: "y_1",
-                key: {y: 1},
-                unique: true,
-            }
-        ]
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            createIndexes: collName,
+            indexes: [
+                {
+                    name: "x_1",
+                    key: {x: 1},
+                },
+                {
+                    name: "y_1",
+                    key: {y: 1},
+                    unique: true,
+                },
+            ],
+        }),
+    );
 
     const docs = [];
     const mostCommonXValues = [];
@@ -63,7 +63,7 @@ function runTest(conn, {rst, st}) {
             docs.push(doc);
             mostCommonYValues.push({value: {y: yValue}, frequency: 1});
         }
-        const isMostCommonXValue = (numDistinctXValues - i) < numMostCommonValues;
+        const isMostCommonXValue = numDistinctXValues - i < numMostCommonValues;
         if (isMostCommonXValue) {
             mostCommonXValues.push({value: {x: xValue}, frequency: xFrequency});
         }
@@ -78,37 +78,39 @@ function runTest(conn, {rst, st}) {
         isUnique: false,
         numDistinctValues: numDistinctXValues,
         mostCommonValues: mostCommonXValues,
-        numMostCommonValues
+        numMostCommonValues,
     };
     const expectedMetricsY = {
         numDocs: docs.length,
         isUnique: true,
         numDistinctValues: numDistinctYValues,
         mostCommonValues: mostCommonYValues,
-        numMostCommonValues
+        numMostCommonValues,
     };
     const expectedAvgDocSize = Object.bsonsize(docs[0]);
 
-    const resXBefore = assert.commandWorked(conn.adminCommand({
-        analyzeShardKey: ns,
-        key: {x: 1},
-        // Skip calculating the read and write distribution metrics since there are not needed by
-        // this test.
-        readWriteDistribution: false
-    }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXBefore.keyCharacteristics,
-                                                        expectedMetricsX);
+    const resXBefore = assert.commandWorked(
+        conn.adminCommand({
+            analyzeShardKey: ns,
+            key: {x: 1},
+            // Skip calculating the read and write distribution metrics since there are not needed by
+            // this test.
+            readWriteDistribution: false,
+        }),
+    );
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXBefore.keyCharacteristics, expectedMetricsX);
     assert.eq(resXBefore.keyCharacteristics.avgDocSizeBytes, expectedAvgDocSize);
 
-    const resYBefore = assert.commandWorked(conn.adminCommand({
-        analyzeShardKey: ns,
-        key: {y: 1},
-        // Skip calculating the read and write distribution metrics since there are not needed by
-        // this test.
-        readWriteDistribution: false
-    }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYBefore.keyCharacteristics,
-                                                        expectedMetricsY);
+    const resYBefore = assert.commandWorked(
+        conn.adminCommand({
+            analyzeShardKey: ns,
+            key: {y: 1},
+            // Skip calculating the read and write distribution metrics since there are not needed by
+            // this test.
+            readWriteDistribution: false,
+        }),
+    );
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYBefore.keyCharacteristics, expectedMetricsY);
     assert.eq(resYBefore.keyCharacteristics.avgDocSizeBytes, expectedAvgDocSize);
 
     let runAnalyzeShardKeyCmd = (host, ns, key) => {
@@ -118,16 +120,20 @@ function runTest(conn, {rst, st}) {
             key: key,
             // Skip calculating the read and write distribution metrics since there are not needed
             // by this test.
-            readWriteDistribution: false
+            readWriteDistribution: false,
         });
     };
     for (let shardKey of [{x: 1}, {y: 1}]) {
         jsTest.log(
             "Verify that the analyzeShardKey command fails when the collection becomes empty " +
-            "right before the $collStats step " + tojson({shardKey}));
+                "right before the $collStats step " +
+                tojson({shardKey}),
+        );
         const analyzeShardKeyThread = new Thread(runAnalyzeShardKeyCmd, conn.host, ns, shardKey);
-        const fp = configureFailPoint(st ? st.rs0.nodes[0] : rst.nodes[0],
-                                      "analyzeShardKeyPauseBeforeCalculatingCollStatsMetrics");
+        const fp = configureFailPoint(
+            st ? st.rs0.nodes[0] : rst.nodes[0],
+            "analyzeShardKeyPauseBeforeCalculatingCollStatsMetrics",
+        );
         analyzeShardKeyThread.start();
         fp.wait();
         // Delete all documents in the collection.
@@ -161,15 +167,17 @@ function runTest(conn, {rst, st}) {
         rstToKill.getPrimary();
     }
 
-    jsTest.log("Verify that the analyzeShardKey command fails if the fast data statistics " +
-               "checked in the $collStats step or monotonicity step indicate that the " +
-               "collection is empty (although it is not) after the unclean shutdown");
-    const collStatsAfter =
-        coll.aggregate([
-                {$collStats: {storageStats: {}}},
-                {$project: {count: "$storageStats.count", size: "$storageStats.size"}}
-            ])
-            .toArray()[0];
+    jsTest.log(
+        "Verify that the analyzeShardKey command fails if the fast data statistics " +
+            "checked in the $collStats step or monotonicity step indicate that the " +
+            "collection is empty (although it is not) after the unclean shutdown",
+    );
+    const collStatsAfter = coll
+        .aggregate([
+            {$collStats: {storageStats: {}}},
+            {$project: {count: "$storageStats.count", size: "$storageStats.size"}},
+        ])
+        .toArray()[0];
 
     jsTest.log("Verify the analyzeShardKey metrics after the unclean shutdown");
 
@@ -178,14 +186,14 @@ function runTest(conn, {rst, st}) {
         key: {x: 1},
         // Skip calculating the read and write distribution metrics since there are not needed by
         // this test.
-        readWriteDistribution: false
+        readWriteDistribution: false,
     });
     const resYAfter = conn.adminCommand({
         analyzeShardKey: ns,
         key: {y: 1},
         // Skip calculating the read and write distribution metrics since there are not needed by
         // this test.
-        readWriteDistribution: false
+        readWriteDistribution: false,
     });
 
     if (collStatsAfter.count == 0) {
@@ -201,8 +209,7 @@ function runTest(conn, {rst, st}) {
     } else {
         assert.gt(collStatsAfter.size, 0);
         assert.commandWorked(resXAfter);
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXAfter.keyCharacteristics,
-                                                            expectedMetricsX);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXAfter.keyCharacteristics, expectedMetricsX);
         assert.eq(resXAfter.keyCharacteristics.avgDocSizeBytes, expectedAvgDocSize);
 
         // Skip checking the key characteristics metrics for a unique shard key after an unclean
@@ -213,15 +220,13 @@ function runTest(conn, {rst, st}) {
 }
 
 {
-    const st =
-        new ShardingTest({shards: 1, rs: {nodes: 1, setParameter: setParameterOpts, syncdelay: 1}});
+    const st = new ShardingTest({shards: 1, rs: {nodes: 1, setParameter: setParameterOpts, syncdelay: 1}});
     runTest(st.s, {st});
     st.stop();
 }
 
 {
-    const rst =
-        new ReplSetTest({nodes: 1, nodeOptions: {setParameter: setParameterOpts, syncdelay: 1}});
+    const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: setParameterOpts, syncdelay: 1}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

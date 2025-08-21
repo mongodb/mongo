@@ -25,8 +25,8 @@ const rst = new ReplSetTest({
             // Setting a transaction lifetime of 1 hour to make sure the transaction reaper
             // doesn't abort the transaction.
             transactionLifetimeLimitSeconds: 3600,
-        }
-    }
+        },
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -45,7 +45,7 @@ assert.commandWorked(sessionDb.mycoll.insert({}));
 const threads = [];
 
 for (let i = 0; i < kNumWriteTickets; ++i) {
-    const thread = new Thread(function(host) {
+    const thread = new Thread(function (host) {
         try {
             const conn = new Mongo(host);
             const db = conn.getDB("test");
@@ -73,7 +73,8 @@ assert.soon(
     },
     () => {
         return `Didn't find ${kNumWriteTickets} drop commands running: ` + tojson(db.currentOp());
-    });
+    },
+);
 
 // Attempting to perform another operation inside of the transaction will block and should
 // cause it to be aborted implicity.
@@ -88,8 +89,7 @@ for (let thread of threads) {
 }
 
 // Transaction should already be aborted.
-let res = assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                       ErrorCodes.NoSuchTransaction);
+let res = assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 assert(res.errmsg.match(/Transaction .* has been aborted/), res.errmsg);
 
 session.endSession();

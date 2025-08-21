@@ -12,4 +12,4 @@ assert.eq(x, t.findOne(), "A2");
 assert.commandWorked(t.createIndex({arr: 1}));
 x.arr[0] = "A3";
 assert.commandWorked(t.update({arr: "A2"}, {$set: {"arr.$": "A3"}}));
-assert.eq(x, t.findOne(), "A3");  // SERVER-1055
+assert.eq(x, t.findOne(), "A3"); // SERVER-1055

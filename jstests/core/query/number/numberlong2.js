@@ -30,5 +30,4 @@ for (let i = 99; i >= 0; --i) {
     t.save({x: NumberLong(s + i)});
 }
 
-assert.eq(t.find().sort({x: 1}).hint({$natural: 1}).toArray(),
-          t.find().sort({x: 1}).hint({x: 1}).toArray());
+assert.eq(t.find().sort({x: 1}).hint({$natural: 1}).toArray(), t.find().sort({x: 1}).hint({x: 1}).toArray());

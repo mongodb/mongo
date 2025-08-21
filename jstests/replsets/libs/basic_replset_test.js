@@ -1,7 +1,5 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    verifyServerStatusElectionReasonCounterValue
-} from "jstests/replsets/libs/election_metrics.js";
+import {verifyServerStatusElectionReasonCounterValue} from "jstests/replsets/libs/election_metrics.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 // Go to `replsettest_api_usage_examples.js` to see more examples of starting up / initiating
@@ -17,8 +15,8 @@ export function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
     // each differently-named replica set gets its own monitor.
     // n0 and n1 get the same SSL config since there are 3 nodes but only 2 different configs
     let replTest = new ReplSetTest({
-        name: 'testSet' + ssl_name,
-        nodes: {n0: ssl_options1, n1: ssl_options1, n2: ssl_options2}
+        name: "testSet" + ssl_name,
+        nodes: {n0: ssl_options1, n1: ssl_options1, n2: ssl_options2},
     });
 
     // call startSet() to start each mongod in the replica set
@@ -35,11 +33,10 @@ export function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
     // Check that both the 'called' and 'successful' fields of the 'electionTimeout' election reason
     // counter have been incremented in serverStatus.
     const primaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
-    verifyServerStatusElectionReasonCounterValue(
-        primaryStatus.electionMetrics, "electionTimeout", 1);
+    verifyServerStatusElectionReasonCounterValue(primaryStatus.electionMetrics, "electionTimeout", 1);
 
     // Ensure the primary logs an n-op to the oplog upon transitioning to primary.
-    assert.gt(primary.getDB("local").oplog.rs.count({op: 'n', o: {msg: 'new primary'}}), 0);
+    assert.gt(primary.getDB("local").oplog.rs.count({op: "n", o: {msg: "new primary"}}), 0);
 
     // Here's how you save something to primary
     primary.getDB("foo").foo.save({a: 1000});
@@ -85,14 +82,14 @@ export function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
     let secondary = replTest.restart(primaryId);
 
     // Now, let's make sure that the old primary comes up as a secondary
-    assert.soon(function() {
+    assert.soon(function () {
         let res = secondary.getDB("admin").runCommand({hello: 1});
         printjson(res);
-        return res['ok'] == 1 && res['isWritablePrimary'] == false;
+        return res["ok"] == 1 && res["isWritablePrimary"] == false;
     });
 
     // And we need to make sure that the replset comes back up
-    assert.soon(function() {
+    assert.soon(function () {
         let res = newPrimary.getDB("admin").runCommand({replSetGetStatus: 1});
         printjson(res);
         return res.myState == 1;
@@ -106,7 +103,7 @@ export function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
 
     let secondaries = replTest.getSecondaries();
     assert(secondaries.length == 2, "Expected 2 secondaries but length was " + secondaries.length);
-    secondaries.forEach(function(secondary) {
+    secondaries.forEach(function (secondary) {
         secondary.setSecondaryOk();
         let count = secondary.getDB("bar").runCommand({count: "bar"});
         printjson(count);
@@ -120,7 +117,7 @@ export function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
     let db = primary.getDB("foo");
     let t = db.foo;
 
-    let ts = secondaries.map(function(z) {
+    let ts = secondaries.map(function (z) {
         z.setSecondaryOk();
         return z.getDB("foo").foo;
     });
@@ -129,7 +126,7 @@ export function basicReplsetTest(signal, ssl_options1, ssl_options2, ssl_name) {
     t.createIndex({a: 1});
     replTest.awaitReplication();
 
-    ts.forEach(function(z) {
+    ts.forEach(function (z) {
         assert.eq(2, z.getIndexKeys().length, "A " + z.getMongo());
     });
 

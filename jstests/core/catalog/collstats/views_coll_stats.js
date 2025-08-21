@@ -9,10 +9,10 @@
 
 let viewsDB = db.getSiblingDB("views_coll_stats");
 const matchStage = {
-    $match: {}
+    $match: {},
 };
 const collStatsStage = {
-    $collStats: {latencyStats: {}}
+    $collStats: {latencyStats: {}},
 };
 
 function clear() {
@@ -24,9 +24,11 @@ function getCollStats(ns) {
 }
 
 function checkCollStatsBelongTo(stats, expectedNs) {
-    assert.eq(stats.ns,
-              viewsDB[expectedNs].getFullName(),
-              "Expected coll stats for " + expectedNs + " but got " + stats.ns);
+    assert.eq(
+        stats.ns,
+        viewsDB[expectedNs].getFullName(),
+        "Expected coll stats for " + expectedNs + " but got " + stats.ns,
+    );
 }
 
 function makeView(viewNs, viewOnNs, pipeline) {
@@ -71,19 +73,22 @@ clear();
 makeView("a", "b");
 assert.commandFailedWithCode(
     viewsDB.runCommand({aggregate: "a", pipeline: [{$collStats: {storageStats: {}}}], cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
+    ErrorCodes.CommandNotSupportedOnView,
+);
 clear();
 
 // Assert that attempting to retrieve collection record count on an identity views fails.
 makeView("a", "b");
 assert.commandFailedWithCode(
     viewsDB.runCommand({aggregate: "a", pipeline: [{$collStats: {count: {}}}], cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
+    ErrorCodes.CommandNotSupportedOnView,
+);
 clear();
 
 // Assert that attempting to retrieve collection record count on a non-identity view fails.
 makeView("a", "b", [{$match: {a: 0}}]);
 assert.commandFailedWithCode(
     viewsDB.runCommand({aggregate: "a", pipeline: [{$collStats: {count: {}}}], cursor: {}}),
-    ErrorCodes.CommandNotSupportedOnView);
+    ErrorCodes.CommandNotSupportedOnView,
+);
 clear();

@@ -12,17 +12,15 @@ const coll = assertDropAndRecreateCollection(db, "include_cluster_time");
 
 const changeStream = coll.watch();
 
-const insertClusterTime =
-    assert.commandWorked(coll.runCommand("insert", {documents: [{_id: 0}]})).operationTime;
+const insertClusterTime = assert.commandWorked(coll.runCommand("insert", {documents: [{_id: 0}]})).operationTime;
 
-const updateClusterTime = assert
-                              .commandWorked(coll.runCommand(
-                                  "update", {updates: [{q: {_id: 0}, u: {$set: {updated: true}}}]}))
-                              .operationTime;
+const updateClusterTime = assert.commandWorked(
+    coll.runCommand("update", {updates: [{q: {_id: 0}, u: {$set: {updated: true}}}]}),
+).operationTime;
 
-const deleteClusterTime =
-    assert.commandWorked(coll.runCommand("delete", {deletes: [{q: {_id: 0}, limit: 1}]}))
-        .operationTime;
+const deleteClusterTime = assert.commandWorked(
+    coll.runCommand("delete", {deletes: [{q: {_id: 0}, limit: 1}]}),
+).operationTime;
 
 const dropClusterTime = assert.commandWorked(db.runCommand({drop: coll.getName()})).operationTime;
 

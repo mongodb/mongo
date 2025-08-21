@@ -50,18 +50,12 @@ function verifyCurrentOpFields(res, isActive) {
     ];
 
     assert.hasFields(transaction, expectedTransactionsFields, tojson(transaction));
-    assert.eq(
-        expectedTransactionsFields.length, Object.keys(transaction).length, tojson(transaction));
+    assert.eq(expectedTransactionsFields.length, Object.keys(transaction).length, tojson(transaction));
 
     // Verify transaction parameters sub object.
 
     const parameters = transaction.parameters;
-    const expectedParametersFields = [
-        "txnNumber",
-        "txnRetryCounter",
-        "autocommit",
-        "readConcern",
-    ];
+    const expectedParametersFields = ["txnNumber", "txnRetryCounter", "autocommit", "readConcern"];
 
     assert.hasFields(parameters, expectedParametersFields, tojson(parameters));
     assert.eq(expectedParametersFields.length, Object.keys(parameters).length, tojson(parameters));
@@ -81,23 +75,24 @@ function verifyCurrentOpFields(res, isActive) {
         assert.hasFields(participant, expectedParticipantFields, tojson(participant));
         if (isActive) {
             // 'readOnly' should not be set.
-            assert.eq(expectedParticipantFields.length,
-                      Object.keys(participant).length,
-                      tojson(participant));
+            assert.eq(expectedParticipantFields.length, Object.keys(participant).length, tojson(participant));
         } else {
             // 'readOnly' should always be set for the inactive transaction.
             assert.hasFields(participant, ["readOnly"], tojson(participant));
-            assert.eq(expectedParticipantFields.length + 1,  // +1 for readOnly.
-                      Object.keys(participant).length,
-                      tojson(participant));
+            assert.eq(
+                expectedParticipantFields.length + 1, // +1 for readOnly.
+                Object.keys(participant).length,
+                tojson(participant),
+            );
         }
     });
 }
 
 function getCurrentOpForFilter(st, matchFilter) {
-    const res = st.s.getDB("admin")
-                    .aggregate([{$currentOp: {localOps: true}}, {$match: matchFilter}])
-                    .toArray();
+    const res = st.s
+        .getDB("admin")
+        .aggregate([{$currentOp: {localOps: true}}, {$match: matchFilter}])
+        .toArray();
     assert.eq(1, res.length, res);
     return res[0];
 }
@@ -127,17 +122,23 @@ jsTest.log("Active transaction.");
 (() => {
     const fp = configureFailPoint(st.rs0.getPrimary(), "waitInFindBeforeMakingBatch");
 
-    const txnThread = new Thread(function(host, dbName, collName) {
-        const mongosConn = new Mongo(host);
-        const threadSession = mongosConn.startSession();
+    const txnThread = new Thread(
+        function (host, dbName, collName) {
+            const mongosConn = new Mongo(host);
+            const threadSession = mongosConn.startSession();
 
-        threadSession.startTransaction({readConcern: {level: "snapshot"}});
-        assert.commandWorked(threadSession.getDatabase(dbName).runCommand(
-            {find: collName, filter: {}, comment: "active_txn_find"}));
+            threadSession.startTransaction({readConcern: {level: "snapshot"}});
+            assert.commandWorked(
+                threadSession.getDatabase(dbName).runCommand({find: collName, filter: {}, comment: "active_txn_find"}),
+            );
 
-        assert.commandWorked(threadSession.abortTransaction_forTesting());
-        threadSession.endSession();
-    }, st.s.host, dbName, collName);
+            assert.commandWorked(threadSession.abortTransaction_forTesting());
+            threadSession.endSession();
+        },
+        st.s.host,
+        dbName,
+        collName,
+    );
     txnThread.start();
 
     // Wait until we know the failpoint has been reached.

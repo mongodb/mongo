@@ -13,19 +13,16 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {parseConfig} from "jstests/concurrency/fsm_libs/parse_config.js";
-import {
-    $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/sharded_partitioned/crud_base_partitioned.js';
-import {
-    extendWithInternalTransactionsUnsharded
-} from
-    "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_unsharded.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/crud_base_partitioned.js";
+import {extendWithInternalTransactionsUnsharded} from "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_unsharded.js";
 
 const parsedBaseConfig = parseConfig($baseConfig);
 const $extendedBaseConfig = extendWithInternalTransactionsUnsharded(
-    Object.extend({}, parsedBaseConfig, true), parsedBaseConfig);
+    Object.extend({}, parsedBaseConfig, true),
+    parsedBaseConfig,
+);
 
-export const $config = extendWorkload($extendedBaseConfig, function($config, $super) {
+export const $config = extendWorkload($extendedBaseConfig, function ($config, $super) {
     $config.data.getQueryForDocument = function getQueryForDocument(doc) {
         // The query for a write command against a sharded collection must contain the shard key.
         const query = $super.data.getQueryForDocument.apply(this, arguments);
@@ -34,21 +31,20 @@ export const $config = extendWorkload($extendedBaseConfig, function($config, $su
     };
 
     $config.data.generateRandomDocument = function generateRandomDocument(
-        tid, {partition, isLowerChunkDoc, isUpperChunkDoc} = {}) {
+        tid,
+        {partition, isLowerChunkDoc, isUpperChunkDoc} = {},
+    ) {
         const doc = $super.data.generateRandomDocument.apply(this, arguments);
         if (partition === undefined) {
             partition = this.partition;
         }
         assert.neq(partition, null);
         if (isLowerChunkDoc) {
-            doc[this.defaultShardKeyField] =
-                this.generateRandomInt(partition.lower, partition.mid - 1);
+            doc[this.defaultShardKeyField] = this.generateRandomInt(partition.lower, partition.mid - 1);
         } else if (isUpperChunkDoc) {
-            doc[this.defaultShardKeyField] =
-                this.generateRandomInt(partition.mid, partition.upper - 1);
+            doc[this.defaultShardKeyField] = this.generateRandomInt(partition.mid, partition.upper - 1);
         } else {
-            doc[this.defaultShardKeyField] =
-                this.generateRandomInt(partition.lower, partition.upper - 1);
+            doc[this.defaultShardKeyField] = this.generateRandomInt(partition.lower, partition.upper - 1);
         }
         return doc;
     };

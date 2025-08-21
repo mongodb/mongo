@@ -4,35 +4,35 @@ var mongo = db.getMongo();
 try {
     var commandsRan = [];
     db._mongo = {
-        getSecondaryOk: function() {
+        getSecondaryOk: function () {
             return false;
         },
-        getReadPrefMode: function() {
+        getReadPrefMode: function () {
             return mongo.getReadPrefMode();
         },
-        getReadPref: function() {
+        getReadPref: function () {
             return mongo.getReadPref();
         },
-        runCommand: function(db, cmd, opts) {
+        runCommand: function (db, cmd, opts) {
             commandsRan.push({db: db, cmd: cmd, opts: opts});
             return {ok: 1};
         },
-        getMinWireVersion: function() {
+        getMinWireVersion: function () {
             return mongo.getMinWireVersion();
         },
-        getMaxWireVersion: function() {
+        getMaxWireVersion: function () {
             return mongo.getMaxWireVersion();
         },
-        isReplicaSetMember: function() {
+        isReplicaSetMember: function () {
             return mongo.isReplicaSetMember();
         },
-        isMongos: function() {
+        isMongos: function () {
             return mongo.isMongos();
         },
-        isCausalConsistency: function() {
+        isCausalConsistency: function () {
             return false;
         },
-        getClusterTime: function() {
+        getClusterTime: function () {
             return null;
         },
     };
@@ -41,9 +41,7 @@ try {
     db.runReadCommand({ping: 1});
     assert.eq(commandsRan.length, 1);
     assert.docEq({ping: 1}, commandsRan[0].cmd, "The command should not have been wrapped.");
-    assert.eq(
-        commandsRan[0].opts & DBQuery.Option.slaveOk, 0, "The slaveOk bit should not be set.");
-
+    assert.eq(commandsRan[0].opts & DBQuery.Option.slaveOk, 0, "The slaveOk bit should not be set.");
 } finally {
     db._mongo = mongo;
     db._session = new _DummyDriverSession(mongo);

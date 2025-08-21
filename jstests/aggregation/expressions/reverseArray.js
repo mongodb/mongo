@@ -10,11 +10,14 @@ coll.drop();
 coll.insert({
     nullField: null,
     undefField: undefined,
-    embedded: [[1, 2], [3, 4]],
+    embedded: [
+        [1, 2],
+        [3, 4],
+    ],
     singleElem: [1],
     normal: [1, 2, 3],
     num: 1,
-    empty: []
+    empty: [],
 });
 
 assertErrorCode(coll, [{$project: {reversed: {$reverseArray: 1}}}], 34435);
@@ -35,15 +38,34 @@ output = res.toArray();
 assert.eq(1, output.length);
 assert.eq(output[0].reversed, null);
 
-res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: [[1, 2], [3, 4]]}}}}]);
+res = coll.aggregate([
+    {
+        $project: {
+            reversed: {
+                $reverseArray: {
+                    $literal: [
+                        [1, 2],
+                        [3, 4],
+                    ],
+                },
+            },
+        },
+    },
+]);
 output = res.toArray();
 assert.eq(1, output.length);
-assert.eq(output[0].reversed, [[3, 4], [1, 2]]);
+assert.eq(output[0].reversed, [
+    [3, 4],
+    [1, 2],
+]);
 
 res = coll.aggregate([{$project: {reversed: {$reverseArray: "$embedded"}}}]);
 output = res.toArray();
 assert.eq(1, output.length);
-assert.eq(output[0].reversed, [[3, 4], [1, 2]]);
+assert.eq(output[0].reversed, [
+    [3, 4],
+    [1, 2],
+]);
 
 res = coll.aggregate([{$project: {reversed: {$reverseArray: {$literal: null}}}}]);
 output = res.toArray();

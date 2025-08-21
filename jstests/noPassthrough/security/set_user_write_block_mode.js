@@ -19,7 +19,7 @@ const {
     bypassUser,
     noBypassUser,
     password,
-    keyfile
+    keyfile,
 } = UserWriteBlockHelpers;
 
 // For this test to work, we expect the state of the connection to be maintained as:
@@ -66,8 +66,14 @@ function testCheckedOps(conn, shouldSucceed, expectedFailure) {
         }
 
         const indexes = coll1.getIndexes();
-        assert.eq(undefined, indexes.find(i => i.name === transientIndexName));
-        assert.neq(undefined, indexes.find(i => i.name === indexName));
+        assert.eq(
+            undefined,
+            indexes.find((i) => i.name === transientIndexName),
+        );
+        assert.neq(
+            undefined,
+            indexes.find((i) => i.name === indexName),
+        );
 
         assert.eq(1, coll1.find({a: 0, b: 0}).count());
         assert.eq(0, coll1.find({a: 1}).count());
@@ -84,8 +90,9 @@ function testCheckedOps(conn, shouldSucceed, expectedFailure) {
 
         // Test create index on empty and non-empty colls, collMod, drop index.
         assert.commandWorked(coll1.createIndex({"a": 1}, {"name": transientIndexName}));
-        assert.commandWorked(db.runCommand(
-            {collMod: coll1Name, "index": {"keyPattern": {"a": 1}, expireAfterSeconds: 200}}));
+        assert.commandWorked(
+            db.runCommand({collMod: coll1Name, "index": {"keyPattern": {"a": 1}, expireAfterSeconds: 200}}),
+        );
         assert.commandWorked(coll1.dropIndex({"a": 1}));
         assert.commandWorked(coll2.createIndex({"a": 1}, {"name": transientIndexName}));
         assert.commandWorked(coll2.dropIndex({"a": 1}));
@@ -94,8 +101,7 @@ function testCheckedOps(conn, shouldSucceed, expectedFailure) {
         assert.commandWorked(db.createCollection(transientCollNames[0]));
         assert.commandWorked(db.createCollection(transientCollNames[1]));
         assert.commandWorked(db[transientCollNames[0]].renameCollection(transientCollNames[2]));
-        assert.commandWorked(
-            db[transientCollNames[2]].renameCollection(transientCollNames[1], true));
+        assert.commandWorked(db[transientCollNames[2]].renameCollection(transientCollNames[1], true));
         assert(db[transientCollNames[1]].drop());
 
         // Test dropping a (non-empty) database.
@@ -109,20 +115,17 @@ function testCheckedOps(conn, shouldSucceed, expectedFailure) {
         assert.commandFailedWithCode(coll1.remove({a: 0, b: 0}), expectedFailure);
 
         // Test create, collMod, drop index.
-        assert.commandFailedWithCode(coll1.createIndex({"a": 1}, {"name": transientIndexName}),
-                                     expectedFailure);
+        assert.commandFailedWithCode(coll1.createIndex({"a": 1}, {"name": transientIndexName}), expectedFailure);
         assert.commandFailedWithCode(
-            db.runCommand(
-                {collMod: coll1Name, "index": {"keyPattern": {"b": 1}, expireAfterSeconds: 200}}),
-            expectedFailure);
+            db.runCommand({collMod: coll1Name, "index": {"keyPattern": {"b": 1}, expireAfterSeconds: 200}}),
+            expectedFailure,
+        );
         assert.commandFailedWithCode(coll1.dropIndex({"b": 1}), expectedFailure);
-        assert.commandFailedWithCode(coll2.createIndex({"a": 1}, {"name": transientIndexName}),
-                                     expectedFailure);
+        assert.commandFailedWithCode(coll2.createIndex({"a": 1}, {"name": transientIndexName}), expectedFailure);
 
         // Test create, rename (both to a non-existent and an existing target), drop collection.
         assert.commandFailedWithCode(db.createCollection(transientCollNames[0]), expectedFailure);
-        assert.commandFailedWithCode(coll2.renameCollection(transientCollNames[1]),
-                                     expectedFailure);
+        assert.commandFailedWithCode(coll2.renameCollection(transientCollNames[1]), expectedFailure);
         assert.commandFailedWithCode(coll2.renameCollection(coll1Name, true), expectedFailure);
         assert.commandFailedWithCode(db.runCommand({drop: coll2Name}), expectedFailure);
 
@@ -136,7 +139,7 @@ function testCheckedOps(conn, shouldSucceed, expectedFailure) {
 
 // Checks that an unprivileged user's operations can be logged on the profiling collection.
 function testProfiling(fixture) {
-    const collName = 'foo';
+    const collName = "foo";
     fixture.asAdmin(({db}) => {
         assert.commandWorked(db[collName].insert({x: 1}));
     });
@@ -152,7 +155,7 @@ function testProfiling(fixture) {
 
     // Check that the find() was logged on the profiling collection.
     fixture.asAdmin(({db}) => {
-        assert.eq(1, db.system.profile.find({'command.comment': comment}).itcount());
+        assert.eq(1, db.system.profile.find({"command.comment": comment}).itcount());
     });
 
     // Restore the original profiling level.
@@ -172,8 +175,9 @@ function runTest(fixture) {
 
         // Ensure that the non-privileged user cannot run setUserWriteBlockMode
         assert.commandFailedWithCode(
-            conn.getDB('admin').runCommand({setUserWriteBlockMode: 1, global: true}),
-            ErrorCodes.Unauthorized);
+            conn.getDB("admin").runCommand({setUserWriteBlockMode: 1, global: true}),
+            ErrorCodes.Unauthorized,
+        );
     });
 
     fixture.assertWriteBlockMode(WriteBlockState.DISABLED);
@@ -226,12 +230,12 @@ function runTest(fixture) {
         // is sharded, meaning index builds will be handled by the shard servers. Indexes on
         // non-sharded collections in internal DBs are built by the config server, which doesn't
         // have the UserWriteBlockModeOpObserver installed.
-        const config = conn.getDB('config');
+        const config = conn.getDB("config");
         assert.commandWorked(config.system.sessions.insert({"a": 2}));
     });
 
-    const testParallelShellWithFailpoint = makeParallelShell => {
-        const fp = fixture.setFailPoint('hangAfterInitializingIndexBuild');
+    const testParallelShellWithFailpoint = (makeParallelShell) => {
+        const fp = fixture.setFailPoint("hangAfterInitializingIndexBuild");
         const shell = makeParallelShell();
         fp.wait();
         fixture.enableWriteBlockMode();
@@ -244,53 +248,78 @@ function runTest(fixture) {
 
     // Test that index builds on user collections spawned by both non-privileged and privileged
     // users will be aborted on enableWriteBlockMode.
-    testParallelShellWithFailpoint(() => fixture.runInParallelShell(false /* asAdmin */,
-                                                                    `({conn}) => { 
+    testParallelShellWithFailpoint(() =>
+        fixture.runInParallelShell(
+            false /* asAdmin */,
+            `({conn}) => { 
         assert.commandFailedWithCode(
             conn.getDB(jsTestName()).${coll3Name}.createIndex({"a": 1}, {"name": "${indexName}"}),
             ErrorCodes.IndexBuildAborted);
-    }`));
-    testParallelShellWithFailpoint(() => fixture.runInParallelShell(true /* asAdmin */,
-                                                                    `({conn}) => {
+    }`,
+        ),
+    );
+    testParallelShellWithFailpoint(() =>
+        fixture.runInParallelShell(
+            true /* asAdmin */,
+            `({conn}) => {
         assert.commandFailedWithCode(
             conn.getDB(jsTestName()).${coll3Name}.createIndex({"a": 1}, {"name": "${indexName}"}),
             ErrorCodes.IndexBuildAborted);
-    }`));
+    }`,
+        ),
+    );
 
     // Test that index builds on non-user (internal collections) won't be aborted on
     // enableWriteBlockMode.
-    testParallelShellWithFailpoint(() => fixture.runInParallelShell(true /* asAdmin */,
-                                                                    `({conn}) => {
+    testParallelShellWithFailpoint(() =>
+        fixture.runInParallelShell(
+            true /* asAdmin */,
+            `({conn}) => {
         assert.commandWorked(
             conn.getDB('config').system.sessions.createIndex(
                 {"a": 1}, {"name": "${indexName}"}));
-    }`));
+    }`,
+        ),
+    );
 
     // Ensure index was not successfully created on user db, but was on internal db.
     fixture.asAdmin(({conn}) => {
-        assert.eq(undefined,
-                  conn.getDB(jsTestName()).coll3Name.getIndexes().find(i => i.name === indexName));
+        assert.eq(
+            undefined,
+            conn
+                .getDB(jsTestName())
+                .coll3Name.getIndexes()
+                .find((i) => i.name === indexName),
+        );
         assert.neq(
             undefined,
-            conn.getDB('config').system.sessions.getIndexes().find(i => i.name === indexName));
+            conn
+                .getDB("config")
+                .system.sessions.getIndexes()
+                .find((i) => i.name === indexName),
+        );
     });
 
     // Test that index builds which hang before commit will block activation of
     // enableWriteBlockMode.
     {
         const fp = fixture.setFailPoint("hangIndexBuildBeforeCommit");
-        const waitIndexBuild = fixture.runInParallelShell(true /* asAdmin */,
-                                                                    `({conn}) => { 
+        const waitIndexBuild = fixture.runInParallelShell(
+            true /* asAdmin */,
+            `({conn}) => { 
             assert.commandWorked(
                 conn.getDB(jsTestName()).${coll3Name}.createIndex({"a": 1}, {"name": "${indexName}"}));
-        }`);
+        }`,
+        );
         fp.wait();
 
-        const waitWriteBlock = fixture.runInParallelShell(true /* asAdmin */,
-                                                          `({conn}) => { 
+        const waitWriteBlock = fixture.runInParallelShell(
+            true /* asAdmin */,
+            `({conn}) => { 
             assert.commandWorked(
                 conn.getDB("admin").runCommand({setUserWriteBlockMode: 1, global: true}));
-        }`);
+        }`,
+        );
         // Wait, and ensure that the setUserWriteBlockMode has not finished yet (it must wait for
         // the index build to finish).
         sleep(3000);
@@ -309,17 +338,18 @@ function runTest(fixture) {
     {
         // Create a temporary collection.
         const collTmpName = "collTmp";
-        fixture.applyOps(
-            [{op: "c", ns: jsTestName() + ".$cmd", o: {create: collTmpName, temp: true}}]);
+        fixture.applyOps([{op: "c", ns: jsTestName() + ".$cmd", o: {create: collTmpName, temp: true}}]);
 
         // Validate that collection exists and it is marked as temporary.
         fixture.asUser(({conn}) => {
             const db = conn.getDB(jsTestName());
-            const collectionInfo = db.getCollectionInfos().find(info => info.name === collTmpName);
+            const collectionInfo = db.getCollectionInfos().find((info) => info.name === collTmpName);
 
             assert(collectionInfo);
-            assert(collectionInfo.options.temp,
-                   'The collection is not marked as a temporary one: ' + tojson(collectionInfo));
+            assert(
+                collectionInfo.options.temp,
+                "The collection is not marked as a temporary one: " + tojson(collectionInfo),
+            );
         });
 
         // Enable user write block mode and force a stepdown.
@@ -330,8 +360,7 @@ function runTest(fixture) {
         // Validate that temporary collections are dropped during startup recovery.
         fixture.asUser(({conn}) => {
             const db = conn.getDB(jsTestName());
-            const collectionExists =
-                db.getCollectionInfos().some(info => info.name === collTmpName);
+            const collectionExists = db.getCollectionInfos().some((info) => info.name === collTmpName);
             assert(!collectionExists);
         });
 
@@ -356,15 +385,14 @@ function testReasons(fixture) {
         return fixture.getStatus().repl.userWriteBlockModeCounters;
     }
     fixture.asAdmin(({conn}) => {
-        assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
+        assert.commandWorked(conn.adminCommand({clearLog: "global"}));
     });
 
     fixture.assertWriteBlockMode(WriteBlockState.DISABLED);
     let expectedCounters = getCounters();
 
     // Ensure that write blocking cannot be enabled with an invalid reason
-    assert.commandFailedWithCode(fixture.setWriteBlockMode(false, {name: "ArglebargleGlopGlyf"}),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(fixture.setWriteBlockMode(false, {name: "ArglebargleGlopGlyf"}), ErrorCodes.BadValue);
     fixture.assertWriteBlockMode(WriteBlockState.DISABLED);
     assert.eq(getCounters(), expectedCounters);
 
@@ -373,19 +401,16 @@ function testReasons(fixture) {
     fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
     fixture.assertWriteBlockReason(WriteBlockReason.DiskUseThresholdExceeded);
     fixture.asAdmin(({conn}) => {
-        checkLog.checkContainsOnceJson(
-            conn, 10296100, {reason: WriteBlockReason.DiskUseThresholdExceeded.name});
+        checkLog.checkContainsOnceJson(conn, 10296100, {reason: WriteBlockReason.DiskUseThresholdExceeded.name});
     });
     expectedCounters.DiskUseThresholdExceeded += 1;
     assert.eq(getCounters().DiskUseThresholdExceeded, expectedCounters.DiskUseThresholdExceeded);
 
     // Ensure that attempting to enable write blocking again with a different reason is an error
     {
-        const res =
-            fixture.setWriteBlockMode(true, WriteBlockReason.ClusterToClusterMigrationInProgress);
+        const res = fixture.setWriteBlockMode(true, WriteBlockReason.ClusterToClusterMigrationInProgress);
         assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
-        assert(res.errmsg.includes("reason: " +
-                                   WriteBlockReason.ClusterToClusterMigrationInProgress.name));
+        assert(res.errmsg.includes("reason: " + WriteBlockReason.ClusterToClusterMigrationInProgress.name));
         assert(res.errmsg.includes("current: " + WriteBlockReason.DiskUseThresholdExceeded.name));
         fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
     }
@@ -396,8 +421,7 @@ function testReasons(fixture) {
         let sec = fixture.rst.getSecondary();
         let admin = sec.getDB("admin");
         assert(admin.auth(bypassUser, password));
-        assert.eq(WriteBlockReason.DiskUseThresholdExceeded.enum,
-                  admin.serverStatus().repl.userWriteBlockReason);
+        assert.eq(WriteBlockReason.DiskUseThresholdExceeded.enum, admin.serverStatus().repl.userWriteBlockReason);
     }
 
     // Ensure that the reason and counters persist across step-down and step-up
@@ -414,11 +438,9 @@ function testReasons(fixture) {
 
     // Ensure that attempting to disable write blocking with an incorrect reason is an error
     {
-        const res =
-            fixture.setWriteBlockMode(false, WriteBlockReason.ClusterToClusterMigrationInProgress);
+        const res = fixture.setWriteBlockMode(false, WriteBlockReason.ClusterToClusterMigrationInProgress);
         assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
-        assert(res.errmsg.includes("reason: " +
-                                   WriteBlockReason.ClusterToClusterMigrationInProgress.name));
+        assert(res.errmsg.includes("reason: " + WriteBlockReason.ClusterToClusterMigrationInProgress.name));
         assert(res.errmsg.includes("current: " + WriteBlockReason.DiskUseThresholdExceeded.name));
         fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
     }
@@ -427,8 +449,7 @@ function testReasons(fixture) {
     fixture.disableWriteBlockMode(WriteBlockReason.DiskUseThresholdExceeded);
     fixture.assertWriteBlockMode(WriteBlockState.DISABLED);
     fixture.asAdmin(({conn}) => {
-        checkLog.checkContainsOnceJson(
-            conn, 10296101, {reason: WriteBlockReason.DiskUseThresholdExceeded.name});
+        checkLog.checkContainsOnceJson(conn, 10296101, {reason: WriteBlockReason.DiskUseThresholdExceeded.name});
     });
 }
 
@@ -436,12 +457,13 @@ function testReasons(fixture) {
     // Validate that setting user write blocking fails on standalones
     const conn = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
     const admin = conn.getDB("admin");
-    assert.commandWorked(admin.runCommand(
-        {createUser: "root", pwd: "root", roles: [{role: "__system", db: "admin"}]}));
+    assert.commandWorked(admin.runCommand({createUser: "root", pwd: "root", roles: [{role: "__system", db: "admin"}]}));
     assert(admin.auth("root", "root"));
 
-    assert.commandFailedWithCode(admin.runCommand({setUserWriteBlockMode: 1, global: true}),
-                                 ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(
+        admin.runCommand({setUserWriteBlockMode: 1, global: true}),
+        ErrorCodes.IllegalOperation,
+    );
     MongoRunner.stopMongod(conn);
 }
 

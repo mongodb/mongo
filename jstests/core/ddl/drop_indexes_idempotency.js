@@ -10,19 +10,23 @@
 
 function assertIndexesExist(coll, indexes) {
     const indexList = coll.getIndexes();
-    indexes.forEach(index => {
-        assert.neq(undefined,
-                   indexList.find((idx) => idx.name === index),
-                   `Index ${index} was expected to exist but it doesn't`);
+    indexes.forEach((index) => {
+        assert.neq(
+            undefined,
+            indexList.find((idx) => idx.name === index),
+            `Index ${index} was expected to exist but it doesn't`,
+        );
     });
 }
 
 function assertIndexesDontExist(coll, indexes) {
     const indexList = coll.getIndexes();
-    indexes.forEach(index => {
-        assert.eq(undefined,
-                  indexList.find((idx) => idx.name === index),
-                  `Index ${index} was expected to be absent, but it exists.`);
+    indexes.forEach((index) => {
+        assert.eq(
+            undefined,
+            indexList.find((idx) => idx.name === index),
+            `Index ${index} was expected to be absent, but it exists.`,
+        );
     });
 }
 
@@ -35,7 +39,7 @@ assert.commandWorked(coll.createIndex({b: 1}));
 
 // Verify that both indexes exist
 let indexList = coll.getIndexes();
-assertIndexesExist(coll, ['a_1', 'b_1']);
+assertIndexesExist(coll, ["a_1", "b_1"]);
 
 // Verify that the {a: 1} index has the expected set of keys.
 assert.eq([{a: 1}, {a: 2}, {a: 3}], coll.find().hint({a: 1}).sort({a: 1}).returnKey().toArray());
@@ -46,10 +50,10 @@ assert.commandWorked(db.runCommand({dropIndexes: coll.getName(), index: ["a_1", 
 
 // Verify that the {a: 1} index has been dropped from listIndexes output.
 indexList = coll.getIndexes();
-assertIndexesDontExist(coll, ['a_1']);
+assertIndexesDontExist(coll, ["a_1"]);
 
 // Verify that the {b: 1} index is still present (wasn't requested to be dropped).
-assertIndexesExist(coll, ['b_1']);
+assertIndexesExist(coll, ["b_1"]);
 
 // Test another scenario: drop multiple existing indexes
 assert.commandWorked(coll.createIndex({c: 1}));
@@ -60,8 +64,7 @@ assert.commandWorked(db.runCommand({dropIndexes: coll.getName(), index: ["b_1", 
 
 // Verify all were dropped
 indexList = coll.getIndexes();
-assertIndexesDontExist(coll, ['b_1', 'c_1', 'd_1']);
+assertIndexesDontExist(coll, ["b_1", "c_1", "d_1"]);
 
 // Test edge case: try to drop only non-existent indexes
-assert.commandWorked(
-    db.runCommand({dropIndexes: coll.getName(), index: ["nonexistent1", "nonexistent2"]}));
+assert.commandWorked(db.runCommand({dropIndexes: coll.getName(), index: ["nonexistent1", "nonexistent2"]}));

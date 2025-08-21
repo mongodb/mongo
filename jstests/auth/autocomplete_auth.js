@@ -15,19 +15,18 @@
 const self = this;
 
 const testName = jsTest.name();
-const conn = MongoRunner.runMongod({auth: ''});
-const admin = conn.getDB('admin');
-admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
-assert(admin.auth('admin', 'pass'));
+const conn = MongoRunner.runMongod({auth: ""});
+const admin = conn.getDB("admin");
+admin.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
+assert(admin.auth("admin", "pass"));
 
 admin.getSiblingDB(testName).createRole({
-    role: 'coachTicket',
-    privileges: [{resource: {db: testName, collection: 'coachClass'}, actions: ['find']}],
-    roles: []
+    role: "coachTicket",
+    privileges: [{resource: {db: testName, collection: "coachClass"}, actions: ["find"]}],
+    roles: [],
 });
 
-admin.getSiblingDB(testName).createUser(
-    {user: 'coachPassenger', pwd: 'password', roles: ['coachTicket']});
+admin.getSiblingDB(testName).createUser({user: "coachPassenger", pwd: "password", roles: ["coachTicket"]});
 
 const testDB = conn.getDB(testName);
 testDB.coachClass.insertOne({});
@@ -35,14 +34,15 @@ testDB.businessClass.insertOne({});
 
 // Must use 'db' to test autocompletion.
 self.db = new Mongo(conn.host).getDB(testName);
-assert(db.auth('coachPassenger', 'password'));
+assert(db.auth("coachPassenger", "password"));
 const authzErrorCode = 13;
 assert.commandFailedWithCode(db.runCommand({listCollections: 1}), authzErrorCode);
-assert.commandWorked(db.runCommand({find: 'coachClass'}));
-assert.commandFailedWithCode(db.runCommand({find: 'businessClass'}), authzErrorCode);
-shellAutocomplete('db.');
-assert(__autocomplete__.includes('db.coachClass'),
-       `Completions should include 'coachClass': ${__autocomplete__}`);
-assert(!__autocomplete__.includes('db.businessClass'),
-       `Completions should NOT include 'businessClass': ${__autocomplete__}`);
+assert.commandWorked(db.runCommand({find: "coachClass"}));
+assert.commandFailedWithCode(db.runCommand({find: "businessClass"}), authzErrorCode);
+shellAutocomplete("db.");
+assert(__autocomplete__.includes("db.coachClass"), `Completions should include 'coachClass': ${__autocomplete__}`);
+assert(
+    !__autocomplete__.includes("db.businessClass"),
+    `Completions should NOT include 'businessClass': ${__autocomplete__}`,
+);
 MongoRunner.stopMongod(conn);

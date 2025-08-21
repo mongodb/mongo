@@ -11,7 +11,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getNewNs(dbName) {
-    if (typeof getNewNs.counter == 'undefined') {
+    if (typeof getNewNs.counter == "undefined") {
         getNewNs.counter = 0;
     }
     getNewNs.counter++;
@@ -28,8 +28,7 @@ const recipientShard = st.shard1;
 const numDocs = 1000;
 const middle = numDocs / 2;
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}));
 
 function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     const [collName, ns] = getNewNs(dbName);
@@ -37,10 +36,8 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: middle}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: donorShard.shardName}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: middle}, to: donorShard.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: donorShard.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: middle}, to: donorShard.shardName}));
 
     // Insert some docs into the collection.
     var bulk = st.s.getDB(dbName).getCollection(collName).initializeUnorderedBulkOp();
@@ -56,23 +53,30 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     // Set the requested failpoint and launch the moveChunk asynchronously.
     let failPoint = configureFailPoint(donorShard, failPointName);
     const awaitResult = startParallelShell(
-        funWithArgs(function(ns, toShardName, middle) {
-            let ret = assert.commandWorked(
-                db.adminCommand({moveChunk: ns, find: {_id: middle}, to: toShardName}));
-            jsTest.log('moveChunk res: ' + tojson(ret));
-        }, ns, recipientShard.shardName, middle), st.s.port);
+        funWithArgs(
+            function (ns, toShardName, middle) {
+                let ret = assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: middle}, to: toShardName}));
+                jsTest.log("moveChunk res: " + tojson(ret));
+            },
+            ns,
+            recipientShard.shardName,
+            middle,
+        ),
+        st.s.port,
+    );
 
     jsTest.log("Waiting for moveChunk to reach " + failPointName + " failpoint");
     failPoint.wait();
 
     let matchingOps;
     assert.soon(() => {
-        matchingOps = donorShard.getDB("admin")
-                          .aggregate([
-                              {$currentOp: {'allUsers': true, 'idleConnections': true}},
-                              {$match: {desc: {$regex: opToKillThreadName}}}
-                          ])
-                          .toArray();
+        matchingOps = donorShard
+            .getDB("admin")
+            .aggregate([
+                {$currentOp: {"allUsers": true, "idleConnections": true}},
+                {$match: {desc: {$regex: opToKillThreadName}}},
+            ])
+            .toArray();
         // Wait for the opid to be present, since it's possible for currentOp to run after the
         // Client has been created but before it has been associated with a new
         // OperationContext.
@@ -88,9 +92,9 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     // Allow the moveChunk to finish:
     commitFailpoint.off();
     jsTest.log("Make sure the recovery is executed");
-    assert.soon(function() {
+    assert.soon(function () {
         try {
-            return (st.s0.getDB(dbName).getCollection(collName).countDocuments({}) == 1000);
+            return st.s0.getDB(dbName).getCollection(collName).countDocuments({}) == 1000;
         } catch (e) {
             if (e.code == ErrorCodes.Interrupted) {
                 // Expected as the request may have joined the filtering metadata refresh that
@@ -102,11 +106,9 @@ function testKillOpAfterFailPoint(failPointName, opToKillThreadName) {
     });
 }
 
-testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible",
-                         "RecoverRefreshThread");
+testKillOpAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible", "RecoverRefreshThread");
 testKillOpAfterFailPoint("hangInPersistMigrateCommitDecisionInterruptible", "RecoverRefreshThread");
-testKillOpAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible",
-                         "RecoverRefreshThread");
+testKillOpAfterFailPoint("hangInDeleteRangeDeletionOnRecipientInterruptible", "RecoverRefreshThread");
 testKillOpAfterFailPoint("hangInReadyRangeDeletionLocallyInterruptible", "RecoverRefreshThread");
 testKillOpAfterFailPoint("hangInAdvanceTxnNumInterruptible", "RecoverRefreshThread");
 

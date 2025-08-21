@@ -17,7 +17,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const testDB = st.s.getDB(jsTestName());
@@ -35,7 +35,7 @@ const expectedStopShardErrors = [
     ErrorCodes.InterruptedAtShutdown,
     ErrorCodes.InterruptedDueToReplStateChange,
     ErrorCodes.NotPrimaryNoSecondaryOk,
-    ErrorCodes.NotPrimaryOrSecondary
+    ErrorCodes.NotPrimaryOrSecondary,
 ];
 
 // First, verify that the 'failGetMoreAfterCursorCheckout' failpoint can effectively exercise the
@@ -43,40 +43,43 @@ const expectedStopShardErrors = [
 function testFailGetMoreAfterCursorCheckoutFailpoint({mongos, errorCode, expectedLabel}) {
     errorCode = ErrorCodes.doMongosRewrite(mongos, errorCode);
     // Activate the failpoint and set the exception that it will throw.
-    assert.commandWorked(testDB.adminCommand({
-        configureFailPoint: "failGetMoreAfterCursorCheckout",
-        mode: "alwaysOn",
-        data: {"errorCode": errorCode}
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            configureFailPoint: "failGetMoreAfterCursorCheckout",
+            mode: "alwaysOn",
+            data: {"errorCode": errorCode},
+        }),
+    );
 
     // Now open a valid $changeStream cursor...
-    const aggCmdRes = assert.commandWorked(
-        coll.runCommand("aggregate", {pipeline: [{$changeStream: {}}], cursor: {}}));
+    const aggCmdRes = assert.commandWorked(coll.runCommand("aggregate", {pipeline: [{$changeStream: {}}], cursor: {}}));
 
     // ... run a getMore using the cursorID from the original command response, and confirm that the
     // expected error was thrown...
     const getMoreRes = assert.commandFailedWithCode(
-        testDB.runCommand({getMore: aggCmdRes.cursor.id, collection: coll.getName()}), errorCode);
+        testDB.runCommand({getMore: aggCmdRes.cursor.id, collection: coll.getName()}),
+        errorCode,
+    );
 
     /// ... and confirm that the label is present or absent depending on the "expectedLabel" value.
-    const errorLabels = (getMoreRes.errorLabels || []);
+    const errorLabels = getMoreRes.errorLabels || [];
     assert.eq("errorLabels" in getMoreRes, expectedLabel, getMoreRes);
     assert.eq(errorLabels.includes("ResumableChangeStreamError"), expectedLabel, getMoreRes);
 
     // Finally, disable the failpoint.
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: "failGetMoreAfterCursorCheckout", mode: "off"}));
 }
 // Test the expected output for both resumable and non-resumable error codes.
-testFailGetMoreAfterCursorCheckoutFailpoint(
-    {mongos: st.s, errorCode: ErrorCodes.ShutdownInProgress, expectedLabel: true});
-testFailGetMoreAfterCursorCheckoutFailpoint(
-    {mongos: st.s, errorCode: ErrorCodes.FailedToParse, expectedLabel: false});
+testFailGetMoreAfterCursorCheckoutFailpoint({
+    mongos: st.s,
+    errorCode: ErrorCodes.ShutdownInProgress,
+    expectedLabel: true,
+});
+testFailGetMoreAfterCursorCheckoutFailpoint({mongos: st.s, errorCode: ErrorCodes.FailedToParse, expectedLabel: false});
 
 // Now test both aggregate and getMore under conditions of an actual cluster outage. Shard the
 // collection on shard0, split at {_id: 0}, and move the upper chunk to the other shard.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0});
 
 // Open a change stream on the collection...
@@ -89,7 +92,7 @@ for (let i = 1; i <= 10; ++i) {
 
 // ... and read all the corresponding events from the stream.
 assert.soon(() => {
-    return (csCursor.hasNext() && csCursor.next().documentKey._id === 10);
+    return csCursor.hasNext() && csCursor.next().documentKey._id === 10;
 });
 
 // Issue a "find" query to retrieve the first few documents, leaving the cursor open.

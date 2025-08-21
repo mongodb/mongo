@@ -21,19 +21,18 @@ function testChangeStreamWithVersionAttributeSet(version = undefined) {
     // Specifying the "version" field does nothing when opening a change stream on a replica set or
     // on a mongod, but it is still permitted to specify it.
     const tests = [
-        {},                      // Whole-cluster change stream
-        {collection: 1},         // Whole-DB change stream
-        {collection: collName},  // Collection change stream
+        {}, // Whole-cluster change stream
+        {collection: 1}, // Whole-DB change stream
+        {collection: collName}, // Collection change stream
     ];
 
     tests.forEach((nss) => {
         db.getSiblingDB(dbName).dropDatabase();
 
-        const isWholeClusterChangeStream = !nss.hasOwnProperty('collection');
+        const isWholeClusterChangeStream = !nss.hasOwnProperty("collection");
 
         const testDB = db.getSiblingDB(dbName);
-        const cst = new ChangeStreamTest(isWholeClusterChangeStream ? testDB.getSiblingDB("admin")
-                                                                    : testDB);
+        const cst = new ChangeStreamTest(isWholeClusterChangeStream ? testDB.getSiblingDB("admin") : testDB);
 
         let cursor;
         try {
@@ -41,12 +40,16 @@ function testChangeStreamWithVersionAttributeSet(version = undefined) {
                 if (isWholeClusterChangeStream) {
                     return cst.startWatchingAllChangesForCluster({}, changeStreamParams);
                 }
-                return cst.startWatchingChanges(
-                    {pipeline: [{$changeStream: changeStreamParams}], collection: nss.collection});
+                return cst.startWatchingChanges({
+                    pipeline: [{$changeStream: changeStreamParams}],
+                    collection: nss.collection,
+                });
             })();
             assert(cursor);
-            assert(validVersions.includes(version),
-                   `expecting change stream to succeed with version ${tojson(version)}`);
+            assert(
+                validVersions.includes(version),
+                `expecting change stream to succeed with version ${tojson(version)}`,
+            );
 
             assert.commandWorked(testDB.getCollection(collName).insert({_id: 1}));
 
@@ -59,8 +62,7 @@ function testChangeStreamWithVersionAttributeSet(version = undefined) {
 
             cst.assertNextChangesEqual({cursor, expectedChanges: [expected]});
         } catch (err) {
-            assert(!validVersions.includes(version),
-                   `expecting change stream to fail with version ${tojson(version)}`);
+            assert(!validVersions.includes(version), `expecting change stream to fail with version ${tojson(version)}`);
         } finally {
             cst.cleanUp();
         }
@@ -71,5 +73,5 @@ validVersions.forEach((version) => {
     testChangeStreamWithVersionAttributeSet(version);
 });
 
-testChangeStreamWithVersionAttributeSet("v3");  // fails
-testChangeStreamWithVersionAttributeSet("v");   // fails
+testChangeStreamWithVersionAttributeSet("v3"); // fails
+testChangeStreamWithVersionAttributeSet("v"); // fails

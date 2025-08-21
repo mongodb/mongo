@@ -6,12 +6,14 @@ import {testNumericServerParameter} from "jstests/noPassthrough/libs/server_para
 // transactionLifetimeLimitSeconds is set to be higher than its default value in test suites.
 delete TestData.transactionLifetimeLimitSeconds;
 
-testNumericServerParameter("transactionLifetimeLimitSeconds",
-                           true /*isStartupParameter*/,
-                           true /*isRuntimeParameter*/,
-                           60 /*defaultValue*/,
-                           30 /*nonDefaultValidValue*/,
-                           true /*hasLowerBound*/,
-                           0 /*lowerOutOfBounds*/,
-                           false /*hasUpperBound*/,
-                           "unused" /*upperOutOfBounds*/);
+testNumericServerParameter(
+    "transactionLifetimeLimitSeconds",
+    true /*isStartupParameter*/,
+    true /*isRuntimeParameter*/,
+    60 /*defaultValue*/,
+    30 /*nonDefaultValidValue*/,
+    true /*hasLowerBound*/,
+    0 /*lowerOutOfBounds*/,
+    false /*hasUpperBound*/,
+    "unused" /*upperOutOfBounds*/,
+);

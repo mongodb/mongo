@@ -19,7 +19,7 @@ function runWithAndWithoutIndex(keyPattern, testFunc) {
 const values = [
     {_id: 125, a: 0, b: 0, c: -(Math.pow(2, 63) + Math.pow(2, 11))},
     {_id: 101, a: 1, b: 0, c: NumberLong("-9223372036854775808")},
-    {_id: 112, a: 1, b: 1, c: -(Math.pow(2, 63))},
+    {_id: 112, a: 1, b: 1, c: -Math.pow(2, 63)},
     {_id: 132, a: 2, b: 0, c: NumberLong("-9223372036854775807")},
     {_id: 106, a: 3, b: 0, c: NumberLong("-9223372036854773761")},
     {_id: 126, a: 4, b: 0, c: NumberLong("-9223372036854773760")},
@@ -47,7 +47,7 @@ const values = [
     {_id: 100, a: 17, b: 1, c: 9007199254740996},
     {_id: 104, a: 18, b: 0, c: NumberLong("9223372036854773759")},
     {_id: 127, a: 19, b: 0, c: NumberLong("9223372036854773760")},
-    {_id: 133, a: 19, b: 1, c: (Math.pow(2, 63) - Math.pow(2, 11))},
+    {_id: 133, a: 19, b: 1, c: Math.pow(2, 63) - Math.pow(2, 11)},
     {_id: 128, a: 20, b: 0, c: NumberLong("9223372036854773761")},
     {_id: 102, a: 21, b: 0, c: NumberLong("9223372036854775807")},
     {_id: 119, a: 22, b: 0, c: Math.pow(2, 63)},
@@ -58,33 +58,42 @@ Random.setRandomSeed(0);
 assert.commandWorked(coll.insert(Array.shuffle(values.concat())));
 
 runWithAndWithoutIndex({a: 1}, () => {
-    const testcase = function(query, lambda) {
+    const testcase = function (query, lambda) {
         const expected = values
-                             .map(x => {
-                                 return {a: x.a};
-                             })
-                             .filter(lambda);
+            .map((x) => {
+                return {a: x.a};
+            })
+            .filter(lambda);
         const result = coll.find(query, {a: 1, _id: 0}).toArray();
-        assert(arrayEq(result, expected),
-               tojson(query) + " failed:\n" + tojson(result) + " != " + tojson(expected));
+        assert(arrayEq(result, expected), tojson(query) + " failed:\n" + tojson(result) + " != " + tojson(expected));
     };
 
     for (const {_id: id, a: a, c: c} of values) {
-        testcase({c: {$lt: c}}, x => (x.a < a));
-        testcase({c: {$lte: c}}, x => (x.a <= a));
-        testcase({c: {$eq: c}}, x => (x.a == a));
-        testcase({c: {$gte: c}}, x => (x.a >= a));
-        testcase({c: {$gt: c}}, x => (x.a > a));
+        testcase({c: {$lt: c}}, (x) => x.a < a);
+        testcase({c: {$lte: c}}, (x) => x.a <= a);
+        testcase({c: {$eq: c}}, (x) => x.a == a);
+        testcase({c: {$gte: c}}, (x) => x.a >= a);
+        testcase({c: {$gt: c}}, (x) => x.a > a);
 
-        testcase({$expr: {$lt: ["$c", c]}}, x => (x.a < a));
-        testcase({$expr: {$lte: ["$c", c]}}, x => (x.a <= a));
-        testcase({$expr: {$eq: ["$c", c]}}, x => (x.a == a));
-        testcase({$expr: {$gte: ["$c", c]}}, x => (x.a >= a));
-        testcase({$expr: {$gt: ["$c", c]}}, x => (x.a > a));
+        testcase({$expr: {$lt: ["$c", c]}}, (x) => x.a < a);
+        testcase({$expr: {$lte: ["$c", c]}}, (x) => x.a <= a);
+        testcase({$expr: {$eq: ["$c", c]}}, (x) => x.a == a);
+        testcase({$expr: {$gte: ["$c", c]}}, (x) => x.a >= a);
+        testcase({$expr: {$gt: ["$c", c]}}, (x) => x.a > a);
 
-        const result = coll.find({}).sort({c: 1, b: 1}).toArray().map(x => x._id);
-        const expected = coll.find({}).sort({a: 1, b: 1}).toArray().map(x => x._id);
-        assert(orderedArrayEq(result, expected),
-               "Comparison of sort results failed:\n" + tojson(result) + " != " + tojson(expected));
+        const result = coll
+            .find({})
+            .sort({c: 1, b: 1})
+            .toArray()
+            .map((x) => x._id);
+        const expected = coll
+            .find({})
+            .sort({a: 1, b: 1})
+            .toArray()
+            .map((x) => x._id);
+        assert(
+            orderedArrayEq(result, expected),
+            "Comparison of sort results failed:\n" + tojson(result) + " != " + tojson(expected),
+        );
     }
 });

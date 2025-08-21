@@ -37,17 +37,18 @@ function arrayIsSubset(smallArray, largeArray) {
 function runIntermediateDataCheckTest(isOrdered) {
     jsTestLog("isOrdered: { " + isOrdered + " }");
     coll.drop();
-    assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 
-    assert.commandWorked(coll.insertMany([
-        {t: time, m: 0, a: 1},                            // Bucket 0
-        {t: new Date(time.getTime() + 100), m: 0, a: 2},  // Bucket 0
-        {t: new Date(time.getTime() + 200), m: 1, a: 1},  // Bucket 1
-        {t: new Date(time.getTime() + 300), m: 1, a: 2},  // Bucket 1
-        {t: new Date(time.getTime() + 400), m: 2, a: 1},  // Bucket 2
-        {t: new Date(time.getTime() + 500), m: 2, a: 2},  // Bucket 2
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            {t: time, m: 0, a: 1}, // Bucket 0
+            {t: new Date(time.getTime() + 100), m: 0, a: 2}, // Bucket 0
+            {t: new Date(time.getTime() + 200), m: 1, a: 1}, // Bucket 1
+            {t: new Date(time.getTime() + 300), m: 1, a: 2}, // Bucket 1
+            {t: new Date(time.getTime() + 400), m: 2, a: 1}, // Bucket 2
+            {t: new Date(time.getTime() + 500), m: 2, a: 2}, // Bucket 2
+        ]),
+    );
 
     // Ensure that we have 3 buckets.
     assert.eq(getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount(), 3);
@@ -57,8 +58,9 @@ function runIntermediateDataCheckTest(isOrdered) {
     // times: 1 to cause it to only fail the first time that we enter the failpoint, i.e, when we
     // are performing the first of the two updates below and are trying to update measurements from
     // Bucket 1.
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'timeseriesDataIntegrityCheckFailureUpdate', mode: {times: 1}}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "timeseriesDataIntegrityCheckFailureUpdate", mode: {times: 1}}),
+    );
 
     // This command performs two updates. The first changes the metaField for the measurements
     // of all buckets to m: "A". If the update succeeded entirely, this would cause all measurements
@@ -81,13 +83,17 @@ function runIntermediateDataCheckTest(isOrdered) {
     // be turned off, updates to Bucket 1, Bucket 2, and Bucket 3 should all succeed, and all the
     // measurements from these 3 buckets should end up in a newly created Bucket 4. Bucket 1, Bucket
     // 2, and Bucket 3 should be deleted because they no longer have any measurements.
-    assert.commandFailedWithCode(testDB.runCommand({
-        "update": coll.getName(),
-        updates:
-            [{q: {}, u: {$set: {m: "A"}}, multi: true}, {q: {}, u: {$set: {m: "B"}}, multi: true}],
-        ordered: isOrdered,
-    }),
-                                 ErrorCodes.TimeseriesBucketCompressionFailed);
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            "update": coll.getName(),
+            updates: [
+                {q: {}, u: {$set: {m: "A"}}, multi: true},
+                {q: {}, u: {$set: {m: "B"}}, multi: true},
+            ],
+            ordered: isOrdered,
+        }),
+        ErrorCodes.TimeseriesBucketCompressionFailed,
+    );
 
     let stats = assert.commandWorked(coll.stats()).timeseries;
     let buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray();
@@ -138,8 +144,9 @@ function runIntermediateDataCheckTest(isOrdered) {
         assert.eq(buckets[0].meta, "B", tojson(buckets));
         assert.eq(buckets[0].control.count, 6, tojson(buckets));
     }
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'timeseriesDataIntegrityCheckFailureUpdate', mode: "off"}));
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "timeseriesDataIntegrityCheckFailureUpdate", mode: "off"}),
+    );
 }
 
 runIntermediateDataCheckTest(true);

@@ -11,11 +11,9 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/agg/agg_with_chunk_migrations.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_with_chunk_migrations.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Set the collection to run concurrent moveChunk operations as the output collection.
     $config.data.collWithMigrations = "agg_merge_when_matched_replace_with_new";
     $config.data.threadRunCount = 0;
@@ -29,8 +27,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 $merge: {
                     into: this.collWithMigrations,
                     whenMatched: "replace",
-                    whenNotMatched: "insert"
-                }
+                    whenNotMatched: "insert",
+                },
             },
         ]);
 
@@ -39,9 +37,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // If running with causal consistency, the writes may not have propagated to the secondaries
         // yet.
         assert.soon(() => {
-            return db[this.collWithMigrations]
-                       .find({_id: this.tid, count: this.threadRunCount})
-                       .itcount() == 1;
+            return db[this.collWithMigrations].find({_id: this.tid, count: this.threadRunCount}).itcount() == 1;
         });
 
         this.threadRunCount += 1;

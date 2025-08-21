@@ -20,8 +20,7 @@ function p() {
     for (var y = 0; y < 10; y++) {
         var c = t.find({y: y}).sort({x: 1});
         var s = "";
-        while (c.hasNext())
-            s += c.next().z + " ";
+        while (c.hasNext()) s += c.next().z + " ";
         print(s);
     }
     print("--------------");
@@ -29,15 +28,13 @@ function p() {
 
 p();
 
-var res = t.update(
-    {loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false /*upsert*/, true /*multi*/);
+var res = t.update({loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false /*upsert*/, true /*multi*/);
 assert.commandWorked(res);
 p();
 
-assert.commandWorked(t.update({}, {'$inc': {'z': 1}}, false /*upsert*/, true /*multi*/));
+assert.commandWorked(t.update({}, {"$inc": {"z": 1}}, false /*upsert*/, true /*multi*/));
 p();
 
-res = t.update(
-    {loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false /*upsert*/, true /*multi*/);
+res = t.update({loc: {$within: {$center: [[5, 5], 2]}}}, {$inc: {z: 1}}, false /*upsert*/, true /*multi*/);
 assert.commandWorked(res);
 p();

@@ -24,7 +24,7 @@ function buildAggCmd(pipeline, batchSize) {
     return {
         aggregate: t.getName(),
         pipeline: pipeline,
-        cursor: (batchSize === undefined ? {} : {batchSize: batchSize}),
+        cursor: batchSize === undefined ? {} : {batchSize: batchSize},
     };
 }
 
@@ -42,8 +42,7 @@ function aggCursor(pipeline, firstBatchSize, followupBatchSize) {
     const cmdOut = db.runCommand(buildAggCmd(pipeline, firstBatchSize));
     assert.commandWorked(cmdOut);
 
-    if (firstBatchSize !== undefined)
-        assert.lte(cmdOut.cursor.firstBatch.length, firstBatchSize);
+    if (firstBatchSize !== undefined) assert.lte(cmdOut.cursor.firstBatch.length, firstBatchSize);
 
     return makeCursor(cmdOut, followupBatchSize);
 }
@@ -53,24 +52,22 @@ function aggCursor(pipeline, firstBatchSize, followupBatchSize) {
 //
 
 let bigArray = [];
-for (let i = 0; i < 1000; i++)
-    bigArray.push(i);
+for (let i = 0; i < 1000; i++) bigArray.push(i);
 
-let bigStr = Array(1001).toString();  // 1000 bytes of ','
+let bigStr = Array(1001).toString(); // 1000 bytes of ','
 
-for (let i = 0; i < 100; i++)
-    t.insert({_id: i, bigArray: bigArray, bigStr: bigStr});
+for (let i = 0; i < 100; i++) t.insert({_id: i, bigArray: bigArray, bigStr: bigStr});
 
 //
 // do testing
 //
 
 // successfully handles results > 16MB (bigArray.length * bytes in bigStr * t.count() == 100MB)
-let cursor = aggCursor([{$unwind: '$bigArray'}]);  // default settings
+let cursor = aggCursor([{$unwind: "$bigArray"}]); // default settings
 assert.eq(cursor.itcount(), bigArray.length * t.count());
-cursor = aggCursor([{$unwind: '$bigArray'}], 0);  // empty first batch
+cursor = aggCursor([{$unwind: "$bigArray"}], 0); // empty first batch
 assert.eq(cursor.itcount(), bigArray.length * t.count());
-cursor = aggCursor([{$unwind: '$bigArray'}], 5, 5);  // many small batches
+cursor = aggCursor([{$unwind: "$bigArray"}], 5, 5); // many small batches
 assert.eq(cursor.itcount(), bigArray.length * t.count());
 
 // empty result set results in cursor.id == 0 unless batchSize is 0;
@@ -87,21 +84,21 @@ res = t.runCommand(buildAggCmd([{$noSuchStage: 1}], 0));
 assert.commandFailed(res);
 
 // data dependent errors can get ok:1 but fail in getMore if they don't fail in first batch
-res = t.runCommand(buildAggCmd([{$project: {cantAddString: {$add: [1, '$bigStr']}}}], 1));
+res = t.runCommand(buildAggCmd([{$project: {cantAddString: {$add: [1, "$bigStr"]}}}], 1));
 assert.commandFailed(res);
 
 // Setting batchSize 0 doesn't guarantee that command will succeed: it may fail during plan
 // selection.
-res = t.runCommand(buildAggCmd([{$project: {cantAddString: {$add: [1, '$bigStr']}}}], 0));
+res = t.runCommand(buildAggCmd([{$project: {cantAddString: {$add: [1, "$bigStr"]}}}], 0));
 if (res.ok) {
-    assert.throws(function() {
+    assert.throws(function () {
         makeCursor(res).itcount();
     });
 }
 
 // error if collection dropped after first batch
-cursor = aggCursor([{$unwind: '$bigArray'}], 0);
+cursor = aggCursor([{$unwind: "$bigArray"}], 0);
 t.drop();
-assert.throws(function() {
+assert.throws(function () {
     cursor.itcount();
 });

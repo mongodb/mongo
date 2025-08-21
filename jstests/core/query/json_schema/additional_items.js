@@ -28,7 +28,7 @@ assertSchemaMatch(coll, schema, {a: []}, true);
 assertSchemaMatch(coll, schema, {a: [1, 2, 3]}, true);
 
 schema = {
-    properties: {a: {additionalItems: {type: "object"}}}
+    properties: {a: {additionalItems: {type: "object"}}},
 };
 assertSchemaMatch(coll, schema, {}, true);
 assertSchemaMatch(coll, schema, {a: "blah"}, true);
@@ -38,7 +38,7 @@ assertSchemaMatch(coll, schema, {a: [1, 2, 3]}, true);
 // Test that "additionalItems" has no effect when "items" is a schema that applies to every
 // element in the array.
 schema = {
-    properties: {a: {items: {}, additionalItems: false}}
+    properties: {a: {items: {}, additionalItems: false}},
 };
 assertSchemaMatch(coll, schema, {}, true);
 assertSchemaMatch(coll, schema, {a: "blah"}, true);
@@ -46,7 +46,7 @@ assertSchemaMatch(coll, schema, {a: []}, true);
 assertSchemaMatch(coll, schema, {a: [1, 2, 3]}, true);
 
 schema = {
-    properties: {a: {items: {}, additionalItems: {type: "object"}}}
+    properties: {a: {items: {}, additionalItems: {type: "object"}}},
 };
 assertSchemaMatch(coll, schema, {}, true);
 assertSchemaMatch(coll, schema, {a: "blah"}, true);
@@ -55,7 +55,7 @@ assertSchemaMatch(coll, schema, {a: [1, 2, 3]}, true);
 
 // Test that {additionalItems: false} correctly bans array indexes not covered by "items".
 schema = {
-    properties: {a: {items: [{type: "number"}, {type: "string"}], additionalItems: false}}
+    properties: {a: {items: [{type: "number"}, {type: "string"}], additionalItems: false}},
 };
 assertSchemaMatch(coll, schema, {a: []}, true);
 assertSchemaMatch(coll, schema, {a: [229]}, true);
@@ -67,14 +67,13 @@ assertSchemaMatch(
     coll,
     {properties: {a: {items: [{type: "number"}, {type: "string"}], additionalItems: true}}},
     {a: [229, "West 43rd", "Street"]},
-    true);
-assertSchemaMatch(
-    coll, {properties: {a: {items: [{not: {}}], additionalItems: true}}}, {a: []}, true);
+    true,
+);
+assertSchemaMatch(coll, {properties: {a: {items: [{not: {}}], additionalItems: true}}}, {a: []}, true);
 
 // Test that the "additionalItems" schema only applies to array indexes not covered by "items".
 schema = {
-    properties:
-        {a: {items: [{type: "number"}, {type: "string"}], additionalItems: {type: "object"}}}
+    properties: {a: {items: [{type: "number"}, {type: "string"}], additionalItems: {type: "object"}}},
 };
 assertSchemaMatch(coll, schema, {a: []}, true);
 assertSchemaMatch(coll, schema, {a: [229]}, true);
@@ -83,7 +82,5 @@ assertSchemaMatch(coll, schema, {a: [229, "West 43rd", "Street"]}, false);
 assertSchemaMatch(coll, schema, {a: [229, "West 43rd", {}]}, true);
 
 // Test that an empty array does not fail against "additionalItems".
-assertSchemaMatch(
-    coll, {properties: {a: {items: [{not: {}}], additionalItems: false}}}, {a: []}, true);
-assertSchemaMatch(
-    coll, {properties: {a: {items: [{not: {}}], additionalItems: {not: {}}}}}, {a: []}, true);
+assertSchemaMatch(coll, {properties: {a: {items: [{not: {}}], additionalItems: false}}}, {a: []}, true);
+assertSchemaMatch(coll, {properties: {a: {items: [{not: {}}], additionalItems: {not: {}}}}}, {a: []}, true);

@@ -13,11 +13,11 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     conflictingIndexSpecs,
     createIndexAndCRUDInTxn,
-    indexSpecs
+    indexSpecs,
 } from "jstests/libs/index_builds/create_index_txn_helpers.js";
 
-let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
-    const dbName = 'test_txns_create_indexes_parallel';
+let doParallelCreateIndexesTest = function (explicitCollectionCreate, multikeyIndex) {
+    const dbName = "test_txns_create_indexes_parallel";
     const collName = "create_new_collection";
     const distinctCollName = collName + "_second";
     const session = db.getMongo().getDB(dbName).getMongo().startSession();
@@ -32,7 +32,7 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     let distinctSessionColl = sessionDB[distinctCollName];
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
-    let withRetryAndCleanup = function(func) {
+    let withRetryAndCleanup = function (func) {
         withRetryOnTransientTxnError(func, () => {
             try {
                 session.abortTransaction();
@@ -52,8 +52,8 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
 
     jsTest.log("Testing duplicate sequential createIndexes, both succeed");
     withRetryAndCleanup(() => {
-        session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
-        secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+        session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
+        secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
 
         createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
         jsTest.log("Committing transaction 1");
@@ -62,8 +62,7 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
         assert.eq(sessionColl.getIndexes().length, 2);
 
         // Ensuring existing index succeeds.
-        assert.commandWorked(
-            secondSessionColl.runCommand({createIndexes: collName, indexes: [indexSpecs]}));
+        assert.commandWorked(secondSessionColl.runCommand({createIndexes: collName, indexes: [indexSpecs]}));
         secondSession.commitTransaction();
         assert.eq(sessionColl.find({}).itcount(), 1);
         assert.eq(sessionColl.getIndexes().length, 2);
@@ -72,8 +71,8 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
 
     jsTest.log("Testing conflicting sequential createIndexes, second fails");
     withRetryAndCleanup(() => {
-        session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
-        secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+        session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
+        secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
 
         createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
         jsTest.log("Committing transaction 2");
@@ -83,9 +82,9 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
 
         assert.commandFailedWithCode(
             sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}),
-            ErrorCodes.IndexKeySpecsConflict);
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+            ErrorCodes.IndexKeySpecsConflict,
+        );
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
         assert.eq(sessionColl.find({}).itcount(), 1);
         assert.eq(sessionColl.getIndexes().length, 2);
@@ -94,14 +93,15 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
     sessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log("Testing conflicting sequential createIndexes, where failing createIndexes " +
-               "performs a successful index creation earlier in the transaction.");
+    jsTest.log(
+        "Testing conflicting sequential createIndexes, where failing createIndexes " +
+            "performs a successful index creation earlier in the transaction.",
+    );
     withRetryAndCleanup(() => {
-        session.startTransaction({writeConcern: {w: "majority"}});        // txn 1
-        secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+        session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
+        secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
 
-        createIndexAndCRUDInTxn(
-            sessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
+        createIndexAndCRUDInTxn(sessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
 
         createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
         jsTest.log("Committing transaction 2");
@@ -114,18 +114,16 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
             // when checking for existing indexes.
             assert.commandFailedWithCode(
                 sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}),
-                ErrorCodes.SnapshotUnavailable);
-            assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                         ErrorCodes.NoSuchTransaction);
+                ErrorCodes.SnapshotUnavailable,
+            );
+            assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
         } else {
             // createIndexes cannot observe the index created in the other transaction so the
             // command will succeed and we will instead throw WCE when trying to commit the
             // transaction.
-            assert.commandWorked(sessionColl.runCommand(
-                {createIndexes: collName, indexes: [conflictingIndexSpecs]}));
+            assert.commandWorked(sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}));
 
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                         ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
         }
 
         assert.eq(sessionColl.find({}).itcount(), 1);
@@ -137,14 +135,13 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
     sessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log(
-        "Testing duplicate createIndexes in parallel, both attempt to commit, second to commit fails");
+    jsTest.log("Testing duplicate createIndexes in parallel, both attempt to commit, second to commit fails");
 
     withRetryAndCleanup(() => {
-        secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
+        secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
         createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
 
-        session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
+        session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
         createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
 
         jsTest.log("Committing transaction 2");
@@ -153,8 +150,7 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
         // WriteConflict occurs here because in all test cases (i.e., explicitCollectionCreate is
         // true versus false), we must create a collection as part of each transaction. The
         // conflicting collection creation causes the WriteConflict.
-        assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                     ErrorCodes.WriteConflict);
+        assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
         assert.eq(sessionColl.find({}).itcount(), 1);
         assert.eq(sessionColl.getIndexes().length, 2);
     });
@@ -165,43 +161,40 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     // transaction won't be release until commit. This will cause the creation outside of a
     // transaction (which will attempt to take the ddl lock as well) to wait indefinitely.
     if (!TestData.implicitlyTrackUnshardedCollectionOnCreation) {
-        jsTest.log(
-            "Testing createIndexes inside txn and createCollection on conflicting collection " +
-            "in parallel.");
+        jsTest.log("Testing createIndexes inside txn and createCollection on conflicting collection " + "in parallel.");
 
         withRetryAndCleanup(() => {
-            session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
+            session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
             createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
             assert.commandWorked(secondSessionDB.createCollection(collName));
             assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
 
             jsTest.log("Committing transaction (SHOULD FAIL)");
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                         ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
             assert.eq(sessionColl.find({}).itcount(), 1);
             assert.eq(sessionColl.getIndexes().length, 1);
         });
     }
     assert.commandWorked(sessionDB.dropDatabase());
 
-    jsTest.log("Testing duplicate createIndexes which implicitly create a database in parallel" +
-               ", both attempt to commit, second to commit fails");
+    jsTest.log(
+        "Testing duplicate createIndexes which implicitly create a database in parallel" +
+            ", both attempt to commit, second to commit fails",
+    );
 
     withRetryOnTransientTxnError(
         () => {
-            secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-            createIndexAndCRUDInTxn(
-                secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
+            secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
+            createIndexAndCRUDInTxn(secondSessionDB, collName, explicitCollectionCreate, multikeyIndex);
 
-            session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
+            session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
             createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
 
             jsTest.log("Committing transaction 2");
             secondSession.commitTransaction();
 
             jsTest.log("Committing transaction 1 (SHOULD FAIL)");
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                         ErrorCodes.WriteConflict);
+            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
             assert.eq(sessionColl.find({}).itcount(), 1);
             assert.eq(sessionColl.getIndexes().length, 2);
         },
@@ -213,7 +206,8 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
                 // ignore
             }
             sessionDB.dropDatabase();
-        });
+        },
+    );
 
     sessionColl.drop({writeConcern: {w: "majority"}});
     secondSessionColl.drop({writeConcern: {w: "majority"}});
@@ -221,12 +215,11 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
 
     jsTest.log("Testing distinct createIndexes in parallel, both successfully commit.");
     withRetryAndCleanup(() => {
-        session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
+        session.startTransaction({writeConcern: {w: "majority"}}); // txn 1
         createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
 
-        secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2
-        createIndexAndCRUDInTxn(
-            secondSessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
+        secondSession.startTransaction({writeConcern: {w: "majority"}}); // txn 2
+        createIndexAndCRUDInTxn(secondSessionDB, distinctCollName, explicitCollectionCreate, multikeyIndex);
 
         session.commitTransaction();
         secondSession.commitTransaction();

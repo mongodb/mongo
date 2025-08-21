@@ -24,22 +24,26 @@ function runTestRenameCollectionOnEvent(st, eventFunction, expectedErrorCode) {
     assert.commandWorked(sourceCol.insertMany([{a: 1}, {a: 2}, {a: 3}]));
     assert.commandWorked(sourceCol.createIndexes([{a: 1}, {b: 1}]));
 
-    assert.commandWorked(
-        testDb.adminCommand({configureFailPoint: failpointName, mode: "alwaysOn"}));
+    assert.commandWorked(testDb.adminCommand({configureFailPoint: failpointName, mode: "alwaysOn"}));
 
-    const renameDone = startParallelShell(funWithArgs(function(expectedErrorCode) {
-                                              const targetDB = db.getSiblingDB("sourceDb");
+    const renameDone = startParallelShell(
+        funWithArgs(function (expectedErrorCode) {
+            const targetDB = db.getSiblingDB("sourceDb");
 
-                                              const destDb = db.getSiblingDB("destDb");
-                                              let destCol = destDb.renameDifferentDb;
-                                              destCol.drop();
+            const destDb = db.getSiblingDB("destDb");
+            let destCol = destDb.renameDifferentDb;
+            destCol.drop();
 
-                                              assert.commandFailedWithCode(targetDB.adminCommand({
-                                                  renameCollection: "sourceDb.renameDifferentDb",
-                                                  to: "destDb.renameDifferentDb"
-                                              }),
-                                                                           expectedErrorCode);
-                                          }, expectedErrorCode), portNum);
+            assert.commandFailedWithCode(
+                targetDB.adminCommand({
+                    renameCollection: "sourceDb.renameDifferentDb",
+                    to: "destDb.renameDifferentDb",
+                }),
+                expectedErrorCode,
+            );
+        }, expectedErrorCode),
+        portNum,
+    );
 
     waitForCurOpByFailPointNoNS(testDb, failpointName, {}, {localOps: true});
 
@@ -52,14 +56,22 @@ function runTestRenameCollectionOnEvent(st, eventFunction, expectedErrorCode) {
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 
 // Tests that the rename command errors if the source database is dropped during execution.
-runTestRenameCollectionOnEvent(st, (testDb) => {
-    assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
-}, ErrorCodes.NamespaceNotFound);
+runTestRenameCollectionOnEvent(
+    st,
+    (testDb) => {
+        assert.commandWorked(testDb.runCommand({dropDatabase: 1}));
+    },
+    ErrorCodes.NamespaceNotFound,
+);
 
 // Tests that the rename command errors if the source collection is dropped during execution.
-runTestRenameCollectionOnEvent(st, (testDb) => {
-    testDb.renameDifferentDb.drop();
-}, ErrorCodes.NamespaceNotFound);
+runTestRenameCollectionOnEvent(
+    st,
+    (testDb) => {
+        testDb.renameDifferentDb.drop();
+    },
+    ErrorCodes.NamespaceNotFound,
+);
 
 // Tests that the rename command errors if the destination collection is created during execution.
 const createDestinationCollection = (testDb) => {
@@ -67,8 +79,7 @@ const createDestinationCollection = (testDb) => {
     let destCol = destDb.renameDifferentDb;
     assert.commandWorked(destCol.insertMany([{a: 1}, {a: 2}, {a: 3}]));
 };
-runTestRenameCollectionOnEvent(
-    st, createDestinationCollection, [ErrorCodes.NamespaceExists, ErrorCodes.CommandFailed]);
+runTestRenameCollectionOnEvent(st, createDestinationCollection, [ErrorCodes.NamespaceExists, ErrorCodes.CommandFailed]);
 
 // Tests that the rename command errors if the destination database is dropped right after creation
 // during execution.

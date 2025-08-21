@@ -44,7 +44,7 @@ s0.getDB(dbName).MyColl.drop();
 // shard1: primary=UNKNOWN, secondary=UNKNOWN
 
 // router1 will target shard1, then shard0.
-s1.getDB(dbName).MyColl.find({x: 0}).readPref('secondary').toArray();
+s1.getDB(dbName).MyColl.find({x: 0}).readPref("secondary").toArray();
 
 // router0: Empty
 // router1: Empty
@@ -69,7 +69,7 @@ assert.commandWorked(s0.adminCommand({movePrimary: dbName, to: st.shard1.shardNa
 
 // If this were to equal 0 it would mean that s1 sent an UNSHARDED version to a stale secondary on
 // the new dbPrimary shard1. Being 1 means we're doing the correct thing here.
-assert.eq(s1.getDB(dbName).MyColl.find({}).readPref('secondary').itcount(), 1);
+assert.eq(s1.getDB(dbName).MyColl.find({}).readPref("secondary").itcount(), 1);
 assert.eq(s0.getDB(dbName).MyColl.find({}).itcount(), 1);
 
 st.stop();

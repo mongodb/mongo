@@ -4,7 +4,7 @@
 // Test that the $bucketAuto stage defines and sorts buckets according to the collation.
 var results;
 const numericOrdering = {
-    collation: {locale: "en_US", numericOrdering: true}
+    collation: {locale: "en_US", numericOrdering: true},
 };
 
 var coll = db.collation_bucket;
@@ -45,9 +45,7 @@ assert.eq({_id: {min: "100", max: "500"}, count: 3}, results[2]);
 // Test that the collection default can be overridden with the simple collation. In this case,
 // the numbers will be sorted in lexicographical order, so the 3 buckets will be:
 // ["1", "10","100"], ["2", "20", "200"], and ["5", "50", "500"]
-results =
-    coll.aggregate([{$bucketAuto: {groupBy: "$num", buckets: 3}}], {collation: {locale: "simple"}})
-        .toArray();
+results = coll.aggregate([{$bucketAuto: {groupBy: "$num", buckets: 3}}], {collation: {locale: "simple"}}).toArray();
 assert.eq(3, results.length);
 assert.eq({_id: {min: "1", max: "2"}, count: 3}, results[0]);
 assert.eq({_id: {min: "2", max: "5"}, count: 3}, results[1]);

@@ -6,4 +6,4 @@ t.drop();
 let string = "string with a NUL (\0) byte";
 t.insert({str: string});
 assert.eq(t.findOne().str, string);
-assert.eq(t.findOne().str.length, string.length);  // just to be sure
+assert.eq(t.findOne().str.length, string.length); // just to be sure

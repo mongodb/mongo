@@ -6,7 +6,7 @@ const testDB = db.getSiblingDB("jsTestName");
 assert.commandWorked(testDB.dropDatabase());
 
 const coll = testDB.coll;
-const largeString = 'x'.repeat(10 * 1024 * 1024);
+const largeString = "x".repeat(10 * 1024 * 1024);
 assert.commandWorked(coll.insert({a: 1, b: largeString}));
 
 // Use '$addFields' to create extra-large documents in the middle of the pipeline followed by
@@ -15,7 +15,7 @@ const pipeline = [
     {$_internalInhibitOptimization: {}},
     {$addFields: {c: {$concat: ["$b", "-"]}}},
     {$match: {c: {$exists: true}}},
-    {$project: {a: 1}}
+    {$project: {a: 1}},
 ];
 
 assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());

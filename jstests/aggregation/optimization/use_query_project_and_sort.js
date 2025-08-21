@@ -21,18 +21,34 @@ assert.commandWorked(bulk.execute());
 function assertQueryCoversProjectionAndSort(pipeline) {
     const explainOutput = coll.explain().aggregate(pipeline);
     assert(isQueryPlan(explainOutput), explainOutput);
-    assert(!planHasStage(db, explainOutput, "FETCH"),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " *not* to include a FETCH stage in the explain output: " + tojson(explainOutput));
-    assert(!planHasStage(db, explainOutput, "SORT"),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " *not* to include a SORT stage in the explain output: " + tojson(explainOutput));
-    assert(planHasStage(db, explainOutput, "IXSCAN"),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " to include an index scan in the explain output: " + tojson(explainOutput));
-    assert(!hasRejectedPlans(explainOutput),
-           "Expected pipeline " + tojsononeline(pipeline) +
-               " not to have any rejected plans in the explain output: " + tojson(explainOutput));
+    assert(
+        !planHasStage(db, explainOutput, "FETCH"),
+        "Expected pipeline " +
+            tojsononeline(pipeline) +
+            " *not* to include a FETCH stage in the explain output: " +
+            tojson(explainOutput),
+    );
+    assert(
+        !planHasStage(db, explainOutput, "SORT"),
+        "Expected pipeline " +
+            tojsononeline(pipeline) +
+            " *not* to include a SORT stage in the explain output: " +
+            tojson(explainOutput),
+    );
+    assert(
+        planHasStage(db, explainOutput, "IXSCAN"),
+        "Expected pipeline " +
+            tojsononeline(pipeline) +
+            " to include an index scan in the explain output: " +
+            tojson(explainOutput),
+    );
+    assert(
+        !hasRejectedPlans(explainOutput),
+        "Expected pipeline " +
+            tojsononeline(pipeline) +
+            " not to have any rejected plans in the explain output: " +
+            tojson(explainOutput),
+    );
     return explainOutput;
 }
 
@@ -40,19 +56,27 @@ assert.commandWorked(coll.createIndex({x: 1, a: -1, _id: 1}));
 
 // Test that a pipeline requiring a subset of the fields in a compound index can use that index
 // to cover the query.
-assertQueryCoversProjectionAndSort(
-    [{$match: {x: "string"}}, {$sort: {x: 1}}, {$project: {_id: 0, x: 1}}]);
-assertQueryCoversProjectionAndSort(
-    [{$match: {x: "string"}}, {$sort: {x: 1}}, {$project: {_id: 1, x: 1}}]);
-assertQueryCoversProjectionAndSort(
-    [{$match: {x: "string"}}, {$sort: {x: -1, a: 1}}, {$project: {_id: 1, x: 1}}]);
-assertQueryCoversProjectionAndSort(
-    [{$match: {x: "string"}}, {$sort: {x: 1, a: -1, _id: 1}}, {$project: {_id: 1}}]);
-assertQueryCoversProjectionAndSort(
-    [{$match: {x: "string"}}, {$sort: {x: 1, a: -1, _id: 1}}, {$project: {_id: 1, x: 1}}]);
-assertQueryCoversProjectionAndSort(
-    [{$match: {x: "string"}}, {$sort: {x: 1, a: -1, _id: 1}}, {$project: {_id: 1, a: 1}}]);
-assertQueryCoversProjectionAndSort(
-    [{$match: {x: "string"}}, {$sort: {x: 1, a: -1, _id: 1}}, {$project: {_id: 0, a: 1, x: 1}}]);
-assertQueryCoversProjectionAndSort(
-    [{$match: {x: "string"}}, {$sort: {x: 1, a: -1, _id: 1}}, {$project: {_id: 1, x: 1, a: 1}}]);
+assertQueryCoversProjectionAndSort([{$match: {x: "string"}}, {$sort: {x: 1}}, {$project: {_id: 0, x: 1}}]);
+assertQueryCoversProjectionAndSort([{$match: {x: "string"}}, {$sort: {x: 1}}, {$project: {_id: 1, x: 1}}]);
+assertQueryCoversProjectionAndSort([{$match: {x: "string"}}, {$sort: {x: -1, a: 1}}, {$project: {_id: 1, x: 1}}]);
+assertQueryCoversProjectionAndSort([{$match: {x: "string"}}, {$sort: {x: 1, a: -1, _id: 1}}, {$project: {_id: 1}}]);
+assertQueryCoversProjectionAndSort([
+    {$match: {x: "string"}},
+    {$sort: {x: 1, a: -1, _id: 1}},
+    {$project: {_id: 1, x: 1}},
+]);
+assertQueryCoversProjectionAndSort([
+    {$match: {x: "string"}},
+    {$sort: {x: 1, a: -1, _id: 1}},
+    {$project: {_id: 1, a: 1}},
+]);
+assertQueryCoversProjectionAndSort([
+    {$match: {x: "string"}},
+    {$sort: {x: 1, a: -1, _id: 1}},
+    {$project: {_id: 0, a: 1, x: 1}},
+]);
+assertQueryCoversProjectionAndSort([
+    {$match: {x: "string"}},
+    {$sort: {x: 1, a: -1, _id: 1}},
+    {$project: {_id: 1, x: 1, a: 1}},
+]);

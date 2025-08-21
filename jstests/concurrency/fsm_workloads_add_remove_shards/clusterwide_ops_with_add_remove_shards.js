@@ -8,7 +8,7 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-export const $config = (function() {
+export const $config = (function () {
     // The 'setup' function is run once by the parent thread after the cluster has been initialized,
     // before the worker threads have been spawned. The 'this' argument is bound as '$config.data'.
     function setup(db, collName, cluster) {
@@ -34,21 +34,21 @@ export const $config = (function() {
     }
 
     var states = {
-        runChangeStream: function(db, collName) {
+        runChangeStream: function (db, collName) {
             const res = db.adminCommand({
                 aggregate: 1,
                 pipeline: [{$changeStream: {allChangesForCluster: true}}],
-                cursor: {}
+                cursor: {},
             });
             closeClusterWideCursor(db, res);
         },
 
-        runCurrentOp: function(db, collName) {
+        runCurrentOp: function (db, collName) {
             const res = db.adminCommand({aggregate: 1, pipeline: [{$currentOp: {}}], cursor: {}});
             closeClusterWideCursor(db, res);
         },
 
-        removeShard: function(db, collName) {
+        removeShard: function (db, collName) {
             // Make sure that only a single removeShard operation is running at any time.
             const testLocksColl = db.getSiblingDB("config").testLocks;
             if (!testLocksColl.insert({_id: "removeShard"}).nInserted) {
@@ -72,19 +72,18 @@ export const $config = (function() {
             db.adminCommand({addShard: shardEntry.host, name: shardEntry._id});
         },
 
-        init: function(db, collName) {
+        init: function (db, collName) {
             // Do nothing. This is only used to randomize the first action taken by each worker.
-        }
+        },
     };
 
-    const transitionProbabilities =
-        {runChangeStream: 0.25, runCurrentOp: 0.25, removeShard: 0.25, addShard: 0.25};
+    const transitionProbabilities = {runChangeStream: 0.25, runCurrentOp: 0.25, removeShard: 0.25, addShard: 0.25};
     var transitions = {
         init: transitionProbabilities,
         runChangeStream: transitionProbabilities,
         runCurrentOp: transitionProbabilities,
         removeShard: transitionProbabilities,
-        addShard: transitionProbabilities
+        addShard: transitionProbabilities,
     };
 
     // The 'teardown' function is run once by the parent thread before the cluster is destroyed, but
@@ -94,8 +93,10 @@ export const $config = (function() {
         db.getSiblingDB("config").shards.update({}, {$unset: {draining: 1}}, {multi: true});
         // Ensure that all shards are present in the cluster before shutting down the ShardingTest.
         for (let shardEntry of this.shardList) {
-            assert.soon(() => db.adminCommand({addShard: shardEntry.host, name: shardEntry._id}).ok,
-                        `failed to add shard ${shardEntry._id} back into cluster at end of test`);
+            assert.soon(
+                () => db.adminCommand({addShard: shardEntry.host, name: shardEntry._id}).ok,
+                `failed to add shard ${shardEntry._id} back into cluster at end of test`,
+            );
         }
     }
 
@@ -106,6 +107,6 @@ export const $config = (function() {
         states: states,
         transitions: transitions,
         setup: setup,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

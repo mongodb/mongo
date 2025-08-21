@@ -10,11 +10,11 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const kConfigSessionsNs = "config.system.sessions";
 
 const refreshCmd = {
-    refreshLogicalSessionCacheNow: 1
+    refreshLogicalSessionCacheNow: 1,
 };
 
 const startSessionCmd = {
-    startSession: 1
+    startSession: 1,
 };
 
 // Refresh logical session cache and check that the number of sessions are as expected.

@@ -52,8 +52,7 @@ assert.commandWorked(primaryColl.update({_id: 104}, {a: emptyTs}, {upsert: true}
 
 // Do a replacement-style findAndModify to add a new document with _id=105. This should result in
 // field "a" being set to the current timestamp.
-findAndModifyResult =
-    primaryColl.findAndModify({query: {_id: 105}, update: {a: emptyTs}, upsert: true});
+findAndModifyResult = primaryColl.findAndModify({query: {_id: 105}, update: {a: emptyTs}, upsert: true});
 assert.eq(findAndModifyResult, null);
 
 // For the rest of the commands below, the empty timestamp values stored in field "a" should be
@@ -70,18 +69,18 @@ assert.eq(findAndModifyResult, {_id: 107, a: 4});
 assert.commandWorked(primaryColl.update({_id: 108}, [{$addFields: {a: emptyTs}}]));
 
 // Do a pipeline-style findAndModify to update _id=109.
-findAndModifyResult =
-    primaryColl.findAndModify({query: {_id: 109}, update: [{$addFields: {a: emptyTs}}]});
+findAndModifyResult = primaryColl.findAndModify({query: {_id: 109}, update: [{$addFields: {a: emptyTs}}]});
 assert.eq(findAndModifyResult, {_id: 109, a: 6});
 
 // Do a pipeline-style update with $internalApplyOplogUpdate to update _id=110.
-assert.commandWorked(primaryColl.update(
-    {_id: 110}, [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}]));
+assert.commandWorked(
+    primaryColl.update({_id: 110}, [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}]),
+);
 
 // Do a pipeline-style findAndModify with $internalApplyOplogUpdate to update _id=111.
 findAndModifyResult = primaryColl.findAndModify({
     query: {_id: 111},
-    update: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}]
+    update: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
 });
 assert.eq(findAndModifyResult, {_id: 111, a: 8});
 
@@ -89,29 +88,32 @@ assert.eq(findAndModifyResult, {_id: 111, a: 8});
 assert.commandWorked(primaryColl.update({_id: 112}, {$set: {a: emptyTs}}, {upsert: true}));
 
 // Do an update-operator-style findAndModify to add a new document with _id=113.
-findAndModifyResult =
-    primaryColl.findAndModify({query: {_id: 113}, update: {$set: {a: emptyTs}}, upsert: true});
+findAndModifyResult = primaryColl.findAndModify({query: {_id: 113}, update: {$set: {a: emptyTs}}, upsert: true});
 assert.eq(findAndModifyResult, null);
 
 // Do a pipeline-style update to add a new document with _id=114.
 assert.commandWorked(primaryColl.update({_id: 114}, [{$addFields: {a: emptyTs}}], {upsert: true}));
 
 // Do a pipeline-style findAndModify to add a new document with _id=115.
-findAndModifyResult = primaryColl.findAndModify(
-    {query: {_id: 115}, update: [{$addFields: {a: emptyTs}}], upsert: true});
+findAndModifyResult = primaryColl.findAndModify({
+    query: {_id: 115},
+    update: [{$addFields: {a: emptyTs}}],
+    upsert: true,
+});
 assert.eq(findAndModifyResult, null);
 
 // Do a pipeline-style update with $internalApplyOplogUpdate to add a new document _id=116.
-assert.commandWorked(primaryColl.update(
-    {_id: 116},
-    [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
-    {upsert: true}));
+assert.commandWorked(
+    primaryColl.update({_id: 116}, [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}], {
+        upsert: true,
+    }),
+);
 
 // Do a pipeline-style findAndModify with $internalApplyOplogUpdate to add a new document _id=117.
 findAndModifyResult = primaryColl.findAndModify({
     query: {_id: 117},
     update: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
-    upsert: true
+    upsert: true,
 });
 assert.eq(findAndModifyResult, null);
 

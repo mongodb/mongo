@@ -13,17 +13,19 @@ assert.commandWorked(testDb.dropDatabase());
 
 const coll = testDb.coll;
 
-assert.commandWorked(coll.insert([
-    {a: 1},
-    {a: 1, b: 1},
-    {a: null, b: 2},
-    {b: 2},
-    {b: 4},
-    {a: {b: 4}},
-    {a: [], b: 2},
-    {a: [[], 3]},
-    {a: {}},
-]));
+assert.commandWorked(
+    coll.insert([
+        {a: 1},
+        {a: 1, b: 1},
+        {a: null, b: 2},
+        {b: 2},
+        {b: 4},
+        {a: {b: 4}},
+        {a: [], b: 2},
+        {a: [[], 3]},
+        {a: {}},
+    ]),
+);
 
 function assertCountScan(pipeline) {
     const explain = coll.explain().aggregate(pipeline);
@@ -69,5 +71,5 @@ runTest({
     query: {a: null, b: 2},
     expectedCount: 2,
     updatedQuery: {a: null, b: 4},
-    updatedCount: 1
+    updatedCount: 1,
 });

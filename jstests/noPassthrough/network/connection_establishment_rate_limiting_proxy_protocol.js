@@ -38,9 +38,9 @@ let rs = new ReplSetTest({
             ingressConnectionEstablishmentBurstCapacitySecs: 1,
             ingressConnectionEstablishmentMaxQueueDepth: 0,
             ingressConnectionEstablishmentRateLimiterBypass: {ranges: [exemptIP]},
-            featureFlagRateLimitIngressConnectionEstablishment: true
-        }
-    }
+            featureFlagRateLimitIngressConnectionEstablishment: true,
+        },
+    },
 });
 rs.startSet();
 rs.initiate();
@@ -57,11 +57,10 @@ rs.initiate();
     // Make sure multiple connections can get through past the rate limit.
     for (let i = 0; i < numConnections; i++) {
         const conn = new Mongo(`mongodb://${exemptIP}:${ingressPort}`);
-        assert.neq(null, conn, 'Client was unable to connect');
+        assert.neq(null, conn, "Client was unable to connect");
     }
 
-    assert.soon(() => getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["exempted"] >=
-                    numConnections);
+    assert.soon(() => getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["exempted"] >= numConnections);
 
     proxy_server.stop();
 }
@@ -99,8 +98,7 @@ rs.getPrimary().adminCommand({
         return false;
     });
 
-    assert.soon(() =>
-                    1 == getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["rejected"]);
+    assert.soon(() => 1 == getConnectionStats(rs.getPrimary())["establishmentRateLimit"]["rejected"]);
 
     proxy_server.stop();
 }

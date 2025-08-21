@@ -10,9 +10,7 @@ import {
     mongotCommandForQuery,
     mongotCommandForVectorSearchQuery,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const stWithMock = new ShardingTestWithMongotMock({shards: {rs0: {nodes: 1}}, mongos: 1});
 stWithMock.start();
@@ -56,7 +54,7 @@ const d0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
 
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 const vectorSearchQuery = {
@@ -77,20 +75,27 @@ function searchQueryExpectedByMock(searchColl, protocolVersion = null) {
         collName: searchColl.getName(),
         db: testDB.getName(),
         collectionUUID: getUUIDFromListCollections(testDB, searchColl.getName()),
-        protocolVersion: protocolVersion
+        protocolVersion: protocolVersion,
     });
 }
 
 function vectorSearchQueryExpectedByMock(coll) {
     const db = testDB.getName();
     const collUUID = getUUIDFromListCollections(testDB, coll.getName());
-    return mongotCommandForVectorSearchQuery(
-        {...vectorSearchQuery, collName: coll.getName(), dbName, collectionUUID: collUUID});
+    return mongotCommandForVectorSearchQuery({
+        ...vectorSearchQuery,
+        collName: coll.getName(),
+        dbName,
+        collectionUUID: collUUID,
+    });
 }
 
 // What mongot should give back:
-const mockedSearchResultIds =
-    [{_id: 4, $searchScore: 0.45}, {_id: 5, $searchScore: 0.38}, {_id: 7, $searchScore: 0.33}];
+const mockedSearchResultIds = [
+    {_id: 4, $searchScore: 0.45},
+    {_id: 5, $searchScore: 0.38},
+    {_id: 7, $searchScore: 0.33},
+];
 // What we expect after idLookup:
 const mockedSearchResults = [
     {"_id": 4, "title": "cakes and oranges"},
@@ -99,17 +104,21 @@ const mockedSearchResults = [
 ];
 // Small note: this is a function and not a constant because the UUID is not known until runtime, so
 // we need this to happen after the collection is set up.
-const searchMock = () => [{
-    expectedCommand: searchQueryExpectedByMock(searchColl),
-    response: {
-        ok: 1,
-        cursor: {firstBatch: mockedSearchResultIds, id: NumberLong(0), ns: searchColl.getFullName()}
-    }
-}];
+const searchMock = () => [
+    {
+        expectedCommand: searchQueryExpectedByMock(searchColl),
+        response: {
+            ok: 1,
+            cursor: {firstBatch: mockedSearchResultIds, id: NumberLong(0), ns: searchColl.getFullName()},
+        },
+    },
+];
 
 // What mongot should give back:
-const mockedVectorSearchResultIds =
-    [{_id: 100, $vectorSearchScore: 0.45}, {_id: 101, $vectorSearchScore: 0.41}];
+const mockedVectorSearchResultIds = [
+    {_id: 100, $vectorSearchScore: 0.45},
+    {_id: 101, $vectorSearchScore: 0.41},
+];
 // What we expect after idLookup:
 const mockedVectorSearchResults = [
     {"_id": 100, "title": "cakes", vector: [1, 2], "weird": false},
@@ -117,32 +126,36 @@ const mockedVectorSearchResults = [
 ];
 // Small note: this is a function and not a constant because the UUID is not known until runtime, so
 // we need this to happen after the collection is set up.
-const vectorSearchMock = () => [{
-    expectedCommand: vectorSearchQueryExpectedByMock(vectorColl),
-    response: {
-        ok: 1,
-        cursor: {
-            firstBatch: mockedVectorSearchResultIds,
-            ns: vectorColl.getFullName(),
-            id: NumberLong(0),
-        }
+const vectorSearchMock = () => [
+    {
+        expectedCommand: vectorSearchQueryExpectedByMock(vectorColl),
+        response: {
+            ok: 1,
+            cursor: {
+                firstBatch: mockedVectorSearchResultIds,
+                ns: vectorColl.getFullName(),
+                id: NumberLong(0),
+            },
+        },
     },
-}];
+];
 
-const planShardedSearchMock = [{
-    expectedCommand: {
-        planShardedSearch: searchColl.getName(),
-        query: searchQuery,
-        $db: dbName,
-        searchFeatures: {shardedSort: 1}
+const planShardedSearchMock = [
+    {
+        expectedCommand: {
+            planShardedSearch: searchColl.getName(),
+            query: searchQuery,
+            $db: dbName,
+            searchFeatures: {shardedSort: 1},
+        },
+        response: {
+            ok: 1,
+            protocolVersion: protocolVersion,
+            // Sum counts in the shard metadata.
+            metaPipeline: [{$group: {_id: null, count: {$sum: "$count"}}}, {$project: {_id: 0, count: 1}}],
+        },
     },
-    response: {
-        ok: 1,
-        protocolVersion: protocolVersion,
-        metaPipeline:  // Sum counts in the shard metadata.
-            [{$group: {_id: null, count: {$sum: "$count"}}}, {$project: {_id: 0, count: 1}}]
-    },
-}];
+];
 
 let cursorId = 1000;
 function setupMockRequest({mongotMockConn, mockCmdAndResponse}) {
@@ -155,7 +168,7 @@ function setupMockRequest({mongotMockConn, mockCmdAndResponse}) {
 //---------------------------------------------
 
 const unionWithSearch = {
-    $unionWith: {coll: searchColl.getName(), pipeline: [{$search: searchQuery}]}
+    $unionWith: {coll: searchColl.getName(), pipeline: [{$search: searchQuery}]},
 };
 
 function testUnionWithSearch() {
@@ -167,7 +180,7 @@ function testUnionWithSearch() {
 }
 
 const unionWithVector = {
-    $unionWith: {coll: vectorColl.getName(), pipeline: [{$vectorSearch: vectorSearchQuery}]}
+    $unionWith: {coll: vectorColl.getName(), pipeline: [{$vectorSearch: vectorSearchQuery}]},
 };
 function testUnionWithVector() {
     const pipeline = [unionWithVector];
@@ -178,10 +191,7 @@ function testUnionWithVector() {
 }
 
 function testVectorUnionWithSearch() {
-    const pipeline = [
-        {$vectorSearch: vectorSearchQuery},
-        unionWithSearch,
-    ];
+    const pipeline = [{$vectorSearch: vectorSearchQuery}, unionWithSearch];
     setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: vectorSearchMock()});
     setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: searchMock()});
     const expectedResult = mockedVectorSearchResults.concat(mockedSearchResults);
@@ -190,10 +200,7 @@ function testVectorUnionWithSearch() {
 }
 
 function testSearchUnionWithVector() {
-    const pipeline = [
-        {$search: searchQuery},
-        unionWithVector,
-    ];
+    const pipeline = [{$search: searchQuery}, unionWithVector];
     setupMockRequest({mongotMockConn: sMongot, mockCmdAndResponse: planShardedSearchMock});
     setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: searchMock()});
     setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: vectorSearchMock()});
@@ -203,15 +210,14 @@ function testSearchUnionWithVector() {
 }
 
 const lookupSearch = {
-    $lookup: {from: searchColl.getName(), pipeline: [{$search: searchQuery}], as: "lookup_results"}
+    $lookup: {from: searchColl.getName(), pipeline: [{$search: searchQuery}], as: "lookup_results"},
 };
 function testLookupSearch() {
     const pipeline = [lookupSearch];
     // You might expect to need 'vectorCollDocs.length' mocked responses here, but
     // because the pipeline is uncorrelated, it can be cached and thus executed only once.
     setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: searchMock()});
-    const expectedResults =
-        vectorCollDocs.map(res => Object.merge(res, {lookup_results: mockedSearchResults}));
+    const expectedResults = vectorCollDocs.map((res) => Object.merge(res, {lookup_results: mockedSearchResults}));
     const actualResults = vectorColl.aggregate(pipeline).toArray();
     assert.sameMembers(actualResults, expectedResults);
 }
@@ -221,8 +227,9 @@ function testVectorLookupSearch() {
     // You might expect to need 'mockedVectorSearchResults.length' mocked responses here, but
     // because the pipeline is uncorrelated, it can be cached and thus executed only once.
     setupMockRequest({mongotMockConn: d0Mongot, mockCmdAndResponse: searchMock()});
-    const expectedResults = mockedVectorSearchResults.map(
-        res => Object.merge(res, {lookup_results: mockedSearchResults}));
+    const expectedResults = mockedVectorSearchResults.map((res) =>
+        Object.merge(res, {lookup_results: mockedSearchResults}),
+    );
     const actualResults = vectorColl.aggregate(pipeline).toArray();
     assert.sameMembers(actualResults, expectedResults);
 }

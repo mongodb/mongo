@@ -11,7 +11,7 @@ function runTest(downgradeVersion) {
     // Start a new replica set with two latest version nodes.
     let rst = new ReplSetTest({
         nodes: [{binVersion: latest}, {binVersion: latest, rsConfig: {priority: 0}}],
-        settings: {chainingAllowed: false}
+        settings: {chainingAllowed: false},
     });
     rst.startSet();
     rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
@@ -21,13 +21,15 @@ function runTest(downgradeVersion) {
 
     // The default WC is majority and stopServerReplication will prevent satisfying any majority
     // writes.
-    assert.commandWorked(primary.adminCommand(
-        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    );
 
     // Set the featureCompatibilityVersion to the downgrade version so that a downgrade node can
     // join the set.
-    assert.commandWorked(primary.getDB("admin").runCommand(
-        {setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(
+        primary.getDB("admin").runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+    );
 
     // Add a downgrade node to the set.
     let downgradeSecondary = rst.add({binVersion: downgradeVersion, rsConfig: {priority: 0}});
@@ -44,8 +46,7 @@ function runTest(downgradeVersion) {
     // Set the featureCompatibilityVersion to the upgrade version. This will not replicate to
     // the downgrade secondary, but the downgrade secondary will no longer be able to
     // communicate with the rest of the set.
-    assert.commandWorked(
-        primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     // Shut down the latest version secondary.
     rst.stop(latestSecondary);
@@ -57,5 +58,5 @@ function runTest(downgradeVersion) {
     rst.stopSet();
 }
 
-runTest('last-continuous');
-runTest('last-lts');
+runTest("last-continuous");
+runTest("last-lts");

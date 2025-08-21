@@ -10,8 +10,8 @@
  * ]
  */
 
-let orig = 'rename_stayTemp_orig';
-let dest = 'rename_stayTemp_dest';
+let orig = "rename_stayTemp_orig";
+let dest = "rename_stayTemp_dest";
 
 db[orig].drop();
 db[dest].drop();
@@ -28,8 +28,7 @@ function istemp(name) {
     return collections[0].options.temp ? true : false;
 }
 
-assert.commandWorked(
-    db.runCommand({applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {create: orig, temp: 1}}]}));
+assert.commandWorked(db.runCommand({applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {create: orig, temp: 1}}]}));
 assert(istemp(orig));
 
 db.adminCommand({renameCollection: ns(orig), to: ns(dest)});
@@ -37,8 +36,7 @@ assert(!istemp(dest));
 
 db[dest].drop();
 
-assert.commandWorked(
-    db.runCommand({applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {create: orig, temp: 1}}]}));
+assert.commandWorked(db.runCommand({applyOps: [{op: "c", ns: db.getName() + ".$cmd", o: {create: orig, temp: 1}}]}));
 assert(istemp(orig));
 
 db.adminCommand({renameCollection: ns(orig), to: ns(dest), stayTemp: true});

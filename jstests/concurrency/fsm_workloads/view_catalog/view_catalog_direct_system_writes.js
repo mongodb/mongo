@@ -12,38 +12,43 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/view_catalog/view_catalog.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/view_catalog/view_catalog.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.create = function create(db, collName) {
         this.counter++;
         let pipeline = [{$match: {_id: this.counter}}];
-        assert.commandWorkedOrFailedWithCode(db.createCollection("system.views"),
-                                             ErrorCodes.NamespaceExists);
-        assert.commandWorked(db.adminCommand({
-            applyOps: [{
-                op: "i",
-                ns: db.getName() + ".system.views",
-                o: {
-                    _id: db.getName() + "." + this.threadViewName,
-                    viewOn: this.threadCollName,
-                    pipeline: pipeline
-                }
-            }]
-        }));
+        assert.commandWorkedOrFailedWithCode(db.createCollection("system.views"), ErrorCodes.NamespaceExists);
+        assert.commandWorked(
+            db.adminCommand({
+                applyOps: [
+                    {
+                        op: "i",
+                        ns: db.getName() + ".system.views",
+                        o: {
+                            _id: db.getName() + "." + this.threadViewName,
+                            viewOn: this.threadCollName,
+                            pipeline: pipeline,
+                        },
+                    },
+                ],
+            }),
+        );
         this.confirmViewDefinition(db, this.threadViewName, collName, pipeline, this.counter);
     };
 
     $config.states.drop = function drop(db, collName) {
-        assert.commandWorked(db.adminCommand({
-            applyOps: [{
-                op: "d",
-                ns: db.getName() + ".system.views",
-                o: {_id: db.getName() + "." + this.threadViewName}
-            }]
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                applyOps: [
+                    {
+                        op: "d",
+                        ns: db.getName() + ".system.views",
+                        o: {_id: db.getName() + "." + this.threadViewName},
+                    },
+                ],
+            }),
+        );
 
         let res = db.runCommand({listCollections: 1, filter: {name: this.threadViewName}});
         assert.commandWorked(res);
@@ -58,7 +63,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         init: {create: 1},
         create: {modify: 0.5, drop: 0.5},
         modify: {modify: 0.3, drop: 0.7},
-        drop: {create: 1}
+        drop: {create: 1},
     };
 
     return $config;

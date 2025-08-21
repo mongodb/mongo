@@ -7,8 +7,8 @@ if (jsTest.options().storageEngine !== "inMemory") {
 }
 
 var mongod = MongoRunner.runMongod({
-    storageEngine: 'inMemory',
-    inMemoryEngineConfigString: 'eviction=(threads_min=1)',
+    storageEngine: "inMemory",
+    inMemoryEngineConfigString: "eviction=(threads_min=1)",
 });
 assert.neq(null, mongod, "mongod failed to started up with --inMemoryEngineConfigString");
 
@@ -19,13 +19,13 @@ MongoRunner.stopMongod(mongod);
 const rst = new ReplSetTest({
     nodes: [
         {
-            storageEngine: 'wiredTiger',
+            storageEngine: "wiredTiger",
         },
         {
             // A secondary configured with the wiredTiger storage
             // engine should ignore settings for the in-memory
             // storage engine.
-            storageEngine: 'wiredTiger',
+            storageEngine: "wiredTiger",
             // Disallow elections on the secondary.
             rsConfig: {
                 priority: 0,
@@ -33,7 +33,7 @@ const rst = new ReplSetTest({
             },
         },
         {
-            storageEngine: 'inMemory',
+            storageEngine: "inMemory",
             // Disallow elections on the secondary.
             rsConfig: {
                 priority: 0,
@@ -46,27 +46,33 @@ rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
-let testDB = primary.getDB('test');
+let testDB = primary.getDB("test");
 
 // Basic error checking on storage engine collection options.
 // When the current storage engine is not 'inMemory', these checks will
 // be handled by the storage engine factory on the primary.
 // See InMemoryFactory.
 assert.commandFailedWithCode(
-    testDB.createCollection('test_bad_storage_options_coll',
-                            {storageEngine: {inMemory: {notConfigStringField: 12345}}}),
-    ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(testDB.createCollection('test_bad_storage_options_idx', {
-    indexOptionDefaults: {storageEngine: {inMemory: {notConfigStringField: 12345}}}
-}),
-                             ErrorCodes.InvalidOptions);
+    testDB.createCollection("test_bad_storage_options_coll", {
+        storageEngine: {inMemory: {notConfigStringField: 12345}},
+    }),
+    ErrorCodes.InvalidOptions,
+);
+assert.commandFailedWithCode(
+    testDB.createCollection("test_bad_storage_options_idx", {
+        indexOptionDefaults: {storageEngine: {inMemory: {notConfigStringField: 12345}}},
+    }),
+    ErrorCodes.InvalidOptions,
+);
 
 // A collection created with in-memory specific storage options should not cause issues for
 // a secondary running the wiredTiger storage engine.
-assert.commandWorked(testDB.createCollection('test_inmem_storage_options_coll', {
-    storageEngine: {inMemory: {configString: 'split_pct=88'}},
-    indexOptionDefaults: {storageEngine: {inMemory: {configString: 'split_pct=77'}}}
-}));
+assert.commandWorked(
+    testDB.createCollection("test_inmem_storage_options_coll", {
+        storageEngine: {inMemory: {configString: "split_pct=88"}},
+        indexOptionDefaults: {storageEngine: {inMemory: {configString: "split_pct=77"}}},
+    }),
+);
 rst.awaitReplication();
 
 rst.stopSet();

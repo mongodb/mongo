@@ -10,7 +10,7 @@
  *   incompatible_with_concurrency_simultaneous,
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     var states = {
         reIndex: function reIndex(db, collName) {
             var res = db[collName].reIndex();
@@ -34,21 +34,20 @@ export const $config = (function() {
         */
 
         // Set up failpoint to trigger WriteConflictException during write operations.
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: 'WTWriteConflictException', mode: {activationProbability: 0.5}}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: {activationProbability: 0.5}}),
+        );
     }
 
     function teardown(db, collName, cluster) {
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: 'WTWriteConflictException', mode: "off"}));
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, traceWriteConflictExceptions: false}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, traceWriteConflictExceptions: false}));
     }
 
     return {
         threadCount: 2,
         iterations: 5,
-        startState: 'reIndex',
+        startState: "reIndex",
         states: states,
         transitions: transitions,
         setup: setup,

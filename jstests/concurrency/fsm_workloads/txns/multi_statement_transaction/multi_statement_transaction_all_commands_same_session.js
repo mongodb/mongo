@@ -13,13 +13,10 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_all_commands.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_all_commands.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.setup = function(db, collName, cluster) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.setup = function (db, collName, cluster) {
         $super.setup.apply(this, arguments);
         this.lsid = tojson({id: UUID()});
     };
@@ -36,7 +33,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.sessionDb = this.session.getDatabase(db.getName());
         this.iteration = 1;
 
-        this.session.startTransaction_forTesting({readConcern: {level: 'snapshot'}});
+        this.session.startTransaction_forTesting({readConcern: {level: "snapshot"}});
         this.txnNumber = 0;
     };
 

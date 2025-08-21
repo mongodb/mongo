@@ -3,11 +3,11 @@
  * strings.
  */
 function getGlobalLog(connOrFile) {
-    assert(typeof connOrFile !== 'undefined', "Connection is undefined");
+    assert(typeof connOrFile !== "undefined", "Connection is undefined");
     let cmdRes;
-    if (typeof connOrFile === 'object') {
+    if (typeof connOrFile === "object") {
         try {
-            cmdRes = connOrFile.adminCommand({getLog: 'global'});
+            cmdRes = connOrFile.adminCommand({getLog: "global"});
         } catch (e) {
             // Retry with network errors.
             print("checkLog ignoring failure: " + e);
@@ -15,7 +15,7 @@ function getGlobalLog(connOrFile) {
         }
         return assert.commandWorked(cmdRes).log;
     } else {
-        assert(typeof connOrFile === 'string', "Connection or path to log file must be used");
+        assert(typeof connOrFile === "string", "Connection or path to log file must be used");
         try {
             // Attempt to read the file.
             return cat(connOrFile).trim().split("\n");
@@ -24,7 +24,7 @@ function getGlobalLog(connOrFile) {
             throw e;
         }
     }
-};
+}
 
 /*
  * Calls the 'getLog' function on the provided connection 'conn' to see if the provided msg
@@ -50,7 +50,7 @@ function getLogMessage(connOrFile, msg) {
         }
     }
     return null;
-};
+}
 
 /*
  * Calls the 'getLog' function on the provided connection or log file 'connOrFile' to see if the
@@ -76,7 +76,7 @@ function checkContainsOnce(connOrFile, msg) {
         }
     }
     return false;
-};
+}
 
 function checkContainsOnceJson(connOrFile, id, attrsDict, severity = null) {
     const logMessages = getGlobalLog(connOrFile);
@@ -89,8 +89,7 @@ function checkContainsOnceJson(connOrFile, id, attrsDict, severity = null) {
         try {
             obj = JSON.parse(logMsg);
         } catch (ex) {
-            print('checkLog.checkContainsOnce: JsonJSON.parse() failed: ' + tojson(ex) + ': ' +
-                  logMsg);
+            print("checkLog.checkContainsOnce: JsonJSON.parse() failed: " + tojson(ex) + ": " + logMsg);
             throw ex;
         }
 
@@ -100,7 +99,7 @@ function checkContainsOnceJson(connOrFile, id, attrsDict, severity = null) {
     }
 
     return false;
-};
+}
 
 /*
  * Acts just like checkContainsOnceJson but introduces the `expectedCount`, `isRelaxed`,
@@ -112,36 +111,51 @@ function checkContainsOnceJson(connOrFile, id, attrsDict, severity = null) {
  * applied to appropriately compare the count with `expectedCount`. `context` allows to check
  * the `ctx` field of the logs.
  */
-function checkContainsWithCountJson(connOrFile,
-                                    id,
-                                    attrsDict,
-                                    expectedCount,
-                                    severity = null,
-                                    isRelaxed = false,
-                                    comparator =
-                                        (actual, expected) => {
-                                            return actual === expected;
-                                        },
-                                    context = null) {
-    const messages =
-        getFilteredLogMessages(connOrFile, id, attrsDict, severity, isRelaxed, context);
+function checkContainsWithCountJson(
+    connOrFile,
+    id,
+    attrsDict,
+    expectedCount,
+    severity = null,
+    isRelaxed = false,
+    comparator = (actual, expected) => {
+        return actual === expected;
+    },
+    context = null,
+) {
+    const messages = getFilteredLogMessages(connOrFile, id, attrsDict, severity, isRelaxed, context);
 
     const count = messages.length;
 
     return comparator(count, expectedCount);
-};
+}
 
 /*
  * Similar to checkContainsWithCountJson, but checks whether there are at least 'expectedCount'
  * instances of 'id' in the logs.
  */
 function checkContainsWithAtLeastCountJson(
-    connOrFile, id, attrsDict, expectedCount, severity = null, isRelaxed = false, context = null) {
+    connOrFile,
+    id,
+    attrsDict,
+    expectedCount,
+    severity = null,
+    isRelaxed = false,
+    context = null,
+) {
     return checkContainsWithCountJson(
-        connOrFile, id, attrsDict, expectedCount, severity, isRelaxed, (actual, expected) => {
+        connOrFile,
+        id,
+        attrsDict,
+        expectedCount,
+        severity,
+        isRelaxed,
+        (actual, expected) => {
             return actual >= expected;
-        }, context);
-};
+        },
+        context,
+    );
+}
 
 /*
  * Calls the 'getLog' function on the provided connection or log file 'connOrFile' to see if a
@@ -164,13 +178,12 @@ function checkContainsOnceJsonStringMatch(connOrFile, id, attrName, msg) {
     }
 
     return false;
-};
+}
 
 /*
  * See checkContainsWithCountJson comment.
  */
-function getFilteredLogMessages(
-    connOrFile, id, attrsDict, severity = null, isRelaxed = false, context = null) {
+function getFilteredLogMessages(connOrFile, id, attrsDict, severity = null, isRelaxed = false, context = null) {
     const logMessages = getGlobalLog(connOrFile);
     if (logMessages === null) {
         return false;
@@ -183,8 +196,7 @@ function getFilteredLogMessages(
         try {
             obj = JSON.parse(logMsg);
         } catch (ex) {
-            print('checkLog.checkContainsOnce: JsonJSON.parse() failed: ' + tojson(ex) + ': ' +
-                  logMsg);
+            print("checkLog.checkContainsOnce: JsonJSON.parse() failed: " + tojson(ex) + ": " + logMsg);
             throw ex;
         }
 
@@ -194,7 +206,7 @@ function getFilteredLogMessages(
     }
 
     return messages;
-};
+}
 
 /*
  * Calls the 'getLog' function at regular intervals on the provided connection or log file
@@ -204,14 +216,15 @@ function getFilteredLogMessages(
 function contains(connOrFile, msg, timeoutMillis = 5 * 60 * 1000, retryIntervalMS = 300) {
     // Don't run the hang analyzer because we don't expect contains() to always succeed.
     assert.soon(
-        function() {
+        function () {
             return checkContainsOnce(connOrFile, msg);
         },
-        'Could not find log entries containing the following message: ' + msg,
+        "Could not find log entries containing the following message: " + msg,
         timeoutMillis,
         retryIntervalMS,
-        {runHangAnalyzer: false});
-};
+        {runHangAnalyzer: false},
+    );
+}
 
 /*
  * Calls the 'getLog' function at regular intervals on the provided connection or log
@@ -222,32 +235,33 @@ function containsLog(connOrFile, msg, timeoutMillis = 5 * 60 * 1000, retryInterv
     // Don't run the hang analyzer because we don't expect contains() to always succeed.
     let logMsg = null;
     assert.soon(
-        function() {
+        function () {
             logMsg = getLogMessage(connOrFile, msg);
             if (logMsg) {
                 return true;
             }
             return false;
         },
-        'Could not find log entries containing the following message: ' + msg,
+        "Could not find log entries containing the following message: " + msg,
         timeoutMillis,
         retryIntervalMS,
-        {runHangAnalyzer: false});
+        {runHangAnalyzer: false},
+    );
     return logMsg;
-};
+}
 
 function containsJson(connOrFile, id, attrsDict, timeoutMillis = 5 * 60 * 1000) {
     // Don't run the hang analyzer because we don't expect contains() to always succeed.
     assert.soon(
-        function() {
+        function () {
             return checkContainsOnceJson(connOrFile, id, attrsDict);
         },
-        'Could not find log entries containing the following id: ' + id +
-            ', and attrs: ' + tojson(attrsDict),
+        "Could not find log entries containing the following id: " + id + ", and attrs: " + tojson(attrsDict),
         timeoutMillis,
         300,
-        {runHangAnalyzer: false});
-};
+        {runHangAnalyzer: false},
+    );
+}
 
 /*
  * Calls checkContainsWithCountJson with the `isRelaxed` parameter set to true at regular
@@ -256,28 +270,37 @@ function containsJson(connOrFile, id, attrsDict, timeoutMillis = 5 * 60 * 1000) 
  * or exactly `expectedCount` times based on the `comparator` function passed in or the timeout
  * (in ms) is reached.
  */
-function containsRelaxedJson(connOrFile,
-                             id,
-                             attrsDict,
-                             expectedCount = 1,
-                             timeoutMillis = 5 * 60 * 1000,
-                             comparator =
-                                 (actual, expected) => {
-                                     return actual === expected;
-                                 },
-                             context = null) {
+function containsRelaxedJson(
+    connOrFile,
+    id,
+    attrsDict,
+    expectedCount = 1,
+    timeoutMillis = 5 * 60 * 1000,
+    comparator = (actual, expected) => {
+        return actual === expected;
+    },
+    context = null,
+) {
     // Don't run the hang analyzer because we don't expect contains() to always succeed.
     assert.soon(
-        function() {
+        function () {
             return checkContainsWithCountJson(
-                connOrFile, id, attrsDict, expectedCount, null, true, comparator, context);
+                connOrFile,
+                id,
+                attrsDict,
+                expectedCount,
+                null,
+                true,
+                comparator,
+                context,
+            );
         },
-        'Could not find log entries containing the following id: ' + id +
-            ', and attrs: ' + tojson(attrsDict),
+        "Could not find log entries containing the following id: " + id + ", and attrs: " + tojson(attrsDict),
         timeoutMillis,
         300,
-        {runHangAnalyzer: false});
-};
+        {runHangAnalyzer: false},
+    );
+}
 
 /*
  * Calls the 'getLog' function at regular intervals on the provided connection or log file
@@ -286,11 +309,10 @@ function containsRelaxedJson(connOrFile,
  * equal to 'expectedCount'. Otherwise, checks whether the count is at least equal to
  * 'expectedCount'. Early returns when at least 'expectedCount' entries are found.
  */
-function containsWithCount(
-    connOrFile, msg, expectedCount, timeoutMillis = 5 * 60 * 1000, exact = true) {
-    let expectedStr = exact ? 'exactly ' : 'at least ';
+function containsWithCount(connOrFile, msg, expectedCount, timeoutMillis = 5 * 60 * 1000, exact = true) {
+    let expectedStr = exact ? "exactly " : "at least ";
     assert.soon(
-        function() {
+        function () {
             let count = 0;
             let logMessages = getGlobalLog(connOrFile);
             if (logMessages === null) {
@@ -307,19 +329,23 @@ function containsWithCount(
                     }
                 }
                 if (!exact && count >= expectedCount) {
-                    print("checkLog found at least " + expectedCount +
-                          " log entries containing the following message: " + msg);
+                    print(
+                        "checkLog found at least " +
+                            expectedCount +
+                            " log entries containing the following message: " +
+                            msg,
+                    );
                     return true;
                 }
             }
 
             return exact ? expectedCount === count : expectedCount <= count;
         },
-        'Did not find ' + expectedStr + expectedCount + ' log entries containing the ' +
-            'following message: ' + msg,
+        "Did not find " + expectedStr + expectedCount + " log entries containing the " + "following message: " + msg,
         timeoutMillis,
-        300);
-};
+        300,
+    );
+}
 
 /*
  * Similar to containsWithCount, but checks whether there are at least 'expectedCount'
@@ -327,7 +353,7 @@ function containsWithCount(
  */
 function containsWithAtLeastCount(connOrFile, msg, expectedCount, timeoutMillis = 5 * 60 * 1000) {
     containsWithCount(connOrFile, msg, expectedCount, timeoutMillis, /*exact*/ false);
-};
+}
 
 /*
  * Converts a scalar or object to a string format suitable for matching against log output.
@@ -338,9 +364,9 @@ function containsWithAtLeastCount(connOrFile, msg, expectedCount, timeoutMillis 
  */
 function formatAsLogLine(value, escapeStrings, toDecimal) {
     if (typeof value === "string") {
-        return (escapeStrings ? `"${value}"` : value);
+        return escapeStrings ? `"${value}"` : value;
     } else if (typeof value === "number") {
-        return (Number.isInteger(value) && toDecimal ? value.toFixed(1) : value);
+        return Number.isInteger(value) && toDecimal ? value.toFixed(1) : value;
     } else if (value instanceof NumberLong) {
         return `${value}`.match(/NumberLong..(.*)../m)[1];
     } else if (typeof value !== "object") {
@@ -354,17 +380,17 @@ function formatAsLogLine(value, escapeStrings, toDecimal) {
         const valueStr = formatAsLogLine(value[fieldName], escapeStrings, toDecimal);
         serialized.push(Array.isArray(value) ? valueStr : `${fieldName}: ${valueStr}`);
     }
-    return (Array.isArray(value) ? `[ ${serialized.join(', ')} ]` : `{ ${serialized.join(', ')} }`);
-};
+    return Array.isArray(value) ? `[ ${serialized.join(", ")} ]` : `{ ${serialized.join(", ")} }`;
+}
 
 /**
  * Format at the json for the log file which has no extra spaces.
  */
 function formatAsJsonLogLine(value, escapeStrings, toDecimal) {
     if (typeof value === "string") {
-        return (escapeStrings ? `"${value}"` : value);
+        return escapeStrings ? `"${value}"` : value;
     } else if (typeof value === "number") {
-        return (Number.isInteger(value) && toDecimal ? value.toFixed(1) : value);
+        return Number.isInteger(value) && toDecimal ? value.toFixed(1) : value;
     } else if (value instanceof NumberLong) {
         return `${value}`.match(/NumberLong..(.*)../m)[1];
     } else if (typeof value !== "object") {
@@ -378,8 +404,8 @@ function formatAsJsonLogLine(value, escapeStrings, toDecimal) {
         const valueStr = formatAsJsonLogLine(value[fieldName], escapeStrings, toDecimal);
         serialized.push(Array.isArray(value) ? valueStr : `"${fieldName}":${valueStr}`);
     }
-    return (Array.isArray(value) ? `[${serialized.join(',')}]` : `{${serialized.join(',')}}`);
-};
+    return Array.isArray(value) ? `[${serialized.join(",")}]` : `{${serialized.join(",")}}`;
+}
 
 /**
  * Internal helper to compare objects filed by field. object1 is considered as the object
@@ -387,14 +413,14 @@ function formatAsJsonLogLine(value, escapeStrings, toDecimal) {
  * `isRelaxed` is true, then object1 must contain all of the fields in object2, but can contain
  * other fields as well. By default, this checks for an exact match between object1 and object2.
  */
-const _deepEqual = function(object1, object2, isRelaxed = false) {
+const _deepEqual = function (object1, object2, isRelaxed = false) {
     if (object1 == null || object2 == null) {
         return false;
     }
     const keys1 = Object.keys(object1);
     const keys2 = Object.keys(object2);
 
-    if (!isRelaxed && (keys1.length !== keys2.length)) {
+    if (!isRelaxed && keys1.length !== keys2.length) {
         return false;
     }
 
@@ -412,7 +438,7 @@ const _deepEqual = function(object1, object2, isRelaxed = false) {
         // If they are any other type of object, then recursively call _deepEqual(). Otherwise
         // perform a simple equality check.
         const areObjects = _isObject(val1) && _isObject(val2);
-        if (areObjects && !_deepEqual(val1, val2, isRelaxed) || !areObjects && val1 !== val2) {
+        if ((areObjects && !_deepEqual(val1, val2, isRelaxed)) || (!areObjects && val1 !== val2)) {
             return false;
         }
     }
@@ -421,8 +447,8 @@ const _deepEqual = function(object1, object2, isRelaxed = false) {
 };
 
 // Internal helper to check that the argument is a non-null object.
-const _isObject = function(object) {
-    return object != null && typeof object === 'object';
+const _isObject = function (object) {
+    return object != null && typeof object === "object";
 };
 
 /*
@@ -469,7 +495,7 @@ function compareLogs(obj, id, severity, context, attrsDict, isRelaxed = false) {
         }
     }
     return true;
-};
+}
 
 export const checkLog = {
     getGlobalLog: getGlobalLog,

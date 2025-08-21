@@ -11,7 +11,7 @@ import {
     assignableFieldArb,
     dollarFieldArb,
     fieldArb,
-    leafParameterArb
+    leafParameterArb,
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
@@ -21,32 +21,30 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 // Inclusion/Exclusion projections. {$project: {_id: 1, a: 0}}
 export function getSingleFieldProjectArb(isInclusion, {simpleFieldsOnly = false} = {}) {
     const projectedFieldArb = simpleFieldsOnly ? assignableFieldArb : fieldArb;
-    return fc.record({field: projectedFieldArb, includeId: fc.boolean()})
-        .map(function({field, includeId}) {
-            const includeIdVal = includeId ? 1 : 0;
-            const includeFieldVal = isInclusion ? 1 : 0;
-            return {$project: {_id: includeIdVal, [field]: includeFieldVal}};
-        });
+    return fc.record({field: projectedFieldArb, includeId: fc.boolean()}).map(function ({field, includeId}) {
+        const includeIdVal = includeId ? 1 : 0;
+        const includeFieldVal = isInclusion ? 1 : 0;
+        return {$project: {_id: includeIdVal, [field]: includeFieldVal}};
+    });
 }
-export const simpleProjectArb = oneof(getSingleFieldProjectArb(true /*isInclusion*/),
-                                      getSingleFieldProjectArb(false /*isInclusion*/));
+export const simpleProjectArb = oneof(
+    getSingleFieldProjectArb(true /*isInclusion*/),
+    getSingleFieldProjectArb(false /*isInclusion*/),
+);
 
 // Project from one field to another. {$project {a: '$b'}}
-export const computedProjectArb =
-    fc.tuple(fieldArb, dollarFieldArb).map(function([destField, srcField]) {
-        return {$project: {[destField]: srcField}};
-    });
+export const computedProjectArb = fc.tuple(fieldArb, dollarFieldArb).map(function ([destField, srcField]) {
+    return {$project: {[destField]: srcField}};
+});
 
 // Add field with a constant argument. {$addFields: {a: 5}}
-export const addFieldsConstArb =
-    fc.tuple(fieldArb, leafParameterArb).map(function([destField, leafParams]) {
-        return {$addFields: {[destField]: leafParams}};
-    });
+export const addFieldsConstArb = fc.tuple(fieldArb, leafParameterArb).map(function ([destField, leafParams]) {
+    return {$addFields: {[destField]: leafParams}};
+});
 // Add field from source field. {$addFields: {a: '$b'}}
-export const addFieldsVarArb =
-    fc.tuple(fieldArb, dollarFieldArb).map(function([destField, sourceField]) {
-        return {$addFields: {[destField]: sourceField}};
-    });
+export const addFieldsVarArb = fc.tuple(fieldArb, dollarFieldArb).map(function ([destField, sourceField]) {
+    return {$addFields: {[destField]: sourceField}};
+});
 
 /*
  * Generates a random $sort, with [1, maxNumSortComponents] sort components.
@@ -66,9 +64,9 @@ export function getSortArb(maxNumSortComponents = 1) {
         .uniqueArray(sortComponent, {
             minLength: 1,
             maxLength: maxNumSortComponents,
-            selector: fieldAndDir => fieldAndDir.field,
+            selector: (fieldAndDir) => fieldAndDir.field,
         })
-        .map(components => {
+        .map((components) => {
             const sortSpec = {};
             for (const {field, dir} of components) {
                 sortSpec[field] = dir;
@@ -97,7 +95,7 @@ function getAllowedStages(allowOrs, deterministicBag) {
             computedProjectArb,
             addFieldsVarArb,
             getSortArb(),
-            groupArb
+            groupArb,
         ];
     } else {
         // If we don't require a deterministic bag, we can allow $skip and $limit anywhere.
@@ -110,7 +108,7 @@ function getAllowedStages(allowOrs, deterministicBag) {
             computedProjectArb,
             addFieldsVarArb,
             getSortArb(),
-            groupArb
+            groupArb,
         ];
     }
 }

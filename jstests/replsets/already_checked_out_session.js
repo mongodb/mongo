@@ -18,12 +18,14 @@ function doInsertWithSession(host, lsid, txnNumber) {
     try {
         const conn = new Mongo(host);
         const db = conn.getDB("test");
-        assert.commandWorked(db.runCommand({
-            insert: "mycoll",
-            documents: [{_id: txnNumber}],
-            lsid: {id: eval(lsid)},
-            txnNumber: NumberLong(txnNumber),
-        }));
+        assert.commandWorked(
+            db.runCommand({
+                insert: "mycoll",
+                documents: [{_id: txnNumber}],
+                lsid: {id: eval(lsid)},
+                txnNumber: NumberLong(txnNumber),
+            }),
+        );
         return {ok: 1};
     } catch (e) {
         print("doInsertWithSession failed with " + e.toString());
@@ -47,13 +49,13 @@ try {
 
     assert.soon(
         () => {
-            const ops = db.currentOp(
-                {"command.insert": "mycoll", "command.txnNumber": {$eq: 1}, waitingForLock: true});
+            const ops = db.currentOp({"command.insert": "mycoll", "command.txnNumber": {$eq: 1}, waitingForLock: true});
             return ops.inprog.length === 1;
         },
         () => {
             return "insert operation with txnNumber 1 was not found: " + tojson(db.currentOp());
-        });
+        },
+    );
 
     thread2 = new Thread(doInsertWithSession, primary.host, tojson(lsid), 2);
     thread2.start();
@@ -66,7 +68,8 @@ try {
         },
         () => {
             return "insert operation with txnNumber 2 was not found: " + tojson(db.currentOp());
-        });
+        },
+    );
 } finally {
     // We run the fsyncUnlock command in a finally block to avoid leaving the server fsyncLock'd
     // if the test were to fail.

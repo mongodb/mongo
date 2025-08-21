@@ -35,7 +35,7 @@ import {
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
-    getPlanStage
+    getPlanStage,
 } from "jstests/libs/query/analyze_plan.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
@@ -50,11 +50,15 @@ function dumpPlanCacheState() {
 }
 
 function getPlansForCacheEntry(query = {}, sort = {}, projection = {}) {
-    const keyHash = getPlanCacheKeyFromShape(
-        {query: query, projection: projection, sort: sort, collection: coll, db: db});
+    const keyHash = getPlanCacheKeyFromShape({
+        query: query,
+        projection: projection,
+        sort: sort,
+        collection: coll,
+        db: db,
+    });
 
-    const res =
-        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    const res = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
     // We expect exactly one matching cache entry.
     assert.eq(1, res.length, dumpPlanCacheState());
     return res[0];
@@ -63,38 +67,47 @@ function getPlansForCacheEntry(query = {}, sort = {}, projection = {}) {
 function getPlansForCacheEntryFromPipeline(pipeline) {
     const keyHash = getPlanCacheKeyFromPipeline(pipeline, coll);
 
-    const res =
-        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    const res = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
     // We expect exactly one matching cache entry.
     assert.eq(1, res.length, dumpPlanCacheState());
     return res[0];
 }
 
 function assertNoCacheEntry(query, sort, projection) {
-    const keyHash = getPlanCacheKeyFromShape(
-        {query: query, projection: projection, sort: sort, collection: coll, db: db});
+    const keyHash = getPlanCacheKeyFromShape({
+        query: query,
+        projection: projection,
+        sort: sort,
+        collection: coll,
+        db: db,
+    });
 
-    assert.eq(0,
-              coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).itcount(),
-              dumpPlanCacheState());
+    assert.eq(
+        0,
+        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).itcount(),
+        dumpPlanCacheState(),
+    );
 }
 
 // Assert that timeOfCreation exists in the cache entry. The difference between the current time
 // and the time a plan was cached should not be larger than an hour.
 function checkTimeOfCreation(query, sort, projection, date) {
-    const keyHash = getPlanCacheKeyFromShape(
-        {query: query, projection: projection, sort: sort, collection: coll, db: db});
+    const keyHash = getPlanCacheKeyFromShape({
+        query: query,
+        projection: projection,
+        sort: sort,
+        collection: coll,
+        db: db,
+    });
 
-    const res =
-        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    const res = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
     // We expect exactly one matching cache entry.
     assert.eq(1, res.length, res);
     const cacheEntry = res[0];
 
-    assert(cacheEntry.hasOwnProperty('timeOfCreation'), cacheEntry);
+    assert(cacheEntry.hasOwnProperty("timeOfCreation"), cacheEntry);
     let kMillisecondsPerHour = 1000 * 60 * 60;
-    assert.lte(
-        Math.abs(date - cacheEntry.timeOfCreation.getTime()), kMillisecondsPerHour, cacheEntry);
+    assert.lte(Math.abs(date - cacheEntry.timeOfCreation.getTime()), kMillisecondsPerHour, cacheEntry);
 }
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
@@ -110,17 +123,15 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 assertNoCacheEntry({unknownfield: 1}, {}, {});
 
 // Create a cache entry.
-assert.eq(1,
-          coll.find({a: 1, b: 1}, {_id: 0, a: 1}).sort({a: -1}).itcount(),
-          'unexpected document count');
+assert.eq(1, coll.find({a: 1, b: 1}, {_id: 0, a: 1}).sort({a: -1}).itcount(), "unexpected document count");
 
 // Verify that the time of creation listed for the plan cache entry is reasonably close to 'now'.
-let now = (new Date()).getTime();
+let now = new Date().getTime();
 checkTimeOfCreation({a: 1, b: 1}, {a: -1}, {_id: 0, a: 1}, now);
 
 // Retrieve plans for valid cache entry.
 let entry = getPlansForCacheEntry({a: 1, b: 1}, {a: -1}, {_id: 0, a: 1});
-assert(entry.hasOwnProperty('works'), entry);
+assert(entry.hasOwnProperty("works"), entry);
 assert.eq(entry.isActive, false);
 
 if (!isUsingSbePlanCache) {
@@ -132,7 +143,7 @@ if (!isUsingSbePlanCache) {
 
 // Test the 'planCacheShapeHash' and planCacheKey property by comparing entries for two different
 // query shapes.
-assert.eq(0, coll.find({a: 123}).sort({b: -1, a: 1}).itcount(), 'unexpected document count');
+assert.eq(0, coll.find({a: 123}).sort({b: -1, a: 1}).itcount(), "unexpected document count");
 let entryNewShape = getPlansForCacheEntry({a: 123}, {b: -1, a: 1});
 // Assert on 'planCacheShapeHash'.
 const oldPlanCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
@@ -156,16 +167,16 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 let numExecutions = 100;
 for (let i = 0; i < numExecutions; i++) {
-    assert.eq(0, coll.find({a: 3, b: 3}, {_id: 0, a: 1}).sort({a: -1}).itcount(), 'query failed');
+    assert.eq(0, coll.find({a: 3, b: 3}, {_id: 0, a: 1}).sort({a: -1}).itcount(), "query failed");
 }
 
 // Verify that the time of creation listed for the plan cache entry is reasonably close to 'now'.
-now = (new Date()).getTime();
+now = new Date().getTime();
 checkTimeOfCreation({a: 3, b: 3}, {a: -1}, {_id: 0, a: 1}, now);
 
 // Test that the cache entry is listed as active.
 entry = getPlansForCacheEntry({a: 3, b: 3}, {a: -1}, {_id: 0, a: 1});
-assert(entry.hasOwnProperty('works'), entry);
+assert(entry.hasOwnProperty("works"), entry);
 assert.eq(entry.isActive, true);
 
 if (!isUsingSbePlanCache) {
@@ -191,9 +202,7 @@ if (!isUsingSbePlanCache) {
     assert.commandWorked(foreignColl.insert({a: 1, b: 1}));
     assert.commandWorked(foreignColl.createIndex({b: 1}));
 
-    const pipeline = [
-        {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "b", as: "matched"}}
-    ];
+    const pipeline = [{$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "b", as: "matched"}}];
     // Have to run the pipeline to refresh foreign coll routing info, it is possible to have
     // stale info indicate it is a non-local collection, which can cause us generate a different
     // query plan as the one generated by the explain (inside getPlansForCacheEntryFromPipeline)
@@ -232,8 +241,7 @@ if (!FixtureHelpers.isStandalone(db)) {
     // Specify 'allowedIndexes' with more than one index, otherwise it will result in single
     // solution plan, that won't be cached in classic.
     const settings = {
-        indexHints:
-            {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: ["a_1_b_1", "b_1_a_1"]}
+        indexHints: {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: ["a_1_b_1", "b_1_a_1"]},
     };
     assert.commandWorked(coll.createIndex({b: 1, a: 1}));
     const filter = {a: 1, b: 1};

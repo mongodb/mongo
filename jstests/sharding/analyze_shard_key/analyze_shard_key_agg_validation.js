@@ -21,11 +21,11 @@ function makeAnalyzeShardKeyAggregateCmdObj(collName, key, splitPointsShardId) {
         aggCmdObj: {
             aggregate: collName,
             pipeline: [{$_analyzeShardKeyReadWriteDistribution: spec}],
-            cursor: {}
+            cursor: {},
         },
         makeSplitPointIdFunc: () => {
             return {analyzeShardKeyId, splitPointId: UUID()};
-        }
+        },
     };
 }
 
@@ -34,8 +34,9 @@ function runTest(rst, validationTest, shardName) {
     const splitPointsColl = primary.getCollection("config.analyzeShardKeySplitPoints");
 
     for (let {dbName, collName, isView} of validationTest.invalidNamespaceTestCases) {
-        jsTest.log(`Testing that the aggregation stage fails if the namespace is invalid ${
-            tojson({dbName, collName})}`);
+        jsTest.log(
+            `Testing that the aggregation stage fails if the namespace is invalid ${tojson({dbName, collName})}`,
+        );
         const {aggCmdObj} = makeAnalyzeShardKeyAggregateCmdObj(collName, {_id: 1}, shardName);
         const res = primary.getDB(dbName).runCommand(aggCmdObj);
         if (isView) {
@@ -48,37 +49,41 @@ function runTest(rst, validationTest, shardName) {
     }
 
     for (let key of validationTest.invalidShardKeyTestCases) {
-        jsTest.log(`Testing that the aggregation stage fails if the shard key is invalid ${
-            tojson({key})}`);
-        const {aggCmdObj} =
-            makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, key, shardName);
-        assert.commandFailedWithCode(primary.getDB(validationTest.dbName).runCommand(aggCmdObj),
-                                     ErrorCodes.BadValue);
+        jsTest.log(`Testing that the aggregation stage fails if the shard key is invalid ${tojson({key})}`);
+        const {aggCmdObj} = makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, key, shardName);
+        assert.commandFailedWithCode(primary.getDB(validationTest.dbName).runCommand(aggCmdObj), ErrorCodes.BadValue);
     }
 
     {
-        jsTest.log("Testing that the aggregation stage fails if there is a split point with an" +
-                   " array field");
+        jsTest.log("Testing that the aggregation stage fails if there is a split point with an" + " array field");
         const ns = validationTest.dbName + "." + validationTest.collName;
-        const {aggCmdObj, makeSplitPointIdFunc} =
-            makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, {b: 1}, shardName);
-        assert.commandWorked(splitPointsColl.insert(
-            {_id: makeSplitPointIdFunc(), ns, splitPoint: {b: [0, 0]}, expireAt: new Date()}));
-        assert.commandFailedWithCode(primary.getDB(validationTest.dbName).runCommand(aggCmdObj),
-                                     ErrorCodes.BadValue);
+        const {aggCmdObj, makeSplitPointIdFunc} = makeAnalyzeShardKeyAggregateCmdObj(
+            validationTest.collName,
+            {b: 1},
+            shardName,
+        );
+        assert.commandWorked(
+            splitPointsColl.insert({_id: makeSplitPointIdFunc(), ns, splitPoint: {b: [0, 0]}, expireAt: new Date()}),
+        );
+        assert.commandFailedWithCode(primary.getDB(validationTest.dbName).runCommand(aggCmdObj), ErrorCodes.BadValue);
         assert.commandWorked(splitPointsColl.remove({}));
     }
 
     {
-        jsTest.log("Testing that the aggregation stage fails if there is a split point that does" +
-                   " not have the same pattern as the shard key");
+        jsTest.log(
+            "Testing that the aggregation stage fails if there is a split point that does" +
+                " not have the same pattern as the shard key",
+        );
         const ns = validationTest.dbName + "." + validationTest.collName;
-        const {aggCmdObj, makeSplitPointIdFunc} =
-            makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, {a: 1}, shardName);
-        assert.commandWorked(splitPointsColl.insert(
-            {_id: makeSplitPointIdFunc(), ns, splitPoint: {_id: 1}, expireAt: new Date()}));
-        assert.commandFailedWithCode(primary.getDB(validationTest.dbName).runCommand(aggCmdObj),
-                                     ErrorCodes.BadValue);
+        const {aggCmdObj, makeSplitPointIdFunc} = makeAnalyzeShardKeyAggregateCmdObj(
+            validationTest.collName,
+            {a: 1},
+            shardName,
+        );
+        assert.commandWorked(
+            splitPointsColl.insert({_id: makeSplitPointIdFunc(), ns, splitPoint: {_id: 1}, expireAt: new Date()}),
+        );
+        assert.commandFailedWithCode(primary.getDB(validationTest.dbName).runCommand(aggCmdObj), ErrorCodes.BadValue);
         assert.commandWorked(splitPointsColl.remove({}));
     }
 }
@@ -90,10 +95,10 @@ function runTest(rst, validationTest, shardName) {
     const validationTest = ValidationTest(st.s);
 
     {
-        jsTest.log("Testing that the aggregation stage is supported on shardsvr mongod but not on" +
-                   " configsvr mongod");
-        const {aggCmdObj} =
-            makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, {id: 1}, st.shard0.name);
+        jsTest.log(
+            "Testing that the aggregation stage is supported on shardsvr mongod but not on" + " configsvr mongod",
+        );
+        const {aggCmdObj} = makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, {id: 1}, st.shard0.name);
         assert.commandWorked(shard0Primary.getDB(validationTest.dbName).runCommand(aggCmdObj));
     }
 
@@ -102,15 +107,15 @@ function runTest(rst, validationTest, shardName) {
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
     const validationTest = ValidationTest(primary);
 
-    jsTest.log(
-        "Testing that the aggregation stage is supported on a standalone replica set mongod");
+    jsTest.log("Testing that the aggregation stage is supported on a standalone replica set mongod");
     runTest(rst, validationTest, null /* shardName */);
 
     rst.stopSet();

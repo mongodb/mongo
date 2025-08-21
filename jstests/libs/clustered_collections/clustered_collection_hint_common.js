@@ -11,8 +11,11 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
     function testHint(coll, clusterKey, clusterKeyName) {
         // Create clustered collection.
         assertDropCollection(coll.getDB(), coll.getName());
-        assert.commandWorked(coll.getDB().createCollection(
-            coll.getName(), {clusteredIndex: {key: {[clusterKeyFieldName]: 1}, unique: true}}));
+        assert.commandWorked(
+            coll
+                .getDB()
+                .createCollection(coll.getName(), {clusteredIndex: {key: {[clusterKeyFieldName]: 1}, unique: true}}),
+        );
 
         // Create an index that the query planner would consider preferable to using the cluster key
         // for point predicates on 'a'.
@@ -39,7 +42,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats: {
                 stage: "COLLSCAN",
                 direction: "forward",
-            }
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
@@ -50,7 +53,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats: {
                 stage: "COLLSCAN",
                 direction: "forward",
-            }
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: 1,
@@ -62,7 +65,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats: {
                 stage: "COLLSCAN",
                 direction: "forward",
-            }
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: 1,
@@ -74,7 +77,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats: {
                 stage: "COLLSCAN",
                 direction: "forward",
-            }
+            },
         });
 
         // Find with hints on cluster key that generate bounded collection scans.
@@ -90,8 +93,8 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 stage: "CLUSTERED_IXSCAN",
                 direction: "forward",
                 minRecord: arbitraryDocId,
-                maxRecord: arbitraryDocId
-            }
+                maxRecord: arbitraryDocId,
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
@@ -99,10 +102,14 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 find: collName,
                 hint: clusterKey,
                 min: {[clusterKeyFieldName]: 101},
-                max: {[clusterKeyFieldName]: MaxKey}
+                max: {[clusterKeyFieldName]: MaxKey},
             },
-            expectedWinningPlanStats:
-                {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 101, maxRecord: MaxKey}
+            expectedWinningPlanStats: {
+                stage: "CLUSTERED_IXSCAN",
+                direction: "forward",
+                minRecord: 101,
+                maxRecord: MaxKey,
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: 0,
@@ -110,10 +117,14 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 find: collName,
                 hint: clusterKey,
                 min: {[clusterKeyFieldName]: MinKey},
-                max: {[clusterKeyFieldName]: -2}
+                max: {[clusterKeyFieldName]: -2},
             },
-            expectedWinningPlanStats:
-                {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: MinKey, maxRecord: -2}
+            expectedWinningPlanStats: {
+                stage: "CLUSTERED_IXSCAN",
+                direction: "forward",
+                minRecord: MinKey,
+                maxRecord: -2,
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: 1,
@@ -126,8 +137,8 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 stage: "CLUSTERED_IXSCAN",
                 direction: "forward",
                 minRecord: arbitraryDocId,
-                maxRecord: arbitraryDocId
-            }
+                maxRecord: arbitraryDocId,
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: arbitraryDocId,
@@ -140,8 +151,8 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 stage: "CLUSTERED_IXSCAN",
                 direction: "forward",
                 minRecord: NaN,
-                maxRecord: arbitraryDocId
-            }
+                maxRecord: arbitraryDocId,
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize - arbitraryDocId,
@@ -154,8 +165,8 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 stage: "CLUSTERED_IXSCAN",
                 direction: "forward",
                 minRecord: arbitraryDocId,
-                maxRecord: Infinity
-            }
+                maxRecord: Infinity,
+            },
         });
 
         // Find with $natural hints.
@@ -168,7 +179,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats: {
                 stage: "COLLSCAN",
                 direction: "backward",
-            }
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
@@ -179,7 +190,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats: {
                 stage: "COLLSCAN",
                 direction: "forward",
-            }
+            },
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: 1,
@@ -191,7 +202,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats: {
                 stage: "COLLSCAN",
                 direction: "backward",
-            }
+            },
         });
 
         // Find with $natural hints and sorts: we should scan the collection in the hinted
@@ -203,7 +214,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 stage: "COLLSCAN",
                 direction: "forward",
             },
-            unexpectedWinningPlanStats: ["SORT"]  // We shouldn't need a blocking sort here.
+            unexpectedWinningPlanStats: ["SORT"], // We shouldn't need a blocking sort here.
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
@@ -213,8 +224,8 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 {
                     stage: "COLLSCAN",
                     direction: "backward",
-                }
-            ]
+                },
+            ],
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
@@ -224,8 +235,8 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 {
                     stage: "COLLSCAN",
                     direction: "forward",
-                }
-            ]
+                },
+            ],
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
@@ -234,7 +245,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 stage: "COLLSCAN",
                 direction: "backward",
             },
-            unexpectedWinningPlanStats: ["SORT"]  // We shouldn't need a blocking sort here.
+            unexpectedWinningPlanStats: ["SORT"], // We shouldn't need a blocking sort here.
         });
 
         // We always need a blocking sort when the sort pattern does not match the provided sort for
@@ -247,8 +258,8 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 {
                     stage: "COLLSCAN",
                     direction: "forward",
-                }
-            ]
+                },
+            ],
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
@@ -258,8 +269,8 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 {
                     stage: "COLLSCAN",
                     direction: "backward",
-                }
-            ]
+                },
+            ],
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
@@ -269,14 +280,16 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 {
                     stage: "COLLSCAN",
                     direction: "forward",
-                }
-            ]
+                },
+            ],
         });
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
             cmd: {find: collName, hint: {$natural: -1}, sort: {a: -1}},
-            expectedWinningPlanStats:
-                [{stage: "SORT", sortPattern: {a: -1}}, {stage: "COLLSCAN", direction: "backward"}],
+            expectedWinningPlanStats: [
+                {stage: "SORT", sortPattern: {a: -1}},
+                {stage: "COLLSCAN", direction: "backward"},
+            ],
         });
 
         // Find on a standard index.
@@ -291,7 +304,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
                 expectedWinningPlanStats: {
                     stage: "IXSCAN",
                     keyPattern: idxA,
-                }
+                },
             });
         }
 
@@ -300,10 +313,9 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedNReturned: 0,
             cmd: {
                 update: collName,
-                updates: [{q: {[clusterKeyFieldName]: 3}, u: {$inc: {a: -2}}, hint: clusterKey}]
+                updates: [{q: {[clusterKeyFieldName]: 3}, u: {$inc: {a: -2}}, hint: clusterKey}],
             },
-            expectedWinningPlanStats:
-                {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 3, maxRecord: 3}
+            expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 3, maxRecord: 3},
         });
 
         // Update with reverse $natural hint.
@@ -311,11 +323,9 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedNReturned: 0,
             cmd: {
                 update: collName,
-                updates:
-                    [{q: {[clusterKeyFieldName]: 80}, u: {$inc: {a: 80}}, hint: {$natural: -1}}]
+                updates: [{q: {[clusterKeyFieldName]: 80}, u: {$inc: {a: 80}}, hint: {$natural: -1}}],
             },
-            expectedWinningPlanStats:
-                {stage: "CLUSTERED_IXSCAN", direction: "backward", minRecord: 80, maxRecord: 80}
+            expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "backward", minRecord: 80, maxRecord: 80},
         });
 
         // Update with hint on secondary index.
@@ -325,7 +335,7 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats: {
                 stage: "IXSCAN",
                 keyPattern: idxA,
-            }
+            },
         });
 
         // Delete with hint on cluster key.
@@ -333,10 +343,9 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedNReturned: 0,
             cmd: {
                 delete: collName,
-                deletes: [{q: {[clusterKeyFieldName]: 2}, limit: 0, hint: clusterKey}]
+                deletes: [{q: {[clusterKeyFieldName]: 2}, limit: 0, hint: clusterKey}],
             },
-            expectedWinningPlanStats:
-                {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 2, maxRecord: 2}
+            expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 2, maxRecord: 2},
         });
 
         // Delete reverse $natural hint.
@@ -344,10 +353,9 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedNReturned: 0,
             cmd: {
                 delete: collName,
-                deletes: [{q: {[clusterKeyFieldName]: 30}, limit: 0, hint: {$natural: -1}}]
+                deletes: [{q: {[clusterKeyFieldName]: 30}, limit: 0, hint: {$natural: -1}}],
             },
-            expectedWinningPlanStats:
-                {stage: "CLUSTERED_IXSCAN", direction: "backward", minRecord: 30, maxRecord: 30}
+            expectedWinningPlanStats: {stage: "CLUSTERED_IXSCAN", direction: "backward", minRecord: 30, maxRecord: 30},
         });
 
         // Delete with hint on standard index.
@@ -357,13 +365,14 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             expectedWinningPlanStats: {
                 stage: "IXSCAN",
                 keyPattern: idxA,
-            }
+            },
         });
 
         // Reverse 'hint' on the cluster key is illegal.
         assert.commandFailedWithCode(
             coll.getDB().runCommand({find: coll.getName(), hint: {[clusterKeyFieldName]: -1}}),
-            ErrorCodes.BadValue);
+            ErrorCodes.BadValue,
+        );
     }
 
     return testHint(coll, clusterKey, clusterKeyName);
@@ -371,7 +380,8 @@ export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
 
 export function validateClusteredCollectionHint(
     coll,
-    {expectedNReturned, cmd, expectedWinningPlanStats = {}, unexpectedWinningPlanStats = []}) {
+    {expectedNReturned, cmd, expectedWinningPlanStats = {}, unexpectedWinningPlanStats = []},
+) {
     const explain = assert.commandWorked(coll.runCommand({explain: cmd}));
     assert.eq(explain.executionStats.nReturned, expectedNReturned, tojson(explain));
 
@@ -387,8 +397,7 @@ export function validateClusteredCollectionHint(
     }
 
     for (const expectedWinningPlanStageStats of expectedWinningPlanStats) {
-        const stageOfInterest =
-            getPlanStage(actualWinningPlan, expectedWinningPlanStageStats.stage);
+        const stageOfInterest = getPlanStage(actualWinningPlan, expectedWinningPlanStageStats.stage);
         assert.neq(null, stageOfInterest);
 
         for (const [key, value] of Object.entries(expectedWinningPlanStageStats)) {

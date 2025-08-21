@@ -15,16 +15,13 @@ let coll = testDb.coll;
 testDb.dropDatabase();
 
 // Create a collection with a non-simple default collation.
-assert.commandWorked(
-    testDb.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}));
+assert.commandWorked(testDb.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}));
 const originalCollectionInfos = testDb.getCollectionInfos({name: coll.getName()});
 assert.eq(originalCollectionInfos.length, 1, tojson(originalCollectionInfos));
 
 assert.commandWorked(coll.insert({_id: "FOO"}));
 assert.commandWorked(coll.insert({_id: "bar"}));
-assert.eq([{_id: "FOO"}],
-          coll.find({_id: "foo"}).toArray(),
-          "query should have performed a case-insensitive match");
+assert.eq([{_id: "FOO"}], coll.find({_id: "foo"}).toArray(), "query should have performed a case-insensitive match");
 
 assert(!coll.isCapped());
 

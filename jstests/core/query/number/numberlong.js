@@ -4,8 +4,8 @@ let n = new NumberLong(4);
 assert.eq(4, n);
 assert.eq(4, n.toNumber());
 assert.eq(8, n + 4);
-assert.eq('NumberLong(4)', n.toString());
-assert.eq('NumberLong(4)', tojson(n));
+assert.eq("NumberLong(4)", n.toString());
+assert.eq("NumberLong(4)", tojson(n));
 let a = {};
 a.a = n;
 let p = tojson(a);
@@ -21,15 +21,15 @@ n = new NumberLong(-4);
 assert.eq(-4, n);
 assert.eq(-4, n.toNumber());
 assert.eq(0, n + 4);
-assert.eq('NumberLong(-4)', n.toString());
-assert.eq('NumberLong(-4)', tojson(n));
+assert.eq("NumberLong(-4)", n.toString());
+assert.eq("NumberLong(-4)", tojson(n));
 a = {};
 a.a = n;
 p = tojson(a);
 assert.eq('{ \"a\" : NumberLong(-4) }', p);
 
 // double
-n = new NumberLong(4294967296);  // 2^32
+n = new NumberLong(4294967296); // 2^32
 assert.eq(4294967296, n);
 assert.eq(4294967296, n.toNumber());
 assert.eq(4294967295, n - 1);
@@ -45,8 +45,8 @@ assert.eq('{ \"a\" : NumberLong(\"4294967296\") }', p);
 
 var goodValues = [
     0,
-    "9223372036854775807",   // int64_t max
-    "-9223372036854775808",  // int64_t min
+    "9223372036854775807", // int64_t max
+    "-9223372036854775808", // int64_t min
     -9223372036854776000,
     9223372036854775000,
 ];
@@ -54,9 +54,9 @@ var badNum = "number passed to NumberLong must be representable as an int64_t";
 var badStr = "could not convert string to long long";
 var badValues = [
     {val: NaN, msg: badNum},
-    {val: "9223372036854775808", msg: badStr},  // int64_t max + 1
+    {val: "9223372036854775808", msg: badStr}, // int64_t max + 1
     {val: 9223372036854776000, msg: badNum},
-    {val: "-9223372036854775809", msg: badStr},  // int64_t min - 1
+    {val: "-9223372036854775809", msg: badStr}, // int64_t min - 1
     {val: -9223372036854778000, msg: badNum},
 ];
 
@@ -64,8 +64,7 @@ for (var i = 0; i < goodValues.length; i++) {
     try {
         NumberLong(goodValues[i]);
     } catch (e) {
-        doassert("Error: NumberLong(" + goodValues[i] + ") should have worked, but got '" +
-                 e.message + "'.");
+        doassert("Error: NumberLong(" + goodValues[i] + ") should have worked, but got '" + e.message + "'.");
     }
 }
 for (var i = 0; i < badValues.length; i++) {
@@ -88,7 +87,7 @@ a.a = n;
 p = tojson(a);
 assert.eq('{ \"a\" : NumberLong(\"11111111111111111\") }', p);
 
-assert.eq(NumberLong('11111111111111111'), eval(tojson(NumberLong('11111111111111111'))));
+assert.eq(NumberLong("11111111111111111"), eval(tojson(NumberLong("11111111111111111"))));
 eval(`y = ${tojson(a)}`);
 assert.eq(a, y);
 
@@ -116,7 +115,7 @@ assert.eq(9223372036854775807, n.floatApprox);
 assert.eq(2147483647, n.top);
 assert.eq(4294967295, n.bottom);
 
-n = new NumberLong(0, 1, 0);  // Test that floatApprox argument is ignored.
+n = new NumberLong(0, 1, 0); // Test that floatApprox argument is ignored.
 assert.eq(4294967296, n.floatApprox);
 assert.eq(1, n.top);
 assert.eq(0, n.bottom);
@@ -124,28 +123,32 @@ assert.eq(0, n.bottom);
 badValues = [
     [0, 4294967296, 0],
     [0, 0, 4294967296],
-    ['asdf', 0, 0],
+    ["asdf", 0, 0],
     [0, 1.5, 0],
 ];
 for (var i = 0; i < badValues.length; i++) {
-    assert.throws(function() {
-        NumberLong.apply(null, badValues[i]);
-    }, [], "Bad arguments to NumberLong should have thrown: " + JSON.stringify(badValues[i]));
+    assert.throws(
+        function () {
+            NumberLong.apply(null, badValues[i]);
+        },
+        [],
+        "Bad arguments to NumberLong should have thrown: " + JSON.stringify(badValues[i]),
+    );
 }
 
 // parsing
-assert.throws(function() {
+assert.throws(function () {
     new NumberLong("");
 });
-assert.throws(function() {
+assert.throws(function () {
     new NumberLong("y");
 });
-assert.throws(function() {
+assert.throws(function () {
     new NumberLong("11111111111111111111");
 });
 
 // create NumberLong from NumberInt (SERVER-9973)
-assert.doesNotThrow(function() {
+assert.doesNotThrow(function () {
     new NumberLong(NumberInt(1));
 });
 
@@ -176,37 +179,37 @@ assert.eq(left.compare(left), 0);
 assert.eq(right.compare(right), 0);
 
 // Bad input to .compare().
-assert.throws(function() {
+assert.throws(function () {
     NumberLong("0").compare();
 });
-assert.throws(function() {
+assert.throws(function () {
     NumberLong("0").compare(null);
 });
-assert.throws(function() {
+assert.throws(function () {
     NumberLong("0").compare(undefined);
 });
-assert.throws(function() {
+assert.throws(function () {
     NumberLong("0").compare(3);
 });
-assert.throws(function() {
+assert.throws(function () {
     NumberLong("0").compare("foo");
 });
-assert.throws(function() {
+assert.throws(function () {
     NumberLong("0").compare(NumberLong("0"), 3);
 });
-assert.throws(function() {
-    NumberLong("0").compare({'replSet2Members': 6});
+assert.throws(function () {
+    NumberLong("0").compare({"replSet2Members": 6});
 });
 
 // Test auto complete
-var getCompletions = function(prefix) {
+var getCompletions = function (prefix) {
     shellAutocomplete(prefix);
     return __autocomplete__;
 };
 
 // assign `myNumberLong` to `globalThis` in case we are being run from another shell context.
 globalThis.myNumberLong = new NumberLong();
-var completions = getCompletions('myNumberLong.');
-assert(completions.indexOf('myNumberLong.floatApprox') >= 0);
-assert(completions.indexOf('myNumberLong.top') >= 0);
-assert(completions.indexOf('myNumberLong.bottom') >= 0);
+var completions = getCompletions("myNumberLong.");
+assert(completions.indexOf("myNumberLong.floatApprox") >= 0);
+assert(completions.indexOf("myNumberLong.top") >= 0);
+assert(completions.indexOf("myNumberLong.bottom") >= 0);

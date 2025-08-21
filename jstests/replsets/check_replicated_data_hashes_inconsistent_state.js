@@ -21,8 +21,9 @@ const primaryDB2 = primary.getDB("db2");
 const collName = "testColl";
 
 // The default WC is majority and godinsert command on a secondary is incompatible with wc:majority.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB("db0");
@@ -39,7 +40,9 @@ assert.commandWorked(primaryDB1.runCommand({insert: collName, documents: [{_id: 
 assert.commandWorked(primaryDB2.runCommand({insert: collName, documents: [{_id: 2, c: 2}]}));
 
 const err = assert.throws(() => rst.checkReplicatedDataHashes());
-assert(err.message.includes("dbhash mismatch between primary and secondary"),
-       `caught error didn't mention dbhash mismatch: ${tojson(err)}`);
+assert(
+    err.message.includes("dbhash mismatch between primary and secondary"),
+    `caught error didn't mention dbhash mismatch: ${tojson(err)}`,
+);
 
 rst.stopSet();

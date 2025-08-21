@@ -4,7 +4,7 @@
 // coverage and allow us to run on same- and mixed-version suites, we allow these commands to have a
 // test defined without always existing on the servers being used.
 export const commandsRemovedFromMongosSinceLastLTS = [
-    "_getAuditConfigGeneration",  // Removed in 8.1
+    "_getAuditConfigGeneration", // Removed in 8.1
     "startRecordingTraffic",
     "stopRecordingTraffic",
 ];

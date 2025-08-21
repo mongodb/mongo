@@ -10,7 +10,7 @@ const coll = db.index_bounds_code;
 coll.drop();
 
 assert.commandWorked(coll.createIndex({a: 1}));
-const insertedFunc = function() {
+const insertedFunc = function () {
     return 1;
 };
 assert.commandWorked(coll.insert({a: insertedFunc}));
@@ -18,9 +18,9 @@ assert.commandWorked(coll.insert({a: insertedFunc}));
 // Test that queries involving comparison operators with values of type Code are covered.
 const proj = {
     a: 1,
-    _id: 0
+    _id: 0,
 };
-const func = function() {
+const func = function () {
     return 2;
 };
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gt: func}}, project: proj, count: 0});
@@ -29,14 +29,10 @@ assertCoveredQueryAndCount({collection: coll, query: {a: {$lt: func}}, project: 
 assertCoveredQueryAndCount({collection: coll, query: {a: {$lte: func}}, project: proj, count: 1});
 
 // Test for equality against the original inserted function.
-assertCoveredQueryAndCount(
-    {collection: coll, query: {a: {$gt: insertedFunc}}, project: proj, count: 0});
-assertCoveredQueryAndCount(
-    {collection: coll, query: {a: {$gte: insertedFunc}}, project: proj, count: 1});
-assertCoveredQueryAndCount(
-    {collection: coll, query: {a: {$lt: insertedFunc}}, project: proj, count: 0});
-assertCoveredQueryAndCount(
-    {collection: coll, query: {a: {$lte: insertedFunc}}, project: proj, count: 1});
+assertCoveredQueryAndCount({collection: coll, query: {a: {$gt: insertedFunc}}, project: proj, count: 0});
+assertCoveredQueryAndCount({collection: coll, query: {a: {$gte: insertedFunc}}, project: proj, count: 1});
+assertCoveredQueryAndCount({collection: coll, query: {a: {$lt: insertedFunc}}, project: proj, count: 0});
+assertCoveredQueryAndCount({collection: coll, query: {a: {$lte: insertedFunc}}, project: proj, count: 1});
 
 // Test that documents that lie outside of the generated index bounds are not returned.
 coll.remove({});

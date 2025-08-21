@@ -21,24 +21,23 @@ const testDB = primary.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 const indexSpecB = {
     key: {b: 1},
-    name: "the_b_1_index"
+    name: "the_b_1_index",
 };
 const indexSpecC = {
     key: {c: 1},
-    name: "the_c_1_index"
+    name: "the_c_1_index",
 };
 
 assert.commandWorked(testDB.runCommand({create: collName}));
 
-const runSuccessfulIndexBuild = function(dbName, collName, indexSpec, requestNumber) {
+const runSuccessfulIndexBuild = function (dbName, collName, indexSpec, requestNumber) {
     jsTest.log("Index build request " + requestNumber + " starting...");
     const res = db.getSiblingDB(dbName).runCommand({createIndexes: collName, indexes: [indexSpec]});
-    jsTest.log("Index build request " + requestNumber +
-               ", expected to succeed, result: " + tojson(res));
+    jsTest.log("Index build request " + requestNumber + ", expected to succeed, result: " + tojson(res));
     assert.commandWorked(res);
 };
 
-const runFailedIndexBuildInTxn = function(dbName, collName, indexSpec, requestNumber) {
+const runFailedIndexBuildInTxn = function (dbName, collName, indexSpec, requestNumber) {
     const session = db.getMongo().startSession();
 
     const sessionDB = session.getDatabase(dbName);
@@ -46,32 +45,33 @@ const runFailedIndexBuildInTxn = function(dbName, collName, indexSpec, requestNu
     jsTest.log("Index build request " + requestNumber + " starting in a transaction...");
     session.startTransaction();
     const res = sessionColl.runCommand({createIndexes: collName, indexes: [indexSpec]});
-    jsTest.log("Index build request " + requestNumber +
-               ", expected to fail, result: " + tojson(res));
+    jsTest.log("Index build request " + requestNumber + ", expected to fail, result: " + tojson(res));
     assert.commandFailedWithCode(res, ErrorCodes.IndexBuildAlreadyInProgress);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 };
 
 // Insert document into collection to avoid optimization for index creation on an empty collection.
 // This allows us to pause index builds on the collection using a fail point.
 assert.commandWorked(testColl.insert({a: 1}));
 
-const failPoint = configureFailPoint(testDB, 'hangAfterSettingUpIndexBuild');
+const failPoint = configureFailPoint(testDB, "hangAfterSettingUpIndexBuild");
 let joinFirstIndexBuild;
 let joinSecondIndexBuild;
 try {
     jsTest.log("Starting a parallel shell to run first index build request...");
     joinFirstIndexBuild = startParallelShell(
-        funWithArgs(runSuccessfulIndexBuild, dbName, collName, indexSpecB, 1), primary.port);
+        funWithArgs(runSuccessfulIndexBuild, dbName, collName, indexSpecB, 1),
+        primary.port,
+    );
 
     jsTest.log("Waiting for first index build to get started...");
     failPoint.wait();
 
-    jsTest.log(
-        "Starting a parallel shell to run a transaction with a second index build request...");
+    jsTest.log("Starting a parallel shell to run a transaction with a second index build request...");
     joinSecondIndexBuild = startParallelShell(
-        funWithArgs(runFailedIndexBuildInTxn, dbName, collName, indexSpecB, 2), primary.port);
+        funWithArgs(runFailedIndexBuildInTxn, dbName, collName, indexSpecB, 2),
+        primary.port,
+    );
     // We wait to observe the second attempt to build the index fails while the
     // hangAfterSettingUpIndexBuild is preventing the first attempt from completing successfully.
     joinSecondIndexBuild();

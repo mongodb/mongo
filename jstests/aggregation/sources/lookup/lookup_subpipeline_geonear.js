@@ -17,21 +17,18 @@ assert.commandWorked(from.createIndex({geo: "2dsphere"}));
 // Insert one matching document in 'from'.
 assert.commandWorked(from.insert({_id: 1, geo: [0, 0]}));
 
-const geonearPipeline = [
-    {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}},
-];
+const geonearPipeline = [{$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}}];
 
 assert.eq(from.aggregate(geonearPipeline).itcount(), 1);
 
 let pipeline = [
-        {
-          $lookup: {
-              pipeline: geonearPipeline,
-              from: from.getName(),
-              as: "c",
-          }
+    {
+        $lookup: {
+            pipeline: geonearPipeline,
+            from: from.getName(),
+            as: "c",
         },
-    ];
+    },
+];
 
-assert.eq(coll.aggregate(pipeline).toArray(),
-          [{"_id": 4, "x": 4, "c": [{"_id": 1, "geo": [0, 0], "distance": 0}]}]);
+assert.eq(coll.aggregate(pipeline).toArray(), [{"_id": 4, "x": 4, "c": [{"_id": 1, "geo": [0, 0], "distance": 0}]}]);

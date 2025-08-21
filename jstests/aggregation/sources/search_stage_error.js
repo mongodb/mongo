@@ -15,22 +15,23 @@ const buildInfo = assert.commandWorked(db.runCommand({"buildInfo": 1}));
 assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
 
 // Check that a query with a $search stage errors without mongot.
-assert.commandFailedWithCode(
-    db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$search: {}}]}),
-    [ErrorCodes.SearchNotEnabled]);
+assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$search: {}}]}), [
+    ErrorCodes.SearchNotEnabled,
+]);
 
 // Check that a query with a $searchMeta stage errors without mongot.
-assert.commandFailedWithCode(
-    db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$searchMeta: {}}]}),
-    [ErrorCodes.SearchNotEnabled]);
+assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$searchMeta: {}}]}), [
+    ErrorCodes.SearchNotEnabled,
+]);
 
 // Check that a query with a $listSearchIndexes stage errors without mongot.
 assert.commandFailedWithCode(
     coll.runCommand({aggregate: coll.getName(), pipeline: [{$listSearchIndexes: {}}], cursor: {}}),
-    [ErrorCodes.SearchNotEnabled]);
+    [ErrorCodes.SearchNotEnabled],
+);
 
 // Check that a query with a $vectorSearch stage errors without mongot.
 assert.commandFailedWithCode(
-    coll.runCommand(
-        {aggregate: coll.getName(), cursor: {}, pipeline: [{$vectorSearch: {limit: 100}}]}),
-    [ErrorCodes.SearchNotEnabled]);
+    coll.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$vectorSearch: {limit: 100}}]}),
+    [ErrorCodes.SearchNotEnabled],
+);

@@ -12,16 +12,15 @@
 
 import {
     kTestOnlyClusterParameters,
-    testInvalidGetClusterParameter
+    testInvalidGetClusterParameter,
 } from "jstests/libs/cluster_server_parameter_utils.js";
 
 // name => name of cluster parameter to get
 // expectedValue => document that should be equal to document describing CP's value, excluding the
 // _id
 function checkGetClusterParameterMatch(conn, name, expectedValue) {
-    const adminDB = conn.getDB('admin');
-    const cps =
-        assert.commandWorked(adminDB.runCommand({getClusterParameter: name})).clusterParameters;
+    const adminDB = conn.getDB("admin");
+    const cps = assert.commandWorked(adminDB.runCommand({getClusterParameter: name})).clusterParameters;
     // confirm we got the document we were looking for.
     assert.eq(cps.length, 1);
     let actualCp = cps[0];
@@ -31,17 +30,22 @@ function checkGetClusterParameterMatch(conn, name, expectedValue) {
     delete actualCp._id;
     delete actualCp.clusterParameterTime;
     if (bsonWoCompare(actualCp, expectedValue) !== 0) {
-        jsTest.log('Server parameter mismatch for parameter ' +
-                   '\n' +
-                   'Expected: ' + tojson(expectedValue) + '\n' +
-                   'Actual: ' + tojson(actualCp));
+        jsTest.log(
+            "Server parameter mismatch for parameter " +
+                "\n" +
+                "Expected: " +
+                tojson(expectedValue) +
+                "\n" +
+                "Actual: " +
+                tojson(actualCp),
+        );
         return false;
     }
     return true;
 }
 
 function runSetClusterParameter(conn, name, value) {
-    assert.commandWorked(conn.getDB('admin').runCommand({setClusterParameter: {[name]: value}}));
+    assert.commandWorked(conn.getDB("admin").runCommand({setClusterParameter: {[name]: value}}));
 }
 
 let conn = db.getMongo();
@@ -52,7 +56,7 @@ let conn = db.getMongo();
 // We need to use assert.soon because, when running against an embedded router,
 // we might not see updates right away.
 for (const [name, data] of Object.entries(kTestOnlyClusterParameters)) {
-    if (data.hasOwnProperty('featureFlag')) {
+    if (data.hasOwnProperty("featureFlag")) {
         // Skip testing feature-flag-gated params for now.
         // Difficult to reliably get and check FCV in passthroughs.
         // Feature-flagged cluster parameters are covered in no-passthrough tests.
@@ -76,31 +80,32 @@ const tenantId = undefined;
 testInvalidGetClusterParameter(conn, tenantId);
 
 // Assert that setting a nonexistent parameter returns an error.
-const adminDB = conn.getDB('admin');
-assert.commandFailed(
-    adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}, tenantId));
+const adminDB = conn.getDB("admin");
+assert.commandFailed(adminDB.runCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}, tenantId));
 
 // Assert that running setClusterParameter with a scalar value fails.
-assert.commandFailed(
-    adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}, tenantId));
+assert.commandFailed(adminDB.runCommand({setClusterParameter: {testIntClusterParameter: 5}}, tenantId));
 
 // Assert that invalid direct writes to config.clusterParameters fail.
-assert.commandFailed(conn.getDB("config").clusterParameters.insert({
-    _id: 'testIntClusterParameter',
-    foo: 'bar',
-    clusterParameterTime: {"$timestamp": {t: 0, i: 0}}
-}));
+assert.commandFailed(
+    conn.getDB("config").clusterParameters.insert({
+        _id: "testIntClusterParameter",
+        foo: "bar",
+        clusterParameterTime: {"$timestamp": {t: 0, i: 0}},
+    }),
+);
 
 // Assert that the results of getClusterParameter: '*' all have an _id element, and that they are
 // consistent with individual gets.
 for (var retry = 0, completed = 0; retry < 2 && completed == 0; retry++) {
     completed = 1;
-    const allParameters =
-        assert.commandWorked(adminDB.runCommand({getClusterParameter: '*'})).clusterParameters;
+    const allParameters = assert.commandWorked(adminDB.runCommand({getClusterParameter: "*"})).clusterParameters;
     jsTest.log(allParameters);
     for (const param of allParameters) {
-        assert(param.hasOwnProperty("_id"),
-               'Entry in {getClusterParameter: "*"} result is missing _id key:\n' + tojson(param));
+        assert(
+            param.hasOwnProperty("_id"),
+            'Entry in {getClusterParameter: "*"} result is missing _id key:\n' + tojson(param),
+        );
         const name = param["_id"];
         try {
             checkGetClusterParameterMatch(conn, name, param);

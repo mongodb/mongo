@@ -7,10 +7,7 @@
  * @tags: [requires_persistence]
  */
 
-import {
-    runTests
-} from
-    "jstests/replsets/libs/rollback_with_coalesced_txn_table_updates_during_oplog_application_helper.js";
+import {runTests} from "jstests/replsets/libs/rollback_with_coalesced_txn_table_updates_during_oplog_application_helper.js";
 
 const initFunc = (primary, ns, counterTotal) => {
     // Set the batch size to 2 so we're testing batching but don't have to insert a huge number
@@ -23,11 +20,13 @@ const stopReplProducerOnDocumentFunc = (counterMajorityCommitted) => {
 };
 
 const opsFunc = (primary, ns, counterTotal, lsid) => {
-    assert.commandWorked(primary.getCollection(ns).runCommand("insert", {
-        documents: Array.from({length: counterTotal}, (_, i) => ({_id: i})),
-        lsid,
-        txnNumber: NumberLong(2),
-    }));
+    assert.commandWorked(
+        primary.getCollection(ns).runCommand("insert", {
+            documents: Array.from({length: counterTotal}, (_, i) => ({_id: i})),
+            lsid,
+            txnNumber: NumberLong(2),
+        }),
+    );
 };
 
 const stmtMajorityCommittedFunc = (primary, ns, counterMajorityCommitted) => {
@@ -37,13 +36,14 @@ const stmtMajorityCommittedFunc = (primary, ns, counterMajorityCommitted) => {
 const validateFunc = (secondary1, ns, counterMajorityCommitted, counterTotal, lsid) => {
     // Make sure we don't re-execute operations that have already been inserted by making sure we
     // we don't get a 'DuplicateKeyError'.
-    assert.commandWorked(secondary1.getCollection(ns).runCommand("insert", {
-        documents: Array.from({length: counterTotal}, (_, i) => ({_id: i})),
-        lsid,
-        txnNumber: NumberLong(2),
-        writeConcern: {w: 5},
-    }));
+    assert.commandWorked(
+        secondary1.getCollection(ns).runCommand("insert", {
+            documents: Array.from({length: counterTotal}, (_, i) => ({_id: i})),
+            lsid,
+            txnNumber: NumberLong(2),
+            writeConcern: {w: 5},
+        }),
+    );
 };
 
-runTests(
-    initFunc, stopReplProducerOnDocumentFunc, opsFunc, stmtMajorityCommittedFunc, validateFunc);
+runTests(initFunc, stopReplProducerOnDocumentFunc, opsFunc, stmtMajorityCommittedFunc, validateFunc);

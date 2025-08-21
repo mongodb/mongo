@@ -1,4 +1,3 @@
-
 /**
  * Test that the ingress request rate limiter works correctly and exposes the right metrics.
  * @tags: [requires_fcv_80]
@@ -26,30 +25,34 @@ import {
 function testServerParameter(conn) {
     const db = conn.getDB("admin");
     // Test setting burst capacity.
-    assert.commandFailedWithCode(db.adminCommand({
-        setParameter: 1,
-        ingressRequestAdmissionBurstCapacitySecs: -1,
-    }),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        db.adminCommand({
+            setParameter: 1,
+            ingressRequestAdmissionBurstCapacitySecs: -1,
+        }),
+        ErrorCodes.BadValue,
+    );
 
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstCapacitySecs: 1}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstCapacitySecs: 1}));
 
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstCapacitySecs: 2}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, ingressRequestAdmissionBurstCapacitySecs: 2}));
 
     // Test setting admission rate
 
-    assert.commandFailedWithCode(db.adminCommand({
-        setParameter: 1,
-        ingressRequestAdmissionRatePerSec: -1,
-    }),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        db.adminCommand({
+            setParameter: 1,
+            ingressRequestAdmissionRatePerSec: -1,
+        }),
+        ErrorCodes.BadValue,
+    );
 
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        ingressRequestAdmissionRatePerSec: 1,
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            ingressRequestAdmissionRatePerSec: 1,
+        }),
+    );
 }
 
 // Arbitrary but low burst capacity in the amount of commands allowed to pass through.
@@ -66,23 +69,25 @@ const extraRequests = 3;
  * This function was factored out since some tests other than testRateLimiterMetrics are doing
  * the same checks.
  */
-function assertMetrics(
-    initialStatus, finalStatus, expectedAmountOfSuccess, expectedAmountOfFailures) {
+function assertMetrics(initialStatus, finalStatus, expectedAmountOfSuccess, expectedAmountOfFailures) {
     const initialIngressRequestRateLimiter = initialStatus.network.ingressRequestRateLimiter;
     const initialInserts = initialStatus.metrics.commands.insert.total;
 
     const ingressRequestRateLimiter = finalStatus.network.ingressRequestRateLimiter;
     const inserts = finalStatus.metrics.commands.insert.total;
 
-    assert.eq(ingressRequestRateLimiter.successfulAdmissions -
-                  initialIngressRequestRateLimiter.successfulAdmissions,
-              expectedAmountOfSuccess);
-    assert.eq(ingressRequestRateLimiter.rejectedAdmissions -
-                  initialIngressRequestRateLimiter.rejectedAdmissions,
-              expectedAmountOfFailures);
-    assert.eq(ingressRequestRateLimiter.attemptedAdmissions -
-                  initialIngressRequestRateLimiter.attemptedAdmissions,
-              expectedAmountOfSuccess + expectedAmountOfFailures);
+    assert.eq(
+        ingressRequestRateLimiter.successfulAdmissions - initialIngressRequestRateLimiter.successfulAdmissions,
+        expectedAmountOfSuccess,
+    );
+    assert.eq(
+        ingressRequestRateLimiter.rejectedAdmissions - initialIngressRequestRateLimiter.rejectedAdmissions,
+        expectedAmountOfFailures,
+    );
+    assert.eq(
+        ingressRequestRateLimiter.attemptedAdmissions - initialIngressRequestRateLimiter.attemptedAdmissions,
+        expectedAmountOfSuccess + expectedAmountOfFailures,
+    );
     assert.eq(inserts - initialInserts, expectedAmountOfSuccess);
 
     // We also ensure all token have been consumed
@@ -101,8 +106,7 @@ function testRateLimiterMetrics(conn, exemptConn) {
     // Here we calculate the amount of requests that are expected to be successful using the
     // available amount of token in the rate limiter
     const requestAmount = maxBurstRequests + extraRequests;
-    const expectedAmountOfSuccess =
-        Math.floor(initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens);
+    const expectedAmountOfSuccess = Math.floor(initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens);
     const expectedAmountOfFailures = requestAmount - expectedAmountOfSuccess;
 
     // We want to ensure we do at least one successful request and one failed request
@@ -269,12 +273,10 @@ function runTestCompressed() {
     // We calculate the amount of expected success and failures depending on the amount of token
     // available
     const initialStatus = admin.serverStatus();
-    const initialAvailableTokens =
-        initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens;
+    const initialAvailableTokens = initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens;
 
     const requestAmount = maxBurstRequests + extraRequests;
-    const expectedAmountOfSuccess =
-        Math.floor(initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens);
+    const expectedAmountOfSuccess = Math.floor(initialStatus.network.ingressRequestRateLimiter.totalAvailableTokens);
     const expectedAmountOfFailures = requestAmount - expectedAmountOfSuccess;
 
     // Here we run a parallel shell so we can enable network compression
@@ -284,16 +286,14 @@ function runTestCompressed() {
             (host, params, exemptAppName, requestAmount) => {
                 const exemptConn = new Mongo(`mongodb://${host}/?appName=${exemptAppName}`);
                 exemptConn.getDB("admin").auth("admin", "pwd");
-                assert.commandWorked(
-                    exemptConn.adminCommand({setParameter: 1, ...JSON.parse(params)}));
+                assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ...JSON.parse(params)}));
 
                 // We run inserts command that will either pass or fail. When it fails, we validate
                 // the error code and label
                 for (let i = 0; i < requestAmount; ++i) {
                     const assertContainSystemOverloadedErrorLabel = (res) => {
                         assert(res.hasOwnProperty("errorLabels"), res);
-                        assert.sameMembers(["SystemOverloadedError", "RetryableError"],
-                                           res.errorLabels);
+                        assert.sameMembers(["SystemOverloadedError", "RetryableError"], res.errorLabels);
                     };
 
                     const collName = `${jsTest.name()}_coll`;
@@ -301,21 +301,21 @@ function runTestCompressed() {
                     const result = db.runCommand({insert: collName, documents: [{dummy: 1}]});
 
                     if (result.ok === 0) {
-                        assert.commandFailedWithCode(result,
-                                                     ErrorCodes.IngressRequestRateLimitExceeded);
+                        assert.commandFailedWithCode(result, ErrorCodes.IngressRequestRateLimitExceeded);
                         assertContainSystemOverloadedErrorLabel(result);
                     }
                 }
-                assert.commandWorked(exemptConn.adminCommand(
-                    {setParameter: 1, ingressRequestRateLimiterEnabled: 0}));
+                assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled: 0}));
             },
             mongod.host,
             JSON.stringify(kParams),
             kRateLimiterExemptAppName,
-            requestAmount),
+            requestAmount,
+        ),
         mongod.port,
         false,
-        ...compressionArgs);
+        ...compressionArgs,
+    );
 
     shell();
 

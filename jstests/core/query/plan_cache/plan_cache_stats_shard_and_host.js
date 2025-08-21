@@ -38,8 +38,7 @@ function filterPlanCacheEntriesByKey(planCacheKey, planCacheContents) {
 let planCacheContents = filterPlanCacheEntriesByKey(planCacheKey, planCache.list());
 
 // We expect every shard that has a chunk for the collection to have produced a plan cache entry.
-assert.eq(
-    FixtureHelpers.numberOfShardsForCollection(coll), planCacheContents.length, planCacheContents);
+assert.eq(FixtureHelpers.numberOfShardsForCollection(coll), planCacheContents.length, planCacheContents);
 
 // Check that the "host" field is present for every plan cache entry.
 for (const entry of planCacheContents) {
@@ -50,11 +49,12 @@ for (const entry of planCacheContents) {
 // Otherwise, we expect "shard" to be absent. In either case, this should be true for each
 // individual plan cache entry.
 for (const entry of planCacheContents) {
-    assert.eq(FixtureHelpers.isMongos(db) ||
-                  (TestData.hasOwnProperty("testingReplicaSetEndpoint") &&
-                   TestData.testingReplicaSetEndpoint),
-              entry.hasOwnProperty("shard"),
-              entry);
+    assert.eq(
+        FixtureHelpers.isMongos(db) ||
+            (TestData.hasOwnProperty("testingReplicaSetEndpoint") && TestData.testingReplicaSetEndpoint),
+        entry.hasOwnProperty("shard"),
+        entry,
+    );
 }
 
 // If we group the results by shard or host, then we should only get one plan cache entry for each
@@ -62,14 +62,18 @@ for (const entry of planCacheContents) {
 // every shard. But for now, we use regular host targeting to choose a particular host in each
 // shard.
 planCacheContents = filterPlanCacheEntriesByKey(
-    planCacheKey, planCache.list([{$group: {_id: "$shard", count: {$sum: 1}}}]));
+    planCacheKey,
+    planCache.list([{$group: {_id: "$shard", count: {$sum: 1}}}]),
+);
 
 for (const entry of planCacheContents) {
     assert.eq(entry.count, 1, entry);
 }
 
 planCacheContents = filterPlanCacheEntriesByKey(
-    planCacheKey, planCache.list([{$group: {_id: "$host", count: {$sum: 1}}}]));
+    planCacheKey,
+    planCache.list([{$group: {_id: "$host", count: {$sum: 1}}}]),
+);
 
 for (const entry of planCacheContents) {
     assert.eq(entry.count, 1, entry);

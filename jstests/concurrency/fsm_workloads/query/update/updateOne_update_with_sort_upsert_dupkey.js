@@ -14,11 +14,9 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/update/updateOne_update_with_sort_and_upsert.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/update/updateOne_update_with_sort_and_upsert.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Use the same workload name as the database name, since the workload
     // name is assumed to be unique.
     $config.data.uniqueDBName = jsTestName();
@@ -30,21 +28,23 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 2;
 
     // The query predicate is on the _id unique index so that we
-    $config.states.updateOne = function(db, collName) {
+    $config.states.updateOne = function (db, collName) {
         const updateCmd = {
             update: collName,
-            updates: [{
-                q: {_id: 2},
-                u: {$inc: {sortField: 1}},
-                multi: false,
-                sort: {sortField: -1},
-                upsert: true
-            }]
+            updates: [
+                {
+                    q: {_id: 2},
+                    u: {$inc: {sortField: 1}},
+                    multi: false,
+                    sort: {sortField: -1},
+                    upsert: true,
+                },
+            ],
         };
 
         var res = db.runCommand(updateCmd);
         if (isMongod(db)) {
-            if (res.hasOwnProperty('upserted') && res.upserted.length != 0) {
+            if (res.hasOwnProperty("upserted") && res.upserted.length != 0) {
                 // Case 1: The _id value is not yet present, so a new document is added to the
                 // collection.
                 assert.eq(res.nModified, 0, tojson(res));
@@ -56,7 +56,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
     };
 
-    $config.teardown = function(db, collName) {
+    $config.teardown = function (db, collName) {
         var docs = db[collName].find().toArray();
 
         // Assert that when 2 threads attempt an updateOne with an upsert on a query with the same

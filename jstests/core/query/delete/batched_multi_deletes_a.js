@@ -12,6 +12,6 @@
  * ]
  */
 
-import {runBatchedMultiDeletesTest} from 'jstests/core/query/delete/batched_multi_deletes.js';
+import {runBatchedMultiDeletesTest} from "jstests/core/query/delete/batched_multi_deletes.js";
 
 runBatchedMultiDeletesTest(db[jsTestName()], {a: {$gte: 0}});

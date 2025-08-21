@@ -16,22 +16,27 @@ function runAnalyzerDocTest(conn) {
     const collName = "testColl";
     const ns = dbName + "." + collName;
 
-    assert.commandFailedWithCode(configColl.insert({_id: ns, unknownField: 0}),
-                                 ErrorCodes.IDLFailedToParse /* IDL required field error */);
+    assert.commandFailedWithCode(
+        configColl.insert({_id: ns, unknownField: 0}),
+        ErrorCodes.IDLFailedToParse /* IDL required field error */,
+    );
 
     assert.commandWorked(conn.getDB(dbName).createCollection(collName));
-    assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}));
-    assert.commandFailedWithCode(configColl.update({}, {unknownField: 0}),
-                                 ErrorCodes.IDLFailedToParse /* IDL required field error */);
+    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}));
+    assert.commandFailedWithCode(
+        configColl.update({}, {unknownField: 0}),
+        ErrorCodes.IDLFailedToParse /* IDL required field error */,
+    );
 }
 
 function runMongosDocTest(conn) {
     const configColl = conn.getCollection("config.mongos");
     assert.commandFailedWithCode(configColl.insert({_id: "mongos0"}), ErrorCodes.NoSuchKey);
 
-    jsTest.log("Wait for the mongos to report its uptime, i.e. for its config.mongos document " +
-               "to exist. Otherwise, the update below would be a no-op and not fail");
+    jsTest.log(
+        "Wait for the mongos to report its uptime, i.e. for its config.mongos document " +
+            "to exist. Otherwise, the update below would be a no-op and not fail",
+    );
     assert.soon(() => {
         return configColl.find().itcount() == 1;
     });
@@ -46,7 +51,8 @@ function runMongosDocTest(conn) {
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();

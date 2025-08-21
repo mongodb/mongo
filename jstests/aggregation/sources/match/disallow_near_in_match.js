@@ -15,13 +15,13 @@ assert.commandWorked(coll.insert({point2d: [0.25, 0.35]}));
 assert.commandWorked(coll.insert({point2dsphere: [0.25, 0.35]}));
 
 const nearQuery = {
-    point2d: {$near: [0, 0]}
+    point2d: {$near: [0, 0]},
 };
 const nearSphereQuery = {
-    point2dsphere: {$nearSphere: [0, 0]}
+    point2dsphere: {$nearSphere: [0, 0]},
 };
 const geoNearQuery = {
-    point2d: {$geoNear: [0, 0]}
+    point2d: {$geoNear: [0, 0]},
 };
 
 // Test that normal finds return a result.

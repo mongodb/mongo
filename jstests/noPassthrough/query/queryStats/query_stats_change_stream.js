@@ -6,14 +6,12 @@
  *   requires_sharding,
  * ]
  */
-import {
-    assertDropAndRecreateCollection,
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     checkChangeStreamEntry,
     getLatestQueryStatsEntry,
     getNumberOfGetMoresUntilNextDocForChangeStream,
-    getQueryStatsServerParameters
+    getQueryStatsServerParameters,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -23,15 +21,14 @@ function testCollectionChangeStream(conn) {
     assertDropAndRecreateCollection(db, "coll");
 
     // Check change stream explain is recorded.
-    assert.commandWorked(
-        db.coll.explain({"verbosity": "queryPlanner"}).aggregate([{"$changeStream": {}}]));
+    assert.commandWorked(db.coll.explain({"verbosity": "queryPlanner"}).aggregate([{"$changeStream": {}}]));
     let queryStatsEntry = getLatestQueryStatsEntry(db);
     checkChangeStreamEntry({
         queryStatsEntry: queryStatsEntry,
         db: db,
         collectionName: "coll",
         numExecs: 1,
-        numDocsReturned: 0
+        numDocsReturned: 0,
     });
     assert(queryStatsEntry.key.hasOwnProperty("explain"));
 
@@ -46,7 +43,7 @@ function testCollectionChangeStream(conn) {
         db: db,
         collectionName: "coll",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     // Insert document into a collection and make sure retrieving the information updates the query
@@ -60,7 +57,7 @@ function testCollectionChangeStream(conn) {
         db: db,
         collectionName: "coll",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     // Close cursor and check that it updates query stats entry.
@@ -72,7 +69,7 @@ function testCollectionChangeStream(conn) {
         db: db,
         collectionName: "coll",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
     // Closing the cursor should result in 0 ms for the operation.
     assert.eq(queryStatsEntry.metrics.lastExecutionMicros, 0);
@@ -93,7 +90,7 @@ function testDatabaseChangeStream(conn) {
         db: db,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     // Insert document into a collection and make sure retrieving the information updates the query
@@ -107,7 +104,7 @@ function testDatabaseChangeStream(conn) {
         db: db,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     // Insert document into a different collection and make sure retrieving the information updates
@@ -120,7 +117,7 @@ function testDatabaseChangeStream(conn) {
         db: db,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     // Close cursor and check that it increases numExecs.
@@ -132,7 +129,7 @@ function testDatabaseChangeStream(conn) {
         db: db,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     // Closing the cursor should result in 0 ms for the operation.
@@ -155,7 +152,7 @@ function testWholeClusterChangeStream(conn) {
         db: dbA,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     // Insert document into a database and make sure retrieving the information updates the query
@@ -169,7 +166,7 @@ function testWholeClusterChangeStream(conn) {
         db: dbA,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     // Insert document into different database and make sure retrieving the information updates the
@@ -183,7 +180,7 @@ function testWholeClusterChangeStream(conn) {
         db: dbA,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     // Close cursor and check that it increases numExecs.
@@ -195,7 +192,7 @@ function testWholeClusterChangeStream(conn) {
         db: dbA,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
     // Closing the cursor should result in 0 ms for the operation.
     assert.eq(queryStatsEntry.metrics.lastExecutionMicros, 0);
@@ -227,7 +224,7 @@ function runTest(conn) {
         mongosOptions: {
             setParameter: {
                 internalQueryStatsRateLimit: -1,
-            }
+            },
         },
     });
     runTest(st.s);

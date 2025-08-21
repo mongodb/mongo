@@ -3,9 +3,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-import {
-    withRetryOnTransientTxnErrorIncrementTxnNum
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnErrorIncrementTxnNum} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kCollName = "testColl";
@@ -17,20 +15,19 @@ function verifyInternalSessionsForExternalClients(testDB, {expectFail}) {
             cmd.txnNumber = NumberLong(txnNum);
 
             if (expectFail) {
-                const res =
-                    assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
-                assert.eq(res.errmsg,
-                          "Internal sessions are only allowed for internal clients",
-                          tojson(res));
+                const res = assert.commandFailedWithCode(testDB.runCommand(cmd), ErrorCodes.InvalidOptions);
+                assert.eq(res.errmsg, "Internal sessions are only allowed for internal clients", tojson(res));
             } else {
                 assert.commandWorked(testDB.runCommand(cmd));
-                assert.commandWorked(testDB.runCommand({
-                    commitTransaction: 1,
-                    lsid: cmd.lsid,
-                    txnNumber: NumberLong(txnNum),
-                    txnRetryCounter: cmd.txnRetryCounter,
-                    autocommit: false,
-                }));
+                assert.commandWorked(
+                    testDB.runCommand({
+                        commitTransaction: 1,
+                        lsid: cmd.lsid,
+                        txnNumber: NumberLong(txnNum),
+                        txnRetryCounter: cmd.txnRetryCounter,
+                        autocommit: false,
+                    }),
+                );
             }
         });
     }
@@ -66,19 +63,19 @@ function verifyTxnRetryCounterForExternalClients(testDB, {expectFail}) {
         findCmd.txnNumber = NumberLong(txnNum);
 
         if (expectFail) {
-            const res =
-                assert.commandFailedWithCode(testDB.runCommand(findCmd), ErrorCodes.InvalidOptions);
-            assert.eq(
-                res.errmsg, "txnRetryCounter is only allowed for internal clients", tojson(res));
+            const res = assert.commandFailedWithCode(testDB.runCommand(findCmd), ErrorCodes.InvalidOptions);
+            assert.eq(res.errmsg, "txnRetryCounter is only allowed for internal clients", tojson(res));
         } else {
             assert.commandWorked(testDB.runCommand(findCmd));
-            assert.commandWorked(testDB.runCommand({
-                commitTransaction: 1,
-                lsid: findCmd.lsid,
-                txnNumber: findCmd.txnNumber,
-                txnRetryCounter: findCmd.txnRetryCounter,
-                autocommit: false,
-            }));
+            assert.commandWorked(
+                testDB.runCommand({
+                    commitTransaction: 1,
+                    lsid: findCmd.lsid,
+                    txnNumber: findCmd.txnNumber,
+                    txnRetryCounter: findCmd.txnRetryCounter,
+                    autocommit: false,
+                }),
+            );
         }
     });
 }
@@ -115,7 +112,7 @@ mongosDB.logout();
 
 jsTestLog("Verify internal session and txnRetryCounter work with internal privileges");
 
-authutil.asCluster(st.s, keyFile, function() {
+authutil.asCluster(st.s, keyFile, function () {
     verifyTxnRetryCounterForExternalClients(mongosDB, {expectFail: false});
     verifyInternalSessionsForExternalClients(mongosDB, {expectFail: false});
 });

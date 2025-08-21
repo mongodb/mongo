@@ -51,20 +51,21 @@ function getShellErrorPipelines(nullStr) {
         [{$group: {_id: "$foo", [nullStr]: {$sum: "$bar"}}}],
         [{$match: {[nullStr]: "foo"}}],
         [{$match: {$or: [{"foo": "bar"}, {[nullStr]: "baz"}]}}],
-        [{
-            $match:
-                {$jsonSchema: {required: ["foo"], properties: {[nullStr]: {bsonType: "string"}}}}
-        }],
-        [{$merge: {into: "coll", on: "_id", let : {[nullStr]: "$foo"}}}],
+        [
+            {
+                $match: {$jsonSchema: {required: ["foo"], properties: {[nullStr]: {bsonType: "string"}}}},
+            },
+        ],
+        [{$merge: {into: "coll", on: "_id", let: {[nullStr]: "$foo"}}}],
         [{$project: {[nullStr]: 1}}],
-        [{$project: {result: {$let: {vars: {[nullStr]: "$foo"}, in : "$$nullStr"}}}}],
+        [{$project: {result: {$let: {vars: {[nullStr]: "$foo"}, in: "$$nullStr"}}}}],
         [{$replaceRoot: {newRoot: {[nullStr]: "$foo"}}}],
         [{$replaceWith: {[nullStr]: "$foo"}}],
         [{$set: {[nullStr]: "$foo"}}],
         [{$setWindowFields: {sortBy: {[nullStr]: 1}, output: {count: {$sum: 1}}}}],
         [{$setWindowFields: {output: {[nullStr]: {count: {$sum: 1}}}}}],
         [{$sort: {[nullStr]: 1}}],
-        [{$unset: {[nullStr]: ""}}]
+        [{$unset: {[nullStr]: ""}}],
     ];
 }
 
@@ -88,16 +89,22 @@ function getFieldPathErrorPipelines(nullStr) {
         [{$bucket: {groupBy: "$foo", boundaries: [0, 5, 10], default: nullStr}}],
         [{$fill: {partitionBy: nullStr, sortBy: {foo: 1}, output: {out: {method: "linear"}}}}],
         [{$setWindowFields: {partitionBy: nullStr, output: {count: {$sum: 1}}}}],
-        [{$lookup: {
+        [
+            {
+                $lookup: {
                     from: "foo",
                     localField: "local",
                     foreignField: "foreign",
                     as: "result",
-                    pipeline: [{
-                        $sortByCount: "$$x"
-                    }],
-                    let: {x : nullStr}
-        }}]
+                    pipeline: [
+                        {
+                            $sortByCount: "$$x",
+                        },
+                    ],
+                    let: {x: nullStr},
+                },
+            },
+        ],
     ];
 
     const nullStrComparisons = [
@@ -107,11 +114,10 @@ function getFieldPathErrorPipelines(nullStr) {
         {$gte: ["foo", nullStr]},
         {$lt: ["foo", nullStr]},
         {$lte: ["foo", nullStr]},
-        {$in: ["foo", [nullStr]]}
+        {$in: ["foo", [nullStr]]},
     ];
 
-    pipelines =
-        pipelines.concat(nullStrComparisons.map(expr => [{$match: {$expr: {field: expr}}}]));
+    pipelines = pipelines.concat(nullStrComparisons.map((expr) => [{$match: {$expr: {field: expr}}}]));
 
     // TODO SERVER-99206: Add testing for all expressions and modify the $listMqlEntities pipeline
     // below to confirm that every expression is covered.
@@ -129,14 +135,14 @@ function getFieldPathErrorPipelines(nullStr) {
         {$toLower: nullStr},
         {$toString: nullStr},
         {$toUpper: nullStr},
-        {$reduce: {input: [nullStr], initialValue: "", in : ""}},
-        {$reduce: {input: ["foo"], initialValue: nullStr, in : ""}},
-        {$reduce: {input: ["foo"], initialValue: "", in : nullStr}},
+        {$reduce: {input: [nullStr], initialValue: "", in: ""}},
+        {$reduce: {input: ["foo"], initialValue: nullStr, in: ""}},
+        {$reduce: {input: ["foo"], initialValue: "", in: nullStr}},
         {$regexMatch: {input: nullStr, regex: "foo"}},
         {$getField: nullStr},
     ];
 
-    return pipelines.concat(expressionTests.map(operator => [{$project: {field: operator}}]));
+    return pipelines.concat(expressionTests.map((operator) => [{$project: {field: operator}}]));
 }
 
 // Confirm the behavior for all the pipelines that should succeed with null-byte literal strings and
@@ -144,7 +150,7 @@ function getFieldPathErrorPipelines(nullStr) {
 for (const nullStr of nullByteStrs) {
     for (const str of getStringUses(nullStr)) {
         for (const pipeline of getFieldPathErrorPipelines(str)) {
-            assert.commandWorked(coll.runCommand('aggregate', {pipeline: pipeline, cursor: {}}));
+            assert.commandWorked(coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}}));
         }
     }
     // When there is an embedded null byte in a field path, we expect error code 16411 in
@@ -162,176 +168,196 @@ function getErrorPipelines(nullStr) {
     return [
         {
             pipeline: [{$bucket: {groupBy: nullStr, boundaries: [0, 5, 10], default: "Other"}}],
-            codes: [40202, 16411]
+            codes: [40202, 16411],
         },
         {
             pipeline: [{$bucketAuto: {groupBy: nullStr, buckets: 5, output: {count: {$sum: 1}}}}],
-            codes: [40239, 16411]
+            codes: [40239, 16411],
         },
         {pipeline: [{$changeStream: {fullDocument: nullStr}}], codes: [ErrorCodes.BadValue]},
         {
             pipeline: [{$changeStream: {fullDocumentBeforeChange: nullStr}}],
-            codes: [ErrorCodes.BadValue]
+            codes: [ErrorCodes.BadValue],
         },
         {pipeline: [{$count: nullStr}], codes: [40159, 40158]},
         {
             pipeline: [{$densify: {field: nullStr, range: {step: 1, bounds: "full"}}}],
-            codes: [16411, 16410]
+            codes: [16411, 16410],
         },
         {
             pipeline: [{$densify: {field: "foo", range: {step: 1, bounds: nullStr}}}],
-            codes: [5946802]
+            codes: [5946802],
         },
         {
-            pipeline: [{
-                $densify: {
-                    field: "foo",
-                    partitionByFields: [nullStr],
-                    range: {step: 1, bounds: "full"}
-                }
-            }],
-            codes: [16411, 16410, 8993000]
+            pipeline: [
+                {
+                    $densify: {
+                        field: "foo",
+                        partitionByFields: [nullStr],
+                        range: {step: 1, bounds: "full"},
+                    },
+                },
+            ],
+            codes: [16411, 16410, 8993000],
         },
         {
             pipeline: [{$fill: {partitionByFields: [nullStr], output: {foo: {value: "bar"}}}}],
-            codes: [16411, 16410]
+            codes: [16411, 16410],
         },
         {
-            pipeline:
-                [{$geoNear: {near: {type: "Point", coordinates: [0, 0]}, distanceField: nullStr}}],
-            codes: [16411, 16410]
+            pipeline: [{$geoNear: {near: {type: "Point", coordinates: [0, 0]}, distanceField: nullStr}}],
+            codes: [16411, 16410],
         },
         {
-            pipeline: [{
-                $geoNear: {
-                    near: {type: "Point", coordinates: [0, 0]},
-                    distanceField: "foo",
-                    includeLocs: nullStr
-                }
-            }],
-            codes: [16411, 16410]
+            pipeline: [
+                {
+                    $geoNear: {
+                        near: {type: "Point", coordinates: [0, 0]},
+                        distanceField: "foo",
+                        includeLocs: nullStr,
+                    },
+                },
+            ],
+            codes: [16411, 16410],
         },
         {
-            pipeline: [{
-                $graphLookup: {
-                    from: nullStr,
-                    startWith: "$foo",
-                    connectFromField: "parentId",
-                    connectToField: "_id",
-                    as: "results"
-                }
-            }],
-            codes: [ErrorCodes.InvalidNamespace]
+            pipeline: [
+                {
+                    $graphLookup: {
+                        from: nullStr,
+                        startWith: "$foo",
+                        connectFromField: "parentId",
+                        connectToField: "_id",
+                        as: "results",
+                    },
+                },
+            ],
+            codes: [ErrorCodes.InvalidNamespace],
         },
         {
-            pipeline: [{
-                $graphLookup: {
-                    from: "coll",
-                    startWith: "$foo",
-                    connectFromField: nullStr,
-                    connectToField: "_id",
-                    as: "results"
-                }
-            }],
-            codes: [16411, 16410]
+            pipeline: [
+                {
+                    $graphLookup: {
+                        from: "coll",
+                        startWith: "$foo",
+                        connectFromField: nullStr,
+                        connectToField: "_id",
+                        as: "results",
+                    },
+                },
+            ],
+            codes: [16411, 16410],
         },
         {
-            pipeline: [{
-                $graphLookup: {
-                    from: "coll",
-                    startWith: "$foo",
-                    connectFromField: "parentId",
-                    connectToField: nullStr,
-                    as: "results"
-                }
-            }],
-            codes: [16411, 16410]
+            pipeline: [
+                {
+                    $graphLookup: {
+                        from: "coll",
+                        startWith: "$foo",
+                        connectFromField: "parentId",
+                        connectToField: nullStr,
+                        as: "results",
+                    },
+                },
+            ],
+            codes: [16411, 16410],
         },
         {
-            pipeline: [{
-                $graphLookup: {
-                    from: "coll",
-                    startWith: "$foo",
-                    connectFromField: "parentId",
-                    connectToField: "_id",
-                    as: nullStr
-                }
-            }],
-            codes: [16411, 16410]
+            pipeline: [
+                {
+                    $graphLookup: {
+                        from: "coll",
+                        startWith: "$foo",
+                        connectFromField: "parentId",
+                        connectToField: "_id",
+                        as: nullStr,
+                    },
+                },
+            ],
+            codes: [16411, 16410],
         },
         {
-            pipeline: [{
-                $graphLookup: {
-                    from: "coll",
-                    startWith: "$foo",
-                    connectFromField: "parentId",
-                    connectToField: "_id",
-                    as: "results",
-                    depthField: nullStr
-                }
-            }],
-            codes: [16411, 16410]
+            pipeline: [
+                {
+                    $graphLookup: {
+                        from: "coll",
+                        startWith: "$foo",
+                        connectFromField: "parentId",
+                        connectToField: "_id",
+                        as: "results",
+                        depthField: nullStr,
+                    },
+                },
+            ],
+            codes: [16411, 16410],
         },
         {
-            pipeline: [{
-                $lookup: {
-                    from: nullStr,
-                    localField: "local",
-                    foreignField: "foreign",
-                    as: "result"
-                }
-            }],
-            codes: [ErrorCodes.InvalidNamespace]
+            pipeline: [
+                {
+                    $lookup: {
+                        from: nullStr,
+                        localField: "local",
+                        foreignField: "foreign",
+                        as: "result",
+                    },
+                },
+            ],
+            codes: [ErrorCodes.InvalidNamespace],
         },
         {
-            pipeline: [{
-                $lookup: {
-                    from: "foo",
-                    localField: nullStr,
-                    foreignField: "foreign",
-                    as: "result"
-                }
-            }],
-            codes: [16411, 16410]
+            pipeline: [
+                {
+                    $lookup: {
+                        from: "foo",
+                        localField: nullStr,
+                        foreignField: "foreign",
+                        as: "result",
+                    },
+                },
+            ],
+            codes: [16411, 16410],
         },
         {
-            pipeline: [{
-                $lookup: {
-                    from: "foo",
-                    localField: "local",
-                    foreignField: nullStr,
-                    as: "result"
-                }
-            }],
-            codes: [16411, 16410]
+            pipeline: [
+                {
+                    $lookup: {
+                        from: "foo",
+                        localField: "local",
+                        foreignField: nullStr,
+                        as: "result",
+                    },
+                },
+            ],
+            codes: [16411, 16410],
         },
         {
-            pipeline: [{
-                $lookup: {
-                    from: "foo",
-                    localField: "local",
-                    foreignField: "foreign",
-                    as: nullStr
-                }
-            }],
-            codes: [16411, 16410]
+            pipeline: [
+                {
+                    $lookup: {
+                        from: "foo",
+                        localField: "local",
+                        foreignField: "foreign",
+                        as: nullStr,
+                    },
+                },
+            ],
+            codes: [16411, 16410],
         },
         {pipeline: [{$merge: {into: nullStr}}], codes: [ErrorCodes.InvalidNamespace]},
         {pipeline: [{$merge: {into: "coll", on: nullStr}}], codes: [16411, 16410]},
         {pipeline: [{$out: {db: nullStr, coll: "coll"}}], codes: [ErrorCodes.InvalidNamespace]},
         {pipeline: [{$out: {db: "db", coll: nullStr}}], codes: [ErrorCodes.InvalidNamespace]},
         {
-            pipeline:
-                [{$project: {field: {$setField: {field: nullStr, input: {}, value: "newField"}}}}],
-            codes: [9534700, 16411]
+            pipeline: [{$project: {field: {$setField: {field: nullStr, input: {}, value: "newField"}}}}],
+            codes: [9534700, 16411],
         },
         {
             pipeline: [{$project: {field: {$unsetField: {field: nullStr, input: {}}}}}],
-            codes: [9534700, 16411]
+            codes: [9534700, 16411],
         },
         {
             pipeline: [{$project: {matches: {$regexMatch: {input: "$foo", regex: nullStr}}}}],
-            codes: [51109, 16411]
+            codes: [51109, 16411],
         },
         {pipeline: [{$replaceRoot: {newRoot: nullStr}}], codes: [40228, 16411, 8105800]},
         {pipeline: [{$replaceWith: nullStr}], codes: [40228, 16411, 8105800]},
@@ -352,10 +378,11 @@ for (const nullStr of nullByteStrs) {
 }
 
 // Use $listMqlEntities to confirm that all aggregation stages have been tested for null byte input.
-const aggStages = db.getSiblingDB("admin")
-                      .aggregate([{$listMqlEntities: {entityType: "aggregationStages"}}])
-                      .toArray()
-                      .map(obj => obj.name);
+const aggStages = db
+    .getSiblingDB("admin")
+    .aggregate([{$listMqlEntities: {entityType: "aggregationStages"}}])
+    .toArray()
+    .map((obj) => obj.name);
 
 // The following pipeline stages do not need to be tested for null byte input. Unless noted
 // otherwise, assume these pipelines are skipped because they do not accept string input.
@@ -390,8 +417,8 @@ const skips = new Set([
     "$_internalShredDocuments",
     "$_internalSplitPipeline",
     "$_internalStreamingGroup",
-    "$_internalUnpackBucket",  // Tested in timeseries_explicit_unpack_bucket.js.
-    "$_unpackBucket",          // Tested in timeseries_explicit_unpack_bucket.js.
+    "$_internalUnpackBucket", // Tested in timeseries_explicit_unpack_bucket.js.
+    "$_unpackBucket", // Tested in timeseries_explicit_unpack_bucket.js.
     "$backupCursor",
     "$backupCursorExtend",
     "$changeStreamSplitLargeEvent",
@@ -408,7 +435,7 @@ const skips = new Set([
     "$listClusterCatalog",
     "$listLocalSessions",
     "$listMqlEntities",
-    "$listSampledQueries",  // Tested in list_sampled_queries.js.
+    "$listSampledQueries", // Tested in list_sampled_queries.js.
     "$listSearchIndexes",
     "$listSessions",
     "$mergeCursors",
@@ -435,18 +462,16 @@ const skips = new Set([
     // TODO SERVER-108821: Remove $testFoo and $testBar from the skips list once extensions aren't
     // listed by $listMqlEntities.
     "$testFoo",
-    "$testBar"
+    "$testBar",
 ]);
 
 const allPipelines = [
     ...getShellErrorPipelines(""),
     ...getFieldPathErrorPipelines(""),
-    ...getErrorPipelines("").map(obj => obj.pipeline)
+    ...getErrorPipelines("").map((obj) => obj.pipeline),
 ];
-const testedStages =
-    new Set(allPipelines.flatMap(pipeline => pipeline.map(obj => Object.keys(obj)[0])));
+const testedStages = new Set(allPipelines.flatMap((pipeline) => pipeline.map((obj) => Object.keys(obj)[0])));
 
 for (const aggStage of aggStages) {
-    assert(testedStages.has(aggStage) || skips.has(aggStage),
-           aggStage + " has not been tested for null bytes.");
+    assert(testedStages.has(aggStage) || skips.has(aggStage), aggStage + " has not been tested for null bytes.");
 }

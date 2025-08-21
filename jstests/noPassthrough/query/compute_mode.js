@@ -4,28 +4,30 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const mongodOption = {
-    setParameter: "enableComputeMode=true"
+    setParameter: "enableComputeMode=true",
 };
 
 const shardsvrOption = {
     replSet: jsTestName(),
     shardsvr: "",
-    setParameter: "enableComputeMode=true"
+    setParameter: "enableComputeMode=true",
 };
 
 const configsvrOption = {
     replSet: jsTestName(),
     configsvr: "",
-    setParameter: "enableComputeMode=true"
+    setParameter: "enableComputeMode=true",
 };
 
 (function testStandaloneMongod() {
     const conn = MongoRunner.runMongod();
     const db = conn.getDB(jsTestName());
 
-    assert.commandFailedWithCode(db.createCollection("a", {virtual: {}}),
-                                 ErrorCodes.IDLUnknownField,
-                                 "ERROR from virtual collection creation in regular mode");
+    assert.commandFailedWithCode(
+        db.createCollection("a", {virtual: {}}),
+        ErrorCodes.IDLUnknownField,
+        "ERROR from virtual collection creation in regular mode",
+    );
 
     MongoRunner.stopMongod(conn);
 })();
@@ -34,21 +36,25 @@ const configsvrOption = {
     const conn = MongoRunner.runMongod(mongodOption);
 
     const db = conn.getDB("admin");
-    const startupLogResults = assert.commandWorked(db.adminCommand({getLog: "startupWarnings"}),
-                                                   "ERROR from getting startupWarnings");
+    const startupLogResults = assert.commandWorked(
+        db.adminCommand({getLog: "startupWarnings"}),
+        "ERROR from getting startupWarnings",
+    );
     assert.gt(startupLogResults.totalLinesWritten, 0, "ERROR from count of startup log message");
 
     let warningMsgFound = false;
-    startupLogResults.log.forEach(log => {
+    startupLogResults.log.forEach((log) => {
         if (log.match("6968201")) {
             warningMsgFound = true;
         }
     });
     assert(warningMsgFound, "ERROR from warning message match");
 
-    assert.commandFailedWithCode(db.createCollection("a", {virtual: {}}),
-                                 ErrorCodes.IDLUnknownField,
-                                 "ERROR from virtual collection creation in compute mode");
+    assert.commandFailedWithCode(
+        db.createCollection("a", {virtual: {}}),
+        ErrorCodes.IDLUnknownField,
+        "ERROR from virtual collection creation in compute mode",
+    );
 
     MongoRunner.stopMongod(conn);
 })();

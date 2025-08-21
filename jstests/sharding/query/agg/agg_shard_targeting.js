@@ -47,24 +47,31 @@ const shard1DB = st.shard1.getDB(jsTestName());
 
 // Turn off best-effort recipient metadata refresh post-migration commit on both shards because
 // it creates non-determinism for the profiler.
-assert.commandWorked(st.shard0.getDB('admin').runCommand(
-    {configureFailPoint: 'migrationRecipientFailPostCommitRefresh', mode: 'alwaysOn'}));
-assert.commandWorked(st.shard1.getDB('admin').runCommand(
-    {configureFailPoint: 'migrationRecipientFailPostCommitRefresh', mode: 'alwaysOn'}));
+assert.commandWorked(
+    st.shard0
+        .getDB("admin")
+        .runCommand({configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
+);
+assert.commandWorked(
+    st.shard1
+        .getDB("admin")
+        .runCommand({configureFailPoint: "migrationRecipientFailPostCommitRefresh", mode: "alwaysOn"}),
+);
 
 // Turn off automatic shard refresh in mongos when a stale config error is thrown.
-assert.commandWorked(mongosForAgg.getDB('admin').runCommand(
-    {configureFailPoint: 'doNotRefreshShardsOnRetargettingError', mode: 'alwaysOn'}));
+assert.commandWorked(
+    mongosForAgg
+        .getDB("admin")
+        .runCommand({configureFailPoint: "doNotRefreshShardsOnRetargettingError", mode: "alwaysOn"}),
+);
 
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Shard the test collection on _id.
-assert.commandWorked(
-    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
 
 // Split the collection into 4 chunks: [MinKey, -100), [-100, 0), [0, 100), [100, MaxKey).
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: -100}}));
@@ -72,10 +79,12 @@ assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), mid
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 100}}));
 
 // Move the [0, 100) and [100, MaxKey) chunks to st.shard1.shardName.
-assert.commandWorked(mongosDB.adminCommand(
-    {moveChunk: mongosColl.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
-assert.commandWorked(mongosDB.adminCommand(
-    {moveChunk: mongosColl.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
+assert.commandWorked(
+    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 50}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {_id: 150}, to: st.shard1.shardName}),
+);
 
 // Write one document into each of the chunks.
 assert.commandWorked(mongosColl.insert({_id: -150}));
@@ -83,14 +92,10 @@ assert.commandWorked(mongosColl.insert({_id: -50}));
 assert.commandWorked(mongosColl.insert({_id: 50}));
 assert.commandWorked(mongosColl.insert({_id: 150}));
 
-const shardExceptions = [
-    ErrorCodes.StaleConfig,
-    ErrorCodes.StaleEpoch,
-];
+const shardExceptions = [ErrorCodes.StaleConfig, ErrorCodes.StaleEpoch];
 
 // Create an $_internalSplitPipeline stage that forces the merge to occur on the same shard.
-let forceOwningShardMerge =
-    [{$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}}];
+let forceOwningShardMerge = [{$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}}];
 
 function runAggShardTargetTest({splitPoint}) {
     // Ensure that both mongoS have up-to-date caches, and enable the profiler on both shards.
@@ -109,11 +114,12 @@ function runAggShardTargetTest({splitPoint}) {
     // Test that a range query is passed through if the chunks encompassed by the query all lie
     // on a single shard, in this case st.shard0.shardName.
     testName = "agg_shard_targeting_range_single_shard_all_chunks_on_same_shard";
-    assert.eq(mongosColl
-                  .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint),
-                             {comment: testName})
-                  .itcount(),
-              2);
+    assert.eq(
+        mongosColl
+            .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint), {comment: testName})
+            .itcount(),
+        2,
+    );
 
     // We expect one aggregation on shard0, none on shard1, and no $mergeCursors on shard0 (the
     // primary shard).
@@ -122,20 +128,20 @@ function runAggShardTargetTest({splitPoint}) {
         filter: {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
-            errCode: {$exists: false}
-        }
+            errCode: {$exists: false},
+        },
     });
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard1DB,
-        filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+        filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
     });
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: primaryShardDB,
         filter: {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
-            "command.pipeline.$mergeCursors": {$exists: 1}
-        }
+            "command.pipeline.$mergeCursors": {$exists: 1},
+        },
     });
 
     // Test that a range query with a stage that requires a primary shard merge ($out in this
@@ -144,14 +150,14 @@ function runAggShardTargetTest({splitPoint}) {
     testName = "agg_shard_targeting_range_all_chunks_on_primary_shard_out_no_merge";
     outColl = mongosDB[testName];
 
-    assert.commandWorked(mongosDB.runCommand({
-        aggregate: mongosColl.getName(),
-        pipeline: [{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint).concat([
-            {$out: testName}
-        ]),
-        comment: testName,
-        cursor: {}
-    }));
+    assert.commandWorked(
+        mongosDB.runCommand({
+            aggregate: mongosColl.getName(),
+            pipeline: [{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint).concat([{$out: testName}]),
+            comment: testName,
+            cursor: {},
+        }),
+    );
 
     // We expect one aggregation on shard0, none on shard1, and no $mergeCursors on shard0 (the
     // primary shard). We expect some of these commands may fail with staleDBVersion and be
@@ -161,16 +167,16 @@ function runAggShardTargetTest({splitPoint}) {
         filter: {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
-            errMsg: {$exists: false}
-        }
+            errMsg: {$exists: false},
+        },
     });
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard1DB,
         filter: {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
-            errMsg: {$exists: false}
-        }
+            errMsg: {$exists: false},
+        },
     });
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: primaryShardDB,
@@ -178,8 +184,8 @@ function runAggShardTargetTest({splitPoint}) {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
             "command.pipeline.$mergeCursors": {$exists: 1},
-            errMsg: {$exists: false}
-        }
+            errMsg: {$exists: false},
+        },
     });
 
     // Verify that the contents of the $out collection are as expected.
@@ -189,24 +195,27 @@ function runAggShardTargetTest({splitPoint}) {
     // shard, get a stale config exception, and find that more than one shard is now involved.
     // Move the _id: [-100, 0) chunk from st.shard0.shardName to st.shard1.shardName via
     // mongosForMove.
-    assert.commandWorked(mongosForMove.getDB("admin").runCommand({
-        moveChunk: mongosColl.getFullName(),
-        find: {_id: -50},
-        to: st.shard1.shardName,
-    }));
+    assert.commandWorked(
+        mongosForMove.getDB("admin").runCommand({
+            moveChunk: mongosColl.getFullName(),
+            find: {_id: -50},
+            to: st.shard1.shardName,
+        }),
+    );
 
     // Run the same aggregation that targeted a single shard via the now-stale mongoS. It should
     // attempt to send the aggregation to st.shard0.shardName, hit a stale config exception,
     // split the pipeline and redispatch. We append an $_internalSplitPipeline stage in order to
     // force a shard merge rather than a mongoS merge.
     testName = "agg_shard_targeting_backout_passthrough_and_split_if_cache_is_stale";
-    assert.eq(mongosColl
-                  .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}]
-                                 .concat(splitPoint)
-                                 .concat(forceOwningShardMerge),
-                             {comment: testName})
-                  .itcount(),
-              2);
+    assert.eq(
+        mongosColl
+            .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint).concat(forceOwningShardMerge), {
+                comment: testName,
+            })
+            .itcount(),
+        2,
+    );
 
     // Before the first dispatch:
     // - mongosForMove and st.shard0.shardName (the donor shard) are up to date.
@@ -232,8 +241,8 @@ function runAggShardTargetTest({splitPoint}) {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
             "command.pipeline.$mergeCursors": {$exists: false},
-            errCode: {$in: shardExceptions}
-        }
+            errCode: {$in: shardExceptions},
+        },
     });
 
     // - At most two aggregations on st.shard0.shardName with no stale config exceptions. The
@@ -246,9 +255,9 @@ function runAggShardTargetTest({splitPoint}) {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
             "command.pipeline.$mergeCursors": {$exists: false},
-            errCode: {$exists: false}
+            errCode: {$exists: false},
         },
-        maxExpectedMatches: 2
+        maxExpectedMatches: 2,
     });
 
     // - One aggregation on st.shard1.shardName with no stale config exception.
@@ -258,8 +267,8 @@ function runAggShardTargetTest({splitPoint}) {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
             "command.pipeline.$mergeCursors": {$exists: false},
-            errCode: {$exists: false}
-        }
+            errCode: {$exists: false},
+        },
     });
 
     // - One $mergeCursors aggregation on primary st.shard0.shardName, since we eventually
@@ -269,31 +278,34 @@ function runAggShardTargetTest({splitPoint}) {
         filter: {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
-            "command.pipeline.$mergeCursors": {$exists: true}
-        }
+            "command.pipeline.$mergeCursors": {$exists: true},
+        },
     });
 
     // Move the _id: [-100, 0) chunk back from st.shard1.shardName to st.shard0.shardName via
     // mongosForMove. Shard0 and mongosForAgg are now stale.
-    assert.commandWorked(mongosForMove.getDB("admin").runCommand({
-        moveChunk: mongosColl.getFullName(),
-        find: {_id: -50},
-        to: st.shard0.shardName,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        mongosForMove.getDB("admin").runCommand({
+            moveChunk: mongosColl.getFullName(),
+            find: {_id: -50},
+            to: st.shard0.shardName,
+            _waitForDelete: true,
+        }),
+    );
 
     // Run the same aggregation via the now-stale mongoS. It should split the pipeline, hit a
     // stale config exception, and reset to the original single-shard pipeline upon refresh. We
     // append an $_internalSplitPipeline stage in order to force a shard merge rather than a
     // mongoS merge.
     testName = "agg_shard_targeting_backout_split_pipeline_and_reassemble_if_cache_is_stale";
-    assert.eq(mongosColl
-                  .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}]
-                                 .concat(splitPoint)
-                                 .concat(forceOwningShardMerge),
-                             {comment: testName})
-                  .itcount(),
-              2);
+    assert.eq(
+        mongosColl
+            .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}].concat(splitPoint).concat(forceOwningShardMerge), {
+                comment: testName,
+            })
+            .itcount(),
+        2,
+    );
 
     // Before the first dispatch:
     // - mongosForMove and st.shard1.shardName (the donor shard) are up to date.
@@ -319,8 +331,8 @@ function runAggShardTargetTest({splitPoint}) {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
             "command.pipeline.$mergeCursors": {$exists: false},
-            errCode: {$in: shardExceptions}
-        }
+            errCode: {$in: shardExceptions},
+        },
     });
 
     // - At most two aggregations on st.shard0.shardName with no stale config exceptions. The
@@ -333,9 +345,9 @@ function runAggShardTargetTest({splitPoint}) {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
             "command.pipeline.$mergeCursors": {$exists: false},
-            errCode: {$exists: false}
+            errCode: {$exists: false},
         },
-        maxExpectedMatches: 2
+        maxExpectedMatches: 2,
     });
 
     // No $mergeCursors aggregation on primary st.shard0.shardName, since after backing out the
@@ -345,8 +357,8 @@ function runAggShardTargetTest({splitPoint}) {
         filter: {
             "command.aggregate": mongosColl.getName(),
             "command.comment": testName,
-            "command.pipeline.$mergeCursors": {$exists: true}
-        }
+            "command.pipeline.$mergeCursors": {$exists: true},
+        },
     });
 
     // Clean up the test run by dropping the $out collection and resetting the profiler.
@@ -371,21 +383,21 @@ runAggShardTargetTest({
     splitPoint: [
         {$facet: {facetPipe: [{$match: {_id: {$gt: MinKey}}}]}},
         {$unwind: "$facetPipe"},
-        {$replaceRoot: {newRoot: "$facetPipe"}}
-    ]
+        {$replaceRoot: {newRoot: "$facetPipe"}},
+    ],
 });
 runAggShardTargetTest({
-        splitPoint: [
-            {
-              $lookup: {
-                  from: "dummycoll",
-                  localField: "dummyfield",
-                  foreignField: "dummyfield",
-                  as: "lookupRes"
-              }
+    splitPoint: [
+        {
+            $lookup: {
+                from: "dummycoll",
+                localField: "dummyfield",
+                foreignField: "dummyfield",
+                as: "lookupRes",
             },
-            {$project: {lookupRes: 0}}
-        ]
-    });
+        },
+        {$project: {lookupRes: 0}},
+    ],
+});
 
 st.stop();

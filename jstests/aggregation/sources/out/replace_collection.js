@@ -60,7 +60,12 @@ assert.eq({a: {$gt: 0}}, listColl.cursor.firstBatch[0].options["validator"]);
 // Test that $out fails if it violates a unique index constraint.
 //
 coll.drop();
-assert.commandWorked(coll.insert([{_id: 0, a: 0}, {_id: 1, a: 0}]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, a: 0},
+        {_id: 1, a: 0},
+    ]),
+);
 dropWithoutImplicitRecreate(targetCollName);
 assert.commandWorked(targetColl.createIndex({a: 1}, {unique: true}));
 

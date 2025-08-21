@@ -24,12 +24,12 @@ import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
-    setAvailableDiskSpaceMode
+    setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getSpillCounter() {
-    return accumulateServerStatusMetric(db, metrics => metrics.query.lookup.hashLookupSpills);
+    return accumulateServerStatusMetric(db, (metrics) => metrics.query.lookup.hashLookupSpills);
 }
 
 const memoryKnob = "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill";
@@ -50,8 +50,7 @@ setServerParameter(sbeIncreasedSpillingKnob, "never");
 
 // For _internalInhibitOptimization tests, prevent DSCursor from reading all the data in a single
 // batch.
-const dsCursorKnobs =
-    ["internalDocumentSourceCursorInitialBatchSize", "internalDocumentSourceCursorBatchSizeBytes"];
+const dsCursorKnobs = ["internalDocumentSourceCursorInitialBatchSize", "internalDocumentSourceCursorBatchSizeBytes"];
 const dsCursorKnobValues = [];
 for (const knob of dsCursorKnobs) {
     dsCursorKnobValues.push(getServerParameter(knob));
@@ -83,25 +82,26 @@ const peopleDocs = [
 assert.commandWorked(students.insertMany(studentsDocs));
 assert.commandWorked(people.insertMany(peopleDocs));
 
-const lookupWithPipeline = [{
+const lookupWithPipeline = [
+    {
         $lookup: {
             from: students.getName(),
             as: "matched",
             let: {l_name: "$name"},
-            pipeline: [{$match: {$expr: {$eq: ["$$l_name", "name"]}}}]
-        }
-    }];
+            pipeline: [{$match: {$expr: {$eq: ["$$l_name", "name"]}}}],
+        },
+    },
+];
 
 const lookupWithoutPipeline = [
-    {$lookup: {from: students.getName(), localField: "name", foreignField: "name", as: "matched"}}
+    {$lookup: {from: students.getName(), localField: "name", foreignField: "name", as: "matched"}},
 ];
 
 const tests = [];
 for (let pipeline of [lookupWithPipeline, lookupWithoutPipeline]) {
     tests.push({localColl: people, pipeline: pipeline});
     // Add {$_internalInhibitOptimization: {}} to avoid pipeline elimination.
-    tests.push(
-        {localColl: students, pipeline: pipeline.concat([{$_internalInhibitOptimization: {}}])});
+    tests.push({localColl: students, pipeline: pipeline.concat([{$_internalInhibitOptimization: {}}])});
 }
 
 for (let {localColl, pipeline} of tests) {
@@ -127,8 +127,7 @@ for (let {localColl, pipeline} of tests) {
         let initialSpillCount = getSpillCounter();
 
         // Retrieve the first batch without spilling.
-        const cursor =
-            localColl.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursor = localColl.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
         const cursorId = cursor.getId();
 
         // Assert it did not spill during the first batch.
@@ -159,8 +158,7 @@ for (let {localColl, pipeline} of tests) {
         let initialSpillCount = getSpillCounter();
 
         // Retrieve the first batch.
-        const cursor =
-            localColl.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursor = localColl.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
         const cursorId = cursor.getId();
 
         // Assert it spilt during the first batch.
@@ -187,18 +185,17 @@ for (let {localColl, pipeline} of tests) {
     // No disk space available for spilling.
     {
         jsTest.log(`Running releaseMemory with no disk space available`);
-        const cursor =
-            localColl.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+        const cursor = localColl.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
         const cursorId = cursor.getId();
 
         // Release memory (i.e., spill)
-        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "alwaysOn");
         const releaseMemoryCmd = {releaseMemory: [cursorId]};
         jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
         const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
         assert.commandWorked(releaseMemoryRes);
         assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
-        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
 
         jsTest.log.info("Running getMore");
         assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);

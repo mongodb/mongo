@@ -30,9 +30,11 @@ assert.eq(c._id, res[2]._id, "D2");
 assert.close(6, res[3].dis, "E1");
 assert.eq(d._id, res[3]._id, "E2");
 
-res = t.aggregate({
-           $geoNear: {near: [0, 0], distanceField: "dis", distanceMultiplier: 2.0}
-       }).toArray();
+res = t
+    .aggregate({
+        $geoNear: {near: [0, 0], distanceField: "dis", distanceMultiplier: 2.0},
+    })
+    .toArray();
 assert.close(0, res[0].dis, "G");
 assert.close(2, res[1].dis, "H");
 assert.close(10, res[2].dis, "I");

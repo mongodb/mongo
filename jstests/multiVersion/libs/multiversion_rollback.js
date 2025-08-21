@@ -10,7 +10,7 @@ import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 import {reconfig, waitForState} from "jstests/replsets/rslib.js";
 
 export function printFCVDoc(nodeAdminDB, logMessage) {
-    const fcvDoc = nodeAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+    const fcvDoc = nodeAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog(logMessage + ` ${tojson(fcvDoc)}`);
 }
 
@@ -50,8 +50,13 @@ export function SyncSourceOps(dbName, node) {
  *
  */
 export function testMultiversionRollback(testName, rollbackNodeVersion, syncSourceVersion) {
-    jsTestLog("Started multiversion rollback test for versions: {rollbackNode: " +
-              rollbackNodeVersion + ", syncSource: " + syncSourceVersion + "}.");
+    jsTestLog(
+        "Started multiversion rollback test for versions: {rollbackNode: " +
+            rollbackNodeVersion +
+            ", syncSource: " +
+            syncSourceVersion +
+            "}.",
+    );
 
     let dbName = testName;
 
@@ -81,8 +86,7 @@ export function testMultiversionRollback(testName, rollbackNodeVersion, syncSour
 // Test rollback between latest rollback node and downgrading sync node.
 export function testMultiversionRollbackLatestFromDowngrading(testName, upgradeImmediately) {
     const dbName = testName;
-    const replSet = new ReplSetTest(
-        {name: testName, nodes: 3, useBridge: true, settings: {chainingAllowed: false}});
+    const replSet = new ReplSetTest({name: testName, nodes: 3, useBridge: true, settings: {chainingAllowed: false}});
 
     replSet.startSet();
     replSet.initiate();
@@ -133,11 +137,9 @@ export function testMultiversionRollbackLatestFromDowngrading(testName, upgradeI
     jsTestLog("Setting sync source FCV to downgrading to lastLTS");
 
     // Set the failpoint so that downgrading will fail.
-    assert.commandWorked(
-        syncSource.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+    assert.commandWorked(syncSource.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
 
-    assert.commandFailed(
-        syncSource.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandFailed(syncSource.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     // Sync source's FCV should be in downgrading to lastLTS while the rollback node's FCV should be
     // in latest.
@@ -163,17 +165,14 @@ export function testMultiversionRollbackLatestFromDowngrading(testName, upgradeI
 
     if (upgradeImmediately) {
         // We can upgrade immediately.
-        assert.commandWorked(
-            newPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
         printFCVDoc(newPrimaryAdminDB, "New primary's FCV after completing upgrade: ");
         checkFCV(newPrimaryAdminDB, latestFCV);
     } else {
         // We can finish downgrading.
-        assert.commandWorked(
-            newPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}));
-        assert.commandWorked(
-            newPrimary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+        assert.commandWorked(newPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}));
+        assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
         printFCVDoc(newPrimaryAdminDB, "New primary's FCV after completing downgrade: ");
         checkFCV(newPrimaryAdminDB, lastLTSFCV);
@@ -185,8 +184,7 @@ export function testMultiversionRollbackLatestFromDowngrading(testName, upgradeI
 // Test rollback between downgrading rollback node and lastLTS sync node.
 export function testMultiversionRollbackDowngradingFromLastLTS(testName) {
     const dbName = testName;
-    const replSet = new ReplSetTest(
-        {name: testName, nodes: 3, useBridge: true, settings: {chainingAllowed: false}});
+    const replSet = new ReplSetTest({name: testName, nodes: 3, useBridge: true, settings: {chainingAllowed: false}});
 
     replSet.startSet();
     replSet.initiate();
@@ -211,10 +209,8 @@ export function testMultiversionRollbackDowngradingFromLastLTS(testName) {
     CommonOps(dbName, rollbackTest.getPrimary());
 
     // Set the failpoint so that downgrading will fail.
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
-    assert.commandFailed(
-        primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+    assert.commandFailed(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     printFCVDoc(primaryAdminDB, "Primary's FCV before RollbackOps: ");
     checkFCV(primaryAdminDB, lastLTSFCV, lastLTSFCV);
@@ -242,8 +238,7 @@ export function testMultiversionRollbackDowngradingFromLastLTS(testName) {
     jsTestLog("Starting SyncSourceOps");
     SyncSourceOps(dbName, syncSource);
     jsTestLog("Setting sync source FCV to lastLTS");
-    assert.commandWorked(
-        syncSource.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(syncSource.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     // Sync source's FCV should be in lastLTS while the rollback node's FCV should be in downgrading
     // to lastLTS.
@@ -290,10 +285,10 @@ export function testMultiversionRollbackDowngradingFromLastLTS(testName) {
 export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion) {
     jsTestLog(
         `[${testName}] Beginning cluster setup with versions: {rollbackNode: ${rollbackNodeVersion},
-            syncSource: ${syncSourceVersion}}.`);
+            syncSource: ${syncSourceVersion}}.`,
+    );
 
-    let sortedVersions =
-        [rollbackNodeVersion, syncSourceVersion].sort(MongoRunner.compareBinVersions);
+    let sortedVersions = [rollbackNodeVersion, syncSourceVersion].sort(MongoRunner.compareBinVersions);
     let lowerVersion = MongoRunner.getBinVersionFor(sortedVersions[0]);
     let higherVersion = MongoRunner.getBinVersionFor(sortedVersions[1]);
 
@@ -304,8 +299,12 @@ export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion
     // second node will be priority: 0 to ensure that it will never become primary. This, in
     // addition to stopping/restarting server replication should make the node exhibit similar
     // behavior to an arbiter.
-    var rst = new ReplSetTest(
-        {name: testName, nodes: initialNodes, useBridge: true, settings: {chainingAllowed: false}});
+    var rst = new ReplSetTest({
+        name: testName,
+        nodes: initialNodes,
+        useBridge: true,
+        settings: {chainingAllowed: false},
+    });
     rst.startSet();
     rst.initiate();
 
@@ -316,10 +315,8 @@ export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion
     const initialPrimary = rst.getPrimary();
 
     // Set FCV to accommodate third node.
-    jsTestLog(
-        `[${testName} - ${initialPrimary.host}] Setting FCV to ${lowerVersion} on the primary.`);
-    assert.commandWorked(
-        initialPrimary.adminCommand({setFeatureCompatibilityVersion: lowerVersion, confirm: true}));
+    jsTestLog(`[${testName} - ${initialPrimary.host}] Setting FCV to ${lowerVersion} on the primary.`);
+    assert.commandWorked(initialPrimary.adminCommand({setFeatureCompatibilityVersion: lowerVersion, confirm: true}));
 
     jsTestLog(`[${testName}] Bringing up third node with version ${lowerVersion}`);
     rst.add({binVersion: lowerVersion});
@@ -329,8 +326,7 @@ export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion
     config.members[1].priority = 0;
     reconfig(rst, config, true);
 
-    jsTestLog(
-        `[${testName} - ${rst.nodes[2].host}] Waiting for the newest node to become a secondary.`);
+    jsTestLog(`[${testName} - ${rst.nodes[2].host}] Waiting for the newest node to become a secondary.`);
     rst.awaitSecondaryNodes();
 
     let primary = rst.nodes[0];
@@ -341,10 +337,8 @@ export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion
     assert.eq(rst.getPrimary(), primary);
 
     // Also make sure the other two nodes are in their expected states.
-    assert.eq(ReplSetTest.State.SECONDARY,
-              tiebreakerNode.adminCommand({replSetGetStatus: true}).myState);
-    assert.eq(ReplSetTest.State.SECONDARY,
-              secondary.adminCommand({replSetGetStatus: true}).myState);
+    assert.eq(ReplSetTest.State.SECONDARY, tiebreakerNode.adminCommand({replSetGetStatus: true}).myState);
+    assert.eq(ReplSetTest.State.SECONDARY, secondary.adminCommand({replSetGetStatus: true}).myState);
 
     jsTestLog(`[${testName}] Cluster now running with versions: {primary: ${higherVersion},
             secondary: ${lowerVersion}, tiebreakerNode: ${higherVersion}}.`);
@@ -352,8 +346,7 @@ export function setupReplicaSet(testName, rollbackNodeVersion, syncSourceVersion
     // Some test cases require that the primary (future rollback node) is running the lower
     // version, which at this point is always on the secondary, so we elect that node instead.
     if (rollbackNodeVersion === lowerVersion) {
-        jsTestLog(
-            `[${testName}] Test case requires opposite versions for primary and secondary. Swapping roles.`);
+        jsTestLog(`[${testName}] Test case requires opposite versions for primary and secondary. Swapping roles.`);
 
         // Force the current secondary to become the primary.
         rst.stepUp(secondary);

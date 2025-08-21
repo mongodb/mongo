@@ -2,4 +2,4 @@
  * @tags: [featureFlagFryer]
  */
 
-(function() {})();
+(function () {})();

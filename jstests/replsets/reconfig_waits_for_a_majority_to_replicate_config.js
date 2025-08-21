@@ -27,7 +27,8 @@ var config = primary.getDB("local").system.replset.findOne();
 config.version++;
 assert.commandFailedWithCode(
     primary.getDB("admin").runCommand({replSetReconfig: config, maxTimeMS: 5000}),
-    ErrorCodes.MaxTimeMSExpired);
+    ErrorCodes.MaxTimeMSExpired,
+);
 assert.eq(isConfigCommitted(primary), false);
 
 // Try to run another reconfig, which should also time out because the previous config is
@@ -36,7 +37,8 @@ var config = primary.getDB("local").system.replset.findOne();
 config.version++;
 assert.commandFailedWithCode(
     primary.getDB("admin").runCommand({replSetReconfig: config, maxTimeMS: 5000}),
-    ErrorCodes.CurrentConfigNotCommittedYet);
+    ErrorCodes.CurrentConfigNotCommittedYet,
+);
 assert.eq(isConfigCommitted(primary), false);
 
 // Reconnect the secondary to the primary.

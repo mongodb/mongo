@@ -48,17 +48,18 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
 
     cst.assertNextChangesEqual({
         cursor: changeStream,
-        expectedChanges: [{
-            documentKey: {_id: 1},
-            fullDocument: {_id: 1},
-            ns: {db: primaryDB.getName(), coll: coll.getName()},
-            operationType: "insert",
-        }]
+        expectedChanges: [
+            {
+                documentKey: {_id: 1},
+                fullDocument: {_id: 1},
+                ns: {db: primaryDB.getName(), coll: coll.getName()},
+                operationType: "insert",
+            },
+        ],
     });
 
     // Now resume using the resume token from the first change (before the failover).
-    const resumeCursor =
-        cst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: firstChange._id});
+    const resumeCursor = cst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: firstChange._id});
 
     // Be sure we can read the 2nd and 3rd changes.
     cst.assertNextChangesEqual({
@@ -75,8 +76,8 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
                 fullDocument: {_id: 2},
                 ns: {db: primaryDB.getName(), coll: coll.getName()},
                 operationType: "insert",
-            }
-        ]
+            },
+        ],
     });
 
     // Unfreeze the original primary so that it can stand for election again.

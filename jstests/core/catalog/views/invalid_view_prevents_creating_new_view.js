@@ -21,20 +21,27 @@ assert.commandWorked(viewsDB.dropDatabase());
 assert.commandWorked(viewsDB.runCommand({create: "collection"}));
 assert.commandWorked(viewsDB.runCommand({create: "testView", viewOn: "collection"}));
 
-assert.commandWorked(viewsDB.adminCommand({
-    applyOps: [{
-        op: "i",
-        ns: viewsDBName + ".system.views",
-        o: {
-            _id: viewsDBName + ".invalidView",
-            viewOn: "collection",
-            pipeline: [{$project: {_id: false}}, {$out: "notExistingCollection"}],
-        }
-    }]
-}));
+assert.commandWorked(
+    viewsDB.adminCommand({
+        applyOps: [
+            {
+                op: "i",
+                ns: viewsDBName + ".system.views",
+                o: {
+                    _id: viewsDBName + ".invalidView",
+                    viewOn: "collection",
+                    pipeline: [{$project: {_id: false}}, {$out: "notExistingCollection"}],
+                },
+            },
+        ],
+    }),
+);
 assert.commandFailedWithCode(
     viewsDB.runCommand({create: "viewWithBadViewCatalog", viewOn: "collection", pipeline: []}),
-    ErrorCodes.OptionNotSupportedOnView);
-assert.commandWorked(viewsDB.adminCommand({
-    applyOps: [{op: "d", ns: viewsDBName + ".system.views", o: {_id: viewsDBName + ".invalidView"}}]
-}));
+    ErrorCodes.OptionNotSupportedOnView,
+);
+assert.commandWorked(
+    viewsDB.adminCommand({
+        applyOps: [{op: "d", ns: viewsDBName + ".system.views", o: {_id: viewsDBName + ".invalidView"}}],
+    }),
+);

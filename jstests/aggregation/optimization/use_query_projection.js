@@ -50,13 +50,11 @@ assert.commandWorked(coll.createIndex({x: 1, a: -1, _id: 1}));
 // to cover the query.
 assertQueryCoversProjection({pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1}}]});
 assertQueryCoversProjection({pipeline: [{$match: {x: "string"}}, {$project: {_id: 0, x: 1}}]});
-assertQueryCoversProjection(
-    {pipeline: [{$match: {x: "string"}}, {$project: {_id: 0, x: 1, a: 1}}]});
-assertQueryCoversProjection(
-    {pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}]});
+assertQueryCoversProjection({pipeline: [{$match: {x: "string"}}, {$project: {_id: 0, x: 1, a: 1}}]});
+assertQueryCoversProjection({pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}]});
 assertQueryCoversProjection({
     pipeline: [{$match: {_id: 0, x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}],
-    options: {hint: {x: 1, a: -1, _id: 1}}
+    options: {hint: {x: 1, a: -1, _id: 1}},
 });
 
 // Test that a pipeline requiring a field that is not in the index cannot use a covered plan.
@@ -69,16 +67,14 @@ assert.commandWorked(coll.createIndex({x: 1}));
 assertQueryCoversProjection({
     pipeline: [
         {$match: {_id: 0, x: "string"}},
-        {$sort: {x: 1, a: 1}},  // Note: not indexable, but doesn't add any additional dependencies.
+        {$sort: {x: 1, a: 1}}, // Note: not indexable, but doesn't add any additional dependencies.
         {$project: {_id: 1, x: 1, a: 1}},
     ],
-    options: {hint: {x: 1, a: -1, _id: 1}}
+    options: {hint: {x: 1, a: -1, _id: 1}},
 });
 
 // Test that a multikey index will prevent a covered plan.
-assert.commandWorked(coll.dropIndex({x: 1}));  // Make sure there is only one plan considered.
+assert.commandWorked(coll.dropIndex({x: 1})); // Make sure there is only one plan considered.
 assert.commandWorked(coll.insert({x: ["an", "array!"]}));
-assertQueryDoesNotCoverProjection(
-    {pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1}}]});
-assertQueryDoesNotCoverProjection(
-    {pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}]});
+assertQueryDoesNotCoverProjection({pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1}}]});
+assertQueryDoesNotCoverProjection({pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}]});

@@ -7,7 +7,7 @@ import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 // Setting internalDocumentSourceCursorBatchSizeBytes=1 ensures that multiple batches pass
 // through DocumentSourceCursor.
 const options = {
-    setParameter: "internalDocumentSourceCursorBatchSizeBytes=1"
+    setParameter: "internalDocumentSourceCursorBatchSizeBytes=1",
 };
 const conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));

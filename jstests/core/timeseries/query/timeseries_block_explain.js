@@ -16,8 +16,7 @@ import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {getSbePlanStages} from "jstests/libs/query/sbe_explain_helpers.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const sbeEnabled = checkSbeFullyEnabled(db) &&
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
+const sbeEnabled = checkSbeFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
 
 if (!sbeEnabled) {
     quit();
@@ -25,8 +24,7 @@ if (!sbeEnabled) {
 
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
 
 // Bucket 1: a and b are both scalars.
 assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: 42, b: 17}));
@@ -48,22 +46,26 @@ assert.commandWorked(coll.insert({time: new Date(), meta: 1, a: {b: [1, 2, 3]}, 
     assert.eq(scanStages.length, 1, () => "Expected one scan stage " + tojson(explain));
 
     // Ensure the scan actually returned something.
-    assert.gte(scanStages[0].nReturned,
-               3,
-               () => "Expected one value returned from scan " + tojson(explain));
+    assert.gte(scanStages[0].nReturned, 3, () => "Expected one value returned from scan " + tojson(explain));
 
     const bucketStages = getSbePlanStages(explain, "ts_bucket_to_cellblock");
     assert.eq(bucketStages.length, 1, () => "Expected one bucket stage " + tojson(explain));
 
-    assert.eq(bucketStages[0].numCellBlocksProduced,
-              9,  // 3 paths are used: Get(a)/Traverse/Id for $match and
-                  // Get(a)/Id, Get(b)/Id for $project.
-              () => "Expected 9 cellBlocks produced " + tojson(explain));
-    assert.eq(bucketStages[0].numStorageBlocks,
-              6,  // There are only storage blocks for 'a' and 'b'.
-              () => "Expected 6 storage blocks " + tojson(explain));
-    assert.eq(bucketStages[0].numStorageBlocksDecompressed,
-              5,  // For the block where 'a' is an array with objects, the filter doesn't pass so
-                  // we don't need to decompress 'b'.
-              () => "Expected 5 storage blocks decoded " + tojson(explain));
+    assert.eq(
+        bucketStages[0].numCellBlocksProduced,
+        9, // 3 paths are used: Get(a)/Traverse/Id for $match and
+        // Get(a)/Id, Get(b)/Id for $project.
+        () => "Expected 9 cellBlocks produced " + tojson(explain),
+    );
+    assert.eq(
+        bucketStages[0].numStorageBlocks,
+        6, // There are only storage blocks for 'a' and 'b'.
+        () => "Expected 6 storage blocks " + tojson(explain),
+    );
+    assert.eq(
+        bucketStages[0].numStorageBlocksDecompressed,
+        5, // For the block where 'a' is an array with objects, the filter doesn't pass so
+        // we don't need to decompress 'b'.
+        () => "Expected 5 storage blocks decoded " + tojson(explain),
+    );
 })();

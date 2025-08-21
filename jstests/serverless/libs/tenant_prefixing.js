@@ -13,8 +13,7 @@ const kCmdsNotExpectSameDbNameInResp = new Set([
     "mapreduce",
 ]);
 function shouldSkipPrefixCheck(cmdName, obj) {
-    return kCmdsNotExpectSameDbNameInResp.has(cmdName) || (obj instanceof DBRef) ||
-        (obj instanceof DBPointer);
+    return kCmdsNotExpectSameDbNameInResp.has(cmdName) || obj instanceof DBRef || obj instanceof DBPointer;
 }
 
 /**
@@ -54,7 +53,7 @@ export function prependTenantIdToDbNameIfApplicable(dbName, tenantId) {
     }
 
     const prefix = `${kTenantPrefixMap[dbName] || tenantId}_`;
-    return (isDenylistedDb(dbName) || dbName.startsWith(prefix)) ? dbName : `${prefix}${dbName}`;
+    return isDenylistedDb(dbName) || dbName.startsWith(prefix) ? dbName : `${prefix}${dbName}`;
 }
 
 /**
@@ -76,8 +75,12 @@ function prependTenantIdToNsIfApplicable(ns, tenantId) {
  * Remove a tenant prefix from the provided database name, if applicable.
  */
 function extractOriginalDbName(dbName) {
-    const anyTenantPrefixOnceRegex =
-        new RegExp(`^(${Object.values(kTenantPrefixMap).map(tid => `${tid}_`).join('|')})`, '');
+    const anyTenantPrefixOnceRegex = new RegExp(
+        `^(${Object.values(kTenantPrefixMap)
+            .map((tid) => `${tid}_`)
+            .join("|")})`,
+        "",
+    );
     return dbName.replace(anyTenantPrefixOnceRegex, "");
 }
 
@@ -94,8 +97,12 @@ function extractOriginalNs(ns) {
  * Removes all occurrences of a tenant prefix in the provided string.
  */
 function removeTenantIdFromString(string) {
-    const anyTenantPrefixGlobalRegex =
-        new RegExp(Object.values(kTenantPrefixMap).map(tid => `${tid}_`).join('|'), 'g');
+    const anyTenantPrefixGlobalRegex = new RegExp(
+        Object.values(kTenantPrefixMap)
+            .map((tid) => `${tid}_`)
+            .join("|"),
+        "g",
+    );
     return string.replace(anyTenantPrefixGlobalRegex, "");
 }
 
@@ -114,8 +121,7 @@ function prependTenantId(obj, tenantId) {
             }
         } else if (Array.isArray(v)) {
             obj[k] = v.map((item) => {
-                return (typeof item === "object" && item !== null) ? prependTenantId(item, tenantId)
-                                                                   : item;
+                return typeof item === "object" && item !== null ? prependTenantId(item, tenantId) : item;
             });
         } else if (typeof v === "object" && v !== null && Object.keys(v).length > 0) {
             obj[k] = prependTenantId(v, tenantId);
@@ -189,16 +195,14 @@ function isCollectionUUIDMismatch(res) {
  */
 function removeTenantIdFromCollectionUUIDMismatch(obj, checkPrefix, tenantId) {
     const prefix = tenantId + "_";
-    const debugLog =
-        `The db name in the errmsg does not contain matched tenant prefix
+    const debugLog = `The db name in the errmsg does not contain matched tenant prefix
                         "${prefix}". The response is "${tojsononeline(obj)}"`;
 
     let errors = [];
     const mismatchCode = ErrorCodes.CollectionUUIDMismatch;
     if (obj.hasOwnProperty("code") && obj.code == mismatchCode) {
         errors.push(obj);
-    } else if (obj.hasOwnProperty("writeConcernError") &&
-               obj.writeConcernError.code == mismatchCode) {
+    } else if (obj.hasOwnProperty("writeConcernError") && obj.writeConcernError.code == mismatchCode) {
         errors.push(obj.writeConcernError);
     } else if (obj.hasOwnProperty("writeErrors")) {
         for (let err of obj.writeErrors) {
@@ -228,14 +232,17 @@ function removeTenantIdFromCollectionUUIDMismatch(obj, checkPrefix, tenantId) {
  * @param {string} [options.cmdName] The command name
  * @param {string} [options.debugLog] The debug log for a failed prefix checking
  */
-export function removeTenantIdAndMaybeCheckPrefixes(obj, options = {
-    checkPrefix: false,
-    expectPrefix: false,
-    tenantId: undefined,
-    dbName: undefined,
-    cmdName: undefined,
-    debugLog: undefined,
-}) {
+export function removeTenantIdAndMaybeCheckPrefixes(
+    obj,
+    options = {
+        checkPrefix: false,
+        expectPrefix: false,
+        tenantId: undefined,
+        dbName: undefined,
+        cmdName: undefined,
+        debugLog: undefined,
+    },
+) {
     const {checkPrefix, expectPrefix, tenantId, dbName: requestDbName, cmdName, debugLog} = options;
     if (checkPrefix) {
         assert(tenantId != null, "Missing required option `tenantId` when checking prefixes");
@@ -253,14 +260,13 @@ export function removeTenantIdAndMaybeCheckPrefixes(obj, options = {
         let originalK = removeTenantIdFromString(k);
         if (typeof v === "string") {
             if (k === "dbName" || k == "db" || k == "dropped") {
-                if (checkPrefix && !isDenylistedDb(requestDbName) &&
-                    !shouldSkipPrefixCheck(cmdName, obj)) {
+                if (checkPrefix && !isDenylistedDb(requestDbName) && !shouldSkipPrefixCheck(cmdName, obj)) {
                     assert.eq(v, expectedDbName, debugLog);
                 }
                 obj[originalK] = extractOriginalDbName(v);
             } else if (k === "namespace" || k === "ns") {
                 if (checkPrefix) {
-                    const responseDbName = v.split('.')[0];
+                    const responseDbName = v.split(".")[0];
                     if (!isDenylistedDb(requestDbName) && !shouldSkipPrefixCheck(cmdName, obj)) {
                         assert.eq(responseDbName, expectedDbName, debugLog);
                     }
@@ -278,7 +284,7 @@ export function removeTenantIdAndMaybeCheckPrefixes(obj, options = {
             }
         } else if (Array.isArray(v)) {
             obj[originalK] = v.map((item) => {
-                return (typeof item === "object" && item !== null)
+                return typeof item === "object" && item !== null
                     ? removeTenantIdAndMaybeCheckPrefixes(item, options)
                     : item;
             });
@@ -290,8 +296,13 @@ export function removeTenantIdAndMaybeCheckPrefixes(obj, options = {
     return obj;
 }
 
-const kCmdsWithNsAsFirstField =
-    new Set(["renameCollection", "checkShardingIndex", "dataSize", "datasize", "splitVector"]);
+const kCmdsWithNsAsFirstField = new Set([
+    "renameCollection",
+    "checkShardingIndex",
+    "dataSize",
+    "datasize",
+    "splitVector",
+]);
 
 /**
  * Returns true if the provided command object has had a tenant prefix appended to its namespaces.
@@ -314,36 +325,37 @@ export function createCmdObjWithTenantId(cmdObj, tenantId) {
 
     // Handle commands with special database and namespace field names.
     if (kCmdsWithNsAsFirstField.has(cmdName)) {
-        cmdObjWithTenantId[cmdName] =
-            prependTenantIdToNsIfApplicable(cmdObjWithTenantId[cmdName], tenantId);
+        cmdObjWithTenantId[cmdName] = prependTenantIdToNsIfApplicable(cmdObjWithTenantId[cmdName], tenantId);
     }
 
     switch (cmdName) {
         case "renameCollection":
-            cmdObjWithTenantId.to =
-                prependTenantIdToNsIfApplicable(cmdObjWithTenantId.to, tenantId);
+            cmdObjWithTenantId.to = prependTenantIdToNsIfApplicable(cmdObjWithTenantId.to, tenantId);
             break;
         case "internalRenameIfOptionsAndIndexesMatch":
-            cmdObjWithTenantId.from =
-                prependTenantIdToNsIfApplicable(cmdObjWithTenantId.from, tenantId);
-            cmdObjWithTenantId.to =
-                prependTenantIdToNsIfApplicable(cmdObjWithTenantId.to, tenantId);
+            cmdObjWithTenantId.from = prependTenantIdToNsIfApplicable(cmdObjWithTenantId.from, tenantId);
+            cmdObjWithTenantId.to = prependTenantIdToNsIfApplicable(cmdObjWithTenantId.to, tenantId);
             break;
         case "configureFailPoint":
             if (cmdObjWithTenantId.data) {
                 if (cmdObjWithTenantId.data.namespace) {
                     cmdObjWithTenantId.data.namespace = prependTenantIdToNsIfApplicable(
-                        cmdObjWithTenantId.data.namespace, tenantId);
+                        cmdObjWithTenantId.data.namespace,
+                        tenantId,
+                    );
                 } else if (cmdObjWithTenantId.data.ns) {
-                    cmdObjWithTenantId.data.ns =
-                        prependTenantIdToNsIfApplicable(cmdObjWithTenantId.data.ns, tenantId);
+                    cmdObjWithTenantId.data.ns = prependTenantIdToNsIfApplicable(cmdObjWithTenantId.data.ns, tenantId);
                 }
             }
             break;
         case "applyOps":
             for (let op of cmdObjWithTenantId.applyOps) {
-                if (typeof op.ns === "string" && op.ns.endsWith("system.views") && op.o._id &&
-                    typeof op.o._id === "string") {
+                if (
+                    typeof op.ns === "string" &&
+                    op.ns.endsWith("system.views") &&
+                    op.o._id &&
+                    typeof op.o._id === "string"
+                ) {
                     // For views, op.ns and op.o._id must be equal.
                     op.o._id = prependTenantIdToNsIfApplicable(op.o._id, tenantId);
                 }
@@ -360,7 +372,8 @@ export function createCmdObjWithTenantId(cmdObj, tenantId) {
         prependTenantId(cmdObjWithTenantId, tenantId);
     }
 
-    cmdObjWithTenantId.comment = Object.assign(
-        cmdObjWithTenantId.comment ? cmdObjWithTenantId.comment : {}, {isCmdObjWithTenantId: true});
+    cmdObjWithTenantId.comment = Object.assign(cmdObjWithTenantId.comment ? cmdObjWithTenantId.comment : {}, {
+        isCmdObjWithTenantId: true,
+    });
     return cmdObjWithTenantId;
 }

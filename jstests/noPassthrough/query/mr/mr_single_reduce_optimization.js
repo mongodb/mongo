@@ -3,25 +3,23 @@
 // @tags: [requires_scripting]
 
 const conn = MongoRunner.runMongod({setParameter: {mrEnableSingleReduceOptimization: true}});
-const testDB = conn.getDB('foo');
+const testDB = conn.getDB("foo");
 const coll = testDB.bar;
 
 assert.commandWorked(coll.insert({x: 1}));
 
-const map = function() {
+const map = function () {
     emit(0, "mapped value");
 };
 
-const reduce = function(key, values) {
+const reduce = function (key, values) {
     return "reduced value";
 };
 
-let res = assert.commandWorked(
-    testDB.runCommand({mapReduce: 'bar', map: map, reduce: reduce, out: {inline: 1}}));
+let res = assert.commandWorked(testDB.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}));
 assert.eq(res.results[0], {_id: 0, value: "mapped value"});
 assert.commandWorked(coll.insert({x: 2}));
-res = assert.commandWorked(
-    testDB.runCommand({mapReduce: 'bar', map: map, reduce: reduce, out: {inline: 1}}));
+res = assert.commandWorked(testDB.runCommand({mapReduce: "bar", map: map, reduce: reduce, out: {inline: 1}}));
 assert.eq(res.results[0], {_id: 0, value: "reduced value"});
 
 MongoRunner.stopMongod(conn);

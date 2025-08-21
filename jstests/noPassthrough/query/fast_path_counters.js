@@ -3,12 +3,7 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {
-    getWinningPlanFromExplain,
-    isExpress,
-    isIdhack,
-    isIdhackOrExpress
-} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isExpress, isIdhack, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
 
 const collName = jsTestName();
 const conn = MongoRunner.runMongod({});
@@ -43,7 +38,10 @@ function assertExpressCounterIncreased(fn) {
 assertNoFastPathCounterIncreased(() => {
     // idHack queries cannot be used with skip().
     jsTestLog("Testing with no idHack query");
-    const explain = collection.find({_id: {a: 1}}).skip(1).explain();
+    const explain = collection
+        .find({_id: {a: 1}})
+        .skip(1)
+        .explain();
     const winningPlan = getWinningPlanFromExplain(explain);
     assert(!isIdhackOrExpress(db, winningPlan), winningPlan);
 });
@@ -52,7 +50,10 @@ assertNoFastPathCounterIncreased(() => {
 assertIdHackCounterIncreased(() => {
     jsTestLog("Testing with idHack find query");
     // Needs batchSize, otherwise this query would be resolved with express instead.
-    const explain = collection.find({_id: {a: 1}}).batchSize(10).explain();
+    const explain = collection
+        .find({_id: {a: 1}})
+        .batchSize(10)
+        .explain();
     const winningPlan = getWinningPlanFromExplain(explain);
     assert(isIdhack(db, winningPlan), winningPlan);
 });
@@ -60,8 +61,7 @@ assertIdHackCounterIncreased(() => {
 // Tests that an update query using express path, increments the express counter.
 assertExpressCounterIncreased(() => {
     jsTestLog("Testing with express update query");
-    const explain = db.runCommand(
-        {explain: {update: collName, updates: [{q: {_id: {a: 1}}, u: {$set: {a: 2}}}]}});
+    const explain = db.runCommand({explain: {update: collName, updates: [{q: {_id: {a: 1}}, u: {$set: {a: 2}}}]}});
     const winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 });
@@ -69,8 +69,7 @@ assertExpressCounterIncreased(() => {
 // Tests that a delete query using express increments the express counter.
 assertExpressCounterIncreased(() => {
     jsTestLog("Testing with express delete query");
-    const explain =
-        db.runCommand({explain: {delete: collName, deletes: [{q: {_id: {a: 1}}, limit: 0}]}});
+    const explain = db.runCommand({explain: {delete: collName, deletes: [{q: {_id: {a: 1}}, limit: 0}]}});
     const winningPlan = getWinningPlanFromExplain(explain);
     assert(isExpress(db, winningPlan), winningPlan);
 });

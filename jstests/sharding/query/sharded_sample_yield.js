@@ -13,7 +13,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({
     name: jsTestName(),
     shards: 2,
-    rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}}
+    rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}},
 });
 
 const mongosDB = st.s.getDB(jsTestName());
@@ -23,17 +23,19 @@ const mongosColl = mongosDB.test;
 st.shardColl(mongosColl, {_id: 1}, {_id: 0}, {_id: 0});
 
 // Insert enough documents on each shard to induce the $sample random-cursor optimization.
-for (let i = (-150); i < 150; ++i) {
+for (let i = -150; i < 150; ++i) {
     assert.commandWorked(mongosColl.insert({_id: i}));
 }
 
 // Run the initial aggregate for the $sample stage.
-const cmdRes = assert.commandWorked(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [{$sample: {size: 3}}],
-    comment: "$sample random",
-    cursor: {batchSize: 0}
-}));
+const cmdRes = assert.commandWorked(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [{$sample: {size: 3}}],
+        comment: "$sample random",
+        cursor: {batchSize: 0},
+    }),
+);
 assert.eq(cmdRes.cursor.firstBatch.length, 0);
 
 // Force each shard to hang on yield to allow for currentOp capture.
@@ -42,29 +44,33 @@ FixtureHelpers.runCommandOnEachPrimary({
     cmdObj: {
         configureFailPoint: "setYieldAllLocksHang",
         mode: "alwaysOn",
-        data: {namespace: mongosColl.getFullName()}
-    }
+        data: {namespace: mongosColl.getFullName()},
+    },
 });
 
 // Run $currentOp to confirm that the $sample getMore yields on both shards.
 const awaitShell = startParallelShell(async () => {
     const {FixtureHelpers} = await import("jstests/libs/fixture_helpers.js");
-    assert.soon(() => db.getSiblingDB("admin")
-                          .aggregate([
-                              {$currentOp: {}},
-                              {
-                                  $match: {
-                                      "cursor.originatingCommand.comment": "$sample random",
-                                      planSummary: "QUEUED_DATA, MULTI_ITERATOR",
-                                      numYields: {$gt: 0}
-                                  }
-                              }
-                          ])
-                          .itcount() === 2);
+    assert.soon(
+        () =>
+            db
+                .getSiblingDB("admin")
+                .aggregate([
+                    {$currentOp: {}},
+                    {
+                        $match: {
+                            "cursor.originatingCommand.comment": "$sample random",
+                            planSummary: "QUEUED_DATA, MULTI_ITERATOR",
+                            numYields: {$gt: 0},
+                        },
+                    },
+                ])
+                .itcount() === 2,
+    );
     // Release the failpoint and allow the getMores to complete.
     FixtureHelpers.runCommandOnEachPrimary({
         db: db.getSiblingDB("admin"),
-        cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "off"}
+        cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "off"},
     });
 }, mongosDB.getMongo().port);
 

@@ -28,8 +28,5 @@ assert.eq(51, a.foo.find().itcount(), "B1");
 assert.eq(100, b.foo.find().itcount(), "B2");
 
 let xCount = x.itcount();
-assert(xCount == 59 || xCount == 99, "C1 : " + xCount);  // snapshot or not is ok
-assert.eq(
-    99,
-    y.itcount(),
-    "C2");  // this was asserting because ClientCursor byLoc doesn't take db into consideration
+assert(xCount == 59 || xCount == 99, "C1 : " + xCount); // snapshot or not is ok
+assert.eq(99, y.itcount(), "C2"); // this was asserting because ClientCursor byLoc doesn't take db into consideration

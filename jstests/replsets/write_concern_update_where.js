@@ -17,14 +17,18 @@ const db = rst.getPrimary().getDB(jsTestName());
 for (var i = 0; i < 3000; i++) {
     db.system.js.insertOne({
         _id: "test" + i,
-        value: function(x) {
+        value: function (x) {
             return x;
-        }
+        },
     });
 }
 assert.commandWorked(db.coll.insertOne({x: 1}));
-assert.commandWorked(db.coll.updateMany({$where: "function() { return test0(this.x) != 0; }"},
-                                        {$set: {x: 2}},
-                                        {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    db.coll.updateMany(
+        {$where: "function() { return test0(this.x) != 0; }"},
+        {$set: {x: 2}},
+        {writeConcern: {w: "majority"}},
+    ),
+);
 
 rst.stopSet();

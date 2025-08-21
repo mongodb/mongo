@@ -7,8 +7,8 @@ const coll = db.jstests_aggregation_match;
 coll.drop();
 
 const identityProjection = {
-    _id: '$_id',
-    a: '$a'
+    _id: "$_id",
+    a: "$a",
 };
 
 /** Assert that an aggregation generated the expected error. */
@@ -22,10 +22,10 @@ function assertError(expectedCode, matchSpec) {
 
 /** Assert that the contents of two arrays are equal, ignoring element ordering. */
 function assertEqualResultsUnordered(one, two) {
-    let oneStr = one.map(function(x) {
+    let oneStr = one.map(function (x) {
         return tojson(x);
     });
-    let twoStr = two.map(function(x) {
+    let twoStr = two.map(function (x) {
         return tojson(x);
     });
     oneStr.sort();
@@ -43,15 +43,14 @@ function assertResults(expectedResults, matchSpec) {
     // Check where matching is folded in to DocumentSourceCursor.
     assertEqualResultsUnordered(findResults, coll.aggregate(matchStage).toArray());
     // Check where matching is not folded in to DocumentSourceCursor.
-    assertEqualResultsUnordered(
-        findResults, coll.aggregate({$project: identityProjection}, matchStage).toArray());
+    assertEqualResultsUnordered(findResults, coll.aggregate({$project: identityProjection}, matchStage).toArray());
 }
 
 // Invalid matcher syntax.
 assertError(2, {a: {$mod: [0 /* invalid */, 0]}});
 
 // $where not allowed.
-assertError(ErrorCodes.BadValue, {$where: 'true'});
+assertError(ErrorCodes.BadValue, {$where: "true"});
 
 // Geo not allowed.
 assertError(5626500, {a: {$near: [-1, 1]}});
@@ -68,34 +67,71 @@ function checkMatchResults(indexed) {
     assert.commandWorked(coll.insert({_id: 2, a: 3}));
 
     // Empty query.
-    assertResults([{_id: 0, a: 1}, {_id: 1, a: 2}, {_id: 2, a: 3}], {});
+    assertResults(
+        [
+            {_id: 0, a: 1},
+            {_id: 1, a: 2},
+            {_id: 2, a: 3},
+        ],
+        {},
+    );
 
     // Simple queries.
     assertResults([{_id: 0, a: 1}], {a: 1});
     assertResults([{_id: 1, a: 2}], {a: 2});
-    assertResults([{_id: 1, a: 2}, {_id: 2, a: 3}], {a: {$gt: 1}});
-    assertResults([{_id: 0, a: 1}, {_id: 1, a: 2}], {a: {$lte: 2}});
-    assertResults([{_id: 0, a: 1}, {_id: 2, a: 3}], {a: {$in: [1, 3]}});
+    assertResults(
+        [
+            {_id: 1, a: 2},
+            {_id: 2, a: 3},
+        ],
+        {a: {$gt: 1}},
+    );
+    assertResults(
+        [
+            {_id: 0, a: 1},
+            {_id: 1, a: 2},
+        ],
+        {a: {$lte: 2}},
+    );
+    assertResults(
+        [
+            {_id: 0, a: 1},
+            {_id: 2, a: 3},
+        ],
+        {a: {$in: [1, 3]}},
+    );
 
     // Regular expression.
     coll.remove({});
-    assert.commandWorked(coll.insert({_id: 0, a: 'x'}));
-    assert.commandWorked(coll.insert({_id: 1, a: 'yx'}));
-    assertResults([{_id: 0, a: 'x'}], {a: /^x/});
-    assertResults([{_id: 0, a: 'x'}, {_id: 1, a: 'yx'}], {a: /x/});
+    assert.commandWorked(coll.insert({_id: 0, a: "x"}));
+    assert.commandWorked(coll.insert({_id: 1, a: "yx"}));
+    assertResults([{_id: 0, a: "x"}], {a: /^x/});
+    assertResults(
+        [
+            {_id: 0, a: "x"},
+            {_id: 1, a: "yx"},
+        ],
+        {a: /x/},
+    );
 
     // Dotted field.
     coll.remove({});
     assert.commandWorked(coll.insert({_id: 0, a: {b: 4}}));
     assert.commandWorked(coll.insert({_id: 1, a: 2}));
-    assertResults([{_id: 0, a: {b: 4}}], {'a.b': 4});
+    assertResults([{_id: 0, a: {b: 4}}], {"a.b": 4});
 
     // Value within an array.
     coll.remove({});
     assert.commandWorked(coll.insert({_id: 0, a: [1, 2, 3]}));
     assert.commandWorked(coll.insert({_id: 1, a: [2, 2, 3]}));
     assert.commandWorked(coll.insert({_id: 2, a: [2, 2, 2]}));
-    assertResults([{_id: 0, a: [1, 2, 3]}, {_id: 1, a: [2, 2, 3]}], {a: 3});
+    assertResults(
+        [
+            {_id: 0, a: [1, 2, 3]},
+            {_id: 1, a: [2, 2, 3]},
+        ],
+        {a: 3},
+    );
 
     // Missing, null, $exists matching.
     coll.remove({});
@@ -135,7 +171,7 @@ function checkMatchResults(indexed) {
     assert.commandWorked(coll.insert({a: NumberInt(1)}));
     assert.commandWorked(coll.insert({a: NumberLong(2)}));
     assert.commandWorked(coll.insert({a: 66.6}));
-    assert.commandWorked(coll.insert({a: 'abc'}));
+    assert.commandWorked(coll.insert({a: "abc"}));
     assert.commandWorked(coll.insert({a: /xyz/}));
     assert.commandWorked(coll.insert({a: {q: 1}}));
     assert.commandWorked(coll.insert({a: true}));
@@ -153,16 +189,27 @@ function checkMatchResults(indexed) {
     // $and
     assertResults([{_id: 1, a: 2}], {$and: [{a: 2}, {_id: 1}]});
     assertResults([], {$and: [{a: 1}, {_id: 1}]});
-    assertResults([{_id: 1, a: 2}, {_id: 2, a: 3}],
-                  {$and: [{$or: [{_id: 1}, {a: 3}]}, {$or: [{_id: 2}, {a: 2}]}]});
+    assertResults(
+        [
+            {_id: 1, a: 2},
+            {_id: 2, a: 3},
+        ],
+        {$and: [{$or: [{_id: 1}, {a: 3}]}, {$or: [{_id: 2}, {a: 2}]}]},
+    );
 
     // $or
-    assertResults([{_id: 0, a: 1}, {_id: 2, a: 3}], {$or: [{_id: 0}, {a: 3}]});
+    assertResults(
+        [
+            {_id: 0, a: 1},
+            {_id: 2, a: 3},
+        ],
+        {$or: [{_id: 0}, {a: 3}]},
+    );
 }
 
 checkMatchResults(false);
 coll.createIndex({a: 1});
 checkMatchResults(true);
-coll.createIndex({'a.b': 1});
-coll.createIndex({'a.c': 1});
+coll.createIndex({"a.b": 1});
+coll.createIndex({"a.c": 1});
 checkMatchResults(true);

@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * This test performs random updates and deletes (see random_update_delete.js) on an unsharded
@@ -16,15 +16,13 @@
  * ];
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    randomUpdateDelete
-} from "jstests/concurrency/fsm_workload_modifiers/random_update_delete.js";
+import {randomUpdateDelete} from "jstests/concurrency/fsm_workload_modifiers/random_update_delete.js";
 
 const $baseConfig = {
     threadCount: 5,
     iterations: 50,
     passConnectionCache: true,
-    startState: 'init',
+    startState: "init",
     states: {
         init: function init(db, collName, connCache) {},
     },
@@ -33,8 +31,9 @@ const $baseConfig = {
         if (!TestData.runningWithShardStepdowns) {
             // Set reshardingMinimumOperationDurationMillis so that moveCollection runs faster.
             cluster.executeOnConfigNodes((db) => {
-                const res = assert.commandWorked(db.adminCommand(
-                    {setParameter: 1, reshardingMinimumOperationDurationMillis: 0}));
+                const res = assert.commandWorked(
+                    db.adminCommand({setParameter: 1, reshardingMinimumOperationDurationMillis: 0}),
+                );
                 this.originalReshardingMinimumOperationDurationMillis = res.was;
             });
         }
@@ -51,19 +50,20 @@ const $baseConfig = {
     teardown: function setup(db, collName, cluster) {
         if (!TestData.runningWithShardStepdowns) {
             cluster.executeOnConfigNodes((db) => {
-                const res = assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    reshardingMinimumOperationDurationMillis:
-                        this.originalReshardingMinimumOperationDurationMillis
-                }));
+                const res = assert.commandWorked(
+                    db.adminCommand({
+                        setParameter: 1,
+                        reshardingMinimumOperationDurationMillis: this.originalReshardingMinimumOperationDurationMillis,
+                    }),
+                );
             });
         }
-    }
+    },
 };
 
 const $partialConfig = extendWorkload($baseConfig, randomUpdateDelete);
 
-export const $config = extendWorkload($partialConfig, function($config, $super) {
+export const $config = extendWorkload($partialConfig, function ($config, $super) {
     // moveCollection committing may kill an ongoing operation (leading to partial multi writes),
     // but we should never retry (which would lead to extra multi writes). This matches the possible
     // behavior for collections in a plain replica set.
@@ -98,8 +98,7 @@ export const $config = extendWorkload($partialConfig, function($config, $super) 
 
         if (!result.ok) {
             if (result.code === ErrorCodes.NamespaceNotFound) {
-                jsTestLog(`Move collection result for ${namespace} to shard ${toShard}: ${
-                    tojson(result)}`);
+                jsTestLog(`Move collection result for ${namespace} to shard ${toShard}: ${tojson(result)}`);
                 return;
             }
         }
@@ -109,14 +108,12 @@ export const $config = extendWorkload($partialConfig, function($config, $super) 
         this.moveCollectionsPerformed++;
     };
 
-    $config.states.untrackUnshardedCollection = function untrackUnshardedCollection(
-        db, collName, connCache) {
+    $config.states.untrackUnshardedCollection = function untrackUnshardedCollection(db, collName, connCache) {
         const namespace = `${db}.${collName}`;
         jsTestLog(`Attempting to untrack collection ${namespace}`);
         const res = db.adminCommand({untrackUnshardedCollection: namespace});
         if (!res.ok) {
-            if (res.code === ErrorCodes.OperationFailed ||
-                res.code === ErrorCodes.InvalidNamespace) {
+            if (res.code === ErrorCodes.OperationFailed || res.code === ErrorCodes.InvalidNamespace) {
                 jsTestLog(`Untrack collection result for ${namespace}: ${tojson(res)}`);
                 return;
             }
@@ -129,7 +126,7 @@ export const $config = extendWorkload($partialConfig, function($config, $super) 
         moveCollection: 0.1,
         untrackUnshardedCollection: 0.1,
         performUpdates: 0.35,
-        performDeletes: 0.35
+        performDeletes: 0.35,
     };
     $config.transitions = {
         init: weights,

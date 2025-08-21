@@ -8,7 +8,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     runWithFailpoint,
-    setupCollectionAndGetExplainTestCases
+    setupCollectionAndGetExplainTestCases,
 } from "jstests/noPassthrough/query/explain/explain_and_profile_optimization_stats_util.js";
 
 const collName = "jstests_explain_optimization_stats";
@@ -17,7 +17,7 @@ function runTest(db) {
     const testCases = setupCollectionAndGetExplainTestCases(db, collName, waitTimeMillis);
 
     function collectOptimizationTimeMillis(explain) {
-        if (explain === null || typeof explain !== 'object') {
+        if (explain === null || typeof explain !== "object") {
             return [];
         }
 
@@ -25,11 +25,11 @@ function runTest(db) {
             return explain.flatMap(collectOptimizationTimeMillis);
         } else {
             let ownResults = [];
-            if (explain.hasOwnProperty('optimizationTimeMillis')) {
+            if (explain.hasOwnProperty("optimizationTimeMillis")) {
                 ownResults = [explain.optimizationTimeMillis];
             }
             return Object.keys(explain)
-                .flatMap(key => collectOptimizationTimeMillis(explain[key]))
+                .flatMap((key) => collectOptimizationTimeMillis(explain[key]))
                 .concat(ownResults);
         }
     }
@@ -42,7 +42,7 @@ function runTest(db) {
 
             // Assert the optimizationTimeMillis field is reported in explain as expected.
             const optimizationTimeMillis = collectOptimizationTimeMillis(explain);
-            optimizationTimeMillis.forEach(time => assert.gte(time, waitTimeMillis, explain));
+            optimizationTimeMillis.forEach((time) => assert.gte(time, waitTimeMillis, explain));
             assert.gt(optimizationTimeMillis.length, 0, explain);
         });
     }

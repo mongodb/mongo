@@ -50,21 +50,22 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
  * @param {Object} keys Name(s) and definitions of the desired search indexes.
  * @param {Object} blockUntilSearchIndexQueryable Object that represents how the
  */
-function _validateSearchIndexArguments(
-    searchIndexCommandName, keys, blockUntilSearchIndexQueryable) {
-    if (!keys.hasOwnProperty('definition')) {
+function _validateSearchIndexArguments(searchIndexCommandName, keys, blockUntilSearchIndexQueryable) {
+    if (!keys.hasOwnProperty("definition")) {
         throw new Error(searchIndexCommandName + " must have a definition");
     }
 
-    if (typeof (blockUntilSearchIndexQueryable) != 'object' ||
+    if (
+        typeof blockUntilSearchIndexQueryable != "object" ||
         Object.keys(blockUntilSearchIndexQueryable).length != 1 ||
-        !blockUntilSearchIndexQueryable.hasOwnProperty('blockUntilSearchIndexQueryable')) {
+        !blockUntilSearchIndexQueryable.hasOwnProperty("blockUntilSearchIndexQueryable")
+    ) {
         throw new Error(
-            searchIndexCommandName +
-            " only accepts index definition object and blockUntilSearchIndexQueryable object");
+            searchIndexCommandName + " only accepts index definition object and blockUntilSearchIndexQueryable object",
+        );
     }
 
-    if (typeof (blockUntilSearchIndexQueryable["blockUntilSearchIndexQueryable"]) != "boolean") {
+    if (typeof blockUntilSearchIndexQueryable["blockUntilSearchIndexQueryable"] != "boolean") {
         throw new Error("'blockUntilSearchIndexQueryable' argument must be a boolean");
     }
 }
@@ -127,28 +128,33 @@ function _verifySearchIndexDropped(coll, indexName) {
     let searchIndexArray = coll.aggregate([{$listSearchIndexes: {"name": indexName}}]).toArray();
 
     // If the index was properly dropped, the array should be empty.
-    assert.eq(searchIndexArray.length,
-              0,
-              "Search index '" + indexName + "' still exists when $listSearchIndexes is executed.");
+    assert.eq(
+        searchIndexArray.length,
+        0,
+        "Search index '" + indexName + "' still exists when $listSearchIndexes is executed.",
+    );
 }
 
 function _runAndReplicateSearchIndexCommand(coll, userCmd, indexName, latestDefinition = null) {
     let response = assert.commandWorked(coll.getDB().runCommand(userCmd));
     // Please see block comment at the top of this file to understand the sharded implementation.
     if (isShardedHelper(coll)) {
-        assert.commandWorked(
-            coll.getDB().runCommand({replicateSearchIndexCommand: coll.getName(), userCmd}));
+        assert.commandWorked(coll.getDB().runCommand({replicateSearchIndexCommand: coll.getName(), userCmd}));
     } else {
-        if (Object.keys(userCmd)[0] != 'dropSearchIndex') {
+        if (Object.keys(userCmd)[0] != "dropSearchIndex") {
             _runListSearchIndexOnNode(coll, indexName, latestDefinition);
         }
     }
     return response;
 }
 
-export function updateSearchIndex(coll, keys, blockUntilSearchIndexQueryable = {
-    "blockUntilSearchIndexQueryable": true
-}) {
+export function updateSearchIndex(
+    coll,
+    keys,
+    blockUntilSearchIndexQueryable = {
+        "blockUntilSearchIndexQueryable": true,
+    },
+) {
     _validateSearchIndexArguments("updateSearchIndex", keys, blockUntilSearchIndexQueryable);
     let blockOnIndexQueryable = blockUntilSearchIndexQueryable["blockUntilSearchIndexQueryable"];
 
@@ -158,7 +164,7 @@ export function updateSearchIndex(coll, keys, blockUntilSearchIndexQueryable = {
 }
 
 export function dropSearchIndex(coll, keys) {
-    if (Object.keys(keys).length != 1 || !keys.hasOwnProperty('name')) {
+    if (Object.keys(keys).length != 1 || !keys.hasOwnProperty("name")) {
         /**
          * dropSearchIndex server command accepts search index ID or name. However, the
          * createSearchIndex library helper only returns the response from issuing the creation
@@ -187,11 +193,14 @@ export function createSearchIndex(coll, keys, blockUntilSearchIndexQueryable) {
     let blockOnIndexQueryable = true;
     if (arguments.length == 3) {
         // The third arg may only be the "blockUntilSearchIndexQueryable" flag.
-        if (typeof (blockUntilSearchIndexQueryable) != 'object' ||
+        if (
+            typeof blockUntilSearchIndexQueryable != "object" ||
             Object.keys(blockUntilSearchIndexQueryable).length != 1 ||
-            !blockUntilSearchIndexQueryable.hasOwnProperty('blockUntilSearchIndexQueryable')) {
+            !blockUntilSearchIndexQueryable.hasOwnProperty("blockUntilSearchIndexQueryable")
+        ) {
             throw new Error(
-                "createSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object");
+                "createSearchIndex only accepts index definition object and blockUntilSearchIndexQueryable object",
+            );
         }
 
         blockOnIndexQueryable = blockUntilSearchIndexQueryable["blockUntilSearchIndexQueryable"];
@@ -200,7 +209,7 @@ export function createSearchIndex(coll, keys, blockUntilSearchIndexQueryable) {
         }
     }
 
-    if (!keys.hasOwnProperty('definition')) {
+    if (!keys.hasOwnProperty("definition")) {
         throw new Error("createSearchIndex must have a definition");
     }
 

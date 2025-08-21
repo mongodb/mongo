@@ -10,16 +10,14 @@ import {
     mongotMultiCursorResponseForBatch,
     mongotResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const docOneSearchRootDocId = ObjectId("507f1f77bcf86cd799439011");
 const docTwoSearchRootDocId = 1;
 const docThreeSearchRootDocId = "two";
 const docFourSearchRootDocId = {
-    obj: {nestedObj: {}}
+    obj: {nestedObj: {}},
 };
 const docFiveSearchRootDocId = BinData(7, "CQDolzLxggEAAID+fAAAAAAAAAA=");
 const shardingBoundary = ObjectId("507f1f77bcf86cd799439030");
@@ -40,68 +38,78 @@ function runUnshardedTests() {
     const coll = testDB.search_root_document_id;
 
     // Test data with nested structure for directors and actors.
-    assert.commandWorked(coll.insert({
-        _id: docOneSearchRootDocId,
-        movieInfo: {
-            title: "The Shawshank Redemption",
-            genre: "Drama",
-            director: "Frank Darabont",
-            actors: ["Tim Robbins", "Morgan Freeman"]
-        }
-    }));
-    assert.commandWorked(coll.insert({
-        _id: docTwoSearchRootDocId,
-        movieInfo: {
-            title: "The Godfather",
-            genre: "Crime",
-            director: "Francis Ford Coppola",
-            actors: ["Marlon Brando", "Al Pacino"]
-        }
-    }));
-    assert.commandWorked(coll.insert({
-        _id: docThreeSearchRootDocId,
-        movieInfo: {
-            title: "The Dark Knight",
-            genre: "Action",
-            director: {first: "Christopher", last: "Nolan"},
-            actors: ["Christian Bale", "Heath Ledger"]
-        }
-    }));
-    assert.commandWorked(coll.insert({
-        _id: docFiveSearchRootDocId,
-        movieInfo: {
-            title: "Pulp Fiction",
-            genre: "Crime",
-            director: {first: "Quentin", last: "Tarantino"},
-            actors: ["John Travolta", "Uma Thurman", "Samuel L. Jackson"]
-        }
-    }));
-    assert.commandWorked(coll.insert({
-        _id: docFourSearchRootDocId,
-        director: "M. Night Shyamalan",
-        birthDate: "1970-08-06",
-        movieInfo: [
-            {
-                title: "The Sixth Sense",
-                releaseYear: 1999,
-                genre: "Thriller",
-                reviews: [
-                    {rating: 9.0, text: "Mind-blowing and suspenseful"},
-                    {rating: 8.5, text: "Incredible plot twist"},
-                    {rating: 5.5, text: "Amazing plot twist"}
-                ]
+    assert.commandWorked(
+        coll.insert({
+            _id: docOneSearchRootDocId,
+            movieInfo: {
+                title: "The Shawshank Redemption",
+                genre: "Drama",
+                director: "Frank Darabont",
+                actors: ["Tim Robbins", "Morgan Freeman"],
             },
-            {
-                title: "Split",
-                releaseYear: 2016,
-                genre: "Thriller",
-                reviews: [
-                    {rating: 8.0, text: "Intense psychological thriller"},
-                    {rating: 7.5, text: "Amazing lead performance"}
-                ]
-            }
-        ]
-    }));
+        }),
+    );
+    assert.commandWorked(
+        coll.insert({
+            _id: docTwoSearchRootDocId,
+            movieInfo: {
+                title: "The Godfather",
+                genre: "Crime",
+                director: "Francis Ford Coppola",
+                actors: ["Marlon Brando", "Al Pacino"],
+            },
+        }),
+    );
+    assert.commandWorked(
+        coll.insert({
+            _id: docThreeSearchRootDocId,
+            movieInfo: {
+                title: "The Dark Knight",
+                genre: "Action",
+                director: {first: "Christopher", last: "Nolan"},
+                actors: ["Christian Bale", "Heath Ledger"],
+            },
+        }),
+    );
+    assert.commandWorked(
+        coll.insert({
+            _id: docFiveSearchRootDocId,
+            movieInfo: {
+                title: "Pulp Fiction",
+                genre: "Crime",
+                director: {first: "Quentin", last: "Tarantino"},
+                actors: ["John Travolta", "Uma Thurman", "Samuel L. Jackson"],
+            },
+        }),
+    );
+    assert.commandWorked(
+        coll.insert({
+            _id: docFourSearchRootDocId,
+            director: "M. Night Shyamalan",
+            birthDate: "1970-08-06",
+            movieInfo: [
+                {
+                    title: "The Sixth Sense",
+                    releaseYear: 1999,
+                    genre: "Thriller",
+                    reviews: [
+                        {rating: 9.0, text: "Mind-blowing and suspenseful"},
+                        {rating: 8.5, text: "Incredible plot twist"},
+                        {rating: 5.5, text: "Amazing plot twist"},
+                    ],
+                },
+                {
+                    title: "Split",
+                    releaseYear: 2016,
+                    genre: "Thriller",
+                    reviews: [
+                        {rating: 8.0, text: "Intense psychological thriller"},
+                        {rating: 7.5, text: "Amazing lead performance"},
+                    ],
+                },
+            ],
+        }),
+    );
     const collUUID = getUUIDFromListCollections(testDB, coll.getName());
 
     // Test basic searchRootDocumentId functionality.
@@ -110,7 +118,7 @@ function runUnshardedTests() {
         const cursorId = NumberLong(123);
         const pipeline = [
             {$search: mongotQuery},
-            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
         const mongotResponseBatch = [
@@ -119,19 +127,19 @@ function runUnshardedTests() {
                     title: "The Shawshank Redemption",
                     genre: "Drama",
                     director: "Frank Darabont",
-                    actors: ["Tim Robbins", "Morgan Freeman"]
+                    actors: ["Tim Robbins", "Morgan Freeman"],
                 },
-                $searchRootDocumentId: docOneSearchRootDocId
+                $searchRootDocumentId: docOneSearchRootDocId,
             },
             {
                 storedSource: {
                     title: "The Godfather",
                     genre: "Crime",
                     director: "Francis Ford Coppola",
-                    actors: ["Marlon Brando", "Al Pacino"]
+                    actors: ["Marlon Brando", "Al Pacino"],
                 },
-                $searchRootDocumentId: docTwoSearchRootDocId
-            }
+                $searchRootDocumentId: docTwoSearchRootDocId,
+            },
         ];
 
         const expectedDocs = [
@@ -140,27 +148,28 @@ function runUnshardedTests() {
                 genre: "Drama",
                 director: "Frank Darabont",
                 actors: ["Tim Robbins", "Morgan Freeman"],
-                searchRootDocumentId: docOneSearchRootDocId
+                searchRootDocumentId: docOneSearchRootDocId,
             },
             {
                 title: "The Godfather",
                 genre: "Crime",
                 director: "Francis Ford Coppola",
                 actors: ["Marlon Brando", "Al Pacino"],
-                searchRootDocumentId: docTwoSearchRootDocId
-            }
+                searchRootDocumentId: docTwoSearchRootDocId,
+            },
         ];
 
-        const history = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: coll.getName(),
-                db: dbName,
-                collectionUUID: collUUID
-            }),
-            response:
-                mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), 1),
-        }];
+        const history = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: coll.getName(),
+                    db: dbName,
+                    collectionUUID: collUUID,
+                }),
+                response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), 1),
+            },
+        ];
 
         mongotMock.setMockResponses(history, cursorId);
         const result = coll.aggregate(pipeline).toArray();
@@ -174,49 +183,53 @@ function runUnshardedTests() {
         const cursorId = NumberLong(456);
         const pipeline = [
             {$search: mongotQuery},
-            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
-        const batchOne = [{
-            storedSource:
-                {title: "The Shawshank Redemption", genre: "Drama", director: "Frank Darabont"},
-            $searchRootDocumentId: docOneSearchRootDocId
-        }];
-
-        const batchTwo = [{
-            storedSource:
-                {title: "The Godfather", genre: "Crime", director: "Francis Ford Coppola"},
-            $searchRootDocumentId: docTwoSearchRootDocId
-        }];
-
-        const batchThree = [{
-            storedSource: {
-                title: "The Dark Knight",
-                genre: "Action",
-                director: {first: "Christopher", last: "Nolan"}
+        const batchOne = [
+            {
+                storedSource: {title: "The Shawshank Redemption", genre: "Drama", director: "Frank Darabont"},
+                $searchRootDocumentId: docOneSearchRootDocId,
             },
-            $searchRootDocumentId: docThreeSearchRootDocId
-        }];
+        ];
+
+        const batchTwo = [
+            {
+                storedSource: {title: "The Godfather", genre: "Crime", director: "Francis Ford Coppola"},
+                $searchRootDocumentId: docTwoSearchRootDocId,
+            },
+        ];
+
+        const batchThree = [
+            {
+                storedSource: {
+                    title: "The Dark Knight",
+                    genre: "Action",
+                    director: {first: "Christopher", last: "Nolan"},
+                },
+                $searchRootDocumentId: docThreeSearchRootDocId,
+            },
+        ];
 
         const expectedDocs = [
             {
                 title: "The Shawshank Redemption",
                 genre: "Drama",
                 director: "Frank Darabont",
-                searchRootDocumentId: docOneSearchRootDocId
+                searchRootDocumentId: docOneSearchRootDocId,
             },
             {
                 title: "The Godfather",
                 genre: "Crime",
                 director: "Francis Ford Coppola",
-                searchRootDocumentId: docTwoSearchRootDocId
+                searchRootDocumentId: docTwoSearchRootDocId,
             },
             {
                 title: "The Dark Knight",
                 genre: "Action",
                 director: {first: "Christopher", last: "Nolan"},
-                searchRootDocumentId: docThreeSearchRootDocId
-            }
+                searchRootDocumentId: docThreeSearchRootDocId,
+            },
         ];
 
         const history = [
@@ -225,7 +238,7 @@ function runUnshardedTests() {
                     query: mongotQuery,
                     collName: coll.getName(),
                     db: dbName,
-                    collectionUUID: collUUID
+                    collectionUUID: collUUID,
                 }),
                 response: mongotResponseForBatch(batchOne, cursorId, coll.getFullName(), 1),
             },
@@ -236,7 +249,7 @@ function runUnshardedTests() {
             {
                 expectedCommand: {getMore: cursorId, collection: coll.getName()},
                 response: mongotResponseForBatch(batchThree, NumberLong(0), coll.getFullName(), 1),
-            }
+            },
         ];
 
         mongotMock.setMockResponses(history, cursorId);
@@ -249,7 +262,7 @@ function runUnshardedTests() {
         const cursorId = NumberLong(555);
         const pipeline = [
             {$search: mongotQuery},
-            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
         const mongotResponseBatch = [
@@ -261,10 +274,10 @@ function runUnshardedTests() {
                     reviews: [
                         {rating: 9.0, text: "Mind-blowing and suspenseful"},
                         {rating: 8.5, text: "Incredible plot twist"},
-                        {rating: 5.5, text: "Amazing plot twist"}
-                    ]
+                        {rating: 5.5, text: "Amazing plot twist"},
+                    ],
                 },
-                $searchRootDocumentId: docFourSearchRootDocId
+                $searchRootDocumentId: docFourSearchRootDocId,
             },
             {
                 storedSource: {
@@ -273,11 +286,11 @@ function runUnshardedTests() {
                     genre: "Thriller",
                     reviews: [
                         {rating: 8.0, text: "Intense psychological thriller"},
-                        {rating: 7.5, text: "Amazing lead performance"}
-                    ]
+                        {rating: 7.5, text: "Amazing lead performance"},
+                    ],
                 },
-                $searchRootDocumentId: docFourSearchRootDocId
-            }
+                $searchRootDocumentId: docFourSearchRootDocId,
+            },
         ];
 
         const expectedDocs = [
@@ -288,9 +301,9 @@ function runUnshardedTests() {
                 reviews: [
                     {rating: 9.0, text: "Mind-blowing and suspenseful"},
                     {rating: 8.5, text: "Incredible plot twist"},
-                    {rating: 5.5, text: "Amazing plot twist"}
+                    {rating: 5.5, text: "Amazing plot twist"},
                 ],
-                searchRootDocumentId: docFourSearchRootDocId
+                searchRootDocumentId: docFourSearchRootDocId,
             },
             {
                 title: "Split",
@@ -298,22 +311,23 @@ function runUnshardedTests() {
                 genre: "Thriller",
                 reviews: [
                     {rating: 8.0, text: "Intense psychological thriller"},
-                    {rating: 7.5, text: "Amazing lead performance"}
+                    {rating: 7.5, text: "Amazing lead performance"},
                 ],
-                searchRootDocumentId: docFourSearchRootDocId
-            }
+                searchRootDocumentId: docFourSearchRootDocId,
+            },
         ];
 
-        const history = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: coll.getName(),
-                db: dbName,
-                collectionUUID: collUUID
-            }),
-            response:
-                mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), 1),
-        }];
+        const history = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: coll.getName(),
+                    db: dbName,
+                    collectionUUID: collUUID,
+                }),
+                response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), 1),
+            },
+        ];
 
         mongotMock.setMockResponses(history, cursorId);
         const result = coll.aggregate(pipeline).toArray();
@@ -325,32 +339,36 @@ function runUnshardedTests() {
         const mongotQuery = {returnStoredSource: true, returnScope: {path: "movieInfo"}};
         const pipeline = [
             {$search: mongotQuery},
-            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
         // Test array searchRootDocumentId should throw error InvalidIdField.
         {
             const cursorId = NumberLong(789);
-            const responseWithInvalidIdType = [{
-                storedSource: {title: "Error Movie"},
-                $searchRootDocumentId: ["array", "invalid", "id", "type"]
-            }];
+            const responseWithInvalidIdType = [
+                {
+                    storedSource: {title: "Error Movie"},
+                    $searchRootDocumentId: ["array", "invalid", "id", "type"],
+                },
+            ];
 
-            const history = [{
-                expectedCommand: mongotCommandForQuery({
-                    query: mongotQuery,
-                    collName: coll.getName(),
-                    db: dbName,
-                    collectionUUID: collUUID
-                }),
-                response: mongotResponseForBatch(
-                    responseWithInvalidIdType, NumberLong(0), coll.getFullName(), 1),
-            }];
+            const history = [
+                {
+                    expectedCommand: mongotCommandForQuery({
+                        query: mongotQuery,
+                        collName: coll.getName(),
+                        db: dbName,
+                        collectionUUID: collUUID,
+                    }),
+                    response: mongotResponseForBatch(responseWithInvalidIdType, NumberLong(0), coll.getFullName(), 1),
+                },
+            ];
 
             mongotMock.setMockResponses(history, cursorId);
             assert.commandFailedWithCode(
                 testDB.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}),
-                ErrorCodes.InvalidIdField);
+                ErrorCodes.InvalidIdField,
+            );
         }
 
         // Test missing searchRootDocumentId field should succeed but not include the metadata.
@@ -358,16 +376,17 @@ function runUnshardedTests() {
             const cursorId = NumberLong(790);
             const responseWithMissing = [{storedSource: {title: "Missing Movie"}}];
 
-            const historyMissing = [{
-                expectedCommand: mongotCommandForQuery({
-                    query: mongotQuery,
-                    collName: coll.getName(),
-                    db: dbName,
-                    collectionUUID: collUUID
-                }),
-                response: mongotResponseForBatch(
-                    responseWithMissing, NumberLong(0), coll.getFullName(), 1),
-            }];
+            const historyMissing = [
+                {
+                    expectedCommand: mongotCommandForQuery({
+                        query: mongotQuery,
+                        collName: coll.getName(),
+                        db: dbName,
+                        collectionUUID: collUUID,
+                    }),
+                    response: mongotResponseForBatch(responseWithMissing, NumberLong(0), coll.getFullName(), 1),
+                },
+            ];
 
             mongotMock.setMockResponses(historyMissing, cursorId);
             const resultMissing = coll.aggregate(pipeline).toArray();
@@ -379,18 +398,22 @@ function runUnshardedTests() {
         // Test error: returnScope is missing.
         const pipeline1 = [
             {$search: {returnStoredSource: true}},
-            {$project: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$project: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
         assert.commandFailedWithCode(
-            testDB.runCommand({aggregate: coll.getName(), pipeline: pipeline1, cursor: {}}), 40218);
+            testDB.runCommand({aggregate: coll.getName(), pipeline: pipeline1, cursor: {}}),
+            40218,
+        );
 
         // Test error: returnStoredSource is missing.
         const pipeline2 = [
             {$search: {returnScope: {path: "movieInfo"}}},
-            {$project: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$project: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
         assert.commandFailedWithCode(
-            testDB.runCommand({aggregate: coll.getName(), pipeline: pipeline2, cursor: {}}), 40218);
+            testDB.runCommand({aggregate: coll.getName(), pipeline: pipeline2, cursor: {}}),
+            40218,
+        );
     }
 
     // Dotted field path test.
@@ -399,35 +422,36 @@ function runUnshardedTests() {
         const cursorId = NumberLong(999);
         const pipeline = [
             {$search: mongotQuery},
-            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
         const mongotResponseBatch = [
             {
                 storedSource: {first: "Christopher", last: "Nolan"},
-                $searchRootDocumentId: docThreeSearchRootDocId
+                $searchRootDocumentId: docThreeSearchRootDocId,
             },
             {
                 storedSource: {first: "Quentin", last: "Tarantino"},
-                $searchRootDocumentId: docFiveSearchRootDocId
-            }
+                $searchRootDocumentId: docFiveSearchRootDocId,
+            },
         ];
 
         const expectedResults = [
             {first: "Christopher", last: "Nolan", searchRootDocumentId: docThreeSearchRootDocId},
-            {first: "Quentin", last: "Tarantino", searchRootDocumentId: docFiveSearchRootDocId}
+            {first: "Quentin", last: "Tarantino", searchRootDocumentId: docFiveSearchRootDocId},
         ];
 
-        const history = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: coll.getName(),
-                db: dbName,
-                collectionUUID: collUUID
-            }),
-            response:
-                mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), 1),
-        }];
+        const history = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: coll.getName(),
+                    db: dbName,
+                    collectionUUID: collUUID,
+                }),
+                response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), coll.getFullName(), 1),
+            },
+        ];
 
         mongotMock.setMockResponses(history, cursorId);
         const result = coll.aggregate(pipeline).toArray();
@@ -452,46 +476,51 @@ function runShardedTests() {
         mongos: 1,
         other: {
             rsOptions: {setParameter: {enableTestCommands: 1}},
-        }
+        },
     });
     stWithMock.start();
     const st = stWithMock.st;
 
     const mongos = st.s;
     const testDB = mongos.getDB(dbName);
-    assert.commandWorked(
-        mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
     const testColl = testDB.getCollection(collName);
     const collNS = testColl.getFullName();
 
-    assert.commandWorked(testColl.insert({
-        _id: shardedDocOneId,
-        movieInfo: {
-            title: "Inception",
-            genre: "Sci-Fi",
-            director: {first: "Christopher", last: "Nolan"},
-            actors: ["Leonardo DiCaprio", "Marion Cotillard"]
-        }
-    }));
-    assert.commandWorked(testColl.insert({
-        _id: shardedDocTwoId,
-        movieInfo: {
-            title: "Casablanca",
-            genre: "Romance",
-            director: "Michael Curtiz",
-            actors: ["Humphrey Bogart", "Ingrid Bergman"]
-        }
-    }));
-    assert.commandWorked(testColl.insert({
-        _id: shardedDocThreeId,
-        movieInfo: {
-            title: "Parasite",
-            genre: "Thriller",
-            director: {first: "Bong", last: "Joon-ho"},
-            actors: ["Song Kang-ho", "Lee Sun-kyun"]
-        }
-    }));
+    assert.commandWorked(
+        testColl.insert({
+            _id: shardedDocOneId,
+            movieInfo: {
+                title: "Inception",
+                genre: "Sci-Fi",
+                director: {first: "Christopher", last: "Nolan"},
+                actors: ["Leonardo DiCaprio", "Marion Cotillard"],
+            },
+        }),
+    );
+    assert.commandWorked(
+        testColl.insert({
+            _id: shardedDocTwoId,
+            movieInfo: {
+                title: "Casablanca",
+                genre: "Romance",
+                director: "Michael Curtiz",
+                actors: ["Humphrey Bogart", "Ingrid Bergman"],
+            },
+        }),
+    );
+    assert.commandWorked(
+        testColl.insert({
+            _id: shardedDocThreeId,
+            movieInfo: {
+                title: "Parasite",
+                genre: "Thriller",
+                director: {first: "Bong", last: "Joon-ho"},
+                actors: ["Song Kang-ho", "Lee Sun-kyun"],
+            },
+        }),
+    );
 
     st.shardColl(testColl, {_id: 1}, {_id: shardingBoundary}, {_id: shardingBoundary});
 
@@ -517,51 +546,71 @@ function runShardedTests() {
         const mongotQuery = {returnStoredSource: true, returnScope: {path: "movieInfo"}};
         const responseOk = 1;
 
-        const mongot0ResponseBatch = [{
-            storedSource: {
-                title: "Inception",
-                genre: "Sci-Fi",
-                director: {first: "Christopher", last: "Nolan"},
-                actors: ["Leonardo DiCaprio", "Marion Cotillard"]
+        const mongot0ResponseBatch = [
+            {
+                storedSource: {
+                    title: "Inception",
+                    genre: "Sci-Fi",
+                    director: {first: "Christopher", last: "Nolan"},
+                    actors: ["Leonardo DiCaprio", "Marion Cotillard"],
+                },
+                $searchScore: 100,
+                $searchRootDocumentId: shardedDocOneId,
             },
-            $searchScore: 100,
-            $searchRootDocumentId: shardedDocOneId
-        }];
+        ];
 
-        const mongot1ResponseBatch = [{
-            storedSource: {
-                title: "Casablanca",
-                genre: "Romance",
-                director: "Michael Curtiz",
-                actors: ["Humphrey Bogart", "Ingrid Bergman"]
+        const mongot1ResponseBatch = [
+            {
+                storedSource: {
+                    title: "Casablanca",
+                    genre: "Romance",
+                    director: "Michael Curtiz",
+                    actors: ["Humphrey Bogart", "Ingrid Bergman"],
+                },
+                $searchScore: 111,
+                $searchRootDocumentId: shardedDocTwoId,
             },
-            $searchScore: 111,
-            $searchRootDocumentId: shardedDocTwoId
-        }];
+        ];
 
-        const history0 = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: collName,
-                db: dbName,
-                collectionUUID: collUUID0,
-                protocolVersion: protocolVersion
-            }),
-            response: mongotMultiCursorResponseForBatch(
-                mongot0ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-        }];
+        const history0 = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID0,
+                    protocolVersion: protocolVersion,
+                }),
+                response: mongotMultiCursorResponseForBatch(
+                    mongot0ResponseBatch,
+                    NumberLong(0),
+                    [{val: 1}],
+                    NumberLong(0),
+                    collNS,
+                    responseOk,
+                ),
+            },
+        ];
 
-        const history1 = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: collName,
-                db: dbName,
-                collectionUUID: collUUID1,
-                protocolVersion: protocolVersion
-            }),
-            response: mongotMultiCursorResponseForBatch(
-                mongot1ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-        }];
+        const history1 = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID1,
+                    protocolVersion: protocolVersion,
+                }),
+                response: mongotMultiCursorResponseForBatch(
+                    mongot1ResponseBatch,
+                    NumberLong(0),
+                    [{val: 1}],
+                    NumberLong(0),
+                    collNS,
+                    responseOk,
+                ),
+            },
+        ];
 
         const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
         const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
@@ -570,20 +619,19 @@ function runShardedTests() {
 
         const pipeline = [
             {$search: mongotQuery},
-            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
-        mockPlanShardedSearchResponse(
-            testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
+        mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
 
         const result = testColl.aggregate(pipeline).toArray();
         assert.gt(result.length, 0, "Should return movie results");
 
-        result.forEach(doc => {
-            assert(doc.hasOwnProperty('title'), "Should have movie title");
-            assert(doc.hasOwnProperty('genre'), "Should have movie genre");
-            assert(doc.hasOwnProperty('director'), "Should have movie director");
-            assert(doc.hasOwnProperty('searchRootDocumentId'), "Should have searchRootDocumentId");
+        result.forEach((doc) => {
+            assert(doc.hasOwnProperty("title"), "Should have movie title");
+            assert(doc.hasOwnProperty("genre"), "Should have movie genre");
+            assert(doc.hasOwnProperty("director"), "Should have movie director");
+            assert(doc.hasOwnProperty("searchRootDocumentId"), "Should have searchRootDocumentId");
         });
     }
 
@@ -596,38 +644,56 @@ function runShardedTests() {
         const responseOk = 1;
 
         const mongot0ResponseBatch = [
-            {storedSource: {title: "Error Movie"}, $searchScore: 100, $searchRootDocumentId: /.*/}
+            {storedSource: {title: "Error Movie"}, $searchScore: 100, $searchRootDocumentId: /.*/},
         ];
 
-        const mongot1ResponseBatch = [{
-            storedSource: {title: "Valid Movie"},
-            $searchScore: 111,
-            $searchRootDocumentId: shardedDocTwoId
-        }];
+        const mongot1ResponseBatch = [
+            {
+                storedSource: {title: "Valid Movie"},
+                $searchScore: 111,
+                $searchRootDocumentId: shardedDocTwoId,
+            },
+        ];
 
-        const history0 = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: collName,
-                db: dbName,
-                collectionUUID: collUUID0,
-                protocolVersion: protocolVersion
-            }),
-            response: mongotMultiCursorResponseForBatch(
-                mongot0ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-        }];
+        const history0 = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID0,
+                    protocolVersion: protocolVersion,
+                }),
+                response: mongotMultiCursorResponseForBatch(
+                    mongot0ResponseBatch,
+                    NumberLong(0),
+                    [{val: 1}],
+                    NumberLong(0),
+                    collNS,
+                    responseOk,
+                ),
+            },
+        ];
 
-        const history1 = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: collName,
-                db: dbName,
-                collectionUUID: collUUID1,
-                protocolVersion: protocolVersion
-            }),
-            response: mongotMultiCursorResponseForBatch(
-                mongot1ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-        }];
+        const history1 = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID1,
+                    protocolVersion: protocolVersion,
+                }),
+                response: mongotMultiCursorResponseForBatch(
+                    mongot1ResponseBatch,
+                    NumberLong(0),
+                    [{val: 1}],
+                    NumberLong(0),
+                    collNS,
+                    responseOk,
+                ),
+            },
+        ];
 
         const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
         const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
@@ -636,11 +702,10 @@ function runShardedTests() {
 
         const pipeline = [
             {$search: mongotQuery},
-            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
-        mockPlanShardedSearchResponse(
-            testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
+        mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
 
         const err = assert.throws(() => testColl.aggregate(pipeline).toArray());
         assert.commandFailedWithCode(err, ErrorCodes.InvalidIdField);
@@ -654,41 +719,61 @@ function runShardedTests() {
         const mongotQuery = {returnStoredSource: true, returnScope: {path: "movieInfo.director"}};
         const responseOk = 1;
 
-        const mongot0ResponseBatch = [{
-            storedSource: {first: "Christopher", last: "Nolan"},
-            $searchScore: 100,
-            $searchRootDocumentId: shardedDocOneId
-        }];
+        const mongot0ResponseBatch = [
+            {
+                storedSource: {first: "Christopher", last: "Nolan"},
+                $searchScore: 100,
+                $searchRootDocumentId: shardedDocOneId,
+            },
+        ];
 
-        const mongot1ResponseBatch = [{
-            storedSource: {first: "Bong", last: "Joon-ho"},
-            $searchScore: 111,
-            $searchRootDocumentId: shardedDocThreeId
-        }];
+        const mongot1ResponseBatch = [
+            {
+                storedSource: {first: "Bong", last: "Joon-ho"},
+                $searchScore: 111,
+                $searchRootDocumentId: shardedDocThreeId,
+            },
+        ];
 
-        const history0 = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: collName,
-                db: dbName,
-                collectionUUID: collUUID0,
-                protocolVersion: protocolVersion
-            }),
-            response: mongotMultiCursorResponseForBatch(
-                mongot0ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-        }];
+        const history0 = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID0,
+                    protocolVersion: protocolVersion,
+                }),
+                response: mongotMultiCursorResponseForBatch(
+                    mongot0ResponseBatch,
+                    NumberLong(0),
+                    [{val: 1}],
+                    NumberLong(0),
+                    collNS,
+                    responseOk,
+                ),
+            },
+        ];
 
-        const history1 = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: collName,
-                db: dbName,
-                collectionUUID: collUUID1,
-                protocolVersion: protocolVersion
-            }),
-            response: mongotMultiCursorResponseForBatch(
-                mongot1ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-        }];
+        const history1 = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID1,
+                    protocolVersion: protocolVersion,
+                }),
+                response: mongotMultiCursorResponseForBatch(
+                    mongot1ResponseBatch,
+                    NumberLong(0),
+                    [{val: 1}],
+                    NumberLong(0),
+                    collNS,
+                    responseOk,
+                ),
+            },
+        ];
 
         const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
         const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
@@ -697,19 +782,18 @@ function runShardedTests() {
 
         const pipeline = [
             {$search: mongotQuery},
-            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}}
+            {$addFields: {searchRootDocumentId: {$meta: "searchRootDocumentId"}}},
         ];
 
-        mockPlanShardedSearchResponse(
-            testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
+        mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined, stWithMock);
 
         const result = testColl.aggregate(pipeline).toArray();
         assert.gt(result.length, 0, "Should return director results");
 
-        result.forEach(doc => {
-            assert(doc.hasOwnProperty('first'), "Should have first field");
-            assert(doc.hasOwnProperty('last'), "Should have last field");
-            assert(doc.hasOwnProperty('searchRootDocumentId'), "Should have searchRootDocumentId");
+        result.forEach((doc) => {
+            assert(doc.hasOwnProperty("first"), "Should have first field");
+            assert(doc.hasOwnProperty("last"), "Should have last field");
+            assert(doc.hasOwnProperty("searchRootDocumentId"), "Should have searchRootDocumentId");
         });
     }
 

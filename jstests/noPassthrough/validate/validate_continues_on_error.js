@@ -13,10 +13,10 @@ import "jstests/multiVersion/libs/verify_versions.js";
 import {getUriForIndex, truncateUriAndRestartMongod} from "jstests/disk/libs/wt_file_helper.js";
 
 // Setup the dbpath for this test.
-const dbpath = MongoRunner.dataPath + 'validate_continues_on_error';
+const dbpath = MongoRunner.dataPath + "validate_continues_on_error";
 resetDbpath(dbpath);
 let conn = MongoRunner.runMongod();
-let coll = conn.getCollection('test.continue');
+let coll = conn.getCollection("test.continue");
 assert.commandWorked(coll.createIndex({x: 1}));
 
 for (let i = 0; i < 5; i++) {
@@ -32,8 +32,7 @@ for (let i = 5; i < 8; i++) {
 }
 
 // Test index entry out-of-order detection still continues to do missing key validation
-assert.commandWorked(
-    conn.adminCommand({configureFailPoint: "failIndexKeyOrdering", mode: "alwaysOn"}));
+assert.commandWorked(conn.adminCommand({configureFailPoint: "failIndexKeyOrdering", mode: "alwaysOn"}));
 let res = assert.commandWorked(coll.validate());
 jsTestLog(res);
 assert(!res.valid);
@@ -48,8 +47,7 @@ assert.commandWorked(conn.adminCommand({configureFailPoint: "failIndexKeyOrderin
 
 // Force a failed index traversal for one index, but verify that other indexes are still checked for
 // inconsistencies
-assert.commandWorked(
-    conn.adminCommand({configureFailPoint: "failIndexTraversal", mode: {times: 1}}));
+assert.commandWorked(conn.adminCommand({configureFailPoint: "failIndexTraversal", mode: {times: 1}}));
 res = assert.commandWorked(coll.validate());
 jsTestLog(res);
 assert(!res.valid);

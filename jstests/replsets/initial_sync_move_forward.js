@@ -45,15 +45,15 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(primaryColl.createIndex({x: 1}, {unique: true}));
 
 // Add a secondary.
-var secondary =
-    rst.add({setParameter: "numInitialSyncAttempts=1", rsConfig: {votes: 0, priority: 0}});
+var secondary = rst.add({setParameter: "numInitialSyncAttempts=1", rsConfig: {votes: 0, priority: 0}});
 secondary.setSecondaryOk();
 var secondaryColl = secondary.getDB("test").coll;
 
 // Pause initial sync when the secondary has copied {_id: 0, x: 0} and {_id: 1, x: 1}.
-var failPoint = configureFailPoint(secondary,
-                                   "initialSyncHangDuringCollectionClone",
-                                   {namespace: secondaryColl.getFullName(), numDocsToClone: 2});
+var failPoint = configureFailPoint(secondary, "initialSyncHangDuringCollectionClone", {
+    namespace: secondaryColl.getFullName(),
+    numDocsToClone: 2,
+});
 rst.reInitiate();
 failPoint.wait();
 

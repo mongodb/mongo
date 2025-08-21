@@ -5,10 +5,7 @@
  */
 import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
-import {
-    getTenantIdForDatabase,
-    removeTenantIdAndMaybeCheckPrefixes,
-} from "jstests/serverless/libs/tenant_prefixing.js";
+import {getTenantIdForDatabase, removeTenantIdAndMaybeCheckPrefixes} from "jstests/serverless/libs/tenant_prefixing.js";
 
 const kUserName = "userTenant1";
 const kTenantId = ObjectId(TestData.tenantId);
@@ -18,8 +15,7 @@ function prepareTenantUser(userName, tenantId) {
     let assertResponse = (res) => {
         if (res.ok === 1) {
             assert.commandWorked(res);
-            jsTest.log.info(
-                `Create a user "${userName}" with the useTenant privilege successfully.`);
+            jsTest.log.info(`Create a user "${userName}" with the useTenant privilege successfully.`);
         } else {
             // If 'username' already exists, then attempts to create a user with the same name
             // will fail with error code 51003.
@@ -27,22 +23,23 @@ function prepareTenantUser(userName, tenantId) {
         }
     };
 
-    const adminDb = db.getSiblingDB('admin');
+    const adminDb = db.getSiblingDB("admin");
 
     // Create a user which has root role root role implicitely grand ActionType::useTenant
     // in order to use a security token.
-    let res = adminDb.runCommand(
-        {createUser: 'root', pwd: 'pwd', roles: ['root'], comment: 'skipOverride'});
+    let res = adminDb.runCommand({createUser: "root", pwd: "pwd", roles: ["root"], comment: "skipOverride"});
     assertResponse(res);
-    assert(adminDb.auth('root', 'pwd'));
+    assert(adminDb.auth("root", "pwd"));
 
     // Create a user for tenant for setting security token on connections.
     jsTest.log.info(`Create a tenant user "${userName}", tenant:  ${tenantId}`);
     const unsignedToken = _createTenantToken({tenant: tenantId});
-    res = runCommandWithSecurityToken(unsignedToken, db.getSiblingDB('$external'), {
+    res = runCommandWithSecurityToken(unsignedToken, db.getSiblingDB("$external"), {
         createUser: userName,
-        roles:
-            [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
+        roles: [
+            {role: "dbAdminAnyDatabase", db: "admin"},
+            {role: "readWriteAnyDatabase", db: "admin"},
+        ],
     });
     assertResponse(res);
     adminDb.logout();
@@ -52,10 +49,8 @@ function createSecurityToken(userName, tenantId) {
     if (TestData.useSignedSecurityToken) {
         jsTest.log.info(`Create signed security token, user: ${userName}, tenant: ${tenantId}`);
         const key = TestData.testOnlyValidatedTenancyScopeKey;
-        assert.eq(
-            typeof key, 'string', 'testOnlyValidatedTenancyScopeKey not configured in TestData');
-        securityToken =
-            _createSecurityToken({user: userName, db: '$external', tenant: tenantId}, key);
+        assert.eq(typeof key, "string", "testOnlyValidatedTenancyScopeKey not configured in TestData");
+        securityToken = _createSecurityToken({user: userName, db: "$external", tenant: tenantId}, key);
     } else {
         jsTest.log.info(`Create unsigned security token , tenant: ${tenantId}`);
         securityToken = _createTenantToken({tenant: tenantId, expectPrefix: false});
@@ -129,8 +124,7 @@ function isAllowedWithSignedSecurityToken(cmdName) {
 
 // Override the runCommand to inject security token and check for the response has the right nss and
 // db name.
-function runCommandForMongoq(
-    conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
+function runCommandForMongoq(conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
     const useSignedSecurityToken = !!TestData.useSignedSecurityToken;
     const tenantId = getTenantIdForDatabase(dbName);
 
@@ -138,11 +132,13 @@ function runCommandForMongoq(
         if (!isAllowedWithSignedSecurityToken(cmdName)) {
             throw new Error(
                 `Refusing to run a test that run commands not allowed with security token, cmdName: ${
-                    cmdName}, cmdObj: ${tojson(cmdObj)}`);
+                    cmdName
+                }, cmdObj: ${tojson(cmdObj)}`,
+            );
         }
     }
 
-    if (typeof conn._securityToken == 'undefined') {
+    if (typeof conn._securityToken == "undefined") {
         conn._setSecurityToken(securityToken);
     }
 
@@ -157,8 +153,11 @@ function runCommandForMongoq(
         tenantId,
         dbName,
         cmdName,
-        debugLog: "Failed to check tenant prefix in response : " + tojsononeline(resObj) +
-            ". The request command obj is " + tojsononeline(cmdObj)
+        debugLog:
+            "Failed to check tenant prefix in response : " +
+            tojsononeline(resObj) +
+            ". The request command obj is " +
+            tojsononeline(cmdObj),
     };
 
     removeTenantIdAndMaybeCheckPrefixes(resObj, checkPrefixOptions);

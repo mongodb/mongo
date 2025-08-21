@@ -6,9 +6,11 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Verifies the transaction server status response has the fields that we expect.
-function verifyServerStatus(conn,
-                            {expectedRC, expectedWC, expectNoDefaultsDocument, expectNothing},
-                            isImplicitDefaultWCMajority) {
+function verifyServerStatus(
+    conn,
+    {expectedRC, expectedWC, expectNoDefaultsDocument, expectNothing},
+    isImplicitDefaultWCMajority,
+) {
     const res = assert.commandWorked(conn.adminCommand({serverStatus: 1}));
     if (expectNothing) {
         assert.eq(undefined, res.defaultRWConcern, tojson(res.defaultRWConcern));
@@ -57,8 +59,7 @@ function verifyServerStatus(conn,
     } else {
         // These fields are always set once a read or write concern has been set at least once and
         // the defaults document is still present.
-        assert.hasFields(defaultsRes,
-                         ["updateOpTime", "updateWallClockTime", "localUpdateWallClockTime"]);
+        assert.hasFields(defaultsRes, ["updateOpTime", "updateWallClockTime", "localUpdateWallClockTime"]);
     }
 }
 
@@ -67,39 +68,47 @@ function testServerStatus(conn, isImplicitDefaultWCMajority) {
     verifyServerStatus(conn, {expectNoDefaultsDocument: true}, isImplicitDefaultWCMajority);
 
     // When only read concern is set.
-    assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "majority"}}));
+    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "majority"}}));
     verifyServerStatus(conn, {expectedRC: {level: "majority"}}, isImplicitDefaultWCMajority);
 
     // When read concern is explicitly unset and write concern is unset.
-    assert.commandWorked(conn.adminCommand(
-        {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {}}));
+    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {}}));
     verifyServerStatus(conn, {}, isImplicitDefaultWCMajority);
 
     // When only write concern is set.
-    assert.commandWorked(conn.adminCommand(
-        {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {w: "majority"}}));
-    verifyServerStatus(
-        conn, {expectedWC: {w: "majority", wtimeout: 0}}, isImplicitDefaultWCMajority);
+    assert.commandWorked(
+        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {w: "majority"}}),
+    );
+    verifyServerStatus(conn, {expectedWC: {w: "majority", wtimeout: 0}}, isImplicitDefaultWCMajority);
 
     // When both read and write concern are set.
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultReadConcern: {level: "majority"},
-        defaultWriteConcern: {w: "majority"}
-    }));
-    verifyServerStatus(conn,
-                       {expectedRC: {level: "majority"}, expectedWC: {w: "majority", wtimeout: 0}},
-                       isImplicitDefaultWCMajority);
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultReadConcern: {level: "majority"},
+            defaultWriteConcern: {w: "majority"},
+        }),
+    );
+    verifyServerStatus(
+        conn,
+        {expectedRC: {level: "majority"}, expectedWC: {w: "majority", wtimeout: 0}},
+        isImplicitDefaultWCMajority,
+    );
 
     // When the defaults document has been deleted.
     assert.commandWorked(conn.getDB("config").settings.remove({_id: "ReadWriteConcernDefaults"}));
-    assert.soon(() => {
-        // Wait for the cache to discover the defaults were deleted. Note the cache is invalidated
-        // on delete on a mongod, so this is only to handle the mongos case.
-        const res = conn.adminCommand({getDefaultRWConcern: 1, inMemory: true});
-        return !res.hasOwnProperty("updateOpTime");
-    }, "mongos failed to pick up deleted default rwc", undefined, 1000, {runHangAnalyzer: false});
+    assert.soon(
+        () => {
+            // Wait for the cache to discover the defaults were deleted. Note the cache is invalidated
+            // on delete on a mongod, so this is only to handle the mongos case.
+            const res = conn.adminCommand({getDefaultRWConcern: 1, inMemory: true});
+            return !res.hasOwnProperty("updateOpTime");
+        },
+        "mongos failed to pick up deleted default rwc",
+        undefined,
+        1000,
+        {runHangAnalyzer: false},
+    );
     verifyServerStatus(conn, {expectNoDefaultsDocument: true}, isImplicitDefaultWCMajority);
 }
 
@@ -109,9 +118,7 @@ function testFTDC(conn, ftdcDirPath, expectNothingOnRotation = false) {
     //
     const latestPeriodicFTDC = verifyGetDiagnosticData(conn.getDB("admin"));
     assert.hasFields(latestPeriodicFTDC, ["serverStatus"]);
-    assert.eq(undefined,
-              latestPeriodicFTDC.serverStatus.defaultRWConcern,
-              tojson(latestPeriodicFTDC.serverStatus));
+    assert.eq(undefined, latestPeriodicFTDC.serverStatus.defaultRWConcern, tojson(latestPeriodicFTDC.serverStatus));
 
     //
     // The first sample in the FTDC file should have the default read write concern, if the node is
@@ -121,8 +128,7 @@ function testFTDC(conn, ftdcDirPath, expectNothingOnRotation = false) {
     const ftdcFiles = listFiles(ftdcDirPath);
 
     // Read from the first non-interim file.
-    const firstFullFile =
-        ftdcFiles.filter(fileDesc => fileDesc.baseName.indexOf("interim") == -1)[0];
+    const firstFullFile = ftdcFiles.filter((fileDesc) => fileDesc.baseName.indexOf("interim") == -1)[0];
     var ftdcData;
     assert.soon(() => {
         try {
@@ -136,7 +142,7 @@ function testFTDC(conn, ftdcDirPath, expectNothingOnRotation = false) {
     assert.hasFields(ftdcData[0], ["doc"], tojson(ftdcData));
 
     // Look for the defaults in the first metadata object.
-    const firstMetadataObj = ftdcData.filter(obj => obj.type == 0)[0];
+    const firstMetadataObj = ftdcData.filter((obj) => obj.type == 0)[0];
     assert.hasFields(firstMetadataObj, ["doc"]);
 
     if (expectNothingOnRotation) {
@@ -157,7 +163,7 @@ jsTestLog("Testing sharded cluster...");
             s0: {setParameter: {diagnosticDataCollectionDirectoryPath: testPathMongos}},
         },
         config: 1,
-        configOptions: {setParameter: {diagnosticDataCollectionDirectoryPath: testPathConfig}}
+        configOptions: {setParameter: {diagnosticDataCollectionDirectoryPath: testPathConfig}},
     });
 
     testServerStatus(st.s, true /* isImplicitDefaultWCMajority */);
@@ -166,10 +172,8 @@ jsTestLog("Testing sharded cluster...");
     testFTDC(st.configRS.getPrimary(), testPathConfig);
 
     // Set a default before verifying it isn't included by shards.
-    assert.commandWorked(
-        st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}));
-    verifyServerStatus(
-        st.rs0.getPrimary(), {expectNothing: true}, true /* isImplicitDefaultWCMajority */);
+    assert.commandWorked(st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}));
+    verifyServerStatus(st.rs0.getPrimary(), {expectNothing: true}, true /* isImplicitDefaultWCMajority */);
     testFTDC(st.rs0.getPrimary(), testPathShard, true /* expectNothingOnRotation */);
     st.stop();
 }
@@ -177,8 +181,10 @@ jsTestLog("Testing sharded cluster...");
 jsTestLog("Testing plain replica set...");
 {
     const testPath = MongoRunner.toRealPath("ftdc_dir_repl_node");
-    const rst = new ReplSetTest(
-        {nodes: 1, nodeOptions: {setParameter: {diagnosticDataCollectionDirectoryPath: testPath}}});
+    const rst = new ReplSetTest({
+        nodes: 1,
+        nodeOptions: {setParameter: {diagnosticDataCollectionDirectoryPath: testPath}},
+    });
     rst.startSet();
     rst.initiate();
 
@@ -201,8 +207,7 @@ jsTestLog("Testing server status for plain replica set with implicit default WC 
 jsTestLog("Testing standalone server...");
 {
     const testPath = MongoRunner.toRealPath("ftdc_dir_standalone");
-    const standalone =
-        MongoRunner.runMongod({setParameter: {diagnosticDataCollectionDirectoryPath: testPath}});
+    const standalone = MongoRunner.runMongod({setParameter: {diagnosticDataCollectionDirectoryPath: testPath}});
 
     verifyServerStatus(standalone, {expectNothing: true}, true /* isImplicitDefaultWCMajority */);
     testFTDC(standalone, testPath, true /* expectNothingOnRotation */);

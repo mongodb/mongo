@@ -22,9 +22,9 @@ const st = new ShardingTest({
             setParameter: {
                 // Reduce the amount of time waiting for a range deletion completion.
                 orphanCleanupDelaySecs: 0,
-            }
-        }
-    }
+            },
+        },
+    },
 });
 
 const db = st.s.getDB(jsTestName());
@@ -33,8 +33,9 @@ const collAux = db.getCollection("collAux");
 const numDocs = 100;
 
 // Create a sharded collection with one chunk on 'shard0'.
-CreateShardedCollectionUtil.shardCollectionWithChunks(
-    coll, {x: 1}, [{min: {x: MinKey}, max: {x: MaxKey}, shard: st.shard0.shardName}]);
+CreateShardedCollectionUtil.shardCollectionWithChunks(coll, {x: 1}, [
+    {min: {x: MinKey}, max: {x: MaxKey}, shard: st.shard0.shardName},
+]);
 
 const insertions = Array.from({length: numDocs}, (_, i) => {
     return {x: i, y: i, fix: "f"};
@@ -74,9 +75,11 @@ const commandsToTest = [
                 cmdExtension: {readConcern: {level: "snapshot"}},
                 shouldWork: true,
                 checkCursorCmdDocsFunc: (docs) => {
-                    assert.eq(100 /* numDocs */,
-                              docs.length,
-                              "Failed to read the expected documents from the secondary.");
+                    assert.eq(
+                        100 /* numDocs */,
+                        docs.length,
+                        "Failed to read the expected documents from the secondary.",
+                    );
                 },
             },
             {
@@ -85,9 +88,7 @@ const commandsToTest = [
                 cmdExtension: {readConcern: {level: "available"}},
                 shouldWork: true,
                 checkCursorCmdDocsFunc: (docs) => {
-                    assert.lt(docs.length,
-                              100 /* numDocs */,
-                              "Expected to miss documents due to a range deletion.");
+                    assert.lt(docs.length, 100 /* numDocs */, "Expected to miss documents due to a range deletion.");
                 },
                 skipAfterMigrationQueryCheck: true,
             },
@@ -99,9 +100,7 @@ const commandsToTest = [
                 removeShardVersionFieldFromRangeDeletionDoc: true,
                 shouldWork: true,
                 checkCursorCmdDocsFunc: (docs) => {
-                    assert.lt(docs.length,
-                              100 /* numDocs */,
-                              "Expected to miss documents due to a range deletion.");
+                    assert.lt(docs.length, 100 /* numDocs */, "Expected to miss documents due to a range deletion.");
                 },
             },
             {
@@ -111,12 +110,10 @@ const commandsToTest = [
                 terminateSecondaryReadsOnOrphanCleanup: false,
                 shouldWork: true,
                 checkCursorCmdDocsFunc: (docs) => {
-                    assert.lt(docs.length,
-                              100 /* numDocs */,
-                              "Expected to miss documents due to a range deletion.");
+                    assert.lt(docs.length, 100 /* numDocs */, "Expected to miss documents due to a range deletion.");
                 },
             },
-        ]
+        ],
     },
     {
         // Aggregate command with a $match stage.
@@ -143,9 +140,11 @@ const commandsToTest = [
                 cmdExtension: {readConcern: {level: "snapshot"}},
                 shouldWork: true,
                 checkCursorCmdDocsFunc: (docs) => {
-                    assert.eq(docs.length,
-                              100 /* numDocs */,
-                              "Failed to read the expected documents from the secondary.");
+                    assert.eq(
+                        docs.length,
+                        100 /* numDocs */,
+                        "Failed to read the expected documents from the secondary.",
+                    );
                 },
             },
             {
@@ -155,9 +154,7 @@ const commandsToTest = [
                 shouldWork: true,
                 skipAfterMigrationQueryCheck: true,
                 checkCursorCmdDocsFunc: (docs) => {
-                    assert.lt(docs.length,
-                              100 /* numDocs */,
-                              "Expected to miss documents due to a range deletion.");
+                    assert.lt(docs.length, 100 /* numDocs */, "Expected to miss documents due to a range deletion.");
                 },
             },
             {
@@ -168,9 +165,7 @@ const commandsToTest = [
                 removeShardVersionFieldFromRangeDeletionDoc: true,
                 shouldWork: true,
                 checkCursorCmdDocsFunc: (docs) => {
-                    assert.lt(docs.length,
-                              100 /* numDocs */,
-                              "Expected to miss documents due to a range deletion.");
+                    assert.lt(docs.length, 100 /* numDocs */, "Expected to miss documents due to a range deletion.");
                 },
             },
             {
@@ -180,12 +175,10 @@ const commandsToTest = [
                 terminateSecondaryReadsOnOrphanCleanup: false,
                 shouldWork: true,
                 checkCursorCmdDocsFunc: (docs) => {
-                    assert.lt(docs.length,
-                              100 /* numDocs */,
-                              "Expected to miss documents due to a range deletion.");
+                    assert.lt(docs.length, 100 /* numDocs */, "Expected to miss documents due to a range deletion.");
                 },
             },
-        ]
+        ],
     },
     {
         // Aggregate command with a $out stage.
@@ -212,7 +205,7 @@ const commandsToTest = [
                     const collOut = db.getCollection("collOut");
                     assert.eq(100 /*numDocs*/, collOut.countDocuments({}));
                     collOut.drop();
-                }
+                },
             },
             {
                 cmdExtension: {readConcern: {level: "local"}},
@@ -234,14 +227,13 @@ const commandsToTest = [
                     collOut.drop();
                 },
             },
-        ]
+        ],
     },
     {
         // Aggregate command with a $lookup stage.
         cmd: {
             aggregate: collAux.getName(),
-            pipeline:
-                [{$lookup: {from: coll.getName(), localField: "y", foreignField: "y", as: "docs"}}],
+            pipeline: [{$lookup: {from: coll.getName(), localField: "y", foreignField: "y", as: "docs"}}],
             $readPreference: {mode: "secondary"},
             cursor: {batchSize: 100},
         },
@@ -262,7 +254,7 @@ const commandsToTest = [
                 shouldWork: true,
                 checkCmdResponseFunc: (res, db) => {},
             },
-        ]
+        ],
     },
     {
         // Count command.
@@ -296,7 +288,7 @@ const commandsToTest = [
             },
             // Can't run with 'snapshot' read concern because: Count doesn't support 'snapshot'
             // read concern.
-        ]
+        ],
     },
     {
         // Distinct command.
@@ -330,45 +322,55 @@ const commandsToTest = [
             // Can't run with 'snapshot' read concern because: Cannot run 'distinct' on a sharded
             // collection with readConcern level 'snapshot'
             // TODO (SERVER-97712): Add a case with 'snapshot' read concern.
-        ]
+        ],
     },
 ];
 
 function moveRange(ns, targetShardName) {
-    assert.commandWorked(st.s.adminCommand(
-        {moveRange: ns, min: {x: MinKey}, max: {x: MaxKey}, toShard: targetShardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveRange: ns, min: {x: MinKey}, max: {x: MaxKey}, toShard: targetShardName}),
+    );
 }
 
 function moveRangeRemovingShardVersionFieldFromRangeDeletionDoc(ns, donorShard, targetShard) {
-    let hangBeforeSendingCommitDecisionFP =
-        configureFailPoint(donorShard, "hangBeforeSendingCommitDecision");
+    let hangBeforeSendingCommitDecisionFP = configureFailPoint(donorShard, "hangBeforeSendingCommitDecision");
 
     const awaitResult = startParallelShell(
-        funWithArgs(function(ns, toShardName) {
-            assert.commandWorked(db.adminCommand(
-                {moveRange: ns, min: {x: MinKey}, max: {x: MaxKey}, toShard: toShardName}));
-        }, ns, targetShard.shardName), st.s.port);
+        funWithArgs(
+            function (ns, toShardName) {
+                assert.commandWorked(
+                    db.adminCommand({moveRange: ns, min: {x: MinKey}, max: {x: MaxKey}, toShard: toShardName}),
+                );
+            },
+            ns,
+            targetShard.shardName,
+        ),
+        st.s.port,
+    );
 
     hangBeforeSendingCommitDecisionFP.wait();
 
-    assert.eq(1,
-              donorShard.getDB("config").getCollection("rangeDeletions").find().toArray().length);
-    assert.eq(1,
-              donorShard.getDB("config")
-                  .getCollection("rangeDeletions")
-                  .find({"preMigrationShardVersion": {$exists: true}})
-                  .toArray()
-                  .length);
-    donorShard.getDB("config")
+    assert.eq(1, donorShard.getDB("config").getCollection("rangeDeletions").find().toArray().length);
+    assert.eq(
+        1,
+        donorShard
+            .getDB("config")
+            .getCollection("rangeDeletions")
+            .find({"preMigrationShardVersion": {$exists: true}})
+            .toArray().length,
+    );
+    donorShard
+        .getDB("config")
         .getCollection("rangeDeletions")
-        .updateOne({"preMigrationShardVersion": {$exists: true}},
-                   {$unset: {"preMigrationShardVersion": ""}});
-    assert.eq(0,
-              donorShard.getDB("config")
-                  .getCollection("rangeDeletions")
-                  .find({"preMigrationShardVersion": {$exists: true}})
-                  .toArray()
-                  .length);
+        .updateOne({"preMigrationShardVersion": {$exists: true}}, {$unset: {"preMigrationShardVersion": ""}});
+    assert.eq(
+        0,
+        donorShard
+            .getDB("config")
+            .getCollection("rangeDeletions")
+            .find({"preMigrationShardVersion": {$exists: true}})
+            .toArray().length,
+    );
 
     hangBeforeSendingCommitDecisionFP.off();
 
@@ -386,32 +388,33 @@ function waitUntilRangeDeletionCompletes(shard) {
 
 function getServerStatusCounters(donorShard, targetShard) {
     let counters = {donor: {primary: 0, secondary: 0}, target: {primary: 0, secondary: 0}};
-    counters.donor.primary = donorShard.rs.getPrimary()
-                                 .adminCommand({serverStatus: 1})
-                                 .metrics.operation.killedDueToRangeDeletion.toNumber();
-    counters.donor.secondary = donorShard.rs.getSecondary()
-                                   .adminCommand({serverStatus: 1})
-                                   .metrics.operation.killedDueToRangeDeletion.toNumber();
-    counters.target.primary = targetShard.rs.getPrimary()
-                                  .adminCommand({serverStatus: 1})
-                                  .metrics.operation.killedDueToRangeDeletion.toNumber();
-    counters.target.secondary = targetShard.rs.getSecondary()
-                                    .adminCommand({serverStatus: 1})
-                                    .metrics.operation.killedDueToRangeDeletion.toNumber();
+    counters.donor.primary = donorShard.rs
+        .getPrimary()
+        .adminCommand({serverStatus: 1})
+        .metrics.operation.killedDueToRangeDeletion.toNumber();
+    counters.donor.secondary = donorShard.rs
+        .getSecondary()
+        .adminCommand({serverStatus: 1})
+        .metrics.operation.killedDueToRangeDeletion.toNumber();
+    counters.target.primary = targetShard.rs
+        .getPrimary()
+        .adminCommand({serverStatus: 1})
+        .metrics.operation.killedDueToRangeDeletion.toNumber();
+    counters.target.secondary = targetShard.rs
+        .getSecondary()
+        .adminCommand({serverStatus: 1})
+        .metrics.operation.killedDueToRangeDeletion.toNumber();
     return counters;
 }
 
 let originalTerminateSecondaryReadsOnOrphanCleanup = undefined;
 function setTerminateSecondaryReadsOnOrphanCleanup(value) {
-    originalTerminateSecondaryReadsOnOrphanCleanup =
-        assert
-            .commandWorked(st.shard0.rs.getSecondary().adminCommand(
-                {getParameter: 1, terminateSecondaryReadsOnOrphanCleanup: 1}))
-            .terminateSecondaryReadsOnOrphanCleanup;
+    originalTerminateSecondaryReadsOnOrphanCleanup = assert.commandWorked(
+        st.shard0.rs.getSecondary().adminCommand({getParameter: 1, terminateSecondaryReadsOnOrphanCleanup: 1}),
+    ).terminateSecondaryReadsOnOrphanCleanup;
     st.getAllShards().forEach((rs) => {
         rs.getSecondaries().forEach((conn) => {
-            assert.commandWorked(conn.adminCommand(
-                {setParameter: 1, terminateSecondaryReadsOnOrphanCleanup: value}));
+            assert.commandWorked(conn.adminCommand({setParameter: 1, terminateSecondaryReadsOnOrphanCleanup: value}));
         });
     });
 }
@@ -420,11 +423,12 @@ function setTerminateSecondaryReadsOnOrphanCleanupToOriginalValue() {
     if (originalTerminateSecondaryReadsOnOrphanCleanup) {
         st.getAllShards().forEach((rs) => {
             rs.getSecondaries().forEach((conn) => {
-                assert.commandWorked(conn.adminCommand({
-                    setParameter: 1,
-                    terminateSecondaryReadsOnOrphanCleanup:
-                        originalTerminateSecondaryReadsOnOrphanCleanup
-                }));
+                assert.commandWorked(
+                    conn.adminCommand({
+                        setParameter: 1,
+                        terminateSecondaryReadsOnOrphanCleanup: originalTerminateSecondaryReadsOnOrphanCleanup,
+                    }),
+                );
             });
         });
     }
@@ -433,15 +437,12 @@ function setTerminateSecondaryReadsOnOrphanCleanupToOriginalValue() {
 
 let originalInternalQueryExecYieldIterations = undefined;
 function setInternalQueryExecYieldIterations(value) {
-    originalInternalQueryExecYieldIterations =
-        assert
-            .commandWorked(st.shard0.rs.getSecondary().adminCommand(
-                {getParameter: 1, internalQueryExecYieldIterations: 1}))
-            .internalQueryExecYieldIterations;
+    originalInternalQueryExecYieldIterations = assert.commandWorked(
+        st.shard0.rs.getSecondary().adminCommand({getParameter: 1, internalQueryExecYieldIterations: 1}),
+    ).internalQueryExecYieldIterations;
     st.getAllShards().forEach((rs) => {
         rs.getSecondaries().forEach((conn) => {
-            assert.commandWorked(
-                conn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: value}));
+            assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: value}));
         });
     });
 }
@@ -450,22 +451,26 @@ function setInternalQueryExecYieldIterationsToOriginalValue() {
     if (originalInternalQueryExecYieldIterations) {
         st.getAllShards().forEach((rs) => {
             rs.getSecondaries().forEach((conn) => {
-                assert.commandWorked(conn.adminCommand({
-                    setParameter: 1,
-                    internalQueryExecYieldIterations: originalInternalQueryExecYieldIterations
-                }));
+                assert.commandWorked(
+                    conn.adminCommand({
+                        setParameter: 1,
+                        internalQueryExecYieldIterations: originalInternalQueryExecYieldIterations,
+                    }),
+                );
             });
         });
     }
     originalInternalQueryExecYieldIterations = undefined;
 }
 
-function checkCommandFailsDueToRangeDeletionOnGetMore(cmd,
-                                                      shouldWork,
-                                                      checkCursorCmdDocsFunc,
-                                                      removeShardVersionFieldFromRangeDeletionDoc,
-                                                      terminateSecondaryReadsOnOrphanCleanup,
-                                                      skipAfterMigrationQueryCheck) {
+function checkCommandFailsDueToRangeDeletionOnGetMore(
+    cmd,
+    shouldWork,
+    checkCursorCmdDocsFunc,
+    removeShardVersionFieldFromRangeDeletionDoc,
+    terminateSecondaryReadsOnOrphanCleanup,
+    skipAfterMigrationQueryCheck,
+) {
     const donorShard = nextDonorShard;
     const targetShard = nextTargetShard;
 
@@ -487,8 +492,7 @@ function checkCommandFailsDueToRangeDeletionOnGetMore(cmd,
     // 2. Execute a chunk migration.
     const countersBeforeRangeDeletion = getServerStatusCounters(donorShard, targetShard);
     if (removeShardVersionFieldFromRangeDeletionDoc) {
-        moveRangeRemovingShardVersionFieldFromRangeDeletionDoc(
-            coll.getFullName(), donorShard, targetShard);
+        moveRangeRemovingShardVersionFieldFromRangeDeletionDoc(coll.getFullName(), donorShard, targetShard);
     } else {
         moveRange(coll.getFullName(), targetShard.shardName);
     }
@@ -514,7 +518,8 @@ function checkCommandFailsDueToRangeDeletionOnGetMore(cmd,
         assert.eq(
             numDocs,
             cursorAfterMigration.itcount(),
-            "Failed to read the expected documents from the query that started after the migration");
+            "Failed to read the expected documents from the query that started after the migration",
+        );
     } else {
         cursorAfterMigration.itcount();
     }
@@ -535,7 +540,8 @@ function checkCommandFailsDueToRangeDeletionOnInitialCmd(
     returnsCursor,
     checkCmdResponseFunc,
     removeShardVersionFieldFromRangeDeletionDoc,
-    terminateSecondaryReadsOnOrphanCleanup) {
+    terminateSecondaryReadsOnOrphanCleanup,
+) {
     const donorShard = nextDonorShard;
     const targetShard = nextTargetShard;
 
@@ -553,7 +559,7 @@ function checkCommandFailsDueToRangeDeletionOnInitialCmd(
     // 1. Verify that the command works correctly without concurrent chunk migrations.
     if (returnsCursor) {
         const res = assert.commandWorked(db.runCommand(cmd));
-        (new DBCommandCursor(db, res)).toArray();
+        new DBCommandCursor(db, res).toArray();
     } else {
         assert.commandWorked(db.runCommand(cmd));
     }
@@ -566,35 +572,43 @@ function checkCommandFailsDueToRangeDeletionOnInitialCmd(
 
     // 3. Start a query before the migration happens and pause it during the first yieldAndRestore
     // execution to be able to run a chunk migration during the query execution.
-    let hangBeforeRestoreStarts = configureFailPoint(
-        donorShard.rs.getSecondary(), "setYieldAllLocksHang", {namespace: coll.getFullName()});
+    let hangBeforeRestoreStarts = configureFailPoint(donorShard.rs.getSecondary(), "setYieldAllLocksHang", {
+        namespace: coll.getFullName(),
+    });
     const awaitQuery = startParallelShell(
-        funWithArgs(function(dbName, cmd, shouldWork, checkCmdResponseFunc, returnsCursor) {
-            const dbTest = db.getSiblingDB(dbName);
-            const res = dbTest.runCommand(cmd);
-            if (!shouldWork) {
-                assert.commandFailedWithCode(res, ErrorCodes.QueryPlanKilled);
-                return;
-            }
+        funWithArgs(
+            function (dbName, cmd, shouldWork, checkCmdResponseFunc, returnsCursor) {
+                const dbTest = db.getSiblingDB(dbName);
+                const res = dbTest.runCommand(cmd);
+                if (!shouldWork) {
+                    assert.commandFailedWithCode(res, ErrorCodes.QueryPlanKilled);
+                    return;
+                }
 
-            assert.commandWorked(res);
+                assert.commandWorked(res);
 
-            if (returnsCursor) {
-                const cursor = new DBCommandCursor(dbTest, res);
-                checkCmdResponseFunc(cursor.toArray());
-
-            } else if (!returnsCursor) {
-                checkCmdResponseFunc(res, dbTest);
-            }
-        }, db.getName(), cmd, shouldWork, checkCmdResponseFunc, returnsCursor), st.s.port);
+                if (returnsCursor) {
+                    const cursor = new DBCommandCursor(dbTest, res);
+                    checkCmdResponseFunc(cursor.toArray());
+                } else if (!returnsCursor) {
+                    checkCmdResponseFunc(res, dbTest);
+                }
+            },
+            db.getName(),
+            cmd,
+            shouldWork,
+            checkCmdResponseFunc,
+            returnsCursor,
+        ),
+        st.s.port,
+    );
 
     const countersBeforeRangeDeletion = getServerStatusCounters(donorShard, targetShard);
 
     // 4. Execute a chunk migration once the failpoint is hit.
     hangBeforeRestoreStarts.wait();
     if (removeShardVersionFieldFromRangeDeletionDoc) {
-        moveRangeRemovingShardVersionFieldFromRangeDeletionDoc(
-            coll.getFullName(), donorShard, targetShard);
+        moveRangeRemovingShardVersionFieldFromRangeDeletionDoc(coll.getFullName(), donorShard, targetShard);
     } else {
         moveRange(coll.getFullName(), targetShard.shardName);
     }
@@ -624,70 +638,88 @@ function checkCommandFailsDueToRangeDeletionOnInitialCmd(
 }
 
 for (const cmdToTest of commandsToTest) {
-    assert(cmdToTest.cmd instanceof Object && Array.isArray(cmdToTest.testCases),
-           "commandsToTest elements must be an object with 'cmd' and 'testCases' fields. Found: " +
-               tojson(cmdToTest));
     assert(
-        cmdToTest.hasOwnProperty('returnsCursor') && typeof cmdToTest.returnsCursor === "boolean",
+        cmdToTest.cmd instanceof Object && Array.isArray(cmdToTest.testCases),
+        "commandsToTest elements must be an object with 'cmd' and 'testCases' fields. Found: " + tojson(cmdToTest),
+    );
+    assert(
+        cmdToTest.hasOwnProperty("returnsCursor") && typeof cmdToTest.returnsCursor === "boolean",
         "Each cmd to test must have a 'returnsCursor' field and it must be a boolean. Found: " +
-            tojson(cmdToTest.returnsCursor));
+            tojson(cmdToTest.returnsCursor),
+    );
 
     const returnsCursor = cmdToTest.returnsCursor;
 
     for (const test of cmdToTest.testCases) {
-        assert(test.cmdExtension && test.cmdExtension instanceof Object,
-               "Each test case must have a 'cmdExtension' field and it must be an object. Found: " +
-                   tojson(test));
-        assert(test.hasOwnProperty('shouldWork') && typeof test.shouldWork === "boolean",
-               "Each test case must have a 'shouldWork' field and it must be a boolean. Found: " +
-                   tojson(test));
+        assert(
+            test.cmdExtension && test.cmdExtension instanceof Object,
+            "Each test case must have a 'cmdExtension' field and it must be an object. Found: " + tojson(test),
+        );
+        assert(
+            test.hasOwnProperty("shouldWork") && typeof test.shouldWork === "boolean",
+            "Each test case must have a 'shouldWork' field and it must be a boolean. Found: " + tojson(test),
+        );
         if (returnsCursor) {
             assert(
                 !test.shouldWork ||
-                    test.hasOwnProperty('checkCursorCmdDocsFunc') &&
-                        test.checkCursorCmdDocsFunc instanceof Function,
+                    (test.hasOwnProperty("checkCursorCmdDocsFunc") && test.checkCursorCmdDocsFunc instanceof Function),
                 "If 'shouldWork' is true and the command returns a cursor, a test case must have " +
                     "a 'checkCursorCmdDocsFunc' field and it must be a function. Found: " +
-                    tojson(test) + " on cmd " + cmdToTest.cmd);
+                    tojson(test) +
+                    " on cmd " +
+                    cmdToTest.cmd,
+            );
         } else {
             assert(
                 !test.shouldWork ||
-                    test.hasOwnProperty('checkCmdResponseFunc') &&
-                        test.checkCmdResponseFunc instanceof Function,
+                    (test.hasOwnProperty("checkCmdResponseFunc") && test.checkCmdResponseFunc instanceof Function),
                 "If 'shouldWork' is true and the command returns a cursor, a test case must have " +
                     "a 'checkCmdResponseFunc' field and it must be a function. Found: " +
-                    tojson(test));
+                    tojson(test),
+            );
         }
         assert(
-            !test.hasOwnProperty('removeShardVersionFieldFromRangeDeletionDoc') ||
+            !test.hasOwnProperty("removeShardVersionFieldFromRangeDeletionDoc") ||
                 typeof test.removeShardVersionFieldFromRangeDeletionDoc === "boolean",
             "If 'removeShardVersionFieldFromRangeDeletionDoc' is provided, it must be a boolean. Found: " +
-                tojson(test) + " on cmd " + cmdToTest.cmd);
+                tojson(test) +
+                " on cmd " +
+                cmdToTest.cmd,
+        );
         assert(
-            !test.hasOwnProperty('terminateSecondaryReadsOnOrphanCleanup') ||
+            !test.hasOwnProperty("terminateSecondaryReadsOnOrphanCleanup") ||
                 typeof test.terminateSecondaryReadsOnOrphanCleanup === "boolean",
             "If 'terminateSecondaryReadsOnOrphanCleanup' is provided, it must be a boolean. Found: " +
-                tojson(test) + " on cmd " + cmdToTest.cmd);
-        assert(!test.hasOwnProperty('skipAfterMigrationQueryCheck') ||
-                   typeof test.skipAfterMigrationQueryCheck === "boolean",
-               "If 'skipAfterMigrationQueryCheck' is provided, it must be a boolean. Found: " +
-                   tojson(test) + " on cmd " + cmdToTest.cmd);
+                tojson(test) +
+                " on cmd " +
+                cmdToTest.cmd,
+        );
+        assert(
+            !test.hasOwnProperty("skipAfterMigrationQueryCheck") ||
+                typeof test.skipAfterMigrationQueryCheck === "boolean",
+            "If 'skipAfterMigrationQueryCheck' is provided, it must be a boolean. Found: " +
+                tojson(test) +
+                " on cmd " +
+                cmdToTest.cmd,
+        );
 
         const cmd = {...cmdToTest.cmd, ...test.cmdExtension};
-        const removeShardVersionFieldFromRangeDeletionDoc =
-            test.hasOwnProperty('removeShardVersionFieldFromRangeDeletionDoc')
+        const removeShardVersionFieldFromRangeDeletionDoc = test.hasOwnProperty(
+            "removeShardVersionFieldFromRangeDeletionDoc",
+        )
             ? test.removeShardVersionFieldFromRangeDeletionDoc
             : false;
-        const terminateSecondaryReadsOnOrphanCleanup =
-            test.hasOwnProperty('terminateSecondaryReadsOnOrphanCleanup')
+        const terminateSecondaryReadsOnOrphanCleanup = test.hasOwnProperty("terminateSecondaryReadsOnOrphanCleanup")
             ? test.terminateSecondaryReadsOnOrphanCleanup
             : true;
-        const skipAfterMigrationQueryCheck = test.hasOwnProperty('skipAfterMigrationQueryCheck')
+        const skipAfterMigrationQueryCheck = test.hasOwnProperty("skipAfterMigrationQueryCheck")
             ? test.skipAfterMigrationQueryCheck
             : false;
         const shouldWork = test.shouldWork;
         const checkCmdResponseFunc = shouldWork
-            ? (returnsCursor ? test.checkCursorCmdDocsFunc : test.checkCmdResponseFunc)
+            ? returnsCursor
+                ? test.checkCursorCmdDocsFunc
+                : test.checkCmdResponseFunc
             : undefined;
 
         if (returnsCursor) {
@@ -697,15 +729,18 @@ for (const cmdToTest of commandsToTest) {
                 checkCmdResponseFunc,
                 removeShardVersionFieldFromRangeDeletionDoc,
                 terminateSecondaryReadsOnOrphanCleanup,
-                skipAfterMigrationQueryCheck);
+                skipAfterMigrationQueryCheck,
+            );
         }
 
-        checkCommandFailsDueToRangeDeletionOnInitialCmd(cmd,
-                                                        shouldWork,
-                                                        returnsCursor,
-                                                        checkCmdResponseFunc,
-                                                        removeShardVersionFieldFromRangeDeletionDoc,
-                                                        terminateSecondaryReadsOnOrphanCleanup);
+        checkCommandFailsDueToRangeDeletionOnInitialCmd(
+            cmd,
+            shouldWork,
+            returnsCursor,
+            checkCmdResponseFunc,
+            removeShardVersionFieldFromRangeDeletionDoc,
+            terminateSecondaryReadsOnOrphanCleanup,
+        );
     }
 }
 

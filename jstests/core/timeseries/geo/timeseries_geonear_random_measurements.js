@@ -15,7 +15,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 Random.setRandomSeed();
 
 // Value is taken from geoconstants.h.
-const earthRadiusMeters = (6378.1 * 1000);
+const earthRadiusMeters = 6378.1 * 1000;
 const earthCircumferenceMeters = earthRadiusMeters * Math.PI * 2;
 
 const numDocs = 100;
@@ -47,19 +47,19 @@ while (docs.length < numDocs) {
 jsTestLog("Generated the following documents:");
 printjson(docs);
 
-const coll = db.getCollection(jsTestName() + '_normal');
-const tsColl = db.getCollection(jsTestName() + '_timeseries');
+const coll = db.getCollection(jsTestName() + "_normal");
+const tsColl = db.getCollection(jsTestName() + "_timeseries");
 coll.drop();
 tsColl.drop();
-assert.commandWorked(coll.createIndex({loc: '2dsphere'}));
-assert.commandWorked(coll.createIndex({loc: '2d'}));
-assert.commandWorked(db.createCollection(tsColl.getName(), {timeseries: {timeField: 'time'}}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2d"}));
+assert.commandWorked(db.createCollection(tsColl.getName(), {timeseries: {timeField: "time"}}));
 assert.commandWorked(coll.insert(docs));
 assert.commandWorked(tsColl.insert(docs));
 
 function assertSortedAscending(numbers) {
     for (let i = 1; i < numbers.length; ++i) {
-        assert.lte(numbers[i - 1], numbers[i], 'Found two descending elements at position ' + i);
+        assert.lte(numbers[i - 1], numbers[i], "Found two descending elements at position " + i);
     }
 }
 
@@ -68,44 +68,56 @@ function assertSortedAscending(numbers) {
 // - Each result should be sorted by 'dist'.
 // - The two result-sets may disagree on the order of ties, so we don't compare the order directly.
 for (const doc of docs) {
-    print('Testing sphere query centered at ' + tojson(doc));
-    const {minDistanceMeters, maxDistanceMeters, loc: [long, lat]} = doc;
-    const pipeline = [{
-        $geoNear: {
-            near: {type: "Point", coordinates: [long, lat]},
-            key: 'loc',
-            distanceField: 'dist',
-            spherical: true,
-            minDistance: minDistanceMeters,
-            maxDistance: maxDistanceMeters,
-        }
-    }];
+    print("Testing sphere query centered at " + tojson(doc));
+    const {
+        minDistanceMeters,
+        maxDistanceMeters,
+        loc: [long, lat],
+    } = doc;
+    const pipeline = [
+        {
+            $geoNear: {
+                near: {type: "Point", coordinates: [long, lat]},
+                key: "loc",
+                distanceField: "dist",
+                spherical: true,
+                minDistance: minDistanceMeters,
+                maxDistance: maxDistanceMeters,
+            },
+        },
+    ];
     const result = coll.aggregate(pipeline).toArray();
     const tsResult = tsColl.aggregate(pipeline).toArray();
     assert.sameMembers(result, tsResult);
-    assertSortedAscending(result.map(d => d.dist));
-    assertSortedAscending(tsResult.map(d => d.dist));
-    print('Got ' + result.length + ' results');
+    assertSortedAscending(result.map((d) => d.dist));
+    assertSortedAscending(tsResult.map((d) => d.dist));
+    print("Got " + result.length + " results");
 }
 
 // Do the same thing, but interpreting the points as lying in a plane.
 for (const doc of docs) {
-    print('Testing flat query centered at ' + tojson(doc));
-    const {minDistanceFlat, maxDistanceFlat, loc: [long, lat]} = doc;
-    const pipeline = [{
-        $geoNear: {
-            near: [long, lat],
-            key: 'loc',
-            distanceField: 'dist',
-            spherical: false,
-            minDistance: minDistanceFlat,
-            maxDistance: maxDistanceFlat,
-        }
-    }];
+    print("Testing flat query centered at " + tojson(doc));
+    const {
+        minDistanceFlat,
+        maxDistanceFlat,
+        loc: [long, lat],
+    } = doc;
+    const pipeline = [
+        {
+            $geoNear: {
+                near: [long, lat],
+                key: "loc",
+                distanceField: "dist",
+                spherical: false,
+                minDistance: minDistanceFlat,
+                maxDistance: maxDistanceFlat,
+            },
+        },
+    ];
     const result = coll.aggregate(pipeline).toArray();
     const tsResult = tsColl.aggregate(pipeline).toArray();
     assert.sameMembers(result, tsResult);
-    assertSortedAscending(result.map(d => d.dist));
-    assertSortedAscending(tsResult.map(d => d.dist));
-    print('Got ' + result.length + ' results');
+    assertSortedAscending(result.map((d) => d.dist));
+    assertSortedAscending(tsResult.map((d) => d.dist));
+    print("Got " + result.length + " results");
 }

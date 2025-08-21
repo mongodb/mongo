@@ -7,9 +7,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {
-    testClusteredCollectionHint
-} from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
+import {testClusteredCollectionHint} from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
 
 const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
 

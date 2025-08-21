@@ -13,15 +13,15 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
  * Returns profiler entries for the resharding oplog fetcher aggregate command.
  */
 function getProfilerEntries(conn) {
-    return conn.getDB("local")
-        .system.profile
-        .find({
+    return conn
+        .getDB("local")
+        .system.profile.find({
             op: "command",
             ns: "local.oplog.rs",
             "command.aggregate": "oplog.rs",
         })
         .toArray()
-        .filter(entry => {
+        .filter((entry) => {
             for (let stage of entry.command.pipeline) {
                 if (stage.hasOwnProperty("$_internalReshardingIterateTransaction")) {
                     return true;
@@ -57,7 +57,7 @@ const st = new ShardingTest({
         // replication on both secondaries, causing the test setup to be wrong since writeConcern of
         // w: majority is unsatisfiable.
         settings: {chainingAllowed: false},
-    }
+    },
 });
 
 const dbName = "testDb";
@@ -66,8 +66,7 @@ const ns = dbName + "." + collName;
 
 const testColl = st.s.getCollection(ns);
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(testColl.insert([{x: -1}, {x: 0}, {x: 1}]));
 
 const configPrimary = st.configRS.getPrimary();
@@ -79,12 +78,10 @@ function runMoveCollection(host, ns, toShard) {
 }
 
 // Turn on profiling on all nodes on the donor shard.
-st.rs0.nodes.forEach(node => resetProfilerCollection(node.getDB("local")));
+st.rs0.nodes.forEach((node) => resetProfilerCollection(node.getDB("local")));
 
-const beforeQueryingRemainingTimeFp =
-    configureFailPoint(configPrimary, "hangBeforeQueryingRecipients");
-const beforeCriticalSectionFp =
-    configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
+const beforeQueryingRemainingTimeFp = configureFailPoint(configPrimary, "hangBeforeQueryingRecipients");
+const beforeCriticalSectionFp = configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeBlockingWrites");
 const moveThread = new Thread(runMoveCollection, st.s.host, ns, st.shard1.shardName);
 moveThread.start();
 
@@ -92,9 +89,9 @@ beforeQueryingRemainingTimeFp.wait();
 
 // Verify that the resharding oplog fetcher initially fetches from the nearest node.
 let numEntriesNearestReadPref = 0;
-st.rs0.nodes.forEach(node => {
+st.rs0.nodes.forEach((node) => {
     const profilerEntries = getProfilerEntries(node);
-    profilerEntries.forEach(profilerEntry => {
+    profilerEntries.forEach((profilerEntry) => {
         const readPref = getReadPreference(profilerEntry);
         assert.eq(readPref, "nearest");
         numEntriesNearestReadPref++;
@@ -103,7 +100,8 @@ st.rs0.nodes.forEach(node => {
 assert.gt(
     numEntriesNearestReadPref,
     0,
-    "Expected to find resharding oplog fetcher profiler entries with read preference 'nearest'");
+    "Expected to find resharding oplog fetcher profiler entries with read preference 'nearest'",
+);
 
 beforeQueryingRemainingTimeFp.off();
 beforeCriticalSectionFp.wait();
@@ -113,10 +111,10 @@ beforeCriticalSectionFp.wait();
 let numEntriesPrimaryReadPrefBefore = 0;
 assert.soon(() => {
     numEntriesPrimaryReadPrefBefore = 0;
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         const profilerEntries = getProfilerEntries(node);
         if (node == donorPrimary) {
-            profilerEntries.forEach(profilerEntry => {
+            profilerEntries.forEach((profilerEntry) => {
                 const readPref = getReadPreference(profilerEntry);
                 assert(readPref == "primary" || readPref == "nearest", readPref);
                 if (readPref == "primary") {
@@ -124,7 +122,7 @@ assert.soon(() => {
                 }
             });
         } else {
-            profilerEntries.forEach(profilerEntry => {
+            profilerEntries.forEach((profilerEntry) => {
                 const readPref = getReadPreference(profilerEntry);
                 assert.eq(readPref, "nearest");
             });
@@ -148,10 +146,10 @@ assert.commandWorked(moveThread.returnData());
 // Verify that the resharding oplog fetcher was still fetching from the primary after the critical
 // section had started.
 let numEntriesPrimaryReadPrefAfter = 0;
-st.rs0.nodes.forEach(node => {
+st.rs0.nodes.forEach((node) => {
     const profilerEntries = getProfilerEntries(node);
     if (node == donorPrimary) {
-        profilerEntries.forEach(profilerEntry => {
+        profilerEntries.forEach((profilerEntry) => {
             const readPref = getReadPreference(profilerEntry);
             assert(readPref == "primary" || readPref == "nearest", readPref);
             if (readPref == "primary") {
@@ -166,13 +164,17 @@ assert.gte(
     numEntriesPrimaryReadPrefAfter,
     numEntriesPrimaryReadPrefBefore,
     "Expected to find at least as many resharding oplog fetcher profiler entries with read " +
-        "preference 'primary' before and after the critical section");
+        "preference 'primary' before and after the critical section",
+);
 
-jsTest.log("Profiler entry counts: " + tojson({
-               numEntriesNearestReadPref,
-               numEntriesPrimaryReadPrefBefore,
-               numEntriesPrimaryReadPrefAfter
-           }));
+jsTest.log(
+    "Profiler entry counts: " +
+        tojson({
+            numEntriesNearestReadPref,
+            numEntriesPrimaryReadPrefBefore,
+            numEntriesPrimaryReadPrefAfter,
+        }),
+);
 
 restartServerReplication(st.rs0.getSecondaries()[1]);
 st.stop();

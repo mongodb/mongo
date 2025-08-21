@@ -6,23 +6,21 @@
  *  ]
  */
 
-import {
-    uniformDistTransitions
-} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
+import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 
-export const $config = (function() {
+export const $config = (function () {
     let data = {
-        dbPrefix: jsTestName() + '_DB_',
+        dbPrefix: jsTestName() + "_DB_",
         dbCount: 2,
-        collPrefix: 'sharded_coll_',
+        collPrefix: "sharded_coll_",
         collCount: 2,
-        getRandomDb: function(db) {
+        getRandomDb: function (db) {
             return db.getSiblingDB(data.dbPrefix + Random.randInt(data.dbCount));
         },
-        getRandomCollection: function(db) {
+        getRandomCollection: function (db) {
             return db[data.collPrefix + Random.randInt(data.collCount)];
         },
-        getRandomShard: function(connCache) {
+        getRandomShard: function (connCache) {
             const shards = Object.keys(connCache.shards);
             return shards[Random.randInt(shards.length)];
         },
@@ -41,66 +39,64 @@ export const $config = (function() {
     };
 
     let states = {
-        create: function(db, collName, connCache) {
+        create: function (db, collName, connCache) {
             db = data.getRandomDb(db);
             const coll = data.getRandomCollection(db);
             const fullNs = coll.getFullName();
 
-            jsTestLog('Executing create state: ' + fullNs);
-            assert.commandWorked(
-                db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}));
+            jsTestLog("Executing create state: " + fullNs);
+            assert.commandWorked(db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}));
         },
-        drop: function(db, collName, connCache) {
+        drop: function (db, collName, connCache) {
             db = data.getRandomDb(db);
             const coll = data.getRandomCollection(db);
 
-            jsTestLog('Executing drop state: ' + coll.getFullName());
+            jsTestLog("Executing drop state: " + coll.getFullName());
 
             assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({drop: coll.getName()}));
         },
-        rename: function(db, collName, connCache) {
+        rename: function (db, collName, connCache) {
             db = data.getRandomDb(db);
             const srcColl = data.getRandomCollection(db);
             const srcCollName = srcColl.getFullName();
             const destCollNS = data.getRandomCollection(db).getFullName();
-            const destCollName = destCollNS.split('.')[1];
+            const destCollName = destCollNS.split(".")[1];
 
-            jsTestLog('Executing rename state:' + srcCollName + ' to ' + destCollNS);
-            assert.commandWorkedOrFailedWithCode(
-                srcColl.renameCollection(destCollName, true /* dropTarget */), [
-                    ErrorCodes.NamespaceNotFound,
-                    ErrorCodes.ConflictingOperationInProgress,
-                    ErrorCodes.IllegalOperation
-                ]);
+            jsTestLog("Executing rename state:" + srcCollName + " to " + destCollNS);
+            assert.commandWorkedOrFailedWithCode(srcColl.renameCollection(destCollName, true /* dropTarget */), [
+                ErrorCodes.NamespaceNotFound,
+                ErrorCodes.ConflictingOperationInProgress,
+                ErrorCodes.IllegalOperation,
+            ]);
         },
-        movePrimary: function(db, collName, connCache) {
+        movePrimary: function (db, collName, connCache) {
             db = data.getRandomDb(db);
             const shardId = data.getRandomShard(connCache);
 
-            jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
+            jsTestLog("Executing movePrimary state: " + db.getName() + " to " + shardId);
             const res = db.adminCommand({movePrimary: db.getName(), to: shardId});
             assert.commandWorkedOrFailedWithCode(res, data.kMovePrimaryAllowedErrorCodes);
         },
-        collMod: function(db, collName, connCache) {
+        collMod: function (db, collName, connCache) {
             db = data.getRandomDb(db);
             const coll = data.getRandomCollection(db);
 
-            jsTestLog('Executing collMod state: ' + coll.getFullName());
-            assert.commandWorkedOrFailedWithCode(
-                db.runCommand({collMod: coll.getName(), validator: {a: {$gt: 0}}}),
-                [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress]);
+            jsTestLog("Executing collMod state: " + coll.getFullName());
+            assert.commandWorkedOrFailedWithCode(db.runCommand({collMod: coll.getName(), validator: {a: {$gt: 0}}}), [
+                ErrorCodes.NamespaceNotFound,
+                ErrorCodes.ConflictingOperationInProgress,
+            ]);
         },
-        checkDatabaseMetadataConsistency: function(db, collName, connCache) {
+        checkDatabaseMetadataConsistency: function (db, collName, connCache) {
             db = data.getRandomDb(db);
-            jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
+            jsTestLog("Executing checkMetadataConsistency state for database: " + db.getName());
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
-        checkCollectionMetadataConsistency: function(db, collName, connCache) {
+        checkCollectionMetadataConsistency: function (db, collName, connCache) {
             db = data.getRandomDb(db);
             const coll = data.getRandomCollection(db);
-            jsTestLog('Executing checkMetadataConsistency state for collection: ' +
-                      coll.getFullName());
+            jsTestLog("Executing checkMetadataConsistency state for collection: " + coll.getFullName());
             const inconsistencies = coll.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
@@ -122,20 +118,19 @@ export const $config = (function() {
             jsTestLog(`Unsharding completed ${namespace}`);
             jsTestLog(`2. Untracking collection ${namespace}`);
             // Note this command will behave as no-op in case the collection is not tracked.
-            assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({untrackUnshardedCollection: namespace}), [
-                    // Handles the case where the collection is not located on its primary
-                    ErrorCodes.OperationFailed,
-                    // Handles the case where the collection is sharded
-                    ErrorCodes.InvalidNamespace,
-                    // Handles the case where the collection/db does not exist
-                    ErrorCodes.NamespaceNotFound,
-                ]);
+            assert.commandWorkedOrFailedWithCode(db.adminCommand({untrackUnshardedCollection: namespace}), [
+                // Handles the case where the collection is not located on its primary
+                ErrorCodes.OperationFailed,
+                // Handles the case where the collection is sharded
+                ErrorCodes.InvalidNamespace,
+                // Handles the case where the collection/db does not exist
+                ErrorCodes.NamespaceNotFound,
+            ]);
             jsTestLog(`Untrack collection completed`);
-        }
+        },
     };
 
-    let setup = function(db, collName, cluster) {
+    let setup = function (db, collName, cluster) {
         for (var i = 0; i < data.dbCount; i++) {
             const dbName = data.dbPrefix + i;
             const newDb = db.getSiblingDB(dbName);
@@ -143,7 +138,7 @@ export const $config = (function() {
         }
     };
 
-    let teardown = function(db, collName, cluster) {
+    let teardown = function (db, collName, cluster) {
         const configDB = db.getSiblingDB("config");
         assert(configDB.collections.countDocuments({allowMigrations: {$exists: true}}) == 0);
     };
@@ -151,12 +146,12 @@ export const $config = (function() {
     return {
         threadCount: 12,
         iterations: 64,
-        startState: 'create',
+        startState: "create",
         data: data,
         states: states,
         transitions: uniformDistTransitions(states),
         setup: setup,
         teardown: teardown,
-        passConnectionCache: true
+        passConnectionCache: true,
     };
 })();

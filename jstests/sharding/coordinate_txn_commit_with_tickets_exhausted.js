@@ -38,8 +38,8 @@ const st = new ShardingTest({
             // transactionLifetimeLimitSeconds, we nevertheless specify the lifetime to avoid
             // relying on a potentially changing default.
             transactionLifetimeLimitSeconds: 24 * 60 * 60,
-        }
-    }
+        },
+    },
 });
 
 const sourceCollection = st.s.getCollection("test.mycoll");
@@ -57,34 +57,43 @@ const txnCoordinator = st.rs1.getPrimary();
 // been run on both participant shards and it is about to write the commit decision locally to the
 // config.transaction_coordinators collection.
 const hangBeforeWritingDecisionFp = configureFailPoint(txnCoordinator, "hangBeforeWritingDecision");
-const preparedTxnThread = new Thread(function runTwoPhaseCommitTxn(host, dbName, collName) {
-    const conn = new Mongo(host);
-    const session = conn.startSession({causalConsistency: false});
-    const sessionCollection = session.getDatabase(dbName).getCollection(collName);
+const preparedTxnThread = new Thread(
+    function runTwoPhaseCommitTxn(host, dbName, collName) {
+        const conn = new Mongo(host);
+        const session = conn.startSession({causalConsistency: false});
+        const sessionCollection = session.getDatabase(dbName).getCollection(collName);
 
-    session.startTransaction();
-    assert.commandWorked(sessionCollection.update({key: 200}, {$inc: {counter: 1}}));
-    assert.commandWorked(sessionCollection.update({key: -200}, {$inc: {counter: 1}}));
-    assert.commandWorked(session.commitTransaction_forTesting());
-}, st.s.host, sourceCollection.getDB().getName(), sourceCollection.getName());
+        session.startTransaction();
+        assert.commandWorked(sessionCollection.update({key: 200}, {$inc: {counter: 1}}));
+        assert.commandWorked(sessionCollection.update({key: -200}, {$inc: {counter: 1}}));
+        assert.commandWorked(session.commitTransaction_forTesting());
+    },
+    st.s.host,
+    sourceCollection.getDB().getName(),
+    sourceCollection.getName(),
+);
 preparedTxnThread.start();
 hangBeforeWritingDecisionFp.wait({timesEntered: 1});
 
 // Create a thread which leaves the TransactionCoordinator in a state where write operations has
 // been run on both participant shards and it is about to start the two-phase-commit protocol (e.g.
 // before writing the participant list).
-const hangBeforeWritingParticipantListFp =
-    configureFailPoint(txnCoordinator, "hangBeforeWritingParticipantList");
-const commitTxnThread = new Thread(function runTwoPhaseCommitTxn(host, dbName, collName) {
-    const conn = new Mongo(host);
-    const session = conn.startSession({causalConsistency: false});
-    const sessionCollection = session.getDatabase(dbName).getCollection(collName);
+const hangBeforeWritingParticipantListFp = configureFailPoint(txnCoordinator, "hangBeforeWritingParticipantList");
+const commitTxnThread = new Thread(
+    function runTwoPhaseCommitTxn(host, dbName, collName) {
+        const conn = new Mongo(host);
+        const session = conn.startSession({causalConsistency: false});
+        const sessionCollection = session.getDatabase(dbName).getCollection(collName);
 
-    session.startTransaction();
-    assert.commandWorked(sessionCollection.insert({key: 300}));
-    assert.commandWorked(sessionCollection.insert({key: -300}));
-    assert.commandWorked(session.commitTransaction_forTesting());
-}, st.s.host, sourceCollection.getDB().getName(), sourceCollection.getName());
+        session.startTransaction();
+        assert.commandWorked(sessionCollection.insert({key: 300}));
+        assert.commandWorked(sessionCollection.insert({key: -300}));
+        assert.commandWorked(session.commitTransaction_forTesting());
+    },
+    st.s.host,
+    sourceCollection.getDB().getName(),
+    sourceCollection.getName(),
+);
 commitTxnThread.start();
 hangBeforeWritingParticipantListFp.wait();
 
@@ -92,28 +101,36 @@ hangBeforeWritingParticipantListFp.wait();
 // test that the TransactionCoordinator from preparedTxnThread can still complete.
 const prepareConflictThreads = [];
 for (let i = 0; i < kNumWriteTickets; ++i) {
-    const thread = new Thread(function hitPrepareConflictOnCoordinator(host, dbName, collName) {
-        const conn = new Mongo(host);
-        const session = conn.startSession({causalConsistency: false});
-        const sessionCollection = session.getDatabase(dbName).getCollection(collName);
+    const thread = new Thread(
+        function hitPrepareConflictOnCoordinator(host, dbName, collName) {
+            const conn = new Mongo(host);
+            const session = conn.startSession({causalConsistency: false});
+            const sessionCollection = session.getDatabase(dbName).getCollection(collName);
 
-        session.startTransaction();
-        // Do a write to ensure the transaction takes a write ticket.
-        assert.commandWorked(sessionCollection.insert({key: 100}));
-        // Then do a read which will block until the prepare conflict resolves.
-        assert.eq({key: 200, counter: 1}, sessionCollection.findOne({key: 200}, {_id: 0}));
-        assert.commandWorked(session.commitTransaction_forTesting());
-    }, st.s.host, sourceCollection.getDB().getName(), sourceCollection.getName());
+            session.startTransaction();
+            // Do a write to ensure the transaction takes a write ticket.
+            assert.commandWorked(sessionCollection.insert({key: 100}));
+            // Then do a read which will block until the prepare conflict resolves.
+            assert.eq({key: 200, counter: 1}, sessionCollection.findOne({key: 200}, {_id: 0}));
+            assert.commandWorked(session.commitTransaction_forTesting());
+        },
+        st.s.host,
+        sourceCollection.getDB().getName(),
+        sourceCollection.getName(),
+    );
     prepareConflictThreads.push(thread);
     thread.start();
 }
 
 const currentOp = (pipeline = []) => st.admin.aggregate([{$currentOp: {}}, ...pipeline]).toArray();
 
-assert.soon(() => {
-    const ops = currentOp([{$match: {prepareReadConflicts: {$gt: 0}}}]);
-    return ops.length >= Math.min(prepareConflictThreads.length, kNumWriteTickets);
-}, () => `Failed to find prepare conflicts in $currentOp output: ${tojson(currentOp())}`);
+assert.soon(
+    () => {
+        const ops = currentOp([{$match: {prepareReadConflicts: {$gt: 0}}}]);
+        return ops.length >= Math.min(prepareConflictThreads.length, kNumWriteTickets);
+    },
+    () => `Failed to find prepare conflicts in $currentOp output: ${tojson(currentOp())}`,
+);
 
 // Allow the commitTxnThread to proceed with preparing the transaction. This tests that we skip
 // write ticket acquisition when preparing a transaction.

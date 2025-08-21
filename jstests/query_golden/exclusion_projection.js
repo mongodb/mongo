@@ -6,7 +6,7 @@
 import {
     getIdProjectionDocs,
     getProjectionDocs,
-    runProjectionsAgainstColl
+    runProjectionsAgainstColl,
 } from "jstests/query_golden/libs/projection_helpers.js";
 
 const coll = db.cqf_exclusion_project;
@@ -28,10 +28,5 @@ const exclusionProjSpecs = [
 ];
 runProjectionsAgainstColl(coll, getProjectionDocs(), [] /*no indexes*/, exclusionProjSpecs);
 
-const idExclusionProjectSpecs = [
-    {_id: 0},
-    {"_id.a": 0},
-    {"_id.a": 0, "_id.b": 0},
-    {"_id.a.b": 0},
-];
+const idExclusionProjectSpecs = [{_id: 0}, {"_id.a": 0}, {"_id.a": 0, "_id.b": 0}, {"_id.a.b": 0}];
 runProjectionsAgainstColl(coll, getIdProjectionDocs(), [] /*no indexes*/, idExclusionProjectSpecs);

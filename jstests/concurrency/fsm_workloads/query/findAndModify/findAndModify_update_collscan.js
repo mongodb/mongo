@@ -14,11 +14,9 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Do not create the { tid: 1, value: 1 } index so that a
     // collection
     // scan is performed for the query and sort operations.

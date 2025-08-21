@@ -15,9 +15,7 @@
  * ]
  */
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const mydb = db.getSiblingDB("list_collections_filter");
 assert.commandWorked(mydb.dropDatabase());
@@ -25,17 +23,17 @@ assert.commandWorked(mydb.dropDatabase());
 // If the test fixture is enabling clustered collections by default, all test collections created
 // in this test will have a 'clusteredIndex' field in the collection options returned by
 // listCollections.
-const defaultCollectionOptionsFilter =
-    ClusteredCollectionUtil.areAllCollectionsClustered(mydb.getMongo())
-    ? {'options.clusteredIndex.unique': true}
+const defaultCollectionOptionsFilter = ClusteredCollectionUtil.areAllCollectionsClustered(mydb.getMongo())
+    ? {"options.clusteredIndex.unique": true}
     : {options: {}};
 
 // Make some collections.
 assert.commandWorked(mydb.createCollection("lists"));
 assert.commandWorked(mydb.createCollection("ordered_sets"));
 assert.commandWorked(mydb.createCollection("unordered_sets"));
-assert.commandWorked(mydb.runCommand(
-    {applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "arrays_temp", temp: true}}]}));
+assert.commandWorked(
+    mydb.runCommand({applyOps: [{op: "c", ns: mydb.getName() + ".$cmd", o: {create: "arrays_temp", temp: true}}]}),
+);
 
 /**
  * Asserts that the names of the collections returned from running the listCollections
@@ -62,8 +60,7 @@ function testListCollections(filter, expectedNames) {
     assert.eq(cursorResultNames.sort(), expectedNames.sort());
 
     // Assert the shell helper returns the same list, but in sorted order.
-    const shellResultNames =
-        mydb.getCollectionInfos(filter).map(stripToName).filter(isNotProfileCollection);
+    const shellResultNames = mydb.getCollectionInfos(filter).map(stripToName).filter(isNotProfileCollection);
     assert.eq(shellResultNames, expectedNames.sort());
 }
 
@@ -82,63 +79,63 @@ testListCollections({name: 1234}, []);
 // Filter with $in.
 testListCollections({name: {$in: ["lists"]}}, ["lists"]);
 testListCollections({name: {$in: []}}, []);
-testListCollections({name: {$in: ["lists", "ordered_sets", "non-existent", "", 1234]}},
-                    ["lists", "ordered_sets"]);
+testListCollections({name: {$in: ["lists", "ordered_sets", "non-existent", "", 1234]}}, ["lists", "ordered_sets"]);
 // With a regex.
-testListCollections({name: {$in: ["lists", /.*_sets$/, "non-existent", "", 1234]}},
-                    ["lists", "ordered_sets", "unordered_sets"]);
+testListCollections({name: {$in: ["lists", /.*_sets$/, "non-existent", "", 1234]}}, [
+    "lists",
+    "ordered_sets",
+    "unordered_sets",
+]);
 
 // Filter with $and.
 testListCollections(Object.merge({name: "lists"}, defaultCollectionOptionsFilter), ["lists"]);
-testListCollections({name: "lists", 'options.temp': true}, []);
-testListCollections({$and: [{name: "lists"}, {'options.temp': true}]}, []);
-testListCollections({name: "arrays_temp", 'options.temp': true}, ["arrays_temp"]);
+testListCollections({name: "lists", "options.temp": true}, []);
+testListCollections({$and: [{name: "lists"}, {"options.temp": true}]}, []);
+testListCollections({name: "arrays_temp", "options.temp": true}, ["arrays_temp"]);
 
 // Filter with $and and $in.
+testListCollections(Object.merge({name: {$in: ["lists", /.*_sets$/]}}, defaultCollectionOptionsFilter), [
+    "lists",
+    "ordered_sets",
+    "unordered_sets",
+]);
 testListCollections(
-    Object.merge({name: {$in: ["lists", /.*_sets$/]}}, defaultCollectionOptionsFilter),
-    ["lists", "ordered_sets", "unordered_sets"]);
-testListCollections({
-    $and: [
-        {name: {$in: ["lists", /.*_sets$/]}},
-        {name: "lists"},
-        defaultCollectionOptionsFilter,
-    ]
-},
-                    ["lists"]);
-testListCollections({
-    $and: [
-        {name: {$in: ["lists", /.*_sets$/]}},
-        {name: "non-existent"},
-        defaultCollectionOptionsFilter,
-    ]
-},
-                    []);
+    {
+        $and: [{name: {$in: ["lists", /.*_sets$/]}}, {name: "lists"}, defaultCollectionOptionsFilter],
+    },
+    ["lists"],
+);
+testListCollections(
+    {
+        $and: [{name: {$in: ["lists", /.*_sets$/]}}, {name: "non-existent"}, defaultCollectionOptionsFilter],
+    },
+    [],
+);
 
 // Filter with $expr.
 testListCollections({$expr: {$eq: ["$name", "lists"]}}, ["lists"]);
 
 // Filter with $expr with an unbound variable.
-assert.throws(function() {
+assert.throws(function () {
     mydb.getCollectionInfos({$expr: {$eq: ["$name", "$$unbound"]}});
 });
 
 // Filter with $expr with a runtime error.
-assert.throws(function() {
+assert.throws(function () {
     mydb.getCollectionInfos({$expr: {$abs: "$name"}});
 });
 
 // No extensions are allowed in filters.
-assert.throws(function() {
+assert.throws(function () {
     mydb.getCollectionInfos({$text: {$search: "str"}});
 });
-assert.throws(function() {
+assert.throws(function () {
     mydb.getCollectionInfos({
-        $where: function() {
+        $where: function () {
             return true;
-        }
+        },
     });
 });
-assert.throws(function() {
+assert.throws(function () {
     mydb.getCollectionInfos({a: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}});
 });

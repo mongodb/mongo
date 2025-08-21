@@ -7,10 +7,9 @@ const collNamePrefix = "reindex_duplicate_keys_";
 let count = 0;
 
 // Bypasses DuplicateKey insertion error for testing via failpoint.
-let addDuplicateDocumentsToCol = function(db, coll, doc) {
+let addDuplicateDocumentsToCol = function (db, coll, doc) {
     jsTestLog("Inserts documents without index entries.");
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "alwaysOn"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "alwaysOn"}));
 
     assert.commandWorked(coll.insert(doc));
     assert.commandWorked(coll.insert(doc));
@@ -18,7 +17,7 @@ let addDuplicateDocumentsToCol = function(db, coll, doc) {
     assert.commandWorked(db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "off"}));
 };
 
-let runTest = function(doc) {
+let runTest = function (doc) {
     const collName = collNamePrefix + count++;
     const coll = db.getCollection(collName);
     coll.drop();

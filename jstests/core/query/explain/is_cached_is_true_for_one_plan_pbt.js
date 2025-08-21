@@ -15,10 +15,7 @@
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
-import {
-    getPlanCache,
-    testProperty
-} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {getPlanCache, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {getRejectedPlans, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const experimentColl = db[jsTestName()];
@@ -57,12 +54,14 @@ const numRuns = 50;
 const numQueriesPerRun = 50;
 
 // Run the property with a regular collection.
-testProperty(isCachedIsTrueForOnePlan,
-             {experimentColl},
-             makeWorkloadModel({
-                 collModel: getCollectionModel(),
-                 // A deterministic set of results isn't needed to check the `isCached` property.
-                 aggModel: getAggPipelineModel({deterministicBag: false}),
-                 numQueriesPerRun
-             }),
-             numRuns);
+testProperty(
+    isCachedIsTrueForOnePlan,
+    {experimentColl},
+    makeWorkloadModel({
+        collModel: getCollectionModel(),
+        // A deterministic set of results isn't needed to check the `isCached` property.
+        aggModel: getAggPipelineModel({deterministicBag: false}),
+        numQueriesPerRun,
+    }),
+    numRuns,
+);

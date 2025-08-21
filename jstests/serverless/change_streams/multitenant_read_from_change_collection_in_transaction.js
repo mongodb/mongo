@@ -6,9 +6,7 @@
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {
-    ChangeStreamMultitenantReplicaSetTest
-} from "jstests/serverless/libs/change_collection_util.js";
+import {ChangeStreamMultitenantReplicaSetTest} from "jstests/serverless/libs/change_collection_util.js";
 
 // Verify that the change stream observes expected events. The method also collects resume tokens
 // for each expected change collection and returns those on successful assertion.
@@ -35,36 +33,34 @@ const firstTenantId = ObjectId("6303b6bb84305d2266d0b779");
 const secondTenantId = ObjectId("7303b6bb84305d2266d0b779");
 
 // Connections to the replica set primary that are stamped with their respective tenant ids.
-const firstTenantConn =
-    ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, firstTenantId);
-const secondTenantConn =
-    ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, secondTenantId);
+const firstTenantConn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, firstTenantId);
+const secondTenantConn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, secondTenantId);
 
 // Get the 'test' db for both tenants.
 const firstTenantTestDb = firstTenantConn.getDB("test");
 const secondTenantTestDb = secondTenantConn.getDB("test");
 
 // Recreate the 'stockPrice' collections and enable pre-images collection for the first tenant.
-assertDropAndRecreateCollection(
-    firstTenantTestDb, "stockPrice", {changeStreamPreAndPostImages: {enabled: true}});
-assert(firstTenantTestDb.getCollectionInfos({name: "stockPrice"})[0]
-           .options.changeStreamPreAndPostImages.enabled);
+assertDropAndRecreateCollection(firstTenantTestDb, "stockPrice", {changeStreamPreAndPostImages: {enabled: true}});
+assert(firstTenantTestDb.getCollectionInfos({name: "stockPrice"})[0].options.changeStreamPreAndPostImages.enabled);
 
 // Recreate the 'stockPrice' collections and enable pre-images collection for the second tenant.
-assertDropAndRecreateCollection(
-    secondTenantTestDb, "stockPrice", {changeStreamPreAndPostImages: {enabled: true}});
-assert(secondTenantTestDb.getCollectionInfos({name: "stockPrice"})[0]
-           .options.changeStreamPreAndPostImages.enabled);
+assertDropAndRecreateCollection(secondTenantTestDb, "stockPrice", {changeStreamPreAndPostImages: {enabled: true}});
+assert(secondTenantTestDb.getCollectionInfos({name: "stockPrice"})[0].options.changeStreamPreAndPostImages.enabled);
 
 // Create a new incarnation of the change collection for both tenants.
 replSetTest.setChangeStreamState(firstTenantConn, true);
 replSetTest.setChangeStreamState(secondTenantConn, true);
 
 // Open the change stream cursors with pre-and-post images enabled.
-const firstTenantCsCursor = firstTenantTestDb.stockPrice.watch(
-    [], {fullDocumentBeforeChange: "required", fullDocument: "required"});
-const secondTenantCsCursor = secondTenantTestDb.stockPrice.watch(
-    [], {fullDocumentBeforeChange: "required", fullDocument: "required"});
+const firstTenantCsCursor = firstTenantTestDb.stockPrice.watch([], {
+    fullDocumentBeforeChange: "required",
+    fullDocument: "required",
+});
+const secondTenantCsCursor = secondTenantTestDb.stockPrice.watch([], {
+    fullDocumentBeforeChange: "required",
+    fullDocument: "required",
+});
 
 // Enable transaction to perform writes within a transaction for the first tenant.
 const firstTenantSession = firstTenantConn.getDB("test").getMongo().startSession();
@@ -92,12 +88,12 @@ secondTenantSession.commitTransaction_forTesting();
 verifyEventsAndGetResumeTokens(firstTenantCsCursor, [
     ["insert", {_id: "mdb", price: 350}],
     ["insert", {_id: "goog", price: 2000}],
-    ["update", {_id: "mdb", price: 190}, {_id: "mdb", price: 350}]
+    ["update", {_id: "mdb", price: 190}, {_id: "mdb", price: 350}],
 ]);
 verifyEventsAndGetResumeTokens(secondTenantCsCursor, [
     ["insert", {_id: "amzn", price: 3000}],
     ["insert", {_id: "tsla", price: 750}],
-    ["update", {_id: "tsla", price: 200}, {_id: "tsla", price: 750}]
+    ["update", {_id: "tsla", price: 200}, {_id: "tsla", price: 750}],
 ]);
 
 replSetTest.stopSet();

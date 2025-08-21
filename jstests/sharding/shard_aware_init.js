@@ -9,9 +9,9 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var waitForPrimary = function(conn) {
-    assert.soon(function() {
-        var res = conn.getDB('admin').runCommand({hello: 1});
+var waitForPrimary = function (conn) {
+    assert.soon(function () {
+        var res = conn.getDB("admin").runCommand({hello: 1});
         return res.isWritablePrimary;
     });
 };
@@ -26,12 +26,12 @@ var waitForPrimary = function(conn) {
  * restarting.  That allows our standalone corrupting update to see the write (and cause us to
  * fail on startup).
  */
-var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
+var runTest = function (mongodConn, configConnStr, awaitVersionUpdate) {
     var shardIdentityDoc = {
-        _id: 'shardIdentity',
+        _id: "shardIdentity",
         configsvrConnectionString: configConnStr,
-        shardName: 'newShard',
-        clusterId: ObjectId()
+        shardName: "newShard",
+        clusterId: ObjectId(),
     };
 
     /**
@@ -39,7 +39,7 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
      * document. Then, restarts the server again with --shardsvr. This also returns a
      * connection to the server after the last restart.
      */
-    var restartAndFixShardIdentityDoc = function(startOptions) {
+    var restartAndFixShardIdentityDoc = function (startOptions) {
         var options = Object.extend({}, startOptions);
         // With Recover to a Timestamp, writes to a replica set member may not be written to
         // disk in the collection, but are instead re-applied from the oplog at startup. When
@@ -53,50 +53,54 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
         var mongodConn = MongoRunner.runMongod(options);
         waitForPrimary(mongodConn);
 
-        var res = mongodConn.getDB('admin').system.version.update({_id: 'shardIdentity'},
-                                                                  shardIdentityDoc);
+        var res = mongodConn.getDB("admin").system.version.update({_id: "shardIdentity"}, shardIdentityDoc);
         assert.eq(1, res.nModified);
 
         MongoRunner.stopMongod(mongodConn);
 
-        newMongodOptions.shardsvr = '';
+        newMongodOptions.shardsvr = "";
         newMongodOptions.replSet = rsName;
         mongodConn = MongoRunner.runMongod(newMongodOptions);
         waitForPrimary(mongodConn);
 
-        res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+        res = mongodConn.getDB("admin").runCommand({shardingState: 1});
 
         assert(res.enabled);
         assert.eq(shardIdentityDoc.shardName, res.shardName);
         assert.eq(shardIdentityDoc.clusterId, res.clusterId);
-        assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
-                        mongodConn.adminCommand({shardingState: 1}).configServer);
+        assert.soon(
+            () =>
+                shardIdentityDoc.configsvrConnectionString == mongodConn.adminCommand({shardingState: 1}).configServer,
+        );
 
         return mongodConn;
     };
 
     // Simulate the upsert that is performed by a config server on addShard.
-    assert.commandWorked(mongodConn.getDB('admin').system.version.update(
-        {
-            _id: shardIdentityDoc._id,
-            shardName: shardIdentityDoc.shardName,
-            clusterId: shardIdentityDoc.clusterId,
-        },
-        {$set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}},
-        {upsert: true}));
+    assert.commandWorked(
+        mongodConn.getDB("admin").system.version.update(
+            {
+                _id: shardIdentityDoc._id,
+                shardName: shardIdentityDoc.shardName,
+                clusterId: shardIdentityDoc.clusterId,
+            },
+            {$set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}},
+            {upsert: true},
+        ),
+    );
 
     awaitVersionUpdate();
 
-    var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+    var res = mongodConn.getDB("admin").runCommand({shardingState: 1});
 
     assert(res.enabled);
     assert.eq(shardIdentityDoc.shardName, res.shardName);
     assert.eq(shardIdentityDoc.clusterId, res.clusterId);
-    assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
-                    mongodConn.adminCommand({shardingState: 1}).configServer);
+    assert.soon(
+        () => shardIdentityDoc.configsvrConnectionString == mongodConn.adminCommand({shardingState: 1}).configServer,
+    );
     // Should not be allowed to remove the shardIdentity document
-    assert.writeErrorWithCode(
-        mongodConn.getDB('admin').system.version.remove({_id: 'shardIdentity'}), 40070);
+    assert.writeErrorWithCode(mongodConn.getDB("admin").system.version.remove({_id: "shardIdentity"}), 40070);
 
     //
     // Test normal startup
@@ -107,19 +111,20 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
         // disable snapshotting to force the stable timestamp forward with or without the
         // majority commit point.  This simplifies forcing out our corrupted write to
         // admin.system.version
-        setParameter: {"failpoint.disableSnapshotting": "{'mode':'alwaysOn'}"}
+        setParameter: {"failpoint.disableSnapshotting": "{'mode':'alwaysOn'}"},
     });
     MongoRunner.stopMongod(mongodConn);
     mongodConn = MongoRunner.runMongod(newMongodOptions);
     waitForPrimary(mongodConn);
 
-    res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+    res = mongodConn.getDB("admin").runCommand({shardingState: 1});
 
     assert(res.enabled);
     assert.eq(shardIdentityDoc.shardName, res.shardName);
     assert.eq(shardIdentityDoc.clusterId, res.clusterId);
-    assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
-                    mongodConn.adminCommand({shardingState: 1}).configServer);
+    assert.soon(
+        () => shardIdentityDoc.configsvrConnectionString == mongodConn.adminCommand({shardingState: 1}).configServer,
+    );
 
     //
     // Test shardIdentity doc without configsvrConnectionString, resulting into parse error
@@ -134,15 +139,21 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
     mongodConn = MongoRunner.runMongod(newMongodOptions);
     waitForPrimary(mongodConn);
 
-    let writeResult = assert.commandWorked(mongodConn.getDB('admin').system.version.update(
-        {_id: 'shardIdentity'}, {_id: 'shardIdentity', shardName: 'x', clusterId: ObjectId()}));
+    let writeResult = assert.commandWorked(
+        mongodConn
+            .getDB("admin")
+            .system.version.update(
+                {_id: "shardIdentity"},
+                {_id: "shardIdentity", shardName: "x", clusterId: ObjectId()},
+            ),
+    );
     assert.eq(writeResult.nModified, 1);
 
     MongoRunner.stopMongod(mongodConn);
 
-    newMongodOptions.shardsvr = '';
+    newMongodOptions.shardsvr = "";
     newMongodOptions.replSet = rsName;
-    assert.throws(function() {
+    assert.throws(function () {
         var connToCrashedMongod = MongoRunner.runMongod(newMongodOptions);
         waitForPrimary(connToCrashedMongod);
     });
@@ -155,7 +166,7 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
     // Test that it is possible to fix the invalid shardIdentity doc by not passing --shardsvr
     //
     mongodConn = restartAndFixShardIdentityDoc(newMongodOptions);
-    res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+    res = mongodConn.getDB("admin").runCommand({shardingState: 1});
     assert(res.enabled);
 };
 
@@ -163,9 +174,9 @@ var st = new ShardingTest({shards: 1});
 
 {
     const replTest = new ReplSetTest({nodes: 1});
-    replTest.startSet({shardsvr: ''});
+    replTest.startSet({shardsvr: ""});
     replTest.initiate();
-    runTest(replTest.getPrimary(), st.configRS.getURL(), function() {
+    runTest(replTest.getPrimary(), st.configRS.getURL(), function () {
         replTest.awaitLastStableRecoveryTimestamp();
     });
     replTest.stopSet();

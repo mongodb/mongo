@@ -17,16 +17,22 @@
 
 const testName = TestData.testName;
 
-const testFindCmd = function() {
+const testFindCmd = function () {
     const testDb = db.getSiblingDB(testName);
     assert.commandWorked(testDb.dropDatabase());
 
     jsTestLog("[Find] Setting up the data.");
-    const testData = [{_id: 0, a: 1}, {_id: 1, b: 2}, {_id: 2, c: 3}, {_id: 3, d: 4}];
+    const testData = [
+        {_id: 0, a: 1},
+        {_id: 1, b: 2},
+        {_id: 2, c: 3},
+        {_id: 3, d: 4},
+    ];
     assert.commandWorked(testDb.test.insert(testData));
     jsTestLog("[Find] Running the initial query.");
-    let res = assert.commandWorked(testDb.runCommand(
-        {find: "test", hint: {$natural: 1}, batchSize: 1, $_requestResumeToken: true}));
+    let res = assert.commandWorked(
+        testDb.runCommand({find: "test", hint: {$natural: 1}, batchSize: 1, $_requestResumeToken: true}),
+    );
     assert.eq(1, res.cursor.firstBatch.length);
     assert.contains(res.cursor.firstBatch[0], testData);
     let queryData = res.cursor.firstBatch;
@@ -37,13 +43,15 @@ const testFindCmd = function() {
     assert.commandWorked(testDb.runCommand({killCursors: "test", cursors: [res.cursor.id]}));
 
     jsTestLog("[Find] Running the second query after killing the cursor.");
-    res = assert.commandWorked(testDb.runCommand({
-        find: "test",
-        hint: {$natural: 1},
-        batchSize: 1,
-        $_requestResumeToken: true,
-        $_resumeAfter: resumeToken
-    }));
+    res = assert.commandWorked(
+        testDb.runCommand({
+            find: "test",
+            hint: {$natural: 1},
+            batchSize: 1,
+            $_requestResumeToken: true,
+            $_resumeAfter: resumeToken,
+        }),
+    );
     assert.eq(1, res.cursor.firstBatch.length);
     // The return value should not be the same as the one before.
     assert.neq(queryData[0], res.cursor.firstBatch[0]);
@@ -52,8 +60,7 @@ const testFindCmd = function() {
     let cursorId = res.cursor.id;
 
     jsTestLog("[Find] Running getMore.");
-    res = assert.commandWorked(
-        testDb.runCommand({getMore: cursorId, collection: "test", batchSize: 1}));
+    res = assert.commandWorked(testDb.runCommand({getMore: cursorId, collection: "test", batchSize: 1}));
     queryData.push(res.cursor.nextBatch[0]);
     assert.hasFields(res.cursor, ["postBatchResumeToken"]);
     resumeToken = res.cursor.postBatchResumeToken;
@@ -62,13 +69,15 @@ const testFindCmd = function() {
     assert.commandWorked(testDb.runCommand({killCursors: "test", cursors: [res.cursor.id]}));
 
     jsTestLog("[Find] Testing resume from getMore");
-    res = assert.commandWorked(testDb.runCommand({
-        find: "test",
-        hint: {$natural: 1},
-        batchSize: 10,
-        $_requestResumeToken: true,
-        $_resumeAfter: resumeToken
-    }));
+    res = assert.commandWorked(
+        testDb.runCommand({
+            find: "test",
+            hint: {$natural: 1},
+            batchSize: 10,
+            $_requestResumeToken: true,
+            $_resumeAfter: resumeToken,
+        }),
+    );
     assert.eq(1, res.cursor.firstBatch.length);
     // This should have exhausted the collection.
     assert.eq(0, res.cursor.id);
@@ -77,31 +86,40 @@ const testFindCmd = function() {
     assert.sameMembers(testData, queryData);
 };
 
-const testAggregateCmd = function(addDummyStage) {
+const testAggregateCmd = function (addDummyStage) {
     // Optimizations in the aggregation code mean there are significant differences between
     // an "empty" aggregate and one with stages that aren't merged into the initial find, so
     // we use a redact stage that we know (but the server doesn't) won't redact anything to
     // disable those optimizations.
-    const logPrefix =
-        addDummyStage ? "[Aggregate non-empty pipeline] " : "[Aggregate empty pipeline] ";
-    const pipeline = addDummyStage ? [{
-        $redact: {$cond: {if: {$eq: ["$d", "never happens"]}, then: "$$PRUNE", else: "$$KEEP"}}
-    }]
-                                   : [];
+    const logPrefix = addDummyStage ? "[Aggregate non-empty pipeline] " : "[Aggregate empty pipeline] ";
+    const pipeline = addDummyStage
+        ? [
+              {
+                  $redact: {$cond: {if: {$eq: ["$d", "never happens"]}, then: "$$PRUNE", else: "$$KEEP"}},
+              },
+          ]
+        : [];
     const testDb = db.getSiblingDB(testName);
     assert.commandWorked(testDb.dropDatabase());
 
     jsTestLog(logPrefix + "Setting up the data.");
-    const testData = [{_id: 0, a: 1}, {_id: 1, b: 2}, {_id: 2, c: 3}, {_id: 3, d: 4}];
+    const testData = [
+        {_id: 0, a: 1},
+        {_id: 1, b: 2},
+        {_id: 2, c: 3},
+        {_id: 3, d: 4},
+    ];
     assert.commandWorked(testDb.test.insert(testData));
     jsTestLog(logPrefix + "Running the initial query.");
-    let res = assert.commandWorked(testDb.runCommand({
-        aggregate: "test",
-        pipeline: pipeline,
-        hint: {$natural: 1},
-        cursor: {batchSize: 1},
-        $_requestResumeToken: true
-    }));
+    let res = assert.commandWorked(
+        testDb.runCommand({
+            aggregate: "test",
+            pipeline: pipeline,
+            hint: {$natural: 1},
+            cursor: {batchSize: 1},
+            $_requestResumeToken: true,
+        }),
+    );
     assert.eq(1, res.cursor.firstBatch.length);
     assert.contains(res.cursor.firstBatch[0], testData);
     let queryData = res.cursor.firstBatch;
@@ -111,14 +129,16 @@ const testAggregateCmd = function(addDummyStage) {
     assert.commandWorked(testDb.runCommand({killCursors: "test", cursors: [res.cursor.id]}));
 
     jsTestLog(logPrefix + "Running the second query after killing the cursor.");
-    res = assert.commandWorked(testDb.runCommand({
-        aggregate: "test",
-        pipeline: pipeline,
-        hint: {$natural: 1},
-        cursor: {batchSize: 1},
-        $_requestResumeToken: true,
-        $_resumeAfter: resumeToken
-    }));
+    res = assert.commandWorked(
+        testDb.runCommand({
+            aggregate: "test",
+            pipeline: pipeline,
+            hint: {$natural: 1},
+            cursor: {batchSize: 1},
+            $_requestResumeToken: true,
+            $_resumeAfter: resumeToken,
+        }),
+    );
     assert.eq(1, res.cursor.firstBatch.length);
     assert.neq(queryData[0], res.cursor.firstBatch[0]);
     assert.contains(res.cursor.firstBatch[0], testData);
@@ -126,8 +146,7 @@ const testAggregateCmd = function(addDummyStage) {
     let cursorId = res.cursor.id;
 
     jsTestLog(logPrefix + "Running getMore.");
-    res = assert.commandWorked(
-        testDb.runCommand({getMore: cursorId, collection: "test", batchSize: 1}));
+    res = assert.commandWorked(testDb.runCommand({getMore: cursorId, collection: "test", batchSize: 1}));
     queryData.push(res.cursor.nextBatch[0]);
     assert.hasFields(res.cursor, ["postBatchResumeToken"]);
     resumeToken = res.cursor.postBatchResumeToken;
@@ -135,14 +154,16 @@ const testAggregateCmd = function(addDummyStage) {
     assert.commandWorked(testDb.runCommand({killCursors: "test", cursors: [res.cursor.id]}));
 
     jsTestLog(logPrefix + "Testing resume from getMore");
-    res = assert.commandWorked(testDb.runCommand({
-        aggregate: "test",
-        pipeline: pipeline,
-        hint: {$natural: 1},
-        cursor: {batchSize: 10},
-        $_requestResumeToken: true,
-        $_resumeAfter: resumeToken
-    }));
+    res = assert.commandWorked(
+        testDb.runCommand({
+            aggregate: "test",
+            pipeline: pipeline,
+            hint: {$natural: 1},
+            cursor: {batchSize: 10},
+            $_requestResumeToken: true,
+            $_resumeAfter: resumeToken,
+        }),
+    );
     assert.eq(1, res.cursor.firstBatch.length);
     assert.eq(0, res.cursor.id);
     queryData.push(res.cursor.firstBatch[0]);

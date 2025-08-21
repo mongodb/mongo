@@ -13,7 +13,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 const source = db[`${jsTestName()}_source`];
 const target = db[`${jsTestName()}_target`];
 
-[source, target].forEach(coll => coll.drop());
+[source, target].forEach((coll) => coll.drop());
 
 function mergeWith(pipeline) {
     return {$merge: {into: target.getName(), whenMatched: pipeline, whenNotMatched: "insert"}};

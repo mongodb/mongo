@@ -5,8 +5,7 @@ const coll = db.hashed_index_with_arrays;
 coll.drop();
 
 for (let i = 0; i < 20; i++) {
-    assert.commandWorked(
-        coll.insert({a: i, b: {subObj: "string_" + (i % 13)}, c: NumberInt(i % 10)}));
+    assert.commandWorked(coll.insert({a: i, b: {subObj: "string_" + (i % 13)}, c: NumberInt(i % 10)}));
 }
 
 // Creation of compound hashed indexes work.
@@ -43,8 +42,7 @@ assert.commandFailedWithCode(coll.update({_id: "missing"}, {field1: []}, {upsert
 assert.commandWorked(coll.insert({field1: {field2: {0: {otherField: []}}}}));
 assert.commandWorked(coll.insert({field1: {field2: {0: {field4: 1}}}}));
 assert.commandWorked(coll.update({}, {field1: {field2: {0: {field4: 1}}}}));
-assert.commandWorked(
-    coll.update({_id: "missing"}, {field1: {field2: {0: {field4: 1}}}}, {upsert: true}));
+assert.commandWorked(coll.update({_id: "missing"}, {field1: {field2: {0: {field4: 1}}}}, {upsert: true}));
 
 /**
  * Tests for sparse indexes.
@@ -64,8 +62,7 @@ assert.commandFailedWithCode(coll.insert({a: []}), 16766);
  * Tests for partial indexes.
  */
 assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(
-    coll.createIndex({a: "hashed", b: 1}, {partialFilterExpression: {b: {$gt: 5}}}));
+assert.commandWorked(coll.createIndex({a: "hashed", b: 1}, {partialFilterExpression: {b: {$gt: 5}}}));
 assert.commandFailedWithCode(coll.insert({a: [1], b: 6}), 16766);
 
 // Array insertion allowed when the document doesn't match the partial filter predication.

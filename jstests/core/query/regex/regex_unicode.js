@@ -18,9 +18,11 @@ let docMixed = {_id: 2, text: "suárez"};
  * 'regex' returns 'expected' when sorting by _id ascending.
  */
 function assertFindResultsEq(regex, expected) {
-    const res = coll.find({text: {$regex: regex}}).sort({_id: 1}).toArray();
-    const errfn = `Regex query "${regex}" returned ${tojson(res)} ` +
-        `but expected ${tojson(expected)}`;
+    const res = coll
+        .find({text: {$regex: regex}})
+        .sort({_id: 1})
+        .toArray();
+    const errfn = `Regex query "${regex}" returned ${tojson(res)} ` + `but expected ${tojson(expected)}`;
     assert.eq(res, expected, errfn);
 }
 
@@ -75,15 +77,15 @@ assertFindResultsEq("(*UCP)^[[:alpha:]]+$", [docAllAscii, docNoAscii, docMixed])
 coll.drop();
 docAllAscii = {
     _id: 0,
-    text: "02191996"
+    text: "02191996",
 };
 docNoAscii = {
     _id: 1,
-    text: "༢༣༤༥"
+    text: "༢༣༤༥",
 };
 docMixed = {
     _id: 2,
-    text: "9୩୪୬୯6"
+    text: "9୩୪୬୯6",
 };
 [docAllAscii, docNoAscii, docMixed].forEach((doc) => assert.commandWorked(coll.insert(doc)));
 

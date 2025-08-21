@@ -23,7 +23,9 @@ assert.commandWorked(coll.createIndex({z: 1, a: "text"}));
 assert.commandWorked(coll.find({$text: {$search: "hello"}, z: "hello"}).explain("executionStats"));
 
 // Ensure no solutions were found for regexes in the prefix.
-assert.throwsWithCode(() => coll.find({$text: {$search: "hello"}, z: /hello/}).toArray(),
-                      [ErrorCodes.NoQueryExecutionPlans]);
+assert.throwsWithCode(
+    () => coll.find({$text: {$search: "hello"}, z: /hello/}).toArray(),
+    [ErrorCodes.NoQueryExecutionPlans],
+);
 
 assertDropCollection(db, collName);

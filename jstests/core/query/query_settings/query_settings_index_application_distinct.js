@@ -16,10 +16,7 @@
 // ]
 //
 
-import {
-    assertDropAndRecreateCollection,
-    assertDropCollection
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
@@ -33,7 +30,7 @@ assertDropCollection(db, viewName);
 assert.commandWorked(db.createView(viewName, coll.getName(), []));
 const ns = {
     db: db.getName(),
-    coll: coll.getName()
+    coll: coll.getName(),
 };
 
 // Ensure query settings are applied as expected in a straightforward scenario for distinct.
@@ -80,13 +77,15 @@ function assertQuerySettingsDistinctFallback(qsutils, qstests, querySettingsQuer
 }
 
 // Insert data into the collection.
-assert.commandWorked(coll.insertMany([
-    {a: 1, b: 5},
-    {a: 2, b: 4},
-    {a: 3, b: 3},
-    {a: 4, b: 2},
-    {a: 5, b: 1},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {a: 1, b: 5},
+        {a: 2, b: 4},
+        {a: 3, b: 3},
+        {a: 4, b: 2},
+        {a: 5, b: 1},
+    ]),
+);
 
 function setIndexes(coll, indexList) {
     assert.commandWorked(coll.dropIndexes());
@@ -103,7 +102,7 @@ function testDistinctQuerySettingsApplication(collOrViewName) {
     setIndexes(coll, qstests.allIndexes);
 
     const querySettingsDistinctQuery = qsutils.makeDistinctQueryInstance({
-        key: 'c',
+        key: "c",
         query: {a: 1, b: 1},
     });
 
@@ -126,7 +125,7 @@ function testDistinctWithDistinctScanQuerySettingsApplication(collOrViewName) {
     // matter what hints/index_filters/query_settings are.
     setIndexes(coll, [qstests.indexA, qstests.indexAB]);
 
-    const querySettingsDistinctQuery = qsutils.makeDistinctQueryInstance({key: 'a'});
+    const querySettingsDistinctQuery = qsutils.makeDistinctQueryInstance({key: "a"});
 
     assertQuerySettingsDistinctIndexApplication(qsutils, qstests, querySettingsDistinctQuery);
     assertQuerySettingsDistinctScanIgnoreCursorHints(qsutils, qstests, querySettingsDistinctQuery);

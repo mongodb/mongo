@@ -11,9 +11,9 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-const mainCollName = 'main_coll';
-const subCollName = 'sub_coll';
-const kOtherDbName = 'commands_with_uuid_db';
+const mainCollName = "main_coll";
+const subCollName = "sub_coll";
+const kOtherDbName = "commands_with_uuid_db";
 db.runCommand({drop: mainCollName});
 db.runCommand({drop: subCollName});
 assert.commandWorked(db.runCommand({create: mainCollName}));
@@ -31,49 +31,49 @@ if (FixtureHelpers.isMongos(db)) {
     quit();
 }
 
-assert.commandWorked(db.runCommand({insert: mainCollName, documents: [{fooField: 'FOO'}]}));
-assert.commandWorked(
-    db.runCommand({insert: subCollName, documents: [{fooField: 'BAR'}, {fooField: 'FOOBAR'}]}));
+assert.commandWorked(db.runCommand({insert: mainCollName, documents: [{fooField: "FOO"}]}));
+assert.commandWorked(db.runCommand({insert: subCollName, documents: [{fooField: "BAR"}, {fooField: "FOOBAR"}]}));
 
 // Ensure passing a UUID to find retrieves results from the correct collection.
 let cmd = {find: uuid};
 let res = db.runCommand(cmd);
-assert.commandWorked(res, 'could not run ' + tojson(cmd));
+assert.commandWorked(res, "could not run " + tojson(cmd));
 let cursor = new DBCommandCursor(db, res);
-let errMsg = 'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
+let errMsg = "expected more data from command " + tojson(cmd) + ", with result " + tojson(res);
 assert(cursor.hasNext(), errMsg);
 let doc = cursor.next();
-assert.eq(doc.fooField, 'FOO');
-assert(!cursor.hasNext(), 'expected to have exhausted cursor for results ' + tojson(res));
+assert.eq(doc.fooField, "FOO");
+assert(!cursor.hasNext(), "expected to have exhausted cursor for results " + tojson(res));
 
 // Although we check for both string type and BinData type for the collection identifier
 // argument to a find command to accomodate for searching both by name and by UUID, if an
 // invalid type is passed, the parsing error message should say the expected type is string and
 // not BinData to avoid confusing the user.
 cmd = {
-    find: 1.0
+    find: 1.0,
 };
 res = db.runCommand(cmd);
-assert.commandFailed(res, 'expected ' + tojson(cmd) + ' to fail.');
+assert.commandFailed(res, "expected " + tojson(cmd) + " to fail.");
 // In newer versions, the error message starts with "Collection name...", while in older versions it
 // start with "collection name...". In order to accommodate multi-version configurations, we can
 // ignore the first letter when asserting.
-assert(res.errmsg.includes('ollection name has invalid type double'),
-       'expected the error message of ' + tojson(res) + ' to include string type');
+assert(
+    res.errmsg.includes("ollection name has invalid type double"),
+    "expected the error message of " + tojson(res) + " to include string type",
+);
 
 // Ensure passing a missing UUID to commands taking UUIDs uasserts that the UUID is not found.
 const missingUUID = UUID();
 for (cmd of [{count: missingUUID}, {find: missingUUID}, {listIndexes: missingUUID}]) {
-    assert.commandFailedWithCode(
-        db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
+    assert.commandFailedWithCode(db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
 }
 
 // Ensure passing a UUID to listIndexes retrieves results from the correct collection.
 cmd = {
-    listIndexes: uuid
+    listIndexes: uuid,
 };
 res = db.runCommand(cmd);
-assert.commandWorked(res, 'could not run ' + tojson(cmd));
+assert.commandWorked(res, "could not run " + tojson(cmd));
 cursor = new DBCommandCursor(db, res);
 assert.eq(1, cursor.toArray().length);
 assert.eq("_id_", cursor.toArray()[0].name);
@@ -81,10 +81,10 @@ assert.eq(bsonWoCompare({"_id": 1}, cursor.toArray()[0].key), 0);
 
 // Ensure passing a UUID to count retrieves results from the correct collection.
 cmd = {
-    count: uuid
+    count: uuid,
 };
 res = db.runCommand(cmd);
-assert.commandWorked(res, 'could not run ' + tojson(cmd));
+assert.commandWorked(res, "could not run " + tojson(cmd));
 assert.eq(res.n, 1, "expected to count a single document with command: " + tojson(cmd));
 
 // Test that UUID resolution fails when the UUID belongs to a different database. First, we
@@ -102,6 +102,5 @@ assert.commandWorked(dbWithUUID.runCommand({find: uuid}));
 // also test that the same command succeeds when there is no database mismatch.
 for (cmd of [{count: uuid}, {distinct: uuid, key: "a"}, {find: uuid}, {listIndexes: uuid}]) {
     assert.commandWorked(dbWithUUID.runCommand(cmd));
-    assert.commandFailedWithCode(
-        db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
+    assert.commandFailedWithCode(db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
 }

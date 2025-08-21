@@ -14,20 +14,17 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/sharded_partitioned/crud_base_partitioned.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/crud_base_partitioned.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 10;
     $config.iterations = 50;
-    $config.startState = "init";  // Inherited from crud_base_partitioned.js.
+    $config.startState = "init"; // Inherited from crud_base_partitioned.js.
     $config.data.partitionSize = 100;
-    $config.data.secondaryDocField = 'y';
-    $config.data.idField = '_id';
-    $config.data.tertiaryDocField = 'tertiaryField';
-    $config.data.runningWithStepdowns =
-        TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
+    $config.data.secondaryDocField = "y";
+    $config.data.idField = "_id";
+    $config.data.tertiaryDocField = "tertiaryField";
+    $config.data.runningWithStepdowns = TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
 
     /**
      * Returns a random integer between min (inclusive) and max (inclusive).
@@ -52,7 +49,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             _id: idVal,
             tid: tid,
             [this.defaultShardKeyField]: val,
-            [this.secondaryDocField]: val
+            [this.secondaryDocField]: val,
         };
     };
 
@@ -81,17 +78,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const queryType = this.generateRandomInt(0, 3);
         if (queryType === 0 /* Range query on shard key field. */) {
             return {
-                [this.defaultShardKeyField]:
-                    {$gte: this.partition.lower, $lte: this.partition.upper - 1}
+                [this.defaultShardKeyField]: {$gte: this.partition.lower, $lte: this.partition.upper - 1},
             };
         } else if (queryType === 1 /* Range query on non shard key field. */) {
             return {
-                [this.secondaryDocField]:
-                    {$gte: this.partition.lower, $lte: this.partition.upper - 1}
+                [this.secondaryDocField]: {$gte: this.partition.lower, $lte: this.partition.upper - 1},
             };
         } else if (queryType === 2 /* Equality query on a field that does not exist */) {
             return {[this.tertiaryDocField]: {$eq: this.generateRandomInt(0, 500)}, tid: this.tid};
-        } else { /* Query any document in the partition. */
+        } else {
+            /* Query any document in the partition. */
             return {tid: this.tid};
         }
     };
@@ -100,8 +96,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Sorts documents by sortVal and returns an array of the _id fields of documents that are first
      * in the sort order.
      */
-    $config.data.returnDocsThatSortFirst = function returnDocsThatSortFirst(
-        db, collName, query, options) {
+    $config.data.returnDocsThatSortFirst = function returnDocsThatSortFirst(db, collName, query, options) {
         // If sorting, ensure that the correct document is modified. Save the _id values of the
         // documents that come first in the sort order, and validate that a document that comes
         // first in the sort order is correctly applied the update.
@@ -123,10 +118,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             return undefined;
         }
 
-        const docsThatSortFirstIds =
-            db[collName]
-                .find({[this.secondaryDocField]: secondaryDocFieldVal}, {[this.idField]: 1})
-                .toArray();
+        const docsThatSortFirstIds = db[collName]
+            .find({[this.secondaryDocField]: secondaryDocFieldVal}, {[this.idField]: 1})
+            .toArray();
 
         return docsThatSortFirstIds;
     };
@@ -136,7 +130,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * updated.
      */
     $config.data.validateSortedUpdate = function validateSortedUpdate(
-        db, collName, update, doShardKeyUpdate, docsThatSortFirstIds) {
+        db,
+        collName,
+        update,
+        doShardKeyUpdate,
+        docsThatSortFirstIds,
+    ) {
         let correctDocModified = false;
         const sortField = doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField;
 
@@ -153,8 +152,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Randomly generates and runs an update operator document update, replacement update,
      * or an aggregation pipeline update.
      */
-    $config.data.generateAndRunRandomUpdateOp = function generateAndRunRandomUpdateOp(db,
-                                                                                      collName) {
+    $config.data.generateAndRunRandomUpdateOp = function generateAndRunRandomUpdateOp(db, collName) {
         const query = this.generateRandomQuery();
         const newValue = this.generateRandomInt(this.partition.lower, this.partition.upper - 1);
         const updateType = this.generateRandomInt(0, 2);
@@ -177,37 +175,51 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             }
         }
 
-        jsTestLog("updateOne state running with the following parameters: \n" +
-                  "query: " + tojson(query) + "\n" +
-                  "updateType: " + updateType + "\n" +
-                  "doShardKeyUpdate: " + doShardKeyUpdate + "\n" +
-                  "doUpsert: " + doUpsert + "\n" +
-                  "doSort: " + doSort + "\n" +
-                  "containsMatchedDocs: " + containsMatchedDocs);
+        jsTestLog(
+            "updateOne state running with the following parameters: \n" +
+                "query: " +
+                tojson(query) +
+                "\n" +
+                "updateType: " +
+                updateType +
+                "\n" +
+                "doShardKeyUpdate: " +
+                doShardKeyUpdate +
+                "\n" +
+                "doUpsert: " +
+                doUpsert +
+                "\n" +
+                "doSort: " +
+                doSort +
+                "\n" +
+                "containsMatchedDocs: " +
+                containsMatchedDocs,
+        );
 
         let res;
         let update;
         try {
             if (updateType === 0 /* Update operator document */) {
                 update = {
-                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
-                        newValue
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue,
                 };
                 res = db[collName].updateOne(query, {$set: update}, options);
             } else if (updateType === 1 /* Replacement Update */) {
                 // Always including a shard key update for replacement documents in order to keep
                 // the new document within the current thread's partition.
-                res = db[collName].replaceOne(query,
-                                              {
-                                                  [this.defaultShardKeyField]: newValue,
-                                                  [this.secondaryDocField]: newValue,
-                                                  tid: this.tid
-                                              },
-                                              options);
-            } else { /* Aggregation pipeline update */
+                res = db[collName].replaceOne(
+                    query,
+                    {
+                        [this.defaultShardKeyField]: newValue,
+                        [this.secondaryDocField]: newValue,
+                        tid: this.tid,
+                    },
+                    options,
+                );
+            } else {
+                /* Aggregation pipeline update */
                 update = {
-                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
-                        newValue
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue,
                 };
 
                 // The $unset will result in a no-op since 'z' is not a field populated in any of
@@ -252,14 +264,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Randomly generates and runs an update operator document update without shard key with ID,
      * replacement update, or an aggregation pipeline update.
      */
-    $config.data.generateAndRunRandomUpdateOpWithId = function generateAndRunRandomUpdateOpWithId(
-        db, collName) {
+    $config.data.generateAndRunRandomUpdateOpWithId = function generateAndRunRandomUpdateOpWithId(db, collName) {
         const query = {
             _id: {
-                $eq: this.generateRandomInt(this.partition.lower - this.partitionSize / 4,
-                                            this.partition.upper + this.partitionSize / 4)
+                $eq: this.generateRandomInt(
+                    this.partition.lower - this.partitionSize / 4,
+                    this.partition.upper + this.partitionSize / 4,
+                ),
             },
-            tid: this.tid
+            tid: this.tid,
         };
         const newValue = this.generateRandomInt(this.partition.lower, this.partition.upper - 1);
         const updateType = this.generateRandomInt(0, 1);
@@ -267,10 +280,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Used for validation after running the write operation.
         const containsMatchedDocs = db[collName].findOne(query) != null;
 
-        jsTestLog("updateOneWithId state running with the following parameters: \n" +
-                  "query: " + tojson(query) + "\n" +
-                  "updateType: " + updateType + "\n" +
-                  "containsMatchedDocs: " + containsMatchedDocs);
+        jsTestLog(
+            "updateOneWithId state running with the following parameters: \n" +
+                "query: " +
+                tojson(query) +
+                "\n" +
+                "updateType: " +
+                updateType +
+                "\n" +
+                "containsMatchedDocs: " +
+                containsMatchedDocs,
+        );
 
         // If the suite runs this function as a txn with retries already as in
         // concurrency_sharded_multi_stmt_txn suites, we skip creating a retryable writes session.
@@ -290,7 +310,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         if (updateType === 0 /* Update operator document */) {
             const update = {[this.secondaryDocField]: newValue};
             res = collection.updateOne(query, {$set: update});
-        } else { /* Aggregation pipeline update */
+        } else {
+            /* Aggregation pipeline update */
             const update = {[this.secondaryDocField]: newValue};
             res = collection.updateOne(query, [{$set: update}]);
         }
@@ -316,8 +337,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Checks the response of a write. If we have a write error, return true if we should skip write
      * response validation for an acceptable error, false otherwise.
      */
-    $config.data.shouldSkipWriteResponseValidation = function shouldSkipWriteResponseValidation(
-        res) {
+    $config.data.shouldSkipWriteResponseValidation = function shouldSkipWriteResponseValidation(res) {
         let acceptableErrors = [
             ErrorCodes.DuplicateKey,
             ErrorCodes.IllegalOperation,
@@ -329,7 +349,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.ShardCannotRefreshDueToLocksHeld,
             ErrorCodes.WriteConflict,
             ErrorCodes.SnapshotUnavailable,
-            ErrorCodes.ExceededTimeLimit
+            ErrorCodes.ExceededTimeLimit,
         ];
 
         // If we're running in a stepdown suite, then attempting to update the shard key may
@@ -343,13 +363,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
 
         const duplicateKeyInChangeShardKeyMsg = "Failed to update document's shard key field";
-        const wouldChangeOwningShardMsg =
-            "Must run update to shard key field in a multi-statement transaction";
+        const wouldChangeOwningShardMsg = "Must run update to shard key field in a multi-statement transaction";
         const otherErrorsInChangeShardKeyMsg = "was converted into a distributed transaction";
-        const failureInRetryableWriteToTxnConversionMsg =
-            "Cannot retry a retryable write that has been converted";
+        const failureInRetryableWriteToTxnConversionMsg = "Cannot retry a retryable write that has been converted";
 
-        if (res.code && (res.code !== ErrorCodes.OK)) {
+        if (res.code && res.code !== ErrorCodes.OK) {
             if (acceptableErrors.includes(res.code)) {
                 const msg = res.errmsg ? res.errmsg : res.message;
 
@@ -364,12 +382,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 // This is a possible transient transaction error issue that could occur with
                 // concurrent moveChunks and/or reshardings and transactions (if we happen to run a
                 // WouldChangeOwningShard update).
-                if (res.code === ErrorCodes.LockTimeout || res.code === ErrorCodes.StaleConfig ||
+                if (
+                    res.code === ErrorCodes.LockTimeout ||
+                    res.code === ErrorCodes.StaleConfig ||
                     res.code === ErrorCodes.ConflictingOperationInProgress ||
                     res.code === ErrorCodes.ShardCannotRefreshDueToLocksHeld ||
                     res.code == ErrorCodes.WriteConflict ||
                     res.code == ErrorCodes.SnapshotUnavailable ||
-                    res.code == ErrorCodes.ExceededTimeLimit) {
+                    res.code == ErrorCodes.ExceededTimeLimit
+                ) {
                     if (!msg.includes(otherErrorsInChangeShardKeyMsg)) {
                         return false;
                     }
@@ -410,8 +431,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     /**
      * Randomly generates and runs either a findAndModify update or a findAndModify remove.
      */
-    $config.data.generateAndRunRandomFindAndModifyOp = function generateAndRunRandomFindAndModifyOp(
-        db, collName) {
+    $config.data.generateAndRunRandomFindAndModifyOp = function generateAndRunRandomFindAndModifyOp(db, collName) {
         const query = this.generateRandomQuery();
 
         // Used for validation after running the write operation.
@@ -437,13 +457,26 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             const doShardKeyUpdate = this.generateRandomInt(0, 1);
             const doUpsert = this.generateRandomBool();
 
-            jsTestLog("findAndModifyUpdate state running with the following parameters: \n" +
-                      "query: " + tojson(query) + "\n" +
-                      "updateType: " + updateType + "\n" +
-                      "doShardKeyUpdate: " + doShardKeyUpdate + "\n" +
-                      "doUpsert: " + doUpsert + "\n" +
-                      "doSort: " + doSort + "\n" +
-                      "containsMatchedDocs: " + containsMatchedDocs);
+            jsTestLog(
+                "findAndModifyUpdate state running with the following parameters: \n" +
+                    "query: " +
+                    tojson(query) +
+                    "\n" +
+                    "updateType: " +
+                    updateType +
+                    "\n" +
+                    "doShardKeyUpdate: " +
+                    doShardKeyUpdate +
+                    "\n" +
+                    "doUpsert: " +
+                    doUpsert +
+                    "\n" +
+                    "doSort: " +
+                    doSort +
+                    "\n" +
+                    "containsMatchedDocs: " +
+                    containsMatchedDocs,
+            );
 
             const cmdObj = {
                 findAndModify: collName,
@@ -454,8 +487,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
             if (updateType === 0 /* Update operator document */) {
                 const update = {
-                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
-                        newValue
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue,
                 };
                 cmdObj.update = {$set: update};
                 res = db.runCommand(cmdObj);
@@ -465,13 +497,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 cmdObj.update = {
                     [this.defaultShardKeyField]: newValue,
                     [this.secondaryDocField]: newValue,
-                    tid: this.tid
+                    tid: this.tid,
                 };
                 res = db.runCommand(cmdObj);
-            } else { /* Aggregation pipeline update */
+            } else {
+                /* Aggregation pipeline update */
                 const update = {
-                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
-                        newValue
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue,
                 };
 
                 // The $unset will result in a no-op since 'z' is not a field populated in any
@@ -500,7 +532,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 assert.eq(res.lastErrorObject.n, 0, res);
                 assert.eq(res.lastErrorObject.updatedExisting, false, res);
             }
-        } else { /* Remove */
+        } else {
+            /* Remove */
             const numMatchedDocsBefore = db[collName].countDocuments(query);
             const cmdObj = {
                 findAndModify: collName,
@@ -511,10 +544,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 cmdObj.sort = sortVal;
             }
 
-            jsTestLog("findAndModifyDelete state running with the following parameters: \n" +
-                      "query: " + tojson(query) + "\n" +
-                      "numMatchedDocsBefore: " + numMatchedDocsBefore + "\n" +
-                      "containsMatchedDocs: " + containsMatchedDocs);
+            jsTestLog(
+                "findAndModifyDelete state running with the following parameters: \n" +
+                    "query: " +
+                    tojson(query) +
+                    "\n" +
+                    "numMatchedDocsBefore: " +
+                    numMatchedDocsBefore +
+                    "\n" +
+                    "containsMatchedDocs: " +
+                    containsMatchedDocs,
+            );
 
             res = assert.commandWorked(db.runCommand(cmdObj));
 
@@ -562,9 +602,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const containsMatchedDocs = db[collName].findOne(query) != null;
         const numMatchedDocsBefore = db[collName].countDocuments(query);
 
-        jsTestLog("deleteOne state running with query: " + tojson(query) + "\n" +
-                  "containsMatchedDocs: " + containsMatchedDocs + "\n" +
-                  "numMatchedDocsBefore: " + numMatchedDocsBefore);
+        jsTestLog(
+            "deleteOne state running with query: " +
+                tojson(query) +
+                "\n" +
+                "containsMatchedDocs: " +
+                containsMatchedDocs +
+                "\n" +
+                "numMatchedDocsBefore: " +
+                numMatchedDocsBefore,
+        );
 
         let res = assert.commandWorked(db[collName].deleteOne(query));
 
@@ -586,10 +633,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         jsTestLog("Running deleteOneWithId state");
         const query = {
             _id: {
-                $eq: this.generateRandomInt(this.partition.lower - this.partitionSize / 4,
-                                            this.partition.upper + this.partitionSize / 4)
+                $eq: this.generateRandomInt(
+                    this.partition.lower - this.partitionSize / 4,
+                    this.partition.upper + this.partitionSize / 4,
+                ),
             },
-            tid: this.tid
+            tid: this.tid,
         };
 
         // If the suite runs this function as a txn with retries already as in
@@ -610,9 +659,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const containsMatchedDocs = collection.findOne(query) != null;
         const numMatchedDocsBefore = collection.countDocuments(query);
 
-        jsTestLog("deleteOneWithId state running with query: " + tojson(query) + "\n" +
-                  "containsMatchedDocs: " + containsMatchedDocs + "\n" +
-                  "numMatchedDocsBefore: " + numMatchedDocsBefore);
+        jsTestLog(
+            "deleteOneWithId state running with query: " +
+                tojson(query) +
+                "\n" +
+                "containsMatchedDocs: " +
+                containsMatchedDocs +
+                "\n" +
+                "numMatchedDocsBefore: " +
+                numMatchedDocsBefore,
+        );
 
         let res = assert.commandWorked(collection.deleteOne(query));
 
@@ -653,43 +709,43 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             deleteOne: 0.175,
             updateOneWithId: 0.175,
             deleteOneWithId: 0.175,
-            findAndModify: 0.3
+            findAndModify: 0.3,
         },
         updateOne: {
             updateOne: 0.175,
             deleteOne: 0.175,
             updateOneWithId: 0.175,
             deleteOneWithId: 0.175,
-            findAndModify: 0.3
+            findAndModify: 0.3,
         },
         deleteOne: {
             updateOne: 0.175,
             deleteOne: 0.175,
             updateOneWithId: 0.175,
             deleteOneWithId: 0.175,
-            findAndModify: 0.3
+            findAndModify: 0.3,
         },
         updateOneWithId: {
             updateOne: 0.175,
             deleteOne: 0.175,
             updateOneWithId: 0.175,
             deleteOneWithId: 0.175,
-            findAndModify: 0.3
+            findAndModify: 0.3,
         },
         deleteOneWithId: {
             updateOne: 0.175,
             deleteOne: 0.175,
             updateOneWithId: 0.175,
             deleteOneWithId: 0.175,
-            findAndModify: 0.3
+            findAndModify: 0.3,
         },
         findAndModify: {
             updateOne: 0.175,
             deleteOne: 0.175,
             updateOneWithId: 0.175,
             deleteOneWithId: 0.175,
-            findAndModify: 0.3
-        }
+            findAndModify: 0.3,
+        },
     };
 
     return $config;

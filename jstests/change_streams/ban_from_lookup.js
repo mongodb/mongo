@@ -14,21 +14,23 @@ const foreignColl = "unsharded";
 assert.commandWorked(coll.insert({_id: 1}));
 
 // Verify that we cannot create a $lookup using a pipeline which begins with $changeStream.
-assertErrorCode(
-    coll, [{$lookup: {from: foreignColl, as: 'as', pipeline: [{$changeStream: {}}]}}], 51047);
+assertErrorCode(coll, [{$lookup: {from: foreignColl, as: "as", pipeline: [{$changeStream: {}}]}}], 51047);
 
 // Verify that we cannot create a $lookup if its pipeline contains a sub-$lookup whose pipeline
 // begins with $changeStream.
 assertErrorCode(
-        coll,
-        [{
-           $lookup: {
-               from: foreignColl,
-               as: 'as',
-               pipeline: [
-                   {$match: {_id: 1}},
-                   {$lookup: {from: foreignColl, as: 'subas', pipeline: [{$changeStream: {}}]}}
-               ]
-           }
-        }],
-        51047);
+    coll,
+    [
+        {
+            $lookup: {
+                from: foreignColl,
+                as: "as",
+                pipeline: [
+                    {$match: {_id: 1}},
+                    {$lookup: {from: foreignColl, as: "subas", pipeline: [{$changeStream: {}}]}},
+                ],
+            },
+        },
+    ],
+    51047,
+);

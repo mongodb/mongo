@@ -20,21 +20,27 @@ if (lastLTSFCV != "8.0") {
 }
 
 const rst = new ReplSetTest({nodes: 2});
-rst.startSet(
-    {binVersion: 'last-lts', setParameter: {featureFlagTSBucketingParametersUnchanged: true}});
+rst.startSet({binVersion: "last-lts", setParameter: {featureFlagTSBucketingParametersUnchanged: true}});
 rst.initiate();
 
 assert.commandWorked(
-    rst.getPrimary().getDB(dbName).createCollection(collName, {timeseries: {timeField: 't'}}));
+    rst
+        .getPrimary()
+        .getDB(dbName)
+        .createCollection(collName, {timeseries: {timeField: "t"}}),
+);
 
 // Upgrade the replica set to the latest FCV and verify that the flag is removed
 rst.stopSet(null /* signal */, true /* forRestart */);
-rst.startSet({binVersion: 'latest'}, true /* restart */);
+rst.startSet({binVersion: "latest"}, true /* restart */);
 
 const db = rst.getPrimary().getDB(dbName);
 
 const getCatalogEntry = () =>
-    db.getCollection(`system.buckets.${collName}`).aggregate([{$listCatalog: {}}]).toArray()[0];
+    db
+        .getCollection(`system.buckets.${collName}`)
+        .aggregate([{$listCatalog: {}}])
+        .toArray()[0];
 
 assert.eq(false, getCatalogEntry().md.timeseriesBucketingParametersHaveChanged);
 assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));

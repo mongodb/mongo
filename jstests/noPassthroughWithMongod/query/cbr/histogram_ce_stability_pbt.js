@@ -39,18 +39,16 @@ const planStabilityFn = createPlanStabilityProperty(experimentColl, true /* asse
 function histogramPlanStabilityProperty(getQuery, testHelpers, {numberBuckets}) {
     // Run analyze on all possible fields the queries could use. This includes all top-level
     // fields, in addition to the dotted paths used, "m1" and "m2".
-    const prefixes = ['a', 'b', 't', 'm', '_id', 'array'];
-    const suffixes = ['', '.m1', '.m2'];
-    const allFields = prefixes.flatMap(p => suffixes.map(s => p + s));
+    const prefixes = ["a", "b", "t", "m", "_id", "array"];
+    const suffixes = ["", ".m1", ".m2"];
+    const allFields = prefixes.flatMap((p) => suffixes.map((s) => p + s));
     for (const analyzeKey of allFields) {
-        assert.commandWorked(experimentColl.runCommand(
-            {analyze: experimentColl.getName(), key: analyzeKey, numberBuckets}));
+        assert.commandWorked(
+            experimentColl.runCommand({analyze: experimentColl.getName(), key: analyzeKey, numberBuckets}),
+        );
     }
 
     return planStabilityFn(getQuery, testHelpers);
 }
 
-testProperty(histogramPlanStabilityProperty,
-             {experimentColl},
-             createStabilityWorkload(numQueriesPerRun),
-             numRuns);
+testProperty(histogramPlanStabilityProperty, {experimentColl}, createStabilityWorkload(numQueriesPerRun), numRuns);

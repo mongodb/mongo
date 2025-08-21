@@ -19,31 +19,30 @@ function renameBucketsCollection(adminDB, username, shouldSucceed) {
     testDB[bucketsCollName].drop();
     testDB[targetBucketsCollName].drop();
 
-    assert.commandWorked(
-        testDB.createCollection(bucketsCollName, {timeseries: {timeField: "time"}}));
+    assert.commandWorked(testDB.createCollection(bucketsCollName, {timeseries: {timeField: "time"}}));
     adminDB.logout();
 
     // Try rename with test users
     jsTestLog("Testing system.buckets renaming with username: " + username);
-    assert(adminDB.auth(username, 'password'));
+    assert(adminDB.auth(username, "password"));
 
     // No privilege grants the ability to rename a system.buckets collection to a non-bucket
     // namespace.
-    assert.commandFailed(testDB.adminCommand({
-        renameCollection: `${testDB}.${bucketsCollName}`,
-        to: `${testDB}.${collName}`,
-        dropTarget: false
-    }));
+    assert.commandFailed(
+        testDB.adminCommand({
+            renameCollection: `${testDB}.${bucketsCollName}`,
+            to: `${testDB}.${collName}`,
+            dropTarget: false,
+        }),
+    );
 
     const res = testDB.adminCommand({
         renameCollection: `${testDB}.${bucketsCollName}`,
         to: `${testDB}.${targetBucketsCollName}`,
-        dropTarget: true
+        dropTarget: true,
     });
 
-    assert.eq((shouldSucceed) ? 1 : 0,
-              res.ok,
-              "Rename collection failed or succeeded unexpectedly:" + tojson(res));
+    assert.eq(shouldSucceed ? 1 : 0, res.ok, "Rename collection failed or succeeded unexpectedly:" + tojson(res));
 
     adminDB.logout();
 }
@@ -52,59 +51,53 @@ function runTest(conn) {
     const adminDB = conn.getDB("admin");
 
     // Create the admin user.
-    adminDB.createUser({user: 'admin', pwd: 'admin', roles: ['root']});
+    adminDB.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     assert.eq(1, adminDB.auth("admin", "admin"));
 
     // Create roles with ability to rename system.buckets collections.
     adminDB.createRole({
         role: "renameBucketsOnly",
-        privileges: [{
-            resource: {db: '', system_buckets: ''},
-            actions: [
-                "createIndex",
-                "dropCollection",
-                "find",
-                "insert",
-            ]
-        }],
-        roles: []
+        privileges: [
+            {
+                resource: {db: "", system_buckets: ""},
+                actions: ["createIndex", "dropCollection", "find", "insert"],
+            },
+        ],
+        roles: [],
     });
 
     // Create test users.
-    adminDB.createUser(
-        {user: 'userAdmin', pwd: 'password', roles: ['userAdminAnyDatabase', 'renameBucketsOnly']});
+    adminDB.createUser({user: "userAdmin", pwd: "password", roles: ["userAdminAnyDatabase", "renameBucketsOnly"]});
 
     // Create read and write users.
     adminDB.createUser({
-        user: 'readWriteAdmin',
-        pwd: 'password',
-        roles: ['readWriteAnyDatabase', 'renameBucketsOnly']
+        user: "readWriteAdmin",
+        pwd: "password",
+        roles: ["readWriteAnyDatabase", "renameBucketsOnly"],
     });
 
     // Create strong users.
-    adminDB.createUser({user: 'restore', pwd: 'password', roles: ['restore', 'renameBucketsOnly']});
-    adminDB.createUser({user: 'root', pwd: 'password', roles: ['root', 'renameBucketsOnly']});
-    adminDB.createUser(
-        {user: 'rootier', pwd: 'password', roles: ['__system', 'renameBucketsOnly']});
-    adminDB.createUser(
-        {user: 'reader', pwd: 'password', roles: ['readAnyDatabase', 'renameBucketsOnly']});
+    adminDB.createUser({user: "restore", pwd: "password", roles: ["restore", "renameBucketsOnly"]});
+    adminDB.createUser({user: "root", pwd: "password", roles: ["root", "renameBucketsOnly"]});
+    adminDB.createUser({user: "rootier", pwd: "password", roles: ["__system", "renameBucketsOnly"]});
+    adminDB.createUser({user: "reader", pwd: "password", roles: ["readAnyDatabase", "renameBucketsOnly"]});
 
     adminDB.logout();
 
     // Expect renaming system.buckets collection to succeed.
-    renameBucketsCollection(adminDB, 'restore', true);
-    renameBucketsCollection(adminDB, 'root', true);
-    renameBucketsCollection(adminDB, 'rootier', true);
+    renameBucketsCollection(adminDB, "restore", true);
+    renameBucketsCollection(adminDB, "root", true);
+    renameBucketsCollection(adminDB, "rootier", true);
 
     // Second test case should fail for user with inadequate role.
-    renameBucketsCollection(adminDB, 'reader', false);
-    renameBucketsCollection(adminDB, 'readWriteAdmin', false);
-    renameBucketsCollection(adminDB, 'userAdmin', false);
+    renameBucketsCollection(adminDB, "reader", false);
+    renameBucketsCollection(adminDB, "readWriteAdmin", false);
+    renameBucketsCollection(adminDB, "userAdmin", false);
 }
 
 jsTestLog("ReplicaSet: Testing rename timeseries collection");
 {
-    const rst = new ReplSetTest({nodes: 1, auth: "", keyFile: 'jstests/libs/key1'});
+    const rst = new ReplSetTest({nodes: 1, auth: "", keyFile: "jstests/libs/key1"});
     rst.startSet();
 
     rst.initiate();
@@ -120,7 +113,7 @@ jsTestLog("Sharding: Testing rename timeseries collection");
         mongos: 1,
         config: 1,
         keyFile: "jstests/libs/key1",
-        other: {rsOptions: {auth: ""}}
+        other: {rsOptions: {auth: ""}},
     });
 
     runTest(st.s);

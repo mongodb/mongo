@@ -9,7 +9,7 @@
  * ]
  */
 
-let dbName = 'create_collection_not_blocked_by_txn';
+let dbName = "create_collection_not_blocked_by_txn";
 let mydb = db.getSiblingDB(dbName);
 
 mydb.a.drop({writeConcern: {w: "majority"}});

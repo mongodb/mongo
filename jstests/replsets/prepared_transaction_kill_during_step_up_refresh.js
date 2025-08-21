@@ -32,7 +32,7 @@ jsTestLog("LSID for our session is " + tojson(lsid));
 
 jsTestLog("Inserting a doc in a transaction.");
 const doc = {
-    _id: "txnDoc"
+    _id: "txnDoc",
 };
 assert.commandWorked(session.getDatabase(dbName).getCollection(collName).insert(doc));
 

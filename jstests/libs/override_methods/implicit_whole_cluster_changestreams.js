@@ -17,16 +17,16 @@ import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 globalThis.ChangeStreamPassthroughHelpers.isUpconvertableChangeStreamRequest =
     globalThis.ChangeStreamPassthroughHelpers.isValidChangeStreamRequest;
 
-globalThis.ChangeStreamPassthroughHelpers.nsMatchFilter = function(db, collName) {
+globalThis.ChangeStreamPassthroughHelpers.nsMatchFilter = function (db, collName) {
     // The $match filter we inject into the pipeline will depend on whether this is a
     // single-collection or whole-db stream.
-    const isSingleCollectionStream = (typeof collName === 'string');
+    const isSingleCollectionStream = typeof collName === "string";
 
     const orBranches = [
-        {"ns.db": db.getName(), "ns.coll": (isSingleCollectionStream ? collName : {$exists: true})},
+        {"ns.db": db.getName(), "ns.coll": isSingleCollectionStream ? collName : {$exists: true}},
         // Add a clause to detect if the collection being watched is the target of a
         // renameCollection command, since that is expected to return a "rename" entry.
-        {"to.db": db.getName(), "to.coll": (isSingleCollectionStream ? collName : {$exists: true})},
+        {"to.db": db.getName(), "to.coll": isSingleCollectionStream ? collName : {$exists: true}},
         {operationType: "endOfTransaction"},
         {operationType: "invalidate"},
     ];
@@ -41,15 +41,15 @@ globalThis.ChangeStreamPassthroughHelpers.nsMatchFilter = function(db, collName)
     return {$match: {$or: orBranches}};
 };
 
-globalThis.ChangeStreamPassthroughHelpers.execDBName = function() {
+globalThis.ChangeStreamPassthroughHelpers.execDBName = function () {
     return "admin";
 };
 
-globalThis.ChangeStreamPassthroughHelpers.changeStreamSpec = function() {
+globalThis.ChangeStreamPassthroughHelpers.changeStreamSpec = function () {
     return {allChangesForCluster: true};
 };
 
-globalThis.ChangeStreamPassthroughHelpers.passthroughType = function() {
+globalThis.ChangeStreamPassthroughHelpers.passthroughType = function () {
     return ChangeStreamWatchMode.kCluster;
 };
 
@@ -60,7 +60,7 @@ globalThis.ChangeStreamPassthroughHelpers.passthroughType = function() {
 // we need to override the helper to ensure that the Mongo.watch function itself is exercised by the
 // passthrough wherever Collection.watch or DB.watch is called.
 const originalDbWatchImpl = DB.prototype.watch;
-DB.prototype.watch = function(pipeline, options) {
+DB.prototype.watch = function (pipeline, options) {
     // If the database being watched is 'admin', don't attempt to upconvert.
     if (this.getName() === "admin") {
         return originalDbWatchImpl.apply(this, [pipeline, options]);

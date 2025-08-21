@@ -15,15 +15,17 @@ var st = new ShardingTest({
     shards: 1,
     config: 1,
     configShard: true,
-    keyFile: 'jstests/libs/key1',
-    useHostname: false  // This is required to use the localhost auth exception
+    keyFile: "jstests/libs/key1",
+    useHostname: false, // This is required to use the localhost auth exception
 });
-var adminDB = st.s0.getDB('admin');
+var adminDB = st.s0.getDB("admin");
 assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
-adminDB = st.shard0.getDB('admin');
-assert.commandFailedWithCode(adminDB.runCommand({createUser: "joe", pwd: "joe", roles: ["root"]}),
-                             ErrorCodes.Unauthorized);
-assert(adminDB.auth('admin', 'admin'));
+adminDB = st.shard0.getDB("admin");
+assert.commandFailedWithCode(
+    adminDB.runCommand({createUser: "joe", pwd: "joe", roles: ["root"]}),
+    ErrorCodes.Unauthorized,
+);
+assert(adminDB.auth("admin", "admin"));
 st.stop();
 
 // Test that we can't create another cluster wide user if we already created a shard specific user
@@ -33,18 +35,20 @@ var st = new ShardingTest({
     shards: 1,
     config: 1,
     configShard: true,
-    keyFile: 'jstests/libs/key1',
-    useHostname: false  // This is required to use the localhost auth exception
+    keyFile: "jstests/libs/key1",
+    useHostname: false, // This is required to use the localhost auth exception
 });
-var adminDB = st.shard0.getDB('admin');
+var adminDB = st.shard0.getDB("admin");
 assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
-assert(adminDB.auth('admin', 'admin'));
-adminDB = st.s0.getDB('admin');
-assert.commandFailedWithCode(adminDB.runCommand({createUser: "joe", pwd: "joe", roles: ["root"]}),
-                             ErrorCodes.Unauthorized);
+assert(adminDB.auth("admin", "admin"));
+adminDB = st.s0.getDB("admin");
+assert.commandFailedWithCode(
+    adminDB.runCommand({createUser: "joe", pwd: "joe", roles: ["root"]}),
+    ErrorCodes.Unauthorized,
+);
 
 // Test that the shard specific user created on the config shard is also a cluster wide user by
 // using it to auth into the mongos
-assert(adminDB.auth('admin', 'admin'));
+assert(adminDB.auth("admin", "admin"));
 
 st.stop();

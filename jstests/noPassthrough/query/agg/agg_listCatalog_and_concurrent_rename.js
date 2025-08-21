@@ -26,13 +26,15 @@ function concurrentAggregation(uuid, collName) {
         collectionUUID: uuid,
         readConcern: {level: "majority"},
         cursor: {},
-        pipeline: [{"$listCatalog": {}}]
+        pipeline: [{"$listCatalog": {}}],
     });
 
     // Considering the concurrent rename we expect this aggregation to fail.
-    assert.commandFailedWithCode(res,
-                                 [ErrorCodes.CollectionUUIDMismatch],
-                                 `Expected failure, encountered: ${JSON.stringify(res)}`);
+    assert.commandFailedWithCode(
+        res,
+        [ErrorCodes.CollectionUUIDMismatch],
+        `Expected failure, encountered: ${JSON.stringify(res)}`,
+    );
 }
 const uuid = testDB.getCollectionInfos({name: coll.getName()})[0].info.uuid;
 
@@ -40,8 +42,7 @@ const uuid = testDB.getCollectionInfos({name: coll.getName()})[0].info.uuid;
 // executor. Execution of the aggregation should now either succed with data, or fail.
 const fp = configureFailPoint(primary, "hangAfterCreatingAggregationPlan", {uuid: uuid});
 
-const aggregateShell =
-    startParallelShell(funWithArgs(concurrentAggregation, uuid, coll.getName()), primary.port);
+const aggregateShell = startParallelShell(funWithArgs(concurrentAggregation, uuid, coll.getName()), primary.port);
 
 fp.wait();
 

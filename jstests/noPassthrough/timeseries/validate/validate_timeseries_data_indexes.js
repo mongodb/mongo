@@ -18,17 +18,17 @@ const weatherData = [
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T12:00:00.000Z"),
-        "temp": 12
+        "temp": 12,
     },
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T16:00:00.000Z"),
-        "temp": 16
+        "temp": 16,
     },
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T20:00:00.000Z"),
-        "humidity": 15
+        "humidity": 15,
     },
 ];
 
@@ -38,9 +38,11 @@ function setUpCollection(data) {
     testCount += 1;
     collName = collPrefix + testCount;
     db.getCollection(collName).drop();
-    assert.commandWorked(db.createCollection(
-        collName,
-        {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
+    assert.commandWorked(
+        db.createCollection(collName, {
+            timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
+        }),
+    );
     const collection = db.getCollection(collName);
     assert.commandWorked(collection.insertMany(data));
     const result = assert.commandWorked(collection.validate());
@@ -53,17 +55,20 @@ function setUpCollection(data) {
     // updates to bucket measurements in order to test validation.
     const bucketDoc = getTimeseriesCollForRawOps(db, collection).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
-    getTimeseriesCollForRawOps(db, collection)
-        .replaceOne({_id: bucketDoc._id}, bucketDoc, getRawOperationSpec(db));
+    getTimeseriesCollForRawOps(db, collection).replaceOne({_id: bucketDoc._id}, bucketDoc, getRawOperationSpec(db));
 }
 
 // Non-numerical index.
 setUpCollection(weatherData);
-jsTestLog("Running validate on bucket with non-numerical data field indexes on collection " +
-          collName);
+jsTestLog("Running validate on bucket with non-numerical data field indexes on collection " + collName);
 let coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$rename": {"data.temp.0": "data.temp.a"}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$rename": {"data.temp.0": "data.temp.a"}},
+        getRawOperationSpec(db),
+    ),
+);
 let res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -71,18 +76,30 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Non-increasing index.
 setUpCollection(weatherData);
-jsTestLog("Running validate on bucket with non-increasing data field indexes on collection " +
-          collName);
+jsTestLog("Running validate on bucket with non-increasing data field indexes on collection " + collName);
 coll = db.getCollection(collName);
 // This keeps indexes from being reordered by Javascript.
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {},
-    {"$rename": {"data.temp.0": "data.temp.a", "data.temp.1": "data.temp.b"}},
-    getRawOperationSpec(db)));
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$rename": {"data.temp.a": "data.temp.1"}}, getRawOperationSpec(db)));
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$rename": {"data.temp.b": "data.temp.0"}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$rename": {"data.temp.0": "data.temp.a", "data.temp.1": "data.temp.b"}},
+        getRawOperationSpec(db),
+    ),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$rename": {"data.temp.a": "data.temp.1"}},
+        getRawOperationSpec(db),
+    ),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$rename": {"data.temp.b": "data.temp.0"}},
+        getRawOperationSpec(db),
+    ),
+);
 printjson(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
@@ -91,11 +108,15 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Out-of-range index.
 setUpCollection(weatherData);
-jsTestLog("Running validate on bucket with out-of-range data field indexes on collection " +
-          collName);
+jsTestLog("Running validate on bucket with out-of-range data field indexes on collection " + collName);
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$rename": {"data.temp.1": "data.temp.10"}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$rename": {"data.temp.1": "data.temp.10"}},
+        getRawOperationSpec(db),
+    ),
+);
 printjson(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
@@ -106,8 +127,13 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 setUpCollection(weatherData);
 jsTestLog("Running validate on bucket with negative data field indexes on collection " + collName);
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$rename": {"data.temp.0": "data.temp.-1"}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$rename": {"data.temp.0": "data.temp.-1"}},
+        getRawOperationSpec(db),
+    ),
+);
 printjson(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
@@ -118,8 +144,9 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 setUpCollection(weatherData);
 jsTestLog("Running validate on bucket with missing time field indexes on collection " + collName);
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$unset": {"data.timestamp.1": ""}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$unset": {"data.timestamp.1": ""}}, getRawOperationSpec(db)),
+);
 printjson(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));

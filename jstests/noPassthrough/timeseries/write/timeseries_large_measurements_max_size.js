@@ -18,24 +18,19 @@ assert.commandWorked(db.dropDatabase());
 const coll = db.getCollection(jsTestName());
 
 const timeFieldName = "time";
-const resetCollection = (() => {
+const resetCollection = () => {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName}}));
-});
+    assert.commandWorked(db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName}}));
+};
 
 const numMeasurements = 4;
-const checkBucketSize = (() => {
+const checkBucketSize = () => {
     const timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
 
     // Buckets with large measurements are kept open after exceeding timeseriesBucketMaxSize
     // until they have 10 measurements. However, if the bucket size were to exceed 12MB, it gets
     // closed regardless.
-    const bucketDocs = getTimeseriesCollForRawOps(db, coll)
-                           .find()
-                           .rawData()
-                           .sort({'control.min._id': 1})
-                           .toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(db, coll).find().rawData().sort({"control.min._id": 1}).toArray();
     assert.eq(2, bucketDocs.length, bucketDocs);
 
     // First bucket should be full with three documents.
@@ -48,7 +43,7 @@ const checkBucketSize = (() => {
 
     assert.eq(1, timeseriesStats.numBucketsClosedDueToSize);
     assert.eq(1, timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
-});
+};
 
 const measurementValueLength = 2 * 1024 * 1024;
 
@@ -57,7 +52,7 @@ resetCollection();
 
 for (let i = 0; i < numMeasurements; i++) {
     // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
-    const value = (i % 2 == 0 ? "a" : "b");
+    const value = i % 2 == 0 ? "a" : "b";
     // Increment the timestamp to test ordering of documents. If the same timestamp
     // were given to all measurements, there would be no guarantee on ordering.
     let timestamp = new Date(ISODate("2024-01-01T01:00:00Z").getTime() + i * 1000);
@@ -72,7 +67,7 @@ resetCollection();
 let batch = [];
 for (let i = 0; i < numMeasurements; i++) {
     // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
-    const value = (i % 2 == 0 ? "a" : "b");
+    const value = i % 2 == 0 ? "a" : "b";
     // Increment the timestamp to test ordering of documents. If the same timestamp
     // were given to all measurements, there would be no guarantee on ordering.
     let timestamp = new Date(ISODate("2024-01-01T01:00:00Z").getTime() + i * 1000);

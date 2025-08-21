@@ -39,127 +39,128 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 // the one passed in.
 const testCases = {
     createCollectionInExistingDB: {
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.other.insert({_id: 1}));
         },
-        performOp: function(db) {
+        performOp: function (db) {
             assert.commandWorked(db.coll.insert({_id: 1}));
         },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['other'],
+        blockedCollections: ["coll"],
+        unblockedCollections: ["other"],
     },
     createCollectionInNewDB: {
-        prepare: function(db) {},
-        performOp: function(db) {
+        prepare: function (db) {},
+        performOp: function (db) {
             assert.commandWorked(db.coll.insert({_id: 1}));
         },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['otherDoesNotExist'],  // Only existent collections are blocked.
+        blockedCollections: ["coll"],
+        unblockedCollections: ["otherDoesNotExist"], // Only existent collections are blocked.
     },
     dropCollection: {
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.other.insert({_id: 1}));
             assert.commandWorked(db.coll.insert({_id: 1}));
         },
-        performOp: function(db) {
+        performOp: function (db) {
             assert(db.coll.drop());
         },
         blockedCollections: [],
-        unblockedCollections: ['coll', 'other'],
+        unblockedCollections: ["coll", "other"],
     },
     dropDB: {
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.coll.insert({_id: 1}));
             // Drop collection explicitly during the preparation phase while we are still able
             // to write to a majority. Otherwise, dropDatabase() will drop the collection
             // and wait for the collection drop to be replicated to a majority of the nodes.
             assert(db.coll.drop());
         },
-        performOp: function(db) {
+        performOp: function (db) {
             assert.commandWorked(db.dropDatabase({w: 1}));
         },
         blockedCollections: [],
-        unblockedCollections: ['coll'],
+        unblockedCollections: ["coll"],
     },
     dropAndRecreateCollection: {
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.other.insert({_id: 1}));
             assert.commandWorked(db.coll.insert({_id: 1}));
         },
-        performOp: function(db) {
+        performOp: function (db) {
             assert(db.coll.drop());
             assert.commandWorked(db.coll.insert({_id: 1}));
         },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['other'],
+        blockedCollections: ["coll"],
+        unblockedCollections: ["other"],
     },
     dropAndRecreateDB: {
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.coll.insert({_id: 1}));
             // Drop collection explicitly during the preparation phase while we are still able
             // to write to a majority. Otherwise, dropDatabase() will drop the collection
             // and wait for the collection drop to be replicated to a majority of the nodes.
             assert(db.coll.drop());
         },
-        performOp: function(db) {
+        performOp: function (db) {
             assert.commandWorked(db.dropDatabase({w: 1}));
             assert.commandWorked(db.coll.insert({_id: 1}));
         },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['otherDoesNotExist'],
+        blockedCollections: ["coll"],
+        unblockedCollections: ["otherDoesNotExist"],
     },
     renameCollectionToNewName: {
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.other.insert({_id: 1}));
             assert.commandWorked(db.from.insert({_id: 1}));
         },
-        performOp: function(db) {
-            assert.commandWorked(db.from.renameCollection('coll'));
+        performOp: function (db) {
+            assert.commandWorked(db.from.renameCollection("coll"));
         },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['other', 'from' /*doesNotExist*/],
+        blockedCollections: ["coll"],
+        unblockedCollections: ["other", "from" /*doesNotExist*/],
     },
     renameCollectionToExistingName: {
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.other.insert({_id: 1}));
-            assert.commandWorked(db.from.insert({_id: 'from'}));
-            assert.commandWorked(db.coll.insert({_id: 'coll'}));
+            assert.commandWorked(db.from.insert({_id: "from"}));
+            assert.commandWorked(db.coll.insert({_id: "coll"}));
         },
-        performOp: function(db) {
-            assert.commandWorked(db.from.renameCollection('coll', true));
+        performOp: function (db) {
+            assert.commandWorked(db.from.renameCollection("coll", true));
         },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['other', 'from' /*doesNotExist*/],
+        blockedCollections: ["coll"],
+        unblockedCollections: ["other", "from" /*doesNotExist*/],
     },
     createIndex: {
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.other.insert({_id: 1}));
             assert.commandWorked(db.coll.insert({_id: 1}));
         },
-        performOp: function(db) {
+        performOp: function (db) {
             // This test create indexes with majority of nodes not available for replication.
             // So, disabling index build commit quorum.
             assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
         },
         blockedCollections: [],
-        unblockedCollections: ['coll', 'other'],
+        unblockedCollections: ["coll", "other"],
     },
     collMod: {
-        prepare: function(db) {
+        prepare: function (db) {
             // This test create indexes with majority of nodes not available for replication.
             // So, disabling index build commit quorum.
             assert.commandWorked(db.coll.createIndex({x: 1}, {expireAfterSeconds: 60 * 60}, 0));
             assert.commandWorked(db.coll.insert({_id: 1, x: 1}));
         },
-        performOp: function(db) {
-            assert.commandWorked(db.coll.runCommand(
-                'collMod', {index: {keyPattern: {x: 1}, expireAfterSeconds: 60 * 61}}));
+        performOp: function (db) {
+            assert.commandWorked(
+                db.coll.runCommand("collMod", {index: {keyPattern: {x: 1}, expireAfterSeconds: 60 * 61}}),
+            );
         },
         blockedCollections: [],
-        unblockedCollections: ['coll'],
+        unblockedCollections: ["coll"],
     },
     dropIndex: {
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.other.insert({_id: 1}));
             assert.commandWorked(db.coll.insert({_id: 1}));
 
@@ -167,17 +168,17 @@ const testCases = {
             // So, disabling index build commit quorum.
             assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
         },
-        performOp: function(db) {
+        performOp: function (db) {
             assert.commandWorked(db.coll.dropIndex({x: 1}));
         },
         blockedCollections: [],
-        unblockedCollections: ['coll', 'other'],
+        unblockedCollections: ["coll", "other"],
     },
 
     // Remaining case is a local-only operation.
     compact: {
         // At least on WiredTiger, compact is fully inplace so it doesn't need to block readers.
-        prepare: function(db) {
+        prepare: function (db) {
             assert.commandWorked(db.other.insert({_id: 1}));
             assert.commandWorked(db.coll.insert({_id: 1}));
 
@@ -185,8 +186,8 @@ const testCases = {
             // So, disabling index build commit quorum.
             assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
         },
-        performOp: function(db) {
-            var res = db.coll.runCommand('compact', {force: true});
+        performOp: function (db) {
+            var res = db.coll.runCommand("compact", {force: true});
             if (res.code != ErrorCodes.CommandNotSupported) {
                 // It is fine for a storage engine to support snapshots but not compact. Since
                 // compact doesn't block any collections we are fine with doing a no-op here.
@@ -195,7 +196,7 @@ const testCases = {
             }
         },
         blockedCollections: [],
-        unblockedCollections: ['coll', 'other'],
+        unblockedCollections: ["coll", "other"],
         localOnly: true,
     },
 };
@@ -205,7 +206,7 @@ const testCases = {
 function assertReadsBlock(db, coll) {
     // With point-in-time catalog lookups, reads no longer block waiting for the majority commit
     // point to advance.
-    assert.commandWorked(coll.runCommand('find', {"readConcern": {"level": "majority"}}));
+    assert.commandWorked(coll.runCommand("find", {"readConcern": {"level": "majority"}}));
 }
 
 function assertReadsSucceed(coll, timeoutMs = 20000) {
@@ -218,8 +219,7 @@ function assertReadsSucceed(coll, timeoutMs = 20000) {
     // As a result, retry until the command succeeds while catching the QueryPlanKilled error.
     let res;
     assert.soon(() => {
-        res =
-            coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": timeoutMs});
+        res = coll.runCommand("find", {"readConcern": {"level": "majority"}, "maxTimeMS": timeoutMs});
         if (res.ok) {
             return true;
         }
@@ -246,8 +246,8 @@ var config = {
     "members": [
         {"_id": 0, "host": nodes[0]},
         {"_id": 1, "host": nodes[1], priority: 0},
-        {"_id": 2, "host": nodes[2], arbiterOnly: true}
-    ]
+        {"_id": 2, "host": nodes[2], arbiterOnly: true},
+    ],
 };
 
 replTest.initiate(config);
@@ -257,21 +257,23 @@ var primary = replTest.getPrimary();
 var secondary = replTest.getSecondary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 replTest.awaitReplication();
 // This is the DB that all of the tests will use.
-var mainDB = primary.getDB('mainDB');
+var mainDB = primary.getDB("mainDB");
 
 // This DB won't be used by any tests so it should always be unblocked.
-var otherDB = primary.getDB('otherDB');
+var otherDB = primary.getDB("otherDB");
 var otherDBCollection = otherDB.collection;
-assert.commandWorked(otherDBCollection.insert(
-    {}, {writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    otherDBCollection.insert({}, {writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 assertReadsSucceed(otherDBCollection);
 
 for (var testName in testCases) {
-    jsTestLog('Running test ' + testName);
+    jsTestLog("Running test " + testName);
     var test = testCases[testName];
 
     const setUpInitialState = function setUpInitialState() {
@@ -314,20 +316,21 @@ for (var testName in testCases) {
     // operation they are waiting on becomes committed while the read is still blocked.
     // We don't do this when testing auth because Thread's don't propagate auth
     // credentials.
-    var threads = jsTest.options().auth ? [] : test.blockedCollections.map((name) => {
-        // This function must get all inputs as arguments and can't use closure because it
-        // is used in a Thread.
-        function bgThread(host, collection, assertReadsSucceed) {
-            // Use a longer timeout since we expect to block for a little while (at least 2
-            // seconds).
-            assertReadsSucceed(new Mongo(host).getCollection(collection), 30 * 1000);
-        }
-        var thread =
-            new Thread(bgThread, primary.host, mainDB[name].getFullName(), assertReadsSucceed);
-        thread.start();
-        return thread;
-    });
-    sleep(1000);  // Give the reads a chance to block.
+    var threads = jsTest.options().auth
+        ? []
+        : test.blockedCollections.map((name) => {
+              // This function must get all inputs as arguments and can't use closure because it
+              // is used in a Thread.
+              function bgThread(host, collection, assertReadsSucceed) {
+                  // Use a longer timeout since we expect to block for a little while (at least 2
+                  // seconds).
+                  assertReadsSucceed(new Mongo(host).getCollection(collection), 30 * 1000);
+              }
+              var thread = new Thread(bgThread, primary.host, mainDB[name].getFullName(), assertReadsSucceed);
+              thread.start();
+              return thread;
+          });
+    sleep(1000); // Give the reads a chance to block.
 
     try {
         // Try the committed read again after sleeping to ensure that it still blocks even if it
@@ -343,12 +346,12 @@ for (var testName in testCases) {
         // Wait for the threads to complete and report any errors encountered from running them.
         threads.forEach((thread) => {
             thread.join();
-            thread.join = () => {};  // Make join a no-op for the finally below.
+            thread.join = () => {}; // Make join a no-op for the finally below.
             assert(!thread.hasFailed(), "One of the threads failed. See above for details.");
         });
     } finally {
         // Make sure we wait for all threads to finish.
-        threads.forEach(thread => thread.join());
+        threads.forEach((thread) => thread.join());
     }
 }
 

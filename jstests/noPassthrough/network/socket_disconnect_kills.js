@@ -29,11 +29,9 @@ function genAppName() {
 }
 
 function getCurOpCount(client, appName) {
-    return client.getDB("admin")
-        .aggregate([
-            {$currentOp: {localOps: true}},
-            {$match: {appName: {$eq: appName}}},
-        ])
+    return client
+        .getDB("admin")
+        .aggregate([{$currentOp: {localOps: true}}, {$match: {appName: {$eq: appName}}}])
         .itcount();
 }
 
@@ -59,27 +57,35 @@ function check(client, pre, post, {appName, expectCleanUp, expectedNumKilled}) {
     assert.commandWorked(conn.adminCommand({ping: 1}));
 
     // Measure 'killedDueToClientDisconnect' before and after.
-    const getNumKilled = () => client.getDB("admin")
-                                   .runCommand({serverStatus: 1})
-                                   .metrics.operation.killedDueToClientDisconnect;
+    const getNumKilled = () =>
+        client.getDB("admin").runCommand({serverStatus: 1}).metrics.operation.killedDueToClientDisconnect;
     const numKilledBefore = getNumKilled();
 
     try {
         // Make sure that whatever operation we ran had a network error
-        assert.throws(function() {
-            try {
-                pre(conn);
-            } catch (e) {
-                if (isNetworkError(e)) {
-                    throw e;
+        assert.throws(
+            function () {
+                try {
+                    pre(conn);
+                } catch (e) {
+                    if (isNetworkError(e)) {
+                        throw e;
+                    }
                 }
-            }
-        }, [], "error doing query: failed: network error while attempting");
+            },
+            [],
+            "error doing query: failed: network error while attempting",
+        );
 
         if (expectCleanUp) {
-            assert.soon(() => {
-                return (getCurOpCount(client, appName) == 0);
-            }, msg, timeout, interval);
+            assert.soon(
+                () => {
+                    return getCurOpCount(client, appName) == 0;
+                },
+                msg,
+                timeout,
+                interval,
+            );
         } else {
             sleep(timeout);
             assert.gt(getCurOpCount(client, appName), 0);
@@ -93,9 +99,10 @@ function check(client, pre, post, {appName, expectCleanUp, expectedNumKilled}) {
     assert.eq(
         actualNumKilled,
         expectedNumKilled,
-        `Expected to see ${
-            expectedNumKilled} operation(s) recorded as killedDueToClientDisconnect, but got ${
-            actualNumKilled}`);
+        `Expected to see ${expectedNumKilled} operation(s) recorded as killedDueToClientDisconnect, but got ${
+            actualNumKilled
+        }`,
+    );
 }
 
 function runCommandWithFailPointEnabled({
@@ -105,32 +112,34 @@ function runCommandWithFailPointEnabled({
     appName,
     command,
     expectClosedEarly,
-    expectedNumKilled
+    expectedNumKilled,
 }) {
-    check(client,
-          function(client) {
-              configureFailPoint(client, failPointName, failPointData);
-              if (typeof command === 'function') {
-                  command();
-              } else {
-                  assert.commandWorked(client.getDB(kTestName).runCommand(command));
-              }
-          },
-          function() {
-              configureFailPoint(client, failPointName, {}, "off");
-          },
-          {
-              appName,
-              expectCleanUp: expectClosedEarly,
-              expectedNumKilled,
-          });
+    check(
+        client,
+        function (client) {
+            configureFailPoint(client, failPointName, failPointData);
+            if (typeof command === "function") {
+                command();
+            } else {
+                assert.commandWorked(client.getDB(kTestName).runCommand(command));
+            }
+        },
+        function () {
+            configureFailPoint(client, failPointName, {}, "off");
+        },
+        {
+            appName,
+            expectCleanUp: expectClosedEarly,
+            expectedNumKilled,
+        },
+    );
 }
 
 // Test that an operation that completes but whose client disconnects before the
 // response is sent is recorded properly.
 function testUnsendableCompletedResponsesCounted(client) {
-    let beforeUnsendableResponsesCount =
-        client.adminCommand({serverStatus: 1}).metrics.operation.unsendableCompletedResponses;
+    let beforeUnsendableResponsesCount = client.adminCommand({serverStatus: 1}).metrics.operation
+        .unsendableCompletedResponses;
     id++;
     const host = client.host;
     let conn = new Mongo(`mongodb://${host}/?appName=${kTestName}${id}`);
@@ -138,8 +147,7 @@ function testUnsendableCompletedResponsesCounted(client) {
     assert.commandWorked(conn.adminCommand({ping: 1}));
 
     // Ensure that after the next command completes, the server fails to send the response.
-    let fp = configureFailPoint(
-        client, "sessionWorkflowDelayOrFailSendMessage", {appName: kTestName + id});
+    let fp = configureFailPoint(client, "sessionWorkflowDelayOrFailSendMessage", {appName: kTestName + id});
 
     // Should fail because the server will close the connection after receiving a simulated network
     // error sinking the response to the client.
@@ -147,8 +155,8 @@ function testUnsendableCompletedResponsesCounted(client) {
     assert(isNetworkError(error), error);
 
     // Ensure we counted the unsendable completed response.
-    let afterUnsendableResponsesCount =
-        client.adminCommand({serverStatus: 1}).metrics.operation.unsendableCompletedResponses;
+    let afterUnsendableResponsesCount = client.adminCommand({serverStatus: 1}).metrics.operation
+        .unsendableCompletedResponses;
 
     assert.eq(beforeUnsendableResponsesCount + 1, afterUnsendableResponsesCount);
 }
@@ -157,8 +165,9 @@ function runTests(client) {
     let admin = client.getDB("admin");
 
     // set timeout for js function execution to 100 ms to speed up tests that run inf loop.
-    assert.commandWorked(client.getDB(kTestName).adminCommand(
-        {setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}));
+    assert.commandWorked(
+        client.getDB(kTestName).adminCommand({setParameter: 1, internalQueryJavaScriptFnTimeoutMillis: 100}),
+    );
     assert.commandWorked(client.getDB(kTestName).test.insert({x: 1}));
     assert.commandWorked(client.getDB(kTestName).test.insert({x: 2}));
     assert.commandWorked(client.getDB(kTestName).test.insert({x: 3}));
@@ -182,10 +191,10 @@ function runTests(client) {
         command: {
             find: "test",
             filter: {
-                $where: function() {
+                $where: function () {
                     sleep(100000);
-                }
-            }
+                },
+            },
         },
     });
     runCommandWithFailPointEnabled({
@@ -198,12 +207,11 @@ function runTests(client) {
         command: {
             find: "test",
             filter: {
-                $where: function() {
-                    while (true) {
-                    }
-                }
-            }
-        }
+                $where: function () {
+                    while (true) {}
+                },
+            },
+        },
     });
 
     // After SERVER-39475, re-enable these tests and add negative testing for $out cursors.
@@ -218,10 +226,8 @@ function runTests(client) {
             expectedNumKilled: 1,
             command: (client) => {
                 const testDB = client.getDB(kTestName);
-                const result = assert.commandWorked(
-                    testDB.runCommand({find: "test", filter: {}, batchSize: 0}));
-                assert.commandWorked(
-                    testDB.runCommand({getMore: result.cursor.id, collection: "test"}));
+                const result = assert.commandWorked(testDB.runCommand({find: "test", filter: {}, batchSize: 0}));
+                assert.commandWorked(testDB.runCommand({getMore: result.cursor.id, collection: "test"}));
             },
         });
     }

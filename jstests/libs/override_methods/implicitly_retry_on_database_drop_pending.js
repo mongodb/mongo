@@ -87,8 +87,10 @@ function runCommandWithRetries(conn, dbName, commandObj, func, makeFuncArgs) {
                 // for the assertion below to avoid the expense of serializing the server's
                 // response as a JSON string repeatedly. (There may be up to 1000 write errors
                 // in the server's response.)
-                const errorMsg = "A write error was returned for an operation outside the list of" +
-                    " operations executed: " + tojson(res);
+                const errorMsg =
+                    "A write error was returned for an operation outside the list of" +
+                    " operations executed: " +
+                    tojson(res);
 
                 for (let writeError of res.writeErrors) {
                     assert.lt(writeError.index, opsExecuted.length, errorMsg);
@@ -120,17 +122,21 @@ function runCommandWithRetries(conn, dbName, commandObj, func, makeFuncArgs) {
                 return true;
             }
         },
-        "timed out while retrying '" + commandName +
-            "' operation on DatabaseDropPending error response for '" + dbName + "' database",
-        defaultTimeout);
+        "timed out while retrying '" +
+            commandName +
+            "' operation on DatabaseDropPending error response for '" +
+            dbName +
+            "' database",
+        defaultTimeout,
+    );
 
     return res;
 }
 
-Mongo.prototype.runCommand = function(dbName, commandObj, options) {
-    return runCommandWithRetries(this,
-                                 dbName,
-                                 commandObj,
-                                 mongoRunCommandOriginal,
-                                 (commandObj) => [dbName, commandObj, options]);
+Mongo.prototype.runCommand = function (dbName, commandObj, options) {
+    return runCommandWithRetries(this, dbName, commandObj, mongoRunCommandOriginal, (commandObj) => [
+        dbName,
+        commandObj,
+        options,
+    ]);
 };

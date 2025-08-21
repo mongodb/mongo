@@ -12,13 +12,12 @@ import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 function runCommandsWithDifferentIds(primary, secondary, cmds) {
     // Disable oplog application to ensure the oplog entries come in the same batch.
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"});
-    checkLog.contains(secondary,
-                      "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
+    checkLog.contains(secondary, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 
     let responseTimestamps = [];
-    cmds.forEach(function(cmd) {
+    cmds.forEach(function (cmd) {
         let res = assert.commandWorked(primary.getDB("test").runCommand(cmd));
-        let opTime = (res.opTime.ts ? res.opTime.ts : res.opTime);
+        let opTime = res.opTime.ts ? res.opTime.ts : res.opTime;
 
         RetryableWritesUtil.checkTransactionTable(primary, cmd.lsid, cmd.txnNumber, opTime);
         responseTimestamps.push(opTime);
@@ -27,13 +26,12 @@ function runCommandsWithDifferentIds(primary, secondary, cmds) {
     // After replication, assert the secondary's transaction table has been updated.
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"});
     replTest.awaitReplication();
-    cmds.forEach(function(cmd, i) {
-        RetryableWritesUtil.checkTransactionTable(
-            secondary, cmd.lsid, cmd.txnNumber, responseTimestamps[i]);
+    cmds.forEach(function (cmd, i) {
+        RetryableWritesUtil.checkTransactionTable(secondary, cmd.lsid, cmd.txnNumber, responseTimestamps[i]);
     });
 
     // Both nodes should have the same transaction collection record for each sessionId.
-    cmds.forEach(function(cmd) {
+    cmds.forEach(function (cmd) {
         RetryableWritesUtil.assertSameRecordOnBothConnections(primary, secondary, cmd.lsid);
     });
 }
@@ -46,26 +44,24 @@ function runCommandsWithDifferentIds(primary, secondary, cmds) {
 function runCommandsWithSameId(primary, secondary, cmds) {
     // Disable oplog application to ensure the oplog entries come in the same batch.
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"});
-    checkLog.contains(secondary,
-                      "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
+    checkLog.contains(secondary, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 
     let latestOpTimeTs = Timestamp();
     let highestTxnNumber = NumberLong(-1);
-    cmds.forEach(function(cmd) {
+    cmds.forEach(function (cmd) {
         let res = assert.commandWorked(primary.getDB("test").runCommand(cmd));
-        let opTime = (res.opTime.ts ? res.opTime.ts : res.opTime);
+        let opTime = res.opTime.ts ? res.opTime.ts : res.opTime;
 
         RetryableWritesUtil.checkTransactionTable(primary, cmd.lsid, cmd.txnNumber, opTime);
         latestOpTimeTs = opTime;
-        highestTxnNumber = (cmd.txnNumber > highestTxnNumber ? cmd.txnNumber : highestTxnNumber);
+        highestTxnNumber = cmd.txnNumber > highestTxnNumber ? cmd.txnNumber : highestTxnNumber;
     });
 
     // After replication, assert the secondary's transaction table has been updated to store the
     // highest transaction number and the latest write optime.
     secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"});
     replTest.awaitReplication();
-    RetryableWritesUtil.checkTransactionTable(
-        secondary, cmds[0].lsid, highestTxnNumber, latestOpTimeTs);
+    RetryableWritesUtil.checkTransactionTable(secondary, cmds[0].lsid, highestTxnNumber, latestOpTimeTs);
 
     // Both nodes should have the same transaction collection record for the sessionId.
     RetryableWritesUtil.assertSameRecordOnBothConnections(primary, secondary, cmds[0].lsid);
@@ -80,8 +76,9 @@ let secondary = replTest.getSecondary();
 
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 ////////////////////////////////////////////////////////////////////////
 // Test insert command
 
@@ -91,21 +88,21 @@ let insertCmds = [
         documents: [{_id: 10}, {_id: 20}, {_id: 30}, {_id: 40}],
         ordered: true,
         lsid: {id: UUID()},
-        txnNumber: NumberLong(5)
+        txnNumber: NumberLong(5),
     },
     {
         insert: "bar",
         documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}],
         ordered: false,
         lsid: {id: UUID()},
-        txnNumber: NumberLong(10)
-    }
+        txnNumber: NumberLong(10),
+    },
 ];
 runCommandsWithDifferentIds(primary, secondary, insertCmds);
 
 let lsid = {id: UUID()};
-insertCmds = insertCmds.map(function(cmd) {
-    cmd.documents.forEach(function(doc) {
+insertCmds = insertCmds.map(function (cmd) {
+    cmd.documents.forEach(function (doc) {
         doc._id = doc._id + 100;
     });
     cmd.lsid = lsid;
@@ -124,11 +121,11 @@ let updateCommands = [
             {q: {_id: 10}, u: {$set: {x: 10}}, upsert: false},
             {q: {_id: 20}, u: {$set: {x: 20}}, upsert: false},
             {q: {_id: 30}, u: {$set: {x: 30}}, upsert: false},
-            {q: {_id: 40}, u: {$set: {x: 40}}, upsert: false}
+            {q: {_id: 40}, u: {$set: {x: 40}}, upsert: false},
         ],
         ordered: false,
         lsid: {id: UUID()},
-        txnNumber: NumberLong(5)
+        txnNumber: NumberLong(5),
     },
     {
         update: "bar",
@@ -136,20 +133,20 @@ let updateCommands = [
             {q: {_id: 1}, u: {$set: {x: 10}}, upsert: true},
             {q: {_id: 2}, u: {$set: {x: 20}}, upsert: true},
             {q: {_id: 3}, u: {$set: {x: 30}}, upsert: true},
-            {q: {_id: 4}, u: {$set: {x: 40}}, upsert: true}
+            {q: {_id: 4}, u: {$set: {x: 40}}, upsert: true},
         ],
         ordered: true,
         lsid: {id: UUID()},
-        txnNumber: NumberLong(10)
-    }
+        txnNumber: NumberLong(10),
+    },
 ];
 runCommandsWithDifferentIds(primary, secondary, updateCommands);
 
 lsid = {
-    id: UUID()
+    id: UUID(),
 };
-updateCommands = updateCommands.map(function(cmd) {
-    cmd.updates.forEach(function(up) {
+updateCommands = updateCommands.map(function (cmd) {
+    cmd.updates.forEach(function (up) {
         up.q._id = up.q._id + 100;
     });
     cmd.lsid = lsid;
@@ -168,11 +165,11 @@ let deleteCommands = [
             {q: {_id: 10}, limit: 1},
             {q: {_id: 20}, limit: 1},
             {q: {_id: 30}, limit: 1},
-            {q: {_id: 40}, limit: 1}
+            {q: {_id: 40}, limit: 1},
         ],
         ordered: true,
         lsid: {id: UUID()},
-        txnNumber: NumberLong(5)
+        txnNumber: NumberLong(5),
     },
     {
         delete: "bar",
@@ -180,20 +177,20 @@ let deleteCommands = [
             {q: {_id: 1}, limit: 1},
             {q: {_id: 2}, limit: 1},
             {q: {_id: 3}, limit: 1},
-            {q: {_id: 4}, limit: 1}
+            {q: {_id: 4}, limit: 1},
         ],
         ordered: false,
         lsid: {id: UUID()},
-        txnNumber: NumberLong(10)
-    }
+        txnNumber: NumberLong(10),
+    },
 ];
 runCommandsWithDifferentIds(primary, secondary, deleteCommands);
 
 lsid = {
-    id: UUID()
+    id: UUID(),
 };
-deleteCommands = deleteCommands.map(function(cmd) {
-    cmd.deletes.forEach(function(d) {
+deleteCommands = deleteCommands.map(function (cmd) {
+    cmd.deletes.forEach(function (d) {
         d.q._id = d.q._id + 100;
     });
     cmd.lsid = lsid;

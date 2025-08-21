@@ -19,10 +19,11 @@ assert.commandWorked(testDB.dropDatabase());
 
 const tsColl = testDB.getCollection("ts_point_data");
 
-assert.commandWorked(testDB.createCollection(
-    tsColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
-assert.commandWorked(tsColl.createIndex({'tags.loc': '2dsphere'}));
+assert.commandWorked(tsColl.createIndex({"tags.loc": "2dsphere"}));
 
 const nMeasurements = 10;
 
@@ -35,13 +36,15 @@ for (let i = 0; i < nMeasurements; i++) {
     assert.commandWorked(tsColl.insert(docToInsert));
 }
 
-let agg = tsColl.aggregate([{
-    $geoNear: {
-        near: {type: "Point", coordinates: [106.65589, 10.787627]},
-        key: 'tags.loc',
-        distanceField: "tags.distance",
-    }
-}]);
+let agg = tsColl.aggregate([
+    {
+        $geoNear: {
+            near: {type: "Point", coordinates: [106.65589, 10.787627]},
+            key: "tags.loc",
+            distanceField: "tags.distance",
+        },
+    },
+]);
 assert.eq(agg.itcount(), nMeasurements);
 
 /* TODO (SERVER-58443): enable these tests once they work

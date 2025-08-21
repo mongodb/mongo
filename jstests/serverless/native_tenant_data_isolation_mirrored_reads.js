@@ -7,33 +7,33 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {
-        auth: '',
+        auth: "",
         setParameter: {
             multitenancySupport: true,
             logComponentVerbosity: tojson({command: 1}),
             mirrorReads: tojsononeline({samplingRate: 1.0}),
             "failpoint.mirrorMaestroExpectsResponse": tojson({mode: "alwaysOn"}),
-        }
-    }
+        },
+    },
 });
-rst.startSet({keyFile: 'jstests/libs/key1'});
+rst.startSet({keyFile: "jstests/libs/key1"});
 rst.initiate();
 
 const primary = rst.getPrimary();
-const adminDb = primary.getDB('admin');
+const adminDb = primary.getDB("admin");
 const secondary = rst.getSecondary();
 
 // Prepare an authenticated user for testing.
 // Must be authenticated as a user with ActionType::useTenant in order to use security token
-assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-assert(adminDb.auth('admin', 'pwd'));
+assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["root"]}));
+assert(adminDb.auth("admin", "pwd"));
 rst.awaitReplication();
-assert(secondary.getDB('admin').auth('admin', 'pwd'));
+assert(secondary.getDB("admin").auth("admin", "pwd"));
 
 const kTenant = ObjectId();
 const kOtherTenant = ObjectId();
-const kDbName = 'myDb';
-const kCollName = 'myColl';
+const kDbName = "myDb";
+const kCollName = "myColl";
 const testDb = primary.getDB(kDbName);
 
 const securityToken = _createTenantToken({tenant: kTenant});
@@ -74,8 +74,7 @@ function verifyMirroredReadStats(cmd, token) {
         jsTestLog("Current primary stats: " + tojson(currentPrimaryStats));
         let resolved = currentPrimaryStats.resolved;
         let succeeded = currentPrimaryStats.succeeded;
-        return (initialPrimaryStats.resolved + 1 == resolved) &&
-            (initialPrimaryStats.succeeded + 1 == succeeded);
+        return initialPrimaryStats.resolved + 1 == resolved && initialPrimaryStats.succeeded + 1 == succeeded;
     });
     assert.eq(initialPrimaryStats.seen + 1, currentPrimaryStats.seen, currentPrimaryStats);
     assertSecondaryStats(initialSecondaryStats, 1);
@@ -88,19 +87,17 @@ verifyMirroredReadStats({find: kCollName, projection: {_id: 0}}, otherSecurityTo
 verifyMirroredReadStats({count: kCollName, query: {x: 1}}, securityToken);
 verifyMirroredReadStats({count: kCollName, query: {i: 1}}, otherSecurityToken);
 
-verifyMirroredReadStats({distinct: kCollName, key: 'x'}, securityToken);
-verifyMirroredReadStats({distinct: kCollName, key: 'i'}, otherSecurityToken);
+verifyMirroredReadStats({distinct: kCollName, key: "x"}, securityToken);
+verifyMirroredReadStats({distinct: kCollName, key: "i"}, otherSecurityToken);
 
-verifyMirroredReadStats({findAndModify: kCollName, query: {x: 1}, update: {$inc: {x: 10}}},
-                        securityToken);
-verifyMirroredReadStats({findAndModify: kCollName, query: {i: 1}, update: {$inc: {i: 10}}},
-                        otherSecurityToken);
+verifyMirroredReadStats({findAndModify: kCollName, query: {x: 1}, update: {$inc: {x: 10}}}, securityToken);
+verifyMirroredReadStats({findAndModify: kCollName, query: {i: 1}, update: {$inc: {i: 10}}}, otherSecurityToken);
 
+verifyMirroredReadStats({update: kCollName, updates: [{q: {x: 1}, u: {"inc": {x: 1}}}], ordered: false}, securityToken);
 verifyMirroredReadStats(
-    {update: kCollName, updates: [{q: {x: 1}, u: {'inc': {x: 1}}}], ordered: false}, securityToken);
-verifyMirroredReadStats(
-    {update: kCollName, updates: [{q: {i: 1}, u: {'inc': {i: 1}}}], ordered: false},
-    otherSecurityToken);
+    {update: kCollName, updates: [{q: {i: 1}, u: {"inc": {i: 1}}}], ordered: false},
+    otherSecurityToken,
+);
 
 primary._setSecurityToken(undefined);
 rst.stopSet();

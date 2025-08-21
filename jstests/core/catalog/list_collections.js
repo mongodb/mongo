@@ -18,43 +18,43 @@
  * listCollections output.
  */
 
-import {cursorCountMatching, getListCollectionsCursor} from 'jstests/core/catalog/libs/helpers.js';
+import {cursorCountMatching, getListCollectionsCursor} from "jstests/core/catalog/libs/helpers.js";
 
 const mydb = db.getSiblingDB("list_collections1");
 let cursor;
 let res;
 let collObj;
 
-jsTest.log('Test basic command output');
+jsTest.log("Test basic command output");
 {
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
     res = mydb.runCommand("listCollections");
     assert.commandWorked(res);
-    assert.eq('object', typeof (res.cursor));
+    assert.eq("object", typeof res.cursor);
     assert.eq(0, res.cursor.id);
-    assert.eq('string', typeof (res.cursor.ns));
-    collObj = res.cursor.firstBatch.filter(function(c) {
+    assert.eq("string", typeof res.cursor.ns);
+    collObj = res.cursor.firstBatch.filter(function (c) {
         return c.name === "foo";
     })[0];
     assert(collObj);
-    assert.eq('object', typeof (collObj.options));
-    assert.eq('collection', collObj.type, tojson(collObj));
+    assert.eq("object", typeof collObj.options);
+    assert.eq("collection", collObj.type, tojson(collObj));
     assert.eq(false, collObj.info.readOnly, tojson(collObj));
-    assert.eq("object", typeof (collObj.idIndex), tojson(collObj));
+    assert.eq("object", typeof collObj.idIndex, tojson(collObj));
     assert(collObj.idIndex.hasOwnProperty("v"), tojson(collObj));
 }
 
-jsTest.log('Test basic command output for views');
+jsTest.log("Test basic command output for views");
 {
     assert.commandWorked(mydb.createView("bar", "foo", []));
     res = mydb.runCommand("listCollections");
     assert.commandWorked(res);
-    collObj = res.cursor.firstBatch.filter(function(c) {
+    collObj = res.cursor.firstBatch.filter(function (c) {
         return c.name === "bar";
     })[0];
     assert(collObj);
-    assert.eq("object", typeof (collObj.options), tojson(collObj));
+    assert.eq("object", typeof collObj.options, tojson(collObj));
     assert.eq("foo", collObj.options.viewOn, tojson(collObj));
     assert.eq([], collObj.options.pipeline, tojson(collObj));
     assert.eq("view", collObj.type, tojson(collObj));
@@ -62,13 +62,16 @@ jsTest.log('Test basic command output for views');
     assert(!collObj.hasOwnProperty("idIndex"), tojson(collObj));
 }
 
-jsTest.log('Test basic usage with DBCommandCursor');
+jsTest.log("Test basic usage with DBCommandCursor");
 {
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
-    assert.eq(1, cursorCountMatching(getListCollectionsCursor(mydb), function(c) {
-                  return c.name === "foo";
-              }));
+    assert.eq(
+        1,
+        cursorCountMatching(getListCollectionsCursor(mydb), function (c) {
+            return c.name === "foo";
+        }),
+    );
 }
 
 jsTest.log('Test basic usage of "filter" option');
@@ -76,23 +79,32 @@ jsTest.log('Test basic usage of "filter" option');
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
     assert.commandWorked(mydb.createCollection("bar"));
-    assert.eq(2, cursorCountMatching(getListCollectionsCursor(mydb, {filter: {}}), function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        2,
+        cursorCountMatching(getListCollectionsCursor(mydb, {filter: {}}), function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
     assert.eq(2, getListCollectionsCursor(mydb, {filter: {name: {$in: ["foo", "bar"]}}}).itcount());
     assert.eq(1, getListCollectionsCursor(mydb, {filter: {name: /^foo$/}}).itcount());
     assert.eq(1, getListCollectionsCursor(mydb, {filter: {name: /^bar$/}}).itcount());
     mydb.foo.drop();
-    assert.eq(1, cursorCountMatching(getListCollectionsCursor(mydb, {filter: {}}), function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        1,
+        cursorCountMatching(getListCollectionsCursor(mydb, {filter: {}}), function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
     assert.eq(1, getListCollectionsCursor(mydb, {filter: {name: {$in: ["foo", "bar"]}}}).itcount());
     assert.eq(0, getListCollectionsCursor(mydb, {filter: {name: /^foo$/}}).itcount());
     assert.eq(1, getListCollectionsCursor(mydb, {filter: {name: /^bar$/}}).itcount());
     mydb.bar.drop();
-    assert.eq(0, cursorCountMatching(getListCollectionsCursor(mydb, {filter: {}}), function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        0,
+        cursorCountMatching(getListCollectionsCursor(mydb, {filter: {}}), function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
     assert.eq(0, getListCollectionsCursor(mydb, {filter: {name: {$in: ["foo", "bar"]}}}).itcount());
     assert.eq(0, getListCollectionsCursor(mydb, {filter: {name: /^foo$/}}).itcount());
     assert.eq(0, getListCollectionsCursor(mydb, {filter: {name: /^bar$/}}).itcount());
@@ -100,16 +112,16 @@ jsTest.log('Test basic usage of "filter" option');
 
 jsTest.log('Test for invalid values of "filter"');
 {
-    assert.throws(function() {
+    assert.throws(function () {
         getListCollectionsCursor(mydb, {filter: {$invalid: 1}});
     });
-    assert.throws(function() {
+    assert.throws(function () {
         getListCollectionsCursor(mydb, {filter: 0});
     });
-    assert.throws(function() {
-        getListCollectionsCursor(mydb, {filter: 'x'});
+    assert.throws(function () {
+        getListCollectionsCursor(mydb, {filter: "x"});
     });
-    assert.throws(function() {
+    assert.throws(function () {
         getListCollectionsCursor(mydb, {filter: []});
     });
 }
@@ -121,40 +133,57 @@ jsTest.log('Test basic usage of "cursor.batchSize" option');
     assert.commandWorked(mydb.createCollection("bar"));
     cursor = getListCollectionsCursor(mydb, {cursor: {batchSize: 2}});
     assert.eq(2, cursor.objsLeftInBatch());
-    assert.eq(2, cursorCountMatching(cursor, function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        2,
+        cursorCountMatching(cursor, function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
     cursor = getListCollectionsCursor(mydb, {cursor: {batchSize: 1}});
     assert.eq(1, cursor.objsLeftInBatch());
-    assert.eq(2, cursorCountMatching(cursor, function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        2,
+        cursorCountMatching(cursor, function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
     cursor = getListCollectionsCursor(mydb, {cursor: {batchSize: 0}});
     assert.eq(0, cursor.objsLeftInBatch());
-    assert.eq(2, cursorCountMatching(cursor, function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        2,
+        cursorCountMatching(cursor, function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
 
     cursor = getListCollectionsCursor(mydb, {cursor: {batchSize: NumberInt(2)}});
     assert.eq(2, cursor.objsLeftInBatch());
-    assert.eq(2, cursorCountMatching(cursor, function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        2,
+        cursorCountMatching(cursor, function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
     cursor = getListCollectionsCursor(mydb, {cursor: {batchSize: NumberLong(2)}});
     assert.eq(2, cursor.objsLeftInBatch());
-    assert.eq(2, cursorCountMatching(cursor, function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        2,
+        cursorCountMatching(cursor, function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
 
     cursor = getListCollectionsCursor(mydb, {cursor: {batchSize: Math.pow(2, 62)}});
     assert.lte(2, cursor.objsLeftInBatch());
-    assert.eq(2, cursorCountMatching(cursor, function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        2,
+        cursorCountMatching(cursor, function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
 }
 
-jsTest.log(
-    'listCollections accepts an empty object for "cursor" (same as not specifying "cursor" at all)');
+jsTest.log('listCollections accepts an empty object for "cursor" (same as not specifying "cursor" at all)');
 // We do not test for objsLeftInBatch() here, since the default batch size for this command
 // is not specified.
 {
@@ -162,40 +191,43 @@ jsTest.log(
     assert.commandWorked(mydb.createCollection("foo"));
     assert.commandWorked(mydb.createCollection("bar"));
     cursor = getListCollectionsCursor(mydb, {cursor: {}});
-    assert.eq(2, cursorCountMatching(cursor, function(c) {
-                  return c.name === "foo" || c.name === "bar";
-              }));
+    assert.eq(
+        2,
+        cursorCountMatching(cursor, function (c) {
+            return c.name === "foo" || c.name === "bar";
+        }),
+    );
 }
 
 jsTest.log('Test for invalid values of "cursor" and "cursor.batchSize"');
 {
-    assert.throws(function() {
+    assert.throws(function () {
         getListCollectionsCursor(mydb, {cursor: 0});
     });
-    assert.throws(function() {
-        getListCollectionsCursor(mydb, {cursor: 'x'});
+    assert.throws(function () {
+        getListCollectionsCursor(mydb, {cursor: "x"});
     });
-    assert.throws(function() {
+    assert.throws(function () {
         getListCollectionsCursor(mydb, {cursor: []});
     });
-    assert.throws(function() {
+    assert.throws(function () {
         getListCollectionsCursor(mydb, {cursor: {foo: 1}});
     });
-    assert.throws(function() {
+    assert.throws(function () {
         getListCollectionsCursor(mydb, {cursor: {batchSize: -1}});
     });
-    assert.throws(function() {
-        getListCollectionsCursor(mydb, {cursor: {batchSize: 'x'}});
+    assert.throws(function () {
+        getListCollectionsCursor(mydb, {cursor: {batchSize: "x"}});
     });
-    assert.throws(function() {
+    assert.throws(function () {
         getListCollectionsCursor(mydb, {cursor: {batchSize: {}}});
     });
-    assert.throws(function() {
+    assert.throws(function () {
         getListCollectionsCursor(mydb, {cursor: {batchSize: 2, foo: 1}});
     });
 }
 
-jsTest.log('Test more than 2 batches of results');
+jsTest.log("Test more than 2 batches of results");
 {
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
@@ -217,18 +249,16 @@ jsTest.log('Test more than 2 batches of results');
     assert.eq(1, cursor.objsLeftInBatch());
 }
 
-jsTest.log('Test that batches are limited to ~16 MB');
+jsTest.log("Test that batches are limited to ~16 MB");
 {
     assert.commandWorked(mydb.dropDatabase());
     const validator = {
         $jsonSchema: {
             bsonType: "object",
             properties: {
-                stringWith4mbDescription:
-                    {bsonType: "string", description: "x".repeat(3 * 1024 * 1024)},
-
-            }
-        }
+                stringWith4mbDescription: {bsonType: "string", description: "x".repeat(3 * 1024 * 1024)},
+            },
+        },
     };
 
     // Each collection's info is about 3 MB; 4 collections fit in the first batch and 2 in the
@@ -242,8 +272,7 @@ jsTest.log('Test that batches are limited to ~16 MB');
 
     // Filter out resharding temporal collections, which may exist when the balancer is moving
     // collections in background.
-    cursor =
-        getListCollectionsCursor(mydb, {filter: {name: {$not: {$regex: /system\.resharding/}}}});
+    cursor = getListCollectionsCursor(mydb, {filter: {name: {$not: {$regex: /system\.resharding/}}}});
     assert(cursor.hasNext());
     const firstBatchSize = cursor.objsLeftInBatch();
     assert.gt(firstBatchSize, 0);
@@ -260,27 +289,33 @@ jsTest.log('Test that batches are limited to ~16 MB');
 //
 // Test on non-existent database.
 //
-jsTest.log('Test on non-existent database');
+jsTest.log("Test on non-existent database");
 {
     assert.commandWorked(mydb.dropDatabase());
     cursor = getListCollectionsCursor(mydb);
-    assert.eq(0, cursorCountMatching(cursor, function(c) {
-                  return c.name === "foo";
-              }));
+    assert.eq(
+        0,
+        cursorCountMatching(cursor, function (c) {
+            return c.name === "foo";
+        }),
+    );
 }
 
-jsTest.log('Test on empty database');
+jsTest.log("Test on empty database");
 {
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
     mydb.foo.drop();
     cursor = getListCollectionsCursor(mydb);
-    assert.eq(0, cursorCountMatching(cursor, function(c) {
-                  return c.name === "foo";
-              }));
+    assert.eq(
+        0,
+        cursorCountMatching(cursor, function (c) {
+            return c.name === "foo";
+        }),
+    );
 }
 
-jsTest.log('Test killCursors against a listCollections cursor');
+jsTest.log("Test killCursors against a listCollections cursor");
 {
     assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
@@ -292,7 +327,7 @@ jsTest.log('Test killCursors against a listCollections cursor');
     cursor = new DBCommandCursor(mydb, res, 2);
     cursor.close();
     cursor = new DBCommandCursor(mydb, res, 2);
-    assert.throws(function() {
+    assert.throws(function () {
         cursor.hasNext();
     });
 }

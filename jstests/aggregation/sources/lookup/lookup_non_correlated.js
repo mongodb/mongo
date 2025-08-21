@@ -36,7 +36,7 @@ assert(!cursor.hasNext());
 cursor = localColl.aggregate([
     {$match: {_id: "A"}},
     {$lookup: {from: foreignName, as: "foreignDocs", pipeline: [{$match: {_id: {"$gte": 2}}}]}},
-    {$unwind: "$foreignDocs"}
+    {$unwind: "$foreignDocs"},
 ]);
 
 assert(cursor.hasNext());
@@ -50,7 +50,7 @@ cursor = localColl.aggregate([
     {$match: {_id: "A"}},
     {$lookup: {from: foreignName, as: "foreignDocs", pipeline: [{$match: {_id: {"$gte": 2}}}]}},
     {$unwind: "$foreignDocs"},
-    {$match: {"foreignDocs._id": 2}}
+    {$match: {"foreignDocs._id": 2}},
 ]);
 
 assert(cursor.hasNext());

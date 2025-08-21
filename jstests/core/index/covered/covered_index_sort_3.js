@@ -19,14 +19,12 @@ for (let i = 0; i < 100; i++) {
 coll.createIndex({a: 1, b: -1, c: 1});
 
 // Test no query, sort on all fields in index order
-var plan = coll.find({}, {b: 1, c: 1, _id: 0})
-               .sort({a: 1, b: -1, c: 1})
-               .hint({a: 1, b: -1, c: 1})
-               .explain("executionStats");
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-       "sort.3.1 - indexOnly should be true on covered query");
-assert.eq(0,
-          plan.executionStats.totalDocsExamined,
-          "sort.3.1 - docs examined should be 0 for covered query");
+var plan = coll
+    .find({}, {b: 1, c: 1, _id: 0})
+    .sort({a: 1, b: -1, c: 1})
+    .hint({a: 1, b: -1, c: 1})
+    .explain("executionStats");
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "sort.3.1 - indexOnly should be true on covered query");
+assert.eq(0, plan.executionStats.totalDocsExamined, "sort.3.1 - docs examined should be 0 for covered query");
 
-print('all tests pass');
+print("all tests pass");

@@ -14,17 +14,14 @@ const date1 = new Date();
 
 function runTest({docs, pipeline, expectedResults}) {
     coll.drop();
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+    );
     assert.commandWorked(coll.insertMany(docs));
     const results = coll.aggregate(pipeline).toArray();
-    assert.eq(expectedResults.length,
-              results.length,
-              `Expected ${tojson(expectedResults)} but got ${tojson(results)}`);
+    assert.eq(expectedResults.length, results.length, `Expected ${tojson(expectedResults)} but got ${tojson(results)}`);
     for (let i = 0; i < results.length; ++i) {
-        assert.docEq(expectedResults[i],
-                     results[i],
-                     `Expected ${tojson(expectedResults)} but got ${tojson(results)}`);
+        assert.docEq(expectedResults[i], results[i], `Expected ${tojson(expectedResults)} but got ${tojson(results)}`);
     }
 }
 
@@ -35,17 +32,19 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: 2, meta: 100}],
         pipeline: [{$addFields: {[metaField]: {$getField: metaField}}}],
-        expectedResults: [{[timeField]: date1, [metaField]: 2, _id: 1, meta: 100}]
+        expectedResults: [{[timeField]: date1, [metaField]: 2, _id: 1, meta: 100}],
     });
 })();
 
 (function testAddFieldsShadowingMetaByItselfWithOtherFields() {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: 2, meta: 100}],
-        pipeline: [{
-            $addFields: {[metaField]: `\$${metaField}`, [timeField]: `\$${timeField}`, _id: "$_id"}
-        }],
-        expectedResults: [{[timeField]: date1, [metaField]: 2, _id: 1, meta: 100}]
+        pipeline: [
+            {
+                $addFields: {[metaField]: `\$${metaField}`, [timeField]: `\$${timeField}`, _id: "$_id"},
+            },
+        ],
+        expectedResults: [{[timeField]: date1, [metaField]: 2, _id: 1, meta: 100}],
     });
 })();
 
@@ -53,17 +52,15 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: 2, meta: 100}],
         pipeline: [{$project: {[metaField]: {$getField: metaField}, _id: 0}}],
-        expectedResults: [{[metaField]: 2}]
+        expectedResults: [{[metaField]: 2}],
     });
 })();
 
 (function testProjectShadowingMetaByItselfWithOtherFields() {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: 2, meta: 100}],
-        pipeline: [
-            {$project: {[metaField]: `\$${metaField}`, [timeField]: `\$${timeField}`, _id: "$_id"}}
-        ],
-        expectedResults: [{[metaField]: 2, [timeField]: date1, _id: 1}]
+        pipeline: [{$project: {[metaField]: `\$${metaField}`, [timeField]: `\$${timeField}`, _id: "$_id"}}],
+        expectedResults: [{[metaField]: 2, [timeField]: date1, _id: 1}],
     });
 })();
 
@@ -75,7 +72,7 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: {s: "string"}, meta: 100}],
         pipeline: [{$addFields: {[metaField]: `\$${metaField}.s`}}],
-        expectedResults: [{[timeField]: date1, [metaField]: "string", _id: 1, meta: 100}]
+        expectedResults: [{[timeField]: date1, [metaField]: "string", _id: 1, meta: 100}],
     });
 })();
 
@@ -83,7 +80,7 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: {s: "string"}, meta: 100}],
         pipeline: [{$project: {[metaField]: `\$${metaField}.s`, meta: 1, _id: 0}}],
-        expectedResults: [{[metaField]: "string", meta: 100}]
+        expectedResults: [{[metaField]: "string", meta: 100}],
     });
 })();
 
@@ -95,18 +92,19 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: {a: 1, b: 2}, meta: 100}],
         pipeline: [{$addFields: {[metaField]: {$add: [`\$${metaField}.a`, `\$${metaField}.b`]}}}],
-        expectedResults: [{[timeField]: date1, [metaField]: 3, _id: 1, meta: 100}]
+        expectedResults: [{[timeField]: date1, [metaField]: 3, _id: 1, meta: 100}],
     });
 })();
 
 (function testProjectShadowingMetaByExpr() {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: {a: 1, b: 2}, meta: 100}],
-        pipeline: [{
-            $project:
-                {[metaField]: {$add: [`\$${metaField}.a`, `\$${metaField}.b`]}, meta: 1, _id: 0}
-        }],
-        expectedResults: [{[metaField]: 3, meta: 100}]
+        pipeline: [
+            {
+                $project: {[metaField]: {$add: [`\$${metaField}.a`, `\$${metaField}.b`]}, meta: 1, _id: 0},
+            },
+        ],
+        expectedResults: [{[metaField]: 3, meta: 100}],
     });
 })();
 
@@ -118,7 +116,7 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: {a: 1, b: 2}, meta: 100}],
         pipeline: [{$addFields: {[metaField]: "$meta"}}],
-        expectedResults: [{[timeField]: date1, [metaField]: 100, _id: 1, meta: 100}]
+        expectedResults: [{[timeField]: date1, [metaField]: 100, _id: 1, meta: 100}],
     });
 })();
 
@@ -126,6 +124,6 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [{_id: 1, [timeField]: date1, [metaField]: {a: 1, b: 2}, meta: 100}],
         pipeline: [{$project: {[metaField]: "$meta", meta: 1, _id: 0}}],
-        expectedResults: [{[metaField]: 100, meta: 100}]
+        expectedResults: [{[metaField]: 100, meta: 100}],
     });
 })();

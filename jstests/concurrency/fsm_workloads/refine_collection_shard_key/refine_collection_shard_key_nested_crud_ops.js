@@ -5,12 +5,9 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/refine_collection_shard_key/refine_collection_shard_key_crud_ops.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/refine_collection_shard_key/refine_collection_shard_key_crud_ops.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Note the base workload assumes this is the nested key when constructing the crud ops.
     $config.data.newShardKey = {a: 1, "b.c": 1};
     $config.data.usingNestedKey = true;

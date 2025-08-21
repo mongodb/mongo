@@ -15,7 +15,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 Random.setRandomSeed(7813223789272959000);
 
 // Value is taken from geoconstants.h.
-const earthRadiusMeters = (6378.1 * 1000);
+const earthRadiusMeters = 6378.1 * 1000;
 const earthCircumferenceMeters = earthRadiusMeters * Math.PI * 2;
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/EPSILON
@@ -23,10 +23,8 @@ const epsilon = Math.pow(2, -52);
 
 function wrap(input, min, max) {
     const span = max - min;
-    if (input > max)
-        input -= span;
-    if (input < min)
-        input += span;
+    if (input > max) input -= span;
+    if (input < min) input += span;
     assert.lte(input, max);
     assert.gte(input, min);
     return input;
@@ -45,31 +43,31 @@ jsTestLog("Cluster center: " + clusterCenter);
 // Determine how far away the center of the cluster is from the query point.
 let sphereDist, flatDist;
 {
-    const temp = db.getCollection(jsTestName() + '_temp');
+    const temp = db.getCollection(jsTestName() + "_temp");
     temp.drop();
     assert.commandWorked(temp.insert({loc: clusterCenter}));
-    assert.commandWorked(temp.createIndex({loc: '2dsphere'}));
-    assert.commandWorked(temp.createIndex({loc: '2d'}));
+    assert.commandWorked(temp.createIndex({loc: "2dsphere"}));
+    assert.commandWorked(temp.createIndex({loc: "2d"}));
 
-    sphereDist = temp.aggregate({
-                         $geoNear: {
-                             near: {type: "Point", coordinates: queryPoint},
-                             key: 'loc',
-                             distanceField: 'dist',
-                         }
-                     })
-                     .toArray()[0]
-                     .dist;
+    sphereDist = temp
+        .aggregate({
+            $geoNear: {
+                near: {type: "Point", coordinates: queryPoint},
+                key: "loc",
+                distanceField: "dist",
+            },
+        })
+        .toArray()[0].dist;
 
-    flatDist = temp.aggregate({
-                       $geoNear: {
-                           near: queryPoint,
-                           key: 'loc',
-                           distanceField: 'dist',
-                       }
-                   })
-                   .toArray()[0]
-                   .dist;
+    flatDist = temp
+        .aggregate({
+            $geoNear: {
+                near: queryPoint,
+                key: "loc",
+                distanceField: "dist",
+            },
+        })
+        .toArray()[0].dist;
 
     temp.drop();
 }
@@ -82,7 +80,7 @@ const clusterPoints = [];
 // from the query point is the same. The smallest possible difference in distance is roughly
 // distance*epsilon. We nudge each point by more than that to ensure they end up with different
 // distances from the query point.
-const sphereDistDegrees = sphereDist * 360 / earthCircumferenceMeters;
+const sphereDistDegrees = (sphereDist * 360) / earthCircumferenceMeters;
 const deltas = [-2 * sphereDistDegrees * epsilon, 0, 2 * sphereDistDegrees * epsilon];
 for (const dx of deltas) {
     for (const dy of deltas) {
@@ -95,46 +93,45 @@ jsTestLog("Generated the following points:");
 printjson(clusterPoints);
 
 // Set up a normal and a time-series collection to compare results.
-const coll = db.getCollection(jsTestName() + '_normal');
-const tsColl = db.getCollection(jsTestName() + '_timeseries');
+const coll = db.getCollection(jsTestName() + "_normal");
+const tsColl = db.getCollection(jsTestName() + "_timeseries");
 coll.drop();
 tsColl.drop();
-assert.commandWorked(coll.createIndex({loc: '2dsphere'}));
-assert.commandWorked(coll.createIndex({loc: '2d'}));
-assert.commandWorked(db.createCollection(tsColl.getName(), {timeseries: {timeField: 'time'}}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2d"}));
+assert.commandWorked(db.createCollection(tsColl.getName(), {timeseries: {timeField: "time"}}));
 
-const docs = clusterPoints.map(point => ({
-                                   time: ISODate(),
-                                   loc: point,
-                               }));
+const docs = clusterPoints.map((point) => ({
+    time: ISODate(),
+    loc: point,
+}));
 assert.commandWorked(coll.insert(docs));
 assert.commandWorked(tsColl.insert(docs));
 
 // Compare time-series vs non-time-series.
-for (const minOrMax of ['maxDistance', 'minDistance']) {
+for (const minOrMax of ["maxDistance", "minDistance"]) {
     const pipeline = [
         {
             $geoNear: {
                 near: {type: "Point", coordinates: queryPoint},
-                key: 'loc',
-                distanceField: 'dist',
+                key: "loc",
+                distanceField: "dist",
                 [minOrMax]: sphereDist,
-            }
+            },
         },
-        {$sort: {'loc.0': 1, 'loc.1': 1}},
+        {$sort: {"loc.0": 1, "loc.1": 1}},
         {
             $project: {
                 _id: 0,
                 loc: "$loc",
                 dist: "$dist",
-            }
-        }
+            },
+        },
     ];
     const result = coll.aggregate(pipeline).toArray();
     // In most cases we expect the query to find some but not all the points.
     // In rare cases (at a pole) the points could be clamped together.
-    jsTestLog("Spherical " + minOrMax + " query included " + result.length + " out of " +
-              docs.length + " points.");
+    jsTestLog("Spherical " + minOrMax + " query included " + result.length + " out of " + docs.length + " points.");
 
     // Make sure the time-series results match.
     const tsResult = tsColl.aggregate(pipeline).toArray();
@@ -142,30 +139,29 @@ for (const minOrMax of ['maxDistance', 'minDistance']) {
 }
 
 // Test the same thing for flat queries.
-for (const minOrMax of ['maxDistance', 'minDistance']) {
+for (const minOrMax of ["maxDistance", "minDistance"]) {
     const pipeline = [
         {
             $geoNear: {
                 near: queryPoint,
-                key: 'loc',
-                distanceField: 'dist',
+                key: "loc",
+                distanceField: "dist",
                 [minOrMax]: flatDist,
-            }
+            },
         },
-        {$sort: {'loc.0': 1, 'loc.1': 1}},
+        {$sort: {"loc.0": 1, "loc.1": 1}},
         {
             $project: {
                 _id: 0,
                 loc: "$loc",
                 dist: "$dist",
-            }
-        }
+            },
+        },
     ];
     const result = coll.aggregate(pipeline).toArray();
     // In most cases we expect the query to find some but not all the points.
     // In rare cases (at a pole) the points could be clamped together.
-    jsTestLog("Flat " + minOrMax + " query included " + result.length + " out of " + docs.length +
-              " points.");
+    jsTestLog("Flat " + minOrMax + " query included " + result.length + " out of " + docs.length + " points.");
 
     // Make sure the time-series results match.
     const tsResult = tsColl.aggregate(pipeline).toArray();

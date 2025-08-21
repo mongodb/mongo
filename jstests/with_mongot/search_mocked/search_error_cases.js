@@ -3,9 +3,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    MongotMock,
-} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 // Start mock mongot.
 const mongotMock = new MongotMock();
@@ -32,7 +30,8 @@ let sessionDb = session.getDatabase(dbName);
 session.startTransaction();
 assert.commandFailedWithCode(
     sessionDb.runCommand({aggregate: collName, pipeline: [{$search: {}}], cursor: {}}),
-    ErrorCodes.OperationNotSupportedInTransaction);
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 session.endSession();
 
 // $search cannot be used inside a $facet subpipeline.
@@ -47,51 +46,56 @@ sessionDb = session.getDatabase(dbName);
 session.startTransaction();
 assert.commandFailedWithCode(
     sessionDb.runCommand({aggregate: collName, pipeline: [{$search: {}}], cursor: {}}),
-    ErrorCodes.OperationNotSupportedInTransaction);
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 session.endSession();
 
 // $search is only valid as the first stage in a pipeline.
-assert.commandFailedWithCode(testDB.runCommand({
-    aggregate: collName,
-    pipeline: [{$match: {}}, {$search: {}}],
-    cursor: {},
-}),
-                             40602);
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        aggregate: collName,
+        pipeline: [{$match: {}}, {$search: {}}],
+        cursor: {},
+    }),
+    40602,
+);
 
 // $search is not allowed in an update pipeline. Error code matters on version.
-assert.commandFailedWithCode(
-    testDB.runCommand({"findandmodify": collName, "update": [{"$search": {}}]}),
-    [6600901, ErrorCodes.InvalidOptions]);
+assert.commandFailedWithCode(testDB.runCommand({"findandmodify": collName, "update": [{"$search": {}}]}), [
+    6600901,
+    ErrorCodes.InvalidOptions,
+]);
 
 // Make sure the server is still up.
 assert.commandWorked(testDB.runCommand("ping"));
 
 // Assert the oversubscription factor cannot be configured to any value less than 1.
 assert.commandFailedWithCode(
-    testDB.adminCommand(
-        {setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: 0.9}}}),
-    ErrorCodes.BadValue);
+    testDB.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: 0.9}}}),
+    ErrorCodes.BadValue,
+);
 assert.commandFailedWithCode(
-    testDB.adminCommand(
-        {setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: 0}}}),
-    ErrorCodes.BadValue);
+    testDB.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: 0}}}),
+    ErrorCodes.BadValue,
+);
 assert.commandFailedWithCode(
-    testDB.adminCommand(
-        {setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: -5}}}),
-    ErrorCodes.BadValue);
+    testDB.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor: -5}}}),
+    ErrorCodes.BadValue,
+);
 
 // Assert the batchSize growth factor cannot be configured to any value less than 1.
 assert.commandFailedWithCode(
-    testDB.adminCommand(
-        {setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: 0.9}}}),
-    ErrorCodes.BadValue);
+    testDB.adminCommand({setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: 0.9}}}),
+    ErrorCodes.BadValue,
+);
 assert.commandFailedWithCode(
     testDB.adminCommand({setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: 0}}}),
-    ErrorCodes.BadValue);
+    ErrorCodes.BadValue,
+);
 assert.commandFailedWithCode(
-    testDB.adminCommand(
-        {setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: -5}}}),
-    ErrorCodes.BadValue);
+    testDB.adminCommand({setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: -5}}}),
+    ErrorCodes.BadValue,
+);
 
 mongotMock.stop();
 rst.stopSet();

@@ -15,7 +15,7 @@ t.drop();
 
 assert.commandWorked(db.createCollection(t.getName()));
 const indexSpec = {
-    a: "hashed"
+    a: "hashed",
 };
 
 // Test unique index not created (maybe change later).
@@ -32,9 +32,11 @@ for (let i = 0; i < 10; i++) {
 }
 assert.eq(t.find().count(), 10, "basic insert didn't work");
 assert.eq(t.find().hint(indexSpec).toArray().length, 10, "basic insert didn't work");
-assert.eq(t.find({a: 3}).hint({_id: 1}).toArray()[0]._id,
-          t.find({a: 3}).hint(indexSpec).toArray()[0]._id,
-          "hashindex lookup didn't work");
+assert.eq(
+    t.find({a: 3}).hint({_id: 1}).toArray()[0]._id,
+    t.find({a: 3}).hint(indexSpec).toArray()[0]._id,
+    "hashindex lookup didn't work",
+);
 
 // Make sure things with the same hash are not both returned.
 assert.commandWorked(t.insert({a: 3.1}));
@@ -70,19 +72,21 @@ assert(isIxscan(db, getWinningPlanFromExplain(explain)), explain);
 
 // Test creation of index based on hash of _id index.
 const indexSpec2 = {
-    '_id': "hashed"
+    "_id": "hashed",
 };
 assert.commandWorked(t.createIndex(indexSpec2));
 assert.eq(t.getIndexes().length, 3, "_id index didn't get created");
 
 const newid = t.findOne()["_id"];
-assert.eq(t.find({_id: newid}).hint({_id: 1}).toArray()[0]._id,
-          t.find({_id: newid}).hint(indexSpec2).toArray()[0]._id,
-          "using hashed index and different index returns different docs");
+assert.eq(
+    t.find({_id: newid}).hint({_id: 1}).toArray()[0]._id,
+    t.find({_id: newid}).hint(indexSpec2).toArray()[0]._id,
+    "using hashed index and different index returns different docs",
+);
 
 // Test creation of sparse hashed index.
 const sparseIndex = {
-    b: "hashed"
+    b: "hashed",
 };
 assert.commandWorked(t.createIndex(sparseIndex, {"sparse": true}));
 assert.eq(t.getIndexes().length, 4, "sparse index didn't get created");

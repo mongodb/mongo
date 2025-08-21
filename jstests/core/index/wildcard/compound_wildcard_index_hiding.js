@@ -53,8 +53,7 @@ function setIndexVisibilityByKeyPattern(collectionName, keyPattern, hidden) {
 }
 
 function setIndexVisibilityByIndexName(collectionName, indexName, hidden) {
-    assert.commandWorked(
-        db.runCommand({collMod: collectionName, index: {name: indexName, hidden}}));
+    assert.commandWorked(db.runCommand({collMod: collectionName, index: {name: indexName, hidden}}));
 }
 
 function testCompoundWildcardIndexesHiding(cwiList, collectionName) {
@@ -123,18 +122,18 @@ function assertHiddenIndexesIsNotUsed(cwiList, collectionName) {
         const indexName = testCase.indexName;
         let explain = null;
 
-        explain = assert.commandWorked(coll.find(query).explain('executionStats'));
+        explain = assert.commandWorked(coll.find(query).explain("executionStats"));
         // The index is hidden and cannot be used.
         WildcardIndexHelpers.assertExpectedIndexIsNotUsed(explain, indexName);
 
         // Unhide the index and make sure it answers the query.
         setIndexVisibilityByIndexName(collectionName, indexName, /*hidden*/ false);
-        explain = assert.commandWorked(coll.find(query).explain('executionStats'));
+        explain = assert.commandWorked(coll.find(query).explain("executionStats"));
         WildcardIndexHelpers.assertExpectedIndexIsUsed(explain, indexName);
 
         // Hide the index and make sure it does not answer the query.
         setIndexVisibilityByIndexName(collectionName, indexName, /*hidden*/ true);
-        explain = assert.commandWorked(coll.find(query).explain('executionStats'));
+        explain = assert.commandWorked(coll.find(query).explain("executionStats"));
         WildcardIndexHelpers.assertExpectedIndexIsNotUsed(explain, indexName);
     }
 }

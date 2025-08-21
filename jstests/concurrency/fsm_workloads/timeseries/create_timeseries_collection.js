@@ -10,10 +10,10 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {prefix: "create_timeseries_collection"};
 
-    var states = (function() {
+    var states = (function () {
         function getCollectionName(prefix, collName, tid) {
             return prefix + "_" + collName + "_" + tid;
         }
@@ -26,19 +26,20 @@ export const $config = (function() {
             collName = getCollectionName(this.prefix, collName, this.tid);
 
             const timeFieldName = "time";
-            assert.commandWorked(
-                db.createCollection(collName, {timeseries: {timeField: timeFieldName}}));
+            assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: timeFieldName}}));
         }
 
         function insert(db, collName) {
             collName = getCollectionName(this.prefix, collName, this.tid);
 
             const coll = db.getCollection(collName);
-            TimeseriesTest.assertInsertWorked(coll.insert({
-                _id: this.num,
-                measurement: "measurement",
-                time: ISODate(),
-            }));
+            TimeseriesTest.assertInsertWorked(
+                coll.insert({
+                    _id: this.num,
+                    measurement: "measurement",
+                    time: ISODate(),
+                }),
+            );
         }
 
         function drop(db, collName) {
@@ -53,7 +54,7 @@ export const $config = (function() {
         init: {create: 1},
         create: {insert: 0.8, drop: 0.2},
         insert: {insert: 0.8, drop: 0.2},
-        drop: {create: 1}
+        drop: {create: 1},
     };
 
     return {

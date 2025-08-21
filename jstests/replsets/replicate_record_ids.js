@@ -23,9 +23,9 @@ replSet.initiate();
 const primary = replSet.getPrimary();
 const secondary = replSet.getSecondaries()[0];
 
-const dbName = 'test';
-const unReplRidCollName = 'unreplRecIdColl';
-const replRidCollName = 'replRecIdColl';
+const dbName = "test";
+const unReplRidCollName = "unreplRecIdColl";
+const replRidCollName = "replRecIdColl";
 
 const primDB = primary.getDB(dbName);
 const secDB = secondary.getDB(dbName);
@@ -33,22 +33,26 @@ const secDB = secondary.getDB(dbName);
 const unReplRidNs = `${dbName}.${unReplRidCollName}`;
 const replRidNs = `${dbName}.${replRidCollName}`;
 
-const getOplogEntries = function(conn, oplogQuery) {
+const getOplogEntries = function (conn, oplogQuery) {
     return replSet.findOplog(conn, oplogQuery).toArray();
 };
 
-const validateRidInOplogs = function(oplogQuery, expectedRid) {
+const validateRidInOplogs = function (oplogQuery, expectedRid) {
     const primOplogEntry = getOplogEntries(primary, oplogQuery)[0];
     const secOplogEntry = getOplogEntries(secondary, oplogQuery)[0];
-    assert.eq(primOplogEntry.rid,
-              expectedRid,
-              `Mismatching recordIds. Primary's oplog entry: ${tojson(primOplogEntry)}, on disk: ${
-                  tojson(expectedRid)}. Oplog query ${tojson(oplogQuery)}`);
+    assert.eq(
+        primOplogEntry.rid,
+        expectedRid,
+        `Mismatching recordIds. Primary's oplog entry: ${tojson(primOplogEntry)}, on disk: ${tojson(
+            expectedRid,
+        )}. Oplog query ${tojson(oplogQuery)}`,
+    );
 
-    assert.eq(secOplogEntry.rid,
-              expectedRid,
-              `Mismatching recordIds. Secondary's oplog entry: ${tojson(secOplogEntry)}, on disk: ${
-                  tojson(expectedRid)}`);
+    assert.eq(
+        secOplogEntry.rid,
+        expectedRid,
+        `Mismatching recordIds. Secondary's oplog entry: ${tojson(secOplogEntry)}, on disk: ${tojson(expectedRid)}`,
+    );
 };
 
 let docA = {"a": 1};
@@ -62,8 +66,7 @@ assert(!oplogNoRid.rid, `Unexpectedly found rid in entry: ${tojson(oplogNoRid)}`
 // Create a collection with the param set. This time the recordId should show up
 // in the oplog.
 primDB.runCommand({create: replRidCollName, recordIdsReplicated: true});
-const docAInsertOpTime =
-    assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [docA]})).opTime;
+const docAInsertOpTime = assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [docA]})).opTime;
 replSet.awaitReplication();
 const docAReplRid = getRidForDoc(primDB, replRidCollName, docA);
 assert.eq(docAReplRid, getRidForDoc(secDB, replRidCollName, docA));
@@ -74,22 +77,19 @@ validateRidInOplogs({ns: `${replRidNs}`, ...docAInsertOpTime}, docAReplRid);
 
 primDB.setLogLevel(3);
 const newDocA = {
-    "a": 2
+    "a": 2,
 };
-const docAUpdateOpTime =
-    assert
-        .commandWorked(
-            primDB.runCommand({update: replRidCollName, updates: [{q: docA, u: {$set: {'a': 2}}}]}))
-        .opTime;
+const docAUpdateOpTime = assert.commandWorked(
+    primDB.runCommand({update: replRidCollName, updates: [{q: docA, u: {$set: {"a": 2}}}]}),
+).opTime;
 docA = newDocA;
 replSet.awaitReplication();
 validateRidInOplogs({ns: `${replRidNs}`, ...docAUpdateOpTime}, docAReplRid);
 
 // The recordId should also be in the oplog entry for the delete.
-const docARemoveOpTime =
-    assert
-        .commandWorked(primDB.runCommand({delete: replRidCollName, deletes: [{q: docA, limit: 1}]}))
-        .opTime;
+const docARemoveOpTime = assert.commandWorked(
+    primDB.runCommand({delete: replRidCollName, deletes: [{q: docA, limit: 1}]}),
+).opTime;
 replSet.awaitReplication();
 validateRidInOplogs({ns: `${replRidNs}`, ...docARemoveOpTime}, docAReplRid);
 

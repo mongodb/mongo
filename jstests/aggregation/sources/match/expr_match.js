@@ -14,10 +14,14 @@ assert.eq(3, coll.aggregate([{$match: {$expr: {$eq: ["$x", {$sqrt: "$y"}]}}}]).i
 // $match with $expr containing $or and $and.
 assert.eq(
     2,
-    coll.aggregate([{
-            $match: {$expr: {$or: [{$eq: ["$x", 3]}, {$and: [{$eq: ["$x", 2]}, {$eq: ["$y", 4]}]}]}}
-        }])
-        .itcount());
+    coll
+        .aggregate([
+            {
+                $match: {$expr: {$or: [{$eq: ["$x", 3]}, {$and: [{$eq: ["$x", 2]}, {$eq: ["$y", 4]}]}]}},
+            },
+        ])
+        .itcount(),
+);
 
 // $match $expr containing $in.
 assert.eq(3, coll.aggregate([{$match: {$expr: {$in: ["$x", [1, {$mod: [4, 2]}, 3]]}}}]).itcount());
@@ -30,11 +34,7 @@ assert.eq(4, coll.aggregate([{$match: {$expr: {$gte: [10, 5]}}}]).itcount());
 assert.eq(0, coll.aggregate([{$match: {$expr: {$gte: [5, 10]}}}]).itcount());
 
 // $match with $expr works inside a $or.
-assert.eq(
-    4,
-    coll.aggregate([{$match: {$or: [{$expr: {$eq: ["$foo", "$bar"]}}, {b: {$gt: 3}}]}}]).itcount());
+assert.eq(4, coll.aggregate([{$match: {$or: [{$expr: {$eq: ["$foo", "$bar"]}}, {b: {$gt: 3}}]}}]).itcount());
 
 // $match with $expr works inside a $and.
-assert.eq(2,
-          coll.aggregate([{$match: {$and: [{$expr: {$eq: ["$foo", "$bar"]}}, {x: {$lt: 2}}]}}])
-              .itcount());
+assert.eq(2, coll.aggregate([{$match: {$and: [{$expr: {$eq: ["$foo", "$bar"]}}, {x: {$lt: 2}}]}}]).itcount());

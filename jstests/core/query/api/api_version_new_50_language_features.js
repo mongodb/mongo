@@ -34,38 +34,44 @@ for (let pipeline of stablePipelines) {
     APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, viewName, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
-    assert.commandWorked(testDb.runCommand({
-        aggregate: coll.getName(),
-        pipeline: pipeline,
-        apiVersion: "1",
-        cursor: {},
-    }));
+    assert.commandWorked(
+        testDb.runCommand({
+            aggregate: coll.getName(),
+            pipeline: pipeline,
+            apiVersion: "1",
+            cursor: {},
+        }),
+    );
 }
 
 // $setWindowFields is not supported in transactions or with read concern snapshot. Test separately
 // and check for all the error codes that can occur depending on what passthrough we are in.
-const setWindowFieldsPipeline = [{
-    $setWindowFields: {
-        sortBy: {_id: 1},
-        output: {runningCount: {$sum: 1, window: {documents: ["unbounded", "current"]}}}
-    }
-}];
+const setWindowFieldsPipeline = [
+    {
+        $setWindowFields: {
+            sortBy: {_id: 1},
+            output: {runningCount: {$sum: 1, window: {documents: ["unbounded", "current"]}}},
+        },
+    },
+];
 APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(setWindowFieldsPipeline, collName);
 
-APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(
-    setWindowFieldsPipeline,
-    collName,
-    [ErrorCodes.InvalidOptions, ErrorCodes.OperationNotSupportedInTransaction]);
+APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(setWindowFieldsPipeline, collName, [
+    ErrorCodes.InvalidOptions,
+    ErrorCodes.OperationNotSupportedInTransaction,
+]);
 
 APIVersionHelpers.assertViewSucceedsWithAPIStrict(setWindowFieldsPipeline, viewName, collName);
 
 // Creating a collection with dotted paths is allowed with apiStrict:true.
 
-assert.commandWorked(testDb.runCommand({
-    create: 'new_50_features_validator',
-    validator: {$expr: {$eq: [{$getField: {input: "$$ROOT", field: "dotted.path"}}, 2]}},
-    apiVersion: "1",
-    apiStrict: true
-}));
+assert.commandWorked(
+    testDb.runCommand({
+        create: "new_50_features_validator",
+        validator: {$expr: {$eq: [{$getField: {input: "$$ROOT", field: "dotted.path"}}, 2]}},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
+);
 
-assert.commandWorked(testDb.runCommand({drop: 'new_50_features_validator'}));
+assert.commandWorked(testDb.runCommand({drop: "new_50_features_validator"}));

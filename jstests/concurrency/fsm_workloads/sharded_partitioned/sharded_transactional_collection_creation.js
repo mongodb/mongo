@@ -9,65 +9,90 @@
  * ]
  */
 
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 
 // TODO(SERVER-46971) Remove `local` readConcern.
 TestData.defaultTransactionReadConcernLevel = "local";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {
         createdDbName: jsTest.name(),
         createdCollName: jsTest.name(),
         // Used by the FSM worker to shard the collection passed to the functions.
-        shardKey: {_id: 'hashed'},
+        shardKey: {_id: "hashed"},
     };
 
-    var states = (function() {
+    var states = (function () {
         function init(db, collName) {
             this.seqNum = 0;
             this.session = db.getMongo().startSession();
         }
 
         function createCollectionImplicitlyViaInsert(db, collName) {
-            withTxnAndAutoRetry(this.session, () => {
-                // Write to multiple shards to force a distributed transaction.
-                assert.commandWorked(this.session.getDatabase(db.getName())
-                                         .getCollection(collName)
-                                         .insert([{a: 1}, {a: 2}, {a: 3}]));
-                assert.commandWorked(this.session.getDatabase(this.createdDbName)
-                                         .getCollection(this.createdCollName)
-                                         .insertOne({_id: this.seqNum}));
-            }, {});
+            withTxnAndAutoRetry(
+                this.session,
+                () => {
+                    // Write to multiple shards to force a distributed transaction.
+                    assert.commandWorked(
+                        this.session
+                            .getDatabase(db.getName())
+                            .getCollection(collName)
+                            .insert([{a: 1}, {a: 2}, {a: 3}]),
+                    );
+                    assert.commandWorked(
+                        this.session
+                            .getDatabase(this.createdDbName)
+                            .getCollection(this.createdCollName)
+                            .insertOne({_id: this.seqNum}),
+                    );
+                },
+                {},
+            );
         }
 
         function createCollectionExplicitlyViaCreate(db, collName) {
-            withTxnAndAutoRetry(this.session, () => {
-                // Write to multiple shards to force a distributed transaction.
-                assert.commandWorked(this.session.getDatabase(db.getName())
-                                         .getCollection(collName)
-                                         .insert([{a: 1}, {a: 2}, {a: 3}]));
-                assert.commandWorked(this.session.getDatabase(this.createdDbName)
-                                         .createCollection(this.createdCollName));
-            }, {});
+            withTxnAndAutoRetry(
+                this.session,
+                () => {
+                    // Write to multiple shards to force a distributed transaction.
+                    assert.commandWorked(
+                        this.session
+                            .getDatabase(db.getName())
+                            .getCollection(collName)
+                            .insert([{a: 1}, {a: 2}, {a: 3}]),
+                    );
+                    assert.commandWorked(
+                        this.session.getDatabase(this.createdDbName).createCollection(this.createdCollName),
+                    );
+                },
+                {},
+            );
         }
 
         function createCollectionImplicitlyViaCreateIndexes(db, collName) {
-            withTxnAndAutoRetry(this.session, () => {
-                // Write to multiple shards to force a distributed transaction.
-                assert.commandWorked(this.session.getDatabase(db.getName())
-                                         .getCollection(collName)
-                                         .insert([{a: 1}, {a: 2}, {a: 3}]));
-                assert.commandWorked(this.session.getDatabase(this.createdDbName)
-                                         .getCollection(this.createdCollName)
-                                         .createIndex({a: 1}));
-            }, {});
+            withTxnAndAutoRetry(
+                this.session,
+                () => {
+                    // Write to multiple shards to force a distributed transaction.
+                    assert.commandWorked(
+                        this.session
+                            .getDatabase(db.getName())
+                            .getCollection(collName)
+                            .insert([{a: 1}, {a: 2}, {a: 3}]),
+                    );
+                    assert.commandWorked(
+                        this.session
+                            .getDatabase(this.createdDbName)
+                            .getCollection(this.createdCollName)
+                            .createIndex({a: 1}),
+                    );
+                },
+                {},
+            );
         }
 
         function createCollectionOutsideTxn(db, collName) {
-            assert.commandWorked(
-                db.getSiblingDB(this.createdDbName).createCollection(this.createdCollName));
+            assert.commandWorked(db.getSiblingDB(this.createdDbName).createCollection(this.createdCollName));
             this.seqNum++;
         }
 

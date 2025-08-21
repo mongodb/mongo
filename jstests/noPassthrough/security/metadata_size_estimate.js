@@ -8,15 +8,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // small records, we are verifying that the batching logic is accounting for the overhead required
 // to serialize each document into a BSONArray.
 const kDataBlockSize = 4 * 1024;
-const kDataBlock = 'x'.repeat(kDataBlockSize);
+const kDataBlock = "x".repeat(kDataBlockSize);
 const kBSONMaxObjSize = 16 * 1024 * 1024;
-const kNumRows = (kBSONMaxObjSize / kDataBlockSize) + 5;
-const kDBPrefix = 'qwertyuiopasdfghjklzxcvbnm_';
+const kNumRows = kBSONMaxObjSize / kDataBlockSize + 5;
+const kDBPrefix = "qwertyuiopasdfghjklzxcvbnm_";
 
 function runTest(conn) {
-    const admin = conn.getDB('admin');
-    assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-    assert(admin.auth('admin', 'pwd'));
+    const admin = conn.getDB("admin");
+    assert.commandWorked(admin.runCommand({createUser: "admin", pwd: "pwd", roles: ["root"]}));
+    assert(admin.auth("admin", "pwd"));
 
     // Create more than 16KB of role data.
     // These roles are grouped into a meta-role to avoid calls to `usersInfo` unexpectedly
@@ -28,19 +28,17 @@ function runTest(conn) {
     for (let i = 0; i < 100; ++i) {
         const roleRoles = [];
         for (let j = 0; j < 100; ++j) {
-            const db = kDBPrefix + String((i * 100) + j);
+            const db = kDBPrefix + String(i * 100 + j);
             if (firstDB === null) {
                 firstDB = db;
             }
-            roleRoles.push({db: db, role: 'read'});
+            roleRoles.push({db: db, role: "read"});
         }
-        assert.commandWorked(
-            admin.runCommand({createRole: 'groupRole_' + i, roles: roleRoles, privileges: []}));
-        userRoles.push({db: 'admin', role: 'groupRole_' + i});
+        assert.commandWorked(admin.runCommand({createRole: "groupRole_" + i, roles: roleRoles, privileges: []}));
+        userRoles.push({db: "admin", role: "groupRole_" + i});
     }
-    assert.commandWorked(
-        admin.runCommand({createRole: 'bigRole', roles: userRoles, privileges: []}));
-    assert.commandWorked(admin.runCommand({createUser: 'user', pwd: 'pwd', roles: ['bigRole']}));
+    assert.commandWorked(admin.runCommand({createRole: "bigRole", roles: userRoles, privileges: []}));
+    assert.commandWorked(admin.runCommand({createUser: "user", pwd: "pwd", roles: ["bigRole"]}));
 
     const db = conn.getDB(firstDB);
 
@@ -53,11 +51,11 @@ function runTest(conn) {
 
     // Switch to user with all the roles.
     admin.logout();
-    assert(admin.auth('user', 'pwd'));
+    assert(admin.auth("user", "pwd"));
 
     // Create an aggregation which will batch up to kMaxWriteBatchSize or 16MB
     // (not counting metadata)
-    assert.eq(0, db.myColl.aggregate([{"$out": 'yourColl'}]).itcount(), 'Aggregation failed');
+    assert.eq(0, db.myColl.aggregate([{"$out": "yourColl"}]).itcount(), "Aggregation failed");
 
     // Verify the $out stage completed.
     assert.eq(db.myColl.count({}), db.yourColl.count({}));

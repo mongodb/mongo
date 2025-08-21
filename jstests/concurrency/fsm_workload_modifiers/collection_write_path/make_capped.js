@@ -11,10 +11,12 @@
 export function makeCapped($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         db[collName].drop();
-        assert.commandWorked(db.createCollection(collName, {
-            capped: true,
-            size: 16384  // bytes
-        }));
+        assert.commandWorked(
+            db.createCollection(collName, {
+                capped: true,
+                size: 16384, // bytes
+            }),
+        );
 
         $super.setup.apply(this, arguments);
     };
@@ -25,7 +27,7 @@ export function makeCapped($config, $super) {
                 this.skipAssertions = true;
                 $super.states.find.apply(this, arguments);
             } catch (e) {
-                if (e.message.indexOf('CappedPositionLost') >= 0) {
+                if (e.message.indexOf("CappedPositionLost") >= 0) {
                     // Ignore errors when a cursor's position in the capped collection is deleted.
                     // Reads from the beginning of a capped collection are not guaranteed to succeed
                     // when there are concurrent inserts that cause a truncation.

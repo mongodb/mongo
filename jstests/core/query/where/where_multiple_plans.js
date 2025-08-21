@@ -19,12 +19,15 @@ assert.commandWorked(coll.insert({_id: 2, a: 2, b: 3, c: 1}));
 assert.commandWorked(coll.insert({_id: 3, a: 2, b: 3, c: 4}));
 assert.commandWorked(coll.insert({_id: 4, a: 2, b: 3, c: 4}));
 
-assert.eq(2,
-          coll.find({
-                  a: {$eq: 2},
-                  b: {$eq: 3},
-                  $where: function() {
-                      return this.c == 4;
-                  }
-              })
-              .itcount());
+assert.eq(
+    2,
+    coll
+        .find({
+            a: {$eq: 2},
+            b: {$eq: 3},
+            $where: function () {
+                return this.c == 4;
+            },
+        })
+        .itcount(),
+);

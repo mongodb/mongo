@@ -27,14 +27,14 @@ function createBigDocument() {
     // Returns a document of the form { _id: ObjectId(...), value: '...' } with the specified
     // 'targetSize' in bytes.
     function makeDocWithSize(targetSize) {
-        let doc = {_id: new ObjectId(), value: ''};
+        let doc = {_id: new ObjectId(), value: ""};
 
         let size = Object.bsonsize(doc);
         assert.gte(targetSize, size);
 
         // Set 'value' as a string with enough characters to make the whole document 'size'
         // bytes long.
-        doc.value = 'x'.repeat(targetSize - size);
+        doc.value = "x".repeat(targetSize - size);
         assert.eq(targetSize, Object.bsonsize(doc));
 
         return doc;
@@ -51,12 +51,16 @@ function runTest(testOptions) {
     // Insert a document so the mapper gets run.
     assert.commandWorked(db.input.insert({}));
 
-    let res = db.runCommand(Object.extend({
-        mapReduce: "input",
-        map: mapper,
-        out: {replace: "mr_bigobject_replace"},
-    },
-                                          testOptions));
+    let res = db.runCommand(
+        Object.extend(
+            {
+                mapReduce: "input",
+                map: mapper,
+                out: {replace: "mr_bigobject_replace"},
+            },
+            testOptions,
+        ),
+    );
 
     // In most cases we expect this to fail because it tries to insert a document that is too large,
     // or we see a particular error code which happens when the input is too large to reduce.
@@ -67,22 +71,23 @@ function runTest(testOptions) {
     assert.commandFailedWithCode(
         res,
         [ErrorCodes.BadValue, ErrorCodes.Interrupted, kCannotReduceLargeObjCode],
-        "creating a document larger than 16MB didn't fail");
+        "creating a document larger than 16MB didn't fail",
+    );
     // If we see 'BadValue', make sure the message indicates it's the kind of error we were
     // expecting.
     if (res.code === ErrorCodes.BadValue) {
         assert.lte(
             0,
             res.errmsg.indexOf("object to insert too large"),
-            "map-reduce command failed for a reason other than inserting a large document: " +
-                tojson(res));
+            "map-reduce command failed for a reason other than inserting a large document: " + tojson(res),
+        );
     }
 }
 
 runTest({reduce: createBigDocument});
 runTest({
-    reduce: function() {
+    reduce: function () {
         return 1;
     },
-    finalize: createBigDocument
+    finalize: createBigDocument,
 });

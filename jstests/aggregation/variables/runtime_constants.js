@@ -16,15 +16,15 @@ assert.commandWorked(coll.insert({x: true}));
 
 // Runtime constant $$IS_MR is unable to be retrieved by users.
 assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: coll.getName(), pipeline: [{$addFields: {testField: "$$IS_MR"}}], cursor: {}}),
-    [51144]);
+    db.runCommand({aggregate: coll.getName(), pipeline: [{$addFields: {testField: "$$IS_MR"}}], cursor: {}}),
+    [51144],
+);
 
 // Runtime constant $$JS_SCOPE is unable to be retrieved by users.
 assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: coll.getName(), pipeline: [{$addFields: {field: "$$JS_SCOPE"}}], cursor: {}}),
-    [51144]);
+    db.runCommand({aggregate: coll.getName(), pipeline: [{$addFields: {field: "$$JS_SCOPE"}}], cursor: {}}),
+    [51144],
+);
 
 // Tests that runtimeConstants can't be specified on a mongod if 'fromRouter' is false.
 const rtc = {
@@ -34,20 +34,24 @@ const rtc = {
 
 if (!FixtureHelpers.isMongos(db)) {
     // RuntimeConstants is disallowed when 'fromRouter' is false.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [{$project: {_id: 0}}],
-        cursor: {},
-        runtimeConstants: rtc,
-        fromRouter: false
-    }),
-                                 463840);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [{$project: {_id: 0}}],
+            cursor: {},
+            runtimeConstants: rtc,
+            fromRouter: false,
+        }),
+        463840,
+    );
     // RuntimeConstants is allowed when 'fromRouter' is true.
-    assert.commandWorked(db.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [{$project: {_id: 0}}],
-        cursor: {},
-        runtimeConstants: rtc,
-        fromRouter: true
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            aggregate: coll.getName(),
+            pipeline: [{$project: {_id: 0}}],
+            cursor: {},
+            runtimeConstants: rtc,
+            fromRouter: true,
+        }),
+    );
 }

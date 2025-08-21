@@ -9,10 +9,7 @@ for (let i = 0; i < 50; ++i) {
     assert.commandWorked(coll.insert({"": 123, "b": 456, sortField: i}));
 }
 
-assert.eq(coll.aggregate([
-                  {$sort: {sortField: 1}},
-                  {$addFields: {"m": {$meta: "sortKey"}}},
-                  {$match: {"b": 456}}
-              ])
-              .itcount(),
-          kNumDocs);
+assert.eq(
+    coll.aggregate([{$sort: {sortField: 1}}, {$addFields: {"m": {$meta: "sortKey"}}}, {$match: {"b": 456}}]).itcount(),
+    kNumDocs,
+);

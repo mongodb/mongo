@@ -15,16 +15,16 @@ import {isTimestamp} from "jstests/libs/timestamp_util.js";
 // compatible with implicit sessions.
 TestData.disableImplicitSessions = true;
 
-const keyFile = 'jstests/libs/key1';
+const keyFile = "jstests/libs/key1";
 const adminUser = {
     db: "admin",
     username: "foo",
-    password: "bar"
+    password: "bar",
 };
 const rUser = {
     db: "test",
     username: "r",
-    password: "bar"
+    password: "bar",
 };
 const timeoutValidLogicalTimeMs = 20 * 1000;
 
@@ -70,21 +70,26 @@ priRSConn.auth(rUser.username, rUser.password);
 
 // use assert.soon since it's possible the shard primary may not have refreshed
 // and loaded the keys into its KeyManager cache.
-assert.soon(function() {
-    return assertContainsValidLogicalTime(priRSConn);
-}, "Failed to assert valid logical time", timeoutValidLogicalTimeMs);
+assert.soon(
+    function () {
+        return assertContainsValidLogicalTime(priRSConn);
+    },
+    "Failed to assert valid logical time",
+    timeoutValidLogicalTimeMs,
+);
 
 priRSConn.logout();
 
 // Enable the failpoint, remove all keys, and restart the config servers with the failpoint
 // still enabled to guarantee there are no keys.
 for (let i = 0; i < st.configRS.nodes.length; i++) {
-    assert.commandWorked(st.configRS.nodes[i].adminCommand(
-        {"configureFailPoint": "disableKeyGeneration", "mode": "alwaysOn"}));
+    assert.commandWorked(
+        st.configRS.nodes[i].adminCommand({"configureFailPoint": "disableKeyGeneration", "mode": "alwaysOn"}),
+    );
 }
 
 var priCSConn = st.configRS.getPrimary();
-authutil.asCluster(priCSConn, keyFile, function() {
+authutil.asCluster(priCSConn, keyFile, function () {
     priCSConn.getDB("admin").system.keys.remove({purpose: "HMAC"});
 });
 
@@ -92,8 +97,7 @@ assert(adminDB.system.keys.count() == 0, "expected there to be no keys on the co
 adminDB.logout();
 
 st.configRS.stopSet(null /* signal */, true /* forRestart */);
-st.configRS.startSet(
-    {restart: true, setParameter: {"failpoint.disableKeyGeneration": "{'mode':'alwaysOn'}"}});
+st.configRS.startSet({restart: true, setParameter: {"failpoint.disableKeyGeneration": "{'mode':'alwaysOn'}"}});
 
 // bounce rs0 to clean the key cache
 st.rs0.stopSet(null /* signal */, true /* forRestart */);

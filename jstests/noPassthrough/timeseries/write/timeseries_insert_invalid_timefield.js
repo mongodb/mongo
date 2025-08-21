@@ -7,14 +7,15 @@ const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
-const coll = testDB.getCollection('t');
+const coll = testDB.getCollection("t");
 coll.drop();
 
-const timeFieldName = 'time';
-const metaFieldName = 'meta';
+const timeFieldName = "time";
+const metaFieldName = "meta";
 
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 // first test a good doc just in case
 const goodDocs = [
@@ -29,7 +30,7 @@ const goodDocs = [
         time: ISODate("2020-11-27T00:00:00.000Z"),
         meta: "A",
         data: true,
-    }
+    },
 ];
 assert.commandWorked(coll.insert(goodDocs[0]));
 assert.eq(1, coll.count());

@@ -16,16 +16,13 @@
  * - Read at T2 - 1 sec, assert success.
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    flushRoutersAndRefreshShardMetadata
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // The snapshot window is the max of minSnapshotHistoryWindowInSeconds and
 // transactionLifetimeLimitSeconds.
 const transactionLifetimeLimitSecs = 15;
 const minSnapshotHistoryWindowSecs = transactionLifetimeLimitSecs;
-const snapshotHistoryWindowSecs =
-    Math.max(minSnapshotHistoryWindowSecs, transactionLifetimeLimitSecs);
+const snapshotHistoryWindowSecs = Math.max(minSnapshotHistoryWindowSecs, transactionLifetimeLimitSecs);
 
 const st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 2}},
@@ -34,38 +31,37 @@ const st = new ShardingTest({
             setParameter: {
                 minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowSecs,
                 transactionLifetimeLimitSeconds: transactionLifetimeLimitSecs,
-                logComponentVerbosity: tojson({sharding: {verbosity: 2}})
-            }
+                logComponentVerbosity: tojson({sharding: {verbosity: 2}}),
+            },
         },
         rsOptions: {
             setParameter: {
                 minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowSecs,
                 transactionLifetimeLimitSeconds: transactionLifetimeLimitSecs,
-            }
-        }
-    }
+            },
+        },
+    },
 });
 
 const primaryAdmin = st.rs0.getPrimary().getDB("admin");
-assert.eq(assert
-              .commandWorked(
-                  primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
-              .minSnapshotHistoryWindowInSeconds,
-          minSnapshotHistoryWindowSecs);
+assert.eq(
+    assert.commandWorked(primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
+        .minSnapshotHistoryWindowInSeconds,
+    minSnapshotHistoryWindowSecs,
+);
 
 const configAdmin = st.configRS.getPrimary().getDB("admin");
-assert.eq(assert
-              .commandWorked(
-                  configAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
-              .minSnapshotHistoryWindowInSeconds,
-          minSnapshotHistoryWindowSecs);
+assert.eq(
+    assert.commandWorked(configAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
+        .minSnapshotHistoryWindowInSeconds,
+    minSnapshotHistoryWindowSecs,
+);
 
 const mongosDB = st.s.getDB(jsTestName());
 const mongosColl = mongosDB.test;
 const ns = `${jsTestName()}.test`;
 
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 st.shardColl(mongosColl, {_id: 1}, false);
 
 const getChunkHistory = (query) => {
@@ -74,14 +70,14 @@ const getChunkHistory = (query) => {
     return configChunks.findOne(query);
 };
 
-const origChunk = (function() {
+const origChunk = (function () {
     const coll = st.configRS.getPrimary().getDB("config").collections.findOne({_id: ns});
     if (coll.timestamp) {
         return getChunkHistory({uuid: coll.uuid});
     } else {
         return getChunkHistory({ns: ns});
     }
-}());
+})();
 jsTestLog(`Original chunk: ${tojson(origChunk)}`);
 assert.eq(1, origChunk.history.length, tojson(origChunk));
 let result = mongosDB.runCommand({insert: "test", documents: [{_id: 0}]});
@@ -104,8 +100,9 @@ const testMarginMS = 1000;
 const testWindowMS = snapshotHistoryWindowSecs * 1000 - testMarginMS;
 while (Date.now() - 1000 * insertTS.getTime() < testWindowMS) {
     // Test that reading from a snapshot at insertTS is still valid.
-    assert.commandWorked(mongosDB.runCommand(
-        {find: "test", readConcern: {level: "snapshot", atClusterTime: insertTS}}));
+    assert.commandWorked(
+        mongosDB.runCommand({find: "test", readConcern: {level: "snapshot", atClusterTime: insertTS}}),
+    );
 
     chunk = getChunkHistory({_id: origChunk._id});
     assert.eq(2, chunk.history.length, tojson(chunk));
@@ -130,11 +127,11 @@ flushRoutersAndRefreshShardMetadata(st, {ns});
 // history but the config servers don't.
 assert.commandFailedWithCode(
     mongosDB.runCommand({find: "test", readConcern: {level: "snapshot", atClusterTime: insertTS}}),
-    ErrorCodes.StaleChunkHistory);
+    ErrorCodes.StaleChunkHistory,
+);
 
 // One second before the newest history entry is valid (check we don't delete *all* old entries).
 var recentTS = Timestamp(chunk.history[0].validAfter.getTime() - 1, 0);
-assert.commandWorked(
-    mongosDB.runCommand({find: "test", readConcern: {level: "snapshot", atClusterTime: recentTS}}));
+assert.commandWorked(mongosDB.runCommand({find: "test", readConcern: {level: "snapshot", atClusterTime: recentTS}}));
 
 st.stop();

@@ -5,8 +5,8 @@
  * @tags: [requires_replication]
  */
 
-export const $config = (function() {
-    var states = (function() {
+export const $config = (function () {
+    var states = (function () {
         function resizeOplog(db, collName) {
             const oplogSizeBytes = (20 + Math.floor(50 * Math.random())) * 1024 * 1024;
             jsTest.log.info("Setting", {oplogSizeBytes});
@@ -51,7 +51,7 @@ export const $config = (function() {
     return {
         threadCount: 4,
         iterations: 100,
-        startState: 'insertDocs',
+        startState: "insertDocs",
         data: {},
         states: states,
         transitions: transitions,

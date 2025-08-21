@@ -13,13 +13,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 2});
 
 const kDbName = jsTestName();
-const kOutCollName = 'out';
-const kSourceCollName = 'foo';
-const kLookUpCollName = 'lookUp';
+const kOutCollName = "out";
+const kSourceCollName = "foo";
+const kLookUpCollName = "lookUp";
 const testDB = st.s.getDB(kDbName);
 const kSourceDocument = {
     x: 1,
-    t: ISODate()
+    t: ISODate(),
 };
 const kPipelineComment = "test_conflicting_namespace_shard_comment";
 const kPrimary = st.shard0.shardName;
@@ -30,13 +30,11 @@ assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: k
 // reference these collections in each test.
 const sourceColl = testDB[kSourceCollName];
 assert.commandWorked(sourceColl.insert(kSourceDocument));
-assert.commandWorked(
-    st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: kOther}));
+assert.commandWorked(st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: kOther}));
 
 const lookUpColl = testDB[kLookUpCollName];
 assert.commandWorked(lookUpColl.insert([{x: 1, t: ISODate(), lookup: 2}]));
-assert.commandWorked(
-    st.s.adminCommand({moveCollection: lookUpColl.getFullName(), toShard: kOther}));
+assert.commandWorked(st.s.adminCommand({moveCollection: lookUpColl.getFullName(), toShard: kOther}));
 
 // Run an $out aggregation pipeline where the $out runs on the non-primary shard and the collection
 // that $out is trying to replace is on the primary shard. Because we have the 'timeseries' option,
@@ -45,8 +43,7 @@ assert.commandWorked(
 function validateAggOutFailed(createCommand) {
     assert(testDB[kOutCollName].drop());
     assert.commandWorked(testDB.runCommand(createCommand));
-    assert.commandWorked(
-        st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: kPrimary}));
+    assert.commandWorked(st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: kPrimary}));
 
     // Must reset the profiler for all shards before running the aggregation.
     const kOtherShardDB = st.shard1.getDB(kDbName);
@@ -56,11 +53,10 @@ function validateAggOutFailed(createCommand) {
 
     const kPipeline = [
         {$lookup: {from: kLookUpCollName, localField: "x", foreignField: "x", as: "bb"}},
-        {$out: {db: kDbName, coll: kOutCollName, timeseries: {timeField: 't'}}}
+        {$out: {db: kDbName, coll: kOutCollName, timeseries: {timeField: "t"}}},
     ];
 
-    assert.throwsWithCode(() => sourceColl.aggregate(kPipeline, {comment: kPipelineComment}),
-                          7268700);
+    assert.throwsWithCode(() => sourceColl.aggregate(kPipeline, {comment: kPipelineComment}), 7268700);
 
     // Confirm the aggregation ran on the other shard using the profiler.
     let profileFilter = {
@@ -74,13 +70,11 @@ function validateAggOutFailed(createCommand) {
     assert.gt(kOtherShardDB.system.profile.find(profileFilter).itcount(), 0);
 
     // Validate the conflicting view or collection remains after $out failed.
-    const collections = testDB.getCollectionNames().filter(coll => !coll.startsWith("system."));
-    assert.sameMembers(
-        [kSourceCollName, kLookUpCollName, kOutCollName], collections, tojson(collections));
+    const collections = testDB.getCollectionNames().filter((coll) => !coll.startsWith("system."));
+    assert.sameMembers([kSourceCollName, kLookUpCollName, kOutCollName], collections, tojson(collections));
 }
 
 validateAggOutFailed({create: kOutCollName});
-validateAggOutFailed(
-    {create: kOutCollName, viewOn: kLookUpCollName, pipeline: [{$project: {val: 1}}]});
+validateAggOutFailed({create: kOutCollName, viewOn: kLookUpCollName, pipeline: [{$project: {val: 1}}]});
 
 st.stop();

@@ -25,12 +25,12 @@ import {getEngine, hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
-    setAvailableDiskSpaceMode
+    setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getSpillCounter() {
-    return accumulateServerStatusMetric(db, metrics => metrics.query.group.spills);
+    return accumulateServerStatusMetric(db, (metrics) => metrics.query.group.spills);
 }
 
 const sbeIncreasedSpillingKnob = "internalQuerySlotBasedExecutionHashAggIncreasedSpilling";
@@ -57,8 +57,7 @@ setServerParameter(classicIncreasedSpillingKnob, false);
 
 // For _internalInhibitOptimization tests, prevent DSCursor from reading all the data in a single
 // batch.
-const dsCursorKnobs =
-    ["internalDocumentSourceCursorInitialBatchSize", "internalDocumentSourceCursorBatchSizeBytes"];
+const dsCursorKnobs = ["internalDocumentSourceCursorInitialBatchSize", "internalDocumentSourceCursorBatchSizeBytes"];
 const dsCursorKnobValues = [];
 for (const knob of dsCursorKnobs) {
     dsCursorKnobValues.push(getServerParameter(knob));
@@ -94,32 +93,34 @@ for (let i = 0; i <= 200; i++) {
     // Create item key with some duplicates:
     // - 80% of documents have unique items (128+ distinct items)
     // - 20% of documents reuse existing items to test grouping behavior
-    const itemChar = (i % 5 === 0)
-        ? String.fromCharCode(96 + (i % 26) + 1)    // Creates duplicates from a-z
-        : String.fromCharCode(96 + (i % 220) + 1);  // Still ensures 200+ distinct items
+    const itemChar =
+        i % 5 === 0
+            ? String.fromCharCode(96 + (i % 26) + 1) // Creates duplicates from a-z
+            : String.fromCharCode(96 + (i % 220) + 1); // Still ensures 200+ distinct items
 
     manyDocs.push({
         "_id": i,
         "item": itemChar,
         "price": Math.floor(Math.random() * 100),
         "quantity": Math.floor(Math.random() * 20),
-        "date": new Date(2014, Math.floor(i % 12), Math.floor((i % 28) + 1))
+        "date": new Date(2014, Math.floor(i % 12), Math.floor((i % 28) + 1)),
     });
 }
 assert.commandWorked(collMany.insertMany(manyDocs));
 
-const groupPipeline = [{
-    $group: {
-        _id: "$item",
-        totalQuantity: {$sum: "$quantity"},
-        totalRevenue: {$sum: {$multiply: ["$price", "$quantity"]}}
-    }
-}];
+const groupPipeline = [
+    {
+        $group: {
+            _id: "$item",
+            totalQuantity: {$sum: "$quantity"},
+            totalRevenue: {$sum: {$multiply: ["$price", "$quantity"]}},
+        },
+    },
+];
 
 const pipelines = [
     groupPipeline,
-    groupPipeline.concat(
-        {$_internalInhibitOptimization: {}}),  // Prevents the pipeline from being eliminated.
+    groupPipeline.concat({$_internalInhibitOptimization: {}}), // Prevents the pipeline from being eliminated.
 ];
 
 for (const pipeline of pipelines) {
@@ -154,8 +155,10 @@ for (const pipeline of pipelines) {
             assert.eq(releaseMemoryRes.cursorsReleased, [cursorId], releaseMemoryRes);
             // In a timeseries collection, in sbe, all records are consumed in the first batch (up
             // to kBlockOutSize = 128) and there is nothing to spill.
-            const willNotSpill = isTimeSeriesCollection(db, coll.getName()) &&
-                expectedResults.length <= 128 && getEngine(explain) === "sbe";
+            const willNotSpill =
+                isTimeSeriesCollection(db, coll.getName()) &&
+                expectedResults.length <= 128 &&
+                getEngine(explain) === "sbe";
             if (willNotSpill) {
                 assert.eq(initialSpillCount, getSpillCounter());
             } else {
@@ -207,8 +210,7 @@ for (const pipeline of pipelines) {
             setServerParameter(classicMemorySizeKnob, 100 * 1024 * 1024);
             let initialSpillCount = getSpillCounter();
 
-            const cursor = coll.aggregate(
-                pipeline, {"allowDiskUse": true, cursor: {batchSize: expectedResultsCount}});
+            const cursor = coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: expectedResultsCount}});
             const cursorId = cursor.getId();
             const newSpillCount = getSpillCounter();
             assert.eq(newSpillCount, initialSpillCount);
@@ -232,23 +234,23 @@ for (const pipeline of pipelines) {
 
         // No disk space available for spilling.
         {
-            const willNotSpill = isTimeSeriesCollection(db, coll.getName()) &&
-                expectedResults.length <= 128 && getEngine(explain) === "sbe";
+            const willNotSpill =
+                isTimeSeriesCollection(db, coll.getName()) &&
+                expectedResults.length <= 128 &&
+                getEngine(explain) === "sbe";
             if (!willNotSpill) {
                 jsTest.log(`Running releaseMemory with no disk space available`);
-                const cursor =
-                    coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
+                const cursor = coll.aggregate(pipeline, {"allowDiskUse": true, cursor: {batchSize: 1}});
                 const cursorId = cursor.getId();
 
                 // Release memory (i.e., spill)
-                setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+                setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "alwaysOn");
                 const releaseMemoryCmd = {releaseMemory: [cursorId]};
                 jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
                 const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
                 assert.commandWorked(releaseMemoryRes);
-                assertReleaseMemoryFailedWithCode(
-                    releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
-                setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+                assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
+                setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
 
                 jsTest.log.info("Running getMore");
                 assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);
@@ -266,8 +268,7 @@ for (const pipeline of pipelines) {
         {
             jsTest.log(`Running releaseMemory with no allowDiskUse`);
 
-            const cursor =
-                coll.aggregate(pipeline, {"allowDiskUse": false, cursor: {batchSize: 1}});
+            const cursor = coll.aggregate(pipeline, {"allowDiskUse": false, cursor: {batchSize: 1}});
             const cursorId = cursor.getId();
 
             // Release memory (i.e., spill)
@@ -277,7 +278,7 @@ for (const pipeline of pipelines) {
             assert.commandWorked(releaseMemoryRes);
             assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, [
                 ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-                ErrorCodes.ReleaseMemoryShardError
+                ErrorCodes.ReleaseMemoryShardError,
             ]);
 
             jsTest.log.info("Running getMore");

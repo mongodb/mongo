@@ -19,13 +19,13 @@ const rst = new ReplSetTest({
                 priority: 0,
             },
         },
-    ]
+    ],
 });
 rst.startSet();
 rst.initiate();
 
-const dbName = 'test';
-const collName = 'coll';
+const dbName = "test";
+const collName = "coll";
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB.getCollection(collName);
@@ -42,22 +42,22 @@ const secondaryColl = secondaryDB.getCollection(collName);
 // effectively pausing the index build on the secondary too as it will wait for the primary to
 // commit or abort.
 IndexBuildTest.pauseIndexBuilds(primary);
-const hangBeforeVoteCommit = configureFailPoint(primary, 'hangBeforeVoteCommitIndexBuild');
+const hangBeforeVoteCommit = configureFailPoint(primary, "hangBeforeVoteCommitIndexBuild");
 
 const tookActionCountBefore = secondaryDB.serverStatus().metrics.diskSpaceMonitor.tookAction;
 
 jsTestLog("Waiting for index build to start on secondary");
-const createIdx = IndexBuildTest.startIndexBuild(
-    primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.IndexBuildAborted]);
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), 'a_1');
+const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, null, [
+    ErrorCodes.IndexBuildAborted,
+]);
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), "a_1");
 
 // Wait until secondary is voting for commit.
 hangBeforeVoteCommit.wait();
 
 // Default indexBuildMinAvailableDiskSpaceMB is 500 MB.
 // Simulate a remaining disk space of 450MB on the secondary node.
-const simulateDiskSpaceFp =
-    configureFailPoint(secondaryDB, 'simulateAvailableDiskSpace', {bytes: 450 * 1024 * 1024});
+const simulateDiskSpaceFp = configureFailPoint(secondaryDB, "simulateAvailableDiskSpace", {bytes: 450 * 1024 * 1024});
 
 jsTestLog("Waiting for the disk space monitor to take action on secondary");
 assert.soon(() => {
@@ -77,7 +77,7 @@ simulateDiskSpaceFp.off();
 assert.eq(0, primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace);
 assert.eq(0, secondaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace);
 
-IndexBuildTest.assertIndexesSoon(primaryColl, 2, ['_id_', 'a_1']);
-IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexesSoon(primaryColl, 2, ["_id_", "a_1"]);
+IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_", "a_1"]);
 
 rst.stopSet();

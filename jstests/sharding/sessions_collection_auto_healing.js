@@ -16,9 +16,8 @@ TestData.disableImplicitSessions = true;
 var st = new ShardingTest({
     shards: 0,
     other: {
-        mongosOptions:
-            {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
-    }
+        mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
+    },
 });
 var configSvr = st.configRS.getPrimary();
 
@@ -52,8 +51,9 @@ var mongosConfig = mongos.getDB("config");
 {
     assert.eq(mongosConfig.shards.countDocuments({}), 0);
 
-    assert.commandFailedWithCode(configSvr.adminCommand({refreshLogicalSessionCacheNow: 1}),
-                                 [ErrorCodes.ShardNotFound]);
+    assert.commandFailedWithCode(configSvr.adminCommand({refreshLogicalSessionCacheNow: 1}), [
+        ErrorCodes.ShardNotFound,
+    ]);
 
     validateSessionsCollection(configSvr, false, false);
 }
@@ -109,8 +109,9 @@ var shardConfig = shard.getDB("config");
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(shard, false, false);
 
-    assert.commandFailedWithCode(shard.adminCommand({refreshLogicalSessionCacheNow: 1}),
-                                 [ErrorCodes.NamespaceNotSharded]);
+    assert.commandFailedWithCode(shard.adminCommand({refreshLogicalSessionCacheNow: 1}), [
+        ErrorCodes.NamespaceNotSharded,
+    ]);
 
     validateSessionsCollection(configSvr, false, false);
     validateSessionsCollection(shard, false, false);

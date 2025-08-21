@@ -10,11 +10,9 @@ t.drop();
 let goldenPoint = {type: "Point", coordinates: [31.0, 41.0]};
 t.insert({geo: goldenPoint});
 t.createIndex({geo: "2dsphere"});
-let resNear =
-    t.aggregate([
-         {$geoNear: {near: [30, 40], distanceField: "d", spherical: true, includeLocs: "loc"}},
-         {$limit: 1}
-     ]).toArray();
+let resNear = t
+    .aggregate([{$geoNear: {near: [30, 40], distanceField: "d", spherical: true, includeLocs: "loc"}}, {$limit: 1}])
+    .toArray();
 assert.eq(resNear.length, 1, tojson(resNear));
 assert.eq(resNear[0].loc, goldenPoint);
 
@@ -35,26 +33,47 @@ let origin = {"type": "Point", "coordinates": [lng, lat]};
 t.createIndex({geo: "2dsphere"});
 
 // Near only works when the query is a point.
-let someline = {"type": "LineString", "coordinates": [[40, 5], [41, 6]]};
-let somepoly = {"type": "Polygon", "coordinates": [[[40, 5], [40, 6], [41, 6], [41, 5], [40, 5]]]};
-assert.throws(function() {
+let someline = {
+    "type": "LineString",
+    "coordinates": [
+        [40, 5],
+        [41, 6],
+    ],
+};
+let somepoly = {
+    "type": "Polygon",
+    "coordinates": [
+        [
+            [40, 5],
+            [40, 6],
+            [41, 6],
+            [41, 5],
+            [40, 5],
+        ],
+    ],
+};
+assert.throws(function () {
     return t.find({"geo": {"$near": {"$geometry": someline}}}).count();
 });
-assert.throws(function() {
+assert.throws(function () {
     return t.find({"geo": {"$near": {"$geometry": somepoly}}}).count();
 });
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: t.getName(),
-    cursor: {},
-    pipeline: [{$geoNear: {near: someline, distanceField: "dis", spherical: true}}]
-}),
-                             2);
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: t.getName(),
-    cursor: {},
-    pipeline: [{$geoNear: {near: somepoly, distanceField: "dis", spherical: true}}]
-}),
-                             2);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: t.getName(),
+        cursor: {},
+        pipeline: [{$geoNear: {near: someline, distanceField: "dis", spherical: true}}],
+    }),
+    2,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: t.getName(),
+        cursor: {},
+        pipeline: [{$geoNear: {near: somepoly, distanceField: "dis", spherical: true}}],
+    }),
+    2,
+);
 
 // Do some basic near searches.
 let res = t.find({"geo": {"$near": {"$geometry": origin, $maxDistance: 2000}}}).limit(10);
@@ -65,19 +84,13 @@ resNear = t.aggregate([
 assert.eq(res.itcount(), resNear.itcount(), "10");
 
 res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10);
-resNear = t.aggregate([
-    {$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}},
-    {$limit: 10},
-]);
+resNear = t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}}, {$limit: 10}]);
 assert.eq(res.itcount(), resNear.itcount(), "10");
 
 // Find all the points!
 res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10000);
-resNear = t.aggregate([
-    {$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}},
-    {$limit: 10000},
-]);
-assert.eq(res.itcount(), resNear.itcount(), ((2 * points) * (2 * points)).toString());
+resNear = t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}}, {$limit: 10000}]);
+assert.eq(res.itcount(), resNear.itcount(), (2 * points * (2 * points)).toString());
 
 // longitude goes -180 to 180
 // latitude goes -90 to 90
@@ -88,39 +101,40 @@ t.insert({geo: {"type": "Point", "coordinates": [180, -90]}});
 t.insert({geo: {"type": "Point", "coordinates": [180, 90]}});
 t.insert({geo: {"type": "Point", "coordinates": [-180, 90]}});
 res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10000);
-resNear = t.aggregate([
-    {$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}},
-    {$limit: 10000},
-]);
-assert.eq(res.itcount(), resNear.itcount(), ((2 * points) * (2 * points) + 4).toString());
+resNear = t.aggregate([{$geoNear: {near: [0, 0], distanceField: "dis", spherical: true}}, {$limit: 10000}]);
+assert.eq(res.itcount(), resNear.itcount(), (2 * points * (2 * points) + 4).toString());
 
 function testRadAndDegreesOK(distance) {
     // Distance for old style points is radians.
-    let resRadians =
-        t.find({geo: {$nearSphere: [0, 0], $maxDistance: (distance / (6378.1 * 1000))}});
+    let resRadians = t.find({geo: {$nearSphere: [0, 0], $maxDistance: distance / (6378.1 * 1000)}});
     // Distance for new style points is meters.
     let resMeters = t.find({"geo": {"$near": {"$geometry": origin, $maxDistance: distance}}});
     // And we should get the same # of results no matter what.
     assert.eq(resRadians.itcount(), resMeters.itcount());
 
     // Also, $geoNear should behave the same way.
-    let resGNMeters = t.aggregate({
-                           $geoNear: {
-                               near: origin,
-                               distanceField: "dis",
-                               maxDistance: distance,
-                               spherical: true,
-                           }
-                       }).toArray();
-    let resGNRadians = t.aggregate({
-                            $geoNear: {
-                                near: [0, 0],
-                                distanceField: "dis",
-                                maxDistance: (distance / (6378.1 * 1000)),
-                                spherical: true,
-                            }
-                        }).toArray();
-    const errmsg = `$geoNear using meter distances returned ${tojson(resGNMeters)}, but ` +
+    let resGNMeters = t
+        .aggregate({
+            $geoNear: {
+                near: origin,
+                distanceField: "dis",
+                maxDistance: distance,
+                spherical: true,
+            },
+        })
+        .toArray();
+    let resGNRadians = t
+        .aggregate({
+            $geoNear: {
+                near: [0, 0],
+                distanceField: "dis",
+                maxDistance: distance / (6378.1 * 1000),
+                spherical: true,
+            },
+        })
+        .toArray();
+    const errmsg =
+        `$geoNear using meter distances returned ${tojson(resGNMeters)}, but ` +
         `$geoNear using radian distances returned ${tojson(resGNRadians)}`;
     assert.eq(resGNRadians.length, resGNMeters.length, errmsg);
     for (var i = 0; i < resGNRadians.length; ++i) {
@@ -135,15 +149,19 @@ testRadAndDegreesOK(50);
 testRadAndDegreesOK(10000);
 
 // SERVER-13666 legacy coordinates must be in bounds for spherical near queries.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: t.getName(),
-    cursor: {},
-    pipeline: [{
-        $geoNear: {
-            near: [1210.466, 31.2051],
-            distanceField: "dis",
-            spherical: true,
-        }
-    }]
-}),
-                             2);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: t.getName(),
+        cursor: {},
+        pipeline: [
+            {
+                $geoNear: {
+                    near: [1210.466, 31.2051],
+                    distanceField: "dis",
+                    spherical: true,
+                },
+            },
+        ],
+    }),
+    2,
+);

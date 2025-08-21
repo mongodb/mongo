@@ -19,7 +19,7 @@ var rst = st.rs0;
 // Insert data into replica set
 var conn = new Mongo(st.s.host);
 
-var coll = conn.getCollection('test.countSecondaryOk');
+var coll = conn.getCollection("test.countSecondaryOk");
 coll.drop();
 
 var bulk = coll.initializeUnorderedBulkOp();

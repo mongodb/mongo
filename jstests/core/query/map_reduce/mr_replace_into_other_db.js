@@ -21,17 +21,20 @@ const outDb = db.getMongo().getDB(outDbStr);
 assert.commandWorked(outDb.random_coll.insert({val: 1}));
 const outColl = outDb[outCollStr];
 
-const mapFn = function() {
-    for (let i = 0; i < this.a.length; i++)
-        emit(this.a[i], 1);
+const mapFn = function () {
+    for (let i = 0; i < this.a.length; i++) emit(this.a[i], 1);
 };
-const reduceFn = function(k, vs) {
+const reduceFn = function (k, vs) {
     return Array.sum(vs);
 };
 
-let res = assert.commandWorked(
-    coll.mapReduce(mapFn, reduceFn, {out: {replace: outCollStr, db: outDbStr}}));
-const expected = [{_id: 1, value: 1}, {_id: 2, value: 2}, {_id: 3, value: 2}, {_id: 4, value: 1}];
+let res = assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {replace: outCollStr, db: outDbStr}}));
+const expected = [
+    {_id: 1, value: 1},
+    {_id: 2, value: 2},
+    {_id: 3, value: 2},
+    {_id: 4, value: 1},
+];
 let actual = outColl.find().sort({_id: 1}).toArray();
 assert.eq(expected, actual);
 

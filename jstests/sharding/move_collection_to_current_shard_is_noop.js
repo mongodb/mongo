@@ -20,9 +20,9 @@ const st = new ShardingTest({
     rs: {nodes: 2},
 });
 
-const dbName = 'db';
+const dbName = "db";
 const unsplittableCollName = "foo_unsplittable";
-const ns = dbName + '.' + unsplittableCollName;
+const ns = dbName + "." + unsplittableCollName;
 let shard0 = st.shard0.shardName;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: shard0}));

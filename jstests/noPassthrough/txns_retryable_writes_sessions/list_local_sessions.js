@@ -16,13 +16,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({
     shards: 1,
     mongos: 1,
-    other: {mongosOptions: {setParameter: {disableLogicalSessionCacheRefresh: true}}}
+    other: {mongosOptions: {setParameter: {disableLogicalSessionCacheRefresh: true}}},
 });
 
 const admin = st.s.getDB("admin");
 
 function listLocalSessions() {
-    return admin.aggregate([{'$listLocalSessions': {allUsers: false}}]);
+    return admin.aggregate([{"$listLocalSessions": {allUsers: false}}]);
 }
 
 // Get current log level.
@@ -37,16 +37,16 @@ try {
     const resultArray = assert.doesNotThrow(listLocalSessions).toArray();
     assert.gte(resultArray.length, 1);
     const resultArrayMine = resultArray
-                                .map(function(sess) {
-                                    return sess._id.id;
-                                })
-                                .filter(function(id) {
-                                    return 0 == bsonWoCompare({x: id}, {x: myid});
-                                });
+        .map(function (sess) {
+            return sess._id.id;
+        })
+        .filter(function (id) {
+            return 0 == bsonWoCompare({x: id}, {x: myid});
+        });
     assert.eq(resultArrayMine.length, 1);
 
     // Try asking for the session by username.
-    const myusername = (function() {
+    const myusername = (function () {
         if (0 == bsonWoCompare({x: resultArray[0]._id.uid}, {x: computeSHA256Block("")})) {
             // Code for "we're running in no-auth mode"
             return {user: "", db: ""};
@@ -60,30 +60,29 @@ try {
         return {user: authUsers[0].user, db: authUsers[0].db};
     })();
 
-    const listMyLocalSessions = function() {
-        return admin.aggregate([{'$listLocalSessions': {users: [myusername]}}]);
+    const listMyLocalSessions = function () {
+        return admin.aggregate([{"$listLocalSessions": {users: [myusername]}}]);
     };
 
-    const myArray = assert.doesNotThrow(listMyLocalSessions)
-                        .toArray()
-                        .map(function(sess) {
-                            return sess._id.id;
-                        })
-                        .filter(function(id) {
-                            return 0 == bsonWoCompare({x: id}, {x: myid});
-                        });
+    const myArray = assert
+        .doesNotThrow(listMyLocalSessions)
+        .toArray()
+        .map(function (sess) {
+            return sess._id.id;
+        })
+        .filter(function (id) {
+            return 0 == bsonWoCompare({x: id}, {x: myid});
+        });
     assert.eq(myArray.length, 1);
 
-    print("sessions returned from $listLocalSessions filtered by user:          [ " + myArray +
-          " ]");
-    print("sessions returned from un-filtered $listLocalSessions for this user: [ " +
-          resultArrayMine + " ]");
+    print("sessions returned from $listLocalSessions filtered by user:          [ " + myArray + " ]");
+    print("sessions returned from un-filtered $listLocalSessions for this user: [ " + resultArrayMine + " ]");
 
     assert.eq(
         0,
         bsonWoCompare(myArray, resultArrayMine),
-        "set of listed sessions for user contains different sessions from prior $listLocalSessions run");
-
+        "set of listed sessions for user contains different sessions from prior $listLocalSessions run",
+    );
 } finally {
     admin.setLogLevel(originalLogLevel);
 }

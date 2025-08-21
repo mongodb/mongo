@@ -11,8 +11,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // session.
 TestData.disableImplicitSessions = true;
 
-const replSetTest =
-    new ReplSetTest({nodes: 2, name: "change-stream-state-commands", serverless: true});
+const replSetTest = new ReplSetTest({nodes: 2, name: "change-stream-state-commands", serverless: true});
 
 replSetTest.startSet({
     serverless: true,
@@ -20,14 +19,14 @@ replSetTest.startSet({
         featureFlagServerlessChangeStreams: true,
         featureFlagSecurityToken: true,
         multitenancySupport: true,
-    }
+    },
 });
 replSetTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Used to set security token on primary and secondary node. Run this when you want to change the
 // tenant that can interact with the repl set
 function setTokenOnEachNode(token) {
-    replSetTest.nodes.forEach(node => {
+    replSetTest.nodes.forEach((node) => {
         node._setSecurityToken(token);
     });
 }
@@ -46,8 +45,9 @@ const token2 = _createTenantToken({tenant: secondOrgTenantId});
 function setChangeStreamState(enabled) {
     assert.soon(() => {
         try {
-            assert.commandWorked(replSetTest.getPrimary().getDB("admin").runCommand(
-                {setChangeStreamState: 1, enabled: enabled}));
+            assert.commandWorked(
+                replSetTest.getPrimary().getDB("admin").runCommand({setChangeStreamState: 1, enabled: enabled}),
+            );
             return true;
         } catch (ex) {
             // The 'setChangeStreamState' will throw 'ConflictingOperationInProgress' if the
@@ -67,16 +67,14 @@ function assertChangeStreamState(enabled) {
     replSetTest.awaitReplication();
     setTokenOnEachNode(token1);
 
-    assert.eq(
-        assert.commandWorked(primary.getDB("admin").runCommand({getChangeStreamState: 1})).enabled,
-        enabled);
+    assert.eq(assert.commandWorked(primary.getDB("admin").runCommand({getChangeStreamState: 1})).enabled, enabled);
 
-    const primaryColls =
-        assert.commandWorked(primary.getDB("config").runCommand({listCollections: 1}))
-            .cursor.firstBatch.map(coll => coll.name);
-    const secondaryColls =
-        assert.commandWorked(secondary.getDB("config").runCommand({listCollections: 1}))
-            .cursor.firstBatch.map(coll => coll.name);
+    const primaryColls = assert
+        .commandWorked(primary.getDB("config").runCommand({listCollections: 1}))
+        .cursor.firstBatch.map((coll) => coll.name);
+    const secondaryColls = assert
+        .commandWorked(secondary.getDB("config").runCommand({listCollections: 1}))
+        .cursor.firstBatch.map((coll) => coll.name);
 
     // Verify that the change collection exists both in the primary and the secondary.
     assert.eq(primaryColls.includes("system.change_collection"), enabled);
@@ -95,15 +93,17 @@ setTokenOnEachNode(token1);
 
     // Verify that the 'setChangeStreamState' command cannot be run with db other than the
     // 'admin' db.
-    assert.commandFailedWithCode(replSetTest.getPrimary().getDB("config").runCommand(
-                                     {setChangeStreamState: 1, enabled: true}),
-                                 ErrorCodes.Unauthorized);
+    assert.commandFailedWithCode(
+        replSetTest.getPrimary().getDB("config").runCommand({setChangeStreamState: 1, enabled: true}),
+        ErrorCodes.Unauthorized,
+    );
 
     // Verify that the 'getChangeStreamState' command cannot be run with db other than the
     // 'admin' db.
     assert.commandFailedWithCode(
         replSetTest.getPrimary().getDB("config").runCommand({getChangeStreamState: 1}),
-        ErrorCodes.Unauthorized);
+        ErrorCodes.Unauthorized,
+    );
 
     // Verify that the change stream is enabled for the tenant.
     setChangeStreamState(true);
@@ -142,8 +142,10 @@ setTokenOnEachNode(token1);
     const secondary = replSetTest.getSecondary();
 
     // Hang the 'SetChangeStreamStateCoordinator' before processing the command request.
-    const fpHangBeforeCmdProcessor =
-        configureFailPoint(primary, "hangSetChangeStreamStateCoordinatorBeforeCommandProcessor");
+    const fpHangBeforeCmdProcessor = configureFailPoint(
+        primary,
+        "hangSetChangeStreamStateCoordinatorBeforeCommandProcessor",
+    );
 
     // While the failpoint is active, issue a request to enable change stream. This command will
     // hang at the fail point.
@@ -152,7 +154,9 @@ setTokenOnEachNode(token1);
             let shellConn = db.getSiblingDB("admin").getMongo();
             shellConn._setSecurityToken(token);
             db.getSiblingDB("admin").runCommand({setChangeStreamState: 1, enabled: true});
-        }, token1), primary.port);
+        }, token1),
+        primary.port,
+    );
 
     // Wait until the fail point is hit.
     fpHangBeforeCmdProcessor.wait();
@@ -175,9 +179,7 @@ setTokenOnEachNode(token1);
 
     // Wait until the new primary has enabled the change stream.
     assert.soon(() => {
-        return assert
-            .commandWorked(
-                replSetTest.getPrimary().getDB("admin").runCommand({getChangeStreamState: 1}))
+        return assert.commandWorked(replSetTest.getPrimary().getDB("admin").runCommand({getChangeStreamState: 1}))
             .enabled;
     });
 
@@ -203,8 +205,10 @@ setTokenOnEachNode(token1);
     const primary = replSetTest.getPrimary();
 
     // Hang the 'SetChangeStreamStateCoordinator' before processing the command request.
-    const fpHangBeforeCmdProcessor =
-        configureFailPoint(primary, "hangSetChangeStreamStateCoordinatorBeforeCommandProcessor");
+    const fpHangBeforeCmdProcessor = configureFailPoint(
+        primary,
+        "hangSetChangeStreamStateCoordinatorBeforeCommandProcessor",
+    );
 
     // While the failpoint is active, issue a request to enable change stream for the tenant. This
     // command will hang at the fail point.
@@ -212,9 +216,10 @@ setTokenOnEachNode(token1);
         funWithArgs((token) => {
             let shellConn = db.getSiblingDB("admin").getMongo();
             shellConn._setSecurityToken(token);
-            assert.commandWorked(
-                db.getSiblingDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
-        }, token1), primary.port);
+            assert.commandWorked(db.getSiblingDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+        }, token1),
+        primary.port,
+    );
 
     // Wait until the fail point is hit.
     fpHangBeforeCmdProcessor.wait();
@@ -222,9 +227,12 @@ setTokenOnEachNode(token1);
     // While the first command is still hung, issue a request to disable the change stream for the
     // same tenants. This request should bail out with 'ConflictingOperationInProgress' exception.
     assert.throwsWithCode(
-        () => assert.commandWorked(replSetTest.getPrimary().getDB("admin").runCommand(
-            {setChangeStreamState: 1, enabled: false})),
-        ErrorCodes.ConflictingOperationInProgress);
+        () =>
+            assert.commandWorked(
+                replSetTest.getPrimary().getDB("admin").runCommand({setChangeStreamState: 1, enabled: false}),
+            ),
+        ErrorCodes.ConflictingOperationInProgress,
+    );
 
     // Turn off the fail point.
     fpHangBeforeCmdProcessor.off();
@@ -249,14 +257,15 @@ setTokenOnEachNode(token1);
     const primary = replSetTest.getPrimary();
 
     // Hang the 'SetChangeStreamStateCoordinator' before processing the command request.
-    const fpHangBeforeCmdProcessor =
-        configureFailPoint(primary, "hangSetChangeStreamStateCoordinatorBeforeCommandProcessor");
+    const fpHangBeforeCmdProcessor = configureFailPoint(
+        primary,
+        "hangSetChangeStreamStateCoordinatorBeforeCommandProcessor",
+    );
 
     const shellFn = (token) => {
         let shellConn = db.getSiblingDB("admin").getMongo();
         shellConn._setSecurityToken(token);
-        assert.commandWorked(
-            db.getSiblingDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+        assert.commandWorked(db.getSiblingDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
     };
 
     // While the failpoint is active, issue a request to enable change stream for the tenant. This
@@ -301,17 +310,20 @@ setTokenOnEachNode(token1);
     const primary = replSetTest.getPrimary();
 
     // Hang the 'SetChangeStreamStateCoordinator' before processing the command request.
-    const fpHangBeforeCmdProcessor =
-        configureFailPoint(primary, "hangSetChangeStreamStateCoordinatorBeforeCommandProcessor");
+    const fpHangBeforeCmdProcessor = configureFailPoint(
+        primary,
+        "hangSetChangeStreamStateCoordinatorBeforeCommandProcessor",
+    );
 
     // Enable the change stream for the tenant 'firstOrgTenantId' in parallel.
     const firstTenantShellReturn = startParallelShell(
         funWithArgs((token) => {
             let shellConn = db.getSiblingDB("admin").getMongo();
             shellConn._setSecurityToken(token);
-            assert.commandWorked(
-                db.getSiblingDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
-        }, token1), primary.port);
+            assert.commandWorked(db.getSiblingDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+        }, token1),
+        primary.port,
+    );
 
     // Wait until the above request hits the fail point.
     fpHangBeforeCmdProcessor.wait({timesEntered: 1});
@@ -322,9 +334,10 @@ setTokenOnEachNode(token1);
         funWithArgs((token) => {
             let shellConn = db.getSiblingDB("admin").getMongo();
             shellConn._setSecurityToken(token);
-            assert.commandWorked(
-                db.getSiblingDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
-        }, token2), primary.port);
+            assert.commandWorked(db.getSiblingDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+        }, token2),
+        primary.port,
+    );
 
     // The request from the 'secondOrgTenantId' will also hang.
     fpHangBeforeCmdProcessor.wait({timesEntered: 2});

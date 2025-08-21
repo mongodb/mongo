@@ -6,18 +6,14 @@
  * ]
  */
 
-import {
-    getUriForColl,
-    insertInvalidUTF8,
-    startMongodOnExistingPath,
-} from "jstests/disk/libs/wt_file_helper.js";
+import {getUriForColl, insertInvalidUTF8, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {clearHealthLog, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 const BSONWarningQuery = {
     operation: "dbCheckBatch",
     severity: "warning",
-    msg: "Document is not well-formed BSON"
+    msg: "Document is not well-formed BSON",
 };
 
 const baseName = "dbcheck_full_bson_validate";
@@ -49,24 +45,34 @@ clearHealthLog(replSet);
 
 let dbCheckParameters = {
     validateMode: "dataConsistencyAndMissingIndexKeysCheck",
-    bsonValidateMode: "kFull"
+    bsonValidateMode: "kFull",
 };
 runDbCheck(replSet, db, collName, dbCheckParameters, true /* awaitCompletion */);
 
-assert.soon(function() {
+assert.soon(function () {
     if (primaryHealthlog.find(BSONWarningQuery).itcount() == numDocs) {
-        return String(primaryHealthlog.find(BSONWarningQuery)
-                          .toArray()
-                          .map((a => a["data"]["context"]["recordID"]))) == String([1]);
+        return (
+            String(
+                primaryHealthlog
+                    .find(BSONWarningQuery)
+                    .toArray()
+                    .map((a) => a["data"]["context"]["recordID"]),
+            ) == String([1])
+        );
     }
     return false;
 }, "dbCheck command didn't complete, record ID of invalid BSON document not in health log entry");
 
-assert.soon(function() {
+assert.soon(function () {
     if (secondaryHealthlog.find(BSONWarningQuery).itcount() == numDocs) {
-        return String(secondaryHealthlog.find(BSONWarningQuery)
-                          .toArray()
-                          .map((a => a["data"]["context"]["recordID"]))) == String([1]);
+        return (
+            String(
+                secondaryHealthlog
+                    .find(BSONWarningQuery)
+                    .toArray()
+                    .map((a) => a["data"]["context"]["recordID"]),
+            ) == String([1])
+        );
     }
     return false;
 }, "dbCheck command didn't complete, record ID of invalid BSON document not in health log entry");

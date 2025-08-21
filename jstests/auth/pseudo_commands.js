@@ -8,18 +8,18 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
-    conn.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
+    conn.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"]});
 
     const adminConn = new Mongo(conn.host);
-    const admin = adminConn.getDB('admin');
+    const admin = adminConn.getDB("admin");
 
-    assert(admin.auth('admin', 'pwd'));
-    admin.createRole({role: 'myRole', roles: [], privileges: []});
-    admin.createUser({user: 'spencer', pwd: 'pwd', roles: ['myRole']});
+    assert(admin.auth("admin", "pwd"));
+    admin.createRole({role: "myRole", roles: [], privileges: []});
+    admin.createUser({user: "spencer", pwd: "pwd", roles: ["myRole"]});
     const arbitraryShard = admin.getSiblingDB("config").shards.findOne();
 
-    const db = conn.getDB('admin');
-    assert(db.auth('spencer', 'pwd'));
+    const db = conn.getDB("admin");
+    assert(db.auth("spencer", "pwd"));
 
     /**
      * Tests that a single operation has the proper authorization.  The operation is run by invoking
@@ -49,7 +49,7 @@ function runTest(conn) {
      */
     function isMongos(db) {
         var res = db.adminCommand({isdbgrid: 1});
-        return (res.ok == 1 && res.isdbgrid == 1);
+        return res.ok == 1 && res.isdbgrid == 1;
     }
 
     (function testInprog() {
@@ -68,12 +68,12 @@ function runTest(conn) {
             hostManager: false,
             clusterAdmin: true,
             root: true,
-            __system: true
+            __system: true,
         };
 
-        var privilege = {resource: {cluster: true}, actions: ['inprog']};
+        var privilege = {resource: {cluster: true}, actions: ["inprog"]};
 
-        var testFunc = function(shouldPass) {
+        var testFunc = function (shouldPass) {
             var passed = true;
             try {
                 var res = db.currentOp();
@@ -107,24 +107,25 @@ function runTest(conn) {
             hostManager: true,
             clusterAdmin: true,
             root: true,
-            __system: true
+            __system: true,
         };
 
-        var privilege = {resource: {cluster: true}, actions: ['killop']};
+        var privilege = {resource: {cluster: true}, actions: ["killop"]};
 
-        var testFunc = function(shouldPass) {
+        var testFunc = function (shouldPass) {
             var passed = true;
             try {
                 var opid;
-                const maxOpId = Math.pow(2, 31) - 1;  // Operation id cannot exceed INT_MAX.
-                if (isMongos(db)) {  // opid format different between mongos and mongod
+                const maxOpId = Math.pow(2, 31) - 1; // Operation id cannot exceed INT_MAX.
+                if (isMongos(db)) {
+                    // opid format different between mongos and mongod
                     opid = arbitraryShard._id + ":" + maxOpId.toString();
                 } else {
                     opid = maxOpId;
                 }
                 var res = db.killOp(opid);
                 printjson(res);
-                passed = res.ok && !res.errmsg && !res.err && !res['$err'];
+                passed = res.ok && !res.errmsg && !res.err && !res["$err"];
             } catch (e) {
                 passed = false;
             }
@@ -136,7 +137,7 @@ function runTest(conn) {
 
     (function testUnlock() {
         if (isMongos(db)) {
-            return;  // unlock doesn't work on mongos
+            return; // unlock doesn't work on mongos
         }
 
         jsTestLog("Testing unlock");
@@ -154,26 +155,25 @@ function runTest(conn) {
             hostManager: true,
             clusterAdmin: true,
             root: true,
-            __system: true
+            __system: true,
         };
 
-        var privilege = {resource: {cluster: true}, actions: ['unlock']};
+        var privilege = {resource: {cluster: true}, actions: ["unlock"]};
 
-        var testFunc = function(shouldPass) {
+        var testFunc = function (shouldPass) {
             var passed = true;
             try {
-                var ret = admin.fsyncLock();  // must be locked first
+                var ret = admin.fsyncLock(); // must be locked first
                 // If the storage engine doesnt support fsync lock, we can't proceed
                 if (!ret.ok) {
                     assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
-                    assert(
-                        shouldPass);  // If we get to the storage engine, we better be authorized.
+                    assert(shouldPass); // If we get to the storage engine, we better be authorized.
                     return;
                 }
                 var res = db.fsyncUnlock();
                 printjson(res);
-                passed = res.ok && !res.errmsg && !res.err && !res['$err'];
-                passed = passed || false;  // convert undefined to false
+                passed = res.ok && !res.errmsg && !res.err && !res["$err"];
+                passed = passed || false; // convert undefined to false
             } catch (e) {
                 passed = false;
             }
@@ -188,12 +188,12 @@ function runTest(conn) {
     })();
 }
 
-jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: ''});
+jsTest.log("Test standalone");
+var conn = MongoRunner.runMongod({auth: ""});
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
-jsTest.log('Test sharding');
-var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1'});
+jsTest.log("Test sharding");
+var st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
 runTest(st.s);
 st.stop();

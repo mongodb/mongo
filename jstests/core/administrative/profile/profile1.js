@@ -13,8 +13,9 @@
 //   requires_fcv_61,
 // ]
 
-const findCommandBatchSize = assert.commandWorked(db.adminCommand(
-    {getParameter: 1, internalQueryFindCommandBatchSize: 1}))["internalQueryFindCommandBatchSize"];
+const findCommandBatchSize = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}),
+)["internalQueryFindCommandBatchSize"];
 
 // function argument overwritten won't affect original value and it can be run in parallel tests
 function profileCursor(testDb, query) {
@@ -42,9 +43,11 @@ try {
     testDb.auth(username, "password");
 
     // expect error given unrecognized options
-    assert.commandFailedWithCode(testDb.runCommand({profile: 0, unknown: {}}),
-                                 ErrorCodes.IDLUnknownField,
-                                 "Expected IDL to reject unknown field for profile command.");
+    assert.commandFailedWithCode(
+        testDb.runCommand({profile: 0, unknown: {}}),
+        ErrorCodes.IDLUnknownField,
+        "Expected IDL to reject unknown field for profile command.",
+    );
 
     // With pre-created system.profile (capped)
     testDb.runCommand({profile: 0});
@@ -64,9 +67,8 @@ try {
 
     // create a msg for later if there is a failure.
     var msg = "";
-    profileItems.forEach(function(d) {
-        msg += "profile doc: " + d.ns + " " + d.op + " " + tojson(d.query ? d.query : d.command) +
-            '\n';
+    profileItems.forEach(function (d) {
+        msg += "profile doc: " + d.ns + " " + d.op + " " + tojson(d.query ? d.query : d.command) + "\n";
     });
     msg += tojson(testDb.system.profile.stats());
 
@@ -77,7 +79,7 @@ try {
     assert.eq(expectedDocs, profileItems.length, "E2 -- " + msg);
 
     // Make sure we can't drop if profiling is still on
-    assert.throws(function(z) {
+    assert.throws(function (z) {
         testDb.getCollection("system.profile").drop();
     });
 

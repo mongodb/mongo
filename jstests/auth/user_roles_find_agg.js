@@ -19,9 +19,10 @@ function runFind(db) {
     assert.eq(
         [
             {_id: "admin.readWriteAnyDatabase", role: "readWriteAnyDatabase", db: "admin"},
-            {_id: "test.read", role: "read", db: dbName}
+            {_id: "test.read", role: "read", db: dbName},
         ],
-        result.myRoles);
+        result.myRoles,
+    );
 }
 
 function runAgg(db) {
@@ -31,7 +32,7 @@ function runAgg(db) {
         comment: "only for engineering team",
         teamMembers: ["John", "Ashley", "Gina"],
         yearlyEduBudget: 15000,
-        yearlyTnEBudget: 2000
+        yearlyTnEBudget: 2000,
     };
 
     let salesDoc = {
@@ -48,10 +49,11 @@ function runAgg(db) {
     // user's roles is not empty, i.e. the user's role allows them to see the document in the
     // results. In this case, only the engDoc has the the "read" role that was assigned to the user,
     // so only the engDoc will appear in the results.
-    let pipeline = [{
-        $match:
-            {$expr: {$not: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}}}
-    }];
+    let pipeline = [
+        {
+            $match: {$expr: {$not: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}}},
+        },
+    ];
     let res = coll.aggregate(pipeline).toArray();
     assert.eq([engDoc], res);
 
@@ -65,18 +67,15 @@ function runAgg(db) {
     let findColl = db.getCollection(findCollName);
     const lookupPipeline = [
         {$lookup: {from: aggCollName, pipeline: subpipeline, as: "docThatMatchesRoles"}},
-        {$project: {_id: 0, docThatMatchesRoles: 1}}
+        {$project: {_id: 0, docThatMatchesRoles: 1}},
     ];
     const lookupRes = findColl.aggregate(lookupPipeline).toArray();
-    assert.eq(
-        [{"docThatMatchesRoles": [{"_id": 2, "allowedRoles": ["readWriteAnyDatabase", "read"]}]}],
-        lookupRes);
+    assert.eq([{"docThatMatchesRoles": [{"_id": 2, "allowedRoles": ["readWriteAnyDatabase", "read"]}]}], lookupRes);
 
     // Ensure that $$USER_ROLES can be present in a $unionWith subpipeline. The result set should
     // include the one document from findColl and the document from the unioned collection inserted
     // above where the allowedRoles field has the currently authenticated user's roles.
-    const unionWithPipeline =
-        [{$unionWith: {coll: aggCollName, pipeline: subpipeline}}, {$project: {_id: 0}}];
+    const unionWithPipeline = [{$unionWith: {coll: aggCollName, pipeline: subpipeline}}, {$project: {_id: 0}}];
     const unionWithRes = findColl.aggregate(unionWithPipeline).toArray();
     assert.eq([{a: 1}, {allowedRoles: ["readWriteAnyDatabase", "read"]}], unionWithRes);
 }
@@ -99,11 +98,16 @@ function runTest(conn, shardingTest = null) {
 
     // Create a user that has roles on more than one database. The readWriteAnyDatabase is necessary
     // for the inserts that follow to work.
-    assert.commandWorked(db.runCommand({
-        createUser: "user",
-        pwd: "pwd",
-        roles: [{role: "readWriteAnyDatabase", db: "admin"}, {role: "read", db: dbName}]
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            createUser: "user",
+            pwd: "pwd",
+            roles: [
+                {role: "readWriteAnyDatabase", db: "admin"},
+                {role: "read", db: dbName},
+            ],
+        }),
+    );
 
     // Logout of the admin user so that we can log into the other user so we can access those roles
     // with $$USER_ROLES below.
@@ -127,7 +131,7 @@ const st = new ShardingTest({
     mongos: 1,
     config: 1,
     shards: 2,
-    keyFile: 'jstests/libs/key1',
+    keyFile: "jstests/libs/key1",
 });
 
 runTest(st.s, st);

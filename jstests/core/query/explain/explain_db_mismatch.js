@@ -5,5 +5,7 @@
 //  # `simulate_atlas_proxy` override.
 //  simulate_atlas_proxy_incompatible,
 // ]
-assert.commandFailedWithCode(db.runCommand({explain: {find: 'some_collection', $db: 'not_my_db'}}),
-                             ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(
+    db.runCommand({explain: {find: "some_collection", $db: "not_my_db"}}),
+    ErrorCodes.InvalidNamespace,
+);

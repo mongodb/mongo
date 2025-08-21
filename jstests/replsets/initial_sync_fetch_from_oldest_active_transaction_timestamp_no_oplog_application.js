@@ -31,8 +31,9 @@ const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application";
@@ -76,22 +77,23 @@ jsTestLog("Expected beginFetchingTimestamp: " + tojson(beginFetchingTs));
 // also cause the beginApplyingTimestamp to be different from the beginFetchingTimestamp. Note
 // that since the beginApplyingTimestamp is the timestamp after which operations are applied
 // during initial sync, this commitTransaction will not be applied.
-const beginApplyingTimestamp =
-    assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp1))
-        .operationTime;
+const beginApplyingTimestamp = assert.commandWorked(
+    PrepareHelpers.commitTransaction(session1, prepareTimestamp1),
+).operationTime;
 
 jsTestLog("beginApplyingTimestamp/stopTimestamp: " + tojson(beginApplyingTimestamp));
 
 // Restart the secondary with startClean set to true so that it goes through initial sync. Since
 // we won't be running any operations during collection cloning, the beginApplyingTimestamp and
 // stopTimestamp should be the same.
-replTest.stop(secondary,
-              // signal
-              undefined,
-              // Validation would encounter a prepare conflict on the open transaction.
-              {skipValidation: true});
-secondary = replTest.start(
-    secondary, {startClean: true, setParameter: {'numInitialSyncAttempts': 1}}, true /* wait */);
+replTest.stop(
+    secondary,
+    // signal
+    undefined,
+    // Validation would encounter a prepare conflict on the open transaction.
+    {skipValidation: true},
+);
+secondary = replTest.start(secondary, {startClean: true, setParameter: {"numInitialSyncAttempts": 1}}, true /* wait */);
 replTest.awaitSecondaryNodes();
 replTest.awaitReplication();
 

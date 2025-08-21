@@ -20,7 +20,7 @@ function isEndAcquireUserEvent(log) {
         return false;
     }
     const user = log.attr.userName;
-    return (user.user === testUser) && (user.db === testDB);
+    return user.user === testUser && user.db === testDB;
 }
 
 function isInvalidateUserEvent(log) {
@@ -29,7 +29,7 @@ function isInvalidateUserEvent(log) {
         return false;
     }
     const user = log.attr.user;
-    return (user.user === testUser) && (user.db === testDB);
+    return user.user === testUser && user.db === testDB;
 }
 
 function isStartAcquireUserEvent(log) {
@@ -38,7 +38,7 @@ function isStartAcquireUserEvent(log) {
         return false;
     }
     const user = log.attr.user;
-    return (user.user === testUser) && (user.db === testDB);
+    return user.user === testUser && user.db === testDB;
 }
 
 /**
@@ -50,7 +50,7 @@ function isStartAcquireUserEvent(log) {
  */
 function assertHasLog(conn, cond, after) {
     var ret = undefined;
-    assert.soon(function() {
+    assert.soon(function () {
         const log = checkLog.getGlobalLog(conn);
         var line;
         for (line in log) {
@@ -59,7 +59,7 @@ function assertHasLog(conn, cond, after) {
                 continue;
             }
 
-            line.t = Date.parse(line.t['$date']);
+            line.t = Date.parse(line.t["$date"]);
             if (line.t >= after) {
                 ret = line;
                 break;
@@ -78,13 +78,13 @@ function assertHasLog(conn, cond, after) {
  */
 function assertLacksLog(conn, cond, start, end) {
     const log = checkLog.getGlobalLog(conn);
-    log.forEach(function(line) {
+    log.forEach(function (line) {
         line = JSON.parse(line);
-        line.t = Date.parse(line.t['$date']);
+        line.t = Date.parse(line.t["$date"]);
         if (line.t < start || line.t > end) {
             return;
         }
-        assert(!cond(line), 'Found entry which should not exist: ' + tojson(line));
+        assert(!cond(line), "Found entry which should not exist: " + tojson(line));
     });
 }
 
@@ -106,16 +106,16 @@ function assertLacksLog(conn, cond, start, end) {
  * sees testRole successfully revoked, and our query fails.
  */
 function runTest(writeNode, readNode, awaitReplication) {
-    const writeAdmin = writeNode.getDB('admin');
-    const readAdmin = readNode.getDB('admin');
+    const writeAdmin = writeNode.getDB("admin");
+    const readAdmin = readNode.getDB("admin");
 
-    writeAdmin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
-    assert(writeAdmin.auth('admin', 'pwd'));
-    assert.soon(() => readAdmin.auth('admin', 'pwd'));
-    assert.commandWorked(readNode.setLogLevel(3, 'accessControl'));
+    writeAdmin.createUser({user: "admin", pwd: "pwd", roles: ["root"]});
+    assert(writeAdmin.auth("admin", "pwd"));
+    assert.soon(() => readAdmin.auth("admin", "pwd"));
+    assert.commandWorked(readNode.setLogLevel(3, "accessControl"));
 
     const writeTest = writeNode.getDB(testDB);
-    writeTest.createUser({user: testUser, pwd: 'pwd', roles: [testRole]});
+    writeTest.createUser({user: testUser, pwd: "pwd", roles: [testRole]});
     assert.writeOK(writeTest.coll.insert({x: 1}));
 
     awaitReplication();
@@ -130,28 +130,32 @@ function runTest(writeNode, readNode, awaitReplication) {
 
     // Set the failpoint before we start the parallel thread so that findOne blocks before user
     // acquisition.
-    const fp = configureFailPoint(
-        readNode, 'waitForUserCacheInvalidation', {userName: {db: testDB, user: testUser}});
+    const fp = configureFailPoint(readNode, "waitForUserCacheInvalidation", {userName: {db: testDB, user: testUser}});
 
-    const thread = new Thread(function(port, testUser, testDB) {
-        const mongo = new Mongo('localhost:' + port);
-        assert(mongo);
-        const test = mongo.getDB(testDB);
-        assert(test);
+    const thread = new Thread(
+        function (port, testUser, testDB) {
+            const mongo = new Mongo("localhost:" + port);
+            assert(mongo);
+            const test = mongo.getDB(testDB);
+            assert(test);
 
-        jsTest.log('Starting auth');
-        assert(test.auth(testUser, 'pwd'));
-        jsTest.log('Completed auth');
+            jsTest.log("Starting auth");
+            assert(test.auth(testUser, "pwd"));
+            jsTest.log("Completed auth");
 
-        assert.throws(() => test.coll.findOne({}), [], "Find succeeded despite revokeRoleFromUser");
-        jsTest.log('Ran command');
-    }, readNode.port, testUser, testDB);
+            assert.throws(() => test.coll.findOne({}), [], "Find succeeded despite revokeRoleFromUser");
+            jsTest.log("Ran command");
+        },
+        readNode.port,
+        testUser,
+        testDB,
+    );
     thread.start();
 
     // Wait for initial auth to start.
-    jsTest.log('Looking for initial user acquisition');
+    jsTest.log("Looking for initial user acquisition");
     assertHasLogAndAdvance(readNode, isStartAcquireUserEvent);
-    jsTest.log('Waiting for initial acquisition to end');
+    jsTest.log("Waiting for initial acquisition to end");
     {
         const entry = assertHasLogAndAdvance(readNode, isEndAcquireUserEvent);
 
@@ -169,20 +173,20 @@ function runTest(writeNode, readNode, awaitReplication) {
 
     // Mutate the user to cause an invalidation.
     // Use writeConcern 1 to avoid blocking on the secondary applications.
-    jsTest.log('Mutating');
+    jsTest.log("Mutating");
     writeTest.revokeRolesFromUser(testUser, [testRole], {w: 1});
 
-    jsTest.log('Looking for invalidation');
+    jsTest.log("Looking for invalidation");
     assertHasLogAndAdvance(readNode, isInvalidateUserEvent);
 
     // Once invalidation happens, the parallel thread breaks out from the
     // waitForUserCacheInvalidation failpoint and proceeds to acquire the user object.
-    jsTest.log('Looking for new acquisition');
+    jsTest.log("Looking for new acquisition");
     assertHasLogAndAdvance(readNode, isStartAcquireUserEvent);
 
     // This should result in getting the newly updated user object without the removed role.
-    jsTest.log('Waiting for reacquisition to end');
-    assertHasLogAndAdvance(readNode, function(entry) {
+    jsTest.log("Waiting for reacquisition to end");
+    assertHasLogAndAdvance(readNode, function (entry) {
         if (!isEndAcquireUserEvent(entry)) {
             return false;
         }
@@ -191,13 +195,13 @@ function runTest(writeNode, readNode, awaitReplication) {
         return entry.attr.directRoles.length == 0;
     });
 
-    jsTest.log('Looking for authZ failure for read after revokeRolesFromUser');
+    jsTest.log("Looking for authZ failure for read after revokeRolesFromUser");
     assertHasLogAndAdvance(readNode, isAuthFailureEvent);
 
     fp.off();
     thread.join();
 
-    jsTest.log('Thread complete');
+    jsTest.log("Thread complete");
 
     writeAdmin.logout();
     readAdmin.logout();
@@ -205,14 +209,14 @@ function runTest(writeNode, readNode, awaitReplication) {
 
 {
     // Standalone
-    const mongod = MongoRunner.runMongod({auth: ''});
+    const mongod = MongoRunner.runMongod({auth: ""});
     runTest(mongod, mongod, () => null);
     MongoRunner.stopMongod(mongod);
 }
 
 {
     // ReplicaSet
-    const rst = new ReplSetTest({nodes: 2, keyFile: 'jstests/libs/key1'});
+    const rst = new ReplSetTest({nodes: 2, keyFile: "jstests/libs/key1"});
     rst.startSet();
     // Prevent stepdowns, by setting priority to zero on all but one node.
     const cfg = rst.getReplSetConfig();
@@ -223,7 +227,7 @@ function runTest(writeNode, readNode, awaitReplication) {
     rst.awaitSecondaryNodes();
 
     // Freeze secondaries to avoid surprise stepdowns.
-    rst.getSecondaries().forEach(node => rst.freeze(node));
+    rst.getSecondaries().forEach((node) => rst.freeze(node));
     rst.awaitReplication();
 
     // Now identify the permanent primary and secondary we'll use.

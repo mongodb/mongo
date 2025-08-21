@@ -12,11 +12,7 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
-import {
-    getAggPlanStages,
-    getPlanStage,
-    getWinningPlanFromExplain
-} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const conn = MongoRunner.runMongod();
@@ -35,8 +31,7 @@ function resetCollection() {
 function resetForeignCollection() {
     testDB.foreign.drop();
     const forColl = testDB.getCollection("foreign");
-    for (var i = 4; i < 18; i += 2)
-        assert.commandWorked(forColl.insert({b: i}));
+    for (var i = 4; i < 18; i += 2) assert.commandWorked(forColl.insert({b: i}));
 }
 //
 // Confirm hasSortStage with in-memory sort.
@@ -55,10 +50,8 @@ profileObj = getLatestProfilerEntry(testDB);
 assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
 assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
 
-assert.commandWorked(
-    testDB.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 10}));
-assert.eq(
-    8, coll.aggregate([{$match: {a: {$gte: 2}}}, {$sort: {a: 1}}], {allowDiskUse: true}).itcount());
+assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 10}));
+assert.eq(8, coll.aggregate([{$match: {a: {$gte: 2}}}, {$sort: {a: 1}}], {allowDiskUse: true}).itcount());
 profileObj = getLatestProfilerEntry(testDB);
 
 assert.eq(profileObj.usedDisk, true, tojson(profileObj));
@@ -99,8 +92,7 @@ coll.aggregate([{$group: {"_id": {$avg: "$a"}}}], {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
 assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
 
-assert.commandWorked(
-    testDB.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 10}));
+assert.commandWorked(testDB.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 10}));
 resetCollection();
 coll.aggregate([{$group: {"_id": {$avg: "$a"}}}], {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
@@ -115,13 +107,18 @@ assert.gt(profileObj.groupSpilledDataStorageSize, 0, tojson(profileObj));
 //
 coll.drop();
 assert.commandWorked(
-    coll.insertMany([{a: "green tea", b: 5}, {a: "black tea", b: 6}, {a: "black coffee", b: 7}]));
+    coll.insertMany([
+        {a: "green tea", b: 5},
+        {a: "black tea", b: 6},
+        {a: "black coffee", b: 7},
+    ]),
+);
 assert.commandWorked(coll.createIndex({a: "text"}));
 assert.commandWorked(testDB.adminCommand({setParameter: 1, internalTextOrStageMaxMemoryBytes: 1}));
 
-coll.aggregate(
-    [{$match: {$text: {$search: "black tea"}}}, {$addFields: {score: {$meta: "textScore"}}}],
-    {allowDiskUse: true});
+coll.aggregate([{$match: {$text: {$search: "black tea"}}}, {$addFields: {score: {$meta: "textScore"}}}], {
+    allowDiskUse: true,
+});
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 assert.gt(profileObj.textOrSpills, 0, tojson(profileObj));
@@ -129,8 +126,7 @@ assert.gt(profileObj.textOrSpilledBytes, 0, tojson(profileObj));
 assert.gt(profileObj.textOrSpilledRecords, 0, tojson(profileObj));
 assert.gt(profileObj.textOrSpilledDataStorageSize, 0, tojson(profileObj));
 
-coll.aggregate([{$match: {$text: {$search: "black tea"}}}, {$sort: {_: {$meta: "textScore"}}}],
-               {allowDiskUse: true});
+coll.aggregate([{$match: {$text: {$search: "black tea"}}}, {$sort: {_: {$meta: "textScore"}}}], {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 assert.gt(profileObj.textOrSpills, 0, tojson(profileObj));
@@ -146,22 +142,29 @@ assert.gt(profileObj.sortSpilledDataStorageSize, 0, tojson(profileObj));
 // Confirm that usedDisk is correctly detected for the $graphLookup stage.
 //
 coll.drop();
-assert.commandWorked(coll.insertMany([
-    {_id: 1, to: [2, 3]},
-    {_id: 2, to: [4, 5]},
-    {_id: 3, to: [6, 7]},
-    {_id: 4},
-    {_id: 5},
-    {_id: 6},
-    {_id: 7}
-]));
 assert.commandWorked(
-    testDB.adminCommand({setParameter: 1, internalDocumentSourceGraphLookupMaxMemoryBytes: 1}));
+    coll.insertMany([
+        {_id: 1, to: [2, 3]},
+        {_id: 2, to: [4, 5]},
+        {_id: 3, to: [6, 7]},
+        {_id: 4},
+        {_id: 5},
+        {_id: 6},
+        {_id: 7},
+    ]),
+);
+assert.commandWorked(testDB.adminCommand({setParameter: 1, internalDocumentSourceGraphLookupMaxMemoryBytes: 1}));
 
 const graphLookupStage = {
-        $graphLookup:
-            { from: "coll", startWith: 1, connectFromField: "to", connectToField: "_id", as: "path", depthField: "depth" }
-    };
+    $graphLookup: {
+        from: "coll",
+        startWith: 1,
+        connectFromField: "to",
+        connectToField: "_id",
+        as: "path",
+        depthField: "depth",
+    },
+};
 
 coll.aggregate([{$limit: 1}, graphLookupStage], {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
@@ -183,8 +186,7 @@ assert.gt(profileObj.graphLookupSpilledDataStorageSize, 0, tojson(profileObj));
 // Confirm that usedDisk is correctly detected for the $setWindowFields stage.
 //
 
-const setWindowFieldsPipeline =
-    [{$setWindowFields: {sortBy: {a: 1}, output: {as: {$addToSet: "$a"}}}}];
+const setWindowFieldsPipeline = [{$setWindowFields: {sortBy: {a: 1}, output: {as: {$addToSet: "$a"}}}}];
 
 function getSetWindowFieldsMemoryLimit() {
     const explain = coll.explain().aggregate(setWindowFieldsPipeline);
@@ -198,10 +200,12 @@ function getSetWindowFieldsMemoryLimit() {
     }
 }
 
-assert.commandWorked(testDB.adminCommand({
-    setParameter: 1,
-    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: getSetWindowFieldsMemoryLimit()
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        setParameter: 1,
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes: getSetWindowFieldsMemoryLimit(),
+    }),
+);
 resetCollection();
 coll.aggregate(setWindowFieldsPipeline, {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
@@ -221,11 +225,9 @@ assert.gt(profileObj.sortSpilledDataStorageSize, 0, tojson(profileObj));
 resetCollection();
 resetForeignCollection();
 coll.aggregate(
-    [
-        {$lookup: {let : {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "foreign", as: "same"}},
-        {$unwind: "$same"}
-    ],
-    {allowDiskUse: true});
+    [{$lookup: {let: {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "foreign", as: "same"}}, {$unwind: "$same"}],
+    {allowDiskUse: true},
+);
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 
@@ -235,9 +237,9 @@ assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 //
 resetCollection();
 resetForeignCollection();
-coll.aggregate(
-    [{$lookup: {let : {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "foreign", as: "same"}}],
-    {allowDiskUse: true});
+coll.aggregate([{$lookup: {let: {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "foreign", as: "same"}}], {
+    allowDiskUse: true,
+});
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 
@@ -248,11 +250,12 @@ resetCollection();
 resetForeignCollection();
 coll.aggregate(
     [
-        {$lookup: {let : {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "foreign", as: "same"}},
+        {$lookup: {let: {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "foreign", as: "same"}},
         {$unwind: "$same"},
-        {$limit: 3}
+        {$limit: 3},
     ],
-    {allowDiskUse: true});
+    {allowDiskUse: true},
+);
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 
@@ -264,38 +267,42 @@ resetForeignCollection();
 coll.aggregate(
     [
         {$limit: 1},
-        {$lookup: {let : {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "foreign", as: "same"}},
-        {$unwind: "$same"}
+        {$lookup: {let: {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "foreign", as: "same"}},
+        {$unwind: "$same"},
     ],
-    {allowDiskUse: true});
+    {allowDiskUse: true},
+);
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 
 //
 // Test that usedDisk is not set for a $lookup with a pipeline that does not use disk.
 //
-assert.commandWorked(testDB.adminCommand(
-    {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 100 * 1024 * 1024}));
+assert.commandWorked(
+    testDB.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 100 * 1024 * 1024}),
+);
 resetCollection();
 resetForeignCollection();
-coll.aggregate(
-    [{$lookup: {let : {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "otherTest", as: "same"}}],
-    {allowDiskUse: true});
+coll.aggregate([{$lookup: {let: {var1: "$a"}, pipeline: [{$sort: {a: 1}}], from: "otherTest", as: "same"}}], {
+    allowDiskUse: true,
+});
 profileObj = getLatestProfilerEntry(testDB);
 assert(!profileObj.hasOwnProperty("usedDisk"), tojson(profileObj));
 
-assert.commandWorked(testDB.adminCommand({
-    setParameter: 1,
-    internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
-}));
-assert.commandWorked(testDB.adminCommand(
-    {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}));
+assert.commandWorked(
+    testDB.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1,
+    }),
+);
+assert.commandWorked(
+    testDB.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}),
+);
 
 function checkHashLookup(pipeline) {
     // HashLookup spills only in SBE
     const explain = coll.explain().aggregate(pipeline);
-    if (getAggPlanStages(explain, "EQ_LOOKUP_UNWIND").length > 0 ||
-        getAggPlanStages(explain, "EQ_LOOKUP").length > 0) {
+    if (getAggPlanStages(explain, "EQ_LOOKUP_UNWIND").length > 0 || getAggPlanStages(explain, "EQ_LOOKUP").length > 0) {
         coll.aggregate(pipeline, {allowDiskUse: true});
         const profileObj = getLatestProfilerEntry(testDB);
         assert.eq(profileObj.usedDisk, true, tojson(profileObj));
@@ -306,14 +313,13 @@ function checkHashLookup(pipeline) {
     }
 }
 
-const lookupPipeline =
-    [{$lookup: {from: "foreign", localField: "a", foreignField: "b", as: "same"}}];
+const lookupPipeline = [{$lookup: {from: "foreign", localField: "a", foreignField: "b", as: "same"}}];
 checkHashLookup(lookupPipeline);
 
 const lookupUnwindPipeline = [
     {$lookup: {from: "foreign", localField: "a", foreignField: "b", as: "same"}},
     {$unwind: "$same"},
-    {$project: {same: 1}}
+    {$project: {same: 1}},
 ];
 checkHashLookup(lookupUnwindPipeline);
 
@@ -321,9 +327,11 @@ checkHashLookup(lookupUnwindPipeline);
 // Test that aggregate command fails when 'allowDiskUse:false' because of insufficient available
 // memory to perform group.
 //
-assert.throws(() => coll.aggregate(
-                  [{$unionWith: {coll: "foreign", pipeline: [{$group: {"_id": {$avg: "$b"}}}]}}],
-                  {allowDiskUse: false}));
+assert.throws(() =>
+    coll.aggregate([{$unionWith: {coll: "foreign", pipeline: [{$group: {"_id": {$avg: "$b"}}}]}}], {
+        allowDiskUse: false,
+    }),
+);
 
 //
 // Test that the above command succeeds with 'allowDiskUse:true'. 'usedDisk' is correctly detected
@@ -331,21 +339,18 @@ assert.throws(() => coll.aggregate(
 //
 resetCollection();
 resetForeignCollection();
-coll.aggregate([{$unionWith: {coll: "foreign", pipeline: [{$group: {"_id": {$avg: "$b"}}}]}}],
-               {allowDiskUse: true});
+coll.aggregate([{$unionWith: {coll: "foreign", pipeline: [{$group: {"_id": {$avg: "$b"}}}]}}], {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
 assert.eq(profileObj.usedDisk, true, tojson(profileObj));
 
 //
 // Test that usedDisk is not set for a $unionWith with a sub-pipeline that does not use disk.
 //
-coll.aggregate([{$unionWith: {coll: "foreign", pipeline: [{$sort: {b: 1}}]}}],
-               {allowDiskUse: true});
+coll.aggregate([{$unionWith: {coll: "foreign", pipeline: [{$sort: {b: 1}}]}}], {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
 assert(!profileObj.usedDisk, tojson(profileObj));
 
-coll.aggregate([{$unionWith: {coll: "foreign", pipeline: [{$match: {a: 1}}]}}],
-               {allowDiskUse: true});
+coll.aggregate([{$unionWith: {coll: "foreign", pipeline: [{$match: {a: 1}}]}}], {allowDiskUse: true});
 profileObj = getLatestProfilerEntry(testDB);
 assert(!profileObj.usedDisk, tojson(profileObj));
 
@@ -357,8 +362,7 @@ MongoRunner.stopMongod(conn);
 const st = new ShardingTest({shards: 2});
 const shardedDB = st.s.getDB(jsTestName());
 
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: shardedDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: shardedDB.getName(), primaryShard: st.shard0.shardName}));
 
 const shardedSourceColl = shardedDB.coll1;
 const shardedForeignColl = shardedDB.coll2;
@@ -392,76 +396,86 @@ function restartProfiler() {
     }
 }
 
-assert.commandWorked(
-    shard0DB.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 10}));
+assert.commandWorked(shard0DB.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 10}));
 restartProfiler();
 // Test that 'usedDisk' doesn't get populated on the profiler entry of the base pipeline, when the
 // $unionWith'd pipeline needs to use disk on a sharded collection.
-assert.commandWorked(shardedDB.runCommand({
-    aggregate: shardedSourceColl.getName(),
-    pipeline: [{
-        $unionWith:
-            {coll: shardedForeignColl.getName(), pipeline: [{$group: {"_id": {$avg: "$x"}}}]}
-    }],
-    cursor: {},
-    allowDiskUse: true,
-}));
+assert.commandWorked(
+    shardedDB.runCommand({
+        aggregate: shardedSourceColl.getName(),
+        pipeline: [
+            {
+                $unionWith: {coll: shardedForeignColl.getName(), pipeline: [{$group: {"_id": {$avg: "$x"}}}]},
+            },
+        ],
+        cursor: {},
+        allowDiskUse: true,
+    }),
+);
 // Verify that the $unionWith'd pipeline always has the profiler entry.
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shard0DB,
-    filter:
-        {'command.getMore': {$exists: true}, usedDisk: true, ns: shardedForeignColl.getFullName()}
+    filter: {"command.getMore": {$exists: true}, usedDisk: true, ns: shardedForeignColl.getFullName()},
 });
 
 // If the $mergeCursor is ran on the shard0DB, then the profiler entry should have the 'usedDisk'
 // set.
-if (shard0DB.system.profile
+if (
+    shard0DB.system.profile
         .find({
             ns: shardedSourceColl.getFullName(),
-            'command.pipeline.$mergeCursors': {$exists: true}
+            "command.pipeline.$mergeCursors": {$exists: true},
         })
-        .itcount() > 0) {
+        .itcount() > 0
+) {
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard0DB,
         filter: {
-            'command.pipeline.$mergeCursors': {$exists: true},
+            "command.pipeline.$mergeCursors": {$exists: true},
             usedDisk: true,
-            ns: shardedSourceColl.getFullName()
-        }
+            ns: shardedSourceColl.getFullName(),
+        },
     });
-    profilerHasZeroMatchingEntriesOrThrow(
-        {profileDB: shard1DB, filter: {usedDisk: true, ns: shardedSourceColl.getFullName()}});
+    profilerHasZeroMatchingEntriesOrThrow({
+        profileDB: shard1DB,
+        filter: {usedDisk: true, ns: shardedSourceColl.getFullName()},
+    });
 } else {
     // If the $mergeCursors is ran on mongos or shard1DB, then the profiler shouldn't have the
     // 'usedDisk' set.
-    profilerHasZeroMatchingEntriesOrThrow(
-        {profileDB: shard0DB, filter: {usedDisk: true, ns: shardedSourceColl.getFullName()}});
-    profilerHasZeroMatchingEntriesOrThrow(
-        {profileDB: shard1DB, filter: {usedDisk: true, ns: shardedSourceColl.getFullName()}});
+    profilerHasZeroMatchingEntriesOrThrow({
+        profileDB: shard0DB,
+        filter: {usedDisk: true, ns: shardedSourceColl.getFullName()},
+    });
+    profilerHasZeroMatchingEntriesOrThrow({
+        profileDB: shard1DB,
+        filter: {usedDisk: true, ns: shardedSourceColl.getFullName()},
+    });
 }
 
 // Verify that the 'usedDisk' is always set correctly on base pipeline.
 restartProfiler();
-assert.commandWorked(shardedDB.runCommand({
-    aggregate: shardedSourceColl.getName(),
-    pipeline: [
-        {$group: {"_id": {$avg: "$x"}}},
-        {$unionWith: {coll: shardedForeignColl.getName(), pipeline: []}}
-    ],
-    cursor: {},
-    allowDiskUse: true,
-}));
+assert.commandWorked(
+    shardedDB.runCommand({
+        aggregate: shardedSourceColl.getName(),
+        pipeline: [{$group: {"_id": {$avg: "$x"}}}, {$unionWith: {coll: shardedForeignColl.getName(), pipeline: []}}],
+        cursor: {},
+        allowDiskUse: true,
+    }),
+);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shard0DB,
-    filter:
-        {'command.getMore': {$exists: true}, usedDisk: true, ns: shardedSourceColl.getFullName()}
+    filter: {"command.getMore": {$exists: true}, usedDisk: true, ns: shardedSourceColl.getFullName()},
 });
-profilerHasZeroMatchingEntriesOrThrow(
-    {profileDB: shard0DB, filter: {usedDisk: true, ns: shardedForeignColl.getFullName()}});
+profilerHasZeroMatchingEntriesOrThrow({
+    profileDB: shard0DB,
+    filter: {usedDisk: true, ns: shardedForeignColl.getFullName()},
+});
 
 // Set the 'internalDocumentSourceGroupMaxMemoryBytes' to a higher value so that st.stop()
 // doesn't fail.
-assert.commandWorked(shard0DB.adminCommand(
-    {setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024}));
+assert.commandWorked(
+    shard0DB.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024}),
+);
 
 st.stop();

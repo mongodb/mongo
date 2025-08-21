@@ -26,9 +26,7 @@ coll.drop();
 // Test that you cannot open a tailable cursor on a non-existent collection.
 assert.eq(0, assert.commandWorked(testDB.runCommand({find: collName})).cursor.id);
 assert.eq(0, assert.commandWorked(testDB.runCommand({find: collName, tailable: true})).cursor.id);
-assert.eq(0,
-          assert.commandWorked(testDB.runCommand({find: collName, tailable: true, awaitData: true}))
-              .cursor.id);
+assert.eq(0, assert.commandWorked(testDB.runCommand({find: collName, tailable: true, awaitData: true})).cursor.id);
 
 if (FixtureHelpers.isMongos(testDB) || TestData.testingReplicaSetEndpoint) {
     // In sharded cluster, if the database exists, the mongos will let you establish a cursor with
@@ -42,11 +40,10 @@ if (FixtureHelpers.isMongos(testDB) || TestData.testingReplicaSetEndpoint) {
     testDB.dropDatabase();
 }
 
-assert.eq(0,
-          assert
-              .commandWorked(testDB.runCommand(
-                  {find: collName, tailable: true, awaitData: true, batchSize: 0}))
-              .cursor.id);
+assert.eq(
+    0,
+    assert.commandWorked(testDB.runCommand({find: collName, tailable: true, awaitData: true, batchSize: 0})).cursor.id,
+);
 
 function dropAndRecreateColl() {
     coll.drop();
@@ -65,8 +62,7 @@ dropAndRecreateColl();
  * cursor id is not 0, then returns the cursor id.
  */
 function openCursor({tailable, awaitData}) {
-    const findRes = assert.commandWorked(
-        testDB.runCommand({find: collName, tailable: tailable, awaitData: awaitData}));
+    const findRes = assert.commandWorked(testDB.runCommand({find: collName, tailable: tailable, awaitData: awaitData}));
     assert.neq(findRes.cursor.id, 0);
     assert.eq(findRes.cursor.ns, coll.getFullName());
     return findRes.cursor.id;
@@ -75,9 +71,13 @@ function openCursor({tailable, awaitData}) {
 // Test that the cursor dies on getMore if the collection has been dropped.
 let cursorId = openCursor({tailable: true, awaitData: false});
 dropAndRecreateColl();
-assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: collName}),
-                             [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound]);
+assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: collName}), [
+    ErrorCodes.QueryPlanKilled,
+    ErrorCodes.NamespaceNotFound,
+]);
 cursorId = openCursor({tailable: true, awaitData: true});
 dropAndRecreateColl();
-assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: collName}),
-                             [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound]);
+assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: collName}), [
+    ErrorCodes.QueryPlanKilled,
+    ErrorCodes.NamespaceNotFound,
+]);

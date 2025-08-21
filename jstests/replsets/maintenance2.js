@@ -4,7 +4,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Replica set testing API
 // Create a new replica set test. Specify set name and the number of nodes you want.
-var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
+var replTest = new ReplSetTest({name: "testSet", nodes: 3});
 
 // call startSet() to start each mongod in the replica set
 // this returns a list of nodes
@@ -31,7 +31,7 @@ for (var i = 0; i < len; ++i) {
 var secondaries = replTest.getSecondaries();
 assert.eq(2, secondaries.length, "Expected 2 secondaries but length was " + secondaries.length);
 
-secondaries.forEach(function(secondary) {
+secondaries.forEach(function (secondary) {
     // put secondary into maintenance (recovery) mode
     assert.commandWorked(secondary.getDB("foo").adminCommand({replSetMaintenance: 1}));
 

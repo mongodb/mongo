@@ -9,11 +9,9 @@
  * Forces 'sort' to perform a collection scan by using $natural.
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_upsert.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_upsert.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.sort = {$natural: 1};
 
     return $config;

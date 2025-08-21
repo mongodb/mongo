@@ -8,13 +8,10 @@
  * @tags: [creates_background_indexes, uses_transactions]
  */
 
-import {
-    doSnapshotFind,
-    doSnapshotGetMore
-} from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
+import {doSnapshotFind, doSnapshotGetMore} from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {numIds: 100, numDocsToInsertPerThread: 5, valueToBeInserted: 1, batchSize: 50};
 
     const states = {
@@ -37,7 +34,7 @@ export const $config = (function() {
                 ErrorCodes.SnapshotTooOld,
                 ErrorCodes.StaleChunkHistory,
                 ErrorCodes.LockTimeout,
-                ErrorCodes.ConflictingOperationInProgress
+                ErrorCodes.ConflictingOperationInProgress,
             ];
             const commitTransactionErrorCodes = readErrorCodes;
             doSnapshotFind(sortByAscending, collName, this, readErrorCodes);
@@ -63,9 +60,11 @@ export const $config = (function() {
                         throw e;
                     }
                     // dropIndex can cause queries to throw if these queries yield.
-                    assert.contains(e.code,
-                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                    'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(
+                        e.code,
+                        [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                        "unexpected error code: " + e.code + ": " + e.message,
+                    );
                 }
             }
         },
@@ -81,9 +80,11 @@ export const $config = (function() {
                         throw e;
                     }
                     // dropIndex can cause queries to throw if these queries yield.
-                    assert.contains(e.code,
-                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                    'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(
+                        e.code,
+                        [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                        "unexpected error code: " + e.code + ": " + e.message,
+                    );
                 }
             }
         },
@@ -99,9 +100,11 @@ export const $config = (function() {
                     throw e;
                 }
                 // dropIndex can cause queries to throw if these queries yield.
-                assert.contains(e.code,
-                                [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                'unexpected error code: ' + e.code + ': ' + e.message);
+                assert.contains(
+                    e.code,
+                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                    "unexpected error code: " + e.code + ": " + e.message,
+                );
             }
         },
 
@@ -111,7 +114,7 @@ export const $config = (function() {
 
         dropIndex: function dropIndex(db, collName) {
             db[collName].dropIndex({value: 1});
-        }
+        },
     };
 
     const transitions = {
@@ -152,7 +155,7 @@ export const $config = (function() {
     return {
         threadCount: 5,
         iterations: 10,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         setup: setup,

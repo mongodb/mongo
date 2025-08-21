@@ -32,8 +32,7 @@ function addShardsToZonesAndAssignZoneRanges(st, ns, shardChunkBounds, shardTags
         }
         zoneChunks[zoneName] = chunkBounds;
         assert.commandWorked(st.s.adminCommand({addShardToZone: shardName, zone: zoneName}));
-        assert.commandWorked(st.s.adminCommand(
-            {updateZoneKeyRange: ns, min: rangeMin, max: rangeMax, zone: zoneName}));
+        assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: rangeMin, max: rangeMax, zone: zoneName}));
     }
     return zoneChunks;
 }
@@ -61,30 +60,26 @@ let coll = testDB.hashed;
 let ns = coll.getFullName();
 let shardKey = {x: "hashed"};
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
 
 jsTest.log("Shard the collection. The command creates one chunk on each of the shards by default.");
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
 
 jsTest.log("Insert docs (one per chunk) and check that they end up on the right shards.");
-const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+const bigString = "X".repeat(1024 * 1024); // 1MB
 let docs = [
     {x: -25, s: bigString},
     {x: -18, s: bigString},
     {x: -5, s: bigString},
     {x: -1, s: bigString},
     {x: 5, s: bigString},
-    {x: 10, s: bigString}
+    {x: 10, s: bigString},
 ];
 
 // Make sure that there is one chunk dedicated for each inserted document
-assert.commandWorked(
-    st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[1].x)}}));
-assert.commandWorked(
-    st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[3].x)}}));
-assert.commandWorked(
-    st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[5].x)}}));
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[1].x)}}));
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[3].x)}}));
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[5].x)}}));
 
 assert.commandWorked(coll.insert(docs));
 
@@ -93,26 +88,26 @@ let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
 let docChunkBounds = [];
 let minHash = MaxKey;
-docs.forEach(function(doc) {
+docs.forEach(function (doc) {
     let hash = convertShardKeyToHashed(doc.x);
-    let {shard, bounds} =
-        chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, {x: hash});
+    let {shard, bounds} = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, {x: hash});
     assert.eq(1, shard.getCollection(ns).count(doc));
     docChunkBounds.push(bounds);
     if (bsonWoCompare(hash, minHash) < 0) {
         minHash = hash;
     }
 });
-assert.eq(docs.length, (new Set(docChunkBounds)).size);
+assert.eq(docs.length, new Set(docChunkBounds).size);
 assert.eq(docs.length, findChunksUtil.countChunksForNs(configDB, ns));
 
 jsTest.log(
     "Assign each shard a zone, make each zone range equal to the chunk range for the shard, " +
-    "and store the chunks for each zone.");
+        "and store the chunks for each zone.",
+);
 let shardTags = {
     [st.shard0.shardName]: ["zoneA"],
     [st.shard1.shardName]: ["zoneB"],
-    [st.shard2.shardName]: ["zoneC"]
+    [st.shard2.shardName]: ["zoneC"],
 };
 let zoneChunkBounds = addShardsToZonesAndAssignZoneRanges(st, ns, shardChunkBounds, shardTags);
 assertShardTags(configDB, shardTags);
@@ -121,12 +116,13 @@ jsTest.log("Test shard's zone changes...");
 
 jsTest.log(
     "Check that removing a zone from a shard causes its chunks and documents to move to other" +
-    " shards that the zone belongs to.");
+        " shards that the zone belongs to.",
+);
 moveZoneToShard(st, "zoneA", st.shard0, st.shard1);
 shardTags = {
     [st.shard0.shardName]: [],
     [st.shard1.shardName]: ["zoneB", "zoneA"],
-    [st.shard2.shardName]: ["zoneC"]
+    [st.shard2.shardName]: ["zoneC"],
 };
 assertShardTags(configDB, shardTags);
 
@@ -134,7 +130,7 @@ runBalancer(st, zoneChunkBounds["zoneA"].length);
 shardChunkBounds = {
     [st.shard0.shardName]: [],
     [st.shard1.shardName]: [...zoneChunkBounds["zoneB"], ...zoneChunkBounds["zoneA"]],
-    [st.shard2.shardName]: zoneChunkBounds["zoneC"]
+    [st.shard2.shardName]: zoneChunkBounds["zoneC"],
 };
 assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
@@ -144,7 +140,7 @@ assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zon
 shardTags = {
     [st.shard0.shardName]: ["zoneB"],
     [st.shard1.shardName]: ["zoneB", "zoneA"],
-    [st.shard2.shardName]: ["zoneC"]
+    [st.shard2.shardName]: ["zoneC"],
 };
 assertShardTags(configDB, shardTags);
 
@@ -154,9 +150,9 @@ shardChunkBounds = {
     [st.shard0.shardName]: zoneChunkBounds["zoneB"].slice(0, numChunksToMove),
     [st.shard1.shardName]: [
         ...zoneChunkBounds["zoneA"],
-        ...zoneChunkBounds["zoneB"].slice(numChunksToMove, zoneChunkBounds["zoneB"].length)
+        ...zoneChunkBounds["zoneB"].slice(numChunksToMove, zoneChunkBounds["zoneB"].length),
     ],
-    [st.shard2.shardName]: zoneChunkBounds["zoneC"]
+    [st.shard2.shardName]: zoneChunkBounds["zoneC"],
 };
 assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
@@ -168,16 +164,15 @@ moveZoneToShard(st, "zoneA", st.shard1, st.shard2);
 shardTags = {
     [st.shard0.shardName]: ["zoneC"],
     [st.shard1.shardName]: ["zoneB"],
-    [st.shard2.shardName]: ["zoneA"]
+    [st.shard2.shardName]: ["zoneA"],
 };
 assertShardTags(configDB, shardTags);
 
-runBalancer(st,
-            numChunksToMove + zoneChunkBounds["zoneA"].length + zoneChunkBounds["zoneC"].length);
+runBalancer(st, numChunksToMove + zoneChunkBounds["zoneA"].length + zoneChunkBounds["zoneC"].length);
 shardChunkBounds = {
     [st.shard0.shardName]: zoneChunkBounds["zoneC"],
     [st.shard1.shardName]: zoneChunkBounds["zoneB"],
-    [st.shard2.shardName]: zoneChunkBounds["zoneA"]
+    [st.shard2.shardName]: zoneChunkBounds["zoneA"],
 };
 assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
@@ -190,71 +185,80 @@ let targetChunkBounds = findHighestChunkBounds(zoneChunkBounds["zoneA"]);
 assert(chunkBoundsUtil.containsKey(targetChunkBounds[0], ...originalZoneARange));
 assert(chunkBoundsUtil.eq(targetChunkBounds[1], originalZoneARange[1]));
 let remainingZoneAChunkBounds = zoneChunkBounds["zoneA"].filter(
-    (chunkBounds) => !chunkBoundsUtil.eq(targetChunkBounds, chunkBounds));
+    (chunkBounds) => !chunkBoundsUtil.eq(targetChunkBounds, chunkBounds),
+);
 
-jsTest.log(
-    "Change the zone ranges so that the chunk that used to belong to zoneA now belongs to zoneB.");
-assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: originalZoneARange[0], max: originalZoneARange[1], zone: null}));
-assert.commandWorked(st.s.adminCommand({
-    updateZoneKeyRange: ns,
-    min: originalZoneARange[0],
-    max: targetChunkBounds[0],
-    zone: "zoneA"
-}));
-assert.commandWorked(st.s.adminCommand({
-    updateZoneKeyRange: ns,
-    min: targetChunkBounds[0],
-    max: originalZoneARange[1],
-    zone: "zoneB"
-}));
+jsTest.log("Change the zone ranges so that the chunk that used to belong to zoneA now belongs to zoneB.");
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: originalZoneARange[0], max: originalZoneARange[1], zone: null}),
+);
+assert.commandWorked(
+    st.s.adminCommand({
+        updateZoneKeyRange: ns,
+        min: originalZoneARange[0],
+        max: targetChunkBounds[0],
+        zone: "zoneA",
+    }),
+);
+assert.commandWorked(
+    st.s.adminCommand({
+        updateZoneKeyRange: ns,
+        min: targetChunkBounds[0],
+        max: originalZoneARange[1],
+        zone: "zoneB",
+    }),
+);
 
 jsTest.log("Check that the chunk moves from zoneA to zoneB after the zone range change.");
 runBalancer(st, 1);
 shardChunkBounds = {
     [st.shard0.shardName]: zoneChunkBounds["zoneC"],
     [st.shard1.shardName]: [targetChunkBounds, ...zoneChunkBounds["zoneB"]],
-    [st.shard2.shardName]: remainingZoneAChunkBounds
+    [st.shard2.shardName]: remainingZoneAChunkBounds,
 };
 assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
 
-jsTest.log(
-    "Change the zone ranges so that the chunk that used to belong to zoneB now belongs to zoneC.");
-assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: null}));
-assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: "zoneC"}));
+jsTest.log("Change the zone ranges so that the chunk that used to belong to zoneB now belongs to zoneC.");
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: null}),
+);
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: "zoneC"}),
+);
 
 jsTest.log("Check that the chunk moves from zoneB to zoneC after the zone range change.");
 runBalancer(st, 1);
 shardChunkBounds = {
     [st.shard0.shardName]: [targetChunkBounds, ...zoneChunkBounds["zoneC"]],
     [st.shard1.shardName]: zoneChunkBounds["zoneB"],
-    [st.shard2.shardName]: remainingZoneAChunkBounds
+    [st.shard2.shardName]: remainingZoneAChunkBounds,
 };
 assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
 
 jsTest.log("Make the chunk not aligned with zone ranges.");
-let splitPoint = (targetChunkBounds[1].x === MaxKey)
-    ? {x: NumberLong(targetChunkBounds[0].x + 5000)}
-    : {x: NumberLong(targetChunkBounds[1].x - 5000)};
+let splitPoint =
+    targetChunkBounds[1].x === MaxKey
+        ? {x: NumberLong(targetChunkBounds[0].x + 5000)}
+        : {x: NumberLong(targetChunkBounds[1].x - 5000)};
 assert(chunkBoundsUtil.containsKey(splitPoint, ...targetChunkBounds));
-assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: null}));
-assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: targetChunkBounds[0], max: splitPoint, zone: "zoneC"}));
-assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: splitPoint, max: targetChunkBounds[1], zone: "zoneA"}));
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: targetChunkBounds[0], max: targetChunkBounds[1], zone: null}),
+);
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: targetChunkBounds[0], max: splitPoint, zone: "zoneC"}),
+);
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: splitPoint, max: targetChunkBounds[1], zone: "zoneA"}),
+);
 
-jsTest.log(
-    "Check that the balancer splits the chunk and that all chunks and docs are on the right shards.");
+jsTest.log("Check that the balancer splits the chunk and that all chunks and docs are on the right shards.");
 runBalancer(st, 1);
 shardChunkBounds = {
     [st.shard0.shardName]: [[targetChunkBounds[0], splitPoint], ...zoneChunkBounds["zoneC"]],
     [st.shard1.shardName]: zoneChunkBounds["zoneB"],
-    [st.shard2.shardName]: [[splitPoint, targetChunkBounds[1]], ...remainingZoneAChunkBounds]
+    [st.shard2.shardName]: [[splitPoint, targetChunkBounds[1]], ...remainingZoneAChunkBounds],
 };
 assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);

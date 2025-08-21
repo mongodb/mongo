@@ -26,7 +26,7 @@ import {
     getAggPipelineModel,
     getSingleFieldProjectArb,
     getSortArb,
-    limitArb
+    limitArb,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
@@ -50,8 +50,8 @@ const numRuns = 20;
  * value).
  */
 function checkExclusionProjectionResults(query, results) {
-    const projectSpec = query.at(-1)['$project'];
-    const excludedField = Object.keys(projectSpec).filter(field => field !== '_id')[0];
+    const projectSpec = query.at(-1)["$project"];
+    const excludedField = Object.keys(projectSpec).filter((field) => field !== "_id")[0];
     const isIdFieldIncluded = projectSpec._id;
 
     for (const doc of results) {
@@ -61,7 +61,7 @@ function checkExclusionProjectionResults(query, results) {
             return false;
         }
         // If _id is excluded and it exists, fail.
-        if (!isIdFieldIncluded && docFields.includes('_id')) {
+        if (!isIdFieldIncluded && docFields.includes("_id")) {
             return false;
         }
     }
@@ -69,29 +69,27 @@ function checkExclusionProjectionResults(query, results) {
 }
 const exclusionProjectionTest = {
     // The stage we're testing.
-    stageArb: getSingleFieldProjectArb(
-        false /*isInclusion*/,
-        {simpleFieldsOnly: true}),  // Only allow simple paths, no dotted paths.
+    stageArb: getSingleFieldProjectArb(false /*isInclusion*/, {simpleFieldsOnly: true}), // Only allow simple paths, no dotted paths.
     // A function that tests the results are as expected.
     checkResultsFn: checkExclusionProjectionResults,
     // A message to output on failure.
-    failMsg: 'Exclusion projection did not remove the specified fields.'
+    failMsg: "Exclusion projection did not remove the specified fields.",
 };
 
 // --- Inclusion projection testing ---
 function checkInclusionProjectionResults(query, results) {
-    const projectSpec = query.at(-1)['$project'];
-    const includedField = Object.keys(projectSpec).filter(field => field !== '_id')[0];
+    const projectSpec = query.at(-1)["$project"];
+    const includedField = Object.keys(projectSpec).filter((field) => field !== "_id")[0];
     const isIdFieldExcluded = !projectSpec._id;
 
     for (const doc of results) {
         for (const field of Object.keys(doc)) {
             // If the _id field is excluded and it exists, fail.
-            if (field === '_id' && isIdFieldExcluded) {
+            if (field === "_id" && isIdFieldExcluded) {
                 return false;
             }
             // If we have a field on the doc that is not the included field, fail.
-            if (field !== '_id' && field !== includedField) {
+            if (field !== "_id" && field !== includedField) {
                 return false;
             }
         }
@@ -101,25 +99,25 @@ function checkInclusionProjectionResults(query, results) {
 const inclusionProjectionTest = {
     stageArb: getSingleFieldProjectArb(true /*isInclusion*/, {simpleFieldsOnly: true}),
     checkResultsFn: checkInclusionProjectionResults,
-    failMsg: 'Inclusion projection did not drop all other fields.'
+    failMsg: "Inclusion projection did not drop all other fields.",
 };
 
 // --- $limit testing ---
 function checkLimitResults(query, results) {
     const limitStage = query.at(-1);
-    const limitVal = limitStage['$limit'];
+    const limitVal = limitStage["$limit"];
 
     return results.length <= limitVal;
 }
 const limitTest = {
     stageArb: limitArb,
     checkResultsFn: checkLimitResults,
-    failMsg: '$limit did not limit how many documents there were in the output'
+    failMsg: "$limit did not limit how many documents there were in the output",
 };
 
 // --- $sort testing ---
 function checkSortResults(query, results) {
-    const sortSpec = query.at(-1)['$sort'];
+    const sortSpec = query.at(-1)["$sort"];
     const sortField = Object.keys(sortSpec)[0];
     const sortDirection = sortSpec[sortField];
 
@@ -134,7 +132,7 @@ function checkSortResults(query, results) {
         if (Array.isArray(doc1SortVal) || Array.isArray(doc2SortVal)) {
             return true;
         }
-        if (typeof doc1SortVal === 'undefined' || typeof doc2SortVal === 'undefined') {
+        if (typeof doc1SortVal === "undefined" || typeof doc2SortVal === "undefined") {
             return true;
         }
 
@@ -158,7 +156,7 @@ function checkSortResults(query, results) {
 const sortTest = {
     stageArb: getSortArb(),
     checkResultsFn: checkSortResults,
-    failMsg: '$sort did not output documents in sorted order.'
+    failMsg: "$sort did not output documents in sorted order.",
 };
 
 // --- $group testing ---
@@ -170,22 +168,21 @@ function checkGroupResults(query, results) {
      * have to worry about overlapping output for JSON.stringify. The data in our PBT test documents
      * have a narrow enough set of types.
      */
-    const ids = results.map(doc => JSON.stringify(doc._id));
+    const ids = results.map((doc) => JSON.stringify(doc._id));
     return new Set(ids).size === results.length;
 }
 const groupTest = {
     stageArb: groupArb,
     checkResultsFn: checkGroupResults,
-    failMsg: '$group did not output documents with unique _ids'
+    failMsg: "$group did not output documents with unique _ids",
 };
 
-const testCases =
-    [exclusionProjectionTest, inclusionProjectionTest, limitTest, sortTest, groupTest];
+const testCases = [exclusionProjectionTest, inclusionProjectionTest, limitTest, sortTest, groupTest];
 
 const experimentColl = db.agg_behavior_correctness_experiment;
 
 function makePropertyFn(checkResultsFn, failMsg) {
-    return function(getQuery, testHelpers) {
+    return function (getQuery, testHelpers) {
         for (let queryIx = 0; queryIx < testHelpers.numQueryShapes; queryIx++) {
             const query = getQuery(queryIx, 0 /* paramIx */);
             const results = experimentColl.aggregate(query).toArray();
@@ -197,7 +194,7 @@ function makePropertyFn(checkResultsFn, failMsg) {
                     msg: failMsg,
                     query,
                     results,
-                    explain: experimentColl.explain().aggregate(query)
+                    explain: experimentColl.explain().aggregate(query),
                 };
             }
         }
@@ -211,17 +208,20 @@ for (const {stageArb, checkResultsFn, failMsg} of testCases) {
     // Create an agg model that ends with the stage we're testing. The bag does not have to be
     // deterministic because these properties should always hold.
     const startOfPipelineArb = getAggPipelineModel({deterministicBag: false});
-    const aggModel = fc.record({startOfPipeline: startOfPipelineArb, lastStage: stageArb})
-                         .map(function({startOfPipeline, lastStage}) {
-                             return [...startOfPipeline, lastStage];
-                         });
+    const aggModel = fc.record({startOfPipeline: startOfPipelineArb, lastStage: stageArb}).map(function ({
+        startOfPipeline,
+        lastStage,
+    }) {
+        return [...startOfPipeline, lastStage];
+    });
 
     // Run the property with a regular collection.
     testProperty(
         propFn,
         {experimentColl},
         makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun: 20}),
-        numRuns);
+        numRuns,
+    );
 
     // TODO SERVER-103381 re-enable timeseries PBT testing.
     // Run the property with a TS collection.

@@ -5,7 +5,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st = new ShardingTest({name: 'sync_conn_cmd', shards: TestData.configShard ? 1 : 0, config: 3});
+var st = new ShardingTest({name: "sync_conn_cmd", shards: TestData.configShard ? 1 : 0, config: 3});
 st.s.setSecondaryOk();
 
 var configDB = st.config;
@@ -20,20 +20,20 @@ if (st.configRS) {
     st.configRS.awaitReplication();
 }
 
-var testNormalCount = function() {
+var testNormalCount = function () {
     var cmdRes = configDB.runCommand({count: coll.getName()});
     assert(cmdRes.ok);
     assert.eq(10, cmdRes.n);
 };
 
-var testCountWithQuery = function() {
+var testCountWithQuery = function () {
     var cmdRes = configDB.runCommand({count: coll.getName(), query: {v: {$gt: 6}}});
     assert(cmdRes.ok);
     assert.eq(3, cmdRes.n);
 };
 
 // Use invalid query operator to make the count return error
-var testInvalidCount = function() {
+var testInvalidCount = function () {
     var cmdRes = configDB.runCommand({count: coll.getName(), query: {$c: {$abc: 3}}});
     assert(!cmdRes.ok);
     assert(cmdRes.errmsg.length > 0);
@@ -53,7 +53,7 @@ testInvalidCount();
 
 // Test with the first and second config server down
 st.configRS.stop(1, undefined /* signal */, undefined /* opts */, {forRestart: true});
-jsTest.log('Second server is down');
+jsTest.log("Second server is down");
 
 testNormalCount();
 testCountWithQuery();

@@ -14,7 +14,7 @@ coll.drop();
 const wildcardIndexes = [
     {keyPattern: {"$**": 1}},
     {keyPattern: {"$**": 1, c: 1}, wildcardProjection: {c: 0}},
-    {keyPattern: {"$**": -1, c: 1}, wildcardProjection: {c: 0}}
+    {keyPattern: {"$**": -1, c: 1}, wildcardProjection: {c: 0}},
 ];
 
 // Inserts the given document and runs the given query to confirm that:
@@ -25,7 +25,7 @@ function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match) {
         coll.drop();
         const option = {};
         if (indexSpec.wildcardProjection) {
-            option['wildcardProjection'] = indexSpec.wildcardProjection;
+            option["wildcardProjection"] = indexSpec.wildcardProjection;
         }
         assert.commandWorked(coll.createIndex(indexSpec.keyPattern, option));
         assert.commandWorked(coll.insert(doc));
@@ -50,34 +50,44 @@ function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match) {
 
 assertExpectedDocAnswersWildcardIndexQuery(
     {a: {b: "foo"}},
-    {$and: [{a: {$type: 'object'}}, {a: {$type: 'object'}}, {"a.b": "foo"}]},
-    true);
-
-assertExpectedDocAnswersWildcardIndexQuery({a: {b: "foo"}},
-                                           {
-                                               $and: [
-                                                   {$expr: {$gt: ["$a", {$literal: {}}]}},
-                                                   {$expr: {$gt: ["$a", {$literal: {}}]}},
-                                                   {"a.b": "foo"}
-                                               ]
-                                           },
-                                           true);
+    {$and: [{a: {$type: "object"}}, {a: {$type: "object"}}, {"a.b": "foo"}]},
+    true,
+);
 
 assertExpectedDocAnswersWildcardIndexQuery(
-    {a: {b: "foo"}}, {$and: [{a: {$gt: {}}}, {a: {$gt: {}}}, {"a.b": "foo"}]}, true);
+    {a: {b: "foo"}},
+    {
+        $and: [{$expr: {$gt: ["$a", {$literal: {}}]}}, {$expr: {$gt: ["$a", {$literal: {}}]}}, {"a.b": "foo"}],
+    },
+    true,
+);
 
 assertExpectedDocAnswersWildcardIndexQuery(
-    {a: {b: "foo"}}, {$and: [{a: {$ne: 3}}, {a: {$ne: 3}}, {"a.b": "foo"}]}, true);
+    {a: {b: "foo"}},
+    {$and: [{a: {$gt: {}}}, {a: {$gt: {}}}, {"a.b": "foo"}]},
+    true,
+);
+
+assertExpectedDocAnswersWildcardIndexQuery(
+    {a: {b: "foo"}},
+    {$and: [{a: {$ne: 3}}, {a: {$ne: 3}}, {"a.b": "foo"}]},
+    true,
+);
 
 assertExpectedDocAnswersWildcardIndexQuery(
     {a: {b: "foo"}},
     {$and: [{a: {$nin: [3, 4, 5]}}, {a: {$nin: [3, 4, 5]}}, {"a.b": "foo"}]},
-    true);
+    true,
+);
 
 assertExpectedDocAnswersWildcardIndexQuery(
-    {a: {b: "foo"}}, {$and: [{a: {$exists: true}}, {a: {$exists: true}}, {"a.b": "foo"}]}, true);
+    {a: {b: "foo"}},
+    {$and: [{a: {$exists: true}}, {a: {$exists: true}}, {"a.b": "foo"}]},
+    true,
+);
 
 assertExpectedDocAnswersWildcardIndexQuery(
     {a: {b: "foo"}},
     {$and: [{a: {$elemMatch: {$gt: {}}}}, {a: {$elemMatch: {$gt: {}}}}, {"a.b": "foo"}]},
-    false);
+    false,
+);

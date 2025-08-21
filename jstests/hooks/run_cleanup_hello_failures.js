@@ -3,10 +3,9 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function cleanupHelloFailInjection(connection) {
     jsTestLog(`Cleanup Hello fail injection in ${connection}`);
-    let adminDB = connection.getDB('admin');
+    let adminDB = connection.getDB("admin");
     assert.commandWorked(adminDB.runCommand({configureFailPoint: "shardWaitInHello", mode: "off"}));
-    const res = assert.commandWorked(
-        adminDB.runCommand({getParameter: 1, "failpoint.shardWaitInHello": 1}));
+    const res = assert.commandWorked(adminDB.runCommand({getParameter: 1, "failpoint.shardWaitInHello": 1}));
     assert.eq(res[`failpoint.shardWaitInHello`].mode, 0);
 }
 
@@ -18,8 +17,8 @@ function doFailInjectionCleanup(db) {
     }
 }
 
-assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
-var cmdLineOpts = db.adminCommand('getCmdLineOpts');
+assert.eq(typeof db, "object", "Invalid `db` object, is the shell connected to a mongod?");
+var cmdLineOpts = db.adminCommand("getCmdLineOpts");
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 jsTestLog(`Run Hello test suite cleanup in ${JSON.stringify(topology)},
                Invoked with ${JSON.stringify(cmdLineOpts)},

@@ -29,7 +29,7 @@ s.adminCommand({
     moveChunk: "test.foo",
     find: {_id: 3},
     to: s.getNonPrimaries("test")[0],
-    _waitForDelete: true
+    _waitForDelete: true,
 });
 
 // restart balancer
@@ -64,10 +64,8 @@ assert(!x.sharded, "XXX3: " + tojson(x));
 var start = new Date();
 
 var whereKillSleepTime = 1000;
-var parallelCommand = "db.foo.find(function() { " +
-    "    sleep(" + whereKillSleepTime + "); " +
-    "    return false; " +
-    "}).itcount(); ";
+var parallelCommand =
+    "db.foo.find(function() { " + "    sleep(" + whereKillSleepTime + "); " + "    return false; " + "}).itcount(); ";
 
 // fork a parallel shell, but do not wait for it to start
 print("about to fork new shell at: " + Date());
@@ -76,8 +74,8 @@ print("done forking shell at: " + Date());
 
 // Get all current $where operations
 function getInProgWhereOps() {
-    let inProgressOps = admin.aggregate([{$currentOp: {'allUsers': true}}]);
-    let inProgressStr = '';
+    let inProgressOps = admin.aggregate([{$currentOp: {"allUsers": true}}]);
+    let inProgressStr = "";
 
     // Find all the where queries
     var myProcs = [];
@@ -90,39 +88,43 @@ function getInProgWhereOps() {
     }
 
     if (myProcs.length == 0) {
-        print('No $where operations found: ' + inProgressStr);
+        print("No $where operations found: " + inProgressStr);
     } else {
-        print('Found ' + myProcs.length + ' $where operations: ' + tojson(myProcs));
+        print("Found " + myProcs.length + " $where operations: " + tojson(myProcs));
     }
 
     return myProcs;
 }
 
-var curOpState = 0;  // 0 = not found, 1 = killed
+var curOpState = 0; // 0 = not found, 1 = killed
 var killTime = null;
 var mine;
 
-assert.soon(function() {
-    // Get all the current operations
-    mine = getInProgWhereOps();
+assert.soon(
+    function () {
+        // Get all the current operations
+        mine = getInProgWhereOps();
 
-    // Wait for the queries to start (one per shard, so 2 total)
-    if (curOpState == 0 && mine.length == 2) {
-        // queries started
-        curOpState = 1;
-        // kill all $where
-        mine.forEach(function(z) {
-            printjson(dbForTest.getSiblingDB("admin").killOp(z.opid));
-        });
-        killTime = new Date();
-    }
-    // Wait for killed queries to end
-    else if (curOpState == 1 && mine.length == 0) {
-        // Queries ended
-        curOpState = 2;
-        return true;
-    }
-}, "Couldn't kill the $where operations.", 2 * 60 * 1000);
+        // Wait for the queries to start (one per shard, so 2 total)
+        if (curOpState == 0 && mine.length == 2) {
+            // queries started
+            curOpState = 1;
+            // kill all $where
+            mine.forEach(function (z) {
+                printjson(dbForTest.getSiblingDB("admin").killOp(z.opid));
+            });
+            killTime = new Date();
+        }
+        // Wait for killed queries to end
+        else if (curOpState == 1 && mine.length == 0) {
+            // Queries ended
+            curOpState = 2;
+            return true;
+        }
+    },
+    "Couldn't kill the $where operations.",
+    2 * 60 * 1000,
+);
 
 print("after loop: " + Date());
 assert(killTime, "timed out waiting too kill last mine:" + tojson(mine));
@@ -131,8 +133,8 @@ assert.eq(2, curOpState, "failed killing");
 
 killTime = new Date().getTime() - killTime.getTime();
 print("killTime: " + killTime);
-print("time if run full: " + (numDocs * whereKillSleepTime));
-assert.gt(whereKillSleepTime * numDocs / 20, killTime, "took too long to kill");
+print("time if run full: " + numDocs * whereKillSleepTime);
+assert.gt((whereKillSleepTime * numDocs) / 20, killTime, "took too long to kill");
 
 // wait for the parallel shell we spawned to complete
 var exitCode = awaitShell({checkExitSuccess: false});

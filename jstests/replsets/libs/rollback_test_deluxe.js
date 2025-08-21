@@ -96,20 +96,20 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
     let lastStandbySecondaryRBID;
 
     // Make sure we have a replica set up and running.
-    replSet = (replSet === undefined) ? performStandardSetup(nodeOptions) : replSet;
+    replSet = replSet === undefined ? performStandardSetup(nodeOptions) : replSet;
     validateAndUseSetup(replSet);
 
     /**
      * Returns the current primary of the replica set.
      */
-    this.getPrimary = function() {
+    this.getPrimary = function () {
         return curPrimary;
     };
 
     /**
      * Returns an array containing connections to the arbiters, in no particular order.
      */
-    this.getArbiters = function() {
+    this.getArbiters = function () {
         return arbiters;
     };
 
@@ -117,14 +117,14 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
      * Returns an array containing connections to the data-bearing secondaries, in no particular
      * order.
      */
-    this.getSecondaries = function() {
+    this.getSecondaries = function () {
         return [rollbackSecondary, standbySecondary];
     };
 
     /**
      * Returns the node that is currently a secondary and will undergo rollback as a secondary.
      */
-    this.getRollbackSecondary = function() {
+    this.getRollbackSecondary = function () {
         return rollbackSecondary;
     };
 
@@ -132,7 +132,7 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
      * Returns the node that is currently a secondary but is next in line for being promoted to
      * primary.
      */
-    this.getStandbySecondary = function() {
+    this.getStandbySecondary = function () {
         return standbySecondary;
     };
 
@@ -144,8 +144,7 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
         let nodeOptions = {};
         if (TestData.logComponentVerbosity) {
             nodeOptions["setParameter"] = nodeOptions["setParameter"] || {};
-            nodeOptions["setParameter"]["logComponentVerbosity"] =
-                tojsononeline(TestData.logComponentVerbosity);
+            nodeOptions["setParameter"]["logComponentVerbosity"] = tojsononeline(TestData.logComponentVerbosity);
         }
         if (TestData.syncdelay) {
             nodeOptions["syncdelay"] = TestData.syncdelay;
@@ -163,13 +162,12 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
                 {_id: 2, host: nodes[2]},
                 {_id: 3, host: nodes[3], arbiterOnly: true},
                 {_id: 4, host: nodes[4], arbiterOnly: true},
-            ]
+            ],
         });
 
         // Tiebreaker's replication is paused for most of the test, avoid falling off the oplog.
         for (let i = 0; i < 3; i++) {
-            assert.commandWorked(
-                replSet.nodes[i].adminCommand({replSetResizeOplog: 1, minRetentionHours: 2}));
+            assert.commandWorked(replSet.nodes[i].adminCommand({replSetResizeOplog: 1, minRetentionHours: 2}));
         }
 
         return replSet;
@@ -179,8 +177,7 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
      * Validate and use the provided ReplSetTest instance 'replSet'.
      */
     function validateAndUseSetup(replSet) {
-        assert(replSet instanceof ReplSetTest,
-               `Must provide an instance of ReplSetTest. Have: ${tojson(replSet)}`);
+        assert(replSet instanceof ReplSetTest, `Must provide an instance of ReplSetTest. Have: ${tojson(replSet)}`);
 
         assert.eq(true, replSet.usesBridge(), "Must set up ReplSetTest with mongobridge enabled.");
         assert.eq(5, replSet.nodes.length, "Replica set must contain exactly five nodes.");
@@ -189,14 +186,19 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
         curPrimary = replSet.getPrimary();
 
         // The default WC is majority and we must use w:1 to be able to properly test rollback.
-        assert.commandWorked(curPrimary.adminCommand(
-            {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+        assert.commandWorked(
+            curPrimary.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: 1},
+                writeConcern: {w: "majority"},
+            }),
+        );
         replSet.awaitReplication();
         // Extract the other nodes and wait for them to be ready.
         arbiters = replSet.getArbiters();
-        arbiters.forEach(arbiter => waitForState(arbiter, ReplSetTest.State.ARBITER));
-        let secondaries = replSet.getSecondaries().filter(node => !arbiters.includes(node));
-        secondaries.forEach(secondary => waitForState(secondary, ReplSetTest.State.SECONDARY));
+        arbiters.forEach((arbiter) => waitForState(arbiter, ReplSetTest.State.ARBITER));
+        let secondaries = replSet.getSecondaries().filter((node) => !arbiters.includes(node));
+        secondaries.forEach((secondary) => waitForState(secondary, ReplSetTest.State.SECONDARY));
 
         // Arbitrarily assign which secondary will roll back and which secondary will eventually
         // become primary.
@@ -210,9 +212,7 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
     }
 
     function checkDataConsistency() {
-        assert.eq(curState,
-                  State.kSteadyStateOps,
-                  "Not in kSteadyStateOps state; cannot check data consistency");
+        assert.eq(curState, State.kSteadyStateOps, "Not in kSteadyStateOps state; cannot check data consistency");
 
         const name = rst.name;
         rst.checkOplogs(name);
@@ -279,16 +279,14 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
 
         switch (curRoleCycleMode) {
             case RollbackTestDeluxe.RoleCycleMode.kCyclical:
-                [rollbackSecondary, standbySecondary, curPrimary] =
-                    [curPrimary, rollbackSecondary, standbySecondary];
+                [rollbackSecondary, standbySecondary, curPrimary] = [curPrimary, rollbackSecondary, standbySecondary];
                 break;
             case RollbackTestDeluxe.RoleCycleMode.kFixedRollbackSecondary:
                 [standbySecondary, curPrimary] = [curPrimary, standbySecondary];
                 break;
             case RollbackTestDeluxe.RoleCycleMode.kRandom: {
                 let oldStandbySecondary = standbySecondary;
-                [standbySecondary, rollbackSecondary] =
-                    Array.shuffle([curPrimary, rollbackSecondary]);
+                [standbySecondary, rollbackSecondary] = Array.shuffle([curPrimary, rollbackSecondary]);
                 curPrimary = oldStandbySecondary;
                 break;
             }
@@ -303,7 +301,7 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
     /**
      * Set the method of determining roles for nodes.
      */
-    this.setRoleCycleMode = function(newMode) {
+    this.setRoleCycleMode = function (newMode) {
         if (!RollbackTestDeluxe.RoleCycleMode.hasOwnProperty(newMode)) {
             throw new Error(`Unknown role cycle mode ${newMode}`);
         }
@@ -316,15 +314,13 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
      * Transition from a rollback state to a steady state. Operations applied in this phase will
      * be replicated to all nodes and should not be rolled back.
      */
-    this.transitionToSteadyStateOperations = function() {
+    this.transitionToSteadyStateOperations = function () {
         // Ensure all secondaries are connected. They may already have been connected from a
         // previous stage.
-        log(`Ensuring the rollback secondary ${rollbackSecondary.host} ` +
-            `is connected to the other nodes`);
+        log(`Ensuring the rollback secondary ${rollbackSecondary.host} ` + `is connected to the other nodes`);
         rollbackSecondary.reconnect(arbiters.concat([curPrimary, standbySecondary]));
 
-        log(`Ensuring the standby secondary ${standbySecondary.host} ` +
-            `is connected to the other nodes`);
+        log(`Ensuring the standby secondary ${standbySecondary.host} ` + `is connected to the other nodes`);
         standbySecondary.reconnect(arbiters.concat([curPrimary]));
 
         // Used to wait for the rollback to complete on 'node'.
@@ -347,8 +343,10 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
             awaitRollback(rollbackSecondary, lastRollbackSecondaryRBID);
             awaitRollback(standbySecondary, lastStandbySecondaryRBID);
         } else {
-            log(`Skipping RBID check on ${rollbackSecondary.host} and ${standbySecondary.host} ` +
-                `because shutdowns may prevent a rollback`);
+            log(
+                `Skipping RBID check on ${rollbackSecondary.host} and ${standbySecondary.host} ` +
+                    `because shutdowns may prevent a rollback`,
+            );
         }
 
         rst.awaitSecondaryNodes();
@@ -379,7 +377,7 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
      *      A  |
      *      A  |
      */
-    this.transitionToRollbackOperations = function() {
+    this.transitionToRollbackOperations = function () {
         // Ensure previous operations are replicated.
         rst.awaitSecondaryNodes();
         rst.awaitReplication();
@@ -387,8 +385,10 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
         transitionIfAllowed(State.kRollbackOps);
 
         // Disconnect one secondary to wait on standby.
-        log(`Isolating secondary ${standbySecondary.host} from the rest of the replica set; ` +
-            `it will eventually become primary`);
+        log(
+            `Isolating secondary ${standbySecondary.host} from the rest of the replica set; ` +
+                `it will eventually become primary`,
+        );
         standbySecondary.disconnect(arbiters.concat([curPrimary, rollbackSecondary]));
 
         return curPrimary;
@@ -407,17 +407,19 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
      *      A  |
      *      A  |
      */
-    this.forceStepdownDuringRollbackOps = function() {
+    this.forceStepdownDuringRollbackOps = function () {
         assert.eq(
             curState,
             State.kRollbackOps,
-            "forceStepdownDuringRollbackOps() can only be called while in state kRollbackOps");
+            "forceStepdownDuringRollbackOps() can only be called while in state kRollbackOps",
+        );
 
         // Insert one document to ensure that each of the data-bearing nodes perform a write while
         // in their current replica set member state.
         let ensureWritesDoc = Object.extend(kEnsureWritesDoc, currentStatusAsDocument());
-        assert.commandWorked(curPrimary.getDB(kEnsureRollbackDBName)
-                                 .ensureWrites.insert(ensureWritesDoc, {writeConcern: {w: 2}}));
+        assert.commandWorked(
+            curPrimary.getDB(kEnsureRollbackDBName).ensureWrites.insert(ensureWritesDoc, {writeConcern: {w: 2}}),
+        );
 
         let sb = [];
         sb.push("Old roles before forced failover:");
@@ -432,10 +434,11 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
 
         // Ensure that the new primary is the rollback secondary.
         const newPrimary = rst.getPrimary();
-        assert.eq(newPrimary,
-                  rollbackSecondary,
-                  `Expected the new primary to be ${rollbackSecondary.host}, ` +
-                      `but ${newPrimary.host} was elected instead`);
+        assert.eq(
+            newPrimary,
+            rollbackSecondary,
+            `Expected the new primary to be ${rollbackSecondary.host}, ` + `but ${newPrimary.host} was elected instead`,
+        );
         log(`Elected the rollback secondary ${newPrimary.host} as the new primary`);
 
         // Manually update the topology.
@@ -459,13 +462,14 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
      *      RS | A
      *         | A
      */
-    this.transitionToSyncSourceOperationsBeforeRollback = function() {
+    this.transitionToSyncSourceOperationsBeforeRollback = function () {
         transitionIfAllowed(State.kSyncSourceOpsBeforeRollback);
 
         // Insert one document to ensure rollback will not be skipped.
         let ensureRollbackDoc = Object.extend(kEnsureRollbackDoc, currentStatusAsDocument());
-        assert.commandWorked(curPrimary.getDB(kEnsureRollbackDBName)
-                                 .ensureRollback.insert(ensureRollbackDoc, {writeConcern: {w: 2}}));
+        assert.commandWorked(
+            curPrimary.getDB(kEnsureRollbackDBName).ensureRollback.insert(ensureRollbackDoc, {writeConcern: {w: 2}}),
+        );
 
         log(`Isolating the rollback secondary ${rollbackSecondary.host} from the arbiters`);
         rollbackSecondary.disconnect(arbiters);
@@ -474,13 +478,14 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
         curPrimary.disconnect(arbiters);
 
         log(`Waiting for the primary ${curPrimary.host} to step down`);
-        assert.adminCommandWorkedAllowingNetworkError(curPrimary,
-                                                      {replSetStepDown: 1, force: true});
+        assert.adminCommandWorkedAllowingNetworkError(curPrimary, {replSetStepDown: 1, force: true});
 
         waitForState(curPrimary, ReplSetTest.State.SECONDARY);
 
-        log(`Reconnecting the standby secondary ${standbySecondary.host} to the arbiters ` +
-            `so that it can be elected`);
+        log(
+            `Reconnecting the standby secondary ${standbySecondary.host} to the arbiters ` +
+                `so that it can be elected`,
+        );
         standbySecondary.reconnect(arbiters);
 
         log(`Waiting for the new primary ${standbySecondary.host} to be elected`);
@@ -489,20 +494,19 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
         const newPrimary = rst.getPrimary();
 
         // Ensure that the new primary is the standby secondary.
-        assert.eq(newPrimary,
-                  standbySecondary,
-                  `Expected the new primary to be ${standbySecondary.host}, ` +
-                      `but ${newPrimary.host} was elected instead`);
+        assert.eq(
+            newPrimary,
+            standbySecondary,
+            `Expected the new primary to be ${standbySecondary.host}, ` + `but ${newPrimary.host} was elected instead`,
+        );
         log(`Elected the standby secondary ${newPrimary.host} as the new primary`);
 
         // Update the topology so that each node gets a new role the next time we enter rollback.
         assignRoles(newPrimary);
 
         // Keep track of the last RBID on each node.
-        lastRollbackSecondaryRBID =
-            assert.commandWorked(rollbackSecondary.adminCommand("replSetGetRBID")).rbid;
-        lastStandbySecondaryRBID =
-            assert.commandWorked(standbySecondary.adminCommand("replSetGetRBID")).rbid;
+        lastRollbackSecondaryRBID = assert.commandWorked(rollbackSecondary.adminCommand("replSetGetRBID")).rbid;
+        lastStandbySecondaryRBID = assert.commandWorked(standbySecondary.adminCommand("replSetGetRBID")).rbid;
 
         return curPrimary;
     };
@@ -516,14 +520,13 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
      * is finished or after the rollback is done. We provide this state, though, as an attempt to
      * provide a way to test this behavior, even if it's non-deterministic.
      */
-    this.transitionToSyncSourceOperationsDuringRollback = function() {
+    this.transitionToSyncSourceOperationsDuringRollback = function () {
         transitionIfAllowed(State.kSyncSourceOpsDuringRollback);
 
         log(`Reconnecting former primary ${rollbackSecondary.host} so it will enter rollback`);
         rollbackSecondary.reconnect(arbiters.concat([curPrimary]));
 
-        log(`Reconnecting former rollback secondary ${standbySecondary.host} so ` +
-            `it will enter rollback`);
+        log(`Reconnecting former rollback secondary ${standbySecondary.host} so ` + `it will enter rollback`);
         standbySecondary.reconnect(arbiters.concat([curPrimary]));
         return curPrimary;
     };
@@ -531,7 +534,7 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
     /**
      * Transitions to the stop state, stopping the replica set.
      */
-    this.stop = function() {
+    this.stop = function () {
         checkDataConsistency();
         transitionIfAllowed(State.kStopped);
         return rst.stopSet();
@@ -540,7 +543,7 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
     /**
      * Sends the signal 'signal' to the node with id 'nodeId'.
      */
-    this.restartNode = function(nodeId, signal) {
+    this.restartNode = function (nodeId, signal) {
         assert(signal === SIGKILL || signal === SIGTERM, `Received unknown signal: ${signal}`);
         assert.gte(nodeId, 0, "Node id number cannot be negative");
 
@@ -557,8 +560,10 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
         }
 
         if (!TestData.allowUncleanShutdowns && signal !== SIGTERM) {
-            log(`Sending node ${hostName} signal ${SIGTERM}` +
-                ` instead of ${signal} because 'allowUncleanShutdowns' was not specified.`);
+            log(
+                `Sending node ${hostName} signal ${SIGTERM}` +
+                    ` instead of ${signal} because 'allowUncleanShutdowns' was not specified.`,
+            );
             signal = SIGTERM;
         }
 
@@ -576,9 +581,10 @@ export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet,
 
         let newPrimary = rst.getPrimary();
         if (newPrimary === rollbackSecondary) {
-            assert(curState === State.kSteadyStateOps || curState === State.kRollbackOps,
-                   `Expected to be in state kSteadyStateOps or kRollbackOps, ` +
-                       `but instead the state is ${curState}`);
+            assert(
+                curState === State.kSteadyStateOps || curState === State.kRollbackOps,
+                `Expected to be in state kSteadyStateOps or kRollbackOps, ` + `but instead the state is ${curState}`,
+            );
 
             // This restart is special so we don't follow the usual role assignment path. Log a
             // message explaining the role change.

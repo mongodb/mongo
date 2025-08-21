@@ -3,7 +3,7 @@ if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wired
 
     var dbpath = MongoRunner.dataPath + baseDir + "/";
 
-    var m = MongoRunner.runMongod({dbpath: dbpath, wiredTigerDirectoryForIndexes: ''});
+    var m = MongoRunner.runMongod({dbpath: dbpath, wiredTigerDirectoryForIndexes: ""});
     const db = m.getDB("foo");
     db.bar.insert({x: 1});
     assert.eq(1, db.bar.count());
@@ -18,11 +18,13 @@ if (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wired
     // Subsequent attempts to start server using same dbpath but different
     // wiredTigerDirectoryForIndexes and directoryperdb options should fail.
     assert.throws(() => MongoRunner.runMongod({dbpath: dbpath, restart: true}));
-    assert.throws(() => MongoRunner.runMongod({dbpath: dbpath, restart: true, directoryperdb: ''}));
-    assert.throws(() => MongoRunner.runMongod({
-        dbpath: dbpath,
-        restart: true,
-        wiredTigerDirectoryForIndexes: '',
-        directoryperdb: ''
-    }));
+    assert.throws(() => MongoRunner.runMongod({dbpath: dbpath, restart: true, directoryperdb: ""}));
+    assert.throws(() =>
+        MongoRunner.runMongod({
+            dbpath: dbpath,
+            restart: true,
+            wiredTigerDirectoryForIndexes: "",
+            directoryperdb: "",
+        }),
+    );
 }

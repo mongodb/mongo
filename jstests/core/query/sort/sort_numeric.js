@@ -1,4 +1,3 @@
-
 let t = db.sort_numeric;
 t.drop();
 

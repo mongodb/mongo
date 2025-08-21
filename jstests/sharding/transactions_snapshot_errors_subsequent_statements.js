@@ -18,7 +18,7 @@ import {
 
 const dbName = "test";
 const collName = "foo";
-const ns = dbName + '.' + collName;
+const ns = dbName + "." + collName;
 
 const kCommandTestCases = [
     {name: "aggregate", command: {aggregate: collName, pipeline: [], cursor: {}}},
@@ -27,19 +27,28 @@ const kCommandTestCases = [
     {
         // findAndModify can only target one shard, even in the two shard case.
         name: "findAndModify",
-        command: {findAndModify: collName, query: {_id: 1}, update: {$set: {x: 1}}}
+        command: {findAndModify: collName, query: {_id: 1}, update: {$set: {x: 1}}},
     },
     {name: "insert", command: {insert: collName, documents: [{_id: 1}, {_id: 11}]}},
     {
         name: "update",
         command: {
             update: collName,
-            updates: [{q: {_id: 1}, u: {$set: {_id: 2}}}, {q: {_id: 11}, u: {$set: {_id: 12}}}]
-        }
+            updates: [
+                {q: {_id: 1}, u: {$set: {_id: 2}}},
+                {q: {_id: 11}, u: {$set: {_id: 12}}},
+            ],
+        },
     },
     {
         name: "delete",
-        command: {delete: collName, deletes: [{q: {_id: 2}, limit: 1}, {q: {_id: 12}, limit: 1}]}
+        command: {
+            delete: collName,
+            deletes: [
+                {q: {_id: 2}, limit: 1},
+                {q: {_id: 12}, limit: 1},
+            ],
+        },
     },
     // We cannot test killCursors because mongos discards the response from any killCursors
     // requests that may be sent to shards.
@@ -69,10 +78,8 @@ function runTest(st, collName, errorCode, isSharded) {
         const res = assert.commandFailedWithCode(sessionDB.runCommand(commandBody), errorCode);
         assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
-        assertNoSuchTransactionOnAllShards(
-            st, session.getSessionId(), session.getTxnNumber_forTesting());
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+        assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     }
 }
 
@@ -82,10 +89,8 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 jsTestLog("Unsharded transaction");
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(
-    st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
 
 // Single shard case simulates the storage engine discarding an in-use snapshot.
 for (let errorCode of kSnapshotErrors) {
@@ -97,15 +102,12 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 // Set up 2 chunks, [minKey, 10), [10, maxKey), each with one document (includes the document
 // already inserted).
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-assert.commandWorked(
-    st.s.getDB(dbName)[collName].insert({_id: 15}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 15}, {writeConcern: {w: "majority"}}));
 
 jsTestLog("One shard transaction");
 
-assert.eq(2,
-          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard0.shardName}));
-assert.eq(0,
-          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard1.shardName}));
+assert.eq(2, findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard0.shardName}));
+assert.eq(0, findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard1.shardName}));
 
 for (let errorCode of kSnapshotErrors) {
     runTest(st, collName, errorCode, true /* isSharded */);
@@ -114,10 +116,8 @@ for (let errorCode of kSnapshotErrors) {
 jsTestLog("Two shard transaction");
 
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 15}, to: st.shard1.shardName}));
-assert.eq(1,
-          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard0.shardName}));
-assert.eq(1,
-          findChunksUtil.countChunksForNs(st.s.getDB('config'), ns, {shard: st.shard1.shardName}));
+assert.eq(1, findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard0.shardName}));
+assert.eq(1, findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st.shard1.shardName}));
 
 // Multi shard case simulates adding a new participant that can no longer support the already
 // chosen read timestamp.

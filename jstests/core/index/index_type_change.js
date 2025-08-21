@@ -16,7 +16,7 @@ assert.commandWorked(coll.insert({a: 2}));
 assert.eq(1, coll.find({a: {$type: "double"}}).itcount());
 
 var newVal = new NumberLong(2);
-var res = coll.update({}, {a: newVal});  // Replacement update.
+var res = coll.update({}, {a: newVal}); // Replacement update.
 assert.commandWorked(res);
 assert.eq(res.nMatched, 1);
 assert.eq(res.nModified, 1);

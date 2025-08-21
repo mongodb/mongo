@@ -18,13 +18,13 @@ import {
     prepareShardedCollection,
     setUpShardedCluster,
     st,
-    timeFieldName
+    timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
 setUpShardedCluster();
 const testDB = getTestDB();
 
-const runTest = function({
+const runTest = function ({
     initialDocList,
     query,
     update,
@@ -68,14 +68,17 @@ const runTest = function({
     }
 
     if (resultDocList) {
-        assert.sameMembers(resultDocList,
-                           coll.find().toArray(),
-                           "Collection contents did not match expected after update");
+        assert.sameMembers(
+            resultDocList,
+            coll.find().toArray(),
+            "Collection contents did not match expected after update",
+        );
     } else {
-        assert.eq(coll.countDocuments({}),
-                  initialDocList.length,
-                  "Collection count did not match expected after update: " +
-                      tojson(coll.find().toArray()));
+        assert.eq(
+            coll.countDocuments({}),
+            initialDocList.length,
+            "Collection count did not match expected after update: " + tojson(coll.find().toArray()),
+        );
     }
 };
 
@@ -83,7 +86,7 @@ const runTest = function({
     runTest({
         initialDocList: [doc2_a_f101, doc4_b_f103],
         query: {[metaFieldName]: "A"},
-        update: {$inc: {f: 'h'}},
+        update: {$inc: {f: "h"}},
         retryableWrite: true,
         expectedWriteErrorCode: ErrorCodes.TypeMismatch,
     });
@@ -95,10 +98,7 @@ const runTest = function({
         query: {[metaFieldName]: "A"},
         update: {$set: {f: 110}},
         nModified: 1,
-        resultDocList: [
-            {_id: 2, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(2), f: 110},
-            doc4_b_f103
-        ],
+        resultDocList: [{_id: 2, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(2), f: 110}, doc4_b_f103],
     });
 })();
 
@@ -121,7 +121,7 @@ const runTest = function({
         resultDocList: [
             doc2_a_f101,
             {_id: 3, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(3), f: 110},
-            doc4_b_f103
+            doc4_b_f103,
         ],
     });
 })();
@@ -133,10 +133,7 @@ const runTest = function({
         query: {[timeFieldName]: generateTimeValue(2)},
         update: {$set: {f: 110}},
         nModified: 1,
-        resultDocList: [
-            {_id: 2, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(2), f: 110},
-            doc4_b_f103
-        ],
+        resultDocList: [{_id: 2, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(2), f: 110}, doc4_b_f103],
     });
 })();
 
@@ -170,10 +167,7 @@ const runTest = function({
         update: {[metaFieldName]: "C", [timeFieldName]: generateTimeValue(4), f: 110},
         replacement: true,
         nModified: 1,
-        resultDocList: [
-            doc2_a_f101,
-            {_id: 4, [metaFieldName]: "C", [timeFieldName]: generateTimeValue(4), f: 110}
-        ],
+        resultDocList: [doc2_a_f101, {_id: 4, [metaFieldName]: "C", [timeFieldName]: generateTimeValue(4), f: 110}],
         retryableWrite: true,
     });
 })();
@@ -185,10 +179,7 @@ const runTest = function({
         update: {[metaFieldName]: "A", [timeFieldName]: generateTimeValue(4), f: 110},
         replacement: true,
         nModified: 1,
-        resultDocList: [
-            doc2_a_f101,
-            {_id: 4, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(4), f: 110}
-        ],
+        resultDocList: [doc2_a_f101, {_id: 4, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(4), f: 110}],
         retryableWrite: true,
     });
 })();
@@ -228,10 +219,7 @@ const runTest = function({
         query: {_id: 4},
         update: {$set: {f: 110}},
         nModified: 1,
-        resultDocList: [
-            doc2_a_f101,
-            {_id: 4, [metaFieldName]: "B", [timeFieldName]: generateTimeValue(4), f: 110},
-        ],
+        resultDocList: [doc2_a_f101, {_id: 4, [metaFieldName]: "B", [timeFieldName]: generateTimeValue(4), f: 110}],
     });
 })();
 
@@ -241,10 +229,7 @@ const runTest = function({
         query: {[timeFieldName]: generateTimeValue(4)},
         update: {$set: {f: 110}},
         nModified: 1,
-        resultDocList: [
-            doc2_a_f101,
-            {_id: 4, [metaFieldName]: "B", [timeFieldName]: generateTimeValue(4), f: 110},
-        ],
+        resultDocList: [doc2_a_f101, {_id: 4, [metaFieldName]: "B", [timeFieldName]: generateTimeValue(4), f: 110}],
     });
 })();
 

@@ -12,10 +12,10 @@ function checkResults(query) {
 }
 
 t.createIndex({x: 1});
-t.save({x: 'aa'});
-t.save({x: 'ab'});
-t.save({x: 'ac'});
-t.save({x: 'ad'});
+t.save({x: "aa"});
+t.save({x: "ab"});
+t.save({x: "ac"});
+t.save({x: "ad"});
 
 checkResults({x: {$in: [/^a/, /^ab/]}});
 checkResults({x: {$in: [/^ab/, /^a/]}});

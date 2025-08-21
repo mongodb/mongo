@@ -4,11 +4,11 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 function isPrimaryNode(conn) {
-    return (conn.adminCommand({hello: 1}).isWritablePrimary);
+    return conn.adminCommand({hello: 1}).isWritablePrimary;
 }
 
 function updateRolesWithPrimaryDB(primaryConn) {
-    roles.forEach(role => {
+    roles.forEach((role) => {
         role.db = primaryConn.getDB(role.dbname);
     });
 }
@@ -47,10 +47,10 @@ const opts = {
     auth: "",
     setParameter: {
         trafficRecordingDirectory: dbPath,
-        mongotHost,   // We have to set the mongotHost parameter for the
-                      // $search-relatead tests to pass configuration checks.
-        syncdelay: 0  // Disable checkpoints as this can cause some commands to fail transiently.
-    }
+        mongotHost, // We have to set the mongotHost parameter for the
+        // $search-relatead tests to pass configuration checks.
+        syncdelay: 0, // Disable checkpoints as this can cause some commands to fail transiently.
+    },
 };
 
 // run all tests replset

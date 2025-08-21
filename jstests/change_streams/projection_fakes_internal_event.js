@@ -13,7 +13,7 @@ const numShards = 2;
 
 const st = new ShardingTest({
     shards: numShards,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const mongosConn = st.s;
@@ -29,23 +29,23 @@ const testColl = testDB.test;
 const existingShardDoc = testDB.getSiblingDB("config").shards.find({_id: st.rs0.name}).next();
 const existingShardWrongNameDoc = {
     _id: "nonExistentName",
-    host: existingShardDoc.host
+    host: existingShardDoc.host,
 };
 const existingShardWrongHostDoc = {
     _id: st.rs1.name,
-    host: `${st.rs1.name}/${st.rs1.host}-wrong:${st.rs1.ports[0]}`
+    host: `${st.rs1.name}/${st.rs1.host}-wrong:${st.rs1.ports[0]}`,
 };
 const fakeShardDoc = {
     _id: "shardX",
-    host: "shardX/nonExistentHost:27017"
+    host: "shardX/nonExistentHost:27017",
 };
 const invalidShardDoc = {
     _id: "shardY",
-    host: null
+    host: null,
 };
 const configDotShardsNs = {
     db: "config",
-    coll: "shards"
+    coll: "shards",
 };
 assert.commandWorked(testColl.insert(existingShardWrongNameDoc));
 assert.commandWorked(testColl.insert(existingShardWrongHostDoc));
@@ -68,8 +68,10 @@ function assertChangeStreamBehaviour(projection, expectedEvents, expectedErrorCo
     const commentID = `${Math.random()}`;
 
     // Create a change stream cursor with the specified projection.
-    var csCursor = testColl.watch([{$addFields: projection}],
-                                  {startAtOperationTime: Timestamp(1, 1), comment: commentID});
+    var csCursor = testColl.watch([{$addFields: projection}], {
+        startAtOperationTime: Timestamp(1, 1),
+        comment: commentID,
+    });
 
     // Confirm that the observed events match the expected events, if specified.
     if (expectedEvents && expectedEvents.length > 0) {
@@ -77,8 +79,7 @@ function assertChangeStreamBehaviour(projection, expectedEvents, expectedErrorCo
             assert.soon(() => csCursor.hasNext());
             const nextEvent = csCursor.next();
             for (let fieldName in expectedEvent) {
-                assert.eq(
-                    expectedEvent[fieldName], nextEvent[fieldName], {expectedEvent, nextEvent});
+                assert.eq(expectedEvent[fieldName], nextEvent[fieldName], {expectedEvent, nextEvent});
             }
         }
     }
@@ -105,21 +106,23 @@ function assertChangeStreamBehaviour(projection, expectedEvents, expectedErrorCo
         // Otherwise, confirm that we still only have a single cursor on each shard. It's possible
         // that the same cursor will be listed as both active and inactive, so group by cursorId.
         const openCursors = adminDB
-                                .aggregate([
-                                    {$currentOp: {idleCursors: true}},
-                                    {$match: {"cursor.originatingCommand.comment": commentID}},
-                                    {
-                                        $group: {
-                                            _id: {shard: "$shard", cursorId: "$cursor.cursorId"},
-                                            currentOps: {$push: "$$ROOT"}
-                                        }
-                                    }
-                                ])
-                                .toArray();
-        assert.eq(openCursors.length,
-                  numShards,
-                  // Dump all the running operations for better debuggability.
-                  () => tojson(adminDB.aggregate([{$currentOp: {idleCursors: true}}]).toArray()));
+            .aggregate([
+                {$currentOp: {idleCursors: true}},
+                {$match: {"cursor.originatingCommand.comment": commentID}},
+                {
+                    $group: {
+                        _id: {shard: "$shard", cursorId: "$cursor.cursorId"},
+                        currentOps: {$push: "$$ROOT"},
+                    },
+                },
+            ])
+            .toArray();
+        assert.eq(
+            openCursors.length,
+            numShards,
+            // Dump all the running operations for better debuggability.
+            () => tojson(adminDB.aggregate([{$currentOp: {idleCursors: true}}]).toArray()),
+        );
     }
 
     // Close the change stream when we are done.
@@ -135,49 +138,49 @@ assertChangeStreamBehaviour(testProjection, []);
 // allowed to pass through.
 testProjection = {
     ns: configDotShardsNs,
-    operationType: null
+    operationType: null,
 };
 assertChangeStreamBehaviour(testProjection, [
     {operationType: null, fullDocument: existingShardWrongNameDoc},
     {operationType: null, fullDocument: existingShardWrongHostDoc},
     {operationType: null, fullDocument: existingShardDoc},
     {operationType: null, fullDocument: invalidShardDoc},
-    {operationType: null, fullDocument: fakeShardDoc}
+    {operationType: null, fullDocument: fakeShardDoc},
 ]);
 
 // Test that a projection which fakes an event on config.shards with a non-timestamp clusterTime
 // is allowed to pass through.
 testProjection = {
     ns: configDotShardsNs,
-    clusterTime: null
+    clusterTime: null,
 };
 assertChangeStreamBehaviour(testProjection, [
     {clusterTime: null, fullDocument: existingShardWrongNameDoc},
     {clusterTime: null, fullDocument: existingShardWrongHostDoc},
     {clusterTime: null, fullDocument: existingShardDoc},
     {clusterTime: null, fullDocument: invalidShardDoc},
-    {clusterTime: null, fullDocument: fakeShardDoc}
+    {clusterTime: null, fullDocument: fakeShardDoc},
 ]);
 
 // Test that a projection which fakes an event on config.shards with a non-object fullDocument
 // is allowed to pass through.
 testProjection = {
     ns: configDotShardsNs,
-    fullDocument: null
+    fullDocument: null,
 };
 assertChangeStreamBehaviour(testProjection, [
     {fullDocument: null},
     {fullDocument: null},
     {fullDocument: null},
     {fullDocument: null},
-    {fullDocument: null}
+    {fullDocument: null},
 ]);
 
 // Test that a projection which fakes a new-shard event on config.shards with a valid fullDocument
 // pointing to an existing shard is swallowed but has no effect.
 testProjection = {
     ns: configDotShardsNs,
-    fullDocument: existingShardDoc
+    fullDocument: existingShardDoc,
 };
 assertChangeStreamBehaviour(testProjection, []);
 
@@ -185,7 +188,7 @@ assertChangeStreamBehaviour(testProjection, []);
 // pointing to an existing shard's host, but the wrong shard name, throws as it attempts to connect.
 testProjection = {
     ns: configDotShardsNs,
-    fullDocument: existingShardWrongNameDoc
+    fullDocument: existingShardWrongNameDoc,
 };
 assertChangeStreamBehaviour(testProjection, null, ErrorCodes.ShardNotFound);
 
@@ -193,7 +196,7 @@ assertChangeStreamBehaviour(testProjection, null, ErrorCodes.ShardNotFound);
 // pointing to an existing shard's name, but the wrong host, is swallowed and has no effect.
 testProjection = {
     ns: configDotShardsNs,
-    fullDocument: existingShardWrongHostDoc
+    fullDocument: existingShardWrongHostDoc,
 };
 assertChangeStreamBehaviour(testProjection, []);
 
@@ -201,7 +204,7 @@ assertChangeStreamBehaviour(testProjection, []);
 // pointing to a non-existent shard throws as it attempts to connect.
 testProjection = {
     ns: configDotShardsNs,
-    fullDocument: fakeShardDoc
+    fullDocument: fakeShardDoc,
 };
 assertChangeStreamBehaviour(testProjection, null, ErrorCodes.ShardNotFound);
 
@@ -209,7 +212,7 @@ assertChangeStreamBehaviour(testProjection, null, ErrorCodes.ShardNotFound);
 // fullDocument throws a validation exception.
 testProjection = {
     ns: configDotShardsNs,
-    fullDocument: invalidShardDoc
+    fullDocument: invalidShardDoc,
 };
 assertChangeStreamBehaviour(testProjection, null, ErrorCodes.TypeMismatch);
 

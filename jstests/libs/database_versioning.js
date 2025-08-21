@@ -3,9 +3,11 @@
 function checkInMemoryDatabaseVersion(conn, dbName, expectedVersion) {
     const res = conn.adminCommand({getDatabaseVersion: dbName});
     assert.commandWorked(res);
-    assert.docEq(expectedVersion,
-                 res.dbVersion,
-                 conn + " did not have expected in-memory database version for " + dbName);
+    assert.docEq(
+        expectedVersion,
+        res.dbVersion,
+        conn + " did not have expected in-memory database version for " + dbName,
+    );
 }
 
 function checkOnDiskDatabaseVersion(conn, dbName, authoritativeEntry) {

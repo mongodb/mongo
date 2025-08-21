@@ -8,7 +8,15 @@ function runTest(bindIP, expectOk) {
     clearRawMongoProgramOutput();
 
     let pid = startMongoProgramNoConnect(
-        "mongod", "--ipv6", "--dbpath", MongoRunner.dataDir, "--bind_ip", bindIP, "--port", 0);
+        "mongod",
+        "--ipv6",
+        "--dbpath",
+        MongoRunner.dataDir,
+        "--bind_ip",
+        bindIP,
+        "--port",
+        0,
+    );
     jsTest.log("".concat("pid=[", pid, "]"));
 
     if (expectOk) {
@@ -16,14 +24,16 @@ function runTest(bindIP, expectOk) {
 
         // We use assert.soonNoExcept() here because the mongod may not be logging yet.
         assert.soonNoExcept(() => {
-            const logContents = rawMongoProgramOutput("\"id\":(7401305|23016)");
+            const logContents = rawMongoProgramOutput('"id":(7401305|23016)');
             let found;
             if (jsTestOptions().shellGRPC) {
                 found = logContents.match(
-                    /"id":7401305,\s*(?:"svc":".",\s*)?"ctx":"initandlisten","msg":"Started gRPC server","attr":{"addresses":\["127.0.0.1:(\d+)/);
+                    /"id":7401305,\s*(?:"svc":".",\s*)?"ctx":"initandlisten","msg":"Started gRPC server","attr":{"addresses":\["127.0.0.1:(\d+)/,
+                );
             } else {
                 found = logContents.match(
-                    /"id":23016,\s*(?:"svc":".",\s*)?"ctx":"listener","msg":"Waiting for connections","attr":{"port":(\d+)/);
+                    /"id":23016,\s*(?:"svc":".",\s*)?"ctx":"listener","msg":"Waiting for connections","attr":{"port":(\d+)/,
+                );
             }
             if (found !== null) {
                 print("Found message from mongod with port it is listening on: " + found[0]);
@@ -49,8 +59,9 @@ function runTest(bindIP, expectOk) {
         assert.soonNoExcept(() => {
             const logContents = rawMongoProgramOutput("ephemeral port");
             const found = logContents.match(
-                /Port 0 \(ephemeral port\) is not allowed when listening on multiple IP interfaces/);
-            return (found !== null);
+                /Port 0 \(ephemeral port\) is not allowed when listening on multiple IP interfaces/,
+            );
+            return found !== null;
         }, "No warning issued for invalid port=0 usage");
     }
 }

@@ -5,15 +5,10 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_atomicity_isolation.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_atomicity_isolation.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.numReads = 5;
 
     $config.states.repeatedRead = function repeatedRead(db, collName) {
@@ -27,17 +22,28 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             for (let i = 0; i < this.numReads; i++) {
                 const collectionDocs = collection.find().batchSize(batchSize).toArray();
                 assert.eq(this.numDocs, collectionDocs.length, () => {
-                    return "txnNumber: " + tojson(this.session.getTxnNumber_forTesting()) +
-                        ", session id: " + tojson(this.session.getSessionId()) +
-                        ", read number: " + i + ", collection docs: " + tojson(collectionDocs);
+                    return (
+                        "txnNumber: " +
+                        tojson(this.session.getTxnNumber_forTesting()) +
+                        ", session id: " +
+                        tojson(this.session.getSessionId()) +
+                        ", read number: " +
+                        i +
+                        ", collection docs: " +
+                        tojson(collectionDocs)
+                    );
                 });
                 if (prevDocuments) {
-                    assert.sameMembers(prevDocuments,
-                                       collectionDocs,
-                                       () => "Document mismatch - previous documents: " +
-                                           tojsononeline(prevDocuments) +
-                                           ", current documents: " + tojsononeline(collectionDocs),
-                                       bsonBinaryEqual);  // Exact document matches.
+                    assert.sameMembers(
+                        prevDocuments,
+                        collectionDocs,
+                        () =>
+                            "Document mismatch - previous documents: " +
+                            tojsononeline(prevDocuments) +
+                            ", current documents: " +
+                            tojsononeline(collectionDocs),
+                        bsonBinaryEqual,
+                    ); // Exact document matches.
                 }
                 prevDocuments = collectionDocs;
             }
@@ -48,7 +54,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         init: {update: 0.7, checkConsistency: 0.1, repeatedRead: 0.2},
         update: {update: 0.7, checkConsistency: 0.1, repeatedRead: 0.2},
         checkConsistency: {update: 0.8, repeatedRead: 0.2},
-        repeatedRead: {update: 0.8, repeatedRead: 0.2}
+        repeatedRead: {update: 0.8, repeatedRead: 0.2},
     };
 
     return $config;

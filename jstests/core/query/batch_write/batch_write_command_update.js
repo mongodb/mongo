@@ -23,22 +23,28 @@ let batch;
 const maxWriteBatchSize = db.hello().maxWriteBatchSize;
 
 function resultOK(result) {
-    return result.ok && !('code' in result) && !('errmsg' in result) && !('errInfo' in result) &&
-        !('writeErrors' in result);
+    return (
+        result.ok &&
+        !("code" in result) &&
+        !("errmsg" in result) &&
+        !("errInfo" in result) &&
+        !("writeErrors" in result)
+    );
 }
 
 function resultNOK(result) {
-    return !result.ok && typeof (result.code) == 'number' && typeof (result.errmsg) == 'string';
+    return !result.ok && typeof result.code == "number" && typeof result.errmsg == "string";
 }
 
 function countEventually(collection, n) {
     assert.soon(
-        function() {
+        function () {
             return collection.count() === n;
         },
-        function() {
+        function () {
             return "unacknowledged write timed out";
-        });
+        },
+    );
 }
 
 // EACH TEST BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
@@ -47,7 +53,7 @@ function countEventually(collection, n) {
 // NO DOCS, illegal command
 coll.remove({});
 request = {
-    update: coll.getName()
+    update: coll.getName(),
 };
 result = coll.runCommand(request);
 assert(resultNOK(result), tojson(result));
@@ -57,12 +63,12 @@ assert(resultNOK(result), tojson(result));
 coll.remove({});
 request = {
     update: coll.getName(),
-    updates: [{q: {a: 1}, u: {$set: {a: 1}}, upsert: true}]
+    updates: [{q: {a: 1}, u: {$set: {a: 1}}, upsert: true}],
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
 assert.eq(1, result.n);
-assert('upserted' in result);
+assert("upserted" in result);
 assert.eq(1, result.upserted.length);
 assert.eq(0, result.upserted[0].index);
 
@@ -77,12 +83,12 @@ assert.commandWorked(coll.remove({}));
 request = {
     update: coll.getName(),
     updates: [{q: {a: 1}, u: {$set: {a: 1}}, upsert: true}],
-    writeConcern: {w: 1}
+    writeConcern: {w: 1},
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
 assert.eq(1, result.n);
-assert('upserted' in result);
+assert("upserted" in result);
 assert.eq(1, result.upserted.length);
 assert.eq(0, result.upserted[0].index);
 
@@ -98,12 +104,12 @@ request = {
     update: coll.getName(),
     updates: [{q: {a: 1}, u: {$set: {a: 1}}, upsert: true}],
     writeConcern: {w: 1},
-    ordered: true
+    ordered: true,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
 assert.eq(1, result.n);
-assert('upserted' in result);
+assert("upserted" in result);
 assert.eq(1, result.upserted.length);
 assert.eq(0, result.upserted[0].index);
 
@@ -119,12 +125,12 @@ assert.commandWorked(coll.insert({a: 1}));
 request = {
     update: coll.getName(),
     updates: [{q: {a: 1}, u: {$set: {c: 1}}}],
-    writeConcern: {w: 1}
+    writeConcern: {w: 1},
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
 assert.eq(1, result.n);
-assert(!('upserted' in result));
+assert(!("upserted" in result));
 assert.eq(1, coll.count());
 assert.eq(1, result.nModified, "missing/wrong nModified");
 
@@ -136,10 +142,10 @@ request = {
     update: coll.getName(),
     updates: [
         {q: {b: 1}, u: {$set: {b: 1, a: 1}}, upsert: true},
-        {q: {b: 2}, u: {$set: {b: 2, a: 1}}, upsert: true}
+        {q: {b: 2}, u: {$set: {b: 2, a: 1}}, upsert: true},
     ],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -160,7 +166,7 @@ request = {
     update: coll.getName(),
     updates: [{q: {a: 1}, u: {$set: {c: 2}}, multi: true}],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -178,9 +184,9 @@ request = {
     update: coll.getName(),
     updates: [{q: {a: 1}, u: {$set: {c: 2}}, multi: true}],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
-printjson(result = coll.runCommand(request));
+printjson((result = coll.runCommand(request)));
 assert(resultOK(result), tojson(result));
 assert.eq(2, result.n);
 assert.eq(1, result.nModified, "missing/wrong nModified");
@@ -199,7 +205,7 @@ request = {
     update: coll.getName(),
     updates: batch,
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -220,7 +226,7 @@ request = {
     update: coll.getName(),
     updates: batch,
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultNOK(result), tojson(result));
@@ -240,10 +246,10 @@ request = {
     updates: [
         {q: {b: 1}, u: {$set: {b: 1, a: 1}}, upsert: true},
         {q: {b: 3}, u: {$set: {b: 3, a: 2}}, upsert: true},
-        {q: {b: 2}, u: {$set: {b: 2, a: 1}}, upsert: true}
+        {q: {b: 2}, u: {$set: {b: 2, a: 1}}, upsert: true},
     ],
     writeConcern: {w: 1},
-    ordered: true
+    ordered: true,
 };
 result = coll.runCommand(request);
 assert(result.ok, tojson(result));
@@ -252,8 +258,8 @@ assert.eq(0, result.nModified, "wrong nModified");
 assert.eq(1, result.writeErrors.length);
 
 assert.eq(2, result.writeErrors[0].index);
-assert.eq('number', typeof result.writeErrors[0].code);
-assert.eq('string', typeof result.writeErrors[0].errmsg);
+assert.eq("number", typeof result.writeErrors[0].code);
+assert.eq("string", typeof result.writeErrors[0].errmsg);
 
 assert.eq(2, result.upserted.length);
 assert.eq(0, result.upserted[0].index);
@@ -272,10 +278,10 @@ request = {
         {q: {b: 1}, u: {$set: {b: 1, a: 1}}, upsert: true},
         {q: {b: 2}, u: {$set: {b: 2, a: 1}}, upsert: true},
         {q: {b: 2}, u: {$set: {b: 2, a: 1}}, upsert: true},
-        {q: {b: 3}, u: {$set: {b: 3, a: 3}}, upsert: true}
+        {q: {b: 3}, u: {$set: {b: 3, a: 3}}, upsert: true},
     ],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(result.ok, tojson(result));
@@ -284,12 +290,12 @@ assert.eq(0, result.nModified, "wrong nModified");
 assert.eq(2, result.writeErrors.length);
 
 assert.eq(1, result.writeErrors[0].index);
-assert.eq('number', typeof result.writeErrors[0].code);
-assert.eq('string', typeof result.writeErrors[0].errmsg);
+assert.eq("number", typeof result.writeErrors[0].code);
+assert.eq("string", typeof result.writeErrors[0].errmsg);
 
 assert.eq(2, result.writeErrors[1].index);
-assert.eq('number', typeof result.writeErrors[1].code);
-assert.eq('string', typeof result.writeErrors[1].errmsg);
+assert.eq("number", typeof result.writeErrors[1].code);
+assert.eq("string", typeof result.writeErrors[1].errmsg);
 
 assert.eq(2, result.upserted.length);
 assert.eq(0, result.upserted[0].index);

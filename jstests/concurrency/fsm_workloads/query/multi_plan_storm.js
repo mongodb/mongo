@@ -11,7 +11,7 @@
  *  does_not_support_stepdowns,
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     const data = {
         numDocs: 20000,
         numUniqueKeys: 100,
@@ -25,34 +25,35 @@ export const $config = (function() {
             const y = Random.randInt(this.numUniqueKeys);
             const z = Random.randInt(this.numUniqueKeys);
             // Range queries.
-            const count = db[collName]
-                              .aggregate([{$match: {a: {$gt: x}, b: {$gt: y}, c: {$lt: z}}}])
-                              .itcount();
+            const count = db[collName].aggregate([{$match: {a: {$gt: x}, b: {$gt: y}, c: {$lt: z}}}]).itcount();
             const docs = db[collName].find({a: {$gt: x}, b: {$gt: y}, c: {$lt: z}}).toArray();
-        }
+        },
     };
 
     const transitions = {query: {query: 1}};
 
     function setup(db, collName, cluster) {
         function setParameter(db, parameterName, newValue, originalStorage) {
-            const originalParamValue =
-                assert.commandWorked(db.adminCommand({getParameter: 1, [parameterName]: 1}));
+            const originalParamValue = assert.commandWorked(db.adminCommand({getParameter: 1, [parameterName]: 1}));
             assert.commandWorked(db.adminCommand({setParameter: 1, [parameterName]: newValue}));
             originalStorage[db.getMongo().host] = originalParamValue[parameterName];
         }
 
         // Forcing the multi-planning rate limiter.
-        cluster.executeOnMongodNodes(db => {
-            setParameter(db,
-                         "internalQueryConcurrentMultiPlanningThreshold",
-                         5,
-                         this.concurrentMultiPlanningThresholdOriginalValues);
+        cluster.executeOnMongodNodes((db) => {
+            setParameter(
+                db,
+                "internalQueryConcurrentMultiPlanningThreshold",
+                5,
+                this.concurrentMultiPlanningThresholdOriginalValues,
+            );
 
-            setParameter(db,
-                         "internalQueryMaxConcurrentMultiPlanJobsPerCacheKey",
-                         15,
-                         this.concurrentMultiPlanJobsPerCacheKey);
+            setParameter(
+                db,
+                "internalQueryMaxConcurrentMultiPlanJobsPerCacheKey",
+                15,
+                this.concurrentMultiPlanJobsPerCacheKey,
+            );
         });
 
         assert.commandWorked(db[collName].createIndex({a: 1}));
@@ -68,7 +69,7 @@ export const $config = (function() {
                 b: Random.randInt(this.numUniqueKeys),
                 c: Random.randInt(this.numUniqueKeys),
                 rand: Random.rand(),
-                randInt: Random.randInt(this.numDocs)
+                randInt: Random.randInt(this.numDocs),
             });
         }
         let res = bulk.execute();
@@ -80,27 +81,34 @@ export const $config = (function() {
         let rateLimiterDelayedCount = 0;
         let rateLimiterReleasedCount = 0;
 
-        cluster.executeOnMongodNodes(db => {
+        cluster.executeOnMongodNodes((db) => {
             const rateLimiterMetrics = db.serverStatus().metrics.query.multiPlanner.rateLimiter;
             rateLimiterAllowedCount += rateLimiterMetrics.allowed;
             rateLimiterDelayedCount += rateLimiterMetrics.delayed;
             rateLimiterReleasedCount += rateLimiterMetrics.released;
 
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryConcurrentMultiPlanningThreshold:
-                    this.concurrentMultiPlanningThresholdOriginalValues[db.getMongo().host]
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryConcurrentMultiPlanningThreshold:
+                        this.concurrentMultiPlanningThresholdOriginalValues[db.getMongo().host],
+                }),
+            );
 
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryMaxConcurrentMultiPlanJobsPerCacheKey:
-                    this.concurrentMultiPlanJobsPerCacheKey[db.getMongo().host]
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryMaxConcurrentMultiPlanJobsPerCacheKey:
+                        this.concurrentMultiPlanJobsPerCacheKey[db.getMongo().host],
+                }),
+            );
         });
 
-        jsTest.log(`Rate Limiter metrics: allowed=${rateLimiterAllowedCount}, delayed=${
-            rateLimiterDelayedCount}, released=${rateLimiterReleasedCount}`);
+        jsTest.log(
+            `Rate Limiter metrics: allowed=${rateLimiterAllowedCount}, delayed=${
+                rateLimiterDelayedCount
+            }, released=${rateLimiterReleasedCount}`,
+        );
 
         // In case of multi-document transaction all metrics rate-limiting metrics will be 0.
         if (rateLimiterAllowedCount + rateLimiterDelayedCount + rateLimiterReleasedCount > 0) {
@@ -114,7 +122,7 @@ export const $config = (function() {
         threadCount: 50,
         iterations: 2,
         states: states,
-        startState: 'query',
+        startState: "query",
         transitions: transitions,
         data: data,
         setup: setup,

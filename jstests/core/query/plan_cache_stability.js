@@ -26,7 +26,7 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {
     getAllNodeExplains,
     getPlanCacheKeyFromExplain,
-    getPlanCacheShapeHashFromExplain
+    getPlanCacheShapeHashFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -47,9 +47,10 @@ function groupBy(arr, keyFn) {
 // produced by the same shard in the event that the 'planCacheKey' format changed in between
 // versions.
 function runTest({explain0, explain1, assertionFn}) {
-    const groupedExplains =
-        groupBy([...getAllNodeExplains(explain0), ...getAllNodeExplains(explain1)],
-                /* keyFn */ (explain) => explain.shardName);
+    const groupedExplains = groupBy(
+        [...getAllNodeExplains(explain0), ...getAllNodeExplains(explain1)],
+        /* keyFn */ (explain) => explain.shardName,
+    );
     for (const group of Object.values(groupedExplains)) {
         assert.eq(group.length, 2);
         const [nodeExplain0, nodeExplain1] = group;
@@ -61,7 +62,7 @@ const coll = assertDropAndRecreateCollection(db, "plan_cache_shape_hash_stabilit
 assert.commandWorked(coll.insert({x: 5}));
 
 const query = {
-    x: 3
+    x: 3,
 };
 const initialExplain = coll.find(query).explain();
 
@@ -72,15 +73,19 @@ runTest({
     explain0: initialExplain,
     explain1: withIndexExplain,
     assertionFn: (nodeExplain0, nodeExplain1) => {
-        assert.eq(getPlanCacheShapeHashFromExplain(nodeExplain0),
-                  getPlanCacheShapeHashFromExplain(nodeExplain1),
-                  "'planCacheShapeHash' shouldn't change accross catalog changes");
+        assert.eq(
+            getPlanCacheShapeHashFromExplain(nodeExplain0),
+            getPlanCacheShapeHashFromExplain(nodeExplain1),
+            "'planCacheShapeHash' shouldn't change accross catalog changes",
+        );
 
         // We added an index so the plan cache key changed.
-        assert.neq(getPlanCacheKeyFromExplain(nodeExplain0),
-                   getPlanCacheKeyFromExplain(nodeExplain1),
-                   "'planCacheKey' should change accross catalog changes");
-    }
+        assert.neq(
+            getPlanCacheKeyFromExplain(nodeExplain0),
+            getPlanCacheKeyFromExplain(nodeExplain1),
+            "'planCacheKey' should change accross catalog changes",
+        );
+    },
 });
 
 // Drop the index.
@@ -91,20 +96,23 @@ runTest({
     explain0: initialExplain,
     explain1: postDropExplain,
     assertionFn: (nodeExplain0, nodeExplain1) => {
-        assert.eq(getPlanCacheShapeHashFromExplain(nodeExplain0),
-                  getPlanCacheShapeHashFromExplain(nodeExplain1),
-                  "'planCacheShapeHash' shouldn't change accross catalog changes");
+        assert.eq(
+            getPlanCacheShapeHashFromExplain(nodeExplain0),
+            getPlanCacheShapeHashFromExplain(nodeExplain1),
+            "'planCacheShapeHash' shouldn't change accross catalog changes",
+        );
 
         if (usesSbePlanCache) {
             // SBE's 'planCacheKey' encoding encodes "collection version" which will be increased
             // after dropping an index.
-            assert.neq(getPlanCacheKeyFromExplain(nodeExplain0),
-                       getPlanCacheKeyFromExplain(nodeExplain1),
-                       "'planCacheKey' should change accross catalog changes");
+            assert.neq(
+                getPlanCacheKeyFromExplain(nodeExplain0),
+                getPlanCacheKeyFromExplain(nodeExplain1),
+                "'planCacheKey' should change accross catalog changes",
+            );
         } else {
             // The 'planCacheKey' should be the same as what it was before we dropped the index.
-            assert.eq(getPlanCacheKeyFromExplain(nodeExplain0),
-                      getPlanCacheKeyFromExplain(nodeExplain1));
+            assert.eq(getPlanCacheKeyFromExplain(nodeExplain0), getPlanCacheKeyFromExplain(nodeExplain1));
         }
-    }
+    },
 });

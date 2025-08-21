@@ -28,15 +28,14 @@ const measurements = [
     {_id: 0, [timeFieldName]: ISODate("2024-02-15T10:10:10.000Z"), a: 1},
     {_id: 1, [timeFieldName]: ISODate("2024-02-15T08:10:20.000Z"), a: 2},
     {_id: 2, [timeFieldName]: ISODate("2024-02-15T10:10:20.000Z"), a: 3},
-    {_id: 3, [timeFieldName]: ISODate("2024-02-15T08:10:20.001Z"), a: 4}
+    {_id: 3, [timeFieldName]: ISODate("2024-02-15T08:10:20.001Z"), a: 4},
 ];
 
 function testIntegrityCheck(turnFailpointOn) {
     jsTestLog("turnFailpointOn {" + turnFailpointOn + "}");
 
     coll.drop();
-    assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
     // Insert first measurement, creating our first bucket A.
     assert.commandWorked(coll.insert(measurements[0]));
@@ -52,8 +51,9 @@ function testIntegrityCheck(turnFailpointOn) {
 
     if (turnFailpointOn) {
         // Turn on the failpoint that causes the timeseries data integrity check to fail.
-        assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: 'timeseriesDataIntegrityCheckFailureUpdate', mode: {times: 1}}));
+        assert.commandWorked(
+            testDB.adminCommand({configureFailPoint: "timeseriesDataIntegrityCheckFailureUpdate", mode: {times: 1}}),
+        );
 
         // Insert third measurement - this should cause the first bucket A that we closed to be
         // reopened. We should try to insert into this bucket, but then fail when we try to add
@@ -71,8 +71,7 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1, tojson(stats.timeseries));
-        assert.eq(
-            stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
 
         // Insert fourth measurement.
         assert.commandWorked(coll.insert(measurements[3]));
@@ -86,8 +85,7 @@ function testIntegrityCheck(turnFailpointOn) {
         assert.eq(stats.timeseries.numBucketsFetched, 1, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsClosedDueToReopening, 0, tojson(stats.timeseries));
         assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1, tojson(stats.timeseries));
-        assert.eq(
-            stats.timeseries.numBucketsArchivedDueToTimeBackward, 2, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 2, tojson(stats.timeseries));
     } else {
         // Insert third measurement.
         assert.commandWorked(coll.insert(measurements[2]));
@@ -102,8 +100,7 @@ function testIntegrityCheck(turnFailpointOn) {
         // We won't close bucket A due to reopening because it is marked with a rolloverReason
         // before we try to load it into the bucket catalog.
         assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 0, tojson(stats.timeseries));
-        assert.eq(
-            stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
 
         // Insert fourth measurement.
         assert.commandWorked(coll.insert(measurements[3]));
@@ -118,8 +115,7 @@ function testIntegrityCheck(turnFailpointOn) {
         // We will use bucket B which was marked with roll-over reason "TimeForward" for
         // measurement 4.
         assert.eq(stats.timeseries.numBucketsClosedDueToTimeForward, 1, tojson(stats.timeseries));
-        assert.eq(
-            stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
+        assert.eq(stats.timeseries.numBucketsArchivedDueToTimeBackward, 1, tojson(stats.timeseries));
     }
 }
 

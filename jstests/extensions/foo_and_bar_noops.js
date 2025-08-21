@@ -9,7 +9,11 @@ import {assertArrayEq, assertErrorCode} from "jstests/aggregation/extras/utils.j
 
 const coll = db[jsTestName()];
 coll.drop();
-const testData = [{_id: 0, x: 1}, {_id: 1, x: 2}, {_id: 2, x: 3}];
+const testData = [
+    {_id: 0, x: 1},
+    {_id: 1, x: 2},
+    {_id: 2, x: 3},
+];
 assert.commandWorked(coll.insertMany(testData));
 
 // Test one no-op stage passes documents through unchanged.
@@ -31,30 +35,32 @@ assert.commandWorked(coll.insertMany(testData));
 // Test $testFoo stage fails to parse.
 {
     const pipeline = [{$testFoo: {invalidField: "value"}}];
-    assertErrorCode(
-        coll, pipeline, 10624200, "Using $testFoo with invalid field should be rejected");
+    assertErrorCode(coll, pipeline, 10624200, "Using $testFoo with invalid field should be rejected");
 }
 
 // Test $testBar stage fails to parse.
 {
     const pipeline = [{$testBar: {}}];
-    assertErrorCode(
-        coll, pipeline, 10785800, "Using $testBar with empty object should be rejected");
+    assertErrorCode(coll, pipeline, 10785800, "Using $testBar with empty object should be rejected");
 }
 
 // Test no-op stages throughout a pipeline.
 {
-    const pipeline =
-        [{$testBar: {anyField: true}}, {$match: {x: {$gte: 2}}}, {$testFoo: {}}, {$sort: {x: 1}}];
+    const pipeline = [{$testBar: {anyField: true}}, {$match: {x: {$gte: 2}}}, {$testFoo: {}}, {$sort: {x: 1}}];
     const result = coll.aggregate(pipeline).toArray();
 
-    assertArrayEq({actual: result, expected: [{_id: 1, x: 2}, {_id: 2, x: 3}]});
+    assertArrayEq({
+        actual: result,
+        expected: [
+            {_id: 1, x: 2},
+            {_id: 2, x: 3},
+        ],
+    });
 }
 
 // Test no-op stage with a subsequent stage that modifies documents.
 {
-    const pipeline =
-        [{$match: {x: {$gte: 2}}}, {$testFoo: {}}, {$group: {_id: null, cnt: {$sum: 1}}}];
+    const pipeline = [{$match: {x: {$gte: 2}}}, {$testFoo: {}}, {$group: {_id: null, cnt: {$sum: 1}}}];
     const result = coll.aggregate(pipeline).toArray();
 
     assertArrayEq({actual: result, expected: [{_id: null, cnt: 2}]});
@@ -94,7 +100,7 @@ assert.commandWorked(coll.insertMany(testData));
         {$testFoo: {}},
         {$project: {y: "$x", _id: 0}},
         {$testBar: {a: 0}},
-        {$sort: {y: -1}}
+        {$sort: {y: -1}},
     ];
     const result = coll.aggregate(pipeline).toArray();
 
@@ -111,8 +117,11 @@ assert.commandWorked(coll.insertMany(testData));
         docInfo: {
             title: "some_doc",
             version: 2,
-            authors: [{name: "John Doe", role: "author"}, {name: "Jane Doe", role: "editor"}]
-        }
+            authors: [
+                {name: "John Doe", role: "author"},
+                {name: "Jane Doe", role: "editor"},
+            ],
+        },
     };
 
     assert.commandWorked(nestedColl.insertOne(nestedDoc));

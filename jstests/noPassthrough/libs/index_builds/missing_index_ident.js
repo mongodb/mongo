@@ -12,44 +12,42 @@ export const MissingIndexIdent = class {
         replTest.startSet();
         replTest.initiate();
 
-        const primary = function() {
+        const primary = function () {
             return replTest.getPrimary();
         };
-        const testDB = function() {
-            return primary().getDB('test');
+        const testDB = function () {
+            return primary().getDB("test");
         };
-        const coll = function() {
+        const coll = function () {
             return testDB()[jsTestName()];
         };
 
         assert.commandWorked(coll().insert({a: 0}));
 
-        const fp = configureFailPoint(primary(), 'hangIndexBuildBeforeCommit');
-        const awaitCreateIndex =
-            IndexBuildTest.startIndexBuild(primary(), coll().getFullName(), {a: 1});
+        const fp = configureFailPoint(primary(), "hangIndexBuildBeforeCommit");
+        const awaitCreateIndex = IndexBuildTest.startIndexBuild(primary(), coll().getFullName(), {a: 1});
         fp.wait();
 
         // Get a timestamp before the commit timestamp of the index build.
-        const ts =
-            assert
-                .commandWorked(testDB().runCommand({insert: coll().getName(), documents: [{a: 1}]}))
-                .operationTime;
+        const ts = assert.commandWorked(
+            testDB().runCommand({insert: coll().getName(), documents: [{a: 1}]}),
+        ).operationTime;
 
-        configureFailPoint(primary(), 'holdStableTimestampAtSpecificTimestamp', {timestamp: ts});
+        configureFailPoint(primary(), "holdStableTimestampAtSpecificTimestamp", {timestamp: ts});
         fp.off();
         awaitCreateIndex();
 
-        const ident = assert.commandWorked(testDB().runCommand({collStats: coll().getName()}))
-                          .indexDetails.a_1.uri.substring('statistics:table:'.length);
+        const ident = assert
+            .commandWorked(testDB().runCommand({collStats: coll().getName()}))
+            .indexDetails.a_1.uri.substring("statistics:table:".length);
 
         replTest.restart(primary(), {
             setParameter: {
                 // Set minSnapshotHistoryWindowInSeconds to 0 so that the the oldest timestamp can
                 // move forward, despite the stable timestamp being held steady.
                 minSnapshotHistoryWindowInSeconds: 0,
-                'failpoint.holdStableTimestampAtSpecificTimestamp':
-                    tojson({mode: 'alwaysOn', data: {timestamp: ts}})
-            }
+                "failpoint.holdStableTimestampAtSpecificTimestamp": tojson({mode: "alwaysOn", data: {timestamp: ts}}),
+            },
         });
 
         MissingIndexIdent.checkRecoveryLogs(primary(), coll(), ts, ident);
@@ -70,16 +68,14 @@ export const MissingIndexIdent = class {
         // On startup, the node will recover from before the index commit timestamp.
         checkLog.containsJson(conn, 23987, {
             recoveryTimestamp: (recoveryTs) => {
-                return timestampCmp(
-                           Timestamp(recoveryTs['$timestamp']['t'], recoveryTs['$timestamp']['i']),
-                           ts) <= 0;
-            }
+                return timestampCmp(Timestamp(recoveryTs["$timestamp"]["t"], recoveryTs["$timestamp"]["i"]), ts) <= 0;
+            },
         });
 
         // Since the index build was not yet completed at the recovery timestamp, its ident will
         // be reset.
         checkLog.containsJson(conn, 6987700, {
-            index: 'a_1',
+            index: "a_1",
             namespace: coll.getFullName(),
             ident: ident,
         });

@@ -23,18 +23,10 @@ import {
     prepareCollection,
     prepareShardedCollection,
     setUpShardedCluster,
-    tearDownShardedCluster
+    tearDownShardedCluster,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
-const docs = [
-    doc1_a_nofields,
-    doc2_a_f101,
-    doc3_a_f102,
-    doc4_b_f103,
-    doc5_b_f104,
-    doc6_c_f105,
-    doc7_c_f106,
-];
+const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
 
 function verifyUpdateDeleteOneRes(res, nAffected) {
     assert.eq(nAffected, res.n, tojson(res));
@@ -49,11 +41,7 @@ function verifyFindAndModifyRes(res, nAffected, resultDoc) {
  * Verifies that a write one command succeed or fail with the expected error code when the sharding
  * state is stale.
  */
-function testWriteOneOnCollectionWithStaleShardingState({
-    writeCmd,
-    nAffected,
-    resultDoc,
-}) {
+function testWriteOneOnCollectionWithStaleShardingState({writeCmd, nAffected, resultDoc}) {
     const callerName = getCallerName();
     jsTestLog(`Running ${callerName}(${tojson(arguments[0])})`);
 
@@ -64,12 +52,18 @@ function testWriteOneOnCollectionWithStaleShardingState({
             isFindAndModifyCmd = true;
             writeCmd["findAndModify"] = callerName;
             return writeCmd["findAndModify"];
-        } else if (writeCmd.hasOwnProperty("delete") && writeCmd["deletes"].length === 1 &&
-                   writeCmd["deletes"][0].limit === 1) {
+        } else if (
+            writeCmd.hasOwnProperty("delete") &&
+            writeCmd["deletes"].length === 1 &&
+            writeCmd["deletes"][0].limit === 1
+        ) {
             writeCmd["delete"] = callerName;
             return writeCmd["delete"];
-        } else if (writeCmd.hasOwnProperty("update") && writeCmd["updates"].length === 1 &&
-                   !writeCmd["updates"][0].multi) {
+        } else if (
+            writeCmd.hasOwnProperty("update") &&
+            writeCmd["updates"].length === 1 &&
+            !writeCmd["updates"][0].multi
+        ) {
             writeCmd["update"] = callerName;
             return writeCmd["update"];
         } else {
@@ -102,8 +96,7 @@ function testWriteOneOnCollectionWithStaleShardingState({
     prepareCollection({dbToUse: mongos0DB, collName: collName, initialDocList: docs});
 
     // This write command will fail because mongos1 has a stale sharding state.
-    res = assert.commandFailedWithCode(mongos1DB[collName].runCommand(writeCmd),
-                                       ErrorCodes.NamespaceNotSharded);
+    res = assert.commandFailedWithCode(mongos1DB[collName].runCommand(writeCmd), ErrorCodes.NamespaceNotSharded);
 
     // This write command should succeed since mongos1 should have refreshed its sharding state.
     res = assert.commandWorked(mongos1DB[collName].runCommand(writeCmd));
@@ -157,7 +150,7 @@ setUpShardedCluster({nMongos: 2});
             query: {f: 1000},
             update: replacementDoc,
             upsert: true,
-            new: true
+            new: true,
         },
         nAffected: 1,
         resultDoc: replacementDoc,
@@ -169,7 +162,7 @@ setUpShardedCluster({nMongos: 2});
     testWriteOneOnCollectionWithStaleShardingState({
         writeCmd: {
             update: "$$$",
-            updates: [{q: {f: 1000}, u: replacementDoc, multi: false, upsert: true}]
+            updates: [{q: {f: 1000}, u: replacementDoc, multi: false, upsert: true}],
         },
         nAffected: 1,
         resultDoc: replacementDoc,

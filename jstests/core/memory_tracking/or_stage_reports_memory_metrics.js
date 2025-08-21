@@ -40,9 +40,7 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 
 // Create a query that can be solved by two index scans that need to be ORed together.
-const pipeline = [
-    {$match: {$or: [{a: 5}, {b: 1}]}},
-];
+const pipeline = [{$match: {$or: [{a: 5}, {b: 1}]}}];
 
 runMemoryStatsTest({
     db,
@@ -52,7 +50,7 @@ runMemoryStatsTest({
         pipeline,
         comment: "memory stats Or stage test",
         allowDiskUse: false,
-        cursor: {batchSize: 15}
+        cursor: {batchSize: 15},
     },
     stageName: "OR",
     expectedNumGetMores: 3,

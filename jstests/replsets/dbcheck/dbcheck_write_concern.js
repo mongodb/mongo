@@ -17,8 +17,8 @@ const replSet = new ReplSetTest({
     nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}},
     settings: {
         // Prevent the primary from stepping down when we temporarily shut down the secondary.
-        electionTimeoutMillis: 120000
-    }
+        electionTimeoutMillis: 120000,
+    },
 });
 replSet.startSet();
 replSet.initiate();
@@ -28,7 +28,7 @@ const collName = "test";
 const primary = replSet.getPrimary();
 const db = primary.getDB(dbName);
 const coll = db[collName];
-const healthlog = db.getSiblingDB('local').system.healthlog;
+const healthlog = db.getSiblingDB("local").system.healthlog;
 
 // Validate that w:majority behaves normally.
 (function testWMajority() {
@@ -42,8 +42,7 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
     runDbCheck(replSet, db, collName, dbCheckParameters);
 
     // Confirm dbCheck logs the expected number of batches.
-    checkHealthLog(
-        healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
+    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
 
     // Confirm there are no warnings or errors.
     checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "warning"}, 0);
@@ -63,8 +62,7 @@ const healthlog = db.getSiblingDB('local').system.healthlog;
     runDbCheck(replSet, db, collName, dbCheckParameters);
 
     // Confirm dbCheck logs the expected number of batches.
-    checkHealthLog(
-        healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
+    checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "info"}, nDocs / maxDocsPerBatch);
 
     // Confirm there are no warnings or errors.
     checkHealthLog(healthlog, {operation: "dbCheckBatch", severity: "warning"}, 0);

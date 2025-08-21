@@ -23,18 +23,12 @@ var s = new ShardingTest({
     other: {
         chunkSize: 1,
         rs0: {
-            nodes: [
-                {},
-                {rsConfig: {priority: 0}},
-            ],
+            nodes: [{}, {rsConfig: {priority: 0}}],
         },
         rs1: {
-            nodes: [
-                {},
-                {rsConfig: {priority: 0}},
-            ],
-        }
-    }
+            nodes: [{}, {rsConfig: {priority: 0}}],
+        },
+    },
 });
 
 var db = s.getDB("test");
@@ -44,12 +38,14 @@ assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.
 // The default WC is 'majority' and fsyncLock will prevent satisfying any majority writes.
 // The default RC is 'local' but fsync will block any refresh on secondaries, that's why RC is
 // defaulted to 'available'.
-assert.commandWorked(s.s.adminCommand({
-    setDefaultRWConcern: 1,
-    defaultReadConcern: {level: "available"},
-    defaultWriteConcern: {w: 1},
-    writeConcern: {w: "majority"}
-}));
+assert.commandWorked(
+    s.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultReadConcern: {level: "available"},
+        defaultWriteConcern: {w: 1},
+        writeConcern: {w: "majority"},
+    }),
+);
 
 // -------------------------------------------------------------------------------------------
 // ---------- test that config server updates when replica set config changes ----------------
@@ -69,9 +65,9 @@ assert.eq(2, countNodes(), "A1");
 
 const rs = s.rs0;
 if (!TestData.configShard) {
-    rs.add({'shardsvr': ""});
+    rs.add({"shardsvr": ""});
 } else {
-    rs.add({'configsvr': ""});
+    rs.add({"configsvr": ""});
 }
 
 try {
@@ -81,15 +77,20 @@ try {
     print(e);
 }
 
-assert.soon(function() {
-    try {
-        printjson(rs.getPrimary().getDB("admin").runCommand("hello"));
-        s.config.shards.find().forEach(printjsononeline);
-        return countNodes() == 3;
-    } catch (e) {
-        print(e);
-    }
-}, "waiting for config server to update", 180 * 1000, 1000);
+assert.soon(
+    function () {
+        try {
+            printjson(rs.getPrimary().getDB("admin").runCommand("hello"));
+            s.config.shards.find().forEach(printjsononeline);
+            return countNodes() == 3;
+        } catch (e) {
+            print(e);
+        }
+    },
+    "waiting for config server to update",
+    180 * 1000,
+    1000,
+);
 
 // cleanup after adding node
 for (var i = 0; i < 5; i++) {
@@ -100,8 +101,7 @@ for (var i = 0; i < 5; i++) {
     }
 }
 
-jsTest.log(
-    "Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts...");
+jsTest.log("Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts...");
 rs.awaitReplication();
 // Make sure we wait for secondaries here - otherwise a secondary could come online later and be
 // used for the
@@ -143,8 +143,7 @@ db.foo.createIndex({x: 1});
 
 var bulk = db.foo.initializeUnorderedBulkOp();
 for (let i = 0; i < 100; i++) {
-    if (i == 17)
-        continue;
+    if (i == 17) continue;
     bulk.insert({x: i});
 }
 assert.commandWorked(bulk.execute({w: 3}));
@@ -176,14 +175,16 @@ assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {x: 50}}));
 s.printShardingStatus();
 
 var other = s.config.shards.findOne({_id: {$ne: s.shard0.shardName}});
-assert.commandWorked(s.getDB('admin').runCommand({
-    moveChunk: "test.foo",
-    find: {x: 10},
-    to: other._id,
-    _secondaryThrottle: true,
-    writeConcern: {w: 2},
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    s.getDB("admin").runCommand({
+        moveChunk: "test.foo",
+        find: {x: 10},
+        to: other._id,
+        _secondaryThrottle: true,
+        writeConcern: {w: 2},
+        _waitForDelete: true,
+    }),
+);
 rs.awaitReplication();
 assert.eq(100, t.count(), "C3");
 
@@ -238,11 +239,9 @@ assert.eq(100, ts.find().itcount(), "E5");
 printjson(ts.find().batchSize(5).explain());
 
 // fsyncLock the secondaries and enable command logging on all the mongods.
-assert.commandWorked(
-    rs.getPrimary().adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
-rs.getSecondaries().forEach(function(secondary) {
-    assert.commandWorked(
-        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
+assert.commandWorked(rs.getPrimary().adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
+rs.getSecondaries().forEach(function (secondary) {
+    assert.commandWorked(secondary.adminCommand({setParameter: 1, logComponentVerbosity: {command: 2}}));
     assert.commandWorked(secondary.getDB("test").fsyncLock());
 });
 
@@ -253,7 +252,7 @@ assert.commandWorked(ts.insert({primaryOnly: true, x: 60}));
 // But we can guarantee not to read from primary.
 assert.eq(0, ts.find({primaryOnly: true, x: 60}).itcount());
 // Unlock the secondaries
-rs.getSecondaries().forEach(function(secondary) {
+rs.getSecondaries().forEach(function (secondary) {
     secondary.getDB("test").fsyncUnlock();
 });
 // Clean up the data

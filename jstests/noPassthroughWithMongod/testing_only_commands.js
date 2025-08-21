@@ -8,24 +8,28 @@
 
 import {testOnlyCommands} from "jstests/auth/test_only_commands_list.js";
 
-var assertCmdNotFound = function(db, cmdName) {
+var assertCmdNotFound = function (db, cmdName) {
     var res = db.runCommand(cmdName);
     assert.eq(0, res.ok);
-    assert.eq(59, res.code, 'expected CommandNotFound(59) error code for test command ' + cmdName);
+    assert.eq(59, res.code, "expected CommandNotFound(59) error code for test command " + cmdName);
 };
 
-var assertCmdFound = function(db, cmdName) {
+var assertCmdFound = function (db, cmdName) {
     var res = db.runCommand(cmdName);
     if (!res.ok) {
-        assert.neq(59,
-                   res.code,
-                   'test command ' + cmdName + ' should either have succeeded or ' +
-                       'failed with an error code other than CommandNotFound(59)');
+        assert.neq(
+            59,
+            res.code,
+            "test command " +
+                cmdName +
+                " should either have succeeded or " +
+                "failed with an error code other than CommandNotFound(59)",
+        );
     }
 };
 
-const isBoundedSortEnabled = function(conn) {
-    const db = conn.getDB('TestDB');
+const isBoundedSortEnabled = function (conn) {
+    const db = conn.getDB("TestDB");
     const coll = db.bounded_sort_coll;
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName()));
@@ -41,8 +45,8 @@ const isBoundedSortEnabled = function(conn) {
 };
 
 // Check if expression $_testApiVersion is only available when enableTestCommands is true
-const isTestApiVersionAvailable = function(conn) {
-    const db = conn.getDB('TestDB');
+const isTestApiVersionAvailable = function (conn) {
+    const db = conn.getDB("TestDB");
     const coll = db.bounded_sort_coll;
     coll.drop();
     db.createCollection(coll.getName());
@@ -56,7 +60,8 @@ const isTestApiVersionAvailable = function(conn) {
     assert.eq(result.code, 31325);
     assert.eq(
         result.errmsg,
-        "Invalid $project :: caused by :: Unknown expression $_testApiVersion: This expression is for MongoDB's internal testing only.");
+        "Invalid $project :: caused by :: Unknown expression $_testApiVersion: This expression is for MongoDB's internal testing only.",
+    );
     return false;
 };
 
@@ -64,7 +69,7 @@ TestData.enableTestCommands = false;
 
 var conn = MongoRunner.runMongod({});
 for (let i in testOnlyCommands) {
-    assertCmdNotFound(conn.getDB('test'), testOnlyCommands[i]);
+    assertCmdNotFound(conn.getDB("test"), testOnlyCommands[i]);
 }
 assert(!isBoundedSortEnabled(conn));
 assert(!isTestApiVersionAvailable(conn));
@@ -75,7 +80,7 @@ TestData.enableTestCommands = true;
 
 var conn = MongoRunner.runMongod({});
 for (let i in testOnlyCommands) {
-    assertCmdFound(conn.getDB('test'), testOnlyCommands[i]);
+    assertCmdFound(conn.getDB("test"), testOnlyCommands[i]);
 }
 assert(isBoundedSortEnabled(conn));
 assert(isTestApiVersionAvailable(conn));

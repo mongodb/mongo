@@ -11,11 +11,7 @@
 // ]
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {
-    getQueryPlanner,
-    getSingleNodeExplain,
-    getWinningPlanFromExplain
-} from "jstests/libs/query/analyze_plan.js";
+import {getQueryPlanner, getSingleNodeExplain, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 var coll = db.orToIn;
 coll.drop();
@@ -24,7 +20,7 @@ function compareValues(v1, v2) {
     if (isNaN(v1) && isNaN(v2)) {
         return true;
     } else {
-        return (v1 == v2);
+        return v1 == v2;
     }
 }
 
@@ -44,12 +40,17 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery) {
     assert.docEq(expectedExplain.queryPlanner.parsedQuery, actualExplain.queryPlanner.parsedQuery);
 
     // Check if the test queries produce the same plans with collations
-    const expectedExplainCollation =
-        coll.find(expectedQuery).sort({f1: 1}).collation({locale: 'en_US'}).explain("queryPlanner");
-    const actualExplainCollation =
-        coll.find(actualQuery).sort({f1: 1}).collation({locale: 'en_US'}).explain("queryPlanner");
-    assert.docEq(expectedExplainCollation.queryPlanner.parsedQuery,
-                 actualExplainCollation.queryPlanner.parsedQuery);
+    const expectedExplainCollation = coll
+        .find(expectedQuery)
+        .sort({f1: 1})
+        .collation({locale: "en_US"})
+        .explain("queryPlanner");
+    const actualExplainCollation = coll
+        .find(actualQuery)
+        .sort({f1: 1})
+        .collation({locale: "en_US"})
+        .explain("queryPlanner");
+    assert.docEq(expectedExplainCollation.queryPlanner.parsedQuery, actualExplainCollation.queryPlanner.parsedQuery);
 
     // Make sure both queries have the same access plan.
     const expectedPlan = getWinningPlanFromExplain(expectedExplain);
@@ -63,16 +64,15 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery) {
     // The queries must produce the same result.
     const expectedRes = coll.find(expectedQuery).toArray();
     const actualRes = coll.find(actualQuery).toArray();
-    assert(arrayEq(expectedRes, actualRes, false, compareValues),
-           `expected=${expectedRes}, actual=${actualRes}`);
+    assert(arrayEq(expectedRes, actualRes, false, compareValues), `expected=${expectedRes}, actual=${actualRes}`);
 
     // also with collation
-    const expectedResCollation =
-        coll.find(expectedQuery).sort({f1: 1}).collation({locale: 'en_US'}).toArray();
-    const actualResCollation =
-        coll.find(actualQuery).sort({f1: 1}).collation({locale: 'en_US'}).toArray();
-    assert(arrayEq(expectedResCollation, actualResCollation, false, compareValues),
-           `expected=${expectedRes}, actual=${actualRes}`);
+    const expectedResCollation = coll.find(expectedQuery).sort({f1: 1}).collation({locale: "en_US"}).toArray();
+    const actualResCollation = coll.find(actualQuery).sort({f1: 1}).collation({locale: "en_US"}).toArray();
+    assert(
+        arrayEq(expectedResCollation, actualResCollation, false, compareValues),
+        `expected=${expectedRes}, actual=${actualRes}`,
+    );
 }
 
 // Make sure that certain $or expressions are not rewritten to $in.
@@ -103,7 +103,7 @@ const data = [
     {_id: 8, f1: undefined, f2: undefined},
     {_id: 9, f1: NaN, f2: NaN},
     {_id: 10, f1: 1, f2: [32, 52]},
-    {_id: 11, f1: 1, f2: [42, [13, 11]]}
+    {_id: 11, f1: 1, f2: [42, [13, 11]]},
 ];
 
 assert.commandWorked(coll.insert(data));
@@ -123,17 +123,27 @@ const positiveTestQueries = [
     [{$or: [{f1: {$regex: /^x/}}, {f1: {$regex: /ab/}}]}, {f1: {$in: [/^x/, /ab/]}}],
     [
         {$and: [{$or: [{f1: 7}, {f1: 3}, {f1: 5}]}, {$or: [{f1: 1}, {f1: 2}, {f1: 3}]}]},
-        {$and: [{f1: {$in: [7, 3, 5]}}, {f1: {$in: [1, 2, 3]}}]}
+        {$and: [{f1: {$in: [7, 3, 5]}}, {f1: {$in: [1, 2, 3]}}]},
     ],
     [
         {$or: [{$or: [{f1: 7}, {f1: 3}, {f1: 5}]}, {$or: [{f1: 1}, {f1: 2}, {f1: 3}]}]},
-        {$or: [{f1: {$in: [7, 3, 5]}}, {f1: {$in: [1, 2, 3]}}]}
+        {$or: [{f1: {$in: [7, 3, 5]}}, {f1: {$in: [1, 2, 3]}}]},
     ],
     [
         {$or: [{$and: [{f1: 7}, {f2: 7}, {f1: 5}]}, {$or: [{f1: 1}, {f1: 2}, {f1: 3}]}]},
         {$or: [{$and: [{f1: 7}, {f2: 7}, {f1: 5}]}, {f1: {$in: [1, 2, 3]}}]},
     ],
-    [{$or: [{f2: [32, 52]}, {f2: [42, [13, 11]]}]}, {f2: {$in: [[32, 52], [42, [13, 11]]]}}],
+    [
+        {$or: [{f2: [32, 52]}, {f2: [42, [13, 11]]}]},
+        {
+            f2: {
+                $in: [
+                    [32, 52],
+                    [42, [13, 11]],
+                ],
+            },
+        },
+    ],
     [{$or: [{f2: 52}, {f2: 13}]}, {f2: {$in: [52, 13]}}],
     [{$or: [{f2: [11]}, {f2: [23]}]}, {f2: {$in: [[11], [23]]}}],
     [{$or: [{f1: 42}, {f1: null}]}, {f1: {$in: [42, null]}}],
@@ -142,27 +152,15 @@ const positiveTestQueries = [
     [{$or: [{f1: "a"}, {f1: "b"}, {f1: /c/}]}, {$or: [{f1: /c/}, {f1: "a"}, {f1: "b"}]}],
     [{$or: [{f1: "a"}, {f1: "b"}, {f1: /c/}]}, {$or: [{f1: "a"}, {f1: /c/}, {f1: "b"}]}],
     [{$or: [{f2: 9}, {f1: 1}, {f1: 99}]}, {$or: [{f2: 9}, {f1: {$in: [1, 99]}}]}],
-    [
-        {$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}]},
-        {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]}
-    ],
+    [{$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}]}, {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]}],
     // Same as above, but different order of predicates.
-    [
-        {$or: [{f1: 1}, {f2: 3}, {f1: 2}, {f2: 4}]},
-        {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]}
-    ],
-    [
-        {$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}, {f3: 5}]},
-        {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}, {f3: 5}]}
-    ],
+    [{$or: [{f1: 1}, {f2: 3}, {f1: 2}, {f2: 4}]}, {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]}],
+    [{$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}, {f3: 5}]}, {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}, {f3: 5}]}],
     [{$or: [{f1: 1}, {f1: 1}]}, {f1: 1}],
 ];
 
 // These $or queries should not be rewritten into $in because of different semantics.
-const negativeTestQueries = [
-    {$or: [{f1: {$eq: /^x/}}, {f1: {$eq: /ab/}}]},
-    {$or: [{f1: {$lt: 2}}, {f1: {$gt: 3}}]},
-];
+const negativeTestQueries = [{$or: [{f1: {$eq: /^x/}}, {f1: {$eq: /ab/}}]}, {$or: [{f1: {$lt: 2}}, {f1: {$gt: 3}}]}];
 
 for (const query of negativeTestQueries) {
     assertOrNotRewrittenToIn(query);
@@ -174,29 +172,29 @@ function testOrToIn(queries) {
     }
 }
 
-testOrToIn(positiveTestQueries);  // test without indexes
+testOrToIn(positiveTestQueries); // test without indexes
 
 assert.commandWorked(coll.createIndex({f1: 1}));
 
-testOrToIn(positiveTestQueries);  // single index
+testOrToIn(positiveTestQueries); // single index
 
 assert.commandWorked(coll.createIndex({f2: 1}));
 // Create descending index to avoid index deduplication.
 assert.commandWorked(coll.createIndex({f1: -1, f2: 1}));
 
-testOrToIn(positiveTestQueries);  // three indexes, requires multiplanning
+testOrToIn(positiveTestQueries); // three indexes, requires multiplanning
 
 // Test with a collection that has a collation, and that collation is the same as the query
 // collation
 coll.drop();
-assert.commandWorked(db.createCollection("orToIn", {collation: {locale: 'en_US'}}));
+assert.commandWorked(db.createCollection("orToIn", {collation: {locale: "en_US"}}));
 coll = db.orToIn;
 assert.commandWorked(coll.insert(data));
 testOrToIn(positiveTestQueries);
 // Test with a collection that has a collation, and that collation is different from the query
 // collation
 coll.drop();
-assert.commandWorked(db.createCollection("orToIn", {collation: {locale: 'de'}}));
+assert.commandWorked(db.createCollection("orToIn", {collation: {locale: "de"}}));
 coll = db.orToIn;
 assert.commandWorked(coll.insert(data));
 testOrToIn(positiveTestQueries);

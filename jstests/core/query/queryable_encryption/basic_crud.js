@@ -13,12 +13,12 @@
 import {
     assertIsIndexedEncryptedField,
     EncryptedClient,
-    kSafeContentField
+    kSafeContentField,
 } from "jstests/fle2/libs/encrypted_client_util.js";
 
 const buildInfo = assert.commandWorked(db.runCommand({"buildInfo": 1}));
 
-if (!(buildInfo.modules.includes("enterprise"))) {
+if (!buildInfo.modules.includes("enterprise")) {
     jsTestLog("Skipping test as it requires the enterprise module");
     quit();
 }
@@ -29,15 +29,17 @@ const initialConn = db.getMongo();
 const localKMS = {
     key: BinData(
         0,
-        "/tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6dr")
+        "/tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6dr",
+    ),
 };
 
 // Some tests silently change the DB name to prefix it with a tenant ID, but we
 // need to pass the real DB name for the keyvault when setting up the auto encryption,
 // so that the internal connection for the key vault will target the right DB name.
-const kvDbName = (typeof (initialConn.getDbNameWithTenantPrefix) === "function")
-    ? initialConn.getDbNameWithTenantPrefix(dbName)
-    : dbName;
+const kvDbName =
+    typeof initialConn.getDbNameWithTenantPrefix === "function"
+        ? initialConn.getDbNameWithTenantPrefix(dbName)
+        : dbName;
 jsTestLog("Using key vault db " + kvDbName);
 
 const clientSideFLEOptions = {
@@ -51,21 +53,25 @@ db.getSiblingDB(dbName).dropDatabase();
 assert(initialConn.setAutoEncryption(clientSideFLEOptions));
 
 let encryptedClient = new EncryptedClient(initialConn, dbName);
-assert.commandWorked(encryptedClient.createEncryptionCollection(collName, {
-    encryptedFields: {
-        "fields": [
-            {"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}},
-        ]
-    }
-}));
+assert.commandWorked(
+    encryptedClient.createEncryptionCollection(collName, {
+        encryptedFields: {
+            "fields": [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}],
+        },
+    }),
+);
 
 initialConn.toggleAutoEncryption(true);
 
 function runIndexedEqualityEncryptedCRUDTest(client, iterations) {
     let conn = client.getDB().getMongo();
     let ecoll = client.getDB()[collName];
-    let values =
-        [["frodo", "baggins"], ["sam", "gamgee"], ["pippin", "took"], ["merry", "brandybuck"]];
+    let values = [
+        ["frodo", "baggins"],
+        ["sam", "gamgee"],
+        ["pippin", "took"],
+        ["merry", "brandybuck"],
+    ];
     let count = 0;
     let escCount = 0;
     let ecocCount = 0;
@@ -107,16 +113,16 @@ function runIndexedEqualityEncryptedCRUDTest(client, iterations) {
 
     // Do updates on encrypted fields
     for (let it = 0; it < iterations; it++) {
-        let res = assert.commandWorked(ecoll.updateOne(
-            {$and: [{last: "baggins"}, {first: "frodo"}]}, {$set: {first: "bilbo"}}));
+        let res = assert.commandWorked(
+            ecoll.updateOne({$and: [{last: "baggins"}, {first: "frodo"}]}, {$set: {first: "bilbo"}}),
+        );
         assert.eq(res.matchedCount, 1);
         assert.eq(res.modifiedCount, 1);
         escCount++;
         ecocCount++;
         client.assertEncryptedCollectionCounts(collName, count, escCount, ecocCount);
 
-        res = assert.commandWorked(
-            ecoll.replaceOne({last: "took"}, {first: "paladin", last: "took"}));
+        res = assert.commandWorked(ecoll.replaceOne({last: "took"}, {first: "paladin", last: "took"}));
         assert.eq(res.matchedCount, 1);
         assert.eq(res.modifiedCount, 1);
         escCount++;
@@ -126,11 +132,13 @@ function runIndexedEqualityEncryptedCRUDTest(client, iterations) {
 
     // Do findAndModifies
     for (let it = 0; it < iterations; it++) {
-        let res = assert.commandWorked(ecoll.runCommand({
-            findAndModify: ecoll.getName(),
-            query: {$and: [{last: "gamgee"}, {first: "sam"}]},
-            update: {$set: {first: "rosie"}},
-        }));
+        let res = assert.commandWorked(
+            ecoll.runCommand({
+                findAndModify: ecoll.getName(),
+                query: {$and: [{last: "gamgee"}, {first: "sam"}]},
+                update: {$set: {first: "rosie"}},
+            }),
+        );
         print(tojson(res));
         assert.eq(res.value.first, "sam");
         assert(res.value[kSafeContentField] !== undefined);
@@ -141,8 +149,7 @@ function runIndexedEqualityEncryptedCRUDTest(client, iterations) {
 
     // Do deletes
     for (let it = 0; it < iterations; it++) {
-        let res = assert.commandWorked(
-            ecoll.deleteOne({last: "brandybuck"}, {writeConcern: {w: "majority"}}));
+        let res = assert.commandWorked(ecoll.deleteOne({last: "brandybuck"}, {writeConcern: {w: "majority"}}));
         assert.eq(res.deletedCount, 1);
         count--;
         client.assertEncryptedCollectionCounts(collName, count, escCount, ecocCount);

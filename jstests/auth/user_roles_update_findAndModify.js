@@ -15,7 +15,7 @@ function initialize(db) {
         teamMembers: ["John", "Ashley", "Gina"],
         yearlyEduBudget: 15000,
         yearlyTnEBudget: 2000,
-        salesWins: 1000
+        salesWins: 1000,
     };
 
     let salesDoc = {
@@ -23,7 +23,7 @@ function initialize(db) {
         allowedRoles: ["sales-person"],
         allowedRole: "observe",
         comment: "only for sales team",
-        salesWins: 1000
+        salesWins: 1000,
     };
 
     let testUpdate = {_id: 2, allowedRole: "test", teamMembersRights: ["testUpdate"]};
@@ -31,7 +31,7 @@ function initialize(db) {
     let testFindAndModify = {
         _id: 3,
         allowedRole: "write",
-        teamMembersRights: ["testFindAndModify"]
+        teamMembersRights: ["testFindAndModify"],
     };
 
     let coll = db.getCollection(collName);
@@ -42,17 +42,18 @@ function initialize(db) {
 function runUpdateQuery(db) {
     let coll = db.getCollection(collName);
 
-    let pre = coll.findOne(
-        {$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}});
+    let pre = coll.findOne({$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}});
     var preSalesWins = pre.salesWins;
 
-    assert.commandWorked(coll.update(
-        {$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}},
-        {$inc: {salesWins: 1000}},
-        {multi: true}));
+    assert.commandWorked(
+        coll.update(
+            {$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}},
+            {$inc: {salesWins: 1000}},
+            {multi: true},
+        ),
+    );
 
-    let post = coll.findOne(
-        {$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}});
+    let post = coll.findOne({$expr: {$eq: [{$setIntersection: ["$allowedRoles", "$$USER_ROLES.role"]}, []]}});
     var postSalesWins = post.salesWins;
 
     assert.eq(postSalesWins, preSalesWins + 1000);
@@ -62,15 +63,14 @@ function runUpdateQuery(db) {
 function runUpdateUpdate(db) {
     let coll = db.getCollection(collName);
 
-    assert.commandWorked(
-        coll.update({_id: 2}, [{$set: {"teamMembersRights": "$$USER_ROLES.role"}}]));
+    assert.commandWorked(coll.update({_id: 2}, [{$set: {"teamMembersRights": "$$USER_ROLES.role"}}]));
 
     let post = coll.findOne({_id: 2});
 
     let expectedResult = {
         _id: 2,
         allowedRole: "test",
-        teamMembersRights: ["readWriteAnyDatabase", "read"]
+        teamMembersRights: ["readWriteAnyDatabase", "read"],
     };
 
     assert.eq(post, expectedResult);
@@ -85,7 +85,7 @@ function runFindAndModifyQuery(db) {
 
     db.coll.findAndModify({
         query: {allowedRole: "read", $expr: {allowedRole: "$$USER_ROLES.role"}},
-        update: {$inc: {salesWins: 1000}}
+        update: {$inc: {salesWins: 1000}},
     });
 
     let post = coll.findOne({$expr: {allowedRole: "$$USER_ROLES.role"}});
@@ -100,7 +100,7 @@ function runFindAndModifyUpdate(db) {
 
     coll.findAndModify({
         query: {allowedRole: "write"},
-        update: [{$set: {"teamMembersRights": "$$USER_ROLES.role"}}]
+        update: [{$set: {"teamMembersRights": "$$USER_ROLES.role"}}],
     });
 
     let post = coll.findOne({_id: 3});
@@ -108,7 +108,7 @@ function runFindAndModifyUpdate(db) {
     let expectedResult = {
         _id: 3,
         allowedRole: "write",
-        teamMembersRights: ["readWriteAnyDatabase", "read"]
+        teamMembersRights: ["readWriteAnyDatabase", "read"],
     };
 
     assert.eq(post, expectedResult);
@@ -130,11 +130,16 @@ function runTest(conn, st = null) {
 
     // Create a user that has roles on more than one database. The readWriteAnyDatabase is
     // necessary for the inserts that follow to work.
-    assert.commandWorked(db.runCommand({
-        createUser: "user",
-        pwd: "pwd",
-        roles: [{role: "readWriteAnyDatabase", db: "admin"}, {role: "read", db: dbName}]
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            createUser: "user",
+            pwd: "pwd",
+            roles: [
+                {role: "readWriteAnyDatabase", db: "admin"},
+                {role: "read", db: dbName},
+            ],
+        }),
+    );
 
     // Logout of the admin user so that we can log into the other user so we can access those
     // roles with $$USER_ROLES below.
@@ -164,7 +169,7 @@ const st = new ShardingTest({
     mongos: 1,
     config: 1,
     shards: 2,
-    keyFile: 'jstests/libs/key1',
+    keyFile: "jstests/libs/key1",
 });
 
 runTest(st.s, st);

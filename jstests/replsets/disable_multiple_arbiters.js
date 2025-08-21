@@ -24,8 +24,8 @@ function multiple_arbiters(multiple_arbiters_allowed) {
             {"_id": 0, "host": nodes[0]},
             {"_id": 1, "host": nodes[1]},
             {"_id": 2, "host": nodes[2]},
-            {"_id": 3, "host": nodes[3], "arbiterOnly": true}
-        ]
+            {"_id": 3, "host": nodes[3], "arbiterOnly": true},
+        ],
     });
 
     const arbiterConn = rst.add(config);
@@ -34,7 +34,7 @@ function multiple_arbiters(multiple_arbiters_allowed) {
     conf.members.push({_id: 4, host: arbiterConn.host, arbiterOnly: true});
     conf.version++;
 
-    jsTestLog('Add second arbiter');
+    jsTestLog("Add second arbiter");
     const response = admin.runCommand({replSetReconfig: conf});
 
     if (multiple_arbiters_allowed) {

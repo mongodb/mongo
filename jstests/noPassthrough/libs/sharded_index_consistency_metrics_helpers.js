@@ -20,8 +20,8 @@ export function checkServerStatusNumCollsWithInconsistentIndexes(conn, expectedC
         () => {
             return expectedCount == getServerStatusNumCollsWithInconsistentIndexes(conn);
         },
-        `expected count of sharded collections with inconsistent indexes to eventually equal ${
-            expectedCount}`,
+        `expected count of sharded collections with inconsistent indexes to eventually equal ${expectedCount}`,
         timeout /* timeout */,
-        1000 /* interval */);
+        1000 /* interval */,
+    );
 }

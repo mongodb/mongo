@@ -21,12 +21,12 @@ const collName = "test";
 const collNS = dbName + "." + collName;
 const ns = {
     db: dbName,
-    coll: collName
+    coll: collName,
 };
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const mongosConn = st.s;
@@ -41,8 +41,7 @@ function getCollectionUuid(coll) {
 function prepareCollection() {
     assertDropCollection(db, collName);
     assert.commandWorked(db.runCommand({create: collName}));
-    assert.commandWorked(
-        db.runCommand({createIndexes: collName, indexes: [{key: {x: 1}, name: "idx_x"}]}));
+    assert.commandWorked(db.runCommand({createIndexes: collName, indexes: [{key: {x: 1}, name: "idx_x"}]}));
 
     assert.commandWorked(st.s.adminCommand({shardCollection: collNS, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: collNS, middle: {_id: 0}}));
@@ -51,14 +50,11 @@ function prepareCollection() {
 // Test that create and createIndexes events are observable with migration.
 function validateCreateEventsFromChunkMigration() {
     prepareCollection();
-    let pipeline = [
-        {$changeStream: {showExpandedEvents: true, showSystemEvents: true}},
-    ];
+    let pipeline = [{$changeStream: {showExpandedEvents: true, showSystemEvents: true}}];
 
     let cursor = test.startWatchingChanges({pipeline, collection: collName});
 
-    assert.commandWorked(
-        db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
 
     test.assertNextChangesEqual({
         cursor: cursor,
@@ -66,7 +62,7 @@ function validateCreateEventsFromChunkMigration() {
             operationType: "create",
             ns: ns,
             nsType: "collection",
-        }
+        },
     });
 
     test.assertNextChangesEqual({
@@ -74,7 +70,7 @@ function validateCreateEventsFromChunkMigration() {
         expectedChanges: {
             operationType: "createIndexes",
             ns: ns,
-        }
+        },
     });
 }
 
@@ -82,13 +78,10 @@ function validateCreateEventsFromChunkMigration() {
 // chunk migration.
 function validateShowSystemEventsFalse() {
     prepareCollection();
-    let pipeline = [
-        {$changeStream: {showExpandedEvents: true, showSystemEvents: false}},
-    ];
+    let pipeline = [{$changeStream: {showExpandedEvents: true, showSystemEvents: false}}];
     let cursor = test.startWatchingChanges({pipeline, collection: collName});
 
-    assert.commandWorked(
-        db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
 
     assert.commandWorked(db[collName].insert({_id: 1, x: 1}));
 
@@ -101,7 +94,7 @@ function validateShowSystemEventsFalse() {
             ns: ns,
             fullDocument: {_id: 1, x: 1},
             documentKey: {_id: 1},
-        }
+        },
     });
 }
 

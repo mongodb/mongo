@@ -26,7 +26,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/secondary_reads.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.buildIndex = function buildIndex(db, spec) {
         // Index must be built eventually.
         assert.soon(() => {
@@ -42,17 +42,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     ErrorCodes.NoMatchingDocument,
                 ]);
             } else {
-                assert.commandFailedWithCode(res, [
-                    ErrorCodes.IndexBuildAborted,
-                    ErrorCodes.NoMatchingDocument,
-                ]);
+                assert.commandFailedWithCode(res, [ErrorCodes.IndexBuildAborted, ErrorCodes.NoMatchingDocument]);
             }
             print("retrying failed createIndex operation: " + tojson(res));
             return false;
         });
     };
 
-    $config.data.assertSecondaryReadOk = function(res) {
+    $config.data.assertSecondaryReadOk = function (res) {
         assert.commandFailedWithCode(
             res,
             [
@@ -65,7 +62,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 // Index not found by cached SBE plan during concurrent index drop
                 ErrorCodes.IndexNotFoundCachedPlan,
             ],
-            'unexpected error code: ' + res.code + ': ' + res.message);
+            "unexpected error code: " + res.code + ": " + res.message,
+        );
     };
 
     $config.states.dropIndex = function dropIndex(db, collName) {
@@ -82,7 +80,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 assert.commandFailedWithCode(res, [
                     ErrorCodes.IndexNotFound,
                     ErrorCodes.NamespaceNotFound,
-                    ErrorCodes.BackgroundOperationInProgressForNamespace
+                    ErrorCodes.BackgroundOperationInProgressForNamespace,
                 ]);
             }
         }
@@ -101,7 +99,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             } else {
                 assert.commandFailedWithCode(res, [
                     ErrorCodes.NamespaceNotFound,
-                    ErrorCodes.BackgroundOperationInProgressForNamespace
+                    ErrorCodes.BackgroundOperationInProgressForNamespace,
                 ]);
             }
             this.nDocumentsInTotal = 0;
@@ -111,7 +109,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.transitions = {
         readFromSecondaries: {readFromSecondaries: 0.9, dropIndex: 0.05, dropCollection: 0.05},
         dropIndex: {readFromSecondaries: 1},
-        dropCollection: {readFromSecondaries: 1}
+        dropCollection: {readFromSecondaries: 1},
     };
 
     return $config;

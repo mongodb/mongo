@@ -11,7 +11,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 
 const collName = jsTestName();
@@ -35,33 +35,33 @@ const vectorStageSpec = {
     limit: limit,
 };
 const vectorStage = {
-    $vectorSearch: vectorStageSpec
+    $vectorSearch: vectorStageSpec,
 };
 
 const searchStageSpec = {
     index: getMovieSearchIndexSpec().name,
     text: {query: "ape", path: ["fullplot", "title"]},
-    scoreDetails: true
+    scoreDetails: true,
 };
 
 const searchStage = {
-    $search: searchStageSpec
+    $search: searchStageSpec,
 };
 
 const sortAscending = {
-    $sort: {_id: 1}
+    $sort: {_id: 1},
 };
 
 const projectScoreScoreDetails = {
-    $project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}
+    $project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}},
 };
 
 const projectScore = {
-    $project: {score: {$meta: "score"}}
+    $project: {score: {$meta: "score"}},
 };
 
 const limitStage = {
-    $limit: limit
+    $limit: limit,
 };
 
 const scoreFusionDetailsDescription =
@@ -88,7 +88,7 @@ const testQueryGivenScoreDetails = (scoreDetails, pipelines, combination) => {
             },
         },
         project,
-        sortAscending
+        sortAscending,
     ];
     return query;
 };
@@ -96,27 +96,27 @@ const testQueryGivenScoreDetails = (scoreDetails, pipelines, combination) => {
 // Test search/vectorSearch where only search has scoreDetails.
 let combinations = {weights: {vector: 1, search: 2}};
 
-let results =
-    coll
-        .aggregate(testQueryGivenScoreDetails(
-            true, {vector: [vectorStage], search: [searchStage, limitStage]}, combinations))
-        .toArray();
+let results = coll
+    .aggregate(
+        testQueryGivenScoreDetails(true, {vector: [vectorStage], search: [searchStage, limitStage]}, combinations),
+    )
+    .toArray();
 
-let resultsNoScoreDetails =
-    coll
-        .aggregate(testQueryGivenScoreDetails(
-            false, {vector: [vectorStage], search: [searchStage, limitStage]}, combinations))
-        .toArray();
+let resultsNoScoreDetails = coll
+    .aggregate(
+        testQueryGivenScoreDetails(false, {vector: [vectorStage], search: [searchStage, limitStage]}, combinations),
+    )
+    .toArray();
 
 // Run $scoreFusion's first pipeline input. We will use the score value it calculates to assert
 // that the calculated rawScore for the first input pipeline is correct.
-let inputPipeline1RawScoreExpectedResults =
-    coll.aggregate([vectorStage, projectScore, sortAscending]).toArray();
+let inputPipeline1RawScoreExpectedResults = coll.aggregate([vectorStage, projectScore, sortAscending]).toArray();
 
 // Run $scoreFusion's second pipeline input. We will use the score value it calculates to assert
 // that the calculated rawScore for the second input pipeline is correct.
-let inputPipeline2RawScoreExpectedResults =
-    coll.aggregate([searchStage, limitStage, projectScore, sortAscending]).toArray();
+let inputPipeline2RawScoreExpectedResults = coll
+    .aggregate([searchStage, limitStage, projectScore, sortAscending])
+    .toArray();
 
 /**
  * Example of the expected score and scoreDetails metadata structure for a given results document:
@@ -176,8 +176,7 @@ for (let i = 0; i < results.length; i++) {
     assert.eq(combination["method"], "average");
 
     function assertFieldPresent(field, obj) {
-        assert(fieldPresent(field, obj),
-               `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
+        assert(fieldPresent(field, obj), `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
     }
     // Description of score fusion. Wrapper on both search / vector.
     assertFieldPresent("details", details);
@@ -189,16 +188,14 @@ for (let i = 0; i < results.length; i++) {
     assert.eq(searchDetails["inputPipelineName"], "search");
     assertFieldPresent("inputPipelineRawScore", searchDetails);
     if (i < inputPipeline2RawScoreExpectedResults.length) {
-        assert.eq(searchDetails["inputPipelineRawScore"],
-                  inputPipeline2RawScoreExpectedResults[i]["score"]);
+        assert.eq(searchDetails["inputPipelineRawScore"], inputPipeline2RawScoreExpectedResults[i]["score"]);
     }
     assertFieldPresent("weight", searchDetails);
     assert.eq(searchDetails["weight"], 2);
     assertFieldPresent("value", searchDetails);
     // No normalization applied to score value in this query, so the total score is the raw score
     // multiplied by the weight.
-    assert.eq(searchDetails["value"],
-              searchDetails["weight"] * searchDetails["inputPipelineRawScore"]);
+    assert.eq(searchDetails["value"], searchDetails["weight"] * searchDetails["inputPipelineRawScore"]);
     const searchScoreValue = searchDetails["value"];
     // If there isn't a details, we didn't get this back from search at all.
     if (searchDetails.hasOwnProperty("details")) {
@@ -207,9 +204,8 @@ for (let i = 0; i < results.length; i++) {
         const searchSearchDetails = searchDetails["details"];
         assertFieldPresent("value", searchSearchDetails);
         assert.eq(searchSearchDetails["value"], searchDetails["inputPipelineRawScore"]);
-        assertFieldPresent("details",
-                           searchSearchDetails);  // Not checking description contents, just that
-                                                  // its present and not our placeholder value.
+        assertFieldPresent("details", searchSearchDetails); // Not checking description contents, just that
+        // its present and not our placeholder value.
         assert.neq(searchSearchDetails["details"], []);
     }
     const vectorDetails = subDetails[1];
@@ -217,8 +213,7 @@ for (let i = 0; i < results.length; i++) {
     assert.eq(vectorDetails["inputPipelineName"], "vector");
     assertFieldPresent("inputPipelineRawScore", vectorDetails);
     if (i < inputPipeline1RawScoreExpectedResults.length) {
-        assert.eq(vectorDetails["inputPipelineRawScore"],
-                  inputPipeline1RawScoreExpectedResults[i]["score"]);
+        assert.eq(vectorDetails["inputPipelineRawScore"], inputPipeline1RawScoreExpectedResults[i]["score"]);
     }
     assertFieldPresent("weight", vectorDetails);
     assert.eq(vectorDetails["weight"], 1);
@@ -230,26 +225,22 @@ for (let i = 0; i < results.length; i++) {
 
 // Test vectorSearch/vectorSearch where neither has score details.
 combinations = {
-    weights: {vector: 0.5, secondVector: 2.8}
+    weights: {vector: 0.5, secondVector: 2.8},
 };
 
-results =
-    coll.aggregate(testQueryGivenScoreDetails(
-                       true, {vector: [vectorStage], secondVector: [vectorStage]}, combinations))
-        .toArray();
+results = coll
+    .aggregate(testQueryGivenScoreDetails(true, {vector: [vectorStage], secondVector: [vectorStage]}, combinations))
+    .toArray();
 
-resultsNoScoreDetails =
-    coll.aggregate(testQueryGivenScoreDetails(
-                       false, {vector: [vectorStage], secondVector: [vectorStage]}, combinations))
-        .toArray();
+resultsNoScoreDetails = coll
+    .aggregate(testQueryGivenScoreDetails(false, {vector: [vectorStage], secondVector: [vectorStage]}, combinations))
+    .toArray();
 
 // Run $scoreFusion's first pipeline input.
-inputPipeline1RawScoreExpectedResults =
-    coll.aggregate([vectorStage, projectScore, sortAscending]).toArray();
+inputPipeline1RawScoreExpectedResults = coll.aggregate([vectorStage, projectScore, sortAscending]).toArray();
 
 // Run $scoreFusion's second pipeline input.
-inputPipeline2RawScoreExpectedResults =
-    coll.aggregate([vectorStage, projectScore, sortAscending]).toArray();
+inputPipeline2RawScoreExpectedResults = coll.aggregate([vectorStage, projectScore, sortAscending]).toArray();
 
 /**
  * Example of the expected score and scoreDetails metadata structure for a given results
@@ -303,8 +294,7 @@ for (let i = 0; i < results.length; i++) {
     assert.eq(combination["method"], "average");
 
     function assertFieldPresent(field, obj) {
-        assert(fieldPresent(field, obj),
-               `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
+        assert(fieldPresent(field, obj), `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
     }
     // Description of score fusion. Wrapper on both secondVector / vector.
     assertFieldPresent("details", details);
@@ -316,19 +306,16 @@ for (let i = 0; i < results.length; i++) {
     assert.eq(secondVectorDetails["inputPipelineName"], "secondVector");
     assertFieldPresent("inputPipelineRawScore", secondVectorDetails);
     if (i < inputPipeline2RawScoreExpectedResults.length) {
-        assert.eq(secondVectorDetails["inputPipelineRawScore"],
-                  inputPipeline2RawScoreExpectedResults[i]["score"]);
+        assert.eq(secondVectorDetails["inputPipelineRawScore"], inputPipeline2RawScoreExpectedResults[i]["score"]);
     }
     const inputPipeline2RawScore = secondVectorDetails["inputPipelineRawScore"];
     assertFieldPresent("weight", secondVectorDetails);
     assert.eq(secondVectorDetails["weight"], 2.8);
-    assertFieldPresent("value",
-                       secondVectorDetails);  // Original 'score' AKA vectorSearchScore.
+    assertFieldPresent("value", secondVectorDetails); // Original 'score' AKA vectorSearchScore.
     assert.eq(secondVectorDetails["value"], inputPipeline2RawScore * 2.8);
     const secondVectorScoreValue = secondVectorDetails["value"];
-    assertFieldPresent("details",
-                       secondVectorDetails);  // Not checking description contents, just that
-                                              // its present and not our placeholder value.
+    assertFieldPresent("details", secondVectorDetails); // Not checking description contents, just that
+    // its present and not our placeholder value.
     assert.eq(secondVectorDetails["details"], []);
 
     const vectorDetails = subDetails[1];
@@ -336,13 +323,12 @@ for (let i = 0; i < results.length; i++) {
     assert.eq(vectorDetails["inputPipelineName"], "vector");
     assertFieldPresent("inputPipelineRawScore", vectorDetails);
     if (i < inputPipeline1RawScoreExpectedResults.length) {
-        assert.eq(vectorDetails["inputPipelineRawScore"],
-                  inputPipeline1RawScoreExpectedResults[i]["score"]);
+        assert.eq(vectorDetails["inputPipelineRawScore"], inputPipeline1RawScoreExpectedResults[i]["score"]);
     }
     const inputPipeline1RawScore = vectorDetails["inputPipelineRawScore"];
     assertFieldPresent("weight", vectorDetails);
     assert.eq(vectorDetails["weight"], 0.5);
-    assertFieldPresent("value", vectorDetails);  // Original 'score' AKA vectorSearchScore.
+    assertFieldPresent("value", vectorDetails); // Original 'score' AKA vectorSearchScore.
     assert.eq(vectorDetails["value"], inputPipeline1RawScore * 0.5);
     const firstVectorScoreValue = vectorDetails["value"];
     assertFieldPresent("details", vectorDetails);
@@ -354,31 +340,32 @@ for (let i = 0; i < results.length; i++) {
 const searchStageSpecNoDetails = {
     index: getMovieSearchIndexSpec().name,
     text: {query: "ape", path: ["fullplot", "title"]},
-    scoreDetails: false
+    scoreDetails: false,
 };
 
 const searchStageNoDetails = {
-    $search: searchStageSpecNoDetails
+    $search: searchStageSpecNoDetails,
 };
 
 results = coll
-              .aggregate(testQueryGivenScoreDetails(
-                  true, {vector: [vectorStage], search: [searchStageNoDetails, limitStage]}, {}))
-              .toArray();
+    .aggregate(
+        testQueryGivenScoreDetails(true, {vector: [vectorStage], search: [searchStageNoDetails, limitStage]}, {}),
+    )
+    .toArray();
 
-resultsNoScoreDetails =
-    coll
-        .aggregate(testQueryGivenScoreDetails(
-            false, {vector: [vectorStage], search: [searchStageNoDetails, limitStage]}, {}))
-        .toArray();
+resultsNoScoreDetails = coll
+    .aggregate(
+        testQueryGivenScoreDetails(false, {vector: [vectorStage], search: [searchStageNoDetails, limitStage]}, {}),
+    )
+    .toArray();
 
 // Run $scoreFusion's first pipeline input.
-inputPipeline1RawScoreExpectedResults =
-    coll.aggregate([vectorStage, projectScore, sortAscending]).toArray();
+inputPipeline1RawScoreExpectedResults = coll.aggregate([vectorStage, projectScore, sortAscending]).toArray();
 
 // Run $scoreFusion's second pipeline input.
-inputPipeline2RawScoreExpectedResults =
-    coll.aggregate([searchStageNoDetails, limitStage, projectScore, sortAscending]).toArray();
+inputPipeline2RawScoreExpectedResults = coll
+    .aggregate([searchStageNoDetails, limitStage, projectScore, sortAscending])
+    .toArray();
 
 /**
  * Example of the expected score and scoreDetails metadata structure for a given results document:
@@ -431,8 +418,7 @@ for (let i = 0; i < results.length; i++) {
     assert.eq(combination["method"], "average");
 
     function assertFieldPresent(field, obj) {
-        assert(fieldPresent(field, obj),
-               `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
+        assert(fieldPresent(field, obj), `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
     }
     // Description of score fusion. Wrapper on both search / vector.
     assertFieldPresent("details", details);
@@ -444,14 +430,12 @@ for (let i = 0; i < results.length; i++) {
     assert.eq(searchDetails["inputPipelineName"], "search");
     assertFieldPresent("inputPipelineRawScore", searchDetails);
     if (i < inputPipeline2RawScoreExpectedResults.length) {
-        assert.eq(searchDetails["inputPipelineRawScore"],
-                  inputPipeline2RawScoreExpectedResults[i]["score"]);
+        assert.eq(searchDetails["inputPipelineRawScore"], inputPipeline2RawScoreExpectedResults[i]["score"]);
     }
     assertFieldPresent("weight", searchDetails);
     assert.eq(searchDetails["weight"], 1);
     assertFieldPresent("value", searchDetails);
-    assert.eq(searchDetails["value"],
-              searchDetails["weight"] * searchDetails["inputPipelineRawScore"]);
+    assert.eq(searchDetails["value"], searchDetails["weight"] * searchDetails["inputPipelineRawScore"]);
     const searchScoreValue = searchDetails["value"];
     // If there isn't a details, we didn't get this back from search at all.
     if (searchDetails.hasOwnProperty("details")) {
@@ -465,14 +449,12 @@ for (let i = 0; i < results.length; i++) {
     assert.eq(vectorDetails["inputPipelineName"], "vector");
     assertFieldPresent("inputPipelineRawScore", vectorDetails);
     if (i < inputPipeline1RawScoreExpectedResults.length) {
-        assert.eq(vectorDetails["inputPipelineRawScore"],
-                  inputPipeline1RawScoreExpectedResults[i]["score"]);
+        assert.eq(vectorDetails["inputPipelineRawScore"], inputPipeline1RawScoreExpectedResults[i]["score"]);
     }
     assertFieldPresent("weight", vectorDetails);
     assert.eq(vectorDetails["weight"], 1);
     assertFieldPresent("value", vectorDetails);
-    assert.eq(vectorDetails["value"],
-              vectorDetails["weight"] * vectorDetails["inputPipelineRawScore"]);
+    assert.eq(vectorDetails["value"], vectorDetails["weight"] * vectorDetails["inputPipelineRawScore"]);
     const vectorScoreValue = vectorDetails["value"];
     assertFieldPresent("details", vectorDetails);
     assert.eq(vectorDetails["details"], []);
@@ -485,12 +467,12 @@ let testQuery = [
         $scoreFusion: {
             input: {
                 pipelines: {vector: [vectorStage], search: [searchStageNoDetails, {$limit: limit}]},
-                normalization: "none"
+                normalization: "none",
             },
             scoreDetails: false,
         },
     },
-    {$project: {score: {$meta: "score"}}}
+    {$project: {score: {$meta: "score"}}},
 ];
 
 results = coll.aggregate(testQuery).toArray();
@@ -515,13 +497,13 @@ testQuery = [
         $scoreFusion: {
             input: {
                 pipelines: {vector: [vectorStage], search: [searchStage, {$limit: limit}]},
-                normalization: "none"
+                normalization: "none",
             },
             combination: {weights: {vector: 1, search: 2}},
             scoreDetails: false,
         },
     },
-    {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
+    {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
 ];
 
 assertErrCodeAndErrMsgContains(coll, testQuery, 40218, "query requires scoreDetails metadata");
@@ -539,7 +521,7 @@ testQuery = [
             scoreDetails: false,
         },
     },
-    {$project: {plot_embedding: 0}}
+    {$project: {plot_embedding: 0}},
 ];
 
 assert.commandWorked(db.runCommand({aggregate: collName, pipeline: testQuery, cursor: {}}));

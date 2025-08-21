@@ -10,11 +10,11 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
-describe("commitShardRemoval correct functionality test", function() {
+describe("commitShardRemoval correct functionality test", function () {
     before(() => {
         this.st = new ShardingTest({shards: 2, other: {enableBalancer: true}});
-        this.rs1 = new ReplSetTest({name: 'repl1', nodes: 1});
-        this.rs2 = new ReplSetTest({name: 'repl2', nodes: 1});
+        this.rs1 = new ReplSetTest({name: "repl1", nodes: 1});
+        this.rs2 = new ReplSetTest({name: "repl2", nodes: 1});
     });
 
     beforeEach(() => {
@@ -30,24 +30,22 @@ describe("commitShardRemoval correct functionality test", function() {
         assert.commandWorked(this.st.s.adminCommand({addShard: this.rs2.getURL()}));
 
         // Create DB
-        assert.commandWorked(
-            this.st.s.adminCommand({enableSharding: 'TestDB', primaryShard: 'repl2'}));
+        assert.commandWorked(this.st.s.adminCommand({enableSharding: "TestDB", primaryShard: "repl2"}));
 
         // Add unsharded collections
-        assert.commandWorked(
-            this.st.s.getDB("TestDB").CollUnsharded.insert({_id: 1, value: "Pos"}));
+        assert.commandWorked(this.st.s.getDB("TestDB").CollUnsharded.insert({_id: 1, value: "Pos"}));
 
         // Start draining the shards
-        assert.commandWorked(this.st.s.adminCommand({startShardDraining: 'repl1'}));
-        assert.commandWorked(this.st.s.adminCommand({startShardDraining: 'repl2'}));
+        assert.commandWorked(this.st.s.adminCommand({startShardDraining: "repl1"}));
+        assert.commandWorked(this.st.s.adminCommand({startShardDraining: "repl2"}));
     });
 
     afterEach(() => {
         // Clean the data
-        assert.commandWorked(this.st.s.getDB('TestDB').dropDatabase());
+        assert.commandWorked(this.st.s.getDB("TestDB").dropDatabase());
 
-        removeShard(this.st, 'repl1');
-        removeShard(this.st, 'repl2');
+        removeShard(this.st, "repl1");
+        removeShard(this.st, "repl2");
 
         this.rs1.stopSet();
         this.rs2.stopSet();
@@ -60,9 +58,9 @@ describe("commitShardRemoval correct functionality test", function() {
         this.st.stop();
     });
     it("check shard is removed correctly", () => {
-        assert.commandWorked(this.st.s.adminCommand({commitShardRemoval: 'repl1'}));
+        assert.commandWorked(this.st.s.adminCommand({commitShardRemoval: "repl1"}));
 
-        assert.eq(0, this.st.s.getDB("config").shards.find({_id: 'repl1'}).toArray().length);
+        assert.eq(0, this.st.s.getDB("config").shards.find({_id: "repl1"}).toArray().length);
     });
     it("check command is idempotent", () => {
         assert.commandWorked(this.st.s.adminCommand({commitShardRemoval: this.rs1.name}));
@@ -74,10 +72,13 @@ describe("commitShardRemoval correct functionality test", function() {
     it("can't remove non-draining shard", () => {
         assert.commandFailedWithCode(
             this.st.s.adminCommand({commitShardRemoval: this.st.shard1.shardName}),
-            ErrorCodes.ConflictingOperationInProgress);
+            ErrorCodes.ConflictingOperationInProgress,
+        );
     });
     it("can't remove a shard that's not completely drained", () => {
-        assert.commandFailedWithCode(this.st.s.adminCommand({commitShardRemoval: 'repl2'}),
-                                     ErrorCodes.IllegalOperation);
+        assert.commandFailedWithCode(
+            this.st.s.adminCommand({commitShardRemoval: "repl2"}),
+            ErrorCodes.IllegalOperation,
+        );
     });
 });

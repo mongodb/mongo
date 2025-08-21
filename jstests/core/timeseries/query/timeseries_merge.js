@@ -35,12 +35,12 @@ function prepareOutputCollectionForMergeOn(outColl) {
  */
 let runSimpleMergeTestCase = () => {
     // Gets the expected results from non time-series observer input collection.
-    let expectedResults = TimeseriesAggTests.getOutputAggregateResults(
-        observerInColl, [{$merge: {into: "observer_out"}}]);
+    let expectedResults = TimeseriesAggTests.getOutputAggregateResults(observerInColl, [
+        {$merge: {into: "observer_out"}},
+    ]);
 
     // Gets the actual results from time-series input collection.
-    let actualResults =
-        TimeseriesAggTests.getOutputAggregateResults(inColl, [{$merge: {into: "out"}}]);
+    let actualResults = TimeseriesAggTests.getOutputAggregateResults(inColl, [{$merge: {into: "out"}}]);
 
     // Verifies that the number of measurements is same as expected.
     assert.eq(actualResults.length, expectedResults.length, actualResults);
@@ -58,13 +58,17 @@ let runMergeOnErrorTestCase = () => {
     // This must fail because source '_id' field will try to replace target '_id' field which is
     // immutable. This verifies that source '_id' is materialized.
     jsTestLog("'ImmutableField' error expected below!");
-    var err = assert.throws(() => inColl.aggregate([{
-        $merge: {
-            into: outColl.getName(),
-            on: "tags.hostid",
-            whenMatched: "replace",
-        }
-    }]));
+    var err = assert.throws(() =>
+        inColl.aggregate([
+            {
+                $merge: {
+                    into: outColl.getName(),
+                    on: "tags.hostid",
+                    whenMatched: "replace",
+                },
+            },
+        ]),
+    );
     assert.commandFailedWithCode(err, ErrorCodes.ImmutableField);
 };
 
@@ -80,22 +84,24 @@ let runMergeOnTestCase = () => {
                 into: "observer_out",
                 on: "tags.hostid",
                 whenMatched: "merge",
-            }
-        }
+            },
+        },
     ];
 
     // Gets the expected results from non time-series observer input collection.
     let expectedResults = TimeseriesAggTests.getOutputAggregateResults(
         observerInColl,
         mergePipeline,
-        /*prepareAction*/ (outColl) => prepareOutputCollectionForMergeOn(outColl));
+        /*prepareAction*/ (outColl) => prepareOutputCollectionForMergeOn(outColl),
+    );
 
     // Gets the actual results from time-series input collection.
     mergePipeline[mergePipeline.length - 1]["$merge"].into = "out";
     let actualResults = TimeseriesAggTests.getOutputAggregateResults(
         inColl,
         mergePipeline,
-        /*prepareAction*/ (outColl) => prepareOutputCollectionForMergeOn(outColl));
+        /*prepareAction*/ (outColl) => prepareOutputCollectionForMergeOn(outColl),
+    );
 
     // Verifies that the number of measurements is same as expected.
     assert.eq(actualResults.length, expectedResults.length, actualResults);

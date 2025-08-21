@@ -8,7 +8,7 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
 
-const collNamePrefix = 'hashed_index_queries_';
+const collNamePrefix = "hashed_index_queries_";
 let collCount = 0;
 let coll;
 
@@ -16,7 +16,7 @@ let docs = [];
 let docId = 0;
 for (let i = 0; i < 100; i++) {
     docs.push({_id: docId++, a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)});
-    docs.push({_id: docId++, a: i, b: (i % 13), c: NumberInt(i % 10)});
+    docs.push({_id: docId++, a: i, b: i % 13, c: NumberInt(i % 10)});
 }
 
 /**
@@ -88,17 +88,19 @@ assert.commandWorked(coll.insert(docs));
 
 // Verify $in query can use point interval bounds on hashed fields and non-hashed fields.
 validateFindCmdOutputAndPlan({
-    filter:
-        {a: {$in: [38, 37]}, b: {$in: [{subObj: "str_12"}, {subObj: "str_11"}]}, c: {$in: [7, 8]}},
-    expectedOutput: [{a: 37, b: {subObj: "str_11"}, c: 7}, {a: 38, b: {subObj: "str_12"}, c: 8}],
-    expectedStages: ["IXSCAN", "FETCH"]
+    filter: {a: {$in: [38, 37]}, b: {$in: [{subObj: "str_12"}, {subObj: "str_11"}]}, c: {$in: [7, 8]}},
+    expectedOutput: [
+        {a: 37, b: {subObj: "str_11"}, c: 7},
+        {a: 38, b: {subObj: "str_12"}, c: 8},
+    ],
+    expectedStages: ["IXSCAN", "FETCH"],
 });
 
 // Verify that a range query on a non-hashed prefix field can use index.
 validateFindCmdOutputAndPlan({
     filter: {a: {$gt: 25, $lt: 29}, b: 0},
     expectedOutput: [{a: 26, b: 0, c: 6}],
-    expectedStages: ["IXSCAN", "FETCH"]
+    expectedStages: ["IXSCAN", "FETCH"],
 });
 
 /**
@@ -110,12 +112,14 @@ assert.commandWorked(coll.createIndex({b: "hashed", a: 1}));
 assert.commandWorked(coll.insert(docs));
 
 // Verify that index is not used for a range query on a hashed field.
-validateCountCmdOutputAndPlan(
-    {filter: {b: {$gt: 10, $lt: 12}}, expectedOutput: 7, expectedStages: ["COLLSCAN"]});
+validateCountCmdOutputAndPlan({filter: {b: {$gt: 10, $lt: 12}}, expectedOutput: 7, expectedStages: ["COLLSCAN"]});
 
 // Verify that index is used for a query on a hashed field.
-validateCountCmdOutputAndPlan(
-    {filter: {b: {subObj: "str_10"}}, expectedOutput: 7, expectedStages: ["IXSCAN", "FETCH"]});
+validateCountCmdOutputAndPlan({
+    filter: {b: {subObj: "str_10"}},
+    expectedOutput: 7,
+    expectedStages: ["IXSCAN", "FETCH"],
+});
 
 /**
  * Tests for 'count' operation when hashed field is not a prefix.
@@ -129,5 +133,5 @@ assert.commandWorked(coll.insert(docs));
 validateCountCmdOutputAndPlan({
     filter: {a: {$gt: 25, $lt: 29}, b: 0},
     expectedOutput: 1,
-    expectedStages: ["IXSCAN", "FETCH"]
+    expectedStages: ["IXSCAN", "FETCH"],
 });

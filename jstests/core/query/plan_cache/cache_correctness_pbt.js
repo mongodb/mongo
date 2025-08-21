@@ -15,9 +15,7 @@
  * requires_getmore,
  * ]
  */
-import {
-    createCacheCorrectnessProperty
-} from "jstests/libs/property_test_helpers/common_properties.js";
+import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
@@ -38,10 +36,12 @@ const correctnessProperty = createCacheCorrectnessProperty(controlColl, experime
 const aggModel = getAggPipelineModel();
 
 // Test with a regular collection.
-testProperty(correctnessProperty,
-             {controlColl, experimentColl},
-             makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
-             numRuns);
+testProperty(
+    correctnessProperty,
+    {controlColl, experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
+    numRuns,
+);
 
 // TODO SERVER-103381 re-enable timeseries PBT testing.
 // Test with a TS collection.

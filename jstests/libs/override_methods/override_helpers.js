@@ -7,11 +7,10 @@ const preOverrideRunCommand = Mongo.prototype.runCommand;
  * The OverrideHelpers object defines convenience methods for overriding commands and functions in
  * the mongo shell.
  */
-export const OverrideHelpers = (function() {
+export const OverrideHelpers = (function () {
     function makeIsAggregationWithFirstStage(stageName) {
-        return function(commandName, commandObj) {
-            if (commandName !== "aggregate" || typeof commandObj !== "object" ||
-                commandObj === null) {
+        return function (commandName, commandObj) {
+            if (commandName !== "aggregate" || typeof commandObj !== "object" || commandObj === null) {
                 return false;
             }
 
@@ -47,8 +46,11 @@ export const OverrideHelpers = (function() {
     }
 
     function isMapReduceWithInlineOutput(commandName, commandObj) {
-        if ((commandName !== "mapReduce" && commandName !== "mapreduce") ||
-            typeof commandObj !== "object" || commandObj === null) {
+        if (
+            (commandName !== "mapReduce" && commandName !== "mapreduce") ||
+            typeof commandObj !== "object" ||
+            commandObj === null
+        ) {
             return false;
         }
 
@@ -62,11 +64,11 @@ export const OverrideHelpers = (function() {
     function prependOverrideInParallelShell(overrideFile) {
         const startParallelShellOriginal = startParallelShell;
 
-        startParallelShell = function(jsCode, port, noConnect) {
+        startParallelShell = function (jsCode, port, noConnect) {
             let newCode;
             if (typeof jsCode === "function") {
                 // Load the override file and immediately invoke the supplied function.
-                if (jsCode.constructor.name === 'AsyncFunction') {
+                if (jsCode.constructor.name === "AsyncFunction") {
                     newCode = `await import("${overrideFile}"); await (${jsCode.toString()})();`;
                 } else {
                     newCode = `await import("${overrideFile}"); (${jsCode.toString()})();`;
@@ -82,13 +84,15 @@ export const OverrideHelpers = (function() {
     function overrideRunCommand(overrideFunc) {
         const mongoRunCommandOriginal = Mongo.prototype.runCommand;
 
-        Mongo.prototype.runCommand = function(dbName, commandObj, options) {
-            return overrideFunc(this,
-                                dbName,
-                                getCommandName(commandObj),
-                                commandObj,
-                                mongoRunCommandOriginal,
-                                (commandObj, db = dbName) => [db, commandObj, options]);
+        Mongo.prototype.runCommand = function (dbName, commandObj, options) {
+            return overrideFunc(
+                this,
+                dbName,
+                getCommandName(commandObj),
+                commandObj,
+                mongoRunCommandOriginal,
+                (commandObj, db = dbName) => [db, commandObj, options],
+            );
         };
     }
 
@@ -108,13 +112,11 @@ export const OverrideHelpers = (function() {
     }
 
     return {
-        isAggregationWithListLocalSessionsStage:
-            makeIsAggregationWithFirstStage("$listLocalSessions"),
+        isAggregationWithListLocalSessionsStage: makeIsAggregationWithFirstStage("$listLocalSessions"),
         isAggregationWithOutOrMergeStage: isAggregationWithOutOrMergeStage,
         isAggregationWithCurrentOpStage: makeIsAggregationWithFirstStage("$currentOp"),
         isAggregationWithChangeStreamStage: makeIsAggregationWithFirstStage("$changeStream"),
-        isAggregationWithInternalListCollections:
-            makeIsAggregationWithFirstStage("$_internalListCollections"),
+        isAggregationWithInternalListCollections: makeIsAggregationWithFirstStage("$_internalListCollections"),
         isAggregationWithListClusterCatalog: makeIsAggregationWithFirstStage("$listClusterCatalog"),
         isAggregationWithQuerySettings: makeIsAggregationWithFirstStage("$querySettings"),
         isMapReduceWithInlineOutput: isMapReduceWithInlineOutput,

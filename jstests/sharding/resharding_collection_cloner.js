@@ -18,7 +18,7 @@ const st = new ShardingTest({
         setParameter: {
             "failpoint.WTPreserveSnapshotHistoryIndefinitely": tojson({mode: "alwaysOn"}),
             logComponentVerbosity: tojson({sharding: {reshard: 2}}),
-        }
+        },
     },
 });
 
@@ -29,12 +29,10 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(inputCollection, {oldKey: 
     {min: {oldKey: 0}, max: {oldKey: MaxKey}, shard: st.shard1.shardName},
 ]);
 
-const inputCollectionUUID =
-    getUUIDFromListCollections(inputCollection.getDB(), inputCollection.getName());
+const inputCollectionUUID = getUUIDFromListCollections(inputCollection.getDB(), inputCollection.getName());
 const inputCollectionUUIDString = extractUUIDFromObject(inputCollectionUUID);
 
-const temporaryReshardingCollection =
-    st.s.getCollection(`reshardingDb.system.resharding.${inputCollectionUUIDString}`);
+const temporaryReshardingCollection = st.s.getCollection(`reshardingDb.system.resharding.${inputCollectionUUIDString}`);
 
 CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollection, {newKey: 1}, [
     {min: {newKey: MinKey}, max: {newKey: 0}, shard: st.shard0.shardName},
@@ -46,25 +44,32 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollect
 // to guarantee they have been written and are visible with the atClusterTime used by the
 // testReshardCloneCollection command.
 for (const shard of [st.shard0, st.shard1]) {
-    assert.commandWorked(shard.rs.getPrimary().adminCommand(
-        {_flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName()}));
+    assert.commandWorked(
+        shard.rs
+            .getPrimary()
+            .adminCommand({_flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName()}),
+    );
 }
 
-assert.commandWorked(inputCollection.insert([
-    {_id: "stays on shard0", oldKey: -10, newKey: -10},
-    {_id: "moves to shard0", oldKey: 10, newKey: -10},
-    {_id: "moves to shard1", oldKey: -10, newKey: 10},
-    {_id: "stays on shard1", oldKey: 10, newKey: 10},
-]));
+assert.commandWorked(
+    inputCollection.insert([
+        {_id: "stays on shard0", oldKey: -10, newKey: -10},
+        {_id: "moves to shard0", oldKey: 10, newKey: -10},
+        {_id: "moves to shard1", oldKey: -10, newKey: 10},
+        {_id: "stays on shard1", oldKey: 10, newKey: 10},
+    ]),
+);
 
 const atClusterTime = inputCollection.getDB().getSession().getOperationTime();
 
-assert.commandWorked(inputCollection.insert([
-    {_id: "not visible, but would stay on shard0", oldKey: -10, newKey: -10},
-    {_id: "not visible, but would move to shard0", oldKey: 10, newKey: -10},
-    {_id: "not visible, but would move to shard1", oldKey: -10, newKey: 10},
-    {_id: "not visible, but would stay on shard1", oldKey: 10, newKey: 10},
-]));
+assert.commandWorked(
+    inputCollection.insert([
+        {_id: "not visible, but would stay on shard0", oldKey: -10, newKey: -10},
+        {_id: "not visible, but would move to shard0", oldKey: 10, newKey: -10},
+        {_id: "not visible, but would move to shard1", oldKey: -10, newKey: 10},
+        {_id: "not visible, but would stay on shard1", oldKey: 10, newKey: 10},
+    ]),
+);
 
 // We wait for the "not visible" inserts to become majority-committed on all members of the replica
 // set shards. This isn't necessary for the test's correctness but makes it more likely that the
@@ -81,21 +86,19 @@ if (!isMultiversion) {
     const shard0Primary = st.rs0.getPrimary();
     const shard1Primary = st.rs1.getPrimary();
 
-    assert.commandWorked(shard0Primary.adminCommand(
-        {setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds}));
-    assert.commandWorked(shard1Primary.adminCommand(
-        {setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds}));
+    assert.commandWorked(shard0Primary.adminCommand({setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds}));
+    assert.commandWorked(shard1Primary.adminCommand({setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds}));
 
     // Verify that setting the ReshardingCollectionCloner's maxStalenessSeconds to 0 or lower
     // than the minimum is disallowed.
     assert.commandFailedWithCode(
-        shard0Primary.adminCommand(
-            {setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds: 0}),
-        ErrorCodes.BadValue);
+        shard0Primary.adminCommand({setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds: 0}),
+        ErrorCodes.BadValue,
+    );
     assert.commandFailedWithCode(
-        shard0Primary.adminCommand(
-            {setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds: 1}),
-        ErrorCodes.MaxStalenessOutOfRange);
+        shard0Primary.adminCommand({setParameter: 1, reshardingCollectionClonerMaxStalenessSeconds: 1}),
+        ErrorCodes.MaxStalenessOutOfRange,
+    );
 }
 
 function testReshardCloneCollection(shard, expectedDocs) {
@@ -122,34 +125,42 @@ function testReshardCloneCollection(shard, expectedDocs) {
     }
 
     // We sort by oldKey so the order of `expectedDocs` can be deterministic.
-    assert.eq(expectedDocs,
-              shard.rs.getPrimary()
-                  .getCollection(temporaryReshardingCollection.getFullName())
-                  .find()
-                  .sort({oldKey: 1})
-                  .toArray());
+    assert.eq(
+        expectedDocs,
+        shard.rs
+            .getPrimary()
+            .getCollection(temporaryReshardingCollection.getFullName())
+            .find()
+            .sort({oldKey: 1})
+            .toArray(),
+    );
 
     // Verify the ReshardingCollectionCloner is sending its aggregation requests with a logical
     // session ID to prevent idle cursors from being timed out by the CursorManager.
     for (const donorShard of [st.shard0, st.shard1]) {
         const profilerEntries = donorShard.rs.nodes
-                                    .map(node => node.getDB(dbName).system.profile.findOne({
-                                        op: "command",
-                                        ns: inputCollection.getFullName(),
-                                        "command.aggregate": inputCollection.getName(),
-                                        "command.collectionUUID": inputCollectionUUID,
-                                    }))
-                                    .filter(entry => entry !== null);
+            .map((node) =>
+                node.getDB(dbName).system.profile.findOne({
+                    op: "command",
+                    ns: inputCollection.getFullName(),
+                    "command.aggregate": inputCollection.getName(),
+                    "command.collectionUUID": inputCollectionUUID,
+                }),
+            )
+            .filter((entry) => entry !== null);
 
-        assert.neq([],
-                   profilerEntries,
-                   `expected to find collection cloning aggregation in profiler output of some ${
-                       donorShard.shardName} node`);
+        assert.neq(
+            [],
+            profilerEntries,
+            `expected to find collection cloning aggregation in profiler output of some ${donorShard.shardName} node`,
+        );
 
         for (const entry of profilerEntries) {
-            assert(entry.command.hasOwnProperty("lsid"),
-                   "expected profiler entry for collection cloning aggregation to have a logical" +
-                       ` session ID: ${tojson(entry)}`);
+            assert(
+                entry.command.hasOwnProperty("lsid"),
+                "expected profiler entry for collection cloning aggregation to have a logical" +
+                    ` session ID: ${tojson(entry)}`,
+            );
 
             if (!isMultiversion) {
                 // Verify that the aggregation requests have readPreference "nearest" with the
@@ -158,12 +169,11 @@ function testReshardCloneCollection(shard, expectedDocs) {
                     entry.command.hasOwnProperty("$queryOptions") &&
                         entry.command["$queryOptions"].hasOwnProperty("$readPreference"),
                     "expected profiler entry for collection cloning aggregation to have a readPreference" +
-                        `: ${tojson(entry)}`);
+                        `: ${tojson(entry)}`,
+                );
                 const readPreference = entry.command["$queryOptions"]["$readPreference"];
                 assert.eq(readPreference.mode, "nearest", entry);
-                assert.eq(readPreference.maxStalenessSeconds,
-                          reshardingCollectionClonerMaxStalenessSeconds,
-                          entry);
+                assert.eq(readPreference.maxStalenessSeconds, reshardingCollectionClonerMaxStalenessSeconds, entry);
             }
         }
     }

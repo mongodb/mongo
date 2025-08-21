@@ -16,7 +16,7 @@ import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {runExpressTest} from "jstests/libs/query/express_utils.js";
 
-const coll = db.getCollection('express_coll_projection');
+const coll = db.getCollection("express_coll_projection");
 
 let isSharded = false;
 let expectedNonZeroFetchCountWhenCovered = false;
@@ -48,7 +48,7 @@ describe("Express path supports simple projections", () => {
             project: {_id: 0, b: 0},
             limit: 1,
             result: [{a: 0}],
-            usesExpress: !isSharded
+            usesExpress: !isSharded,
         });
     });
 
@@ -64,29 +64,28 @@ describe("Express path supports simple projections", () => {
             expectedNonZeroFetchCountWhenCovered,
         });
     });
-    it("can cover inclusion projection without limit 1 if there is a matching unique index present",
-       () => {
-           assert.commandWorked(coll.createIndex({a: 1, extra: 1, b: 1}));
-           runExpressTest({
-               coll,
-               filter: {a: 0},
-               project: {b: 1, _id: 0},
-               result: [{b: 0}],
-               usesExpress: false,  // no unique index
-               expectedNonZeroFetchCountWhenCovered,
-           });
-           if (!isSharded) {
-               assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
-               runExpressTest({
-                   coll,
-                   filter: {a: 0},
-                   project: {b: 1, _id: 0},
-                   result: [{b: 0}],
-                   usesExpress: true,  // index
-                   expectedNonZeroFetchCountWhenCovered,
-               });
-           }
-       });
+    it("can cover inclusion projection without limit 1 if there is a matching unique index present", () => {
+        assert.commandWorked(coll.createIndex({a: 1, extra: 1, b: 1}));
+        runExpressTest({
+            coll,
+            filter: {a: 0},
+            project: {b: 1, _id: 0},
+            result: [{b: 0}],
+            usesExpress: false, // no unique index
+            expectedNonZeroFetchCountWhenCovered,
+        });
+        if (!isSharded) {
+            assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
+            runExpressTest({
+                coll,
+                filter: {a: 0},
+                project: {b: 1, _id: 0},
+                result: [{b: 0}],
+                usesExpress: true, // index
+                expectedNonZeroFetchCountWhenCovered,
+            });
+        }
+    });
 });
 
 describe("Express path correctly handles multi-key indexes when covering projections", () => {
@@ -192,8 +191,7 @@ describe("Express path handles collation when covering projections", () => {
 
     before(() => {
         recreateCollWith(docs);
-        assert.commandWorked(coll.createIndex({a: 1, extra1: 1, c: 1, extra2: 1, b: 1},
-                                              {collation: caseInsensitive}));
+        assert.commandWorked(coll.createIndex({a: 1, extra1: 1, c: 1, extra2: 1, b: 1}, {collation: caseInsensitive}));
         assert.commandWorked(coll.createIndex({a: 1}, {collation: caseInsensitive}));
     });
 
@@ -240,7 +238,10 @@ describe("Express path handles collation when covering projections", () => {
 });
 
 describe("Express path includes projection into explain", () => {
-    const docs = [{_id: 0, a: 1, b: 2}, {_id: 3, a: 4, b: 5}];
+    const docs = [
+        {_id: 0, a: 1, b: 2},
+        {_id: 3, a: 4, b: 5},
+    ];
 
     before(() => {
         recreateCollWith(docs);
@@ -254,14 +255,11 @@ describe("Express path includes projection into explain", () => {
         assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
         assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
-        const explainCovered =
-            getWinningPlanFromExplain(coll.find({a: 1}, {b: 1, _id: 0}).explain());
+        const explainCovered = getWinningPlanFromExplain(coll.find({a: 1}, {b: 1, _id: 0}).explain());
 
         assert.eq(explainCovered.stage, "EXPRESS_IXSCAN", explainCovered);
         assert.eq(explainCovered.projection, {b: 1, _id: 0}, explainCovered);
-        assert.eq(explainCovered.projectionCovered,
-                  !expectedNonZeroFetchCountWhenCovered,
-                  explainCovered);
+        assert.eq(explainCovered.projectionCovered, !expectedNonZeroFetchCountWhenCovered, explainCovered);
 
         const explainNotCovered = getWinningPlanFromExplain(coll.find({a: 1}, {_id: 0}).explain());
 

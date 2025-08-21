@@ -15,7 +15,7 @@ if (!isLinux()) {
 
 const pathToExtensionVectorSearch = MongoRunner.getExtensionPath("libvector_search_extension.so");
 const options = {
-    loadExtensions: pathToExtensionVectorSearch
+    loadExtensions: pathToExtensionVectorSearch,
 };
 
 function runVectorSearchOverrideTest(conn, shardingTest = null) {
@@ -25,7 +25,7 @@ function runVectorSearchOverrideTest(conn, shardingTest = null) {
     const testData = [
         {_id: 0, vector: [1, 2, 3, 4], text: "poppi cans"},
         {_id: 1, vector: [0, 2, 4, 6], text: "homegrown tomatoes"},
-        {_id: 2, vector: [3, 6, 9, 16], text: "crispy rice puffs"}
+        {_id: 2, vector: [3, 6, 9, 16], text: "crispy rice puffs"},
     ];
     assert.commandWorked(coll.insertMany(testData));
     if (shardingTest) {
@@ -48,7 +48,7 @@ function runVectorSearchOverrideTest(conn, shardingTest = null) {
             {$vectorSearch: {}},
             {$project: {y: "$text", _id: 0}},
             {$vectorSearch: {a: 0}},
-            {$sort: {y: -1}}
+            {$sort: {y: -1}},
         ];
         const result = coll.aggregate(pipeline).toArray();
 

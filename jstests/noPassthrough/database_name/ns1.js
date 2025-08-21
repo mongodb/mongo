@@ -2,7 +2,7 @@ const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");
 let mydb = conn.getDB(jsTestName());
 
-const check = function(n, isNew) {
+const check = function (n, isNew) {
     var coll = mydb["x" + n];
     if (isNew) {
         assert.eq(0, coll.count(), "pop a: " + n);

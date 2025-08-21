@@ -20,15 +20,14 @@ import {forceSyncSource} from "jstests/replsets/libs/sync_source.js";
 let st = new ShardingTest({shards: 0});
 
 // TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(),
-                                        "ShardAuthoritativeDbMetadataDDL")) {
+if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
     st.stop();
     quit();
 }
 
 // Set up replica set that we'll add as shard
 let replTest = new ReplSetTest({nodes: 3, name: jsTest.name() + "-newReplSet"});
-replTest.startSet({shardsvr: ''});
+replTest.startSet({shardsvr: ""});
 let nodeList = replTest.nodeList();
 
 replTest.initiate({
@@ -36,8 +35,8 @@ replTest.initiate({
     members: [
         {_id: 0, host: nodeList[0], priority: 1},
         {_id: 1, host: nodeList[1], priority: 0, tags: {"tag": "hanging"}},
-        {_id: 2, host: nodeList[2], priority: 0}
-    ]
+        {_id: 2, host: nodeList[2], priority: 0},
+    ],
 });
 
 let primary = replTest.getPrimary();
@@ -46,8 +45,7 @@ let anotherSecondary = replTest.getSecondaries()[1];
 
 // Set failpoint on one secondary to hang during sharding initialization
 jsTest.log("Going to turn on the hangDuringShardingInitialization fail point.");
-const fpHangDuringShardInit =
-    configureFailPoint(hangingSecondary, "hangDuringShardingInitialization");
+const fpHangDuringShardInit = configureFailPoint(hangingSecondary, "hangDuringShardingInitialization");
 
 /**
  * Force the other secondary node to sync from the primary. If it syncs from the hanging secondary
@@ -59,14 +57,12 @@ const fpForceSyncSource = forceSyncSource(replTest, anotherSecondary, primary);
 
 jsTest.log("Going to add replica set as shard: " + tojson(replTest.getReplSetConfig()));
 const shardName = "newShard";
-assert.commandWorked(
-    st.s.getDB("admin").runCommand({addShard: replTest.getURL(), name: shardName}));
+assert.commandWorked(st.s.getDB("admin").runCommand({addShard: replTest.getURL(), name: shardName}));
 fpHangDuringShardInit.wait();
 
 jsTest.log("Check and wait for the sharding state to be initialized on primary.");
-assert.soon(function() {
-    const shardingStatePrimary =
-        replTest.getPrimary().getDB('admin').runCommand({shardingState: 1});
+assert.soon(function () {
+    const shardingStatePrimary = replTest.getPrimary().getDB("admin").runCommand({shardingState: 1});
     return shardingStatePrimary.enabled == true;
 });
 
@@ -81,12 +77,11 @@ assert.commandWorked(sessionDb.foo.insert({x: 1}));
 // TODO (SERVER-97816) remove check once 9.0 becomes last LTS.
 const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 if (!isMultiversion) {
-    jsTest.log(
-        "Going to send a read request which will be versioned by the mongoS to force the secondary to wait");
+    jsTest.log("Going to send a read request which will be versioned by the mongoS to force the secondary to wait");
     const error = st.s.getDB(dbName).runCommand({
         find: "foo",
         maxTimeMS: 10000,
-        $readPreference: {mode: "secondary", tags: [{"tag": "hanging"}]}
+        $readPreference: {mode: "secondary", tags: [{"tag": "hanging"}]},
     });
     assert.commandFailedWithCode(error, ErrorCodes.MaxTimeMSExpired);
 }
@@ -104,13 +99,14 @@ if (!isMultiversion) {
  * The afterClusterTime we give is T2.  On hanging secondary node, the oplog is still at ts < T1.
  */
 jsTest.log(
-    "Going to send a read request with maxTimeMS 100000 to secondary that is hanging in setting up sharding initialization.");
+    "Going to send a read request with maxTimeMS 100000 to secondary that is hanging in setting up sharding initialization.",
+);
 const operationTime = sessionDb.getSession().getOperationTime();
 const error = sessionDb.runCommand({
     find: "foo",
     maxTimeMS: 10000,
     $readPreference: {mode: "secondary", tags: [{"tag": "hanging"}]},
-    readConcern: {level: "local", "afterClusterTime": operationTime}
+    readConcern: {level: "local", "afterClusterTime": operationTime},
 });
 assert.commandFailedWithCode(error, ErrorCodes.MaxTimeMSExpired);
 
@@ -118,20 +114,26 @@ jsTest.log("Going to turn off the hangDuringShardingInitialization.");
 fpHangDuringShardInit.off();
 
 jsTest.log("Check and wait for the sharding state to be initialized on hanging secondary.");
-assert.soon(function() {
-    return hangingSecondary.getDB('admin').runCommand({shardingState: 1}).enabled == true;
-}, "Mongos did not update its sharding state after 10 seconds", 10 * 1000);
+assert.soon(
+    function () {
+        return hangingSecondary.getDB("admin").runCommand({shardingState: 1}).enabled == true;
+    },
+    "Mongos did not update its sharding state after 10 seconds",
+    10 * 1000,
+);
 
 /**
  * Send the read request again. We expect it to succeed now as the sharding state is initialized and
  * the read won't block waiting for read concern.
  */
 jsTest.log("Going to send the read request again.");
-assert.commandWorked(sessionDb.runCommand({
-    find: "foo",
-    $readPreference: {mode: "secondary", tags: [{"tag": "hanging"}]},
-    readConcern: {level: "local", "afterClusterTime": operationTime}
-}));
+assert.commandWorked(
+    sessionDb.runCommand({
+        find: "foo",
+        $readPreference: {mode: "secondary", tags: [{"tag": "hanging"}]},
+        readConcern: {level: "local", "afterClusterTime": operationTime},
+    }),
+);
 
 fpForceSyncSource.off();
 sessionDb.getSession().endSession();

@@ -9,8 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let st = new ShardingTest({shards: 3});
 
 function listDatabases(options) {
-    return assert.commandWorked(st.s.adminCommand(Object.assign({listDatabases: 1}, options)))
-        .databases;
+    return assert.commandWorked(st.s.adminCommand(Object.assign({listDatabases: 1}, options))).databases;
 }
 
 function createAndDropDatabase(dbName) {
@@ -38,8 +37,13 @@ assert(result.toArray().length == 50);
 //$documents stage evaluates to an array of objects in a pipeline
 db = createAndDropDatabase("test2");
 result = db.aggregate([
-    {$documents: [{_id: 1, size: "medium"}, {_id: 2, size: "large"}]},
-    {$match: {size: "medium"}}
+    {
+        $documents: [
+            {_id: 1, size: "medium"},
+            {_id: 2, size: "large"},
+        ],
+    },
+    {$match: {size: "medium"}},
 ]);
 assert(result.toArray().length == 1);
 

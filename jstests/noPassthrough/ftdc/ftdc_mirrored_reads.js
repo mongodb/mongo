@@ -19,17 +19,17 @@ const rst = new ReplSetTest({nodes: 3});
 rst.startSet({
     setParameter: {
         mirrorReads: tojsononeline({samplingRate: 0.0}),
-        logComponentVerbosity: tojson({command: 1})
-    }
+        logComponentVerbosity: tojson({command: 1}),
+    },
 });
 rst.initiate();
 const primary = rst.getPrimary();
 const secondaries = rst.getSecondaries();
 
 function getDiagnosticData(node) {
-    let db = node.getDB('admin');
+    let db = node.getDB("admin");
     const stats = verifyGetDiagnosticData(db, false /* logData */).serverStatus;
-    assert(stats.hasOwnProperty('mirroredReads'));
+    assert(stats.hasOwnProperty("mirroredReads"));
     jsTestLog(`Got diagnostic data for host: ${node}, ${tojson(stats.mirroredReads)}`);
     return stats.mirroredReads;
 }
@@ -46,14 +46,12 @@ function getMirroredReadsProcessedAsSecondary() {
 function waitForPrimaryToSendMirroredReads(expectedReadsSeen, expectedReadsSent) {
     assert.soon(() => {
         jsTestLog("Verifying reads were seen and sent by the maestro");
-        jsTestLog("ExpectedReadsSent :" + expectedReadsSent +
-                  ", ExpectedReadsSeen:" + expectedReadsSeen);
+        jsTestLog("ExpectedReadsSent :" + expectedReadsSent + ", ExpectedReadsSeen:" + expectedReadsSeen);
         const afterPrimaryReadStats = getDiagnosticData(primary);
         const actualMirrorableReadsSeen = afterPrimaryReadStats.seen;
         const actualMirroredReadsSent = afterPrimaryReadStats.sent;
         jsTestLog("Primary metrics after reads: " + tojson(afterPrimaryReadStats));
-        return expectedReadsSeen <= actualMirrorableReadsSeen &&
-            expectedReadsSent == actualMirroredReadsSent;
+        return expectedReadsSeen <= actualMirrorableReadsSeen && expectedReadsSent == actualMirroredReadsSent;
     });
 }
 
@@ -71,7 +69,7 @@ function sendAndCheckReads(rst) {
     }
 
     const expectedReadsSeen = mirrorableReadsSeenBefore + kOperations;
-    const expectedReadsSent = mirroredReadsSentBefore + (2 * kOperations);
+    const expectedReadsSent = mirroredReadsSentBefore + 2 * kOperations;
 
     // Wait for primary to have sent out all mirrored reads.
     waitForPrimaryToSendMirroredReads(expectedReadsSeen, expectedReadsSent);
@@ -79,10 +77,12 @@ function sendAndCheckReads(rst) {
 
 function activateFailPoint(node) {
     const db = node.getDB(kDbName);
-    assert.commandWorked(db.adminCommand({
-        configureFailPoint: "mirrorMaestroExpectsResponse",
-        mode: "alwaysOn",
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            configureFailPoint: "mirrorMaestroExpectsResponse",
+            mode: "alwaysOn",
+        }),
+    );
 }
 
 // Mirror every mirror-able command.
@@ -93,30 +93,42 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {sampli
     let primaryStatsBeforeReads = getDiagnosticData(primary);
     let initialMirrorableReadsSeen = primaryStatsBeforeReads.seen;
     // The following metrics are not included by default.
-    assert(!primaryStatsBeforeReads.hasOwnProperty('resolved'));
-    assert(!primaryStatsBeforeReads.hasOwnProperty('resolvedBreakdown'));
+    assert(!primaryStatsBeforeReads.hasOwnProperty("resolved"));
+    assert(!primaryStatsBeforeReads.hasOwnProperty("resolvedBreakdown"));
 
     sendAndCheckReads(rst);
 
-    assert.soon(() => {
-        let mirrorableReadsSeen = getDiagnosticData(primary).seen;
-        jsTestLog(`Seen ${mirrorableReadsSeen} mirrored reads so far`);
-        return initialMirrorableReadsSeen + kOperations <= mirrorableReadsSeen;
-    }, "Failed to update FTDC metrics within time limit", 30000);
-    assert.soon(() => {
-        // Mirrored reads from this test should finish processing before we get
-        // processedAsSecondary in the next test.
-        return getMirroredReadsProcessedAsSecondary() == kOperations * 2;
-    }, "Failed to wait for processedAsSecondary to converge", 30000);
+    assert.soon(
+        () => {
+            let mirrorableReadsSeen = getDiagnosticData(primary).seen;
+            jsTestLog(`Seen ${mirrorableReadsSeen} mirrored reads so far`);
+            return initialMirrorableReadsSeen + kOperations <= mirrorableReadsSeen;
+        },
+        "Failed to update FTDC metrics within time limit",
+        30000,
+    );
+    assert.soon(
+        () => {
+            // Mirrored reads from this test should finish processing before we get
+            // processedAsSecondary in the next test.
+            return getMirroredReadsProcessedAsSecondary() == kOperations * 2;
+        },
+        "Failed to wait for processedAsSecondary to converge",
+        30000,
+    );
 }
 
 {
     // Send and check reads after activating mirrorMaestroExpectsResponse fail point.
     jsTestLog("Verifying diagnostic collection when mirrorMaestroExpectsResponse");
     activateFailPoint(primary);
-    assert.soon(() => {
-        return getDiagnosticData(primary).hasOwnProperty('resolved');
-    }, "Failed to find 'resolved' in mirrored reads FTDC metrics within time limit", 30000);
+    assert.soon(
+        () => {
+            return getDiagnosticData(primary).hasOwnProperty("resolved");
+        },
+        "Failed to find 'resolved' in mirrored reads FTDC metrics within time limit",
+        30000,
+    );
 
     let primaryStatsBeforeReads = getDiagnosticData(primary);
     let mirroredReadsProcessedBefore = getMirroredReadsProcessedAsSecondary();
@@ -125,30 +137,39 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {sampli
 
     sendAndCheckReads(rst);
 
-    assert.soon(() => {
-        let primaryResolvedAfterReads = getDiagnosticData(primary).resolved;
-        jsTestLog(`Mirrored ${primaryResolvedAfterReads} reads so far`);
-        for (let i = 0; i < secondaries.length; i++) {
-            // Print the secondary metrics for easier debugging.
-            getDiagnosticData(secondaries[i]);
-        }
-        // There are two secondaries, so `kOperations * 2` reads must be resolved.
-        return primaryResolvedBeforeReads + kOperations * 2 <= primaryResolvedAfterReads;
-    }, "Failed to update extended FTDC metrics within time limit", 30000);
+    assert.soon(
+        () => {
+            let primaryResolvedAfterReads = getDiagnosticData(primary).resolved;
+            jsTestLog(`Mirrored ${primaryResolvedAfterReads} reads so far`);
+            for (let i = 0; i < secondaries.length; i++) {
+                // Print the secondary metrics for easier debugging.
+                getDiagnosticData(secondaries[i]);
+            }
+            // There are two secondaries, so `kOperations * 2` reads must be resolved.
+            return primaryResolvedBeforeReads + kOperations * 2 <= primaryResolvedAfterReads;
+        },
+        "Failed to update extended FTDC metrics within time limit",
+        30000,
+    );
 
     const primaryDataAfterReads = getDiagnosticData(primary);
     const primarySentAfterReads = primaryDataAfterReads.sent;
     const primaryResolvedAfterReads = primaryDataAfterReads.resolved;
-    assert.eq(primaryResolvedAfterReads - primaryResolvedBeforeReads,
-              primarySentAfterReads - primarySentBeforeReads,
-              primaryDataAfterReads);
+    assert.eq(
+        primaryResolvedAfterReads - primaryResolvedBeforeReads,
+        primarySentAfterReads - primarySentBeforeReads,
+        primaryDataAfterReads,
+    );
 
-    assert.soon(() => {
-        jsTestLog("Verifying diagnostic collection for mirrored reads on secondaries");
-        let mirroredReadsSucceeded = getDiagnosticData(primary).succeeded;
-        let mirroredReadsProcessedAfter = getMirroredReadsProcessedAsSecondary();
-        return mirroredReadsSucceeded ==
-            (mirroredReadsProcessedAfter - mirroredReadsProcessedBefore);
-    }, "Failed to wait for secondary mirrored reads stats to converge", 30000);
+    assert.soon(
+        () => {
+            jsTestLog("Verifying diagnostic collection for mirrored reads on secondaries");
+            let mirroredReadsSucceeded = getDiagnosticData(primary).succeeded;
+            let mirroredReadsProcessedAfter = getMirroredReadsProcessedAsSecondary();
+            return mirroredReadsSucceeded == mirroredReadsProcessedAfter - mirroredReadsProcessedBefore;
+        },
+        "Failed to wait for secondary mirrored reads stats to converge",
+        30000,
+    );
 }
 rst.stopSet();

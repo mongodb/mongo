@@ -4,30 +4,30 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const rst =
-    new ReplSetTest({nodes: 3, nodeOptions: {auth: '', setParameter: {multitenancySupport: true}}});
-rst.startSet({keyFile: 'jstests/libs/key1'});
+const rst = new ReplSetTest({nodes: 3, nodeOptions: {auth: "", setParameter: {multitenancySupport: true}}});
+rst.startSet({keyFile: "jstests/libs/key1"});
 rst.initiate();
 
 let primary = rst.getPrimary();
-let adminDb = primary.getDB('admin');
+let adminDb = primary.getDB("admin");
 
 // Create a user for testing
-assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-assert(adminDb.auth('admin', 'pwd'));
+assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["root"]}));
+assert(adminDb.auth("admin", "pwd"));
 
 {
     const kTenant = ObjectId();
-    let testDb = primary.getDB('myDb0');
+    let testDb = primary.getDB("myDb0");
     let token = _createTenantToken({tenant: kTenant});
     primary._setSecurityToken(token);
 
     // Create a collection by inserting a document to it.
-    assert.commandWorked(testDb.runCommand({insert: 'myColl0', documents: [{_id: 0, a: 1, b: 1}]}));
+    assert.commandWorked(testDb.runCommand({insert: "myColl0", documents: [{_id: 0, a: 1, b: 1}]}));
 
     // Run findAndModify on the document.
     let fad = assert.commandWorked(
-        testDb.runCommand({findAndModify: "myColl0", query: {a: 1}, update: {$inc: {a: 10}}}));
+        testDb.runCommand({findAndModify: "myColl0", query: {a: 1}, update: {$inc: {a: 10}}}),
+    );
     assert.eq({_id: 0, a: 1, b: 1}, fad.value, tojson(fad));
 
     // Create a view on the collection.
@@ -42,9 +42,9 @@ assert(adminDb.auth('admin', 'pwd'));
     primary = rst.getPrimary();
     primary._setSecurityToken(token);
 
-    adminDb = primary.getDB('admin');
-    assert(adminDb.auth('admin', 'pwd'));
-    testDb = primary.getDB('myDb0');
+    adminDb = primary.getDB("admin");
+    assert(adminDb.auth("admin", "pwd"));
+    testDb = primary.getDB("myDb0");
 
     // Assert we see 3 collections in the tenant's db 'myDb0' - the original collection we
     // created, the view on it, and the system.views collection.
@@ -53,13 +53,12 @@ assert(adminDb.auth('admin', 'pwd'));
     const expectedColls = [
         {"name": "myColl0", "type": "collection"},
         {"name": "system.views", "type": "collection"},
-        {"name": "view1", "type": "view"}
+        {"name": "view1", "type": "view"},
     ];
     assert(arrayEq(expectedColls, colls.cursor.firstBatch), tojson(colls.cursor.firstBatch));
 
     // Assert we can still run findAndModify on the doc.
-    fad = assert.commandWorked(
-        testDb.runCommand({findAndModify: "myColl0", query: {a: 11}, update: {$inc: {a: 10}}}));
+    fad = assert.commandWorked(testDb.runCommand({findAndModify: "myColl0", query: {a: 11}, update: {$inc: {a: 10}}}));
     assert.eq({_id: 0, a: 11, b: 1}, fad.value, tojson(fad));
     primary._setSecurityToken(undefined);
 }

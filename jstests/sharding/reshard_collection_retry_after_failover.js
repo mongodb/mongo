@@ -23,8 +23,11 @@ const getTempUUID = (tempNs) => {
     return getUUIDFromConfigCollections(mongos, tempCollection.getFullName());
 };
 
-const reshardingTest = new ReshardingTest(
-    {numDonors: 1, minimumOperationDurationMS: 0, initiateWithDefaultElectionTimeout: true});
+const reshardingTest = new ReshardingTest({
+    numDonors: 1,
+    minimumOperationDurationMS: 0,
+    initiateWithDefaultElectionTimeout: true,
+});
 reshardingTest.setup();
 const donorShardNames = reshardingTest.donorShardNames;
 const recipientShardNames = reshardingTest.recipientShardNames;
@@ -44,10 +47,14 @@ let pauseBeforeCloningFP = configureFailPoint(configsvr, "reshardingPauseCoordin
 let expectedUUIDAfterReshardingCompletes = undefined;
 
 const generateAbortThread = (mongosConnString, ns) => {
-    return new Thread((mongosConnString, ns) => {
-        const mongos = new Mongo(mongosConnString);
-        assert.commandWorked(mongos.adminCommand({abortReshardCollection: ns}));
-    }, mongosConnString, ns);
+    return new Thread(
+        (mongosConnString, ns) => {
+            const mongos = new Mongo(mongosConnString);
+            assert.commandWorked(mongos.adminCommand({abortReshardCollection: ns}));
+        },
+        mongosConnString,
+        ns,
+    );
 };
 
 let abortThread = generateAbortThread(mongos.host, sourceCollection.getFullName());
@@ -71,26 +78,27 @@ reshardingTest.withReshardingInBackground(
     },
     {
         expectedErrorCode: ErrorCodes.ReshardCollectionAborted,
-    });
+    },
+);
 abortThread.join();
 
 // Confirm the collection UUID did not change.
-let finalSourceCollectionUUID =
-    getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+let finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
 assert.eq(reshardingTest.sourceCollectionUUID, finalSourceCollectionUUID);
 
 jsTestLog("Retrying aborted resharding with UUID: " + originalReshardingUUID);
 // A retry after the fact with the same UUID should not attempt to reshard the collection again,
 // and also should return same error code.
-assert.commandFailedWithCode(mongos.adminCommand({
-    reshardCollection: sourceCollection.getFullName(),
-    key: {newKey: 1},
-    _presetReshardedChunks: reshardingTest.presetReshardedChunks,
-    reshardingUUID: originalReshardingUUID
-}),
-                             ErrorCodes.ReshardCollectionAborted);
-finalSourceCollectionUUID =
-    getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+assert.commandFailedWithCode(
+    mongos.adminCommand({
+        reshardCollection: sourceCollection.getFullName(),
+        key: {newKey: 1},
+        _presetReshardedChunks: reshardingTest.presetReshardedChunks,
+        reshardingUUID: originalReshardingUUID,
+    }),
+    ErrorCodes.ReshardCollectionAborted,
+);
+finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
 assert.eq(reshardingTest.sourceCollectionUUID, finalSourceCollectionUUID);
 
 // Makes sure the same thing happens after failover
@@ -99,15 +107,16 @@ topology = DiscoverTopology.findConnectedNodes(mongos);
 configsvr = new Mongo(topology.configsvr.primary);
 
 jsTestLog("After failover, retrying aborted resharding with UUID: " + originalReshardingUUID);
-assert.commandFailedWithCode(mongos.adminCommand({
-    reshardCollection: sourceCollection.getFullName(),
-    key: {newKey: 1},
-    _presetReshardedChunks: reshardingTest.presetReshardedChunks,
-    reshardingUUID: originalReshardingUUID
-}),
-                             ErrorCodes.ReshardCollectionAborted);
-finalSourceCollectionUUID =
-    getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+assert.commandFailedWithCode(
+    mongos.adminCommand({
+        reshardCollection: sourceCollection.getFullName(),
+        key: {newKey: 1},
+        _presetReshardedChunks: reshardingTest.presetReshardedChunks,
+        reshardingUUID: originalReshardingUUID,
+    }),
+    ErrorCodes.ReshardCollectionAborted,
+);
+finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
 assert.eq(reshardingTest.sourceCollectionUUID, finalSourceCollectionUUID);
 
 // Try it again but let it succeed this time.
@@ -115,40 +124,41 @@ jsTestLog("Trying resharding with new UUID: " + newReshardingUUID);
 reshardingTest.retryOnceOnNetworkError(() => {
     pauseBeforeCloningFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
 });
-reshardingTest.withReshardingInBackground({
-    newShardKeyPattern: {newKey: 1},
-    reshardingUUID: newReshardingUUID,
-    newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
-},
-                                          (tempNs) => {
-                                              pauseBeforeCloningFP.wait();
+reshardingTest.withReshardingInBackground(
+    {
+        newShardKeyPattern: {newKey: 1},
+        reshardingUUID: newReshardingUUID,
+        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+    },
+    (tempNs) => {
+        pauseBeforeCloningFP.wait();
 
-                                              // The UUID of the temporary resharding collection
-                                              // should become the UUID of the original collection
-                                              // once resharding has completed.
-                                              expectedUUIDAfterReshardingCompletes =
-                                                  getTempUUID(tempNs);
+        // The UUID of the temporary resharding collection
+        // should become the UUID of the original collection
+        // once resharding has completed.
+        expectedUUIDAfterReshardingCompletes = getTempUUID(tempNs);
 
-                                              pauseBeforeCloningFP.off();
-                                          });
+        pauseBeforeCloningFP.off();
+    },
+);
 
 // Resharding should have succeeded.
 assert.neq(expectedUUIDAfterReshardingCompletes, undefined);
-finalSourceCollectionUUID =
-    getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 jsTestLog("After completion, retrying resharding with UUID: " + newReshardingUUID);
 // A retry after the fact with the same UUID should not attempt to reshard the collection again,
 // and should succeed.
-assert.commandWorked(mongos.adminCommand({
-    reshardCollection: sourceCollection.getFullName(),
-    key: {newKey: 1},
-    _presetReshardedChunks: reshardingTest.presetReshardedChunks,
-    reshardingUUID: newReshardingUUID
-}));
-finalSourceCollectionUUID =
-    getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+assert.commandWorked(
+    mongos.adminCommand({
+        reshardCollection: sourceCollection.getFullName(),
+        key: {newKey: 1},
+        _presetReshardedChunks: reshardingTest.presetReshardedChunks,
+        reshardingUUID: newReshardingUUID,
+    }),
+);
+finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 // Makes sure the same thing happens after failover
@@ -157,14 +167,15 @@ topology = DiscoverTopology.findConnectedNodes(mongos);
 configsvr = new Mongo(topology.configsvr.primary);
 
 jsTestLog("After completion and failover, retrying resharding with UUID: " + newReshardingUUID);
-assert.commandWorked(mongos.adminCommand({
-    reshardCollection: sourceCollection.getFullName(),
-    key: {newKey: 1},
-    _presetReshardedChunks: reshardingTest.presetReshardedChunks,
-    reshardingUUID: newReshardingUUID
-}));
-finalSourceCollectionUUID =
-    getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+assert.commandWorked(
+    mongos.adminCommand({
+        reshardCollection: sourceCollection.getFullName(),
+        key: {newKey: 1},
+        _presetReshardedChunks: reshardingTest.presetReshardedChunks,
+        reshardingUUID: newReshardingUUID,
+    }),
+);
+finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 reshardingTest.teardown();

@@ -20,14 +20,14 @@ assert.commandWorked(coll.insert({"_id": 3, "title": "vegetables"}));
 const collUUID = getUUIDFromListCollections(db, coll.getName());
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 const searchCmd = {
     search: coll.getName(),
     collectionUUID: collUUID,
     query: searchQuery,
-    $db: "test"
+    $db: "test",
 };
 
 // Give mongotmock some stuff to return.
@@ -42,9 +42,12 @@ const cursorId = NumberLong(123);
                 cursor: {
                     id: cursorId,
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 2, $searchScore: 0.654}, {_id: 1, $searchScore: 0.321}]
+                    nextBatch: [
+                        {_id: 2, $searchScore: 0.654},
+                        {_id: 1, $searchScore: 0.321},
+                    ],
                 },
-            }
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -52,21 +55,19 @@ const cursorId = NumberLong(123);
                 cursor: {
                     id: NumberLong(0),
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 3, $searchScore: 0.123}]
+                    nextBatch: [{_id: 3, $searchScore: 0.123}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 // Verify that a $search query SEARCH_META evaluates to missing if no collector results are returned
 // from mongot.
-let cursor = coll.aggregate([{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}],
-                            {cursor: {}});
+let cursor = coll.aggregate([{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}], {cursor: {}});
 
 const expected = [{"_id": 2}, {"_id": 1}, {"_id": 3}];
 assert.eq(expected, cursor.toArray());

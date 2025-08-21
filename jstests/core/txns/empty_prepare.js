@@ -19,7 +19,7 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
 const doc = {
     _id: 1,
     a: 1,
-    b: 1
+    b: 1,
 };
 assert.commandWorked(testColl.insert(doc));
 
@@ -30,8 +30,10 @@ const sessionColl = sessionDB.getCollection(collName);
 // ---- Test 1. No operations before prepare ----
 
 session.startTransaction();
-assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(
+    sessionDB.adminCommand({prepareTransaction: 1}),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 // ---- Test 2. Only reads before prepare ----

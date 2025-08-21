@@ -14,9 +14,7 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {isExpress, isIdhack, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
 
 const testDB = db.getSiblingDB("express_id_eq");
@@ -24,7 +22,7 @@ assert.commandWorked(testDB.dropDatabase());
 
 const caseInsensitiveCollation = {
     locale: "en_US",
-    strength: 1
+    strength: 1,
 };
 const docs = [{_id: 123, a: 1}, {_id: "str", a: 1}, {_id: {}}, {_id: {a: 1}}];
 
@@ -33,12 +31,10 @@ function assertUsesExpress(coll, filter, expectedResults) {
         assertArrayEq({
             actual: result,
             expected: expectedResults,
-            extraErrorMsg:
-                "Result set comparison failed for find(" + filter + "). Explain: " + tojson(explain)
+            extraErrorMsg: "Result set comparison failed for find(" + filter + "). Explain: " + tojson(explain),
         });
 
-        assert(isExpress(testDB, explain),
-               "Expected the query to use express. Explain: " + tojson(explain));
+        assert(isExpress(testDB, explain), "Expected the query to use express. Explain: " + tojson(explain));
     }
 
     // Find
@@ -61,15 +57,14 @@ function assertUsesExpress(coll, filter, expectedResults) {
         // 'internalQueryDisableSingleFieldExpressExecutor' only disables the express path for
         // queries on a user index, so disabling the knob and running the query again should show
         // that we still use the express path.
-        testDB.adminCommand(
-            {setParameter: 1, internalQueryDisableSingleFieldExpressExecutor: true});
+        testDB.adminCommand({setParameter: 1, internalQueryDisableSingleFieldExpressExecutor: true});
         const explainAfterKnobDisabled = coll.find(filter).collation(findCollation).explain();
         assert(
             isExpress(testDB, explainAfterKnobDisabled),
             "Expected the query to use express after disabling 'internalQueryDisableSingleFieldExpressExecutor'. Explain: " +
-                tojson(explainAfterKnobDisabled));
-        testDB.adminCommand(
-            {setParameter: 1, internalQueryDisableSingleFieldExpressExecutor: false});
+                tojson(explainAfterKnobDisabled),
+        );
+        testDB.adminCommand({setParameter: 1, internalQueryDisableSingleFieldExpressExecutor: false});
     }
 
     // Agg, to test pushdown to find.
@@ -87,15 +82,14 @@ function assertUsesExpress(coll, filter, expectedResults) {
         assertOnResultAndExplain(result, explain);
 
         // See comment above.
-        testDB.adminCommand(
-            {setParameter: 1, internalQueryDisableSingleFieldExpressExecutor: true});
+        testDB.adminCommand({setParameter: 1, internalQueryDisableSingleFieldExpressExecutor: true});
         const explainAfterKnobDisabled = coll.explain().aggregate([{$match: filter}], aggOptions);
         assert(
             isExpress(testDB, explainAfterKnobDisabled),
             "Expected the query to use express after disabling 'internalQueryDisableSingleFieldExpressExecutor'. Explain: " +
-                tojson(explainAfterKnobDisabled));
-        testDB.adminCommand(
-            {setParameter: 1, internalQueryDisableSingleFieldExpressExecutor: false});
+                tojson(explainAfterKnobDisabled),
+        );
+        testDB.adminCommand({setParameter: 1, internalQueryDisableSingleFieldExpressExecutor: false});
     }
 }
 
@@ -106,13 +100,12 @@ function assertUsesIdHack(coll, filter, projection, expectedResults) {
     assertArrayEq({
         actual: result,
         expected: expectedResults,
-        extraErrorMsg: "Result set comparison failed for find(" + filter + ", " + projection +
-            "). Explain: " + tojson(explain)
+        extraErrorMsg:
+            "Result set comparison failed for find(" + filter + ", " + projection + "). Explain: " + tojson(explain),
     });
 
     // Assert that the plan is IDHACK, and not express.
-    assert(isIdhack(testDB, explain),
-           "Expected the query to use IDHACK. Explain: " + tojson(explain));
+    assert(isIdhack(testDB, explain), "Expected the query to use IDHACK. Explain: " + tojson(explain));
 }
 
 function runTests(collection, isSimpleCollation) {
@@ -155,18 +148,14 @@ function runTests(collection, isSimpleCollation) {
     assertUsesExpress(collection, {_id: {$eq: "STR"}}, isSimpleCollation ? [] : [docs[1]]);
     assertUsesExpress(collection, {_id: {$in: ["STR"]}}, isSimpleCollation ? [] : [docs[1]]);
 
-    assertUsesIdHack(
-        collection, {_id: "STR"}, {_id: 1, "foo.bar": 0}, isSimpleCollation ? [] : [docs[1]]);
-    assertUsesIdHack(
-        collection, {_id: {$eq: "STR"}}, complexProj, isSimpleCollation ? [] : [docs[1]]);
-    assertUsesIdHack(
-        collection, {_id: {$in: ["STR"]}}, complexProj, isSimpleCollation ? [] : [docs[1]]);
+    assertUsesIdHack(collection, {_id: "STR"}, {_id: 1, "foo.bar": 0}, isSimpleCollation ? [] : [docs[1]]);
+    assertUsesIdHack(collection, {_id: {$eq: "STR"}}, complexProj, isSimpleCollation ? [] : [docs[1]]);
+    assertUsesIdHack(collection, {_id: {$in: ["STR"]}}, complexProj, isSimpleCollation ? [] : [docs[1]]);
 
     // Assert that equality to null does not use express because 'null' isn't an exact bounds
     // generating type.
     let explain = collection.find({_id: {$eq: null}}).explain();
-    assert(!isExpress(testDB, explain),
-           "Expected the query to not express. Explain: " + tojson(explain));
+    assert(!isExpress(testDB, explain), "Expected the query to not express. Explain: " + tojson(explain));
 
     // Assert that a find that contains an express-eligible predicate but has other stipulations
     // does not go through either IDHACK or express. If the collection is a clustered collection on
@@ -175,8 +164,10 @@ function runTests(collection, isSimpleCollation) {
     var isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(testDB);
     if (collection.getName() != "clustered_collection" && !isClustered) {
         explain = collection.find({_id: {$eq: 1, $lt: 4}}).explain();
-        assert(!isIdhackOrExpress(testDB, explain),
-               "Expected the query to not express or IDHACK. Explain: " + tojson(explain));
+        assert(
+            !isIdhackOrExpress(testDB, explain),
+            "Expected the query to not express or IDHACK. Explain: " + tojson(explain),
+        );
     }
 }
 
@@ -189,16 +180,16 @@ runTests(coll, true /* isSimpleCollation */);
 
 // Collation of the collection is non-simple (and thus any indexes, including the _id index, will
 // automatically also have that collation).
-assert.commandWorked(
-    testDB.createCollection("collection_with_collation", {collation: caseInsensitiveCollation}));
+assert.commandWorked(testDB.createCollection("collection_with_collation", {collation: caseInsensitiveCollation}));
 const collWithCollation = testDB.collection_with_collation;
 collWithCollation.remove({});
 assert.commandWorked(collWithCollation.insert(docs));
 runTests(collWithCollation, false /* isSimpleCollation */);
 
 // Clustered collection.
-assert.commandWorked(testDB.createCollection("clustered_collection",
-                                             {clusteredIndex: {"key": {_id: 1}, "unique": true}}));
+assert.commandWorked(
+    testDB.createCollection("clustered_collection", {clusteredIndex: {"key": {_id: 1}, "unique": true}}),
+);
 const clusteredColl = testDB.clustered_collection;
 clusteredColl.remove({});
 assert.commandWorked(clusteredColl.insert(docs));

@@ -7,8 +7,8 @@
 //   requires_getmore
 // ]
 
-let collName = 'system_indexes_invalidations';
-let collNameRenamed = 'renamed_collection';
+let collName = "system_indexes_invalidations";
+let collNameRenamed = "renamed_collection";
 let coll = db[collName];
 let collRenamed = db[collNameRenamed];
 
@@ -21,12 +21,12 @@ function testIndexInvalidation(isRename) {
     let cmd = {listIndexes: collName};
     Object.extend(cmd, {cursor: {batchSize: 2}});
     let res = db.runCommand(cmd);
-    assert.commandWorked(res, 'could not run ' + tojson(cmd));
+    assert.commandWorked(res, "could not run " + tojson(cmd));
     printjson(res);
 
     // Ensure the cursor has data, rename or drop the collection, and exhaust the cursor.
     let cursor = new DBCommandCursor(db, res);
-    let errMsg = 'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
+    let errMsg = "expected more data from command " + tojson(cmd) + ", with result " + tojson(res);
     assert(cursor.hasNext(), errMsg);
     assert(res.cursor.id !== NumberLong("0"), errMsg);
     if (isRename) {

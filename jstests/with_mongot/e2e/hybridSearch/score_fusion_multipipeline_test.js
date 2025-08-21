@@ -38,24 +38,19 @@ function runScoreFusionMultiplePipelineTest(normalization, expectedResults) {
                                     index: getRentalSearchIndexSpec().name,
                                     text: {
                                         query: "brooklyn",
-                                        path: [
-                                            "name",
-                                            "summary",
-                                            "description",
-                                            "neighborhood_overview",
-                                        ],
+                                        path: ["name", "summary", "description", "neighborhood_overview"],
                                     },
-                                }
+                                },
                             },
                             // Note that we sort here such that sharded/unsharded queries can return
                             // the same set of results, due to the $limit stage.
                             {$sort: {_id: 1}},
-                            {$limit: limit}
+                            {$limit: limit},
                         ],
                         match: [
                             {$match: {$text: {$search: "apartment"}}},
                             {$sort: {"review_score": -1}},
-                            {$limit: limit}
+                            {$limit: limit},
                         ],
                         searchtwo: [
                             {
@@ -65,19 +60,19 @@ function runScoreFusionMultiplePipelineTest(normalization, expectedResults) {
                                         query: "kitchen",
                                         path: ["space", "description"],
                                     },
-                                }
+                                },
                             },
                             // Note that we sort here such that sharded/unsharded queries can return
                             // the same set of results, due to the $limit stage.
                             {$sort: {_id: 1}},
-                            {$limit: limit}
+                            {$limit: limit},
                         ],
                     },
-                    normalization: normalization
-                }
-            }
+                    normalization: normalization,
+                },
+            },
         },
-        {$limit: limit}
+        {$limit: limit},
     ];
 
     let results = coll.aggregate(testQuery).toArray();
@@ -87,18 +82,23 @@ function runScoreFusionMultiplePipelineTest(normalization, expectedResults) {
 
 (function testMultiplePipelineNoNormalization() {
     runScoreFusionMultiplePipelineTest(
-        "none", [28, 13, 24, 2, 14, 41, 47, 26, 40, 15, 18, 21, 22, 31, 8, 7, 20, 11, 38, 23]);
+        "none",
+        [28, 13, 24, 2, 14, 41, 47, 26, 40, 15, 18, 21, 22, 31, 8, 7, 20, 11, 38, 23],
+    );
 })();
 
 (function testMultiplePipelineSigmoidNormalization() {
     runScoreFusionMultiplePipelineTest(
-        "sigmoid", [28, 24, 14, 21, 31, 13, 47, 26, 15, 22, 8, 7, 11, 20, 27, 6, 2, 41, 40, 18]);
+        "sigmoid",
+        [28, 24, 14, 21, 31, 13, 47, 26, 15, 22, 8, 7, 11, 20, 27, 6, 2, 41, 40, 18],
+    );
 })();
 
 (function testMultiplePipelineNoNormalization() {
     runScoreFusionMultiplePipelineTest(
         "minMaxScaler",
-        [15, 13, 28, 14, 26, 24, 22, 47, 2, 25, 41, 21, 8, 1, 40, 29, 31, 18, 7, 3]);
+        [15, 13, 28, 14, 26, 24, 22, 47, 2, 25, 41, 21, 8, 1, 40, 29, 31, 18, 7, 3],
+    );
 })();
 
 dropSearchIndex(coll, {name: getRentalSearchIndexSpec().name});

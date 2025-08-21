@@ -32,10 +32,11 @@ const numRuns = 40;
 const numQueriesPerRun = 30;
 
 const experimentColl = db[jsTestName()];
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}));
 assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"}));
-testProperty(createPlanStabilityProperty(experimentColl, true /* assertCeExists */),
-             {experimentColl},
-             createStabilityWorkload(numQueriesPerRun),
-             numRuns);
+testProperty(
+    createPlanStabilityProperty(experimentColl, true /* assertCeExists */),
+    {experimentColl},
+    createStabilityWorkload(numQueriesPerRun),
+    numRuns,
+);

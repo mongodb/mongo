@@ -25,12 +25,9 @@ const st = new ShardingTest({shards: 2});
  * Set up a sharded collection with 2 chunks, one on each shard.
  */
 jsTest.log("Setting up sharded cluster...");
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(
-    st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(
-    st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: -1}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
@@ -61,12 +58,14 @@ assert.commandWorked(st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUp
     // Note that the test command targets the shard and not mongos. Clients should never know
     // about this startOrContinueTransaction session option, which should only be used during
     // shard-to-shard communication.
-    assert.commandWorked(sessionDB.runCommand({
-        find: collName,
-        filter: {_id: -1},
-        startOrContinueTransaction: true,
-        readConcern: {level: "majority"},
-    }));
+    assert.commandWorked(
+        sessionDB.runCommand({
+            find: collName,
+            filter: {_id: -1},
+            startOrContinueTransaction: true,
+            readConcern: {level: "majority"},
+        }),
+    );
 
     session.abortTransaction();
     jsTest.log("Exiting verifyStartOrContinueTransactionCanSpecifyReadConcern.");

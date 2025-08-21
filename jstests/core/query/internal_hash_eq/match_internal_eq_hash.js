@@ -15,19 +15,13 @@ const coll = db.match_internal_eq_hash;
 (function testTopLevel() {
     coll.drop();
 
-    assert.commandWorked(coll.insert([
-        {_id: 0},
-        {_id: 1, a: 1},
-        {_id: 2, a: NumberLong(1)},
-        {_id: 3, a: "1"},
-        {_id: 4, a: null}
-    ]));
+    assert.commandWorked(
+        coll.insert([{_id: 0}, {_id: 1, a: 1}, {_id: 2, a: NumberLong(1)}, {_id: 3, a: "1"}, {_id: 4, a: null}]),
+    );
 
     // Test that the expression works without an index - just doesn't crash or match anything in
     // this case.
-    assert.eq(coll.find({a: {$_internalEqHash: NumberLong(0)}}).toArray(),
-              [],
-              "Expected nothing to hash to 0");
+    assert.eq(coll.find({a: {$_internalEqHash: NumberLong(0)}}).toArray(), [], "Expected nothing to hash to 0");
     let explainPlan = coll.find({a: {$_internalEqHash: NumberLong(0)}}).explain();
     assert(isCollscan(db, explainPlan));
 
@@ -39,7 +33,12 @@ const coll = db.match_internal_eq_hash;
     const hashOfInterest = doc.key.a;
 
     const testQuery = {a: {$_internalEqHash: hashOfInterest}};
-    assert(resultsEq(coll.find(testQuery).toArray(), [{_id: 1, a: 1}, {_id: 2, a: NumberLong(1)}]));
+    assert(
+        resultsEq(coll.find(testQuery).toArray(), [
+            {_id: 1, a: 1},
+            {_id: 2, a: NumberLong(1)},
+        ]),
+    );
     explainPlan = coll.find(testQuery).explain();
     assert(isIxscan(db, explainPlan), explainPlan);
 
@@ -52,12 +51,22 @@ const coll = db.match_internal_eq_hash;
     assert.commandWorked(coll.dropIndex({a: "hashed"}));
     explainPlan = coll.find(testQuery, {_id: 1}).explain();
     assert(isCollscan(db, explainPlan));
-    assert(resultsEq(coll.find(testQuery).toArray(), [{_id: 1, a: 1}, {_id: 2, a: NumberLong(1)}]));
+    assert(
+        resultsEq(coll.find(testQuery).toArray(), [
+            {_id: 1, a: 1},
+            {_id: 2, a: NumberLong(1)},
+        ]),
+    );
 
     // Now add a compound hashed index and test it can still work on a leading hash component.
     assert.commandWorked(coll.createIndex({a: "hashed", b: 1}));
 
-    assert(resultsEq(coll.find(testQuery).toArray(), [{_id: 1, a: 1}, {_id: 2, a: NumberLong(1)}]));
+    assert(
+        resultsEq(coll.find(testQuery).toArray(), [
+            {_id: 1, a: 1},
+            {_id: 2, a: NumberLong(1)},
+        ]),
+    );
     explainPlan = coll.find(testQuery).explain();
     assert(isIxscan(db, explainPlan), explainPlan);
 
@@ -66,7 +75,12 @@ const coll = db.match_internal_eq_hash;
     assert.commandWorked(coll.dropIndex({a: "hashed", b: 1}));
     assert.commandWorked(coll.createIndex({b: 1, a: "hashed"}));
 
-    assert(resultsEq(coll.find(testQuery).toArray(), [{_id: 1, a: 1}, {_id: 2, a: NumberLong(1)}]));
+    assert(
+        resultsEq(coll.find(testQuery).toArray(), [
+            {_id: 1, a: 1},
+            {_id: 2, a: NumberLong(1)},
+        ]),
+    );
     explainPlan = coll.find(testQuery).explain();
     assert(isCollscan(db, explainPlan), explainPlan);
 
@@ -75,31 +89,37 @@ const coll = db.match_internal_eq_hash;
     assert.commandWorked(coll.dropIndex({b: 1, a: "hashed"}));
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    assert(resultsEq(coll.find(testQuery).toArray(), [{_id: 1, a: 1}, {_id: 2, a: NumberLong(1)}]));
+    assert(
+        resultsEq(coll.find(testQuery).toArray(), [
+            {_id: 1, a: 1},
+            {_id: 2, a: NumberLong(1)},
+        ]),
+    );
     explainPlan = coll.find(testQuery).explain();
     assert(isCollscan(db, explainPlan), explainPlan);
-}());
+})();
 
 (function testDotted() {
     coll.drop();
 
-    assert.commandWorked(coll.insert([
-        {},
-        {a: 1},
-        {a: {}},
-        {a: {b: 1}},
-        {a: {b: {c: NumberDecimal("1.0")}}},
-        {a: {b: {c: 2}}},
-        {"a.b.c": 1},
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {},
+            {a: 1},
+            {a: {}},
+            {a: {b: 1}},
+            {a: {b: {c: NumberDecimal("1.0")}}},
+            {a: {b: {c: 2}}},
+            {"a.b.c": 1},
+        ]),
+    );
 
     assert.commandWorked(coll.createIndex({"a.b.c": "hashed"}));
-    const hashOfInterest =
-        coll.findOne({"a.b.c": 1}, {key: {$meta: "indexKey"}}, {hint: {"a.b.c": "hashed"}})
-            .key["a.b.c"];
+    const hashOfInterest = coll.findOne({"a.b.c": 1}, {key: {$meta: "indexKey"}}, {hint: {"a.b.c": "hashed"}}).key[
+        "a.b.c"
+    ];
     const testQuery = {"a.b.c": {$_internalEqHash: hashOfInterest}};
-    assert(
-        resultsEq(coll.find(testQuery, {_id: 0}).toArray(), [{a: {b: {c: NumberDecimal("1.0")}}}]));
+    assert(resultsEq(coll.find(testQuery, {_id: 0}).toArray(), [{a: {b: {c: NumberDecimal("1.0")}}}]));
 
     let explainPlan = coll.find(testQuery).explain();
     assert(isIxscan(db, explainPlan), explainPlan);
@@ -108,9 +128,8 @@ const coll = db.match_internal_eq_hash;
     assert.commandWorked(coll.dropIndex({"a.b.c": "hashed"}));
     explainPlan = coll.find(testQuery, {_id: 1}).explain();
     assert(isCollscan(db, explainPlan));
-    assert(
-        resultsEq(coll.find(testQuery, {_id: 0}).toArray(), [{a: {b: {c: NumberDecimal("1.0")}}}]));
-}());
+    assert(resultsEq(coll.find(testQuery, {_id: 0}).toArray(), [{a: {b: {c: NumberDecimal("1.0")}}}]));
+})();
 
 (function testInvalidTypes() {
     coll.drop();
@@ -129,7 +148,7 @@ const coll = db.match_internal_eq_hash;
         [1],
         [1, 2, 3],
         null,
-        BinData(0, 'asdf'),
+        BinData(0, "asdf"),
         UUID("326d92af-2d76-452b-a03f-69f05ab98416"),
         undefined,
         ObjectId("62d05ec744ca83616c92772c"),
@@ -142,8 +161,10 @@ const coll = db.match_internal_eq_hash;
         },
         MaxKey,
     ];
-    invalidBsonTypes.forEach(function(v) {
+    invalidBsonTypes.forEach(function (v) {
         assert.commandFailedWithCode(
-            db.runCommand({find: "match_internal_eq_hash", filter: {a: {$_internalEqHash: v}}}), 2);
+            db.runCommand({find: "match_internal_eq_hash", filter: {a: {$_internalEqHash: v}}}),
+            2,
+        );
     });
 })();

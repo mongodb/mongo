@@ -32,7 +32,7 @@ function setupCollection() {
         assert(result["_id"].toString().startsWith("ObjectId("));
     }
     // All generated ObjectIds are unique.
-    assert.eq(new Set(resultArray.map(res => res["_id"].toString())).size, resultArray.length);
+    assert.eq(new Set(resultArray.map((res) => res["_id"].toString())).size, resultArray.length);
 }
 
 // Test with invalid arguments.
@@ -40,31 +40,28 @@ setupCollection();
 const failedToParseCode = 9;
 {
     // non-empty object
-    const error = assert.throws(
-        () => coll.aggregate([{$project: {_id: {$createObjectId: {"key": "value"}}}}]).toArray());
+    const error = assert.throws(() =>
+        coll.aggregate([{$project: {_id: {$createObjectId: {"key": "value"}}}}]).toArray(),
+    );
     assert.commandFailedWithCode(error, failedToParseCode);
 }
 {
     // null
-    const error =
-        assert.throws(() => coll.aggregate([{$project: {_id: {$createObjectId: null}}}]).toArray());
+    const error = assert.throws(() => coll.aggregate([{$project: {_id: {$createObjectId: null}}}]).toArray());
     assert.commandFailedWithCode(error, failedToParseCode);
 }
 {
     // array
-    const error = assert.throws(
-        () => coll.aggregate([{$project: {_id: {$createObjectId: ["argument"]}}}]).toArray());
+    const error = assert.throws(() => coll.aggregate([{$project: {_id: {$createObjectId: ["argument"]}}}]).toArray());
     assert.commandFailedWithCode(error, failedToParseCode);
 }
 {
     // object id
-    const error = assert.throws(
-        () => coll.aggregate([{$project: {_id: {$createObjectId: ObjectId()}}}]).toArray());
+    const error = assert.throws(() => coll.aggregate([{$project: {_id: {$createObjectId: ObjectId()}}}]).toArray());
     assert.commandFailedWithCode(error, failedToParseCode);
 }
 {
     // string
-    const error = assert.throws(
-        () => coll.aggregate([{$project: {_id: {$createObjectId: "argument"}}}]).toArray());
+    const error = assert.throws(() => coll.aggregate([{$project: {_id: {$createObjectId: "argument"}}}]).toArray());
     assert.commandFailedWithCode(error, failedToParseCode);
 }

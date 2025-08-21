@@ -1,4 +1,3 @@
-
 assert.eq(5, Array.sum([1, 4]), "A");
 assert.eq(2.5, Array.avg([1, 4]), "B");
 

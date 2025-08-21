@@ -15,18 +15,24 @@ for (let i = 0; i < 100; i++) {
 assert.commandWorked(t.insert(docs));
 
 let explainResult = t.find({x: 27}).explain(true);
-assert.eq(1,
-          explainResult.executionStats.totalKeysExamined,
-          'explain x=27 with index {x : 1}: ' + tojson(explainResult));
+assert.eq(
+    1,
+    explainResult.executionStats.totalKeysExamined,
+    "explain x=27 with index {x : 1}: " + tojson(explainResult),
+);
 
 assert.commandWorked(t.createIndex({x: -1}));
 
 explainResult = t.find({x: 27}).explain(true);
-assert.eq(1,
-          explainResult.executionStats.totalKeysExamined,
-          'explain x=27 with indexes {x : 1} and {x: -1}: ' + tojson(explainResult));
+assert.eq(
+    1,
+    explainResult.executionStats.totalKeysExamined,
+    "explain x=27 with indexes {x : 1} and {x: -1}: " + tojson(explainResult),
+);
 
 explainResult = t.find({x: {$gt: 59}}).explain(true);
-assert.eq(40,
-          explainResult.executionStats.totalKeysExamined,
-          'explain x>59 with indexes {x : 1} and {x: -1}: ' + tojson(explainResult));
+assert.eq(
+    40,
+    explainResult.executionStats.totalKeysExamined,
+    "explain x>59 with indexes {x : 1} and {x: -1}: " + tojson(explainResult),
+);

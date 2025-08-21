@@ -13,23 +13,23 @@ var replTest = new ReplSetTest({
         {rsConfig: {priority: 1, votes: 1}},
         {rsConfig: {priority: 0, votes: 0}},
         {rsConfig: {priority: 0, votes: 0}},
-    ]
+    ],
 });
 var nodes = replTest.startSet();
 
 // Stopping replication on secondaries can be very slow with a high election timeout. Set a small
 // oplog getMore timeout so the test runs faster.
-nodes.forEach(node => {
-    assert.commandWorked(
-        node.adminCommand({configureFailPoint: 'setSmallOplogGetMoreMaxTimeMS', mode: 'alwaysOn'}));
+nodes.forEach((node) => {
+    assert.commandWorked(node.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}));
 });
 
 replTest.initiate();
 var primary = replTest.getPrimary();
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 replTest.awaitReplication();
 // Do a write that should not be able to replicate to node1 since we stopped replication.
 stopServerReplication(nodes[1]);
@@ -47,8 +47,10 @@ assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 // This new reconfig has a timeout of 5 seconds, and should fail with a CurrentConfigNotCommittedYet
 // error.
 config.version++;
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config, maxTimeMS: 5000}),
-                             ErrorCodes.CurrentConfigNotCommittedYet);
+assert.commandFailedWithCode(
+    primary.adminCommand({replSetReconfig: config, maxTimeMS: 5000}),
+    ErrorCodes.CurrentConfigNotCommittedYet,
+);
 // Check the latest reconfig is rejected.
 assert.gt(config.version, replTest.getReplSetConfigFromNode().version);
 restartServerReplication(nodes[1]);

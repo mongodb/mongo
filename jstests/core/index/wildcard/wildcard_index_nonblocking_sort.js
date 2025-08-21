@@ -23,8 +23,7 @@ function checkQueryHasSameResultsWhenUsingIdIndex(query, sort, projection) {
     assert(arrayEq(l, r));
 }
 
-function checkQueryUsesSortTypeAndGetsCorrectResults(
-    query, sort, projection, isBlocking, isCompound = false) {
+function checkQueryUsesSortTypeAndGetsCorrectResults(query, sort, projection, isBlocking, isCompound = false) {
     const explain = assert.commandWorked(coll.find(query, projection).sort(sort).explain());
     const plan = getWinningPlanFromExplain(explain.queryPlanner);
 
@@ -63,8 +62,7 @@ function checkQueryUsesBlockingSortAndGetsCorrectResults(query, sort, projection
 function runSortTests(dir, proj, isCompound = false) {
     // Test that the $** index can provide a non-blocking sort where appropriate.
     checkQueryUsesNonBlockingSortAndGetsCorrectResults({a: {$gte: 0}}, {a: dir}, proj, isCompound);
-    checkQueryUsesNonBlockingSortAndGetsCorrectResults(
-        {a: {$gte: 0}, x: 123}, {a: dir}, proj, isCompound);
+    checkQueryUsesNonBlockingSortAndGetsCorrectResults({a: {$gte: 0}, x: 123}, {a: dir}, proj, isCompound);
 
     // Test that the $** index can produce a solution with a blocking sort where appropriate.
     checkQueryUsesBlockingSortAndGetsCorrectResults({a: {$gte: 0}}, {a: dir, b: dir}, proj);
@@ -78,10 +76,10 @@ function runSortTests(dir, proj, isCompound = false) {
         {a: {$gte: 0}, excludedField: {$gte: 0}},
         {a: dir, excludedField: dir},
         proj,
-        !isCompound,  // A compound index can yield a non-blocking sort here.
-        isCompound);
-    checkQueryUsesBlockingSortAndGetsCorrectResults(
-        {excludedField: {$gte: 0}}, {a: dir, excludedField: dir}, proj);
+        !isCompound, // A compound index can yield a non-blocking sort here.
+        isCompound,
+    );
+    checkQueryUsesBlockingSortAndGetsCorrectResults({excludedField: {$gte: 0}}, {a: dir, excludedField: dir}, proj);
 
     // Test sorted queries on a multikey field, with and without $elemMatch.
     checkQueryUsesBlockingSortAndGetsCorrectResults({x: 123}, {a: dir}, proj);
@@ -98,8 +96,7 @@ for (const dir of [1, -1]) {
 
 // Repeat tests for compound wildcard indexes.
 assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(
-    coll.createIndex({"$**": 1, excludedField: 1}, {wildcardProjection: {"excludedField": 0}}));
+assert.commandWorked(coll.createIndex({"$**": 1, excludedField: 1}, {wildcardProjection: {"excludedField": 0}}));
 
 for (const dir of [1, -1]) {
     for (const proj of [{}, {_id: 0, a: 1}]) {

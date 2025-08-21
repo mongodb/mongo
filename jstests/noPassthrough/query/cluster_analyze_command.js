@@ -10,10 +10,8 @@ const db = st.getDB("test");
 const coll = db.analyze_coll;
 coll.drop();
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}));
-assert.commandWorked(
-    st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
 
 assert.commandWorked(coll.insert({a: 1, b: 2}));
 

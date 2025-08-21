@@ -10,7 +10,7 @@ import {waitForState} from "jstests/replsets/rslib.js";
 const testName = "txnsDuringStepDown";
 const dbName = testName;
 const collName = "testcoll";
-const collNss = dbName + '.' + collName;
+const collNss = dbName + "." + collName;
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {arbiter: true}]});
 rst.startSet();
@@ -29,7 +29,7 @@ function refreshConnection() {
 refreshConnection();
 
 jsTestLog("Writing data to collection.");
-assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: 'readOp'}]}));
+assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{_id: "readOp"}]}));
 rst.awaitReplication();
 
 const readFailPoint = "waitInFindBeforeMakingBatch";
@@ -48,36 +48,37 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     toRemovedState = toRemovedState || false;
 
     // Clears the log before running the test.
-    assert.commandWorked(primary.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 
     jsTestLog("Enable fail point for namespace '" + collNss + "'");
     // Find command.
     configureFailPoint(primary, readFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
     // Insert command.
-    const writeFp =
-        configureFailPoint(primary, writeFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
+    const writeFp = configureFailPoint(primary, writeFailPoint, {nss: collNss, shouldCheckForInterrupt: true});
 
     var startSafeParallelShell = (func, port) => {
         TestData.func = func;
-        var safeFunc = (toRemovedState) ? () => {
-            assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
-            TestData.func();
-        } : func;
+        var safeFunc = toRemovedState
+            ? () => {
+                  assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
+                  TestData.func();
+              }
+            : func;
         return startParallelShell(safeFunc, port);
     };
 
     const joinReadThread = startSafeParallelShell(() => {
         jsTestLog("Start blocking find cmd before step down");
-        var findRes = assert.commandWorked(
-            db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
+        var findRes = assert.commandWorked(db.getSiblingDB(TestData.dbName).runCommand({"find": TestData.collName}));
         assert.eq(findRes.cursor.firstBatch.length, 1);
     }, primary.port);
 
     const joinWriteThread = startSafeParallelShell(() => {
         jsTestLog("Start blocking insert cmd before step down");
         assert.commandFailedWithCode(
-            db.getSiblingDB(TestData.dbName)[TestData.collName].insert([{val: 'writeOp1'}]),
-            ErrorCodes.InterruptedDueToReplStateChange);
+            db.getSiblingDB(TestData.dbName)[TestData.collName].insert([{val: "writeOp1"}]),
+            ErrorCodes.InterruptedDueToReplStateChange,
+        );
     }, primary.port);
 
     // A failpoint to hang in the middle of a 'checkLog' command. This is used to synchronize
@@ -90,8 +91,7 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
         jsTestLog("Unblock step down");
         // Turn off fail point on find cmd to allow step down to continue. Hardcode the use of the
         // shard failpoint here since we are in a parallel shell.
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "off"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: "shardWaitInFindBeforeMakingBatch", mode: "off"}));
     }, primary.port);
 
     jsTestLog("Wait for find cmd to reach the fail point");
@@ -105,8 +105,10 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     hangFp.off();
 
     let res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
-    assert(res.electionCandidateMetrics,
-           () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res));
+    assert(
+        res.electionCandidateMetrics,
+        () => "Response should have an 'electionCandidateMetrics' field: " + tojson(res),
+    );
 
     jsTestLog("Trigger step down");
     var oldConfig = stepDownFn();
@@ -117,8 +119,7 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
     joinWriteThread();
 
     // Wait till the primary stepped down to primary.
-    waitForState(primary,
-                 (toRemovedState) ? ReplSetTest.State.REMOVED : ReplSetTest.State.SECONDARY);
+    waitForState(primary, toRemovedState ? ReplSetTest.State.REMOVED : ReplSetTest.State.SECONDARY);
 
     writeFp.off();
 
@@ -128,7 +129,8 @@ function runStepDownTest({testMsg, stepDownFn, toRemovedState}) {
         res = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
         assert(
             !res.electionCandidateMetrics,
-            () => "Response should not have an 'electionCandidateMetrics' field: " + tojson(res));
+            () => "Response should not have an 'electionCandidateMetrics' field: " + tojson(res),
+        );
     }
 
     // Get the new primary.
@@ -141,7 +143,7 @@ function runStepsDowntoRemoved(params) {
     // Run the test.
     params["toRemovedState"] = true;
     runStepDownTest(params);
-    oldConfigBeforeTest.version = ++(rst.getReplSetConfigFromNode().version);
+    oldConfigBeforeTest.version = ++rst.getReplSetConfigFromNode().version;
 
     // On exit, add the removed node back to replica set.
     assert.commandWorked(primary.adminCommand({replSetReconfig: oldConfigBeforeTest, force: true}));
@@ -162,7 +164,7 @@ runStepDownTest({
 
         // Run it on primary
         assert.commandWorked(primary.adminCommand({replSetReconfig: newConfig, force: true}));
-    }
+    },
 });
 
 runStepDownTest({
@@ -179,7 +181,7 @@ runStepDownTest({
 
         // Run it on secondary
         assert.commandWorked(secondary.adminCommand({replSetReconfig: newConfig, force: true}));
-    }
+    },
 });
 
 runStepsDowntoRemoved({
@@ -197,7 +199,7 @@ runStepsDowntoRemoved({
 
         // Run it on secondary
         assert.commandWorked(secondary.adminCommand({replSetReconfig: newConfig, force: true}));
-    }
+    },
 });
 
 runStepDownTest({
@@ -214,7 +216,7 @@ runStepDownTest({
 
         // Now, step up the secondary which will make the current primary to step down.
         rst.stepUp(secondary);
-    }
+    },
 });
 
 rst.stopSet();

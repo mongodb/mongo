@@ -28,31 +28,36 @@ const dbName = "test";
 const collName = "mycoll";
 const fpData = {
     "cmdName": "insert",
-    "ns": dbName + '.' + collName
+    "ns": dbName + "." + collName,
 };
-const hangBeforeCheckInterruptFailPoint =
-    configureFailPoint(st.s, "hangBeforeCheckingMongosShutdownInterrupt", fpData);
+const hangBeforeCheckInterruptFailPoint = configureFailPoint(st.s, "hangBeforeCheckingMongosShutdownInterrupt", fpData);
 
-const insertThread = new Thread(function insertDoc(host, dbName, collName) {
-    var lsid = UUID();
-    const conn = new Mongo(host);
-    const retrySession = conn.startSession({retryWrites: true});
-    const retrySessionDB = retrySession.getDatabase(dbName);
+const insertThread = new Thread(
+    function insertDoc(host, dbName, collName) {
+        var lsid = UUID();
+        const conn = new Mongo(host);
+        const retrySession = conn.startSession({retryWrites: true});
+        const retrySessionDB = retrySession.getDatabase(dbName);
 
-    try {
-        var res = assert.commandWorked(retrySessionDB.runCommand({
-            insert: 'mycoll',
-            documents: [{x: 0}, {x: 1}],
-            ordered: true,
-            lsid: {id: lsid},
-            txnNumber: NumberLong(1)
-        }));
-
-    } catch (e) {
-        assert.eq(e.errorLabels, ["RetryableWriteError"], e);
-    }
-    retrySession.endSession();
-}, st.s.host, dbName, collName);
+        try {
+            var res = assert.commandWorked(
+                retrySessionDB.runCommand({
+                    insert: "mycoll",
+                    documents: [{x: 0}, {x: 1}],
+                    ordered: true,
+                    lsid: {id: lsid},
+                    txnNumber: NumberLong(1),
+                }),
+            );
+        } catch (e) {
+            assert.eq(e.errorLabels, ["RetryableWriteError"], e);
+        }
+        retrySession.endSession();
+    },
+    st.s.host,
+    dbName,
+    collName,
+);
 
 insertThread.start();
 hangBeforeCheckInterruptFailPoint.wait();

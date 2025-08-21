@@ -14,8 +14,8 @@ const replTest = new ReplSetTest({name: testName, nodes: 2});
 replTest.startSet();
 replTest.initiate();
 
-const dbName = 'test';
-const collName = 'rrid';
+const dbName = "test";
+const collName = "rrid";
 
 const primary = replTest.getPrimary();
 const secondary = replTest.getSecondaries()[0];
@@ -34,7 +34,7 @@ const primDB = primary.getDB(dbName);
 // This is as though before the last two writes got replicated, the
 // secondary became the primary.
 const ops = [];
-ops.push({op: "i", ns: dbName + '.' + collName, o: {_id: 1}, o2: {_id: 1}, rid: NumberLong(3)});
+ops.push({op: "i", ns: dbName + "." + collName, o: {_id: 1}, o2: {_id: 1}, rid: NumberLong(3)});
 assert.commandWorked(primDB.runCommand({create: collName, recordIdsReplicated: true}));
 assert.commandWorked(primDB.runCommand({applyOps: ops}));
 

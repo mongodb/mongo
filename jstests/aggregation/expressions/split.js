@@ -31,10 +31,7 @@ function runAndAssert(args, result) {
     assert.commandWorked(coll.insertOne(document));
 
     // Test again with fields from document.
-    assert.eq(coll.aggregate([{$project: {result: {$split: ["$input", "$delimiter"]}}}])
-                  .toArray()[0]
-                  .result,
-              result);
+    assert.eq(coll.aggregate([{$project: {result: {$split: ["$input", "$delimiter"]}}}]).toArray()[0].result, result);
 
     // Clean up.
     coll.drop();
@@ -131,33 +128,33 @@ let pipeline = {$project: {split: {$split: []}}};
 assertErrorCode(coll, pipeline, 16020);
 
 pipeline = {
-    $project: {split: {$split: ["a"]}}
+    $project: {split: {$split: ["a"]}},
 };
 assertErrorCode(coll, pipeline, 16020);
 
 pipeline = {
-    $project: {split: {$split: ["a", "b", "c"]}}
+    $project: {split: {$split: ["a", "b", "c"]}},
 };
 assertErrorCode(coll, pipeline, 16020);
 
 // Ensure that $split errors when given non-string/regex input.
 pipeline = {
-    $project: {split: {$split: [1, "abc"]}}
+    $project: {split: {$split: [1, "abc"]}},
 };
 assertErrorCode(coll, pipeline, 40085);
 
 pipeline = {
-    $project: {split: {$split: [1, /abc/]}}
+    $project: {split: {$split: [1, /abc/]}},
 };
 assertErrorCode(coll, pipeline, 40085);
 
 pipeline = {
-    $project: {split: {$split: ["abc", 1]}}
+    $project: {split: {$split: ["abc", 1]}},
 };
 assertErrorCode(coll, pipeline, 40086);
 
 // Ensure that $split errors when given an empty separator.
 pipeline = {
-    $project: {split: {$split: ["abc", ""]}}
+    $project: {split: {$split: ["abc", ""]}},
 };
 assertErrorCode(coll, pipeline, 40087);

@@ -7,7 +7,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getCollectionUuid(conn, dbName, collName) {
     const listCollectionRes = assert.commandWorked(
-        conn.getDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}));
+        conn.getDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}),
+    );
     return listCollectionRes.cursor.firstBatch[0].info.uuid;
 }
 
@@ -48,7 +49,7 @@ const rsOptions = {
     setParameter: {
         periodicNoopIntervalSecs: 1,
         writePeriodicNoops: true,
-    }
+    },
 };
 const st = new ShardingTest({
     shards: 2,
@@ -68,35 +69,36 @@ function runTest(testName, setUpFunc, runCmdFunc) {
 
     const numDocs = 10;
     for (let i = 0; i < numDocs / 2; i++) {
-        assert.commandWorked(testColl.insert([
-            {_id: UUID(), x: -i, y: -i},
-            {_id: UUID(), x: i, y: i},
-        ]));
+        assert.commandWorked(
+            testColl.insert([
+                {_id: UUID(), x: -i, y: -i},
+                {_id: UUID(), x: i, y: i},
+            ]),
+        );
     }
 
     const defaultOptions = {};
     const expandedOptions = {showExpandedEvents: true};
 
-    const collectionChangeStreamCursorDefault =
-        testColl.aggregate([{$changeStream: defaultOptions}]);
-    const collectionChangeStreamCursorExpanded =
-        testColl.aggregate([{$changeStream: expandedOptions}]);
+    const collectionChangeStreamCursorDefault = testColl.aggregate([{$changeStream: defaultOptions}]);
+    const collectionChangeStreamCursorExpanded = testColl.aggregate([{$changeStream: expandedOptions}]);
 
     const databaseChangeStreamCursorDefault = testDB.aggregate([{$changeStream: defaultOptions}]);
     const databaseChangeStreamCursorExpanded = testDB.aggregate([{$changeStream: expandedOptions}]);
 
-    const clusterChangeStreamCursorDefault = adminDB.aggregate(
-        [{$changeStream: Object.assign({allChangesForCluster: true}, defaultOptions)}]);
-    const clusterChangeStreamCursorExpanded = adminDB.aggregate(
-        [{$changeStream: Object.assign({allChangesForCluster: true}, expandedOptions)}]);
+    const clusterChangeStreamCursorDefault = adminDB.aggregate([
+        {$changeStream: Object.assign({allChangesForCluster: true}, defaultOptions)},
+    ]);
+    const clusterChangeStreamCursorExpanded = adminDB.aggregate([
+        {$changeStream: Object.assign({allChangesForCluster: true}, expandedOptions)},
+    ]);
 
     const collUuidBefore = getCollectionUuid(st.s, testDbName, testCollName);
     runCmdFunc(st, testDbName, testCollName);
     const collUuidAfter = getCollectionUuid(st.s, testDbName, testCollName);
 
     const newDoc = {_id: UUID(), x: 100, y: 100};
-    const res =
-        assert.commandWorked(testDB.runCommand({insert: testCollName, documents: [newDoc]}));
+    const res = assert.commandWorked(testDB.runCommand({insert: testCollName, documents: [newDoc]}));
     const insertTs = res.operationTime;
 
     const validateEvents = (events, isExpanded) => {
@@ -174,15 +176,16 @@ const testCases = [];
 //   collection exists as an empty collection on shard0.
 const setUp = (st, testDbName, testCollName) => {
     const testNs = testDbName + "." + testCollName;
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: testDbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: testDbName, primaryShard: st.shard1.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: testNs, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: testNs, middle: {x: 0}}));
 
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: testNs, find: {x: MinKey}, to: st.shard0.shardName, _waitForDelete: true}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: testNs, find: {x: MinKey}, to: st.shard1.shardName, _waitForDelete: true}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: testNs, find: {x: MinKey}, to: st.shard0.shardName, _waitForDelete: true}),
+    );
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: testNs, find: {x: MinKey}, to: st.shard1.shardName, _waitForDelete: true}),
+    );
 };
 
 // To achieve (3):
@@ -193,17 +196,18 @@ const runReshardCollection = (st, testDbName, testCollName) => {
 
     const zoneName = "zoneA";
     assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: zoneName}));
-    assert.commandWorked(st.s.adminCommand({
-        reshardCollection: testNs,
-        numInitialChunks: 1,
-        key: {x: 1, y: 1},
-        zones: [{min: {x: MinKey, y: MinKey}, max: {x: MaxKey, y: MaxKey}, zone: zoneName}]
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            reshardCollection: testNs,
+            numInitialChunks: 1,
+            key: {x: 1, y: 1},
+            zones: [{min: {x: MinKey, y: MinKey}, max: {x: MaxKey, y: MaxKey}, zone: zoneName}],
+        }),
+    );
 };
 const runUnshardCollection = (st, testDbName, testCollName) => {
     const testNs = testDbName + "." + testCollName;
-    assert.commandWorked(
-        st.s.adminCommand({unshardCollection: testNs, toShard: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({unshardCollection: testNs, toShard: st.shard1.shardName}));
 };
 
 testCases.push({

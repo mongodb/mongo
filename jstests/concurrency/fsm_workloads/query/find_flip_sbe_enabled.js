@@ -11,7 +11,7 @@
  *     assumes_balancer_off,
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     let data = {originalParamValues: {}};
 
     function getCollectionName(collName) {
@@ -20,33 +20,30 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         cluster.executeOnMongodNodes((db) => {
-            const originalParamValue =
-                db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
+            const originalParamValue = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
             assert.commandWorked(originalParamValue);
             assert(originalParamValue.hasOwnProperty("internalQueryFrameworkControl"));
-            this.originalParamValues[db.getMongo().host] =
-                originalParamValue.internalQueryFrameworkControl;
+            this.originalParamValues[db.getMongo().host] = originalParamValue.internalQueryFrameworkControl;
         });
 
         const coll = db.getCollection(getCollectionName(collName));
         for (let i = 0; i < 10; ++i) {
-            assert.commandWorked(
-                coll.insert({_id: i, x: i.toString(), y: i.toString(), z: i.toString()}));
+            assert.commandWorked(coll.insert({_id: i, x: i.toString(), y: i.toString(), z: i.toString()}));
         }
 
         assert.commandWorked(coll.createIndex({x: 1}));
         assert.commandWorked(coll.createIndex({y: 1}));
     }
 
-    let states = (function() {
+    let states = (function () {
         function setForceClassicEngineOn(db, collName) {
-            assert.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+            );
         }
 
         function setForceClassicEngineOff(db, collName) {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
         }
 
         function runQueriesAndCheckResults(db, collName) {
@@ -59,7 +56,7 @@ export const $config = (function() {
                     assert.eq(res[0]._id, i);
                 } catch (e) {
                     if (e.code !== ErrorCodes.QueryPlanKilled) {
-                        throw e;  // This is an unexpected error, so we throw it again.
+                        throw e; // This is an unexpected error, so we throw it again.
                     }
                 }
             }
@@ -68,16 +65,18 @@ export const $config = (function() {
         function createIndex(db, collName) {
             const coll = db.getCollection(getCollectionName(collName));
             const res = coll.createIndex({z: 1});
-            assert(res.ok === 1 || res.code === ErrorCodes.IndexBuildAlreadyInProgress ||
-                       res.code == ErrorCodes.IndexBuildAborted,
-                   "Create index failed: " + tojson(res));
+            assert(
+                res.ok === 1 ||
+                    res.code === ErrorCodes.IndexBuildAlreadyInProgress ||
+                    res.code == ErrorCodes.IndexBuildAborted,
+                "Create index failed: " + tojson(res),
+            );
         }
 
         function dropIndex(db, collName) {
             const coll = db.getCollection(getCollectionName(collName));
             const res = coll.dropIndex({z: 1});
-            assert(res.ok === 1 || res.code === ErrorCodes.IndexNotFound,
-                   "Drop index failed: " + tojson(res));
+            assert(res.ok === 1 || res.code === ErrorCodes.IndexNotFound, "Drop index failed: " + tojson(res));
         }
 
         return {
@@ -85,7 +84,7 @@ export const $config = (function() {
             setForceClassicEngineOff: setForceClassicEngineOff,
             runQueriesAndCheckResults: runQueriesAndCheckResults,
             createIndex: createIndex,
-            dropIndex: dropIndex
+            dropIndex: dropIndex,
         };
     })();
 
@@ -93,13 +92,13 @@ export const $config = (function() {
         setForceClassicEngineOn: {
             setForceClassicEngineOn: 0.1,
             setForceClassicEngineOff: 0.1,
-            runQueriesAndCheckResults: 0.8
+            runQueriesAndCheckResults: 0.8,
         },
 
         setForceClassicEngineOff: {
             setForceClassicEngineOn: 0.1,
             setForceClassicEngineOff: 0.1,
-            runQueriesAndCheckResults: 0.8
+            runQueriesAndCheckResults: 0.8,
         },
 
         runQueriesAndCheckResults: {
@@ -114,7 +113,7 @@ export const $config = (function() {
             setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.78,
             createIndex: 0.01,
-            dropIndex: 0.01
+            dropIndex: 0.01,
         },
 
         dropIndex: {
@@ -122,27 +121,29 @@ export const $config = (function() {
             setForceClassicEngineOff: 0.1,
             runQueriesAndCheckResults: 0.78,
             createIndex: 0.02,
-        }
+        },
     };
 
     function teardown(db, collName, cluster) {
         // Restore the original state of the internalQueryFrameworkControl parameter.
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryFrameworkControl: this.originalParamValues[db.getMongo().host]
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryFrameworkControl: this.originalParamValues[db.getMongo().host],
+                }),
+            );
         });
     }
 
     return {
         threadCount: 10,
         iterations: 100,
-        startState: 'setForceClassicEngineOff',
+        startState: "setForceClassicEngineOff",
         states: states,
         transitions: transitions,
         setup: setup,
         teardown: teardown,
-        data: data
+        data: data,
     };
 })();

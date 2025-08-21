@@ -18,8 +18,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function setDefaultReadMaxTimeMS(db, newValue) {
-    assert.commandWorked(
-        db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
+    assert.commandWorked(db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
 
     // Currently, the mongos cluster parameter cache is not updated on setClusterParameter. An
     // explicit call to getClusterParameter will refresh the cache.
@@ -32,7 +31,7 @@ function runTests(conn, directConn) {
     let connectionsToCheck = [adminDB];
 
     // Create the admin user, which is used to insert.
-    adminDB.createUser({user: 'admin', pwd: 'admin', roles: ['root']});
+    adminDB.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     assert.eq(1, adminDB.auth("admin", "admin"));
 
     const testDB = adminDB.getSiblingDB(dbName);
@@ -44,19 +43,18 @@ function runTests(conn, directConn) {
     }
 
     // Prepare a regular user without the 'bypassDefaultMaxTimeMS' privilege.
-    adminDB.createUser({user: 'regularUser', pwd: 'password', roles: ["readWriteAnyDatabase"]});
+    adminDB.createUser({user: "regularUser", pwd: "password", roles: ["readWriteAnyDatabase"]});
     // Prepare a user through the direct connection to the shard for getting serverStatus.
     if (directConn) {
         assert.eq(1, directConn.getDB("local").auth("__system", "foopdedoop"));
-        directConn.getDB("admin").createUser(
-            {user: "directUser", pwd: "password", roles: ["root"]});
-        const directDB = new Mongo(directConn.host).getDB('admin');
-        assert(directDB.auth('directUser', 'password'), "Auth failed");
+        directConn.getDB("admin").createUser({user: "directUser", pwd: "password", roles: ["root"]});
+        const directDB = new Mongo(directConn.host).getDB("admin");
+        assert(directDB.auth("directUser", "password"), "Auth failed");
         connectionsToCheck.push(directDB);
     }
 
-    const regularUserConn = new Mongo(conn.host).getDB('admin');
-    assert(regularUserConn.auth('regularUser', 'password'), "Auth failed");
+    const regularUserConn = new Mongo(conn.host).getDB("admin");
+    assert(regularUserConn.auth("regularUser", "password"), "Auth failed");
     const regularUserDB = regularUserConn.getSiblingDB(dbName);
 
     // Sets the default maxTimeMS for read operations with a small value.
@@ -77,27 +75,32 @@ function runTests(conn, directConn) {
     // Times out due to the default value.
     assertCommandFailedWithMaxTimeMSExpired(
         {find: collName, filter: {$where: "sleep(1000); return true;"}},
-        "killedDueToDefaultMaxTimeMSExpired");
+        "killedDueToDefaultMaxTimeMSExpired",
+    );
 
     // Times out due to the request value.
     assertCommandFailedWithMaxTimeMSExpired(
         {find: collName, filter: {$where: "sleep(1000); return true;"}, maxTimeMS: 2000},
-        "killedDueToMaxTimeMSExpired");
+        "killedDueToMaxTimeMSExpired",
+    );
 
     // Times out due to the request value that is equal to the default value.
     assertCommandFailedWithMaxTimeMSExpired(
         {find: collName, filter: {$where: "sleep(1000); return true;"}, maxTimeMS: 1000},
-        "killedDueToMaxTimeMSExpired");
+        "killedDueToMaxTimeMSExpired",
+    );
 
     // Times out due to the default value.
     assertCommandFailedWithMaxTimeMSExpired(
         {count: collName, query: {$where: "sleep(1000); return true;"}},
-        "killedDueToDefaultMaxTimeMSExpired");
+        "killedDueToDefaultMaxTimeMSExpired",
+    );
 
     // Times out due to the default value.
     assertCommandFailedWithMaxTimeMSExpired(
         {distinct: collName, key: "a", query: {$where: "sleep(1000); return true;"}},
-        "killedDueToDefaultMaxTimeMSExpired");
+        "killedDueToDefaultMaxTimeMSExpired",
+    );
 
     adminDB.logout();
     regularUserDB.logout();
@@ -116,8 +119,8 @@ const st = new ShardingTest({
     mongos: 1,
     shards: {nodes: 1},
     config: {nodes: 1},
-    keyFile: 'jstests/libs/key1',
-    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
+    keyFile: "jstests/libs/key1",
+    mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
 });
 // Ensures the command times out on the shard but not the router.
 const mongosFP = configureFailPoint(st.s.getDB("admin"), "maxTimeNeverTimeOut");

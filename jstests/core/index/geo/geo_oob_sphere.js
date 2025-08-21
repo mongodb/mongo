@@ -16,25 +16,28 @@ assert.commandWorked(coll.insert({loc: {x: 30, y: 91}}));
 
 assert.commandWorked(coll.createIndex({loc: "2d"}));
 
-assert.throws(function() {
+assert.throws(function () {
     coll.find({loc: {$nearSphere: [30, 91], $maxDistance: 0.25}}).count();
 });
 
-assert.throws(function() {
+assert.throws(function () {
     coll.find({loc: {$within: {$centerSphere: [[-180, -91], 0.25]}}}).count();
 });
 
 // In a spherical geometry, this point is out-of-bounds.
-assert.commandFailedWithCode(coll.runCommand("find", {filter: {loc: {$nearSphere: [179, -91]}}}),
-                             2);
-assert.commandFailedWithCode(coll.runCommand("aggregate", {
-    cursor: {},
-    pipeline: [{
-        $geoNear: {
-            near: [179, -91],
-            distanceField: "dis",
-            spherical: true,
-        }
-    }]
-}),
-                             2);
+assert.commandFailedWithCode(coll.runCommand("find", {filter: {loc: {$nearSphere: [179, -91]}}}), 2);
+assert.commandFailedWithCode(
+    coll.runCommand("aggregate", {
+        cursor: {},
+        pipeline: [
+            {
+                $geoNear: {
+                    near: [179, -91],
+                    distanceField: "dis",
+                    spherical: true,
+                },
+            },
+        ],
+    }),
+    2,
+);

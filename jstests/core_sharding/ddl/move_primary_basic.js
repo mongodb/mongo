@@ -14,27 +14,27 @@
  * ]
  */
 
-import {getRandomShardName} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 {
-    jsTest.log('Fail with missing destination shard');
+    jsTest.log("Fail with missing destination shard");
 
     assert.commandFailed(db.adminCommand({movePrimary: db.getName()}));
 }
 
 {
-    jsTest.log('Fail with invalid destination shard');
+    jsTest.log("Fail with invalid destination shard");
 
-    const invalidShardNames = ['', 'unknown', 'nonExistingShard', 'shard1000'];
+    const invalidShardNames = ["", "unknown", "nonExistingShard", "shard1000"];
 
     // Move primary with non existing shard must fail even if the database does not exists
-    invalidShardNames.forEach(invalidShardName => {
+    invalidShardNames.forEach((invalidShardName) => {
         assert.commandFailed(db.adminCommand({movePrimary: db.getName(), to: invalidShardName}));
     });
 
     // Move primary with non existing shard must fail when the database exists
     db.coll.insertOne({a: 1});
-    invalidShardNames.forEach(invalidShardName => {
+    invalidShardNames.forEach((invalidShardName) => {
         assert.commandFailed(db.adminCommand({movePrimary: db.getName(), to: invalidShardName}));
     });
     assert.eq(1, db.coll.countDocuments({}));
@@ -42,31 +42,37 @@ import {getRandomShardName} from 'jstests/libs/sharded_cluster_fixture_helpers.j
 }
 
 {
-    jsTest.log('Fail with internal databases');
-    const internalDBs = ['config', 'admin', 'local'];
+    jsTest.log("Fail with internal databases");
+    const internalDBs = ["config", "admin", "local"];
 
     const validShardId = getRandomShardName(db);
-    internalDBs.forEach(dbName => {
-        assert.commandFailed(db.adminCommand({movePrimary: dbName, to: validShardId}),
-                             `movePrimary succeeded on internal database ${dbName}`);
+    internalDBs.forEach((dbName) => {
         assert.commandFailed(
-            db.adminCommand({movePrimary: dbName, to: 'nonExistingShard'}),
-            `movePrimary succeeded on internal database ${dbName} and non existing shard`);
+            db.adminCommand({movePrimary: dbName, to: validShardId}),
+            `movePrimary succeeded on internal database ${dbName}`,
+        );
         assert.commandFailed(
-            db.adminCommand({movePrimary: dbName, to: 'config'}),
-            `movePrimary succeeded on internal database ${dbName} and non existing 'config' shard`);
+            db.adminCommand({movePrimary: dbName, to: "nonExistingShard"}),
+            `movePrimary succeeded on internal database ${dbName} and non existing shard`,
+        );
+        assert.commandFailed(
+            db.adminCommand({movePrimary: dbName, to: "config"}),
+            `movePrimary succeeded on internal database ${dbName} and non existing 'config' shard`,
+        );
     });
 }
 
 {
     jsTest.log("Fail with invalid db name");
 
-    const invalidDbNames = ['', 'a.b'];
+    const invalidDbNames = ["", "a.b"];
 
     const validShardId = getRandomShardName(db);
-    invalidDbNames.forEach(dbName => {
-        assert.commandFailed(db.adminCommand({movePrimary: dbName, to: validShardId}),
-                             `movePrimary succeeded on invalid database name '${dbName}'`);
+    invalidDbNames.forEach((dbName) => {
+        assert.commandFailed(
+            db.adminCommand({movePrimary: dbName, to: validShardId}),
+            `movePrimary succeeded on invalid database name '${dbName}'`,
+        );
     });
 }
 
@@ -74,7 +80,8 @@ import {getRandomShardName} from 'jstests/libs/sharded_cluster_fixture_helpers.j
     // Fail against a non-admin database.
     assert.commandFailedWithCode(
         db.runCommand({movePrimary: db.getName(), to: getRandomShardName(db)}),
-        ErrorCodes.Unauthorized);
+        ErrorCodes.Unauthorized,
+    );
 }
 
 {

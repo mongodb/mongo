@@ -6,7 +6,8 @@ const now = new Date();
 // Note - month is 0-indexed, so 11 is December.
 if (now.getMonth() == 11 && now.getDate() == 31 && now.getHours() == 23) {
     jsTestLog(
-        "Deterministic certificate generation relies on the current year being constant; skipping test as there is less than an hour until the year changes.");
+        "Deterministic certificate generation relies on the current year being constant; skipping test as there is less than an hour until the year changes.",
+    );
     quit();
 }
 
@@ -46,7 +47,6 @@ assert.eq("", diffout, diffout);
 // Run mkcert on the apple-certs.yml definitions file, which contains pkcs12 certificates, and
 // ensure a .pfx file was generated.
 jsTest.log("Running apple certs");
-res = runNonMongoProgram(
-    getPython3Binary(), "-m", "x509.mkcert", "-o", genpath, "--config", "x509/apple-certs.yml");
+res = runNonMongoProgram(getPython3Binary(), "-m", "x509.mkcert", "-o", genpath, "--config", "x509/apple-certs.yml");
 assert.eq(res, 0);
 assert(fileExists(genpath + "macos-trusted-server.pfx"));

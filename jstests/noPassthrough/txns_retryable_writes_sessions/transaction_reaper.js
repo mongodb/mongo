@@ -18,15 +18,15 @@ function Repl(lifetime) {
     this.rst.initiate();
 }
 
-Repl.prototype.stop = function() {
+Repl.prototype.stop = function () {
     this.rst.stopSet();
 };
 
-Repl.prototype.getConn = function() {
+Repl.prototype.getConn = function () {
     return this.rst.getPrimary();
 };
 
-Repl.prototype.getTransactionConn = function() {
+Repl.prototype.getTransactionConn = function () {
     return this.rst.getPrimary();
 };
 
@@ -39,8 +39,7 @@ function Sharding(lifetime) {
             rs: true,
             rsOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: lifetime}},
             rs0: {nodes: 1},
-            mongosOptions:
-                {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
+            mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
         },
     });
 
@@ -49,23 +48,22 @@ function Sharding(lifetime) {
 
     // Ensure that the sessions collection exists.
     assert.commandWorked(this.st.c0.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
-    assert.commandWorked(
-        this.st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
+    assert.commandWorked(this.st.rs0.getPrimary().getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
 
     // Remove the session created by the above shardCollection
     this.st.s.getDB("config").system.sessions.remove({});
     this.getTransactionConn().getDB("config").transactions.remove({});
 }
 
-Sharding.prototype.stop = function() {
+Sharding.prototype.stop = function () {
     this.st.stop();
 };
 
-Sharding.prototype.getConn = function() {
+Sharding.prototype.getConn = function () {
     return this.st.s0;
 };
 
-Sharding.prototype.getTransactionConn = function() {
+Sharding.prototype.getTransactionConn = function () {
     return this.st.rs0.getPrimary();
 };
 
@@ -106,35 +104,34 @@ function Fixture(impl) {
     this.assertOutstandingSessions(nSessions);
 }
 
-Fixture.prototype.assertOutstandingTransactions = function(count) {
+Fixture.prototype.assertOutstandingTransactions = function (count) {
     assert.eq(count, this.transactionConn.getDB("config").transactions.count());
 };
 
-Fixture.prototype.assertOutstandingSessions = function(count) {
+Fixture.prototype.assertOutstandingSessions = function (count) {
     assert.eq(count, this.getDB("config").system.sessions.count());
 };
 
-Fixture.prototype.refresh = function() {
+Fixture.prototype.refresh = function () {
     assert.commandWorked(this.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1}));
 };
 
-Fixture.prototype.reap = function() {
-    assert.commandWorked(
-        this.transactionConn.getDB("admin").runCommand({reapLogicalSessionCacheNow: 1}));
+Fixture.prototype.reap = function () {
+    assert.commandWorked(this.transactionConn.getDB("admin").runCommand({reapLogicalSessionCacheNow: 1}));
 };
 
-Fixture.prototype.getDB = function(db) {
+Fixture.prototype.getDB = function (db) {
     return this.conn.getDB(db);
 };
 
-Fixture.prototype.stop = function() {
-    this.sessions.forEach(function(session) {
+Fixture.prototype.stop = function () {
+    this.sessions.forEach(function (session) {
         session.endSession();
     });
     return this.impl.stop();
 };
 
-[Repl, Sharding].forEach(function(Impl) {
+[Repl, Sharding].forEach(function (Impl) {
     {
         var fixture = new Fixture(new Impl(-1));
         // Remove a session

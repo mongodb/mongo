@@ -9,8 +9,8 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const dbName = 'test';
-const collectionName = 'coll';
+const dbName = "test";
+const collectionName = "coll";
 
 // How many documents to insert on the primary prior to
 // starting initial-sync.
@@ -40,7 +40,7 @@ for (let i = 0; i < initialDocs; ++i) {
 // Add a secondary.
 const secondary = rst.add({
     rsConfig: {votes: 0, priority: 0},
-    setParameter: {"numInitialSyncAttempts": 1, 'collectionClonerBatchSize': clonerBatchSize}
+    setParameter: {"numInitialSyncAttempts": 1, "collectionClonerBatchSize": clonerBatchSize},
 });
 secondary.setSecondaryOk();
 const secondaryColl = secondary.getDB(dbName).getCollection(collectionName);
@@ -48,9 +48,9 @@ const secondaryColl = secondary.getDB(dbName).getCollection(collectionName);
 // We set the collectionClonerBatchSize low above, so we will definitely hit
 // this fail-point and hang after the first batch is applied. While the
 // secondary is hung we clone the problematic document.
-const failPoint = configureFailPoint(secondary,
-                                     "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
-                                     {nss: secondaryColl.getFullName()});
+const failPoint = configureFailPoint(secondary, "initialSyncHangCollectionClonerAfterHandlingBatchResponse", {
+    nss: secondaryColl.getFullName(),
+});
 rst.reInitiate();
 failPoint.wait();
 

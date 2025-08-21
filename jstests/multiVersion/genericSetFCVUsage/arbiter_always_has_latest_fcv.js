@@ -10,18 +10,19 @@ function runTest(FCV) {
 
     const primary = rst.getPrimary();
     if (FCV != latestFCV) {
-        assert.commandWorked(primary.getDB("admin").runCommand(
-            {setFeatureCompatibilityVersion: FCV, confirm: true}));
+        assert.commandWorked(primary.getDB("admin").runCommand({setFeatureCompatibilityVersion: FCV, confirm: true}));
     }
 
     const primaryFCV = assert.commandWorked(
-        primary.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+        primary.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+    );
     assert.eq(primaryFCV.featureCompatibilityVersion.version, FCV, tojson(primaryFCV));
 
     // The arbiter should always have an FCV matching kLatest.
     const arbiter = rst.getArbiter();
     const arbiterFCV = assert.commandWorked(
-        arbiter.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+        arbiter.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+    );
     assert.eq(arbiterFCV.featureCompatibilityVersion.version, latestFCV, tojson(arbiterFCV));
     rst.stopSet();
 }

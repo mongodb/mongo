@@ -17,8 +17,10 @@ const collName = "collmod_without_uuid";
 
 function checkUUIDs() {
     let infos = db.getCollectionInfos();
-    assert(infos.every((coll) => coll.name != collName || coll.info.uuid != undefined),
-           "Not all collections have UUIDs: " + tojson({infos}));
+    assert(
+        infos.every((coll) => coll.name != collName || coll.info.uuid != undefined),
+        "Not all collections have UUIDs: " + tojson({infos}),
+    );
 }
 
 db[collName].drop();

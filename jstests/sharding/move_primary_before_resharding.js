@@ -26,10 +26,8 @@ assert.neq(originalCollInfo, null, "failed to find sharded collection before res
 
 const st = reshardingTest._st;
 // Move chunk to and from donorShard to warm up config server CatalogCache
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: collName, find: {oldKey: 0}, to: donorShardName}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: collName, find: {oldKey: 0}, to: recipientShardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: collName, find: {oldKey: 0}, to: donorShardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: collName, find: {oldKey: 0}, to: recipientShardName}));
 
 assert.commandWorked(st.s.adminCommand({movePrimary: "reshardingDb", to: donorShardName}));
 
@@ -42,8 +40,10 @@ reshardingTest.withReshardingInBackground({
     newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardName}],
 });
 
-assert(st.shard1.getCollection(collName).exists(),
-       "Collection does not exist on shard1-recipient0 despite the shard having chunks");
+assert(
+    st.shard1.getCollection(collName).exists(),
+    "Collection does not exist on shard1-recipient0 despite the shard having chunks",
+);
 const newCollInfo = sourceCollection.exists();
 
 // There should be a catalog entry present in new primary shard

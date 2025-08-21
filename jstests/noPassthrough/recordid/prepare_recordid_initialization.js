@@ -50,35 +50,38 @@ let replTest = new ReplSetTest({
             // necessary to predictably exercise the minimum visible timestamp initialization of
             // collections and indexes across a restart.
             minSnapshotHistoryWindowInSeconds: 0,
-        }
-    }
+        },
+    },
 });
 replTest.startSet();
 replTest.initiate();
 let primary = replTest.getPrimary();
 let coll = primary.getDB("test")["foo"];
 
-let origInsertTs = primary.getDB("test").runCommand(
-    {insert: "foo", documents: [{_id: 1}], writeConcern: {w: "majority"}})["operationTime"];
+let origInsertTs = primary
+    .getDB("test")
+    .runCommand({insert: "foo", documents: [{_id: 1}], writeConcern: {w: "majority"}})["operationTime"];
 
 // Pin with an arbitrarily small timestamp. Let the rounding tell us where the pin ended up. The
 // write to the `mdb_testing.pinned_timestamp` collection is not logged/replayed during replication
 // recovery. Repinning across startup happens before replication recovery. Do a majority write for
 // predictability of the test.
-assert.commandWorked(primary.adminCommand(
-    {"pinHistoryReplicated": incTs(origInsertTs), round: true, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({"pinHistoryReplicated": incTs(origInsertTs), round: true, writeConcern: {w: "majority"}}),
+);
 
 let s1 = primary.startSession();
 let s1DB = s1.getDatabase("test");
 let s1Coll = s1DB.getCollection("foo");
 s1.startTransaction();
 
-assert.commandWorked(s1Coll.insert({_id: 2, prepared: true}));  // RID: 2
+assert.commandWorked(s1Coll.insert({_id: 2, prepared: true})); // RID: 2
 let prepTs = PrepareHelpers.prepareTransaction(s1);
 
-assert.commandWorked(coll.insert({_id: 3, cnt: 1}));  // RID: 3
-let readCollidingTs = assert.commandWorked(primary.getDB("test").runCommand(
-    {insert: "foo", documents: [{_id: 4, cnt: 1}]}))["operationTime"];  // RID: 4
+assert.commandWorked(coll.insert({_id: 3, cnt: 1})); // RID: 3
+let readCollidingTs = assert.commandWorked(
+    primary.getDB("test").runCommand({insert: "foo", documents: [{_id: 4, cnt: 1}]}),
+)["operationTime"]; // RID: 4
 assert.commandWorked(coll.remove({_id: 4}));
 
 // After deleting _id: 4, the highest visible RID will be 3. When reconstructing the prepared insert
@@ -87,8 +90,7 @@ assert.commandWorked(coll.remove({_id: 4}));
 // a) if recordIdsReplicated:true, replaying the prepare oplog entry will give the previously
 // inserted document the same RID it had then - RID: 2 - as this info is present in the oplog entry.
 // b) if recordIdsReplicated:false, determine that RID 4 is not visible and insert at RID 5.
-let preparedRecordId =
-    (primary.getDB('test').getCollectionInfos({name: 'foo'})[0].options.recordIdsReplicated)
+let preparedRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].options.recordIdsReplicated
     ? NumberLong(2)
     : NumberLong(5);
 replTest.restart(primary);
@@ -101,41 +103,44 @@ const txnNumber = s1.getTxnNumber_forTesting();
 s1 = PrepareHelpers.createSessionWithGivenId(primary, lsid);
 s1.setTxnNumber_forTesting(txnNumber);
 let sessionDb = s1.getDatabase("test");
-assert.commandWorked(sessionDb.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: prepTs,
-    txnNumber: NumberLong(txnNumber),
-    autocommit: false,
-}));
+assert.commandWorked(
+    sessionDb.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: prepTs,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
+);
 
 let s2 = primary.startSession();
 sessionDb = s2.getDatabase("test");
 s2.startTransaction({readConcern: {level: "snapshot", atClusterTime: readCollidingTs}});
 let docs = sessionDb["foo"].find().showRecordId().toArray();
-assert(arrayEq(docs,
-               [
-                   {"_id": 1, "$recordId": NumberLong(1)},
-                   {"_id": 3, "cnt": 1, "$recordId": NumberLong(3)},
-                   {"_id": 4, "cnt": 1, "$recordId": NumberLong(4)},
-                   {"_id": 2, "prepared": true, "$recordId": preparedRecordId}
-               ]),
-       tojson(docs));
+assert(
+    arrayEq(docs, [
+        {"_id": 1, "$recordId": NumberLong(1)},
+        {"_id": 3, "cnt": 1, "$recordId": NumberLong(3)},
+        {"_id": 4, "cnt": 1, "$recordId": NumberLong(4)},
+        {"_id": 2, "prepared": true, "$recordId": preparedRecordId},
+    ]),
+    tojson(docs),
+);
 assert.commandWorked(s2.commitTransaction_forTesting());
 
 coll = primary.getDB("test")["foo"];
-assert.commandWorked(coll.insert({_id: 6}));  // Should not re-use any RecordIds
-const newestRecordId =
-    (primary.getDB('test').getCollectionInfos({name: 'foo'})[0].options.recordIdsReplicated)
+assert.commandWorked(coll.insert({_id: 6})); // Should not re-use any RecordIds
+const newestRecordId = primary.getDB("test").getCollectionInfos({name: "foo"})[0].options.recordIdsReplicated
     ? NumberLong(5)
     : NumberLong(6);
 docs = sessionDb["foo"].find().showRecordId().toArray();
-assert(arrayEq(docs,
-               [
-                   {"_id": 1, "$recordId": NumberLong(1)},
-                   {"_id": 3, "cnt": 1, "$recordId": NumberLong(3)},
-                   {"_id": 2, "prepared": true, "$recordId": preparedRecordId},
-                   {"_id": 6, "$recordId": newestRecordId}
-               ]),
-       tojson(docs));
+assert(
+    arrayEq(docs, [
+        {"_id": 1, "$recordId": NumberLong(1)},
+        {"_id": 3, "cnt": 1, "$recordId": NumberLong(3)},
+        {"_id": 2, "prepared": true, "$recordId": preparedRecordId},
+        {"_id": 6, "$recordId": newestRecordId},
+    ]),
+    tojson(docs),
+);
 
 replTest.stopSet();

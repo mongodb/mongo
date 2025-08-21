@@ -23,25 +23,29 @@ const db = session.getDatabase("test");
 
 // We prevent the replica set from advancing oldest_timestamp. This ensures that the snapshot
 // associated with 'clusterTime' is retained for the duration of this test.
-rst.nodes.forEach(conn => {
-    assert.commandWorked(conn.adminCommand({
-        configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
-        mode: "alwaysOn",
-    }));
+rst.nodes.forEach((conn) => {
+    assert.commandWorked(
+        conn.adminCommand({
+            configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+            mode: "alwaysOn",
+        }),
+    );
 });
 
 // We insert a document and save the md5sum associated with the opTime of that write.
 assert.commandWorked(db.mycoll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 const clusterTime = db.getSession().getOperationTime();
 
-let res = assert.commandWorked(db.runCommand({
-    dbHash: 1,
-    readConcern: {level: "snapshot", atClusterTime: clusterTime},
-}));
+let res = assert.commandWorked(
+    db.runCommand({
+        dbHash: 1,
+        readConcern: {level: "snapshot", atClusterTime: clusterTime},
+    }),
+);
 
 const atClusterTimeHashBefore = {
     collections: res.collections,
-    md5: res.md5
+    md5: res.md5,
 };
 
 // We insert another document to ensure the collection's contents have a different md5sum now.
@@ -53,20 +57,23 @@ assert.commandWorked(db.mycoll.insert({_id: 2}, {writeConcern: {w: "majority"}})
 
 // However, using snapshot read concern to read at the opTime of the first insert should return the
 // same md5sum as it did originally.
-res = assert.commandWorked(db.runCommand({
-    dbHash: 1,
-    readConcern: {level: "snapshot", atClusterTime: clusterTime},
-}));
+res = assert.commandWorked(
+    db.runCommand({
+        dbHash: 1,
+        readConcern: {level: "snapshot", atClusterTime: clusterTime},
+    }),
+);
 
 const atClusterTimeHashAfter = {
     collections: res.collections,
-    md5: res.md5
+    md5: res.md5,
 };
 
-assert.eq(atClusterTimeHashBefore,
-          atClusterTimeHashAfter,
-          "primary returned different dbhash after " +
-              "second insert while using \"snapshot\" level read concern");
+assert.eq(
+    atClusterTimeHashBefore,
+    atClusterTimeHashAfter,
+    "primary returned different dbhash after " + 'second insert while using "snapshot" level read concern',
+);
 
 {
     const secondarySession = secondary.startSession({causalConsistency: false});
@@ -75,17 +82,20 @@ assert.eq(atClusterTimeHashBefore,
     // Using snapshot read concern to read at the opTime of the first insert should return the same
     // md5sum on the secondary as it did on the primary.
 
-    let res = assert.commandWorked(secondaryDB.runCommand({
-        dbHash: 1,
-        readConcern: {level: "snapshot", atClusterTime: clusterTime},
-    }));
+    let res = assert.commandWorked(
+        secondaryDB.runCommand({
+            dbHash: 1,
+            readConcern: {level: "snapshot", atClusterTime: clusterTime},
+        }),
+    );
 
     const atClusterTimeSecondaryHash = {collections: res.collections, md5: res.md5};
 
-    assert.eq(atClusterTimeHashBefore,
-              atClusterTimeSecondaryHash,
-              "primary returned different dbhash " +
-                  "while using \"snapshot\" level read concern");
+    assert.eq(
+        atClusterTimeHashBefore,
+        atClusterTimeSecondaryHash,
+        "primary returned different dbhash " + 'while using "snapshot" level read concern',
+    );
 }
 
 session.endSession();

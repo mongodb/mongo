@@ -23,39 +23,50 @@ function runTest(conn, shardingTest = null) {
     const db = conn.getDB(dbName);
 
     // Create a custom role "csm".
-    assert.commandWorked(db.runCommand({
-        createRole: "csm",
-        roles: [],
-        privileges: [],
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            createRole: "csm",
+            roles: [],
+            privileges: [],
+        }),
+    );
 
     // Create a user that has the custom csm role.
-    assert.commandWorked(db.runCommand({
-        createUser: "user1",
-        pwd: "pwd",
-        roles: [{role: "csm", db: dbName}, {role: "read", db: dbName}],
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            createUser: "user1",
+            pwd: "pwd",
+            roles: [
+                {role: "csm", db: dbName},
+                {role: "read", db: dbName},
+            ],
+        }),
+    );
 
     // Create a user that does not have the custom csm role.
-    assert.commandWorked(db.runCommand({
-        createUser: "user2",
-        pwd: "pwd",
-        roles: [{role: "read", db: dbName}],
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            createUser: "user2",
+            pwd: "pwd",
+            roles: [{role: "read", db: dbName}],
+        }),
+    );
 
     // Create a view on top of the "accounts" collection that hides information about the contract
     // (contractDetails) from anyone who does not have the csm role.
-    let pipeline = [{
-        $set: {
-            "contractDetails": {
-                $cond: {
-                    if: {$in: ["csm", '$$USER_ROLES.role']},
-                    then: "$contractDetails",
-                    else: "$$REMOVE"
-                }
-            }
-        }
-    }];
+    let pipeline = [
+        {
+            $set: {
+                "contractDetails": {
+                    $cond: {
+                        if: {$in: ["csm", "$$USER_ROLES.role"]},
+                        then: "$contractDetails",
+                        else: "$$REMOVE",
+                    },
+                },
+            },
+        },
+    ];
     assert.commandWorked(db.createView("accounts_view", collName, pipeline));
     let accounts = db.getCollection(collName);
 
@@ -66,7 +77,7 @@ function runTest(conn, shardingTest = null) {
         contractDetails: {
             contractCreatedOn: new Date("2022-01-15T12:00:00Z"),
             contractExpires: new Date("2023-01-15T12:00:00Z"),
-        }
+        },
     };
     assert.commandWorked(accounts.insert(doc));
 
@@ -104,7 +115,7 @@ const st = new ShardingTest({
     mongos: 1,
     config: 1,
     shards: 2,
-    keyFile: 'jstests/libs/key1',
+    keyFile: "jstests/libs/key1",
 });
 
 runTest(st.s, st);

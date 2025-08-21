@@ -13,9 +13,9 @@ const rst = new ReplSetTest({
     nodes: [
         {rsConfig: {tags: {region: "us", category: "A"}}},
         {rsConfig: {tags: {region: "us", category: "B"}}},
-        {rsConfig: {tags: {region: "eu", category: "A"}}}
+        {rsConfig: {tags: {region: "eu", category: "A"}}},
     ],
-    settings: {getLastErrorModes: {multiRegion: {region: 2}}}
+    settings: {getLastErrorModes: {multiRegion: {region: 2}}},
 });
 
 rst.startSet();
@@ -26,10 +26,9 @@ const primary = rst.getPrimary();
 jsTestLog("Setting up setDefaultRWC thread.");
 let hangDuringSetRWCFP = configureFailPoint(primary, "hangWhileSettingDefaultRWC");
 
-let waitForSetDefaultRWC = startParallelShell(function() {
+let waitForSetDefaultRWC = startParallelShell(function () {
     jsTestLog("Begin setDefaultRWC.");
-    assert.commandWorked(
-        db.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}));
+    assert.commandWorked(db.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}));
     jsTestLog("End setDefaultRWC.");
 }, primary.port);
 
@@ -38,14 +37,14 @@ hangDuringSetRWCFP.wait();
 
 jsTestLog("Attempting a non-WC tag changing reconfig which should not be affected.");
 let cfg = rst.getReplSetConfigFromNode();
-cfg.settings.catchUpTimeoutMillis = 99999;  // unrelated setting
+cfg.settings.catchUpTimeoutMillis = 99999; // unrelated setting
 reconfig(rst, cfg);
 
 jsTestLog("Attempting WC tag-changing reconfig (should fail).");
 cfg = rst.getReplSetConfigFromNode();
 cfg.settings.getLastErrorModes = {
     multiRegion: {region: 2},
-    multiCategory: {category: 2}
+    multiCategory: {category: 2},
 };
 assert.throwsWithCode(() => {
     reconfig(rst, cfg);

@@ -6,19 +6,19 @@ var data = [
     {"description": "[decq021] Normality", "input": "-1234567890123456789012345678901234"},
     {
         "description": "[decq823] values around [u]int32 edges (zeros done earlier)",
-        "input": "-2147483649"
+        "input": "-2147483649",
     },
     {
         "description": "[decq822] values around [u]int32 edges (zeros done earlier)",
-        "input": "-2147483648"
+        "input": "-2147483648",
     },
     {
         "description": "[decq821] values around [u]int32 edges (zeros done earlier)",
-        "input": "-2147483647"
+        "input": "-2147483647",
     },
     {
         "description": "[decq820] values around [u]int32 edges (zeros done earlier)",
-        "input": "-2147483646"
+        "input": "-2147483646",
     },
     {"description": "[decq152] fold-downs (more below)", "input": "-12345"},
     {"description": "[decq154] fold-downs (more below)", "input": "-1234"},
@@ -29,34 +29,34 @@ var data = [
     {"description": "[decq158] fold-downs (more below)", "input": "-12"},
     {
         "description": "[decq122] Nmax and similar",
-        "input": "-9.999999999999999999999999999999999E+6144"
+        "input": "-9.999999999999999999999999999999999E+6144",
     },
     {
         "description": "[decq002] (mostly derived from the Strawman 4 document and examples)",
-        "input": "-7.50"
+        "input": "-7.50",
     },
     {"description": "[decq004] derivative canonical plain strings", "input": "-7.50E+3"},
     {"description": "[decq018] derivative canonical plain strings", "input": "-7.50E-7"},
     {
         "description": "[decq125] Nmax and similar",
-        "input": "-1.234567890123456789012345678901234E+6144"
+        "input": "-1.234567890123456789012345678901234E+6144",
     },
     {
         "description": "[decq131] fold-downs (more below)",
-        "input": "-1.230000000000000000000000000000000E+6144"
+        "input": "-1.230000000000000000000000000000000E+6144",
     },
     {"description": "[decq162] fold-downs (more below)", "input": "-1.23"},
     {
         "description": "[decq176] Nmin and below",
-        "input": "-1.000000000000000000000000000000001E-6143"
+        "input": "-1.000000000000000000000000000000001E-6143",
     },
     {
         "description": "[decq174] Nmin and below",
-        "input": "-1.000000000000000000000000000000000E-6143"
+        "input": "-1.000000000000000000000000000000000E-6143",
     },
     {
         "description": "[decq133] fold-downs (more below)",
-        "input": "-1.000000000000000000000000000000000E+6144"
+        "input": "-1.000000000000000000000000000000000E+6144",
     },
     {"description": "[decq160] fold-downs (more below)", "input": "-1"},
     {"description": "[decq172] Nmin and below", "input": "-1E-6143"},
@@ -84,51 +84,51 @@ var data = [
     {"description": "[decq541] Specials", "input": "NaN"},
     {
         "description": "[decq074] Nmin and below",
-        "input": "1.000000000000000000000000000000000E-6143"
+        "input": "1.000000000000000000000000000000000E-6143",
     },
     {
         "description": "[decq602] fold-down full sequence",
-        "input": "1.000000000000000000000000000000000E+6144"
+        "input": "1.000000000000000000000000000000000E+6144",
     },
     {
         "description": "[decq604] fold-down full sequence",
-        "input": "1.00000000000000000000000000000000E+6143"
+        "input": "1.00000000000000000000000000000000E+6143",
     },
     {
         "description": "[decq606] fold-down full sequence",
-        "input": "1.0000000000000000000000000000000E+6142"
+        "input": "1.0000000000000000000000000000000E+6142",
     },
     {
         "description": "[decq608] fold-down full sequence",
-        "input": "1.000000000000000000000000000000E+6141"
+        "input": "1.000000000000000000000000000000E+6141",
     },
     {
         "description": "[decq610] fold-down full sequence",
-        "input": "1.00000000000000000000000000000E+6140"
+        "input": "1.00000000000000000000000000000E+6140",
     },
     {
         "description": "[decq612] fold-down full sequence",
-        "input": "1.0000000000000000000000000000E+6139"
+        "input": "1.0000000000000000000000000000E+6139",
     },
     {
         "description": "[decq614] fold-down full sequence",
-        "input": "1.000000000000000000000000000E+6138"
+        "input": "1.000000000000000000000000000E+6138",
     },
     {
         "description": "[decq616] fold-down full sequence",
-        "input": "1.00000000000000000000000000E+6137"
+        "input": "1.00000000000000000000000000E+6137",
     },
     {
         "description": "[decq618] fold-down full sequence",
-        "input": "1.0000000000000000000000000E+6136"
+        "input": "1.0000000000000000000000000E+6136",
     },
     {
         "description": "[decq620] fold-down full sequence",
-        "input": "1.000000000000000000000000E+6135"
+        "input": "1.000000000000000000000000E+6135",
     },
     {
         "description": "[decq622] fold-down full sequence",
-        "input": "1.00000000000000000000000E+6134"
+        "input": "1.00000000000000000000000E+6134",
     },
     {"description": "[decq624] fold-down full sequence", "input": "1.0000000000000000000000E+6133"},
     {"description": "[decq626] fold-down full sequence", "input": "1.000000000000000000000E+6132"},
@@ -158,16 +158,16 @@ var data = [
     {"description": "[decq072] Nmin and below", "input": "1E-6143"},
     {
         "description": "[decq076] Nmin and below",
-        "input": "1.000000000000000000000000000000001E-6143"
+        "input": "1.000000000000000000000000000000001E-6143",
     },
     {
         "description": "[decq036] fold-downs (more below)",
-        "input": "1.230000000000000000000000000000000E+6144"
+        "input": "1.230000000000000000000000000000000E+6144",
     },
     {"description": "[decq062] fold-downs (more below)", "input": "1.23"},
     {
         "description": "[decq034] Nmax and similar",
-        "input": "1.234567890123456789012345678901234E+6144"
+        "input": "1.234567890123456789012345678901234E+6144",
     },
     {"description": "[decq441] exponent lengths", "input": "7"},
     {"description": "[decq449] exponent lengths", "input": "7E+5999"},
@@ -180,7 +180,7 @@ var data = [
     {"description": "[decq701] Selected DPD codes", "input": "9"},
     {
         "description": "[decq032] Nmax and similar",
-        "input": "9.999999999999999999999999999999999E+6144"
+        "input": "9.999999999999999999999999999999999E+6144",
     },
     {"description": "[decq702] Selected DPD codes", "input": "10"},
     {"description": "[decq057] fold-downs (more below)", "input": "12"},
@@ -216,39 +216,39 @@ var data = [
     {"description": "[decq743] DPD: one of each of the huffman groups", "input": "877"},
     {
         "description": "[decq753] DPD all-highs cases (includes the 24 redundant codes)",
-        "input": "888"
+        "input": "888",
     },
     {
         "description": "[decq754] DPD all-highs cases (includes the 24 redundant codes)",
-        "input": "889"
+        "input": "889",
     },
     {
         "description": "[decq760] DPD all-highs cases (includes the 24 redundant codes)",
-        "input": "898"
+        "input": "898",
     },
     {
         "description": "[decq764] DPD all-highs cases (includes the 24 redundant codes)",
-        "input": "899"
+        "input": "899",
     },
     {"description": "[decq745] DPD: one of each of the huffman groups", "input": "979"},
     {
         "description": "[decq770] DPD all-highs cases (includes the 24 redundant codes)",
-        "input": "988"
+        "input": "988",
     },
     {
         "description": "[decq774] DPD all-highs cases (includes the 24 redundant codes)",
-        "input": "989"
+        "input": "989",
     },
     {"description": "[decq730] Selected DPD codes", "input": "994"},
     {"description": "[decq731] Selected DPD codes", "input": "995"},
     {"description": "[decq744] DPD: one of each of the huffman groups", "input": "997"},
     {
         "description": "[decq780] DPD all-highs cases (includes the 24 redundant codes)",
-        "input": "998"
+        "input": "998",
     },
     {
         "description": "[decq787] DPD all-highs cases (includes the 24 redundant codes)",
-        "input": "999"
+        "input": "999",
     },
     {"description": "[decq053] fold-downs (more below)", "input": "1234"},
     {"description": "[decq052] fold-downs (more below)", "input": "12345"},
@@ -256,42 +256,42 @@ var data = [
     {"description": "[decq793] Miscellaneous (testers' queries, etc.)", "input": "890000"},
     {
         "description": "[decq824] values around [u]int32 edges (zeros done earlier)",
-        "input": "2147483646"
+        "input": "2147483646",
     },
     {
         "description": "[decq825] values around [u]int32 edges (zeros done earlier)",
-        "input": "2147483647"
+        "input": "2147483647",
     },
     {
         "description": "[decq826] values around [u]int32 edges (zeros done earlier)",
-        "input": "2147483648"
+        "input": "2147483648",
     },
     {
         "description": "[decq827] values around [u]int32 edges (zeros done earlier)",
-        "input": "2147483649"
+        "input": "2147483649",
     },
     {
         "description": "[decq828] values around [u]int32 edges (zeros done earlier)",
-        "input": "4294967294"
+        "input": "4294967294",
     },
     {
         "description": "[decq829] values around [u]int32 edges (zeros done earlier)",
-        "input": "4294967295"
+        "input": "4294967295",
     },
     {
         "description": "[decq830] values around [u]int32 edges (zeros done earlier)",
-        "input": "4294967296"
+        "input": "4294967296",
     },
     {
         "description": "[decq831] values around [u]int32 edges (zeros done earlier)",
-        "input": "4294967297"
+        "input": "4294967297",
     },
     {"description": "[decq022] Normality", "input": "1111111111111111111111111111111111"},
     {"description": "[decq020] Normality", "input": "1234567890123456789012345678901234"},
-    {"description": "[decq550] Specials", "input": "9999999999999999999999999999999999"}
+    {"description": "[decq550] Specials", "input": "9999999999999999999999999999999999"},
 ];
 
-data.forEach(function(testCase) {
+data.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
     var output = NumberDecimal(testCase.input).toString();
     if (testCase.expected) {

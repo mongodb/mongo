@@ -17,32 +17,31 @@ const collName = jsTestName();
 const coll = db[collName];
 
 const vectorSearchClauseAndSearchClause = {
-    score1: [{
-        $vectorSearch: {
-            queryVector: [1.0, 2.0, 3.0],
-            path: "plot_embedding",
-            numCandidates: 300,
-            index: "vector_index",
-            limit: 10
-        }
-    }],
-    search1: [{$search: {index: "search_index", text: {query: "mystery", path: "genres"}}}]
+    score1: [
+        {
+            $vectorSearch: {
+                queryVector: [1.0, 2.0, 3.0],
+                path: "plot_embedding",
+                numCandidates: 300,
+                index: "vector_index",
+                limit: 10,
+            },
+        },
+    ],
+    search1: [{$search: {index: "search_index", text: {query: "mystery", path: "genres"}}}],
 };
 
 const searchMatchAsClause = {
-    score2: [
-        {$search: {index: "search_index", text: {query: "mystery", path: "genres"}}},
-        {$match: {author: "dave"}}
-    ]
+    score2: [{$search: {index: "search_index", text: {query: "mystery", path: "genres"}}}, {$match: {author: "dave"}}],
 };
 
 const scoreInputPipelines = {
     score3: [{$match: {author: "Agatha Christie"}}, {$score: {score: 50.0}}],
-    score4: [{$match: {author: "dave"}}, {$score: {score: 10.0}}]
+    score4: [{$match: {author: "dave"}}, {$score: {score: 10.0}}],
 };
 
 const textMatchClause = {
-    score5: [{$match: {$text: {$search: "coffee"}}}]
+    score5: [{$match: {$text: {$search: "coffee"}}}],
 };
 
 function runPipeline(pipeline) {
@@ -50,173 +49,222 @@ function runPipeline(pipeline) {
 }
 
 // Check that a single input pipeline is allowed.
-assert.commandWorked(runPipeline([{
-    $scoreFusion: {
-        input: {pipelines: searchMatchAsClause, normalization: "none"},
-        combination: {weights: {score2: 5}}
-    }
-}]));
+assert.commandWorked(
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {pipelines: searchMatchAsClause, normalization: "none"},
+                combination: {weights: {score2: 5}},
+            },
+        },
+    ]),
+);
 
 // Error if the weights array doesn't have elements of type safe double
-assert.commandFailedWithCode(runPipeline([{
-                                 $scoreFusion: {
-                                     input: {pipelines: searchMatchAsClause, normalization: "none"},
-                                     combination: {weights: {score2: "hi"}}
-                                 }
-                             }]),
-                             13118);
+assert.commandFailedWithCode(
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {pipelines: searchMatchAsClause, normalization: "none"},
+                combination: {weights: {score2: "hi"}},
+            },
+        },
+    ]),
+    13118,
+);
 
 // Check that an array of ints for weights is a valid input
-assert.commandWorked(runPipeline([{
-    $scoreFusion: {
-        input: {pipelines: vectorSearchClauseAndSearchClause, normalization: "none"},
-        combination: {weights: {score1: 5, search1: 100}}
-    }
-}]));
+assert.commandWorked(
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {pipelines: vectorSearchClauseAndSearchClause, normalization: "none"},
+                combination: {weights: {score1: 5, search1: 100}},
+            },
+        },
+    ]),
+);
 
 // Check that a mixed array of ints/decimals for weights is a valid input
-assert.commandWorked(runPipeline([{
-    $scoreFusion: {
-        input: {pipelines: vectorSearchClauseAndSearchClause, normalization: "none"},
-        combination: {weights: {score1: 5, search1: 100.2}}
-    }
-}]));
+assert.commandWorked(
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {pipelines: vectorSearchClauseAndSearchClause, normalization: "none"},
+                combination: {weights: {score1: 5, search1: 100.2}},
+            },
+        },
+    ]),
+);
 
 // Check that including all optional arguments is parsed correctly
-assert.commandWorked(runPipeline([{
-    $scoreFusion: {
-        input: {pipelines: searchMatchAsClause, normalization: "none"},
-        combination: {weights: {score2: 5}}
-    }
-}]));
+assert.commandWorked(
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {pipelines: searchMatchAsClause, normalization: "none"},
+                combination: {weights: {score2: 5}},
+            },
+        },
+    ]),
+);
 
 // Check that invalid normalization option throws BadValue error. The correct spelling or value
 // is "minMaxScaler" with an e, not "minMaxScalar" with an a.
 assert.commandFailedWithCode(
-    runPipeline([{
-        $scoreFusion: {
-            input: {pipelines: scoreInputPipelines, normalization: "minMaxScalar"},
-            combination: {weights: {score3: 5, score4: 10}}
-        }
-    }]),
-    ErrorCodes.BadValue);
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {pipelines: scoreInputPipelines, normalization: "minMaxScalar"},
+                combination: {weights: {score3: 5, score4: 10}},
+            },
+        },
+    ]),
+    ErrorCodes.BadValue,
+);
 
 // Check that sigmoid option parsed correctly
-assert.commandWorked(runPipeline([{
-    $scoreFusion: {
-        input: {pipelines: scoreInputPipelines, normalization: "sigmoid"},
-        combination: {weights: {score3: 5, score4: 10}}
-    }
-}]));
+assert.commandWorked(
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {pipelines: scoreInputPipelines, normalization: "sigmoid"},
+                combination: {weights: {score3: 5, score4: 10}},
+            },
+        },
+    ]),
+);
 
 // Check that $text match is valid.
 assert.commandWorked(coll.createIndex({text: "text"}));
-assert.commandWorked(
-    runPipeline([{$scoreFusion: {input: {pipelines: textMatchClause, normalization: "none"}}}]));
+assert.commandWorked(runPipeline([{$scoreFusion: {input: {pipelines: textMatchClause, normalization: "none"}}}]));
 
 // Check that unscored pipeline is invalid.
 assert.commandFailedWithCode(
-    runPipeline([{
-        $scoreFusion: {
-            input: {pipelines: {pipeOne: [{$limit: 2}]}, normalization: "none"},
-        }
-    }]),
-    9402500);
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {pipelines: {pipeOne: [{$limit: 2}]}, normalization: "none"},
+            },
+        },
+    ]),
+    9402500,
+);
 
 // Check that non-selection pipeline is invalid
 assert.commandFailedWithCode(
-    runPipeline([{
-        $scoreFusion: {
-            input: {
-                pipelines: {
-                    pipeOne: [{$score: {score: 2, normalization: "none"}}, {$project: {score3: 1}}]
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {
+                    pipelines: {
+                        pipeOne: [{$score: {score: 2, normalization: "none"}}, {$project: {score3: 1}}],
+                    },
+                    normalization: "none",
                 },
-                normalization: "none"
             },
-        }
-    }]),
-    9402502);
+        },
+    ]),
+    9402502,
+);
 
 assert.commandFailedWithCode(
-    runPipeline([{
-        $scoreFusion: {
-            input: {
-                pipelines: {
-                    nested: [{
-                        $scoreFusion: {
-                            input: {
-                                pipelines: {simple: [{$score: {score: "$score_50"}}]},
-                                normalization: "sigmoid"
-                            }
-                        }
-                    }]
-                },
-                normalization: "none"
-            }
-        }
-    }]),
-    10473003);
-
-assert.commandFailedWithCode(runPipeline([{
-                                 $scoreFusion: {
-                                     input: {
-                                         pipelines: {
-                                             nested: [{
-                                                 $rankFusion: {
-                                                     input: {
-                                                         pipelines: {simple: [{$sort: {a: 1}}]},
-                                                     }
-                                                 }
-                                             }]
-                                         },
-                                         normalization: "none"
-                                     }
-                                 }
-                             }]),
-                             10473003);
-
-assert.commandFailedWithCode(
-    runPipeline([{
-        $scoreFusion: {
-            input: {
-                pipelines: {
-                    nested: [
-                        {$score: 10},
-                        {
-                            $scoreFusion: {
-                                input: {
-                                    pipelines: {simple: [{$score: {score: "$score_50"}}]},
-                                    normalization: "sigmoid"
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {
+                    pipelines: {
+                        nested: [
+                            {
+                                $scoreFusion: {
+                                    input: {
+                                        pipelines: {simple: [{$score: {score: "$score_50"}}]},
+                                        normalization: "sigmoid",
+                                    },
                                 },
-                            }
-                        },
-                    ]
+                            },
+                        ],
+                    },
+                    normalization: "none",
                 },
-                normalization: "none"
-            }
-        }
-    }]),
-    10170100);
+            },
+        },
+    ]),
+    10473003,
+);
 
 assert.commandFailedWithCode(
-    runPipeline([{
-        $scoreFusion: {
-            input: {
-                pipelines: {
-                    nested: [
-                        {
-                            $scoreFusion: {
-                                input: {
-                                    pipelines: {simple: [{$score: {score: "$score_50"}}]},
-                                    normalization: "sigmoid"
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {
+                    pipelines: {
+                        nested: [
+                            {
+                                $rankFusion: {
+                                    input: {
+                                        pipelines: {simple: [{$sort: {a: 1}}]},
+                                    },
                                 },
-                            }
-                        },
-                        {$score: 10},
-                    ]
+                            },
+                        ],
+                    },
+                    normalization: "none",
                 },
-                normalization: "none"
-            }
-        }
-    }]),
-    10473003);
+            },
+        },
+    ]),
+    10473003,
+);
+
+assert.commandFailedWithCode(
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {
+                    pipelines: {
+                        nested: [
+                            {$score: 10},
+                            {
+                                $scoreFusion: {
+                                    input: {
+                                        pipelines: {simple: [{$score: {score: "$score_50"}}]},
+                                        normalization: "sigmoid",
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                    normalization: "none",
+                },
+            },
+        },
+    ]),
+    10170100,
+);
+
+assert.commandFailedWithCode(
+    runPipeline([
+        {
+            $scoreFusion: {
+                input: {
+                    pipelines: {
+                        nested: [
+                            {
+                                $scoreFusion: {
+                                    input: {
+                                        pipelines: {simple: [{$score: {score: "$score_50"}}]},
+                                        normalization: "sigmoid",
+                                    },
+                                },
+                            },
+                            {$score: 10},
+                        ],
+                    },
+                    normalization: "none",
+                },
+            },
+        },
+    ]),
+    10473003,
+);

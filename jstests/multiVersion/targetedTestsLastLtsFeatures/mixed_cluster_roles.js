@@ -21,7 +21,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function testCRUD(conn) {
-    const db = conn.getDB('apple');
+    const db = conn.getDB("apple");
     assert.commandWorked(db.foo.insert({x: 1}));
     assert.commandWorked(db.foo.insert({x: -1}));
     assert.commandWorked(db.foo.update({x: 1}, {$set: {y: 1}}));
@@ -40,8 +40,9 @@ function testCRUD(conn) {
 
 function ensureShardingCommandsFail(conn) {
     assert.commandFailedWithCode(
-        conn.getDB('admin').runCommand({_shardsvrCreateCollection: 'test.test', key: {_id: 1}}),
-        ErrorCodes.ShardingStateNotInitialized);
+        conn.getDB("admin").runCommand({_shardsvrCreateCollection: "test.test", key: {_id: 1}}),
+        ErrorCodes.ShardingStateNotInitialized,
+    );
 }
 
 /**
@@ -59,18 +60,18 @@ function ensureShardingCommandsFail(conn) {
  * before the shard identity document was inserted.
  */
 {
-    jsTestLog('Starting a replica set with 4 nodes (only the first node can be elected).');
+    jsTestLog("Starting a replica set with 4 nodes (only the first node can be elected).");
     let rst = new ReplSetTest({
-        name: 'rs',
+        name: "rs",
         nodes: [
             // Only allow elections on node1 to make it easier to control what ClusterRole the
             // primary has.
             {},
             {rsConfig: {priority: 0}},
             {rsConfig: {priority: 0}},
-            {rsConfig: {priority: 0}}
+            {rsConfig: {priority: 0}},
         ],
-        nodeOptions: {binVersion: 'last-lts'}
+        nodeOptions: {binVersion: "last-lts"},
     });
     rst.startSet();
     rst.initiate();
@@ -78,122 +79,123 @@ function ensureShardingCommandsFail(conn) {
     rst.awaitSecondaryNodes();
     let [node0, node1, node2, node3] = rst.nodes;
 
-    jsTestLog('Restarting node1 as shard server and node2 as config server.');
+    jsTestLog("Restarting node1 as shard server and node2 as config server.");
     MongoRunner.stopMongod(node1, null, {noCleanData: true});
     MongoRunner.stopMongod(node2, null, {noCleanData: true});
     node1 = MongoRunner.runMongod({
         noCleanData: true,
-        shardsvr: '',
-        replSet: 'rs',
+        shardsvr: "",
+        replSet: "rs",
         dbpath: node1.dbpath,
         port: node1.port,
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-        }
+        },
     });
     node2 = MongoRunner.runMongod({
         noCleanData: true,
-        configsvr: '',
-        replSet: 'rs',
+        configsvr: "",
+        replSet: "rs",
         dbpath: node2.dbpath,
         port: node2.port,
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-        }
+        },
     });
 
-    jsTestLog('Test with 7.0 node as primary before the shard identity document is inserted.');
+    jsTestLog("Test with 7.0 node as primary before the shard identity document is inserted.");
     assert.eq(rst.getPrimary(), node0);
     testCRUD(node0);
     ensureShardingCommandsFail(node0);
 
-    jsTestLog('Test with shard server primary before the shard identity document is inserted.');
+    jsTestLog("Test with shard server primary before the shard identity document is inserted.");
     MongoRunner.stopMongod(node0, null, {noCleanData: true});
     node0 = MongoRunner.runMongod({
         noCleanData: true,
-        shardsvr: '',
-        replSet: 'rs',
+        shardsvr: "",
+        replSet: "rs",
         dbpath: node0.dbpath,
         port: node0.port,
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-        }
+        },
     });
     assert.eq(rst.getPrimary(), node0);
     testCRUD(node0);
     ensureShardingCommandsFail(node0);
 
-    jsTestLog('Restarting with config server as primary.');
+    jsTestLog("Restarting with config server as primary.");
     MongoRunner.stopMongod(node0, null, {noCleanData: true});
     node0 = MongoRunner.runMongod({
         noCleanData: true,
-        configsvr: '',
-        replSet: 'rs',
+        configsvr: "",
+        replSet: "rs",
         dbpath: node0.dbpath,
         port: node0.port,
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-        }
+        },
     });
 
-    jsTestLog('Upgrading the 7.0 replica set node to a 8.0 config server.');
+    jsTestLog("Upgrading the 7.0 replica set node to a 8.0 config server.");
     MongoRunner.stopMongod(node3, null, {noCleanData: true});
     node3 = MongoRunner.runMongod({
         noCleanData: true,
-        configsvr: '',
-        replSet: 'rs',
+        configsvr: "",
+        replSet: "rs",
         dbpath: node3.dbpath,
         port: node3.port,
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-        }
+        },
     });
 
     jsTestLog(
-        'Wait for config server primary to be writable primary (which implies shard identity document is inserted).');
+        "Wait for config server primary to be writable primary (which implies shard identity document is inserted).",
+    );
     assert.soonNoExcept(() => testCRUD(node0));
 
-    jsTestLog('Checking that the node1 shard server crashes.');
+    jsTestLog("Checking that the node1 shard server crashes.");
     assert.soon(() => !checkProgram(node1.pid).alive);
-    [node0, node2, node3].map(node => checkProgram(node.pid).alive);
+    [node0, node2, node3].map((node) => checkProgram(node.pid).alive);
 
-    jsTestLog('Restarting the crashed node1 server as a config server should work.');
+    jsTestLog("Restarting the crashed node1 server as a config server should work.");
     node1 = MongoRunner.runMongod({
         noCleanData: true,
-        configsvr: '',
-        replSet: 'rs',
+        configsvr: "",
+        replSet: "rs",
         dbpath: node1.dbpath,
         port: node1.port,
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-        }
+        },
     });
-    assert.commandWorked(node1.getDB('admin').runCommand({ping: 1}));
+    assert.commandWorked(node1.getDB("admin").runCommand({ping: 1}));
 
-    jsTestLog('Restarting a config server as a shard server should fail.');
-    rst.awaitSecondaryNodes();  // Ensure shard identity document replicated to secondaries
+    jsTestLog("Restarting a config server as a shard server should fail.");
+    rst.awaitSecondaryNodes(); // Ensure shard identity document replicated to secondaries
     MongoRunner.stopMongod(node2, null, {noCleanData: true});
     assert.throws(() => {
         MongoRunner.runMongod({
             noCleanData: true,
-            shardsvr: '',
-            replSet: 'rs',
+            shardsvr: "",
+            replSet: "rs",
             dbpath: node2.dbpath,
             port: node2.port,
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
-            }
+            },
         });
     });
     node2 = MongoRunner.runMongod({
         noCleanData: true,
-        configsvr: '',
-        replSet: 'rs',
+        configsvr: "",
+        replSet: "rs",
         dbpath: node2.dbpath,
         port: node2.port,
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-        }
+        },
     });
 
     // stopSet() will also check oplogs, preImageCollection, changeCollection and db hashes
@@ -222,65 +224,65 @@ function ensureShardingCommandsFail(conn) {
         shards: 1,
         rs: {nodes: 3},
         configShard: false,
-        nodeOptions: {binVersion: 'last-lts'}
+        nodeOptions: {binVersion: "last-lts"},
     });
 
-    jsTestLog('Restarting a 7.0 config server secondary as a 8.0 shard server should fail.');
+    jsTestLog("Restarting a 7.0 config server secondary as a 8.0 shard server should fail.");
     let configSecondary = st.configRS.getSecondary();
     printjson(configSecondary);
     MongoRunner.stopMongod(configSecondary, null, {noCleanData: true});
     assert.throws(() => {
         MongoRunner.runMongod({
             noCleanData: true,
-            shardsvr: '',
+            shardsvr: "",
             replSet: st.configRS.name,
             dbpath: configSecondary.dbpath,
             port: configSecondary.port,
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
-            }
+            },
         });
     });
 
-    jsTestLog('Restarting a 7.0 config server secondary as a 8.0 config server should work.');
+    jsTestLog("Restarting a 7.0 config server secondary as a 8.0 config server should work.");
     configSecondary = MongoRunner.runMongod({
         noCleanData: true,
-        configsvr: '',
+        configsvr: "",
         replSet: st.configRS.name,
         dbpath: configSecondary.dbpath,
         port: configSecondary.port,
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-        }
+        },
     });
     testCRUD(st.s0);
 
-    jsTestLog('Restarting a 7.0 shard server secondary as a 8.0 config server should fail.');
+    jsTestLog("Restarting a 7.0 shard server secondary as a 8.0 config server should fail.");
     let shardSecondary = st.rs0.getSecondary();
     MongoRunner.stopMongod(shardSecondary, null, {noCleanData: true});
     assert.throws(() => {
         shardSecondary = MongoRunner.runMongod({
             noCleanData: true,
-            configsvr: '',
+            configsvr: "",
             replSet: st.rs0.name,
             dbpath: shardSecondary.dbpath,
             port: shardSecondary.port,
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
-            }
+            },
         });
     });
 
-    jsTestLog('Restarting a 7.0 shard server secondary as a 8.0 shard server should work.');
+    jsTestLog("Restarting a 7.0 shard server secondary as a 8.0 shard server should work.");
     shardSecondary = MongoRunner.runMongod({
         noCleanData: true,
-        shardsvr: '',
+        shardsvr: "",
         replSet: st.rs0.name,
         dbpath: shardSecondary.dbpath,
         port: shardSecondary.port,
         setParameter: {
             featureFlagAllMongodsAreSharded: true,
-        }
+        },
     });
     testCRUD(st.s0);
 

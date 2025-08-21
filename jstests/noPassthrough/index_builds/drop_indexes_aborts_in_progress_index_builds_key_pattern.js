@@ -28,8 +28,9 @@ assert.commandWorked(testDB.getCollection(collName).insert({b: 1}));
 
 IndexBuildTest.pauseIndexBuilds(testDB.getMongo());
 
-const awaitIndexBuild = IndexBuildTest.startIndexBuild(
-    testDB.getMongo(), coll.getFullName(), {a: 1, b: 1}, {}, [ErrorCodes.IndexBuildAborted]);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(testDB.getMongo(), coll.getFullName(), {a: 1, b: 1}, {}, [
+    ErrorCodes.IndexBuildAborted,
+]);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, "a_1_b_1");
 
 const awaitDropIndex = startParallelShell(() => {

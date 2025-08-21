@@ -35,7 +35,7 @@ assert.commandFailed(setparam(admin, {"watchdogPeriodSeconds": 61}));
 // Now test MongoD with it enabled at startup
 //
 const conn = MongoRunner.runMongod({setParameter: "watchdogPeriodSeconds=60"});
-assert.neq(null, conn, 'mongod was unable to start up');
+assert.neq(null, conn, "mongod was unable to start up");
 
 const admin2 = conn.getDB("admin");
 

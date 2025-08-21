@@ -18,8 +18,11 @@ function retryOnNoProgressMade(originalFunc, context, args) {
             if (e instanceof BulkWriteError && e.hasWriteErrors()) {
                 for (let writeErr of e.getWriteErrors()) {
                     if (writeErr.code == ErrorCodes.NoProgressMade) {
-                        print(`No progress made while inserting documents. Received error ${
-                            tojson(writeErr.code)}, Retrying.`);
+                        print(
+                            `No progress made while inserting documents. Received error ${tojson(
+                                writeErr.code,
+                            )}, Retrying.`,
+                        );
                         return false;
                     }
                 }
@@ -44,42 +47,42 @@ const originalDeleteOne = DBCollection.prototype.deleteOne;
 const originalDeleteMany = DBCollection.prototype.deleteMany;
 const originalReplaceOne = DBCollection.prototype.replaceOne;
 
-DBCollection.prototype.insert = function(obj, options) {
+DBCollection.prototype.insert = function (obj, options) {
     return retryOnNoProgressMade(originalInsert, this, [obj, options]);
 };
 
-DBCollection.prototype.insertOne = function(document, options) {
+DBCollection.prototype.insertOne = function (document, options) {
     return retryOnNoProgressMade(originalInsertOne, this, [document, options]);
 };
 
-DBCollection.prototype.insertMany = function(documents, options) {
+DBCollection.prototype.insertMany = function (documents, options) {
     return retryOnNoProgressMade(originalInsertMany, this, [documents, options]);
 };
 
-DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
+DBCollection.prototype.update = function (query, updateSpec, upsert, multi) {
     return retryOnNoProgressMade(originalUpdate, this, [query, updateSpec, upsert, multi]);
 };
 
-DBCollection.prototype.updateOne = function(filter, update, options) {
+DBCollection.prototype.updateOne = function (filter, update, options) {
     return retryOnNoProgressMade(originalUpdateOne, this, [filter, update, options]);
 };
 
-DBCollection.prototype.updateMany = function(filter, update, options) {
+DBCollection.prototype.updateMany = function (filter, update, options) {
     return retryOnNoProgressMade(originalUpdateMany, this, [filter, update, options]);
 };
 
-DBCollection.prototype.remove = function(t, justOne) {
+DBCollection.prototype.remove = function (t, justOne) {
     return retryOnNoProgressMade(originalRemove, this, [t, justOne]);
 };
 
-DBCollection.prototype.deleteOne = function(filter, options) {
+DBCollection.prototype.deleteOne = function (filter, options) {
     return retryOnNoProgressMade(originalDeleteOne, this, [filter, options]);
 };
 
-DBCollection.prototype.deleteMany = function(filter, options) {
+DBCollection.prototype.deleteMany = function (filter, options) {
     return retryOnNoProgressMade(originalDeleteMany, this, [filter, options]);
 };
 
-DBCollection.prototype.replaceOne = function(filter, replacement, options) {
+DBCollection.prototype.replaceOne = function (filter, replacement, options) {
     return retryOnNoProgressMade(originalReplaceOne, this, [filter, replacement, options]);
 };

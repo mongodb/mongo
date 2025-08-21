@@ -5,9 +5,7 @@
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
-import {
-    TestCases
-} from "jstests/libs/query/index_with_hashed_path_prefix_of_nonhashed_path_tests.js";
+import {TestCases} from "jstests/libs/query/index_with_hashed_path_prefix_of_nonhashed_path_tests.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
@@ -15,12 +13,13 @@ import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_paramete
 function setSbe(conn, test, val) {
     const testDb = conn.getDB("test");
     if (test instanceof ShardingTest) {
-        setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(testDb.getMongo()),
-                               "internalQueryFrameworkControl",
-                               val);
+        setParameterOnAllHosts(
+            DiscoverTopology.findNonConfigNodes(testDb.getMongo()),
+            "internalQueryFrameworkControl",
+            val,
+        );
     } else {
-        assert.commandWorked(
-            testDb.adminCommand({setParameter: 1, "internalQueryFrameworkControl": val}));
+        assert.commandWorked(testDb.adminCommand({setParameter: 1, "internalQueryFrameworkControl": val}));
     }
 }
 
@@ -40,8 +39,9 @@ function runTestOnFixtures(runQueriesAndCompareResults) {
     {
         const st = new ShardingTest(Object.assign({shards: 2}));
         const testDB = st.s.getDB("test");
-        assert.commandWorked(testDB.adminCommand(
-            {enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+        );
         runQueriesAndCompareResults(st.s, st);
         st.stop();
     }
@@ -104,18 +104,15 @@ function runTestAsyncAddDropIndex(conn, query, index, indexName, docs, results) 
 function testSuite(conn) {
     const testDb = conn.getDB("test");
     for (let testCase of TestCases) {
-        runTest(conn,
-                testCase.query,
-                testCase.index,
-                testCase.indexName,
-                testCase.docs,
-                testCase.results);
-        runTestAsyncAddDropIndex(conn,
-                                 testCase.query,
-                                 testCase.index,
-                                 testCase.indexName,
-                                 testCase.docs,
-                                 testCase.results);
+        runTest(conn, testCase.query, testCase.index, testCase.indexName, testCase.docs, testCase.results);
+        runTestAsyncAddDropIndex(
+            conn,
+            testCase.query,
+            testCase.index,
+            testCase.indexName,
+            testCase.docs,
+            testCase.results,
+        );
     }
 }
 
@@ -124,13 +121,15 @@ function testPqsCase(conn) {
     const query = [{"$project": {"t": "$a.b"}}];
     const index = {"_id": 1, "a.b": 1, "a": "hashed"};
     const indexName = "aHashed";
-    assert.commandWorked(testDb.adminCommand({
-        setQuerySettings: {aggregate: "c", pipeline: query, $db: "test"},
-        settings: {
-            indexHints: {ns: {db: "test", coll: "c"}, allowedIndexes: [indexName]},
-            queryFramework: "sbe",
-        }
-    }));
+    assert.commandWorked(
+        testDb.adminCommand({
+            setQuerySettings: {aggregate: "c", pipeline: query, $db: "test"},
+            settings: {
+                indexHints: {ns: {db: "test", coll: "c"}, allowedIndexes: [indexName]},
+                queryFramework: "sbe",
+            },
+        }),
+    );
     const docs = [{"_id": 0, "a": {"b": 0}}];
     const results = [{"_id": 0, "t": 0}];
     assert(testDb.c.drop());
@@ -143,7 +142,7 @@ function tests(conn, test) {
     for (let sbeMode of sbeModes) {
         setSbe(conn, test, sbeMode);
         testSuite(conn);
-        if ((test instanceof ShardingTest) || (test instanceof ReplSetTest)) {
+        if (test instanceof ShardingTest || test instanceof ReplSetTest) {
             // setQuerySettings does not work on standalone.
             testPqsCase(conn);
         }

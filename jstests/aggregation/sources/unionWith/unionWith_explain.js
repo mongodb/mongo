@@ -36,30 +36,24 @@ const executionStatsIngoredFields = [
     "numKeysEstimate",
 ];
 
-const stagesIgnoredFields = [
-    "slots",
-    "optimizationTimeMillis",
-    "planCacheKey",
-    "querySettings",
-    "isCached",
-];
+const stagesIgnoredFields = ["slots", "optimizationTimeMillis", "planCacheKey", "querySettings", "isCached"];
 
-const mongosIgnoredFields = [
-    "works",
-    "needTime",
-    "queryHash",
-    "planCacheShapeHash",
-    "optimizationTimeMillis",
-].concat(executionStatsIngoredFields, stagesIgnoredFields);
+const mongosIgnoredFields = ["works", "needTime", "queryHash", "planCacheShapeHash", "optimizationTimeMillis"].concat(
+    executionStatsIngoredFields,
+    stagesIgnoredFields,
+);
 
-const queryPlannerIgnoredFields = [
-    "optimizedPipeline",
-    "optimizationTimeMillis",
-].concat(stagesIgnoredFields);
+const queryPlannerIgnoredFields = ["optimizedPipeline", "optimizationTimeMillis"].concat(stagesIgnoredFields);
 
 function buildErrorString(unionExplain, realExplain, field) {
-    return "Explains did not match in field " + field + ". Union:\n" + tojson(unionExplain) +
-        "\nRegular:\n" + tojson(realExplain);
+    return (
+        "Explains did not match in field " +
+        field +
+        ". Union:\n" +
+        tojson(unionExplain) +
+        "\nRegular:\n" +
+        tojson(realExplain)
+    );
 }
 
 function anyEqWithIgnoredFields(union, regular, ignoredFields) {
@@ -67,8 +61,7 @@ function anyEqWithIgnoredFields(union, regular, ignoredFields) {
 }
 
 function documentEqWithIgnoredFields(union, regular, ignoredFields) {
-    return documentEq(
-        union, regular, false /* verbose */, null /* valueComparator */, ignoredFields);
+    return documentEq(union, regular, false /* verbose */, null /* valueComparator */, ignoredFields);
 }
 
 function arrayEqWithIgnoredFields(union, regular, ignoredFields) {
@@ -79,45 +72,65 @@ function assertExplainEq(union, regular) {
     if (FixtureHelpers.isMongos(testDB)) {
         assert(
             anyEqWithIgnoredFields(union.splitPipeline, regular.splitPipeline, mongosIgnoredFields),
-            buildErrorString(union, regular, "splitPipeline"));
+            buildErrorString(union, regular, "splitPipeline"),
+        );
 
-        assert.eq(
-            union.mergeType, regular.mergeType, buildErrorString(union, regular, "mergeType"));
+        assert.eq(union.mergeType, regular.mergeType, buildErrorString(union, regular, "mergeType"));
 
-        assert(documentEqWithIgnoredFields(union.shards, regular.shards, mongosIgnoredFields),
-               buildErrorString(union, regular, "shards"));
+        assert(
+            documentEqWithIgnoredFields(union.shards, regular.shards, mongosIgnoredFields),
+            buildErrorString(union, regular, "shards"),
+        );
     } else if ("executionStats" in regular) {
         const unionStats = union[0].$cursor.executionStats;
         const regularStats = regular.executionStats;
 
-        assert(documentEqWithIgnoredFields(unionStats.executionStages,
-                                           regularStats.executionStages,
-                                           executionStatsIngoredFields),
-               buildErrorString(unionStats, regularStats, "executionStages"));
+        assert(
+            documentEqWithIgnoredFields(
+                unionStats.executionStages,
+                regularStats.executionStages,
+                executionStatsIngoredFields,
+            ),
+            buildErrorString(unionStats, regularStats, "executionStages"),
+        );
     } else if ("stages" in regular) {
         // For explains run with the runCommand({explain: ...}) format.
-        if (regular.stages.length > 1 && "$cursor" in regular.stages[0] &&
-            "executionStats" in regular.stages[0]["$cursor"]) {
+        if (
+            regular.stages.length > 1 &&
+            "$cursor" in regular.stages[0] &&
+            "executionStats" in regular.stages[0]["$cursor"]
+        ) {
             assert(
-                arrayEqWithIgnoredFields(union,
-                                         regular.stages,
-                                         [...stagesIgnoredFields, ...executionStatsIngoredFields]),
-                buildErrorString(union, regular, "stages with executionStats"));
+                arrayEqWithIgnoredFields(union, regular.stages, [
+                    ...stagesIgnoredFields,
+                    ...executionStatsIngoredFields,
+                ]),
+                buildErrorString(union, regular, "stages with executionStats"),
+            );
         } else {
-            assert(arrayEqWithIgnoredFields(union, regular.stages, stagesIgnoredFields),
-                   buildErrorString(union, regular, "stages"));
+            assert(
+                arrayEqWithIgnoredFields(union, regular.stages, stagesIgnoredFields),
+                buildErrorString(union, regular, "stages"),
+            );
         }
     } else if ("queryPlanner" in regular) {
         assert.eq(union.length, 1, "Expected single union stage");
         const unionCursor = union[0].$cursor;
-        assert(documentEqWithIgnoredFields(
-                   regular.queryPlanner, unionCursor.queryPlanner, queryPlannerIgnoredFields),
-               buildErrorString(unionCursor, regular, "queryPlanner"));
+        assert(
+            documentEqWithIgnoredFields(regular.queryPlanner, unionCursor.queryPlanner, queryPlannerIgnoredFields),
+            buildErrorString(unionCursor, regular, "queryPlanner"),
+        );
     } else {
-        assert(false,
-               "Don't know how to compare following explains.\n" +
-                   "regular: " + tojson(regular) + "\n" +
-                   "union: " + tojson(union) + "\n");
+        assert(
+            false,
+            "Don't know how to compare following explains.\n" +
+                "regular: " +
+                tojson(regular) +
+                "\n" +
+                "union: " +
+                tojson(union) +
+                "\n",
+        );
     }
 }
 
@@ -129,8 +142,7 @@ function assertExplainMatch(unionExplain, regularExplain) {
 }
 
 function testPipeline(pipeline) {
-    let unionResult = collA.aggregate([{$unionWith: {coll: collB.getName(), pipeline: pipeline}}],
-                                      {explain: true});
+    let unionResult = collA.aggregate([{$unionWith: {coll: collB.getName(), pipeline: pipeline}}], {explain: true});
     let queryResult = collB.aggregate(pipeline, {explain: true});
     assertExplainMatch(unionResult, queryResult);
 
@@ -140,11 +152,10 @@ function testPipeline(pipeline) {
             explain: {
                 "aggregate": collA.getName(),
                 "pipeline": [{$unionWith: {coll: collB.getName(), pipeline: pipeline}}],
-                "cursor": {}
-            }
+                "cursor": {},
+            },
         });
-        queryResult = db.runCommand(
-            {explain: {"aggregate": collB.getName(), "pipeline": pipeline, "cursor": {}}});
+        queryResult = db.runCommand({explain: {"aggregate": collB.getName(), "pipeline": pipeline, "cursor": {}}});
         assertExplainMatch(unionResult, queryResult);
     }
 }
@@ -159,51 +170,55 @@ testPipeline([{$unionWith: {coll: collC.getName()}}]);
 
 testPipeline([{$unionWith: {coll: collC.getName(), pipeline: [{$addFields: {bump: true}}]}}]);
 
-testPipeline([
-    {$project: {firstProj: false}},
-    {$group: {_id: "$groupKey", sum: {$sum: "$val"}}},
-    {$match: {_id: 2}}
-]);
+testPipeline([{$project: {firstProj: false}}, {$group: {_id: "$groupKey", sum: {$sum: "$val"}}}, {$match: {_id: 2}}]);
 
 testPipeline([{$limit: 3}, {$sort: {_id: 1}}, {$addFields: {bump: true}}]);
 
-testPipeline([{
-    $addFields: {
-        value: {
-            $function: {
-                body: function(base, pow) {
-                    return Math.pow(base, pow);
+testPipeline([
+    {
+        $addFields: {
+            value: {
+                $function: {
+                    body: function (base, pow) {
+                        return Math.pow(base, pow);
+                    },
+                    args: [2, 3],
+                    lang: "js",
                 },
-                args: [2, 3],
-                lang: "js"
-            }
-        }
-    }
-}]);
+            },
+        },
+    },
+]);
 
 // Ensure that both agg with the explain argument and the explain command work.
-assert.commandWorked(testDB.runCommand({
-    aggregate: collA.getName(),
-    pipeline: [{$unionWith: collB.getName()}],
-    cursor: {},
-    explain: true
-}));
-assert.commandWorked(testDB.runCommand({
-    explain: {
+assert.commandWorked(
+    testDB.runCommand({
         aggregate: collA.getName(),
         pipeline: [{$unionWith: collB.getName()}],
         cursor: {},
-    }
-}));
+        explain: true,
+    }),
+);
+assert.commandWorked(
+    testDB.runCommand({
+        explain: {
+            aggregate: collA.getName(),
+            pipeline: [{$unionWith: collB.getName()}],
+            cursor: {},
+        },
+    }),
+);
 
 // Ensure that $unionWith can still execute explain if followed by a stage that calls dispose().
-let result = assert.commandWorked(testDB.runCommand({
-    explain: {
-        aggregate: collA.getName(),
-        pipeline: [{$unionWith: collB.getName()}, {$limit: 1}],
-        cursor: {},
-    }
-}));
+let result = assert.commandWorked(
+    testDB.runCommand({
+        explain: {
+            aggregate: collA.getName(),
+            pipeline: [{$unionWith: collB.getName()}, {$limit: 1}],
+            cursor: {},
+        },
+    }),
+);
 
 // Test that execution stats inner cursor is populated.
 result = collA.explain("executionStats").aggregate([{"$unionWith": collB.getName()}]);
@@ -213,16 +228,15 @@ assert.commandWorked(expectedResult);
 let unionStage = getUnionWithStage(result);
 assert(unionStage, result);
 if (FixtureHelpers.isMongos(testDB)) {
-    assert(documentEqWithIgnoredFields(
-               expectedResult.shards, unionStage.$unionWith.pipeline.shards, mongosIgnoredFields),
-           buildErrorString(unionStage, expectedResult));
+    assert(
+        documentEqWithIgnoredFields(expectedResult.shards, unionStage.$unionWith.pipeline.shards, mongosIgnoredFields),
+        buildErrorString(unionStage, expectedResult),
+    );
     // TODO SERVER-50597 Fix unionWith nReturned stat in sharded cluster
     // assert.eq(unionStage.nReturned, docsPerColl, unionStage);
 } else {
     assert.eq(unionStage.nReturned, docsPerColl * 2, unionStage);
-    assert.eq(unionStage.$unionWith.pipeline[0].$cursor.executionStats.nReturned,
-              docsPerColl,
-              unionStage);
+    assert.eq(unionStage.$unionWith.pipeline[0].$cursor.executionStats.nReturned, docsPerColl, unionStage);
 }
 
 // Test explain with executionStats when the $unionWith stage doesn't need to read from it's
@@ -238,8 +252,7 @@ if (!FixtureHelpers.isSharded(collB)) {
 
 // Test explain with executionStats when the $unionWith stage partially reads from it's
 // sub-pipeline.
-result = collA.explain("executionStats")
-             .aggregate([{"$unionWith": collB.getName()}, {$limit: docsPerColl + 1}]);
+result = collA.explain("executionStats").aggregate([{"$unionWith": collB.getName()}, {$limit: docsPerColl + 1}]);
 assert.commandWorked(result);
 unionStage = getUnionWithStage(result);
 assert(unionStage, result);
@@ -258,9 +271,9 @@ const indexedColl = testDB.indexed;
 assert.commandWorked(indexedColl.createIndex({val: 1}));
 indexedColl.insert([{val: 0}, {val: 1}, {val: 2}, {val: 3}]);
 
-result = collA.explain("executionStats").aggregate([
-    {$unionWith: {coll: indexedColl.getName(), pipeline: [{$match: {val: {$gt: 2}}}]}}
-]);
+result = collA
+    .explain("executionStats")
+    .aggregate([{$unionWith: {coll: indexedColl.getName(), pipeline: [{$match: {val: {$gt: 2}}}]}}]);
 expectedResult = indexedColl.explain("executionStats").aggregate([{$match: {val: {$gt: 2}}}]);
 assertExplainMatch(result, expectedResult);
 
@@ -272,20 +285,20 @@ testPipeline([{$unionWith: {coll: indexedColl.getName(), pipeline: [{$match: {va
 const res = db.adminCommand({getParameter: 1, "failpoint.disablePipelineOptimization": 1});
 assert.commandWorked(res);
 if (!res["failpoint.disablePipelineOptimization"].mode) {
-    result = collA.explain("executionStats")
-                 .aggregate([{$unionWith: indexedColl.getName()}, {$match: {val: {$gt: 2}}}]);
+    result = collA
+        .explain("executionStats")
+        .aggregate([{$unionWith: indexedColl.getName()}, {$match: {val: {$gt: 2}}}]);
     expectedResult = indexedColl.explain("executionStats").aggregate([{$match: {val: {$gt: 2}}}]);
     assertExplainMatch(result, expectedResult);
 }
 
 // Test that $unionWith that has uses variables runs correctly.
-result = collA.explain("executionStats").aggregate([{
-    $unionWith: {
-        coll: collB.getName(),
-        pipeline: [
-            {$match: {b: 2}},
-            {$redact: {$cond: {if: {$eq: ["val", 2]}, then: "$$PRUNE", else: "$$PRUNE"}}}
-        ]
-    }
-}]);
+result = collA.explain("executionStats").aggregate([
+    {
+        $unionWith: {
+            coll: collB.getName(),
+            pipeline: [{$match: {b: 2}}, {$redact: {$cond: {if: {$eq: ["val", 2]}, then: "$$PRUNE", else: "$$PRUNE"}}}],
+        },
+    },
+]);
 assert.commandWorked(result);

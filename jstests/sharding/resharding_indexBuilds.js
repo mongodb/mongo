@@ -22,9 +22,7 @@ const inputCollection = reshardingTest.createShardedCollection({
 });
 
 // Insert a document so that the index build will hit the failpoint.
-assert.commandWorked(inputCollection.insert([
-    {_id: 0, oldKey: -10, newKey: -10},
-]));
+assert.commandWorked(inputCollection.insert([{_id: 0, oldKey: -10, newKey: -10}]));
 
 const mongos = inputCollection.getMongo();
 const recipientShardNames = reshardingTest.recipientShardNames;
@@ -34,7 +32,7 @@ const donor_host = topology.shards[donorShardNames[0]].primary;
 const donor0 = new Mongo(donor_host);
 
 // Create an inProgress index build.
-const createIndexThread = new Thread(function(host) {
+const createIndexThread = new Thread(function (host) {
     const con = new Mongo(host).getCollection("reshardingDb.coll");
     return con.createIndexes([{newKey: 1}]);
 }, donor_host);
@@ -48,7 +46,8 @@ reshardingTest.withReshardingInBackground(
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
     () => {},
-    {expectedErrorCode: ErrorCodes.BackgroundOperationInProgressForNamespace});
+    {expectedErrorCode: ErrorCodes.BackgroundOperationInProgressForNamespace},
+);
 
 // Resume index build.
 createIndexFailpoint.off();

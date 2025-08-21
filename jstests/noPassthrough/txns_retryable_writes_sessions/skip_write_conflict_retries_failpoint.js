@@ -23,12 +23,14 @@ const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(testDB.getName());
 const sessionColl = sessionDB.getCollection(testColl.getName());
 
-assert.commandWorked(testColl.runCommand(
-    "createIndexes",
-    {indexes: [{key: {a: 1}, name: "a_1", unique: true}], writeConcern: {w: "majority"}}));
-
 assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "skipWriteConflictRetries", mode: "alwaysOn"}));
+    testColl.runCommand("createIndexes", {
+        indexes: [{key: {a: 1}, name: "a_1", unique: true}],
+        writeConcern: {w: "majority"},
+    }),
+);
+
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "skipWriteConflictRetries", mode: "alwaysOn"}));
 
 // A non-transactional insert would ordinarily keep retrying if it conflicts with a write
 // operation performed inside a multi-statement transaction. However, with the
@@ -37,8 +39,7 @@ assert.commandWorked(
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "from transaction", a: 0}));
 
-assert.commandFailedWithCode(testColl.insert({_id: "from outside transaction", a: 0}),
-                             ErrorCodes.WriteConflict);
+assert.commandFailedWithCode(testColl.insert({_id: "from outside transaction", a: 0}), ErrorCodes.WriteConflict);
 
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(testColl.findOne({a: 0}), {_id: "from transaction", a: 0});
@@ -51,14 +52,12 @@ session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "from prepared transaction", a: 1}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-assert.commandFailedWithCode(testColl.update({_id: "from transaction"}, {$set: {a: 1}}),
-                             ErrorCodes.WriteConflict);
+assert.commandFailedWithCode(testColl.update({_id: "from transaction"}, {$set: {a: 1}}), ErrorCodes.WriteConflict);
 
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 assert.eq(testColl.findOne({a: 1}), {_id: "from prepared transaction", a: 1});
 
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "skipWriteConflictRetries", mode: "off"}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "skipWriteConflictRetries", mode: "off"}));
 
 session.endSession();
 rst.stopSet();

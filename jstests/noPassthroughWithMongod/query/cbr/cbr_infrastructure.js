@@ -9,7 +9,7 @@ import {
     getPlanStages,
     getRejectedPlans,
     getWinningPlanFromExplain,
-    isCollscan
+    isCollscan,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -28,33 +28,41 @@ coll1.drop();
 
 // Insert such data that some queries will do well with an {a: 1} index while
 // others with a {b: 1} index.
-assert.commandWorked(coll.insertMany(Array.from({length: 3000}, (_, i) => {
-    const doc = {a: 1, b: i, c: i % 7, x: i % 5, mixed: i};
-    if (i % 9 === 0) {
-        doc.missing_90_percent = i;
-        doc.bool_field = true;
-    }
-    if (i % 9 !== 0) {
-        doc.missing_10_percent = i;
-        doc.bool_field = false;
-    }
-    return doc;
-})));
-assert.commandWorked(coll.insertMany(Array.from({length: 3000}, (_, i) => {
-    const doc = {a: i, b: 1, c: i % 3, x: i % 9};
-    if (i % 9 === 0) {
-        doc.missing_90_percent = i % 3;
-    }
-    if (i % 9 !== 0) {
-        doc.missing_10_percent = i;
-    }
-    if (i % 2 === 0) {
-        doc.mixed = 'xyz';
-    } else {
-        doc.mixed = 3.14;
-    }
-    return doc;
-})));
+assert.commandWorked(
+    coll.insertMany(
+        Array.from({length: 3000}, (_, i) => {
+            const doc = {a: 1, b: i, c: i % 7, x: i % 5, mixed: i};
+            if (i % 9 === 0) {
+                doc.missing_90_percent = i;
+                doc.bool_field = true;
+            }
+            if (i % 9 !== 0) {
+                doc.missing_10_percent = i;
+                doc.bool_field = false;
+            }
+            return doc;
+        }),
+    ),
+);
+assert.commandWorked(
+    coll.insertMany(
+        Array.from({length: 3000}, (_, i) => {
+            const doc = {a: i, b: 1, c: i % 3, x: i % 9};
+            if (i % 9 === 0) {
+                doc.missing_90_percent = i % 3;
+            }
+            if (i % 9 !== 0) {
+                doc.missing_10_percent = i;
+            }
+            if (i % 2 === 0) {
+                doc.mixed = "xyz";
+            } else {
+                doc.mixed = 3.14;
+            }
+            return doc;
+        }),
+    ),
+);
 
 coll.createIndexes([
     {a: 1},
@@ -71,10 +79,8 @@ coll.createIndexes([
 assert.commandWorked(coll.runCommand({analyze: collName, key: "a", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "b", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "c", numberBuckets: 10}));
-assert.commandWorked(
-    coll.runCommand({analyze: collName, key: "missing_90_percent", numberBuckets: 10}));
-assert.commandWorked(
-    coll.runCommand({analyze: collName, key: "missing_10_percent", numberBuckets: 10}));
+assert.commandWorked(coll.runCommand({analyze: collName, key: "missing_90_percent", numberBuckets: 10}));
+assert.commandWorked(coll.runCommand({analyze: collName, key: "missing_10_percent", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "mixed", numberBuckets: 10}));
 assert.commandWorked(coll.runCommand({analyze: collName, key: "bool_field", numberBuckets: 10}));
 
@@ -113,10 +119,7 @@ const queries = [
     scanned by a plan. CBR plans should scan no more than Classic plans.
     */
     {
-        $and: [
-            {$or: [{a: 10}, {b: {$gt: 99}}]},
-            {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]},
-        ],
+        $and: [{$or: [{a: 10}, {b: {$gt: 99}}]}, {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}],
     },
     {a: {$not: {$lt: 130}}},
     {missing_10_percent: {$exists: false}},
@@ -157,8 +160,8 @@ const queries = [
             {$and: [{a: 0}, {a: {$gt: 3}}]},
             {$and: [{a: 0}, {a: {$lt: 0}}]},
             {$and: [{a: 1}, {a: {$gt: 3}}]},
-            {$and: [{a: 1}, {a: {$lt: 0}}]}
-        ]
+            {$and: [{a: 1}, {a: {$lt: 0}}]},
+        ],
     },
     // Same query shape, different constants, non-empty result
     {$and: [{$or: [{a: 1}, {a: 2}]}, {$or: [{a: {$gt: 3}}, {a: {$lt: 9}}]}]},
@@ -168,8 +171,8 @@ const queries = [
     {$and: [{a: 3}, {b: {$size: 9}}]},
     // TODO SPM-3658: Sort cost vs ixscan + fetch cost not estimated propertly, so we choose the
     // wrong plan {mixed: {$type: 'int'}}
-    {mixed: {$type: 'string'}},
-    {mixed: {$type: 'double'}},
+    {mixed: {$type: "string"}},
+    {mixed: {$type: "double"}},
     {bool_field: true},
     {bool_field: false},
     // TODO SERVER-97790 Show estimates of SUBPLAN phases
@@ -193,15 +196,14 @@ function assertCbrExplain(plan) {
     if (plan.hasOwnProperty("inputStage")) {
         assertCbrExplain(plan.inputStage);
     } else if (plan.hasOwnProperty("inputStages")) {
-        plan.inputStages.forEach(p => assertCbrExplain(p));
+        plan.inputStages.forEach((p) => assertCbrExplain(p));
     } else {
-        assert(plan.hasOwnProperty("numKeysEstimate") || plan.hasOwnProperty("numDocsEstimate"),
-               plan);
+        assert(plan.hasOwnProperty("numKeysEstimate") || plan.hasOwnProperty("numDocsEstimate"), plan);
     }
 }
 
 function checkWinningPlan({query = {}, project = {}, order = {}}) {
-    const isRootedOr = (Object.keys(query).length == 1 && Object.keys(query)[0] === "$or");
+    const isRootedOr = Object.keys(query).length == 1 && Object.keys(query)[0] === "$or";
 
     // Classic plan via multiplanning
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
@@ -244,8 +246,7 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     // works because of e.g. a sort. Sort is usually an in-memory operation thus much faster than
     // I/O. "Works" do not reflect that, but is apparent from measurements.
     const worksFactor = getPlanStage(e1, "SORT") ? 1.1 : 1.0;
-    assert(e1.executionStats.executionStages.works <=
-           e0.executionStats.executionStages.works * worksFactor);
+    assert(e1.executionStats.executionStages.works <= e0.executionStats.executionStages.works * worksFactor);
 }
 
 function verifyCollectionCardinalityEstimate() {
@@ -276,16 +277,15 @@ function verifyHeuristicEstimateSource() {
 function verifyFetchOverFetchDoesNotAssert() {
     coll.drop();
     assert.commandWorked(coll.insert({_id: 1}));
-    assert.commandWorked(coll.createIndex({a: 1, 'b.c': 1}));
+    assert.commandWorked(coll.createIndex({a: 1, "b.c": 1}));
 
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "heuristicCE"}));
 
-    const explain =
-        coll.find({a: 1, $or: [{a: 2}, {b: {$elemMatch: {$or: [{c: 4}, {c: 5}]}}}]}).explain();
+    const explain = coll.find({a: 1, $or: [{a: 2}, {b: {$elemMatch: {$or: [{c: 4}, {c: 5}]}}}]}).explain();
     // At least one plan should contain a FETCH over FETCH stages and that should not raise an
     // assertion in FETCH's cardinality estimation.
     let foundFetchOverFetch = false;
-    [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)].forEach(plan => {
+    [getWinningPlanFromExplain(explain), ...getRejectedPlans(explain)].forEach((plan) => {
         const fetches = getPlanStages(plan, "FETCH");
         if (fetches.length > 1) {
             foundFetchOverFetch = true;
@@ -307,7 +307,7 @@ try {
         checkWinningPlan({query: q, project: {c: 0}});
         checkWinningPlan({query: q, project: {a: 1, b: 1}});
         checkWinningPlan({query: q, project: {a: 1, x: 1}});
-        checkWinningPlan({query: q, project: {b: {$add: ['$a', 1]}}});
+        checkWinningPlan({query: q, project: {b: {$add: ["$a", 1]}}});
         checkWinningPlan({query: q, project: {a: 1}, order: {a: 1}});
         checkWinningPlan({query: q, project: {a: 1}, order: {b: 1}});
         checkWinningPlan({query: q, project: {x: 1}, order: {a: 1}});
@@ -343,8 +343,7 @@ try {
 
     // Request histogam CE on a field that doesn't have a histogram
     assert.throwsWithCode(() => coll1.find({a: 1}).explain(), ErrorCodes.HistogramCEFailure);
-    assert.throwsWithCode(() => coll1.find({$and: [{b: 1}, {a: 3}]}).explain(),
-                          ErrorCodes.HistogramCEFailure);
+    assert.throwsWithCode(() => coll1.find({$and: [{b: 1}, {a: 3}]}).explain(), ErrorCodes.HistogramCEFailure);
 
     // $or cannot fail because QueryPlanner::planSubqueries() falls back to choosePlanWholeQuery()
     // when one of the subqueries could not be planned. In this way the CE error is masked.
@@ -352,8 +351,7 @@ try {
     assert(isCollscan(db, getWinningPlanFromExplain(orExpl)));
 
     // Histogram CE fails because of inestimable interval
-    assert.throwsWithCode(() => coll1.find({b: {$gte: {foo: 1}}}).explain(),
-                          ErrorCodes.HistogramCEFailure);
+    assert.throwsWithCode(() => coll1.find({b: {$gte: {foo: 1}}}).explain(), ErrorCodes.HistogramCEFailure);
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));

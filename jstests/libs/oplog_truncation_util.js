@@ -3,8 +3,8 @@
  * not been started and oplog sampling has not occurred.
  */
 export function verifyOplogCapMaintainerThreadNotStarted(log) {
-    const threadRegex = new RegExp("\"id\":5295000");
-    const oplogTruncateMarkersRegex = new RegExp("\"id\":22382");
+    const threadRegex = new RegExp('"id":5295000');
+    const oplogTruncateMarkersRegex = new RegExp('"id":22382');
 
     assert(!threadRegex.test(log));
     assert(!oplogTruncateMarkersRegex.test(log));

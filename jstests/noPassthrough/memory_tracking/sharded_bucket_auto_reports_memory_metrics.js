@@ -11,16 +11,17 @@ import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_paramete
 
 const st = new ShardingTest(Object.assign({shards: 2}));
 const testDB = st.s.getDB("test");
-setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(testDB.getMongo()),
-                       "internalQueryFrameworkControl",
-                       "forceClassicEngine");
+setParameterOnAllHosts(
+    DiscoverTopology.findNonConfigNodes(testDB.getMongo()),
+    "internalQueryFrameworkControl",
+    "forceClassicEngine",
+);
 
 const collName = jsTestName();
 const coll = testDB[collName];
 testDB[collName].drop();
 
-assert.commandWorked(
-    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 st.shardColl(coll, {shard: 1}, {shard: 1}, {shard: 1}, testDB.getName(), true);
 
@@ -30,18 +31,20 @@ for (let i = 1; i <= 100; i++) {
     docs.push({
         value: i,
         category: i % 10 === 0 ? "decade" : "regular",
-        group: Math.floor(i / 25) + 1  // Creates 4 groups (1-25, 26-50, 51-75, 76-100)
+        group: Math.floor(i / 25) + 1, // Creates 4 groups (1-25, 26-50, 51-75, 76-100)
     });
 }
 assert.commandWorked(coll.insertMany(docs));
 
-const pipeline = [{
-    $bucketAuto: {
-        groupBy: "$value",
-        buckets: 5,
-        output: {"count": {$sum: 1}, "valueList": {$push: "$value"}, "avgValue": {$avg: "$value"}}
-    }
-}];
+const pipeline = [
+    {
+        $bucketAuto: {
+            groupBy: "$value",
+            buckets: 5,
+            output: {"count": {$sum: 1}, "valueList": {$push: "$value"}, "avgValue": {$avg: "$value"}},
+        },
+    },
+];
 
 runShardedMemoryStatsTest({
     db: testDB,
@@ -57,7 +60,7 @@ runShardedMemoryStatsTest({
     stageName: "$bucketAuto",
     expectedNumGetMores: 5,
     numShards: 2,
-    skipExplain: true  // $bucketAuto will execute on the merging part of the pipeline and will not
-                       // appear in the shards' explain output.
+    skipExplain: true, // $bucketAuto will execute on the merging part of the pipeline and will not
+    // appear in the shards' explain output.
 });
 st.stop();

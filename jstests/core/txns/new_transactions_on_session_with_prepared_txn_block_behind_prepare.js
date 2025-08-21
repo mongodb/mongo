@@ -26,8 +26,9 @@ function runConcurrentTransactionOnSession(dbName, collName, lsid) {
     var awaitShell;
     try {
         // Turn on failpoint that parallel shell will hit when blocked on prepare.
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: 'waitAfterNewStatementBlocksBehindPrepare', mode: "alwaysOn"}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "waitAfterNewStatementBlocksBehindPrepare", mode: "alwaysOn"}),
+        );
 
         function runTransactionOnSession(dbName, collName, lsid) {
             // Use txnNumber : 1 since the active txnNumber will be 0.
@@ -35,24 +36,26 @@ function runConcurrentTransactionOnSession(dbName, collName, lsid) {
             // Try to do an insert in a new transaction on the same session.  Note that we're
             // manually including the lsid and stmtId instead of using the session object directly
             // since there's no way to share a session with the parallel shell.
-            assert.commandWorked(db.getSiblingDB(dbName).runCommand({
-                insert: collName,
-                documents: [{x: "blocks_behind_prepare"}],
-                readConcern: {level: "snapshot"},
-                lsid: lsid,
-                txnNumber: txnNumber,
-                stmtId: NumberInt(0),
-                startTransaction: true,
-                autocommit: false
-            }));
+            assert.commandWorked(
+                db.getSiblingDB(dbName).runCommand({
+                    insert: collName,
+                    documents: [{x: "blocks_behind_prepare"}],
+                    readConcern: {level: "snapshot"},
+                    lsid: lsid,
+                    txnNumber: txnNumber,
+                    stmtId: NumberInt(0),
+                    startTransaction: true,
+                    autocommit: false,
+                }),
+            );
 
-            assert.commandWorked(db.adminCommand(
-                {commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}));
+            assert.commandWorked(
+                db.adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+            );
         }
         // Launch a parallel shell to start a new transaction, insert a document, and commit. These
         // operations should block behind the previous prepared transaction on the session.
-        awaitShell =
-            startParallelShell(funWithArgs(runTransactionOnSession, dbName, collName, lsid));
+        awaitShell = startParallelShell(funWithArgs(runTransactionOnSession, dbName, collName, lsid));
 
         // Wait until parallel shell insert is blocked on prepare.
         waitForCurOpByFailPointNoNS(db, "waitAfterNewStatementBlocksBehindPrepare");
@@ -60,8 +63,9 @@ function runConcurrentTransactionOnSession(dbName, collName, lsid) {
         // Disable failpoint to allow the parallel shell to continue - it should still be blocked on
         // prepare. This is needed in a finally block so that if something fails we're guaranteed to
         // turn this failpoint off, so that it doesn't cause problems for subsequent tests.
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: 'waitAfterNewStatementBlocksBehindPrepare', mode: "off"}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "waitAfterNewStatementBlocksBehindPrepare", mode: "off"}),
+        );
     }
 
     return awaitShell;
@@ -79,7 +83,8 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
 
 (() => {
     jsTestLog(
-        "New transactions on a session should block behind an existing prepared transaction on that session until it aborts.");
+        "New transactions on a session should block behind an existing prepared transaction on that session until it aborts.",
+    );
 
     const session = testDB.getMongo().startSession();
     const sessionDb = session.getDatabase(dbName);
@@ -105,7 +110,8 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
 
 (() => {
     jsTestLog(
-        "New transactions on a session should block behind an existing prepared transaction on that session until it commits.");
+        "New transactions on a session should block behind an existing prepared transaction on that session until it commits.",
+    );
 
     const session = testDB.getMongo().startSession();
     const sessionDb = session.getDatabase(dbName);
@@ -124,8 +130,9 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
     // a new transaction. Not using PrepareHelpers.commitTransaction because it calls
     // commitTransaction twice, and the second call races with the second transaction the test
     // started.
-    assert.commandWorked(session.getDatabase('admin').adminCommand(
-        {commitTransaction: 1, commitTimestamp: prepareTimestamp}));
+    assert.commandWorked(
+        session.getDatabase("admin").adminCommand({commitTransaction: 1, commitTimestamp: prepareTimestamp}),
+    );
 
     awaitShell();
 
@@ -133,8 +140,7 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
 })();
 
 (() => {
-    jsTestLog(
-        "Test error precedence when executing a malformed command during a prepared transaction.");
+    jsTestLog("Test error precedence when executing a malformed command during a prepared transaction.");
 
     const session = testDB.getMongo().startSession();
     const sessionDb = session.getDatabase(dbName);
@@ -144,14 +150,16 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
     PrepareHelpers.prepareTransaction(session);
 
     // The following command specifies txnNumber: 2 without startTransaction: true.
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        insert: collName,
-        documents: [{_id: "no_such_txn"}],
-        txnNumber: NumberLong(2),
-        stmtId: NumberInt(0),
-        autocommit: false
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        sessionDb.runCommand({
+            insert: collName,
+            documents: [{_id: "no_such_txn"}],
+            txnNumber: NumberLong(2),
+            stmtId: NumberInt(0),
+            autocommit: false,
+        }),
+        ErrorCodes.NoSuchTransaction,
+    );
 
     assert.commandWorked(session.abortTransaction_forTesting());
 

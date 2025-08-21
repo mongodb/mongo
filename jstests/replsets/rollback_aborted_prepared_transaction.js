@@ -57,16 +57,16 @@ assert.eq(testColl.count(), 1);
 session2.startTransaction();
 assert.commandWorked(sessionColl2.insert({_id: 2}));
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session2, {w: 1});
-let res = assert.commandFailedWithCode(PrepareHelpers.commitTransaction(session2, prepareTimestamp),
-                                       ErrorCodes.InvalidOptions);
-assert(
-    res.errmsg.includes("cannot be run before its prepare oplog entry has been majority committed"),
-    res);
+let res = assert.commandFailedWithCode(
+    PrepareHelpers.commitTransaction(session2, prepareTimestamp),
+    ErrorCodes.InvalidOptions,
+);
+assert(res.errmsg.includes("cannot be run before its prepare oplog entry has been majority committed"), res);
 assert.eq(testColl.find().itcount(), 1);
 assert.eq(testColl.count(), 1);
 
 // Check that we have two transactions in the transactions table.
-assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
+assert.eq(primary.getDB("config")["transactions"].find().itcount(), 2);
 
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
@@ -75,7 +75,7 @@ rollbackTest.transitionToSteadyStateOperations();
 // Make sure there are no transactions in the transactions table. This is because both the abort
 // and prepare operations are rolled back, and the entry in the transactions table is only made
 // durable when a transaction is prepared.
-assert.eq(primary.getDB('config')['transactions'].find().itcount(), 0);
+assert.eq(primary.getDB("config")["transactions"].find().itcount(), 0);
 
 // Make sure the first collection only has one document since the prepared insert was rolled
 // back.

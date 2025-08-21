@@ -28,35 +28,37 @@ export function testReadCommittedLookup(db, secondary, rst) {
         aggregate: "local",
         pipeline: [
             {
-              $lookup: {
-                  from: "foreign",
-                  localField: "foreignKey",
-                  foreignField: "matchedField",
-                  as: "match",
-              }
+                $lookup: {
+                    from: "foreign",
+                    localField: "foreignKey",
+                    foreignField: "matchedField",
+                    as: "match",
+                },
             },
         ],
         cursor: {},
         readConcern: {
             level: "majority",
-        }
+        },
     };
 
     const aggCmdGraphLookupObj = {
         aggregate: "local",
-        pipeline: [{
-            $graphLookup: {
-                from: "foreign",
-                startWith: '$foreignKey',
-                connectFromField: 'foreignKey',
-                connectToField: "matchedField",
-                as: "match"
-            }
-        }],
+        pipeline: [
+            {
+                $graphLookup: {
+                    from: "foreign",
+                    startWith: "$foreignKey",
+                    connectFromField: "foreignKey",
+                    connectToField: "matchedField",
+                    as: "match",
+                },
+            },
+        ],
         cursor: {},
         readConcern: {
             level: "majority",
-        }
+        },
     };
 
     // Seed matching data.
@@ -66,18 +68,20 @@ export function testReadCommittedLookup(db, secondary, rst) {
     db.foreign.deleteMany({}, majorityWriteConcernObj);
     const foreignId = db.foreign.insertOne({matchedField: "x"}, majorityWriteConcernObj).insertedId;
 
-    const expectedMatchedResult = [{
-        _id: localId,
-        foreignKey: "x",
-        match: [
-            {_id: foreignId, matchedField: "x"},
-        ],
-    }];
-    const expectedUnmatchedResult = [{
-        _id: localId,
-        foreignKey: "x",
-        match: [],
-    }];
+    const expectedMatchedResult = [
+        {
+            _id: localId,
+            foreignKey: "x",
+            match: [{_id: foreignId, matchedField: "x"}],
+        },
+    ];
+    const expectedUnmatchedResult = [
+        {
+            _id: localId,
+            foreignKey: "x",
+            match: [],
+        },
+    ];
 
     // Confirm lookup/graphLookup return the matched result.
     let result = assert.commandWorked(db.runCommand(aggCmdLookupObj)).cursor.firstBatch;

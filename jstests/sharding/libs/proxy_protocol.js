@@ -21,8 +21,8 @@ export class ProxyProtocolServer {
         assert(version === 1 || version === 2);
         this.version = version;
 
-        this.ingress_address = '127.0.0.1';
-        this.egress_address = '127.0.0.1';
+        this.ingress_address = "127.0.0.1";
+        this.egress_address = "127.0.0.1";
     }
 
     /**
@@ -69,8 +69,8 @@ export class ProxyProtocolServer {
             "-u",
             this.web_server_py,
             "--service",
-            this.ingress_address + ':' + this.ingress_port,
-            this.egress_address + ':' + this.egress_port + "?pp=v" + this.version,
+            this.ingress_address + ":" + this.ingress_port,
+            this.egress_address + ":" + this.egress_port + "?pp=v" + this.version,
         ];
 
         clearRawMongoProgramOutput();
@@ -95,7 +95,7 @@ export class ProxyProtocolServer {
         }
 
         // Wait for the web server to start
-        assert.soon(function() {
+        assert.soon(function () {
             return rawMongoProgramOutput(".*").search("Starting proxy protocol server...") !== -1;
         });
 
@@ -112,11 +112,11 @@ export class ProxyProtocolServer {
         const tools = [
             {
                 args: ["ss", "-nt", `dst 127.0.0.1:${this.egress_port}`],
-                regex: `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`
+                regex: `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}`,
             },
             {
                 args: ["netstat", "-nt"],
-                regex: `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}\\s*ESTABLISHED`
+                regex: `127.0.0.1:(\\d+)\\s+127.0.0.1:${this.egress_port}\\s*ESTABLISHED`,
             },
         ];
 
@@ -130,16 +130,18 @@ export class ProxyProtocolServer {
 
             const match = rawMongoProgramOutput(".*").match(regex);
             if (match === null) {
-                throw Error(`The output of ${args[0]} did not contain a connection to egress port ${
-                    this.egress_port}`);
+                throw Error(`The output of ${args[0]} did not contain a connection to egress port ${this.egress_port}`);
             }
 
             return parseInt(match[1], 10);
         }
 
-        const commandsJson = JSON.stringify(tools.map(tool => tool.args[0]));
-        throw Error(`Could not find connection to egress port ${
-            this.egress_port}: all of the following commands failed: ${commandsJson}`);
+        const commandsJson = JSON.stringify(tools.map((tool) => tool.args[0]));
+        throw Error(
+            `Could not find connection to egress port ${
+                this.egress_port
+            }: all of the following commands failed: ${commandsJson}`,
+        );
     }
 
     /**

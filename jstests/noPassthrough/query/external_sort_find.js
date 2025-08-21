@@ -11,7 +11,7 @@ const kMaxMemoryUsageBytes = kMaxMemoryUsageKB * 1024;
 // Construct a document that is just over 1 kB.
 const charToRepeat = "-";
 const templateDoc = {
-    padding: charToRepeat.repeat(1024)
+    padding: charToRepeat.repeat(1024),
 };
 
 const approximateDocumentSize = Object.bsonsize(templateDoc) + 20;
@@ -26,7 +26,7 @@ function getFindSortStats(allowDiskUse) {
 
 function getAggregationSortStatsPipelineOptimizedAway() {
     const cursor = collection.explain("executionStats").aggregate([{$sort: {sequenceNumber: -1}}], {
-        allowDiskUse: true
+        allowDiskUse: true,
     });
     const stageName = isSBEEnabled ? "sort" : "SORT";
 
@@ -36,10 +36,9 @@ function getAggregationSortStatsPipelineOptimizedAway() {
 }
 
 function getAggregationSortStatsForPipeline() {
-    const cursor =
-        collection.explain("executionStats")
-            .aggregate([{$_internalInhibitOptimization: {}}, {$sort: {sequenceNumber: -1}}],
-                       {allowDiskUse: true});
+    const cursor = collection
+        .explain("executionStats")
+        .aggregate([{$_internalInhibitOptimization: {}}, {$sort: {sequenceNumber: -1}}], {allowDiskUse: true});
     return getAggPlanStage(cursor, "$sort");
 }
 
@@ -60,10 +59,8 @@ for (let i = 0; i < kNumDocsWithinMemLimit; ++i) {
 }
 
 // We should be able to successfully sort the collection with or without disk use allowed.
-assert.eq(kNumDocsWithinMemLimit,
-          collection.find().sort({sequenceNumber: -1}).allowDiskUse(false).itcount());
-assert.eq(kNumDocsWithinMemLimit,
-          collection.find().sort({sequenceNumber: -1}).allowDiskUse(true).itcount());
+assert.eq(kNumDocsWithinMemLimit, collection.find().sort({sequenceNumber: -1}).allowDiskUse(false).itcount());
+assert.eq(kNumDocsWithinMemLimit, collection.find().sort({sequenceNumber: -1}).allowDiskUse(true).itcount());
 
 // From the total allowed memory 90% is used for data and 10% (up to 1MB) is used to store the file
 // iterators.
@@ -88,11 +85,10 @@ for (let i = kNumDocsWithinMemLimit; i < kNumDocsExceedingMemLimit; ++i) {
 
 // The sort should fail if disk use is not allowed, but succeed if disk use is allowed.
 assert.commandFailedWithCode(
-    testDb.runCommand(
-        {find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-assert.eq(kNumDocsExceedingMemLimit,
-          collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
+    testDb.runCommand({find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
+assert.eq(kNumDocsExceedingMemLimit, collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 
 // Explain should report that the SORT stage failed if disk use is not allowed.
 sortStats = getFindSortStats(false);
@@ -116,12 +112,10 @@ assert.eq(sortStats.usedDisk, true);
 
 // If disk use is not allowed but there is a limit, we should be able to avoid exceeding the memory
 // limit.
-assert.eq(kNumDocsWithinMemLimit,
-          collection.find()
-              .sort({sequenceNumber: -1})
-              .allowDiskUse(false)
-              .limit(kNumDocsWithinMemLimit)
-              .itcount());
+assert.eq(
+    kNumDocsWithinMemLimit,
+    collection.find().sort({sequenceNumber: -1}).allowDiskUse(false).limit(kNumDocsWithinMemLimit).itcount(),
+);
 
 // Create a view on top of the collection. When a find command is run against the view without disk
 // use allowed, the command should fail with the expected error code. When the find command allows
@@ -129,16 +123,16 @@ assert.eq(kNumDocsWithinMemLimit,
 assert.commandWorked(testDb.createView("identityView", collection.getName(), []));
 let identityView = testDb.identityView;
 assert.commandFailedWithCode(
-    testDb.runCommand(
-        {find: identityView.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-assert.eq(kNumDocsExceedingMemLimit,
-          identityView.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
+    testDb.runCommand({find: identityView.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
+assert.eq(kNumDocsExceedingMemLimit, identityView.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 
 // Computing the expected number of spills based on the approximate document size. At this moment
 // the number of documents in the collection is 'kNumDocsExceedingMemLimit'
-let expectedNumberOfSpills =
-    Math.ceil(approximateDocumentSize * kNumDocsExceedingMemLimit / kMaxDataMemoryUsageBytes);
+let expectedNumberOfSpills = Math.ceil(
+    (approximateDocumentSize * kNumDocsExceedingMemLimit) / kMaxDataMemoryUsageBytes,
+);
 
 // Verify that performing sorting on the collection using find that exceeds the memory limit results
 // in 'expectedNumberOfSpills' when allowDiskUse is set to true.
@@ -149,23 +143,23 @@ assert.eq(findExternalSortStats.spills, expectedNumberOfSpills, findExternalSort
 // Verify that performing sorting on the collection using aggregate that exceeds the memory limit
 // and can be optimized away results in 'expectedNumberOfSpills' when allowDiskUse is set to true.
 let aggregationExternalSortStatsForNonPipeline = getAggregationSortStatsPipelineOptimizedAway();
-assert.eq(aggregationExternalSortStatsForNonPipeline.usedDisk,
-          true,
-          aggregationExternalSortStatsForNonPipeline);
-assert.eq(aggregationExternalSortStatsForNonPipeline.spills,
-          expectedNumberOfSpills,
-          aggregationExternalSortStatsForNonPipeline);
+assert.eq(aggregationExternalSortStatsForNonPipeline.usedDisk, true, aggregationExternalSortStatsForNonPipeline);
+assert.eq(
+    aggregationExternalSortStatsForNonPipeline.spills,
+    expectedNumberOfSpills,
+    aggregationExternalSortStatsForNonPipeline,
+);
 
 // Verify that performing sorting on the collection using aggregate pipeline that exceeds the memory
 // limit and can not be optimized away results in 'expectedNumberOfSpills' when allowDiskUse is set
 // to true.
 let aggregationExternalSortStatsForPipeline = getAggregationSortStatsForPipeline();
-assert.eq(aggregationExternalSortStatsForPipeline.usedDisk,
-          true,
-          aggregationExternalSortStatsForPipeline);
-assert.eq(aggregationExternalSortStatsForPipeline.spills,
-          expectedNumberOfSpills,
-          aggregationExternalSortStatsForPipeline);
+assert.eq(aggregationExternalSortStatsForPipeline.usedDisk, true, aggregationExternalSortStatsForPipeline);
+assert.eq(
+    aggregationExternalSortStatsForPipeline.spills,
+    expectedNumberOfSpills,
+    aggregationExternalSortStatsForPipeline,
+);
 
 MongoRunner.stopMongod(conn);
 
@@ -175,8 +169,8 @@ let kMaxIteratorsMemoryUsagePercentage = 0.0;
 options = {
     setParameter: {
         internalQueryMaxBlockingSortMemoryUsageBytes: kMaxMemoryUsageBytes,
-        maxIteratorsMemoryUsagePercentage: kMaxIteratorsMemoryUsagePercentage
-    }
+        maxIteratorsMemoryUsagePercentage: kMaxIteratorsMemoryUsagePercentage,
+    },
 };
 conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
@@ -193,10 +187,8 @@ for (let i = 0; i < kNumDocsWithinMemLimit; ++i) {
 }
 
 // We should be able to successfully sort the collection with or without disk use allowed.
-assert.eq(kNumDocsWithinMemLimit,
-          collection.find().sort({sequenceNumber: -1}).allowDiskUse(false).itcount());
-assert.eq(kNumDocsWithinMemLimit,
-          collection.find().sort({sequenceNumber: -1}).allowDiskUse(true).itcount());
+assert.eq(kNumDocsWithinMemLimit, collection.find().sort({sequenceNumber: -1}).allowDiskUse(false).itcount());
+assert.eq(kNumDocsWithinMemLimit, collection.find().sort({sequenceNumber: -1}).allowDiskUse(true).itcount());
 
 // kMaxIteratorsMemoryUsagePercentage is set to 0%. Only data enough for 1 iterator (~150 bytes)
 // will be used.
@@ -221,11 +213,10 @@ for (let i = kNumDocsWithinMemLimit; i < kNumDocsExceedingMemLimit; ++i) {
 
 // The sort should fail if disk use is not allowed, but succeed if disk use is allowed.
 assert.commandFailedWithCode(
-    testDb.runCommand(
-        {find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-assert.eq(kNumDocsExceedingMemLimit,
-          collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
+    testDb.runCommand({find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
+assert.eq(kNumDocsExceedingMemLimit, collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 
 // Explain should report that the SORT stage failed if disk use is not allowed.
 sortStats = getFindSortStats(false);
@@ -249,12 +240,10 @@ assert.eq(sortStats.usedDisk, true);
 
 // If disk use is not allowed but there is a limit, we should be able to avoid exceeding the memory
 // limit.
-assert.eq(kNumDocsWithinMemLimit,
-          collection.find()
-              .sort({sequenceNumber: -1})
-              .allowDiskUse(false)
-              .limit(kNumDocsWithinMemLimit)
-              .itcount());
+assert.eq(
+    kNumDocsWithinMemLimit,
+    collection.find().sort({sequenceNumber: -1}).allowDiskUse(false).limit(kNumDocsWithinMemLimit).itcount(),
+);
 
 // Create a view on top of the collection. When a find command is run against the view without disk
 // use allowed, the command should fail with the expected error code. When the find command allows
@@ -262,17 +251,15 @@ assert.eq(kNumDocsWithinMemLimit,
 assert.commandWorked(testDb.createView("identityView", collection.getName(), []));
 identityView = testDb.identityView;
 assert.commandFailedWithCode(
-    testDb.runCommand(
-        {find: identityView.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-assert.eq(kNumDocsExceedingMemLimit,
-          identityView.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
+    testDb.runCommand({find: identityView.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
+assert.eq(kNumDocsExceedingMemLimit, identityView.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 
 // maxIteratorsMemoryUsagePercentage is set to 0%. Only one file iterator is allowed. Every time a
 // second iterator is created there will be a merge and a spill in order to keep the number of
 // iterators to 1.
-expectedNumberOfSpills =
-    Math.ceil(approximateDocumentSize * kNumDocsExceedingMemLimit / kMaxDataMemoryUsageBytes);
+expectedNumberOfSpills = Math.ceil((approximateDocumentSize * kNumDocsExceedingMemLimit) / kMaxDataMemoryUsageBytes);
 expectedNumberOfSpills = expectedNumberOfSpills + expectedNumberOfSpills - 1;
 
 // Verify that performing sorting on the collection using find that exceeds the memory limit results
@@ -284,23 +271,23 @@ assert.eq(findExternalSortStats.spills, expectedNumberOfSpills, findExternalSort
 // Verify that performing sorting on the collection using aggregate that exceeds the memory limit
 // and can be optimized away results in 'expectedNumberOfSpills' when allowDiskUse is set to true.
 aggregationExternalSortStatsForNonPipeline = getAggregationSortStatsPipelineOptimizedAway();
-assert.eq(aggregationExternalSortStatsForNonPipeline.usedDisk,
-          true,
-          aggregationExternalSortStatsForNonPipeline);
-assert.eq(aggregationExternalSortStatsForNonPipeline.spills,
-          expectedNumberOfSpills,
-          aggregationExternalSortStatsForNonPipeline);
+assert.eq(aggregationExternalSortStatsForNonPipeline.usedDisk, true, aggregationExternalSortStatsForNonPipeline);
+assert.eq(
+    aggregationExternalSortStatsForNonPipeline.spills,
+    expectedNumberOfSpills,
+    aggregationExternalSortStatsForNonPipeline,
+);
 
 // Verify that performing sorting on the collection using aggregate pipeline that exceeds the memory
 // limit and can not be optimized away results in 'expectedNumberOfSpills' when allowDiskUse is set
 // to true.
 aggregationExternalSortStatsForPipeline = getAggregationSortStatsForPipeline();
-assert.eq(aggregationExternalSortStatsForPipeline.usedDisk,
-          true,
-          aggregationExternalSortStatsForPipeline);
-assert.eq(aggregationExternalSortStatsForPipeline.spills,
-          expectedNumberOfSpills,
-          aggregationExternalSortStatsForPipeline);
+assert.eq(aggregationExternalSortStatsForPipeline.usedDisk, true, aggregationExternalSortStatsForPipeline);
+assert.eq(
+    aggregationExternalSortStatsForPipeline.spills,
+    expectedNumberOfSpills,
+    aggregationExternalSortStatsForPipeline,
+);
 
 MongoRunner.stopMongod(conn);
 
@@ -310,8 +297,8 @@ kMaxIteratorsMemoryUsagePercentage = 1.0;
 options = {
     setParameter: {
         internalQueryMaxBlockingSortMemoryUsageBytes: kMaxMemoryUsageBytes,
-        maxIteratorsMemoryUsagePercentage: kMaxIteratorsMemoryUsagePercentage
-    }
+        maxIteratorsMemoryUsagePercentage: kMaxIteratorsMemoryUsagePercentage,
+    },
 };
 conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
@@ -328,9 +315,9 @@ for (let i = 0; i < 1; ++i) {
 
 // The sort should fail if disk use is not allowed, but succeed if disk use is allowed.
 assert.commandFailedWithCode(
-    testDb.runCommand(
-        {find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+    testDb.runCommand({find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
 assert.eq(1, collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 
 // kMaxIteratorsMemoryUsagePercentage is set to 1.0. All memory is used for the file iterators.
@@ -351,11 +338,10 @@ for (let i = 1; i < kNumDocsExceedingMemLimit; ++i) {
 
 // The sort should fail if disk use is not allowed, but succeed if disk use is allowed.
 assert.commandFailedWithCode(
-    testDb.runCommand(
-        {find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-assert.eq(kNumDocsExceedingMemLimit,
-          collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
+    testDb.runCommand({find: collection.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
+assert.eq(kNumDocsExceedingMemLimit, collection.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 
 // Explain should report that the SORT stage failed if disk use is not allowed.
 sortStats = getFindSortStats(false);
@@ -383,11 +369,10 @@ assert.eq(sortStats.usedDisk, true);
 assert.commandWorked(testDb.createView("identityView", collection.getName(), []));
 identityView = testDb.identityView;
 assert.commandFailedWithCode(
-    testDb.runCommand(
-        {find: identityView.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-assert.eq(kNumDocsExceedingMemLimit,
-          identityView.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
+    testDb.runCommand({find: identityView.getName(), sort: {sequenceNumber: -1}, allowDiskUse: false}),
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
+assert.eq(kNumDocsExceedingMemLimit, identityView.find().sort({sequenceNumber: -1}).allowDiskUse().itcount());
 
 // maxIteratorsMemoryUsagePercentage is set to 1.0. Every document will be cause spill and when
 // spills are merged at the end there can be only 2 spills used in parallel resulting in 101 more
@@ -408,22 +393,22 @@ assert.eq(findExternalSortStats.spills, expectedNumberOfSpills, findExternalSort
 // Verify that performing sorting on the collection using aggregate that exceeds the memory limit
 // and can be optimized away results in 'expectedNumberOfSpills' when allowDiskUse is set to true.
 aggregationExternalSortStatsForNonPipeline = getAggregationSortStatsPipelineOptimizedAway();
-assert.eq(aggregationExternalSortStatsForNonPipeline.usedDisk,
-          true,
-          aggregationExternalSortStatsForNonPipeline);
-assert.eq(aggregationExternalSortStatsForNonPipeline.spills,
-          expectedNumberOfSpills,
-          aggregationExternalSortStatsForNonPipeline);
+assert.eq(aggregationExternalSortStatsForNonPipeline.usedDisk, true, aggregationExternalSortStatsForNonPipeline);
+assert.eq(
+    aggregationExternalSortStatsForNonPipeline.spills,
+    expectedNumberOfSpills,
+    aggregationExternalSortStatsForNonPipeline,
+);
 
 // Verify that performing sorting on the collection using aggregate pipeline that exceeds the memory
 // limit and can not be optimized away results in 'expectedNumberOfSpills' when allowDiskUse is set
 // to true.
 aggregationExternalSortStatsForPipeline = getAggregationSortStatsForPipeline();
-assert.eq(aggregationExternalSortStatsForPipeline.usedDisk,
-          true,
-          aggregationExternalSortStatsForPipeline);
-assert.eq(aggregationExternalSortStatsForPipeline.spills,
-          expectedNumberOfSpills,
-          aggregationExternalSortStatsForPipeline);
+assert.eq(aggregationExternalSortStatsForPipeline.usedDisk, true, aggregationExternalSortStatsForPipeline);
+assert.eq(
+    aggregationExternalSortStatsForPipeline.spills,
+    expectedNumberOfSpills,
+    aggregationExternalSortStatsForPipeline,
+);
 
 MongoRunner.stopMongod(conn);

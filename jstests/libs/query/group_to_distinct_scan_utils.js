@@ -15,7 +15,7 @@ export let indexList = [
     {pattern: {aa: 1, bb: 1, c: 1}, option: {}},
     {pattern: {"foo.a": 1, "foo.b": 1}, option: {}},
     {pattern: {"mkFoo.a": 1, "mkFoo.b": 1}, option: {}},
-    {pattern: {"foo.a": 1, "mkFoo.b": 1}, option: {}}
+    {pattern: {"foo.a": 1, "mkFoo.b": 1}, option: {}},
 ];
 
 export function createIndexes() {
@@ -47,12 +47,19 @@ export const documents = [
     {_id: 16, foo: {a: 2, b: 2}, mkFoo: {a: 2, b: 2}},
     {_id: 17, foo: {b: 1}, mkFoo: {b: 1}},
     {_id: 18, foo: {a: null, b: 1}, mkFoo: {a: null, b: 1}},
-    {_id: 19, foo: {a: 3}, mkFoo: [{a: 3, b: 4}, {a: 4, b: 3}]},
+    {
+        _id: 19,
+        foo: {a: 3},
+        mkFoo: [
+            {a: 3, b: 4},
+            {a: 4, b: 3},
+        ],
+    },
 
     {_id: 20, str: "foo", d: 1},
     {_id: 21, str: "FoO", d: 2},
     {_id: 22, str: "bar", d: 4},
-    {_id: 23, str: "bAr", d: 3}
+    {_id: 23, str: "bAr", d: 3},
 ];
 
 // Helper for dropping an index and removing it from the list of indexes.
@@ -89,8 +96,7 @@ export function prepareShardedCollectionWithOrphans(st) {
     // Shard the collection and move all docs where 'a' >= 2 to the non-primary shard.
     assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
     assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {a: 2}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: coll.getFullName(), find: {a: 2}, to: otherShard}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: coll.getFullName(), find: {a: 2}, to: otherShard}));
 
     // Insert orphans to both shards. Both shards must include multikey values in order to not break
     // sharded passthrough tests which rely on the assumption that multikey indexes are indeed
@@ -102,7 +108,7 @@ export function prepareShardedCollectionWithOrphans(st) {
             c: "orphan",
             mkA: ["orphan"],
             mkB: ["orphan"],
-            mkFoo: [{a: "orphan"}]
+            mkFoo: [{a: "orphan"}],
         },
         {a: 2.2, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
         {a: 2.3, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
@@ -115,14 +121,13 @@ export function prepareShardedCollectionWithOrphans(st) {
             c: "orphan",
             mkA: ["orphan"],
             mkB: ["orphan"],
-            mkFoo: [{a: "orphan"}]
+            mkFoo: [{a: "orphan"}],
         },
         {a: 1.1, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
         {a: 1.2, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
         {a: 1.3, b: "orphan", c: "orphan", mkA: ["orphan"], mkB: ["orphan"], mkFoo: ["orphan"]},
     ];
-    assert.commandWorked(
-        st.shard0.getCollection(coll.getFullName()).insert(primaryShardOrphanDocs));
+    assert.commandWorked(st.shard0.getCollection(coll.getFullName()).insert(primaryShardOrphanDocs));
     assert.commandWorked(st.shard1.getCollection(coll.getFullName()).insert(otherShardOrphanDocs));
     return db;
 }
@@ -131,12 +136,14 @@ export function prepareShardedCollectionWithOrphans(st) {
 // We also test with and without indices to check all the possibilities. 'options' is the
 // options to pass to aggregate() and may be omitted. Similarly, the hint object can be omitted
 // and will default to a $natural hint.
-export function assertResultsMatchWithAndWithoutHintandIndexes(pipeline,
-                                                               expectedResults,
-                                                               hintObj = {
-                                                                   $natural: 1
-                                                               },
-                                                               options = {}) {
+export function assertResultsMatchWithAndWithoutHintandIndexes(
+    pipeline,
+    expectedResults,
+    hintObj = {
+        $natural: 1,
+    },
+    options = {},
+) {
     assert.commandWorked(coll.dropIndexes());
     const resultsNoIndex = coll.aggregate(pipeline, options).toArray();
 

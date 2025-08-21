@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Start up a replica set with the last-lts binary version.
 const nodeOption = {
-    binVersion: 'last-lts'
+    binVersion: "last-lts",
 };
 // Need at least 2 nodes because upgradeSet method needs to be able call step down
 // with another primary-eligible node available.
@@ -20,7 +20,7 @@ replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // Upgrade the set and enable the feature flag. The feature flag will be enabled as of
 // the latest FCV. However, the repl set will still have FCV last-lts.
-replSet.upgradeSet({binVersion: 'latest', setParameter: {internalQueryStatsRateLimit: -1}});
+replSet.upgradeSet({binVersion: "latest", setParameter: {internalQueryStatsRateLimit: -1}});
 
 const primary = replSet.getPrimary();
 const db = primary.getDB("test");
@@ -39,8 +39,7 @@ let queryStats = getQueryStats(db, {collName});
 assert.eq(queryStats.length, 0, queryStats);
 
 // Upgrade FCV and confirm the feature flag is now enabled.
-assert.commandWorked(
-    primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 assert(FeatureFlagUtil.isPresentAndEnabled(db, "QueryStatsCountDistinct"));
 
 // Now verify that query stats are collected for count and distinct commands.
@@ -56,11 +55,9 @@ assert.eq(queryStats.key.queryShape.command, "distinct", queryStats);
 
 // Now test query stats during a failed FCV downgrade. During the failed FCV downgrade, the FCV
 // reverts back to the lastLTSFCV which doesn't support queryStats.
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
 
-assert.commandFailedWithCode(
-    primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}), 549181);
+assert.commandFailedWithCode(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}), 549181);
 assert(!FeatureFlagUtil.isEnabled(db, "QueryStatsCountDistinct"));
 
 // Query stats should not be collected for count and distinct.
@@ -71,10 +68,9 @@ queryStats = getQueryStats(db, {collName});
 assert.eq(queryStats.length, 2, queryStats);
 
 // Finally, test a successful downgrade, and confirm the feature flag is disabled.
-assert.commandWorked(primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "off"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}));
 
-assert.commandWorked(
-    primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 assert(!FeatureFlagUtil.isEnabled(db, "QueryStatsCountDistinct"));
 
 // Query stats should still not be collected for count and distinct.

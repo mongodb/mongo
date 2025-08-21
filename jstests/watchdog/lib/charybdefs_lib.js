@@ -19,10 +19,10 @@ export function CharybdefsControl(test_name) {
     // amount of time plus a small buffer of time to account for thread scheduling, etc.
     const fs_delay_sec = wd_period_sec * 2 + 5;
 
-    const mount_point = MongoRunner.toRealPath(test_name + '_mnt');
-    const backing_path = MongoRunner.toRealPath(test_name + '_backing');
+    const mount_point = MongoRunner.toRealPath(test_name + "_mnt");
+    const backing_path = MongoRunner.toRealPath(test_name + "_backing");
 
-    this._runControl = function(cmd, ...args) {
+    this._runControl = function (cmd, ...args) {
         let cmd_args = [python, control_py, cmd];
         cmd_args = cmd_args.concat(args);
         let ret = run.apply(null, cmd_args);
@@ -34,7 +34,7 @@ export function CharybdefsControl(test_name) {
      *
      * @return {string} mount point
      */
-    this.getMountPath = function() {
+    this.getMountPath = function () {
         return mount_point;
     };
 
@@ -43,20 +43,22 @@ export function CharybdefsControl(test_name) {
      *
      * @return {number} number of sections
      */
-    this.getWatchdogPeriodSeconds = function() {
+    this.getWatchdogPeriodSeconds = function () {
         return wd_period_sec;
     };
 
     /**
      *  Start the Charybdefs filesystem.
      */
-    this.start = function() {
+    this.start = function () {
         this.cleanup();
 
-        this._runControl("start",
-                         "--fuse_mount=" + mount_point,
-                         "--backing_path=" + backing_path,
-                         "--log_file=foo_fs.log");
+        this._runControl(
+            "start",
+            "--fuse_mount=" + mount_point,
+            "--backing_path=" + backing_path,
+            "--log_file=foo_fs.log",
+        );
         print("Charybdefs sucessfully started.");
     };
 
@@ -74,11 +76,15 @@ export function CharybdefsControl(test_name) {
      *
      * @param {object} MongoDB connection to admin database
      */
-    this.waitForWatchdogToStart = function(admin) {
+    this.waitForWatchdogToStart = function (admin) {
         print("Waiting for MongoDB watchdog to checks run twice.");
-        assert.soon(function() {
-            return _getGeneration(admin) > 2;
-        }, "Watchdog did not start running", 5 * wd_period_sec * 1000);
+        assert.soon(
+            function () {
+                return _getGeneration(admin) > 2;
+            },
+            "Watchdog did not start running",
+            5 * wd_period_sec * 1000,
+        );
     };
 
     /**
@@ -86,7 +92,7 @@ export function CharybdefsControl(test_name) {
      *
      * @param {string} file_name - file name to inject fault on
      */
-    this.addWriteDelayFaultAndWait = function(file_name) {
+    this.addWriteDelayFaultAndWait = function (file_name) {
         // Convert seconds to microseconds for charybdefs
         const delay_us = fs_delay_sec * 1000000;
         this.addFault("write_buf", file_name, delay_us);
@@ -103,19 +109,21 @@ export function CharybdefsControl(test_name) {
      * @param {string} file_name - file name to inject fault on
      * @param {number} delay_us - optional delay in microseconds to wait
      */
-    this.addFault = function(method, file_name, delay_us) {
-        this._runControl("set_fault",
-                         "--methods=" + method,
-                         "--errno=5",
-                         "--probability=100000",
-                         "--regexp=.*" + file_name,
-                         "--delay_us=" + delay_us);
+    this.addFault = function (method, file_name, delay_us) {
+        this._runControl(
+            "set_fault",
+            "--methods=" + method,
+            "--errno=5",
+            "--probability=100000",
+            "--regexp=.*" + file_name,
+            "--delay_us=" + delay_us,
+        );
     };
 
     /**
      * Shutdown and clean up the Charybdefs filesystem.
      */
-    this.cleanup = function() {
+    this.cleanup = function () {
         this._runControl("stop_all", "--fuse_mount=" + mount_point);
 
         // Delete any remaining files

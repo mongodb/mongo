@@ -12,7 +12,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const majorityWriteConcern = {
-    writeConcern: {w: "majority", wtimeout: 60 * 1000}
+    writeConcern: {w: "majority", wtimeout: 60 * 1000},
 };
 
 // Each test case includes a 'prepareCollection' method that sets up the initial state starting
@@ -22,28 +22,28 @@ const majorityWriteConcern = {
 // collection either empty or with a single document with _id: 1.
 const testCases = {
     insert: {
-        prepareCollection: function(coll) {},  // No-op
-        write: function(coll, writeConcern) {
+        prepareCollection: function (coll) {}, // No-op
+        write: function (coll, writeConcern) {
             assert.commandWorked(coll.insert({_id: 1}, writeConcern));
         },
         expectedBefore: [],
         expectedAfter: [{_id: 1}],
     },
     update: {
-        prepareCollection: function(coll) {
-            assert.commandWorked(coll.insert({_id: 1, state: 'before'}, majorityWriteConcern));
+        prepareCollection: function (coll) {
+            assert.commandWorked(coll.insert({_id: 1, state: "before"}, majorityWriteConcern));
         },
-        write: function(coll, writeConcern) {
-            assert.commandWorked(coll.update({_id: 1}, {$set: {state: 'after'}}, writeConcern));
+        write: function (coll, writeConcern) {
+            assert.commandWorked(coll.update({_id: 1}, {$set: {state: "after"}}, writeConcern));
         },
-        expectedBefore: [{_id: 1, state: 'before'}],
-        expectedAfter: [{_id: 1, state: 'after'}],
+        expectedBefore: [{_id: 1, state: "before"}],
+        expectedAfter: [{_id: 1, state: "after"}],
     },
     remove: {
-        prepareCollection: function(coll) {
+        prepareCollection: function (coll) {
             assert.commandWorked(coll.insert({_id: 1}, majorityWriteConcern));
         },
-        write: function(coll, writeConcern) {
+        write: function (coll, writeConcern) {
             assert.commandWorked(coll.remove({_id: 1}, writeConcern));
         },
         expectedBefore: [{_id: 1}],
@@ -62,8 +62,8 @@ var config = {
     "members": [
         {"_id": 0, "host": nodes[0]},
         {"_id": 1, "host": nodes[1], priority: 0},
-        {"_id": 2, "host": nodes[2], arbiterOnly: true}
-    ]
+        {"_id": 2, "host": nodes[2], arbiterOnly: true},
+    ],
 };
 
 replTest.initiate(config);
@@ -75,8 +75,9 @@ var coll = primary.getDB(name)[name];
 var secondaryColl = secondary.getDB(name)[name];
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 replTest.awaitReplication();
 function log(arg) {
     jsTest.log(tojson(arg));
@@ -84,7 +85,7 @@ function log(arg) {
 
 function doRead(coll, readConcern) {
     readConcern.maxTimeMS = 3000;
-    var res = assert.commandWorked(coll.runCommand('find', readConcern));
+    var res = assert.commandWorked(coll.runCommand("find", readConcern));
     return new DBCommandCursor(coll.getDB(), res).toArray();
 }
 
@@ -103,8 +104,8 @@ function doCommittedRead(coll) {
 }
 
 function readLatestOplogEntry(readConcernLevel) {
-    var oplog = primary.getDB('local').oplog.rs;
-    var res = oplog.runCommand('find', {
+    var oplog = primary.getDB("local").oplog.rs;
+    var res = oplog.runCommand("find", {
         "readConcern": {"level": readConcernLevel},
         "maxTimeMS": 3000,
         sort: {$natural: -1},
@@ -115,7 +116,7 @@ function readLatestOplogEntry(readConcernLevel) {
 }
 
 for (var testName in testCases) {
-    jsTestLog('Running test ' + testName);
+    jsTestLog("Running test " + testName);
     var test = testCases[testName];
 
     const setUpInitialState = function setUpInitialState() {
@@ -137,34 +138,34 @@ for (var testName in testCases) {
     // them from becoming committed.
     setUpInitialState();
     stopServerReplication(secondary);
-    const initialOplogTs = readLatestOplogEntry('local').ts;
+    const initialOplogTs = readLatestOplogEntry("local").ts;
 
     // Writes done without majority write concern must be immediately visible to dirty read
     // and hidden from committed reads until they have been replicated. The rules for seeing
     // an oplog entry for a write are the same as for the write itself.
     test.write(coll, {});
     assert.eq(doDirtyRead(coll), test.expectedAfter);
-    assert.neq(readLatestOplogEntry('local').ts, initialOplogTs);
+    assert.neq(readLatestOplogEntry("local").ts, initialOplogTs);
     assert.eq(doCommittedRead(coll), test.expectedBefore);
-    assert.eq(readLatestOplogEntry('majority').ts, initialOplogTs);
+    assert.eq(readLatestOplogEntry("majority").ts, initialOplogTs);
 
     // Try the committed read again after sleeping to ensure it doesn't only work for
     // queries immediately after the write.
     sleep(1000);
     assert.eq(doCommittedRead(coll), test.expectedBefore);
-    assert.eq(readLatestOplogEntry('majority').ts, initialOplogTs);
+    assert.eq(readLatestOplogEntry("majority").ts, initialOplogTs);
 
     // Restart oplog application on the secondary and ensure the committed view is updated.
     restartServerReplication(secondary);
     replTest.awaitLastOpCommitted();
 
     assert.eq(doCommittedRead(coll), test.expectedAfter);
-    assert.neq(readLatestOplogEntry('majority').ts, initialOplogTs);
+    assert.neq(readLatestOplogEntry("majority").ts, initialOplogTs);
 
     // The secondary will be able to make the write committed soon after the primary, but there
     // is no way to block until it does.
     try {
-        assert.soon(function() {
+        assert.soon(function () {
             return friendlyEqual(doCommittedRead(secondaryColl), test.expectedAfter);
         });
     } catch (e) {

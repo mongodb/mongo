@@ -9,12 +9,12 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/distinct/distinct.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.prefix = 'distinct_projection_fsm';
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.prefix = "distinct_projection_fsm";
 
     $config.states.distinct = function distinct(db, collName) {
         var query = {i: {$lt: this.numDocs / 2}};
-        assert.eq(this.numDocs / 2, db[this.threadCollName].distinct('i', query).length);
+        assert.eq(this.numDocs / 2, db[this.threadCollName].distinct("i", query).length);
     };
 
     return $config;

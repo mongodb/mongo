@@ -12,20 +12,20 @@
  * ]
  */
 
-const collName = 'collmod_convert_to_unique';
+const collName = "collmod_convert_to_unique";
 const coll = db.getCollection(collName);
 coll.drop();
 assert.commandWorked(db.createCollection(collName));
 
 function countUnique(key) {
-    const all = coll.getIndexes().filter(function(z) {
+    const all = coll.getIndexes().filter(function (z) {
         return z.unique && friendlyEqual(z.key, key);
     });
     return all.length;
 }
 
-const assertUniqueNew = function(result) {
-    assert(result.hasOwnProperty('unique_new'), tojson(result));
+const assertUniqueNew = function (result) {
+    assert(result.hasOwnProperty("unique_new"), tojson(result));
     assert(result.unique_new, tojson(result));
 };
 
@@ -35,43 +35,46 @@ assert.commandWorked(coll.createIndex({a: 1}));
 // Tries to convert to unique without setting `prepareUnique`.
 assert.commandFailedWithCode(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 // First sets 'prepareUnique' before converting the index to unique.
-assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 
 // Tries to modify with a string 'unique' value.
 assert.commandFailedWithCode(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: '100'}}),
-    ErrorCodes.TypeMismatch);
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: "100"}}),
+    ErrorCodes.TypeMismatch,
+);
 
 // Tries to modify with a false 'unique' value.
-assert.commandFailedWithCode(db.runCommand({
-    collMod: collName,
-    index: {keyPattern: {a: 1}, unique: false},
-}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({
+        collMod: collName,
+        index: {keyPattern: {a: 1}, unique: false},
+    }),
+    ErrorCodes.BadValue,
+);
 
 // Tries to modify a non-existent collection.
-assert.commandFailedWithCode(db.runCommand({
-    collMod: collName + '_missing',
-    index: {keyPattern: {a: 1}, unique: true},
-}),
-                             ErrorCodes.NamespaceNotFound);
+assert.commandFailedWithCode(
+    db.runCommand({
+        collMod: collName + "_missing",
+        index: {keyPattern: {a: 1}, unique: true},
+    }),
+    ErrorCodes.NamespaceNotFound,
+);
 
 // Conversion should fail when there are existing duplicates.
-assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: false}}));
+assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: false}}));
 assert.commandWorked(coll.insert({_id: 1, a: 100}));
 assert.commandWorked(coll.insert({_id: 2, a: 100}));
-assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 const cannotConvertIndexToUniqueError = assert.commandFailedWithCode(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
-    ErrorCodes.CannotConvertIndexToUnique);
-jsTestLog('Cannot enable index constraint error from failed conversion: ' +
-          tojson(cannotConvertIndexToUniqueError));
+    ErrorCodes.CannotConvertIndexToUnique,
+);
+jsTestLog("Cannot enable index constraint error from failed conversion: " + tojson(cannotConvertIndexToUniqueError));
 
 assert.commandWorked(coll.remove({_id: 2}));
 
@@ -80,60 +83,65 @@ assert.commandWorked(coll.remove({_id: 2}));
 //
 
 // Currently, support for dry run mode should be limited to unique conversion.
-assert.commandFailedWithCode(db.runCommand({
-    collMod: collName,
-    index: {keyPattern: {a: 1}, hidden: true},
-    dryRun: true,
-}),
-                             ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(db.runCommand({
-    collMod: collName,
-    validationLevel: 'off',
-    dryRun: true,
-}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    db.runCommand({
+        collMod: collName,
+        index: {keyPattern: {a: 1}, hidden: true},
+        dryRun: true,
+    }),
+    ErrorCodes.InvalidOptions,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        collMod: collName,
+        validationLevel: "off",
+        dryRun: true,
+    }),
+    ErrorCodes.InvalidOptions,
+);
 
 // Unique may not be combined with any other modification in dry run mode.
-assert.commandFailedWithCode(db.runCommand({
-    collMod: collName,
-    index: {keyPattern: {a: 1}, hidden: true, unique: true},
-    dryRun: true,
-}),
-                             ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(db.runCommand({
-    collMod: collName,
-    index: {keyPattern: {a: 1}, unique: true},
-    validationLevel: 'off',
-    dryRun: true,
-}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    db.runCommand({
+        collMod: collName,
+        index: {keyPattern: {a: 1}, hidden: true, unique: true},
+        dryRun: true,
+    }),
+    ErrorCodes.InvalidOptions,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        collMod: collName,
+        index: {keyPattern: {a: 1}, unique: true},
+        validationLevel: "off",
+        dryRun: true,
+    }),
+    ErrorCodes.InvalidOptions,
+);
 
 // Conversion should not update the catalog in dry run mode.
-assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}, dryRun: true}));
-assert.eq(countUnique({a: 1}), 0, 'index should not be unique: ' + tojson(coll.getIndexes()));
+assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}, dryRun: true}));
+assert.eq(countUnique({a: 1}), 0, "index should not be unique: " + tojson(coll.getIndexes()));
 
 // Conversion should report errors if there are duplicates.
-assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: false}}));
+assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: false}}));
 assert.commandWorked(coll.insert({_id: 3, a: 100}));
-assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 assert.commandFailedWithCode(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}, dryRun: true}),
-    ErrorCodes.CannotConvertIndexToUnique);
+    ErrorCodes.CannotConvertIndexToUnique,
+);
 assert.commandWorked(coll.remove({_id: 3}));
 
 // Successfully converts to a unique index.
-let result = assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}));
+let result = assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}));
 
 // New index state should be reflected in 'unique_new' field in collMod response.
 
 assertUniqueNew(result);
 
 // Look up index details in listIndexes output.
-assert.eq(countUnique({a: 1}), 1, 'index should be unique now: ' + tojson(coll.getIndexes()));
+assert.eq(countUnique({a: 1}), 1, "index should be unique now: " + tojson(coll.getIndexes()));
 
 // Test uniqueness constraint.
 assert.commandFailedWithCode(coll.insert({_id: 100, a: 100}), ErrorCodes.DuplicateKey);
@@ -143,19 +151,20 @@ assert.commandFailedWithCode(coll.insert({_id: 100, a: 100}), ErrorCodes.Duplica
 //
 
 // Tries to modify with a false 'forceNonUnique' value.
-assert.commandFailedWithCode(db.runCommand({
-    collMod: collName,
-    index: {keyPattern: {a: 1}, forceNonUnique: false},
-}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({
+        collMod: collName,
+        index: {keyPattern: {a: 1}, forceNonUnique: false},
+    }),
+    ErrorCodes.BadValue,
+);
 
 // Successfully converts to a regular index.
-result = assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, forceNonUnique: true}}));
+result = assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, forceNonUnique: true}}));
 
 // New index state should be reflected in 'forceNonUnique_new' field in collMod response.
-const assertForceNonUniqueNew = function(result) {
-    assert(result.hasOwnProperty('forceNonUnique_new'), tojson(result));
+const assertForceNonUniqueNew = function (result) {
+    assert(result.hasOwnProperty("forceNonUnique_new"), tojson(result));
     assert(result.forceNonUnique_new, tojson(result));
 };
 

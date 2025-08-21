@@ -12,7 +12,7 @@ for (let a = 0; a < k; a++) {
     }
 }
 
-const collNamePrefix = 'distinct_index2_';
+const collNamePrefix = "distinct_index2_";
 let collCount = 0;
 
 const correct = Array.from({length: k}, (_, i) => i);

@@ -10,8 +10,10 @@ checkFCV(adminDB, latestFCV);
 assert.commandWorked(testDB.runCommand({insert: collName, documents: [{x: 1}]}));
 
 function testFCVChange({fcvDoc, expectConnectionClosed = true} = {}) {
-    let findCmdFailPoint = configureFailPoint(
-        db, "waitInFindBeforeMakingBatch", {nss: "test.coll", shouldCheckForInterrupt: true});
+    let findCmdFailPoint = configureFailPoint(db, "waitInFindBeforeMakingBatch", {
+        nss: "test.coll",
+        shouldCheckForInterrupt: true,
+    });
 
     // Mimic running a find command from an internal client with a lower binary version.
     function findWithLowerBinaryInternalClient(expectConnectionClosed) {
@@ -27,17 +29,18 @@ function testFCVChange({fcvDoc, expectConnectionClosed = true} = {}) {
         // shell is always compatible talking to the server. In reality though, a real internal
         // client with a lower binary version is expected to hang up immediately after receiving the
         // response to the 'hello' command from a latest server with an upgraded FCV.
-        assert.commandWorked(testDB.adminCommand({
-            hello: 1,
-            internalClient: {minWireVersion: NumberInt(9), maxWireVersion: NumberInt(9)}
-        }));
+        assert.commandWorked(
+            testDB.adminCommand({
+                hello: 1,
+                internalClient: {minWireVersion: NumberInt(9), maxWireVersion: NumberInt(9)},
+            }),
+        );
 
         // Since mongod expects other cluster members to always include explicit read/write concern
         // (on commands that accept read/write concern), this test must be careful to mimic this
         // behavior.
         if (expectConnectionClosed) {
-            const e = assert.throws(
-                () => testDB.runCommand({find: "coll", readConcern: {level: "local"}}));
+            const e = assert.throws(() => testDB.runCommand({find: "coll", readConcern: {level: "local"}}));
             assert.includes(e.toString(), "network error while attempting to run command");
         } else {
             assert.commandWorked(testDB.runCommand({find: "coll", readConcern: {level: "local"}}));
@@ -45,14 +48,15 @@ function testFCVChange({fcvDoc, expectConnectionClosed = true} = {}) {
     }
 
     const joinFindThread = startParallelShell(
-        funWithArgs(findWithLowerBinaryInternalClient, expectConnectionClosed), db.getMongo().port);
+        funWithArgs(findWithLowerBinaryInternalClient, expectConnectionClosed),
+        db.getMongo().port,
+    );
 
     jsTestLog("Waiting for waitInFindBeforeMakingBatch failpoint");
     findCmdFailPoint.wait();
 
     jsTestLog("Updating featureCompatibilityVersion document to: " + tojson(fcvDoc));
-    assert.commandWorked(
-        adminDB.system.version.update({_id: "featureCompatibilityVersion"}, fcvDoc));
+    assert.commandWorked(adminDB.system.version.update({_id: "featureCompatibilityVersion"}, fcvDoc));
 
     jsTestLog("Turning off waitInFindBeforeMakingBatch failpoint");
     findCmdFailPoint.off();

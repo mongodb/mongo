@@ -12,8 +12,7 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryDisablePlanC
 // To avoid needing a huge collection to see the effects of the collFraction limit kick in.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 1}));
 // Ensure total coll fraction is always used in this test instead of the per-plan limit.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryPlanEvaluationCollFraction: 1}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationCollFraction: 1}));
 
 const coll = db.getCollection(collName);
 coll.drop();
@@ -28,7 +27,7 @@ for (let i = 0; i < numDocs; i++) {
         nonSelective3: i,
         nonSelective4: i,
         nonSelective5: i,
-        nonSelective6: i
+        nonSelective6: i,
     });
 }
 assert.commandWorked(bulkOp.execute());
@@ -54,7 +53,7 @@ function generateIndexes(n) {
         "nonSelective3",
         "nonSelective4",
         "nonSelective5",
-        "nonSelective6"
+        "nonSelective6",
     ];
     const selectiveField = "selective";
 
@@ -82,14 +81,15 @@ const query = {
     nonSelective4: {$gte: 0},
     nonSelective5: {$gte: 0},
     nonSelective6: {$gte: 0},
-    selective: {$lt: 0}
+    selective: {$lt: 0},
 };
 
 // Reports which multi-planner stopping condition metric increased after running a query
 // with the given 'collFraction' setting.
 function getStoppingCondition(collFraction) {
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryPlanTotalEvaluationCollFraction: collFraction}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlanTotalEvaluationCollFraction: collFraction}),
+    );
 
     const before = db.serverStatus().metrics.query.multiPlanner.stoppingCondition;
     coll.find(query).explain();

@@ -14,41 +14,37 @@
  *     requires_timeseries,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {
     forwardIxscan,
     runDoesntRewriteTest,
-    runRewritesTest
+    runRewritesTest,
 } from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
-const ciStringCollName = jsTestName() + '_ci';
+const ciStringCollName = jsTestName() + "_ci";
 const ciStringColl = db[ciStringCollName];
-const csStringCollName = jsTestName() + '_cs';
+const csStringCollName = jsTestName() + "_cs";
 const csStringColl = db[csStringCollName];
 
 // Create two collections, with the same data but different collation.
 
-const times = [
-    ISODate('1970-01-01T00:00:00'),
-    ISODate('1970-01-01T00:00:07'),
-];
+const times = [ISODate("1970-01-01T00:00:00"), ISODate("1970-01-01T00:00:07")];
 let docs = [];
-for (const m of ['a', 'A', 'b', 'B'])
-    for (const t of times)
-        docs.push({t, m});
+for (const m of ["a", "A", "b", "B"]) for (const t of times) docs.push({t, m});
 
 csStringColl.drop();
 ciStringColl.drop();
-assert.commandWorked(db.createCollection(csStringCollName, {
-    timeseries: {timeField: "t", metaField: "m"},
-}));
-assert.commandWorked(db.createCollection(ciStringCollName, {
-    timeseries: {timeField: "t", metaField: "m"},
-    collation: {locale: 'en_US', strength: 2},
-}));
+assert.commandWorked(
+    db.createCollection(csStringCollName, {
+        timeseries: {timeField: "t", metaField: "m"},
+    }),
+);
+assert.commandWorked(
+    db.createCollection(ciStringCollName, {
+        timeseries: {timeField: "t", metaField: "m"},
+        collation: {locale: "en_US", strength: 2},
+    }),
+);
 
 for (const coll of [csStringColl, ciStringColl]) {
     assert.commandWorked(coll.insert(docs));
@@ -59,19 +55,27 @@ for (const coll of [csStringColl, ciStringColl]) {
 //
 // When the collation of the query matches the index, an equality predicate in the query
 // becomes a 1-point interval in the index bounds.
-runRewritesTest(
-    {t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, csStringColl, true, [{$match: {m: 'a'}}]);
-runRewritesTest(
-    {t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, ciStringColl, true, [{$match: {m: 'a'}}]);
+runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, csStringColl, true, [{$match: {m: "a"}}]);
+runRewritesTest({t: 1}, {m: 1, t: 1}, {m: 1, t: 1}, forwardIxscan, ciStringColl, true, [{$match: {m: "a"}}]);
 // When the collation doesn't match, then the equality predicate is not a 1-point interval
 // in the index.
 csStringColl.dropIndexes();
 ciStringColl.dropIndexes();
-assert.commandWorked(csStringColl.createIndex({m: 1, t: 1}, {
-    collation: {locale: 'en_US', strength: 2},
-}));
-assert.commandWorked(ciStringColl.createIndex({m: 1, t: 1}, {
-    collation: {locale: 'simple'},
-}));
-runDoesntRewriteTest({t: 1}, null, {m: 1, t: 1}, csStringColl, [{$match: {m: 'a'}}]);
-runDoesntRewriteTest({t: 1}, null, {m: 1, t: 1}, ciStringColl, [{$match: {m: 'a'}}]);
+assert.commandWorked(
+    csStringColl.createIndex(
+        {m: 1, t: 1},
+        {
+            collation: {locale: "en_US", strength: 2},
+        },
+    ),
+);
+assert.commandWorked(
+    ciStringColl.createIndex(
+        {m: 1, t: 1},
+        {
+            collation: {locale: "simple"},
+        },
+    ),
+);
+runDoesntRewriteTest({t: 1}, null, {m: 1, t: 1}, csStringColl, [{$match: {m: "a"}}]);
+runDoesntRewriteTest({t: 1}, null, {m: 1, t: 1}, ciStringColl, [{$match: {m: "a"}}]);

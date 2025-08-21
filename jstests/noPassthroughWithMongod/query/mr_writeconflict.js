@@ -2,11 +2,11 @@
 
 import {Thread} from "jstests/libs/parallelTester.js";
 
-var makeDoc = function(keyLimit, valueLimit) {
+var makeDoc = function (keyLimit, valueLimit) {
     return {_id: ObjectId(), key: Random.randInt(keyLimit), value: Random.randInt(valueLimit)};
 };
 
-var main = function() {
+var main = function () {
     function mapper() {
         var obj = {};
         obj[this.value] = 1;
@@ -16,8 +16,8 @@ var main = function() {
     function reducer(key, values) {
         var res = {};
 
-        values.forEach(function(obj) {
-            Object.keys(obj).forEach(function(value) {
+        values.forEach(function (obj) {
+            Object.keys(obj).forEach(function (value) {
                 if (!res.hasOwnProperty(value)) {
                     res[value] = 0;
                 }
@@ -30,7 +30,7 @@ var main = function() {
 
     for (var i = 0; i < 10; i++) {
         // Have all threads combine their results into the same collection
-        var res = db.source.mapReduce(mapper, reducer, {out: {reduce: 'dest'}});
+        var res = db.source.mapReduce(mapper, reducer, {out: {reduce: "dest"}});
         assert.commandWorked(res);
     }
 };
@@ -50,7 +50,7 @@ assert.commandWorked(res);
 assert.eq(numDocs, res.nInserted);
 
 db.dest.drop();
-assert.commandWorked(db.createCollection('dest'));
+assert.commandWorked(db.createCollection("dest"));
 
 var numThreads = 6;
 var t = [];

@@ -9,7 +9,7 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     createSearchIndexesAndExecuteTests,
-    validateSearchExplain
+    validateSearchExplain,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
@@ -27,28 +27,30 @@ bulk.insert({_id: "Trenton", state: "NJ", pop: 5});
 assert.commandWorked(bulk.execute());
 
 const viewName = "addFields";
-const viewPipeline = [{"$addFields": {pop: {$ifNull: ['$pop', "unknown"]}}}];
-assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', viewPipeline));
+const viewPipeline = [{"$addFields": {pop: {$ifNull: ["$pop", "unknown"]}}}];
+assert.commandWorked(testDb.createView(viewName, "underlyingSourceCollection", viewPipeline));
 const addFieldsView = testDb[viewName];
 
 const indexConfig = {
     coll: addFieldsView,
-    definition: {name: "default", definition: {"mappings": {"dynamic": true}}}
+    definition: {name: "default", definition: {"mappings": {"dynamic": true}}},
 };
 
 const addFieldsBaseCaseTestCases = (isStoredSource) => {
     // =========================================================================================
     // Case 1: Basic $search pipeline on the newly created view.
     // =========================================================================================
-    const basicPipeline = [{
-        $search: {
-            index: "default",
-            exists: {
-                path: "state",
+    const basicPipeline = [
+        {
+            $search: {
+                index: "default",
+                exists: {
+                    path: "state",
+                },
+                returnStoredSource: isStoredSource,
             },
-            returnStoredSource: isStoredSource
-        }
-    }];
+        },
+    ];
 
     const basicPipelineExpectedResults = [
         {"_id": "New York", "state": "NY", "pop": 7},
@@ -75,13 +77,12 @@ const addFieldsBaseCaseTestCases = (isStoredSource) => {
                 exists: {
                     path: "state",
                 },
-                returnStoredSource: isStoredSource
-            }
+                returnStoredSource: isStoredSource,
+            },
         },
-        {$project: {pop: 1, _id: 1}}
+        {$project: {pop: 1, _id: 1}},
     ];
-    validateSearchExplain(
-        addFieldsView, pipelineWithStageAfterSearch, isStoredSource, viewPipeline);
+    validateSearchExplain(addFieldsView, pipelineWithStageAfterSearch, isStoredSource, viewPipeline);
 
     // =========================================================================================
     // Case 3: Non-search query on a view indexed by mongot, ensuring view transforms are still

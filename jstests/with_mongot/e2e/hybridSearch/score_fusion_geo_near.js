@@ -36,29 +36,24 @@ const testQuery = [
                                 index: getRentalSearchIndexSpec().name,
                                 text: {
                                     query: "brooklyn",
-                                    path: [
-                                        "name",
-                                        "summary",
-                                        "description",
-                                        "neighborhood_overview",
-                                    ],
+                                    path: ["name", "summary", "description", "neighborhood_overview"],
                                 },
-                            }
+                            },
                         },
-                        {$limit: limit}
+                        {$limit: limit},
                     ],
                     geonear: [
                         {
                             $geoNear: {
                                 near: [-73.97713, 40.68675],
-                            }
+                            },
                         },
                         {$score: {score: {$meta: "geoNearDistance"}, normalization: "none"}},
-                        {$limit: limit}
+                        {$limit: limit},
                     ],
                 },
-                normalization: "none"
-            }
+                normalization: "none",
+            },
         },
     },
     {$limit: limit},

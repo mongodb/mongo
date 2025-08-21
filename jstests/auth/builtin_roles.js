@@ -38,8 +38,8 @@ function assertIsBuiltinRole(def, name, expectPrivs = false, expectAuthRest = fa
 }
 
 function runTest(mongo) {
-    const admin = mongo.getDB('admin');
-    const test = mongo.getDB('test');
+    const admin = mongo.getDB("admin");
+    const test = mongo.getDB("test");
 
     function rolesInfo(db, role, basic = false) {
         const cmd = {
@@ -48,39 +48,40 @@ function runTest(mongo) {
             showAuthenticationRestrictions: !basic,
             showBuiltinRoles: !basic,
         };
-        return assert.commandWorked(db.runCommand(cmd))
-            .roles.sort((a, b) => (a.role + '.' + a.db).localeCompare(b.role + '.' + b.db, 'en'));
+        return assert
+            .commandWorked(db.runCommand(cmd))
+            .roles.sort((a, b) => (a.role + "." + a.db).localeCompare(b.role + "." + b.db, "en"));
     }
 
-    const kTestReadRole = {role: 'read', db: 'test'};
-    const kAdminReadRole = {role: 'read', db: 'admin'};
+    const kTestReadRole = {role: "read", db: "test"};
+    const kAdminReadRole = {role: "read", db: "admin"};
     const kReadRoleActions = [
-        'changeStream',
-        'collStats',
-        'dbHash',
-        'dbStats',
-        'find',
-        'killCursors',
-        'listCollections',
-        'listIndexes',
-        'listSearchIndexes',
-        'planCacheRead',
-        'performRawDataOperations',
+        "changeStream",
+        "collStats",
+        "dbHash",
+        "dbStats",
+        "find",
+        "killCursors",
+        "listCollections",
+        "listIndexes",
+        "listSearchIndexes",
+        "planCacheRead",
+        "performRawDataOperations",
     ];
     const kAdminReadPrivs = [
-        {resource: {db: 'admin', collection: ''}, actions: kReadRoleActions},
-        {resource: {db: 'admin', collection: 'system.js'}, actions: kReadRoleActions},
+        {resource: {db: "admin", collection: ""}, actions: kReadRoleActions},
+        {resource: {db: "admin", collection: "system.js"}, actions: kReadRoleActions},
     ];
     const kTestReadPrivs = [
-        {resource: {db: 'test', collection: ''}, actions: kReadRoleActions},
-        {resource: {db: 'test', collection: 'system.js'}, actions: kReadRoleActions},
+        {resource: {db: "test", collection: ""}, actions: kReadRoleActions},
+        {resource: {db: "test", collection: "system.js"}, actions: kReadRoleActions},
     ];
 
-    const adminReadBasic = rolesInfo(admin, 'read', true);
+    const adminReadBasic = rolesInfo(admin, "read", true);
     assert.eq(adminReadBasic.length, 1);
     assertIsBuiltinRole(adminReadBasic[0], kAdminReadRole, false, false);
 
-    const adminRead = rolesInfo(admin, 'read');
+    const adminRead = rolesInfo(admin, "read");
     assert.eq(adminRead.length, 1);
     assertIsBuiltinRole(adminRead[0], kAdminReadRole, true, true);
     assertIsBuiltinRole(adminRead[0], kAdminReadRole, kAdminReadPrivs, true);
@@ -90,28 +91,27 @@ function runTest(mongo) {
     assertIsBuiltinRole(testRead[0], kTestReadRole, true, true);
     assertIsBuiltinRole(testRead[0], kTestReadRole, kTestReadPrivs, true);
 
-    const testMulti = rolesInfo(admin, ['read', kTestReadRole]);
+    const testMulti = rolesInfo(admin, ["read", kTestReadRole]);
     assert.eq(testMulti.length, 2);
     assertIsBuiltinRole(testMulti[0], kAdminReadRole, kAdminReadPrivs, true);
     assertIsBuiltinRole(testMulti[1], kTestReadRole, kTestReadPrivs, true);
 
-    const testRole1Privs = [{resource: {db: 'test', collection: ''}, actions: ['insert']}];
-    assert.commandWorked(
-        test.runCommand({createRole: 'role1', roles: ['read'], privileges: testRole1Privs}));
+    const testRole1Privs = [{resource: {db: "test", collection: ""}, actions: ["insert"]}];
+    assert.commandWorked(test.runCommand({createRole: "role1", roles: ["read"], privileges: testRole1Privs}));
 
     const testRoles = rolesInfo(test, 1);
     const testUserRoles = testRoles.filter((r) => !r.isBuiltin);
     assert.eq(testUserRoles.length, 1);
     const testUserRole1 = testUserRoles[0];
-    jsTest.log('testUserRole1: ' + tojson(testUserRole1));
-    assert.eq(testUserRole1.db, 'test');
-    assert.eq(testUserRole1.role, 'role1');
+    jsTest.log("testUserRole1: " + tojson(testUserRole1));
+    assert.eq(testUserRole1.db, "test");
+    assert.eq(testUserRole1.role, "role1");
     assert.eq(testUserRole1.roles, [kTestReadRole]);
     assert.eq(testUserRole1.inheritedRoles, [kTestReadRole]);
     assert.eq(testUserRole1.privileges, testRole1Privs);
     assert.eq(testUserRole1.inheritedPrivileges, testRole1Privs.concat(kTestReadPrivs));
 
-    const testRolesReadRole = testRoles.filter((r) => r.role === 'read');
+    const testRolesReadRole = testRoles.filter((r) => r.role === "read");
     assert.eq(testRolesReadRole.length, 1);
     assertIsBuiltinRole(testRolesReadRole[0], kTestReadRole, kTestReadPrivs, true);
 }

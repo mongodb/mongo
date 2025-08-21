@@ -16,7 +16,7 @@
 // The buffer needs to be big enough that no one consumer buffer gets filled near the final
 // iteration, or it may hang if the final getMore is blocked waiting on a different consumer to make
 // space in its buffer.
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         numDocs: 10000,
         numConsumers: 5,
@@ -29,8 +29,7 @@ export const $config = (function() {
     function runGetMoreOnCursor(db, collName, cursorIndex, batchSize, cursorIds, sessionId) {
         // See comment at the end of setup() for why we need eval().
         const cursorId = eval(cursorIds[cursorIndex]);
-        const res = db.runCommand(
-            {getMore: cursorId, collection: collName, batchSize, lsid: {id: eval(sessionId)}});
+        const res = db.runCommand({getMore: cursorId, collection: collName, batchSize, lsid: {id: eval(sessionId)}});
 
         // If the getMore was successful, assert we have enough results returned; otherwise, it
         // should have because another worker thread has that cursor in use.
@@ -45,11 +44,10 @@ export const $config = (function() {
 
     // One state per consumer consumer, with equal probability so we exhaust each cursor in
     // approximately the same timeline. See runGetMoreOnCursor for details.
-    var states = function() {
+    var states = (function () {
         function makeConsumerCallback(consumerId) {
             return function consumerCallback(db, collName) {
-                return runGetMoreOnCursor(
-                    db, collName, consumerId, this.batchSize, this.cursorIds, this.sessionId);
+                return runGetMoreOnCursor(db, collName, consumerId, this.batchSize, this.cursorIds, this.sessionId);
             };
         }
 
@@ -62,10 +60,9 @@ export const $config = (function() {
             consumer3: makeConsumerCallback(3),
             consumer4: makeConsumerCallback(4),
         };
-    }();
+    })();
 
-    var allStatesEqual =
-        {init: 0, consumer0: 0.2, consumer1: 0.2, consumer2: 0.2, consumer3: 0.2, consumer4: 0.2};
+    var allStatesEqual = {init: 0, consumer0: 0.2, consumer1: 0.2, consumer2: 0.2, consumer3: 0.2, consumer4: 0.2};
     var transitions = {
         init: allStatesEqual,
         consumer0: allStatesEqual,
@@ -91,16 +88,18 @@ export const $config = (function() {
         assert.eq(this.numDocs, db[collName].find().itcount());
 
         // Run an exchange to get a list of cursors.
-        res = assert.commandWorked(session.getDatabase(db.getName()).runCommand({
-            aggregate: collName,
-            pipeline: [],
-            exchange: {
-                policy: "roundrobin",
-                consumers: NumberInt(this.numConsumers),
-                bufferSize: NumberInt(this.bufferSize)
-            },
-            cursor: {batchSize: 0},
-        }));
+        res = assert.commandWorked(
+            session.getDatabase(db.getName()).runCommand({
+                aggregate: collName,
+                pipeline: [],
+                exchange: {
+                    policy: "roundrobin",
+                    consumers: NumberInt(this.numConsumers),
+                    bufferSize: NumberInt(this.bufferSize),
+                },
+                cursor: {batchSize: 0},
+            }),
+        );
 
         // Save the cursor ids to $config.data so each of the worker threads has access to the
         // cursors, as well as the sessionId.
@@ -129,11 +128,11 @@ export const $config = (function() {
     return {
         threadCount: data.numConsumers,
         iterations: 20,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         setup: setup,
         teardown: teardown,
-        data: data
+        data: data,
     };
 })();

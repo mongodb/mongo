@@ -14,19 +14,19 @@ assert.eq(0, t.count({a: /bcde/}), "D");
 
 t.drop();
 assert.commandWorked(t.save({a: {b: "cde"}}));
-assert.eq(1, t.count({'a.b': /de/}), "E");
+assert.eq(1, t.count({"a.b": /de/}), "E");
 
 t.drop();
 assert.commandWorked(t.save({a: {b: ["cde"]}}));
-assert.eq(1, t.count({'a.b': /de/}), "F");
+assert.eq(1, t.count({"a.b": /de/}), "F");
 
 t.drop();
 assert.commandWorked(t.save({a: [{b: "cde"}]}));
-assert.eq(1, t.count({'a.b': /de/}), "G");
+assert.eq(1, t.count({"a.b": /de/}), "G");
 
 t.drop();
 assert.commandWorked(t.save({a: [{b: ["cde"]}]}));
-assert.eq(1, t.count({'a.b': /de/}), "H");
+assert.eq(1, t.count({"a.b": /de/}), "H");
 
 //
 // Confirm match and explain serialization for $elemMatch with $regex.
@@ -35,7 +35,7 @@ t.drop();
 assert.commandWorked(t.insert({x: ["abc"]}));
 
 const query = {
-    x: {$elemMatch: {$regex: 'ABC', $options: 'i'}}
+    x: {$elemMatch: {$regex: "ABC", $options: "i"}},
 };
 assert.eq(1, t.count(query));
 
@@ -50,14 +50,14 @@ assert.eq(queryPlanner.parsedQuery, query);
 // Disallow embedded null bytes when using $regex syntax.
 //
 t.drop();
-assert.throws(function() {
+assert.throws(function () {
     t.find({a: {$regex: "a\0b", $options: "i"}}).itcount();
 });
-assert.throws(function() {
+assert.throws(function () {
     t.find({a: {$regex: "ab", $options: "i\0"}}).itcount();
 });
-assert.throws(function() {
-    t.find({key: {$regex: 'abcd\0xyz'}}).explain();
+assert.throws(function () {
+    t.find({key: {$regex: "abcd\0xyz"}}).explain();
 });
 
 //
@@ -66,15 +66,15 @@ assert.throws(function() {
 t.drop();
 assert.commandWorked(t.insert({x: ["abc"]}));
 
-let regexFirst = assert.throws(() => t.find({x: {$regex: /ab/i, $options: 's'}}).itcount());
+let regexFirst = assert.throws(() => t.find({x: {$regex: /ab/i, $options: "s"}}).itcount());
 assert.commandFailedWithCode(regexFirst, 51075);
 
-let optsFirst = assert.throws(() => t.find({x: {$options: 's', $regex: /ab/i}}).itcount());
+let optsFirst = assert.throws(() => t.find({x: {$options: "s", $regex: /ab/i}}).itcount());
 assert.commandFailedWithCode(optsFirst, 51074);
 
 t.drop();
 assert.commandWorked(t.save({x: ["abc"]}));
 
 assert.eq(1, t.count({x: {$regex: /ABC/i}}));
-assert.eq(1, t.count({x: {$regex: /ABC/, $options: 'i'}}));
-assert.eq(1, t.count({x: {$options: 'i', $regex: /ABC/}}));
+assert.eq(1, t.count({x: {$regex: /ABC/, $options: "i"}}));
+assert.eq(1, t.count({x: {$options: "i", $regex: /ABC/}}));

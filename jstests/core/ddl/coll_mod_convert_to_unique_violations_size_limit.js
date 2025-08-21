@@ -22,7 +22,7 @@ function sortViolationsArray(arr) {
     for (let i = 0; i < arr.length; i++) {
         arr[i].ids = arr[i].ids.sort();
     }
-    return arr.sort(function(a, b) {
+    return arr.sort(function (a, b) {
         if (a.ids[0] < b.ids[0]) {
             return -1;
         }
@@ -49,14 +49,16 @@ function countMatchingViolations(idsResult, idsExpected) {
 }
 
 function tojsonWithTruncatedIds(ids) {
-    return tojson(ids.map(obj => {
-        let ret = {...obj};
-        ret.ids = [];
-        for (let i = 0; i < obj.ids.length; ++i) {
-            ret.ids[i] = "..." + obj.ids[i].substr(obj.ids[i].length - 8, 8);
-        }
-        return ret;
-    }));
+    return tojson(
+        ids.map((obj) => {
+            let ret = {...obj};
+            ret.ids = [];
+            for (let i = 0; i < obj.ids.length; ++i) {
+                ret.ids[i] = "..." + obj.ids[i].substr(obj.ids[i].length - 8, 8);
+            }
+            return ret;
+        }),
+    );
 }
 
 // Checks that the violations match what we expect.
@@ -66,12 +68,14 @@ function assertFailedWithViolations(result, expectedViolations, sizeLimitViolati
         assert.eq(
             result.errmsg,
             "Cannot convert the index to unique. Too many conflicting documents were detected. " +
-                "Please resolve them and rerun collMod.");
+                "Please resolve them and rerun collMod.",
+        );
     } else {
         assert.eq(
             result.errmsg,
             "Cannot convert the index to unique. Please resolve conflicting documents before " +
-                "running collMod again.");
+                "running collMod again.",
+        );
     }
     sortViolationsArray(result.violations);
 
@@ -84,14 +88,19 @@ function assertFailedWithViolations(result, expectedViolations, sizeLimitViolati
     // One less violation will be reported because the last violation is over 8MB limit.
     assert.eq(idsResult.length, nDocs - 1);
 
-    assert.eq(countMatchingViolations(idsResult, idsExpected),
-              nDocs - 1,
-              "result violations " + tojsonWithTruncatedIds(result.violations) + " do not match " +
-                  (nDocs - 1) + " of the expected violations " +
-                  tojsonWithTruncatedIds(expectedViolations));
+    assert.eq(
+        countMatchingViolations(idsResult, idsExpected),
+        nDocs - 1,
+        "result violations " +
+            tojsonWithTruncatedIds(result.violations) +
+            " do not match " +
+            (nDocs - 1) +
+            " of the expected violations " +
+            tojsonWithTruncatedIds(expectedViolations),
+    );
 }
 
-const collName = 'collmod_convert_to_unique_violations_size_limit';
+const collName = "collmod_convert_to_unique_violations_size_limit";
 const coll = db.getCollection(collName);
 coll.drop();
 assert.commandWorked(db.createCollection(collName));
@@ -109,18 +118,21 @@ for (let i = 0; i < nDocs; ++i) {
 }
 
 // Sets 'prepareUnique' before converting the index to unique.
-assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 
 // Expects dryRun: true and unique: true conversion to fail with size exceeding violation.
 assertFailedWithViolations(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}, dryRun: true}),
     [{ids}],
-    true);
+    true,
+);
 
 // Expects unique: true conversion to fail with size exceeding violation.
 assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}), [{ids}], true);
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
+    [{ids}],
+    true,
+);
 
 // Removes last violation.
 assert.commandWorked(coll.deleteOne({_id: id}));
@@ -129,8 +141,12 @@ assert.commandWorked(coll.deleteOne({_id: id}));
 assertFailedWithViolations(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}, dryRun: true}),
     [{ids}],
-    false);
+    false,
+);
 
 // Expects unique: true conversion to fail without size exceeding violation.
 assertFailedWithViolations(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}), [{ids}], false);
+    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}),
+    [{ids}],
+    false,
+);

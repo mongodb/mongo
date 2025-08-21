@@ -14,9 +14,11 @@ var config = replTest.getReplSetConfig();
 config.members[numNodes - 1].arbiterOnly = true;
 // An invalid time to get status
 var statusBeforeInitCode = 94;
-assert.commandFailedWithCode(nodes[0].getDB("admin").runCommand({replSetGetStatus: 1}),
-                             statusBeforeInitCode,
-                             "replSetGetStatus should fail before initializing.");
+assert.commandFailedWithCode(
+    nodes[0].getDB("admin").runCommand({replSetGetStatus: 1}),
+    statusBeforeInitCode,
+    "replSetGetStatus should fail before initializing.",
+);
 replTest.initiate(config);
 replTest.awaitSecondaryNodes();
 

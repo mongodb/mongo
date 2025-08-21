@@ -15,11 +15,9 @@ import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 // TODO SERVER-99909 Remove this once shutdown-during-startup issues are fixed.
 TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
-requireSSLProvider('apple', function() {
-    const CLIENT =
-        'CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
-    const SERVER =
-        'CN=Trusted Kernel Test Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
+requireSSLProvider("apple", function () {
+    const CLIENT = "CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
+    const SERVER = "CN=Trusted Kernel Test Server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
     const INVALID = null;
 
     function getCertificateSHA1BySubject(subject) {
@@ -41,36 +39,37 @@ requireSSLProvider('apple', function() {
 
     // Using the thumbprint of the certificate stored in the keychain should always work as a
     // selector. Uppercase everything so we don't fail on unmatching case.
-    const trusted_server_thumbprint =
-        getCertificateSHA1BySubject("Trusted Kernel Test Server").toUpperCase();
-    const trusted_client_thumbprint =
-        getCertificateSHA1BySubject("Trusted Kernel Test Client").toUpperCase();
+    const trusted_server_thumbprint = getCertificateSHA1BySubject("Trusted Kernel Test Server").toUpperCase();
+    const trusted_client_thumbprint = getCertificateSHA1BySubject("Trusted Kernel Test Client").toUpperCase();
 
-    const expected_server_thumbprint =
-        cat("jstests/libs/trusted-server.pem.digest.sha1").toUpperCase();
-    const expected_client_thumbprint =
-        cat("jstests/libs/trusted-client.pem.digest.sha1").toUpperCase();
+    const expected_server_thumbprint = cat("jstests/libs/trusted-server.pem.digest.sha1").toUpperCase();
+    const expected_client_thumbprint = cat("jstests/libs/trusted-client.pem.digest.sha1").toUpperCase();
 
     // If we fall into this case, our trusted certificates are not installed on the machine's
     // certificate keychain. This probably means that certificates have just been renewed, but have
     // not been installed in MacOS machines yet.
-    if (expected_server_thumbprint !== trusted_server_thumbprint ||
-        expected_client_thumbprint !== trusted_client_thumbprint) {
+    if (
+        expected_server_thumbprint !== trusted_server_thumbprint ||
+        expected_client_thumbprint !== trusted_client_thumbprint
+    ) {
         jsTest.log.error(
-            "macOS host has an unexpected version of the trusted server certificate (jstests/libs/trusted-server.pem) or trusted client certificate (jstests/libs/trusted-client.pem) installed.");
-        jsTest.log.error("Expecting server thumbprint: " + expected_server_thumbprint +
-                         ", got: " + trusted_server_thumbprint);
-        jsTest.log.error("Expecting client thumbprint: " + expected_client_thumbprint +
-                         ", got: " + trusted_client_thumbprint);
+            "macOS host has an unexpected version of the trusted server certificate (jstests/libs/trusted-server.pem) or trusted client certificate (jstests/libs/trusted-client.pem) installed.",
+        );
+        jsTest.log.error(
+            "Expecting server thumbprint: " + expected_server_thumbprint + ", got: " + trusted_server_thumbprint,
+        );
+        jsTest.log.error(
+            "Expecting client thumbprint: " + expected_client_thumbprint + ", got: " + trusted_client_thumbprint,
+        );
     }
 
     const testCases = [
-        {selector: 'thumbprint=' + trusted_server_thumbprint, name: SERVER},
-        {selector: 'subject=Trusted Kernel Test Server', name: SERVER},
-        {selector: 'thumbprint=' + trusted_client_thumbprint, name: CLIENT},
-        {selector: 'subject=Trusted Kernel Test Client', name: CLIENT},
-        {selector: 'thumbprint=DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF', name: INVALID},
-        {selector: 'subject=Unknown Test Client', name: INVALID}
+        {selector: "thumbprint=" + trusted_server_thumbprint, name: SERVER},
+        {selector: "subject=Trusted Kernel Test Server", name: SERVER},
+        {selector: "thumbprint=" + trusted_client_thumbprint, name: CLIENT},
+        {selector: "subject=Trusted Kernel Test Client", name: CLIENT},
+        {selector: "thumbprint=DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF", name: INVALID},
+        {selector: "subject=Unknown Test Client", name: INVALID},
     ];
 
     function test(cert, cluster) {
@@ -78,26 +77,30 @@ requireSSLProvider('apple', function() {
         jsTest.log.info(`  Cert Name: ${cert.name}, Selector: ${cert.selector}`);
         jsTest.log.info(`  Cluster Name: ${cluster.name}, Selector: ${cluster.selector}`);
         const opts = {
-            tlsMode: 'requireTLS',
+            tlsMode: "requireTLS",
             tlsCertificateSelector: cert.selector,
             tlsClusterCertificateSelector: cluster.selector,
             waitForConnect: false,
-            setParameter: {logLevel: '1', tlsUseSystemCA: true},
+            setParameter: {logLevel: "1", tlsUseSystemCA: true},
         };
         clearRawMongoProgramOutput();
         const mongod = MongoRunner.runMongod(opts);
 
-        assert.soon(function() {
-            const log = rawMongoProgramOutput(".*");
-            if ((cert.name === null) || (cluster.name === null)) {
-                // Invalid search criteria should fail.
-                return log.search('Certificate selector returned no results') >= 0;
-            }
-            // Valid search criteria should show our Subject Names.
-            const certOK = log.search('\"name\":\"' + cert.name) >= 0;
-            const clusOK = log.search('\"name\":\"' + cluster.name) >= 0;
-            return certOK && clusOK;
-        }, "Starting Mongod with " + tojson(opts), 60000);
+        assert.soon(
+            function () {
+                const log = rawMongoProgramOutput(".*");
+                if (cert.name === null || cluster.name === null) {
+                    // Invalid search criteria should fail.
+                    return log.search("Certificate selector returned no results") >= 0;
+                }
+                // Valid search criteria should show our Subject Names.
+                const certOK = log.search('\"name\":\"' + cert.name) >= 0;
+                const clusOK = log.search('\"name\":\"' + cluster.name) >= 0;
+                return certOK && clusOK;
+            },
+            "Starting Mongod with " + tojson(opts),
+            60000,
+        );
 
         try {
             MongoRunner.stopMongod(mongod);
@@ -111,12 +114,10 @@ requireSSLProvider('apple', function() {
     // Test each possible combination of server/cluster certificate selectors. Make sure we only use
     // the trusted-server certificate as the server certificate, and only use the trusted-client
     // certificate as the cluster certificate.
-    testCases.forEach(cert => {
-        if (cert.name === CLIENT)
-            return;
-        testCases.forEach(cluster => {
-            if (cluster.name === SERVER)
-                return;
+    testCases.forEach((cert) => {
+        if (cert.name === CLIENT) return;
+        testCases.forEach((cluster) => {
+            if (cluster.name === SERVER) return;
             test(cert, cluster);
         });
     });

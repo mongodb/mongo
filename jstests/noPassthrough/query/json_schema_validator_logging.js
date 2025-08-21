@@ -11,7 +11,7 @@ function containsValidatorWarning(logLine) {
 }
 // Validator that doesn't allow '_id'.
 let validator = {
-    validator: {$jsonSchema: {bsonType: "object", required: ["val"], additionalProperties: false}}
+    validator: {$jsonSchema: {bsonType: "object", required: ["val"], additionalProperties: false}},
 };
 
 db.createCollection(collName, validator);
@@ -25,9 +25,8 @@ assert.eq(logLine.length, 2, logLine);
 coll.drop();
 validator = {
     validator: {
-        $jsonSchema:
-            {bsonType: "object", patternProperties: {"^_id*": {}}, additionalProperties: false}
-    }
+        $jsonSchema: {bsonType: "object", patternProperties: {"^_id*": {}}, additionalProperties: false},
+    },
 };
 
 db.createCollection(collName, validator);
@@ -39,8 +38,7 @@ assert.eq(logLine.length, 2, logLine);
 // Repeat for required properties.
 coll.drop();
 validator = {
-    validator:
-        {$jsonSchema: {bsonType: "object", required: ["val", "_id"], additionalProperties: false}}
+    validator: {$jsonSchema: {bsonType: "object", required: ["val", "_id"], additionalProperties: false}},
 };
 
 db.createCollection(collName, validator);

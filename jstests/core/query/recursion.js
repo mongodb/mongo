@@ -23,13 +23,14 @@ assert.throws(shellRecursion);
 // Make sure server side stack overflow doesn't blow up.
 function mapReduceRecursion() {
     db.recursion.mapReduce(
-        function() {
+        function () {
             (function recursion() {
                 recursion.apply();
             })();
         },
-        function() {},
-        {out: {merge: 'out_coll'}});
+        function () {},
+        {out: {merge: "out_coll"}},
+    );
 }
 
 assert.commandWorked(db.recursion.insert({}));

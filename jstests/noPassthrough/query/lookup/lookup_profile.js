@@ -17,8 +17,7 @@ testColl.insert({a: 1});
 
 testDB.setProfilingLevel(2);
 
-const pipeline =
-    [{$lookup: {from: 'system.profile', localField: 'key', foreignField: 'key', as: 'results'}}];
+const pipeline = [{$lookup: {from: "system.profile", localField: "key", foreignField: "key", as: "results"}}];
 testColl.aggregate(pipeline).toArray();
 
 rst.stopSet();

@@ -28,10 +28,9 @@ let staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({shards: 2});
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
-assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 0}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.user", key: {x: 1}}));
+assert.commandWorked(st.s.adminCommand({split: "test.user", middle: {x: 0}}));
 
 moveOutSessionChunks(st, st.shard1.shardName, st.shard0.shardName);
 
@@ -41,13 +40,15 @@ st.forEachConfigServer((conn) => {
     assert.commandWorked(conn.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 200}));
 });
 
-let joinMoveChunk = moveChunkParallel(staticMongod,
-                                      st.s.host,
-                                      {x: 0},
-                                      null,
-                                      'test.user',
-                                      st.shard1.shardName,
-                                      false /**parallel should expect failure */);
+let joinMoveChunk = moveChunkParallel(
+    staticMongod,
+    st.s.host,
+    {x: 0},
+    null,
+    "test.user",
+    st.shard1.shardName,
+    false /**parallel should expect failure */,
+);
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
@@ -59,9 +60,12 @@ unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 joinMoveChunk();
 
 // All shard0 should now own all chunks
-st.s.getDB('config').chunks.find().forEach(function(chunk) {
-    assert.eq(st.shard0.shardName, chunk.shard, tojson(chunk));
-});
+st.s
+    .getDB("config")
+    .chunks.find()
+    .forEach(function (chunk) {
+        assert.eq(st.shard0.shardName, chunk.shard, tojson(chunk));
+    });
 
 st.stop();
 

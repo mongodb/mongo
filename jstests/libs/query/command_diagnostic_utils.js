@@ -22,7 +22,7 @@ export function getDiagnosticLogs({description, logFile}) {
     const logLines = log.split("\n");
     assert.gt(logLines.length, 0, `${description}: no log lines`);
 
-    return logLines.filter(function(logLine) {
+    return logLines.filter(function (logLine) {
         return logLine.includes("ScopedDebugInfo");
     });
 }
@@ -32,13 +32,11 @@ export function getDiagnosticLogs({description, logFile}) {
 // messages.
 export function assertOnDiagnosticLogContents({description, logFile, expectedDiagnosticInfo}) {
     const commandDiagnostics = getDiagnosticLogs({description, logFile});
-    assert(commandDiagnostics.length > 0,
-           `${description}: no log line containing command diagnostics`);
+    assert(commandDiagnostics.length > 0, `${description}: no log line containing command diagnostics`);
 
     let errorStr = "";
     for (let logLine of commandDiagnostics) {
-        const missingDiagnostics =
-            expectedDiagnosticInfo.filter(diagnosticInfo => !logLine.includes(diagnosticInfo));
+        const missingDiagnostics = expectedDiagnosticInfo.filter((diagnosticInfo) => !logLine.includes(diagnosticInfo));
 
         // Found a match!
         if (missingDiagnostics.length == 0) {
@@ -47,19 +45,17 @@ export function assertOnDiagnosticLogContents({description, logFile, expectedDia
 
         errorStr += `Missing ${missingDiagnostics} in log line: ${logLine}. `;
     }
-    assert(false,
-           `${description}: Failed to find a log line containing all expected diagnostic info. ` +
-               errorStr);
+    assert(false, `${description}: Failed to find a log line containing all expected diagnostic info. ` + errorStr);
 }
 
 export const planExecutorAlwaysFails = {
     failpointName: "planExecutorAlwaysFails",
-    failpointOpts: {'tassert': true},
+    failpointOpts: {"tassert": true},
     errorCode: 9028201,
 };
 export const failAllInserts = {
     failpointName: "failAllInserts",
-    failpointOpts: {'tassert': true},
+    failpointOpts: {"tassert": true},
     errorCode: 9276700,
 };
 export const queryPlannerAlwaysFails = {
@@ -78,7 +74,7 @@ export const planFromCacheAlwaysFails = {
 export function getQueryPlannerAlwaysFailsWithNamespace(namespace) {
     return {
         failpointName: queryPlannerAlwaysFails.failpointName,
-        failpointOpts: {'namespace': namespace},
+        failpointOpts: {"namespace": namespace},
         errorCode: queryPlannerAlwaysFails.errorCode,
     };
 }

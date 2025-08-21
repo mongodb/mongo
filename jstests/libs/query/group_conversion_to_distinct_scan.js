@@ -35,7 +35,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
                 i++;
             },
             options,
-            hint
+            hint,
         });
     }
 
@@ -52,8 +52,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1}}, {$group: {_id: "$a"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -114,12 +113,14 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         //
         // Verify that a $group pipeline with an index filter still uses DISTINCT_SCAN.
         //
-        assert.commandWorked(database.runCommand({
-            planCacheSetFilter: coll.getName(),
-            query: {},
-            projection: {a: 1, _id: 0},
-            indexes: ["a_1_b_1_c_1"]
-        }));
+        assert.commandWorked(
+            database.runCommand({
+                planCacheSetFilter: coll.getName(),
+                query: {},
+                projection: {a: 1, _id: 0},
+                indexes: ["a_1_b_1_c_1"],
+            }),
+        );
 
         assertPipelineResultsAndExplainAndQueryHash({
             pipeline,
@@ -139,10 +140,10 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
             hint: {$natural: 1},
             expectsIndexFilter: !TestData.isHintsToQuerySettingsSuite,
             validateExplain: (explain) =>
-                ((TestData.isHintsToQuerySettingsSuite &&
-                  FeatureFlagUtil.isPresentAndEnabled(database, "ShardFilteringDistinctScan"))
-                     ? assertPlanUsesCollScan(explain)
-                     : assertPlanUsesDistinctScan(database, explain, keyPattern)),
+                TestData.isHintsToQuerySettingsSuite &&
+                FeatureFlagUtil.isPresentAndEnabled(database, "ShardFilteringDistinctScan")
+                    ? assertPlanUsesCollScan(explain)
+                    : assertPlanUsesDistinctScan(database, explain, keyPattern),
         });
 
         //
@@ -175,9 +176,12 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: 1},
+            {_id: 2, accum: 2},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -186,9 +190,12 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: 1},
+            {_id: 2, accum: 2},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -196,15 +203,13 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     // entire document.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline:
-            [{$sort: {a: -1, b: -1, c: -1}}, {$group: {_id: "$a", accum: {$first: "$$ROOT"}}}],
+        pipeline: [{$sort: {a: -1, b: -1, c: -1}}, {$group: {_id: "$a", accum: {$first: "$$ROOT"}}}],
         expectedOutput: [
             {_id: null, accum: {_id: 6, a: null, b: 1, c: 1.5}},
             {_id: 1, accum: {_id: 3, a: 1, b: 3, c: 2}},
-            {_id: 2, accum: {_id: 4, a: 2, b: 2, c: 2}}
+            {_id: 2, accum: {_id: 4, a: 2, b: 2, c: 2}},
         ],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -216,10 +221,9 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         expectedOutput: [
             {_id: null, accum: {_id: 6, a: null, b: 1, c: 1.5}},
             {_id: 1, accum: {_id: 3, a: 1, b: 3, c: 2}},
-            {_id: 2, accum: {_id: 4, a: 2, b: 2, c: 2}}
+            {_id: 2, accum: {_id: 4, a: 2, b: 2, c: 2}},
         ],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -227,29 +231,25 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     // with dotted paths.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$sort: {"foo.a": 1, "foo.b": 1}},
-            {$group: {_id: "$foo.a", accum: {$first: "$foo.b"}}}
-        ],
+        pipeline: [{$sort: {"foo.a": 1, "foo.b": 1}}, {$group: {_id: "$foo.a", accum: {$first: "$foo.b"}}}],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: 1},
             {_id: 2, accum: 2},
-            {_id: 3, accum: null}
+            {_id: 3, accum: null},
         ],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {"foo.a": 1, "foo.b": 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {"foo.a": 1, "foo.b": 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$sort: {"foo.a": 1, "foo.b": 1}},
-            {$group: {_id: "$foo.a", accum: {$last: "$foo.b"}}}
+        pipeline: [{$sort: {"foo.a": 1, "foo.b": 1}}, {$group: {_id: "$foo.a", accum: {$last: "$foo.b"}}}],
+        expectedOutput: [
+            {_id: null, accum: 1},
+            {_id: 1, accum: 2},
+            {_id: 2, accum: 2},
+            {_id: 3, accum: null},
         ],
-        expectedOutput:
-            [{_id: null, accum: 1}, {_id: 1, accum: 2}, {_id: 2, accum: 2}, {_id: 3, accum: null}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {"foo.a": 1, "foo.b": 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {"foo.a": 1, "foo.b": 1}),
     });
 
     //
@@ -259,8 +259,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$foo.a"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}],
-        validateExplain: (explain, keyPattern) =>
-            assertPlanUsesDistinctScan(database, explain, keyPattern),
+        validateExplain: (explain, keyPattern) => assertPlanUsesDistinctScan(database, explain, keyPattern),
     });
 
     // Verify that we _do not_ attempt to use a DISTINCT_SCAN on a multikey field.
@@ -274,12 +273,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     // is not multikey, but an intermediate component is.
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$group: {_id: "$mkFoo.a"}}],
-        expectedOutput: [
-            {_id: null},
-            {_id: 1},
-            {_id: 2},
-            {_id: [3, 4]},
-        ],
+        expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: [3, 4]}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
@@ -288,29 +282,23 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     // a sort is present.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$sort: {"mkFoo.a": 1, "mkFoo.b": 1}},
-            {$group: {_id: "$mkFoo.a", accum: {$first: "$mkFoo.b"}}}
-        ],
+        pipeline: [{$sort: {"mkFoo.a": 1, "mkFoo.b": 1}}, {$group: {_id: "$mkFoo.a", accum: {$first: "$mkFoo.b"}}}],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: 1},
             {_id: 2, accum: 2},
-            {_id: [3, 4], accum: [4, 3]}
+            {_id: [3, 4], accum: [4, 3]},
         ],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$sort: {"mkFoo.a": 1, "mkFoo.b": 1}},
-            {$group: {_id: "$mkFoo.a", accum: {$last: "$mkFoo.b"}}}
-        ],
+        pipeline: [{$sort: {"mkFoo.a": 1, "mkFoo.b": 1}}, {$group: {_id: "$mkFoo.a", accum: {$last: "$mkFoo.b"}}}],
         expectedOutput: [
             {_id: null, accum: 1},
             {_id: 1, accum: 2},
             {_id: 2, accum: 2},
-            {_id: [3, 4], accum: [4, 3]}
+            {_id: [3, 4], accum: [4, 3]},
         ],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
@@ -321,22 +309,34 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: 1, mkB: 1}}, {$group: {_id: "$aa", accum: {$first: "$mkB"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: [1, 3]},
+            {_id: 2, accum: []},
+        ],
         validateExplain: (explain) => {
             assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, mkB: 1, c: 1}, true);
-        }
+        },
     });
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: -1, mkB: -1}}, {$group: {_id: "$aa", accum: {$first: "$mkB"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: [1, 3]},
+            {_id: 2, accum: []},
+        ],
         validateExplain: (explain) => {
             assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, mkB: 1, c: 1}, true);
-        }
+        },
     });
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: -1, mkB: -1}}, {$group: {_id: "$aa", accum: {$last: "$mkB"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: []}],
-        validateExplain: assertPlanDoesNotUseDistinctScan
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: 2},
+            {_id: 2, accum: []},
+        ],
+        validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
     //
@@ -345,12 +345,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: 1, mkB: 1}}, {$group: {_id: {aa: "$aa", mkB: "$mkB"}}}],
-        expectedOutput: [
-            {_id: {aa: 1, mkB: [1, 3]}},
-            {_id: {}},
-            {_id: {aa: 1, mkB: 2}},
-            {_id: {aa: 2, mkB: []}}
-        ],
+        expectedOutput: [{_id: {aa: 1, mkB: [1, 3]}}, {_id: {}}, {_id: {aa: 1, mkB: 2}}, {_id: {aa: 2, mkB: []}}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
@@ -359,15 +354,12 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     // the bounds are [minKey, maxKey].
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$sort: {"foo.a": 1, "mkFoo.b": 1}},
-            {$group: {_id: "$foo.a", accum: {$first: "$mkFoo.b"}}}
-        ],
+        pipeline: [{$sort: {"foo.a": 1, "mkFoo.b": 1}}, {$group: {_id: "$foo.a", accum: {$first: "$mkFoo.b"}}}],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: 1},
             {_id: 2, accum: 2},
-            {_id: 3, accum: [4, 3]}
+            {_id: 3, accum: [4, 3]},
         ],
         validateExplain: (explain) => {
             assertPlanUsesDistinctScanOnlyOnStandalone(explain, {"foo.a": 1, "mkFoo.b": 1}, true);
@@ -375,15 +367,12 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$sort: {"foo.a": 1, "mkFoo.b": -1}},
-            {$group: {_id: "$foo.a", accum: {$last: "$mkFoo.b"}}}
-        ],
+        pipeline: [{$sort: {"foo.a": 1, "mkFoo.b": -1}}, {$group: {_id: "$foo.a", accum: {$last: "$mkFoo.b"}}}],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: 1},
             {_id: 2, accum: 2},
-            {_id: 3, accum: [4, 3]}
+            {_id: 3, accum: [4, 3]},
         ],
         validateExplain: assertPlanUsesCollScan,
     });
@@ -396,9 +385,13 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         pipeline: [
             {$match: {mkB: {$ne: 9999}}},
             {$sort: {aa: 1, mkB: 1}},
-            {$group: {_id: "$aa", accum: {$first: "$mkB"}}}
+            {$group: {_id: "$aa", accum: {$first: "$mkB"}}},
         ],
-        expectedOutput: [{_id: 1, accum: [1, 3]}, {_id: null, accum: null}, {_id: 2, accum: []}],
+        expectedOutput: [
+            {_id: 1, accum: [1, 3]},
+            {_id: null, accum: null},
+            {_id: 2, accum: []},
+        ],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
@@ -406,7 +399,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         pipeline: [
             {$match: {mkB: {$gt: -5}}},
             {$sort: {aa: 1, mkB: 1}},
-            {$group: {_id: "$aa", accum: {$first: "$mkB"}}}
+            {$group: {_id: "$aa", accum: {$first: "$mkB"}}},
         ],
         expectedOutput: [{_id: 1, accum: [1, 3]}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
@@ -418,9 +411,13 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         pipeline: [
             {$match: {mkB: {$ne: 9999}}},
             {$sort: {aa: 1, mkB: 1}},
-            {$group: {_id: "$aa", accum: {$last: "$mkB"}}}
+            {$group: {_id: "$aa", accum: {$last: "$mkB"}}},
         ],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: []}],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: 2},
+            {_id: 2, accum: []},
+        ],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
@@ -428,7 +425,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         pipeline: [
             {$match: {mkB: {$gt: -5}}},
             {$sort: {aa: 1, mkB: 1}},
-            {$group: {_id: "$aa", accum: {$last: "$mkB"}}}
+            {$group: {_id: "$aa", accum: {$last: "$mkB"}}},
         ],
         expectedOutput: [{_id: 1, accum: 2}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
@@ -442,13 +439,13 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         pipeline: [
             {$match: {"mkFoo.b": {$ne: 20000}}},
             {$sort: {"foo.a": 1, "mkFoo.b": 1}},
-            {$group: {_id: "$foo.a", accum: {$first: "$mkFoo.b"}}}
+            {$group: {_id: "$foo.a", accum: {$first: "$mkFoo.b"}}},
         ],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: 1},
             {_id: 2, accum: 2},
-            {_id: 3, accum: [4, 3]}
+            {_id: 3, accum: [4, 3]},
         ],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
@@ -457,13 +454,13 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         pipeline: [
             {$match: {"mkFoo.b": {$ne: 20000}}},
             {$sort: {"foo.a": 1, "mkFoo.b": -1}},
-            {$group: {_id: "$foo.a", accum: {$last: "$mkFoo.b"}}}
+            {$group: {_id: "$foo.a", accum: {$last: "$mkFoo.b"}}},
         ],
         expectedOutput: [
             {_id: null, accum: null},
             {_id: 1, accum: 1},
             {_id: 2, accum: 2},
-            {_id: 3, accum: [4, 3]}
+            {_id: 3, accum: [4, 3]},
         ],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
@@ -481,8 +478,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {"foo.a": 1}}, {$group: {_id: "$foo.a"}}],
         expectedOutput: [{_id: null}, {_id: 1}, {_id: 2}, {_id: 3}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {"foo.a": 1, "mkFoo.b": 1})
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {"foo.a": 1, "mkFoo.b": 1}),
     });
 
     //
@@ -491,9 +487,12 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: 1, bb: 1}}, {$group: {_id: "$aa", accum: {$first: "$mkB"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: [1, 3]}, {_id: 2, accum: []}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, bb: 1, c: 1}),
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: [1, 3]},
+            {_id: 2, accum: []},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, bb: 1, c: 1}),
     });
 
     //
@@ -502,9 +501,12 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {aa: 1, bb: 1}}, {$group: {_id: "$aa", accum: {$last: "$mkB"}}}],
-        expectedOutput: [{_id: 1, accum: 2}, {_id: 2, accum: []}, {_id: null, accum: null}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, bb: 1, c: 1}),
+        expectedOutput: [
+            {_id: 1, accum: 2},
+            {_id: 2, accum: []},
+            {_id: null, accum: null},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {aa: 1, bb: 1, c: 1}),
     });
 
     //
@@ -512,11 +514,13 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     // accumulator that includes an expression.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline:
-            [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: {$add: ["$b", "$c"]}}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 2}, {_id: 2, accum: 4}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: {$add: ["$b", "$c"]}}}}],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: 2},
+            {_id: 2, accum: 4},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -531,11 +535,14 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
              * Because those compare equal, we don't know whether the $last one will be the one
              * matching {c: 1} or {c: 1.5}. To make the test deterministic, we add 0.6 to
              * whatever result we get and round it to the nearest integer. */
-            {$project: {_id: "$_id", accum: {$round: [{$add: ["$accum", 0.6]}, 0]}}}
+            {$project: {_id: "$_id", accum: {$round: [{$add: ["$accum", 0.6]}, 0]}}},
         ],
-        expectedOutput: [{_id: null, accum: 3.0}, {_id: 1, accum: 6}, {_id: 2, accum: 5}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        expectedOutput: [
+            {_id: null, accum: 3.0},
+            {_id: 1, accum: 6},
+            {_id: 2, accum: 5},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -546,8 +553,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$match: {a: 1}}, {$sort: {b: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -558,8 +564,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$match: {a: 1}}, {$sort: {a: 1, b: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -568,8 +573,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$match: {a: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -602,12 +606,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     // preclude the use of the DISTINCT_SCAN optimization).
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$match: {a: 1}},
-            {$project: {a: 1, b: 1}},
-            {$sort: {a: 1, b: 1}},
-            {$group: {_id: "$b"}}
-        ],
+        pipeline: [{$match: {a: 1}}, {$project: {a: 1, b: 1}}, {$sort: {a: 1, b: 1}}, {$group: {_id: "$b"}}],
         expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
@@ -618,16 +617,22 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
-        expectedOutput: [{_id: null, accum: 1}, {_id: 1, accum: 3}, {_id: 2, accum: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        expectedOutput: [
+            {_id: null, accum: 1},
+            {_id: 1, accum: 3},
+            {_id: 2, accum: 2},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: 1},
+            {_id: 2, accum: 2},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -636,7 +641,11 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1}}, {$group: {_id: "$a", accum: {$sum: "$b"}}}],
-        expectedOutput: [{_id: null, accum: 2}, {_id: 1, accum: 8}, {_id: 2, accum: 2}],
+        expectedOutput: [
+            {_id: null, accum: 2},
+            {_id: 1, accum: 8},
+            {_id: 2, accum: 2},
+        ],
         validateExplain: (explain) => assertPlanUsesIndexScan(explain, {a: 1, b: 1, c: 1}),
     });
 
@@ -645,9 +654,12 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     // and $last accumulators.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline:
-            [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", f: {$first: "$b"}, l: {$last: "$b"}}}],
-        expectedOutput: [{_id: null, f: 1, l: null}, {_id: 1, f: 3, l: 1}, {_id: 2, f: 2, l: 2}],
+        pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", f: {$first: "$b"}, l: {$last: "$b"}}}],
+        expectedOutput: [
+            {_id: null, f: 1, l: null},
+            {_id: 1, f: 3, l: 1},
+            {_id: 2, f: 2, l: 2},
+        ],
         validateExplain: (explain) => assertPlanUsesIndexScan(explain, {a: 1, b: 1, c: 1}),
     });
 
@@ -655,47 +667,46 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     // Verify that a $sort-$group pipeline with multiple $first accumulators uses DISTINCT_SCAN.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$sort: {a: -1, b: -1}},
-            {$group: {_id: "$a", f1: {$first: "$b"}, f2: {$first: "$b"}}}
+        pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", f1: {$first: "$b"}, f2: {$first: "$b"}}}],
+        expectedOutput: [
+            {_id: null, f1: 1, f2: 1},
+            {_id: 1, f1: 3, f2: 3},
+            {_id: 2, f1: 2, f2: 2},
         ],
-        expectedOutput: [{_id: null, f1: 1, f2: 1}, {_id: 1, f1: 3, f2: 3}, {_id: 2, f1: 2, f2: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$sort: {a: -1, b: -1, c: -1}},
-            {$group: {_id: "$a", fb: {$first: "$b"}, fc: {$first: "$c"}}}
+        pipeline: [{$sort: {a: -1, b: -1, c: -1}}, {$group: {_id: "$a", fb: {$first: "$b"}, fc: {$first: "$c"}}}],
+        expectedOutput: [
+            {_id: null, fb: 1, fc: 1.5},
+            {_id: 1, fb: 3, fc: 2},
+            {_id: 2, fb: 2, fc: 2},
         ],
-        expectedOutput:
-            [{_id: null, fb: 1, fc: 1.5}, {_id: 1, fb: 3, fc: 2}, {_id: 2, fb: 2, fc: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
     // Verify that a $sort-$group pipeline with multiple $last accumulators uses DISTINCT_SCAN.
     //
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline:
-            [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", l1: {$last: "$b"}, l2: {$last: "$b"}}}],
-        expectedOutput:
-            [{_id: null, l1: null, l2: null}, {_id: 1, l1: 1, l2: 1}, {_id: 2, l1: 2, l2: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        pipeline: [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", l1: {$last: "$b"}, l2: {$last: "$b"}}}],
+        expectedOutput: [
+            {_id: null, l1: null, l2: null},
+            {_id: 1, l1: 1, l2: 1},
+            {_id: 2, l1: 2, l2: 2},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
-        pipeline: [
-            {$sort: {a: -1, b: -1, c: -1}},
-            {$group: {_id: "$a", lb: {$last: "$b"}, lc: {$last: "$c"}}}
+        pipeline: [{$sort: {a: -1, b: -1, c: -1}}, {$group: {_id: "$a", lb: {$last: "$b"}, lc: {$last: "$c"}}}],
+        expectedOutput: [
+            {_id: null, lb: null, lc: null},
+            {_id: 1, lb: 1, lc: 1},
+            {_id: 2, lb: 2, lc: 2},
         ],
-        expectedOutput:
-            [{_id: null, lb: null, lc: null}, {_id: 1, lb: 1, lc: 1}, {_id: 2, lb: 2, lc: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -704,13 +715,21 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: 1},
+            {_id: 2, accum: 2},
+        ],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: 1, accum: 1}, {_id: 2, accum: 2}],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: 1, accum: 1},
+            {_id: 2, accum: 2},
+        ],
         validateExplain: assertPlanDoesNotUseDistinctScan,
     });
 
@@ -731,10 +750,12 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: {v: "$a"}, accum: {$first: "$b"}}}],
-        expectedOutput:
-            [{_id: {v: null}, accum: null}, {_id: {v: 1}, accum: 1}, {_id: {v: 2}, accum: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        expectedOutput: [
+            {_id: {v: null}, accum: null},
+            {_id: {v: 1}, accum: 1},
+            {_id: {v: 2}, accum: 2},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     //
@@ -743,10 +764,12 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {a: 1, b: 1}}, {$group: {_id: {v: "$a"}, accum: {$last: "$b"}}}],
-        expectedOutput:
-            [{_id: {v: null}, accum: 1}, {_id: {v: 1}, accum: 3}, {_id: {v: 2}, accum: 2}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
+        expectedOutput: [
+            {_id: {v: null}, accum: 1},
+            {_id: {v: 1}, accum: 3},
+            {_id: {v: 2}, accum: 2},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScan(database, explain, {a: 1, b: 1, c: 1}),
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -787,7 +810,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
             {_id: "FoO", accum: 2},
             {_id: "bAr", accum: 3},
             {_id: "bar", accum: 4},
-            {_id: "foo", accum: 1}
+            {_id: "foo", accum: 1},
         ],
         validateExplain: assertPlanUsesCollScan,
     });
@@ -799,7 +822,7 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
             {_id: "FoO", accum: 2},
             {_id: "bAr", accum: 3},
             {_id: "bar", accum: 4},
-            {_id: "foo", accum: 1}
+            {_id: "foo", accum: 1},
         ],
         validateExplain: assertPlanUsesCollScan,
     });
@@ -810,7 +833,11 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: "bAr", accum: 3}, {_id: "foo", accum: 1}],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: "bAr", accum: 3},
+            {_id: "foo", accum: 1},
+        ],
         validateExplain: assertPlanUsesCollScan,
         options: collationOption,
     });
@@ -821,7 +848,11 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$last: "$d"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: "bAr", accum: 4}, {_id: "foo", accum: 2}],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: "bAr", accum: 4},
+            {_id: "foo", accum: 2},
+        ],
         validateExplain: assertPlanUsesCollScan,
         options: collationOption,
     });
@@ -867,10 +898,9 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
             {_id: "FoO", accum: 2},
             {_id: "bAr", accum: 3},
             {_id: "bar", accum: 4},
-            {_id: "foo", accum: 1}
+            {_id: "foo", accum: 1},
         ],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
@@ -880,10 +910,9 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
             {_id: "FoO", accum: 2},
             {_id: "bAr", accum: 3},
             {_id: "bar", accum: 4},
-            {_id: "foo", accum: 1}
+            {_id: "foo", accum: 1},
         ],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
     });
 
     //
@@ -892,9 +921,13 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: "bAr", accum: 3}, {_id: "foo", accum: 1}],
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: "bAr", accum: 3},
+            {_id: "foo", accum: 1},
+        ],
         validateExplain: assertPlanUsesCollScan,
-        options: collationOption
+        options: collationOption,
     });
 
     //
@@ -903,9 +936,13 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: -1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
-        expectedOutput: [{_id: "bar", accum: 4}, {_id: "FoO", accum: 2}, {_id: null, accum: null}],
+        expectedOutput: [
+            {_id: "bar", accum: 4},
+            {_id: "FoO", accum: 2},
+            {_id: null, accum: null},
+        ],
         validateExplain: assertPlanUsesCollScan,
-        options: collationOption
+        options: collationOption,
     });
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -937,9 +974,8 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str"}}],
         expectedOutput: [{_id: null}, {_id: "bAr"}, {_id: "foo"}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
-        options: collationOption
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
+        options: collationOption,
     });
 
     //
@@ -953,9 +989,9 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
             {_id: "FoO", accum: 2},
             {_id: "bAr", accum: 3},
             {_id: "bar", accum: 4},
-            {_id: "foo", accum: 1}
+            {_id: "foo", accum: 1},
         ],
-        validateExplain: assertPlanUsesCollScan
+        validateExplain: assertPlanUsesCollScan,
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
@@ -965,9 +1001,9 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
             {_id: "FoO", accum: 2},
             {_id: "bAr", accum: 3},
             {_id: "bar", accum: 4},
-            {_id: "foo", accum: 1}
+            {_id: "foo", accum: 1},
         ],
-        validateExplain: assertPlanUsesCollScan
+        validateExplain: assertPlanUsesCollScan,
     });
 
     //
@@ -976,10 +1012,13 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
     //
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [{$sort: {str: 1, d: 1}}, {$group: {_id: "$str", accum: {$first: "$d"}}}],
-        expectedOutput: [{_id: null, accum: null}, {_id: "bAr", accum: 3}, {_id: "foo", accum: 1}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
-        options: collationOption
+        expectedOutput: [
+            {_id: null, accum: null},
+            {_id: "bAr", accum: 3},
+            {_id: "foo", accum: 1},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
+        options: collationOption,
     });
 
     //
@@ -992,12 +1031,15 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         pipeline: [
             {$sort: {str: 1, d: 1}},
             {$group: {_id: "$str", accum: {$last: "$d"}}},
-            {$addFields: {_id: {$toLower: "$_id"}}}
+            {$addFields: {_id: {$toLower: "$_id"}}},
         ],
-        expectedOutput: [{_id: "foo", accum: 2}, {_id: "", accum: null}, {_id: "bar", accum: 4}],
-        validateExplain: (explain) =>
-            assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
-        options: collationOption
+        expectedOutput: [
+            {_id: "foo", accum: 2},
+            {_id: "", accum: null},
+            {_id: "bar", accum: 4},
+        ],
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {str: 1, d: 1}),
+        options: collationOption,
     });
 
     //
@@ -1015,23 +1057,21 @@ export function runGroupConversionToDistinctScanTests(database, queryHashes, isS
         pipeline: [
             {$sort: {_id: 1}},
             {
-                $_internalStreamingGroup:
-                    {_id: "$_id", value: {$first: "$a"}, $monotonicIdFields: ["_id"]}
-            }
+                $_internalStreamingGroup: {_id: "$_id", value: {$first: "$a"}, $monotonicIdFields: ["_id"]},
+            },
         ],
         expectedOutput: expectedResult,
-        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {_id: 1})
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {_id: 1}),
     });
 
     assertPipelineResultsAndExplainAndQueryHash({
         pipeline: [
             {$sort: {_id: 1}},
             {
-                $_internalStreamingGroup:
-                    {_id: "$_id", value: {$last: "$a"}, $monotonicIdFields: ["_id"]}
-            }
+                $_internalStreamingGroup: {_id: "$_id", value: {$last: "$a"}, $monotonicIdFields: ["_id"]},
+            },
         ],
         expectedOutput: expectedResult,
-        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {_id: 1})
+        validateExplain: (explain) => assertPlanUsesDistinctScanOnlyOnStandalone(explain, {_id: 1}),
     });
 }

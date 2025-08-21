@@ -7,6 +7,6 @@ let nodes = [
     {binVersion: newVersion},
     {binVersion: oldVersion},
     {binVersion: newVersion},
-    {binVersion: oldVersion}
+    {binVersion: oldVersion},
 ];
 new TagsTest({nodes: nodes}).run();

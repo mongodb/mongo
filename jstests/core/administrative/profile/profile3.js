@@ -16,7 +16,7 @@ db.dropAllUsers();
 let t = db.profile3;
 t.drop();
 
-let profileCursor = function(query) {
+let profileCursor = function (query) {
     print("----");
     query = query || {};
     Object.extend(query, {user: username + "@" + db.getName()});
@@ -37,8 +37,9 @@ try {
 
     // Don't profile the setFCV command, which could be run during this test in the
     // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-    assert.commandWorked(db.setProfilingLevel(
-        1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+    assert.commandWorked(
+        db.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    );
 
     db.createCollection(t.getName());
     t.insert({x: 1});
@@ -56,7 +57,6 @@ try {
     assert.eq(profileCursor({nMatched: 1}).count(), 2);
     assert.eq(profileCursor({nMatched: 0}).count(), 1);
     db.system.profile.drop();
-
 } finally {
     db.setProfilingLevel(0);
     db.logout();

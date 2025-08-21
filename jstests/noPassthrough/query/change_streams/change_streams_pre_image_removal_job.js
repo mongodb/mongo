@@ -37,18 +37,18 @@ const rst = new ReplSetTest({nodes: 2, oplogSize: oplogSizeMB, nodeOptions: {syn
 rst.startSet({
     setParameter: {
         expiredChangeStreamPreImageRemovalJobSleepSecs: 1,
-        preImagesCollectionTruncateMarkersMinBytes: 1
-    }
+        preImagesCollectionTruncateMarkersMinBytes: 1,
+    },
 });
 rst.initiate();
-const largeStr = 'abcdefghi'.repeat(4 * 1024);
+const largeStr = "abcdefghi".repeat(4 * 1024);
 const primaryNode = rst.getPrimary();
 const testDB = primaryNode.getDB(jsTestName());
 const localDB = primaryNode.getDB("local");
 
 // Activate more detailed logging for pre-image removal.
 const adminDB = primaryNode.getDB("admin");
-adminDB.setLogLevel(1, 'query');
+adminDB.setLogLevel(1, "query");
 
 // Returns documents from the pre-images collection from 'node'.
 function getPreImages(node) {
@@ -62,8 +62,7 @@ function rollOverCurrentOplog() {
     // Keep populating the oplog as long as the first oplog entry is newer (more recent) than
     // 'lastOplogEntry'. The majority concern guarantees that both nodes of the 2-node replica set
     // have identical oplogs.
-    while (timestampCmp(lastOplogEntry.ts,
-                        getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) >= 0) {
+    while (timestampCmp(lastOplogEntry.ts, getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) >= 0) {
         assert.commandWorked(testDB.tmp.insert({largeStr}, {writeConcern: {w: "majority"}}));
     }
 }
@@ -100,10 +99,8 @@ function retryOnCappedPositionLostError(func, message) {
     assert.soon(() => getPreImages(primaryNode).length === 0);
 
     // Drop and recreate the collections with pre-images recording.
-    const collA = assertDropAndRecreateCollection(
-        testDB, "collA", {changeStreamPreAndPostImages: {enabled: true}});
-    const collB = assertDropAndRecreateCollection(
-        testDB, "collB", {changeStreamPreAndPostImages: {enabled: true}});
+    const collA = assertDropAndRecreateCollection(testDB, "collA", {changeStreamPreAndPostImages: {enabled: true}});
+    const collB = assertDropAndRecreateCollection(testDB, "collB", {changeStreamPreAndPostImages: {enabled: true}});
 
     // Perform insert and update operations.
     for (const coll of [collA, collB]) {
@@ -136,12 +133,16 @@ function retryOnCappedPositionLostError(func, message) {
             preImages = getPreImages(primaryNode);
             const onlyTwoPreImagesLeft = preImages.length === 2;
             const allPreImagesHaveBiggerTimestamp = preImages.every(
-                preImage => timestampCmp(preImage._id.ts, lastOplogEntryToBeRemoved.ts) === 1);
+                (preImage) => timestampCmp(preImage._id.ts, lastOplogEntryToBeRemoved.ts) === 1,
+            );
             return onlyTwoPreImagesLeft && allPreImagesHaveBiggerTimestamp;
         },
-        () => "Existing pre-images: " + tojson(getPreImages(primaryNode)) +
+        () =>
+            "Existing pre-images: " +
+            tojson(getPreImages(primaryNode)) +
             ", first oplog entry: " +
-            tojson(getFirstOplogEntry(primaryNode, {readConcern: "majority"})));
+            tojson(getFirstOplogEntry(primaryNode, {readConcern: "majority"})),
+    );
 }
 
 // Increase oplog size on each node to prevent oplog entries from being deleted which removes a

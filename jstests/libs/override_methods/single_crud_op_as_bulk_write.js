@@ -16,30 +16,30 @@ function getAdditionalParameters(cmdObj) {
     Object.assign(cmdCopy, cmdObj);
 
     // Remove all parameters we extract for use in bulkWrite.
-    ["bypassDocumentValidation",
-     "ordered",
-     "writeConcern",
-     "insert",
-     "update",
-     "delete",
-     "let",
-     "sampleId",
-     "documents",
-     "updates",
-     "deletes",
-     "collectionUUID",
-     "encryptionInformation",
-     "isTimeseriesNamespace"]
-        .forEach(property => {
-            if (cmdCopy.hasOwnProperty(property)) {
-                delete cmdCopy[property];
-            }
-        });
+    [
+        "bypassDocumentValidation",
+        "ordered",
+        "writeConcern",
+        "insert",
+        "update",
+        "delete",
+        "let",
+        "sampleId",
+        "documents",
+        "updates",
+        "deletes",
+        "collectionUUID",
+        "encryptionInformation",
+        "isTimeseriesNamespace",
+    ].forEach((property) => {
+        if (cmdCopy.hasOwnProperty(property)) {
+            delete cmdCopy[property];
+        }
+    });
     return cmdCopy;
 }
 
-function runCommandSingleOpBulkWriteOverride(
-    conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
+function runCommandSingleOpBulkWriteOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
     let cmdNameLower = cmdName.toLowerCase();
     if (BulkWriteUtils.canProcessAsBulkWrite(cmdNameLower)) {
         BulkWriteUtils.processCRUDOp(dbName, cmdNameLower, cmdObj);
@@ -51,7 +51,8 @@ function runCommandSingleOpBulkWriteOverride(
                 originalRunCommand,
                 makeRunCommandArgs,
                 false /* isMultiOp */,
-                {...{"errorsOnly": errorsOnly}, ...additionalParameters});
+                {...{"errorsOnly": errorsOnly}, ...additionalParameters},
+            );
             assert.eq(response.length, 1);
             BulkWriteUtils.resetBulkWriteBatch();
             return response[0];
@@ -84,8 +85,7 @@ function runCommandSingleOpBulkWriteOverride(
     return originalRunCommand.apply(conn, makeRunCommandArgs(cmdObj));
 }
 
-TestData.runningWithBulkWriteOverride = true;  // See update_metrics.js.
+TestData.runningWithBulkWriteOverride = true; // See update_metrics.js.
 
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/single_crud_op_as_bulk_write.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/single_crud_op_as_bulk_write.js");
 OverrideHelpers.overrideRunCommand(runCommandSingleOpBulkWriteOverride);

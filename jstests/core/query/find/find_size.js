@@ -6,15 +6,17 @@ const coll = db.jstests_find_size;
 coll.drop();
 
 // Check nested arrays.
-assert.commandWorked(coll.insert([
-    {a: [{b: [1, 2, 3]}, {b: 1}]},
-    {a: [1, [2], [3]]},
-    {a: [1, [2]]},
-    {a: [[1, [1]]]},
-    {a: [[[1]]]},
-    {a: 1},
-    {a: {}},
-]));
+assert.commandWorked(
+    coll.insert([
+        {a: [{b: [1, 2, 3]}, {b: 1}]},
+        {a: [1, [2], [3]]},
+        {a: [1, [2]]},
+        {a: [[1, [1]]]},
+        {a: [[[1]]]},
+        {a: 1},
+        {a: {}},
+    ]),
+);
 
 assert.eq(1, coll.find({"a": {$size: 3}}).itcount());
 assert.eq(2, coll.find({"a": {$size: 2}}).itcount());
@@ -43,15 +45,17 @@ assert(coll.drop());
 
 // Check more nested arrays with dotted paths and that as long as one
 // of the elements of array matches, the document matches.
-assert.commandWorked(coll.insert([
-    {a: [{b: [1, 2, 3]}, {b: 1}]},
-    {a: [{b: [1, [2]]}, {b: [1]}]},
-    {a: [{b: [{c: [1]}, {c: []}]}, {b: [1]}]},
-    {a: {b: [1, [2], [[3]]]}},
-    {a: {b: [1, 2, 3]}},
-    {b: {a: [1, [2], [[3]]]}},
-    {b: {a: []}},
-]));
+assert.commandWorked(
+    coll.insert([
+        {a: [{b: [1, 2, 3]}, {b: 1}]},
+        {a: [{b: [1, [2]]}, {b: [1]}]},
+        {a: [{b: [{c: [1]}, {c: []}]}, {b: [1]}]},
+        {a: {b: [1, [2], [[3]]]}},
+        {a: {b: [1, 2, 3]}},
+        {b: {a: [1, [2], [[3]]]}},
+        {b: {a: []}},
+    ]),
+);
 
 assert.eq(3, coll.find({"a.b": {$size: 3}}).itcount());
 assert.eq(2, coll.find({"a.b": {$size: 2}}).itcount());
@@ -79,7 +83,9 @@ assert.eq(1, coll.find({"a": {$size: NumberInt(4)}}).itcount());
 
 // Check bad inputs.
 const badInputs = [-1, NumberLong(-10000), "str", 3.2, 0.1, NumberLong(-9223372036854775808)];
-badInputs.forEach(function(input) {
-    assert.commandFailed(db.runCommand({find: coll.getName(), filter: {"a": {$size: input}}}),
-                         "$size argument " + input + " should have failed");
+badInputs.forEach(function (input) {
+    assert.commandFailed(
+        db.runCommand({find: coll.getName(), filter: {"a": {$size: input}}}),
+        "$size argument " + input + " should have failed",
+    );
 });

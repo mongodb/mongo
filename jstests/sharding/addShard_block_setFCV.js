@@ -24,21 +24,24 @@ rs0.initiate();
 
 jsTest.log("Checking that RS is not locked for setting the FCV before running addShard");
 let adminDB = rs0.getPrimary().getDB("admin");
-assert.commandWorked(
-    adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
 jsTest.log("Run an addShard command but pause immediately after blocking setFCV commands");
 const configPrimary = st.configRS.getPrimary();
 const addShardFp = configureFailPoint(configPrimary, "hangAfterLockingNewShard");
-const awaitResult = startParallelShell(funWithArgs(function(url) {
-                                           assert.commandWorked(db.adminCommand({addShard: url}));
-                                       }, rs0.getURL()), st.s.port);
+const awaitResult = startParallelShell(
+    funWithArgs(function (url) {
+        assert.commandWorked(db.adminCommand({addShard: url}));
+    }, rs0.getURL()),
+    st.s.port,
+);
 addShardFp.wait();
 
 jsTest.log("Checking that RS is locked for setting the FCV after running addShard");
 assert.commandFailedWithCode(
     adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-    ErrorCodes.ConflictingOperationInProgress);
+    ErrorCodes.ConflictingOperationInProgress,
+);
 
 // Release fail point
 addShardFp.off();

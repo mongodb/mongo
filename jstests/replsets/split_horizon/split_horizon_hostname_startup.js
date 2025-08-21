@@ -9,8 +9,8 @@
 let startupConfig = {
     replSet: "test",
     startClean: true,
-    dbpath: MongoRunner.dataPath + 'split-hz-test',
-    setParameter: {disableSplitHorizonIPCheck: true}
+    dbpath: MongoRunner.dataPath + "split-hz-test",
+    setParameter: {disableSplitHorizonIPCheck: true},
 };
 
 let mongod = MongoRunner.runMongod(startupConfig);
@@ -18,7 +18,7 @@ assert(mongod);
 
 const replConfig = {
     _id: "test",
-    members: [{_id: 0, host: "127.0.0.1:" + mongod.port, horizons: {horizon_name: "127.0.0.0/20"}}]
+    members: [{_id: 0, host: "127.0.0.1:" + mongod.port, horizons: {horizon_name: "127.0.0.0/20"}}],
 };
 
 // Make sure replSetInitiate works

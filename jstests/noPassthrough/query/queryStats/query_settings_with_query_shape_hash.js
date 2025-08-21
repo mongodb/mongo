@@ -5,7 +5,7 @@ import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {
     getQueryStatsFindCmd,
     getQueryStatsShapeHashes,
-    runOnReplsetAndShardedCluster
+    runOnReplsetAndShardedCluster,
 } from "jstests/libs/query/query_stats_utils.js";
 
 runOnReplsetAndShardedCluster((conn, test) => {
@@ -14,13 +14,15 @@ runOnReplsetAndShardedCluster((conn, test) => {
 
     const qsutils = new QuerySettingsUtils(db, coll.getName());
 
-    assert.commandWorked(coll.insertMany([
-        {a: 1, b: 5},
-        {a: 2, b: 4},
-        {a: 3, b: 3},
-        {a: 4, b: 2},
-        {a: 5, b: 1},
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            {a: 1, b: 5},
+            {a: 2, b: 4},
+            {a: 3, b: 3},
+            {a: 4, b: 2},
+            {a: 5, b: 1},
+        ]),
+    );
 
     const querySettingsQuery = qsutils.makeFindQueryInstance({filter: {a: 1, b: 5}});
     const query = qsutils.withoutDollarDB(querySettingsQuery);
@@ -34,18 +36,14 @@ runOnReplsetAndShardedCluster((conn, test) => {
     assert.eq(queryShapeHashes.length, 1);
 
     // Set query settings via hash. Representative query is missing so we can't run explain yet.
-    assert.commandWorked(
-        db.adminCommand({setQuerySettings: queryShapeHashes[0], settings: initialSettings}));
-    qsutils.assertQueryShapeConfiguration([{settings: initialSettings}],
-                                          false /* shouldRunExplain */);
+    assert.commandWorked(db.adminCommand({setQuerySettings: queryShapeHashes[0], settings: initialSettings}));
+    qsutils.assertQueryShapeConfiguration([{settings: initialSettings}], false /* shouldRunExplain */);
 
     // Update the query settings via query. Representative query will be populated and we can run
     // explain to make sure that the settings applied with the hash map to and apply to the correct
     // query shape.
-    assert.commandWorked(
-        db.adminCommand({setQuerySettings: querySettingsQuery, settings: {reject: true}}));
-    qsutils.assertQueryShapeConfiguration(
-        [qsutils.makeQueryShapeConfiguration(finalSettings, querySettingsQuery)]);
+    assert.commandWorked(db.adminCommand({setQuerySettings: querySettingsQuery, settings: {reject: true}}));
+    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(finalSettings, querySettingsQuery)]);
 
     // Cleanup.
     qsutils.removeAllQuerySettings();

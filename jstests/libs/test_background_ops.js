@@ -7,7 +7,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 /**
  * Allows synchronization between background ops and the test operations
  */
-export var waitForLock = function(mongo, name) {
+export var waitForLock = function (mongo, name) {
     var ts = new ObjectId();
     var lockColl = mongo.getCollection("config.testLocks");
 
@@ -19,26 +19,29 @@ export var waitForLock = function(mongo, name) {
 
     var startTime = new Date().getTime();
 
-    assert.soon(function() {
-        let res = lockColl.update({_id: name, state: 0}, {$set: {ts: ts, state: 1}});
+    assert.soon(
+        function () {
+            let res = lockColl.update({_id: name, state: 0}, {$set: {ts: ts, state: 1}});
 
-        if (new Date().getTime() - startTime > 20 * 1000) {
-            jsTest.log.info("Waiting for...");
-            jsTest.log.info({res});
-            jsTest.log.info({lockColl: lockColl.findOne()});
-            jsTest.log.info({ts});
-        }
+            if (new Date().getTime() - startTime > 20 * 1000) {
+                jsTest.log.info("Waiting for...");
+                jsTest.log.info({res});
+                jsTest.log.info({lockColl: lockColl.findOne()});
+                jsTest.log.info({ts});
+            }
 
-        return res.nModified == 1;
-    }, "could not acquire lock", 30 * 1000, 100);
+            return res.nModified == 1;
+        },
+        "could not acquire lock",
+        30 * 1000,
+        100,
+    );
 
-    jsTest.log.info("Acquired lock",
-                    {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
+    jsTest.log.info("Acquired lock", {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
 
     // Set the state back to 0
-    var unlock = function() {
-        jsTest.log.info("Releasing lock",
-                        {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
+    var unlock = function () {
+        jsTest.log.info("Releasing lock", {lock: {_id: name, ts: ts}, curr: lockColl.findOne({_id: name})});
         lockColl.update({_id: name, ts: ts}, {$set: {state: 0}});
     };
 
@@ -49,40 +52,36 @@ export var waitForLock = function(mongo, name) {
 /**
  * Allows a test or background op to say it's finished
  */
-export var setFinished = function(mongo, name, finished) {
+export var setFinished = function (mongo, name, finished) {
     if (finished || finished == undefined)
         mongo.getCollection("config.testFinished").update({_id: name}, {_id: name}, true);
-    else
-        mongo.getCollection("config.testFinished").remove({_id: name});
+    else mongo.getCollection("config.testFinished").remove({_id: name});
 };
 
 /**
  * Checks whether a test or background op is finished
  */
-export var isFinished = function(mongo, name) {
+export var isFinished = function (mongo, name) {
     return mongo.getCollection("config.testFinished").findOne({_id: name}) != null;
 };
 
 /**
  * Sets the result of a background op
  */
-export var setResult = function(mongo, name, result, err) {
-    mongo.getCollection("config.testResult")
-        .update({_id: name}, {_id: name, result: result, err: err}, true);
+export var setResult = function (mongo, name, result, err) {
+    mongo.getCollection("config.testResult").update({_id: name}, {_id: name, result: result, err: err}, true);
 };
 
 /**
  * Gets the result for a background op
  */
-export var getResult = function(mongo, name) {
+export var getResult = function (mongo, name) {
     return mongo.getCollection("config.testResult").findOne({_id: name});
 };
 
-export var startParallelOps = function(mongo, proc, args, context) {
+export var startParallelOps = function (mongo, proc, args, context) {
     var procName = proc.name + "-" + new ObjectId();
-    var seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join(""))
-                   .getTimestamp()
-                   .getTime();
+    var seed = new ObjectId(new ObjectId().valueOf().split("").reverse().join("")).getTimestamp().getTime();
 
     // Make sure we aren't finished before we start
     setFinished(mongo, procName, false);
@@ -97,23 +96,23 @@ export var startParallelOps = function(mongo, proc, args, context) {
         isFinished: isFinished,
         setResult: setResult,
 
-        setup: function(context, stored) {
-            globalThis.waitForLock = function() {
+        setup: function (context, stored) {
+            globalThis.waitForLock = function () {
                 return context.waitForLock(db.getMongo(), context.procName);
             };
-            globalThis.setFinished = function(finished) {
+            globalThis.setFinished = function (finished) {
                 return context.setFinished(db.getMongo(), context.procName, finished);
             };
-            globalThis.isFinished = function() {
+            globalThis.isFinished = function () {
                 return context.isFinished(db.getMongo(), context.procName);
             };
-            globalThis.setResult = function(result, err) {
+            globalThis.setResult = function (result, err) {
                 return context.setResult(db.getMongo(), context.procName, result, err);
             };
-        }
+        },
     };
 
-    var bootstrapper = function(stored) {
+    var bootstrapper = function (stored) {
         var procContext = stored.procContext;
         eval("procContext = " + procContext);
         procContext.setup(procContext, stored);
@@ -122,7 +121,7 @@ export var startParallelOps = function(mongo, proc, args, context) {
         eval("contexts = " + contexts);
 
         for (var i = 0; i < contexts.length; i++) {
-            if (typeof (contexts[i]) != "undefined") {
+            if (typeof contexts[i] != "undefined") {
                 // Evaluate all contexts
                 contexts[i](procContext);
             }
@@ -150,17 +149,24 @@ export var startParallelOps = function(mongo, proc, args, context) {
 
     var testDataColl = mongo.getCollection("config.parallelTest");
 
-    assert.commandWorked(testDataColl.insert({
-        _id: procName,
-        bootstrapper: tojson(bootstrapper),
-        operation: tojson(proc),
-        args: tojson(args),
-        procContext: tojson(procContext),
-        contexts: tojson(contexts)
-    }));
+    assert.commandWorked(
+        testDataColl.insert({
+            _id: procName,
+            bootstrapper: tojson(bootstrapper),
+            operation: tojson(proc),
+            args: tojson(args),
+            procContext: tojson(procContext),
+            contexts: tojson(contexts),
+        }),
+    );
 
-    var bootstrapStartup = "{ var procName = '" + procName + "'; " +
-        "var stored = db.getMongo().getCollection( '" + testDataColl + "' )" +
+    var bootstrapStartup =
+        "{ var procName = '" +
+        procName +
+        "'; " +
+        "var stored = db.getMongo().getCollection( '" +
+        testDataColl +
+        "' )" +
         ".findOne({ _id : procName }); " +
         "var bootstrapper = stored.bootstrapper; " +
         "eval( 'bootstrapper = ' + bootstrapper ); " +
@@ -170,7 +176,7 @@ export var startParallelOps = function(mongo, proc, args, context) {
     // Save the global db object if it exists, so that we can restore it after starting the parallel
     // shell.
     let oldDB = undefined;
-    if (typeof db !== 'undefined') {
+    if (typeof db !== "undefined") {
         oldDB = db;
     }
     globalThis.db = mongo.getDB("test");
@@ -181,7 +187,7 @@ export var startParallelOps = function(mongo, proc, args, context) {
 
     globalThis.db = oldDB;
 
-    var join = function(options = {}) {
+    var join = function (options = {}) {
         const {checkExitSuccess = true} = options;
         delete options.checkExitSuccess;
         setFinished(mongo, procName, true);
@@ -204,14 +210,14 @@ export var startParallelOps = function(mongo, proc, args, context) {
     return join;
 };
 
-export var RandomFunctionContext = function(context) {
+export var RandomFunctionContext = function (context) {
     Random.srand(context.seed);
 
-    Random.randBool = function() {
+    Random.randBool = function () {
         return Random.rand() > 0.5;
     };
 
-    Random.randInt = function(min, max) {
+    Random.randInt = function (min, max) {
         if (max == undefined) {
             max = min;
             min = 0;
@@ -220,8 +226,8 @@ export var RandomFunctionContext = function(context) {
         return min + Math.floor(Random.rand() * max);
     };
 
-    Random.randShardKey = function() {
-        var numFields = 2;  // Random.randInt(1, 3)
+    Random.randShardKey = function () {
+        var numFields = 2; // Random.randInt(1, 3)
 
         var key = {};
         for (var i = 0; i < numFields; i++) {
@@ -232,7 +238,7 @@ export var RandomFunctionContext = function(context) {
         return key;
     };
 
-    Random.randShardKeyValue = function(shardKey) {
+    Random.randShardKeyValue = function (shardKey) {
         var keyValue = {};
         for (let field in shardKey) {
             keyValue[field] = Random.randInt(1, 100);
@@ -241,9 +247,9 @@ export var RandomFunctionContext = function(context) {
         return keyValue;
     };
 
-    Random.randCluster = function() {
-        var numShards = 2;  // Random.randInt( 1, 10 )
-        const rs = false;   // Random.randBool()
+    Random.randCluster = function () {
+        var numShards = 2; // Random.randInt( 1, 10 )
+        const rs = false; // Random.randBool()
         var st = new ShardingTest({shards: numShards, mongos: 4, other: {rs: rs}});
 
         return st;
@@ -267,8 +273,7 @@ export function moveOps(collName, options) {
         var toShard = shards[Random.randInt(shards.length)]._id;
 
         try {
-            jsTest.log.info(
-                {res: admin.runCommand({moveChunk: collName, find: findKey, to: toShard})});
+            jsTest.log.info({res: admin.runCommand({moveChunk: collName, find: findKey, to: toShard})});
         } catch (e) {
             jsTest.log.info({error: e});
         }

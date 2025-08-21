@@ -51,7 +51,7 @@ MongoRunner.stopMongod(secondary);
 assertRepairSucceeds(secondaryDbpath, secondaryPort);
 
 // Starting up without --replSet should not fail, and the collection should exist with its data.
-assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(nodeDB[collName].exists());
     assert.eq(nodeDB[collName].find().itcount(), 1);
@@ -59,10 +59,15 @@ assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, fun
 
 // Starting the secondary with the same data directory should succeed with the same data.
 secondary = assertStartInReplSet(
-    replSet, originalSecondary, false /* cleanData */, false /* expectResync */, function(node) {
+    replSet,
+    originalSecondary,
+    false /* cleanData */,
+    false /* expectResync */,
+    function (node) {
         let nodeDB = node.getDB(dbName);
         assert.eq(nodeDB[collName].find().itcount(), 1);
-    });
+    },
+);
 secondaryDB = secondary.getDB(dbName);
 
 //
@@ -81,11 +86,10 @@ removeFile(secondaryCollFile);
 assertRepairSucceeds(secondaryDbpath, secondaryPort);
 
 // Starting up with --replSet should fail with a specific error.
-assertErrorOnStartupWhenStartingAsReplSet(
-    secondaryDbpath, secondaryPort, replSet.getReplSetConfig()._id);
+assertErrorOnStartupWhenStartingAsReplSet(secondaryDbpath, secondaryPort, replSet.getReplSetConfig()._id);
 
 // Starting up without --replSet should not fail, but the collection should exist with no data.
-assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(nodeDB[collName].exists());
     assert.eq(nodeDB[collName].find().itcount(), 0);
@@ -93,10 +97,15 @@ assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, fun
 
 // Starting the secondary with a wiped data directory should force an initial sync.
 secondary = assertStartInReplSet(
-    replSet, originalSecondary, true /* cleanData */, true /* expectResync */, function(node) {
+    replSet,
+    originalSecondary,
+    true /* cleanData */,
+    true /* expectResync */,
+    function (node) {
         let nodeDB = node.getDB(dbName);
         assert.eq(nodeDB[collName].find().itcount(), 1);
-    });
+    },
+);
 secondaryDB = secondary.getDB(dbName);
 
 //
@@ -114,7 +123,7 @@ removeFile(mdbCatalogFile);
 assertRepairSucceeds(secondaryDbpath, secondaryPort);
 
 // Starting up without --replSet should not fail, but the collection should exist with no data.
-assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(secondaryDbpath, secondaryPort, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(!nodeDB[collName].exists());
     assert(!nodeDB.getSiblingDB("local")["system.replset"].exists());
@@ -127,9 +136,14 @@ assertErrorOnStartupWhenInitialSyncingWithData(replSet, originalSecondary);
 
 // Clearing the data will allow us to successfully complete initial sync on the node.
 secondary = assertStartInReplSet(
-    replSet, originalSecondary, true /* cleanData */, true /* expectResync */, function(node) {
+    replSet,
+    originalSecondary,
+    true /* cleanData */,
+    true /* expectResync */,
+    function (node) {
         let nodeDB = node.getDB(dbName);
         assert.eq(nodeDB[collName].find().itcount(), 1);
-    });
+    },
+);
 
 replSet.stopSet();

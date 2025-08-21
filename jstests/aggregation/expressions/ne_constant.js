@@ -20,9 +20,9 @@ const cursor = coll.aggregate([
             constantAndField: {$ne: [1, "$a"]},
             fieldAndConstant: {$ne: ["$a", 1]},
             constantAndConstant: {$ne: [1, 1]},
-            fieldAndField: {$ne: ["$a", "$a"]}
-        }
-    }
+            fieldAndField: {$ne: ["$a", "$a"]},
+        },
+    },
 ]);
 
 // In both documents, the constantAndConstant and fieldAndField should be false since they
@@ -34,14 +34,14 @@ const expected = [
         constantAndField: false,
         fieldAndConstant: false,
         constantAndConstant: false,
-        fieldAndField: false
+        fieldAndField: false,
     },
     {
         constantAndField: true,
         fieldAndConstant: true,
         constantAndConstant: false,
-        fieldAndField: false
-    }
+        fieldAndField: false,
+    },
 ];
 
 assert.eq(cursor.toArray(), expected);

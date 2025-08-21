@@ -7,19 +7,33 @@
 // results when the update touches a field on which the query is sorting.
 const collName = jsTestName();
 const coll = db[collName];
-const kDocList =
-    [{_id: 0, a: 1, b: 4}, {_id: 1, a: 2, b: 3}, {_id: 2, a: 3, b: 2}, {_id: 3, a: 4, b: 1}];
+const kDocList = [
+    {_id: 0, a: 1, b: 4},
+    {_id: 1, a: 2, b: 3},
+    {_id: 2, a: 3, b: 2},
+    {_id: 3, a: 4, b: 1},
+];
 const kBatchSize = 2;
 const kFilters = [
     {a: {$lt: 5}},
 
     // Optimized multi interval index bounds (the system knows which intervals need to be scanned).
     {a: {$in: [1, 2, 3, 4]}, b: {$gt: 0, $lt: 5}},
-    {$or: [{a: {$in: [1, 2]}, b: {$gte: 3, $lt: 5}}, {a: {$in: [3, 4]}, b: {$gt: 0, $lt: 3}}]},
+    {
+        $or: [
+            {a: {$in: [1, 2]}, b: {$gte: 3, $lt: 5}},
+            {a: {$in: [3, 4]}, b: {$gt: 0, $lt: 3}},
+        ],
+    },
 
     // Generic multi interval index bounds (index intervals unknown prior to query runtime).
     {a: {$gt: 0}, b: {$lt: 5}},
-    {$or: [{a: {$gte: 0}, b: {$gte: 3}}, {a: {$gte: 0}, b: {$lte: 2}}]}
+    {
+        $or: [
+            {a: {$gte: 0}, b: {$gte: 3}},
+            {a: {$gte: 0}, b: {$lte: 2}},
+        ],
+    },
 ];
 
 for (const filter of kFilters) {
@@ -37,6 +51,8 @@ for (const filter of kFilters) {
     // We might either drop the document where "b" is 2 from the result set, or we might include the
     // old version of this document (before the update is applied). Either is acceptable, but
     // out-of-order results are unacceptable.
-    assert(result.b === 2 || result.b === 1,
-           "cursor returned: " + printjson(result) + " for filter: " + printjson(filter));
+    assert(
+        result.b === 2 || result.b === 1,
+        "cursor returned: " + printjson(result) + " for filter: " + printjson(filter),
+    );
 }

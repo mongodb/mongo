@@ -17,12 +17,12 @@ Random.setRandomSeed();
 const st = new ShardingTest({shards: numShards});
 
 const clusterMaxChunkSizeMB = 8;
-const collectionBalancedTimeoutMS = 10 * 60 * 1000 /* 10min */;
+const collectionBalancedTimeoutMS = 10 * 60 * 1000; /* 10min */
 
 const numDatabases = numShards;
 const numCollInDB = 3;
-const dbNamePrefix = 'test_db_';
-const collNamePrefix = 'coll_';
+const dbNamePrefix = "test_db_";
+const collNamePrefix = "coll_";
 
 // 1. Setup an initial set of collections.
 for (let i = 0; i < numDatabases; ++i) {
@@ -37,10 +37,12 @@ for (let i = 0; i < numDatabases; ++i) {
         // Use {_id: 1} as shard key to allow room for imbalance as documents get later inserted.
         st.s.adminCommand({shardCollection: ns, key: {_id: 1}});
         const collMaxChunkSizeMB = Random.randInt(clusterMaxChunkSizeMB - 1) + 1;
-        assert.commandWorked(st.s.adminCommand({
-            configureCollectionBalancing: ns,
-            chunkSize: collMaxChunkSizeMB,
-        }));
+        assert.commandWorked(
+            st.s.adminCommand({
+                configureCollectionBalancing: ns,
+                chunkSize: collMaxChunkSizeMB,
+            }),
+        );
     }
 }
 
@@ -48,12 +50,10 @@ for (let i = 0; i < numDatabases; ++i) {
 //    collections.
 st.startBalancer();
 
-function doBatchInserts(
-    numDatabases, dbNamePrefix, numCollInDB, collNamePrefix, clusterMaxChunkSizeMB) {
+function doBatchInserts(numDatabases, dbNamePrefix, numCollInDB, collNamePrefix, clusterMaxChunkSizeMB) {
     Random.setRandomSeed();
     const numOfBatchInserts = 8;
-    const bigString =
-        'X'.repeat(1024 * 1024 - 30);  // Almost 1MB, to create documents of exactly 1MB
+    const bigString = "X".repeat(1024 * 1024 - 30); // Almost 1MB, to create documents of exactly 1MB
 
     for (let i = 0; i < numOfBatchInserts; ++i) {
         const dbName = dbNamePrefix + `${Random.randInt(numDatabases)}`;
@@ -74,13 +74,12 @@ function doBatchInserts(
 const numBackgroundBatchInserters = 5;
 let backgroundBatchInserters = [];
 for (let i = 0; i < numBackgroundBatchInserters; ++i) {
-    backgroundBatchInserters.push(startParallelShell(funWithArgs(doBatchInserts,
-                                                                 numDatabases,
-                                                                 dbNamePrefix,
-                                                                 numCollInDB,
-                                                                 collNamePrefix,
-                                                                 clusterMaxChunkSizeMB),
-                                                     st.s.port));
+    backgroundBatchInserters.push(
+        startParallelShell(
+            funWithArgs(doBatchInserts, numDatabases, dbNamePrefix, numCollInDB, collNamePrefix, clusterMaxChunkSizeMB),
+            st.s.port,
+        ),
+    );
 }
 
 // 3. Once the insertion workers are done, verify that the balancer may bring each tracked
@@ -93,7 +92,7 @@ let testedAtLeastOneCollection = false;
 for (let i = 0; i < numDatabases; i++) {
     const dbName = dbNamePrefix + `${i}`;
     for (let j = 0; j < numCollInDB; j++) {
-        const ns = dbName + '.' + collNamePrefix + `${j}`;
+        const ns = dbName + "." + collNamePrefix + `${j}`;
 
         const coll = st.s.getCollection(ns);
         if (coll.countDocuments({}) === 0) {

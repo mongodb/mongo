@@ -56,7 +56,8 @@ reshardingTest.withReshardingInBackground(
     },
     {
         expectedErrorCode: ErrorCodes.OplogOperationUnsupported,
-    });
+    },
+);
 
 shardsvrReshardingOperationTimeFailpoint.off();
 

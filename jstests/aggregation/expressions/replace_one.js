@@ -34,15 +34,17 @@ function runAndAssert(args, result) {
 
     // Test again with fields from document.
     assert.eq(
-        coll.aggregate([{
-                $project: {
-                    result:
-                        {$replaceOne: {input: "$input", find: "$find", replacement: "$replacement"}}
-                }
-            }])
-            .toArray()[0]
-            .result,
-        result);
+        coll
+            .aggregate([
+                {
+                    $project: {
+                        result: {$replaceOne: {input: "$input", find: "$find", replacement: "$replacement"}},
+                    },
+                },
+            ])
+            .toArray()[0].result,
+        result,
+    );
 
     // Clean up.
     coll.drop();
@@ -50,8 +52,7 @@ function runAndAssert(args, result) {
 }
 
 function runAndAssertThrows(args, code) {
-    const error = assert.throws(
-        () => coll.aggregate([{$project: {args, result: {$replaceOne: args}}}]).toArray());
+    const error = assert.throws(() => coll.aggregate([{$project: {args, result: {$replaceOne: args}}}]).toArray());
     assert.commandFailedWithCode(error, code);
 }
 
@@ -68,10 +69,8 @@ runAndAssert({input: "", find: "rachel", replacement: "ross"}, "");
 runAndAssert({input: "", find: "rachel", replacement: ""}, "");
 
 // Test finding many only replaces first occurrence.
-runAndAssert({input: "an antelope is an animal", find: "an", replacement: ""},
-             " antelope is an animal");
-runAndAssert({input: "an antelope is an animal", find: "an", replacement: "this"},
-             "this antelope is an animal");
+runAndAssert({input: "an antelope is an animal", find: "an", replacement: ""}, " antelope is an animal");
+runAndAssert({input: "an antelope is an animal", find: "an", replacement: "this"}, "this antelope is an animal");
 
 // Test that any combination of null and non-null arguments returns null.
 runAndAssert({input: null, find: null, replacement: null}, null);
@@ -121,16 +120,18 @@ runAndAssert({input: "helloworld", find: /(([aeiou]+)l)/, replacement: "X"}, "hX
 //
 
 assert(coll.drop());
-assert.commandWorked(coll.insertOne({
-    obj_field: {a: 1, b: 1, c: {d: 2}},
-    arr_field1: [1, 2, 3, "c"],
-    arr_field2: ["aaaaa"],
-    int_field: 1,
-    dbl_field: 1.0,
-    null_field: null,
-    str_field: "foo",
-    regex_field: /.*/,
-}));
+assert.commandWorked(
+    coll.insertOne({
+        obj_field: {a: 1, b: 1, c: {d: 2}},
+        arr_field1: [1, 2, 3, "c"],
+        arr_field2: ["aaaaa"],
+        int_field: 1,
+        dbl_field: 1.0,
+        null_field: null,
+        str_field: "foo",
+        regex_field: /.*/,
+    }),
+);
 
 // replacement is not a string
 const invalidReplacementCode = 10503902;
@@ -139,93 +140,56 @@ const invalidFindCode = 10503903;
 // input is not a string
 const invalidInputCode = 10503904;
 
-runAndAssertThrows({input: "$obj_field", find: "$str_field", replacement: "$str_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$arr_field1", find: "$str_field", replacement: "$str_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$int_field", find: "$regex_field", replacement: "$str_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$dbl_field", find: "$regex_field", replacement: "$str_field"},
-                   invalidInputCode);
+runAndAssertThrows({input: "$obj_field", find: "$str_field", replacement: "$str_field"}, invalidInputCode);
+runAndAssertThrows({input: "$arr_field1", find: "$str_field", replacement: "$str_field"}, invalidInputCode);
+runAndAssertThrows({input: "$int_field", find: "$regex_field", replacement: "$str_field"}, invalidInputCode);
+runAndAssertThrows({input: "$dbl_field", find: "$regex_field", replacement: "$str_field"}, invalidInputCode);
 
-runAndAssertThrows({input: "$str_field", find: "$obj_field", replacement: "$str_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$str_field", find: "$arr_field1", replacement: "$str_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$str_field", find: "$int_field", replacement: "$str_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$str_field", find: "$dbl_field", replacement: "$str_field"},
-                   invalidFindCode);
+runAndAssertThrows({input: "$str_field", find: "$obj_field", replacement: "$str_field"}, invalidFindCode);
+runAndAssertThrows({input: "$str_field", find: "$arr_field1", replacement: "$str_field"}, invalidFindCode);
+runAndAssertThrows({input: "$str_field", find: "$int_field", replacement: "$str_field"}, invalidFindCode);
+runAndAssertThrows({input: "$str_field", find: "$dbl_field", replacement: "$str_field"}, invalidFindCode);
 
-runAndAssertThrows({input: "$str_field", find: "$str_field", replacement: "$obj_field"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$str_field", find: "$str_field", replacement: "$arr_field1"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$str_field", find: "$regex_field", replacement: "$int_field"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$str_field", find: "$regex_field", replacement: "$dbl_field"},
-                   invalidReplacementCode);
+runAndAssertThrows({input: "$str_field", find: "$str_field", replacement: "$obj_field"}, invalidReplacementCode);
+runAndAssertThrows({input: "$str_field", find: "$str_field", replacement: "$arr_field1"}, invalidReplacementCode);
+runAndAssertThrows({input: "$str_field", find: "$regex_field", replacement: "$int_field"}, invalidReplacementCode);
+runAndAssertThrows({input: "$str_field", find: "$regex_field", replacement: "$dbl_field"}, invalidReplacementCode);
 
-runAndAssertThrows({input: "$str_field", find: "$arr_field2", replacement: "$dbl_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$obj_field", find: "$arr_field2", replacement: "$str_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$int_field", find: "$arr_field2", replacement: "$dbl_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$arr_field2", find: "$arr_field2", replacement: "$arr_field2"},
-                   invalidInputCode);
+runAndAssertThrows({input: "$str_field", find: "$arr_field2", replacement: "$dbl_field"}, invalidFindCode);
+runAndAssertThrows({input: "$obj_field", find: "$arr_field2", replacement: "$str_field"}, invalidInputCode);
+runAndAssertThrows({input: "$int_field", find: "$arr_field2", replacement: "$dbl_field"}, invalidInputCode);
+runAndAssertThrows({input: "$arr_field2", find: "$arr_field2", replacement: "$arr_field2"}, invalidInputCode);
 
 //
 // Test always throws when invalid fields are given, even if some fields are also null or missing.
 //
 
-runAndAssertThrows({input: "$obj_field", find: "$null_field", replacement: "$str_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$obj_field", find: "$missing_field", replacement: "$str_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$obj_field", find: "$str_field", replacement: "$null_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$obj_field", find: "$str_field", replacement: "$missing_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$obj_field", find: "$missing_field", replacement: "$null_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$obj_field", find: "$null_field", replacement: "$missing_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$obj_field", find: "$missing_field", replacement: "$missing_field"},
-                   invalidInputCode);
-runAndAssertThrows({input: "$obj_field", find: "$null_field", replacement: "$null_field"},
-                   invalidInputCode);
+runAndAssertThrows({input: "$obj_field", find: "$null_field", replacement: "$str_field"}, invalidInputCode);
+runAndAssertThrows({input: "$obj_field", find: "$missing_field", replacement: "$str_field"}, invalidInputCode);
+runAndAssertThrows({input: "$obj_field", find: "$str_field", replacement: "$null_field"}, invalidInputCode);
+runAndAssertThrows({input: "$obj_field", find: "$str_field", replacement: "$missing_field"}, invalidInputCode);
+runAndAssertThrows({input: "$obj_field", find: "$missing_field", replacement: "$null_field"}, invalidInputCode);
+runAndAssertThrows({input: "$obj_field", find: "$null_field", replacement: "$missing_field"}, invalidInputCode);
+runAndAssertThrows({input: "$obj_field", find: "$missing_field", replacement: "$missing_field"}, invalidInputCode);
+runAndAssertThrows({input: "$obj_field", find: "$null_field", replacement: "$null_field"}, invalidInputCode);
 
-runAndAssertThrows({input: "$null_field", find: "$obj_field", replacement: "$str_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$missing_field", find: "$obj_field", replacement: "$str_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$str_field", find: "$obj_field", replacement: "$null_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$str_field", find: "$obj_field", replacement: "$missing_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$missing_field", find: "$obj_field", replacement: "$null_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$null_field", find: "$obj_field", replacement: "$missing_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$missing_field", find: "$obj_field", replacement: "$missing_field"},
-                   invalidFindCode);
-runAndAssertThrows({input: "$null_field", find: "$obj_field", replacement: "$null_field"},
-                   invalidFindCode);
+runAndAssertThrows({input: "$null_field", find: "$obj_field", replacement: "$str_field"}, invalidFindCode);
+runAndAssertThrows({input: "$missing_field", find: "$obj_field", replacement: "$str_field"}, invalidFindCode);
+runAndAssertThrows({input: "$str_field", find: "$obj_field", replacement: "$null_field"}, invalidFindCode);
+runAndAssertThrows({input: "$str_field", find: "$obj_field", replacement: "$missing_field"}, invalidFindCode);
+runAndAssertThrows({input: "$missing_field", find: "$obj_field", replacement: "$null_field"}, invalidFindCode);
+runAndAssertThrows({input: "$null_field", find: "$obj_field", replacement: "$missing_field"}, invalidFindCode);
+runAndAssertThrows({input: "$missing_field", find: "$obj_field", replacement: "$missing_field"}, invalidFindCode);
+runAndAssertThrows({input: "$null_field", find: "$obj_field", replacement: "$null_field"}, invalidFindCode);
 
-runAndAssertThrows({input: "$null_field", find: "$str_field", replacement: "$obj_field"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$missing_field", find: "$str_field", replacement: "$obj_field"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$str_field", find: "$null_field", replacement: "$obj_field"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$str_field", find: "$missing_field", replacement: "$obj_field"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$missing_field", find: "$null_field", replacement: "$obj_field"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$null_field", find: "$missing_field", replacement: "$obj_field"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$missing_field", find: "$missing_field", replacement: "$obj_field"},
-                   invalidReplacementCode);
-runAndAssertThrows({input: "$null_field", find: "$null_field", replacement: "$obj_field"},
-                   invalidReplacementCode);
+runAndAssertThrows({input: "$null_field", find: "$str_field", replacement: "$obj_field"}, invalidReplacementCode);
+runAndAssertThrows({input: "$missing_field", find: "$str_field", replacement: "$obj_field"}, invalidReplacementCode);
+runAndAssertThrows({input: "$str_field", find: "$null_field", replacement: "$obj_field"}, invalidReplacementCode);
+runAndAssertThrows({input: "$str_field", find: "$missing_field", replacement: "$obj_field"}, invalidReplacementCode);
+runAndAssertThrows({input: "$missing_field", find: "$null_field", replacement: "$obj_field"}, invalidReplacementCode);
+runAndAssertThrows({input: "$null_field", find: "$missing_field", replacement: "$obj_field"}, invalidReplacementCode);
+runAndAssertThrows(
+    {input: "$missing_field", find: "$missing_field", replacement: "$obj_field"},
+    invalidReplacementCode,
+);
+runAndAssertThrows({input: "$null_field", find: "$null_field", replacement: "$obj_field"}, invalidReplacementCode);

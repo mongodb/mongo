@@ -5,9 +5,7 @@
 TestData.disableImplicitSessions = true;
 
 import {verifyInvalidGetMoreAttempts} from "jstests/libs/global_snapshot_reads_util.js";
-import {
-    flushRoutersAndRefreshShardMetadata
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -17,7 +15,7 @@ const unshardedCollName = "unshardedColl";
 
 const commands = {
     aggregate: {
-        firstCommand: function(collName) {
+        firstCommand: function (collName) {
             return {
                 aggregate: collName,
                 pipeline: [{$sort: {_id: 1}}],
@@ -25,17 +23,17 @@ const commands = {
                 readConcern: {level: "snapshot"},
             };
         },
-        secondCommand: function(collName) {
+        secondCommand: function (collName) {
             return {
                 aggregate: collName,
                 pipeline: [{$sort: {_id: 1}}],
                 cursor: {batchSize: 20},
                 readConcern: {level: "snapshot"},
             };
-        }
+        },
     },
     find: {
-        firstCommand: function(collName) {
+        firstCommand: function (collName) {
             return {
                 find: collName,
                 sort: {_id: 1},
@@ -43,15 +41,15 @@ const commands = {
                 readConcern: {level: "snapshot"},
             };
         },
-        secondCommand: function(collName) {
+        secondCommand: function (collName) {
             return {
                 find: collName,
                 sort: {_id: 1},
                 batchSize: 20,
                 readConcern: {level: "snapshot"},
             };
-        }
-    }
+        },
+    },
 };
 
 let shardingScenarios = {
@@ -61,10 +59,10 @@ let shardingScenarios = {
     singleShard: {
         compatibleCollections: [shardedCollName, unshardedCollName],
         name: "singleShard",
-        setUp: function(collName) {
+        setUp: function (collName) {
             const st = new ShardingTest({shards: 1, mongos: 1});
             return shardingScenarios.allScenarios.setUp(st, collName);
-        }
+        },
     },
     // Tests a snapshot cursor command in a multi shard enviroment. The set up inserts a
     // collection, shards the collection, and inserts ten documents. Afterwards, chunks are
@@ -73,7 +71,7 @@ let shardingScenarios = {
     multiShardAllShardReads: {
         compatibleCollections: [shardedCollName],
         name: "multiShardAllShardReads",
-        setUp: function(collName) {
+        setUp: function (collName) {
             let st = new ShardingTest({shards: 3, mongos: 1});
             st = shardingScenarios.allScenarios.setUp(st, collName);
 
@@ -83,32 +81,23 @@ let shardingScenarios = {
 
             const mongos = st.s0;
 
-            const ns = dbName + '.' + shardedCollName;
+            const ns = dbName + "." + shardedCollName;
 
             assert.commandWorked(st.splitAt(ns, {_id: 4}));
             assert.commandWorked(st.splitAt(ns, {_id: 7}));
 
-            assert.commandWorked(
-                mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
-            assert.commandWorked(
-                mongos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}));
-            assert.commandWorked(
-                mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
+            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 4}, to: st.shard1.shardName}));
+            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
 
-            assert.eq(1,
-                      findChunksUtil.countChunksForNs(
-                          mongos.getDB('config'), ns, {shard: st.shard0.shardName}));
-            assert.eq(1,
-                      findChunksUtil.countChunksForNs(
-                          mongos.getDB('config'), ns, {shard: st.shard1.shardName}));
-            assert.eq(1,
-                      findChunksUtil.countChunksForNs(
-                          mongos.getDB('config'), ns, {shard: st.shard2.shardName}));
+            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}));
+            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}));
+            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}));
 
             flushRoutersAndRefreshShardMetadata(st, {ns});
 
             return st;
-        }
+        },
     },
     // Tests a snapshot cursor command in a multi shard enviroment. The set up inserts a
     // collection, shards the collection, and inserts ten documents. Afterwards, chunks are
@@ -117,7 +106,7 @@ let shardingScenarios = {
     multiShardSomeShardReads: {
         compatibleCollections: [shardedCollName],
         name: "multiShardSomeShardReads",
-        setUp: function(collName) {
+        setUp: function (collName) {
             let st = new ShardingTest({shards: 3, mongos: 1});
             st = shardingScenarios.allScenarios.setUp(st, collName);
 
@@ -127,35 +116,28 @@ let shardingScenarios = {
 
             const mongos = st.s0;
 
-            const ns = dbName + '.' + shardedCollName;
+            const ns = dbName + "." + shardedCollName;
 
             assert.commandWorked(st.splitAt(ns, {_id: 5}));
-            assert.commandWorked(
-                mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
-            assert.commandWorked(
-                mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
+            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+            assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 7}, to: st.shard2.shardName}));
 
-            assert.eq(0,
-                      findChunksUtil.countChunksForNs(
-                          mongos.getDB('config'), ns, {shard: st.shard0.shardName}));
-            assert.eq(1,
-                      findChunksUtil.countChunksForNs(
-                          mongos.getDB('config'), ns, {shard: st.shard1.shardName}));
-            assert.eq(1,
-                      findChunksUtil.countChunksForNs(
-                          mongos.getDB('config'), ns, {shard: st.shard2.shardName}));
+            assert.eq(0, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard0.shardName}));
+            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard1.shardName}));
+            assert.eq(1, findChunksUtil.countChunksForNs(mongos.getDB("config"), ns, {shard: st.shard2.shardName}));
 
             flushRoutersAndRefreshShardMetadata(st, {ns});
 
             return st;
-        }
+        },
     },
     allScenarios: {
         name: "allScenarios",
-        setUp: function(st, collName) {
+        setUp: function (st, collName) {
             assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-            assert.commandWorked(st.s.adminCommand(
-                {shardCollection: st.s.getDB(dbName)[shardedCollName] + "", key: {_id: 1}}));
+            assert.commandWorked(
+                st.s.adminCommand({shardCollection: st.s.getDB(dbName)[shardedCollName] + "", key: {_id: 1}}),
+            );
 
             const mainDb = st.s.getDB(dbName);
 
@@ -166,12 +148,12 @@ let shardingScenarios = {
             assert.commandWorked(bulk.execute({w: "majority"}));
 
             return st;
-        }
-    }
+        },
+    },
 };
 
 function runScenario(testScenario, {useCausalConsistency}) {
-    testScenario.compatibleCollections.forEach(function(collName) {
+    testScenario.compatibleCollections.forEach(function (collName) {
         jsTestLog("Running the " + testScenario.name + " scenario on collection " + collName);
         runTest(testScenario, {useCausalConsistency, commands, collName});
     });
@@ -218,21 +200,25 @@ function runTest(testScenario, {useCausalConsistency, commands, collName}) {
 
         // Fetch the 6th document. This confirms that the transaction stash is preserved across
         // multiple getMore invocations.
-        res = assert.commandWorked(sessionDb.runCommand({
-            getMore: cursorId,
-            collection: collName,
-            batchSize: 1,
-        }));
+        res = assert.commandWorked(
+            sessionDb.runCommand({
+                getMore: cursorId,
+                collection: collName,
+                batchSize: 1,
+            }),
+        );
         assert(res.hasOwnProperty("cursor"));
         assert(res.cursor.hasOwnProperty("id"));
         assert.neq(0, res.cursor.id);
 
         // Exhaust the cursor, retrieving the remainder of the result set.
-        res = assert.commandWorked(sessionDb.runCommand({
-            getMore: cursorId,
-            collection: collName,
-            batchSize: 10,
-        }));
+        res = assert.commandWorked(
+            sessionDb.runCommand({
+                getMore: cursorId,
+                collection: collName,
+                batchSize: 10,
+            }),
+        );
 
         // The cursor has been exhausted.
         assert(res.hasOwnProperty("cursor"));
@@ -274,5 +260,4 @@ runScenario(shardingScenarios.singleShard, {useCausalConsistency: false});
 
 runScenario(shardingScenarios.multiShardAllShardReads, {useCausalConsistency: false});
 
-runScenario(shardingScenarios.multiShardSomeShardReads,
-            {useCausalConsistency: false, collName: shardedCollName});
+runScenario(shardingScenarios.multiShardSomeShardReads, {useCausalConsistency: false, collName: shardedCollName});

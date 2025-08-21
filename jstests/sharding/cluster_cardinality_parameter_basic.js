@@ -33,12 +33,9 @@ removeShard(st, shard1Name);
 jsTest.log("Checking the cluster parameter while the cluster contains one shard again");
 // The removeShard command should set to cluster parameter to false if the config server primary's
 // binVersion is 7.3 or the replica set endpoint feature flag is enabled.
-let binVersion =
-    assert.commandWorked(st.configRS.getPrimary().adminCommand({serverStatus: 1})).version;
-let rsEndpointEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ReplicaSetEndpoint");
-const expectedHasTwoOrMoreShards =
-    MongoRunner.compareBinVersions(binVersion, "7.3") != 0 && !rsEndpointEnabled;
+let binVersion = assert.commandWorked(st.configRS.getPrimary().adminCommand({serverStatus: 1})).version;
+let rsEndpointEnabled = FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ReplicaSetEndpoint");
+const expectedHasTwoOrMoreShards = MongoRunner.compareBinVersions(binVersion, "7.3") != 0 && !rsEndpointEnabled;
 checkClusterParameter(st.configRS, expectedHasTwoOrMoreShards);
 checkClusterParameter(st.rs0, expectedHasTwoOrMoreShards);
 

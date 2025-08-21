@@ -15,9 +15,12 @@ t.createIndex({b: "2d"});
 function check(field) {
     var q = {};
     q[field] = {$near: [11, 11]};
-    let arr = t.find(q).limit(3).map(function(z) {
-        return Geo.distance([11, 11], z[field]);
-    });
+    let arr = t
+        .find(q)
+        .limit(3)
+        .map(function (z) {
+            return Geo.distance([11, 11], z[field]);
+        });
     assert.eq(2 * Math.sqrt(2), Array.sum(arr), "test " + field);
 }
 

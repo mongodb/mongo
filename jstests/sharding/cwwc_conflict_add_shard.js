@@ -18,7 +18,7 @@ import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 TestData.skipCheckOrphans = true;
 
 const st = new ShardingTest({shards: 1, mongos: 1});
-const admin = st.getDB('admin');
+const admin = st.getDB("admin");
 let shardServer;
 
 function createNewShard() {
@@ -38,26 +38,29 @@ function createNewShard() {
 function convertShardToRS() {
     jsTestLog("Converting shard server to replicaSet.");
     let start = new Date();
-    shardServer.nodes.forEach(function(node) {
+    shardServer.nodes.forEach(function (node) {
         delete node.fullOptions.shardsvr;
     });
 
-    shardServer.nodes.forEach(node => shardServer.restart(node, {skipValidation: true}));
+    shardServer.nodes.forEach((node) => shardServer.restart(node, {skipValidation: true}));
     jsTest.log("Coversion shard -> RS took: " + (new Date() - start));
 }
 
 function convertRSToShard() {
     let start = new Date();
     jsTestLog("Converting replicaSet server to shardServer.");
-    shardServer.nodes.forEach(node =>
-                                  shardServer.restart(node, {shardsvr: "", skipValidation: true}));
+    shardServer.nodes.forEach((node) => shardServer.restart(node, {shardsvr: "", skipValidation: true}));
 
     jsTest.log("Coversion RS -> Shard took: " + (new Date() - start));
 }
 
 function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard) {
-    jsTestLog("Running addShard test with CWWCOnShard: " + tojson(cwwcOnShard) +
-              " and CWWCOnCluster: " + tojson(cwwcOnCluster));
+    jsTestLog(
+        "Running addShard test with CWWCOnShard: " +
+            tojson(cwwcOnShard) +
+            " and CWWCOnCluster: " +
+            tojson(cwwcOnCluster),
+    );
 
     let cwwcOnShardCmd, cwwcOnClusterCmd;
 
@@ -66,7 +69,7 @@ function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard)
         cwwcOnShardCmd = {
             setDefaultRWConcern: 1,
             defaultWriteConcern: cwwcOnShard,
-            writeConcern: {w: "majority"}
+            writeConcern: {w: "majority"},
         };
         assert.commandWorked(shardServer.getPrimary().adminCommand(cwwcOnShardCmd));
     }
@@ -76,7 +79,7 @@ function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard)
         cwwcOnClusterCmd = {
             setDefaultRWConcern: 1,
             defaultWriteConcern: cwwcOnCluster,
-            writeConcern: {w: "majority"}
+            writeConcern: {w: "majority"},
         };
         assert.commandWorked(st.s.adminCommand(cwwcOnClusterCmd));
     }
@@ -110,22 +113,19 @@ function testAddShard(cwwcOnShard, cwwcOnCluster, shouldSucceed, fixCWWCOnShard)
     convertShardToRS();
 }
 
-const cwwc = [
-    {w: 1},
-    {w: "majority"},
-    {w: "majority", wtimeout: 0, j: false},
-    {w: "majority", wtimeout: 0, j: true}
-];
+const cwwc = [{w: 1}, {w: "majority"}, {w: "majority", wtimeout: 0, j: false}, {w: "majority", wtimeout: 0, j: true}];
 
 createNewShard();
 // No CWWC set neither on shard nor cluster should succeed.
 testAddShard(undefined /* cwwcOnShard */, undefined /* cwwcOnCluster */, true /* shouldSucceed */);
 
 // No CWWC set on cluster while shard has CWWC should fail.
-testAddShard(cwwc[0] /* cwwcOnShard */,
-             undefined /* cwwcOnCluster */,
-             false /* shouldSucceed */,
-             false /* fixCWWCOnShard */);
+testAddShard(
+    cwwc[0] /* cwwcOnShard */,
+    undefined /* cwwcOnCluster */,
+    false /* shouldSucceed */,
+    false /* fixCWWCOnShard */,
+);
 
 createNewShard();
 // No CWWC set on shard while cluster has CWWC should succeed.
@@ -137,10 +137,12 @@ for (var i = 0; i < cwwc.length; i++) {
     for (var j = i + 1; j < cwwc.length; j++) {
         for (const fixCWWCOnShard of [true, false]) {
             // Setting different CWWC on shard and cluster should fail.
-            testAddShard(cwwc[i] /* cwwcOnShard */,
-                         cwwc[j] /* cwwcOnCluster */,
-                         false /* shouldSucceed */,
-                         fixCWWCOnShard);
+            testAddShard(
+                cwwc[i] /* cwwcOnShard */,
+                cwwc[j] /* cwwcOnCluster */,
+                false /* shouldSucceed */,
+                fixCWWCOnShard,
+            );
         }
     }
 }

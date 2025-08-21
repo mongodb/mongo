@@ -10,8 +10,7 @@ export class TestDefinition extends SelinuxBaseTest {
         // - that process is running in correct SELinux context
 
         assert(db);
-        assert.eq(0,
-                  run("bash", "-c", "ps -efZ | grep -P 'system_u:system_r:mongod_t:s0[ ]+mongod'"));
+        assert.eq(0, run("bash", "-c", "ps -efZ | grep -P 'system_u:system_r:mongod_t:s0[ ]+mongod'"));
 
         jsTest.log("success");
     }

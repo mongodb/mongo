@@ -34,9 +34,8 @@ other.drop();
 function checkUnshardedResults(pipeline, expectedPlanStages, expectedPipeline) {
     const explain = getSingleNodeExplain(coll.explain().aggregate(pipeline));
     if (explain.stages) {
-        const queryStages =
-            flattenQueryPlanTree(getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner));
-        const pipelineStages = explain.stages.slice(1).map(s => Object.keys(s)[0]);
+        const queryStages = flattenQueryPlanTree(getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner));
+        const pipelineStages = explain.stages.slice(1).map((s) => Object.keys(s)[0]);
         assert.eq(queryStages, expectedPlanStages, explain);
         assert.eq(pipelineStages, expectedPipeline, explain);
     } else {
@@ -54,13 +53,13 @@ function checkShardedResults(pipeline, expected) {
 
 // Insert ten documents into coll: {x: 0}, {x: 1}, ..., {x: 9}.
 const bulk = coll.initializeOrderedBulkOp();
-Array.from({length: 10}, (_, i) => ({x: i})).forEach(doc => bulk.insert(doc));
+Array.from({length: 10}, (_, i) => ({x: i})).forEach((doc) => bulk.insert(doc));
 assert.commandWorked(bulk.execute());
 
 // Insert twenty documents into other: {x: 0, y: 0}, {x: 0, y: 1}, ..., {x: 9, y: 0}, {x: 9, y: 1}.
 const bulk_other = other.initializeOrderedBulkOp();
-Array.from({length: 10}, (_, i) => ({x: i, y: 0})).forEach(doc => bulk_other.insert(doc));
-Array.from({length: 10}, (_, i) => ({x: i, y: 1})).forEach(doc => bulk_other.insert(doc));
+Array.from({length: 10}, (_, i) => ({x: i, y: 0})).forEach((doc) => bulk_other.insert(doc));
+Array.from({length: 10}, (_, i) => ({x: i, y: 1})).forEach((doc) => bulk_other.insert(doc));
 assert.commandWorked(bulk_other.execute());
 
 // Tests on an unsharded collection.
@@ -69,7 +68,7 @@ assert.commandWorked(bulk_other.execute());
 // system.
 const lookupPipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
-    {$limit: 5}
+    {$limit: 5},
 ];
 checkUnshardedResults(lookupPipeline, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"], []);
 
@@ -79,17 +78,16 @@ const multiLookupPipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$addFields: {z: 0}},
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
-    {$limit: 5}
+    {$limit: 5},
 ];
-checkUnshardedResults(
-    multiLookupPipeline, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"], []);
+checkUnshardedResults(multiLookupPipeline, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"], []);
 
 // Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it.
 const unwindPipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$unwind: "$from_other"},
-    {$limit: 5}
+    {$limit: 5},
 ];
 checkUnshardedResults(unwindPipeline, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "LIMIT"], []);
 
@@ -100,7 +98,7 @@ const sortPipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$unwind: "$from_other"},
     {$sort: {x: 1}},
-    {$limit: 5}
+    {$limit: 5},
 ];
 checkUnshardedResults(sortPipeline, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "SORT"], []);
 
@@ -109,12 +107,11 @@ checkUnshardedResults(sortPipeline, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "SORT"], []
 const topKSortPipeline = [
     {$sort: {x: 1}},
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
-    {$limit: 5}
+    {$limit: 5},
 ];
 checkUnshardedResults(topKSortPipeline, ["COLLSCAN", "SORT", "EQ_LOOKUP"], []);
 const explain = getSingleNodeExplain(coll.explain().aggregate(topKSortPipeline));
-assert.eq(
-    getPlanStage(getWinningPlanFromExplain(explain.queryPlanner), "SORT").limitAmount, 5, explain);
+assert.eq(getPlanStage(getWinningPlanFromExplain(explain.queryPlanner), "SORT").limitAmount, 5, explain);
 
 // Tests on a sharded collection.
 coll.createIndex({x: 1});

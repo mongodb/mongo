@@ -13,7 +13,7 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 import {
     ImplicitlyShardAccessCollSettings,
     setTestMayRunDropInParallel,
-    ShardingOverrideCommon
+    ShardingOverrideCommon,
 } from "jstests/libs/override_methods/shard_collection_util.js";
 
 // Expose settings for this override on `globalThis`
@@ -27,13 +27,19 @@ var originalDBCollectionDrop = DBCollection.prototype.drop;
 var originalStartParallelShell = startParallelShell;
 var originalRunCommand = Mongo.prototype.runCommand;
 
-DB.prototype.createCollection = function() {
+DB.prototype.createCollection = function () {
     const createCollResult = originalCreateCollection.apply(this, arguments);
 
-    if (!createCollResult.ok || arguments.length < 2 || arguments[1] == null ||
-        !isObject(arguments[1]) || !arguments[1].timeseries || !arguments[1].timeseries.timeField ||
+    if (
+        !createCollResult.ok ||
+        arguments.length < 2 ||
+        arguments[1] == null ||
+        !isObject(arguments[1]) ||
+        !arguments[1].timeseries ||
+        !arguments[1].timeseries.timeField ||
         (typeof TestData.shardCollectionProbability !== "undefined" &&
-         Math.random() >= TestData.shardCollectionProbability)) {
+            Math.random() >= TestData.shardCollectionProbability)
+    ) {
         return createCollResult;
     }
 
@@ -42,13 +48,13 @@ DB.prototype.createCollection = function() {
         db: this,
         collName: arguments[0],
         shardKey: {[timeField]: 1},
-        timeseriesSpec: arguments[1]["timeseries"]
+        timeseriesSpec: arguments[1]["timeseries"],
     });
 
     return createCollResult;
 };
 
-DB.prototype.getCollection = function() {
+DB.prototype.getCollection = function () {
     var collection = originalGetCollection.apply(this, arguments);
 
     // The following "collStats" command can behave unexpectedly when running in a causal
@@ -83,8 +89,7 @@ DB.prototype.getCollection = function() {
     // Attempt to enable sharding on database and collection if not already done.
     if (!TestData.implicitlyShardOnCreateCollectionOnly) {
         if (typeof TestData.shardCollectionProbability !== "undefined") {
-            throw new Error(
-                "Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability");
+            throw new Error("Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability");
         }
         ShardingOverrideCommon.shardCollection(collection);
     }
@@ -92,14 +97,13 @@ DB.prototype.getCollection = function() {
     return collection;
 };
 
-DBCollection.prototype.drop = function() {
+DBCollection.prototype.drop = function () {
     var dropResult = originalDBCollectionDrop.apply(this, arguments);
 
     // Attempt to enable sharding on database and collection if not already done.
     if (!TestData.implicitlyShardOnCreateCollectionOnly) {
         if (typeof TestData.shardCollectionProbability !== "undefined") {
-            throw new Error(
-                "Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability");
+            throw new Error("Must set implicitlyShardOnCreateCollectionOnly if using shardCollectionProbability");
         }
         ShardingOverrideCommon.shardCollection(this);
     }
@@ -109,11 +113,14 @@ DBCollection.prototype.drop = function() {
 
 // The mapReduce command has a special requirement where the command must indicate the output
 // collection is sharded, so we must be sure to add this information in this passthrough.
-Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
+Mongo.prototype.runCommand = function (dbName, cmdObj, options) {
     // Skip any commands that are not mapReduce or do not have an 'out' option.
-    if (typeof cmdObj !== 'object' || cmdObj === null ||
-        (!cmdObj.hasOwnProperty('mapreduce') && !cmdObj.hasOwnProperty('mapReduce')) ||
-        !cmdObj.hasOwnProperty('out')) {
+    if (
+        typeof cmdObj !== "object" ||
+        cmdObj === null ||
+        (!cmdObj.hasOwnProperty("mapreduce") && !cmdObj.hasOwnProperty("mapReduce")) ||
+        !cmdObj.hasOwnProperty("out")
+    ) {
         return originalRunCommand.apply(this, arguments);
     }
 
@@ -125,10 +132,10 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
 
     // Modify the output options to specify that the collection is sharded.
     let outputSpec = cmdObj.out;
-    if (typeof (outputSpec) === "string") {
-        this.getDB(dbName)[outputSpec].drop();  // This will implicitly shard it.
+    if (typeof outputSpec === "string") {
+        this.getDB(dbName)[outputSpec].drop(); // This will implicitly shard it.
         outputSpec = {replace: outputSpec};
-    } else if (typeof (outputSpec) !== "object") {
+    } else if (typeof outputSpec !== "object") {
         // This is a malformed command, just send it along.
         return originalRunCommand.apply(this, arguments);
     } else if (!outputSpec.hasOwnProperty("sharded")) {
@@ -145,22 +152,24 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
             // This is a malformed command, just send it along.
             return originalRunCommand.apply(this, arguments);
         }
-        this.getDB(dbName)[outputColl].drop();  // This will implicitly shard it.
+        this.getDB(dbName)[outputColl].drop(); // This will implicitly shard it.
     }
 
     cmdObj.out = outputSpec;
-    jsTestLog('Overriding mapReduce command. Original command: ' + tojson(originalCmdObj) +
-              ' New command: ' + tojson(cmdObj));
+    jsTestLog(
+        "Overriding mapReduce command. Original command: " + tojson(originalCmdObj) + " New command: " + tojson(cmdObj),
+    );
     return originalRunCommand.apply(this, arguments);
 };
 
 // Tests may use a parallel shell to run the "drop" command concurrently with other
 // operations. This can cause the "shardCollection" command to return a
 // ConflictingOperationInProgress error response.
-globalThis.startParallelShell = function() {
+globalThis.startParallelShell = function () {
     setTestMayRunDropInParallel(true);
     return originalStartParallelShell.apply(this, arguments);
 };
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
+    "jstests/libs/override_methods/implicitly_shard_accessed_collections.js",
+);

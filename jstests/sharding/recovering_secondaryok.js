@@ -11,8 +11,7 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var shardTest =
-    new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});
+var shardTest = new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});
 
 var mongos = shardTest.s0;
 var mongosSOK = shardTest.s1;
@@ -39,12 +38,14 @@ assert.commandWorked(coll.save({_id: 1, b: "b", date: new Date()}));
 
 print("2: shard collection");
 
-shardTest.shardColl(coll,
-                    /* shardBy */ {_id: 1},
-                    /* splitAt */ {_id: 0},
-                    /* move chunk */ {_id: 0},
-                    /* dbname */ null,
-                    /* waitForDelete */ true);
+shardTest.shardColl(
+    coll,
+    /* shardBy */ {_id: 1},
+    /* splitAt */ {_id: 0},
+    /* move chunk */ {_id: 0},
+    /* dbname */ null,
+    /* waitForDelete */ true,
+);
 
 print("3: test normal and secondaryOk queries");
 
@@ -62,7 +63,7 @@ rsA.awaitReplication();
 rsB.awaitReplication();
 
 // Because of async migration cleanup, we need to wait for this condition to be true
-assert.soon(function() {
+assert.soon(function () {
     return coll.find().itcount() == collSOk.find().itcount();
 });
 
@@ -89,9 +90,9 @@ assert.eq(2, collSOk.find().itcount());
 
 print("8: restart both our secondaries clean");
 
-rsA.getSecondaries().forEach(
-    secondary =>
-        rsA.restart(secondary, {remember: true, startClean: true}, undefined, 5 * 60 * 1000));
+rsA.getSecondaries().forEach((secondary) =>
+    rsA.restart(secondary, {remember: true, startClean: true}, undefined, 5 * 60 * 1000),
+);
 
 print("9: wait for recovery");
 

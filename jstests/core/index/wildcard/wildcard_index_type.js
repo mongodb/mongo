@@ -13,7 +13,7 @@ coll.drop();
 
 const wildcardIndexes = [
     {keyPattern: {"$**": 1}},
-    {keyPattern: {"$**": 1, "other": 1}, wildcardProjection: {"other": 0}}
+    {keyPattern: {"$**": 1, "other": 1}, wildcardProjection: {"other": 0}},
 ];
 
 // Inserts the given document and runs the given query to confirm that:
@@ -25,7 +25,7 @@ function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match, expectedB
         coll.drop();
         const option = {};
         if (indexSpec.wildcardProjection) {
-            option['wildcardProjection'] = indexSpec.wildcardProjection;
+            option["wildcardProjection"] = indexSpec.wildcardProjection;
         }
 
         assert.commandWorked(coll.createIndex(indexSpec.keyPattern, option));
@@ -50,7 +50,7 @@ function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match, expectedB
         // Expected bounds were used.
         if (expectedBounds !== undefined) {
             if (indexSpec.keyPattern.other) {
-                expectedBounds['other'] = [`[MinKey, MaxKey]`];
+                expectedBounds["other"] = [`[MinKey, MaxKey]`];
             }
             ixScans.forEach((ixScan) => assert.docEq(expectedBounds, ixScan.indexBounds));
         }
@@ -72,58 +72,59 @@ assertExpectedDocAnswersWildcardIndexQuery({a: "a", b: 1.1, c: true}, {a: {$type
 // A compound $type of 'string' and 'double' will match a multifield document with a string and
 // double value.
 assertExpectedDocAnswersWildcardIndexQuery(
-    {a: "a", b: 1.1, c: true}, {a: {$type: "string"}, b: {$type: "double"}}, true);
+    {a: "a", b: 1.1, c: true},
+    {a: {$type: "string"}, b: {$type: "double"}},
+    true,
+);
 
 // A compound $type of 'string' and 'double' won't match a multifield document with a string but
 // no double value.
 assertExpectedDocAnswersWildcardIndexQuery(
-    {a: "a", b: "b", c: true}, {a: {$type: "string"}, b: {$type: "double"}}, false);
+    {a: "a", b: "b", c: true},
+    {a: {$type: "string"}, b: {$type: "double"}},
+    false,
+);
 
 // A $type of 'object' will match a object.
-assertExpectedDocAnswersWildcardIndexQuery(
-    {a: {"": ""}},
-    {a: {$type: "object"}},
-    true,
-    {$_path: [`["a", "a"]`, `["a.", "a/")`], a: [`[MinKey, MaxKey]`]});
+assertExpectedDocAnswersWildcardIndexQuery({a: {"": ""}}, {a: {$type: "object"}}, true, {
+    $_path: [`["a", "a"]`, `["a.", "a/")`],
+    a: [`[MinKey, MaxKey]`],
+});
 
 // A $type of 'object' will match an empty object.
-assertExpectedDocAnswersWildcardIndexQuery(
-    {a: {}},
-    {a: {$type: "object"}},
-    true,
-    {$_path: [`["a", "a"]`, `["a.", "a/")`], a: [`[MinKey, MaxKey]`]});
+assertExpectedDocAnswersWildcardIndexQuery({a: {}}, {a: {$type: "object"}}, true, {
+    $_path: [`["a", "a"]`, `["a.", "a/")`],
+    a: [`[MinKey, MaxKey]`],
+});
 
 // A $type of 'object' will match a nested object.
-assertExpectedDocAnswersWildcardIndexQuery(
-    {b: {a: {}}},
-    {"b.a": {$type: "object"}},
-    true,
-    {$_path: [`["b.a", "b.a"]`, `["b.a.", "b.a/")`], "b.a": [`[MinKey, MaxKey]`]});
+assertExpectedDocAnswersWildcardIndexQuery({b: {a: {}}}, {"b.a": {$type: "object"}}, true, {
+    $_path: [`["b.a", "b.a"]`, `["b.a.", "b.a/")`],
+    "b.a": [`[MinKey, MaxKey]`],
+});
 
 // A $type of 'object' will match an array of objects with size 3.
 assertExpectedDocAnswersWildcardIndexQuery(
     {a: [{b: 2}, {c: 3}, {d: 4}]},
-    {$and: [{"a": {$type: 'object'}}, {"a": {$size: NumberLong("3")}}]},
+    {$and: [{"a": {$type: "object"}}, {"a": {$size: NumberLong("3")}}]},
     true,
-    {$_path: [`["a", "a"]`, `["a.", "a/")`], "a": [`[MinKey, MaxKey]`]});
+    {$_path: [`["a", "a"]`, `["a.", "a/")`], "a": [`[MinKey, MaxKey]`]},
+);
 
 // A conjunction of {$type: 'object'} and $eq should match the given object.
-assertExpectedDocAnswersWildcardIndexQuery(
-    {a: {b: "foo"}}, {$and: [{"a": {$type: 'object'}}, {"a.b": "foo"}]}, true);
+assertExpectedDocAnswersWildcardIndexQuery({a: {b: "foo"}}, {$and: [{"a": {$type: "object"}}, {"a.b": "foo"}]}, true);
 
 // A $type of 'array' will match an empty array.
-assertExpectedDocAnswersWildcardIndexQuery(
-    {a: [[]]},
-    {a: {$type: "array"}},
-    true,
-    {$_path: [`["a", "a"]`, `["a.", "a/")`], a: [`[MinKey, MaxKey]`]});
+assertExpectedDocAnswersWildcardIndexQuery({a: [[]]}, {a: {$type: "array"}}, true, {
+    $_path: [`["a", "a"]`, `["a.", "a/")`],
+    a: [`[MinKey, MaxKey]`],
+});
 
 // A $type of 'array' will match an array.
-assertExpectedDocAnswersWildcardIndexQuery(
-    {a: [["c"]]},
-    {a: {$type: "array"}},
-    true,
-    {$_path: [`["a", "a"]`, `["a.", "a/")`], a: [`[MinKey, MaxKey]`]});
+assertExpectedDocAnswersWildcardIndexQuery({a: [["c"]]}, {a: {$type: "array"}}, true, {
+    $_path: [`["a", "a"]`, `["a.", "a/")`],
+    a: [`[MinKey, MaxKey]`],
+});
 
 // A $type of 'regex' will match regex.
 assertExpectedDocAnswersWildcardIndexQuery({a: /r/}, {a: {$type: "regex"}}, true);
@@ -138,13 +139,15 @@ assertExpectedDocAnswersWildcardIndexQuery({a: undefined}, {a: {$type: "undefine
 assertExpectedDocAnswersWildcardIndexQuery({a: null}, {a: {$type: "undefined"}}, false);
 
 // A $type of 'code' will match a function value.
-assertExpectedDocAnswersWildcardIndexQuery({
-    a: function() {
-        var a = 0;
-    }
-},
-                                           {a: {$type: "javascript"}},
-                                           true);
+assertExpectedDocAnswersWildcardIndexQuery(
+    {
+        a: function () {
+            var a = 0;
+        },
+    },
+    {a: {$type: "javascript"}},
+    true,
+);
 
 // A $type of 'binData' will match a binData value.
 assertExpectedDocAnswersWildcardIndexQuery({a: new BinData(0, "")}, {a: {$type: "binData"}}, true);
@@ -153,12 +156,10 @@ assertExpectedDocAnswersWildcardIndexQuery({a: new BinData(0, "")}, {a: {$type: 
 assertExpectedDocAnswersWildcardIndexQuery({a: new Timestamp()}, {a: {$type: "timestamp"}}, true);
 
 // A $type of 'timestamp' will match a timestamp value.
-assertExpectedDocAnswersWildcardIndexQuery(
-    {a: new Timestamp(0x80008000, 0)}, {a: {$type: "timestamp"}}, true);
+assertExpectedDocAnswersWildcardIndexQuery({a: new Timestamp(0x80008000, 0)}, {a: {$type: "timestamp"}}, true);
 
 // A $type of 'date' won't match a timestamp value.
-assertExpectedDocAnswersWildcardIndexQuery(
-    {a: new Timestamp(0x80008000, 0)}, {a: {$type: "date"}}, false);
+assertExpectedDocAnswersWildcardIndexQuery({a: new Timestamp(0x80008000, 0)}, {a: {$type: "date"}}, false);
 
 // A $type of 'date' will match a date value.
 assertExpectedDocAnswersWildcardIndexQuery({a: new Date()}, {a: {$type: "date"}}, true);

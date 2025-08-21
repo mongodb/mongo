@@ -27,8 +27,7 @@ assert.commandWorked(s0.adminCommand({shardCollection: kNsColl, key: {_id: 1}}))
 assert.commandWorked(s0Coll.insert({_id: 2}));
 
 // Ensure that mongos0 becomes stale.
-assert.commandWorked(
-    s1.adminCommand({moveChunk: kNsColl, find: {_id: 2}, to: st.shard1.shardName}));
+assert.commandWorked(s1.adminCommand({moveChunk: kNsColl, find: {_id: 2}, to: st.shard1.shardName}));
 
 // Insert corrupted document
 configureFailPoint(st.shard1, "corruptDocumentOnInsert", {}, "alwaysOn");

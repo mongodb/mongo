@@ -14,9 +14,9 @@
  * ]
  */
 
-const dbPrefix = jsTestName() + '_DB_';
+const dbPrefix = jsTestName() + "_DB_";
 const dbCount = 2;
-const collPrefix = 'sharded_coll_';
+const collPrefix = "sharded_coll_";
 const collCount = 2;
 const maxChunkSizeMB = 10;
 
@@ -51,13 +51,12 @@ function getAllChunks(configDB, ns, keyPattern) {
         while (chunksCursor.objsLeftInBatch()) {
             chunkArray.push(chunksCursor.next());
         }
-        chunksCursor =
-            findChunksUtil.findChunksByNs(configDB, ns).sort(keyPattern).skip(chunkArray.length);
+        chunksCursor = findChunksUtil.findChunksByNs(configDB, ns).sort(keyPattern).skip(chunkArray.length);
     }
     return chunkArray;
 }
 
-export const $config = (function() {
+export const $config = (function () {
     var states = {
         init: function init(db, collName, connCache) {
             // Initialize defragmentation
@@ -65,11 +64,13 @@ export const $config = (function() {
                 const dbName = dbPrefix + i;
                 for (let j = 0; j < collCount; j++) {
                     const fullNs = dbName + "." + collPrefix + j;
-                    assert.commandWorked(connCache.mongos[0].adminCommand({
-                        configureCollectionBalancing: fullNs,
-                        defragmentCollection: true,
-                        chunkSize: maxChunkSizeMB,
-                    }));
+                    assert.commandWorked(
+                        connCache.mongos[0].adminCommand({
+                            configureCollectionBalancing: fullNs,
+                            defragmentCollection: true,
+                            chunkSize: maxChunkSizeMB,
+                        }),
+                    );
                 }
             }
         },
@@ -77,25 +78,25 @@ export const $config = (function() {
         moveChunk: function moveChunk(db, collName, connCache) {
             const randomDB = getRandomDb(db);
             const randomColl = getRandomCollection(randomDB);
-            const configDB = randomDB.getSiblingDB('config');
-            const chunksJoinClause =
-                findChunksUtil.getChunksJoinClause(configDB, randomColl.getFullName());
-            const randomChunk =
-                configDB.chunks.aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
-                    .next();
+            const configDB = randomDB.getSiblingDB("config");
+            const chunksJoinClause = findChunksUtil.getChunksJoinClause(configDB, randomColl.getFullName());
+            const randomChunk = configDB.chunks.aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}]).next();
             const fromShard = randomChunk.shard;
             const bounds = [randomChunk.min, randomChunk.max];
             const zoneForChunk = defragmentationUtil.getZoneForRange(
-                connCache.mongos[0], randomColl.getFullName(), randomChunk.min, randomChunk.max);
+                connCache.mongos[0],
+                randomColl.getFullName(),
+                randomChunk.min,
+                randomChunk.max,
+            );
 
             // Pick a shard at random to move it to. If the chunk is in a zone, look for a shard
             // with that zone.
             let shardFilter = {_id: {$ne: fromShard}};
             if (zoneForChunk !== null) {
-                shardFilter['tag'] = zoneForChunk;
+                shardFilter["tag"] = zoneForChunk;
             }
-            const shardCursor =
-                configDB.shards.aggregate([{$match: shardFilter}, {$sample: {size: 1}}]);
+            const shardCursor = configDB.shards.aggregate([{$match: shardFilter}, {$sample: {size: 1}}]);
             if (!shardCursor.hasNext()) {
                 return;
             }
@@ -103,9 +104,8 @@ export const $config = (function() {
 
             // Issue a moveChunk command.
             try {
-                ChunkHelper.moveChunk(randomDB, randomColl.getName(), bounds, toShard['_id'], true);
-                jsTest.log("Manual move chunk of chunk " + tojson(randomChunk) + " to shard " +
-                           toShard['_id']);
+                ChunkHelper.moveChunk(randomDB, randomColl.getName(), bounds, toShard["_id"], true);
+                jsTest.log("Manual move chunk of chunk " + tojson(randomChunk) + " to shard " + toShard["_id"]);
             } catch (e) {
                 jsTest.log("Ignoring manual move chunk error: " + tojson(e));
             }
@@ -114,7 +114,7 @@ export const $config = (function() {
         mergeChunks: function mergeChunks(db, collName, connCache) {
             const randomDB = getRandomDb(db);
             const randomColl = getRandomCollection(randomDB);
-            const configDB = randomDB.getSiblingDB('config');
+            const configDB = randomDB.getSiblingDB("config");
             const keyPattern = getCollectionShardKey(configDB, randomColl.getFullName());
 
             // Get all the chunks without using getMore so the test can run with stepdowns.
@@ -129,20 +129,30 @@ export const $config = (function() {
             // that each thread tries to move the same chunk.
             let index = Random.randInt(chunks.length - 1);
             for (let i = 0; i < chunks.length - 1; i++) {
-                if (chunks[index].shard === chunks[index + 1].shard &&
-                    defragmentationUtil.getZoneForRange(connCache.mongos[0],
-                                                        randomColl.getFullName(),
-                                                        chunks[index].min,
-                                                        chunks[index].max) ===
-                        defragmentationUtil.getZoneForRange(connCache.mongos[0],
-                                                            randomColl.getFullName(),
-                                                            chunks[index + 1].min,
-                                                            chunks[index + 1].max)) {
+                if (
+                    chunks[index].shard === chunks[index + 1].shard &&
+                    defragmentationUtil.getZoneForRange(
+                        connCache.mongos[0],
+                        randomColl.getFullName(),
+                        chunks[index].min,
+                        chunks[index].max,
+                    ) ===
+                        defragmentationUtil.getZoneForRange(
+                            connCache.mongos[0],
+                            randomColl.getFullName(),
+                            chunks[index + 1].min,
+                            chunks[index + 1].max,
+                        )
+                ) {
                     const bounds = [chunks[index].min, chunks[index + 1].max];
                     try {
                         ChunkHelper.mergeChunks(randomDB, randomColl.getName(), bounds);
-                        jsTest.log("Manual merge chunks of chunks " + tojson(chunks[index]) +
-                                   " and " + tojson(chunks[index + 1]));
+                        jsTest.log(
+                            "Manual merge chunks of chunks " +
+                                tojson(chunks[index]) +
+                                " and " +
+                                tojson(chunks[index + 1]),
+                        );
                     } catch (e) {
                         jsTest.log("Ignoring manual merge chunks error: " + tojson(e));
                     }
@@ -158,15 +168,13 @@ export const $config = (function() {
         splitChunks: function splitChunks(db, collName, connCache) {
             const randomDB = getRandomDb(db);
             const randomColl = getRandomCollection(randomDB);
-            const configDB = randomDB.getSiblingDB('config');
-            const chunksJoinClause =
-                findChunksUtil.getChunksJoinClause(configDB, randomColl.getFullName());
-            const randomChunk =
-                configDB.chunks.aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
-                    .toArray()[0];
+            const configDB = randomDB.getSiblingDB("config");
+            const chunksJoinClause = findChunksUtil.getChunksJoinClause(configDB, randomColl.getFullName());
+            const randomChunk = configDB.chunks
+                .aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
+                .toArray()[0];
             try {
-                assert.commandWorked(
-                    db.adminCommand({split: randomColl.getFullName(), find: randomChunk.min}));
+                assert.commandWorked(db.adminCommand({split: randomColl.getFullName(), find: randomChunk.min}));
                 jsTest.log("Manual split chunk of chunk " + tojson(randomChunk));
             } catch (e) {
                 jsTest.log("Ignoring manual split chunk error: " + tojson(e));
@@ -176,19 +184,23 @@ export const $config = (function() {
         refineShardKey: function refineShardKey(db, collName, connCache) {
             const randomDB = getRandomDb(db);
             const randomColl = getRandomCollection(randomDB);
-            const configDB = randomDB.getSiblingDB('config');
-            const extendedShardKey =
-                getExtendedCollectionShardKey(configDB, randomColl.getFullName());
+            const configDB = randomDB.getSiblingDB("config");
+            const extendedShardKey = getExtendedCollectionShardKey(configDB, randomColl.getFullName());
             try {
                 assert.commandWorked(randomColl.createIndex(extendedShardKey));
-                assert.commandWorked(randomDB.adminCommand(
-                    {refineCollectionShardKey: randomColl.getFullName(), key: extendedShardKey}));
-                jsTest.log("Manual refine shard key for collection " + randomColl.getFullName() +
-                           " to " + tojson(extendedShardKey));
+                assert.commandWorked(
+                    randomDB.adminCommand({refineCollectionShardKey: randomColl.getFullName(), key: extendedShardKey}),
+                );
+                jsTest.log(
+                    "Manual refine shard key for collection " +
+                        randomColl.getFullName() +
+                        " to " +
+                        tojson(extendedShardKey),
+                );
             } catch (e) {
                 jsTest.log("Ignoring manual refine shard key error: " + tojson(e));
             }
-        }
+        },
     };
 
     var transitions = {
@@ -204,23 +216,23 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         cluster.executeOnConfigNodes((db) => {
-            defaultBalancerShouldReturnRandomMigrations =
-                assert
-                    .commandWorked(db.adminCommand({
-                        getParameter: 1,
-                        'failpoint.balancerShouldReturnRandomMigrations': 1
-                    }))['failpoint.balancerShouldReturnRandomMigrations']
-                    .mode;
+            defaultBalancerShouldReturnRandomMigrations = assert.commandWorked(
+                db.adminCommand({
+                    getParameter: 1,
+                    "failpoint.balancerShouldReturnRandomMigrations": 1,
+                }),
+            )["failpoint.balancerShouldReturnRandomMigrations"].mode;
 
             // If the failpoint is enabled on this suite, disable it because this test relies on the
             // balancer taking correct decisions.
             if (defaultBalancerShouldReturnRandomMigrations === 1) {
-                assert.commandWorked(db.adminCommand(
-                    {configureFailPoint: 'balancerShouldReturnRandomMigrations', mode: 'off'}));
+                assert.commandWorked(
+                    db.adminCommand({configureFailPoint: "balancerShouldReturnRandomMigrations", mode: "off"}),
+                );
             }
         });
 
-        const mongos = cluster.getDB('config').getMongo();
+        const mongos = cluster.getDB("config").getMongo();
         // Create all fragmented collections
         for (let i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
@@ -239,7 +251,8 @@ export const $config = (function() {
                     numZones,
                     docSizeBytesRange,
                     1000 /* chunkSpacing */,
-                    true /* disableCollectionBalancing*/);
+                    true /* disableCollectionBalancing*/,
+                );
             }
         }
         // Remove throttling to speed up test execution
@@ -251,17 +264,18 @@ export const $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
-        const mongos = cluster.getDB('config').getMongo();
+        const mongos = cluster.getDB("config").getMongo();
 
         let defaultBalancerMigrationsThrottling;
         cluster.executeOnConfigNodes((db) => {
-            defaultBalancerMigrationsThrottling = assert.commandWorked(db.adminCommand({
-                getParameter: 1,
-                'balancerMigrationsThrottlingMs': 1
-            }))['balancerMigrationsThrottlingMs'];
+            defaultBalancerMigrationsThrottling = assert.commandWorked(
+                db.adminCommand({
+                    getParameter: 1,
+                    "balancerMigrationsThrottlingMs": 1,
+                }),
+            )["balancerMigrationsThrottlingMs"];
 
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 100}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 100}));
         });
 
         for (let i = 0; i < dbCount; i++) {
@@ -271,28 +285,39 @@ export const $config = (function() {
                 // Wait for defragmentation to complete
                 defragmentationUtil.waitForEndOfDefragmentation(mongos, fullNs);
                 // Enable balancing and wait for balanced
-                assert.commandWorked(mongos.getDB('config').collections.update(
-                    {_id: fullNs}, {$set: {"noBalance": false}}));
+                assert.commandWorked(
+                    mongos.getDB("config").collections.update({_id: fullNs}, {$set: {"noBalance": false}}),
+                );
                 sh.awaitCollectionBalance(mongos.getCollection(fullNs), 300000 /* 5 minutes */);
                 // Re-disable balancing
-                assert.commandWorked(mongos.getDB('config').collections.update(
-                    {_id: fullNs}, {$set: {"noBalance": true}}));
+                assert.commandWorked(
+                    mongos.getDB("config").collections.update({_id: fullNs}, {$set: {"noBalance": true}}),
+                );
                 // Begin defragmentation again
-                assert.commandWorked(mongos.adminCommand({
-                    configureCollectionBalancing: fullNs,
-                    defragmentCollection: true,
-                    chunkSize: maxChunkSizeMB,
-                }));
+                assert.commandWorked(
+                    mongos.adminCommand({
+                        configureCollectionBalancing: fullNs,
+                        defragmentCollection: true,
+                        chunkSize: maxChunkSizeMB,
+                    }),
+                );
                 // Wait for defragmentation to complete and check final state
                 defragmentationUtil.waitForEndOfDefragmentation(mongos, fullNs);
                 defragmentationUtil.checkPostDefragmentationState(
-                    cluster.getConfigPrimaryNode(), mongos, fullNs, maxChunkSizeMB, "key");
+                    cluster.getConfigPrimaryNode(),
+                    mongos,
+                    fullNs,
+                    maxChunkSizeMB,
+                    "key",
+                );
                 // Resume original throttling value
                 cluster.executeOnConfigNodes((db) => {
-                    assert.commandWorked(db.adminCommand({
-                        setParameter: 1,
-                        chunkDefragmentationThrottlingMS: defaultChunkDefragmentationThrottlingMS
-                    }));
+                    assert.commandWorked(
+                        db.adminCommand({
+                            setParameter: 1,
+                            chunkDefragmentationThrottlingMS: defaultChunkDefragmentationThrottlingMS,
+                        }),
+                    );
                 });
             }
         }
@@ -300,19 +325,20 @@ export const $config = (function() {
         cluster.executeOnConfigNodes((db) => {
             // Reset the failpoint to its original value.
             if (defaultBalancerShouldReturnRandomMigrations === 1) {
-                defaultBalancerShouldReturnRandomMigrations =
-                    assert
-                        .commandWorked(db.adminCommand({
-                            configureFailPoint: 'balancerShouldReturnRandomMigrations',
-                            mode: 'alwaysOn'
-                        }))
-                        .was;
+                defaultBalancerShouldReturnRandomMigrations = assert.commandWorked(
+                    db.adminCommand({
+                        configureFailPoint: "balancerShouldReturnRandomMigrations",
+                        mode: "alwaysOn",
+                    }),
+                ).was;
             }
 
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                balancerMigrationsThrottlingMs: defaultBalancerMigrationsThrottling
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    balancerMigrationsThrottlingMs: defaultBalancerMigrationsThrottling,
+                }),
+            );
         });
     }
 
@@ -323,6 +349,6 @@ export const $config = (function() {
         transitions: transitions,
         setup: setup,
         teardown: teardown,
-        passConnectionCache: true
+        passConnectionCache: true,
     };
 })();

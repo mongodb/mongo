@@ -17,24 +17,28 @@ const st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 const shardConn = st.rs0.getPrimary();
 const shardAdminDB = shardConn.getDB("admin");
 
 jsTest.log("Setup users for test");
-shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root"]});
-assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
-assert.commandWorked(shardAdminDB.runCommand(
-    {setParameter: 1, logComponentVerbosity: {sharding: {verbosity: 2}, assert: {verbosity: 1}}}));
+shardAdminDB.createUser({user: "admin", pwd: "x", roles: ["root"]});
+assert(shardAdminDB.auth("admin", "x"), "Authentication failed");
+assert.commandWorked(
+    shardAdminDB.runCommand({
+        setParameter: 1,
+        logComponentVerbosity: {sharding: {verbosity: 2}, assert: {verbosity: 1}},
+    }),
+);
 // The replSetStateChange action type is needed for this test
 shardAdminDB.createUser({user: "user", pwd: "y", roles: ["clusterManager"]});
 shardAdminDB.logout();
 
 function awaitReplication(rst) {
     let nodes = rst.nodes;
-    authutil.asCluster(nodes, "jstests/libs/key1", function() {
+    authutil.asCluster(nodes, "jstests/libs/key1", function () {
         rst.awaitReplication();
     });
 }
@@ -59,7 +63,7 @@ jsTest.log("Testing replSetStepDown and replSetStepUp");
 {
     let secondaryConn = setupConn(st.rs0.getSecondary(), "user", "y");
     assert.commandWorked(secondaryConn.adminCommand({replSetStepUp: 1}));
-    authutil.asCluster(st.rs0.nodes, "jstests/libs/key1", function() {
+    authutil.asCluster(st.rs0.nodes, "jstests/libs/key1", function () {
         st.rs0.awaitNodesAgreeOnPrimary();
         st.rs0.awaitSecondaryNodes();
     });
@@ -68,7 +72,7 @@ jsTest.log("Testing replSetStepDown and replSetStepUp");
         // the node later in the test if it will be stepped up to primary.
         return secondaryConn.adminCommand({replSetStepDown: 1, force: true}).ok;
     }, `failed attempt to step down node ${secondaryConn.host}`);
-    authutil.asCluster(st.rs0.nodes, "jstests/libs/key1", function() {
+    authutil.asCluster(st.rs0.nodes, "jstests/libs/key1", function () {
         st.rs0.awaitNodesAgreeOnPrimary();
         st.rs0.awaitSecondaryNodes();
     });
@@ -120,21 +124,22 @@ jsTest.log("Testing replSetAbortPrimaryCatchUp");
     newConfig.settings.catchUpTimeoutMillis = -1;
     assert.commandWorked(primaryConn.adminCommand({replSetReconfig: newConfig}));
     // Put new secondary into primary catch up
-    const stopReplProducerFailPoint2 = configureFailPoint(secondary2Conn, 'stopReplProducer');
+    const stopReplProducerFailPoint2 = configureFailPoint(secondary2Conn, "stopReplProducer");
     stopReplProducerFailPoint2.wait();
     runAsAdminUser(primary, {insert: "catch_up", documents: [{_id: 0}]}, "test");
     assert.soon(() => {
-        let count = runAsAdminUser(secondary1,
-                                   {
-                                       count: "catch_up",
-                                       readConcern: {level: "local"},
-                                       $readPreference: {mode: "secondary"}
-                                   },
-                                   "test")
-                        .n;
+        let count = runAsAdminUser(
+            secondary1,
+            {
+                count: "catch_up",
+                readConcern: {level: "local"},
+                $readPreference: {mode: "secondary"},
+            },
+            "test",
+        ).n;
         return count == 1;
     });
-    const stopReplProducerFailPoint1 = configureFailPoint(secondary1Conn, 'stopReplProducer');
+    const stopReplProducerFailPoint1 = configureFailPoint(secondary1Conn, "stopReplProducer");
     stopReplProducerFailPoint1.wait();
     runAsAdminUser(primary, {insert: "catch_up", documents: [{_id: 1}]}, "test");
     // Step up the first secondary, it will enter catch up indefinitely
@@ -150,7 +155,7 @@ jsTest.log("Testing replSetAbortPrimaryCatchUp");
     secondary1Conn.close();
     secondary2Conn.close();
 
-    authutil.asCluster(st.rs0.nodes, "jstests/libs/key1", function() {
+    authutil.asCluster(st.rs0.nodes, "jstests/libs/key1", function () {
         st.rs0.awaitNodesAgreeOnPrimary();
         st.rs0.awaitSecondaryNodes();
     });

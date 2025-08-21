@@ -50,7 +50,7 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
         lsid: lsid,
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(stmtId),
-        autocommit: false
+        autocommit: false,
     };
 }
 
@@ -58,19 +58,20 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
     function runTest({isPreparedTxn}) {
         jsTest.log(
             `Test aborting ${isPreparedTxn ? "a prepared" : "an unprepared"} retryable internal ` +
-            "transaction and retrying the write statements executed in the aborted transaction " +
-            "and in a retryable write prior to the transaction");
+                "transaction and retrying the write statements executed in the aborted transaction " +
+                "and in a retryable write prior to the transaction",
+        );
         let {parentLsid, parentTxnNumber, childLsid, childTxnNumber, stmtId} = makeSessionOpts();
 
         // Execute a write statement in a retryable write.
-        const parentSessionCmdObj =
-            makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
+        const parentSessionCmdObj = makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
         assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
 
         // Execute another write statement in a retryable internal transaction.
         const childSessionCmdObj1 = Object.assign(
             makeInsertCmdObjForTransaction(childLsid, childTxnNumber, stmtId++, {_id: 1}),
-            {startTransaction: true});
+            {startTransaction: true},
+        );
         assert.commandWorked(testDB.runCommand(childSessionCmdObj1));
 
         // Prepare and abort the transaction.
@@ -83,8 +84,7 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
 
         // Retry all write statements including the one executed as a retryable write and verify
         // that they execute exactly once.
-        const retryResForParentSessionCmdObj =
-            assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
+        const retryResForParentSessionCmdObj = assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
         assert.eq(retryResForParentSessionCmdObj.n, 1);
 
         assert.eq(testColl.find({_id: 0}).itcount(), 1);
@@ -94,9 +94,12 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
         // the write statements in the commands below would not execute, and therefore the doc
         // {_id: 1} would not exist.
         const parentSessionCmdObj1 = makeInsertCmdObjForRetryableWrite(
-            parentLsid, parentTxnNumber, childSessionCmdObj1.stmtId, {_id: 1});
-        const retryResForParentSessionCmdObj1 =
-            assert.commandWorked(testDB.runCommand(parentSessionCmdObj1));
+            parentLsid,
+            parentTxnNumber,
+            childSessionCmdObj1.stmtId,
+            {_id: 1},
+        );
+        const retryResForParentSessionCmdObj1 = assert.commandWorked(testDB.runCommand(parentSessionCmdObj1));
         assert.eq(retryResForParentSessionCmdObj1.n, 1);
 
         assert.eq(testColl.find({_id: 0}).itcount(), 1);
@@ -113,18 +116,19 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
     function runTest({isPreparedTxn}) {
         jsTest.log(
             `Test aborting ${isPreparedTxn ? "a prepared" : "an unprepared"} retryable ` +
-            "internal transaction and running the transaction with different write statements");
+                "internal transaction and running the transaction with different write statements",
+        );
         let {parentLsid, parentTxnNumber, childLsid, childTxnNumber, stmtId} = makeSessionOpts();
 
         // Execute a write statement in a retryable write.
-        const parentSessionCmdObj =
-            makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
+        const parentSessionCmdObj = makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
         assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
 
         // Execute another write statement in a retryable internal transaction.
         const childSessionCmdObj1 = Object.assign(
             makeInsertCmdObjForTransaction(childLsid, childTxnNumber, stmtId++, {_id: 1}),
-            {startTransaction: true});
+            {startTransaction: true},
+        );
         assert.commandWorked(testDB.runCommand(childSessionCmdObj1));
 
         // Prepare and abort the transaction.
@@ -136,8 +140,7 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
         assert.commandWorked(testDB.adminCommand(abortCmdObj));
 
         // Retry.
-        const retryResForParentSessionCmdObj =
-            assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
+        const retryResForParentSessionCmdObj = assert.commandWorked(testDB.runCommand(parentSessionCmdObj));
         assert.eq(retryResForParentSessionCmdObj.n, 1);
 
         assert.eq(testColl.find({_id: 0}).itcount(), 1);
@@ -145,7 +148,8 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc) {
 
         const childSessionCmdObj2 = Object.assign(
             makeInsertCmdObjForTransaction(childLsid, childTxnNumber, stmtId++, {_id: 2}),
-            {startTransaction: true});
+            {startTransaction: true},
+        );
 
         if (isPreparedTxn) {
             // It is illegal to retry an aborted prepared transaction.

@@ -10,18 +10,20 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/yield/yield.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.query = function geoNear(db, collName) {
         // This distance gets about 80 docs around the origin. There is one doc inserted
         // every 1m^2 and the area scanned by a 5m radius is PI*(5m)^2 ~ 79.
         const maxDistance = 5;
-        const cursor = db[collName].aggregate([{
-            $geoNear: {
-                near: [0, 0],
-                distanceField: "dist",
-                maxDistance: maxDistance,
-            }
-        }]);
+        const cursor = db[collName].aggregate([
+            {
+                $geoNear: {
+                    near: [0, 0],
+                    distanceField: "dist",
+                    maxDistance: maxDistance,
+                },
+            },
+        ]);
 
         // We only run the verification when workloads are run on separate collections, since the
         // aggregation may fail if we don't have exactly one 2d index to use.
@@ -30,12 +32,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         let lastDistanceSeen = 0;
         while (cursor.hasNext()) {
             const doc = cursor.next();
-            assert.lte(doc.dist,
-                       maxDistance,
-                       `dist in ${tojson(doc)} exceeds max allowable $geoNear distance`);
-            assert.lte(lastDistanceSeen,
-                       doc.dist,
-                       `dist in ${tojson(doc)} is not less than the previous distance`);
+            assert.lte(doc.dist, maxDistance, `dist in ${tojson(doc)} exceeds max allowable $geoNear distance`);
+            assert.lte(lastDistanceSeen, doc.dist, `dist in ${tojson(doc)} is not less than the previous distance`);
             lastDistanceSeen = doc.dist;
         }
     };
@@ -50,7 +48,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.data.getIndexSpec = function getIndexSpec() {
-        return {geo: '2d'};
+        return {geo: "2d"};
     };
 
     $config.data.getReplaceSpec = function getReplaceSpec(i, coords) {

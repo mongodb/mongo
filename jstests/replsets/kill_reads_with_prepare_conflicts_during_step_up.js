@@ -16,7 +16,7 @@ const config = rst.getReplSetConfig();
 // Increase the election timeout so that we do not accidentally trigger an election before
 // we make the secondary step up.
 config.settings = {
-    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000,
 };
 rst.initiate(config);
 
@@ -43,11 +43,9 @@ assert.commandWorked(sessionColl.update({_id: 1}, {_id: 1, a: 1}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 // Advance the clusterTime with another insert.
-const clusterTimeAfterPrepare =
-    assert
-        .commandWorked(primaryColl.runCommand(
-            "insert", {documents: [{advanceClusterTime: 1}], writeConcern: {w: "majority"}}))
-        .operationTime;
+const clusterTimeAfterPrepare = assert.commandWorked(
+    primaryColl.runCommand("insert", {documents: [{advanceClusterTime: 1}], writeConcern: {w: "majority"}}),
+).operationTime;
 
 // Ensure that the secondary replicates the prepare and the additional insert.
 rst.awaitReplication();
@@ -55,13 +53,15 @@ rst.awaitReplication();
 // Make sure a secondary read using afterClusterTime times out when trying to
 // read a prepared document.
 const secondaryDB = secondary.getDB(dbName);
-assert.commandFailedWithCode(secondaryDB.runCommand({
-    find: collName,
-    filter: {_id: 1},
-    readConcern: {afterClusterTime: clusterTimeAfterPrepare},
-    maxTimeMS: 2 * 1000  // 2 seconds
-}),
-                             ErrorCodes.MaxTimeMSExpired);
+assert.commandFailedWithCode(
+    secondaryDB.runCommand({
+        find: collName,
+        filter: {_id: 1},
+        readConcern: {afterClusterTime: clusterTimeAfterPrepare},
+        maxTimeMS: 2 * 1000, // 2 seconds
+    }),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Set a failpoint so we can wait when we hit the prepare conflict.
 let failPoint = configureFailPoint(secondary, "WTPrintPrepareConflictLog");
@@ -79,12 +79,14 @@ const waitForSecondaryReadBlockedOnPrepareConflictThread = startParallelShell(()
     // The following read should block on the prepared transaction since it will be
     // reading a conflicting document using an afterClusterTime later than the
     // prepareTimestamp.
-    assert.commandFailedWithCode(parallelTestDB.runCommand({
-        find: parallelTestCollName,
-        filter: {_id: 1},
-        readConcern: {afterClusterTime: TestData.clusterTime}
-    }),
-                                 ErrorCodes.InterruptedDueToReplStateChange);
+    assert.commandFailedWithCode(
+        parallelTestDB.runCommand({
+            find: parallelTestCollName,
+            filter: {_id: 1},
+            readConcern: {afterClusterTime: TestData.clusterTime},
+        }),
+        ErrorCodes.InterruptedDueToReplStateChange,
+    );
 }, secondary.port);
 
 jsTestLog("Waiting for failpoint");
@@ -117,11 +119,13 @@ const txnNumber = session.getTxnNumber_forTesting();
 
 jsTestLog("Committing transaction");
 // Commit the transaction.
-assert.commandWorked(sessionDB.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: prepareTimestamp,
-    txnNumber: NumberLong(txnNumber),
-    autocommit: false,
-}));
+assert.commandWorked(
+    sessionDB.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: prepareTimestamp,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
+);
 
 rst.stopSet();

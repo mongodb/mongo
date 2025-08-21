@@ -65,39 +65,96 @@ assert.commandWorked(coll.insert(docsToInsert));
 
 // Without a hint. Do it twice to make sure caching is ok.
 for (let i = 0; i < 2; i++) {
-    assert.eq(15, coll.find({a: {$gte: 85}}).sort({b: 1}).batchSize(2).itcount());
-    assert.eq(6, coll.find({a: {$gte: 85}}).sort({b: 1}).limit(6).itcount());
+    assert.eq(
+        15,
+        coll
+            .find({a: {$gte: 85}})
+            .sort({b: 1})
+            .batchSize(2)
+            .itcount(),
+    );
+    assert.eq(
+        6,
+        coll
+            .find({a: {$gte: 85}})
+            .sort({b: 1})
+            .limit(6)
+            .itcount(),
+    );
 }
 
 // Hinting 'a'.
-assert.eq(15, coll.find({a: {$gte: 85}}).sort({b: 1}).hint({a: 1}).batchSize(2).itcount());
-assert.eq(6, coll.find({a: {$gte: 85}}).sort({b: 1}).hint({a: 1}).limit(6).itcount());
+assert.eq(
+    15,
+    coll
+        .find({a: {$gte: 85}})
+        .sort({b: 1})
+        .hint({a: 1})
+        .batchSize(2)
+        .itcount(),
+);
+assert.eq(
+    6,
+    coll
+        .find({a: {$gte: 85}})
+        .sort({b: 1})
+        .hint({a: 1})
+        .limit(6)
+        .itcount(),
+);
 
 // Hinting 'b'.
-assert.eq(15, coll.find({a: {$gte: 85}}).sort({b: 1}).hint({b: 1}).batchSize(2).itcount());
-assert.eq(6, coll.find({a: {$gte: 85}}).sort({b: 1}).hint({b: 1}).limit(6).itcount());
+assert.eq(
+    15,
+    coll
+        .find({a: {$gte: 85}})
+        .sort({b: 1})
+        .hint({b: 1})
+        .batchSize(2)
+        .itcount(),
+);
+assert.eq(
+    6,
+    coll
+        .find({a: {$gte: 85}})
+        .sort({b: 1})
+        .hint({b: 1})
+        .limit(6)
+        .itcount(),
+);
 
 // With explain.
-let explain = coll.find({a: {$gte: 85}}).sort({b: 1}).batchSize(2).explain("executionStats");
+let explain = coll
+    .find({a: {$gte: 85}})
+    .sort({b: 1})
+    .batchSize(2)
+    .explain("executionStats");
 assert.eq(15, explain.executionStats.nReturned);
-explain = coll.find({a: {$gte: 85}}).sort({b: 1}).limit(6).explain("executionStats");
+explain = coll
+    .find({a: {$gte: 85}})
+    .sort({b: 1})
+    .limit(6)
+    .explain("executionStats");
 if (FixtureHelpers.isMongos(db)) {
     // If we're talking to a mongos, we expect at most one batch from each shard.
-    assert.gte(FixtureHelpers.numberOfShardsForCollection(coll) * 6,
-               explain.executionStats.nReturned);
+    assert.gte(FixtureHelpers.numberOfShardsForCollection(coll) * 6, explain.executionStats.nReturned);
 } else {
     assert.eq(6, explain.executionStats.nReturned);
 }
 
 // Double check that we're not scanning more stuff than we have to. In order to get the sort
 // using index 'a', we should need to scan about 50 keys and 50 documents.
-explain = coll.find({a: {$gte: 50}}).sort({b: 1}).hint({a: 1}).limit(6).explain("executionStats");
+explain = coll
+    .find({a: {$gte: 50}})
+    .sort({b: 1})
+    .hint({a: 1})
+    .limit(6)
+    .explain("executionStats");
 assert.lte(explain.executionStats.totalKeysExamined, 60);
 assert.lte(explain.executionStats.totalDocsExamined, 60);
 if (FixtureHelpers.isMongos(db)) {
     // If we're talking to a mongos, we expect at most one batch from each shard.
-    assert.gte(FixtureHelpers.numberOfShardsForCollection(coll) * 6,
-               explain.executionStats.nReturned);
+    assert.gte(FixtureHelpers.numberOfShardsForCollection(coll) * 6, explain.executionStats.nReturned);
 } else {
     assert.eq(6, explain.executionStats.nReturned);
 }

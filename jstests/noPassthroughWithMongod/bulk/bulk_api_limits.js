@@ -13,7 +13,7 @@ var result;
  * well as for the legacy operations
  *
  *******************************************************/
-var executeTestsUnordered = function() {
+var executeTestsUnordered = function () {
     // Create unique index
     coll.dropIndexes();
     coll.remove({});
@@ -25,7 +25,7 @@ var executeTestsUnordered = function() {
     // Set up a giant string to blow through the max message size
     var hugeString = "";
     // Create it bigger than 16MB
-    for (var i = 0; i < (1024 * 1100); i++) {
+    for (var i = 0; i < 1024 * 1100; i++) {
         hugeString = hugeString + "1234567890123456";
     }
 
@@ -36,8 +36,7 @@ var executeTestsUnordered = function() {
     try {
         batch.insert({string: hugeString});
         assert(false);
-    } catch (err) {
-    }
+    } catch (err) {}
 
     // Create unique index
     coll.dropIndexes();
@@ -49,7 +48,7 @@ var executeTestsUnordered = function() {
     // Set up a giant string to blow through the max message size
     var hugeString = "";
     // Create 4 MB strings to test splitting
-    for (var i = 0; i < (1024 * 256); i++) {
+    for (var i = 0; i < 1024 * 256; i++) {
         hugeString = hugeString + "1234567890123456";
     }
 
@@ -75,14 +74,14 @@ var executeTestsUnordered = function() {
  * well as for the legacy operations
  *
  *******************************************************/
-var executeTestsOrdered = function() {
+var executeTestsOrdered = function () {
     /**
      * Fail during batch construction due to single document > maxBSONSize
      */
     // Set up a giant string to blow through the max message size
     var hugeString = "";
     // Create it bigger than 16MB
-    for (var i = 0; i < (1024 * 1100); i++) {
+    for (var i = 0; i < 1024 * 1100; i++) {
         hugeString = hugeString + "1234567890123456";
     }
 
@@ -93,8 +92,7 @@ var executeTestsOrdered = function() {
     try {
         batch.insert({string: hugeString});
         assert(false);
-    } catch (err) {
-    }
+    } catch (err) {}
 
     // Create unique index
     coll.dropIndexes();
@@ -106,7 +104,7 @@ var executeTestsOrdered = function() {
     // Set up a giant string to blow through the max message size
     var hugeString = "";
     // Create 4 MB strings to test splitting
-    for (var i = 0; i < (1024 * 256); i++) {
+    for (var i = 0; i < 1024 * 256; i++) {
         hugeString = hugeString + "1234567890123456";
     }
 

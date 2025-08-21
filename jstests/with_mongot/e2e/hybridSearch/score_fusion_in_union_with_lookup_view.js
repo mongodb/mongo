@@ -10,16 +10,18 @@ import {
     runHybridSearchInUnionWithLookupSubViewTest,
     runHybridSearchInUnionWithLookupTopLevelViewTest,
     runHybridSearchInUnionWithLookupViewTopAndSubTest,
-    searchIndexName
+    searchIndexName,
 } from "jstests/with_mongot/e2e_lib/hybrid_search_in_union_with_lookup_view.js";
 
 function buildScoreFusionPipeline(inputPipelines) {
-    return [{
-        $scoreFusion: {
-            input: {pipelines: inputPipelines, normalization: "sigmoid"},
-            combination: {method: "avg"}
-        }
-    }];
+    return [
+        {
+            $scoreFusion: {
+                input: {pipelines: inputPipelines, normalization: "sigmoid"},
+                combination: {method: "avg"},
+            },
+        },
+    ];
 }
 
 (function testScoreFusionInUnionWithLookupSubViewTest() {
@@ -27,44 +29,55 @@ function buildScoreFusionPipeline(inputPipelines) {
     // and a view on the $unionWith/$lookup. Test queries like:
     // db.coll.aggregate([{$unionWith/$lookup: { from: "view", pipeline: [{$scoreFusion}] }}])
     function runScoreFusionInUnionWithLookupSubViewTest(testName, viewPipeline, inputPipelines) {
-        runHybridSearchInUnionWithLookupSubViewTest(
-            testName, viewPipeline, inputPipelines, buildScoreFusionPipeline);
+        runHybridSearchInUnionWithLookupSubViewTest(testName, viewPipeline, inputPipelines, buildScoreFusionPipeline);
     }
 
     (function testMatchView() {
         runScoreFusionInUnionWithLookupSubViewTest(
-            "match_view_match_pipelines", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
+            "match_view_match_pipelines",
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            {
                 a: [
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
                 b: [
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
 
         runScoreFusionInUnionWithLookupSubViewTest(
-            "match_view_search_pipeline_second", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
+            "match_view_search_pipeline_second",
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            {
                 a: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
-                b: [{$sort: {x: 1}}, {$score: {score: "$y", normalization: "sigmoid"}}]
-            });
+                b: [{$sort: {x: 1}}, {$score: {score: "$y", normalization: "sigmoid"}}],
+            },
+        );
 
         runScoreFusionInUnionWithLookupSubViewTest(
-            "match_pipeline_search_pipeline_second", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
+            "match_pipeline_search_pipeline_second",
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            {
                 a: [{$sort: {x: 1}}, {$score: {score: "$x", normalization: "minMaxScaler"}}],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
 
         runScoreFusionInUnionWithLookupSubViewTest(
-            "match_pipeline_both_search_pipelines", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
+            "match_pipeline_both_search_pipelines",
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            {
                 a: [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
     })();
 
     (function testSearchView() {
@@ -76,15 +89,16 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
                 b: [
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
     })();
 })();
 
@@ -92,46 +106,61 @@ function buildScoreFusionPipeline(inputPipelines) {
     // Tests when the query is running on the underlying collection at the top-level,
     // and a view on the $unionWith/$lookup. Test queries like:
     // db.view.aggregate([{$unionWith/$lookup: { from: "coll", pipeline: [{$scoreFusion}] }}])
-    function runScoreFusionInUnionWithLookupTopLevelViewTest(
-        testName, viewPipeline, inputPipelines) {
+    function runScoreFusionInUnionWithLookupTopLevelViewTest(testName, viewPipeline, inputPipelines) {
         runHybridSearchInUnionWithLookupTopLevelViewTest(
-            testName, viewPipeline, inputPipelines, buildScoreFusionPipeline);
+            testName,
+            viewPipeline,
+            inputPipelines,
+            buildScoreFusionPipeline,
+        );
     }
 
     (function testMatchView() {
         runScoreFusionInUnionWithLookupTopLevelViewTest(
-            "match_view_match_pipelines", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
+            "match_view_match_pipelines",
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            {
                 a: [
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
                 b: [
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
 
         runScoreFusionInUnionWithLookupTopLevelViewTest(
-            "match_view_search_pipeline_second", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
+            "match_view_search_pipeline_second",
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            {
                 a: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
-                b: [{$sort: {x: 1}}, {$score: {score: "$y", normalization: "sigmoid"}}]
-            });
+                b: [{$sort: {x: 1}}, {$score: {score: "$y", normalization: "sigmoid"}}],
+            },
+        );
 
         runScoreFusionInUnionWithLookupTopLevelViewTest(
-            "match_pipeline_search_pipeline_second", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
+            "match_pipeline_search_pipeline_second",
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            {
                 a: [{$sort: {x: 1}}, {$score: {score: "$x", normalization: "minMaxScaler"}}],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
 
         runScoreFusionInUnionWithLookupTopLevelViewTest(
-            "match_pipeline_both_search_pipelines", [{$match: {$expr: {$gt: ["$y", 10]}}}], {
+            "match_pipeline_both_search_pipelines",
+            [{$match: {$expr: {$gt: ["$y", 10]}}}],
+            {
                 a: [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
     })();
 
     (function testSearchView() {
@@ -143,15 +172,16 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
                 b: [
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
 
         runScoreFusionInUnionWithLookupTopLevelViewTest(
             "search_view_search_pipeline_first",
@@ -162,9 +192,10 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
+                    {$score: {score: "$y", normalization: "sigmoid"}},
                 ],
-            });
+            },
+        );
 
         runScoreFusionInUnionWithLookupTopLevelViewTest(
             "search_view_search_pipeline_second",
@@ -174,18 +205,20 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
 
         runScoreFusionInUnionWithLookupTopLevelViewTest(
             "search_view_both_search_pipelines",
             [{$search: {index: searchIndexName, text: {query: "apple", path: "b"}}}],
             {
                 a: [{$search: {index: searchIndexName, text: {query: "bar", path: "a"}}}],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
     })();
 })();
 
@@ -194,12 +227,18 @@ function buildScoreFusionPipeline(inputPipelines) {
     // $unionWith/$lookup. Test queries like: db.topLevelView.aggregate([{$unionWith/$lookup: {
     // from: "subView", pipeline: [{$scoreFusion}] }}]) Tests all combinations of of view1 and view2
     function runScoreFusionInUnionWithLookupViewTopAndSubTest(
-        testName, topLevelViewPipeline, subViewPipeline, inputPipelines) {
-        runHybridSearchInUnionWithLookupViewTopAndSubTest(testName,
-                                                          topLevelViewPipeline,
-                                                          subViewPipeline,
-                                                          inputPipelines,
-                                                          buildScoreFusionPipeline);
+        testName,
+        topLevelViewPipeline,
+        subViewPipeline,
+        inputPipelines,
+    ) {
+        runHybridSearchInUnionWithLookupViewTopAndSubTest(
+            testName,
+            topLevelViewPipeline,
+            subViewPipeline,
+            inputPipelines,
+            buildScoreFusionPipeline,
+        );
     }
 
     (function testBothMatchViews() {
@@ -212,15 +251,16 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
                 b: [
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
 
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "match_views_search_pipeline_first",
@@ -232,9 +272,10 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
 
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "match_views_search_pipeline_second",
@@ -245,10 +286,11 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
 
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "match_views_both_search_pipelines",
@@ -256,8 +298,9 @@ function buildScoreFusionPipeline(inputPipelines) {
             [{$match: {$expr: {$lt: ["$y", 25]}}}],
             {
                 a: [{$search: {index: searchIndexName, text: {query: "bar", path: "a"}}}],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
     })();
 
     (function testMatchTopViewSearchSubView() {
@@ -270,15 +313,16 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
                 b: [
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
     })();
 
     (function testSearchTopViewMatchSubView() {
@@ -291,15 +335,16 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
                 b: [
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
 
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "search_top_match_sub_view_search_pipeline_first",
@@ -311,9 +356,10 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
 
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "search_top_match_sub_view_search_pipeline_second",
@@ -324,10 +370,11 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
 
         runScoreFusionInUnionWithLookupViewTopAndSubTest(
             "search_top_match_sub_view_both_search_pipelines",
@@ -335,8 +382,9 @@ function buildScoreFusionPipeline(inputPipelines) {
             [{$match: {$expr: {$lt: ["$y", 25]}}}],
             {
                 a: [{$search: {index: searchIndexName, text: {query: "bar", path: "a"}}}],
-                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}]
-            });
+                b: [{$search: {index: searchIndexName, text: {query: "foo", path: "a"}}}],
+            },
+        );
     })();
 
     (function testBothSearchViews() {
@@ -349,14 +397,15 @@ function buildScoreFusionPipeline(inputPipelines) {
                     {$match: {x: {$gte: 3}}},
                     {$sort: {x: 1}},
                     {$limit: 10},
-                    {$score: {score: "$x", normalization: "minMaxScaler"}}
+                    {$score: {score: "$x", normalization: "minMaxScaler"}},
                 ],
                 b: [
                     {$match: {x: {$lte: 13}}},
                     {$sort: {x: -1}},
                     {$limit: 8},
-                    {$score: {score: "$y", normalization: "sigmoid"}}
-                ]
-            });
+                    {$score: {score: "$y", normalization: "sigmoid"}},
+                ],
+            },
+        );
     })();
 })();

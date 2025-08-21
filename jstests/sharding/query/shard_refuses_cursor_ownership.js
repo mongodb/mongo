@@ -30,22 +30,40 @@ const other = st.getOther(st.getPrimaryShard(dbName));
 
 // Start an aggregation that requires merging on a shard. Let it run until the shard cursors have
 // been established but make it hang right before opening the merge cursor.
-let shardedAggregateHangBeforeDispatchMergingPipelineFP =
-    configureFailPoint(st.s, "shardedAggregateHangBeforeDispatchMergingPipeline");
+let shardedAggregateHangBeforeDispatchMergingPipelineFP = configureFailPoint(
+    st.s,
+    "shardedAggregateHangBeforeDispatchMergingPipeline",
+);
 let awaitAggregationShell = startParallelShell(
-    funWithArgs((dbName, collName) => {
-        assert.eq(
-            0, db.getSiblingDB(dbName)[collName].aggregate([{$out: collName + ".out"}]).itcount());
-    }, dbName, collName), st.s.port);
+    funWithArgs(
+        (dbName, collName) => {
+            assert.eq(
+                0,
+                db
+                    .getSiblingDB(dbName)
+                    [collName].aggregate([{$out: collName + ".out"}])
+                    .itcount(),
+            );
+        },
+        dbName,
+        collName,
+    ),
+    st.s.port,
+);
 shardedAggregateHangBeforeDispatchMergingPipelineFP.wait();
 
 // Start a chunk migration, let it run until it enters the critical section.
-let hangBeforePostMigrationCommitRefresh =
-    configureFailPoint(primary, "hangBeforePostMigrationCommitRefresh");
+let hangBeforePostMigrationCommitRefresh = configureFailPoint(primary, "hangBeforePostMigrationCommitRefresh");
 let awaitMoveChunkShell = startParallelShell(
-    funWithArgs((recipientShard, ns) => {
-        assert.commandWorked(db.adminCommand({moveChunk: ns, find: {x: -1}, to: recipientShard}));
-    }, other.shardName, ns), st.s.port);
+    funWithArgs(
+        (recipientShard, ns) => {
+            assert.commandWorked(db.adminCommand({moveChunk: ns, find: {x: -1}, to: recipientShard}));
+        },
+        other.shardName,
+        ns,
+    ),
+    st.s.port,
+);
 hangBeforePostMigrationCommitRefresh.wait();
 
 // Let the aggregation continue and try to establish the merge cursor (it will first fail because
@@ -61,12 +79,10 @@ awaitAggregationShell();
 awaitMoveChunkShell();
 
 // Did any cursor leak?
-const idleCursors = primary.getDB("admin")
-                        .aggregate([
-                            {$currentOp: {idleCursors: true, allUsers: true}},
-                            {$match: {type: "idleCursor", ns: ns}}
-                        ])
-                        .toArray();
+const idleCursors = primary
+    .getDB("admin")
+    .aggregate([{$currentOp: {idleCursors: true, allUsers: true}}, {$match: {type: "idleCursor", ns: ns}}])
+    .toArray();
 assert.eq(0, idleCursors.length, "Found idle cursors: " + tojson(idleCursors));
 
 // Check that range deletions can be completed (if a cursor was left open, the range deletion would
@@ -75,7 +91,7 @@ assert.soon(
     () => {
         return primary.getDB("config")["rangeDeletions"].find().itcount() === 0;
     },
-    "Range deletion tasks did not finish: + " +
-        tojson(primary.getDB("config")["rangeDeletions"].find().toArray()));
+    "Range deletion tasks did not finish: + " + tojson(primary.getDB("config")["rangeDeletions"].find().toArray()),
+);
 
 st.stop();

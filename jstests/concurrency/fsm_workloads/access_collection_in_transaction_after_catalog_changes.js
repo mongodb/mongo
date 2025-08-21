@@ -12,12 +12,10 @@
  * @tags: [uses_transactions, requires_replication]
  */
 
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 
-export const $config = (function() {
-    var states = (function() {
+export const $config = (function () {
+    var states = (function () {
         function init(db, collName) {
             this.session = db.getMongo().startSession();
         }
@@ -39,68 +37,56 @@ export const $config = (function() {
          */
 
         function aggregate(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 ddlColl.aggregate([{$limit: 1}]).itcount();
             };
-            runOpInTxn(
-                this.session, db, collName, this.ddlDBName, this.ddlCollName, "aggregate", op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "aggregate", op);
         }
 
         function distinct(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 ddlColl.distinct("x");
             };
-            runOpInTxn(
-                this.session, db, collName, this.ddlDBName, this.ddlCollName, "distinct", op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "distinct", op);
         }
 
         function findAndModify(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 ddlColl.findAndModify({query: {}, sort: {x: 1}, update: {$inc: {x: 1}}});
             };
-            runOpInTxn(
-                this.session, db, collName, this.ddlDBName, this.ddlCollName, "findAndModify", op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findAndModify", op);
         }
 
         function findCollScan(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 ddlColl.findOne();
             };
-            runOpInTxn(
-                this.session, db, collName, this.ddlDBName, this.ddlCollName, "findCollScan", op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findCollScan", op);
         }
 
         function findGetMore(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 ddlColl.find().batchSize(1).itcount();
             };
-            runOpInTxn(
-                this.session, db, collName, this.ddlDBName, this.ddlCollName, "findGetMore", op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findGetMore", op);
         }
 
         function findIdScan(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 ddlColl.findOne({_id: 0});
             };
-            runOpInTxn(
-                this.session, db, collName, this.ddlDBName, this.ddlCollName, "findIdScan", op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findIdScan", op);
         }
 
         function findSecondaryIndexScan(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 ddlColl.findOne({x: 1});
             };
-            runOpInTxn(this.session,
-                       db,
-                       collName,
-                       this.ddlDBName,
-                       this.ddlCollName,
-                       "findSecondaryIndexScan",
-                       op);
+            runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "findSecondaryIndexScan", op);
         }
 
         function insert(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 let res = ddlColl.insert({x: 1});
                 if (res instanceof WriteResult && res.hasWriteError()) {
                     throw _getErrorWithCode(res.getWriteError(), res.getWriteError().errmsg);
@@ -112,14 +98,14 @@ export const $config = (function() {
         }
 
         function remove(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 assert.commandWorked(ddlColl.remove({}, {justOne: true}));
             };
             runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "remove", op);
         }
 
         function update(db, collName) {
-            const op = function(ddlColl) {
+            const op = function (ddlColl) {
                 assert.commandWorked(ddlColl.update({}, {$inc: {x: 1}}));
             };
             runOpInTxn(this.session, db, collName, this.ddlDBName, this.ddlCollName, "update", op);
@@ -138,23 +124,24 @@ export const $config = (function() {
         function createIndex(db, collName) {
             assert.commandWorkedOrFailedWithCode(
                 db.getSiblingDB(this.ddlDBName)[this.ddlCollName].createIndex({x: 1}),
-                [ErrorCodes.IndexBuildAborted, ErrorCodes.NoMatchingDocument]);
+                [ErrorCodes.IndexBuildAborted, ErrorCodes.NoMatchingDocument],
+            );
         }
 
         function dropColl(db, collName) {
             assert.commandWorkedOrFailedWithCode(
                 db.getSiblingDB(this.ddlDBName).runCommand({drop: this.ddlCollName}),
-                ErrorCodes.NamespaceNotFound);
+                ErrorCodes.NamespaceNotFound,
+            );
         }
 
         function renameColl(db, collName) {
             const ddlCollFullName = db.getSiblingDB(this.ddlDBName)[this.ddlCollName].getFullName();
-            const renameCollFullName =
-                db.getSiblingDB(this.ddlDBName)[this.renameCollName].getFullName();
+            const renameCollFullName = db.getSiblingDB(this.ddlDBName)[this.renameCollName].getFullName();
             assert.commandWorkedOrFailedWithCode(
-                db.adminCommand(
-                    {renameCollection: ddlCollFullName, to: renameCollFullName, dropTarget: true}),
-                ErrorCodes.NamespaceNotFound);
+                db.adminCommand({renameCollection: ddlCollFullName, to: renameCollFullName, dropTarget: true}),
+                ErrorCodes.NamespaceNotFound,
+            );
         }
 
         return {
@@ -172,7 +159,7 @@ export const $config = (function() {
             createColl: createColl,
             createIndex: createIndex,
             dropColl: dropColl,
-            renameColl: renameColl
+            renameColl: renameColl,
         };
     })();
 
@@ -190,7 +177,7 @@ export const $config = (function() {
         findSecondaryIndexScan: 0.1,
         insert: 0.1,
         remove: 0.1,
-        update: 0.1
+        update: 0.1,
     };
 
     var randomDDLState = {createColl: 0.4, createIndex: 0.2, dropColl: 0.2, renameColl: 0.2};
@@ -215,20 +202,20 @@ export const $config = (function() {
         createColl: randomDDLState,
         createIndex: randomDDLState,
         dropColl: randomDDLState,
-        renameColl: randomDDLState
+        renameColl: randomDDLState,
     };
 
     return {
         threadCount: 10,
         iterations: 100,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         data: {
             ddlCollName: "ddl_coll",
             ddlDBName: "access_collection_in_transaction_after_catalog_changes_ddl_db",
-            renameCollName: "rename_coll"
+            renameCollName: "rename_coll",
         },
-        setup: setup
+        setup: setup,
     };
 })();

@@ -16,8 +16,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function setDefaultReadMaxTimeMS(db, newValue) {
-    assert.commandWorked(
-        db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
+    assert.commandWorked(db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
 
     // Currently, the mongos cluster parameter cache is not updated on setClusterParameter. An
     // explicit call to getClusterParameter will refresh the cache.
@@ -29,7 +28,7 @@ function runTests(conn) {
     const adminDB = conn.getDB("admin");
 
     // Create the admin user, which is used to insert.
-    adminDB.createUser({user: 'admin', pwd: 'admin', roles: ['root']});
+    adminDB.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     assert.eq(1, adminDB.auth("admin", "admin"));
 
     const testDB = adminDB.getSiblingDB(dbName);
@@ -44,67 +43,75 @@ function runTests(conn) {
         $match: {
             $expr: {
                 $function: {
-                    body: function() {
+                    body: function () {
                         sleep(1000);
                         return true;
                     },
                     args: [],
-                    lang: "js"
-                }
-            }
-        }
+                    lang: "js",
+                },
+            },
+        },
     };
 
     // Sets the default maxTimeMS for read operations with a small value.
     setDefaultReadMaxTimeMS(adminDB, 1);
 
     // Prepare a regular user without the 'bypassDefaultMaxTimeMS' privilege.
-    adminDB.createUser({user: 'regularUser', pwd: 'password', roles: ["readWriteAnyDatabase"]});
+    adminDB.createUser({user: "regularUser", pwd: "password", roles: ["readWriteAnyDatabase"]});
 
-    const regularUserConn = new Mongo(conn.host).getDB('admin');
-    assert(regularUserConn.auth('regularUser', 'password'), "Auth failed");
+    const regularUserConn = new Mongo(conn.host).getDB("admin");
+    assert(regularUserConn.auth("regularUser", "password"), "Auth failed");
     const regularUserDB = regularUserConn.getSiblingDB(dbName);
 
     // A long running aggregation will fail even without specifying a maxTimeMS option.
     // Note the error could manifest as an Interrupted error sometimes due to the JavaScript
     // execution being interrupted. This happens with both using the per-query option and the
     // default parameter.
-    assert.commandFailedWithCode(regularUserDB.runCommand({
-        aggregate: collName,
-        pipeline: [slowStage],
-        cursor: {},
-    }),
-                                 [ErrorCodes.Interrupted, ErrorCodes.MaxTimeMSExpired]);
+    assert.commandFailedWithCode(
+        regularUserDB.runCommand({
+            aggregate: collName,
+            pipeline: [slowStage],
+            cursor: {},
+        }),
+        [ErrorCodes.Interrupted, ErrorCodes.MaxTimeMSExpired],
+    );
 
     // Specifying a maxTimeMS option will overwrite the default value.
-    assert.commandWorked(regularUserDB.runCommand({
-        aggregate: collName,
-        pipeline: [slowStage],
-        cursor: {},
-        maxTimeMS: 0,
-    }));
+    assert.commandWorked(
+        regularUserDB.runCommand({
+            aggregate: collName,
+            pipeline: [slowStage],
+            cursor: {},
+            maxTimeMS: 0,
+        }),
+    );
 
     // If the aggregate performs a write operation, the time limit will not apply.
-    assert.commandWorked(regularUserDB.runCommand({
-        aggregate: collName,
-        pipeline: [
-            slowStage,
-            {
-                $out: "foo",
-            }
-        ],
-        cursor: {},
-    }));
-    assert.commandWorked(regularUserDB.runCommand({
-        aggregate: collName,
-        pipeline: [
-            slowStage,
-            {
-                $merge: "bar",
-            }
-        ],
-        cursor: {},
-    }));
+    assert.commandWorked(
+        regularUserDB.runCommand({
+            aggregate: collName,
+            pipeline: [
+                slowStage,
+                {
+                    $out: "foo",
+                },
+            ],
+            cursor: {},
+        }),
+    );
+    assert.commandWorked(
+        regularUserDB.runCommand({
+            aggregate: collName,
+            pipeline: [
+                slowStage,
+                {
+                    $merge: "bar",
+                },
+            ],
+            cursor: {},
+        }),
+    );
 
     // Unsets the default MaxTimeMS to make queries not to time out in the following code.
     setDefaultReadMaxTimeMS(adminDB, 0);
@@ -123,8 +130,8 @@ const st = new ShardingTest({
     mongos: 1,
     shards: {nodes: 1},
     config: {nodes: 1},
-    keyFile: 'jstests/libs/key1',
-    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
+    keyFile: "jstests/libs/key1",
+    mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
 });
 runTests(st.s);
 st.stop();

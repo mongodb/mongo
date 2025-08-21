@@ -1,12 +1,12 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForAllMembers} from "jstests/replsets/rslib.js";
 
-let doTest = function(signal) {
+let doTest = function (signal) {
     // Test replication with write concern.
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
-    var replTest = new ReplSetTest({name: 'testSet', nodes: 3, oplogSize: 5});
+    var replTest = new ReplSetTest({name: "testSet", nodes: 3, oplogSize: 5});
 
     // call startSet() to start each mongod in the replica set
     // this returns a list of nodes
@@ -29,7 +29,7 @@ let doTest = function(signal) {
     waitForAllMembers(primary.getDB(testDB));
 
     var secondaries = replTest.getSecondaries();
-    secondaries.forEach(function(secondary) {
+    secondaries.forEach(function (secondary) {
         secondary.setSecondaryOk();
     });
 
@@ -53,15 +53,15 @@ let doTest = function(signal) {
 
     let m1 = primary.getDB(testDB).foo.findOne({n: 1});
     printjson(m1);
-    assert(m1['n'] == 1, "replset2.js Failed to save to primary on multiple inserts");
+    assert(m1["n"] == 1, "replset2.js Failed to save to primary on multiple inserts");
 
     print("replset2.js **** TEMP 1b ****");
 
     var s0 = secondaries[0].getDB(testDB).foo.findOne({n: 1});
-    assert(s0['n'] == 1, "replset2.js Failed to replicate to secondary 0 on multiple inserts");
+    assert(s0["n"] == 1, "replset2.js Failed to replicate to secondary 0 on multiple inserts");
 
     var s1 = secondaries[1].getDB(testDB).foo.findOne({n: 1});
-    assert(s1['n'] == 1, "replset2.js Failed to replicate to secondary 1 on multiple inserts");
+    assert(s1["n"] == 1, "replset2.js Failed to replicate to secondary 1 on multiple inserts");
 
     // Test write concern with a simple insert
     print("replset2.js **** Try inserting a single record ****");
@@ -71,13 +71,13 @@ let doTest = function(signal) {
 
     m1 = primary.getDB(testDB).foo.findOne({n: 1});
     printjson(m1);
-    assert(m1['n'] == 1, "replset2.js Failed to save to primary");
+    assert(m1["n"] == 1, "replset2.js Failed to save to primary");
 
     s0 = secondaries[0].getDB(testDB).foo.findOne({n: 1});
-    assert(s0['n'] == 1, "replset2.js Failed to replicate to secondary 0");
+    assert(s0["n"] == 1, "replset2.js Failed to replicate to secondary 0");
 
     s1 = secondaries[1].getDB(testDB).foo.findOne({n: 1});
-    assert(s1['n'] == 1, "replset2.js Failed to replicate to secondary 1");
+    assert(s1["n"] == 1, "replset2.js Failed to replicate to secondary 1");
 
     print("replset2.js **** Try inserting many records ****");
     try {
@@ -90,11 +90,11 @@ let doTest = function(signal) {
 
         print("replset2.js **** V1 ");
 
-        var verifyReplication = function(nodeName, collection) {
+        var verifyReplication = function (nodeName, collection) {
             let data = collection.findOne({n: 1});
-            assert(data['n'] == 1, "replset2.js Failed to save to " + nodeName);
+            assert(data["n"] == 1, "replset2.js Failed to save to " + nodeName);
             data = collection.findOne({n: 999});
-            assert(data['n'] == 999, "replset2.js Failed to save to " + nodeName);
+            assert(data["n"] == 999, "replset2.js Failed to save to " + nodeName);
         };
 
         print("replset2.js **** V2 ");
@@ -105,14 +105,11 @@ let doTest = function(signal) {
     } catch (e) {
         var errstr = "ERROR: " + e;
         errstr += "\nMaster oplog findOne:\n";
-        errstr +=
-            tojson(primary.getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+        errstr += tojson(primary.getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
         errstr += "\nSecondary 0 oplog findOne:\n";
-        errstr += tojson(
-            secondaries[0].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+        errstr += tojson(secondaries[0].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
         errstr += "\nSecondary 1 oplog findOne:\n";
-        errstr += tojson(
-            secondaries[1].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
+        errstr += tojson(secondaries[1].getDB("local").oplog.rs.find().sort({"$natural": -1}).limit(1).next());
         assert(false, errstr);
     }
 

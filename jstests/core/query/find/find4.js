@@ -22,17 +22,23 @@ assert(coll.drop());
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(coll.insert({a: 2, b: 2}));
-assert.eq("1-1,2-2",
-          coll.find()
-              .sort({a: 1})
-              .map(function(z) {
-                  return z.a + "-" + z.b;
-              })
-              .toString());
-assert.eq("1-undefined,2-undefined",
-          coll.find({}, {a: 1})
-              .sort({a: 1})
-              .map(function(z) {
-                  return z.a + "-" + z.b;
-              })
-              .toString());
+assert.eq(
+    "1-1,2-2",
+    coll
+        .find()
+        .sort({a: 1})
+        .map(function (z) {
+            return z.a + "-" + z.b;
+        })
+        .toString(),
+);
+assert.eq(
+    "1-undefined,2-undefined",
+    coll
+        .find({}, {a: 1})
+        .sort({a: 1})
+        .map(function (z) {
+            return z.a + "-" + z.b;
+        })
+        .toString(),
+);

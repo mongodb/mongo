@@ -56,64 +56,84 @@ function assertQueryPlanForFindContainsExpressIxscan(query = {}, msg = "") {
     assert(!planHasStage(db, explain, "COLLSCAN")), msg + tojson(explain);
 }
 
-assertQueryPlanForAggDoesNotContainFilter([{$match: {$expr: true}}],
-                                          "{$expr: true} should be optimized away");
+assertQueryPlanForAggDoesNotContainFilter([{$match: {$expr: true}}], "{$expr: true} should be optimized away");
 
 assertQueryPlanForFindDoesNotContainFilter({$expr: true}, "{$expr: true} should be optimized away");
 
 assertQueryPlanForFindContainsEOF({$expr: false}, "{$expr: false} should be optimized away");
 
-assertQueryPlanForFindContainsEOF({$expr: {$eq: ["0", "-1"]}},
-                                  "expressions that optimize to false should be optimized away");
+assertQueryPlanForFindContainsEOF(
+    {$expr: {$eq: ["0", "-1"]}},
+    "expressions that optimize to false should be optimized away",
+);
 
-assertQueryPlanForFindContainsEOF({$expr: {$const: null}},
-                                  "$expr containing falsy constant should be optimized away");
+assertQueryPlanForFindContainsEOF({$expr: {$const: null}}, "$expr containing falsy constant should be optimized away");
 
-assertQueryPlanForFindContainsEOF({$and: [{$expr: false}, {_id: 15}]},
-                                  "$and containing {$expr: false} should be optimized away");
+assertQueryPlanForFindContainsEOF(
+    {$and: [{$expr: false}, {_id: 15}]},
+    "$and containing {$expr: false} should be optimized away",
+);
 
-assertQueryPlanForFindContainsEOF({$and: [{$expr: false}, {$expr: true}, {_id: 15}]},
-                                  "$and containing {$expr: false} should be optimized away");
+assertQueryPlanForFindContainsEOF(
+    {$and: [{$expr: false}, {$expr: true}, {_id: 15}]},
+    "$and containing {$expr: false} should be optimized away",
+);
 
 assertQueryPlanForFindContainsExpressIxscan(
     {$or: [{$expr: false}, {_id: 15}]},
-    "$or expression containing false constant should be optimized to IXSCAN");
+    "$or expression containing false constant should be optimized to IXSCAN",
+);
 
 assertQueryPlanForFindContainsExpressIxscan(
     {$or: [{$expr: false}, {$expr: false}, {_id: 20}]},
-    "$or expression containing false constants should be optimized to IXSCAN");
+    "$or expression containing false constants should be optimized to IXSCAN",
+);
 
 assertQueryPlanForAggDoesNotContainFilter(
     [{$match: {$expr: "foo"}}],
-    "{$expr: 'foo'} contains a truthy constant and should be optimized away");
+    "{$expr: 'foo'} contains a truthy constant and should be optimized away",
+);
 
 assertQueryPlanForFindDoesNotContainFilter(
-    {$expr: "foo"}, "{$expr: 'foo'} contains a truthy constant and should be optimized away");
+    {$expr: "foo"},
+    "{$expr: 'foo'} contains a truthy constant and should be optimized away",
+);
 
 assertQueryPlanForAggDoesNotContainFilter(
     [{$match: {$expr: true}}, {$match: {$expr: "foo"}}],
-    "Multiple $match stages containing truthy constants should be optimized away");
+    "Multiple $match stages containing truthy constants should be optimized away",
+);
 
 assertQueryPlanForFindDoesNotContainFilter(
     {$and: [{$expr: true}, {$expr: "foo"}]},
-    "$and expression containing multiple truthy constants should be optimized away");
+    "$and expression containing multiple truthy constants should be optimized away",
+);
 
 assertQueryPlanForAggContainsFilter(
     [{$match: {$expr: "$foo"}}],
-    "{$expr: '$foo'} refers to a field and should not be optimized away");
+    "{$expr: '$foo'} refers to a field and should not be optimized away",
+);
 
 assertQueryPlanForFindContainsFilter(
-    {$expr: "$foo"}, "{$expr: '$foo'} refers to a field and should not be optimized away");
+    {$expr: "$foo"},
+    "{$expr: '$foo'} refers to a field and should not be optimized away",
+);
 
-const explainAggregate =
-    coll.explain().aggregate([{$match: {$expr: "foo"}}, {$match: {$expr: "$foo"}}]);
-assert.eq(getWinningPlanFromExplain(explainAggregate).filter,
-          {$expr: "$foo"},
-          "$expr with truthy constant expression should be optimized away when used " +
-              "in conjunction with $expr containing non-constant expression");
+const explainAggregate = coll.explain().aggregate([{$match: {$expr: "foo"}}, {$match: {$expr: "$foo"}}]);
+assert.eq(
+    getWinningPlanFromExplain(explainAggregate).filter,
+    {$expr: "$foo"},
+    "$expr with truthy constant expression should be optimized away when used " +
+        "in conjunction with $expr containing non-constant expression",
+);
 
-const explainFind = coll.explain().find({$and: [{$expr: "foo"}, {$expr: "$foo"}]}).finish();
-assert.eq(getWinningPlanFromExplain(explainFind).filter,
-          {$expr: "$foo"},
-          "$expr truthy constant expression should be optimized away when used " +
-              "in conjunction with $expr containing non-constant expression");
+const explainFind = coll
+    .explain()
+    .find({$and: [{$expr: "foo"}, {$expr: "$foo"}]})
+    .finish();
+assert.eq(
+    getWinningPlanFromExplain(explainFind).filter,
+    {$expr: "$foo"},
+    "$expr truthy constant expression should be optimized away when used " +
+        "in conjunction with $expr containing non-constant expression",
+);

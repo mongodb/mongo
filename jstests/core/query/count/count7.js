@@ -6,15 +6,15 @@ let t = db.jstests_count7;
 t.drop();
 
 t.createIndex({a: 1});
-t.save({a: 'algebra'});
-t.save({a: 'apple'});
-t.save({a: 'azores'});
-t.save({a: 'bumper'});
-t.save({a: 'supper'});
-t.save({a: 'termite'});
-t.save({a: 'zeppelin'});
-t.save({a: 'ziggurat'});
-t.save({a: 'zope'});
+t.save({a: "algebra"});
+t.save({a: "apple"});
+t.save({a: "azores"});
+t.save({a: "bumper"});
+t.save({a: "supper"});
+t.save({a: "termite"});
+t.save({a: "zeppelin"});
+t.save({a: "ziggurat"});
+t.save({a: "zope"});
 
 assert.eq(5, t.count({a: /p/}));
 

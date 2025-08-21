@@ -28,7 +28,7 @@ const db = primary.getDB(dbName);
 const nDocs = 1000;
 const maxDocsPerBatch = 100;
 const writeConcern = {
-    w: 'majority'
+    w: "majority",
 };
 
 function testParametersInHealthlog() {
@@ -48,9 +48,9 @@ function testParametersInHealthlog() {
                 validateMode: "dataConsistency",
                 secondaryIndex: "",
                 skipLookupForExtraKeys: false,
-                bsonValidateMode: "kDefault"
-            }
-        }
+                bsonValidateMode: "kDefault",
+            },
+        },
     };
     checkHealthLog(primaryHealthlog, query, 2);
     checkHealthLog(secondaryHealthlog, query, 2);
@@ -62,7 +62,7 @@ function testParametersInHealthlog() {
         maxDocsPerBatch: maxDocsPerBatch,
         batchWriteConcern: writeConcern,
         validateMode: "dataConsistencyAndMissingIndexKeysCheck",
-        bsonValidateMode: "kExtended"
+        bsonValidateMode: "kExtended",
     };
     runDbCheck(replSet, db, colName, dbCheckParameters);
     query = {
@@ -73,9 +73,9 @@ function testParametersInHealthlog() {
                 validateMode: "dataConsistencyAndMissingIndexKeysCheck",
                 secondaryIndex: "",
                 skipLookupForExtraKeys: false,
-                bsonValidateMode: "kExtended"
-            }
-        }
+                bsonValidateMode: "kExtended",
+            },
+        },
     };
     checkHealthLog(primaryHealthlog, query, 2);
     checkHealthLog(secondaryHealthlog, query, 2);
@@ -90,7 +90,7 @@ function testParametersInHealthlog() {
         batchWriteConcern: writeConcern,
         validateMode: "extraIndexKeysCheck",
         secondaryIndex: "secondaryIndex",
-        skipLookupForExtraKeys: true
+        skipLookupForExtraKeys: true,
     };
     runDbCheck(replSet, db, colName, dbCheckParameters);
     query = {
@@ -101,9 +101,9 @@ function testParametersInHealthlog() {
                 validateMode: "extraIndexKeysCheck",
                 secondaryIndex: "secondaryIndex",
                 skipLookupForExtraKeys: true,
-                bsonValidateMode: "kDefault"
-            }
-        }
+                bsonValidateMode: "kDefault",
+            },
+        },
     };
     checkHealthLog(primaryHealthlog, query, 2);
     checkHealthLog(secondaryHealthlog, query, 2);

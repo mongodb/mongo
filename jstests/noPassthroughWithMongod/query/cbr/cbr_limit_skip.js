@@ -2,10 +2,7 @@
  * Ensure limit and skip stages in find queries are estimated correctly.
  */
 
-import {
-    getPlanStage,
-    getWinningPlanFromExplain,
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {ceEqual} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -95,8 +92,7 @@ try {
 
     // Get the cost of the skip stage
     const smallCardSkipExplain = coll.find(query).skip(skip).explain();
-    const smallCardSkipCost =
-        getPlanStage(getWinningPlanFromExplain(smallCardSkipExplain), "SKIP").costEstimate;
+    const smallCardSkipCost = getPlanStage(getWinningPlanFromExplain(smallCardSkipExplain), "SKIP").costEstimate;
 
     // Add more docs to the collection and update histogram
     assert.commandWorked(coll.insert(docs));
@@ -104,8 +100,7 @@ try {
 
     // Get the cost of the skip stage
     const largeCardSkipExplain = coll.find(query).skip(skip).explain();
-    const largeCardSkipCost =
-        getPlanStage(getWinningPlanFromExplain(largeCardSkipExplain), "SKIP").costEstimate;
+    const largeCardSkipCost = getPlanStage(getWinningPlanFromExplain(largeCardSkipExplain), "SKIP").costEstimate;
 
     assert.gt(largeCardSkipCost, smallCardSkipCost);
 } finally {

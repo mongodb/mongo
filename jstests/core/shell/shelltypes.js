@@ -26,18 +26,34 @@ b = Timestamp(a.t, a.i);
 printjson(a);
 assert.eq(tojson(a), tojson(b), "timestamp");
 
-assert.throws(function() {
-    Timestamp(-2, 3);
-}, [], "Timestamp time must not accept negative time");
-assert.throws(function() {
-    Timestamp(0, -1);
-}, [], "Timestamp increment must not accept negative time");
-assert.throws(function() {
-    Timestamp(0x10000 * 0x10000, 0);
-}, [], "Timestamp time must not accept values larger than 2**32 - 1");
-assert.throws(function() {
-    Timestamp(0, 0x10000 * 0x10000);
-}, [], "Timestamp increment must not accept values larger than 2**32 - 1");
+assert.throws(
+    function () {
+        Timestamp(-2, 3);
+    },
+    [],
+    "Timestamp time must not accept negative time",
+);
+assert.throws(
+    function () {
+        Timestamp(0, -1);
+    },
+    [],
+    "Timestamp increment must not accept negative time",
+);
+assert.throws(
+    function () {
+        Timestamp(0x10000 * 0x10000, 0);
+    },
+    [],
+    "Timestamp time must not accept values larger than 2**32 - 1",
+);
+assert.throws(
+    function () {
+        Timestamp(0, 0x10000 * 0x10000);
+    },
+    [],
+    "Timestamp increment must not accept values larger than 2**32 - 1",
+);
 
 a = new Timestamp(0x80008000, 0x80008000 + 0.5);
 b = Timestamp(a.t, Math.round(a.i));
@@ -81,32 +97,48 @@ var timestampA = a.getTimestamp();
 var dateA = new Date(timestampA.getTime());
 
 // ObjectId.fromDate - invalid input types
-assert.throws(function() {
-    ObjectId.fromDate(undefined);
-}, [], "ObjectId.fromDate should error on undefined date");
+assert.throws(
+    function () {
+        ObjectId.fromDate(undefined);
+    },
+    [],
+    "ObjectId.fromDate should error on undefined date",
+);
 
-assert.throws(function() {
-    ObjectId.fromDate(12345);
-}, [], "ObjectId.fromDate should error on numerical value");
+assert.throws(
+    function () {
+        ObjectId.fromDate(12345);
+    },
+    [],
+    "ObjectId.fromDate should error on numerical value",
+);
 
-assert.throws(function() {
-    ObjectId.fromDate(dateA.toISOString());
-}, [], "ObjectId.fromDate should error on string value");
+assert.throws(
+    function () {
+        ObjectId.fromDate(dateA.toISOString());
+    },
+    [],
+    "ObjectId.fromDate should error on string value",
+);
 
 // SERVER-14623 dates less than or equal to 1978-07-04T21:24:15Z fail
-var checkFromDate = function(millis, expected, comment) {
+var checkFromDate = function (millis, expected, comment) {
     var oid = ObjectId.fromDate(new Date(millis));
     assert.eq(oid.valueOf(), expected, comment);
 };
 checkFromDate(Math.pow(2, 28) * 1000, "100000000000000000000000", "1978-07-04T21:24:16Z");
-checkFromDate((Math.pow(2, 28) * 1000) - 1, "0fffffff0000000000000000", "1978-07-04T21:24:15Z");
+checkFromDate(Math.pow(2, 28) * 1000 - 1, "0fffffff0000000000000000", "1978-07-04T21:24:15Z");
 checkFromDate(0, "000000000000000000000000", "start of epoch");
 
 // test date upper limit
-checkFromDate((Math.pow(2, 32) * 1000) - 1, "ffffffff0000000000000000", "last valid date");
-assert.throws(function() {
-    ObjectId.fromDate(new Date(Math.pow(2, 32) * 1000));
-}, [], "ObjectId limited to 4 bytes for seconds");
+checkFromDate(Math.pow(2, 32) * 1000 - 1, "ffffffff0000000000000000", "last valid date");
+assert.throws(
+    function () {
+        ObjectId.fromDate(new Date(Math.pow(2, 32) * 1000));
+    },
+    [],
+    "ObjectId limited to 4 bytes for seconds",
+);
 
 // ObjectId.fromDate - Date
 b = ObjectId.fromDate(dateA);
@@ -116,24 +148,27 @@ assert.eq(tojson(a.getTimestamp()), tojson(b.getTimestamp()), "ObjectId.fromDate
 // tojsonObject
 
 // Empty object
-assert.eq('{\n\t\n}', tojsonObject({}, '', false));
-assert.eq('{  }', tojsonObject({}, '', true));
-assert.eq('{\n\t\t\t\n\t\t}', tojsonObject({}, '\t\t', false));
+assert.eq("{\n\t\n}", tojsonObject({}, "", false));
+assert.eq("{  }", tojsonObject({}, "", true));
+assert.eq("{\n\t\t\t\n\t\t}", tojsonObject({}, "\t\t", false));
 
 // Single field
-assert.eq('{\n\t"a" : 1\n}', tojsonObject({a: 1}, '', false));
-assert.eq('{ "a" : 1 }', tojsonObject({a: 1}, '', true));
-assert.eq('{\n\t\t\t"a" : 1\n\t\t}', tojsonObject({a: 1}, '\t\t', false));
+assert.eq('{\n\t"a" : 1\n}', tojsonObject({a: 1}, "", false));
+assert.eq('{ "a" : 1 }', tojsonObject({a: 1}, "", true));
+assert.eq('{\n\t\t\t"a" : 1\n\t\t}', tojsonObject({a: 1}, "\t\t", false));
 
 // Multiple fields
-assert.eq('{\n\t"a" : 1,\n\t"b" : 2\n}', tojsonObject({a: 1, b: 2}, '', false));
-assert.eq('{ "a" : 1, "b" : 2 }', tojsonObject({a: 1, b: 2}, '', true));
-assert.eq('{\n\t\t\t"a" : 1,\n\t\t\t"b" : 2\n\t\t}', tojsonObject({a: 1, b: 2}, '\t\t', false));
+assert.eq('{\n\t"a" : 1,\n\t"b" : 2\n}', tojsonObject({a: 1, b: 2}, "", false));
+assert.eq('{ "a" : 1, "b" : 2 }', tojsonObject({a: 1, b: 2}, "", true));
+assert.eq('{\n\t\t\t"a" : 1,\n\t\t\t"b" : 2\n\t\t}', tojsonObject({a: 1, b: 2}, "\t\t", false));
 
 // Nested fields
-assert.eq('{\n\t"a" : 1,\n\t"b" : {\n\t\t"bb" : 2,\n\t\t"cc" : 3\n\t}\n}',
-          tojsonObject({a: 1, b: {bb: 2, cc: 3}}, '', false));
-assert.eq('{ "a" : 1, "b" : { "bb" : 2, "cc" : 3 } }',
-          tojsonObject({a: 1, b: {bb: 2, cc: 3}}, '', true));
-assert.eq('{\n\t\t\t"a" : 1,\n\t\t\t"b" : {\n\t\t\t\t"bb" : 2,\n\t\t\t\t"cc" : 3\n\t\t\t}\n\t\t}',
-          tojsonObject({a: 1, b: {bb: 2, cc: 3}}, '\t\t', false));
+assert.eq(
+    '{\n\t"a" : 1,\n\t"b" : {\n\t\t"bb" : 2,\n\t\t"cc" : 3\n\t}\n}',
+    tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", false),
+);
+assert.eq('{ "a" : 1, "b" : { "bb" : 2, "cc" : 3 } }', tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", true));
+assert.eq(
+    '{\n\t\t\t"a" : 1,\n\t\t\t"b" : {\n\t\t\t\t"bb" : 2,\n\t\t\t\t"cc" : 3\n\t\t\t}\n\t\t}',
+    tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "\t\t", false),
+);

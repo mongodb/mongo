@@ -10,7 +10,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_buil
 
 function killopOnFailpoint(rst, failpointName, collName) {
     const primary = rst.getPrimary();
-    const testDB = primary.getDB('test');
+    const testDB = primary.getDB("test");
     const coll = testDB.getCollection(collName);
 
     assert.commandWorked(coll.insert({a: 1}));
@@ -23,19 +23,21 @@ function killopOnFailpoint(rst, failpointName, collName) {
     const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
     // When the index build starts, find its op id.
-    const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
+    const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1");
 
     IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
-        jsTestLog('Inspecting db.currentOp() entry for index build: ' + tojson(op));
+        jsTestLog("Inspecting db.currentOp() entry for index build: " + tojson(op));
         assert.eq(
             undefined,
             op.connectionId,
-            'Was expecting IndexBuildsCoordinator op; found db.currentOp() for connection thread instead: ' +
-                tojson(op));
+            "Was expecting IndexBuildsCoordinator op; found db.currentOp() for connection thread instead: " +
+                tojson(op),
+        );
         assert.eq(
             coll.getFullName(),
             op.ns,
-            'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
+            "Unexpected ns field value in db.currentOp() result for index build: " + tojson(op),
+        );
     });
 
     // Once we have the opId, we can resume index builds (the target failpoint will block it at the
@@ -43,10 +45,9 @@ function killopOnFailpoint(rst, failpointName, collName) {
     IndexBuildTest.resumeIndexBuilds(primary);
 
     // Index build should be present in the config.system.indexBuilds collection.
-    const indexMap =
-        IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
-    const indexBuildUUID = indexMap['a_1'].buildUUID;
-    assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
+    const indexMap = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+    const indexBuildUUID = indexMap["a_1"].buildUUID;
+    assert(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
 
     // Kill the index builder thread.
     fp.wait();
@@ -54,25 +55,23 @@ function killopOnFailpoint(rst, failpointName, collName) {
     fp.off();
 
     const exitCode = createIdx({checkExitSuccess: false});
-    assert.neq(
-        0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
+    assert.neq(0, exitCode, "expected shell to exit abnormally due to index build being terminated");
 
     // Check that no new index has been created.  This verifies that the index build was aborted
     // rather than successfully completed.
-    IndexBuildTest.assertIndexesSoon(coll, 1, ['_id_']);
+    IndexBuildTest.assertIndexesSoon(coll, 1, ["_id_"]);
 
-    const cmdNs = testDB.getCollection('$cmd').getFullName();
-    let ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.startIndexBuild': coll.getName()});
-    assert.eq(1, ops.length, 'incorrect number of startIndexBuild oplog entries: ' + tojson(ops));
-    ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.abortIndexBuild': coll.getName()});
-    assert.eq(1, ops.length, 'incorrect number of abortIndexBuild oplog entries: ' + tojson(ops));
-    ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.commitIndexBuild': coll.getName()});
-    assert.eq(0, ops.length, 'incorrect number of commitIndexBuild oplog entries: ' + tojson(ops));
+    const cmdNs = testDB.getCollection("$cmd").getFullName();
+    let ops = rst.dumpOplog(primary, {op: "c", ns: cmdNs, "o.startIndexBuild": coll.getName()});
+    assert.eq(1, ops.length, "incorrect number of startIndexBuild oplog entries: " + tojson(ops));
+    ops = rst.dumpOplog(primary, {op: "c", ns: cmdNs, "o.abortIndexBuild": coll.getName()});
+    assert.eq(1, ops.length, "incorrect number of abortIndexBuild oplog entries: " + tojson(ops));
+    ops = rst.dumpOplog(primary, {op: "c", ns: cmdNs, "o.commitIndexBuild": coll.getName()});
+    assert.eq(0, ops.length, "incorrect number of commitIndexBuild oplog entries: " + tojson(ops));
 
     // Index build should be removed from the config.system.indexBuilds collection.
     assert.soon(() => {
-        return primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}) ==
-            null;
+        return primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}) == null;
     });
 }
 
@@ -86,17 +85,17 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
 });
 rst.startSet();
 rst.initiate();
 
 // Kill the build before it has voted for commit.
 jsTestLog("killOp index build on primary before vote for commit readiness");
-killopOnFailpoint(rst, 'hangAfterIndexBuildFirstDrain', 'beforeVoteCommit');
+killopOnFailpoint(rst, "hangAfterIndexBuildFirstDrain", "beforeVoteCommit");
 
 // Kill the build after it has voted for commit.
 jsTestLog("killOp index build on primary after vote for commit readiness");
-killopOnFailpoint(rst, 'hangIndexBuildAfterSignalPrimaryForCommitReadiness', 'afterVoteCommit');
+killopOnFailpoint(rst, "hangIndexBuildAfterSignalPrimaryForCommitReadiness", "afterVoteCommit");
 
 rst.stopSet();

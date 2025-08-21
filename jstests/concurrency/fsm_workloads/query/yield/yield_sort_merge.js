@@ -14,12 +14,12 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/yield/yield.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     /*
      * Execute a query that will use the SORT_MERGE stage.
      */
     $config.states.query = function sortMerge(db, collName) {
-        var nMatches = 50;  // Don't push this too high, or SORT_MERGE stage won't be selected.
+        var nMatches = 50; // Don't push this too high, or SORT_MERGE stage won't be selected.
 
         // Build an array [0, nMatches).
         var matches = [];
@@ -27,12 +27,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             matches.push(i);
         }
 
-        var cursor = db[collName].find({a: {$in: matches}}).sort({b: -1}).batchSize(this.batchSize);
+        var cursor = db[collName]
+            .find({a: {$in: matches}})
+            .sort({b: -1})
+            .batchSize(this.batchSize);
 
         var verifier = function sortMergeVerifier(doc, prevDoc) {
             var correctOrder = true;
             if (prevDoc !== null) {
-                correctOrder = (doc.b <= prevDoc.b);
+                correctOrder = doc.b <= prevDoc.b;
             }
             return doc.a < nMatches && correctOrder;
         };

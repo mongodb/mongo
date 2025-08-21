@@ -13,7 +13,9 @@ t.insert({loc: [-0.9, 0]});
 
 t.createIndex({loc: "2d"});
 
-t.find({loc: {$near: [0, 0]}}).limit(2).forEach(function(o) {
-    // printjson(o);
-    assert.lt(Geo.distance([0, 0], o.loc), 0.95);
-});
+t.find({loc: {$near: [0, 0]}})
+    .limit(2)
+    .forEach(function (o) {
+        // printjson(o);
+        assert.lt(Geo.distance([0, 0], o.loc), 0.95);
+    });

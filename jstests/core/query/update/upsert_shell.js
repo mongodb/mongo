@@ -24,7 +24,7 @@ assert(l.getUpsertedId() === null);
 assert(l._id === undefined);
 
 // use the _id from the query for the insert
-l = t.update({_id: 3}, {$set: {a: '123'}}, true);
+l = t.update({_id: 3}, {$set: {a: "123"}}, true);
 assert(l.getUpsertedId(), "C1 - " + tojson(l));
 assert.eq(l.getUpsertedId()._id, 3, "C2 - " + tojson(l));
 assert.eq(l._id, 3, "C2 - " + tojson(l));

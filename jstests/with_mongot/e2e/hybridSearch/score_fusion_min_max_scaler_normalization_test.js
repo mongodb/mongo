@@ -6,7 +6,7 @@
 const coll = db[jsTestName()];
 
 function scoreInRange(score, min, max) {
-    return (score >= min && score <= max);
+    return score >= min && score <= max;
 }
 
 /**
@@ -36,39 +36,39 @@ function scoreInRange(score, min, max) {
     assert.commandWorked(bulk.execute());
 
     // Pipeline returns an array of documents, each with the score that $scoreFusion computed.
-    const actualResults =
-        coll.aggregate([
-                {
-                    $scoreFusion: {
-                        input: {
-                            pipelines: {
-                                bigScore: [{$score: {score: "$big_score", normalization: "none"}}]
-                            },
-                            normalization: "minMaxScaler"
-                        }
-                    }
+    const actualResults = coll
+        .aggregate([
+            {
+                $scoreFusion: {
+                    input: {
+                        pipelines: {
+                            bigScore: [{$score: {score: "$big_score", normalization: "none"}}],
+                        },
+                        normalization: "minMaxScaler",
+                    },
                 },
-                {$project: {_id: 0, big_score: 1, score: {$meta: "score"}}}
-            ])
-            .toArray();
+            },
+            {$project: {_id: 0, big_score: 1, score: {$meta: "score"}}},
+        ])
+        .toArray();
     assert.eq(nDocs, actualResults.length);
 
-    const expectedResults =
-        coll.aggregate([
-                {
-                    $setWindowFields: {
-                        output: {
-                            score: {
-                                $minMaxScaler: {input: "$big_score"},
-                                window: {documents: ["unbounded", "unbounded"]}
-                            }
-                        }
-                    }
+    const expectedResults = coll
+        .aggregate([
+            {
+                $setWindowFields: {
+                    output: {
+                        score: {
+                            $minMaxScaler: {input: "$big_score"},
+                            window: {documents: ["unbounded", "unbounded"]},
+                        },
+                    },
                 },
-                {$sort: {score: -1, _id: 1}},
-                {$project: {_id: 0, big_score: 1, score: 1}}
-            ])
-            .toArray();
+            },
+            {$sort: {score: -1, _id: 1}},
+            {$project: {_id: 0, big_score: 1, score: 1}},
+        ])
+        .toArray();
     assert.eq(actualResults, expectedResults);
 
     for (let i = 0; i < nDocs; i++) {
@@ -102,51 +102,51 @@ function scoreInRange(score, min, max) {
     assert.commandWorked(bulk.execute());
 
     // Pipeline returns an array of documents, each with the score that $scoreFusion computed.
-    const actualResults =
-        coll.aggregate([
-                {
-                    $scoreFusion: {
-                        input: {
-                            pipelines: {
-                                single: [{$score: {score: "$single", normalization: "none"}}],
-                                double: [{$score: {score: "$double", normalization: "none"}}]
-                            },
-                            normalization: "minMaxScaler"
-                        }
-                    }
+    const actualResults = coll
+        .aggregate([
+            {
+                $scoreFusion: {
+                    input: {
+                        pipelines: {
+                            single: [{$score: {score: "$single", normalization: "none"}}],
+                            double: [{$score: {score: "$double", normalization: "none"}}],
+                        },
+                        normalization: "minMaxScaler",
+                    },
                 },
-                {$project: {_id: 1, single: 1, double: 1, score: {$meta: "score"}}}
-            ])
-            .toArray();
+            },
+            {$project: {_id: 1, single: 1, double: 1, score: {$meta: "score"}}},
+        ])
+        .toArray();
     assert.eq(nDocs, actualResults.length);
 
-    const expectedResults =
-        coll.aggregate([
-                {
-                    $setWindowFields: {
-                        output: {
-                            single_score: {
-                                $minMaxScaler: {input: "$single"},
-                                window: {documents: ["unbounded", "unbounded"]}
-                            },
-                            double_score: {
-                                $minMaxScaler: {input: "$double"},
-                                window: {documents: ["unbounded", "unbounded"]}
-                            }
-                        }
-                    }
+    const expectedResults = coll
+        .aggregate([
+            {
+                $setWindowFields: {
+                    output: {
+                        single_score: {
+                            $minMaxScaler: {input: "$single"},
+                            window: {documents: ["unbounded", "unbounded"]},
+                        },
+                        double_score: {
+                            $minMaxScaler: {input: "$double"},
+                            window: {documents: ["unbounded", "unbounded"]},
+                        },
+                    },
                 },
-                {
-                    $project: {
-                        _id: 1,
-                        single: 1,
-                        double: 1,
-                        score: {$avg: ["$single_score", "$double_score"]}
-                    }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    single: 1,
+                    double: 1,
+                    score: {$avg: ["$single_score", "$double_score"]},
                 },
-                {$sort: {score: -1, _id: 1}}
-            ])
-            .toArray();
+            },
+            {$sort: {score: -1, _id: 1}},
+        ])
+        .toArray();
     assert.eq(actualResults, expectedResults);
 
     for (let i = 0; i < nDocs; i++) {

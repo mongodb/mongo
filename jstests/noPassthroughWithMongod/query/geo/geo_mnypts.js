@@ -20,11 +20,14 @@ for (var i = 0; i < 4; i++) {
     var x = i % 2;
     var y = Math.floor(i / 2);
 
-    var box = [[0, 0], [49, 49]];
-    box[0][0] += (x == 1 ? 50 : 0);
-    box[1][0] += (x == 1 ? 50 : 0);
-    box[0][1] += (y == 1 ? 50 : 0);
-    box[1][1] += (y == 1 ? 50 : 0);
+    var box = [
+        [0, 0],
+        [49, 49],
+    ];
+    box[0][0] += x == 1 ? 50 : 0;
+    box[1][0] += x == 1 ? 50 : 0;
+    box[0][1] += y == 1 ? 50 : 0;
+    box[1][1] += y == 1 ? 50 : 0;
 
     assert.eq(totalPts / 4, coll.find({loc: {$within: {$box: box}}}).count());
     assert.eq(totalPts / 4, coll.find({loc: {$within: {$box: box}}}).itcount());
@@ -32,9 +35,12 @@ for (var i = 0; i < 4; i++) {
 
 // Check that half of points in each half
 for (var i = 0; i < 2; i++) {
-    var box = [[0, 0], [49, 99]];
-    box[0][0] += (i == 1 ? 50 : 0);
-    box[1][0] += (i == 1 ? 50 : 0);
+    var box = [
+        [0, 0],
+        [49, 99],
+    ];
+    box[0][0] += i == 1 ? 50 : 0;
+    box[1][0] += i == 1 ? 50 : 0;
 
     assert.eq(totalPts / 2, coll.find({loc: {$within: {$box: box}}}).count());
     assert.eq(totalPts / 2, coll.find({loc: {$within: {$box: box}}}).itcount());
@@ -43,7 +49,5 @@ for (var i = 0; i < 2; i++) {
 // Check that all but corner set of points in radius
 var circle = [[0, 0], (100 - 1) * Math.sqrt(2) - 0.25];
 
-assert.eq(totalPts - totalPts / (100 * 100),
-          coll.find({loc: {$within: {$center: circle}}}).count());
-assert.eq(totalPts - totalPts / (100 * 100),
-          coll.find({loc: {$within: {$center: circle}}}).itcount());
+assert.eq(totalPts - totalPts / (100 * 100), coll.find({loc: {$within: {$center: circle}}}).count());
+assert.eq(totalPts - totalPts / (100 * 100), coll.find({loc: {$within: {$center: circle}}}).itcount());

@@ -13,16 +13,16 @@ TestData.skipEnforceFastCountOnValidate = true;
 
 const baseName = jsTestName();
 const collName = baseName;
-const dbpath = MongoRunner.dataPath + baseName + '/';
+const dbpath = MongoRunner.dataPath + baseName + "/";
 resetDbpath(dbpath);
 
 const mongodOptions = {
     dbpath: dbpath,
-    noCleanData: true
+    noCleanData: true,
 };
 let conn = MongoRunner.runMongod(mongodOptions);
 
-let testDB = conn.getDB('test');
+let testDB = conn.getDB("test");
 let testColl = testDB.getCollection(collName);
 
 // Insert a single document and create the collection.
@@ -33,8 +33,7 @@ assert.eq("_id_", spec.name, tojson(spec));
 
 // Enable a failpoint that causes reIndex to crash after dropping the indexes but before
 // rebuilding them.
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: 'reIndexCrashAfterDrop', mode: 'alwaysOn'}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "reIndexCrashAfterDrop", mode: "alwaysOn"}));
 assert.throws(() => testColl.runCommand({reIndex: collName}));
 
 // The server should have crashed from the failpoint.
@@ -42,7 +41,7 @@ MongoRunner.stopMongod(conn, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 
 // The server should start up successfully after rebuilding the _id index.
 conn = MongoRunner.runMongod(mongodOptions);
-testDB = conn.getDB('test');
+testDB = conn.getDB("test");
 testColl = testDB.getCollection(collName);
 assert(testColl.exists());
 

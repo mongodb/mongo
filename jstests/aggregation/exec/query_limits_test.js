@@ -47,10 +47,10 @@ function runAgg(pipeline) {
 function testLargeIn() {
     jsTestLog("Testing large $in");
     // Int limit is different than double limit.
-    const filterValsInts = range(1200000).map(i => NumberInt(i));
+    const filterValsInts = range(1200000).map((i) => NumberInt(i));
     runAgg([{$match: {a: {$in: filterValsInts}}}]);
 
-    const filterValsDoubles = range(1000000).map(i => i * 1.0);
+    const filterValsDoubles = range(1000000).map((i) => i * 1.0);
     runAgg([{$match: {a: {$in: filterValsDoubles}}}]);
 }
 
@@ -58,10 +58,10 @@ function testLargeIn() {
 function testLargeSwitch() {
     jsTestLog("Testing large $switch");
     const cases = range(150000)
-                      .map(function(i) {
-                          return {case: {$gt: ["$a", i]}, then: i};
-                      })
-                      .reverse();
+        .map(function (i) {
+            return {case: {$gt: ["$a", i]}, then: i};
+        })
+        .reverse();
     runAgg([{$project: {b: {$switch: {branches: cases, default: 345678}}}}]);
 }
 
@@ -72,21 +72,23 @@ function testLargeBucket() {
     for (let i = 0; i < 100000; i++) {
         boundaries.push(i);
     }
-    runAgg([{
-        $bucket: {
-            groupBy: "$a",
-            boundaries: boundaries,
-            default: "default",
-            output: {"count": {$sum: 1}}
-        }
-    }]);
+    runAgg([
+        {
+            $bucket: {
+                groupBy: "$a",
+                boundaries: boundaries,
+                default: "default",
+                output: {"count": {$sum: 1}},
+            },
+        },
+    ]);
 }
 
 // Construct a {$project: {a0: 1, a1: 1, ...}}.
 function testLargeProject() {
     jsTestLog("Testing large $project");
     const projectFields = {};
-    range(1000000).forEach(function(i) {
+    range(1000000).forEach(function (i) {
         projectFields["a" + i] = NumberInt(1);
     });
     runAgg([{$project: projectFields}]);
@@ -105,51 +107,51 @@ function testLargeAndOrPredicates() {
 
     // Large $match of the form {$match: {a0: 1, a1: 1, ...}}
     const largeMatch = {};
-    range(800000).forEach(function(i) {
+    range(800000).forEach(function (i) {
         largeMatch["a" + i] = NumberInt(1);
     });
     runAgg([{$match: largeMatch}]);
 
     function intStream(n) {
-        return range(n).map(i => NumberInt(i));
+        return range(n).map((i) => NumberInt(i));
     }
 
     const andOrFilters = [
         // Plain a=i filter.
-        intStream(500000).map(function(i) {
+        intStream(500000).map(function (i) {
             return {a: i};
         }),
         // a_i = i filter. Different field for each value.
-        intStream(500000).map(function(i) {
+        intStream(500000).map(function (i) {
             const field = "a" + i;
             return {[field]: i};
         }),
         // Mix of lt and gt with the same field.
-        intStream(500000).map(function(i) {
+        intStream(500000).map(function (i) {
             const predicate = i % 2 ? {$lt: i} : {$gt: i};
             return {a: predicate};
         }),
         // Mix of lt and gt with different fields.
-        intStream(400000).map(function(i) {
+        intStream(400000).map(function (i) {
             const field = "a" + i;
             const predicate = i % 2 ? {$lt: i} : {$gt: i};
             return {[field]: predicate};
         }),
         // Mix of lt and gt wrapped in not with different fields.
-        intStream(300000).map(function(i) {
+        intStream(300000).map(function (i) {
             const field = "a" + i;
             const predicate = i % 2 ? {$lt: i} : {$gt: i};
             return {[field]: {$not: predicate}};
         }),
         // $exists on different fields.
-        intStream(400000).map(function(i) {
+        intStream(400000).map(function (i) {
             const field = "a" + i;
             return {[field]: {$exists: true}};
         }),
-        intStream(400000).map(function(i) {
+        intStream(400000).map(function (i) {
             const field = "a" + i;
             return {[field]: {$exists: false}};
-        })
+        }),
     ];
     for (const m of andOrFilters) {
         runAgg([{$match: {$and: m}}]);
@@ -161,7 +163,7 @@ function testLongFieldNames() {
     jsTestLog("Testing $match with long field name");
     // Test with a long field name that's accepted by the server.
     {
-        const longFieldName = 'a'.repeat(10_000_000);
+        const longFieldName = "a".repeat(10_000_000);
         const predicate = {[longFieldName]: 1};
         runAgg([{$match: predicate}]);
         runAgg([{$match: {$and: [predicate]}}]);
@@ -170,7 +172,7 @@ function testLongFieldNames() {
 
     // Test with a field name that's too long, where the server rejects it.
     {
-        const extraLongFieldName = 'a'.repeat(17_000_000);
+        const extraLongFieldName = "a".repeat(17_000_000);
         const predicate = {[extraLongFieldName]: 1};
         assert.throwsWithCode(() => runAgg([{$match: predicate}]), 17260);
         assert.throwsWithCode(() => runAgg([{$match: {$and: [predicate]}}]), 17260);
@@ -192,9 +194,9 @@ function testDeeplyNestedPath() {
 // Test pipeline length.
 function testPipelineLimits() {
     jsTestLog("Testing large agg pipelines");
-    const pipelineLimit =
-        assert.commandWorked(db.adminCommand({getParameter: 1, internalPipelineLengthLimit: 1}))
-            .internalPipelineLengthLimit;
+    const pipelineLimit = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalPipelineLengthLimit: 1}),
+    ).internalPipelineLengthLimit;
     let stages = [
         {$limit: 1},
         {$skip: 1},
@@ -209,7 +211,7 @@ function testPipelineLimits() {
     ];
 
     for (const stage of stages) {
-        const pipeline = range(pipelineLimit).map(_ => stage);
+        const pipeline = range(pipelineLimit).map((_) => stage);
         jsTestLog(stage);
         runAgg(pipeline);
     }
@@ -223,13 +225,13 @@ function testPipelineLimits() {
 let fieldIndex = 0;
 function generateNestedAndOrHelper(type, branchingFactor, maxDepth) {
     if (maxDepth === 0) {
-        const field = 'a' + fieldIndex;
+        const field = "a" + fieldIndex;
         const query = {[field]: NumberInt(fieldIndex)};
         fieldIndex++;
         return query;
     }
 
-    const oppositeType = type === '$and' ? '$or' : '$and';
+    const oppositeType = type === "$and" ? "$or" : "$and";
     const children = [];
     for (let i = 0; i < branchingFactor; i++) {
         const childQuery = generateNestedAndOrHelper(oppositeType, branchingFactor, maxDepth - 1);
@@ -246,7 +248,7 @@ function generateNestedAndOr(type, branchingFactor, maxDepth) {
 
 function testNestedAndOr() {
     jsTestLog("Testing nested $and/$or");
-    for (const topLevelType of ['$and', '$or']) {
+    for (const topLevelType of ["$and", "$or"]) {
         // Test different types of nested queries
         let [branchingFactor, maxDepth] = [3, 10];
         const deepNarrowQuery = generateNestedAndOr(topLevelType, branchingFactor, maxDepth);
@@ -303,7 +305,7 @@ const tests = [
     testPipelineLimits,
     testLargeSetFunction,
     testLargeConcatFunction,
-    testLargeArrayToObjectFunction
+    testLargeArrayToObjectFunction,
 ];
 
 for (const test of tests) {

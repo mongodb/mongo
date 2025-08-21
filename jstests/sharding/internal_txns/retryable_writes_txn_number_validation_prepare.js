@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     makeCommitTransactionCmdObj,
-    makePrepareTransactionCmdObj
+    makePrepareTransactionCmdObj,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const rst = new ReplSetTest({nodes: 2});
@@ -34,9 +34,7 @@ const kTestMode = {
 
 function setUpTestMode(mode) {
     if (mode == kTestMode.kRestart) {
-        rst.stopSet(null /* signal */,
-                    true /*forRestart */,
-                    {skipValidation: true, skipCheckDBHashes: true});
+        rst.stopSet(null /* signal */, true /*forRestart */, {skipValidation: true, skipCheckDBHashes: true});
         rst.startSet({restart: true});
         primary = rst.getPrimary();
     } else if (mode == kTestMode.kFailoverOldPrimary) {
@@ -44,8 +42,7 @@ function setUpTestMode(mode) {
         const oldSecondary = rst.getSecondary();
 
         assert.commandWorked(oldSecondary.adminCommand({replSetFreeze: ReplSetTest.kForeverSecs}));
-        assert.commandWorked(
-            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
         assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
 
         const newPrimary = rst.getPrimary();
@@ -56,8 +53,7 @@ function setUpTestMode(mode) {
         const oldSecondary = rst.getSecondary();
 
         assert.commandWorked(oldSecondary.adminCommand({replSetFreeze: 0}));
-        assert.commandWorked(
-            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
 
         const newPrimary = rst.getPrimary();
         assert.neq(oldPrimary, newPrimary);
@@ -68,7 +64,9 @@ function setUpTestMode(mode) {
 }
 
 function testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
-    testModeName, prevTxnNumberIsRetryableInternalTxn) {
+    testModeName,
+    prevTxnNumberIsRetryableInternalTxn,
+) {
     jsTest.log(`Testing with ${tojson({testModeName, prevTxnNumberIsRetryableInternalTxn})}`);
     const testMode = kTestMode[testModeName];
     const sessionUUID = UUID();
@@ -90,7 +88,7 @@ function testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
         lsid: lsid,
         txnNumber: NumberLong(txnNumber),
         startTransaction: true,
-        autocommit: false
+        autocommit: false,
     };
     const prepareCmdObj = makePrepareTransactionCmdObj(lsid, txnNumber);
     const commitCmdObj = makeCommitTransactionCmdObj(lsid, txnNumber);
@@ -102,11 +100,11 @@ function testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
     setUpTestMode(testMode);
     rst.awaitLastOpCommitted();
 
-    let runNewTxnNumber = async function(primaryHost, parentSessionUUIDString, dbName, collName) {
-        const {makeCommitTransactionCmdObj} =
-            await import("jstests/sharding/libs/sharded_transactions_helpers.js");
-        const {withRetryOnTransientTxnErrorIncrementTxnNum} =
-            await import("jstests/libs/auto_retry_transaction_in_sharding.js");
+    let runNewTxnNumber = async function (primaryHost, parentSessionUUIDString, dbName, collName) {
+        const {makeCommitTransactionCmdObj} = await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+        const {withRetryOnTransientTxnErrorIncrementTxnNum} = await import(
+            "jstests/libs/auto_retry_transaction_in_sharding.js"
+        );
 
         const primary = new Mongo(primaryHost);
         const testDB = primary.getDB(dbName);
@@ -120,7 +118,7 @@ function testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
                 lsid: lsid,
                 txnNumber: NumberLong(txnNum),
                 startTransaction: true,
-                autocommit: false
+                autocommit: false,
             };
             const commitCmdObj = makeCommitTransactionCmdObj(lsid, txnNum);
 
@@ -131,7 +129,12 @@ function testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
 
     const fp = configureFailPoint(primary, fpName);
     const newTxnNumberThread = new Thread(
-        runNewTxnNumber, primary.host, extractUUIDFromObject(sessionUUID), dbName, collName);
+        runNewTxnNumber,
+        primary.host,
+        extractUUIDFromObject(sessionUUID),
+        dbName,
+        collName,
+    );
     newTxnNumberThread.start();
     fp.wait();
     fp.off();
@@ -147,7 +150,9 @@ function testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
 for (let testModeName in kTestMode) {
     for (let prevTxnNumberIsRetryableInternalTxn of [false, true]) {
         testTxnNumberValidationStartNewTxnNumberWhilePreviousIsInPrepare(
-            testModeName, prevTxnNumberIsRetryableInternalTxn);
+            testModeName,
+            prevTxnNumberIsRetryableInternalTxn,
+        );
     }
 }
 

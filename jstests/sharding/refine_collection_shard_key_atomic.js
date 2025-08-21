@@ -9,24 +9,24 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
-const kDbName = 'db';
-const kNsName = kDbName + '.foo';
-const kConfigCollections = 'config.collections';
-const kConfigChunks = 'config.chunks';
-const kConfigTags = 'config.tags';
+const kDbName = "db";
+const kNsName = kDbName + ".foo";
+const kConfigCollections = "config.collections";
+const kConfigChunks = "config.chunks";
+const kConfigTags = "config.tags";
 
 const oldKeyDoc = {
     a: 1,
-    b: 1
+    b: 1,
 };
 const newKeyDoc = {
     a: 1,
     b: 1,
     c: 1,
-    d: 1
+    d: 1,
 };
 
-jsTestLog('********** TEST TRANSACTION PASSES **********');
+jsTestLog("********** TEST TRANSACTION PASSES **********");
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: oldKeyDoc}));
@@ -44,12 +44,14 @@ assert.commandWorked(mongos.adminCommand({split: kNsName, middle: {a: 5, b: 5}})
 //
 // Zone 1: {a: MinKey, b: MinKey} -->> {a: 0, b: 0}
 // Zone 2: {a: 0, b: 0} -->> {a: MaxKey, b: MaxKey}
-assert.commandWorked(mongos.adminCommand({addShardToZone: st.shard0.shardName, zone: 'zone_1'}));
-assert.commandWorked(mongos.adminCommand({addShardToZone: st.shard0.shardName, zone: 'zone_2'}));
-assert.commandWorked(mongos.adminCommand(
-    {updateZoneKeyRange: kNsName, min: {a: MinKey, b: MinKey}, max: {a: 0, b: 0}, zone: 'zone_1'}));
-assert.commandWorked(mongos.adminCommand(
-    {updateZoneKeyRange: kNsName, min: {a: 0, b: 0}, max: {a: MaxKey, b: MaxKey}, zone: 'zone_2'}));
+assert.commandWorked(mongos.adminCommand({addShardToZone: st.shard0.shardName, zone: "zone_1"}));
+assert.commandWorked(mongos.adminCommand({addShardToZone: st.shard0.shardName, zone: "zone_2"}));
+assert.commandWorked(
+    mongos.adminCommand({updateZoneKeyRange: kNsName, min: {a: MinKey, b: MinKey}, max: {a: 0, b: 0}, zone: "zone_1"}),
+);
+assert.commandWorked(
+    mongos.adminCommand({updateZoneKeyRange: kNsName, min: {a: 0, b: 0}, max: {a: MaxKey, b: MaxKey}, zone: "zone_2"}),
+);
 
 // Verify that 'config.collections' is as expected before refineCollectionShardKey.
 let oldCollArr = mongos.getCollection(kConfigCollections).find({_id: kNsName}).toArray();
@@ -57,8 +59,7 @@ assert.eq(1, oldCollArr.length);
 assert.eq(oldKeyDoc, oldCollArr[0].key);
 
 // Verify that 'config.chunks' is as expected before refineCollectionShardKey.
-const oldChunkArr =
-    findChunksUtil.findChunksByNs(mongos.getDB('config'), kNsName).sort({min: 1}).toArray();
+const oldChunkArr = findChunksUtil.findChunksByNs(mongos.getDB("config"), kNsName).sort({min: 1}).toArray();
 assert.eq(3, oldChunkArr.length);
 assert.eq({a: MinKey, b: MinKey}, oldChunkArr[0].min);
 assert.eq({a: 0, b: 0}, oldChunkArr[0].max);
@@ -77,12 +78,13 @@ assert.eq({a: MaxKey, b: MaxKey}, oldTagsArr[1].max);
 
 // Enable failpoint 'hangRefineCollectionShardKeyBeforeCommit' and run refineCollectionShardKey in a
 // parallel shell.
-let hangBeforeCommitFailPoint =
-    configureFailPoint(st.configRS.getPrimary(), 'hangRefineCollectionShardKeyBeforeCommit');
+let hangBeforeCommitFailPoint = configureFailPoint(
+    st.configRS.getPrimary(),
+    "hangRefineCollectionShardKeyBeforeCommit",
+);
 
 let awaitShellToRefineCollectionShardKey = startParallelShell(() => {
-    assert.commandWorked(
-        db.adminCommand({refineCollectionShardKey: 'db.foo', key: {a: 1, b: 1, c: 1, d: 1}}));
+    assert.commandWorked(db.adminCommand({refineCollectionShardKey: "db.foo", key: {a: 1, b: 1, c: 1, d: 1}}));
 }, mongos.port);
 hangBeforeCommitFailPoint.wait();
 
@@ -90,24 +92,23 @@ hangBeforeCommitFailPoint.wait();
 // except for the 'allowMigrations' property which is updated by the
 // RefineCollectionShardKeyCoordinator before the commit phase.
 let newCollArr = mongos.getCollection(kConfigCollections).find({_id: kNsName}).toArray();
-newCollArr.forEach(element => {
-    delete element['allowMigrations'];
+newCollArr.forEach((element) => {
+    delete element["allowMigrations"];
 });
 assert.sameMembers(oldCollArr, newCollArr);
 
 // Verify that 'config.chunks' has not been updated since we haven't committed the transaction,
 // except for the chunk version which has been bumped by the setAllowMigrations command prior to the
 // refineCollectionShardKey commit.
-let newChunkArr =
-    findChunksUtil.findChunksByNs(mongos.getDB('config'), kNsName).sort({min: 1}).toArray();
+let newChunkArr = findChunksUtil.findChunksByNs(mongos.getDB("config"), kNsName).sort({min: 1}).toArray();
 
-newChunkArr.forEach(element => {
-    delete element['lastmod'];
+newChunkArr.forEach((element) => {
+    delete element["lastmod"];
 });
 
 let oldChunkArrWithoutLastmod = oldChunkArr;
-oldChunkArrWithoutLastmod.forEach(element => {
-    delete element['lastmod'];
+oldChunkArrWithoutLastmod.forEach((element) => {
+    delete element["lastmod"];
 });
 
 assert.sameMembers(oldChunkArr, newChunkArr);
@@ -126,8 +127,7 @@ assert.eq(1, newCollArr.length);
 assert.eq(newKeyDoc, newCollArr[0].key);
 
 // Verify that 'config.chunks' is as expected after refineCollectionShardKey.
-newChunkArr =
-    findChunksUtil.findChunksByNs(mongos.getDB('config'), kNsName).sort({min: 1}).toArray();
+newChunkArr = findChunksUtil.findChunksByNs(mongos.getDB("config"), kNsName).sort({min: 1}).toArray();
 assert.eq(3, newChunkArr.length);
 assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, newChunkArr[0].min);
 assert.eq({a: 0, b: 0, c: MinKey, d: MinKey}, newChunkArr[0].max);
@@ -146,7 +146,7 @@ assert.eq({a: MaxKey, b: MaxKey, c: MaxKey, d: MaxKey}, newTagsArr[1].max);
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
-jsTestLog('********** TEST TRANSACTION AUTOMATICALLY RETRIES **********');
+jsTestLog("********** TEST TRANSACTION AUTOMATICALLY RETRIES **********");
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: oldKeyDoc}));
@@ -160,10 +160,11 @@ assert.eq(oldKeyDoc, oldCollArr[0].key);
 // Enable failpoint 'hangRefineCollectionShardKeyBeforeUpdatingChunks' and run
 // refineCollectionShardKey in a parallel shell.
 let hangBeforeUpdatingChunksFailPoint = configureFailPoint(
-    st.configRS.getPrimary(), 'hangRefineCollectionShardKeyBeforeUpdatingChunks');
+    st.configRS.getPrimary(),
+    "hangRefineCollectionShardKeyBeforeUpdatingChunks",
+);
 awaitShellToRefineCollectionShardKey = startParallelShell(() => {
-    assert.commandWorked(
-        db.adminCommand({refineCollectionShardKey: 'db.foo', key: {a: 1, b: 1, c: 1, d: 1}}));
+    assert.commandWorked(db.adminCommand({refineCollectionShardKey: "db.foo", key: {a: 1, b: 1, c: 1, d: 1}}));
 }, mongos.port);
 hangBeforeUpdatingChunksFailPoint.wait();
 
@@ -171,11 +172,9 @@ hangBeforeUpdatingChunksFailPoint.wait();
 // exception.
 const coll = mongos.getCollection(kNsName);
 if (coll.timestamp) {
-    assert.writeOK(
-        mongos.getCollection(kConfigChunks).update({uuid: coll.uuid}, {$set: {jumbo: true}}));
+    assert.writeOK(mongos.getCollection(kConfigChunks).update({uuid: coll.uuid}, {$set: {jumbo: true}}));
 } else {
-    assert.writeOK(
-        mongos.getCollection(kConfigChunks).update({ns: kNsName}, {$set: {jumbo: true}}));
+    assert.writeOK(mongos.getCollection(kConfigChunks).update({ns: kNsName}, {$set: {jumbo: true}}));
 }
 
 // Disable failpoint 'hangRefineCollectionShardKeyBeforeUpdatingChunks' and await parallel shell.
@@ -188,8 +187,7 @@ assert.eq(1, newCollArr.length);
 assert.eq(newKeyDoc, newCollArr[0].key);
 
 // Verify that 'config.chunks' is as expected after refineCollectionShardKey.
-newChunkArr =
-    findChunksUtil.findChunksByNs(mongos.getDB('config'), kNsName).sort({min: 1}).toArray();
+newChunkArr = findChunksUtil.findChunksByNs(mongos.getDB("config"), kNsName).sort({min: 1}).toArray();
 assert.eq(1, newChunkArr.length);
 assert.eq({a: MinKey, b: MinKey, c: MinKey, d: MinKey}, newChunkArr[0].min);
 assert.eq({a: MaxKey, b: MaxKey, c: MaxKey, d: MaxKey}, newChunkArr[0].max);

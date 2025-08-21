@@ -12,8 +12,7 @@ assert.commandWorked(coll.insert({_id: 0}));
 assert.commandWorked(coll.insert({_id: 1}));
 
 function assertFailedWithCode(cmd, errorCode) {
-    assert.commandFailedWithCode(
-        coll.runCommand(Object.merge({findAndModify: coll.getName()}, cmd)), errorCode);
+    assert.commandFailedWithCode(coll.runCommand(Object.merge({findAndModify: coll.getName()}, cmd)), errorCode);
 }
 
 function assertWorked(cmd, expectedValue) {
@@ -100,38 +99,33 @@ assert.commandWorked(coll.insert({_id: 0}));
 assertFailedWithCode({update: {value: 2}, remove: true}, ErrorCodes.FailedToParse);
 assertFailedWithCode({query: {_id: 1}, upsert: true, remove: true}, ErrorCodes.FailedToParse);
 assertFailedWithCode({new: true, remove: true}, ErrorCodes.FailedToParse);
-assertFailedWithCode({update: {}, arrayFilters: [{"x.a": {$gt: 85}}], remove: true},
-                     ErrorCodes.FailedToParse);
+assertFailedWithCode({update: {}, arrayFilters: [{"x.a": {$gt: 85}}], remove: true}, ErrorCodes.FailedToParse);
 
 // Verify that the above updates succeed when the boolean values are set to 'false' or '0'.
 assertWorked({update: {value: "newVal"}, new: true, remove: false}, "newVal");
 assertWorked({update: {value: "newerVal"}, new: false, remove: 0}, "newVal");
-assertWorked({query: {_id: 1}, update: {value: "newerVal"}, new: 1, remove: false, upsert: 1},
-             "newerVal");
-assertWorked(
-    {update: {value: "newestVal"}, new: false, arrayFilters: [{"x.a": {$gt: 85}}], remove: 0.0},
-    "newerVal");
+assertWorked({query: {_id: 1}, update: {value: "newerVal"}, new: 1, remove: false, upsert: 1}, "newerVal");
+assertWorked({update: {value: "newestVal"}, new: false, arrayFilters: [{"x.a": {$gt: 85}}], remove: 0.0}, "newerVal");
 
-out = coll.findAndModify(
-    {query: {_id: 2}, update: {value: "newVal"}, new: false, remove: false, upsert: true});
+out = coll.findAndModify({query: {_id: 2}, update: {value: "newVal"}, new: false, remove: false, upsert: true});
 assert.eq(out, null);
 
 // Pipeline update with 'arrayFilters'.
 assertFailedWithCode({update: [], arrayFilters: [{"x.a": {$gt: 85}}]}, ErrorCodes.FailedToParse);
 
 // Invalid value for hint.
-assertFailedWithCode({query: {_id: 0}, update: {value: "usedHint"}, hint: 1},
-                     ErrorCodes.FailedToParse);
+assertFailedWithCode({query: {_id: 0}, update: {value: "usedHint"}, hint: 1}, ErrorCodes.FailedToParse);
 
 // Hint with string and object.
-assert.commandWorked(coll.createIndex({value: 1}, {name: 'value'}));
-assertWorked({query: {_id: 0}, update: {value: "usedHint"}, new: 1.0, hint: "value", remove: 0.0},
-             "usedHint");
-assertWorked({
-    query: {_id: 0, value: "usedHint"},
-    update: {value: "newValue"},
-    new: 0,
-    hint: {_id: 1},
-    remove: 0
-},
-             "usedHint");
+assert.commandWorked(coll.createIndex({value: 1}, {name: "value"}));
+assertWorked({query: {_id: 0}, update: {value: "usedHint"}, new: 1.0, hint: "value", remove: 0.0}, "usedHint");
+assertWorked(
+    {
+        query: {_id: 0, value: "usedHint"},
+        update: {value: "newValue"},
+        new: 0,
+        hint: {_id: 1},
+        remove: 0,
+    },
+    "usedHint",
+);

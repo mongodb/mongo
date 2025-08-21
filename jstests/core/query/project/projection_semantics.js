@@ -26,42 +26,43 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     assert.docEq(
         expectedOutput,
         coll.find({_id: input._id}, projection).limit(1).hint({$natural: 1}).toArray()[0],
-        () =>
-            tojson(coll.find({_id: input._id}, projection).limit(1).hint({$natural: 1}).explain()));
+        () => tojson(coll.find({_id: input._id}, projection).limit(1).hint({$natural: 1}).explain()),
+    );
 
     for (let indexSpec of interestingIndexes) {
-        assert.commandWorkedOrFailedWithCode(coll.createIndex(indexSpec),
-                                             ErrorCodes.IndexAlreadyExists);
-        assert.docEq(
-            expectedOutput,
-            coll.find({_id: input._id}, projection).hint(indexSpec).toArray()[0],
-            () => tojson(
-                coll.find({_id: input._id}, projection).hint(indexSpec).explain("executionStats")));
+        assert.commandWorkedOrFailedWithCode(coll.createIndex(indexSpec), ErrorCodes.IndexAlreadyExists);
+        assert.docEq(expectedOutput, coll.find({_id: input._id}, projection).hint(indexSpec).toArray()[0], () =>
+            tojson(coll.find({_id: input._id}, projection).hint(indexSpec).explain("executionStats")),
+        );
     }
 
     assert.docEq(
         expectedOutput,
-        coll.aggregate([{$match: {_id: input._id}}, {$project: projection}], {hint: {$natural: 1}})
-            .toArray()[0]);
+        coll.aggregate([{$match: {_id: input._id}}, {$project: projection}], {hint: {$natural: 1}}).toArray()[0],
+    );
 }
 
 // The basics: what happens when I include a top-level field?
 (function testTopLevelInclusion() {
     // Test the basic "include a" projection. This should implicitly include the _id.
-    const testIncludeA = (input, output) => testInputOutput({
-        input: input,
-        projection: {a: 1},
-        expectedOutput: output,
-        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}]
-    });
+    const testIncludeA = (input, output) =>
+        testInputOutput({
+            input: input,
+            projection: {a: 1},
+            expectedOutput: output,
+            interestingIndexes: [
+                {_id: 1, a: 1},
+                {a: 1, _id: 1},
+            ],
+        });
 
     // Test some basic "normal" cases.
-    testIncludeA({_id: ++globalIdCounter, a: "demo", b: "other", x: "extra"},
-                 {_id: globalIdCounter, a: "demo"});
-    testIncludeA({_id: ++globalIdCounter, a: "demo", aWSuffix: "other", 'a.b': "extra"},
-                 {_id: globalIdCounter, a: "demo"});
-    testIncludeA({_id: ++globalIdCounter, a: null, b: "other", x: "extra"},
-                 {_id: globalIdCounter, a: null});
+    testIncludeA({_id: ++globalIdCounter, a: "demo", b: "other", x: "extra"}, {_id: globalIdCounter, a: "demo"});
+    testIncludeA(
+        {_id: ++globalIdCounter, a: "demo", aWSuffix: "other", "a.b": "extra"},
+        {_id: globalIdCounter, a: "demo"},
+    );
+    testIncludeA({_id: ++globalIdCounter, a: null, b: "other", x: "extra"}, {_id: globalIdCounter, a: null});
 
     // Test including "a" when "a" is missing/not present.
     // TODO SERVER-23229 this will return different results if there is a covering index, so here
@@ -70,22 +71,26 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: {_id: ++globalIdCounter, b: "other", x: "extra"},
         projection: {a: 1},
         expectedOutput: {_id: globalIdCounter},
-        interestingIndexes: []
+        interestingIndexes: [],
     });
     testInputOutput({
         input: {_id: ++globalIdCounter},
         projection: {a: 1},
         expectedOutput: {_id: globalIdCounter},
-        interestingIndexes: []
+        interestingIndexes: [],
     });
 
     // Test a range of interesting values for "a". We expect everything to be preserved unmodified.
-    const testIdentityInclusionA = (input) => testInputOutput({
-        input: input,
-        projection: {a: 1},
-        expectedOutput: input,
-        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}]
-    });
+    const testIdentityInclusionA = (input) =>
+        testInputOutput({
+            input: input,
+            projection: {a: 1},
+            expectedOutput: input,
+            interestingIndexes: [
+                {_id: 1, a: 1},
+                {a: 1, _id: 1},
+            ],
+        });
     testIdentityInclusionA({_id: ++globalIdCounter, a: null});
     testIdentityInclusionA({_id: ++globalIdCounter, a: undefined});
     testIdentityInclusionA({_id: ++globalIdCounter, a: {}});
@@ -102,20 +107,20 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     testIdentityInclusionA({_id: ++globalIdCounter, a: [{b: "scalar"}]});
 
     // Now test with the same documents but excluding the "_id" field.
-    const testIncludeOnlyA = (input, output) => testInputOutput({
-        input: input,
-        projection: {a: 1, _id: 0},
-        expectedOutput: output,
-        // Can't use {a: "hashed"} here because it doesn't support array values.
-        // Could use {a: "$**"}, but it can't be hinted without a query predicate so we'll leave
-        // that coverage for elsewhere rather than add complexity to get a valid query predicate.
-        interestingIndexes: [{a: 1}, {a: -1}]
-    });
+    const testIncludeOnlyA = (input, output) =>
+        testInputOutput({
+            input: input,
+            projection: {a: 1, _id: 0},
+            expectedOutput: output,
+            // Can't use {a: "hashed"} here because it doesn't support array values.
+            // Could use {a: "$**"}, but it can't be hinted without a query predicate so we'll leave
+            // that coverage for elsewhere rather than add complexity to get a valid query predicate.
+            interestingIndexes: [{a: 1}, {a: -1}],
+        });
 
     // The "basics" again.
     testIncludeOnlyA({_id: ++globalIdCounter, a: "demo", b: "other", x: "extra"}, {a: "demo"});
-    testIncludeOnlyA({_id: ++globalIdCounter, a: "demo", aWSuffix: "other", 'a.b': "extra"},
-                     {a: "demo"});
+    testIncludeOnlyA({_id: ++globalIdCounter, a: "demo", aWSuffix: "other", "a.b": "extra"}, {a: "demo"});
     testIncludeOnlyA({_id: ++globalIdCounter, a: null, b: "other", x: "extra"}, {a: null});
 
     // Missing 'a' value again.
@@ -125,13 +130,13 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: {_id: ++globalIdCounter, b: "other", x: "extra"},
         projection: {a: 1, _id: 0},
         expectedOutput: {},
-        interestingIndexes: []
+        interestingIndexes: [],
     });
     testInputOutput({
         input: {_id: ++globalIdCounter},
         projection: {a: 1, _id: 0},
         expectedOutput: {},
-        interestingIndexes: []
+        interestingIndexes: [],
     });
 
     // Just a couple of the cases above to confirm the same behavior just without the _id.
@@ -141,35 +146,50 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     testIncludeOnlyA({_id: ++globalIdCounter, a: {x: 1, b: "scalar"}}, {a: {x: 1, b: "scalar"}});
     testIncludeOnlyA({_id: ++globalIdCounter, a: {b: {}}}, {a: {b: {}}});
     testIncludeOnlyA({_id: ++globalIdCounter, a: [{b: "scalar"}]}, {a: [{b: "scalar"}]});
-}());
+})();
 
 // Now test one level of nesting - a single "dot" in the path.
 (function testInclusionOneLevelOfNesting() {
     // Test the basic "include a.b" projection. This should implicitly include the _id.
-    const testIncludeADotB = (input, output) => testInputOutput({
-        input: input,
-        projection: {'a.b': 1},
-        expectedOutput: output,
-        interestingIndexes: [{_id: 1, 'a.b': 1}, {'a.b': 1, _id: 1}]
-    });
+    const testIncludeADotB = (input, output) =>
+        testInputOutput({
+            input: input,
+            projection: {"a.b": 1},
+            expectedOutput: output,
+            interestingIndexes: [
+                {_id: 1, "a.b": 1},
+                {"a.b": 1, _id: 1},
+            ],
+        });
 
     // Test some basic "normal" cases.
     // Test that it excludes extra fields at the root and at the sub-document.
-    testIncludeADotB({_id: ++globalIdCounter, a: {b: "demo", y: "extra"}, x: "extra"},
-                     {_id: globalIdCounter, a: {b: "demo"}});
+    testIncludeADotB(
+        {_id: ++globalIdCounter, a: {b: "demo", y: "extra"}, x: "extra"},
+        {_id: globalIdCounter, a: {b: "demo"}},
+    );
     // Test that (at least for now) the dotted path doesn't work great here.
-    testIncludeADotB({_id: ++globalIdCounter, a: {b: "demo"}, 'a.b': "extra"},
-                     {_id: globalIdCounter, a: {b: "demo"}});
+    testIncludeADotB({_id: ++globalIdCounter, a: {b: "demo"}, "a.b": "extra"}, {_id: globalIdCounter, a: {b: "demo"}});
     // Test that '_id' within a sub-document is excluded.
-    testIncludeADotB({_id: ++globalIdCounter, a: {b: "demo", _id: "extra"}},
-                     {_id: globalIdCounter, a: {b: "demo"}});
+    testIncludeADotB({_id: ++globalIdCounter, a: {b: "demo", _id: "extra"}}, {_id: globalIdCounter, a: {b: "demo"}});
 
     // Test array use case.
-    testIncludeADotB({_id: ++globalIdCounter, a: [{b: 1, c: 1}, {b: 2, c: 2}], x: "extra"},
-                     {_id: globalIdCounter, a: [{b: 1}, {b: 2}]});
+    testIncludeADotB(
+        {
+            _id: ++globalIdCounter,
+            a: [
+                {b: 1, c: 1},
+                {b: 2, c: 2},
+            ],
+            x: "extra",
+        },
+        {_id: globalIdCounter, a: [{b: 1}, {b: 2}]},
+    );
     // Test that a missing field within an object in an array will show up as an empty object.
-    testIncludeADotB({_id: ++globalIdCounter, a: [{b: 1, c: 1}, {c: 2}], x: "extra"},
-                     {_id: globalIdCounter, a: [{b: 1}, {}]});
+    testIncludeADotB(
+        {_id: ++globalIdCounter, a: [{b: 1, c: 1}, {c: 2}], x: "extra"},
+        {_id: globalIdCounter, a: [{b: 1}, {}]},
+    );
 
     // Test including "a.b" when "a.b" is missing/not present.
     //
@@ -182,32 +202,39 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     // we will need to add a fetch to reconstruct the array anyway and will figure out the correct
     // answer in the process.
     //
-    const testADotBNoIndexes = (input, output) => testInputOutput(
-        {input: input, projection: {'a.b': 1}, expectedOutput: output, interestingIndexes: []});
+    const testADotBNoIndexes = (input, output) =>
+        testInputOutput({input: input, projection: {"a.b": 1}, expectedOutput: output, interestingIndexes: []});
 
     testADotBNoIndexes({_id: ++globalIdCounter, b: "other", x: "extra"}, {_id: globalIdCounter});
     testADotBNoIndexes({_id: ++globalIdCounter}, {_id: globalIdCounter});
     testADotBNoIndexes({_id: ++globalIdCounter, a: {}}, {_id: globalIdCounter, a: {}});
     testADotBNoIndexes({_id: ++globalIdCounter, a: "scalar"}, {_id: globalIdCounter});
 
-    const testIncludeOnlyADotB = (input, output) => testInputOutput({
-        input: input,
-        projection: {'a.b': 1, _id: 0},
-        expectedOutput: output,
-        interestingIndexes: [{'a.b': 1}, {'a.b': -1}]
-    });
+    const testIncludeOnlyADotB = (input, output) =>
+        testInputOutput({
+            input: input,
+            projection: {"a.b": 1, _id: 0},
+            expectedOutput: output,
+            interestingIndexes: [{"a.b": 1}, {"a.b": -1}],
+        });
 
     // The "basics" again - no _id this time.
-    testIncludeOnlyADotB({_id: ++globalIdCounter, a: {b: "demo", y: "extra"}, x: "extra"},
-                         {a: {b: "demo"}});
-    testIncludeOnlyADotB({_id: ++globalIdCounter, a: {b: "demo"}, 'a.b': "extra"},
-                         {a: {b: "demo"}});
+    testIncludeOnlyADotB({_id: ++globalIdCounter, a: {b: "demo", y: "extra"}, x: "extra"}, {a: {b: "demo"}});
+    testIncludeOnlyADotB({_id: ++globalIdCounter, a: {b: "demo"}, "a.b": "extra"}, {a: {b: "demo"}});
     testIncludeOnlyADotB({_id: ++globalIdCounter, a: {b: "demo", _id: "extra"}}, {a: {b: "demo"}});
 
-    testIncludeOnlyADotB({_id: ++globalIdCounter, a: [{b: 1, c: 1}, {b: 2, c: 2}], x: "extra"},
-                         {a: [{b: 1}, {b: 2}]});
-    testIncludeOnlyADotB({_id: ++globalIdCounter, a: [{b: 1, c: 1}, {c: 2}], x: "extra"},
-                         {a: [{b: 1}, {}]});
+    testIncludeOnlyADotB(
+        {
+            _id: ++globalIdCounter,
+            a: [
+                {b: 1, c: 1},
+                {b: 2, c: 2},
+            ],
+            x: "extra",
+        },
+        {a: [{b: 1}, {b: 2}]},
+    );
+    testIncludeOnlyADotB({_id: ++globalIdCounter, a: [{b: 1, c: 1}, {c: 2}], x: "extra"}, {a: [{b: 1}, {}]});
 
     // More cases where 'a.b' doesn't exist - but with arrays this time.
     testIncludeOnlyADotB({_id: ++globalIdCounter, a: [], x: "extra"}, {a: []});
@@ -215,141 +242,217 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     testIncludeOnlyADotB({_id: ++globalIdCounter, a: ["scalar", "scalar"], x: "extra"}, {a: []});
     testIncludeOnlyADotB({_id: ++globalIdCounter, a: [null]}, {a: []});
     // This is an interesting case: the scalars are ignored but the shadow documents are preserved.
-    testIncludeOnlyADotB({_id: ++globalIdCounter, a: ["scalar", {}, "scalar", {c: 1}], x: "extra"},
-                         {a: [{}, {}]});
+    testIncludeOnlyADotB({_id: ++globalIdCounter, a: ["scalar", {}, "scalar", {c: 1}], x: "extra"}, {a: [{}, {}]});
     // Further interest: the array within the array is preserved.
     testIncludeOnlyADotB({_id: ++globalIdCounter, a: [[]]}, {a: [[]]});
     // But not the scalar elements of it.
     testIncludeOnlyADotB({_id: ++globalIdCounter, a: [[1, 2, 3]]}, {a: [[]]});
     // But if there's a "b" again we see that.
-    testIncludeOnlyADotB({_id: ++globalIdCounter, a: [[1, {b: 1}, {b: 2, c: 2}, "scalar"]]},
-                         {a: [[{b: 1}, {b: 2}]]});
-    testIncludeOnlyADotB({
-        _id: ++globalIdCounter,
-        a: [
-            ["x", {b: 1}, {b: 2, c: 2}, "x"],
-            [[{b: 1}]],
-            [{b: 1}, [{b: 2}], [[{b: [2]}]]],
-        ]
-    },
-                         {
-                             a: [
-                                 [{b: 1}, {b: 2}],
-                                 [[{b: 1}]],
-                                 [{b: 1}, [{b: 2}], [[{b: [2]}]]],
-                             ]
-                         });
-    testIncludeOnlyADotB({_id: ++globalIdCounter, a: [[], [[], [], [1], [{c: 1}]], {b: 1}]}, {
-        a: [
-            [],
-            [[], [], [], [{}]],
-            {b: 1},
-        ]
-    });
+    testIncludeOnlyADotB({_id: ++globalIdCounter, a: [[1, {b: 1}, {b: 2, c: 2}, "scalar"]]}, {a: [[{b: 1}, {b: 2}]]});
+    testIncludeOnlyADotB(
+        {
+            _id: ++globalIdCounter,
+            a: [["x", {b: 1}, {b: 2, c: 2}, "x"], [[{b: 1}]], [{b: 1}, [{b: 2}], [[{b: [2]}]]]],
+        },
+        {
+            a: [[{b: 1}, {b: 2}], [[{b: 1}]], [{b: 1}, [{b: 2}], [[{b: [2]}]]]],
+        },
+    );
+    testIncludeOnlyADotB(
+        {_id: ++globalIdCounter, a: [[], [[], [], [1], [{c: 1}]], {b: 1}]},
+        {
+            a: [[], [[], [], [], [{}]], {b: 1}],
+        },
+    );
 
     // Test the case where two paths in a projection go through the same parent object.
-    const testIncludeOnlyADotBAndADotC = (input, output) => testInputOutput({
-        input: input,
-        projection: {'a.b': 1, 'a.c': 1, _id: 0},
-        expectedOutput: output,
-        interestingIndexes: [
-            {a: 1},
-            {'a.b': 1},
-            {'a.c': 1},
-            {'a.b': 1, 'a.c': 1},
-            {'a.b': 1, 'a.c': -1},
-        ]
-    });
+    const testIncludeOnlyADotBAndADotC = (input, output) =>
+        testInputOutput({
+            input: input,
+            projection: {"a.b": 1, "a.c": 1, _id: 0},
+            expectedOutput: output,
+            interestingIndexes: [{a: 1}, {"a.b": 1}, {"a.c": 1}, {"a.b": 1, "a.c": 1}, {"a.b": 1, "a.c": -1}],
+        });
     testIncludeOnlyADotBAndADotC(
         {_id: ++globalIdCounter, a: {b: "scalar", c: "scalar", d: "extra"}},
-        {a: {b: "scalar", c: "scalar"}});
+        {a: {b: "scalar", c: "scalar"}},
+    );
     testIncludeOnlyADotBAndADotC(
-        {_id: ++globalIdCounter, a: [{b: 1, c: 2, d: 3}, {b: 4, c: 5, d: 6}]},
-        {a: [{b: 1, c: 2}, {b: 4, c: 5}]});
+        {
+            _id: ++globalIdCounter,
+            a: [
+                {b: 1, c: 2, d: 3},
+                {b: 4, c: 5, d: 6},
+            ],
+        },
+        {
+            a: [
+                {b: 1, c: 2},
+                {b: 4, c: 5},
+            ],
+        },
+    );
 
     // Array cases where one or both of the paths don't exist.
-    testIncludeOnlyADotBAndADotC({_id: ++globalIdCounter, a: [{b: 1, c: 2}, {b: 3, d: 4}]},
-                                 {a: [{b: 1, c: 2}, {b: 3}]});
-    testIncludeOnlyADotBAndADotC({_id: ++globalIdCounter, a: [{c: 1, d: 2}, {b: 3, d: 4}]},
-                                 {a: [{c: 1}, {b: 3}]});
+    testIncludeOnlyADotBAndADotC(
+        {
+            _id: ++globalIdCounter,
+            a: [
+                {b: 1, c: 2},
+                {b: 3, d: 4},
+            ],
+        },
+        {a: [{b: 1, c: 2}, {b: 3}]},
+    );
+    testIncludeOnlyADotBAndADotC(
+        {
+            _id: ++globalIdCounter,
+            a: [
+                {c: 1, d: 2},
+                {b: 3, d: 4},
+            ],
+        },
+        {a: [{c: 1}, {b: 3}]},
+    );
     testIncludeOnlyADotBAndADotC({_id: ++globalIdCounter, a: []}, {a: []});
-    testIncludeOnlyADotBAndADotC({_id: ++globalIdCounter, a: [{b: 1, c: 2}, "extra", {b: 3, c: 4}]},
-                                 {a: [{b: 1, c: 2}, {b: 3, c: 4}]});
+    testIncludeOnlyADotBAndADotC(
+        {_id: ++globalIdCounter, a: [{b: 1, c: 2}, "extra", {b: 3, c: 4}]},
+        {
+            a: [
+                {b: 1, c: 2},
+                {b: 3, c: 4},
+            ],
+        },
+    );
 
     // Non-array cases where one or both of the paths don't exist.
     //
     // TODO SERVER-23229: This will return different results if there is a covering index, so here
     // but not elsewhere we don't use any "interestingIndexes" in test cases.
-    const testIncludeADotBAndCNoIndexes = (input, output) => testInputOutput({
-        input: input,
-        projection: {'a.b': 1, 'a.c': 1, _id: 0},
-        expectedOutput: output,
-        interestingIndexes: []
-    });
+    const testIncludeADotBAndCNoIndexes = (input, output) =>
+        testInputOutput({
+            input: input,
+            projection: {"a.b": 1, "a.c": 1, _id: 0},
+            expectedOutput: output,
+            interestingIndexes: [],
+        });
 
-    testIncludeADotBAndCNoIndexes({_id: ++globalIdCounter, a: {b: "scalar", d: "extra"}},
-                                  {a: {b: "scalar"}});
-    testIncludeADotBAndCNoIndexes({_id: ++globalIdCounter, a: {c: "scalar", d: "extra"}},
-                                  {a: {c: "scalar"}});
+    testIncludeADotBAndCNoIndexes({_id: ++globalIdCounter, a: {b: "scalar", d: "extra"}}, {a: {b: "scalar"}});
+    testIncludeADotBAndCNoIndexes({_id: ++globalIdCounter, a: {c: "scalar", d: "extra"}}, {a: {c: "scalar"}});
     testIncludeADotBAndCNoIndexes({_id: ++globalIdCounter, a: {d: "extra"}}, {a: {}});
-}());
+})();
 
 (function testInclusionLevelsOfNesting() {
     // Test the basic "include a.b.c" projection. We've seen the implicit '_id' behavior above so
     // we'll always project _id out for these tests.
-    const testIncludeADotBDotC = (input, output) => testInputOutput({
-        input: input,
-        projection: {'a.b.c': 1, _id: 0},
-        expectedOutput: output,
-        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}]
-    });
+    const testIncludeADotBDotC = (input, output) =>
+        testInputOutput({
+            input: input,
+            projection: {"a.b.c": 1, _id: 0},
+            expectedOutput: output,
+            interestingIndexes: [{"a.b.c": 1}, {"a.b.c": -1}],
+        });
 
     // Test some basic "normal" cases.
     // Test that it excludes extra fields at the root and at the sub-document
-    testIncludeADotBDotC({a: {b: {c: "demo", z: "extra"}, y: "extra"}, x: "extra"},
-                         {a: {b: {c: "demo"}}});
+    testIncludeADotBDotC({a: {b: {c: "demo", z: "extra"}, y: "extra"}, x: "extra"}, {a: {b: {c: "demo"}}});
 
     // Test array use cases.
     // 'a' is an array.
-    testIncludeADotBDotC({a: [{b: {c: 1, d: 1}}, {b: {c: 2, d: 2}}]},
-                         {a: [{b: {c: 1}}, {b: {c: 2}}]});
+    testIncludeADotBDotC({a: [{b: {c: 1, d: 1}}, {b: {c: 2, d: 2}}]}, {a: [{b: {c: 1}}, {b: {c: 2}}]});
     // 'a.b' is an array.
-    testIncludeADotBDotC({a: {b: [{c: 1, d: 1}, {c: 2, d: 2}]}}, {a: {b: [{c: 1}, {c: 2}]}});
+    testIncludeADotBDotC(
+        {
+            a: {
+                b: [
+                    {c: 1, d: 1},
+                    {c: 2, d: 2},
+                ],
+            },
+        },
+        {a: {b: [{c: 1}, {c: 2}]}},
+    );
     // 'a' and 'a.b' are arrays.
     testIncludeADotBDotC(
-        {a: [{b: [{c: 1, d: 1}, {c: 2, d: 2}]}, {b: [{c: 3, d: 3}, {c: 4, d: 4}]}]},
-        {a: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {c: 4}]}]});
+        {
+            a: [
+                {
+                    b: [
+                        {c: 1, d: 1},
+                        {c: 2, d: 2},
+                    ],
+                },
+                {
+                    b: [
+                        {c: 3, d: 3},
+                        {c: 4, d: 4},
+                    ],
+                },
+            ],
+        },
+        {a: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {c: 4}]}]},
+    );
     // 'a' and 'a.b' and 'a.b.c' are arrays.
     testIncludeADotBDotC(
         {
             a: [
-                {b: [{c: [1, 2, 3], d: 1}, {c: [2, 3, 4], d: 2}]},
-                {b: [{c: [3, 4, 5], d: 3}, {c: [4, 5, 6], d: 4}]}
-            ]
+                {
+                    b: [
+                        {c: [1, 2, 3], d: 1},
+                        {c: [2, 3, 4], d: 2},
+                    ],
+                },
+                {
+                    b: [
+                        {c: [3, 4, 5], d: 3},
+                        {c: [4, 5, 6], d: 4},
+                    ],
+                },
+            ],
         },
-        {a: [{b: [{c: [1, 2, 3]}, {c: [2, 3, 4]}]}, {b: [{c: [3, 4, 5]}, {c: [4, 5, 6]}]}]});
+        {a: [{b: [{c: [1, 2, 3]}, {c: [2, 3, 4]}]}, {b: [{c: [3, 4, 5]}, {c: [4, 5, 6]}]}]},
+    );
 
     // Test that when the path is missing we preserve the structure.
-    testIncludeADotBDotC({
-        a: [
-            // No 'b' here.
-            {bPrime: [{c: "x"}, {c: "x"}]},
-            // No 'c' anywhere
-            {b: [{cPrime: "x", d: 1}, {cPrime: "x", d: 2}]},
-            // Only some 'c's
-            {b: [{c: 3, d: 3}, {cPrime: "x", d: 4}, {c: 5}]},
-            // One more without a 'b' to prove we get trailing empty objects.
-            {bPrime: {somethingDifferent: "just because"}},
-        ]
-    },
-                         {
-                             a: [
-                                 {/* bPrime was here */},
-                                 {b: [{}, {} /* all cPrimes */]},
-                                 {b: [{c: 3}, {/*cPrime was here */}, {c: 5}]},
-                                 {/* bPrime again */}
-                             ]
-                         });
+    testIncludeADotBDotC(
+        {
+            a: [
+                // No 'b' here.
+                {bPrime: [{c: "x"}, {c: "x"}]},
+                // No 'c' anywhere
+                {
+                    b: [
+                        {cPrime: "x", d: 1},
+                        {cPrime: "x", d: 2},
+                    ],
+                },
+                // Only some 'c's
+                {b: [{c: 3, d: 3}, {cPrime: "x", d: 4}, {c: 5}]},
+                // One more without a 'b' to prove we get trailing empty objects.
+                {bPrime: {somethingDifferent: "just because"}},
+            ],
+        },
+        {
+            a: [
+                {
+                    /* bPrime was here */
+                },
+                {b: [{}, {} /* all cPrimes */]},
+                {
+                    b: [
+                        {c: 3},
+                        {
+                            /*cPrime was here */
+                        },
+                        {c: 5},
+                    ],
+                },
+                {
+                    /* bPrime again */
+                },
+            ],
+        },
+    );
 
     // Test including "a.b.c" when "a.b.c" is missing/not present.
     //
@@ -362,12 +465,13 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     // array), since we will need to add a fetch to reconstruct the array anyway and will figure out
     // the correct answer in the process.
     //
-    const testADotBDotCNoIndexes = (input, output) => testInputOutput({
-        input: input,
-        projection: {'a.b.c': 1, _id: 0},
-        expectedOutput: output,
-        interestingIndexes: []
-    });
+    const testADotBDotCNoIndexes = (input, output) =>
+        testInputOutput({
+            input: input,
+            projection: {"a.b.c": 1, _id: 0},
+            expectedOutput: output,
+            interestingIndexes: [],
+        });
 
     testADotBDotCNoIndexes({}, {});
     testADotBDotCNoIndexes({b: "other", x: "extra"}, {});
@@ -378,12 +482,13 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     testADotBDotCNoIndexes({a: {b: "scalar"}}, {a: {}});
     testADotBDotCNoIndexes({a: {b: {x: 1, y: 1}}}, {a: {b: {}}});
 
-    const testIncludeOnlyADotBDotC = (input, output) => testInputOutput({
-        input: input,
-        projection: {'a.b.c': 1, _id: 0},
-        expectedOutput: output,
-        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}]
-    });
+    const testIncludeOnlyADotBDotC = (input, output) =>
+        testInputOutput({
+            input: input,
+            projection: {"a.b.c": 1, _id: 0},
+            expectedOutput: output,
+            interestingIndexes: [{"a.b.c": 1}, {"a.b.c": -1}],
+        });
 
     // More cases where 'a.b.c' doesn't exist - but with arrays this time.
 
@@ -407,29 +512,24 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     testIncludeOnlyADotBDotC({a: [{b: [{}]}]}, {a: [{b: [{}]}]});
     testIncludeOnlyADotBDotC({a: [[1, {b: 1}, {b: 2, c: 2}, "scalar"]]}, {a: [[{}, {}]]});
     testIncludeOnlyADotBDotC({a: [1, {b: [[1, 2], [{}], 2]}, 2]}, {a: [{b: [[], [{}]]}]});
-    testIncludeOnlyADotBDotC({a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]},
-                             {a: [[], [{b: [[], [{c: [[1, 2], [{}], 2]}]]}]]});
-    testIncludeOnlyADotBDotC({
-        a: [
-            ["x", {b: 1}, {b: 2, c: 2}, "x"],
-            [[{b: 1}]],
-            [{b: 1}, [{b: 2}], [[{b: [2]}]]],
-        ]
-    },
-                             {
-                                 a: [
-                                     [{}, {}],
-                                     [[{}]],
-                                     [{}, [{}], [[{b: []}]]],
-                                 ]
-                             });
-    testIncludeOnlyADotBDotC({a: [[], [[], [], [1], [{x: 1}]], {b: 1}]}, {
-        a: [
-            [],
-            [[], [], [], [{}]],
-            {},
-        ]
-    });
+    testIncludeOnlyADotBDotC(
+        {a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]},
+        {a: [[], [{b: [[], [{c: [[1, 2], [{}], 2]}]]}]]},
+    );
+    testIncludeOnlyADotBDotC(
+        {
+            a: [["x", {b: 1}, {b: 2, c: 2}, "x"], [[{b: 1}]], [{b: 1}, [{b: 2}], [[{b: [2]}]]]],
+        },
+        {
+            a: [[{}, {}], [[{}]], [{}, [{}], [[{b: []}]]]],
+        },
+    );
+    testIncludeOnlyADotBDotC(
+        {a: [[], [[], [], [1], [{x: 1}]], {b: 1}]},
+        {
+            a: [[], [[], [], [], [{}]], {}],
+        },
+    );
 
     // Now some new cases where 'a.b.c' sometimes exists.
     // One array path.
@@ -437,34 +537,32 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     testIncludeOnlyADotBDotC({a: [{b: {x: 1, c: "scalar"}}]}, {a: [{b: {c: "scalar"}}]});
     testIncludeOnlyADotBDotC({a: [1, {b: {c: {x: 1}}}, 2]}, {a: [{b: {c: {x: 1}}}]});
     testIncludeOnlyADotBDotC({a: [1, {b: {x: 1, c: "scalar"}}, 2]}, {a: [{b: {c: "scalar"}}]});
-    testIncludeOnlyADotBDotC({a: [[1, 2], [{b: {x: 1, c: "scalar"}}], 2]},
-                             {a: [[], [{b: {c: "scalar"}}]]});
+    testIncludeOnlyADotBDotC({a: [[1, 2], [{b: {x: 1, c: "scalar"}}], 2]}, {a: [[], [{b: {c: "scalar"}}]]});
     // 'b' is array.
-    testIncludeOnlyADotBDotC({a: {b: [{c: "scalar"}, {c: "scalar2"}]}},
-                             {a: {b: [{c: "scalar"}, {c: "scalar2"}]}});
+    testIncludeOnlyADotBDotC({a: {b: [{c: "scalar"}, {c: "scalar2"}]}}, {a: {b: [{c: "scalar"}, {c: "scalar2"}]}});
     testIncludeOnlyADotBDotC({a: {b: [1, {c: "scalar"}, 2]}}, {a: {b: [{c: "scalar"}]}});
-    testIncludeOnlyADotBDotC({a: {b: [[1, 2], [{c: "scalar"}], 2]}},
-                             {a: {b: [[], [{c: "scalar"}]]}});
+    testIncludeOnlyADotBDotC({a: {b: [[1, 2], [{c: "scalar"}], 2]}}, {a: {b: [[], [{c: "scalar"}]]}});
     // 'c' is array.
     testIncludeOnlyADotBDotC({a: {x: 1, b: {x: 1, c: ["scalar"]}}}, {a: {b: {c: ["scalar"]}}});
     testIncludeOnlyADotBDotC({a: {b: {c: [[1, 2], [{}], 2]}}}, {a: {b: {c: [[1, 2], [{}], 2]}}});
 
     // Two arrays.
     // 'b' and 'c' are arrays.
-    testIncludeOnlyADotBDotC({a: {x: 1, b: [1, {c: [[1, 2], [{}], 2]}, 2]}},
-                             {a: {b: [{c: [[1, 2], [{}], 2]}]}});
-    testIncludeOnlyADotBDotC({a: {x: 1, b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}},
-                             {a: {b: [[], [{c: [[1, 2], [{}], 2]}]]}});
+    testIncludeOnlyADotBDotC({a: {x: 1, b: [1, {c: [[1, 2], [{}], 2]}, 2]}}, {a: {b: [{c: [[1, 2], [{}], 2]}]}});
+    testIncludeOnlyADotBDotC(
+        {a: {x: 1, b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}},
+        {a: {b: [[], [{c: [[1, 2], [{}], 2]}]]}},
+    );
     // 'a' and 'b' are arrays.
     testIncludeOnlyADotBDotC({a: [{b: [{c: "scalar"}]}]}, {a: [{b: [{c: "scalar"}]}]});
     testIncludeOnlyADotBDotC({a: [1, {b: [{c: {x: 1}}]}, 2]}, {a: [{b: [{c: {x: 1}}]}]});
     testIncludeOnlyADotBDotC({a: [1, {b: [1, {c: "scalar"}, 2]}, 2]}, {a: [{b: [{c: "scalar"}]}]});
-    testIncludeOnlyADotBDotC({a: [1, {b: [[1, 2], [{c: "scalar"}], 2]}, 2]},
-                             {a: [{b: [[], [{c: "scalar"}]]}]});
-    testIncludeOnlyADotBDotC({a: [[1, 2], [{b: [1, {c: "scalar"}, 2]}], 2]},
-                             {a: [[], [{b: [{c: "scalar"}]}]]});
-    testIncludeOnlyADotBDotC({a: [[1, 2], [{b: [[1, 2], [{c: "scalar"}], 2]}], 2]},
-                             {a: [[], [{b: [[], [{c: "scalar"}]]}]]});
+    testIncludeOnlyADotBDotC({a: [1, {b: [[1, 2], [{c: "scalar"}], 2]}, 2]}, {a: [{b: [[], [{c: "scalar"}]]}]});
+    testIncludeOnlyADotBDotC({a: [[1, 2], [{b: [1, {c: "scalar"}, 2]}], 2]}, {a: [[], [{b: [{c: "scalar"}]}]]});
+    testIncludeOnlyADotBDotC(
+        {a: [[1, 2], [{b: [[1, 2], [{c: "scalar"}], 2]}], 2]},
+        {a: [[], [{b: [[], [{c: "scalar"}]]}]]},
+    );
     // 'a' and 'c' are arrays.
     testIncludeOnlyADotBDotC({a: [1, {b: {c: [1, {}, 2]}}, 2]}, {a: [{b: {c: [1, {}, 2]}}]});
     testIncludeOnlyADotBDotC({a: [1, {b: {x: 1, c: [[]]}}, 2]}, {a: [{b: {c: [[]]}}]});
@@ -473,13 +571,13 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     // Three arrays.
     testIncludeOnlyADotBDotC({a: [{b: [{c: ["scalar"]}]}]}, {a: [{b: [{c: ["scalar"]}]}]});
     testIncludeOnlyADotBDotC({a: [{b: [1, {c: ["scalar"]}, 2]}]}, {a: [{b: [{c: ["scalar"]}]}]});
-    testIncludeOnlyADotBDotC({a: [{b: [[1, 2], [{c: ["scalar"]}], 2]}]},
-                             {a: [{b: [[], [{c: ["scalar"]}]]}]});
-    testIncludeOnlyADotBDotC({a: [1, {b: [[1, 2], [{c: [1, {}, 2]}], 2]}, 2]},
-                             {a: [{b: [[], [{c: [1, {}, 2]}]]}]});
-    testIncludeOnlyADotBDotC({a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]},
-                             {a: [[], [{b: [[], [{c: [[1, 2], [{}], 2]}]]}]]});
-}());
+    testIncludeOnlyADotBDotC({a: [{b: [[1, 2], [{c: ["scalar"]}], 2]}]}, {a: [{b: [[], [{c: ["scalar"]}]]}]});
+    testIncludeOnlyADotBDotC({a: [1, {b: [[1, 2], [{c: [1, {}, 2]}], 2]}, 2]}, {a: [{b: [[], [{c: [1, {}, 2]}]]}]});
+    testIncludeOnlyADotBDotC(
+        {a: [[1, 2], [{b: [[1, 2], [{c: [[1, 2], [{}], 2]}], 2]}], 2]},
+        {a: [[], [{b: [[], [{c: [[1, 2], [{}], 2]}]]}]]},
+    );
+})();
 
 // Now test the exclusion semantics. This part is a lot smaller since a lot of the behaviors mirror
 // inclusion projection.
@@ -488,19 +586,19 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     testInputOutput({
         input: {_id: ++globalIdCounter, a: 1, b: 1, c: 1},
         projection: {a: 0},
-        expectedOutput: {_id: globalIdCounter, b: 1, c: 1}
+        expectedOutput: {_id: globalIdCounter, b: 1, c: 1},
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: 1, b: 1, c: 1},
         projection: {a: 0, b: 0},
-        expectedOutput: {_id: globalIdCounter, c: 1}
+        expectedOutput: {_id: globalIdCounter, c: 1},
     });
 
     // Test some dotted examples.
     testInputOutput({
         input: {_id: ++globalIdCounter, a: {b: 1, c: 1, d: 1}, x: {y: 1, z: 1}},
         projection: {"a.b": 0},
-        expectedOutput: {_id: globalIdCounter, a: {c: 1, d: 1}, x: {y: 1, z: 1}}
+        expectedOutput: {_id: globalIdCounter, a: {c: 1, d: 1}, x: {y: 1, z: 1}},
     });
     // One notable difference between inclusion and exclusion projections is that parent's scalar
     // values remain untouched during an exclusion projection. The "scalar" here remains. In an
@@ -508,29 +606,29 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     testInputOutput({
         input: {_id: ++globalIdCounter, a: ["scalar", {b: 1, c: 1, d: 1}, {b: 2, c: 2}, {b: 3}]},
         projection: {"a.b": 0},
-        expectedOutput: {_id: globalIdCounter, a: ["scalar", {c: 1, d: 1}, {c: 2}, {}]}
+        expectedOutput: {_id: globalIdCounter, a: ["scalar", {c: 1, d: 1}, {c: 2}, {}]},
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: [{b: 1, c: 1, d: 1}, {b: 2, c: 2}, {b: 3}]},
         projection: {"a.b": 0, "a.c": 0},
-        expectedOutput: {_id: globalIdCounter, a: [{d: 1}, {}, {}]}
+        expectedOutput: {_id: globalIdCounter, a: [{d: 1}, {}, {}]},
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: [{b: 1, c: 1, d: 1}, {b: 2, c: 2}, {b: 3}]},
         projection: {"a.b": 0, "a.c": 0},
-        expectedOutput: {_id: globalIdCounter, a: [{d: 1}, {}, {}]}
+        expectedOutput: {_id: globalIdCounter, a: [{d: 1}, {}, {}]},
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: []},
         projection: {"a.b": 0},
-        expectedOutput: {_id: globalIdCounter, a: []}
+        expectedOutput: {_id: globalIdCounter, a: []},
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: [[], [{b: [[1, 2], {c: 1, d: 1}]}]]},
         projection: {"a.b.c": 0},
-        expectedOutput: {_id: globalIdCounter, a: [[], [{b: [[1, 2], {d: 1}]}]]}
+        expectedOutput: {_id: globalIdCounter, a: [[], [{b: [[1, 2], {d: 1}]}]]},
     });
-}());
+})();
 
 // Now test the semantics of projecting a computed field. Again this is fairly similar to inclusion
 // projections but with a few interesting twists.
@@ -539,19 +637,19 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     testInputOutput({
         input: {_id: ++globalIdCounter, a: 1, b: 1, c: 1},
         projection: {a: {$literal: 0}},
-        expectedOutput: {_id: globalIdCounter, a: 0}
+        expectedOutput: {_id: globalIdCounter, a: 0},
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: 1, b: 1, c: 1},
         projection: {a: {$literal: 0}, b: "string"},
-        expectedOutput: {_id: globalIdCounter, a: 0, b: "string"}
+        expectedOutput: {_id: globalIdCounter, a: 0, b: "string"},
     });
 
     // Test some dotted examples.
     testInputOutput({
         input: {_id: ++globalIdCounter, a: {b: 1, c: 1, d: 1}, x: {y: 1, z: 1}},
         projection: {"a.b": "new value"},
-        expectedOutput: {_id: globalIdCounter, a: {b: "new value"}}
+        expectedOutput: {_id: globalIdCounter, a: {b: "new value"}},
     });
     // One notable difference for computed projections is that they overwrite scalars rather than
     // ignoring or removing them.
@@ -560,8 +658,8 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         projection: {"a.b": "new value"},
         expectedOutput: {
             _id: globalIdCounter,
-            a: [{b: "new value"}, {b: "new value"}, {b: "new value"}, {b: "new value"}]
-        }
+            a: [{b: "new value"}, {b: "new value"}, {b: "new value"}, {b: "new value"}],
+        },
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: [{b: 1, c: 1, d: 1}, {b: 2, c: 2}, {b: 3}]},
@@ -571,9 +669,9 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
             a: [
                 {b: "new value", c: "new C"},
                 {b: "new value", c: "new C"},
-                {b: "new value", c: "new C"}
-            ]
-        }
+                {b: "new value", c: "new C"},
+            ],
+        },
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: [{b: 1, c: 1, d: 1}, {b: 2, c: 2}, {b: 3}]},
@@ -583,14 +681,14 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
             a: [
                 {b: "new value", c: "new C"},
                 {b: "new value", c: "new C"},
-                {b: "new value", c: "new C"}
-            ]
-        }
+                {b: "new value", c: "new C"},
+            ],
+        },
     });
     testInputOutput({
         input: {_id: ++globalIdCounter, a: []},
         projection: {"a.b": "new value"},
-        expectedOutput: {_id: globalIdCounter, a: []}
+        expectedOutput: {_id: globalIdCounter, a: []},
     });
     // Computed projections will traverse through double arrays and preserve structure. For example,
     // we preserve two brackets inside the existing 'b: [[1,2]]' and leave the empty array in 'a'
@@ -600,10 +698,10 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         projection: {"a.b.c": "new value"},
         expectedOutput: {
             _id: globalIdCounter,
-            a: [[], [{b: [[{c: "new value"}, {c: "new value"}], {c: "new value"}]}]]
-        }
+            a: [[], [{b: [[{c: "new value"}, {c: "new value"}], {c: "new value"}]}]],
+        },
     });
-}());
+})();
 
 // Test that a numeric path component never describes an array index if used in a projection. We
 // have the $slice operator for that functionality.
@@ -646,7 +744,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: {_id: ++globalIdCounter},
         projection: {_id: 1},
         expectedOutput: {_id: globalIdCounter},
-        interestingIndexes: [{_id: 1}]
+        interestingIndexes: [{_id: 1}],
     });
     testInputOutput({
         input: {_id: ++globalIdCounter},
@@ -663,15 +761,15 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     // same thing.
     testInputOutput({
         input: {measurements: {temperature: 20, pressure: 0.7, humidity: 0.4, time: new Date()}},
-        projection: {'measurements.temperature': 1, 'measurements.pressure': 1, _id: 0},
+        projection: {"measurements.temperature": 1, "measurements.pressure": 1, _id: 0},
         expectedOutput: {measurements: {temperature: 20, pressure: 0.7}},
-        interestingIndexes: [{'measurements.temperature': 1, 'measurements.pressure': 1}]
+        interestingIndexes: [{"measurements.temperature": 1, "measurements.pressure": 1}],
     });
     testInputOutput({
         input: {measurements: {temperature: 20, pressure: 0.7, humidity: 0.4, time: new Date()}},
         projection: {measurements: {temperature: 1, pressure: 1}, _id: 0},
         expectedOutput: {measurements: {temperature: 20, pressure: 0.7}},
-        interestingIndexes: [{'measurements.temperature': 1, 'measurements.pressure': 1}]
+        interestingIndexes: [{"measurements.temperature": 1, "measurements.pressure": 1}],
     });
     // Now with an exclusion projection.
     testInputOutput({
@@ -679,4 +777,4 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         projection: {measurements: {humidity: 0, time: 0}, _id: 0},
         expectedOutput: {measurements: {temperature: 20, pressure: 0.7}},
     });
-}());
+})();

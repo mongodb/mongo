@@ -23,8 +23,8 @@ const replTest = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],
     nodeOptions: {
         setParameter: {logComponentVerbosity: tojsononeline({replication: {initialSync: 5}})},
-        oplogSize: 1024
-    }
+        oplogSize: 1024,
+    },
 });
 replTest.startSet();
 replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
@@ -33,30 +33,33 @@ replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 // secondary node.
 function assertPreImagesCollectionOnPrimaryMatchesSecondary() {
     function detailedError() {
-        return "pre-images collection on primary " + tojson(getPreImages(replTest.getPrimary())) +
+        return (
+            "pre-images collection on primary " +
+            tojson(getPreImages(replTest.getPrimary())) +
             " does not match pre-images collection on secondary " +
-            tojson(getPreImages(replTest.getSecondary()));
+            tojson(getPreImages(replTest.getSecondary()))
+        );
     }
     const preImagesCollOnPrimary = getPreImagesCollection(replTest.getPrimary());
     const preImagesCollOnSecondary = getPreImagesCollection(replTest.getSecondary());
-    assert.eq(preImagesCollOnPrimary.find().itcount(),
-              preImagesCollOnSecondary.find().itcount(),
-              detailedError);
-    assert.eq(preImagesCollOnPrimary.hashAllDocs(),
-              preImagesCollOnSecondary.hashAllDocs(),
-              detailedError);
+    assert.eq(preImagesCollOnPrimary.find().itcount(), preImagesCollOnSecondary.find().itcount(), detailedError);
+    assert.eq(preImagesCollOnPrimary.hashAllDocs(), preImagesCollOnSecondary.hashAllDocs(), detailedError);
 }
 
 for (const [collectionName, collectionOptions] of [
-         ["collStandard", {}],
-         ["collClustered", {clusteredIndex: {key: {_id: 1}, unique: true}}]]) {
+    ["collStandard", {}],
+    ["collClustered", {clusteredIndex: {key: {_id: 1}, unique: true}}],
+]) {
     const testDB = replTest.getPrimary().getDB(testName);
     jsTest.log(`Testing on collection '${collectionName}'`);
 
     // Create a collection with change stream pre- and post-images enabled.
-    assert.commandWorked(testDB.createCollection(
-        collectionName,
-        Object.assign({changeStreamPreAndPostImages: {enabled: true}}, collectionOptions)));
+    assert.commandWorked(
+        testDB.createCollection(
+            collectionName,
+            Object.assign({changeStreamPreAndPostImages: {enabled: true}}, collectionOptions),
+        ),
+    );
     const coll = testDB[collectionName];
 
     function issueRetryableFindAndModifyCommands(testDB) {
@@ -66,49 +69,69 @@ for (const [collectionName, collectionOptions] of [
         assert.commandWorked(coll.insert({_id: 5, v: 1}));
 
         // Issue "findAndModify" command to return a document version before update.
-        assert.docEq({_id: 5, v: 1},
-                     coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: false}));
+        assert.docEq({_id: 5, v: 1}, coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: false}));
 
         // Issue "findAndModify" command to return a document version after update.
-        assert.docEq({_id: 5, v: 3},
-                     coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: true}));
+        assert.docEq({_id: 5, v: 3}, coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: true}));
 
         // Issue "findAndModify" command to return a document version before deletion.
         assert.docEq(
             {_id: 5, v: 3},
-            coll.findAndModify({query: {_id: 5}, new: false, remove: true, writeConcern: {w: 2}}));
+            coll.findAndModify({query: {_id: 5}, new: false, remove: true, writeConcern: {w: 2}}),
+        );
     }
 
     function issueWriteCommandsInTransaction(testDB) {
         assert.commandWorked(coll.deleteMany({$and: [{_id: {$gte: 6}}, {_id: {$lte: 10}}]}));
-        assert.commandWorked(coll.insert([{_id: 6, a: 1}, {_id: 7, a: 1}, {_id: 8, a: 1}]));
+        assert.commandWorked(
+            coll.insert([
+                {_id: 6, a: 1},
+                {_id: 7, a: 1},
+                {_id: 8, a: 1},
+            ]),
+        );
 
         const transactionOptions = {readConcern: {level: "majority"}, writeConcern: {w: 2}};
 
         // Issue commands in a single "applyOps" transaction.
-        TxnUtil.runInTransaction(testDB, () => {}, function(db, state) {
-            const coll = db[collectionName];
-            assert.commandWorked(coll.updateOne({_id: 6}, {$inc: {a: 1}}));
-            assert.commandWorked(coll.replaceOne({_id: 7}, {a: "Long string"}));
-            assert.commandWorked(coll.deleteOne({_id: 8}));
-        }, transactionOptions);
+        TxnUtil.runInTransaction(
+            testDB,
+            () => {},
+            function (db, state) {
+                const coll = db[collectionName];
+                assert.commandWorked(coll.updateOne({_id: 6}, {$inc: {a: 1}}));
+                assert.commandWorked(coll.replaceOne({_id: 7}, {a: "Long string"}));
+                assert.commandWorked(coll.deleteOne({_id: 8}));
+            },
+            transactionOptions,
+        );
 
         // Issue commands in a multiple-"applyOps" transaction.
         assert.commandWorked(coll.insert({_id: 8, a: 1}));
-        TxnUtil.runInTransaction(testDB, () => {}, function(db, state) {
-            const coll = db[collectionName];
-            const largeString = "a".repeat(15 * 1024 * 1024);
-            assert.commandWorked(coll.updateOne({_id: 6}, {$inc: {a: 1}}));
-            assert.commandWorked(coll.insert({_id: 9, a: largeString}));
-            assert.commandWorked(coll.insert(
-                {_id: 10, a: largeString}));  // Should go to the second "applyOps" entry.
-            assert.commandWorked(coll.replaceOne({_id: 7}, {a: "String"}));
-            assert.commandWorked(coll.deleteOne({_id: 8}));
-        }, transactionOptions);
+        TxnUtil.runInTransaction(
+            testDB,
+            () => {},
+            function (db, state) {
+                const coll = db[collectionName];
+                const largeString = "a".repeat(15 * 1024 * 1024);
+                assert.commandWorked(coll.updateOne({_id: 6}, {$inc: {a: 1}}));
+                assert.commandWorked(coll.insert({_id: 9, a: largeString}));
+                assert.commandWorked(coll.insert({_id: 10, a: largeString})); // Should go to the second "applyOps" entry.
+                assert.commandWorked(coll.replaceOne({_id: 7}, {a: "String"}));
+                assert.commandWorked(coll.deleteOne({_id: 8}));
+            },
+            transactionOptions,
+        );
 
         // Issue commands in a transaction that gets prepared before a commit.
         assert.commandWorked(coll.deleteMany({$and: [{_id: {$gte: 6}}, {_id: {$lte: 10}}]}));
-        assert.commandWorked(coll.insert([{_id: 6, a: 1}, {_id: 7, a: 1}, {_id: 8, a: 1}]));
+        assert.commandWorked(
+            coll.insert([
+                {_id: 6, a: 1},
+                {_id: 7, a: 1},
+                {_id: 8, a: 1},
+            ]),
+        );
         const session = testDB.getMongo().startSession();
         const sessionDb = session.getDatabase(testDB.getName());
         session.startTransaction();
@@ -122,13 +145,20 @@ for (const [collectionName, collectionOptions] of [
 
     function issueApplyOpsCommand(testDB) {
         assert.commandWorked(coll.deleteMany({$and: [{_id: {$gte: 9}}, {_id: {$lte: 10}}]}));
-        assert.commandWorked(coll.insert([{_id: 9, a: 1}, {_id: 10, a: 1}]));
-        assert.commandWorked(testDB.runCommand({
-            applyOps: [
-                {op: "u", ns: coll.getFullName(), o2: {_id: 9}, o: {$v: 2, diff: {u: {a: 2}}}},
-                {op: "d", ns: coll.getFullName(), o: {_id: 10}}
-            ],
-        }));
+        assert.commandWorked(
+            coll.insert([
+                {_id: 9, a: 1},
+                {_id: 10, a: 1},
+            ]),
+        );
+        assert.commandWorked(
+            testDB.runCommand({
+                applyOps: [
+                    {op: "u", ns: coll.getFullName(), o2: {_id: 9}, o: {$v: 2, diff: {u: {a: 2}}}},
+                    {op: "d", ns: coll.getFullName(), o: {_id: 10}},
+                ],
+            }),
+        );
     }
 
     (function testSteadyStateReplication() {
@@ -184,17 +214,18 @@ for (const [collectionName, collectionOptions] of [
         // data situation during oplog application.
         const initialSyncNode = replTest.add({
             rsConfig: {priority: 0},
-            setParameter:
-                {'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'})}
+            setParameter: {"failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"})},
         });
 
         // Wait until the new node starts and pauses on the fail point.
         replTest.reInitiate();
-        assert.commandWorked(initialSyncNode.adminCommand({
-            waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
-            timesEntered: 1,
-            maxTimeMS: 60000
-        }));
+        assert.commandWorked(
+            initialSyncNode.adminCommand({
+                waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
+                timesEntered: 1,
+                maxTimeMS: 60000,
+            }),
+        );
 
         // Update the document on the primary node.
         assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {v: 1}}, {writeConcern: {w: 2}}));
@@ -207,8 +238,9 @@ for (const [collectionName, collectionOptions] of [
         issueWriteCommandsInTransaction(testDB);
 
         // Resume the initial sync process.
-        assert.commandWorked(initialSyncNode.adminCommand(
-            {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+        assert.commandWorked(
+            initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+        );
 
         // Wait until the initial sync process is complete and the new node becomes a fully
         // functioning secondary.
@@ -235,8 +267,7 @@ for (const [collectionName, collectionOptions] of [
 
         // Pause check-pointing on the primary node to ensure new pre-images are not flushed to the
         // disk.
-        const pauseCheckpointThreadFailPoint =
-            configureFailPoint(replTest.getPrimary(), "pauseCheckpointThread");
+        const pauseCheckpointThreadFailPoint = configureFailPoint(replTest.getPrimary(), "pauseCheckpointThread");
         pauseCheckpointThreadFailPoint.wait();
 
         // Update the document on the primary node.

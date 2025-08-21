@@ -12,7 +12,7 @@ t.save({_id: 2, title: "my 2nd post", text: "this is a new blog i am writing. ya
 t.save({
     _id: 3,
     title: "knives are Fun for writing eliot",
-    text: "this is a new blog i am writing. yay"
+    text: "this is a new blog i am writing. yay",
 });
 
 // default weight is 1
@@ -33,19 +33,19 @@ assert.eq(1, t.getIndexKeys().length, "C1");
 t.createIndex({dummy: "text"}, {weights: {"$**": 1, title: 2}});
 
 res = t.find({"$text": {"$search": "write"}}, {score: {"$meta": "textScore"}}).sort({
-    score: {"$meta": "textScore"}
+    score: {"$meta": "textScore"},
 });
 assert.eq(3, res.length(), "C2");
 assert.eq(3, res[0]._id, "C3");
 
 res = t.find({"$text": {"$search": "blog"}}, {score: {"$meta": "textScore"}}).sort({
-    score: {"$meta": "textScore"}
+    score: {"$meta": "textScore"},
 });
 assert.eq(3, res.length(), "D1");
 assert.eq(1, res[0]._id, "D2");
 
 res = t.find({"$text": {"$search": "eliot"}}, {score: {"$meta": "textScore"}}).sort({
-    score: {"$meta": "textScore"}
+    score: {"$meta": "textScore"},
 });
 assert.eq(2, res.length(), "E1");
 assert.eq(3, res[0]._id, "E2");

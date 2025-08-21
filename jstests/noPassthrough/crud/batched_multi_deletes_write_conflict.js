@@ -19,25 +19,35 @@ const ns = coll.getFullName();
 
 assertDropCollection(testDB, collName);
 
-const collCount = 50002;  // Intentionally not a multiple of the default batch size.
+const collCount = 50002; // Intentionally not a multiple of the default batch size.
 
-assert.commandWorked(coll.insertMany(
-    [...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)})), {ordered: false}));
+assert.commandWorked(
+    coll.insertMany(
+        [...Array(collCount).keys()].map((x) => ({_id: x, a: "a".repeat(1024)})),
+        {ordered: false},
+    ),
+);
 
 assert.commandWorked(testDB.setProfilingLevel(2));
 
 // While test is not deterministic, there will most likely be several write conflicts during the
 // execution. ~250 write conflicts on average.
 const batchedDeleteWriteConflictFP = configureFailPoint(
-    testDB, "throwWriteConflictExceptionInBatchedDeleteStage", {}, {activationProbability: .005});
+    testDB,
+    "throwWriteConflictExceptionInBatchedDeleteStage",
+    {},
+    {activationProbability: 0.005},
+);
 
 const commentID = jsTestName() + "_delete_op_id";
-assert.commandWorked(testDB.runCommand({
-    delete: collName,
-    deletes: [{q: {_id: {$gte: 0}}, limit: 0}],
-    comment: commentID,
-    writeConcern: {w: "majority"}
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        delete: collName,
+        deletes: [{q: {_id: {$gte: 0}}, limit: 0}],
+        comment: commentID,
+        writeConcern: {w: "majority"},
+    }),
+);
 batchedDeleteWriteConflictFP.off();
 
 // Confirm the metrics are as expected despite write conflicts.

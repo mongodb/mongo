@@ -8,7 +8,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const lsid = {
-    id: UUID()
+    id: UUID(),
 };
 
 {
@@ -27,8 +27,7 @@ const lsid = {
         autocommit: false,
     };
 
-    assert.commandWorked(
-        collection.runCommand(Object.assign({}, commandObj, {startTransaction: true})));
+    assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {startTransaction: true})));
 
     assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {readConcern: {}})));
 
@@ -47,8 +46,7 @@ const lsid = {
         autocommit: false,
     };
 
-    assert.commandWorked(
-        collection.runCommand(Object.assign({}, commandObj, {startTransaction: true})));
+    assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {startTransaction: true})));
 
     assert.commandWorked(collection.runCommand(Object.assign({}, commandObj, {readConcern: {}})));
 

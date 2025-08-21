@@ -24,10 +24,12 @@ assert.commandWorked(testColl.update({_id: 1}, [{$set: {update: true}}]));
 assert.commandWorked(testColl.update({}, [{$set: {updateMulti: true}}], {multi: true}));
 assert.commandWorked(testColl.updateOne({_id: 1}, [{$set: {updateOne: true}}]));
 assert.commandWorked(testColl.updateMany({}, [{$set: {updateMany: true}}]));
-assert.commandWorked(testColl.bulkWrite([
-    {updateOne: {filter: {_id: 1}, update: [{$set: {bulkWriteUpdateOne: true}}]}},
-    {updateMany: {filter: {}, update: [{$set: {bulkWriteUpdateMany: true}}]}}
-]));
+assert.commandWorked(
+    testColl.bulkWrite([
+        {updateOne: {filter: {_id: 1}, update: [{$set: {bulkWriteUpdateOne: true}}]}},
+        {updateMany: {filter: {}, update: [{$set: {bulkWriteUpdateMany: true}}]}},
+    ]),
+);
 
 // Test that each of the Bulk API update functions correctly handle pipeline syntax.
 const unorderedBulkOp = testColl.initializeUnorderedBulkOp();
@@ -56,7 +58,7 @@ const expectedResults = [
         unorderedBulkOpUpdateOne: true,
         unorderedBulkOpUpdateMulti: true,
         orderedBulkOpUpdateOne: true,
-        orderedBulkOpUpdateMulti: true
+        orderedBulkOpUpdateMulti: true,
     },
     {
         _id: 2,
@@ -66,20 +68,23 @@ const expectedResults = [
         updateMany: true,
         bulkWriteUpdateMany: true,
         unorderedBulkOpUpdateMulti: true,
-        orderedBulkOpUpdateMulti: true
-    }
+        orderedBulkOpUpdateMulti: true,
+    },
 ];
 assert(arrayEq(observedResults, expectedResults));
 
 // Test that findAndModify and associated helpers correctly handle pipeline syntax.
 const expectedFindAndModifyPostImage = Object.merge(expectedResults[0], {findAndModify: true});
-const expectedFindOneAndUpdatePostImage =
-    Object.merge(expectedFindAndModifyPostImage, {findOneAndUpdate: true});
-const findAndModifyPostImage =
-    testColl.findAndModify({query: {_id: 1}, update: [{$set: {findAndModify: true}}], new: true});
+const expectedFindOneAndUpdatePostImage = Object.merge(expectedFindAndModifyPostImage, {findOneAndUpdate: true});
+const findAndModifyPostImage = testColl.findAndModify({
+    query: {_id: 1},
+    update: [{$set: {findAndModify: true}}],
+    new: true,
+});
 assert.docEq(expectedFindAndModifyPostImage, findAndModifyPostImage);
-const findOneAndUpdatePostImage = testColl.findOneAndUpdate(
-    {_id: 1}, [{$set: {findOneAndUpdate: true}}], {returnNewDocument: true});
+const findOneAndUpdatePostImage = testColl.findOneAndUpdate({_id: 1}, [{$set: {findOneAndUpdate: true}}], {
+    returnNewDocument: true,
+});
 assert.docEq(expectedFindOneAndUpdatePostImage, findOneAndUpdatePostImage);
 
 //
@@ -131,5 +136,4 @@ if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
 // Shell helpers for replacement updates should reject pipeline-style updates.
 assert.throws(() => testColl.replaceOne({_id: 1}, [{$replaceWith: {}}]));
 assert.throws(() => testColl.findOneAndReplace({_id: 1}, [{$replaceWith: {}}]));
-assert.throws(() => testColl.bulkWrite(
-                  [{replaceOne: {filter: {_id: 1}, replacement: [{$replaceWith: {}}]}}]));
+assert.throws(() => testColl.bulkWrite([{replaceOne: {filter: {_id: 1}, replacement: [{$replaceWith: {}}]}}]));

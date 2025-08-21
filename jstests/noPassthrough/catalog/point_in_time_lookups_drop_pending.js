@@ -18,8 +18,8 @@ const rst = new ReplSetTest({
             // order for drop pending tables to stick around.
             minSnapshotHistoryWindowInSeconds: 60 * 60,
             logComponentVerbosity: tojson({storage: 1}),
-        }
-    }
+        },
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -42,11 +42,13 @@ const dropTS = assert.commandWorked(db.runCommand({drop: jsTestName()})).operati
 jsTestLog("Drop collection timestamp: " + tojson(dropTS));
 
 // Test that we can perform a point-in-time read from a drop pending table using an index.
-let res = assert.commandWorked(db.runCommand({
-    find: jsTestName(),
-    hint: {x: 1},
-    readConcern: {level: "snapshot", atClusterTime: createIndexTS}
-}));
+let res = assert.commandWorked(
+    db.runCommand({
+        find: jsTestName(),
+        hint: {x: 1},
+        readConcern: {level: "snapshot", atClusterTime: createIndexTS},
+    }),
+);
 assert.eq(kNumDocs, res.cursor.firstBatch.length);
 
 rst.stopSet();

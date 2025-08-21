@@ -9,16 +9,15 @@ var res;
 var dbArray;
 
 // grab the config db instance by name
-var getDBSection = function(dbsArray, dbToFind) {
+var getDBSection = function (dbsArray, dbToFind) {
     for (var pos in dbsArray) {
-        if (dbsArray[pos].name && dbsArray[pos].name === dbToFind)
-            return dbsArray[pos];
+        if (dbsArray[pos].name && dbsArray[pos].name === dbToFind) return dbsArray[pos];
     }
     return null;
 };
 
 // Function to verify information for a database entry in listDatabases.
-var dbEntryCheck = function(dbEntry, onConfig) {
+var dbEntryCheck = function (dbEntry, onConfig) {
     assert.neq(null, dbEntry);
     assert.neq(null, dbEntry.sizeOnDisk);
     assert.eq(false, dbEntry.empty);
@@ -48,7 +47,7 @@ var dbEntryCheck = function(dbEntry, onConfig) {
     res = mongos.adminCommand("listDatabases");
     dbArray = res.databases;
 
-    assert(!getDBSection(dbArray, 'local'));
+    assert(!getDBSection(dbArray, "local"));
 }
 
 // Admin and config are always reported on the config shard.

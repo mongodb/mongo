@@ -30,10 +30,12 @@ assert.commandWorked(sessionColl.insertMany(expectedDocuments));
 // Skip the execution of the test from suites that directly set a read concern via
 // jstests/libs/override_methods/set_read_and_write_concerns.js if it is not supported in
 // causal consistency.
-if (TestData.defaultReadConcernLevel === "available" ||
-    TestData.defaultReadConcernLevel === "linearizable") {
-    jsTestLog("Skipping the test find_on_secondary.js because the read concern " +
-              TestData.defaultReadConcernLevel + " is not supported with causal consistency");
+if (TestData.defaultReadConcernLevel === "available" || TestData.defaultReadConcernLevel === "linearizable") {
+    jsTestLog(
+        "Skipping the test find_on_secondary.js because the read concern " +
+            TestData.defaultReadConcernLevel +
+            " is not supported with causal consistency",
+    );
     quit();
 }
 
@@ -54,13 +56,14 @@ try {
     // TODO remove retry after SERVER-103880 fixed.
     retryOnRetryableError(
         () => {
-            const arr = sessionColl.find().batchSize(5).readPref('secondaryPreferred').toArray();
+            const arr = sessionColl.find().batchSize(5).readPref("secondaryPreferred").toArray();
             assert.gt(arr.length, 0, "Failed to retrieve documents");
             assert(arrayEq(expectedDocuments, arr), () => arrayDiff(expectedDocuments, arr));
         },
         100 /* numRetries */,
         0 /* sleepMs */,
-        [ErrorCodes.QueryPlanKilled, ErrorCodes.CursorNotFound]);
+        [ErrorCodes.QueryPlanKilled, ErrorCodes.CursorNotFound],
+    );
     assert(sessionColl.drop());
     session.endSession();
 } finally {

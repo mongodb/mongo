@@ -8,29 +8,29 @@
  *   uses_full_validation,
  * ]
  */
-export const dbPrefix = jsTestName() + '_db_';
+export const dbPrefix = jsTestName() + "_db_";
 
-export const $config = (function() {
+export const $config = (function () {
     let states = {
-        init: function(db, collName) {
+        init: function (db, collName) {
             jsTestLog("init tid: " + this.tid);
         },
-        dbHash: function(db, collName) {
+        dbHash: function (db, collName) {
             jsTestLog("dbHash: " + db + "." + collName + " tid: " + this.tid);
-            let opTime =
-                assert
-                    .commandWorked(db.runCommand(
-                        {insert: collName, documents: [{x: 1}], writeConcern: {w: "majority"}}))
-                    .operationTime;
+            let opTime = assert.commandWorked(
+                db.runCommand({insert: collName, documents: [{x: 1}], writeConcern: {w: "majority"}}),
+            ).operationTime;
             jsTestLog("dbHash opTime:" + tojson(opTime));
             jsTestLog("dbHash begin opTime:" + tojson(opTime));
-            let dbHashRes = assert.commandWorked(db.collName.runCommand({
-                dbHash: 1,
-                readConcern: {level: "snapshot", atClusterTime: Timestamp(opTime['t'], opTime['i'])}
-            }));
+            let dbHashRes = assert.commandWorked(
+                db.collName.runCommand({
+                    dbHash: 1,
+                    readConcern: {level: "snapshot", atClusterTime: Timestamp(opTime["t"], opTime["i"])},
+                }),
+            );
             jsTestLog("dbHash done" + dbHashRes.timeMillis);
         },
-        fullValidation: function(db, collName) {
+        fullValidation: function (db, collName) {
             jsTestLog("fullValidation: " + db + "." + collName + " tid: " + this.tid);
             let res = assert.commandWorked(db.collName.validate({full: true}));
             jsTestLog("fullValidation done: " + db + "." + collName + " " + this.tid);
@@ -38,14 +38,14 @@ export const $config = (function() {
         },
     };
 
-    const setSyncDelay = function(db, delay) {
+    const setSyncDelay = function (db, delay) {
         jsTestLog("setSyncDelay: ", delay);
         assert.commandWorked(db.adminCommand({setParameter: 1, syncdelay: delay}));
     };
 
-    const setup = function(db, collName) {
+    const setup = function (db, collName) {
         jsTestLog("Creating:" + db + "." + collName + " tid: " + this.tid);
-        let x = 'x'.repeat(20 * 1024);  // 20KB
+        let x = "x".repeat(20 * 1024); // 20KB
 
         let bulk = db.collName.initializeOrderedBulkOp();
         for (let i = 0; i < 80; i++) {
@@ -59,7 +59,7 @@ export const $config = (function() {
         jsTestLog("Creating done:" + db + "." + collName);
     };
 
-    const teardown = function(db, collName) {
+    const teardown = function (db, collName) {
         setSyncDelay(db, 60);
     };
 

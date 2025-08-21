@@ -26,14 +26,14 @@ const collName = "viewOnForViewWithInvalidDBNameTest";
 const viewDef = {
     _id: viewName,
     viewOn: collName,
-    pipeline: []
+    pipeline: [],
 };
 
 testDB.system.views.drop();
 assert.commandWorked(testDB.createCollection("system.views"));
-assert.commandWorked(testDB.adminCommand(
-    {applyOps: [{op: "i", ns: testDB.getName() + ".system.views", o: viewDef}]}));
+assert.commandWorked(testDB.adminCommand({applyOps: [{op: "i", ns: testDB.getName() + ".system.views", o: viewDef}]}));
 
 // Don't let the bogus view stick around, or else it will cause an error in validation.
-assert.commandWorked(testDB.adminCommand(
-    {applyOps: [{op: "d", ns: testDB.getName() + ".system.views", o: {_id: viewName}}]}));
+assert.commandWorked(
+    testDB.adminCommand({applyOps: [{op: "d", ns: testDB.getName() + ".system.views", o: {_id: viewName}}]}),
+);

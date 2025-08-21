@@ -35,32 +35,29 @@ function runTest(downgradeFCV) {
         // The setFCV command will need to acquire a global S lock to complete. The global
         // lock is currently held by prepare, so that will block. We use a failpoint to make that
         // command fail immediately when it tries to get the lock.
-        assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "alwaysOn"}));
+        assert.commandWorked(
+            testDB.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "alwaysOn"}),
+        );
 
         jsTestLog("Attempt to downgrade the featureCompatibilityVersion.");
         assert.commandFailedWithCode(
             testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
-            ErrorCodes.LockTimeout);
+            ErrorCodes.LockTimeout,
+        );
 
-        assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
+        assert.commandWorked(testDB.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
 
         jsTestLog("Commit the prepared transaction.");
         assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
         jsTestLog("Rerun the setFCV command and let it complete successfully.");
-        assert.commandWorked(
-            testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+        assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
         checkFCV(adminDB, downgradeFCV);
-
     } finally {
-        assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
+        assert.commandWorked(testDB.adminCommand({configureFailPoint: "failNonIntentLocksIfWaitNeeded", mode: "off"}));
 
         jsTestLog("Restore the original featureCompatibilityVersion.");
-        assert.commandWorked(
-            testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
         checkFCV(adminDB, latestFCV);
     }
 

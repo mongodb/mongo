@@ -18,8 +18,7 @@ const testDB = db.getSiblingDB(dbName);
 const testColl = testDB.getCollection(collName);
 
 testColl.drop({writeConcern: {w: "majority"}});
-assert.commandWorked(
-    testDB.runCommand({create: testColl.getName(), writeConcern: {w: "majority"}}));
+assert.commandWorked(testDB.runCommand({create: testColl.getName(), writeConcern: {w: "majority"}}));
 
 const apiParamCombos = [
     {},
@@ -31,7 +30,7 @@ const apiParamCombos = [
     {apiVersion: "1", apiStrict: true, apiDeprecationErrors: false},
     {apiVersion: "1", apiStrict: false},
     {apiVersion: "1", apiStrict: false, apiDeprecationErrors: true},
-    {apiVersion: "1", apiStrict: false, apiDeprecationErrors: false}
+    {apiVersion: "1", apiStrict: false, apiDeprecationErrors: false},
 ];
 
 function addApiParams(obj, params) {
@@ -41,16 +40,18 @@ function addApiParams(obj, params) {
 for (const txnInitiatingParams of apiParamCombos) {
     for (const txnContinuingParams of apiParamCombos) {
         for (const txnEndingCmdName of ["commitTransaction", "abortTransaction"]) {
-            const compatibleParams = (txnContinuingParams === txnInitiatingParams);
+            const compatibleParams = txnContinuingParams === txnInitiatingParams;
             const session = db.getMongo().startSession();
             const sessionDb = session.getDatabase(dbName);
 
             function checkCommand(db, command) {
                 const commandWithParams = addApiParams(command, txnContinuingParams);
-                jsTestLog(`Session ${session.getSessionId().id}, ` +
-                          `initial params: ${tojson(txnInitiatingParams)}, ` +
-                          `continuing params: ${tojson(txnContinuingParams)}, ` +
-                          `compatible: ${tojson(compatibleParams)}`);
+                jsTestLog(
+                    `Session ${session.getSessionId().id}, ` +
+                        `initial params: ${tojson(txnInitiatingParams)}, ` +
+                        `continuing params: ${tojson(txnContinuingParams)}, ` +
+                        `compatible: ${tojson(compatibleParams)}`,
+                );
                 jsTestLog(`Command: ${tojson(commandWithParams)}`);
                 const reply = db.runCommand(commandWithParams);
                 jsTestLog(`Reply: ${tojson(reply)}`);
@@ -65,8 +66,11 @@ for (const txnInitiatingParams of apiParamCombos) {
             withRetryOnTransientTxnError(
                 () => {
                     session.startTransaction();
-                    assert.commandWorked(sessionDb.runCommand(addApiParams(
-                        {insert: collName, documents: [{}, {}, {}]}, txnInitiatingParams)));
+                    assert.commandWorked(
+                        sessionDb.runCommand(
+                            addApiParams({insert: collName, documents: [{}, {}, {}]}, txnInitiatingParams),
+                        ),
+                    );
 
                     /*
                      * Check "insert" with API params in a transaction.
@@ -75,28 +79,29 @@ for (const txnInitiatingParams of apiParamCombos) {
                 },
                 () => {
                     session.abortTransaction_forTesting();
-                });
+                },
+            );
 
             /*
              * Check "commitTransaction" or "abortTransaction".
              */
             let txnEndingCmd = {};
             txnEndingCmd[txnEndingCmdName] = 1;
-            Object.assign(txnEndingCmd,
-                          {txnNumber: session.getTxnNumber_forTesting(), autocommit: false});
+            Object.assign(txnEndingCmd, {txnNumber: session.getTxnNumber_forTesting(), autocommit: false});
 
             checkCommand(session.getDatabase("admin"), txnEndingCmd);
 
             if (!compatibleParams) {
-                jsTestLog('Cleaning up');
+                jsTestLog("Cleaning up");
                 // Clean up by calling abortTransaction with the right API parameters.
                 const abortCmd = {
                     abortTransaction: 1,
                     txnNumber: session.getTxnNumber_forTesting(),
-                    autocommit: false
+                    autocommit: false,
                 };
-                const cleanupReply = session.getDatabase("admin").runCommand(
-                    addApiParams(abortCmd, txnInitiatingParams));
+                const cleanupReply = session
+                    .getDatabase("admin")
+                    .runCommand(addApiParams(abortCmd, txnInitiatingParams));
                 jsTestLog(`Cleanup reply ${tojson(cleanupReply)}`);
             }
 

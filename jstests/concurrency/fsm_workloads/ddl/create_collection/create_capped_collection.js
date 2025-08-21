@@ -6,18 +6,18 @@
  *
  * @tags: [requires_capped]
  */
-export const $config = (function() {
+export const $config = (function () {
     // Returns a document of the form { _id: ObjectId(...), field: '...' }
     // with specified BSON size.
     function makeDocWithSize(targetSize) {
-        var doc = {_id: new ObjectId(), field: ''};
+        var doc = {_id: new ObjectId(), field: ""};
 
         var size = Object.bsonsize(doc);
         assert.gte(targetSize, size);
 
         // Set 'field' as a string with enough characters
         // to make the whole document 'size' bytes long
-        doc.field = 'x'.repeat(targetSize - size);
+        doc.field = "x".repeat(targetSize - size);
         assert.eq(targetSize, Object.bsonsize(doc));
 
         return doc;
@@ -38,15 +38,18 @@ export const $config = (function() {
     // Returns an array containing the _id fields of all the documents
     // in the collection, sorted according to their insertion order.
     function getObjectIds(db, collName) {
-        return db[collName].find({}, {_id: 1}).batchSize(1000).map(function(doc) {
-            return doc._id;
-        });
+        return db[collName]
+            .find({}, {_id: 1})
+            .batchSize(1000)
+            .map(function (doc) {
+                return doc._id;
+            });
     }
 
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
-        prefix: 'create_capped_collection',
+        prefix: "create_capped_collection",
         insert: insert,
         getObjectIds: getObjectIds,
 
@@ -70,21 +73,23 @@ export const $config = (function() {
             var foundIds = this.getObjectIds(db, myCollName);
             var count = foundIds.length;
 
-            assert.lt(count, threshold, 'expected at least one truncation to occur');
-            assert.eq(insertedIds.slice(insertedIds.length - count),
-                      foundIds,
-                      'expected truncation to remove the oldest documents');
-        }
+            assert.lt(count, threshold, "expected at least one truncation to occur");
+            assert.eq(
+                insertedIds.slice(insertedIds.length - count),
+                foundIds,
+                "expected truncation to remove the oldest documents",
+            );
+        },
     };
 
-    var states = (function() {
+    var states = (function () {
         var options = {
             capped: true,
-            size: 8192  // multiple of 256; larger than 4096 default
+            size: 8192, // multiple of 256; larger than 4096 default
         };
 
         function uniqueCollectionName(prefix, tid, num) {
-            return prefix + tid + '_' + num;
+            return prefix + tid + "_" + num;
         }
 
         function init(db, collName) {

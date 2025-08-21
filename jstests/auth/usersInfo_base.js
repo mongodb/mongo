@@ -16,12 +16,8 @@ export function runTest(conn) {
 
     // Check we can find a particular user on the "test" database.
     assert.eq(1, assert.commandWorked(db.runCommand({usersInfo: "user12"})).users.length);
-    assert.eq(1,
-              assert.commandWorked(db.runCommand({usersInfo: {user: "user12", db: "test"}}))
-                  .users.length);
-    assert.eq(0,
-              assert.commandWorked(db.runCommand({usersInfo: {user: "user12", db: "test2"}}))
-                  .users.length);
+    assert.eq(1, assert.commandWorked(db.runCommand({usersInfo: {user: "user12", db: "test"}})).users.length);
+    assert.eq(0, assert.commandWorked(db.runCommand({usersInfo: {user: "user12", db: "test2"}})).users.length);
     assert.eq(0, assert.commandWorked(emptyDB.runCommand({usersInfo: "user12"})).users.length);
 
     // No users are found on a database without users.

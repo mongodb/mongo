@@ -1,4 +1,3 @@
-
 let a = db.dbref1a;
 let b = db.dbref1b;
 

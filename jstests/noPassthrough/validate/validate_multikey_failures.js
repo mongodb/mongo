@@ -12,18 +12,22 @@ const resetCollection = () => {
 };
 
 const disableMultikeyUpdate = () => {
-    assert.commandWorked(
-        conn.adminCommand({configureFailPoint: "skipUpdateIndexMultikey", mode: "alwaysOn"}));
+    assert.commandWorked(conn.adminCommand({configureFailPoint: "skipUpdateIndexMultikey", mode: "alwaysOn"}));
 };
 
 const enableMultikeyUpdate = () => {
-    assert.commandWorked(
-        conn.adminCommand({configureFailPoint: "skipUpdateIndexMultikey", mode: "off"}));
+    assert.commandWorked(conn.adminCommand({configureFailPoint: "skipUpdateIndexMultikey", mode: "off"}));
 };
 
 function checkValidateLogs() {
-    assert(checkLog.checkContainsWithAtLeastCountJson(
-        conn, 7463100, {"spec": {"v": 2, "key": {"_id": 1}, "name": "_id_"}}, 1));
+    assert(
+        checkLog.checkContainsWithAtLeastCountJson(
+            conn,
+            7463100,
+            {"spec": {"v": 2, "key": {"_id": 1}, "name": "_id_"}},
+            1,
+        ),
+    );
 }
 
 // Test that multiple keys suggest index should be marked multikey.
@@ -65,8 +69,7 @@ res = coll.validate({fixMultikey: true});
 assert.commandWorked(res);
 assert(!res.valid);
 assert.eq(res.indexDetails["a.b_1"].errors.length, 1);
-assert(res.indexDetails["a.b_1"].errors[0].startsWith(
-    "Index a.b_1 multikey paths do not cover a document"));
+assert(res.indexDetails["a.b_1"].errors[0].startsWith("Index a.b_1 multikey paths do not cover a document"));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556100, {"indexName": "a.b_1"}, 1));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 7556101, {"indexKey": {"a.b": 6}}, 1));
 assert(checkLog.checkContainsWithAtLeastCountJson(conn, 5367500, {"index": "a.b_1"}, 1));

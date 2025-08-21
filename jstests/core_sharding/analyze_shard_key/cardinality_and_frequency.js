@@ -8,9 +8,7 @@
  *   requires_fcv_70,
  * ]
  */
-import {
-    numMostCommonValues
-} from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
+import {numMostCommonValues} from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
 import {
     testAnalyzeCandidateShardKeysShardedCollection,
     testAnalyzeCandidateShardKeysUnshardedCollection,
@@ -18,7 +16,7 @@ import {
 } from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common_tests.js";
 
 const mongos = db.getMongo();
-const shardNames = db.adminCommand({listShards: 1}).shards.map(shard => shard._id);
+const shardNames = db.adminCommand({listShards: 1}).shards.map((shard) => shard._id);
 if (shardNames.length < 2) {
     print(jsTestName() + " will not run; at least 2 shards are required.");
     quit();
@@ -42,11 +40,11 @@ for (const [key, value] of Object.entries(shardMap.map)) {
 // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
 // command with readPreference "secondaryPreferred".
 const writeConcern = {
-    w: numNodesPerRS
+    w: numNodesPerRS,
 };
 
 const setParameterOpts = {
-    analyzeShardKeyNumMostCommonValues: numMostCommonValues
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
 };
 const setParamCmd = Object.assign({setParameter: 1}, setParameterOpts);
 assert.commandWorked(db.adminCommand(setParamCmd));

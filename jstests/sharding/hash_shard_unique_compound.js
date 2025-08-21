@@ -33,8 +33,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({a: 1, b: 1}, {unique: true}));
 
 // shard a fresh collection using a hashed shard key
-assert.commandWorked(db.adminCommand({shardcollection: ns, key: {a: "hashed"}}),
-                     "shardcollection didn't worked 2");
+assert.commandWorked(db.adminCommand({shardcollection: ns, key: {a: "hashed"}}), "shardcollection didn't worked 2");
 
 s.printShardingStatus();
 jsTest.log("------ indexes 2-------");

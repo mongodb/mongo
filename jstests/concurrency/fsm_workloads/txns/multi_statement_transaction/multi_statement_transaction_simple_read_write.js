@@ -18,15 +18,10 @@
 import "jstests/libs/override_methods/retry_writes_at_least_once.js";
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_simple.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_simple.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.counters = {};
     $config.data.threadUniqueField = "";
 
@@ -40,7 +35,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         $super.states.init.apply(this, arguments);
 
         // Each thread updates a thread unique field to avoid collisions.
-        this.threadUniqueField = 'thread' + this.tid;
+        this.threadUniqueField = "thread" + this.tid;
         for (let i = 0; i < this.numAccounts; i++) {
             this.counters[i] = 0;
         }
@@ -51,25 +46,35 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.counters[writeDocId] += 1;
 
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-        withTxnAndAutoRetry(this.session, () => {
-            let res = collection.runCommand('update', {
-                updates: [{q: {_id: writeDocId}, u: {$inc: {[this.threadUniqueField]: 1}}}],
-            });
+        withTxnAndAutoRetry(
+            this.session,
+            () => {
+                let res = collection.runCommand("update", {
+                    updates: [{q: {_id: writeDocId}, u: {$inc: {[this.threadUniqueField]: 1}}}],
+                });
 
-            assert.commandWorked(res);
-            assert.eq(res.n, 1, () => tojson(res));
-            assert.eq(res.nModified, 1, () => tojson(res));
+                assert.commandWorked(res);
+                assert.eq(res.n, 1, () => tojson(res));
+                assert.eq(res.nModified, 1, () => tojson(res));
 
-            const doc = collection.findOne({_id: readDocId});
-            assert.eq(
-                // The document has been updated, so the in-memory counters should all be correct.
-                this.counters[readDocId],
-                // We don't initialize the thread unique field to 0, so treat undefined as 0.
-                doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
-                'unexpected thread unique field value in transaction, read after write, thread: ' +
-                    this.tid + ', readId: ' + readDocId + ', writeId: ' + writeDocId +
-                    ', doc: ' + tojson(doc));
-        }, {retryOnKilledSession: this.retryOnKilledSession});
+                const doc = collection.findOne({_id: readDocId});
+                assert.eq(
+                    // The document has been updated, so the in-memory counters should all be correct.
+                    this.counters[readDocId],
+                    // We don't initialize the thread unique field to 0, so treat undefined as 0.
+                    doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
+                    "unexpected thread unique field value in transaction, read after write, thread: " +
+                        this.tid +
+                        ", readId: " +
+                        readDocId +
+                        ", writeId: " +
+                        writeDocId +
+                        ", doc: " +
+                        tojson(doc),
+                );
+            },
+            {retryOnKilledSession: this.retryOnKilledSession},
+        );
     };
 
     $config.states.readThenWriteTxn = function readThenWriteTxn(db, collName) {
@@ -83,24 +88,34 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             readDocId !== writeDocId ? this.counters[readDocId] : this.counters[readDocId] - 1;
 
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-        withTxnAndAutoRetry(this.session, () => {
-            const doc = collection.findOne({_id: readDocId});
-            assert.eq(
-                expectedCounterBeforeWrite,
-                // We don't initialize the thread unique field to 0, so treat undefined as 0.
-                doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
-                'unexpected thread unique field value in transaction, read before write, thread: ' +
-                    this.tid + ', readId: ' + readDocId + ', writeId: ' + writeDocId +
-                    ', doc: ' + tojson(doc));
+        withTxnAndAutoRetry(
+            this.session,
+            () => {
+                const doc = collection.findOne({_id: readDocId});
+                assert.eq(
+                    expectedCounterBeforeWrite,
+                    // We don't initialize the thread unique field to 0, so treat undefined as 0.
+                    doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
+                    "unexpected thread unique field value in transaction, read before write, thread: " +
+                        this.tid +
+                        ", readId: " +
+                        readDocId +
+                        ", writeId: " +
+                        writeDocId +
+                        ", doc: " +
+                        tojson(doc),
+                );
 
-            const updateRes = collection.runCommand('update', {
-                updates: [{q: {_id: writeDocId}, u: {$inc: {[this.threadUniqueField]: 1}}}],
-            });
+                const updateRes = collection.runCommand("update", {
+                    updates: [{q: {_id: writeDocId}, u: {$inc: {[this.threadUniqueField]: 1}}}],
+                });
 
-            assert.commandWorked(updateRes);
-            assert.eq(updateRes.n, 1, () => tojson(updateRes));
-            assert.eq(updateRes.nModified, 1, () => tojson(updateRes));
-        }, {retryOnKilledSession: this.retryOnKilledSession});
+                assert.commandWorked(updateRes);
+                assert.eq(updateRes.n, 1, () => tojson(updateRes));
+                assert.eq(updateRes.nModified, 1, () => tojson(updateRes));
+            },
+            {retryOnKilledSession: this.retryOnKilledSession},
+        );
     };
 
     $config.states.readThenWriteThenReadTxn = function readThenWriteThenReadTxn(db, collName) {
@@ -114,34 +129,50 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             readDocId !== writeDocId ? this.counters[readDocId] : this.counters[readDocId] - 1;
 
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-        withTxnAndAutoRetry(this.session, () => {
-            let doc = collection.findOne({_id: readDocId});
-            assert.eq(
-                expectedCounterBeforeWrite,
-                // We don't initialize the thread unique field to 0, so treat undefined as 0.
-                doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
-                'unexpected thread unique field value in transaction, read before write, thread: ' +
-                    this.tid + ', readId: ' + readDocId + ', writeId: ' + writeDocId +
-                    ', doc: ' + tojson(doc));
+        withTxnAndAutoRetry(
+            this.session,
+            () => {
+                let doc = collection.findOne({_id: readDocId});
+                assert.eq(
+                    expectedCounterBeforeWrite,
+                    // We don't initialize the thread unique field to 0, so treat undefined as 0.
+                    doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
+                    "unexpected thread unique field value in transaction, read before write, thread: " +
+                        this.tid +
+                        ", readId: " +
+                        readDocId +
+                        ", writeId: " +
+                        writeDocId +
+                        ", doc: " +
+                        tojson(doc),
+                );
 
-            const updateRes = collection.runCommand('update', {
-                updates: [{q: {_id: writeDocId}, u: {$inc: {[this.threadUniqueField]: 1}}}],
-            });
+                const updateRes = collection.runCommand("update", {
+                    updates: [{q: {_id: writeDocId}, u: {$inc: {[this.threadUniqueField]: 1}}}],
+                });
 
-            assert.commandWorked(updateRes);
-            assert.eq(updateRes.n, 1, () => tojson(updateRes));
-            assert.eq(updateRes.nModified, 1, () => tojson(updateRes));
+                assert.commandWorked(updateRes);
+                assert.eq(updateRes.n, 1, () => tojson(updateRes));
+                assert.eq(updateRes.nModified, 1, () => tojson(updateRes));
 
-            doc = collection.findOne({_id: readDocId});
-            assert.eq(
-                // The document has been updated, so the in-memory counters should all be correct.
-                this.counters[readDocId],
-                // We don't initialize the thread unique field to 0, so treat undefined as 0.
-                doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
-                'unexpected thread unique field value in transaction, read after write, thread: ' +
-                    this.tid + ', readId: ' + readDocId + ', writeId: ' + writeDocId +
-                    ', doc: ' + tojson(doc));
-        }, {retryOnKilledSession: this.retryOnKilledSession});
+                doc = collection.findOne({_id: readDocId});
+                assert.eq(
+                    // The document has been updated, so the in-memory counters should all be correct.
+                    this.counters[readDocId],
+                    // We don't initialize the thread unique field to 0, so treat undefined as 0.
+                    doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
+                    "unexpected thread unique field value in transaction, read after write, thread: " +
+                        this.tid +
+                        ", readId: " +
+                        readDocId +
+                        ", writeId: " +
+                        writeDocId +
+                        ", doc: " +
+                        tojson(doc),
+                );
+            },
+            {retryOnKilledSession: this.retryOnKilledSession},
+        );
     };
 
     $config.transitions = {

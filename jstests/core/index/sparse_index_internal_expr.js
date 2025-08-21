@@ -18,7 +18,7 @@ coll.drop();
 coll.insert({a: 1});
 
 const exprQuery = {
-    $expr: {$lt: ["$missing", "r"]}
+    $expr: {$lt: ["$missing", "r"]},
 };
 
 // Run a query with $expr on a missing field. This query will use a COLLSCAN plan and return
@@ -46,12 +46,10 @@ assert.docEq(res[0], {a: 1});
 
 // Drop the non-sparse index and create a sparse index with the same key pattern.
 assert.commandWorked(coll.dropIndex("missing_1"));
-assert.commandWorked(
-    coll.createIndex({'missing': 1}, {'sparse': true, 'name': 'missing_1_sparse'}));
+assert.commandWorked(coll.createIndex({"missing": 1}, {"sparse": true, "name": "missing_1_sparse"}));
 
 // Run the same query to test that a COLLSCAN plan is used rather than an indexed plan.
-const collScans =
-    getPlanStages(getWinningPlanFromExplain(coll.find(exprQuery).explain()), "COLLSCAN");
+const collScans = getPlanStages(getWinningPlanFromExplain(coll.find(exprQuery).explain()), "COLLSCAN");
 
 // Verify that the winning plan uses the $** index with the expected bounds.
 assert.gt(collScans.length, 0, collScans);
@@ -61,8 +59,7 @@ assert.gt(collScans.length, 0, collScans);
 res = coll.find(exprQuery, {_id: 0}).hint("missing_1_sparse").toArray();
 assert.eq(res.length, 0);
 
-ixScans = getPlanStages(
-    getWinningPlanFromExplain(coll.find(exprQuery).hint("missing_1_sparse").explain()), "IXSCAN");
+ixScans = getPlanStages(getWinningPlanFromExplain(coll.find(exprQuery).hint("missing_1_sparse").explain()), "IXSCAN");
 
 assert.gt(ixScans.length, 0, ixScans);
 assert.eq("missing_1_sparse", ixScans[0].indexName, ixScans);

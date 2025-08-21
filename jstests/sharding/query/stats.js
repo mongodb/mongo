@@ -13,20 +13,18 @@ const db = s.getDB("test");
 
 function numKeys(o) {
     var num = 0;
-    for (let _ in o)
-        num++;
+    for (let _ in o) num++;
     return num;
 }
 
 db.foo.drop();
-assert.commandWorked(db.foo.stats(),
-                     'db.collection.stats() should return 0s on non-existent collection');
+assert.commandWorked(db.foo.stats(), "db.collection.stats() should return 0s on non-existent collection");
 
 // ---------- load some data -----
 
 // need collections sharded before and after main collection for proper test
 s.adminCommand({shardcollection: "test.aaa", key: {_id: 1}});
-s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});  // this collection is actually used
+s.adminCommand({shardcollection: "test.foo", key: {_id: 1}}); // this collection is actually used
 s.adminCommand({shardcollection: "test.zzz", key: {_id: 1}});
 
 let N = 10000;
@@ -35,12 +33,11 @@ s.adminCommand({
     moveChunk: "test.foo",
     find: {_id: 3},
     to: s.getNonPrimaries("test")[0],
-    _waitForDelete: true
+    _waitForDelete: true,
 });
 
 var bulk = db.foo.initializeUnorderedBulkOp();
-for (let i = 0; i < N; i++)
-    bulk.insert({_id: i});
+for (let i = 0; i < N; i++) bulk.insert({_id: i});
 assert.commandWorked(bulk.execute());
 
 // Flush all writes to disk since some of the stats are dependent on state in disk (like
@@ -57,16 +54,16 @@ assert.eq(2, x.nchunks, "coll chunk num");
 assert.eq(2, numKeys(x.shards), "coll shard num");
 assert.eq(N / 2, x.shards[s.shard0.shardName].count, "coll count on s.shard0.shardName expected");
 assert.eq(N / 2, x.shards[s.shard1.shardName].count, "coll count on s.shard1.shardName expected");
-assert.eq(
-    a.foo.count(), x.shards[s.shard0.shardName].count, "coll count on s.shard0.shardName match");
-assert.eq(
-    b.foo.count(), x.shards[s.shard1.shardName].count, "coll count on s.shard1.shardName match");
-assert(!x.shards[s.shard0.shardName].indexDetails,
-       'indexDetails should not be present in s.shard0.shardName: ' +
-           tojson(x.shards[s.shard0.shardName]));
-assert(!x.shards[s.shard1.shardName].indexDetails,
-       'indexDetails should not be present in s.shard1.shardName: ' +
-           tojson(x.shards[s.shard1.shardName]));
+assert.eq(a.foo.count(), x.shards[s.shard0.shardName].count, "coll count on s.shard0.shardName match");
+assert.eq(b.foo.count(), x.shards[s.shard1.shardName].count, "coll count on s.shard1.shardName match");
+assert(
+    !x.shards[s.shard0.shardName].indexDetails,
+    "indexDetails should not be present in s.shard0.shardName: " + tojson(x.shards[s.shard0.shardName]),
+);
+assert(
+    !x.shards[s.shard1.shardName].indexDetails,
+    "indexDetails should not be present in s.shard1.shardName: " + tojson(x.shards[s.shard1.shardName]),
+);
 
 let a_extras = a.stats().objects - a.foo.count();
 let b_extras = b.stats().objects - b.foo.count();
@@ -77,10 +74,8 @@ x = assert.commandWorked(db.stats());
 
 assert.eq(N + (a_extras + b_extras), x.objects, "db total count expected");
 assert.eq(2, numKeys(x.raw), "db shard num");
-assert.eq(
-    (N / 2) + a_extras, x.raw[s.shard0.name].objects, "db count on s.shard0.shardName expected");
-assert.eq(
-    (N / 2) + b_extras, x.raw[s.shard1.name].objects, "db count on s.shard1.shardName expected");
+assert.eq(N / 2 + a_extras, x.raw[s.shard0.name].objects, "db count on s.shard0.shardName expected");
+assert.eq(N / 2 + b_extras, x.raw[s.shard1.name].objects, "db count on s.shard1.shardName expected");
 assert.eq(a.stats().objects, x.raw[s.shard0.name].objects, "db count on s.shard0.shardName match");
 assert.eq(b.stats().objects, x.raw[s.shard1.name].objects, "db count on s.shard1.shardName match");
 
@@ -89,12 +84,11 @@ assert.eq(b.stats().objects, x.raw[s.shard1.name].objects, "db count on s.shard1
 /* Helper functions */
 function statComp(stat, stat_scaled, scale) {
     /* Because of loss of floating point precision, do not check exact equality */
-    if (stat == stat_scaled)
-        return true;
+    if (stat == stat_scaled) return true;
 
-    var msg = 'scaled: ' + stat_scaled + ', stat: ' + stat + ', scale: ' + scale;
-    assert.lte((stat_scaled - 2), (stat / scale), msg);
-    assert.gte((stat_scaled + 2), (stat / scale), msg);
+    var msg = "scaled: " + stat_scaled + ", stat: " + stat + ", scale: " + scale;
+    assert.lte(stat_scaled - 2, stat / scale, msg);
+    assert.gte(stat_scaled + 2, stat / scale, msg);
 }
 
 function dbStatComp(stat_obj, stat_obj_scaled, scale) {
@@ -145,69 +139,79 @@ collStatComp(coll_not_scaled, coll_scaled_512, 512, true);
 collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
 
 /* db.collection.stats() - indexDetails tests */
-(function() {
-var t = db.foo;
+(function () {
+    var t = db.foo;
 
-assert.commandWorked(t.createIndex({a: 1}));
-assert.eq(2, t.getIndexes().length);
+    assert.commandWorked(t.createIndex({a: 1}));
+    assert.eq(2, t.getIndexes().length);
 
-var isWiredTiger =
-    (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger");
+    var isWiredTiger = !jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger";
 
-var stats = assert.commandWorked(t.stats({indexDetails: true}));
-var shardName;
-var shardStats;
-for (shardName in stats.shards) {
-    shardStats = stats.shards[shardName];
-    assert(shardStats.indexDetails,
-           'indexDetails missing for ' + shardName + ': ' + tojson(shardStats));
-    if (isWiredTiger) {
-        assert.eq(t.getIndexes().length,
-                  Object.keys(shardStats.indexDetails).length,
-                  'incorrect number of entries in WiredTiger indexDetails: ' + tojson(shardStats));
-    }
-}
-
-function getIndexName(indexKey) {
-    var indexes = t.getIndexes().filter(function(doc) {
-        return friendlyEqual(doc.key, indexKey);
-    });
-    assert.eq(1,
-              indexes.length,
-              tojson(indexKey) + ' not found in getIndexes() result: ' + tojson(t.getIndexes()));
-    return indexes[0].name;
-}
-
-function checkIndexDetails(options, indexName) {
-    var stats = assert.commandWorked(t.stats(options));
+    var stats = assert.commandWorked(t.stats({indexDetails: true}));
+    var shardName;
+    var shardStats;
     for (shardName in stats.shards) {
         shardStats = stats.shards[shardName];
-        assert(shardStats.indexDetails,
-               'indexDetails missing from db.collection.stats(' + tojson(options) + ').shards[' +
-                   shardName + '] result: ' + tojson(shardStats));
-        // Currently, indexDetails is only supported with WiredTiger.
+        assert(shardStats.indexDetails, "indexDetails missing for " + shardName + ": " + tojson(shardStats));
         if (isWiredTiger) {
-            assert.eq(1,
-                      Object.keys(shardStats.indexDetails).length,
-                      'WiredTiger indexDetails must have exactly one entry');
-            assert(shardStats.indexDetails[indexName],
-                   indexName +
-                       ' missing from WiredTiger indexDetails: ' + tojson(shardStats.indexDetails));
-            assert.neq(0,
-                       Object.keys(shardStats.indexDetails[indexName]).length,
-                       indexName + ' exists in indexDetails but contains no information: ' +
-                           tojson(shardStats.indexDetails));
+            assert.eq(
+                t.getIndexes().length,
+                Object.keys(shardStats.indexDetails).length,
+                "incorrect number of entries in WiredTiger indexDetails: " + tojson(shardStats),
+            );
         }
     }
-}
 
-// indexDetailsKey - show indexDetails results for this index key only.
-var indexKey = {a: 1};
-var indexName = getIndexName(indexKey);
-checkIndexDetails({indexDetails: true, indexDetailsKey: indexKey}, indexName);
+    function getIndexName(indexKey) {
+        var indexes = t.getIndexes().filter(function (doc) {
+            return friendlyEqual(doc.key, indexKey);
+        });
+        assert.eq(1, indexes.length, tojson(indexKey) + " not found in getIndexes() result: " + tojson(t.getIndexes()));
+        return indexes[0].name;
+    }
 
-// indexDetailsName - show indexDetails results for this index name only.
-checkIndexDetails({indexDetails: true, indexDetailsName: indexName}, indexName);
-}());
+    function checkIndexDetails(options, indexName) {
+        var stats = assert.commandWorked(t.stats(options));
+        for (shardName in stats.shards) {
+            shardStats = stats.shards[shardName];
+            assert(
+                shardStats.indexDetails,
+                "indexDetails missing from db.collection.stats(" +
+                    tojson(options) +
+                    ").shards[" +
+                    shardName +
+                    "] result: " +
+                    tojson(shardStats),
+            );
+            // Currently, indexDetails is only supported with WiredTiger.
+            if (isWiredTiger) {
+                assert.eq(
+                    1,
+                    Object.keys(shardStats.indexDetails).length,
+                    "WiredTiger indexDetails must have exactly one entry",
+                );
+                assert(
+                    shardStats.indexDetails[indexName],
+                    indexName + " missing from WiredTiger indexDetails: " + tojson(shardStats.indexDetails),
+                );
+                assert.neq(
+                    0,
+                    Object.keys(shardStats.indexDetails[indexName]).length,
+                    indexName +
+                        " exists in indexDetails but contains no information: " +
+                        tojson(shardStats.indexDetails),
+                );
+            }
+        }
+    }
+
+    // indexDetailsKey - show indexDetails results for this index key only.
+    var indexKey = {a: 1};
+    var indexName = getIndexName(indexKey);
+    checkIndexDetails({indexDetails: true, indexDetailsKey: indexKey}, indexName);
+
+    // indexDetailsName - show indexDetails results for this index name only.
+    checkIndexDetails({indexDetails: true, indexDetailsName: indexName}, indexName);
+})();
 
 s.stop();

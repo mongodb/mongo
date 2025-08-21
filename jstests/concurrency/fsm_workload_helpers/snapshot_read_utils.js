@@ -34,7 +34,7 @@ export function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) 
         txnNumber: NumberLong(data.txnNumber),
         stmtId: NumberInt(data.stmtId++),
         startTransaction: true,
-        autocommit: false
+        autocommit: false,
     };
 
     let res = data.sessionDb.runCommand(findCmd);
@@ -48,8 +48,7 @@ export function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) 
     const cursor = parseCursor(res);
 
     if (!cursor) {
-        abortTransaction(
-            data.sessionDb, data.txnNumber, [ErrorCodes.NoSuchTransaction, ErrorCodes.Interrupted]);
+        abortTransaction(data.sessionDb, data.txnNumber, [ErrorCodes.NoSuchTransaction, ErrorCodes.Interrupted]);
         data.cursorId = NumberLong(0);
     } else {
         assert(cursor.hasOwnProperty("firstBatch"), tojson(res));
@@ -74,45 +73,41 @@ export function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTrans
         batchSize: data.batchSize,
         txnNumber: NumberLong(data.txnNumber),
         stmtId: NumberInt(data.stmtId++),
-        autocommit: false
+        autocommit: false,
     };
     let res = data.sessionDb.runCommand(getMoreCmd);
 
     // A transaction request can always fail with a transient transaction error, so only check the
     // specific error code if it is not labeled as transient.
     if (!TxnUtil.isTransientTransactionError(res)) {
-        assert.commandWorkedOrFailedWithCode(
-            res, getMoreErrorCodes, () => `cmd: ${tojson(getMoreCmd)}`);
+        assert.commandWorkedOrFailedWithCode(res, getMoreErrorCodes, () => `cmd: ${tojson(getMoreCmd)}`);
     }
 
     const commitCmd = {
         commitTransaction: 1,
         txnNumber: NumberLong(data.txnNumber),
-        autocommit: false
+        autocommit: false,
     };
     res = data.sessionDb.adminCommand(commitCmd);
-    assert.commandWorkedOrFailedWithCode(
-        res, commitTransactionErrorCodes, () => `cmd: ${tojson(commitCmd)}`);
+    assert.commandWorkedOrFailedWithCode(res, commitTransactionErrorCodes, () => `cmd: ${tojson(commitCmd)}`);
 }
 
 /**
  * Performs a find with readConcern {level: "snapshot"} and optionally atClusterTime, if specified.
  */
-export function doSnapshotFindAtClusterTime(
-    db, collName, data, findErrorCodes, sortOrder, checkSnapshotCorrectness) {
+export function doSnapshotFindAtClusterTime(db, collName, data, findErrorCodes, sortOrder, checkSnapshotCorrectness) {
     const findCmd = {
         find: collName,
         sort: sortOrder,
         batchSize: data.batchSize,
-        readConcern: {level: "snapshot"}
+        readConcern: {level: "snapshot"},
     };
     if (data.atClusterTime) {
         findCmd.readConcern.atClusterTime = data.atClusterTime;
     }
 
     let res = db.runCommand(findCmd);
-    assert.commandWorkedOrFailedWithCode(
-        res, findErrorCodes, () => `cmd: ${tojson(findCmd)}, res: ${tojson(res)}`);
+    assert.commandWorkedOrFailedWithCode(res, findErrorCodes, () => `cmd: ${tojson(findCmd)}, res: ${tojson(res)}`);
     const cursor = parseCursor(res);
 
     if (!cursor) {
@@ -134,8 +129,7 @@ export function doSnapshotFindAtClusterTime(
  * Performs a getMore on a previously established snapshot cursor. This function is to be used in
  * conjunction with doSnapshotFindAtClusterTime.
  */
-export function doSnapshotGetMoreAtClusterTime(
-    db, collName, data, getMoreErrorCodes, checkSnapshotCorrectness) {
+export function doSnapshotGetMoreAtClusterTime(db, collName, data, getMoreErrorCodes, checkSnapshotCorrectness) {
     const getMoreCmd = {
         getMore: data.cursorId,
         collection: collName,
@@ -143,7 +137,10 @@ export function doSnapshotGetMoreAtClusterTime(
     };
     let res = db.runCommand(getMoreCmd);
     assert.commandWorkedOrFailedWithCode(
-        res, getMoreErrorCodes, () => `cmd: ${tojson(getMoreCmd)}, res: ${tojson(res)}`);
+        res,
+        getMoreErrorCodes,
+        () => `cmd: ${tojson(getMoreCmd)}, res: ${tojson(res)}`,
+    );
     const cursor = parseCursor(res);
     if (cursor) {
         data.cursorId = cursor.id;

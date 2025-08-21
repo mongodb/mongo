@@ -51,13 +51,12 @@ function runTest(host, rst, waitForPrimary) {
     // network errors, we run a dummy operation here to force the shell to reconnect.
     try {
         conn.getDB("admin").runCommand("ping");
-    } catch (e) {
-    }
+    } catch (e) {}
 
     // Even though our connection doesn't have secondaryOk set, we should still be able to iterate
     // our cursor and kill our cursor.
     assert(cursor.hasNext());
-    assert.doesNotThrow(function() {
+    assert.doesNotThrow(function () {
         cursor.close();
     });
 }
@@ -84,7 +83,7 @@ var st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 rst = st.rs0;
 runTest(st.s0.host, rst, true);

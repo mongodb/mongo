@@ -22,7 +22,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-export var ApplyOpsConcurrentTest = function(options) {
+export var ApplyOpsConcurrentTest = function (options) {
     if (!(this instanceof ApplyOpsConcurrentTest)) {
         return new ApplyOpsConcurrentTest(options);
     }
@@ -36,16 +36,18 @@ export var ApplyOpsConcurrentTest = function(options) {
      * Logs message using test name as prefix.
      */
     function testLog(message) {
-        jsTestLog('ApplyOpsConcurrentTest: ' + message);
+        jsTestLog("ApplyOpsConcurrentTest: " + message);
     }
 
     /**
      * Creates an array of insert operations for applyOps into collection 'coll'.
      */
     function generateInsertOps(coll, numOps, id) {
-        const ops = Array(numOps).fill('ignored').map((unused, i) => {
-            return {op: 'i', ns: coll.getFullName(), o: {_id: (id * numOps + i), id: id}};
-        });
+        const ops = Array(numOps)
+            .fill("ignored")
+            .map((unused, i) => {
+                return {op: "i", ns: coll.getFullName(), o: {_id: id * numOps + i, id: id}};
+            });
         return ops;
     }
 
@@ -55,8 +57,7 @@ export var ApplyOpsConcurrentTest = function(options) {
     function applyOpsInsert(coll, numOps, id) {
         const ops = generateInsertOps(coll, numOps, id);
         const mydb = coll.getDB();
-        assert.commandWorked(mydb.runCommand({applyOps: ops}),
-                             'failed to insert documents into ' + coll.getFullName());
+        assert.commandWorked(mydb.runCommand({applyOps: ops}), "failed to insert documents into " + coll.getFullName());
     }
 
     /**
@@ -85,10 +86,9 @@ export var ApplyOpsConcurrentTest = function(options) {
         const numOps = options.numOps;
         const id = options.id;
 
-        testLog('Starting to apply ' + numOps + ' operations in collection ' + coll.getFullName());
+        testLog("Starting to apply " + numOps + " operations in collection " + coll.getFullName());
         applyOpsInsert(coll, numOps, id);
-        testLog('Successfully applied ' + numOps + ' operations in collection ' +
-                coll.getFullName());
+        testLog("Successfully applied " + numOps + " operations in collection " + coll.getFullName());
     }
 
     /**
@@ -101,14 +101,27 @@ export var ApplyOpsConcurrentTest = function(options) {
             numOps: numOps,
             id: id,
         };
-        const functionName = 'insertFunction_' + coll.getFullName().replace(/\./g, '_');
-        const s =                                                         //
-            '\n\n' +                                                      //
-            'const testLog = ' + testLog + ';\n\n' +                      //
-            'const generateInsertOps = ' + generateInsertOps + ';\n\n' +  //
-            'const applyOpsInsert = ' + applyOpsInsert + ';\n\n' +        //
-            'const ' + functionName + ' = ' + insertFunction + ';\n\n' +  //
-            functionName + '(' + tojson(options) + ');';                  //
+        const functionName = "insertFunction_" + coll.getFullName().replace(/\./g, "_");
+        const s = //
+            "\n\n" + //
+            "const testLog = " +
+            testLog +
+            ";\n\n" + //
+            "const generateInsertOps = " +
+            generateInsertOps +
+            ";\n\n" + //
+            "const applyOpsInsert = " +
+            applyOpsInsert +
+            ";\n\n" + //
+            "const " +
+            functionName +
+            " = " +
+            insertFunction +
+            ";\n\n" + //
+            functionName +
+            "(" +
+            tojson(options) +
+            ");"; //
         return s;
     }
 
@@ -120,25 +133,26 @@ export var ApplyOpsConcurrentTest = function(options) {
      *     3.4 and older: 'opcountersRepl.insert'
      */
     function getInsertOpCount(serverStatus) {
-        return (serverStatus.version.substr(0, 3) === "3.4") ? serverStatus.opcountersRepl.insert
-                                                             : serverStatus.opcounters.insert;
+        return serverStatus.version.substr(0, 3) === "3.4"
+            ? serverStatus.opcountersRepl.insert
+            : serverStatus.opcounters.insert;
     }
 
     /**
      * Runs the test.
      */
-    this.run = function() {
+    this.run = function () {
         const options = this.options;
 
-        assert(options.ns1, 'collection 1 namespace not provided');
-        assert(options.ns2, 'collection 2 namespace not provided');
+        assert(options.ns1, "collection 1 namespace not provided");
+        assert(options.ns2, "collection 2 namespace not provided");
 
         const replTest = new ReplSetTest({nodes: 1, waitForKeys: true});
         replTest.startSet();
         replTest.initiate();
 
         const primary = replTest.getPrimary();
-        const adminDb = primary.getDB('admin');
+        const adminDb = primary.getDB("admin");
 
         const coll1 = primary.getCollection(options.ns1);
         const db1 = coll1.getDB();
@@ -151,21 +165,18 @@ export var ApplyOpsConcurrentTest = function(options) {
         }
 
         // Enable fail point to pause applyOps between operations.
-        assert.commandWorked(primary.adminCommand(
-            {configureFailPoint: 'applyOpsPauseBetweenOperations', mode: 'alwaysOn'}));
+        assert.commandWorked(
+            primary.adminCommand({configureFailPoint: "applyOpsPauseBetweenOperations", mode: "alwaysOn"}),
+        );
 
         // This logs each operation being applied.
-        const previousLogLevel =
-            assert.commandWorked(primary.setLogLevel(3, 'replication')).was.replication.verbosity;
+        const previousLogLevel = assert.commandWorked(primary.setLogLevel(3, "replication")).was.replication.verbosity;
 
-        testLog('Applying operations in collections ' + coll1.getFullName() + ' and ' +
-                coll2.getFullName());
+        testLog("Applying operations in collections " + coll1.getFullName() + " and " + coll2.getFullName());
 
         const numOps = 100;
-        const insertProcess1 =
-            startParallelShell(createInsertFunction(coll1, numOps, 0), replTest.getPort(0));
-        const insertProcess2 =
-            startParallelShell(createInsertFunction(coll2, numOps, 1), replTest.getPort(0));
+        const insertProcess1 = startParallelShell(createInsertFunction(coll1, numOps, 0), replTest.getPort(0));
+        const insertProcess2 = startParallelShell(createInsertFunction(coll2, numOps, 1), replTest.getPort(0));
 
         // The fail point will prevent applyOps from advancing past the first operation in each
         // batch of operations. If applyOps is applying both sets of operations concurrently without
@@ -179,35 +190,43 @@ export var ApplyOpsConcurrentTest = function(options) {
                 expectedFinalOpCount = 5;
             }
             assert.soon(
-                function() {
+                function () {
                     const serverStatus = adminDb.serverStatus();
                     insertOpCount = getInsertOpCount(serverStatus);
                     // This assertion may fail if the fail point is not implemented correctly within
                     // applyOps. This allows us to fail fast instead of waiting for the
                     // assert.soon() function to time out.
-                    assert.lte(insertOpCount,
-                               expectedFinalOpCount,
-                               'Expected at most ' + expectedFinalOpCount +
-                                   ' documents inserted with fail point enabled. ' +
-                                   'Most recent insert operation count = ' + insertOpCount);
+                    assert.lte(
+                        insertOpCount,
+                        expectedFinalOpCount,
+                        "Expected at most " +
+                            expectedFinalOpCount +
+                            " documents inserted with fail point enabled. " +
+                            "Most recent insert operation count = " +
+                            insertOpCount,
+                    );
                     return insertOpCount == expectedFinalOpCount;
                 },
-                'Insert operation count did not reach ' + expectedFinalOpCount +
-                    ' as expected with fail point enabled. Most recent insert operation count = ' +
-                    insertOpCount);
+                "Insert operation count did not reach " +
+                    expectedFinalOpCount +
+                    " as expected with fail point enabled. Most recent insert operation count = " +
+                    insertOpCount,
+            );
         } finally {
-            assert.commandWorked(primary.adminCommand(
-                {configureFailPoint: 'applyOpsPauseBetweenOperations', mode: 'off'}));
+            assert.commandWorked(
+                primary.adminCommand({configureFailPoint: "applyOpsPauseBetweenOperations", mode: "off"}),
+            );
         }
 
         insertProcess1();
         insertProcess2();
 
-        testLog('Successfully applied operations in collections ' + coll1.getFullName() + ' and ' +
-                coll2.getFullName());
+        testLog(
+            "Successfully applied operations in collections " + coll1.getFullName() + " and " + coll2.getFullName(),
+        );
 
         // Reset log level.
-        primary.setLogLevel(previousLogLevel, 'replication');
+        primary.setLogLevel(previousLogLevel, "replication");
 
         const serverStatus = adminDb.serverStatus();
         let expectedOpCount = 202;
@@ -215,10 +234,11 @@ export var ApplyOpsConcurrentTest = function(options) {
             expectedOpCount = 203;
         }
         // insert opCount will include insertions of two HMAC signing keys generated at RS initiate.
-        assert.eq(expectedOpCount,
-                  getInsertOpCount(serverStatus),
-                  'incorrect number of insert operations in server status after applyOps: ' +
-                      tojson(serverStatus));
+        assert.eq(
+            expectedOpCount,
+            getInsertOpCount(serverStatus),
+            "incorrect number of insert operations in server status after applyOps: " + tojson(serverStatus),
+        );
 
         replTest.stopSet();
     };

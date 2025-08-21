@@ -10,61 +10,61 @@ coll.drop();
 
 const nestedSubdocXHasSameTypeDiffValDoc = {
     x: 1,
-    subDocument: {x: 6.98, y: 1, subDocument: {x: 1}}
+    subDocument: {x: 6.98, y: 1, subDocument: {x: 1}},
 };
 const nestedSubdocXHasSameTypeSameValDoc = {
-    _id: 2,  // We will later assert that this document is returned and we want a predictable '_id'
-             // for this one.
+    _id: 2, // We will later assert that this document is returned and we want a predictable '_id'
+    // for this one.
     x: 2,
-    subDocument: {x: 2, y: 2, subDocument: {x: 2}}
+    subDocument: {x: 2, y: 2, subDocument: {x: 2}},
 };
 const nestedSubdocXHasDiffTypeDoc = {
     x: 3,
-    subDocument: {x: "big", y: "small", subDocument: {x: 3}}
+    subDocument: {x: "big", y: "small", subDocument: {x: 3}},
 };
 const nestedSubdocXIsNestedDoc = {
     x: 5,
-    subDocument: {x: "small", y: 5, subDocument: {x: {a: 2}}}
+    subDocument: {x: "small", y: 5, subDocument: {x: {a: 2}}},
 };
 const subdocAIsObjectWithNumericStrField = {
-    subDocument: {a: {"0": 2}}
+    subDocument: {a: {"0": 2}},
 };
 const subdocAIsArrayWithTwo = {
-    subDocument: {a: [2, 3]}
+    subDocument: {a: [2, 3]},
 };
 const subdocAIsArrayWithoutTwo = {
-    subDocument: {a: [1, 0]}
+    subDocument: {a: [1, 0]},
 };
 const subdocAIsArrayWithObject = {
-    subDocument: {a: [{b: 2}]}
+    subDocument: {a: [{b: 2}]},
 };
 const subdocAIsObject = {
-    subDocument: {a: {b: 3}}
+    subDocument: {a: {b: 3}},
 };
 const subdocAIsAnotherObject = {
-    subDocument: {a: {c: 4}}
+    subDocument: {a: {c: 4}},
 };
 const subdocAIsArrayOfObjectsWithNumericStrFields = {
-    subDocument: {a: [{"0": 4}, {"0": 2}]}
+    subDocument: {a: [{"0": 4}, {"0": 2}]},
 };
 const subdocAIsArrayOfObjects = {
-    subDocument: {a: [{b: 2}, {b: 2}]}
+    subDocument: {a: [{b: 2}, {b: 2}]},
 };
 const subdocAIsObjectWithEmptyArray = {
-    subDocument: {a: {b: []}}
+    subDocument: {a: {b: []}},
 };
 const subdocIsDollarDottedPathWithNumericStrField = {
-    subDocument: {"$a.0": 2}
+    subDocument: {"$a.0": 2},
 };
 const subdocIsDottedPath = {
-    subDocument: {"a.b": 4}
+    subDocument: {"a.b": 4},
 };
 const subdocIsArray = {
-    subDocument: [{a: 4}, {a: 5}]
+    subDocument: [{a: 4}, {a: 5}],
 };
 const subdocsHaveDiffNames = {
     x: 5,
-    subDocumentA: {x: "small", y: 5, subDocumentB: {x: {a: 2}}}
+    subDocumentA: {x: "small", y: 5, subDocumentB: {x: {a: 2}}},
 };
 
 const docs = [
@@ -82,7 +82,7 @@ const docs = [
     subdocAIsArrayOfObjects,
     subdocAIsObjectWithEmptyArray,
     subdocIsDollarDottedPathWithNumericStrField,
-    subdocIsDottedPath
+    subdocIsDottedPath,
 ];
 assert.commandWorked(coll.insert(docs));
 
@@ -132,8 +132,7 @@ const assertFail = (pipeline) => {
 {
     // Multiple replaceWiths before match should fail because <replacementDocument> resolves to a
     // missing document for some documents in the collection.
-    const pipeline =
-        [{$replaceWith: "$subDocument"}, {$replaceWith: "$subDocument"}, {$match: {"x.a": 2}}];
+    const pipeline = [{$replaceWith: "$subDocument"}, {$replaceWith: "$subDocument"}, {$match: {"x.a": 2}}];
     assertFail(pipeline);
 }
 {
@@ -161,7 +160,7 @@ const assertFail = (pipeline) => {
         {$match: {"subDocument.subDocument.x": {$exists: true}}},
         {$replaceWith: "$subDocument"},
         {$replaceWith: "$subDocument"},
-        {$match: {"x.a": 2}}
+        {$match: {"x.a": 2}},
     ];
     const expected = [nestedSubdocXIsNestedDoc["subDocument"]["subDocument"]];
     runTest(pipeline, expected);
@@ -181,7 +180,7 @@ const assertFail = (pipeline) => {
     const expected = [
         subdocAIsObjectWithNumericStrField,
         subdocAIsArrayWithTwo,
-        subdocAIsArrayOfObjectsWithNumericStrFields
+        subdocAIsArrayOfObjectsWithNumericStrFields,
     ];
     runTestWithSubdocExpectedResult(pipeline, expected);
 }
@@ -199,23 +198,19 @@ const assertFail = (pipeline) => {
         subdocAIsArrayOfObjectsWithNumericStrFields,
         subdocAIsArrayOfObjects,
         subdocAIsObject,
-        subdocAIsObjectWithEmptyArray
+        subdocAIsObjectWithEmptyArray,
     ];
     runTestWithSubdocExpectedResult(pipeline, expected);
 }
 {
     // match on $expr with $literal will match on a field that contains '$' in its name.
-    const pipeline = [
-        {$replaceWith: "$subDocument"},
-        {$match: {$expr: {$eq: [{$getField: {$literal: "$a.0"}}, 2]}}}
-    ];
+    const pipeline = [{$replaceWith: "$subDocument"}, {$match: {$expr: {$eq: [{$getField: {$literal: "$a.0"}}, 2]}}}];
     const expected = [subdocIsDollarDottedPathWithNumericStrField];
     runTestWithSubdocExpectedResult(pipeline, expected);
 }
 {
     // match on $expr with $getField will match on a dotted field path.
-    const pipeline =
-        [{$replaceWith: "$subDocument"}, {$match: {$expr: {$gt: [{$getField: "a.b"}, 2]}}}];
+    const pipeline = [{$replaceWith: "$subDocument"}, {$match: {$expr: {$gt: [{$getField: "a.b"}, 2]}}}];
     const expected = [subdocIsDottedPath];
     runTestWithSubdocExpectedResult(pipeline, expected);
 }
@@ -229,11 +224,7 @@ assert.commandWorked(coll.insert(subdocIsArray));
 {
     // First stage matches on a subDocument that is not an object. Note that {$type: "object"} will
     // sometimes match on documents with array values at "field".
-    const pipeline = [
-        {$match: {subDocument: {$type: "object"}}},
-        {$replaceWith: "$subDocument"},
-        {$match: {a: 3}}
-    ];
+    const pipeline = [{$match: {subDocument: {$type: "object"}}}, {$replaceWith: "$subDocument"}, {$match: {a: 3}}];
     assertFail(pipeline);
 }
 {
@@ -241,11 +232,10 @@ assert.commandWorked(coll.insert(subdocIsArray));
     // followed by match.
     const pipeline = [
         {
-            $match:
-                {$and: [{subDocument: {$type: "object"}}, {subDocument: {$not: {$type: "array"}}}]}
+            $match: {$and: [{subDocument: {$type: "object"}}, {subDocument: {$not: {$type: "array"}}}]},
         },
         {$replaceWith: "$subDocument"},
-        {$match: {a: 3}}
+        {$match: {a: 3}},
     ];
     const expected = [subdocAIsArrayWithTwo];
     runTestWithSubdocExpectedResult(pipeline, expected);
@@ -259,7 +249,7 @@ assert.commandWorked(coll.insert(subdocsHaveDiffNames));
         {$match: {"subDocumentA.subDocumentB.x": {$exists: true}}},
         {$replaceWith: "$subDocumentA"},
         {$replaceWith: "$subDocumentB"},
-        {$match: {"x.a": 2}}
+        {$match: {"x.a": 2}},
     ];
     const expected = [subdocsHaveDiffNames["subDocumentA"]["subDocumentB"]];
     runTest(pipeline, expected);

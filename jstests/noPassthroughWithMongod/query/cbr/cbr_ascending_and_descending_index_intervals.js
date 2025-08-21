@@ -73,7 +73,6 @@ try {
      * the index interval bounds are descending.
      */
     runTest({a: {$gt: 1}, b: {$lte: 20}}, {a: -1}, 3, {a: ["[inf, 1.0)"]}, "backward");
-
 } finally {
     /** Ensure that query knob doesn't leak into other testcases in the suite. */
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));

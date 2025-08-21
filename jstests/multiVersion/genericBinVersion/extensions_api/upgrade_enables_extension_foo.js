@@ -30,9 +30,7 @@ import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
-import {
-    testPerformUpgradeSharded
-} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
+import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 if (!isLinux()) {
     jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");
@@ -44,14 +42,17 @@ const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.
 const fooStageUnrecognizedErrCode = 40324;
 export const fooExtensionNodeOptions = {
     loadExtensions: [pathToExtensionFoo],
-    setParameter: {featureFlagExtensionsAPI: true}
+    setParameter: {featureFlagExtensionsAPI: true},
 };
 
 const collName = jsTestName();
 const viewName = "foo_view";
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
-const docs =
-    [{_id: 0, foo: "dreaming"}, {_id: 1, foo: "about"}, {_id: 2, foo: "super cool extensions"}];
+const docs = [
+    {_id: 0, foo: "dreaming"},
+    {_id: 1, foo: "about"},
+    {_id: 2, foo: "super cool extensions"},
+];
 
 export function setupCollection(primaryConn, shardingTest = null) {
     const coll = assertDropAndRecreateCollection(getDB(primaryConn), collName);
@@ -72,11 +73,11 @@ export function assertFooStageRejected(primaryConn) {
     // $testFoo is rejected in a plain aggregation command.
     assert.commandFailedWithCode(
         db.runCommand({aggregate: collName, pipeline: [{$testFoo: {}}], cursor: {}}),
-        fooStageUnrecognizedErrCode);
+        fooStageUnrecognizedErrCode,
+    );
 
     // $testFoo is rejected in a view pipeline.
-    assert.commandFailedWithCode(db.createView(viewName, collName, [{$testFoo: {}}]),
-                                 fooStageUnrecognizedErrCode);
+    assert.commandFailedWithCode(db.createView(viewName, collName, [{$testFoo: {}}]), fooStageUnrecognizedErrCode);
 }
 
 export function assertFooStageAccepted(primaryConn) {
@@ -91,7 +92,8 @@ export function assertFooStageAccepted(primaryConn) {
     // $testFoo is accepted in a view pipeline.
     assert.commandWorked(db.createView(viewName, collName, [{$testFoo: {}}]));
     const viewResult = assert.commandWorked(
-        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}));
+        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}),
+    );
     assertArrayEq({actual: viewResult.cursor.firstBatch, expected: [docs[0]]});
 }
 
@@ -104,8 +106,10 @@ function assertFooViewCreationAllowedButQueriesRejected(primaryConn) {
     // the createView() command is rejected first for not recognizing $testFoo.
     const createViewResult = db.createView(viewName, collName, [{$testFoo: {}}]);
     if (createViewResult["ok"]) {
-        assert.commandFailedWithCode(db.runCommand({aggregate: viewName, pipeline: [], cursor: {}}),
-                                     fooStageUnrecognizedErrCode);
+        assert.commandFailedWithCode(
+            db.runCommand({aggregate: viewName, pipeline: [], cursor: {}}),
+            fooStageUnrecognizedErrCode,
+        );
     } else {
         assert.commandFailedWithCode(createViewResult, fooStageUnrecognizedErrCode);
     }
@@ -113,7 +117,8 @@ function assertFooViewCreationAllowedButQueriesRejected(primaryConn) {
     // $testFoo is rejected in a plain aggregation command.
     assert.commandFailedWithCode(
         db.runCommand({aggregate: collName, pipeline: [{$testFoo: {}}], cursor: {}}),
-        fooStageUnrecognizedErrCode);
+        fooStageUnrecognizedErrCode,
+    );
 }
 
 testPerformUpgradeReplSet({

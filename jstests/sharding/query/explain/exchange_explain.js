@@ -27,9 +27,9 @@ function runExplainQuery(targetColl) {
                     coll: targetColl.getName(),
                 },
                 whenMatched: "replace",
-                whenNotMatched: "insert"
-            }
-        }
+                whenNotMatched: "insert",
+            },
+        },
     ]);
 }
 
@@ -43,9 +43,9 @@ function runRealQuery(targetColl) {
                     coll: targetColl.getName(),
                 },
                 whenMatched: "replace",
-                whenNotMatched: "insert"
-            }
-        }
+                whenNotMatched: "insert",
+            },
+        },
     ]);
 }
 
@@ -82,7 +82,7 @@ assert.eq(exchangeSpec.key, {_id: 1});
 
 // Run the real query.
 runRealQuery(targetCollRange);
-let results = targetCollRange.aggregate([{'$count': "count"}]).next().count;
+let results = targetCollRange.aggregate([{"$count": "count"}]).next().count;
 assert.eq(results, numDocs);
 
 // Rerun the same query with the hash based exchange.
@@ -96,23 +96,27 @@ assert.eq(exchangeSpec.key, {_id: "hashed"});
 
 // Run the real query.
 runRealQuery(targetCollHash);
-results = targetCollHash.aggregate([{'$count': "count"}]).next().count;
+results = targetCollHash.aggregate([{"$count": "count"}]).next().count;
 assert.eq(results, numDocs);
 
 // This should fail because the "on" field ('b' in this case, the shard key of the target
 // collection) cannot be an array.
-assertErrorCode(inColl,
-                [{
-                    $merge: {
-                        into: {
-                            db: targetCollRangeOtherField.getDB().getName(),
-                            coll: targetCollRangeOtherField.getName(),
-                        },
-                        whenMatched: "replace",
-                        whenNotMatched: "insert"
-                    }
-                }],
-                [51132, 51185]);
+assertErrorCode(
+    inColl,
+    [
+        {
+            $merge: {
+                into: {
+                    db: targetCollRangeOtherField.getDB().getName(),
+                    coll: targetCollRangeOtherField.getName(),
+                },
+                whenMatched: "replace",
+                whenNotMatched: "insert",
+            },
+        },
+    ],
+    [51132, 51185],
+);
 
 // Turn off the exchange and rerun the query.
 assert.commandWorked(mongosDB.adminCommand({setParameter: 1, internalQueryDisableExchange: 1}));
@@ -124,48 +128,58 @@ assert(explain.hasOwnProperty("splitPipeline"), tojson(explain));
 assert(!explain.splitPipeline.hasOwnProperty("exchange"), tojson(explain));
 
 // This should fail similar to before even if we are not running the exchange.
-assertErrorCode(inColl,
-                [{
-                    $merge: {
-                        into: {
-                            db: targetCollRangeOtherField.getDB().getName(),
-                            coll: targetCollRangeOtherField.getName(),
-                        },
-                        whenMatched: "replace",
-                        whenNotMatched: "insert"
-                    }
-                }],
-                [51132, 51185]);
+assertErrorCode(
+    inColl,
+    [
+        {
+            $merge: {
+                into: {
+                    db: targetCollRangeOtherField.getDB().getName(),
+                    coll: targetCollRangeOtherField.getName(),
+                },
+                whenMatched: "replace",
+                whenNotMatched: "insert",
+            },
+        },
+    ],
+    [51132, 51185],
+);
 
 // SERVER-38349 Make sure mongos rejects specifying exchange directly.
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: inColl.getName(),
-    pipeline: [],
-    cursor: {},
-    exchange: {
-        policy: "keyRange",
-        bufferSize: NumberInt(1024),
-        boundaries: [{_id: 0}],
-        consumers: NumberInt(2),
-        consumerIds: [NumberInt(0), NumberInt(1)]
-    }
-}),
-                             51028);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: inColl.getName(),
+        pipeline: [],
+        cursor: {},
+        exchange: {
+            policy: "keyRange",
+            bufferSize: NumberInt(1024),
+            boundaries: [{_id: 0}],
+            consumers: NumberInt(2),
+            consumerIds: [NumberInt(0), NumberInt(1)],
+        },
+    }),
+    51028,
+);
 
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: inColl.getName(),
-    pipeline: [{
-        $merge: {into: targetCollRange.getName(), whenMatched: "replace", whenNotMatched: "insert"}
-    }],
-    cursor: {},
-    exchange: {
-        policy: "keyRange",
-        bufferSize: NumberInt(1024),
-        boundaries: [{_id: 0}],
-        consumers: NumberInt(2),
-        consumerIds: [NumberInt(0), NumberInt(1)]
-    }
-}),
-                             51028);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: inColl.getName(),
+        pipeline: [
+            {
+                $merge: {into: targetCollRange.getName(), whenMatched: "replace", whenNotMatched: "insert"},
+            },
+        ],
+        cursor: {},
+        exchange: {
+            policy: "keyRange",
+            bufferSize: NumberInt(1024),
+            boundaries: [{_id: 0}],
+            consumers: NumberInt(2),
+            consumerIds: [NumberInt(0), NumberInt(1)],
+        },
+    }),
+    51028,
+);
 
 st.stop();

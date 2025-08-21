@@ -11,71 +11,72 @@ const testColl = assertDropAndRecreateCollection(testDB, "test");
 
 {
     // Test that $changeStreamSplitLargeEvent cannot be used in a non-$changeStream pipeline.
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: testColl.getName(),
-        pipeline: [{$changeStreamSplitLargeEvent: {}}],
-        cursor: {}
-    }),
-                                 ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            aggregate: testColl.getName(),
+            pipeline: [{$changeStreamSplitLargeEvent: {}}],
+            cursor: {},
+        }),
+        ErrorCodes.IllegalOperation,
+    );
 }
 
 {
     // Test that $changeStreamSplitLargeEvent can only be used once in the pipeline.
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: testColl.getName(),
-        pipeline: [
-            {$changeStream: {}},
-            {$changeStreamSplitLargeEvent: {}},
-            {$changeStreamSplitLargeEvent: {}}
-        ],
-        cursor: {}
-    }),
-                                 7182802);
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            aggregate: testColl.getName(),
+            pipeline: [{$changeStream: {}}, {$changeStreamSplitLargeEvent: {}}, {$changeStreamSplitLargeEvent: {}}],
+            cursor: {},
+        }),
+        7182802,
+    );
 }
 
 {
     // Test that $changeStreamSplitLargeEvent can only be the last stage in the pipeline.
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: testColl.getName(),
-        pipeline: [
-            {$changeStream: {}},
-            {$changeStreamSplitLargeEvent: {}},
-            {$project: {fullDocument: 0}}
-        ],
-        cursor: {}
-    }),
-                                 7182802);
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            aggregate: testColl.getName(),
+            pipeline: [{$changeStream: {}}, {$changeStreamSplitLargeEvent: {}}, {$project: {fullDocument: 0}}],
+            cursor: {},
+        }),
+        7182802,
+    );
 }
 
 // Compute the size for the large strings used in the subsequent tests.
-const kLargeStringSize = (16 * 1024 * 1024) - bsonsize({_id: "aaa", a: "x"}) + 1;
+const kLargeStringSize = 16 * 1024 * 1024 - bsonsize({_id: "aaa", a: "x"}) + 1;
 
 // Insert two large documents into the test collection.
-assert.commandWorked(testColl.insertMany([
-    {_id: "aaa", a: "x".repeat(kLargeStringSize)},
-    {_id: "bbb", a: "x".repeat(kLargeStringSize)}
-]));
+assert.commandWorked(
+    testColl.insertMany([
+        {_id: "aaa", a: "x".repeat(kLargeStringSize)},
+        {_id: "bbb", a: "x".repeat(kLargeStringSize)},
+    ]),
+);
 
 // For sharded passthrough suites with 2 or more shards, ensure the two inserted documents are on
 // different shards.
 if (FixtureHelpers.numberOfShardsForCollection(testColl) >= 2) {
     FixtureHelpers.getPrimaries(db).forEach((conn) => {
-        assert.lte(conn.getDB(jsTestName()).getCollection(testColl.getName()).find().itcount(),
-                   1,
-                   "Unexpected document count on connection " + conn);
+        assert.lte(
+            conn.getDB(jsTestName()).getCollection(testColl.getName()).find().itcount(),
+            1,
+            "Unexpected document count on connection " + conn,
+        );
     });
 }
 
 function getChangeStreamMetricSum(metricName) {
-    return FixtureHelpers
-        .mapOnEachShardNode(
-            {db: testDB, func: (db) => db.serverStatus().metrics.changeStreams[metricName]})
-        .reduce((total, val) => total + val, 0);
+    return FixtureHelpers.mapOnEachShardNode({
+        db: testDB,
+        func: (db) => db.serverStatus().metrics.changeStreams[metricName],
+    }).reduce((total, val) => total + val, 0);
 }
 
 // Enable pre- and post-images.
-assert.commandWorked(testDB.runCommand(
-    {collMod: testColl.getName(), changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(testDB.runCommand({collMod: testColl.getName(), changeStreamPreAndPostImages: {enabled: true}}));
 
 // Open a change stream without pre- and post-images.
 let csCursor = testColl.watch([]);
@@ -109,8 +110,7 @@ assert.commandWorked(testColl.update({_id: "bbb"}, {$set: {a: "y".repeat(kLargeS
 {
     // Test that for events which are not over the size limit, $changeStreamSplitLargeEvent does not
     // change anything.
-    const csCursor =
-        testColl.watch([{$changeStreamSplitLargeEvent: {}}], {resumeAfter: testStartToken});
+    const csCursor = testColl.watch([{$changeStreamSplitLargeEvent: {}}], {resumeAfter: testStartToken});
     assert.soon(() => csCursor.hasNext());
     const fullEvent = csCursor.next();
     assert.eq("aaa", fullEvent.documentKey._id);
@@ -123,7 +123,8 @@ assert.commandWorked(testColl.update({_id: "bbb"}, {$set: {a: "y".repeat(kLargeS
  * Also returns an array containing the resume tokens for each fragment.
  */
 function reconstructSplitEvent(cursor, expectedFragmentCount) {
-    let event = {}, resumeTokens = [];
+    let event = {},
+        resumeTokens = [];
 
     for (let fragmentNumber = 1; fragmentNumber <= expectedFragmentCount; ++fragmentNumber) {
         assert.soon(() => cursor.hasNext());
@@ -179,35 +180,31 @@ for (const postImageMode of ["required", "updateLookup"]) {
         const oldChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
 
         const csCursor = testColl.watch([], {
-            batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
+            batchSize: 0, // Ensure same behavior for replica sets and sharded clusters.
             fullDocument: postImageMode,
             fullDocumentBeforeChange: "required",
-            resumeAfter: testStartToken
+            resumeAfter: testStartToken,
         });
-        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
-                              ErrorCodes.BSONObjectTooLarge);
+        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()), ErrorCodes.BSONObjectTooLarge);
 
         const newChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
         // We will hit the 'BSONObjectTooLarge' error once on each shard that encounters a large
         // change event document. The error will occur maximum on 2 shards, because we trigger only
         // 2 change events. The error might occur only on 1 shard when the collection is not sharded
         // or due to the timing of exceptions on sharded clusters.
-        assert.contains(newChangeStreamsLargeEventsFailed - oldChangeStreamsLargeEventsFailed,
-                        [1, 2]);
+        assert.contains(newChangeStreamsLargeEventsFailed - oldChangeStreamsLargeEventsFailed, [1, 2]);
     }
 
     {
         // Test that oversized events are split into fragments and can be reassembled to form the
         // original event, and that the largeEventSplit metric counter is correctly incremented.
 
-        const csCursor = testColl.watch(
-            [{$changeStreamSplitLargeEvent: {}}],
-            {
-                batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
-                fullDocument: postImageMode,
-                fullDocumentBeforeChange: "required",
-                resumeAfter: testStartToken
-            });
+        const csCursor = testColl.watch([{$changeStreamSplitLargeEvent: {}}], {
+            batchSize: 0, // Ensure same behavior for replica sets and sharded clusters.
+            fullDocument: postImageMode,
+            fullDocumentBeforeChange: "required",
+            resumeAfter: testStartToken,
+        });
 
         const oldChangeStreamsLargeEventsSplit = getChangeStreamMetricSum("largeEventSplit");
 
@@ -235,17 +232,18 @@ for (const postImageMode of ["required", "updateLookup"]) {
                         $or: [
                             {"fullDocument": {$exists: true}},
                             {"fullDocumentBeforeChange": {$exists: true}},
-                            {"updateDescription": {$exists: true}}
-                        ]
-                    }
+                            {"updateDescription": {$exists: true}},
+                        ],
+                    },
                 },
-                {$changeStreamSplitLargeEvent: {}}
+                {$changeStreamSplitLargeEvent: {}},
             ],
             {
                 fullDocument: postImageMode,
                 fullDocumentBeforeChange: "required",
-                resumeAfter: testStartToken
-            });
+                resumeAfter: testStartToken,
+            },
+        );
         assert.docEq(resumeTokens, reconstructSplitEvent(csCursor, 3)[1]);
         validateResumeTokens(resumeTokens, 3);
     }
@@ -256,61 +254,60 @@ for (const postImageMode of ["required", "updateLookup"]) {
         const csCursor = testColl.watch([{$changeStreamSplitLargeEvent: {}}], {
             fullDocument: postImageMode,
             fullDocumentBeforeChange: "required",
-            resumeAfter: resumeTokens[resumeTokens.length - 2]
+            resumeAfter: resumeTokens[resumeTokens.length - 2],
         });
         assert.soon(() => csCursor.hasNext());
         const resumedEvent = csCursor.next();
         assert.eq(resumedEvent.updateDescription.updatedFields.a.length, kLargeStringSize);
-        assert.docEq({fragment: resumeTokens.length, of: resumeTokens.length},
-                     resumedEvent.splitEvent);
+        assert.docEq({fragment: resumeTokens.length, of: resumeTokens.length}, resumedEvent.splitEvent);
     }
 
     {
         // Test that projecting out one of the large fields in the resumed pipeline changes the
         // split such that the resume point won't be generated, and we therefore throw an exception.
-        const csCursor = testColl.watch(
-            [{$project: {"fullDocument.a": 0}}, {$changeStreamSplitLargeEvent: {}}], {
-                batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
-                fullDocument: postImageMode,
-                fullDocumentBeforeChange: "required",
-                resumeAfter: resumeTokens[resumeTokens.length - 1]
-            });
-        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
-                              ErrorCodes.ChangeStreamFatalError);
+        const csCursor = testColl.watch([{$project: {"fullDocument.a": 0}}, {$changeStreamSplitLargeEvent: {}}], {
+            batchSize: 0, // Ensure same behavior for replica sets and sharded clusters.
+            fullDocument: postImageMode,
+            fullDocumentBeforeChange: "required",
+            resumeAfter: resumeTokens[resumeTokens.length - 1],
+        });
+        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()), ErrorCodes.ChangeStreamFatalError);
     }
 }
 
 {
     // Test that inhibiting pipeline optimization will cause $changeStreamSplitLargeEvent to throw
     // if it cannot move to the correct position in the pipeline.
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: testColl.getName(),
-        pipeline: [
-            {$changeStream: {resumeAfter: resumeTokens[resumeTokens.length - 2]}},
-            {$_internalInhibitOptimization: {}},
-            {$changeStreamSplitLargeEvent: {}}
-        ],
-        cursor: {}
-    }),
-                                 7182803);
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            aggregate: testColl.getName(),
+            pipeline: [
+                {$changeStream: {resumeAfter: resumeTokens[resumeTokens.length - 2]}},
+                {$_internalInhibitOptimization: {}},
+                {$changeStreamSplitLargeEvent: {}},
+            ],
+            cursor: {},
+        }),
+        7182803,
+    );
 }
 
 {
     // Test that resuming from a split event token without requesting pre- and post- images fails,
     // because the resulting event is too small to be split.
     const csCursor = testColl.watch([{$changeStreamSplitLargeEvent: {}}], {
-        batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
-        resumeAfter: resumeTokens[resumeTokens.length - 1]
+        batchSize: 0, // Ensure same behavior for replica sets and sharded clusters.
+        resumeAfter: resumeTokens[resumeTokens.length - 1],
     });
-    assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
-                          ErrorCodes.ChangeStreamFatalError);
+    assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()), ErrorCodes.ChangeStreamFatalError);
 }
 
 {
     // Test that resuming from split event without the $changeStreamSplitLargeEvent stage fails.
     assert.throwsWithCode(
         () => testColl.watch([], {resumeAfter: resumeTokens[resumeTokens.length - 2]}),
-        ErrorCodes.ChangeStreamFatalError);
+        ErrorCodes.ChangeStreamFatalError,
+    );
 }
 
 {
@@ -332,12 +329,12 @@ for (const postImageMode of ["required", "updateLookup"]) {
                 // (mongoS) pipeline.
                 // TODO SERVER-55492: Update the comment above when there are rename checks for
                 // 'other' match expressions.
-                $match:
-                    {$jsonSchema: {properties: {fullDocument: {properties: {a: {type: "number"}}}}}}
+                $match: {$jsonSchema: {properties: {fullDocument: {properties: {a: {type: "number"}}}}}},
             },
-            {$changeStreamSplitLargeEvent: {}}
+            {$changeStreamSplitLargeEvent: {}},
         ],
-        {resumeAfter: eventResumeToken});
+        {resumeAfter: eventResumeToken},
+    );
 
     // Assert the change stream pipeline works and can produce events.
     assert.commandWorked(testColl.insertOne({_id: "ddd", a: 42}));

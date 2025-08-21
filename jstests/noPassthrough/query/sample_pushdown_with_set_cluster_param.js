@@ -9,7 +9,7 @@ import {aggPlanHasStage} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const numDocs = 1000;
-const sampleSize = numDocs * .06;
+const sampleSize = numDocs * 0.06;
 let docs = [];
 for (let i = 0; i < numDocs; ++i) {
     docs.push({a: i});
@@ -18,8 +18,8 @@ for (let i = 0; i < numDocs; ++i) {
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
-const collName = 'sample_pushdown';
-const dbName = 'admin';
+const collName = "sample_pushdown";
+const dbName = "admin";
 const testDB = rst.getPrimary().getDB(dbName);
 const coll = testDB[collName];
 assert.commandWorked(coll.insert(docs));
@@ -46,24 +46,23 @@ const pipeline = [{$sample: {size: sampleSize}}, {$match: {a: {$gte: 0}}}];
 (function testNotDefaultClusterParamValue() {
     // Try to set the cluster parameter to 0, should fail since the value must be gt 0 and lte 1.
     const clusterParameterValue0 = {sampleCutoff: 0};
-    const clusterParameterName0 = 'internalQueryCutoffForSampleFromRandomCursor';
+    const clusterParameterName0 = "internalQueryCutoffForSampleFromRandomCursor";
     const clusterParameter0 = {[clusterParameterName0]: clusterParameterValue0};
-    assert.commandFailedWithCode(
-        testDB.runCommand({setClusterParameter: clusterParameter0}),
-        [ErrorCodes.BadValue, 51024]);  // getting BadValue when binary is > 7.1, else 51024
+    assert.commandFailedWithCode(testDB.runCommand({setClusterParameter: clusterParameter0}), [
+        ErrorCodes.BadValue,
+        51024,
+    ]); // getting BadValue when binary is > 7.1, else 51024
 
     // Set the cluster parameter to have a cutoff of 7%.
     const clusterParameterValue = {sampleCutoff: 0.07};
-    const clusterParameterName = 'internalQueryCutoffForSampleFromRandomCursor';
+    const clusterParameterName = "internalQueryCutoffForSampleFromRandomCursor";
     const clusterParameter = {[clusterParameterName]: clusterParameterValue};
     assert.commandWorked(testDB.runCommand({setClusterParameter: clusterParameter}));
 
     // Make sure this cluster parameter holds the correct value.
-    const getClusterVal =
-        assert
-            .commandWorked(testDB.runCommand(
-                {getClusterParameter: clusterParameterName}))["clusterParameters"][0]
-            .sampleCutoff;
+    const getClusterVal = assert.commandWorked(testDB.runCommand({getClusterParameter: clusterParameterName}))[
+        "clusterParameters"
+    ][0].sampleCutoff;
     assert.eq(getClusterVal, 0.07);
 
     // Verify that our pipeline uses $sample push down, since the sample size is less than 7% of the
@@ -73,16 +72,14 @@ const pipeline = [{$sample: {size: sampleSize}}, {$match: {a: {$gte: 0}}}];
 
     // Set the cluster parameter to have a cutoff of 1%.
     const clusterParameterValue1 = {sampleCutoff: 0.01};
-    const clusterParameterName1 = 'internalQueryCutoffForSampleFromRandomCursor';
+    const clusterParameterName1 = "internalQueryCutoffForSampleFromRandomCursor";
     const clusterParameter1 = {[clusterParameterName1]: clusterParameterValue1};
     assert.commandWorked(testDB.runCommand({setClusterParameter: clusterParameter1}));
 
     // Make sure this cluster parameter holds the correct value.
-    const getClusterVal1 =
-        assert
-            .commandWorked(testDB.runCommand(
-                {getClusterParameter: clusterParameterName1}))["clusterParameters"][0]
-            .sampleCutoff;
+    const getClusterVal1 = assert.commandWorked(testDB.runCommand({getClusterParameter: clusterParameterName1}))[
+        "clusterParameters"
+    ][0].sampleCutoff;
     assert.eq(getClusterVal1, 0.01);
 
     // Verify that our pipeline does not use $sample push down, since the sample size is more than

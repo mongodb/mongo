@@ -9,13 +9,14 @@ let conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
-const coll = testDB.getCollection('t');
+const coll = testDB.getCollection("t");
 
-const timeFieldName = 'time';
-const metaFieldName = 'meta';
+const timeFieldName = "time";
+const metaFieldName = "meta";
 
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 MongoRunner.stopMongod(conn);
 

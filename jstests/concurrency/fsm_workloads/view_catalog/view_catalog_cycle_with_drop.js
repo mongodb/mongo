@@ -4,19 +4,19 @@
  * Creates a set of views and then attempts to read while remapping views against each other and the
  * underlying collection.
  */
-export const $config = (function() {
+export const $config = (function () {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
-    const prefix = 'view_catalog_cycle_with_drop_';
+    const prefix = "view_catalog_cycle_with_drop_";
 
     var data = {
-        viewList: ['viewA', 'viewB', 'viewC'].map(viewName => prefix + viewName),
-        getRandomView: function(viewList) {
+        viewList: ["viewA", "viewB", "viewC"].map((viewName) => prefix + viewName),
+        getRandomView: function (viewList) {
             return viewList[Random.randInt(viewList.length)];
         },
     };
 
-    var states = (function() {
+    var states = (function () {
         /**
          * Redefines a view definition by changing the namespace it is a view on. We intentionally
          * allow attempting to remap a view to be defined on itself (results in 'GraphContainsCycle'
@@ -31,7 +31,7 @@ export const $config = (function() {
             const errorCodes = [
                 ErrorCodes.GraphContainsCycle,
                 ErrorCodes.NamespaceNotFound,
-                ErrorCodes.ConflictingOperationInProgress
+                ErrorCodes.ConflictingOperationInProgress,
             ];
             assert.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: ${tojson(cmd)}`);
         }
@@ -46,8 +46,7 @@ export const $config = (function() {
             const dropCmd = {drop: viewName};
             let res = db.runCommand(dropCmd);
             let errorCodes = [ErrorCodes.NamespaceNotFound];
-            assert.commandWorkedOrFailedWithCode(
-                db.runCommand(dropCmd), errorCodes, () => `cmd: ${tojson(dropCmd)}`);
+            assert.commandWorkedOrFailedWithCode(db.runCommand(dropCmd), errorCodes, () => `cmd: ${tojson(dropCmd)}`);
 
             res = db.createView(viewName, collName, []);
             errorCodes = [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound];
@@ -72,16 +71,14 @@ export const $config = (function() {
         return {
             remapViewToView: remapViewToView,
             recreateViewOnCollection: recreateViewOnCollection,
-            readFromView: readFromView
+            readFromView: readFromView,
         };
     })();
 
     var transitions = {
-        remapViewToView:
-            {remapViewToView: 0.50, recreateViewOnCollection: 0.25, readFromView: 0.25},
-        recreateViewOnCollection:
-            {remapViewToView: 0.50, recreateViewOnCollection: 0.25, readFromView: 0.25},
-        readFromView: {remapViewToView: 0.50, recreateViewOnCollection: 0.25, readFromView: 0.25},
+        remapViewToView: {remapViewToView: 0.5, recreateViewOnCollection: 0.25, readFromView: 0.25},
+        recreateViewOnCollection: {remapViewToView: 0.5, recreateViewOnCollection: 0.25, readFromView: 0.25},
+        readFromView: {remapViewToView: 0.5, recreateViewOnCollection: 0.25, readFromView: 0.25},
     };
 
     function setup(db, collName, cluster) {
@@ -98,7 +95,7 @@ export const $config = (function() {
         iterations: 10,
         data: data,
         states: states,
-        startState: 'readFromView',
+        startState: "readFromView",
         transitions: transitions,
         setup: setup,
     };

@@ -26,15 +26,18 @@ assert.commandWorked(s.s0.adminCommand({split: "test.data", middle: {_id: 33}}))
 assert.commandWorked(s.s0.adminCommand({split: "test.data", middle: {_id: 66}}));
 
 // Migrate the middle chunk to another shard
-assert.commandWorked(s.s0.adminCommand(
-    {movechunk: "test.data", find: {_id: 50}, to: s.getOther(s.getPrimaryShard("test")).name}));
+assert.commandWorked(
+    s.s0.adminCommand({movechunk: "test.data", find: {_id: 50}, to: s.getOther(s.getPrimaryShard("test")).name}),
+);
 
 // Check that we get results rather than an error
 var result = d.data
-                 .aggregate({$group: {_id: '$_id', i: {$first: '$i'}}},
-                            {$group: {_id: '$i', avg_id: {$avg: '$_id'}}},
-                            {$sort: {_id: 1}})
-                 .toArray();
+    .aggregate(
+        {$group: {_id: "$_id", i: {$first: "$i"}}},
+        {$group: {_id: "$i", avg_id: {$avg: "$_id"}}},
+        {$sort: {_id: 1}},
+    )
+    .toArray();
 var expected = [
     {"_id": 0, "avg_id": 45},
     {"_id": 1, "avg_id": 46},
@@ -45,7 +48,7 @@ var expected = [
     {"_id": 6, "avg_id": 51},
     {"_id": 7, "avg_id": 52},
     {"_id": 8, "avg_id": 53},
-    {"_id": 9, "avg_id": 54}
+    {"_id": 9, "avg_id": 54},
 ];
 
 assert.eq(result, expected);

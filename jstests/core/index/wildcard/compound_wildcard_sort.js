@@ -96,7 +96,15 @@ function initializeDocs() {
             {pre, wild, str2: "", num2, post},
             {/* 'pre' missing */ wild, str2, num2, post},
             {pre, /* 'wild' missing */ str2, num2, post},
-            {pre, wild: {/* 'str1', 'num1' missing */}, str2, num2, post},
+            {
+                pre,
+                wild: {
+                    /* 'str1', 'num1' missing */
+                },
+                str2,
+                num2,
+                post,
+            },
             {pre, wild: {str1: "", num1}, str2, num2, post},
             {pre, wild, /* 'str2', 'num2' missing */ post},
         ];
@@ -200,7 +208,7 @@ function testIndexesForWildcardField(wildcardField, subFields) {
 
                 let blockingSort = true;
                 // A sort only on the regular prefix field can get a nonblocking sort.
-                if (sort.hasOwnProperty('pre') && Object.keys(sort).length === 1) {
+                if (sort.hasOwnProperty("pre") && Object.keys(sort).length === 1) {
                     blockingSort = false;
                 }
 

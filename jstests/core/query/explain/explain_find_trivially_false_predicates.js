@@ -12,16 +12,18 @@ import {
     assertNoFetchFilter,
     getPlanStages,
     getWinningPlanFromExplain,
-    isEofPlan
+    isEofPlan,
 } from "jstests/libs/query/analyze_plan.js";
 
 const collName = "jstests_explain_find_trivially_false_predicates";
 
-[{description: "Regular collections", collOptions: {}}, {
-    description: "Clustered collections",
-    collOptions:
-        {clusteredIndex: {key: {_id: 1}, unique: true, name: "Clustered index definition"}},
-}].forEach((testConfig) => {
+[
+    {description: "Regular collections", collOptions: {}},
+    {
+        description: "Clustered collections",
+        collOptions: {clusteredIndex: {key: {_id: 1}, unique: true, name: "Clustered index definition"}},
+    },
+].forEach((testConfig) => {
     jsTestLog(`Testing trivially false optimization with ${testConfig.description}`);
     assertDropAndRecreateCollection(db, collName, testConfig.collOptions);
     const coll = db[collName];
@@ -33,14 +35,14 @@ const collName = "jstests_explain_find_trivially_false_predicates";
     let winningPlan = getWinningPlanFromExplain(explain);
     assert(isEofPlan(db, winningPlan));
     let eofStages = getPlanStages(winningPlan, "EOF");
-    eofStages.forEach(stage => assert.eq(stage.type, "predicateEvalsToFalse"));
+    eofStages.forEach((stage) => assert.eq(stage.type, "predicateEvalsToFalse"));
 
     // It also uses EOF for queries including projection, sorting, limit and skip arguments.
     explain = coll.find({$alwaysFalse: 1}, {_id: 0, a: 1}).skip(1).limit(2).explain();
     winningPlan = getWinningPlanFromExplain(explain);
     assert(isEofPlan(db, winningPlan));
     eofStages = getPlanStages(winningPlan, "EOF");
-    eofStages.forEach(stage => assert.eq(stage.type, "predicateEvalsToFalse"));
+    eofStages.forEach((stage) => assert.eq(stage.type, "predicateEvalsToFalse"));
 
     explain = coll.find({$nor: [{$alwaysTrue: 1}]}).explain();
     winningPlan = getWinningPlanFromExplain(explain);

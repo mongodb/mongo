@@ -40,7 +40,7 @@ const cmdRes = coll.getDB().runCommand({
     filter: {},
     sort: {index: 1},
     batchSize: 5,
-    readConcern: {level: "snapshot"}
+    readConcern: {level: "snapshot"},
 });
 assert.commandWorked(cmdRes);
 const cursorId = cmdRes.cursor.id;

@@ -30,7 +30,7 @@ s.adminCommand({
     movechunk: "test.foo",
     find: {name: "eliot"},
     to: seconday.getMongo().name,
-    _waitForDelete: true
+    _waitForDelete: true,
 });
 
 s.printChunks();
@@ -43,16 +43,28 @@ assert.eq(6, db.foo.find().sort({name: 1}).toArray().length, "total count sorted
 
 assert.eq(6, db.foo.find().sort({name: 1}).count(), "total count with count()");
 
-assert.eq("allan,bob,eliot,joe,mark,sara",
-          db.foo.find().sort({name: 1}).toArray().map(function(z) {
-              return z.name;
-          }),
-          "sort 1");
-assert.eq("sara,mark,joe,eliot,bob,allan",
-          db.foo.find().sort({name: -1}).toArray().map(function(z) {
-              return z.name;
-          }),
-          "sort 2");
+assert.eq(
+    "allan,bob,eliot,joe,mark,sara",
+    db.foo
+        .find()
+        .sort({name: 1})
+        .toArray()
+        .map(function (z) {
+            return z.name;
+        }),
+    "sort 1",
+);
+assert.eq(
+    "sara,mark,joe,eliot,bob,allan",
+    db.foo
+        .find()
+        .sort({name: -1})
+        .toArray()
+        .map(function (z) {
+            return z.name;
+        }),
+    "sort 2",
+);
 
 // TODO(SERVER-97588): Remove version check from tests when 8.1 becomes last LTS.
 const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
@@ -63,10 +75,10 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "
 } else {
     // make sure we can't force a split on an extreme key
     // [allan->joe)
-    assert.throws(function() {
+    assert.throws(function () {
         s.adminCommand({split: "test.foo", middle: {name: "allan"}});
     });
-    assert.throws(function() {
+    assert.throws(function () {
         s.adminCommand({split: "test.foo", middle: {name: "eliot"}});
     });
 }

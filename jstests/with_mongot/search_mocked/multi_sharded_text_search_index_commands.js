@@ -17,7 +17,7 @@ const st = new ShardingTest({
     other: {
         mongosOptions: {setParameter: {searchIndexManagementHostAndPort: mockConn.host}},
         rsOptions: {setParameter: {searchIndexManagementHostAndPort: mockConn.host}},
-    }
+    },
 });
 
 const mongos = st.s;
@@ -41,45 +41,51 @@ st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 // The following tests will test the commands and $listSearchIndexes aggregation stage succeed.
 (function createIndexSuccedsOneIndex() {
     const manageSearchIndexCommandResponse = {
-        indexesCreated: [{id: "index-Id", name: "index-name"}]
+        indexesCreated: [{id: "index-Id", name: "index-name"}],
     };
 
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(testDB.runCommand({
-        'createSearchIndexes': collName,
-        'indexes': [{'definition': {'mappings': {'dynamic': true}}, 'type': "vectorSearch"}]
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            "createSearchIndexes": collName,
+            "indexes": [{"definition": {"mappings": {"dynamic": true}}, "type": "vectorSearch"}],
+        }),
+    );
 })();
 
 (function createIndexSuccedsMultipleIndexes() {
     const manageSearchIndexCommandResponse = {
-        indexesCreated: [{id: "index-Id", name: "index-name"}]
+        indexesCreated: [{id: "index-Id", name: "index-name"}],
     };
 
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(testDB.runCommand({
-        'createSearchIndexes': collName,
-        'indexes': [
-            {'name': 'indexName', 'definition': {'mappings': {'dynamic': true}}},
-            {'definition': {'mappings': {'dynamic': false}}},
-        ]
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            "createSearchIndexes": collName,
+            "indexes": [
+                {"name": "indexName", "definition": {"mappings": {"dynamic": true}}},
+                {"definition": {"mappings": {"dynamic": false}}},
+            ],
+        }),
+    );
 })();
 
 (function updateIndexSucceeds() {
     const manageSearchIndexCommandResponse = {ok: 1};
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(testDB.runCommand({
-        'updateSearchIndex': collName,
-        'id': 'index-ID-number',
-        'definition': {"testBlob": "blob"}
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            "updateSearchIndex": collName,
+            "id": "index-ID-number",
+            "definition": {"testBlob": "blob"},
+        }),
+    );
 })();
 
 (function dropIndexSucceeds() {
     const manageSearchIndexCommandResponse = {ok: 1};
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(testDB.runCommand({'dropSearchIndex': collName, 'name': 'indexName'}));
+    assert.commandWorked(testDB.runCommand({"dropSearchIndex": collName, "name": "indexName"}));
 })();
 
 (function listSearchIndexCommandSucceeds() {
@@ -96,7 +102,7 @@ st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
                     definition: {
                         mappings: {
                             dynamic: true,
-                        }
+                        },
                     },
                 },
                 {
@@ -108,23 +114,23 @@ st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
                             dynamic: true,
                         },
                         synonyms: [{"synonym-mapping": "thing"}],
-                    }
-                }
-            ]
-        }
+                    },
+                },
+            ],
+        },
     };
 
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    assert.commandWorked(testDB.runCommand({'listSearchIndexes': collName}));
+    assert.commandWorked(testDB.runCommand({"listSearchIndexes": collName}));
 })();
 
 (function listSearchIndexCommandSucceeds_EmptyResponse() {
     const emptyResponse = {
         ok: 1,
-        cursor: {id: 0, ns: "database-name.collection-name", firstBatch: []}
+        cursor: {id: 0, ns: "database-name.collection-name", firstBatch: []},
     };
     mongotMock.setMockSearchIndexCommandResponse(emptyResponse);
-    assert.commandWorked(testDB.runCommand({'listSearchIndexes': collName}));
+    assert.commandWorked(testDB.runCommand({"listSearchIndexes": collName}));
 })();
 
 (function listSearchIndexAggStageSucceeds() {
@@ -141,7 +147,7 @@ st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
                     definition: {
                         mappings: {
                             dynamic: true,
-                        }
+                        },
                     },
                 },
                 {
@@ -153,27 +159,26 @@ st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
                             dynamic: true,
                         },
                         synonyms: [{"synonym-mapping": "thing"}],
-                    }
-                }
-            ]
-        }
+                    },
+                },
+            ],
+        },
     };
 
     const expectedDocs = manageSearchIndexCommandResponse["cursor"]["firstBatch"];
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
     const result = testColl.aggregate([{$listSearchIndexes: {}}]).toArray();
     assert.eq(result, expectedDocs);
-}());
+})();
 
 (function listSearchIndexAggStageSucceeds_EmptyResponse() {
     const emptyResponse = {
         ok: 1,
-        cursor: {id: 0, ns: "database-name.collection-name", firstBatch: []}
+        cursor: {id: 0, ns: "database-name.collection-name", firstBatch: []},
     };
     mongotMock.setMockSearchIndexCommandResponse(emptyResponse);
     const expectedDocs = emptyResponse["cursor"]["firstBatch"];
-    const result =
-        testColl.aggregate([{$listSearchIndexes: {}}], {cursor: {batchSize: 1}}).toArray();
+    const result = testColl.aggregate([{$listSearchIndexes: {}}], {cursor: {batchSize: 1}}).toArray();
     assert.eq(result, expectedDocs);
 })();
 
@@ -190,14 +195,16 @@ const manageSearchIndexCommandResponse = {
 
 (function createIndexError() {
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    let res = assert.commandFailedWithCode(testDB.runCommand({
-        'createSearchIndexes': collName,
-        'indexes': [
-            {'name': 'indexName', 'definition': {'mappings': {'dynamic': true}}},
-            {'definition': {'mappings': {'dynamic': false}}},
-        ],
-    }),
-                                           ErrorCodes.InvalidUUID);
+    let res = assert.commandFailedWithCode(
+        testDB.runCommand({
+            "createSearchIndexes": collName,
+            "indexes": [
+                {"name": "indexName", "definition": {"mappings": {"dynamic": true}}},
+                {"definition": {"mappings": {"dynamic": false}}},
+            ],
+        }),
+        ErrorCodes.InvalidUUID,
+    );
     delete res.$clusterTime;
     delete res.operationTime;
     assert.eq(manageSearchIndexCommandResponse, res);
@@ -206,8 +213,9 @@ const manageSearchIndexCommandResponse = {
 (function dropIndexError() {
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
     let res = assert.commandFailedWithCode(
-        testDB.runCommand({'dropSearchIndex': collName, 'name': 'indexName'}),
-        ErrorCodes.InvalidUUID);
+        testDB.runCommand({"dropSearchIndex": collName, "name": "indexName"}),
+        ErrorCodes.InvalidUUID,
+    );
     delete res.$clusterTime;
     delete res.operationTime;
     assert.eq(manageSearchIndexCommandResponse, res);
@@ -215,12 +223,14 @@ const manageSearchIndexCommandResponse = {
 
 (function updateIndexError() {
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    let res = assert.commandFailedWithCode(testDB.runCommand({
-        'updateSearchIndex': collName,
-        'id': 'index-ID-number',
-        'definition': {"testBlob": "blob"},
-    }),
-                                           ErrorCodes.InvalidUUID);
+    let res = assert.commandFailedWithCode(
+        testDB.runCommand({
+            "updateSearchIndex": collName,
+            "id": "index-ID-number",
+            "definition": {"testBlob": "blob"},
+        }),
+        ErrorCodes.InvalidUUID,
+    );
     delete res.$clusterTime;
     delete res.operationTime;
     assert.eq(manageSearchIndexCommandResponse, res);
@@ -236,16 +246,17 @@ const indexInformationTooLargeError = {
 
 (function listSearchIndexCommandError() {
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    let res = assert.commandFailedWithCode(testDB.runCommand({'listSearchIndexes': collName}),
-                                           ErrorCodes.InvalidUUID);
+    let res = assert.commandFailedWithCode(testDB.runCommand({"listSearchIndexes": collName}), ErrorCodes.InvalidUUID);
     delete res.$clusterTime;
     delete res.operationTime;
     assert.eq(manageSearchIndexCommandResponse, res);
 
     // Test returning a IndexInformationTooLarge error.
     mongotMock.setMockSearchIndexCommandResponse(indexInformationTooLargeError);
-    res = assert.commandFailedWithCode(testDB.runCommand({'listSearchIndexes': collName}),
-                                       ErrorCodes.IndexInformationTooLarge);
+    res = assert.commandFailedWithCode(
+        testDB.runCommand({"listSearchIndexes": collName}),
+        ErrorCodes.IndexInformationTooLarge,
+    );
     delete res.$clusterTime;
     delete res.operationTime;
     assert.eq(indexInformationTooLargeError, res);
@@ -255,14 +266,14 @@ const indexInformationTooLargeError = {
     // Aggregation errors add additional context to the error message, so we use a helper
     // function to validate the error message.
     mongotMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
-    let pipeline = [{'$listSearchIndexes': {'id': 'indexID'}}];
+    let pipeline = [{"$listSearchIndexes": {"id": "indexID"}}];
     let expectErrMsg = manageSearchIndexCommandResponse["errmsg"];
     let expectedCode = manageSearchIndexCommandResponse["code"];
     assertErrCodeAndErrMsgContains(testDB[collName], pipeline, expectedCode, expectErrMsg);
 
     // Test returning a IndexInformationTooLarge error.
     mongotMock.setMockSearchIndexCommandResponse(indexInformationTooLargeError);
-    pipeline = [{'$listSearchIndexes': {'id': 'indexID'}}];
+    pipeline = [{"$listSearchIndexes": {"id": "indexID"}}];
     expectErrMsg = indexInformationTooLargeError["errmsg"];
     expectedCode = indexInformationTooLargeError["code"];
     assertErrCodeAndErrMsgContains(testDB[collName], pipeline, expectedCode, expectErrMsg);
@@ -275,31 +286,38 @@ const indexInformationTooLargeError = {
     const droppedColl = testDB.getCollection(droppedCollName);
     droppedColl.drop();
 
-    assert.commandFailedWithCode(testDB.runCommand({
-        'createSearchIndexes': droppedCollName,
-        'indexes': [{'definition': {'mappings': {'dynamic': true}}}]
-    }),
-                                 ErrorCodes.NamespaceNotFound);
-
-    assert.commandFailedWithCode(testDB.runCommand({
-        'updateSearchIndex': droppedCollName,
-        'id': 'index-ID-number',
-        'definition': {"testBlob": "blob"}
-    }),
-                                 ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            "createSearchIndexes": droppedCollName,
+            "indexes": [{"definition": {"mappings": {"dynamic": true}}}],
+        }),
+        ErrorCodes.NamespaceNotFound,
+    );
 
     assert.commandFailedWithCode(
-        testDB.runCommand({'dropSearchIndex': droppedCollName, 'name': 'indexName'}),
-        ErrorCodes.NamespaceNotFound);
+        testDB.runCommand({
+            "updateSearchIndex": droppedCollName,
+            "id": "index-ID-number",
+            "definition": {"testBlob": "blob"},
+        }),
+        ErrorCodes.NamespaceNotFound,
+    );
 
-    assert.commandFailedWithCode(testDB.runCommand({'listSearchIndexes': droppedCollName}),
-                                 ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(
+        testDB.runCommand({"dropSearchIndex": droppedCollName, "name": "indexName"}),
+        ErrorCodes.NamespaceNotFound,
+    );
+
+    assert.commandFailedWithCode(
+        testDB.runCommand({"listSearchIndexes": droppedCollName}),
+        ErrorCodes.NamespaceNotFound,
+    );
 
     // The $listSearchIndexes aggregation stage should return an empty result set rather than an
     // error when the collection doesn't exist and the port is set up.
     const result = testDB[droppedColl].aggregate([{$listSearchIndexes: {}}]).toArray();
     assert.eq([], result, "Expected non-existent collection to return an empty result set");
-}());
+})();
 
 st.stop();
 mongotMock.stop();

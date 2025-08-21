@@ -1,30 +1,33 @@
 // Tests --networkMessageCompressors options.
 
-var runTest = function(optionValue, expected) {
-    jsTest.log("Testing with --networkMessageCompressors=\"" + optionValue +
-               "\" expecting: " + expected);
+var runTest = function (optionValue, expected) {
+    jsTest.log('Testing with --networkMessageCompressors="' + optionValue + '" expecting: ' + expected);
     var mongo = MongoRunner.runMongod({networkMessageCompressors: optionValue});
     assert.commandWorked(mongo.adminCommand({hello: 1}));
     clearRawMongoProgramOutput();
-    assert.eq(runMongoProgram("mongo",
-                              "--eval",
-                              "tostrictjson(db.hello());",
-                              "--port",
-                              mongo.port,
-                              "--networkMessageCompressors=snappy"),
-              0);
+    assert.eq(
+        runMongoProgram(
+            "mongo",
+            "--eval",
+            "tostrictjson(db.hello());",
+            "--port",
+            mongo.port,
+            "--networkMessageCompressors=snappy",
+        ),
+        0,
+    );
 
     var output = rawMongoProgramOutput(".*")
-                     .split("\n")
-                     .map(function(str) {
-                         str = str.replace(/^sh[0-9]+\| /, "");
-                         if (!/^{.*isWritablePrimary/.test(str)) {
-                             return "";
-                         }
-                         return str;
-                     })
-                     .join("\n")
-                     .trim();
+        .split("\n")
+        .map(function (str) {
+            str = str.replace(/^sh[0-9]+\| /, "");
+            if (!/^{.*isWritablePrimary/.test(str)) {
+                return "";
+            }
+            return str;
+        })
+        .join("\n")
+        .trim();
 
     output = JSON.parse(output);
 

@@ -9,11 +9,9 @@ function assertPlanCacheCommandsSucceed(db) {
     assert.commandWorked(db.runCommand({planCacheClear: name, query: {a: 1}}));
 
     // Using aggregate to list the contents of the plan cache.
-    assert.commandWorked(
-        db.runCommand({aggregate: name, pipeline: [{$planCacheStats: {}}], cursor: {}}));
+    assert.commandWorked(db.runCommand({aggregate: name, pipeline: [{$planCacheStats: {}}], cursor: {}}));
 
-    assert.commandWorked(
-        db.runCommand({planCacheSetFilter: name, query: {a: 1}, indexes: [{a: 1}]}));
+    assert.commandWorked(db.runCommand({planCacheSetFilter: name, query: {a: 1}, indexes: [{a: 1}]}));
 
     assert.commandWorked(db.runCommand({planCacheListFilters: name}));
 
@@ -24,11 +22,9 @@ function assertPlanCacheCommandsFail(db) {
     assert.commandFailed(db.runCommand({planCacheClear: name, query: {a: 1}}));
 
     // Using aggregate to list the contents of the plan cache.
-    assert.commandFailed(
-        db.runCommand({aggregate: name, pipeline: [{$planCacheStats: {}}], cursor: {}}));
+    assert.commandFailed(db.runCommand({aggregate: name, pipeline: [{$planCacheStats: {}}], cursor: {}}));
 
-    assert.commandFailed(
-        db.runCommand({planCacheSetFilter: name, query: {a: 1}, indexes: [{a: 1}]}));
+    assert.commandFailed(db.runCommand({planCacheSetFilter: name, query: {a: 1}, indexes: [{a: 1}]}));
 
     assert.commandFailed(db.runCommand({planCacheListFilters: name}));
 

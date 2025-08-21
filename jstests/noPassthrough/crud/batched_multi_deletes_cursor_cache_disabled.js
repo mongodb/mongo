@@ -11,36 +11,41 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var st =
-    new ShardingTest({shards: 1, rs: {nodes: 1, setParameter: {wiredTigerCursorCacheSize: 0}}});
+var st = new ShardingTest({shards: 1, rs: {nodes: 1, setParameter: {wiredTigerCursorCacheSize: 0}}});
 
 const primary = st.s0;
 const buildInfo = assert.commandWorked(st.s0.adminCommand({"buildInfo": 1}));
-const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
+const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes("-fsanitize");
 
 if (!isSanitizerEnabled) {
     jsTestLog("Skipping " + jsTestName() + " because address sanitizer is not active.");
 }
 
 const rsPrimary = st.rs0.getPrimary();
-const db = primary.getDB('test');
+const db = primary.getDB("test");
 const coll = db.test;
 
-assert.commandWorked(primary.adminCommand({shardCollection: 'test.test', key: {_id: 1}}));
+assert.commandWorked(primary.adminCommand({shardCollection: "test.test", key: {_id: 1}}));
 
 const docIds = Array.from(Array(10).keys());
-assert.commandWorked(coll.insert(docIds.map((x) => {
-    return {_id: x, x: x};
-})));
+assert.commandWorked(
+    coll.insert(
+        docIds.map((x) => {
+            return {_id: x, x: x};
+        }),
+    ),
+);
 
-const throwWriteConflictExceptionInBatchedDeleteStage =
-    configureFailPoint(rsPrimary, "throwWriteConflictExceptionInBatchedDeleteStage");
+const throwWriteConflictExceptionInBatchedDeleteStage = configureFailPoint(
+    rsPrimary,
+    "throwWriteConflictExceptionInBatchedDeleteStage",
+);
 
 function performBatchedDelete() {
     const testDB = db.getMongo().getDB("test");
     const coll = testDB.test;
     const result = assert.commandWorked(coll.remove({x: {$gte: 0}}));
-    jsTestLog('delete result: ' + tojson(result));
+    jsTestLog("delete result: " + tojson(result));
 }
 
 const awaitBatchedDelete = startParallelShell(performBatchedDelete, primary.port);

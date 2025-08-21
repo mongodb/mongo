@@ -27,8 +27,7 @@ function getPlanCacheEntryForFilter(coll, filter) {
     // First, use explain to obtain the 'planCacheKey' associated with 'filter'.
     const explain = coll.find(filter).explain();
     const cacheKey = explain.queryPlanner.planCacheKey;
-    const allPlanCacheEntries =
-        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: cacheKey}}]).toArray();
+    const allPlanCacheEntries = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: cacheKey}}]).toArray();
     // There should be only one cache entry with the given key.
     assert.eq(allPlanCacheEntries.length, 1, allPlanCacheEntries);
     return allPlanCacheEntries[0];
@@ -47,8 +46,7 @@ function assertExistenceOfRequiredCacheEntryFields(entry) {
     assert(!entry.hasOwnProperty("querySettings"), entry);
 }
 
-const debugInfoFields =
-    ["createdFromQuery", "cachedPlan", "creationExecStats", "candidatePlanScores"];
+const debugInfoFields = ["createdFromQuery", "cachedPlan", "creationExecStats", "candidatePlanScores"];
 
 function assertCacheEntryHasDebugInfo(entry) {
     assertExistenceOfRequiredCacheEntryFields(entry);
@@ -105,7 +103,8 @@ assert.eq(cacheEntry.estimatedSizeBytes, newPlanCacheSize - oldPlanCacheSize, ca
 
 // Configure the server so that new plan cache entries should not preserve debug info.
 const setParamRes = assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryCacheMaxSizeBytesBeforeStripDebugInfo: 0}));
+    db.adminCommand({setParameter: 1, internalQueryCacheMaxSizeBytesBeforeStripDebugInfo: 0}),
+);
 const stripDebugInfoThresholdDefault = setParamRes.was;
 
 // Generate a query which includes a 10,000 element $in predicate.
@@ -133,14 +132,11 @@ let largeQueryCacheEntry = getPlanCacheEntryForFilter(coll, largeQuery);
 assertCacheEntryIsMissingDebugInfo(largeQueryCacheEntry);
 
 // The second cache entry should be smaller than the first, despite the query being much larger.
-assert.lt(largeQueryCacheEntry.estimatedSizeBytes,
-          smallQueryCacheEntry.estimatedSizeBytes,
-          cacheContents);
+assert.lt(largeQueryCacheEntry.estimatedSizeBytes, smallQueryCacheEntry.estimatedSizeBytes, cacheContents);
 
 // The new cache entry's size should account for the latest observed increase in total plan cache
 // size.
-assert.eq(
-    largeQueryCacheEntry.estimatedSizeBytes, newPlanCacheSize - oldPlanCacheSize, cacheContents);
+assert.eq(largeQueryCacheEntry.estimatedSizeBytes, newPlanCacheSize - oldPlanCacheSize, cacheContents);
 
 // Verify that a new cache entry in a different collection also has its debug info stripped. This
 // demonstrates that the size threshold applies on a server-wide basis as opposed to on a
@@ -171,10 +167,12 @@ assertCacheEntryIsMissingDebugInfo(getPlanCacheEntryForFilter(coll, largeQuery))
 // Restore the threshold for stripping debug info to its default. Verify that if we add a third
 // cache entry to the original collection 'coll', the plan cache size increases once again, and the
 // new cache entry stores debug info.
-assert.commandWorked(db.adminCommand({
-    setParameter: 1,
-    internalQueryCacheMaxSizeBytesBeforeStripDebugInfo: stripDebugInfoThresholdDefault,
-}));
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        internalQueryCacheMaxSizeBytesBeforeStripDebugInfo: stripDebugInfoThresholdDefault,
+    }),
+);
 const smallQuery2 = {
     a: 1,
     b: 1,

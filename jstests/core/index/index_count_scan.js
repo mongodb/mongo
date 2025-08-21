@@ -17,37 +17,38 @@ import {getPlanStage, getSingleNodeExplain} from "jstests/libs/query/analyze_pla
 const coll = db.index_count;
 coll.drop();
 
-assert.commandWorked(coll.insert([
-    {a: 1},
-    {a: 1, b: 1},
-    {a: 2},
-    {a: 3},
-    {a: null},
-    {a: [-1, 0]},
-    {a: [4, -3, 5]},
-    {},
-    {a: {b: 4}},
-    {a: []},
-    {a: [[], {}]},
-    {a: {}},
-    {a: true},
-    {a: false},
-    {a: ""}
-]));
+assert.commandWorked(
+    coll.insert([
+        {a: 1},
+        {a: 1, b: 1},
+        {a: 2},
+        {a: 3},
+        {a: null},
+        {a: [-1, 0]},
+        {a: [4, -3, 5]},
+        {},
+        {a: {b: 4}},
+        {a: []},
+        {a: [[], {}]},
+        {a: {}},
+        {a: true},
+        {a: false},
+        {a: ""},
+    ]),
+);
 
 // Retrieve the query plain from explain, whose shape varies depending on the query and the
 // engines used (classic/sbe).
-const getQueryPlan = function(explain) {
+const getQueryPlan = function (explain) {
     if (explain.stages) {
         explain = explain.stages[0].$cursor;
     }
     let winningPlan = explain.queryPlanner.winningPlan;
-    return winningPlan.queryPlan ? [winningPlan.queryPlan, winningPlan.slotBasedPlan]
-                                 : [winningPlan, null];
+    return winningPlan.queryPlan ? [winningPlan.queryPlan, winningPlan.slotBasedPlan] : [winningPlan, null];
 };
 
 // Verify that this query uses a COUNT_SCAN.
-const runAndVerify = function(expectedCount, pipeline, stage, sbePlanStage) {
+const runAndVerify = function (expectedCount, pipeline, stage, sbePlanStage) {
     assert.eq(expectedCount, coll.aggregate(pipeline).next().count);
     let explain = getSingleNodeExplain(coll.explain().aggregate(pipeline));
     const [queryPlan, sbePlan] = getQueryPlan(explain);
@@ -59,16 +60,16 @@ const runAndVerify = function(expectedCount, pipeline, stage, sbePlanStage) {
 };
 
 // Verify that this query uses a COUNT_SCAN.
-const runAndVerifyCountScan = function(expectedCount, pipeline) {
+const runAndVerifyCountScan = function (expectedCount, pipeline) {
     runAndVerify(expectedCount, pipeline, "COUNT_SCAN", "ixseek");
 };
 
 // Verify that this query uses an IXSCAN.
-const runAndVerifyIxscan = function(expectedCount, pipeline) {
+const runAndVerifyIxscan = function (expectedCount, pipeline) {
     runAndVerify(expectedCount, pipeline, "IXSCAN", "ixscan_generic");
 };
 
-const runTest = function(indexPattern, indexOption = {}) {
+const runTest = function (indexPattern, indexOption = {}) {
     assert.commandWorked(coll.createIndex(indexPattern, indexOption));
 
     assert.eq(5, coll.count({a: {$gt: 0}}));

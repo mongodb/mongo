@@ -9,12 +9,12 @@ let st = new ShardingTest({shards: 1, mongos: 2, useBridge: true});
 
 // Sever outgoing communications from the second mongos.
 st.s0.disconnect(st.s1);
-st.forEachConfigServer(function(configSvr) {
+st.forEachConfigServer(function (configSvr) {
     configSvr.disconnect(st.s1);
 });
 
-st._rsObjects.forEach(function(rsNodes) {
-    rsNodes.nodes.forEach(function(conn) {
+st._rsObjects.forEach(function (rsNodes) {
+    rsNodes.nodes.forEach(function (conn) {
         conn.disconnect(st.s1);
     });
 });
@@ -29,14 +29,16 @@ let res = assert.commandWorked(connectedDB.runCommand({insert: "foo", documents:
 // command to the disconnected mongos. hello does not require mongos to contact any other
 // servers, so the command should succeed.
 let lt = res.$clusterTime;
-res =
-    assert.commandWorked(disconnectedDB.runCommand({hello: 1, $clusterTime: lt}),
-                         "expected the disconnected mongos to accept cluster time: " + tojson(lt));
+res = assert.commandWorked(
+    disconnectedDB.runCommand({hello: 1, $clusterTime: lt}),
+    "expected the disconnected mongos to accept cluster time: " + tojson(lt),
+);
 
 // Verify cluster time response from the disconnected mongos matches what was passed.
-assert.eq(lt,
-          res.$clusterTime,
-          "expected the disconnected mongos to send cluster time: " + tojson(lt) +
-              ", received: " + tojson(res.$clusterTime));
+assert.eq(
+    lt,
+    res.$clusterTime,
+    "expected the disconnected mongos to send cluster time: " + tojson(lt) + ", received: " + tojson(res.$clusterTime),
+);
 
 st.stop();

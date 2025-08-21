@@ -20,13 +20,13 @@ const st = new ShardingTest({
         configOptions: {
             setParameter: {
                 logComponentVerbosity: tojson({sharding: {verbosity: 3}}),
-                chunkDefragmentationThrottlingMS: 0
-            }
+                chunkDefragmentationThrottlingMS: 0,
+            },
         },
-    }
+    },
 });
 
-let runTest = function(numCollections, dbName) {
+let runTest = function (numCollections, dbName) {
     jsTest.log("Running test with " + numCollections + " collections.");
     // setup the database for the test
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -42,14 +42,16 @@ let runTest = function(numCollections, dbName) {
 
         const coll = db[coll_prefix + i];
 
-        defragmentationUtil.createFragmentedCollection(st.s,
-                                                       coll.getFullName(),
-                                                       numChunks,
-                                                       maxChunkFillMB,
-                                                       numZones,
-                                                       docSizeBytesRange,
-                                                       chunkSpacing,
-                                                       true);
+        defragmentationUtil.createFragmentedCollection(
+            st.s,
+            coll.getFullName(),
+            numChunks,
+            maxChunkFillMB,
+            numZones,
+            docSizeBytesRange,
+            chunkSpacing,
+            true,
+        );
 
         collections.push(coll);
     }
@@ -57,11 +59,13 @@ let runTest = function(numCollections, dbName) {
     st.printShardingStatus();
 
     collections.forEach((coll) => {
-        assert.commandWorked(st.s.adminCommand({
-            configureCollectionBalancing: coll.getFullName(),
-            defragmentCollection: true,
-            chunkSize: maxChunkSizeMB,
-        }));
+        assert.commandWorked(
+            st.s.adminCommand({
+                configureCollectionBalancing: coll.getFullName(),
+                defragmentCollection: true,
+                chunkSize: maxChunkSizeMB,
+            }),
+        );
     });
 
     collections.forEach((coll) => {
@@ -69,11 +73,9 @@ let runTest = function(numCollections, dbName) {
 
         // Wait for defragmentation to end and check collection final state
         defragmentationUtil.waitForEndOfDefragmentation(st.s, ns);
-        const finalNumberChunks = findChunksUtil.countChunksForNs(st.s.getDB('config'), ns);
-        jsTest.log("Finished defragmentation of collection " + coll + " with " + finalNumberChunks +
-                   " chunks.");
-        defragmentationUtil.checkPostDefragmentationState(
-            st.configRS.getPrimary(), st.s, ns, maxChunkSizeMB, "key");
+        const finalNumberChunks = findChunksUtil.countChunksForNs(st.s.getDB("config"), ns);
+        jsTest.log("Finished defragmentation of collection " + coll + " with " + finalNumberChunks + " chunks.");
+        defragmentationUtil.checkPostDefragmentationState(st.configRS.getPrimary(), st.s, ns, maxChunkSizeMB, "key");
     });
 
     st.printShardingStatus();

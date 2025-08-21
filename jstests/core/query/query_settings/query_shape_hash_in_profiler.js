@@ -21,8 +21,7 @@ db.test.insert({x: 4});
 
 // Finds the query shape hash from profiler output where the query has comment 'queryComment'.
 function getQueryShapeHashFromQueryProfiler(queryComment) {
-    const profiles =
-        db.system.profile.find({"command.comment": queryComment}).sort({ts: -1}).limit(1).toArray();
+    const profiles = db.system.profile.find({"command.comment": queryComment}).sort({ts: -1}).limit(1).toArray();
     assert.eq(profiles.length, 1, "Couldn't find any profiling data");
     const profile = profiles[0];
     assert.eq(typeof profile.queryShapeHash, "string", "No query shape hash found");
@@ -36,8 +35,8 @@ function testQueryShapeHash(query) {
                 db: db.getName(),
                 coll: collName,
             },
-            allowedIndexes: [{x: 1}, {$natural: 1}]
-        }
+            allowedIndexes: [{x: 1}, {$natural: 1}],
+        },
     };
 
     // Run command to hit the profiler.
@@ -50,22 +49,29 @@ function testQueryShapeHash(query) {
     qsutils.withQuerySettings(query, querySettings, () => {
         // Make sure query settings are applied.
         const querySettingsQueryShapeHash = qsutils.getQueryShapeHashFromQuerySettings(query);
-        assert(querySettingsQueryShapeHash,
-               `Couldn't find query settings for provided query: ${JSON.stringify(query)}`);
+        assert(
+            querySettingsQueryShapeHash,
+            `Couldn't find query settings for provided query: ${JSON.stringify(query)}`,
+        );
     });
 }
 
 {
     // Test find.
-    const query = qsutils.makeFindQueryInstance(
-        {filter: {x: 4}, comment: "Query shape hash in profiler test. Find query."});
+    const query = qsutils.makeFindQueryInstance({
+        filter: {x: 4},
+        comment: "Query shape hash in profiler test. Find query.",
+    });
     testQueryShapeHash(query);
 }
 
 {
     // Test distinct.
-    const query = qsutils.makeDistinctQueryInstance(
-        {key: "x", query: {x: 4}, comment: "Query shape hash in profiler test. Distinct query."});
+    const query = qsutils.makeDistinctQueryInstance({
+        key: "x",
+        query: {x: 4},
+        comment: "Query shape hash in profiler test. Distinct query.",
+    });
     testQueryShapeHash(query);
 }
 
@@ -74,7 +80,7 @@ function testQueryShapeHash(query) {
     const query = qsutils.makeAggregateQueryInstance({
         pipeline: [{$match: {x: 4}}],
         comment: "Query shape hash in profiler test. Aggregate query.",
-        cursor: {}
+        cursor: {},
     });
     testQueryShapeHash(query);
 }

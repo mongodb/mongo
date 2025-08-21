@@ -26,29 +26,29 @@ const invalidMixedVersionsToCheck = [
     {
         shards: {
             rs0: {nodes: [{binVersion: "last-continuous"}, {binVersion: "last-lts"}]},
-            rs1: {nodes: [{binVersion: "last-lts"}]}
+            rs1: {nodes: [{binVersion: "last-lts"}]},
         },
-        other: {mongosOptions: {binVersion: "last-lts"}}
+        other: {mongosOptions: {binVersion: "last-lts"}},
     },
 ];
 
 for (let config of invalidMixedVersionsToCheck) {
     jsTest.log("Testing invalid mixed versions: " + tojson(config));
 
-    let err = assert.throws(
-        () => new ShardingTest({shouldFailInit: true, shards: config.shards, other: config.other}));
+    let err = assert.throws(() => new ShardingTest({shouldFailInit: true, shards: config.shards, other: config.other}));
     assert.eq(
         true,
-        formatErrorMsg(err.message, err.extraAttr)
-            .includes(
-                "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
-        "Unexpected Error");
+        formatErrorMsg(err.message, err.extraAttr).includes(
+            "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.",
+        ),
+        "Unexpected Error",
+    );
 }
 
 const validMixedVersionsToCheck = [
     {
         shards: {rs0: {nodes: [{binVersion: "latest"}]}, rs1: {nodes: [{binVersion: "last-lts"}]}},
-        other: {mongosOptions: {binVersion: "last-lts"}}
+        other: {mongosOptions: {binVersion: "last-lts"}},
     },
 ];
 

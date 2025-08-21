@@ -41,19 +41,16 @@ runTest(
             ns: {db: "test", coll: kCollName},
             documentKey: {_id: {sub: "two"}},
         },
-    ]);
+    ],
+);
 
 // Value with characters in it that can a have special meaning inside strings.
 const fieldValue = "fx {{{\"'x\\";
 
 // Pipeline with literal match expression on _id with special value.
 runTest(
-    [
-        {_id: fieldValue},
-    ],
-    [
-        {$match: {"fullDocument._id": fieldValue}},
-    ],
+    [{_id: fieldValue}],
+    [{$match: {"fullDocument._id": fieldValue}}],
     [
         {
             operationType: "insert",
@@ -61,19 +58,16 @@ runTest(
             ns: {db: "test", coll: kCollName},
             documentKey: {_id: fieldValue},
         },
-    ]);
+    ],
+);
 
 // Field name with characters in it that can a have special meaning inside strings.
 const subField = "fx {{{\"'x";
 
 // Pipeline with $expr match expression on $fullDocument _id with subfield that has a special name.
 runTest(
-    [
-        {_id: {[subField]: "x"}},
-    ],
-    [
-        {$match: {["fullDocument._id." + subField]: "x"}},
-    ],
+    [{_id: {[subField]: "x"}}],
+    [{$match: {["fullDocument._id." + subField]: "x"}}],
     [
         {
             operationType: "insert",
@@ -81,16 +75,13 @@ runTest(
             ns: {db: "test", coll: kCollName},
             documentKey: {_id: {[subField]: "x"}},
         },
-    ]);
+    ],
+);
 
 // Pipeline with $expr match expression on $fullDocument _id with subfield that has a special name.
 runTest(
-    [
-        {_id: {[subField]: "x"}},
-    ],
-    [
-        {$match: {$expr: {$eq: ["$fullDocument._id", {[subField]: "x"}]}}},
-    ],
+    [{_id: {[subField]: "x"}}],
+    [{$match: {$expr: {$eq: ["$fullDocument._id", {[subField]: "x"}]}}}],
     [
         {
             operationType: "insert",
@@ -98,16 +89,13 @@ runTest(
             ns: {db: "test", coll: kCollName},
             documentKey: {_id: {[subField]: "x"}},
         },
-    ]);
+    ],
+);
 
 // Pipeline with $expr match expression on $fullDocument _id with subfield that has a special name.
 runTest(
-    [
-        {_id: {[subField]: "x"}},
-    ],
-    [
-        {$match: {$expr: {$eq: ["$fullDocument._id." + subField, "x"]}}},
-    ],
+    [{_id: {[subField]: "x"}}],
+    [{$match: {$expr: {$eq: ["$fullDocument._id." + subField, "x"]}}}],
     [
         {
             operationType: "insert",
@@ -115,16 +103,13 @@ runTest(
             ns: {db: "test", coll: kCollName},
             documentKey: {_id: {[subField]: "x"}},
         },
-    ]);
+    ],
+);
 
 // Pipeline with $expr match expression on subfield that has a special name.
 runTest(
-    [
-        {_id: "z", [subField]: "y"},
-    ],
-    [
-        {$match: {$expr: {$eq: ["$fullDocument." + subField, "y"]}}},
-    ],
+    [{_id: "z", [subField]: "y"}],
+    [{$match: {$expr: {$eq: ["$fullDocument." + subField, "y"]}}}],
     [
         {
             operationType: "insert",
@@ -132,16 +117,13 @@ runTest(
             ns: {db: "test", coll: kCollName},
             documentKey: {_id: "z"},
         },
-    ]);
+    ],
+);
 
 // Pipeline with $expr match expression on $documentKey subfield that has a special name.
 runTest(
-    [
-        {_id: {[subField]: "x"}},
-    ],
-    [
-        {$match: {$expr: {$not: {$eq: ["$documentKey." + subField, "x"]}}}},
-    ],
+    [{_id: {[subField]: "x"}}],
+    [{$match: {$expr: {$not: {$eq: ["$documentKey." + subField, "x"]}}}}],
     [
         {
             operationType: "insert",
@@ -149,16 +131,13 @@ runTest(
             ns: {db: "test", coll: kCollName},
             documentKey: {_id: {[subField]: "x"}},
         },
-    ]);
+    ],
+);
 
 // Pipeline with $expr match expression on $documentKey subfield that has a special name.
 runTest(
-    [
-        {_id: {[subField]: "x"}},
-    ],
-    [
-        {$match: {$expr: {$lte: ["$documentKey." + subField, "a"]}}},
-    ],
+    [{_id: {[subField]: "x"}}],
+    [{$match: {$expr: {$lte: ["$documentKey." + subField, "a"]}}}],
     [
         {
             operationType: "insert",
@@ -166,26 +145,22 @@ runTest(
             ns: {db: "test", coll: kCollName},
             documentKey: {_id: {[subField]: "x"}},
         },
-    ]);
+    ],
+);
 
 // Pipeline with $expr match expression on $documentKey subfield opening 1K braces.
 runTest(
-    [
-        {_id: {[subField]: "x"}},
-    ],
+    [{_id: {[subField]: "x"}}],
     [
         {
             $match: {
                 $expr: {
                     $not: {
-                        $eq: [
-                            "$documentKey.abc', 'test': " +
-                                "{a: ".repeat(2048),
-                            "x"
-                        ]
-                    }
-                }
-            }
+                        $eq: ["$documentKey.abc', 'test': " + "{a: ".repeat(2048), "x"],
+                    },
+                },
+            },
         },
     ],
-    []);
+    [],
+);

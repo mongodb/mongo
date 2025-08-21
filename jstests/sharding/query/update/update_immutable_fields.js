@@ -7,8 +7,7 @@ var mongos = st.s;
 var config = mongos.getDB("config");
 var coll = mongos.getCollection(jsTestName() + ".coll1");
 
-assert.commandWorked(
-    config.adminCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
+assert.commandWorked(config.adminCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(config.adminCommand({shardCollection: "" + coll, key: {a: 1}}));
 
 assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: coll.getFullName()}));

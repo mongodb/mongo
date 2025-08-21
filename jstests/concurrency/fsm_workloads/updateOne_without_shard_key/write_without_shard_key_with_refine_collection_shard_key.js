@@ -12,12 +12,9 @@
 import "jstests/libs/parallelTester.js";
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/updateOne_without_shard_key/write_without_shard_key_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.startState = "init";
     $config.iterations = 25;
     $config.threadCount = 5;
@@ -42,10 +39,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // race that could occur between sharding a collection and creating an index on the new
         // shard key (if this step were done after every refineCollectionShardKey).
         for (let i = this.latchCount; i >= 0; --i) {
-            const latchCollName = collName + '_' + i;
+            const latchCollName = collName + "_" + i;
             let coll = db.getCollection(latchCollName);
-            assert.commandWorked(
-                db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}));
+            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}));
             assert.commandWorked(coll.createIndex(this.newShardKey));
             $super.setup.apply(this, [db, latchCollName, cluster]);
         }
@@ -58,19 +54,18 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         assert.commandWorked(db.adminCommand({flushRouterConfig: db.getName()}));
     };
 
-    $config.data.getCurrentLatchCollName = function(collName) {
-        return collName + '_' + this.latch.getCount().toString();
+    $config.data.getCurrentLatchCollName = function (collName) {
+        return collName + "_" + this.latch.getCount().toString();
     };
 
-    $config.states.refineCollectionShardKey = function refineCollectionShardKey(
-        db, collName, connCache) {
+    $config.states.refineCollectionShardKey = function refineCollectionShardKey(db, collName, connCache) {
         jsTestLog("Running refineCollectionShardKey state.");
         const latchCollName = this.getCurrentLatchCollName(collName);
 
         try {
             const cmdObj = {
                 refineCollectionShardKey: db.getCollection(latchCollName).getFullName(),
-                key: this.newShardKey
+                key: this.newShardKey,
             };
 
             assert.commandWorked(db.adminCommand(cmdObj));
@@ -89,18 +84,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.states.findAndModify = function findAndModify(db, collName, connCache) {
-        $super.states.findAndModify.apply(this,
-                                          [db, this.getCurrentLatchCollName(collName), connCache]);
+        $super.states.findAndModify.apply(this, [db, this.getCurrentLatchCollName(collName), connCache]);
     };
 
     $config.states.updateOne = function findAndModify(db, collName, connCache) {
-        $super.states.updateOne.apply(this,
-                                      [db, this.getCurrentLatchCollName(collName), connCache]);
+        $super.states.updateOne.apply(this, [db, this.getCurrentLatchCollName(collName), connCache]);
     };
 
     $config.states.deleteOne = function findAndModify(db, collName, connCache) {
-        $super.states.deleteOne.apply(this,
-                                      [db, this.getCurrentLatchCollName(collName), connCache]);
+        $super.states.deleteOne.apply(this, [db, this.getCurrentLatchCollName(collName), connCache]);
     };
 
     $config.transitions = {
@@ -110,28 +102,28 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             updateOne: 0.3,
             deleteOne: 0.3,
             findAndModify: 0.3,
-            flushRouterConfig: 0.05
+            flushRouterConfig: 0.05,
         },
         deleteOne: {
             refineCollectionShardKey: 0.05,
             updateOne: 0.3,
             deleteOne: 0.3,
             findAndModify: 0.3,
-            flushRouterConfig: 0.05
+            flushRouterConfig: 0.05,
         },
         findAndModify: {
             refineCollectionShardKey: 0.05,
             updateOne: 0.3,
             deleteOne: 0.3,
             findAndModify: 0.3,
-            flushRouterConfig: 0.05
+            flushRouterConfig: 0.05,
         },
         refineCollectionShardKey: {
             refineCollectionShardKey: 0.05,
             updateOne: 0.3,
             deleteOne: 0.3,
             findAndModify: 0.3,
-            flushRouterConfig: 0.05
+            flushRouterConfig: 0.05,
         },
         flushRouterConfig: {updateOne: 0.33, deleteOne: 0.33, findAndModify: 0.34},
     };

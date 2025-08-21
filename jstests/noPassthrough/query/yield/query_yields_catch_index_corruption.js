@@ -13,11 +13,13 @@ replSet.initiate();
 const primary = replSet.getPrimary();
 
 let db = primary.getDB(dbName);
-assert.commandWorked(db.adminCommand({
-    configureFailPoint: "skipUnindexingDocumentWhenDeleted",
-    mode: "alwaysOn",
-    data: {indexName: "a_1_b_1"}
-}));
+assert.commandWorked(
+    db.adminCommand({
+        configureFailPoint: "skipUnindexingDocumentWhenDeleted",
+        mode: "alwaysOn",
+        data: {indexName: "a_1_b_1"},
+    }),
+);
 
 let coll = db.getCollection(collName);
 assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
@@ -51,14 +53,14 @@ function createDanglingIndexEntry(doc) {
             if (!oplogDocId.equals(docId)) {
                 return false;
             }
-            jsTestLog('Found oplog entry for corrupted index entry: ' + tojson(oplogDoc));
-            if (oplogDoc.op === 'd') {
+            jsTestLog("Found oplog entry for corrupted index entry: " + tojson(oplogDoc));
+            if (oplogDoc.op === "d") {
                 foundDelete = true;
-            } else if (oplogDoc.op === 'i') {
+            } else if (oplogDoc.op === "i") {
                 foundInsert = true;
             }
             return foundDelete && foundInsert;
-        }
+        },
     });
 
     // A query that accesses the now dangling index entry should fail with a
@@ -66,8 +68,7 @@ function createDanglingIndexEntry(doc) {
     // prepare conflicts by default and that exempts them from checking this assertion. Only writes
     // and reads in multi-document transactions enforce prepare conflicts and should encounter this
     // assertion.
-    assert.commandFailedWithCode(coll.update(doc, {$set: {c: 1}}),
-                                 ErrorCodes.DataCorruptionDetected);
+    assert.commandFailedWithCode(coll.update(doc, {$set: {c: 1}}), ErrorCodes.DataCorruptionDetected);
 
     const session = db.getMongo().startSession();
     const sessionDB = session.getDatabase(dbName);

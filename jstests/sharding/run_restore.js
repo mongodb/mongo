@@ -18,8 +18,7 @@ TestData.skipEnforceFastCountOnValidate = true;
 // shell to clean up the core dump that is left behind.
 TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
-const s =
-    new ShardingTest({name: "runRestore", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
+const s = new ShardingTest({name: "runRestore", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
 
 let mongos = s.s0;
 let db = s.getDB("test");
@@ -45,44 +44,28 @@ for (let i = 0; i < 6; i++) {
     assert.commandWorked(mongos.adminCommand({split: "test.b", middle: {x: i}}));
 }
 
-const aCollUUID =
-    mongos.getDB("config").getCollection("collections").find({_id: "test.a"}).toArray()[0].uuid;
-const bCollUUID =
-    mongos.getDB("config").getCollection("collections").find({_id: "test.b"}).toArray()[0].uuid;
+const aCollUUID = mongos.getDB("config").getCollection("collections").find({_id: "test.a"}).toArray()[0].uuid;
+const bCollUUID = mongos.getDB("config").getCollection("collections").find({_id: "test.b"}).toArray()[0].uuid;
 
 for (const uuid of [aCollUUID, bCollUUID]) {
-    assert.eq(7,
-              mongos.getDB("config")
-                  .getCollection("chunks")
-                  .find({uuid: uuid, shard: primaryName})
-                  .count());
-    assert.eq(0,
-              mongos.getDB("config")
-                  .getCollection("chunks")
-                  .find({uuid: uuid, shard: secondaryName})
-                  .count());
+    assert.eq(7, mongos.getDB("config").getCollection("chunks").find({uuid: uuid, shard: primaryName}).count());
+    assert.eq(0, mongos.getDB("config").getCollection("chunks").find({uuid: uuid, shard: secondaryName}).count());
 }
 
 // Move chunks between shards.
 for (const x of [0, 2, 4]) {
-    assert.commandWorked(s.s0.adminCommand(
-        {moveChunk: "test.a", find: {x: x}, to: secondary.getMongo().name, _waitForDelete: true}));
-    assert.commandWorked(s.s0.adminCommand(
-        {moveChunk: "test.b", find: {x: x}, to: secondary.getMongo().name, _waitForDelete: true}));
+    assert.commandWorked(
+        s.s0.adminCommand({moveChunk: "test.a", find: {x: x}, to: secondary.getMongo().name, _waitForDelete: true}),
+    );
+    assert.commandWorked(
+        s.s0.adminCommand({moveChunk: "test.b", find: {x: x}, to: secondary.getMongo().name, _waitForDelete: true}),
+    );
 }
 
 // Check config collection counts.
 for (const uuid of [aCollUUID, bCollUUID]) {
-    assert.eq(4,
-              mongos.getDB("config")
-                  .getCollection("chunks")
-                  .find({uuid: uuid, shard: primaryName})
-                  .count());
-    assert.eq(3,
-              mongos.getDB("config")
-                  .getCollection("chunks")
-                  .find({uuid: uuid, shard: secondaryName})
-                  .count());
+    assert.eq(4, mongos.getDB("config").getCollection("chunks").find({uuid: uuid, shard: primaryName}).count());
+    assert.eq(3, mongos.getDB("config").getCollection("chunks").find({uuid: uuid, shard: secondaryName}).count());
 }
 
 assert.eq(1, mongos.getDB("config").getCollection("collections").find({_id: "test.a"}).count());
@@ -101,8 +84,7 @@ let conn = MongoRunner.runMongod({noCleanData: true, dbpath: configDbPath});
 assert(conn);
 
 // Can't run the "_configsvrRunRestore" command without --restore.
-assert.commandFailedWithCode(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}),
-                             ErrorCodes.CommandFailed);
+assert.commandFailedWithCode(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}), ErrorCodes.CommandFailed);
 
 MongoRunner.stopMongod(conn);
 
@@ -113,51 +95,37 @@ assert(conn);
 assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, logLevel: 1}));
 
 // Can't run if the "local.system.collections_to_restore" collection is missing.
-assert.commandFailedWithCode(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}),
-                             ErrorCodes.NamespaceNotFound);
+assert.commandFailedWithCode(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}), ErrorCodes.NamespaceNotFound);
 
 let [_, uuidStr] = aCollUUID.toString().match(/"((?:\\.|[^"\\])*)"/);
-assert.commandWorked(conn.getDB("local").getCollection("system.collections_to_restore").insert({
-    ns: "test.a",
-    uuid: uuidStr
-}));
+assert.commandWorked(
+    conn.getDB("local").getCollection("system.collections_to_restore").insert({
+        ns: "test.a",
+        uuid: uuidStr,
+    }),
+);
 
 // The "local.system.collections_to_restore" collection must have UUID as the correct type.
-assert.commandFailedWithCode(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}), ErrorCodes.BadValue);
 
 // Recreate the "local.system.collections_to_restore" collection and insert 'test.a'.
 assert(conn.getDB("local").getCollection("system.collections_to_restore").drop());
 assert.commandWorked(conn.getDB("local").createCollection("system.collections_to_restore"));
 
-assert.commandWorked(conn.getDB("local").getCollection("system.collections_to_restore").insert({
-    ns: "test.a",
-    uuid: aCollUUID
-}));
+assert.commandWorked(
+    conn.getDB("local").getCollection("system.collections_to_restore").insert({
+        ns: "test.a",
+        uuid: aCollUUID,
+    }),
+);
 
 assert.commandWorked(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}));
 
-assert.eq(4,
-          conn.getDB("config")
-              .getCollection("chunks")
-              .find({uuid: aCollUUID, shard: primaryName})
-              .count());
-assert.eq(3,
-          conn.getDB("config")
-              .getCollection("chunks")
-              .find({uuid: aCollUUID, shard: secondaryName})
-              .count());
+assert.eq(4, conn.getDB("config").getCollection("chunks").find({uuid: aCollUUID, shard: primaryName}).count());
+assert.eq(3, conn.getDB("config").getCollection("chunks").find({uuid: aCollUUID, shard: secondaryName}).count());
 
-assert.eq(0,
-          conn.getDB("config")
-              .getCollection("chunks")
-              .find({uuid: bCollUUID, shard: primaryName})
-              .count());
-assert.eq(0,
-          conn.getDB("config")
-              .getCollection("chunks")
-              .find({uuid: bCollUUID, shard: secondaryName})
-              .count());
+assert.eq(0, conn.getDB("config").getCollection("chunks").find({uuid: bCollUUID, shard: primaryName}).count());
+assert.eq(0, conn.getDB("config").getCollection("chunks").find({uuid: bCollUUID, shard: secondaryName}).count());
 
 assert.eq(1, conn.getDB("config").getCollection("collections").find({_id: "test.a"}).count());
 assert.eq(0, conn.getDB("config").getCollection("collections").find({_id: "test.b"}).count());
@@ -177,7 +145,7 @@ assert.commandWorked(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}));
 
 // Can't run during testing if the config server has unrecognized collections.
 assert.commandWorked(conn.getDB("config").createCollection("unknown"));
-let error = assert.throws(function() {
+let error = assert.throws(function () {
     conn.getDB("admin").runCommand({_configsvrRunRestore: 1});
 });
 assert(isNetworkError(error));

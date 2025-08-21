@@ -50,13 +50,16 @@ function testCommandIsRetried(testFn, assertFn) {
     };
 
     try {
-        assert.doesNotThrow(() => testFn(
-                                () => {
-                                    shouldCaptureCmdObjs = true;
-                                },
-                                () => {
-                                    shouldCaptureCmdObjs = false;
-                                }));
+        assert.doesNotThrow(() =>
+            testFn(
+                () => {
+                    shouldCaptureCmdObjs = true;
+                },
+                () => {
+                    shouldCaptureCmdObjs = false;
+                },
+            ),
+        );
     } finally {
         Mongo.prototype.runCommand = mongoRunCommandOriginal;
     }
@@ -87,10 +90,13 @@ testCommandIsRetried(
     },
     function assertInsertRetriedExactlyOnce(cmdObjsSeen) {
         assert.eq(2, cmdObjsSeen.length, () => tojson(cmdObjsSeen));
-        assert(cmdObjsSeen.every(cmdObj => Object.keys(cmdObj)[0] === "insert"),
-               () => "expected both attempts to be insert requests: " + tojson(cmdObjsSeen));
+        assert(
+            cmdObjsSeen.every((cmdObj) => Object.keys(cmdObj)[0] === "insert"),
+            () => "expected both attempts to be insert requests: " + tojson(cmdObjsSeen),
+        );
         assert.eq(cmdObjsSeen[0], cmdObjsSeen[1], "command request changed between retry attempts");
-    });
+    },
+);
 
 testCommandIsRetried(
     function testUpdateRetriedOnRetryableCommandError(enableCapture, disableCapture) {
@@ -101,9 +107,9 @@ testCommandIsRetried(
             configureFailPoint: "onPrimaryTransactionalWrite",
             data: {
                 closeConnection: false,
-                failBeforeCommitExceptionCode: ErrorCodes.InterruptedDueToReplStateChange
+                failBeforeCommitExceptionCode: ErrorCodes.InterruptedDueToReplStateChange,
             },
-            mode: {times: 1}
+            mode: {times: 1},
         });
 
         enableCapture();
@@ -115,9 +121,12 @@ testCommandIsRetried(
     },
     function assertUpdateRetriedExactlyOnce(cmdObjsSeen) {
         assert.eq(2, cmdObjsSeen.length, () => tojson(cmdObjsSeen));
-        assert(cmdObjsSeen.every(cmdObj => Object.keys(cmdObj)[0] === "update"),
-               () => "expected both attempts to be update requests: " + tojson(cmdObjsSeen));
+        assert(
+            cmdObjsSeen.every((cmdObj) => Object.keys(cmdObj)[0] === "update"),
+            () => "expected both attempts to be update requests: " + tojson(cmdObjsSeen),
+        );
         assert.eq(cmdObjsSeen[0], cmdObjsSeen[1], "command request changed between retry attempts");
-    });
+    },
+);
 
 rst.stopSet();

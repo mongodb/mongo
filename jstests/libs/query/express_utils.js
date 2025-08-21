@@ -16,30 +16,34 @@ export function runExpressTest({
     expectedNonZeroFetchCount,
 }) {
     const actual = coll.find(filter, project).limit(limit).collation(collation).toArray();
-    const explain =
-        coll.find(filter, project).limit(limit).collation(collation).explain("executionStats");
+    const explain = coll.find(filter, project).limit(limit).collation(collation).explain("executionStats");
 
     assertArrayEq({
         actual: actual,
         expected: result,
-        extraErrorMsg: "Result set comparison failed for find(" + tojson(filter) + ", " +
-            tojson(project) + ").limit(" + limit + "). Explain: " + tojson(explain)
+        extraErrorMsg:
+            "Result set comparison failed for find(" +
+            tojson(filter) +
+            ", " +
+            tojson(project) +
+            ").limit(" +
+            limit +
+            "). Explain: " +
+            tojson(explain),
     });
 
     assert.eq(
         usesExpress,
         isExpress(db, explain),
-        "Expected the query to " + (usesExpress ? "" : "not ") + "use express: " + tojson(explain));
+        "Expected the query to " + (usesExpress ? "" : "not ") + "use express: " + tojson(explain),
+    );
 
     if (expectedNonZeroFetchCount) {
         const actualFetchCount = explain.executionStats.totalDocsExamined;
         if (expectedNonZeroFetchCount) {
-            assert.gt(actualFetchCount,
-                      0,
-                      "Expected the query to fetch some documents: " + tojson(explain));
+            assert.gt(actualFetchCount, 0, "Expected the query to fetch some documents: " + tojson(explain));
         } else {
-            assert.eq(
-                0, actualFetchCount, "Expected the query to fetch 0 documents: " + tojson(explain));
+            assert.eq(0, actualFetchCount, "Expected the query to fetch 0 documents: " + tojson(explain));
         }
     }
 }

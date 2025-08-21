@@ -17,10 +17,7 @@
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
-import {
-    getPlanCache,
-    testProperty
-} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {getPlanCache, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 if (isSlowBuild(db)) {
@@ -54,7 +51,7 @@ function identicalQueryCreatesAtMostOneCacheEntry(getQuery, testHelpers) {
                 explain: experimentColl.explain().aggregate(query),
                 cacheBefore,
                 cacheAfter,
-                numberOfCacheEntriesCreated: cacheAfter.length - cacheBefore.length
+                numberOfCacheEntriesCreated: cacheAfter.length - cacheBefore.length,
             };
         }
     }
@@ -67,7 +64,8 @@ testProperty(
     identicalQueryCreatesAtMostOneCacheEntry,
     {experimentColl},
     makeWorkloadModel({collModel: getCollectionModel({isTS: false}), aggModel, numQueriesPerRun}),
-    numRuns);
+    numRuns,
+);
 // TODO SERVER-103381 re-enable time-series PBT testing
 // testProperty(
 //     identicalQueryCreatesAtMostOneCacheEntry,

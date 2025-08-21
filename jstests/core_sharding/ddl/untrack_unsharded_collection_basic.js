@@ -15,17 +15,14 @@
  * ]
  */
 
-import {
-    getRandomShardName,
-    verifyCollectionTrackingState
-} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {getRandomShardName, verifyCollectionTrackingState} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 // Setup an untracked collection
 db.dropDatabase();
 
 const kDbName = db.getName();
-const kCollName = 'coll';
-const kNss = kDbName + '.' + kCollName;
+const kCollName = "coll";
+const kNss = kDbName + "." + kCollName;
 
 assert.commandWorked(db[kCollName].insert({x: 1}));
 
@@ -42,13 +39,10 @@ jsTest.log("Untrack a collection placed outside its non-primary shard returns er
 {
     // Move the collection outside its primary shard; this will also make it tracked.
     assert.commandWorked(db.adminCommand({moveCollection: kNss, toShard: anotherShard}));
-    verifyCollectionTrackingState(
-        db, kNss, true /*expectedToBeTracked*/, true /*expectedToBeUnsplittable*/);
+    verifyCollectionTrackingState(db, kNss, true /*expectedToBeTracked*/, true /*expectedToBeUnsplittable*/);
 
-    assert.commandFailedWithCode(db.adminCommand({untrackUnshardedCollection: kNss}),
-                                 ErrorCodes.OperationFailed);
-    verifyCollectionTrackingState(
-        db, kNss, true /*expectedToBeTracked*/, true /*expectedToBeUnsplittable*/);
+    assert.commandFailedWithCode(db.adminCommand({untrackUnshardedCollection: kNss}), ErrorCodes.OperationFailed);
+    verifyCollectionTrackingState(db, kNss, true /*expectedToBeTracked*/, true /*expectedToBeUnsplittable*/);
 }
 
 jsTest.log("Untrack a collection placed on its primary shard succeeds.");

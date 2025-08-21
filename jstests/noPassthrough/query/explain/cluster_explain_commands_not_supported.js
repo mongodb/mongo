@@ -18,12 +18,11 @@ const clusterCommandsCases = [
     {cmd: {explain: {clusterFind: kCollName}}},
     {cmd: {explain: {clusterInsert: kCollName, documents: [{x: 1}]}}},
     {cmd: {explain: {clusterUpdate: kCollName, updates: [{q: {doesNotExist: 1}, u: {x: 1}}]}}},
-    {cmd: {explain: {clusterDelete: `${kCollName}`, deletes: [{q: {}, limit: 1}]}}}
+    {cmd: {explain: {clusterDelete: `${kCollName}`, deletes: [{q: {}, limit: 1}]}}},
 ];
 
 function runTestCaseExpectFail(conn, testCase, code) {
-    assert.commandFailedWithCode(
-        conn.getDB(kDbName).runCommand(testCase.cmd), code, tojson(testCase.cmd));
+    assert.commandFailedWithCode(conn.getDB(kDbName).runCommand(testCase.cmd), code, tojson(testCase.cmd));
 }
 
 //

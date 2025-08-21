@@ -18,8 +18,7 @@ var config = st.s.getDB("config");
 var admin = st.s.getDB("admin");
 var coll = st.s.getCollection("foo.bar");
 
-assert.commandWorked(
-    insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
+assert.commandWorked(insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
 
 var shards = [st.shard0, st.shard1];
 
@@ -29,8 +28,7 @@ var shards = [st.shard0, st.shard1];
 
 jsTest.log("Enabling sharding for the first time...");
 
-assert.commandWorked(
-    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 assert.commandWorked(coll.insert({hello: "world"}));
@@ -44,7 +42,7 @@ printjson(res);
 res = admin.runCommand({
     moveChunk: coll + "",
     find: {_id: 0},
-    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name
+    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name,
 });
 assert.commandWorked(res);
 printjson(res);
@@ -73,13 +71,11 @@ jsTest.log("Rebuilding sharded collection with different split...");
 
 coll.drop();
 
-assert.commandWorked(
-    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 var bulk = coll.initializeUnorderedBulkOp();
-for (var i = 0; i < 100; i++)
-    bulk.insert({_id: i});
+for (var i = 0; i < 100; i++) bulk.insert({_id: i});
 assert.commandWorked(bulk.execute());
 
 res = admin.runCommand({split: coll + "", middle: {_id: 200}});
@@ -89,7 +85,7 @@ printjson(res);
 res = admin.runCommand({
     moveChunk: coll + "",
     find: {_id: 200},
-    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name
+    to: st.getOther(st.getPrimaryShard(coll.getDB() + "")).name,
 });
 assert.commandWorked(res);
 printjson(res);
@@ -106,8 +102,7 @@ assert.neq(null, readMongos.getCollection(coll + "").findOne({_id: 1}));
 
 jsTest.log("Checking update...");
 // Ensure that updating an element finds the right location
-assert.commandWorked(
-    updateMongos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}));
+assert.commandWorked(updateMongos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}));
 assert.neq(null, coll.findOne({updated: true}));
 
 jsTest.log("Checking insert...");

@@ -3,10 +3,7 @@
  */
 import "jstests/libs/query/sbe_assert_error_override.js";
 
-import {
-    seedWithTickerData,
-    testAccumAgainstGroup
-} from "jstests/aggregation/extras/window_function_helpers.js";
+import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const simple = (n, input) => ({n, input: "$" + input});
 const topBottomN = (n, output) => ({n, output: "$" + output, sortBy: {[output]: 1}});
@@ -25,16 +22,17 @@ const nAccumulators = {
     $bottom: topBottom,
 };
 
-const needsSortBy = (op) => ({
-    $minN: false,
-    $maxN: false,
-    $firstN: false,
-    $lastN: false,
-    $topN: true,
-    $bottomN: true,
-    $top: true,
-    $bottom: true,
-}[op]);
+const needsSortBy = (op) =>
+    ({
+        $minN: false,
+        $maxN: false,
+        $firstN: false,
+        $lastN: false,
+        $topN: true,
+        $bottomN: true,
+        $top: true,
+        $bottom: true,
+    })[op];
 
 export function testAccumulator(acc) {
     const coll = db[jsTestName()];
@@ -46,7 +44,7 @@ export function testAccumulator(acc) {
 
     for (const nValue of [4, 7, 12]) {
         jsTestLog("Testing accumulator " + tojson(acc) + " with 'n' set to " + tojson(nValue));
-        const noValue = (acc === "$top" || acc === "$bottom") ? null : [];
+        const noValue = acc === "$top" || acc === "$bottom" ? null : [];
         testAccumAgainstGroup(coll, acc, noValue, nAccumulators[acc](nValue, "price"));
     }
 
@@ -56,7 +54,7 @@ export function testAccumulator(acc) {
             $setWindowFields: {
                 partitionBy: "$ticker",
                 sortBy: {_id: 1},
-                output: {res: {[acc]: nAccumulators[acc]({$add: [1, 2]}, "price")}}
+                output: {res: {[acc]: nAccumulators[acc]({$add: [1, 2]}, "price")}},
             },
         },
     ];
@@ -73,7 +71,7 @@ export function testAccumulator(acc) {
                 $setWindowFields: {
                     partitionBy: "$partIndex",
                     sortBy: {_id: 1},
-                    output: {res: {[acc]: nAccumulators[acc]({$add: ["$partIndex", 2]}, "price")}}
+                    output: {res: {[acc]: nAccumulators[acc]({$add: ["$partIndex", 2]}, "price")}},
                 },
             },
         ];
@@ -82,19 +80,24 @@ export function testAccumulator(acc) {
     }
     // Error cases.
     function testError(accSpec, expectedCode) {
-        assert.throwsWithCode(() => coll.aggregate([{
-            $setWindowFields: {
-                partitionBy: "$ticker",
-                sortBy: {ts: 1},
-                output: {outputField: accSpec},
-            }
-        }]),
-                              expectedCode);
+        assert.throwsWithCode(
+            () =>
+                coll.aggregate([
+                    {
+                        $setWindowFields: {
+                            partitionBy: "$ticker",
+                            sortBy: {ts: 1},
+                            output: {outputField: accSpec},
+                        },
+                    },
+                ]),
+            expectedCode,
+        );
     }
 
     // The parsers for $minN/$maxN and $firstN/$lastN will use different codes to indicate a
     // parsing error due to a non-object specification.
-    const expectedCode = (acc === "$minN" || acc === "$maxN") ? 5787900 : 5787801;
+    const expectedCode = acc === "$minN" || acc === "$maxN" ? 5787900 : 5787801;
 
     if (!needsSortBy(acc)) {
         // Invalid/missing accumulator specification.

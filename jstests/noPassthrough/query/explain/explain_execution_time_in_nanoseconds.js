@@ -33,8 +33,7 @@ function verifyStages(execStages, microAndNanosExpected) {
 let explainResult = coll.find({x: {$gt: 500}}).explain("executionStats");
 // Verify that "queryPlanner" has "optimizationTimeMillis".
 assert(explainResult.hasOwnProperty("queryPlanner"), explainResult);
-assert(explainResult.queryPlanner.hasOwnProperty("optimizationTimeMillis"),
-       explainResult.queryPlanner);
+assert(explainResult.queryPlanner.hasOwnProperty("optimizationTimeMillis"), explainResult.queryPlanner);
 let executionStages = explainResult.executionStats.executionStages;
 assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionStages);
 verifyStages(executionStages, false);
@@ -56,8 +55,7 @@ for (let executionStage of executionStages) {
     if (executionStage.hasOwnProperty("$cursor")) {
         // Verify that "queryPlanner" has "optimizationTimeMillis".
         assert(executionStage["$cursor"].hasOwnProperty("queryPlanner"), executionStage);
-        assert(executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMillis"),
-               executionStage);
+        assert(executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMillis"), executionStage);
         const stages = executionStage["$cursor"]["executionStats"]["executionStages"];
         verifyStages(stages, false);
     }

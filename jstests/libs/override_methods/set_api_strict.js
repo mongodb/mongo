@@ -49,38 +49,63 @@ function isOperationPartOfStableAPI(commandName, commandObj) {
         "renameCollection",
     ]);
     if (stableCommands.has(commandName)) {
-        if (commandName == "aggregate" && commandObj.pipeline &&
-            Array.isArray(commandObj.pipeline) && commandObj.pipeline.length > 0) {
-            if (commandObj.pipeline[0].$indexStats ||
+        if (
+            commandName == "aggregate" &&
+            commandObj.pipeline &&
+            Array.isArray(commandObj.pipeline) &&
+            commandObj.pipeline.length > 0
+        ) {
+            if (
+                commandObj.pipeline[0].$indexStats ||
                 (commandObj.pipeline[0].$collStats &&
-                 (commandObj.pipeline[0].$collStats.latencyStats ||
-                  commandObj.pipeline[0].$collStats.storageStats ||
-                  commandObj.pipeline[0].$collStats.storageStats))) {
+                    (commandObj.pipeline[0].$collStats.latencyStats ||
+                        commandObj.pipeline[0].$collStats.storageStats ||
+                        commandObj.pipeline[0].$collStats.storageStats))
+            ) {
                 return false;
             }
             for (let i = 0; i < commandObj.pipeline.length; i++) {
-                if (commandObj.pipeline[i].$currentOp ||
+                if (
+                    commandObj.pipeline[i].$currentOp ||
                     commandObj.pipeline[i].$listLocalSessions ||
                     commandObj.pipeline[i].$listSessions ||
-                    commandObj.pipeline[i].$planCacheStats || commandObj.pipeline[i].$search) {
+                    commandObj.pipeline[i].$planCacheStats ||
+                    commandObj.pipeline[i].$search
+                ) {
                     return false;
                 }
             }
-        } else if (commandName == "find" &&
-                   (commandObj.awaitData || commandObj.max || commandObj.min ||
-                    commandObj.noCursorTimeout || commandObj.oplogReplay || commandObj.returnKey ||
-                    commandObj.showRecordId || commandObj.tailable)) {
+        } else if (
+            commandName == "find" &&
+            (commandObj.awaitData ||
+                commandObj.max ||
+                commandObj.min ||
+                commandObj.noCursorTimeout ||
+                commandObj.oplogReplay ||
+                commandObj.returnKey ||
+                commandObj.showRecordId ||
+                commandObj.tailable)
+        ) {
             return false;
-        } else if (commandName == "create" &&
-                   (commandObj.capped || commandObj.indexOptionDefaults || commandObj.max ||
-                    commandObj.size || commandObj.storageEngine)) {
+        } else if (
+            commandName == "create" &&
+            (commandObj.capped ||
+                commandObj.indexOptionDefaults ||
+                commandObj.max ||
+                commandObj.size ||
+                commandObj.storageEngine)
+        ) {
             return false;
-        } else if (commandName == "createIndexes" && commandObj.indexes &&
-                   Array.isArray(commandObj.indexes)) {
+        } else if (commandName == "createIndexes" && commandObj.indexes && Array.isArray(commandObj.indexes)) {
             for (let i = 0; i < commandObj.indexes.length; i++) {
-                if (commandObj.indexes[i].key.text || commandObj.indexes[i].key.geoHaystack ||
-                    commandObj.indexes[i].background || commandObj.indexes[i].bucketSize ||
-                    commandObj.indexes[i].sparse || commandObj.indexes[i].storageEngine) {
+                if (
+                    commandObj.indexes[i].key.text ||
+                    commandObj.indexes[i].key.geoHaystack ||
+                    commandObj.indexes[i].background ||
+                    commandObj.indexes[i].bucketSize ||
+                    commandObj.indexes[i].sparse ||
+                    commandObj.indexes[i].storageEngine
+                ) {
                     return false;
                 }
             }

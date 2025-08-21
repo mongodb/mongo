@@ -6,8 +6,10 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
-const reshardingTest = new ReshardingTest(
-    {enableElections: true, logComponentVerbosity: tojson({sharding: 2, network: 4})});
+const reshardingTest = new ReshardingTest({
+    enableElections: true,
+    logComponentVerbosity: tojson({sharding: 2, network: 4}),
+});
 reshardingTest.setup();
 
 const donorShardNames = reshardingTest.donorShardNames;
@@ -39,9 +41,10 @@ const shardsvrAbortReshardCollectionFailpoint = configureFailPoint(recipient, "f
 // We pause the _configsvrReshardCollection command upon joining an existing ReshardingCoordinator
 // instance on all of the config server replica set because we don't know which node will be elected
 // primary from calling stepUpNewPrimaryOnShard().
-const configsvrConnections = topology.configsvr.nodes.map(host => new Mongo(host));
-const reshardCollectionJoinedFailPointsList = configsvrConnections.map(
-    conn => configureFailPoint(conn, "reshardCollectionJoinedExistingOperation"));
+const configsvrConnections = topology.configsvr.nodes.map((host) => new Mongo(host));
+const reshardCollectionJoinedFailPointsList = configsvrConnections.map((conn) =>
+    configureFailPoint(conn, "reshardCollectionJoinedExistingOperation"),
+);
 
 let awaitAbort;
 reshardingTest.withReshardingInBackground(
@@ -53,15 +56,17 @@ reshardingTest.withReshardingInBackground(
         // Wait until participants are aware of the resharding operation.
         reshardingTest.awaitCloneTimestampChosen();
 
-        awaitAbort = startParallelShell(funWithArgs(function(ns) {
-                                            db.adminCommand({abortReshardCollection: ns});
-                                        }, ns), mongos.port);
+        awaitAbort = startParallelShell(
+            funWithArgs(function (ns) {
+                db.adminCommand({abortReshardCollection: ns});
+            }, ns),
+            mongos.port,
+        );
 
         // Wait for the coordinator to have persisted its decision to abort the resharding operation
         // as a result of the abortReshardCollection command being processed.
         assert.soon(() => {
-            const coordinatorDoc =
-                mongos.getCollection("config.reshardingOperations").findOne({ns: ns});
+            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: ns});
 
             return coordinatorDoc !== null && coordinatorDoc.state === "aborting";
         });
@@ -74,27 +79,24 @@ reshardingTest.withReshardingInBackground(
             // Mongos automatically retries the abortReshardCollection command on retryable errors.
             // We interrupt the abortReshardCollection command running on mongos to verify that the
             // ReshardingCoordinator recovers the decision on its own.
-            const ops = mongos.getDB("admin")
-                            .aggregate([
-                                {$currentOp: {localOps: true}},
-                                {$match: {"command.abortReshardCollection": ns}}
-                            ])
-                            .toArray();
+            const ops = mongos
+                .getDB("admin")
+                .aggregate([{$currentOp: {localOps: true}}, {$match: {"command.abortReshardCollection": ns}}])
+                .toArray();
 
             assert.neq([], ops, "failed to find abortReshardCollection command running on mongos");
             assert.eq(
                 1,
                 ops.length,
-                () =>
-                    `found more than one abortReshardCollection command on mongos: ${tojson(ops)}`);
+                () => `found more than one abortReshardCollection command on mongos: ${tojson(ops)}`,
+            );
 
             assert.commandWorked(mongos.getDB("admin").killOp(ops[0].opid));
 
             // Step down the config shard's primary.
             let configRS = reshardingTest.getReplSetForShard(reshardingTest.configShardName);
             let primary = configRS.getPrimary();
-            assert.commandWorked(
-                primary.getDB("admin").runCommand({replSetStepDown: 60, force: true}));
+            assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 60, force: true}));
             configRS.waitForPrimary();
 
             // After a stepdown, the _configsvrReshardCollection command will be retried by the
@@ -108,19 +110,18 @@ reshardingTest.withReshardingInBackground(
             // client.
             topology = DiscoverTopology.findConnectedNodes(mongos);
             const configsvrPrimary = new Mongo(topology.configsvr.primary);
-            const idx = reshardCollectionJoinedFailPointsList.findIndex(fp => fp.conn.host ===
-                                                                            configsvrPrimary.host);
+            const idx = reshardCollectionJoinedFailPointsList.findIndex((fp) => fp.conn.host === configsvrPrimary.host);
             reshardCollectionJoinedFailPointsList[idx].wait();
 
             // Wait for secondaries to recover and catchup with primary before turning off the
             // failpoints as a replication roll back can disconnect the test client.
             configRS.awaitSecondaryNodes();
             configRS.awaitReplication();
-            reshardCollectionJoinedFailPointsList.forEach(
-                fp => reshardingTest.retryOnceOnNetworkError(fp.off));
+            reshardCollectionJoinedFailPointsList.forEach((fp) => reshardingTest.retryOnceOnNetworkError(fp.off));
             shardsvrAbortReshardCollectionFailpoint.off();
         },
-    });
+    },
+);
 
 awaitAbort();
 

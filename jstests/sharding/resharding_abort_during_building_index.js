@@ -32,10 +32,13 @@ const recipientShardNames = reshardingTest.recipientShardNames;
 const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
 
 assert.commandWorked(
-    mongos.getCollection(ns).insert([{oldKey: 1, newKey: -1}, {oldKey: 2, newKey: -2}]));
+    mongos.getCollection(ns).insert([
+        {oldKey: 1, newKey: -1},
+        {oldKey: 2, newKey: -2},
+    ]),
+);
 assert.commandWorked(mongos.getCollection(ns).createIndex({oldKey: 1}));
-const hangAfterInitializingIndexBuildFailPoint =
-    configureFailPoint(recipient, "hangAfterInitializingIndexBuild");
+const hangAfterInitializingIndexBuildFailPoint = configureFailPoint(recipient, "hangAfterInitializingIndexBuild");
 
 let awaitAbort;
 reshardingTest.withReshardingInBackground(
@@ -49,18 +52,20 @@ reshardingTest.withReshardingInBackground(
         jsTestLog("Hang primary during building index, then abort resharding");
 
         assert.neq(null, mongos.getCollection("config.reshardingOperations").findOne({ns: ns}));
-        awaitAbort =
-            startParallelShell(funWithArgs(function(sourceNamespace) {
-                                   db.adminCommand({abortReshardCollection: sourceNamespace});
-                               }, ns), mongos.port);
+        awaitAbort = startParallelShell(
+            funWithArgs(function (sourceNamespace) {
+                db.adminCommand({abortReshardCollection: sourceNamespace});
+            }, ns),
+            mongos.port,
+        );
 
         assert.soon(() => {
-            const coordinatorDoc =
-                mongos.getCollection("config.reshardingOperations").findOne({ns: ns});
+            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: ns});
             return coordinatorDoc === null || coordinatorDoc.state === "aborting";
         });
     },
-    {expectedErrorCode: ErrorCodes.ReshardCollectionAborted});
+    {expectedErrorCode: ErrorCodes.ReshardCollectionAborted},
+);
 
 awaitAbort();
 hangAfterInitializingIndexBuildFailPoint.off();

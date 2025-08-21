@@ -15,14 +15,14 @@ rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
-const db = primary.getDB('test');
+const db = primary.getDB("test");
 const coll = db.t;
 
 // The test cases here revolve around having a TTL index in the catalog with a NaN
 // 'expireAfterSeconds'. The current createIndexes behavior will overwrite NaN with int32::max
 // unless we use a fail point.
-const fp = configureFailPoint(primary, 'skipTTLIndexValidationOnCreateIndex');
-const fp2 = configureFailPoint(primary, 'skipTTLIndexExpireAfterSecondsValidation');
+const fp = configureFailPoint(primary, "skipTTLIndexValidationOnCreateIndex");
+const fp2 = configureFailPoint(primary, "skipTTLIndexExpireAfterSecondsValidation");
 try {
     assert.commandWorked(coll.createIndex({t: 1}, {expireAfterSeconds: NaN}));
 } finally {
@@ -46,9 +46,9 @@ rst.awaitSecondaryNodes(null, [secondary]);
 checkLog.containsJson(secondary, 6852200, {
     ns: coll.getFullName(),
     spec: (spec) => {
-        jsTestLog('TTL index on secondary at startup: ' + tojson(spec));
+        jsTestLog("TTL index on secondary at startup: " + tojson(spec));
         return isNaN(spec.expireAfterSeconds);
-    }
+    },
 });
 
 rst.stopSet();

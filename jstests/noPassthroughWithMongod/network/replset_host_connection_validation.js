@@ -11,7 +11,7 @@ if (_isWindows()) {
     quit();
 }
 
-const replSetName = 'hostTestReplSetName';
+const replSetName = "hostTestReplSetName";
 
 // This "inner_mode" method of spawning a replset and re-running was copied from
 // host_connection_string_validation.js
@@ -29,7 +29,7 @@ if ("undefined" == typeof inner_mode) {
         "--nodb",
         "--eval",
         "inner_mode=true;port=" + primary.port + ";",
-        "jstests/noPassthroughWithMongod/network/replset_host_connection_validation.js"
+        "jstests/noPassthroughWithMongod/network/replset_host_connection_validation.js",
     ];
     const exitCode = _runMongoProgram(...args);
     jsTest.log("Inner mode test finished, exit code was " + exitCode);
@@ -43,7 +43,7 @@ if ("undefined" == typeof inner_mode) {
 }
 
 function testHost(host, uri, ok) {
-    const exitCode = runMongoProgram('mongo', '--eval', ';', '--host', host, uri);
+    const exitCode = runMongoProgram("mongo", "--eval", ";", "--host", host, uri);
     if (ok) {
         assert.eq(exitCode, 0, "failed to connect with `--host " + host + "`");
     } else {
@@ -60,14 +60,14 @@ function runConnectionStringTestFor(connectionString, uri, ok) {
 }
 
 function expSuccess(str) {
-    runConnectionStringTestFor(str, '', true);
-    if (!str.startsWith('mongodb://')) {
-        runConnectionStringTestFor(str, 'dbname', true);
+    runConnectionStringTestFor(str, "", true);
+    if (!str.startsWith("mongodb://")) {
+        runConnectionStringTestFor(str, "dbname", true);
     }
 }
 
 function expFailure(str) {
-    runConnectionStringTestFor(str, '', false);
+    runConnectionStringTestFor(str, "", false);
 }
 
 expSuccess(`localhost:${port}`);
@@ -78,14 +78,14 @@ expSuccess(`${replSetName}/localhost:${port},,`);
 expSuccess(`mongodb://localhost:${port}/admin?replicaSet=${replSetName}`);
 expSuccess(`mongodb://localhost:${port}`);
 
-expFailure(',');
-expFailure(',,');
+expFailure(",");
+expFailure(",,");
 expFailure(`${replSetName}/`);
 expFailure(`${replSetName}/,`);
 expFailure(`${replSetName}/,,`);
 expFailure(`${replSetName}//not/a/socket`);
 expFailure(`mongodb://localhost:${port}/admin?replicaSet=`);
-expFailure('mongodb://localhost:');
+expFailure("mongodb://localhost:");
 expFailure(`mongodb://:${port}`);
 
 jsTest.log("SUCCESSFUL test completion");

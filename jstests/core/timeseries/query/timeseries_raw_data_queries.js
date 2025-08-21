@@ -18,24 +18,27 @@ const t = new Date("2002-05-29T00:00:00Z");
 
 const coll = db[jsTestName()];
 
-assert.commandWorked(db.createCollection(
-    coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
-assert.commandWorked(coll.insertMany([
-    {[timeField]: t, [metaField]: "1", v: "replacement"},
-    {[timeField]: t, [metaField]: "2", v: "baz"},
-    {[timeField]: t, [metaField]: "2", v: "qux"},
-]));
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+assert.commandWorked(
+    coll.insertMany([
+        {[timeField]: t, [metaField]: "1", v: "replacement"},
+        {[timeField]: t, [metaField]: "2", v: "baz"},
+        {[timeField]: t, [metaField]: "2", v: "qux"},
+    ]),
+);
 
 assert(coll.drop());
 
 function crudTest(fn, addStartingMeasurements = true) {
     db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}});
     if (addStartingMeasurements) {
-        assert.commandWorked(coll.insertMany([
-            {[timeField]: t, [metaField]: "1", v: "foo"},
-            {[timeField]: t, [metaField]: "1", v: "bar"},
-            {[timeField]: t, [metaField]: "2", v: "baz"},
-        ]));
+        assert.commandWorked(
+            coll.insertMany([
+                {[timeField]: t, [metaField]: "1", v: "foo"},
+                {[timeField]: t, [metaField]: "1", v: "bar"},
+                {[timeField]: t, [metaField]: "2", v: "baz"},
+            ]),
+        );
     }
     fn();
     assert(coll.drop());
@@ -43,17 +46,14 @@ function crudTest(fn, addStartingMeasurements = true) {
 
 // aggregate()
 crudTest(() => {
-    const agg = coll.aggregate(
-        [
-            {$match: {"control.count": 2}},
-        ],
-        {rawData: true});
+    const agg = coll.aggregate([{$match: {"control.count": 2}}], {rawData: true});
     assert.eq(agg.toArray().length, 1);
 
-    assert.eq(coll.aggregate([{$indexStats: {}}, {$match: {name: "m_1_t_1"}}], {rawData: true})
-                  .toArray()[0]
-                  .key,
-              {meta: 1, "control.min.t": 1, "control.max.t": 1});
+    assert.eq(coll.aggregate([{$indexStats: {}}, {$match: {name: "m_1_t_1"}}], {rawData: true}).toArray()[0].key, {
+        meta: 1,
+        "control.min.t": 1,
+        "control.max.t": 1,
+    });
 });
 
 // count()
@@ -79,8 +79,7 @@ crudTest(() => {
 
 // findOne()
 crudTest(() => {
-    const retrievedBucket =
-        coll.findOne({"control.count": 2}, null, null, null, null, true /* rawData */);
+    const retrievedBucket = coll.findOne({"control.count": 2}, null, null, null, null, true /* rawData */);
     assert.eq(retrievedBucket.control.count, 2);
     assert.eq(retrievedBucket.meta, "1");
 });

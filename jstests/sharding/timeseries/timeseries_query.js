@@ -14,11 +14,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
 
-const dbName = 'testDB';
-const collName = 'testColl';
+const dbName = "testDB";
+const collName = "testColl";
 const unshardedColl = "unsharded";
-const timeField = 'time';
-const metaField = 'hostid';
+const timeField = "time";
+const metaField = "hostid";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const sDB = st.s.getDB(dbName);
@@ -33,11 +33,13 @@ function generateId() {
 }
 
 function generateDoc(time, metaValue) {
-    return TimeseriesTest.generateHosts(1).map((host, index) => Object.assign(host, {
-        _id: generateId(),
-        [metaField]: metaValue,
-        [timeField]: ISODate(time),
-    }))[0];
+    return TimeseriesTest.generateHosts(1).map((host, index) =>
+        Object.assign(host, {
+            _id: generateId(),
+            [metaField]: metaValue,
+            [timeField]: ISODate(time),
+        }),
+    )[0];
 }
 
 function runQueryOnTimeField({date, matchOperator, expectedDocs, expectedShards}) {
@@ -50,8 +52,7 @@ function runInsert(timestamp, metaValue) {
     assert.commandWorked(sDB.getCollection(unshardedColl).insert(doc));
 }
 
-function runQuery(
-    {query, expectedDocs, expectedShards, expectQueryRewrite = true, expectCollScan = false}) {
+function runQuery({query, expectedDocs, expectedShards, expectQueryRewrite = true, expectCollScan = false}) {
     // Restart profiler.
     for (let shardDB of [shard0DB, shard1DB]) {
         shardDB.setProfilingLevel(0);
@@ -107,11 +108,11 @@ function runQuery(
         const plans = [
             coll.find(query).explain(),
             coll.explain().aggregate([{$match: query}]),
-            coll.aggregate([{$match: query}], {explain: true})
+            coll.aggregate([{$match: query}], {explain: true}),
         ];
-        plans.forEach(plan => {
+        plans.forEach((plan) => {
             assert.eq(expectedShards.sort(), Object.keys(plan.shards).sort());
-            expectedShards.forEach(shard => {
+            expectedShards.forEach((shard) => {
                 const winningPlan = plan.shards[shard].stages[0].$cursor.queryPlanner.winningPlan;
                 if (expectCollScan) {
                     assert(isCollscan(sDB, winningPlan));
@@ -128,27 +129,32 @@ function runQuery(
     // Shard time-series collection.
     const shardKey = {[timeField]: 1};
     const coll = sDB[collName];
-    assert.commandWorked(sDB.adminCommand({
-        shardCollection: coll.getFullName(),
-        key: shardKey,
-        timeseries: {timeField, granularity: "hours"}
-    }));
+    assert.commandWorked(
+        sDB.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: shardKey,
+            timeseries: {timeField, granularity: "hours"},
+        }),
+    );
 
     // Split the chunks such that primary shard has chunk: [MinKey, 2020-01-01) and other shard has
     // chunk [2020-01-01, MaxKey].
     let splitPoint = {[`control.min.${timeField}`]: ISODate(`2020-01-01`)};
-    assert.commandWorked(sDB.adminCommand(
-        {split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}));
+    assert.commandWorked(
+        sDB.adminCommand({split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}),
+    );
 
     // Move one of the chunks into the second shard.
     const primaryShard = st.getPrimaryShard(dbName);
     const otherShard = st.getOther(primaryShard);
-    assert.commandWorked(sDB.adminCommand({
-        movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
-        find: splitPoint,
-        to: otherShard.name,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        sDB.adminCommand({
+            movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
+            find: splitPoint,
+            to: otherShard.name,
+            _waitForDelete: true,
+        }),
+    );
 
     // Ensure that each shard owns one chunk.
     const counts = st.chunkCounts(coll.getName(), dbName);
@@ -167,25 +173,25 @@ function runQuery(
         date: "2019-11-11",
         matchOperator: "$eq",
         expectedDocs: 2,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQueryOnTimeField({
         date: "2019-12-31",
         matchOperator: "$eq",
         expectedDocs: 2,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQueryOnTimeField({
         date: "2020-01-21",
         matchOperator: "$eq",
         expectedDocs: 2,
-        expectedShards: [otherShard.shardName, primaryShard.shardName]
+        expectedShards: [otherShard.shardName, primaryShard.shardName],
     });
     runQueryOnTimeField({
         date: "2020-11-31",
         matchOperator: "$eq",
         expectedDocs: 2,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
 
     // LTE.
@@ -193,28 +199,25 @@ function runQuery(
         date: "2019-11-11",
         matchOperator: "$lte",
         expectedDocs: 2,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQueryOnTimeField({
         date: "2019-12-31",
         matchOperator: "$lte",
         expectedDocs: 4,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQueryOnTimeField({
         date: "2020-02-11",
         matchOperator: "$lte",
         expectedDocs: 6,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQueryOnTimeField({
         date: "2021-01-01",
         matchOperator: "$lte",
         expectedDocs: 8,
-        expectedShards: [
-            primaryShard.shardName,
-            otherShard.shardName,
-        ]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
 
     // LT.
@@ -222,25 +225,25 @@ function runQuery(
         date: "2019-11-11",
         matchOperator: "$lt",
         expectedDocs: 0,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQueryOnTimeField({
         date: "2019-12-31",
         matchOperator: "$lte",
         expectedDocs: 4,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQueryOnTimeField({
         date: "2020-02-11",
         matchOperator: "$lt",
         expectedDocs: 6,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQueryOnTimeField({
         date: "2021-01-01",
         matchOperator: "$lt",
         expectedDocs: 8,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
 
     // GTE
@@ -248,19 +251,19 @@ function runQuery(
         date: "2019-11-11",
         matchOperator: "$gte",
         expectedDocs: 8,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQueryOnTimeField({
         date: "2020-01-11",
         matchOperator: "$gte",
         expectedDocs: 4,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQueryOnTimeField({
         date: "2021-01-01",
         matchOperator: "$gte",
         expectedDocs: 0,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
 
     // GT
@@ -268,19 +271,19 @@ function runQuery(
         date: "2019-11-11",
         matchOperator: "$gt",
         expectedDocs: 6,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQueryOnTimeField({
         date: "2020-01-11",
         matchOperator: "$gt",
         expectedDocs: 4,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQueryOnTimeField({
         date: "2021-01-01",
         matchOperator: "$gt",
         expectedDocs: 0,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
 
     // OR queries are rewritten if all their arguments are.
@@ -298,27 +301,33 @@ function runQuery(
 // Shard key on the metadata field and time fields.
 (function metaAndTimeShardKey() {
     const coll = sDB[collName];
-    assert.commandWorked(sDB.adminCommand({
-        shardCollection: coll.getFullName(),
-        key: {[metaField]: 1, 'time': 1},
-        timeseries: {timeField, metaField, granularity: "hours"}
-    }));
+    assert.commandWorked(
+        sDB.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: {[metaField]: 1, "time": 1},
+            timeseries: {timeField, metaField, granularity: "hours"},
+        }),
+    );
 
     // Split the chunks such that primary shard has chunk: [{MinKey, MinKey}, {0, 2020-01-01}) and
     // other shard has chunk [{0, 2020-01-01}, {MaxKey, MaxKey}].
-    assert.commandWorked(st.s.adminCommand({
-        split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
-        middle: {meta: 0, 'control.min.time': ISODate(`2020-01-01`)}
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
+            middle: {meta: 0, "control.min.time": ISODate(`2020-01-01`)},
+        }),
+    );
 
     const primaryShard = st.getPrimaryShard(dbName);
     const otherShard = st.getOther(primaryShard);
-    assert.commandWorked(st.s.adminCommand({
-        movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
-        find: {meta: 10, 'control.min.time': MinKey},
-        to: otherShard.shardName,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
+            find: {meta: 10, "control.min.time": MinKey},
+            to: otherShard.shardName,
+            _waitForDelete: true,
+        }),
+    );
 
     const counts = st.chunkCounts(coll.getName(), dbName);
     assert.eq(1, counts[st.shard0.shardName]);
@@ -336,7 +345,7 @@ function runQuery(
     runQuery({
         query: {[metaField]: 0},
         expectedDocs: 4,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQuery({query: {[metaField]: 1}, expectedDocs: 2, expectedShards: [otherShard.shardName]});
 
@@ -352,100 +361,100 @@ function runQuery(
     runQuery({
         query: {[metaField]: 0, [timeField]: ISODate("2019-12-31")},
         expectedDocs: 1,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQuery({
         query: {[metaField]: 0, [timeField]: ISODate("2020-01-21")},
         expectedDocs: 1,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
 
     // LTE.
     runQuery({
         query: {[metaField]: 0, [timeField]: {$lte: ISODate("2019-12-31")}},
         expectedDocs: 2,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQuery({
         query: {[metaField]: 1, [timeField]: {$lte: ISODate("2020-11-11")}},
         expectedDocs: 2,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
     runQuery({
         query: {[metaField]: 0, [timeField]: {$lte: ISODate("2020-11-11")}},
         expectedDocs: 3,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQuery({
         query: {[metaField]: {$lte: 0}, [timeField]: {$lte: ISODate("2019-12-31")}},
         expectedDocs: 3,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
 
     // LT.
     runQuery({
         query: {[metaField]: 0, [timeField]: {$lt: ISODate("2019-12-31")}},
         expectedDocs: 1,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQuery({
         query: {[metaField]: 1, [timeField]: {$lt: ISODate("2020-11-11")}},
         expectedDocs: 2,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
     runQuery({
         query: {[metaField]: 0, [timeField]: {$lt: ISODate("2020-11-11")}},
         expectedDocs: 3,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQuery({
         query: {[metaField]: {$lt: 0}, [timeField]: {$lt: ISODate("2019-12-31")}},
         expectedDocs: 0,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
 
     // GTE.
     runQuery({
         query: {[metaField]: -1, [timeField]: {$gte: ISODate("2020-11-31")}},
         expectedDocs: 1,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQuery({
         query: {[metaField]: 0, [timeField]: {$gte: ISODate("2020-11-11")}},
         expectedDocs: 1,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
     runQuery({
         query: {[metaField]: 0, [timeField]: {$gte: ISODate("2020-01-02")}},
         expectedDocs: 2,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQuery({
         query: {[metaField]: {$gte: 0}, [timeField]: {$gte: ISODate("2020-02-01")}},
         expectedDocs: 1,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
 
     // GT.
     runQuery({
         query: {[metaField]: -1, [timeField]: {$gt: ISODate("2020-11-31")}},
         expectedDocs: 0,
-        expectedShards: [primaryShard.shardName]
+        expectedShards: [primaryShard.shardName],
     });
     runQuery({
         query: {[metaField]: 0, [timeField]: {$gt: ISODate("2020-11-11")}},
         expectedDocs: 1,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
     runQuery({
         query: {[metaField]: 0, [timeField]: {$gt: ISODate("2020-01-02")}},
         expectedDocs: 2,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQuery({
         query: {[metaField]: {$gt: 0}, [timeField]: {$gt: ISODate("2020-02-01")}},
         expectedDocs: 0,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
 
     assert(coll.drop());
@@ -458,22 +467,26 @@ function runQuery(
     const metaSuffix = `${metaField}.suffix`;
     const shardKey = {[metaPrefix]: 1, [metaSuffix]: 1};
     const coll = sDB[collName];
-    assert.commandWorked(sDB.adminCommand(
-        {shardCollection: coll.getFullName(), key: shardKey, timeseries: {timeField, metaField}}));
+    assert.commandWorked(
+        sDB.adminCommand({shardCollection: coll.getFullName(), key: shardKey, timeseries: {timeField, metaField}}),
+    );
 
-    let splitPoint = {'meta.prefix': 0, 'meta.suffix': 0};
-    assert.commandWorked(sDB.adminCommand(
-        {split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}));
+    let splitPoint = {"meta.prefix": 0, "meta.suffix": 0};
+    assert.commandWorked(
+        sDB.adminCommand({split: getTimeseriesCollForDDLOps(sDB, coll).getFullName(), middle: splitPoint}),
+    );
 
     // Move one of the chunks into the second shard.
     const primaryShard = st.getPrimaryShard(dbName);
     const otherShard = st.getOther(primaryShard);
-    assert.commandWorked(sDB.adminCommand({
-        movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
-        find: splitPoint,
-        to: otherShard.name,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        sDB.adminCommand({
+            movechunk: getTimeseriesCollForDDLOps(sDB, coll).getFullName(),
+            find: splitPoint,
+            to: otherShard.name,
+            _waitForDelete: true,
+        }),
+    );
 
     // Ensure that each shard owns one chunk.
     const counts = st.chunkCounts(coll.getName(), dbName);
@@ -491,19 +504,19 @@ function runQuery(
     runQuery({
         query: {[metaPrefix]: 0},
         expectedDocs: 4,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
     runQuery({
         query: {[metaPrefix]: 0, [metaSuffix]: 0},
         expectedDocs: 4,
-        expectedShards: [otherShard.shardName]
+        expectedShards: [otherShard.shardName],
     });
     runQuery({query: {[metaPrefix]: 1}, expectedDocs: 2, expectedShards: [otherShard.shardName]});
 
     runQuery({
         query: {[metaPrefix]: 0, [timeField]: ISODate("2019-12-31")},
         expectedDocs: 1,
-        expectedShards: [primaryShard.shardName, otherShard.shardName]
+        expectedShards: [primaryShard.shardName, otherShard.shardName],
     });
 
     assert(coll.drop());

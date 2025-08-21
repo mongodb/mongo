@@ -19,8 +19,9 @@ assert.doesNotThrow(() => {
     getTop(testDB.getCollection(sourceCollection));
 });
 
-assert.commandWorked(testDB.adminCommand(
-    {renameCollection: dbName + "." + sourceCollection, to: dbName + "." + destCollection}));
+assert.commandWorked(
+    testDB.adminCommand({renameCollection: dbName + "." + sourceCollection, to: dbName + "." + destCollection}),
+);
 assert.throws(() => {
     getTop(testDB.getCollection(sourceCollection));
 });
@@ -35,8 +36,12 @@ assert.doesNotThrow(() => {
 // MapReduce creates temporary collections before renaming them in place. Test that these temporary
 // collections are not kept in Top's output after the command finishes.
 assert.commandWorked(
-    testDB.getCollection(destCollection)
-        .mapReduce(function() {}, function() {}, {out: {merge: mapReduceCollection}}));
+    testDB.getCollection(destCollection).mapReduce(
+        function () {},
+        function () {},
+        {out: {merge: mapReduceCollection}},
+    ),
+);
 
 const top = testDB.adminCommand("top");
 assert.commandWorked(top);

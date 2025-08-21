@@ -20,7 +20,7 @@ let insertCmd = {
     documents: [{_id: 10}, {_id: 30}],
     ordered: false,
     lsid: {id: UUID()},
-    txnNumber: NumberLong(5)
+    txnNumber: NumberLong(5),
 };
 
 // Run the command on the primary and wait for replication.
@@ -58,9 +58,9 @@ assert.eq(insertOplogEntries, oplog.find({ns: "test.foo", op: "i"}).itcount());
 let updateCmd = {
     update: "foo",
     updates: [
-        {q: {_id: 10}, u: {$inc: {x: 1}}},  // in place
+        {q: {_id: 10}, u: {$inc: {x: 1}}}, // in place
         {q: {_id: 20}, u: {$inc: {y: 1}}, upsert: true},
-        {q: {_id: 30}, u: {z: 1}}  // replacement
+        {q: {_id: 30}, u: {z: 1}}, // replacement
     ],
     ordered: false,
     lsid: {id: UUID()},
@@ -111,7 +111,10 @@ assert.eq(insertOplogEntries, oplog.find({ns: "test.foo", op: "i"}).itcount());
 
 let deleteCmd = {
     delete: "foo",
-    deletes: [{q: {x: 1}, limit: 1}, {q: {y: 1}, limit: 1}],
+    deletes: [
+        {q: {x: 1}, limit: 1},
+        {q: {y: 1}, limit: 1},
+    ],
     ordered: false,
     lsid: {id: UUID()},
     txnNumber: NumberLong(15),

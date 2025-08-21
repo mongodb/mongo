@@ -11,7 +11,7 @@ let options = {
 };
 
 const conn = MongoRunner.runMongod(options);
-const testDB = conn.getDB('test');
+const testDB = conn.getDB("test");
 var coll = testDB[jsTestName()];
 coll.drop();
 

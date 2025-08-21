@@ -15,10 +15,7 @@
 // ]
 //
 
-import {
-    assertDropAndRecreateCollection,
-    assertDropCollection
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
@@ -30,17 +27,19 @@ assertDropCollection(db, viewName);
 assert.commandWorked(db.createView(viewName, coll.getName(), []));
 const ns = {
     db: db.getName(),
-    coll: coll.getName()
+    coll: coll.getName(),
 };
 
 // Insert data into the collection.
-assert.commandWorked(coll.insertMany([
-    {a: 1, b: 5},
-    {a: 2, b: 4},
-    {a: 3, b: 3},
-    {a: 4, b: 2},
-    {a: 5, b: 1},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {a: 1, b: 5},
+        {a: 2, b: 4},
+        {a: 3, b: 3},
+        {a: 4, b: 2},
+        {a: 5, b: 1},
+    ]),
+);
 
 function setIndexes(coll, indexList) {
     assert.commandWorked(coll.dropIndexes());
@@ -62,10 +61,10 @@ function testFindQuerySettingsApplication(collOrViewName) {
         // in a sharded cluster. Nevertheless, the shards should use the query settings matching the
         // original query shape.
         skip: 3,
-        let : {
+        let: {
             c: 1,
             d: 2,
-        }
+        },
     });
 
     qstests.assertQuerySettingsIndexApplication(querySettingsFindQuery, ns);

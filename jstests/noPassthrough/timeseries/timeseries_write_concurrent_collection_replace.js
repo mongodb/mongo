@@ -18,9 +18,11 @@ const coll = db.coll;
 
 function runInsertTest(ordered, updateBucket, expectedErrorCode) {
     assert.commandWorked(db.dropDatabase());
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: timeField},
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeField},
+        }),
+    );
 
     if (updateBucket) {
         // Causes the subsequent hanging write to execute as a bucket update.
@@ -30,18 +32,32 @@ function runInsertTest(ordered, updateBucket, expectedErrorCode) {
     const fp = configureFailPoint(conn, "hangTimeseriesInsertBeforeWrite");
 
     const insertShell = startParallelShell(
-        funWithArgs((dbName, collName, ordered, errorCode) => {
-            assert.commandFailedWithCode(db.getSiblingDB(dbName).getCollection(collName).insert(
-                                             [{t: new Date(), value: "test2"}], {ordered: ordered}),
-                                         errorCode);
-        }, db.getName(), coll.getName(), ordered, expectedErrorCode), conn.port);
+        funWithArgs(
+            (dbName, collName, ordered, errorCode) => {
+                assert.commandFailedWithCode(
+                    db
+                        .getSiblingDB(dbName)
+                        .getCollection(collName)
+                        .insert([{t: new Date(), value: "test2"}], {ordered: ordered}),
+                    errorCode,
+                );
+            },
+            db.getName(),
+            coll.getName(),
+            ordered,
+            expectedErrorCode,
+        ),
+        conn.port,
+    );
 
     fp.wait();
 
     assert(coll.drop());
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: timeField},
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeField},
+        }),
+    );
 
     fp.off();
     insertShell();

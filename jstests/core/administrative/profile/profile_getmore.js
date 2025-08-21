@@ -22,8 +22,9 @@ const coll = testDB.getCollection(collName);
 
 /// Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDB.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
 let i;
 //
@@ -34,13 +35,16 @@ for (i = 0; i < 10; ++i) {
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-let cursor = coll.find({a: {$gt: 0}}).sort({a: 1}).batchSize(2);
-cursor.next();  // Perform initial query and consume first of 2 docs returned.
+let cursor = coll
+    .find({a: {$gt: 0}})
+    .sort({a: 1})
+    .batchSize(2);
+cursor.next(); // Perform initial query and consume first of 2 docs returned.
 
-let cursorId = getLatestProfilerEntry(testDB, {op: "query"}).cursorid;  // Save cursorid from find.
+let cursorId = getLatestProfilerEntry(testDB, {op: "query"}).cursorid; // Save cursorid from find.
 
-cursor.next();  // Consume second of 2 docs from initial query.
-cursor.next();  // getMore performed, leaving open cursor.
+cursor.next(); // Consume second of 2 docs from initial query.
+cursor.next(); // getMore performed, leaving open cursor.
 
 let profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
@@ -80,10 +84,13 @@ for (i = 0; i < 10; ++i) {
     assert.commandWorked(coll.insert({a: i}));
 }
 
-cursor = coll.find({a: {$gt: 0}}).sort({a: 1}).batchSize(2);
-cursor.next();  // Perform initial query and consume first of 2 docs returned.
-cursor.next();  // Consume second of 2 docs from initial query.
-cursor.next();  // getMore performed, leaving open cursor.
+cursor = coll
+    .find({a: {$gt: 0}})
+    .sort({a: 1})
+    .batchSize(2);
+cursor.next(); // Perform initial query and consume first of 2 docs returned.
+cursor.next(); // Consume second of 2 docs from initial query.
+cursor.next(); // getMore performed, leaving open cursor.
 
 profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
@@ -98,13 +105,12 @@ for (i = 0; i < 3; ++i) {
 }
 
 cursor = coll.find().batchSize(2);
-cursor.next();     // Perform initial query and consume first of 3 docs returned.
-cursor.itcount();  // Exhaust the cursor.
+cursor.next(); // Perform initial query and consume first of 3 docs returned.
+cursor.itcount(); // Exhaust the cursor.
 
 profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
-assert(profileObj.hasOwnProperty("cursorid"),
-       profileObj);  // cursorid should always be present on getMore.
+assert(profileObj.hasOwnProperty("cursorid"), profileObj); // cursorid should always be present on getMore.
 assert.neq(0, profileObj.cursorid, profileObj);
 assert.eq(profileObj.cursorExhausted, true, profileObj);
 assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
@@ -122,7 +128,7 @@ cursor = coll.aggregate([{$match: {a: {$gte: 0}}}], {cursor: {batchSize: 0}, hin
 cursorId = getLatestProfilerEntry(testDB, {"command.aggregate": coll.getName()}).cursorid;
 assert.neq(0, cursorId);
 
-cursor.next();  // Consume the result set.
+cursor.next(); // Consume the result set.
 
 profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
@@ -156,8 +162,8 @@ for (i = 0; i < 4; i++) {
 }
 
 cursor = coll.find(docToInsert).comment("profile_getmore").batchSize(2);
-assert.eq(cursor.itcount(), 4);  // Consume result set and trigger getMore.
+assert.eq(cursor.itcount(), 4); // Consume result set and trigger getMore.
 
 profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
-assert.eq((typeof profileObj.originatingCommand.$truncated), "string", profileObj);
+assert.eq(typeof profileObj.originatingCommand.$truncated, "string", profileObj);
 assert.eq(profileObj.originatingCommand.comment, "profile_getmore", profileObj);

@@ -13,10 +13,10 @@ function checkArrs(a, b) {
     assert.eq(a.length, b.length);
     const aStr = [];
     const bStr = [];
-    a.forEach(function(x) {
+    a.forEach(function (x) {
         aStr.push(tojson(x));
     });
-    b.forEach(function(x) {
+    b.forEach(function (x) {
         bStr.push(tojson(x));
     });
     for (let i = 0; i < aStr.length; ++i) {
@@ -38,13 +38,13 @@ function doTest(index) {
     assert.commandWorked(t.insert({_id: 6, x: 1, a: 2, b: 1}));
     assert.commandWorked(t.insert({_id: 7, x: 1, a: 2, b: 2}));
 
-    assert.throws(function() {
+    assert.throws(function () {
         t.find({x: 0, $or: "a"}).toArray();
     });
-    assert.throws(function() {
+    assert.throws(function () {
         t.find({x: 0, $or: []}).toArray();
     });
-    assert.throws(function() {
+    assert.throws(function () {
         t.find({x: 0, $or: ["a"]}).toArray();
     });
 
@@ -56,8 +56,14 @@ function doTest(index) {
     }
 
     const a1b2 = t.find({x: 1, $or: [{a: 1}, {b: 2}]}).toArray();
-    checkArrs([{_id: 4, x: 1, a: 1, b: 1}, {_id: 5, x: 1, a: 1, b: 2}, {_id: 7, x: 1, a: 2, b: 2}],
-              a1b2);
+    checkArrs(
+        [
+            {_id: 4, x: 1, a: 1, b: 1},
+            {_id: 5, x: 1, a: 1, b: 2},
+            {_id: 7, x: 1, a: 2, b: 2},
+        ],
+        a1b2,
+    );
     if (index) {
         const explain = t.find({x: 0, $or: [{a: 1}]}).explain();
         assert(isIxscan(db, getWinningPlanFromExplain(explain)));

@@ -1,18 +1,10 @@
-
-import {
-    after,
-    afterEach,
-    before,
-    beforeEach,
-    describe,
-    it,
-} from "jstests/libs/mochalite.js";
+import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
 let e;
 let expected = [];
 let forbidden = [];
-let forbid = msg => (() => forbidden.push(msg));
-let expect = msg => (() => expected.push(msg));
+let forbid = (msg) => () => forbidden.push(msg);
+let expect = (msg) => () => expected.push(msg);
 
 const RUN = () => globalThis.__mochalite_closer();
 const FAILURE = () => {
@@ -124,10 +116,10 @@ assert.eq(expected, ["test"]);
 // Multiple failing tests report multiple failures
 let spyloginfo = [];
 let previous_info = jsTest.log.info;
-jsTest.log.info = msg => spyloginfo.push(msg);
+jsTest.log.info = (msg) => spyloginfo.push(msg);
 let spylogerr = [];
 let previous_error = jsTest.log.error;
-jsTest.log.error = msg => spylogerr.push(msg);
+jsTest.log.error = (msg) => spylogerr.push(msg);
 describe("multiple test failures", () => {
     it("test1", expect("test1"));
     it("test2", FAILURE);
@@ -139,18 +131,14 @@ assert.eq(e.message, "2 failing tests detected");
 assert.eq(spyloginfo, [
     "✔ multiple test failures > test1",
     "✔ multiple test failures > test3",
-    "Test Report Summary:\n  2 passing\n\u001b[31m  2 failing\u001b[0m\nFailures and stacks are reprinted below."
+    "Test Report Summary:\n  2 passing\n\u001b[31m  2 failing\u001b[0m\nFailures and stacks are reprinted below.",
 ]);
 assert.eq(spylogerr.length, 4);
 assert.eq(spylogerr[0], "\u001b[31m✘ multiple test failures > test2\u001b[0m");
 assert.eq(spylogerr[1], "\u001b[31m✘ multiple test failures > test4\u001b[0m");
 // these are stack-dependent
-assert.startsWith(
-    spylogerr[2],
-    "\u001b[31m✘ multiple test failures > test2\nIntentional failure\nFAILURE@jstests");
-assert.startsWith(
-    spylogerr[3],
-    "\u001b[31m✘ multiple test failures > test4\nIntentional failure\nFAILURE@jstests");
+assert.startsWith(spylogerr[2], "\u001b[31m✘ multiple test failures > test2\nIntentional failure\nFAILURE@jstests");
+assert.startsWith(spylogerr[3], "\u001b[31m✘ multiple test failures > test4\nIntentional failure\nFAILURE@jstests");
 
 jsTest.log.info = previous_info;
 jsTest.log.error = previous_error;

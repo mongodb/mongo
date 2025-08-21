@@ -11,11 +11,9 @@ import {
     mongotCommandForQuery,
     MongotMock,
     mongotMultiCursorResponseForBatch,
-    mongotResponseForBatch
+    mongotResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const collName = jsTestName();
@@ -31,13 +29,13 @@ const docs = [
         "_id": 7,
         "title": "Call Me, Beep Me! (The Kim Possible Theme)",
         "artist": "Kim",
-        streams: 598
+        streams: 598,
     },
     {
         "_id": 8,
-        "title": "My Heart Will Go On - Love Theme from \"Titanic\"",
+        "title": 'My Heart Will Go On - Love Theme from "Titanic"',
         "artist": "Celine Dion",
-        streams: 2522
+        streams: 2522,
     },
     {"_id": 9, "title": "Rocky Theme", "artist": "Bill Conti", streams: 1329},
     {"_id": 10, "title": "Mia and Sebastian's Theme", "artist": "Justin Hurwitz", streams: 5939},
@@ -47,20 +45,20 @@ const docs = [
         "_id": 13,
         "title": "The Office Theme (from The Office)",
         "artist": "Jim and Pam",
-        streams: 876
+        streams: 876,
     },
     {"_id": 14, "title": "Theme from Jurassic Park", "artist": "John Williams", streams: 1502},
     {
         "_id": 15,
         "title": "Theme from Superman - Concert Version",
         "artist": "John Williams",
-        streams: 901
+        streams: 901,
     },
     {
         "_id": 16,
         "title": "Ghostbusters - Instrumental Version",
         "artist": "Ray Parker Jr.",
-        streams: 1049
+        streams: 1049,
     },
     {"_id": 17, "title": "Full House Theme", "artist": "Jesse Frederick", streams: 692},
     {"_id": 18, "title": "The James Bond Theme", "artist": "Monty Normon", streams: 1320},
@@ -68,13 +66,13 @@ const docs = [
         "_id": 19,
         "title": "Twelve Variations on Vous dirai-je, Mama",
         "artist": "Wolfgang Amadeus Mozart",
-        streams: 390
+        streams: 390,
     },
     {
         "_id": 20,
-        "title": "Theme (from \"Spider Man\")",
+        "title": 'Theme (from "Spider Man")',
         "artist": "Francis Webster and Bob Harris",
-        streams: 182
+        streams: 182,
     },
 ];
 
@@ -86,7 +84,7 @@ let relevantDocsSortedByStreams = [];
 let relevantSearchDocs = [];
 let relevantStoredSourceDocs = [];
 let relevantDocsOnlyTitle = [];
-let searchScore = 0.300;
+let searchScore = 0.3;
 for (let i = 0; i < docs.length; i++) {
     if (docs[i][mongotQuery.path].includes(mongotQuery.query)) {
         relevantDocs.push(docs[i]);
@@ -120,9 +118,9 @@ function runTest(db, mockRequestFn) {
     function assertOversubscriptionSetAsExpected(expectedOversubscription) {
         assert.eq(
             expectedOversubscription,
-            assert.commandWorked(db.adminCommand({getClusterParameter: "internalSearchOptions"}))
-                .clusterParameters[0]
-                .oversubscriptionFactor);
+            assert.commandWorked(db.adminCommand({getClusterParameter: "internalSearchOptions"})).clusterParameters[0]
+                .oversubscriptionFactor,
+        );
     }
 
     /**
@@ -130,8 +128,7 @@ function runTest(db, mockRequestFn) {
      * then asserts that the results are correct. This will fail (via the mongotMock internals) if
      * the batchSize sent to mongot is different than expected.
      */
-    function runInitialBatchSizeTest(
-        {pipeline, expectedDocs, expectedBatchSize, isStoredSource = false}) {
+    function runInitialBatchSizeTest({pipeline, expectedDocs, expectedBatchSize, isStoredSource = false}) {
         mockRequestFn(expectedBatchSize, isStoredSource);
         let res = coll.aggregate(pipeline).toArray();
         assert.eq(expectedDocs, res);
@@ -160,8 +157,7 @@ function runTest(db, mockRequestFn) {
 
         // Runs a pipeline with an extractable limit less than 10; we still request at least 10.
         runInitialBatchSizeTest({
-            pipeline:
-                [{$search: mongotQuery}, {$project: {_id: 0, artist: 0, streams: 0}}, {$limit: 5}],
+            pipeline: [{$search: mongotQuery}, {$project: {_id: 0, artist: 0, streams: 0}}, {$limit: 5}],
             expectedBatchSize: 10,
             expectedDocs: relevantDocsOnlyTitle.slice(0, 5),
         });
@@ -182,8 +178,7 @@ function runTest(db, mockRequestFn) {
 
         // Runs a pipeline that applies a filter before a blocking stage $sort.
         runInitialBatchSizeTest({
-            pipeline:
-                [{$search: mongotQuery}, {$match: {streams: {$gt: 1500}}}, {$sort: {streams: -1}}],
+            pipeline: [{$search: mongotQuery}, {$match: {streams: {$gt: 1500}}}, {$sort: {streams: -1}}],
             expectedBatchSize: Math.ceil(kDefaultMongotBatchSize * kDefaultOversubscriptionFactor),
             // There are 4 relevant documents with > 1500 streams.
             expectedDocs: relevantDocsSortedByStreams.slice(0, 4),
@@ -198,12 +193,7 @@ function runTest(db, mockRequestFn) {
 
         // Runs a pipeline with a non-extractable limit (due to the $match before $limit).
         runInitialBatchSizeTest({
-            pipeline: [
-                {$search: mongotQuery},
-                {$match: {streams: {$gt: 1500}}},
-                {$limit: 98},
-                {$sort: {streams: -1}}
-            ],
+            pipeline: [{$search: mongotQuery}, {$match: {streams: {$gt: 1500}}}, {$limit: 98}, {$sort: {streams: -1}}],
             expectedBatchSize: Math.ceil(98 * kDefaultOversubscriptionFactor),
             expectedDocs: relevantDocsSortedByStreams.slice(0, 4),
         });
@@ -211,12 +201,7 @@ function runTest(db, mockRequestFn) {
         // Runs a pipeline with a non-extractable limit, where the computed batchSize is less than
         // the default batchSize; in that case, we round up to default batchSize.
         runInitialBatchSizeTest({
-            pipeline: [
-                {$search: mongotQuery},
-                {$match: {streams: {$gt: 1500}}},
-                {$limit: 50},
-                {$sort: {streams: -1}}
-            ],
+            pipeline: [{$search: mongotQuery}, {$match: {streams: {$gt: 1500}}}, {$limit: 50}, {$sort: {streams: -1}}],
             expectedBatchSize: kDefaultMongotBatchSize,
             expectedDocs: relevantDocsSortedByStreams.slice(0, 4),
         });
@@ -230,7 +215,7 @@ function runTest(db, mockRequestFn) {
                 {$search: mongotQuery},
                 {$unwind: {path: "$nonexistentArrayField", preserveNullAndEmptyArrays: true}},
                 {$project: {_id: 0, title: 1}},
-                {$limit: 5}
+                {$limit: 5},
             ],
             expectedBatchSize: 10,
             expectedDocs: relevantDocsOnlyTitle.slice(0, 5),
@@ -241,7 +226,7 @@ function runTest(db, mockRequestFn) {
                 {$search: mongotQuery},
                 {$unwind: {path: "$nonexistentArrayField", preserveNullAndEmptyArrays: true}},
                 {$project: {_id: 0, title: 1}},
-                {$limit: 500}
+                {$limit: 500},
             ],
             expectedBatchSize: kDefaultMongotBatchSize,
             expectedDocs: relevantDocsOnlyTitle,
@@ -252,7 +237,7 @@ function runTest(db, mockRequestFn) {
                 {$search: mongotQuery},
                 {$unwind: {path: "$nonexistentArrayField", preserveNullAndEmptyArrays: true}},
                 {$project: {_id: 0, title: 1}},
-                {$limit: 60}
+                {$limit: 60},
             ],
             expectedBatchSize: Math.ceil(60 * kDefaultOversubscriptionFactor),
             expectedDocs: relevantDocsOnlyTitle,
@@ -266,8 +251,7 @@ function runTest(db, mockRequestFn) {
 
         // Run pipelines with overSubscriptionFactor set to 1.
         let oversubscriptionFactor = 1;
-        assert.commandWorked(db.adminCommand(
-            {setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}}}));
+        assert.commandWorked(db.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}}}));
         assertOversubscriptionSetAsExpected(oversubscriptionFactor);
         runInitialBatchSizeTest({
             pipeline: [{$search: mongotQuery}, {$project: {_id: 0, title: 1}}],
@@ -282,8 +266,7 @@ function runTest(db, mockRequestFn) {
 
         // Run pipelines with overSubscriptionFactor set to 1.8.
         oversubscriptionFactor = 1.8;
-        assert.commandWorked(db.adminCommand(
-            {setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}}}));
+        assert.commandWorked(db.adminCommand({setClusterParameter: {internalSearchOptions: {oversubscriptionFactor}}}));
         assertOversubscriptionSetAsExpected(oversubscriptionFactor);
         runInitialBatchSizeTest({
             pipeline: [{$search: mongotQuery}, {$project: {_id: 0, title: 1}}],
@@ -303,13 +286,13 @@ function runTest(db, mockRequestFn) {
             pipeline: [{$search: mongotQuery}, {$project: {_id: 0, title: 1}}],
             expectedBatchSize: kDefaultMongotBatchSize,
             expectedDocs: relevantDocsOnlyTitle,
-            isStoredSource: true
+            isStoredSource: true,
         });
         runInitialBatchSizeTest({
             pipeline: [{$search: mongotQuery}, {$limit: 40}],
             expectedBatchSize: 40,
             expectedDocs: relevantDocs,
-            isStoredSource: true
+            isStoredSource: true,
         });
     }
 }
@@ -327,8 +310,7 @@ function runTest(db, mockRequestFn) {
     let coll = db.getCollection(collName);
     coll.drop();
 
-    if (checkSbeRestrictedOrFullyEnabled(db) &&
-        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchInSbe')) {
+    if (checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) {
         jsTestLog("Skipping the test because it only applies to $search in classic engine.");
         MongoRunner.stopMongod(conn);
         mongotMock.stop();
@@ -342,19 +324,21 @@ function runTest(db, mockRequestFn) {
         const cursorId = NumberLong(99);
         const responseOk = 1;
 
-        const docsToReturn = isStoredSource ? relevantStoredSourceDocs.slice(0, batchSize)
-                                            : relevantSearchDocs.slice(0, batchSize);
-        const history = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: collName,
-                db: dbName,
-                collectionUUID: collUUID,
-                cursorOptions: {batchSize}
-            }),
-            response:
-                mongotResponseForBatch(docsToReturn, NumberLong(0), coll.getFullName(), responseOk),
-        }];
+        const docsToReturn = isStoredSource
+            ? relevantStoredSourceDocs.slice(0, batchSize)
+            : relevantSearchDocs.slice(0, batchSize);
+        const history = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID,
+                    cursorOptions: {batchSize},
+                }),
+                response: mongotResponseForBatch(docsToReturn, NumberLong(0), coll.getFullName(), responseOk),
+            },
+        ];
         mongotMock.setMockResponses(history, cursorId);
     };
 
@@ -378,7 +362,7 @@ function runTest(db, mockRequestFn) {
         mongos: 1,
         other: {
             rsOptions: {setParameter: {enableTestCommands: 1}},
-        }
+        },
     });
     stWithMock.start();
     let st = stWithMock.st;
@@ -387,8 +371,7 @@ function runTest(db, mockRequestFn) {
     let coll = db.getCollection(collName);
     coll.drop();
 
-    assert.commandWorked(
-        mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
     assert.commandWorked(coll.insertMany(docs));
     // Shard the collection, split it at {_id: chunkBoundary}, and move the higher chunk to
@@ -396,10 +379,12 @@ function runTest(db, mockRequestFn) {
     st.shardColl(coll, {_id: 1}, {_id: chunkBoundary}, {_id: chunkBoundary + 1});
     const relevantDocsShard0 = relevantSearchDocs.filter((doc) => doc._id < chunkBoundary);
     const relevantDocsShard1 = relevantSearchDocs.filter((doc) => doc._id >= chunkBoundary);
-    const relevantStoredSourceDocsShard0 =
-        relevantStoredSourceDocs.filter((doc) => doc.storedSource._id < chunkBoundary);
-    const relevantStoredSourceDocsShard1 =
-        relevantStoredSourceDocs.filter((doc) => doc.storedSource._id >= chunkBoundary);
+    const relevantStoredSourceDocsShard0 = relevantStoredSourceDocs.filter(
+        (doc) => doc.storedSource._id < chunkBoundary,
+    );
+    const relevantStoredSourceDocsShard1 = relevantStoredSourceDocs.filter(
+        (doc) => doc.storedSource._id >= chunkBoundary,
+    );
 
     const collUUID = getUUIDFromListCollections(db, coll.getName());
 
@@ -414,46 +399,53 @@ function runTest(db, mockRequestFn) {
         const shard1DocsToReturn = isStoredSource
             ? relevantStoredSourceDocsShard1.slice(0, batchSize)
             : relevantDocsShard1.slice(0, batchSize);
-        const historyShard0 = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: collName,
-                db: dbName,
-                collectionUUID: collUUID,
-                protocolVersion: protocolVersion,
-                cursorOptions: {batchSize}
-            }),
-            response: mongotMultiCursorResponseForBatch(shard0DocsToReturn,
-                                                        NumberLong(0),
-                                                        [{metaVal: 1}],
-                                                        NumberLong(0),
-                                                        coll.getFullName(),
-                                                        responseOk),
-        }];
+        const historyShard0 = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID,
+                    protocolVersion: protocolVersion,
+                    cursorOptions: {batchSize},
+                }),
+                response: mongotMultiCursorResponseForBatch(
+                    shard0DocsToReturn,
+                    NumberLong(0),
+                    [{metaVal: 1}],
+                    NumberLong(0),
+                    coll.getFullName(),
+                    responseOk,
+                ),
+            },
+        ];
         const s0Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs0.getPrimary());
         s0Mongot.setMockResponses(historyShard0, cursorId, metaId);
 
-        const historyShard1 = [{
-            expectedCommand: mongotCommandForQuery({
-                query: mongotQuery,
-                collName: collName,
-                db: dbName,
-                collectionUUID: collUUID,
-                protocolVersion: protocolVersion,
-                cursorOptions: {batchSize}
-            }),
-            response: mongotMultiCursorResponseForBatch(shard1DocsToReturn,
-                                                        NumberLong(0),
-                                                        [{metaVal: 1}],
-                                                        NumberLong(0),
-                                                        coll.getFullName(),
-                                                        responseOk),
-        }];
+        const historyShard1 = [
+            {
+                expectedCommand: mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID,
+                    protocolVersion: protocolVersion,
+                    cursorOptions: {batchSize},
+                }),
+                response: mongotMultiCursorResponseForBatch(
+                    shard1DocsToReturn,
+                    NumberLong(0),
+                    [{metaVal: 1}],
+                    NumberLong(0),
+                    coll.getFullName(),
+                    responseOk,
+                ),
+            },
+        ];
         const s1Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs1.getPrimary());
         s1Mongot.setMockResponses(historyShard1, cursorId, metaId);
 
-        mockPlanShardedSearchResponse(
-            collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+        mockPlanShardedSearchResponse(collName, mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
     };
 
     runTest(db, mockRequestFn);

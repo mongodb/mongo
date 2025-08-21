@@ -19,22 +19,20 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const kBaseConfig = {
     threadCount: 1,
     iterations: 1,
     startState: "init",
     data: {},
-    states: {init: function(db, collName) {}},
+    states: {init: function (db, collName) {}},
     transitions: {init: {init: 1}},
-    setup: function(db, collName) {},
-    teardown: function(db, collName) {},
+    setup: function (db, collName) {},
+    teardown: function (db, collName) {},
 };
 
-export const $config = extendWorkload(kBaseConfig, function($config, $super) {
+export const $config = extendWorkload(kBaseConfig, function ($config, $super) {
     $config.threadCount = 10;
     $config.iterations = 500;
 
@@ -92,26 +90,28 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             // It is illegal to create a unique index that doesn't have the shard key as a prefix.
             shardKey = {
                 [this.currentShardKeyFieldName]: isHashed ? "hashed" : 1,
-                [this.candidateShardKeyFieldName]: 1
+                [this.candidateShardKeyFieldName]: 1,
             };
-            indexSpecs = [{
-                name: "compatible_index",
-                key: {[this.currentShardKeyFieldName]: 1, [this.candidateShardKeyFieldName]: 1},
-                unique: isUnique
-            }];
+            indexSpecs = [
+                {
+                    name: "compatible_index",
+                    key: {[this.currentShardKeyFieldName]: 1, [this.candidateShardKeyFieldName]: 1},
+                    unique: isUnique,
+                },
+            ];
         } else {
             shardKey = {[this.candidateShardKeyFieldName]: isHashed ? "hashed" : 1};
-            indexSpecs = [{
-                name: "compatible_index",
-                key: {[this.candidateShardKeyFieldName]: 1},
-                unique: isUnique
-            }];
+            indexSpecs = [
+                {
+                    name: "compatible_index",
+                    key: {[this.candidateShardKeyFieldName]: 1},
+                    unique: isUnique,
+                },
+            ];
         }
-        const isCurrentShardKey =
-            cluster.isSharded() && bsonWoCompare(this.shardKey, shardKey) === 0;
+        const isCurrentShardKey = cluster.isSharded() && bsonWoCompare(this.shardKey, shardKey) === 0;
 
-        this.shardKeyOptions =
-            {isHashed, isUnique, isMonotonic, isCurrentShardKey, shardKey, indexSpecs};
+        this.shardKeyOptions = {isHashed, isUnique, isMonotonic, isCurrentShardKey, shardKey, indexSpecs};
     };
 
     /**
@@ -138,13 +138,12 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         }
         this.documentOptions[this.nonCandidateShardKeyFieldName] = {
             isMonotonic: false,
-            type: "uuid"
+            type: "uuid",
         };
-        if (cluster.isSharded() &&
-            !this.documentOptions.hasOwnProperty(this.currentShardKeyFieldName)) {
+        if (cluster.isSharded() && !this.documentOptions.hasOwnProperty(this.currentShardKeyFieldName)) {
             this.documentOptions[this.currentShardKeyFieldName] = {
                 isMonotonic: false,
-                type: "uuid"
+                type: "uuid",
             };
         }
     };
@@ -189,11 +188,13 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * Returns a random document assigned to the thread invoking this.
      */
     $config.data.getRandomDocument = function getRandomDocument(db, collName) {
-        const res = assert.commandWorked(db.runCommand({
-            aggregate: collName,
-            pipeline: [{$match: {tid: this.tid}}, {$sample: {size: 1}}],
-            cursor: {}
-        }));
+        const res = assert.commandWorked(
+            db.runCommand({
+                aggregate: collName,
+                pipeline: [{$match: {tid: this.tid}}, {$sample: {size: 1}}],
+                cursor: {},
+            }),
+        );
         assert.eq(res.cursor.id, 0, res);
         return res.cursor.firstBatch[0];
     };
@@ -202,16 +203,16 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * Generates and inserts initial documents.
      */
     $config.data.insertBatchSize = 1000;
-    $config.data.generateInitialDocuments = function generateInitialDocuments(
-        db, collName, cluster) {
+    $config.data.generateInitialDocuments = function generateInitialDocuments(db, collName, cluster) {
         this.numInitialDocuments = 0;
         this.numInitialDistinctValues = 0;
         let docs = [];
 
         if (this.shardKeyOptions.isUnique) {
-            this.numInitialDocuments =
-                AnalyzeShardKeyUtil.getRandInteger(this.uniqueShardKeyOptions.minInitialNumDocs,
-                                                   this.uniqueShardKeyOptions.maxInitialNumDocs);
+            this.numInitialDocuments = AnalyzeShardKeyUtil.getRandInteger(
+                this.uniqueShardKeyOptions.minInitialNumDocs,
+                this.uniqueShardKeyOptions.maxInitialNumDocs,
+            );
             this.numInitialDistinctValues = this.numInitialDocuments;
             for (let i = 0; i < this.numInitialDocuments; ++i) {
                 const docBase = this.generateRandomDocumentBase(i % this.threadCount);
@@ -220,12 +221,14 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         } else {
             this.numInitialDistinctValues = AnalyzeShardKeyUtil.getRandInteger(
                 this.nonUniqueShardKeyOptions.minInitialNumDistinctValues,
-                this.nonUniqueShardKeyOptions.maxInitialNumDistinctValues);
+                this.nonUniqueShardKeyOptions.maxInitialNumDistinctValues,
+            );
             for (let i = 0; i < this.numInitialDistinctValues; ++i) {
                 const docBase = this.generateRandomDocumentBase(i % this.threadCount);
                 const frequency = AnalyzeShardKeyUtil.getRandInteger(
                     this.nonUniqueShardKeyOptions.minInitialFrequency,
-                    this.nonUniqueShardKeyOptions.maxInitialFrequency);
+                    this.nonUniqueShardKeyOptions.maxInitialFrequency,
+                );
                 for (let j = 0; j < frequency; j++) {
                     docs.push(Object.assign({}, docBase, {[this.idFieldName]: UUID()}));
                     this.numInitialDocuments++;
@@ -234,26 +237,28 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         }
         assert.eq(docs.length, this.numInitialDocuments);
 
-        assert.commandWorked(
-            db.runCommand({createIndexes: collName, indexes: this.shardKeyOptions.indexSpecs}));
+        assert.commandWorked(db.runCommand({createIndexes: collName, indexes: this.shardKeyOptions.indexSpecs}));
         // To reduce the insertion order noise caused by parallel oplog application on
         // secondaries, insert the documents in multiple batches.
         let currIndex = 0;
         while (currIndex < docs.length) {
             const endIndex = currIndex + this.insertBatchSize;
-            assert.commandWorked(db.runCommand(
-                {insert: collName, documents: docs.slice(currIndex, endIndex), ordered: true}));
+            assert.commandWorked(
+                db.runCommand({insert: collName, documents: docs.slice(currIndex, endIndex), ordered: true}),
+            );
             currIndex = endIndex;
             // Wait for secondaries to have replicated the writes.
             cluster.awaitReplication();
         }
 
-        print(`Set up collection that have the following shard key to analyze ${tojson({
-            shardKeyOptions: this.shardKeyOptions,
-            documentOptions: this.documentOptions,
-            numInitialDocuments: this.numInitialDocuments,
-            numInitialDistinctValues: this.numInitialDistinctValues
-        })}`);
+        print(
+            `Set up collection that have the following shard key to analyze ${tojson({
+                shardKeyOptions: this.shardKeyOptions,
+                documentOptions: this.documentOptions,
+                numInitialDocuments: this.numInitialDocuments,
+                numInitialDistinctValues: this.numInitialDistinctValues,
+            })}`,
+        );
     };
 
     ////
@@ -265,7 +270,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     $config.data.generateRandomPercentages = function generateRandomPercentages(n) {
         const rands = Array.from({length: n}, () => Math.random());
         const sum = rands.reduce((partialSum, x) => partialSum + x, 0);
-        return rands.map(rand => rand * 100 / sum);
+        return rands.map((rand) => (rand * 100) / sum);
     };
 
     /**
@@ -275,16 +280,16 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     $config.data.calculateShardTargetingMetrics = function calculateShardTargetingMetrics(
         percentageOfFilterByShardKeyEquality,
         percentageOfFilterByShardKeyRange,
-        percentageOfNotFilterByShardKey) {
-        const totalPercentage = percentageOfFilterByShardKeyEquality +
-            percentageOfFilterByShardKeyRange + percentageOfNotFilterByShardKey;
+        percentageOfNotFilterByShardKey,
+    ) {
+        const totalPercentage =
+            percentageOfFilterByShardKeyEquality + percentageOfFilterByShardKeyRange + percentageOfNotFilterByShardKey;
         AnalyzeShardKeyUtil.assertApprox(totalPercentage, 100);
 
         const percentageOfSingleShard = percentageOfFilterByShardKeyEquality;
-        const percentageOfMultiShard =
-            this.shardKeyOptions.isHashed ? 0 : percentageOfFilterByShardKeyRange;
+        const percentageOfMultiShard = this.shardKeyOptions.isHashed ? 0 : percentageOfFilterByShardKeyRange;
         const percentageOfScatterGather = this.shardKeyOptions.isHashed
-            ? (percentageOfFilterByShardKeyRange + percentageOfNotFilterByShardKey)
+            ? percentageOfFilterByShardKeyRange + percentageOfNotFilterByShardKey
             : percentageOfNotFilterByShardKey;
 
         return [percentageOfSingleShard, percentageOfMultiShard, percentageOfScatterGather];
@@ -298,30 +303,34 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * the analyzeShardKey command should return.
      */
     $config.data.generateRandomQueryPatterns = function generateRandomQueryPatterns() {
-        [this.percentageOfReadsFilterByShardKeyEquality,
-         this.percentageOfReadsFilterByShardKeyRange,
-         this.percentageOfReadsNotFilterByShardKey] = this.generateRandomPercentages(3);
-        const [percentageOfSingleShardReads,
-               percentageOfMultiShardReads,
-               percentageOfScatterGatherReads] =
-            this.calculateShardTargetingMetrics(this.percentageOfReadsFilterByShardKeyEquality,
-                                                this.percentageOfReadsFilterByShardKeyRange,
-                                                this.percentageOfReadsNotFilterByShardKey);
+        [
+            this.percentageOfReadsFilterByShardKeyEquality,
+            this.percentageOfReadsFilterByShardKeyRange,
+            this.percentageOfReadsNotFilterByShardKey,
+        ] = this.generateRandomPercentages(3);
+        const [percentageOfSingleShardReads, percentageOfMultiShardReads, percentageOfScatterGatherReads] =
+            this.calculateShardTargetingMetrics(
+                this.percentageOfReadsFilterByShardKeyEquality,
+                this.percentageOfReadsFilterByShardKeyRange,
+                this.percentageOfReadsNotFilterByShardKey,
+            );
         this.readDistribution = {
             percentageOfSingleShardReads,
             percentageOfMultiShardReads,
-            percentageOfScatterGatherReads
+            percentageOfScatterGatherReads,
         };
 
-        [this.percentageOfWritesFilterByShardKeyEquality,
-         this.percentageOfWritesFilterByShardKeyRange,
-         this.percentageOfWritesNotFilterByShardKey] = this.generateRandomPercentages(3);
-        const [percentageOfSingleShardWrites,
-               percentageOfMultiShardWrites,
-               percentageOfScatterGatherWrites] =
-            this.calculateShardTargetingMetrics(this.percentageOfWritesFilterByShardKeyEquality,
-                                                this.percentageOfWritesFilterByShardKeyRange,
-                                                this.percentageOfWritesNotFilterByShardKey);
+        [
+            this.percentageOfWritesFilterByShardKeyEquality,
+            this.percentageOfWritesFilterByShardKeyRange,
+            this.percentageOfWritesNotFilterByShardKey,
+        ] = this.generateRandomPercentages(3);
+        const [percentageOfSingleShardWrites, percentageOfMultiShardWrites, percentageOfScatterGatherWrites] =
+            this.calculateShardTargetingMetrics(
+                this.percentageOfWritesFilterByShardKeyEquality,
+                this.percentageOfWritesFilterByShardKeyRange,
+                this.percentageOfWritesNotFilterByShardKey,
+            );
 
         this.probabilityOfMultiWrites = (() => {
             if (TestData.runningWithShardStepdowns) {
@@ -342,12 +351,12 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         this.percentageOfSingleWrites = 50 + (1 - this.probabilityOfMultiWrites) * 50;
         this.percentageOfMultiWrites = this.probabilityOfMultiWrites * 50;
 
-        const percentageOfWritesWithoutShardKey = this.percentageOfWritesFilterByShardKeyRange +
-            this.percentageOfWritesNotFilterByShardKey;
+        const percentageOfWritesWithoutShardKey =
+            this.percentageOfWritesFilterByShardKeyRange + this.percentageOfWritesNotFilterByShardKey;
         const percentageOfSingleWritesWithoutShardKey =
-            this.percentageOfSingleWrites * percentageOfWritesWithoutShardKey / 100;
+            (this.percentageOfSingleWrites * percentageOfWritesWithoutShardKey) / 100;
         const percentageOfMultiWritesWithoutShardKey =
-            this.percentageOfMultiWrites * percentageOfWritesWithoutShardKey / 100;
+            (this.percentageOfMultiWrites * percentageOfWritesWithoutShardKey) / 100;
 
         this.probabilityOfShardKeyUpdates = Math.random();
         // The write states "update", "remove", "findAndModifyUpdate" and "findAndModifyRemove"
@@ -364,20 +373,22 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             percentageOfMultiWritesWithoutShardKey,
         };
 
-        print(`Testing the following read and write distribution ${tojson({
-            readQueryPatterns: {
-                percentageFilterByShardKeyEquality: this.percentageOfReadsFilterByShardKeyEquality,
-                percentageFilterByShardKeyRange: this.percentageOfReadsFilterByShardKeyRange,
-                percentageNotFilterByShardKey: this.percentageOfReadsNotFilterByShardKey
-            },
-            writeQueryPatterns: {
-                percentageFilterByShardKeyEquality: this.percentageOfWritesFilterByShardKeyEquality,
-                percentageFilterByShardKeyRange: this.percentageOfWritesFilterByShardKeyRange,
-                percentageNotFilterByShardKey: this.percentageOfWritesNotFilterByShardKey
-            },
-            readDistribution: this.readDistribution,
-            writeDistribution: this.writeDistribution,
-        })}`);
+        print(
+            `Testing the following read and write distribution ${tojson({
+                readQueryPatterns: {
+                    percentageFilterByShardKeyEquality: this.percentageOfReadsFilterByShardKeyEquality,
+                    percentageFilterByShardKeyRange: this.percentageOfReadsFilterByShardKeyRange,
+                    percentageNotFilterByShardKey: this.percentageOfReadsNotFilterByShardKey,
+                },
+                writeQueryPatterns: {
+                    percentageFilterByShardKeyEquality: this.percentageOfWritesFilterByShardKeyEquality,
+                    percentageFilterByShardKeyRange: this.percentageOfWritesFilterByShardKeyRange,
+                    percentageNotFilterByShardKey: this.percentageOfWritesNotFilterByShardKey,
+                },
+                readDistribution: this.readDistribution,
+                writeDistribution: this.writeDistribution,
+            })}`,
+        );
     };
 
     ////
@@ -395,8 +406,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             }
             return filter;
         }
-        if (rand < (this.percentageOfReadsFilterByShardKeyEquality +
-                    this.percentageOfReadsFilterByShardKeyRange)) {
+        if (rand < this.percentageOfReadsFilterByShardKeyEquality + this.percentageOfReadsFilterByShardKeyRange) {
             let filter = {};
             for (let fieldName in this.shardKeyOptions.shardKey) {
                 filter[fieldName] = {$gte: this.generateRandomValue(fieldName)};
@@ -404,8 +414,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             return filter;
         }
         return {
-            [this.nonCandidateShardKeyFieldName]:
-                this.generateRandomValue(this.nonCandidateShardKeyFieldName)
+            [this.nonCandidateShardKeyFieldName]: this.generateRandomValue(this.nonCandidateShardKeyFieldName),
         };
     };
 
@@ -414,8 +423,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * this. If the document lookup fails with an expected error, returns null. If it fails with
      * some other error, throws the error.
      */
-    $config.data.tryGenerateRandomWriteFilter = function tryGenerateRandomWriteFilter(db,
-                                                                                      collName) {
+    $config.data.tryGenerateRandomWriteFilter = function tryGenerateRandomWriteFilter(db, collName) {
         let doc;
         try {
             doc = this.getRandomDocument(db, collName);
@@ -435,8 +443,10 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             for (let fieldName in this.shardKeyOptions.shardKey) {
                 filter[fieldName] = doc[fieldName];
             }
-        } else if (rand < (this.percentageOfWritesFilterByShardKeyEquality +
-                           this.percentageOfWritesFilterByShardKeyRange)) {
+        } else if (
+            rand <
+            this.percentageOfWritesFilterByShardKeyEquality + this.percentageOfWritesFilterByShardKeyRange
+        ) {
             for (let fieldName in this.shardKeyOptions.shardKey) {
                 filter[fieldName] = {$gte: doc[fieldName]};
             }
@@ -452,9 +462,10 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * value.
      */
     $config.data.generateRandomModifierUpdate = function generateRandomModifierUpdate() {
-        const fieldName = Math.random() < this.probabilityOfShardKeyUpdates
-            ? this.candidateShardKeyFieldName
-            : this.nonCandidateShardKeyFieldName;
+        const fieldName =
+            Math.random() < this.probabilityOfShardKeyUpdates
+                ? this.candidateShardKeyFieldName
+                : this.nonCandidateShardKeyFieldName;
         return {$set: {[fieldName]: this.generateRandomValue(fieldName)}};
     };
 
@@ -473,8 +484,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * Verifies that the metrics about the characteristics of the shard key are within acceptable
      * ranges.
      */
-    $config.data.assertKeyCharacteristicsMetrics = function assertKeyCharacteristicsMetrics(
-        res, isSampling) {
+    $config.data.assertKeyCharacteristicsMetrics = function assertKeyCharacteristicsMetrics(res, isSampling) {
         // Perform basic validation of the metrics.
         AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res);
         const metrics = res.keyCharacteristics;
@@ -491,7 +501,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         // not unique, they are calculated using an aggregation with readConcern "available" (i.e.
         // it opts out of shard versioning and filtering). If the shard key is unique, they are
         // inferred from fast count of the documents.
-        if (!isSampling && (metrics.numDistinctValues < this.numInitialDistinctValues)) {
+        if (!isSampling && metrics.numDistinctValues < this.numInitialDistinctValues) {
             if (!TestData.runningWithBalancer) {
                 assert(this.shardKeyOptions.isUnique, metrics);
                 if (!TestData.runningWithShardStepdowns) {
@@ -499,7 +509,8 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
                     AnalyzeShardKeyUtil.assertDiffPercentage(
                         metrics.numDistinctValues,
                         this.numInitialDistinctValues,
-                        this.numDistinctValuesMaxDiffPercentage);
+                        this.numDistinctValuesMaxDiffPercentage,
+                    );
                 }
             }
         }
@@ -532,15 +543,17 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         //   insertion order is preserved.
         // - There is a lot of shard key updates since they overwrite the recordId order in the
         //   the shard key index.
-        const shouldCheckMonotonicity = !isSampling && !TestData.runningWithBalancer &&
-            (this.writeDistribution.percentageOfShardKeyUpdates <=
-             this.percentageOfShardKeyUpdatesThresholdForMonotonicityCheck);
+        const shouldCheckMonotonicity =
+            !isSampling &&
+            !TestData.runningWithBalancer &&
+            this.writeDistribution.percentageOfShardKeyUpdates <=
+                this.percentageOfShardKeyUpdatesThresholdForMonotonicityCheck;
         if (shouldCheckMonotonicity) {
-            assert.eq(metrics.monotonicity.type,
-                      this.shardKeyOptions.isMonotonic && !this.shardKeyOptions.isHashed
-                          ? "monotonic"
-                          : "not monotonic",
-                      metrics.monotonicity);
+            assert.eq(
+                metrics.monotonicity.type,
+                this.shardKeyOptions.isMonotonic && !this.shardKeyOptions.isHashed ? "monotonic" : "not monotonic",
+                metrics.monotonicity,
+            );
         }
     };
 
@@ -566,43 +579,39 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     // monotonicity check decreases as the number of shard key updates increases.
     $config.data.percentageOfShardKeyUpdatesThresholdForMonotonicityCheck = 20;
 
-    $config.data.isAcceptableSampleSize = function isAcceptableSampleSize(
-        part, whole, expectedPercentage) {
-        return Math.abs(AnalyzeShardKeyUtil.calculatePercentage(part, whole) - expectedPercentage) <
-            this.sampleSizePercentageMaxDiff;
+    $config.data.isAcceptableSampleSize = function isAcceptableSampleSize(part, whole, expectedPercentage) {
+        return (
+            Math.abs(AnalyzeShardKeyUtil.calculatePercentage(part, whole) - expectedPercentage) <
+            this.sampleSizePercentageMaxDiff
+        );
     };
 
-    $config.data.shouldValidateReadDistribution = function shouldValidateReadDistribution(
-        sampleSize) {
+    $config.data.shouldValidateReadDistribution = function shouldValidateReadDistribution(sampleSize) {
         if (sampleSize.total < this.numSampledQueriesThreshold) {
             return false;
         }
 
         // There are 4 read states (i.e. find, aggregate, count and distinct) and they have the
         // same incoming and outgoing state transition probabilities.
-        const isAcceptable = this.isAcceptableSampleSize(
-                                 sampleSize.find, sampleSize.total, 25 /* expectedPercentage */) &&
-            this.isAcceptableSampleSize(
-                sampleSize.aggregate, sampleSize.total, 25 /* expectedPercentage */) &&
-            this.isAcceptableSampleSize(
-                sampleSize.count, sampleSize.total, 25 /* expectedPercentage */) &&
-            this.isAcceptableSampleSize(
-                sampleSize.distinct, sampleSize.total, 25 /* expectedPercentage */);
+        const isAcceptable =
+            this.isAcceptableSampleSize(sampleSize.find, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(sampleSize.aggregate, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(sampleSize.count, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(sampleSize.distinct, sampleSize.total, 25 /* expectedPercentage */);
 
         if (!isAcceptable) {
             print(
                 `Skip validating the read distribution metrics because the sample ` +
-                `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`);
+                    `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`,
+            );
             // The sample population should always match the mock query patterns unless there are
             // retries.
-            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer ||
-                   TestData.runInsideTransaction);
+            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer || TestData.runInsideTransaction);
         }
         return isAcceptable;
     };
 
-    $config.data.shouldValidateWriteDistribution = function shouldValidateWriteDistribution(
-        sampleSize) {
+    $config.data.shouldValidateWriteDistribution = function shouldValidateWriteDistribution(sampleSize) {
         if (sampleSize.total < this.numSampledQueriesThreshold) {
             return false;
         }
@@ -611,21 +620,18 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         // findAndModifyRemove) and they have the same incoming and outgoing state transition
         // probabilities.
         const isAcceptable =
-            this.isAcceptableSampleSize(
-                sampleSize.update, sampleSize.total, 25 /* expectedPercentage */) &&
-            this.isAcceptableSampleSize(
-                sampleSize.delete, sampleSize.total, 25 /* expectedPercentage */) &&
-            this.isAcceptableSampleSize(
-                sampleSize.findAndModify, sampleSize.total, 50 /* expectedPercentage */);
+            this.isAcceptableSampleSize(sampleSize.update, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(sampleSize.delete, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(sampleSize.findAndModify, sampleSize.total, 50 /* expectedPercentage */);
 
         if (!isAcceptable) {
             print(
                 `Skip validating the write distribution metrics because the sample ` +
-                `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`);
+                    `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`,
+            );
             // The sample population should always match the mock query patterns unless there are
             // retries.
-            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer ||
-                   TestData.runInsideTransaction);
+            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer || TestData.runInsideTransaction);
         }
         return isAcceptable;
     };
@@ -634,85 +640,113 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * Verifies that the metrics about the read and write distribution are within acceptable ranges.
      */
     $config.data.assertReadWriteDistributionMetrics = function assertReadWriteDistributionMetrics(
-        res, isFinal, duration) {
+        res,
+        isFinal,
+        duration,
+    ) {
         AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res);
 
         let assertReadMetricsDiff = (actual, expected) => {
-            const maxDiff = isFinal ? this.finalReadDistributionMetricsMaxDiff
-                                    : this.intermediateReadDistributionMetricsMaxDiff;
+            const maxDiff = isFinal
+                ? this.finalReadDistributionMetricsMaxDiff
+                : this.intermediateReadDistributionMetricsMaxDiff;
             assert.lt(Math.abs(actual - expected), maxDiff, {actual, expected});
         };
         let assertWriteMetricsDiff = (actual, expected) => {
-            const maxDiff = isFinal ? this.finalWriteDistributionMetricsMaxDiff
-                                    : this.intermediateWriteDistributionMetricsMaxDiff;
+            const maxDiff = isFinal
+                ? this.finalWriteDistributionMetricsMaxDiff
+                : this.intermediateWriteDistributionMetricsMaxDiff;
             assert.lt(Math.abs(actual - expected), maxDiff, {actual, expected});
         };
 
-        const currentNumSampledQueries =
-            res.readDistribution.sampleSize.total + res.writeDistribution.sampleSize.total;
+        const currentNumSampledQueries = res.readDistribution.sampleSize.total + res.writeDistribution.sampleSize.total;
         this.previousNumSampledQueries = currentNumSampledQueries;
 
         if (isFinal) {
             // Sanity check sampleSize to make sure we collected non-zero metrics for each of the
             // commands.
-            for (const readCmd of ['find', 'aggregate', 'count', 'distinct']) {
-                assert.gt(res.readDistribution.sampleSize[readCmd],
-                          0,
-                          () => "Expected sampleSize for '" + readCmd +
-                              "' to be greater than zero: " +
-                              tojson(this.truncateAnalyzeShardKeyResponseForLogging(res)));
+            for (const readCmd of ["find", "aggregate", "count", "distinct"]) {
+                assert.gt(
+                    res.readDistribution.sampleSize[readCmd],
+                    0,
+                    () =>
+                        "Expected sampleSize for '" +
+                        readCmd +
+                        "' to be greater than zero: " +
+                        tojson(this.truncateAnalyzeShardKeyResponseForLogging(res)),
+                );
             }
-            for (const writeCmd of ['update', 'delete', 'findAndModify']) {
-                assert.gt(res.writeDistribution.sampleSize[writeCmd],
-                          0,
-                          () => "Expected sampleSize for '" + writeCmd +
-                              "' to be greater than zero: " +
-                              tojson(this.truncateAnalyzeShardKeyResponseForLogging(res)));
+            for (const writeCmd of ["update", "delete", "findAndModify"]) {
+                assert.gt(
+                    res.writeDistribution.sampleSize[writeCmd],
+                    0,
+                    () =>
+                        "Expected sampleSize for '" +
+                        writeCmd +
+                        "' to be greater than zero: " +
+                        tojson(this.truncateAnalyzeShardKeyResponseForLogging(res)),
+                );
             }
         }
 
         if (this.shouldValidateReadDistribution(res.readDistribution.sampleSize)) {
-            assertReadMetricsDiff(res.readDistribution.percentageOfSingleShardReads,
-                                  this.readDistribution.percentageOfSingleShardReads);
-            assertReadMetricsDiff(res.readDistribution.percentageOfMultiShardReads,
-                                  this.readDistribution.percentageOfMultiShardReads);
-            assertReadMetricsDiff(res.readDistribution.percentageOfScatterGatherReads,
-                                  this.readDistribution.percentageOfScatterGatherReads);
+            assertReadMetricsDiff(
+                res.readDistribution.percentageOfSingleShardReads,
+                this.readDistribution.percentageOfSingleShardReads,
+            );
+            assertReadMetricsDiff(
+                res.readDistribution.percentageOfMultiShardReads,
+                this.readDistribution.percentageOfMultiShardReads,
+            );
+            assertReadMetricsDiff(
+                res.readDistribution.percentageOfScatterGatherReads,
+                this.readDistribution.percentageOfScatterGatherReads,
+            );
             try {
-                assert.eq(res.readDistribution.numReadsByRange.length,
-                          this.analyzeShardKeyNumRanges);
+                assert.eq(res.readDistribution.numReadsByRange.length, this.analyzeShardKeyNumRanges);
             } catch (e) {
                 if (duration <= this.splitPointExpirationSecs) {
                     // Ignore errors if the duration of analyzeShardKey is greater than
                     // splitPointExpirationSecs because the TTL monitor may have deleted split point
                     // documents before numReadsByRange metrics were calculated.
-                    throw (e);
+                    throw e;
                 }
             }
         }
 
         if (this.shouldValidateWriteDistribution(res.writeDistribution.sampleSize)) {
-            assertWriteMetricsDiff(res.writeDistribution.percentageOfSingleShardWrites,
-                                   this.writeDistribution.percentageOfSingleShardWrites);
-            assertWriteMetricsDiff(res.writeDistribution.percentageOfMultiShardWrites,
-                                   this.writeDistribution.percentageOfMultiShardWrites);
-            assertWriteMetricsDiff(res.writeDistribution.percentageOfScatterGatherWrites,
-                                   this.writeDistribution.percentageOfScatterGatherWrites);
-            assertWriteMetricsDiff(res.writeDistribution.percentageOfShardKeyUpdates,
-                                   this.writeDistribution.percentageOfShardKeyUpdates);
-            assertWriteMetricsDiff(res.writeDistribution.percentageOfSingleWritesWithoutShardKey,
-                                   this.writeDistribution.percentageOfSingleWritesWithoutShardKey);
-            assertWriteMetricsDiff(res.writeDistribution.percentageOfMultiWritesWithoutShardKey,
-                                   this.writeDistribution.percentageOfMultiWritesWithoutShardKey);
+            assertWriteMetricsDiff(
+                res.writeDistribution.percentageOfSingleShardWrites,
+                this.writeDistribution.percentageOfSingleShardWrites,
+            );
+            assertWriteMetricsDiff(
+                res.writeDistribution.percentageOfMultiShardWrites,
+                this.writeDistribution.percentageOfMultiShardWrites,
+            );
+            assertWriteMetricsDiff(
+                res.writeDistribution.percentageOfScatterGatherWrites,
+                this.writeDistribution.percentageOfScatterGatherWrites,
+            );
+            assertWriteMetricsDiff(
+                res.writeDistribution.percentageOfShardKeyUpdates,
+                this.writeDistribution.percentageOfShardKeyUpdates,
+            );
+            assertWriteMetricsDiff(
+                res.writeDistribution.percentageOfSingleWritesWithoutShardKey,
+                this.writeDistribution.percentageOfSingleWritesWithoutShardKey,
+            );
+            assertWriteMetricsDiff(
+                res.writeDistribution.percentageOfMultiWritesWithoutShardKey,
+                this.writeDistribution.percentageOfMultiWritesWithoutShardKey,
+            );
             try {
-                assert.eq(res.writeDistribution.numWritesByRange.length,
-                          this.analyzeShardKeyNumRanges);
+                assert.eq(res.writeDistribution.numWritesByRange.length, this.analyzeShardKeyNumRanges);
             } catch (e) {
                 if (duration <= this.splitPointExpirationSecs) {
                     // Ignore errors if the duration of analyzeShardKey is greater than
                     // splitPointExpirationSecs because the TTL monitor may have deleted split point
                     // documents before numReadsByRange metrics were calculated.
-                    throw (e);
+                    throw e;
                 }
             }
         }
@@ -727,23 +761,24 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             // complete. For the analyzeShardKey command, it turns out mongos can sometimes use up
             // all of its StaleConfig retries. This is likely caused by the refreshes that occur as
             // metrics are calculated.
-            print(`Failed to analyze the shard key due to a stale config error ${
-                tojsononeline(err)}`);
+            print(`Failed to analyze the shard key due to a stale config error ${tojsononeline(err)}`);
             return true;
         }
         if (err.code == ErrorCodes.QueryPlanKilled && TestData.runningWithBalancer) {
             // analyzeShardKey uses secondary reads, which can be terminated by the node if the
             // targeted data belongs to a deleted range.
             print(
-                `Failed to analyze the shard key due to a cursor terminated by a secondary node: ${
-                    tojsononeline(err)}`);
+                `Failed to analyze the shard key due to a cursor terminated by a secondary node: ${tojsononeline(err)}`,
+            );
             return true;
         }
         // TODO SERVER-107475: Keep or remove this acceptable error based on the outcome of the
         // investigation.
         if (err.code == 7826505) {
-            print(`Failed to analyze the shard key: no samples could be collected due to low ` +
-                  `sample rate + insufficient documents within the shard. ${tojsononeline(err)}`);
+            print(
+                `Failed to analyze the shard key: no samples could be collected due to low ` +
+                    `sample rate + insufficient documents within the shard. ${tojsononeline(err)}`,
+            );
             return true;
         }
         if (err.code == 28799 || err.code == 4952606) {
@@ -752,39 +787,49 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             // based split policy throws if it fails to find the specified number of split points.
             print(
                 `Failed to analyze the shard key due to duplicate keys returned by random ` +
-                `cursor. Skipping the next ${this.numAnalyzeShardKeySkipsAfterRandomCursorError} ` +
-                `analyzeShardKey states since the analyzeShardKey command is likely to fail with ` +
-                `this error again. ${tojsononeline(err)}`);
+                    `cursor. Skipping the next ${this.numAnalyzeShardKeySkipsAfterRandomCursorError} ` +
+                    `analyzeShardKey states since the analyzeShardKey command is likely to fail with ` +
+                    `this error again. ${tojsononeline(err)}`,
+            );
             this.numAnalyzeShardKeySkips = this.numAnalyzeShardKeySkipsAfterRandomCursorError;
             return true;
         }
         if (this.expectedAggregateInterruptErrors.includes(err.code)) {
             print(
-                `Failed to analyze the shard key because internal aggregate commands got interrupted ${
-                    tojsononeline(err)}`);
+                `Failed to analyze the shard key because internal aggregate commands got interrupted ${tojsononeline(
+                    err,
+                )}`,
+            );
             return true;
         }
         if (err.code == 7559401) {
-            print(`Failed to analyze the shard key because one of the shards fetched the split ` +
-                  `point documents after the TTL deletions had started. ${tojsononeline(err)}`);
+            print(
+                `Failed to analyze the shard key because one of the shards fetched the split ` +
+                    `point documents after the TTL deletions had started. ${tojsononeline(err)}`,
+            );
             return true;
         }
         if (err.code == 7588600) {
-            print(`Failed to analyze the shard key because the document for one of the most ` +
-                  `common shard key values got deleted while the command was running. ${
-                      tojsononeline(err)}`);
+            print(
+                `Failed to analyze the shard key because the document for one of the most ` +
+                    `common shard key values got deleted while the command was running. ${tojsononeline(err)}`,
+            );
             return true;
         }
         if (err.code == 7826501) {
-            print(`Failed to analyze the shard key because $collStats indicates that the ` +
-                  `collection is empty. ${tojsononeline(err)}`);
+            print(
+                `Failed to analyze the shard key because $collStats indicates that the ` +
+                    `collection is empty. ${tojsononeline(err)}`,
+            );
             // Inaccurate fast count is only expected when there is unclean shutdown.
             return TestData.runningWithShardStepdowns;
         }
         if (err.code == 7826507) {
             print(
-                `Failed to analyze the shard key because the number of sampled documents is zero. ${
-                    tojsononeline(err)}`);
+                `Failed to analyze the shard key because the number of sampled documents is zero. ${tojsononeline(
+                    err,
+                )}`,
+            );
             // Here are the relevant steps in the cluster analyzeShardKey command:
             // 1. The mongos forwards the analyzeShardKey command to one of the shards that owns
             //    chunks for the collection (the primary shard is prioritized).
@@ -798,16 +843,26 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             // those steps must not overlap. Please see SERVER-91030 for more details.
             return true;
         }
-        if (err.code == ErrorCodes.IllegalOperation && err.errmsg &&
-            err.errmsg.includes("monotonicity") && err.errmsg.includes("empty collection")) {
-            print(`Failed to analyze the shard key because the fast count during the ` +
-                  `step for calculating the monotonicity metrics indicates that collection ` +
-                  `is empty. ${tojsononeline(err)}`);
+        if (
+            err.code == ErrorCodes.IllegalOperation &&
+            err.errmsg &&
+            err.errmsg.includes("monotonicity") &&
+            err.errmsg.includes("empty collection")
+        ) {
+            print(
+                `Failed to analyze the shard key because the fast count during the ` +
+                    `step for calculating the monotonicity metrics indicates that collection ` +
+                    `is empty. ${tojsononeline(err)}`,
+            );
             // Inaccurate fast count is only expected when there is unclean shutdown.
             return TestData.runningWithShardStepdowns;
         }
-        if (err.code === ErrorCodes.BadValue && err.errmsg && err.errmsg.includes("hint") &&
-            err.errmsg.includes("existing index")) {
+        if (
+            err.code === ErrorCodes.BadValue &&
+            err.errmsg &&
+            err.errmsg.includes("hint") &&
+            err.errmsg.includes("existing index")
+        ) {
             // The analyzeShardKey metrics calculation requires that the shard key has a
             // supporting index. In concurrency test suites, it is possible that the
             // analyzeShardKey aggregate query targets a node before the index exists on that
@@ -816,8 +871,10 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             // before the analyzeShardKey command targets it.
             // In these cases, we should just retry the analyzeShardKey command.
             print(
-                `Failed to analyze the shard key because the candidateKeyField index was not found. ${
-                    tojsononeline(err)}`);
+                `Failed to analyze the shard key because the candidateKeyField index was not found. ${tojsononeline(
+                    err,
+                )}`,
+            );
             return true;
         }
         return false;
@@ -841,15 +898,14 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * "numWritesByRange" fields truncated if they exist since they are arrays of length
      * this.numRanges (defaults to 100).
      */
-    $config.data.truncateAnalyzeShardKeyResponseForLogging =
-        function truncateAnalyzeShardKeyResponseForLogging(originalRes) {
+    $config.data.truncateAnalyzeShardKeyResponseForLogging = function truncateAnalyzeShardKeyResponseForLogging(
+        originalRes,
+    ) {
         const truncatedRes = Object.extend({}, originalRes, true /* deep */);
-        if (truncatedRes.hasOwnProperty("readDistribution") &&
-            truncatedRes.readDistribution.sampleSize.total > 0) {
+        if (truncatedRes.hasOwnProperty("readDistribution") && truncatedRes.readDistribution.sampleSize.total > 0) {
             truncatedRes.readDistribution["numReadsByRange"] = "truncated";
         }
-        if (truncatedRes.hasOwnProperty("writeDistribution") &&
-            truncatedRes.writeDistribution.sampleSize.total > 0) {
+        if (truncatedRes.hasOwnProperty("writeDistribution") && truncatedRes.writeDistribution.sampleSize.total > 0) {
             truncatedRes.writeDistribution["numWritesByRange"] = "truncated";
         }
         return truncatedRes;
@@ -863,20 +919,23 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         const ns = db.getName() + "." + collName;
         let docs;
         try {
-            docs = db.getSiblingDB("admin")
-                       .aggregate([{$listSampledQueries: {namespace: ns}}],
-                                  // The network override does not support issuing getMore commands
-                                  // since if a network error occurs during it then it won't know
-                                  // whether the cursor was advanced or not. To allow this workload
-                                  // to run in a suite with network error, use a large batch size so
-                                  // that no getMore commands would be issued.
-                                  {
-                                      cursor: TestData.runningWithShardStepdowns ||
-                                              TestData.runningWithBalancer
-                                          ? {batchSize: 100000}
-                                          : {}
-                                  })
-                       .toArray();
+            docs = db
+                .getSiblingDB("admin")
+                .aggregate(
+                    [{$listSampledQueries: {namespace: ns}}],
+                    // The network override does not support issuing getMore commands
+                    // since if a network error occurs during it then it won't know
+                    // whether the cursor was advanced or not. To allow this workload
+                    // to run in a suite with network error, use a large batch size so
+                    // that no getMore commands would be issued.
+                    {
+                        cursor:
+                            TestData.runningWithShardStepdowns || TestData.runningWithBalancer
+                                ? {batchSize: 100000}
+                                : {},
+                    },
+                )
+                .toArray();
         } catch (e) {
             if (this.expectedAggregateInterruptErrors.includes(e.code)) {
                 return;
@@ -898,10 +957,12 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
 
     $config.data.overrideSplitPointExpiration = function overrideSplitPointExpiration(cluster) {
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                analyzeShardKeySplitPointExpirationSecs: this.splitPointExpirationSecs,
-            }));
+            const res = assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    analyzeShardKeySplitPointExpirationSecs: this.splitPointExpirationSecs,
+                }),
+            );
             this.originalSplitPointExpirationSecs[db.getMongo().host] = res.was;
         });
     };
@@ -909,27 +970,31 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     $config.data.overrideTTLMonitorSleepSecs = function overrideTTLMonitorSleepSecs(cluster) {
         cluster.executeOnMongodNodes((db) => {
             const res = assert.commandWorked(
-                db.adminCommand({setParameter: 1, ttlMonitorSleepSecs: this.ttlMonitorSleepSecs}));
+                db.adminCommand({setParameter: 1, ttlMonitorSleepSecs: this.ttlMonitorSleepSecs}),
+            );
             this.originalTTLMonitorSleepSecs[db.getMongo().host] = res.was;
         });
     };
 
     $config.data.restoreSplitPointExpiration = function restoreSplitPointExpiration(cluster) {
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                analyzeShardKeySplitPointExpirationSecs:
-                    this.originalSplitPointExpirationSecs[db.getMongo().host],
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    analyzeShardKeySplitPointExpirationSecs: this.originalSplitPointExpirationSecs[db.getMongo().host],
+                }),
+            );
         });
     };
 
     $config.data.restoreTTLMonitorSleepSecs = function restoreTTLMonitorSleepSecs(cluster) {
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                ttlMonitorSleepSecs: this.originalTTLMonitorSleepSecs[db.getMongo().host],
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    ttlMonitorSleepSecs: this.originalTTLMonitorSleepSecs[db.getMongo().host],
+                }),
+            );
         });
     };
 
@@ -937,49 +1002,58 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
      * Returns the number of documents that match the given filter in the given collection.
      */
     $config.data.getNumDocuments = function getNumDocuments(db, collName, filter) {
-        const firstBatch = assert
-                               .commandWorked(db.runCommand({
-                                   aggregate: collName,
-                                   pipeline: [{$match: filter}, {$count: "count"}],
-                                   cursor: {}
-                               }))
-                               .cursor.firstBatch;
+        const firstBatch = assert.commandWorked(
+            db.runCommand({
+                aggregate: collName,
+                pipeline: [{$match: filter}, {$count: "count"}],
+                cursor: {},
+            }),
+        ).cursor.firstBatch;
         return firstBatch.length == 0 ? 0 : firstBatch[0].count;
     };
 
     // To avoid leaving unnecessary documents in config database after this workload finishes,
     // remove all the sampled query documents and split point documents during teardown().
-    $config.data.removeSampledQueryAndSplitPointDocuments =
-        function removeSampledQueryAndSplitPointDocuments(db, collName, cluster) {
+    $config.data.removeSampledQueryAndSplitPointDocuments = function removeSampledQueryAndSplitPointDocuments(
+        db,
+        collName,
+        cluster,
+    ) {
         const ns = db.getName() + "." + collName;
-        cluster.getReplicaSets().forEach(rst => {
+        cluster.getReplicaSets().forEach((rst) => {
             while (true) {
                 try {
                     const configDb = rst.getPrimary().getDB("config");
                     jsTest.log("Removing sampled query documents and split points documents");
                     jsTest.log(
-                        "The counts before removing " + tojsononeline({
-                            sampledQueries: this.getNumDocuments(configDb, "sampledQueries", {ns}),
-                            sampledQueriesDiff:
-                                this.getNumDocuments(configDb, "sampledQueriesDiff", {ns}),
-                            analyzeShardKeySplitPoints:
-                                this.getNumDocuments(configDb, "analyzeShardKeySplitPoints", {ns}),
-
-                        }));
+                        "The counts before removing " +
+                            tojsononeline({
+                                sampledQueries: this.getNumDocuments(configDb, "sampledQueries", {ns}),
+                                sampledQueriesDiff: this.getNumDocuments(configDb, "sampledQueriesDiff", {ns}),
+                                analyzeShardKeySplitPoints: this.getNumDocuments(
+                                    configDb,
+                                    "analyzeShardKeySplitPoints",
+                                    {ns},
+                                ),
+                            }),
+                    );
 
                     assert.commandWorked(configDb.sampledQueries.remove({}));
                     assert.commandWorked(configDb.sampledQueriesDiff.remove({}));
                     assert.commandWorked(configDb.analyzeShardKeySplitPoints.remove({}));
 
                     jsTest.log(
-                        "The counts after removing " + tojsononeline({
-                            sampledQueries: this.getNumDocuments(configDb, "sampledQueries", {ns}),
-                            sampledQueriesDiff:
-                                this.getNumDocuments(configDb, "sampledQueriesDiff", {ns}),
-                            analyzeShardKeySplitPoints:
-                                this.getNumDocuments(configDb, "analyzeShardKeySplitPoints", {ns}),
-
-                        }));
+                        "The counts after removing " +
+                            tojsononeline({
+                                sampledQueries: this.getNumDocuments(configDb, "sampledQueries", {ns}),
+                                sampledQueriesDiff: this.getNumDocuments(configDb, "sampledQueriesDiff", {ns}),
+                                analyzeShardKeySplitPoints: this.getNumDocuments(
+                                    configDb,
+                                    "analyzeShardKeySplitPoints",
+                                    {ns},
+                                ),
+                            }),
+                    );
                     return;
                 } catch (e) {
                     if (RetryableWritesUtil.isRetryableCode(e.code)) {
@@ -999,16 +1073,17 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         // Look up the number of most common values and the number of ranges that the
         // analyzeShardKey command should return.
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({
-                getParameter: 1,
-                analyzeShardKeyNumMostCommonValues: 1,
-                analyzeShardKeyNumRanges: 1
-            }));
+            const res = assert.commandWorked(
+                db.adminCommand({
+                    getParameter: 1,
+                    analyzeShardKeyNumMostCommonValues: 1,
+                    analyzeShardKeyNumRanges: 1,
+                }),
+            );
             if (this.analyzeShardKeyNumMostCommonValues === undefined) {
                 this.analyzeShardKeyNumMostCommonValues = res.analyzeShardKeyNumMostCommonValues;
             } else {
-                assert.eq(this.analyzeShardKeyNumMostCommonValues,
-                          res.analyzeShardKeyNumMostCommonValues);
+                assert.eq(this.analyzeShardKeyNumMostCommonValues, res.analyzeShardKeyNumMostCommonValues);
             }
             if (this.analyzeShardKeyNumRanges === undefined) {
                 this.analyzeShardKeyNumRanges = res.analyzeShardKeyNumRanges;
@@ -1021,15 +1096,15 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         // as eligible for sampling.
         if (cluster.isSharded) {
             cluster.executeOnMongosNodes((adminDb) => {
-                configureFailPoint(adminDb,
-                                   "queryAnalysisSamplerFilterByComment",
-                                   {comment: this.eligibleForSamplingComment});
+                configureFailPoint(adminDb, "queryAnalysisSamplerFilterByComment", {
+                    comment: this.eligibleForSamplingComment,
+                });
             });
         }
         cluster.executeOnMongodNodes((adminDb) => {
-            configureFailPoint(adminDb,
-                               "queryAnalysisSamplerFilterByComment",
-                               {comment: this.eligibleForSamplingComment});
+            configureFailPoint(adminDb, "queryAnalysisSamplerFilterByComment", {
+                comment: this.eligibleForSamplingComment,
+            });
         });
 
         this.overrideSplitPointExpiration(cluster);
@@ -1064,17 +1139,17 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             configureFailPoint(adminDb, "queryAnalysisSamplerFilterByComment", {}, "off");
         });
 
-        const res =
-            db[this.metricsCollName].find({_id: new UUID(this.metricsDocIdString)}).toArray();
+        const res = db[this.metricsCollName].find({_id: new UUID(this.metricsDocIdString)}).toArray();
         assert.eq(res.length, 1, res);
         const metrics = res[0].metrics;
         const duration = res[0].duration;
-        print("Doing final validation of read and write distribution metrics " +
-              tojson(this.truncateAnalyzeShardKeyResponseForLogging(metrics)));
+        print(
+            "Doing final validation of read and write distribution metrics " +
+                tojson(this.truncateAnalyzeShardKeyResponseForLogging(metrics)),
+        );
         this.assertReadWriteDistributionMetrics(metrics, true /* isFinal */, duration);
 
-        print("Listing sampled queries " +
-              tojsononeline({lastNumSampledQueries: this.previousNumSampledQueries}));
+        print("Listing sampled queries " + tojsononeline({lastNumSampledQueries: this.previousNumSampledQueries}));
         assert.gt(this.previousNumSampledQueries, 0);
         this.listSampledQueries(db, collName);
 
@@ -1108,11 +1183,13 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             cmdObj.sampleRate = Math.random() * 0.5 + 0.5;
         } else if (rand < 0.5) {
             cmdObj.sampleSize = NumberLong(
-                AnalyzeShardKeyUtil.getRandInteger(Math.floor(0.5 * this.numInitialDocuments),
-                                                   Math.floor(1.5 * this.numInitialDocuments)));
+                AnalyzeShardKeyUtil.getRandInteger(
+                    Math.floor(0.5 * this.numInitialDocuments),
+                    Math.floor(1.5 * this.numInitialDocuments),
+                ),
+            );
         }
-        const isSampling =
-            cmdObj.hasOwnProperty("sampleRate") || cmdObj.hasOwnProperty("sampleSize");
+        const isSampling = cmdObj.hasOwnProperty("sampleRate") || cmdObj.hasOwnProperty("sampleSize");
 
         print("Starting analyzeShardKey state " + tojsononeline(cmdObj));
         const startTime = Date.now();
@@ -1120,15 +1197,17 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         const elapsedTime = Date.now() - startTime;
         try {
             assert.commandWorked(res);
-            print("Metrics: " +
-                  tojsononeline({res: this.truncateAnalyzeShardKeyResponseForLogging(res)}));
+            print("Metrics: " + tojsononeline({res: this.truncateAnalyzeShardKeyResponseForLogging(res)}));
             this.assertKeyCharacteristicsMetrics(res, isSampling);
             this.assertReadWriteDistributionMetrics(res, false /* isFinal */, elapsedTime);
             // Persist the metrics so we can do the final validation during teardown.
-            assert.commandWorked(db[this.metricsCollName].update(
-                {_id: this.metricsDocId},
-                {_id: this.metricsDocId, collName, metrics: res, duration: elapsedTime},
-                true /* upsert */));
+            assert.commandWorked(
+                db[this.metricsCollName].update(
+                    {_id: this.metricsDocId},
+                    {_id: this.metricsDocId, collName, metrics: res, duration: elapsedTime},
+                    true /* upsert */,
+                ),
+            );
         } catch (e) {
             if (!this.isAcceptableAnalyzeShardKeyError(res)) {
                 throw e;
@@ -1140,12 +1219,16 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     $config.states.enableQuerySampling = function enableQuerySampling(db, collName) {
         print("Starting enableQuerySampling state");
         const ns = db.getName() + "." + collName;
-        assert.commandWorked(db.adminCommand({
-            configureQueryAnalyzer: ns,
-            mode: "full",
-            samplesPerSecond: AnalyzeShardKeyUtil.getRandInteger(this.minSamplesPerSecond,
-                                                                 this.maxSamplesPerSecond)
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                configureQueryAnalyzer: ns,
+                mode: "full",
+                samplesPerSecond: AnalyzeShardKeyUtil.getRandInteger(
+                    this.minSamplesPerSecond,
+                    this.maxSamplesPerSecond,
+                ),
+            }),
+        );
         print("Finished enableQuerySampling state");
     };
 
@@ -1166,8 +1249,8 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         const cmdObj = {
             find: collName,
             filter: this.generateRandomReadFilter(),
-            singleBatch: true,  // Avoid leaving open cursors.
-            comment: this.eligibleForSamplingComment
+            singleBatch: true, // Avoid leaving open cursors.
+            comment: this.eligibleForSamplingComment,
         };
         print("Starting find state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
@@ -1180,14 +1263,13 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             aggregate: collName,
             pipeline: [
                 {$match: this.generateRandomReadFilter()},
-                {$limit: 10}  // Avoid leaving open cursors.
+                {$limit: 10}, // Avoid leaving open cursors.
             ],
             cursor: {},
-            comment: this.eligibleForSamplingComment
+            comment: this.eligibleForSamplingComment,
         };
         print("Starting aggregate state " + tojsononeline(cmdObj));
-        const res = assert.commandWorkedOrFailedWithCode(db.runCommand(cmdObj),
-                                                         this.expectedAggregateInterruptErrors);
+        const res = assert.commandWorkedOrFailedWithCode(db.runCommand(cmdObj), this.expectedAggregateInterruptErrors);
         if (res.ok) {
             assert.eq(res.cursor.id, 0, res);
         }
@@ -1198,7 +1280,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         const cmdObj = {
             count: collName,
             query: this.generateRandomReadFilter(),
-            comment: this.eligibleForSamplingComment
+            comment: this.eligibleForSamplingComment,
         };
         print("Starting count state " + tojsononeline(cmdObj));
         assert.commandWorked(db.runCommand(cmdObj));
@@ -1210,7 +1292,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             distinct: collName,
             key: this.candidateShardKeyFieldName,
             query: this.generateRandomReadFilter(),
-            comment: this.eligibleForSamplingComment
+            comment: this.eligibleForSamplingComment,
         };
         print("Starting distinct state " + tojsononeline(cmdObj));
         assert.commandWorked(db.runCommand(cmdObj));
@@ -1228,7 +1310,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         const cmdObj = {
             update: collName,
             updates: [{q: filter, u: update, multi: isMulti}],
-            comment: this.eligibleForSamplingComment
+            comment: this.eligibleForSamplingComment,
         };
         print("Starting update state " + tojsononeline(cmdObj));
         const res = db.runCommand(cmdObj);
@@ -1237,9 +1319,10 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             assert.eq(res.nModified, 1, {cmdObj, res});
             assert.eq(res.n, 1, {cmdObj, res});
         } catch (e) {
-            if (!this.isAcceptableUpdateError(res) &&
-                !(res.hasOwnProperty("writeErrors") &&
-                  this.isAcceptableUpdateError(res.writeErrors[0]))) {
+            if (
+                !this.isAcceptableUpdateError(res) &&
+                !(res.hasOwnProperty("writeErrors") && this.isAcceptableUpdateError(res.writeErrors[0]))
+            ) {
                 throw e;
             }
         }
@@ -1256,15 +1339,14 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         const cmdObj = {
             delete: collName,
             deletes: [{q: filter, limit: isMulti ? 0 : 1}],
-            comment: this.eligibleForSamplingComment
+            comment: this.eligibleForSamplingComment,
         };
         print("Starting remove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
         assert.eq(res.n, 1, {cmdObj, res});
 
         // Insert a random document to restore the original number of documents.
-        assert.commandWorked(
-            db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));
+        assert.commandWorked(db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));
         print("Finished remove state");
     };
 
@@ -1279,7 +1361,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             findAndModify: collName,
             query: filter,
             update,
-            comment: this.eligibleForSamplingComment
+            comment: this.eligibleForSamplingComment,
         };
         print("Starting findAndModifyUpdate state " + tojsononeline(cmdObj));
         const res = db.runCommand(cmdObj);
@@ -1305,15 +1387,14 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             findAndModify: collName,
             query: filter,
             remove: true,
-            comment: this.eligibleForSamplingComment
+            comment: this.eligibleForSamplingComment,
         };
         print("Starting findAndModifyRemove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
         assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
 
         // Insert a random document to restore the original number of documents.
-        assert.commandWorked(
-            db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));
+        assert.commandWorked(db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));
         print("Finished findAndModifyRemove state");
     };
 
@@ -1322,72 +1403,72 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         // collName and connCache. This workload does not set 'passConnectionCache' since it doesn't
         // use 'connCache' but it may extend a sharding workload that uses it.
         const originalInit = $config.states.init;
-        $config.states.init = function(db, collName, connCache) {
+        $config.states.init = function (db, collName, connCache) {
             originalInit.call(this, db, collName);
         };
 
         const originalEnableQuerySampling = $config.states.enableQuerySampling;
-        $config.states.enableQuerySampling = function(db, collName, connCache) {
+        $config.states.enableQuerySampling = function (db, collName, connCache) {
             originalEnableQuerySampling.call(this, db, collName);
         };
 
         const originalDisableQuerySampling = $config.states.disableQuerySampling;
-        $config.states.disableQuerySampling = function(db, collName, connCache) {
+        $config.states.disableQuerySampling = function (db, collName, connCache) {
             originalDisableQuerySampling.call(this, db, collName);
         };
 
         const originalListSampledQueries = $config.states.listSampledQueries;
-        $config.states.listSampledQueries = function(db, collName, connCache) {
+        $config.states.listSampledQueries = function (db, collName, connCache) {
             originalListSampledQueries.call(this, db, collName);
         };
 
         const originalAnalyzeShardKey = $config.states.analyzeShardKey;
-        $config.states.analyzeShardKey = function(db, collName, connCache) {
+        $config.states.analyzeShardKey = function (db, collName, connCache) {
             originalAnalyzeShardKey.call(this, db, collName);
         };
 
         const originalFind = $config.states.find;
-        $config.states.find = function(db, collName, connCache) {
+        $config.states.find = function (db, collName, connCache) {
             originalFind.call(this, db, collName);
         };
 
         const originalAggregate = $config.states.aggregate;
-        $config.states.aggregate = function(db, collName, connCache) {
+        $config.states.aggregate = function (db, collName, connCache) {
             originalAggregate.call(this, db, collName);
         };
 
         const originalCount = $config.states.count;
-        $config.states.count = function(db, collName, connCache) {
+        $config.states.count = function (db, collName, connCache) {
             originalCount.call(this, db, collName);
         };
 
         const originalDistinct = $config.states.distinct;
-        $config.states.distinct = function(db, collName, connCache) {
+        $config.states.distinct = function (db, collName, connCache) {
             originalDistinct.call(this, db, collName);
         };
 
         const originalInsert = $config.states.insert;
-        $config.states.insert = function(db, collName, connCache) {
+        $config.states.insert = function (db, collName, connCache) {
             originalInsert.call(this, db, collName);
         };
 
         const originalUpdate = $config.states.update;
-        $config.states.update = function(db, collName, connCache) {
+        $config.states.update = function (db, collName, connCache) {
             originalUpdate.call(this, db, collName);
         };
 
         const originalRemove = $config.states.remove;
-        $config.states.remove = function(db, collName, connCache) {
+        $config.states.remove = function (db, collName, connCache) {
             originalRemove.call(this, db, collName);
         };
 
         const originalFindAndModifyUpdate = $config.states.findAndModifyUpdate;
-        $config.states.findAndModifyUpdate = function(db, collName, connCache) {
+        $config.states.findAndModifyUpdate = function (db, collName, connCache) {
             originalFindAndModifyUpdate.call(this, db, collName);
         };
 
         const originalFindAndModifyRemove = $config.states.findAndModifyRemove;
-        $config.states.findAndModifyRemove = function(db, collName, connCache) {
+        $config.states.findAndModifyRemove = function (db, collName, connCache) {
             originalFindAndModifyRemove.call(this, db, collName);
         };
     }
@@ -1533,7 +1614,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             update: 0.1,
             remove: 0.1,
             findAndModifyUpdate: 0.1,
-        }
+        },
     };
 
     return $config;

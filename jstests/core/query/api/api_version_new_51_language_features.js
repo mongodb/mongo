@@ -29,10 +29,12 @@ for (let pipeline of stablePipelines) {
     APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, viewName, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
-    assert.commandWorked(testDb.runCommand({
-        aggregate: coll.getName(),
-        pipeline: pipeline,
-        apiVersion: "1",
-        cursor: {},
-    }));
+    assert.commandWorked(
+        testDb.runCommand({
+            aggregate: coll.getName(),
+            pipeline: pipeline,
+            apiVersion: "1",
+            cursor: {},
+        }),
+    );
 }

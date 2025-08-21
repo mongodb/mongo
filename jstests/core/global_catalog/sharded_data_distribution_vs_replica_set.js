@@ -11,4 +11,5 @@ if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
 
 assert.commandFailedWithCode(
     db.adminCommand({aggregate: 1, pipeline: [{$shardedDataDistribution: {}}], cursor: {}}),
-    6789101);
+    6789101,
+);

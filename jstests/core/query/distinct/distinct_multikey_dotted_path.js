@@ -11,11 +11,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-import {
-    getAggPlanStages,
-    getWinningPlanFromExplain,
-    planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.distinct_multikey;
 coll.drop();
@@ -28,7 +24,7 @@ assert.commandWorked(coll.insert({a: {b: {notRelevant: 3}}}));
 assert.commandWorked(coll.insert({a: {notRelevant: 3}}));
 
 const numPredicate = {
-    "a.b.c": {$gt: 0}
+    "a.b.c": {$gt: 0},
 };
 
 function getAggPipelineForDistinct(path) {
@@ -123,8 +119,8 @@ assert.commandWorked(coll.insert({a: {b: {c: []}}}));
     const multiKeyResults = coll.distinct("a.b");
     assert.sameMembers(
         [
-            null,  // From the document with no 'b' field. TODO SERVER-14832: this is
-                   // inconsistent with behavior when no index is present.
+            null, // From the document with no 'b' field. TODO SERVER-14832: this is
+            // inconsistent with behavior when no index is present.
             {c: 1},
             {c: 2},
             {c: 3},
@@ -132,9 +128,10 @@ assert.commandWorked(coll.insert({a: {b: {c: []}}}));
             {c: 5},
             {c: 6},
             {c: []},
-            {notRelevant: 3}
+            {notRelevant: 3},
         ],
-        multiKeyResults);
+        multiKeyResults,
+    );
 
     const expl = coll.explain().distinct("a.b");
     assert.eq(true, planHasStage(db, getWinningPlanFromExplain(expl), "DISTINCT_SCAN"));
@@ -146,13 +143,7 @@ assert.commandWorked(coll.insert({a: {b: {c: []}}}));
     assert.commandWorked(coll.createIndex({"a.b": 1}));
     const pred = {"a.b": {$type: "array"}};
     const multiKeyResults = coll.distinct("a.b", pred);
-    assert.sameMembers(
-        [
-            {c: 4},
-            {c: 5},
-            {c: 6},
-        ],
-        multiKeyResults);
+    assert.sameMembers([{c: 4}, {c: 5}, {c: 6}], multiKeyResults);
 
     const expl = coll.explain().distinct("a.b", pred);
     const winningPlan = getWinningPlanFromExplain(expl);

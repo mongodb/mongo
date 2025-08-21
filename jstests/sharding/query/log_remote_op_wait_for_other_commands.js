@@ -15,25 +15,26 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 st.stopBalancer();
 
 const dbName = st.s.defaultDB;
-const coll = st.s.getDB(dbName).getCollection('profile_remote_op_wait');
+const coll = st.s.getDB(dbName).getCollection("profile_remote_op_wait");
 
 coll.drop();
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 
 // Shards the test collection and splits it into two chunks: one that contains all {shard: 1}
 // documents and one that contains all {shard: 2} documents.
-st.shardColl(coll.getName(),
-             {shard: 1} /* shard key */,
-             {shard: 2} /* split at */,
-             {shard: 2} /* move the chunk containing {shard: 2} to its own shard */,
-             dbName,
-             true);
+st.shardColl(
+    coll.getName(),
+    {shard: 1} /* shard key */,
+    {shard: 2} /* split at */,
+    {shard: 2} /* move the chunk containing {shard: 2} to its own shard */,
+    dbName,
+    true,
+);
 
-assert.commandWorked(
-    coll.insert(Array.from({length: 100}, (_, i) => ({_id: i, shard: (i % 2) + 1, x: i}))));
+assert.commandWorked(coll.insert(Array.from({length: 100}, (_, i) => ({_id: i, shard: (i % 2) + 1, x: i}))));
 
 // Sets the slow query logging threshold (slowMS) to -1 to ensure every query gets logged.
-st.s.getDB('admin').setProfilingLevel(0, -1);
+st.s.getDB("admin").setProfilingLevel(0, -1);
 
 function getRemoteOpWait(logLine) {
     const pattern = /remoteOpWaitMillis"?:([0-9]+)/;
@@ -54,13 +55,12 @@ function getDuration(logLine) {
 }
 
 // An .find() includes remoteOpWaitMillis.
-const findComment = 'example_find_should_have_remote_op_wait_too';
+const findComment = "example_find_should_have_remote_op_wait_too";
 coll.find().sort({x: 1}).comment(findComment).next();
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const lines =
-        [...iterateMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: findComment})];
-    const line = lines.find(line => line.match(/command.{1,4}find/));
+    const lines = [...iterateMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: findComment})];
+    const line = lines.find((line) => line.match(/command.{1,4}find/));
     assert(line, "Failed to find a 'find' log line matching the comment");
     assert(line.match(/remoteOpWait/), `Log line does not contain remoteOpWait: ${line}`);
     const remoteOpWait = getRemoteOpWait(line);
@@ -70,13 +70,12 @@ coll.find().sort({x: 1}).comment(findComment).next();
 
 // Other commands which execute remote operations also include remoteOpWaitMillis, such as
 // listCollections.
-const listCollectionsComment = 'example_listCollections_should_have_remote_op_wait_too';
+const listCollectionsComment = "example_listCollections_should_have_remote_op_wait_too";
 coll.runCommand({listCollections: 1, comment: listCollectionsComment});
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const lines = [...iterateMatchingLogLines(
-        mongosLog.log, {msg: "Slow query", comment: listCollectionsComment})];
-    const line = lines.find(line => line.match(/command.{1,4}listCollections/));
+    const lines = [...iterateMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: listCollectionsComment})];
+    const line = lines.find((line) => line.match(/command.{1,4}listCollections/));
     assert(line, "Failed to find a 'listCollections' log line matching the comment");
     assert(line.match(/remoteOpWait/), `Log line does not contain remoteOpWait: ${line}`);
     const remoteOpWait = getRemoteOpWait(line);

@@ -30,30 +30,29 @@ for (var i = 0; i < 1000; i++) {
 // the documents in the collection.
 var awaitShell = startParallelShell(() => {
     jsTest.log("Starting long-running count in parallel shell");
-    db.jstests_count_plan_summary.find({x: 1, $where: 'sleep(100); return true;'}).count();
+    db.jstests_count_plan_summary.find({x: 1, $where: "sleep(100); return true;"}).count();
     jsTest.log("Finished long-running count in parallel shell");
 });
 
 // Find the count op in db.currentOp() and check for the plan summary.
-assert.soon(function() {
-    var currentCountOps =
-        db.getSiblingDB("admin")
-            .aggregate([
-                {$currentOp: {}},
-                {
-                    $match: {
-                        $and: [
-                            {"command.count": t.getName()},
-                            // On the replica set endpoint, currentOp reports both router and shard
-                            // operations. So filter out one of them.
-                            TestData.testingReplicaSetEndpoint ? {role: "ClusterRole{shard}"}
-                                                               : {role: {$exists: false}}
-                        ]
-                    }
+assert.soon(function () {
+    var currentCountOps = db
+        .getSiblingDB("admin")
+        .aggregate([
+            {$currentOp: {}},
+            {
+                $match: {
+                    $and: [
+                        {"command.count": t.getName()},
+                        // On the replica set endpoint, currentOp reports both router and shard
+                        // operations. So filter out one of them.
+                        TestData.testingReplicaSetEndpoint ? {role: "ClusterRole{shard}"} : {role: {$exists: false}},
+                    ],
                 },
-                {$limit: 1},
-            ])
-            .toArray();
+            },
+            {$limit: 1},
+        ])
+        .toArray();
 
     if (currentCountOps.length !== 1) {
         jsTest.log("Still didn't find count operation in the currentOp log.");
@@ -84,6 +83,5 @@ var exitCode = awaitShell({checkExitSuccess: false});
 // This can make killOp commands overlap with a concurrent placement version mismatch,
 // such that the given operation is getting retried and completed, instead of being terminated.
 if (!TestData.shardsAddedRemoved) {
-    assert.neq(
-        0, exitCode, "Expected shell to exit abnormally due to JS execution being terminated");
+    assert.neq(0, exitCode, "Expected shell to exit abnormally due to JS execution being terminated");
 }

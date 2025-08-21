@@ -12,8 +12,7 @@ export function setupShardedCollectionWithOrphans() {
     // Enable sharding.
     const primaryShard = shardingTest.shard0.shardName;
     const otherShard = shardingTest.shard1.shardName;
-    assert.commandWorked(
-        shardingTest.s0.adminCommand({enableSharding: db.getName(), primaryShard}));
+    assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName(), primaryShard}));
 
     const shard0Chunks = ["chunk1_s0", "chunk2_s0", "chunk3_s0"];
     const shard1Chunks = ["chunk1_s1", "chunk2_s1", "chunk3_s1"];
@@ -25,30 +24,30 @@ export function setupShardedCollectionWithOrphans() {
     coll.createIndex({shardKey: 1, notShardKey: 1});
 
     const docs = [];
-    let _id = 0;  // We don't want non-deterministic _ids in $$ROOT tests.
+    let _id = 0; // We don't want non-deterministic _ids in $$ROOT tests.
     for (const chunk of allChunks) {
         for (let i = 0; i < 3; i++) {
             docs.push(
                 {_id: _id++, shardKey: `${chunk}_${i}`, notShardKey: `1notShardKey_${chunk}_${i}`},
                 {_id: _id++, shardKey: `${chunk}_${i}`, notShardKey: `2notShardKey_${chunk}_${i}`},
-                {_id: _id++, shardKey: `${chunk}_${i}`, notShardKey: `3notShardKey_${chunk}_${i}`});
+                {_id: _id++, shardKey: `${chunk}_${i}`, notShardKey: `3notShardKey_${chunk}_${i}`},
+            );
         }
     }
     coll.insertMany(docs);
 
-    assert.commandWorked(
-        shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}));
+    assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}));
 
     // Split chunks up.
     for (const chunk of allChunks) {
-        assert.commandWorked(
-            shardingTest.s.adminCommand({split: coll.getFullName(), middle: {shardKey: chunk}}));
+        assert.commandWorked(shardingTest.s.adminCommand({split: coll.getFullName(), middle: {shardKey: chunk}}));
     }
 
     // Move "shard 1" chunks off of primary.
     for (const shardKey of shard1Chunks) {
-        assert.commandWorked(shardingTest.s.adminCommand(
-            {moveChunk: coll.getFullName(), find: {shardKey}, to: otherShard}));
+        assert.commandWorked(
+            shardingTest.s.adminCommand({moveChunk: coll.getFullName(), find: {shardKey}, to: otherShard}),
+        );
     }
 
     {
@@ -58,7 +57,7 @@ export function setupShardedCollectionWithOrphans() {
             for (let i = 0; i < 3; i++) {
                 docs.push({
                     shardKey: `${chunk}_${i}_orphan`,
-                    notShardKey: `notShardKey_${chunk}_${i}_orphan`
+                    notShardKey: `notShardKey_${chunk}_${i}_orphan`,
                 });
             }
         }
@@ -71,7 +70,7 @@ export function setupShardedCollectionWithOrphans() {
             for (let i = 0; i < 3; i++) {
                 docs.push({
                     shardKey: `${chunk}_${i}_orphan`,
-                    notShardKey: `notShardKey_${chunk}_${i}_orphan`
+                    notShardKey: `notShardKey_${chunk}_${i}_orphan`,
                 });
             }
         }

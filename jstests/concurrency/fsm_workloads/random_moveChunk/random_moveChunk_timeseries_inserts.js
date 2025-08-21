@@ -13,9 +13,7 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
-import {
-    $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js';
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -23,7 +21,7 @@ import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // This test manually shards the collection.
     TestData.shardCollectionProbability = 0;
 
@@ -40,8 +38,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.numInitialDocs = 60 * 24 * 30;
     $config.data.numMetaCount = 30;
 
-    $config.data.metaField = 'm';
-    $config.data.timeField = 't';
+    $config.data.metaField = "m";
+    $config.data.timeField = "t";
 
     $config.data.generateMetaFieldValueForInitialInserts = () => {
         return Math.floor(Random.rand() * $config.data.numMetaCount);
@@ -58,8 +56,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.insert = function insert(db, collName, connCache) {
         for (let i = 0; i < 10; i++) {
             // Generate a random timestamp between 'startTime' and largest timestamp we inserted.
-            const timer =
-                this.startTime + Math.floor(Random.rand() * this.numInitialDocs * this.increment);
+            const timer = this.startTime + Math.floor(Random.rand() * this.numInitialDocs * this.increment);
             const metaVal = this.generateMetaFieldValueForInsertStage(this.tid);
             const doc = {
                 _id: new ObjectId(),
@@ -76,7 +73,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Moves a random chunk in the target collection.
      */
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
-        const configDB = db.getSiblingDB('config');
+        const configDB = db.getSiblingDB("config");
         const coll = getTimeseriesCollForDDLOps(db, db[collName]);
         const chunks = findChunksUtil.findChunksByNs(configDB, coll.getFullName()).toArray();
         const chunkToMove = chunks[this.tid];
@@ -84,15 +81,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // Choose a random shard to move the chunk to.
         const shardNames = Object.keys(connCache.shards);
-        const destinationShards = shardNames.filter(function(shard) {
+        const destinationShards = shardNames.filter(function (shard) {
             if (shard !== fromShard) {
                 return shard;
             }
         });
         const toShard = destinationShards[Random.randInt(destinationShards.length)];
         const waitForDelete = false;
-        ChunkHelper.moveChunk(
-            db, coll.getName(), [chunkToMove.min, chunkToMove.max], toShard, waitForDelete);
+        ChunkHelper.moveChunk(db, coll.getName(), [chunkToMove.min, chunkToMove.max], toShard, waitForDelete);
     };
 
     $config.states.init = function init(db, collName, connCache) {};
@@ -100,26 +96,30 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.transitions = {
         init: {insert: 1},
         insert: {insert: 7, moveChunk: 1},
-        moveChunk: {insert: 1, moveChunk: 0}
+        moveChunk: {insert: 1, moveChunk: 0},
     };
 
     $config.data.validateCollection = function validate(db, collName) {
-        const pipeline =
-            [{$project: {_id: "$_id", m: "$m", t: "$t"}}, {$sort: {m: 1, t: 1, _id: 1}}];
-        const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
-                                                    db[this.nonShardCollName].aggregate(pipeline));
-        assert.eq(diff,
-                  {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
+        const pipeline = [{$project: {_id: "$_id", m: "$m", t: "$t"}}, {$sort: {m: 1, t: 1, _id: 1}}];
+        const diff = DataConsistencyChecker.getDiff(
+            db[collName].aggregate(pipeline),
+            db[this.nonShardCollName].aggregate(pipeline),
+        );
+        assert.eq(diff, {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        const numBuckets =
-            getTimeseriesCollForRawOps(db, db[collName]).find({}).rawData().itcount();
+        const numBuckets = getTimeseriesCollForRawOps(db, db[collName]).find({}).rawData().itcount();
         const numInitialDocs = db[collName].find().itcount();
 
-        jsTestLog("NumBuckets " + numBuckets + ", numDocs on sharded cluster" +
-                  db[collName].find().itcount() + "numDocs on unsharded collection " +
-                  db[this.nonShardCollName].find({}).itcount());
+        jsTestLog(
+            "NumBuckets " +
+                numBuckets +
+                ", numDocs on sharded cluster" +
+                db[collName].find().itcount() +
+                "numDocs on unsharded collection " +
+                db[this.nonShardCollName].find({}).itcount(),
+        );
 
         // Validate the contents of the collection.
         this.validateCollection(db, collName);
@@ -131,18 +131,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 "$_internalUnpackBucket": {
                     "metaField": this.metaField,
                     "timeField": this.timeField,
-                    "bucketMaxSpanSeconds": NumberInt(3600)
-                }
+                    "bucketMaxSpanSeconds": NumberInt(3600),
+                },
             };
-            const numDocsInBuckets =
-                getTimeseriesCollForRawOps(db, db[collName])
-                    .aggregate([{$sort: bucketIndex}, unpackStage], getRawOperationSpec(db))
-                    .itcount();
+            const numDocsInBuckets = getTimeseriesCollForRawOps(db, db[collName])
+                .aggregate([{$sort: bucketIndex}, unpackStage], getRawOperationSpec(db))
+                .itcount();
             assert.eq(numInitialDocs, numDocsInBuckets);
             const plan = getTimeseriesCollForRawOps(db, db[collName])
-                             .explain()
-                             .aggregate([{$sort: bucketIndex}], getRawOperationSpec(db));
-            const stages = getPlanStages(plan, 'IXSCAN');
+                .explain()
+                .aggregate([{$sort: bucketIndex}], getRawOperationSpec(db));
+            const stages = getPlanStages(plan, "IXSCAN");
             assert(stages.length > 0);
             for (let ixScan of stages) {
                 assert.eq(bucketIndex, ixScan.keyPattern, ixScan);
@@ -158,8 +157,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         db[collName].drop();
         db[this.nonShardCollName].drop();
 
-        assert.commandWorked(db.createCollection(
-            collName, {timeseries: {metaField: this.metaField, timeField: this.timeField}}));
+        assert.commandWorked(
+            db.createCollection(collName, {timeseries: {metaField: this.metaField, timeField: this.timeField}}),
+        );
         cluster.shardCollection(db[collName], {t: 1}, false);
 
         // Create indexes to verify index integrity during the teardown state.
@@ -202,12 +202,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Pick 'this.threadCount - 1' split points so that we have 'this.threadCount' chunks.
         const chunkRange = (currentTimeStamp - this.startTime) / this.threadCount;
         currentTimeStamp = this.startTime;
-        for (let i = 0; i < (this.threadCount - 1); ++i) {
+        for (let i = 0; i < this.threadCount - 1; ++i) {
             currentTimeStamp += chunkRange;
             assert.commandWorked(
-                ChunkHelper.splitChunkAt(db,
-                                         getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-                                         {'control.min.t': new Date(currentTimeStamp)}));
+                ChunkHelper.splitChunkAt(db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {
+                    "control.min.t": new Date(currentTimeStamp),
+                }),
+            );
         }
 
         // Create an extra chunk on each shard to make sure multi:true operations return correct
@@ -216,16 +217,18 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         for (const destinationShard of destinationShards) {
             currentTimeStamp += chunkRange;
             assert.commandWorked(
-                ChunkHelper.splitChunkAt(db,
-                                         getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-                                         {'control.min.t': new Date(currentTimeStamp)}));
+                ChunkHelper.splitChunkAt(db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {
+                    "control.min.t": new Date(currentTimeStamp),
+                }),
+            );
 
             ChunkHelper.moveChunk(
                 db,
                 getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-                [{'control.min.t': new Date(currentTimeStamp)}, {'control.min.t': MaxKey}],
+                [{"control.min.t": new Date(currentTimeStamp)}, {"control.min.t": MaxKey}],
                 destinationShard,
-                /*waitForDelete=*/ false);
+                /*waitForDelete=*/ false,
+            );
         }
 
         // Verify that the number of docs remain the same.

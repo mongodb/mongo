@@ -31,9 +31,9 @@ lsidList.push(UUID());
 lsidList.push(UUID());
 lsidList.push(UUID());
 
-let execRetryableInsert = function(lsid, doc) {
-    return inputCollection.getDB('reshardingDb').runCommand({
-        insert: 'coll',
+let execRetryableInsert = function (lsid, doc) {
+    return inputCollection.getDB("reshardingDb").runCommand({
+        insert: "coll",
         documents: [doc],
         ordered: false,
         lsid: {id: lsid},
@@ -58,10 +58,14 @@ reshardingTest.withUnshardCollectionInBackground({
 const mongos = inputCollection.getMongo();
 assert.commandWorked(mongos.adminCommand({flushRouterConfig: 1}));
 
-assert.commandFailedWithCode(execRetryableInsert(lsidList[0], {oldKey: -10, newKey: 0}),
-                             ErrorCodes.IncompleteTransactionHistory);
-assert.commandFailedWithCode(execRetryableInsert(lsidList[1], {oldKey: 0, newKey: 100}),
-                             ErrorCodes.IncompleteTransactionHistory);
+assert.commandFailedWithCode(
+    execRetryableInsert(lsidList[0], {oldKey: -10, newKey: 0}),
+    ErrorCodes.IncompleteTransactionHistory,
+);
+assert.commandFailedWithCode(
+    execRetryableInsert(lsidList[1], {oldKey: 0, newKey: 100}),
+    ErrorCodes.IncompleteTransactionHistory,
+);
 
 // Since we are doing a reshardInPlace operation, the recipient is one of the donors and
 // this insert is targetted to the same donor, which has already executed the write and

@@ -14,11 +14,24 @@ for (let x = 0; x <= 20; x++) {
     }
 }
 
-assert.eq(21 * 21 - 1,
-          t.find({
-               $and: [
-                   {loc: {$ne: [0, 0]}},
-                   {loc: {$within: {$box: [[0, 0], [100, 100]]}}},
-               ]
-           }).itcount(),
-          "UHOH!");
+assert.eq(
+    21 * 21 - 1,
+    t
+        .find({
+            $and: [
+                {loc: {$ne: [0, 0]}},
+                {
+                    loc: {
+                        $within: {
+                            $box: [
+                                [0, 0],
+                                [100, 100],
+                            ],
+                        },
+                    },
+                },
+            ],
+        })
+        .itcount(),
+    "UHOH!",
+);

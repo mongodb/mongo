@@ -41,10 +41,8 @@ reshardingTest.withReshardingInBackground({
     ],
 });
 
-const oplog = reshardingTest.getReplSetForShard(primaryShardName)
-                  .getPrimary()
-                  .getCollection("local.oplog.rs");
-const logEntry = oplog.findOne({ns: sourceNs, op: 'n', "o2.reshardCollection": sourceNs});
+const oplog = reshardingTest.getReplSetForShard(primaryShardName).getPrimary().getCollection("local.oplog.rs");
+const logEntry = oplog.findOne({ns: sourceNs, op: "n", "o2.reshardCollection": sourceNs});
 assert(logEntry != null);
 const reshardedUUID = getUUIDFromConfigCollections(mongos, sourceNs);
 assert.eq(reshardedUUID, logEntry.o2.reshardUUID, logEntry);

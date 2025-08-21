@@ -23,14 +23,17 @@ const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donor = new Mongo(topology.shards[donorShardNames[0]].primary);
 
-const reshardingPauseDonorBeforeCatalogCacheRefreshFailpoint =
-    configureFailPoint(donor, "reshardingPauseDonorBeforeCatalogCacheRefresh");
+const reshardingPauseDonorBeforeCatalogCacheRefreshFailpoint = configureFailPoint(
+    donor,
+    "reshardingPauseDonorBeforeCatalogCacheRefresh",
+);
 
 // We trigger a refresh to make the catalog cache track the routing info for the temporary
 // resharding namespace as unsharded because the collection won't exist yet.
 assert.commandWorked(donor.adminCommand({_flushRoutingTableCacheUpdates: reshardingTest.tempNs}));
 
-reshardingTest.withReshardingInBackground(  //
+reshardingTest.withReshardingInBackground(
+    //
     {
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
@@ -40,6 +43,7 @@ reshardingTest.withReshardingInBackground(  //
 
         assert.commandWorked(sourceCollection.insert({_id: 0, oldKey: 5, newKey: 15}));
         reshardingPauseDonorBeforeCatalogCacheRefreshFailpoint.off();
-    });
+    },
+);
 
 reshardingTest.teardown();

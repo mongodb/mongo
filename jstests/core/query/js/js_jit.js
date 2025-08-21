@@ -23,7 +23,7 @@ function testDB() {
 }
 
 function testDBQuery() {
-    const c = DBQuery('a', 'b', 'c', 'd');
+    const c = DBQuery("a", "b", "c", "d");
     for (let i = 0; i < 100000; i++) {
         if (c.toString() != "DBQuery: d -> null") {
             throw i;

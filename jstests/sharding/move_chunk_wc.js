@@ -12,11 +12,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 var st = new ShardingTest({
     shards: {
         rs0: {nodes: 3, settings: {chainingAllowed: false}},
-        rs1: {nodes: 5, settings: {chainingAllowed: false}}
+        rs1: {nodes: 5, settings: {chainingAllowed: false}},
     },
     mongos: 1,
     config: 1,
-    configReplSetTestOptions: {settings: {chainingAllowed: false}}
+    configReplSetTestOptions: {settings: {chainingAllowed: false}},
 });
 
 var mongos = st.s;
@@ -27,7 +27,7 @@ var s1 = st.shard1.shardName;
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: s0}));
 
 var db = mongos.getDB(dbName);
-var collName = 'leaves';
+var collName = "leaves";
 var coll = db[collName];
 var numberDoc = 20;
 
@@ -52,64 +52,64 @@ var req = {
     find: {x: numberDoc / 2},
     to: s0,
     _secondaryThrottle: true,
-    _waitForDelete: true
+    _waitForDelete: true,
 };
 
 req.writeConcern = {
     w: 1,
-    wtimeout: 30000
+    wtimeout: 30000,
 };
 jsTest.log("Testing " + tojson(req));
 var res = db.adminCommand(req);
 assert.commandWorked(res);
-assert(!res.writeConcernError, 'moveChunk had writeConcernError: ' + tojson(res));
+assert(!res.writeConcernError, "moveChunk had writeConcernError: " + tojson(res));
 checkChunkCount(2, 0);
 
 // This should pass because w: majority is always passed to config servers.
 req.writeConcern = {
     w: 2,
-    wtimeout: 30000
+    wtimeout: 30000,
 };
 jsTest.log("Testing " + tojson(req));
 req.to = s1;
 res = db.adminCommand(req);
 assert.commandWorked(res);
-assert(!res.writeConcernError, 'moveChunk had writeConcernError: ' + tojson(res));
+assert(!res.writeConcernError, "moveChunk had writeConcernError: " + tojson(res));
 checkChunkCount(1, 1);
 
 // This should fail because the writeConcern cannot be satisfied on the to shard.
 req.writeConcern = {
     w: 4,
-    wtimeout: 3000
+    wtimeout: 3000,
 };
 jsTest.log("Testing " + tojson(req));
 req.to = s0;
 res = db.adminCommand(req);
 assert.commandFailed(res);
-assert(!res.writeConcernError, 'moveChunk had writeConcernError: ' + tojson(res));
+assert(!res.writeConcernError, "moveChunk had writeConcernError: " + tojson(res));
 checkChunkCount(1, 1);
 
 // This should fail because the writeConcern cannot be satisfied on the from shard.
 req.writeConcern = {
     w: 6,
-    wtimeout: 3000
+    wtimeout: 3000,
 };
 jsTest.log("Testing " + tojson(req));
 req.to = s0;
 res = db.adminCommand(req);
 assert.commandFailed(res);
-assert(!res.writeConcernError, 'moveChunk had writeConcernError: ' + tojson(res));
+assert(!res.writeConcernError, "moveChunk had writeConcernError: " + tojson(res));
 checkChunkCount(1, 1);
 
 // This should fail because the writeConcern is invalid and cannot be satisfied anywhere.
 req.writeConcern = {
     w: "invalid",
-    wtimeout: 3000
+    wtimeout: 3000,
 };
 jsTest.log("Testing " + tojson(req));
 req.to = s0;
 res = db.adminCommand(req);
 assert.commandFailed(res);
-assert(!res.writeConcernError, 'moveChunk had writeConcernError: ' + tojson(res));
+assert(!res.writeConcernError, "moveChunk had writeConcernError: " + tojson(res));
 checkChunkCount(1, 1);
 st.stop();

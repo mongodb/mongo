@@ -6,21 +6,20 @@ import {checkPauseAfterPopulate} from "jstests/libs/pause_after_populate.js";
  */
 
 function seededRandom(seed) {
-    let m = 0x80000000;  // 2**31
+    let m = 0x80000000; // 2**31
     let a = 1664525;
     let c = 1013904223;
 
     let state = seed;
 
-    return function() {
+    return function () {
         state = (a * state + c) % m;
         return state / m;
     };
 }
 
 function generateZipfianList(size, s) {
-    if (s <= 0)
-        throw new Error("The skewness parameter 's' must be greater than 0.");
+    if (s <= 0) throw new Error("The skewness parameter 's' must be greater than 0.");
 
     // Step 1: Calculate the normalization constant
     let normalizationConstant = 0;
@@ -31,7 +30,7 @@ function generateZipfianList(size, s) {
     // Step 2: Generate the Zipfian probabilities
     const probabilities = [];
     for (let i = 1; i <= size; i++) {
-        probabilities.push((1 / Math.pow(i, s)) / normalizationConstant);
+        probabilities.push(1 / Math.pow(i, s) / normalizationConstant);
     }
 
     // Step 3: Generate the output list based on probabilities
@@ -43,7 +42,7 @@ function generateZipfianList(size, s) {
         for (let j = 0; j < probabilities.length; j++) {
             cumulativeProbability += probabilities[j];
             if (random() < cumulativeProbability) {
-                zipfianValues.push(j + 1);  // Rank starts from 1
+                zipfianValues.push(j + 1); // Rank starts from 1
                 break;
             }
         }
@@ -112,25 +111,26 @@ export function populateSimplePlanStabilityDataset(collName, collSize) {
     coll.insertMany(documents);
 
     jsTestLog("Creating indexes on collection " + collName);
-    const fields = ['i', 'z', 'c', 'd', 'h', 'k', 'a'];
+    const fields = ["i", "z", "c", "d", "h", "k", "a"];
     for (const field of fields) {
         assert.commandWorked(coll.createIndex({[field + "_idx"]: 1}));
         assert.commandWorked(coll.createIndex({[field + "_compound"]: 1}));
 
-        for (const suffix of ['_idx', '_noidx', '_compound']) {
+        for (const suffix of ["_idx", "_noidx", "_compound"]) {
             db.runCommand({analyze: collName, key: field + suffix, numberBuckets: 1000});
         }
     }
 
-    [{i_compound: 1, z_compound: 1},
-     {z_compound: 1, c_compound: 1},
-     {c_compound: 1, d_compound: 1},
-     {d_compound: 1, k_compound: 1},
-     {k_compound: 1, a_compound: 1},
-     {a_compound: 1, i_compound: 1}]
-        .forEach(compoundIndex => {
-            assert.commandWorked(coll.createIndex(compoundIndex));
-        });
+    [
+        {i_compound: 1, z_compound: 1},
+        {z_compound: 1, c_compound: 1},
+        {c_compound: 1, d_compound: 1},
+        {d_compound: 1, k_compound: 1},
+        {k_compound: 1, a_compound: 1},
+        {a_compound: 1, i_compound: 1},
+    ].forEach((compoundIndex) => {
+        assert.commandWorked(coll.createIndex(compoundIndex));
+    });
 
     jsTestLog("Done creating indexes.");
 

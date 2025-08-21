@@ -27,7 +27,8 @@ coll.createIndex({x: 1});
 // Rename the collection.
 assert.commandWorked(
     adminDB.runCommand({renameCollection: "test.foo", to: "bar.test", dropTarget: true}),
-    "Call to renameCollection failed.");
+    "Call to renameCollection failed.",
+);
 
 // Await replication.
 rst.awaitReplication();

@@ -19,49 +19,47 @@ const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
 
 jsTest.log(
-    'Check that test command createUnsplittableCollection can create a collection in a different shard than the dbPrimary');
+    "Check that test command createUnsplittableCollection can create a collection in a different shard than the dbPrimary",
+);
 {
-    const kDataColl = 'unsplittable_collection_on_different_shard';
-    const kDataCollNss = kDbName + '.' + kDataColl;
+    const kDataColl = "unsplittable_collection_on_different_shard";
+    const kDataCollNss = kDbName + "." + kDataColl;
 
-    assert.commandWorked(st.s.getDB(kDbName).runCommand(
-        {createUnsplittableCollection: kDataColl, dataShard: shard1}));
+    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: shard1}));
 
-    let res = assert.commandWorked(
-        st.rs1.getPrimary().getDB(kDbName).runCommand({listIndexes: kDataColl}));
+    let res = assert.commandWorked(st.rs1.getPrimary().getDB(kDbName).runCommand({listIndexes: kDataColl}));
     let indexes = res.cursor.firstBatch;
     assert(indexes.length === 1);
 
-    let col = st.s.getCollection('config.collections').findOne({_id: kDataCollNss});
+    let col = st.s.getCollection("config.collections").findOne({_id: kDataCollNss});
 
-    assert.eq(st.s.getCollection('config.chunks').countDocuments({uuid: col.uuid}), 1);
+    assert.eq(st.s.getCollection("config.chunks").countDocuments({uuid: col.uuid}), 1);
 
-    let chunk = st.s.getCollection('config.chunks').findOne({uuid: col.uuid});
+    let chunk = st.s.getCollection("config.chunks").findOne({uuid: col.uuid});
 
     assert.eq(chunk.shard, shard1);
 }
 
-jsTest.log(
-    "Testing that creating a collection on a different data shard when it exists already fails");
+jsTest.log("Testing that creating a collection on a different data shard when it exists already fails");
 {
-    const kDataColl = 'unsplittable_collection_on_different_shard_2';
+    const kDataColl = "unsplittable_collection_on_different_shard_2";
 
-    assert.commandWorked(st.s.getDB(kDbName).runCommand(
-        {createUnsplittableCollection: kDataColl, dataShard: shard1}));
+    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: shard1}));
 
-    assert.commandFailedWithCode(st.s.getDB(kDbName).runCommand(
-                                     {createUnsplittableCollection: kDataColl, dataShard: shard0}),
-                                 ErrorCodes.AlreadyInitialized);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: shard0}),
+        ErrorCodes.AlreadyInitialized,
+    );
 }
 
 jsTest.log("Testing that creating an unsplittable collection on a non-existing shard fails.");
 {
-    const kDataColl = 'unsplittable_collection_on_config_shard';
+    const kDataColl = "unsplittable_collection_on_config_shard";
 
     assert.commandFailedWithCode(
-        st.s.getDB(kDbName).runCommand(
-            {createUnsplittableCollection: kDataColl, dataShard: "non-existing-shard-name"}),
-        ErrorCodes.ShardNotFound);
+        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kDataColl, dataShard: "non-existing-shard-name"}),
+        ErrorCodes.ShardNotFound,
+    );
 }
 
 st.stop();

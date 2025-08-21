@@ -20,7 +20,7 @@ const collName = "test";
 const primary = rst.getPrimary();
 const testColl = primary.getDB(dbName).getCollection(collName);
 const doc = {
-    a: 1
+    a: 1,
 };
 
 assert.commandWorked(testColl.insert(doc, {writeConcern: {w: 2}}));

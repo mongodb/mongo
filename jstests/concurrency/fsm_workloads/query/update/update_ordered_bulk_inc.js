@@ -15,10 +15,10 @@
 
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var states = {
         init: function init(db, collName) {
-            this.fieldName = 't' + this.tid;
+            this.fieldName = "t" + this.tid;
         },
 
         update: function update(db, collName) {
@@ -49,19 +49,19 @@ export const $config = (function() {
             if (isMongod(db)) {
                 // Storage engines will automatically retry any operations when there are conflicts,
                 // so we should have updated all matching documents.
-                docs.forEach(function(doc) {
+                docs.forEach(function (doc) {
                     assert.eq(this.count, doc[this.fieldName]);
                 }, this);
             }
 
-            docs.forEach(function(doc) {
+            docs.forEach(function (doc) {
                 // If the document hasn't been updated at all, then the field won't exist.
                 if (doc.hasOwnProperty(this.fieldName)) {
                     assert.lte(doc[this.fieldName], this.count);
                 }
                 assert.lt(doc._id, this.docCount);
             }, this);
-        }
+        },
     };
 
     var transitions = {init: {update: 1}, update: {find: 1}, find: {update: 1}};
@@ -79,6 +79,6 @@ export const $config = (function() {
         states: states,
         transitions: transitions,
         setup: setup,
-        data: {docCount: 15}
+        data: {docCount: 15},
     };
 })();

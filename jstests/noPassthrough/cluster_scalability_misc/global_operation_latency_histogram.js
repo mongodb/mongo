@@ -9,7 +9,7 @@ import {
     opLatencies,
     opWorkingTime,
     runLatencyComparisonTest,
-    runTests
+    runTests,
 } from "jstests/libs/global_latency_histogram.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

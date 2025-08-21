@@ -27,12 +27,11 @@ function reduceFunc(key, values) {
 function runTest(optionsObjOrOutString) {
     // Succeeds for all modes when using agg map reduce.
     for (let verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
-        const results =
-            coll.explain(verbosity).mapReduce(mapFunc, reduceFunc, optionsObjOrOutString);
+        const results = coll.explain(verbosity).mapReduce(mapFunc, reduceFunc, optionsObjOrOutString);
 
         // Check server info
-        assert(results.hasOwnProperty('serverInfo'), results);
-        assert.hasFields(results.serverInfo, ['host', 'port', 'version', 'gitVersion']);
+        assert(results.hasOwnProperty("serverInfo"), results);
+        assert.hasFields(results.serverInfo, ["host", "port", "version", "gitVersion"]);
 
         const stages = getAggPlanStages(results, "$cursor");
         assert(stages !== null);

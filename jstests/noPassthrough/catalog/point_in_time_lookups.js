@@ -18,15 +18,15 @@ const replTest = new ReplSetTest({
             minSnapshotHistoryWindowInSeconds: 60 * 60,
             // Exercise yielding and restoring point-in-time collections.
             internalQueryExecYieldIterations: 0,
-            internalQueryExecYieldPeriodMS: 0
-        }
-    }
+            internalQueryExecYieldPeriodMS: 0,
+        },
+    },
 });
 
 replTest.startSet();
 replTest.initiate();
 
-const restart = function() {
+const restart = function () {
     replTest.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
     replTest.start(
         0,
@@ -35,42 +35,41 @@ const restart = function() {
                 // Set the history window to 1 hour to prevent the oldest timestamp from advancing.
                 // This is necessary to avoid removing data files across restarts for this test.
                 minSnapshotHistoryWindowInSeconds: 60 * 60,
-            }
+            },
         },
-        true /* restart */);
+        true /* restart */,
+    );
 };
 
-const primary = function() {
+const primary = function () {
     return replTest.getPrimary();
 };
 
-const db = function() {
+const db = function () {
     return primary().getDB("test");
 };
 
-const coll = function() {
+const coll = function () {
     return db()[jsTestName()];
 };
 
-const insert = function(document) {
+const insert = function (document) {
     // The write concern guarantees the stable and oldest timestamp are bumped.
-    return assert
-        .commandWorked(db().runCommand(
-            {insert: coll().getName(), documents: [document], writeConcern: {w: "majority"}}))
-        .operationTime;
+    return assert.commandWorked(
+        db().runCommand({insert: coll().getName(), documents: [document], writeConcern: {w: "majority"}}),
+    ).operationTime;
 };
 
-const find = function(collName, withIndex, atClusterTime, numDocs, expectedError) {
+const find = function (collName, withIndex, atClusterTime, numDocs, expectedError) {
     let res = {};
     if (withIndex) {
         res = db().runCommand({
             find: collName,
             hint: {x: 1},
-            readConcern: {level: "snapshot", atClusterTime: atClusterTime}
+            readConcern: {level: "snapshot", atClusterTime: atClusterTime},
         });
     } else {
-        res = db().runCommand(
-            {find: collName, readConcern: {level: "snapshot", atClusterTime: atClusterTime}});
+        res = db().runCommand({find: collName, readConcern: {level: "snapshot", atClusterTime: atClusterTime}});
     }
 
     if (expectedError) {
@@ -114,7 +113,7 @@ jsTestLog("Third insert timestamp: " + tojson(thirdInsertTS));
 const createIndexTS = assert.commandWorked(coll().createIndex({x: 1})).operationTime;
 const dropIndexTS = assert.commandWorked(coll().dropIndex({x: 1})).operationTime;
 
-const runPointInTimeTests = function() {
+const runPointInTimeTests = function () {
     (function oldestTimestampTests() {
         // Point-in-time reads on a collection before it was created should have like reading from a
         // non-existent collection.
@@ -128,11 +127,7 @@ const runPointInTimeTests = function() {
         // Reading at 'createTS' from the original collection should not find any document yet.
         // Using the index at this point returns BadValue from hint as it does not exist yet.
         find(coll().getName(), /*withIndex=*/ false, createTS, /*numDocs=*/ 0);
-        find(coll().getName(),
-             /*withIndex=*/ true,
-             createTS,
-             /*numDocs=*/ 0,
-             /*expectedError=*/ true);
+        find(coll().getName(), /*withIndex=*/ true, createTS, /*numDocs=*/ 0, /*expectedError=*/ true);
 
         // Reading at 'createTS' from the renamed collection should not find any document as it was
         // non-existent.
@@ -144,11 +139,7 @@ const runPointInTimeTests = function() {
         // Reading at 'firstInsertTS' from the original collection should find a document. Using the
         // index at this point returns BadValue from hint as it does not exist yet.
         find(coll().getName(), /*withIndex=*/ false, firstInsertTS, /*numDocs=*/ 1);
-        find(coll().getName(),
-             /*withIndex=*/ true,
-             firstInsertTS,
-             /*numDocs=*/ 0,
-             /*expectedError=*/ true);
+        find(coll().getName(), /*withIndex=*/ true, firstInsertTS, /*numDocs=*/ 0, /*expectedError=*/ true);
 
         // Reading at 'firstInsertTS' from the renamed collection should not find any document as it
         // was non-existent.
@@ -208,11 +199,7 @@ const runPointInTimeTests = function() {
         // Reading at 'recreatedTS' from the original collection should not find any document yet.
         // Using the index at this point returns BadValue from hint as it does not exist yet.
         find(coll().getName(), /*withIndex=*/ false, recreatedTS, /*numDocs=*/ 0);
-        find(coll().getName(),
-             /*withIndex=*/ true,
-             recreatedTS,
-             /*numDocs=*/ 0,
-             /*expectedError=*/ true);
+        find(coll().getName(), /*withIndex=*/ true, recreatedTS, /*numDocs=*/ 0, /*expectedError=*/ true);
 
         // Reading at 'recreatedTS' from the renamed collection should not find any document as it
         // was non-existent.
@@ -224,11 +211,7 @@ const runPointInTimeTests = function() {
         // Reading at 'thirdInsertTS' from the original collection should find a document. Using the
         // index at this point returns BadValue from hint as it does not exist yet.
         find(coll().getName(), /*withIndex=*/ false, thirdInsertTS, /*numDocs=*/ 1);
-        find(coll().getName(),
-             /*withIndex=*/ true,
-             thirdInsertTS,
-             /*numDocs=*/ 0,
-             /*expectedError=*/ true);
+        find(coll().getName(), /*withIndex=*/ true, thirdInsertTS, /*numDocs=*/ 0, /*expectedError=*/ true);
 
         // Reading at 'thirdInsertTS' from the renamed collection should not find any document as it
         // was non-existent.
@@ -243,11 +226,7 @@ const runPointInTimeTests = function() {
         find(coll().getName(), /*withIndex=*/ false, createIndexTS, /*numDocs=*/ 1);
 
         // Reading at 'dropIndexTS' will prevent us from using the index.
-        find(coll().getName(),
-             /*withIndex=*/ true,
-             dropIndexTS,
-             /*numDocs=*/ 1,
-             /*expectedError=*/ true);
+        find(coll().getName(), /*withIndex=*/ true, dropIndexTS, /*numDocs=*/ 1, /*expectedError=*/ true);
         find(coll().getName(), /*withIndex=*/ false, dropIndexTS, /*numDocs=*/ 1);
     })();
 };

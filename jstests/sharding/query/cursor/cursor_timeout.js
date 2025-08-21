@@ -47,22 +47,22 @@ const st = new ShardingTest({
             verbose: 1,
             setParameter: {
                 cursorTimeoutMillis: mongodCursorTimeoutMs,
-                clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs
-            }
+                clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs,
+            },
         },
         mongosOptions: {
             verbose: 1,
             setParameter: {
                 cursorTimeoutMillis: mongosCursorTimeoutMs,
-                clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs
-            }
+                clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs,
+            },
         },
     },
-    enableBalancer: false
+    enableBalancer: false,
 });
 
 const adminDB = st.admin;
-const mongosDB = st.s.getDB('test');
+const mongosDB = st.s.getDB("test");
 const routerColl = mongosDB.user;
 
 const shardHost = st.config.shards.findOne({_id: st.shard1.shardName}).host;
@@ -70,17 +70,20 @@ const mongod = new Mongo(shardHost);
 const shardColl = mongod.getCollection(routerColl.getFullName());
 const shardDB = shardColl.getDB();
 
-assert.commandWorked(adminDB.runCommand(
-    {enableSharding: routerColl.getDB().getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    adminDB.runCommand({enableSharding: routerColl.getDB().getName(), primaryShard: st.shard0.shardName}),
+);
 
 assert.commandWorked(adminDB.runCommand({shardCollection: routerColl.getFullName(), key: {x: 1}}));
 assert.commandWorked(adminDB.runCommand({split: routerColl.getFullName(), middle: {x: 10}}));
-assert.commandWorked(adminDB.runCommand({
-    moveChunk: routerColl.getFullName(),
-    find: {x: 11},
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        moveChunk: routerColl.getFullName(),
+        find: {x: 11},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
 
 for (let x = 0; x < 20; x++) {
     assert.commandWorked(routerColl.insert({x: x}));
@@ -120,7 +123,7 @@ shardSessionCursor.next();
 // have the "no timeout" flag set.  We use the "cursorTimeoutMillis" and
 // "clientCursorMonitorFrequencySecs" setParameters above to reduce the amount of time we need to
 // wait here.
-assert.soon(function() {
+assert.soon(function () {
     return routerColl.getDB().serverStatus().metrics.cursor.timedOut > 0;
 }, "sharded cursor failed to time out");
 
@@ -129,14 +132,14 @@ assert.soon(function() {
 // metrics.cursor.timedOut here, because this will be 2 if routerCursorWithTimeout is killed for
 // timing out on the shard, and 1 if routerCursorWithTimeout is killed by a killCursors command from
 // the mongos.
-assert.soon(function() {
+assert.soon(function () {
     return shardColl.getDB().serverStatus().metrics.cursor.open.total == 4;
 }, "cursor failed to time out");
 
-assert.throws(function() {
+assert.throws(function () {
     routerCursorWithTimeout.itcount();
 });
-assert.throws(function() {
+assert.throws(function () {
     shardCursorWithTimeout.itcount();
 });
 
@@ -147,14 +150,14 @@ assert.commandWorked(shardDB.runCommand({killSessions: [shardSession.getSessionI
 
 // Wait for the shard to have two open cursors on it (routerCursorWithNoTimeout,
 // shardCursorWithNoTimeout).
-assert.soon(function() {
+assert.soon(function () {
     return shardColl.getDB().serverStatus().metrics.cursor.open.total == 2;
 }, "session cursor failed to time out");
 
-assert.throws(function() {
+assert.throws(function () {
     routerSessionCursor.itcount();
 });
-assert.throws(function() {
+assert.throws(function () {
     shardSessionCursor.itcount();
 });
 
@@ -163,7 +166,7 @@ assert.throws(function() {
 // idea.
 let killRes = mongosDB.runCommand({
     killCursors: routerColl.getName(),
-    cursors: [routerSessionCursor.getId(), shardSessionCursor.getId()]
+    cursors: [routerSessionCursor.getId(), shardSessionCursor.getId()],
 });
 assert.commandWorked(killRes);
 assert.eq(killRes.cursorsAlive, []);
@@ -176,83 +179,82 @@ assert.eq(shardColl.count(), shardCursorWithNoTimeout.itcount() + 1);
 
 // Confirm that cursors opened within a session will timeout when the
 // 'enableTimeoutOfInactiveSessionCursors' setParameter has been enabled.
-(function() {
-assert.commandWorked(
-    mongosDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: true}));
-assert.commandWorked(
-    shardDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: true}));
+(function () {
+    assert.commandWorked(mongosDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: true}));
+    assert.commandWorked(shardDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: true}));
 
-// Open a session on mongos.
-routerSession = mongosDB.getMongo().startSession();
-routerSessionDB = routerSession.getDatabase(mongosDB.getName());
-routerSessionCursor = routerSessionDB.user.find().batchSize(1);
-const numRouterCursorsTimedOut = routerColl.getDB().serverStatus().metrics.cursor.timedOut;
+    // Open a session on mongos.
+    routerSession = mongosDB.getMongo().startSession();
+    routerSessionDB = routerSession.getDatabase(mongosDB.getName());
+    routerSessionCursor = routerSessionDB.user.find().batchSize(1);
+    const numRouterCursorsTimedOut = routerColl.getDB().serverStatus().metrics.cursor.timedOut;
 
-// Open a session on mongod.
-shardSession = shardDB.getMongo().startSession();
-shardSessionDB = shardSession.getDatabase(shardDB.getName());
-shardSessionCursor = shardSessionDB.user.find().batchSize(1);
-const numShardCursorsTimedOut = routerColl.getDB().serverStatus().metrics.cursor.timedOut;
+    // Open a session on mongod.
+    shardSession = shardDB.getMongo().startSession();
+    shardSessionDB = shardSession.getDatabase(shardDB.getName());
+    shardSessionCursor = shardSessionDB.user.find().batchSize(1);
+    const numShardCursorsTimedOut = routerColl.getDB().serverStatus().metrics.cursor.timedOut;
 
-// Execute initial find on each cursor.
-routerSessionCursor.next();
-shardSessionCursor.next();
+    // Execute initial find on each cursor.
+    routerSessionCursor.next();
+    shardSessionCursor.next();
 
-// Wait until mongos reflects the newly timed out cursors.
-assert.soon(function() {
-    return shardColl.getDB().serverStatus().metrics.cursor.timedOut >=
-        (numRouterCursorsTimedOut + 1);
-}, "sharded cursor failed to time out");
+    // Wait until mongos reflects the newly timed out cursors.
+    assert.soon(function () {
+        return shardColl.getDB().serverStatus().metrics.cursor.timedOut >= numRouterCursorsTimedOut + 1;
+    }, "sharded cursor failed to time out");
 
-// Wait until mongod reflects the newly timed out cursors.
-assert.soon(function() {
-    return routerColl.getDB().serverStatus().metrics.cursor.timedOut >=
-        (numShardCursorsTimedOut + 1);
-}, "router cursor failed to time out");
+    // Wait until mongod reflects the newly timed out cursors.
+    assert.soon(function () {
+        return routerColl.getDB().serverStatus().metrics.cursor.timedOut >= numShardCursorsTimedOut + 1;
+    }, "router cursor failed to time out");
 
-assert.throws(function() {
-    routerCursorWithTimeout.itcount();
-});
-assert.throws(function() {
-    shardCursorWithTimeout.itcount();
-});
+    assert.throws(function () {
+        routerCursorWithTimeout.itcount();
+    });
+    assert.throws(function () {
+        shardCursorWithTimeout.itcount();
+    });
 
-{
-    // Test that aggregation cursors on mongos time out properly.
+    {
+        // Test that aggregation cursors on mongos time out properly.
 
-    // Insert some additional data to ensure proper grouping.
-    for (let x = 0; x < 30; x++) {
-        assert.commandWorked(routerColl.insert({x: x, group: x % 5, value: x * 10}));
+        // Insert some additional data to ensure proper grouping.
+        for (let x = 0; x < 30; x++) {
+            assert.commandWorked(routerColl.insert({x: x, group: x % 5, value: x * 10}));
+        }
+
+        const shard0Count = st.shard0.getDB(mongosDB.getName())[routerColl.getName()].count();
+        const shard1Count = st.shard1.getDB(mongosDB.getName())[routerColl.getName()].count();
+        assert.gt(shard0Count, 0, "Expected documents on shard0");
+        assert.gt(shard1Count, 0, "Expected documents on shard1");
+
+        // Use a small batch size to ensure multiple batches.
+        const batchSize = 2;
+
+        // Create aggregation cursors on mongos.
+        const routerAggCursor = routerColl.aggregate(
+            [{$group: {_id: "$group", count: {$sum: 1}, total: {$sum: "$value"}}}, {$sort: {_id: 1}}],
+            {cursor: {batchSize: batchSize}},
+        );
+
+        const routerTimeoutCount = routerColl.getDB().serverStatus().metrics.cursor.timedOut;
+
+        assert.soon(function () {
+            return routerColl.getDB().serverStatus().metrics.cursor.timedOut > routerTimeoutCount;
+        }, "mongos aggregation cursor with $group failed to time out");
+
+        assert.throws(
+            function () {
+                routerAggCursor.itcount();
+            },
+            [],
+            "Expected mongos aggregation cursor to be timed out",
+        );
     }
 
-    const shard0Count = st.shard0.getDB(mongosDB.getName())[routerColl.getName()].count();
-    const shard1Count = st.shard1.getDB(mongosDB.getName())[routerColl.getName()].count();
-    assert.gt(shard0Count, 0, "Expected documents on shard0");
-    assert.gt(shard1Count, 0, "Expected documents on shard1");
-
-    // Use a small batch size to ensure multiple batches.
-    const batchSize = 2;
-
-    // Create aggregation cursors on mongos.
-    const routerAggCursor = routerColl.aggregate(
-        [{$group: {_id: "$group", count: {$sum: 1}, total: {$sum: "$value"}}}, {$sort: {_id: 1}}],
-        {cursor: {batchSize: batchSize}});
-
-    const routerTimeoutCount = routerColl.getDB().serverStatus().metrics.cursor.timedOut;
-
-    assert.soon(function() {
-        return routerColl.getDB().serverStatus().metrics.cursor.timedOut > routerTimeoutCount;
-    }, "mongos aggregation cursor with $group failed to time out");
-
-    assert.throws(function() {
-        routerAggCursor.itcount();
-    }, [], "Expected mongos aggregation cursor to be timed out");
-}
-
-assert.commandWorked(
-    mongosDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: false}));
-assert.commandWorked(
-    shardDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: false}));
+    assert.commandWorked(mongosDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: false}));
+    assert.commandWorked(shardDB.adminCommand({setParameter: 1, enableTimeoutOfInactiveSessionCursors: false}));
 })();
 
 st.stop();

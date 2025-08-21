@@ -9,24 +9,24 @@
 var coll = db[jsTestName()];
 coll.drop();
 
-var upsertedResult = function(query, expr) {
+var upsertedResult = function (query, expr) {
     coll.drop();
     let result = coll.update(query, expr, {upsert: true});
     return result;
 };
 
-var upsertedField = function(query, expr, fieldName) {
+var upsertedField = function (query, expr, fieldName) {
     var res = assert.commandWorked(upsertedResult(query, expr));
     var doc = coll.findOne();
     assert.neq(doc, null, "findOne query returned no results! UpdateRes: " + tojson(res));
     return doc[fieldName];
 };
 
-var upsertedId = function(query, expr) {
+var upsertedId = function (query, expr) {
     return upsertedField(query, expr, "_id");
 };
 
-var upsertedXVal = function(query, expr) {
+var upsertedXVal = function (query, expr) {
     return upsertedField(query, expr, "x");
 };
 
@@ -63,10 +63,8 @@ for (var i = 0; i < 3; i++) {
     var expr = {};
 
     // $op style
-    if (i == 1)
-        expr = {$set: {a: 1}};
-    if (i == 2)
-        expr = {$setOnInsert: {a: 1}};
+    if (i == 1) expr = {$set: {a: 1}};
+    if (i == 2) expr = {$setOnInsert: {a: 1}};
 
     var isReplStyle = i == 0;
 
@@ -154,7 +152,7 @@ for (var i = 0; i < 3; i++) {
     assert.eq(value, upsertedXVal({$or: [{x: {$eq: 1}}]}, expr));
     // Special types extracted
     assert.eq(isReplStyle ? undefined : [1, 2], upsertedXVal({x: [1, 2]}, expr));
-    assert.eq(isReplStyle ? undefined : {'x.x': 1}, upsertedXVal({x: {'x.x': 1}}, expr));
+    assert.eq(isReplStyle ? undefined : {"x.x": 1}, upsertedXVal({x: {"x.x": 1}}, expr));
 
     // field not extracted
     assert.eq(undefined, upsertedXVal({x: {$gt: 1}}, expr));
@@ -176,7 +174,7 @@ for (var i = 0; i < 3; i++) {
         assert.writeError(upsertedResult({$and: [{x: 1}, {x: 2}]}, expr));
         assert.writeError(upsertedResult({$and: [{x: {$eq: 1}}, {x: 2}]}, expr));
     } else {
-        assert.eq(undefined, upsertedXVal({x: {'x.x': 1}}, expr));
+        assert.eq(undefined, upsertedXVal({x: {"x.x": 1}}, expr));
         assert.eq(undefined, upsertedXVal({x: {$all: [1, 2]}}, expr));
         assert.eq(undefined, upsertedXVal({$and: [{x: 1}, {x: 1}]}, expr));
         assert.eq(undefined, upsertedXVal({$and: [{x: {$eq: 1}}, {x: 2}]}, expr));

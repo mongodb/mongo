@@ -16,25 +16,39 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     replSet.startSet({setParameter: {ttlMonitorSleepSecs: 1}});
     replSet.initiate();
 
-    const replicatedDB = replSet.getPrimary().getDB('replicated');
-    const nonReplicatedDB = replSet.getPrimary().getDB('local');
-    const collName = 'clustered_collection';
+    const replicatedDB = replSet.getPrimary().getDB("replicated");
+    const nonReplicatedDB = replSet.getPrimary().getDB("local");
+    const collName = "clustered_collection";
     const replicatedColl = replicatedDB[collName];
     const nonReplicatedColl = nonReplicatedDB[collName];
 
     replicatedColl.drop();
     nonReplicatedColl.drop();
 
-    ClusteredCappedUtils.testClusteredCappedCollectionWithTTL(replicatedDB, collName, '_id');
-    ClusteredCappedUtils.testClusteredTailableCursorCreation(
-        replicatedDB, collName, '_id', true /* isReplicated */);
+    ClusteredCappedUtils.testClusteredCappedCollectionWithTTL(replicatedDB, collName, "_id");
+    ClusteredCappedUtils.testClusteredTailableCursorCreation(replicatedDB, collName, "_id", true /* isReplicated */);
     for (let awaitData of [false, true]) {
         ClusteredCappedUtils.testClusteredTailableCursorWithTTL(
-            replicatedDB, collName, '_id', true /* isReplicated */, awaitData);
+            replicatedDB,
+            collName,
+            "_id",
+            true /* isReplicated */,
+            awaitData,
+        );
         ClusteredCappedUtils.testClusteredTailableCursorCappedPositionLostWithTTL(
-            replicatedDB, collName, '_id', true /* isReplicated */, awaitData);
+            replicatedDB,
+            collName,
+            "_id",
+            true /* isReplicated */,
+            awaitData,
+        );
         ClusteredCappedUtils.testClusteredTailableCursorOutOfOrderInsertion(
-            replicatedDB, collName, '_id', true /* isReplicated */, awaitData);
+            replicatedDB,
+            collName,
+            "_id",
+            true /* isReplicated */,
+            awaitData,
+        );
     }
     ClusteredCappedUtils.testClusteredReplicatedTTLDeletion(replicatedDB, collName);
 
@@ -49,10 +63,16 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     replSetNoTestCommands.initiate();
 
     assert.commandFailedWithCode(
-        replSetNoTestCommands.getPrimary().getDB("test").createCollection(
-            'c',
-            {clusteredIndex: {key: {_id: 1}, unique: true}, capped: true, expireAfterSeconds: 10}),
-        6127800);
+        replSetNoTestCommands
+            .getPrimary()
+            .getDB("test")
+            .createCollection("c", {
+                clusteredIndex: {key: {_id: 1}, unique: true},
+                capped: true,
+                expireAfterSeconds: 10,
+            }),
+        6127800,
+    );
 
     replSetNoTestCommands.stopSet();
 }

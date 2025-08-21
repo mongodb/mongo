@@ -20,32 +20,31 @@ import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
-import {
-    blockProcessingTestCases,
-    generateMetaVals
-} from "jstests/libs/query/block_processing_test_cases.js";
+import {blockProcessingTestCases, generateMetaVals} from "jstests/libs/query/block_processing_test_cases.js";
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeStatus,
     kSbeDisabled,
-    kSbeFullyEnabled
+    kSbeFullyEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 TimeseriesTest.run((insert) => {
     const datePrefix = 1680912440;
 
-    let coll = db[jsTestName() + '_ts'];
-    let collNotTs = db[jsTestName() + '_not_ts'];
+    let coll = db[jsTestName() + "_ts"];
+    let collNotTs = db[jsTestName() + "_not_ts"];
 
-    const timeFieldName = 'time';
-    const metaFieldName = 'meta';
+    const timeFieldName = "time";
+    const metaFieldName = "meta";
 
     coll.drop();
     collNotTs.drop();
 
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
+    );
 
     assert.commandWorked(db.createCollection(collNotTs.getName()));
 
@@ -131,37 +130,40 @@ TimeseriesTest.run((insert) => {
     const sbeFullyEnabled = checkSbeFullFeatureFlagEnabled(db);
     const featureFlagsAllowBlockHashAgg =
         // SBE can't be disabled altogether.
-        (sbeStatus != kSbeDisabled) &&
+        sbeStatus != kSbeDisabled &&
         // We have to allow time series queries to run in SBE.
-        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe') &&
+        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe") &&
         // Either we have SBE full or the SBE BlockHashAgg flag.
-        (sbeStatus == kSbeFullyEnabled ||
-         FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SbeBlockHashAgg'));
+        (sbeStatus == kSbeFullyEnabled || FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SbeBlockHashAgg"));
 
     function runTests(allowDiskUse, forceIncreasedSpilling) {
-        assert.commandWorked(db.adminCommand({
-            setParameter: 1,
-            internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceIncreasedSpilling
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceIncreasedSpilling,
+            }),
+        );
         const dateUpperBound = new Date(datePrefix + 200);
         const dateLowerBound = new Date(datePrefix);
 
         function compareResultEntries(lhs, rhs) {
             const lhsJson = tojson(lhs);
             const rhsJson = tojson(rhs);
-            return lhsJson < rhsJson ? -1 : (lhsJson > rhsJson ? 1 : 0);
+            return lhsJson < rhsJson ? -1 : lhsJson > rhsJson ? 1 : 0;
         }
 
         const options = {allowDiskUse: allowDiskUse};
         const allowDiskUseStr = allowDiskUse ? "true" : "false";
 
-        const testcases = blockProcessingTestCases(timeFieldName,
-                                                   metaFieldName,
-                                                   datePrefix,
-                                                   dateUpperBound,
-                                                   dateLowerBound,
-                                                   featureFlagsAllowBlockHashAgg,
-                                                   sbeFullyEnabled);
+        const testcases = blockProcessingTestCases(
+            timeFieldName,
+            metaFieldName,
+            datePrefix,
+            dateUpperBound,
+            dateLowerBound,
+            featureFlagsAllowBlockHashAgg,
+            sbeFullyEnabled,
+        );
 
         for (let testcase of testcases) {
             const name = testcase.name + " (allowDiskUse=" + allowDiskUseStr + ")";
@@ -182,8 +184,13 @@ TimeseriesTest.run((insert) => {
                 results.sort(compareResultEntries);
                 expectedResult.sort(compareResultEntries);
 
-                const errMsgFn = () => "Test case '" + name + "':\nExpected " +
-                    tojson(expectedResult) + "\n  !=\nActual " + tojson(results);
+                const errMsgFn = () =>
+                    "Test case '" +
+                    name +
+                    "':\nExpected " +
+                    tojson(expectedResult) +
+                    "\n  !=\nActual " +
+                    tojson(results);
 
                 // Check that the expected result and actual results have the same number of
                 // elements.
@@ -203,27 +210,30 @@ TimeseriesTest.run((insert) => {
             const singleNodeQueryPlanner = getQueryPlanner(getSingleNodeExplain(explain));
 
             function testcaseAndExplainFn(description) {
-                return () => description + " for test case '" + name + "' failed with explain " +
-                    tojson(singleNodeQueryPlanner);
+                return () =>
+                    description + " for test case '" + name + "' failed with explain " + tojson(singleNodeQueryPlanner);
             }
 
             const hasSbePlan = engineUsed === "sbe";
-            const sbePlan =
-                hasSbePlan ? singleNodeQueryPlanner.winningPlan.slotBasedPlan.stages : null;
+            const sbePlan = hasSbePlan ? singleNodeQueryPlanner.winningPlan.slotBasedPlan.stages : null;
 
             if (usesBlockProcessing) {
                 // Verify that we have an SBE plan, and verify that "block_group" appears in the
                 // plan.
                 assert.eq(engineUsed, "sbe", testcaseAndExplainFn("Expected to use SBE"));
 
-                assert(sbePlan.includes("block_group"),
-                       testcaseAndExplainFn("Expected explain to use block processing"));
+                assert(
+                    sbePlan.includes("block_group"),
+                    testcaseAndExplainFn("Expected explain to use block processing"),
+                );
             } else {
                 if (hasSbePlan) {
                     // If 'usesBlockProcessing' is false and we have an SBE plan, verify that
                     // "block_group" does not appear anywhere in the SBE plan.
-                    assert(!sbePlan.includes("block_group"),
-                           testcaseAndExplainFn("Expected explain not to use block processing"));
+                    assert(
+                        !sbePlan.includes("block_group"),
+                        testcaseAndExplainFn("Expected explain not to use block processing"),
+                    );
                 }
             }
         }

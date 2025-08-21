@@ -25,21 +25,22 @@ function restartPrimaryShard(rs, ...expectedCollections) {
     rs.restart(0);
     rs.awaitSecondaryNodes();
 
-    expectedCollections.forEach(function(coll) {
-        assert(!hasRoutingInfoForNs(rs.getPrimary(), coll.getFullName()),
-               'Shard role not cleared for ' + coll.getFullName());
+    expectedCollections.forEach(function (coll) {
+        assert(
+            !hasRoutingInfoForNs(rs.getPrimary(), coll.getFullName()),
+            "Shard role not cleared for " + coll.getFullName(),
+        );
     });
 }
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on shard0 and cause it to refresh its sharding metadata.
 const nodeOptions = {
-    setParameter: {enableShardedIndexConsistencyCheck: false}
+    setParameter: {enableShardedIndexConsistencyCheck: false},
 };
 
 const testName = "lookup_stale_mongod";
-const st =
-    new ShardingTest({shards: 2, mongos: 2, rs: {nodes: 1}, other: {configOptions: nodeOptions}});
+const st = new ShardingTest({shards: 2, mongos: 2, rs: {nodes: 1}, other: {configOptions: nodeOptions}});
 
 const mongos0DB = st.s0.getDB(testName);
 const mongos0LocalColl = mongos0DB[testName + "_local"];
@@ -54,7 +55,7 @@ const pipeline = [
     // Unwind the results of the $lookup, so we can sort by them to get a consistent ordering
     // for the query results.
     {$unwind: "$same"},
-    {$sort: {_id: 1, "same._id": 1}}
+    {$sort: {_id: 1, "same._id": 1}},
 ];
 
 // The results are expected to be correct if the $lookup stage is executed on the mongos which
@@ -64,12 +65,11 @@ const expectedResults = [
     {_id: 1, a: null, "same": {_id: 1, b: null}},
     {_id: 1, a: null, "same": {_id: 2}},
     {_id: 2, "same": {_id: 1, b: null}},
-    {_id: 2, "same": {_id: 2}}
+    {_id: 2, "same": {_id: 2}},
 ];
 
 // Ensure that shard0 is the primary shard.
-assert.commandWorked(mongos0DB.adminCommand(
-    {enableSharding: mongos0DB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongos0DB.adminCommand({enableSharding: mongos0DB.getName(), primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(mongos0LocalColl.insert({_id: 0, a: 1}));
 assert.commandWorked(mongos0LocalColl.insert({_id: 1, a: null}));
@@ -88,20 +88,20 @@ assert.commandWorked(mongos1ForeignColl.insert({_id: 2}));
 //
 
 // Shard the foreign collection.
-assert.commandWorked(
-    mongos0DB.adminCommand({shardCollection: mongos0ForeignColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(mongos0DB.adminCommand({shardCollection: mongos0ForeignColl.getFullName(), key: {_id: 1}}));
 
 // Split the collection into 2 chunks: [MinKey, 1), [1, MaxKey).
-assert.commandWorked(
-    mongos0DB.adminCommand({split: mongos0ForeignColl.getFullName(), middle: {_id: 1}}));
+assert.commandWorked(mongos0DB.adminCommand({split: mongos0ForeignColl.getFullName(), middle: {_id: 1}}));
 
 // Move the [minKey, 1) chunk to shard1.
-assert.commandWorked(mongos0DB.adminCommand({
-    moveChunk: mongos0ForeignColl.getFullName(),
-    find: {_id: 0},
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    mongos0DB.adminCommand({
+        moveChunk: mongos0ForeignColl.getFullName(),
+        find: {_id: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
 
 // Verify $lookup results through the fresh mongos.
 restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
@@ -119,20 +119,20 @@ assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 //
 
 // Shard the local collection.
-assert.commandWorked(
-    mongos0DB.adminCommand({shardCollection: mongos0LocalColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(mongos0DB.adminCommand({shardCollection: mongos0LocalColl.getFullName(), key: {_id: 1}}));
 
 // Split the collection into 2 chunks: [MinKey, 1), [1, MaxKey).
-assert.commandWorked(
-    mongos0DB.adminCommand({split: mongos0LocalColl.getFullName(), middle: {_id: 1}}));
+assert.commandWorked(mongos0DB.adminCommand({split: mongos0LocalColl.getFullName(), middle: {_id: 1}}));
 
 // Move the [minKey, 1) chunk to shard1.
-assert.commandWorked(mongos0DB.adminCommand({
-    moveChunk: mongos0LocalColl.getFullName(),
-    find: {_id: 0},
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    mongos0DB.adminCommand({
+        moveChunk: mongos0LocalColl.getFullName(),
+        find: {_id: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
 
 // Verify $lookup results through the fresh mongos.
 restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
@@ -166,41 +166,43 @@ assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 //
 jsTest.log("Running two-level $lookup with a shard that needs recovery");
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'D', primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: "D", primaryShard: st.shard0.shardName}));
 
-const D = st.s0.getDB('D');
+const D = st.s0.getDB("D");
 
 assert.commandWorked(D.A.insert({Key: 1, Value: 1}));
 assert.commandWorked(D.B.insert({Key: 1, Value: 1}));
 assert.commandWorked(D.C.insert({Key: 1, Value: 1}));
 assert.commandWorked(D.D.insert({Key: 1, Value: 1}));
 
-const aggPipeline = [{
-    $lookup: {
-        from: 'B',
-        localField: 'Key',
-        foreignField: 'Value',
-        as: 'Joined',
-        pipeline: [
-            {
-                $lookup: {
-                    from: 'C',
-                    localField: 'Key',
-                    foreignField: 'Value',
-                    as: 'Joined',
-                }
-            },
-            {
-                $lookup: {
-                    from: 'D',
-                    localField: 'Key',
-                    foreignField: 'Value',
-                    as: 'Joined',
-                }
-            },
-        ],
-    }
-}];
+const aggPipeline = [
+    {
+        $lookup: {
+            from: "B",
+            localField: "Key",
+            foreignField: "Value",
+            as: "Joined",
+            pipeline: [
+                {
+                    $lookup: {
+                        from: "C",
+                        localField: "Key",
+                        foreignField: "Value",
+                        as: "Joined",
+                    },
+                },
+                {
+                    $lookup: {
+                        from: "D",
+                        localField: "Key",
+                        foreignField: "Value",
+                        as: "Joined",
+                    },
+                },
+            ],
+        },
+    },
+];
 
 const resultBefore = D.A.aggregate(aggPipeline).toArray();
 

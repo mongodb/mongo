@@ -6,9 +6,11 @@ import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 function assertChangeStreamNotSupportedOnConnection(conn) {
     const notReplicaSetErrorCode = 40573;
     assertErrorCode(conn.getDB("test").non_existent, [{$changeStream: {}}], notReplicaSetErrorCode);
-    assertErrorCode(conn.getDB("test").non_existent,
-                    [{$changeStream: {fullDocument: "updateLookup"}}],
-                    notReplicaSetErrorCode);
+    assertErrorCode(
+        conn.getDB("test").non_existent,
+        [{$changeStream: {fullDocument: "updateLookup"}}],
+        notReplicaSetErrorCode,
+    );
 }
 
 const conn = MongoRunner.runMongod();

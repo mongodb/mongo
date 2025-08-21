@@ -48,7 +48,7 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
             pipeline,
             comment: "memory stats mergesort test",
             allowDiskUse: false,
-            cursor: {batchSize: 1}
+            cursor: {batchSize: 1},
         },
         stageName: "SORT_MERGE",
         // There are 5 `getMore` operations because the pipeline filters down the original
@@ -70,7 +70,7 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
             pipeline: pipelineWithLimit,
             comment: "memory stats mergesort limit test",
             allowDiskUse: false,
-            cursor: {batchSize: 1}
+            cursor: {batchSize: 1},
         },
         stageName: "SORT_MERGE",
         expectedNumGetMores: 2,

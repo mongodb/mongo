@@ -17,7 +17,7 @@ const testCases = [
     {ns: "reshardingDb.has_compatible_index", indexToCreateBeforeResharding: {newKey: 1}},
     {
         ns: "reshardingDb.compatible_index_with_extra",
-        indexToCreateBeforeResharding: {newKey: 1, extra: 1}
+        indexToCreateBeforeResharding: {newKey: 1, extra: 1},
     },
 ];
 
@@ -48,13 +48,15 @@ for (let {ns, indexToCreateBeforeResharding} of testCases) {
     if (indexToCreateBeforeResharding !== undefined) {
         assert.sameMembers(indexesBeforeResharding, indexesAfterResharding);
     } else {
-        const shardKeyIndexPos = indexesAfterResharding.findIndex(
-            indexInfo => bsonBinaryEqual(indexInfo.key, {newKey: 1}));
+        const shardKeyIndexPos = indexesAfterResharding.findIndex((indexInfo) =>
+            bsonBinaryEqual(indexInfo.key, {newKey: 1}),
+        );
 
-        assert.lte(0,
-                   shardKeyIndexPos,
-                   `resharding didn't create index on new shard key pattern: ${
-                       tojson(indexesAfterResharding)}`);
+        assert.lte(
+            0,
+            shardKeyIndexPos,
+            `resharding didn't create index on new shard key pattern: ${tojson(indexesAfterResharding)}`,
+        );
 
         const indexesAfterReshardingToCompare = indexesAfterResharding.slice();
         indexesAfterReshardingToCompare.splice(shardKeyIndexPos, 1);

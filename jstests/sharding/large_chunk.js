@@ -12,7 +12,7 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Starts a new sharding environment limiting the chunk size to 1GB (highest value allowed).
 // Note that early splitting will start with a 1/4 of max size currently.
-var st = new ShardingTest({name: 'large_chunk', shards: 2, other: {chunkSize: 1024}});
+var st = new ShardingTest({name: "large_chunk", shards: 2, other: {chunkSize: 1024}});
 var db = st.getDB("test");
 
 //
@@ -20,8 +20,7 @@ var db = st.getDB("test");
 //
 
 // Turn on sharding on the 'test.foo' collection and generate a large chunk
-assert.commandWorked(
-    st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
 
 var bigString = "";
 while (bigString.length < 10000) {
@@ -31,7 +30,7 @@ while (bigString.length < 10000) {
 var inserted = 0;
 var num = 0;
 var bulk = db.foo.initializeUnorderedBulkOp();
-while (inserted < (400 * 1024 * 1024)) {
+while (inserted < 400 * 1024 * 1024) {
     bulk.insert({_id: num++, s: bigString});
     inserted += bigString.length;
 }
@@ -39,8 +38,7 @@ assert.commandWorked(bulk.execute());
 
 assert.commandWorked(st.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1}}));
 
-assert.eq(
-    1, findChunksUtil.countChunksForNs(st.config, "test.foo"), "step 1 - need one large chunk");
+assert.eq(1, findChunksUtil.countChunksForNs(st.config, "test.foo"), "step 1 - need one large chunk");
 
 var primary = st.getPrimaryShard("test").getDB("test");
 var secondary = st.getOther(primary).getDB("test");
@@ -50,25 +48,25 @@ var secondary = st.getOther(primary).getDB("test");
 jsTest.log("moveChunk expected to fail due to excessive size");
 var maxMB = 200;
 
-assert.commandWorked(
-    st.s.adminCommand({configureCollectionBalancing: "test.foo", chunkSize: maxMB}));
+assert.commandWorked(st.s.adminCommand({configureCollectionBalancing: "test.foo", chunkSize: maxMB}));
 
-assert.throws(function() {
+assert.throws(function () {
     st.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMongo().name});
 });
 
 // Move back to the default configuration and move the chunk
-assert.commandWorked(st.s.adminCommand({
-    configureCollectionBalancing: "test.foo",
-    chunkSize: 0  // clears override
-}));
+assert.commandWorked(
+    st.s.adminCommand({
+        configureCollectionBalancing: "test.foo",
+        chunkSize: 0, // clears override
+    }),
+);
 
 jsTest.log("moveChunk expected to succeed");
-var before = findChunksUtil.findChunksByNs(st.config, 'test.foo').toArray();
-assert.commandWorked(
-    st.s0.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMongo().name}));
+var before = findChunksUtil.findChunksByNs(st.config, "test.foo").toArray();
+assert.commandWorked(st.s0.adminCommand({movechunk: "test.foo", find: {_id: 1}, to: secondary.getMongo().name}));
 
-var after = findChunksUtil.findChunksByNs(st.config, 'test.foo').toArray();
+var after = findChunksUtil.findChunksByNs(st.config, "test.foo").toArray();
 assert.neq(before[0].shard, after[0].shard, "move chunk did not work");
 
 st.config.changelog.find().forEach(printjson);

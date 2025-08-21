@@ -9,7 +9,7 @@ export function checkCollectionUUIDs(adminDB) {
     assert.commandWorked(res);
     let databaseList = res.databases;
 
-    databaseList.forEach(function(database) {
+    databaseList.forEach(function (database) {
         let currentDatabase = adminDB.getSiblingDB(database.name);
         let collectionInfos = currentDatabase.getCollectionInfos();
         for (let i = 0; i < collectionInfos.length; i++) {
@@ -17,8 +17,7 @@ export function checkCollectionUUIDs(adminDB) {
                 continue;
             }
 
-            assert(collectionInfos[i].info.uuid,
-                   "Expect uuid for collection: " + tojson(collectionInfos[i]));
+            assert(collectionInfos[i].info.uuid, "Expect uuid for collection: " + tojson(collectionInfos[i]));
         }
     });
 }

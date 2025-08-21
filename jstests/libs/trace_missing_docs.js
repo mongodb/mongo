@@ -1,13 +1,10 @@
-
 //
 // On error inserting documents, traces back and shows where the document was dropped
 //
 
 export function traceMissingDoc(coll, doc, mongos) {
-    if (mongos)
-        coll = mongos.getCollection(coll + "");
-    else
-        mongos = coll.getMongo();
+    if (mongos) coll = mongos.getCollection(coll + "");
+    else mongos = coll.getMongo();
 
     var config = mongos.getDB("config");
     var shards = config.shards.find().toArray();
@@ -21,16 +18,21 @@ export function traceMissingDoc(coll, doc, mongos) {
     var shardKey = {};
     for (var k in shardKeyPatt) {
         if (doc[k] == undefined) {
-            jsTest.log("Shard key " + tojson(shardKey) + " not found in doc " + tojson(doc) +
-                       ", falling back to _id search...");
+            jsTest.log(
+                "Shard key " +
+                    tojson(shardKey) +
+                    " not found in doc " +
+                    tojson(doc) +
+                    ", falling back to _id search...",
+            );
             shardKeyPatt = {_id: 1};
-            shardKey = {_id: doc['_id']};
+            shardKey = {_id: doc["_id"]};
             break;
         }
         shardKey[k] = doc[k];
     }
 
-    if (doc['_id'] == undefined) {
+    if (doc["_id"] == undefined) {
         jsTest.log("Id not found in doc " + tojson(doc) + " cannot trace oplog entries.");
         return;
     }
@@ -46,15 +48,15 @@ export function traceMissingDoc(coll, doc, mongos) {
             continue;
         }
 
-        var addKeyQuery = function(query, prefix) {
+        var addKeyQuery = function (query, prefix) {
             for (var k in shardKey) {
-                query[prefix + '.' + k] = shardKey[k];
+                query[prefix + "." + k] = shardKey[k];
             }
             return query;
         };
 
-        var addToOps = function(cursor) {
-            cursor.forEach(function(doc) {
+        var addToOps = function (cursor) {
+            cursor.forEach(function (doc) {
                 doc.shard = shards[i]._id;
                 doc.realTime = new Date(doc.ts.getTime() * 1000);
                 allOps.push(doc);
@@ -62,13 +64,13 @@ export function traceMissingDoc(coll, doc, mongos) {
         };
 
         // Find ops
-        addToOps(oplog.find(addKeyQuery({op: 'i'}, 'o')));
-        var updateQuery = {$or: [addKeyQuery({op: 'u'}, 'o2'), {op: 'u', 'o2._id': doc['_id']}]};
+        addToOps(oplog.find(addKeyQuery({op: "i"}, "o")));
+        var updateQuery = {$or: [addKeyQuery({op: "u"}, "o2"), {op: "u", "o2._id": doc["_id"]}]};
         addToOps(oplog.find(updateQuery));
-        addToOps(oplog.find({op: 'd', 'o._id': doc['_id']}));
+        addToOps(oplog.find({op: "d", "o._id": doc["_id"]}));
     }
 
-    var compareOps = function(opA, opB) {
+    var compareOps = function (opA, opB) {
         return bsonWoCompare(opA.ts, opB.ts);
     };
 

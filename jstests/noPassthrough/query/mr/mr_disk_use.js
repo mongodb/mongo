@@ -12,29 +12,28 @@ const coll = db.getCollection(jsTestName());
 coll.drop();
 
 const memoryLimitMb = 1;
-const largeStr = "A".repeat(1024 * 1024);  // 1MB string
+const largeStr = "A".repeat(1024 * 1024); // 1MB string
 
 // Create a collection exceeding the memory limit.
-for (let i = 0; i < memoryLimitMb + 1; ++i)
-    assert.commandWorked(coll.insert({largeStr: largeStr}));
+for (let i = 0; i < memoryLimitMb + 1; ++i) assert.commandWorked(coll.insert({largeStr: largeStr}));
 
 const mapReduceCmd = {
     mapReduce: coll.getName(),
-    map: function() {
+    map: function () {
         emit("a", this.largeStr);
     },
-    reduce: function(k, v) {
+    reduce: function (k, v) {
         return 42;
     },
-    out: {inline: 1}
+    out: {inline: 1},
 };
 
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: memoryLimitMb * 1024 * 1024}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: memoryLimitMb * 1024 * 1024}),
+);
 
 assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: false}));
-assert.commandFailedWithCode(db.runCommand(mapReduceCmd),
-                             ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+assert.commandFailedWithCode(db.runCommand(mapReduceCmd), ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
 assert.commandWorked(db.adminCommand({setParameter: 1, allowDiskUseByDefault: true}));
 const res = assert.commandWorked(db.runCommand(mapReduceCmd));

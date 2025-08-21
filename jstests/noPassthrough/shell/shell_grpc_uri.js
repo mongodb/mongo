@@ -11,12 +11,12 @@ function assertConnectFailsWithErrorCode(uri, errorCode) {
 // (true for success). This is used over assertConnectFailsWithErrorCode when CLI-only arguments
 // need to be specified.
 function testShellConnect(ok, ...args) {
-    const cmd = 'assert.commandWorked(db.runCommand({hello: 1}));';
-    const exitCode = runMongoProgram('mongo', '--eval', cmd, ...args);
+    const cmd = "assert.commandWorked(db.runCommand({hello: 1}));";
+    const exitCode = runMongoProgram("mongo", "--eval", cmd, ...args);
     if (ok) {
-        assert.eq(exitCode, 0, "failed to connect with `" + args.join(' ') + "`");
+        assert.eq(exitCode, 0, "failed to connect with `" + args.join(" ") + "`");
     } else {
-        assert.neq(exitCode, 0, "unexpectedly succeeded connecting with `" + args.join(' ') + "`");
+        assert.neq(exitCode, 0, "unexpectedly succeeded connecting with `" + args.join(" ") + "`");
     }
 }
 
@@ -31,24 +31,24 @@ if (!FeatureFlagUtil.isPresentAndEnabled(mongod.getDB("admin"), "GRPC")) {
 const host = `localhost:${mongod.fullOptions.grpcPort}`;
 
 function testGRPCConnect(ok, ...args) {
-    testShellConnect(ok, `mongodb://${host}`, '--gRPC', ...args);
+    testShellConnect(ok, `mongodb://${host}`, "--gRPC", ...args);
     testShellConnect(ok, `mongodb://${host}/?gRPC=true`, ...args);
 }
 
 testGRPCConnect(true);
 
 // Options currently prohibited when using gRPC.
-testGRPCConnect(false, '--tlsCRLFile', 'jstests/libs/crl.pem');
-testGRPCConnect(false,
-                '--tlsCertificateKeyFile',
-                'jstests/libs/password_protected.pem',
-                '--tlsCertificateKeyFilePassword',
-                'qwerty');
-testGRPCConnect(false, '--tlsFIPSMode');
+testGRPCConnect(false, "--tlsCRLFile", "jstests/libs/crl.pem");
+testGRPCConnect(
+    false,
+    "--tlsCertificateKeyFile",
+    "jstests/libs/password_protected.pem",
+    "--tlsCertificateKeyFilePassword",
+    "qwerty",
+);
+testGRPCConnect(false, "--tlsFIPSMode");
 
-assertConnectFailsWithErrorCode(`mongodb://user:password@${host}/?gRPC=true&tls=true`,
-                                ErrorCodes.InvalidOptions);
-assertConnectFailsWithErrorCode(`mongodb://${host}/?gRPC=true&tls=true&replicaSet=blah`,
-                                ErrorCodes.InvalidOptions);
+assertConnectFailsWithErrorCode(`mongodb://user:password@${host}/?gRPC=true&tls=true`, ErrorCodes.InvalidOptions);
+assertConnectFailsWithErrorCode(`mongodb://${host}/?gRPC=true&tls=true&replicaSet=blah`, ErrorCodes.InvalidOptions);
 
 MongoRunner.stopMongod(mongod);

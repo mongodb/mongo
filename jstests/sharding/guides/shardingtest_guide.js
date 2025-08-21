@@ -36,7 +36,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     let st = new ShardingTest({
         shards: [{verbose: 5}, {verbose: 3}],
         mongos: [{verbose: 5}, {verbose: 3}],
-        config: [{verbose: 5}, {verbose: 3}]
+        config: [{verbose: 5}, {verbose: 3}],
     });
     st.stop();
 }
@@ -51,14 +51,14 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
             d0: {verbose: 5 /* node parameters */},
             d1: {verbose: 5 /* node parameters */},
             rs2: {nodes: 2 /* ReplSetTest parameters */},
-            rs3: {nodes: 2 /* ReplSetTest parameters */}
+            rs3: {nodes: 2 /* ReplSetTest parameters */},
         },
         mongos: {s0: {verbose: 5 /* node parameters */}, s1: {verbose: 5 /* node parameters */}},
         config: {
             c0: {verbose: 5 /* node parameters */},
             c1: {verbose: 5 /* node parameters */},
-            c2: {verbose: 5 /* node parameters */}
-        }
+            c2: {verbose: 5 /* node parameters */},
+        },
     });
 
     // We can retrieve the connection strings of each component of the sharded cluster using the
@@ -69,12 +69,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     print("shard3 connection string: " + tojson(st.shard3));
     print("mongos0 connection string: " + tojson(st.s0));
     print("mongos1 connection string: " + tojson(st.s1));
-    print("configsvr replica node 0 connection string: " +
-          tojson(st.c0));  // can also do st.config0
-    print("configsvr replica node 1 connection string: " +
-          tojson(st.c1));  // can also do st.config1
-    print("configsvr replica node 2 connection string: " +
-          tojson(st.c2));  // can also do st.config2
+    print("configsvr replica node 0 connection string: " + tojson(st.c0)); // can also do st.config0
+    print("configsvr replica node 1 connection string: " + tojson(st.c1)); // can also do st.config1
+    print("configsvr replica node 2 connection string: " + tojson(st.c2)); // can also do st.config2
 
     // Some other connection strings we can retrieve from the ShardingTest object.
     print("first mongos connection string: " + tojson(st.s));
@@ -101,8 +98,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
     // Once we get the connection string we can use them to run commands. Below is an example
     // of an insert done on shard0.
-    assert.commandWorked(
-        st.shard0.getDB("test").runCommand({insert: 'testColl', documents: [{x: 1}]}));
+    assert.commandWorked(st.shard0.getDB("test").runCommand({insert: "testColl", documents: [{x: 1}]}));
 
     st.stop();
 }
@@ -119,8 +115,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     // We can specify a common replica set size for our shards. Below we start 2 3 node
     // replica set shards, 2 mongos, 1 single node replica set config server.
 
-    let st = new ShardingTest(
-        {shards: 2, mongos: 2, config: 1, rs: {nodes: 3, /* other ReplSetTest options */}});
+    let st = new ShardingTest({shards: 2, mongos: 2, config: 1, rs: {nodes: 3 /* other ReplSetTest options */}});
     st.stop();
 }
 
@@ -138,10 +133,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
         mongos: 2,
         config: 1,
         other: {
-            rs: {nodes: 3, /* other ReplSetTest options */},
+            rs: {nodes: 3 /* other ReplSetTest options */},
             enableBalancer: true,
-            rsOptions: nodeOptions
-        }
+            rsOptions: nodeOptions,
+        },
     });
     st.stop();
 }

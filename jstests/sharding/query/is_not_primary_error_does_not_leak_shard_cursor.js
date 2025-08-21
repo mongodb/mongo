@@ -9,9 +9,9 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const dbName = 'test';
-const collName = 'foo';
-const ns = dbName + '.' + collName;
+const dbName = "test";
+const collName = "foo";
+const ns = dbName + "." + collName;
 
 const st = new ShardingTest({
     mongos: 1,
@@ -21,7 +21,7 @@ const st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 let coll = st.s.getDB(dbName)[collName];
@@ -36,7 +36,7 @@ let session = st.s.startSession();
 let sessionColl = session.getDatabase(dbName)[collName];
 session.startTransaction();
 
-let cursor = sessionColl.find().batchSize(2).comment('myCursor');
+let cursor = sessionColl.find().batchSize(2).comment("myCursor");
 
 cursor.next();
 cursor.next();
@@ -56,12 +56,15 @@ cursor.close();
 
 // Check that the shard cursors eventually gets killed.
 assert.soon(() => {
-    return shardPrimary.getDB('admin')
-               .aggregate([
-                   {$currentOp: {idleCursors: true, allUsers: true}},
-                   {$match: {type: 'idleCursor', 'cursor.originatingCommand.comment': 'myCursor'}}
-               ])
-               .itcount() === 0;
+    return (
+        shardPrimary
+            .getDB("admin")
+            .aggregate([
+                {$currentOp: {idleCursors: true, allUsers: true}},
+                {$match: {type: "idleCursor", "cursor.originatingCommand.comment": "myCursor"}},
+            ])
+            .itcount() === 0
+    );
 });
 
 st.stop();

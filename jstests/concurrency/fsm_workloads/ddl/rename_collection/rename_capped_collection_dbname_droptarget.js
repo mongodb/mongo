@@ -11,18 +11,18 @@
  *   requires_capped,
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
-        prefix: 'rename_capped_collection_dbname_droptarget'
+        prefix: "rename_capped_collection_dbname_droptarget",
     };
 
-    var states = (function() {
+    var states = (function () {
         var options = {capped: true, size: 4096};
 
         function uniqueDBName(prefix, tid, num) {
-            return prefix + tid + '_' + num;
+            return prefix + tid + "_" + num;
         }
 
         function insert(db, collName, numDocs) {
@@ -61,9 +61,9 @@ export const $config = (function() {
             // Verify that 'fromCollCount' documents exist in the "to" collection
             // after the rename occurs
             var renameCommand = {
-                renameCollection: this.fromDBName + '.' + collName,
-                to: this.toDBName + '.' + collName,
-                dropTarget: true
+                renameCollection: this.fromDBName + "." + collName,
+                to: this.toDBName + "." + collName,
+                dropTarget: true,
             };
 
             assert.commandWorked(fromDB.adminCommand(renameCommand));

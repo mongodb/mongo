@@ -16,7 +16,7 @@ if (HOST_TYPE == "macOS") {
     // Ensure trusted-ca.pem is properly installed on MacOS hosts.
     // (MacOS is the only OS where it is installed outside of this test)
     let exitCode = runProgram("security", "verify-cert", "-c", "./jstests/libs/trusted-client.pem");
-    assert.eq(0, exitCode, 'Check for proper installation of Trusted CA on MacOS host');
+    assert.eq(0, exitCode, "Check for proper installation of Trusted CA on MacOS host");
 }
 if (HOST_TYPE == "windows") {
     assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
@@ -33,10 +33,9 @@ const certDir = MongoRunner.toRealDir("$dataDir/ssl_with_system_ca_test/");
 if (HOST_TYPE == "linux") {
     mkdir(certDir);
     clearRawMongoProgramOutput();
-    assert.eq(
-        0, runProgram("openssl", "x509", "-hash", "-noout", "-in", "jstests/libs/trusted-ca.pem"));
+    assert.eq(0, runProgram("openssl", "x509", "-hash", "-noout", "-in", "jstests/libs/trusted-ca.pem"));
     let hash = rawMongoProgramOutput(".*");
-    jsTestLog(hash);  // has form: "|sh<pid> <hash>\n"
+    jsTestLog(hash); // has form: "|sh<pid> <hash>\n"
     hash = hash.trim().split(" ")[1];
     copyCertificateFile("jstests/libs/trusted-ca.pem", `${certDir}/${hash}.0`);
 }
@@ -48,8 +47,8 @@ function testServerIngress() {
     // Start a mongod configured with sslPEMKeyFile = trusted-server.pem,
     // and a system CA store containing trusted-ca.pem.
     const serverOpts = {
-        tlsMode: 'preferTLS',
-        tlsCertificateKeyFile: 'jstests/libs/trusted-server.pem',
+        tlsMode: "preferTLS",
+        tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
         tlsAllowInvalidHostnames: "",
         waitForConnect: true,
         setParameter: {tlsUseSystemCA: true},
@@ -64,26 +63,21 @@ function testServerIngress() {
             certificateKeyFile: "jstests/libs/trusted-client.pem",
             CAFile: "jstests/libs/trusted-ca.pem",
             allowInvalidHostnames: true,
-        }
+        },
     };
     assert.doesNotThrow(() => {
         let newConn = new Mongo(conn.host, undefined, clientOpts);
-        assert.commandWorked(newConn.getDB('admin').runCommand({buildinfo: 1}));
+        assert.commandWorked(newConn.getDB("admin").runCommand({buildinfo: 1}));
     });
 
     // Using untrusted keys, verify the server rejects the client.
     jsTestLog("Testing server ingress rejects untrusted client certificate");
     clientOpts.tls.certificateKeyFile = "jstests/libs/client.pem";
-    assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(conn.adminCommand({clearLog: "global"}));
 
-    let error = assert.throwsWithCode(
-        () => {
-            new Mongo(conn.host, undefined, clientOpts);
-        },
-        [
-            ErrorCodes.SocketException,
-            ErrorCodes.HostUnreachable
-        ]);  // Different error depending on OS
+    let error = assert.throwsWithCode(() => {
+        new Mongo(conn.host, undefined, clientOpts);
+    }, [ErrorCodes.SocketException, ErrorCodes.HostUnreachable]); // Different error depending on OS
     assert(error.reason.includes("handshake failed"), error.reason);
     checkLog.containsRelaxedJson(conn, 22988, {error: {code: ErrorCodes.SSLHandshakeFailed}});
 
@@ -99,9 +93,9 @@ function testServerEgress() {
     // and a system CA store containing trusted-ca.pem.
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet({
-        tlsMode: 'preferTLS',
-        tlsCertificateKeyFile: 'jstests/libs/trusted-server.pem',  // used on ingress
-        tlsClusterFile: 'jstests/libs/trusted-client.pem',         // used on egress to node2
+        tlsMode: "preferTLS",
+        tlsCertificateKeyFile: "jstests/libs/trusted-server.pem", // used on ingress
+        tlsClusterFile: "jstests/libs/trusted-client.pem", // used on egress to node2
         tlsAllowInvalidHostnames: "",
         waitForConnect: true,
         setParameter: {tlsUseSystemCA: true},
@@ -113,15 +107,15 @@ function testServerEgress() {
 
     // Add new node that uses a key not trusted by the first node.
     let badNode = rst.add({
-        tlsMode: 'preferTLS',
-        tlsCertificateKeyFile: "jstests/libs/server.pem",   // used on ingress, untrusted
-        tlsClusterFile: "jstests/libs/trusted-client.pem",  // used on egress to node1
+        tlsMode: "preferTLS",
+        tlsCertificateKeyFile: "jstests/libs/server.pem", // used on ingress, untrusted
+        tlsClusterFile: "jstests/libs/trusted-client.pem", // used on egress to node1
         tlsCAFile: "jstests/libs/trusted-ca.pem",
         tlsAllowInvalidHostnames: "",
         waitForConnect: true,
     });
 
-    assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(conn.adminCommand({clearLog: "global"}));
     jsTestLog("Reinitiating replica set with one additional node using untrusted key file");
     rst.reInitiate();
 
@@ -132,15 +126,15 @@ function testServerEgress() {
 
     // Add new node that uses a key trusted by the first node.
     let goodNode = rst.add({
-        tlsMode: 'preferTLS',
-        tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",  // used on ingress, trusted
-        tlsClusterFile: "jstests/libs/trusted-client.pem",         // used on egress to node1
+        tlsMode: "preferTLS",
+        tlsCertificateKeyFile: "jstests/libs/trusted-server.pem", // used on ingress, trusted
+        tlsClusterFile: "jstests/libs/trusted-client.pem", // used on egress to node1
         tlsCAFile: "jstests/libs/trusted-ca.pem",
         tlsAllowInvalidHostnames: "",
         waitForConnect: true,
     });
 
-    assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(conn.adminCommand({clearLog: "global"}));
     jsTestLog("Reinitiating replica set with one additional node using trusted key file");
     rst.reInitiate();
     rst.awaitSecondaryNodes();
@@ -157,7 +151,7 @@ try {
     testServerEgress();
 } finally {
     if (HOST_TYPE == "windows") {
-        const trusted_ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
+        const trusted_ca_thumbprint = cat("jstests/libs/trusted-ca.pem.digest.sha1");
         runProgram("certutil.exe", "-delstore", "-f", "Root", trusted_ca_thumbprint);
         runProgram("certutil.exe", "-delstore", "-user", "-f", "CA", trusted_ca_thumbprint);
     }

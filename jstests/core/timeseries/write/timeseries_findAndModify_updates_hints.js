@@ -10,7 +10,7 @@
  * ]
  */
 
-import {getWinningPlanFromExplain} from 'jstests/libs/query/analyze_plan.js';
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
@@ -27,34 +27,32 @@ const testUpdateHint = ({
     resultDocList,
     nModifiedBuckets,
     expectedPlan,
-    expectedError
+    expectedError,
 }) => {
     const testDB = db.getSiblingDB(dbName);
     const coll = testDB.getCollection(collName);
 
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     assert.commandWorked(coll.createIndexes(indexes));
 
     assert.commandWorked(coll.insert(initialDocList));
 
-    const findAndModifyCmd =
-        {findAndModify: coll.getName(), query: query, update: update, hint: hint};
+    const findAndModifyCmd = {findAndModify: coll.getName(), query: query, update: update, hint: hint};
 
     if (expectedError != undefined) {
         assert.commandFailedWithCode(
-            testDB.runCommand(
-                {findAndModify: coll.getName(), query: query, update: update, hint: hint}),
-            expectedError);
+            testDB.runCommand({findAndModify: coll.getName(), query: query, update: update, hint: hint}),
+            expectedError,
+        );
 
         assert.eq(initialDocList.length, resultDocList.length);
 
-        resultDocList.forEach(resultDoc => {
+        resultDocList.forEach((resultDoc) => {
             const actualDoc = coll.findOne(resultDoc);
-            assert(actualDoc,
-                   "Document " + tojson(resultDoc) +
-                       " is not found in the result collection as expected ");
+            assert(actualDoc, "Document " + tojson(resultDoc) + " is not found in the result collection as expected ");
             assert.docEq(resultDoc, actualDoc);
         });
     } else {
@@ -62,25 +60,22 @@ const testUpdateHint = ({
         assert.eq(nModifiedBuckets, res.lastErrorObject.n);
         assert.eq(initialDocList.length, resultDocList.length);
 
-        resultDocList.forEach(resultDoc => {
+        resultDocList.forEach((resultDoc) => {
             const actualDoc = coll.findOne(resultDoc);
-            assert(actualDoc,
-                   "Document " + tojson(resultDoc) +
-                       " is not found in the result collection as expected ");
+            assert(actualDoc, "Document " + tojson(resultDoc) + " is not found in the result collection as expected ");
             assert.docEq(resultDoc, actualDoc);
         });
 
-        const winningPlan = getWinningPlanFromExplain(assert.commandWorked(
-            testDB.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"})));
+        const winningPlan = getWinningPlanFromExplain(
+            assert.commandWorked(testDB.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"})),
+        );
 
         // Verify that the query plan uses the expected index.
         if (expectedPlan.stage == "COLLSCAN") {
             assert.eq(expectedPlan.stage, winningPlan.inputStage.stage);
         } else {
             assert.eq(expectedPlan.stage, winningPlan.inputStage.inputStage.stage);
-            assert.eq(bsonWoCompare(expectedPlan.keyPattern,
-                                    winningPlan.inputStage.inputStage.keyPattern),
-                      0);
+            assert.eq(bsonWoCompare(expectedPlan.keyPattern, winningPlan.inputStage.inputStage.keyPattern), 0);
         }
     }
 
@@ -91,19 +86,19 @@ const hintDoc1 = {
     _id: 1,
     [timeFieldName]: dateTime,
     [metaFieldName]: {"a": 1},
-    measurement: 1
+    measurement: 1,
 };
 const hintDoc2 = {
     _id: 2,
     [timeFieldName]: dateTime,
     [metaFieldName]: {"a": 2},
-    measurement: 2
+    measurement: 2,
 };
 const hintDoc3 = {
     _id: 3,
     [timeFieldName]: dateTime,
     [metaFieldName]: {"a": 3},
-    measurement: 3
+    measurement: 3,
 };
 
 /************* Tests passing a hint to an update on a collection with a single index. *************/
@@ -111,32 +106,32 @@ const hintDoc3 = {
 testUpdateHint({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName]: 1}],
-    query: {[metaFieldName + '.a']: {$gte: 3}},
+    query: {[metaFieldName + ".a"]: {$gte: 3}},
     update: {$inc: {measurement: 10}},
     hint: {$natural: 1},
     resultDocList: [
         hintDoc1,
         hintDoc2,
-        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 3}, measurement: 13}
+        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 3}, measurement: 13},
     ],
     nModifiedBuckets: 1,
-    expectedPlan: {stage: "COLLSCAN"}
+    expectedPlan: {stage: "COLLSCAN"},
 });
 
 // Query on and update the measurement field using a backward collection scan: hint: {$natural -1}.
 testUpdateHint({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName]: 1}],
-    query: {[metaFieldName + '.a']: {$gte: 3}},
+    query: {[metaFieldName + ".a"]: {$gte: 3}},
     update: {$inc: {measurement: 10}},
     hint: {$natural: -1},
     resultDocList: [
         hintDoc1,
         hintDoc2,
-        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 3}, measurement: 13}
+        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 3}, measurement: 13},
     ],
     nModifiedBuckets: 1,
-    expectedPlan: {stage: "COLLSCAN"}
+    expectedPlan: {stage: "COLLSCAN"},
 });
 
 // Query on and update a measurement using the metaField index as a hint, specifying the hint with
@@ -144,13 +139,13 @@ testUpdateHint({
 testUpdateHint({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName]: 1}],
-    query: {[metaFieldName + '.a']: {$lte: 1}},
+    query: {[metaFieldName + ".a"]: {$lte: 1}},
     update: {$inc: {measurement: 10}},
     hint: {[metaFieldName]: 1},
     resultDocList: [
         {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {"a": 1}, measurement: 11},
         hintDoc2,
-        hintDoc3
+        hintDoc3,
     ],
     nModifiedBuckets: 1,
     expectedPlan: {stage: "IXSCAN", keyPattern: {"meta": 1}},
@@ -167,11 +162,10 @@ testUpdateHint({
     resultDocList: [
         hintDoc1,
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 2}, measurement: 12},
-        hintDoc3
+        hintDoc3,
     ],
     nModifiedBuckets: 1,
-    expectedPlan:
-        {stage: "IXSCAN", keyPattern: {"meta": 1, "control.min.time": 1, "control.max.time": 1}},
+    expectedPlan: {stage: "IXSCAN", keyPattern: {"meta": 1, "control.min.time": 1, "control.max.time": 1}},
 });
 
 testUpdateHint({
@@ -183,11 +177,10 @@ testUpdateHint({
     resultDocList: [
         hintDoc1,
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 2}, measurement: 12},
-        hintDoc3
+        hintDoc3,
     ],
     nModifiedBuckets: 1,
-    expectedPlan:
-        {stage: "IXSCAN", keyPattern: {"meta": -1, "control.min.time": 1, "control.max.time": 1}},
+    expectedPlan: {stage: "IXSCAN", keyPattern: {"meta": -1, "control.min.time": 1, "control.max.time": 1}},
 });
 
 // Query on and update a measurement using a compound index on the metaField and timeField as a
@@ -201,11 +194,10 @@ testUpdateHint({
     resultDocList: [
         hintDoc1,
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 2}, measurement: 12},
-        hintDoc3
+        hintDoc3,
     ],
     nModifiedBuckets: 1,
-    expectedPlan:
-        {stage: "IXSCAN", keyPattern: {"meta": 1, "control.min.time": 1, "control.max.time": 1}},
+    expectedPlan: {stage: "IXSCAN", keyPattern: {"meta": 1, "control.min.time": 1, "control.max.time": 1}},
 });
 
 // Query on and update a measurement using a compound index on the timeField and an embedded field
@@ -222,8 +214,7 @@ testUpdateHint({
         hintDoc3,
     ],
     nModifiedBuckets: 1,
-    expectedPlan:
-        {stage: "IXSCAN", keyPattern: {"meta.a": -1, "control.min.time": 1, "control.max.time": 1}},
+    expectedPlan: {stage: "IXSCAN", keyPattern: {"meta.a": -1, "control.min.time": 1, "control.max.time": 1}},
 });
 
 /************ Tests passing a hint to an update on a collection with multiple indexes. ************/
@@ -238,7 +229,7 @@ testUpdateHint({
     resultDocList: [
         {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {"a": 1}, measurement: 10},
         hintDoc2,
-        hintDoc3
+        hintDoc3,
     ],
     nModifiedBuckets: 1,
     expectedPlan: {stage: "IXSCAN", keyPattern: {"control.max.time": -1, "control.min.time": -1}},

@@ -1,10 +1,7 @@
 /*
  * Utility functions to help run a property-based test in a jstest.
  */
-import {
-    LeafParameter,
-    leafParametersPerFamily
-} from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {LeafParameter, leafParametersPerFamily} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 /*
@@ -24,7 +21,7 @@ export function concreteQueryFromFamily(queryShape, leafId) {
             result.push(concreteQueryFromFamily(el, leafId));
         }
         return result;
-    } else if (typeof queryShape === 'object' && queryShape !== null) {
+    } else if (typeof queryShape === "object" && queryShape !== null) {
         // Recurse through the object values and create a new object.
         const obj = {};
         const keys = Object.keys(queryShape);
@@ -38,7 +35,7 @@ export function concreteQueryFromFamily(queryShape, leafId) {
 
 function createColl(coll, isTS = false) {
     const db = coll.getDB();
-    const args = isTS ? {timeseries: {timeField: 't', metaField: 'm'}} : {};
+    const args = isTS ? {timeseries: {timeField: "t", metaField: "m"}} : {};
     assert.commandWorked(db.createCollection(coll.getName(), args));
 }
 /*
@@ -102,13 +99,14 @@ function runProperty(propertyFn, namespaces, workload) {
         const name = "index_" + num;
         assert.commandWorkedOrFailedWithCode(
             experimentColl.createIndex(indexSpec.def, Object.assign({}, indexSpec.options, {name})),
-            okIndexCreationErrorCodes);
+            okIndexCreationErrorCodes,
+        );
     });
 
     const testHelpers = {
         comp: _resultSetsEqualUnordered,
         numQueryShapes: queries.length,
-        leafParametersPerFamily
+        leafParametersPerFamily,
     };
 
     function getQuery(queryIx, paramIx) {
@@ -125,11 +123,11 @@ function runProperty(propertyFn, namespaces, workload) {
  * what property failed very clearly, or provide more details beyond the counterexample.
  */
 function reporter(propertyFn, namespaces) {
-    return function(runDetails) {
+    return function (runDetails) {
         if (runDetails.failed) {
             // Print the fast-check failure summary, the counterexample, and additional details
             // about the property failure.
-            jsTestLog('Failed property: ' + propertyFn.name);
+            jsTestLog("Failed property: " + propertyFn.name);
             jsTestLog(runDetails);
             const workload = runDetails.counterexample[0];
             jsTestLog(workload);
@@ -146,14 +144,12 @@ function reporter(propertyFn, namespaces) {
  * failed property.
  */
 export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples) {
-    assert.eq(typeof propertyFn, 'function');
-    assert(Object.keys(namespaces)
-               .every(collName => collName === 'controlColl' || collName === 'experimentColl'));
-    assert.eq(typeof numRuns, 'number');
+    assert.eq(typeof propertyFn, "function");
+    assert(Object.keys(namespaces).every((collName) => collName === "controlColl" || collName === "experimentColl"));
+    assert.eq(typeof numRuns, "number");
 
     const seed = 4;
-    jsTestLog('Running property `' + propertyFn.name + '` from test file `' + jsTestName() +
-              '`, seed = ' + seed);
+    jsTestLog("Running property `" + propertyFn.name + "` from test file `" + jsTestName() + "`, seed = " + seed);
     // PBTs can throw (and then catch) exceptions for a few reasons. For example it's hard to model
     // indexes exactly, so we end up trying to create some invalid indexes which throw exceptions.
     // These exceptions make the logs hard to read and can be ignored, so we turn off
@@ -163,29 +159,32 @@ export function testProperty(propertyFn, namespaces, workloadModel, numRuns, exa
     TestData.traceExceptions = false;
 
     let alwaysPassed = true;
-    fc.assert(fc.property(workloadModel, workload => {
-        // Only return if the property passed or not. On failure,
-        // `runProperty` is called again and more details are exposed.
-        const result = runProperty(propertyFn, namespaces, workload);
-        // If it failed for the first time, print that out so we have the first failure available
-        // in case shrinking fails.
-        if (!result.passed && alwaysPassed) {
-            jsTestLog('The property ' + propertyFn.name + ' from ' + jsTestName() + ' failed');
-            jsTestLog('Initial inputs **before minimization**');
-            jsTestLog(workload);
-            jsTestLog('Initial failure details **before minimization**');
-            jsTestLog(result);
-            alwaysPassed = false;
-        }
-        return result.passed;
-    }), {seed, numRuns, reporter: reporter(propertyFn, namespaces), examples});
+    fc.assert(
+        fc.property(workloadModel, (workload) => {
+            // Only return if the property passed or not. On failure,
+            // `runProperty` is called again and more details are exposed.
+            const result = runProperty(propertyFn, namespaces, workload);
+            // If it failed for the first time, print that out so we have the first failure available
+            // in case shrinking fails.
+            if (!result.passed && alwaysPassed) {
+                jsTestLog("The property " + propertyFn.name + " from " + jsTestName() + " failed");
+                jsTestLog("Initial inputs **before minimization**");
+                jsTestLog(workload);
+                jsTestLog("Initial failure details **before minimization**");
+                jsTestLog(result);
+                alwaysPassed = false;
+            }
+            return result.passed;
+        }),
+        {seed, numRuns, reporter: reporter(propertyFn, namespaces), examples},
+    );
 }
 
 function isCollTS(collName) {
     const res = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
     const colls = res.cursor.firstBatch;
     assert.eq(colls.length, 1);
-    return colls[0].type === 'timeseries';
+    return colls[0].type === "timeseries";
 }
 
 export function getPlanCache(coll) {
@@ -213,21 +212,26 @@ export function runDeoptimized(controlColl, queries) {
     // and then set the `internalQueryDisablePlanCache` knob.
     getPlanCache(controlColl).clear();
     const db = controlColl.getDB();
-    const priorSettings = assert.commandWorked(db.adminCommand(
-        {getParameter: 1, internalQueryFrameworkControl: 1, internalQueryDisablePlanCache: 1}));
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQueryFrameworkControl: 'forceClassicEngine',
-        internalQueryDisablePlanCache: true
-    }));
+    const priorSettings = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1, internalQueryDisablePlanCache: 1}),
+    );
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryFrameworkControl: "forceClassicEngine",
+            internalQueryDisablePlanCache: true,
+        }),
+    );
 
-    const resultMap = queries.map(query => controlColl.aggregate(unoptimize(query)).toArray());
+    const resultMap = queries.map((query) => controlColl.aggregate(unoptimize(query)).toArray());
 
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQueryFrameworkControl: priorSettings.internalQueryFrameworkControl,
-        internalQueryDisablePlanCache: priorSettings.internalQueryDisablePlanCache
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryFrameworkControl: priorSettings.internalQueryFrameworkControl,
+            internalQueryDisablePlanCache: priorSettings.internalQueryDisablePlanCache,
+        }),
+    );
 
     return resultMap;
 }

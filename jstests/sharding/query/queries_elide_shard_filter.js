@@ -39,15 +39,15 @@ function createCollection(coll, shardKey) {
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: coll.getDB().getName()}));
 
-jsTest.log('Tests with single shard key');
+jsTest.log("Tests with single shard key");
 createCollection(coll, {a: 1});
 
 // We're requesting a specific shard key, therefore we should optimize away SHARDING_FILTER
 // and use a cheaper COUNT_SCAN.
-let explain = assert.commandWorked(coll.explain('executionStats').count({a: true}));
+let explain = assert.commandWorked(coll.explain("executionStats").count({a: true}));
 assertCountScan(explain);
 // Check this works with a subset of records as well.
-explain = assert.commandWorked(coll.explain('executionStats').count({a: true, b: true}));
+explain = assert.commandWorked(coll.explain("executionStats").count({a: true, b: true}));
 assertCountScan(explain);
 
 // Test that a find() query which specifies the entire shard key does not need a shard filter.
@@ -57,22 +57,21 @@ explain = assert.commandWorked(coll.find({a: true, b: true}).explain());
 assertNoShardFilter(explain);
 
 // We're not checking shard key for equality, therefore need a sharding filter.
-explain = assert.commandWorked(coll.explain('executionStats').count({a: {$in: [true, false]}}));
+explain = assert.commandWorked(coll.explain("executionStats").count({a: {$in: [true, false]}}));
 assertShardFilter(explain);
 
 // We're requesting a disjoint key from shardkey, therefore need a sharding filter.
-explain = assert.commandWorked(coll.explain('executionStats').count({b: true}));
+explain = assert.commandWorked(coll.explain("executionStats").count({b: true}));
 assertShardFilter(explain);
 
-jsTest.log('Tests with compound shard key');
+jsTest.log("Tests with compound shard key");
 createCollection(coll, {a: 1, b: 1});
 
-explain = assert.commandWorked(coll.explain('executionStats').count({a: true}));
+explain = assert.commandWorked(coll.explain("executionStats").count({a: true}));
 assertShardFilter(explain);
-explain = assert.commandWorked(coll.explain('executionStats').count({a: true, b: true}));
+explain = assert.commandWorked(coll.explain("executionStats").count({a: true, b: true}));
 assertCountScan(explain);
-explain =
-    assert.commandWorked(coll.explain('executionStats').count({a: true, b: {$in: [true, false]}}));
+explain = assert.commandWorked(coll.explain("executionStats").count({a: true, b: {$in: [true, false]}}));
 assertShardFilter(explain);
 
 explain = assert.commandWorked(coll.find({a: true}).explain());
@@ -82,16 +81,16 @@ assertNoShardFilter(explain);
 explain = assert.commandWorked(coll.find({a: true, b: {$in: [true, false]}}).explain());
 assertShardFilter(explain);
 
-jsTest.log('Tests with hashed shard key');
-createCollection(coll, {a: 'hashed'});
+jsTest.log("Tests with hashed shard key");
+createCollection(coll, {a: "hashed"});
 
-explain = assert.commandWorked(coll.explain('executionStats').count({a: true}));
+explain = assert.commandWorked(coll.explain("executionStats").count({a: true}));
 assertCountScan(explain);
-explain = assert.commandWorked(coll.explain('executionStats').count({a: true, b: true}));
+explain = assert.commandWorked(coll.explain("executionStats").count({a: true, b: true}));
 assertCountScan(explain);
-explain = assert.commandWorked(coll.explain('executionStats').count({a: {$in: [true, false]}}));
+explain = assert.commandWorked(coll.explain("executionStats").count({a: {$in: [true, false]}}));
 assertShardFilter(explain);
-explain = assert.commandWorked(coll.explain('executionStats').count({b: true}));
+explain = assert.commandWorked(coll.explain("executionStats").count({b: true}));
 assertShardFilter(explain);
 
 explain = assert.commandWorked(coll.find({a: true}).explain());

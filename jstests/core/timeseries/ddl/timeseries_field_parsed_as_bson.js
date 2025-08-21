@@ -38,23 +38,23 @@ if (!areViewlessTimeseriesEnabled(db)) {
                         "min": {
                             "bsonType": "object",
                             "required": [timeField],
-                            "properties": properties
+                            "properties": properties,
                         },
                         "max": {
                             "bsonType": "object",
                             "required": [timeField],
-                            "properties": properties
+                            "properties": properties,
                         },
                         "closed": {"bsonType": "bool"},
-                        "count": {"bsonType": "number", "minimum": 1}
+                        "count": {"bsonType": "number", "minimum": 1},
                     },
-                    "additionalProperties": false
+                    "additionalProperties": false,
                 },
                 "data": {"bsonType": "object"},
-                "meta": {}
+                "meta": {},
             },
-            "additionalProperties": false
-        }
+            "additionalProperties": false,
+        },
     };
 
     assert(timeseriesCollInfo.options);
@@ -63,7 +63,7 @@ if (!areViewlessTimeseriesEnabled(db)) {
 
 const doc = {
     a: 1,
-    [timeField]: new Date("2021-01-01")
+    [timeField]: new Date("2021-01-01"),
 };
 assert.commandWorked(coll.insert(doc));
 assert.docEq([doc], coll.aggregate([{$match: {}}, {$project: {_id: 0}}]).toArray());

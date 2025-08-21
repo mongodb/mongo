@@ -13,7 +13,7 @@ const st = new ShardingTest({
     mongos: 2,
     config: 1,
     rs: {nodes: 1},
-    mongosOptions: {setParameter: {logComponentVerbosity: tojson({sharding: 4})}}
+    mongosOptions: {setParameter: {logComponentVerbosity: tojson({sharding: 4})}},
 });
 
 // Performing an insert through bulkWrite on a sharded collection will cause a
@@ -31,13 +31,15 @@ for (let i = 0; i < 100000; i++) {
     opsArr.push({insert: 0, document: {a: i}});
 }
 
-assert.commandWorked(db_s0.adminCommand({
-    bulkWrite: 1,
-    ops: opsArr,
-    ordered: false,
-    nsInfo: [{ns: "test.repro"}],
-    writeConcern: {w: 0}
-}));
+assert.commandWorked(
+    db_s0.adminCommand({
+        bulkWrite: 1,
+        ops: opsArr,
+        ordered: false,
+        nsInfo: [{ns: "test.repro"}],
+        writeConcern: {w: 0},
+    }),
+);
 
 // Make sure that all documents were written to the collection.
 assert.eq(100000, db_s0.repro.find().itcount());

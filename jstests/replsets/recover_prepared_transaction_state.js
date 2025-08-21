@@ -60,8 +60,7 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session1);
 
 // Prevent the stable timestamp from moving beyond the following prepared transactions so
 // that when we replay the oplog from the stable timestamp, we correctly recover them.
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
 
 // The following transactions will be prepared before the common point, so they must be in
 // prepare after rollback recovery.
@@ -73,7 +72,7 @@ assert.commandWorked(sessionColl2.update({_id: 2}, {$set: {b: 2}}));
 const prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2, {w: 1});
 
 // Check that we have two transactions in the transactions table.
-assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
+assert.eq(primary.getDB("config")["transactions"].find().itcount(), 2);
 
 // This characterizes the current behavior of fastcount, which is that the two open transaction
 // count toward the value.
@@ -92,12 +91,11 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 try {
     rollbackTest.transitionToSteadyStateOperations({skipDataConsistencyChecks: true});
 } finally {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'}));
+    assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
 }
 
 // Make sure there are two transactions in the transactions table after rollback recovery.
-assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
+assert.eq(primary.getDB("config")["transactions"].find().itcount(), 2);
 
 // Make sure we can only see the first write and cannot see the writes from the prepared
 // transactions or the write that was rolled back.
@@ -124,35 +122,41 @@ session1.setTxnNumber_forTesting(0);
 const txnNumber1 = session1.getTxnNumber_forTesting();
 
 // Make sure we cannot add any operations to a prepared transaction.
-assert.commandFailedWithCode(sessionDB1.runCommand({
-    insert: collName,
-    txnNumber: NumberLong(txnNumber1),
-    documents: [{_id: 10}],
-    autocommit: false,
-}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB1.runCommand({
+        insert: collName,
+        txnNumber: NumberLong(txnNumber1),
+        documents: [{_id: 10}],
+        autocommit: false,
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 // Make sure that writing to a document that was updated in the first prepared transaction
 // causes a write conflict.
 assert.commandFailedWithCode(
-    sessionDB1.runCommand(
-        {update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    sessionDB1.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 const commitTimestamp = Timestamp(prepareTimestamp.getTime(), prepareTimestamp.getInc() + 1);
-assert.commandWorked(sessionDB1.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: commitTimestamp,
-    txnNumber: NumberLong(txnNumber1),
-    autocommit: false,
-}));
+assert.commandWorked(
+    sessionDB1.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: commitTimestamp,
+        txnNumber: NumberLong(txnNumber1),
+        autocommit: false,
+    }),
+);
 // Retry the commitTransaction command after rollback.
-assert.commandWorked(sessionDB1.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: commitTimestamp,
-    txnNumber: NumberLong(txnNumber1),
-    autocommit: false,
-}));
+assert.commandWorked(
+    sessionDB1.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: commitTimestamp,
+        txnNumber: NumberLong(txnNumber1),
+        autocommit: false,
+    }),
+);
 
 // Make sure we can successfully abort the second recovered prepared transaction.
 session2 = PrepareHelpers.createSessionWithGivenId(primary, sessionID2, {causalConsistency: false});
@@ -163,26 +167,30 @@ session2.setTxnNumber_forTesting(0);
 const txnNumber2 = session2.getTxnNumber_forTesting();
 
 // Make sure we cannot add any operations to a prepared transaction.
-assert.commandFailedWithCode(sessionDB2.runCommand({
-    insert: collName,
-    txnNumber: NumberLong(txnNumber2),
-    documents: [{_id: 10}],
-    autocommit: false,
-}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB2.runCommand({
+        insert: collName,
+        txnNumber: NumberLong(txnNumber2),
+        documents: [{_id: 10}],
+        autocommit: false,
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 // Make sure that writing to a document that was updated in the second prepared transaction
 // causes a write conflict.
 assert.commandFailedWithCode(
-    sessionDB2.runCommand(
-        {update: collName, updates: [{q: {_id: 2}, u: {$set: {b: 3}}}], maxTimeMS: 5 * 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    sessionDB2.runCommand({update: collName, updates: [{q: {_id: 2}, u: {$set: {b: 3}}}], maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
-assert.commandWorked(sessionDB2.adminCommand({
-    abortTransaction: 1,
-    txnNumber: NumberLong(txnNumber2),
-    autocommit: false,
-}));
+assert.commandWorked(
+    sessionDB2.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(txnNumber2),
+        autocommit: false,
+    }),
+);
 
 rollbackTest.awaitReplication();
 

@@ -12,8 +12,8 @@ replTest.initiate({
     "members": [
         {"_id": 0, "host": nodes[0], priority: 3},
         {"_id": 1, "host": nodes[1], priority: 0},
-        {"_id": 2, "host": nodes[2], priority: 0}
-    ]
+        {"_id": 2, "host": nodes[2], priority: 0},
+    ],
 });
 
 var testDB = replTest.getPrimary().getDB(name);

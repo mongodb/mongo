@@ -22,15 +22,16 @@ if (checkSbeStatus(db) !== kSbeRestricted) {
 }
 
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {
-    timeseries: {timeField: 'time', metaField: 'meta'},
-}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: "time", metaField: "meta"},
+    }),
+);
 
 // Just after midnight on Saturday, April 8, 2023 in GMT, expressed as milliseconds since the epoch.
 const datePrefix = 1680912440;
 for (let i = 0; i < 50; ++i) {
-    assert.commandWorked(
-        coll.insert({_id: i, time: new Date(datePrefix + i * 10), meta: "foobar", x: i, y: i * 2}));
+    assert.commandWorked(coll.insert({_id: i, time: new Date(datePrefix + i * 10), meta: "foobar", x: i, y: i * 2}));
 }
 assert.gt(getTimeseriesCollForRawOps(db, coll).count({}, getRawOperationSpec(db)), 0);
 
@@ -53,7 +54,7 @@ function checkPipelineUsesCacheEntry({pipeline, expectedId, cacheEntry}) {
         fromMultiPlanning: false,
         cacheEntryVersion: 1,
         cacheEntryIsActive: true,
-        cachedIndexName: null
+        cachedIndexName: null,
     });
 
     assert.eq(cacheEntry.planCacheShapeHash, newEntry.planCacheShapeHash, {cacheEntry, newEntry});
@@ -70,10 +71,10 @@ function checkPipelineUsesCacheEntry({pipeline, expectedId, cacheEntry}) {
  * Also checks that the pipeline returns one document whose _id is 'expectedId'.
  */
 function testLoweredPipeline({
-    queryColl,      // collection to run the query on (may be a view).
-    planCacheColl,  // collection to read profiler from. (If not a view, same as queryColl)
+    queryColl, // collection to run the query on (may be a view).
+    planCacheColl, // collection to read profiler from. (If not a view, same as queryColl)
     pipeline,
-    expectedId
+    expectedId,
 }) {
     const expl = queryColl.explain().aggregate(pipeline);
     let results = queryColl.aggregate(pipeline).toArray();
@@ -87,7 +88,7 @@ function testLoweredPipeline({
         fromMultiPlanning: true,
         cacheEntryVersion: 1,
         cacheEntryIsActive: false,
-        cachedIndexName: null
+        cachedIndexName: null,
     });
 
     results = queryColl.aggregate(pipeline).toArray();
@@ -100,7 +101,7 @@ function testLoweredPipeline({
         fromMultiPlanning: true,
         cacheEntryVersion: 1,
         cacheEntryIsActive: true,
-        cachedIndexName: null
+        cachedIndexName: null,
     });
 
     assert.eq(entry.planCacheShapeHash, nextEntry.planCacheShapeHash, {entry, nextEntry});
@@ -120,17 +121,17 @@ const originalPipeline = [
         $match: {
             time: {$gt: new Date(datePrefix), $lt: new Date(datePrefix + 500)},
             meta: "foobar",
-            x: {$eq: 20}
-        }
+            x: {$eq: 20},
+        },
     },
-    {$project: {_id: 1, x: 1}}
+    {$project: {_id: 1, x: 1}},
 ];
 
 const cacheEntry = testLoweredPipeline({
     queryColl: coll,
     planCacheColl: getTimeseriesCollForDDLOps(db, coll),
     pipeline: originalPipeline,
-    expectedId: 20
+    expectedId: 20,
 });
 
 // Now run pipelines with the same shape but different parameters on 'time' and 'x'. These
@@ -141,29 +142,27 @@ const cacheEntry = testLoweredPipeline({
             $match: {
                 time: {
                     $gt: new Date(datePrefix),
-                    $lt: new Date(datePrefix + 400 /* Different from above. */)
+                    $lt: new Date(datePrefix + 400 /* Different from above. */),
                 },
                 meta: "foobar",
-                x: {$eq: 20}
-            }
+                x: {$eq: 20},
+            },
         },
-        {$project: {_id: 1, x: 1}}
+        {$project: {_id: 1, x: 1}},
     ];
-    checkPipelineUsesCacheEntry(
-        {pipeline: pipelineWithDifferentTimeFilter, expectedId: 20, cacheEntry});
+    checkPipelineUsesCacheEntry({pipeline: pipelineWithDifferentTimeFilter, expectedId: 20, cacheEntry});
 
     const pipelineWithDifferentXFilter = [
         {
             $match: {
                 time: {$gt: new Date(datePrefix), $lt: new Date(datePrefix + 500)},
                 meta: "foobar",
-                x: {$eq: 21 /* Different from above */}
-            }
+                x: {$eq: 21 /* Different from above */},
+            },
         },
-        {$project: {_id: 1, x: 1}}
+        {$project: {_id: 1, x: 1}},
     ];
-    checkPipelineUsesCacheEntry(
-        {pipeline: pipelineWithDifferentXFilter, expectedId: 21, cacheEntry});
+    checkPipelineUsesCacheEntry({pipeline: pipelineWithDifferentXFilter, expectedId: 21, cacheEntry});
 }
 
 {
@@ -177,16 +176,16 @@ const cacheEntry = testLoweredPipeline({
                 time: {$gt: new Date(datePrefix), $lt: new Date(datePrefix + 500)},
                 meta: "foobar",
                 x: 20,
-                y: {$gt: 0}
-            }
+                y: {$gt: 0},
+            },
         },
-        {$project: {_id: 1, x: 1}}
+        {$project: {_id: 1, x: 1}},
     ];
     const newCacheEntry = testLoweredPipeline({
         queryColl: coll,
         planCacheColl: getTimeseriesCollForDDLOps(db, coll),
         pipeline: pipelineWithDifferentShape,
-        expectedId: 20
+        expectedId: 20,
     });
     assert.neq(newCacheEntry.planCacheKey, cacheEntry.planCacheKey);
 }

@@ -13,7 +13,7 @@ function setParameter({nodeToReadFrom, value}) {
 function getSecondariesWithTargetedTag(nodeToReadFrom, tag) {
     let nodeIdsWithTag = [];
     let rsConfig = nodeToReadFrom.getDB("local").system.replset.findOne();
-    rsConfig.members.forEach(function(member) {
+    rsConfig.members.forEach(function (member) {
         if (bsonWoCompare(member.tags, tag) == 0) {
             nodeIdsWithTag.push(member.host);
         }
@@ -38,20 +38,19 @@ function getStatDifferences(beforeStats, afterStats) {
 function getStat(stats, statName, mirrorMode) {
     switch (statName) {
         case "sent":
-            return (mirrorMode == kGeneralMode ? stats.sent : stats.targetedSent);
+            return mirrorMode == kGeneralMode ? stats.sent : stats.targetedSent;
         case "succeeded":
-            return (mirrorMode == kGeneralMode ? stats.succeeded : stats.targetedSucceeded);
+            return mirrorMode == kGeneralMode ? stats.succeeded : stats.targetedSucceeded;
         case "erroredDuringSend":
-            return (mirrorMode == kGeneralMode ? stats.erroredDuringSend
-                                               : stats.targetedErroredDuringSend);
+            return mirrorMode == kGeneralMode ? stats.erroredDuringSend : stats.targetedErroredDuringSend;
         case "resolved":
-            return (mirrorMode == kGeneralMode ? stats.resolved : stats.targetedResolved);
+            return mirrorMode == kGeneralMode ? stats.resolved : stats.targetedResolved;
         case "seen":
             return stats.seen;
         case "pending":
-            return (mirrorMode == kGeneralMode ? stats.pending : stats.targetedPending);
+            return mirrorMode == kGeneralMode ? stats.pending : stats.targetedPending;
         case "scheduled":
-            return (mirrorMode == kGeneralMode ? stats.scheduled : stats.targetedScheduled);
+            return mirrorMode == kGeneralMode ? stats.scheduled : stats.targetedScheduled;
     }
 }
 
@@ -75,46 +74,58 @@ function sendReads({nodeToReadFrom, db, cmd, burstCount, initialStatsOnReadingNo
 /* Wait for all reads to resolve on primary, and check various other metrics related to the
    primary. */
 function waitForReadsToResolveOnTargetedNode(
-    nodeToReadFrom, mirrorMode, db, initialStatsOnReadingNode, readsExpectedToFail) {
+    nodeToReadFrom,
+    mirrorMode,
+    db,
+    initialStatsOnReadingNode,
+    readsExpectedToFail,
+) {
     let sent, succeeded, erroredDuringSend;
 
     // Wait for stats to reflect that all the sent reads have been resolved.
-    assert.soon(() => {
-        let currentStatsOnReadingNode = getMirroredReadsStats(nodeToReadFrom, db);
-        const statDifferenceOnReadingNode =
-            getStatDifferences(initialStatsOnReadingNode, currentStatsOnReadingNode);
+    assert.soon(
+        () => {
+            let currentStatsOnReadingNode = getMirroredReadsStats(nodeToReadFrom, db);
+            const statDifferenceOnReadingNode = getStatDifferences(
+                initialStatsOnReadingNode,
+                currentStatsOnReadingNode,
+            );
 
-        sent = getStat(statDifferenceOnReadingNode, "sent", mirrorMode);
-        succeeded = getStat(statDifferenceOnReadingNode, "succeeded", mirrorMode);
-        erroredDuringSend = getStat(statDifferenceOnReadingNode, "erroredDuringSend", mirrorMode);
-        let resolved = getStat(statDifferenceOnReadingNode, "resolved", mirrorMode);
-        let seen = getStat(statDifferenceOnReadingNode, "seen", mirrorMode);
+            sent = getStat(statDifferenceOnReadingNode, "sent", mirrorMode);
+            succeeded = getStat(statDifferenceOnReadingNode, "succeeded", mirrorMode);
+            erroredDuringSend = getStat(statDifferenceOnReadingNode, "erroredDuringSend", mirrorMode);
+            let resolved = getStat(statDifferenceOnReadingNode, "resolved", mirrorMode);
+            let seen = getStat(statDifferenceOnReadingNode, "seen", mirrorMode);
 
-        // `pending` refers to the number of reads the node should mirror, but hasn't yet
-        // scheduled. Unlike the other mirrored reads metrics, this metric does not accumulate, and
-        // refers only to the reads currently pending.
-        let pending = getStat(statDifferenceOnReadingNode, "pending", mirrorMode);
+            // `pending` refers to the number of reads the node should mirror, but hasn't yet
+            // scheduled. Unlike the other mirrored reads metrics, this metric does not accumulate, and
+            // refers only to the reads currently pending.
+            let pending = getStat(statDifferenceOnReadingNode, "pending", mirrorMode);
 
-        // `scheduled` refers to the number of reads the node has scheduled mirrors for, but
-        // hasn't yet resolved. Unlike the other mirrored reads metrics, this metric does not
-        // accumulate, and refers only to the reads currently scheduled.
-        let scheduled = getStat(statDifferenceOnReadingNode, "scheduled", mirrorMode);
+            // `scheduled` refers to the number of reads the node has scheduled mirrors for, but
+            // hasn't yet resolved. Unlike the other mirrored reads metrics, this metric does not
+            // accumulate, and refers only to the reads currently scheduled.
+            let scheduled = getStat(statDifferenceOnReadingNode, "scheduled", mirrorMode);
 
-        jsTestLog(`Verifying that all mirrored reads sent from ${
-                      nodeToReadFrom.host} have been resolved: ` +
-                  tojson({
-                      sent: sent,
-                      erroredDuringSend: erroredDuringSend,
-                      resolved: resolved,
-                      succeeded: succeeded,
-                      pending: pending,
-                      scheduled: scheduled,
-                      seen: seen
-                  }));
+            jsTestLog(
+                `Verifying that all mirrored reads sent from ${nodeToReadFrom.host} have been resolved: ` +
+                    tojson({
+                        sent: sent,
+                        erroredDuringSend: erroredDuringSend,
+                        resolved: resolved,
+                        succeeded: succeeded,
+                        pending: pending,
+                        scheduled: scheduled,
+                        seen: seen,
+                    }),
+            );
 
-        // Verify that the reads mirrored to the secondaries have been resolved by the reading node.
-        return pending == 0 && scheduled == 0 && sent === resolved;
-    }, "Did not resolve all requests within time limit", 20000);
+            // Verify that the reads mirrored to the secondaries have been resolved by the reading node.
+            return pending == 0 && scheduled == 0 && sent === resolved;
+        },
+        "Did not resolve all requests within time limit",
+        20000,
+    );
 
     if (!readsExpectedToFail) {
         // If we don't expect to fail from some fail point, then we expect most of our reads
@@ -123,14 +134,15 @@ function waitForReadsToResolveOnTargetedNode(
     }
 }
 
-function getProcessedAsSecondaryTotal(
-    rst, mirrorMode, db, initialStatsOnSecondaries, secondariesWithTag) {
+function getProcessedAsSecondaryTotal(rst, mirrorMode, db, initialStatsOnSecondaries, secondariesWithTag) {
     const secondaries = rst.getSecondaries();
 
     let processedAsSecondaryTotal = 0;
     for (const secondary of secondaries) {
         const statDifferenceOnSecondary = getStatDifferences(
-            initialStatsOnSecondaries[secondary.nodeId], getMirroredReadsStats(secondary, db));
+            initialStatsOnSecondaries[secondary.nodeId],
+            getMirroredReadsStats(secondary, db),
+        );
         const processedAsSecondary = statDifferenceOnSecondary.processedAsSecondary;
         processedAsSecondaryTotal += processedAsSecondary;
 
@@ -143,22 +155,28 @@ function getProcessedAsSecondaryTotal(
     return processedAsSecondaryTotal;
 }
 
-function checkStatsOnSecondaries(rst,
-                                 nodeToReadFrom,
-                                 mirrorMode,
-                                 db,
-                                 initialStatsOnReadingNode,
-                                 initialStatsOnSecondaries,
-                                 currentStatsOnReadingNode,
-                                 readsExpectedToFail,
-                                 secondariesWithTag) {
-    let statDifferenceOnReadingNode =
-        getStatDifferences(initialStatsOnReadingNode, currentStatsOnReadingNode);
+function checkStatsOnSecondaries(
+    rst,
+    nodeToReadFrom,
+    mirrorMode,
+    db,
+    initialStatsOnReadingNode,
+    initialStatsOnSecondaries,
+    currentStatsOnReadingNode,
+    readsExpectedToFail,
+    secondariesWithTag,
+) {
+    let statDifferenceOnReadingNode = getStatDifferences(initialStatsOnReadingNode, currentStatsOnReadingNode);
 
     let sent = getStat(statDifferenceOnReadingNode, "sent", mirrorMode);
     let erroredDuringSend = getStat(statDifferenceOnReadingNode, "erroredDuringSend", mirrorMode);
     let processedAsSecondaryTotal = getProcessedAsSecondaryTotal(
-        rst, mirrorMode, db, initialStatsOnSecondaries, secondariesWithTag);
+        rst,
+        mirrorMode,
+        db,
+        initialStatsOnSecondaries,
+        secondariesWithTag,
+    );
 
     assert.eq(processedAsSecondaryTotal + erroredDuringSend, sent);
     if (!readsExpectedToFail) {
@@ -175,10 +193,9 @@ function checkReadsMirroringRate({
     maxRate,
     initialStatsOnReadingNode,
     currentStatsOnReadingNode,
-    nodesElligibleForMirrors
+    nodesElligibleForMirrors,
 }) {
-    let statDifferenceOnReadingNode =
-        getStatDifferences(initialStatsOnReadingNode, currentStatsOnReadingNode);
+    let statDifferenceOnReadingNode = getStatDifferences(initialStatsOnReadingNode, currentStatsOnReadingNode);
 
     let seen = getStat(statDifferenceOnReadingNode, "seen", mirrorMode);
     let resolved = getStat(statDifferenceOnReadingNode, "resolved", mirrorMode);
@@ -192,8 +209,17 @@ function checkReadsMirroringRate({
 }
 
 /* Send `burstCount` mirror reads. Check metrics are values we expect when the reads succeed. */
-function sendAndCheckReadsSucceedWithRate(
-    {rst, nodeToReadFrom, secondariesWithTag, mirrorMode, db, cmd, minRate, maxRate, burstCount}) {
+function sendAndCheckReadsSucceedWithRate({
+    rst,
+    nodeToReadFrom,
+    secondariesWithTag,
+    mirrorMode,
+    db,
+    cmd,
+    minRate,
+    maxRate,
+    burstCount,
+}) {
     let initialStatsOnReadingNode = getMirroredReadsStats(nodeToReadFrom, db);
 
     let initialStatsOnMirroredSecondaries = {};
@@ -203,25 +229,27 @@ function sendAndCheckReadsSucceedWithRate(
     }
 
     sendReads({nodeToReadFrom, db, cmd, burstCount, initialStatsOnReadingNode});
-    waitForReadsToResolveOnTargetedNode(
-        nodeToReadFrom, mirrorMode, db, initialStatsOnReadingNode, false);
+    waitForReadsToResolveOnTargetedNode(nodeToReadFrom, mirrorMode, db, initialStatsOnReadingNode, false);
 
     // Stats should be stable now that all of the reads have resolved.
     let currentStatsOnReadingNode = getMirroredReadsStats(nodeToReadFrom, db);
-    jsTestLog("Verifying sending node statistics: " +
-              tojson({current: currentStatsOnReadingNode, start: initialStatsOnReadingNode}));
-    checkStatsOnSecondaries(rst,
-                            nodeToReadFrom,
-                            mirrorMode,
-                            db,
-                            initialStatsOnReadingNode,
-                            initialStatsOnMirroredSecondaries,
-                            currentStatsOnReadingNode,
-                            false,
-                            secondariesWithTag);
+    jsTestLog(
+        "Verifying sending node statistics: " +
+            tojson({current: currentStatsOnReadingNode, start: initialStatsOnReadingNode}),
+    );
+    checkStatsOnSecondaries(
+        rst,
+        nodeToReadFrom,
+        mirrorMode,
+        db,
+        initialStatsOnReadingNode,
+        initialStatsOnMirroredSecondaries,
+        currentStatsOnReadingNode,
+        false,
+        secondariesWithTag,
+    );
 
-    let nodesElligibleForMirrors =
-        mirrorMode == kGeneralMode ? secondaries.length : secondariesWithTag.length;
+    let nodesElligibleForMirrors = mirrorMode == kGeneralMode ? secondaries.length : secondariesWithTag.length;
     checkReadsMirroringRate({
         mirrorMode,
         cmd,
@@ -229,7 +257,7 @@ function sendAndCheckReadsSucceedWithRate(
         maxRate,
         initialStatsOnReadingNode,
         currentStatsOnReadingNode,
-        nodesElligibleForMirrors
+        nodesElligibleForMirrors,
     });
 }
 
@@ -243,7 +271,7 @@ function sendAndCheckReadsFailBeforeProcessing({
     db,
     cmd,
     burstCount,
-    expectErroredDuringSend
+    expectErroredDuringSend,
 }) {
     const secondaries = rst.getSecondaries();
 
@@ -255,18 +283,23 @@ function sendAndCheckReadsFailBeforeProcessing({
 
     sendReads({nodeToReadFrom, db, cmd, burstCount, initialStatsOnReadingNode});
 
-    waitForReadsToResolveOnTargetedNode(
-        nodeToReadFrom, mirrorMode, db, initialStatsOnReadingNode, true);
+    waitForReadsToResolveOnTargetedNode(nodeToReadFrom, mirrorMode, db, initialStatsOnReadingNode, true);
 
     // Stats should be stable now that all of the reads have resolved.
     let currentStatsOnReadingNode = getMirroredReadsStats(nodeToReadFrom, db);
-    jsTestLog("Verifying sending node statistics: " +
-              tojson({current: currentStatsOnReadingNode, start: initialStatsOnReadingNode}));
+    jsTestLog(
+        "Verifying sending node statistics: " +
+            tojson({current: currentStatsOnReadingNode, start: initialStatsOnReadingNode}),
+    );
 
     let processedAsSecondaryTotal = getProcessedAsSecondaryTotal(
-        rst, mirrorMode, db, initialStatsOnSecondaries, secondariesWithTag);
-    let statDifferenceOnReadingNode =
-        getStatDifferences(initialStatsOnReadingNode, currentStatsOnReadingNode);
+        rst,
+        mirrorMode,
+        db,
+        initialStatsOnSecondaries,
+        secondariesWithTag,
+    );
+    let statDifferenceOnReadingNode = getStatDifferences(initialStatsOnReadingNode, currentStatsOnReadingNode);
     let succeeded = getStat(statDifferenceOnReadingNode, "succeeded", mirrorMode);
     let erroredDuringSend = getStat(statDifferenceOnReadingNode, "erroredDuringSend", mirrorMode);
 
@@ -285,7 +318,7 @@ function sendAndCheckReadsFailBeforeProcessing({
 /* Verify that the processedAsSecondary metric does not increment if the command fails
    on the secondary before the secondary is able to process the read. */
 function verifyProcessedAsSecondaryOnEarlyError(rst, mirrorMode, dbName, collName) {
-    let nodeToReadFrom = (mirrorMode == kGeneralMode ? rst.getPrimary() : rst.getSecondaries()[0]);
+    let nodeToReadFrom = mirrorMode == kGeneralMode ? rst.getPrimary() : rst.getSecondaries()[0];
 
     let secondariesWithTag = [];
     if (mirrorMode == kTargetedMode) {
@@ -294,9 +327,10 @@ function verifyProcessedAsSecondaryOnEarlyError(rst, mirrorMode, dbName, collNam
 
     // Mirror every mirror-able command.
     const samplingRate = 1.0;
-    let param = (mirrorMode == kGeneralMode
-                     ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                     : {targetedMirroring: {samplingRate: samplingRate}});
+    let param =
+        mirrorMode == kGeneralMode
+            ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
+            : {targetedMirroring: {samplingRate: samplingRate}};
     assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
 
     for (const secondary of rst.getSecondaries()) {
@@ -304,15 +338,17 @@ function verifyProcessedAsSecondaryOnEarlyError(rst, mirrorMode, dbName, collNam
             continue;
         }
 
-        assert.commandWorked(secondary.getDB(dbName).adminCommand({
-            configureFailPoint: "failCommand",
-            mode: "alwaysOn",
-            data: {
-                errorCode: ErrorCodes.MaxTimeMSExpired,
-                failCommands: ["find"],
-                failInternalCommands: true,
-            }
-        }));
+        assert.commandWorked(
+            secondary.getDB(dbName).adminCommand({
+                configureFailPoint: "failCommand",
+                mode: "alwaysOn",
+                data: {
+                    errorCode: ErrorCodes.MaxTimeMSExpired,
+                    failCommands: ["find"],
+                    failInternalCommands: true,
+                },
+            }),
+        );
     }
 
     sendAndCheckReadsFailBeforeProcessing({
@@ -323,7 +359,7 @@ function verifyProcessedAsSecondaryOnEarlyError(rst, mirrorMode, dbName, collNam
         db: dbName,
         cmd: {find: collName, filter: {}},
         burstCount: kBurstCount,
-        expectErroredDuringSend: false
+        expectErroredDuringSend: false,
     });
 
     for (const secondary of rst.getSecondaries()) {
@@ -331,13 +367,12 @@ function verifyProcessedAsSecondaryOnEarlyError(rst, mirrorMode, dbName, collNam
             continue;
         }
 
-        assert.commandWorked(
-            secondary.getDB(dbName).adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+        assert.commandWorked(secondary.getDB(dbName).adminCommand({configureFailPoint: "failCommand", mode: "off"}));
     }
 }
 
 function verifyErroredDuringSend(rst, mirrorMode, dbName, collName, tag) {
-    let nodeToReadFrom = (mirrorMode == kGeneralMode ? rst.getPrimary() : rst.getSecondaries()[0]);
+    let nodeToReadFrom = mirrorMode == kGeneralMode ? rst.getPrimary() : rst.getSecondaries()[0];
 
     let secondariesWithTag = [];
     if (mirrorMode == kTargetedMode) {
@@ -346,18 +381,21 @@ function verifyErroredDuringSend(rst, mirrorMode, dbName, collName, tag) {
 
     // Mirror every mirror-able command.
     const samplingRate = 1.0;
-    let param = (mirrorMode == kGeneralMode
-                     ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                     : {targetedMirroring: {samplingRate: samplingRate, tag: tag}});
+    let param =
+        mirrorMode == kGeneralMode
+            ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
+            : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
     assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
 
-    assert.commandWorked(nodeToReadFrom.getDB(dbName).adminCommand({
-        configureFailPoint: "forceConnectionNetworkTimeout",
-        mode: "alwaysOn",
-        data: {
-            collectionNS: collName,
-        }
-    }));
+    assert.commandWorked(
+        nodeToReadFrom.getDB(dbName).adminCommand({
+            configureFailPoint: "forceConnectionNetworkTimeout",
+            mode: "alwaysOn",
+            data: {
+                collectionNS: collName,
+            },
+        }),
+    );
 
     sendAndCheckReadsFailBeforeProcessing({
         rst: rst,
@@ -367,16 +405,17 @@ function verifyErroredDuringSend(rst, mirrorMode, dbName, collName, tag) {
         db: dbName,
         cmd: {find: collName, filter: {}},
         burstCount: kBurstCount,
-        expectErroredDuringSend: true
+        expectErroredDuringSend: true,
     });
 
-    assert.commandWorked(nodeToReadFrom.getDB(dbName).adminCommand(
-        {configureFailPoint: "forceConnectionNetworkTimeout", mode: "off"}));
+    assert.commandWorked(
+        nodeToReadFrom.getDB(dbName).adminCommand({configureFailPoint: "forceConnectionNetworkTimeout", mode: "off"}),
+    );
 }
 
 /* Verify mirror reads behavior with various sampling rates. */
 function verifyMirrorReads(rst, mirrorMode, db, cmd, tag) {
-    let nodeToReadFrom = (mirrorMode == kGeneralMode ? rst.getPrimary() : rst.getSecondaries()[0]);
+    let nodeToReadFrom = mirrorMode == kGeneralMode ? rst.getPrimary() : rst.getSecondaries()[0];
     let secondariesWithTag = [];
     if (mirrorMode == kTargetedMode) {
         secondariesWithTag = getSecondariesWithTargetedTag(nodeToReadFrom, tag);
@@ -385,9 +424,10 @@ function verifyMirrorReads(rst, mirrorMode, db, cmd, tag) {
     {
         jsTestLog(`Verifying disabled read mirroring with ${tojson(cmd)}`);
         let samplingRate = 0.0;
-        let param = (mirrorMode == kGeneralMode
-                         ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                         : {targetedMirroring: {samplingRate: samplingRate, tag: tag}});
+        let param =
+            mirrorMode == kGeneralMode
+                ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
+                : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
         assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
         sendAndCheckReadsSucceedWithRate({
             rst: rst,
@@ -398,16 +438,17 @@ function verifyMirrorReads(rst, mirrorMode, db, cmd, tag) {
             cmd: cmd,
             minRate: samplingRate,
             maxRate: samplingRate,
-            burstCount: kBurstCount
+            burstCount: kBurstCount,
         });
     }
 
     {
         jsTestLog(`Verifying full read mirroring with ${tojson(cmd)}`);
         let samplingRate = 1.0;
-        let param = (mirrorMode == kGeneralMode
-                         ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                         : {targetedMirroring: {samplingRate: samplingRate, tag: tag}});
+        let param =
+            mirrorMode == kGeneralMode
+                ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
+                : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
 
         assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
         sendAndCheckReadsSucceedWithRate({
@@ -419,20 +460,21 @@ function verifyMirrorReads(rst, mirrorMode, db, cmd, tag) {
             cmd: cmd,
             minRate: samplingRate,
             maxRate: samplingRate,
-            burstCount: kBurstCount
+            burstCount: kBurstCount,
         });
     }
 
     {
         jsTestLog(`Verifying partial read mirroring with ${tojson(cmd)}`);
         let samplingRate = 0.5;
-        let gaussDeviation = .34;
+        let gaussDeviation = 0.34;
         let max = samplingRate + gaussDeviation;
         let min = samplingRate - gaussDeviation;
 
-        let param = (mirrorMode == kGeneralMode
-                         ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                         : {targetedMirroring: {samplingRate: samplingRate, tag: tag}});
+        let param =
+            mirrorMode == kGeneralMode
+                ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
+                : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
         assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
         sendAndCheckReadsSucceedWithRate({
             rst: rst,
@@ -443,15 +485,16 @@ function verifyMirrorReads(rst, mirrorMode, db, cmd, tag) {
             cmd: cmd,
             minRate: min,
             maxRate: max,
-            burstCount: kBurstCount
+            burstCount: kBurstCount,
         });
     }
 
     // Reset param to avoid mirroring before next test case
     let samplingRate = 0.0;
-    let param = (mirrorMode == kGeneralMode
-                     ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                     : {targetedMirroring: {samplingRate: samplingRate, tag: tag}});
+    let param =
+        mirrorMode == kGeneralMode
+            ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
+            : {targetedMirroring: {samplingRate: samplingRate, tag: tag}};
     assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
 }
 
@@ -459,7 +502,7 @@ function computeMean(before, after) {
     let sum = 0;
     let count = 0;
 
-    Object.keys(after.resolvedBreakdown).forEach(function(host) {
+    Object.keys(after.resolvedBreakdown).forEach(function (host) {
         sum = sum + after.resolvedBreakdown[host];
         if (host in before.resolvedBreakdown) {
             sum = sum - before.resolvedBreakdown[host];
@@ -474,7 +517,7 @@ function computeSTD(before, after, mean) {
     let stDev = 0.0;
     let count = 0;
 
-    Object.keys(after.resolvedBreakdown).forEach(function(host) {
+    Object.keys(after.resolvedBreakdown).forEach(function (host) {
         let result = after.resolvedBreakdown[host];
         if (host in before.resolvedBreakdown) {
             result = result - before.resolvedBreakdown[host];
@@ -492,16 +535,17 @@ function computeSTD(before, after, mean) {
 /* Verify that mirrored reads are distributed reasonably across secondaries */
 function verifyMirroringDistribution(rst, mirrorMode, dbName, collName) {
     const samplingRate = 0.5;
-    const gaussDeviation = .34;
+    const gaussDeviation = 0.34;
     const max = samplingRate + gaussDeviation;
     const min = samplingRate - gaussDeviation;
 
-    let nodeToReadFrom = (mirrorMode == kGeneralMode ? rst.getPrimary() : rst.getSecondaries()[0]);
+    let nodeToReadFrom = mirrorMode == kGeneralMode ? rst.getPrimary() : rst.getSecondaries()[0];
 
     jsTestLog(`Running test with sampling rate = ${samplingRate}`);
-    let param = (mirrorMode == kGeneralMode
-                     ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
-                     : {targetedMirroring: {samplingRate: samplingRate}});
+    let param =
+        mirrorMode == kGeneralMode
+            ? {samplingRate: samplingRate, targetedMirroring: {samplingRate: 0.0}}
+            : {targetedMirroring: {samplingRate: samplingRate}};
     assert.commandWorked(setParameter({nodeToReadFrom: nodeToReadFrom, value: param}));
 
     let before = getMirroredReadsStats(nodeToReadFrom, dbName);
@@ -541,5 +585,5 @@ export const MirrorReadsHelpers = {
     verifyProcessedAsSecondaryOnEarlyError,
     verifyErroredDuringSend,
     verifyMirrorReads,
-    verifyMirroringDistribution
+    verifyMirroringDistribution,
 };

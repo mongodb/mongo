@@ -18,7 +18,7 @@ const searches = [
     [[5, 5], 5],
     [[0, 5], 5],
 ];
-let correct = searches.map(function(z) {
+let correct = searches.map(function (z) {
     return [];
 });
 
@@ -30,8 +30,7 @@ for (let x = 0; x <= 20; x++) {
         const o = {_id: num++, loc: [x, y]};
         docs.push(o);
         for (let i = 0; i < searches.length; i++)
-            if (Geo.distance([x, y], searches[i][0]) <= searches[i][1])
-                correct[i].push(o);
+            if (Geo.distance([x, y], searches[i][0]) <= searches[i][1]) correct[i].push(o);
     }
 }
 assert.commandWorked(t.insert(docs));
@@ -52,9 +51,9 @@ for (let i = 0; i < searches.length; i++) {
     assert.eq(correct[i].length, t.countDocuments(q), "aggregation : " + tojson(searches[i]));
     const explain = t.find(q).explain("executionStats");
     // The index should be at least minimally effective in preventing the full collection scan.
-    assert.gt(num,
-              explain.executionStats.totalKeysExamined,
-              "nscanned : " +
-                  tojson(searches[i] + "; query : " + tojson(q, '', true) +
-                         "; explain : " + tojson(explain)));
+    assert.gt(
+        num,
+        explain.executionStats.totalKeysExamined,
+        "nscanned : " + tojson(searches[i] + "; query : " + tojson(q, "", true) + "; explain : " + tojson(explain)),
+    );
 }

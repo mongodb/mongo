@@ -19,8 +19,8 @@ const rst = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             "ttlMonitorSleepSecs": 1,
-        }
-    }
+        },
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -30,15 +30,16 @@ function runTest(conn, testCase) {
     const admin = conn.getDB("admin");
 
     // Make sure the TTLMonitor is disabled, while not holding any global locks
-    const pauseTtl = configureFailPoint(primary, 'hangTTLMonitorBetweenPasses');
+    const pauseTtl = configureFailPoint(primary, "hangTTLMonitorBetweenPasses");
     pauseTtl.wait();
 
     function runTTLMonitor() {
         const ttlPass = admin.serverStatus().metrics.ttl.passes;
-        assert.commandWorked(
-            admin.runCommand({configureFailPoint: "hangTTLMonitorBetweenPasses", mode: {skip: 1}}));
-        assert.soon(() => admin.serverStatus().metrics.ttl.passes >= ttlPass + 1,
-                    "TTL monitor didn't run before timing out.");
+        assert.commandWorked(admin.runCommand({configureFailPoint: "hangTTLMonitorBetweenPasses", mode: {skip: 1}}));
+        assert.soon(
+            () => admin.serverStatus().metrics.ttl.passes >= ttlPass + 1,
+            "TTL monitor didn't run before timing out.",
+        );
     }
 
     // Set up data and TTL indexes
@@ -69,8 +70,8 @@ function runTest(conn, testCase) {
                     "code": ErrorCodes.UserWritesBlocked,
                     "codeName": "UserWritesBlocked",
                     "errmsg":
-                        "Plan executor error during delete :: caused by :: User writes blocked, reason: Unspecified"
-                }
+                        "Plan executor error during delete :: caused by :: User writes blocked, reason: Unspecified",
+                },
             });
         }
     }
@@ -98,6 +99,6 @@ runTest(primary, [
     // Collections in system databases should be reaped
     {dbname: "admin", colName: "user_write_blocking_ttl_index", expectReap: true},
     {dbname: "config", colName: "user_write_blocking_ttl_index", expectReap: true},
-    {dbname: "local", colName: "user_write_blocking_ttl_index", expectReap: true}
+    {dbname: "local", colName: "user_write_blocking_ttl_index", expectReap: true},
 ]);
 rst.stopSet();

@@ -17,8 +17,8 @@ var config = {
     "members": [
         {"_id": 0, "host": nodes[0], priority: 4},
         {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2]}
-    ]
+        {"_id": 2, "host": nodes[2]},
+    ],
 };
 var r = replTest.initiate(config);
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
@@ -37,12 +37,11 @@ assert(primary == conns[0], "conns[0] assumed to be primary");
 assert(a_conn.host == primary.host);
 
 // create an oplog entry with an insert
-assert.commandWorked(
-    A.foo.insert({x: 1}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(A.foo.insert({x: 1}, {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 replTest.stop(BID);
 
 print("******************** starting load for 30 secs *********************");
-var work = function() {
+var work = function () {
     print("starting loadgen");
     var start = new Date().getTime();
 
@@ -53,13 +52,12 @@ var work = function() {
             db["a" + x].insert({a: x});
         }
 
-        var runTime = (new Date().getTime() - start);
-        if (runTime > 30000)
-            break;
-        else if (runTime < 5000)  // back-off more during first 2 seconds
+        var runTime = new Date().getTime() - start;
+        if (runTime > 30000) break;
+        else if (runTime < 5000)
+            // back-off more during first 2 seconds
             sleep(50);
-        else
-            sleep(1);
+        else sleep(1);
     }
     print("finishing loadgen");
 };
@@ -67,19 +65,23 @@ var work = function() {
 var loadGen = startParallelShell(work, replTest.ports[0]);
 
 // wait for document to appear to continue
-assert.soon(function() {
-    try {
-        return 1 == primary.getDB("test")["timeToStartTrigger"].find().itcount();
-    } catch (e) {
-        print(e);
-        return false;
-    }
-}, "waited too long for start trigger", 90 * 1000 /* 90 secs */);
+assert.soon(
+    function () {
+        try {
+            return 1 == primary.getDB("test")["timeToStartTrigger"].find().itcount();
+        } catch (e) {
+            print(e);
+            return false;
+        }
+    },
+    "waited too long for start trigger",
+    90 * 1000 /* 90 secs */,
+);
 
 print("*************** STARTING node without data ***************");
 replTest.start(BID);
 // check that it is up
-assert.soon(function() {
+assert.soon(function () {
     try {
         var result = b_conn.getDB("admin").runCommand({replSetGetStatus: 1});
         return true;

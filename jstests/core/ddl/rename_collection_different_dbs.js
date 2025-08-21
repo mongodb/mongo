@@ -29,8 +29,7 @@ b.drop();
 a.insertMany([{a: 1}, {a: 2}, {a: 3}]);
 assert.commandWorked(a.createIndexes([{a: 1}, {b: 1}]));
 
-assert.commandWorked(db.adminCommand(
-    {renameCollection: "db_a.rename_different_db", to: "db_b.rename_different_db"}));
+assert.commandWorked(db.adminCommand({renameCollection: "db_a.rename_different_db", to: "db_b.rename_different_db"}));
 
 assert.eq(0, a.countDocuments({}));
 assert(db_a.getCollectionNames().indexOf(a.getName()) < 0);
@@ -44,13 +43,14 @@ b.drop();
 // Test that the dropTarget option works when renaming across databases.
 a.save({});
 b.save({});
-assert.commandFailed(db.adminCommand(
-    {renameCollection: "db_a.rename_different_db", to: "db_b.rename_different_db"}));
-assert.commandWorked(db.adminCommand({
-    renameCollection: "db_a.rename_different_db",
-    to: "db_b.rename_different_db",
-    dropTarget: true
-}));
+assert.commandFailed(db.adminCommand({renameCollection: "db_a.rename_different_db", to: "db_b.rename_different_db"}));
+assert.commandWorked(
+    db.adminCommand({
+        renameCollection: "db_a.rename_different_db",
+        to: "db_b.rename_different_db",
+        dropTarget: true,
+    }),
+);
 a.drop();
 b.drop();
 
@@ -62,8 +62,7 @@ b = db_b.rename_capped;
 a.insertMany([{a: 1}, {a: 2}, {a: 3}]);
 let previousMaxSize = assert.commandWorked(a.stats()).maxSize;
 
-assert.commandWorked(
-    db.adminCommand({renameCollection: "db_a.rename_capped", to: "db_b.rename_capped"}));
+assert.commandWorked(db.adminCommand({renameCollection: "db_a.rename_capped", to: "db_b.rename_capped"}));
 
 assert.eq(0, a.countDocuments({}));
 assert(db_a.getCollectionNames().indexOf(a.getName()) < 0);

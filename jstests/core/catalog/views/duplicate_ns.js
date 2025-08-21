@@ -26,20 +26,24 @@ assert.commandWorked(viewsDb.createCollection("system.views"));
 // applyOps. Trying to write to system.views or to use the proper DDL commands will prevent this
 // from happening. We may close this loophole in the future, but for now we should ensure that it
 // works and does not crash the server.
-assert.commandWorked(viewsDb.adminCommand({
-    applyOps: [{
-        op: "i",
-        ns: dbName + ".system.views",
-        o: {
-            _id: viewId,
-            viewOn: "coll",
-            pipeline: [],
-        }
-    }]
-}));
-assert.eq(2,
-          viewsDb.getCollectionInfos()
-              .filter(coll => {
-                  return coll.name === collName;
-              })
-              .length);
+assert.commandWorked(
+    viewsDb.adminCommand({
+        applyOps: [
+            {
+                op: "i",
+                ns: dbName + ".system.views",
+                o: {
+                    _id: viewId,
+                    viewOn: "coll",
+                    pipeline: [],
+                },
+            },
+        ],
+    }),
+);
+assert.eq(
+    2,
+    viewsDb.getCollectionInfos().filter((coll) => {
+        return coll.name === collName;
+    }).length,
+);

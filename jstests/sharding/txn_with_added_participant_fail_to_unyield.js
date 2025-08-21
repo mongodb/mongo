@@ -30,16 +30,15 @@ assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {x: 1}}
 assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {x: 0}, to: shard1.shardName}));
 assert.commandWorked(st.s.getDB(dbName).foreign.insert({_id: 1, x: 1}));
 
-const originalMongosMetrics =
-    assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
-const originalShard0Metrics =
-    assert.commandWorked(st.shard0.adminCommand({serverStatus: 1})).transactions;
-const originalShard1Metrics =
-    assert.commandWorked(st.shard1.adminCommand({serverStatus: 1})).transactions;
+const originalMongosMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
+const originalShard0Metrics = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1})).transactions;
+const originalShard1Metrics = assert.commandWorked(st.shard1.adminCommand({serverStatus: 1})).transactions;
 
 // Refresh the routing information for the foreign collection in shard0 before running the checks.
-st.s.getDB(dbName).getCollection(localColl).aggregate(
-    [{$lookup: {from: foreignColl, pipeline: [], as: "out"}}]);
+st.s
+    .getDB(dbName)
+    .getCollection(localColl)
+    .aggregate([{$lookup: {from: foreignColl, pipeline: [], as: "out"}}]);
 
 const session = st.s.startSession();
 const sessionDB = session.getDatabase(dbName);
@@ -54,8 +53,9 @@ let fp = configureFailPoint(st.shard0, "restoreLocksFail");
 // should cause shard0 to fail to unyield after getting a response from shard1, causing the request
 // to fail with a LockTimeout error.
 let err = assert.throwsWithCode(() => {
-    sessionDB.getCollection(localColl).aggregate(
-        [{$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}}]);
+    sessionDB
+        .getCollection(localColl)
+        .aggregate([{$lookup: {from: foreignColl, localField: "x", foreignField: "_id", as: "result"}}]);
 }, ErrorCodes.LockTimeout);
 assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
 
@@ -71,8 +71,7 @@ const mongosMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1}))
 assert.gte(mongosMetrics.totalStarted, originalMongosMetrics.totalStarted + 1);
 assert.gte(mongosMetrics.currentOpen, 0);
 assert.gte(mongosMetrics.totalStarted, originalMongosMetrics.totalStarted + 1);
-assert.gte(mongosMetrics.totalContactedParticipants,
-           originalMongosMetrics.totalContactedParticipants + 1);
+assert.gte(mongosMetrics.totalContactedParticipants, originalMongosMetrics.totalContactedParticipants + 1);
 
 const shard0Metrics = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1})).transactions;
 assert.gte(shard0Metrics.totalStarted, originalShard0Metrics.totalStarted + 1);

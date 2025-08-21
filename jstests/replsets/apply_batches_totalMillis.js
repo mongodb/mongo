@@ -10,8 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Gets the value of metrics.repl.apply.batches.totalMillis.
 function getTotalMillis(node) {
-    return assert.commandWorked(node.adminCommand({serverStatus: 1}))
-        .metrics.repl.apply.batches.totalMillis;
+    return assert.commandWorked(node.adminCommand({serverStatus: 1})).metrics.repl.apply.batches.totalMillis;
 }
 
 // Do a bulk insert of documents as: {{key: 0}, {key: 1}, {key: 2}, ... , {key: num-1}}

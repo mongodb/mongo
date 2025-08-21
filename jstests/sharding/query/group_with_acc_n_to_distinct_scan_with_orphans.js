@@ -13,12 +13,8 @@
  * ]
  */
 
-import {
-    prepareShardedCollectionWithOrphans
-} from "jstests/libs/query/group_to_distinct_scan_utils.js";
-import {
-    runGroupWithAccNToDistinctScanTests
-} from "jstests/libs/query/group_with_acc_n_to_distinct_scan.js";
+import {prepareShardedCollectionWithOrphans} from "jstests/libs/query/group_to_distinct_scan_utils.js";
+import {runGroupWithAccNToDistinctScanTests} from "jstests/libs/query/group_with_acc_n_to_distinct_scan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 TestData.skipCheckOrphans = true;

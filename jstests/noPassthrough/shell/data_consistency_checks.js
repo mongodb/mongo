@@ -21,16 +21,14 @@ function regexForValidateAndDBHashSlowQuery() {
 }
 
 function makePatternForDBHash(dbName) {
-    return new RegExp(
-        `Slow query.*"ns":"${dbName}\\.\\$cmd".*"appName":"MongoDB Shell","command":{"db[Hh]ash`,
-        "g");
+    return new RegExp(`Slow query.*"ns":"${dbName}\\.\\$cmd".*"appName":"MongoDB Shell","command":{"db[Hh]ash`, "g");
 }
 
 function makePatternForValidate(dbName, collName) {
     return new RegExp(
-        `Slow query.*"ns":"${dbName}\\.\\$cmd".*"appName":"MongoDB Shell","command":{"validate":"${
-            collName}"`,
-        "g");
+        `Slow query.*"ns":"${dbName}\\.\\$cmd".*"appName":"MongoDB Shell","command":{"validate":"${collName}"`,
+        "g",
+    );
 }
 
 function countMatches(pattern, output) {
@@ -47,7 +45,7 @@ function runDataConsistencyChecks(testCase) {
     clearRawMongoProgramOutput();
 
     // NOTE: once modules are imported they are cached, so we need to run this in a parallel shell.
-    const awaitShell = startParallelShell(async function() {
+    const awaitShell = startParallelShell(async function () {
         globalThis.db = db.getSiblingDB("test");
         await import("jstests/hooks/run_check_repl_dbhash.js");
         await import("jstests/hooks/run_validate_collections.js");
@@ -68,7 +66,7 @@ function runDataConsistencyChecks(testCase) {
         nodes: numNodes,
         nodeOptions: {
             setParameter: {logComponentVerbosity: tojson({command: 1})},
-        }
+        },
     });
     rst.startSet();
     rst.initiate();
@@ -78,14 +76,18 @@ function runDataConsistencyChecks(testCase) {
     const output = runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
 
     let pattern = makePatternForDBHash("test");
-    assert.eq(numNodes,
-              countMatches(pattern, output),
-              "expected to find " + tojson(pattern) + " from each node in the log output");
+    assert.eq(
+        numNodes,
+        countMatches(pattern, output),
+        "expected to find " + tojson(pattern) + " from each node in the log output",
+    );
 
     pattern = makePatternForValidate("test", "mycoll");
-    assert.eq(numNodes,
-              countMatches(pattern, output),
-              "expected to find " + tojson(pattern) + " from each node in the log output");
+    assert.eq(
+        numNodes,
+        countMatches(pattern, output),
+        "expected to find " + tojson(pattern) + " from each node in the log output",
+    );
 })();
 
 (function testReplicaSetWithNonVotingSecondaries() {
@@ -94,7 +96,7 @@ function runDataConsistencyChecks(testCase) {
         nodes: numNodes,
         nodeOptions: {
             setParameter: {logComponentVerbosity: tojson({command: 1})},
-        }
+        },
     });
     rst.startSet();
 
@@ -110,14 +112,18 @@ function runDataConsistencyChecks(testCase) {
     const output = runDataConsistencyChecks({conn: rst.nodes[0], teardown: () => rst.stopSet()});
 
     let pattern = makePatternForDBHash("test");
-    assert.eq(numNodes,
-              countMatches(pattern, output),
-              "expected to find " + tojson(pattern) + " from each node in the log output");
+    assert.eq(
+        numNodes,
+        countMatches(pattern, output),
+        "expected to find " + tojson(pattern) + " from each node in the log output",
+    );
 
     pattern = makePatternForValidate("test", "mycoll");
-    assert.eq(numNodes,
-              countMatches(pattern, output),
-              "expected to find " + tojson(pattern) + " from each node in the log output");
+    assert.eq(
+        numNodes,
+        countMatches(pattern, output),
+        "expected to find " + tojson(pattern) + " from each node in the log output",
+    );
 })();
 
 (function testShardedClusterWithOneNodeCSRS() {
@@ -127,7 +133,7 @@ function runDataConsistencyChecks(testCase) {
         configOptions: {
             setParameter: {logComponentVerbosity: tojson({command: 1})},
         },
-        shards: 1
+        shards: 1,
     });
 
     // We shard a collection in order to guarantee that at least one collection on the "config"
@@ -137,17 +143,21 @@ function runDataConsistencyChecks(testCase) {
     const output = runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
 
     let pattern = makePatternForDBHash("config");
-    assert.eq(0,
-              countMatches(pattern, output),
-              "expected not to find " + tojson(pattern) + " in the log output for 1-node CSRS");
+    assert.eq(
+        0,
+        countMatches(pattern, output),
+        "expected not to find " + tojson(pattern) + " in the log output for 1-node CSRS",
+    );
 
     // The choice of using the "config.collections" collection here is mostly arbitrary as the
     // "config.databases" and "config.chunks" collections are also implicitly created as part of
     // sharding a collection.
     pattern = makePatternForValidate("config", "collections");
-    assert.eq(1,
-              countMatches(pattern, output),
-              "expected to find " + tojson(pattern) + " in the log output for 1-node CSRS");
+    assert.eq(
+        1,
+        countMatches(pattern, output),
+        "expected to find " + tojson(pattern) + " in the log output for 1-node CSRS",
+    );
 })();
 
 (function testShardedCluster() {
@@ -161,7 +171,7 @@ function runDataConsistencyChecks(testCase) {
         rs: {nodes: 2},
         rsOptions: {
             setParameter: {logComponentVerbosity: tojson({command: 1})},
-        }
+        },
     });
 
     // We shard a collection in order to guarantee that at least one collection on the "config"
@@ -176,28 +186,35 @@ function runDataConsistencyChecks(testCase) {
     // The "config" database exists on both the CSRS and the replica set shards due to the
     // "config.transactions" collection.
     let pattern = makePatternForDBHash("config");
-    assert.eq(5,
-              countMatches(pattern, output),
-              "expected to find " + tojson(pattern) +
-                  " from each CSRS node and each replica set shard node in the log output");
+    assert.eq(
+        5,
+        countMatches(pattern, output),
+        "expected to find " +
+            tojson(pattern) +
+            " from each CSRS node and each replica set shard node in the log output",
+    );
 
     // The choice of using the "config.collections" collection here is mostly arbitrary as the
     // "config.databases" and "config.chunks" collections are also implicitly created as part of
     // sharding a collection.
     pattern = makePatternForValidate("config", "collections");
-    assert.eq(3,
-              countMatches(pattern, output),
-              "expected to find " + tojson(pattern) + " from each CSRS node in the log output");
+    assert.eq(
+        3,
+        countMatches(pattern, output),
+        "expected to find " + tojson(pattern) + " from each CSRS node in the log output",
+    );
 
     pattern = makePatternForDBHash("test");
-    assert.eq(2,
-              countMatches(pattern, output),
-              "expected to find " + tojson(pattern) +
-                  " from each replica set shard node in the log output");
+    assert.eq(
+        2,
+        countMatches(pattern, output),
+        "expected to find " + tojson(pattern) + " from each replica set shard node in the log output",
+    );
 
     pattern = makePatternForValidate("test", "mycoll");
-    assert.eq(2,
-              countMatches(pattern, output),
-              "expected to find " + tojson(pattern) +
-                  " from each replica set shard node in the log output");
+    assert.eq(
+        2,
+        countMatches(pattern, output),
+        "expected to find " + tojson(pattern) + " from each replica set shard node in the log output",
+    );
 })();

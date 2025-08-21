@@ -10,7 +10,7 @@
 
 // Test attaching maxTimeMS to a getMore command.
 var cmdRes;
-var collName = 'getmore_cmd_maxtimems';
+var collName = "getmore_cmd_maxtimems";
 var coll = db[collName];
 coll.drop();
 

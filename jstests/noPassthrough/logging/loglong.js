@@ -2,11 +2,11 @@
 // make sure very long long lines get truncated
 
 const options = {
-    setParameter: "maxLogSizeKB=9"
+    setParameter: "maxLogSizeKB=9",
 };
 const conn = MongoRunner.runMongod(options);
 
-var db = conn.getDB('db');
+var db = conn.getDB("db");
 var res = db.adminCommand({getParameter: 1, maxLogSizeKB: 1});
 assert.eq(9, res.maxLogSizeKB);
 

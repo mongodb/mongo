@@ -18,9 +18,8 @@
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
-if (typeof db === 'undefined') {
-    throw new Error(
-        "Expected mongo shell to be connected a server, but global 'db' object isn't defined");
+if (typeof db === "undefined") {
+    throw new Error("Expected mongo shell to be connected a server, but global 'db' object isn't defined");
 }
 
 // We turn off printing the JavaScript stacktrace in doassert() to avoid generating an
@@ -63,18 +62,21 @@ async function checkReplDbhashBackgroundThread(hosts) {
     });
 
     if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapshotReadConcern) {
-        print("Skipping data consistency checks for replica set: " + rst.getURL() +
-              " because storage engine does not support snapshot reads.");
+        print(
+            "Skipping data consistency checks for replica set: " +
+                rst.getURL() +
+                " because storage engine does not support snapshot reads.",
+        );
         return {ok: 1};
     }
     print("Running data consistency checks for replica set: " + rst.getURL());
 
     const sessions = [
         rst.getPrimary(),
-        ...rst.getSecondaries().filter(conn => {
+        ...rst.getSecondaries().filter((conn) => {
             return !conn.adminCommand({isMaster: 1}).arbiterOnly;
-        })
-    ].map(conn => conn.startSession({causalConsistency: false}));
+        }),
+    ].map((conn) => conn.startSession({causalConsistency: false}));
 
     const resetFns = [];
     const dbs = new Map();
@@ -84,35 +86,38 @@ async function checkReplDbhashBackgroundThread(hosts) {
     for (let session of sessions) {
         // Use the session's client directly so FSM workloads that kill random sessions won't
         // interrupt these operations.
-        const dbNoSession = session.getClient().getDB('admin');
+        const dbNoSession = session.getClient().getDB("admin");
 
-        let preserveRes = assert.commandWorked(dbNoSession.runCommand({
-            configureFailPoint: 'WTPreserveSnapshotHistoryIndefinitely',
-            mode: 'alwaysOn',
-        }),
-                                               debugInfo);
+        let preserveRes = assert.commandWorked(
+            dbNoSession.runCommand({
+                configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+                mode: "alwaysOn",
+            }),
+            debugInfo,
+        );
         debugInfo.push({
             "node": dbNoSession.getMongo(),
             "session": session,
-            "preserveFailPointOpTime": preserveRes['operationTime']
+            "preserveFailPointOpTime": preserveRes["operationTime"],
         });
 
         resetFns.push(() => {
-            assert.commandWorked(dbNoSession.runCommand({
-                configureFailPoint: 'WTPreserveSnapshotHistoryIndefinitely',
-                mode: 'off',
-            }));
+            assert.commandWorked(
+                dbNoSession.runCommand({
+                    configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+                    mode: "off",
+                }),
+            );
         });
     }
 
-    const multitenancyRes =
-        rst.getPrimary().adminCommand({getParameter: 1, multitenancySupport: 1});
+    const multitenancyRes = rst.getPrimary().adminCommand({getParameter: 1, multitenancySupport: 1});
     const multitenancy = multitenancyRes.ok && multitenancyRes["multitenancySupport"];
 
     for (let session of sessions) {
         // Use the session's client directly so FSM workloads that kill random sessions won't
         // interrupt these operations.
-        const dbNoSession = session.getClient().getDB('admin');
+        const dbNoSession = session.getClient().getDB("admin");
 
         const cmdObj = multitenancy ? {listDatabasesForAllTenants: 1} : {listDatabases: 1};
         const res = RetryableWritesUtil.runCommandWithRetries(dbNoSession, cmdObj);
@@ -124,7 +129,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
         debugInfo.push({
             "node": dbNoSession.getMongo(),
             "session": session,
-            "listDatabaseOpTime": res['operationTime']
+            "listDatabaseOpTime": res["operationTime"],
         });
     }
 
@@ -145,7 +150,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
         debugInfo.push({"waitForSecondaries": clusterTime, "signedClusterTime": signedClusterTime});
         for (let i = 1; i < sessions.length; ++i) {
             const session = sessions[i];
-            const db = session.getDatabase('admin');
+            const db = session.getDatabase("admin");
 
             // We advance the clusterTime on the secondary's session to ensure that
             // 'clusterTime' doesn't exceed the node's notion of the latest clusterTime.
@@ -155,17 +160,19 @@ async function checkReplDbhashBackgroundThread(hosts) {
             // its majority commit point. Issue an afterClusterTime read on  a nonexistent
             // collection and wait on it. This has the advantage of being easier to debug in case of
             // a timeout.
-            let res = assert.commandWorked(db.runCommand({
-                find: 'run_check_repl_dbhash_background',
-                readConcern: {level: 'majority', afterClusterTime: clusterTime},
-                limit: 1,
-                singleBatch: true,
-            }),
-                                           debugInfo);
+            let res = assert.commandWorked(
+                db.runCommand({
+                    find: "run_check_repl_dbhash_background",
+                    readConcern: {level: "majority", afterClusterTime: clusterTime},
+                    limit: 1,
+                    singleBatch: true,
+                }),
+                debugInfo,
+            );
             debugInfo.push({
                 "node": db.getMongo(),
                 "session": session,
-                "majorityReadOpTime": res['operationTime']
+                "majorityReadOpTime": res["operationTime"],
             });
         }
     };
@@ -177,8 +184,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
     // on the primary but not yet applied on the secondary.
     const checkCollectionHashesForDB = (dbName, clusterTime) => {
         const result = [];
-        const hashes =
-            rst.getHashesUsingSessions(sessions, dbName, {readAtClusterTime: clusterTime});
+        const hashes = rst.getHashesUsingSessions(sessions, dbName, {readAtClusterTime: clusterTime});
         const hashesByUUID = hashes.map((response, i) => {
             const info = {};
 
@@ -211,23 +217,35 @@ async function checkReplDbhashBackgroundThread(hosts) {
                 const secondaryInfo = hashesByUUID[i].hashesByUUID[uuid];
 
                 if (primaryInfo === undefined) {
-                    print("Skipping collection because it doesn't exist on the primary: " +
-                          tojsononeline(secondaryInfo));
+                    print(
+                        "Skipping collection because it doesn't exist on the primary: " + tojsononeline(secondaryInfo),
+                    );
                     continue;
                 }
 
                 if (secondaryInfo === undefined) {
-                    print("Skipping collection because it doesn't exist on the secondary: " +
-                          tojsononeline(primaryInfo));
+                    print(
+                        "Skipping collection because it doesn't exist on the secondary: " + tojsononeline(primaryInfo),
+                    );
                     continue;
                 }
 
                 if (primaryInfo.hash !== secondaryInfo.hash) {
-                    print("DBHash mismatch found for collection with uuid: " + uuid +
-                          ". Primary info: " + tojsononeline(primaryInfo) +
-                          ". Secondary info: " + tojsononeline(secondaryInfo));
+                    print(
+                        "DBHash mismatch found for collection with uuid: " +
+                            uuid +
+                            ". Primary info: " +
+                            tojsononeline(primaryInfo) +
+                            ". Secondary info: " +
+                            tojsononeline(secondaryInfo),
+                    );
                     const diff = DataConsistencyChecker.getCollectionDiffUsingSessions(
-                        primarySession, secondarySession, dbName, primaryInfo.uuid, clusterTime);
+                        primarySession,
+                        secondarySession,
+                        dbName,
+                        primaryInfo.uuid,
+                        clusterTime,
+                    );
 
                     result.push({
                         primary: primaryInfo,
@@ -246,12 +264,12 @@ async function checkReplDbhashBackgroundThread(hosts) {
     const checkCollectionHashesForDBWithToken = (dbName, clusterTime, token) => {
         try {
             jsTestLog(`About to run setSecurity token on ${rst}`);
-            rst.nodes.forEach(node => node._setSecurityToken(token));
+            rst.nodes.forEach((node) => node._setSecurityToken(token));
 
             jsTestLog(`Running checkcollection for ${dbName} with token ${token}`);
             return checkCollectionHashesForDB(dbName, clusterTime);
         } finally {
-            rst.nodes.forEach(node => node._setSecurityToken(undefined));
+            rst.nodes.forEach((node) => node._setSecurityToken(undefined));
         }
     };
 
@@ -260,7 +278,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
     // have not been used and will have contain null logical time values. The process for selecting
     // a read timestamp below assumes each session has valid logical times, so run a dummy command
     // through each session to populate its logical times.
-    sessions.forEach(session => session.getDatabase('admin').runCommand({ping: 1}));
+    sessions.forEach((session) => session.getDatabase("admin").runCommand({ping: 1}));
 
     for (const [key, db] of dbs) {
         let result = [];
@@ -351,7 +369,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
                     debugInfo.push({
                         "node": session.getClient(),
                         "session": session,
-                        "readAtClusterTime": clusterTime
+                        "readAtClusterTime": clusterTime,
                     });
                 }
 
@@ -373,7 +391,8 @@ async function checkReplDbhashBackgroundThread(hosts) {
                         // time.
                         assert.commandWorkedOrFailedWithCode(
                             primaryConn.adminCommand({appendOplogNote: 1, data: {}}),
-                            ErrorCodes.LockFailed);
+                            ErrorCodes.LockFailed,
+                        );
                     }
 
                     debugInfo.push({"transientError": e, "performNoopWrite": performNoopWrite});
@@ -396,32 +415,30 @@ async function checkReplDbhashBackgroundThread(hosts) {
     }
 
     const headings = [];
-    let errorBlob = '';
+    let errorBlob = "";
 
     for (let mismatchInfo of results) {
         const diff = mismatchInfo.diff;
         delete mismatchInfo.diff;
 
-        const heading =
-            `dbhash mismatch for ${mismatchInfo.dbName}.${mismatchInfo.primary.collName}`;
+        const heading = `dbhash mismatch for ${mismatchInfo.dbName}.${mismatchInfo.primary.collName}`;
 
         headings.push(heading);
 
         if (headings.length > 1) {
-            errorBlob += '\n\n';
+            errorBlob += "\n\n";
         }
         errorBlob += heading;
         errorBlob += `: ${tojson(mismatchInfo)}`;
 
         if (diff.docsWithDifferentContents.length > 0) {
-            errorBlob += '\nThe following documents have different contents on the primary and' +
-                ' secondary:';
+            errorBlob += "\nThe following documents have different contents on the primary and" + " secondary:";
             for (let {sourceNode, syncingNode} of diff.docsWithDifferentContents) {
                 errorBlob += `\n  primary:   ${tojsononeline(sourceNode)}`;
                 errorBlob += `\n  secondary: ${tojsononeline(syncingNode)}`;
             }
         } else {
-            errorBlob += '\nNo documents have different contents on the primary and secondary';
+            errorBlob += "\nNo documents have different contents on the primary and secondary";
         }
 
         if (diff.docsMissingOnSource.length > 0) {
@@ -430,7 +447,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
                 errorBlob += `\n  ${tojsononeline(doc)}`;
             }
         } else {
-            errorBlob += '\nNo documents are missing from the primary';
+            errorBlob += "\nNo documents are missing from the primary";
         }
 
         if (diff.docsMissingOnSyncing.length > 0) {
@@ -439,7 +456,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
                 errorBlob += `\n  ${tojsononeline(doc)}`;
             }
         } else {
-            errorBlob += '\nNo documents are missing from the secondary';
+            errorBlob += "\nNo documents are missing from the secondary";
         }
     }
 
@@ -454,7 +471,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
         return {
             ok: 0,
             hosts: hosts,
-            error: `dbhash mismatch (search for the following headings): ${tojson(headings)}`
+            error: `dbhash mismatch (search for the following headings): ${tojson(headings)}`,
         };
     }
 
@@ -463,7 +480,7 @@ async function checkReplDbhashBackgroundThread(hosts) {
 
 if (topology.type === Topology.kReplicaSet) {
     let res = await checkReplDbhashBackgroundThread(topology.nodes);
-    assert.commandWorked(res, () => 'data consistency checks failed: ' + tojson(res));
+    assert.commandWorked(res, () => "data consistency checks failed: " + tojson(res));
 } else if (topology.type === Topology.kShardedCluster) {
     const threads = [];
     try {
@@ -472,21 +489,21 @@ if (topology.type === Topology.kReplicaSet) {
             threads.push(thread);
             thread.start();
         } else {
-            print('Skipping data consistency checks for 1-node CSRS: ' +
-                  tojsononeline(topology.configsvr));
+            print("Skipping data consistency checks for 1-node CSRS: " + tojsononeline(topology.configsvr));
         }
 
         for (let shardName of Object.keys(topology.shards)) {
             const shard = topology.shards[shardName];
 
             if (shard.type === Topology.kStandalone) {
-                print('Skipping data consistency checks for stand-alone shard ' + shardName + ": " +
-                      tojsononeline(shard));
+                print(
+                    "Skipping data consistency checks for stand-alone shard " + shardName + ": " + tojsononeline(shard),
+                );
                 continue;
             }
 
             if (shard.type !== Topology.kReplicaSet) {
-                throw new Error('Unrecognized topology format: ' + tojson(topology));
+                throw new Error("Unrecognized topology format: " + tojson(topology));
             }
 
             if (shard.nodes.length > 1) {
@@ -494,14 +511,15 @@ if (topology.type === Topology.kReplicaSet) {
                 threads.push(thread);
                 thread.start();
             } else {
-                print('Skipping data consistency checks for stand-alone shard ' + shardName + ": " +
-                      tojsononeline(shard));
+                print(
+                    "Skipping data consistency checks for stand-alone shard " + shardName + ": " + tojsononeline(shard),
+                );
             }
         }
     } finally {
         // Wait for each thread to finish. Throw an error if any thread fails.
         let exception;
-        const returnData = threads.map(thread => {
+        const returnData = threads.map((thread) => {
             try {
                 thread.join();
                 return thread.returnData();
@@ -516,11 +534,10 @@ if (topology.type === Topology.kReplicaSet) {
             throw exception;
         }
 
-        returnData.forEach(res => {
-            assert.commandWorked(
-                res, () => 'data consistency checks (point-in-time) failed: ' + tojson(res));
+        returnData.forEach((res) => {
+            assert.commandWorked(res, () => "data consistency checks (point-in-time) failed: " + tojson(res));
         });
     }
 } else {
-    throw new Error('Unsupported topology configuration: ' + tojson(topology));
+    throw new Error("Unsupported topology configuration: " + tojson(topology));
 }

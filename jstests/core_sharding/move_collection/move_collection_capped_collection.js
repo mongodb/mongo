@@ -30,7 +30,7 @@ if (shardNames.length < 2) {
 
 const collName = jsTestName();
 const dbName = db.getName();
-const ns = dbName + '.' + collName;
+const ns = dbName + "." + collName;
 
 let shard0 = shardNames[0];
 let shard1 = shardNames[1];
@@ -52,9 +52,9 @@ assert.commandWorked(bulk.execute());
 assert.eq(coll.find({}).itcount(), numDocs);
 const preReshardingOrder = coll.find({}).toArray();
 
-const configDb = db.getSiblingDB('config');
+const configDb = db.getSiblingDB("config");
 const primaryShard = getPrimaryShardNameForDB(db);
-const nonPrimaryShard = (shard0 == primaryShard) ? shard1 : shard0;
+const nonPrimaryShard = shard0 == primaryShard ? shard1 : shard0;
 
 jsTestLog("Move to non-primary shard (" + nonPrimaryShard + ")");
 assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: nonPrimaryShard}));
@@ -65,11 +65,11 @@ assert.eq(collEntry.unsplittable, true);
 assert.eq(collEntry.key, {_id: 1});
 assert.eq(coll.find({}).itcount(), numDocs);
 
-verifyOrderMatches();  // Order matches after resharding.
+verifyOrderMatches(); // Order matches after resharding.
 
 jsTestLog("Move to primary shard (" + primaryShard + ")");
 assert.commandWorked(db.adminCommand({moveCollection: ns, toShard: primaryShard}));
 assert.eq(coll.find({}).itcount(), numDocs);
-verifyOrderMatches();  // Order matches after resharding.
+verifyOrderMatches(); // Order matches after resharding.
 
 coll.drop();

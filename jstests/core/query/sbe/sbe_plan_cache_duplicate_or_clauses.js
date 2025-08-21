@@ -21,10 +21,7 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {
-    getPlanCacheShapeHashFromExplain,
-    getPlanCacheShapeHashFromObject
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanCacheShapeHashFromExplain, getPlanCacheShapeHashFromObject} from "jstests/libs/query/analyze_plan.js";
 
 const coll = assertDropAndRecreateCollection(db, "sbe_plan_cache_duplicate_or_clauses");
 const planCacheShapeHashSet = new Set();
@@ -50,7 +47,7 @@ assert.eq(1, coll.find({a: 1, b: 1, $or: [{c: 1}, {c: 1, d: {$eq: null}}]}).itco
 
 // Check that each query has a separate entry in the plan cache
 const cacheEntries = coll.getPlanCache().list().map(getPlanCacheShapeHashFromObject);
-const matchingEntries = cacheEntries.filter(entry => planCacheShapeHashSet.has(entry));
+const matchingEntries = cacheEntries.filter((entry) => planCacheShapeHashSet.has(entry));
 assert.eq(2, matchingEntries.length, [cacheEntries, planCacheShapeHashSet]);
 
 // The query from above should still return 2 results.

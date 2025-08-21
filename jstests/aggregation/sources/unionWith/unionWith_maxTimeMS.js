@@ -17,18 +17,23 @@ function sleepAndIncrement(val) {
     sleep(2000);
     return val + 1;
 }
-assert.commandFailedWithCode(testDB.runCommand({
-    aggregate: collA.getName(),
-    pipeline: [{
-        $unionWith: {
-            coll: collB.getName(),
-            pipeline: [{
-                $project:
-                    {newVal: {$function: {args: ["$val"], body: sleepAndIncrement, lang: "js"}}}
-            }]
-        }
-    }],
-    cursor: {},
-    maxTimeMS: 3 * 1000
-}),
-                             ErrorCodes.MaxTimeMSExpired);
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        aggregate: collA.getName(),
+        pipeline: [
+            {
+                $unionWith: {
+                    coll: collB.getName(),
+                    pipeline: [
+                        {
+                            $project: {newVal: {$function: {args: ["$val"], body: sleepAndIncrement, lang: "js"}}},
+                        },
+                    ],
+                },
+            },
+        ],
+        cursor: {},
+        maxTimeMS: 3 * 1000,
+    }),
+    ErrorCodes.MaxTimeMSExpired,
+);

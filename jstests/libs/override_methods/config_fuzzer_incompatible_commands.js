@@ -9,14 +9,14 @@ function runCommandOverride(conn, dbName, commandName, commandObj, func, makeFun
         // when mongod configurations stress the server.
         throw new Error(
             "Cowardly refusing to run test that uses command 'compact' with the config fuzzer enabled. " +
-            tojson(commandObj));
+                tojson(commandObj),
+        );
     }
 
     const serverResponse = func.apply(conn, makeFuncArgs(commandObj));
     return serverResponse;
 }
 
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/config_fuzzer_incompatible_commands.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/config_fuzzer_incompatible_commands.js");
 
 OverrideHelpers.overrideRunCommand(runCommandOverride);

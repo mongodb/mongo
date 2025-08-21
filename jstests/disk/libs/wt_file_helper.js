@@ -1,23 +1,18 @@
-import {
-    getPlanStage,
-    getWinningPlanFromExplain,
-    isExpress,
-    isIxscan
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain, isExpress, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 /**
  * Get the URI of the wt collection file given the collection name.
  */
-export let getUriForColl = function(coll) {
-    assert(coll.exists());  // Collection must exist
+export let getUriForColl = function (coll) {
+    assert(coll.exists()); // Collection must exist
     return coll.stats().wiredTiger.uri.split("table:")[1];
 };
 
 /**
  * Get the URI of the wt index file given the collection name and the index name.
  */
-export let getUriForIndex = function(coll, indexName) {
-    assert(coll.exists());  // Collection must exist
+export let getUriForIndex = function (coll, indexName) {
+    assert(coll.exists()); // Collection must exist
     const ret = assert.commandWorked(coll.getDB().runCommand({collStats: coll.getName()}));
     return ret.indexDetails[indexName].uri.split("table:")[1];
 };
@@ -25,7 +20,7 @@ export let getUriForIndex = function(coll, indexName) {
 /**
  * 'Corrupt' the file by replacing it with an empty file.
  */
-export let corruptFile = function(file) {
+export let corruptFile = function (file) {
     removeFile(file);
     writeFile(file, "");
 };
@@ -34,16 +29,15 @@ export let corruptFile = function(file) {
  * Starts a mongod on the provided data path without clearing data. Accepts 'options' as parameters
  * to runMongod.
  */
-export let startMongodOnExistingPath = function(dbpath, options) {
+export let startMongodOnExistingPath = function (dbpath, options) {
     let args = {dbpath: dbpath, noCleanData: true};
     for (let attr in options) {
-        if (options.hasOwnProperty(attr))
-            args[attr] = options[attr];
+        if (options.hasOwnProperty(attr)) args[attr] = options[attr];
     }
     return MongoRunner.runMongod(args);
 };
 
-export let assertQueryUsesIndex = function(coll, query, indexName) {
+export let assertQueryUsesIndex = function (coll, query, indexName) {
     let res = coll.find(query).explain();
     assert.commandWorked(res);
 
@@ -54,18 +48,16 @@ export let assertQueryUsesIndex = function(coll, query, indexName) {
         assert(isExpress(coll.getDB(), res), tojson(res));
         stage = getPlanStage(getWinningPlanFromExplain(res), "EXPRESS_IXSCAN");
     }
-    assert.eq(
-        stage.indexName, indexName, "Expecting index scan on " + indexName + ": " + tojson(res));
+    assert.eq(stage.indexName, indexName, "Expecting index scan on " + indexName + ": " + tojson(res));
 };
 
 /**
  * Assert that running MongoDB with --repair on the provided dbpath exits cleanly.
  */
-export let assertRepairSucceeds = function(dbpath, port, opts) {
+export let assertRepairSucceeds = function (dbpath, port, opts) {
     let args = ["mongod", "--repair", "--port", port, "--dbpath", dbpath, "--bind_ip_all"];
     for (let a in opts) {
-        if (opts.hasOwnProperty(a))
-            args.push("--" + a);
+        if (opts.hasOwnProperty(a)) args.push("--" + a);
 
         if (opts[a].length > 0) {
             args.push(opts[a]);
@@ -75,20 +67,20 @@ export let assertRepairSucceeds = function(dbpath, port, opts) {
     assert.eq(0, runMongoProgram.apply(this, args));
 };
 
-export let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {
+export let assertRepairFailsWithFailpoint = function (dbpath, port, failpoint) {
     const param = "failpoint." + failpoint + "={'mode': 'alwaysOn'}";
     jsTestLog("The node should fail to complete repair with --setParameter " + param);
 
     assert.eq(
         MongoRunner.EXIT_ABRUPT,
-        runMongoProgram(
-            "mongod", "--repair", "--port", port, "--dbpath", dbpath, "--setParameter", param));
+        runMongoProgram("mongod", "--repair", "--port", port, "--dbpath", dbpath, "--setParameter", param),
+    );
 };
 
 /**
  * Asserts that running MongoDB with --repair on the provided dbpath fails.
  */
-export let assertRepairFails = function(dbpath, port) {
+export let assertRepairFails = function (dbpath, port) {
     jsTestLog("The node should complete repairing the node but fails.");
 
     assert.neq(0, runMongoProgram("mongod", "--repair", "--port", port, "--dbpath", dbpath));
@@ -98,13 +90,18 @@ export let assertRepairFails = function(dbpath, port) {
  * Assert that starting MongoDB with --replSet on an existing data path exits with a specific
  * error.
  */
-export let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rsName) {
+export let assertErrorOnStartupWhenStartingAsReplSet = function (dbpath, port, rsName) {
     jsTestLog("The repaired node should fail to start up with the --replSet option");
 
     clearRawMongoProgramOutput();
-    let node = MongoRunner.runMongod(
-        {dbpath: dbpath, port: port, replSet: rsName, noCleanData: true, waitForConnect: false});
-    assert.soon(function() {
+    let node = MongoRunner.runMongod({
+        dbpath: dbpath,
+        port: port,
+        replSet: rsName,
+        noCleanData: true,
+        waitForConnect: false,
+    });
+    assert.soon(function () {
         return rawMongoProgramOutput("Fatal assertion").search(/50923/) >= 0;
     });
     MongoRunner.stopMongod(node, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
@@ -114,13 +111,12 @@ export let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rs
  * Assert that starting MongoDB as a standalone on an existing data path exits with a specific
  * error because the previous repair failed.
  */
-export let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
+export let assertErrorOnStartupAfterIncompleteRepair = function (dbpath, port) {
     jsTestLog("The node should fail to start up because a previous repair did not complete");
 
     clearRawMongoProgramOutput();
-    let node = MongoRunner.runMongod(
-        {dbpath: dbpath, port: port, noCleanData: true, waitForConnect: false});
-    assert.soon(function() {
+    let node = MongoRunner.runMongod({dbpath: dbpath, port: port, noCleanData: true, waitForConnect: false});
+    assert.soon(function () {
         return rawMongoProgramOutput("Fatal assertion").search(/50922/) >= 0;
     });
     MongoRunner.stopMongod(node, null, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
@@ -130,7 +126,7 @@ export let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
  * Assert that starting MongoDB with --replSet will fail when going through initial sync with
  * existing data on the node.
  */
-export let assertErrorOnStartupWhenInitialSyncingWithData = function(replSet, originalNode) {
+export let assertErrorOnStartupWhenInitialSyncingWithData = function (replSet, originalNode) {
     jsTestLog("The node with data should fail to complete initial sync");
 
     clearRawMongoProgramOutput();
@@ -144,12 +140,12 @@ export let assertErrorOnStartupWhenInitialSyncingWithData = function(replSet, or
             port: originalNode.port,
             restart: true,
             waitForConnect: true,
-            setParameter: {"failpoint.skipClearInitialSyncState": "{'mode':'alwaysOn'}"}
+            setParameter: {"failpoint.skipClearInitialSyncState": "{'mode':'alwaysOn'}"},
         });
     } catch (e) {
         jsTestLog("Ignoring exception from replsettest.start: " + tojson(e));
     } finally {
-        assert.soon(function() {
+        assert.soon(function () {
             return rawMongoProgramOutput("Fatal assertion").search(/9184100/) >= 0;
         });
         if (node) {
@@ -162,7 +158,7 @@ export let assertErrorOnStartupWhenInitialSyncingWithData = function(replSet, or
  * Assert that starting MongoDB as a standalone on an existing data path succeeds. Uses a provided
  * testFunc to run any caller-provided checks on the started node.
  */
-export let assertStartAndStopStandaloneOnExistingDbpath = function(dbpath, port, testFunc) {
+export let assertStartAndStopStandaloneOnExistingDbpath = function (dbpath, port, testFunc) {
     jsTestLog("The repaired node should start up and serve reads as a standalone");
     let node = MongoRunner.runMongod({dbpath: dbpath, port: port, noCleanData: true});
     assert(node);
@@ -176,17 +172,15 @@ export let assertStartAndStopStandaloneOnExistingDbpath = function(dbpath, port,
  *
  * Returns the started node.
  */
-export let assertStartInReplSet = function(
-    replSet, originalNode, cleanData, expectResync, testFunc) {
-    jsTestLog("The node should rejoin the replica set. Clean data: " + cleanData +
-              ". Expect resync: " + expectResync);
+export let assertStartInReplSet = function (replSet, originalNode, cleanData, expectResync, testFunc) {
+    jsTestLog("The node should rejoin the replica set. Clean data: " + cleanData + ". Expect resync: " + expectResync);
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
     let node = replSet.start(originalNode, {
         dbpath: originalNode.dbpath,
         port: originalNode.port,
         restart: !cleanData,
-        setParameter: {"failpoint.skipClearInitialSyncState": "{'mode':'alwaysOn'}"}
+        setParameter: {"failpoint.skipClearInitialSyncState": "{'mode':'alwaysOn'}"},
     });
 
     replSet.awaitSecondaryNodes();
@@ -200,8 +194,7 @@ export let assertStartInReplSet = function(
         assert.eq(undefined, res.initialSyncStatus);
     }
 
-    assert.commandWorked(
-        node.adminCommand({configureFailPoint: 'skipClearInitialSyncState', mode: 'off'}));
+    assert.commandWorked(node.adminCommand({configureFailPoint: "skipClearInitialSyncState", mode: "off"}));
 
     testFunc(node);
     return node;
@@ -210,8 +203,7 @@ export let assertStartInReplSet = function(
 /**
  * Assert that mongo crashes on startup when files are missing or corrupt.
  */
-export let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
-    dbpath, dbName, collName, deleteOrCorruptFunc) {
+export let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function (dbpath, dbName, collName, deleteOrCorruptFunc) {
     // Start a MongoDB instance, create the collection file.
     const mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
     const testColl = mongod.getDB(dbName)[collName];
@@ -222,15 +214,19 @@ export let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
     deleteOrCorruptFunc(mongod, testColl);
 
     // Restart the MongoDB instance and get the abrupt exit code (14).
-    assert.eq(MongoRunner.EXIT_ABRUPT,
-              runMongoProgram("mongod", "--port", mongod.port, "--dbpath", dbpath));
+    assert.eq(MongoRunner.EXIT_ABRUPT, runMongoProgram("mongod", "--port", mongod.port, "--dbpath", dbpath));
 };
 
 /**
  * Assert mongo crashes when files are missing or corrupt.
  */
-export let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
-    dbpath, dbName, collName, deleteOrCorruptFunc, requestFunc) {
+export let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function (
+    dbpath,
+    dbName,
+    collName,
+    deleteOrCorruptFunc,
+    requestFunc,
+) {
     // Start a MongoDB instance, create the collection file.
     let mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
     let testColl = mongod.getDB(dbName)[collName];
@@ -253,16 +249,16 @@ export let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
 /**
  * Runs the WiredTiger tool with the provided arguments.
  */
-export let runWiredTigerTool = function(...args) {
-    const cmd = ['wt'].concat(args);
-    assert.eq(run.apply(undefined, cmd), 0, "error executing: " + cmd.join(' '));
+export let runWiredTigerTool = function (...args) {
+    const cmd = ["wt"].concat(args);
+    assert.eq(run.apply(undefined, cmd), 0, "error executing: " + cmd.join(" "));
 };
 
 /**
  * Stops the given mongod, runs the truncate command on the given uri using the WiredTiger tool, and
  * starts mongod again on the same path.
  */
-export let truncateUriAndRestartMongod = function(uri, conn, mongodOptions) {
+export let truncateUriAndRestartMongod = function (uri, conn, mongodOptions) {
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
     runWiredTigerTool("-h", conn.dbpath, "truncate", uri);
     return startMongodOnExistingPath(conn.dbpath, mongodOptions);
@@ -271,14 +267,15 @@ export let truncateUriAndRestartMongod = function(uri, conn, mongodOptions) {
 /**
  * Stops the given mongod and runs the alter command to modify the index table's metadata.
  */
-export let alterIndexFormatVersion = function(uri, conn, formatVersion) {
+export let alterIndexFormatVersion = function (uri, conn, formatVersion) {
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
     runWiredTigerTool(
         "-h",
         conn.dbpath,
         "alter",
         "table:" + uri,
-        "app_metadata=(formatVersion=" + formatVersion + "),exclusive_refreshed=false");
+        "app_metadata=(formatVersion=" + formatVersion + "),exclusive_refreshed=false",
+    );
 };
 
 /**
@@ -287,21 +284,23 @@ export let alterIndexFormatVersion = function(uri, conn, formatVersion) {
  */
 export let count = 0;
 
-export let rewriteTable = function(uri, conn, modifyData) {
+export let rewriteTable = function (uri, conn, modifyData) {
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
-    const separator = _isWindows() ? '\\' : '/';
+    const separator = _isWindows() ? "\\" : "/";
     const tempDumpFile = conn.dbpath + separator + "temp_dump";
     const newTableFile = conn.dbpath + separator + "new_table_file" + count++;
-    runWiredTigerTool("-h",
-                      conn.dbpath,
-                      "-r",
-                      "-C",
-                      "log=(compressor=snappy,path=journal)",
-                      "dump",
-                      "-x",
-                      "-f",
-                      tempDumpFile,
-                      "table:" + uri);
+    runWiredTigerTool(
+        "-h",
+        conn.dbpath,
+        "-r",
+        "-C",
+        "log=(compressor=snappy,path=journal)",
+        "dump",
+        "-x",
+        "-f",
+        tempDumpFile,
+        "table:" + uri,
+    );
     let dumpLines = cat(tempDumpFile).split("\n");
     modifyData(dumpLines);
     writeFile(newTableFile, dumpLines.join("\n"));
@@ -315,36 +314,34 @@ export const wtHeaderLines = 7;
 /**
  * Inserts the documents with duplicate field names into the MongoDB server.
  */
-export let insertDocDuplicateFieldName = function(coll, uri, conn, numDocs) {
+export let insertDocDuplicateFieldName = function (coll, uri, conn, numDocs) {
     for (let i = 0; i < numDocs; ++i) {
         coll.insert({a: "aaaaaaa", b: "bbbbbbb"});
     }
     // The format of the BSON documents will be {_id: ObjectId(), a: "aaaaaaa", a: "bbbbbbb"}.
-    let makeDuplicateFieldNames = function(lines) {
+    let makeDuplicateFieldNames = function (lines) {
         // The offset of the document's field name 'b' in the hex string dumped by wt tool.
         const offsetToFieldB = 75;
         // Each record takes two lines with a key and a value. We will only modify the values.
         for (let i = wtHeaderLines; i < lines.length; i += 2) {
             // Switch the field name 'b' to 'a' to create a duplicate field name.
-            lines[i] = lines[i].substring(0, offsetToFieldB) + "1" +
-                lines[i].substring(offsetToFieldB + 1);
+            lines[i] = lines[i].substring(0, offsetToFieldB) + "1" + lines[i].substring(offsetToFieldB + 1);
         }
     };
     rewriteTable(uri, conn, makeDuplicateFieldNames);
 };
 
-export let insertDocSymbolField = function(coll, uri, conn, numDocs) {
+export let insertDocSymbolField = function (coll, uri, conn, numDocs) {
     for (let i = 0; i < numDocs; ++i) {
         coll.insert({a: "aaaaaaa"});
     }
-    let makeSymbolField = function(lines) {
+    let makeSymbolField = function (lines) {
         // The offset of the type of field 'a' in the hex string dumped by wt tool.
         const offsetToFieldAType = 43;
         // Each record takes two lines with a key and a value. We will only modify the values.
         for (let i = wtHeaderLines; i < lines.length; i += 2) {
             // Switch the field type from string to symbol.
-            lines[i] = lines[i].substring(0, offsetToFieldAType) + "e" +
-                lines[i].substring(offsetToFieldAType + 1);
+            lines[i] = lines[i].substring(0, offsetToFieldAType) + "e" + lines[i].substring(offsetToFieldAType + 1);
         }
     };
     rewriteTable(uri, conn, makeSymbolField);
@@ -353,17 +350,16 @@ export let insertDocSymbolField = function(coll, uri, conn, numDocs) {
 /**
  * Inserts array document with non-sequential indexes into the MongoDB server.
  */
-export let insertNonSequentialArrayIndexes = function(coll, uri, conn, numDocs) {
+export let insertNonSequentialArrayIndexes = function (coll, uri, conn, numDocs) {
     for (let i = 0; i < numDocs; ++i) {
         coll.insert({arr: [1, 2, [1, [1, 2], 2], 3]});
     }
-    let makeNonSequentialIndexes = function(lines) {
+    let makeNonSequentialIndexes = function (lines) {
         // The offset of the 0th index of the innermost array in the hex string dumped by wt tool.
         const offsetToNestedIndex0 = 179;
         // Each record takes two lines with a key and a value. We will only modify the values.
         for (let i = wtHeaderLines; i < lines.length; i += 2) {
-            lines[i] = lines[i].substring(0, offsetToNestedIndex0) + "4" +
-                lines[i].substring(offsetToNestedIndex0 + 1);
+            lines[i] = lines[i].substring(0, offsetToNestedIndex0) + "4" + lines[i].substring(offsetToNestedIndex0 + 1);
         }
     };
     rewriteTable(uri, conn, makeNonSequentialIndexes);
@@ -372,9 +368,9 @@ export let insertNonSequentialArrayIndexes = function(coll, uri, conn, numDocs) 
 /**
  * Inserts documents with invalid regex options into the MongoDB server.
  */
-export let insertInvalidRegex = function(coll, mongod, nDocuments) {
+export let insertInvalidRegex = function (coll, mongod, nDocuments) {
     const regex = "a*.conn";
-    const options = 'gimsuy';
+    const options = "gimsuy";
 
     // First, insert valid expressions which will not be rejected by the JS interpreter.
     for (let i = 0; i < nDocuments; i++) {
@@ -382,21 +378,24 @@ export let insertInvalidRegex = function(coll, mongod, nDocuments) {
     }
 
     // Inserts 4 types of invalid expressions.
-    let swapOptions = function(lines) {
+    let swapOptions = function (lines) {
         const toInsert = ["imlsux", "imzsux", "xuslmi", "amlsux"];
         const offsetToOptionStr = 64;
-        const toHexStr = function(str) {
-            return str.split('')
+        const toHexStr = function (str) {
+            return str
+                .split("")
                 .map((a) => {
                     return a.charCodeAt(0).toString(16);
                 })
-                .join('');
+                .join("");
         };
 
         let modifiedOptions;
         for (let i = wtHeaderLines; i < lines.length; i += 2) {
             modifiedOptions = toHexStr(toInsert[((i - wtHeaderLines) / 2) % toInsert.length]);
-            lines[i] = lines[i].substring(0, offsetToOptionStr) + modifiedOptions +
+            lines[i] =
+                lines[i].substring(0, offsetToOptionStr) +
+                modifiedOptions +
                 lines[i].substring(offsetToOptionStr + modifiedOptions.length);
         }
     };
@@ -406,18 +405,17 @@ export let insertInvalidRegex = function(coll, mongod, nDocuments) {
 /**
  * Inserts document with invalid UTF-8 string into the MongoDB server.
  */
-export let insertInvalidUTF8 = function(coll, uri, conn, numDocs) {
+export let insertInvalidUTF8 = function (coll, uri, conn, numDocs) {
     for (let i = 0; i < numDocs; ++i) {
         coll.insert({validString: "\x70"});
     }
-    let makeInvalidUTF8 = function(lines) {
+    let makeInvalidUTF8 = function (lines) {
         // The offset of the first byte of the string, flips \x70 to \x80 (10000000) - invalid
         // because single byte UTF-8 cannot have a leading 1.
         const offsetToString = 76;
         // Each record takes two lines with a key and a value. We will only modify the values.
         for (let i = wtHeaderLines; i < lines.length; i += 2) {
-            lines[i] = lines[i].substring(0, offsetToString) + "8" +
-                lines[i].substring(offsetToString + 1);
+            lines[i] = lines[i].substring(0, offsetToString) + "8" + lines[i].substring(offsetToString + 1);
         }
     };
     rewriteTable(uri, conn, makeInvalidUTF8);
@@ -428,23 +426,25 @@ export let insertInvalidUTF8 = function(coll, uri, conn, numDocs) {
  * each entry, which should modify the passed entry (in-place). The modified contents are then
  * written back to the _mdb_catalog.wt file.
  */
-export let rewriteCatalogTable = function(conn, modifyCatalogEntry) {
+export let rewriteCatalogTable = function (conn, modifyCatalogEntry) {
     const uri = "_mdb_catalog";
     const fullURI = "table:" + uri;
 
-    const separator = _isWindows() ? '\\' : '/';
+    const separator = _isWindows() ? "\\" : "/";
     const tempDumpFile = conn.dbpath + separator + "temp_dump";
     const newTableFile = conn.dbpath + separator + "new_table_file" + count++;
-    runWiredTigerTool("-h",
-                      conn.dbpath,
-                      "-r",
-                      "-C",
-                      "log=(compressor=snappy,path=journal)",
-                      "dump",
-                      "-x",
-                      "-f",
-                      tempDumpFile,
-                      fullURI);
+    runWiredTigerTool(
+        "-h",
+        conn.dbpath,
+        "-r",
+        "-C",
+        "log=(compressor=snappy,path=journal)",
+        "dump",
+        "-x",
+        "-f",
+        tempDumpFile,
+        fullURI,
+    );
 
     let lines = cat(tempDumpFile).split("\n");
 

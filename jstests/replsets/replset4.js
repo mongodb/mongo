@@ -1,8 +1,8 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-let doTest = function(signal) {
+let doTest = function (signal) {
     // Test orphaned primary steps down
-    var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
+    var replTest = new ReplSetTest({name: "testSet", nodes: 3});
 
     replTest.startSet();
     replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
@@ -18,10 +18,10 @@ let doTest = function(signal) {
 
     print("replset4.js 1");
 
-    assert.soon(function() {
+    assert.soon(function () {
         try {
             var result = primary.getDB("admin").runCommand({hello: 1});
-            return (result['ok'] == 1 && result['isWritablePrimary'] == false);
+            return result["ok"] == 1 && result["isWritablePrimary"] == false;
         } catch (e) {
             print("replset4.js caught " + e);
             return false;

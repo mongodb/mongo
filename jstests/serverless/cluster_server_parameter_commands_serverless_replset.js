@@ -23,8 +23,8 @@ rst.startSet({
     setParameter: {
         multitenancySupport: true,
         featureFlagRequireTenantID: true,
-        featureFlagServerlessChangeStreams: true
-    }
+        featureFlagServerlessChangeStreams: true,
+    },
 });
 rst.initiate();
 

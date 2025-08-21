@@ -15,12 +15,13 @@ import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_paramete
 // of a error.
 if (FixtureHelpers.isMongos(db)) {
     // Create database
-    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
+    assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }
 
 const paramName = "internalQueryMaxAllowedDensifyDocs";
-const origParamValue = assert.commandWorked(
-    db.adminCommand({getParameter: 1, internalQueryMaxAllowedDensifyDocs: 1}))[paramName];
+const origParamValue = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryMaxAllowedDensifyDocs: 1}))[
+    paramName
+];
 function setMaxDocs(max) {
     setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), paramName, max);
 }
@@ -33,7 +34,8 @@ function runAggregate(densifyStage, failCode = null) {
     } else {
         assert.commandFailedWithCode(
             db.runCommand({aggregate: coll.getName(), pipeline: [densifyStage], cursor: {}}),
-            failCode);
+            failCode,
+        );
     }
 }
 
@@ -53,9 +55,7 @@ runAggregate({$densify: {field: "val", range: {step: 1, bounds: "full"}}}, 58979
 setMaxDocs(20);
 assert.commandWorked(coll.insert({val: 0, part: 2}));
 assert.commandWorked(coll.insert({val: 12, part: 2}));
-runAggregate(
-    {$densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}}},
-    5897900);
+runAggregate({$densify: {field: "val", partitionByFields: ["part"], range: {step: 1, bounds: "partition"}}}, 5897900);
 
 // Test that already existing documents don't count towards the limit.
 coll.drop();

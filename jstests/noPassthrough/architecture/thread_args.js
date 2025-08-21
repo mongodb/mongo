@@ -29,7 +29,7 @@ function testThread(threadType) {
         func1: returnTrue,
         // Pass some Code objects to simulate what happens with --enableJavaScriptProtection
         func2: new Code(returnTrue.toString()),
-        funcArray: [new Code(returnTrue.toString())]
+        funcArray: [new Code(returnTrue.toString())],
     };
 
     var thread = new threadType(threadFn, args);

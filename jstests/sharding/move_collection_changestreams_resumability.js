@@ -14,8 +14,12 @@ import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Use a higher frequency for periodic noops to speed up the test.
-const reshardingTest = new ReshardingTest(
-    {numDonors: 1, numRecipients: 1, periodicNoopIntervalSecs: 1, writePeriodicNoops: true});
+const reshardingTest = new ReshardingTest({
+    numDonors: 1,
+    numRecipients: 1,
+    periodicNoopIntervalSecs: 1,
+    writePeriodicNoops: true,
+});
 reshardingTest.setup();
 
 const kDbName = "reshardingDb";
@@ -23,8 +27,7 @@ const collName = "coll";
 const ns = kDbName + "." + collName;
 
 const donorShardNames = reshardingTest.donorShardNames;
-const sourceCollection =
-    reshardingTest.createUnshardedCollection({ns: ns, primaryShardName: donorShardNames[0]});
+const sourceCollection = reshardingTest.createUnshardedCollection({ns: ns, primaryShardName: donorShardNames[0]});
 
 const mongos = sourceCollection.getMongo();
 const reshardingDb = mongos.getDB(kDbName);
@@ -32,8 +35,7 @@ const reshardingDb = mongos.getDB(kDbName);
 const cst = new ChangeStreamTest(reshardingDb);
 
 // Open a change streams cursor on the collection that will be resharded.
-let changeStreamsCursor =
-    cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collName});
+let changeStreamsCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collName});
 assert.eq([], changeStreamsCursor.firstBatch, "Expected cursor not to have changes, but it did");
 
 // We want to confirm that change streams can see events before, during, and after the resharding
@@ -69,7 +71,7 @@ const expectedChanges = [
         fullDocument: {_id: 4, newKey: 4, oldKey: 4},
         ns: {db: kDbName, coll: collName},
         operationType: "insert",
-    }
+    },
 ];
 const preReshardCollectionChange = expectedChanges[0];
 const midReshardCollectionChanges = expectedChanges.slice(1, 3);
@@ -77,10 +79,10 @@ const postReshardCollectionChanges = expectedChanges.slice(3);
 
 // Verify that the cursor sees changes before the collection is resharded.
 assert.commandWorked(sourceCollection.insert({_id: 0, oldKey: 0}));
-const preReshardCollectionResumeToken =
-    cst.assertNextChangesEqual(
-           {cursor: changeStreamsCursor, expectedChanges: [preReshardCollectionChange]})[0]
-        ._id;
+const preReshardCollectionResumeToken = cst.assertNextChangesEqual({
+    cursor: changeStreamsCursor,
+    expectedChanges: [preReshardCollectionChange],
+})[0]._id;
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 let midReshardCollectionResumeToken;
@@ -90,57 +92,52 @@ reshardingTest.withMoveCollectionInBackground({toShard: recipientShardNames[0]},
     reshardingTest.awaitCloneTimestampChosen();
 
     // Open another change streams cursor while the collection is being resharded.
-    changeStreamsCursor2 =
-        cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collName});
+    changeStreamsCursor2 = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collName});
 
     assert.commandWorked(sourceCollection.insert({_id: 1, oldKey: 1}));
     assert.commandWorked(sourceCollection.insert({_id: 2, oldKey: 2}));
 
     // Assert that both the cursors see the two new inserts.
-    cst.assertNextChangesEqual(
-        {cursor: changeStreamsCursor, expectedChanges: midReshardCollectionChanges});
-    cst.assertNextChangesEqual(
-        {cursor: changeStreamsCursor2, expectedChanges: midReshardCollectionChanges});
+    cst.assertNextChangesEqual({cursor: changeStreamsCursor, expectedChanges: midReshardCollectionChanges});
+    cst.assertNextChangesEqual({cursor: changeStreamsCursor2, expectedChanges: midReshardCollectionChanges});
 
     // Check that we can resume from the token returned before resharding began.
     let resumedCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: preReshardCollectionResumeToken}}],
-        collection: collName
+        collection: collName,
     });
-    midReshardCollectionResumeToken =
-        cst.assertNextChangesEqual(
-               {cursor: resumedCursor, expectedChanges: midReshardCollectionChanges})[1]
-            ._id;
+    midReshardCollectionResumeToken = cst.assertNextChangesEqual({
+        cursor: resumedCursor,
+        expectedChanges: midReshardCollectionChanges,
+    })[1]._id;
 });
 
 assert.commandWorked(sourceCollection.insert({_id: 3, newKey: 3, oldKey: 3}));
 
 // Assert that both the cursor opened before resharding started and the one opened during
 // resharding see the insert after resharding has finished.
-cst.assertNextChangesEqual(
-    {cursor: changeStreamsCursor, expectedChanges: [postReshardCollectionChanges[0]]});
-cst.assertNextChangesEqual(
-    {cursor: changeStreamsCursor2, expectedChanges: [postReshardCollectionChanges[0]]});
+cst.assertNextChangesEqual({cursor: changeStreamsCursor, expectedChanges: [postReshardCollectionChanges[0]]});
+cst.assertNextChangesEqual({cursor: changeStreamsCursor2, expectedChanges: [postReshardCollectionChanges[0]]});
 
 // Check that we can resume from both the token returned before resharding began and the token
 // returned during resharding.
 let resumedCursorFromPreOperation = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: preReshardCollectionResumeToken}}],
-    collection: collName
+    collection: collName,
 });
-let midAndPostReshardCollectionChanges =
-    midReshardCollectionChanges.concat(postReshardCollectionChanges);
+let midAndPostReshardCollectionChanges = midReshardCollectionChanges.concat(postReshardCollectionChanges);
 
 let resumedCursorFromMidOperation = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: midReshardCollectionResumeToken}}],
-    collection: collName
+    collection: collName,
 });
 
 assert.commandWorked(sourceCollection.insert({_id: 4, newKey: 4, oldKey: 4}));
 
-cst.assertNextChangesEqual(
-    {cursor: resumedCursorFromPreOperation, expectedChanges: midAndPostReshardCollectionChanges});
-cst.assertNextChangesEqual(
-    {cursor: resumedCursorFromMidOperation, expectedChanges: postReshardCollectionChanges});
+cst.assertNextChangesEqual({
+    cursor: resumedCursorFromPreOperation,
+    expectedChanges: midAndPostReshardCollectionChanges,
+});
+cst.assertNextChangesEqual({cursor: resumedCursorFromMidOperation, expectedChanges: postReshardCollectionChanges});
 
 reshardingTest.teardown();

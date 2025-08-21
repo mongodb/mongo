@@ -23,7 +23,7 @@ export function startThenShutdownMongos(configRS, args = {}) {
 }
 
 function parseExitCodeFromLogLine(line) {
-    if (line.trim() == '') {
+    if (line.trim() == "") {
         return null;
     }
 
@@ -87,7 +87,7 @@ function waitForExitCode(logpath) {
     const kRetryDelayMs = 500;
 
     for (let i = 0; i < kAttempts; i++) {
-        const isFinalAttempt = (i == kAttempts - 1);
+        const isFinalAttempt = i == kAttempts - 1;
         // We ignore parse errors on all but our last attempt to read the file. This is because
         // we're reading the file as it's being written and we could read a partial line at some
         // point. When we're about to give up though, we want a parse error to be fatal.
@@ -102,7 +102,7 @@ function waitForExitCode(logpath) {
 }
 
 function getPidFromRawProgramOutput(rawOutput) {
-    return scanLinesUntilMatch(rawOutput, line => {
+    return scanLinesUntilMatch(rawOutput, (line) => {
         if (line.includes("forked process: ")) {
             const arr = line.split(": ");
             assert.eq(2, arr.length, "Failed to parse forked process pid");
@@ -132,8 +132,7 @@ function forkThenShutdownMongoProgram(program, args) {
     const exitCode = waitForExitCode(logpath, pid);
     if (exitCode === null) {
         jsTestLog("Killing process with pid " + pid + " due to not observing shutdown.");
-        assert.eq(
-            0, runNonMongoProgram("kill", "-s", "SIGKILL", pid), "Failed to kill forked process");
+        assert.eq(0, runNonMongoProgram("kill", "-s", "SIGKILL", pid), "Failed to kill forked process");
         assert(false, "Didn't observe shutdown message in forked process' log file");
     }
     jsTestLog("Forked process exited with code " + exitCode);
@@ -147,16 +146,16 @@ function forkThenShutdownMongoProgram(program, args) {
  */
 export function forkThenShutdownMongod(args = {}) {
     const defaultArgs = {
-        fork: '',
+        fork: "",
         setParameter: {
-            'failpoint.shutdownAtStartup': '{mode:"alwaysOn"}',
+            "failpoint.shutdownAtStartup": '{mode:"alwaysOn"}',
         },
         useLogFiles: true,
         waitForConnect: false,
     };
 
     const testArgs = MongoRunner.mongodOptions({...defaultArgs, ...args});
-    forkThenShutdownMongoProgram('mongod', testArgs);
+    forkThenShutdownMongoProgram("mongod", testArgs);
 }
 
 /**
@@ -166,9 +165,9 @@ export function forkThenShutdownMongod(args = {}) {
  */
 export function forkThenShutdownMongos(configRS, args = {}) {
     const defaultArgs = {
-        fork: '',
+        fork: "",
         setParameter: {
-            'failpoint.shutdownAtStartup': '{mode:"alwaysOn"}',
+            "failpoint.shutdownAtStartup": '{mode:"alwaysOn"}',
         },
         configdb: configRS.getURL(),
         useLogFiles: true,
@@ -176,5 +175,5 @@ export function forkThenShutdownMongos(configRS, args = {}) {
     };
 
     const testArgs = MongoRunner.mongosOptions({...defaultArgs, ...args});
-    forkThenShutdownMongoProgram('mongos', testArgs);
+    forkThenShutdownMongoProgram("mongos", testArgs);
 }

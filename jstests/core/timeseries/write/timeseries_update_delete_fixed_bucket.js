@@ -21,11 +21,11 @@ import {
     testFindOneAndRemove,
     testFindOneAndUpdate,
     testUpdateOne,
-    timeFieldName
+    timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
 {
-    const roundingParam = 900;  // number of seconds in 15 minutes.
+    const roundingParam = 900; // number of seconds in 15 minutes.
     const tsOptions = {bucketMaxSpanSeconds: roundingParam, bucketRoundingSeconds: roundingParam};
     const startingTime = ISODate("2023-02-06T01:30:00Z");
     const offset = roundingParam * 1000;
@@ -65,14 +65,14 @@ import {
                         {_id: {$lt: ObjectId("63e058180000000000000000")}},
                         {"control.max.time": {$_internalExprLt: ISODate("2023-02-06T01:45:00Z")}},
                         {"control.min.time": {$_internalExprLt: startingTime}},
-                    ]
+                    ],
                 }),
                 residualFilter: {},
                 nBucketsUnpacked: 1,
                 nMatched: 1,
                 nModified: 1,
             },
-            timeseriesOptions: tsOptions
+            timeseriesOptions: tsOptions,
         });
     })();
 
@@ -92,14 +92,14 @@ import {
                         {_id: {$gt: ObjectId("63e05494ffffffffffffffff")}},
                         {"control.max.time": {$_internalExprGt: startingTime}},
                         {"control.min.time": {$_internalExprGte: startingTime}},
-                    ]
+                    ],
                 }),
                 residualFilter: {"time": {"$gt": startingTime}},
                 nBucketsUnpacked: 1,
                 nMatched: 1,
                 nModified: 1,
             },
-            timeseriesOptions: tsOptions
+            timeseriesOptions: tsOptions,
         });
     })();
 
@@ -111,7 +111,7 @@ import {
                 filter: {[timeFieldName]: {$gte: times[3]}},
                 update: doc_a_latest_time,
                 returnNew: true,
-                upsert: true
+                upsert: true,
             },
             res: {
                 resultDocList: [doc_b_start_time, doc_a_late_time, doc_a_latest_time],
@@ -121,7 +121,7 @@ import {
                         {_id: {$gte: ObjectId("63e058180000000000000000")}},
                         {"control.max.time": {$_internalExprGte: times[3]}},
                         {"control.min.time": {$_internalExprGte: times[3]}},
-                    ]
+                    ],
                 }),
                 residualFilter: {},
                 nBucketsUnpacked: 0,
@@ -129,7 +129,7 @@ import {
                 nModified: 0,
                 nUpserted: 1,
             },
-            timeseriesOptions: tsOptions
+            timeseriesOptions: tsOptions,
         });
     })();
 
@@ -141,7 +141,7 @@ import {
             updateObj: {$set: {[metaFieldName]: 2}},
             // Don't validate exact results as we could update any doc.
             nMatched: 1,
-            timeseriesOptions: tsOptions
+            timeseriesOptions: tsOptions,
         });
     })();
 
@@ -149,16 +149,13 @@ import {
     // boundaries.
     (function testUpdateOne_ConjunctionPredicate() {
         const query = {
-            $and: [{[timeFieldName]: {$lt: times[3]}}, {[timeFieldName]: {$gte: times[1]}}]
+            $and: [{[timeFieldName]: {$lt: times[3]}}, {[timeFieldName]: {$gte: times[1]}}],
         };
         testFindOneAndUpdate({
             initialDocList: [doc_a_early_time, doc_b_start_time],
             cmd: {filter: query, update: {$set: {[metaFieldName]: 2}}},
             res: {
-                resultDocList: [
-                    doc_a_early_time,
-                    {[timeFieldName]: times[1], [metaFieldName]: 2, _id: 1, b: 1},
-                ],
+                resultDocList: [doc_a_early_time, {[timeFieldName]: times[1], [metaFieldName]: 2, _id: 1, b: 1}],
                 returnDoc: doc_b_start_time,
                 bucketFilter: makeBucketFilter({
                     $and: [
@@ -167,18 +164,17 @@ import {
                         {"control.max.time": {$_internalExprGte: times[1]}},
                         {"control.min.time": {$_internalExprGte: times[1]}},
                         {
-                            "control.max.time":
-                                {$_internalExprLt: new Date(times[3].getTime() + offset)}
+                            "control.max.time": {$_internalExprLt: new Date(times[3].getTime() + offset)},
                         },
                         {"control.min.time": {$_internalExprLt: times[3]}},
-                    ]
+                    ],
                 }),
                 residualFilter: {},
                 nBucketsUnpacked: 1,
                 nMatched: 1,
                 nModified: 1,
             },
-            timeseriesOptions: tsOptions
+            timeseriesOptions: tsOptions,
         });
     })();
 
@@ -189,24 +185,24 @@ import {
             initialDocList: [doc_a_early_time, doc_a_latest_time],
             cmd: {filter: query, update: {$set: {a: 10}}},
             res: {
-                resultDocList: [
-                    doc_a_early_time,
-                    {[timeFieldName]: times[3], [metaFieldName]: 1, _id: 1, b: 1, a: 10}
-                ],
+                resultDocList: [doc_a_early_time, {[timeFieldName]: times[3], [metaFieldName]: 1, _id: 1, b: 1, a: 10}],
                 returnDoc: doc_a_latest_time,
-                bucketFilter: makeBucketFilter({meta: {$eq: 1}}, {
-                    $and: [
-                        {_id: {$gte: ObjectId("63e054940000000000000000")}},
-                        {"control.max.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
-                        {"control.min.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
-                    ]
-                }),
+                bucketFilter: makeBucketFilter(
+                    {meta: {$eq: 1}},
+                    {
+                        $and: [
+                            {_id: {$gte: ObjectId("63e054940000000000000000")}},
+                            {"control.max.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
+                            {"control.min.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
+                        ],
+                    },
+                ),
                 residualFilter: {},
                 nBucketsUnpacked: 1,
                 nMatched: 1,
                 nModified: 1,
             },
-            timeseriesOptions: tsOptions
+            timeseriesOptions: tsOptions,
         });
     })();
 
@@ -216,8 +212,7 @@ import {
      */
     (function testDeleteOne_MatchMultipleBuckets() {
         testDeleteOne({
-            initialDocList:
-                [doc_a_early_time, doc_b_start_time, doc_a_late_time, doc_a_latest_time],
+            initialDocList: [doc_a_early_time, doc_b_start_time, doc_a_late_time, doc_a_latest_time],
             filter: {[timeFieldName]: {$lte: times[3]}},
             // Don't validate exact results as we could delete any doc.
             nDeleted: 1,
@@ -226,8 +221,7 @@ import {
 
     (function testDeleteOne_MatchOneDoc_InBucket() {
         testDeleteOne({
-            initialDocList:
-                [doc_a_early_time, doc_b_start_time, doc_a_late_time, doc_a_latest_time],
+            initialDocList: [doc_a_early_time, doc_b_start_time, doc_a_late_time, doc_a_latest_time],
             filter: {[timeFieldName]: {$lte: times[0]}},
             expectedDocList: [doc_b_start_time, doc_a_late_time, doc_a_latest_time],
             nDeleted: 1,
@@ -247,17 +241,16 @@ import {
                     $and: [
                         {_id: {$lt: ObjectId("63e059da0000000000000000")}},
                         {
-                            "control.max.time":
-                                {$_internalExprLt: new Date(times[2].getTime() + offset)}
+                            "control.max.time": {$_internalExprLt: new Date(times[2].getTime() + offset)},
                         },
                         {"control.min.time": {$_internalExprLt: times[2]}},
-                    ]
+                    ],
                 }),
                 residualFilter: {[timeFieldName]: {$lt: times[2]}},
                 nBucketsUnpacked: 1,
                 nReturned: 1,
             },
-            timeseriesOptions: tsOptions
+            timeseriesOptions: tsOptions,
         });
     })();
 
@@ -277,13 +270,13 @@ import {
                         {"control.min.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
                         {"control.max.time": {$_internalExprLte: ISODate("2023-02-06T01:52:30Z")}},
                         {"control.min.time": {$_internalExprLte: ISODate("2023-02-06T01:37:30Z")}},
-                    ]
+                    ],
                 }),
                 residualFilter: {[timeFieldName]: {$eq: times[2]}},
                 nBucketsUnpacked: 1,
                 nReturned: 1,
             },
-            timeseriesOptions: tsOptions
+            timeseriesOptions: tsOptions,
         });
     })();
 
@@ -300,13 +293,13 @@ import {
                         {_id: {$gte: ObjectId("63e058180000000000000000")}},
                         {"control.max.time": {$_internalExprGte: times[3]}},
                         {"control.min.time": {$_internalExprGte: times[3]}},
-                    ]
+                    ],
                 }),
                 residualFilter: {},
                 nBucketsUnpacked: 1,
                 nReturned: 1,
             },
-            timeseriesOptions: tsOptions
+            timeseriesOptions: tsOptions,
         });
     })();
 }

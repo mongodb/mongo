@@ -7,14 +7,15 @@
 import {TLSTest} from "jstests/libs/ssl_test.js";
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
-requireSSLProvider(['openssl', 'windows'], function() {
+requireSSLProvider(["openssl", "windows"], function () {
     var testUnrevoked = new TLSTest(
         // Server option overrides
         {
             tlsMode: "requireTLS",
             tlsCRLFile: "jstests/libs/crl.pem",
-            setParameter: {enableTestCommands: 1}
-        });
+            setParameter: {enableTestCommands: 1},
+        },
+    );
 
     assert(testUnrevoked.connectWorked());
 
@@ -23,8 +24,9 @@ requireSSLProvider(['openssl', 'windows'], function() {
         {
             tlsMode: "requireTLS",
             tlsCRLFile: "jstests/libs/crl_expired.pem",
-            setParameter: {enableTestCommands: 1}
-        });
+            setParameter: {enableTestCommands: 1},
+        },
+    );
 
     assert(!testRevoked.connectWorked());
 });

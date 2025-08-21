@@ -11,7 +11,7 @@
  * ]
  */
 
-import {getWinningPlanFromExplain, isEofPlan, isIxscan} from 'jstests/libs/query/analyze_plan.js';
+import {getWinningPlanFromExplain, isEofPlan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -21,21 +21,16 @@ coll.drop();
  * winning plans and failureContext to `assertions`.
  */
 function runAggAndFindExplainsWithAssertions(matchPredicate, opts, assertions) {
-    const failureContext = "Match predicate: " + JSON.stringify(matchPredicate) +
-        ". Options = " + JSON.stringify(opts);
+    const failureContext = "Match predicate: " + JSON.stringify(matchPredicate) + ". Options = " + JSON.stringify(opts);
     {
         const explain = coll.explain().aggregate([{$match: matchPredicate}], opts);
         const plan = getWinningPlanFromExplain(explain);
-        assertions(plan,
-                   "aggregate() assertions failed. " + failureContext +
-                       ". Winning plan:" + JSON.stringify(plan));
+        assertions(plan, "aggregate() assertions failed. " + failureContext + ". Winning plan:" + JSON.stringify(plan));
     }
     {
         const explain = coll.find(matchPredicate, {}, opts).explain();
         const plan = getWinningPlanFromExplain(explain);
-        assertions(plan,
-                   "find() assertions failed. " + failureContext +
-                       ". Winning plan:" + JSON.stringify(plan));
+        assertions(plan, "find() assertions failed. " + failureContext + ". Winning plan:" + JSON.stringify(plan));
     }
 }
 
@@ -44,7 +39,7 @@ function runAggAndFindExplainsWithAssertions(matchPredicate, opts, assertions) {
  * plan with an index scan node.
  */
 function assertContainsEof(matchPredicate, opts = {}) {
-    runAggAndFindExplainsWithAssertions(matchPredicate, opts, function(plan, failureContext) {
+    runAggAndFindExplainsWithAssertions(matchPredicate, opts, function (plan, failureContext) {
         assert(isEofPlan(db, plan), "Expected an EOF. " + failureContext);
         assert(!isIxscan(db, plan), "Expected no index scan. " + failureContext);
     });
@@ -55,7 +50,7 @@ function assertContainsEof(matchPredicate, opts = {}) {
  * plan with an index scan node.
  */
 function assertContainsIndexScan(matchPredicate, opts = {}) {
-    runAggAndFindExplainsWithAssertions(matchPredicate, opts, function(plan, failureContext) {
+    runAggAndFindExplainsWithAssertions(matchPredicate, opts, function (plan, failureContext) {
         assert(!isEofPlan(db, plan), "Expected no EOF. " + failureContext);
         assert(isIxscan(db, plan), "Expected index scan. " + failureContext);
     });

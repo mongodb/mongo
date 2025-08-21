@@ -12,24 +12,27 @@
 import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 const filterSystemColl = {
-    name: {'$not': /^system\./}
+    name: {"$not": /^system\./},
 };
 
 function checkOptions(coll, expectedOptions) {
-    assert.hasFields(coll.getMetadata().options,
-                     Object.keys(expectedOptions),
-                     `Missing expected option(s) for collection '${coll.getFullName()}'`);
+    assert.hasFields(
+        coll.getMetadata().options,
+        Object.keys(expectedOptions),
+        `Missing expected option(s) for collection '${coll.getFullName()}'`,
+    );
 }
 
 function checkUUID(coll, expectedUUID) {
-    assert.eq(
-        expectedUUID, coll.getUUID(), `Incorrect uuid for collection '${coll.getFullName()}'`);
+    assert.eq(expectedUUID, coll.getUUID(), `Incorrect uuid for collection '${coll.getFullName()}'`);
 }
 
 function checkIndexes(coll, expectedIndexes) {
-    assert.sameMembers(expectedIndexes,
-                       coll.getIndexes(),
-                       `Unexpected indexes found for collection '${coll.getFullName()}'`);
+    assert.sameMembers(
+        expectedIndexes,
+        coll.getIndexes(),
+        `Unexpected indexes found for collection '${coll.getFullName()}'`,
+    );
 }
 
 function createCollection(coll, options, indexes, sharded) {
@@ -53,14 +56,14 @@ function testMovePrimary(sharded) {
     // ----------------------------
     db.dropDatabase();
 
-    const c1_name = 'c1';
-    const c2_name = 'c2';
+    const c1_name = "c1";
+    const c2_name = "c2";
 
     const c1_options = {validationLevel: "off"};
-    const c2_options = {validator: {$jsonSchema: {required: ['a']}}};
+    const c2_options = {validator: {$jsonSchema: {required: ["a"]}}};
 
-    const c1_index_specs = [{key: {a: 1}, name: 'index1', expireAfterSeconds: 5000}];
-    const c2_index_specs = [{key: {a: -1}, name: 'index2'}];
+    const c1_index_specs = [{key: {a: 1}, name: "index1", expireAfterSeconds: 5000}];
+    const c2_index_specs = [{key: {a: -1}, name: "index2"}];
 
     const c1 = db[c1_name];
     const c2 = db[c2_name];
@@ -74,16 +77,12 @@ function testMovePrimary(sharded) {
     const c1_indexes = c1.getIndexes();
     const c2_indexes = c2.getIndexes();
 
-    assert.eq(
-        3, c1.countDocuments({}), 'Unexpected number of document after c1 collection creation');
-    assert.eq(
-        3, c2.countDocuments({}), 'Unexpected number of document after c2 collection creation');
+    assert.eq(3, c1.countDocuments({}), "Unexpected number of document after c1 collection creation");
+    assert.eq(3, c2.countDocuments({}), "Unexpected number of document after c2 collection creation");
 
     {
         const colls = db.getCollectionInfos(filterSystemColl);
-        assert.eq(2,
-                  colls.length,
-                  `Unexpected number of collections found before moving primary: ${tojson(colls)}`);
+        assert.eq(2, colls.length, `Unexpected number of collections found before moving primary: ${tojson(colls)}`);
     }
 
     // ----------------------------
@@ -96,8 +95,7 @@ function testMovePrimary(sharded) {
         jsTest.log(`moving primary of ${db.getName()} from ${fromShard} to ${toShard}`);
         const res = db.adminCommand({movePrimary: db.getName(), to: toShard});
         if (res.code == ErrorCodes.ShardNotFound) {
-            jsTest.log(`moving primary of ${db.getName()} from ${fromShard} to ${
-                toShard} failed, retrying...`);
+            jsTest.log(`moving primary of ${db.getName()} from ${fromShard} to ${toShard} failed, retrying...`);
             return false;
         }
         assert.commandWorked(res);
@@ -109,9 +107,7 @@ function testMovePrimary(sharded) {
     // ----------------------------
     {
         const colls = db.getCollectionInfos(filterSystemColl);
-        assert.eq(2,
-                  colls.length,
-                  `Unexpected number of collections found after moving primary: ${tojson(colls)}`);
+        assert.eq(2, colls.length, `Unexpected number of collections found after moving primary: ${tojson(colls)}`);
     }
 
     assert(c1.exists());

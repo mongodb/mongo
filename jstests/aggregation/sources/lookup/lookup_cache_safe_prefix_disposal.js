@@ -23,18 +23,22 @@ testColl.drop();
 // re-use the cache.
 testColl.insert([{}, {}]);
 
-assert.doesNotThrow(() => testColl.aggregate([{
-  $lookup: {
-    as: 'items_check',
-    from: joinColl.getName(),
-    let: { id: '$_id' },
-    pipeline: [
-      // This pipeline is interesting - the $match stage will swap before the $addFields. In doing
-      // so, it will create a copy and destroy itself, which will leave $facet with a dangling
-      // pointer to an old $match stage which is no longer valid.
-      { $addFields: { id: '$_id' } },
-      { $match: {} },
-      { $facet: { all: [{ $match: {} }] } }
-    ]
-  }
-}]));
+assert.doesNotThrow(() =>
+    testColl.aggregate([
+        {
+            $lookup: {
+                as: "items_check",
+                from: joinColl.getName(),
+                let: {id: "$_id"},
+                pipeline: [
+                    // This pipeline is interesting - the $match stage will swap before the $addFields. In doing
+                    // so, it will create a copy and destroy itself, which will leave $facet with a dangling
+                    // pointer to an old $match stage which is no longer valid.
+                    {$addFields: {id: "$_id"}},
+                    {$match: {}},
+                    {$facet: {all: [{$match: {}}]}},
+                ],
+            },
+        },
+    ]),
+);

@@ -28,9 +28,9 @@ const documentList = [
                 "_id": 1335,
                 "str": "strategize",
                 "date": ISODate("2019-03-12T19:21:41.618Z"),
-                "obj": {}
+                "obj": {},
             },
-        }
+        },
     },
     {
         "_id": 1378,
@@ -41,7 +41,7 @@ const documentList = [
         "obj": {
             "_id": 1404,
             "str": "payment recontextualize",
-            "date": ISODate("2019-01-31T12:53:44.088Z")
+            "date": ISODate("2019-01-31T12:53:44.088Z"),
         },
     },
 ];
@@ -51,35 +51,38 @@ const documentList = [
 // only validate the results for this case, since the explain does not include index usage on the
 // foreign colleciton.
 const testGraphLookup = [
-    {$graphLookup: {
-        from: "that",
-        startWith: null,
-        connectFromField: "obj.obj.obj.obj.obj.num",
-        connectToField: "obj.date",
-        as: "array",
-        restrictSearchWithMatch: {"obj.obj.obj.str": {$not: {$lte: "redundant"}}}
-    }}
+    {
+        $graphLookup: {
+            from: "that",
+            startWith: null,
+            connectFromField: "obj.obj.obj.obj.obj.num",
+            connectToField: "obj.date",
+            as: "array",
+            restrictSearchWithMatch: {"obj.obj.obj.str": {$not: {$lte: "redundant"}}},
+        },
+    },
 ];
 
-const testLargerMatch = [{
-    $match: {
-        $and: [
-            {"obj.obj.obj.str": {$not: {$lte: "redundant"}}},
-            {"obj.date": {$in: [null]}},
-            {"obj.date": {$exists: true}},
-            {"obj.date": {$not: {$type: "undefined"}}}
-        ]
-    }
-}];
+const testLargerMatch = [
+    {
+        $match: {
+            $and: [
+                {"obj.obj.obj.str": {$not: {$lte: "redundant"}}},
+                {"obj.date": {$in: [null]}},
+                {"obj.date": {$exists: true}},
+                {"obj.date": {$not: {$type: "undefined"}}},
+            ],
+        },
+    },
+];
 
-const testSmallerMatch = [{
-    $match: {
-        $and: [
-            {"obj.obj.obj.str": {$not: {$lte: "redundant"}}},
-            {"obj.date": {$exists: true}},
-        ]
-    }
-}];
+const testSmallerMatch = [
+    {
+        $match: {
+            $and: [{"obj.obj.obj.str": {$not: {$lte: "redundant"}}}, {"obj.date": {$exists: true}}],
+        },
+    },
+];
 
 function assertCollScan(explain) {
     const ixScans = getAggPlanStages(explain, "IXSCAN");

@@ -28,14 +28,14 @@ const conversionTestDocs = [
         _id: 9,
         input: "0123456789abcdef01234567",
         target: "objectId",
-        expected: ObjectId("0123456789abcdef01234567")
+        expected: ObjectId("0123456789abcdef01234567"),
     },
     {_id: 10, input: "", target: "bool", expected: true},
     {
         _id: 11,
         input: "1970-01-01T00:00:00.001Z",
         target: "date",
-        expected: ISODate("1970-01-01T00:00:00.001Z")
+        expected: ISODate("1970-01-01T00:00:00.001Z"),
     },
     {_id: 12, input: "1", target: "int", expected: NumberInt(1)},
     {_id: 13, input: "1", target: "long", expected: NumberLong(1)},
@@ -45,20 +45,20 @@ const conversionTestDocs = [
         _id: 15,
         input: ObjectId("0123456789abcdef01234567"),
         target: "string",
-        expected: "0123456789abcdef01234567"
+        expected: "0123456789abcdef01234567",
     },
     {_id: 16, input: ObjectId("0123456789abcdef01234567"), target: "bool", expected: true},
     {
         _id: 17,
         input: ObjectId("0123456789abcdef01234567"),
         target: "objectId",
-        expected: ObjectId("0123456789abcdef01234567")
+        expected: ObjectId("0123456789abcdef01234567"),
     },
     {
         _id: 18,
         input: ObjectId("0123456789abcdef01234567"),
         target: "date",
-        expected: ISODate("1970-08-09T22:25:43Z")
+        expected: ISODate("1970-08-09T22:25:43Z"),
     },
 
     {_id: 19, input: false, target: "double", expected: 0.0},
@@ -73,26 +73,26 @@ const conversionTestDocs = [
         _id: 26,
         input: ISODate("1970-01-01T00:00:00.123Z"),
         target: "string",
-        expected: "1970-01-01T00:00:00.123Z"
+        expected: "1970-01-01T00:00:00.123Z",
     },
     {_id: 27, input: ISODate("1970-01-01T00:00:00.123Z"), target: "bool", expected: true},
     {
         _id: 28,
         input: ISODate("1970-01-01T00:00:00.123Z"),
         target: "date",
-        expected: ISODate("1970-01-01T00:00:00.123Z")
+        expected: ISODate("1970-01-01T00:00:00.123Z"),
     },
     {
         _id: 29,
         input: ISODate("1970-01-01T00:00:00.123Z"),
         target: "long",
-        expected: NumberLong(123)
+        expected: NumberLong(123),
     },
     {
         _id: 30,
         input: ISODate("1970-01-01T00:00:00.123Z"),
         target: "decimal",
-        expected: NumberDecimal("123")
+        expected: NumberDecimal("123"),
     },
 
     {_id: 31, input: NumberInt(1), target: "double", expected: 1.0},
@@ -117,7 +117,7 @@ const conversionTestDocs = [
         _id: 47,
         input: NumberDecimal("1.9"),
         target: "date",
-        expected: ISODate("1970-01-01T00:00:00.001Z")
+        expected: ISODate("1970-01-01T00:00:00.001Z"),
     },
     {_id: 48, input: NumberDecimal("1.9"), target: "int", expected: NumberInt(1)},
     {_id: 49, input: NumberDecimal("1.9"), target: "long", expected: NumberLong(1)},
@@ -129,7 +129,7 @@ const conversionTestDocs = [
     {_id: 54, input: BinData(0, "BBBBBBBBBBBBBBBBBBBBBBBBBBBB"), target: "bool", expected: true},
     {_id: 55, input: /B*/, target: "bool", expected: true},
     {_id: 56, input: new DBRef("db.test", "oid"), target: "bool", expected: true},
-    {_id: 57, input: function() {}, target: "bool", expected: true},
+    {_id: 57, input: function () {}, target: "bool", expected: true},
     // Symbol and CodeWScope are not supported from JavaScript, so we can't test them here.
     {_id: 58, input: new Timestamp(1 / 1000, 1), target: "bool", expected: true},
     {_id: 59, input: MinKey, target: "bool", expected: true},
@@ -138,7 +138,7 @@ const conversionTestDocs = [
         _id: 60,
         input: Timestamp(1, 1),
         target: "date",
-        expected: ISODate("1970-01-01T00:00:01.000Z")
+        expected: ISODate("1970-01-01T00:00:01.000Z"),
     },
 ];
 
@@ -184,7 +184,6 @@ const illegalConversionTestDocs = [
 //
 // One test document for each "nullish" value.
 //
-const nullTestDocs =
-    [{_id: 0, input: null}, {_id: 1, input: undefined}, {_id: 2, /* input is missing */}];
+const nullTestDocs = [{_id: 0, input: null}, {_id: 1, input: undefined}, {_id: 2 /* input is missing */}];
 
 runConvertTests({coll, requiresFCV80, conversionTestDocs, illegalConversionTestDocs, nullTestDocs});

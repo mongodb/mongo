@@ -14,17 +14,17 @@ for (let i = 1; i <= nDocs; i++) {
     assert.commandWorked(coll.insert({"_id": i}));
 }
 
-const getStats = function(explain) {
+const getStats = function (explain) {
     assert(Array.isArray(explain), explain);
-    assert(explain[0].hasOwnProperty('$cursor'), explain);
+    assert(explain[0].hasOwnProperty("$cursor"), explain);
     return explain[0].$cursor.executionStats.nReturned;
 };
 
-const setCursorBatchSize = (size) => assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalDocumentSourceCursorInitialBatchSize: size}));
+const setCursorBatchSize = (size) =>
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceCursorInitialBatchSize: size}));
 
 const nonOptStage = {
-    $_internalInhibitOptimization: {}
+    $_internalInhibitOptimization: {},
 };
 
 {
@@ -35,18 +35,14 @@ const nonOptStage = {
     setCursorBatchSize(0);
 
     // The documents are tiny, DocumentSourceCursor batches all documents.
-    assert.eq(
-        nDocs,
-        getStats(assert.commandWorked(coll.explain('executionStats').aggregate(pipeline)).stages));
+    assert.eq(nDocs, getStats(assert.commandWorked(coll.explain("executionStats").aggregate(pipeline)).stages));
 
     // Make the initial batch size to be very small.
     setCursorBatchSize(1);
 
     // The executor returns a number of document that is close to what is needed, it is 3 instead of
     // 2 because the initial batch size is 1 and grows to 2 when the first batch is not enough.
-    assert.eq(
-        3,
-        getStats(assert.commandWorked(coll.explain('executionStats').aggregate(pipeline)).stages));
+    assert.eq(3, getStats(assert.commandWorked(coll.explain("executionStats").aggregate(pipeline)).stages));
 }
 
 // Make the initial batch size to be very small.
@@ -57,9 +53,7 @@ setCursorBatchSize(1);
     // CanonicalQuery.
     const pipeline = [{$match: {}}, {$limit: 5}, nonOptStage, {$limit: 2}];
     // One $limit is pushed down, batching limitation won't work.
-    assert.eq(
-        5,
-        getStats(assert.commandWorked(coll.explain('executionStats').aggregate(pipeline)).stages));
+    assert.eq(5, getStats(assert.commandWorked(coll.explain("executionStats").aggregate(pipeline)).stages));
 }
 
 {
@@ -68,25 +62,17 @@ setCursorBatchSize(1);
     if (checkSbeFullyEnabled(db)) {
         // Case when there are two $limit stages and only first one is pushed down into cqPipeline
         // of CanonicalQuery.
-        const pipeline =
-            [{$group: {_id: "$_id", count: {$count: {}}}}, {$limit: 5}, nonOptStage, {$limit: 2}];
+        const pipeline = [{$group: {_id: "$_id", count: {$count: {}}}}, {$limit: 5}, nonOptStage, {$limit: 2}];
         // One $limit is pushed down, batching limitation won't work.
-        assert.eq(
-            5,
-            getStats(
-                assert.commandWorked(coll.explain('executionStats').aggregate(pipeline)).stages));
+        assert.eq(5, getStats(assert.commandWorked(coll.explain("executionStats").aggregate(pipeline)).stages));
     }
 }
 
 {
     // Case when there is a $limit in sub-pipeline that can be pushed down, and a stricter $limit in
     // the main pipeline after $unionWith.
-    const pipeline = [
-        {$match: {_id: 1}},
-        {$unionWith: {coll: coll.getName(), pipeline: [{$limit: 5}]}},
-        {$limit: 2}
-    ];
-    const res = assert.commandWorked(coll.explain('executionStats').aggregate(pipeline));
+    const pipeline = [{$match: {_id: 1}}, {$unionWith: {coll: coll.getName(), pipeline: [{$limit: 5}]}}, {$limit: 2}];
+    const res = assert.commandWorked(coll.explain("executionStats").aggregate(pipeline));
     // $limit in sub-pipeline is pushed down, batching limitation won't work.
     assert.eq(5, getStats(res.stages[1].$unionWith.pipeline), res);
 }

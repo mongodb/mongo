@@ -14,7 +14,7 @@ import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 const source = db.unique_key_validation_source;
 const target = db.unique_key_validation_target;
 
-[source, target].forEach(coll => coll.drop());
+[source, target].forEach((coll) => coll.drop());
 assert.commandWorked(source.insert({_id: 0}));
 
 //
@@ -22,8 +22,7 @@ assert.commandWorked(source.insert({_id: 0}));
 //
 function assertOnFieldsIsInvalid(onFields, expectedErrorCode) {
     const stage = {
-        $merge:
-            {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: onFields}
+        $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: onFields},
     };
     assertErrorCode(source, stage, expectedErrorCode);
 }
@@ -47,14 +46,16 @@ assertOnFieldsIsInvalid([true, "a"], 51134);
 //
 assert.commandWorked(target.remove({}));
 assert.commandWorked(target.createIndex({name: 1, team: -1}, {unique: true, sparse: true}));
-const pipelineNameTeam = [{
-    $merge: {
-        into: target.getName(),
-        whenMatched: "replace",
-        whenNotMatched: "insert",
-        on: ["name", "team"]
-    }
-}];
+const pipelineNameTeam = [
+    {
+        $merge: {
+            into: target.getName(),
+            whenMatched: "replace",
+            whenNotMatched: "insert",
+            on: ["name", "team"],
+        },
+    },
+];
 
 // Missing both "name" and "team".
 assertErrorCode(source, pipelineNameTeam, 51132);
@@ -78,14 +79,16 @@ assert.eq(target.find().toArray(), [{_id: 0, name: "nicholas", team: "query"}]);
 //
 assert.commandWorked(target.remove({}));
 assert.commandWorked(target.createIndex({"song.artist": 1}, {unique: 1, sparse: true}));
-const pipelineSongDotArtist = [{
-    $merge: {
-        into: target.getName(),
-        whenMatched: "replace",
-        whenNotMatched: "insert",
-        on: ["song.artist"]
-    }
-}];
+const pipelineSongDotArtist = [
+    {
+        $merge: {
+            into: target.getName(),
+            whenMatched: "replace",
+            whenNotMatched: "insert",
+            on: ["song.artist"],
+        },
+    },
+];
 
 // Explicit null "song" (a prefix of an "on" field).
 assert.commandWorked(source.update({_id: 0}, {_id: 0, song: null}));
@@ -114,18 +117,19 @@ assert.eq(target.find().toArray(), [{_id: 0, song: {artist: "Illenium"}}]);
 //
 assert.commandWorked(target.remove({}));
 assert.commandWorked(target.createIndex({"address.street": 1}, {unique: 1, sparse: 1}));
-const pipelineAddressDotStreet = [{
-    $merge: {
-        into: target.getName(),
-        whenMatched: "replace",
-        whenNotMatched: "insert",
-        on: ["address.street"]
-    }
-}];
+const pipelineAddressDotStreet = [
+    {
+        $merge: {
+            into: target.getName(),
+            whenMatched: "replace",
+            whenNotMatched: "insert",
+            on: ["address.street"],
+        },
+    },
+];
 
 // "address.street" is an array.
-assert.commandWorked(
-    source.update({_id: 0}, {_id: 0, address: {street: ["West 43rd St", "1633 Broadway"]}}));
+assert.commandWorked(source.update({_id: 0}, {_id: 0, address: {street: ["West 43rd St", "1633 Broadway"]}}));
 assertErrorCode(source, pipelineAddressDotStreet, 51185);
 
 // "address" is an array (a prefix of an "on" field).
@@ -154,10 +158,13 @@ assert.eq(target.find().toArray(), [{_id: 0, address: {street: "1633 Broadway"}}
     assert.commandWorked(source.update({_id: 0}, obj));
 
     // Test $merge on fieldname.
-    assert.doesNotThrow(() => source.aggregate([{
-        $merge:
-            {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: onField}
-    }]));
+    assert.doesNotThrow(() =>
+        source.aggregate([
+            {
+                $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert", on: onField},
+            },
+        ]),
+    );
 
     assert.eq(target.find().toArray(), [obj]);
 });

@@ -14,9 +14,9 @@ var pipeline = {
         "output": {
             "$switch": {
                 "branches": [{"case": {"$eq": [1, 1]}, "then": "one is equal to one!"}],
-            }
-        }
-    }
+            },
+        },
+    },
 };
 var res = coll.aggregate(pipeline).toArray();
 
@@ -31,11 +31,11 @@ pipeline = {
             "$switch": {
                 "branches": [
                     {"case": {"$eq": [1, 1]}, "then": "one is equal to one!"},
-                    {"case": {"$eq": [2, 2]}, "then": "two is equal to two!"}
+                    {"case": {"$eq": [2, 2]}, "then": "two is equal to two!"},
                 ],
-            }
-        }
-    }
+            },
+        },
+    },
 };
 res = coll.aggregate(pipeline).toArray();
 
@@ -49,10 +49,10 @@ pipeline = {
         "output": {
             "$switch": {
                 "branches": [{"case": {"$eq": [1, 2]}, "then": "one is equal to two!"}],
-                "default": "no case matched."
-            }
-        }
-    }
+                "default": "no case matched.",
+            },
+        },
+    },
 };
 res = coll.aggregate(pipeline).toArray();
 
@@ -67,10 +67,10 @@ pipeline = {
         "output": {
             "$switch": {
                 "branches": [{"case": null, "then": "Null was true!"}],
-                "default": "No case matched."
-            }
-        }
-    }
+                "default": "No case matched.",
+            },
+        },
+    },
 };
 res = coll.aggregate(pipeline).toArray();
 
@@ -83,10 +83,10 @@ pipeline = {
         "output": {
             "$switch": {
                 "branches": [{"case": "$missingField", "then": "Null was true!"}],
-                "default": "No case matched."
-            }
-        }
-    }
+                "default": "No case matched.",
+            },
+        },
+    },
 };
 res = coll.aggregate(pipeline).toArray();
 
@@ -96,8 +96,8 @@ assert.eq(res[0], {"output": "No case matched."});
 pipeline = {
     "$project": {
         "_id": 0,
-        "output": {"$switch": {"branches": [{"case": true, "then": null}], "default": false}}
-    }
+        "output": {"$switch": {"branches": [{"case": true, "then": null}], "default": false}},
+    },
 };
 res = coll.aggregate(pipeline).toArray();
 
@@ -107,9 +107,8 @@ assert.eq(res[0], {"output": null});
 pipeline = {
     "$project": {
         "_id": 0,
-        "output":
-            {"$switch": {"branches": [{"case": true, "then": "$missingField"}], "default": false}}
-    }
+        "output": {"$switch": {"branches": [{"case": true, "then": "$missingField"}], "default": false}},
+    },
 };
 res = coll.aggregate(pipeline).toArray();
 
@@ -119,8 +118,8 @@ assert.eq(res[0], {});
 pipeline = {
     "$project": {
         "_id": 0,
-        "output": {"$switch": {"branches": [{"case": null, "then": false}], "default": null}}
-    }
+        "output": {"$switch": {"branches": [{"case": null, "then": false}], "default": null}},
+    },
 };
 res = coll.aggregate(pipeline).toArray();
 
@@ -130,9 +129,8 @@ assert.eq(res[0], {"output": null});
 pipeline = {
     "$project": {
         "_id": 0,
-        "output":
-            {"$switch": {"branches": [{"case": null, "then": false}], "default": "$missingField"}}
-    }
+        "output": {"$switch": {"branches": [{"case": null, "then": false}], "default": "$missingField"}},
+    },
 };
 res = coll.aggregate(pipeline).toArray();
 

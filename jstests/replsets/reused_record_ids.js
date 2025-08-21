@@ -10,33 +10,31 @@
  *   exclude_when_record_ids_replicated
  * ]
  */
-import {
-    validateShowRecordIdReplicatesAcrossNodes
-} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
+import {validateShowRecordIdReplicatesAcrossNodes} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
 
 function checkRecordIdsResult(arr) {
     for (let i in arr) {
         const doc = arr[i];
-        assert(doc['$recordId'] = i);
+        assert((doc["$recordId"] = i));
     }
 }
 
-const numDocs = 10;    // Number of documents to insert, delete and re-insert
-const idOffset = 500;  // The start of the new set of `_id` when reinserting
+const numDocs = 10; // Number of documents to insert, delete and re-insert
+const idOffset = 500; // The start of the new set of `_id` when reinserting
 
 const rst = new ReplSetTest({
     nodes: [
         {},
-        {rsConfig: {priority: 0}},  // Prevent secondary from stepping up.
+        {rsConfig: {priority: 0}}, // Prevent secondary from stepping up.
     ],
     nodeOptions: {
         setParameter: {
             // On restart we will have no history to consult to figure out the highest leaf node.
             minSnapshotHistoryWindowInSeconds: 0,
-        }
-    }
+        },
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -44,8 +42,8 @@ rst.initiate();
 let primary = rst.getPrimary();
 let secondary = rst.getSecondaries()[0];
 
-const dbName = 'test';
-const replRidCollName = 'replRecIdColl';
+const dbName = "test";
+const replRidCollName = "replRecIdColl";
 
 let primDB = primary.getDB(dbName);
 
@@ -58,8 +56,7 @@ stopReplicationOnSecondaries(rst);
 // Inserting the documents
 jsTestLog("Inserting documents into primary.");
 for (let i = 0; i < numDocs; i++) {
-    assert.commandWorked(primDB.runCommand(
-        {insert: replRidCollName, documents: [{"_id": i}], writeConcern: {w: 1}}));
+    assert.commandWorked(primDB.runCommand({insert: replRidCollName, documents: [{"_id": i}], writeConcern: {w: 1}}));
 }
 
 jsTestLog("Checking records IDs on primary.");
@@ -68,13 +65,13 @@ checkRecordIdsResult(primDB[replRidCollName].find().showRecordId().toArray());
 // Deleting the documents on the primary to reuse the Record Id later after restarting
 jsTestLog("Deleting documents from primary.");
 for (let i = 0; i < numDocs; i++) {
-    assert.commandWorked(primDB.runCommand({
-        delete: replRidCollName,
-        deletes: [
-            {q: {_id: i}, limit: 1},
-        ],
-        writeConcern: {w: 1}
-    }));
+    assert.commandWorked(
+        primDB.runCommand({
+            delete: replRidCollName,
+            deletes: [{q: {_id: i}, limit: 1}],
+            writeConcern: {w: 1},
+        }),
+    );
 }
 
 jsTestLog("Restarting primary node.");
@@ -100,8 +97,9 @@ jsTestLog("Re-inserting documents on primary node");
 // concurrently with the earlier inserts and deletes), we use different `_id` values for re-inserted
 // documents.
 for (let i = 0; i < numDocs; i++) {
-    assert.commandWorked(primDB.runCommand(
-        {insert: replRidCollName, documents: [{"_id": idOffset + i}], writeConcern: {w: 1}}));
+    assert.commandWorked(
+        primDB.runCommand({insert: replRidCollName, documents: [{"_id": idOffset + i}], writeConcern: {w: 1}}),
+    );
 }
 assert.eq(primDB[replRidCollName].count(), numDocs);
 

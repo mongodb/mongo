@@ -11,7 +11,7 @@ import {
     getCachedPlan,
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
-    getPlanStage
+    getPlanStage,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -26,9 +26,7 @@ function getReplannedMetric() {
 
 function getReplannedPlanIsCachedPlanMetric() {
     const planCacheType = isSbePlanCacheEnabled ? "sbe" : "classic";
-    return assert.commandWorked(db.serverStatus())
-        .metrics.query.planCache[planCacheType]
-        .replanned_plan_is_cached_plan;
+    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[planCacheType].replanned_plan_is_cached_plan;
 }
 
 function getCachedPlanForQuery(filter) {
@@ -66,19 +64,23 @@ function assertPlanHasIxScanStage(entry, indexName, expectedPlanCacheShapeHash) 
 
 // Carefully construct a collection so that some queries will have fewer works with an {a: 1} index
 // other with greater works.
-assert.commandWorked(coll.insertMany(Array.from({length: 1000}, (_, index) => {
-    return {a: Math.min(10, index), b: 1};
-})));
+assert.commandWorked(
+    coll.insertMany(
+        Array.from({length: 1000}, (_, index) => {
+            return {a: Math.min(10, index), b: 1};
+        }),
+    ),
+);
 
 // This query will be quick because there is only one matching document.
 const cheapQuery = {
     a: 1,
-    b: 1
+    b: 1,
 };
 // This query will be expensive because there are 990 matching documents.
 const expensiveQuery = {
     a: 10,
-    b: 1
+    b: 1,
 };
 
 assert.commandWorked(coll.createIndex({a: 1}));

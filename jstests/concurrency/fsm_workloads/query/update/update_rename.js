@@ -3,8 +3,8 @@
  *
  * Each thread does a $rename to cause documents to jump between indexes.
  */
-export const $config = (function() {
-    var fieldNames = ['update_rename_x', 'update_rename_y', 'update_rename_z'];
+export const $config = (function () {
+    var fieldNames = ["update_rename_x", "update_rename_y", "update_rename_z"];
 
     function choose(array) {
         assert.gt(array.length, 0, "can't choose an element of an empty array");
@@ -14,9 +14,11 @@ export const $config = (function() {
     var states = {
         update: function update(db, collName) {
             var from = choose(fieldNames);
-            var to = choose(fieldNames.filter(function(n) {
-                return n !== from;
-            }));
+            var to = choose(
+                fieldNames.filter(function (n) {
+                    return n !== from;
+                }),
+            );
             var updater = {$rename: {}};
             updater.$rename[from] = to;
 
@@ -28,7 +30,7 @@ export const $config = (function() {
             assert.eq(0, res.nUpserted, tojson(res));
             assert.contains(res.nMatched, [0, 1], tojson(res));
             assert.eq(res.nMatched, res.nModified, tojson(res));
-        }
+        },
     };
 
     var transitions = {update: {update: 1}};
@@ -36,7 +38,7 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         // Create an index on all but one fieldName key to make it possible to test renames
         // between indexed fields and non-indexed fields
-        fieldNames.slice(1).forEach(function(fieldName) {
+        fieldNames.slice(1).forEach(function (fieldName) {
             var indexSpec = {};
             indexSpec[fieldName] = 1;
             assert.commandWorked(db[collName].createIndex(indexSpec));
@@ -44,7 +46,7 @@ export const $config = (function() {
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 5);
-        assert.gt(this.numDocs, 0, 'numDocs should be a positive number');
+        assert.gt(this.numDocs, 0, "numDocs should be a positive number");
 
         for (var i = 0; i < this.numDocs; ++i) {
             var fieldName = fieldNames[i % fieldNames.length];
@@ -59,9 +61,9 @@ export const $config = (function() {
     return {
         threadCount: 20,
         iterations: 20,
-        startState: 'update',
+        startState: "update",
         states: states,
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

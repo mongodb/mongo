@@ -9,17 +9,13 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    assertVoteCount,
-    waitForNewlyAddedRemovalForNodeToBeCommitted
-} from "jstests/replsets/rslib.js";
+import {assertVoteCount, waitForNewlyAddedRemovalForNodeToBeCommitted} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest(
-    {name: testName, nodes: 1, settings: {chainingAllowed: false}, useBridge: true});
+const rst = new ReplSetTest({name: testName, nodes: 1, settings: {chainingAllowed: false}, useBridge: true});
 rst.startSet();
 rst.initiate();
 
@@ -34,8 +30,8 @@ jsTestLog("Adding a new node to the replica set");
 const secondary = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'numInitialSyncAttempts': 1,
-    }
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
 rst.awaitSecondaryNodes(null, [secondary]);
@@ -56,8 +52,8 @@ assert.commandWorked(primaryDb.adminCommand({replSetStepUp: 1}));
 hangBeforeTermBumpFP.wait();
 
 jsTestLog("Releasing both failpoints");
-const bumpFirst = (Math.random() > 0.5);
-const sleepAmount = Math.floor(Math.random() * 1000);  // 0-1000 ms
+const bumpFirst = Math.random() > 0.5;
+const sleepAmount = Math.floor(Math.random() * 1000); // 0-1000 ms
 jsTestLog("Will sleep for " + sleepAmount + " milliseconds");
 
 if (bumpFirst) {
@@ -85,8 +81,6 @@ assertVoteCount(primary, {
 jsTestLog("Making sure the config term has been updated");
 assert.eq(primary, rst.getPrimary());
 const configAfterTermBump = assert.commandWorked(primaryDb.adminCommand({replSetGetConfig: 1}));
-assert.eq(2,
-          configAfterTermBump.config.term,
-          () => [tojson(configBeforeTermBump), tojson(configAfterTermBump)]);
+assert.eq(2, configAfterTermBump.config.term, () => [tojson(configBeforeTermBump), tojson(configAfterTermBump)]);
 
 rst.stopSet();

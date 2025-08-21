@@ -13,9 +13,7 @@
  */
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 import {
     assertDiffWindow,
@@ -25,7 +23,8 @@ import {
     runNestedAggregateCmdsOnRepeat,
 } from "jstests/sharding/analyze_shard_key/libs/sample_rates_common.js";
 
-if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test
+if (jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Delete test
     quit();
 }
 
@@ -48,9 +47,9 @@ const rst = new ReplSetTest({
         setParameter: {
             queryAnalysisSamplerConfigurationRefreshSecs,
             queryAnalysisWriterIntervalSecs,
-            logComponentVerbosity: tojson({sharding: 3})
+            logComponentVerbosity: tojson({sharding: 3}),
         },
-    }
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -75,7 +74,7 @@ function getSampleSize() {
     const docs = primary.getCollection("config.sampledQueries").find().toArray();
     sampleSize.total += docs.length;
 
-    docs.forEach(doc => {
+    docs.forEach((doc) => {
         if (!sampleSize.hasOwnProperty(doc.cmdName)) {
             sampleSize[[doc.cmdName]] = 0;
         }
@@ -94,37 +93,42 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     const samplesPerSecond = 5;
     const durationSecs = 90;
 
-    assert.commandWorked(
-        primary.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
+    assert.commandWorked(primary.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
     sleep(queryAnalysisSamplerConfigurationRefreshSecs * 1000);
 
     // Define a thread for executing find commands via one of the secondaries.
     const targetNumFindPerSec = 100;
-    const findThread = new Thread(runFindCmdsOnRepeat,
-                                  secondaries[0].host,
-                                  dbName,
-                                  collNameSampled,
-                                  targetNumFindPerSec,
-                                  durationSecs);
+    const findThread = new Thread(
+        runFindCmdsOnRepeat,
+        secondaries[0].host,
+        dbName,
+        collNameSampled,
+        targetNumFindPerSec,
+        durationSecs,
+    );
 
     // Define a thread for executing delete commands via the primary.
     const targetNumDeletePerSec = 80;
-    const deleteThread = new Thread(runDeleteCmdsOnRepeat,
-                                    primary.host,
-                                    dbName,
-                                    collNameSampled,
-                                    targetNumDeletePerSec,
-                                    durationSecs);
+    const deleteThread = new Thread(
+        runDeleteCmdsOnRepeat,
+        primary.host,
+        dbName,
+        collNameSampled,
+        targetNumDeletePerSec,
+        durationSecs,
+    );
 
     // Define a thread for executing aggregate commands via the other secondary.
     const targetNumAggPerSec = 40;
-    const aggThread = new Thread(runNestedAggregateCmdsOnRepeat,
-                                 secondaries[1].host,
-                                 dbName,
-                                 collNameNotSampled,
-                                 collNameSampled,
-                                 targetNumAggPerSec,
-                                 durationSecs);
+    const aggThread = new Thread(
+        runNestedAggregateCmdsOnRepeat,
+        secondaries[1].host,
+        dbName,
+        collNameNotSampled,
+        collNameSampled,
+        targetNumAggPerSec,
+        durationSecs,
+    );
 
     // Run the commands.
     findThread.start();
@@ -133,10 +137,8 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     const actualNumFindPerSec = findThread.returnData();
     const actualNumDeletePerSec = deleteThread.returnData();
     const actualNumAggPerSec = aggThread.returnData();
-    jsTest.log("actual rate " +
-               tojson({actualNumFindPerSec, actualNumDeletePerSec, actualNumAggPerSec}));
-    const actualTotalQueriesPerSec =
-        actualNumFindPerSec + actualNumDeletePerSec + actualNumAggPerSec;
+    jsTest.log("actual rate " + tojson({actualNumFindPerSec, actualNumDeletePerSec, actualNumAggPerSec}));
+    const actualTotalQueriesPerSec = actualNumFindPerSec + actualNumDeletePerSec + actualNumAggPerSec;
 
     assert.commandWorked(primary.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}));
     sleep(queryAnalysisWriterIntervalSecs * 1000);
@@ -152,32 +154,36 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
         }
         return true;
     });
-    jsTest.log("Finished waiting for sampled queries: " +
-               tojsononeline({actualSampleSize: sampleSize}));
+    jsTest.log("Finished waiting for sampled queries: " + tojsononeline({actualSampleSize: sampleSize}));
 
-    const deleteField = TestData.runningWithBulkWriteOverride ? 'bulkWrite' : 'delete';
+    const deleteField = TestData.runningWithBulkWriteOverride ? "bulkWrite" : "delete";
 
     // Verify that the difference between the actual and expected number of samples is within the
     // expected threshold.
     const expectedTotalCount = durationSecs * samplesPerSecond;
-    const expectedFindPercentage =
-        AnalyzeShardKeyUtil.calculatePercentage(actualNumFindPerSec, actualTotalQueriesPerSec);
-    const expectedDeletePercentage =
-        AnalyzeShardKeyUtil.calculatePercentage(actualNumDeletePerSec, actualTotalQueriesPerSec);
-    const expectedAggPercentage =
-        AnalyzeShardKeyUtil.calculatePercentage(actualNumAggPerSec, actualTotalQueriesPerSec);
+    const expectedFindPercentage = AnalyzeShardKeyUtil.calculatePercentage(
+        actualNumFindPerSec,
+        actualTotalQueriesPerSec,
+    );
+    const expectedDeletePercentage = AnalyzeShardKeyUtil.calculatePercentage(
+        actualNumDeletePerSec,
+        actualTotalQueriesPerSec,
+    );
+    const expectedAggPercentage = AnalyzeShardKeyUtil.calculatePercentage(actualNumAggPerSec, actualTotalQueriesPerSec);
 
     const slowBuild = isSlowBuild(primary);
-    jsTest.log("Checking that the number of sampled queries is within the threshold: " +
-               tojsononeline({
-                   expectedSampleSize: {
-                       total: expectedTotalCount,
-                       find: expectedFindPercentage * expectedTotalCount / 100,
-                       [deleteField]: expectedDeletePercentage * expectedTotalCount / 100,
-                       aggregate: expectedAggPercentage * expectedTotalCount / 100
-                   },
-                   isSlowBuild: slowBuild
-               }));
+    jsTest.log(
+        "Checking that the number of sampled queries is within the threshold: " +
+            tojsononeline({
+                expectedSampleSize: {
+                    total: expectedTotalCount,
+                    find: (expectedFindPercentage * expectedTotalCount) / 100,
+                    [deleteField]: (expectedDeletePercentage * expectedTotalCount) / 100,
+                    aggregate: (expectedAggPercentage * expectedTotalCount) / 100,
+                },
+                isSlowBuild: slowBuild,
+            }),
+    );
 
     // The maximum percentage difference between the actual and expected total number of samples.
     const maxTotalSampleDiffPercentage = slowBuild ? 50 : 25;
@@ -185,16 +191,12 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     // command.
     const maxCommandPercentageDiff = slowBuild ? 15 : 10;
 
-    AnalyzeShardKeyUtil.assertDiffPercentage(
-        sampleSize.total, expectedTotalCount, maxTotalSampleDiffPercentage);
-    const actualFindPercentage =
-        AnalyzeShardKeyUtil.calculatePercentage(sampleSize.find, sampleSize.total);
+    AnalyzeShardKeyUtil.assertDiffPercentage(sampleSize.total, expectedTotalCount, maxTotalSampleDiffPercentage);
+    const actualFindPercentage = AnalyzeShardKeyUtil.calculatePercentage(sampleSize.find, sampleSize.total);
     assertDiffWindow(actualFindPercentage, expectedFindPercentage, maxCommandPercentageDiff);
-    const actualDeletePercentage =
-        AnalyzeShardKeyUtil.calculatePercentage(sampleSize[deleteField], sampleSize.total);
+    const actualDeletePercentage = AnalyzeShardKeyUtil.calculatePercentage(sampleSize[deleteField], sampleSize.total);
     assertDiffWindow(actualDeletePercentage, expectedDeletePercentage, maxCommandPercentageDiff);
-    const actualAggPercentage =
-        AnalyzeShardKeyUtil.calculatePercentage(sampleSize.aggregate, sampleSize.total);
+    const actualAggPercentage = AnalyzeShardKeyUtil.calculatePercentage(sampleSize.aggregate, sampleSize.total);
     assertDiffWindow(actualAggPercentage, expectedAggPercentage, maxCommandPercentageDiff);
 
     QuerySamplingUtil.clearSampledQueryCollection(primary);

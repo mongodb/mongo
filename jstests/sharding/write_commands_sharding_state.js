@@ -8,11 +8,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
 
-var dbTestName = 'WriteCommandsTestDB';
-var collName = dbTestName + '.TestColl';
+var dbTestName = "WriteCommandsTestDB";
+var collName = dbTestName + ".TestColl";
 
-assert.commandWorked(
-    st.s0.adminCommand({enablesharding: dbTestName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enablesharding: dbTestName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: collName, key: {Key: 1}, unique: true}));
 
@@ -20,15 +19,17 @@ assert.commandWorked(st.s0.adminCommand({shardCollection: collName, key: {Key: 1
 assert.commandWorked(st.s0.adminCommand({split: collName, middle: {Key: 10}}));
 assert.commandWorked(st.s0.adminCommand({split: collName, middle: {Key: 20}}));
 
-printjson(st.config.getSiblingDB('config').chunks.find().toArray());
+printjson(st.config.getSiblingDB("config").chunks.find().toArray());
 
 // Move 10 and 20 to st.shard0.shardName1
-assert.commandWorked(st.s0.adminCommand(
-    {moveChunk: collName, find: {Key: 19}, to: st.shard1.shardName, _waitForDelete: true}));
-assert.commandWorked(st.s0.adminCommand(
-    {moveChunk: collName, find: {Key: 21}, to: st.shard1.shardName, _waitForDelete: true}));
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: collName, find: {Key: 19}, to: st.shard1.shardName, _waitForDelete: true}),
+);
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: collName, find: {Key: 21}, to: st.shard1.shardName, _waitForDelete: true}),
+);
 
-printjson(st.config.getSiblingDB('config').chunks.find().toArray());
+printjson(st.config.getSiblingDB("config").chunks.find().toArray());
 
 // Insert one document in each chunk, which we will use to change
 assert(st.s1.getDB(dbTestName).TestColl.insert({Key: 1}));
@@ -47,10 +48,11 @@ assert.eq(1, st.shard1.getDB(dbTestName).TestColl.find({Key: 11}).count());
 assert.eq(1, st.shard1.getDB(dbTestName).TestColl.find({Key: 21}).count());
 
 // Move chunk [0, 19] to st.shard0.shardName and make sure the documents are correctly placed
-assert.commandWorked(st.s0.adminCommand(
-    {moveChunk: collName, find: {Key: 19}, _waitForDelete: true, to: st.shard0.shardName}));
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: collName, find: {Key: 19}, _waitForDelete: true, to: st.shard0.shardName}),
+);
 
-printjson(st.config.getSiblingDB('config').chunks.find().toArray());
+printjson(st.config.getSiblingDB("config").chunks.find().toArray());
 printjson(st.shard0.getDB(dbTestName).TestColl.find({}).toArray());
 printjson(st.shard1.getDB(dbTestName).TestColl.find({}).toArray());
 

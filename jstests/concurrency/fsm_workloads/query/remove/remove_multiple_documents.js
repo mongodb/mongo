@@ -10,7 +10,7 @@
  *
  * @tags: [assumes_balancer_off, requires_getmore]
  */
-export const $config = (function() {
+export const $config = (function () {
     var states = {
         init: function init(db, collName) {
             this.numDocs = 200;
@@ -33,7 +33,7 @@ export const $config = (function() {
         count: function count(db, collName) {
             var numDocs = db[collName].find({tid: this.tid}).itcount();
             assert.eq(this.numDocs, numDocs);
-        }
+        },
     };
 
     var transitions = {init: {count: 1}, count: {remove: 1}, remove: {remove: 0.825, count: 0.125}};

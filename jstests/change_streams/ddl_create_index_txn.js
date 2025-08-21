@@ -19,7 +19,7 @@ import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const dbName = jsTestName() + "_db0";
-const collName = jsTestName() + '_1';
+const collName = jsTestName() + "_1";
 const otherCollName = jsTestName() + "_2";
 
 const otherDBName = jsTestName() + "_3";
@@ -52,25 +52,37 @@ assert.neq(testStartTime, undefined);
 
 const txnOptions = {
     readConcern: {level: "local"},
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 
-withTxnAndAutoRetryOnMongos(session, () => {
-    assert.commandWorked(sessionColl.createIndex({unused: 1}));
-}, txnOptions);
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        assert.commandWorked(sessionColl.createIndex({unused: 1}));
+    },
+    txnOptions,
+);
 
 const lsid = session.getSessionId();
 const txnNumberColl = session.getTxnNumber_forTesting();
 
-withTxnAndAutoRetryOnMongos(session, () => {
-    assert.commandWorked(sessionOtherColl.createIndex({unused: 1}));
-}, txnOptions);
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        assert.commandWorked(sessionOtherColl.createIndex({unused: 1}));
+    },
+    txnOptions,
+);
 
 const txnNumberOtherColl = session.getTxnNumber_forTesting();
 
-withTxnAndAutoRetryOnMongos(session, () => {
-    assert.commandWorked(sessionOtherDBColl.createIndex({unused: 1}));
-}, txnOptions);
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        assert.commandWorked(sessionOtherDBColl.createIndex({unused: 1}));
+    },
+    txnOptions,
+);
 
 const txnNumberOtherDBColl = session.getTxnNumber_forTesting();
 
@@ -81,8 +93,8 @@ const expectedChanges = [
         ns: {db: dbName, coll: collName},
         "operationDescription": {"indexes": [{"v": 2, "key": {"unused": 1}, "name": "unused_1"}]},
         lsid,
-        txnNumber: txnNumberColl
-    }
+        txnNumber: txnNumberColl,
+    },
 ];
 
 // Test single coll changeStream.
@@ -96,8 +108,8 @@ const otherCollEvents = [
         ns: {db: dbName, coll: otherCollName},
         "operationDescription": {"indexes": [{"v": 2, "key": {"unused": 1}, "name": "unused_1"}]},
         lsid,
-        txnNumber: txnNumberOtherColl
-    }
+        txnNumber: txnNumberOtherColl,
+    },
 ];
 expectedChanges.push(...otherCollEvents);
 csOptions.startAfter = testStartTime;
@@ -115,8 +127,8 @@ const otherDBEvents = [
         ns: {db: otherDBName, coll: otherDBCollName},
         "operationDescription": {"indexes": [{"v": 2, "key": {"unused": 1}, "name": "unused_1"}]},
         lsid,
-        txnNumber: txnNumberOtherDBColl
-    }
+        txnNumber: txnNumberOtherDBColl,
+    },
 ];
 expectedChanges.push(...otherDBEvents);
 csOptions.allChangesForCluster = true;

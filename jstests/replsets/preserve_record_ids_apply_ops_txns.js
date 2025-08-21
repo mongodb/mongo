@@ -10,9 +10,7 @@
  *   exclude_when_record_ids_replicated
  * ]
  */
-import {
-    validateShowRecordIdReplicatesAcrossNodes,
-} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
+import {validateShowRecordIdReplicatesAcrossNodes} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -23,9 +21,9 @@ replSet.initiate();
 const primary = replSet.getPrimary();
 const secondary = replSet.getSecondaries()[0];
 
-const unRepRidlNs = 'unreplRecIdColl';
-const replRidNs = 'replRecIdColl';
-const dbName = 'test';
+const unRepRidlNs = "unreplRecIdColl";
+const replRidNs = "replRecIdColl";
+const dbName = "test";
 
 const primDB = primary.getDB(dbName);
 const secDB = secondary.getDB(dbName);
@@ -38,26 +36,24 @@ const replRidColl = session.getDatabase(dbName)[replRidNs];
 
 // Validates the most recent 'applyOps' oplog entry on the primary has the 'rid' field on operations
 // performed on the collection with replicated record ids.
-const validateMostRecentApplyOpsInOplogs = function() {
+const validateMostRecentApplyOpsInOplogs = function () {
     const matchApplyOps = {
-        '$match': {ns: 'admin.$cmd', 'o.applyOps.ns': replRidColl.getFullName()}
+        "$match": {ns: "admin.$cmd", "o.applyOps.ns": replRidColl.getFullName()},
     };
-    const sortForMostRecent = {'$sort': {txnNumber: -1}};
-    const limit = {'$limit': 1};
-    const unwind = {'$unwind': {path: '$o.applyOps'}};
+    const sortForMostRecent = {"$sort": {txnNumber: -1}};
+    const limit = {"$limit": 1};
+    const unwind = {"$unwind": {path: "$o.applyOps"}};
     const groupByNamespaceAndRidField = {
-        '$group': {
+        "$group": {
             _id: {
-                ns: '$o.applyOps.ns',
-                hasRid: {'$cond': {if: {'$gt': ['$o.applyOps.rid', null]}, then: true, else: false}}
+                ns: "$o.applyOps.ns",
+                hasRid: {"$cond": {if: {"$gt": ["$o.applyOps.rid", null]}, then: true, else: false}},
             },
-            count: {'$sum': 1}
-        }
+            count: {"$sum": 1},
+        },
     };
     const getLatestApplyOpsForError = () => {
-        return primDB.getSiblingDB('local')
-            .oplog.rs.aggregate([matchApplyOps, sortForMostRecent, limit])
-            .toArray();
+        return primDB.getSiblingDB("local").oplog.rs.aggregate([matchApplyOps, sortForMostRecent, limit]).toArray();
     };
 
     // The aggregate returns the most recent 'applyOps' entry parsed into the following
@@ -71,12 +67,10 @@ const validateMostRecentApplyOpsInOplogs = function() {
     // We expect there to only be 1 combination per for the replicated recordId namespace : {'ns':
     // replRidCollName, 'hasRid': true}. All non-replicated namespaces should take the form
     // of {'ns': <>, 'hasRid': false}.
-    const applyOpsAggResult =
-        primDB.getSiblingDB('local')
-            .oplog.rs
-            .aggregate(
-                [matchApplyOps, sortForMostRecent, limit, unwind, groupByNamespaceAndRidField])
-            .toArray();
+    const applyOpsAggResult = primDB
+        .getSiblingDB("local")
+        .oplog.rs.aggregate([matchApplyOps, sortForMostRecent, limit, unwind, groupByNamespaceAndRidField])
+        .toArray();
 
     let containsReplNs = false;
     for (let aggRes of applyOpsAggResult) {
@@ -84,25 +78,28 @@ const validateMostRecentApplyOpsInOplogs = function() {
             assert.eq(
                 aggRes._id.hasRid,
                 true,
-                `Expected all 'ops' for the replicated ns to have the rid field. Missing 'rid' field for op ${
-                    tojson(aggRes)}. Most recent applyOps entry ${
-                    tojson(getLatestApplyOpsForError())}`);
+                `Expected all 'ops' for the replicated ns to have the rid field. Missing 'rid' field for op ${tojson(
+                    aggRes,
+                )}. Most recent applyOps entry ${tojson(getLatestApplyOpsForError())}`,
+            );
             containsReplNs = true;
         } else {
             assert.neq(
                 aggRes._id.hasRid,
                 true,
-                `Expected all 'ops' for the ns without replicated recordIds to omit the 'rid' field. Found in op ${
-                    tojson(aggRes)}. Most recent applyOps entry ${
-                    tojson(getLatestApplyOpsForError())}`);
+                `Expected all 'ops' for the ns without replicated recordIds to omit the 'rid' field. Found in op ${tojson(
+                    aggRes,
+                )}. Most recent applyOps entry ${tojson(getLatestApplyOpsForError())}`,
+            );
         }
     }
 
     assert(
         containsReplNs,
-        `Expected for aggregate to contain entries for the namespace with replicated recordIds. Got agg results: ${
-            tojson(applyOpsAggResult)}. Most recent apply ops entry: ${
-            tojson(getLatestApplyOpsForError())}`);
+        `Expected for aggregate to contain entries for the namespace with replicated recordIds. Got agg results: ${tojson(
+            applyOpsAggResult,
+        )}. Most recent apply ops entry: ${tojson(getLatestApplyOpsForError())}`,
+    );
 };
 
 // On replication, secondaries apply oplog entries in parallel - a batch of oplog entries is
@@ -129,8 +126,7 @@ replSet.awaitReplication();
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
 
-jsTestLog(
-    "Testing that within a transaction the recordIds are preserved on update, upsert, and multi-update.");
+jsTestLog("Testing that within a transaction the recordIds are preserved on update, upsert, and multi-update.");
 session.startTransaction();
 assert.commandWorked(replRidColl.update({a: 0}, {$set: {a: 101}}));
 assert.commandWorked(replRidColl.update({b: 300}, {$set: {a: 300}}, {upsert: true}));
@@ -222,7 +218,7 @@ for (let i = 0; i < numIters; i++) {
         ns: replRidColl.getFullName(),
         o: {_id: i},
         o2: {_id: i},
-        rid: NumberLong(2000 + i)
+        rid: NumberLong(2000 + i),
     });
 
     ops.push({
@@ -236,7 +232,7 @@ for (let i = 0; i < numIters; i++) {
         ns: replRidColl.getFullName(),
         o: {$v: 2, diff: {u: {a: i + 1}}},
         o2: {_id: i},
-        rid: NumberLong(2000 + i)
+        rid: NumberLong(2000 + i),
     });
 
     if (i % 4 == 0) {
@@ -251,7 +247,7 @@ for (let i = 0; i < numIters; i++) {
             ns: replRidColl.getFullName(),
             o: {_id: i},
             o2: {_id: i},
-            rid: NumberLong(2000 + i)
+            rid: NumberLong(2000 + i),
         });
         docsRemovedPerColl++;
     }

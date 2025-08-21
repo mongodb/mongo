@@ -20,12 +20,11 @@ const otherDbName = `${dbName}_other`;
 const collName = `coll_${jsTestName()}`;
 const bucketsCollName = `system.buckets.${collName}`;
 const timeseriesOpts = {
-    timeseries: {timeField: "time"}
+    timeseries: {timeField: "time"},
 };
 
 // TODO SERVER-101595 get rid of all the code protected behind this flag
-const viewlessTimeseriesEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
+const viewlessTimeseriesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections");
 
 function setupEnv() {
     db.dropDatabase();
@@ -38,18 +37,20 @@ function setupEnv() {
         // Additionally rename only works across database with the same primary shard. Thus create
         // second database on the same primary shard.
         assert.commandWorked(db.adminCommand({enableSharding: dbName}));
-        assert.commandWorked(db.adminCommand({
-            enableSharding: otherDbName,
-            primaryShard: db.getSiblingDB(dbName).getDatabasePrimaryShardId()
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                enableSharding: otherDbName,
+                primaryShard: db.getSiblingDB(dbName).getDatabasePrimaryShardId(),
+            }),
+        );
     }
 }
 
 // Insert measurements -> rename -> check measurements/buckets have not changed
 function checkSuccessfullRename(fromDb, fromColl, toDb, toColl) {
-    const srcNss = fromDb + (viewlessTimeseriesEnabled ? '.' : '.system.buckets.') + fromColl;
+    const srcNss = fromDb + (viewlessTimeseriesEnabled ? "." : ".system.buckets.") + fromColl;
     const srcColl = db.getSiblingDB(fromDb)[fromColl];
-    const dstNss = toDb + (viewlessTimeseriesEnabled ? '.' : '.system.buckets.') + toColl;
+    const dstNss = toDb + (viewlessTimeseriesEnabled ? "." : ".system.buckets.") + toColl;
     const dstColl = db.getSiblingDB(toDb)[toColl];
 
     // 4 measurements falling into 3 different buckets
@@ -57,15 +58,14 @@ function checkSuccessfullRename(fromDb, fromColl, toDb, toColl) {
         {time: ISODate("2019-01-30T07:30:10.957Z"), meta: 0},
         {time: ISODate("2019-01-30T07:30:11.957Z"), meta: 1},
         {time: ISODate("2020-01-30T07:30:11.957Z"), meta: 2},
-        {time: ISODate("2021-01-30T07:30:11.957Z"), meta: 3}
+        {time: ISODate("2021-01-30T07:30:11.957Z"), meta: 3},
     ];
 
     for (let i = 0; i < measurements.length; i++) {
         assert.commandWorked(srcColl.insert(measurements[i]));
     }
 
-    const beforeBuckets =
-        viewlessTimeseriesEnabled ? srcColl.find().rawData().toArray() : srcColl.find().toArray();
+    const beforeBuckets = viewlessTimeseriesEnabled ? srcColl.find().rawData().toArray() : srcColl.find().toArray();
 
     assert.commandWorked(db.adminCommand({renameCollection: srcNss, to: dstNss}));
 
@@ -75,8 +75,7 @@ function checkSuccessfullRename(fromDb, fromColl, toDb, toColl) {
         assert.commandWorked(db.getSiblingDB(toDb).createCollection(toColl, timeseriesOpts));
     }
 
-    const afterBuckets =
-        viewlessTimeseriesEnabled ? dstColl.find().rawData().toArray() : dstColl.find().toArray();
+    const afterBuckets = viewlessTimeseriesEnabled ? dstColl.find().rawData().toArray() : dstColl.find().toArray();
     assert.eq(beforeBuckets, afterBuckets);
 
     const afterMeasurements = dstColl.find({}, {_id: 0}).sort({time: 1}).toArray();
@@ -90,64 +89,65 @@ function runSystemBucketsTests(targetDbName) {
         setupEnv();
         assert.commandWorked(db.createCollection(collName, timeseriesOpts));
         assert.commandFailedWithCode(
-            db.adminCommand(
-                {renameCollection: `${dbName}.${collName}`, to: `${targetDbName}.newColl`}),
+            db.adminCommand({renameCollection: `${dbName}.${collName}`, to: `${targetDbName}.newColl`}),
             // TODO SERVER-89100 unify error code between sharded clusters and replicaset
-            [ErrorCodes.IllegalOperation, ErrorCodes.CommandNotSupportedOnView]);
+            [ErrorCodes.IllegalOperation, ErrorCodes.CommandNotSupportedOnView],
+        );
     }
     {
-        jsTest.log(
-            "Renaming a simple collection to a bucket collection without timeseries options fails");
+        jsTest.log("Renaming a simple collection to a bucket collection without timeseries options fails");
         setupEnv();
         assert.commandWorked(db.createCollection(collName));
         const res = db.adminCommand({
             renameCollection: `${dbName}.${collName}`,
-            to: `${targetDbName}.system.buckets.newColl`
+            to: `${targetDbName}.system.buckets.newColl`,
         });
         assert.commandFailedWithCode(res, [ErrorCodes.IllegalOperation]);
     }
     {
-        jsTest.log(
-            "Renaming a timeseries collection using the main namespace with a target bucket collection fail");
+        jsTest.log("Renaming a timeseries collection using the main namespace with a target bucket collection fail");
         setupEnv();
         assert.commandWorked(db.createCollection(collName, timeseriesOpts));
         assert.commandFailedWithCode(
             db.adminCommand({
                 renameCollection: `${dbName}.${collName}`,
-                to: `${dbName}.system.buckets.newColl`
+                to: `${dbName}.system.buckets.newColl`,
             }),
             // TODO SERVER-89100 unify error code between sharded clusters and replicaset
-            [ErrorCodes.IllegalOperation, ErrorCodes.CommandNotSupportedOnView]);
+            [ErrorCodes.IllegalOperation, ErrorCodes.CommandNotSupportedOnView],
+        );
     }
     {
         jsTest.log("Renaming a timeseries bucket collection to a normal collection fail");
         setupEnv();
         assert.commandWorked(db.createCollection(collName, timeseriesOpts));
         assert.commandFailedWithCode(
-            db.adminCommand(
-                {renameCollection: `${dbName}.${bucketsCollName}`, to: `${targetDbName}.newColl`}),
-            ErrorCodes.IllegalOperation);
+            db.adminCommand({renameCollection: `${dbName}.${bucketsCollName}`, to: `${targetDbName}.newColl`}),
+            ErrorCodes.IllegalOperation,
+        );
     }
 
     {
         setupEnv();
         assert.commandWorked(db.createCollection(collName, timeseriesOpts));
         const isUnsharded =
-            db.getSiblingDB('config').collections.countDocuments(
-                {_id: `${dbName}.${bucketsCollName}`, unsplittable: {$ne: true}}) == 0;
+            db
+                .getSiblingDB("config")
+                .collections.countDocuments({_id: `${dbName}.${bucketsCollName}`, unsplittable: {$ne: true}}) == 0;
         // Rename across db is not supported for sharded collections
         if (dbName == targetDbName || isUnsharded) {
-            jsTest.log(
-                "Renaming a timeseries bucket collection to another bucket collection works");
-            checkSuccessfullRename(dbName, collName, targetDbName, 'newColl');
+            jsTest.log("Renaming a timeseries bucket collection to another bucket collection works");
+            checkSuccessfullRename(dbName, collName, targetDbName, "newColl");
         } else {
             jsTest.log("Renaming a sharded timeseries bucket collection to a different db fails");
 
-            assert.commandFailedWithCode(db.adminCommand({
-                renameCollection: `${dbName}.${bucketsCollName}`,
-                to: `${targetDbName}.system.buckets.newColl`
-            }),
-                                         ErrorCodes.CommandFailed);
+            assert.commandFailedWithCode(
+                db.adminCommand({
+                    renameCollection: `${dbName}.${bucketsCollName}`,
+                    to: `${targetDbName}.system.buckets.newColl`,
+                }),
+                ErrorCodes.CommandFailed,
+            );
         }
     }
 }
@@ -156,20 +156,24 @@ function runViewLessTimeseriesTests(targetDbName) {
     {
         setupEnv();
         assert.commandWorked(db.createCollection(collName, timeseriesOpts));
-        const isUnsharded = db.getSiblingDB('config').collections.countDocuments(
-                                {_id: `${dbName}.${collName}`, unsplittable: {$ne: true}}) == 0;
+        const isUnsharded =
+            db
+                .getSiblingDB("config")
+                .collections.countDocuments({_id: `${dbName}.${collName}`, unsplittable: {$ne: true}}) == 0;
 
         // Rename across db is not supported for sharded collections
         if (dbName == targetDbName || isUnsharded) {
             jsTest.log("Renaming a viewless timeseries collection works");
-            checkSuccessfullRename(dbName, collName, targetDbName, 'newColl');
+            checkSuccessfullRename(dbName, collName, targetDbName, "newColl");
         } else {
             jsTest.log("Renaming a sharded viewless timeseries collection to a different db fails");
-            assert.commandFailedWithCode(db.adminCommand({
-                renameCollection: `${dbName}.${bucketsCollName}`,
-                to: `${targetDbName}.newColl`
-            }),
-                                         ErrorCodes.IllegalOperation);
+            assert.commandFailedWithCode(
+                db.adminCommand({
+                    renameCollection: `${dbName}.${bucketsCollName}`,
+                    to: `${targetDbName}.newColl`,
+                }),
+                ErrorCodes.IllegalOperation,
+            );
         }
     }
 
@@ -179,7 +183,7 @@ function runViewLessTimeseriesTests(targetDbName) {
         assert.commandWorked(db.createCollection(collName));
         const res = db.adminCommand({
             renameCollection: `${dbName}.${collName}`,
-            to: `${targetDbName}.system.buckets.newColl`
+            to: `${targetDbName}.system.buckets.newColl`,
         });
         assert.commandFailedWithCode(res, [ErrorCodes.IllegalOperation]);
     }

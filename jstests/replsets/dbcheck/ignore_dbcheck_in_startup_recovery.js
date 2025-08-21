@@ -10,12 +10,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    checkHealthLog,
-    logQueries,
-    resetAndInsert,
-    runDbCheck
-} from "jstests/replsets/libs/dbcheck_utils.js";
+import {checkHealthLog, logQueries, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 // This test injects inconsistencies between replica set members; do not fail because of expected
 // dbHash differences.
@@ -28,7 +23,7 @@ const collName = "ignore_dbcheck_in_startup_recovery-collection";
 const replSet = new ReplSetTest({
     name: jsTestName(),
     nodes: 2,
-    nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}}
+    nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}},
 });
 replSet.startSet();
 replSet.initiate();
@@ -41,14 +36,14 @@ const primaryColl = primaryDb.getCollection(collName);
 
 const nDocs = 200;
 resetAndInsert(replSet, primaryDb, collName, nDocs);
-assert.commandWorked(
-    primaryDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+assert.commandWorked(primaryDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
 replSet.awaitReplication();
 assert.eq(primaryColl.find({}).count(), nDocs);
 
 // Set up inconsistency.
-const skipUnindexingDocumentWhenDeleted =
-    configureFailPoint(primaryDb, "skipUnindexingDocumentWhenDeleted", {indexName: "a_1"});
+const skipUnindexingDocumentWhenDeleted = configureFailPoint(primaryDb, "skipUnindexingDocumentWhenDeleted", {
+    indexName: "a_1",
+});
 jsTestLog("Deleting docs");
 const stableTimestamp = assert.commandWorked(primaryColl.deleteMany({}));
 
@@ -58,31 +53,34 @@ assert.eq(secondaryDb.getCollection(collName).find({}).count(), 0);
 
 configureFailPoint(primary, "holdStableTimestampAtSpecificTimestamp", {timestamp: stableTimestamp});
 
-runDbCheck(replSet,
-           primaryDb,
-           collName,
-           {
-               validateMode: "extraIndexKeysCheck",
-               secondaryIndex: "a_1",
-               maxDocsPerBatch: 20,
-               batchWriteConcern: {w: 2}
-           },
-           true /*awaitCompletion*/);
+runDbCheck(
+    replSet,
+    primaryDb,
+    collName,
+    {
+        validateMode: "extraIndexKeysCheck",
+        secondaryIndex: "a_1",
+        maxDocsPerBatch: 20,
+        batchWriteConcern: {w: 2},
+    },
+    true /*awaitCompletion*/,
+);
 
 // Wait to make sure that the secondary applied the stop entry before the ungraceful shutdown.
 replSet.awaitNodesAgreeOnAppliedOpTime();
 
 // Perform ungraceful shutdown of the secondary node and do not clean the db path directory.
-replSet.stop(
-    1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true, skipValidation: true});
+replSet.stop(1, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true, skipValidation: true});
 
-secondary = replSet.start(secondary,
-                          {
-                              setParameter: {
-                                  "failpoint.stopReplProducer": tojson({"mode": "alwaysOn"}),
-                              },
-                          },
-                          {noCleanData: true});
+secondary = replSet.start(
+    secondary,
+    {
+        setParameter: {
+            "failpoint.stopReplProducer": tojson({"mode": "alwaysOn"}),
+        },
+    },
+    {noCleanData: true},
+);
 
 primary = replSet.getPrimary();
 

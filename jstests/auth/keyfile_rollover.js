@@ -16,7 +16,7 @@ let rst = new ReplSetTest({nodes: 3, keyFile: "jstests/libs/key1"});
 rst.startSet();
 rst.initiate();
 
-const runPrimaryTest = function(fn) {
+const runPrimaryTest = function (fn) {
     const curPrimary = rst.getPrimary();
     assert(curPrimary.getDB("admin").auth("root", "root"));
     try {
@@ -28,11 +28,13 @@ const runPrimaryTest = function(fn) {
 };
 
 // Create a user to login as when auth is enabled later
-rst.getPrimary().getDB('admin').createUser({user: 'root', pwd: 'root', roles: ['root']});
+rst.getPrimary()
+    .getDB("admin")
+    .createUser({user: "root", pwd: "root", roles: ["root"]});
 
 runPrimaryTest((curPrimary) => {
-    assert.commandWorked(curPrimary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
-    assert.eq(1, curPrimary.getDB('test').a.count(), 'Error interacting with replSet');
+    assert.commandWorked(curPrimary.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"}));
+    assert.eq(1, curPrimary.getDB("test").a.count(), "Error interacting with replSet");
 });
 
 jsTestLog("Using keyForRollover to transition auth to both keys");
@@ -42,12 +44,12 @@ jsTestLog("Using keyForRollover to transition auth to both keys");
  * servers should use, and the second is the keyfile the shell should use to authenticate
  * with the servers.
  */
-const rolloverKey = function(keyFileForServers, keyFileForAuth) {
+const rolloverKey = function (keyFileForServers, keyFileForAuth) {
     // Update the keyFile parameter for the ReplSetTest as a whole
     rst.keyFile = keyFileForServers;
     // Function to restart a node with a new keyfile parameter and wait for secondaries
     // to come back online
-    const restart = function(node) {
+    const restart = function (node) {
         const nodeId = rst.getNodeId(node);
         rst.stop(nodeId);
         rst.start(nodeId, {keyFile: keyFileForServers});
@@ -57,7 +59,7 @@ const rolloverKey = function(keyFileForServers, keyFileForAuth) {
     };
 
     // First we restart the secondaries.
-    rst.getSecondaries().forEach(function(secondary) {
+    rst.getSecondaries().forEach(function (secondary) {
         restart(secondary);
     });
 
@@ -75,16 +77,16 @@ const rolloverKey = function(keyFileForServers, keyFileForAuth) {
 rolloverKey("jstests/libs/keyForRollover", "jstests/libs/key1");
 
 runPrimaryTest((curPrimary) => {
-    assert.commandWorked(curPrimary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
-    assert.eq(2, curPrimary.getDB('test').a.count(), 'Error interacting with replSet');
+    assert.commandWorked(curPrimary.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"}));
+    assert.eq(2, curPrimary.getDB("test").a.count(), "Error interacting with replSet");
 });
 
 jsTestLog("Upgrading set to use key2");
 rolloverKey("jstests/libs/key2", "jstests/libs/key2");
 
 runPrimaryTest((curPrimary) => {
-    assert.commandWorked(curPrimary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
-    assert.eq(3, curPrimary.getDB('test').a.count(), 'Error interacting with replSet');
+    assert.commandWorked(curPrimary.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"}));
+    assert.eq(3, curPrimary.getDB("test").a.count(), "Error interacting with replSet");
 });
 
 rst.stopSet();

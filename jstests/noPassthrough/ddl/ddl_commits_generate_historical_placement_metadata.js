@@ -16,12 +16,10 @@ let configDB = null;
 let st = new ShardingTest({
     shards: 3,
     chunkSize: 1,
-    configOptions:
-        {setParameter:
-             {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000, /* 1 day */}}
+    configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */}},
 });
 
-configDB = st.s.getDB('config');
+configDB = st.s.getDB("config");
 const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
 const shard2 = st.shard2.shardName;
@@ -41,9 +39,8 @@ const replicaSetByShardId = {
 
 // Creates a database + a sharded collection with a single chunk; the DB primary shard and the
 // location of the chunk are randomly chosen.
-function setupDbWithShardedCollection(
-    dbName, collName, primaryShard = null, dataBearingShard = null) {
-    const nss = dbName + '.' + collName;
+function setupDbWithShardedCollection(dbName, collName, primaryShard = null, dataBearingShard = null) {
+    const nss = dbName + "." + collName;
 
     if (!primaryShard) {
         primaryShard = randomShard();
@@ -61,13 +58,11 @@ function setupDbWithShardedCollection(
     // collection is dropped or renamed, each shard will emit the expected commit op entries.
     for (let shard of shards) {
         if (shard !== primaryShard && shard !== dataBearingShard) {
-            assert.commandWorked(
-                st.s.adminCommand({moveChunk: nss, find: {_id: MinKey}, to: shard}));
+            assert.commandWorked(st.s.adminCommand({moveChunk: nss, find: {_id: MinKey}, to: shard}));
         }
     }
 
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: nss, find: {_id: MinKey}, to: dataBearingShard}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: nss, find: {_id: MinKey}, to: dataBearingShard}));
     return {primaryShard, dataBearingShard};
 }
 
@@ -92,10 +87,7 @@ function getInfoFromConfigCollections(fullCollName) {
 }
 
 function getLatestPlacementEntriesFor(namespace, numEntries) {
-    return configDB.placementHistory.find({nss: namespace})
-        .sort({timestamp: -1})
-        .limit(numEntries)
-        .toArray();
+    return configDB.placementHistory.find({nss: namespace}).sort({timestamp: -1}).limit(numEntries).toArray();
 }
 
 function getLatestPlacementInfoFor(namespace) {
@@ -132,9 +124,8 @@ function getValidatedPlacementInfoForDroppedDb(dbName) {
     return dbPlacementAfterDrop;
 }
 
-function getValidatedPlacementInfoForCollection(
-    dbName, collName, expectedShardList, isInitialPlacement = false) {
-    const fullName = dbName + '.' + collName;
+function getValidatedPlacementInfoForCollection(dbName, collName, expectedShardList, isInitialPlacement = false) {
+    const fullName = dbName + "." + collName;
     const configCollInfo = getInfoFromConfigCollections(fullName);
     assert.neq(null, configCollInfo);
 
@@ -164,11 +155,10 @@ function getValidatedPlacementInfoForDroppedColl(collNss, collUUID) {
 }
 
 function makeDropCollectionEntryTemplate(dbName, collName, numDroppedDocs = 0) {
-    return {op: 'c', ns: `${dbName}.$cmd`, o: {drop: collName}, o2: {numRecords: numDroppedDocs}};
+    return {op: "c", ns: `${dbName}.$cmd`, o: {drop: collName}, o2: {numRecords: numDroppedDocs}};
 }
 
-function makeCreateCollectionEntryTemplate(
-    dbName, collName, cappedCollectionSize = null, temp = false) {
+function makeCreateCollectionEntryTemplate(dbName, collName, cappedCollectionSize = null, temp = false) {
     let oFieldValue = {create: collName};
     if (cappedCollectionSize !== null) {
         oFieldValue.capped = true;
@@ -177,48 +167,46 @@ function makeCreateCollectionEntryTemplate(
     if (temp) {
         oFieldValue.temp = true;
     }
-    oFieldValue.idIndex = {v: 2, key: {_id: 1}, name: '_id_'};
-    return {op: 'c', ns: `${dbName}.$cmd`, o: oFieldValue};
+    oFieldValue.idIndex = {v: 2, key: {_id: 1}, name: "_id_"};
+    return {op: "c", ns: `${dbName}.$cmd`, o: oFieldValue};
 }
 
 function makeCreateIndexesEntryTemplate(dbName, collName, indexSpec) {
     const indexName = Object.keys(indexSpec).reduce((acc, key) => {
-        return acc + key + '_' + indexSpec[key];
-    }, '');
+        return acc + key + "_" + indexSpec[key];
+    }, "");
     return {
-        op: 'c',
+        op: "c",
         ns: `${dbName}.$cmd`,
         o: {createIndexes: collName, v: 2, key: indexSpec, name: indexName},
-
     };
 }
 
 function makeShardCollectionEntryTemplate(dbName, collName, shardKeyObj) {
-    const nss = dbName + '.' + collName;
+    const nss = dbName + "." + collName;
     return {
-        'op': 'n',
-        'ns': nss,
-        'o': {'msg': {'shardCollection': nss}},
-        'o2': {
-            'shardCollection': nss,
-            'shardKey': shardKeyObj,
-            'unique': false,
-            'presplitHashedZones': false,
-            'capped': false
-        }
+        "op": "n",
+        "ns": nss,
+        "o": {"msg": {"shardCollection": nss}},
+        "o2": {
+            "shardCollection": nss,
+            "shardKey": shardKeyObj,
+            "unique": false,
+            "presplitHashedZones": false,
+            "capped": false,
+        },
     };
 }
 
-function makeRenameCollectionEntryTemplate(
-    commonDbName, sourceCollName, targetCollName, targetUUID = null) {
+function makeRenameCollectionEntryTemplate(commonDbName, sourceCollName, targetCollName, targetUUID = null) {
     let entryTemplate = {
-        op: 'c',
+        op: "c",
         ns: `${commonDbName}.$cmd`,
         o: {
             renameCollection: `${commonDbName}.${sourceCollName}`,
             to: `${commonDbName}.${targetCollName}`,
-            stayTemp: false
-        }
+            stayTemp: false,
+        },
     };
 
     if (targetUUID) {
@@ -230,48 +218,46 @@ function makeRenameCollectionEntryTemplate(
 }
 
 function makeDropDatabaseEntryTemplate(dbName) {
-    return {op: 'c', ns: `${dbName}.$cmd`, o: {dropDatabase: 1}};
+    return {op: "c", ns: `${dbName}.$cmd`, o: {dropDatabase: 1}};
 }
 
 function makeMoveChunkEntryTemplate(nss, donor, recipient, noMoreChunksOnDonor) {
     return {
-        op: 'n',
+        op: "n",
         ns: nss,
         o: {msg: {moveChunk: nss}},
         o2: {
             moveChunk: nss,
             donor: donor,
             recipient: recipient,
-            allCollectionChunksMigratedFromDonor: noMoreChunksOnDonor
-        }
+            allCollectionChunksMigratedFromDonor: noMoreChunksOnDonor,
+        },
     };
 }
 
 function makeChunkOnNewShardEntryTemplate(nss, donor, recipient) {
     return {
-        op: 'n',
+        op: "n",
         ns: nss,
         o: {
-            msg: `Migrating chunk from shard ${donor} to shard ${
-                recipient} with no chunks for this collection`
+            msg: `Migrating chunk from shard ${donor} to shard ${recipient} with no chunks for this collection`,
         },
-        o2: {migrateChunkToNewShard: nss, fromShardId: donor, toShardId: recipient}
+        o2: {migrateChunkToNewShard: nss, fromShardId: donor, toShardId: recipient},
     };
 }
 
 function makeOpEntryOnEmptiedDonor(nss, donor) {
     return {
-        op: 'n',
+        op: "n",
         ns: nss,
         o: {msg: `Migrate the last chunk for ${nss} off shard ${donor}`},
-        o2: {migrateLastChunkFromShard: nss, shardId: donor}
+        o2: {migrateLastChunkFromShard: nss, shardId: donor},
     };
 }
 
-function makeReshardCollectionEntryTemplate(
-    nss, oldShardKey, newShardKey, reshardUUID, numInitialChunks, zones) {
+function makeReshardCollectionEntryTemplate(nss, oldShardKey, newShardKey, reshardUUID, numInitialChunks, zones) {
     return {
-        op: 'n',
+        op: "n",
         ns: nss,
         o2: {
             reshardCollection: nss,
@@ -280,21 +266,21 @@ function makeReshardCollectionEntryTemplate(
             oldShardKey: oldShardKey,
             unique: false,
             numInitialChunks: NumberLong(numInitialChunks),
-            provenance: 'reshardCollection',
+            provenance: "reshardCollection",
             zones: zones,
-        }
+        },
     };
-};
+}
 
 function makePlacementChangedEntryTemplate(commitTime, dbName, collName = null) {
-    const nss = collName ? dbName + '.' + collName : dbName;
+    const nss = collName ? dbName + "." + collName : dbName;
     const o2Value = {namespacePlacementChanged: 1, ns: {db: dbName}, committedAt: commitTime};
     if (collName) {
         o2Value.ns.coll = collName;
     }
 
-    return {op: 'n', ns: nss, o: {msg: {namespacePlacementChanged: nss}}, o2: o2Value};
-};
+    return {op: "n", ns: nss, o: {msg: {namespacePlacementChanged: nss}}, o2: o2Value};
+}
 
 // Verifies that the expected un/ordered sequence of op entries is generated on each shard
 // at the top of its op log.
@@ -302,24 +288,24 @@ function makePlacementChangedEntryTemplate(commitTime, dbName, collName = null) 
 // timestamps and active FCV version.
 // The function also returns the raw entries retrieved on each shard (in increasing 'ts' order).
 function verifyCommitOpEntriesOnShards(expectedOpEntryTemplates, shards, orderStrict = true) {
-    const namespaces = [...new Set(expectedOpEntryTemplates.map(t => t.ns))];
+    const namespaces = [...new Set(expectedOpEntryTemplates.map((t) => t.ns))];
     const foundOpEntriesByShard = {};
     for (const shard of shards) {
         const foundOpEntries = replicaSetByShardId[shard]
-                                   .getPrimary()
-                                   .getCollection('local.oplog.rs')
-                                   .find({
-                                       ns: {$in: namespaces},
-                                       op: {$in: ['c', 'n']},
-                                       // Discard entries related to
-                                       // authoritative db metadata management.
-                                       'o.dropDatabaseMetadata': {$exists: false},
-                                       'o.createDatabaseMetadata': {$exists: false},
-                                   })
-                                   .sort({ts: -1})
-                                   .limit(expectedOpEntryTemplates.length)
-                                   .toArray()
-                                   .reverse();
+            .getPrimary()
+            .getCollection("local.oplog.rs")
+            .find({
+                ns: {$in: namespaces},
+                op: {$in: ["c", "n"]},
+                // Discard entries related to
+                // authoritative db metadata management.
+                "o.dropDatabaseMetadata": {$exists: false},
+                "o.createDatabaseMetadata": {$exists: false},
+            })
+            .sort({ts: -1})
+            .limit(expectedOpEntryTemplates.length)
+            .toArray()
+            .reverse();
 
         // Strip out non-relevant or hard-to-handle entry fields before performing the equality
         // comparison.
@@ -355,28 +341,35 @@ function verifyCommitOpEntriesOnShards(expectedOpEntryTemplates, shards, orderSt
 }
 
 function testEnableSharding(dbName, primaryShardName) {
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
     getValidatedPlacementInfoForDB(dbName);
 }
 
 function testShardCollection() {
     {
         jsTest.log(`Testing shardCollection() with implicit database and collection creation`);
-        const dbName = 'shardCollectionTestImplicitlyCreatedDB';
-        const collName = 'implicitlyCreatedColl';
-        const nss = dbName + '.' + collName;
+        const dbName = "shardCollectionTestImplicitlyCreatedDB";
+        const collName = "implicitlyCreatedColl";
+        const nss = dbName + "." + collName;
         assert.eq(null, getLatestPlacementInfoFor(dbName));
         assert.eq(null, getLatestPlacementInfoFor(nss));
         // By applying a hashed shard key, the collection is expected to have a chunk on each shard.
-        const shardKeySpec = {_id: 'hashed'};
+        const shardKeySpec = {_id: "hashed"};
         assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: shardKeySpec}));
 
         const dbPlacementUponShardCollectionCompleted = getValidatedPlacementInfoForDB(dbName);
-        const collPlacementUponShardCollectionCompleted =
-            getValidatedPlacementInfoForCollection(dbName, collName, shards, true);
-        assert(timestampCmp(dbPlacementUponShardCollectionCompleted.timestamp,
-                            collPlacementUponShardCollectionCompleted.timestamp) < 0);
+        const collPlacementUponShardCollectionCompleted = getValidatedPlacementInfoForCollection(
+            dbName,
+            collName,
+            shards,
+            true,
+        );
+        assert(
+            timestampCmp(
+                dbPlacementUponShardCollectionCompleted.timestamp,
+                collPlacementUponShardCollectionCompleted.timestamp,
+            ) < 0,
+        );
 
         // Verify that the primary shard emitted the expected events.
         const primaryShard = dbPlacementUponShardCollectionCompleted.shards[0];
@@ -384,110 +377,118 @@ function testShardCollection() {
             makeCreateCollectionEntryTemplate(dbName, collName),
             makeCreateIndexesEntryTemplate(dbName, collName, shardKeySpec),
             makeShardCollectionEntryTemplate(dbName, collName, shardKeySpec),
-            makePlacementChangedEntryTemplate(
-                collPlacementUponShardCollectionCompleted.timestamp, dbName, collName)
+            makePlacementChangedEntryTemplate(collPlacementUponShardCollectionCompleted.timestamp, dbName, collName),
         ];
 
-        const [createCollEntry, _, shardCollEntry, collPlacementChangedEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplates, [primaryShard])[primaryShard];
+        const [createCollEntry, _, shardCollEntry, collPlacementChangedEntry] = verifyCommitOpEntriesOnShards(
+            expectedEntryTemplates,
+            [primaryShard],
+        )[primaryShard];
 
         // Commit events are user visible
         assert(!createCollEntry.fromMigrate || createCollEntry.fromMigrate === false);
         assert(!shardCollEntry.fromMigrate || shardCollEntry.fromMigrate === false);
         // The placement change docs and the expected events are genereted with the expected timing.
-        assert(timestampCmp(dbPlacementUponShardCollectionCompleted.timestamp, createCollEntry.ts) <
-               0);
-        assert(timestampCmp(shardCollEntry.ts,
-                            collPlacementUponShardCollectionCompleted.timestamp) < 0);
-        assert(timestampCmp(collPlacementUponShardCollectionCompleted.timestamp,
-                            collPlacementChangedEntry.ts) <= 0);
+        assert(timestampCmp(dbPlacementUponShardCollectionCompleted.timestamp, createCollEntry.ts) < 0);
+        assert(timestampCmp(shardCollEntry.ts, collPlacementUponShardCollectionCompleted.timestamp) < 0);
+        assert(timestampCmp(collPlacementUponShardCollectionCompleted.timestamp, collPlacementChangedEntry.ts) <= 0);
     }
 
     {
-        jsTest.log('Testing shardCollection() with an existing unsplittable collection');
-        const dbName = 'shardCollectionTestUnsplittableDB';
-        const collName = 'unsplittableColl';
-        const nss = dbName + '.' + collName;
+        jsTest.log("Testing shardCollection() with an existing unsplittable collection");
+        const dbName = "shardCollectionTestUnsplittableDB";
+        const collName = "unsplittableColl";
+        const nss = dbName + "." + collName;
         const primaryShard = shards[0];
         const dataBearingShard = shards[1];
         const shardKeySpec = {x: 1};
 
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
 
         assert.commandWorked(st.s.getDB(dbName).createCollection(collName));
         assert.commandWorked(st.s.adminCommand({moveCollection: nss, toShard: dataBearingShard}));
 
         const placementUponMoveCollection = getValidatedPlacementInfoForCollection(
-            dbName, collName, [dataBearingShard], true /*isInitialPlacement*/);
+            dbName,
+            collName,
+            [dataBearingShard],
+            true /*isInitialPlacement*/,
+        );
 
         assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: shardKeySpec}));
 
         const placementUponShardCollection = getValidatedPlacementInfoForCollection(
-            dbName, collName, [dataBearingShard], true /*isInitialPlacement*/);
+            dbName,
+            collName,
+            [dataBearingShard],
+            true /*isInitialPlacement*/,
+        );
         assert.eq(placementUponMoveCollection.uuid, placementUponShardCollection.uuid);
-        assert(timestampCmp(placementUponMoveCollection.timestamp,
-                            placementUponShardCollection.timestamp) < 0);
+        assert(timestampCmp(placementUponMoveCollection.timestamp, placementUponShardCollection.timestamp) < 0);
 
         // Commit events are expected to be emitted by the current data bearing shard...
         const expectedEntryTemplatesOnDataShard = [
             makeShardCollectionEntryTemplate(dbName, collName, shardKeySpec),
-            makePlacementChangedEntryTemplate(
-                placementUponShardCollection.timestamp, dbName, collName)
+            makePlacementChangedEntryTemplate(placementUponShardCollection.timestamp, dbName, collName),
         ];
 
         const [shardCollEntry, collPlacementChangedEntry] = verifyCommitOpEntriesOnShards(
-            expectedEntryTemplatesOnDataShard, [dataBearingShard])[dataBearingShard];
+            expectedEntryTemplatesOnDataShard,
+            [dataBearingShard],
+        )[dataBearingShard];
 
         // ... With the expected user visibility and timing
         assert(!shardCollEntry.fromMigrate || shardCollEntry.fromMigrate === false);
 
         // The placement change docs and the expected events are genereted with the expected timing.
         assert(timestampCmp(shardCollEntry.ts, placementUponShardCollection.timestamp) < 0);
-        assert(timestampCmp(placementUponShardCollection.timestamp, collPlacementChangedEntry.ts) <
-               0);
+        assert(timestampCmp(placementUponShardCollection.timestamp, collPlacementChangedEntry.ts) < 0);
 
         // ... while the primary shard should only emit an entry related to the creation of the
         // shard key index.
-        const expectedEntryTemplatesOnPrimaryShard = [
-            makeCreateIndexesEntryTemplate(dbName, collName, shardKeySpec),
-        ];
+        const expectedEntryTemplatesOnPrimaryShard = [makeCreateIndexesEntryTemplate(dbName, collName, shardKeySpec)];
 
-        const [createIndexesEntry] = verifyCommitOpEntriesOnShards(
-            expectedEntryTemplatesOnPrimaryShard, [primaryShard])[primaryShard];
+        const [createIndexesEntry] = verifyCommitOpEntriesOnShards(expectedEntryTemplatesOnPrimaryShard, [
+            primaryShard,
+        ])[primaryShard];
 
         assert(!createIndexesEntry.fromMigrate || createIndexesEntry.fromMigrate === false);
     }
 
     {
         jsTest.log(
-            'Testing shardCollection() (with implicit collection creation) against a preallocated set of zones that prevents the primary shard from bearing any data');
-        const dbName = 'shardCollectionTestWithZonesDB';
-        const collName = 'shardedColl';
-        const nss = dbName + '.' + collName;
+            "Testing shardCollection() (with implicit collection creation) against a preallocated set of zones that prevents the primary shard from bearing any data",
+        );
+        const dbName = "shardCollectionTestWithZonesDB";
+        const collName = "shardedColl";
+        const nss = dbName + "." + collName;
         const primaryShard = shards[0];
         const shardWithZone = shards[1];
         const shardKeySpec = {x: 1};
 
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
 
         // Create a zone and assign it to a non-primary shard.
-        assert.commandWorked(
-            st.s.adminCommand({addShardToZone: shardWithZone, zone: 'zoneForShardedColl'}));
+        assert.commandWorked(st.s.adminCommand({addShardToZone: shardWithZone, zone: "zoneForShardedColl"}));
         // Allocate the whole routing table range to the zone, so that the primary shard
         // won't be able own any data.
-        assert.commandWorked(st.s.adminCommand({
-            updateZoneKeyRange: nss,
-            min: {x: MinKey},
-            max: {x: MaxKey},
-            zone: 'zoneForShardedColl'
-        }));
+        assert.commandWorked(
+            st.s.adminCommand({
+                updateZoneKeyRange: nss,
+                min: {x: MinKey},
+                max: {x: MaxKey},
+                zone: "zoneForShardedColl",
+            }),
+        );
 
         assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: shardKeySpec}));
 
         const placementInfo = getValidatedPlacementInfoForCollection(
-            dbName, collName, [shardWithZone], true /*isInitialPlacement*/);
+            dbName,
+            collName,
+            [shardWithZone],
+            true /*isInitialPlacement*/,
+        );
 
         // Despite the zone constraint, the primary shard should still be the one
         // responsible for emitting the expected commit op entries.
@@ -495,11 +496,13 @@ function testShardCollection() {
             makeCreateCollectionEntryTemplate(dbName, collName),
             makeCreateIndexesEntryTemplate(dbName, collName, shardKeySpec),
             makeShardCollectionEntryTemplate(dbName, collName, shardKeySpec),
-            makePlacementChangedEntryTemplate(placementInfo.timestamp, dbName, collName)
+            makePlacementChangedEntryTemplate(placementInfo.timestamp, dbName, collName),
         ];
 
-        const [createCollEntry, _, shardCollEntry, collPlacementChangedEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplates, [primaryShard])[primaryShard];
+        const [createCollEntry, _, shardCollEntry, collPlacementChangedEntry] = verifyCommitOpEntriesOnShards(
+            expectedEntryTemplates,
+            [primaryShard],
+        )[primaryShard];
 
         // Commit events are user visible
         assert(!createCollEntry.fromMigrate || createCollEntry.fromMigrate === false);
@@ -509,11 +512,10 @@ function testShardCollection() {
 
 function testMoveChunk(dbName, collName) {
     // Setup - All the data are contained by a single chunk on the primary shard
-    const nss = dbName + '.' + collName;
+    const nss = dbName + "." + collName;
     testEnableSharding(dbName, shard0);
     assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {x: 1}}));
-    const collPlacementInfoAtCreationTime =
-        getValidatedPlacementInfoForCollection(dbName, collName, [shard0], true);
+    const collPlacementInfoAtCreationTime = getValidatedPlacementInfoForCollection(dbName, collName, [shard0], true);
     const collUUID = collPlacementInfoAtCreationTime.uuid;
     assert.eq(1, configDB.chunks.count({uuid: collUUID}));
 
@@ -521,41 +523,33 @@ function testMoveChunk(dbName, collName) {
     // placement entry
     st.s.adminCommand({split: nss, middle: {x: 0}});
     assert.commandWorked(st.s.adminCommand({moveChunk: nss, find: {x: -1}, to: shard1}));
-    let placementAfterMigration =
-        getValidatedPlacementInfoForCollection(dbName, collName, [shard0, shard1]);
+    let placementAfterMigration = getValidatedPlacementInfoForCollection(dbName, collName, [shard0, shard1]);
     let migratedChunk = configDB.chunks.findOne({uuid: collUUID, min: {x: MinKey}});
-    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) ===
-           0);
-    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) ===
-           0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) === 0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) === 0);
     // The commit should also be matched by two no-op entries
     const expectedEntriesForNewOwningShard = [
         makeMoveChunkEntryTemplate(nss, shard0, shard1, false /*noMoreChunksOnDonor*/),
-        makeChunkOnNewShardEntryTemplate(nss, shard0, shard1)
+        makeChunkOnNewShardEntryTemplate(nss, shard0, shard1),
     ];
 
-    verifyCommitOpEntriesOnShards(
-        expectedEntriesForNewOwningShard, [shard0], false /*orderStrict*/);
+    verifyCommitOpEntriesOnShards(expectedEntriesForNewOwningShard, [shard0], false /*orderStrict*/);
 
     // Move out the last chunk from shard0 to shard2 - a new placement entry should appear,
     // where the donor has been removed and the recipient inserted
     assert.commandWorked(st.s.adminCommand({moveChunk: nss, find: {x: 1}, to: shard2}));
-    placementAfterMigration =
-        getValidatedPlacementInfoForCollection(dbName, collName, [shard1, shard2]);
+    placementAfterMigration = getValidatedPlacementInfoForCollection(dbName, collName, [shard1, shard2]);
     migratedChunk = configDB.chunks.findOne({uuid: collUUID, min: {x: 0}});
-    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) ===
-           0);
-    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) ===
-           0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) === 0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) === 0);
     // The commit should also be matched by three no-op entries
     const expectedEntriesForNewOwningShardPlusEmptyDonor = [
         makeMoveChunkEntryTemplate(nss, shard0, shard2, true /*noMoreChunksOnDonor*/),
         makeOpEntryOnEmptiedDonor(nss, shard0),
-        makeChunkOnNewShardEntryTemplate(nss, shard0, shard2)
+        makeChunkOnNewShardEntryTemplate(nss, shard0, shard2),
     ];
 
-    verifyCommitOpEntriesOnShards(
-        expectedEntriesForNewOwningShardPlusEmptyDonor, [shard0], false /*orderStrict*/);
+    verifyCommitOpEntriesOnShards(expectedEntriesForNewOwningShardPlusEmptyDonor, [shard0], false /*orderStrict*/);
 
     // Create a third chunk in shard1, then move it to shard2: since this migration does not
     // alter the subset of shards owning collection data, no new record should be inserted
@@ -565,52 +559,47 @@ function testMoveChunk(dbName, collName) {
     const numPlacementEntriesAfterMigration = configDB.placementHistory.count({nss: nss});
     assert.eq(numPlacementEntriesBeforeMigration, numPlacementEntriesAfterMigration);
     // The commit should still be be matched by a single no-op entry.s
-    const expectedEntriesForChunkMigrationWithouthPlacementChanges =
-        [makeMoveChunkEntryTemplate(nss, shard2, shard1, false /*noMoreChunksOnDonor*/)];
+    const expectedEntriesForChunkMigrationWithouthPlacementChanges = [
+        makeMoveChunkEntryTemplate(nss, shard2, shard1, false /*noMoreChunksOnDonor*/),
+    ];
 
     verifyCommitOpEntriesOnShards(
-        expectedEntriesForChunkMigrationWithouthPlacementChanges, [shard2], false /*orderStrict*/);
+        expectedEntriesForChunkMigrationWithouthPlacementChanges,
+        [shard2],
+        false /*orderStrict*/,
+    );
 }
 
 function testMoveRange(dbName, collName) {
     // Setup - All the data are contained by a single chunk on the primary shard
-    const nss = dbName + '.' + collName;
+    const nss = dbName + "." + collName;
     testEnableSharding(dbName, shard0);
     assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {x: 1}}));
-    const collPlacementInfoAtCreationTime =
-        getValidatedPlacementInfoForCollection(dbName, collName, [shard0], true);
+    const collPlacementInfoAtCreationTime = getValidatedPlacementInfoForCollection(dbName, collName, [shard0], true);
     const collUUID = collPlacementInfoAtCreationTime.uuid;
     assert.eq(1, configDB.chunks.count({uuid: collUUID}));
 
     // Move half of the existing chunk to shard 1 -> the recipient should be added to the
     // placement data, while the donor should emit two op entries
-    assert.commandWorked(
-        st.s.adminCommand({moveRange: nss, min: {x: MinKey}, max: {x: 0}, toShard: shard1}));
-    let placementAfterMigration =
-        getValidatedPlacementInfoForCollection(dbName, collName, [shard0, shard1]);
+    assert.commandWorked(st.s.adminCommand({moveRange: nss, min: {x: MinKey}, max: {x: 0}, toShard: shard1}));
+    let placementAfterMigration = getValidatedPlacementInfoForCollection(dbName, collName, [shard0, shard1]);
     let migratedChunk = configDB.chunks.findOne({uuid: collUUID, min: {x: MinKey}});
-    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) ===
-           0);
-    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) ===
-           0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) === 0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) === 0);
 
     const expectedEntriesForNewOwningShard = [
         makeMoveChunkEntryTemplate(nss, shard0, shard1, false /*noMoreChunksOnDonor*/),
-        makeChunkOnNewShardEntryTemplate(nss, shard0, shard1)
+        makeChunkOnNewShardEntryTemplate(nss, shard0, shard1),
     ];
-    verifyCommitOpEntriesOnShards(
-        expectedEntriesForNewOwningShard, [shard0], false /*orderStrict*/);
+    verifyCommitOpEntriesOnShards(expectedEntriesForNewOwningShard, [shard0], false /*orderStrict*/);
 
     // Move the other half to shard 1 -> shard 0 should be removed from the placement data and
     // generate two op entries.
-    assert.commandWorked(
-        st.s.adminCommand({moveRange: nss, min: {x: 0}, max: {x: MaxKey}, toShard: shard1}));
+    assert.commandWorked(st.s.adminCommand({moveRange: nss, min: {x: 0}, max: {x: MaxKey}, toShard: shard1}));
     placementAfterMigration = getValidatedPlacementInfoForCollection(dbName, collName, [shard1]);
     migratedChunk = configDB.chunks.findOne({uuid: collUUID, min: {x: 0}});
-    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) ===
-           0);
-    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) ===
-           0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) === 0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) === 0);
 
     const expectedEntriesEmptyDonor = [
         makeMoveChunkEntryTemplate(nss, shard0, shard1, true /*noMoreChunksOnDonor*/),
@@ -632,9 +621,9 @@ function testMovePrimary(dbName, fromPrimaryShardName, toPrimaryShardName) {
 }
 
 function testDropCollection() {
-    const dbName = 'dropCollectionTestDB';
-    const collName = 'shardedCollName';
-    const nss = dbName + '.' + collName;
+    const dbName = "dropCollectionTestDB";
+    const collName = "shardedCollName";
+    const nss = dbName + "." + collName;
     const db = st.s.getDB(dbName);
 
     // 1) Verify that the drop of a sharded collection generates the expected metadata
@@ -648,8 +637,7 @@ function testDropCollection() {
     // 1.a) A single config.placementHistory document has been inserted.
     const numHistoryEntriesAfterFirstDrop = configDB.placementHistory.count({nss: nss});
     assert.eq(numHistoryEntriesBeforeFirstDrop + 1, numHistoryEntriesAfterFirstDrop);
-    const collPlacementAfterDrop =
-        getValidatedPlacementInfoForDroppedColl(nss, initialPlacementInfo.uuid);
+    const collPlacementAfterDrop = getValidatedPlacementInfoForDroppedColl(nss, initialPlacementInfo.uuid);
     assert(timestampCmp(initialPlacementInfo.timestamp, collPlacementAfterDrop.timestamp) < 0);
 
     // 1.b) The only data-bearing shard has generated a commit op entry, followed by a
@@ -657,11 +645,12 @@ function testDropCollection() {
     {
         const expectedEntryTemplates = [
             makeDropCollectionEntryTemplate(dbName, collName),
-            makePlacementChangedEntryTemplate(collPlacementAfterDrop.timestamp, dbName, collName)
+            makePlacementChangedEntryTemplate(collPlacementAfterDrop.timestamp, dbName, collName),
         ];
 
-        const [commitEntry, placementChangedEntry] = verifyCommitOpEntriesOnShards(
-            expectedEntryTemplates, [dataBearingShard])[dataBearingShard];
+        const [commitEntry, placementChangedEntry] = verifyCommitOpEntriesOnShards(expectedEntryTemplates, [
+            dataBearingShard,
+        ])[dataBearingShard];
         // The commit entry must be visible to the end user.
         assert(!commitEntry.fromMigrate || commitEntry.fromMigrate === false);
         // The config.placementHistory doc references a cluster time within the range defined by the
@@ -675,8 +664,7 @@ function testDropCollection() {
     {
         const nonDataBearingShards = shards.filter((shard) => shard !== dataBearingShard);
         const expectedEntryTemplates = [makeDropCollectionEntryTemplate(dbName, collName)];
-        const retrievedEntriesByShard =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplates, nonDataBearingShards);
+        const retrievedEntriesByShard = verifyCommitOpEntriesOnShards(expectedEntryTemplates, nonDataBearingShards);
         for (const shardId in retrievedEntriesByShard) {
             const commitOpEntry = retrievedEntriesByShard[shardId][0];
             assert.eq(commitOpEntry.fromMigrate, true);
@@ -690,29 +678,27 @@ function testDropCollection() {
 
     // 3. Verify that the creation and drop of an untracked collection leaves no trace in
     // config.placementHistory.
-    const unshardedCollName = 'unshardedColl';
+    const unshardedCollName = "unshardedColl";
     assert.commandWorked(db.createCollection(unshardedCollName));
     assert.commandWorked(db.runCommand({drop: unshardedCollName}));
-    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedCollName}));
+    assert.eq(0, configDB.placementHistory.count({nss: dbName + "." + unshardedCollName}));
 }
 
 function testRenameCollection() {
     {
-        jsTest.log(
-            'Testing rename of sharded collection (located on the primary shard) with dropTarget=false');
-        const dbName = 'renameShardedNoDropTargetTestDB';
+        jsTest.log("Testing rename of sharded collection (located on the primary shard) with dropTarget=false");
+        const dbName = "renameShardedNoDropTargetTestDB";
         const db = st.s.getDB(dbName);
         const primaryShard = randomShard();
         const dataBearingShard = primaryShard;
-        const sourceCollName = 'sourceColl';
-        const sourceNss = dbName + '.' + sourceCollName;
-        const targetCollName = 'targetColl';
-        const targetNss = dbName + '.' + targetCollName;
+        const sourceCollName = "sourceColl";
+        const sourceNss = dbName + "." + sourceCollName;
+        const targetCollName = "targetColl";
+        const targetNss = dbName + "." + targetCollName;
         setupDbWithShardedCollection(dbName, sourceCollName, primaryShard, dataBearingShard);
         const sourcePlacementBeforeRename = getLatestPlacementInfoFor(sourceNss);
 
-        assert.commandWorked(
-            db[sourceCollName].renameCollection(targetCollName, false /*dropTarget*/));
+        assert.commandWorked(db[sourceCollName].renameCollection(targetCollName, false /*dropTarget*/));
 
         const sourcePlacementAfterRename = getLatestPlacementInfoFor(sourceNss);
         assert.eq(sourcePlacementBeforeRename.uuid, sourcePlacementAfterRename.uuid);
@@ -721,43 +707,41 @@ function testRenameCollection() {
         const targetPlacementAfterRename = getLatestPlacementInfoFor(targetNss);
         assert.eq(sourcePlacementBeforeRename.uuid, targetPlacementAfterRename.uuid);
         assert.sameMembers(sourcePlacementBeforeRename.shards, targetPlacementAfterRename.shards);
-        assert(timestampCmp(sourcePlacementBeforeRename.timestamp,
-                            sourcePlacementAfterRename.timestamp) < 0);
-        assert(timestampCmp(sourcePlacementAfterRename.timestamp,
-                            targetPlacementAfterRename.timestamp) === 0);
+        assert(timestampCmp(sourcePlacementBeforeRename.timestamp, sourcePlacementAfterRename.timestamp) < 0);
+        assert(timestampCmp(sourcePlacementAfterRename.timestamp, targetPlacementAfterRename.timestamp) === 0);
 
         // 2.1 The data-bearing shard has to emit the user-visible commit op entry and the namespace
         // placement change for the source.
         // Being also the primary shard, it has to first emit the namespace placement change for the
         // target.
         const expectedEntryTemplatesOnDataBearingShard = [
-            makePlacementChangedEntryTemplate(
-                targetPlacementAfterRename.timestamp, dbName, targetCollName),
+            makePlacementChangedEntryTemplate(targetPlacementAfterRename.timestamp, dbName, targetCollName),
             makeRenameCollectionEntryTemplate(dbName, sourceCollName, targetCollName),
-            makePlacementChangedEntryTemplate(
-                sourcePlacementAfterRename.timestamp, dbName, sourceCollName),
+            makePlacementChangedEntryTemplate(sourcePlacementAfterRename.timestamp, dbName, sourceCollName),
         ];
 
         const [targetPlacementChangeEntry, renameCommitOpEntry, sourcePlacementChangeEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplatesOnDataBearingShard,
-                                          [dataBearingShard])[dataBearingShard];
+            verifyCommitOpEntriesOnShards(expectedEntryTemplatesOnDataBearingShard, [dataBearingShard])[
+                dataBearingShard
+            ];
         assert(!renameCommitOpEntry.fromMigrate || renameCommitOpEntry.fromMigrate === false);
 
         // For renameCollection, the timestamps persisted in the config.placementHistory docs
         // precede the timestamps associated to each op entry.
-        assert(timestampCmp(targetPlacementAfterRename.timestamp, targetPlacementChangeEntry.ts) <
-               0);
+        assert(timestampCmp(targetPlacementAfterRename.timestamp, targetPlacementChangeEntry.ts) < 0);
         assert(timestampCmp(targetPlacementAfterRename.timestamp, renameCommitOpEntry.ts) < 0);
-        assert(timestampCmp(sourcePlacementAfterRename.timestamp, sourcePlacementChangeEntry.ts) <=
-               0);
+        assert(timestampCmp(sourcePlacementAfterRename.timestamp, sourcePlacementChangeEntry.ts) <= 0);
 
         // 2.2 Other shards have to emit a non-visible commit op entry.
         const nonDataBearingShards = shards.filter((shard) => shard !== dataBearingShard);
-        const expectedEntryTemplatesOnOtherShards =
-            [makeRenameCollectionEntryTemplate(dbName, sourceCollName, targetCollName)];
+        const expectedEntryTemplatesOnOtherShards = [
+            makeRenameCollectionEntryTemplate(dbName, sourceCollName, targetCollName),
+        ];
 
         const retrievedEntriesByShard = verifyCommitOpEntriesOnShards(
-            expectedEntryTemplatesOnOtherShards, nonDataBearingShards);
+            expectedEntryTemplatesOnOtherShards,
+            nonDataBearingShards,
+        );
         for (const shardId in retrievedEntriesByShard) {
             const commitOpEntry = retrievedEntriesByShard[shardId][0];
             assert.eq(commitOpEntry.fromMigrate, true);
@@ -765,35 +749,35 @@ function testRenameCollection() {
     }
 
     {
-        jsTest.log(
-            'Testing rename of unsplittable collections outside of their primary shard with dropTarget=true');
-        const sourceDbName = 'renameWithDropUnsplittableSourceDB';
-        const targetDbName = 'renameWithDropUnsplittableTargetDB';
+        jsTest.log("Testing rename of unsplittable collections outside of their primary shard with dropTarget=true");
+        const sourceDbName = "renameWithDropUnsplittableSourceDB";
+        const targetDbName = "renameWithDropUnsplittableTargetDB";
         const dbSource = st.s.getDB(sourceDbName);
         const dbTarget = st.s.getDB(targetDbName);
-        const sourceCollName = 'sourceColl';
-        const sourceNss = sourceDbName + '.' + sourceCollName;
-        const targetCollName = 'targetColl';
-        const targetNss = targetDbName + '.' + targetCollName;
+        const sourceCollName = "sourceColl";
+        const sourceNss = sourceDbName + "." + sourceCollName;
+        const targetCollName = "targetColl";
+        const targetNss = targetDbName + "." + targetCollName;
 
         const commonPrimaryShard = shards[0];
         const sourceDataBearingShard = shards[1];
         const targetDataBearingShard = shards[2];
+        assert.commandWorked(st.s.adminCommand({enableSharding: sourceDbName, primaryShard: commonPrimaryShard}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: targetDbName, primaryShard: commonPrimaryShard}));
         assert.commandWorked(
-            st.s.adminCommand({enableSharding: sourceDbName, primaryShard: commonPrimaryShard}));
+            dbSource.runCommand({createUnsplittableCollection: sourceCollName, dataShard: sourceDataBearingShard}),
+        );
         assert.commandWorked(
-            st.s.adminCommand({enableSharding: targetDbName, primaryShard: commonPrimaryShard}));
-        assert.commandWorked(dbSource.runCommand(
-            {createUnsplittableCollection: sourceCollName, dataShard: sourceDataBearingShard}));
-        assert.commandWorked(dbTarget.runCommand(
-            {createUnsplittableCollection: targetCollName, dataShard: targetDataBearingShard}));
-        const sourcePlacementBeforeRename = getValidatedPlacementInfoForCollection(
-            sourceDbName, sourceCollName, [sourceDataBearingShard]);
-        const targetPlacementBeforeRename = getValidatedPlacementInfoForCollection(
-            targetDbName, targetCollName, [targetDataBearingShard]);
+            dbTarget.runCommand({createUnsplittableCollection: targetCollName, dataShard: targetDataBearingShard}),
+        );
+        const sourcePlacementBeforeRename = getValidatedPlacementInfoForCollection(sourceDbName, sourceCollName, [
+            sourceDataBearingShard,
+        ]);
+        const targetPlacementBeforeRename = getValidatedPlacementInfoForCollection(targetDbName, targetCollName, [
+            targetDataBearingShard,
+        ]);
 
-        assert.commandWorked(
-            dbSource.adminCommand({renameCollection: sourceNss, to: targetNss, dropTarget: true}));
+        assert.commandWorked(dbSource.adminCommand({renameCollection: sourceNss, to: targetNss, dropTarget: true}));
 
         const sourcePlacementAfterRename = getLatestPlacementInfoFor(sourceNss);
         const targetPlacementAfterRename = getLatestPlacementInfoFor(targetNss);
@@ -803,46 +787,41 @@ function testRenameCollection() {
         assert.sameMembers(sourcePlacementBeforeRename.shards, targetPlacementAfterRename.shards);
         // Cross-DB rename ops do not maintain the uuid of the source collection.
         assert.neq(sourcePlacementAfterRename.uuid, targetPlacementAfterRename.uuid);
-        assert(timestampCmp(sourcePlacementAfterRename.timestamp,
-                            targetPlacementAfterRename.timestamp) === 0);
+        assert(timestampCmp(sourcePlacementAfterRename.timestamp, targetPlacementAfterRename.timestamp) === 0);
         const commitTime = sourcePlacementAfterRename.timestamp;
 
         // When a cross-DB rename is performed, the request will involve the use of a temporary
         // collection under the target DB with a randomly generated name.
         // First retrieve its value from the oplog...
         const tempCollName = replicaSetByShardId[sourceDataBearingShard]
-                                 .getPrimary()
-                                 .getCollection('local.oplog.rs')
-                                 .find({
-                                     op: 'c',
-                                     ns: `${targetDbName}.$cmd`,
-                                     'o.create': {$regex: /^tmp.*renameCollection$/}
-                                 })
-                                 .sort({ts: -1})
-                                 .limit(1)
-                                 .toArray()[0]
-                                 .o.create;
+            .getPrimary()
+            .getCollection("local.oplog.rs")
+            .find({
+                op: "c",
+                ns: `${targetDbName}.$cmd`,
+                "o.create": {$regex: /^tmp.*renameCollection$/},
+            })
+            .sort({ts: -1})
+            .limit(1)
+            .toArray()[0].o.create;
         const expectedEntryTemplatesOnSourceDataBearingShard = [
             makeCreateCollectionEntryTemplate(targetDbName, tempCollName),
             makeRenameCollectionEntryTemplate(targetDbName, tempCollName, targetCollName),
             // The source collection gets dropped...
             makeDropCollectionEntryTemplate(sourceDbName, sourceCollName),
             // ... and the placement change gets notified.
-            makePlacementChangedEntryTemplate(commitTime, sourceDbName, sourceCollName)
+            makePlacementChangedEntryTemplate(commitTime, sourceDbName, sourceCollName),
         ];
 
-        const [tempCollCreationEntry,
-               renameCommitOpEntry,
-               dropSourceCollCommitEntry,
-               sourcePlacementChangeEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplatesOnSourceDataBearingShard,
-                                          [sourceDataBearingShard])[sourceDataBearingShard];
+        const [tempCollCreationEntry, renameCommitOpEntry, dropSourceCollCommitEntry, sourcePlacementChangeEntry] =
+            verifyCommitOpEntriesOnShards(expectedEntryTemplatesOnSourceDataBearingShard, [sourceDataBearingShard])[
+                sourceDataBearingShard
+            ];
 
         // All commit entries must be visible to the end user.
         assert(!tempCollCreationEntry.fromMigrate || tempCollCreationEntry.fromMigrate === false);
         assert(!renameCommitOpEntry.fromMigrate || renameCommitOpEntry.fromMigrate === false);
-        assert(!dropSourceCollCommitEntry.fromMigrate ||
-               dropSourceCollCommitEntry.fromMigrate === false);
+        assert(!dropSourceCollCommitEntry.fromMigrate || dropSourceCollCommitEntry.fromMigrate === false);
 
         // The data bearing shard or the target collection has no knowledge of the source - due
         // to this, the commit will be matched by a non-visible notification of a
@@ -852,9 +831,10 @@ function testRenameCollection() {
             makeDropCollectionEntryTemplate(targetDbName, targetCollName),
         ];
 
-        const [targetPlacementChangeEntry, commitDropTargetOpEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplatesOnTargetDataBearingShard,
-                                          [targetDataBearingShard])[targetDataBearingShard];
+        const [targetPlacementChangeEntry, commitDropTargetOpEntry] = verifyCommitOpEntriesOnShards(
+            expectedEntryTemplatesOnTargetDataBearingShard,
+            [targetDataBearingShard],
+        )[targetDataBearingShard];
         assert.eq(commitDropTargetOpEntry.fromMigrate, true);
 
         // The placement change is first notified on the target collection, so that change stream
@@ -865,69 +845,66 @@ function testRenameCollection() {
 
     {
         jsTest.log(
-            'Testing rename of an unsharded collection (with drop of a sharded one placed outside the primary shard)');
-        const dbName = 'renameUnshardedCollTestDB';
+            "Testing rename of an unsharded collection (with drop of a sharded one placed outside the primary shard)",
+        );
+        const dbName = "renameUnshardedCollTestDB";
         const db = st.s.getDB(dbName);
-        const sourceCollName = 'sourceColl';
-        const targetCollName = 'targetColl';
+        const sourceCollName = "sourceColl";
+        const targetCollName = "targetColl";
         const primaryShard = randomShard();
         const sourceDataBearingShard = primaryShard;
         const targetDataBearingShard = shards.find((shard) => shard !== primaryShard);
 
         setupDbWithShardedCollection(dbName, targetCollName, primaryShard, targetDataBearingShard);
         assert.commandWorked(db.createCollection(sourceCollName));
-        const sourceCollUuidBeforeRename =
-            db.getCollectionInfos({name: sourceCollName})[0].info.uuid;
+        const sourceCollUuidBeforeRename = db.getCollectionInfos({name: sourceCollName})[0].info.uuid;
 
-        const targetPlacementBeforeRename =
-            getLatestPlacementInfoFor(dbName + '.' + targetCollName);
+        const targetPlacementBeforeRename = getLatestPlacementInfoFor(dbName + "." + targetCollName);
         assert.sameMembers([targetDataBearingShard], targetPlacementBeforeRename.shards);
 
-        assert.commandWorked(
-            db[sourceCollName].renameCollection(targetCollName, true /*dropTarget*/));
+        assert.commandWorked(db[sourceCollName].renameCollection(targetCollName, true /*dropTarget*/));
 
         // config.placementHistory should contain no document on the source collection.
-        assert.eq(null, getLatestPlacementInfoFor(dbName + '.' + sourceCollName));
+        assert.eq(null, getLatestPlacementInfoFor(dbName + "." + sourceCollName));
 
-        const targetPlacementAfterRename = getLatestPlacementInfoFor(dbName + '.' + targetCollName);
+        const targetPlacementAfterRename = getLatestPlacementInfoFor(dbName + "." + targetCollName);
         assert.sameMembers([], targetPlacementAfterRename.shards);
         assert.eq(sourceCollUuidBeforeRename, targetPlacementAfterRename.uuid);
 
         // On the source shard,
         const expectedEntryTemplatesOnSourceDataBearingShard = [
-            makeRenameCollectionEntryTemplate(
-                dbName, sourceCollName, targetCollName, targetPlacementBeforeRename.uuid),
-            makePlacementChangedEntryTemplate(
-                targetPlacementAfterRename.timestamp, dbName, sourceCollName)
+            makeRenameCollectionEntryTemplate(dbName, sourceCollName, targetCollName, targetPlacementBeforeRename.uuid),
+            makePlacementChangedEntryTemplate(targetPlacementAfterRename.timestamp, dbName, sourceCollName),
         ];
 
-        const [renameCommitOpEntry, sourcePlacementChangeEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplatesOnSourceDataBearingShard,
-                                          [sourceDataBearingShard])[sourceDataBearingShard];
+        const [renameCommitOpEntry, sourcePlacementChangeEntry] = verifyCommitOpEntriesOnShards(
+            expectedEntryTemplatesOnSourceDataBearingShard,
+            [sourceDataBearingShard],
+        )[sourceDataBearingShard];
         assert(!renameCommitOpEntry.fromMigrate || renameCommitOpEntry.fromMigrate === false);
 
         const expectedEntryTemplatesOnTargetDataBearingShard = [
-            makePlacementChangedEntryTemplate(
-                targetPlacementAfterRename.timestamp, dbName, targetCollName),
-            makeDropCollectionEntryTemplate(dbName, targetCollName)
+            makePlacementChangedEntryTemplate(targetPlacementAfterRename.timestamp, dbName, targetCollName),
+            makeDropCollectionEntryTemplate(dbName, targetCollName),
         ];
 
-        const [targetPlacementChangeEntry, commitDropTargetOpEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplatesOnTargetDataBearingShard,
-                                          [targetDataBearingShard])[targetDataBearingShard];
+        const [targetPlacementChangeEntry, commitDropTargetOpEntry] = verifyCommitOpEntriesOnShards(
+            expectedEntryTemplatesOnTargetDataBearingShard,
+            [targetDataBearingShard],
+        )[targetDataBearingShard];
         assert.eq(commitDropTargetOpEntry.fromMigrate, true);
     }
 }
 
 function testDropDatabase() {
-    const dbName = 'dropDatabaseTestDB';
+    const dbName = "dropDatabaseTestDB";
     const db = st.s.getDB(dbName);
 
     // Test case 1: a database containing a sharded collection with a single chunk placed on the
     // primary shard.
     {
-        const shardedCollName = 'shardedColl';
-        const shardedCollNss = dbName + '.' + shardedCollName;
+        const shardedCollName = "shardedColl";
+        const shardedCollNss = dbName + "." + shardedCollName;
         const primaryShard = shards[0];
         const dataBearingShard = primaryShard;
         setupDbWithShardedCollection(dbName, shardedCollName, primaryShard, dataBearingShard);
@@ -936,25 +913,22 @@ function testDropDatabase() {
 
         assert.commandWorked(db.dropDatabase());
 
-        const dbDropTimeInPlacementHistory =
-            getValidatedPlacementInfoForDroppedDb(dbName).timestamp;
-        const collDropTimeInPlacementHistory =
-            getValidatedPlacementInfoForDroppedColl(shardedCollNss, collUUID).timestamp;
+        const dbDropTimeInPlacementHistory = getValidatedPlacementInfoForDroppedDb(dbName).timestamp;
+        const collDropTimeInPlacementHistory = getValidatedPlacementInfoForDroppedColl(
+            shardedCollNss,
+            collUUID,
+        ).timestamp;
 
         // The primary shard (being also a data-bearing one) should have generated a pair of entries
         // for each dropped namespace.
         let expectedEntryTemplates = [
             makeDropCollectionEntryTemplate(dbName, shardedCollName),
-            makePlacementChangedEntryTemplate(
-                collDropTimeInPlacementHistory, dbName, shardedCollName),
+            makePlacementChangedEntryTemplate(collDropTimeInPlacementHistory, dbName, shardedCollName),
             makeDropDatabaseEntryTemplate(dbName),
-            makePlacementChangedEntryTemplate(dbDropTimeInPlacementHistory, dbName)
+            makePlacementChangedEntryTemplate(dbDropTimeInPlacementHistory, dbName),
         ];
 
-        const [commitCollDropEntry,
-               collPlacementChangedEntry,
-               commitDbOpEntry,
-               dbPlacementChangedEntry] =
+        const [commitCollDropEntry, collPlacementChangedEntry, commitDbOpEntry, dbPlacementChangedEntry] =
             verifyCommitOpEntriesOnShards(expectedEntryTemplates, [primaryShard])[primaryShard];
 
         // Each commit entry must be visible to the end user.
@@ -973,10 +947,9 @@ function testDropDatabase() {
         const nonDataBearingShards = shards.filter((shard) => shard !== dataBearingShard);
         expectedEntryTemplates = [
             makeDropCollectionEntryTemplate(dbName, shardedCollName),
-            makeDropDatabaseEntryTemplate(dbName)
+            makeDropDatabaseEntryTemplate(dbName),
         ];
-        const retrievedEntriesByShard =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplates, nonDataBearingShards);
+        const retrievedEntriesByShard = verifyCommitOpEntriesOnShards(expectedEntryTemplates, nonDataBearingShards);
         for (const shardId in retrievedEntriesByShard) {
             const commitDropCollectionEntry = retrievedEntriesByShard[shardId][0];
             assert.eq(commitDropCollectionEntry.fromMigrate, true);
@@ -986,8 +959,8 @@ function testDropDatabase() {
     }
 
     // Test case 2 : a database containing an unsharded collection.
-    const unshardedCollName = 'unshardedColl';
-    const unshardedCollNss = dbName + '.' + unshardedCollName;
+    const unshardedCollName = "unshardedColl";
+    const unshardedCollNss = dbName + "." + unshardedCollName;
     const primaryShard = shards[0];
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
 
@@ -1005,11 +978,13 @@ function testDropDatabase() {
     let expectedEntryTemplates = [
         makeDropCollectionEntryTemplate(dbName, unshardedCollName),
         makeDropDatabaseEntryTemplate(dbName),
-        makePlacementChangedEntryTemplate(dbDropTimeInPlacementHistory, dbName)
+        makePlacementChangedEntryTemplate(dbDropTimeInPlacementHistory, dbName),
     ];
 
-    const [commitCollDropEntry, commitDbOpEntry, dbPlacementChangedEntry] =
-        verifyCommitOpEntriesOnShards(expectedEntryTemplates, [primaryShard])[primaryShard];
+    const [commitCollDropEntry, commitDbOpEntry, dbPlacementChangedEntry] = verifyCommitOpEntriesOnShards(
+        expectedEntryTemplates,
+        [primaryShard],
+    )[primaryShard];
 
     // Each commit entry must be visible to the end user.
     assert(!commitCollDropEntry.fromMigrate || commitCollDropEntry.fromMigrate === false);
@@ -1022,8 +997,7 @@ function testDropDatabase() {
     // database.
     const nonDataBearingShards = shards.filter((shard) => shard !== primaryShard);
     expectedEntryTemplates = [makeDropDatabaseEntryTemplate(dbName)];
-    const retrievedEntriesByShard =
-        verifyCommitOpEntriesOnShards(expectedEntryTemplates, nonDataBearingShards);
+    const retrievedEntriesByShard = verifyCommitOpEntriesOnShards(expectedEntryTemplates, nonDataBearingShards);
     for (const shardId in retrievedEntriesByShard) {
         const commitDropDatabaseEntry = retrievedEntriesByShard[shardId][0];
         assert.eq(commitDropDatabaseEntry.fromMigrate, true);
@@ -1032,35 +1006,36 @@ function testDropDatabase() {
     // Test case 3: a database containing an unsplittable collection, located outside its primary
     // shard.
     {
-        const unsplittableCollName = 'unsplittableColl';
-        const unsplittableCollNss = dbName + '.' + unsplittableCollName;
+        const unsplittableCollName = "unsplittableColl";
+        const unsplittableCollNss = dbName + "." + unsplittableCollName;
         const primaryShard = shards[0];
         const dataBearingShard = shards[1];
 
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
         assert.commandWorked(db.createCollection(unsplittableCollName));
-        assert.commandWorked(
-            st.s.adminCommand({moveCollection: unsplittableCollNss, toShard: dataBearingShard}));
+        assert.commandWorked(st.s.adminCommand({moveCollection: unsplittableCollNss, toShard: dataBearingShard}));
         const collUUID = configDB.collections.findOne({_id: unsplittableCollNss}).uuid;
 
         assert.commandWorked(db.dropDatabase());
 
-        const dbDropTimeInPlacementHistory =
-            getValidatedPlacementInfoForDroppedDb(dbName).timestamp;
-        const collDropTimeInPlacementHistory =
-            getValidatedPlacementInfoForDroppedColl(unsplittableCollNss, collUUID).timestamp;
+        const dbDropTimeInPlacementHistory = getValidatedPlacementInfoForDroppedDb(dbName).timestamp;
+        const collDropTimeInPlacementHistory = getValidatedPlacementInfoForDroppedColl(
+            unsplittableCollNss,
+            collUUID,
+        ).timestamp;
 
         // The primary shard is expected to generate an non-visible commit op entry for the
         // collection drop, plus the two entries for the database drop.
         let expectedEntryTemplates = [
             makeDropCollectionEntryTemplate(dbName, unsplittableCollName),
             makeDropDatabaseEntryTemplate(dbName),
-            makePlacementChangedEntryTemplate(dbDropTimeInPlacementHistory, dbName)
+            makePlacementChangedEntryTemplate(dbDropTimeInPlacementHistory, dbName),
         ];
 
-        const [nonVisibleCommitCollDropEntry, commitDbOpEntry, dbPlacementChangedEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplates, [primaryShard])[primaryShard];
+        const [nonVisibleCommitCollDropEntry, commitDbOpEntry, dbPlacementChangedEntry] = verifyCommitOpEntriesOnShards(
+            expectedEntryTemplates,
+            [primaryShard],
+        )[primaryShard];
 
         assert(nonVisibleCommitCollDropEntry.fromMigrate === true);
         assert(!commitDbOpEntry.fromMigrate || commitDbOpEntry.fromMigrate === false);
@@ -1073,14 +1048,12 @@ function testDropDatabase() {
         // for its drop, plus a non-visible commit op entry for the parent db.
         expectedEntryTemplates = [
             makeDropCollectionEntryTemplate(dbName, unsplittableCollName),
-            makePlacementChangedEntryTemplate(
-                collDropTimeInPlacementHistory, dbName, unsplittableCollName),
-            makeDropDatabaseEntryTemplate(dbName)
+            makePlacementChangedEntryTemplate(collDropTimeInPlacementHistory, dbName, unsplittableCollName),
+            makeDropDatabaseEntryTemplate(dbName),
         ];
 
         const [commitCollDropEntry, collPlacementChangedEntry, nonVisibleCommitDbOpEntry] =
-            verifyCommitOpEntriesOnShards(expectedEntryTemplates,
-                                          [dataBearingShard])[dataBearingShard];
+            verifyCommitOpEntriesOnShards(expectedEntryTemplates, [dataBearingShard])[dataBearingShard];
 
         assert(!commitCollDropEntry.fromMigrate || commitCollDropEntry.fromMigrate === false);
         assert(nonVisibleCommitDbOpEntry.fromMigrate === true);
@@ -1092,9 +1065,9 @@ function testDropDatabase() {
 }
 
 function testReshardCollection() {
-    const dbName = 'reshardCollectionTestDB';
-    const collName = 'shardedCollName';
-    const nss = dbName + '.' + collName;
+    const dbName = "reshardCollectionTestDB";
+    const collName = "shardedCollName";
+    const nss = dbName + "." + collName;
     let db = st.s.getDB(dbName);
 
     // Start with a collection with a single chunk outside the primary shard.
@@ -1104,30 +1077,33 @@ function testReshardCollection() {
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
     assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: oldShardKeySpec}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: nss, find: {oldShardKey: MinKey}, to: dataBearingShardBeforeReshard}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: nss, find: {oldShardKey: MinKey}, to: dataBearingShardBeforeReshard}),
+    );
 
     const initialNumPlacementEntries = configDB.placementHistory.count({});
-    const initialCollPlacementInfo =
-        getValidatedPlacementInfoForCollection(dbName, collName, [dataBearingShardBeforeReshard]);
+    const initialCollPlacementInfo = getValidatedPlacementInfoForCollection(dbName, collName, [
+        dataBearingShardBeforeReshard,
+    ]);
 
     // Create a zone to force the assignment of the chunks produced by resharding to a third shard.
     // the shards of the cluster.
     const dataBearingShardAfterReshard = shard2;
-    const zoneName = 'zone';
-    assert.commandWorked(
-        st.s.adminCommand({addShardToZone: dataBearingShardAfterReshard, zone: zoneName}));
+    const zoneName = "zone";
+    assert.commandWorked(st.s.adminCommand({addShardToZone: dataBearingShardAfterReshard, zone: zoneName}));
     const zoneDescriptor = {zone: zoneName, min: {newShardKey: MinKey}, max: {newShardKey: MaxKey}};
 
     // Launch the reshard operation.
     const newShardKeySpec = {newShardKey: 1};
 
-    assert.commandWorked(db.adminCommand({
-        reshardCollection: nss,
-        key: newShardKeySpec,
-        numInitialChunks: 1,
-        zones: [zoneDescriptor]
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            reshardCollection: nss,
+            key: newShardKeySpec,
+            numInitialChunks: 1,
+            zones: [zoneDescriptor],
+        }),
+    );
 
     // A single new placement document should have been added (the temp collection created by
     // resharding does not get tracked in config.placementHistory).
@@ -1135,7 +1111,11 @@ function testReshardCollection() {
 
     // Verify that the latest placement info matches the expectations.
     const finalCollPlacementInfo = getValidatedPlacementInfoForCollection(
-        dbName, collName, [dataBearingShardAfterReshard], false);
+        dbName,
+        collName,
+        [dataBearingShardAfterReshard],
+        false,
+    );
 
     // The resharded collection maintains its nss, but changes its uuid.
     assert.neq(initialCollPlacementInfo.uuid, finalCollPlacementInfo.uuid);
@@ -1144,17 +1124,15 @@ function testReshardCollection() {
     // op entries as part of the commit sequence.
     const expectedEntryTemplates = [
         // nss, oldShardKey, newShardKey, reshardUUID, numInitialChunks, zones
-        makeReshardCollectionEntryTemplate(nss,
-                                           oldShardKeySpec,
-                                           newShardKeySpec,
-                                           finalCollPlacementInfo.uuid,
-                                           1,
-                                           [zoneDescriptor]),
-        makePlacementChangedEntryTemplate(finalCollPlacementInfo.timestamp, dbName, collName)
+        makeReshardCollectionEntryTemplate(nss, oldShardKeySpec, newShardKeySpec, finalCollPlacementInfo.uuid, 1, [
+            zoneDescriptor,
+        ]),
+        makePlacementChangedEntryTemplate(finalCollPlacementInfo.timestamp, dbName, collName),
     ];
 
-    const [reshardCommitOpEntry, collPlacementChangeEntry] = verifyCommitOpEntriesOnShards(
-        expectedEntryTemplates, [dataBearingShardBeforeReshard])[dataBearingShardBeforeReshard];
+    const [reshardCommitOpEntry, collPlacementChangeEntry] = verifyCommitOpEntriesOnShards(expectedEntryTemplates, [
+        dataBearingShardBeforeReshard,
+    ])[dataBearingShardBeforeReshard];
 
     // The commit entry must be visible to the end user.
     assert(!reshardCommitOpEntry.fromMigrate || reshardCommitOpEntry.fromMigrate === false);
@@ -1166,20 +1144,18 @@ function testReshardCollection() {
 }
 
 function testConvertToCapped() {
-    const dbName = 'convertToCappedTestDB';
-    const collName = 'collName';
-    const nss = dbName + '.' + collName;
+    const dbName = "convertToCappedTestDB";
+    const collName = "collName";
+    const nss = dbName + "." + collName;
     let db = st.s.getDB(dbName);
 
     // Create the collection, placing it outside the primary shard.
     const primaryShard = shards[0];
     const dataBearingShard = shards[1];
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
-    assert.commandWorked(
-        db.runCommand({createUnsplittableCollection: collName, dataShard: dataBearingShard}));
+    assert.commandWorked(db.runCommand({createUnsplittableCollection: collName, dataShard: dataBearingShard}));
 
-    const initialCollPlacementInfo =
-        getValidatedPlacementInfoForCollection(dbName, collName, [dataBearingShard]);
+    const initialCollPlacementInfo = getValidatedPlacementInfoForCollection(dbName, collName, [dataBearingShard]);
 
     // Perform the conversion to capped.
     const cappedCollectionSize = 1000;
@@ -1187,36 +1163,32 @@ function testConvertToCapped() {
 
     // The operation should change the collection placement, but it should have and effect on the
     // recorded UUID.
-    const finalCollPlacementInfo =
-        getValidatedPlacementInfoForCollection(dbName, collName, [dataBearingShard]);
+    const finalCollPlacementInfo = getValidatedPlacementInfoForCollection(dbName, collName, [dataBearingShard]);
     assert(timestampCmp(initialCollPlacementInfo.timestamp, finalCollPlacementInfo.timestamp) < 0);
     assert.neq(initialCollPlacementInfo.uuid, finalCollPlacementInfo.uuid);
 
     // The data bearing shard should have created a temporary collection to clone the capped version
     // of the collection data and then renamed it to the original collection name. First retrieve
     // its value from the oplog...
-    const tempCollName =
-        replicaSetByShardId[dataBearingShard]
-            .getPrimary()
-            .getCollection('local.oplog.rs')
-            .find(
-                {op: 'c', ns: `${dbName}.$cmd`, 'o.create': {$regex: /^tmp.*convertToCapped\..*$/}})
-            .sort({ts: -1})
-            .limit(1)
-            .toArray()[0]
-            .o.create;
+    const tempCollName = replicaSetByShardId[dataBearingShard]
+        .getPrimary()
+        .getCollection("local.oplog.rs")
+        .find({op: "c", ns: `${dbName}.$cmd`, "o.create": {$regex: /^tmp.*convertToCapped\..*$/}})
+        .sort({ts: -1})
+        .limit(1)
+        .toArray()[0].o.create;
 
     // ... then verify that the expected commit op entries have been generated.
     const expectedEntryTemplates = [
-        makeCreateCollectionEntryTemplate(
-            dbName, tempCollName, cappedCollectionSize, true /*temp*/),
-        makeRenameCollectionEntryTemplate(
-            dbName, tempCollName, collName, initialCollPlacementInfo.uuid),
-        makePlacementChangedEntryTemplate(finalCollPlacementInfo.timestamp, dbName, collName)
+        makeCreateCollectionEntryTemplate(dbName, tempCollName, cappedCollectionSize, true /*temp*/),
+        makeRenameCollectionEntryTemplate(dbName, tempCollName, collName, initialCollPlacementInfo.uuid),
+        makePlacementChangedEntryTemplate(finalCollPlacementInfo.timestamp, dbName, collName),
     ];
 
-    const [tempCollCreationEntry, renameCommitOpEntry, placementChangeEntry] =
-        verifyCommitOpEntriesOnShards(expectedEntryTemplates, [dataBearingShard])[dataBearingShard];
+    const [tempCollCreationEntry, renameCommitOpEntry, placementChangeEntry] = verifyCommitOpEntriesOnShards(
+        expectedEntryTemplates,
+        [dataBearingShard],
+    )[dataBearingShard];
 
     // The commit entries must be visible to the end user.
     assert(!tempCollCreationEntry.fromMigrate || tempCollCreationEntry.fromMigrate === false);
@@ -1227,66 +1199,61 @@ function testConvertToCapped() {
     assert(timestampCmp(finalCollPlacementInfo.timestamp, placementChangeEntry.ts) <= 0);
 }
 
-jsTest.log('Verifying metadata generated by explicit DB creation');
-testEnableSharding('explicitlyCreatedDB', shard0);
+jsTest.log("Verifying metadata generated by explicit DB creation");
+testEnableSharding("explicitlyCreatedDB", shard0);
 
-jsTest.log('Verifying metadata generated by shardCollection()');
+jsTest.log("Verifying metadata generated by shardCollection()");
 
 testShardCollection();
 
-jsTest.log('Verifying metadata generated by dropCollection()');
+jsTest.log("Verifying metadata generated by dropCollection()");
 testDropCollection();
 
-jsTest.log('Verifying metadata generated by a sequence of moveChunk() commands');
-testMoveChunk('explicitlyCreatedDB', 'testMoveChunk');
+jsTest.log("Verifying metadata generated by a sequence of moveChunk() commands");
+testMoveChunk("explicitlyCreatedDB", "testMoveChunk");
 
-jsTest.log('Verifying metadata generated by a sequence of moveRange() commands');
-testMoveRange('explicitlyCreatedDB', 'testMoveRange');
+jsTest.log("Verifying metadata generated by a sequence of moveRange() commands");
+testMoveRange("explicitlyCreatedDB", "testMoveRange");
 
-jsTest.log(
-    'Verifying metadata generated by movePrimary() over a new sharding-enabled DB with no data');
-testMovePrimary('movePrimaryDB', st.shard0.shardName, st.shard1.shardName);
+jsTest.log("Verifying metadata generated by movePrimary() over a new sharding-enabled DB with no data");
+testMovePrimary("movePrimaryDB", st.shard0.shardName, st.shard1.shardName);
 
-jsTest.log('Verifying metadata generated by renameCollection()');
+jsTest.log("Verifying metadata generated by renameCollection()");
 testRenameCollection();
 
-jsTest.log(
-    'Verifying metadata generated by dropDatabase() over a new sharding-enabled DB with data');
+jsTest.log("Verifying metadata generated by dropDatabase() over a new sharding-enabled DB with data");
 testDropDatabase();
 
-jsTest.log('Verifying metadata generated by reshardCollection()');
+jsTest.log("Verifying metadata generated by reshardCollection()");
 testReshardCollection();
 
-jsTest.log('Verifying metadata generated by convertToCapped()');
+jsTest.log("Verifying metadata generated by convertToCapped()");
 testConvertToCapped();
 
 // TODO (SERVER-100403): Remove mayTestAddShard once addShard registers dbs in the shard catalog.
-const mayTestAddShard =
-    !FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataDDL");
+const mayTestAddShard = !FeatureFlagUtil.isPresentAndEnabled(st.shard0, "ShardAuthoritativeDbMetadataDDL");
 
 st.stop();
 
 if (!mayTestAddShard || TestData.configShard) {
-    jsTest.log('Skipping verification of addShard()');
+    jsTest.log("Skipping verification of addShard()");
     quit();
 }
 
-jsTest.log('Verifying metadata generated by addShard()');
+jsTest.log("Verifying metadata generated by addShard()");
 st = new ShardingTest({
     shards: 0,
     chunkSize: 1,
-    configOptions:
-        {setParameter:
-             {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000, /* 1 day */}}
+    configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */}},
 });
 
 // Create a new replica set and populate it with some initial DBs
 const newReplicaSet = new ReplSetTest({name: "addedShard", nodes: 1});
-const newShardName = 'addedShard';
-const preExistingCollName = 'preExistingColl';
+const newShardName = "addedShard";
+const preExistingCollName = "preExistingColl";
 newReplicaSet.startSet({shardsvr: ""});
 newReplicaSet.initiate();
-const dbsOnNewReplicaSet = ['addShardTestDB1', 'addShardTestDB2'];
+const dbsOnNewReplicaSet = ["addShardTestDB1", "addShardTestDB2"];
 for (const dbName of dbsOnNewReplicaSet) {
     const db = newReplicaSet.getPrimary().getDB(dbName);
     assert.commandWorked(db[preExistingCollName].save({value: 1}));
@@ -1297,10 +1264,10 @@ for (const dbName of dbsOnNewReplicaSet) {
 // details.
 assert.commandWorked(st.s.adminCommand({addShard: newReplicaSet.getURL(), name: newShardName}));
 
-configDB = st.s.getDB('config');
+configDB = st.s.getDB("config");
 
 for (const dbName of dbsOnNewReplicaSet) {
-    assert.eq(null, getLatestPlacementInfoFor(dbName + '.' + preExistingCollName));
+    assert.eq(null, getLatestPlacementInfoFor(dbName + "." + preExistingCollName));
 
     const dbPlacementEntry = getValidatedPlacementInfoForDB(dbName);
     assert.sameMembers([newShardName], dbPlacementEntry.shards);

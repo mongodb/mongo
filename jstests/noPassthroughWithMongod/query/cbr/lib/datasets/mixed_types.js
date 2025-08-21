@@ -12,11 +12,11 @@ export class MixedTypesDataset {
             mixed_docs.push({a: i.toString().repeat(2)});
 
             // Strings
-            mixed_docs.push({a: 'x' + i.toString().repeat(2)});
-            mixed_docs.push({a: i.toString().repeat(2) + 'y'});
+            mixed_docs.push({a: "x" + i.toString().repeat(2)});
+            mixed_docs.push({a: i.toString().repeat(2) + "y"});
 
             // Date, timestamp
-            let threeDigitYear = String(i).padStart(3, '0');
+            let threeDigitYear = String(i).padStart(3, "0");
             mixed_docs.push({a: ISODate(`2${threeDigitYear}-01-01T01:01:01.001`)});
             // Avoid Timestamp(0,0)
             mixed_docs.push({a: Timestamp(i + 1, i + 1)});
@@ -50,9 +50,9 @@ export class MixedTypesDataset {
             {a: {$gt: "55y"}},
             {a: {$lt: "55y"}},
 
-            {a: ISODate('2050-01-01T01:01:01.001')},
-            {a: {$gt: ISODate('2050-01-01T01:01:01.001')}},
-            {a: {$lt: ISODate('2050-01-01T01:01:01.001')}},
+            {a: ISODate("2050-01-01T01:01:01.001")},
+            {a: {$gt: ISODate("2050-01-01T01:01:01.001")}},
+            {a: {$lt: ISODate("2050-01-01T01:01:01.001")}},
 
             {a: Timestamp(50, 50)},
             {a: {$gt: Timestamp(50, 50)}},
@@ -63,18 +63,18 @@ export class MixedTypesDataset {
 
             // TODO(SERVER-99628): {a: {$type: 'double'}},
             // TODO(SERVER-99628): {a: {$type: 'string'}},
-            {a: {$type: 'object'}},
-            {a: {$type: 'bool'}},
-            {a: {$type: 'null'}},
-            {a: {$type: 'regex'}},
+            {a: {$type: "object"}},
+            {a: {$type: "bool"}},
+            {a: {$type: "null"}},
+            {a: {$type: "regex"}},
             // TODO(SERVER-99628): {a: {$type: 'int'}},
-            {a: {$type: 'timestamp'}},
+            {a: {$type: "timestamp"}},
             // TODO(SERVER-99628): {a: {$type: 'decimal'}},
 
             // Those should return no rows
             {$and: [{a: {$lt: 50}}, {a: {$gt: "x55"}}]},
             {$and: [{a: {$lt: 50}}, {a: {$lt: "55y"}}]},
-            {$and: [{a: {$lt: true}}, {a: {$gt: ISODate('2050-01-01T01:01:01.001')}}]}
+            {$and: [{a: {$lt: true}}, {a: {$gt: ISODate("2050-01-01T01:01:01.001")}}]},
         ];
     }
 }

@@ -8,10 +8,8 @@ const severityMap = {
     E: 1,
     W: 2,
     I: 3,
-    D: 4
+    D: 4,
 };
-;
-
 /**
  * A helper function to capture log output from 'jsTest.log*()' calls.
  */
@@ -23,13 +21,12 @@ function captureLogOutput({fn, logLevel = logLevelInfo, logFormat = "json"} = {}
         // Override the TestData object.
         TestData = {...TestData, logFormat, logLevel};
         // Override the print function.
-        print = msg => {
+        print = (msg) => {
             print.console.push(msg);
         };
         print.console = [];
         fn();
-        if (print.console.length === 0)
-            return undefined;
+        if (print.console.length === 0) return undefined;
         assert.eq(1, print.console.length);
         let actualLogEntry = print.console[0];
         if (logFormat === "json") {
@@ -66,12 +63,13 @@ tests.push(function assertJsTestLogJsonFormat() {
     assertLogOutput({fn: () => jsTestLog("test message", extraArgs), expectedLogEntry});
 
     // Assert the plain format works as before.
-    const expectedLegacyResult =
-        ["----", "test message plain " + tojson(extraArgs), "----"].map(s => `[jsTest] ${s}`);
+    const expectedLegacyResult = ["----", "test message plain " + tojson(extraArgs), "----"].map(
+        (s) => `[jsTest] ${s}`,
+    );
     assertLogOutput({
         fn: () => jsTestLog("test message plain", extraArgs),
         expectedLogEntry: `\n\n${expectedLegacyResult.join("\n")}\n\n`,
-        logFormat: "plain"
+        logFormat: "plain",
     });
 });
 
@@ -89,7 +87,7 @@ tests.push(function assertLogSeverities() {
         assertLogOutput({
             fn: () => jsTest.log[logFnName]("test message", extraArgs),
             expectedLogEntry,
-            logLevel: severityMap[severity]
+            logLevel: severityMap[severity],
         });
     }
 
@@ -104,37 +102,40 @@ tests.push(function assertLogsAreFilteredBySeverity() {
     const extraArgs = {hello: "world", foo: "bar"};
     const severityFunctionNames = ["info", "debug", "warning", "error"];
 
-    ["json", "plain"].forEach(logFormat => {
+    ["json", "plain"].forEach((logFormat) => {
         // For each possible log level, test that all logs with greater severity are skipped.
-        [1, 2, 3, 4].forEach(logLevel => {
-            const printedLogs =
-                severityFunctionNames
-                    .map(logFnName => captureLogOutput({
-                             fn: () => jsTest.log[logFnName]("test message", extraArgs),
-                             logLevel,
-                             logFormat
-                         }))
-                    .filter(log => log);
-            assert.eq(
-                logLevel, printedLogs.length, "printed a different number of logs: " + logLevel);
+        [1, 2, 3, 4].forEach((logLevel) => {
+            const printedLogs = severityFunctionNames
+                .map((logFnName) =>
+                    captureLogOutput({
+                        fn: () => jsTest.log[logFnName]("test message", extraArgs),
+                        logLevel,
+                        logFormat,
+                    }),
+                )
+                .filter((log) => log);
+            assert.eq(logLevel, printedLogs.length, "printed a different number of logs: " + logLevel);
         });
     });
 });
 
 tests.push(function assertInvalidLogLevelAndSeverityThrows() {
     // Invalid log level is not accepted.
-    [0, 5, "a", {a: 4}, {}].forEach(logLevel => {
+    [0, 5, "a", {a: 4}, {}].forEach((logLevel) => {
         assert.throws(
             () => captureLogOutput({fn: () => jsTest.log.info("This should throw."), logLevel}),
             [],
-            "invalid log levels should throw an exception");
+            "invalid log levels should throw an exception",
+        );
     });
 
     // Invalid log level severity is not accepted.
-    ["q", 0, 12, {hello: "world"}, {}].forEach(severity => {
-        assert.throws(() => jsTest.log("This should throw.", null, {severity}),
-                      [],
-                      "invalid severity should throw an exception");
+    ["q", 0, 12, {hello: "world"}, {}].forEach((severity) => {
+        assert.throws(
+            () => jsTest.log("This should throw.", null, {severity}),
+            [],
+            "invalid severity should throw an exception",
+        );
     });
 });
 

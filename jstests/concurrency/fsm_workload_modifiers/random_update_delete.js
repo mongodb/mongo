@@ -27,7 +27,7 @@
 import {
     findFirstBatch,
     inNonTransactionalStepdownSuite,
-    runWithManualRetriesIfInNonTransactionalStepdownSuite
+    runWithManualRetriesIfInNonTransactionalStepdownSuite,
 } from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 
 function chooseRandomMapValue(map) {
@@ -188,8 +188,7 @@ export function randomUpdateDelete($config, $super) {
         return map;
     };
 
-    $config.data.verifyDocumentCounters = function verifyDocumentCounters(onDiskBefore,
-                                                                          onDiskAfter) {
+    $config.data.verifyDocumentCounters = function verifyDocumentCounters(onDiskBefore, onDiskAfter) {
         for (const key of this.expectedDocs.keys()) {
             // Verify the counter separately from the rest of the document to account for differing
             // semantics around retries.
@@ -209,9 +208,12 @@ export function randomUpdateDelete($config, $super) {
             const {counter: actualCounter, ...actualDocNoCounter} = actualDoc;
             const priorCounter = priorDoc ? priorDoc.counter : 0;
             assert.docEq(expectedDocNoCounter, actualDocNoCounter);
-            assert(this.counterWithinRange(expectedCounter, actualCounter, priorCounter),
-                   `Expected counter ${tojson(expectedDoc)} and on disk counter ${
-                       tojson(actualDoc)} differ by more than allowed`);
+            assert(
+                this.counterWithinRange(expectedCounter, actualCounter, priorCounter),
+                `Expected counter ${tojson(expectedDoc)} and on disk counter ${tojson(
+                    actualDoc,
+                )} differ by more than allowed`,
+            );
         }
     };
 
@@ -269,7 +271,7 @@ export function randomUpdateDelete($config, $super) {
 
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
-        findFirstBatch(db, collName, {}, 1000).forEach(doc => {
+        findFirstBatch(db, collName, {}, 1000).forEach((doc) => {
             const q = {_id: doc._id};
             let mods = {};
             if (!("tid" in doc)) {
@@ -283,18 +285,19 @@ export function randomUpdateDelete($config, $super) {
 
         // Increase yielding so that there is more interleaving between operations.
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 50}));
+            const res = assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 50}));
             this.internalQueryExecYieldIterationsDefault = res.was;
         });
     };
 
-    $config.teardown = function(db, collName, cluster) {
+    $config.teardown = function (db, collName, cluster) {
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryExecYieldIterations: this.internalQueryExecYieldIterationsDefault
-            }));
+            const res = assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryExecYieldIterations: this.internalQueryExecYieldIterationsDefault,
+                }),
+            );
         });
     };
 
@@ -328,8 +331,7 @@ export function randomUpdateDelete($config, $super) {
             }
             const onDiskAfter = this.readOwnedDocuments(db, collName);
             this.verifyDocumentCounters(onDiskBefore, onDiskAfter);
-            this.verifyUpdateResult({n: totalUpdates, nModified: totalUpdates - totalUpserts},
-                                    result);
+            this.verifyUpdateResult({n: totalUpdates, nModified: totalUpdates - totalUpserts}, result);
         });
     };
 

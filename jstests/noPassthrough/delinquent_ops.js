@@ -49,21 +49,23 @@ function assertDelinquentStats(metrics, count, msg, previousOperationMetrics) {
 
 function assertNoOverdueOps(operationMetrics, previousOperationMetrics) {
     assert.eq(operationMetrics.sampledOps, previousOperationMetrics.sampledOps, operationMetrics);
-    assert.eq(operationMetrics.checksFromSample,
-              previousOperationMetrics.checksFromSample,
-              operationMetrics);
-    assert.eq(operationMetrics.overdueOpsFromSample,
-              previousOperationMetrics.overdueOpsFromSample,
-              operationMetrics);
-    assert.eq(operationMetrics.overdueChecksFromSample,
-              previousOperationMetrics.overdueChecksFromSample,
-              operationMetrics);
-    assert.eq(operationMetrics.overdueInterruptTotalMillisFromSample,
-              previousOperationMetrics.overdueInterruptTotalMillisFromSample,
-              operationMetrics);
-    assert.eq(operationMetrics.overdueInterruptApproxMaxMillisFromSample,
-              previousOperationMetrics.overdueInterruptApproxMaxMillisFromSample,
-              operationMetrics);
+    assert.eq(operationMetrics.checksFromSample, previousOperationMetrics.checksFromSample, operationMetrics);
+    assert.eq(operationMetrics.overdueOpsFromSample, previousOperationMetrics.overdueOpsFromSample, operationMetrics);
+    assert.eq(
+        operationMetrics.overdueChecksFromSample,
+        previousOperationMetrics.overdueChecksFromSample,
+        operationMetrics,
+    );
+    assert.eq(
+        operationMetrics.overdueInterruptTotalMillisFromSample,
+        previousOperationMetrics.overdueInterruptTotalMillisFromSample,
+        operationMetrics,
+    );
+    assert.eq(
+        operationMetrics.overdueInterruptApproxMaxMillisFromSample,
+        previousOperationMetrics.overdueInterruptApproxMaxMillisFromSample,
+        operationMetrics,
+    );
 }
 
 function assertOverdueOps(operationMetrics, previousOperationMetrics) {
@@ -73,27 +75,27 @@ function assertOverdueOps(operationMetrics, previousOperationMetrics) {
     function errorString() {
         return {metricsBefore: previousInterruptMetrics, metricsAfter: operationMetrics};
     }
+    assert.gt(interruptMetrics.checksFromSample, previousInterruptMetrics.checksFromSample, errorString);
+    assert.gt(interruptMetrics.overdueOpsFromSample, previousInterruptMetrics.overdueOpsFromSample, errorString);
+    assert.gt(interruptMetrics.overdueChecksFromSample, previousInterruptMetrics.overdueChecksFromSample, errorString);
     assert.gt(
-        interruptMetrics.checksFromSample, previousInterruptMetrics.checksFromSample, errorString);
-    assert.gt(interruptMetrics.overdueOpsFromSample,
-              previousInterruptMetrics.overdueOpsFromSample,
-              errorString);
-    assert.gt(interruptMetrics.overdueChecksFromSample,
-              previousInterruptMetrics.overdueChecksFromSample,
-              errorString);
-    assert.gt(interruptMetrics.overdueInterruptTotalMillisFromSample,
-              previousInterruptMetrics.overdueInterruptTotalMillisFromSample,
-              errorString);
-    assert.gte(interruptMetrics.overdueInterruptApproxMaxMillisFromSample,
-               previousInterruptMetrics.overdueInterruptApproxMaxMillisFromSample,
-               errorString);
+        interruptMetrics.overdueInterruptTotalMillisFromSample,
+        previousInterruptMetrics.overdueInterruptTotalMillisFromSample,
+        errorString,
+    );
+    assert.gte(
+        interruptMetrics.overdueInterruptApproxMaxMillisFromSample,
+        previousInterruptMetrics.overdueInterruptApproxMaxMillisFromSample,
+        errorString,
+    );
 }
 
 function testDelinquencyOnRouter(routerDb) {
     // Before running the operation, reduce our threshold so that an operation that hangs for
     // 200ms should get marked overdue.
-    assert.commandWorked(routerDb.adminCommand(
-        {setParameter: 1, overdueInterruptCheckIntervalMillis: delinquentIntervalMs}));
+    assert.commandWorked(
+        routerDb.adminCommand({setParameter: 1, overdueInterruptCheckIntervalMillis: delinquentIntervalMs}),
+    );
 
     // Collect the number of overdue operations before running the op that we force to be
     // overdue.
@@ -101,9 +103,10 @@ function testDelinquencyOnRouter(routerDb) {
 
     // Configure a failpoint to ensure the find() command hangs for a while and considered
     // delinquent.
-    const failPoint = configureFailPoint(routerDb,
-                                         "waitInFindBeforeMakingBatch",
-                                         {sleepFor: waitPerIterationMs, comment: findComment});
+    const failPoint = configureFailPoint(routerDb, "waitInFindBeforeMakingBatch", {
+        sleepFor: waitPerIterationMs,
+        comment: findComment,
+    });
 
     assert.eq(routerDb.testColl.find().comment(findComment).itcount(), 4);
 
@@ -123,8 +126,9 @@ function testDelinquencyOnRouter(routerDb) {
 function testDelinquencyOnShard(routerDb, shardDb) {
     // Before running the operation, reduce our threshold so that an operation that hangs for
     // 200ms should get marked overdue.
-    assert.commandWorked(shardDb.adminCommand(
-        {setParameter: 1, overdueInterruptCheckIntervalMillis: delinquentIntervalMs}));
+    assert.commandWorked(
+        shardDb.adminCommand({setParameter: 1, overdueInterruptCheckIntervalMillis: delinquentIntervalMs}),
+    );
 
     // Collect the number of overdue operations before running the op that we force to be
     // overdue.
@@ -132,20 +136,25 @@ function testDelinquencyOnShard(routerDb, shardDb) {
 
     // Configure a failpoint to wait some time before yielding, so that the ticket hold by find()
     // command is considered delinquent.
-    const failPoint = configureFailPoint(
-        shardDb, "setPreYieldWait", {waitForMillis: waitPerIterationMs, comment: findComment});
+    const failPoint = configureFailPoint(shardDb, "setPreYieldWait", {
+        waitForMillis: waitPerIterationMs,
+        comment: findComment,
+    });
 
     // Run the find() command in a parallel shell to retrieve the $currentOp information.
     const joinShell = startParallelShell(
-        funWithArgs(function(dbName, findComment) {
-            assert.eq(
-                db.getSiblingDB(dbName).testColl.find().batchSize(3).comment(findComment).itcount(),
-                4);
-        }, routerDb.getName(), findComment), routerDb.getMongo().port);
+        funWithArgs(
+            function (dbName, findComment) {
+                assert.eq(db.getSiblingDB(dbName).testColl.find().batchSize(3).comment(findComment).itcount(), 4);
+            },
+            routerDb.getName(),
+            findComment,
+        ),
+        routerDb.getMongo().port,
+    );
 
     failPoint.wait({timesEntered: 3});
-    const curOp = shardDb.currentOp(
-        {"command.comment": findComment, "command.find": "testColl", "active": true});
+    const curOp = shardDb.currentOp({"command.comment": findComment, "command.find": "testColl", "active": true});
     joinShell();
 
     // Ensure that serverStatus indicates a find() was run.Add commentMore actions
@@ -161,7 +170,8 @@ function testDelinquencyOnShard(routerDb, shardDb) {
     {
         assert(
             curOp.inprog.length === 1,
-            "Expected to find exactly one active find() command with the comment " + findComment);
+            "Expected to find exactly one active find() command with the comment " + findComment,
+        );
         assertDelinquentStats(curOp.inprog[0].delinquencyInfo, 2, curOp.inprog[0]);
     }
 
@@ -172,10 +182,12 @@ function testDelinquencyOnShard(routerDb, shardDb) {
     {
         const serverStatus = shardDb.serverStatus();
         assert.gte(serverStatus.metrics.commands["find"].total, 1);
-        assertDelinquentStats(serverStatus.queues.execution.read.normalPriority,
-                              4,
-                              serverStatus,
-                              previousOperationMetrics.queues.execution.read.normalPriority);
+        assertDelinquentStats(
+            serverStatus.queues.execution.read.normalPriority,
+            4,
+            serverStatus,
+            previousOperationMetrics.queues.execution.read.normalPriority,
+        );
     }
 
     // Now examine the log for this find() command and ensure it has information
@@ -191,11 +203,17 @@ function testDelinquencyOnShard(routerDb, shardDb) {
         };
 
         const globalLog = assert.commandWorked(shardDb.adminCommand({getLog: "global"}));
-        const lineFind = findMatchingLogLine(
-            globalLog.log, {msg: "Slow query", comment: findComment, "command": "find"});
+        const lineFind = findMatchingLogLine(globalLog.log, {
+            msg: "Slow query",
+            comment: findComment,
+            "command": "find",
+        });
         assertLine(lineFind, 3);
-        const lineGetMore = findMatchingLogLine(
-            globalLog.log, {msg: "Slow query", comment: findComment, "command": "getMore"});
+        const lineGetMore = findMatchingLogLine(globalLog.log, {
+            msg: "Slow query",
+            comment: findComment,
+            "command": "getMore",
+        });
         assertLine(lineGetMore, 1);
     }
 
@@ -203,20 +221,20 @@ function testDelinquencyOnShard(routerDb, shardDb) {
         const queryStats = getQueryStats(routerDb.getMongo(), {collName: "testColl"});
         assert(
             queryStats.length === 1,
-            "Expected to find exactly one query stats entry for 'testColl' " + tojson(queryStats));
+            "Expected to find exactly one query stats entry for 'testColl' " + tojson(queryStats),
+        );
         assert.gte(queryStats[0].metrics.delinquentAcquisitions.sum, 4, tojson(queryStats));
-        assert.gte(queryStats[0].metrics.totalAcquisitionDelinquencyMillis.sum,
-                   waitPerIterationMs * 4,
-                   tojson(queryStats));
-        assert.gte(queryStats[0].metrics.maxAcquisitionDelinquencyMillis.max,
-                   waitPerIterationMs,
-                   tojson(queryStats));
+        assert.gte(
+            queryStats[0].metrics.totalAcquisitionDelinquencyMillis.sum,
+            waitPerIterationMs * 4,
+            tojson(queryStats),
+        );
+        assert.gte(queryStats[0].metrics.maxAcquisitionDelinquencyMillis.max, waitPerIterationMs, tojson(queryStats));
     }
 
     {
         const serverStatus = shardDb.serverStatus();
-        assertOverdueOps(serverStatus.metrics.operation,
-                         previousOperationMetrics.metrics.operation);
+        assertOverdueOps(serverStatus.metrics.operation, previousOperationMetrics.metrics.operation);
     }
 
     failPoint.off();
@@ -233,19 +251,25 @@ function testDelinquencyOnShard(routerDb, shardDb) {
 
         {
             session.startTransaction();
-            assert.eq(sessionDb.txn_coll.find({$where: `sleep(${sleepMillis}); return true;`})
-                          .comment(findTxnComment)
-                          .itcount(),
-                      1);
+            assert.eq(
+                sessionDb.txn_coll
+                    .find({$where: `sleep(${sleepMillis}); return true;`})
+                    .comment(findTxnComment)
+                    .itcount(),
+                1,
+            );
             assert.commandWorked(sessionDb.txn_coll.insert({a: 2}));
             session.commitTransaction();
         }
 
         const globalLog = assert.commandWorked(shardDb.adminCommand({getLog: "global"}));
-        const line = findMatchingLogLine(
-            globalLog.log, {msg: "Slow query", comment: findTxnComment, "command": "find"});
+        const line = findMatchingLogLine(globalLog.log, {
+            msg: "Slow query",
+            comment: findTxnComment,
+            "command": "find",
+        });
         const parsedLine = JSON.parse(line);
-        assert(!('delinquencyInfo' in parsedLine.attr), parsedLine);
+        assert(!("delinquencyInfo" in parsedLine.attr), parsedLine);
 
         // Check that the server status counters were not bumped. Here we can only do a loose check.
         {
@@ -256,18 +280,17 @@ function testDelinquencyOnShard(routerDb, shardDb) {
             // assert that the max delinquent value for each queue is less than the time this
             // operation slept. This assumes that no other background operation that the test
             // didn't trigger directly was delinquent for more than 'sleepMillis'.
-            assert.lt(
-                queues.write.normalPriority.maxAcquisitionDelinquencyMillis, sleepMillis, queues);
-            assert.lt(
-                queues.read.normalPriority.maxAcquisitionDelinquencyMillis, sleepMillis, queues);
+            assert.lt(queues.write.normalPriority.maxAcquisitionDelinquencyMillis, sleepMillis, queues);
+            assert.lt(queues.read.normalPriority.maxAcquisitionDelinquencyMillis, sleepMillis, queues);
         }
 
         // Ensure that the query stats for this operation do not indicate that it's delinquent.
         {
             const queryStats = getQueryStats(routerDb.getMongo(), {collName: "txn_coll"});
-            assert(queryStats.length === 1,
-                   "Expected to find exactly one query stats entry for 'testColl' " +
-                       tojson(queryStats));
+            assert(
+                queryStats.length === 1,
+                "Expected to find exactly one query stats entry for 'testColl' " + tojson(queryStats),
+            );
             assert.eq(queryStats[0].metrics.delinquentAcquisitions.sum, 0, queryStats);
             assert.eq(queryStats[0].metrics.totalAcquisitionDelinquencyMillis.sum, 0, queryStats);
             assert.eq(queryStats[0].metrics.maxAcquisitionDelinquencyMillis.max, 0, queryStats);
@@ -286,7 +309,6 @@ function runTest(routerDb, shardDb) {
         // assertDelinquentStats(shardStatus.queues.execution.read.normalPriority, 0, shardStatus);
         // TODO: SERVER-104007 Add back this assertion
         // assertOverdueOps(shardStatus.metrics.operation, null);
-
         // const routerStatus = routerDb.serverStatus();
         // TODO: SERVER-104007 Add back this assertion
         // assertOverdueOps(routerStatus.metrics.operation, null);
@@ -296,7 +318,7 @@ function runTest(routerDb, shardDb) {
     {
         const previousOperationMetrics = routerDb.serverStatus().metrics.operation;
 
-        const pingResult = routerDb.getSiblingDB('admin').runCommand({ping: 1});
+        const pingResult = routerDb.getSiblingDB("admin").runCommand({ping: 1});
         assert.commandWorked(pingResult, "Ping command failed");
 
         const serverStatus = routerDb.serverStatus();
@@ -327,7 +349,7 @@ const startupParameters = {
     internalQueryStatsRateLimit: -1,
 
     overdueInterruptCheckIntervalMillis: delinquentIntervalMs,
-    overdueInterruptCheckSamplingRate: 1.0,  // For this test we sample 100% of the time.
+    overdueInterruptCheckSamplingRate: 1.0, // For this test we sample 100% of the time.
 };
 
 {
@@ -355,11 +377,10 @@ const startupParameters = {
         shards: 1,
         rs: {nodes: 1, setParameter: startupParameters},
         mongos: 1,
-        mongosOptions: {setParameter: startupParameters}
+        mongosOptions: {setParameter: startupParameters},
     });
 
-    assert.commandWorked(
-        st.shard0.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+    assert.commandWorked(st.shard0.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
     runTest(st.s.getDB(jsTestName()), st.shard0.getDB(jsTestName()));
     st.stop();
 }

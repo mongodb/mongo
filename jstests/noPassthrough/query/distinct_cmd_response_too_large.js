@@ -3,14 +3,14 @@
  * exceeds MaxBSONSize.
  */
 const conn = MongoRunner.runMongod();
-const db = conn.getDB('test');
+const db = conn.getDB("test");
 const coll = db.test;
 
-const largeString = 'x'.repeat(1000 * 1000);
+const largeString = "x".repeat(1000 * 1000);
 
 let bulk = coll.initializeUnorderedBulkOp();
 for (let x = 0; x < 17; ++x) {
-    bulk.insert({_id: (largeString + x.toString())});
+    bulk.insert({_id: largeString + x.toString()});
 }
 assert.commandWorked(bulk.execute());
 

@@ -24,15 +24,17 @@ function makeTestAnalyzeShardKeyAggregateCmdObj(ns) {
     const splitNs = ns.split(".");
     return {
         aggregate: splitNs.length == 1 ? "" : splitNs[1],
-        pipeline: [{
-            $_analyzeShardKeyReadWriteDistribution: {
-                key: {x: 1},
-                splitPointsFilter: {"_id.analyzeShardKeyId": UUID()},
-                splitPointsAfterClusterTime: new Timestamp(100, 1),
-                splitPointsShardId: "shard0"
-            }
-        }],
-        cursor: {}
+        pipeline: [
+            {
+                $_analyzeShardKeyReadWriteDistribution: {
+                    key: {x: 1},
+                    splitPointsFilter: {"_id.analyzeShardKeyId": UUID()},
+                    splitPointsAfterClusterTime: new Timestamp(100, 1),
+                    splitPointsShardId: "shard0",
+                },
+            },
+        ],
+        cursor: {},
     };
 }
 
@@ -52,8 +54,7 @@ function runTestForCmd(db, makeCmdObjFunc, testDbName, testCollName, requiresCol
     assert.commandFailedWithCode(res2, ErrorCodes.InvalidNamespace);
 
     const res3 = db.runCommand(makeCmdObjFunc(testCollName));
-    jsTest.log("*** Response for command: " +
-               tojsononeline({db, ns: testCollName, response: res3}));
+    jsTest.log("*** Response for command: " + tojsononeline({db, ns: testCollName, response: res3}));
     assert.commandFailedWithCode(res3, ErrorCodes.InvalidNamespace);
 }
 
@@ -69,49 +70,65 @@ function runTests(conn, rst) {
     const primaryTestDb = primary.getDB(testDbName);
     const isReplicaSetEndpointActive = rst.isReplicaSetEndpointActive();
 
-    runTestForCmd(adminDb,
-                  makeTestConfigureAnalyzerCmdObj,
-                  testDbName,
-                  testCollName0,
-                  true /* requiresCollectionToExist */);
-    runTestForCmd(adminDb,
-                  makeTestAnalyzeShardKeyCmdObj,
-                  testDbName,
-                  testCollName0,
-                  true /* requiresCollectionToExist */);
-    runTestForCmd(adminDb,
-                  makeTestListSampledQueriesAggregateCmdObj,
-                  testDbName,
-                  testCollName0,
-                  false /* requiresCollectionToExist */);
-    runTestForCmd(primaryTestDb,
-                  makeTestAnalyzeShardKeyAggregateCmdObj,
-                  testDbName,
-                  testCollName0,
-                  !isReplicaSetEndpointActive /* requiresCollectionToExist */);
+    runTestForCmd(
+        adminDb,
+        makeTestConfigureAnalyzerCmdObj,
+        testDbName,
+        testCollName0,
+        true /* requiresCollectionToExist */,
+    );
+    runTestForCmd(
+        adminDb,
+        makeTestAnalyzeShardKeyCmdObj,
+        testDbName,
+        testCollName0,
+        true /* requiresCollectionToExist */,
+    );
+    runTestForCmd(
+        adminDb,
+        makeTestListSampledQueriesAggregateCmdObj,
+        testDbName,
+        testCollName0,
+        false /* requiresCollectionToExist */,
+    );
+    runTestForCmd(
+        primaryTestDb,
+        makeTestAnalyzeShardKeyAggregateCmdObj,
+        testDbName,
+        testCollName0,
+        !isReplicaSetEndpointActive /* requiresCollectionToExist */,
+    );
 
     assert.commandWorked(testDb.createCollection(testCollName1));
 
-    runTestForCmd(adminDb,
-                  makeTestConfigureAnalyzerCmdObj,
-                  testDbName,
-                  testCollName0,
-                  true /* requiresCollectionToExist */);
-    runTestForCmd(adminDb,
-                  makeTestAnalyzeShardKeyCmdObj,
-                  testDbName,
-                  testCollName0,
-                  true /* requiresCollectionToExist */);
-    runTestForCmd(adminDb,
-                  makeTestListSampledQueriesAggregateCmdObj,
-                  testDbName,
-                  testCollName0,
-                  false /* requiresCollectionToExist */);
-    runTestForCmd(primaryTestDb,
-                  makeTestAnalyzeShardKeyAggregateCmdObj,
-                  testDbName,
-                  testCollName0,
-                  true /* requiresCollectionToExist */);
+    runTestForCmd(
+        adminDb,
+        makeTestConfigureAnalyzerCmdObj,
+        testDbName,
+        testCollName0,
+        true /* requiresCollectionToExist */,
+    );
+    runTestForCmd(
+        adminDb,
+        makeTestAnalyzeShardKeyCmdObj,
+        testDbName,
+        testCollName0,
+        true /* requiresCollectionToExist */,
+    );
+    runTestForCmd(
+        adminDb,
+        makeTestListSampledQueriesAggregateCmdObj,
+        testDbName,
+        testCollName0,
+        false /* requiresCollectionToExist */,
+    );
+    runTestForCmd(
+        primaryTestDb,
+        makeTestAnalyzeShardKeyAggregateCmdObj,
+        testDbName,
+        testCollName0,
+        true /* requiresCollectionToExist */,
+    );
 }
 
 {

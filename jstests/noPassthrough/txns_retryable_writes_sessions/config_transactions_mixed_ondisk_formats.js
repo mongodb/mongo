@@ -10,42 +10,40 @@
 // disable implicit sessions so that we can drop config.transactions down below.
 TestData.disableImplicitSessions = true;
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const storageEngine = jsTest.options().storageEngine || 'wiredTiger';
+const storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
 // Verifies that config.transactions is of the format specified in options on all nodes. Only valid
 // values are {clustered: true} and {clustered: false}.
 function verifyConfigTxnsFormat(replSet, options) {
-    const clusteredOptions = ClusteredCollectionUtil.constructFullCreateOptions(
-        {clusteredIndex: {key: {_id: 1}, unique: true}});
+    const clusteredOptions = ClusteredCollectionUtil.constructFullCreateOptions({
+        clusteredIndex: {key: {_id: 1}, unique: true},
+    });
     for (const node of replSet.nodes) {
-        const configTxns = node.getDB('config');
+        const configTxns = node.getDB("config");
         if (options.clustered)
-            ClusteredCollectionUtil.validateListCollections(
-                configTxns, 'transactions', clusteredOptions);
-        else
-            ClusteredCollectionUtil.validateListCollectionsNotClustered(configTxns, 'transactions');
+            ClusteredCollectionUtil.validateListCollections(configTxns, "transactions", clusteredOptions);
+        else ClusteredCollectionUtil.validateListCollectionsNotClustered(configTxns, "transactions");
     }
 }
 
 // Opens transactions numbered [startIdx, endIdx) and closes them out. Returns endIdx + 1.
 function openAndCloseTransactions(primaryOrRouter, startIdx, endIdx, transactionCB) {
-    const dbName = 'testDB';
-    const collName = 'testColl';
+    const dbName = "testDB";
+    const collName = "testColl";
     startIdx = startIdx || 0;
-    endIdx = endIdx || (startIdx + 20);
-    transactionCB = transactionCB || function(sessionColl, txnNum) {
-        assert.commandWorked(sessionColl.insert({_id: "txn-" + txnNum}));
-    };
+    endIdx = endIdx || startIdx + 20;
+    transactionCB =
+        transactionCB ||
+        function (sessionColl, txnNum) {
+            assert.commandWorked(sessionColl.insert({_id: "txn-" + txnNum}));
+        };
 
     const coll = primaryOrRouter.getDB(dbName)[collName];
-    assert.commandWorked(
-        coll.insert({_id: 'pretransaction' + startIdx, x: 0}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(coll.insert({_id: "pretransaction" + startIdx, x: 0}, {writeConcern: {w: "majority"}}));
     for (let txnNum = startIdx; txnNum < endIdx; txnNum++) {
         const session = primaryOrRouter.startSession({causalConsistency: false});
         session.startTransaction();
@@ -67,8 +65,8 @@ function testSecondaryReplicationOfConfigTxnsFormat() {
         name: jsTestName(),
         nodes: [
             {setParameter: {featureFlagClusteredConfigTransactions: true}},
-            {setParameter: {featureFlagClusteredConfigTransactions: false}}
-        ]
+            {setParameter: {featureFlagClusteredConfigTransactions: false}},
+        ],
     });
     replSet.startSet();
     replSet.initiate();
@@ -82,8 +80,8 @@ function testSecondaryReplicationOfConfigTxnsFormat() {
     // collection.
     const primary = replSet.getPrimary();
     const secondary = replSet.getSecondary();
-    const primaryConfig = primary.getDB('config');
-    assert.commandWorked(primaryConfig.runCommand({drop: 'transactions'}));
+    const primaryConfig = primary.getDB("config");
+    assert.commandWorked(primaryConfig.runCommand({drop: "transactions"}));
     replSet.awaitReplication();
     assert.commandWorked(secondary.adminCommand({replSetStepUp: 1}));
     replSet.awaitNodesAgreeOnPrimary();
@@ -103,8 +101,8 @@ function testRestartSecondaryWithDifferentExpectedConfigTxnsFormat() {
             name: jsTestName(),
             nodes: [
                 {setParameter: {featureFlagClusteredConfigTransactions: primarySetting}},
-                {setParameter: {featureFlagClusteredConfigTransactions: primarySetting}}
-            ]
+                {setParameter: {featureFlagClusteredConfigTransactions: primarySetting}},
+            ],
         });
         replSet.startSet();
         replSet.initiate();
@@ -114,7 +112,7 @@ function testRestartSecondaryWithDifferentExpectedConfigTxnsFormat() {
 
         replSet.restart(1, {
             startClean: false,
-            setParameter: {featureFlagClusteredConfigTransactions: !primarySetting}
+            setParameter: {featureFlagClusteredConfigTransactions: !primarySetting},
         });
         replSet.awaitSecondaryNodes();
         replSet.reInitiate();
@@ -161,8 +159,8 @@ function testShardsWithDifferentConfigTxnsFormats() {
         mongos: 1,
         shards: {
             rs0: {nodes: 1, setParameter: {featureFlagClusteredConfigTransactions: true}},
-            rs1: {nodes: 1, setParameter: {featureFlagClusteredConfigTransactions: false}}
-        }
+            rs1: {nodes: 1, setParameter: {featureFlagClusteredConfigTransactions: false}},
+        },
     });
 
     // Replica set nodes in sharded clusters create config.transactions before upgrading to latest
@@ -171,8 +169,8 @@ function testShardsWithDifferentConfigTxnsFormats() {
     // that it recreates config.transactions as a clustered collection.
     ((shardedCluster) => {
         const primary = shardedCluster.rs0.getPrimary();
-        const primaryConfig = primary.getDB('config');
-        assert.commandWorked(primaryConfig.runCommand({drop: 'transactions'}));
+        const primaryConfig = primary.getDB("config");
+        assert.commandWorked(primaryConfig.runCommand({drop: "transactions"}));
         shardedCluster.rs0.awaitReplication();
         assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: true}));
         shardedCluster.rs0.awaitReplication();
@@ -186,19 +184,19 @@ function testShardsWithDifferentConfigTxnsFormats() {
     // Set up the sharded collection with two chunks:
     // shard0: (-inf, 0)
     // shard1: [0, +inf)
-    const dbName = 'testDB';
-    const collName = 'testColl';
-    const ns = dbName + '.' + collName;
+    const dbName = "testDB";
+    const collName = "testColl";
+    const ns = dbName + "." + collName;
     assert.commandWorked(shardedCluster.s.adminCommand({enableSharding: dbName}));
-    assert.commandWorked(
-        shardedCluster.s.adminCommand({movePrimary: dbName, to: shardedCluster.shard0.shardName}));
+    assert.commandWorked(shardedCluster.s.adminCommand({movePrimary: dbName, to: shardedCluster.shard0.shardName}));
     assert.commandWorked(shardedCluster.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(shardedCluster.s.adminCommand({split: ns, middle: {_id: 0}}));
-    assert.commandWorked(shardedCluster.s.adminCommand(
-        {moveChunk: ns, find: {_id: 0}, to: shardedCluster.shard1.shardName}));
+    assert.commandWorked(
+        shardedCluster.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: shardedCluster.shard1.shardName}),
+    );
 
     // Open transactions whose documents will hit both shards, and then close them out.
-    openAndCloseTransactions(shardedCluster.s, 0, 20, function(sessionColl, txnNum) {
+    openAndCloseTransactions(shardedCluster.s, 0, 20, function (sessionColl, txnNum) {
         assert.commandWorked(sessionColl.insert({_id: txnNum + 1}));
         assert.commandWorked(sessionColl.insert({_id: 0 - txnNum}));
     });
@@ -208,10 +206,9 @@ function testShardsWithDifferentConfigTxnsFormats() {
 
 testSecondaryReplicationOfConfigTxnsFormat();
 testRestartSecondaryWithDifferentExpectedConfigTxnsFormat();
-testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat();  // logical initial sync
+testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat(); // logical initial sync
 // File copy based sync requires the wired tiger storage engine; skip if using something else.
-if (storageEngine == 'wiredTiger') {
-    testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat(
-        {initialSyncMethod: 'fileCopyBased'});
+if (storageEngine == "wiredTiger") {
+    testInitialSyncFromPrimaryWithDifferentExpectedConfigTxnsFormat({initialSyncMethod: "fileCopyBased"});
 }
 testShardsWithDifferentConfigTxnsFormats();

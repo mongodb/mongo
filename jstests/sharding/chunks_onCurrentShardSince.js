@@ -15,8 +15,7 @@ function performRandomSplitChunks(st, collFullName, maxNumSplits) {
         if (st.config.chunks.find({"min": {x: NumberLong(splitPoint)}}).count() != 0) {
             continue;
         }
-        assert.commandWorked(
-            st.s.adminCommand({split: collFullName, middle: {x: NumberLong(splitPoint)}}));
+        assert.commandWorked(st.s.adminCommand({split: collFullName, middle: {x: NumberLong(splitPoint)}}));
     }
 }
 
@@ -24,10 +23,12 @@ function performRandomSplitChunks(st, collFullName, maxNumSplits) {
 let _collCounter = 0;
 function newShardedColl(st, testDB) {
     const coll = testDB["coll_" + _collCounter++];
-    assert.commandWorked(st.s.adminCommand({
-        shardCollection: coll.getFullName(),
-        key: {x: "hashed"},
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: {x: "hashed"},
+        }),
+    );
     // Perform up to 200 chunk splits
     performRandomSplitChunks(st, coll.getFullName(), 200);
     return coll;
@@ -49,8 +50,9 @@ function performRandomMoveChunks(st, collFullName) {
     for (let i = 0; i < numMoves; i++) {
         const chunks = st.config.chunks.find({"uuid": collUuid}).sort({min: 1}).toArray();
         const chunk = chunks[Math.floor(Math.random() * chunks.length)];
-        assert.commandWorked(st.s.adminCommand(
-            {moveChunk: collFullName, find: chunk.min, to: getOppositeShard(chunk.shard)}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: collFullName, find: chunk.min, to: getOppositeShard(chunk.shard)}),
+        );
     }
 }
 
@@ -61,22 +63,18 @@ function assertChunksConsistency(chunksColl) {
     const numTotalChunks = chunksColl.find().count();
     assert.neq(0, numTotalChunks);
 
-    const numConsistenChunks =
-        chunksColl
-            .find({
-                $and: [
-                    {"onCurrentShardSince": {$exists: 1}},
-                    {
-                        $expr: {
-                            $eq: [
-                                "$onCurrentShardSince",
-                                {$getField: {field: "validAfter", input: {$first: "$history"}}}
-                            ]
-                        }
-                    }
-                ]
-            })
-            .count();
+    const numConsistenChunks = chunksColl
+        .find({
+            $and: [
+                {"onCurrentShardSince": {$exists: 1}},
+                {
+                    $expr: {
+                        $eq: ["$onCurrentShardSince", {$getField: {field: "validAfter", input: {$first: "$history"}}}],
+                    },
+                },
+            ],
+        })
+        .count();
     assert.eq(numTotalChunks, numConsistenChunks);
 }
 
@@ -107,8 +105,9 @@ function moveAndMergeChunksTest(st, testDB) {
         }
         const lastChunk = chunks[lastChunkToMergeIndex];
 
-        assert.commandWorked(st.s.adminCommand(
-            {mergeChunks: coll.getFullName(), bounds: [firstChunk.min, lastChunk.max]}));
+        assert.commandWorked(
+            st.s.adminCommand({mergeChunks: coll.getFullName(), bounds: [firstChunk.min, lastChunk.max]}),
+        );
     }
 
     assertChunksConsistency(st.config.chunks);

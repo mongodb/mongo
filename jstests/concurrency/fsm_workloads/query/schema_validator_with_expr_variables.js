@@ -15,67 +15,75 @@
  *  requires_standalone,
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     function setup(db, collName) {
         for (let i = 0; i < 200; ++i) {
-            assert.commandWorked(
-                db[collName].insert({_id: i, a: i, one: 1, counter: 0, array: [0, i]}));
+            assert.commandWorked(db[collName].insert({_id: i, a: i, one: 1, counter: 0, array: [0, i]}));
         }
 
         // Add a validator which checks that field 'a' has value 5 and sum of the elements in field
         // 'array' is 5. The expression is purposefully complex so that it can create a stress on
         // expressions with variables.
-        assert.commandWorked(db.runCommand({
-            collMod: collName,
-            validator: {
-                $expr: {
-                    $and: [
-                        {
-                          $eq: [
-                              5,
-                              {
-                                $let: {
-                                    vars: {item: {$multiply: ["$a", "$one"]}},
-                                    in : {$multiply: ["$$item", "$one"]}
-                                }
-                              }
-                          ]
-                        },
-                        {
-                          $eq: [
-                              5,
-                              {
-                                $sum: {
-                                    $map:
-                                        {"input": "$array", "as": "item", "in": "$$item"}
-                                }
-                              }
-                          ]
-                        }
-                    ]
-                }
-            }
-        }));
+        assert.commandWorked(
+            db.runCommand({
+                collMod: collName,
+                validator: {
+                    $expr: {
+                        $and: [
+                            {
+                                $eq: [
+                                    5,
+                                    {
+                                        $let: {
+                                            vars: {item: {$multiply: ["$a", "$one"]}},
+                                            in: {$multiply: ["$$item", "$one"]},
+                                        },
+                                    },
+                                ],
+                            },
+                            {
+                                $eq: [
+                                    5,
+                                    {
+                                        $sum: {
+                                            $map: {"input": "$array", "as": "item", "in": "$$item"},
+                                        },
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            }),
+        );
     }
 
     const states = {
-        applyValidator: function(db, collName) {
+        applyValidator: function (db, collName) {
             assert.commandWorked(db[collName].update({_id: 5}, {$inc: {counter: 1}}));
             assert.commandFailedWithCode(
                 db[collName].update({_id: 4}, {$set: {a: 4}, $inc: {counter: 1}}),
-                ErrorCodes.DocumentValidationFailure);
+                ErrorCodes.DocumentValidationFailure,
+            );
 
             // Update all the documents in the collection.
-            retryOnRetryableError(() => {
-                assert.commandWorked(db[collName].update(
-                    {}, {$set: {a: 5, array: [2, 3]}, $inc: {counter: 1}}, {multi: true}));
-            }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
+            retryOnRetryableError(
+                () => {
+                    assert.commandWorked(
+                        db[collName].update({}, {$set: {a: 5, array: [2, 3]}, $inc: {counter: 1}}, {multi: true}),
+                    );
+                },
+                100,
+                undefined,
+                TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : [],
+            );
 
             // Validation fails when elements of 'array' doesn't add up to 5.
             assert.commandFailedWithCode(
                 db[collName].update({_id: 4}, {$set: {a: 5, array: [2, 2]}}),
-                ErrorCodes.DocumentValidationFailure);
-        }
+                ErrorCodes.DocumentValidationFailure,
+            );
+        },
     };
 
     let transitions = {applyValidator: {applyValidator: 1}};
@@ -86,6 +94,6 @@ export const $config = (function() {
         states: states,
         startState: "applyValidator",
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

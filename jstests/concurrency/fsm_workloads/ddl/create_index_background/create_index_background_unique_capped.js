@@ -7,14 +7,11 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_unique.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_unique.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.prefix = "create_index_background_unique_capped_";
-    $config.data.getCollectionOptions = function() {
+    $config.data.getCollectionOptions = function () {
         // We create an 8MB capped collection, as it will comfortably fit the collection data
         // inserted by this test.
         const ONE_MB = 1024 * 1024;

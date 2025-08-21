@@ -20,30 +20,32 @@ let testColl = testDB[testCollName];
 
 // Ensure applyOps logging produces an oplog entry for each operation in the applyOps call and no
 // record of applyOps appears for these operations.
-assert.commandWorked(testDB.runCommand({
-    applyOps: [
-        {
-            op: "c",
-            ns: "test.$cmd",
-            o: {
-                renameCollection: "test.testColl",
-                to: "test.renamedColl",
-                stayTemp: false,
-                dropTarget: false
-            }
-        },
-        {
-            op: "c",
-            ns: "test.$cmd",
-            o: {
-                renameCollection: "test.renamedColl",
-                to: "test." + rerenamedCollName,
-                stayTemp: false,
-                dropTarget: false
-            }
-        }
-    ]
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        applyOps: [
+            {
+                op: "c",
+                ns: "test.$cmd",
+                o: {
+                    renameCollection: "test.testColl",
+                    to: "test.renamedColl",
+                    stayTemp: false,
+                    dropTarget: false,
+                },
+            },
+            {
+                op: "c",
+                ns: "test.$cmd",
+                o: {
+                    renameCollection: "test.renamedColl",
+                    to: "test." + rerenamedCollName,
+                    stayTemp: false,
+                    dropTarget: false,
+                },
+            },
+        ],
+    }),
+);
 assert.eq(oplogColl.find({"o.renameCollection": {"$exists": true}}).count(), 2);
 assert.eq(oplogColl.find({"o.applyOps": {"$exists": true}}).count(), 0);
 
@@ -51,13 +53,15 @@ assert.eq(oplogColl.find({"o.applyOps": {"$exists": true}}).count(), 0);
 // 'allowAtomic' field. We fail to insert a duplicate doc, and ensure that the original doc was
 // inserted successfully. Atomic applyOps would fail to insert both documents.
 assert.commandWorked(testDB.createCollection(testColl.getName()));
-assert.commandWorked(testDB.runCommand({
-    applyOps: [
-        {op: "i", ns: testColl.getFullName(), o: {_id: 3, a: "augh"}},
-        {op: "i", ns: testColl.getFullName(), o: {_id: 4, a: "blah"}}
-    ],
-    allowAtomic: true,
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        applyOps: [
+            {op: "i", ns: testColl.getFullName(), o: {_id: 3, a: "augh"}},
+            {op: "i", ns: testColl.getFullName(), o: {_id: 4, a: "blah"}},
+        ],
+        allowAtomic: true,
+    }),
+);
 
 assert.eq(oplogColl.find({"o.applyOps": {"$exists": true}}).count(), 0);
 assert.eq(oplogColl.find({op: "i", ns: testColl.getFullName()}).count(), 2);

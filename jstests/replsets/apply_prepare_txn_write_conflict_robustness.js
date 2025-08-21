@@ -24,8 +24,9 @@ assert.commandWorked(primaryColl.insert({_id: 0}, {"writeConcern": {"w": "majori
 
 // Enable fail point on secondary to cause apply prepare transaction oplog entry's ops to fail
 // with write conflict error at least once.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "applyPrepareTxnOpsFailsWithWriteConflict", mode: {times: 1}}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "applyPrepareTxnOpsFailsWithWriteConflict", mode: {times: 1}}),
+);
 
 jsTestLog("Start transaction");
 let session = primary.startSession();

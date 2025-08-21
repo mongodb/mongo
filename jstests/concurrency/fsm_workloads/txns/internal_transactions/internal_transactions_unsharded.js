@@ -17,9 +17,7 @@ import "jstests/libs/override_methods/retry_writes_at_least_once.js";
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 // This workload involves running commands outside a session.
@@ -29,8 +27,12 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 
-    $config.data.executionContextTypes =
-        {kNoClientSession: 1, kClientSession: 2, kClientRetryableWrite: 3, kClientTransaction: 4};
+    $config.data.executionContextTypes = {
+        kNoClientSession: 1,
+        kClientSession: 2,
+        kClientRetryableWrite: 3,
+        kClientTransaction: 4,
+    };
     $config.data.imageTypes = {kPreImage: 1, kPostImage: 2};
 
     // The number of documents assigned to a thread when the workload starts.
@@ -114,16 +116,18 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
 
     $config.data.startSessions = function startSessions(db) {
         this.mongo = db.getMongo();
-        this.nonRetryableWriteSession = this.mongo.startSession(
-            {causalConsistency: this.shouldUseCausalConsistency, retryWrites: false});
-        this.retryableWriteSession = this.mongo.startSession(
-            {causalConsistency: this.shouldUseCausalConsistency, retryWrites: true});
+        this.nonRetryableWriteSession = this.mongo.startSession({
+            causalConsistency: this.shouldUseCausalConsistency,
+            retryWrites: false,
+        });
+        this.retryableWriteSession = this.mongo.startSession({
+            causalConsistency: this.shouldUseCausalConsistency,
+            retryWrites: true,
+        });
         this.sessions = [this.nonRetryableWriteSession, this.retryableWriteSession];
 
-        print(`Started a non-retryable write session ${
-            tojsononeline(this.nonRetryableWriteSession.getSessionId())}`);
-        print(`Started a retryable write session ${
-            tojsononeline(this.retryableWriteSession.getSessionId())}`);
+        print(`Started a non-retryable write session ${tojsononeline(this.nonRetryableWriteSession.getSessionId())}`);
+        print(`Started a retryable write session ${tojsononeline(this.retryableWriteSession.getSessionId())}`);
     };
 
     $config.data.getInternalTransactionDB = function getDB(executionCtxType, dbName) {
@@ -135,15 +139,15 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
             case this.executionContextTypes.kClientRetryableWrite:
                 return this.retryableWriteSession.getDatabase(dbName);
             case this.executionContextTypes.kClientTransaction:
-                return this.generateRandomBool() ? this.nonRetryableWriteSession.getDatabase(dbName)
-                                                 : this.retryableWriteSession.getDatabase(dbName);
+                return this.generateRandomBool()
+                    ? this.nonRetryableWriteSession.getDatabase(dbName)
+                    : this.retryableWriteSession.getDatabase(dbName);
             default:
                 throw Error("Unknown execution context");
         }
     };
 
-    $config.data.getCollectionForDocumentChecks = function getCollectionForDocumentChecks(
-        defaultDb, txnDb, collName) {
+    $config.data.getCollectionForDocumentChecks = function getCollectionForDocumentChecks(defaultDb, txnDb, collName) {
         assert.eq(defaultDb.getMongo().host, txnDb.getMongo().host);
         return txnDb.getCollection(collName);
     };
@@ -188,9 +192,11 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         // retryable after network errors.
         // The linearizable read has a 15s timeout, then a LinearizableReadConcernError will be
         // thrown, so we retry on this error in test
-        return res &&
+        return (
+            res &&
             (res.code == ErrorCodes.LinearizableReadConcernError ||
-             (TestData.runningWithShardStepdowns && interruptedQueryErrors.includes(res.code)));
+                (TestData.runningWithShardStepdowns && interruptedQueryErrors.includes(res.code)))
+        );
     };
 
     $config.data.getRandomDocument = function getRandomDocument(db, collName) {
@@ -203,16 +209,14 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         // include the found document. Skip if the test has a default read concern or requires
         // casual consistency because in both cases the default read concern should provide this
         // guarantee already.
-        if (!TestData.defaultReadConcernLevel &&
-            !db.getSession().getOptions().isCausalConsistency()) {
+        if (!TestData.defaultReadConcernLevel && !db.getSession().getOptions().isCausalConsistency()) {
             aggregateCmdObj.readConcern = {level: "linearizable"};
         }
 
         let numTries = 0;
         const numDocs = Object.keys(this.expectedCounters).length;
         while (numTries < numDocs) {
-            print("Finding a random document " +
-                  tojsononeline({aggregateCmdObj, numTries, numDocs}));
+            print("Finding a random document " + tojsononeline({aggregateCmdObj, numTries, numDocs}));
             let aggRes;
             assert.soon(() => {
                 try {
@@ -227,8 +231,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
                 }
             });
             const doc = aggRes.cursor.firstBatch[0];
-            print("Found a random document " +
-                  tojsononeline({doc, isDirty: this.isDirtyDocument(doc)}));
+            print("Found a random document " + tojsononeline({doc, isDirty: this.isDirtyDocument(doc)}));
             if (!this.isDirtyDocument(doc)) {
                 return doc;
             }
@@ -264,18 +267,18 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
 
         const updatedDoc = Object.assign({}, docToUpdate);
         updatedDoc[updateOpFieldName] = docToUpdate.hasOwnProperty(updateOpFieldName)
-            ? (docToUpdate[updateOpFieldName] + 1)
+            ? docToUpdate[updateOpFieldName] + 1
             : 0;
         updatedDoc.counter += 1;
 
         const update = {
             $set: {[updateOpFieldName]: updatedDoc[updateOpFieldName]},
-            $inc: {counter: 1}
+            $inc: {counter: 1},
         };
 
         const cmdObj = {
             update: collName,
-            updates: [{q: this.getQueryForDocument(docToUpdate), u: update}]
+            updates: [{q: this.getQueryForDocument(docToUpdate), u: update}],
         };
         const checkResponseFunc = (res) => {
             assert.eq(res.n, 1, res);
@@ -297,7 +300,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
 
         const cmdObj = {
             delete: collName,
-            deletes: [{q: this.getQueryForDocument(docToDelete), limit: 1}]
+            deletes: [{q: this.getQueryForDocument(docToDelete), limit: 1}],
         };
         const checkResponseFunc = (res) => {
             assert.eq(res.n, 1, res);
@@ -315,24 +318,23 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         const isUpsert = this.generateRandomBool();
         const imageType = this.generateRandomImageType();
 
-        const docToUpdate =
-            isUpsert ? this.generateRandomDocument(this.tid) : this.getRandomDocument(db, collName);
+        const docToUpdate = isUpsert ? this.generateRandomDocument(this.tid) : this.getRandomDocument(db, collName);
 
         const updatedDoc = Object.assign({}, docToUpdate);
         updatedDoc[findAndModifyOpFieldName] = docToUpdate.hasOwnProperty(findAndModifyOpFieldName)
-            ? (docToUpdate[findAndModifyOpFieldName] + 1)
+            ? docToUpdate[findAndModifyOpFieldName] + 1
             : 0;
         updatedDoc.counter += 1;
 
         const update = {
             $set: {[findAndModifyOpFieldName]: updatedDoc[findAndModifyOpFieldName]},
-            $inc: {counter: 1}
+            $inc: {counter: 1},
         };
 
         const cmdObj = {
             findAndModify: collName,
             query: this.getQueryForDocument(docToUpdate),
-            update: update
+            update: update,
         };
         cmdObj.upsert = isUpsert;
         if (imageType == this.imageTypes.kPostImage) {
@@ -345,9 +347,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
                 assert.eq(res.lastErrorObject.upserted, updatedDoc._id, res);
             } else {
                 assert.eq(res.lastErrorObject.updatedExisting, true, res);
-                assert.eq(res.value,
-                          imageType == this.imageTypes.kPreImage ? docToUpdate : updatedDoc,
-                          res);
+                assert.eq(res.value, imageType == this.imageTypes.kPreImage ? docToUpdate : updatedDoc, res);
             }
         };
         const checkDocsFunc = (collection) => {
@@ -374,7 +374,11 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
      * specified client 'executionCtxType'.
      */
     $config.data.runInternalTransaction = function runInternalTransaction(
-        defaultDb, collName, executionCtxType, crudOp) {
+        defaultDb,
+        collName,
+        executionCtxType,
+        crudOp,
+    ) {
         // The testInternalTransactions command below runs with the session setting defined by
         // 'executionCtxType'.
         fsm.forceRunningOutsideTransaction(this);
@@ -391,15 +395,18 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
             testInternalTransactions: 1,
             commandInfos: [
                 {dbName: defaultDb.getName(), command: crudOp.cmdObj},
-                {dbName: defaultDb.getName(), command: insertOp.cmdObj}
+                {dbName: defaultDb.getName(), command: insertOp.cmdObj},
             ],
         };
         if (this.useClusterClient) {
             internalTxnTestCmdObj.useClusterClient = true;
         }
 
-        print(`Running an internal transaction using a test command ${
-            tojsononeline(internalTxnTestCmdObj)}: ${tojsononeline({executionCtxType})}`);
+        print(
+            `Running an internal transaction using a test command ${tojsononeline(
+                internalTxnTestCmdObj,
+            )}: ${tojsononeline({executionCtxType})}`,
+        );
         const txnDb = this.getInternalTransactionDB(executionCtxType, defaultDb.getName());
 
         const runFunc = () => {
@@ -412,14 +419,15 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
                 // pull out the originalError thrown (similar to what mongos would do) for the
                 // client to handle. This error should never escape a mongos and be seen by a
                 // client, so allow the error to be thrown if the client is talking to a mongos.
-                if (res.code == ErrorCodes.TransactionParticipantFailedUnyield &&
-                    !isMongos(txnDb)) {
+                if (res.code == ErrorCodes.TransactionParticipantFailedUnyield && !isMongos(txnDb)) {
                     res = res.originalError;
                 }
                 assert.commandWorked(res);
             } catch (e) {
-                if ((executionCtxType == this.executionContextTypes.kClientRetryableWrite) &&
-                    this.isAcceptableRetryError(res, executionCtxType)) {
+                if (
+                    executionCtxType == this.executionContextTypes.kClientRetryableWrite &&
+                    this.isAcceptableRetryError(res, executionCtxType)
+                ) {
                     print("Ignoring retry error for retryable write: " + tojsononeline(res));
                     return;
                 }
@@ -427,7 +435,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
             }
 
             // Check responses.
-            res.responses.forEach(innerRes => {
+            res.responses.forEach((innerRes) => {
                 assert.commandWorked(innerRes);
             });
             if (executionCtxType == this.executionContextTypes.kClientRetryableWrite) {
@@ -450,8 +458,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         this.dirtyDocs[executionCtxType][insertOp.docId] = "insert";
 
         if (executionCtxType == this.executionContextTypes.kClientTransaction) {
-            withTxnAndAutoRetry(
-                txnDb.getSession(), runFunc, {retryOnKilledSession: this.retryOnKilledSession});
+            withTxnAndAutoRetry(txnDb.getSession(), runFunc, {retryOnKilledSession: this.retryOnKilledSession});
         } else {
             runFunc();
         }
@@ -475,47 +482,50 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         assert.commandWorked(bulk.execute());
     };
 
-    $config.data.overrideInternalTransactionsReapThreshold =
-        function overrideInternalTransactionsReapThreshold(cluster) {
+    $config.data.overrideInternalTransactionsReapThreshold = function overrideInternalTransactionsReapThreshold(
+        cluster,
+    ) {
         const newThreshold = this.generateRandomInt(0, 4);
         print("Setting internalSessionsReapThreshold to " + newThreshold);
         cluster.executeOnMongodNodes((db) => {
             const res = assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalSessionsReapThreshold: newThreshold}));
+                db.adminCommand({setParameter: 1, internalSessionsReapThreshold: newThreshold}),
+            );
             this.originalInternalSessionReapThreshold[db.getMongo().host] = res.was;
         });
     };
 
-    $config.data.restoreInternalTransactionsReapThreshold =
-        function restoreInternalTransactionsReapThreshold(cluster) {
+    $config.data.restoreInternalTransactionsReapThreshold = function restoreInternalTransactionsReapThreshold(cluster) {
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalSessionsReapThreshold:
-                    this.originalInternalSessionReapThreshold[db.getMongo().host]
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalSessionsReapThreshold: this.originalInternalSessionReapThreshold[db.getMongo().host],
+                }),
+            );
         });
     };
 
-    $config.data.overrideTransactionLifetimeLimit = function overrideTransactionLifetimeLimit(
-        cluster) {
+    $config.data.overrideTransactionLifetimeLimit = function overrideTransactionLifetimeLimit(cluster) {
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                transactionLifetimeLimitSeconds: this.transactionLifetimeLimitSeconds
-            }));
+            const res = assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    transactionLifetimeLimitSeconds: this.transactionLifetimeLimitSeconds,
+                }),
+            );
             this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
         });
     };
 
-    $config.data.restoreTransactionLifetimeLimit = function restoreTransactionLifetimeLimit(
-        cluster) {
+    $config.data.restoreTransactionLifetimeLimit = function restoreTransactionLifetimeLimit(cluster) {
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                transactionLifetimeLimitSeconds:
-                    this.originalTransactionLifetimeLimitSeconds[db.getMongo().host]
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    transactionLifetimeLimitSeconds: this.originalTransactionLifetimeLimitSeconds[db.getMongo().host],
+                }),
+            );
         });
     };
 
@@ -558,15 +568,15 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
             this.insertInitialDocuments(db, collName, this.tid);
         }
 
-        const docs = assert
-                         .commandWorked(db.runCommand({
-                             find: collName,
-                             filter: {tid: this.tid},
-                             batchSize: this.batchSizeForDocsLookUp,
-                         }))
-                         .cursor.firstBatch;
+        const docs = assert.commandWorked(
+            db.runCommand({
+                find: collName,
+                filter: {tid: this.tid},
+                batchSize: this.batchSizeForDocsLookUp,
+            }),
+        ).cursor.firstBatch;
         assert.eq(docs.length, this.partitionSize);
-        docs.forEach(doc => {
+        docs.forEach((doc) => {
             this.expectedCounters[doc._id] = doc.counter;
         });
 
@@ -574,8 +584,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         this.initTime = new Date();
     };
 
-    $config.states.internalTransactionForInsert = function internalTransactionForInsert(db,
-                                                                                        collName) {
+    $config.states.internalTransactionForInsert = function internalTransactionForInsert(db, collName) {
         print("Starting internalTransactionForInsert");
         const executionCtxType = this.generateRandomExecutionContext();
         const insertOp = this.generateRandomInsert(db, collName);
@@ -583,8 +592,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         print("Finished internalTransactionForInsert");
     };
 
-    $config.states.internalTransactionForUpdate = function internalTransactionForUpdate(db,
-                                                                                        collName) {
+    $config.states.internalTransactionForUpdate = function internalTransactionForUpdate(db, collName) {
         print("Starting internalTransactionForUpdate");
         const executionCtxType = this.generateRandomExecutionContext();
         const updateOp = this.generateRandomUpdate(db, collName);
@@ -592,8 +600,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         print("Finished internalTransactionForUpdate");
     };
 
-    $config.states.internalTransactionForDelete = function internalTransactionForDelete(db,
-                                                                                        collName) {
+    $config.states.internalTransactionForDelete = function internalTransactionForDelete(db, collName) {
         print("Starting internalTransactionForDelete");
         const executionCtxType = this.generateRandomExecutionContext();
         const deleteOp = this.generateRandomDelete(db, collName);
@@ -601,8 +608,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         print("Finished internalTransactionForDelete");
     };
 
-    $config.states.internalTransactionForFindAndModify =
-        function internalTransactionForFindAndModify(db, collName) {
+    $config.states.internalTransactionForFindAndModify = function internalTransactionForFindAndModify(db, collName) {
         print("Starting internalTransactionForFindAndModify");
         const executionCtxType = this.generateRandomExecutionContext();
         const findAndModifyOp = this.generateRandomFindAndModify(db, collName);
@@ -619,16 +625,22 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
 
         for (const executionCtxType in this.expectDirtyDocs) {
             const numDirtyDocs = Object.keys(this.dirtyDocs[executionCtxType]).length;
-            print(`Dirty documents: ${tojsononeline({
-                executionCtxType,
-                count: numDirtyDocs,
-                docs: this.dirtyDocs[executionCtxType]
-            })}`);
+            print(
+                `Dirty documents: ${tojsononeline({
+                    executionCtxType,
+                    count: numDirtyDocs,
+                    docs: this.dirtyDocs[executionCtxType],
+                })}`,
+            );
             if (!this.expectDirtyDocs[executionCtxType]) {
-                assert.eq(0,
-                          numDirtyDocs,
-                          () => `expected to find no dirty documents for ${
-                              tojsononeline({executionCtxType})} but found ${numDirtyDocs}`);
+                assert.eq(
+                    0,
+                    numDirtyDocs,
+                    () =>
+                        `expected to find no dirty documents for ${tojsononeline({
+                            executionCtxType,
+                        })} but found ${numDirtyDocs}`,
+                );
             }
         }
 
@@ -638,10 +650,8 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         const session = db.getMongo().startSession();
         const sessionDb = session.getDatabase(db.getName());
         for (const s of this.sessions) {
-            if (s.getClusterTime() !== undefined)
-                session.advanceClusterTime(s.getClusterTime());
-            if (s.getOperationTime() !== undefined)
-                session.advanceOperationTime(s.getOperationTime());
+            if (s.getClusterTime() !== undefined) session.advanceClusterTime(s.getClusterTime());
+            if (s.getOperationTime() !== undefined) session.advanceOperationTime(s.getOperationTime());
         }
 
         const numDocsExpected = Object.keys(this.expectedCounters).length;
@@ -657,18 +667,19 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
             }
         }
         const docs = assert.commandWorked(sessionDb.runCommand(findCmdObj)).cursor.firstBatch;
-        print("verifyDocuments " +
-              tojsononeline(
-                  {findCmdObj, numDocsFound: docs.length, numDocsExpected: numDocsExpected}));
+        print(
+            "verifyDocuments " +
+                tojsononeline({findCmdObj, numDocsFound: docs.length, numDocsExpected: numDocsExpected}),
+        );
 
-        docs.forEach(doc => {
+        docs.forEach((doc) => {
             if (this.isDirtyDocument(doc)) {
                 return;
             }
             assert(doc._id in this.expectedCounters, tojson(doc));
             const expectedCounter = this.expectedCounters[doc._id];
             assert.eq(expectedCounter, doc.counter, () => {
-                return 'unexpected counter value, doc: ' + tojson(doc);
+                return "unexpected counter value, doc: " + tojson(doc);
             });
         });
 
@@ -680,33 +691,32 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         // collName and connCache. This workload does not set 'passConnectionCache' since it doesn't
         // use 'connCache' but it may extend a sharding workload that uses it.
         const originalInit = $config.states.init;
-        $config.states.init = function(db, collName, connCache) {
+        $config.states.init = function (db, collName, connCache) {
             originalInit.call(this, db, collName);
         };
 
         const originalInternalTransactionForInsert = $config.states.internalTransactionForInsert;
-        $config.states.internalTransactionForInsert = function(db, collName, connCache) {
+        $config.states.internalTransactionForInsert = function (db, collName, connCache) {
             originalInternalTransactionForInsert.call(this, db, collName);
         };
 
         const originalInternalTransactionForUpdate = $config.states.internalTransactionForUpdate;
-        $config.states.internalTransactionForUpdate = function(db, collName, connCache) {
+        $config.states.internalTransactionForUpdate = function (db, collName, connCache) {
             originalInternalTransactionForUpdate.call(this, db, collName);
         };
 
         const originalInternalTransactionForDelete = $config.states.internalTransactionForDelete;
-        $config.states.internalTransactionForDelete = function(db, collName, connCache) {
+        $config.states.internalTransactionForDelete = function (db, collName, connCache) {
             originalInternalTransactionForDelete.call(this, db, collName);
         };
 
-        const originalInternalTransactionForFindAndModify =
-            $config.states.internalTransactionForFindAndModify;
-        $config.states.internalTransactionForFindAndModify = function(db, collName, connCache) {
+        const originalInternalTransactionForFindAndModify = $config.states.internalTransactionForFindAndModify;
+        $config.states.internalTransactionForFindAndModify = function (db, collName, connCache) {
             originalInternalTransactionForFindAndModify.call(this, db, collName);
         };
 
         const originalVerifyDocuments = $config.states.verifyDocuments;
-        $config.states.verifyDocuments = function(db, collName, connCache) {
+        $config.states.verifyDocuments = function (db, collName, connCache) {
             originalVerifyDocuments.call(this, db, collName);
         };
     }
@@ -723,35 +733,35 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
             internalTransactionForUpdate: 0.2,
             internalTransactionForDelete: 0.2,
             internalTransactionForFindAndModify: 0.2,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         internalTransactionForUpdate: {
             internalTransactionForInsert: 0.2,
             internalTransactionForUpdate: 0.2,
             internalTransactionForDelete: 0.2,
             internalTransactionForFindAndModify: 0.2,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         internalTransactionForDelete: {
             internalTransactionForInsert: 0.2,
             internalTransactionForUpdate: 0.2,
             internalTransactionForDelete: 0.2,
             internalTransactionForFindAndModify: 0.2,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         internalTransactionForFindAndModify: {
             internalTransactionForInsert: 0.2,
             internalTransactionForUpdate: 0.2,
             internalTransactionForDelete: 0.2,
             internalTransactionForFindAndModify: 0.2,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         verifyDocuments: {
             internalTransactionForInsert: 0.25,
             internalTransactionForUpdate: 0.25,
             internalTransactionForDelete: 0.25,
             internalTransactionForFindAndModify: 0.25,
-        }
+        },
     };
 
     return $config;
@@ -762,10 +772,10 @@ const kBaseConfig = {
     iterations: 1,
     startState: "init",
     data: {},
-    states: {init: function(db, collName) {}},
+    states: {init: function (db, collName) {}},
     transitions: {init: {init: 1}},
-    setup: function(db, collName) {},
-    teardown: function(db, collName) {},
+    setup: function (db, collName) {},
+    teardown: function (db, collName) {},
 };
 
 export const $config = extendWorkload(kBaseConfig, extendWithInternalTransactionsUnsharded);

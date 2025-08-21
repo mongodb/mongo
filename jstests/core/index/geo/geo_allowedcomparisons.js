@@ -11,18 +11,41 @@ let oldPoint = [0, 0];
 // GeoJSON polygons can contain any geojson object and OLD points.
 let geojsonPoly = {
     "type": "Polygon",
-    "coordinates": [[[-5, -5], [-5, 5], [5, 5], [5, -5], [-5, -5]]]
+    "coordinates": [
+        [
+            [-5, -5],
+            [-5, 5],
+            [5, 5],
+            [5, -5],
+            [-5, -5],
+        ],
+    ],
 };
 
 // This can be contained by GJ polygons, intersected by anything GJ and old points.
-let geojsonLine = {"type": "LineString", "coordinates": [[0, 0], [1, 1]]};
+let geojsonLine = {
+    "type": "LineString",
+    "coordinates": [
+        [0, 0],
+        [1, 1],
+    ],
+};
 
 // $centerSphere can contain old or new points.
 let oldCenterSphere = [[0, 0], Math.PI / 180];
 // $box can contain old points.
-let oldBox = [[-5, -5], [5, 5]];
+let oldBox = [
+    [-5, -5],
+    [5, 5],
+];
 // $polygon can contain old points.
-let oldPolygon = [[-5, -5], [-5, 5], [5, 5], [5, -5], [-5, -5]];
+let oldPolygon = [
+    [-5, -5],
+    [-5, 5],
+    [5, 5],
+    [5, -5],
+    [-5, -5],
+];
 // $center can contain old points.
 let oldCenter = [[0, 0], 1];
 
@@ -61,20 +84,20 @@ function runTests() {
     assert.eq(1, t.find({geo: {$geoWithin: {$center: oldCenter}}}).itcount());
     assert.eq(1, t.find({geo: {$geoWithin: {$centerSphere: oldCenterSphere}}}).itcount());
     // Using geojson with 2d-style geoWithin syntax should choke.
-    assert.throws(function() {
+    assert.throws(function () {
         return t.find({geo: {$geoWithin: {$polygon: geojsonPoly}}}).itcount();
     });
     // Using old polygon w/new syntax should choke too.
-    assert.throws(function() {
+    assert.throws(function () {
         return t.find({geo: {$geoWithin: {$geometry: oldPolygon}}}).itcount();
     });
-    assert.throws(function() {
+    assert.throws(function () {
         return t.find({geo: {$geoWithin: {$geometry: oldBox}}}).itcount();
     });
-    assert.throws(function() {
+    assert.throws(function () {
         return t.find({geo: {$geoWithin: {$geometry: oldCenter}}}).itcount();
     });
-    assert.throws(function() {
+    assert.throws(function () {
         return t.find({geo: {$geoWithin: {$geometry: oldCenterSphere}}}).itcount();
     });
     // Even if we only have a 2d index, the 2d suitability function should

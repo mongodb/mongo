@@ -8,7 +8,7 @@ import {
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
     getLatestQueryStatsEntry,
-    withQueryStatsEnabled
+    withQueryStatsEnabled,
 } from "jstests/libs/query/query_stats_utils.js";
 
 const collName = jsTestName();
@@ -40,7 +40,7 @@ withQueryStatsEnabled(collName, (coll) => {
         hasSortStage: false,
         usedDisk: false,
         fromMultiPlanner: false,
-        fromPlanCache: false
+        fromPlanCache: false,
     });
     assertExpectedResults({
         results: firstEntry,
@@ -50,6 +50,6 @@ withQueryStatsEnabled(collName, (coll) => {
         expectedDocsReturnedMax: 3,
         expectedDocsReturnedMin: 3,
         expectedDocsReturnedSumOfSq: 9,
-        getMores: false
+        getMores: false,
     });
 });

@@ -15,58 +15,60 @@ rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
-let testDB = primary.getDB('test');
-let coll = testDB.getCollection('test');
+let testDB = primary.getDB("test");
+let coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(primary);
 
-const awaitIndexBuild = IndexBuildTest.startIndexBuild(
-    primary, coll.getFullName(), {a: 1}, {}, [ErrorCodes.InterruptedDueToReplStateChange]);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {}, [
+    ErrorCodes.InterruptedDueToReplStateChange,
+]);
 
 // When the index build starts, find its op id.
-const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
+const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1");
 
 IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {
-    jsTestLog('Inspecting db.currentOp() entry for index build: ' + tojson(op));
+    jsTestLog("Inspecting db.currentOp() entry for index build: " + tojson(op));
     assert.eq(
         undefined,
         op.connectionId,
-        'Was expecting IndexBuildsCoordinator op; found db.currentOp() for connection thread instead: ' +
-            tojson(op));
-    assert.eq(coll.getFullName(),
-              op.ns,
-              'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
+        "Was expecting IndexBuildsCoordinator op; found db.currentOp() for connection thread instead: " + tojson(op),
+    );
+    assert.eq(
+        coll.getFullName(),
+        op.ns,
+        "Unexpected ns field value in db.currentOp() result for index build: " + tojson(op),
+    );
 });
 
 // Index build should be present in the config.system.indexBuilds collection.
-const indexMap =
-    IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
-const indexBuildUUID = indexMap['a_1'].buildUUID;
-assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
+const indexMap = IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+const indexBuildUUID = indexMap["a_1"].buildUUID;
+assert(primary.getCollection("config.system.indexBuilds").findOne({_id: indexBuildUUID}));
 
-assert.commandWorked(primary.adminCommand(
-    {configureFailPoint: "hangIndexBuildBeforeAbortCleanUp", mode: "alwaysOn"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "hangIndexBuildBeforeAbortCleanUp", mode: "alwaysOn"}));
 
 // Signal the index builder thread to exit.
 assert.commandWorked(testDB.killOp(opId));
 
 // Wait for the index build to hang before cleaning up.
 IndexBuildTest.resumeIndexBuilds(primary);
-assert.commandWorked(primary.adminCommand({
-    waitForFailPoint: "hangIndexBuildBeforeAbortCleanUp",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    primary.adminCommand({
+        waitForFailPoint: "hangIndexBuildBeforeAbortCleanUp",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 // Step down the primary.
 assert.commandWorked(testDB.adminCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 10}));
 rst.awaitSecondaryNodes(null, [primary]);
 
 // Resume the abort.
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "hangIndexBuildBeforeAbortCleanUp", mode: "off"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "hangIndexBuildBeforeAbortCleanUp", mode: "off"}));
 
 awaitIndexBuild();
 
@@ -82,7 +84,7 @@ checkLog.containsJson(primary, 20655);
 rst.awaitReplication();
 
 // Verify that the interrupted index build was aborted.
-IndexBuildTest.assertIndexes(rst.getPrimary().getDB('test').getCollection('test'), 1, ['_id_']);
-IndexBuildTest.assertIndexes(rst.getSecondary().getDB('test').getCollection('test'), 1, ['_id_']);
+IndexBuildTest.assertIndexes(rst.getPrimary().getDB("test").getCollection("test"), 1, ["_id_"]);
+IndexBuildTest.assertIndexes(rst.getSecondary().getDB("test").getCollection("test"), 1, ["_id_"]);
 
 rst.stopSet();

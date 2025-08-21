@@ -13,7 +13,7 @@ t.save({a: 0});
 t.save({a: 0.5});
 
 let e = t.find({a: {$ne: 0}}).explain(true);
-assert.eq(2, e.executionStats.nReturned, 'A');
+assert.eq(2, e.executionStats.nReturned, "A");
 
 e = t.find({a: {$gt: -1, $lt: 1, $ne: 0}}).explain(true);
-assert.eq(2, e.executionStats.nReturned, 'B');
+assert.eq(2, e.executionStats.nReturned, "B");

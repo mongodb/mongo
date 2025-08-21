@@ -5,18 +5,18 @@ t.drop();
 
 assert.commandWorked(t.insert({x: 1}));
 
-res = t.update({x: 1}, {$set: {y: 1}});  // ok
+res = t.update({x: 1}, {$set: {y: 1}}); // ok
 assert.commandWorked(res);
 
 // Disallow $ in field names at the top-level.
-res = t.update({x: 1}, {$set: {$z: 1}});  // not ok
+res = t.update({x: 1}, {$set: {$z: 1}}); // not ok
 assert.writeError(res);
 
-res = t.update({x: 1}, {$inc: {$z: 1}});  // not ok
+res = t.update({x: 1}, {$inc: {$z: 1}}); // not ok
 assert.writeError(res);
 
 // Allow $ in nested field names.
-res = t.update({x: 1}, {$set: {'a.$b': 1}});
+res = t.update({x: 1}, {$set: {"a.$b": 1}});
 assert.commandWorked(res);
 
 res = t.update({x: 1}, {$set: {a: {$z: 1}}});
@@ -73,7 +73,7 @@ assert.writeError(res);
 // Test that '$id', '$db', and '$ref' are acceptable field names in
 // the correct case ( subdoc)
 // SERVER-3231
-res = t.update({n: 0}, {$set: {x: {$ref: '1', $id: 1, $db: '1'}}});
+res = t.update({n: 0}, {$set: {x: {$ref: "1", $id: 1, $db: "1"}}});
 assert.commandWorked(res);
 t.save({_id: 0, n: 0});
 

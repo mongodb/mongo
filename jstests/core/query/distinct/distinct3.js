@@ -24,7 +24,7 @@ for (let i = 0; i < 100; ++i) {
 assert.commandWorked(bulk.execute());
 
 // Attempt to remove the last match for the {a:1} index scan while distinct is yielding.
-let p = startParallelShell(function() {
+let p = startParallelShell(function () {
     for (let i = 0; i < 100; ++i) {
         var bulk = db.jstests_distinct3.initializeUnorderedBulkOp();
         bulk.find({a: 49}).remove();
@@ -36,7 +36,7 @@ let p = startParallelShell(function() {
 });
 
 for (let i = 0; i < 100; ++i) {
-    let count = t.distinct('c', {$or: [{a: {$gte: 0}, d: 0}, {b: {$gte: 0}}]}).length;
+    let count = t.distinct("c", {$or: [{a: {$gte: 0}, d: 0}, {b: {$gte: 0}}]}).length;
     assert.gt(count, 100);
 }
 

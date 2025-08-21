@@ -10,17 +10,15 @@ import {outputPlanCacheStats} from "jstests/libs/query/golden_test_utils.js";
 
 const coll = db[jsTestName()];
 
-const docs = [
-    {_id: 0, a: 0},
-];
+const docs = [{_id: 0, a: 0}];
 
 const q1 = {
-    $or: [{a: 1}, {a: {$lte: 'a string'}}],
-    _id: {$lte: 5}
+    $or: [{a: 1}, {a: {$lte: "a string"}}],
+    _id: {$lte: 5},
 };
 const q2 = {
     $or: [{a: 1}, {a: {$lte: 10}}],
-    _id: {$lte: 5}
+    _id: {$lte: 5},
 };
 
 coll.drop();
@@ -42,15 +40,17 @@ runTest(q1);
 runTest(q2);
 
 const partialFilter = {
-    $or: [{a: 1}, {a: {$lte: 'a string'}}]
+    $or: [{a: 1}, {a: {$lte: "a string"}}],
 };
 assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: partialFilter}));
 section("Index setup");
 line("Creating Index");
-code(tojson({
-    a: 1,
-    partialFilterExpression: partialFilter,
-}));
+code(
+    tojson({
+        a: 1,
+        partialFilterExpression: partialFilter,
+    }),
+);
 
 section("Queries with partial index");
 // Ensure q1 is cached which uses the partial filter.
@@ -67,6 +67,5 @@ line("Verifying that the plan cache contains an entry with the partial index");
 outputPlanCacheStats(coll);
 
 // q2 should not used the partial index and return the document.
-line(
-    "Verify that 2nd query does not use cached partial index plan and returns the correct document");
+line("Verify that 2nd query does not use cached partial index plan and returns the correct document");
 runTest(q2);

@@ -19,8 +19,7 @@ coll.drop();
 // score (i.e. 'searchScore' / 'vectorSearchScore') value.
 // Takes in the prefix stages of an aggregation pipeline that should generate documents with the
 // legacy and 'score' fields as metadata, as well as the argument name of the legacy metadata.
-function assertScoreMetadataPresentAndEqual(
-    {pipelinePrefix, legacyMetadataArg, forceProjectionOnMerger}) {
+function assertScoreMetadataPresentAndEqual({pipelinePrefix, legacyMetadataArg, forceProjectionOnMerger}) {
     function buildPipeline(projections) {
         let pipeline = pipelinePrefix;
 
@@ -36,7 +35,7 @@ function assertScoreMetadataPresentAndEqual(
 
     const pipelineWithScoreAndLegacyArg = buildPipeline({
         [legacyMetadataArg]: {$meta: legacyMetadataArg},
-        [kScoreMetadataArg]: {$meta: kScoreMetadataArg}
+        [kScoreMetadataArg]: {$meta: kScoreMetadataArg},
     });
 
     let results = coll.aggregate(pipelineWithScoreAndLegacyArg).toArray();
@@ -45,10 +44,11 @@ function assertScoreMetadataPresentAndEqual(
     for (let result of results) {
         assert(result.hasOwnProperty(legacyMetadataArg));
         assert(result.hasOwnProperty(kScoreMetadataArg));
-        assert.eq(result[legacyMetadataArg],
-                  result[kScoreMetadataArg],
-                  "the legacy metadata value '" + legacyMetadataArg +
-                      "' is not equal to the 'score' metadata value");
+        assert.eq(
+            result[legacyMetadataArg],
+            result[kScoreMetadataArg],
+            "the legacy metadata value '" + legacyMetadataArg + "' is not equal to the 'score' metadata value",
+        );
     }
 
     // We should also be able to project $score by itself.
@@ -64,11 +64,13 @@ function assertScoreMetadataPresentAndEqual(
 
 // Testing $search
 {
-    assert.commandWorked(coll.insertMany([
-        {a: -1, title: "Of Mice and Men"},
-        {a: 100, title: "The Big Mouse"},
-        {a: 10, title: "X-Men"}
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            {a: -1, title: "Of Mice and Men"},
+            {a: 100, title: "The Big Mouse"},
+            {a: 10, title: "X-Men"},
+        ]),
+    );
 
     const indexName = "search-test-index";
 
@@ -79,12 +81,12 @@ function assertScoreMetadataPresentAndEqual(
     assertScoreMetadataPresentAndEqual({
         pipelinePrefix: [{$search: searchQuery}],
         legacyMetadataArg: kSearchScoreMetadataArg,
-        forceProjectionOnMerger: false
+        forceProjectionOnMerger: false,
     });
     assertScoreMetadataPresentAndEqual({
         pipelinePrefix: [{$search: searchQuery}],
         legacyMetadataArg: kSearchScoreMetadataArg,
-        forceProjectionOnMerger: true
+        forceProjectionOnMerger: true,
     });
 
     dropSearchIndex(coll, {name: indexName});
@@ -92,11 +94,13 @@ function assertScoreMetadataPresentAndEqual(
 
 // Testing $vectorSearch
 {
-    assert.commandWorked(coll.insertMany([
-        {a: -1, v: [1, 0, 8, 1, 8]},
-        {a: 100, v: [2, -2, 1, 4, 4]},
-        {a: 10, v: [4, 10, -8, 22, 0]}
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            {a: -1, v: [1, 0, 8, 1, 8]},
+            {a: 100, v: [2, -2, 1, 4, 4]},
+            {a: 10, v: [4, 10, -8, 22, 0]},
+        ]),
+    );
 
     const indexName = "vector-search-test-index";
     // Create vector search index on movie plot embeddings.
@@ -104,9 +108,8 @@ function assertScoreMetadataPresentAndEqual(
         name: indexName,
         type: "vectorSearch",
         definition: {
-            "fields":
-                [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}]
-        }
+            "fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}],
+        },
     };
 
     createSearchIndex(coll, vectorIndex);
@@ -122,12 +125,12 @@ function assertScoreMetadataPresentAndEqual(
     assertScoreMetadataPresentAndEqual({
         pipelinePrefix: [{$vectorSearch: vectorSearchQuery}],
         legacyMetadataArg: kVectorSearchScoreMetadataArg,
-        forceProjectionOnMerger: false
+        forceProjectionOnMerger: false,
     });
     assertScoreMetadataPresentAndEqual({
         pipelinePrefix: [{$vectorSearch: vectorSearchQuery}],
         legacyMetadataArg: kVectorSearchScoreMetadataArg,
-        forceProjectionOnMerger: true
+        forceProjectionOnMerger: true,
     });
 
     dropSearchIndex(coll, {name: indexName});

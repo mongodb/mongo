@@ -19,11 +19,9 @@ assert.commandWorked(sessionCollection.insert(Array.from({length: 5}, (_, i) => 
 
 const res = assert.commandWorked(sessionCollection.runCommand("find", {batchSize: 2}));
 
-assert.commandFailedWithCode(db.adminCommand({refreshLogicalSessionCacheNow: 1}),
-                             ErrorCodes.InternalError);
+assert.commandFailedWithCode(db.adminCommand({refreshLogicalSessionCacheNow: 1}), ErrorCodes.InternalError);
 
-assert.commandWorked(
-    sessionDb.runCommand({getMore: res.cursor.id, collection: sessionCollection.getName()}));
+assert.commandWorked(sessionDb.runCommand({getMore: res.cursor.id, collection: sessionCollection.getName()}));
 
 fp.off();
 

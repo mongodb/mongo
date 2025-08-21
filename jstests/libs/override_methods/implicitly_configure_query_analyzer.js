@@ -5,13 +5,10 @@
  * sharding.
  */
 
-import {
-    denylistedNamespaces,
-    ShardingOverrideCommon
-} from "jstests/libs/override_methods/shard_collection_util.js";
+import {denylistedNamespaces, ShardingOverrideCommon} from "jstests/libs/override_methods/shard_collection_util.js";
 
 const kShardProbability = 0.5;
-const kSamplesPerSecond = 1000;  // per second.
+const kSamplesPerSecond = 1000; // per second.
 
 // Save a reference to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
@@ -36,8 +33,7 @@ function configureQueryAnalyzer({db, collName}) {
 
     let result;
     try {
-        result = db.adminCommand(
-            {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: kSamplesPerSecond});
+        result = db.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: kSamplesPerSecond});
     } catch (e) {
         jsTest.log.info("Failed to configure query analyzer", {ns, error: e});
         if (!isNetworkError(e)) {
@@ -45,10 +41,12 @@ function configureQueryAnalyzer({db, collName}) {
         }
     }
     if (!result.ok) {
-        if (result.code === ErrorCodes.CommandNotFound ||
+        if (
+            result.code === ErrorCodes.CommandNotFound ||
             result.code === ErrorCodes.NamespaceNotFound ||
             result.code === ErrorCodes.CommandNotSupportedOnView ||
-            result.code === ErrorCodes.IllegalOperation) {
+            result.code === ErrorCodes.IllegalOperation
+        ) {
             jsTest.log.info("Failed to configure query analyzer", {ns, result});
             return;
         }
@@ -56,7 +54,7 @@ function configureQueryAnalyzer({db, collName}) {
     }
 }
 
-DB.prototype.createCollection = function() {
+DB.prototype.createCollection = function () {
     const result = originalCreateCollection.apply(this, arguments);
 
     if (!result.ok || arguments.length < 2 || arguments[1] == null || !isObject(arguments[1])) {
@@ -80,7 +78,7 @@ DB.prototype.createCollection = function() {
                 db: this,
                 collName,
                 shardKey: {[timeField]: 1},
-                timeseriesSpec: arguments[1]["timeseries"]
+                timeseriesSpec: arguments[1]["timeseries"],
             });
         } else {
             ShardingOverrideCommon.shardCollection(originalGetCollection.apply(this, [collName]));
@@ -91,7 +89,7 @@ DB.prototype.createCollection = function() {
     return result;
 };
 
-DB.prototype.getCollection = function() {
+DB.prototype.getCollection = function () {
     const collection = originalGetCollection.apply(this, arguments);
 
     const dbName = this.getName();
@@ -114,8 +112,7 @@ DB.prototype.getCollection = function() {
 
     const result = originalCreateCollection.apply(this, [collName]);
 
-    if (!result.ok)
-        return collection;
+    if (!result.ok) return collection;
 
     // Only shard some of the time, so that query sampling is also tested on unsharded collections.
     if (Math.random() < kShardProbability) {
@@ -126,7 +123,7 @@ DB.prototype.getCollection = function() {
     return collection;
 };
 
-DBCollection.prototype.drop = function() {
+DBCollection.prototype.drop = function () {
     const result = originalDBCollectionDrop.apply(this, arguments);
 
     if (!result || TestData.implicitlyShardOnCreateCollectionOnly) {

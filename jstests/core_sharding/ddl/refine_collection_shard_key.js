@@ -42,10 +42,8 @@ function validateCRUDAfterRefine() {
     const sessionDB = session.getDatabase(kDbName);
 
     // Verify that documents inserted before refineCollectionShardKey have not been corrupted.
-    assert.eq([{a: 5, b: 5, c: 5, d: 5}],
-              sessionDB.getCollection(kCollName).find({a: 5}, {_id: 0}).toArray());
-    assert.eq([{a: 10, b: 10, c: 10, d: 10}],
-              sessionDB.getCollection(kCollName).find({a: 10}, {_id: 0}).toArray());
+    assert.eq([{a: 5, b: 5, c: 5, d: 5}], sessionDB.getCollection(kCollName).find({a: 5}, {_id: 0}).toArray());
+    assert.eq([{a: 10, b: 10, c: 10, d: 10}], sessionDB.getCollection(kCollName).find({a: 10}, {_id: 0}).toArray());
 
     // A write with the incomplete shard key is treated as if the missing values are null.
     assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: 1, b: 1}));
@@ -59,12 +57,9 @@ function validateCRUDAfterRefine() {
     assert.commandWorked(sessionDB.getCollection(kCollName).insert({a: -1, b: -1, c: -1, d: -1}));
 
     // This enables the feature allows writes to omit the shard key in their queries.
-    assert.commandWorked(
-        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {x: 2}}));
-    assert.commandWorked(
-        sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
-    assert.commandWorked(
-        sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1}, {$set: {b: 4}}));
+    assert.commandWorked(sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1}, {$set: {x: 2}}));
+    assert.commandWorked(sessionDB.getCollection(kCollName).update({a: 1, b: 1, c: 1, d: 1}, {$set: {b: 2}}));
+    assert.commandWorked(sessionDB.getCollection(kCollName).update({a: -1, b: -1, c: -1, d: -1}, {$set: {b: 4}}));
 
     assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).x);
     assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
@@ -90,13 +85,13 @@ if (shardNames.length >= 2) {
 
 const oldKeyDoc = {
     a: 1,
-    b: 1
+    b: 1,
 };
 const newKeyDoc = {
     a: 1,
     b: 1,
     c: 1,
-    d: 1
+    d: 1,
 };
 
 assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: oldKeyDoc}));
@@ -119,20 +114,16 @@ assert.commandWorked(mongos.getDB(kDbName).runCommand({drop: kCollName}));
     const shardedNs = kDbName + ".shardedColl";
     const refinedNs = kDbName + ".refinedColl";
 
-    assert.commandWorked(
-        mongos.adminCommand({shardCollection: shardedNs, key: {a: 1, b: 1, c: 1}}));
-    assert.commandWorked(
-        mongos.adminCommand({split: shardedNs, middle: {a: 0, b: MinKey, c: MinKey}}));
-    assert.commandWorked(
-        mongos.adminCommand({split: shardedNs, middle: {a: 10, b: MinKey, c: MinKey}}));
+    assert.commandWorked(mongos.adminCommand({shardCollection: shardedNs, key: {a: 1, b: 1, c: 1}}));
+    assert.commandWorked(mongos.adminCommand({split: shardedNs, middle: {a: 0, b: MinKey, c: MinKey}}));
+    assert.commandWorked(mongos.adminCommand({split: shardedNs, middle: {a: 10, b: MinKey, c: MinKey}}));
 
     assert.commandWorked(mongos.adminCommand({shardCollection: refinedNs, key: {a: 1}}));
     assert.commandWorked(mongos.adminCommand({split: refinedNs, middle: {a: 0}}));
     assert.commandWorked(mongos.adminCommand({split: refinedNs, middle: {a: 10}}));
 
     assert.commandWorked(mongos.getCollection(refinedNs).createIndex({a: 1, b: 1, c: 1}));
-    assert.commandWorked(
-        mongos.adminCommand({refineCollectionShardKey: refinedNs, key: {a: 1, b: 1, c: 1}}));
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: refinedNs, key: {a: 1, b: 1, c: 1}}));
 
     compareBoundaries(mongos, shardedNs, refinedNs);
 })();
@@ -142,21 +133,17 @@ assert.commandWorked(mongos.getDB(kDbName).runCommand({drop: kCollName}));
     const shardedNs = kDbName + ".nestedShardedColl";
     const refinedNs = kDbName + ".nestedRefinedColl";
 
-    assert.commandWorked(
-        mongos.adminCommand({shardCollection: shardedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
+    assert.commandWorked(mongos.adminCommand({shardCollection: shardedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
 
-    assert.commandWorked(
-        mongos.adminCommand({split: shardedNs, middle: {"a.b": 0, "c.d.e": MinKey, f: MinKey}}));
-    assert.commandWorked(
-        mongos.adminCommand({split: shardedNs, middle: {"a.b": 10, "c.d.e": MinKey, f: MinKey}}));
+    assert.commandWorked(mongos.adminCommand({split: shardedNs, middle: {"a.b": 0, "c.d.e": MinKey, f: MinKey}}));
+    assert.commandWorked(mongos.adminCommand({split: shardedNs, middle: {"a.b": 10, "c.d.e": MinKey, f: MinKey}}));
 
     assert.commandWorked(mongos.adminCommand({shardCollection: refinedNs, key: {"a.b": 1}}));
     assert.commandWorked(mongos.adminCommand({split: refinedNs, middle: {"a.b": 0}}));
     assert.commandWorked(mongos.adminCommand({split: refinedNs, middle: {"a.b": 10}}));
 
     assert.commandWorked(mongos.getCollection(refinedNs).createIndex({"a.b": 1, "c.d.e": 1, f: 1}));
-    assert.commandWorked(mongos.adminCommand(
-        {refineCollectionShardKey: refinedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: refinedNs, key: {"a.b": 1, "c.d.e": 1, f: 1}}));
 
     compareBoundaries(mongos, shardedNs, refinedNs);
 })();

@@ -40,9 +40,10 @@ function stepUpNewPrimary(replSet) {
 
             jsTest.log(
                 `Got a network error ${tojson(e)} while` +
-                ` attempting to step up secondary ${newPrimary.host}. This is likely due to` +
-                ` the secondary previously having transitioned through ROLLBACK and closing` +
-                ` its user connections. Will retry stepping up the same secondary again`);
+                    ` attempting to step up secondary ${newPrimary.host}. This is likely due to` +
+                    ` the secondary previously having transitioned through ROLLBACK and closing` +
+                    ` its user connections. Will retry stepping up the same secondary again`,
+            );
             res = newPrimary.adminCommand({replSetStepUp: 1});
         }
 
@@ -52,8 +53,10 @@ function stepUpNewPrimary(replSet) {
             return true;
         }
 
-        jsTest.log(`Failed to step up secondary ${newPrimary.host} and` +
-                   ` got error ${tojson(res)}. Will retry until one of the secondaries step up`);
+        jsTest.log(
+            `Failed to step up secondary ${newPrimary.host} and` +
+                ` got error ${tojson(res)}. Will retry until one of the secondaries step up`,
+        );
         return false;
     });
 }
@@ -102,13 +105,12 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
     assertDropCollection(testDB, collName);
 
     if (clustered) {
-        assert.commandWorked(
-            testDB.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+        assert.commandWorked(testDB.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
     }
 
-    const collCount = 5032;  // Intentionally not a multiple of the default batch size.
+    const collCount = 5032; // Intentionally not a multiple of the default batch size.
 
-    const docs = [...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024), b: 2 * x}));
+    const docs = [...Array(collCount).keys()].map((x) => ({_id: x, a: "a".repeat(1024), b: 2 * x}));
 
     assert.commandWorked(coll.insertMany(docs, {ordered: false}));
 
@@ -118,30 +120,38 @@ function runTest(failoverFn, clustered, expectNetworkErrorOnDelete) {
     assert.commandWorked(coll.createIndex({b: 1}));
 
     const hangAfterApproxNDocs = Random.randInt(collCount);
-    jsTestLog(`About to hang batched delete after evaluating approximately ${
-        hangAfterApproxNDocs} documents`);
+    jsTestLog(`About to hang batched delete after evaluating approximately ${hangAfterApproxNDocs} documents`);
 
     // When the delete fails, the failpoint will automatically unpause. If the connection is killed,
     // it is unsafe to try and disable the failpoint tied to testDB's original connection.
-    const fp = configureFailPoint(
-        testDB,
-        "batchedDeleteStageSleepAfterNDocuments",
-        {nDocs: hangAfterApproxNDocs, ns: coll.getFullName(), sleepMs: 60 * 60 * 1000});
+    const fp = configureFailPoint(testDB, "batchedDeleteStageSleepAfterNDocuments", {
+        nDocs: hangAfterApproxNDocs,
+        ns: coll.getFullName(),
+        sleepMs: 60 * 60 * 1000,
+    });
 
     const awaitDeleteFails = startParallelShell(
-        funWithArgs((dbName, collName, expectNetworkErrorOnDelete) => {
-            const testDB = db.getSiblingDB(dbName);
-            const coll = testDB.getCollection(collName);
-            try {
-                assert.commandFailed(testDB.runCommand(
-                    {delete: collName, deletes: [{q: {_id: {$gte: 0}}, limit: 0}]}));
-            } catch (e) {
-                if (!isNetworkError(e) || !expectNetworkErrorOnDelete) {
-                    // On unclean shutdown, expect a network error.
-                    throw e;
+        funWithArgs(
+            (dbName, collName, expectNetworkErrorOnDelete) => {
+                const testDB = db.getSiblingDB(dbName);
+                const coll = testDB.getCollection(collName);
+                try {
+                    assert.commandFailed(
+                        testDB.runCommand({delete: collName, deletes: [{q: {_id: {$gte: 0}}, limit: 0}]}),
+                    );
+                } catch (e) {
+                    if (!isNetworkError(e) || !expectNetworkErrorOnDelete) {
+                        // On unclean shutdown, expect a network error.
+                        throw e;
+                    }
                 }
-            }
-        }, dbName, collName, expectNetworkErrorOnDelete), primary.port);
+            },
+            dbName,
+            collName,
+            expectNetworkErrorOnDelete,
+        ),
+        primary.port,
+    );
 
     fp.wait();
 

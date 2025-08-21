@@ -7,10 +7,7 @@
  * @tags: [ featureFlagRankFusionFull, featureFlagSearchHybridScoringFull, requires_fcv_82 ]
  */
 
-import {
-    getMovieData,
-    getMovieSearchIndexSpec,
-} from "jstests/with_mongot/e2e_lib/data/movies.js";
+import {getMovieData, getMovieSearchIndexSpec} from "jstests/with_mongot/e2e_lib/data/movies.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -28,7 +25,7 @@ function buildQueryWithWeights(weights, hybridSearchStageName) {
             $search: {
                 index: getMovieSearchIndexSpec().name,
                 text: {query: "foo", path: ["fullplot", "title"]},
-            }
+            },
         },
     ];
     const pipelines = {
@@ -50,8 +47,7 @@ function buildQueryWithWeights(weights, hybridSearchStageName) {
         // Must be $scoreFusion.
         const query = [
             {
-                $scoreFusion:
-                    {input: {pipelines: pipelines, normalization: "none"}, combination: {weights}},
+                $scoreFusion: {input: {pipelines: pipelines, normalization: "none"}, combination: {weights}},
             },
         ];
         return query;
@@ -98,19 +94,19 @@ function assertWeightsSuggestionErrorMessage(weights, suggestions) {
             let errMsg = e.message;
 
             // Build expected message
-            let expectedErrMsg = stageName + " stage contained (" + suggestions.length +
+            let expectedErrMsg =
+                stageName +
+                " stage contained (" +
+                suggestions.length +
                 ") weight(s) in 'combination.weights' that did not reference valid pipeline names. " +
                 "Suggestions for valid pipeline names: ";
             for (let i = 0; i < suggestions.length; i++) {
                 expectedErrMsg += convertSingleSuggestionToString(i);
             }
 
-            assert.includes(errMsg,
-                            expectedErrMsg,
-                            stageName + " error message for misspelled weights did not match");
+            assert.includes(errMsg, expectedErrMsg, stageName + " error message for misspelled weights did not match");
         }
-        assert(didError,
-               "expected " + stageName + " query with provided weights to error, but did not.");
+        assert(didError, "expected " + stageName + " query with provided weights to error, but did not.");
     }
     buildErrorMessage(weights, "$rankFusion");
     buildErrorMessage(weights, "$scoreFusion");
@@ -119,18 +115,22 @@ function assertWeightsSuggestionErrorMessage(weights, suggestions) {
 // Run test cases.
 // Cases that will produce at most one suggestion per invalid weight.
 assertWeightsSuggestionErrorMessage({kit: 1}, [["kit", "kite"]]);
-assertWeightsSuggestionErrorMessage({kit: 1, knife: 1, necessary: 1, neptune: 1},
-                                    [["kit", "kite"]]);
+assertWeightsSuggestionErrorMessage({kit: 1, knife: 1, necessary: 1, neptune: 1}, [["kit", "kite"]]);
 assertWeightsSuggestionErrorMessage({knife: 1, kite: 1, necptune: 1}, [["necptune", "neptune"]]);
-assertWeightsSuggestionErrorMessage({knife: 1, kite: 1, necessary: 1, necptune: 1},
-                                    [["necptune", "neptune"]]);
+assertWeightsSuggestionErrorMessage({knife: 1, kite: 1, necessary: 1, necptune: 1}, [["necptune", "neptune"]]);
 
 // Cases that produce multiple suggestions per invalid weight.
 assertWeightsSuggestionErrorMessage({fite: 1}, [["fite", "kite", "mite", "nite"]]);
-assertWeightsSuggestionErrorMessage({nife: 1, kit: 1},
-                                    [["nife", "knife", "nite"], ["kit", "kite"]]);
-assertWeightsSuggestionErrorMessage({nife: 1, kit: 1, necessary: 1, neptune: 1},
-                                    [["nife", "knife", "nite"], ["kit", "kite"]]);
-assertWeightsSuggestionErrorMessage(
-    {nife: 1, kit: 1, necptune: 1},
-    [["nife", "knife", "nite"], ["kit", "kite"], ["necptune", "neptune"]]);
+assertWeightsSuggestionErrorMessage({nife: 1, kit: 1}, [
+    ["nife", "knife", "nite"],
+    ["kit", "kite"],
+]);
+assertWeightsSuggestionErrorMessage({nife: 1, kit: 1, necessary: 1, neptune: 1}, [
+    ["nife", "knife", "nite"],
+    ["kit", "kite"],
+]);
+assertWeightsSuggestionErrorMessage({nife: 1, kit: 1, necptune: 1}, [
+    ["nife", "knife", "nite"],
+    ["kit", "kite"],
+    ["necptune", "neptune"],
+]);

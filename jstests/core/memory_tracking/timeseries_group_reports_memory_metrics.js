@@ -29,9 +29,11 @@ const collName = jsTestName();
 const coll = db[collName];
 db[collName].drop();
 
-assert.commandWorked(db.createCollection(coll.getName(), {
-    timeseries: {timeField: 't', metaField: 'm'},
-}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: "t", metaField: "m"},
+    }),
+);
 
 const nBuckets = 50;
 const nDocsPerBucket = 200;
@@ -45,23 +47,18 @@ for (let m = 1; m <= nBuckets; m++) {
 }
 assert.commandWorked(bulk.execute());
 
-const pipeline = [
-    {$group: {_id: {y: '$a'}, min: {$min: "$b"}}},
-];
-const pipelineWithLimit = [{$group: {_id: {y: '$a'}, min: {$min: "$b"}}}, {$limit: 10}];
+const pipeline = [{$group: {_id: {y: "$a"}, min: {$min: "$b"}}}];
+const pipelineWithLimit = [{$group: {_id: {y: "$a"}, min: {$min: "$b"}}}, {$limit: 10}];
 
 const stageName = "block_group";
 
 // 'forceIncreasedSpilling' should not be enabled for the following tests.
-const kOriginalForceIncreasedSpilling =
-    assert
-        .commandWorked(db.adminCommand(
-            {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}))
-        .was;
+const kOriginalForceIncreasedSpilling = assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}),
+).was;
 
 // We need the query to run in SBE to use block processing for timeseries.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 
 try {
     {
@@ -73,7 +70,7 @@ try {
                 pipeline: pipeline,
                 cursor: {batchSize: 20},
                 comment: "$group on timeseries collection with block processing",
-                allowDiskUse: false
+                allowDiskUse: false,
             },
             stageName: stageName,
             expectedNumGetMores: 4,
@@ -89,7 +86,7 @@ try {
                 pipeline: pipelineWithLimit,
                 cursor: {batchSize: 2},
                 comment: "memory stats timeseries $group limit test",
-                allowDiskUse: false
+                allowDiskUse: false,
             },
             stageName: stageName,
             expectedNumGetMores: 5,
@@ -98,14 +95,17 @@ try {
 
     {
         // Set maxMemory low to force spill to disk.
-        const originalMemoryLimit = assert.commandWorked(db.adminCommand({
-            setParameter: 1,
-            internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1000
-        }));
+        const originalMemoryLimit = assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1000,
+            }),
+        );
         // This parameter is generally true for debug builds, but we would like to turn it off
         // for this test.
-        const originalForceSpilling = assert.commandWorked(db.adminCommand(
-            {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}));
+        const originalForceSpilling = assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}),
+        );
 
         try {
             runMemoryStatsTest({
@@ -116,7 +116,7 @@ try {
                     pipeline: pipeline,
                     cursor: {batchSize: 20},
                     comment: "memory stats timeseries $group spilling test",
-                    allowDiskUse: true
+                    allowDiskUse: true,
                 },
                 stageName: stageName,
                 expectedNumGetMores: 4,
@@ -126,21 +126,26 @@ try {
             });
         } finally {
             // Set maxMemory back to the original value.
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
-                    originalMemoryLimit.was
-            }));
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQuerySlotBasedExecutionHashAggIncreasedSpilling: originalForceSpilling.was
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: originalMemoryLimit.was,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQuerySlotBasedExecutionHashAggIncreasedSpilling: originalForceSpilling.was,
+                }),
+            );
         }
     }
 } finally {
     db[collName].drop();
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQuerySlotBasedExecutionHashAggIncreasedSpilling: kOriginalForceIncreasedSpilling
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggIncreasedSpilling: kOriginalForceIncreasedSpilling,
+        }),
+    );
 }

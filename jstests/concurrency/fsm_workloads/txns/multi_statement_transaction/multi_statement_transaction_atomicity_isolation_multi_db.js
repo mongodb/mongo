@@ -5,10 +5,7 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_atomicity_isolation.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_atomicity_isolation.js";
 
 export const $config = extendWorkload($baseConfig, ($config, $super) => {
     // Number of unique collections and number of unique databases. The square root is used
@@ -20,8 +17,7 @@ export const $config = extendWorkload($baseConfig, ($config, $super) => {
         const collections = [];
         for (let i = 0; i < nsCount; ++i) {
             for (let j = 0; j < nsCount; ++j) {
-                collections.push(
-                    db.getSiblingDB(db.getName() + '_' + i).getCollection(collName + '_' + j));
+                collections.push(db.getSiblingDB(db.getName() + "_" + i).getCollection(collName + "_" + j));
             }
         }
         return collections;

@@ -8,7 +8,7 @@ rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
-let coll = primary.getCollection('test.traversal_failure');
+let coll = primary.getCollection("test.traversal_failure");
 assert.commandWorked(coll.createIndex({x: 1}));
 
 for (let i = 0; i < 5; i++) {
@@ -16,8 +16,7 @@ for (let i = 0; i < 5; i++) {
 }
 
 // Test that validation runs to completion when encountering a index traversal issue
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "failIndexTraversal", mode: "alwaysOn"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "failIndexTraversal", mode: "alwaysOn"}));
 let res = assert.commandWorked(coll.validate());
 jsTestLog(res);
 assert(!res.valid);

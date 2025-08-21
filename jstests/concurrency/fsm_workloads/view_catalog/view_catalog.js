@@ -4,34 +4,34 @@
  * Creates, modifies and drops view namespaces concurrently. Each worker operates on their own view,
  * built on a shared underlying collection.
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         // Use the workload name as a prefix for the view name, since the workload name is assumed
         // to be unique.
-        prefix: 'view_catalog',
-
+        prefix: "view_catalog",
     };
 
-    var states = (function() {
+    var states = (function () {
         function init(db, collName) {
             this.threadCollName = db[collName].getName();
-            this.threadViewName = this.prefix + '_' + this.tid;
+            this.threadViewName = this.prefix + "_" + this.tid;
             this.counter = 0;
-            this.confirmViewDefinition = function confirmViewDefinition(
-                db, viewName, collName, pipeline, counter) {
+            this.confirmViewDefinition = function confirmViewDefinition(db, viewName, collName, pipeline, counter) {
                 assert.eq({_id: counter}, db[collName].aggregate(pipeline).toArray()[0]);
                 assert.eq({_id: counter}, db[viewName].findOne());
                 const res = db.runCommand({listCollections: 1, filter: {name: viewName}});
                 assert.commandWorked(res);
                 assert.eq(1, res.cursor.firstBatch.length, tojson(res));
-                assert.eq({
-                    name: viewName,
-                    type: "view",
-                    options: {viewOn: collName, pipeline: pipeline},
-                    info: {readOnly: true}
-                },
-                          res.cursor.firstBatch[0],
-                          tojson(res));
+                assert.eq(
+                    {
+                        name: viewName,
+                        type: "view",
+                        options: {viewOn: collName, pipeline: pipeline},
+                        info: {readOnly: true},
+                    },
+                    res.cursor.firstBatch[0],
+                    tojson(res),
+                );
             };
         }
 
@@ -45,8 +45,9 @@ export const $config = (function() {
         function modify(db, collName) {
             this.counter++;
             let pipeline = [{$match: {_id: this.counter}}];
-            assert.commandWorked(db.runCommand(
-                {collMod: this.threadViewName, viewOn: this.threadCollName, pipeline: pipeline}));
+            assert.commandWorked(
+                db.runCommand({collMod: this.threadViewName, viewOn: this.threadCollName, pipeline: pipeline}),
+            );
             this.confirmViewDefinition(db, this.threadViewName, collName, pipeline, this.counter);
         }
 
@@ -65,7 +66,7 @@ export const $config = (function() {
         init: {create: 1},
         create: {modify: 0.75, drop: 0.25},
         modify: {modify: 0.5, drop: 0.5},
-        drop: {create: 1}
+        drop: {create: 1},
     };
 
     var setup = function setup(db, collName, cluster) {

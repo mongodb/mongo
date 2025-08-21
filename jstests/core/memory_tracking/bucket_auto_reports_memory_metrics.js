@@ -27,20 +27,21 @@ for (let i = 1; i <= 100; i++) {
     docs.push({
         value: i,
         category: i % 10 === 0 ? "decade" : "regular",
-        group: Math.floor(i / 25) + 1  // Creates 4 groups (1-25, 26-50, 51-75, 76-100).
+        group: Math.floor(i / 25) + 1, // Creates 4 groups (1-25, 26-50, 51-75, 76-100).
     });
 }
 assert.commandWorked(coll.insertMany(docs));
 
 {
-    const pipeline = [{
-        $bucketAuto: {
-            groupBy: "$value",
-            buckets: 5,
-            output:
-                {"count": {$sum: 1}, "valueList": {$push: "$value"}, "avgValue": {$avg: "$value"}}
-        }
-    }];
+    const pipeline = [
+        {
+            $bucketAuto: {
+                groupBy: "$value",
+                buckets: 5,
+                output: {"count": {$sum: 1}, "valueList": {$push: "$value"}, "avgValue": {$avg: "$value"}},
+            },
+        },
+    ];
     jsTest.log.info("Running basic pipeline test : " + tojson(pipeline));
 
     runMemoryStatsTest({
@@ -67,11 +68,11 @@ assert.commandWorked(coll.insertMany(docs));
                 output: {
                     "count": {$sum: 1},
                     "valueList": {$push: "$value"},
-                    "avgValue": {$avg: "$value"}
-                }
-            }
+                    "avgValue": {$avg: "$value"},
+                },
+            },
         },
-        {$limit: 1}
+        {$limit: 1},
     ];
     jsTest.log.info("Running pipeline with $limit : " + tojson(pipeline));
 
@@ -83,12 +84,12 @@ assert.commandWorked(coll.insertMany(docs));
             pipeline: pipeline,
             cursor: {batchSize: 1},
             comment: "memory stats bucketAuto with limit test",
-            allowDiskUse: false
+            allowDiskUse: false,
         },
         stageName,
         expectedNumGetMores: 1,
-        skipInUseTrackedMemBytesCheck: true,  // $limit will force execution to stop early, so
-                                              // inUseTrackedMemBytes may not appear in CurOp.
+        skipInUseTrackedMemBytesCheck: true, // $limit will force execution to stop early, so
+        // inUseTrackedMemBytes may not appear in CurOp.
     });
 }
 
@@ -101,21 +102,18 @@ assert.commandWorked(coll.insertMany(docs));
                 output: {
                     "count": {$sum: 1},
                     "valueList": {$push: "$value"},
-                    "avgValue": {$avg: "$value"}
-                }
-            }
+                    "avgValue": {$avg: "$value"},
+                },
+            },
         },
     ];
     jsTest.log.info("Running pipeline that will spill : " + tojson(pipeline));
 
     // Set a low memory limit to force spilling to disk.
-    const originalMemoryLimit =
-        assert
-            .commandWorked(db.adminCommand(
-                {getParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: 1}))
-            .internalDocumentSourceBucketAutoMaxMemoryBytes;
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: 100}));
+    const originalMemoryLimit = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: 1}),
+    ).internalDocumentSourceBucketAutoMaxMemoryBytes;
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: 100}));
 
     runMemoryStatsTest({
         db: db,
@@ -125,14 +123,15 @@ assert.commandWorked(coll.insertMany(docs));
             pipeline: pipeline,
             cursor: {batchSize: 1},
             comment: "memory stats bucketAuto with spilling test",
-            allowDiskUse: true
+            allowDiskUse: true,
         },
         stageName,
-        expectedNumGetMores: 5
+        expectedNumGetMores: 5,
     });
 
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: originalMemoryLimit}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalDocumentSourceBucketAutoMaxMemoryBytes: originalMemoryLimit}),
+    );
 }
 
 // Clean up.

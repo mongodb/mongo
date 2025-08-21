@@ -25,9 +25,8 @@ function runTest(validateMode) {
         name: jsTestName(),
         nodes: 2,
         nodeOptions: {
-            setParameter:
-                {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
-        }
+            setParameter: {logComponentVerbosity: tojson({command: 3}), dbCheckHealthLogEveryNBatches: 1},
+        },
     });
     rst.startSet();
     rst.initiate();
@@ -38,15 +37,16 @@ function runTest(validateMode) {
     const primaryDB = primary.getDB(dbName);
     const secondaryDB = secondary.getDB(dbName);
 
-    assert.commandWorked(
-        secondary.adminCommand({"setParameter": 1, "dbCheckSecondaryBatchMaxTimeMs": 1}));
-    const writeConcern = {w: 'majority'};
+    assert.commandWorked(secondary.adminCommand({"setParameter": 1, "dbCheckSecondaryBatchMaxTimeMs": 1}));
+    const writeConcern = {w: "majority"};
 
     resetAndInsert(rst, primaryDB, collName, nDocs);
-    assert.commandWorked(primaryDB.runCommand({
-        createIndexes: collName,
-        indexes: [{key: {a: 1}, name: 'a_1'}],
-    }));
+    assert.commandWorked(
+        primaryDB.runCommand({
+            createIndexes: collName,
+            indexes: [{key: {a: 1}, name: "a_1"}],
+        }),
+    );
     rst.awaitReplication();
 
     assert.eq(primaryDB.getCollection(collName).find({}).count(), nDocs);
@@ -55,28 +55,32 @@ function runTest(validateMode) {
 
     if (validateMode == "dataConsistencyCheck") {
         jsTestLog("Running dbCheck dataConsistencyCheck");
-        runDbCheck(rst,
-                   primary.getDB(dbName),
-                   collName,
-                   {
-                       maxDocsPerBatch: nDocs,
-                       batchWriteConcern: writeConcern,
-                       maxBatchTimeMillis: maxBatchTimeMillis
-                   },
-                   true /*awaitCompletion*/);
+        runDbCheck(
+            rst,
+            primary.getDB(dbName),
+            collName,
+            {
+                maxDocsPerBatch: nDocs,
+                batchWriteConcern: writeConcern,
+                maxBatchTimeMillis: maxBatchTimeMillis,
+            },
+            true /*awaitCompletion*/,
+        );
     } else if (validateMode == "extraIndexKeysCheck") {
         jsTestLog("Running dbCheck extraIndexKeysCheck");
-        runDbCheck(rst,
-                   primary.getDB(dbName),
-                   collName,
-                   {
-                       validateMode: "extraIndexKeysCheck",
-                       secondaryIndex: "a_1",
-                       maxDocsPerBatch: nDocs,
-                       batchWriteConcern: writeConcern,
-                       maxBatchTimeMillis: maxBatchTimeMillis
-                   },
-                   true /*awaitCompletion*/);
+        runDbCheck(
+            rst,
+            primary.getDB(dbName),
+            collName,
+            {
+                validateMode: "extraIndexKeysCheck",
+                secondaryIndex: "a_1",
+                maxDocsPerBatch: nDocs,
+                batchWriteConcern: writeConcern,
+                maxBatchTimeMillis: maxBatchTimeMillis,
+            },
+            true /*awaitCompletion*/,
+        );
     }
 
     checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
@@ -89,8 +93,6 @@ function runTest(validateMode) {
     rst.stopSet();
 }
 
-["extraIndexKeysCheck",
- "dataConsistencyCheck",
-].forEach((validateMode) => {
+["extraIndexKeysCheck", "dataConsistencyCheck"].forEach((validateMode) => {
     runTest(validateMode);
 });

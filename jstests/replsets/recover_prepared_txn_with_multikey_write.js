@@ -21,9 +21,9 @@ const rst = new ReplSetTest({
             rsConfig: {
                 priority: 0,
                 votes: 0,
-            }
-        }
-    ]
+            },
+        },
+    ],
 });
 
 rst.startSet();
@@ -58,11 +58,13 @@ jsTestLog("Making sure no prepare conflicts are generated on the catalog.");
 assert.commandWorked(primary.adminCommand({listDatabases: 1}));
 
 jsTestLog("Aborting the prepared transaction.");
-assert.commandWorked(primary.adminCommand({
-    abortTransaction: 1,
-    lsid: session.getSessionId(),
-    txnNumber: session.getTxnNumber_forTesting(),
-    autocommit: false
-}));
+assert.commandWorked(
+    primary.adminCommand({
+        abortTransaction: 1,
+        lsid: session.getSessionId(),
+        txnNumber: session.getTxnNumber_forTesting(),
+        autocommit: false,
+    }),
+);
 
 rst.stopSet();

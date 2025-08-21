@@ -10,13 +10,14 @@ function checkEqual(name, key, value) {
     o[key] = {$nin: [value]};
     var n = t.find(o).count();
 
-    assert.eq(t.find().count(),
-              i + n,
-              "checkEqual " + name + " $in + $nin != total | " + i + " + " + n +
-                  " != " + t.find().count());
+    assert.eq(
+        t.find().count(),
+        i + n,
+        "checkEqual " + name + " $in + $nin != total | " + i + " + " + n + " != " + t.find().count(),
+    );
 }
 
-let doTest = function(n) {
+let doTest = function (n) {
     t.save({a: [1, 2, 3]});
     t.save({a: [1, 2, 4]});
     t.save({a: [1, 8, 5]});
@@ -46,13 +47,13 @@ let doTest = function(n) {
     checkEqual(n + " B", "a", 5);
     checkEqual(n + " C", "a.b", 5);
 
-    assert.eq(7, t.find({'a.b': {$nin: [10]}}).count(), n + " L");
-    assert.eq(7, t.find({'a.b': {$nin: [[10, 11]]}}).count(), n + " M");
+    assert.eq(7, t.find({"a.b": {$nin: [10]}}).count(), n + " L");
+    assert.eq(7, t.find({"a.b": {$nin: [[10, 11]]}}).count(), n + " M");
     assert.eq(7, t.find({a: {$nin: [11]}}).count(), n + " N");
 
     t.save({a: {b: [20, 30]}});
-    assert.eq(1, t.find({'a.b': {$all: [20]}}).count(), n + " O");
-    assert.eq(1, t.find({'a.b': {$all: [20, 30]}}).count(), n + " P");
+    assert.eq(1, t.find({"a.b": {$all: [20]}}).count(), n + " O");
+    assert.eq(1, t.find({"a.b": {$all: [20, 30]}}).count(), n + " P");
 };
 
 doTest("no index");

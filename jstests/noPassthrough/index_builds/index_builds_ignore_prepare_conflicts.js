@@ -14,19 +14,16 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_buil
 
 const replSetTest = new ReplSetTest({
     name: jsTestName(),
-    nodes: [
-        {},
-        {rsConfig: {priority: 0}},
-    ],
+    nodes: [{}, {rsConfig: {priority: 0}}],
 });
 replSetTest.startSet();
 replSetTest.initiate();
 
 const primary = replSetTest.getPrimary();
-const primaryDB = primary.getDB('test');
+const primaryDB = primary.getDB("test");
 
 let numDocs = 10;
-let setUp = function(coll) {
+let setUp = function (coll) {
     coll.drop();
     let bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < numDocs; i++) {
@@ -39,8 +36,8 @@ let setUp = function(coll) {
  * Run a background index build, and depending on the provided node, 'conn', ensure that a
  * prepared update does not introduce prepare conflicts on the index builder.
  */
-let runTest = function(conn) {
-    const testDB = conn.getDB('test');
+let runTest = function (conn) {
+    const testDB = conn.getDB("test");
 
     const collName = jsTestName();
     const coll = primaryDB.getCollection(collName);
@@ -49,7 +46,7 @@ let runTest = function(conn) {
     // Start and pause an index build.
     IndexBuildTest.pauseIndexBuilds(conn);
     const awaitBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
-    const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, 'i_1');
+    const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, "i_1");
 
     // This insert will block until the index build pauses and releases its exclusive lock.
     // This guarantees that the subsequent transaction can immediately acquire a lock and not
@@ -59,7 +56,7 @@ let runTest = function(conn) {
     // Start a session and introduce a document that is in a prepared state, but should be
     // ignored by the index build, at least until the transaction commits.
     const session = primaryDB.getMongo().startSession();
-    const sessionDB = session.getDatabase('test');
+    const sessionDB = session.getDatabase("test");
     const sessionColl = sessionDB.getCollection(collName);
     session.startTransaction();
     assert.commandWorked(sessionColl.update({i: 0}, {i: "prepared"}));
@@ -77,8 +74,7 @@ let runTest = function(conn) {
     // Unpause the index build from the first failpoint so that it can resume and pause at the
     // next failpoint.
     IndexBuildTest.resumeIndexBuilds(conn);
-    assert.soon(
-        () => rawMongoProgramOutput(".*").indexOf("Hanging after index build first drain") >= 0);
+    assert.soon(() => rawMongoProgramOutput(".*").indexOf("Hanging after index build first drain") >= 0);
 
     // Right before the index build completes, ensure no prepare conflicts were hit.
     IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId, (op) => {

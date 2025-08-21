@@ -9,17 +9,16 @@ const viewNs = "test.view";
 const viewDefinition = {
     _id: viewNs,
     viewOn: "coll",
-    pipeline: []
+    pipeline: [],
 };
 const invalidField = {
-    invalidField: true
+    invalidField: true,
 };
 
-assert.commandFailedWithCode(db["system.views"].insert(viewDefinition),
-                             ErrorCodes.InvalidNamespace);
-assert.commandFailedWithCode(db["system.views"].update({}, invalidField),
-                             ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(db["system.views"].insert(viewDefinition), ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(db["system.views"].update({}, invalidField), ErrorCodes.InvalidNamespace);
 assert.commandFailedWithCode(
     db.runCommand({findAndModify: "system.views", query: {}, update: invalidField}),
-    ErrorCodes.InvalidNamespace);
+    ErrorCodes.InvalidNamespace,
+);
 assert.commandFailedWithCode(db["system.views"].remove({}), ErrorCodes.InvalidNamespace);

@@ -21,27 +21,25 @@ const st = new ShardingTest({
     rs: {
         nodes: 2,
         binVersion: "latest",
-        setParameter: {logComponentVerbosity: '{command: {verbosity: 2}}'}
+        setParameter: {logComponentVerbosity: "{command: {verbosity: 2}}"},
     },
     other: {
-        configOptions:
-            {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}},
-        mongosOptions: {binVersion: "latest"}
+        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}},
+        mongosOptions: {binVersion: "latest"},
     },
     // By default, our test infrastructure sets the election timeout to a very high value (24
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 let shardedColl = st.s.getDB(dbName)[collName];
 assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {sk: 1}}));
 
-const largeStr = '*'.repeat(512);
-const giantStr = '*'.repeat(1024);
+const largeStr = "*".repeat(512);
+const giantStr = "*".repeat(1024);
 
 //  Define a set of standard write tests. These tests will be run for every new version and should
 //  not be modified. Each test case should have a function with field name 'generateOpLogEntry'
@@ -50,130 +48,153 @@ const standardTestCases = [
     // Basic insert case.
     {
         testName: "StandardInsert",
-        generateOpLogEntry: function(coll) {
-            assert.commandWorked(coll.runCommand({
-                insert: coll.getName(),
-                documents: [
-                    {sk: 1},
-                    {sk: 2, giantStr: giantStr},
-                    {sk: -1},
-                    {sk: -2, giantStr: giantStr, obj: {a: 1, b: 2}}
-                ],
-                ordered: false
-            }));
-        }
+        generateOpLogEntry: function (coll) {
+            assert.commandWorked(
+                coll.runCommand({
+                    insert: coll.getName(),
+                    documents: [
+                        {sk: 1},
+                        {sk: 2, giantStr: giantStr},
+                        {sk: -1},
+                        {sk: -2, giantStr: giantStr, obj: {a: 1, b: 2}},
+                    ],
+                    ordered: false,
+                }),
+            );
+        },
     },
     // Op-style update.
     {
         testName: "OpStyleUpdate",
-        generateOpLogEntry: function(coll) {
-            assert.commandWorked(coll.runCommand({
-                update: shardedColl.getName(),
-                updates: [
-                    {q: {sk: 1}, u: {$set: {a: 1}}},
-                    {q: {sk: -1}, u: {$set: {a: 1}}},
-                    {q: {sk: 2}, u: {$set: {a: 1}}}
-                ],
-                ordered: false
-            }));
-        }
+        generateOpLogEntry: function (coll) {
+            assert.commandWorked(
+                coll.runCommand({
+                    update: shardedColl.getName(),
+                    updates: [
+                        {q: {sk: 1}, u: {$set: {a: 1}}},
+                        {q: {sk: -1}, u: {$set: {a: 1}}},
+                        {q: {sk: 2}, u: {$set: {a: 1}}},
+                    ],
+                    ordered: false,
+                }),
+            );
+        },
     },
     // Replacement style update.
     {
         testName: "ReplacementStyleUpdate",
-        generateOpLogEntry: function(coll) {
-            assert.commandWorked(coll.runCommand({
-                update: shardedColl.getName(),
-                updates: [{q: {sk: 1}, u: {sk: 1, a: 2}}, {q: {sk: -1}, u: {sk: -1, a: 2}}]
-            }));
-        }
+        generateOpLogEntry: function (coll) {
+            assert.commandWorked(
+                coll.runCommand({
+                    update: shardedColl.getName(),
+                    updates: [
+                        {q: {sk: 1}, u: {sk: 1, a: 2}},
+                        {q: {sk: -1}, u: {sk: -1, a: 2}},
+                    ],
+                }),
+            );
+        },
     },
     // Pipeline style update (delta type diff).
     {
         testName: "PipelineStyleUpdateDeltaOplog",
-        generateOpLogEntry: function(coll) {
-            assert.commandWorked(coll.runCommand({
-                update: shardedColl.getName(),
-                updates: [
-                    {q: {sk: 2}, u: [{$set: {a: 3}}]},
-                    {q: {sk: -2}, u: [{$set: {a: 3}}]},
-                    {
-                        q: {sk: 2},
-                        u: [
-                            {$replaceRoot: {newRoot: {sk: 2}}},
-                            {$addFields: {"a": "updated", "b": 2}},
-                            {$project: {"sk": true, "a": true}},
-                        ]
-                    }
-                ]
-            }));
-        }
+        generateOpLogEntry: function (coll) {
+            assert.commandWorked(
+                coll.runCommand({
+                    update: shardedColl.getName(),
+                    updates: [
+                        {q: {sk: 2}, u: [{$set: {a: 3}}]},
+                        {q: {sk: -2}, u: [{$set: {a: 3}}]},
+                        {
+                            q: {sk: 2},
+                            u: [
+                                {$replaceRoot: {newRoot: {sk: 2}}},
+                                {$addFields: {"a": "updated", "b": 2}},
+                                {$project: {"sk": true, "a": true}},
+                            ],
+                        },
+                    ],
+                }),
+            );
+        },
     },
     // Pipeline style update (replacement style diff).
     {
         testName: "PipelineStyleUpdateReplacementOplog",
-        generateOpLogEntry: function(coll) {
-            assert.commandWorked(coll.runCommand({
-                update: shardedColl.getName(),
-                updates:
-                    [{q: {sk: -2}, u: [{$replaceRoot: {newRoot: {sk: -2, largeStr: largeStr}}}]}]
-            }));
-        }
+        generateOpLogEntry: function (coll) {
+            assert.commandWorked(
+                coll.runCommand({
+                    update: shardedColl.getName(),
+                    updates: [{q: {sk: -2}, u: [{$replaceRoot: {newRoot: {sk: -2, largeStr: largeStr}}}]}],
+                }),
+            );
+        },
     },
     // Basic delete.
     {
         testName: "Delete",
-        generateOpLogEntry: function(coll) {
-            assert.commandWorked(coll.runCommand({
-                delete: shardedColl.getName(),
-                deletes: [{q: {sk: 1}, limit: 0}, {q: {sk: -2}, limit: 0}, {q: {sk: -1}, limit: 0}]
-            }));
-        }
+        generateOpLogEntry: function (coll) {
+            assert.commandWorked(
+                coll.runCommand({
+                    delete: shardedColl.getName(),
+                    deletes: [
+                        {q: {sk: 1}, limit: 0},
+                        {q: {sk: -2}, limit: 0},
+                        {q: {sk: -1}, limit: 0},
+                    ],
+                }),
+            );
+        },
     },
     // Basic createIndex.
     {
         testName: "CreateIndex",
-        generateOpLogEntry: function(coll) {
+        generateOpLogEntry: function (coll) {
             const collName = "CreateIndex";
             const targetColl = coll.getDB()[collName];
             assert.commandWorked(targetColl.createIndex({x: 1}));
             assert.commandWorked(targetColl.insert({x: 0}));
-        }
+        },
     },
     // Basic dropIndex.
     {
         testName: "DropIndex",
-        generateOpLogEntry: function(coll) {
+        generateOpLogEntry: function (coll) {
             const collName = "DropIndex";
             const targetColl = coll.getDB()[collName];
             assert.commandWorked(targetColl.createIndex({x: 1}));
             assert.commandWorked(targetColl.dropIndex({x: 1}));
-        }
+        },
     },
     // Basic collMod.
     {
         testName: "CollMod",
-        generateOpLogEntry: function(coll) {
+        generateOpLogEntry: function (coll) {
             const collName = "collMod";
             const targetColl = coll.getDB()[collName];
             assert.commandWorked(targetColl.insert({x: 1}));
-            assert.commandWorked(targetColl.runCommand({
-                collMod: collName,
-                validator: {x: 1},
-                validationLevel: "moderate",
-                validationAction: "warn"
-            }));
-        }
+            assert.commandWorked(
+                targetColl.runCommand({
+                    collMod: collName,
+                    validator: {x: 1},
+                    validationLevel: "moderate",
+                    validationAction: "warn",
+                }),
+            );
+        },
     },
     // Basic reshardCollection.
     {
         testName: "ReshardCollection",
-        generateOpLogEntry: function(coll) {
+        generateOpLogEntry: function (coll) {
             assert.commandWorked(coll.insert({sk: 2, a: 1}));
-            assert.commandWorked(coll.getDB().adminCommand(
-                {reshardCollection: coll.getFullName(), key: {sk: 1, a: 1}, numInitialChunks: 1}));
-        }
-    }
+            assert.commandWorked(
+                coll
+                    .getDB()
+                    .adminCommand({reshardCollection: coll.getFullName(), key: {sk: 1, a: 1}, numInitialChunks: 1}),
+            );
+        },
+    },
 ];
 
 // The list of test cases against which to test the downgraded change stream. Any time a change is
@@ -189,46 +210,48 @@ const testCases = standardTestCases.concat(latestVersionTestCases);
 // Each entry should have function with field name 'watch' which opens a new change stream.
 const changeStreamsVariants = [
     {
-        watch: function(options) {
+        watch: function (options) {
             return shardedColl.watch([], options);
-        }
+        },
     },
     {
-        watch: function(options) {
+        watch: function (options) {
             return shardedColl.getDB().watch([], options);
-        }
+        },
     },
     {
-        watch: function(options) {
+        watch: function (options) {
             return st.s.watch([], options);
-        }
+        },
     },
     {
-        watch: function(options) {
+        watch: function (options) {
             return shardedColl.watch([], Object.assign(options, {fullDocument: "updateLookup"}));
-        }
+        },
     },
     {
-        watch: function(options) {
-            return shardedColl.getDB().watch(
-                [], Object.assign(options, {fullDocument: "updateLookup"}));
-        }
+        watch: function (options) {
+            return shardedColl.getDB().watch([], Object.assign(options, {fullDocument: "updateLookup"}));
+        },
     },
     {
-        watch: function(options) {
+        watch: function (options) {
             return st.s.watch([], Object.assign(options, {fullDocument: "updateLookup"}));
-        }
+        },
     },
     {
         // With all the options enabled.
-        watch: function(options) {
-            return st.s.watch([], Object.assign(options, {
-                showExpandedEvents: true,
-                showSystemEvents: true,
-                fullDocument: "updateLookup"
-            }));
-        }
-    }
+        watch: function (options) {
+            return st.s.watch(
+                [],
+                Object.assign(options, {
+                    showExpandedEvents: true,
+                    showSystemEvents: true,
+                    fullDocument: "updateLookup",
+                }),
+            );
+        },
+    },
 ];
 
 function dumpLatestOpLogEntries(node, limit) {
@@ -249,8 +272,7 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
 
         // Find the oplog entry for the document inserted above, and return its timestamp.
         const oplog = st.rs0.getPrimary().getCollection("local.oplog.rs");
-        const opLogEntries =
-            oplog.find({op: "i", "o._id": documentId, ns: shardedColl.getFullName()}).toArray();
+        const opLogEntries = oplog.find({op: "i", "o._id": documentId, ns: shardedColl.getFullName()}).toArray();
         assert.eq(opLogEntries.length, 1);
         return opLogEntries[0].ts;
     }
@@ -261,8 +283,7 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
     let testStartTime = createSentinelEntryAndGetTimeStamp(testNum);
     const outputChangeStreams = [];
     for (let testCase of testCases) {
-        jsTestLog(`Opening a change stream for '${testCase.testName}' at startTime: ${
-            tojson(testStartTime)}`);
+        jsTestLog(`Opening a change stream for '${testCase.testName}' at startTime: ${tojson(testStartTime)}`);
 
         // Capture the 'resumeToken' when the sentinel entry is found. We use the token to resume
         // the stream rather than the 'testStartTime' because resuming from a token adds more stages
@@ -276,11 +297,12 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
                 }
                 const nextEvent = csCursor.next();
                 resumeToken = nextEvent._id;
-                return (nextEvent.documentKey._id == "sentinel_entry_" + testNum);
+                return nextEvent.documentKey._id == "sentinel_entry_" + testNum;
             },
             () => {
                 return tojson(dumpLatestOpLogEntries(st.rs0.getPrimary(), 100));
-            });
+            },
+        );
 
         for (let changeStreamVariant of changeStreamsVariants) {
             // Start a change stream on the sentinel entry for each test case.
@@ -291,7 +313,7 @@ function writeOplogEntriesAndCreateResumePointsOnLatestVersion() {
                 // sentinel entry for the next test case.
                 endSentinelEntry: "sentinel_entry_" + (testNum + 1),
                 // We copy this for debugging purposes only.
-                testName: testCases.testName
+                testName: testCases.testName,
             };
             outputChangeStreams.push(outputChangeStream);
         }
@@ -324,8 +346,7 @@ function resumeStreamsOnDowngradedVersion(changeStreams) {
             }
             try {
                 const nextEvent = csCursor.next();
-                return (nextEvent.documentKey &&
-                        nextEvent.documentKey._id == changeStream.endSentinelEntry);
+                return nextEvent.documentKey && nextEvent.documentKey._id == changeStream.endSentinelEntry;
             } catch (e) {
                 jsTestLog("Error occurred while reading change stream. " + tojson(e));
 
@@ -348,8 +369,9 @@ function runTests(downgradeVersion) {
     jsTestLog("Running test with 'downgradeVersion': " + downgradeVersion);
     const downgradeFCV = downgradeVersion === "last-lts" ? lastLTSFCV : lastContinuousFCV;
     // Downgrade the entire cluster to the 'downgradeVersion' binVersion.
-    assert.commandWorked(st.s.getDB(dbName).adminCommand(
-        {setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(
+        st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
+    );
     st.downgradeCluster(downgradeVersion);
 
     // Refresh our reference to the sharded collection post-downgrade.
@@ -361,13 +383,12 @@ function runTests(downgradeVersion) {
 }
 
 // Test resuming change streams after downgrading the cluster to 'last-continuous'.
-runTests('last-continuous');
+runTests("last-continuous");
 
 // Upgrade the entire cluster back to the latest version.
-st.upgradeCluster('latest', {waitUntilStable: true});
-assert.commandWorked(
-    st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+st.upgradeCluster("latest", {waitUntilStable: true});
+assert.commandWorked(st.s.getDB(dbName).adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
 // Test resuming change streams after downgrading the cluster to 'last-lts'.
-runTests('last-lts');
+runTests("last-lts");
 st.stop();

@@ -1,4 +1,4 @@
-const collNamePrefix = 'insert1_';
+const collNamePrefix = "insert1_";
 let collCount = 0;
 
 // _id field of inserted document should be generated if omitted.
@@ -16,7 +16,7 @@ t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 o = {
     a: 2,
-    _id: new ObjectId()
+    _id: new ObjectId(),
 };
 let id = o._id;
 assert.commandWorked(t.insert(o));
@@ -29,7 +29,7 @@ t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 o = {
     a: 3,
-    _id: "asdf"
+    _id: "asdf",
 };
 id = o._id;
 assert.commandWorked(t.insert(o));
@@ -42,7 +42,7 @@ t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 o = {
     a: 4,
-    _id: null
+    _id: null,
 };
 assert.commandWorked(t.insert(o));
 doc = t.findOne();
@@ -52,8 +52,7 @@ assert.eq(null, doc._id, tojson(doc));
 // Tests that failing to insert an invalid document with a regex for the _id field will not result
 // in the collection being created.
 // Previously in insert2.js (tagged with assumes_no_implicit_collection_creation_after_drop).
-const originalImplicitlyShardOnCreateCollectionOnly =
-    TestData.implicitlyShardOnCreateCollectionOnly;
+const originalImplicitlyShardOnCreateCollectionOnly = TestData.implicitlyShardOnCreateCollectionOnly;
 try {
     // Some passthroughs, sharded test fixtures for example, may override DB.getCollection() or
     // DB.drop() to create and shard the collection. We should disable the collection creation on

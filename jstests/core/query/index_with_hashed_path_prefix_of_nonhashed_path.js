@@ -6,9 +6,7 @@
  * TODO BACKPORT-24552, BACKPORT-24553 - relax this fcv requirement.
  * @tags: [requires_fcv_82, requires_non_retryable_commands]
  */
-import {
-    TestCases
-} from "jstests/libs/query/index_with_hashed_path_prefix_of_nonhashed_path_tests.js";
+import {TestCases} from "jstests/libs/query/index_with_hashed_path_prefix_of_nonhashed_path_tests.js";
 
 const coll = db.index_with_hashed_path_prefix_of_nonhashed_path;
 for (let testCase of TestCases) {

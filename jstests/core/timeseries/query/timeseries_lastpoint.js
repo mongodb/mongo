@@ -40,16 +40,13 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {
     getAggPlanStage,
     getEngine,
     getPlanStage,
     getSingleNodeExplain,
-    isAggregationPlan
+    isAggregationPlan,
 } from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -71,20 +68,19 @@ const timestamps = {
     t5: ISODate("2016-01-01T00:25:59Z"),
     t6: ISODate("2016-01-01T00:30:01Z"),
 };
-let lpx1 = undefined;  // lastpoint value of x for m = 1
-let lpx2 = undefined;  // lastpoint value of x for m = 2
+let lpx1 = undefined; // lastpoint value of x for m = 1
+let lpx2 = undefined; // lastpoint value of x for m = 2
 (function setupCollection() {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 
-    coll.insert({t: timestamps.t2, m: 1, x: 2});  // create bucket #3
-    coll.insert({t: timestamps.t4, m: 1, x: 4});  // add to bucket #3
-    coll.insert({t: timestamps.t1, m: 1, x: 1});  // earlier time => create bucket #2 (close #3)
-    coll.insert({t: timestamps.t5, m: 1, x: 5});  // add to bucket #2, this is the lastpoint event
+    coll.insert({t: timestamps.t2, m: 1, x: 2}); // create bucket #3
+    coll.insert({t: timestamps.t4, m: 1, x: 4}); // add to bucket #3
+    coll.insert({t: timestamps.t1, m: 1, x: 1}); // earlier time => create bucket #2 (close #3)
+    coll.insert({t: timestamps.t5, m: 1, x: 5}); // add to bucket #2, this is the lastpoint event
     lpx1 = 5;
-    coll.insert({t: timestamps.t0, m: 1, x: 0});  // earlier time => create bucket #1 (close #2)
-    coll.insert({t: timestamps.t3, m: 1, x: 3});  // add to bucket #1
+    coll.insert({t: timestamps.t0, m: 1, x: 0}); // earlier time => create bucket #1 (close #2)
+    coll.insert({t: timestamps.t3, m: 1, x: 3}); // add to bucket #1
 
     // An event with a different meta goes into a separate bucket.
     coll.insert({t: timestamps.t6, m: 2, x: 6});
@@ -96,12 +92,13 @@ let lpx2 = undefined;  // lastpoint value of x for m = 2
     assertArrayEq({
         expected: [{t: timestamps.t3}, {t: timestamps.t4}, {t: timestamps.t5}, {t: timestamps.t6}],
         actual: getTimeseriesCollForRawOps(coll)
-                    .aggregate([{$project: {t: "$control.max.t", _id: 0}}], kRawOperationSpec)
-                    .toArray(),
-        extraErrorMsg: `For the test data expect to create buckets with these max times but got ${
-            tojson(getTimeseriesCollForRawOps(coll)
-                       .aggregate([{$project: {control: 1, _id: 0}}], kRawOperationSpec)
-                       .toArray())}`
+            .aggregate([{$project: {t: "$control.max.t", _id: 0}}], kRawOperationSpec)
+            .toArray(),
+        extraErrorMsg: `For the test data expect to create buckets with these max times but got ${tojson(
+            getTimeseriesCollForRawOps(coll)
+                .aggregate([{$project: {control: 1, _id: 0}}], kRawOperationSpec)
+                .toArray(),
+        )}`,
     });
 })();
 
@@ -134,40 +131,46 @@ const casesNoLastpointOptimization = [
     // TopN/bottomN family of accumulators with n > 1 or non-const (even if it always evals to 1).
     [{$group: {_id: "$m", acc: {$bottomN: {n: 2, sortBy: {t: 1}, output: ["$x"]}}}}],
     [{$group: {_id: "$m", acc: {$topN: {n: 2, sortBy: {t: -1}, output: ["$x"]}}}}],
-    [{
-        $group: {
-            _id: "$m",
-            acc: {
-                $bottomN: {
-                    n: {$cond: {if: {$lte: ["$m", 1024]}, then: 1, else: 2}},
-                    sortBy: {t: 1},
-                    output: ["$x"]
-                }
-            }
-        }
-    }],
-    [{
-        $group: {
-            _id: "$m",
-            acc: {
-                $topN: {
-                    n: {$cond: {if: {$lte: ["$m", 1024]}, then: 1, else: 2}},
-                    sortBy: {t: -1},
-                    output: ["$x"]
-                }
-            }
-        }
-    }],
+    [
+        {
+            $group: {
+                _id: "$m",
+                acc: {
+                    $bottomN: {
+                        n: {$cond: {if: {$lte: ["$m", 1024]}, then: 1, else: 2}},
+                        sortBy: {t: 1},
+                        output: ["$x"],
+                    },
+                },
+            },
+        },
+    ],
+    [
+        {
+            $group: {
+                _id: "$m",
+                acc: {
+                    $topN: {
+                        n: {$cond: {if: {$lte: ["$m", 1024]}, then: 1, else: 2}},
+                        sortBy: {t: -1},
+                        output: ["$x"],
+                    },
+                },
+            },
+        },
+    ],
 
     // If there are multiple top/bottom accumulators, even if all of them are eligible for the
     // optimization, we don't do it.
-    [{
-        $group: {
-            _id: "$m",
-            acc1: {$bottom: {sortBy: {t: 1}, output: ["$x"]}},
-            acc2: {$top: {sortBy: {t: -1}, output: ["$y"]}},
-        }
-    }],
+    [
+        {
+            $group: {
+                _id: "$m",
+                acc1: {$bottom: {sortBy: {t: 1}, output: ["$x"]}},
+                acc2: {$top: {sortBy: {t: -1}, output: ["$y"]}},
+            },
+        },
+    ],
 
     // If there are accumulators, other than the supported ones or if mixing direction.
     [{$sort: {t: 1}}, {$group: {_id: "$m", acc1: {$last: "$x"}, acc2: {$max: " $y"}}}],
@@ -187,25 +190,24 @@ const casesNoLastpointOptimization = [
     // the lastpoint optimization, but it hasn't been implemented yet).
     [{$group: {_id: null, acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
     [{$group: {_id: "$y", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
-    [{
-        $group: {
-            _id: {$dateTrunc: {date: "$t", unit: "hour", binSize: 1}},
-            acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}
-        }
-    }],
+    [
+        {
+            $group: {
+                _id: {$dateTrunc: {date: "$t", unit: "hour", binSize: 1}},
+                acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}},
+            },
+        },
+    ],
     [{$group: {_id: {a: "$m.a", b: "$m.b"}, acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
     [{$group: {_id: {$add: [1, "$m"]}, acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
-    [
-        {$addFields: {mm: {$add: [1, "$m"]}}},
-        {$group: {_id: "$mm", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}
-    ],
+    [{$addFields: {mm: {$add: [1, "$m"]}}}, {$group: {_id: "$mm", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
 
     // Fields computed from 'metaField' cannot be used in the $group stage. Pushing down the
     // computed fields 'mm' would disable the last point optimization, as the optimization relies
     // that the 'control' block summaries which may have been invlidated by the $addFields pushdown.
     [
         {$addFields: {mm: {$add: [42, "$m"]}}},
-        {$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x", "$mm"]}}}}
+        {$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x", "$mm"]}}}},
     ],
 ];
 
@@ -216,126 +218,181 @@ const casesLastpointOptimization = [
     // First/last family of accumulators.
     {
         pipeline: [{$sort: {t: 1}}, {$group: {_id: "$m", acc: {$last: "$x"}}}],
-        expectedResult: [{_id: 1, acc: lpx1}, {_id: 2, acc: lpx2}]
+        expectedResult: [
+            {_id: 1, acc: lpx1},
+            {_id: 2, acc: lpx2},
+        ],
     },
     {
         pipeline: [{$sort: {t: -1}}, {$group: {_id: "$m", acc: {$first: "$x"}}}],
-        expectedResult: [{_id: 1, acc: lpx1}, {_id: 2, acc: lpx2}]
+        expectedResult: [
+            {_id: 1, acc: lpx1},
+            {_id: 2, acc: lpx2},
+        ],
     },
     {
         pipeline: [{$sort: {m: 1, t: 1}}, {$group: {_id: "$m", acc: {$last: "$x"}}}],
-        expectedResult: [{_id: 1, acc: lpx1}, {_id: 2, acc: lpx2}]
+        expectedResult: [
+            {_id: 1, acc: lpx1},
+            {_id: 2, acc: lpx2},
+        ],
     },
     {
         pipeline: [{$sort: {m: 1, t: -1}}, {$group: {_id: "$m", acc: {$first: "$x"}}}],
-        expectedResult: [{_id: 1, acc: lpx1}, {_id: 2, acc: lpx2}]
+        expectedResult: [
+            {_id: 1, acc: lpx1},
+            {_id: 2, acc: lpx2},
+        ],
     },
     {
         pipeline: [{$sort: {m: -1, t: 1}}, {$group: {_id: "$m", acc: {$last: "$x"}}}],
-        expectedResult: [{_id: 1, acc: lpx1}, {_id: 2, acc: lpx2}]
+        expectedResult: [
+            {_id: 1, acc: lpx1},
+            {_id: 2, acc: lpx2},
+        ],
     },
     {
         pipeline: [{$sort: {m: -1, t: -1}}, {$group: {_id: "$m", acc: {$first: "$x"}}}],
-        expectedResult: [{_id: 1, acc: lpx1}, {_id: 2, acc: lpx2}]
+        expectedResult: [
+            {_id: 1, acc: lpx1},
+            {_id: 2, acc: lpx2},
+        ],
     },
 
     // Top/bottom family of accumulators.
     {
         pipeline: [{$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [lpx1]}, {_id: 2, acc: [lpx2]}]
+        expectedResult: [
+            {_id: 1, acc: [lpx1]},
+            {_id: 2, acc: [lpx2]},
+        ],
     },
     {
         pipeline: [{$group: {_id: "$m", acc: {$top: {sortBy: {t: -1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [lpx1]}, {_id: 2, acc: [lpx2]}]
+        expectedResult: [
+            {_id: 1, acc: [lpx1]},
+            {_id: 2, acc: [lpx2]},
+        ],
     },
     {
         pipeline: [{$group: {_id: "$m", acc: {$bottom: {sortBy: {m: 1, t: 1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [lpx1]}, {_id: 2, acc: [lpx2]}]
+        expectedResult: [
+            {_id: 1, acc: [lpx1]},
+            {_id: 2, acc: [lpx2]},
+        ],
     },
     {
         pipeline: [{$group: {_id: "$m", acc: {$top: {sortBy: {m: 1, t: -1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [lpx1]}, {_id: 2, acc: [lpx2]}]
+        expectedResult: [
+            {_id: 1, acc: [lpx1]},
+            {_id: 2, acc: [lpx2]},
+        ],
     },
     {
         pipeline: [{$group: {_id: "$m", acc: {$bottom: {sortBy: {m: -1, t: 1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [lpx1]}, {_id: 2, acc: [lpx2]}]
+        expectedResult: [
+            {_id: 1, acc: [lpx1]},
+            {_id: 2, acc: [lpx2]},
+        ],
     },
     {
         pipeline: [{$group: {_id: "$m", acc: {$top: {sortBy: {m: -1, t: -1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [lpx1]}, {_id: 2, acc: [lpx2]}]
+        expectedResult: [
+            {_id: 1, acc: [lpx1]},
+            {_id: 2, acc: [lpx2]},
+        ],
     },
 
     // TopN/bottomN family of accumulators.
     {
         pipeline: [{$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {t: 1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [[lpx1]]}, {_id: 2, acc: [[lpx2]]}]
+        expectedResult: [
+            {_id: 1, acc: [[lpx1]]},
+            {_id: 2, acc: [[lpx2]]},
+        ],
     },
     {
         pipeline: [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {t: -1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [[lpx1]]}, {_id: 2, acc: [[lpx2]]}]
+        expectedResult: [
+            {_id: 1, acc: [[lpx1]]},
+            {_id: 2, acc: [[lpx2]]},
+        ],
     },
     {
-        pipeline:
-            [{$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {m: 1, t: 1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [[lpx1]]}, {_id: 2, acc: [[lpx2]]}]
+        pipeline: [{$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {m: 1, t: 1}, output: ["$x"]}}}}],
+        expectedResult: [
+            {_id: 1, acc: [[lpx1]]},
+            {_id: 2, acc: [[lpx2]]},
+        ],
     },
     {
-        pipeline:
-            [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {m: 1, t: -1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [[lpx1]]}, {_id: 2, acc: [[lpx2]]}]
+        pipeline: [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {m: 1, t: -1}, output: ["$x"]}}}}],
+        expectedResult: [
+            {_id: 1, acc: [[lpx1]]},
+            {_id: 2, acc: [[lpx2]]},
+        ],
     },
     {
-        pipeline:
-            [{$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {m: -1, t: 1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [[lpx1]]}, {_id: 2, acc: [[lpx2]]}]
+        pipeline: [{$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {m: -1, t: 1}, output: ["$x"]}}}}],
+        expectedResult: [
+            {_id: 1, acc: [[lpx1]]},
+            {_id: 2, acc: [[lpx2]]},
+        ],
     },
     {
-        pipeline:
-            [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {m: -1, t: -1}, output: ["$x"]}}}}],
-        expectedResult: [{_id: 1, acc: [[lpx1]]}, {_id: 2, acc: [[lpx2]]}]
+        pipeline: [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {m: -1, t: -1}, output: ["$x"]}}}}],
+        expectedResult: [
+            {_id: 1, acc: [[lpx1]]},
+            {_id: 2, acc: [[lpx2]]},
+        ],
     },
 
     // Multiple $first ($last) are supported. As well as multiple outputs in top/bottom.
     {
-        pipeline:
-            [{$sort: {t: 1}}, {$group: {_id: "$m", acc1: {$last: "$x"}, acc2: {$last: "$y"}}}],
-        expectedResult: [{_id: 1, acc1: lpx1, acc2: null}, {_id: 2, acc1: lpx2, acc2: null}]
+        pipeline: [{$sort: {t: 1}}, {$group: {_id: "$m", acc1: {$last: "$x"}, acc2: {$last: "$y"}}}],
+        expectedResult: [
+            {_id: 1, acc1: lpx1, acc2: null},
+            {_id: 2, acc1: lpx2, acc2: null},
+        ],
     },
     {
-        pipeline:
-            [{$sort: {t: -1}}, {$group: {_id: "$m", acc1: {$first: "$x"}, acc2: {$first: "$y"}}}],
-        expectedResult: [{_id: 1, acc1: lpx1, acc2: null}, {_id: 2, acc1: lpx2, acc2: null}]
+        pipeline: [{$sort: {t: -1}}, {$group: {_id: "$m", acc1: {$first: "$x"}, acc2: {$first: "$y"}}}],
+        expectedResult: [
+            {_id: 1, acc1: lpx1, acc2: null},
+            {_id: 2, acc1: lpx2, acc2: null},
+        ],
     },
     {
         pipeline: [{$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x", "$y"]}}}}],
-        expectedResult: [{_id: 1, acc: [lpx1, null]}, {_id: 2, acc: [lpx2, null]}]
+        expectedResult: [
+            {_id: 1, acc: [lpx1, null]},
+            {_id: 2, acc: [lpx2, null]},
+        ],
     },
     {
-        pipeline:
-            [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {t: -1}, output: ["$x", "$y"]}}}}],
-        expectedResult: [{_id: 1, acc: [[lpx1, null]]}, {_id: 2, acc: [[lpx2, null]]}]
+        pipeline: [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {t: -1}, output: ["$x", "$y"]}}}}],
+        expectedResult: [
+            {_id: 1, acc: [[lpx1, null]]},
+            {_id: 2, acc: [[lpx2, null]]},
+        ],
     },
 
     // A filter on 'metaField' should not prevent this optimization.
     {
-        pipeline:
-            [{$match: {m: 1}}, {$sort: {m: -1, t: 1}}, {$group: {_id: "$m", acc: {$last: "$x"}}}],
-        expectedResult: [{_id: 1, acc: lpx1}]
+        pipeline: [{$match: {m: 1}}, {$sort: {m: -1, t: 1}}, {$group: {_id: "$m", acc: {$last: "$x"}}}],
+        expectedResult: [{_id: 1, acc: lpx1}],
     },
     {
-        pipeline: [
-            {$match: {m: {$lte: 1}}},
-            {$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}
-        ],
-        expectedResult: [{_id: 1, acc: [lpx1]}]
+        pipeline: [{$match: {m: {$lte: 1}}}, {$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
+        expectedResult: [{_id: 1, acc: [lpx1]}],
     },
     {
         pipeline: [
             {$match: {m: {$ne: 2}}},
-            {$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {t: 1}, output: ["$x"]}}}}
+            {$group: {_id: "$m", acc: {$bottomN: {n: 1, sortBy: {t: 1}, output: ["$x"]}}}},
         ],
-        expectedResult: [{_id: 1, acc: [[lpx1]]}]
-    }
+        expectedResult: [{_id: 1, acc: [[lpx1]]}],
+    },
 ];
 
 // When there is a suitable index, DISTINCT_SCAN optimization should kick in. We only sanity test
@@ -345,22 +402,31 @@ const casesLastpointWithDistinctScan = [
     {
         pipeline: [{$sort: {t: 1}}, {$group: {_id: "$m", acc: {$last: "$x"}}}],
         suitableIndex: {m: -1, t: -1},
-        expectedResult: [{_id: 1, acc: lpx1}, {_id: 2, acc: lpx2}]
+        expectedResult: [
+            {_id: 1, acc: lpx1},
+            {_id: 2, acc: lpx2},
+        ],
     },
     {
         pipeline: [{$group: {_id: "$m", acc: {$bottom: {sortBy: {t: 1}, output: ["$x"]}}}}],
         suitableIndex: {m: -1, t: -1},
-        expectedResult: [{_id: 1, acc: [lpx1]}, {_id: 2, acc: [lpx2]}]
+        expectedResult: [
+            {_id: 1, acc: [lpx1]},
+            {_id: 2, acc: [lpx2]},
+        ],
     },
     {
         pipeline: [{$group: {_id: "$m", acc: {$topN: {n: 1, sortBy: {t: -1}, output: ["$x"]}}}}],
         suitableIndex: {m: 1, t: -1},
-        expectedResult: [{_id: 1, acc: [[lpx1]]}, {_id: 2, acc: [[lpx2]]}]
+        expectedResult: [
+            {_id: 1, acc: [[lpx1]]},
+            {_id: 2, acc: [[lpx2]]},
+        ],
     },
     {
         pipeline: [{$match: {m: 1}}, {$sort: {t: -1}}, {$group: {_id: "$m", acc: {$first: "$x"}}}],
         suitableIndex: {m: 1, t: -1},
-        expectedResult: [{_id: 1, acc: lpx1}]
+        expectedResult: [{_id: 1, acc: lpx1}],
     },
 ];
 
@@ -380,18 +446,23 @@ const casesLastpointWithDistinctScan = [
                 }
                 assert(
                     !stage.hasOwnProperty("$group"),
-                    `Without lastpoint opt there should be no group before unpack but for pipeline ${
-                        tojson(pipeline)} got ${tojson(explain)}`);
+                    `Without lastpoint opt there should be no group before unpack but for pipeline ${tojson(
+                        pipeline,
+                    )} got ${tojson(explain)}`,
+                );
             }
         } else {
             // The pipeline was executed in SBE. The input to 'UNPACK_TS_BUCKET' cannot be a group.
-            const unpack = isAggregationPlan(explain) ? getAggPlanStage(explain, "UNPACK_TS_BUCKET")
-                                                      : getPlanStage(explain, "UNPACK_TS_BUCKET");
+            const unpack = isAggregationPlan(explain)
+                ? getAggPlanStage(explain, "UNPACK_TS_BUCKET")
+                : getPlanStage(explain, "UNPACK_TS_BUCKET");
             assert.neq(
                 "GROUP",
                 unpack.inputStage.stage,
-                `Without lastpoint opt there should be no group before unpack but for pipeline ${
-                    tojson(pipeline)} got ${tojson(explain)}`);
+                `Without lastpoint opt there should be no group before unpack but for pipeline ${tojson(
+                    pipeline,
+                )} got ${tojson(explain)}`,
+            );
         }
     }
 })();
@@ -410,23 +481,28 @@ const casesLastpointWithDistinctScan = [
                 if (stage.hasOwnProperty("$group")) {
                     break;
                 }
-                assert(!stage.hasOwnProperty("$_internalUnpackBucket"),
-                       `Lastpoint opt should have inserted group before unpack for pipeline ${
-                           tojson(pipeline)} but got ${tojson(explainFull)}`);
+                assert(
+                    !stage.hasOwnProperty("$_internalUnpackBucket"),
+                    `Lastpoint opt should have inserted group before unpack for pipeline ${tojson(
+                        pipeline,
+                    )} but got ${tojson(explainFull)}`,
+                );
             }
         } else {
             // The lastpoint opt currently isn't lowered to SBE.
-            assert(false,
-                   `Lastpoint opt isn't implemented in SBE for pipeline ${
-                       tojson(pipeline)} but got ${tojson(explainFull)}`);
+            assert(
+                false,
+                `Lastpoint opt isn't implemented in SBE for pipeline ${tojson(
+                    pipeline,
+                )} but got ${tojson(explainFull)}`,
+            );
         }
 
         // Check that the result matches the expected by the test case.
         assertArrayEq({
             expected: testCase.expectedResult,
             actual: coll.aggregate(pipeline).toArray(),
-            extraErrorMsg: `Expected result for pipeline ${tojson(pipeline)} with explain ${
-                tojson(explainFull)}`
+            extraErrorMsg: `Expected result for pipeline ${tojson(pipeline)} with explain ${tojson(explainFull)}`,
         });
     }
 })();
@@ -449,24 +525,28 @@ const casesLastpointWithDistinctScan = [
                 if (stage.hasOwnProperty("$groupByDistinctScan")) {
                     break;
                 }
-                assert(!stage.hasOwnProperty("$_internalUnpackBucket"),
-                       `Lastpoint opt should have enabled distinct scan for pipeline ${
-                           tojson(pipeline)} with index ${tojson(testCase.suitableIndex)} but got ${
-                           tojson(explainFull)}`);
+                assert(
+                    !stage.hasOwnProperty("$_internalUnpackBucket"),
+                    `Lastpoint opt should have enabled distinct scan for pipeline ${tojson(
+                        pipeline,
+                    )} with index ${tojson(testCase.suitableIndex)} but got ${tojson(explainFull)}`,
+                );
             }
         } else {
             // The distinct scan opt currently isn't lowered to SBE.
-            assert(false,
-                   `Lastpoint opt isn't implemented in SBE for pipeline ${
-                       tojson(pipeline)} but got ${tojson(explainFull)}`);
+            assert(
+                false,
+                `Lastpoint opt isn't implemented in SBE for pipeline ${tojson(
+                    pipeline,
+                )} but got ${tojson(explainFull)}`,
+            );
         }
 
         // Check that the result matches the expected by the test case.
         assertArrayEq({
             expected: testCase.expectedResult,
             actual: coll.aggregate(pipeline).toArray(),
-            extraErrorMsg: `Expected result for pipeline ${tojson(pipeline)} with explain ${
-                tojson(explainFull)}`
+            extraErrorMsg: `Expected result for pipeline ${tojson(pipeline)} with explain ${tojson(explainFull)}`,
         });
     }
 })();

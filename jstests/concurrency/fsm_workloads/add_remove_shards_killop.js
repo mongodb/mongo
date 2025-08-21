@@ -20,15 +20,12 @@
 import "jstests/libs/override_methods/retry_on_killed_session.js";
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads_add_remove_shards/clusterwide_ops_with_add_remove_shards.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads_add_remove_shards/clusterwide_ops_with_add_remove_shards.js";
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 import {
     checkClusterParameter,
     interruptConfigsvrAddShard,
-    interruptConfigsvrRemoveShard
+    interruptConfigsvrRemoveShard,
 } from "jstests/sharding/libs/cluster_cardinality_parameter_util.js";
 
 // By default retry_on_killed_session.js will only retry known retryable operations like reads and
@@ -36,18 +33,18 @@ import {
 // are safe to retry so opt into always retrying killed operations.
 TestData.alwaysRetryOnKillSessionErrors = true;
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const originalInit = $config.states.init;
     const originalAddShard = $config.states.addShard;
     const originalRemoveShard = $config.states.removeShard;
 
     $config.states = {};
 
-    $config.states.init = function(db, collName, connCache) {
+    $config.states.init = function (db, collName, connCache) {
         originalInit.call(this, db, collName);
     };
 
-    $config.states.addShard = function(db, collName, connCache) {
+    $config.states.addShard = function (db, collName, connCache) {
         assert.soon(() => {
             try {
                 originalAddShard.call(this, db, collName);
@@ -68,29 +65,35 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         });
     };
 
-    $config.states.removeShard = function(db, collName, connCache) {
+    $config.states.removeShard = function (db, collName, connCache) {
         originalRemoveShard.call(this, db, collName);
     };
 
-    $config.states.interruptAddShard = function(db, collName, connCache) {
-        connCache.config.forEach(conn => {
+    $config.states.interruptAddShard = function (db, collName, connCache) {
+        connCache.config.forEach((conn) => {
             // Removing a shard will close its ReplicaSetMonitor, which can lead requests targeting
             // it, like the aggregation this sends to all shards when the RS endpoint is on, to fail
             // with ShutdownInProgress.
-            RetryableWritesUtil.retryOnRetryableCode(() => {
-                interruptConfigsvrAddShard(conn);
-            }, "Retry interrupt add shard on " + tojson(conn));
+            RetryableWritesUtil.retryOnRetryableCode(
+                () => {
+                    interruptConfigsvrAddShard(conn);
+                },
+                "Retry interrupt add shard on " + tojson(conn),
+            );
         });
     };
 
-    $config.states.interruptRemoveShard = function(db, collName, connCache) {
-        connCache.config.forEach(conn => {
+    $config.states.interruptRemoveShard = function (db, collName, connCache) {
+        connCache.config.forEach((conn) => {
             // Removing a shard will close its ReplicaSetMonitor, which can lead requests targeting
             // it, like the aggregation this sends to all shards when the RS endpoint is on, to fail
             // with ShutdownInProgress.
-            RetryableWritesUtil.retryOnRetryableCode(() => {
-                interruptConfigsvrRemoveShard(conn);
-            }, "Retry interrupt remove shard on " + tojson(conn));
+            RetryableWritesUtil.retryOnRetryableCode(
+                () => {
+                    interruptConfigsvrRemoveShard(conn);
+                },
+                "Retry interrupt remove shard on " + tojson(conn),
+            );
         });
     };
 
@@ -98,11 +101,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         $super.teardown.apply(this, arguments);
 
         const shardDocs = db.getSiblingDB("config").getCollection("shards").find().toArray();
-        jsTest.log("Checking the cluster parameter " +
-                   tojsononeline({numShards: shardDocs.length, shardDocs}));
+        jsTest.log("Checking the cluster parameter " + tojsononeline({numShards: shardDocs.length, shardDocs}));
         const hasTwoOrMoreShards = shardDocs.length >= 2;
 
-        cluster.getReplicaSets().forEach(rst => {
+        cluster.getReplicaSets().forEach((rst) => {
             RetryableWritesUtil.retryOnRetryableCode(() => {
                 checkClusterParameter(rst, hasTwoOrMoreShards);
             }, "Retry cluster parameter check");

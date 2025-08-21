@@ -11,22 +11,21 @@ import {
     createMoviesViewAndIndex,
     enrichedTitleViewPipeline,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery
+    makeMovieVectorQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
     buildExpectedResults,
     datasets,
-    validateSearchExplain
+    validateSearchExplain,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 // Create the action movies view on top of the enriched title view.
-const actionMoviesWithEnrichedTitle =
-    createMoviesViewAndIndex(datasets.ACTION_MOVIES_WITH_ENRICHED_TITLE);
+const actionMoviesWithEnrichedTitle = createMoviesViewAndIndex(datasets.ACTION_MOVIES_WITH_ENRICHED_TITLE);
 const vectorQuery = makeMovieVectorQuery({
     queryVector: getMoviePlotEmbeddingById(6),
     limit: 5,
-    indexName: datasets.ACTION_MOVIES_WITH_ENRICHED_TITLE.indexName
+    indexName: datasets.ACTION_MOVIES_WITH_ENRICHED_TITLE.indexName,
 });
 
 // Combine the two view pipelines for validation.

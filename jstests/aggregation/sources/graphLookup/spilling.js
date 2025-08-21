@@ -51,9 +51,9 @@ function testResultSizeLimitKnob() {
                 startWith: "$start",
                 connectFromField: "to",
                 connectToField: "_id",
-                as: "output"
-            }
-        }
+                as: "output",
+            },
+        },
     ];
 
     assert.throwsWithCode(() => local.aggregate(pipeline).itcount(), 8442700);
@@ -68,8 +68,7 @@ function testResultSizeLimitKnob() {
 testResultSizeLimitKnob();
 
 function assertFieldPositive(fieldName, filteredExplain, fullExplain) {
-    assert.gt(
-        filteredExplain[fieldName], 0, `Expected ${fieldName} > 0. Found: ` + tojson(fullExplain));
+    assert.gt(filteredExplain[fieldName], 0, `Expected ${fieldName} > 0. Found: ` + tojson(fullExplain));
 }
 
 function runPipelineAndCheckUsedDiskValue(pipeline, expectSpilling = true) {
@@ -79,13 +78,16 @@ function runPipelineAndCheckUsedDiskValue(pipeline, expectSpilling = true) {
     // and we don't have execution stats for it
     if (graphLookupExplains.length !== 0) {
         const filteredExplains = graphLookupExplains.filter((e) => e.nReturned > 0);
-        assert.eq(filteredExplains.length,
-                  1,
-                  "Expected only one shard to return data. Found: " + tojson(graphLookupExplains));
+        assert.eq(
+            filteredExplains.length,
+            1,
+            "Expected only one shard to return data. Found: " + tojson(graphLookupExplains),
+        );
         assert.eq(
             filteredExplains[0].usedDisk,
             expectSpilling,
-            "Expected usedDisk: " + expectSpilling + ". Found: " + tojson(graphLookupExplains));
+            "Expected usedDisk: " + expectSpilling + ". Found: " + tojson(graphLookupExplains),
+        );
         if (expectSpilling) {
             assertFieldPositive("spills", filteredExplains[0], explain);
             assertFieldPositive("spilledBytes", filteredExplains[0], explain);
@@ -119,9 +121,9 @@ function testKnobsAndVisitedSpilling() {
                 startWith: "$start",
                 connectFromField: "to",
                 connectToField: "_id",
-                as: "output"
-            }
-        }
+                as: "output",
+            },
+        },
     ];
 
     function assertCorrectResult(cursor) {
@@ -143,9 +145,9 @@ function testKnobsAndVisitedSpilling() {
                         $sortArray: {
                             input: "$output",
                             sortBy: {_id: 1},
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             },
             {$unwind: "$output"},
             {$replaceRoot: {newRoot: "$output"}},
@@ -159,8 +161,10 @@ function testKnobsAndVisitedSpilling() {
 
     // We hit memory limit and should fail without spilling.
     const disableSpillingOptions = {allowDiskUse: false};
-    assert.throwsWithCode(() => local.aggregate(pipeline, disableSpillingOptions).itcount(),
-                          ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+    assert.throwsWithCode(
+        () => local.aggregate(pipeline, disableSpillingOptions).itcount(),
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+    );
 
     const previousMemoryLimitKnobValue = getKnob(memoryLimitKnob);
     setKnob(memoryLimitKnob, 100 * 1024 * 1024);
@@ -183,10 +187,15 @@ function testQueueSpilling() {
     const docCount = 128;
     for (let i = 1; i <= docCount; ++i) {
         // Adding payload to _id so queue also have to be spilled.
-        assert.commandWorked(db.foreign.insertOne({
-            _id: {index: i, payload: string1KB},
-            to: [{index: 2 * i, payload: string1KB}, {index: 2 * i + 1, payload: string1KB}]
-        }));
+        assert.commandWorked(
+            db.foreign.insertOne({
+                _id: {index: i, payload: string1KB},
+                to: [
+                    {index: 2 * i, payload: string1KB},
+                    {index: 2 * i + 1, payload: string1KB},
+                ],
+            }),
+        );
     }
     local.insertOne({start: {index: 1, payload: string1KB}});
 
@@ -198,11 +207,11 @@ function testQueueSpilling() {
                 connectFromField: "to",
                 connectToField: "_id",
                 depthField: "depth",
-                as: "output"
-            }
+                as: "output",
+            },
         },
-        { $unwind: "$output" },
-        { $replaceRoot: { newRoot: "$output" } },
+        {$unwind: "$output"},
+        {$replaceRoot: {newRoot: "$output"}},
         {$sort: {_id: 1}},
     ];
 

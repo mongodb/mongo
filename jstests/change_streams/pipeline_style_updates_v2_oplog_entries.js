@@ -14,33 +14,40 @@ assertDropAndRecreateCollection(db, "t1");
 const cst = new ChangeStreamTest(db);
 
 jsTestLog("Testing pipeline-based update with $set");
-const kGiantStr = '*'.repeat(1024);
-const kMediumStr = '*'.repeat(128);
-const kSmallStr = '*'.repeat(32);
+const kGiantStr = "*".repeat(1024);
+const kMediumStr = "*".repeat(128);
+const kSmallStr = "*".repeat(32);
 
-assert.commandWorked(db.t1.insert({
-    _id: 100,
-    "a": 1,
-    "b": 2,
-    "arrayForSubdiff": [kGiantStr, {a: kMediumStr}, 1, 2, 3],
-    "arrayForReplacement": [0, 1, 2, 3],
-    "giantStr": kGiantStr
-}));
+assert.commandWorked(
+    db.t1.insert({
+        _id: 100,
+        "a": 1,
+        "b": 2,
+        "arrayForSubdiff": [kGiantStr, {a: kMediumStr}, 1, 2, 3],
+        "arrayForReplacement": [0, 1, 2, 3],
+        "giantStr": kGiantStr,
+    }),
+);
 
-const changeStreamCursor =
-    cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+const changeStreamCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
 // Test change stream with 'fullDocument' set.
-const fullDocCursor = cst.startWatchingChanges(
-    {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: db.t1});
+const fullDocCursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+    collection: db.t1,
+});
 
-assert.commandWorked(db.t1.update({_id: 100}, [{
-                                      $set: {
-                                          "a": 2,
-                                          "arrayForSubdiff": [kGiantStr, {"a": kMediumStr, "b": 3}],
-                                          "arrayForReplacement": [0],
-                                          "c": 3
-                                      }
-                                  }]));
+assert.commandWorked(
+    db.t1.update({_id: 100}, [
+        {
+            $set: {
+                "a": 2,
+                "arrayForSubdiff": [kGiantStr, {"a": kMediumStr, "b": 3}],
+                "arrayForReplacement": [0],
+                "c": 3,
+            },
+        },
+    ]),
+);
 
 let expected = {
     documentKey: {_id: 100},
@@ -96,8 +103,7 @@ jsTestLog("Testing pipeline-based update with $replaceRoot");
 //  "arrayForSubdiff": [kGiantStr, {"a": kMediumStr, "b": 3}],
 //  "giantStr": kGiantStr,
 //  }.
-assert.commandWorked(
-    db.t1.update({_id: 100}, [{$replaceRoot: {newRoot: {_id: 100, "giantStr": kGiantStr}}}]));
+assert.commandWorked(db.t1.update({_id: 100}, [{$replaceRoot: {newRoot: {_id: 100, "giantStr": kGiantStr}}}]));
 expected = {
     documentKey: {_id: 100},
     ns: {db: "test", coll: "t1"},
@@ -116,35 +122,37 @@ jsTestLog("Testing pipeline-based update with a complex pipeline");
 //  "giantStr": kGiantStr,
 //  }.
 
-assert.commandWorked(db.t1.update({_id: 100}, [
-    {
-        $replaceRoot: {
-            // Also constructing a new doc for later test.
-            newRoot: {
-                _id: 100,
-                "giantStr": kGiantStr,
-                "arr": [{"x": 1, "y": kSmallStr}, kMediumStr],
-                "arr_a": [1, kMediumStr],
-                "arr_b": [[1, kSmallStr], kMediumStr],
-                "arr_c": [[kSmallStr, 1, 2, 3], kMediumStr],
-                "obj": {"x": {"a": 1, "b": 1, "c": [kMediumStr, 1, 2, 3], "str": kMediumStr}},
-            }
-        }
-    },
-    {$addFields: {"a": "updated", "b": 2, "doc": {"a": {0: "foo"}}}},
-    {
-        $project: {
-            "a": true,
-            "giantStr": true,
-            "doc": true,
-            "arr": true,
-            "arr_a": true,
-            "arr_b": true,
-            "arr_c": true,
-            "obj": true
-        }
-    },
-]));
+assert.commandWorked(
+    db.t1.update({_id: 100}, [
+        {
+            $replaceRoot: {
+                // Also constructing a new doc for later test.
+                newRoot: {
+                    _id: 100,
+                    "giantStr": kGiantStr,
+                    "arr": [{"x": 1, "y": kSmallStr}, kMediumStr],
+                    "arr_a": [1, kMediumStr],
+                    "arr_b": [[1, kSmallStr], kMediumStr],
+                    "arr_c": [[kSmallStr, 1, 2, 3], kMediumStr],
+                    "obj": {"x": {"a": 1, "b": 1, "c": [kMediumStr, 1, 2, 3], "str": kMediumStr}},
+                },
+            },
+        },
+        {$addFields: {"a": "updated", "b": 2, "doc": {"a": {0: "foo"}}}},
+        {
+            $project: {
+                "a": true,
+                "giantStr": true,
+                "doc": true,
+                "arr": true,
+                "arr_a": true,
+                "arr_b": true,
+                "arr_c": true,
+                "obj": true,
+            },
+        },
+    ]),
+);
 
 expected = {
     documentKey: {_id: 100},
@@ -180,19 +188,22 @@ cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expect
 jsTestLog("Testing pipeline-based update with modifications to nested elements");
 
 assert.commandWorked(
-    db.t1.update({_id: 100}, [{
-                     $replaceRoot: {
-                         newRoot: {
-                             _id: 100,
-                             "giantStr": kGiantStr,
-                             "arr": [{"y": kSmallStr}, kMediumStr],
-                             "arr_a": [2, kMediumStr],
-                             "arr_b": [[2, kSmallStr], kMediumStr],
-                             "arr_c": [[kSmallStr], kMediumStr],
-                             "obj": {"x": {"b": 2, "c": [kMediumStr], "str": kMediumStr}},
-                         }
-                     }
-                 }]));
+    db.t1.update({_id: 100}, [
+        {
+            $replaceRoot: {
+                newRoot: {
+                    _id: 100,
+                    "giantStr": kGiantStr,
+                    "arr": [{"y": kSmallStr}, kMediumStr],
+                    "arr_a": [2, kMediumStr],
+                    "arr_b": [[2, kSmallStr], kMediumStr],
+                    "arr_c": [[kSmallStr], kMediumStr],
+                    "obj": {"x": {"b": 2, "c": [kMediumStr], "str": kMediumStr}},
+                },
+            },
+        },
+    ]),
+);
 expected = {
     documentKey: {_id: 100},
     ns: {db: "test", coll: "t1"},
@@ -204,7 +215,10 @@ expected = {
             "obj.x.b": 2,
         },
         removedFields: ["a", "doc", "arr.0.x", "obj.x.a"],
-        truncatedArrays: [{"field": "arr_c.0", "newSize": 1}, {"field": "obj.x.c", "newSize": 1}],
+        truncatedArrays: [
+            {"field": "arr_c.0", "newSize": 1},
+            {"field": "obj.x.c", "newSize": 1},
+        ],
     },
 };
 cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});

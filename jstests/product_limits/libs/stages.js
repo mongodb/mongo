@@ -49,13 +49,15 @@ export class WorkloadMergeManyLet extends PipelineWorkload {
         for (let i = 0; i < this.scale(); i++) {
             letList[`f${i}`] = i;
         }
-        return [{
-            $merge: {
-                into: this.constructor.name,
-                whenMatched: [{$addFields: {"foo": "bar"}}],
-                let : letList
-            }
-        }];
+        return [
+            {
+                $merge: {
+                    into: this.constructor.name,
+                    whenMatched: [{$addFields: {"foo": "bar"}}],
+                    let: letList,
+                },
+            },
+        ];
     }
 
     result() {
@@ -78,11 +80,11 @@ export class WorkloadLetManyVars extends PipelineWorkload {
         for (let i = 0; i < this.scale(); i++) {
             varsList[`v${i}`] = {"$and": condList};
         }
-        let inList = range(this.scale()).map((i) => (`$$v${i}`));
+        let inList = range(this.scale()).map((i) => `$$v${i}`);
 
         let letList = {};
         for (let i = 0; i < this.scale(); i++) {
-            letList[`max${i}`] = {$let: {vars: varsList, in : {$max: inList}}};
+            letList[`max${i}`] = {$let: {vars: varsList, in: {$max: inList}}};
         }
 
         return [{$project: letList}, {$unset: "_id"}];
@@ -103,9 +105,9 @@ export class WorkloadProjectManyExpressions extends PipelineWorkload {
         let project = {};
 
         for (let i = 0; i < this.scale(); i++) {
-            project[`f${i}`] = 'a';
+            project[`f${i}`] = "a";
         }
-        project['_id'] = 0;
+        project["_id"] = 0;
 
         return [{$project: project}];
     }
@@ -113,7 +115,7 @@ export class WorkloadProjectManyExpressions extends PipelineWorkload {
     result() {
         let row = {};
         for (let i = 0; i < this.scale(); i++) {
-            row[`f${i}`] = 'a';
+            row[`f${i}`] = "a";
         }
         return [row];
     }
@@ -148,7 +150,7 @@ export class WorkloadNestedProject extends PipelineWorkload {
             {$project: {[project.join(".")]: "abc"}},
             {$unset: "_id"},
             {$unset: project.join(".")},
-            {$count: "cnt"}
+            {$count: "cnt"},
         ];
     }
     result() {
@@ -297,10 +299,9 @@ export class WorkloadGetField extends PipelineWorkload {
     pipeline() {
         return [
             {
-                $project:
-                    {"getField": {$getField: {field: `f${this.scale() - 1}`, input: "$$CURRENT"}}}
+                $project: {"getField": {$getField: {field: `f${this.scale() - 1}`, input: "$$CURRENT"}}},
             },
-            {$unset: "_id"}
+            {$unset: "_id"},
         ];
     }
 
@@ -311,7 +312,7 @@ export class WorkloadGetField extends PipelineWorkload {
 
 export class WorkloadLongFieldName extends PipelineWorkload {
     longString() {
-        return 'x'.repeat(this.scale());
+        return "x".repeat(this.scale());
     }
 
     pipeline() {

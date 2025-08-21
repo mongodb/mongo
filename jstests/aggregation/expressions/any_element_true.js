@@ -5,18 +5,20 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 
 const coll = db.any_element_true;
 coll.drop();
-assert.commandWorked(coll.insert({
-    _id: 0,
-    allTrue: [true, true],
-    someTrue: [true, false],
-    noneTrue: [0, false],
-    nonArray: 1,
-    nullInput: [null],
-    undefinedInput: [undefined],
-    undefinedTrue: [undefined, true],
-    nullTrue: [null, true],
-    empty: []
-}));
+assert.commandWorked(
+    coll.insert({
+        _id: 0,
+        allTrue: [true, true],
+        someTrue: [true, false],
+        noneTrue: [0, false],
+        nonArray: 1,
+        nullInput: [null],
+        undefinedInput: [undefined],
+        undefinedTrue: [undefined, true],
+        nullTrue: [null, true],
+        empty: [],
+    }),
+);
 
 function testOp(expression, expected) {
     const results = coll.aggregate([{$project: {_id: 0, result: expression}}]).toArray();
@@ -27,8 +29,7 @@ function testOp(expression, expected) {
 }
 
 function assertThrows(expression) {
-    const error =
-        assert.throws(() => coll.aggregate([{$project: {_id: 0, result: expression}}]).toArray());
+    const error = assert.throws(() => coll.aggregate([{$project: {_id: 0, result: expression}}]).toArray());
     assert.commandFailedWithCode(error, 5159200);
 }
 

@@ -15,12 +15,12 @@ var admin = mongos.getDB("admin");
 
 // Wait for the background thread from the mongos to insert their entries before beginning
 // the tests.
-assert.soon(function() {
-    return MONGOS_COUNT == mongos.getDB('config').mongos.count();
+assert.soon(function () {
+    return MONGOS_COUNT == mongos.getDB("config").mongos.count();
 });
 
 function grabStatusOutput(configdb, verbose) {
-    var res = print.captureAllOutput(function() {
+    var res = print.captureAllOutput(function () {
         return printShardingStatus(configdb, verbose);
     });
     var output = res.output.join("\n");
@@ -29,15 +29,17 @@ function grabStatusOutput(configdb, verbose) {
 }
 
 function assertPresentInOutput(output, content, what) {
-    assert(output.includes(content),
-           what + " \"" + content + "\" NOT present in output of " +
-               "printShardingStatus() (but it should be)");
+    assert(
+        output.includes(content),
+        what + ' "' + content + '" NOT present in output of ' + "printShardingStatus() (but it should be)",
+    );
 }
 
 function assertNotPresentInOutput(output, content, what) {
-    assert(!output.includes(content),
-           what + " \"" + content + "\" IS present in output of " +
-               "printShardingStatus() (but it should not be)");
+    assert(
+        !output.includes(content),
+        what + ' "' + content + '" IS present in output of ' + "printShardingStatus() (but it should not be)",
+    );
 }
 
 ////////////////////////
@@ -96,33 +98,42 @@ testBasicVerboseOnly(outputVerbose);
 // Copy into a standalone to also test running printShardingStatus() against a config dump.
 var config = mongos.getDB("config");
 var configCopy = standalone.getDB("configCopy");
-config.getCollectionInfos().forEach(function(c) {
+config.getCollectionInfos().forEach(function (c) {
     // It's illegal to copy the system collections.
-    if ([
+    if (
+        [
             "system.indexBuilds",
             "system.preimages",
             "system.change_collection",
             "cache.chunks.config.system.sessions",
             "system.sessions",
             "system.sharding_ddl_coordinators",
-        ].includes(c.name)) {
+        ].includes(c.name)
+    ) {
         return;
     }
 
     // Create collection with options.
     assert.commandWorked(configCopy.createCollection(c.name, c.options));
     // Clone the docs.
-    config.getCollection(c.name).find().hint({_id: 1}).forEach(function(d) {
-        assert.commandWorked(configCopy.getCollection(c.name).insert(d));
-    });
+    config
+        .getCollection(c.name)
+        .find()
+        .hint({_id: 1})
+        .forEach(function (d) {
+            assert.commandWorked(configCopy.getCollection(c.name).insert(d));
+        });
     // Build the indexes.
-    config.getCollection(c.name).getIndexes().forEach(function(i) {
-        var key = i.key;
-        delete i.key;
-        delete i.ns;
-        delete i.v;
-        assert.commandWorked(configCopy.getCollection(c.name).createIndex(key, i));
-    });
+    config
+        .getCollection(c.name)
+        .getIndexes()
+        .forEach(function (i) {
+            var key = i.key;
+            delete i.key;
+            delete i.ns;
+            delete i.v;
+            assert.commandWorked(configCopy.getCollection(c.name).createIndex(key, i));
+        });
 });
 
 // Inactive mongoses
@@ -163,8 +174,7 @@ output = grabStatusOutput(configCopy, false);
 assertPresentInOutput(output, "most recently active mongoses:\n        none", "no mongoses");
 
 output = grabStatusOutput(configCopy, true);
-assertPresentInOutput(
-    output, "most recently active mongoses:\n        none", "no mongoses (verbose)");
+assertPresentInOutput(output, "most recently active mongoses:\n        none", "no mongoses (verbose)");
 
 assert(mongos.getDB(dbName).dropDatabase());
 
@@ -174,11 +184,11 @@ assert(mongos.getDB(dbName).dropDatabase());
 
 var testCollDetailsNum = 0;
 function testCollDetails(args) {
-    if (args === undefined || typeof (args) != "object") {
+    if (args === undefined || typeof args != "object") {
         args = {};
     }
 
-    var getCollName = function(x) {
+    var getCollName = function (x) {
         return "test.test" + x.zeroPad(4);
     };
     var collName = getCollName(testCollDetailsNum);
@@ -191,16 +201,16 @@ function testCollDetails(args) {
 
     var originalValues = {};
     if (args.hasOwnProperty("unique")) {
-        originalValues["unique"] =
-            mongos.getDB("config").collections.findOne({_id: collName}).unique;
-        assert.commandWorked(mongos.getDB("config").collections.update(
-            {_id: collName}, {$set: {"unique": args.unique}}));
+        originalValues["unique"] = mongos.getDB("config").collections.findOne({_id: collName}).unique;
+        assert.commandWorked(
+            mongos.getDB("config").collections.update({_id: collName}, {$set: {"unique": args.unique}}),
+        );
     }
     if (args.hasOwnProperty("noBalance")) {
-        originalValues["noBalance"] =
-            mongos.getDB("config").collections.findOne({_id: collName}).noBalance;
-        assert.commandWorked(mongos.getDB("config").collections.update(
-            {_id: collName}, {$set: {"noBalance": args.noBalance}}));
+        originalValues["noBalance"] = mongos.getDB("config").collections.findOne({_id: collName}).noBalance;
+        assert.commandWorked(
+            mongos.getDB("config").collections.update({_id: collName}, {$set: {"noBalance": args.noBalance}}),
+        );
     }
 
     var output = grabStatusOutput(st.config);
@@ -215,26 +225,27 @@ function testCollDetails(args) {
         assertNotPresentInOutput(output, getCollName(i), "previous collection");
     }
 
-    assertPresentInOutput(output, "unique: " + (!!args.unique), "unique shard key indicator");
+    assertPresentInOutput(output, "unique: " + !!args.unique, "unique shard key indicator");
 
-    if (args.hasOwnProperty("unique") && typeof (args.unique) != "boolean") {
+    if (args.hasOwnProperty("unique") && typeof args.unique != "boolean") {
         // non-bool: actual value must be shown
         assertPresentInOutput(output, tojson(args.unique), "unique shard key indicator (non bool)");
 
         // Restore original value.
-        assert.commandWorked(mongos.getDB("config").collections.update(
-            {_id: collName}, {$set: {"unique": originalValues.unique}}));
+        assert.commandWorked(
+            mongos.getDB("config").collections.update({_id: collName}, {$set: {"unique": originalValues.unique}}),
+        );
     }
 
-    assertPresentInOutput(
-        output, "balancing: " + (!args.noBalance), "balancing indicator (inverse of noBalance)");
-    if (args.hasOwnProperty("noBalance") && typeof (args.noBalance) != "boolean") {
+    assertPresentInOutput(output, "balancing: " + !args.noBalance, "balancing indicator (inverse of noBalance)");
+    if (args.hasOwnProperty("noBalance") && typeof args.noBalance != "boolean") {
         // non-bool: actual value must be shown
         assertPresentInOutput(output, tojson(args.noBalance), "noBalance indicator (non bool)");
 
         // Restore original value.
-        assert.commandWorked(mongos.getDB("config").collections.update(
-            {_id: collName}, {$set: {"noBalance": originalValues.noBalance}}));
+        assert.commandWorked(
+            mongos.getDB("config").collections.update({_id: collName}, {$set: {"noBalance": originalValues.noBalance}}),
+        );
     }
 
     try {

@@ -6,17 +6,19 @@
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 
-export const $config = (function() {
+export const $config = (function () {
     let data = {
-        collName: 'localColl',
-        foreignCollName: 'foreignColl',
+        collName: "localColl",
+        foreignCollName: "foreignColl",
     };
 
     let states = {
         lookup: function lookup(db, collName) {
             try {
                 const coll = db[this.collName];
-                const result = coll.aggregate([{$lookup: { from: this.foreignCollName, localField: 'a', foreignField: 'b', as: 'out'}}]).toArray();
+                const result = coll
+                    .aggregate([{$lookup: {from: this.foreignCollName, localField: "a", foreignField: "b", as: "out"}}])
+                    .toArray();
                 assert.eq(result.length, 1);
                 assert.docEq({_id: 0, a: 0, out: [{_id: 0, b: 0}]}, result[0]);
             } catch (e) {
@@ -39,7 +41,7 @@ export const $config = (function() {
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ]);
-        }
+        },
     };
 
     let transitions = {lookup: {lookup: 0.8, dropIndex: 0.2}, dropIndex: {lookup: 1}};
@@ -55,8 +57,8 @@ export const $config = (function() {
         iterations: 50,
         data: data,
         states: states,
-        startState: 'lookup',
+        startState: "lookup",
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

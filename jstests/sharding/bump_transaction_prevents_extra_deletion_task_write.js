@@ -18,14 +18,13 @@ let st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 function getNewNs(dbName) {
-    if (typeof getNewNs.counter == 'undefined') {
+    if (typeof getNewNs.counter == "undefined") {
         getNewNs.counter = 0;
     }
     getNewNs.counter++;
@@ -34,9 +33,16 @@ function getNewNs(dbName) {
 }
 
 function moveChunkParallel(ns, toShard) {
-    return startParallelShell(funWithArgs(function(ns, toShard) {
-                                  db.adminCommand({moveChunk: ns, find: {x: 50}, to: toShard});
-                              }, ns, toShard), st.s.port);
+    return startParallelShell(
+        funWithArgs(
+            function (ns, toShard) {
+                db.adminCommand({moveChunk: ns, find: {x: 50}, to: toShard});
+            },
+            ns,
+            toShard,
+        ),
+        st.s.port,
+    );
 }
 
 function sendRecvChunkStart(conn, ns, id, sessionId, lsid, from, to) {
@@ -52,7 +58,7 @@ function sendRecvChunkStart(conn, ns, id, sessionId, lsid, from, to) {
         min: {x: 50.0},
         max: {x: MaxKey},
         shardKeyPattern: {x: 1.0},
-        resumableRangeDeleterDisabled: false
+        resumableRangeDeleterDisabled: false,
     };
 
     return conn.getDB("admin").runCommand(cmd);
@@ -71,7 +77,8 @@ function sendRecvChunkStatus(conn, ns, sessionId) {
 (() => {
     jsTestLog(
         "Test that recovering a migration coordination ensures a delayed _recvChunkStart does not \
-         cause the recipient to re-insert a range deletion task");
+         cause the recipient to re-insert a range deletion task",
+    );
 
     const [collName, ns] = getNewNs(dbName);
 
@@ -85,7 +92,7 @@ function sendRecvChunkStatus(conn, ns, sessionId) {
     }
 
     let donorPrimary = st.rs0.getPrimary();
-    let failpoint = configureFailPoint(donorPrimary, 'moveChunkHangAtStep3');
+    let failpoint = configureFailPoint(donorPrimary, "moveChunkHangAtStep3");
 
     // Move chunk [50, inf) to shard1.
     const awaitShell = moveChunkParallel(ns, st.shard1.shardName);
@@ -124,20 +131,23 @@ function sendRecvChunkStatus(conn, ns, sessionId) {
     // without inserting a new range deletion task.Since the business logic of
     //_recvChunkStart is executed asynchronously, use _recvChunkStatus to check the
     // result of the _recvChunkStart.
-    assert.commandWorked(sendRecvChunkStart(recipientPrimary,
-                                            ns,
-                                            migrationDoc._id,
-                                            migrationDoc.migrationSessionId,
-                                            migrationDoc.lsid,
-                                            st.shard0,
-                                            st.shard1));
+    assert.commandWorked(
+        sendRecvChunkStart(
+            recipientPrimary,
+            ns,
+            migrationDoc._id,
+            migrationDoc.migrationSessionId,
+            migrationDoc.lsid,
+            st.shard0,
+            st.shard1,
+        ),
+    );
 
     assert.soon(() => {
         let result = sendRecvChunkStatus(recipientPrimary, ns, migrationDoc.migrationSessionId);
         jsTestLog("recvChunkStatus: " + tojson(result));
 
-        return result.state === "fail" &&
-            result.errmsg.startsWith("migrate failed: TransactionTooOld:");
+        return result.state === "fail" && result.errmsg.startsWith("migrate failed: TransactionTooOld:");
     });
 
     // Verify deletion task doesn't exist on recipient.
@@ -147,7 +157,8 @@ function sendRecvChunkStatus(conn, ns, sessionId) {
 (() => {
     jsTestLog(
         "Test that completing a migration coordination at the end of moveChunk ensures a delayed \
-         _recvChunkStart does not cause the recipient to re - insert a range deletion task");
+         _recvChunkStart does not cause the recipient to re - insert a range deletion task",
+    );
 
     const [collName, ns] = getNewNs(dbName);
 
@@ -161,7 +172,7 @@ function sendRecvChunkStatus(conn, ns, sessionId) {
     }
 
     let donorPrimary = st.rs0.getPrimary();
-    let failpoint = configureFailPoint(donorPrimary, 'moveChunkHangAtStep3');
+    let failpoint = configureFailPoint(donorPrimary, "moveChunkHangAtStep3");
 
     // Move chunk [50, inf) to shard1.
     const awaitShell = moveChunkParallel(ns, st.shard1.shardName);
@@ -182,20 +193,23 @@ function sendRecvChunkStatus(conn, ns, sessionId) {
     //_recvChunkStart is executed asynchronously, use _recvChunkStatus to check the
     // result of the _recvChunkStart.
     let recipientPrimary = st.rs1.getPrimary();
-    assert.commandWorked(sendRecvChunkStart(recipientPrimary,
-                                            ns,
-                                            migrationDoc._id,
-                                            migrationDoc.migrationSessionId,
-                                            migrationDoc.lsid,
-                                            st.shard0,
-                                            st.shard1));
+    assert.commandWorked(
+        sendRecvChunkStart(
+            recipientPrimary,
+            ns,
+            migrationDoc._id,
+            migrationDoc.migrationSessionId,
+            migrationDoc.lsid,
+            st.shard0,
+            st.shard1,
+        ),
+    );
 
     assert.soon(() => {
         let result = sendRecvChunkStatus(recipientPrimary, ns, migrationDoc.migrationSessionId);
         jsTestLog("recvChunkStatus: " + tojson(result));
 
-        return result.state === "fail" &&
-            result.errmsg.startsWith("migrate failed: TransactionTooOld:");
+        return result.state === "fail" && result.errmsg.startsWith("migrate failed: TransactionTooOld:");
     });
 
     // Verify deletion task doesn't exist on recipient.

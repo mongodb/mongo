@@ -9,16 +9,16 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
     getTimeseriesBucketsColl,
-    getTimeseriesCollForDDLOps
+    getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
 
-const dbName = 'testDB';
-const collName = 'testColl';
-const timeField = 'time';
-const metaField = 'hostid';
+const dbName = "testDB";
+const collName = "testColl";
+const timeField = "time";
+const metaField = "hostid";
 
 // Connections.
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -48,21 +48,21 @@ const collectionConfigurations = {
     // Shard key only on meta field/subfields.
     metaShardKey: {
         nDocs: 4,
-        metaGenerator: (id => id),
+        metaGenerator: (id) => id,
         shardKey: {[metaField]: 1},
         splitPoint: {meta: 2},
     },
     metaObjectShardKey: {
         nDocs: 4,
-        metaGenerator: (index => ({a: index})),
+        metaGenerator: (index) => ({a: index}),
         shardKey: {[metaField]: 1},
         splitPoint: {meta: {a: 2}},
     },
     metaSubFieldShardKey: {
         nDocs: 4,
-        metaGenerator: (index => ({a: index})),
-        shardKey: {[metaField + '.a']: 1},
-        splitPoint: {'meta.a': 2},
+        metaGenerator: (index) => ({a: index}),
+        shardKey: {[metaField + ".a"]: 1},
+        splitPoint: {"meta.a": 2},
     },
 
     // Shard key on time field.
@@ -75,21 +75,21 @@ const collectionConfigurations = {
     // Shard key on both meta and time field.
     metaTimeShardKey: {
         nDocs: 4,
-        metaGenerator: (id => id),
+        metaGenerator: (id) => id,
         shardKey: {[metaField]: 1, [timeField]: 1},
         splitPoint: {meta: 2, [`control.min.${timeField}`]: generateTimeValue(2)},
     },
     metaObjectTimeShardKey: {
         nDocs: 4,
-        metaGenerator: (index => ({a: index})),
+        metaGenerator: (index) => ({a: index}),
         shardKey: {[metaField]: 1, [timeField]: 1},
         splitPoint: {meta: {a: 2}, [`control.min.${timeField}`]: generateTimeValue(2)},
     },
     metaSubFieldTimeShardKey: {
         nDocs: 4,
-        metaGenerator: (index => ({a: index})),
-        shardKey: {[metaField + '.a']: 1, [timeField]: 1},
-        splitPoint: {'meta.a': 1, [`control.min.${timeField}`]: generateTimeValue(2)},
+        metaGenerator: (index) => ({a: index}),
+        shardKey: {[metaField + ".a"]: 1, [timeField]: 1},
+        splitPoint: {"meta.a": 1, [`control.min.${timeField}`]: generateTimeValue(2)},
     },
 };
 
@@ -125,13 +125,13 @@ const requestConfigurations = {
         reachesShard1: true,
     },
     metaSubFieldFilterOneShard: {
-        deletePredicates: [{[metaField + '.a']: 2}, {[metaField + '.a']: 3}],
+        deletePredicates: [{[metaField + ".a"]: 2}, {[metaField + ".a"]: 3}],
         remainingDocumentsIds: [0, 1],
         reachesShard0: false,
         reachesShard1: true,
     },
     metaSubFieldFilterTwoShards: {
-        deletePredicates: [{[metaField + '.a']: 1}, {[metaField + '.a']: 2}],
+        deletePredicates: [{[metaField + ".a"]: 1}, {[metaField + ".a"]: 2}],
         remainingDocumentsIds: [0, 3],
         reachesShard0: true,
         reachesShard1: true,
@@ -140,29 +140,27 @@ const requestConfigurations = {
 
 const testCases = {
     // Shard key only on meta field/subfields.
-    metaShardKey: ['emptyFilter', 'metaFilterOneShard', 'metaFilterTwoShards'],
+    metaShardKey: ["emptyFilter", "metaFilterOneShard", "metaFilterTwoShards"],
     metaObjectShardKey: [
-        'emptyFilter',
-        'metaObjectFilterOneShard',
-        'metaObjectFilterTwoShards',
-        'metaSubFieldFilterTwoShards'
+        "emptyFilter",
+        "metaObjectFilterOneShard",
+        "metaObjectFilterTwoShards",
+        "metaSubFieldFilterTwoShards",
     ],
     metaSubFieldShardKey: [
-        'emptyFilter',
-        'metaObjectFilterTwoShards',
-        'metaSubFieldFilterOneShard',
-        'metaSubFieldFilterTwoShards'
+        "emptyFilter",
+        "metaObjectFilterTwoShards",
+        "metaSubFieldFilterOneShard",
+        "metaSubFieldFilterTwoShards",
     ],
 
     // Shard key on time field.
-    timeShardKey: ['emptyFilter'],
+    timeShardKey: ["emptyFilter"],
 
     // Shard key on both meta and time field.
-    metaTimeShardKey: ['emptyFilter', 'metaFilterTwoShards'],
-    metaObjectTimeShardKey:
-        ['emptyFilter', 'metaObjectFilterTwoShards', 'metaSubFieldFilterTwoShards'],
-    metaSubFieldTimeShardKey:
-        ['emptyFilter', 'metaObjectFilterTwoShards', 'metaSubFieldFilterTwoShards'],
+    metaTimeShardKey: ["emptyFilter", "metaFilterTwoShards"],
+    metaObjectTimeShardKey: ["emptyFilter", "metaObjectFilterTwoShards", "metaSubFieldFilterTwoShards"],
+    metaSubFieldTimeShardKey: ["emptyFilter", "metaObjectFilterTwoShards", "metaSubFieldFilterTwoShards"],
 };
 
 function runTest(collConfig, reqConfig, insert) {
@@ -182,20 +180,24 @@ function runTest(collConfig, reqConfig, insert) {
 
     // Shard timeseries collection.
     assert.commandWorked(coll.createIndex(collConfig.shardKey));
-    assert.commandWorked(mongos.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
-        key: collConfig.shardKey,
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            shardCollection: `${dbName}.${collName}`,
+            key: collConfig.shardKey,
+        }),
+    );
 
     // Insert initial set of documents.
     const documents = generateDocsForTestCase(collConfig);
     assert.commandWorked(insert(coll, documents));
 
     // Manually split the data into two chunks.
-    assert.commandWorked(mongos.adminCommand({
-        split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
-        middle: collConfig.splitPoint
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
+            middle: collConfig.splitPoint,
+        }),
+    );
 
     // Ensure that currently both chunks reside on the primary shard.
     let counts = st.chunkCounts(collName, dbName);
@@ -204,12 +206,14 @@ function runTest(collConfig, reqConfig, insert) {
 
     // Move one of the chunks into the second shard.
     const otherShard = st.getOther(primaryShard);
-    assert.commandWorked(mongos.adminCommand({
-        movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
-        find: collConfig.splitPoint,
-        to: otherShard.name,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
+            find: collConfig.splitPoint,
+            to: otherShard.name,
+            _waitForDelete: true,
+        }),
+    );
 
     // Ensure that each shard owns one chunk.
     counts = st.chunkCounts(collName, dbName);
@@ -236,8 +240,7 @@ function runTest(collConfig, reqConfig, insert) {
         // On a mongod node, 'isTimeseriesNamespace' can only be used on time-series buckets
         // namespace.
         failingDeleteCommand.delete = collName;
-        assert.commandFailedWithCode(st.shard0.getDB(dbName).runCommand(failingDeleteCommand),
-                                     [5916400, 7934201]);
+        assert.commandFailedWithCode(st.shard0.getDB(dbName).runCommand(failingDeleteCommand), [5916400, 7934201]);
     }
 
     // Reset database profiler.
@@ -271,10 +274,7 @@ function runTest(collConfig, reqConfig, insert) {
 
     // Check that the query was routed to the correct shards.
     const profilerFilter = {
-        $or: [
-            {op: 'remove'},
-            {op: 'bulkWrite', "command.delete": {$exists: true}},
-        ],
+        $or: [{op: "remove"}, {op: "bulkWrite", "command.delete": {$exists: true}}],
         ns: `${dbName}.${collName}`,
         // Filter out events recorded because of StaleConfig error.
         ok: {$ne: 0},
@@ -293,19 +293,27 @@ function runTest(collConfig, reqConfig, insert) {
     }
 
     // Ensure that the collection contains only expected documents.
-    const remainingIds = coll.find({}, {_id: 1}).sort({_id: 1}).toArray().map(x => x._id);
+    const remainingIds = coll
+        .find({}, {_id: 1})
+        .sort({_id: 1})
+        .toArray()
+        .map((x) => x._id);
 
     reqConfig.remainingDocumentsIds.sort();
 
-    assert.eq(remainingIds, reqConfig.remainingDocumentsIds, `
+    assert.eq(
+        remainingIds,
+        reqConfig.remainingDocumentsIds,
+        `
     Delete query: ${tojsononeline(reqConfig.deleteQuery)}
     Input documents:
-        Ids: ${tojsononeline(documents.map(x => x._id))}
-        Meta: ${tojsononeline(documents.map(x => x[metaField]))}
-        Time: ${tojsononeline(documents.map(x => x[timeField]))}
+        Ids: ${tojsononeline(documents.map((x) => x._id))}
+        Meta: ${tojsononeline(documents.map((x) => x[metaField]))}
+        Time: ${tojsononeline(documents.map((x) => x[timeField]))}
     Remaining ids: ${tojsononeline(remainingIds)}
     Expected remaining ids: ${tojsononeline(reqConfig.remainingDocumentsIds)}
-    `);
+    `,
+    );
 }
 
 TimeseriesTest.run((insert) => {

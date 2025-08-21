@@ -9,7 +9,7 @@ for (let i = 0; i < 10; ++i) {
 }
 
 const collation = {
-    collation: {locale: "zh", backwards: false}
+    collation: {locale: "zh", backwards: false},
 };
 
 const firstResults = coll.aggregate([{$sort: {_id: 1}}], collation).toArray();

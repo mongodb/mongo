@@ -12,12 +12,10 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.indexedField = 'indexed_insert_upsert';
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.indexedField = "indexed_insert_upsert";
     $config.data.shardKey = {};
     $config.data.shardKey[$config.data.indexedField] = 1;
 
@@ -29,8 +27,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.states.insert = function insert(db, collName) {
         var doc = this.getDoc();
-        doc.counter = this.counter++;  // ensure doc is unique to guarantee an upsert occurs
-        doc._id = new ObjectId();      // _id is required for shard targeting
+        doc.counter = this.counter++; // ensure doc is unique to guarantee an upsert occurs
+        doc._id = new ObjectId(); // _id is required for shard targeting
 
         var res = db[collName].update(doc, {$inc: {unused: 0}}, {upsert: true});
         assert.eq(0, res.nMatched, tojson(res));

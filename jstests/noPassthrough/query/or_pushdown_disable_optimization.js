@@ -7,8 +7,7 @@
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+assert.commandWorked(db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
 
 const coll = db.getCollection(jsTestName());
 coll.drop();
@@ -25,11 +24,7 @@ assert.commandWorked(coll.insert(docs));
 // This query has a nested $and, and a one-argument contained $or. Normally we canonicalize this
 // predicate by flattening the $and and unwrapping the $or. The OR-pushdown optimization assumes the
 // predicate has been canonicalized, but this assumption is broken by the failpoint.
-const results = coll.aggregate([
-                        {$match: {$and: [{$and: [{a: 2}]}, {$or: [{b: 3}]}]}},
-                        {$unset: "_id"},
-                    ])
-                    .toArray();
+const results = coll.aggregate([{$match: {$and: [{$and: [{a: 2}]}, {$or: [{b: 3}]}]}}, {$unset: "_id"}]).toArray();
 assert.eq(results, [{a: 2, b: 3}]);
 
 MongoRunner.stopMongod(conn);

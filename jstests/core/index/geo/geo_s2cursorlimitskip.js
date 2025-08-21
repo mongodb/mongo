@@ -51,9 +51,11 @@ var batchSize = 4;
 // Insert points between 0.01 and 1.0 away.
 insertRandomPoints(totalPointCount, 0.01, 1.0);
 
-var cursor = t.find({
-                  geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}
-              }).batchSize(batchSize);
+var cursor = t
+    .find({
+        geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}},
+    })
+    .batchSize(batchSize);
 assert.eq(cursor.count(), totalPointCount);
 
 // Disable profiling in order to drop the system.profile collection.
@@ -63,12 +65,12 @@ testDB.setProfilingLevel(0);
 testDB.system.profile.drop();
 // Create 4MB system.profile collection to prevent the 'getmore' operations from overwriting the
 // original query.
-assert.commandWorked(
-    testDB.createCollection("system.profile", {capped: true, size: 4 * 1024 * 1024}));
+assert.commandWorked(testDB.createCollection("system.profile", {capped: true, size: 4 * 1024 * 1024}));
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDB.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
 for (var j = 0; j < initialAdvance; j++) {
     assert(cursor.hasNext());
@@ -99,22 +101,27 @@ assert(!cursor.hasNext());
 
 var someLimit = 23;
 // Make sure limit does something.
-cursor = t.find({
-              geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}
-          }).limit(someLimit);
+cursor = t
+    .find({
+        geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}},
+    })
+    .limit(someLimit);
 // Count doesn't work here -- ignores limit/skip, so we use itcount.
 assert.eq(cursor.itcount(), someLimit);
 // Make sure skip works by skipping some stuff ourselves.
 var someSkip = 3;
-cursor = t.find({
-              geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}
-          }).limit(someLimit + someSkip);
+cursor = t
+    .find({
+        geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}},
+    })
+    .limit(someLimit + someSkip);
 for (var i = 0; i < someSkip; ++i) {
     cursor.next();
 }
-var cursor2 = t.find({geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}})
-                  .skip(someSkip)
-                  .limit(someLimit);
+var cursor2 = t
+    .find({geo: {$geoNear: {$geometry: {type: "Point", coordinates: [0.0, 0.0]}}}})
+    .skip(someSkip)
+    .limit(someLimit);
 while (cursor.hasNext()) {
     assert(cursor2.hasNext());
     assert.eq(cursor.next(), cursor2.next());

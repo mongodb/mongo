@@ -22,27 +22,20 @@ import {
     exactIdDelete,
     initDeleteInTransactionStates,
     multiDelete,
-    verifyDocuments
+    verifyDocuments,
 } from "jstests/concurrency/fsm_workload_helpers/delete_in_transaction_states.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_refine_collection_shard_key.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_refine_collection_shard_key.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.iterations = 10;
 
-    $config.states.exactIdDelete = function(db, collName, connCache) {
+    $config.states.exactIdDelete = function (db, collName, connCache) {
         exactIdDelete(db, this.getCurrentOrPreviousLatchCollName(collName), this.session);
     };
-    $config.states.multiDelete = function(db, collName, connCache) {
-        multiDelete(db,
-                    this.getCurrentOrPreviousLatchCollName(collName),
-                    this.session,
-                    this.tid,
-                    this.partitionSize);
+    $config.states.multiDelete = function (db, collName, connCache) {
+        multiDelete(db, this.getCurrentOrPreviousLatchCollName(collName), this.session, this.tid, this.partitionSize);
     };
-    $config.states.verifyDocuments = function(db, collName, connCache) {
+    $config.states.verifyDocuments = function (db, collName, connCache) {
         verifyDocuments(db, this.getCurrentOrPreviousLatchCollName(collName), this.tid);
     };
 
@@ -57,7 +50,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.session = db.getMongo().startSession({causalConsistency: false});
 
         for (let i = this.latchCount; i >= 0; --i) {
-            const latchCollName = collName + '_' + i;
+            const latchCollName = collName + "_" + i;
             initDeleteInTransactionStates(db, latchCollName, this.tid, this.partitionSize);
         }
     };
@@ -68,7 +61,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             refineCollectionShardKey: 0.2,
             exactIdDelete: 0.25,
             multiDelete: 0.25,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         moveChunk: {
             moveChunk: 0.18,
@@ -76,7 +69,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             exactIdDelete: 0.18,
             multiDelete: 0.18,
             verifyDocuments: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         refineCollectionShardKey: {
             moveChunk: 0.2,
@@ -84,7 +77,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             exactIdDelete: 0.2,
             multiDelete: 0.2,
             verifyDocuments: 0.2,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         exactIdDelete: {
             moveChunk: 0.18,
@@ -92,7 +85,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             exactIdDelete: 0.18,
             multiDelete: 0.18,
             verifyDocuments: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         multiDelete: {
             moveChunk: 0.18,
@@ -100,21 +93,21 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             exactIdDelete: 0.18,
             multiDelete: 0.18,
             verifyDocuments: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         verifyDocuments: {
             moveChunk: 0.2,
             refineCollectionShardKey: 0.2,
             exactIdDelete: 0.2,
             multiDelete: 0.2,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         flushRouterConfig: {
             moveChunk: 0.2,
             refineCollectionShardKey: 0.2,
             exactIdDelete: 0.2,
             multiDelete: 0.2,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
     };
 

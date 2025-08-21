@@ -12,8 +12,7 @@ function assertProfileOnlyContainsAppName(db, appname) {
         // Dump collection.
         print("dumping db.system.profile");
         db.system.profile.find().forEach((doc) => printjsononeline(doc));
-        doassert(`system.profile expected to only have appName=${appname}` +
-                 ` but found ${tojson(res)}`);
+        doassert(`system.profile expected to only have appName=${appname}` + ` but found ${tojson(res)}`);
     }
 }
 

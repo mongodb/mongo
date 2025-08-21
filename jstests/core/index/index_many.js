@@ -18,10 +18,8 @@ function f() {
     while (x < 70) {
         let patt = {};
         patt[x] = 1;
-        if (x == 20)
-            patt = {x: 1};
-        if (x == 64)
-            patt = {y: 1};
+        if (x == 20) patt = {x: 1};
+        if (x == 64) patt = {y: 1};
         lastErr = t.createIndex(patt);
         x++;
     }

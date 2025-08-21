@@ -4,7 +4,7 @@ const KMaxNumOfOutputAppNames = 1000;
 const conn = MongoRunner.runMongod({verbose: 0});
 const uri = "mongodb://" + conn.host + "/test";
 
-let addAppName = function(suffix) {
+let addAppName = function (suffix) {
     try {
         // The client.application.name cannot exceed 128 bytes.
         const appName = "a".repeat(123) + "_" + suffix;
@@ -19,7 +19,7 @@ let addAppName = function(suffix) {
 };
 
 const db = new Mongo(uri + "?appName=ServerStatus").getDB("test");
-let getNumberofAppNamesReturned = function() {
+let getNumberofAppNamesReturned = function () {
     return Object.keys(db.serverStatus().metrics.apiVersions).length;
 };
 

@@ -6,10 +6,10 @@ const db = m.getDB("admin");
 // These statements throw because the localhost exception does not allow
 // these operations: it only allows the creation of the first admin user
 // and necessary setup operations.
-assert.throws(function() {
+assert.throws(function () {
     db.users.count();
 });
-assert.throws(function() {
+assert.throws(function () {
     db.shutdownServer();
 });
 
@@ -17,10 +17,10 @@ db.createUser({user: "eliot", pwd: "eliot", roles: ["root"]});
 
 // These statements throw because we have a user but have not authenticated
 // as that user.
-assert.throws(function() {
+assert.throws(function () {
     db.users.count();
 });
-assert.throws(function() {
+assert.throws(function () {
     db.shutdownServer();
 });
 

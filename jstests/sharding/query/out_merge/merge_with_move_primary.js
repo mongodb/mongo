@@ -10,15 +10,19 @@ const sourceColl = mongosDB["source"];
 const targetColl = mongosDB["target"];
 
 function setAggHang(mode) {
-    assert.commandWorked(st.shard0.adminCommand(
-        {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
-    assert.commandWorked(st.shard1.adminCommand(
-        {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
+    assert.commandWorked(
+        st.shard0.adminCommand({configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}),
+    );
+    assert.commandWorked(
+        st.shard1.adminCommand({configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}),
+    );
 
-    assert.commandWorked(st.shard0.adminCommand(
-        {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
-    assert.commandWorked(st.shard1.adminCommand(
-        {configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}));
+    assert.commandWorked(
+        st.shard0.adminCommand({configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}),
+    );
+    assert.commandWorked(
+        st.shard1.adminCommand({configureFailPoint: "hangWhileBuildingDocumentSourceOutBatch", mode: mode}),
+    );
 }
 
 function runPipelineWithStage({stage, shardedColl, expectedfailCode, expectedNumDocs}) {
@@ -26,8 +30,7 @@ function runPipelineWithStage({stage, shardedColl, expectedfailCode, expectedNum
     setAggHang("alwaysOn");
 
     // Set the primary shard.
-    assert.commandWorked(
-        st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard0.shardName}));
 
     let comment = jsTestName() + "_comment";
     let outFn = `
@@ -50,19 +53,19 @@ function runPipelineWithStage({stage, shardedColl, expectedfailCode, expectedNum
     let outShell = startParallelShell(outFn, st.s.port);
 
     // Wait for the parallel shell to hit the failpoint.
-    assert.soon(() => mongosDB
-                          .currentOp({
-                              $or: [
-                                  {op: "command", "command.comment": comment},
-                                  {op: "getmore", "cursor.originatingCommand.comment": comment}
-                              ]
-                          })
-                          .inprog.length == 1,
-                () => tojson(mongosDB.currentOp().inprog));
+    assert.soon(
+        () =>
+            mongosDB.currentOp({
+                $or: [
+                    {op: "command", "command.comment": comment},
+                    {op: "getmore", "cursor.originatingCommand.comment": comment},
+                ],
+            }).inprog.length == 1,
+        () => tojson(mongosDB.currentOp().inprog),
+    );
 
     // Migrate the primary shard from shard0 to shard1.
-    assert.commandWorked(
-        st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard1.shardName}));
 
     // Unset the failpoint to unblock the $merge and join with the parallel shell.
     setAggHang("off");
@@ -86,12 +89,12 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             $merge: {
                 into: targetColl.getName(),
                 whenMatched: whenMatchedMode,
-                whenNotMatched: whenNotMatchedMode
-            }
+                whenNotMatched: whenNotMatchedMode,
+            },
         },
         shardedColl: sourceColl,
         expectedNumDocs: whenNotMatchedMode == "discard" ? 0 : 2,
-        expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined
+        expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined,
     });
 });
 sourceColl.drop();
@@ -109,12 +112,12 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             $merge: {
                 into: targetColl.getName(),
                 whenMatched: whenMatchedMode,
-                whenNotMatched: whenNotMatchedMode
-            }
+                whenNotMatched: whenNotMatchedMode,
+            },
         },
         shardedColl: sourceColl,
         expectedNumDocs: whenNotMatchedMode == "discard" ? 0 : 2,
-        expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined
+        expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined,
     });
 });
 
@@ -135,12 +138,12 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             $merge: {
                 into: targetColl.getName(),
                 whenMatched: whenMatchedMode,
-                whenNotMatched: whenNotMatchedMode
-            }
+                whenNotMatched: whenNotMatchedMode,
+            },
         },
         shardedColl: targetColl,
         expectedNumDocs: whenNotMatchedMode == "discard" ? 0 : 2,
-        expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined
+        expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined,
     });
 });
 
@@ -162,12 +165,12 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             $merge: {
                 into: targetColl.getName(),
                 whenMatched: whenMatchedMode,
-                whenNotMatched: whenNotMatchedMode
-            }
+                whenNotMatched: whenNotMatchedMode,
+            },
         },
         shardedColl: targetColl,
         expectedNumDocs: whenNotMatchedMode == "discard" ? 0 : 2,
-        expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined
+        expectedfailCode: whenNotMatchedMode == "fail" ? 13113 : undefined,
     });
 });
 

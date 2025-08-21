@@ -25,17 +25,19 @@ function runCommandWithLsidCheck(conn, dbName, cmdName, cmdObj, func, makeFuncAr
 // Override the getDB to return a db object with the correct driverSession. We use a WeakMap
 // to cache the session for each connection instance so we can retrieve the same session on
 // subsequent calls to getDB.
-Mongo.prototype.getDB = function(dbName) {
+Mongo.prototype.getDB = function (dbName) {
     if (jsTest.options().disableEnableSessions) {
         return getDBOriginal.apply(this, arguments);
     }
 
-    if (sessionOptions && sessionOptions.hasOwnProperty("maybeUseCausalConsistency") &&
-        sessionOptions.maybeUseCausalConsistency === true) {
+    if (
+        sessionOptions &&
+        sessionOptions.hasOwnProperty("maybeUseCausalConsistency") &&
+        sessionOptions.maybeUseCausalConsistency === true
+    ) {
         const causalConsistency = Math.random() < 0.5;
         sessionOptions.causalConsistency = causalConsistency;
-        jsTestLog(
-            `Sessions override setting causalConsistency=${causalConsistency} for db ${dbName}`);
+        jsTestLog(`Sessions override setting causalConsistency=${causalConsistency} for db ${dbName}`);
 
         delete sessionOptions.maybeUseCausalConsistency;
     }

@@ -18,8 +18,7 @@ const collUnsharded = db[collName + "_unsharded"];
 assert.commandWorked(db.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(
-    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 
 // Range-shard the test collection on _id.
 assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
@@ -30,20 +29,17 @@ assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0
 assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 100}}));
 
 // Move the [0, 100) and [100, MaxKey] chunks to shard1.
-assert.commandWorked(
-    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
-assert.commandWorked(
-    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
+assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
+assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
 function runArrayAccumTest(testName, accumulator) {
     // Check the result of the aggregation on the unsharded collection vs. the sharded collection to
     // ensure $concatArrays and $setUnion produce the same results in both.
-    let pipeline = [{$sort: {_id: 1}}, {$group: {_id: null, lotsOfNumbers: {[accumulator]: '$x'}}}];
+    let pipeline = [{$sort: {_id: 1}}, {$group: {_id: null, lotsOfNumbers: {[accumulator]: "$x"}}}];
     if (accumulator === setUnionAcc) {
         // Need to add a stage to sort the values in the result array since the $setUnion
         // accumulator does not guarantee anything about the order of values.
-        pipeline.push(
-            {$project: {_id: 1, numbers: {$sortArray: {input: '$lotsOfNumbers', sortBy: 1}}}});
+        pipeline.push({$project: {_id: 1, numbers: {$sortArray: {input: "$lotsOfNumbers", sortBy: 1}}}});
     }
     let res = coll.aggregate(pipeline).toArray();
     let resUnsharded = collUnsharded.aggregate(pipeline).toArray();
@@ -51,8 +47,10 @@ function runArrayAccumTest(testName, accumulator) {
         res,
         resUnsharded,
         testName +
-            `Got different results from the unsharded and sharded collections. Result from unsharded collection: ${
-                tojson(resUnsharded)}. Result from sharded collection: ${tojson(res)}`);
+            `Got different results from the unsharded and sharded collections. Result from unsharded collection: ${tojson(
+                resUnsharded,
+            )}. Result from sharded collection: ${tojson(res)}`,
+    );
 
     // For $concatArrays, run the same test again but with the reverse sort order to ensure
     // sortedness is being respected.
@@ -64,8 +62,10 @@ function runArrayAccumTest(testName, accumulator) {
             res,
             resUnsharded,
             testName +
-                `Got different results from the unsharded and sharded collections. Result from unsharded collection: ${
-                    tojson(resUnsharded)}. Result from sharded collection: ${tojson(res)}`);
+                `Got different results from the unsharded and sharded collections. Result from unsharded collection: ${tojson(
+                    resUnsharded,
+                )}. Result from sharded collection: ${tojson(res)}`,
+        );
     }
 
     // Test with grouping to ensure that sharded clusters correctly compute the groups. The extra
@@ -73,15 +73,13 @@ function runArrayAccumTest(testName, accumulator) {
     // pipeline result.
     pipeline = [
         {$sort: {_id: 1}},
-        {$group: {_id: {$mod: ['$_id', 5]}, lotsOfNumbers: {[accumulator]: '$x'}}},
-        {$set: {_id: {$mod: ['$_id', 5]}}},
+        {$group: {_id: {$mod: ["$_id", 5]}, lotsOfNumbers: {[accumulator]: "$x"}}},
+        {$set: {_id: {$mod: ["$_id", 5]}}},
     ];
     if (accumulator === setUnionAcc) {
         // Need to add a stage to sort the values in the result array since the $setUnion
         // accumulator does not guarantee anything about the order of values.
-        pipeline.push(
-            {$project: {_id: 1, numbers: {$sortArray: {input: '$lotsOfNumbers', sortBy: 1}}}},
-        );
+        pipeline.push({$project: {_id: 1, numbers: {$sortArray: {input: "$lotsOfNumbers", sortBy: 1}}}});
     }
     pipeline.push({$sort: {_id: 1}});
 
@@ -91,8 +89,10 @@ function runArrayAccumTest(testName, accumulator) {
         res,
         resUnsharded,
         testName +
-            `Got different results from the unsharded and sharded collections. Result from unsharded collection: ${
-                tojson(resUnsharded)}. Result from sharded collection: ${tojson(res)}`);
+            `Got different results from the unsharded and sharded collections. Result from unsharded collection: ${tojson(
+                resUnsharded,
+            )}. Result from sharded collection: ${tojson(res)}`,
+    );
 }
 
 (function testMergingAcrossShards() {
@@ -158,7 +158,7 @@ function runArrayAccumTest(testName, accumulator) {
     // Write 400 documents across the 4 chunks. Values of 'val' field are distributed across both
     // shards such that their ranges overlap but the datasets aren't identical
     for (let i = -200; i < 200; i++) {
-        const val = (i + 200) % 270 + 1;  // [1, ..., 200] & [201, ..., 270, 1, ..., 130]
+        const val = ((i + 200) % 270) + 1; // [1, ..., 200] & [201, ..., 270, 1, ..., 130]
         const docToInsert = {_id: i, x: [val]};
         assert.commandWorked(coll.insert(docToInsert));
         assert.commandWorked(collUnsharded.insert(docToInsert));

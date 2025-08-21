@@ -58,7 +58,7 @@ const hashTests = [
     {key: {a: Math.pow(2, 63), b: NaN}, expected: NumberLong("1223292051903137684")},
 ];
 
-hashTests.forEach(test => {
+hashTests.forEach((test) => {
     const hashResult = db.runCommand({_hashBSONElement: test.key, seed: 1});
     assert.commandWorked(hashResult);
     assert.eq(test.expected, hashResult.out, tojson(test.key));

@@ -21,7 +21,6 @@ const docs = [
     {"location": {"type": "Point", "coordinates": [90, 45]}},
     {"location": {"type": "Point", "coordinates": [90, 45.1]}},
     {"location": {"type": "Point", "coordinates": [90, 45.01]}},
-
 ];
 assert.commandWorked(coll.insert(docs));
 assert.commandWorked(coll.createIndex({location: "2dsphere"}));
@@ -38,10 +37,10 @@ for (const doc of docs) {
                     maxDistance: dist,
                     spherical: true,
                     distanceField: "dist.calculated",
-                    includeLocs: "dist.location"
-                }
+                    includeLocs: "dist.location",
+                },
             },
-            {$project: {_id: 0, location: 1}}
+            {$project: {_id: 0, location: 1}},
         ];
         const result = coll.aggregate(pipeline).toArray();
         assert.eq(1, result.length, tojson(doc));

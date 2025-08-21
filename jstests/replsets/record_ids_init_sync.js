@@ -7,9 +7,10 @@
  * ]
  */
 
-import {
-    testPreservingRecordIdsDuringInitialSync,
-} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
+import {testPreservingRecordIdsDuringInitialSync} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 
 testPreservingRecordIdsDuringInitialSync(
-    "logical", "initialSyncHangBeforeCopyingDatabases", "initialSyncHangAfterDataCloning");
+    "logical",
+    "initialSyncHangBeforeCopyingDatabases",
+    "initialSyncHangAfterDataCloning",
+);

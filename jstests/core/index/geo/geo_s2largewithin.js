@@ -12,12 +12,24 @@ let testPoint = {name: "origin", geo: {type: "Point", coordinates: [0.0, 0.0]}};
 
 let testHorizLine = {
     name: "horiz",
-    geo: {type: "LineString", coordinates: [[-2.0, 10.0], [2.0, 10.0]]}
+    geo: {
+        type: "LineString",
+        coordinates: [
+            [-2.0, 10.0],
+            [2.0, 10.0],
+        ],
+    },
 };
 
 let testVertLine = {
     name: "vert",
-    geo: {type: "LineString", coordinates: [[10.0, -2.0], [10.0, 2.0]]}
+    geo: {
+        type: "LineString",
+        coordinates: [
+            [10.0, -2.0],
+            [10.0, 2.0],
+        ],
+    },
 };
 
 t.insert(testPoint);
@@ -28,7 +40,15 @@ t.insert(testVertLine);
 
 let longPoly = {
     type: "Polygon",
-    coordinates: [[[30.0, 1.0], [-30.0, 1.0], [-30.0, -1.0], [30.0, -1.0], [30.0, 1.0]]]
+    coordinates: [
+        [
+            [30.0, 1.0],
+            [-30.0, 1.0],
+            [-30.0, -1.0],
+            [30.0, -1.0],
+            [30.0, 1.0],
+        ],
+    ],
 };
 
 let result = t.find({geo: {$geoWithin: {$geometry: longPoly}}});

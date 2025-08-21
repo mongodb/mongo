@@ -9,8 +9,7 @@ import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function runTest({forcePooledConnectionsDropped, withUUID}) {
-    const reshardingTest =
-        new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
+    const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
     reshardingTest.setup();
 
     const donorShardNames = reshardingTest.donorShardNames;
@@ -27,8 +26,9 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
 
     let mongos = inputCollection.getMongo();
 
-    jsTestLog("Testing with forcePooledConnectionsDropped: " + forcePooledConnectionsDropped +
-              " withUUID: " + withUUID);
+    jsTestLog(
+        "Testing with forcePooledConnectionsDropped: " + forcePooledConnectionsDropped + " withUUID: " + withUUID,
+    );
 
     for (let x = 0; x < 1000; x++) {
         assert.commandWorked(inputCollection.insert({oldKey: x, newKey: -1 * x}));
@@ -46,11 +46,11 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
 
     function checkCoordinatorDoc() {
         assert.soon(() => {
-            const coordinatorDoc =
-                mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace});
+            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace});
 
-            return coordinatorDoc === null || coordinatorDoc.state === "aborting" ||
-                coordinatorDoc.state === "quiesced";
+            return (
+                coordinatorDoc === null || coordinatorDoc.state === "aborting" || coordinatorDoc.state === "quiesced"
+            );
         });
     }
 
@@ -74,16 +74,19 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
             // Wait for config server to have started resharding before sending setFCV, otherwise
             // there is a possible race where setFCV can be sent to the config before
             // configsvrReshard.
-            assert.soon(() => {
-                return mongos.getDB('config').reshardingOperations.findOne() != null;
-            }, "timed out waiting for coordinator doc to be written", 30 * 1000);
+            assert.soon(
+                () => {
+                    return mongos.getDB("config").reshardingOperations.findOne() != null;
+                },
+                "timed out waiting for coordinator doc to be written",
+                30 * 1000,
+            );
 
             if (forcePooledConnectionsDropped) {
                 pauseBeforeTellDonorToRefresh.wait();
             }
 
-            let codeToRunInParallelShell =
-                `{
+            let codeToRunInParallelShell = `{
                 assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
             }`;
 
@@ -100,8 +103,7 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
                 pauseBeforeMarkKeepOpen.wait();
 
                 jsTestLog("Set hitDropConnections failpoint");
-                let hitDropConnections =
-                    configureFailPoint(config, "finishedDropConnections", {}, {times: 1});
+                let hitDropConnections = configureFailPoint(config, "finishedDropConnections", {}, {times: 1});
                 pauseBeforeCloseCxns.off();
 
                 waitForFailpoint("Hit finishedDropConnections", 1);
@@ -129,8 +131,9 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
                 // The use of $_requestResumeToken can fail after downgrade because resharding
                 // improvements are not enabled, which produces this specific error code.
                 90675,
-            ]
-        });
+            ],
+        },
+    );
 
     awaitShell();
 
@@ -143,14 +146,19 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
             ],
         },
         () => {
-            assert.soon(() => {
-                return mongos.getDB('config').reshardingOperations.findOne() != null;
-            }, "timed out waiting for coordinator doc to be written", 30 * 1000);
+            assert.soon(
+                () => {
+                    return mongos.getDB("config").reshardingOperations.findOne() != null;
+                },
+                "timed out waiting for coordinator doc to be written",
+                30 * 1000,
+            );
             awaitShell = startParallelShell(
-                funWithArgs(function(latestFCV) {
-                    assert.commandWorked(db.adminCommand(
-                        {setFeatureCompatibilityVersion: latestFCV, confirm: true}));
-                }, latestFCV), mongos.port);
+                funWithArgs(function (latestFCV) {
+                    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+                }, latestFCV),
+                mongos.port,
+            );
             checkCoordinatorDoc();
         },
         {
@@ -162,8 +170,9 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
                 // building index, it is possible that the index build gets aborted first and
                 // resharding fails on IndexBuildAborted.
                 ErrorCodes.IndexBuildAborted,
-            ]
-        });
+            ],
+        },
+    );
 
     awaitShell();
     reshardingTest.teardown();

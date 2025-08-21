@@ -14,63 +14,67 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig,
-    testCommand
+    testCommand,
 } from "jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const origStates = Object.keys($config.states);
-    $config.states = Object.extend({
-        shardingCommands: function shardingCommands(db, collName) {
-            const namespace = db.getName() + "." + collName;
+    $config.states = Object.extend(
+        {
+            shardingCommands: function shardingCommands(db, collName) {
+                const namespace = db.getName() + "." + collName;
 
-            // ShardCollection should fail as the collection is already sharded.
-            let shardCollectionCmd = {
-                shardCollection: namespace,
-                key: {a: 1},
-                collectionUUID: this.collUUID
-            };
-            testCommand(db, namespace, "shardCollection", shardCollectionCmd, this, [
-                ErrorCodes.AlreadyInitialized
-            ]);
+                // ShardCollection should fail as the collection is already sharded.
+                let shardCollectionCmd = {
+                    shardCollection: namespace,
+                    key: {a: 1},
+                    collectionUUID: this.collUUID,
+                };
+                testCommand(db, namespace, "shardCollection", shardCollectionCmd, this, [
+                    ErrorCodes.AlreadyInitialized,
+                ]);
 
-            // Reshard with new shard-key.
-            let reshardCollectionCmd = {
-                reshardCollection: namespace,
-                key: {a: 1},
-                collectionUUID: this.collUUID,
-                numInitialChunks: 1,
-            };
-            testCommand(db, namespace, "reshardCollection", reshardCollectionCmd, this);
+                // Reshard with new shard-key.
+                let reshardCollectionCmd = {
+                    reshardCollection: namespace,
+                    key: {a: 1},
+                    collectionUUID: this.collUUID,
+                    numInitialChunks: 1,
+                };
+                testCommand(db, namespace, "reshardCollection", reshardCollectionCmd, this);
 
-            // Refine the shard-key.
-            const refineCollectionCmd = {
-                refineCollectionShardKey: namespace,
-                key: {a: 1, b: 1},
-                collectionUUID: this.collUUID
-            };
-            testCommand(db,
-                        namespace,
-                        "refineCollectionShardKey",
-                        refineCollectionCmd,
-                        this,
-                        // The shard key might be changed to '_id' already by another thread.
-                        [ErrorCodes.InvalidOptions]);
+                // Refine the shard-key.
+                const refineCollectionCmd = {
+                    refineCollectionShardKey: namespace,
+                    key: {a: 1, b: 1},
+                    collectionUUID: this.collUUID,
+                };
+                testCommand(
+                    db,
+                    namespace,
+                    "refineCollectionShardKey",
+                    refineCollectionCmd,
+                    this,
+                    // The shard key might be changed to '_id' already by another thread.
+                    [ErrorCodes.InvalidOptions],
+                );
 
-            // Reshard back with '_id' shard-key.
-            reshardCollectionCmd = {
-                reshardCollection: namespace,
-                key: {_id: 1},
-                collectionUUID: this.collUUID,
-                numInitialChunks: 1,
-            };
-            testCommand(db, namespace, "reshardCollection", reshardCollectionCmd, this);
-        }
-    },
-                                   $super.states);
+                // Reshard back with '_id' shard-key.
+                reshardCollectionCmd = {
+                    reshardCollection: namespace,
+                    key: {_id: 1},
+                    collectionUUID: this.collUUID,
+                    numInitialChunks: 1,
+                };
+                testCommand(db, namespace, "reshardCollection", reshardCollectionCmd, this);
+            },
+        },
+        $super.states,
+    );
 
     let newTransitions = Object.extend({}, $super.transitions);
     let indexCommandsState = {};
-    origStates.forEach(function(state) {
+    origStates.forEach(function (state) {
         if (state === "indexCommands") {
             indexCommandsState = newTransitions[state];
         }

@@ -16,12 +16,13 @@ let node = rst.nodes[0];
 
 const getParamCmd = {
     getParameter: 1,
-    featureCompatibilityVersion: 1
+    featureCompatibilityVersion: 1,
 };
 assert.commandFailedWithCode(
-    node.getDB('admin').runCommand(getParamCmd),
+    node.getDB("admin").runCommand(getParamCmd),
     ErrorCodes.UnknownFeatureCompatibilityVersion,
-    'expected ' + tojson(getParamCmd) + ' to fail with code UnknownFeatureCompatibilityVersion');
+    "expected " + tojson(getParamCmd) + " to fail with code UnknownFeatureCompatibilityVersion",
+);
 
 rst.initiate();
 

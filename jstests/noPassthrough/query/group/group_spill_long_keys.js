@@ -15,8 +15,8 @@ const memLimit = MEM_LIMIT_KB * 1024;
 const conn = MongoRunner.runMongod({
     setParameter: {
         internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: memLimit,
-        internalDocumentSourceGroupMaxMemoryBytes: memLimit
-    }
+        internalDocumentSourceGroupMaxMemoryBytes: memLimit,
+    },
 });
 assert.neq(conn, null, "mongod failed to start up");
 
@@ -75,7 +75,7 @@ for (let i = 0; i < docsNeeded; ++i) {
  * Generates the _id field for a $group query that aggregates on 'NUM_GROUP_KEY' unique keys. The
  * returned document should look like {a: "$a", b: "$b", ...}.
  */
-const groupKey = (function() {
+const groupKey = (function () {
     let doc = {};
     let str = "a";
     for (let i = 0; i < NUM_GROUP_KEYS; ++i) {
@@ -83,7 +83,7 @@ const groupKey = (function() {
         str = nextFieldName(str);
     }
     return doc;
-}());
+})();
 
 const pipeline = [{$group: {_id: groupKey}}];
 

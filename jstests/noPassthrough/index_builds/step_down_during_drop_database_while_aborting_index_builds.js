@@ -29,8 +29,9 @@ assert.commandWorked(bulk.execute());
 replSet.awaitReplication();
 
 IndexBuildTest.pauseIndexBuilds(testDB.getMongo());
-const awaitIndexBuild = IndexBuildTest.startIndexBuild(
-    testDB.getMongo(), testColl.getFullName(), {x: 1}, {}, [ErrorCodes.IndexBuildAborted]);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(testDB.getMongo(), testColl.getFullName(), {x: 1}, {}, [
+    ErrorCodes.IndexBuildAborted,
+]);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, "x_1");
 
 const failpoint = "dropDatabaseHangAfterWaitingForIndexBuilds";
@@ -64,8 +65,7 @@ assert(primary.port != newPrimary.port);
 let indexesRes = assert.commandWorked(newPrimary.getDB(dbName).runCommand({listIndexes: collName}));
 assert.eq(1, indexesRes.cursor.firstBatch.length);
 
-indexesRes =
-    assert.commandWorked(replSet.getSecondary().getDB(dbName).runCommand({listIndexes: collName}));
+indexesRes = assert.commandWorked(replSet.getSecondary().getDB(dbName).runCommand({listIndexes: collName}));
 assert.eq(1, indexesRes.cursor.firstBatch.length);
 
 // Run dropDatabase on the new primary. The secondary (formerly the primary) should be able to

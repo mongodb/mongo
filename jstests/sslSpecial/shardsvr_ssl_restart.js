@@ -14,9 +14,9 @@ let opts = {
     tlsMode: "allowTLS",
     tlsCertificateKeyFile: "jstests/libs/client.pem",
     tlsCAFile: "jstests/libs/ca.pem",
-    shardsvr: ''
+    shardsvr: "",
 };
-requireSSLProvider('openssl', function() {
+requireSSLProvider("openssl", function () {
     // Only the OpenSSL provider supports encrypted PKCS#8
     opts.tlsCertificateKeyFile = "jstests/libs/password_protected.pem";
     opts.tlsCertificateKeyFilePassword = "qwerty";

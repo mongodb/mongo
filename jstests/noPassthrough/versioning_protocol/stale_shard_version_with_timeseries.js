@@ -16,14 +16,14 @@ const dbStaleRouter = st.s0.getDB(dbName);
 const dbOtherRouter = st.s1.getDB(dbName);
 
 // Force the db primary shard to be shard0.
-assert.commandWorked(
-    dbOtherRouter.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(dbOtherRouter.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 // Create a sharded collection with chunks only in shard1.
 assert.commandWorked(dbOtherRouter.adminCommand({shardCollection: ns, key: {x: 1}}));
 
-assert.commandWorked(dbOtherRouter.adminCommand(
-    {moveRange: ns, toShard: st.shard1.shardName, min: {x: MinKey}, max: {x: MaxKey}}));
+assert.commandWorked(
+    dbOtherRouter.adminCommand({moveRange: ns, toShard: st.shard1.shardName, min: {x: MinKey}, max: {x: MaxKey}}),
+);
 
 // Both routers get a notion of the normal collection placed in shard1.
 assert.commandWorked(dbOtherRouter[collName].insert({x: 1}));
@@ -32,14 +32,17 @@ assert.commandWorked(dbStaleRouter[collName].insert({x: 2}));
 dbOtherRouter[collName].drop();
 
 // Re-create the same collection as timeseries with chunks only in shard1 and some data.
-assert.commandWorked(dbOtherRouter.adminCommand(
-    {shardCollection: ns, key: {time: 1}, timeseries: {timeField: "time"}}));
-assert.commandWorked(dbOtherRouter.adminCommand({
-    moveRange: dbName + "." + getTimeseriesCollForDDLOps(dbOtherRouter, collName),
-    toShard: st.shard1.shardName,
-    min: {"control.min.time": MinKey},
-    max: {"control.min.time": MaxKey}
-}));
+assert.commandWorked(
+    dbOtherRouter.adminCommand({shardCollection: ns, key: {time: 1}, timeseries: {timeField: "time"}}),
+);
+assert.commandWorked(
+    dbOtherRouter.adminCommand({
+        moveRange: dbName + "." + getTimeseriesCollForDDLOps(dbOtherRouter, collName),
+        toShard: st.shard1.shardName,
+        min: {"control.min.time": MinKey},
+        max: {"control.min.time": MaxKey},
+    }),
+);
 const time = ISODate();
 assert.commandWorked(dbOtherRouter[collName].insert({time: time}));
 

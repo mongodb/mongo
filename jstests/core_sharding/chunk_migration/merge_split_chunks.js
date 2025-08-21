@@ -17,10 +17,10 @@ const dbName = db.getName();
 const admin = db.getSiblingDB("admin");
 const config = db.getSiblingDB("config");
 const collName = jsTestName();
-const ns = dbName + '.' + collName;
+const ns = dbName + "." + collName;
 const coll = db.getCollection(collName);
 
-const shardNames = db.adminCommand({listShards: 1}).shards.map(shard => shard._id);
+const shardNames = db.adminCommand({listShards: 1}).shards.map((shard) => shard._id);
 
 if (shardNames.length < 2) {
     print(jsTestName() + " will not run; at least 2 shards are required.");
@@ -35,14 +35,17 @@ assert.commandWorked(admin.runCommand({shardCollection: ns, key: {_id: 1}}));
 // Make sure split is correctly disabled for unsharded collection
 jsTest.log("Trying to split an unsharded collection ...");
 const collNameUnsplittable = collName + "_unsplittable";
-const nsUnsplittable = dbName + '.' + collNameUnsplittable;
+const nsUnsplittable = dbName + "." + collNameUnsplittable;
 assert.commandWorked(db.runCommand({create: collNameUnsplittable}));
-assert.commandFailedWithCode(admin.runCommand({split: nsUnsplittable, middle: {_id: 0}}),
-                             ErrorCodes.NamespaceNotSharded);
+assert.commandFailedWithCode(
+    admin.runCommand({split: nsUnsplittable, middle: {_id: 0}}),
+    ErrorCodes.NamespaceNotSharded,
+);
 jsTest.log("Trying to merge an unsharded collection ...");
 assert.commandFailedWithCode(
     admin.runCommand({mergeChunks: nsUnsplittable, bounds: [{_id: 90}, {_id: MaxKey}]}),
-    ErrorCodes.NamespaceNotSharded);
+    ErrorCodes.NamespaceNotSharded,
+);
 db.getCollection(collNameUnsplittable).drop();
 
 // Create ranges MIN->0,0->10,(hole),20->40,40->50,50->90,(hole),100->110,110->MAX on first

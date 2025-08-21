@@ -4,7 +4,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-export const UserWriteBlockHelpers = (function() {
+export const UserWriteBlockHelpers = (function () {
     const WriteBlockState = {UNKNOWN: 0, DISABLED: 1, ENABLED: 2};
     const WriteBlockReason = {
         Unspecified: {name: "Unspecified", enum: 0},
@@ -30,27 +30,31 @@ export const UserWriteBlockHelpers = (function() {
             // User with "__system" role has restore role and thus can bypass user write blocking.
             // Can also run setUserWriteBlockMode.
             if (!this.haveCreatedUsers) {
-                assert.commandWorked(admin.runCommand({
-                    createUser: bypassUser,
-                    pwd: password,
-                    roles: [{role: "__system", db: "admin"}]
-                }));
+                assert.commandWorked(
+                    admin.runCommand({
+                        createUser: bypassUser,
+                        pwd: password,
+                        roles: [{role: "__system", db: "admin"}],
+                    }),
+                );
             }
             assert(admin.auth(bypassUser, password));
 
             if (!this.haveCreatedUsers) {
-                assert.commandWorked(admin.runCommand({
-                    createUser: noBypassUser,
-                    pwd: password,
-                    roles: [
-                        // Need for CUD operations
-                        {role: "readWriteAnyDatabase", db: "admin"},
-                        // Need for DDL operations
-                        {role: "dbAdminAnyDatabase", db: "admin"},
-                        // Need for importCollection
-                        {role: "clusterAdmin", db: "admin"}
-                    ]
-                }));
+                assert.commandWorked(
+                    admin.runCommand({
+                        createUser: noBypassUser,
+                        pwd: password,
+                        roles: [
+                            // Need for CUD operations
+                            {role: "readWriteAnyDatabase", db: "admin"},
+                            // Need for DDL operations
+                            {role: "dbAdminAnyDatabase", db: "admin"},
+                            // Need for importCollection
+                            {role: "clusterAdmin", db: "admin"},
+                        ],
+                    }),
+                );
                 this.haveCreatedUsers = true;
             }
 
@@ -82,10 +86,15 @@ export const UserWriteBlockHelpers = (function() {
 
         runInParallelShell(asAdmin, funString) {
             const userName = asAdmin ? bypassUser : noBypassUser;
-            return startParallelShell(`{
+            return startParallelShell(
+                `{
                     db.getSiblingDB('admin').auth('${userName}', '${password}');
-                    (` + funString + `)({conn: db.getMongo()});
-            }`, this.conn.port);
+                    (` +
+                    funString +
+                    `)({conn: db.getMongo()});
+            }`,
+                this.conn.port,
+            );
         }
 
         enableWriteBlockMode(reason) {
@@ -159,8 +168,8 @@ export const UserWriteBlockHelpers = (function() {
                 keyFile: keyfile,
                 setParameter: {
                     // Set the history window to zero to explicitly control the oldest timestamp.
-                    minSnapshotHistoryWindowInSeconds: 0
-                }
+                    minSnapshotHistoryWindowInSeconds: 0,
+                },
             });
             rst.startSet();
             rst.initiate();
@@ -182,31 +191,36 @@ export const UserWriteBlockHelpers = (function() {
                 }
 
                 unlock() {
-                    assert.commandWorked(this.fixture.adminConn.getDB("admin").runCommand(
-                        {killOp: 1, op: this.opId}));
+                    assert.commandWorked(this.fixture.adminConn.getDB("admin").runCommand({killOp: 1, op: this.opId}));
                     this.waiter();
                 }
             }
 
             const parallelShell = startParallelShell(
-                funWithArgs((connString, username, password) => {
-                    let admin = db.getSiblingDB("admin");
-                    admin.auth(username, password);
-                    assert.commandFailedWithCode(admin.runCommand({sleep: 1, lock: "w", secs: 600}),
-                                                 ErrorCodes.Interrupted);
-                }, "127.0.0.1:" + this.conn.port, bypassUser, password), this.conn.port);
+                funWithArgs(
+                    (connString, username, password) => {
+                        let admin = db.getSiblingDB("admin");
+                        admin.auth(username, password);
+                        assert.commandFailedWithCode(
+                            admin.runCommand({sleep: 1, lock: "w", secs: 600}),
+                            ErrorCodes.Interrupted,
+                        );
+                    },
+                    "127.0.0.1:" + this.conn.port,
+                    bypassUser,
+                    password,
+                ),
+                this.conn.port,
+            );
 
             var opId;
 
             assert.soon(() => {
-                let result = this.adminConn.getDB("admin")
-                                 .aggregate([
-                                     {$currentOp: {}},
-                                     {$match: {op: "command", "command.sleep": {$exists: true}}}
-                                 ])
-                                 .toArray();
-                if (result.length !== 1)
-                    return false;
+                let result = this.adminConn
+                    .getDB("admin")
+                    .aggregate([{$currentOp: {}}, {$match: {op: "command", "command.sleep": {$exists: true}}}])
+                    .toArray();
+                if (result.length !== 1) return false;
 
                 opId = result[0].opid;
 
@@ -221,7 +235,7 @@ export const UserWriteBlockHelpers = (function() {
         }
 
         getAllDbPaths() {
-            return this.rst.nodes.map(node => this.rst.getDbPath(node));
+            return this.rst.nodes.map((node) => this.rst.getDbPath(node));
         }
 
         restart() {
@@ -249,20 +263,18 @@ export const UserWriteBlockHelpers = (function() {
         }
 
         setProfilingLevel(level) {
-            return assert.commandWorked(
-                this.adminConn.getDB(jsTestName()).setProfilingLevel(level));
+            return assert.commandWorked(this.adminConn.getDB(jsTestName()).setProfilingLevel(level));
         }
 
         assertFCV(expectedFCV) {
-            const actualFCV = assert
-                                  .commandWorked(this.adminConn.getDB('admin').runCommand(
-                                      {getParameter: 1, featureCompatibilityVersion: 1}))
-                                  .featureCompatibilityVersion.version;
+            const actualFCV = assert.commandWorked(
+                this.adminConn.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+            ).featureCompatibilityVersion.version;
             assert.eq(expectedFCV, actualFCV);
         }
 
         applyOps(params) {
-            assert.commandWorked(this.adminConn.getDB('admin').runCommand({applyOps: params}));
+            assert.commandWorked(this.adminConn.getDB("admin").runCommand({applyOps: params}));
         }
     }
 
@@ -273,7 +285,7 @@ export const UserWriteBlockHelpers = (function() {
                 rs: {nodes: 3},
                 auth: "",
                 other: {keyFile: keyfile},
-                initiateWithDefaultElectionTimeout: initiateWithDefaultElectionTimeout
+                initiateWithDefaultElectionTimeout: initiateWithDefaultElectionTimeout,
             });
 
             super(st.s.port);
@@ -282,32 +294,37 @@ export const UserWriteBlockHelpers = (function() {
 
         getStatus() {
             const backend = this.st.rs0.getPrimary();
-            return authutil.asCluster(
-                backend, keyfile, () => backend.getDB('admin').serverStatus());
+            return authutil.asCluster(backend, keyfile, () => backend.getDB("admin").serverStatus());
         }
 
         hangTransition(command, failpoint) {
             const configuredFp = this._hangTransition(this.st.shard0, failpoint);
-            const awaitShell =
-                startParallelShell(funWithArgs((username, password, command) => {
-                                       let admin = db.getSiblingDB("admin");
-                                       admin.auth(username, password);
-                                       assert.commandWorked(admin.runCommand(command));
-                                   }, bypassUser, password, command), this.conn.port);
+            const awaitShell = startParallelShell(
+                funWithArgs(
+                    (username, password, command) => {
+                        let admin = db.getSiblingDB("admin");
+                        admin.auth(username, password);
+                        assert.commandWorked(admin.runCommand(command));
+                    },
+                    bypassUser,
+                    password,
+                    command,
+                ),
+                this.conn.port,
+            );
             configuredFp.wait();
 
             return {waiter: awaitShell, failpoint: configuredFp};
         }
 
         restartConfigPrimary() {
-            jsTestLog('Restarting config primary');
+            jsTestLog("Restarting config primary");
             this.st.restartConfigServer(this.st.configRS.getPrimary());
         }
 
         setFailPoint(failpointName) {
             const backend = this.st.rs0.getPrimary();
-            return authutil.asCluster(
-                backend, keyfile, () => configureFailPoint(backend, failpointName));
+            return authutil.asCluster(backend, keyfile, () => configureFailPoint(backend, failpointName));
         }
 
         restart() {
@@ -320,7 +337,7 @@ export const UserWriteBlockHelpers = (function() {
         }
 
         stepDown() {
-            const forceStepDown = function(rst) {
+            const forceStepDown = function (rst) {
                 const primary = rst.getPrimary();
 
                 rst.asCluster(rst.nodes, () => {
@@ -339,26 +356,23 @@ export const UserWriteBlockHelpers = (function() {
 
         setProfilingLevel(level) {
             const backend = this.st.rs0.getPrimary();
-            return authutil.asCluster(
-                backend, keyfile, () => backend.getDB(jsTestName()).setProfilingLevel(level));
+            return authutil.asCluster(backend, keyfile, () => backend.getDB(jsTestName()).setProfilingLevel(level));
         }
 
         assertFCV(expectedFCV) {
-            const configAdminDB = this.st.c0.getDB('admin');
+            const configAdminDB = this.st.c0.getDB("admin");
             assert(configAdminDB.auth(bypassUser, password));
-            const actualFCV = assert
-                                  .commandWorked(configAdminDB.runCommand(
-                                      {getParameter: 1, featureCompatibilityVersion: 1}))
-                                  .featureCompatibilityVersion.version;
+            const actualFCV = assert.commandWorked(
+                configAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+            ).featureCompatibilityVersion.version;
             assert.eq(actualFCV, expectedFCV);
         }
 
         applyOps(params) {
             const backend = this.st.rs0.getPrimary();
-            return authutil.asCluster(
-                backend,
-                keyfile,
-                () => assert.commandWorked(backend.getDB('admin').runCommand({applyOps: params})));
+            return authutil.asCluster(backend, keyfile, () =>
+                assert.commandWorked(backend.getDB("admin").runCommand({applyOps: params})),
+            );
         }
     }
 
@@ -370,6 +384,6 @@ export const UserWriteBlockHelpers = (function() {
         bypassUser: bypassUser,
         noBypassUser,
         password: password,
-        keyfile: keyfile
+        keyfile: keyfile,
     };
 })();

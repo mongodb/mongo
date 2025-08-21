@@ -21,8 +21,9 @@ const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "prepared_transactions_index_build";
@@ -38,17 +39,18 @@ for (let i = 0; i < 10; ++i) {
 assert.commandWorked(bulk.execute());
 
 // activate failpoint to hang index build on secondary.
-secondary.getDB("admin").runCommand(
-    {configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'});
+secondary.getDB("admin").runCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"});
 
 // This test create indexes with fail point enabled on secondary which prevents secondary from
 // voting. So, disabling index build commit quorum.
 jsTestLog("Starting a background index build.");
-assert.commandWorked(testDB.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {x: 1}, name: 'x_1'}],
-    commitQuorum: 0,
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {x: 1}, name: "x_1"}],
+        commitQuorum: 0,
+    }),
+);
 
 const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);
@@ -65,15 +67,13 @@ jsTestLog("Prepared a transaction at " + tojson(prepareTimestamp));
 jsTestLog("Unblocking index build.");
 
 // finish the index build
-secondary.getDB("admin").runCommand(
-    {configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'});
+secondary.getDB("admin").runCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"});
 
 // It's illegal to commit a prepared transaction before its prepare oplog entry has been
 // majority committed. So wait for prepare oplog entry to be majority committed before issuing
 // the commitTransaction command. We know the index build is also done if the prepare has
 // finished on the secondary.
-jsTestLog(
-    "Waiting for prepare oplog entry to be majority committed and all index builds to finish on all nodes.");
+jsTestLog("Waiting for prepare oplog entry to be majority committed and all index builds to finish on all nodes.");
 PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp);
 
 jsTestLog("Committing txn");
@@ -83,8 +83,6 @@ replTest.awaitReplication();
 
 jsTestLog("Testing index integrity");
 // Index should work.
-assert.eq(
-    1000,
-    secondary.getDB(dbName).getCollection(collName).find({x: 1000}).hint({x: 1}).toArray()[0].x);
+assert.eq(1000, secondary.getDB(dbName).getCollection(collName).find({x: 1000}).hint({x: 1}).toArray()[0].x);
 jsTestLog("Shutting down the set");
 replTest.stopSet();

@@ -1,14 +1,15 @@
 // Test SCRAM iterationCount defaults.
 
 function runOpt(params, sha1Value, sha256Value) {
-    const conn = MongoRunner.runMongod({auth: '', setParameter: params});
-    const adminDB = conn.getDB('admin');
+    const conn = MongoRunner.runMongod({auth: "", setParameter: params});
+    const adminDB = conn.getDB("admin");
 
-    adminDB.createUser({user: 'user1', pwd: 'pass', roles: jsTest.adminUserRoles});
-    assert(adminDB.auth({user: 'user1', pwd: 'pass'}));
+    adminDB.createUser({user: "user1", pwd: "pass", roles: jsTest.adminUserRoles});
+    assert(adminDB.auth({user: "user1", pwd: "pass"}));
 
-    const response = assert.commandWorked(adminDB.runCommand(
-        {getParameter: 1, scramIterationCount: 1, scramSHA256IterationCount: 1}));
+    const response = assert.commandWorked(
+        adminDB.runCommand({getParameter: 1, scramIterationCount: 1, scramSHA256IterationCount: 1}),
+    );
     assert.eq(response.scramIterationCount, sha1Value);
     assert.eq(response.scramSHA256IterationCount, sha256Value);
 

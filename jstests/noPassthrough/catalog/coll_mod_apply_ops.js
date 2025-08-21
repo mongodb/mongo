@@ -18,7 +18,7 @@ assert.neq(randomUUID, coll.uuid);
 assert.commandWorked(dbCollMod.createCollection(collName));
 let cmd = {"collMod": collName, "validationLevel": "off"};
 let res = dbCollMod.runCommand(cmd);
-assert.commandWorked(res, 'could not run ' + tojson(cmd));
+assert.commandWorked(res, "could not run " + tojson(cmd));
 let collectionInfosOriginal = dbCollMod.getCollectionInfos()[0];
 assert.eq(collectionInfosOriginal.options.validationLevel, "off");
 
@@ -31,7 +31,7 @@ let collModApplyOpsEntry = {
     "ns": dbCollModName + ".$cmd",
     "ui": randomUUID,
     "o2": {"collectionOptions_old": {"uuid": randomUUID}},
-    "o": {"collMod": collName, "validationLevel": "moderate"}
+    "o": {"collMod": collName, "validationLevel": "moderate"},
 };
 assert.commandWorked(dbCollMod.adminCommand({"applyOps": [collModApplyOpsEntry]}));
 

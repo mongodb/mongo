@@ -18,7 +18,7 @@ import {
     makeBucketFilter,
     metaFieldName,
     prepareCollection,
-    timeFieldName
+    timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -69,32 +69,28 @@ function testUpdateExplain({
     const updateExplainPlanCommand = {explain: innerUpdateCommand, verbosity: "queryPlanner"};
     let explain = assert.commandWorked(testDB.runCommand(updateExplainPlanCommand));
     const updateStage = getPlanStage(explain.queryPlanner.winningPlan, expectedUpdateStageName);
-    assert.neq(null,
-               updateStage,
-               `${expectedUpdateStageName} stage not found in the plan: ${tojson(explain)}`);
+    assert.neq(null, updateStage, `${expectedUpdateStageName} stage not found in the plan: ${tojson(explain)}`);
     if (expectedUpdateStageName === "TS_MODIFY") {
-        assert.eq(expectedOpType,
-                  updateStage.opType,
-                  `TS_MODIFY opType is wrong: ${tojson(updateStage)}`);
-        assert.eq(expectedBucketFilter,
-                  updateStage.bucketFilter,
-                  `TS_MODIFY bucketFilter is wrong: ${tojson(updateStage)}`);
-        assert.eq(expectedResidualFilter,
-                  updateStage.residualFilter,
-                  `TS_MODIFY residualFilter is wrong: ${tojson(updateStage)}`);
+        assert.eq(expectedOpType, updateStage.opType, `TS_MODIFY opType is wrong: ${tojson(updateStage)}`);
+        assert.eq(
+            expectedBucketFilter,
+            updateStage.bucketFilter,
+            `TS_MODIFY bucketFilter is wrong: ${tojson(updateStage)}`,
+        );
+        assert.eq(
+            expectedResidualFilter,
+            updateStage.residualFilter,
+            `TS_MODIFY residualFilter is wrong: ${tojson(updateStage)}`,
+        );
     } else {
         const collScanStage = getPlanStage(explain.queryPlanner.winningPlan, "COLLSCAN");
         assert.neq(null, collScanStage, `COLLSCAN stage not found in the plan: ${tojson(explain)}`);
-        assert.eq(expectedBucketFilter,
-                  collScanStage.filter,
-                  `COLLSCAN filter is wrong: ${tojson(collScanStage)}`);
+        assert.eq(expectedBucketFilter, collScanStage.filter, `COLLSCAN filter is wrong: ${tojson(collScanStage)}`);
     }
 
     if (expectedUsedIndexName) {
         const ixscanStage = getPlanStage(explain.queryPlanner.winningPlan, "IXSCAN");
-        assert.eq(expectedUsedIndexName,
-                  ixscanStage.indexName,
-                  `Wrong index used: ${tojson(ixscanStage)}`);
+        assert.eq(expectedUsedIndexName, ixscanStage.indexName, `Wrong index used: ${tojson(ixscanStage)}`);
     }
 
     // Verifies the TS_MODIFY stage in the execution stats.
@@ -102,33 +98,38 @@ function testUpdateExplain({
     explain = assert.commandWorked(testDB.runCommand(updateExplainStatsCommand));
     const execStages = getExecutionStages(explain);
     assert.gt(execStages.length, 0, `No execution stages found: ${tojson(explain)}`);
-    assert.eq(expectedUpdateStageName,
-              execStages[0].stage,
-              `TS_MODIFY stage not found in executionStages: ${tojson(explain)}`);
+    assert.eq(
+        expectedUpdateStageName,
+        execStages[0].stage,
+        `TS_MODIFY stage not found in executionStages: ${tojson(explain)}`,
+    );
     if (expectedUpdateStageName === "TS_MODIFY") {
-        assert.eq(expectedNumUpdated,
-                  execStages[0].nMeasurementsUpdated,
-                  `Got wrong nMeasurementsUpdated: ${tojson(execStages[0])}`);
-        assert.eq(expectedNumMatched,
-                  execStages[0].nMeasurementsMatched,
-                  `Got wrong nMeasurementsMatched: ${tojson(execStages[0])}`);
-        assert.eq(expectedNumUpserted,
-                  execStages[0].nMeasurementsUpserted,
-                  `Got wrong nMeasurementsUpserted: ${tojson(execStages[0])}`);
-        assert.eq(expectedNumUnpacked,
-                  execStages[0].nBucketsUnpacked,
-                  `Got wrong nBucketsUnpacked: ${tojson(execStages[0])}`);
+        assert.eq(
+            expectedNumUpdated,
+            execStages[0].nMeasurementsUpdated,
+            `Got wrong nMeasurementsUpdated: ${tojson(execStages[0])}`,
+        );
+        assert.eq(
+            expectedNumMatched,
+            execStages[0].nMeasurementsMatched,
+            `Got wrong nMeasurementsMatched: ${tojson(execStages[0])}`,
+        );
+        assert.eq(
+            expectedNumUpserted,
+            execStages[0].nMeasurementsUpserted,
+            `Got wrong nMeasurementsUpserted: ${tojson(execStages[0])}`,
+        );
+        assert.eq(
+            expectedNumUnpacked,
+            execStages[0].nBucketsUnpacked,
+            `Got wrong nBucketsUnpacked: ${tojson(execStages[0])}`,
+        );
     } else {
-        assert.eq(expectedNumUpdated,
-                  execStages[0].nWouldModify,
-                  `Got wrong nWouldModify: ${tojson(execStages[0])}`);
-        assert.eq(expectedNumMatched,
-                  execStages[0].nMatched,
-                  `Got wrong nMatched: ${tojson(execStages[0])}`);
+        assert.eq(expectedNumUpdated, execStages[0].nWouldModify, `Got wrong nWouldModify: ${tojson(execStages[0])}`);
+        assert.eq(expectedNumMatched, execStages[0].nMatched, `Got wrong nMatched: ${tojson(execStages[0])}`);
     }
 
-    assert.sameMembers(
-        docs, coll.find().toArray(), "Explain command must not touch documents in the collection");
+    assert.sameMembers(docs, coll.find().toArray(), "Explain command must not touch documents in the collection");
 }
 
 (function testUpdateManyWithEmptyQuery() {
@@ -143,7 +144,7 @@ function testUpdateExplain({
         expectedBucketFilter: makeBucketFilter({}),
         expectedResidualFilter: {},
         expectedNumUpdated: 4,
-        expectedNumUnpacked: 2
+        expectedNumUnpacked: 2,
     });
 })();
 
@@ -158,12 +159,11 @@ function testUpdateExplain({
         },
         expectedUpdateStageName: "TS_MODIFY",
         expectedOpType: "updateMany",
-        expectedBucketFilter:
-            makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 3}}),
+        expectedBucketFilter: makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 3}}),
         expectedResidualFilter: {_id: {$gte: 3}},
         expectedNumUpdated: 0,
         expectedNumMatched: 2,
-        expectedNumUnpacked: 1
+        expectedNumUnpacked: 1,
     });
 })();
 
@@ -175,20 +175,20 @@ function testUpdateExplain({
             q: {[metaFieldName]: 2, _id: 3},
             u: {$set: {[metaFieldName]: 3}},
             multi: true,
-            hint: {[metaFieldName]: 1}
+            hint: {[metaFieldName]: 1},
         },
         expectedUpdateStageName: "TS_MODIFY",
         expectedOpType: "updateMany",
-        expectedBucketFilter: makeBucketFilter({meta: {$eq: 2}}, {
-            $and: [
-                {"control.min._id": {$_internalExprLte: 3}},
-                {"control.max._id": {$_internalExprGte: 3}}
-            ]
-        }),
+        expectedBucketFilter: makeBucketFilter(
+            {meta: {$eq: 2}},
+            {
+                $and: [{"control.min._id": {$_internalExprLte: 3}}, {"control.max._id": {$_internalExprGte: 3}}],
+            },
+        ),
         expectedResidualFilter: {_id: {$eq: 3}},
         expectedNumUpdated: 1,
         expectedNumUnpacked: 1,
-        expectedUsedIndexName: metaFieldName + "_1"
+        expectedUsedIndexName: metaFieldName + "_1",
     });
 })();
 
@@ -245,14 +245,11 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
         expectedUpdateStageName: "TS_MODIFY",
         expectedOpType: "updateOne",
         expectedBucketFilter: makeBucketFilter({
-            $and: [
-                {"control.min._id": {$_internalExprLte: 3}},
-                {"control.max._id": {$_internalExprGte: 3}}
-            ]
+            $and: [{"control.min._id": {$_internalExprLte: 3}}, {"control.max._id": {$_internalExprGte: 3}}],
         }),
         expectedResidualFilter: {_id: {$eq: 3}},
         expectedNumUpdated: 1,
-        expectedNumUnpacked: 1
+        expectedNumUnpacked: 1,
     });
 })();
 
@@ -267,15 +264,13 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
         },
         expectedUpdateStageName: "TS_MODIFY",
         expectedOpType: "updateOne",
-        expectedBucketFilter:
-            makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
+        expectedBucketFilter: makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
         expectedResidualFilter: {_id: {$gte: 1}},
         expectedNumUpdated: 1,
         expectedNumUnpacked: 1,
         // TODO: SERVER-107666 Remove this once explain update works on sharded viewless
         // collections.
-        skipIfSharded:
-            FeatureFlagUtil.isPresentAndEnabled(testDB, "CreateViewlessTimeseriesCollections"),
+        skipIfSharded: FeatureFlagUtil.isPresentAndEnabled(testDB, "CreateViewlessTimeseriesCollections"),
     });
 })();
 
@@ -287,19 +282,17 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
             q: {[metaFieldName]: 2, _id: {$gte: 1}},
             u: {$set: {[metaFieldName]: 3}},
             multi: false,
-            hint: {[metaFieldName]: 1}
+            hint: {[metaFieldName]: 1},
         },
         expectedUpdateStageName: "TS_MODIFY",
         expectedOpType: "updateOne",
-        expectedBucketFilter:
-            makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
+        expectedBucketFilter: makeBucketFilter({meta: {$eq: 2}}, {"control.max._id": {$_internalExprGte: 1}}),
         expectedResidualFilter: {_id: {$gte: 1}},
         expectedNumUpdated: 1,
         expectedNumUnpacked: 1,
         expectedUsedIndexName: metaFieldName + "_1",
         // TODO: SERVER-107666 Remove this once explain update works on sharded viewless
         // collections.
-        skipIfSharded:
-            FeatureFlagUtil.isPresentAndEnabled(testDB, "CreateViewlessTimeseriesCollections"),
+        skipIfSharded: FeatureFlagUtil.isPresentAndEnabled(testDB, "CreateViewlessTimeseriesCollections"),
     });
 })();

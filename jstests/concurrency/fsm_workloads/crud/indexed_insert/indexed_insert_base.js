@@ -5,7 +5,7 @@
  * documents appear in both a collection scan and an index scan. The indexed
  * value is the thread's id.
  */
-export const $config = (function() {
+export const $config = (function () {
     function makeSortSpecFromIndexSpec(ixSpec) {
         var sort = {};
 
@@ -15,7 +15,8 @@ export const $config = (function() {
             }
 
             var order = ixSpec[field];
-            if (order !== 1 && order !== -1) {  // e.g. '2d' or '2dsphere'
+            if (order !== 1 && order !== -1) {
+                // e.g. '2d' or '2dsphere'
                 order = 1;
             }
 
@@ -63,18 +64,20 @@ export const $config = (function() {
                     assert.eq(count, this.nInserted);
                 }
             }
-        }
+        },
     };
 
     var transitions = {init: {insert: 1}, insert: {find: 1}, find: {insert: 1}};
 
     function setup(db, collName, cluster) {
         const spec = {name: this.getIndexName(), key: this.getIndexSpec()};
-        assert.commandWorked(db.runCommand({
-            createIndexes: collName,
-            indexes: [spec],
-            writeConcern: {w: 'majority'},
-        }));
+        assert.commandWorked(
+            db.runCommand({
+                createIndexes: collName,
+                indexes: [spec],
+                writeConcern: {w: "majority"},
+            }),
+        );
         this.indexExists = true;
     }
 
@@ -85,7 +88,7 @@ export const $config = (function() {
         transitions: transitions,
         data: {
             getIndexName: function getIndexName() {
-                return this.indexedField + '_1';
+                return this.indexedField + "_1";
             },
             getIndexSpec: function getIndexSpec() {
                 var ixSpec = {};
@@ -100,11 +103,11 @@ export const $config = (function() {
             getQuery: function getQuery() {
                 return this.getDoc();
             },
-            indexedField: 'x',
+            indexedField: "x",
             shardKey: {x: 1},
             docsPerInsert: 1,
             skipAssertions: false,
         },
-        setup: setup
+        setup: setup,
     };
 })();

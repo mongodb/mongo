@@ -3,8 +3,9 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function getShowRecordIdsCursor(node, dbName, replicatedCollName) {
-    return node.getDB(dbName)[replicatedCollName].aggregate(
-        [{"$project": {"recordId": {"$meta": "recordId"}, "document": "$$ROOT"}}]);
+    return node
+        .getDB(dbName)
+        [replicatedCollName].aggregate([{"$project": {"recordId": {"$meta": "recordId"}, "document": "$$ROOT"}}]);
 }
 
 // Confirms data returned from a full collection scan on 'replicatedCollName', with the '$recordId'
@@ -21,23 +22,26 @@ export function validateShowRecordIdReplicatesAcrossNodes(nodes, dbName, replica
         assert(curNodeCursor.hasNext(), `Expected to validate non-empty results`);
 
         const actualDiff = DataConsistencyChecker.getDiff(node0Cursor, curNodeCursor);
-        assert.eq({docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},
-                  actualDiff,
-                  `Expected RecordIds to match between node ${node0.host} and node ${
-                      curNode.host}. Got diff ${tojson(actualDiff)}`);
+        assert.eq(
+            {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},
+            actualDiff,
+            `Expected RecordIds to match between node ${node0.host} and node ${
+                curNode.host
+            }. Got diff ${tojson(actualDiff)}`,
+        );
     }
 }
 
 // Returns the '$recordId' associated with the 'doc' when a find() with 'showRecordId()' is
 // performed.
 export function getRidForDoc(db, collName, doc) {
-    assert(db[collName].exists(),
-           `Collection ${db[collName].getFullName()} not found on ${db.getMongo().host}`);
+    assert(db[collName].exists(), `Collection ${db[collName].getFullName()} not found on ${db.getMongo().host}`);
     const docs = db[collName].find(doc).showRecordId().toArray();
-    assert.eq(docs.length,
-              1,
-              `Document ${tojson(doc)} not found in collection ${db[collName].getFullName()} on ${
-                  db.getMongo().host}`);
+    assert.eq(
+        docs.length,
+        1,
+        `Document ${tojson(doc)} not found in collection ${db[collName].getFullName()} on ${db.getMongo().host}`,
+    );
     const res = docs[0];
     assert.neq(res["$recordId"], null);
     return res["$recordId"];
@@ -48,11 +52,9 @@ export function getRidForDoc(db, collName, doc) {
 // name of the key.
 export function mapFieldToMatchingDocRid(docs, fieldName) {
     return docs.reduce((m, doc) => {
-        assert(doc.hasOwnProperty(fieldName),
-               `Missing key ${fieldName} in query results: ${tojson(doc)}`);
-        assert(doc.hasOwnProperty('$recordId'),
-               `Missing record ID in query results: ${tojson(doc)}`);
-        const recordId = doc['$recordId'];
+        assert(doc.hasOwnProperty(fieldName), `Missing key ${fieldName} in query results: ${tojson(doc)}`);
+        assert(doc.hasOwnProperty("$recordId"), `Missing record ID in query results: ${tojson(doc)}`);
+        const recordId = doc["$recordId"];
         m[doc[fieldName]] = recordId;
         return m;
     }, {});
@@ -66,15 +68,14 @@ export function mapFieldToMatchingDocRid(docs, fieldName) {
 // The 'beforeCloningFP' is a failpoint that is used to pause initial sync before
 // collections have been cloned. The 'afterCloningFP' is a failpoint that is used to pause initial
 // sync after collections have been cloned, but before oplog application.
-export function testPreservingRecordIdsDuringInitialSync(
-    initSyncMethod, beforeCloningFP, afterCloningFP) {
+export function testPreservingRecordIdsDuringInitialSync(initSyncMethod, beforeCloningFP, afterCloningFP) {
     const testName = jsTestName();
     const replTest = new ReplSetTest({name: testName, nodes: 2});
     replTest.startSet();
     replTest.initiate();
 
-    const dbName = 'test';
-    const collName = 'rrid';
+    const dbName = "test";
+    const collName = "rrid";
 
     const primary = replTest.getPrimary();
     const primDB = primary.getDB(dbName);
@@ -87,12 +88,14 @@ export function testPreservingRecordIdsDuringInitialSync(
         // Insert documents where some have a $recordId field within them. The recordId provided
         // here is just a field and is separate from the true recordId used when inserting.
         assert.commandWorked(primDB.runCommand({create: collName, recordIdsReplicated: true}));
-        assert.commandWorked(primDB[collName].insertMany([
-            {_id: 1, a: 1},                 // recordId: 1
-            {$recordId: 12, _id: 2, a: 2},  // recordId: 2
-            {_id: 3, $recordId: 13, a: 3},  // recordId: 3
-            {_id: 4, a: 4}                  // recordId: 4
-        ]));
+        assert.commandWorked(
+            primDB[collName].insertMany([
+                {_id: 1, a: 1}, // recordId: 1
+                {$recordId: 12, _id: 2, a: 2}, // recordId: 2
+                {_id: 3, $recordId: 13, a: 3}, // recordId: 3
+                {_id: 4, a: 4}, // recordId: 4
+            ]),
+        );
 
         // Remove recordId: 1 and then insert the doc again, which now gets recordId: 5.
         assert.commandWorked(primDB[collName].remove({_id: 1}));
@@ -103,8 +106,8 @@ export function testPreservingRecordIdsDuringInitialSync(
             rsConfig: {priority: 0},
             setParameter: {
                 logComponentVerbosity: tojsononeline({replication: 0, storage: 0}),
-                initialSyncMethod: initSyncMethod
-            }
+                initialSyncMethod: initSyncMethod,
+            },
         });
 
         replTest.reInitiate();
@@ -112,8 +115,10 @@ export function testPreservingRecordIdsDuringInitialSync(
         replTest.awaitReplication();
 
         validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);
-        assert.sameMembers(primary.getDB(dbName).getCollectionInfos(),
-                           initialSyncNode.getDB(dbName).getCollectionInfos());
+        assert.sameMembers(
+            primary.getDB(dbName).getCollectionInfos(),
+            initialSyncNode.getDB(dbName).getCollectionInfos(),
+        );
 
         replTest.remove(initialSyncNode);
         replTest.reInitiate();
@@ -142,23 +147,22 @@ export function testPreservingRecordIdsDuringInitialSync(
             rsConfig: {priority: 0},
             setParameter: {
                 logComponentVerbosity: tojsononeline({replication: 5, storage: 5}),
-                initialSyncMethod: initSyncMethod
-            }
+                initialSyncMethod: initSyncMethod,
+            },
         });
-        assert.commandWorked(
-            initialSyncNode.adminCommand({configureFailPoint: afterCloningFP, mode: "alwaysOn"}));
+        assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: afterCloningFP, mode: "alwaysOn"}));
         replTest.reInitiate();
 
         jsTestLog("Wait for the initial sync to start and pause right after copying databases.");
-        assert.commandWorked(initialSyncNode.adminCommand(
-            {waitForFailPoint: afterCloningFP, timesEntered: 1, maxTimeMS: 60000}));
+        assert.commandWorked(
+            initialSyncNode.adminCommand({waitForFailPoint: afterCloningFP, timesEntered: 1, maxTimeMS: 60000}),
+        );
 
         jsTestLog("Insert documents on the primary.");
         assert.commandWorked(primDB[collName].insertMany(moreDocsToInsert));
 
         jsTestLog("Resume initial sync.");
-        assert.commandWorked(
-            initialSyncNode.adminCommand({configureFailPoint: afterCloningFP, mode: "off"}));
+        assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: afterCloningFP, mode: "off"}));
         replTest.awaitSecondaryNodes(null, [initialSyncNode], null, true);
         replTest.awaitReplication();
 
@@ -193,23 +197,22 @@ export function testPreservingRecordIdsDuringInitialSync(
             rsConfig: {priority: 0},
             setParameter: {
                 logComponentVerbosity: tojsononeline({replication: 5, storage: 5}),
-                initialSyncMethod: initSyncMethod
-            }
+                initialSyncMethod: initSyncMethod,
+            },
         });
-        assert.commandWorked(
-            initialSyncNode.adminCommand({configureFailPoint: beforeCloningFP, mode: "alwaysOn"}));
+        assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: beforeCloningFP, mode: "alwaysOn"}));
         replTest.reInitiate();
 
         jsTestLog("Wait for the initial sync to start and pause right before copying databases.");
-        assert.commandWorked(initialSyncNode.adminCommand(
-            {waitForFailPoint: beforeCloningFP, timesEntered: 1, maxTimeMS: 60000}));
+        assert.commandWorked(
+            initialSyncNode.adminCommand({waitForFailPoint: beforeCloningFP, timesEntered: 1, maxTimeMS: 60000}),
+        );
 
         jsTestLog("Insert documents on the primary.");
         assert.commandWorked(primDB[collName].insertMany(moreDocsToInsert));
 
         jsTestLog("Resume initial sync.");
-        assert.commandWorked(
-            initialSyncNode.adminCommand({configureFailPoint: beforeCloningFP, mode: "off"}));
+        assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: beforeCloningFP, mode: "off"}));
         replTest.awaitSecondaryNodes(null, [initialSyncNode], null, true);
         replTest.awaitReplication();
 
@@ -226,8 +229,7 @@ export function testPreservingRecordIdsDuringInitialSync(
         assert.commandWorked(primDB.runCommand({create: collName, recordIdsReplicated: true}));
         // Insert a few 16 MB documents.
         for (let i = 0; i < 5; i++) {
-            assert.commandWorked(
-                primDB[collName].insert({_id: -100 + i, a: 'a'.repeat(16 * 1024 * 1024 - 26)}));
+            assert.commandWorked(primDB[collName].insert({_id: -100 + i, a: "a".repeat(16 * 1024 * 1024 - 26)}));
         }
 
         jsTestLog("Add a new node.");
@@ -235,8 +237,8 @@ export function testPreservingRecordIdsDuringInitialSync(
             rsConfig: {priority: 0},
             setParameter: {
                 logComponentVerbosity: tojsononeline({replication: 5, storage: 5}),
-                initialSyncMethod: initSyncMethod
-            }
+                initialSyncMethod: initSyncMethod,
+            },
         });
         replTest.reInitiate();
         replTest.awaitSecondaryNodes(null, [initialSyncNode], null, true);

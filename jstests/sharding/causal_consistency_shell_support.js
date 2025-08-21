@@ -20,12 +20,14 @@ function runCommandAndCheckLogicalTimes(cmdObj, db, shouldAdvance) {
 
     // Verify cluster and operation time.
     if (shouldAdvance) {
-        assert(bsonWoCompare(session.getOperationTime(), operationTime) > 0,
-               "expected the shell's operationTime to increase after running command: " +
-                   tojson(cmdObj));
-        assert(bsonWoCompare(session.getClusterTime().clusterTime, clusterTimeObj.clusterTime) > 0,
-               "expected the shell's clusterTime value to increase after running command: " +
-                   tojson(cmdObj));
+        assert(
+            bsonWoCompare(session.getOperationTime(), operationTime) > 0,
+            "expected the shell's operationTime to increase after running command: " + tojson(cmdObj),
+        );
+        assert(
+            bsonWoCompare(session.getClusterTime().clusterTime, clusterTimeObj.clusterTime) > 0,
+            "expected the shell's clusterTime value to increase after running command: " + tojson(cmdObj),
+        );
     } else {
         // Don't expect either clusterTime or operationTime to not change, because they may be
         // incremented by unrelated activity in the cluster.
@@ -42,9 +44,13 @@ function commandWorksAndUpdatesOperationTime(cmdObj, db) {
     assert.commandWorked(testDB.runCommand(cmdObj));
 
     // Verify the response contents and that new operation time is >= passed in time.
-    assert(bsonWoCompare(session.getOperationTime(), clusterTimeObj.clusterTime) >= 0,
-           "expected the shell's operationTime to be >= to:" + tojson(clusterTimeObj.clusterTime) +
-               " after running command: " + tojson(cmdObj));
+    assert(
+        bsonWoCompare(session.getOperationTime(), clusterTimeObj.clusterTime) >= 0,
+        "expected the shell's operationTime to be >= to:" +
+            tojson(clusterTimeObj.clusterTime) +
+            " after running command: " +
+            tojson(cmdObj),
+    );
 }
 
 // Manually create a shard so tests on storage engines that don't support majority readConcern
@@ -55,7 +61,7 @@ const rst = new ReplSetTest({
     name: rsName,
     nodeOptions: {
         shardsvr: "",
-    }
+    },
 });
 
 rst.startSet();
@@ -70,15 +76,15 @@ const testDB = st.s.getDB("test");
 const session = testDB.getSession();
 
 // Verify causal consistency is disabled unless explicitly set.
-assert.eq(testDB.getMongo()._causalConsistency,
-          false,
-          "causal consistency should be disabled by default");
+assert.eq(testDB.getMongo()._causalConsistency, false, "causal consistency should be disabled by default");
 testDB.getMongo().setCausalConsistency(true);
 
 // Verify causal consistency is enabled for the connection and for each supported command.
-assert.eq(testDB.getMongo()._causalConsistency,
-          true,
-          "calling setCausalConsistency() didn't enable causal consistency");
+assert.eq(
+    testDB.getMongo()._causalConsistency,
+    true,
+    "calling setCausalConsistency() didn't enable causal consistency",
+);
 
 // Verify cluster times are tracked even before causal consistency is set (so the first
 // operation with causal consistency set can use valid cluster times).
@@ -96,8 +102,7 @@ assert.neq(session.getClusterTime(), null);
 
 // Test that write commands advance both operation and cluster time.
 runCommandAndCheckLogicalTimes({insert: "foo", documents: [{x: 2}]}, testDB, true);
-runCommandAndCheckLogicalTimes(
-    {update: "foo", updates: [{q: {x: 2}, u: {$set: {x: 3}}}]}, testDB, true);
+runCommandAndCheckLogicalTimes({update: "foo", updates: [{q: {x: 2}, u: {$set: {x: 3}}}]}, testDB, true);
 
 // Test that each supported command works as expected and the shell's cluster times are properly
 // forwarded to the server and updated based on the response.
@@ -145,8 +150,8 @@ let geoNearCmd = {
             $geoNear: {
                 near: {type: "Point", coordinates: [-10, 10]},
                 distanceField: "dist",
-                spherical: true
-            }
+                spherical: true,
+            },
         },
     ],
 };
@@ -155,7 +160,8 @@ assert.commandWorked(testDB[geoNearColl].createIndex({loc: "2dsphere"}));
 runCommandAndCheckLogicalTimes(
     {insert: geoNearColl, documents: [{_id: 1, loc: {type: "Point", coordinates: [-10, 10]}}]},
     testDB,
-    true);
+    true,
+);
 runCommandAndCheckLogicalTimes(geoNearCmd, testDB, false);
 commandWorksAndUpdatesOperationTime(geoNearCmd, testDB);
 
@@ -163,18 +169,23 @@ commandWorksAndUpdatesOperationTime(geoNearCmd, testDB);
 
 // Verify that the server rejects commands when operation time is invalid by running a command
 // with an afterClusterTime value one day ahead.
-const invalidTime = new Timestamp(session.getOperationTime().getTime() + (60 * 60 * 24), 0);
+const invalidTime = new Timestamp(session.getOperationTime().getTime() + 60 * 60 * 24, 0);
 const invalidCmd = {
     find: "foo",
-    readConcern: {level: "majority", afterClusterTime: invalidTime}
+    readConcern: {level: "majority", afterClusterTime: invalidTime},
 };
-assert.commandFailedWithCode(testDB.runCommand(invalidCmd),
-                             ErrorCodes.InvalidOptions,
-                             "expected command, " + tojson(invalidCmd) + ", to fail with code, " +
-                                 ErrorCodes.InvalidOptions +
-                                 ", because the afterClusterTime value, " + tojson(invalidTime) +
-                                 ", should not be ahead of the clusterTime, " +
-                                 tojson(session.getClusterTime().clusterTime));
+assert.commandFailedWithCode(
+    testDB.runCommand(invalidCmd),
+    ErrorCodes.InvalidOptions,
+    "expected command, " +
+        tojson(invalidCmd) +
+        ", to fail with code, " +
+        ErrorCodes.InvalidOptions +
+        ", because the afterClusterTime value, " +
+        tojson(invalidTime) +
+        ", should not be ahead of the clusterTime, " +
+        tojson(session.getClusterTime().clusterTime),
+);
 
 st.stop();
 rst.stopSet();

@@ -14,19 +14,22 @@ const conn = MongoRunner.runMongod();
 function runTest(conn, failPointConn, shardColl) {
     const testDB = conn.getDB(jsTestName());
 
-    const coll = testDB.getCollection('t');
+    const coll = testDB.getCollection("t");
 
-    const timeFieldName = 'time';
-    const metaFieldName = 'meta';
+    const timeFieldName = "time";
+    const metaFieldName = "meta";
 
     coll.drop();
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
     if (shardColl) {
-        assert.commandWorked(conn.adminCommand({
-            shardCollection: coll.getFullName(),
-            key: {[metaFieldName]: 1},
-        }));
+        assert.commandWorked(
+            conn.adminCommand({
+                shardCollection: coll.getFullName(),
+                key: {[metaFieldName]: 1},
+            }),
+        );
     }
 
     const docs = [
@@ -40,14 +43,14 @@ function runTest(conn, failPointConn, shardColl) {
     //
     // Test with failPoint which aborts all subsequent write operations of the batch.
     //
-    let fp = configureFailPoint(failPointConn ? failPointConn : conn,
-                                'failUnorderedTimeseriesInsert',
-                                {metadata: 0, canContinue: false});
+    let fp = configureFailPoint(failPointConn ? failPointConn : conn, "failUnorderedTimeseriesInsert", {
+        metadata: 0,
+        canContinue: false,
+    });
 
-    const resWithCannotContinue =
-        assert.commandFailed(coll.insert(docs.slice(1), {ordered: false}));
+    const resWithCannotContinue = assert.commandFailed(coll.insert(docs.slice(1), {ordered: false}));
 
-    jsTestLog('Checking insert result: ' + tojson(resWithCannotContinue));
+    jsTestLog("Checking insert result: " + tojson(resWithCannotContinue));
     // We don't guarantee orderedness of inserts based on the metadata value/the order that the
     // documents are inserted in the array; however we know there needs to be at least two inserts
     // that fail because there are two documents with {meta: 0} and we have a non-continuable error.
@@ -55,21 +58,21 @@ function runTest(conn, failPointConn, shardColl) {
     // We could have the documents with {meta: 1} be successfully inserted if we have that {meta: 0}
     // documents are committed after the documents with {meta: 1} are inserted.
     assert(resWithCannotContinue.nInserted <= 2);
-    assert.eq(resWithCannotContinue.getWriteErrors().length,
-              docs.length - resWithCannotContinue.nInserted - 1);
+    assert.eq(resWithCannotContinue.getWriteErrors().length, docs.length - resWithCannotContinue.nInserted - 1);
 
     assert.commandWorked(coll.insert(docs[0]));
 
     // We now have that we will fail both the inserts with {meta: 0} with continuable errors.
     // This exercises both the "insert" and "update" path when we are attempting to commit a
     // measurement.
-    fp = configureFailPoint(failPointConn ? failPointConn : conn,
-                            'failUnorderedTimeseriesInsert',
-                            {metadata: 0, canContinue: true});
+    fp = configureFailPoint(failPointConn ? failPointConn : conn, "failUnorderedTimeseriesInsert", {
+        metadata: 0,
+        canContinue: true,
+    });
 
     const res = assert.commandFailed(coll.insert(docs.slice(1), {ordered: false}));
 
-    jsTestLog('Checking insert result: ' + tojson(res));
+    jsTestLog("Checking insert result: " + tojson(res));
     // We should successfully insert the two documents with {meta: 1}; these will always be
     // successfully inserted because we now have a continuable error.
     assert.eq(res.nInserted, 2);
@@ -84,10 +87,12 @@ function runTest(conn, failPointConn, shardColl) {
     // The documents should go into two new buckets due to the failed insert on the existing
     // bucket.
     assert.commandWorked(coll.insert(docs.slice(1, 3), {ordered: false}));
-    assert.eq(getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)),
-              2,
-              'Expected two buckets but found: ' +
-                  tojson(getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray()));
+    assert.eq(
+        getTimeseriesCollForRawOps(testDB, coll).count({}, getRawOperationSpec(testDB)),
+        2,
+        "Expected two buckets but found: " +
+            tojson(getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray()),
+    );
 }
 
 runTest(conn);

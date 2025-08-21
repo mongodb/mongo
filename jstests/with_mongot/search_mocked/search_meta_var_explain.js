@@ -9,10 +9,7 @@ import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
-import {
-    mongotCommandForQuery,
-    MongotMock,
-} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {mongotCommandForQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     getDefaultLastExplainContents,
     getMongotStagesAndValidateExplainExecutionStats,
@@ -34,8 +31,7 @@ coll.drop();
 const collName = coll.getName();
 const explainObject = getDefaultLastExplainContents();
 
-if (checkSbeRestrictedOrFullyEnabled(db) &&
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchInSbe')) {
+if (checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     MongoRunner.stopMongod(conn);
     mongotmock.stop();
@@ -52,42 +48,47 @@ const collUUID = getUUIDFromListCollections(db, coll.getName());
 
 const searchQuery = {
     query: "Chekhov",
-    path: "name"
+    path: "name",
 };
 const explainContents = {
-    profession: "writer"
+    profession: "writer",
 };
 
 function testUnionWith(searchCmd, verbosity) {
     {
-        const history = [{
-            expectedCommand: searchCmd,
-            response: {
-                ok: 1,
-                cursor: {
-                    id: NumberLong(0),
-                    ns: coll.getFullName(),
-                    nextBatch: [
-                        {_id: 2, $searchScore: 0.654},
-                        {_id: 1, $searchScore: 0.321},
-                        {_id: 3, $searchScore: 0.123}
-                    ]
+        const history = [
+            {
+                expectedCommand: searchCmd,
+                response: {
+                    ok: 1,
+                    cursor: {
+                        id: NumberLong(0),
+                        ns: coll.getFullName(),
+                        nextBatch: [
+                            {_id: 2, $searchScore: 0.654},
+                            {_id: 1, $searchScore: 0.321},
+                            {_id: 3, $searchScore: 0.123},
+                        ],
+                    },
+                    vars: {SEARCH_META: {value: 7}},
+                    explain: explainContents,
                 },
-                vars: {SEARCH_META: {value: 7}},
-                explain: explainContents,
-            }
-        }];
+            },
+        ];
 
         // This response is for the first $search in the top level pipeline.
-        assert.commandWorked(mongotConn.adminCommand(
-            {setMockResponses: 1, cursorId: NumberLong(123), history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(123), history: history}),
+        );
         // This response is for $search in $unionWith when the query is being executed.
-        assert.commandWorked(mongotConn.adminCommand(
-            {setMockResponses: 1, cursorId: NumberLong(124), history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(124), history: history}),
+        );
         // $unionWith will run its subpipeline again for explain execution stats so we need to mock
         // another response.
-        assert.commandWorked(mongotConn.adminCommand(
-            {setMockResponses: 1, cursorId: NumberLong(125), history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(125), history: history}),
+        );
     }
     const result = coll.explain(verbosity).aggregate([
         {$search: searchQuery},
@@ -95,12 +96,9 @@ function testUnionWith(searchCmd, verbosity) {
         {
             $unionWith: {
                 coll: coll.getName(),
-                pipeline: [
-                    {$search: searchQuery},
-                    {$project: {_id: {$add: [100, "$_id"]}, meta: "$$SEARCH_META"}},
-                ]
-            }
-        }
+                pipeline: [{$search: searchQuery}, {$project: {_id: {$add: [100, "$_id"]}, meta: "$$SEARCH_META"}}],
+            },
+        },
     ]);
 
     // Check stats for toplevel pipeline.
@@ -155,12 +153,9 @@ function runExplainTest(verbosity) {
         collName: collName,
         db: dbName,
         collectionUUID: collUUID,
-        explainVerbosity: {verbosity}
+        explainVerbosity: {verbosity},
     });
-    const pipeline = [
-        {$search: searchQuery},
-        {$project: {_id: 1, meta: "$$SEARCH_META"}},
-    ];
+    const pipeline = [{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}];
     const vars = {SEARCH_META: {value: 42}};
     {
         // TODO SERVER-91594: setUpMongotReturnExplain() should only be run for 'queryPlanner'
@@ -186,7 +181,7 @@ function runExplainTest(verbosity) {
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(0),
-            explainObject
+            explainObject,
         });
         getMongotStagesAndValidateExplainExecutionStats({
             result,
@@ -205,7 +200,7 @@ function runExplainTest(verbosity) {
                 nextBatch: [
                     {_id: 2, $searchScore: 0.654},
                     {_id: 1, $searchScore: 0.321},
-                    {_id: 3, $searchScore: 0.123}
+                    {_id: 3, $searchScore: 0.123},
                 ],
             });
             const result = coll.explain(verbosity).aggregate(pipeline);
@@ -214,7 +209,7 @@ function runExplainTest(verbosity) {
                 stageType: "$_internalSearchMongotRemote",
                 verbosity,
                 nReturned: NumberLong(3),
-                explainObject
+                explainObject,
             });
             getMongotStagesAndValidateExplainExecutionStats({
                 result,
@@ -232,9 +227,15 @@ function runExplainTest(verbosity) {
                 coll,
                 searchCmd,
                 batchList: [
-                    [{_id: 0, $searchScore: 1.234}, {_id: 5, $searchScore: 1.21}],
-                    [{_id: 2, $searchScore: 1.1}, {_id: 6, $searchScore: 0.8}],
-                    [{_id: 8, $searchScore: 0.2}]
+                    [
+                        {_id: 0, $searchScore: 1.234},
+                        {_id: 5, $searchScore: 1.21},
+                    ],
+                    [
+                        {_id: 2, $searchScore: 1.1},
+                        {_id: 6, $searchScore: 0.8},
+                    ],
+                    [{_id: 8, $searchScore: 0.2}],
                 ],
                 vars,
             });
@@ -244,7 +245,7 @@ function runExplainTest(verbosity) {
                 stageType: "$_internalSearchMongotRemote",
                 verbosity,
                 nReturned: NumberLong(5),
-                explainObject
+                explainObject,
             });
             getMongotStagesAndValidateExplainExecutionStats({
                 result,

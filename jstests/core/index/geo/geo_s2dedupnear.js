@@ -10,7 +10,15 @@ t.drop();
 t.createIndex({geo: "2dsphere"});
 var x = {
     "type": "Polygon",
-    "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]
+    "coordinates": [
+        [
+            [100.0, 0.0],
+            [101.0, 0.0],
+            [101.0, 1.0],
+            [100.0, 1.0],
+            [100.0, 0.0],
+        ],
+    ],
 };
 t.insert({geo: x});
 let res = t.find({geo: {$geoNear: {"type": "Point", "coordinates": [31, 41]}}});

@@ -6,20 +6,15 @@
  * @tags: [requires_auth]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {
-    mockPlanShardedSearchResponse,
-    MongotMock
-} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {mockPlanShardedSearchResponse, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = jsTestName();
 const collName = "testColl";
 
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 // Perform a simple search-query command, and test that it succeeds.
@@ -28,8 +23,7 @@ function testSimpleSearchQuery(mongodConn, mongotConn) {
     let coll = db.getCollection(collName);
     const collUUID = getUUIDFromListCollections(db, collName);
 
-    const searchCmd =
-        {search: coll.getName(), collectionUUID: collUUID, query: searchQuery, $db: dbName};
+    const searchCmd = {search: coll.getName(), collectionUUID: collUUID, query: searchQuery, $db: dbName};
 
     const history = [
         {
@@ -38,15 +32,14 @@ function testSimpleSearchQuery(mongodConn, mongotConn) {
                 cursor: {
                     id: NumberLong(0),
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 1, $searchScore: 0.321}]
+                    nextBatch: [{_id: 1, $searchScore: 0.321}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand(
-        {setMockResponses: 1, cursorId: NumberLong(123), history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(123), history: history}));
 
     let cursor = coll.aggregate([{$search: searchQuery}], {cursor: {batchSize: 2}});
     const expected = [{"_id": 1, "title": "cakes"}];
@@ -56,24 +49,28 @@ function testSimpleSearchQuery(mongodConn, mongotConn) {
 
 function assertCreateSearchIndexFailsAuth(conn) {
     let testDB = conn.getDB(dbName);
-    assert.commandFailedWithCode(testDB.runCommand({
-        'createSearchIndexes': collName,
-        'indexes': [{'definition': {'mappings': {'dynamic': true}}}]
-    }),
-                                 ErrorCodes.AuthenticationFailed);
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            "createSearchIndexes": collName,
+            "indexes": [{"definition": {"mappings": {"dynamic": true}}}],
+        }),
+        ErrorCodes.AuthenticationFailed,
+    );
 }
 
 function assertCreateSearchIndexSucceeds(mongosConn, searchIndexServerMock) {
     const manageSearchIndexCommandResponse = {
-        indexesCreated: [{id: "index-Id", name: "index-name"}]
+        indexesCreated: [{id: "index-Id", name: "index-name"}],
     };
 
     searchIndexServerMock.setMockSearchIndexCommandResponse(manageSearchIndexCommandResponse);
     let testDB = mongosConn.getDB(dbName);
-    assert.commandWorked(testDB.runCommand({
-        'createSearchIndexes': collName,
-        'indexes': [{'definition': {'mappings': {'dynamic': true}}}]
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            "createSearchIndexes": collName,
+            "indexes": [{"definition": {"mappings": {"dynamic": true}}}],
+        }),
+    );
 }
 
 // Set up mongotmock. This mongot won't skip authentication.
@@ -94,8 +91,8 @@ let mongodConn = MongoRunner.runMongod({
     setParameter: {
         mongotHost: mongotConnWithAuth.host,
         searchIndexManagementHostAndPort: searchIndexServerConn.host,
-        skipAuthenticationToSearchIndexManagementServer: false
-    }
+        skipAuthenticationToSearchIndexManagementServer: false,
+    },
 });
 
 // Seed the server with a document.
@@ -118,8 +115,8 @@ mongodConn = MongoRunner.runMongod({
     setParameter: {
         mongotHost: mongotConnWithAuth.host,
         searchIndexManagementHostAndPort: searchIndexServerConn.host,
-        skipAuthenticationToSearchIndexManagementServer: true
-    }
+        skipAuthenticationToSearchIndexManagementServer: true,
+    },
 });
 
 // Seed the server with a document.
@@ -143,15 +140,15 @@ let shardingTestOptions = {
         mongosOptions: {
             setParameter: {
                 searchIndexManagementHostAndPort: searchIndexServerConn.host,
-                skipAuthenticationToSearchIndexManagementServer: false
-            }
+                skipAuthenticationToSearchIndexManagementServer: false,
+            },
         },
         rs0: {
             setParameter: {
                 searchIndexManagementHostAndPort: searchIndexServerConn.host,
             },
         },
-    }
+    },
 };
 
 let stWithMock = new ShardingTestWithMongotMock(shardingTestOptions);
@@ -165,8 +162,7 @@ let testCollMongos = testDBMongos.getCollection(collName);
 // Create and shard the collection so the commands can succeed.
 assert.commandWorked(testDBMongos.createCollection(collName));
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-assert.commandWorked(
-    mongos.adminCommand({shardCollection: testCollMongos.getFullName(), key: {a: 1}}));
+assert.commandWorked(mongos.adminCommand({shardCollection: testCollMongos.getFullName(), key: {a: 1}}));
 
 // Seed the server with a document.
 assert.commandWorked(testCollMongos.insert({"_id": 1, "title": "cakes"}));
@@ -178,15 +174,13 @@ assertCreateSearchIndexFailsAuth(mongos);
 // Test that a search query to mongot still succeeds, since both mongod and mongot support auth in
 // this configuration. Set up the mongos with a mocked planning response first.
 mockPlanShardedSearchResponse(collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
-testSimpleSearchQuery(mongos,
-                      stWithMock.getMockConnectedToHost(st.rs0.getPrimary()).getConnection());
+testSimpleSearchQuery(mongos, stWithMock.getMockConnectedToHost(st.rs0.getPrimary()).getConnection());
 
 stWithMock.stop();
 
 // Restart mongos with the option set to turn off authentication for mongos <--> search-index-server
 // connections.
-shardingTestOptions.other.mongosOptions.setParameter
-    .skipAuthenticationToSearchIndexManagementServer = true;
+shardingTestOptions.other.mongosOptions.setParameter.skipAuthenticationToSearchIndexManagementServer = true;
 stWithMock = new ShardingTestWithMongotMock(shardingTestOptions);
 stWithMock.start();
 st = stWithMock.st;
@@ -198,8 +192,7 @@ testCollMongos = testDBMongos.getCollection(collName);
 // Create and shard the collection so the commands can succeed.
 assert.commandWorked(testDBMongos.createCollection(collName));
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-assert.commandWorked(
-    mongos.adminCommand({shardCollection: testCollMongos.getFullName(), key: {a: 1}}));
+assert.commandWorked(mongos.adminCommand({shardCollection: testCollMongos.getFullName(), key: {a: 1}}));
 
 // Seed the server with a document.
 assert.commandWorked(testCollMongos.insert({"_id": 1, "title": "cakes"}));
@@ -210,8 +203,7 @@ assertCreateSearchIndexSucceeds(mongos, searchIndexServerMock);
 // Search queries should still work fine.
 // Set up the mongos with a mocked planning response first.
 mockPlanShardedSearchResponse(collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
-testSimpleSearchQuery(mongos,
-                      stWithMock.getMockConnectedToHost(st.rs0.getPrimary()).getConnection());
+testSimpleSearchQuery(mongos, stWithMock.getMockConnectedToHost(st.rs0.getPrimary()).getConnection());
 
 stWithMock.stop();
 searchIndexServerMock.stop();

@@ -14,14 +14,14 @@ rst.initiate();
 
 // This testCmd is gated by gFeatureFlagBlender which is enabled on latest version.
 const testCmd = {
-    testCommandFeatureFlaggedOnLatestFCV: 1
+    testCommandFeatureFlaggedOnLatestFCV: 1,
 };
 
 // The testCmd should not be registered when the node is on the last-lts binary.
 assert.commandFailedWithCode(rst.getPrimary().adminCommand(testCmd), ErrorCodes.CommandNotFound);
 
 jsTest.log("Upgrading the replica set to latest.");
-rst.upgradeSet({binVersion: 'latest'});
+rst.upgradeSet({binVersion: "latest"});
 jsTest.log("Upgrade complete.");
 
 // Check that the FCV is still on lastLTS since we only upgraded the binary to latest.

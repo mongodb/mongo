@@ -25,11 +25,10 @@ db[collName].drop();
 
 // Get the current value of the query framework server parameter so we can restore it at the end of
 // the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl =
-    assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-        .internalQueryFrameworkControl;
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+).internalQueryFrameworkControl;
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 
 for (let i = 0; i < 10; ++i) {
     //'a' is an array to create a multikey index.
@@ -48,7 +47,7 @@ runMemoryStatsTest({
         pipeline,
         comment: "memory stats index scan stage test",
         allowDiskUse: false,
-        cursor: {batchSize: 1}
+        cursor: {batchSize: 1},
     },
     stageName,
     expectedNumGetMores: 10,
@@ -58,5 +57,6 @@ runMemoryStatsTest({
 
 // Clean up.
 db[collName].drop();
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
+);

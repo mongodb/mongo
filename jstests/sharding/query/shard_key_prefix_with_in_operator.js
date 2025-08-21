@@ -8,7 +8,7 @@ const coll = db.shard_key_prefix_with_in_operator;
 
 const shardKey = {
     a: 1,
-    b: 1
+    b: 1,
 };
 assert.commandWorked(coll.createIndex(shardKey));
 

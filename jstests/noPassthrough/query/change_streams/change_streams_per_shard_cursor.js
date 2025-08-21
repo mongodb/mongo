@@ -9,8 +9,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();
 const setupShardedCluster = (shards = 1) => {
-    const st = new ShardingTest(
-        {shards, mongos: 1, config: 1, rs: {nodes: 1, setParameter: {writePeriodicNoops: false}}});
+    const st = new ShardingTest({
+        shards,
+        mongos: 1,
+        config: 1,
+        rs: {nodes: 1, setParameter: {writePeriodicNoops: false}},
+    });
     const sdb = st.s0.getDB(dbName);
     assert.commandWorked(sdb.dropDatabase());
 
@@ -27,8 +31,7 @@ const setupShardedCluster = (shards = 1) => {
     } else {
         assert(shards === 1, "only 1 or 2 shards supported");
         assert.commandWorked(st.s.adminCommand({shardCollection: dbName + ".coll", key: {_id: 1}}));
-        assert.commandWorked(
-            st.s.adminCommand({shardCollection: dbName + ".coll2", key: {_id: 1}}));
+        assert.commandWorked(st.s.adminCommand({shardCollection: dbName + ".coll2", key: {_id: 1}}));
     }
 
     const shardId = st.shard0.shardName;
@@ -40,7 +43,7 @@ const pscWatch = (db, coll, shardId, options = {}, csOptions = {}) => {
         aggregate: coll,
         cursor: {},
         pipeline: [{$changeStream: csOptions}],
-        $_passthroughToShard: {shard: shardId}
+        $_passthroughToShard: {shard: shardId},
     };
     cmd = Object.assign({}, cmd, options);
     if (options.pipeline) {
@@ -58,34 +61,40 @@ const pscWatch = (db, coll, shardId, options = {}, csOptions = {}) => {
 let [sdb, st, shardId] = setupShardedCluster();
 
 // Should not allow pipeline without $changeStream.
-assert.commandFailedWithCode(sdb.runCommand({
-    aggregate: "coll",
-    cursor: {},
-    pipeline: [{$match: {perfect: true}}],
-    $_passthroughToShard: {shard: shardId}
-}),
-                             6273801);
+assert.commandFailedWithCode(
+    sdb.runCommand({
+        aggregate: "coll",
+        cursor: {},
+        pipeline: [{$match: {perfect: true}}],
+        $_passthroughToShard: {shard: shardId},
+    }),
+    6273801,
+);
 
 // $out can't passthrough so it's not allowed. This may be caught in parsing, or when preparing
 // the aggregation.
 assert.commandFailedWithCode(
     assert.throws(() => pscWatch(sdb, "coll", shardId, {pipeline: [{$out: "h"}]})),
-                 [6273802, ErrorCodes.IllegalOperation]);
+    [6273802, ErrorCodes.IllegalOperation],
+);
 
 // Shard option should be specified.
 assert.commandFailedWithCode(
-    sdb.runCommand(
-        {aggregate: "coll", cursor: {}, pipeline: [{$changeStream: {}}], $_passthroughToShard: {}}),
-    ErrorCodes.IDLFailedToParse);
+    sdb.runCommand({aggregate: "coll", cursor: {}, pipeline: [{$changeStream: {}}], $_passthroughToShard: {}}),
+    ErrorCodes.IDLFailedToParse,
+);
 
 // The shardId field should be a string.
-assert.commandFailedWithCode(assert.throws(() => pscWatch(sdb, "coll", 42)),
-                                          ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    assert.throws(() => pscWatch(sdb, "coll", 42)),
+    ErrorCodes.TypeMismatch,
+);
 
 // The shardId should be a valid shard.
 assert.commandFailedWithCode(
     assert.throws(() => pscWatch(sdb, "coll", "Dwane 'the Shard' Johnson")),
-                 ErrorCodes.ShardNotFound);
+    ErrorCodes.ShardNotFound,
+);
 
 // Correctness.
 
@@ -158,12 +167,17 @@ assert.hasOwnProperty(explainOut, "stages");
     sdb.toDrop.drop();
     assert.commandFailedWithCode(
         assert.throws(() => {
-                         assert.retry(() => {
-                             c._runGetMoreCommand();
-                             return false;
-                         }, "change stream should have been invalidated by now", 4);
-                     }),
-                     ErrorCodes.CursorNotFound);
+            assert.retry(
+                () => {
+                    c._runGetMoreCommand();
+                    return false;
+                },
+                "change stream should have been invalidated by now",
+                4,
+            );
+        }),
+        ErrorCodes.CursorNotFound,
+    );
 });
 
 st.stop();

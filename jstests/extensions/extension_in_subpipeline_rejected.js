@@ -15,28 +15,23 @@ assert.commandWorked(other.insert({_id: 1}));
 
 // Test $lookup pipeline rejects extension stage.
 {
-    const lookupPipeline =
-        [{$lookup: {from: other.getName(), as: "joined", pipeline: [{$testFoo: {}}]}}];
-    assertErrorCode(coll,
-                    lookupPipeline,
-                    51047,
-                    "Using $lookup with $testFoo in sub-pipeline should be rejected");
+    const lookupPipeline = [{$lookup: {from: other.getName(), as: "joined", pipeline: [{$testFoo: {}}]}}];
+    assertErrorCode(coll, lookupPipeline, 51047, "Using $lookup with $testFoo in sub-pipeline should be rejected");
 }
 
 // Test $unionWith pipeline rejects extension stage.
 {
     const unionWithPipeline = [{$unionWith: {coll: other.getName(), pipeline: [{$testFoo: {}}]}}];
-    assertErrorCode(coll,
-                    unionWithPipeline,
-                    31441,
-                    "Using $unionWith with $testFoo in sub-pipeline should be rejected");
+    assertErrorCode(
+        coll,
+        unionWithPipeline,
+        31441,
+        "Using $unionWith with $testFoo in sub-pipeline should be rejected",
+    );
 }
 
 // Test $facet pipeline rejects extension stage.
 {
     const facetPipeline = [{$facet: {facetPipe: [{$testFoo: {}}]}}];
-    assertErrorCode(coll,
-                    facetPipeline,
-                    40600,
-                    "Using $facet with $testFoo in sub-pipeline should be rejected");
+    assertErrorCode(coll, facetPipeline, 40600, "Using $facet with $testFoo in sub-pipeline should be rejected");
 }

@@ -13,11 +13,9 @@ import {
     createMoviesCollAndIndex,
     createMoviesView,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery
+    makeMovieVectorQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
-import {
-    datasets,
-} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
+import {datasets} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const moviesWithEnrichedTitle = createMoviesView(datasets.MOVIES_WITH_ENRICHED_TITLE);
 createMoviesCollAndIndex();
@@ -28,8 +26,7 @@ tvShowColl.insertOne({title: "Breaking Bad"});
 
 const basicQueryResult = (indexName) => {
     return moviesWithEnrichedTitle
-        .aggregate(makeMovieVectorQuery(
-            {queryVector: getMoviePlotEmbeddingById(11), limit: 3, indexName: indexName}))
+        .aggregate(makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(11), limit: 3, indexName: indexName}))
         .toArray();
 };
 
@@ -40,13 +37,15 @@ const unionWithQueryResult = (indexName) => {
             {
                 $unionWith: {
                     coll: moviesWithEnrichedTitle.getName(),
-                    pipeline: [makeMovieVectorQuery({
-                        queryVector: getMoviePlotEmbeddingById(11),
-                        limit: 3,
-                        indexName: indexName
-                    })]
-                }
-            }
+                    pipeline: [
+                        makeMovieVectorQuery({
+                            queryVector: getMoviePlotEmbeddingById(11),
+                            limit: 3,
+                            indexName: indexName,
+                        }),
+                    ],
+                },
+            },
         ])
         .toArray();
 };

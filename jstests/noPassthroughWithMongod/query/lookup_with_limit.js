@@ -5,7 +5,7 @@ import {flattenQueryPlanTree, getWinningPlanFromExplain} from "jstests/libs/quer
 import {
     checkSbeFullFeatureFlagEnabled,
     checkSbeFullyEnabled,
-    checkSbeRestrictedOrFullyEnabled
+    checkSbeRestrictedOrFullyEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 const isFeatureFlagSbeFullEnabled = checkSbeFullFeatureFlagEnabled(db);
@@ -20,15 +20,16 @@ other.drop();
 // Checks that the order of the query stages and pipeline stages matches the expected ordering
 // depending on whether the pipeline is optimized or not.
 function checkResults(pipeline, isOptimized, expected) {
-    assert.commandWorked(db.adminCommand({
-        "configureFailPoint": 'disablePipelineOptimization',
-        "mode": isOptimized ? 'off' : 'alwaysOn'
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            "configureFailPoint": "disablePipelineOptimization",
+            "mode": isOptimized ? "off" : "alwaysOn",
+        }),
+    );
     const explain = coll.explain().aggregate(pipeline);
     if (explain.stages) {
-        const queryStages =
-            flattenQueryPlanTree(getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner));
-        const pipelineStages = explain.stages.slice(1).map(s => Object.keys(s)[0]);
+        const queryStages = flattenQueryPlanTree(getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner));
+        const pipelineStages = explain.stages.slice(1).map((s) => Object.keys(s)[0]);
         assert.eq(queryStages.concat(pipelineStages), expected, explain);
     } else {
         const queryStages = flattenQueryPlanTree(getWinningPlanFromExplain(explain.queryPlanner));
@@ -38,13 +39,13 @@ function checkResults(pipeline, isOptimized, expected) {
 
 // Insert ten documents into coll: {x: 0}, {x: 1}, ..., {x: 9}.
 const bulk = coll.initializeOrderedBulkOp();
-Array.from({length: 10}, (_, i) => ({x: i})).forEach(doc => bulk.insert(doc));
+Array.from({length: 10}, (_, i) => ({x: i})).forEach((doc) => bulk.insert(doc));
 assert.commandWorked(bulk.execute());
 
 // Insert twenty documents into other: {x: 0, y: 0}, {x: 0, y: 1}, ..., {x: 9, y: 0}, {x: 9, y: 1}.
 const bulk_other = other.initializeOrderedBulkOp();
-Array.from({length: 10}, (_, i) => ({x: i, y: 0})).forEach(doc => bulk_other.insert(doc));
-Array.from({length: 10}, (_, i) => ({x: i, y: 1})).forEach(doc => bulk_other.insert(doc));
+Array.from({length: 10}, (_, i) => ({x: i, y: 0})).forEach((doc) => bulk_other.insert(doc));
+Array.from({length: 10}, (_, i) => ({x: i, y: 1})).forEach((doc) => bulk_other.insert(doc));
 assert.commandWorked(bulk_other.execute());
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,10 +54,7 @@ assert.commandWorked(bulk_other.execute());
 
 // TEST_01: Check that lookup->limit is reordered to limit->lookup, with the limit stage pushed down
 // to query system.
-let pipeline = [
-    {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
-    {$limit: 5}
-];
+let pipeline = [{$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}}, {$limit: 5}];
 if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "LIMIT"]);
     checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"]);
@@ -74,13 +72,11 @@ pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$addFields: {z: 0}},
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
-    {$limit: 5}
+    {$limit: 5},
 ];
 if (isSbeEnabled) {
-    checkResults(
-        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "LIMIT"]);
-    checkResults(
-        pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"]);
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$addFields", "$lookup", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "$addFields", "$lookup"]);
@@ -94,7 +90,7 @@ if (isSbeEnabled) {
 pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$unwind: "$from_other"},
-    {$limit: 5}
+    {$limit: 5},
 ];
 if (isFeatureFlagSbeFullEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "LIMIT"]);
@@ -116,18 +112,14 @@ pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$unset: "nonexistent_field"},
     {$unwind: "$from_other"},
-    {$limit: 5}
+    {$limit: 5},
 ];
 if (isFeatureFlagSbeFullEnabled) {
-    checkResults(
-        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "LIMIT"]);
-    checkResults(
-        pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "LIMIT"]);
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "LIMIT"]);
 } else if (isSbeEnabled) {
-    checkResults(
-        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "$unwind", "$limit"]);
-    checkResults(
-        pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "$unwind", "$limit"]);
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "$unwind", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "$unwind", "$limit"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$limit"]);
@@ -143,7 +135,7 @@ pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$unwind: "$from_other"},
     {$sort: {x: 1}},
-    {$limit: 5}
+    {$limit: 5},
 ];
 
 if (isFeatureFlagSbeFullEnabled) {
@@ -167,28 +159,18 @@ pipeline = [
     {$unset: "nonexistent_field"},
     {$unwind: "$from_other"},
     {$sort: {x: 1}},
-    {$limit: 5}
+    {$limit: 5},
 ];
 if (isFeatureFlagSbeFullEnabled) {
-    checkResults(pipeline,
-                 false,
-                 ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "SORT", "LIMIT"]);
-    checkResults(
-        pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "SORT", "UNWIND", "LIMIT"]);
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "SORT", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "SORT", "UNWIND", "LIMIT"]);
 } else if (isSbeEnabled) {
-    checkResults(pipeline,
-                 false,
-                 ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "$unwind", "$sort", "$limit"]);
-    checkResults(pipeline,
-                 true,
-                 ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "SORT", "$unwind", "$limit"]);
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "SORT", "$unwind", "$limit"]);
 } else if (isSbeGroupLookupOnly) {
-    checkResults(
-        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$sort", "$limit"]);
-    checkResults(
-        pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "$project", "$sort", "$unwind", "$limit"]);
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "$project", "$sort", "$unwind", "$limit"]);
 } else {
-    checkResults(
-        pipeline, false, ["COLLSCAN", "$lookup", "$project", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$project", "$unwind", "$sort", "$limit"]);
     checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$project", "$sort", "$unwind", "$limit"]);
 }

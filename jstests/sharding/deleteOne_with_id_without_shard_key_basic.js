@@ -28,16 +28,14 @@ assert.commandWorked(coll.insert({x: -1, _id: -1}));
 assert.commandWorked(coll.insert({x: -1, _id: 0}));
 assert.commandWorked(coll.insert({x: 1, _id: 1}));
 
-const fp = configureFailPoint(st.s, 'hangAfterCompletingWriteWithoutShardKeyWithId');
+const fp = configureFailPoint(st.s, "hangAfterCompletingWriteWithoutShardKeyWithId");
 
 // Test that transactions do not use broadcast protocol per PM-3190.
 let session = st.s.startSession({retryWrites: false});
 let sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
 withTxnAndAutoRetryOnMongos(session, () => {
     let deleteCmd = {
-        deletes: [
-            {q: {_id: -1}, limit: 1},
-        ]
+        deletes: [{q: {_id: -1}, limit: 1}],
     };
     assert.commandWorked(sessionColl.runCommand("delete", deleteCmd));
 });
@@ -49,9 +47,7 @@ session = st.s.startSession({retryWrites: true});
 withTxnAndAutoRetryOnMongos(session, () => {
     sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
     let deleteCmd = {
-        deletes: [
-            {q: {_id: 0}, limit: 1},
-        ]
+        deletes: [{q: {_id: 0}, limit: 1}],
     };
     assert.commandWorked(sessionColl.runCommand("delete", deleteCmd));
 });
@@ -63,15 +59,25 @@ session = st.s.startSession({retryWrites: true});
 const lsid = session.getSessionId();
 
 const joinDelete = startParallelShell(
-    funWithArgs(function(dbName, collName, lsid) {
-        assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).runCommand("delete", {
-            deletes: [
-                {q: {_id: 1}, limit: 1},
-            ],
-            lsid: lsid,
-            txnNumber: NumberLong(5)
-        }));
-    }, db.getName(), coll.getName(), lsid), mongos.port);
+    funWithArgs(
+        function (dbName, collName, lsid) {
+            assert.commandWorked(
+                db
+                    .getSiblingDB(dbName)
+                    .getCollection(collName)
+                    .runCommand("delete", {
+                        deletes: [{q: {_id: 1}, limit: 1}],
+                        lsid: lsid,
+                        txnNumber: NumberLong(5),
+                    }),
+            );
+        },
+        db.getName(),
+        coll.getName(),
+        lsid,
+    ),
+    mongos.port,
+);
 
 // We should hit the configured failpoint if PM-3190 code is used.
 fp.wait();

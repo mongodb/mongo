@@ -9,14 +9,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
-const st = new ShardingTest(
-    {name: "mrShardedOutputAuth", shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1'}});
+const st = new ShardingTest({name: "mrShardedOutputAuth", shards: 1, mongos: 1, other: {keyFile: "jstests/libs/key1"}});
 
 // Setup the users to the input, output and admin databases
 const authenticatedConn = st.s;
-const adminDb = authenticatedConn.getDB('admin');
-adminDb.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
-assert(adminDb.auth('admin', 'pass'));
+const adminDb = authenticatedConn.getDB("admin");
+adminDb.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
+assert(adminDb.auth("admin", "pass"));
 
 assert.commandWorked(adminDb.adminCommand({enablesharding: "output"}));
 
@@ -36,24 +35,23 @@ assert.eq(inputDb.numbers.count(), nDocs);
 function doMapReduce(connection, outputDb) {
     // clean output db and run m/r
     outputDb.numbers_out.drop();
-    assert.commandWorked(
-        adminDb.runCommand({shardCollection: outputDb.numbers_out.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(adminDb.runCommand({shardCollection: outputDb.numbers_out.getFullName(), key: {_id: 1}}));
 
-    return connection.getDB('input').runCommand({
+    return connection.getDB("input").runCommand({
         mapreduce: "numbers",
-        map: function() {
+        map: function () {
             emit(this.num, {count: 1});
         },
-        reduce: function(k, values) {
+        reduce: function (k, values) {
             const result = {};
-            values.forEach(function() {
+            values.forEach(function () {
                 result.count = 1;
             });
             return result;
         },
         out: {merge: "numbers_out", sharded: true, db: "output"},
         verbose: true,
-        query: {}
+        query: {},
     });
 }
 
@@ -69,21 +67,21 @@ function assertFailure(cmdResponse, configDb, outputDb) {
 }
 
 function runTest(user, roles, assertion) {
-    authenticatedConn.getDB(user.db).createUser({user: user.user, pwd: 'pass', roles: roles});
+    authenticatedConn.getDB(user.db).createUser({user: user.user, pwd: "pass", roles: roles});
 
     const conn = new Mongo(st.s.host);
-    assert(conn.getDB(user.db).auth(user.user, 'pass'));
+    assert(conn.getDB(user.db).auth(user.user, "pass"));
     const response = doMapReduce(conn, outputDb);
     assertion(response, configDb, outputDb);
 }
 
 // Setup a connection authenticated to both input and output db
-runTest({user: 'inout', db: 'admin'}, ['readWriteAnyDatabase'], assertSuccess);
+runTest({user: "inout", db: "admin"}, ["readWriteAnyDatabase"], assertSuccess);
 
 // setup a connection authenticated to only input db
-runTest({user: 'inonly', db: 'input'}, ['readWrite'], assertFailure);
+runTest({user: "inonly", db: "input"}, ["readWrite"], assertFailure);
 
 // setup a connection authenticated to only output db
-runTest({user: 'outOnly', db: 'output'}, ['readWrite'], assertFailure);
+runTest({user: "outOnly", db: "output"}, ["readWrite"], assertFailure);
 
 st.stop();

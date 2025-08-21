@@ -17,15 +17,14 @@ function testInvalidDBName(invalidName) {
 
     function validateState() {
         // Ensure that no database was created
-        var dbList = db.getSiblingDB('admin').runCommand({listDatabases: 1}).databases;
-        dbList.forEach(function(dbInfo) {
+        var dbList = db.getSiblingDB("admin").runCommand({listDatabases: 1}).databases;
+        dbList.forEach(function (dbInfo) {
             assert.neq(invalidName, dbInfo.name, errMsg);
         });
 
         // On sharding ensure no entry was added to config.databases
         if (isMongos) {
-            assert.eq(
-                db.getSiblingDB('config').databases.countDocuments({_id: invalidName}), 0, errMsg);
+            assert.eq(db.getSiblingDB("config").databases.countDocuments({_id: invalidName}), 0, errMsg);
         }
     }
 

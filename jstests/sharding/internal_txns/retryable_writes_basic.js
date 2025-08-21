@@ -8,9 +8,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, exclude_from_large_txns]
  */
-import {
-    RetryableInternalTransactionTest
-} from "jstests/sharding/internal_txns/libs/retryable_internal_transaction_test.js";
+import {RetryableInternalTransactionTest} from "jstests/sharding/internal_txns/libs/retryable_internal_transaction_test.js";
 
 const transactionTest = new RetryableInternalTransactionTest();
 
@@ -20,8 +18,7 @@ const transactionTest = new RetryableInternalTransactionTest();
         return {id: UUID()};
     };
     const expectRetryToSucceed = false;
-    transactionTest.runInsertUpdateDeleteTests(
-        {txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
+    transactionTest.runInsertUpdateDeleteTests({txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
 }
 
 {
@@ -30,14 +27,15 @@ const transactionTest = new RetryableInternalTransactionTest();
         return {id: UUID(), txnUUID: UUID()};
     };
     const expectRetryToSucceed = false;
-    transactionTest.runInsertUpdateDeleteTests(
-        {txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
+    transactionTest.runInsertUpdateDeleteTests({txnOptions: {makeSessionIdFunc}, expectRetryToSucceed});
 }
 
 {
     jsTest.log("Test that retryable internal transactions can be retried");
     transactionTest.runTestsForAllRetryableInternalTransactionTypes(
-        transactionTest.runInsertUpdateDeleteTests, transactionTest.TestMode.kNonRecovery);
+        transactionTest.runInsertUpdateDeleteTests,
+        transactionTest.TestMode.kNonRecovery,
+    );
 }
 
 {
@@ -46,8 +44,7 @@ const transactionTest = new RetryableInternalTransactionTest();
 }
 
 {
-    jsTest.log(
-        "Test multi writes with an initialized statement id are rejected in retryable transactions");
+    jsTest.log("Test multi writes with an initialized statement id are rejected in retryable transactions");
     transactionTest.testRetryableTxnMultiWrites();
 }
 

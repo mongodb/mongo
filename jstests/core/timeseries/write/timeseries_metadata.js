@@ -16,10 +16,10 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const collNamePrefix = jsTestName() + '_';
+    const collNamePrefix = jsTestName() + "_";
 
-    const timeFieldName = 'time';
-    const metaFieldName = 'meta';
+    const timeFieldName = "time";
+    const metaFieldName = "meta";
 
     let collCount = 0;
 
@@ -28,32 +28,35 @@ TimeseriesTest.run((insert) => {
      * for the metadata field (but distinct from the other list). We should see two buckets created
      * in the time-series collection.
      */
-    const runTest = function(docsBucketA, docsBucketB) {
+    const runTest = function (docsBucketA, docsBucketB) {
         const coll = db.getCollection(collNamePrefix + collCount++);
         coll.drop();
 
-        jsTestLog('Running test: collection: ' + coll.getFullName() +
-                  '; bucketA: ' + tojson(docsBucketA) + '; bucketB: ' + tojson(docsBucketB));
+        jsTestLog(
+            "Running test: collection: " +
+                coll.getFullName() +
+                "; bucketA: " +
+                tojson(docsBucketA) +
+                "; bucketB: " +
+                tojson(docsBucketB),
+        );
 
-        assert.commandWorked(db.createCollection(
-            coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        );
 
         let docs = docsBucketA.concat(docsBucketB);
-        assert.commandWorked(insert(coll, docs), 'failed to insert docs: ' + tojson(docs));
+        assert.commandWorked(insert(coll, docs), "failed to insert docs: " + tojson(docs));
 
         // Check measurements.
         const userDocs = coll.find({}).sort({_id: 1}).toArray();
         assert.eq(docs.length, userDocs.length, userDocs);
         for (let i = 0; i < docs.length; i++) {
-            assert.docEq(docs[i], userDocs[i], 'unexpected measurement doc: ' + i);
+            assert.docEq(docs[i], userDocs[i], "unexpected measurement doc: " + i);
         }
 
         // Check buckets.
-        const bucketDocs = getTimeseriesCollForRawOps(coll)
-                               .find()
-                               .rawData()
-                               .sort({'control.min._id': 1})
-                               .toArray();
+        const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
         assert.eq(2, bucketDocs.length, bucketDocs);
 
         // Check both buckets.
@@ -61,27 +64,39 @@ TimeseriesTest.run((insert) => {
         // buckets contain the correct documents, we need to decompress the buckets.
         TimeseriesTest.decompressBucket(bucketDocs[0]);
         TimeseriesTest.decompressBucket(bucketDocs[1]);
-        assert.eq(docsBucketA.length,
-                  Object.keys(bucketDocs[0].data[timeFieldName]).length,
-                  'invalid number of measurements in first bucket: ' + tojson(bucketDocs[0]));
+        assert.eq(
+            docsBucketA.length,
+            Object.keys(bucketDocs[0].data[timeFieldName]).length,
+            "invalid number of measurements in first bucket: " + tojson(bucketDocs[0]),
+        );
         if (docsBucketA[0].hasOwnProperty(metaFieldName)) {
-            assert.eq(docsBucketA[0][metaFieldName],
-                      bucketDocs[0].meta,
-                      'invalid meta in first bucket: ' + tojson(bucketDocs[0]));
-            assert(!bucketDocs[0].data.hasOwnProperty(metaFieldName),
-                   'unexpected metadata in first bucket data: ' + tojson(bucketDocs[0]));
+            assert.eq(
+                docsBucketA[0][metaFieldName],
+                bucketDocs[0].meta,
+                "invalid meta in first bucket: " + tojson(bucketDocs[0]),
+            );
+            assert(
+                !bucketDocs[0].data.hasOwnProperty(metaFieldName),
+                "unexpected metadata in first bucket data: " + tojson(bucketDocs[0]),
+            );
         }
 
         // Second bucket should contain documents specified in 'bucketB'.
-        assert.eq(docsBucketB.length,
-                  Object.keys(bucketDocs[1].data[timeFieldName]).length,
-                  'invalid number of measurements in second bucket: ' + tojson(bucketDocs[1]));
+        assert.eq(
+            docsBucketB.length,
+            Object.keys(bucketDocs[1].data[timeFieldName]).length,
+            "invalid number of measurements in second bucket: " + tojson(bucketDocs[1]),
+        );
         if (docsBucketB[0].hasOwnProperty(metaFieldName)) {
-            assert.eq(docsBucketB[0][metaFieldName],
-                      bucketDocs[1].meta,
-                      'invalid meta in second bucket: ' + tojson(bucketDocs[1]));
-            assert(!bucketDocs[1].data.hasOwnProperty(metaFieldName),
-                   'unexpected metadata in second bucket data: ' + tojson(bucketDocs[1]));
+            assert.eq(
+                docsBucketB[0][metaFieldName],
+                bucketDocs[1].meta,
+                "invalid meta in second bucket: " + tojson(bucketDocs[1]),
+            );
+            assert(
+                !bucketDocs[1].data.hasOwnProperty(metaFieldName),
+                "unexpected metadata in second bucket data: " + tojson(bucketDocs[1]),
+            );
         }
     };
 
@@ -95,13 +110,14 @@ TimeseriesTest.run((insert) => {
 
     runTest(
         [
-            {_id: 0, time: t[0], meta: 'a', x: 0},
-            {_id: 1, time: t[1], meta: 'a', x: 10},
+            {_id: 0, time: t[0], meta: "a", x: 0},
+            {_id: 1, time: t[1], meta: "a", x: 10},
         ],
         [
-            {_id: 2, time: t[2], meta: 'b', x: 20},
-            {_id: 3, time: t[3], meta: 'b', x: 30},
-        ]);
+            {_id: 2, time: t[2], meta: "b", x: 20},
+            {_id: 3, time: t[3], meta: "b", x: 30},
+        ],
+    );
 
     runTest(
         [
@@ -111,7 +127,8 @@ TimeseriesTest.run((insert) => {
         [
             {_id: 2, time: t[2], x: 20},
             {_id: 3, time: t[3], x: 30},
-        ]);
+        ],
+    );
 
     runTest(
         [
@@ -121,7 +138,8 @@ TimeseriesTest.run((insert) => {
         [
             {_id: 2, time: t[2], meta: 123, x: 20},
             {_id: 3, time: t[3], meta: 123, x: 30},
-        ]);
+        ],
+    );
 
     runTest(
         // Metadata field contains an array.
@@ -132,7 +150,8 @@ TimeseriesTest.run((insert) => {
         [
             {_id: 2, time: t[2], x: 20},
             {_id: 3, time: t[3], x: 30},
-        ]);
+        ],
+    );
 
     runTest(
         // Metadata field contains an object. Its ordering does not affect which bucket is used.
@@ -141,9 +160,8 @@ TimeseriesTest.run((insert) => {
             {_id: 1, time: t[1], meta: {a: 1, b: 1}, x: 10},
             {_id: 2, time: t[2], meta: {b: 1, a: 1}, x: 20},
         ],
-        [
-            {_id: 3, time: t[3], meta: {a: 1}, x: 30},
-        ]);
+        [{_id: 3, time: t[3], meta: {a: 1}, x: 30}],
+    );
 
     runTest(
         // Metadata field contains an array within an object.
@@ -154,7 +172,8 @@ TimeseriesTest.run((insert) => {
         [
             {_id: 2, time: t[2], meta: {a: [{b: 2, c: 0}]}, x: 20},
             {_id: 3, time: t[3], meta: {a: [{c: 0, b: 2}]}, x: 30},
-        ]);
+        ],
+    );
 
     runTest(
         // Metadata field contains a nested array.
@@ -165,7 +184,8 @@ TimeseriesTest.run((insert) => {
         [
             {_id: 2, time: t[2], meta: {a: [[{e: 1, f: 0}], {b: 1, c: 0}]}, x: 20},
             {_id: 3, time: t[3], meta: {a: [[{f: 0, e: 1}], {c: 0, b: 1}]}, x: 30},
-        ]);
+        ],
+    );
 
     runTest(
         // Metadata field contains an array.
@@ -176,5 +196,6 @@ TimeseriesTest.run((insert) => {
         [
             {_id: 2, time: t[2], meta: {a: [2, 1, 3]}, x: 20},
             {_id: 3, time: t[3], meta: {a: [2, 1, 3]}, x: 30},
-        ]);
+        ],
+    );
 });

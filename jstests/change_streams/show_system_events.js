@@ -15,20 +15,22 @@ import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 const testDB = db.getSiblingDB(jsTestName());
 
 // Assert that the flag is not allowed with 'apiStrict'.
-assert.commandFailedWithCode(testDB.runCommand({
-    aggregate: 1,
-    pipeline: [{$changeStream: {showSystemEvents: true}}],
-    cursor: {},
-    apiVersion: "1",
-    apiStrict: true
-}),
-                             ErrorCodes.APIStrictError);
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        aggregate: 1,
+        pipeline: [{$changeStream: {showSystemEvents: true}}],
+        cursor: {},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
+    ErrorCodes.APIStrictError,
+);
 
 const test = new ChangeStreamTest(testDB);
 
 const systemNS = {
     db: testDB.getName(),
-    coll: 'system.js'
+    coll: "system.js",
 };
 
 function runWholeDbChangeStreamTestWithoutSystemEvents(test, cursor, nonSystemColl) {
@@ -58,7 +60,7 @@ function runWholeDbChangeStreamTestWithoutSystemEvents(test, cursor, nonSystemCo
             fullDocument: {_id: 1, a: 1},
             ns: {db: testDB.getName(), coll: nonSystemColl.getName()},
             operationType: "insert",
-        }
+        },
     ];
     test.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedChanges});
 
@@ -105,7 +107,7 @@ function runWholeDbChangeStreamTestWithSystemEvents(test, cursor, nonSystemColl)
             fullDocument: {_id: 1, a: 1},
             ns: {db: testDB.getName(), coll: nonSystemColl.getName()},
             operationType: "insert",
-        }
+        },
     ];
     test.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedChanges});
 
@@ -175,7 +177,7 @@ function runSingleCollectionChangeStreamTest(test, cursor, nonSystemColl) {
             fullDocument: {_id: 2, a: 2},
             ns: {db: testDB.getName(), coll: nonSystemColl.getName()},
             operationType: "insert",
-        }
+        },
     ];
     test.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedChanges});
 }

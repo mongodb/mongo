@@ -1,4 +1,3 @@
-
 /**
  * Run the database command using the provided security token on behalf of a tenant.
  * @param {object} tenantToken The provided security token which indicates the tenant.

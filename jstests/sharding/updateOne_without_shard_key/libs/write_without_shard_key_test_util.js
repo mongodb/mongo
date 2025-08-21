@@ -1,17 +1,14 @@
 /*
  * Utilities for performing writes without shard key under various test configurations.
  */
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
-export var WriteWithoutShardKeyTestUtil = (function() {
+export var WriteWithoutShardKeyTestUtil = (function () {
     const Configurations = {
         noSession: "Running without a session",
-        sessionNotRetryableWrite:
-            "Running within a session but not as a retryable write or transaction",
+        sessionNotRetryableWrite: "Running within a session but not as a retryable write or transaction",
         sessionRetryableWrite: "Running as a retryable write",
-        transaction: "Running as a transaction"
+        transaction: "Running as a transaction",
     };
 
     const OperationType = {
@@ -25,8 +22,7 @@ export var WriteWithoutShardKeyTestUtil = (function() {
         const splitString = nss.split(".");
         const dbName = splitString[0];
 
-        assert.commandWorked(
-            st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
         assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: shardKey}));
 
         for (let splitPoint of splitPoints) {
@@ -34,11 +30,13 @@ export var WriteWithoutShardKeyTestUtil = (function() {
         }
 
         for (let {query, shard} of chunksToMove) {
-            assert.commandWorked(st.s.adminCommand({
-                moveChunk: nss,
-                find: query,
-                to: shard,
-            }));
+            assert.commandWorked(
+                st.s.adminCommand({
+                    moveChunk: nss,
+                    find: query,
+                    to: shard,
+                }),
+            );
         }
     }
 
@@ -52,10 +50,10 @@ export var WriteWithoutShardKeyTestUtil = (function() {
      * unique document in the collection.
      */
     function validateResultUpdate(docs, expectedMods, isReplacementTest, updatedDocId = null) {
-        expectedMods.forEach(mod => {
+        expectedMods.forEach((mod) => {
             if (isReplacementTest) {
                 let matches = 0;
-                docs.forEach(doc => {
+                docs.forEach((doc) => {
                     let {_id: _, ...docWithoutId} = doc;
                     if (tojson(docWithoutId) == tojson(mod)) {
                         matches++;
@@ -66,7 +64,7 @@ export var WriteWithoutShardKeyTestUtil = (function() {
                 let field = Object.keys(mod)[0];
                 let value = mod[field];
                 let docsHaveFieldMatchArray = [];
-                docs.forEach(doc => {
+                docs.forEach((doc) => {
                     if (doc[field] == value) {
                         docsHaveFieldMatchArray.push(doc[field] == value);
                         // For updateOne with sort, validate that the document that was first in the
@@ -95,19 +93,21 @@ export var WriteWithoutShardKeyTestUtil = (function() {
      * Inserts a batch of documents and runs a write without shard key and returns all of the
      * documents inserted.
      */
-    function insertDocsAndRunCommand(conn,
-                                     collName,
-                                     docsToInsert,
-                                     cmdObj,
-                                     operationType,
-                                     expectedResponse,
-                                     expectedRetryResponse = {}) {
+    function insertDocsAndRunCommand(
+        conn,
+        collName,
+        docsToInsert,
+        cmdObj,
+        operationType,
+        expectedResponse,
+        expectedRetryResponse = {},
+    ) {
         assert.commandWorked(conn.getCollection(collName).insert(docsToInsert));
         let res = assert.commandWorked(conn.runCommand(cmdObj));
         if (operationType === OperationType.updateOne) {
             assert.eq(expectedResponse.n, res.n);
             assert.eq(expectedResponse.nModified, res.nModified);
-            cmdObj.updates.forEach(update => {
+            cmdObj.updates.forEach((update) => {
                 if (update.upsert) {
                     assert.eq(expectedResponse.upserted, res.upserted);
                 }
@@ -116,9 +116,8 @@ export var WriteWithoutShardKeyTestUtil = (function() {
             assert.eq(expectedResponse.n, res.n);
         } else {
             assert.eq(expectedResponse.lastErrorObject.n, res.lastErrorObject.n);
-            assert.eq(expectedResponse.lastErrorObject.updateExisting,
-                      res.lastErrorObject.updateExisting);
-            assert((typeof res.value) !== "undefined");
+            assert.eq(expectedResponse.lastErrorObject.updateExisting, res.lastErrorObject.updateExisting);
+            assert(typeof res.value !== "undefined");
 
             if (expectedResponse.value) {
                 assert.eq(expectedResponse.value, res.value, res.value);
@@ -144,8 +143,7 @@ export var WriteWithoutShardKeyTestUtil = (function() {
             assert.eq(expectedRetryResponse.retriedStmtIds, res.retriedStmtIds);
         } else {
             assert.eq(expectedRetryResponse.lastErrorObject.n, res.lastErrorObject.n);
-            assert.eq(expectedRetryResponse.lastErrorObject.updateExisting,
-                      res.lastErrorObject.updateExisting);
+            assert.eq(expectedRetryResponse.lastErrorObject.updateExisting, res.lastErrorObject.updateExisting);
             assert.eq(expectedRetryResponse.retriedStmtId, res.retriedStmtId);
             assert.eq(expectedRetryResponse.value, res.value);
         }
@@ -161,9 +159,8 @@ export var WriteWithoutShardKeyTestUtil = (function() {
             testCase.options = [{}];
         }
 
-        testCase.options.forEach(option => {
-            jsTestLog(testCase.logMessage + "\n" +
-                      "For option: " + tojson(option) + "\n" + config);
+        testCase.options.forEach((option) => {
+            jsTestLog(testCase.logMessage + "\n" + "For option: " + tojson(option) + "\n" + config);
             let newCmdObj = Object.assign({}, testCase.cmdObj, option);
 
             let allMatchedDocs;
@@ -172,13 +169,15 @@ export var WriteWithoutShardKeyTestUtil = (function() {
                 withAbortAndRetryOnTransientTxnError(conn, () => {
                     conn.startTransaction();
                     dbConn = conn.getDatabase(testCase.dbName);
-                    allMatchedDocs = insertDocsAndRunCommand(dbConn,
-                                                             testCase.collName,
-                                                             testCase.docsToInsert,
-                                                             newCmdObj,
-                                                             operationType,
-                                                             testCase.expectedResponse,
-                                                             testCase.expectedRetryResponse);
+                    allMatchedDocs = insertDocsAndRunCommand(
+                        dbConn,
+                        testCase.collName,
+                        testCase.docsToInsert,
+                        newCmdObj,
+                        operationType,
+                        testCase.expectedResponse,
+                        testCase.expectedRetryResponse,
+                    );
                     conn.commitTransaction_forTesting();
                 });
             } else {
@@ -198,44 +197,48 @@ export var WriteWithoutShardKeyTestUtil = (function() {
                     };
                     Object.assign(newCmdObj, retryableWriteFields);
                 }
-                allMatchedDocs = insertDocsAndRunCommand(dbConn,
-                                                         testCase.collName,
-                                                         testCase.docsToInsert,
-                                                         newCmdObj,
-                                                         operationType,
-                                                         testCase.expectedResponse,
-                                                         testCase.expectedRetryResponse);
+                allMatchedDocs = insertDocsAndRunCommand(
+                    dbConn,
+                    testCase.collName,
+                    testCase.docsToInsert,
+                    newCmdObj,
+                    operationType,
+                    testCase.expectedResponse,
+                    testCase.expectedRetryResponse,
+                );
             }
 
             // Test that the retryable write response is recovered.
             if (testCase.retryableWriteTest) {
-                retryableWriteTest(
-                    dbConn, newCmdObj, operationType, testCase.expectedRetryResponse);
+                retryableWriteTest(dbConn, newCmdObj, operationType, testCase.expectedRetryResponse);
             }
 
             switch (operationType) {
                 case OperationType.updateOne:
-                    validateResultUpdate(allMatchedDocs,
-                                         testCase.expectedMods,
-                                         testCase.replacementDocTest,
-                                         testCase.updatedDocId);
+                    validateResultUpdate(
+                        allMatchedDocs,
+                        testCase.expectedMods,
+                        testCase.replacementDocTest,
+                        testCase.updatedDocId,
+                    );
                     break;
                 case OperationType.findAndModifyUpdate:
-                    validateResultUpdate(
-                        allMatchedDocs, testCase.expectedMods, testCase.replacementDocTest);
+                    validateResultUpdate(allMatchedDocs, testCase.expectedMods, testCase.replacementDocTest);
                     break;
                 case OperationType.deleteOne:
                     validateResultDelete(
                         allMatchedDocs.length,
-                        testCase.docsToInsert.length - testCase.expectedResponse.n);
+                        testCase.docsToInsert.length - testCase.expectedResponse.n,
+                    );
                     break;
                 case OperationType.findAndModifyRemove:
                     validateResultDelete(
                         allMatchedDocs.length,
-                        testCase.docsToInsert.length - testCase.expectedResponse.lastErrorObject.n);
+                        testCase.docsToInsert.length - testCase.expectedResponse.lastErrorObject.n,
+                    );
                     break;
                 default:
-                    throw 'Invalid OperationType.';
+                    throw "Invalid OperationType.";
             }
 
             // Clean up the collection for the next test case without dropping the collection.
@@ -244,15 +247,16 @@ export var WriteWithoutShardKeyTestUtil = (function() {
             // Check that the retryable write response is still recoverable even if the document was
             // removed.
             if (testCase.retryableWriteTest) {
-                retryableWriteTest(
-                    dbConn, newCmdObj, operationType, testCase.expectedRetryResponse);
+                retryableWriteTest(dbConn, newCmdObj, operationType, testCase.expectedRetryResponse);
             }
 
             // Killing the session after the command is done using it to not excessively leave
             // unused sessions around.
-            if (config == Configurations.transaction ||
+            if (
+                config == Configurations.transaction ||
                 config == Configurations.sessionNotRetryableWrite ||
-                config == Configurations.sessionRetryableWrite) {
+                config == Configurations.sessionRetryableWrite
+            ) {
                 conn.endSession();
             }
         });
@@ -272,7 +276,7 @@ export var WriteWithoutShardKeyTestUtil = (function() {
             case Configurations.transaction:
                 return st.s.startSession({retryWrites: true});
             default:
-                throw 'Invalid configuration chosen.';
+                throw "Invalid configuration chosen.";
         }
     }
 
@@ -282,6 +286,6 @@ export var WriteWithoutShardKeyTestUtil = (function() {
         runTestWithConfig,
         insertDocsAndRunCommand,
         Configurations,
-        OperationType
+        OperationType,
     };
 })();

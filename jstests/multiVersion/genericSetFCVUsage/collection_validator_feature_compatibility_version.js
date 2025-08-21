@@ -28,9 +28,7 @@ const testCasesLastContinuous = [
     // Populate with any new expressions.
     //
 ];
-const testCasesLastContinuousWithFeatureFlags = [
-
-];
+const testCasesLastContinuousWithFeatureFlags = [];
 
 const testCasesLastStable = testCasesLastContinuous.concat([]);
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
@@ -51,8 +49,7 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     for (let i = 0; i < featureFlags.length; i++) {
         const command = {"getParameter": 1};
         command[featureFlags[i]] = 1;
-        const featureEnabled =
-            assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]].value;
+        const featureEnabled = assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]].value;
         if (!featureEnabled) {
             jsTestLog("Skipping test because the " + featureFlags[i] + " feature flag is disabled");
             MongoRunner.stopMongod(conn);
@@ -63,77 +60,86 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     let adminDB = conn.getDB("admin");
 
     // Explicitly set the feature compatibility version to the latest version.
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
-    testCases.forEach(function(test, i) {
+    testCases.forEach(function (test, i) {
         // Create a collection with a validator using new query features.
         const coll = testDB["coll" + i];
         assert.commandWorked(
             testDB.createCollection(coll.getName(), {validator: test.validator}),
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+            `Expected to be able to create collection with validator ${tojson(test.validator)}`,
+        );
 
         // The validator should cause this insert to fail.
         assert.writeErrorWithCode(
             coll.insert(test.nonMatchingDocument),
             ErrorCodes.DocumentValidationFailure,
             `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
-                `collection with validator ${tojson(test.validator)}`);
+                `collection with validator ${tojson(test.validator)}`,
+        );
 
         // Set a validator using new query features on an existing collection.
         coll.drop();
         assert.commandWorked(testDB.createCollection(coll.getName()));
         assert.commandWorked(
             testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
-            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
+            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`,
+        );
 
         // Another failing update.
         assert.writeErrorWithCode(
             coll.insert(test.nonMatchingDocument),
             ErrorCodes.DocumentValidationFailure,
             `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
-                `collection with validator ${tojson(test.validator)}`);
+                `collection with validator ${tojson(test.validator)}`,
+        );
     });
 
     // Set the feature compatibility version to the last version.
-    assert.commandWorked(adminDB.runCommand(
-        {setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
+    );
 
-    testCases.forEach(
-        function(test, i) {
-            // The validator is already in place, so it should still cause this insert to fail.
-            const coll = testDB["coll" + i];
-            assert.writeErrorWithCode(
-                coll.insert(test.nonMatchingDocument),
-                ErrorCodes.DocumentValidationFailure,
-                `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
-                    `collection with validator ${tojson(test.validator)}`);
+    testCases.forEach(function (test, i) {
+        // The validator is already in place, so it should still cause this insert to fail.
+        const coll = testDB["coll" + i];
+        assert.writeErrorWithCode(
+            coll.insert(test.nonMatchingDocument),
+            ErrorCodes.DocumentValidationFailure,
+            `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
+                `collection with validator ${tojson(test.validator)}`,
+        );
 
-            // Trying to create a new collection with a validator using new query features should
-            // fail while feature compatibility version is the last version.
-            let res = testDB.createCollection("other", {validator: test.validator});
-            assert.commandFailedWithCode(
-                res,
-                ErrorCodes.QueryFeatureNotAllowed,
-                'Expected *not* to be able to create collection with validator ' +
-                    tojson(test.validator));
-            assert(res.errmsg.match(/feature compatibility version/),
-           `Expected error message from createCollection with validator ` +
-               `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
-               res.errmsg);
+        // Trying to create a new collection with a validator using new query features should
+        // fail while feature compatibility version is the last version.
+        let res = testDB.createCollection("other", {validator: test.validator});
+        assert.commandFailedWithCode(
+            res,
+            ErrorCodes.QueryFeatureNotAllowed,
+            "Expected *not* to be able to create collection with validator " + tojson(test.validator),
+        );
+        assert(
+            res.errmsg.match(/feature compatibility version/),
+            `Expected error message from createCollection with validator ` +
+                `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
+                res.errmsg,
+        );
 
-            // Trying to update a collection with a validator using new query features should also
-            // fail.
-            res = testDB.runCommand({collMod: coll.getName(), validator: test.validator});
-            assert.commandFailedWithCode(res,
-                                         ErrorCodes.QueryFeatureNotAllowed,
-                                         `Expected to be able to create collection with validator ${
-                                             tojson(test.validator)}`);
-            assert(res.errmsg.match(/feature compatibility version/),
-           `Expected error message from createCollection with validator ` +
-               `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
-               res.errmsg);
-        });
+        // Trying to update a collection with a validator using new query features should also
+        // fail.
+        res = testDB.runCommand({collMod: coll.getName(), validator: test.validator});
+        assert.commandFailedWithCode(
+            res,
+            ErrorCodes.QueryFeatureNotAllowed,
+            `Expected to be able to create collection with validator ${tojson(test.validator)}`,
+        );
+        assert(
+            res.errmsg.match(/feature compatibility version/),
+            `Expected error message from createCollection with validator ` +
+                `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
+                res.errmsg,
+        );
+    });
 
     MongoRunner.stopMongod(conn);
 
@@ -141,12 +147,11 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         // Versions of mongod 4.2 and later are able to start up with a collection validator that's
         // considered invalid. However, any writes to the collection will fail.
         conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastVersion, noCleanData: true});
-        assert.neq(
-            null, conn, lastVersion + " mongod was unable to start up with invalid validator");
+        assert.neq(null, conn, lastVersion + " mongod was unable to start up with invalid validator");
         const testDB = conn.getDB(testName);
 
         // Check that writes fail to all collections with validators using new query features.
-        testCases.forEach(function(test, i) {
+        testCases.forEach(function (test, i) {
             const coll = testDB["coll" + i];
             assert.commandFailedWithCode(coll.insert({foo: 1}), test.lastStableErrCode);
         });
@@ -163,13 +168,14 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     testDB = conn.getDB(testName);
 
     // And the validator should still work.
-    testCases.forEach(function(test, i) {
+    testCases.forEach(function (test, i) {
         const coll = testDB["coll" + i];
         assert.writeErrorWithCode(
             coll.insert(test.nonMatchingDocument),
             ErrorCodes.DocumentValidationFailure,
             `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
-                `collection with validator ${tojson(test.validator)}`);
+                `collection with validator ${tojson(test.validator)}`,
+        );
 
         // Remove the validator.
         assert.commandWorked(testDB.runCommand({collMod: coll.getName(), validator: {}}));
@@ -183,7 +189,8 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         null,
         conn,
         `version ${MongoRunner.getBinVersionFor(lastVersion)} of mongod failed to start, even` +
-            " after we removed the validator using new query features");
+            " after we removed the validator using new query features",
+    );
 
     MongoRunner.stopMongod(conn);
 
@@ -195,48 +202,51 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     testDB = conn.getDB(testName);
 
     // Set the feature compatibility version back to the latest version.
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
-    testCases.forEach(function(test, i) {
+    testCases.forEach(function (test, i) {
         const coll = testDB["coll2" + i];
 
         // Now we should be able to create a collection with a validator using new query features
         // again.
         assert.commandWorked(
             testDB.createCollection(coll.getName(), {validator: test.validator}),
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+            `Expected to be able to create collection with validator ${tojson(test.validator)}`,
+        );
 
         // And we should be able to modify a collection to have a validator using new query
         // features.
         assert.commandWorked(
             testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
-            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
+            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`,
+        );
     });
 
     // Set the feature compatibility version to the last version and then restart with
     // internalValidateFeaturesAsPrimary=false.
-    assert.commandWorked(adminDB.runCommand(
-        {setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
+    );
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({
         dbpath: dbpath,
         binVersion: "latest",
         noCleanData: true,
-        setParameter: "internalValidateFeaturesAsPrimary=false"
+        setParameter: "internalValidateFeaturesAsPrimary=false",
     });
     assert.neq(null, conn, "mongod was unable to start up");
 
     testDB = conn.getDB(testName);
 
-    testCases.forEach(function(test, i) {
+    testCases.forEach(function (test, i) {
         const coll = testDB["coll3" + i];
         // Even though the feature compatibility version is the last version, we should still
         // be able to add a validator using new query features, because
         // internalValidateFeaturesAsPrimary is false.
         assert.commandWorked(
             testDB.createCollection(coll.getName(), {validator: test.validator}),
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+            `Expected to be able to create collection with validator ${tojson(test.validator)}`,
+        );
 
         // We should also be able to modify a collection to have a validator using new query
         // features.
@@ -244,15 +254,14 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         assert.commandWorked(testDB.createCollection(coll.getName()));
         assert.commandWorked(
             testDB.runCommand({collMod: coll.getName(), validator: test.validator}),
-            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`);
+            `Expected to be able to modify collection validator to be ${tojson(test.validator)}`,
+        );
     });
 
     MongoRunner.stopMongod(conn);
 }
 
 testCollectionValidatorFCVBehavior("last-lts", testCasesLastStable);
-testCollectionValidatorFCVBehavior(
-    "last-lts", testCasesLastStableWithFeatureFlags, featureFlagsToEnable);
+testCollectionValidatorFCVBehavior("last-lts", testCasesLastStableWithFeatureFlags, featureFlagsToEnable);
 testCollectionValidatorFCVBehavior("last-continuous", testCasesLastContinuous);
-testCollectionValidatorFCVBehavior(
-    "last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);
+testCollectionValidatorFCVBehavior("last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);

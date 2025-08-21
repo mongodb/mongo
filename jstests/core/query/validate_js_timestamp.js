@@ -20,72 +20,72 @@ const testCases = [
     {
         assignments: {t: 20000000000},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp time"
+        errorShouldContain: "Timestamp time",
     },
     {
         assignments: {i: 20000000000},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp increment"
+        errorShouldContain: "Timestamp increment",
     },
     {
         assignments: {t: -1},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp time"
+        errorShouldContain: "Timestamp time",
     },
     {
         assignments: {i: -1},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp increment"
+        errorShouldContain: "Timestamp increment",
     },
     {
         assignments: {t: "str"},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp time"
+        errorShouldContain: "Timestamp time",
     },
     {
         assignments: {i: "str"},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp increment"
+        errorShouldContain: "Timestamp increment",
     },
     {
         assignments: {t: {foo: "bar"}},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp time"
+        errorShouldContain: "Timestamp time",
     },
     {
         assignments: {i: {foo: "bar"}},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp increment"
+        errorShouldContain: "Timestamp increment",
     },
     {
         assignments: {t: [2]},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp time"
+        errorShouldContain: "Timestamp time",
     },
     {
         assignments: {i: [2]},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp increment"
+        errorShouldContain: "Timestamp increment",
     },
     {
         assignments: {t: "str1", i: "str2"},
         expectedErrorCode: ErrorCodes.BadValue,
-        errorShouldContain: "Timestamp"
+        errorShouldContain: "Timestamp",
     },
     {
         assignments: {t: "REMOVE"},
         expectedErrorCode: 6900900,
-        errorShouldContain: "missing timestamp field"
+        errorShouldContain: "missing timestamp field",
     },
     {
         assignments: {i: "REMOVE"},
         expectedErrorCode: 6900901,
-        errorShouldContain: "missing increment field"
+        errorShouldContain: "missing increment field",
     },
     {
         assignments: {i: "REMOVE", t: "REMOVE"},
         expectedErrorCode: [6900900, 6900901],
-        errorShouldContain: "missing"
+        errorShouldContain: "missing",
     },
 ];
 
@@ -108,7 +108,7 @@ function testPipeline(assignments, embedInObject) {
             $project: {
                 computedField: {
                     $function: {
-                        body: function(assignments, embedInObject) {
+                        body: function (assignments, embedInObject) {
                             let timestamp = Timestamp(1, 1);
 
                             for (let [field, value] of Object.entries(JSON.parse(assignments))) {
@@ -122,11 +122,11 @@ function testPipeline(assignments, embedInObject) {
                             return embedInObject ? {result: timestamp} : timestamp;
                         },
                         args: ["$unvalidatedUserData", "$embedInObject"],
-                        lang: "js"
-                    }
-                }
-            }
-        }
+                        lang: "js",
+                    },
+                },
+            },
+        },
     ];
 }
 
@@ -136,15 +136,15 @@ function testPipeline(assignments, embedInObject) {
  */
 for (let {assignments, expectedErrorCode, errorShouldContain} of testCases) {
     let error = assert.commandFailedWithCode(
-        db.runCommand(
-            {aggregate: 1, pipeline: testPipeline(tojson(assignments), false), cursor: {}}),
-        expectedErrorCode);
+        db.runCommand({aggregate: 1, pipeline: testPipeline(tojson(assignments), false), cursor: {}}),
+        expectedErrorCode,
+    );
     assert(error.errmsg.indexOf(errorShouldContain) >= 0, error);
 
     error = assert.commandFailedWithCode(
-        db.runCommand(
-            {aggregate: 1, pipeline: testPipeline(tojson(assignments), true), cursor: {}}),
-        expectedErrorCode);
+        db.runCommand({aggregate: 1, pipeline: testPipeline(tojson(assignments), true), cursor: {}}),
+        expectedErrorCode,
+    );
     assert(error.errmsg.indexOf(errorShouldContain) >= 0, error);
 }
 

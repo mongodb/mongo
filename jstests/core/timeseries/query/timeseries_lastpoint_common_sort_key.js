@@ -19,10 +19,7 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {getEngine, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -45,27 +42,23 @@ const timestamps = {
     t6: ISODate("2016-01-01T00:30:01Z"),
 };
 
-let lpx1 = undefined;  // lastpoint value of x for m = 1
-let lpx2 = undefined;  // lastpoint value of x for m = 2
-let lpa1 = undefined;  // lastpoint value of a for m = 1
-let lpa2 = undefined;  // lastpoint value of a for m = 1
+let lpx1 = undefined; // lastpoint value of x for m = 1
+let lpx2 = undefined; // lastpoint value of x for m = 2
+let lpa1 = undefined; // lastpoint value of a for m = 1
+let lpa2 = undefined; // lastpoint value of a for m = 1
 
 (function setupCollection() {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 
-    coll.insert({t: timestamps.t2, m: 1, x: 2, a: 12});  // create bucket #3
-    coll.insert({t: timestamps.t4, m: 1, x: 4, a: 14});  // add to bucket #3
-    coll.insert(
-        {t: timestamps.t1, m: 1, x: 1, a: 11});  // earlier time => create bucket #2 (close #3)
-    coll.insert(
-        {t: timestamps.t5, m: 1, x: 5, a: 15});  // add to bucket #2, this is the lastpoint event
+    coll.insert({t: timestamps.t2, m: 1, x: 2, a: 12}); // create bucket #3
+    coll.insert({t: timestamps.t4, m: 1, x: 4, a: 14}); // add to bucket #3
+    coll.insert({t: timestamps.t1, m: 1, x: 1, a: 11}); // earlier time => create bucket #2 (close #3)
+    coll.insert({t: timestamps.t5, m: 1, x: 5, a: 15}); // add to bucket #2, this is the lastpoint event
     lpx1 = 5;
     lpa1 = 15;
-    coll.insert(
-        {t: timestamps.t0, m: 1, x: 0, a: 10});  // earlier time => create bucket #1 (close #2)
-    coll.insert({t: timestamps.t3, m: 1, x: 3, a: 13});  // add to bucket #1
+    coll.insert({t: timestamps.t0, m: 1, x: 0, a: 10}); // earlier time => create bucket #1 (close #2)
+    coll.insert({t: timestamps.t3, m: 1, x: 3, a: 13}); // add to bucket #1
 
     // An event with a different meta goes into a separate bucket.
     coll.insert({t: timestamps.t6, m: 2, x: 6, a: 16});
@@ -78,12 +71,13 @@ let lpa2 = undefined;  // lastpoint value of a for m = 1
     assertArrayEq({
         expected: [{t: timestamps.t3}, {t: timestamps.t4}, {t: timestamps.t5}, {t: timestamps.t6}],
         actual: getTimeseriesCollForRawOps(coll)
-                    .aggregate([{$project: {t: "$control.max.t", _id: 0}}], kRawOperationSpec)
-                    .toArray(),
-        extraErrorMsg: `For the test data expect to create buckets with these max times but got ${
-            tojson(getTimeseriesCollForRawOps(coll)
-                       .aggregate([{$project: {control: 1, _id: 0}}], kRawOperationSpec)
-                       .toArray())}`
+            .aggregate([{$project: {t: "$control.max.t", _id: 0}}], kRawOperationSpec)
+            .toArray(),
+        extraErrorMsg: `For the test data expect to create buckets with these max times but got ${tojson(
+            getTimeseriesCollForRawOps(coll)
+                .aggregate([{$project: {control: 1, _id: 0}}], kRawOperationSpec)
+                .toArray(),
+        )}`,
     });
 })();
 
@@ -94,24 +88,34 @@ const casesLastpointOptimization = [
     // If all multiple top/bottom accumulators that use the same sort pattern can be merged into one
     // lastpoint top/bottom, the merged top/bottom can be optimized.
     {
-        pipeline: [{
-            $group: {
-                _id: "$m",
-                acc1: {$bottom: {sortBy: {t: 1}, output: ["$x"]}},
-                acc2: {$bottom: {sortBy: {t: 1}, output: ["$a"]}},
-            }
-        }],
-        expectedResult: [{_id: 1, acc1: [lpx1], acc2: [lpa1]}, {_id: 2, acc1: [lpx2], acc2: [lpa2]}]
+        pipeline: [
+            {
+                $group: {
+                    _id: "$m",
+                    acc1: {$bottom: {sortBy: {t: 1}, output: ["$x"]}},
+                    acc2: {$bottom: {sortBy: {t: 1}, output: ["$a"]}},
+                },
+            },
+        ],
+        expectedResult: [
+            {_id: 1, acc1: [lpx1], acc2: [lpa1]},
+            {_id: 2, acc1: [lpx2], acc2: [lpa2]},
+        ],
     },
     {
-        pipeline: [{
-            $group: {
-                _id: "$m",
-                acc1: {$top: {sortBy: {t: -1}, output: ["$x"]}},
-                acc2: {$top: {sortBy: {t: -1}, output: ["$a"]}},
-            }
-        }],
-        expectedResult: [{_id: 1, acc1: [lpx1], acc2: [lpa1]}, {_id: 2, acc1: [lpx2], acc2: [lpa2]}]
+        pipeline: [
+            {
+                $group: {
+                    _id: "$m",
+                    acc1: {$top: {sortBy: {t: -1}, output: ["$x"]}},
+                    acc2: {$top: {sortBy: {t: -1}, output: ["$a"]}},
+                },
+            },
+        ],
+        expectedResult: [
+            {_id: 1, acc1: [lpx1], acc2: [lpa1]},
+            {_id: 2, acc1: [lpx2], acc2: [lpa2]},
+        ],
     },
 ];
 
@@ -128,23 +132,28 @@ const casesLastpointOptimization = [
                 if (stage.hasOwnProperty("$group")) {
                     break;
                 }
-                assert(!stage.hasOwnProperty("$_internalUnpackBucket"),
-                       `Lastpoint opt should have inserted group before unpack for pipeline ${
-                           tojson(pipeline)} but got ${tojson(explainFull)}`);
+                assert(
+                    !stage.hasOwnProperty("$_internalUnpackBucket"),
+                    `Lastpoint opt should have inserted group before unpack for pipeline ${tojson(
+                        pipeline,
+                    )} but got ${tojson(explainFull)}`,
+                );
             }
         } else {
             // The lastpoint opt currently isn't lowered to SBE.
-            assert(false,
-                   `Lastpoint opt isn't implemented in SBE for pipeline ${
-                       tojson(pipeline)} but got ${tojson(explainFull)}`);
+            assert(
+                false,
+                `Lastpoint opt isn't implemented in SBE for pipeline ${tojson(
+                    pipeline,
+                )} but got ${tojson(explainFull)}`,
+            );
         }
 
         // Check that the result matches the expected by the test case.
         assertArrayEq({
             expected: expectedResult,
             actual: coll.aggregate(pipeline).toArray(),
-            extraErrorMsg: `Expected result for pipeline ${tojson(pipeline)} with explain ${
-                tojson(explainFull)}`
+            extraErrorMsg: `Expected result for pipeline ${tojson(pipeline)} with explain ${tojson(explainFull)}`,
         });
     }
 })();

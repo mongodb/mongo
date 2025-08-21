@@ -6,8 +6,7 @@
 const viewsDB = db.getSiblingDB("views_dbref_projection");
 assert.commandWorked(viewsDB.dropDatabase());
 
-assert.commandWorked(
-    viewsDB.baseColl.insert({_id: 0, link: new DBRef("otherColl", "someId", viewsDB.getName())}));
+assert.commandWorked(viewsDB.baseColl.insert({_id: 0, link: new DBRef("otherColl", "someId", viewsDB.getName())}));
 
 assert.commandWorked(viewsDB.runCommand({create: "view", viewOn: "baseColl"}));
 

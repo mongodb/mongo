@@ -14,11 +14,13 @@ const collName = "search_profiling";
 const coll = db[collName];
 coll.drop();
 
-assert.commandWorked(coll.insert([
-    {_id: 0, size: "small"},
-    {_id: 1, size: "medium", mood: "content hippo"},
-    {_id: 2, size: "large", mood: "very hungry hippo"}
-]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, size: "small"},
+        {_id: 1, size: "medium", mood: "content hippo"},
+        {_id: 2, size: "large", mood: "very hungry hippo"},
+    ]),
+);
 
 createSearchIndex(coll, {name: "test-dynamic", definition: {"mappings": {"dynamic": true}}});
 
@@ -26,7 +28,7 @@ const searchForHungryHippo = {
     $search: {
         index: "test-dynamic",
         text: {query: "hungry hippo", path: ["mood"]},
-    }
+    },
 };
 
 // Enable profiling on the database.
@@ -35,44 +37,53 @@ db.setProfilingLevel(1, {slowms: -1});
 // Run a $search query.
 const queryComment = "profiling query on " + collName;
 let results = coll.aggregate([searchForHungryHippo], {comment: queryComment}).toArray();
-assert(resultsEq(
-    [
-        {_id: 2, size: "large", mood: "very hungry hippo"},
-        {_id: 1, size: "medium", mood: "content hippo"}
-    ],
-    results));
+assert(
+    resultsEq(
+        [
+            {_id: 2, size: "large", mood: "very hungry hippo"},
+            {_id: 1, size: "medium", mood: "content hippo"},
+        ],
+        results,
+    ),
+);
 
 const unionWithQueryComment = "profiling unionWith query on " + collName;
-results = coll.aggregate(
-                  [
-                      searchForHungryHippo,
-                      {$unionWith: {coll: coll.getName(), pipeline: [searchForHungryHippo]}}
-                  ],
-                  {comment: unionWithQueryComment})
-              .toArray();
-assert(resultsEq(
-    [
-        {_id: 2, size: "large", mood: "very hungry hippo"},
-        {_id: 1, size: "medium", mood: "content hippo"},
-        {_id: 2, size: "large", mood: "very hungry hippo"},
-        {_id: 1, size: "medium", mood: "content hippo"},
-    ],
-    results));
+results = coll
+    .aggregate([searchForHungryHippo, {$unionWith: {coll: coll.getName(), pipeline: [searchForHungryHippo]}}], {
+        comment: unionWithQueryComment,
+    })
+    .toArray();
+assert(
+    resultsEq(
+        [
+            {_id: 2, size: "large", mood: "very hungry hippo"},
+            {_id: 1, size: "medium", mood: "content hippo"},
+            {_id: 2, size: "large", mood: "very hungry hippo"},
+            {_id: 1, size: "medium", mood: "content hippo"},
+        ],
+        results,
+    ),
+);
 
 const lookupQueryComment = "profiling lookup query on " + collName;
-results = coll.aggregate(
-                        [
-                            searchForHungryHippo,
-                            {$lookup: {from: coll.getName(), pipeline: [searchForHungryHippo, {$project: {_id: "$_id"}}], as: "docs"}}
-                        ],
-                        {comment: lookupQueryComment})
-                    .toArray();
-assert(resultsEq(
-    [
-        {_id: 2, size: "large", mood: "very hungry hippo", docs: [{_id: 2}, {_id: 1}]},
-        {_id: 1, size: "medium", mood: "content hippo", docs: [{_id: 2}, {_id: 1}]},
-    ],
-    results));
+results = coll
+    .aggregate(
+        [
+            searchForHungryHippo,
+            {$lookup: {from: coll.getName(), pipeline: [searchForHungryHippo, {$project: {_id: "$_id"}}], as: "docs"}},
+        ],
+        {comment: lookupQueryComment},
+    )
+    .toArray();
+assert(
+    resultsEq(
+        [
+            {_id: 2, size: "large", mood: "very hungry hippo", docs: [{_id: 2}, {_id: 1}]},
+            {_id: 1, size: "medium", mood: "content hippo", docs: [{_id: 2}, {_id: 1}]},
+        ],
+        results,
+    ),
+);
 
 // Check the slow query log for our $search queries.
 function checkLog(log, comment, ndocs) {
@@ -91,7 +102,7 @@ checkLog(log, lookupQueryComment, 4);
 
 // Check system.profile for our $search queries.
 function checkProfiler(comment, ndocs) {
-    const profileEntry = db.system.profile.findOne({'command.comment': comment});
+    const profileEntry = db.system.profile.findOne({"command.comment": comment});
     assert(profileEntry, db.system.profile.find({}, {command: 1}).toArray());
     assert.eq(profileEntry.keysExamined, ndocs, profileEntry);
     assert.eq(profileEntry.docsExamined, ndocs, profileEntry);

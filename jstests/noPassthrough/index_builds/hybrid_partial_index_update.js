@@ -18,14 +18,14 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
 });
 const nodes = rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const testDB = primary.getDB("test");
+const coll = testDB.getCollection("test");
 
 assert.commandWorked(testDB.createCollection(coll.getName()));
 
@@ -38,11 +38,12 @@ IndexBuildTest.pauseIndexBuilds(primary);
 // Create a partial index for documents where 'a', the field in the filter expression,
 // is equal to 1.
 const partialIndex = {
-    a: 1
+    a: 1,
 };
-const createIdx = IndexBuildTest.startIndexBuild(
-    primary, coll.getFullName(), partialIndex, {partialFilterExpression: {a: 1}});
-IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
+const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), partialIndex, {
+    partialFilterExpression: {a: 1},
+});
+IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1");
 
 assert.commandWorked(coll.insert({_id: 0, a: 1}));
 
@@ -53,9 +54,9 @@ IndexBuildTest.resumeIndexBuilds(primary);
 
 // Wait for the index build to finish.
 createIdx();
-IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 
 let res = assert.commandWorked(coll.validate({full: true}));
-assert(res.valid, 'validation failed on primary: ' + tojson(res));
+assert(res.valid, "validation failed on primary: " + tojson(res));
 
 rst.stopSet();

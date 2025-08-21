@@ -34,7 +34,7 @@ function assertOrphanedDocsFiltered(coll, ownedDocs, unownedDocs, countFilters) 
 
 function runTest(st, coll, ownedDocs, unownedDocs, isHashed) {
     let ns = coll.getFullName();
-    let chunkDocs = findChunksUtil.findChunksByNs(st.s.getDB('config'), ns).toArray();
+    let chunkDocs = findChunksUtil.findChunksByNs(st.s.getDB("config"), ns).toArray();
     let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
     // Do regular inserts.
@@ -52,8 +52,8 @@ function runTest(st, coll, ownedDocs, unownedDocs, isHashed) {
 
     // Check that unowned docs are filtered correctly.
     let countFilters = [
-        {filter: {x: {$lte: 0}}, count: ownedDocs.filter(doc => doc.x <= 0).length},
-        {filter: {x: {$gt: 0}}, count: ownedDocs.filter(doc => doc.x > 0).length}
+        {filter: {x: {$lte: 0}}, count: ownedDocs.filter((doc) => doc.x <= 0).length},
+        {filter: {x: {$gt: 0}}, count: ownedDocs.filter((doc) => doc.x > 0).length},
     ];
     assertOrphanedDocsFiltered(coll, ownedDocs, unownedDocs, countFilters);
 
@@ -71,14 +71,12 @@ let hashedShardedColl = testDB.hashed;
 let rangeShardedNs = rangeShardedColl.getFullName();
 let hashedShardedNs = hashedShardedColl.getFullName();
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 jsTest.log("Test range sharding...");
 assert.commandWorked(testDB.adminCommand({shardCollection: rangeShardedNs, key: {x: 1}}));
 assert.commandWorked(testDB.adminCommand({split: rangeShardedNs, middle: {x: 50}}));
-assert.commandWorked(
-    testDB.adminCommand({moveChunk: rangeShardedNs, find: {x: 100}, to: st.shard1.shardName}));
+assert.commandWorked(testDB.adminCommand({moveChunk: rangeShardedNs, find: {x: 100}, to: st.shard1.shardName}));
 
 let ownedDocs = [];
 for (let i = 0; i < 100; i++) {
@@ -88,7 +86,7 @@ let unownedDocs = [{x: 100}, {x: -1}];
 runTest(st, rangeShardedColl, ownedDocs, unownedDocs, false);
 
 jsTest.log("Test hashed sharding...");
-assert.commandWorked(st.s.adminCommand({shardCollection: hashedShardedNs, key: {x: 'hashed'}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: hashedShardedNs, key: {x: "hashed"}}));
 
 ownedDocs = [{x: -1000}, {x: 0}, {x: 5}];
 unownedDocs = [{x: -5}, {x: 10}];

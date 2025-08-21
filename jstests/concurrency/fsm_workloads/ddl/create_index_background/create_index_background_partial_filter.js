@@ -13,24 +13,22 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const fieldName = "isIndexed";
 
-    $config.data.getIndexSpec = function() {
+    $config.data.getIndexSpec = function () {
         return {[fieldName]: 1};
     };
 
-    $config.data.getPartialFilterExpression = function() {
+    $config.data.getPartialFilterExpression = function () {
         return {[fieldName]: 1};
     };
 
     $config.data.extendUpdateExpr = function extendUpdateExpr(updateExpr) {
         // Set the field so that it may change whether or not it still applies to the partial index.
-        updateExpr['$set'] = {[fieldName]: Random.randInt(2)};
+        updateExpr["$set"] = {[fieldName]: Random.randInt(2)};
         return updateExpr;
     };
 

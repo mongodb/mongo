@@ -5,7 +5,7 @@ import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
-assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
+assert.eq(typeof db, "object", "Invalid `db` object, is the shell connected to a mongod?");
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 
 const hostList = [];
@@ -30,34 +30,34 @@ if (topology.type === Topology.kStandalone) {
             hostList.push(...shard.nodes);
             new ReplSetTest(shard.nodes[0]).awaitSecondaryNodes();
         } else {
-            throw new Error('Unrecognized topology format: ' + tojson(topology));
+            throw new Error("Unrecognized topology format: " + tojson(topology));
         }
     }
 } else {
-    throw new Error('Unrecognized topology format: ' + tojson(topology));
+    throw new Error("Unrecognized topology format: " + tojson(topology));
 }
 
-const adminDB = db.getSiblingDB('admin');
+const adminDB = db.getSiblingDB("admin");
 let requiredFCV = jsTest.options().forceValidationWithFeatureCompatibilityVersion;
 
 let originalFCV;
 let originalTransactionLifetimeLimitSeconds;
 
 if (requiredFCV) {
-    requiredFCV = new Function(
-        `return typeof ${requiredFCV} === "string" ? ${requiredFCV} : "${requiredFCV}"`)();
+    requiredFCV = new Function(`return typeof ${requiredFCV} === "string" ? ${requiredFCV} : "${requiredFCV}"`)();
 
     // Running the setFeatureCompatibilityVersion command may implicitly involve running a
     // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
     // 24 hours to avoid spurious failures from it having been set to a lower value.
-    originalTransactionLifetimeLimitSeconds = hostList.map(hostStr => {
+    originalTransactionLifetimeLimitSeconds = hostList.map((hostStr) => {
         const conn = newMongoWithRetry(hostStr);
         const res = assert.commandWorked(
-            conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 24 * 60 * 60}));
+            conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 24 * 60 * 60}),
+        );
         return {conn, originalValue: res.was};
     });
 
-    originalFCV = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+    originalFCV = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
 
     if (originalFCV.targetVersion) {
         let cmd = {setFeatureCompatibilityVersion: originalFCV.targetVersion, confirm: true};
@@ -75,20 +75,17 @@ if (requiredFCV) {
 
     // Now that we are certain that an upgrade or downgrade of the FCV is not in progress, ensure
     // the 'requiredFCV' is set.
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV, confirm: true}));
 }
 
 new CollectionValidator().validateNodes(hostList);
 
 if (originalFCV && originalFCV.version !== requiredFCV) {
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.version, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: originalFCV.version, confirm: true}));
 }
 
 if (originalTransactionLifetimeLimitSeconds) {
     for (let {conn, originalValue} of originalTransactionLifetimeLimitSeconds) {
-        assert.commandWorked(
-            conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: originalValue}));
+        assert.commandWorked(conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: originalValue}));
     }
 }

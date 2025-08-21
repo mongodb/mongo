@@ -7,14 +7,9 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    getPlanStage,
-    getPlanStages,
-    isIndexOnly,
-    isIxscan
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getPlanStages, isIndexOnly, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
-const collNamePrefix = 'sort_merge_';
+const collNamePrefix = "sort_merge_";
 let collCount = 0;
 let coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
@@ -44,7 +39,7 @@ for (let i = 0; i < 100; ++i) {
         filterFieldA: randomInt(),
         filterFieldB: randomInt(),
         sortFieldA: randomInt(),
-        sortFieldB: randomInt()
+        sortFieldB: randomInt(),
     });
 }
 assert.commandWorked(coll.insert(docs));
@@ -110,9 +105,15 @@ function runTest(sorts, filters, verifyCallback) {
         for (let filter of filters) {
             verifyPlan(sortInfo, filter, verifyCallback);
             const res = coll.find(filter).sort(sortInfo.sortPattern).toArray();
-            assert(isSorted(res, sortInfo.cmpFunction),
-                   () => "Assertion failed for filter: " + tojson(filter) + "\n" +
-                       "sort pattern " + tojson(sortInfo.sortPattern));
+            assert(
+                isSorted(res, sortInfo.cmpFunction),
+                () =>
+                    "Assertion failed for filter: " +
+                    tojson(filter) +
+                    "\n" +
+                    "sort pattern " +
+                    tojson(sortInfo.sortPattern),
+            );
 
             // Check that there are no duplicates.
             let ids = new Set();
@@ -128,15 +129,20 @@ function runTest(sorts, filters, verifyCallback) {
 (function testFetchedChildren() {
     const kFilterPredicates = [
         // $or with two children.
-        {$or: [{filterFieldA: 4, filterFieldB: 4}, {filterFieldA: 3, filterFieldB: 3}]},
+        {
+            $or: [
+                {filterFieldA: 4, filterFieldB: 4},
+                {filterFieldA: 3, filterFieldB: 3},
+            ],
+        },
 
         // $or with three children.
         {
             $or: [
                 {filterFieldA: 4, filterFieldB: 4},
                 {filterFieldA: 3, filterFieldB: 3},
-                {filterFieldA: 1, filterFieldB: 1}
-            ]
+                {filterFieldA: 1, filterFieldB: 1},
+            ],
         },
 
         // $or with four children.
@@ -145,29 +151,31 @@ function runTest(sorts, filters, verifyCallback) {
                 {filterFieldA: 4, filterFieldB: 4},
                 {filterFieldA: 3, filterFieldB: 3},
                 {filterFieldA: 2, filterFieldB: 2},
-                {filterFieldA: 1, filterFieldB: 1}
-            ]
+                {filterFieldA: 1, filterFieldB: 1},
+            ],
         },
     ];
 
     const kSorts = [
         {
             sortPattern: {sortFieldA: 1},
-            cmpFunction: (docA, docB) => docA.sortFieldA < docB.sortFieldA
+            cmpFunction: (docA, docB) => docA.sortFieldA < docB.sortFieldA,
         },
         {
             sortPattern: {sortFieldA: -1},
-            cmpFunction: (docA, docB) => docA.sortFieldA > docB.sortFieldA
+            cmpFunction: (docA, docB) => docA.sortFieldA > docB.sortFieldA,
         },
         {
             sortPattern: {sortFieldA: 1, sortFieldB: 1},
-            cmpFunction: (docA, docB) => docA.sortFieldA < docB.sortFieldA ||
-                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB < docB.sortFieldB)
+            cmpFunction: (docA, docB) =>
+                docA.sortFieldA < docB.sortFieldA ||
+                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB < docB.sortFieldB),
         },
         {
             sortPattern: {sortFieldA: -1, sortFieldB: -1},
-            cmpFunction: (docA, docB) => docA.sortFieldA > docB.sortFieldA ||
-                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB > docB.sortFieldB)
+            cmpFunction: (docA, docB) =>
+                docA.sortFieldA > docB.sortFieldA ||
+                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB > docB.sortFieldB),
         },
     ];
 
@@ -181,14 +189,14 @@ function runTest(sorts, filters, verifyCallback) {
             $or: [
                 {sortFieldA: 1, sortFieldB: 3},
                 {filterFieldA: 2, sortFieldB: 2},
-            ]
+            ],
         },
         {
             $or: [
                 {sortFieldA: 1, sortFieldB: 3},
                 {sortFieldA: 2, sortFieldB: 2},
                 {sortFieldA: 4, sortFieldB: 2},
-            ]
+            ],
         },
         {
             $or: [
@@ -196,33 +204,36 @@ function runTest(sorts, filters, verifyCallback) {
                 {sortFieldA: 2, sortFieldB: 2},
                 {sortFieldA: 4, sortFieldB: 2},
                 {sortFieldA: 3, sortFieldB: 1},
-            ]
+            ],
         },
     ];
 
     const kSorts = [
         {
             sortPattern: {sortFieldB: 1},
-            cmpFunction: (docA, docB) => docA.sortFieldB < docB.sortFieldB
+            cmpFunction: (docA, docB) => docA.sortFieldB < docB.sortFieldB,
         },
         {
             sortPattern: {sortFieldA: -1},
-            cmpFunction: (docA, docB) => docA.sortFieldA > docB.sortFieldA
+            cmpFunction: (docA, docB) => docA.sortFieldA > docB.sortFieldA,
         },
         {
             sortPattern: {sortFieldA: 1, sortFieldB: 1},
-            cmpFunction: (docA, docB) => docA.sortFieldA < docB.sortFieldA ||
-                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB < docB.sortFieldB)
+            cmpFunction: (docA, docB) =>
+                docA.sortFieldA < docB.sortFieldA ||
+                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB < docB.sortFieldB),
         },
         {
             sortPattern: {sortFieldB: 1, sortFieldA: 1},
-            cmpFunction: (docA, docB) => docA.sortFieldB < docB.sortFieldB ||
-                (docA.sortFieldB === docB.sortFieldB && docA.sortFieldA < docB.sortFieldA)
+            cmpFunction: (docA, docB) =>
+                docA.sortFieldB < docB.sortFieldB ||
+                (docA.sortFieldB === docB.sortFieldB && docA.sortFieldA < docB.sortFieldA),
         },
         {
             sortPattern: {sortFieldA: 1, sortFieldB: -1},
-            cmpFunction: (docA, docB) => docA.sortFieldA < docB.sortFieldA ||
-                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB > docB.sortFieldB)
+            cmpFunction: (docA, docB) =>
+                docA.sortFieldA < docB.sortFieldA ||
+                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB > docB.sortFieldB),
         },
     ];
     runTest(kSorts, kFilterPredicates, verifyCoveredPlan);
@@ -231,40 +242,48 @@ function runTest(sorts, filters, verifyCallback) {
 // Cases where the children of the $or are a mix of fetched and unfetched.
 (function testFetchedAndUnfetchedChildren() {
     const kFilterPredicates = [
-        {$or: [{sortFieldA: 1, sortFieldB: 2}, {sortFieldA: 2, sortFieldB: 2, filterFieldB: 1}]},
+        {
+            $or: [
+                {sortFieldA: 1, sortFieldB: 2},
+                {sortFieldA: 2, sortFieldB: 2, filterFieldB: 1},
+            ],
+        },
         {
             $or: [
                 {sortFieldA: 1, sortFieldB: 2},
                 {sortFieldA: 2, sortFieldB: 2, filterFieldB: 1},
                 {sortFieldA: 3, sortFieldB: 4, filterFieldA: 2},
-                {sortFieldA: 4, sortFieldB: 1, filterFieldB: 4}
-            ]
+                {sortFieldA: 4, sortFieldB: 1, filterFieldB: 4},
+            ],
         },
     ];
 
     const kSorts = [
         {
             sortPattern: {sortFieldB: 1},
-            cmpFunction: (docA, docB) => docA.sortFieldB < docB.sortFieldB
+            cmpFunction: (docA, docB) => docA.sortFieldB < docB.sortFieldB,
         },
         {
             sortPattern: {sortFieldA: -1},
-            cmpFunction: (docA, docB) => docA.sortFieldA > docB.sortFieldA
+            cmpFunction: (docA, docB) => docA.sortFieldA > docB.sortFieldA,
         },
         {
             sortPattern: {sortFieldA: 1, sortFieldB: 1},
-            cmpFunction: (docA, docB) => docA.sortFieldA < docB.sortFieldA ||
-                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB < docB.sortFieldB)
+            cmpFunction: (docA, docB) =>
+                docA.sortFieldA < docB.sortFieldA ||
+                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB < docB.sortFieldB),
         },
         {
             sortPattern: {sortFieldB: 1, sortFieldA: 1},
-            cmpFunction: (docA, docB) => docA.sortFieldB < docB.sortFieldB ||
-                (docA.sortFieldB === docB.sortFieldB && docA.sortFieldA < docB.sortFieldA)
+            cmpFunction: (docA, docB) =>
+                docA.sortFieldB < docB.sortFieldB ||
+                (docA.sortFieldB === docB.sortFieldB && docA.sortFieldA < docB.sortFieldA),
         },
         {
             sortPattern: {sortFieldA: 1, sortFieldB: -1},
-            cmpFunction: (docA, docB) => docA.sortFieldA < docB.sortFieldA ||
-                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB > docB.sortFieldB)
+            cmpFunction: (docA, docB) =>
+                docA.sortFieldA < docB.sortFieldA ||
+                (docA.sortFieldA === docB.sortFieldA && docA.sortFieldB > docB.sortFieldB),
         },
     ];
     runTest(kSorts, kFilterPredicates, verifyMixedPlan);
@@ -272,24 +291,26 @@ function runTest(sorts, filters, verifyCallback) {
 
 // Insert documents with arrays into the collection and check that the deduping works correctly.
 (function testDeduplication() {
-    assert.commandWorked(coll.insert([
-        {_id: 100, filterFieldA: [1, 2], filterFieldB: "multikeydoc", sortFieldA: 1, sortFieldB: 1},
-        {_id: 101, sortFieldA: [1, 2], filterFieldA: "multikeydoc"}
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 100, filterFieldA: [1, 2], filterFieldB: "multikeydoc", sortFieldA: 1, sortFieldB: 1},
+            {_id: 101, sortFieldA: [1, 2], filterFieldA: "multikeydoc"},
+        ]),
+    );
 
     const kUniqueFilters = [
         {
             $or: [
                 {filterFieldA: 1, filterFieldB: "multikeydoc"},
-                {filterFieldA: 2, filterFieldB: "multikeydoc"}
+                {filterFieldA: 2, filterFieldB: "multikeydoc"},
             ],
         },
         {
             $or: [
                 {sortFieldA: 1, filterFieldA: "multikeydoc"},
-                {sortFieldA: 2, filterFieldA: "multikeydoc"}
-            ]
-        }
+                {sortFieldA: 2, filterFieldA: "multikeydoc"},
+            ],
+        },
     ];
 
     for (const filter of kUniqueFilters) {
@@ -303,35 +324,39 @@ function runTest(sorts, filters, verifyCallback) {
 (function testDottedPathSortMerge() {
     coll = db.getCollection(collNamePrefix + collCount++);
     coll.drop();
-    assert.commandWorked(coll.createIndex({'filterFieldA': 1, 'sortField.a': 1, 'sortField.b': 1}));
+    assert.commandWorked(coll.createIndex({"filterFieldA": 1, "sortField.a": 1, "sortField.b": 1}));
     let docs = [];
     for (let i = 0; i < 100; ++i) {
         docs.push({
-            _id: (200 + i),
+            _id: 200 + i,
             filterFieldA: randomInt(),
             filterFieldB: randomInt(),
-            sortField: {a: randomInt(), b: randomInt()}
+            sortField: {a: randomInt(), b: randomInt()},
         });
     }
     assert.commandWorked(coll.insert(docs));
 
     const kSortPattern = {
-        sortPattern: {'sortField.a': 1, 'sortField.b': 1},
-        cmpFunction: (docA, docB) => docA.sortField.a < docB.sortField.a ||
-            (docA.sortField.a === docB.sortField.a && docA.sortField.b < docB.sortField.b)
+        sortPattern: {"sortField.a": 1, "sortField.b": 1},
+        cmpFunction: (docA, docB) =>
+            docA.sortField.a < docB.sortField.a ||
+            (docA.sortField.a === docB.sortField.a && docA.sortField.b < docB.sortField.b),
     };
 
     const kNonCoveredFilter = {
-        $or: [{filterFieldA: 1, filterFieldB: 2}, {filterFieldA: 2, filterFieldB: 1}]
+        $or: [
+            {filterFieldA: 1, filterFieldB: 2},
+            {filterFieldA: 2, filterFieldB: 1},
+        ],
     };
     runTest([kSortPattern], [kNonCoveredFilter], verifyNonCoveredPlan);
 
     const kCoveredFilter = {
         $or: [
-            {filterFieldA: 1, 'sortField.a': 1},
-            {filterFieldA: 2, 'sortField.a': 3},
-            {filterFieldA: 3, 'sortField.a': 4, 'sortField.b': 3},
-        ]
+            {filterFieldA: 1, "sortField.a": 1},
+            {filterFieldA: 2, "sortField.a": 3},
+            {filterFieldA: 3, "sortField.a": 4, "sortField.b": 3},
+        ],
     };
     runTest([kSortPattern], [kCoveredFilter], verifyCoveredPlan);
 })();

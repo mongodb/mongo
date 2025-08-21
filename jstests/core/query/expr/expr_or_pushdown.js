@@ -14,11 +14,15 @@ assert.commandWorked(coll.insert({_id: 2, a: "a", b: "x", d: "d"}));
 assert.commandWorked(coll.insert({_id: 3, a: "x", b: "b", d: "d"}));
 assert.commandWorked(coll.insert({_id: 4, a: "a", b: "b", d: "x"}));
 
-const results = coll.find({
-                        $expr: {$and: [{$eq: ["$d", "d"]}, {$eq: ["$a", "a"]}]},
-                        $or: [{"b": "b"}, {"b": "c"}]
-                    })
-                    .sort({_id: 1})
-                    .toArray();
+const results = coll
+    .find({
+        $expr: {$and: [{$eq: ["$d", "d"]}, {$eq: ["$a", "a"]}]},
+        $or: [{"b": "b"}, {"b": "c"}],
+    })
+    .sort({_id: 1})
+    .toArray();
 
-assert.eq(results, [{_id: 0, a: "a", b: "b", d: "d"}, {_id: 1, a: "a", b: "c", d: "d"}]);
+assert.eq(results, [
+    {_id: 0, a: "a", b: "b", d: "d"},
+    {_id: 1, a: "a", b: "c", d: "d"},
+]);

@@ -20,8 +20,7 @@ coll.drop();
 assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
 
 function doInsert(docs, bypassEmptyTsReplacement) {
-    let cmdRes = db.runCommand(
-        {insert: collName, documents: docs, bypassEmptyTsReplacement: bypassEmptyTsReplacement});
+    let cmdRes = db.runCommand({insert: collName, documents: docs, bypassEmptyTsReplacement: bypassEmptyTsReplacement});
     assert.commandWorked(cmdRes);
 }
 
@@ -29,7 +28,7 @@ function doUpdate(filter, update, bypassEmptyTsReplacement) {
     let cmdRes = db.runCommand({
         update: collName,
         updates: [{q: filter, u: update, multi: true}],
-        bypassEmptyTsReplacement: bypassEmptyTsReplacement
+        bypassEmptyTsReplacement: bypassEmptyTsReplacement,
     });
     assert.commandWorked(cmdRes);
 }
@@ -47,8 +46,7 @@ function runTests(bypassEmptyTsReplacement) {
 
     // Insert two documents.
     doInsert([{_id: getId(1), t: new Date(100), m: emptyTs, a: emptyTs}], bypassEmptyTsReplacement);
-    doInsert([{_id: getId(2), t: new Date(200), m: getId(2), a: emptyTs}],
-             bypassEmptyTsReplacement);
+    doInsert([{_id: getId(2), t: new Date(200), m: getId(2), a: emptyTs}], bypassEmptyTsReplacement);
 
     // Do a replacement-style update containing an empty timestamp value.
     doUpdate({m: getId(2)}, {$set: {m: emptyTs}}, bypassEmptyTsReplacement);

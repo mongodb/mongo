@@ -5,7 +5,8 @@ const t = db[jsTestName()];
 
 Random.setRandomSeed();
 
-for (let v = 0; v < 2; ++v) {  // Try each index version.
+for (let v = 0; v < 2; ++v) {
+    // Try each index version.
     t.drop();
     const indexCreateRes = t.createIndex({a: 1}, {v: v});
     if (v === 0) {
@@ -18,7 +19,7 @@ for (let v = 0; v < 2; ++v) {  // Try each index version.
     for (let x = 0; x < S; x++) {
         let batch = [];
         for (let y = 0; y < B; y++) {
-            let i = y + (B * x);
+            let i = y + B * x;
             batch.push({a: i});
         }
         assert.commandWorked(t.insert(batch));
@@ -27,7 +28,7 @@ for (let v = 0; v < 2; ++v) {  // Try each index version.
 
     let toDrop = [];
     for (let i = 0; i < S * B; ++i) {
-        toDrop.push(Random.randInt(10000));  // Dups in the query will be ignored.
+        toDrop.push(Random.randInt(10000)); // Dups in the query will be ignored.
     }
     assert.commandWorked(t.remove({a: {$in: toDrop}}));
 }

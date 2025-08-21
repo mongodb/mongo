@@ -12,7 +12,7 @@ const x509_options = {
     tlsCAFile: "jstests/libs/ca.pem",
     tlsClusterFile: "jstests/libs/cluster_cert.pem",
     tlsAllowInvalidHostnames: "",
-    clusterAuthMode: "x509"
+    clusterAuthMode: "x509",
 };
 
 function runTest() {
@@ -27,11 +27,11 @@ function runTest() {
             configOptions: x509_options,
             mongosOptions: x509_options,
             rsOptions: x509_options,
-        }
+        },
     });
 
-    st.s.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
-    st.s.getDB('admin').auth('admin', 'pwd');
+    st.s.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"]});
+    st.s.getDB("admin").auth("admin", "pwd");
 
     const coll = st.s.getCollection("test.foo");
 
@@ -39,13 +39,14 @@ function runTest() {
 
     // Authenticate the config server and verify that a log line concerning a username change does
     // not appear on the config server since we are doing intracluster auth using X509.
-    st.c0.getDB('admin').auth('admin', 'pwd');
+    st.c0.getDB("admin").auth("admin", "pwd");
     const globalLog = assert.commandWorked(st.c0.adminCommand({getLog: "global"}));
     const fieldMatcher = {msg: "Different user name was supplied to saslSupportedMechs"};
     assert.eq(
         null,
         findMatchingLogLine(globalLog.log, fieldMatcher),
-        "Found log line concerning \"Different user name was supplied to saslSupportedMechs\" when we did not expect to.");
+        'Found log line concerning "Different user name was supplied to saslSupportedMechs" when we did not expect to.',
+    );
 
     print("starting insertion phase");
 
@@ -79,12 +80,12 @@ function runTest() {
     assert.commandWorked(bulk.execute());
 
     // Make sure the right amount of data is there
-    assert.eq(coll.find().itcount({my: 'test'}), toInsert / 2);
+    assert.eq(coll.find().itcount({my: "test"}), toInsert / 2);
 
     // Authenticate csrs so ReplSetTest.stopSet() can do db hash check.
     if (st.configRS) {
         st.configRS.nodes.forEach((node) => {
-            node.getDB('admin').auth('admin', 'pwd');
+            node.getDB("admin").auth("admin", "pwd");
         });
     }
 

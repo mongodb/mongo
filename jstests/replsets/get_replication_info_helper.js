@@ -16,25 +16,28 @@ var primary = replSet.getPrimary();
 const syncTarget = replSet.add({
     rsConfig: {votes: 0, priority: 0},
     setParameter: {
-        'failpoint.forceSyncSourceCandidate':
-            tojson({mode: 'alwaysOn', data: {hostAndPort: primary.name}})
-    }
+        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: primary.name}}),
+    },
 });
 syncTarget.setSecondaryOk();
-const failPointBeforeFinish = configureFailPoint(syncTarget, 'initialSyncHangBeforeFinish');
+const failPointBeforeFinish = configureFailPoint(syncTarget, "initialSyncHangBeforeFinish");
 replSet.reInitiate();
 
 failPointBeforeFinish.wait();
 const callPrintSecondaryReplInfo = startParallelShell(
-    "db.getSiblingDB('admin').printSecondaryReplicationInfo();", syncTarget.port);
+    "db.getSiblingDB('admin').printSecondaryReplicationInfo();",
+    syncTarget.port,
+);
 callPrintSecondaryReplInfo();
 assert(rawMongoProgramOutput("InitialSyncSyncSource: ").match(primary.name));
 let subStr = "InitialSyncRemainingEstimatedDuration: ";
 assert(rawMongoProgramOutput(subStr).match(subStr));
 clearRawMongoProgramOutput();
 
-const callPrintSlaveReplInfo =
-    startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", syncTarget.port);
+const callPrintSlaveReplInfo = startParallelShell(
+    "db.getSiblingDB('admin').printSlaveReplicationInfo();",
+    syncTarget.port,
+);
 callPrintSlaveReplInfo();
 assert(rawMongoProgramOutput("InitialSyncSyncSource: ").match(primary.name));
 assert(rawMongoProgramOutput(subStr).match(subStr));
@@ -43,11 +46,11 @@ failPointBeforeFinish.off();
 replSet.awaitSecondaryNodes();
 
 for (var i = 0; i < 100; i++) {
-    primary.getDB('test').foo.insert({a: i});
+    primary.getDB("test").foo.insert({a: i});
 }
 replSet.awaitReplication();
 
-var replInfo = primary.getDB('admin').getReplicationInfo();
+var replInfo = primary.getDB("admin").getReplicationInfo();
 var replInfoString = tojson(replInfo);
 
 assert.eq(50, replInfo.logSizeMB, replInfoString);
@@ -61,8 +64,7 @@ assert(replInfo.now, replInfoString);
 
 // calling this function with and without a primary, should provide sufficient code coverage
 // to catch any JS errors
-var mongo =
-    startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
+var mongo = startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
 mongo();
 subStr = "behind the primary";
 assert(rawMongoProgramOutput(subStr).match(subStr));
@@ -70,9 +72,9 @@ assert(rawMongoProgramOutput(subStr).match(subStr));
 // get to a primaryless state
 for (i in replSet.getSecondaries()) {
     var secondary = replSet.getSecondaries()[i];
-    secondary.getDB('admin').runCommand({replSetFreeze: 120});
+    secondary.getDB("admin").runCommand({replSetFreeze: 120});
 }
-assert.commandWorked(primary.getDB('admin').runCommand({replSetStepDown: 120, force: true}));
+assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 120, force: true}));
 
 // printSlaveReplicationInfo is deprecated and aliased to printSecondaryReplicationInfo, but ensure
 // it still works for backwards compatibility.
@@ -85,8 +87,7 @@ clearRawMongoProgramOutput();
 assert.eq(rawMongoProgramOutput(subStr).match(subStr), null);
 
 // Ensure that the new helper, printSecondaryReplicationInfo works the same.
-mongo =
-    startParallelShell("db.getSiblingDB('admin').printSecondaryReplicationInfo();", primary.port);
+mongo = startParallelShell("db.getSiblingDB('admin').printSecondaryReplicationInfo();", primary.port);
 mongo();
 assert(rawMongoProgramOutput(subStr).match(subStr));
 

@@ -18,7 +18,7 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
 
 // Start the session.
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -59,40 +59,55 @@ function checkHistogramLatencyDiff(lastHistogram, thisHistogram, sleepTime) {
 let lastHistogram = getHistogramStats();
 
 // Verify the base stats are correct.
-lastHistogram = checkHistogramDiff(lastHistogram,
-                                   getHistogramStats(),
-                                   {"reads": 0, "writes": 0, "commands": 1, "transactions": 0});
+lastHistogram = checkHistogramDiff(lastHistogram, getHistogramStats(), {
+    "reads": 0,
+    "writes": 0,
+    "commands": 1,
+    "transactions": 0,
+});
 
 // Test histogram increments on a successful transaction. "commitTransaction" and "serverStatus"
 // commands are counted towards the "commands" counter.
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "insert-1"}));
 assert.commandWorked(session.commitTransaction_forTesting());
-lastHistogram = checkHistogramDiff(lastHistogram,
-                                   getHistogramStats(),
-                                   {"reads": 0, "writes": 1, "commands": 2, "transactions": 1});
+lastHistogram = checkHistogramDiff(lastHistogram, getHistogramStats(), {
+    "reads": 0,
+    "writes": 1,
+    "commands": 2,
+    "transactions": 1,
+});
 
 // Test histogram increments on aborted transaction due to error (duplicate insert).
 session.startTransaction();
 assert.commandFailedWithCode(sessionColl.insert({_id: "insert-1"}), ErrorCodes.DuplicateKey);
-lastHistogram = checkHistogramDiff(lastHistogram,
-                                   getHistogramStats(),
-                                   {"reads": 0, "writes": 1, "commands": 1, "transactions": 1});
+lastHistogram = checkHistogramDiff(lastHistogram, getHistogramStats(), {
+    "reads": 0,
+    "writes": 1,
+    "commands": 1,
+    "transactions": 1,
+});
 
 // Ensure that the transaction was aborted on failure.
 assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
-lastHistogram = checkHistogramDiff(lastHistogram,
-                                   getHistogramStats(),
-                                   {"reads": 0, "writes": 0, "commands": 2, "transactions": 0});
+lastHistogram = checkHistogramDiff(lastHistogram, getHistogramStats(), {
+    "reads": 0,
+    "writes": 0,
+    "commands": 2,
+    "transactions": 0,
+});
 
 // Test histogram increments on an aborted transaction. "abortTransaction" command is counted
 // towards the "commands" counter.
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
 assert.commandWorked(session.abortTransaction_forTesting());
-lastHistogram = checkHistogramDiff(lastHistogram,
-                                   getHistogramStats(),
-                                   {"reads": 0, "writes": 1, "commands": 2, "transactions": 1});
+lastHistogram = checkHistogramDiff(lastHistogram, getHistogramStats(), {
+    "reads": 0,
+    "writes": 1,
+    "commands": 2,
+    "transactions": 1,
+});
 
 // Test histogram increments on a multi-statement committed transaction.
 session.startTransaction();
@@ -100,9 +115,12 @@ assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
 assert.commandWorked(sessionColl.insert({_id: "insert-4"}));
 assert.eq(sessionColl.find({_id: "insert-1"}).itcount(), 1);
 assert.commandWorked(session.commitTransaction_forTesting());
-lastHistogram = checkHistogramDiff(lastHistogram,
-                                   getHistogramStats(),
-                                   {"reads": 1, "writes": 2, "commands": 2, "transactions": 1});
+lastHistogram = checkHistogramDiff(lastHistogram, getHistogramStats(), {
+    "reads": 1,
+    "writes": 2,
+    "commands": 2,
+    "transactions": 1,
+});
 
 // Test that the cumulative transaction latency counter is updated appropriately after a
 // sequence of back-to-back 200 ms transactions.

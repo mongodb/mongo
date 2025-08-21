@@ -24,7 +24,7 @@ const sessionColl = sessionDB.getCollection(collName);
 
 const doc1 = {
     _id: 1,
-    x: 1
+    x: 1,
 };
 
 // ---- Test 1. Insert a single document and run prepare. ----
@@ -54,7 +54,7 @@ assert.commandWorked(sessionColl.update(doc1, {$inc: {x: 1}}));
 
 const doc2 = {
     _id: 1,
-    x: 2
+    x: 2,
 };
 
 // Update should not be visible outside the session.

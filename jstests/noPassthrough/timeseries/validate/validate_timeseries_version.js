@@ -24,8 +24,9 @@ jsTestLog("Running the validate command to check time-series bucket versions");
 testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
-assert.commandWorked(db.createCollection(
-    collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
+assert.commandWorked(
+    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+);
 coll = db.getCollection(collName);
 
 // Inserts documents into a bucket. Checks no issues are found.
@@ -38,29 +39,34 @@ assert.eq(res.warnings.length, 0);
 
 // Inserts documents into another bucket but manually changes the version. Expects warnings
 // from validation.
-assert.eq(1,
-          getTimeseriesCollForRawOps(db, coll)
-              .find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
-              .rawData()
-              .count());
-jsTestLog(
-    "Manually changing 'control.version' from 2 to 1 and checking for warnings from validation.");
+assert.eq(
+    1,
+    getTimeseriesCollForRawOps(db, coll)
+        .find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
+        .rawData()
+        .count(),
+);
+jsTestLog("Manually changing 'control.version' from 2 to 1 and checking for warnings from validation.");
 testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
-assert.commandWorked(db.createCollection(
-    collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
+assert.commandWorked(
+    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+);
 coll = db.getCollection(collName);
-coll.insertMany([...Array(10).keys()].map(i => ({
-                                              "metadata": {"sensorId": 2, "type": "temperature"},
-                                              "timestamp": ISODate(),
-                                              "temp": i
-                                          })),
-                {ordered: false});
+coll.insertMany(
+    [...Array(10).keys()].map((i) => ({
+        "metadata": {"sensorId": 2, "type": "temperature"},
+        "timestamp": ISODate(),
+        "temp": i,
+    })),
+    {ordered: false},
+);
 getTimeseriesCollForRawOps(db, coll).updateOne(
     {"meta.sensorId": 2},
     {"$set": {"control.version": TimeseriesTest.BucketVersion.kUncompressed}},
-    getRawOperationSpec(db));
+    getRawOperationSpec(db),
+);
 res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
@@ -68,24 +74,27 @@ assert.eq(res.errors.length, 1);
 
 // Inserts enough documents to close a bucket and then manually changes the version to 1.
 // Expects warnings from validation.
-jsTestLog(
-    "Changing the 'control.version' of a closed bucket from 2 to 1, and checking for warnings from validation.");
+jsTestLog("Changing the 'control.version' of a closed bucket from 2 to 1, and checking for warnings from validation.");
 testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
-assert.commandWorked(db.createCollection(
-    collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
+assert.commandWorked(
+    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+);
 coll = db.getCollection(collName);
-coll.insertMany([...Array(1200).keys()].map(i => ({
-                                                "metadata": {"sensorId": 3, "type": "temperature"},
-                                                "timestamp": ISODate(),
-                                                "temp": i
-                                            })),
-                {ordered: false});
+coll.insertMany(
+    [...Array(1200).keys()].map((i) => ({
+        "metadata": {"sensorId": 3, "type": "temperature"},
+        "timestamp": ISODate(),
+        "temp": i,
+    })),
+    {ordered: false},
+);
 getTimeseriesCollForRawOps(db, coll).updateOne(
     {"meta.sensorId": 3, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.version": TimeseriesTest.BucketVersion.kUncompressed}},
-    getRawOperationSpec(db));
+    getRawOperationSpec(db),
+);
 res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
@@ -96,26 +105,30 @@ jsTestLog("Changing 'control.version' to an unsupported version and checking for
 testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
-assert.commandWorked(db.createCollection(
-    collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
+assert.commandWorked(
+    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+);
 coll = db.getCollection(collName);
-coll.insertMany([...Array(1100).keys()].map(i => ({
-                                                "metadata": {"sensorId": 4, "type": "temperature"},
-                                                "timestamp": ISODate(),
-                                                "temp": i
-                                            })),
-                {ordered: false});
+coll.insertMany(
+    [...Array(1100).keys()].map((i) => ({
+        "metadata": {"sensorId": 4, "type": "temperature"},
+        "timestamp": ISODate(),
+        "temp": i,
+    })),
+    {ordered: false},
+);
 assert.gte(
     getTimeseriesCollForRawOps(db, coll)
-        .find(
-            {"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
+        .find({"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
         .rawData()
         .count(),
-    1);
+    1,
+);
 getTimeseriesCollForRawOps(db, coll).updateOne(
     {"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.version": 500}},
-    getRawOperationSpec(db));
+    getRawOperationSpec(db),
+);
 res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
@@ -123,12 +136,12 @@ assert.eq(res.errors.length, 1);
 
 // Creates a type-version mismatch in the previous bucket and checks that multiple warnings are
 // reported from a single collection with multiple inconsistent documents.
-jsTestLog(
-    "Making a type-version mismatch in the same bucket as the previous test and checking for warnings.");
+jsTestLog("Making a type-version mismatch in the same bucket as the previous test and checking for warnings.");
 getTimeseriesCollForRawOps(db, coll).updateOne(
     {"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.version": TimeseriesTest.BucketVersion.kUncompressed}},
-    getRawOperationSpec(db));
+    getRawOperationSpec(db),
+);
 res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 2);

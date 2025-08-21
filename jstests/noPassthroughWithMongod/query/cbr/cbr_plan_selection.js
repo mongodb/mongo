@@ -4,11 +4,7 @@
  * test should hold regardless of any future calibration of the constants in the cost model.
  */
 
-import {
-    getPlanStage,
-    getRejectedPlans,
-    getWinningPlanFromExplain
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getRejectedPlans, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-92589: Remove this exemption
@@ -27,7 +23,7 @@ let docs = [];
 // while we want CBR to get involved and make the right decision.
 for (let i = 1; i < 1001; i++) {
     docs.push({unique1: i, b: i % 4, c: i % 3, d: i % 2, constant: 1, unique2: i});
-};
+}
 coll.insert(docs);
 
 for (const key of ["unique1", "b", "c", "d", "constant", "unique2"]) {
@@ -79,10 +75,8 @@ try {
 
     // Same in the case of covering index scans.
     assert.eq(winningIndexFromCursor(coll.find({unique1: 1}, {_id: 0, unique1: 1})), "unique1_1");
-    assert.eq(winningIndexFromCursor(coll.find({unique1: {$gte: 0}}, {_id: 0, unique1: 1})),
-              "unique1_1");
-    assert.eq(winningIndexFromCursor(coll.find({unique1: {$lt: 0}}, {_id: 0, unique1: 1})),
-              "unique1_1");
+    assert.eq(winningIndexFromCursor(coll.find({unique1: {$gte: 0}}, {_id: 0, unique1: 1})), "unique1_1");
+    assert.eq(winningIndexFromCursor(coll.find({unique1: {$lt: 0}}, {_id: 0, unique1: 1})), "unique1_1");
 
     // In the presence of two predicates, the index on the more selective one is chosen.
     assert.eq(winningIndex({unique1: 1, b: 1}), "unique1_1");
@@ -118,8 +112,7 @@ try {
 
     // In the presence of a compound index, it is chosen regardless of the selectivity of the
     // predicates.
-    assert.contains(winningIndex({unique1: 1, unique2: 1}),
-                    ["unique1_1_unique2_1", "unique2_1_unique1_1"]);
+    assert.contains(winningIndex({unique1: 1, unique2: 1}), ["unique1_1_unique2_1", "unique2_1_unique1_1"]);
     assert.eq(winningIndex({unique1: {$gte: 0}, unique2: {$gte: 0}}), "unique1_1_unique2_1");
     assert.eq(winningIndex({unique1: 1, unique2: {$gte: 0}}), "unique1_1_unique2_1");
 
@@ -139,8 +132,7 @@ try {
     // TODO(SERVER-98102): assert.eq(winningIndex({unique1: 1, unique2: {$lt: 0}}),
     // "unique1_1_unique2_1");
     assert.eq(winningIndex({unique1: {$gte: 500}, unique2: 1}), "unique2_1_unique1_1");
-    assert.eq(winningIndex({unique1: {$gte: 500}, unique2: {$in: [1, 2, 3]}}),
-              "unique2_1_unique1_1");
+    assert.eq(winningIndex({unique1: {$gte: 500}, unique2: {$in: [1, 2, 3]}}), "unique2_1_unique1_1");
     assert.eq(winningIndex({unique1: 1, unique2: {$gte: 500}}), "unique1_1_unique2_1");
     // TODO(SERVER-98102): assert.eq(winningIndex({unique1: {$lt: 0}, unique2: 1}),
     // "unique2_1_unique1_1");
@@ -157,20 +149,17 @@ try {
     assert.eq(winningIndexFromCursor(coll.find({b: 1, c: 1, d: 1}).sort({c: 1})), "c_1");
 
     // Sort on the shortest index that can be brought to bear to do the find() and the sort()
-    assert.eq(winningIndexFromCursor(coll.find({unique1: 1, unique2: 1}).sort({unique1: 1})),
-              "unique1_1_unique2_1");
-    assert.eq(winningIndexFromCursor(coll.find({unique1: 1, unique2: -1}).sort({unique1: 1})),
-              "unique1_1_unique2_1");
+    assert.eq(winningIndexFromCursor(coll.find({unique1: 1, unique2: 1}).sort({unique1: 1})), "unique1_1_unique2_1");
+    assert.eq(winningIndexFromCursor(coll.find({unique1: 1, unique2: -1}).sort({unique1: 1})), "unique1_1_unique2_1");
     assert.eq(
         winningIndexFromCursor(coll.find({unique1: 1, unique2: {$gte: 0}}).sort({unique1: 1})),
-        "unique1_1_unique2_1");
-    assert.eq(winningIndexFromCursor(coll.find({unique1: 1, b: 1}).sort({unique1: 1})),
-              "unique1_1");
+        "unique1_1_unique2_1",
+    );
+    assert.eq(winningIndexFromCursor(coll.find({unique1: 1, b: 1}).sort({unique1: 1})), "unique1_1");
 
     // If there IS a clear selectivity winner among the other predicates,
     // we pick the index of that predicate.
-    assert.eq(winningIndexFromCursor(coll.find({unique1: 1, b: 1, c: 1, d: 1}).sort({b: 1})),
-              "unique1_1");
+    assert.eq(winningIndexFromCursor(coll.find({unique1: 1, b: 1, c: 1, d: 1}).sort({b: 1})), "unique1_1");
 
     /*
      * Plan selection for find() + sort() on different fields.
@@ -193,15 +182,44 @@ try {
     assert.eq(winningIndexFromCursor(coll.find({b: {$gte: 0}}).sort({unique1: 1})), "unique1_1");
 
     // In the presence of sort() + limit(1) we pick the index on the predicate.
-    assert.eq(winningIndexFromCursor(coll.find({unique1: {$gte: 0}}).sort({b: 1}).limit(1)),
-              "unique1_1");
-    assert.eq(winningIndexFromCursor(coll.find({b: {$gte: 0}}).sort({unique1: 1}).limit(1)), "b_1");
+    assert.eq(
+        winningIndexFromCursor(
+            coll
+                .find({unique1: {$gte: 0}})
+                .sort({b: 1})
+                .limit(1),
+        ),
+        "unique1_1",
+    );
+    assert.eq(
+        winningIndexFromCursor(
+            coll
+                .find({b: {$gte: 0}})
+                .sort({unique1: 1})
+                .limit(1),
+        ),
+        "b_1",
+    );
 
     // In the presence of sort() + large limit, we pick again the index on the sort field.
-    assert.eq(winningIndexFromCursor(coll.find({unique1: {$gte: 0}}).sort({b: 1}).limit(10000)),
-              "b_1");
-    assert.eq(winningIndexFromCursor(coll.find({b: {$gte: 0}}).sort({unique1: 1}).limit(10000)),
-              "unique1_1");
+    assert.eq(
+        winningIndexFromCursor(
+            coll
+                .find({unique1: {$gte: 0}})
+                .sort({b: 1})
+                .limit(10000),
+        ),
+        "b_1",
+    );
+    assert.eq(
+        winningIndexFromCursor(
+            coll
+                .find({b: {$gte: 0}})
+                .sort({unique1: 1})
+                .limit(10000),
+        ),
+        "unique1_1",
+    );
 } finally {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
 }

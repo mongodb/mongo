@@ -16,8 +16,7 @@ var collCompound = mongos.getCollection("foo.barCompound");
 var collNested = mongos.getCollection("foo.barNested");
 var collHashed = mongos.getCollection("foo.barHashed");
 
-assert.commandWorked(
-    admin.runCommand({enableSharding: coll.getDB().toString(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString(), primaryShard: st.shard0.shardName}));
 
 //
 // Split the collection so that "abcde-0" and "abcde-1" go on different shards when possible
@@ -25,35 +24,38 @@ assert.commandWorked(
 
 assert.commandWorked(admin.runCommand({shardCollection: collSharded.toString(), key: {a: 1}}));
 assert.commandWorked(admin.runCommand({split: collSharded.toString(), middle: {a: "abcde-1"}}));
-assert.commandWorked(admin.runCommand({
-    moveChunk: collSharded.toString(),
-    find: {a: 0},
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
-
 assert.commandWorked(
-    admin.runCommand({shardCollection: collCompound.toString(), key: {a: 1, b: 1}}));
-assert.commandWorked(
-    admin.runCommand({split: collCompound.toString(), middle: {a: "abcde-1", b: 0}}));
-assert.commandWorked(admin.runCommand({
-    moveChunk: collCompound.toString(),
-    find: {a: 0, b: 0},
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
+    admin.runCommand({
+        moveChunk: collSharded.toString(),
+        find: {a: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
 
-assert.commandWorked(admin.runCommand({shardCollection: collNested.toString(), key: {'a.b': 1}}));
-assert.commandWorked(admin.runCommand({split: collNested.toString(), middle: {'a.b': "abcde-1"}}));
-assert.commandWorked(admin.runCommand({
-    moveChunk: collNested.toString(),
-    find: {a: {b: 0}},
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
-
+assert.commandWorked(admin.runCommand({shardCollection: collCompound.toString(), key: {a: 1, b: 1}}));
+assert.commandWorked(admin.runCommand({split: collCompound.toString(), middle: {a: "abcde-1", b: 0}}));
 assert.commandWorked(
-    admin.runCommand({shardCollection: collHashed.toString(), key: {hash: "hashed"}}));
+    admin.runCommand({
+        moveChunk: collCompound.toString(),
+        find: {a: 0, b: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
+
+assert.commandWorked(admin.runCommand({shardCollection: collNested.toString(), key: {"a.b": 1}}));
+assert.commandWorked(admin.runCommand({split: collNested.toString(), middle: {"a.b": "abcde-1"}}));
+assert.commandWorked(
+    admin.runCommand({
+        moveChunk: collNested.toString(),
+        find: {a: {b: 0}},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
+
+assert.commandWorked(admin.runCommand({shardCollection: collHashed.toString(), key: {hash: "hashed"}}));
 
 st.printShardingStatus();
 
@@ -99,11 +101,13 @@ collNested.remove({});
 assert.commandWorked(collNested.insert({a: {b: "abcde-0"}}));
 assert.commandWorked(collNested.insert({a: {b: "abcde-1"}}));
 assert.commandWorked(collNested.insert({a: {b: /abcde.*/}}));
-assert.eq(collNested.find().itcount(), collNested.find({'a.b': /abcde.*/}).itcount());
+assert.eq(collNested.find().itcount(), collNested.find({"a.b": /abcde.*/}).itcount());
 
 collHashed.remove({});
-while (st.shard0.getCollection(collHashed.toString()).count() == 0 ||
-       st.shard1.getCollection(collHashed.toString()).count() == 0) {
+while (
+    st.shard0.getCollection(collHashed.toString()).count() == 0 ||
+    st.shard1.getCollection(collHashed.toString()).count() == 0
+) {
     assert.commandWorked(collHashed.insert({hash: "abcde-" + ObjectId().toString()}));
 }
 assert.commandWorked(collHashed.insert({hash: /abcde.*/}));
@@ -137,12 +141,14 @@ collNested.remove({});
 assert.commandWorked(collNested.insert({a: {b: "abcde-0"}}));
 assert.commandWorked(collNested.insert({a: {b: "abcde-1"}}));
 assert.commandWorked(collNested.insert({a: {b: /abcde.*/}}));
-assert.commandWorked(collNested.update({'a.b': /abcde.*/}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(collNested.update({"a.b": /abcde.*/}, {$set: {updated: true}}, {multi: true}));
 assert.eq(collNested.find().itcount(), collNested.find({updated: true}).itcount());
 
 collHashed.remove({});
-while (st.shard0.getCollection(collHashed.toString()).count() == 0 ||
-       st.shard1.getCollection(collHashed.toString()).count() == 0) {
+while (
+    st.shard0.getCollection(collHashed.toString()).count() == 0 ||
+    st.shard1.getCollection(collHashed.toString()).count() == 0
+) {
     assert.commandWorked(collHashed.insert({hash: "abcde-" + ObjectId().toString()}));
 }
 assert.commandWorked(collHashed.insert({hash: /abcde.*/}));
@@ -156,23 +162,19 @@ collNested.remove({});
 // Op-style updates with regex succeed on sharded collections.
 assert.commandWorked(collSharded.update({a: /abcde-1/}, {"$set": {b: 1}}, {upsert: false}));
 assert.commandWorked(collSharded.update({a: /abcde-[1-2]/}, {"$set": {b: 1}}, {upsert: false}));
-assert.commandWorked(
-    collNested.update({a: {b: /abcde-1/}}, {"$set": {"a.b": /abcde-1/, b: 1}}, {upsert: false}));
+assert.commandWorked(collNested.update({a: {b: /abcde-1/}}, {"$set": {"a.b": /abcde-1/, b: 1}}, {upsert: false}));
 assert.commandWorked(collNested.update({"a.b": /abcde.*/}, {"$set": {b: 1}}, {upsert: false}));
 
 assert.commandWorked(collSharded.update({a: /abcde.*/}, {$set: {a: /abcde.*/}}, {upsert: true}));
-assert.commandWorked(
-    collCompound.update({a: /abcde-1/}, {$set: {a: /abcde.*/, b: 1}}, {upsert: true}));
-assert.commandWorked(
-    collNested.update({'a.b': /abcde.*/}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
-assert.commandWorked(
-    collNested.update({a: {b: /abcde.*/}}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
-assert.commandWorked(collNested.update({c: 1}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
+assert.commandWorked(collCompound.update({a: /abcde-1/}, {$set: {a: /abcde.*/, b: 1}}, {upsert: true}));
+assert.commandWorked(collNested.update({"a.b": /abcde.*/}, {$set: {"a.b": /abcde.*/}}, {upsert: true}));
+assert.commandWorked(collNested.update({a: {b: /abcde.*/}}, {$set: {"a.b": /abcde.*/}}, {upsert: true}));
+assert.commandWorked(collNested.update({c: 1}, {$set: {"a.b": /abcde.*/}}, {upsert: true}));
 
 // Upsert by replacement-style regex succeed on sharded collections.
 assert.commandWorked(collSharded.update({a: /abcde.*/}, {a: /abcde.*/}, {upsert: true}));
 assert.commandWorked(collCompound.update({a: /abcde.*/}, {a: /abcde.*/, b: 1}, {upsert: true}));
-assert.commandWorked(collNested.update({'a.b': /abcde-1/}, {a: {b: /abcde.*/}}, {upsert: true}));
+assert.commandWorked(collNested.update({"a.b": /abcde-1/}, {a: {b: /abcde.*/}}, {upsert: true}));
 assert.commandWorked(collNested.update({a: {b: /abcde.*/}}, {a: {b: /abcde.*/}}, {upsert: true}));
 assert.commandWorked(collNested.update({c: 1}, {a: {b: /abcde.*/}}, {upsert: true}));
 
@@ -181,7 +183,7 @@ assert.commandWorked(collNested.update({c: 1}, {a: {b: /abcde.*/}}, {upsert: tru
 assert.commandWorked(collSharded.update({a: /abcde.*/}, {a: /abcde.*/, b: 1}, {upsert: false}));
 assert.commandWorked(collSharded.update({a: /abcde-1/}, {a: /abcde-1/, b: 1}, {upsert: false}));
 assert.commandWorked(collNested.update({a: {b: /abcde.*/}}, {a: {b: /abcde.*/}}, {upsert: false}));
-assert.commandWorked(collNested.update({'a.b': /abcde-1/}, {a: {b: /abcde.*/}}, {upsert: false}));
+assert.commandWorked(collNested.update({"a.b": /abcde-1/}, {a: {b: /abcde.*/}}, {upsert: false}));
 
 //
 //
@@ -211,12 +213,14 @@ collNested.remove({});
 assert.commandWorked(collNested.insert({a: {b: "abcde-0"}}));
 assert.commandWorked(collNested.insert({a: {b: "abcde-1"}}));
 assert.commandWorked(collNested.insert({a: {b: /abcde.*/}}));
-assert.commandWorked(collNested.remove({'a.b': /abcde.*/}));
+assert.commandWorked(collNested.remove({"a.b": /abcde.*/}));
 assert.eq(0, collNested.find({}).itcount());
 
 collHashed.remove({});
-while (st.shard0.getCollection(collHashed.toString()).count() == 0 ||
-       st.shard1.getCollection(collHashed.toString()).count() == 0) {
+while (
+    st.shard0.getCollection(collHashed.toString()).count() == 0 ||
+    st.shard1.getCollection(collHashed.toString()).count() == 0
+) {
     assert.commandWorked(collHashed.insert({hash: "abcde-" + ObjectId().toString()}));
 }
 assert.commandWorked(collHashed.insert({hash: /abcde.*/}));
@@ -242,8 +246,7 @@ assert.commandWorked(collNested.insert({a: {b: "abcde-0"}}));
 assert.commandWorked(collNested.insert({a: {b: "abcde-1"}}));
 assert.commandWorked(collNested.insert({a: {b: /abcde.*/}}));
 assert.eq(1, collNested.find({a: {b: /abcde.*/}}).itcount());
-assert.commandWorked(
-    collNested.update({a: {b: /abcde.*/}}, {$set: {updated: true}}, {multi: true}));
+assert.commandWorked(collNested.update({a: {b: /abcde.*/}}, {$set: {updated: true}}, {multi: true}));
 assert.eq(1, collNested.find({updated: true}).itcount());
 assert.commandWorked(collNested.remove({a: {b: /abcde.*/}}));
 assert.eq(2, collNested.find().itcount());

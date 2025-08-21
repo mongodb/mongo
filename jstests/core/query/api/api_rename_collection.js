@@ -36,7 +36,7 @@ function getNewColl() {
 
 function filterResponseFields(response) {
     return Object.keys(response)
-        .filter((field) => field !== '$clusterTime' && field !== 'operationTime')
+        .filter((field) => field !== "$clusterTime" && field !== "operationTime")
         .sort();
 }
 
@@ -82,7 +82,7 @@ variants.forEach((variant) => {
 
     assert.eq(3, src.countDocuments({}));
 
-    const baseCommand = {renameCollection: src.getFullName(), to: db.getName() + '.' + dstName};
+    const baseCommand = {renameCollection: src.getFullName(), to: db.getName() + "." + dstName};
     assertCollectionRenameWorked(runCommandVariant(baseCommand, variant));
 
     assert.eq(0, src.countDocuments({}));
@@ -120,7 +120,7 @@ variants.forEach((variant) => {
     assertCollectionRenameFailed(runCommandVariant(failCommand, variant));
 
     const originalNumberOfIndexes = src.getIndexes().length;
-    const okCommand = {renameCollection: src.getFullName(), to: db.getName() + '.' + dstName};
+    const okCommand = {renameCollection: src.getFullName(), to: db.getName() + "." + dstName};
     assertCollectionRenameWorked(runCommandVariant(okCommand, variant));
     assert.eq(0, src.countDocuments({}));
 
@@ -157,7 +157,7 @@ variants.forEach((variant) => {
     const okCommand = {
         renameCollection: src.getFullName(),
         to: dst.getFullName(),
-        dropTarget: true
+        dropTarget: true,
     };
     assertCollectionRenameWorked(runCommandVariant(okCommand, variant));
 
@@ -173,30 +173,34 @@ variants.forEach((variant) => {
     assert.commandWorked(src.insert({x: 1}));
 
     // Test extra command parameters with apiVersion: "1" and apiStrict.
-    assertCollectionRenameFailedWithCode(db.adminCommand({
-        renameCollection: src.getFullName(),
-        to: src.getFullName(),
-        something: "foo",
-        apiVersion: "1",
-        apiStrict: true
-    }),
-                                         ErrorCodes.IDLUnknownField);
+    assertCollectionRenameFailedWithCode(
+        db.adminCommand({
+            renameCollection: src.getFullName(),
+            to: src.getFullName(),
+            something: "foo",
+            apiVersion: "1",
+            apiStrict: true,
+        }),
+        ErrorCodes.IDLUnknownField,
+    );
 
     // Test wrong input parameters with apiVersion: "1".
     assertCollectionRenameFailedWithCode(
         db.adminCommand({renameCollection: {}, to: src.getFullName(), apiVersion: "1"}),
-        ErrorCodes.TypeMismatch);
+        ErrorCodes.TypeMismatch,
+    );
     assertCollectionRenameFailedWithCode(
         db.adminCommand({renameCollection: src.getFullName(), to: {}, apiVersion: "1"}),
-        ErrorCodes.TypeMismatch);
+        ErrorCodes.TypeMismatch,
+    );
     assertCollectionRenameFailedWithCode(
-        db.adminCommand(
-            {renameCollection: {}, to: src.getFullName(), apiVersion: "1", apiStrict: true}),
-        ErrorCodes.TypeMismatch);
+        db.adminCommand({renameCollection: {}, to: src.getFullName(), apiVersion: "1", apiStrict: true}),
+        ErrorCodes.TypeMismatch,
+    );
     assertCollectionRenameFailedWithCode(
-        db.adminCommand(
-            {renameCollection: src.getFullName(), to: {}, apiVersion: "1", apiStrict: true}),
-        ErrorCodes.TypeMismatch);
+        db.adminCommand({renameCollection: src.getFullName(), to: {}, apiVersion: "1", apiStrict: true}),
+        ErrorCodes.TypeMismatch,
+    );
 
     src.drop();
 }

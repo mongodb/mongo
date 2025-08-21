@@ -25,7 +25,7 @@ const fullyMinimizedDoc = {
     m: {m1: 0, m2: 0},
     array: 0,
     a: 0,
-    b: 0
+    b: 0,
 };
 
 function testShrinking(isTS) {

@@ -29,18 +29,15 @@ TestData.skipCheckShardFilteringMetadata = true;
 const mongosParams = {
     setParameter: {
         healthMonitoringIntensities: tojson({
-            values: [
-                {type: "configServer", intensity: "critical"},
-            ]
+            values: [{type: "configServer", intensity: "critical"}],
         }),
         healthMonitoringIntervals: tojson({values: [{type: "configServer", interval: 1}]}),
         activeFaultDurationSecs: kActiveFaultDurationSec,
-    }
+    },
 };
 
-const assertFaultState = function(state) {
-    let result =
-        assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
+const assertFaultState = function (state) {
+    let result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
     print(`Server health: ${tojson(result)}`);
     assert(result.state == state);
 };
@@ -52,14 +49,13 @@ var st = new ShardingTest({
     config: 3,
 });
 
-assert.commandWorked(st.s0.adminCommand(
-    {"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 3}}}));
+assert.commandWorked(st.s0.adminCommand({"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 3}}}));
 
 const configPrimary = st.configRS.getPrimary();
 const admin = configPrimary.getDB("admin");
 
 // There should be no faults and we should be able to ping mongos.
-assertFaultState('Ok');
+assertFaultState("Ok");
 assert.commandWorked(st.s0.adminCommand({"ping": 1}));
 
 let pidsBefore = _runningMongoChildProcessIds();
@@ -76,55 +72,67 @@ for (let i = 0; i < conf.members.length; i++) {
     }
 }
 reconfig(st.configRS, conf);
-jsTest.log('Partitioning a config server replica from the mongos');
+jsTest.log("Partitioning a config server replica from the mongos");
 st.config0.discardMessagesFrom(st.s, 1.0);
 st.s.discardMessagesFrom(st.config0, 1.0);
 
-jsTest.log('Partitioning another config server replica from the mongos');
+jsTest.log("Partitioning another config server replica from the mongos");
 st.config1.discardMessagesFrom(st.s, 1.0);
 st.s.discardMessagesFrom(st.config1, 1.0);
 
-jsTest.log('Partitioning the final config server replica from the mongos');
+jsTest.log("Partitioning the final config server replica from the mongos");
 st.config2.discardMessagesFrom(st.s, 1.0);
 st.s.discardMessagesFrom(st.config2, 1.0);
 
-const failedChecksCount = function() {
-    let result =
-        assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
+const failedChecksCount = function () {
+    let result = assert.commandWorked(st.s0.adminCommand({serverStatus: 1, health: {details: true}})).health;
     print(`Server status: ${tojson(result)}`);
-    return result.configServer.totalChecksWithFailure && result.state == 'TransientFault';
+    return result.configServer.totalChecksWithFailure && result.state == "TransientFault";
 };
 
 // Wait until a failure is detected.
-assert.soon(() => {
-    return failedChecksCount();
-}, 'Health observer did not detect a failure', 20000, 1000, {runHangAnalyzer: false});
+assert.soon(
+    () => {
+        return failedChecksCount();
+    },
+    "Health observer did not detect a failure",
+    20000,
+    1000,
+    {runHangAnalyzer: false},
+);
 
 // Asserts that the Config server health observer will eventually trigger mongos crash.
-jsTestLog('Wait until the mongos crashes.');
-assert.soon(() => {
-    try {
-        let res = st.s0.adminCommand({"ping": 1});
-        jsTestLog(`Ping result: ${tojson(res)}`);
-        return res.ok != 1;
-    } catch (e) {
-        jsTestLog(`Ping failed: ${tojson(e)}`);
-        return true;
-    }
-}, 'Mongos is not shutting down as expected', 30000, 2500);
+jsTestLog("Wait until the mongos crashes.");
+assert.soon(
+    () => {
+        try {
+            let res = st.s0.adminCommand({"ping": 1});
+            jsTestLog(`Ping result: ${tojson(res)}`);
+            return res.ok != 1;
+        } catch (e) {
+            jsTestLog(`Ping failed: ${tojson(e)}`);
+            return true;
+        }
+    },
+    "Mongos is not shutting down as expected",
+    30000,
+    2500,
+);
 
 try {
     // Refresh PIDs to force de-registration of the crashed mongos.
     assert.soon(
         () => {
             var numPidsNow = _runningMongoChildProcessIds().length;
-            return (numPidsBefore - numPidsNow) == 1;
+            return numPidsBefore - numPidsNow == 1;
         },
         () => {
             var pids = _runningMongoChildProcessIds();
-            return `Encountered incorrect number of running processes. Expected: 11. Running processes: ${
-                tojson(pids)}`;
-        });
+            return `Encountered incorrect number of running processes. Expected: 11. Running processes: ${tojson(
+                pids,
+            )}`;
+        },
+    );
     var pidsNow = _runningMongoChildProcessIds();
     pidsBefore = pidsBefore.map((e) => e.toNumber());
     pidsNow = pidsNow.map((e) => e.toNumber());

@@ -28,8 +28,8 @@ const st = new ShardingTest({
     shards: 1,
     rs: {
         // Use the noop writer with a higher frequency for periodic noops to speed up the test.
-        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}
-    }
+        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
+    },
 });
 const db = st.s.getDB(jsTestName());
 const dbName = db.getName();
@@ -51,8 +51,7 @@ const wholeClusterCursor = db.getMongo().watch();
 
 // Create a new sharded collection that we will start watching later.
 assert.commandWorked(db.createCollection("system.resharding.someUUID"));
-assert.commandWorked(db.adminCommand(
-    {shardCollection: db.getName() + ".system.resharding.someUUID", key: {_id: 1}}));
+assert.commandWorked(db.adminCommand({shardCollection: db.getName() + ".system.resharding.someUUID", key: {_id: 1}}));
 
 // Insert a document to capture the cluster time at which our tests begin.
 assert.commandWorked(db.t1.insert({_id: 0, a: 1}));
@@ -60,12 +59,8 @@ assert.soon(() => wholeDBCursor.hasNext());
 const documentInsertedEvent = wholeDBCursor.next();
 
 // Verify that the event is a document insertion event.
-assert.eq("insert",
-          documentInsertedEvent.operationType,
-          "Unexpected change event: " + tojson(documentInsertedEvent));
-assert.eq("t1",
-          documentInsertedEvent.ns.coll,
-          "Unexpected change event: " + tojson(documentInsertedEvent));
+assert.eq("insert", documentInsertedEvent.operationType, "Unexpected change event: " + tojson(documentInsertedEvent));
+assert.eq("t1", documentInsertedEvent.ns.coll, "Unexpected change event: " + tojson(documentInsertedEvent));
 const clusterTimeAtInsert = documentInsertedEvent.clusterTime;
 
 const systemCollection = db["system.resharding.someUUID"];
@@ -83,13 +78,16 @@ assert.throwsWithCode(
     () => systemCollection.watch([], {allowToRunOnSystemNS: true}),
     ErrorCodes.InvalidNamespace,
     [],
-    "expected a request with 'allowToRunOnSystemNS: true' to open a change stream on a system collection through mongos to fail");
+    "expected a request with 'allowToRunOnSystemNS: true' to open a change stream on a system collection through mongos to fail",
+);
 
 const systemCollectionThroughShard = st.shard0.getCollection(systemCollection.getFullName());
 
 // Start watching system.* collection by opening a change stream through a shard.
-const systemCollectionThroughShardCursor = systemCollectionThroughShard.watch(
-    [], {startAtOperationTime: clusterTimeAtInsert, allowToRunOnSystemNS: true});
+const systemCollectionThroughShardCursor = systemCollectionThroughShard.watch([], {
+    startAtOperationTime: clusterTimeAtInsert,
+    allowToRunOnSystemNS: true,
+});
 
 // Verify that a document insert event in a system.* collection is observed.
 assertNextChangeStreamEventEquals(systemCollectionThroughShardCursor, {

@@ -27,9 +27,9 @@ function testBackupSystemCollStats(adminDB) {
     adminDB.createUser({user: "backup-agent", pwd: "pwd", roles: ["backup"]});
     adminDB.system.js.save({
         _id: "testFunction",
-        value: function(x) {
+        value: function (x) {
             return x;
-        }
+        },
     });
     adminDB.logout();
 

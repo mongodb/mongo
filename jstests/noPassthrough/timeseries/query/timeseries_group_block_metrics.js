@@ -9,13 +9,14 @@
  */
 import {getAggPlanStage, getEngine} from "jstests/libs/query/analyze_plan.js";
 
-const conn = MongoRunner.runMongod(
-    {setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
-const db = conn.getDB('test');
+const conn = MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
+const db = conn.getDB("test");
 // Debug mode changes how often we spill. This test assumes SBE is being used.
-if (db.adminCommand('buildInfo').debug ||
+if (
+    db.adminCommand("buildInfo").debug ||
     assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-            .internalQueryFrameworkControl == "forceClassicEngine") {
+        .internalQueryFrameworkControl == "forceClassicEngine"
+) {
     jsTestLog("Returning early because debug or forceClassic is on.");
     MongoRunner.stopMongod(conn);
     quit();
@@ -24,9 +25,11 @@ if (db.adminCommand('buildInfo').debug ||
 const coll = db[jsTestName()];
 coll.drop();
 
-assert.commandWorked(db.createCollection(coll.getName(), {
-    timeseries: {timeField: 't', metaField: 'm'},
-}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: "t", metaField: "m"},
+    }),
+);
 
 /*
  * We'll have 50 time series buckets (which become blocks in our block processing pipeline). 25 of
@@ -48,10 +51,7 @@ for (let m = 1; m <= nBuckets; m++) {
 assert.commandWorked(bulk.execute());
 
 // Simple $group stage that will trigger block processing.
-const pipeline = [
-    {$match: {a: {$gt: 0}}},
-    {$group: {_id: {y: '$a'}, min: {$min: "$b"}}},
-];
+const pipeline = [{$match: {a: {$gt: 0}}}, {$group: {_id: {y: "$a"}, min: {$min: "$b"}}}];
 
 const explain = coll.explain("executionStats").aggregate(pipeline);
 assert.eq(getEngine(explain), "sbe");

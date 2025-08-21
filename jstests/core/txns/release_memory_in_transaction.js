@@ -26,7 +26,7 @@ function createInactiveCursor(coll) {
     const cmdRes = coll.getDB().runCommand(findCmd);
     assert.commandWorked(cmdRes);
     return cmdRes.cursor.id;
-};
+}
 
 db.dropDatabase();
 const coll = db[jsTestName()];
@@ -43,16 +43,14 @@ try {
     const sessionCursorId = createInactiveCursor(sessionColl);
 
     {
-        const sessionReleaseMemoryRes =
-            sessionDb.runCommand({releaseMemory: [sessionCursorId, outOfSessionCursorId]});
+        const sessionReleaseMemoryRes = sessionDb.runCommand({releaseMemory: [sessionCursorId, outOfSessionCursorId]});
         assert.commandWorked(sessionReleaseMemoryRes);
         assertReleaseMemoryWorked(sessionReleaseMemoryRes, sessionCursorId);
         assertReleaseMemoryWorked(sessionReleaseMemoryRes, outOfSessionCursorId);
     }
 
     {
-        const outOfSessionReleaseMemoryRes =
-            db.runCommand({releaseMemory: [sessionCursorId, outOfSessionCursorId]});
+        const outOfSessionReleaseMemoryRes = db.runCommand({releaseMemory: [sessionCursorId, outOfSessionCursorId]});
         assert.commandWorked(outOfSessionReleaseMemoryRes);
         assertReleaseMemoryWorked(outOfSessionReleaseMemoryRes, sessionCursorId);
         assertReleaseMemoryWorked(outOfSessionReleaseMemoryRes, outOfSessionCursorId);

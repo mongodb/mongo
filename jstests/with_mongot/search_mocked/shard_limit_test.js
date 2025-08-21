@@ -8,11 +8,9 @@ import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     getDefaultProtocolVersionForPlanShardedSearch,
     mockPlanShardedSearchResponse,
-    mongotResponseForBatch
+    mongotResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const collName = "internal_search_mongot_remote";
@@ -26,7 +24,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     mongos: 1,
     other: {
         rsOptions: {setParameter: {enableTestCommands: 1}},
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
@@ -36,18 +34,16 @@ const testDB = mongos.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 let protocolVersion = null;
 
-const searchInSbe = checkSbeRestrictedOrFullyEnabled(testDB) &&
-    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchInSbe');
+const searchInSbe =
+    checkSbeRestrictedOrFullyEnabled(testDB) && FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe");
 
 // TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
-if (FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchExplainExecutionStats') &&
-    !searchInSbe) {
+if (FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchExplainExecutionStats") && !searchInSbe) {
     protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 }
 
 // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 
 assert.commandWorked(testColl.insert({_id: 1, x: "ow"}));
@@ -68,7 +64,7 @@ let expectedMongotCommand = {
     collectionUUID: collUUID0,
     query: mongotQuery,
     explain: {verbosity: explainVerbosity},
-    $db: "test"
+    $db: "test",
 };
 if (protocolVersion != null) {
     expectedMongotCommand.intermediate = protocolVersion;
@@ -92,7 +88,6 @@ function assertLimitAbsorbed(explainRes, query) {
         for (let [_, limitObj] of Object.entries(limitStages)) {
             assert.eq(7, limitObj["limitAmount"], explainRes);
         }
-
     } else {
         let shardsArray = explainRes["shards"];
 
@@ -113,24 +108,27 @@ function assertLimitAbsorbed(explainRes, query) {
 }
 
 function testBasicCase(shard0Conn, shard1Conn, cursorId) {
-    const history = [{
-        expectedCommand: expectedMongotCommand,
-        response:
-            mongotResponseForBatch([], NumberLong(0), testColl.getFullName(), 1, {"garbage": true})
-    }];
+    const history = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch([], NumberLong(0), testColl.getFullName(), 1, {"garbage": true}),
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history, cursorId);
 
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history, cursorId);
 
-    mockPlanShardedSearchResponse(testColl.getName(),
-                                  mongotQuery,
-                                  dbName,
-                                  undefined /*sortSpec*/,
-                                  stWithMock,
-                                  false /*maybeUnused*/,
-                                  {verbosity: explainVerbosity});
+    mockPlanShardedSearchResponse(
+        testColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+        false /*maybeUnused*/,
+        {verbosity: explainVerbosity},
+    );
     const explainResult = testColl.explain(explainVerbosity).aggregate(pipeline);
     assertLimitAbsorbed(explainResult, mongotQuery);
 }
@@ -138,7 +136,7 @@ runTestOnPrimaries(testBasicCase, NumberLong(123));
 
 // Run again with storedSource.
 mongotQuery = {
-    returnStoredSource: true
+    returnStoredSource: true,
 };
 pipeline = [
     {$search: mongotQuery},
@@ -151,7 +149,7 @@ expectedMongotCommand = {
     collectionUUID: collUUID0,
     query: mongotQuery,
     explain: {verbosity: explainVerbosity},
-    $db: "test"
+    $db: "test",
 };
 if (protocolVersion != null) {
     expectedMongotCommand.intermediate = protocolVersion;

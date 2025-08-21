@@ -12,10 +12,11 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function expectChunks(st, ns, chunks) {
     for (let i = 0; i < chunks.length; i++) {
-        assert.eq(chunks[i],
-                  findChunksUtil.countChunksForNs(
-                      st.s.getDB("config"), ns, {shard: st["shard" + i].shardName}),
-                  "unexpected number of chunks on shard " + i);
+        assert.eq(
+            chunks[i],
+            findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st["shard" + i].shardName}),
+            "unexpected number of chunks on shard " + i,
+        );
     }
 }
 
@@ -27,7 +28,8 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack, hashed,
 
     if (!hashed) {
         expectChunks(st, ns, [1, 1, 0]);
-    } else {  // hashed ns
+    } else {
+        // hashed ns
         expectChunks(st, ns, [2, 2, 2]);
     }
 
@@ -55,27 +57,35 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack, hashed,
 
         // Flush metadata on the destination shard so the next request doesn't encounter
         // StaleConfig. The router refreshes after moving a chunk, so it will already be fresh.
-        assert.commandWorked(
-            st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
+        assert.commandWorked(st.rs1.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
     }
 
     st.refreshCatalogCacheForNs(st.s, ns);
 
     // The find should target shard0 and find the doc. If it targets shard1, it will not be able to
     // find the doc because it is using the snapshot for the pinned global read timestamp.
-    assert.eq(sessionColl.find(docs[0]).itcount(),
-              1,
-              "expected find to target the right shard even after moveChunk");
+    assert.eq(sessionColl.find(docs[0]).itcount(), 1, "expected find to target the right shard even after moveChunk");
 
     // The write should always fail, but the particular error varies.
     const res = assert.commandFailed(
         sessionDB.runCommand(cmdTargetChunk2),
-        "expected write to second chunk to fail, case: " + testCaseName +
-            ", cmd: " + tojson(cmdTargetChunk2) + ", moveChunkBack: " + moveChunkBack);
+        "expected write to second chunk to fail, case: " +
+            testCaseName +
+            ", cmd: " +
+            tojson(cmdTargetChunk2) +
+            ", moveChunkBack: " +
+            moveChunkBack,
+    );
 
-    const errMsg = "write to second chunk failed with unexpected error, res: " + tojson(res) +
-        ", case: " + testCaseName + ", cmd: " + tojson(cmdTargetChunk2) +
-        ", moveChunkBack: " + moveChunkBack;
+    const errMsg =
+        "write to second chunk failed with unexpected error, res: " +
+        tojson(res) +
+        ", case: " +
+        testCaseName +
+        ", cmd: " +
+        tojson(cmdTargetChunk2) +
+        ", moveChunkBack: " +
+        moveChunkBack;
 
     // On slow hosts, this request can always fail with SnapshotTooOld or StaleChunkHistory if
     // a migration takes long enough.
@@ -104,8 +114,7 @@ function runTest(testCase, ns, collName, moveChunkToFunc, moveChunkBack, hashed,
     assert.eq(res.errorLabels, ["TransientTransactionError"], tojson(res));
 
     // The commit should fail because the earlier write failed.
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
     // Move the chunk back to Shard1, if necessary, and reset the database state for the next
     // iteration.
@@ -120,50 +129,46 @@ const dbName = "test";
 
 const st = new ShardingTest({shards: 3, mongos: 1, config: 1});
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 var fixtures = [
     {collName: "not_hashed", shardKey: "_id", docs: [{_id: -3}, {_id: 11}, {_id: 3}]},
     {
         collName: "not_hashed_nested",
         shardKey: "a.b",
-        docs: [{a: {b: -3}}, {a: {b: 11}}, {a: {b: 1}}]
-    }
+        docs: [{a: {b: -3}}, {a: {b: 11}}, {a: {b: 1}}],
+    },
 ];
-fixtures.forEach(function(fixture) {
+fixtures.forEach(function (fixture) {
     //////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Ranged Sharding Test
 
     const rangedCollName = fixture.collName;
-    const rangedNs = dbName + '.' + rangedCollName;
+    const rangedNs = dbName + "." + rangedCollName;
 
     // Set up one sharded collection with 2 chunks, both on the primary shard.
-    assert.commandWorked(st.s.getDB(dbName)[rangedCollName].insert(
-        fixture.docs[0], {writeConcern: {w: "majority"}}));
-    assert.commandWorked(st.s.getDB(dbName)[rangedCollName].insert(
-        fixture.docs[1], {writeConcern: {w: "majority"}}));
+    assert.commandWorked(st.s.getDB(dbName)[rangedCollName].insert(fixture.docs[0], {writeConcern: {w: "majority"}}));
+    assert.commandWorked(st.s.getDB(dbName)[rangedCollName].insert(fixture.docs[1], {writeConcern: {w: "majority"}}));
 
     assert.commandWorked(st.s.getDB(dbName)[rangedCollName].createIndex({[fixture.shardKey]: 1}));
-    assert.commandWorked(
-        st.s.adminCommand({shardCollection: rangedNs, key: {[fixture.shardKey]: 1}}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: rangedNs, key: {[fixture.shardKey]: 1}}));
     assert.commandWorked(st.s.adminCommand({split: rangedNs, middle: {[fixture.shardKey]: 0}}));
 
     expectChunks(st, rangedNs, [2, 0, 0]);
 
     // Force a routing table refresh on Shard2, to avoid picking a global read timestamp before the
     // sharding metadata cache collections are created.
-    assert.commandWorked(
-        st.rs2.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: rangedNs}));
+    assert.commandWorked(st.rs2.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: rangedNs}));
 
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: rangedNs, find: {[fixture.shardKey]: 11}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: rangedNs, find: {[fixture.shardKey]: 11}, to: st.shard1.shardName}),
+    );
 
     expectChunks(st, rangedNs, [1, 1, 0]);
 
     // The command should target only the second chunk.
-    let commandTestCases = function(collName) {
+    let commandTestCases = function (collName) {
         return [
             {
                 name: "insert",
@@ -177,7 +182,7 @@ fixtures.forEach(function(fixture) {
                 name: "update_replacement",
                 command: {
                     update: collName,
-                    updates: [{q: fixture.docs[1], u: {[fixture.shardKey]: 11, x: 1}}]
+                    updates: [{q: fixture.docs[1], u: {[fixture.shardKey]: 11, x: 1}}],
                 },
             },
             {
@@ -191,30 +196,36 @@ fixtures.forEach(function(fixture) {
             {
                 name: "findAndModify_delete",
                 command: {findAndModify: collName, query: fixture.docs[1], remove: true},
-            }
+            },
         ];
     };
 
-    let moveNotHashed = function(toShard) {
+    let moveNotHashed = function (toShard) {
         return st.s.adminCommand({moveChunk: rangedNs, find: fixture.docs[1], to: toShard});
     };
 
-    commandTestCases(rangedCollName)
-        .forEach(testCase => runTest(testCase,
-                                     rangedNs,
-                                     rangedCollName,
-                                     moveNotHashed,
-                                     false /*moveChunkBack*/,
-                                     false /*hashed*/,
-                                     fixture.docs));
-    commandTestCases(rangedCollName)
-        .forEach(testCase => runTest(testCase,
-                                     rangedNs,
-                                     rangedCollName,
-                                     moveNotHashed,
-                                     true /*moveChunkBack*/,
-                                     false /*hashed*/,
-                                     fixture.docs));
+    commandTestCases(rangedCollName).forEach((testCase) =>
+        runTest(
+            testCase,
+            rangedNs,
+            rangedCollName,
+            moveNotHashed,
+            false /*moveChunkBack*/,
+            false /*hashed*/,
+            fixture.docs,
+        ),
+    );
+    commandTestCases(rangedCollName).forEach((testCase) =>
+        runTest(
+            testCase,
+            rangedNs,
+            rangedCollName,
+            moveNotHashed,
+            true /*moveChunkBack*/,
+            false /*hashed*/,
+            fixture.docs,
+        ),
+    );
 
     st.s.getDB(dbName)[rangedCollName].drop();
 });
@@ -229,67 +240,75 @@ fixtures.forEach(function(fixture) {
 //   moved.
 
 const hashedCollName = "hashed";
-const hashedNs = dbName + '.' + hashedCollName;
+const hashedNs = dbName + "." + hashedCollName;
 
-assert.commandWorked(st.s.adminCommand({shardCollection: hashedNs, key: {_id: 'hashed'}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: hashedNs, key: {_id: "hashed"}}));
 
 // Make sure there are two chunks on each shard
-assert.commandWorked(
-    st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("-6148914691236517204")}}));
+assert.commandWorked(st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("-6148914691236517204")}}));
 assert.commandWorked(st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("0")}}));
-assert.commandWorked(
-    st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("6148914691236517204")}}));
+assert.commandWorked(st.s.adminCommand({split: hashedNs, middle: {_id: NumberLong("6148914691236517204")}}));
 
 // Setup a predictable chunk distribution:
-assert.commandWorked(st.s.adminCommand({
-    moveChunk: hashedNs,
-    bounds: [{_id: MinKey}, {_id: NumberLong("-6148914691236517204")}],
-    to: st.shard0.shardName,
-    _waitForDelete: true
-}));
-assert.commandWorked(st.s.adminCommand({
-    moveChunk: hashedNs,
-    bounds: [{_id: NumberLong("-6148914691236517204")}, {_id: NumberLong("-3074457345618258602")}],
-    to: st.shard0.shardName,
-    _waitForDelete: true
-}));
-assert.commandWorked(st.s.adminCommand({
-    moveChunk: hashedNs,
-    bounds: [{_id: NumberLong("-3074457345618258602")}, {_id: NumberLong("0")}],
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
-assert.commandWorked(st.s.adminCommand({
-    moveChunk: hashedNs,
-    bounds: [{_id: NumberLong("0")}, {_id: NumberLong("3074457345618258602")}],
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
-assert.commandWorked(st.s.adminCommand({
-    moveChunk: hashedNs,
-    bounds: [{_id: NumberLong("3074457345618258602")}, {_id: NumberLong("6148914691236517204")}],
-    to: st.shard2.shardName,
-    _waitForDelete: true
-}));
-assert.commandWorked(st.s.adminCommand({
-    moveChunk: hashedNs,
-    bounds: [{_id: NumberLong("6148914691236517204")}, {_id: MaxKey}],
-    to: st.shard2.shardName,
-    _waitForDelete: true
-}));
-
 assert.commandWorked(
-    st.s.getDB(dbName)[hashedCollName].insert({_id: -3}, {writeConcern: {w: "majority"}}));
+    st.s.adminCommand({
+        moveChunk: hashedNs,
+        bounds: [{_id: MinKey}, {_id: NumberLong("-6148914691236517204")}],
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
+);
 assert.commandWorked(
-    st.s.getDB(dbName)[hashedCollName].insert({_id: 11}, {writeConcern: {w: "majority"}}));
+    st.s.adminCommand({
+        moveChunk: hashedNs,
+        bounds: [{_id: NumberLong("-6148914691236517204")}, {_id: NumberLong("-3074457345618258602")}],
+        to: st.shard0.shardName,
+        _waitForDelete: true,
+    }),
+);
+assert.commandWorked(
+    st.s.adminCommand({
+        moveChunk: hashedNs,
+        bounds: [{_id: NumberLong("-3074457345618258602")}, {_id: NumberLong("0")}],
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
+assert.commandWorked(
+    st.s.adminCommand({
+        moveChunk: hashedNs,
+        bounds: [{_id: NumberLong("0")}, {_id: NumberLong("3074457345618258602")}],
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
+assert.commandWorked(
+    st.s.adminCommand({
+        moveChunk: hashedNs,
+        bounds: [{_id: NumberLong("3074457345618258602")}, {_id: NumberLong("6148914691236517204")}],
+        to: st.shard2.shardName,
+        _waitForDelete: true,
+    }),
+);
+assert.commandWorked(
+    st.s.adminCommand({
+        moveChunk: hashedNs,
+        bounds: [{_id: NumberLong("6148914691236517204")}, {_id: MaxKey}],
+        to: st.shard2.shardName,
+        _waitForDelete: true,
+    }),
+);
 
-let moveHashed = function(toShard) {
+assert.commandWorked(st.s.getDB(dbName)[hashedCollName].insert({_id: -3}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.getDB(dbName)[hashedCollName].insert({_id: 11}, {writeConcern: {w: "majority"}}));
+
+let moveHashed = function (toShard) {
     // Use hard coded bounds since the insert and updates in the test case depends on it and
     // we can catch it if the assumption is longer true.
     return st.s.adminCommand({
         moveChunk: hashedNs,
-        bounds: [{_id: NumberLong('-3074457345618258602')}, {_id: 0}],
-        to: toShard
+        bounds: [{_id: NumberLong("-3074457345618258602")}, {_id: 0}],
+        to: toShard,
     });
 };
 
@@ -297,12 +316,14 @@ var hashedDocs = [{_id: -3}, {_id: 11}];
 
 // The "insert_into_multiple_chunks" test case depends on the first document targeting the chunk on
 // the second shard which isn't being moved.
-assert(bsonWoCompare(convertShardKeyToHashed(4), NumberLong("0")) >= 0 &&
-           bsonWoCompare(convertShardKeyToHashed(4), NumberLong("3074457345618258602")) < 0,
-       "expected {_id: 4} document to reside within unmoved chunk on shard1");
+assert(
+    bsonWoCompare(convertShardKeyToHashed(4), NumberLong("0")) >= 0 &&
+        bsonWoCompare(convertShardKeyToHashed(4), NumberLong("3074457345618258602")) < 0,
+    "expected {_id: 4} document to reside within unmoved chunk on shard1",
+);
 
 // The command should target only the second shard.
-let commandTestCases = function(collName) {
+let commandTestCases = function (collName) {
     return [
         {
             name: "insert",
@@ -331,25 +352,15 @@ let commandTestCases = function(collName) {
         {
             name: "findAndModify_delete",
             command: {findAndModify: collName, query: {_id: 11}, remove: true},
-        }
+        },
     ];
 };
 
-commandTestCases(hashedCollName)
-    .forEach(testCase => runTest(testCase,
-                                 hashedNs,
-                                 hashedCollName,
-                                 moveHashed,
-                                 false /*moveChunkBack*/,
-                                 true /*hashed*/,
-                                 hashedDocs));
-commandTestCases(hashedCollName)
-    .forEach(testCase => runTest(testCase,
-                                 hashedNs,
-                                 hashedCollName,
-                                 moveHashed,
-                                 true /*moveChunkBack*/,
-                                 true /*hashed*/,
-                                 hashedDocs));
+commandTestCases(hashedCollName).forEach((testCase) =>
+    runTest(testCase, hashedNs, hashedCollName, moveHashed, false /*moveChunkBack*/, true /*hashed*/, hashedDocs),
+);
+commandTestCases(hashedCollName).forEach((testCase) =>
+    runTest(testCase, hashedNs, hashedCollName, moveHashed, true /*moveChunkBack*/, true /*hashed*/, hashedDocs),
+);
 
 st.stop();

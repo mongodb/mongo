@@ -30,9 +30,9 @@ function doesRouteToSec(coll, query) {
     assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
     var serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
     var conn = new Mongo(serverInfo.host + ":" + serverInfo.port.toString());
-    var cmdRes = conn.getDB('admin').runCommand({hello: 1});
+    var cmdRes = conn.getDB("admin").runCommand({hello: 1});
 
-    jsTest.log('hello: ' + tojson(cmdRes));
+    jsTest.log("hello: " + tojson(cmdRes));
 
     return cmdRes.secondary;
 }
@@ -41,17 +41,17 @@ var rsOpts = {oplogSize: 50};
 var st = new ShardingTest({
     shards: 1,
     rs: rsOpts,
-    other: {keyFile: 'jstests/libs/key1'},
+    other: {keyFile: "jstests/libs/key1"},
     // By default, our test infrastructure sets the election timeout to a very high value
     // (24 hours). For this test, we need a shorter election timeout because it relies on
     // nodes running an election when they do not detect an active primary. Therefore, we
     // are setting the electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 var mongos = st.s;
 var replTest = st.rs0;
-var testDB = mongos.getDB('AAAAA');
+var testDB = mongos.getDB("AAAAA");
 var coll = testDB.user;
 var nodeCount = replTest.nodes.length;
 
@@ -60,15 +60,14 @@ var nodeCount = replTest.nodes.length;
  * connections to access the server from localhost connections if there
  * is no admin user.
  */
-var adminDB = mongos.getDB('admin');
-adminDB.createUser({user: 'user', pwd: 'password', roles: jsTest.adminUserRoles});
-adminDB.auth('user', 'password');
+var adminDB = mongos.getDB("admin");
+adminDB.createUser({user: "user", pwd: "password", roles: jsTest.adminUserRoles});
+adminDB.auth("user", "password");
 if (!TestData.configShard) {
     // In config shard mode, creating this user above also created it on the first shard.
-    var priAdminDB = replTest.getPrimary().getDB('admin');
+    var priAdminDB = replTest.getPrimary().getDB("admin");
     replTest.getPrimary().waitForClusterTime(60);
-    priAdminDB.createUser({user: 'user', pwd: 'password', roles: jsTest.adminUserRoles},
-                          {w: 3, wtimeout: 30000});
+    priAdminDB.createUser({user: "user", pwd: "password", roles: jsTest.adminUserRoles}, {w: 3, wtimeout: 30000});
 }
 
 coll.drop();
@@ -91,11 +90,11 @@ assert.commandWorked(bulk.execute({w: nodeCount}));
  */
 var vToFind = 0;
 
-jsTest.log('First query to SEC');
+jsTest.log("First query to SEC");
 assert(doesRouteToSec(coll, {v: vToFind++}));
 
 var SIG_TERM = 15;
-replTest.stopSet(SIG_TERM, true, {auth: {user: 'user', pwd: 'password'}});
+replTest.stopSet(SIG_TERM, true, {auth: {user: "user", pwd: "password"}});
 
 for (var n = 0; n < nodeCount; n++) {
     replTest.restart(n, rsOpts);
@@ -117,12 +116,12 @@ awaitRSClientHosts(mongos, replTest.getSecondaries(), {ok: true, secondary: true
 awaitRSClientHosts(mongos, replTest.getPrimary(), {ok: true, ismaster: true});
 
 // Recheck if we can still query secondaries after refreshing connections.
-jsTest.log('Final query to SEC');
+jsTest.log("Final query to SEC");
 assert(doesRouteToSec(coll, {v: vToFind++}));
 
 // Cleanup auth so Windows will be able to shutdown gracefully
-priAdminDB = replTest.getPrimary().getDB('admin');
-priAdminDB.auth('user', 'password');
-priAdminDB.dropUser('user');
+priAdminDB = replTest.getPrimary().getDB("admin");
+priAdminDB.auth("user", "password");
+priAdminDB.dropUser("user");
 
 st.stop();

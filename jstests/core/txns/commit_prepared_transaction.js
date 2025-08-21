@@ -25,7 +25,7 @@ const sessionColl = sessionDB.getCollection(collName);
 
 const doc1 = {
     _id: 1,
-    x: 1
+    x: 1,
 };
 
 // ---- Test 1. Insert a single document and run prepare. ----
@@ -47,10 +47,9 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 {
     var conn = new Mongo(db.getMongo().host);
     conn._setDummyDefaultSession();
-    var configDB = conn.getDB('config');
+    var configDB = conn.getDB("config");
     assert.commandFailed(configDB.transactions.remove({"_id.id": session.getSessionId().id}));
-    assert.commandFailed(configDB.transactions.update({"_id.id": session.getSessionId().id},
-                                                      {$set: {extraField: 1}}));
+    assert.commandFailed(configDB.transactions.update({"_id.id": session.getSessionId().id}, {$set: {extraField: 1}}));
 }
 
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
@@ -65,7 +64,7 @@ assert.commandWorked(sessionColl.update(doc1, {$inc: {x: 1}}));
 
 const doc2 = {
     _id: 1,
-    x: 2
+    x: 2,
 };
 
 // Update should not be visible outside the session.

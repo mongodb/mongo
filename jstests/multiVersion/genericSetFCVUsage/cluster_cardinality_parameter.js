@@ -16,8 +16,7 @@ function isRSEndpointEnabled(conn) {
 
 function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
     for (let oldVersion of ["last-lts", "last-continuous"]) {
-        jsTest.log("Running test for " +
-                   tojsononeline({oldVersion, hasTwoOrMoreShardsPriorToUpgrade}));
+        jsTest.log("Running test for " + tojsononeline({oldVersion, hasTwoOrMoreShardsPriorToUpgrade}));
         const st = new ShardingTest({
             shards: 2,
             other: {
@@ -30,7 +29,7 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
             // (24 hours). For this test, we need a shorter election timeout because it relies on
             // nodes running an election when they do not detect an active primary. Therefore, we
             // are setting the electionTimeoutMillis to its default value.
-            initiateWithDefaultElectionTimeout: true
+            initiateWithDefaultElectionTimeout: true,
         });
 
         const oldVersionIs73 = MongoRunner.areBinVersionsTheSame("7.3", oldVersion);
@@ -68,15 +67,13 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
         }
 
         jsTest.log("Start upgrading the FCV for the cluster");
-        assert.commandWorked(
-            st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
         jsTest.log("Finished upgrading the FCV for the cluster");
 
         // The cluster parameter will only be updated on upgrade if the RSEndpoint feature flag is
         // enabled. The parameter will also have the updated value if the old version is 7.3.
-        let expectedValue = (isRSEndpointEnabled(st.configRS.getPrimary()) || oldVersionIs73)
-            ? hasTwoOrMoreShardsPriorToUpgrade
-            : true;
+        let expectedValue =
+            isRSEndpointEnabled(st.configRS.getPrimary()) || oldVersionIs73 ? hasTwoOrMoreShardsPriorToUpgrade : true;
         checkClusterParameter(st.configRS, expectedValue);
         checkClusterParameter(st.rs0, expectedValue);
         if (hasTwoOrMoreShardsPriorToUpgrade) {

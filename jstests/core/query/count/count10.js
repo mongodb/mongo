@@ -30,19 +30,18 @@ assert.commandWorked(bulk.execute());
 // Start a parallel shell which repeatedly checks for a count
 // query using db.currentOp(). As soon as the op is found,
 // kill it via db.killOp().
-var s = startParallelShell(function() {
-    assert.soon(function() {
-        var currentCountOps =
-            db.getSiblingDB("admin")
-                .aggregate([
-                    {$currentOp: {}},
-                    {
-                        $match:
-                            {"ns": db.count10.getFullName(), "command.count": db.count10.getName()}
-                    },
-                    {$limit: 1}
-                ])
-                .toArray();
+var s = startParallelShell(function () {
+    assert.soon(function () {
+        var currentCountOps = db
+            .getSiblingDB("admin")
+            .aggregate([
+                {$currentOp: {}},
+                {
+                    $match: {"ns": db.count10.getFullName(), "command.count": db.count10.getName()},
+                },
+                {$limit: 1},
+            ])
+            .toArray();
 
         // Check that we found the count op. If not, return false so
         // that assert.soon will retry.
@@ -60,9 +59,13 @@ var s = startParallelShell(function() {
     }, "Could not find count op after retrying, gave up");
 });
 
-var res = assert.throws(function() {
-    coll.find("sleep(1000)").count();
-}, [], "Count op completed without being killed");
+var res = assert.throws(
+    function () {
+        coll.find("sleep(1000)").count();
+    },
+    [],
+    "Count op completed without being killed",
+);
 
 jsTest.log("Killed count output start");
 printjson(res);

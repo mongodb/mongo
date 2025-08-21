@@ -9,7 +9,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
@@ -32,25 +32,27 @@ function buildQueryWithWeights(weights, stageName) {
     // Multiplication factor of limit for numCandidates in $vectorSearch.
     const vectorSearchOverrequestFactor = 10;
     const pipelines = {
-        vector: [{
-            $vectorSearch: {
-                // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
-                queryVector: getMoviePlotEmbeddingById(6),
-                path: "plot_embedding",
-                numCandidates: limit * vectorSearchOverrequestFactor,
-                index: getMovieVectorSearchIndexSpec().name,
-                limit: limit,
-            }
-        }],
+        vector: [
+            {
+                $vectorSearch: {
+                    // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
+                    queryVector: getMoviePlotEmbeddingById(6),
+                    path: "plot_embedding",
+                    numCandidates: limit * vectorSearchOverrequestFactor,
+                    index: getMovieVectorSearchIndexSpec().name,
+                    limit: limit,
+                },
+            },
+        ],
         search: [
             {
                 $search: {
                     index: getMovieSearchIndexSpec().name,
                     text: {query: "ape", path: ["fullplot", "title"]},
-                }
+                },
             },
-            {$limit: limit}
-        ]
+            {$limit: limit},
+        ],
     };
     let query = [];
     if (stageName === "$rankFusion") {
@@ -58,16 +60,15 @@ function buildQueryWithWeights(weights, stageName) {
             {
                 $rankFusion: {input: {pipelines: pipelines}, combination: {weights}},
             },
-            {$limit: limit}
+            {$limit: limit},
         ];
     } else {
         // Must be $scoreFusion.
         query = [
             {
-                $scoreFusion:
-                    {input: {pipelines: pipelines, normalization: "none"}, combination: {weights}},
+                $scoreFusion: {input: {pipelines: pipelines, normalization: "none"}, combination: {weights}},
             },
-            {$limit: limit}
+            {$limit: limit},
         ];
     }
     return query;
@@ -77,23 +78,21 @@ function buildQueryWithWeights(weights, stageName) {
 function runTest(weights, expectedResultIds) {
     let rankFusionQuery = buildQueryWithWeights(weights, "$rankFusion");
     let rankFusionResults = coll.aggregate(rankFusionQuery).toArray();
-    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES),
-                              rankFusionResults);
+    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), rankFusionResults);
     let scoreFusionQuery = buildQueryWithWeights(weights, "$scoreFusion");
     let scoreFusionResults = coll.aggregate(scoreFusionQuery).toArray();
-    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES),
-                              scoreFusionResults);
+    assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), scoreFusionResults);
 }
 
 // Asserts the $rankFusion/$scoreFusion query fails with the expected error code, given a bad
 // weights object.
 function runTestExpectError(weights, errorCode) {
     let rankFusionQuery = buildQueryWithWeights(weights, "$rankFusion");
-    assert.throwsWithCode(function() {
+    assert.throwsWithCode(function () {
         coll.aggregate(rankFusionQuery);
     }, errorCode);
     let scoreFusionQuery = buildQueryWithWeights(weights, "$scoreFusion");
-    assert.throwsWithCode(function() {
+    assert.throwsWithCode(function () {
         coll.aggregate(scoreFusionQuery);
     }, errorCode);
 }

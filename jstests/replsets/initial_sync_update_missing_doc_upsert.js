@@ -11,10 +11,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    finishAndValidate,
-    reInitiateSetWithSecondary
-} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
+import {finishAndValidate, reInitiateSetWithSecondary} from "jstests/replsets/libs/initial_sync_update_missing_doc.js";
 
 const replSet = new ReplSetTest({nodes: 1});
 
@@ -22,7 +19,7 @@ replSet.startSet();
 replSet.initiate();
 
 const primary = replSet.getPrimary();
-const dbName = 'test';
+const dbName = "test";
 const collectionName = jsTestName();
 
 assert.commandWorked(primary.getDB(dbName).createCollection(collectionName));
@@ -31,15 +28,16 @@ const coll = primary.getDB(dbName).getCollection(collectionName);
 // Add a secondary node with priority: 0 and votes: 0 so that we prevent elections while
 // it is syncing from the primary.
 const secondaryConfig = {
-    rsConfig: {votes: 0, priority: 0}
+    rsConfig: {votes: 0, priority: 0},
 };
 const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
 
 jsTestLog("Allow initial sync to finish cloning collections");
 
-let failPoint = configureFailPoint(secondary, 'initialSyncHangAfterDataCloning');
-assert.commandWorked(secondary.getDB('admin').runCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
+let failPoint = configureFailPoint(secondary, "initialSyncHangAfterDataCloning");
+assert.commandWorked(
+    secondary.getDB("admin").runCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 failPoint.wait();
 
 jsTestLog('Use both "update" and "applyOps" to upsert doc on primary');
@@ -53,9 +51,7 @@ numDocuments++;
 
 function applyOps({documentId}) {
     let command = {
-        applyOps: [
-            {op: "u", ns: coll.getFullName(), o2: {_id: documentId}, o: {$v: 2, diff: {u: {x: 1}}}}
-        ]
+        applyOps: [{op: "u", ns: coll.getFullName(), o2: {_id: documentId}, o: {$v: 2, diff: {u: {x: 1}}}}],
     };
 
     assert.commandWorked(primary.getDB(dbName).runCommand(command));

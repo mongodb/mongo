@@ -15,9 +15,7 @@ import {
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const shardedCollName = "sharded_coll";
@@ -31,7 +29,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     mongos: 1,
     other: {
         rsOptions: {setParameter: {enableTestCommands: 1}},
-    }
+    },
 });
 stWithMock.start();
 
@@ -44,16 +42,18 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: 
 const shardedColl = testDB.getCollection(shardedCollName);
 shardedColl.drop();
 const shardedCollNS = shardedColl.getFullName();
-assert.commandWorked(shardedColl.insert([
-    {_id: 1, x: "ow"},
-    {_id: 2, x: "now", y: "lorem"},
-    {_id: 3, x: "brown", y: "ipsum"},
-    {_id: 4, x: "cow", y: "lorem ipsum"},
-    {_id: 11, x: "brown", y: "ipsum"},
-    {_id: 12, x: "cow", y: "lorem ipsum"},
-    {_id: 13, x: "brown", y: "ipsum"},
-    {_id: 14, x: "cow", y: "lorem ipsum"}
-]));
+assert.commandWorked(
+    shardedColl.insert([
+        {_id: 1, x: "ow"},
+        {_id: 2, x: "now", y: "lorem"},
+        {_id: 3, x: "brown", y: "ipsum"},
+        {_id: 4, x: "cow", y: "lorem ipsum"},
+        {_id: 11, x: "brown", y: "ipsum"},
+        {_id: 12, x: "cow", y: "lorem ipsum"},
+        {_id: 13, x: "brown", y: "ipsum"},
+        {_id: 14, x: "cow", y: "lorem ipsum"},
+    ]),
+);
 
 // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
 st.shardColl(shardedColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
@@ -66,7 +66,7 @@ const expectedMongotCommand = mongotCommandForQuery({
     collName: shardedCollName,
     db: dbName,
     collectionUUID: collUUID0,
-    protocolVersion: protocolVersion
+    protocolVersion: protocolVersion,
 });
 
 let cursorId = NumberLong(123);
@@ -86,15 +86,19 @@ function mockShards() {
         {_id: 4, $searchScore: 1},
         {_id: 1, $searchScore: 0.99},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(mongot0ResponseBatch,
-                                                    NumberLong(0),
-                                                    [{val: 1}],
-                                                    NumberLong(0),
-                                                    shardedCollNS,
-                                                    responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot0ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                shardedCollNS,
+                responseOk,
+            ),
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId, metaCursorId);
 
@@ -105,15 +109,19 @@ function mockShards() {
         {_id: 12, $searchScore: 29},
         {_id: 14, $searchScore: 28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(mongot1ResponseBatch,
-                                                    NumberLong(0),
-                                                    [{val: 1}],
-                                                    NumberLong(0),
-                                                    shardedCollNS,
-                                                    responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot1ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                shardedCollNS,
+                responseOk,
+            ),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId, metaCursorId);
 
@@ -122,28 +130,31 @@ function mockShards() {
 }
 
 function mockPlanShardedSearchFromMongos() {
-    mockPlanShardedSearchResponse(
-        shardedColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(shardedColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
 }
 
 // Mongos will non-deterministically choose a shard to run the sub-pipeline, so we'll mock a
 // planShardedSearch request with {maybeUnused: true} for both shards, knowing only one will be
 // executed.
 function mockPlanShardedSearchFromShards() {
-    mockPlanShardedSearchResponseOnConn(shardedColl.getName(),
-                                        mongotQuery,
-                                        dbName,
-                                        undefined /*sortSpec*/,
-                                        stWithMock,
-                                        shard0Conn,
-                                        /*maybeUnused*/ true);
-    mockPlanShardedSearchResponseOnConn(shardedColl.getName(),
-                                        mongotQuery,
-                                        dbName,
-                                        undefined /*sortSpec*/,
-                                        stWithMock,
-                                        shard1Conn,
-                                        /*maybeUnused*/ true);
+    mockPlanShardedSearchResponseOnConn(
+        shardedColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+        shard0Conn,
+        /*maybeUnused*/ true,
+    );
+    mockPlanShardedSearchResponseOnConn(
+        shardedColl.getName(),
+        mongotQuery,
+        dbName,
+        undefined /*sortSpec*/,
+        stWithMock,
+        shard1Conn,
+        /*maybeUnused*/ true,
+    );
 }
 
 function resetShardProfilers() {
@@ -163,7 +174,7 @@ function runRequiresSearchMetaCursorTest({
     subPipelinePlanShardedSearchDispatchedToShards,
     expectedDocs,
     outerPipelineShouldRequireSearchMetaCursor,
-    innerPipelineShouldRequireSearchMetaCursor
+    innerPipelineShouldRequireSearchMetaCursor,
 }) {
     // Each pipeline will run planShardedSearch from mongos for the top-level $search. The
     // subPipelinePlanShardedSearchDispatchedToShards arguments indicates if the sub-pipeline will
@@ -194,21 +205,25 @@ function runRequiresSearchMetaCursorTest({
         // We expect each shard to have two entries, one per $search. One shard may also have an
         // entry for $mergeCursors, which is filtered out by the last predicate.
         const res = shardDB.system.profile
-                        .find({
-                            "command.comment": comment,
-                            "command.aggregate": shardedCollName,
-                            "command.pipeline.0.$search": {$exists: true},
-                            "errCode": {"$ne": ErrorCodes.StaleConfig}
-                        })
-                        .toArray();
+            .find({
+                "command.comment": comment,
+                "command.aggregate": shardedCollName,
+                "command.pipeline.0.$search": {$exists: true},
+                "errCode": {"$ne": ErrorCodes.StaleConfig},
+            })
+            .toArray();
         assert.eq(2, res.length, res);
 
-        assert.eq(outerPipelineShouldRequireSearchMetaCursor,
-                  res[0].command.pipeline[0].$search.requiresSearchMetaCursor,
-                  res);
-        assert.eq(innerPipelineShouldRequireSearchMetaCursor,
-                  res[1].command.pipeline[0].$search.requiresSearchMetaCursor,
-                  res);
+        assert.eq(
+            outerPipelineShouldRequireSearchMetaCursor,
+            res[0].command.pipeline[0].$search.requiresSearchMetaCursor,
+            res,
+        );
+        assert.eq(
+            innerPipelineShouldRequireSearchMetaCursor,
+            res[1].command.pipeline[0].$search.requiresSearchMetaCursor,
+            res,
+        );
     }
 }
 
@@ -221,14 +236,17 @@ runRequiresSearchMetaCursorTest({
         {
             $unionWith: {
                 coll: shardedCollName,
-                pipeline: [{$search: mongotQuery}, {$sort: {_id: -1}}, {$limit: 1}]
-            }
-        }
+                pipeline: [{$search: mongotQuery}, {$sort: {_id: -1}}, {$limit: 1}],
+            },
+        },
     ],
-    expectedDocs: [{_id: 1, x: "ow"}, {_id: 14, x: "cow", y: "lorem ipsum"}],
+    expectedDocs: [
+        {_id: 1, x: "ow"},
+        {_id: 14, x: "cow", y: "lorem ipsum"},
+    ],
     subPipelinePlanShardedSearchDispatchedToShards: true,
     outerPipelineShouldRequireSearchMetaCursor: false,
-    innerPipelineShouldRequireSearchMetaCursor: false
+    innerPipelineShouldRequireSearchMetaCursor: false,
 });
 
 // Run a pipeline with references to $$SEARCH_META in the top-level and sub-pipelines.
@@ -245,15 +263,18 @@ runRequiresSearchMetaCursorTest({
                     {$search: mongotQuery},
                     {$sort: {_id: -1}},
                     {$limit: 1},
-                    {$project: {meta: "$$SEARCH_META"}}
-                ]
-            }
-        }
+                    {$project: {meta: "$$SEARCH_META"}},
+                ],
+            },
+        },
     ],
-    expectedDocs: [{_id: 1, meta: {val: 1}}, {_id: 14, meta: {val: 1}}],
+    expectedDocs: [
+        {_id: 1, meta: {val: 1}},
+        {_id: 14, meta: {val: 1}},
+    ],
     subPipelinePlanShardedSearchDispatchedToShards: true,
     outerPipelineShouldRequireSearchMetaCursor: true,
-    innerPipelineShouldRequireSearchMetaCursor: true
+    innerPipelineShouldRequireSearchMetaCursor: true,
 });
 
 // Run a pipeline with a reference to $$SEARCH_META only in the sub-pipeline.
@@ -267,19 +288,22 @@ runRequiresSearchMetaCursorTest({
                 pipeline: [
                     {$search: mongotQuery},
                     {$match: {y: "ipsum"}},
-                    {$project : {_id: 0, x: 1, meta: "$$SEARCH_META"}},
-                    {$limit: 1}
+                    {$project: {_id: 0, x: 1, meta: "$$SEARCH_META"}},
+                    {$limit: 1},
                 ],
-                as: "out"
-            }
+                as: "out",
+            },
         },
-        {$project: {_id: 1, out: 1}}
+        {$project: {_id: 1, out: 1}},
     ],
-    expectedDocs: [{_id: 2, out: [{x: "brown", meta: {val: 1}}]}, {_id: 1, out: [{x: "brown", meta: {val: 1}}]}],
+    expectedDocs: [
+        {_id: 2, out: [{x: "brown", meta: {val: 1}}]},
+        {_id: 1, out: [{x: "brown", meta: {val: 1}}]},
+    ],
     // This usage of $lookup after $search will dispatch both planShardedSearch requests from mongos.
     subPipelinePlanShardedSearchDispatchedToShards: false,
     outerPipelineShouldRequireSearchMetaCursor: false,
-    innerPipelineShouldRequireSearchMetaCursor: true
+    innerPipelineShouldRequireSearchMetaCursor: true,
 });
 
 // Run a pipeline with a reference to $$SEARCH_META only in the top-level pipeline.
@@ -291,24 +315,19 @@ runRequiresSearchMetaCursorTest({
         {
             $lookup: {
                 from: shardedCollName,
-                pipeline: [
-                    {$search: mongotQuery},
-                    {$sort: {y: -1}},
-                    {$limit: 1},
-                    {$project: {_id: 0}}
-                ],
-                as: "out"
-            }
+                pipeline: [{$search: mongotQuery}, {$sort: {y: -1}}, {$limit: 1}, {$project: {_id: 0}}],
+                as: "out",
+            },
         },
     ],
     expectedDocs: [
         {meta: 1, out: [{x: "cow", y: "lorem ipsum"}]},
-        {meta: 1, out: [{x: "cow", y: "lorem ipsum"}]}
+        {meta: 1, out: [{x: "cow", y: "lorem ipsum"}]},
     ],
     // This usage of $lookup after $search will dispatch both planShardedSearch requests from mongos.
     subPipelinePlanShardedSearchDispatchedToShards: false,
     outerPipelineShouldRequireSearchMetaCursor: true,
-    innerPipelineShouldRequireSearchMetaCursor: false
+    innerPipelineShouldRequireSearchMetaCursor: false,
 });
 
 stWithMock.stop();

@@ -14,6 +14,35 @@ t.insert({loc: [4, 0]});
 
 t.createIndex({loc: "2d"});
 
-printjson(t.find({loc: {"$within": {"$polygon": [[0, 0], [2, 0], [4, 0]]}}}).toArray());
+printjson(
+    t
+        .find({
+            loc: {
+                "$within": {
+                    "$polygon": [
+                        [0, 0],
+                        [2, 0],
+                        [4, 0],
+                    ],
+                },
+            },
+        })
+        .toArray(),
+);
 
-assert.eq(5, t.find({loc: {"$within": {"$polygon": [[0, 0], [2, 0], [4, 0]]}}}).itcount());
+assert.eq(
+    5,
+    t
+        .find({
+            loc: {
+                "$within": {
+                    "$polygon": [
+                        [0, 0],
+                        [2, 0],
+                        [4, 0],
+                    ],
+                },
+            },
+        })
+        .itcount(),
+);

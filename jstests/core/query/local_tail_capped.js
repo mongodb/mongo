@@ -22,9 +22,9 @@ import {Thread} from "jstests/libs/parallelTester.js";
 
 function insertWorker(host, collName, tid, nInserts) {
     const conn = new Mongo(host);
-    const db = conn.getDB('local');
+    const db = conn.getDB("local");
 
-    for (let i = 0; i < nInserts;) {
+    for (let i = 0; i < nInserts; ) {
         const bulk = db[collName].initializeUnorderedBulkOp();
         for (let j = 0; j < 10; j++) {
             bulk.insert({t: tid, i: i++});
@@ -38,16 +38,15 @@ function tailWorker(host, collName, tid, expectedDocs) {
     // Rewrite the connection string as a mongo URI so that we can add an 'appName' to make
     // debugging easier. When run against a standalone, 'host' is in the form '<host>:<port>'. When
     // run against a replica set, 'host' is in the form '<rs name>/<host1>:<port1>,...'
-    const iSlash = host.indexOf('/');
-    let connString = 'mongodb://';
+    const iSlash = host.indexOf("/");
+    let connString = "mongodb://";
     if (iSlash > 0) {
-        connString += host.substr(iSlash + 1) + '/?appName=tid' + tid +
-            '&replicaSet=' + host.substr(0, iSlash);
+        connString += host.substr(iSlash + 1) + "/?appName=tid" + tid + "&replicaSet=" + host.substr(0, iSlash);
     } else {
-        connString += host + '/?appName=tid' + tid;
+        connString += host + "/?appName=tid" + tid;
     }
     const conn = new Mongo(connString);
-    const db = conn.getDB('local');
+    const db = conn.getDB("local");
     const cloneColl = db[collName + "_clone_" + tid];
     cloneColl.drop();
 
@@ -72,11 +71,19 @@ function tailWorker(host, collName, tid, expectedDocs) {
             emptyGetMores++;
         }
 
-        print(tid + ': got batch of size ' + batchLen +
-              '. first doc: ' + tojson(res.cursor.nextBatch[0]) +
-              '. last doc: ' + tojson(res.cursor.nextBatch[batchLen - 1]) +
-              '. empty getMores so far: ' + emptyGetMores +
-              '. non-empty getMores so far: ' + nonEmptyGetMores);
+        print(
+            tid +
+                ": got batch of size " +
+                batchLen +
+                ". first doc: " +
+                tojson(res.cursor.nextBatch[0]) +
+                ". last doc: " +
+                tojson(res.cursor.nextBatch[batchLen - 1]) +
+                ". empty getMores so far: " +
+                emptyGetMores +
+                ". non-empty getMores so far: " +
+                nonEmptyGetMores,
+        );
         myCount += batchLen;
 
         const bulk = cloneColl.initializeUnorderedBulkOp();
@@ -98,21 +105,19 @@ function tailWorker(host, collName, tid, expectedDocs) {
     print(tid + ": validating");
     const expected = db[collName].find().sort({_id: 1}).toArray();
     const actual = cloneColl.find().sort({_id: 1}).toArray();
-    assert.eq(expected.length, actual.length, function() {
-        return "number of documents do not match. expected: " + tojson(expected) +
-            " actual: " + tojson(actual);
+    assert.eq(expected.length, actual.length, function () {
+        return "number of documents do not match. expected: " + tojson(expected) + " actual: " + tojson(actual);
     });
     for (let i = 0; i < actual.length; i++) {
-        assert.docEq(actual[i], expected[i], function() {
-            return "mismatched documents. expected: " + tojson(expected) +
-                " actual: " + tojson(actual);
+        assert.docEq(actual[i], expected[i], function () {
+            return "mismatched documents. expected: " + tojson(expected) + " actual: " + tojson(actual);
         });
     }
     print(tid + ": done");
 }
 
-const collName = 'capped';
-const localDb = db.getSiblingDB('local');
+const collName = "capped";
+const localDb = db.getSiblingDB("local");
 localDb[collName].drop();
 
 assert.commandWorked(localDb.runCommand({create: collName, capped: true, size: 10 * 1024 * 1024}));
@@ -127,15 +132,13 @@ const expectedDocs = nWriters * insertsPerThread + 1;
 let threads = [];
 
 for (let i = 0; i < nReaders; i++) {
-    const thread =
-        new Thread(tailWorker, db.getMongo().host, collName, threads.length, expectedDocs);
+    const thread = new Thread(tailWorker, db.getMongo().host, collName, threads.length, expectedDocs);
     thread.start();
     threads.push(thread);
 }
 
 for (let i = 0; i < nWriters; i++) {
-    const thread =
-        new Thread(insertWorker, db.getMongo().host, collName, threads.length, insertsPerThread);
+    const thread = new Thread(insertWorker, db.getMongo().host, collName, threads.length, insertsPerThread);
     thread.start();
     threads.push(thread);
 }

@@ -20,41 +20,48 @@ function checkTopEntries(expectedEntries) {
         return;
     }
 
-    let entriesInTop = Object.keys(res.totals).filter(function(ns) {
+    let entriesInTop = Object.keys(res.totals).filter(function (ns) {
         // This filter only includes non-system collections in our test database.
         const tenantId = topDB.getName() + ".";
         const systemCollectionPrefix = "system.";
         return ns.startsWith(tenantId) && !ns.startsWith(tenantId + systemCollectionPrefix);
     });
-    let expectedEntryNames = expectedEntries.map(function(coll) {
+    let expectedEntryNames = expectedEntries.map(function (coll) {
         return coll.getFullName();
     });
 
     const entriesAreEqual = friendlyEqual(entriesInTop.sort(), expectedEntryNames.sort());
     if (!entriesAreEqual) {
         // TODO(SERVER-26750): This block can be removed once SERVER-26750 is resolved.
-        jsTest.log("Warning: expected to see " + tojson(expectedEntryNames) + " in top, but got " +
-                   tojson(entriesInTop));
+        jsTest.log(
+            "Warning: expected to see " + tojson(expectedEntryNames) + " in top, but got " + tojson(entriesInTop),
+        );
 
-        assert.lt(expectedEntryNames.length,
-                  entriesInTop.length,
-                  "Fewer entries in top than expected; got " + tojson(entriesInTop) +
-                      " but expected " + tojson(expectedEntryNames) + "\nFull top output:\n" +
-                      tojson(res.totals));
+        assert.lt(
+            expectedEntryNames.length,
+            entriesInTop.length,
+            "Fewer entries in top than expected; got " +
+                tojson(entriesInTop) +
+                " but expected " +
+                tojson(expectedEntryNames) +
+                "\nFull top output:\n" +
+                tojson(res.totals),
+        );
 
         // We allow an unexpected entry in top if the insert counter has been cleared. This is
         // probably due to a background job releasing an AutoGetCollectionForReadCommand for
         // that collection.
-        entriesInTop.forEach(function(coll) {
+        entriesInTop.forEach(function (coll) {
             if (expectedEntryNames.includes(coll)) {
                 return;
             }
 
             let topStats = res.totals[coll];
-            assert.eq(0,
-                      res.totals[coll].insert.count,
-                      coll + " has unexpected insert entries in top. Full top output:\n" +
-                          tojson(res.totals));
+            assert.eq(
+                0,
+                res.totals[coll].insert.count,
+                coll + " has unexpected insert entries in top. Full top output:\n" + tojson(res.totals),
+            );
         });
     }
 }

@@ -23,14 +23,14 @@ assert.commandWorked(collBase.insert({"_id": 101, "localField": "cakes and kale"
 
 const limit = 1000;
 function runExplainTest(verbosity) {
-    let result = collBase.explain(verbosity).aggregate([{
-        $unionWith: {
-            coll: coll.getName(),
-            pipeline: [
-                getGenericVectorSearchQuery(limit),
-            ]
-        }
-    }]);
+    let result = collBase.explain(verbosity).aggregate([
+        {
+            $unionWith: {
+                coll: coll.getName(),
+                pipeline: [getGenericVectorSearchQuery(limit)],
+            },
+        },
+    ]);
 
     let unionWithStage = getUnionWithStage(result);
     let unionSubExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);

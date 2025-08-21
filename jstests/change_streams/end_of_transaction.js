@@ -27,27 +27,27 @@ let cst = new ChangeStreamTest(db);
 let collChangeStream = cst.startWatchingChanges({
     pipeline: [
         {$changeStream: {showExpandedEvents: true}},
-        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}}
+        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}},
     ],
     collection: coll,
-    doNotModifyInPassthroughs: true
+    doNotModifyInPassthroughs: true,
 });
 
 let dbChangeStream = cst.startWatchingChanges({
     pipeline: [
         {$changeStream: {showExpandedEvents: true}},
-        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}}
+        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}},
     ],
     collection: 1,
-    doNotModifyInPassthroughs: true
+    doNotModifyInPassthroughs: true,
 });
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const txnOptions = {
     readConcern: {level: "snapshot"},
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 
 const session = db.getMongo().startSession(sessionOptions);
@@ -62,28 +62,44 @@ const sessionOtherDbColl = session.getDatabase(otherDbName)[otherDbCollName];
 const txnNumbers = [];
 
 // First transaction only affects main collection
-withTxnAndAutoRetryOnMongos(session, () => {
-    assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
-}, txnOptions);
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
+    },
+    txnOptions,
+);
 txnNumbers.push(session.getTxnNumber_forTesting());
 
 // Second transaction only affects other collection
-withTxnAndAutoRetryOnMongos(session, () => {
-    assert.commandWorked(sessionOtherColl.insert({_id: 2, a: 0}));
-}, txnOptions);
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        assert.commandWorked(sessionOtherColl.insert({_id: 2, a: 0}));
+    },
+    txnOptions,
+);
 txnNumbers.push(session.getTxnNumber_forTesting());
 
 // Third transaction affects both collections
-withTxnAndAutoRetryOnMongos(session, () => {
-    assert.commandWorked(sessionColl.insert({_id: 3, a: 0}));
-    assert.commandWorked(sessionOtherColl.insert({_id: 3, a: 0}));
-}, txnOptions);
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        assert.commandWorked(sessionColl.insert({_id: 3, a: 0}));
+        assert.commandWorked(sessionOtherColl.insert({_id: 3, a: 0}));
+    },
+    txnOptions,
+);
 txnNumbers.push(session.getTxnNumber_forTesting());
 
 // Forth transaction affects the other db
-withTxnAndAutoRetryOnMongos(session, () => {
-    assert.commandWorked(sessionOtherDbColl.insert({_id: 4, a: 0}));
-}, txnOptions);
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        assert.commandWorked(sessionOtherDbColl.insert({_id: 4, a: 0}));
+    },
+    txnOptions,
+);
 txnNumbers.push(session.getTxnNumber_forTesting());
 
 // Drop the collection. This will trigger an "invalidate" event at the end of the collection-wide
@@ -142,11 +158,17 @@ const expectedChangesDb = [
     dropEvent(coll.getName()),
 ];
 
-const collChanges = cst.assertNextChangesEqualWithDeploymentAwareness(
-    {cursor: collChangeStream, expectedChanges: expectedChangesColl, expectInvalidate: true});
+const collChanges = cst.assertNextChangesEqualWithDeploymentAwareness({
+    cursor: collChangeStream,
+    expectedChanges: expectedChangesColl,
+    expectInvalidate: true,
+});
 assertEndOfTransaction(collChanges);
-const dbChanges = cst.assertNextChangesEqualWithDeploymentAwareness(
-    {cursor: dbChangeStream, expectedChanges: expectedChangesDb, expectInvalidate: false});
+const dbChanges = cst.assertNextChangesEqualWithDeploymentAwareness({
+    cursor: dbChangeStream,
+    expectedChanges: expectedChangesDb,
+    expectInvalidate: false,
+});
 assertEndOfTransaction(dbChanges);
 
 cst.cleanUp();

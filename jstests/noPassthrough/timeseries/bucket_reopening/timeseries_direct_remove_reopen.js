@@ -11,21 +11,22 @@ const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
-const collName = 'test';
+const collName = "test";
 
-const metaFieldName = 'meta';
-const timeFieldName = 'time';
-const times = [ISODate('2021-01-01T01:00:00Z'), ISODate('2021-01-01T01:10:00Z')];
+const metaFieldName = "meta";
+const timeFieldName = "time";
+const times = [ISODate("2021-01-01T01:00:00Z"), ISODate("2021-01-01T01:10:00Z")];
 let docs = [
     {_id: 0, [timeFieldName]: times[0], [metaFieldName]: 1},
-    {_id: 1, [timeFieldName]: times[1], [metaFieldName]: 1}
+    {_id: 1, [timeFieldName]: times[1], [metaFieldName]: 1},
 ];
 
 const coll = testDB.getCollection(collName);
 coll.drop();
 
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 assert.commandWorked(coll.insert(docs[0]));
 assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());
@@ -42,25 +43,35 @@ const fpClear = configureFailPoint(conn, "hangTimeseriesDirectModificationAfterS
 const fpOnCommit = configureFailPoint(conn, "hangTimeseriesDirectModificationBeforeFinish");
 const awaitRemove = startParallelShell(
     funWithArgs(
-        function(dbName, collName, id, getRawOperationSpec) {
+        function (dbName, collName, id, getRawOperationSpec) {
             const removeResult = assert.commandWorked(
-                db.getSiblingDB(dbName)[collName].remove({_id: id}, getRawOperationSpec));
+                db.getSiblingDB(dbName)[collName].remove({_id: id}, getRawOperationSpec),
+            );
             assert.eq(removeResult.nRemoved, 1);
         },
         dbName,
         getTimeseriesCollForRawOps(testDB, coll).getName(),
         buckets[0]._id,
-        getRawOperationSpec(testDB)),
-    conn.port);
+        getRawOperationSpec(testDB),
+    ),
+    conn.port,
+);
 fpClear.wait();
 
 // Start inserting a bucket. We should find that there's no open bucket, since it's been cleared,
 // but that there's an eligible bucket on disk. Pause before actually reopening it in the catalog.
 const fpReopen = configureFailPoint(conn, "hangTimeseriesInsertBeforeReopeningBucket");
 const awaitInsert = startParallelShell(
-    funWithArgs(function(dbName, collName, doc) {
-        assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).insert(doc));
-    }, dbName, coll.getName(), docs[1]), conn.port);
+    funWithArgs(
+        function (dbName, collName, doc) {
+            assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).insert(doc));
+        },
+        dbName,
+        coll.getName(),
+        docs[1],
+    ),
+    conn.port,
+);
 fpReopen.wait();
 
 // Now proceed to delete the bucket from disk, but pause before we clear it from the catalog again

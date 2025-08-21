@@ -16,8 +16,7 @@ function runTest(conn, {isShardedColl, st}) {
     const db = conn.getDB(dbName);
 
     if (st) {
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
     }
 
     const coll = db.getCollection(collName);
@@ -34,11 +33,11 @@ function runTest(conn, {isShardedColl, st}) {
     }
     assert.commandWorked(coll.insert(docs));
 
-    assert.commandFailedWithCode(conn.adminCommand({analyzeShardKey: ns, key: {ts: 1}}),
-                                 ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(conn.adminCommand({analyzeShardKey: ns, key: {ts: 1}}), ErrorCodes.IllegalOperation);
     assert.commandFailedWithCode(
         conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}),
-        ErrorCodes.IllegalOperation);
+        ErrorCodes.IllegalOperation,
+    );
 
     assert(coll.drop());
 }

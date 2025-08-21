@@ -7,19 +7,19 @@ var replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
 replTest.initiate();
 var primary = replTest.getPrimary();
-var testDB = primary.getDB('test');
-const collName = 'foo';
+var testDB = primary.getDB("test");
+const collName = "foo";
 var testColl = testDB.getCollection(collName);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 replTest.awaitReplication();
 
 // Insert a document and implicitly create the collection.
-let resetCollection = function(w) {
-    assert.commandWorked(
-        testColl.insert({_id: 0}, {writeConcern: {w: w, wtimeout: replTest.timeoutMS}}));
+let resetCollection = function (w) {
+    assert.commandWorked(testColl.insert({_id: 0}, {writeConcern: {w: w, wtimeout: replTest.timeoutMS}}));
     assert.eq(1, testColl.find().itcount());
 };
 
@@ -29,14 +29,12 @@ resetCollection(3);
 replTest.stop(2);
 
 // Test wtimeout
-var res = testDB.runCommand(
-    {insert: collName, documents: [{a: 1}], writeConcern: {w: 3, wtimeout: 1000}});
+var res = testDB.runCommand({insert: collName, documents: [{a: 1}], writeConcern: {w: 3, wtimeout: 1000}});
 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 assert.eq(ErrorCodes.WriteConcernTimeout, res.writeConcernError.code);
 
 // Test maxTimeMS timeout
-res = testDB.runCommand(
-    {insert: collName, documents: [{a: 1}], writeConcern: {w: 3}, maxTimeMS: 1000});
+res = testDB.runCommand({insert: collName, documents: [{a: 1}], writeConcern: {w: 3}, maxTimeMS: 1000});
 assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
 
 // Test with wtimeout < maxTimeMS
@@ -44,7 +42,7 @@ res = testDB.runCommand({
     insert: collName,
     documents: [{a: 1}],
     writeConcern: {w: 3, wtimeout: 1000},
-    maxTimeMS: 10 * 1000
+    maxTimeMS: 10 * 1000,
 });
 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernTimeout);
 assert.eq(ErrorCodes.WriteConcernTimeout, res.writeConcernError.code);
@@ -54,7 +52,7 @@ res = testDB.runCommand({
     insert: collName,
     documents: [{a: 1}],
     writeConcern: {w: 3, wtimeout: 10 * 1000},
-    maxTimeMS: 1000
+    maxTimeMS: 1000,
 });
 assert.commandFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
 

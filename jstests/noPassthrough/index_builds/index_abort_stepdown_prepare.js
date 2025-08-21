@@ -43,22 +43,25 @@ assert.commandWorked(primaryColl.insert({_id: 1, a: 1}));
 
 // Enable fail point which makes index build hang in an interruptible state.
 const failPoint = "hangAfterIndexBuildDumpsInsertsFromBulk";
-let res =
-    assert.commandWorked(primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
+let res = assert.commandWorked(primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
 let timesEntered = res.count;
 
 const indexName = "a_1";
-const createIndex = IndexBuildTest.startIndexBuild(primary,
-                                                   primaryColl.getFullName(),
-                                                   {a: 1},
-                                                   {name: indexName},
-                                                   ErrorCodes.InterruptedDueToReplStateChange);
+const createIndex = IndexBuildTest.startIndexBuild(
+    primary,
+    primaryColl.getFullName(),
+    {a: 1},
+    {name: indexName},
+    ErrorCodes.InterruptedDueToReplStateChange,
+);
 jsTestLog("Waiting for index build to hit failpoint");
-assert.commandWorked(primary.adminCommand({
-    waitForFailPoint: failPoint,
-    timesEntered: timesEntered + 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    primary.adminCommand({
+        waitForFailPoint: failPoint,
+        timesEntered: timesEntered + 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Start txn");
 const session = primary.startSession();
@@ -74,8 +77,10 @@ PrepareHelpers.prepareTransaction(session);
 // X lock.
 const abortIndexThread = startParallelShell(() => {
     jsTestLog("Attempting to abort the index build");
-    assert.commandFailedWithCode(db.getSiblingDB('test').coll.dropIndex("a_1"),
-                                 ErrorCodes.InterruptedDueToReplStateChange);
+    assert.commandFailedWithCode(
+        db.getSiblingDB("test").coll.dropIndex("a_1"),
+        ErrorCodes.InterruptedDueToReplStateChange,
+    );
 }, primary.port);
 checkLog.containsJson(primary, 4656010);
 

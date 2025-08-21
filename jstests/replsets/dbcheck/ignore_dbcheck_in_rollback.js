@@ -8,12 +8,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    checkHealthLog,
-    logQueries,
-    resetAndInsert,
-    runDbCheck
-} from "jstests/replsets/libs/dbcheck_utils.js";
+import {checkHealthLog, logQueries, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 // This test injects inconsistencies between replica set members; do not fail because of expected
@@ -28,7 +23,7 @@ const replSet = new ReplSetTest({
     name: jsTestName(),
     nodes: [{}, {}, {rsConfig: {priority: 0}}],
     useBridge: true,
-    settings: {chainingAllowed: false}
+    settings: {chainingAllowed: false},
 });
 replSet.startSet();
 replSet.initiate();
@@ -41,14 +36,14 @@ const primaryColl = primaryDB.getCollection(collName);
 
 const nDocs = 200;
 resetAndInsert(replSet, primaryDB, collName, nDocs);
-assert.commandWorked(
-    primaryDB.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+assert.commandWorked(primaryDB.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
 replSet.awaitReplication();
 assert.eq(primaryColl.find({}).count(), nDocs);
 
 // Set up inconsistency.
-const skipUnindexingDocumentWhenDeleted =
-    configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {indexName: "a_1"});
+const skipUnindexingDocumentWhenDeleted = configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {
+    indexName: "a_1",
+});
 jsTestLog("Deleting docs");
 const stableTimestamp = assert.commandWorked(primaryColl.deleteMany({}));
 
@@ -61,13 +56,15 @@ primary = rollbackTest.getPrimary();
 primaryDB = primary.getDB(dbName);
 
 // Hold stable timestamp.
-const stableTimestampFailPoint = configureFailPoint(
-    primary, "holdStableTimestampAtSpecificTimestamp", {timestamp: stableTimestamp});
+const stableTimestampFailPoint = configureFailPoint(primary, "holdStableTimestampAtSpecificTimestamp", {
+    timestamp: stableTimestamp,
+});
 
-runDbCheck(rollbackTest,
-           primaryDB,
-           collName,
-           {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1", maxDocsPerBatch: 20});
+runDbCheck(rollbackTest, primaryDB, collName, {
+    validateMode: "extraIndexKeysCheck",
+    secondaryIndex: "a_1",
+    maxDocsPerBatch: 20,
+});
 
 // Check that the old primary prior to transitioning to rollback has start, batch, and stop entries.
 const oldPrimaryHealthLog = primary.getDB("local").system.healthlog;

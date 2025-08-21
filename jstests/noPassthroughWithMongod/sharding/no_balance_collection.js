@@ -14,10 +14,10 @@ var shardAName = st.shard0.shardName;
 var shardBName = st.shard1.shardName;
 
 const dbName = jsTest.name();
-const collAName = 'collA';
-const collBName = 'collB';
-const collA = st.s.getCollection(dbName + '.' + collAName);
-const collB = st.s.getCollection(dbName + '.' + collBName);
+const collAName = "collA";
+const collBName = "collB";
+const collA = st.s.getCollection(dbName + "." + collAName);
+const collB = st.s.getCollection(dbName + "." + collBName);
 
 // Shard two collections
 st.shardColl(collA, {_id: 1}, false);
@@ -27,7 +27,7 @@ st.shardColl(collB, {_id: 1}, false);
 sh.disableBalancing(collB);
 
 // Insert 10MB data so balancing can occur
-const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+const bigString = "X".repeat(1024 * 1024); // 1MB
 const bulkA = collA.initializeUnorderedBulkOp();
 var bulkB = collB.initializeUnorderedBulkOp();
 for (var i = 0; i < 10; i++) {
@@ -50,12 +50,12 @@ st.awaitBalance(collAName, dbName, 60 * 1000);
 jsTest.log("Chunks for " + collA + " are balanced.");
 
 // Check that the collB chunks were not moved
-var shardAChunks =
-    findChunksUtil.findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardAName})
-        .itcount();
-var shardBChunks =
-    findChunksUtil.findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardBName})
-        .itcount();
+var shardAChunks = findChunksUtil
+    .findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardAName})
+    .itcount();
+var shardBChunks = findChunksUtil
+    .findChunksByNs(st.s.getDB("config"), collB.getFullName(), {shard: shardBName})
+    .itcount();
 printjson({shardA: shardAChunks, shardB: shardBChunks});
 assert(shardAChunks == 0 || shardBChunks == 0);
 

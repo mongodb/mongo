@@ -12,12 +12,11 @@ import {
 import {
     numDocsRange,
     rangeShardingCompoundTestCases,
-    testProbability
+    testProbability,
 } from "jstests/sharding/analyze_shard_key/libs/monotonicity_range_sharding_compound_common.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, oplogSize: 500}});
 
-testAnalyzeShardKeysUnshardedCollection(
-    st.s, rangeShardingCompoundTestCases, testProbability, numDocsRange);
+testAnalyzeShardKeysUnshardedCollection(st.s, rangeShardingCompoundTestCases, testProbability, numDocsRange);
 
 st.stop();

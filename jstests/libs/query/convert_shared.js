@@ -12,15 +12,14 @@ class ConvertTest {
     populateCollection(docs) {
         this.coll.drop();
         const bulk = this.coll.initializeOrderedBulkOp();
-        docs.forEach(doc => bulk.insert(doc));
+        docs.forEach((doc) => bulk.insert(doc));
         assert.commandWorked(bulk.execute());
     }
 
     getFormatField() {
         // The "format" field is not supported in FCVs prior to 8.0. Hence the we must not use it in
         // the pipelines unless the workload is guaranteed to not run on older FCVs.
-        return this.requiresFCV80 || this.requiresFCV81 || this.requiresFCV83 ? {format: "$format"}
-                                                                              : {};
+        return this.requiresFCV80 || this.requiresFCV81 || this.requiresFCV83 ? {format: "$format"} : {};
     }
 
     getByteOrderField() {
@@ -53,18 +52,18 @@ class ConvertTest {
                         {
                             $and: [
                                 {$eq: ["$outputType", "string"]},
-                                {$in: ["$inputType", ["int", "long", "double", "decimal"]]}
-                            ]
+                                {$in: ["$inputType", ["int", "long", "double", "decimal"]]},
+                            ],
                         },
                         {
                             $and: [
                                 {$eq: ["$inputType", "string"]},
-                                {$in: ["$outputType", ["int", "long", "double", "decimal"]]}
-                            ]
-                        }
-                    ]
-                }
-            ]
+                                {$in: ["$outputType", ["int", "long", "double", "decimal"]]},
+                            ],
+                        },
+                    ],
+                },
+            ],
         };
 
         // Test $convert on each document.
@@ -77,14 +76,14 @@ class ConvertTest {
                             input: "$input",
                             ...baseField,
                             ...formatField,
-                            ...byteOrderField
-                        }
+                            ...byteOrderField,
+                        },
                     },
                     target: {$ifNull: ["$target.type", "$target"]},
                     expected: "$expected",
                     ...baseField,
-                    inputType: {$type: "$input"}
-                }
+                    inputType: {$type: "$input"},
+                },
             },
             {$addFields: {outputType: {$type: "$output"}}},
             {
@@ -95,23 +94,23 @@ class ConvertTest {
                             then: {
                                 $convert: {
                                     input: {
-                                        $convert: {input: "$output", to: "$inputType", ...baseField}
+                                        $convert: {input: "$output", to: "$inputType", ...baseField},
                                     },
                                     to: "$outputType",
-                                    ...baseField
-                                }
+                                    ...baseField,
+                                },
                             },
-                            else: "$output"
-                        }
-                    }
-                }
+                            else: "$output",
+                        },
+                    },
+                },
             },
-            {$sort: {_id: 1}}
+            {$sort: {_id: 1}},
         ];
         const aggResult = coll.aggregate(pipeline).toArray();
         assert.eq(aggResult.length, conversionTestDocs.length);
 
-        aggResult.forEach(doc => {
+        aggResult.forEach((doc) => {
             assert.eq(doc.outputType, doc.target, "Conversion to incorrect type: _id = " + doc._id);
             assert.eq(doc.output, doc.expected, "Unexpected conversion: _id = " + doc._id);
             assert.eq(doc.output, doc.roundTripOutput);
@@ -139,8 +138,8 @@ class ConvertTest {
                 $cond: {
                     if: {$eq: ["$byteOrder", "little"]},
                     then: {$toInt: "$input"},
-                    else: {$convert: {to: "$target", input: "$input", ...byteOrderField}}
-                }
+                    else: {$convert: {to: "$target", input: "$input", ...byteOrderField}},
+                },
             },
         };
 
@@ -150,8 +149,8 @@ class ConvertTest {
                 $cond: {
                     if: {$eq: ["$byteOrder", "little"]},
                     then: {$toLong: "$input"},
-                    else: {$convert: {to: "$target", input: "$input", ...byteOrderField}}
-                }
+                    else: {$convert: {to: "$target", input: "$input", ...byteOrderField}},
+                },
             },
         };
 
@@ -161,8 +160,8 @@ class ConvertTest {
                 $cond: {
                     if: {$eq: ["$byteOrder", "little"]},
                     then: {$toDouble: "$input"},
-                    else: {$convert: {to: "$target", input: "$input", ...byteOrderField}}
-                }
+                    else: {$convert: {to: "$target", input: "$input", ...byteOrderField}},
+                },
             },
         };
 
@@ -175,19 +174,19 @@ class ConvertTest {
                                 ...(this.requiresFCV81 ? [toDoubleBinDataCase] : []),
                                 {
                                     case: {$in: ["$target", ["double", {type: "double"}]]},
-                                    then: {$toDouble: "$input"}
+                                    then: {$toDouble: "$input"},
                                 },
                                 {
                                     case: {$in: ["$target", ["objectId", {type: "objectId"}]]},
-                                    then: {$toObjectId: "$input"}
+                                    then: {$toObjectId: "$input"},
                                 },
                                 {
                                     case: {$in: ["$target", ["bool", {type: "bool"}]]},
-                                    then: {$toBool: "$input"}
+                                    then: {$toBool: "$input"},
                                 },
                                 {
                                     case: {$in: ["$target", ["date", {type: "date"}]]},
-                                    then: {$toDate: "$input"}
+                                    then: {$toDate: "$input"},
                                 },
                                 // $toInt and $toLong with BinData are not supported in FCVs
                                 // prior to v8.1.
@@ -195,15 +194,15 @@ class ConvertTest {
                                 ...(this.requiresFCV81 ? [toLongBinDataCase] : []),
                                 {
                                     case: {$in: ["$target", ["int", {type: "int"}]]},
-                                    then: {$toInt: "$input"}
+                                    then: {$toInt: "$input"},
                                 },
                                 {
                                     case: {$in: ["$target", ["long", {type: "long"}]]},
-                                    then: {$toLong: "$input"}
+                                    then: {$toLong: "$input"},
                                 },
                                 {
                                     case: {$in: ["$target", ["decimal", {type: "decimal"}]]},
-                                    then: {$toDecimal: "$input"}
+                                    then: {$toDecimal: "$input"},
                                 },
                                 {
                                     case: {
@@ -211,8 +210,8 @@ class ConvertTest {
                                             {$in: ["$target", ["string", {type: "string"}]]},
                                             // $toString uses the 'auto' format for
                                             // BinData-to-string conversions.
-                                            {$in: ["$format", ["auto", "uuid"]]}
-                                        ]
+                                            {$in: ["$format", ["auto", "uuid"]]},
+                                        ],
                                     },
                                     then: {$toString: "$input"},
                                 },
@@ -224,22 +223,22 @@ class ConvertTest {
                                     to: "$target",
                                     input: "$input",
                                     ...formatField,
-                                    ...byteOrderField
-                                }
-                            }
-                        }
+                                    ...byteOrderField,
+                                },
+                            },
+                        },
                     },
                     target: {$ifNull: ["$target.type", "$target"]},
-                    expected: "$expected"
-                }
+                    expected: "$expected",
+                },
             },
             {$addFields: {outputType: {$type: "$output"}}},
-            {$sort: {_id: 1}}
+            {$sort: {_id: 1}},
         ];
         const aggResult = coll.aggregate(pipeline).toArray();
         assert.eq(aggResult.length, conversionTestDocs.length);
 
-        aggResult.forEach(doc => {
+        aggResult.forEach((doc) => {
             assert.eq(doc.outputType, doc.target, "Conversion to incorrect type: _id = " + doc._id);
             assert.eq(doc.output, doc.expected, "Unexpected conversion: _id = " + doc._id);
         });
@@ -248,12 +247,17 @@ class ConvertTest {
     runIllegalConversionTest({illegalConversionTestDocs}) {
         // Test a $convert expression with "onError" to make sure that error handling still
         // allows an error in the "input" expression to propagate.
-        assert.throws(function() {
-            coll.aggregate([{
-                $project:
-                    {output: {$convert: {to: "string", input: {$divide: [1, 0]}, onError: "ERROR"}}}
-            }]);
-        }, [], "Pipeline should have failed");
+        assert.throws(
+            function () {
+                coll.aggregate([
+                    {
+                        $project: {output: {$convert: {to: "string", input: {$divide: [1, 0]}, onError: "ERROR"}}},
+                    },
+                ]);
+            },
+            [],
+            "Pipeline should have failed",
+        );
 
         this.populateCollection(illegalConversionTestDocs);
 
@@ -263,7 +267,7 @@ class ConvertTest {
         const baseField = this.getBaseField();
 
         // Test each document to ensure that the conversion throws an error.
-        illegalConversionTestDocs.forEach(doc => {
+        illegalConversionTestDocs.forEach((doc) => {
             const pipeline = [
                 {$match: {_id: doc._id}},
                 {
@@ -274,17 +278,21 @@ class ConvertTest {
                                 input: "$input",
                                 ...baseField,
                                 ...formatField,
-                                ...byteOrderField
-                            }
-                        }
-                    }
-                }
+                                ...byteOrderField,
+                            },
+                        },
+                    },
+                },
             ];
 
-            assert.throws(function() {
-                const res = coll.aggregate(pipeline);
-                jsTest.log.info("should have failed", {res: res.toArray()});
-            }, [], "Conversion should have failed: _id = " + doc._id);
+            assert.throws(
+                function () {
+                    const res = coll.aggregate(pipeline);
+                    jsTest.log.info("should have failed", {res: res.toArray()});
+                },
+                [],
+                "Conversion should have failed: _id = " + doc._id,
+            );
         });
 
         {
@@ -299,17 +307,17 @@ class ConvertTest {
                                 ...baseField,
                                 ...formatField,
                                 ...byteOrderField,
-                                onError: "ERROR"
-                            }
-                        }
-                    }
+                                onError: "ERROR",
+                            },
+                        },
+                    },
                 },
-                {$sort: {_id: 1}}
+                {$sort: {_id: 1}},
             ];
             const aggResult = coll.aggregate(pipeline).toArray();
             assert.eq(aggResult.length, illegalConversionTestDocs.length);
 
-            aggResult.forEach(doc => {
+            aggResult.forEach((doc) => {
                 assert.eq(doc.output, "ERROR", "Unexpected result: _id = " + doc._id);
             });
         }
@@ -327,17 +335,17 @@ class ConvertTest {
                                 ...baseField,
                                 ...formatField,
                                 ...byteOrderField,
-                                onError: "$$REMOVE"
-                            }
-                        }
-                    }
+                                onError: "$$REMOVE",
+                            },
+                        },
+                    },
                 },
-                {$sort: {_id: 1}}
+                {$sort: {_id: 1}},
             ];
             const aggResult = coll.aggregate(pipeline).toArray();
             assert.eq(aggResult.length, illegalConversionTestDocs.length);
 
-            aggResult.forEach(doc => {
+            aggResult.forEach((doc) => {
                 assert.eq(doc, {});
             });
         }
@@ -352,12 +360,12 @@ class ConvertTest {
             // Test that all nullish inputs result in the 'onNull' output.
             const pipeline = [
                 {$project: {output: {$convert: {to: "int", input: "$input", onNull: "NULL"}}}},
-                {$sort: {_id: 1}}
+                {$sort: {_id: 1}},
             ];
             const aggResult = coll.aggregate(pipeline).toArray();
             assert.eq(aggResult.length, nullTestDocs.length);
 
-            aggResult.forEach(doc => {
+            aggResult.forEach((doc) => {
                 assert.eq(doc.output, "NULL", "Unexpected result: _id = " + doc._id);
             });
         }
@@ -367,12 +375,12 @@ class ConvertTest {
             // nullish.
             const pipeline = [
                 {$project: {output: {$convert: {to: null, input: "$input", onNull: "NULL"}}}},
-                {$sort: {_id: 1}}
+                {$sort: {_id: 1}},
             ];
             const aggResult = coll.aggregate(pipeline).toArray();
             assert.eq(aggResult.length, nullTestDocs.length);
 
-            aggResult.forEach(doc => {
+            aggResult.forEach((doc) => {
                 assert.eq(doc.output, "NULL", "Unexpected result: _id = " + doc._id);
             });
         }
@@ -387,7 +395,7 @@ class ConvertTest {
         const baseField = this.getBaseField();
 
         // Test that $convert returns a parsing error for invalid arguments.
-        invalidArgumentValueDocs.forEach(doc => {
+        invalidArgumentValueDocs.forEach((doc) => {
             // A parsing error is expected even when 'onError' is specified.
             for (const onError of [{}, {onError: "NULL"}]) {
                 const pipeline = [
@@ -401,10 +409,10 @@ class ConvertTest {
                                     ...baseField,
                                     ...formatField,
                                     ...byteOrderField,
-                                    ...onError
-                                }
-                            }
-                        }
+                                    ...onError,
+                                },
+                            },
+                        },
                     },
                 ];
 
@@ -412,7 +420,8 @@ class ConvertTest {
                 assert.commandFailedWithCode(
                     error,
                     doc.expectedCode,
-                    "Conversion should have failed with parsing error: _id = " + doc._id);
+                    "Conversion should have failed with parsing error: _id = " + doc._id,
+                );
             }
         });
     }

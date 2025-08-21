@@ -93,17 +93,15 @@ for (let i = 0; i < 20; i++) {
     assert.commandWorked(coll.createIndex({d: 1}));
 
     // This cursor will not be used with a getMore.
-    const listIndCursorId1 =
-        assert.commandWorked(db.runCommand({listIndexes: coll.getName(), cursor: {batchSize: 2}}))
-            .cursor.id;
+    const listIndCursorId1 = assert.commandWorked(db.runCommand({listIndexes: coll.getName(), cursor: {batchSize: 2}}))
+        .cursor.id;
     assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [listIndCursorId1]}));
     assert.eq(initialTotalOpened + 5, getTotalCursorsOpened());
     assert.eq(initialNumCursorsWithMoreThanOneBatch + 2, getNumCursorsWithMoreThanOneBatch());
 
     // Use this cursor with a getMore.
-    const listIndCursorId2 =
-        assert.commandWorked(db.runCommand({listIndexes: coll.getName(), cursor: {batchSize: 2}}))
-            .cursor.id;
+    const listIndCursorId2 = assert.commandWorked(db.runCommand({listIndexes: coll.getName(), cursor: {batchSize: 2}}))
+        .cursor.id;
     assert.commandWorked(db.runCommand({getMore: listIndCursorId2, collection: coll.getName()}));
     assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [listIndCursorId2]}));
     assert.eq(initialTotalOpened + 6, getTotalCursorsOpened());
@@ -121,20 +119,17 @@ for (let i = 0; i < 20; i++) {
     }
 
     // Create cursors to test the listCollections command.
-    const listCollsCursorId1 =
-        assert.commandWorked(db.runCommand({listCollections: 1, cursor: {batchSize: 2}})).cursor.id;
-    assert.commandWorked(
-        db.runCommand({killCursors: "$cmd.listCollections", cursors: [listCollsCursorId1]}));
+    const listCollsCursorId1 = assert.commandWorked(db.runCommand({listCollections: 1, cursor: {batchSize: 2}})).cursor
+        .id;
+    assert.commandWorked(db.runCommand({killCursors: "$cmd.listCollections", cursors: [listCollsCursorId1]}));
     assert.eq(initialTotalOpened + 7, getTotalCursorsOpened());
     assert.eq(initialNumCursorsWithMoreThanOneBatch + 3, getNumCursorsWithMoreThanOneBatch());
 
     // Use this cursor with a getMore.
-    const listCollsCursorId2 =
-        assert.commandWorked(db.runCommand({listCollections: 1, cursor: {batchSize: 2}})).cursor.id;
-    assert.commandWorked(
-        db.runCommand({getMore: listCollsCursorId2, collection: "$cmd.listCollections"}));
-    assert.commandWorked(
-        db.runCommand({killCursors: "$cmd.listCollections", cursors: [listCollsCursorId2]}));
+    const listCollsCursorId2 = assert.commandWorked(db.runCommand({listCollections: 1, cursor: {batchSize: 2}})).cursor
+        .id;
+    assert.commandWorked(db.runCommand({getMore: listCollsCursorId2, collection: "$cmd.listCollections"}));
+    assert.commandWorked(db.runCommand({killCursors: "$cmd.listCollections", cursors: [listCollsCursorId2]}));
     assert.eq(initialTotalOpened + 8, getTotalCursorsOpened());
     assert.eq(initialNumCursorsWithMoreThanOneBatch + 4, getNumCursorsWithMoreThanOneBatch());
 

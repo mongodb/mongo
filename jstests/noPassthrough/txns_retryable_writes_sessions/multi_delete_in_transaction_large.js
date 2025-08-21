@@ -22,30 +22,34 @@ const testColl = testDB[collName];
 assert.commandWorked(testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
 const sessionColl = sessionDb[collName];
 const txnOpts = {
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 
 // Verify that a large number of small documents can be deleted when the transaction spans multiple
 // "applyOps" entries.
 jsTest.log("Prepopulate the collection.");
 const numberOfDocuments = 256000;
-const documents = [...new Array(numberOfDocuments).keys()].map(x => ({_id: x}));
+const documents = [...new Array(numberOfDocuments).keys()].map((x) => ({_id: x}));
 assert.commandWorked(testColl.insert(documents, {writeConcern: {w: "majority"}}));
 
 jsTest.log("Do a large multiple-result multi-delete.");
-withTxnAndAutoRetryOnMongos(session, () => {
-    // Verify that all documents are removed.
-    let res = assert.commandWorked(sessionColl.remove({}, {justOne: false}));
-    assert.eq(numberOfDocuments, res.nRemoved);
-    res = sessionColl.find({});
-    assert.sameMembers(res.toArray(), []);
-}, txnOpts);
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        // Verify that all documents are removed.
+        let res = assert.commandWorked(sessionColl.remove({}, {justOne: false}));
+        assert.eq(numberOfDocuments, res.nRemoved);
+        res = sessionColl.find({});
+        assert.sameMembers(res.toArray(), []);
+    },
+    txnOpts,
+);
 
 // Collection should be empty.
 assert.eq(0, testColl.countDocuments({}));

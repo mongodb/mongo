@@ -90,20 +90,30 @@ assert.commandWorked(coll.update({"a.b": 2}, {"a.b": 3}));
 assert.eq(0, coll.find({"a.b": 3}).itcount());
 
 // Upserting _id fields containing $-prefixed fields is not allowed.
-assert.writeErrorWithCode(coll.update({"a.b": 1}, {_id: {$invalid: 1}}, {upsert: true}),
-                          ErrorCodes.DollarPrefixedFieldName);
-assert.writeErrorWithCode(coll.update({"a.b": 1}, {$set: {_id: {$invalid: 1}}}, {upsert: true}),
-                          ErrorCodes.DollarPrefixedFieldName);
-assert.writeErrorWithCode(coll.update({"a.b": 1}, {$set: {"_id.$gt": 1}}, {upsert: true}),
-                          ErrorCodes.DollarPrefixedFieldName);
+assert.writeErrorWithCode(
+    coll.update({"a.b": 1}, {_id: {$invalid: 1}}, {upsert: true}),
+    ErrorCodes.DollarPrefixedFieldName,
+);
+assert.writeErrorWithCode(
+    coll.update({"a.b": 1}, {$set: {_id: {$invalid: 1}}}, {upsert: true}),
+    ErrorCodes.DollarPrefixedFieldName,
+);
+assert.writeErrorWithCode(
+    coll.update({"a.b": 1}, {$set: {"_id.$gt": 1}}, {upsert: true}),
+    ErrorCodes.DollarPrefixedFieldName,
+);
 assert.writeErrorWithCode(
     coll.update({"a.b": 1}, {$setOnInsert: {_id: {$invalid: 1}}}, {upsert: true}),
-    ErrorCodes.DollarPrefixedFieldName);
+    ErrorCodes.DollarPrefixedFieldName,
+);
 assert.writeErrorWithCode(
     coll.update({"a.b": 1}, {$setOnInsert: {"_id.$invalid": 1}}, {upsert: true}),
-    ErrorCodes.DollarPrefixedFieldName);
-assert.writeErrorWithCode(coll.update({"_id.$gt": 1}, {$set: {a: 1}}, {upsert: true}),
-                          ErrorCodes.DollarPrefixedFieldName);
+    ErrorCodes.DollarPrefixedFieldName,
+);
+assert.writeErrorWithCode(
+    coll.update({"_id.$gt": 1}, {$set: {a: 1}}, {upsert: true}),
+    ErrorCodes.DollarPrefixedFieldName,
+);
 
 // Replacement-style updates can contain nested $-prefixed fields.
 assert.commandWorked(coll.update({"a.b": 1}, {a: {$c: 1}}));
@@ -112,18 +122,14 @@ assert.commandWorked(coll.update({"a.b": 1}, {foo: {$c: 1, bar: {$d: 4}}}));
 
 // Pipeline-style updates are allowed to contain $-prefixed fields.
 assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {$a: 1}}}]));
-assert.commandWorked(
-    coll.update({"a.b": 3}, [{$replaceWith: {$literal: {a: {$a: 1}}}}], {upsert: true}));
+assert.commandWorked(coll.update({"a.b": 3}, [{$replaceWith: {$literal: {a: {$a: 1}}}}], {upsert: true}));
 assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {a: {$a: 1}}}}]));
 
 // Pipeline-style updates are allowed to contain reserved $-prefixed fields.
 assert.commandWorked(coll.update({"a.b": 1}, [{$replaceWith: {$literal: {$ref: 1}}}]));
-assert.commandWorked(
-    coll.update({"a.b": 4}, [{$replaceWith: {$literal: {$ref: 1}}}], {upsert: true}));
-assert.commandWorked(
-    coll.update({"a.b": 5}, [{$replaceWith: {$literal: {$id: 1}}}], {upsert: true}));
-assert.commandWorked(
-    coll.update({"a.b": 6}, [{$replaceWith: {$literal: {$db: 1}}}], {upsert: true}));
+assert.commandWorked(coll.update({"a.b": 4}, [{$replaceWith: {$literal: {$ref: 1}}}], {upsert: true}));
+assert.commandWorked(coll.update({"a.b": 5}, [{$replaceWith: {$literal: {$id: 1}}}], {upsert: true}));
+assert.commandWorked(coll.update({"a.b": 6}, [{$replaceWith: {$literal: {$db: 1}}}], {upsert: true}));
 
 // $-prefixed field names are not allowed at the top-level in replacement-style updates.
 assert.writeErrorWithCode(coll.update({"a.b": 1}, {$c: 1}), ErrorCodes.FailedToParse);
@@ -166,30 +172,30 @@ coll.findAndModify({query: {_id: 1}, update: [{$replaceWith: {$literal: {_id: 1,
 assert.eq([{_id: 1, "a.b.c": 3}], coll.find({_id: 1}).toArray());
 
 // Dotted fields without $literal cannot be updated in a pipeline-style update.
-assert.throws(function() {
+assert.throws(function () {
     coll.findAndModify({query: {_id: 1}, update: [{$replaceWith: {_id: 1, "a.b.": 2}}]});
 });
 
-assert.throws(function() {
+assert.throws(function () {
     coll.findAndModify({query: {_id: 1}, update: [{$replaceWith: {_id: 1, "a.b.c": 3}}]});
 });
 
 // Top-level $-prefixed field names are not allowed in a replacement-style update.
-assert.throws(function() {
+assert.throws(function () {
     coll.findAndModify({query: {_id: 1}, update: {_id: 1, $invalid: 1}});
 });
-assert.throws(function() {
+assert.throws(function () {
     coll.findAndModify({query: {_id: 1}, update: {$set: {_id: 1, $invalid: 1}}});
 });
 
 // Reserved $-prefixed field names are not allowed in a replacement-style update.
-assert.throws(function() {
+assert.throws(function () {
     coll.findAndModify({query: {_id: 1}, update: {_id: 1, $ref: 1}});
 });
-assert.throws(function() {
+assert.throws(function () {
     coll.findAndModify({query: {_id: 1}, update: {_id: 1, $id: 1}});
 });
-assert.throws(function() {
+assert.throws(function () {
     coll.findAndModify({query: {_id: 1}, update: {_id: 1, $db: 1}});
 });
 
@@ -201,7 +207,7 @@ assert([{_id: 2, out: {$in: 1, "x": 2}}], coll.find({_id: 2}).toArray());
 coll.findAndModify({
     query: {_id: 2},
     update: [{$replaceWith: {$literal: {_id: 2, $in: 2, "x": 3}}}],
-    upsert: true
+    upsert: true,
 });
 assert([{_id: 2, $in: 2, "x": 3}], coll.find({_id: 2}).toArray());
 
@@ -223,44 +229,47 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: {a: 1, b: 2}, "c.d": 3}));
 
 // Dotted fields represent paths in an aggregation pipeline.
-assert.eq(coll.aggregate([{$match: {"_id.a": 1}}, {$project: {"_id.b": 1}}]).toArray(),
-          [{_id: {b: 2}}]);
+assert.eq(coll.aggregate([{$match: {"_id.a": 1}}, {$project: {"_id.b": 1}}]).toArray(), [{_id: {b: 2}}]);
 assert.eq(coll.aggregate([{$match: {"c.d": 3}}, {$project: {"_id.b": 1}}]).toArray(), []);
 
 assert.eq(coll.aggregate([{$project: {"_id.a": 1}}]).toArray(), [{_id: {a: 1}}]);
 assert.eq(coll.aggregate([{$project: {"c.d": 1, _id: 0}}]).toArray(), [{}]);
 
-assert.eq(coll.aggregate([
-                  {$addFields: {"new.field": {$multiply: ["$c.d", "$_id.a"]}}},
-                  {$project: {"new.field": 1, _id: 0}}
-              ])
-              .toArray(),
-          [{new: {field: null}}]);
+assert.eq(
+    coll
+        .aggregate([{$addFields: {"new.field": {$multiply: ["$c.d", "$_id.a"]}}}, {$project: {"new.field": 1, _id: 0}}])
+        .toArray(),
+    [{new: {field: null}}],
+);
 
-assert.eq(coll.aggregate([{$group: {_id: "$_id.a", e: {$sum: "$_id.b"}}}]).toArray(),
-          [{_id: 1, e: 2}]);
-assert.eq(coll.aggregate([{$group: {_id: "$_id.a", e: {$sum: "$c.d"}}}]).toArray(),
-          [{_id: 1, e: 0}]);
+assert.eq(coll.aggregate([{$group: {_id: "$_id.a", e: {$sum: "$_id.b"}}}]).toArray(), [{_id: 1, e: 2}]);
+assert.eq(coll.aggregate([{$group: {_id: "$_id.a", e: {$sum: "$c.d"}}}]).toArray(), [{_id: 1, e: 0}]);
 
 // Accumulation statements cannot have a dotted field name.
-assert.commandFailed(db.runCommand(
-    {aggregate: coll.getName(), pipeline: [{$group: {_id: "$_id.a", "e.f": {$sum: "$_id.b"}}}]}));
+assert.commandFailed(
+    db.runCommand({aggregate: coll.getName(), pipeline: [{$group: {_id: "$_id.a", "e.f": {$sum: "$_id.b"}}}]}),
+);
 
 // $-prefixed field names are not allowed in an aggregation pipeline.
+assert.commandFailed(db.runCommand({aggregate: coll.getName(), pipeline: [{$match: {"$invalid": 1}}]}));
+
 assert.commandFailed(
-    db.runCommand({aggregate: coll.getName(), pipeline: [{$match: {"$invalid": 1}}]}));
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$project: {"_id.a": 1, "$newField": {$multiply: ["$_id.b", "$_id.a"]}}}],
+    }),
+);
 
-assert.commandFailed(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [{$project: {"_id.a": 1, "$newField": {$multiply: ["$_id.b", "$_id.a"]}}}]
-}));
+assert.commandFailed(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$addFields: {"_id.a": 1, "$newField": {$multiply: ["$_id.b", "$_id.a"]}}}],
+    }),
+);
 
-assert.commandFailed(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [{$addFields: {"_id.a": 1, "$newField": {$multiply: ["$_id.b", "$_id.a"]}}}]
-}));
-
-assert.commandFailed(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [{$group: {_id: "$_id.a", "$invalid": {$sum: "$_id.b"}}}]
-}));
+assert.commandFailed(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$group: {_id: "$_id.a", "$invalid": {$sum: "$_id.b"}}}],
+    }),
+);

@@ -11,7 +11,7 @@ const dbName = "kill_ttl_on_stepdown";
 
 const rst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],
-    nodeOptions: {setParameter: "ttlMonitorSleepSecs=15"}
+    nodeOptions: {setParameter: "ttlMonitorSleepSecs=15"},
 });
 rst.startSet();
 rst.initiate();
@@ -40,8 +40,7 @@ failPoint.wait();
 let ttlPassesBeforeStepdown = getNumTTLPasses();
 
 // Force a stepdown of the primary.
-assert.commandWorked(
-    primary.getDB("admin").runCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}));
+assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 60 * 10 /* 10 minutes */, force: true}));
 rst.awaitSecondaryNodes(null, [primary]);
 assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
 assert.commandWorked(primary.adminCommand({replSetStepUp: 1}));

@@ -5,10 +5,7 @@
 //   uses_transactions,
 // ]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    restartReplicationOnSecondaries,
-    stopReplicationOnSecondaries
-} from "jstests/libs/write_concern_util.js";
+import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -34,40 +31,48 @@ function testReadConcernLevel(level) {
 
     // A majority-committed read-only transaction on the primary after the new cluster time
     // should time out at commit time waiting for the cluster time to be majority committed.
-    assert.commandWorked(primaryDB.runCommand({
-        find: collName,
-        txnNumber: NumberLong(++txnNumber),
-        startTransaction: true,
-        autocommit: false,
-        readConcern: {level: level, afterClusterTime: clusterTime}
-    }));
-    assert.commandFailedWithCode(primaryDB.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: {w: "majority"},
-        maxTimeMS: 1000
-    }),
-                                 ErrorCodes.MaxTimeMSExpired);
+    assert.commandWorked(
+        primaryDB.runCommand({
+            find: collName,
+            txnNumber: NumberLong(++txnNumber),
+            startTransaction: true,
+            autocommit: false,
+            readConcern: {level: level, afterClusterTime: clusterTime},
+        }),
+    );
+    assert.commandFailedWithCode(
+        primaryDB.adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            writeConcern: {w: "majority"},
+            maxTimeMS: 1000,
+        }),
+        ErrorCodes.MaxTimeMSExpired,
+    );
 
     // Restart replication.
     restartReplicationOnSecondaries(rst);
 
     // A majority-committed read-only transaction on the primary after the new cluster time now
     // succeeds.
-    assert.commandWorked(primaryDB.runCommand({
-        find: collName,
-        txnNumber: NumberLong(++txnNumber),
-        startTransaction: true,
-        autocommit: false,
-        readConcern: {level: level, afterClusterTime: clusterTime}
-    }));
-    assert.commandWorked(primaryDB.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: {w: "majority"}
-    }));
+    assert.commandWorked(
+        primaryDB.runCommand({
+            find: collName,
+            txnNumber: NumberLong(++txnNumber),
+            startTransaction: true,
+            autocommit: false,
+            readConcern: {level: level, afterClusterTime: clusterTime},
+        }),
+    );
+    assert.commandWorked(
+        primaryDB.adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            writeConcern: {w: "majority"},
+        }),
+    );
 }
 
 testReadConcernLevel("majority");

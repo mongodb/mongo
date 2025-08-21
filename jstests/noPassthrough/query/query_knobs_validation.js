@@ -5,9 +5,7 @@
  * parameter's valid bounds.
  */
 
-import {
-    getExpectedPipelineLimit,
-} from "jstests/libs/query/aggregation_pipeline_utils.js";
+import {getExpectedPipelineLimit} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("admin");
@@ -78,8 +76,7 @@ function assertDefaultParameterValues() {
     // 'getParameter' is same as the expected value.
     for (let paramName in expectedParamDefaults) {
         const expectedParamValue = expectedParamDefaults[paramName];
-        const getParamRes =
-            assert.commandWorked(testDB.adminCommand({getParameter: 1, [paramName]: 1}));
+        const getParamRes = assert.commandWorked(testDB.adminCommand({getParameter: 1, [paramName]: 1}));
         assert.eq(getParamRes[paramName], expectedParamValue);
     }
 }
@@ -87,18 +84,15 @@ function assertDefaultParameterValues() {
 function assertSetParameterSucceeds(paramName, value) {
     assert.commandWorked(testDB.adminCommand({setParameter: 1, [paramName]: value}));
     // Verify that the set parameter actually worked by doing a get and verifying the value.
-    const getParamRes =
-        assert.commandWorked(testDB.adminCommand({getParameter: 1, [paramName]: 1}));
+    const getParamRes = assert.commandWorked(testDB.adminCommand({getParameter: 1, [paramName]: 1}));
     assert.eq(getParamRes[paramName], value);
 }
 
 function assertSetParameterFails(paramName, value) {
-    assert.commandFailedWithCode(testDB.adminCommand({setParameter: 1, [paramName]: value}),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(testDB.adminCommand({setParameter: 1, [paramName]: value}), ErrorCodes.BadValue);
 }
 
-const getParamRes =
-    assert.commandWorked(testDB.adminCommand({getParameter: 1, internalPipelineLengthLimit: 1}));
+const getParamRes = assert.commandWorked(testDB.adminCommand({getParameter: 1, internalPipelineLengthLimit: 1}));
 assert.eq(getParamRes["internalPipelineLengthLimit"], getExpectedPipelineLimit(testDB));
 
 // Verify that the default values are set as expected when the server starts up.
@@ -224,8 +218,7 @@ const bsonUserSizeLimit = assert.commandWorked(testDB.hello()).maxBsonObjectSize
 const bsonObjMaxInternalSize = bsonUserSizeLimit + 16 * 1024;
 
 assertSetParameterFails("internalLookupStageIntermediateDocumentMaxSizeBytes", 1);
-assertSetParameterSucceeds("internalLookupStageIntermediateDocumentMaxSizeBytes",
-                           bsonObjMaxInternalSize);
+assertSetParameterSucceeds("internalLookupStageIntermediateDocumentMaxSizeBytes", bsonObjMaxInternalSize);
 
 assertSetParameterSucceeds("internalInsertMaxBatchSize", 11);
 assertSetParameterFails("internalInsertMaxBatchSize", 0);
@@ -288,11 +281,9 @@ assertSetParameterSucceeds("internalQueryMaxSpoolDiskUsageBytes", 1);
 assertSetParameterFails("internalQueryMaxSpoolDiskUsageBytes", 0);
 
 assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes", 10);
-assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
-                           4 * 1024 * 1024);
+assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes", 4 * 1024 * 1024);
 assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes", -1);
-assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
-                        9 * 1024 * 1024);
+assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes", 9 * 1024 * 1024);
 
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableTimeSeriesPushdown", true);
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableTimeSeriesPushdown", false);

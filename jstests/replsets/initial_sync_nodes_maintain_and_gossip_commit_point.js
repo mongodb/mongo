@@ -16,7 +16,7 @@ const name = jsTestName();
 const rst = new ReplSetTest({
     name,
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0, votes: 0}}],
-    useBridge: true
+    useBridge: true,
 });
 rst.startSet();
 rst.initiate();
@@ -50,15 +50,18 @@ jsTest.log("Adding a new node to the replica set");
 const initialSyncNode = rst.add({
     setParameter: {
         // Make sure our initial sync node does not sync from the node with votes 0.
-        'failpoint.forceSyncSourceCandidate':
-            tojson({mode: 'alwaysOn', data: {"hostAndPort": primary.host}}),
-    }
+        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {"hostAndPort": primary.host}}),
+    },
 });
 
-const hangAfterGettingBeginFetchingTimestamp =
-    configureFailPoint(initialSyncNode, "initialSyncHangAfterGettingBeginFetchingTimestamp");
-const hangBeforeCompletingOplogFetching =
-    configureFailPoint(initialSyncNode, "initialSyncHangBeforeCompletingOplogFetching");
+const hangAfterGettingBeginFetchingTimestamp = configureFailPoint(
+    initialSyncNode,
+    "initialSyncHangAfterGettingBeginFetchingTimestamp",
+);
+const hangBeforeCompletingOplogFetching = configureFailPoint(
+    initialSyncNode,
+    "initialSyncHangBeforeCompletingOplogFetching",
+);
 const hangBeforeFinish = configureFailPoint(initialSyncNode, "initialSyncHangBeforeFinish");
 
 jsTestLog("Waiting for initial sync node to reach initial sync state");
@@ -86,10 +89,11 @@ assert.eq(1, rs.compareOpTimes(secondCommitPointSecondary, firstCommitPoint));
 
 // Verify that the commit point has *NOT* advanced on the non-voting secondary.
 const commitPointNonVotingSecondary = getLastCommittedOpTime(nonVotingSecondary);
-assert.eq(rs.compareOpTimes(commitPointNonVotingSecondary, secondCommitPointPrimary),
-          -1,
-          `commit point on the non-voting secondary should not have been advanced: ${
-              tojson(commitPointNonVotingSecondary)}`);
+assert.eq(
+    rs.compareOpTimes(commitPointNonVotingSecondary, secondCommitPointPrimary),
+    -1,
+    `commit point on the non-voting secondary should not have been advanced: ${tojson(commitPointNonVotingSecondary)}`,
+);
 
 // Allow the node to proceed to the oplog applying phase of initial sync and ensure that the oplog
 // fetcher thread is still running.
@@ -135,9 +139,9 @@ assert.soon(() => {
 // Verify that the non-voting secondary has received the updated commit point via heartbeats from
 // the initial sync node.
 assert.soon(
-    () => rs.compareOpTimes(getLastCommittedOpTime(nonVotingSecondary),
-                            getLastCommittedOpTime(initialSyncNode)) >= 0,
-    "The nonVotingSecondary was unable to update its commit point from the initial sync node");
+    () => rs.compareOpTimes(getLastCommittedOpTime(nonVotingSecondary), getLastCommittedOpTime(initialSyncNode)) >= 0,
+    "The nonVotingSecondary was unable to update its commit point from the initial sync node",
+);
 
 // Since the primary sends a shut down command to all secondaries in `rst.stopSet()`, we reconnect
 // the disconnected secondary to the primary to allow it to be shut down.

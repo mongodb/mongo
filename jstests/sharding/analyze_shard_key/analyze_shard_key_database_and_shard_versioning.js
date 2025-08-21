@@ -6,16 +6,14 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 // The write concern to use when inserting documents into test collections. Waiting for the
 // documents to get replicated to all nodes is necessary since the test later runs the
 // analyzeShardKey command with readPreference "secondary".
 const numNodesPerRS = 2;
 const writeConcern = {
-    w: numNodesPerRS
+    w: numNodesPerRS,
 };
 
 const numMostCommonValues = 5;
@@ -24,8 +22,8 @@ const st = new ShardingTest({
     shards: 2,
     rs: {
         nodes: numNodesPerRS,
-        setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues}
-    }
+        setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues},
+    },
 });
 
 function runTest(readPreference) {
@@ -35,8 +33,7 @@ function runTest(readPreference) {
     jsTest.log(`Testing analyzeShardKey with ${tojson({dbName, collName, readPreference})}`);
 
     // Make shard0 the primary shard.
-    assert.commandWorked(
-        st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
     const mongos0Coll = st.s0.getCollection(ns);
     assert.commandWorked(mongos0Coll.createIndex({x: 1}));
@@ -55,8 +52,11 @@ function runTest(readPreference) {
         numDocs: 2,
         isUnique: false,
         numDistinctValues: 2,
-        mostCommonValues: [{value: {x: -1}, frequency: 1}, {value: {x: 1}, frequency: 1}],
-        numMostCommonValues
+        mostCommonValues: [
+            {value: {x: -1}, frequency: 1},
+            {value: {x: 1}, frequency: 1},
+        ],
+        numMostCommonValues,
     };
 
     // Run the analyzeShardKey command and verify that the metrics are as expected.
@@ -83,8 +83,9 @@ function runTest(readPreference) {
     // Again, run all the commands against mongos0.
     assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
     assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 0}}));
-    assert.commandWorked(st.s0.adminCommand(
-        {moveChunk: ns, find: {x: 1}, to: st.shard0.shardName, _waitForDelete: true}));
+    assert.commandWorked(
+        st.s0.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard0.shardName, _waitForDelete: true}),
+    );
 
     // Rerun the analyzeShardKey command against mongos1. Since it does not know that a migration
     // occurred, it would only forward the analyzeShardKey command to shard1 only. Without shard

@@ -42,16 +42,32 @@ st = new ShardingTest({
     useBridge: true,
     rsOptions: {settings: {electionTimeoutMillis: 60000}},
 });
-assert.throws(() => {
-    st.rs0.getSecondary().delayMessagesFrom(st.rs0.getPrimary(), 13000);
-}, [], "testing commands have not been enabled. delayMessagesFrom will not work as expected");
-assert.throws(() => {
-    st.rs0.getSecondary().discardMessagesFrom(st.rs0.getPrimary(), 1.0);
-}, [], "testing commands have not been enabled. discardMessagesFrom will not work as expected");
-assert.throws(() => {
-    st.rs0.getSecondary().acceptConnectionsFrom(st.rs0.getPrimary());
-}, [], "testing commands have not been enabled. acceptConnectionsFrom will not work as expected");
-assert.throws(() => {
-    st.rs0.getSecondary().rejectConnectionsFrom(st.rs0.getPrimary());
-}, [], "testing commands have not been enabled. rejectConnectionsFrom will not work as expected");
+assert.throws(
+    () => {
+        st.rs0.getSecondary().delayMessagesFrom(st.rs0.getPrimary(), 13000);
+    },
+    [],
+    "testing commands have not been enabled. delayMessagesFrom will not work as expected",
+);
+assert.throws(
+    () => {
+        st.rs0.getSecondary().discardMessagesFrom(st.rs0.getPrimary(), 1.0);
+    },
+    [],
+    "testing commands have not been enabled. discardMessagesFrom will not work as expected",
+);
+assert.throws(
+    () => {
+        st.rs0.getSecondary().acceptConnectionsFrom(st.rs0.getPrimary());
+    },
+    [],
+    "testing commands have not been enabled. acceptConnectionsFrom will not work as expected",
+);
+assert.throws(
+    () => {
+        st.rs0.getSecondary().rejectConnectionsFrom(st.rs0.getPrimary());
+    },
+    [],
+    "testing commands have not been enabled. rejectConnectionsFrom will not work as expected",
+);
 st.stop();

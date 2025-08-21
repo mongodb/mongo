@@ -13,55 +13,58 @@ var NOSUBJ_NOSAN_CERT = "jstests/libs/server_no_subject_no_SAN.pem";
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
     jsTestLog("Testing certificate: " + JSON.stringify(arguments));
-    var mongod = MongoRunner.runMongod(
-        {tlsMode: "requireTLS", tlsCertificateKeyFile: certPath, tlsCAFile: CA_CERT});
+    var mongod = MongoRunner.runMongod({tlsMode: "requireTLS", tlsCertificateKeyFile: certPath, tlsCAFile: CA_CERT});
 
     var mongo;
     if (allowInvalidCert) {
-        mongo = runMongoProgram("mongo",
-                                "--port",
-                                mongod.port,
-                                "--tls",
-                                "--tlsCAFile",
-                                CA_CERT,
-                                "--tlsCertificateKeyFile",
-                                CLIENT_CERT,
-                                "--tlsAllowInvalidCertificates",
-                                "--eval",
-                                ";");
+        mongo = runMongoProgram(
+            "mongo",
+            "--port",
+            mongod.port,
+            "--tls",
+            "--tlsCAFile",
+            CA_CERT,
+            "--tlsCertificateKeyFile",
+            CLIENT_CERT,
+            "--tlsAllowInvalidCertificates",
+            "--eval",
+            ";",
+        );
     } else if (allowInvalidHost) {
-        mongo = runMongoProgram("mongo",
-                                "--port",
-                                mongod.port,
-                                "--tls",
-                                "--tlsCAFile",
-                                CA_CERT,
-                                "--tlsCertificateKeyFile",
-                                CLIENT_CERT,
-                                "--tlsAllowInvalidHostnames",
-                                "--eval",
-                                ";");
+        mongo = runMongoProgram(
+            "mongo",
+            "--port",
+            mongod.port,
+            "--tls",
+            "--tlsCAFile",
+            CA_CERT,
+            "--tlsCertificateKeyFile",
+            CLIENT_CERT,
+            "--tlsAllowInvalidHostnames",
+            "--eval",
+            ";",
+        );
     } else {
-        mongo = runMongoProgram("mongo",
-                                "--port",
-                                mongod.port,
-                                "--tls",
-                                "--tlsCAFile",
-                                CA_CERT,
-                                "--tlsCertificateKeyFile",
-                                CLIENT_CERT,
-                                "--eval",
-                                ";");
+        mongo = runMongoProgram(
+            "mongo",
+            "--port",
+            mongod.port,
+            "--tls",
+            "--tlsCAFile",
+            CA_CERT,
+            "--tlsCertificateKeyFile",
+            CLIENT_CERT,
+            "--eval",
+            ";",
+        );
     }
 
     if (shouldSucceed) {
         // runMongoProgram returns 0 on success
-        assert.eq(
-            0, mongo, "Connection attempt failed when it should succeed certPath: " + certPath);
+        assert.eq(0, mongo, "Connection attempt failed when it should succeed certPath: " + certPath);
     } else {
         // runMongoProgram returns 1 on failure
-        assert.eq(
-            1, mongo, "Connection attempt succeeded when it should fail certPath: " + certPath);
+        assert.eq(1, mongo, "Connection attempt succeeded when it should fail certPath: " + certPath);
     }
     MongoRunner.stopMongod(mongod);
 }
@@ -94,7 +97,7 @@ let ssl_options = {
     tlsMode: "requireTLS",
     // SERVER_CERT has SAN=localhost. CLIENT_CERT is exact same except no SANS
     tlsCertificateKeyFile: CLIENT_CERT,
-    tlsCAFile: CA_CERT
+    tlsCAFile: CA_CERT,
 };
 
 replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});
@@ -104,7 +107,7 @@ replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});
 MongoRunner.runHangAnalyzer.disable();
 
 replTest.startSet();
-assert.throws(function() {
+assert.throws(function () {
     replTest.initiate();
 });
 replTest.stopSet();
@@ -119,7 +122,7 @@ ssl_options = {
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: SERVER_CERT,
     tlsCAFile: CA_CERT,
-    tlsAllowInvalidHostnames: ""
+    tlsAllowInvalidHostnames: "",
 };
 
 var replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});
@@ -133,7 +136,7 @@ ssl_options = {
     // SERVER_CERT has SAN=localhost. CLIENT_CERT is exact same except no SANS
     tlsCertificateKeyFile: SERVER_CERT,
     tlsCAFile: CA_CERT,
-    tlsAllowInvalidCertificates: ""
+    tlsAllowInvalidCertificates: "",
 };
 
 replTest = new ReplSetTest({nodes: {node0: ssl_options, node1: ssl_options}});

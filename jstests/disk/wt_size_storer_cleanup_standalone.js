@@ -7,15 +7,13 @@
  * ]
  */
 
-import {
-    runWiredTigerTool,
-} from "jstests/disk/libs/wt_file_helper.js";
+import {runWiredTigerTool} from "jstests/disk/libs/wt_file_helper.js";
 
-const runTest = function(insertAfterRestart) {
+const runTest = function (insertAfterRestart) {
     let conn = MongoRunner.runMongod();
     const dbpath = conn.dbpath;
 
-    const coll = function() {
+    const coll = function () {
         return conn.getDB(jsTestName()).test;
     };
 
@@ -23,10 +21,9 @@ const runTest = function(insertAfterRestart) {
     assert.eq(coll().count(), 1);
     const uri = coll().stats().wiredTiger.uri.split("statistics:")[1];
 
-    const assertSizeStorerEntry = function(expected) {
+    const assertSizeStorerEntry = function (expected) {
         const filePath = dbpath + (_isWindows() ? "\\" : "/") + jsTestName();
-        runWiredTigerTool(
-            "-r", "-h", dbpath, "dump", "-j", "-k", uri, "-f", filePath, "sizeStorer");
+        runWiredTigerTool("-r", "-h", dbpath, "dump", "-j", "-k", uri, "-f", filePath, "sizeStorer");
         const data = JSON.parse(cat(filePath))["table:sizeStorer"][1].data;
         assert.eq(data.length, expected ? 1 : 0, tojson(data));
     };

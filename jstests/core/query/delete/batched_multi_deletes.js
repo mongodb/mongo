@@ -7,18 +7,22 @@
 export function runBatchedMultiDeletesTest(coll, queryPredicate) {
     const testDB = coll.getDB();
 
-    const collCount = 94321;  // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
+    const collCount = 94321; // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
 
     coll.drop();
     assert.commandWorked(
-        coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: x})), {ordered: false}));
+        coll.insertMany(
+            [...Array(collCount).keys()].map((x) => ({_id: x, a: x})),
+            {ordered: false},
+        ),
+    );
 
     assert.eq(collCount, coll.countDocuments({}));
 
     // Verify the delete will involve the BATCHED_DELETE stage.
     const expl = testDB.runCommand({
         explain: {delete: coll.getName(), deletes: [{q: queryPredicate, limit: 0}]},
-        verbosity: "executionStats"
+        verbosity: "executionStats",
     });
     assert.commandWorked(expl);
 

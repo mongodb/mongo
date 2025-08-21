@@ -32,10 +32,7 @@ export class WorkloadSwitch extends PipelineWorkload {
             branches.push({case: {$ne: [`$f${i}`, i]}, then: i});
         }
 
-        return [
-            {$project: {"result": {$switch: {branches: branches, default: "no match"}}}},
-            {$unset: "_id"}
-        ];
+        return [{$project: {"result": {$switch: {branches: branches, default: "no match"}}}}, {$unset: "_id"}];
     }
 
     result() {
@@ -48,7 +45,7 @@ export class WorkloadCond extends PipelineWorkload {
      * $cond with many levels of nesting
      */
     scale() {
-        return Math.min(70, super.scale());  // Exceeded depth limit of 150 when converting js
+        return Math.min(70, super.scale()); // Exceeded depth limit of 150 when converting js
 
         // object to BSON. Do you have a cycle?
     }

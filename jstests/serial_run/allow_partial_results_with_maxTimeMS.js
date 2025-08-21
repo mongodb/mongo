@@ -21,10 +21,10 @@ function getMillis() {
 function runtimeMillis(f) {
     var start = getMillis();
     f();
-    return (getMillis() - start);
+    return getMillis() - start;
 }
 function isError(res) {
-    return !res.hasOwnProperty('ok') || !res['ok'];
+    return !res.hasOwnProperty("ok") || !res["ok"];
 }
 
 const dbName = "test-SERVER-57469";
@@ -42,9 +42,9 @@ function initDb(numSamples, splitPoint) {
 
     st.shardColl(
         coll,
-        {_id: 1},              // shard key
-        {_id: splitPoint},     // split point
-        {_id: splitPoint + 1}  // move the chunk to the other shard
+        {_id: 1}, // shard key
+        {_id: splitPoint}, // split point
+        {_id: splitPoint + 1}, // move the chunk to the other shard
     );
 
     let bulk = coll.initializeUnorderedBulkOp();
@@ -67,14 +67,14 @@ initDb(nDocs, splitPoint);
 function interpretCommandResult(cmdRes, expectedFullSize) {
     if (isError(cmdRes)) {
         print(JSON.stringify(cmdRes));
-        assert.eq(ErrorCodes.MaxTimeMSExpired, cmdRes.code);  // timeout
+        assert.eq(ErrorCodes.MaxTimeMSExpired, cmdRes.code); // timeout
         return "error";
     }
-    let fetchedSize = (cmdRes.cursor.firstBatch !== undefined) ? cmdRes.cursor.firstBatch.length
-                                                               : cmdRes.cursor.nextBatch.length;
+    let fetchedSize =
+        cmdRes.cursor.firstBatch !== undefined ? cmdRes.cursor.firstBatch.length : cmdRes.cursor.nextBatch.length;
     if (cmdRes.cursor.partialResultsReturned) {
         assert.lt(fetchedSize, expectedFullSize);
-        assert.eq(0, cmdRes.cursor.id);  // Note: we always see cursor id == 0 with partial results.
+        assert.eq(0, cmdRes.cursor.id); // Note: we always see cursor id == 0 with partial results.
         return "partial";
     }
     assert.eq(fetchedSize, expectedFullSize);
@@ -85,9 +85,9 @@ function interpretCommandResult(cmdRes, expectedFullSize) {
 function runBigBatchQuery(timeoutMs) {
     // The batchSize is equal to the full collection size.
     return interpretCommandResult(
-        coll.runCommand(
-            {find: collName, maxTimeMS: timeoutMs, allowPartialResults: true, batchSize: nDocs}),
-        nDocs);
+        coll.runCommand({find: collName, maxTimeMS: timeoutMs, allowPartialResults: true, batchSize: nDocs}),
+        nDocs,
+    );
 }
 
 // Time the full query.
@@ -96,14 +96,14 @@ function runBigBatchQuery(timeoutMs) {
 // Give it practically unlimited time to complete.
 let fullQueryTimeoutMS = runtimeMillis(() => assert.eq("full", runBigBatchQuery(9999999)));
 print("ran in " + fullQueryTimeoutMS + " ms");
-const targetTimeoutMS =
-    1000;  // We want the query to run for at least this long, to allow for timeout.
+const targetTimeoutMS = 1000; // We want the query to run for at least this long, to allow for timeout.
 if (fullQueryTimeoutMS < targetTimeoutMS) {
     // Assume linear scaling of runtime with the number of docs.
     nDocs *= Math.ceil(targetTimeoutMS / fullQueryTimeoutMS);
     // Limit size to prevent long runtime due to bad first sample.
     nDocs = Math.min(nDocs, 1000000);
-    if (nDocs % 2 == 1) {  // make sure it's even so the math for half size is easier
+    if (nDocs % 2 == 1) {
+        // make sure it's even so the math for half size is easier
         nDocs += 1;
     }
     splitPoint = Math.max(1, nDocs / 10);
@@ -127,14 +127,15 @@ function searchForAndAssertPartialResults(initialTimeoutMS, queryFunc) {
     for (let j = 1; j <= attempts; j++) {
         print("try query with maxTimeMS: " + timeoutMS);
         // The longer we are searching, the more fine-grained our changes to the timeout become.
-        const changeFactor = 0.2 - ((0.2 * j) / attempts);
+        const changeFactor = 0.2 - (0.2 * j) / attempts;
         let res = queryFunc(timeoutMS);
         if (res == "partial") {
             // Got partial results!
             return timeoutMS;
         } else if (res == "full") {
             // Timeout was so long that we got complete results.  Make it shorter and try again
-            if (timeoutMS > 1) {  // 1 ms is the min timeout allowed.
+            if (timeoutMS > 1) {
+                // 1 ms is the min timeout allowed.
                 timeoutMS = Math.floor((1 - changeFactor) * timeoutMS);
             }
         } else {
@@ -156,14 +157,18 @@ function searchForAndAssertPartialResults(initialTimeoutMS, queryFunc) {
 searchForAndAssertPartialResults(Math.round(fullQueryTimeoutMS), runBigBatchQuery);
 
 // Try to get partial results in a getMore.
-searchForAndAssertPartialResults(Math.round(0.5 * fullQueryTimeoutMS), function(timeout) {
+searchForAndAssertPartialResults(Math.round(0.5 * fullQueryTimeoutMS), function (timeout) {
     // Find the first batch.
     // First batch size must be chosen carefully.  We want it to be small enough that we don't get
     // all the docs from the small shard in the first batch.  We want it to be large enough that
     // the repeated getMores on the remotes for the remaining data does not overwhelm the exec time.
-    const firstBatchSize = Math.round(splitPoint / 2);  // Half the size of the small shard.
-    let findRes = coll.runCommand(
-        {find: collName, allowPartialResults: true, batchSize: firstBatchSize, maxTimeMS: timeout});
+    const firstBatchSize = Math.round(splitPoint / 2); // Half the size of the small shard.
+    let findRes = coll.runCommand({
+        find: collName,
+        allowPartialResults: true,
+        batchSize: firstBatchSize,
+        maxTimeMS: timeout,
+    });
     // We don't expect this first batch find to timeout, but it can if we're unlucky.
     const findResStatus = interpretCommandResult(findRes, firstBatchSize);
     if (findResStatus == "error" || findResStatus == "partial") {
@@ -175,9 +180,9 @@ searchForAndAssertPartialResults(Math.round(0.5 * fullQueryTimeoutMS), function(
     // getMores sent to the shards (for details, see SERVER-71248).
     const secondBatchSize = nDocs - firstBatchSize;
     return interpretCommandResult(
-        coll.runCommand(
-            {getMore: findRes.cursor.id, collection: collName, batchSize: secondBatchSize}),
-        secondBatchSize);
+        coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: secondBatchSize}),
+        secondBatchSize,
+    );
 });
 
 st.stop();

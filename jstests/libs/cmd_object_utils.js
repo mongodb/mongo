@@ -39,7 +39,7 @@ export const kGenericArgFieldNames = [
     "requestGossipRoutingCache",
     "startOrContinueTransaction",
     "rawData",
-    "serialization_context"
+    "serialization_context",
 ];
 
 /**
@@ -72,7 +72,8 @@ export function getInnerCommand(cmdObj) {
  * Splits 'cmdObj' into a pair of [<command without generic args>, <generic args>].
  */
 function extractGenericArgs(cmdObj) {
-    let cmd = {}, genericArgs = {};
+    let cmd = {},
+        genericArgs = {};
     for (const [key, value] of Object.entries(cmdObj)) {
         const isGenericArg = kGenericArgFieldNames.includes(key);
         if (isGenericArg) {
@@ -92,7 +93,7 @@ export function getExplainCommand(cmdObj, verbosity = "queryPlanner") {
     // explain command.
     const [cmd, genericArgs] = extractGenericArgs(cmdObj);
 
-    if ('rawData' in genericArgs) {
+    if ("rawData" in genericArgs) {
         // Unlike the rest of the generic arguments, 'rawData' must be passed to the inner command.
         cmd.rawData = genericArgs.rawData;
         delete genericArgs.rawData;
@@ -137,7 +138,7 @@ export function getCollectionName(db, cmdObj) {
         let viewOn;
         let name = cmdObj[getCommandName(cmdObj)];
         do {
-            let collInfo = collectionsInfo.find(c => c.name === name);
+            let collInfo = collectionsInfo.find((c) => c.name === name);
             if (!collInfo) {
                 name = undefined;
             }

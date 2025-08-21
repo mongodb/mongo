@@ -32,7 +32,8 @@ function assertDataSizeCmdWorked(conn, keyPattern, expectedNumObjects) {
 
     const {globalMin, globalMax} = getGlobalMinMaxKey(keyPattern);
     res = assert.commandWorked(
-        conn.adminCommand({dataSize: kNs, keyPattern: keyPattern, min: globalMin, max: globalMax}));
+        conn.adminCommand({dataSize: kNs, keyPattern: keyPattern, min: globalMin, max: globalMax}),
+    );
     assert.eq(res.numObjects, expectedNumObjects);
 }
 
@@ -41,8 +42,7 @@ function assertDataSizeCmdWorked(conn, keyPattern, expectedNumObjects) {
  * asserts that command failed with BadValue error.
  */
 function assertDataSizeCmdFailedWithBadValue(conn, keyPattern) {
-    assert.commandFailedWithCode(conn.adminCommand({dataSize: kNs, keyPattern: keyPattern}),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(conn.adminCommand({dataSize: kNs, keyPattern: keyPattern}), ErrorCodes.BadValue);
 }
 
 /*
@@ -51,8 +51,10 @@ function assertDataSizeCmdFailedWithBadValue(conn, keyPattern) {
  * command succeeds if run with valid min and max and returns the expected numObjects.
  */
 function testDataSizeCmd(conn, keyPattern, invalidRanges, numObjects) {
-    assert.commandFailedWithCode(conn.adminCommand({dataSize: kCollName}),
-                                 [ErrorCodes.NamespaceNotFound, ErrorCodes.InvalidNamespace]);
+    assert.commandFailedWithCode(conn.adminCommand({dataSize: kCollName}), [
+        ErrorCodes.NamespaceNotFound,
+        ErrorCodes.InvalidNamespace,
+    ]);
 
     for (const {min, max, errorCode} of invalidRanges) {
         const cmdObj = {dataSize: kNs, keyPattern: keyPattern, min: min, max: max};
@@ -64,11 +66,10 @@ function testDataSizeCmd(conn, keyPattern, invalidRanges, numObjects) {
 }
 
 const st = new ShardingTest({mongos: 3, shards: 2});
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
 const shardKey1 = {
-    x: 1
+    x: 1,
 };
 jsTest.log(`Sharding the collection with key ${tojson(shardKey1)}`);
 assert.commandWorked(st.s0.adminCommand({shardCollection: kNs, key: shardKey1}));
@@ -94,7 +95,7 @@ jsTest.log("Dropping the collection");
 st.s0.getCollection(kNs).drop();
 
 const shardKey2 = {
-    y: 1
+    y: 1,
 };
 jsTest.log(`Resharding the collection with key ${tojson(shardKey2)}`);
 assert.commandWorked(st.s0.adminCommand({shardCollection: kNs, key: shardKey2}));

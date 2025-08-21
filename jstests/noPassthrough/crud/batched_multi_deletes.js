@@ -15,34 +15,40 @@ function validateBatchedDeletes(conn) {
     const coll = db.getCollection("c");
     const collName = coll.getName();
 
-    const docsPerBatchDefault = 100;  // batchedDeletesTargetBatchDocs.
-    const collCount = 5017;  // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
+    const docsPerBatchDefault = 100; // batchedDeletesTargetBatchDocs.
+    const collCount = 5017; // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
 
     function validateDeletion(db, coll, docsPerBatch) {
         coll.drop();
         assert.commandWorked(
-            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)})),
-                            {ordered: false}));
+            coll.insertMany(
+                [...Array(collCount).keys()].map((x) => ({_id: x, a: "a".repeat(1024)})),
+                {ordered: false},
+            ),
+        );
 
-        const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
+        const serverStatusBatchesBefore = db.serverStatus()["batchedDeletes"]["batches"];
+        const serverStatusDocsBefore = db.serverStatus()["batchedDeletes"]["docs"];
 
         assert.eq(collCount, coll.find().itcount());
         assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));
         assert.eq(0, coll.find().itcount());
 
-        const serverStatusBatchesAfter = db.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocsAfter = db.serverStatus()['batchedDeletes']['docs'];
-        const serverStatusBatchesExpected =
-            serverStatusBatchesBefore + Math.ceil(collCount / docsPerBatch);
+        const serverStatusBatchesAfter = db.serverStatus()["batchedDeletes"]["batches"];
+        const serverStatusDocsAfter = db.serverStatus()["batchedDeletes"]["docs"];
+        const serverStatusBatchesExpected = serverStatusBatchesBefore + Math.ceil(collCount / docsPerBatch);
         const serverStatusDocsExpected = serverStatusDocsBefore + collCount;
         assert.eq(serverStatusBatchesAfter, serverStatusBatchesExpected);
         assert.eq(serverStatusDocsAfter, serverStatusDocsExpected);
     }
 
     coll.drop();
-    assert.commandWorked(coll.insertMany(
-        [...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(1024)})), {ordered: false}));
+    assert.commandWorked(
+        coll.insertMany(
+            [...Array(collCount).keys()].map((x) => ({_id: x, a: "a".repeat(1024)})),
+            {ordered: false},
+        ),
+    );
 
     // For consistent results, don't enforce the targetBatchTimeMS and targetStagedDocBytes.
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
@@ -52,7 +58,7 @@ function validateBatchedDeletes(conn) {
     {
         const expl = db.runCommand({
             explain: {delete: collName, deletes: [{q: {_id: {$gte: 0}}, limit: 0}]},
-            verbosity: "executionStats"
+            verbosity: "executionStats",
         });
         assert.commandWorked(expl);
 
@@ -66,8 +72,7 @@ function validateBatchedDeletes(conn) {
 
     // Actual deletion.
     for (const docsPerBatch of [10, docsPerBatchDefault]) {
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
         validateDeletion(db, coll, docsPerBatch);
     }
 }

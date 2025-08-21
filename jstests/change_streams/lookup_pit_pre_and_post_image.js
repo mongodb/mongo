@@ -7,19 +7,19 @@ const collName = "test";
 
 const originalDoc = {
     _id: 1,
-    x: 1
+    x: 1,
 };
 const updatedDoc = {
     _id: 1,
-    x: 3
+    x: 3,
 };
 const updatedDoc2 = {
     _id: 1,
-    x: 5
+    x: 5,
 };
 const replacedDoc = {
     _id: 1,
-    z: 1
+    z: 1,
 };
 
 // Tests the change stream point-in-time pre-/post-images behaviour with different change stream
@@ -40,8 +40,7 @@ function preAndPostImageTest({
             assert(!changeStreamDoc.hasOwnProperty("fullDocumentBeforeChange"), changeStreamDoc);
         }
 
-        if (!changeStreamOptions.hasOwnProperty("fullDocument") &&
-            changeStreamDoc.operationType == "update") {
+        if (!changeStreamOptions.hasOwnProperty("fullDocument") && changeStreamDoc.operationType == "update") {
             assert(!changeStreamDoc.hasOwnProperty("fullDocument"), changeStreamDoc);
         }
     }
@@ -56,7 +55,7 @@ function preAndPostImageTest({
     assert.commandWorked(coll.insert(originalDoc));
     assert.soon(() => changeStreamCursor.hasNext());
     changeStreamDoc = changeStreamCursor.next();
-    assert.eq(changeStreamDoc.operationType, 'insert');
+    assert.eq(changeStreamDoc.operationType, "insert");
     assertChangeStreamInternalFieldsNotPresent(changeStreamDoc);
 
     // Perform an update modification.
@@ -64,16 +63,14 @@ function preAndPostImageTest({
 
     // Change stream should throw an exception while trying to fetch the next document if
     // pre-/post-image is required.
-    const shouldThrow = changeStreamOptions.fullDocument === 'required' ||
-        changeStreamOptions.fullDocumentBeforeChange === 'required';
+    const shouldThrow =
+        changeStreamOptions.fullDocument === "required" || changeStreamOptions.fullDocumentBeforeChange === "required";
     if (shouldThrow) {
         try {
             assert.soon(() => changeStreamCursor.hasNext());
             assert(false, `Unexpected result from cursor: ${tojson(changeStreamCursor.next())}`);
         } catch (error) {
-            assert.eq(error.code,
-                      ErrorCodes.NoMatchingDocument,
-                      `Caught unexpected error: ${tojson(error)}`);
+            assert.eq(error.code, ErrorCodes.NoMatchingDocument, `Caught unexpected error: ${tojson(error)}`);
         }
 
         // Reopen the failed change stream.
@@ -81,16 +78,16 @@ function preAndPostImageTest({
     } else {
         assert.soon(() => changeStreamCursor.hasNext());
         changeStreamDoc = changeStreamCursor.next();
-        assert.eq(changeStreamDoc.fullDocumentBeforeChange,
-                  expectedOnUpdateImagesWithChangeStreamPreImagesDisabled.preImage);
-        assert.eq(changeStreamDoc.fullDocument,
-                  expectedOnUpdateImagesWithChangeStreamPreImagesDisabled.postImage);
+        assert.eq(
+            changeStreamDoc.fullDocumentBeforeChange,
+            expectedOnUpdateImagesWithChangeStreamPreImagesDisabled.preImage,
+        );
+        assert.eq(changeStreamDoc.fullDocument, expectedOnUpdateImagesWithChangeStreamPreImagesDisabled.postImage);
         assertChangeStreamInternalFieldsNotPresent(changeStreamDoc);
     }
 
     // Enable changeStreamPreAndPostImages for pre-images recording.
-    assert.commandWorked(
-        testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
+    assert.commandWorked(testDB.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}));
 
     // Perform an update modification.
     assert.commandWorked(coll.update(updatedDoc, {$inc: {x: 2}}));
@@ -129,10 +126,10 @@ preAndPostImageTest({
     expectedOnReplaceImages: {
         postImage: replacedDoc,
     },
-    expectedOnDeleteImages: {}
+    expectedOnDeleteImages: {},
 });
 preAndPostImageTest({
-    changeStreamOptions: {fullDocumentBeforeChange: 'whenAvailable'},
+    changeStreamOptions: {fullDocumentBeforeChange: "whenAvailable"},
     expectedOnUpdateImagesWithChangeStreamPreImagesDisabled: {
         preImage: null,
     },
@@ -145,10 +142,10 @@ preAndPostImageTest({
     },
     expectedOnDeleteImages: {
         preImage: replacedDoc,
-    }
+    },
 });
 preAndPostImageTest({
-    changeStreamOptions: {fullDocument: 'whenAvailable'},
+    changeStreamOptions: {fullDocument: "whenAvailable"},
     expectedOnUpdateImagesWithChangeStreamPreImagesDisabled: {
         postImage: null,
     },
@@ -157,10 +154,10 @@ preAndPostImageTest({
     },
     expectedOnReplaceImages: {
         postImage: replacedDoc,
-    }
+    },
 });
 preAndPostImageTest({
-    changeStreamOptions: {fullDocumentBeforeChange: 'whenAvailable', fullDocument: 'whenAvailable'},
+    changeStreamOptions: {fullDocumentBeforeChange: "whenAvailable", fullDocument: "whenAvailable"},
     expectedOnUpdateImagesWithChangeStreamPreImagesDisabled: {
         preImage: null,
         postImage: null,
@@ -175,10 +172,10 @@ preAndPostImageTest({
     },
     expectedOnDeleteImages: {
         preImage: replacedDoc,
-    }
+    },
 });
 preAndPostImageTest({
-    changeStreamOptions: {fullDocumentBeforeChange: 'required'},
+    changeStreamOptions: {fullDocumentBeforeChange: "required"},
     expectedOnUpdateImagesWithChangeStreamPreImagesDisabled: {} /* will throw on hasNext() */,
     expectedOnUpdateImages: {
         preImage: updatedDoc,
@@ -189,35 +186,20 @@ preAndPostImageTest({
     },
     expectedOnDeleteImages: {
         preImage: replacedDoc,
-    }
+    },
 });
 preAndPostImageTest({
-    changeStreamOptions: {fullDocument: 'required'},
+    changeStreamOptions: {fullDocument: "required"},
     expectedOnUpdateImagesWithChangeStreamPreImagesDisabled: {} /* will throw on hasNext() */,
     expectedOnUpdateImages: {
         postImage: updatedDoc2,
     },
     expectedOnReplaceImages: {
         postImage: replacedDoc,
-    }
+    },
 });
 preAndPostImageTest({
-    changeStreamOptions: {fullDocumentBeforeChange: 'required', fullDocument: 'required'},
-    expectedOnUpdateImagesWithChangeStreamPreImagesDisabled: {} /* will throw on hasNext() */,
-    expectedOnUpdateImages: {
-        preImage: updatedDoc,
-        postImage: updatedDoc2,
-    },
-    expectedOnReplaceImages: {
-        preImage: updatedDoc2,
-        postImage: replacedDoc,
-    },
-    expectedOnDeleteImages: {
-        preImage: replacedDoc,
-    }
-});
-preAndPostImageTest({
-    changeStreamOptions: {fullDocumentBeforeChange: 'whenAvailable', fullDocument: 'required'},
+    changeStreamOptions: {fullDocumentBeforeChange: "required", fullDocument: "required"},
     expectedOnUpdateImagesWithChangeStreamPreImagesDisabled: {} /* will throw on hasNext() */,
     expectedOnUpdateImages: {
         preImage: updatedDoc,
@@ -229,10 +211,10 @@ preAndPostImageTest({
     },
     expectedOnDeleteImages: {
         preImage: replacedDoc,
-    }
+    },
 });
 preAndPostImageTest({
-    changeStreamOptions: {fullDocumentBeforeChange: 'required', fullDocument: 'whenAvailable'},
+    changeStreamOptions: {fullDocumentBeforeChange: "whenAvailable", fullDocument: "required"},
     expectedOnUpdateImagesWithChangeStreamPreImagesDisabled: {} /* will throw on hasNext() */,
     expectedOnUpdateImages: {
         preImage: updatedDoc,
@@ -244,5 +226,20 @@ preAndPostImageTest({
     },
     expectedOnDeleteImages: {
         preImage: replacedDoc,
-    }
+    },
+});
+preAndPostImageTest({
+    changeStreamOptions: {fullDocumentBeforeChange: "required", fullDocument: "whenAvailable"},
+    expectedOnUpdateImagesWithChangeStreamPreImagesDisabled: {} /* will throw on hasNext() */,
+    expectedOnUpdateImages: {
+        preImage: updatedDoc,
+        postImage: updatedDoc2,
+    },
+    expectedOnReplaceImages: {
+        preImage: updatedDoc2,
+        postImage: replacedDoc,
+    },
+    expectedOnDeleteImages: {
+        preImage: replacedDoc,
+    },
 });

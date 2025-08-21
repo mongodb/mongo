@@ -10,5 +10,4 @@ assert.commandWorked(before.renameCollection(after.getName()));
 const res = after.insert({_id: 1});
 assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
 const err = res.getWriteError();
-assert.gt(
-    err.errmsg.indexOf(after.getName()), 0, "error message does not contain new collection name");
+assert.gt(err.errmsg.indexOf(after.getName()), 0, "error message does not contain new collection name");

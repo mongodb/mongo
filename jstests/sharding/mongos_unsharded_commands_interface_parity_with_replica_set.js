@@ -72,7 +72,7 @@ import {
     restartReplicationOnAllShards,
     restartReplicationOnSecondaries,
     stopReplicationOnSecondaries,
-    stopReplicationOnSecondariesOfAllShards
+    stopReplicationOnSecondariesOfAllShards,
 } from "jstests/libs/write_concern_util.js";
 
 function joinFilteringMetadataRefresh(db, collName, mongoConfig) {
@@ -82,11 +82,10 @@ function joinFilteringMetadataRefresh(db, collName, mongoConfig) {
         // finished before running our tests.
         assert.soon(() => {
             let shard = mongoConfig.getPrimaryShard(db.getName());
-            const shardVersion = assert.commandWorked(
-                shard.rs.getPrimary().adminCommand({getShardVersion: fullName}));
+            const shardVersion = assert.commandWorked(shard.rs.getPrimary().adminCommand({getShardVersion: fullName}));
             const filteringMetadataState = shardVersion.global;
             assert(filteringMetadataState !== undefined);
-            return filteringMetadataState !== 'UNKNOWN';
+            return filteringMetadataState !== "UNKNOWN";
         });
     }
 }
@@ -101,14 +100,13 @@ function removeInconsistentFields(res) {
 }
 
 const tests = [
-
     {
         name: "validate",
         database: "test",
-        setup: function(db) {
+        setup: function (db) {
             assert.commandWorked(db.x.insert({}));
         },
-        teardown: function(db) {
+        teardown: function (db) {
             db.x.drop();
         },
         supportsWriteConcern: false,
@@ -122,7 +120,7 @@ const tests = [
             },
             {
                 shortDescription: "Runs validate on an empty collection.",
-                testCaseSetup: function(db, mongoConfig) {
+                testCaseSetup: function (db, mongoConfig) {
                     assert.commandWorked(db.createCollection("x"));
                     joinFilteringMetadataRefresh(db, "x", mongoConfig);
                 },
@@ -140,15 +138,15 @@ const tests = [
                 command: {validate: "x", full: true},
                 modifyCommandResult: removeInconsistentFields,
             },
-        ]
+        ],
     },
     {
         name: "collMod",
         database: "test",
-        setup: function(db) {
+        setup: function (db) {
             assert.commandWorked(db.x.createIndex({type: 1}));
         },
-        teardown: function(db) {
+        teardown: function (db) {
             db.x.drop();
         },
         // writeConcernError is retriable in mongos collMod command.
@@ -181,7 +179,7 @@ const tests = [
                     index: {keyPattern: {type: 1}, expireAfterSeconds: 5},
                 },
             },
-        ]
+        ],
     },
     {
         name: "dbStats",
@@ -196,7 +194,7 @@ const tests = [
                 shortDescription: "Runs dbStats with freeStorage=1.",
                 command: {dbStats: 1, scale: 1024, freeStorage: 1},
             },
-        ]
+        ],
     },
     {
         name: "appendOplogNote",
@@ -207,28 +205,30 @@ const tests = [
                 shortDescription: "Runs appendOplogNote.",
                 command: {appendOplogNote: 1, data: {msg: "message"}},
             },
-        ]
+        ],
     },
     {
         name: "setIndexCommitQuorum",
         database: "test",
         supportsWriteConcern: true,
-        setup: function(db) {
+        setup: function (db) {
             // Insert a document to avoid empty collection optimisation for index build.
             assert.commandWorked(db.x.insert({}));
             const primary = FixtureHelpers.getPrimaryForNodeHostingDatabase(db);
             let awaitShell;
             const failPoint = configureFailPoint(primary, "hangAfterIndexBuildFirstDrain");
-            awaitShell = startParallelShell(function() {
-                assert.commandWorked(db.runCommand({
-                    createIndexes: "x",
-                    indexes: [{key: {a: 1}, name: "a_1"}],
-                }));
+            awaitShell = startParallelShell(function () {
+                assert.commandWorked(
+                    db.runCommand({
+                        createIndexes: "x",
+                        indexes: [{key: {a: 1}, name: "a_1"}],
+                    }),
+                );
             }, db.getMongo().port);
             failPoint.wait();
             return {failPoint: failPoint, awaitShell: awaitShell};
         },
-        teardown: function(db, ctx) {
+        teardown: function (db, ctx) {
             ctx.failPoint.off();
             ctx.awaitShell();
             db.x.drop();
@@ -249,69 +249,64 @@ const tests = [
                     setIndexCommitQuorum: "x",
                     indexNames: ["a_1"],
                     commitQuorum: 1,
-                    comment: "message"
+                    comment: "message",
                 },
             },
-        ]
+        ],
     },
     {
         name: "createIndexes",
         database: "test",
         supportsWriteConcern: true,
-        teardown: function(db) {
+        teardown: function (db) {
             db.x.drop();
         },
         testCases: [
             {
                 shortDescription: "Runs createIndexes expecting an index option conflict error.",
-                testCaseSetup: function(db) {
-                    assert.commandWorked(
-                        db.runCommand({createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]}));
+                testCaseSetup: function (db) {
+                    assert.commandWorked(db.runCommand({createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]}));
                 },
                 command: {createIndexes: "x", indexes: [{key: {a: 1}, name: "err"}]},
                 expectedError: ErrorCodes.IndexOptionsConflict,
             },
             {
-                shortDescription:
-                    "Runs createIndexes expecting 'createdCollectionAutomatically' : true.",
+                shortDescription: "Runs createIndexes expecting 'createdCollectionAutomatically' : true.",
                 command: {createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]},
                 testCaseDoesNotSupportWriteConcern: true,
             },
 
             {
-                shortDescription:
-                    "Runs createIndexes expecting 'note' : 'all indexes already exist'",
-                testCaseSetup: function(db) {
-                    assert.commandWorked(
-                        db.runCommand({createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]}));
+                shortDescription: "Runs createIndexes expecting 'note' : 'all indexes already exist'",
+                testCaseSetup: function (db) {
+                    assert.commandWorked(db.runCommand({createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]}));
                 },
                 command: {createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]},
                 testCaseDoesNotSupportWriteConcern: true,
             },
             {
                 shortDescription: "Runs createIndexes on an existing empty collection.",
-                testCaseSetup: function(db, mongoConfig) {
+                testCaseSetup: function (db, mongoConfig) {
                     assert.commandWorked(db.createCollection("x"));
                     joinFilteringMetadataRefresh(db, "x", mongoConfig);
                 },
                 command: {createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]},
             },
             {
-                shortDescription:
-                    "Runs createIndexes on an existing collection with data (causing an index build).",
-                testCaseSetup: function(db) {
+                shortDescription: "Runs createIndexes on an existing collection with data (causing an index build).",
+                testCaseSetup: function (db) {
                     assert.commandWorked(db.x.insert({}));
                 },
                 command: {createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]},
                 testCaseDoesNotSupportWriteConcern: true,
             },
-        ]
+        ],
     },
     {
         name: "dropIndexes",
         database: "test",
         supportsWriteConcern: false,
-        teardown: function(db) {
+        teardown: function (db) {
             db.x.drop();
         },
         testCases: [
@@ -322,13 +317,12 @@ const tests = [
             },
             {
                 shortDescription: "Runs dropIndexes.",
-                testCaseSetup: function(db) {
-                    assert.commandWorked(
-                        db.runCommand({createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]}));
+                testCaseSetup: function (db) {
+                    assert.commandWorked(db.runCommand({createIndexes: "x", indexes: [{key: {a: 1}, name: "a_1"}]}));
                 },
                 command: {dropIndexes: "x", index: ["a_1"]},
-            }
-        ]
+            },
+        ],
     },
     {
         name: "cpuload",
@@ -338,7 +332,7 @@ const tests = [
                 shortDescription: "Runs cpuload.",
                 command: {cpuload: 1, cpuFactor: 1},
             },
-        ]
+        ],
     },
     {
         name: "lockInfo",
@@ -348,7 +342,7 @@ const tests = [
                 shortDescription: "Runs lockInfo.",
                 command: {lockInfo: 1},
             },
-        ]
+        ],
     },
 ];
 
@@ -373,13 +367,18 @@ function collModParity(db, collModCommand) {
     collModCommand.command.collMod = "z";
     const shardedResultKeys = Object.keys(runAndAssertTestCase(collModCommand, db));
 
-    assert(isSubset(unsplitableResultKeys, unshardedResultKeys) &&
-               isSubset(unshardedResultKeys, shardedResultKeys) &&
-               isSubset(shardedResultKeys, unsplitableResultKeys),
-           "Missing fields in the response" +
-               "\nKeys in unsplitable (sharded) collection response: " + unsplitableResultKeys +
-               "\nKeys in unshardedResultKeys collection response: " + unshardedResultKeys +
-               "\nKeys in sharded collection response: " + shardedResultKeys);
+    assert(
+        isSubset(unsplitableResultKeys, unshardedResultKeys) &&
+            isSubset(unshardedResultKeys, shardedResultKeys) &&
+            isSubset(shardedResultKeys, unsplitableResultKeys),
+        "Missing fields in the response" +
+            "\nKeys in unsplitable (sharded) collection response: " +
+            unsplitableResultKeys +
+            "\nKeys in unshardedResultKeys collection response: " +
+            unshardedResultKeys +
+            "\nKeys in sharded collection response: " +
+            shardedResultKeys,
+    );
 
     db.x.drop();
     db.y.drop();
@@ -392,27 +391,27 @@ function collModParityTests(db) {
 
     collModParity(db, {
         command: {
-            collMod: "",  // Filled by collModParity
-            index: {name: "ageIndex", hidden: true}
-        }
+            collMod: "", // Filled by collModParity
+            index: {name: "ageIndex", hidden: true},
+        },
     });
     collModParity(db, {
         command: {
-            collMod: "",  // Filled by collModParity
-            index: {name: "ageIndex", expireAfterSeconds: NumberLong(5)}
-        }
+            collMod: "", // Filled by collModParity
+            index: {name: "ageIndex", expireAfterSeconds: NumberLong(5)},
+        },
     });
     collModParity(db, {
         command: {
-            collMod: "",  // Filled by collModParity
-            index: {name: "ageIndex", expireAfterSeconds: 5}
-        }
+            collMod: "", // Filled by collModParity
+            index: {name: "ageIndex", expireAfterSeconds: 5},
+        },
     });
     collModParity(db, {
         command: {
-            collMod: "",  // Filled by collModParity
-            index: {name: "ageIndex", prepareUnique: true}
-        }
+            collMod: "", // Filled by collModParity
+            index: {name: "ageIndex", prepareUnique: true},
+        },
     });
 }
 
@@ -448,8 +447,10 @@ function runAndAssertTestCase(testCase, db) {
  */
 function runTestCase(test, testCase, forceWriteConcernError, testFixture) {
     const isSharded = testFixture.mongoConfig instanceof ShardingTest;
-    jsTestLog(`Test case: '${testCase.shortDescription}'` +
-              `\nEnv: sharded=${isSharded}, forceWriteConcernError=${forceWriteConcernError}`);
+    jsTestLog(
+        `Test case: '${testCase.shortDescription}'` +
+            `\nEnv: sharded=${isSharded}, forceWriteConcernError=${forceWriteConcernError}`,
+    );
 
     var ctx;
     const db = testFixture.db;
@@ -477,7 +478,7 @@ function runTestCase(test, testCase, forceWriteConcernError, testFixture) {
  * Checks if an array is a subset of another array.
  */
 function isSubset(superset, subset) {
-    return subset.every(el => superset.includes(el));
+    return subset.every((el) => superset.includes(el));
 }
 
 function assertMongosAndReplicaSetInterfaceParity(test, testCase, forceWriteConcernError, st, rst) {
@@ -498,24 +499,20 @@ function assertMongosAndReplicaSetInterfaceParity(test, testCase, forceWriteConc
         restartReplication: restartReplicationOnAllShards,
     };
 
-    const replSetResultKeys = Object.keys(runTestCase(
-        test,
-        testCase,
-        forceWriteConcernError,
-        replicaSetTestFixture,
-        ));
+    const replSetResultKeys = Object.keys(runTestCase(test, testCase, forceWriteConcernError, replicaSetTestFixture));
 
-    const shardResultKeys = Object.keys(runTestCase(
-        test,
-        testCase,
-        forceWriteConcernError,
-        mongosTestFixture,
-        ));
+    const shardResultKeys = Object.keys(runTestCase(test, testCase, forceWriteConcernError, mongosTestFixture));
 
-    assert(isSubset(shardResultKeys, replSetResultKeys),
-           "Missing fields in the mongos response" +
-               "\nKeys in replica set response: " + replSetResultKeys +
-               "\nKeys in shard response: " + shardResultKeys + "\nTest case: " + tojson(testCase));
+    assert(
+        isSubset(shardResultKeys, replSetResultKeys),
+        "Missing fields in the mongos response" +
+            "\nKeys in replica set response: " +
+            replSetResultKeys +
+            "\nKeys in shard response: " +
+            shardResultKeys +
+            "\nTest case: " +
+            tojson(testCase),
+    );
 }
 
 function runTestCases(st, rst, forceWriteConcernError) {
@@ -525,12 +522,10 @@ function runTestCases(st, rst, forceWriteConcernError) {
         }
 
         test.testCases.forEach((testCase) => {
-            if (forceWriteConcernError &&
-                (testCase.expectedError || testCase.testCaseDoesNotSupportWriteConcern)) {
+            if (forceWriteConcernError && (testCase.expectedError || testCase.testCaseDoesNotSupportWriteConcern)) {
                 return;
             }
-            assertMongosAndReplicaSetInterfaceParity(
-                test, testCase, forceWriteConcernError, st, rst);
+            assertMongosAndReplicaSetInterfaceParity(test, testCase, forceWriteConcernError, st, rst);
         });
     });
 }

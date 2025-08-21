@@ -22,7 +22,7 @@ rst.initiate();
 const db = rst.getPrimary().getDB(dbName);
 assert.commandWorked(db.createCollection(collName));
 
-const failpoint = 'hangBeforeGettingNextCollection';
+const failpoint = "hangBeforeGettingNextCollection";
 
 // Hang 'forEachCollectionFromDb' after iterating through the first collection.
 assert.commandWorked(db.adminCommand({configureFailPoint: failpoint, mode: "alwaysOn"}));

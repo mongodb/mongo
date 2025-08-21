@@ -35,13 +35,15 @@ function appenWriteConcern(command, writeConcern) {
 function runTests(collName, commandName, writeConcern) {
     const ns = dbName + "." + collName;
     // Non-existing collection with a random expected UUID (command succeeds, noop)
-    assert.commandWorked(db.runCommand(appenWriteConcern(
-        {[`${commandName}`]: collName, expectedCollectionUUID: UUID()}, writeConcern)));
+    assert.commandWorked(
+        db.runCommand(appenWriteConcern({[`${commandName}`]: collName, expectedCollectionUUID: UUID()}, writeConcern)),
+    );
 
     // Existing collection with a random expected UUID (command succeeds after successful drop)
     assert.commandWorked(db.getCollection(collName).insert({_id: 0}));
-    assert.commandWorked(db.runCommand(appenWriteConcern(
-        {[`${commandName}`]: collName, expectedCollectionUUID: UUID()}, writeConcern)));
+    assert.commandWorked(
+        db.runCommand(appenWriteConcern({[`${commandName}`]: collName, expectedCollectionUUID: UUID()}, writeConcern)),
+    );
     assert.eq(null, db.getCollection(collName).findOne({_id: 0}));
 
     // Existing collection with the expected UUID (command succeeds but no drop)
@@ -50,13 +52,14 @@ function runTests(collName, commandName, writeConcern) {
     assert.eq(0, st.s.getDB(dbName).getCollection(collName).countDocuments({}));
     const collUUID = st.config.collections.findOne({_id: ns}).uuid;
     assert.commandWorked(db.getCollection(collName).insert({_id: 0}));
-    assert.commandWorked(db.runCommand(appenWriteConcern(
-        {[`${commandName}`]: collName, expectedCollectionUUID: collUUID}, writeConcern)));
+    assert.commandWorked(
+        db.runCommand(
+            appenWriteConcern({[`${commandName}`]: collName, expectedCollectionUUID: collUUID}, writeConcern),
+        ),
+    );
     assert.neq(null, db.getCollection(collName).findOne({_id: 0}));
 }
 
-runTests("coll2",
-         "_shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern",
-         {writeConcern: {w: 'majority'}});
+runTests("coll2", "_shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern", {writeConcern: {w: "majority"}});
 
 st.stop();

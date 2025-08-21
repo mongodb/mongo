@@ -6,19 +6,21 @@ const CLIENT_CERT = "jstests/libs/client_roles.pem";
 
 function runTest(port) {
     // Run given test function in a parallel shell.
-    const runShell = function(func) {
-        const res = runMongoProgram("mongo",
-                                    "--host",
-                                    "localhost",
-                                    "--port",
-                                    port,
-                                    "--tls",
-                                    "--tlsCAFile",
-                                    CA_CERT,
-                                    "--tlsCertificateKeyFile",
-                                    CLIENT_CERT,
-                                    "--eval",
-                                    `(${func.toString()})();`);
+    const runShell = function (func) {
+        const res = runMongoProgram(
+            "mongo",
+            "--host",
+            "localhost",
+            "--port",
+            port,
+            "--tls",
+            "--tlsCAFile",
+            CA_CERT,
+            "--tlsCertificateKeyFile",
+            CLIENT_CERT,
+            "--eval",
+            `(${func.toString()})();`,
+        );
 
         assert.eq(0, res, "Connection attempt failed");
     };
@@ -29,8 +31,7 @@ function runTest(port) {
     runShell(() => {
         let ret = db.getSiblingDB("$external").auth({
             mechanism: "MONGODB-X509",
-            user:
-                "CN=Kernel Client Peer Role,OU=Kernel Users,O=MongoDB,L=New York City,ST=New York,C=US"
+            user: "CN=Kernel Client Peer Role,OU=Kernel Users,O=MongoDB,L=New York City,ST=New York,C=US",
         });
         assert.eq(ret, 1, "Auth failed");
     });
@@ -66,15 +67,19 @@ function runTest(port) {
     }`);
 }
 
-const setup = function(conn) {
+const setup = function (conn) {
     // Create an admin user, which we will later use to invalidate the user cache.
-    const admin = conn.getDB('admin');
+    const admin = conn.getDB("admin");
     admin.createUser({user: "admin", pwd: "admin", roles: ["root"]});
-    assert(admin.auth('admin', 'admin'));
+    assert(admin.auth("admin", "admin"));
 };
 
-let mongo = MongoRunner.runMongod(
-    {tlsMode: "requireTLS", tlsCertificateKeyFile: SERVER_CERT, tlsCAFile: CA_CERT, auth: ""});
+let mongo = MongoRunner.runMongod({
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: SERVER_CERT,
+    tlsCAFile: CA_CERT,
+    auth: "",
+});
 jsTest.log("Setup");
 setup(mongo);
 

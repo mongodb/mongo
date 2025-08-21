@@ -31,136 +31,154 @@ assert.throwsWithCode(() => {
 
 // No external file metadata
 assert.throwsWithCode(() => {
-    db.coll.aggregate([{$match: {a: 1}}],
-                      {$_externalDataSources: [{collName: "coll", dataSources: []}]});
+    db.coll.aggregate([{$match: {a: 1}}], {$_externalDataSources: [{collName: "coll", dataSources: []}]});
 }, 7039001);
 
 // No file type
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe"}]
-        }]
+        $_externalDataSources: [
+            {
+                collName: "coll",
+                dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe"}],
+            },
+        ],
     });
 }, ErrorCodes.IDLFailedToParse);
 
 // Unknown file type
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [{
-                url: kUrlProtocolFile + getRandomPipeName(),
-                storageType: "pipe",
-                fileType: "unknown"
-            }]
-        }]
+        $_externalDataSources: [
+            {
+                collName: "coll",
+                dataSources: [
+                    {
+                        url: kUrlProtocolFile + getRandomPipeName(),
+                        storageType: "pipe",
+                        fileType: "unknown",
+                    },
+                ],
+            },
+        ],
     });
 }, ErrorCodes.BadValue);
 
 // No storage type
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), fileType: "bson"}]
-        }]
+        $_externalDataSources: [
+            {
+                collName: "coll",
+                dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), fileType: "bson"}],
+            },
+        ],
     });
 }, ErrorCodes.IDLFailedToParse);
 
 // Unknown storage type
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [{
-                url: kUrlProtocolFile + getRandomPipeName(),
-                storageType: "unknown",
-                fileType: "bson"
-            }]
-        }]
+        $_externalDataSources: [
+            {
+                collName: "coll",
+                dataSources: [
+                    {
+                        url: kUrlProtocolFile + getRandomPipeName(),
+                        storageType: "unknown",
+                        fileType: "bson",
+                    },
+                ],
+            },
+        ],
     });
 }, ErrorCodes.BadValue);
 
 // No url
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources:
-            [{collName: "coll", dataSources: [{storageType: "pipe", fileType: "bson"}]}]
+        $_externalDataSources: [{collName: "coll", dataSources: [{storageType: "pipe", fileType: "bson"}]}],
     });
 }, ErrorCodes.IDLFailedToParse);
 
 // Invalid url #1: Unsupported protocol for 'pipe'
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [{url: "http://abc.com/name1", storageType: "pipe", fileType: "bson"}]
-        }]
+        $_externalDataSources: [
+            {
+                collName: "coll",
+                dataSources: [{url: "http://abc.com/name1", storageType: "pipe", fileType: "bson"}],
+            },
+        ],
     });
 }, 6968500);
 
 // Invalid url #2: '..' in the url
 assert.throwsWithCode(() => {
     db.coll.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources:
-                [{url: kUrlProtocolFile + "../name1", storageType: "pipe", fileType: "bson"}]
-        }]
+        $_externalDataSources: [
+            {
+                collName: "coll",
+                dataSources: [{url: kUrlProtocolFile + "../name1", storageType: "pipe", fileType: "bson"}],
+            },
+        ],
     });
 }, [7001100, 7001101]);
 
 // The source namespace is not an external data source
 assert.throwsWithCode(() => {
     db.unknown.aggregate([{$match: {a: 1}}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [
-                {url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe", fileType: "bson"}
-            ]
-        }]
+        $_externalDataSources: [
+            {
+                collName: "coll",
+                dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe", fileType: "bson"}],
+            },
+        ],
     });
 }, 7039003);
 
 (function testSampleStageOverExternalDataSourceNotOptimized() {
     const explain = db.coll.explain().aggregate([{$sample: {size: 10}}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [
-                {url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe", fileType: "bson"}
-            ]
-        }]
+        $_externalDataSources: [
+            {
+                collName: "coll",
+                dataSources: [{url: kUrlProtocolFile + getRandomPipeName(), storageType: "pipe", fileType: "bson"}],
+            },
+        ],
     });
-    assert(aggPlanHasStage(explain, "$sample"),
-           `Expected $sample is not optimized into $sampleFromRandomCursor but got ${
-               tojson(explain)}`);
+    assert(
+        aggPlanHasStage(explain, "$sample"),
+        `Expected $sample is not optimized into $sampleFromRandomCursor but got ${tojson(explain)}`,
+    );
 })();
 
 // Verifies that an external data source cannot be used for the $merge / $out pipeline stages.
 (function testMergeOrOutStageToExternalDataSource() {
-    [{$out: "out"}, {$merge: "out"}].forEach(stage => {
+    [{$out: "out"}, {$merge: "out"}].forEach((stage) => {
         assert.throwsWithCode(() => {
             db.coll.aggregate([stage], {
                 $_externalDataSources: [
                     {
                         collName: "coll",
-                        dataSources: [{
-                            url: kUrlProtocolFile + getRandomPipeName(),
-                            storageType: "pipe",
-                            fileType: "bson"
-                        }]
+                        dataSources: [
+                            {
+                                url: kUrlProtocolFile + getRandomPipeName(),
+                                storageType: "pipe",
+                                fileType: "bson",
+                            },
+                        ],
                     },
                     {
                         collName: "out",
-                        dataSources: [{
-                            url: kUrlProtocolFile + getRandomPipeName(),
-                            storageType: "pipe",
-                            fileType: "bson"
-                        }]
-                    }
-                ]
+                        dataSources: [
+                            {
+                                url: kUrlProtocolFile + getRandomPipeName(),
+                                storageType: "pipe",
+                                fileType: "bson",
+                            },
+                        ],
+                    },
+                ],
             });
         }, 7239302);
     });
@@ -195,9 +213,10 @@ let objsPerPipe = 25;
     _writeTestPipe(pipeName2, objsPerPipe);
     let result = _readTestPipes(pipeName1, pipeName2);
     assert.eq(
-        (2 * objsPerPipe),
-        bsonObjToArray(result)[0],  // "objects" first field contains the count of objects read
-        "_readTestPipes read wrong number of objects: " + bsonObjToArray(result)[0]);
+        2 * objsPerPipe,
+        bsonObjToArray(result)[0], // "objects" first field contains the count of objects read
+        "_readTestPipes read wrong number of objects: " + bsonObjToArray(result)[0],
+    );
 })();
 
 function testSimpleAggregationsOverExternalDataSource(pipeDir) {
@@ -213,19 +232,21 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         _writeTestPipe(pipeName1, objsPerPipe, 0, 2048, pipeDir);
         _writeTestPipe(pipeName2, objsPerPipe, 0, 2048, pipeDir);
         let result = db.coll.aggregate([{$count: "objects"}], {
-            $_externalDataSources: [{
-                collName: "coll",
-                dataSources: [
-                    {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                    {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
-                ]
-            }]
+            $_externalDataSources: [
+                {
+                    collName: "coll",
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                        {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"},
+                    ],
+                },
+            ],
         });
         assert.eq(
-            (2 * objsPerPipe),
-            result._batch[0]
-                .objects,  // shell puts agg result in "_batch"[0] field of a wrapper obj
-            "$_externalDataSources read wrong number of objects: " + result._batch[0].objects);
+            2 * objsPerPipe,
+            result._batch[0].objects, // shell puts agg result in "_batch"[0] field of a wrapper obj
+            "$_externalDataSources read wrong number of objects: " + result._batch[0].objects,
+        );
     })();
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -233,7 +254,7 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     // them.
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // The following objects are also in BSON file external_data_source.bson in the same order.
-    const kPipes = 2;  // number of pipes to write
+    const kPipes = 2; // number of pipes to write
     const kObjsToWrite = [
         {"Zero": "zero zero zero zero zero zero zero zero zero zero zero zero zero zero zero zero"},
         {"One": "one one one one one one one one one one one one one one one one one one one one"},
@@ -241,9 +262,9 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         {"Three": "three three three three three three three three three three three three three"},
         {"Four": "four four four four four four four four four four four four four four four four"},
         {"Five": "five five five five five five five five five five five five five five five five"},
-        {"Six": "six six six six six six six six six six six six six six six six six six six six"}
+        {"Six": "six six six six six six six six six six six six six six six six six six six six"},
     ];
-    const kNumObjs = kObjsToWrite.length;  // number of different objects for round-robin
+    const kNumObjs = kObjsToWrite.length; // number of different objects for round-robin
     (function testRoundtripOverMultiplePipes() {
         jsTestLog("Testing testRoundtripOverMultiplePipes()");
 
@@ -252,20 +273,24 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         _writeTestPipeObjects(pipeName1, objsPerPipe, kObjsToWrite, pipeDir);
         _writeTestPipeObjects(pipeName2, objsPerPipe, kObjsToWrite, pipeDir);
         let cursor = db.coll.aggregate([], {
-            $_externalDataSources: [{
-                collName: "coll",
-                dataSources: [
-                    {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                    {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
-                ]
-            }]
+            $_externalDataSources: [
+                {
+                    collName: "coll",
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                        {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"},
+                    ],
+                },
+            ],
         });
         // Verify the objects read from the pipes match what was written to them.
         for (let pipe = 0; pipe < kPipes; ++pipe) {
             for (let objIdx = 0; objIdx < objsPerPipe; ++objIdx) {
-                assert.eq(cursor.next(),
-                          kObjsToWrite[objIdx % kNumObjs],
-                          "Object read from pipe does not match expected.");
+                assert.eq(
+                    cursor.next(),
+                    kObjsToWrite[objIdx % kNumObjs],
+                    "Object read from pipe does not match expected.",
+                );
             }
         }
     })();
@@ -280,29 +305,37 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
 
         const pipeName1 = getRandomPipeName();
         const pipeName2 = pipeName1 + "1";
-        _writeTestPipeBsonFile(pipeName1,
-                               objsPerPipe,
-                               "jstests/noPassthrough/query/external_data_source.bson",
-                               pipeDir);
-        _writeTestPipeBsonFile(pipeName2,
-                               objsPerPipe,
-                               "jstests/noPassthrough/query/external_data_source.bson",
-                               pipeDir);
+        _writeTestPipeBsonFile(
+            pipeName1,
+            objsPerPipe,
+            "jstests/noPassthrough/query/external_data_source.bson",
+            pipeDir,
+        );
+        _writeTestPipeBsonFile(
+            pipeName2,
+            objsPerPipe,
+            "jstests/noPassthrough/query/external_data_source.bson",
+            pipeDir,
+        );
         let cursor = db.coll.aggregate([{$project: {_id: 0}}], {
-            $_externalDataSources: [{
-                collName: "coll",
-                dataSources: [
-                    {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                    {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
-                ]
-            }]
+            $_externalDataSources: [
+                {
+                    collName: "coll",
+                    dataSources: [
+                        {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                        {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"},
+                    ],
+                },
+            ],
         });
         // Verify the objects read from the pipes match what was written to them.
         for (let pipe = 0; pipe < kPipes; ++pipe) {
             for (let objIdx = 0; objIdx < objsPerPipe; ++objIdx) {
-                assert.eq(cursor.next(),
-                          kObjsToWrite[objIdx % kNumObjs],
-                          "Object read from pipe does not match expected.");
+                assert.eq(
+                    cursor.next(),
+                    kObjsToWrite[objIdx % kNumObjs],
+                    "Object read from pipe does not match expected.",
+                );
             }
         }
     })();
@@ -316,7 +349,7 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     for (let i = 0; i < kDocs; ++i) {
         collObjs.push({
             _id: i,
-            g: Random.randInt(kNumGroups),  // 10 groups
+            g: Random.randInt(kNumGroups), // 10 groups
             str1: "strdata_" + Random.randInt(100000000),
         });
     }
@@ -328,21 +361,19 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
 
         const kNumFilter = 5;
-        const expectedRes = collObjs.filter(obj => obj.g < kNumFilter);
+        const expectedRes = collObjs.filter((obj) => obj.g < kNumFilter);
         const cursor = db.coll.aggregate([{$match: {g: {$lt: kNumFilter}}}], {
-            $_externalDataSources: [{
-                collName: "coll",
-                dataSources: [
-                    {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                ]
-            }]
+            $_externalDataSources: [
+                {
+                    collName: "coll",
+                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
+                },
+            ],
         });
         const resArr = cursor.toArray();
         assert.eq(resArr.length, expectedRes.length);
         for (let i = 0; i < expectedRes.length; ++i) {
-            assert.eq(resArr[i],
-                      expectedRes[i],
-                      `Expected ${tojson(expectedRes[i])} but got ${tojson(resArr[i])}`);
+            assert.eq(resArr[i], expectedRes[i], `Expected ${tojson(expectedRes[i])} but got ${tojson(resArr[i])}`);
         }
     })();
 
@@ -352,7 +383,7 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         for (let i = 0; i < kNumGroups; ++i) {
             countPerGroup[i] = 0;
         }
-        collObjs.forEach(obj => {
+        collObjs.forEach((obj) => {
             ++countPerGroup[obj.g];
         });
         const expectedRes = [];
@@ -373,12 +404,12 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
 
         const expectedRes = getCountPerGroupResult(collObjs);
         const cursor = db.coll.aggregate([{$group: {_id: "$g", c: {$count: {}}}}], {
-            $_externalDataSources: [{
-                collName: "coll",
-                dataSources: [
-                    {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                ]
-            }]
+            $_externalDataSources: [
+                {
+                    collName: "coll",
+                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
+                },
+            ],
         });
         const resArr = cursor.toArray();
         assert.sameMembers(resArr, expectedRes);
@@ -399,24 +430,18 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
             $_externalDataSources: [
                 {
                     collName: collName1,
-                    dataSources: [
-                        {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                    ]
+                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
                 },
                 {
                     collName: collName2,
-                    dataSources: [
-                        {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"},
-                    ]
-                }
-            ]
+                    dataSources: [{url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}],
+                },
+            ],
         });
         const resArr = cursor.toArray();
         assert.eq(resArr.length, expectedRes.length);
         for (let i = 0; i < expectedRes.length; ++i) {
-            assert.eq(resArr[i],
-                      expectedRes[i],
-                      `Expected ${tojson(expectedRes[i])} but got ${tojson(resArr[i])}`);
+            assert.eq(resArr[i], expectedRes[i], `Expected ${tojson(expectedRes[i])} but got ${tojson(resArr[i])}`);
         }
     })();
 
@@ -424,44 +449,46 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         jsTestLog("Testing testSpillingGroupOverExternalDataSource()");
 
         // Makes sure that both classic/SBE $group spill data.
-        const oldClassicGroupMaxMemory = assert
-                                             .commandWorked(db.adminCommand({
-                                                 setParameter: 1,
-                                                 internalDocumentSourceGroupMaxMemoryBytes: 1,
-                                             }))
-                                             .was;
-        const oldSbeGroupMaxMemory =
-            assert
-                .commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1,
-                }))
-                .was;
+        const oldClassicGroupMaxMemory = assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalDocumentSourceGroupMaxMemoryBytes: 1,
+            }),
+        ).was;
+        const oldSbeGroupMaxMemory = assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1,
+            }),
+        ).was;
 
         const pipeName1 = getRandomPipeName();
         _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
 
         const expectedRes = getCountPerGroupResult(collObjs);
         const cursor = db.coll.aggregate([{$group: {_id: "$g", c: {$count: {}}}}], {
-            $_externalDataSources: [{
-                collName: "coll",
-                dataSources: [
-                    {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                ]
-            }]
+            $_externalDataSources: [
+                {
+                    collName: "coll",
+                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
+                },
+            ],
         });
         const resArr = cursor.toArray();
         assert.sameMembers(resArr, expectedRes);
 
-        assert.commandWorked(db.adminCommand({
-            setParameter: 1,
-            internalDocumentSourceGroupMaxMemoryBytes: oldClassicGroupMaxMemory,
-        }));
-        assert.commandWorked(db.adminCommand({
-            setParameter: 1,
-            internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
-                oldSbeGroupMaxMemory,
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalDocumentSourceGroupMaxMemoryBytes: oldClassicGroupMaxMemory,
+            }),
+        );
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: oldSbeGroupMaxMemory,
+            }),
+        );
     })();
 
     // Verifies that 'killCursors' command works over external data sources while the server keeps
@@ -475,7 +502,7 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         for (let i = 0; i < kManyDocs; ++i) {
             largeCollObjs.push({
                 _id: i,
-                g: Random.randInt(10),  // 10 groups
+                g: Random.randInt(10), // 10 groups
                 str1: "strdata_" + Random.randInt(100000000),
             });
         }
@@ -495,15 +522,13 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
             $_externalDataSources: [
                 {
                     collName: collName1,
-                    dataSources:
-                        [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}]
+                    dataSources: [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}],
                 },
                 {
                     collName: collName2,
-                    dataSources:
-                        [{url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}]
+                    dataSources: [{url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}],
                 },
-            ]
+            ],
         });
 
         // Has 'getMore' command issued to the server since the default batch size is 101 documents.
@@ -532,8 +557,7 @@ if (hostInfo.os.type != "Windows") {
         assert(mkdir(pipeDir).created, `Failed to create ${pipeDir}`);
 
         jsTestLog(`Testing named pipe test cases with externalPipeDir=${pipeDir}`);
-        conn = MongoRunner.runMongod(
-            {setParameter: {enableComputeMode: true, externalPipeDir: pipeDir}});
+        conn = MongoRunner.runMongod({setParameter: {enableComputeMode: true, externalPipeDir: pipeDir}});
         db = conn.getDB(jsTestName());
 
         testSimpleAggregationsOverExternalDataSource(pipeDir);
@@ -549,15 +573,17 @@ if (hostInfo.os.type != "Windows") {
         assert(mkdir(pipeDir).created, `Failed to create ${pipeDir}`);
 
         jsTestLog(`Testing externalPipeDir=${pipeDir}`);
-        const pid = MongoRunner
-                        .runMongod({
-                            waitForConnect: false,
-                            setParameter: {enableComputeMode: true, externalPipeDir: pipeDir}
-                        })
-                        .pid;
-        assert.soon(() => {
-            const runningStatus = checkProgram(pid);
-            return !runningStatus.alive && runningStatus.exitCode != 0;
-        }, "Expected mongod died due to an error", 120 * 1000);
+        const pid = MongoRunner.runMongod({
+            waitForConnect: false,
+            setParameter: {enableComputeMode: true, externalPipeDir: pipeDir},
+        }).pid;
+        assert.soon(
+            () => {
+                const runningStatus = checkProgram(pid);
+                return !runningStatus.alive && runningStatus.exitCode != 0;
+            },
+            "Expected mongod died due to an error",
+            120 * 1000,
+        );
     })();
 }

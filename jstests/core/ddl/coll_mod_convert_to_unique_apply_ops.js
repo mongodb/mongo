@@ -18,13 +18,13 @@
  * ]
  */
 
-const collName = 'collmod_convert_to_unique_apply_ops';
+const collName = "collmod_convert_to_unique_apply_ops";
 const coll = db.getCollection(collName);
 coll.drop();
 assert.commandWorked(db.createCollection(collName));
 
 function countUnique(key) {
-    const all = coll.getIndexes().filter(function(z) {
+    const all = coll.getIndexes().filter(function (z) {
         return z.unique && friendlyEqual(z.key, key);
     });
     return all.length;
@@ -38,7 +38,7 @@ assert.commandWorked(coll.createIndex({a: 1}));
 const applyOpsCmd = {
     applyOps: [
         {
-            op: 'c',
+            op: "c",
             ns: db.$cmd.getFullName(),
             o: {
                 collMod: coll.getName(),
@@ -48,19 +48,19 @@ const applyOpsCmd = {
                 },
             },
         },
-    ]
+    ],
 };
 
 // Conversion should fail when there are existing duplicates.
 assert.commandWorked(coll.insert({_id: 1, a: 100}));
 assert.commandWorked(coll.insert({_id: 2, a: 100}));
 // First sets 'prepareUnique' before converting the index to unique.
-assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 const cannotConvertIndexToUniqueError = assert.commandFailedWithCode(
-    db.adminCommand(applyOpsCmd), ErrorCodes.CannotConvertIndexToUnique);
-jsTestLog('Cannot enable index constraint error from failed conversion: ' +
-          tojson(cannotConvertIndexToUniqueError));
+    db.adminCommand(applyOpsCmd),
+    ErrorCodes.CannotConvertIndexToUnique,
+);
+jsTestLog("Cannot enable index constraint error from failed conversion: " + tojson(cannotConvertIndexToUniqueError));
 assert.eq(1, cannotConvertIndexToUniqueError.applied, tojson(cannotConvertIndexToUniqueError));
 assert.commandWorked(coll.remove({_id: 2}));
 
@@ -69,10 +69,9 @@ assert.commandWorked(coll.remove({_id: 2}));
 // through applyOps.
 const dryRunCmd = Object.extend({}, applyOpsCmd, true /* deep */);
 dryRunCmd.applyOps[0].o.dryRun = true;
-jsTestLog('Running collMod in dry run mode through applyOps: ' + tojson(dryRunCmd));
-const dryRunError =
-    assert.commandFailedWithCode(db.adminCommand(dryRunCmd), ErrorCodes.InvalidOptions);
-jsTestLog('Rejected dry run mode result: ' + tojson(dryRunError));
+jsTestLog("Running collMod in dry run mode through applyOps: " + tojson(dryRunCmd));
+const dryRunError = assert.commandFailedWithCode(db.adminCommand(dryRunCmd), ErrorCodes.InvalidOptions);
+jsTestLog("Rejected dry run mode result: " + tojson(dryRunError));
 
 // Successfully converts to a unique index.
 const result = assert.commandWorked(db.adminCommand(applyOpsCmd));
@@ -82,7 +81,7 @@ assert.eq(1, result.applied, tojson(result));
 assert.sameMembers([true], result.results, tojson(result));
 
 // Look up index details in listIndexes output.
-assert.eq(countUnique({a: 1}), 1, 'index should be unique now: ' + tojson(coll.getIndexes()));
+assert.eq(countUnique({a: 1}), 1, "index should be unique now: " + tojson(coll.getIndexes()));
 
 // Test uniqueness constraint.
 assert.commandFailedWithCode(coll.insert({_id: 100, a: 100}), ErrorCodes.DuplicateKey);

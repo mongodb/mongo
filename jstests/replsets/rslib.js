@@ -40,14 +40,14 @@ var w = 0;
  * sync source and make sure it's ahead. When replication is restarted, the desired sync
  * source will be a valid sync source for the syncing node.
  */
-syncFrom = function(syncingNode, desiredSyncSource, rst) {
+syncFrom = function (syncingNode, desiredSyncSource, rst) {
     jsTestLog("Forcing " + syncingNode.name + " to sync from " + desiredSyncSource.name);
 
     // Ensure that 'desiredSyncSource' doesn't already have the dummy write sitting around from
     // a previous syncFrom attempt.
     var dummyName = "dummyForSyncFrom";
     rst.getPrimary().getDB(dummyName).getCollection(dummyName).drop();
-    assert.soonNoExcept(function() {
+    assert.soonNoExcept(function () {
         return desiredSyncSource.getDB(dummyName).getCollection(dummyName).findOne() == null;
     });
 
@@ -56,7 +56,7 @@ syncFrom = function(syncingNode, desiredSyncSource, rst) {
     assert.commandWorked(rst.getPrimary().getDB(dummyName).getCollection(dummyName).insert({a: 1}));
     // Wait for 'desiredSyncSource' to get the dummy write we just did so we know it's
     // definitely ahead of 'syncingNode' before we call replSetSyncFrom.
-    assert.soonNoExcept(function() {
+    assert.soonNoExcept(function () {
         return desiredSyncSource.getDB(dummyName).getCollection(dummyName).findOne({a: 1});
     });
 
@@ -71,7 +71,7 @@ syncFrom = function(syncingNode, desiredSyncSource, rst) {
  * been called more than 'retries' times without returning true. If 'retries' is not given,
  * it defaults to 200. 'retries' must be an integer greater than or equal to zero.
  */
-wait = function(f, msg, retries) {
+wait = function (f, msg, retries) {
     w++;
     var n = 0;
     var default_retries = 200;
@@ -89,7 +89,7 @@ wait = function(f, msg, retries) {
             print("" + f);
         }
         if (n >= retries) {
-            throw new Error('Tried ' + retries + ' times, giving up on ' + msg);
+            throw new Error("Tried " + retries + " times, giving up on " + msg);
         }
         sleep(delay_interval_ms);
     }
@@ -104,7 +104,7 @@ wait = function(f, msg, retries) {
  * }
  * </pre>
  */
-occasionally = function(f, n) {
+occasionally = function (f, n) {
     var interval = n || 4;
     if (count % interval == 0) {
         f();
@@ -121,14 +121,14 @@ occasionally = function(f, n) {
  *
  * @param conn - a Mongo connection object or DB object.
  */
-reconnect = function(conn) {
+reconnect = function (conn) {
     var retries = 200;
-    wait(function() {
+    wait(function () {
         var db;
         try {
             // Make this work with either dbs or connections.
-            if (typeof (conn.getDB) == "function") {
-                db = conn.getDB('config');
+            if (typeof conn.getDB == "function") {
+                db = conn.getDB("config");
             } else {
                 db = conn;
             }
@@ -148,44 +148,51 @@ reconnect = function(conn) {
     }, retries);
 };
 
-getLatestOp = function(server) {
+getLatestOp = function (server) {
     server.getDB("admin").getMongo().setSecondaryOk();
-    var log = server.getDB("local")['oplog.rs'];
-    var cursor = log.find({}).sort({'$natural': -1}).limit(1);
+    var log = server.getDB("local")["oplog.rs"];
+    var cursor = log.find({}).sort({"$natural": -1}).limit(1);
     if (cursor.hasNext()) {
         return cursor.next();
     }
     return null;
 };
 
-waitForAllMembers = function(master, timeout) {
+waitForAllMembers = function (master, timeout) {
     var failCount = 0;
 
-    assert.soon(function() {
-        var state = null;
-        try {
-            state = master.getSiblingDB("admin").runCommand({replSetGetStatus: 1});
-            failCount = 0;
-        } catch (e) {
-            // Connection can get reset on replica set failover causing a socket exception
-            print("Calling replSetGetStatus failed");
-            print(e);
-            return false;
-        }
-        occasionally(function() {
-            printjson(state);
-        }, 10);
-
-        for (var m in state.members) {
-            if (state.members[m].state != 1 &&  // PRIMARY
-                state.members[m].state != 2 &&  // SECONDARY
-                state.members[m].state != 7) {  // ARBITER
+    assert.soon(
+        function () {
+            var state = null;
+            try {
+                state = master.getSiblingDB("admin").runCommand({replSetGetStatus: 1});
+                failCount = 0;
+            } catch (e) {
+                // Connection can get reset on replica set failover causing a socket exception
+                print("Calling replSetGetStatus failed");
+                print(e);
                 return false;
             }
-        }
-        printjson(state);
-        return true;
-    }, "not all members ready", timeout || 10 * 60 * 1000);
+            occasionally(function () {
+                printjson(state);
+            }, 10);
+
+            for (var m in state.members) {
+                if (
+                    state.members[m].state != 1 && // PRIMARY
+                    state.members[m].state != 2 && // SECONDARY
+                    state.members[m].state != 7
+                ) {
+                    // ARBITER
+                    return false;
+                }
+            }
+            printjson(state);
+            return true;
+        },
+        "not all members ready",
+        timeout || 10 * 60 * 1000,
+    );
 
     print("All members are now in state PRIMARY, SECONDARY, or ARBITER");
 };
@@ -202,12 +209,11 @@ function reconfigWithRetry(primary, config, force, shouldFail = false, errCode, 
     let reconfigCommand = {
         replSetReconfig: config,
         force: force,
-        maxTimeMS: ReplSetTest.kDefaultTimeoutMS
+        maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
     };
 
-    assert.soon(function() {
-        const newVersion =
-            assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version + 1;
+    assert.soon(function () {
+        const newVersion = assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version + 1;
         reconfigCommand.replSetReconfig.version = newVersion;
         let res = admin.runCommand(reconfigCommand);
 
@@ -215,15 +221,17 @@ function reconfigWithRetry(primary, config, force, shouldFail = false, errCode, 
         // reason for this is if the connections used for heartbeats get closed on the destination
         // node.
         if (!res.ok && res.code === ErrorCodes.NodeNotFound) {
-            print("Replset reconfig failed because quorum check failed. Retry reconfig once. " +
-                  "Error: " + tojson(res));
+            print(
+                "Replset reconfig failed because quorum check failed. Retry reconfig once. " + "Error: " + tojson(res),
+            );
             res = admin.runCommand(reconfigCommand);
         }
 
         // Always retry on these errors, even if we already retried on NodeNotFound.
-        if (!res.ok &&
-            (res.code === ErrorCodes.ConfigurationInProgress ||
-             res.code === ErrorCodes.CurrentConfigNotCommittedYet)) {
+        if (
+            !res.ok &&
+            (res.code === ErrorCodes.ConfigurationInProgress || res.code === ErrorCodes.CurrentConfigNotCommittedYet)
+        ) {
             print("Replset reconfig failed since another configuration is in progress. Retry.");
             // Retry.
             return false;
@@ -232,11 +240,11 @@ function reconfigWithRetry(primary, config, force, shouldFail = false, errCode, 
         // Always retry on NewReplicaSetConfigurationIncompatible, if the current config version is
         // higher than the requested one.
         if (!res.ok && res.code === ErrorCodes.NewReplicaSetConfigurationIncompatible) {
-            const curVersion =
-                assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version;
+            const curVersion = assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version;
             if (curVersion >= newVersion) {
-                print("Replset reconfig failed since the config version was too low. Retry. " +
-                      "Error: " + tojson(res));
+                print(
+                    "Replset reconfig failed since the config version was too low. Retry. " + "Error: " + tojson(res),
+                );
                 // Retry.
                 return false;
             }
@@ -313,67 +321,78 @@ function autoReconfig(rst, targetConfig) {
     let config = Object.assign({}, sourceConfig);
 
     // Look up the index of a given member in the given array by its member id.
-    const memberIndex = (cfg, id) => cfg.members.findIndex(m => m._id === id);
-    const memberInConfig = (cfg, id) => cfg.members.find(m => m._id === id);
+    const memberIndex = (cfg, id) => cfg.members.findIndex((m) => m._id === id);
+    const memberInConfig = (cfg, id) => cfg.members.find((m) => m._id === id);
     const getMember = (cfg, id) => cfg.members[memberIndex(cfg, id)];
-    const getVotes = (cfg, id) =>
-        getMember(cfg, id).hasOwnProperty("votes") ? getMember(cfg, id).votes : 1;
+    const getVotes = (cfg, id) => (getMember(cfg, id).hasOwnProperty("votes") ? getMember(cfg, id).votes : 1);
 
-    print(`autoReconfig: source config: ${tojson(sourceConfig)}, target config: ${
-        tojson(targetConfig)}`);
+    print(`autoReconfig: source config: ${tojson(sourceConfig)}, target config: ${tojson(targetConfig)}`);
 
     // All the members in the target that aren't in the source.
-    let membersToAdd = targetConfig.members.filter(m => !memberInConfig(sourceConfig, m._id));
+    let membersToAdd = targetConfig.members.filter((m) => !memberInConfig(sourceConfig, m._id));
     // All the members in the source that aren't in the target.
-    let membersToRemove = sourceConfig.members.filter(m => !memberInConfig(targetConfig, m._id));
+    let membersToRemove = sourceConfig.members.filter((m) => !memberInConfig(targetConfig, m._id));
     // All the members that appear in both the source and target and have changed.
     let membersToUpdate = targetConfig.members.filter(
-        (m) => memberInConfig(sourceConfig, m._id) &&
-            bsonWoCompare(m, memberInConfig(sourceConfig, m._id)) !== 0);
+        (m) => memberInConfig(sourceConfig, m._id) && bsonWoCompare(m, memberInConfig(sourceConfig, m._id)) !== 0,
+    );
 
     // Sort the members to ensure that we do updates that remove a node's vote first.
     let membersToUpdateRemoveVote = membersToUpdate.filter(
-        (m) => (getVotes(targetConfig, m._id) < getVotes(sourceConfig, m._id)));
+        (m) => getVotes(targetConfig, m._id) < getVotes(sourceConfig, m._id),
+    );
     let membersToUpdateAddVote = membersToUpdate.filter(
-        (m) => (getVotes(targetConfig, m._id) >= getVotes(sourceConfig, m._id)));
+        (m) => getVotes(targetConfig, m._id) >= getVotes(sourceConfig, m._id),
+    );
     membersToUpdate = membersToUpdateRemoveVote.concat(membersToUpdateAddVote);
 
-    print(`autoReconfig: Starting with membersToRemove: ${
-        tojsononeline(membersToRemove)}, membersToUpdate: ${
-        tojsononeline(membersToUpdate)}, membersToAdd: ${tojsononeline(membersToAdd)}`);
+    print(
+        `autoReconfig: Starting with membersToRemove: ${tojsononeline(
+            membersToRemove,
+        )}, membersToUpdate: ${tojsononeline(membersToUpdate)}, membersToAdd: ${tojsononeline(membersToAdd)}`,
+    );
 
     // Remove members.
-    membersToRemove.forEach(toRemove => {
-        config.members = config.members.filter(m => m._id !== toRemove._id);
+    membersToRemove.forEach((toRemove) => {
+        config.members = config.members.filter((m) => m._id !== toRemove._id);
         config.version++;
-        print(`autoReconfig: remove member id ${toRemove._id}, reconfiguring to member set: ${
-            tojsononeline(config.members)}`);
+        print(
+            `autoReconfig: remove member id ${toRemove._id}, reconfiguring to member set: ${tojsononeline(
+                config.members,
+            )}`,
+        );
         reconfigWithRetry(primary, config);
     });
 
     // Update members.
-    membersToUpdate.forEach(toUpdate => {
+    membersToUpdate.forEach((toUpdate) => {
         let configIndex = memberIndex(config, toUpdate._id);
         config.members[configIndex] = toUpdate;
         config.version++;
-        print(`autoReconfig: update member id ${toUpdate._id}, reconfiguring to member set: ${
-            tojsononeline(config.members)}`);
+        print(
+            `autoReconfig: update member id ${toUpdate._id}, reconfiguring to member set: ${tojsononeline(
+                config.members,
+            )}`,
+        );
         reconfigWithRetry(primary, config);
     });
 
     // Add members.
-    membersToAdd.forEach(toAdd => {
+    membersToAdd.forEach((toAdd) => {
         config.members.push(toAdd);
         config.version++;
-        print(`autoReconfig: add member id ${toAdd._id}, reconfiguring to member set: ${
-            tojsononeline(config.members)}`);
+        print(
+            `autoReconfig: add member id ${toAdd._id}, reconfiguring to member set: ${tojsononeline(config.members)}`,
+        );
         reconfigWithRetry(primary, config);
     });
 
     // Verify that the final set of members is correct.
-    assert.sameMembers(targetConfig.members.map(m => m._id),
-                       rst.getReplSetConfigFromNode().members.map(m => m._id),
-                       "final config does not have the expected member set.");
+    assert.sameMembers(
+        targetConfig.members.map((m) => m._id),
+        rst.getReplSetConfigFromNode().members.map((m) => m._id),
+        "final config does not have the expected member set.",
+    );
 
     // Do a final reconfig to update any other top level config fields. This also ensures the
     // correct member order in the final config since the add/remove procedure above will result in
@@ -397,7 +416,7 @@ function autoReconfig(rst, targetConfig) {
  * @param doNotWaitForMembers - if set, we will skip waiting for all members to be in primary,
  *     secondary, or arbiter states
  */
-reconfig = function(rst, config, force, doNotWaitForMembers) {
+reconfig = function (rst, config, force, doNotWaitForMembers) {
     var primary = rst.getPrimary();
     config = rst._updateConfigIfNotDurable(config);
 
@@ -429,21 +448,21 @@ reconfig = function(rst, config, force, doNotWaitForMembers) {
  * @param errMsg - if exists, we verify that the reconfig fails with error message containing this
  * errMsg.
  */
-safeReconfigShouldFail = function(rst, config, force, errCode, errMsg) {
+safeReconfigShouldFail = function (rst, config, force, errCode, errMsg) {
     reconfigWithRetry(rst.getPrimary(), config, force, true /* shouldFail */, errCode, errMsg);
 };
 
-awaitOpTime = function(catchingUpNode, latestOpTimeNode) {
+awaitOpTime = function (catchingUpNode, latestOpTimeNode) {
     var ts, ex, opTime;
     assert.soon(
-        function() {
+        function () {
             try {
                 // The following statement extracts the timestamp field from the most recent
                 // element of
                 // the oplog, and stores it in "ts".
                 ts = getLatestOp(catchingUpNode).ts;
                 opTime = getLatestOp(latestOpTimeNode).ts;
-                if ((ts.t == opTime.t) && (ts.i == opTime.i)) {
+                if (ts.t == opTime.t && ts.i == opTime.i) {
                     return true;
                 }
                 ex = null;
@@ -452,14 +471,14 @@ awaitOpTime = function(catchingUpNode, latestOpTimeNode) {
                 return false;
             }
         },
-        function() {
-            var message = "Node " + catchingUpNode + " only reached optime " + tojson(ts) +
-                " not " + tojson(opTime);
+        function () {
+            var message = "Node " + catchingUpNode + " only reached optime " + tojson(ts) + " not " + tojson(opTime);
             if (ex) {
                 message += "; last attempt failed with exception " + tojson(ex);
             }
             return message;
-        });
+        },
+    );
 };
 
 /**
@@ -468,14 +487,14 @@ awaitOpTime = function(catchingUpNode, latestOpTimeNode) {
  * 'rs' is an array of connections to replica set nodes.  This function is useful when you
  * don't have a ReplSetTest object to use, otherwise ReplSetTest.awaitReplication is preferred.
  */
-waitUntilAllNodesCaughtUp = function(rs, timeout) {
+waitUntilAllNodesCaughtUp = function (rs, timeout) {
     var rsStatus;
     var firstConflictingIndex;
     var ot;
     var otherOt;
     assert.soon(
-        function() {
-            rsStatus = rs[0].adminCommand('replSetGetStatus');
+        function () {
+            rsStatus = rs[0].adminCommand("replSetGetStatus");
             if (rsStatus.ok != 1) {
                 return false;
             }
@@ -485,8 +504,7 @@ waitUntilAllNodesCaughtUp = function(rs, timeout) {
                 var otherNode = rsStatus.members[i];
 
                 // Must be in PRIMARY or SECONDARY state.
-                if (otherNode.state != ReplSetTest.State.PRIMARY &&
-                    otherNode.state != ReplSetTest.State.SECONDARY) {
+                if (otherNode.state != ReplSetTest.State.PRIMARY && otherNode.state != ReplSetTest.State.SECONDARY) {
                     return false;
                 }
 
@@ -499,21 +517,31 @@ waitUntilAllNodesCaughtUp = function(rs, timeout) {
             }
             return true;
         },
-        function() {
-            return "Optimes of members 0 (" + tojson(ot) + ") and " + firstConflictingIndex + " (" +
-                tojson(otherOt) + ") are different in " + tojson(rsStatus);
+        function () {
+            return (
+                "Optimes of members 0 (" +
+                tojson(ot) +
+                ") and " +
+                firstConflictingIndex +
+                " (" +
+                tojson(otherOt) +
+                ") are different in " +
+                tojson(rsStatus)
+            );
         },
-        timeout);
+        timeout,
+    );
 };
 
 /**
  * Waits for the given node to reach the given state, ignoring network errors.  Ensures that the
  * connection is re-connected and usable when the function returns.
  */
-waitForState = function(node, state) {
-    assert.soonNoExcept(function() {
-        assert.commandWorked(node.adminCommand(
-            {replSetTest: 1, waitForMemberState: state, timeoutMillis: 60 * 1000 * 5}));
+waitForState = function (node, state) {
+    assert.soonNoExcept(function () {
+        assert.commandWorked(
+            node.adminCommand({replSetTest: 1, waitForMemberState: state, timeoutMillis: 60 * 1000 * 5}),
+        );
         return true;
     });
     // Some state transitions cause connections to be closed, but whether the connection close
@@ -526,7 +554,7 @@ waitForState = function(node, state) {
  * Performs a reInitiate() call on 'replSetTest', ignoring errors that are related to an aborted
  * secondary member. All other errors are rethrown.
  */
-reInitiateWithoutThrowingOnAbortedMember = function(replSetTest) {
+reInitiateWithoutThrowingOnAbortedMember = function (replSetTest) {
     try {
         replSetTest.reInitiate();
     } catch (e) {
@@ -544,7 +572,7 @@ reInitiateWithoutThrowingOnAbortedMember = function(replSetTest) {
 /**
  * Waits for the specified hosts to enter a certain state.
  */
-awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
+awaitRSClientHosts = function (conn, host, hostOk, rs, timeout) {
     var hostCount = host.length;
     if (hostCount) {
         for (var i = 0; i < hostCount; i++) {
@@ -556,96 +584,95 @@ awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
 
     timeout = timeout || 5 * 60 * 1000;
 
-    if (hostOk == undefined)
-        hostOk = {ok: true};
-    if (host.host)
-        host = host.host;
-    if (rs)
-        rs = rs.name;
+    if (hostOk == undefined) hostOk = {ok: true};
+    if (host.host) host = host.host;
+    if (rs) rs = rs.name;
 
     print("Awaiting " + host + " to be " + tojson(hostOk) + " for " + conn + " (rs: " + rs + ")");
 
     var tests = 0;
 
-    assert.soon(function() {
-        var rsClientHosts = conn.adminCommand('connPoolStats').replicaSets;
-        if (tests++ % 10 == 0) {
-            printjson(rsClientHosts);
-        }
+    assert.soon(
+        function () {
+            var rsClientHosts = conn.adminCommand("connPoolStats").replicaSets;
+            if (tests++ % 10 == 0) {
+                printjson(rsClientHosts);
+            }
 
-        for (var rsName in rsClientHosts) {
-            if (rs && rs != rsName)
-                continue;
+            for (var rsName in rsClientHosts) {
+                if (rs && rs != rsName) continue;
 
-            for (var i = 0; i < rsClientHosts[rsName].hosts.length; i++) {
-                var clientHost = rsClientHosts[rsName].hosts[i];
-                if (clientHost.addr != host)
-                    continue;
+                for (var i = 0; i < rsClientHosts[rsName].hosts.length; i++) {
+                    var clientHost = rsClientHosts[rsName].hosts[i];
+                    if (clientHost.addr != host) continue;
 
-                // Check that *all* host properties are set correctly
-                var propOk = true;
-                for (var prop in hostOk) {
-                    // Use special comparator for tags because hello can return the fields in
-                    // different order. The fields of the tags should be treated like a set of
-                    // strings and 2 tags should be considered the same if the set is equal.
-                    if (prop == 'tags') {
-                        if (!clientHost.tags) {
-                            propOk = false;
-                            break;
-                        }
-
-                        for (var hostTag in hostOk.tags) {
-                            if (clientHost.tags[hostTag] != hostOk.tags[hostTag]) {
+                    // Check that *all* host properties are set correctly
+                    var propOk = true;
+                    for (var prop in hostOk) {
+                        // Use special comparator for tags because hello can return the fields in
+                        // different order. The fields of the tags should be treated like a set of
+                        // strings and 2 tags should be considered the same if the set is equal.
+                        if (prop == "tags") {
+                            if (!clientHost.tags) {
                                 propOk = false;
                                 break;
                             }
+
+                            for (var hostTag in hostOk.tags) {
+                                if (clientHost.tags[hostTag] != hostOk.tags[hostTag]) {
+                                    propOk = false;
+                                    break;
+                                }
+                            }
+
+                            for (var clientTag in clientHost.tags) {
+                                if (clientHost.tags[clientTag] != hostOk.tags[clientTag]) {
+                                    propOk = false;
+                                    break;
+                                }
+                            }
+
+                            continue;
                         }
 
-                        for (var clientTag in clientHost.tags) {
-                            if (clientHost.tags[clientTag] != hostOk.tags[clientTag]) {
+                        if (isObject(hostOk[prop])) {
+                            if (!friendlyEqual(hostOk[prop], clientHost[prop])) {
                                 propOk = false;
                                 break;
                             }
-                        }
-
-                        continue;
-                    }
-
-                    if (isObject(hostOk[prop])) {
-                        if (!friendlyEqual(hostOk[prop], clientHost[prop])) {
+                        } else if (clientHost[prop] != hostOk[prop]) {
                             propOk = false;
                             break;
                         }
-                    } else if (clientHost[prop] != hostOk[prop]) {
-                        propOk = false;
-                        break;
                     }
-                }
 
-                if (propOk) {
-                    return true;
+                    if (propOk) {
+                        return true;
+                    }
                 }
             }
-        }
 
-        return false;
-    }, 'timed out waiting for replica set client to recognize hosts', timeout);
+            return false;
+        },
+        "timed out waiting for replica set client to recognize hosts",
+        timeout,
+    );
 };
 
 /**
  * Returns the last opTime of the connection based from replSetGetStatus. Can only
  * be used on replica set nodes.
  */
-getLastOpTime = function(conn) {
+getLastOpTime = function (conn) {
     var replSetStatus = assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
-    var connStatus = replSetStatus.members.filter(m => m.self)[0];
+    var connStatus = replSetStatus.members.filter((m) => m.self)[0];
     return connStatus.optime;
 };
 
 /**
  * Returns the oldest oplog entry.
  */
-getFirstOplogEntry = function(server, opts = {}) {
+getFirstOplogEntry = function (server, opts = {}) {
     server.getDB("admin").getMongo().setSecondaryOk();
 
     // The query plan may yield between the cursor establishment and iterating to retrieve the first
@@ -655,8 +682,7 @@ getFirstOplogEntry = function(server, opts = {}) {
     let firstEntry;
     assert.soon(() => {
         try {
-            let firstEntryQuery =
-                server.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1);
+            let firstEntryQuery = server.getDB("local").oplog.rs.find().sort({$natural: 1}).limit(1);
             if (opts.readConcern) {
                 firstEntryQuery = firstEntryQuery.readConcern(opts.readConcern);
             }
@@ -676,12 +702,12 @@ getFirstOplogEntry = function(server, opts = {}) {
  * Set log verbosity on all given nodes.
  * e.g. setLogVerbosity(replTest.nodes, { "replication": {"verbosity": 3} });
  */
-setLogVerbosity = function(nodes, logVerbosity) {
+setLogVerbosity = function (nodes, logVerbosity) {
     var verbosity = {
         "setParameter": 1,
         "logComponentVerbosity": logVerbosity,
     };
-    nodes.forEach(function(node) {
+    nodes.forEach(function (node) {
         assert.commandWorked(node.adminCommand(verbosity));
     });
 };
@@ -692,7 +718,7 @@ setLogVerbosity = function(nodes, logVerbosity) {
  * The old primary has extra writes that are not replicated to the other nodes yet,
  * but the new primary steps up, getting the vote from the the third node "voter".
  */
-stopReplicationAndEnforceNewPrimaryToCatchUp = function(rst, node) {
+stopReplicationAndEnforceNewPrimaryToCatchUp = function (rst, node) {
     // Write documents that cannot be replicated to secondaries in time.
     const oldSecondaries = rst.getSecondaries();
     const oldPrimary = rst.getPrimary();
@@ -713,8 +739,8 @@ stopReplicationAndEnforceNewPrimaryToCatchUp = function(rst, node) {
         () => {
             return node.getDB("test").junk_coll.find().readConcern("local").itcount() == 1;
         },
-        `Unexpected document count: ${
-            node.getDB("test").junk_coll.find().readConcern("local").itcount()}`);
+        `Unexpected document count: ${node.getDB("test").junk_coll.find().readConcern("local").itcount()}`,
+    );
     stopServerReplication(node);
 
     for (let i = 0; i < 3; i++) {
@@ -724,8 +750,7 @@ stopReplicationAndEnforceNewPrimaryToCatchUp = function(rst, node) {
     const latestOpOnOldPrimary = getLatestOp(oldPrimary);
 
     // New primary wins immediately, but needs to catch up.
-    const newPrimary =
-        rst.stepUp(node, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
+    const newPrimary = rst.stepUp(node, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
     const latestOpOnNewPrimary = getLatestOp(newPrimary);
     // Check this node is not writable.
     assert.eq(newPrimary.getDB("test").isMaster().ismaster, false);
@@ -736,24 +761,23 @@ stopReplicationAndEnforceNewPrimaryToCatchUp = function(rst, node) {
         newPrimary: newPrimary,
         voter: oldSecondaries[1],
         latestOpOnOldPrimary: latestOpOnOldPrimary,
-        latestOpOnNewPrimary: latestOpOnNewPrimary
+        latestOpOnNewPrimary: latestOpOnNewPrimary,
     };
 };
 
 /**
  * Returns the replSetGetConfig field 'commitmentStatus', which is true or false.
  */
-isConfigCommitted = function(node) {
-    let adminDB = node.getDB('admin');
-    return assert.commandWorked(adminDB.runCommand({replSetGetConfig: 1, commitmentStatus: true}))
-        .commitmentStatus;
+isConfigCommitted = function (node) {
+    let adminDB = node.getDB("admin");
+    return assert.commandWorked(adminDB.runCommand({replSetGetConfig: 1, commitmentStatus: true})).commitmentStatus;
 };
 
 /**
  * Asserts that replica set config A is the same as replica set config B ignoring the 'version' and
  * 'term' field.
  */
-assertSameConfigContent = function(configA, configB) {
+assertSameConfigContent = function (configA, configB) {
     assert(isSameConfigContent(configA, configB));
 };
 
@@ -761,7 +785,7 @@ assertSameConfigContent = function(configA, configB) {
  * Returns true if replica set config A is the same as replica set config B ignoring the 'version'
  * and 'term' field.
  */
-isSameConfigContent = function(configA, configB) {
+isSameConfigContent = function (configA, configB) {
     // Save original versions and terms.
     const [versionA, termA] = [configA.version, configA.term];
     const [versionB, termB] = [configB.version, configB.term];
@@ -782,22 +806,22 @@ isSameConfigContent = function(configA, configB) {
  * Returns the result of 'replSetGetConfig' with the test-parameter specified that indicates to
  * include 'newlyAdded' fields.
  */
-getConfigWithNewlyAdded = function(node) {
-    return assert.commandWorked(
-        node.adminCommand({replSetGetConfig: 1, $_internalIncludeNewlyAdded: true}));
+getConfigWithNewlyAdded = function (node) {
+    return assert.commandWorked(node.adminCommand({replSetGetConfig: 1, $_internalIncludeNewlyAdded: true}));
 };
 
 /**
  * @param memberIndex is optional. If not provided, then it will return true even if
  * a single member in the replSet config has "newlyAdded" field.
  */
-isMemberNewlyAdded = function(node, memberIndex) {
+isMemberNewlyAdded = function (node, memberIndex) {
     const config = getConfigWithNewlyAdded(node).config;
 
-    const allMembers = (memberIndex === undefined);
-    assert(allMembers || (memberIndex >= 0 && memberIndex < config.members.length),
-           "memberIndex should be between 0 and " + (config.members.length - 1) +
-               ", but memberIndex is " + memberIndex);
+    const allMembers = memberIndex === undefined;
+    assert(
+        allMembers || (memberIndex >= 0 && memberIndex < config.members.length),
+        "memberIndex should be between 0 and " + (config.members.length - 1) + ", but memberIndex is " + memberIndex,
+    );
 
     var hasNewlyAdded = (index) => {
         const memberConfig = config.members[index];
@@ -810,8 +834,7 @@ isMemberNewlyAdded = function(node, memberIndex) {
 
     if (allMembers) {
         for (let i = 0; i < config.members.length; i++) {
-            if (hasNewlyAdded(i))
-                return true;
+            if (hasNewlyAdded(i)) return true;
         }
         return false;
     }
@@ -819,20 +842,17 @@ isMemberNewlyAdded = function(node, memberIndex) {
     return hasNewlyAdded(memberIndex);
 };
 
-waitForNewlyAddedRemovalForNodeToBeCommitted = function(node, memberIndex, force = false) {
+waitForNewlyAddedRemovalForNodeToBeCommitted = function (node, memberIndex, force = false) {
     jsTestLog("Waiting for member " + memberIndex + " to no longer be 'newlyAdded'");
-    assert.soonNoExcept(function() {
+    assert.soonNoExcept(function () {
         return !isMemberNewlyAdded(node, memberIndex, force) && isConfigCommitted(node);
     }, getConfigWithNewlyAdded(node).config);
 };
 
-assertVoteCount = function(node, {
-    votingMembersCount,
-    majorityVoteCount,
-    writableVotingMembersCount,
-    writeMajorityCount,
-    totalMembersCount
-}) {
+assertVoteCount = function (
+    node,
+    {votingMembersCount, majorityVoteCount, writableVotingMembersCount, writeMajorityCount, totalMembersCount},
+) {
     const status = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
     assert.eq(status["votingMembersCount"], votingMembersCount, status);
     assert.eq(status["majorityVoteCount"], majorityVoteCount, status);
@@ -841,7 +861,7 @@ assertVoteCount = function(node, {
     assert.eq(status["members"].length, totalMembersCount, status);
 };
 
-disconnectSecondaries = function(rst, secondariesDown) {
+disconnectSecondaries = function (rst, secondariesDown) {
     for (let i = 1; i <= secondariesDown; i++) {
         for (const node of rst.nodes) {
             if (node !== rst.nodes[i]) {
@@ -851,7 +871,7 @@ disconnectSecondaries = function(rst, secondariesDown) {
     }
 };
 
-reconnectSecondaries = function(rst) {
+reconnectSecondaries = function (rst) {
     for (const node of rst.nodes) {
         for (const node2 of rst.nodes) {
             if (node2 !== node) {
@@ -861,10 +881,10 @@ reconnectSecondaries = function(rst) {
     }
 };
 
-createRstArgs = function(rst) {
+createRstArgs = function (rst) {
     const rstArgs = {
         name: rst.name,
-        nodeHosts: rst.nodes.map(node => `127.0.0.1:${node.port}`),
+        nodeHosts: rst.nodes.map((node) => `127.0.0.1:${node.port}`),
         nodeOptions: rst.nodeOptions,
         keyFile: rst.keyFile,
         host: rst.host,
@@ -877,7 +897,7 @@ createRstArgs = function(rst) {
  * Returns a new ReplSetTest created based on the given 'rstArgs'. If 'retryOnRetryableErrors'
  * is true, retries on retryable errors (e.g. errors caused by shutdown).
  */
-createRst = function(rstArgs, retryOnRetryableErrors) {
+createRst = function (rstArgs, retryOnRetryableErrors) {
     const kCreateRstRetryIntervalMS = 100;
 
     while (true) {
@@ -885,8 +905,11 @@ createRst = function(rstArgs, retryOnRetryableErrors) {
             return new ReplSetTest({rstArgs: rstArgs});
         } catch (e) {
             if (retryOnRetryableErrors && isNetworkError(e)) {
-                jsTest.log(`Failed to create ReplSetTest for ${rstArgs.name} with error: ${
-                    tojson(e)}. Retrying in ${kCreateRstRetryIntervalMS}ms.`);
+                jsTest.log(
+                    `Failed to create ReplSetTest for ${rstArgs.name} with error: ${tojson(
+                        e,
+                    )}. Retrying in ${kCreateRstRetryIntervalMS}ms.`,
+                );
                 sleep(kCreateRstRetryIntervalMS);
                 continue;
             }

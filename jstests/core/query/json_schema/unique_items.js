@@ -27,43 +27,123 @@ assertSchemaMatch(coll, schema, {a: {foo: [1, 1], bar: [2, 2]}}, true);
 
 // Test that {uniqueItems: true} matches arrays whose items are all unique.
 schema = {
-    properties: {a: {uniqueItems: true}}
+    properties: {a: {uniqueItems: true}},
 };
 assertSchemaMatch(coll, schema, {a: []}, true);
 assertSchemaMatch(coll, schema, {a: [1]}, true);
 assertSchemaMatch(coll, schema, {a: [1, 2, 3]}, true);
 assertSchemaMatch(coll, schema, {a: ["foo", "FOO"]}, true);
 assertSchemaMatch(coll, schema, {a: [{}, "", [], null]}, true);
-assertSchemaMatch(coll, schema, {a: [[1, 2], [2, 1]]}, true);
+assertSchemaMatch(
+    coll,
+    schema,
+    {
+        a: [
+            [1, 2],
+            [2, 1],
+        ],
+    },
+    true,
+);
 
 // Test that {uniqueItems: true} rejects arrays with duplicates.
 schema = {
-    properties: {a: {uniqueItems: true}}
+    properties: {a: {uniqueItems: true}},
 };
 assertSchemaMatch(coll, schema, {a: [1, 1]}, false);
 assertSchemaMatch(coll, schema, {a: [NumberLong(1), NumberInt(1)]}, false);
 assertSchemaMatch(coll, schema, {a: ["foo", "foo"]}, false);
 assertSchemaMatch(coll, schema, {a: [{a: 1}, {a: 1}]}, false);
-assertSchemaMatch(coll, schema, {a: [[1, 2], [1, 2]]}, false);
+assertSchemaMatch(
+    coll,
+    schema,
+    {
+        a: [
+            [1, 2],
+            [1, 2],
+        ],
+    },
+    false,
+);
 assertSchemaMatch(coll, schema, {a: [null, null]}, false);
-assertSchemaMatch(coll, schema, {a: [{x: 1, y: 1}, {y: 1, x: 1}]}, false);
-assertSchemaMatch(coll, schema, {a: [{x: [1, 2], y: "a"}, {y: "a", x: [1, 2]}]}, false);
+assertSchemaMatch(
+    coll,
+    schema,
+    {
+        a: [
+            {x: 1, y: 1},
+            {y: 1, x: 1},
+        ],
+    },
+    false,
+);
+assertSchemaMatch(
+    coll,
+    schema,
+    {
+        a: [
+            {x: [1, 2], y: "a"},
+            {y: "a", x: [1, 2]},
+        ],
+    },
+    false,
+);
 
 // Test that {uniqueItems: false} has no effect.
 schema = {
-    properties: {a: {uniqueItems: false}}
+    properties: {a: {uniqueItems: false}},
 };
 assertSchemaMatch(coll, schema, {a: []}, true);
 assertSchemaMatch(coll, schema, {a: [1]}, true);
 assertSchemaMatch(coll, schema, {a: [1, 2, 3]}, true);
 assertSchemaMatch(coll, schema, {a: ["foo", "FOO"]}, true);
 assertSchemaMatch(coll, schema, {a: [{}, "", [], null]}, true);
-assertSchemaMatch(coll, schema, {a: [[1, 2], [2, 1]]}, true);
+assertSchemaMatch(
+    coll,
+    schema,
+    {
+        a: [
+            [1, 2],
+            [2, 1],
+        ],
+    },
+    true,
+);
 assertSchemaMatch(coll, schema, {a: [1, 1]}, true);
 assertSchemaMatch(coll, schema, {a: [NumberLong(1), NumberInt(1)]}, true);
 assertSchemaMatch(coll, schema, {a: ["foo", "foo"]}, true);
 assertSchemaMatch(coll, schema, {a: [{a: 1}, {a: 1}]}, true);
-assertSchemaMatch(coll, schema, {a: [[1, 2], [1, 2]]}, true);
+assertSchemaMatch(
+    coll,
+    schema,
+    {
+        a: [
+            [1, 2],
+            [1, 2],
+        ],
+    },
+    true,
+);
 assertSchemaMatch(coll, schema, {a: [null, null]}, true);
-assertSchemaMatch(coll, schema, {a: [{x: 1, y: 1}, {y: 1, x: 1}]}, true);
-assertSchemaMatch(coll, schema, {a: [{x: [1, 2], y: "a"}, {y: "a", x: [1, 2]}]}, true);
+assertSchemaMatch(
+    coll,
+    schema,
+    {
+        a: [
+            {x: 1, y: 1},
+            {y: 1, x: 1},
+        ],
+    },
+    true,
+);
+assertSchemaMatch(
+    coll,
+    schema,
+    {
+        a: [
+            {x: [1, 2], y: "a"},
+            {y: "a", x: [1, 2]},
+        ],
+    },
+    true,
+);

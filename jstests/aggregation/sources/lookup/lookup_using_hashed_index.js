@@ -16,8 +16,7 @@ const testIndexName = "testIndex";
 // Creates 'indexForeignColl' on foreignColl with 'options', and checks that the result of running
 // an aggregation with 'pipeline' with 'options' matches 'expected'.
 function runTest(indexForeignColl, pipeline, expected, options = {}) {
-    assert.commandWorked(
-        foreignColl.createIndex(indexForeignColl, {name: testIndexName, ...options}));
+    assert.commandWorked(foreignColl.createIndex(indexForeignColl, {name: testIndexName, ...options}));
     const results = coll.aggregate(pipeline, options).toArray();
     assert(resultsEq(results, expected, true), [results, expected]);
     assert.commandWorked(foreignColl.dropIndex(testIndexName));
@@ -29,10 +28,9 @@ assert.commandWorked(foreignColl.insert(allDocs));
 
 // Each document should look up the equivalent document in the foreign collection since both
 // collections are identical.
-const expected = allDocs.map(doc => Object.merge(doc, {relookup: [doc]}));
+const expected = allDocs.map((doc) => Object.merge(doc, {relookup: [doc]}));
 
-const pipeline =
-    [{$lookup: {from: foreignCollName, localField: "a", foreignField: "a", as: "relookup"}}];
+const pipeline = [{$lookup: {from: foreignCollName, localField: "a", foreignField: "a", as: "relookup"}}];
 
 // Test 1: foreignField IS the hashed field.
 runTest({a: "hashed", b: 1}, pipeline, expected);
@@ -45,28 +43,27 @@ assert.commandWorked(foreignColl.insert({_id: 5, str: "STRSTRSTR"}));
 assert.commandWorked(foreignColl.insert({_id: 6, str: null}));
 const collationOptions = {
     collation: {
-        locale: 'ru',
+        locale: "ru",
         strength: 1,
     },
 };
-const collatedPipeline =
-    [{$lookup: {from: foreignCollName, localField: "str", foreignField: "str", as: "relookup"}}];
+const collatedPipeline = [{$lookup: {from: foreignCollName, localField: "str", foreignField: "str", as: "relookup"}}];
 const collatedExpected = [
     {
         _id: 0,
-        relookup: [{"_id": 0}, {"_id": 1, "a": 3}, {"_id": 2, "a": "3"}, {"_id": 6, "str": null}]
+        relookup: [{"_id": 0}, {"_id": 1, "a": 3}, {"_id": 2, "a": "3"}, {"_id": 6, "str": null}],
     },
     {
         _id: 1,
         a: 3,
-        relookup: [{"_id": 0}, {"_id": 1, "a": 3}, {"_id": 2, "a": "3"}, {"_id": 6, "str": null}]
+        relookup: [{"_id": 0}, {"_id": 1, "a": 3}, {"_id": 2, "a": "3"}, {"_id": 6, "str": null}],
     },
     {
         _id: 2,
         a: "3",
-        relookup: [{"_id": 0}, {"_id": 1, "a": 3}, {"_id": 2, "a": "3"}, {"_id": 6, "str": null}]
+        relookup: [{"_id": 0}, {"_id": 1, "a": 3}, {"_id": 2, "a": "3"}, {"_id": 6, "str": null}],
     },
-    {_id: 3, str: "strstrstr", relookup: [{_id: 5, str: "STRSTRSTR"}]}
+    {_id: 3, str: "strstrstr", relookup: [{_id: 5, str: "STRSTRSTR"}]},
 ];
 // Test 3: collscan.
 runTest({nonExistentField: 1}, collatedPipeline, collatedExpected, collationOptions);

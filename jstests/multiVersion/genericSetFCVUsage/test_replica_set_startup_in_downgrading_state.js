@@ -20,26 +20,24 @@ function runReplicaSet() {
     const primary = rst.getPrimary();
     const secondaryAdminDB = rst.getSecondary().getDB("admin");
 
-    fcvDoc = primaryAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+    fcvDoc = primaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog(`Primary's version before downgrading: ${tojson(fcvDoc)}`);
     checkFCV(primaryAdminDB, latestFCV);
 
     // Set the failDowngrading failpoint so that the downgrading will fail.
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
+    assert.commandWorked(primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
 
     // Start downgrading. It will fail.
     jsTestLog("setFCV command called. Downgrading from latestFCV to lastLTSFCV.");
-    assert.commandFailed(
-        primaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandFailed(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
-    fcvDoc = primaryAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+    fcvDoc = primaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog(`Primary's version after downgrading: ${tojson(fcvDoc)}`);
     checkFCV(primaryAdminDB, lastLTSFCV, lastLTSFCV);
 
     rst.awaitReplication();
 
-    fcvDoc = secondaryAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+    fcvDoc = secondaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog(`Secondary's version after downgrading: ${tojson(fcvDoc)}`);
     checkFCV(secondaryAdminDB, lastLTSFCV, lastLTSFCV);
 
@@ -52,27 +50,26 @@ function runReplicaSet() {
     rst.restart(primaryId, {}, true /* wait */);
     rst.awaitSecondaryNodes(null, [primary]);
 
-    fcvDoc = primaryAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+    fcvDoc = primaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog(`Old primary's version after restarting: ${tojson(fcvDoc)}`);
     checkFCV(primaryAdminDB, lastLTSFCV, lastLTSFCV);
 
-    fcvDoc = secondaryAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+    fcvDoc = secondaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog(`New primary's version after restarting: ${tojson(fcvDoc)}`);
     checkFCV(secondaryAdminDB, lastLTSFCV, lastLTSFCV);
 
     // Upgrade the replica set to upgraded (latestFCV).
     const newPrimaryAdminDB = rst.getPrimary().getDB("admin");
     jsTestLog("setFCV command called. Finish upgrading to latestFCV.");
-    assert.commandWorked(
-        newPrimaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(newPrimaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     rst.awaitReplication();
 
-    fcvDoc = primaryAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+    fcvDoc = primaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog(`Old primary's version after successfully upgrading: ${tojson(fcvDoc)}`);
     checkFCV(primaryAdminDB, latestFCV);
 
-    fcvDoc = secondaryAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
+    fcvDoc = secondaryAdminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     jsTestLog(`New primary's version after successfully upgrading: ${tojson(fcvDoc)}`);
     checkFCV(secondaryAdminDB, latestFCV);
 

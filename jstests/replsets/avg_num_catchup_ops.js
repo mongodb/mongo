@@ -7,16 +7,16 @@ import {restartServerReplication} from "jstests/libs/write_concern_util.js";
 import {stopReplicationAndEnforceNewPrimaryToCatchUp} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
-const rst = new ReplSetTest(
-    {name: name, nodes: 3, useBridge: true, settings: {catchUpTimeoutMillis: 4 * 60 * 1000}});
+const rst = new ReplSetTest({name: name, nodes: 3, useBridge: true, settings: {catchUpTimeoutMillis: 4 * 60 * 1000}});
 
 rst.startSet();
 rst.initiate();
 rst.awaitSecondaryNodes();
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(rst.getPrimary().adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 rst.awaitReplication();
 
 const testNode = rst.getSecondaries()[0];
@@ -28,22 +28,22 @@ assert.eq(stepUpResults.newPrimary, rst.getPrimary());
 // Wait until the new primary completes the transition to primary and writes a no-op.
 checkLog.contains(stepUpResults.newPrimary, "Transition to primary complete");
 
-let testNodeReplSetGetStatus =
-    assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
-let testNodeServerStatus =
-    assert.commandWorked(stepUpResults.newPrimary.adminCommand({serverStatus: 1}));
+let testNodeReplSetGetStatus = assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
+let testNodeServerStatus = assert.commandWorked(stepUpResults.newPrimary.adminCommand({serverStatus: 1}));
 
 // Check that metrics associated with catchup have been set correctly in both replSetGetStatus and
 // serverStatus.
-assert(testNodeReplSetGetStatus.electionCandidateMetrics.numCatchUpOps,
-       () => "Response should have an 'numCatchUpOps' field: " +
-           tojson(testNodeReplSetGetStatus.electionCandidateMetrics));
+assert(
+    testNodeReplSetGetStatus.electionCandidateMetrics.numCatchUpOps,
+    () => "Response should have an 'numCatchUpOps' field: " + tojson(testNodeReplSetGetStatus.electionCandidateMetrics),
+);
 // numCatchUpOps should be 4 because the 'foo' collection is implicitly created during the 3
 // inserts, and that's where the additional oplog entry comes from.
 assert.eq(testNodeReplSetGetStatus.electionCandidateMetrics.numCatchUpOps, 4);
-assert(testNodeServerStatus.electionMetrics.averageCatchUpOps,
-       () => "Response should have an 'averageCatchUpOps' field: " +
-           tojson(testNodeServerStatus.electionMetrics));
+assert(
+    testNodeServerStatus.electionMetrics.averageCatchUpOps,
+    () => "Response should have an 'averageCatchUpOps' field: " + tojson(testNodeServerStatus.electionMetrics),
+);
 assert.eq(testNodeServerStatus.electionMetrics.averageCatchUpOps, 4);
 
 // Step up another node temporarily.
@@ -57,10 +57,8 @@ assert.eq(stepUpResults.newPrimary, rst.getPrimary());
 checkLog.contains(stepUpResults.newPrimary, "Transition to primary complete");
 rst.awaitReplication();
 
-testNodeServerStatus =
-    assert.commandWorked(stepUpResults.newPrimary.adminCommand({serverStatus: 1}));
-testNodeReplSetGetStatus =
-    assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
+testNodeServerStatus = assert.commandWorked(stepUpResults.newPrimary.adminCommand({serverStatus: 1}));
+testNodeReplSetGetStatus = assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetGetStatus: 1}));
 
 // numCatchUpOps is now 3 due to the 'foo' collection already being created.
 assert.eq(testNodeReplSetGetStatus.electionCandidateMetrics.numCatchUpOps, 3);

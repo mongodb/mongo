@@ -14,9 +14,7 @@
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    flushRoutersAndRefreshShardMetadata
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 2});
 const dbName = jsTestName();
@@ -54,7 +52,7 @@ const invalidLookups = [
             localField: "x",
             foreignField: "_id.x",
             as: "results",
-        }
+        },
     },
     {
         $lookup: {
@@ -62,35 +60,33 @@ const invalidLookups = [
             localField: "x",
             foreignField: "_id.x",
             as: "results",
-        }
+        },
     },
     {
         $lookup: {
             from: {db: "config", coll: "validDB.LetLookup.invalidCollectionName"},
             let: {x_field: "$x"},
-            pipeline: [
-                {$match: {$expr: { $eq: ["$_id.x", "$$x_field"]}}}
-            ],
+            pipeline: [{$match: {$expr: {$eq: ["$_id.x", "$$x_field"]}}}],
             as: "results",
-        }
+        },
     },
     {
         $lookup: {
             from: {db: "wrongDBWithLet", coll: `${chunksCollName}`},
             let: {x_field: "$x"},
-            pipeline: [
-                {$match: {$expr: { $eq: ["$_id.x", "$$x_field"]}}}
-            ],
+            pipeline: [{$match: {$expr: {$eq: ["$_id.x", "$$x_field"]}}}],
             as: "results",
-        }
-    }
+        },
+    },
 ];
 
 invalidLookups.forEach((testCase) => {
-    assertErrorCode(sourceCollection,
-                    [testCase],
-                    ErrorCodes.FailedToParse,
-                    `Expected $lookup to fail. Original command: ${tojson(testCase)}`);
+    assertErrorCode(
+        sourceCollection,
+        [testCase],
+        ErrorCodes.FailedToParse,
+        `Expected $lookup to fail. Original command: ${tojson(testCase)}`,
+    );
 });
 
 const nodeList = DiscoverTopology.findNonConfigNodes(st.s);
@@ -112,7 +108,7 @@ const lookupBasic = {
         localField: "x",
         foreignField: "_id.x",
         as: "results",
-    }
+    },
 };
 testLookupFromConfigCacheChunks(lookupBasic);
 
@@ -120,11 +116,9 @@ const lookupLet = {
     $lookup: {
         from: {db: "config", coll: `${chunksCollName}`},
         let: {x_field: "$x"},
-        pipeline: [
-            {$match: {$expr: { $eq: ["$_id.x", "$$x_field"]}}}
-        ],
+        pipeline: [{$match: {$expr: {$eq: ["$_id.x", "$$x_field"]}}}],
         as: "results",
-    }
+    },
 };
 testLookupFromConfigCacheChunks(lookupLet);
 st.stop();

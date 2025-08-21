@@ -9,16 +9,20 @@
  * behavior.
  */
 function runWithWait(millis, func) {
-    assert.commandWorked(testDB.adminCommand({
-        configureFailPoint: "setAutoGetCollectionWait",
-        mode: "alwaysOn",
-        data: {waitForMillis: millis}
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            configureFailPoint: "setAutoGetCollectionWait",
+            mode: "alwaysOn",
+            data: {waitForMillis: millis},
+        }),
+    );
     func();
-    assert.commandWorked(testDB.adminCommand({
-        configureFailPoint: "setAutoGetCollectionWait",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            configureFailPoint: "setAutoGetCollectionWait",
+            mode: "off",
+        }),
+    );
 }
 
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
@@ -39,7 +43,7 @@ assert.commandWorked(testDB.setProfilingLevel(2));
 // Test that insert profiler/logs include lock acquisition time. Rather than parsing the log
 // lines, we are just verifying that the log line appears, which implies that the recorded
 // latency exceeds slowms.
-runWithWait(hangMillis, function() {
+runWithWait(hangMillis, function () {
     assert.commandWorked(testColl.insert({a: 1}));
 });
 let profileEntry = getLatestProfilerEntry(testDB, {
@@ -50,7 +54,7 @@ assert.gte(profileEntry.millis, hangMillis - padding);
 checkLog.contains(conn, /"ns":"test.lock_acquisition_time".*"command":{"insert"/);
 
 // Test that update profiler/logs include lock acquisition time.
-runWithWait(hangMillis, function() {
+runWithWait(hangMillis, function () {
     assert.commandWorked(testColl.update({}, {$set: {b: 1}}));
 });
 profileEntry = getLatestProfilerEntry(testDB, {
@@ -61,7 +65,7 @@ assert.gte(profileEntry.millis, hangMillis - padding);
 checkLog.contains(conn, /"ns":"test.\$cmd".*"command":{"update":"lock_acquisition_time"/);
 
 // Test that find profiler/logs include lock acquisition time.
-runWithWait(hangMillis, function() {
+runWithWait(hangMillis, function () {
     assert.eq(1, testColl.find({b: 1}).itcount());
 });
 profileEntry = getLatestProfilerEntry(testDB, {
@@ -73,7 +77,7 @@ checkLog.contains(conn, '"command":{"find":"lock_acquisition_time"');
 
 // Test that getMore profiler/logs include lock acquisition time.
 assert.commandWorked(testColl.insert([{a: 2}, {a: 3}]));
-runWithWait(hangMillis, function() {
+runWithWait(hangMillis, function () {
     // Include a batchSize in order to ensure that a getMore is issued.
     assert.eq(3, testColl.find().batchSize(2).itcount());
 });
@@ -86,7 +90,7 @@ checkLog.contains(conn, '"originatingCommand":{"find":"lock_acquisition_time"');
 assert.commandWorked(testColl.remove({a: {$gt: 1}}));
 
 // Test that aggregate profiler/logs include lock acquisition time.
-runWithWait(hangMillis, function() {
+runWithWait(hangMillis, function () {
     assert.eq(1, testColl.aggregate([{$match: {b: 1}}]).itcount());
 });
 profileEntry = getLatestProfilerEntry(testDB, {
@@ -97,7 +101,7 @@ assert.gte(profileEntry.millis, hangMillis - padding);
 checkLog.contains(conn, '"command":{"aggregate":"lock_acquisition_time"');
 
 // Test that count profiler/logs include lock acquisition time.
-runWithWait(hangMillis, function() {
+runWithWait(hangMillis, function () {
     assert.eq(1, testColl.count());
 });
 profileEntry = getLatestProfilerEntry(testDB, {
@@ -108,7 +112,7 @@ assert.gte(profileEntry.millis, hangMillis - padding);
 checkLog.contains(conn, '"command":{"count":"lock_acquisition_time"');
 
 // Test that distinct profiler/logs include lock acquisition time.
-runWithWait(hangMillis, function() {
+runWithWait(hangMillis, function () {
     assert.eq([1], testColl.distinct("a"));
 });
 profileEntry = getLatestProfilerEntry(testDB, {
@@ -119,7 +123,7 @@ assert.gte(profileEntry.millis, hangMillis - padding);
 checkLog.contains(conn, '"command":{"distinct":"lock_acquisition_time"');
 
 // Test that delete profiler/logs include lock acquisition time.
-runWithWait(hangMillis, function() {
+runWithWait(hangMillis, function () {
     assert.commandWorked(testColl.remove({b: 1}));
 });
 profileEntry = getLatestProfilerEntry(testDB, {

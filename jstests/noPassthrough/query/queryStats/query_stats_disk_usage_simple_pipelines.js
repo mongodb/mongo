@@ -15,15 +15,17 @@ import {
 function makeUnshardedCollection(conn) {
     const coll = conn.getDB("test")[jsTestName()];
     coll.drop();
-    assert.commandWorked(coll.insert([
-        {v: 1, y: -3},
-        {v: 2, y: -2},
-        {v: 3, y: -1},
-        {v: 4, y: 1},
-        {v: 5, y: 2},
-        {v: 6, y: 3},
-        {v: 7, y: 4}
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {v: 1, y: -3},
+            {v: 2, y: -2},
+            {v: 3, y: -1},
+            {v: 4, y: 1},
+            {v: 5, y: 2},
+            {v: 6, y: 3},
+            {v: 7, y: 4},
+        ]),
+    );
     assert.commandWorked(coll.createIndex({y: 1}));
     return coll;
 }
@@ -31,12 +33,14 @@ function makeUnshardedCollection(conn) {
 function makeShardedCollection(st) {
     const conn = st.s;
     const coll = makeUnshardedCollection(conn);
-    st.shardColl(coll,
-                 /* key */ {y: 1},
-                 /* split at */ {y: 0},
-                 /* move chunk containing */ {y: 1},
-                 /* db */ coll.getDB().getName(),
-                 /* waitForDelete */ true);
+    st.shardColl(
+        coll,
+        /* key */ {y: 1},
+        /* split at */ {y: 0},
+        /* move chunk containing */ {y: 1},
+        /* db */ coll.getDB().getName(),
+        /* waitForDelete */ true,
+    );
     return coll;
 }
 
@@ -44,12 +48,10 @@ function runMatchSortPipelineTest(conn, coll) {
     const expectedDocs = 4;
 
     const shape = {
-        pipeline:
-            [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}, {$sort: {v: 1}}]
+        pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}, {$sort: {v: 1}}],
     };
 
-    const queryStatsKey =
-        getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -59,8 +61,12 @@ function runMatchSortPipelineTest(conn, coll) {
             pipeline: [{$match: {v: {$gt: 0, $lt: 5}}}, {$sort: {v: 1}}],
             cursor: {batchSize: batchSize},
         };
-        const queryStats = exhaustCursorAndGetQueryStats(
-            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
+        const queryStats = exhaustCursorAndGetQueryStats({
+            conn: conn,
+            cmd: cmd,
+            key: queryStatsKey,
+            expectedDocs: expectedDocs,
+        });
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 0,
@@ -68,7 +74,7 @@ function runMatchSortPipelineTest(conn, coll) {
             hasSortStage: true,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 }
@@ -77,8 +83,7 @@ function runMatchPipelineTest(conn, coll) {
     const expectedDocs = 4;
 
     const shape = {pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}]};
-    const queryStatsKey =
-        getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -89,8 +94,12 @@ function runMatchPipelineTest(conn, coll) {
             cursor: {batchSize: batchSize},
         };
 
-        const queryStats = exhaustCursorAndGetQueryStats(
-            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
+        const queryStats = exhaustCursorAndGetQueryStats({
+            conn: conn,
+            cmd: cmd,
+            key: queryStatsKey,
+            expectedDocs: expectedDocs,
+        });
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 0,
@@ -98,7 +107,7 @@ function runMatchPipelineTest(conn, coll) {
             hasSortStage: false,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 }
@@ -112,12 +121,10 @@ function runViewPipelineTest(conn, coll) {
 
     const expectedDocs = 3;
     const shape = {
-        pipeline:
-            [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}, {$sort: {v: 1}}]
+        pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}, {$sort: {v: 1}}],
     };
 
-    const queryStatsKey =
-        getAggregateQueryStatsKey({conn: conn, collName: view.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getAggregateQueryStatsKey({conn: conn, collName: view.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, view);
@@ -128,8 +135,12 @@ function runViewPipelineTest(conn, coll) {
             cursor: {batchSize: batchSize},
         };
 
-        const queryStats = exhaustCursorAndGetQueryStats(
-            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
+        const queryStats = exhaustCursorAndGetQueryStats({
+            conn: conn,
+            cmd: cmd,
+            key: queryStatsKey,
+            expectedDocs: expectedDocs,
+        });
 
         // The view only contains 6 documents, but the query still ends up being a collection
         // scan of all docs in the collection.
@@ -139,7 +150,7 @@ function runViewPipelineTest(conn, coll) {
             hasSortStage: true,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 }
@@ -153,8 +164,7 @@ function runCollStatsPipelineTest(conn, coll) {
     const pipeline = [{$collStats: {}}, {$sort: {ns: 1}}];
     const shape = {pipeline: pipeline};
 
-    const queryStatsKey =
-        getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
+    const queryStatsKey = getAggregateQueryStatsKey({conn: conn, collName: coll.getName(), queryShapeExtra: shape});
 
     for (let batchSize = 1; batchSize <= expectedDocs + 1; batchSize++) {
         clearPlanCacheAndQueryStatsStore(conn, coll);
@@ -164,8 +174,12 @@ function runCollStatsPipelineTest(conn, coll) {
             pipeline: pipeline,
             cursor: {batchSize: batchSize},
         };
-        const queryStats = exhaustCursorAndGetQueryStats(
-            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
+        const queryStats = exhaustCursorAndGetQueryStats({
+            conn: conn,
+            cmd: cmd,
+            key: queryStatsKey,
+            expectedDocs: expectedDocs,
+        });
 
         assertAggregatedMetricsSingleExec(queryStats, {
             keysExamined: 0,
@@ -173,7 +187,7 @@ function runCollStatsPipelineTest(conn, coll) {
             hasSortStage: true,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 }
@@ -186,7 +200,7 @@ function runTests(conn, coll) {
 }
 
 const options = {
-    setParameter: {internalQueryStatsRateLimit: -1}
+    setParameter: {internalQueryStatsRateLimit: -1},
 };
 
 jsTestLog("Standalone: Testing query stats disk usage for aggregate queries");

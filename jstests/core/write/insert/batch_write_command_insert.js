@@ -26,22 +26,28 @@ var batch;
 var maxWriteBatchSize = db.hello().maxWriteBatchSize;
 
 function resultOK(result) {
-    return result.ok && !('code' in result) && !('errmsg' in result) && !('errInfo' in result) &&
-        !('writeErrors' in result);
+    return (
+        result.ok &&
+        !("code" in result) &&
+        !("errmsg" in result) &&
+        !("errInfo" in result) &&
+        !("writeErrors" in result)
+    );
 }
 
 function resultNOK(result) {
-    return !result.ok && typeof (result.code) == 'number' && typeof (result.errmsg) == 'string';
+    return !result.ok && typeof result.code == "number" && typeof result.errmsg == "string";
 }
 
 function countEventually(collection, n) {
     assert.soon(
-        function() {
+        function () {
             return collection.count() === n;
         },
-        function() {
+        function () {
             return "unacknowledged write timed out";
-        });
+        },
+    );
 }
 
 // EACH TEST BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
@@ -50,7 +56,7 @@ function countEventually(collection, n) {
 // NO DOCS, illegal command
 coll.drop();
 request = {
-    insert: coll.getName()
+    insert: coll.getName(),
 };
 result = coll.runCommand(request);
 assert(resultNOK(result), tojson(result));
@@ -60,7 +66,7 @@ assert(resultNOK(result), tojson(result));
 coll.drop();
 request = {
     insert: coll.getName(),
-    documents: [{a: 1}]
+    documents: [{a: 1}],
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -74,7 +80,7 @@ request = {
     insert: coll.getName(),
     documents: [{a: 1}],
     writeConcern: {w: 1},
-    ordered: true
+    ordered: true,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -88,7 +94,7 @@ request = {
     insert: coll.getName(),
     documents: [{a: 1}],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -102,7 +108,7 @@ request = {
     insert: coll.getName(),
     documents: [{o: {$set: {a: 1}}}],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -120,7 +126,7 @@ request = {
     insert: coll.getName(),
     documents: batch,
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -138,7 +144,7 @@ request = {
     insert: coll.getName(),
     documents: batch,
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultNOK(result), tojson(result));
@@ -149,7 +155,7 @@ assert.eq(coll.count(), 0);
 coll.drop();
 request = {
     insert: coll.getName(),
-    documents: []
+    documents: [],
 };
 result = coll.runCommand(request);
 assert(resultNOK(result), tojson(result));
@@ -165,7 +171,7 @@ coll.createIndex({a: 1}, {unique: true});
 coll.insert({a: 1});
 request = {
     insert: coll.getName(),
-    documents: [{a: 1}]
+    documents: [{a: 1}],
 };
 result = coll.runCommand(request);
 assert(result.ok, tojson(result));
@@ -181,7 +187,7 @@ request = {
     insert: coll.getName(),
     documents: [{a: 1}, {a: 1}, {a: 1}],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(result.ok, tojson(result));
@@ -190,12 +196,12 @@ assert.eq(2, result.writeErrors.length);
 assert.eq(coll.count(), 1);
 
 assert.eq(1, result.writeErrors[0].index);
-assert.eq('number', typeof result.writeErrors[0].code);
-assert.eq('string', typeof result.writeErrors[0].errmsg);
+assert.eq("number", typeof result.writeErrors[0].code);
+assert.eq("string", typeof result.writeErrors[0].errmsg);
 
 assert.eq(2, result.writeErrors[1].index);
-assert.eq('number', typeof result.writeErrors[1].code);
-assert.eq('string', typeof result.writeErrors[1].errmsg);
+assert.eq("number", typeof result.writeErrors[1].code);
+assert.eq("string", typeof result.writeErrors[1].errmsg);
 
 assert.eq(coll.count(), 1);
 
@@ -207,7 +213,7 @@ request = {
     insert: coll.getName(),
     documents: [{a: 1}, {a: 1}, {a: 1}],
     writeConcern: {w: 1},
-    ordered: true
+    ordered: true,
 };
 result = coll.runCommand(request);
 assert(result.ok, tojson(result));
@@ -215,8 +221,8 @@ assert.eq(1, result.n);
 assert.eq(1, result.writeErrors.length);
 
 assert.eq(1, result.writeErrors[0].index);
-assert.eq('number', typeof result.writeErrors[0].code);
-assert.eq('string', typeof result.writeErrors[0].errmsg);
+assert.eq("number", typeof result.writeErrors[0].code);
+assert.eq("string", typeof result.writeErrors[0].errmsg);
 
 assert.eq(coll.count(), 1);
 
@@ -226,11 +232,11 @@ coll.drop();
 coll.createIndex({a: 1}, {unique: true});
 request = {
     insert: coll.getName(),
-    documents: [{a: 1}, {a: 2, _id: 2}]
+    documents: [{a: 1}, {a: 2, _id: 2}],
 };
 result = coll.runCommand(request);
 assert.eq(2, coll.count());
-coll.find().forEach(function(doc) {
+coll.find().forEach(function (doc) {
     var firstKey = null;
     for (var key in doc) {
         firstKey = key;
@@ -242,7 +248,7 @@ coll.find().forEach(function(doc) {
 //
 // Ensure we error out correctly in the middle of a batch
 coll.drop();
-coll.insert({_id: 50});  // Create a document to force a duplicate key exception.
+coll.insert({_id: 50}); // Create a document to force a duplicate key exception.
 
 var bulk = coll.initializeOrderedBulkOp();
 for (i = 1; i < 100; i++) {

@@ -17,7 +17,7 @@ coll.drop();
 db.createCollection(collName);
 
 function findTTL(collection, key, expireAfterSeconds) {
-    const all = collection.getIndexes().filter(function(z) {
+    const all = collection.getIndexes().filter(function (z) {
         return z.expireAfterSeconds == expireAfterSeconds && friendlyEqual(z.key, key);
     });
     return all.length == 1;
@@ -28,32 +28,32 @@ coll.createIndex({a: 1});
 
 // Tries to modify with a string 'expireAfterSeconds' value.
 assert.commandFailedWithCode(
-    db.runCommand(
-        {"collMod": collName, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": "100"}}),
-    ErrorCodes.TypeMismatch);
+    db.runCommand({"collMod": collName, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": "100"}}),
+    ErrorCodes.TypeMismatch,
+);
 
 // Tries to modify with a negative 'expireAfterSeconds' value.
 assert.commandFailedWithCode(
     db.runCommand({"collMod": collName, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": -1}}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 // Successfully converts to a TTL index.
-assert.commandWorked(db.runCommand(
-    {"collMod": collName, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}}));
+assert.commandWorked(db.runCommand({"collMod": collName, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}}));
 assert(findTTL(coll, {a: 1}, 100), "TTL index should be 100 now");
 
 // Tries to convert a compound index to a TTL index.
 coll.createIndex({a: 1, b: 1});
 assert.commandFailedWithCode(
-    db.runCommand(
-        {"collMod": collName, "index": {"keyPattern": {a: 1, b: 1}, "expireAfterSeconds": 100}}),
-    ErrorCodes.InvalidOptions);
+    db.runCommand({"collMod": collName, "index": {"keyPattern": {a: 1, b: 1}, "expireAfterSeconds": 100}}),
+    ErrorCodes.InvalidOptions,
+);
 
 // Tries to convert the '_id' index to a TTL index.
 assert.commandFailedWithCode(
-    db.runCommand(
-        {"collMod": collName, "index": {"keyPattern": {_id: 1}, "expireAfterSeconds": 100}}),
-    ErrorCodes.InvalidOptions);
+    db.runCommand({"collMod": collName, "index": {"keyPattern": {_id: 1}, "expireAfterSeconds": 100}}),
+    ErrorCodes.InvalidOptions,
+);
 
 const collCapped = db.getCollection(collName + "_capped");
 collCapped.drop();
@@ -61,8 +61,10 @@ db.createCollection(collCapped.getName(), {capped: true, size: 1024 * 1024});
 collCapped.createIndex({a: 1});
 
 // Successfully convert to a TTL index.
-assert.commandWorked(db.runCommand({
-    "collMod": collCapped.getName(),
-    "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100},
-}));
+assert.commandWorked(
+    db.runCommand({
+        "collMod": collCapped.getName(),
+        "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100},
+    }),
+);
 assert(findTTL(collCapped, {a: 1}, 100), "TTL index should be 100 now");

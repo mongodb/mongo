@@ -8,35 +8,38 @@ const coll = db.unary_numeric;
 coll.drop();
 
 // Testing behavior for common cases.
-assert.commandWorked(coll.insert([
-    {_id: 0, x: null},
-    {_id: 1, x: undefined},
-    {_id: 2},
-    {_id: 3, x: 1},
-    {_id: 4, x: 10},
-    {_id: 5, x: 100},
-    {_id: 6, x: 2.3},
-    {_id: 7, x: 2.6},
-    {_id: 8, x: NumberDecimal("40")},
-    {_id: 9, x: NumberLong(4)},
-    {_id: 10, x: NumberLong("9223372036854775807")},  // LLONG_MAX
-]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, x: null},
+        {_id: 1, x: undefined},
+        {_id: 2},
+        {_id: 3, x: 1},
+        {_id: 4, x: 10},
+        {_id: 5, x: 100},
+        {_id: 6, x: 2.3},
+        {_id: 7, x: 2.6},
+        {_id: 8, x: NumberDecimal("40")},
+        {_id: 9, x: NumberLong(4)},
+        {_id: 10, x: NumberLong("9223372036854775807")}, // LLONG_MAX
+    ]),
+);
 
-let results = coll.aggregate([
-                      {
-                          $project: {
-                              ceil: {$ceil: "$x"},
-                              exp: {$exp: "$x"},
-                              floor: {$floor: "$x"},
-                              ln: {$ln: "$x"},
-                              log10: {$log10: "$x"},
-                              sqrt: {$sqrt: "$x"},
-                              abs: {$abs: "$x"},
-                          }
-                      },
-                      {$sort: {_id: 1}}
-                  ])
-                  .toArray();
+let results = coll
+    .aggregate([
+        {
+            $project: {
+                ceil: {$ceil: "$x"},
+                exp: {$exp: "$x"},
+                floor: {$floor: "$x"},
+                ln: {$ln: "$x"},
+                log10: {$log10: "$x"},
+                sqrt: {$sqrt: "$x"},
+                abs: {$abs: "$x"},
+            },
+        },
+        {$sort: {_id: 1}},
+    ])
+    .toArray();
 
 let expectedResults = [
     {
@@ -47,7 +50,7 @@ let expectedResults = [
         "ln": null,
         "log10": null,
         "sqrt": null,
-        "abs": null
+        "abs": null,
     },
     {
         _id: 1,
@@ -57,7 +60,7 @@ let expectedResults = [
         "ln": null,
         "log10": null,
         "sqrt": null,
-        "abs": null
+        "abs": null,
     },
     {
         _id: 2,
@@ -67,7 +70,7 @@ let expectedResults = [
         "ln": null,
         "log10": null,
         "sqrt": null,
-        "abs": null
+        "abs": null,
     },
     {
         _id: 3,
@@ -77,7 +80,7 @@ let expectedResults = [
         "ln": 0,
         "log10": 0,
         "sqrt": 1,
-        "abs": 1
+        "abs": 1,
     },
     {
         _id: 4,
@@ -87,17 +90,17 @@ let expectedResults = [
         "ln": 2.302585092994046,
         "log10": 1,
         "sqrt": 3.1622776601683795,
-        "abs": 10
+        "abs": 10,
     },
     {
         _id: 5,
         "ceil": 100,
-        "exp": 2.6881171418161356e+43,
+        "exp": 2.6881171418161356e43,
         "floor": 100,
         "ln": 4.605170185988092,
         "log10": 2,
         "sqrt": 10,
-        "abs": 100
+        "abs": 100,
     },
     {
         _id: 6,
@@ -107,7 +110,7 @@ let expectedResults = [
         "ln": 0.8329091229351039,
         "log10": 0.36172783601759284,
         "sqrt": 1.51657508881031,
-        "abs": 2.3
+        "abs": 2.3,
     },
     {
         _id: 7,
@@ -117,7 +120,7 @@ let expectedResults = [
         "ln": 0.9555114450274363,
         "log10": 0.414973347970818,
         "sqrt": 1.61245154965971,
-        "abs": 2.6
+        "abs": 2.6,
     },
     {
         // Note that we do not test exp, ln, log10, and sqrt here, because they provide inexact
@@ -126,7 +129,7 @@ let expectedResults = [
         _id: 8,
         "ceil": NumberDecimal("40"),
         "floor": NumberDecimal("40"),
-        "abs": NumberDecimal("40")
+        "abs": NumberDecimal("40"),
     },
     {
         _id: 9,
@@ -136,7 +139,7 @@ let expectedResults = [
         "ln": 1.3862943611198906,
         "log10": 0.6020599913279624,
         "sqrt": 2,
-        "abs": NumberLong(4)
+        "abs": NumberLong(4),
     },
     {
         _id: 10,
@@ -146,7 +149,7 @@ let expectedResults = [
         "ln": 43.66827237527655,
         "log10": 18.964889726830815,
         "sqrt": 3037000499.97605,
-        "abs": NumberLong("9223372036854775807")
+        "abs": NumberLong("9223372036854775807"),
     },
 ];
 
@@ -154,7 +157,7 @@ let expectedResults = [
 // using an approximate equality comparison for numbers. Many of the operators tested may vary in
 // their last few bits depending on platform.
 for (const resultDoc of results) {
-    const expectedDoc = expectedResults.find(doc => (resultDoc._id === doc._id));
+    const expectedDoc = expectedResults.find((doc) => resultDoc._id === doc._id);
     assert(expectedDoc);
 
     for (const [key, expectedValue] of Object.entries(expectedDoc)) {
@@ -162,23 +165,25 @@ for (const resultDoc of results) {
         const resultValue = resultDoc[key];
 
         let matches = false;
-        if (((typeof expectedValue) == "object") && ((typeof resultValue) == "object")) {
+        if (typeof expectedValue == "object" && typeof resultValue == "object") {
             // NumberDecimal case.
-            matches = (bsonWoCompare({value: expectedValue}, {value: resultValue}) === 0);
+            matches = bsonWoCompare({value: expectedValue}, {value: resultValue}) === 0;
         } else if (isFinite(expectedValue) && isFinite(resultValue)) {
             // Regular numbers; do an approximate comparison, expecting 48 bits of precision.
             const epsilon = Math.pow(2, -48);
             const delta = Math.abs(expectedValue - resultValue);
-            matches = (delta === 0) ||
-                ((delta /
-                  Math.min(Math.abs(expectedValue) + Math.abs(resultValue), Number.MAX_VALUE)) <
-                 epsilon);
+            matches =
+                delta === 0 ||
+                delta / Math.min(Math.abs(expectedValue) + Math.abs(resultValue), Number.MAX_VALUE) < epsilon;
         } else {
-            matches = (expectedValue === resultValue);
+            matches = expectedValue === resultValue;
         }
-        assert(matches,
-               `Mismatched ${key} field in document with _id ${resultDoc._id} -- Expected: ${
-                   expectedValue}, Actual: ${resultValue}`);
+        assert(
+            matches,
+            `Mismatched ${key} field in document with _id ${resultDoc._id} -- Expected: ${
+                expectedValue
+            }, Actual: ${resultValue}`,
+        );
     }
 }
 
@@ -186,20 +191,22 @@ for (const resultDoc of results) {
 // error.
 assert(coll.drop());
 
-assert.commandWorked(coll.insert([
-    {_id: 0, x: 0},
-    {_id: 1, x: NaN},
-    {_id: 2, x: Infinity},
-    {_id: 3, x: -Infinity},
-    {_id: 4, x: -2.6}
-]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, x: 0},
+        {_id: 1, x: NaN},
+        {_id: 2, x: Infinity},
+        {_id: 3, x: -Infinity},
+        {_id: 4, x: -2.6},
+    ]),
+);
 
-results =
-    coll.aggregate([
-            {$project: {ceil: {$ceil: "$x"}, floor: {$floor: "$x"}, exp: {$ceil: {$exp: "$x"}}}},
-            {$sort: {_id: 1}}
-        ])
-        .toArray();
+results = coll
+    .aggregate([
+        {$project: {ceil: {$ceil: "$x"}, floor: {$floor: "$x"}, exp: {$ceil: {$exp: "$x"}}}},
+        {$sort: {_id: 1}},
+    ])
+    .toArray();
 
 assert.eq(results, [
     {
@@ -231,23 +238,26 @@ assert.eq(results, [
         "ceil": -2,
         "floor": -3,
         "exp": 1,
-    }
+    },
 ]);
 
 // Testing $sqrt, $ln & $log10 success with NaN:
 assert(coll.drop());
 
-assert.commandWorked(coll.insert([{_id: 0, x: NaN}, {_id: 1, x: NumberDecimal("NaN")}]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, x: NaN},
+        {_id: 1, x: NumberDecimal("NaN")},
+    ]),
+);
 
-results = coll.aggregate([
-                  {$project: {ln: {$ln: "$x"}, log10: {$log10: "$x"}, sqrt: {$sqrt: "$x"}}},
-                  {$sort: {_id: 1}}
-              ])
-              .toArray();
+results = coll
+    .aggregate([{$project: {ln: {$ln: "$x"}, log10: {$log10: "$x"}, sqrt: {$sqrt: "$x"}}}, {$sort: {_id: 1}}])
+    .toArray();
 
 assert.eq(results, [
     {_id: 0, "ln": NaN, "log10": NaN, "sqrt": NaN},
-    {_id: 1, "ln": NaN, "log10": NaN, "sqrt": NumberDecimal("NaN")}
+    {_id: 1, "ln": NaN, "log10": NaN, "sqrt": NumberDecimal("NaN")},
 ]);
 
 // Testing error codes.

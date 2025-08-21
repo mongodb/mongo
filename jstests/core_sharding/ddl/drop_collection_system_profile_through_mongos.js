@@ -11,9 +11,11 @@ const profileCollName = "system.profile";
 
 assert.commandWorked(db.dropDatabase());
 
-assert.commandWorked(db.createCollection(profileCollName, {
-    capped: true,
-    size: 1024,
-}));
+assert.commandWorked(
+    db.createCollection(profileCollName, {
+        capped: true,
+        size: 1024,
+    }),
+);
 
 assert.commandWorked(db.runCommand({drop: profileCollName}));

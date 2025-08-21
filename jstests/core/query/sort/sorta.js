@@ -15,7 +15,7 @@ const docs = [
     {_id: 5, a: null},
     {_id: 6, a: 1},
     {_id: 7, a: [2]},
-    {_id: 8, a: MaxKey}
+    {_id: 8, a: MaxKey},
 ];
 const bulk = coll.initializeUnorderedBulkOp();
 for (let doc of docs) {

@@ -11,11 +11,7 @@ if (_isWindows()) {
     quit();
 }
 
-import {
-    CA_CERT,
-    CLIENT_CERT,
-    SERVER_CERT,
-} from "jstests/ssl/libs/ssl_helpers.js";
+import {CA_CERT, CLIENT_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 function runTest(port, expectedError) {
     clearRawMongoProgramOutput();
@@ -32,31 +28,35 @@ function runTest(port, expectedError) {
             },
         });
     } catch (e) {
-        const logContents = rawMongoProgramOutput("\"id\":20574");
-        assert.neq(logContents.match(expectedError),
-                   null,
-                   "did not see expected error message in log output: " + expectedError);
+        const logContents = rawMongoProgramOutput('"id":20574');
+        assert.neq(
+            logContents.match(expectedError),
+            null,
+            "did not see expected error message in log output: " + expectedError,
+        );
         return;
     }
 
-    const evalFunc = function(dbname, cmd) {
+    const evalFunc = function (dbname, cmd) {
         jsTest.log(assert.commandWorked(db.getSiblingDB(dbname).runCommand({ping: 1})));
     };
-    const evalstr = `(${evalFunc})(${tojson('admin')}, ${tojson({ping: 1})});`;
+    const evalstr = `(${evalFunc})(${tojson("admin")}, ${tojson({ping: 1})});`;
 
     let exitCode;
     try {
-        exitCode = runMongoProgram("mongo",
-                                   "--gRPC",
-                                   "--port",
-                                   port,
-                                   "--tls",
-                                   "--tlsCAFile",
-                                   CA_CERT,
-                                   "--tlsCertificateKeyFile",
-                                   CLIENT_CERT,
-                                   '--eval',
-                                   evalstr);
+        exitCode = runMongoProgram(
+            "mongo",
+            "--gRPC",
+            "--port",
+            port,
+            "--tls",
+            "--tlsCAFile",
+            CA_CERT,
+            "--tlsCertificateKeyFile",
+            CLIENT_CERT,
+            "--eval",
+            evalstr,
+        );
     } catch (e) {
         jsTest.log("Caught exception while running ping command over gRPC: " + e);
     }

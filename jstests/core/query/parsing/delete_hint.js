@@ -33,11 +33,11 @@ function normalIndexTest() {
     assertCommandUsesIndex(deleteCmd, {x: 1});
 
     // Hint using an index name.
-    deleteCmd = {delete: coll.getName(), deletes: [{q: {x: 1}, limit: 1, hint: 'y_-1'}]};
+    deleteCmd = {delete: coll.getName(), deletes: [{q: {x: 1}, limit: 1, hint: "y_-1"}]};
     assertCommandUsesIndex(deleteCmd, {y: -1});
 
     // Passing a hint should not use the idhack fast-path.
-    deleteCmd = {delete: coll.getName(), deletes: [{q: {_id: 1}, limit: 1, hint: 'y_-1'}]};
+    deleteCmd = {delete: coll.getName(), deletes: [{q: {_id: 1}, limit: 1, hint: "y_-1"}]};
     assertCommandUsesIndex(deleteCmd, {y: -1});
 }
 
@@ -83,12 +83,14 @@ function shellHelpersTest() {
     res = coll.bulkWrite([{deleteOne: {filter: {x: 1}, hint: {s: 1}}}]);
     assert.eq(res.deletedCount, 1);
 
-    res = coll.bulkWrite([{
-        deleteMany: {
-            filter: {x: 1},
-            hint: {s: 1},
-        }
-    }]);
+    res = coll.bulkWrite([
+        {
+            deleteMany: {
+                filter: {x: 1},
+                hint: {s: 1},
+            },
+        },
+    ]);
     assert.eq(res.deletedCount, 2);
 }
 

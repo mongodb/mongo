@@ -67,7 +67,7 @@ db.dropDatabase();
 const coll = db[jsTestName()];
 setupCollection(coll);
 
-const createInactiveCursor = function(coll) {
+const createInactiveCursor = function (coll) {
     const findCmd = {find: coll.getName(), filter: {}, sort: {index: 1}, batchSize: 1};
     jsTest.log.info("Running findCmd: ", findCmd);
     const cmdRes = coll.getDB().runCommand(findCmd);
@@ -75,8 +75,9 @@ const createInactiveCursor = function(coll) {
     return cmdRes.cursor.id;
 };
 
-const failpointName = FixtureHelpers.isMongos(db) ? "clusterReleaseMemoryHangAfterPinCursor"
-                                                  : "releaseMemoryHangAfterPinCursor";
+const failpointName = FixtureHelpers.isMongos(db)
+    ? "clusterReleaseMemoryHangAfterPinCursor"
+    : "releaseMemoryHangAfterPinCursor";
 
 const getMoreRetriesKnob = "internalQueryGetMoreMaxCursorPinRetryAttempts";
 const originalKnobValue = getServerParameter(getMoreRetriesKnob);
@@ -86,20 +87,22 @@ const originalKnobValue = getServerParameter(getMoreRetriesKnob);
 
     const releaseMemoryFailPoint = configureFailPoint(db, failpointName);
 
-    const joinReleaseMemory = startParallelShell(funWithArgs(function(cursorId) {
-        const releaseMemoryCmd = {releaseMemory: [cursorId]};
-        jsTest.log.info("Running releaseMemory in parallel shell: ", releaseMemoryCmd);
-        assert.commandWorked(db.runCommand(releaseMemoryCmd));
-    }, cursorIdForGetMore));
+    const joinReleaseMemory = startParallelShell(
+        funWithArgs(function (cursorId) {
+            const releaseMemoryCmd = {releaseMemory: [cursorId]};
+            jsTest.log.info("Running releaseMemory in parallel shell: ", releaseMemoryCmd);
+            assert.commandWorked(db.runCommand(releaseMemoryCmd));
+        }, cursorIdForGetMore),
+    );
 
     releaseMemoryFailPoint.wait();
 
     // getMore retries pinning the cursor if releaseMemory holds the pin, but it does it for a
     // limited amount of retries.
     setServerParameter(getMoreRetriesKnob, 2);
-    assert.commandFailedWithCode(
-        db.runCommand({getMore: cursorIdForGetMore, collection: jsTestName()}),
-        [ErrorCodes.CursorInUse]);
+    assert.commandFailedWithCode(db.runCommand({getMore: cursorIdForGetMore, collection: jsTestName()}), [
+        ErrorCodes.CursorInUse,
+    ]);
 
     releaseMemoryFailPoint.off();
     joinReleaseMemory();
@@ -107,8 +110,9 @@ const originalKnobValue = getServerParameter(getMoreRetriesKnob);
 
 const retryLogId = FixtureHelpers.isMongos(db) ? 10546601 : 10116501;
 
-{  // Run getMore and releaseMemory a lot in parallel to ensure that getMore can retry pinning the
-   // cursor.
+{
+    // Run getMore and releaseMemory a lot in parallel to ensure that getMore can retry pinning the
+    // cursor.
     // Set the knob to a very high value to ensure practically infinite retries.
     setServerParameter(getMoreRetriesKnob, 1000000000);
 
@@ -119,28 +123,34 @@ const retryLogId = FixtureHelpers.isMongos(db) ? 10546601 : 10116501;
 
     const releaseMemoryFailPoint = configureFailPoint(db, failpointName);
 
-    const joinReleaseMemory = startParallelShell(funWithArgs(function(cursorId) {
-        const releaseMemoryCmd = {releaseMemory: [cursorId]};
-        jsTest.log.info("Running releaseMemory in parallel shell: ", releaseMemoryCmd);
-        for (let i = 0; i < 200; ++i) {
-            const res = db.runCommand(releaseMemoryCmd);
-            assert.commandWorked(res);
-            if (res.cursorsReleased.length > 0) {
-                assert.eq(res.cursorsReleased, [cursorId], res);
-            } else {
-                assert.eq(res.cursorsCurrentlyPinned, [cursorId], res);
+    const joinReleaseMemory = startParallelShell(
+        funWithArgs(function (cursorId) {
+            const releaseMemoryCmd = {releaseMemory: [cursorId]};
+            jsTest.log.info("Running releaseMemory in parallel shell: ", releaseMemoryCmd);
+            for (let i = 0; i < 200; ++i) {
+                const res = db.runCommand(releaseMemoryCmd);
+                assert.commandWorked(res);
+                if (res.cursorsReleased.length > 0) {
+                    assert.eq(res.cursorsReleased, [cursorId], res);
+                } else {
+                    assert.eq(res.cursorsCurrentlyPinned, [cursorId], res);
+                }
             }
-        }
-    }, cursorId));
+        }, cursorId),
+    );
 
     releaseMemoryFailPoint.wait();
 
-    const joinGetMore = startParallelShell(funWithArgs(assertGetMore,
-                                                       cursorId,
-                                                       coll.getName(),
-                                                       session.getSessionId(),
-                                                       session.getTxnNumber_forTesting(),
-                                                       150 /*times*/));
+    const joinGetMore = startParallelShell(
+        funWithArgs(
+            assertGetMore,
+            cursorId,
+            coll.getName(),
+            session.getSessionId(),
+            session.getTxnNumber_forTesting(),
+            150 /*times*/,
+        ),
+    );
 
     // Assert that at least one retry happened.
     waitForLog({id: retryLogId});

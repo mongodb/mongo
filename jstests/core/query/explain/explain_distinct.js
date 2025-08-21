@@ -13,7 +13,7 @@ import {
     getPlanStages,
     getWinningPlanFromExplain,
     isCollscan,
-    planHasStage
+    planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
 
 const collName = "jstests_explain_distinct";
@@ -22,11 +22,11 @@ const coll = db[collName];
 function runDistinctExplain(collection, keyString, query) {
     const distinctCmd = {distinct: collection.getName(), key: keyString};
 
-    if (typeof query !== 'undefined') {
+    if (typeof query !== "undefined") {
         distinctCmd.query = query;
     }
 
-    return coll.runCommand({explain: distinctCmd, verbosity: 'executionStats'});
+    return coll.runCommand({explain: distinctCmd, verbosity: "executionStats"});
 }
 
 // Ensure db exists (needed for explain to work).
@@ -37,12 +37,12 @@ db.filler_collection.drop();
 coll.drop();
 
 // Collection doesn't exist.
-let explain = runDistinctExplain(coll, 'a', {});
+let explain = runDistinctExplain(coll, "a", {});
 assert.commandWorked(explain);
 let winningPlan = getWinningPlanFromExplain(explain);
 assert(planHasStage(db, winningPlan, "EOF"));
 const eofStages = getPlanStages(winningPlan, "EOF");
-eofStages.forEach(stage => assert.eq(stage.type, "nonExistentNamespace", explain));
+eofStages.forEach((stage) => assert.eq(stage.type, "nonExistentNamespace", explain));
 
 // Insert the data to perform distinct() on.
 for (let i = 0; i < 10; i++) {
@@ -50,18 +50,18 @@ for (let i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({a: 2, c: 1}));
 }
 
-assert.commandFailed(runDistinctExplain(coll, {}, {}));            // Bad keyString.
-assert.commandFailed(runDistinctExplain(coll, 'a', 'a'));          // Bad query.
-assert.commandFailed(runDistinctExplain(coll, 'b', {$not: 1}));    // Bad query.
-assert.commandFailed(runDistinctExplain(coll, 'a', {$not: 1}));    // Bad query.
-assert.commandFailed(runDistinctExplain(coll, '_id', {$not: 1}));  // Bad query.
+assert.commandFailed(runDistinctExplain(coll, {}, {})); // Bad keyString.
+assert.commandFailed(runDistinctExplain(coll, "a", "a")); // Bad query.
+assert.commandFailed(runDistinctExplain(coll, "b", {$not: 1})); // Bad query.
+assert.commandFailed(runDistinctExplain(coll, "a", {$not: 1})); // Bad query.
+assert.commandFailed(runDistinctExplain(coll, "_id", {$not: 1})); // Bad query.
 
 // Ensure that server accepts a distinct command with no 'query' field.
-assert.commandWorked(runDistinctExplain(coll, 'a', null));
-assert.commandWorked(runDistinctExplain(coll, 'a'));
+assert.commandWorked(runDistinctExplain(coll, "a", null));
+assert.commandWorked(runDistinctExplain(coll, "a"));
 
-assert.eq([1], coll.distinct('b'));
-explain = runDistinctExplain(coll, 'b', {});
+assert.eq([1], coll.distinct("b"));
+explain = runDistinctExplain(coll, "b", {});
 assert.commandWorked(explain);
 winningPlan = getWinningPlanFromExplain(explain);
 assert.eq(20, explain.executionStats.nReturned);
@@ -69,8 +69,8 @@ assert(isCollscan(db, winningPlan));
 
 assert.commandWorked(coll.createIndex({a: 1}));
 
-assert.eq([1, 2], coll.distinct('a'));
-explain = runDistinctExplain(coll, 'a', {});
+assert.eq([1, 2], coll.distinct("a"));
+explain = runDistinctExplain(coll, "a", {});
 assert.commandWorked(explain);
 winningPlan = getWinningPlanFromExplain(explain);
 assert.eq(2, explain.executionStats.nReturned);
@@ -90,16 +90,16 @@ assert("indexBounds" in stage);
 
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
-assert.eq([1], coll.distinct('a', {a: 1}));
-explain = runDistinctExplain(coll, 'a', {a: 1});
+assert.eq([1], coll.distinct("a", {a: 1}));
+explain = runDistinctExplain(coll, "a", {a: 1});
 assert.commandWorked(explain);
 winningPlan = getWinningPlanFromExplain(explain);
 assert.eq(1, explain.executionStats.nReturned);
 assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
 
-assert.eq([1], coll.distinct('b', {a: 1}));
-explain = runDistinctExplain(coll, 'b', {a: 1});
+assert.eq([1], coll.distinct("b", {a: 1}));
+explain = runDistinctExplain(coll, "b", {a: 1});
 assert.commandWorked(explain);
 winningPlan = getWinningPlanFromExplain(explain);
 assert.eq(1, explain.executionStats.nReturned);

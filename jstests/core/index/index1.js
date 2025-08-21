@@ -17,12 +17,12 @@ assert(t.findOne({z: {a: 17}}) == null);
 
 o = {
     name: "bar",
-    z: {a: 18}
+    z: {a: 18},
 };
 t.save(o);
 
 assert.eq(2, t.find().length());
-assert.eq(2, t.find().sort({'z.a': 1}).length());
-assert.eq(2, t.find().sort({'z.a': -1}).length());
+assert.eq(2, t.find().sort({"z.a": 1}).length());
+assert.eq(2, t.find().sort({"z.a": -1}).length());
 
 assert(t.validate().valid);

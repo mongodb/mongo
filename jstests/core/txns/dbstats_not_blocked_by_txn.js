@@ -10,7 +10,7 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-var dbName = 'dbstats_not_blocked_by_txn';
+var dbName = "dbstats_not_blocked_by_txn";
 var mydb = db.getSiblingDB(dbName);
 
 mydb.foo.drop({writeConcern: {w: "majority"}});

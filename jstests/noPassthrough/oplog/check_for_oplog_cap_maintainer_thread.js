@@ -14,14 +14,13 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Verify that the oplog cap maintainer thread is running under normal circumstances.
 jsTestLog("Testing single node replica set mode");
-const rst = new ReplSetTest(
-    {nodes: 1, nodeOptions: {setParameter: {logComponentVerbosity: tojson({storage: 1})}}});
+const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {logComponentVerbosity: tojson({storage: 1})}}});
 rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-checkLog.containsJson(primary, 5295000);  // OplogCapMaintainerThread started.
-checkLog.containsJson(primary, 22382);    // Oplog truncate markers calculated.
+checkLog.containsJson(primary, 5295000); // OplogCapMaintainerThread started.
+checkLog.containsJson(primary, 22382); // Oplog truncate markers calculated.
 
 rst.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 
@@ -45,7 +44,7 @@ clearRawMongoProgramOutput();
 conn = MongoRunner.runMongod({
     dbpath: primary.dbpath,
     noCleanData: true,
-    queryableBackupMode: "",  // readOnly
+    queryableBackupMode: "", // readOnly
     setParameter: {logComponentVerbosity: tojson({storage: 1})},
 });
 assert(conn);

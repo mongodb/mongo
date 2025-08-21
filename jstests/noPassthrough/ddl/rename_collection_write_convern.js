@@ -18,7 +18,7 @@ let st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 let db = st.getDB("test");
 
@@ -29,13 +29,13 @@ replTest.remove(0);
 
 // Call getPrimary() to populate replTest._secondaries.
 replTest.getPrimary();
-let liveSecondaries = replTest.getSecondaries().filter(function(node) {
+let liveSecondaries = replTest.getSecondaries().filter(function (node) {
     return node.host !== replTest.nodes[0].host;
 });
 replTest.awaitSecondaryNodes(null, liveSecondaries);
 awaitRSClientHosts(st.s, replTest.getPrimary(), {ok: true, ismaster: true}, replTest.name);
 
 assert.commandWorked(db.foo.insert({_id: 4}));
-assert.commandWorked(db.foo.renameCollection('bar', true));
+assert.commandWorked(db.foo.renameCollection("bar", true));
 
 st.stop();

@@ -18,8 +18,7 @@ function setupShardedCollection(st, dbName, collName) {
     assert.commandWorked(admin.runCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(admin.runCommand({shardCollection: fullNss, key: {_id: 1}}));
     assert.commandWorked(admin.runCommand({split: fullNss, middle: {_id: 0}}));
-    assert.commandWorked(
-        admin.runCommand({moveChunk: fullNss, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(admin.runCommand({moveChunk: fullNss, find: {_id: 0}, to: st.shard1.shardName}));
 
     // Insert some docs on each shard
     let coll = admin.getSiblingDB(dbName).getCollection(collName);
@@ -57,8 +56,7 @@ function runCursorTest(conn) {
     const dbName = kTestName;
     const collName = kTestName;
     const comment = kTestName;
-    const cursorThread =
-        new Thread(openCursor, conn.host, dbName, collName, comment, countdownLatch);
+    const cursorThread = new Thread(openCursor, conn.host, dbName, collName, comment, countdownLatch);
     cursorThread.start();
 
     // Wait until we see the cursor is idle
@@ -68,7 +66,7 @@ function runCursorTest(conn) {
         const curopCursor = admin.aggregate([
             {$currentOp: {allUsers: true, idleCursors: true, localOps: true}},
             {$match: {type: "idleCursor"}},
-            {$match: {"cursor.originatingCommand.comment": comment}}
+            {$match: {"cursor.originatingCommand.comment": comment}},
         ]);
         if (curopCursor.hasNext()) {
             idleCursor = curopCursor.next().cursor;
@@ -88,17 +86,21 @@ function runCursorTest(conn) {
 
     // Assert that the cursor is cleaned up
     jsTestLog("Waiting for the cursor to get cleaned up");
-    assert.soon(() => {
-        const numCursorsFoundWithId =
-            admin
+    assert.soon(
+        () => {
+            const numCursorsFoundWithId = admin
                 .aggregate([
                     {$currentOp: {allUsers: true, idleCursors: true, localOps: true}},
                     {$match: {type: "idleCursor"}},
-                    {$match: {"cursor.cursorId": cursorId}}
+                    {$match: {"cursor.cursorId": cursorId}},
                 ])
                 .itcount();
-        return (numCursorsFoundWithId == 0);
-    }, "The cursor was not cleaned up", 10000, 1000);
+            return numCursorsFoundWithId == 0;
+        },
+        "The cursor was not cleaned up",
+        10000,
+        1000,
+    );
 }
 
 // Starts a transaction and then waits on the countdown latch
@@ -118,7 +120,7 @@ function startTransaction(host, dbName, collName, appName, countdownLatch) {
         lsid: session,
         txnNumber: txnNumber,
         startTransaction: true,
-        autocommit: false
+        autocommit: false,
     });
     assert.commandWorked(result);
 
@@ -136,14 +138,13 @@ function runTransactionTest(conn) {
     let countdownLatch = new CountDownLatch(1);
 
     // capture txn statistics before opening and aborting the txn.
-    const preStatus = admin.adminCommand({'serverStatus': 1}).transactions;
+    const preStatus = admin.adminCommand({"serverStatus": 1}).transactions;
 
     const dbName = kTestName;
     const collName = kTestName;
     const appName = kTestName;
 
-    const transactionThread =
-        new Thread(startTransaction, conn.host, dbName, collName, appName, countdownLatch);
+    const transactionThread = new Thread(startTransaction, conn.host, dbName, collName, appName, countdownLatch);
     transactionThread.start();
 
     let idleSession = {};
@@ -154,7 +155,7 @@ function runTransactionTest(conn) {
         const curopCursor = admin.aggregate([
             {$currentOp: {allUsers: true, idleCursors: true, localOps: true, idleSessions: true}},
             {$match: {type: "idleSession"}},
-            {$match: {appName: appName}}
+            {$match: {appName: appName}},
         ]);
         if (curopCursor.hasNext()) {
             idleSession = curopCursor.next();
@@ -175,12 +176,15 @@ function runTransactionTest(conn) {
 
     // Assert that the transaction is cleaned up.
     jsTestLog("Waiting for the transaction to be cleaned up.");
-    const numPrevInterrupted =
-        preStatus.abortCause.hasOwnProperty('Interrupted') ? preStatus.abortCause.Interrupted : 0;
+    const numPrevInterrupted = preStatus.abortCause.hasOwnProperty("Interrupted")
+        ? preStatus.abortCause.Interrupted
+        : 0;
     assert.soon(() => {
-        const postStatus = admin.adminCommand({'serverStatus': 1}).transactions;
-        return (postStatus.totalAborted == preStatus.totalAborted + 1) &&
-            (postStatus.abortCause.Interrupted, numPrevInterrupted + 1);
+        const postStatus = admin.adminCommand({"serverStatus": 1}).transactions;
+        return (
+            postStatus.totalAborted == preStatus.totalAborted + 1 &&
+            (postStatus.abortCause.Interrupted, numPrevInterrupted + 1)
+        );
     });
 }
 
@@ -189,7 +193,7 @@ function runTest(conn) {
     runTransactionTest(conn);
 }
 
-if (typeof inner == 'undefined') {
+if (typeof inner == "undefined") {
     jsTestLog("Outer shell: setting up test environment");
     let st = new ShardingTest({shards: 2});
 
@@ -204,7 +208,7 @@ if (typeof inner == 'undefined') {
     const grpcUri = `mongodb://localhost:${st.s.fullOptions.grpcPort}/?gRPC=true`;
     jsTestLog("Outer shell: launching inner shell to connect over gRPC to " + grpcUri);
 
-    const exitCode = runMongoProgram('mongo', grpcUri, '--eval', `const inner=true;`, kThisFile);
+    const exitCode = runMongoProgram("mongo", grpcUri, "--eval", `const inner=true;`, kThisFile);
     assert.eq(exitCode, 0);
     jsTestLog("Outer shell: inner shell exited cleanly.");
 

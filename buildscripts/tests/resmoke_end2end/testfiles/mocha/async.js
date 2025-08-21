@@ -1,12 +1,4 @@
-
-import {
-    after,
-    afterEach,
-    before,
-    beforeEach,
-    describe,
-    it,
-} from "jstests/libs/mochalite.js";
+import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 
 // validate test execution and ordering among sync and async content
 
@@ -27,7 +19,7 @@ after(async () => log("after2"));
 it("test1", () => log("----test1"));
 it("test2", async () => log("----test2"));
 
-describe("describe", function() {
+describe("describe", function () {
     before(() => log("----describe before1"));
     before(async () => log("----describe before2"));
 

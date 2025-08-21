@@ -3,32 +3,30 @@
  * metrics.
  */
 
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 export const kOrderTypes = [
     {
         name: "constant",
         monotonicity: "not monotonic",
-        supportedFieldTypes: ["integer", "string", "date", "objectid", "uuid"]
+        supportedFieldTypes: ["integer", "string", "date", "objectid", "uuid"],
     },
     {
         name: "fluctuating",
         monotonicity: "not monotonic",
-        supportedFieldTypes: ["integer", "string", "date", "uuid"]
+        supportedFieldTypes: ["integer", "string", "date", "uuid"],
     },
     {
         name: "increasing",
         monotonicity: "monotonic",
-        supportedFieldTypes: ["integer", "string", "date"]
+        supportedFieldTypes: ["integer", "string", "date"],
     },
 
     {
         name: "decreasing",
         monotonicity: "monotonic",
-        supportedFieldTypes: ["integer", "string", "date"]
-    }
+        supportedFieldTypes: ["integer", "string", "date"],
+    },
 ];
 
 // Only use a single-node RS for montonicity tests. By default, the router runs the analyzeShardKey
@@ -108,8 +106,7 @@ export function appendDuplicatedField(docs, fieldName, getNextValueFunc, maxFreq
     let docIndex = 0;
     while (docIndex < docs.length) {
         const value = getNextValueFunc();
-        const frequency =
-            Math.min(docs.length - docIndex, AnalyzeShardKeyUtil.getRandInteger(1, maxFrequency));
+        const frequency = Math.min(docs.length - docIndex, AnalyzeShardKeyUtil.getRandInteger(1, maxFrequency));
         for (let i = 0; i < frequency; i++) {
             AnalyzeShardKeyUtil.setDottedField(docs[docIndex], fieldName, value);
             docIndex++;
@@ -217,24 +214,24 @@ export function makeDocuments(numDocs, fieldOpts) {
     return docs;
 }
 
-export function testMonotonicity(conn,
-                                 dbName,
-                                 collName,
-                                 currentShardKey,
-                                 testCases,
-                                 testProbability,
-                                 numDocsRange,
-                                 setupCollection) {
+export function testMonotonicity(
+    conn,
+    dbName,
+    collName,
+    currentShardKey,
+    testCases,
+    testProbability,
+    numDocsRange,
+    setupCollection,
+) {
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
 
-    const correlationCoefficientThreshold =
-        assert
-            .commandWorked(db.adminCommand(
-                {getParameter: 1, analyzeShardKeyMonotonicityCorrelationCoefficientThreshold: 1}))
-            .analyzeShardKeyMonotonicityCorrelationCoefficientThreshold;
+    const correlationCoefficientThreshold = assert.commandWorked(
+        db.adminCommand({getParameter: 1, analyzeShardKeyMonotonicityCorrelationCoefficientThreshold: 1}),
+    ).analyzeShardKeyMonotonicityCorrelationCoefficientThreshold;
 
-    testCases.forEach(testCase => {
+    testCases.forEach((testCase) => {
         if (Math.random() > testProbability) {
             return;
         }
@@ -243,8 +240,7 @@ export function testMonotonicity(conn,
             const order = testCase.fieldOpts[i].order;
             if (order == "increasing" || order == "decreasing") {
                 // Make the field have at least 15 unique values in the collection.
-                testCase.fieldOpts[i].maxFrequency =
-                    AnalyzeShardKeyUtil.getRandInteger(1, numDocs / 15);
+                testCase.fieldOpts[i].maxFrequency = AnalyzeShardKeyUtil.getRandInteger(1, numDocs / 15);
             }
         }
         const fieldOpts = [...testCase.fieldOpts];
@@ -254,8 +250,7 @@ export function testMonotonicity(conn,
             }
         }
 
-        jsTest.log(`Testing metrics for ${
-            tojson({dbName, collName, currentShardKey, numDocs, testCase})}`);
+        jsTest.log(`Testing metrics for ${tojson({dbName, collName, currentShardKey, numDocs, testCase})}`);
 
         setupCollection();
 
@@ -265,30 +260,36 @@ export function testMonotonicity(conn,
         let currIndex = 0;
         while (currIndex < docs.length) {
             const endIndex = currIndex + insertBatchSize;
-            assert.commandWorked(db.runCommand({
-                insert: collName,
-                documents: docs.slice(currIndex, endIndex),
-                // Wait for secondaries to have replicated the writes.
-                writeConcern: {w: numNodesPerRS}
-            }));
+            assert.commandWorked(
+                db.runCommand({
+                    insert: collName,
+                    documents: docs.slice(currIndex, endIndex),
+                    // Wait for secondaries to have replicated the writes.
+                    writeConcern: {w: numNodesPerRS},
+                }),
+            );
             currIndex = endIndex;
         }
 
         // Waiting for the index to be created on all nodes is necessary since mongos runs
         // the analyzeShardKey command with readPreference "secondaryPreferred".
-        assert.commandWorked(db.runCommand({
-            createIndexes: collName,
-            indexes: [{key: testCase.indexKey, name: JSON.stringify(testCase.indexKey)}],
-            writeConcern: {w: numNodesPerRS}
-        }));
+        assert.commandWorked(
+            db.runCommand({
+                createIndexes: collName,
+                indexes: [{key: testCase.indexKey, name: JSON.stringify(testCase.indexKey)}],
+                writeConcern: {w: numNodesPerRS},
+            }),
+        );
 
-        const res = assert.commandWorked(conn.adminCommand({
-            analyzeShardKey: ns,
-            key: testCase.shardKey,
-            // Skip calculating the read and write distribution metrics since there are not needed
-            // by this test.
-            readWriteDistribution: false
-        }));
+        const res = assert.commandWorked(
+            conn.adminCommand({
+                analyzeShardKey: ns,
+                key: testCase.shardKey,
+                // Skip calculating the read and write distribution metrics since there are not needed
+                // by this test.
+                readWriteDistribution: false,
+            }),
+        );
         const metrics = res.keyCharacteristics;
 
         const isClusteredColl = AnalyzeShardKeyUtil.isClusterCollection(conn, dbName, collName);
@@ -301,11 +302,15 @@ export function testMonotonicity(conn,
             assert(metrics.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"));
 
             if (expectedType == "monotonic") {
-                assert.gte(Math.abs(metrics.monotonicity.recordIdCorrelationCoefficient),
-                           correlationCoefficientThreshold);
+                assert.gte(
+                    Math.abs(metrics.monotonicity.recordIdCorrelationCoefficient),
+                    correlationCoefficientThreshold,
+                );
             } else if (expectedType == "not monotonic") {
-                assert.lt(Math.abs(metrics.monotonicity.recordIdCorrelationCoefficient),
-                          correlationCoefficientThreshold);
+                assert.lt(
+                    Math.abs(metrics.monotonicity.recordIdCorrelationCoefficient),
+                    correlationCoefficientThreshold,
+                );
             } else {
                 throw new Error("Unknown expected monotonicity '" + expectedType + "'");
             }
@@ -318,50 +323,50 @@ export function testMonotonicity(conn,
     });
 }
 
-export function testAnalyzeShardKeysUnshardedCollection(
-    conn, testCases, testProbability, numDocsRange) {
+export function testAnalyzeShardKeysUnshardedCollection(conn, testCases, testProbability, numDocsRange) {
     const dbName = "testDb";
     const collName = "testCollUnsharded";
 
-    jsTest.log(`Testing analyzing a shard key for an unsharded collection: ${
-        tojsononeline({dbName, collName})}`);
+    jsTest.log(`Testing analyzing a shard key for an unsharded collection: ${tojsononeline({dbName, collName})}`);
 
     let setUpCollection = () => {};
-    testMonotonicity(conn,
-                     dbName,
-                     collName,
-                     null /* currentShardKey */,
-                     testCases,
-                     testProbability,
-                     numDocsRange,
-                     setUpCollection);
+    testMonotonicity(
+        conn,
+        dbName,
+        collName,
+        null /* currentShardKey */,
+        testCases,
+        testProbability,
+        numDocsRange,
+        setUpCollection,
+    );
 }
 
-export function testAnalyzeShardKeysShardedCollection(
-    st, testCases, testProbability, numDocsRange) {
+export function testAnalyzeShardKeysShardedCollection(st, testCases, testProbability, numDocsRange) {
     const dbName = "testDb";
     const collName = "testCollSharded";
     const ns = dbName + "." + collName;
     const currentShardKey = {skey: 1};
     const currentShardKeySplitPoint = {skey: 0};
 
-    jsTest.log(`Testing analyzing a shard key for a sharded collection: ${
-        tojsononeline({dbName, collName})}`);
+    jsTest.log(`Testing analyzing a shard key for a sharded collection: ${tojsononeline({dbName, collName})}`);
 
     let setUpCollection = () => {
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentShardKey}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
-        assert.commandWorked(st.s.adminCommand(
-            {moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}));
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}),
+        );
     };
-    testMonotonicity(st.s,
-                     dbName,
-                     collName,
-                     currentShardKey,
-                     testCases,
-                     testProbability,
-                     numDocsRange,
-                     setUpCollection);
+    testMonotonicity(
+        st.s,
+        dbName,
+        collName,
+        currentShardKey,
+        testCases,
+        testProbability,
+        numDocsRange,
+        setUpCollection,
+    );
 }

@@ -6,10 +6,12 @@
 import {getQueryPlanner, planHasStage} from "jstests/libs/query/analyze_plan.js";
 const coll = db[jsTestName()];
 coll.drop();
-const documents = [{
-    _id: 31,
-    date: 2,
-}];
+const documents = [
+    {
+        _id: 31,
+        date: 2,
+    },
+];
 
 assert.commandWorked(coll.insert(documents));
 
@@ -17,9 +19,8 @@ assert.commandWorked(coll.insert(documents));
 let q = [
     {"$match": {"_id": 31}},
     {
-        "$setWindowFields":
-            {"sortBy": {"date": 1}, "partitionBy": "$array", "output": {"x": {"$denseRank": {}}}}
-    }
+        "$setWindowFields": {"sortBy": {"date": 1}, "partitionBy": "$array", "output": {"x": {"$denseRank": {}}}},
+    },
 ];
 
 // This query should return one successfully ranked document.

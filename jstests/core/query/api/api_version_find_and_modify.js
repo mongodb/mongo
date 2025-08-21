@@ -16,7 +16,7 @@ let curStock = 10;
 
 assert.commandWorked(coll.insert({itemNumber: 1, stockUnit: curStock}));
 
-const assertStockUnits = function() {
+const assertStockUnits = function () {
     const result = coll.find({itemNumber: 1}).toArray();
     assert.eq(result.length, 1);
     curStock += incStockFactor;
@@ -24,13 +24,15 @@ const assertStockUnits = function() {
 };
 
 // Test the command with latest command name and 'apiStrict'.
-assert.commandWorked(testDB.runCommand({
-    findAndModify: collName,
-    query: {itemNumber: 1},
-    update: {"$inc": {stockUnit: incStockFactor}},
-    apiVersion: "1",
-    apiStrict: true
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        findAndModify: collName,
+        query: {itemNumber: 1},
+        update: {"$inc": {stockUnit: incStockFactor}},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
+);
 assertStockUnits();
 
 // Test the command with command alias 'findandmodify' and 'apiStrict'.
@@ -39,24 +41,28 @@ const result = testDB.runCommand({
     query: {itemNumber: 1},
     update: {"$inc": {stockUnit: incStockFactor}},
     apiVersion: "1",
-    apiStrict: true
+    apiStrict: true,
 });
 assert.commandFailedWithCode(result, ErrorCodes.APIStrictError);
 
 // Test the command with latest command name without 'apiStrict'.
-assert.commandWorked(testDB.runCommand({
-    findAndModify: collName,
-    query: {itemNumber: 1},
-    update: {"$inc": {stockUnit: incStockFactor}},
-    apiVersion: "1"
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        findAndModify: collName,
+        query: {itemNumber: 1},
+        update: {"$inc": {stockUnit: incStockFactor}},
+        apiVersion: "1",
+    }),
+);
 assertStockUnits();
 
 // Test the command with command alias 'findandmodify' without 'apiStrict'.
-assert.commandWorked(testDB.runCommand({
-    findandmodify: collName,
-    query: {itemNumber: 1},
-    update: {"$inc": {stockUnit: incStockFactor}},
-    apiVersion: "1"
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        findandmodify: collName,
+        query: {itemNumber: 1},
+        update: {"$inc": {stockUnit: incStockFactor}},
+        apiVersion: "1",
+    }),
+);
 assertStockUnits();

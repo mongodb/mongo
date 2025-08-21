@@ -17,7 +17,7 @@ const rst = new ReplSetTest({
     name: collName,
     nodes: 1,
     // Make it easy to generate multiple oplog entries per transaction.
-    nodeOptions: {setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 1}}
+    nodeOptions: {setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 1}},
 });
 rst.startSet();
 rst.initiate();
@@ -26,7 +26,7 @@ const primary = rst.getPrimary();
 
 // Initiate a session on the primary.
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const primarySession = primary.getDB(dbName).getMongo().startSession(sessionOptions);
 const primarySessionDb = primarySession.getDatabase(dbName);
@@ -62,9 +62,7 @@ PrepareHelpers.commitTransaction(primarySession, prepareTs);
 
 txnNum = primarySession.getTxnNumber_forTesting();
 let preparedAndCommittedTxnOps = oplog.find({"lsid.id": sessionId, txnNumber: txnNum}).toArray();
-assert.eq(preparedAndCommittedTxnOps.length,
-          3,
-          "unexpected op count: " + tojson(preparedAndCommittedTxnOps));
+assert.eq(preparedAndCommittedTxnOps.length, 3, "unexpected op count: " + tojson(preparedAndCommittedTxnOps));
 
 // Run a prepared transaction that aborts.
 primarySession.startTransaction();
@@ -75,8 +73,7 @@ assert.commandWorked(primarySession.abortTransaction_forTesting());
 
 txnNum = primarySession.getTxnNumber_forTesting();
 let preparedAndAbortedTxnOps = oplog.find({"lsid.id": sessionId, txnNumber: txnNum}).toArray();
-assert.eq(
-    preparedAndAbortedTxnOps.length, 3, "unexpected op count: " + tojson(preparedAndAbortedTxnOps));
+assert.eq(preparedAndAbortedTxnOps.length, 3, "unexpected op count: " + tojson(preparedAndAbortedTxnOps));
 
 // Clear out any documents that may have been created in the collection.
 assert.commandWorked(primarySessionColl.remove({}));
@@ -85,23 +82,23 @@ assert.commandWorked(primarySessionColl.remove({}));
 // Now we test running the various transaction ops we captured through the 'applyOps' command.
 //
 
-let op = unpreparedTxnOps[0];  // in-progress op.
+let op = unpreparedTxnOps[0]; // in-progress op.
 jsTestLog("Testing in-progress transaction op: " + tojson(op));
 assert.commandFailedWithCode(primarySessionDb.adminCommand({applyOps: [op]}), 31056);
 
-op = unpreparedTxnOps[1];  // implicit commit op.
+op = unpreparedTxnOps[1]; // implicit commit op.
 jsTestLog("Testing unprepared implicit commit transaction op: " + tojson(op));
 assert.commandFailedWithCode(primarySessionDb.adminCommand({applyOps: [op]}), 31240);
 
-op = preparedAndCommittedTxnOps[1];  // implicit prepare op.
+op = preparedAndCommittedTxnOps[1]; // implicit prepare op.
 jsTestLog("Testing implicit prepare transaction op: " + tojson(op));
 assert.commandFailedWithCode(primarySessionDb.adminCommand({applyOps: [op]}), 51145);
 
-op = preparedAndCommittedTxnOps[2];  // prepared commit op.
+op = preparedAndCommittedTxnOps[2]; // prepared commit op.
 jsTestLog("Testing prepared commit transaction op: " + tojson(op));
 assert.commandFailedWithCode(primarySessionDb.adminCommand({applyOps: [op]}), 50987);
 
-op = preparedAndAbortedTxnOps[2];  // prepared abort op.
+op = preparedAndAbortedTxnOps[2]; // prepared abort op.
 jsTestLog("Testing prepared abort transaction op: " + tojson(op));
 assert.commandFailedWithCode(primarySessionDb.adminCommand({applyOps: [op]}), 50972);
 

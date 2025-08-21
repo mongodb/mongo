@@ -21,10 +21,12 @@ assert.commandWorked(sourceColl.insert({_id: 1}));
 // Verifies that running the execution explains do not error, perform any writes, or create the
 // target collection.
 function assertExecutionExplainOk(writingStage, verbosity) {
-    assert.commandWorked(db.runCommand({
-        explain: {aggregate: sourceColl.getName(), pipeline: [writingStage], cursor: {}},
-        verbosity: verbosity
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            explain: {aggregate: sourceColl.getName(), pipeline: [writingStage], cursor: {}},
+            verbosity: verbosity,
+        }),
+    );
     assert.eq(targetColl.find().itcount(), 0);
     // Verify that the collection was not created.
     const collectionList = db.getCollectionInfos({name: targetColl.getName()});
@@ -34,8 +36,7 @@ function assertExecutionExplainOk(writingStage, verbosity) {
 // Test that $out can be explained with 'queryPlanner' explain verbosity and does not perform
 // any writes.
 let explain = sourceColl.explain("queryPlanner").aggregate([{$out: targetColl.getName()}]);
-let explainedPipeline =
-    getExplainPipelineFromAggregationResult(explain, {inhibitOptimization: false});
+let explainedPipeline = getExplainPipelineFromAggregationResult(explain, {inhibitOptimization: false});
 assert.eq(1, explainedPipeline.length);
 assert(explainedPipeline[0].$out);
 let outExplain = explainedPipeline[0];
@@ -50,13 +51,13 @@ assertExecutionExplainOk({$out: targetColl.getName()}, "executionStats");
 assertExecutionExplainOk({$out: targetColl.getName()}, "allPlansExecution");
 
 // Test each $merge mode with each explain verbosity.
-withEachMergeMode(function({whenMatchedMode, whenNotMatchedMode}) {
+withEachMergeMode(function ({whenMatchedMode, whenNotMatchedMode}) {
     const mergeStage = {
         $merge: {
             into: targetColl.getName(),
             whenMatched: whenMatchedMode,
-            whenNotMatched: whenNotMatchedMode
-        }
+            whenNotMatched: whenNotMatchedMode,
+        },
     };
 
     // Verify that execution explains don't error for $merge.
@@ -64,8 +65,7 @@ withEachMergeMode(function({whenMatchedMode, whenNotMatchedMode}) {
     assertExecutionExplainOk(mergeStage, "allPlansExecution");
 
     const explain = sourceColl.explain("queryPlanner").aggregate([mergeStage]);
-    let explainedPipeline =
-        getExplainPipelineFromAggregationResult(explain, {inhibitOptimization: false});
+    let explainedPipeline = getExplainPipelineFromAggregationResult(explain, {inhibitOptimization: false});
     assert.eq(1, explainedPipeline.length);
     assert(explainedPipeline[0].$merge);
     const mergeExplain = explainedPipeline[0];

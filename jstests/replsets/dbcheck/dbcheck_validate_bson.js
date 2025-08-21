@@ -13,7 +13,7 @@ import {
     clearHealthLog,
     forEachNonArbiterNode,
     resetAndInsert,
-    runDbCheck
+    runDbCheck,
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
 // Skipping data consistency checks because invalid BSON is inserted into primary and secondary
@@ -27,7 +27,7 @@ const collName = "dbCheckBSONValidation-collection";
 const replSet = new ReplSetTest({
     name: jsTestName(),
     nodes: 2,
-    nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}}
+    nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}},
 });
 replSet.startSet();
 replSet.initiate();
@@ -47,52 +47,51 @@ const invalidBSONQuery = {
     operation: "dbCheckBatch",
     severity: "error",
     msg: "Document is not well-formed BSON",
-    "data.context.recordID": {$exists: true}
+    "data.context.recordID": {$exists: true},
 };
 const invalidHashQuery = {
     operation: "dbCheckBatch",
     severity: "error",
     msg: "dbCheck batch inconsistent",
-    "data.md5": {$exists: true}
+    "data.md5": {$exists: true},
 };
 const warningQuery = {
     operation: "dbCheckBatch",
-    severity: "warning"
+    severity: "warning",
 };
 const BSONWarningQuery = {
     operation: "dbCheckBatch",
     severity: "warning",
-    msg: "Document is not well-formed BSON"
+    msg: "Document is not well-formed BSON",
 };
 const successfulBatchQuery = {
     operation: "dbCheckBatch",
     severity: "info",
     msg: "dbCheck batch consistent",
-    "data.count": maxDocsPerBatch
+    "data.count": maxDocsPerBatch,
 };
 const errAndWarningQuery = {
     operation: "dbCheckBatch",
-    $or: [{severity: "error"}, {severity: "warning"}]
+    $or: [{severity: "error"}, {severity: "warning"}],
 };
 
 const doc1 = {
     _id: 0,
-    a: 1
+    a: 1,
 };
 
 // The default WC is majority and godinsert command on a secondary is incompatible with
 // wc:majority.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Insert corrupt document for testing via failpoint.
-const insertCorruptDocument = function(db, collName) {
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "alwaysOn"}));
+const insertCorruptDocument = function (db, collName) {
+    assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "alwaysOn"}));
     // Use godinsert to insert into the node directly.
     assert.commandWorked(db.runCommand({godinsert: collName, obj: doc1}));
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}));
 };
 
 function testKDefaultBSONValidation() {
@@ -103,16 +102,18 @@ function testKDefaultBSONValidation() {
     // Insert invalid BSON that fails the kDefault check into both nodes in the replica set.
     assert.commandWorked(primaryDb.createCollection(collName));
     replSet.awaitReplication();
-    forEachNonArbiterNode(replSet, function(node) {
+    forEachNonArbiterNode(replSet, function (node) {
         insertCorruptDocument(node.getDB(dbName), collName);
     });
 
     // Both primary and secondary should have error in health log for invalid BSON.
-    runDbCheck(replSet,
-               primaryDb,
-               collName,
-               {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
-               true /* awaitCompletion */);
+    runDbCheck(
+        replSet,
+        primaryDb,
+        collName,
+        {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
+        true /* awaitCompletion */,
+    );
 
     // Primary and secondary have the same invalid BSON document so there is an error for invalid
     // BSON but not data inconsistency. We check that the only errors in the health log are for
@@ -143,7 +144,8 @@ function testPrimaryInvalidBson() {
         primaryDb,
         collName,
         {maxDocsPerBatch: maxDocsPerBatch, validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
-        true /* awaitCompletion */);
+        true /* awaitCompletion */,
+    );
 
     // Verify primary logs an error for invalid BSON while the secondary logs an error for data
     // inconsistency.
@@ -175,7 +177,8 @@ function testSecondaryInvalidBson() {
         primaryDb,
         collName,
         {maxDocsPerBatch: maxDocsPerBatch, validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
-        true /* awaitCompletion */);
+        true /* awaitCompletion */,
+    );
 
     // Verify secondary logs an error for invalid BSON and data inconsistency.
     checkHealthLog(secondary.getDB("local").system.healthlog, invalidBSONQuery, 1);
@@ -201,18 +204,16 @@ function testMultipleBatches() {
         primaryDb,
         collName,
         {maxDocsPerBatch: maxDocsPerBatch, validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
-        true /* awaitCompletion */);
+        true /* awaitCompletion */,
+    );
 
     // Secondary logs an error for invalid BSON and data inconsistency.
     checkHealthLog(secondary.getDB("local").system.healthlog, invalidBSONQuery, 1);
     checkHealthLog(secondary.getDB("local").system.healthlog, invalidHashQuery, 1);
 
     // Primary and secondary do not terminate after first batch and finish dbCheck successfully.
-    checkHealthLog(
-        primary.getDB("local").system.healthlog, successfulBatchQuery, nDocs / maxDocsPerBatch);
-    checkHealthLog(secondary.getDB("local").system.healthlog,
-                   successfulBatchQuery,
-                   (nDocs / maxDocsPerBatch) - 1);
+    checkHealthLog(primary.getDB("local").system.healthlog, successfulBatchQuery, nDocs / maxDocsPerBatch);
+    checkHealthLog(secondary.getDB("local").system.healthlog, successfulBatchQuery, nDocs / maxDocsPerBatch - 1);
     // There should be no other error queries.
     checkHealthLog(primary.getDB("local").system.healthlog, errQuery, 0);
     checkHealthLog(secondary.getDB("local").system.healthlog, errQuery, 2);
@@ -222,7 +223,8 @@ function testMultipleBatches() {
 
 function testInvalidUuid() {
     jsTestLog(
-        "Testing that a BSON document that is structurally valid but invalid in other ways (such as by having UUID that have incorrect lengths) is included in hashing but logs a warning");
+        "Testing that a BSON document that is structurally valid but invalid in other ways (such as by having UUID that have incorrect lengths) is included in hashing but logs a warning",
+    );
     clearHealthLog(replSet);
 
     primaryDb[collName].drop();
@@ -231,19 +233,20 @@ function testInvalidUuid() {
 
     // Insert 2 documents with invalid UUID (length is 4 or 20 instead of 16).
     assert.commandWorked(primaryDb[collName].insert({u: HexData(4, "deadbeef")}));
-    assert.commandWorked(
-        primaryDb[collName].insert({u: HexData(20, "deadbeefdeadbeefdeadbeefdeadbeef")}));
+    assert.commandWorked(primaryDb[collName].insert({u: HexData(20, "deadbeefdeadbeefdeadbeefdeadbeef")}));
     replSet.awaitReplication();
 
-    runDbCheck(replSet,
-               primaryDb,
-               collName,
-               {
-                   maxDocsPerBatch: maxDocsPerBatch,
-                   validateMode: "dataConsistencyAndMissingIndexKeysCheck",
-                   bsonValidateMode: "kExtended"
-               },
-               true /* awaitCompletion */);
+    runDbCheck(
+        replSet,
+        primaryDb,
+        collName,
+        {
+            maxDocsPerBatch: maxDocsPerBatch,
+            validateMode: "dataConsistencyAndMissingIndexKeysCheck",
+            bsonValidateMode: "kExtended",
+        },
+        true /* awaitCompletion */,
+    );
 
     // Verify both primary and secondary log a warning for invalid BSON (k).
     checkHealthLog(primary.getDB("local").system.healthlog, BSONWarningQuery, 2);

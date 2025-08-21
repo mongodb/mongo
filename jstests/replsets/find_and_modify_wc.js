@@ -33,7 +33,7 @@ var reqUpdate = {
     findAndModify: coll.getName(),
     query: {i: 3},
     update: {$inc: {j: 1}},
-    writeConcern: {w: 'majority'}
+    writeConcern: {w: "majority"},
 };
 
 // Verify findAndModify returns old document new: false
@@ -54,15 +54,14 @@ assert.eq(2 * res.value.i + 2, res.value.j);
 assert(!res.writeConcernError);
 
 // Verify findAndModify remove works
-res = coll.runCommand(
-    {findAndModify: coll.getName(), sort: {i: 1}, remove: true, writeConcern: {w: nodeCount}});
+res = coll.runCommand({findAndModify: coll.getName(), sort: {i: 1}, remove: true, writeConcern: {w: nodeCount}});
 assert.eq(res.value.i, 1);
 assert.eq(coll.find().itcount(), 4);
 assert(!res.writeConcernError);
 
 // Verify findAndModify returns writeConcernError
 // when given invalid writeConcerns
-[{w: 'invalid'}, {w: nodeCount + 1}].forEach(function(wc) {
+[{w: "invalid"}, {w: nodeCount + 1}].forEach(function (wc) {
     reqUpdate.writeConcern = wc;
     res = coll.runCommand(reqUpdate);
 

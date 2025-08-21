@@ -5,12 +5,10 @@
  * collection have the same indexes.
  */
 
-import {
-    ClusterIndexConsistencyChecker
-} from "jstests/libs/check_cluster_index_consistency_helpers.js";
+import {ClusterIndexConsistencyChecker} from "jstests/libs/check_cluster_index_consistency_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function() {
+ShardingTest.prototype.checkIndexesConsistentAcrossCluster = function () {
     if (jsTest.options().skipCheckingIndexesConsistentAcrossCluster) {
         jsTest.log.info("Skipping index consistency check across the cluster");
         return;

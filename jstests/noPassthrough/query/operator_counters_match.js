@@ -42,10 +42,13 @@ function checkCounters(command, countersToIncrease) {
     if (!Array.isArray(countersToIncrease)) {
         countersToIncrease = [countersToIncrease];
     }
-    checkCountersWithValues(command, countersToIncrease.reduce((acc, val) => {
-        acc[val] = 1;
-        return acc;
-    }, {}));
+    checkCountersWithValues(
+        command,
+        countersToIncrease.reduce((acc, val) => {
+            acc[val] = 1;
+            return acc;
+        }, {}),
+    );
 }
 
 /**
@@ -102,8 +105,7 @@ checkCounters(() => assert.eq(2, coll.find({b: /^f/}).itcount()), "$regex");
 
 checkCounters(() => assert.eq(2, coll.find({b: {$not: /^f/}}).itcount()), ["$regex", "$not"]);
 
-checkCounters(() => assert.eq(2, coll.find({$jsonSchema: {required: ["a", "b", "c"]}}).itcount()),
-              "$jsonSchema");
+checkCounters(() => assert.eq(2, coll.find({$jsonSchema: {required: ["a", "b", "c"]}}).itcount()), "$jsonSchema");
 
 checkCounters(() => assert.eq(4, coll.find({$alwaysTrue: 1}).itcount()), "$alwaysTrue");
 
@@ -111,43 +113,46 @@ checkCounters(() => assert.eq(0, coll.find({$alwaysFalse: 1}).itcount()), "$alwa
 
 // Increments  only the $expr counter, counters for $rand, $lt, and $add are recorded in
 // operatorCounters.expressions metrics.
-checkCounters(
-    () => assert.eq(4, coll.find({$expr: {$lt: ["$a", {$add: [{$rand: {}}, 10]}]}}).itcount()),
-    "$expr");
+checkCounters(() => assert.eq(4, coll.find({$expr: {$lt: ["$a", {$add: [{$rand: {}}, 10]}]}}).itcount()), "$expr");
 
 checkCounters(
     () => assert.eq(2, coll.find({a: {$mod: [2, 0]}, $comment: "Find even values."}).itcount()),
-    ["$mod", "$comment"]);
+    ["$mod", "$comment"],
+);
 
-checkCounters(() => assert.eq(1,
-                              coll.find({
-                                      $where: function() {
-                                          return (this.a == 1);
-                                      }
-                                  })
-                                  .itcount()),
-              "$where");
+checkCounters(
+    () =>
+        assert.eq(
+            1,
+            coll
+                .find({
+                    $where: function () {
+                        return this.a == 1;
+                    },
+                })
+                .itcount(),
+        ),
+    "$where",
+);
 
 // Array query operators.
-checkCounters(() => assert.eq(2, coll.find({c: {$elemMatch: {$gt: 10, $lt: 50}}}).itcount()),
-              ["$elemMatch", "$gt", "$lt"]);
+checkCounters(
+    () => assert.eq(2, coll.find({c: {$elemMatch: {$gt: 10, $lt: 50}}}).itcount()),
+    ["$elemMatch", "$gt", "$lt"],
+);
 
 checkCounters(() => assert.eq(1, coll.find({c: {$size: 2}}).itcount()), "$size");
 
 checkCounters(() => assert.eq(1, coll.find({c: {$all: [10, 20]}}).itcount()), "$all");
 
 // Logical operators.
-checkCountersWithValues(() => assert.eq(1, coll.find({$and: [{c: 10}, {c: 20}]}).itcount()),
-                        {"$and": 1, "$eq": 2});
+checkCountersWithValues(() => assert.eq(1, coll.find({$and: [{c: 10}, {c: 20}]}).itcount()), {"$and": 1, "$eq": 2});
 
-checkCounters(() => assert.eq(2, coll.find({$and: [{c: 10}, {a: {$lt: 2}}]}).itcount()),
-              ["$and", "$lt", "$eq"]);
+checkCounters(() => assert.eq(2, coll.find({$and: [{c: 10}, {a: {$lt: 2}}]}).itcount()), ["$and", "$lt", "$eq"]);
 
-checkCountersWithValues(() => assert.eq(2, coll.find({$or: [{c: 50}, {a: 2}]}).itcount()),
-                        {"$or": 1, "$eq": 2});
+checkCountersWithValues(() => assert.eq(2, coll.find({$or: [{c: 50}, {a: 2}]}).itcount()), {"$or": 1, "$eq": 2});
 
-checkCounters(() => assert.eq(1, coll.find({$nor: [{a: {$gt: 1}}, {c: 50}]}).itcount()),
-              ["$nor", "$eq", "$gt"]);
+checkCounters(() => assert.eq(1, coll.find({$nor: [{a: {$gt: 1}}, {c: 50}]}).itcount()), ["$nor", "$eq", "$gt"]);
 
 checkCounters(() => assert.eq(2, coll.find({b: {$not: {$eq: "foo"}}}).itcount()), ["$not", "$eq"]);
 
@@ -156,15 +161,16 @@ checkCounters(() => assert.eq(2, coll.find({a: {$bitsAllClear: [0]}}).itcount())
 
 checkCounters(() => assert.eq(1, coll.find({a: {$bitsAllSet: [0, 1]}}).itcount()), "$bitsAllSet");
 
-checkCounters(() => assert.eq(3, coll.find({a: {$bitsAnyClear: [0, 1]}}).itcount()),
-              "$bitsAnyClear");
+checkCounters(() => assert.eq(3, coll.find({a: {$bitsAnyClear: [0, 1]}}).itcount()), "$bitsAnyClear");
 
 checkCounters(() => assert.eq(3, coll.find({a: {$bitsAnySet: [0, 1]}}).itcount()), "$bitsAnySet");
 
 // Invalid expressions do not increment any counter.
-checkCountersWithError(() => coll.find({$or: [{c: {$size: 'a'}}, {a: 2}]}).itcount(),
-                       ErrorCodes.BadValue,
-                       ["$or", "$eq", "$size"]);
+checkCountersWithError(() => coll.find({$or: [{c: {$size: "a"}}, {a: 2}]}).itcount(), ErrorCodes.BadValue, [
+    "$or",
+    "$eq",
+    "$size",
+]);
 
 // Match expression counters in aggregation pipelines.
 
@@ -194,9 +200,10 @@ checkCounters(() => assert.lte(0, coll.aggregate(pipeline).itcount()), "$sampleR
 
 // Invalid expressions do not increment any counter.
 checkCountersWithError(
-    () => coll.aggregate([{$match: {$and: [{b: /^fo/}, {a: {$mod: [2, 'z']}}]}}]).itcount(),
+    () => coll.aggregate([{$match: {$and: [{b: /^fo/}, {a: {$mod: [2, "z"]}}]}}]).itcount(),
     ErrorCodes.BadValue,
-    ["$and", "$regex", "$mod"]);
+    ["$and", "$regex", "$mod"],
+);
 
 // Text search.
 const textCollName = "myTextCollection";
@@ -209,9 +216,7 @@ assert.commandWorked(textColl.insert({_id: 2, title: "Cake with coffee"}));
 
 assert.commandWorked(textColl.createIndex({title: "text"}));
 
-checkCounters(
-    () => assert.eq(1, textColl.find({$text: {$search: "cake", $caseSensitive: true}}).itcount()),
-    "$text");
+checkCounters(() => assert.eq(1, textColl.find({$text: {$search: "cake", $caseSensitive: true}}).itcount()), "$text");
 
 // Geospatial expressions.
 const geoCollName = "myGeoCollection";
@@ -221,66 +226,98 @@ geoColl.drop();
 assert.commandWorked(geoColl.insert({_id: 0, location: {type: "Point", coordinates: [10, 20]}}));
 assert.commandWorked(geoColl.createIndex({location: "2dsphere"}));
 
-checkCounters(() => assert.eq(1,
-                              geoColl
-                                  .find({
-                                      location: {
-                                          $near: {
-                                              $geometry: {type: "Point", coordinates: [10, 20]},
-                                              $minDistance: 0,
-                                              $maxDistance: 100
-                                          }
-                                      }
-                                  })
-                                  .itcount()),
-              "$near");
-
-checkCounters(() => assert.eq(1,
-                              geoColl
-                                  .find({
-                                      location: {
-                                          $nearSphere: {
-                                              $geometry: {type: "Point", coordinates: [10.001, 20]},
-                                              $minDistance: 100,
-                                              $maxDistance: 500
-                                          }
-                                      }
-                                  })
-                                  .itcount()),
-              "$nearSphere");
+checkCounters(
+    () =>
+        assert.eq(
+            1,
+            geoColl
+                .find({
+                    location: {
+                        $near: {
+                            $geometry: {type: "Point", coordinates: [10, 20]},
+                            $minDistance: 0,
+                            $maxDistance: 100,
+                        },
+                    },
+                })
+                .itcount(),
+        ),
+    "$near",
+);
 
 checkCounters(
-    () => assert.eq(
-        1,
-        geoColl
-            .find({
-                location: {
-                    $geoWithin: {
-                        $geometry: {
-                            type: "Polygon",
-                            coordinates: [[[12, 18], [12, 21], [8, 21], [8, 18], [12, 18]]]
+    () =>
+        assert.eq(
+            1,
+            geoColl
+                .find({
+                    location: {
+                        $nearSphere: {
+                            $geometry: {type: "Point", coordinates: [10.001, 20]},
+                            $minDistance: 100,
+                            $maxDistance: 500,
                         },
-                    }
-                }
-            })
-            .itcount()),
-    "$geoWithin");
+                    },
+                })
+                .itcount(),
+        ),
+    "$nearSphere",
+);
 
 checkCounters(
-    () => assert.eq(
-        1,
-        geoColl
-            .find({
-                location: {
-                    $geoIntersects: {
-                        $geometry: {
-                            type: "Polygon",
-                            coordinates: [[[12, 18], [12, 21], [8, 21], [8, 18], [12, 18]]]
+    () =>
+        assert.eq(
+            1,
+            geoColl
+                .find({
+                    location: {
+                        $geoWithin: {
+                            $geometry: {
+                                type: "Polygon",
+                                coordinates: [
+                                    [
+                                        [12, 18],
+                                        [12, 21],
+                                        [8, 21],
+                                        [8, 18],
+                                        [12, 18],
+                                    ],
+                                ],
+                            },
                         },
-                    }
-                }
-            })
-            .itcount()),
-    "$geoIntersects");
+                    },
+                })
+                .itcount(),
+        ),
+    "$geoWithin",
+);
+
+checkCounters(
+    () =>
+        assert.eq(
+            1,
+            geoColl
+                .find({
+                    location: {
+                        $geoIntersects: {
+                            $geometry: {
+                                type: "Polygon",
+                                coordinates: [
+                                    [
+                                        [12, 18],
+                                        [12, 21],
+                                        [8, 21],
+                                        [8, 18],
+                                        [12, 18],
+                                    ],
+                                ],
+                            },
+                        },
+                    },
+                })
+                .itcount(),
+        ),
+    "$geoIntersects",
+);
 
 MongoRunner.stopMongod(mongod);

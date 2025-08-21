@@ -24,15 +24,14 @@ var st = new ShardingTest({
     config: 3,
     // ShardingTest use a high config command timeout to avoid spurious failures but this test may
     // require a timeout to complete, so we restore the default value to avoid failures.
-    other: {mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}}}
+    other: {mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}}},
 });
 
-var testDB = st.s.getDB('BlackHoleDB');
-var configDB = st.s.getDB('config');
+var testDB = st.s.getDB("BlackHoleDB");
+var configDB = st.s.getDB("config");
 
-assert.commandWorked(testDB.adminCommand({enableSharding: 'BlackHoleDB'}));
-assert.commandWorked(
-    testDB.adminCommand({shardCollection: testDB.ShardedColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(testDB.adminCommand({enableSharding: "BlackHoleDB"}));
+assert.commandWorked(testDB.adminCommand({shardCollection: testDB.ShardedColl.getFullName(), key: {_id: 1}}));
 
 var bulk = testDB.ShardedColl.initializeUnorderedBulkOp();
 for (var i = 0; i < 1000; i++) {
@@ -54,19 +53,21 @@ for (let i = 0; i < conf.members.length; i++) {
     }
 }
 reconfig(st.configRS, conf);
-jsTest.log('Partitioning the config server primary from the mongos');
+jsTest.log("Partitioning the config server primary from the mongos");
 configPrimary.discardMessagesFrom(st.s, 1.0);
 st.s.discardMessagesFrom(configPrimary, 1.0);
 
 assert.commandWorked(testDB.adminCommand({flushRouterConfig: 1}));
 
 // This should fail, because the primary is not available
-jsTest.log('Doing write operation on a new database and collection');
+jsTest.log("Doing write operation on a new database and collection");
 assert.writeError(
-    st.s.getDB('NonExistentDB')
-        .TestColl.insert({_id: 0, value: 'This value will never be inserted'}, {maxTimeMS: 15000}));
+    st.s
+        .getDB("NonExistentDB")
+        .TestColl.insert({_id: 0, value: "This value will never be inserted"}, {maxTimeMS: 15000}),
+);
 
-jsTest.log('Doing CRUD operations on the sharded collection');
+jsTest.log("Doing CRUD operations on the sharded collection");
 assert.soon(() => {
     // eventually the mongos will route the traffic to a secondary of the config replica set
     try {
@@ -79,27 +80,27 @@ assert.soon(() => {
 assert.commandWorked(testDB.ShardedColl.insert({_id: 1000}));
 assert.eq(1001, testDB.ShardedColl.find().count());
 
-jsTest.log('Doing read operations on a config server collection');
+jsTest.log("Doing read operations on a config server collection");
 
 // Should fail due to primary read preference
-assert.throws(function() {
+assert.throws(function () {
     configDB.chunks.find().itcount();
 });
-assert.throws(function() {
+assert.throws(function () {
     configDB.chunks.find().count();
 });
-assert.throws(function() {
+assert.throws(function () {
     configDB.chunks.aggregate().itcount();
 });
 
 // With secondary read pref config server reads should work
-st.s.setReadPref('secondary');
+st.s.setReadPref("secondary");
 FixtureHelpers.awaitReplication(configDB);
 assert.lt(0, configDB.chunks.find().itcount());
 assert.lt(0, configDB.chunks.find().count());
 assert.lt(0, configDB.chunks.aggregate().itcount());
 
-jsTest.log('Remove network partition before tearing down');
+jsTest.log("Remove network partition before tearing down");
 configPrimary.discardMessagesFrom(st.s, 0.0);
 st.s.discardMessagesFrom(configPrimary, 0.0);
 

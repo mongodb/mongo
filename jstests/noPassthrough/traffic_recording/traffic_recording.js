@@ -12,7 +12,7 @@ function getDB(client) {
 function runTest(client, restartCommand) {
     let db = getDB(client);
 
-    let res = db.runCommand({'startTrafficRecording': 1, 'destination': 'notARealPath'});
+    let res = db.runCommand({"startTrafficRecording": 1, "destination": "notARealPath"});
     assert.eq(res.ok, false);
     assert.eq(res["errmsg"], "Traffic recording directory not set");
 
@@ -33,7 +33,7 @@ function runTest(client, restartCommand) {
     client = restartCommand({
         trafficRecordingDirectory: path,
         AlwaysRecordTraffic: "notARealPath",
-        enableTestCommands: 1
+        enableTestCommands: 1,
     });
     assert.neq(null, client, "AlwaysRecordTraffic and with enableTestCommands should suceed");
     db = getDB(client);
@@ -43,11 +43,11 @@ function runTest(client, restartCommand) {
     client = restartCommand({trafficRecordingDirectory: path});
     db = getDB(client);
 
-    res = db.runCommand({'startTrafficRecording': 1, 'destination': 'notARealPath'});
+    res = db.runCommand({"startTrafficRecording": 1, "destination": "notARealPath"});
     assert.eq(res.ok, true);
 
     // Running the command again should fail
-    res = db.runCommand({'startTrafficRecording': 1, 'destination': 'notARealPath'});
+    res = db.runCommand({"startTrafficRecording": 1, "destination": "notARealPath"});
     assert.eq(res.ok, false);
     assert.eq(res["errmsg"], "Traffic recording already active");
 
@@ -65,11 +65,11 @@ function runTest(client, restartCommand) {
     assert(trafficStats2["currentFileSize"] >= trafficStats["currentFileSize"]);
 
     // Running the stopTrafficRecording command should succeed
-    res = db.runCommand({'stopTrafficRecording': 1});
+    res = db.runCommand({"stopTrafficRecording": 1});
     assert.eq(res.ok, true);
 
     // Running the stopTrafficRecording command again should fail
-    res = db.runCommand({'stopTrafficRecording': 1});
+    res = db.runCommand({"stopTrafficRecording": 1});
     assert.eq(res.ok, false);
     assert.eq(res["errmsg"], "Traffic recording not active");
 
@@ -90,9 +90,9 @@ function runTest(client, restartCommand) {
     db.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
     db.auth("admin", "pass");
 
-    m = runTest(m, function(setParams) {
+    m = runTest(m, function (setParams) {
         if (m) {
-            MongoRunner.stopMongod(m, null, {user: 'admin', pwd: 'pass'});
+            MongoRunner.stopMongod(m, null, {user: "admin", pwd: "pass"});
         }
         try {
             m = MongoRunner.runMongod({auth: "", setParameter: setParams});
@@ -105,7 +105,7 @@ function runTest(client, restartCommand) {
         return m;
     });
 
-    MongoRunner.stopMongod(m, null, {user: 'admin', pwd: 'pass'});
+    MongoRunner.stopMongod(m, null, {user: "admin", pwd: "pass"});
 }
 
 {
@@ -115,7 +115,7 @@ function runTest(client, restartCommand) {
         shards: 0,
     });
 
-    runTest(shardTest.s, function(setParams) {
+    runTest(shardTest.s, function (setParams) {
         shardTest.restartMongos(0, {
             restart: true,
             setParameter: setParams,
@@ -131,13 +131,12 @@ function runTest(client, restartCommand) {
 // max file size.
 {
     const path = MongoRunner.toRealDir("$dataDir/traffic_recording/");
-    let recordingDir = path + '/recordings/';
+    let recordingDir = path + "/recordings/";
 
     removeFile(recordingDir);
     mkdir(recordingDir);
 
-    let m = MongoRunner.runMongod(
-        {auth: "", setParameter: {trafficRecordingDirectory: path, enableTestCommands: 1}});
+    let m = MongoRunner.runMongod({auth: "", setParameter: {trafficRecordingDirectory: path, enableTestCommands: 1}});
 
     let db = m.getDB("admin");
 
@@ -145,8 +144,7 @@ function runTest(client, restartCommand) {
     db.auth("admin", "pass");
 
     let coll = db[jsTestName()];
-    let res = db.runCommand(
-        {'startTrafficRecording': 1, 'destination': 'recordings', 'maxFileSize': NumberLong(100)});
+    let res = db.runCommand({"startTrafficRecording": 1, "destination": "recordings", "maxFileSize": NumberLong(100)});
     assert.eq(res.ok, true, res);
 
     // Note how many files exist at this point in time.
@@ -179,10 +177,10 @@ function runTest(client, restartCommand) {
     trafficStats = res["trafficRecording"];
     assert.gt(ls(recordingDir).length, initialNumFiles, "A new recording file should be created");
 
-    res = db.runCommand({'stopTrafficRecording': 1});
+    res = db.runCommand({"stopTrafficRecording": 1});
     assert.eq(res.ok, true);
 
-    MongoRunner.stopMongod(m, null, {user: 'admin', pwd: 'pass'});
+    MongoRunner.stopMongod(m, null, {user: "admin", pwd: "pass"});
 
     removeFile(recordingDir);
 }

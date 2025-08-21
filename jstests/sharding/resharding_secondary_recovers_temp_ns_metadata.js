@@ -20,7 +20,8 @@ const sourceCollection = reshardingTest.createShardedCollection({
 });
 
 const recipientShardNames = reshardingTest.recipientShardNames;
-reshardingTest.withReshardingInBackground(  //
+reshardingTest.withReshardingInBackground(
+    //
     {
         newShardKeyPattern: {newKey: 1},
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
@@ -42,6 +43,7 @@ reshardingTest.withReshardingInBackground(  //
 
         reshardingTest.stepUpNewPrimaryOnShard(recipientShardNames[0]);
         assert.commandWorked(sourceCollection.remove({oldKey: 1, newKey: 2}, {justOne: true}));
-    });
+    },
+);
 
 reshardingTest.teardown();

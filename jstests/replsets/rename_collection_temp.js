@@ -27,7 +27,7 @@ function checkCollectionTemp(db, collName, expectedTempValue) {
     }
 }
 
-var replTest = new ReplSetTest({name: 'renameCollectionTest', nodes: 2});
+var replTest = new ReplSetTest({name: "renameCollectionTest", nodes: 2});
 var nodes = replTest.startSet();
 
 replTest.initiate();
@@ -37,13 +37,13 @@ var primary = replTest.getPrimary();
 // Create a temporary collection.
 var dbFoo = primary.getDB("foo");
 
-assert.commandWorked(dbFoo.runCommand(
-    {applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}]}));
+assert.commandWorked(
+    dbFoo.runCommand({applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}]}),
+);
 checkCollectionTemp(dbFoo, "tempColl", true);
 
 // Rename the collection.
-assert.commandWorked(
-    primary.adminCommand({renameCollection: "foo.tempColl", to: "foo.permanentColl"}));
+assert.commandWorked(primary.adminCommand({renameCollection: "foo.tempColl", to: "foo.permanentColl"}));
 
 // Confirm that it is no longer temporary.
 checkCollectionTemp(dbFoo, "permanentColl", false);
@@ -61,16 +61,18 @@ checkCollectionTemp(secondaryFoo, "permanentColl", false);
 // Check the behavior when the "dropTarget" flag is passed to renameCollection.
 dbFoo.permanentColl.drop();
 
-assert.commandWorked(dbFoo.runCommand(
-    {applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}]}));
+assert.commandWorked(
+    dbFoo.runCommand({applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}]}),
+);
 checkCollectionTemp(dbFoo, "tempColl", true);
 
 // Construct an empty collection that will be dropped on rename.
 assert.commandWorked(dbFoo.runCommand({create: "permanentColl"}));
 
 // Rename, dropping "permanentColl" and replacing it.
-assert.commandWorked(primary.adminCommand(
-    {renameCollection: "foo.tempColl", to: "foo.permanentColl", dropTarget: true}));
+assert.commandWorked(
+    primary.adminCommand({renameCollection: "foo.tempColl", to: "foo.permanentColl", dropTarget: true}),
+);
 
 checkCollectionTemp(dbFoo, "permanentColl", false);
 

@@ -68,21 +68,26 @@ function testReadCmd(rst, cmdOpts, testCase) {
                     cmdName: cmdOpts.cmdName,
                     cmdObj: {
                         filter: filter ? filter : {},
-                        collation: collation ? collation : cmdOpts.defaultCollation
-                    }
+                        collation: collation ? collation : cmdOpts.defaultCollation,
+                    },
                 });
             }
         }
 
         const db = Math.random() < 0.5 ? primaryDB : secondaryDB;
-        jsTest.log(`Testing test case ${tojson(testCase)} with ${
-            tojson({dbName, collName, originalCmdObj, host: db.getMongo().host})}`);
+        jsTest.log(
+            `Testing test case ${tojson(testCase)} with ${tojson({
+                dbName,
+                collName,
+                originalCmdObj,
+                host: db.getMongo().host,
+            })}`,
+        );
         assert.commandWorked(db.runCommand(originalCmdObj));
     }
 
     if (testCase.expectSampling) {
-        QuerySamplingUtil.assertSoonSampledQueryDocuments(
-            primary, ns, collectionUuid, expectedSampledQueryDocs);
+        QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
     } else {
         // To verify that no writes occurred, wait for one interval before asserting.
         sleep(queryAnalysisWriterIntervalSecs * 1000);
@@ -147,7 +152,7 @@ function testAggregateCmd(rst, testCases) {
             return {
                 aggregate: collName,
                 pipeline: [{$group: {_id: "$a", count: {$sum: 1}}}],
-                cursor: {}
+                cursor: {},
             };
         }
         return {aggregate: collName, pipeline: [{$match: filter}], cursor: {}};

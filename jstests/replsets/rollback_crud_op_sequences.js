@@ -4,7 +4,7 @@
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 // Helper function for verifying contents at the end of the test.
-const checkFinalResults = function(db) {
+const checkFinalResults = function (db) {
     assert.eq(0, db.bar.count({q: 70}));
     assert.eq(2, db.bar.count({q: 40}));
     assert.eq(3, db.bar.count({a: "foo"}));
@@ -32,7 +32,7 @@ assert.commandWorked(rollbackNodeDB.bar.insert({q: 2, a: "foo", x: 1}));
 assert.commandWorked(rollbackNodeDB.bar.insert({q: 3, bb: 9, a: "foo"}));
 assert.commandWorked(rollbackNodeDB.bar.insert({q: 40, a: 1}));
 assert.commandWorked(rollbackNodeDB.bar.insert({q: 40, a: 2}));
-assert.commandWorked(rollbackNodeDB.bar.insert({q: 70, txt: 'willremove'}));
+assert.commandWorked(rollbackNodeDB.bar.insert({q: 70, txt: "willremove"}));
 rollbackNodeDB.createCollection("kap", {capped: true, size: 5000});
 assert.commandWorked(rollbackNodeDB.kap.insert({foo: 1}));
 // Going back to empty on capped is a special case and must be tested.
@@ -44,7 +44,7 @@ rollbackTest.transitionToRollbackOperations();
 // These operations are only done on 'rollbackNode' and should eventually be rolled back.
 assert.commandWorked(rollbackNodeDB.bar.insert({q: 4}));
 assert.commandWorked(rollbackNodeDB.bar.update({q: 3}, {q: 3, rb: true}));
-assert.commandWorked(rollbackNodeDB.bar.remove({q: 40}));  // multi remove test
+assert.commandWorked(rollbackNodeDB.bar.remove({q: 40})); // multi remove test
 assert.commandWorked(rollbackNodeDB.bar.update({q: 2}, {q: 39, rb: true}));
 // Rolling back a delete will involve reinserting the item(s).
 assert.commandWorked(rollbackNodeDB.bar.remove({q: 1}));
@@ -61,7 +61,7 @@ rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 // Insert new data into syncSource so that rollbackNode enters rollback when it is reconnected.
 // These operations should not be rolled back.
 assert.gte(syncSourceDB.bar.find().itcount(), 1, "count check");
-assert.commandWorked(syncSourceDB.bar.insert({txt: 'foo'}));
+assert.commandWorked(syncSourceDB.bar.insert({txt: "foo"}));
 assert.commandWorked(syncSourceDB.bar.remove({q: 70}));
 assert.commandWorked(syncSourceDB.bar.update({q: 0}, {$inc: {y: 33}}));
 

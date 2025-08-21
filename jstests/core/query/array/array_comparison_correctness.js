@@ -46,7 +46,7 @@ function generateFailedEqString(expected, found) {
 }
 function generateExpectedResults(indexes) {
     resultSet = [];
-    indexes.forEach(function(index) {
+    indexes.forEach(function (index) {
         resultSet.push(docsInColl[index]);
     });
     return resultSet;

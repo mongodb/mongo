@@ -11,23 +11,25 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // the response and the change is logged correctly. If `newFilter' is null, unsets the filter.
 function updateProfilingFilterGlobally(db, {oldFilter, newFilter}) {
     const result = assert.commandWorked(
-        db.runCommand({setProfilingFilterGlobally: 1, filter: newFilter ? newFilter : "unset"}));
+        db.runCommand({setProfilingFilterGlobally: 1, filter: newFilter ? newFilter : "unset"}),
+    );
     assert.eq(result.was, oldFilter ? oldFilter : "none");
 
     const log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
-    assert(!!findMatchingLogLine(log, {
-        msg: "Profiler settings changed globally",
-        from: {filter: oldFilter ? oldFilter : "none"},
-        to: {filter: newFilter ? newFilter : "none"}
-    }),
-           "expected log line was not found");
+    assert(
+        !!findMatchingLogLine(log, {
+            msg: "Profiler settings changed globally",
+            from: {filter: oldFilter ? oldFilter : "none"},
+            to: {filter: newFilter ? newFilter : "none"},
+        }),
+        "expected log line was not found",
+    );
 }
 
 (function testQueryKnobMustBeEnabledToUseCommand() {
     // First make sure we can't run the command with the query knob turned off.
     const conn = MongoRunner.runMongod({});
-    assert.commandFailedWithCode(
-        conn.adminCommand({setProfilingFilterGlobally: 1, filter: "unset"}), 7283301);
+    assert.commandFailedWithCode(conn.adminCommand({setProfilingFilterGlobally: 1, filter: "unset"}), 7283301);
     MongoRunner.stopMongod(conn);
 })();
 
@@ -35,15 +37,16 @@ function updateProfilingFilterGlobally(db, {oldFilter, newFilter}) {
     // Test that setting the global filter overrides the startup configuration.
     const conn = MongoRunner.runMongod({
         config: "jstests/libs/config_files/set_profiling_filter.json",
-        setParameter: {internalQueryGlobalProfilingFilter: 1}
+        setParameter: {internalQueryGlobalProfilingFilter: 1},
     });
     updateProfilingFilterGlobally(conn.getDB("test"), {
         oldFilter: {$expr: {$lt: [{$rand: {}}, {$const: 0.01}]}},
-        newFilter: {$expr: {$lt: [{$rand: {}}, {$const: 0.5}]}}
+        newFilter: {$expr: {$lt: [{$rand: {}}, {$const: 0.5}]}},
     });
-    updateProfilingFilterGlobally(
-        conn.getDB("test"),
-        {oldFilter: {$expr: {$lt: [{$rand: {}}, {$const: 0.5}]}}, newFilter: null});
+    updateProfilingFilterGlobally(conn.getDB("test"), {
+        oldFilter: {$expr: {$lt: [{$rand: {}}, {$const: 0.5}]}},
+        newFilter: null,
+    });
     MongoRunner.stopMongod(conn);
 })();
 
@@ -100,14 +103,15 @@ function runCorrectnessTests(conn) {
                 assert.eq(
                     !!findMatchingLogLine(log, {msg: "Slow query", comment: queryComment(name)}),
                     shouldProfile,
-                    `expected query${shouldProfile ? "" : " not"} to be logged: ${
-                        queryComment(name)}`);
+                    `expected query${shouldProfile ? "" : " not"} to be logged: ${queryComment(name)}`,
+                );
 
                 if (!isMongos) {
-                    assert.eq(!!db.system.profile.findOne({'command.comment': queryComment(name)}),
-                              shouldProfile,
-                              `expected query${shouldProfile ? "" : " not"} to be profiled: ${
-                                  queryComment(name)}`);
+                    assert.eq(
+                        !!db.system.profile.findOne({"command.comment": queryComment(name)}),
+                        shouldProfile,
+                        `expected query${shouldProfile ? "" : " not"} to be profiled: ${queryComment(name)}`,
+                    );
                 }
             }
 
@@ -145,17 +149,16 @@ function runCorrectnessTests(conn) {
     }
 
     // Error cases (invalid filters or parameters).
-    assert.commandFailedWithCode(db.runCommand({setProfilingFilterGlobally: 1, filter: null}),
-                                 ErrorCodes.BadValue);
-    assert.commandFailedWithCode(
-        db.runCommand({setProfilingFilterGlobally: 1, filter: {noSuchField: 1}}), 4910200);
+    assert.commandFailedWithCode(db.runCommand({setProfilingFilterGlobally: 1, filter: null}), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(db.runCommand({setProfilingFilterGlobally: 1, filter: {noSuchField: 1}}), 4910200);
     assert.commandFailedWithCode(
         db.runCommand({setProfilingFilterGlobally: 1, filter: {}, writeConcern: {w: "majority"}}),
-        ErrorCodes.InvalidOptions);
+        ErrorCodes.InvalidOptions,
+    );
     assert.commandFailedWithCode(
-        db.runCommand(
-            {setProfilingFilterGlobally: 1, filter: {}, readConcern: {level: "majority"}}),
-        ErrorCodes.InvalidOptions);
+        db.runCommand({setProfilingFilterGlobally: 1, filter: {}, readConcern: {level: "majority"}}),
+        ErrorCodes.InvalidOptions,
+    );
 
     // Make sure that behavior is as expected in the default/startup state.
     (function testDefaultSettingIsNone() {
@@ -173,7 +176,7 @@ function runCorrectnessTests(conn) {
         verify({
             desc: "setting the global filter affects all databases",
             globalFilter: profileFilter1,
-            dbFilters: {}
+            dbFilters: {},
         });
     })();
 
@@ -182,7 +185,7 @@ function runCorrectnessTests(conn) {
         verify({
             desc: "unsetting the global filter clears the global setting",
             globalFilter: null,
-            dbFilters: {}
+            dbFilters: {},
         });
     })();
 
@@ -191,69 +194,72 @@ function runCorrectnessTests(conn) {
         verify({
             desc: "unsetting the global filter when already unset is a noop",
             globalFilter: null,
-            dbFilters: {}
+            dbFilters: {},
         });
     })();
 
     (function testGlobalFilterSettingOverridesDatabaseSpecificSettings() {
-        let result = assert.commandWorked(db.getSiblingDB("db1").runCommand(
-            {profile: isMongos ? 0 : 1, filter: profileFilter1.filter}));
+        let result = assert.commandWorked(
+            db.getSiblingDB("db1").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter1.filter}),
+        );
         assert(!result.filter);
-        result = assert.commandWorked(db.getSiblingDB("db2").runCommand(
-            {profile: isMongos ? 0 : 1, filter: profileFilter2.filter}));
+        result = assert.commandWorked(
+            db.getSiblingDB("db2").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter2.filter}),
+        );
         assert(!result.filter);
         verify({
             desc: "setting the global filter overrides database specific settings (pre-validate)",
             globalFilter: null,
-            dbFilters: {db1: profileFilter1, db2: profileFilter2}
+            dbFilters: {db1: profileFilter1, db2: profileFilter2},
         });
 
         updateProfilingFilterGlobally(db, {oldFilter: null, newFilter: profileFilter2.filter});
         verify({
             desc: "setting the global filter overrides database specific settings",
             globalFilter: profileFilter2,
-            dbFilters: {}
+            dbFilters: {},
         });
     })();
 
     (function testGlobalFilterSettingOverridesDatabaseSpecificSettingsEvenWhenNoop() {
-        let result = assert.commandWorked(db.getSiblingDB("db1").runCommand(
-            {profile: isMongos ? 0 : 1, filter: profileFilter1.filter}));
+        let result = assert.commandWorked(
+            db.getSiblingDB("db1").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter1.filter}),
+        );
         assert.eq(result.filter, profileFilter2.filter);
         verify({
-            desc:
-                "setting the global filter overrides database specific settings even when a noop (pre-validate)",
+            desc: "setting the global filter overrides database specific settings even when a noop (pre-validate)",
             globalFilter: profileFilter2,
-            dbFilters: {db1: profileFilter1}
+            dbFilters: {db1: profileFilter1},
         });
 
-        updateProfilingFilterGlobally(
-            db, {oldFilter: profileFilter2.filter, newFilter: profileFilter2.filter});
+        updateProfilingFilterGlobally(db, {oldFilter: profileFilter2.filter, newFilter: profileFilter2.filter});
         verify({
             desc: "setting the global filter overrides database specific settings even when a noop",
             globalFilter: profileFilter2,
-            dbFilters: {}
+            dbFilters: {},
         });
     })();
 
     (function testGlobalFilterUnsetOverridesDatabaseSpecificSettings() {
-        let result = assert.commandWorked(db.getSiblingDB("db1").runCommand(
-            {profile: isMongos ? 0 : 1, filter: profileFilter1.filter}));
+        let result = assert.commandWorked(
+            db.getSiblingDB("db1").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter1.filter}),
+        );
         assert.eq(result.filter, profileFilter2.filter);
-        result = assert.commandWorked(db.getSiblingDB("db3").runCommand(
-            {profile: isMongos ? 0 : 1, filter: profileFilter2.filter}));
+        result = assert.commandWorked(
+            db.getSiblingDB("db3").runCommand({profile: isMongos ? 0 : 1, filter: profileFilter2.filter}),
+        );
         assert.eq(result.filter, profileFilter2.filter);
         verify({
             desc: "unsetting the global filter overrides database specific settings (pre-validate)",
             globalFilter: profileFilter2,
-            dbFilters: {db1: profileFilter1, db3: profileFilter2}
+            dbFilters: {db1: profileFilter1, db3: profileFilter2},
         });
 
         updateProfilingFilterGlobally(db, {oldFilter: profileFilter2.filter, newFilter: null});
         verify({
             desc: "unsetting the global filter overrides database specific settings",
             globalFilter: null,
-            dbFilters: {}
+            dbFilters: {},
         });
     })();
 }
@@ -271,7 +277,7 @@ function runCorrectnessTests(conn) {
         shards: 1,
         rs: {nodes: 1},
         config: 1,
-        mongosOptions: {setParameter: {internalQueryGlobalProfilingFilter: 1}}
+        mongosOptions: {setParameter: {internalQueryGlobalProfilingFilter: 1}},
     });
     runCorrectnessTests(st);
     st.stop();

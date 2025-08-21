@@ -15,9 +15,7 @@
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    getOldestRequiredTimestampForCrashRecovery
-} from "jstests/libs/storage_engine/storage_helpers.js";
+import {getOldestRequiredTimestampForCrashRecovery} from "jstests/libs/storage_engine/storage_helpers.js";
 
 // A new replica set for both the commit and abort tests to ensure the same clean state.
 function doTest(commitOrAbort) {
@@ -25,7 +23,7 @@ function doTest(commitOrAbort) {
         oplogSize: PrepareHelpers.oplogSizeMB,
         // Oplog can be truncated each "sync" cycle. Increase its frequency to once per second.
         nodeOptions: {syncdelay: 1, setParameter: {logComponentVerbosity: tojson({storage: 1})}},
-        nodes: 1
+        nodes: 1,
     });
 
     replSet.startSet(PrepareHelpers.replSetStartSetOptions);
@@ -45,8 +43,7 @@ function doTest(commitOrAbort) {
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
     const txnEntry = primary.getDB("config").transactions.findOne();
 
-    const oldestRequiredTimestampForCrashRecovery =
-        getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
+    const oldestRequiredTimestampForCrashRecovery = getOldestRequiredTimestampForCrashRecovery(primary.getDB("test"));
     assert.lte(oldestRequiredTimestampForCrashRecovery, prepareTimestamp);
 
     // Make sure that the timestamp of the first oplog entry for this transaction matches the

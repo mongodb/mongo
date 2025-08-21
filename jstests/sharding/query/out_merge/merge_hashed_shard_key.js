@@ -22,8 +22,7 @@ function testHashedShardKey(shardKey, spec, prefixPipeline = []) {
     st.shardColl(target, shardKey, spec);
 
     // Test that $merge passes without specifying an "on" field.
-    assertMergeSucceedsWithExpectedUniqueIndex(
-        {source: source, target: target, prevStages: prefixPipeline});
+    assertMergeSucceedsWithExpectedUniqueIndex({source: source, target: target, prevStages: prefixPipeline});
 
     // Test that $merge fails even if the "on" fields matches the shardKey, since it isn't
     // unique.
@@ -31,7 +30,7 @@ function testHashedShardKey(shardKey, spec, prefixPipeline = []) {
         source: source,
         target: target,
         onFields: Object.keys(shardKey),
-        prevStages: prefixPipeline
+        prevStages: prefixPipeline,
     });
 
     // Test that the $merge passes if there exists a unique index prefixed on the hashed shard
@@ -39,13 +38,12 @@ function testHashedShardKey(shardKey, spec, prefixPipeline = []) {
     const prefixedUniqueKey = Object.merge(shardKey, {extraField: 1});
     prefixPipeline = prefixPipeline.concat([{$addFields: {extraField: 1}}]);
     assert.commandWorked(target.createIndex(prefixedUniqueKey, {unique: true}));
-    assertMergeSucceedsWithExpectedUniqueIndex(
-        {source: source, target: target, prevStages: prefixPipeline});
+    assertMergeSucceedsWithExpectedUniqueIndex({source: source, target: target, prevStages: prefixPipeline});
     assertMergeSucceedsWithExpectedUniqueIndex({
         source: source,
         target: target,
         onFields: Object.keys(prefixedUniqueKey),
-        prevStages: prefixPipeline
+        prevStages: prefixPipeline,
     });
 }
 
@@ -65,9 +63,11 @@ testHashedShardKey({"dotted.path": 1}, {"dotted.path": "hashed"}, prevStage);
 // Tests for a compound hashed shard key.
 //
 prevStage = [{$addFields: {hashedKey: {subField: 1}, nonHashedKey: 1}}];
-testHashedShardKey({"hashedKey.subField": 1, nonHashedKey: 1},
-                   {"hashedKey.subField": "hashed", nonHashedKey: 1},
-                   prevStage);
+testHashedShardKey(
+    {"hashedKey.subField": 1, nonHashedKey: 1},
+    {"hashedKey.subField": "hashed", nonHashedKey: 1},
+    prevStage,
+);
 
 //
 // Tests for a hashed _id shard key.

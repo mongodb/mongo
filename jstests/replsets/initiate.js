@@ -5,16 +5,14 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({name: 'testSet2', nodes: 1});
+var replTest = new ReplSetTest({name: "testSet2", nodes: 1});
 var nodes = replTest.startSet();
 
-assert.soon(function() {
+assert.soon(function () {
     try {
-        var result = nodes[0].getDB("admin").runCommand(
-            {replSetInitiate: {_id: "testSet2", members: [{_id: 0}]}});
+        var result = nodes[0].getDB("admin").runCommand({replSetInitiate: {_id: "testSet2", members: [{_id: 0}]}});
         printjson(result);
-        return (
-            result.errmsg.match(/BSON field 'MemberConfig.host' is missing but a required field/));
+        return result.errmsg.match(/BSON field 'MemberConfig.host' is missing but a required field/);
     } catch (e) {
         print(e);
     }

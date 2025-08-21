@@ -18,9 +18,10 @@ function assertLookupRunsOnShards(explain) {
     assert(explain.hasOwnProperty("splitPipeline"), tojson(explain));
     assert(explain.splitPipeline.hasOwnProperty("shardsPart"), tojson(explain));
     assert.eq(
-        explain.splitPipeline.shardsPart.filter(stage => stage.hasOwnProperty("$lookup")).length,
+        explain.splitPipeline.shardsPart.filter((stage) => stage.hasOwnProperty("$lookup")).length,
         1,
-        tojson(explain));
+        tojson(explain),
+    );
     assert(explain.splitPipeline.hasOwnProperty("mergerPart"), tojson(explain));
     // mergerPart will only have a $mergeCursors stage since other work happens in the shardsPart.
     assert.eq(1, explain.splitPipeline.mergerPart.length, tojson(explain));
@@ -35,42 +36,57 @@ function assertLookupRunsOnShards(explain) {
     // Shards the collection into two parts.
     st.shardColl(coll, {a: "hashed"}, false, false);
     const explain = coll.explain().aggregate([
-        {$match: {$expr: {$gte: ['$_id', {$literal: 1}]}}},
+        {$match: {$expr: {$gte: ["$_id", {$literal: 1}]}}},
         {$sort: {_id: 1}},
-        {$replaceWith: {original: '$$ROOT'}},
-        {$lookup: {    
-            from: {        
-                db: 'config',        
-                coll: 'cache.chunks.test.system.resharding'
-            },    
-            let: {sk: [        
-                '$original.x',        
-                {$toHashedIndexKey: '$original.y'}   
-            ]},    
-            pipeline: [        
-                {$match: {$expr: {$eq: ['$shard', 'shard0']}}},        
-                {$match: {$expr: {$let: {            
-                    vars: {                
-                        min: {$map: {input: {$objectToArray: '$_id'}, in: '$$this.v'}},                
-                        max: {$map: {input: {$objectToArray: '$max'}, in: '$$this.v'}}            
-                    },            
-                    in: {$and: [                
-                        {$gte: ['$$sk', '$$min']},                
-                        {$cond: {                    
-                            if: {$allElementsTrue: [{$map: {                        
-                                input: '$$max',                        
-                                in: {$eq: [{$type: '$$this'}, 'maxKey']}                    
-                            }}]},                    
-                            then: {$lte: ['$$sk', '$$max']},                    
-                            else: {$lt : ['$$sk', '$$max']}                
-                        }}            
-                    ]}        
-                }}}}    
-            ],    
-            as: 'intersectingChunk'
-        }},
+        {$replaceWith: {original: "$$ROOT"}},
+        {
+            $lookup: {
+                from: {
+                    db: "config",
+                    coll: "cache.chunks.test.system.resharding",
+                },
+                let: {sk: ["$original.x", {$toHashedIndexKey: "$original.y"}]},
+                pipeline: [
+                    {$match: {$expr: {$eq: ["$shard", "shard0"]}}},
+                    {
+                        $match: {
+                            $expr: {
+                                $let: {
+                                    vars: {
+                                        min: {$map: {input: {$objectToArray: "$_id"}, in: "$$this.v"}},
+                                        max: {$map: {input: {$objectToArray: "$max"}, in: "$$this.v"}},
+                                    },
+                                    in: {
+                                        $and: [
+                                            {$gte: ["$$sk", "$$min"]},
+                                            {
+                                                $cond: {
+                                                    if: {
+                                                        $allElementsTrue: [
+                                                            {
+                                                                $map: {
+                                                                    input: "$$max",
+                                                                    in: {$eq: [{$type: "$$this"}, "maxKey"]},
+                                                                },
+                                                            },
+                                                        ],
+                                                    },
+                                                    then: {$lte: ["$$sk", "$$max"]},
+                                                    else: {$lt: ["$$sk", "$$max"]},
+                                                },
+                                            },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                    },
+                ],
+                as: "intersectingChunk",
+            },
+        },
         {$match: {intersectingChunk: {$ne: []}}},
-        {$replaceWith: '$original'}
+        {$replaceWith: "$original"},
     ]);
     assertLookupRunsOnShards(explain);
 })();

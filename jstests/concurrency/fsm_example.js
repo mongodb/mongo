@@ -4,7 +4,7 @@
  * Includes documentation of each property on $config.
  * Serves as a template for new workloads.
  */
-export const $config = (function() {
+export const $config = (function () {
     // 'data' is passed (copied) to each of the worker threads.
     var data = {};
 
@@ -38,7 +38,7 @@ export const $config = (function() {
     var transitions = {
         init: {scanGT: 0.5, scanLTE: 0.5},
         scanGT: {scanGT: 0.8, scanLTE: 0.2},
-        scanLTE: {scanGT: 0.2, scanLTE: 0.8}
+        scanLTE: {scanGT: 0.2, scanLTE: 0.8},
     };
 
     // 'setup' is run once by the parent thread after the cluster has
@@ -52,11 +52,11 @@ export const $config = (function() {
             db[collName].insert({_id: i});
         }
 
-        cluster.executeOnMongodNodes(function(db) {
+        cluster.executeOnMongodNodes(function (db) {
             printjson(db.serverCmdLineOpts());
         });
 
-        cluster.executeOnMongosNodes(function(db) {
+        cluster.executeOnMongosNodes(function (db) {
             printjson(db.serverCmdLineOpts());
         });
     }
@@ -65,17 +65,16 @@ export const $config = (function() {
     // is destroyed, but after the worker threads have been reaped.
     // The 'this' argument is bound as '$config.data'. 'cluster' is provided
     // to allow execution against all mongos and mongod nodes.
-    function teardown(db, collName, cluster) {
-    }
+    function teardown(db, collName, cluster) {}
 
     return {
         threadCount: 5,
         iterations: 10,
-        startState: 'init',  // optional, default 'init'
+        startState: "init", // optional, default 'init'
         states: states,
         transitions: transitions,
-        setup: setup,        // optional, default empty function
-        teardown: teardown,  // optional, default empty function
-        data: data           // optional, default empty object
+        setup: setup, // optional, default empty function
+        teardown: teardown, // optional, default empty function
+        data: data, // optional, default empty object
     };
 })();

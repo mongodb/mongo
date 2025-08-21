@@ -92,24 +92,23 @@ function runTest(docs, expectedResults, filter, updateMods) {
     }
 
     assert.commandWorked(coll.remove({}));
-};
+}
 
 function runAllTestsForConfigAndExecCtx(config, execCtxType) {
-    useSession = (execCtxType != execCtxTypes.kNoSession);
-    useRetryableWrites = (execCtxType == execCtxTypes.kRetryableWrite);
-    useTransactions = (execCtxType == execCtxTypes.kTransaction);
+    useSession = execCtxType != execCtxTypes.kNoSession;
+    useRetryableWrites = execCtxType == execCtxTypes.kRetryableWrite;
+    useTransactions = execCtxType == execCtxTypes.kTransaction;
 
     useFindAndModify = config.hasOwnProperty("findAndModify") ? config.findAndModify : false;
     doUpsert = config.hasOwnProperty("upsert") ? config.upsert : false;
 
-    const doReplacementUpdate =
-        config.hasOwnProperty("replacementUpdate") ? config.replacementUpdate : false;
+    const doReplacementUpdate = config.hasOwnProperty("replacementUpdate") ? config.replacementUpdate : false;
 
     const docs = [{_id: 1, x: -1, y: 1, z: 1}];
     const docsUpdated = [{_id: 1, y: 1, z: -1}];
     const mods = doReplacementUpdate ? {y: 1, z: -1} : {$set: {z: -1}, $unset: {x: 1}};
 
-    const expectSuccess = (useRetryableWrites || useTransactions);
+    const expectSuccess = useRetryableWrites || useTransactions;
     const expectedResults = expectSuccess ? docsUpdated : ErrorCodes.IllegalOperation;
 
     runTest(docs, expectedResults, {x: -1}, mods);

@@ -20,14 +20,14 @@
  */
 
 const timeseriesOptions = {
-    timeseries: {timeField: "t"}
+    timeseries: {timeField: "t"},
 };
 
 const dummyCollection = "dummyCollection";
 
 let _collCounter = 1;
 function getNewColl(db) {
-    const collNamePrefix = jsTestName() + '_coll_';
+    const collNamePrefix = jsTestName() + "_coll_";
     const coll = db[collNamePrefix + _collCounter++];
     return coll;
 }

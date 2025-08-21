@@ -16,14 +16,11 @@
  *  ]
  */
 
-import {
-    getRandomShardName,
-    setupTestDatabase
-} from "jstests/libs/sharded_cluster_fixture_helpers.js";
+import {getRandomShardName, setupTestDatabase} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 
-const fromCollName = 'from';
-const toCollName = 'to';
+const fromCollName = "from";
+const toCollName = "to";
 
 /**
  * Initialize a sharded collection with key 'x:1' and 2 chunks distributed on 2 different nodes -
@@ -31,21 +28,23 @@ const toCollName = 'to';
  */
 function setupShardedCollection(conn, dbName, collName) {
     const testDB = conn.getSiblingDB(dbName);
-    const ns = dbName + '.' + collName;
+    const ns = dbName + "." + collName;
     const primaryShardId = conn.getSiblingDB(dbName).getDatabasePrimaryShardId();
-    const nonPrimaryShardId = getRandomShardName(db, /* exclude = */[primaryShardId]);
+    const nonPrimaryShardId = getRandomShardName(db, /* exclude = */ [primaryShardId]);
     assert.commandWorked(conn.adminCommand({shardCollection: ns, key: {x: 1}}));
 
     const coll = testDB.getCollection(collName);
     coll.insert({x: 0});
     coll.insert({x: 2});
 
-    assert.commandWorked(conn.adminCommand({
-        moveRange: ns,
-        min: {x: 0},
-        max: {x: MaxKey},
-        toShard: nonPrimaryShardId,
-    }));
+    assert.commandWorked(
+        conn.adminCommand({
+            moveRange: ns,
+            min: {x: 0},
+            max: {x: MaxKey},
+            toShard: nonPrimaryShardId,
+        }),
+    );
 }
 
 /**
@@ -65,50 +64,48 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     assert.commandWorked(res);
 
     const toUUID = getUUIDFromConfigCollections(conn, `${dbName}.${toCollName}`);
-    const chunks = conn.getSiblingDB('config').chunks.find({uuid: toUUID});
+    const chunks = conn.getSiblingDB("config").chunks.find({uuid: toUUID});
     const chunk0 = chunks.next();
     const chunk1 = chunks.next();
 
-    assert(!chunks.hasNext(), 'Target collection expected to have exactly 2 chunks');
-    assert.neq(chunk0.shard, chunk1.shard, 'Chunks expected to be on different shards');
+    assert(!chunks.hasNext(), "Target collection expected to have exactly 2 chunks");
+    assert.neq(chunk0.shard, chunk1.shard, "Chunks expected to be on different shards");
 
     const toColl = testDB.getCollection(toCollName);
-    assert.eq(toColl.countDocuments({x: 0}), 1, 'Expected exactly one document on the shard');
-    assert.eq(toColl.countDocuments({x: 2}), 1, 'Expected exactly one document on the shard');
+    assert.eq(toColl.countDocuments({x: 0}), 1, "Expected exactly one document on the shard");
+    assert.eq(toColl.countDocuments({x: 2}), 1, "Expected exactly one document on the shard");
 }
 
 // Successful rename must pass tags from source to the target collection
 {
-    const dbName = 'testRenameFromTaggedCollection';
+    const dbName = "testRenameFromTaggedCollection";
     const testDB = setupTestDatabase(db, dbName);
 
-    const fromNs = dbName + '.' + fromCollName;
-    const toNs = dbName + '.' + toCollName;
+    const fromNs = dbName + "." + fromCollName;
+    const toNs = dbName + "." + toCollName;
 
     const primaryShardId = testDB.getDatabasePrimaryShardId();
     const nonPrimaryShardId = getRandomShardName(db, [primaryShardId]);
 
-    assert.commandWorked(testDB.adminCommand({addShardToZone: primaryShardId, zone: 'x'}));
-    assert.commandWorked(testDB.adminCommand({addShardToZone: nonPrimaryShardId, zone: 'y'}));
-    assert.commandWorked(
-        testDB.adminCommand({updateZoneKeyRange: fromNs, min: {x: 0}, max: {x: 2}, zone: 'x'}));
-    assert.commandWorked(
-        testDB.adminCommand({updateZoneKeyRange: fromNs, min: {x: 2}, max: {x: 4}, zone: 'y'}));
+    assert.commandWorked(testDB.adminCommand({addShardToZone: primaryShardId, zone: "x"}));
+    assert.commandWorked(testDB.adminCommand({addShardToZone: nonPrimaryShardId, zone: "y"}));
+    assert.commandWorked(testDB.adminCommand({updateZoneKeyRange: fromNs, min: {x: 0}, max: {x: 2}, zone: "x"}));
+    assert.commandWorked(testDB.adminCommand({updateZoneKeyRange: fromNs, min: {x: 2}, max: {x: 4}, zone: "y"}));
     assert.commandWorked(testDB.adminCommand({shardCollection: fromNs, key: {x: 1}}));
 
-    var fromTags = testDB.getSiblingDB('config').tags.find({ns: fromNs}).toArray();
+    var fromTags = testDB.getSiblingDB("config").tags.find({ns: fromNs}).toArray();
 
     const fromColl = testDB.getCollection(fromCollName);
     fromColl.insert({x: 1});
 
     assert.commandWorked(fromColl.renameCollection(toCollName, false /* dropTarget */));
 
-    const toTags = testDB.getSiblingDB('config').tags.find({ns: toNs}).toArray();
+    const toTags = testDB.getSiblingDB("config").tags.find({ns: toNs}).toArray();
     assert.eq(toTags.length, 2, "Expected 2 tags associated to the target collection");
 
     function deleteDifferentTagFields(tag, index, array) {
-        delete tag['_id'];
-        delete tag['ns'];
+        delete tag["_id"];
+        delete tag["ns"];
     }
     fromTags.forEach(deleteDifferentTagFields);
     toTags.forEach(deleteDifferentTagFields);
@@ -117,20 +114,19 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
     assert.docEq(fromTags[0], toTags[0], "Expected source tags to be passed to target collection");
     assert.docEq(fromTags[1], toTags[1], "Expected source tags to be passed to target collection");
 
-    fromTags = testDB.getSiblingDB('config').tags.find({ns: fromNs}).toArray();
+    fromTags = testDB.getSiblingDB("config").tags.find({ns: fromNs}).toArray();
     assert.eq(fromTags.length, 0, "Expected no tags associated to the source collection");
 }
 
 // Rename to target collection with tags must fail
 {
-    const dbName = 'testRenameToTaggedCollection';
+    const dbName = "testRenameToTaggedCollection";
     const testDB = setupTestDatabase(db, dbName);
 
-    const fromNs = dbName + '.' + fromCollName;
-    const toNs = dbName + '.' + toCollName;
-    assert.commandWorked(testDB.adminCommand({addShardToZone: getRandomShardName(db), zone: 'x'}));
-    assert.commandWorked(
-        testDB.adminCommand({updateZoneKeyRange: toNs, min: {x: 0}, max: {x: 10}, zone: 'x'}));
+    const fromNs = dbName + "." + fromCollName;
+    const toNs = dbName + "." + toCollName;
+    assert.commandWorked(testDB.adminCommand({addShardToZone: getRandomShardName(db), zone: "x"}));
+    assert.commandWorked(testDB.adminCommand({updateZoneKeyRange: toNs, min: {x: 0}, max: {x: 10}, zone: "x"}));
 
     assert.commandWorked(testDB.adminCommand({shardCollection: fromNs, key: {x: 1}}));
 
@@ -141,25 +137,15 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
 
 // Rename to target collection with very a long name
 {
-    const dbName = 'testRenameToCollectionWithVeryLongName';
+    const dbName = "testRenameToCollectionWithVeryLongName";
     const testDB = setupTestDatabase(db, dbName);
 
     setupShardedCollection(testDB, dbName, fromCollName);
-    const longEnoughCollName = 'x'.repeat(235 - `${dbName}.`.length);
+    const longEnoughCollName = "x".repeat(235 - `${dbName}.`.length);
 
-    testRename(testDB,
-               dbName,
-               fromCollName,
-               longEnoughCollName,
-               false /* dropTarget */,
-               false /* mustFail */);
+    testRename(testDB, dbName, fromCollName, longEnoughCollName, false /* dropTarget */, false /* mustFail */);
 
-    const tooLongCollName = longEnoughCollName + 'x';
+    const tooLongCollName = longEnoughCollName + "x";
 
-    testRename(testDB,
-               dbName,
-               longEnoughCollName,
-               tooLongCollName,
-               false /* dropTarget */,
-               true /* mustFail */);
+    testRename(testDB, dbName, longEnoughCollName, tooLongCollName, false /* dropTarget */, true /* mustFail */);
 }

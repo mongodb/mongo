@@ -1,4 +1,3 @@
-
 import {describe, it} from "jstests/libs/mochalite.js";
 
 describe("fruits", () => {

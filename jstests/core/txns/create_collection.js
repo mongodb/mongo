@@ -10,17 +10,17 @@
  */
 import {
     withAbortAndRetryOnTransientTxnError,
-    withTxnAndAutoRetryOnMongos
+    withTxnAndAutoRetryOnMongos,
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertCollCreateFailedWithCode,
-    createCollAndCRUDInTxn
+    createCollAndCRUDInTxn,
 } from "jstests/libs/txns/create_collection_txn_helpers.js";
 
 function runCollectionCreateTest(command, explicitCreate) {
     const session = db.getMongo().startSession();
-    const dbName = 'test_txns_create_collection';
+    const dbName = "test_txns_create_collection";
     const collName = "create_new_collection";
     // Note: using strange collection name here to test sorting of operations by namespace,
     // SERVER-48628
@@ -33,25 +33,37 @@ function runCollectionCreateTest(command, explicitCreate) {
     secondSessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log("Testing createCollection in a transaction");
-    withTxnAndAutoRetryOnMongos(session, () => {
-        createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
-    }, {writeConcern: {w: "majority"}});
+    withTxnAndAutoRetryOnMongos(
+        session,
+        () => {
+            createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
+        },
+        {writeConcern: {w: "majority"}},
+    );
     assert.eq(sessionColl.find({}).itcount(), 1);
 
     jsTest.log("Testing createCollection in a transaction, implicitly creating database");
     assert.commandWorked(sessionDB.dropDatabase());
-    withTxnAndAutoRetryOnMongos(session, () => {
-        createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
-    }, {writeConcern: {w: "majority"}});
+    withTxnAndAutoRetryOnMongos(
+        session,
+        () => {
+            createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
+        },
+        {writeConcern: {w: "majority"}},
+    );
     assert.eq(sessionColl.find({}).itcount(), 1);
 
     sessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log("Testing multiple createCollections in a transaction");
-    withTxnAndAutoRetryOnMongos(session, () => {
-        createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
-        createCollAndCRUDInTxn(sessionDB, secondCollName, command, explicitCreate);
-    }, {writeConcern: {w: "majority"}});
+    withTxnAndAutoRetryOnMongos(
+        session,
+        () => {
+            createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
+            createCollAndCRUDInTxn(sessionDB, secondCollName, command, explicitCreate);
+        },
+        {writeConcern: {w: "majority"}},
+    );
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(secondSessionColl.find({}).itcount(), 1);
 
@@ -80,18 +92,15 @@ function runCollectionCreateTest(command, explicitCreate) {
     sessionColl.drop({writeConcern: {w: "majority"}});
     secondSessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log(
-        "Testing createCollection on an existing collection in a transaction (SHOULD ABORT)");
+    jsTest.log("Testing createCollection on an existing collection in a transaction (SHOULD ABORT)");
     assert.commandWorked(sessionDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
     withAbortAndRetryOnTransientTxnError(session, () => {
         session.startTransaction({writeConcern: {w: "majority"}});
         createCollAndCRUDInTxn(sessionDB, secondCollName, command, explicitCreate);
     });
 
-    assert.commandFailedWithCode(sessionDB.runCommand({create: collName}),
-                                 ErrorCodes.NamespaceExists);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(sessionDB.runCommand({create: collName}), ErrorCodes.NamespaceExists);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(secondSessionColl.find({}).itcount(), 0);
@@ -100,18 +109,13 @@ function runCollectionCreateTest(command, explicitCreate) {
 
     // mongos does not support throwWCEDuringTxnCollCreate
     if (!FixtureHelpers.isMongos(db)) {
-        jsTest.log(
-            "Testing createCollection with writeConflict errors in a transaction (SHOULD ABORT");
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "throwWCEDuringTxnCollCreate", mode: "alwaysOn"}));
+        jsTest.log("Testing createCollection with writeConflict errors in a transaction (SHOULD ABORT");
+        assert.commandWorked(db.adminCommand({configureFailPoint: "throwWCEDuringTxnCollCreate", mode: "alwaysOn"}));
         session.startTransaction({writeConcern: {w: "majority"}});
-        assertCollCreateFailedWithCode(
-            sessionDB, collName, command, explicitCreate, ErrorCodes.WriteConflict);
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+        assertCollCreateFailedWithCode(sessionDB, collName, command, explicitCreate, ErrorCodes.WriteConflict);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
         assert.eq(sessionColl.find({}).itcount(), 0);
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "throwWCEDuringTxnCollCreate", mode: "off"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: "throwWCEDuringTxnCollCreate", mode: "off"}));
     }
 
     session.endSession();

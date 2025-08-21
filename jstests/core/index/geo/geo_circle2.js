@@ -7,8 +7,7 @@ t.drop();
 
 t.createIndex({loc: "2d", categories: 1}, {"name": "placesIdx", "min": -100, "max": 100});
 
-t.insert(
-    {"uid": 368900, "loc": {"x": -36, "y": -8}, "categories": ["sports", "hotel", "restaurant"]});
+t.insert({"uid": 368900, "loc": {"x": -36, "y": -8}, "categories": ["sports", "hotel", "restaurant"]});
 t.insert({"uid": 555344, "loc": {"x": 13, "y": 29}, "categories": ["sports", "hotel"]});
 t.insert({"uid": 855878, "loc": {"x": 38, "y": 30}, "categories": ["sports", "hotel"]});
 t.insert({"uid": 917347, "loc": {"x": 15, "y": 46}, "categories": ["hotel"]});
@@ -23,10 +22,7 @@ t.insert({"uid": 368895, "loc": {"x": -8, "y": 14}, "categories": ["sports"]});
 t.insert({"uid": 355844, "loc": {"x": 34, "y": -4}, "categories": ["sports", "hotel"]});
 
 assert.eq(10, t.find({"loc": {"$within": {"$center": [{"x": 0, "y": 0}, 50]}}}).itcount(), "A");
-assert.eq(6,
-          t.find({"loc": {"$within": {"$center": [{"x": 0, "y": 0}, 50]}}, "categories": "sports"})
-              .itcount(),
-          "B");
+assert.eq(6, t.find({"loc": {"$within": {"$center": [{"x": 0, "y": 0}, 50]}}, "categories": "sports"}).itcount(), "B");
 
 // When not a $near or $within query, geo index should not be used.  Fails if geo index is used.
 assert.eq(1, t.find({"loc": {"x": -36, "y": -8}, "categories": "sports"}).itcount(), "C");

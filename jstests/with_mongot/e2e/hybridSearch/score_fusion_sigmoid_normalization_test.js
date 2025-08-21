@@ -10,7 +10,7 @@
  * @param {Number} max
  */
 function scoreInRange(score, min, max) {
-    return (score >= min && score <= max);
+    return score >= min && score <= max;
 }
 
 const coll = db[jsTestName()];
@@ -41,38 +41,37 @@ const coll = db[jsTestName()];
     assert.commandWorked(bulk.execute());
 
     // Pipeline returns an array of documents, each with the score that $scoreFusion computed.
-    const actualResults =
-        coll.aggregate([
-                {
-                    $scoreFusion: {
-                        input: {
-                            pipelines: {
-                                negativeScore:
-                                    [{$score: {score: "$negative_score", normalization: "sigmoid"}}]
-                            },
-                            normalization: "sigmoid"
-                        }
-                    }
+    const actualResults = coll
+        .aggregate([
+            {
+                $scoreFusion: {
+                    input: {
+                        pipelines: {
+                            negativeScore: [{$score: {score: "$negative_score", normalization: "sigmoid"}}],
+                        },
+                        normalization: "sigmoid",
+                    },
                 },
-                {$project: {_id: 0, negative_score: 1, score: {$meta: "score"}}}
-            ])
-            .toArray();
+            },
+            {$project: {_id: 0, negative_score: 1, score: {$meta: "score"}}},
+        ])
+        .toArray();
 
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
-    const expectedResults =
-        coll.aggregate([
-                {
-                    $project: {
-                        _id: 1,
-                        negative_score: 1,
-                        score: {$avg: [{$sigmoid: {$sigmoid: "$negative_score"}}]}
-                    }
+    const expectedResults = coll
+        .aggregate([
+            {
+                $project: {
+                    _id: 1,
+                    negative_score: 1,
+                    score: {$avg: [{$sigmoid: {$sigmoid: "$negative_score"}}]},
                 },
-                {$sort: {score: -1, _id: 1}},
-                {$project: {_id: 0}}
-            ])
-            .toArray();
+            },
+            {$sort: {score: -1, _id: 1}},
+            {$project: {_id: 0}},
+        ])
+        .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the
     // $sigmoid
@@ -110,31 +109,31 @@ const coll = db[jsTestName()];
     assert.commandWorked(bulk.execute());
 
     // Pipeline returns an array of documents, each with the score that $scoreFusion computed.
-    const actualResults =
-        coll.aggregate([
-                {
-                    $scoreFusion: {
-                        input: {
-                            pipelines: {
-                                scoreVal: [{$score: {score: "$score_val", normalization: "none"}}]
-                            },
-                            normalization: "sigmoid"
-                        }
-                    }
+    const actualResults = coll
+        .aggregate([
+            {
+                $scoreFusion: {
+                    input: {
+                        pipelines: {
+                            scoreVal: [{$score: {score: "$score_val", normalization: "none"}}],
+                        },
+                        normalization: "sigmoid",
+                    },
                 },
-                {$project: {_id: 0, score_val: 1, score: {$meta: "score"}}}
-            ])
-            .toArray();
+            },
+            {$project: {_id: 0, score_val: 1, score: {$meta: "score"}}},
+        ])
+        .toArray();
 
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
-    const expectedResults =
-        coll.aggregate([
-                {$project: {_id: 1, score_val: 1, score: {$avg: [{$sigmoid: "$score_val"}]}}},
-                {$sort: {score: -1, _id: 1}},
-                {$project: {_id: 0}}
-            ])
-            .toArray();
+    const expectedResults = coll
+        .aggregate([
+            {$project: {_id: 1, score_val: 1, score: {$avg: [{$sigmoid: "$score_val"}]}}},
+            {$sort: {score: -1, _id: 1}},
+            {$project: {_id: 0}},
+        ])
+        .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the $sigmoid
     // normalization.
@@ -172,38 +171,38 @@ const coll = db[jsTestName()];
     assert.commandWorked(bulk.execute());
 
     // Pipeline returns an array of documents, each with the score that $scoreFusion computed.
-    const actualResults =
-        coll.aggregate([
-                {
-                    $scoreFusion: {
-                        input: {
-                            pipelines: {
-                                single: [{$score: {score: "$single", normalization: "none"}}],
-                                double: [{$score: {score: "$double", normalization: "none"}}]
-                            },
-                            normalization: "sigmoid"
-                        }
-                    }
+    const actualResults = coll
+        .aggregate([
+            {
+                $scoreFusion: {
+                    input: {
+                        pipelines: {
+                            single: [{$score: {score: "$single", normalization: "none"}}],
+                            double: [{$score: {score: "$double", normalization: "none"}}],
+                        },
+                        normalization: "sigmoid",
+                    },
                 },
-                {$project: {_id: 1, single: 1, double: 1, score: {$meta: "score"}}}
-            ])
-            .toArray();
+            },
+            {$project: {_id: 1, single: 1, double: 1, score: {$meta: "score"}}},
+        ])
+        .toArray();
 
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
-    const expectedResults =
-        coll.aggregate([
-                {
-                    $project: {
-                        _id: 1,
-                        single: 1,
-                        double: 1,
-                        score: {$avg: [{$sigmoid: "$single"}, {$sigmoid: "$double"}]}
-                    }
+    const expectedResults = coll
+        .aggregate([
+            {
+                $project: {
+                    _id: 1,
+                    single: 1,
+                    double: 1,
+                    score: {$avg: [{$sigmoid: "$single"}, {$sigmoid: "$double"}]},
                 },
-                {$sort: {score: -1, _id: 1}}
-            ])
-            .toArray();
+            },
+            {$sort: {score: -1, _id: 1}},
+        ])
+        .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the $sigmoid
     // normalization.
@@ -250,43 +249,41 @@ const coll = db[jsTestName()];
     assert.commandWorked(bulk.execute());
 
     // Pipeline returns an array of documents, each with the score that $scoreFusion computed.
-    const actualResults =
-        coll.aggregate([
-                {
-                    $scoreFusion: {
-                        input: {
-                            pipelines: {
-                                score50: [{$score: {score: "$score_50", normalization: "sigmoid"}}],
-                                score10: [{$score: {score: "$score_10", normalization: "sigmoid"}}]
-                            },
-                            normalization: "sigmoid"
-                        }
-                    }
+    const actualResults = coll
+        .aggregate([
+            {
+                $scoreFusion: {
+                    input: {
+                        pipelines: {
+                            score50: [{$score: {score: "$score_50", normalization: "sigmoid"}}],
+                            score10: [{$score: {score: "$score_10", normalization: "sigmoid"}}],
+                        },
+                        normalization: "sigmoid",
+                    },
                 },
-                {$project: {_id: 0, score_10: 1, score_50: 1, score: {$meta: "score"}}}
-            ])
-            .toArray();
+            },
+            {$project: {_id: 0, score_10: 1, score_50: 1, score: {$meta: "score"}}},
+        ])
+        .toArray();
 
     // Pipeline returns an array of documents, each with the calculated expected score that
     // $scoreFusion should have computed.
-    const expectedResults = coll.aggregate([
-                                    {
-                                        $project: {
-                                            _id: 1,
-                                            score_10: 1,
-                                            score_50: 1,
-                                            score: {
-                                                $avg: [
-                                                    {$sigmoid: {$sigmoid: "$score_10"}},
-                                                    {$sigmoid: {$sigmoid: "$score_50"}}
-                                                ]
-                                            }
-                                        }
-                                    },
-                                    {$sort: {score: -1, _id: 1}},
-                                    {$project: {_id: 0}}
-                                ])
-                                .toArray();
+    const expectedResults = coll
+        .aggregate([
+            {
+                $project: {
+                    _id: 1,
+                    score_10: 1,
+                    score_50: 1,
+                    score: {
+                        $avg: [{$sigmoid: {$sigmoid: "$score_10"}}, {$sigmoid: {$sigmoid: "$score_50"}}],
+                    },
+                },
+            },
+            {$sort: {score: -1, _id: 1}},
+            {$project: {_id: 0}},
+        ])
+        .toArray();
 
     // Assert that every document returned by $scoreFusion is scored as expected using the $sigmoid
     // normalization.

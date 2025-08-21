@@ -6,19 +6,19 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const kVTSKey = 'secret';
+const kVTSKey = "secret";
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
-        auth: '',
+        auth: "",
         setParameter: {
             multitenancySupport: true,
             featureFlagSecurityToken: true,
             testOnlyValidatedTenancyScopeKey: kVTSKey,
-        }
-    }
+        },
+    },
 });
-rst.startSet({keyFile: 'jstests/libs/key1'});
+rst.startSet({keyFile: "jstests/libs/key1"});
 rst.initiate();
 
 const primary = rst.getPrimary();
@@ -32,29 +32,37 @@ const primaryConn = new Mongo(primary.host);
 const primaryDB = primaryConn.getDB(kDbName);
 
 // Create users for two different tenants.
-const adminDb = primary.getDB('admin');
-assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-assert(adminDb.auth('admin', 'pwd'));
+const adminDb = primary.getDB("admin");
+assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["root"]}));
+assert(adminDb.auth("admin", "pwd"));
 
 const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTenantID");
 
-const securityToken1 =
-    _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant1}, kVTSKey);
+const securityToken1 = _createSecurityToken({user: "userTenant1", db: "$external", tenant: kTenant1}, kVTSKey);
 
 primary._setSecurityToken(_createTenantToken({tenant: kTenant1}));
-assert.commandWorked(primary.getDB('$external').runCommand({
-    createUser: "userTenant1",
-    roles: [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
-}));
+assert.commandWorked(
+    primary.getDB("$external").runCommand({
+        createUser: "userTenant1",
+        roles: [
+            {role: "dbAdminAnyDatabase", db: "admin"},
+            {role: "readWriteAnyDatabase", db: "admin"},
+        ],
+    }),
+);
 
-const securityToken2 =
-    _createSecurityToken({user: "userTenant2", db: '$external', tenant: kTenant2}, kVTSKey);
+const securityToken2 = _createSecurityToken({user: "userTenant2", db: "$external", tenant: kTenant2}, kVTSKey);
 
 primary._setSecurityToken(_createTenantToken({tenant: kTenant2}));
-assert.commandWorked(primary.getDB('$external').runCommand({
-    createUser: "userTenant2",
-    roles: [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
-}));
+assert.commandWorked(
+    primary.getDB("$external").runCommand({
+        createUser: "userTenant2",
+        roles: [
+            {role: "dbAdminAnyDatabase", db: "admin"},
+            {role: "readWriteAnyDatabase", db: "admin"},
+        ],
+    }),
+);
 primary._setSecurityToken(undefined);
 
 // Logout the root user to avoid multiple authentication.
@@ -63,21 +71,32 @@ primaryConn.getDB("admin").logout();
 // Create a collection, insert some data, and create indexes on the collection for tenant1.
 primaryConn._setSecurityToken(securityToken1);
 
-const tenant1Docs = [{_id: 0, a: 1, b: 1}, {_id: 1, a: 2, b: 3}];
+const tenant1Docs = [
+    {_id: 0, a: 1, b: 1},
+    {_id: 1, a: 2, b: 3},
+];
 assert.commandWorked(primaryDB.runCommand({insert: kCollName, documents: tenant1Docs}));
 
-const tenant1Idxs = [{key: {a: 1}, name: "indexA"}, {key: {b: 1}, name: "indexB"}];
-let res =
-    assert.commandWorked(primaryDB.runCommand({createIndexes: kCollName, indexes: tenant1Idxs}));
+const tenant1Idxs = [
+    {key: {a: 1}, name: "indexA"},
+    {key: {b: 1}, name: "indexB"},
+];
+let res = assert.commandWorked(primaryDB.runCommand({createIndexes: kCollName, indexes: tenant1Idxs}));
 assert.eq(3, res.numIndexesAfter, tojson(res));
 
 // Create a collections, insert some data, and create indexes on the collection for tenant2.
 primaryConn._setSecurityToken(securityToken2);
 
-const tenant2Docs = [{_id: 10, a: 10, b: 10}, {_id: 11, a: 20, b: 30}];
+const tenant2Docs = [
+    {_id: 10, a: 10, b: 10},
+    {_id: 11, a: 20, b: 30},
+];
 assert.commandWorked(primaryDB.runCommand({insert: kCollName, documents: tenant2Docs}));
 
-const tenant2Idxs = [{key: {a: -1}, name: "indexA"}, {key: {b: -1}, name: "indexB"}];
+const tenant2Idxs = [
+    {key: {a: -1}, name: "indexA"},
+    {key: {b: -1}, name: "indexB"},
+];
 res = assert.commandWorked(primaryDB.runCommand({createIndexes: kCollName, indexes: tenant2Idxs}));
 assert.eq(3, res.numIndexesAfter, tojson(res));
 
@@ -87,7 +106,7 @@ const secondary = rst.add({
         multitenancySupport: true,
         featureFlagSecurityToken: true,
         testOnlyValidatedTenancyScopeKey: kVTSKey,
-    }
+    },
 });
 rst.reInitiate();
 rst.awaitReplication();
@@ -106,13 +125,15 @@ assert(arrayEq(tenant1Docs, findTenant1Res.cursor.firstBatch), tojson(findTenant
 
 res = assert.commandWorked(secondaryDB.runCommand({listIndexes: kCollName}));
 assert.eq(3, res.cursor.firstBatch.length, tojson(res.cursor.firstBatch));
-assert(arrayEq(tenant1Idxs.concat([
-           {key: {"_id": 1}, name: "_id_"},
-       ]),
-               res.cursor.firstBatch.map(function(index) {
-                   return {key: index.key, name: index.name};
-               })),
-       tojson(res.cursor.firstBatch));
+assert(
+    arrayEq(
+        tenant1Idxs.concat([{key: {"_id": 1}, name: "_id_"}]),
+        res.cursor.firstBatch.map(function (index) {
+            return {key: index.key, name: index.name};
+        }),
+    ),
+    tojson(res.cursor.firstBatch),
+);
 
 // Look for tenant2's data and indexes.
 secondaryConn._setSecurityToken(securityToken2);
@@ -121,12 +142,14 @@ assert(arrayEq(tenant2Docs, findTenant2Res.cursor.firstBatch), tojson(findTenant
 
 res = assert.commandWorked(secondaryDB.runCommand({listIndexes: kCollName}));
 assert.eq(3, res.cursor.firstBatch.length, tojson(res.cursor.firstBatch));
-assert(arrayEq(tenant2Idxs.concat([
-           {key: {"_id": 1}, name: "_id_"},
-       ]),
-               res.cursor.firstBatch.map(function(index) {
-                   return {key: index.key, name: index.name};
-               })),
-       tojson(res.cursor.firstBatch));
+assert(
+    arrayEq(
+        tenant2Idxs.concat([{key: {"_id": 1}, name: "_id_"}]),
+        res.cursor.firstBatch.map(function (index) {
+            return {key: index.key, name: index.name};
+        }),
+    ),
+    tojson(res.cursor.firstBatch),
+);
 
 rst.stopSet();

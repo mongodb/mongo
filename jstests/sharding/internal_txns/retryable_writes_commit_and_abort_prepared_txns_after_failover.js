@@ -23,7 +23,7 @@ const st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 const kDbName = "testDb";
@@ -65,7 +65,7 @@ function makeInsertCmdObjForTransaction(lsid, txnNumber, stmtId, doc, isLargeTxn
         lsid: lsid,
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(stmtId),
-        autocommit: false
+        autocommit: false,
     };
 }
 
@@ -77,8 +77,7 @@ function stepDownShard0Primary() {
     const oldPrimary = st.rs0.getPrimary();
     const oldSecondary = st.rs0.getSecondary();
     assert.commandWorked(oldSecondary.adminCommand({replSetFreeze: 0}));
-    assert.commandWorked(
-        oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
     const newPrimary = st.rs0.getPrimary();
     assert.neq(oldPrimary, newPrimary);
     shard0TestDB = st.rs0.getPrimary().getDB(kDbName);
@@ -86,9 +85,11 @@ function stepDownShard0Primary() {
 }
 
 {
-    jsTest.log("Test committing a prepared retryable internal transaction after failover and " +
-               "retrying the write statements executed in the committed transaction and in a " +
-               "retryable write prior to the transaction");
+    jsTest.log(
+        "Test committing a prepared retryable internal transaction after failover and " +
+            "retrying the write statements executed in the committed transaction and in a " +
+            "retryable write prior to the transaction",
+    );
     // Upon failover, the new primary will not refresh the state for the transaction below from disk
     // since the transaction is in the prepared state. Therefore, retryability works if and only if
     // secondaries keep track of write statements executed in prepared retryable internal
@@ -98,24 +99,23 @@ function stepDownShard0Primary() {
     // transaction has multiple applyOps oplog entries.
     function runTest({isLargeTxn}) {
         let {parentLsid, parentTxnNumber, childLsid, childTxnNumber, stmtId} = makeSessionOpts();
-        let makeInsertCmdObjForTransactionFunc =
-            isLargeTxn ? makeInsertCmdObjForLargeTransaction : makeInsertCmdObjForTransaction;
+        let makeInsertCmdObjForTransactionFunc = isLargeTxn
+            ? makeInsertCmdObjForLargeTransaction
+            : makeInsertCmdObjForTransaction;
 
         // Execute a write statement in a retryable write.
-        const parentSessionCmdObj =
-            makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
+        const parentSessionCmdObj = makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
         assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj));
 
         // Execute additional write statements in a retryable internal transaction.
         const childSessionCmdObj1 = Object.assign(
             makeInsertCmdObjForTransactionFunc(childLsid, childTxnNumber, stmtId++, {_id: 1}),
-            {startTransaction: true});
+            {startTransaction: true},
+        );
         assert.commandWorked(shard0TestDB.runCommand(childSessionCmdObj1));
-        const childSessionCmdObj2 =
-            makeInsertCmdObjForTransactionFunc(childLsid, childTxnNumber, stmtId++, {_id: 2});
+        const childSessionCmdObj2 = makeInsertCmdObjForTransactionFunc(childLsid, childTxnNumber, stmtId++, {_id: 2});
         assert.commandWorked(shard0TestDB.runCommand(childSessionCmdObj2));
-        const childSessionCmdObj3 =
-            makeInsertCmdObjForTransactionFunc(childLsid, childTxnNumber, stmtId++, {_id: 3});
+        const childSessionCmdObj3 = makeInsertCmdObjForTransactionFunc(childLsid, childTxnNumber, stmtId++, {_id: 3});
         assert.commandWorked(shard0TestDB.runCommand(childSessionCmdObj3));
 
         // Prepare the transaction.
@@ -143,21 +143,30 @@ function stepDownShard0Primary() {
         assert.eq(shard0TestColl.find({_id: 3}).itcount(), 1);
 
         const parentSessionCmdObj1 = makeInsertCmdObjForRetryableWrite(
-            parentLsid, parentTxnNumber, childSessionCmdObj1.stmtId, {_id: 1});
-        const retryResForParentSessionCmdObj1 =
-            assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj1));
+            parentLsid,
+            parentTxnNumber,
+            childSessionCmdObj1.stmtId,
+            {_id: 1},
+        );
+        const retryResForParentSessionCmdObj1 = assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj1));
         assert.eq(retryResForParentSessionCmdObj1.n, 1);
 
         const parentSessionCmdObj2 = makeInsertCmdObjForRetryableWrite(
-            parentLsid, parentTxnNumber, childSessionCmdObj2.stmtId, {_id: 2});
-        const retryResForParentSessionCmdObj2 =
-            assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj2));
+            parentLsid,
+            parentTxnNumber,
+            childSessionCmdObj2.stmtId,
+            {_id: 2},
+        );
+        const retryResForParentSessionCmdObj2 = assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj2));
         assert.eq(retryResForParentSessionCmdObj2.n, 1);
 
         const parentSessionCmdObj3 = makeInsertCmdObjForRetryableWrite(
-            parentLsid, parentTxnNumber, childSessionCmdObj3.stmtId, {_id: 3});
-        const retryResForParentSessionCmdObj3 =
-            assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj3));
+            parentLsid,
+            parentTxnNumber,
+            childSessionCmdObj3.stmtId,
+            {_id: 3},
+        );
+        const retryResForParentSessionCmdObj3 = assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj3));
         assert.eq(retryResForParentSessionCmdObj3.n, 1);
 
         assert.eq(shard0TestColl.find({_id: 0}).itcount(), 1);
@@ -173,24 +182,24 @@ function stepDownShard0Primary() {
 }
 
 {
-    jsTest.log("Test aborting a prepared retryable internal transaction and retrying the write " +
-               "statements executed in the aborted transaction and in a retryable write prior to " +
-               "the transaction");
+    jsTest.log(
+        "Test aborting a prepared retryable internal transaction and retrying the write " +
+            "statements executed in the aborted transaction and in a retryable write prior to " +
+            "the transaction",
+    );
     let {parentLsid, parentTxnNumber, childLsid, childTxnNumber, stmtId} = makeSessionOpts();
 
     // Execute a write statement in a retryable write.
-    const parentSessionCmdObj =
-        makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
-    const initialResForParentSessionCmdObj =
-        assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj));
+    const parentSessionCmdObj = makeInsertCmdObjForRetryableWrite(parentLsid, parentTxnNumber, stmtId++, {_id: 0});
+    const initialResForParentSessionCmdObj = assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj));
 
     // Execute additional write statements in a retryable internal transaction.
-    const childSessionCmdObj1 =
-        Object.assign(makeInsertCmdObjForTransaction(childLsid, childTxnNumber, stmtId++, {_id: 1}),
-                      {startTransaction: true});
+    const childSessionCmdObj1 = Object.assign(
+        makeInsertCmdObjForTransaction(childLsid, childTxnNumber, stmtId++, {_id: 1}),
+        {startTransaction: true},
+    );
     assert.commandWorked(shard0TestDB.runCommand(childSessionCmdObj1));
-    const childSessionCmdObj2 =
-        makeInsertCmdObjForTransaction(childLsid, childTxnNumber, stmtId++, {_id: 2});
+    const childSessionCmdObj2 = makeInsertCmdObjForTransaction(childLsid, childTxnNumber, stmtId++, {_id: 2});
     assert.commandWorked(shard0TestDB.runCommand(childSessionCmdObj2));
 
     // Prepare the transaction.
@@ -205,15 +214,13 @@ function stepDownShard0Primary() {
 
     // Retry all write statements including the one executed as a retryable write and verify
     // that they execute exactly once.
-    const retryResForParentSessionCmdObj =
-        assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj));
+    const retryResForParentSessionCmdObj = assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj));
     assert.eq(initialResForParentSessionCmdObj.n, retryResForParentSessionCmdObj.n);
 
     // It is illegal to restart an aborted prepared transaction.
     assert.commandFailedWithCode(shard0TestDB.runCommand(childSessionCmdObj1), 50911);
     // It is illegal to continue an aborted prepared transaction.
-    assert.commandFailedWithCode(shard0TestDB.runCommand(childSessionCmdObj2),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(shard0TestDB.runCommand(childSessionCmdObj2), ErrorCodes.NoSuchTransaction);
 
     assert.eq(shard0TestColl.find({_id: 0}).itcount(), 1);
     assert.eq(shard0TestColl.find({_id: 1}).itcount(), 0);
@@ -223,15 +230,21 @@ function stepDownShard0Primary() {
     // the transaction aborted, the write statements in the commands below would not execute, and
     // therefore the docs {_id: 1} and {_id: 2} would not exist.
     const parentSessionCmdObj1 = makeInsertCmdObjForRetryableWrite(
-        parentLsid, parentTxnNumber, childSessionCmdObj1.stmtId, {_id: 1});
-    const retryResForParentSessionCmdObj1 =
-        assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj1));
+        parentLsid,
+        parentTxnNumber,
+        childSessionCmdObj1.stmtId,
+        {_id: 1},
+    );
+    const retryResForParentSessionCmdObj1 = assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj1));
     assert.eq(retryResForParentSessionCmdObj1.n, 1);
 
     const parentSessionCmdObj2 = makeInsertCmdObjForRetryableWrite(
-        parentLsid, parentTxnNumber, childSessionCmdObj2.stmtId, {_id: 2});
-    const retryResForParentSessionCmdObj2 =
-        assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj2));
+        parentLsid,
+        parentTxnNumber,
+        childSessionCmdObj2.stmtId,
+        {_id: 2},
+    );
+    const retryResForParentSessionCmdObj2 = assert.commandWorked(shard0TestDB.runCommand(parentSessionCmdObj2));
     assert.eq(retryResForParentSessionCmdObj2.n, 1);
 
     assert.eq(shard0TestColl.find({_id: 0}).itcount(), 1);

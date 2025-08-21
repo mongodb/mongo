@@ -18,34 +18,34 @@ replSet.initiate({
     "members": [
         {"_id": 0, "host": nodes[0], "priority": 3},
         {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2], "arbiterOnly": true}
-    ]
+        {"_id": 2, "host": nodes[2], "arbiterOnly": true},
+    ],
 });
 
 replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 var primary = replSet.getPrimary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 var secondary = replSet.getSecondary();
-jsTestLog('Disable replication on the SECONDARY ' + secondary.host);
+jsTestLog("Disable replication on the SECONDARY " + secondary.host);
 stopServerReplication(secondary);
 
 jsTestLog("do a write then ask the PRIMARY to stepdown");
 var options = {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
 assert.commandWorked(primary.getDB(name).foo.insert({x: 1}, options));
 
-var stepDownCmd = function() {
+var stepDownCmd = function () {
     assert.commandWorked(db.adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 60}));
 };
 var stepDowner = startParallelShell(stepDownCmd, primary.port);
 
-assert.soon(function() {
-    var res = primary.getDB('admin').currentOp(true);
+assert.soon(function () {
+    var res = primary.getDB("admin").currentOp(true);
     for (var entry in res.inprog) {
-        if (res.inprog[entry]["command"] &&
-            res.inprog[entry]["command"]["replSetStepDown"] === 60) {
+        if (res.inprog[entry]["command"] && res.inprog[entry]["command"]["replSetStepDown"] === 60) {
             return true;
         }
     }
@@ -54,17 +54,17 @@ assert.soon(function() {
 }, "No pending stepdown command found");
 
 jsTestLog("Ensure that writes start failing with NotWritablePrimary errors");
-assert.soonNoExcept(function() {
-    assert.commandFailedWithCode(primary.getDB(name).foo.insert({x: 2}),
-                                 ErrorCodes.NotWritablePrimary);
+assert.soonNoExcept(function () {
+    assert.commandFailedWithCode(primary.getDB(name).foo.insert({x: 2}), ErrorCodes.NotWritablePrimary);
     return true;
 });
 
-jsTestLog("Ensure that even though writes are failing with NotWritablePrimary, we still report " +
-          "ourselves as PRIMARY");
-assert.eq(ReplSetTest.State.PRIMARY, primary.adminCommand('replSetGetStatus').myState);
+jsTestLog(
+    "Ensure that even though writes are failing with NotWritablePrimary, we still report " + "ourselves as PRIMARY",
+);
+assert.eq(ReplSetTest.State.PRIMARY, primary.adminCommand("replSetGetStatus").myState);
 
-jsTestLog('Enable replication on the SECONDARY ' + secondary.host);
+jsTestLog("Enable replication on the SECONDARY " + secondary.host);
 restartServerReplication(secondary);
 
 jsTestLog("Wait for PRIMARY " + primary.host + " to completely step down.");

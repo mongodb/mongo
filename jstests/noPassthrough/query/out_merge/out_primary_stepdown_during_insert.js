@@ -30,15 +30,20 @@ function runTest(connInfo) {
     setUpFn(db);
     connInfo.awaitReplication();
 
-    for (const failpoint
-             of ["hangWhileBuildingDocumentSourceOutBatch", "hangDollarOutAfterInsert"]) {
+    for (const failpoint of ["hangWhileBuildingDocumentSourceOutBatch", "hangDollarOutAfterInsert"]) {
         // Test both general $out and $out to a timeseries collection, with 'apiStrict' true and
         // false.
         for (const isTimeseries of [false, true]) {
             for (const useAPIStrict of [false, true]) {
-                jsTestLog("Testing " + (isTimeseries ? " timeseries " : " normal ") +
-                          " collection with apiStrict set to " + useAPIStrict +
-                          " and with failpoint " + failpoint + " enabled");
+                jsTestLog(
+                    "Testing " +
+                        (isTimeseries ? " timeseries " : " normal ") +
+                        " collection with apiStrict set to " +
+                        useAPIStrict +
+                        " and with failpoint " +
+                        failpoint +
+                        " enabled",
+                );
 
                 let cmdObj = {
                     aggregate: sourceCollName,
@@ -69,19 +74,20 @@ function runTest(connInfo) {
                         assert.commandFailedWithCode(result, [
                             ErrorCodes.CollectionUUIDMismatch,
                             8555700 /* Thrown when catalog changes are detected in timeseries */,
-                            ErrorCodes.NamespaceNotFound
+                            ErrorCodes.NamespaceNotFound,
                         ]);
-                    }, cmdObj), connInfo.getNodeRunningOut().port);
+                    }, cmdObj),
+                    connInfo.getNodeRunningOut().port,
+                );
 
                 fp.wait();
 
                 // Step down the primary and keep checking for a new primary
-                assert.soon(function() {
+                assert.soon(function () {
                     jsTestLog("Stepping down primary");
                     // Stepdown the primary.
                     let initialPrimary = connInfo.getPrimary();
-                    assert.commandWorked(
-                        initialPrimary.adminCommand({replSetStepDown: 60, force: true}));
+                    assert.commandWorked(initialPrimary.adminCommand({replSetStepDown: 60, force: true}));
 
                     // Wait for a new primary to be elected.
                     const newPrimary = connInfo.getPrimary();
@@ -106,7 +112,7 @@ let connInfo = {
     getPrimary: () => rst.getPrimary(),
     getSecondary: () => rst.getSecondary(),
     getNodeRunningOut: () => rst.getSecondary(),
-    awaitReplication: () => rst.awaitReplication()
+    awaitReplication: () => rst.awaitReplication(),
 };
 runTest(connInfo);
 rst.stopSet();
@@ -118,7 +124,7 @@ connInfo = {
     getPrimary: () => st.rs0.getPrimary(),
     getSecondary: () => st.rs0.getSecondary(),
     getNodeRunningOut: () => st.s,
-    awaitReplication: () => st.awaitReplicationOnShards()
+    awaitReplication: () => st.awaitReplicationOnShards(),
 };
 runTest(connInfo);
 st.stop();

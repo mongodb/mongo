@@ -18,7 +18,7 @@ coll.drop();
 const testIndex = {
     a: 1,
     b: 1,
-    c: 1
+    c: 1,
 };
 assert.commandWorked(coll.createIndex(testIndex));
 
@@ -28,7 +28,7 @@ for (let i = 0; i < 10000; i++) {
         a: i % 2,
         b: i % 4,
         c: Math.floor(Math.random() * 1000),
-        d: Math.floor(Math.random() * 1000)
+        d: Math.floor(Math.random() * 1000),
     });
 }
 assert.commandWorked(bulk.execute());
@@ -44,24 +44,23 @@ assert.gte(explainResult.executionStats.totalKeysExamined, 2500);
 assert.eq(explainResult.executionStats.totalDocsExamined, 100);
 
 // This sort can also be computed using the index.
-explainResult =
-    coll.find({a: 0, b: 2}).hint(testIndex).sort({c: 1}).skip(2400).explain("executionStats");
+explainResult = coll.find({a: 0, b: 2}).hint(testIndex).sort({c: 1}).skip(2400).explain("executionStats");
 assert.gte(explainResult.executionStats.totalKeysExamined, 2500);
 assert.eq(explainResult.executionStats.totalDocsExamined, 100);
 
 // This query is covered by the index, so there should be no fetch at all.
-explainResult = coll.find({a: 0, b: 2}, {_id: 0, a: 1})
-                    .hint(testIndex)
-                    .sort({c: 1})
-                    .skip(2400)
-                    .explain("executionStats");
+explainResult = coll
+    .find({a: 0, b: 2}, {_id: 0, a: 1})
+    .hint(testIndex)
+    .sort({c: 1})
+    .skip(2400)
+    .explain("executionStats");
 assert.gte(explainResult.executionStats.totalKeysExamined, 2500);
 assert.eq(explainResult.executionStats.totalDocsExamined, 0);
 assert(isIndexOnly(db, explainResult.queryPlanner.winningPlan));
 
 // This sort requires a field that is not in the index, so we should be fetching all 2500
 // documents that match the find predicate.
-explainResult =
-    coll.find({a: 0, b: 2}).hint(testIndex).sort({d: 1}).skip(2400).explain("executionStats");
+explainResult = coll.find({a: 0, b: 2}).hint(testIndex).sort({d: 1}).skip(2400).explain("executionStats");
 assert.gte(explainResult.executionStats.totalKeysExamined, 2500);
 assert.eq(explainResult.executionStats.totalDocsExamined, 2500);

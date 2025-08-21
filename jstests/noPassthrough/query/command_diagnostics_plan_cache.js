@@ -5,11 +5,9 @@
 import {
     assertOnDiagnosticLogContents,
     planFromCacheAlwaysFails,
-    runWithFailpoint
+    runWithFailpoint,
 } from "jstests/libs/query/command_diagnostic_utils.js";
-import {
-    checkSbeFullyEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // This test triggers an unclean shutdown, which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;
@@ -25,8 +23,10 @@ function runTest(description, command, diagnosticInfo) {
 
     if (checkSbeFullyEnabled(db)) {
         MongoRunner.stopMongod(conn);
-        jsTestLog("Skipping command_diagnostics_plan_cache.js because SBE is fully enabled " +
-                  "and the plan cache diagnostic logging is not enabled for the SBE plan cache.");
+        jsTestLog(
+            "Skipping command_diagnostics_plan_cache.js because SBE is fully enabled " +
+                "and the plan cache diagnostic logging is not enabled for the SBE plan cache.",
+        );
         quit();
     }
 
@@ -47,13 +47,14 @@ function runTest(description, command, diagnosticInfo) {
         assert.commandFailedWithCode(
             conn.getDB(dbName).runCommand(command),
             errorCode,
-            "Expected query to fail with planFromCacheAlwaysFails failpoint");
+            "Expected query to fail with planFromCacheAlwaysFails failpoint",
+        );
     });
 
     assertOnDiagnosticLogContents({
         description: description,
         logFile: conn.fullOptions.logFile,
-        expectedDiagnosticInfo: diagnosticInfo
+        expectedDiagnosticInfo: diagnosticInfo,
     });
 
     // We expect a non-zero exit code due to tassert triggered.
@@ -74,14 +75,16 @@ runTest(
     {
         aggregate: collName,
         pipeline: [{$match: {a: {$lt: 5}}}, {$group: {_id: null, s: {$sum: "$a"}}}],
-        cursor: {}
+        cursor: {},
     },
     [
         `opDescription': { aggregate: \\"${
-            collName}\\", pipeline: [ { $match: { a: { $lt: 5.0 } } }, { $group: { _id: null, s: { $sum: \\"$a\\" } } } ]`,
+            collName
+        }\\", pipeline: [ { $match: { a: { $lt: 5.0 } } }, { $group: { _id: null, s: { $sum: \\"$a\\" } } } ]`,
         `queryPlannerParams: {mainCollectionInfo: {exists: true, isTimeseries: false, indexes: [`,
         `name: \'(_id_, )\'`,
         `name: '(a_1, )`,
         `name: '(a_1_b_1, )`,
         `planCacheSolution': (index-tagged expression tree:`,
-    ]);
+    ],
+);

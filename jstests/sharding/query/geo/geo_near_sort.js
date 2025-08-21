@@ -6,17 +6,15 @@ const db = st.getDB("test");
 const coll = db.geo_near_sort;
 const caseInsensitive = {
     locale: "en_US",
-    strength: 2
+    strength: 2,
 };
 
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
 // Split the data into 2 chunks and move the chunk with _id > 0 to shard 1.
 assert.commandWorked(st.s0.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
-assert.commandWorked(
-    st.s0.adminCommand({movechunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
+assert.commandWorked(st.s0.adminCommand({movechunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
 
 // Insert some documents. The sort order by distance from the origin is [-2, 1, -1, 2] (under 2d
 // or 2dsphere geometry). The sort order by {a: 1} under the case-insensitive collation is [2,
@@ -25,25 +23,25 @@ const docMinus2 = {
     _id: -2,
     geo: [0, 0],
     a: "BB",
-    b: 3
+    b: 3,
 };
 const docMinus1 = {
     _id: -1,
     geo: [0, 2],
     a: "aB",
-    b: 1
+    b: 1,
 };
 const doc1 = {
     _id: 1,
     geo: [0, 1],
     a: "Ba",
-    b: 2
+    b: 2,
 };
 const doc2 = {
     _id: 2,
     geo: [0, 3],
     a: "aa",
-    b: 0
+    b: 0,
 };
 assert.commandWorked(coll.insert(docMinus2));
 assert.commandWorked(coll.insert(docMinus1));
@@ -101,9 +99,7 @@ function testSortOrders(query, indexSpec) {
 
 testSortOrders({geo: {$near: [0, 0]}}, {geo: "2d"});
 testSortOrders({geo: {$nearSphere: [0, 0]}}, {geo: "2d"});
-testSortOrders({geo: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}}}},
-               {geo: "2dsphere"});
-testSortOrders({geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}},
-               {geo: "2dsphere"});
+testSortOrders({geo: {$near: {$geometry: {type: "Point", coordinates: [0, 0]}}}}, {geo: "2dsphere"});
+testSortOrders({geo: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}}, {geo: "2dsphere"});
 
 st.stop();

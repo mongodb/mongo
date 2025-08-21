@@ -32,8 +32,7 @@ for (let i = 0; i < 5; i++) {
 }
 
 // The collection has not been checkpointed yet, so there is nothing to validate.
-assert.commandFailedWithCode(db.runCommand({validate: collName, background: true}),
-                             ErrorCodes.NamespaceNotFound);
+assert.commandFailedWithCode(db.runCommand({validate: collName, background: true}), ErrorCodes.NamespaceNotFound);
 
 forceCheckpoint();
 

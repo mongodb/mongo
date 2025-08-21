@@ -7,9 +7,7 @@ import {
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const collName = "internal_search_mongot_remote";
@@ -23,15 +21,14 @@ const stWithMock = new ShardingTestWithMongotMock({
     mongos: 1,
     other: {
         rsOptions: {setParameter: {enableTestCommands: 1}},
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const testColl = testDB.getCollection(collName);
 const collNS = testColl.getFullName();
@@ -58,14 +55,12 @@ const expectedMongotCommand = mongotCommandForQuery({
     collName: collName,
     db: dbName,
     collectionUUID: collUUID0,
-    protocolVersion: protocolVersion
+    protocolVersion: protocolVersion,
 });
 
 const cursorId = NumberLong(123);
 const secondCursorId = NumberLong(cursorId + 1001);
-const pipeline = [
-    {$search: mongotQuery},
-];
+const pipeline = [{$search: mongotQuery}];
 
 function runTestOnPrimaries(testFn) {
     testDB.getMongo().setReadPref("primary");
@@ -87,11 +82,19 @@ function testBasicCase(shard0Conn, shard1Conn) {
         {_id: 4, $searchScore: 1},
         {_id: 1, $searchScore: 0.99},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot0ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot0ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
+    ];
 
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId, secondCursorId);
@@ -102,11 +105,19 @@ function testBasicCase(shard0Conn, shard1Conn) {
         {_id: 12, $searchScore: 29},
         {_id: 14, $searchScore: 28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot1ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot1ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId, secondCursorId);
 
@@ -121,8 +132,7 @@ function testBasicCase(shard0Conn, shard1Conn) {
         {_id: 1, x: "ow"},
     ];
 
-    mockPlanShardedSearchResponse(
-        testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
 
     assert.eq(testColl.aggregate(pipeline).toArray(), expectedDocs);
 }
@@ -134,14 +144,18 @@ runTestOnSecondaries(testBasicCase);
 function testErrorCase(shard0Conn, shard1Conn) {
     const responseOk = 1;
 
-    const mongot0ResponseBatch = [
-        {_id: 3, $searchScore: 100},
-    ];
+    const mongot0ResponseBatch = [{_id: 3, $searchScore: 100}];
     const history0 = [
         {
             expectedCommand: expectedMongotCommand,
             response: mongotMultiCursorResponseForBatch(
-                mongot0ResponseBatch, cursorId, [{val: 1}], NumberLong(0), collNS, responseOk),
+                mongot0ResponseBatch,
+                cursorId,
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
         },
         {
             expectedCommand: {getMore: cursorId, collection: collName},
@@ -149,9 +163,9 @@ function testErrorCase(shard0Conn, shard1Conn) {
                 ok: 0,
                 errmsg: "mongot error",
                 code: ErrorCodes.InternalError,
-                codeName: "InternalError"
-            }
-        }
+                codeName: "InternalError",
+            },
+        },
     ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId, secondCursorId);
@@ -162,16 +176,23 @@ function testErrorCase(shard0Conn, shard1Conn) {
         {_id: 12, $searchScore: 29},
         {_id: 14, $searchScore: 28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot1ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot1ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId, secondCursorId);
 
-    mockPlanShardedSearchResponse(
-        testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
 
     const err = assert.throws(() => testColl.aggregate(pipeline).toArray());
     assert.commandFailedWithCode(err, ErrorCodes.InternalError);
@@ -184,14 +205,20 @@ runTestOnSecondaries(testErrorCase);
 function testUnevenResultDistributionCase(shard0Conn, shard1Conn) {
     const responseOk = 1;
 
-    const mongot0ResponseBatch = [
-        {_id: 3, $searchScore: 100},
+    const mongot0ResponseBatch = [{_id: 3, $searchScore: 100}];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot0ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot0ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId, secondCursorId);
 
@@ -199,24 +226,32 @@ function testUnevenResultDistributionCase(shard0Conn, shard1Conn) {
         {
             expectedCommand: expectedMongotCommand,
             response: mongotMultiCursorResponseForBatch(
-                [{_id: 11, $searchScore: 111}, {_id: 13, $searchScore: 30}],
+                [
+                    {_id: 11, $searchScore: 111},
+                    {_id: 13, $searchScore: 30},
+                ],
                 cursorId,
                 [{val: 1}],
                 NumberLong(0),
                 collNS,
-                responseOk),
+                responseOk,
+            ),
         },
 
         {
             expectedCommand: {getMore: cursorId, collection: collName},
             response: mongotMultiCursorResponseForBatch(
-                [{_id: 12, $searchScore: 29}, {_id: 14, $searchScore: 28}],
+                [
+                    {_id: 12, $searchScore: 29},
+                    {_id: 14, $searchScore: 28},
+                ],
                 NumberLong(0),
                 [{val: 1}],
                 NumberLong(0),
                 collNS,
-                responseOk)
-        }
+                responseOk,
+            ),
+        },
     ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId, secondCursorId);
@@ -229,8 +264,7 @@ function testUnevenResultDistributionCase(shard0Conn, shard1Conn) {
         {_id: 14, x: "cow", y: "lorem ipsum"},
     ];
 
-    mockPlanShardedSearchResponse(
-        testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
 
     assert.eq(testColl.aggregate(pipeline).toArray(), expectedDocs);
 }
@@ -249,11 +283,19 @@ function testMisbehavingMongot(shard0Conn, shard1Conn) {
         {_id: 2, $searchScore: 10},
         {_id: 3, $searchScore: 100},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot0ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot0ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId, secondCursorId);
 
@@ -263,11 +305,19 @@ function testMisbehavingMongot(shard0Conn, shard1Conn) {
         {_id: 12, $searchScore: 29},
         {_id: 14, $searchScore: 28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot1ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot1ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId, secondCursorId);
 
@@ -282,8 +332,7 @@ function testMisbehavingMongot(shard0Conn, shard1Conn) {
         {_id: 1, x: "ow"},
     ];
 
-    mockPlanShardedSearchResponse(
-        testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
 
     const res = testColl.aggregate(pipeline).toArray();
 
@@ -305,11 +354,19 @@ function testSearchFollowedBySortOnDifferentKey(shard0Conn, shard1Conn) {
         {_id: 4, $searchScore: 1},
         {_id: 1, $searchScore: 0.99},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot0ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot0ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId, secondCursorId);
 
@@ -319,11 +376,19 @@ function testSearchFollowedBySortOnDifferentKey(shard0Conn, shard1Conn) {
         {_id: 12, $searchScore: 29},
         {_id: 14, $searchScore: 28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot1ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot1ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId, secondCursorId);
 
@@ -338,8 +403,7 @@ function testSearchFollowedBySortOnDifferentKey(shard0Conn, shard1Conn) {
         {_id: 14, x: "cow", y: "lorem ipsum"},
     ];
 
-    mockPlanShardedSearchResponse(
-        testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
     assert.eq(testColl.aggregate(pipeline.concat([{$sort: {_id: 1}}])).toArray(), expectedDocs);
 }
 runTestOnPrimaries(testSearchFollowedBySortOnDifferentKey);

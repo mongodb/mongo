@@ -5,10 +5,10 @@ export function ingressHandshakeMetricsTest(conn, options) {
     // Unpack test options
 
     const {
-        rootCredentials = {user: 'root', pwd: 'root'},
-        guestCredentials = {user: 'guest', pwd: 'guest'},
-        dbName = 'test',
-        collectionName = 'test_coll',
+        rootCredentials = {user: "root", pwd: "root"},
+        guestCredentials = {user: "guest", pwd: "guest"},
+        dbName = "test",
+        collectionName = "test_coll",
         connectionHealthLoggingOn,
         preAuthDelayMillis,
         postAuthDelayMillis,
@@ -19,7 +19,7 @@ export function ingressHandshakeMetricsTest(conn, options) {
     // Define helper functions
 
     function setupTest() {
-        let admin = conn.getDB('admin');
+        let admin = conn.getDB("admin");
         let db = conn.getDB(dbName);
 
         admin.createUser(Object.assign(rootCredentials, {roles: jsTest.adminUserRoles}));
@@ -29,8 +29,9 @@ export function ingressHandshakeMetricsTest(conn, options) {
         db[collectionName].insert({foo: 42});
 
         if (!connectionHealthLoggingOn) {
-            assert.commandWorked(conn.adminCommand(
-                {setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}));
+            assert.commandWorked(
+                conn.adminCommand({setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}),
+            );
         }
     }
 
@@ -45,13 +46,15 @@ export function ingressHandshakeMetricsTest(conn, options) {
 
     function getIngressHandshakeMetrics() {
         let status = assert.commandWorked(conn.adminCommand({serverStatus: 1}));
-        jsTest.log.info({'status.metrics.network': status.metrics.network});
-        return Object.fromEntries([
-            'totalTimeToFirstNonAuthCommandMillis',
-            'averageTimeToCompletedTLSHandshakeMicros',
-            'averageTimeToCompletedHelloMicros',
-            'averageTimeToCompletedAuthMicros',
-        ].map(name => [name, status.metrics.network[name]]));
+        jsTest.log.info({"status.metrics.network": status.metrics.network});
+        return Object.fromEntries(
+            [
+                "totalTimeToFirstNonAuthCommandMillis",
+                "averageTimeToCompletedTLSHandshakeMicros",
+                "averageTimeToCompletedHelloMicros",
+                "averageTimeToCompletedAuthMicros",
+            ].map((name) => [name, status.metrics.network[name]]),
+        );
     }
 
     function logLineExists(id, predicate) {
@@ -65,7 +68,7 @@ export function ingressHandshakeMetricsTest(conn, options) {
     }
 
     function timingLogLineExists() {
-        return logLineExists(6788700, entry => entry.attr.elapsedMillis >= postAuthDelayMillis);
+        return logLineExists(6788700, (entry) => entry.attr.elapsedMillis >= postAuthDelayMillis);
     }
 
     function performAuthMetricsTest() {
@@ -79,14 +82,14 @@ export function ingressHandshakeMetricsTest(conn, options) {
             assert.eq(
                 timingLogLineExists(),
                 false,
-                "Found 'first non-auth command log line' despite disabling connection health logging");
+                "Found 'first non-auth command log line' despite disabling connection health logging",
+            );
         }
 
         const after = getIngressHandshakeMetrics();
 
         // Total time increased by at least as long as we slept.
-        const diffMillis = after.totalTimeToFirstNonAuthCommandMillis -
-            before.totalTimeToFirstNonAuthCommandMillis;
+        const diffMillis = after.totalTimeToFirstNonAuthCommandMillis - before.totalTimeToFirstNonAuthCommandMillis;
         assert.gte(diffMillis, totalDelayMillis);
 
         // Average time to hello will be no larger than average time to completed auth.
@@ -104,8 +107,8 @@ export function ingressHandshakeMetricsTest(conn, options) {
 
     setupTest();
 
-    return function() {
-        assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
+    return function () {
+        assert.commandWorked(conn.adminCommand({clearLog: "global"}));
         performAuthMetricsTest();
     };
 }

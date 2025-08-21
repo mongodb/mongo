@@ -1,10 +1,7 @@
 /**
  * Test that explain of $unionWith resolves views on sharded collections correctly.
  */
-import {
-    assertDropAndRecreateCollection,
-    assertDropCollection
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {getAllNodeExplains} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -15,7 +12,11 @@ const db = st.s.getDB(dbName);
 
 function setupColl(name) {
     const coll = assertDropAndRecreateCollection(db, name);
-    coll.insertMany([{a: 1, b: 5}, {a: "foo", b: "bar"}, {a: "foo1", b: "bar1"}]);
+    coll.insertMany([
+        {a: 1, b: 5},
+        {a: "foo", b: "bar"},
+        {a: "foo1", b: "bar1"},
+    ]);
     st.shardColl(coll.getName(), {_id: 1});
     return coll;
 }
@@ -47,11 +48,17 @@ function testPipeline(pipeline) {
         assert.eq(res.mergeType, "anyShard", errorMsg);
 
         const {shardsPart} = res.splitPipeline;
-        assert(!shardsPart.some(x => x.hasOwnProperty("$unionWith")), errorMsg);
+        assert(!shardsPart.some((x) => x.hasOwnProperty("$unionWith")), errorMsg);
 
         const {mergerPart} = res.splitPipeline;
-        assert(mergerPart.some(x => x.hasOwnProperty("$unionWith")), errorMsg);
-        assert(mergerPart.some(x => x.hasOwnProperty("$mergeCursors")), errorMsg);
+        assert(
+            mergerPart.some((x) => x.hasOwnProperty("$unionWith")),
+            errorMsg,
+        );
+        assert(
+            mergerPart.some((x) => x.hasOwnProperty("$mergeCursors")),
+            errorMsg,
+        );
 
         if (hasExecutionStats) {
             const allExecutionStats = [];
@@ -62,9 +69,11 @@ function testPipeline(pipeline) {
 
             // Each $unionWith matches one document. There are two shards, so every other explain
             // node should match a document.
-            assert(allExecutionStats.filter(x => x.nReturned > 1).length === 0);
-            assert(allExecutionStats.filter(x => x.nReturned === 1).length ===
-                   allExecutionStats.filter(x => x.nReturned === 0).length);
+            assert(allExecutionStats.filter((x) => x.nReturned > 1).length === 0);
+            assert(
+                allExecutionStats.filter((x) => x.nReturned === 1).length ===
+                    allExecutionStats.filter((x) => x.nReturned === 0).length,
+            );
         }
     };
 
@@ -88,23 +97,20 @@ function testPipeline(pipeline) {
 }
 
 const testViews = [
-    nestedViews[0],  // View depth 1
-    nestedViews[4],  // View depth 5
-    nestedViews[9],  // View depth 10
+    nestedViews[0], // View depth 1
+    nestedViews[4], // View depth 5
+    nestedViews[9], // View depth 10
 ];
 
 // Single $unionWith on a sharded view.
 for (const viewName of testViews) {
-    testPipeline([
-        {$match: {a: "foo", b: "bar"}},
-        {$unionWith: {coll: viewName, pipeline: [{$match: {a: 1, b: 5}}]}},
-    ]);
+    testPipeline([{$match: {a: "foo", b: "bar"}}, {$unionWith: {coll: viewName, pipeline: [{$match: {a: 1, b: 5}}]}}]);
 }
 
 // Multiple $unionWith stages on sharded views.
 testPipeline([
     {$match: {a: "foo", b: "bar"}},
-    ...testViews.map(view => ({$unionWith: {coll: view, pipeline: [{$match: {a: 1, b: 5}}]}})),
+    ...testViews.map((view) => ({$unionWith: {coll: view, pipeline: [{$match: {a: 1, b: 5}}]}})),
 ]);
 
 // Nested $unionWith on sharded views.
@@ -121,13 +127,13 @@ testPipeline([
                         coll: secondView,
                         pipeline: [
                             {$match: {a: 1, b: 5}},
-                            {$unionWith: {coll: thirdView, pipeline: [{$match: {a: 1, b: 5}}]}}
-                        ]
-                    }
-                }
-            ]
-        }
-    }
+                            {$unionWith: {coll: thirdView, pipeline: [{$match: {a: 1, b: 5}}]}},
+                        ],
+                    },
+                },
+            ],
+        },
+    },
 ]);
 
 st.stop();

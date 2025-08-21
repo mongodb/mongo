@@ -24,9 +24,11 @@ assert.commandWorked(testDB.dropDatabase());
  */
 function testDelete({initialDocList, deleteList, resultDocList, nDeleted, timeseriesOptions}) {
     const coll = testDB.getCollection(collNamePrefix + testCaseId++);
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(),
-        {timeseries: {timeField: timeFieldName, metaField: metaFieldName, ...timeseriesOptions}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName, ...timeseriesOptions},
+        }),
+    );
 
     assert.commandWorked(coll.insert(initialDocList));
 
@@ -37,11 +39,12 @@ function testDelete({initialDocList, deleteList, resultDocList, nDeleted, timese
     const resDoc = coll.find().toArray();
     assert.eq(resultDocList.length, resDoc.length);
 
-    resultDocList.forEach(resultDoc => {
-        assert.docEq(resultDoc,
-                     coll.findOne({_id: resultDoc._id}),
-                     `Expected document (_id = ${resultDoc._id}) not found in result collection: ${
-                         tojson(resDoc)}`);
+    resultDocList.forEach((resultDoc) => {
+        assert.docEq(
+            resultDoc,
+            coll.findOne({_id: resultDoc._id}),
+            `Expected document (_id = ${resultDoc._id}) not found in result collection: ${tojson(resDoc)}`,
+        );
     });
 }
 
@@ -54,31 +57,31 @@ const doc2_a_f101 = {
     _id: 2,
     [timeFieldName]: dateTime,
     [metaFieldName]: "A",
-    f: 101
+    f: 101,
 };
 const doc3_a_f102 = {
     _id: 3,
     [timeFieldName]: dateTime,
     [metaFieldName]: "A",
-    f: 102
+    f: 102,
 };
 const doc4_b_f103 = {
     _id: 4,
     [timeFieldName]: dateTime,
     [metaFieldName]: "B",
-    f: 103
+    f: 103,
 };
 const doc5_b_f104 = {
     _id: 5,
     [timeFieldName]: dateTime,
     [metaFieldName]: "B",
-    f: 104
+    f: 104,
 };
 const doc6_c_f105 = {
     _id: 6,
     [timeFieldName]: dateTime,
     [metaFieldName]: "C",
-    f: 105
+    f: 105,
 };
 const doc7_c_f106 = {
     _id: 7,
@@ -90,7 +93,7 @@ const times = [
     new Date(dateTime.getTime() - (bucketParam * 1000) / 2),
     dateTime,
     new Date(dateTime.getTime() + (bucketParam * 1000) / 2),
-    new Date(dateTime.getTime() + (bucketParam * 1000)),
+    new Date(dateTime.getTime() + bucketParam * 1000),
 ];
 
 const doc_id_8_time_f101 = {
@@ -103,7 +106,7 @@ const doc_id_9_time_f106 = {
     _id: 9,
     [timeFieldName]: times[1],
     [metaFieldName]: "C",
-    f: 106
+    f: 106,
 };
 const doc_id_10_time_nofields = {
     _id: 10,
@@ -124,10 +127,12 @@ const doc_id_12_time_nometa = {
 (function testZeroMeasurementDelete() {
     testDelete({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
-        deleteList: [{
-            q: {_id: {$gt: 3}},
-            limit: 0,
-        }],
+        deleteList: [
+            {
+                q: {_id: {$gt: 3}},
+                limit: 0,
+            },
+        ],
         resultDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
         nDeleted: 0,
     });
@@ -137,10 +142,12 @@ const doc_id_12_time_nometa = {
 (function testPartialBucketDelete1() {
     testDelete({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
-        deleteList: [{
-            q: {_id: {$lt: 2}},
-            limit: 0,
-        }],
+        deleteList: [
+            {
+                q: {_id: {$lt: 2}},
+                limit: 0,
+            },
+        ],
         resultDocList: [doc2_a_f101, doc3_a_f102],
         nDeleted: 1,
     });
@@ -150,10 +157,12 @@ const doc_id_12_time_nometa = {
 (function testPartialBucketDelete2() {
     testDelete({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
-        deleteList: [{
-            q: {_id: {$lt: 3}},
-            limit: 0,
-        }],
+        deleteList: [
+            {
+                q: {_id: {$lt: 3}},
+                limit: 0,
+            },
+        ],
         resultDocList: [doc3_a_f102],
         nDeleted: 2,
     });
@@ -163,10 +172,12 @@ const doc_id_12_time_nometa = {
 (function testFullBucketDelete() {
     testDelete({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
-        deleteList: [{
-            q: {[timeFieldName]: dateTime},
-            limit: 0,
-        }],
+        deleteList: [
+            {
+                q: {[timeFieldName]: dateTime},
+                limit: 0,
+            },
+        ],
         resultDocList: [],
         nDeleted: 3,
     });
@@ -175,19 +186,13 @@ const doc_id_12_time_nometa = {
 // Query on the 'f' field leads to partial/full bucket deletes.
 (function testMultiBucketDelete() {
     testDelete({
-        initialDocList: [
-            doc1_a_nofields,
-            doc2_a_f101,
-            doc3_a_f102,
-            doc4_b_f103,
-            doc5_b_f104,
-            doc6_c_f105,
-            doc7_c_f106
+        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106],
+        deleteList: [
+            {
+                q: {f: {$lt: 106}},
+                limit: 0,
+            },
         ],
-        deleteList: [{
-            q: {f: {$lt: 106}},
-            limit: 0,
-        }],
         // Partial delete of bucket A and C, full delete of bucket B.
         resultDocList: [doc1_a_nofields, doc7_c_f106],
         nDeleted: 5,
@@ -197,15 +202,7 @@ const doc_id_12_time_nometa = {
 // Query on meta results in scanning records that don't match the filter.
 (function testMultiBucketDeleteComplexBucketFilter() {
     testDelete({
-        initialDocList: [
-            doc1_a_nofields,
-            doc2_a_f101,
-            doc3_a_f102,
-            doc4_b_f103,
-            doc5_b_f104,
-            doc6_c_f105,
-            doc7_c_f106
-        ],
+        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106],
         deleteList: [
             {
                 q: {f: {$in: [101, 102, 104, 105]}, [metaFieldName]: {$in: ["A", "C"]}},
@@ -223,26 +220,23 @@ const doc_id_12_time_nometa = {
  */
 const fixedBucketOptions = {
     bucketMaxSpanSeconds: bucketParam,
-    bucketRoundingSeconds: bucketParam
+    bucketRoundingSeconds: bucketParam,
 };
 
 // Since the predicate aligns with bucket boundaries, we expect no residualFilter and a full bucket
 // deletion.
 (function testFullBucketDelete_NoFilter() {
     testDelete({
-        initialDocList: [
-            doc_id_8_time_f101,
-            doc_id_9_time_f106,
-            doc_id_10_time_nofields,
-            doc_id_11_time_nofields
+        initialDocList: [doc_id_8_time_f101, doc_id_9_time_f106, doc_id_10_time_nofields, doc_id_11_time_nofields],
+        deleteList: [
+            {
+                q: {[timeFieldName]: {$lt: times[3]}},
+                limit: 0,
+            },
         ],
-        deleteList: [{
-            q: {[timeFieldName]: {$lt: times[3]}},
-            limit: 0,
-        }],
         resultDocList: [doc_id_11_time_nofields],
         nDeleted: 3,
-        timeseriesOptions: fixedBucketOptions
+        timeseriesOptions: fixedBucketOptions,
     });
 })();
 
@@ -251,13 +245,15 @@ const fixedBucketOptions = {
 (function testDeleteConjunctionMeta_NoFilter() {
     testDelete({
         initialDocList: [doc_id_8_time_f101, doc_id_9_time_f106, doc_id_12_time_nometa],
-        deleteList: [{
-            q: {[timeFieldName]: {$gte: times[1]}, [metaFieldName]: "C"},
-            limit: 0,
-        }],
+        deleteList: [
+            {
+                q: {[timeFieldName]: {$gte: times[1]}, [metaFieldName]: "C"},
+                limit: 0,
+            },
+        ],
         resultDocList: [doc_id_8_time_f101, doc_id_12_time_nometa],
         nDeleted: 1,
-        timeseriesOptions: fixedBucketOptions
+        timeseriesOptions: fixedBucketOptions,
     });
 })();
 
@@ -266,12 +262,14 @@ const fixedBucketOptions = {
 (function testPartialBucketDelete_Filter() {
     testDelete({
         initialDocList: [doc_id_9_time_f106, doc_id_10_time_nofields, doc_id_11_time_nofields],
-        deleteList: [{
-            q: {[timeFieldName]: {$lte: times[1]}},
-            limit: 0,
-        }],
+        deleteList: [
+            {
+                q: {[timeFieldName]: {$lte: times[1]}},
+                limit: 0,
+            },
+        ],
         resultDocList: [doc_id_10_time_nofields, doc_id_11_time_nofields],
         nDeleted: 1,
-        timeseriesOptions: fixedBucketOptions
+        timeseriesOptions: fixedBucketOptions,
     });
 })();

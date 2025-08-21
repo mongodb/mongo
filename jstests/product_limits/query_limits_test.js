@@ -11,6 +11,6 @@
 import {DATASETS} from "jstests/product_limits/libs/datasets.js";
 
 for (const dataset of DATASETS) {
-    let ds = new dataset;
+    let ds = new dataset();
     ds.runDataset();
 }

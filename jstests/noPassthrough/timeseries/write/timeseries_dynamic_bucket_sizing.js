@@ -15,18 +15,18 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const minWiredTigerCacheSizeGB = 0.256;
-const cacheSize = minWiredTigerCacheSizeGB * 1000 * 1000 * 1000;  // 256 MB
-const defaultBucketMaxSize = 128000;                              // 125 KB
+const cacheSize = minWiredTigerCacheSizeGB * 1000 * 1000 * 1000; // 256 MB
+const defaultBucketMaxSize = 128000; // 125 KB
 const minBucketCount = 10;
-const timeFieldName = 'time';
-const metaFieldName = 'meta';
-const timestamp = ISODate('2023-02-13T01:00:00Z');
-const collName = 't';
-const bucketCatalogMemoryLimit = 1 * 1000 * 1000 * 1000;  // 1 GB
+const timeFieldName = "time";
+const metaFieldName = "meta";
+const timestamp = ISODate("2023-02-13T01:00:00Z");
+const collName = "t";
+const bucketCatalogMemoryLimit = 1 * 1000 * 1000 * 1000; // 1 GB
 
 // A cardinality higher than this calculated value will call for smaller bucket size limit caused
 // by cache pressure.
-const cardinalityForCachePressure = Math.ceil(cacheSize / (2 * defaultBucketMaxSize));  // 1000
+const cardinalityForCachePressure = Math.ceil(cacheSize / (2 * defaultBucketMaxSize)); // 1000
 
 const replSet = new ReplSetTest({
     nodes: 1,
@@ -35,39 +35,40 @@ const replSet = new ReplSetTest({
 replSet.startSet({
     setParameter: {
         timeseriesBucketMaxSize: defaultBucketMaxSize,
-        timeseriesIdleBucketExpiryMemoryUsageThreshold: bucketCatalogMemoryLimit
-    }
+        timeseriesIdleBucketExpiryMemoryUsageThreshold: bucketCatalogMemoryLimit,
+    },
 });
 replSet.initiate();
 
 const db = replSet.getPrimary().getDB(jsTestName());
 
-let coll = db.getCollection(collName + '1');
+let coll = db.getCollection(collName + "1");
 coll.drop();
-assert.commandWorked(db.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 // Helper to log timeseries stats.
-const formatStatsLog = ((stats) => {
+const formatStatsLog = (stats) => {
     return "Timeseries stats: " + tojson(stats);
-});
+};
 
 // Inserts documents into the collection with increasing meta fields to generate N buckets. We make
 // sure to exceed the bucket min count per bucket to bypass large measurement checks. After this
 // call we should have numOfBuckets buckets each with size of around ~12KB.
-const initializeBucketsPastMinCount = function(numOfBuckets = 1) {
+const initializeBucketsPastMinCount = function (numOfBuckets = 1) {
     jsTestLog("Inserting and generating buckets. Targeting '" + numOfBuckets + "' buckets.");
     let bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < numOfBuckets; i++) {
         for (let j = 0; j < minBucketCount; ++j) {
             // Strings greater than 16 bytes are not compressed unless they are equal to the
             // previous.
-            const value = (j % 2 == 0 ? "a" : "b");
+            const value = j % 2 == 0 ? "a" : "b";
             const doc = {
-                _id: '' + i + j,
+                _id: "" + i + j,
                 [timeFieldName]: timestamp,
                 [metaFieldName]: i,
-                value: value.repeat(1000)
+                value: value.repeat(1000),
             };
             bulk.insert(doc);
         }
@@ -98,12 +99,12 @@ assert.eq(timeseriesStats.bucketCount, belowCardinalityThreshold, formatStatsLog
 let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < belowCardinalityThreshold; i++) {
     // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
-    const value = (i % 2 == 0 ? "a" : "b");
+    const value = i % 2 == 0 ? "a" : "b";
     bulk.insert({
-        _id: '00' + i,
+        _id: "00" + i,
         [timeFieldName]: timestamp,
         [metaFieldName]: i,
-        value: value.repeat(120000)
+        value: value.repeat(120000),
     });
 }
 
@@ -122,14 +123,15 @@ assert.eq(bucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
 // buckets is now high enough to make the cache derived maximum bucket size smaller than the
 // default maximum bucket size, buckets should begin to close because of cache pressure rather than
 // size.
-coll = db.getCollection(collName + '2');
+coll = db.getCollection(collName + "2");
 coll.drop();
-assert.commandWorked(db.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 // If we pass the cardinality point to simulate cache pressure, we will begin to see buckets
 // closed due to 'CachePressure' and not 'DueToSize'.
-const aboveCardinalityThreshold = cardinalityForCachePressure * 3 / 2;
+const aboveCardinalityThreshold = (cardinalityForCachePressure * 3) / 2;
 initializeBucketsPastMinCount(aboveCardinalityThreshold);
 
 timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
@@ -149,12 +151,12 @@ assert.eq(bucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
 bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < aboveCardinalityThreshold; i++) {
     // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
-    const value = (i % 2 == 0 ? "a" : "b");
+    const value = i % 2 == 0 ? "a" : "b";
     bulk.insert({
-        _id: '00' + i,
+        _id: "00" + i,
         [timeFieldName]: timestamp,
         [metaFieldName]: i,
-        value: value.repeat(80000)
+        value: value.repeat(80000),
     });
 }
 assert.commandWorked(bulk.execute());
@@ -174,7 +176,6 @@ assert.eq(timeseriesStats.numBucketsClosedDueToMemoryThreshold, 0, formatStatsLo
 // Previously, the bucket max size was 128KB, but under cache pressure using
 // 'aboveCardinalityThreshold', the max size drops to roughly ~55KB. Therfore, all of the buckets
 // should have been closed due to cache pressure.
-assert.eq(
-    bucketsClosedDueToCachePressure, aboveCardinalityThreshold, formatStatsLog(timeseriesStats));
+assert.eq(bucketsClosedDueToCachePressure, aboveCardinalityThreshold, formatStatsLog(timeseriesStats));
 
 replSet.stopSet();

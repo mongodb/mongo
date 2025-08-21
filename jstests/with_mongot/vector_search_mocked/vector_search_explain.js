@@ -7,10 +7,7 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {
-    mongotCommandForVectorSearchQuery,
-    MongotMock
-} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {mongotCommandForVectorSearchQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     getDefaultLastExplainContents,
     getMongotStagesAndValidateExplainExecutionStats,
@@ -43,7 +40,7 @@ const numCandidates = NumberLong(10);
 const limit = NumberLong(5);
 const index = "index";
 const filter = {
-    x: {$gt: 0}
+    x: {$gt: 0},
 };
 
 const expectedExplainObject = getDefaultLastExplainContents();
@@ -159,9 +156,15 @@ function runExplainExecutionStatsTest(verbosity) {
             coll,
             searchCmd: vectorSearchCmd,
             batchList: [
-                [{_id: 3, $vectorSearchScore: 100}, {_id: 2, $vectorSearchScore: 10}],
-                [{_id: 4, $vectorSearchScore: 1}, {_id: 1, $vectorSearchScore: 0.99}],
-                [{_id: 8, $vectorSearchScore: 0.2}]
+                [
+                    {_id: 3, $vectorSearchScore: 100},
+                    {_id: 2, $vectorSearchScore: 10},
+                ],
+                [
+                    {_id: 4, $vectorSearchScore: 1},
+                    {_id: 1, $vectorSearchScore: 0.99},
+                ],
+                [{_id: 8, $vectorSearchScore: 0.2}],
             ],
         });
         const result = coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
@@ -183,7 +186,7 @@ function runExplainExecutionStatsTest(verbosity) {
 }
 
 runExplainQueryPlannerTest();
-if (FeatureFlagUtil.isEnabled(testDB.getMongo(), 'SearchExplainExecutionStats')) {
+if (FeatureFlagUtil.isEnabled(testDB.getMongo(), "SearchExplainExecutionStats")) {
     runExplainExecutionStatsTest("executionStats");
     runExplainExecutionStatsTest("allPlansExecution");
 }

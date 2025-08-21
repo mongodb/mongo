@@ -40,13 +40,13 @@ const documents = [
         n: null,
         a: 1,
         b: 0,
-        zero: 0
+        zero: 0,
     },
     {_id: 23, i1: NumberInt(1), i2: NumberInt(-1), i3: NumberInt(-2147483648)},
     {_id: 24, l1: NumberLong("12345678900"), l2: NumberLong("-12345678900")},
     {_id: 25, s: "string", l: NumberLong("-9223372036854775808"), n: null},
     {_id: 26, d1: 4.6, d2: -4.6, dec1: NumberDecimal("4.6"), dec2: NumberDecimal("-4.6")},
-    {_id: 27, dec1: NumberDecimal("-1.0"), dec2: NumberDecimal("2.0"), dec3: NumberDecimal("3.0")}
+    {_id: 27, dec1: NumberDecimal("-1.0"), dec2: NumberDecimal("2.0"), dec3: NumberDecimal("3.0")},
 ];
 assert.commandWorked(coll.insert(documents));
 
@@ -55,9 +55,9 @@ assert.commandWorked(coll.insert(documents));
 // of the form {foo: [INTEGER_LIST]}, where INTEGER_LIST is the list of '_id' values for documents
 // where "foo" should be true.
 function computedProjectionWithBoolValues(boolProj) {
-    return documents.map(doc => {
+    return documents.map((doc) => {
         const projectedDoc = {_id: doc._id};
-        Object.keys(boolProj).forEach(key => {
+        Object.keys(boolProj).forEach((key) => {
             projectedDoc[key] = boolProj[key].includes(doc._id);
         });
         return projectedDoc;
@@ -68,37 +68,107 @@ const testCases = [
     {
         desc: "Single-level path 1",
         expected: [
-            {_id: 0, foo: 1},   {_id: 1, foo: 2},   {_id: 2, foo: 3},  {_id: 3},  {_id: 4},
-            {_id: 5},           {_id: 6},           {_id: 7},          {_id: 8},  {_id: 9},
-            {_id: 10},          {_id: 11},          {_id: 12},         {_id: 13}, {_id: 14},
-            {_id: 15, foo: 10}, {_id: 16, foo: 10}, {_id: 17},         {_id: 18}, {_id: 19},
-            {_id: 20},          {_id: 21},          {_id: 22, foo: 1}, {_id: 23}, {_id: 24},
-            {_id: 25},          {_id: 26},          {_id: 27}
+            {_id: 0, foo: 1},
+            {_id: 1, foo: 2},
+            {_id: 2, foo: 3},
+            {_id: 3},
+            {_id: 4},
+            {_id: 5},
+            {_id: 6},
+            {_id: 7},
+            {_id: 8},
+            {_id: 9},
+            {_id: 10},
+            {_id: 11},
+            {_id: 12},
+            {_id: 13},
+            {_id: 14},
+            {_id: 15, foo: 10},
+            {_id: 16, foo: 10},
+            {_id: 17},
+            {_id: 18},
+            {_id: 19},
+            {_id: 20},
+            {_id: 21},
+            {_id: 22, foo: 1},
+            {_id: 23},
+            {_id: 24},
+            {_id: 25},
+            {_id: 26},
+            {_id: 27},
         ],
         query: {},
-        proj: {_id: 1, foo: "$a"}
+        proj: {_id: 1, foo: "$a"},
     },
     {
         desc: "Single-level path 2",
         expected: [
-            {_id: 0, foo: 1},   {_id: 1, foo: 2},   {_id: 2, foo: 3},  {_id: 3},  {_id: 4},
-            {_id: 5},           {_id: 6},           {_id: 7},          {_id: 8},  {_id: 9},
-            {_id: 10},          {_id: 11},          {_id: 12},         {_id: 13}, {_id: 14},
-            {_id: 15, foo: 10}, {_id: 16, foo: 10}, {_id: 17},         {_id: 18}, {_id: 19},
-            {_id: 20},          {_id: 21},          {_id: 22, foo: 1}, {_id: 23}, {_id: 24},
-            {_id: 25},          {_id: 26},          {_id: 27}
+            {_id: 0, foo: 1},
+            {_id: 1, foo: 2},
+            {_id: 2, foo: 3},
+            {_id: 3},
+            {_id: 4},
+            {_id: 5},
+            {_id: 6},
+            {_id: 7},
+            {_id: 8},
+            {_id: 9},
+            {_id: 10},
+            {_id: 11},
+            {_id: 12},
+            {_id: 13},
+            {_id: 14},
+            {_id: 15, foo: 10},
+            {_id: 16, foo: 10},
+            {_id: 17},
+            {_id: 18},
+            {_id: 19},
+            {_id: 20},
+            {_id: 21},
+            {_id: 22, foo: 1},
+            {_id: 23},
+            {_id: 24},
+            {_id: 25},
+            {_id: 26},
+            {_id: 27},
         ],
         query: {},
-        proj: {foo: "$a"}
+        proj: {foo: "$a"},
     },
     {
         desc: "Single-level path 3",
         expected: [
-            {foo: 1}, {foo: 2},  {foo: 3},  {}, {}, {}, {}, {}, {},       {}, {}, {}, {}, {},
-            {},       {foo: 10}, {foo: 10}, {}, {}, {}, {}, {}, {foo: 1}, {}, {}, {}, {}, {}
+            {foo: 1},
+            {foo: 2},
+            {foo: 3},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {foo: 10},
+            {foo: 10},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {foo: 1},
+            {},
+            {},
+            {},
+            {},
+            {},
         ],
         query: {},
-        proj: {_id: 0, foo: "$a"}
+        proj: {_id: 0, foo: "$a"},
     },
     {
         desc: "Two single-level paths",
@@ -130,22 +200,26 @@ const testCases = [
             {_id: 24},
             {_id: 25},
             {_id: 26},
-            {_id: 27}
+            {_id: 27},
         ],
         query: {},
-        proj: {_id: 1, foo: "$a", bar: "$b"}
+        proj: {_id: 1, foo: "$a", bar: "$b"},
     },
     {
         desc: "Simple addition",
-        expected: [{_id: 0, foo: 11}, {_id: 1, foo: 13}, {_id: 2, foo: 15}],
+        expected: [
+            {_id: 0, foo: 11},
+            {_id: 1, foo: 13},
+            {_id: 2, foo: 15},
+        ],
         query: {c: {$gt: 0}},
-        proj: {foo: {$add: ["$a", "$c"]}}
+        proj: {foo: {$add: ["$a", "$c"]}},
     },
     {
         desc: "$add with arity 1 and 3",
         expected: [{_id: 27, add1: NumberDecimal("-1.0"), add3: NumberDecimal("4.0")}],
         query: {dec1: NumberDecimal("-1.0")},
-        proj: {add1: {$add: "$dec1"}, add3: {$add: ["$dec1", "$dec2", "$dec3"]}}
+        proj: {add1: {$add: "$dec1"}, add3: {$add: ["$dec1", "$dec2", "$dec3"]}},
     },
     {
         desc: "Single-level path 4",
@@ -177,10 +251,10 @@ const testCases = [
             {_id: 24},
             {_id: 25},
             {_id: 26},
-            {_id: 27}
+            {_id: 27},
         ],
         query: {},
-        proj: {a: 1, foo: "$b"}
+        proj: {a: 1, foo: "$b"},
     },
     {
         desc: "Two-level path 1",
@@ -212,10 +286,10 @@ const testCases = [
             {_id: 24},
             {_id: 25},
             {_id: 26},
-            {_id: 27}
+            {_id: 27},
         ],
         query: {},
-        proj: {_id: 1, foo: "$x.y"}
+        proj: {_id: 1, foo: "$x.y"},
     },
     {
         desc: "Two-level path 2",
@@ -247,10 +321,10 @@ const testCases = [
             {_id: 24},
             {_id: 25},
             {_id: 26},
-            {_id: 27}
+            {_id: 27},
         ],
         query: {},
-        proj: {foo: "$x.y"}
+        proj: {foo: "$x.y"},
     },
     {
         desc: "Two-level path 3",
@@ -282,10 +356,10 @@ const testCases = [
             {},
             {},
             {},
-            {}
+            {},
         ],
         query: {},
-        proj: {_id: 0, foo: "$x.y"}
+        proj: {_id: 0, foo: "$x.y"},
     },
     {
         desc: "Two two-level paths",
@@ -317,16 +391,16 @@ const testCases = [
             {_id: 24},
             {_id: 25},
             {_id: 26},
-            {_id: 27}
+            {_id: 27},
         ],
         query: {},
-        proj: {foo: "$x.y", bar: "$v.w"}
+        proj: {foo: "$x.y", bar: "$v.w"},
     },
     {
         desc: "Addition of two-level paths",
         expected: [{_id: 19, foo: 15}],
         query: {"i.j": {$gt: 0}},
-        proj: {foo: {$add: ["$i.j", "$k.l"]}}
+        proj: {foo: {$add: ["$i.j", "$k.l"]}},
     },
     {
         desc: "Dotted-path projection and two-level path",
@@ -354,17 +428,17 @@ const testCases = [
             {_id: 20, x: [[{y: 1}, {y: 2}], {y: 3}, {y: 4}, [[[{y: 5}]]], {y: 6}]},
             {
                 _id: 21,
-                x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}]
+                x: [[{y: {z: 1}}, {y: 2}], {y: 3}, {y: {z: 2}}, [[[{y: 5}, {y: {z: 3}}]]], {y: 6}],
             },
             {_id: 22},
             {_id: 23},
             {_id: 24},
             {_id: 25},
             {_id: 26},
-            {_id: 27}
+            {_id: 27},
         ],
         query: {},
-        proj: {"x.y": 1, foo: "$v.w"}
+        proj: {"x.y": 1, foo: "$v.w"},
     },
     //
     // Test simple expressions with the $abs operator.
@@ -373,48 +447,50 @@ const testCases = [
         desc: "$abs operator",
         expected: [{_id: 23, abs_i1: 1, abs_i2: 1, abs_i3: NumberLong("2147483648")}],
         query: {i1: 1},
-        proj: {abs_i1: {$abs: "$i1"}, abs_i2: {$abs: "$i2"}, abs_i3: {$abs: "$i3"}}
+        proj: {abs_i1: {$abs: "$i1"}, abs_i2: {$abs: "$i2"}, abs_i3: {$abs: "$i3"}},
     },
     {
         desc: "$abs with NumberLong input",
         expected: [{_id: 24, abs_l1: NumberLong("12345678900"), abs_l2: NumberLong("12345678900")}],
         query: {l1: NumberLong("12345678900")},
-        proj: {abs_l1: {$abs: "$l1"}, abs_l2: {$abs: "$l2"}}
+        proj: {abs_l1: {$abs: "$l1"}, abs_l2: {$abs: "$l2"}},
     },
     {
         desc: "$abs with NumberDecimal input",
-        expected: [{
-            _id: 26,
-            abs_d1: 4.6,
-            abs_d2: 4.6,
-            abs_dec1: NumberDecimal("4.6"),
-            abs_dec2: NumberDecimal("4.6")
-        }],
+        expected: [
+            {
+                _id: 26,
+                abs_d1: 4.6,
+                abs_d2: 4.6,
+                abs_dec1: NumberDecimal("4.6"),
+                abs_dec2: NumberDecimal("4.6"),
+            },
+        ],
         query: {d1: 4.6},
         proj: {
             abs_d1: {$abs: "$d1"},
             abs_d2: {$abs: "$d2"},
             abs_dec1: {$abs: "$dec1"},
-            abs_dec2: {$abs: "$dec2"}
-        }
+            abs_dec2: {$abs: "$dec2"},
+        },
     },
     {
         desc: "$abs with string input",
         expectedErrorCode: 28765,
         query: {s: "string"},
-        proj: {abs_s: {$abs: "$s"}}
+        proj: {abs_s: {$abs: "$s"}},
     },
     {
         desc: "$abs with MIN_LONG_LONG input",
         expectedErrorCode: 28680,
         query: {s: "string"},
-        proj: {abs_l: {$abs: "$l"}}
+        proj: {abs_l: {$abs: "$l"}},
     },
     {
         desc: "$abs with missing input",
         expected: [{_id: 25, abs_n: null, abs_ne: null}],
         query: {s: "string"},
-        proj: {abs_n: {$abs: "$n"}, abs_ne: {$abs: "$non_existent"}}
+        proj: {abs_n: {$abs: "$n"}, abs_ne: {$abs: "$non_existent"}},
     },
     //
     // Test $and/$or.
@@ -422,90 +498,126 @@ const testCases = [
     {
         desc: "Single-branch $and",
         expected: [
-            {_id: 0, foo: true},   {_id: 1, foo: true},   {_id: 2, foo: true},
-            {_id: 3, foo: false},  {_id: 4, foo: false},  {_id: 5, foo: false},
-            {_id: 6, foo: false},  {_id: 7, foo: false},  {_id: 8, foo: false},
-            {_id: 9, foo: false},  {_id: 10, foo: false}, {_id: 11, foo: false},
-            {_id: 12, foo: false}, {_id: 13, foo: false}, {_id: 14, foo: false},
-            {_id: 15, foo: true},  {_id: 16, foo: true},  {_id: 17, foo: false},
-            {_id: 18, foo: false}, {_id: 19, foo: false}, {_id: 20, foo: false},
-            {_id: 21, foo: false}, {_id: 22, foo: true},  {_id: 23, foo: false},
-            {_id: 24, foo: false}, {_id: 25, foo: false}, {_id: 26, foo: false},
-            {_id: 27, foo: false}
+            {_id: 0, foo: true},
+            {_id: 1, foo: true},
+            {_id: 2, foo: true},
+            {_id: 3, foo: false},
+            {_id: 4, foo: false},
+            {_id: 5, foo: false},
+            {_id: 6, foo: false},
+            {_id: 7, foo: false},
+            {_id: 8, foo: false},
+            {_id: 9, foo: false},
+            {_id: 10, foo: false},
+            {_id: 11, foo: false},
+            {_id: 12, foo: false},
+            {_id: 13, foo: false},
+            {_id: 14, foo: false},
+            {_id: 15, foo: true},
+            {_id: 16, foo: true},
+            {_id: 17, foo: false},
+            {_id: 18, foo: false},
+            {_id: 19, foo: false},
+            {_id: 20, foo: false},
+            {_id: 21, foo: false},
+            {_id: 22, foo: true},
+            {_id: 23, foo: false},
+            {_id: 24, foo: false},
+            {_id: 25, foo: false},
+            {_id: 26, foo: false},
+            {_id: 27, foo: false},
         ],
         query: {},
-        proj: {foo: {$and: ["$a"]}}
+        proj: {foo: {$and: ["$a"]}},
     },
     {
         desc: "Single-branch $or",
         expected: [
-            {_id: 0, foo: true},   {_id: 1, foo: true},   {_id: 2, foo: true},
-            {_id: 3, foo: false},  {_id: 4, foo: false},  {_id: 5, foo: false},
-            {_id: 6, foo: false},  {_id: 7, foo: false},  {_id: 8, foo: false},
-            {_id: 9, foo: false},  {_id: 10, foo: false}, {_id: 11, foo: false},
-            {_id: 12, foo: false}, {_id: 13, foo: false}, {_id: 14, foo: false},
-            {_id: 15, foo: true},  {_id: 16, foo: true},  {_id: 17, foo: false},
-            {_id: 18, foo: false}, {_id: 19, foo: false}, {_id: 20, foo: false},
-            {_id: 21, foo: false}, {_id: 22, foo: true},  {_id: 23, foo: false},
-            {_id: 24, foo: false}, {_id: 25, foo: false}, {_id: 26, foo: false},
-            {_id: 27, foo: false}
+            {_id: 0, foo: true},
+            {_id: 1, foo: true},
+            {_id: 2, foo: true},
+            {_id: 3, foo: false},
+            {_id: 4, foo: false},
+            {_id: 5, foo: false},
+            {_id: 6, foo: false},
+            {_id: 7, foo: false},
+            {_id: 8, foo: false},
+            {_id: 9, foo: false},
+            {_id: 10, foo: false},
+            {_id: 11, foo: false},
+            {_id: 12, foo: false},
+            {_id: 13, foo: false},
+            {_id: 14, foo: false},
+            {_id: 15, foo: true},
+            {_id: 16, foo: true},
+            {_id: 17, foo: false},
+            {_id: 18, foo: false},
+            {_id: 19, foo: false},
+            {_id: 20, foo: false},
+            {_id: 21, foo: false},
+            {_id: 22, foo: true},
+            {_id: 23, foo: false},
+            {_id: 24, foo: false},
+            {_id: 25, foo: false},
+            {_id: 26, foo: false},
+            {_id: 27, foo: false},
         ],
         query: {},
-        proj: {foo: {$or: ["$a"]}}
+        proj: {foo: {$or: ["$a"]}},
     },
     {
         desc: "$and with BSONNull branch",
         expected: [{_id: 22, foo: false}],
         query: {_id: 22, a: 1},
-        proj: {foo: {$and: ["$n"]}}
+        proj: {foo: {$and: ["$n"]}},
     },
     {
         desc: "$or with BSONNull branch",
         expected: [{_id: 22, foo: false}],
         query: {_id: 22, a: 1},
-        proj: {foo: {$or: ["$n"]}}
+        proj: {foo: {$or: ["$n"]}},
     },
     {
         desc: "$and with missing path in branch",
         expected: [{_id: 22, foo: false}],
         query: {_id: 22, a: 1},
-        proj: {foo: {$and: ["$nonexistent"]}}
+        proj: {foo: {$and: ["$nonexistent"]}},
     },
     {
         desc: "$or with missing path in branch",
         expected: [{_id: 22, foo: false}],
         query: {_id: 22, a: 1},
-        proj: {foo: {$or: ["$nonexistent"]}}
+        proj: {foo: {$or: ["$nonexistent"]}},
     },
     {
         desc: "$and with array branch",
         expected: [{_id: 22, foo: true, bar: true}],
         query: {_id: 22, a: 1},
-        proj: {foo: {$and: []}, bar: {$and: ["$tf", "$t", "$a"]}}
+        proj: {foo: {$and: []}, bar: {$and: ["$tf", "$t", "$a"]}},
     },
     {
         desc: "Three-branch $or",
         expected: [{_id: 22, foo: false, bar: false}],
         query: {_id: 22, a: 1},
-        proj: {foo: {$or: []}, bar: {$or: ["$f", "$n", "$nonexistent"]}}
+        proj: {foo: {$or: []}, bar: {$or: ["$f", "$n", "$nonexistent"]}},
     },
     {
         desc: "Multiple computed $and projections 1",
         expected: [{_id: 22, foo: false, bar: false, baz: false}],
         query: {_id: 22, a: 1},
-        proj: {foo: {$and: ["$a", "$b"]}, bar: {$and: ["$a", "$f"]}, baz: {$and: ["$a", "$n"]}}
+        proj: {foo: {$and: ["$a", "$b"]}, bar: {$and: ["$a", "$f"]}, baz: {$and: ["$a", "$n"]}},
     },
     {
         desc: "Multiple computed $or projections",
         expected: [{_id: 22, foo: true, bar: true, baz: true}],
         query: {_id: 22, a: 1},
-        proj: {foo: {$or: ["$a", "$b"]}, bar: {$or: ["$a", "$f"]}, baz: {$or: ["$a", "$n"]}}
+        proj: {foo: {$or: ["$a", "$b"]}, bar: {$or: ["$a", "$f"]}, baz: {$or: ["$a", "$n"]}},
     },
     {
         desc: "Multiple computed $and projections 2",
         expected: [{_id: 22, foo: true, bar: false}],
         query: {_id: 22, a: 1},
-        proj: {foo: {$and: ["$ff", "$t"]}, bar: {$and: ["$nonexistent", "$t"]}}
+        proj: {foo: {$and: ["$ff", "$t"]}, bar: {$and: ["$nonexistent", "$t"]}},
     },
     //
     // $switch and $cond tests.
@@ -513,38 +625,104 @@ const testCases = [
     {
         desc: "Single-case $switch with default",
         expected: [
-            {_id: 0, foo: "x"}, {_id: 1, foo: 11}, {_id: 2, foo: 12}, {_id: 3},  {_id: 4},
-            {_id: 5},           {_id: 6},          {_id: 7},          {_id: 8},  {_id: 9},
-            {_id: 10},          {_id: 11},         {_id: 12},         {_id: 13}, {_id: 14},
-            {_id: 15},          {_id: 16},         {_id: 17},         {_id: 18}, {_id: 19},
-            {_id: 20},          {_id: 21},         {_id: 22, foo: 0}, {_id: 23}, {_id: 24},
-            {_id: 25},          {_id: 26},         {_id: 27}
+            {_id: 0, foo: "x"},
+            {_id: 1, foo: 11},
+            {_id: 2, foo: 12},
+            {_id: 3},
+            {_id: 4},
+            {_id: 5},
+            {_id: 6},
+            {_id: 7},
+            {_id: 8},
+            {_id: 9},
+            {_id: 10},
+            {_id: 11},
+            {_id: 12},
+            {_id: 13},
+            {_id: 14},
+            {_id: 15},
+            {_id: 16},
+            {_id: 17},
+            {_id: 18},
+            {_id: 19},
+            {_id: 20},
+            {_id: 21},
+            {_id: 22, foo: 0},
+            {_id: 23},
+            {_id: 24},
+            {_id: 25},
+            {_id: 26},
+            {_id: 27},
         ],
         query: {},
-        proj: {foo: {$switch: {branches: [{case: {$eq: ["$a", 1]}, then: "$b"}], default: "$c"}}}
+        proj: {foo: {$switch: {branches: [{case: {$eq: ["$a", 1]}, then: "$b"}], default: "$c"}}},
     },
     {
         desc: "$cond",
         expected: [
-            {_id: 0, foo: "x"}, {_id: 1, foo: 11}, {_id: 2, foo: 12}, {_id: 3},  {_id: 4},
-            {_id: 5},           {_id: 6},          {_id: 7},          {_id: 8},  {_id: 9},
-            {_id: 10},          {_id: 11},         {_id: 12},         {_id: 13}, {_id: 14},
-            {_id: 15},          {_id: 16},         {_id: 17},         {_id: 18}, {_id: 19},
-            {_id: 20},          {_id: 21},         {_id: 22, foo: 0}, {_id: 23}, {_id: 24},
-            {_id: 25},          {_id: 26},         {_id: 27}
+            {_id: 0, foo: "x"},
+            {_id: 1, foo: 11},
+            {_id: 2, foo: 12},
+            {_id: 3},
+            {_id: 4},
+            {_id: 5},
+            {_id: 6},
+            {_id: 7},
+            {_id: 8},
+            {_id: 9},
+            {_id: 10},
+            {_id: 11},
+            {_id: 12},
+            {_id: 13},
+            {_id: 14},
+            {_id: 15},
+            {_id: 16},
+            {_id: 17},
+            {_id: 18},
+            {_id: 19},
+            {_id: 20},
+            {_id: 21},
+            {_id: 22, foo: 0},
+            {_id: 23},
+            {_id: 24},
+            {_id: 25},
+            {_id: 26},
+            {_id: 27},
         ],
         query: {},
-        proj: {foo: {$cond: {if: {$eq: ["$a", 1]}, then: "$b", else: "$c"}}}
+        proj: {foo: {$cond: {if: {$eq: ["$a", 1]}, then: "$b", else: "$c"}}},
     },
     {
         desc: "Two-case $switch with default",
         expected: [
-            {_id: 0, foo: "x"}, {_id: 1, foo: 2}, {_id: 2, foo: 12}, {_id: 3},  {_id: 4},
-            {_id: 5},           {_id: 6},         {_id: 7},          {_id: 8},  {_id: 9},
-            {_id: 10},          {_id: 11},        {_id: 12},         {_id: 13}, {_id: 14},
-            {_id: 15},          {_id: 16},        {_id: 17},         {_id: 18}, {_id: 19},
-            {_id: 20},          {_id: 21},        {_id: 22, foo: 0}, {_id: 23}, {_id: 24},
-            {_id: 25},          {_id: 26},        {_id: 27}
+            {_id: 0, foo: "x"},
+            {_id: 1, foo: 2},
+            {_id: 2, foo: 12},
+            {_id: 3},
+            {_id: 4},
+            {_id: 5},
+            {_id: 6},
+            {_id: 7},
+            {_id: 8},
+            {_id: 9},
+            {_id: 10},
+            {_id: 11},
+            {_id: 12},
+            {_id: 13},
+            {_id: 14},
+            {_id: 15},
+            {_id: 16},
+            {_id: 17},
+            {_id: 18},
+            {_id: 19},
+            {_id: 20},
+            {_id: 21},
+            {_id: 22, foo: 0},
+            {_id: 23},
+            {_id: 24},
+            {_id: 25},
+            {_id: 26},
+            {_id: 27},
         ],
         query: {},
         proj: {
@@ -552,12 +730,12 @@ const testCases = [
                 $switch: {
                     branches: [
                         {case: {$eq: ["$a", 1]}, then: "$b"},
-                        {case: {$eq: ["$b", "y"]}, then: "$a"}
+                        {case: {$eq: ["$b", "y"]}, then: "$a"},
                     ],
-                    default: "$c"
-                }
-            }
-        }
+                    default: "$c",
+                },
+            },
+        },
     },
     //
     // Failing expressions
@@ -566,13 +744,13 @@ const testCases = [
         desc: "$abs with string input as $and branch",
         expectedErrorCode: 28765,
         query: {s: "string"},
-        proj: {foo: {$and: [{$abs: ["$s"]}, "$n"]}}
+        proj: {foo: {$and: [{$abs: ["$s"]}, "$n"]}},
     },
     {
         desc: "$abs with string input as $or branch",
         expectedErrorCode: 28765,
         query: {s: "string"},
-        proj: {foo: {$or: [{$abs: ["$s"]}, "$s"]}}
+        proj: {foo: {$or: [{$abs: ["$s"]}, "$s"]}},
     },
     {
         desc: "Switch fall-through with no default",
@@ -583,51 +761,50 @@ const testCases = [
                 $switch: {
                     branches: [
                         {case: {$eq: ["$a", 1]}, then: "$b"},
-                        {case: {$eq: ["$b", "y"]}, then: "$a"}
-                    ]
+                        {case: {$eq: ["$b", "y"]}, then: "$a"},
+                    ],
                     // No default case.
-                }
-            }
-        }
+                },
+            },
+        },
     },
     {
         desc: "$abs with string input as case condition",
         expectedErrorCode: 28765,
         query: {s: "string"},
-        proj: {foo: {$switch: {branches: [{case: {$gt: [{$abs: ["$s"]}, 0]}, then: "$n"}]}}}
+        proj: {foo: {$switch: {branches: [{case: {$gt: [{$abs: ["$s"]}, 0]}, then: "$n"}]}}},
     },
     {
         desc: "$abs with string input as case result",
         expectedErrorCode: 28765,
         query: {s: "string"},
-        proj: {foo: {$switch: {branches: [{case: {$eq: ["$s", "string"]}, then: {$abs: ["$s"]}}]}}}
+        proj: {foo: {$switch: {branches: [{case: {$eq: ["$s", "string"]}, then: {$abs: ["$s"]}}]}}},
     },
     {
         desc: "$abs with string input as $switch default",
         expectedErrorCode: 28765,
         query: {s: "string"},
         proj: {
-            foo:
-                {$switch: {branches: [{case: {$eq: ["$s", 0]}, then: "$n"}], default: {$abs: "$s"}}}
-        }
+            foo: {$switch: {branches: [{case: {$eq: ["$s", 0]}, then: "$n"}], default: {$abs: "$s"}}},
+        },
     },
     {
         desc: "$abs with string input as $cond condition",
         expectedErrorCode: 28765,
         query: {s: "string"},
-        proj: {foo: {$cond: {if: {$eq: [{$abs: "$s"}, "$n"]}, then: "$b", else: "$c"}}}
+        proj: {foo: {$cond: {if: {$eq: [{$abs: "$s"}, "$n"]}, then: "$b", else: "$c"}}},
     },
     {
         desc: "$abs with string input as $cond result (then)",
         expectedErrorCode: 28765,
         query: {s: "string"},
-        proj: {foo: {$cond: {if: {$eq: ["$s", "string"]}, then: {$abs: ["$s"]}, else: "$c"}}}
+        proj: {foo: {$cond: {if: {$eq: ["$s", "string"]}, then: {$abs: ["$s"]}, else: "$c"}}},
     },
     {
         desc: "$abs with string input as $cond result (else)",
         expectedErrorCode: 28765,
         query: {s: "string"},
-        proj: {foo: {$cond: {if: {$eq: ["$s", "gnirts"]}, then: "$b", else: {$abs: ["$s"]}}}}
+        proj: {foo: {$cond: {if: {$eq: ["$s", "gnirts"]}, then: "$b", else: {$abs: ["$s"]}}}},
     },
     //
     // Test short circuiting: these queries have expressions that would fail (because |$x| is
@@ -637,13 +814,13 @@ const testCases = [
         desc: "$abs with string input as short-circuited $and branch",
         expected: [{_id: 25, foo: false}],
         query: {s: "string"},
-        proj: {foo: {$and: ["$n", {$abs: ["$s"]}]}}
+        proj: {foo: {$and: ["$n", {$abs: ["$s"]}]}},
     },
     {
         desc: "$abs with string input as short-circuited $or branch",
         expected: [{_id: 25, foo: true}],
         query: {s: "string"},
-        proj: {foo: {$or: ["$s", {$abs: ["$s"]}]}}
+        proj: {foo: {$or: ["$s", {$abs: ["$s"]}]}},
     },
     //
     // Test that short-circuited branches do not do any work, such as traversing an array. The
@@ -656,8 +833,8 @@ const testCases = [
         query: {_id: 22, a: 1},
         proj: {
             foo: {$and: ["$f", {$divide: [1, "$zero"]}]},
-            bar: {$or: ["$t", {$divide: [1, "$zero"]}]}
-        }
+            bar: {$or: ["$t", {$divide: [1, "$zero"]}]},
+        },
     },
     {
         desc: "$divide by zero in nested short-circuited $or branches",
@@ -665,52 +842,64 @@ const testCases = [
         query: {_id: 22, a: 1},
         proj: {
             foo: {$and: ["$f", {$or: ["$f", {$divide: [1, "$zero"]}]}, {$eq: ["$a", 1]}]},
-            bar: {$and: ["$t", {$or: ["$t", {$divide: [1, "$zero"]}]}, {$eq: ["$a", 1]}]}
-        }
+            bar: {$and: ["$t", {$or: ["$t", {$divide: [1, "$zero"]}]}, {$eq: ["$a", 1]}]},
+        },
     },
     {
         desc: "$divide by zero in untaken $switch cases",
-        expected: [{_id: 0, foo: "x"}, {_id: 22, foo: 0}],
+        expected: [
+            {_id: 0, foo: "x"},
+            {_id: 22, foo: 0},
+        ],
         query: {a: 1},
         proj: {
             foo: {
                 $switch: {
                     branches: [
                         {case: {$eq: ["$a", 2]}, then: {$divide: [1, "$zero"]}},
-                        {case: {$eq: ["$a", 3]}, then: {$divide: [1, "$zero"]}}
+                        {case: {$eq: ["$a", 3]}, then: {$divide: [1, "$zero"]}},
                     ],
-                    default: "$b"
-                }
-            }
-        }
+                    default: "$b",
+                },
+            },
+        },
     },
     {
         desc: "$divide by zero in unevaluated case condition and untaken $switch default branch",
-        expected: [{_id: 0, foo: "x"}, {_id: 22, foo: 0}],
+        expected: [
+            {_id: 0, foo: "x"},
+            {_id: 22, foo: 0},
+        ],
         query: {a: 1},
         proj: {
             foo: {
                 $switch: {
                     branches: [
                         {case: {$eq: ["$a", 1]}, then: "$b"},
-                        {case: {$divide: [1, "$zero"]}, then: {$divide: [1, "$zero"]}}
+                        {case: {$divide: [1, "$zero"]}, then: {$divide: [1, "$zero"]}},
                     ],
-                    default: {$divide: [1, "$zero"]}
-                }
-            }
-        }
+                    default: {$divide: [1, "$zero"]},
+                },
+            },
+        },
     },
     {
         desc: "$divide by zero in untaken $cond branch (else)",
-        expected: [{_id: 0, foo: "x"}, {_id: 22, foo: 0}],
+        expected: [
+            {_id: 0, foo: "x"},
+            {_id: 22, foo: 0},
+        ],
         query: {a: 1},
-        proj: {foo: {$cond: {if: {$eq: ["$a", 1]}, then: "$b", else: {$divide: [1, "$zero"]}}}}
+        proj: {foo: {$cond: {if: {$eq: ["$a", 1]}, then: "$b", else: {$divide: [1, "$zero"]}}}},
     },
     {
         desc: "$divide by zero in untaken $cond branch (then)",
-        expected: [{_id: 0, foo: "x"}, {_id: 22, foo: 0}],
+        expected: [
+            {_id: 0, foo: "x"},
+            {_id: 22, foo: 0},
+        ],
         query: {a: 1},
-        proj: {foo: {$cond: {if: {$eq: ["$a", 2]}, then: {$divide: [1, "$zero"]}, else: "$b"}}}
+        proj: {foo: {$cond: {if: {$eq: ["$a", 2]}, then: {$divide: [1, "$zero"]}, else: "$b"}}},
     },
     //
     // $let tests.
@@ -719,25 +908,25 @@ const testCases = [
         desc: "$let with single-path variable definitions 1",
         expected: computedProjectionWithBoolValues({foo: [0, 1, 2, 15, 16, 22]}),
         query: {},
-        proj: {foo: {$let: {vars: {va: "$a", vb: "$b"}, "in": {$and: "$$va"}}}}
+        proj: {foo: {$let: {vars: {va: "$a", vb: "$b"}, "in": {$and: "$$va"}}}},
     },
     {
         desc: "$let with single-path variable definitions 2",
         expected: computedProjectionWithBoolValues({foo: [0, 1, 2]}),
         query: {},
-        proj: {foo: {$let: {vars: {va: "$a", vb: "$b"}, "in": {$and: "$$vb"}}}}
+        proj: {foo: {$let: {vars: {va: "$a", vb: "$b"}, "in": {$and: "$$vb"}}}},
     },
     {
         desc: "$let with single-path variable definitions 3",
         expected: computedProjectionWithBoolValues({foo: [0, 1, 2]}),
         query: {},
-        proj: {foo: {$let: {vars: {va: "$a", vb: "$b"}, "in": {$and: ["$$va", "$$vb"]}}}}
+        proj: {foo: {$let: {vars: {va: "$a", vb: "$b"}, "in": {$and: ["$$va", "$$vb"]}}}},
     },
     {
         desc: "$let with $and variable definition",
         expected: computedProjectionWithBoolValues({foo: [0, 1, 2]}),
         query: {},
-        proj: {foo: {$let: {vars: {va: {$and: ["$a", "$b"]}}, "in": "$$va"}}}
+        proj: {foo: {$let: {vars: {va: {$and: ["$a", "$b"]}}, "in": "$$va"}}},
     },
     {
         desc: "Two-level path including $let variable",
@@ -769,10 +958,10 @@ const testCases = [
             {_id: 24},
             {_id: 25},
             {_id: 26},
-            {_id: 27}
+            {_id: 27},
         ],
         query: {},
-        proj: {foo: {$let: {vars: {va: "$x"}, "in": "$$va.y"}}}
+        proj: {foo: {$let: {vars: {va: "$x"}, "in": "$$va.y"}}},
     },
     {
         desc: "Nested $let expressions",
@@ -783,12 +972,11 @@ const testCases = [
                 $let: {
                     vars: {vt: "$t", vf: "$f"},
                     "in": {
-                        $let: {vars: {vf: "$$vt", va: "$a"},
-                               "in": {$and: ["$$vt", "$$vf", "$$va"]}}
-                    }
-                }
-            }
-        }
+                        $let: {vars: {vf: "$$vt", va: "$a"}, "in": {$and: ["$$vt", "$$vf", "$$va"]}},
+                    },
+                },
+            },
+        },
     },
     {
         desc: "$let with variable definition including nested $let",
@@ -797,85 +985,125 @@ const testCases = [
         proj: {
             foo: {
                 $let: {
-                    vars:
-                        {va: {$let: {vars: {vt: "$t", va: "$va"}, "in": {$and: ["$$vt", "$$va"]}}}},
-                    "in": "$$va"
-                }
-            }
-        }
+                    vars: {va: {$let: {vars: {vt: "$t", va: "$va"}, "in": {$and: ["$$vt", "$$va"]}}}},
+                    "in": "$$va",
+                },
+            },
+        },
     },
     {
         desc: "$let renaming $$CURRENT",
         expected: [
-            {_id: 0, foo: 1},   {_id: 1, foo: 2},   {_id: 2, foo: 3},  {_id: 3},  {_id: 4},
-            {_id: 5},           {_id: 6},           {_id: 7},          {_id: 8},  {_id: 9},
-            {_id: 10},          {_id: 11},          {_id: 12},         {_id: 13}, {_id: 14},
-            {_id: 15, foo: 10}, {_id: 16, foo: 10}, {_id: 17},         {_id: 18}, {_id: 19},
-            {_id: 20},          {_id: 21},          {_id: 22, foo: 1}, {_id: 23}, {_id: 24},
-            {_id: 25},          {_id: 26},          {_id: 27}
+            {_id: 0, foo: 1},
+            {_id: 1, foo: 2},
+            {_id: 2, foo: 3},
+            {_id: 3},
+            {_id: 4},
+            {_id: 5},
+            {_id: 6},
+            {_id: 7},
+            {_id: 8},
+            {_id: 9},
+            {_id: 10},
+            {_id: 11},
+            {_id: 12},
+            {_id: 13},
+            {_id: 14},
+            {_id: 15, foo: 10},
+            {_id: 16, foo: 10},
+            {_id: 17},
+            {_id: 18},
+            {_id: 19},
+            {_id: 20},
+            {_id: 21},
+            {_id: 22, foo: 1},
+            {_id: 23},
+            {_id: 24},
+            {_id: 25},
+            {_id: 26},
+            {_id: 27},
         ],
         query: {},
-        proj: {foo: {$let: {vars: {doc: "$$CURRENT"}, "in": "$$doc.a"}}}
+        proj: {foo: {$let: {vars: {doc: "$$CURRENT"}, "in": "$$doc.a"}}},
     },
     {
         desc: "$let shadowing $$CURRENT",
         expected: [
-            {_id: 0, foo: 1},   {_id: 1, foo: 2},   {_id: 2, foo: 3},  {_id: 3},  {_id: 4},
-            {_id: 5},           {_id: 6},           {_id: 7},          {_id: 8},  {_id: 9},
-            {_id: 10},          {_id: 11},          {_id: 12},         {_id: 13}, {_id: 14},
-            {_id: 15, foo: 10}, {_id: 16, foo: 10}, {_id: 17},         {_id: 18}, {_id: 19},
-            {_id: 20},          {_id: 21},          {_id: 22, foo: 1}, {_id: 23}, {_id: 24},
-            {_id: 25},          {_id: 26},          {_id: 27}
+            {_id: 0, foo: 1},
+            {_id: 1, foo: 2},
+            {_id: 2, foo: 3},
+            {_id: 3},
+            {_id: 4},
+            {_id: 5},
+            {_id: 6},
+            {_id: 7},
+            {_id: 8},
+            {_id: 9},
+            {_id: 10},
+            {_id: 11},
+            {_id: 12},
+            {_id: 13},
+            {_id: 14},
+            {_id: 15, foo: 10},
+            {_id: 16, foo: 10},
+            {_id: 17},
+            {_id: 18},
+            {_id: 19},
+            {_id: 20},
+            {_id: 21},
+            {_id: 22, foo: 1},
+            {_id: 23},
+            {_id: 24},
+            {_id: 25},
+            {_id: 26},
+            {_id: 27},
         ],
         query: {},
-        proj: {foo: {$let: {vars: {CURRENT: "$$CURRENT.a"}, "in": "$$CURRENT"}}}
+        proj: {foo: {$let: {vars: {CURRENT: "$$CURRENT.a"}, "in": "$$CURRENT"}}},
     },
     {
         desc: "$$REMOVE",
-        expected: documents.map(doc => ({_id: doc._id})),
+        expected: documents.map((doc) => ({_id: doc._id})),
         query: {},
-        proj: {a: "$$REMOVE"}
+        proj: {a: "$$REMOVE"},
     },
     {
         desc: "$$REMOVE with additional path components",
-        expected: documents.map(doc => ({_id: doc._id})),
+        expected: documents.map((doc) => ({_id: doc._id})),
         query: {},
-        proj: {a: "$$REMOVE.x.y"}
+        proj: {a: "$$REMOVE.x.y"},
     },
     {
         desc: "$lt",
-        expected: computedProjectionWithBoolValues(
-            {foo: [3, 4, 5, 6, 7, 8, 9, 17, 18, 20, 21], bar: [0, 1, 2], baz: [5, 8, 9], qux: []}),
+        expected: computedProjectionWithBoolValues({
+            foo: [3, 4, 5, 6, 7, 8, 9, 17, 18, 20, 21],
+            bar: [0, 1, 2],
+            baz: [5, 8, 9],
+            qux: [],
+        }),
         query: {},
         proj: {
             foo: {$lt: ["$a", "$x"]},
             bar: {$lt: ["$a", "$b"]},
             baz: {$lt: ["$x.y", "$v.w"]},
-            qux: {$lt: ["$a", "$nonexistent"]}
-        }
+            qux: {$lt: ["$a", "$nonexistent"]},
+        },
     },
     {
         desc: "$lte",
         expected: computedProjectionWithBoolValues({
-            foo: [
-                3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14,
-                16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27
-            ],
-            bar: [
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
-                13, 14, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27
-            ],
+            foo: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27],
+            bar: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27],
             baz: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 22, 23, 24, 25, 26, 27],
-            qux:
-                [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27]
+            qux: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27],
         }),
         query: {},
         proj: {
             foo: {$lte: ["$a", "$x"]},
             bar: {$lte: ["$a", "$b"]},
             baz: {$lte: ["$x.y", "$v.w"]},
-            qux: {$lte: ["$a", "$nonexistent"]}
-        }
+            qux: {$lte: ["$a", "$nonexistent"]},
+        },
     },
     {
         desc: "$gt",
@@ -883,40 +1111,31 @@ const testCases = [
             foo: [0, 1, 2, 15, 22],
             bar: [15, 16, 22],
             baz: [3, 4, 17, 18, 20, 21],
-            qux: [0, 1, 2, 15, 16, 22]
+            qux: [0, 1, 2, 15, 16, 22],
         }),
         query: {},
         proj: {
             foo: {$gt: ["$a", "$x"]},
             bar: {$gt: ["$a", "$b"]},
             baz: {$gt: ["$x.y", "$v.w"]},
-            qux: {$gt: ["$a", "$nonexistent"]}
-        }
+            qux: {$gt: ["$a", "$nonexistent"]},
+        },
     },
     {
         desc: "$gte",
         expected: computedProjectionWithBoolValues({
             foo: [0, 1, 2, 10, 11, 12, 13, 14, 15, 16, 19, 22, 23, 24, 25, 26, 27],
-            bar: [
-                3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15,
-                16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27
-            ],
-            baz: [
-                0,  1,  2,  3,  4,  6,  7,  10, 11, 12, 13, 14, 15,
-                16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27
-            ],
-            qux: [
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13,
-                14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27
-            ]
+            bar: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
+            baz: [0, 1, 2, 3, 4, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
+            qux: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
         }),
         query: {},
         proj: {
             foo: {$gte: ["$a", "$x"]},
             bar: {$gte: ["$a", "$b"]},
             baz: {$gte: ["$x.y", "$v.w"]},
-            qux: {$gte: ["$a", "$nonexistent"]}
-        }
+            qux: {$gte: ["$a", "$nonexistent"]},
+        },
     },
     {
         desc: "$eq",
@@ -924,16 +1143,15 @@ const testCases = [
             foo: [10, 11, 12, 13, 14, 16, 19, 23, 24, 25, 26, 27],
             bar: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27],
             baz: [0, 1, 2, 6, 7, 10, 11, 12, 13, 14, 15, 16, 19, 22, 23, 24, 25, 26, 27],
-            qux:
-                [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27]
+            qux: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27],
         }),
         query: {},
         proj: {
             foo: {$eq: ["$a", "$x"]},
             bar: {$eq: ["$a", "$b"]},
             baz: {$eq: ["$x.y", "$v.w"]},
-            qux: {$eq: ["$a", "$nonexistent"]}
-        }
+            qux: {$eq: ["$a", "$nonexistent"]},
+        },
     },
     {
         desc: "$ne",
@@ -941,41 +1159,55 @@ const testCases = [
             foo: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 17, 18, 20, 21, 22],
             bar: [0, 1, 2, 15, 16, 22],
             baz: [3, 4, 5, 8, 9, 17, 18, 20, 21],
-            qux: [0, 1, 2, 15, 16, 22]
+            qux: [0, 1, 2, 15, 16, 22],
         }),
         query: {},
         proj: {
             foo: {$ne: ["$a", "$x"]},
             bar: {$ne: ["$a", "$b"]},
             baz: {$ne: ["$x.y", "$v.w"]},
-            qux: {$ne: ["$a", "$nonexistent"]}
-        }
+            qux: {$ne: ["$a", "$nonexistent"]},
+        },
     },
     {
         desc: "$cmp",
         expected: [
-            {_id: 0, foo: 1, bar: -1, baz: 0, qux: 1},  {_id: 1, foo: 1, bar: -1, baz: 0, qux: 1},
-            {_id: 2, foo: 1, bar: -1, baz: 0, qux: 1},  {_id: 3, foo: -1, bar: 0, baz: 1, qux: 0},
-            {_id: 4, foo: -1, bar: 0, baz: 1, qux: 0},  {_id: 5, foo: -1, bar: 0, baz: -1, qux: 0},
-            {_id: 6, foo: -1, bar: 0, baz: 0, qux: 0},  {_id: 7, foo: -1, bar: 0, baz: 0, qux: 0},
-            {_id: 8, foo: -1, bar: 0, baz: -1, qux: 0}, {_id: 9, foo: -1, bar: 0, baz: -1, qux: 0},
-            {_id: 10, foo: 0, bar: 0, baz: 0, qux: 0},  {_id: 11, foo: 0, bar: 0, baz: 0, qux: 0},
-            {_id: 12, foo: 0, bar: 0, baz: 0, qux: 0},  {_id: 13, foo: 0, bar: 0, baz: 0, qux: 0},
-            {_id: 14, foo: 0, bar: 0, baz: 0, qux: 0},  {_id: 15, foo: 1, bar: 1, baz: 0, qux: 1},
-            {_id: 16, foo: 0, bar: 1, baz: 0, qux: 1},  {_id: 17, foo: -1, bar: 0, baz: 1, qux: 0},
-            {_id: 18, foo: -1, bar: 0, baz: 1, qux: 0}, {_id: 19, foo: 0, bar: 0, baz: 0, qux: 0},
-            {_id: 20, foo: -1, bar: 0, baz: 1, qux: 0}, {_id: 21, foo: -1, bar: 0, baz: 1, qux: 0},
-            {_id: 22, foo: 1, bar: 1, baz: 0, qux: 1},  {_id: 23, foo: 0, bar: 0, baz: 0, qux: 0},
-            {_id: 24, foo: 0, bar: 0, baz: 0, qux: 0},  {_id: 25, foo: 0, bar: 0, baz: 0, qux: 0},
-            {_id: 26, foo: 0, bar: 0, baz: 0, qux: 0},  {_id: 27, foo: 0, bar: 0, baz: 0, qux: 0}
+            {_id: 0, foo: 1, bar: -1, baz: 0, qux: 1},
+            {_id: 1, foo: 1, bar: -1, baz: 0, qux: 1},
+            {_id: 2, foo: 1, bar: -1, baz: 0, qux: 1},
+            {_id: 3, foo: -1, bar: 0, baz: 1, qux: 0},
+            {_id: 4, foo: -1, bar: 0, baz: 1, qux: 0},
+            {_id: 5, foo: -1, bar: 0, baz: -1, qux: 0},
+            {_id: 6, foo: -1, bar: 0, baz: 0, qux: 0},
+            {_id: 7, foo: -1, bar: 0, baz: 0, qux: 0},
+            {_id: 8, foo: -1, bar: 0, baz: -1, qux: 0},
+            {_id: 9, foo: -1, bar: 0, baz: -1, qux: 0},
+            {_id: 10, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 11, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 12, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 13, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 14, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 15, foo: 1, bar: 1, baz: 0, qux: 1},
+            {_id: 16, foo: 0, bar: 1, baz: 0, qux: 1},
+            {_id: 17, foo: -1, bar: 0, baz: 1, qux: 0},
+            {_id: 18, foo: -1, bar: 0, baz: 1, qux: 0},
+            {_id: 19, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 20, foo: -1, bar: 0, baz: 1, qux: 0},
+            {_id: 21, foo: -1, bar: 0, baz: 1, qux: 0},
+            {_id: 22, foo: 1, bar: 1, baz: 0, qux: 1},
+            {_id: 23, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 24, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 25, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 26, foo: 0, bar: 0, baz: 0, qux: 0},
+            {_id: 27, foo: 0, bar: 0, baz: 0, qux: 0},
         ],
         query: {},
         proj: {
             foo: {$cmp: ["$a", "$x"]},
             bar: {$cmp: ["$a", "$b"]},
             baz: {$cmp: ["$x.y", "$v.w"]},
-            qux: {$cmp: ["$a", "$nonexistent"]}
-        }
+            qux: {$cmp: ["$a", "$nonexistent"]},
+        },
     },
     //
     // Nesting torture tests.
@@ -988,10 +1220,10 @@ const testCases = [
             foo: {
                 $let: {
                     vars: {v1: {$or: ["$x.y", "$v.w"]}, vx: "$x"},
-                    "in": {$and: ["$$vx.y", "$v.w"]}
-                }
-            }
-        }
+                    "in": {$and: ["$$vx.y", "$v.w"]},
+                },
+            },
+        },
     },
     {
         desc: "Nesting torture test 2",
@@ -1003,21 +1235,19 @@ const testCases = [
                     vars: {v1: "$x.y"},
                     "in": {
                         $let: {
-                            vars:
-                                {v2: {$let: {vars: {v3: "$v.w"}, "in": {$and: ["$$v1", "$$v3"]}}}},
-                            "in": "$$v2"
-                        }
-                    }
-                }
-            }
-        }
+                            vars: {v2: {$let: {vars: {v3: "$v.w"}, "in": {$and: ["$$v1", "$$v3"]}}}},
+                            "in": "$$v2",
+                        },
+                    },
+                },
+            },
+        },
     },
     {
         desc: "Nesting torture test 3",
-        expected: computedProjectionWithBoolValues(
-            {foo: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 18, 20, 21, 22]}),
+        expected: computedProjectionWithBoolValues({foo: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 18, 20, 21, 22]}),
         query: {},
-        proj: {foo: {$or: ["$a", {$lt: [{$and: ["$a", "$c"]}, {$or: ["$c", "$x"]}]}, "$x"]}}
+        proj: {foo: {$or: ["$a", {$lt: [{$and: ["$a", "$c"]}, {$or: ["$c", "$x"]}]}, "$x"]}},
     },
     {
         desc: "Ludicrous nesting torture test with multiple computed fields",
@@ -1049,7 +1279,7 @@ const testCases = [
             {_id: 24, foo: false, baz: false},
             {_id: 25, foo: false, baz: false},
             {_id: 26, foo: false, baz: false},
-            {_id: 27, foo: false, baz: false}
+            {_id: 27, foo: false, baz: false},
         ],
         query: {},
         proj: {
@@ -1058,28 +1288,28 @@ const testCases = [
                     vars: {
                         v1: {$or: ["$x.y", "$v.w"]},
                         v2: {$switch: {branches: [{case: "$v.w", then: 1}], default: 2}},
-                        v3: "$b"
+                        v3: "$b",
                     },
                     "in": {
                         $switch: {
                             branches: [
                                 {case: {$eq: ["$x.y", 1]}, then: "$$v2"},
                                 {case: {$eq: ["$x.y", 2]}, then: "$v.w"},
-                                {case: {$eq: ["$$v3", 2]}, then: "$c"}
+                                {case: {$eq: ["$$v3", 2]}, then: "$c"},
                             ],
-                            default: {$or: ["$$v1", "$tf"]}
-                        }
-                    }
-                }
+                            default: {$or: ["$$v1", "$tf"]},
+                        },
+                    },
+                },
             },
             bar: {
                 $switch: {
                     branches: [
                         {case: {$gt: ["$x.y", 1]}, then: "$x.y"},
-                        {case: {$let: {vars: {v4: "$v.w1"}, "in": "$$v4"}}, then: "$v.w2"}
+                        {case: {$let: {vars: {v4: "$v.w1"}, "in": "$$v4"}}, then: "$v.w2"},
                     ],
-                    default: "$x.y.z"
-                }
+                    default: "$x.y.z",
+                },
             },
             baz: {
                 $let: {
@@ -1091,33 +1321,39 @@ const testCases = [
                                 $switch: {
                                     branches: [
                                         {case: {$eq: ["$v.w", 5]}, then: "$v.w"},
-                                        {case: {$eq: ["$v.w", 4]}, then: "$x.y"}
+                                        {case: {$eq: ["$v.w", 4]}, then: "$x.y"},
                                     ],
-                                    default: {$or: ["$$v5", "$$v6"]}
-                                }
+                                    default: {$or: ["$$v5", "$$v6"]},
+                                },
                             },
-                            else: false
-                        }
-                    }
-                }
-            }
-        }
-    }
+                            else: false,
+                        },
+                    },
+                },
+            },
+        },
+    },
 ];
 
-testCases.forEach(function(test) {
+testCases.forEach(function (test) {
     if (test.expected) {
         let actual;
-        assert.doesNotThrow(() => {
-            actual = coll.find(test.query, test.proj).toArray();
-        }, [], test);
+        assert.doesNotThrow(
+            () => {
+                actual = coll.find(test.query, test.proj).toArray();
+            },
+            [],
+            test,
+        );
         assert(arrayEq(actual, test.expected), Object.assign({actual: actual}, test));
     } else {
         assert(test.expectedErrorCode, test);
         let result;
-        assert.throwsWithCode(() => result = coll.find(test.query, test.proj).toArray(),
-                              test.expectedErrorCode,
-                              [],
-                              Object.assign({result: result}, test));
+        assert.throwsWithCode(
+            () => (result = coll.find(test.query, test.proj).toArray()),
+            test.expectedErrorCode,
+            [],
+            Object.assign({result: result}, test),
+        );
     }
 });

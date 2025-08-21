@@ -95,8 +95,8 @@ if (isUsingSbePlanCache) {
     assert.eq(1, planCacheStats.length, planCacheStats);
 
     const serverStatusAfter = db.serverStatus();
-    const numPlanCacheHits = serverStatusAfter.metrics.query.planCache['sbe'].hits -
-        serverStatusBefore.metrics.query.planCache['sbe'].hits;
+    const numPlanCacheHits =
+        serverStatusAfter.metrics.query.planCache["sbe"].hits - serverStatusBefore.metrics.query.planCache["sbe"].hits;
     if (FixtureHelpers.isStandalone(db)) {
         // The first query will get cached, and since the entry will be pinned, the remaining
         // four will read the cache. Only assert on a standalone since the plan cache is local.

@@ -19,11 +19,9 @@ function runCommandAndCheckLog(collName, shouldFindLog) {
 
     let predicate = new RegExp(`Slow query.*"` + collName);
     if (shouldFindLog) {
-        assert(checkLog.checkContainsOnce(primary, predicate),
-               "Could not find log containing " + predicate);
+        assert(checkLog.checkContainsOnce(primary, predicate), "Could not find log containing " + predicate);
     } else {
-        assert.neq(checkLog.checkContainsOnce(primary, predicate),
-                   "Could not find log containing " + predicate);
+        assert.neq(checkLog.checkContainsOnce(primary, predicate), "Could not find log containing " + predicate);
     }
 }
 

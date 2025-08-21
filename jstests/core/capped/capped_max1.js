@@ -44,6 +44,6 @@ for (var j = 0; j < max * 2; j++) {
 }
 
 // Cursor should now be dead.
-assert.throws(function() {
+assert.throws(function () {
     cursor.toArray();
 });

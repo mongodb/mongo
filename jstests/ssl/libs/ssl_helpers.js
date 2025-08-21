@@ -24,28 +24,28 @@ export var CLUSTER_CERT = "jstests/libs/cluster_cert.pem";
 // Note: "tlsAllowInvalidCertificates" is enabled to avoid
 // hostname conflicts with our testing certificates
 export var disabled = {
-    tlsMode: "disabled"
+    tlsMode: "disabled",
 };
 
 export var allowTLS = {
     tlsMode: "allowTLS",
     tlsAllowInvalidCertificates: "",
     tlsCertificateKeyFile: SERVER_CERT,
-    tlsCAFile: CA_CERT
+    tlsCAFile: CA_CERT,
 };
 
 export var preferTLS = {
     tlsMode: "preferTLS",
     tlsAllowInvalidCertificates: "",
     tlsCertificateKeyFile: SERVER_CERT,
-    tlsCAFile: CA_CERT
+    tlsCAFile: CA_CERT,
 };
 
 export var requireTLS = {
     tlsMode: "requireTLS",
     tlsAllowInvalidCertificates: "",
     tlsCertificateKeyFile: SERVER_CERT,
-    tlsCAFile: CA_CERT
+    tlsCAFile: CA_CERT,
 };
 
 export var dhparamSSL = {
@@ -53,18 +53,18 @@ export var dhparamSSL = {
     tlsAllowInvalidCertificates: "",
     tlsCertificateKeyFile: SERVER_CERT,
     tlsCAFile: CA_CERT,
-    setParameter: {"opensslDiffieHellmanParameters": DH_PARAM}
+    setParameter: {"opensslDiffieHellmanParameters": DH_PARAM},
 };
 
 // Test if ssl replset  configs work
 
-export var replShouldSucceed = function(name, opt1, opt2) {
+export var replShouldSucceed = function (name, opt1, opt2) {
     // try running this file using the given config
     basicReplsetTest(15, opt1, opt2, name);
 };
 
 // Test if ssl replset configs fail
-export var replShouldFail = function(name, opt1, opt2) {
+export var replShouldFail = function (name, opt1, opt2) {
     // This will cause an assert.soon() in ReplSetTest to fail. This normally triggers the hang
     // analyzer, but since we do not want to run it on expected timeouts, we temporarily disable it.
     MongoRunner.runHangAnalyzer.disable();
@@ -82,10 +82,11 @@ export var replShouldFail = function(name, opt1, opt2) {
  */
 export function testShardedLookup(shardingTest) {
     var st = shardingTest;
-    assert(st.adminCommand({enableSharding: "lookupTest"}),
-           "error enabling sharding for this configuration");
-    assert(st.adminCommand({shardCollection: "lookupTest.foo", key: {_id: "hashed"}}),
-           "error sharding collection for this configuration");
+    assert(st.adminCommand({enableSharding: "lookupTest"}), "error enabling sharding for this configuration");
+    assert(
+        st.adminCommand({shardCollection: "lookupTest.foo", key: {_id: "hashed"}}),
+        "error sharding collection for this configuration",
+    );
 
     var lookupdb = st.getDB("lookupTest");
 
@@ -101,13 +102,12 @@ export function testShardedLookup(shardingTest) {
     assert.commandWorked(fooBulk.execute());
     assert.commandWorked(barBulk.execute());
 
-    var docs =
-        lookupdb.foo
-            .aggregate([
-                {$sort: {_id: 1}},
-                {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "bar_docs"}}
-            ])
-            .toArray();
+    var docs = lookupdb.foo
+        .aggregate([
+            {$sort: {_id: 1}},
+            {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "bar_docs"}},
+        ])
+        .toArray();
     assert.eq(lookupShouldReturn, docs, "error $lookup failed in this configuration");
     assert.commandWorked(lookupdb.dropDatabase());
 }
@@ -143,13 +143,13 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
             other: {
                 enableBalancer: true,
                 configOptions: options1,
-                writeConcernMajorityJournalDefault: wcMajorityJournalDefault
+                writeConcernMajorityJournalDefault: wcMajorityJournalDefault,
             },
         });
 
         // Create admin user in case the options include auth
-        st.admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
-        st.admin.auth('admin', 'pwd');
+        st.admin.createUser({user: "admin", pwd: "pwd", roles: ["root"]});
+        st.admin.auth("admin", "pwd");
 
         authSucceeded = true;
 
@@ -162,7 +162,7 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
         var r = st.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName});
         assert.eq(r, true, "error enabling sharding for this configuration");
 
-        r = st.adminCommand({movePrimary: 'test', to: st.shard1.shardName});
+        r = st.adminCommand({movePrimary: "test", to: st.shard1.shardName});
         assert.eq(r, true, "error movePrimary failed for this configuration");
 
         var db1 = st.getDB("test");
@@ -170,7 +170,7 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
         assert.eq(r, true, "error sharding collection for this configuration");
 
         // Test mongos talking to shards
-        var bigstr = '#'.repeat(1024 * 1024);
+        var bigstr = "#".repeat(1024 * 1024);
 
         var bulk = db1.col.initializeUnorderedBulkOp();
         for (var i = 0; i < 128; i++) {
@@ -183,34 +183,29 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
         assert.commandWorked(st.splitFind("test.col", {_id: 0}));
 
         // Test shards talking to each other
-        r = st.getDB('test').adminCommand(
-            {moveChunk: 'test.col', find: {_id: 0}, to: st.shard0.shardName});
+        r = st.getDB("test").adminCommand({moveChunk: "test.col", find: {_id: 0}, to: st.shard0.shardName});
         assert(r.ok, "error moving chunks: " + tojson(r));
 
         db1.col.remove({});
-
     } catch (e) {
-        if (shouldSucceed)
-            throw e;
+        if (shouldSucceed) throw e;
         // silence error if we should fail...
         print("IMPORTANT! => Test failed when it should have failed...continuing...");
     } finally {
         // Authenticate csrs so ReplSetTest.stopSet() can do db hash check.
         if (authSucceeded && st.configRS) {
             st.configRS.nodes.forEach((node) => {
-                node.getDB('admin').auth('admin', 'pwd');
+                node.getDB("admin").auth("admin", "pwd");
             });
         }
 
         // This has to be done in order for failure
         // to not prevent future tests from running...
         if (st) {
-            if (st.s.fullOptions.clusterAuthMode === 'x509') {
+            if (st.s.fullOptions.clusterAuthMode === "x509") {
                 // Index consistency check during shutdown needs a privileged user to auth as.
-                const x509User =
-                    'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
-                st.s.getDB('$external')
-                    .createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
+                const x509User = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
+                st.s.getDB("$external").createUser({user: x509User, roles: [{role: "__system", db: "admin"}]});
             }
 
             st.stop();
@@ -220,13 +215,13 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
 
 export function determineSSLProvider() {
     const info = getBuildInfo();
-    const ssl = (info.openssl === undefined) ? '' : info.openssl.running;
+    const ssl = info.openssl === undefined ? "" : info.openssl.running;
     if (/OpenSSL/.test(ssl)) {
-        return 'openssl';
+        return "openssl";
     } else if (/Apple/.test(ssl)) {
-        return 'apple';
+        return "apple";
     } else if (/Windows/.test(ssl)) {
-        return 'windows';
+        return "windows";
     } else {
         return null;
     }
@@ -238,7 +233,7 @@ export function isMacOS(minVersion) {
         // This allows vesions like: 10.15.7-pl2 or other extra data.
         const v = version.match(/^(\d+)\.(\d+)\.(\d+)/);
         assert(v !== null, "Invalid version string '" + version + "'");
-        return (v[1] << 16) | (v[2] << 8) | (v[3]);
+        return (v[1] << 16) | (v[2] << 8) | v[3];
     }
 
     const macOS = getBuildInfo().macOS;
@@ -252,13 +247,12 @@ export function isMacOS(minVersion) {
         return true;
     }
 
-    assert(macOS.osProductVersion !== undefined,
-           "Expected getBuildInfo() field 'macOS.osProductVersion' not present");
+    assert(macOS.osProductVersion !== undefined, "Expected getBuildInfo() field 'macOS.osProductVersion' not present");
     return parseVersion(minVersion) <= parseVersion(macOS.osProductVersion);
 }
 
 export function requireSSLProvider(required, fn) {
-    if ((typeof required) === 'string') {
+    if (typeof required === "string") {
         required = [required];
     }
 
@@ -274,26 +268,30 @@ export function requireSSLProvider(required, fn) {
 
 export function detectDefaultTLSProtocol() {
     const conn = MongoRunner.runMongod({
-        tlsMode: 'allowTLS',
+        tlsMode: "allowTLS",
         tlsCertificateKeyFile: SERVER_CERT,
-        tlsDisabledProtocols: 'none',
+        tlsDisabledProtocols: "none",
         useLogFiles: true,
         tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2,TLS1_3",
         waitForConnect: true,
-        tlsCAFile: CA_CERT
+        tlsCAFile: CA_CERT,
     });
 
-    assert.eq(0,
-              runMongoProgram('mongo',
-                              '--ssl',
-                              '--port',
-                              conn.port,
-                              '--tlsCertificateKeyFile',
-                              CLIENT_CERT,
-                              '--tlsCAFile',
-                              CA_CERT,
-                              '--eval',
-                              ';'));
+    assert.eq(
+        0,
+        runMongoProgram(
+            "mongo",
+            "--ssl",
+            "--port",
+            conn.port,
+            "--tlsCertificateKeyFile",
+            CLIENT_CERT,
+            "--tlsCAFile",
+            CA_CERT,
+            "--eval",
+            ";",
+        ),
+    );
 
     const res = conn.getDB("admin").serverStatus().transportSecurity;
 
@@ -366,7 +364,7 @@ export function opensslVersionAsInt() {
 
 export function supportsFIPS() {
     // OpenSSL supports FIPS
-    let expectSupportsFIPS = (determineSSLProvider() == "openssl");
+    let expectSupportsFIPS = determineSSLProvider() == "openssl";
 
     // But OpenSSL supports FIPS only sometimes
     // - Debian does not support FIPS, Fedora 37 does not, Fedora 38 does
@@ -396,12 +394,12 @@ export function clientSupportsTLS1_1() {
         return false;
     }
     const opensslVersion = opensslVersionAsInt();
-    return (opensslVersion === undefined) ? true : (opensslVersion >= 0x100000C);  // 1.0.0l
+    return opensslVersion === undefined ? true : opensslVersion >= 0x100000c; // 1.0.0l
 }
 
 export function clientSupportsTLS1_2() {
     const opensslVersion = opensslVersionAsInt();
-    return (opensslVersion === undefined) ? true : (opensslVersion >= 0x1000106);  // 1.0.1f
+    return opensslVersion === undefined ? true : opensslVersion >= 0x1000106; // 1.0.1f
 }
 
 export function clientSupportsTLS1_3() {
@@ -410,5 +408,5 @@ export function clientSupportsTLS1_3() {
         return false;
     }
     const opensslVersion = opensslVersionAsInt();
-    return (opensslVersion === undefined) ? true : (opensslVersion >= 0x1010100);  // 1.1.1
+    return opensslVersion === undefined ? true : opensslVersion >= 0x1010100; // 1.1.1
 }

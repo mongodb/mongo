@@ -6,25 +6,20 @@
 
 import "jstests/multiVersion/libs/verify_versions.js";
 
-import {
-    getUriForColl,
-    getUriForIndex,
-    runWiredTigerTool
-} from "jstests/disk/libs/wt_file_helper.js";
+import {getUriForColl, getUriForIndex, runWiredTigerTool} from "jstests/disk/libs/wt_file_helper.js";
 import {allLtsVersions} from "jstests/multiVersion/libs/lts_versions.js";
 
 // Setup the dbpath for this test.
-const dbpath = MongoRunner.dataPath + 'validate_cross_version';
+const dbpath = MongoRunner.dataPath + "validate_cross_version";
 
 function setupCommon(db) {
-    assert.commandWorked(db.createCollection('collect'));
-    assert.commandWorked(db['collect'].insert({a: 1}));
-    assert.commandWorked(db['collect'].createIndex({b: 1}));
+    assert.commandWorked(db.createCollection("collect"));
+    assert.commandWorked(db["collect"].insert({a: 1}));
+    assert.commandWorked(db["collect"].createIndex({b: 1}));
 }
 
 function checkCommon(validateLogs, shouldCorrupt) {
-    let results = validateLogs.filter(
-        json => (json.id === 9437301 && json.attr.results.ns == "test.collect"));
+    let results = validateLogs.filter((json) => json.id === 9437301 && json.attr.results.ns == "test.collect");
 
     assert.eq(1, results.length);
     let result = results[0].attr.results;
@@ -39,21 +34,18 @@ function checkCommon(validateLogs, shouldCorrupt) {
     assert.eq(1, result.keysPerIndex["b_1"]);
 
     if (shouldCorrupt) {
-        assert.eq(1, validateLogs.filter(json => json.id === 9437304).length);
+        assert.eq(1, validateLogs.filter((json) => json.id === 9437304).length);
     } else {
-        assert.eq(1, validateLogs.filter(json => json.id === 9437303).length);
+        assert.eq(1, validateLogs.filter((json) => json.id === 9437303).length);
     }
 }
 
 function setup4(db) {
     // Removed in 5.0 as per https://www.mongodb.com/docs/v6.2/core/geohaystack/
-    assert.commandWorked(db.createCollection('geohaystack'));
-    assert.commandWorked(
-        db['geohaystack'].insert({_id: 100, pos: {lng: 126.9, lat: 35.2}, type: "restaurant"}));
-    assert.commandWorked(
-        db['geohaystack'].insert({_id: 200, pos: {lng: 127.5, lat: 36.1}, type: "restaurant"}));
-    assert.commandWorked(
-        db['geohaystack'].createIndex({pos: "geoHaystack", type: 1}, {bucketSize: 1}));
+    assert.commandWorked(db.createCollection("geohaystack"));
+    assert.commandWorked(db["geohaystack"].insert({_id: 100, pos: {lng: 126.9, lat: 35.2}, type: "restaurant"}));
+    assert.commandWorked(db["geohaystack"].insert({_id: 200, pos: {lng: 127.5, lat: 36.1}, type: "restaurant"}));
+    assert.commandWorked(db["geohaystack"].createIndex({pos: "geoHaystack", type: 1}, {bucketSize: 1}));
 }
 
 function corrupt4(conn) {
@@ -62,8 +54,7 @@ function corrupt4(conn) {
 }
 
 function check4(validateLogs, shouldCorrupt) {
-    let results = validateLogs.filter(
-        json => (json.id === 9437301 && json.attr.results.ns == "test.geohaystack"));
+    let results = validateLogs.filter((json) => json.id === 9437301 && json.attr.results.ns == "test.geohaystack");
     assert.eq(1, results.length);
     let result = results[0].attr.results;
     assert(result, "Couldn't find validation result for test.geohaystack");
@@ -79,31 +70,40 @@ function check4(validateLogs, shouldCorrupt) {
 function setup5(db) {
     // https://www.mongodb.com/docs/manual/core/timeseries-collections/#std-label-manual-timeseries-collection
     // May have changed in 6.0 as it wasn't downgrade safe
-    assert.commandWorked(db.createCollection("weather", {
-        timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "seconds"},
-        expireAfterSeconds: 86400
-    }));
-    assert.commandWorked(db.weather.insertMany([
-        {
-            metadata: {sensorId: 5578, type: "temperature"},
-            timestamp: ISODate("2021-05-18T00:00:00.000Z"),
-            temp: 12,
-        },
-        {
-            metadata: {sensorId: 5578, type: "temperature"},
-            timestamp: ISODate("2021-05-18T04:00:00.000Z"),
-            temp: 11,
-        },
-        {
-            metadata: {sensorId: 5578, type: "temperature"},
-            timestamp: ISODate("2021-05-18T08:00:00.000Z"),
-        }
-    ]));
+    assert.commandWorked(
+        db.createCollection("weather", {
+            timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "seconds"},
+            expireAfterSeconds: 86400,
+        }),
+    );
+    assert.commandWorked(
+        db.weather.insertMany([
+            {
+                metadata: {sensorId: 5578, type: "temperature"},
+                timestamp: ISODate("2021-05-18T00:00:00.000Z"),
+                temp: 12,
+            },
+            {
+                metadata: {sensorId: 5578, type: "temperature"},
+                timestamp: ISODate("2021-05-18T04:00:00.000Z"),
+                temp: 11,
+            },
+            {
+                metadata: {sensorId: 5578, type: "temperature"},
+                timestamp: ISODate("2021-05-18T08:00:00.000Z"),
+            },
+        ]),
+    );
     assert.commandWorked(db.weather.createIndex({"metadata.sensorId": 1}));
     // https://www.mongodb.com/docs/manual/release-notes/6.0-compatibility/#index-key-format
     assert.commandWorked(db.createCollection("uniqueColl"));
-    assert.commandWorked(db.uniqueColl.insertMany(
-        [{uniq: 14, value: 23}, {uniq: 11, value: 17}, {uniq: 21, value: 23}]));
+    assert.commandWorked(
+        db.uniqueColl.insertMany([
+            {uniq: 14, value: 23},
+            {uniq: 11, value: 17},
+            {uniq: 21, value: 23},
+        ]),
+    );
     assert.commandWorked(db.uniqueColl.createIndex({uniq: 1}, {unique: true}));
 }
 
@@ -112,13 +112,14 @@ function corrupt5(conn) {
     // strange formats
     return [
         getUriForColl(conn.getDB("test").getCollection("weather")),
-        getUriForColl(conn.getDB("test").getCollection("uniqueColl"))
+        getUriForColl(conn.getDB("test").getCollection("uniqueColl")),
     ];
 }
 
 function check5(validateLogs, shouldCorrupt) {
     let weatherResults = validateLogs.filter(
-        json => (json.id === 9437301 && json.attr.results.ns == "test.system.buckets.weather"));
+        (json) => json.id === 9437301 && json.attr.results.ns == "test.system.buckets.weather",
+    );
     assert.eq(1, weatherResults.length);
     let weatherResult = weatherResults[0].attr.results;
     assert(weatherResult, "Couldn't find validation result for test.weather");
@@ -133,8 +134,7 @@ function check5(validateLogs, shouldCorrupt) {
         assert.eq(3, weatherResult.nrecords);
     }
 
-    let uniqResults = validateLogs.filter(
-        json => (json.id === 9437301 && json.attr.results.ns == "test.uniqueColl"));
+    let uniqResults = validateLogs.filter((json) => json.id === 9437301 && json.attr.results.ns == "test.uniqueColl");
     assert.eq(1, uniqResults.length);
     let uniqResult = uniqResults[0].attr.results;
     assert(uniqResult, "Couldn't find validation result for test.uniqueColl");
@@ -175,15 +175,17 @@ function testVersion(binVersion, fcv, shouldCorrupt) {
         // We failed due to requiring 'confirm: true' on the command. This will only
         // occur on 7.0+ nodes that have 'enableTestCommands' set to false. Retry the
         // setFCV command with 'confirm: true'.
-        assert.commandWorked(adminDB.runCommand({
-            "setFeatureCompatibilityVersion": fcv,
-            confirm: true,
-        }));
+        assert.commandWorked(
+            adminDB.runCommand({
+                "setFeatureCompatibilityVersion": fcv,
+                confirm: true,
+            }),
+        );
     } else {
         assert.commandWorked(res, "Failed to run command with args: " + binVersion + " " + fcv);
     }
 
-    let testDB1 = conn.getDB('test');
+    let testDB1 = conn.getDB("test");
     const port = conn.port;
     setupCommon(testDB1);
 
@@ -203,9 +205,9 @@ function testVersion(binVersion, fcv, shouldCorrupt) {
     MongoRunner.runMongod({port: port, dbpath: dbpath, validate: "", noCleanData: true});
 
     let validateLogs = rawMongoProgramOutput("(9437301|9437303|9437304)")
-                           .split("\n")
-                           .filter(line => line.trim() !== "")
-                           .map(line => JSON.parse(line.split("|").slice(1).join("|")));
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
 
     checkCommon(validateLogs, shouldCorrupt);
 }

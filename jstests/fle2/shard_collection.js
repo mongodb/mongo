@@ -17,16 +17,17 @@ if (!isEnterpriseShell()) {
     quit();
 }
 
-let dbName = 'shard_state';
+let dbName = "shard_state";
 let dbTest = db.getSiblingDB(dbName);
 dbTest.dropDatabase();
 
 let client = new EncryptedClient(db.getMongo(), dbName);
 
-assert.commandWorked(client.createEncryptionCollection("basic", {
-    encryptedFields:
-        {"fields": [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}]}
-}));
+assert.commandWorked(
+    client.createEncryptionCollection("basic", {
+        encryptedFields: {"fields": [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}]},
+    }),
+);
 
 const result = dbTest.getCollectionInfos({name: "basic"});
 print("result" + tojson(result));
@@ -35,6 +36,10 @@ assert.eq(ef.escCollection, "enxcol_.basic.esc");
 assert.eq(ef.ecocCollection, "enxcol_.basic.ecoc");
 
 assert.commandFailedWithCode(
-    db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.esc', key: {_id: 1}}), 6464401);
+    db.adminCommand({shardCollection: "shard_state.enxcol_.basic.esc", key: {_id: 1}}),
+    6464401,
+);
 assert.commandFailedWithCode(
-    db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.ecoc', key: {_id: 1}}), 6464401);
+    db.adminCommand({shardCollection: "shard_state.enxcol_.basic.ecoc", key: {_id: 1}}),
+    6464401,
+);

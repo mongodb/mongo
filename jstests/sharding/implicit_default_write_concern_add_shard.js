@@ -29,15 +29,18 @@ function addNonArbiterNode(nodeId, rst) {
 }
 
 function testAddShard(CWWCSet, isPSASet, fixAddShard) {
-    jsTestLog("Running sharding test with CWWCSet: " + tojson(CWWCSet) +
-              ", isPSASet: " + tojson(isPSASet));
+    jsTestLog("Running sharding test with CWWCSet: " + tojson(CWWCSet) + ", isPSASet: " + tojson(isPSASet));
     let replSetNodes = [{}, {}];
     if (isPSASet) {
         replSetNodes = [{}, {}, {arbiter: true}];
     }
 
-    let shardServer = new ReplSetTest(
-        {name: "shardServer", nodes: replSetNodes, nodeOptions: {shardsvr: ""}, useHostName: true});
+    let shardServer = new ReplSetTest({
+        name: "shardServer",
+        nodes: replSetNodes,
+        nodeOptions: {shardsvr: ""},
+        useHostName: true,
+    });
     const conns = shardServer.startSet();
     shardServer.initiate();
 
@@ -45,12 +48,13 @@ function testAddShard(CWWCSet, isPSASet, fixAddShard) {
         shards: TestData.configShard ? 1 : 0,
         mongos: 1,
     });
-    var admin = st.getDB('admin');
+    var admin = st.getDB("admin");
 
     if (CWWCSet) {
         jsTestLog("Setting the CWWC before adding shard.");
-        assert.commandWorked(st.s.adminCommand(
-            {setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}));
+        assert.commandWorked(
+            st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}),
+        );
     }
 
     jsTestLog("Attempting to add shard to the cluster");
@@ -60,8 +64,9 @@ function testAddShard(CWWCSet, isPSASet, fixAddShard) {
 
         if (fixAddShard == "setCWWC") {
             jsTestLog("Setting the CWWC to fix addShard.");
-            assert.commandWorked(st.s.adminCommand(
-                {setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}));
+            assert.commandWorked(
+                st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority", wtimeout: 0}}),
+            );
         } else {
             jsTestLog("Reconfig shardServer to fix addShard.");
             addNonArbiterNode(3, shardServer);

@@ -8,7 +8,7 @@ import {
     getCachedPlan,
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
-    getPlanStage
+    getPlanStage,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -23,15 +23,12 @@ function getReplannedMetric() {
 
 function getReplannedPlanIsCachedPlanMetric() {
     const planCacheType = isSbePlanCacheEnabled ? "sbe" : "classic";
-    return assert.commandWorked(db.serverStatus())
-        .metrics.query.planCache[planCacheType]
-        .replanned_plan_is_cached_plan;
+    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[planCacheType].replanned_plan_is_cached_plan;
 }
 
 function getInactiveCachedPlansReplacedMetric() {
     const planCacheType = isSbePlanCacheEnabled ? "sbe" : "classic";
-    return assert.commandWorked(db.serverStatus())
-        .metrics.query.planCache[planCacheType]
+    return assert.commandWorked(db.serverStatus()).metrics.query.planCache[planCacheType]
         .inactive_cached_plans_replaced;
 }
 
@@ -83,13 +80,13 @@ for (let i = 1000; i < 1100; i++) {
 // each document which has 2 as the value of the 'b' field.
 const aIndexQuery = {
     a: 1099,
-    b: 2
+    b: 2,
 };
 // Opposite of 'aIndexQuery'. Should be quick if the {b: 1} index is used, and slower if the {a: 1}
 // index is used.
 const bIndexQuery = {
     a: 1,
-    b: 1099
+    b: 1099,
 };
 
 assert.commandWorked(coll.createIndex({a: 1}));
@@ -226,7 +223,7 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     const filterOnSelectiveKey = {notSelectiveKey: {$lt: 50}, selectiveKey: 3};
     const filterOnSelectiveKeySpecialValue = {
         notSelectiveKey: {$lt: 50},
-        selectiveKey: kSpecialSelectiveKey
+        selectiveKey: kSpecialSelectiveKey,
     };
 
     // Insert 110 documents for each value of selectiveKey from 1-10. We use the number 110 docs
@@ -234,8 +231,7 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     // cached planning and multi-planning.
     for (let i = 0; i < 10; ++i) {
         for (let j = 0; j < 110; ++j) {
-            assert.commandWorked(
-                coll.insert({notSelectiveKey: 10, selectiveKey: i, tiebreak: kTieBreakHigh}));
+            assert.commandWorked(coll.insert({notSelectiveKey: 10, selectiveKey: i, tiebreak: kTieBreakHigh}));
         }
     }
 
@@ -243,8 +239,9 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     // 'selectiveKey' is 'kSpecialSelectiveKey'. We use a low value of 'tiebreak' to ensure that
     // this special, non-matching document is inspected before the documents which do match the
     // filter.
-    assert.commandWorked(coll.insert(
-        {notSelectiveKey: 55, selectiveKey: kSpecialSelectiveKey, tiebreak: kTieBreakLow}));
+    assert.commandWorked(
+        coll.insert({notSelectiveKey: 55, selectiveKey: kSpecialSelectiveKey, tiebreak: kTieBreakLow}),
+    );
 
     // Now we run a query using the special value of 'selectiveKey' until the plan gets cached. We
     // run it twice to make the cache entry active.
@@ -283,9 +280,7 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     // to the old cache entry's, since the query on the special value is slightly less efficient.
     assert.lt(entry.works, specialValueCacheEntryWorks, entry);
     if (!isSbePlanCacheEnabled) {
-        assert.lt(entry.creationExecStats[0].totalKeysExamined,
-                  specialValueCacheEntryKeysExamined,
-                  entry);
+        assert.lt(entry.creationExecStats[0].totalKeysExamined, specialValueCacheEntryKeysExamined, entry);
     }
 
     // Now run the query on the "special" value again and check that replanning does not happen
@@ -299,8 +294,10 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
 
     assert.eq(entry.works, entryAfterRunningSpecialQuery.works, entryAfterRunningSpecialQuery);
     if (!isSbePlanCacheEnabled) {
-        assert.eq(entryAfterRunningSpecialQuery.creationExecStats[0].totalKeysExamined,
-                  entry.creationExecStats[0].totalKeysExamined,
-                  entryAfterRunningSpecialQuery);
+        assert.eq(
+            entryAfterRunningSpecialQuery.creationExecStats[0].totalKeysExamined,
+            entry.creationExecStats[0].totalKeysExamined,
+            entryAfterRunningSpecialQuery,
+        );
     }
 }

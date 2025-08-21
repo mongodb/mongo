@@ -7,10 +7,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {
-    mongotCommandForQuery,
-    MongotMock,
-} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {mongotCommandForQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     getDefaultLastExplainContents,
     getMongotStagesAndValidateExplainExecutionStats,
@@ -33,8 +30,7 @@ const collName = coll.getName();
 
 const explainObject = getDefaultLastExplainContents();
 
-if (checkSbeRestrictedOrFullyEnabled(db) &&
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchInSbe')) {
+if (checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     MongoRunner.stopMongod(conn);
     mongotmock.stop();
@@ -50,7 +46,7 @@ const collUUID = getUUIDFromListCollections(db, coll.getName());
 
 const searchQuery = {
     query: "fire",
-    path: "element"
+    path: "element",
 };
 
 function runExplainTest(verbosity) {
@@ -59,7 +55,7 @@ function runExplainTest(verbosity) {
         collName: collName,
         db: dbName,
         collectionUUID: collUUID,
-        explainVerbosity: {verbosity}
+        explainVerbosity: {verbosity},
     });
     const pipeline = [{$search: searchQuery}];
 
@@ -84,7 +80,7 @@ function runExplainTest(verbosity) {
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(0),
-            explainObject
+            explainObject,
         });
         getMongotStagesAndValidateExplainExecutionStats({
             result,
@@ -111,7 +107,7 @@ function runExplainTest(verbosity) {
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(4),
-            explainObject
+            explainObject,
         });
         getMongotStagesAndValidateExplainExecutionStats({
             result,
@@ -127,9 +123,15 @@ function runExplainTest(verbosity) {
             coll,
             searchCmd,
             batchList: [
-                [{_id: 3, $searchScore: 100}, {_id: 2, $searchScore: 10}],
-                [{_id: 4, $searchScore: 1}, {_id: 1, $searchScore: 0.99}],
-                [{_id: 8, $searchScore: 0.2}]
+                [
+                    {_id: 3, $searchScore: 100},
+                    {_id: 2, $searchScore: 10},
+                ],
+                [
+                    {_id: 4, $searchScore: 1},
+                    {_id: 1, $searchScore: 0.99},
+                ],
+                [{_id: 8, $searchScore: 0.2}],
             ],
         });
         const result = coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
@@ -138,7 +140,7 @@ function runExplainTest(verbosity) {
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(5),
-            explainObject
+            explainObject,
         });
         getMongotStagesAndValidateExplainExecutionStats({
             result,

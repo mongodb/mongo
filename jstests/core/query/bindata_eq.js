@@ -18,7 +18,7 @@ const docs = [
     {a: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")},
     {a: BinData(1, "JA4A8gAxqTwciCuF5GGzAA==")},
     {a: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")},
-    {a: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=")}
+    {a: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=")},
 ];
 assert.commandWorked(coll.insert(docs));
 
@@ -65,7 +65,7 @@ const duplicates = [
     {a: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
     {a: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
     {a: BinData(1, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
-    {a: BinData(1, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}
+    {a: BinData(1, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
 ];
 assert.commandWorked(coll.insert(duplicates));
 

@@ -7,7 +7,7 @@ rs.startSet();
 rs.initiate();
 
 var primary = rs.getPrimary();
-var db = primary.getDB('admin');
+var db = primary.getDB("admin");
 db.foo.insert({a: 1});
 
 // Make sure "optime" field gets updated
@@ -17,7 +17,7 @@ var statusAfter = db.runCommand({replSetGetStatus: 1});
 assert.lt(statusBefore.members[0].optime.ts, statusAfter.members[0].optime.ts);
 
 // Make sure note written successfully
-var op = db.getSiblingDB('local').oplog.rs.find().sort({$natural: -1}).limit(1).next();
+var op = db.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
 assert.eq(1, op.o.a);
 
 rs.stopSet();

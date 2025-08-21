@@ -11,29 +11,28 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/timeseries/timeseries_raw_data_operations.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/timeseries/timeseries_raw_data_operations.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.assertExplain = function(db, commandResult, commandName) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.assertExplain = function (db, commandResult, commandName) {
         const coll = this.getMainCollection(db);
         assert(commandResult.ok);
         if (commandResult.command.pipeline) {
             for (const stage of commandResult.command.pipeline) {
-                assert.isnull(stage["$_internalUnpackBucket"],
-                              `Expected not to find $_internalUnpackBucket stage`);
+                assert.isnull(stage["$_internalUnpackBucket"], `Expected not to find $_internalUnpackBucket stage`);
             }
         }
         assert.isnull(getPlanStage(commandResult, "TS_MODIFY")),
             "Expected not to find TS_MODIFY stage " + tojson(commandResult);
-        assert(commandResult.command.rawData,
-               `Expected command to include rawData but got ${tojson(commandResult)}`);
-        assert.eq(commandResult.command[commandName],
-                  coll.getName(),
-                  `Expected command namespace to be ${tojson(coll.getName())} but got ${
-                      tojson(commandResult.command[commandName])}`);
+        assert(commandResult.command.rawData, `Expected command to include rawData but got ${tojson(commandResult)}`);
+        assert.eq(
+            commandResult.command[commandName],
+            coll.getName(),
+            `Expected command namespace to be ${tojson(coll.getName())} but got ${tojson(
+                commandResult.command[commandName],
+            )}`,
+        );
     };
 
     $config.states.explainAggregate = function explainAggregate(db, collName) {
@@ -41,36 +40,44 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.assertExplain(
             db,
             coll.explain().aggregate([{$match: {[this.thisThreadKey]: this.tid}}], {rawData: true}),
-            "aggregate");
+            "aggregate",
+        );
     };
 
     $config.states.explainCount = function explainCount(db, collName) {
         const coll = this.getMainCollection(db);
-        this.assertExplain(
-            db, coll.explain().count({[this.thisThreadKey]: this.tid}, {rawData: true}), "count");
+        this.assertExplain(db, coll.explain().count({[this.thisThreadKey]: this.tid}, {rawData: true}), "count");
     };
 
     $config.states.explainDistinct = function explainDistinct(db, collName) {
         const coll = this.getMainCollection(db);
-        this.assertExplain(
-            db, coll.explain().distinct(this.thisThreadKey, {}, {rawData: true}), "distinct");
+        this.assertExplain(db, coll.explain().distinct(this.thisThreadKey, {}, {rawData: true}), "distinct");
     };
 
     $config.states.explainFind = function explainFind(db, collName) {
         const coll = this.getMainCollection(db);
         this.assertExplain(
-            db, coll.explain().find({[this.thisThreadKey]: this.tid}).rawData().finish(), "find");
+            db,
+            coll
+                .explain()
+                .find({[this.thisThreadKey]: this.tid})
+                .rawData()
+                .finish(),
+            "find",
+        );
     };
 
     $config.states.explainFindAndModify = function explainFindAndModify(db, collName) {
         const coll = this.getMainCollection(db);
-        this.assertExplain(db,
-                           coll.explain().findAndModify({
-                               query: {"control.count": 2},
-                               update: {$set: this.getNextMetaField()},
-                               rawData: true,
-                           }),
-                           "findAndModify");
+        this.assertExplain(
+            db,
+            coll.explain().findAndModify({
+                query: {"control.count": 2},
+                update: {$set: this.getNextMetaField()},
+                rawData: true,
+            }),
+            "findAndModify",
+        );
     };
 
     $config.states.explainUpdate = function explainUpdate(db, collName) {
@@ -78,13 +85,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.assertExplain(
             db,
             coll.explain().update({"control.count": 1}, {$set: {meta: "3"}}, {rawData: true}),
-            "update");
+            "update",
+        );
     };
 
     $config.states.explainDelete = function explainDelete(db, collName) {
         const coll = this.getMainCollection(db);
-        this.assertExplain(
-            db, coll.explain().remove({"control.count": 1}, {rawData: true}), "delete");
+        this.assertExplain(db, coll.explain().remove({"control.count": 1}, {rawData: true}), "delete");
     };
 
     const standardTransition = {

@@ -7,7 +7,7 @@
 
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     function makeQuery(options) {
         var query = {};
         if (!options.multi) {
@@ -27,8 +27,8 @@ export const $config = (function() {
         var push = Random.rand() > 0.2;
 
         var updateDoc = {};
-        updateDoc[set ? '$set' : '$unset'] = {x: x};
-        updateDoc[push ? '$push' : '$pull'] = {y: y};
+        updateDoc[set ? "$set" : "$unset"] = {x: x};
+        updateDoc[push ? "$push" : "$pull"] = {y: y};
         updateDoc.$inc = {z: z};
 
         return updateDoc;
@@ -43,7 +43,7 @@ export const $config = (function() {
             var query = makeQuery({multi: this.multi, numDocs: this.numDocs});
             var res = db[collName].update(query, updateDoc, {multi: this.multi});
             this.assertResult(res, db, collName, query);
-        }
+        },
     };
 
     var transitions = {update: {update: 1}};
@@ -56,7 +56,7 @@ export const $config = (function() {
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 3);
-        assert.gt(this.numDocs, 0, 'numDocs should be a positive number');
+        assert.gt(this.numDocs, 0, "numDocs should be a positive number");
 
         for (var i = 0; i < this.numDocs; ++i) {
             var res = db[collName].insert({_id: i});
@@ -68,11 +68,11 @@ export const $config = (function() {
     return {
         threadCount: 10,
         iterations: 10,
-        startState: 'update',
+        startState: "update",
         states: states,
         transitions: transitions,
         data: {
-            assertResult: function(res, db, collName, query) {
+            assertResult: function (res, db, collName, query) {
                 assert.eq(0, res.nUpserted, tojson(res));
 
                 if (isMongod(db)) {
@@ -92,6 +92,6 @@ export const $config = (function() {
             },
             multi: false,
         },
-        setup: setup
+        setup: setup,
     };
 })();

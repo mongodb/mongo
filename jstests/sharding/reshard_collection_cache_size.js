@@ -15,8 +15,8 @@ const st = new ShardingTest({
     shards: 2,
     rs: {
         // 0.25 is the minimum value for 'wiredTigerCacheSizeGB'.
-        wiredTigerCacheSizeGB: 0.25
-    }
+        wiredTigerCacheSizeGB: 0.25,
+    },
 });
 
 const dbName = "testDb";
@@ -26,8 +26,7 @@ const ns = dbName + "." + collName;
 const testDb = st.s.getDB(dbName);
 const testColl = testDb.getCollection(collName);
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 jsTest.log("Start inserting documents");
 const numDocs = 200000;

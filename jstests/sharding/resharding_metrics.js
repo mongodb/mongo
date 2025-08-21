@@ -1,12 +1,13 @@
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
-const kNamespace = 'test.resharding';
+const kNamespace = "test.resharding";
 function getCurrentOpSection(mongo, role) {
     let curOpSection = {};
     assert.soon(() => {
-        const report = mongo.getDB("admin").currentOp(
-            {ns: kNamespace, desc: {$regex: 'ReshardingMetrics' + role + 'Service'}});
+        const report = mongo
+            .getDB("admin")
+            .currentOp({ns: kNamespace, desc: {$regex: "ReshardingMetrics" + role + "Service"}});
 
         if (report.inprog.length === 1) {
             curOpSection = report.inprog[0];
@@ -20,11 +21,10 @@ function getCurrentOpSection(mongo, role) {
 }
 
 function getServerStatusSection(mongo) {
-    const stats = mongo.getDB('admin').serverStatus({});
-    assert(stats.hasOwnProperty('shardingStatistics'), stats);
+    const stats = mongo.getDB("admin").serverStatus({});
+    assert(stats.hasOwnProperty("shardingStatistics"), stats);
     const shardingStats = stats.shardingStatistics;
-    assert(shardingStats.hasOwnProperty('resharding'),
-           `Missing resharding section in ${tojson(shardingStats)}`);
+    assert(shardingStats.hasOwnProperty("resharding"), `Missing resharding section in ${tojson(shardingStats)}`);
 
     return shardingStats.resharding;
 }
@@ -50,9 +50,9 @@ for (let [_, shardReplSet] of Object.entries(topology.shards)) {
 }
 allNodes.push(topology.configsvr.primary);
 allNodes.forEach((hostName) => {
-    const status = new Mongo(hostName).getDB('admin').serverStatus({});
+    const status = new Mongo(hostName).getDB("admin").serverStatus({});
     const shardingStats = status.shardingStatistics;
-    assert(!shardingStats.hasOwnProperty('resharding'));
+    assert(!shardingStats.hasOwnProperty("resharding"));
 });
 
 reshardingTest.withReshardingInBackground(
@@ -68,59 +68,50 @@ reshardingTest.withReshardingInBackground(
         const mongos = inputCollection.getMongo();
         assert.soon(() => {
             const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: inputCollection.getFullName()
+                ns: inputCollection.getFullName(),
             });
             return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
 
-        donorShardNames.forEach(function(shardName) {
-            const curOpSection =
-                getCurrentOpSection(new Mongo(topology.shards[shardName].primary), "Donor");
-            assert(curOpSection.hasOwnProperty('donorState'), tojson(curOpSection));
-            assert(curOpSection.hasOwnProperty('totalCriticalSectionTimeElapsedSecs'),
-                   tojson(curOpSection));
+        donorShardNames.forEach(function (shardName) {
+            const curOpSection = getCurrentOpSection(new Mongo(topology.shards[shardName].primary), "Donor");
+            assert(curOpSection.hasOwnProperty("donorState"), tojson(curOpSection));
+            assert(curOpSection.hasOwnProperty("totalCriticalSectionTimeElapsedSecs"), tojson(curOpSection));
         });
 
-        recipientShardNames.forEach(function(shardName) {
-            const curOpSection =
-                getCurrentOpSection(new Mongo(topology.shards[shardName].primary), "Recipient");
-            assert(curOpSection.hasOwnProperty('recipientState'), tojson(curOpSection));
-            assert(curOpSection.hasOwnProperty('documentsCopied'), tojson(curOpSection));
-            assert(curOpSection.hasOwnProperty('oplogEntriesApplied'), tojson(curOpSection));
+        recipientShardNames.forEach(function (shardName) {
+            const curOpSection = getCurrentOpSection(new Mongo(topology.shards[shardName].primary), "Recipient");
+            assert(curOpSection.hasOwnProperty("recipientState"), tojson(curOpSection));
+            assert(curOpSection.hasOwnProperty("documentsCopied"), tojson(curOpSection));
+            assert(curOpSection.hasOwnProperty("oplogEntriesApplied"), tojson(curOpSection));
         });
 
-        const curOpSection =
-            getCurrentOpSection(new Mongo(topology.configsvr.nodes[0]), "Coordinator");
-        assert(curOpSection.hasOwnProperty('coordinatorState'), tojson(curOpSection));
-        assert(curOpSection.hasOwnProperty('totalCriticalSectionTimeElapsedSecs'),
-               tojson(curOpSection));
-    });
+        const curOpSection = getCurrentOpSection(new Mongo(topology.configsvr.nodes[0]), "Coordinator");
+        assert(curOpSection.hasOwnProperty("coordinatorState"), tojson(curOpSection));
+        assert(curOpSection.hasOwnProperty("totalCriticalSectionTimeElapsedSecs"), tojson(curOpSection));
+    },
+);
 
 allNodes.forEach((hostName) => {
     const serverStatus = getServerStatusSection(new Mongo(hostName));
 
     let debugStr = () => {
-        return 'server: ' + tojson(hostName) + ', serverStatusSection: ' + tojson(serverStatus);
+        return "server: " + tojson(hostName) + ", serverStatusSection: " + tojson(serverStatus);
     };
-    assert(serverStatus.hasOwnProperty('countSucceeded'), debugStr());
-    assert(serverStatus.hasOwnProperty('countFailed'), debugStr());
+    assert(serverStatus.hasOwnProperty("countSucceeded"), debugStr());
+    assert(serverStatus.hasOwnProperty("countFailed"), debugStr());
 
-    assert(serverStatus.hasOwnProperty('active'), debugStr());
-    assert(serverStatus.active.hasOwnProperty('documentsCopied'), debugStr());
+    assert(serverStatus.hasOwnProperty("active"), debugStr());
+    assert(serverStatus.active.hasOwnProperty("documentsCopied"), debugStr());
 
-    assert(serverStatus.hasOwnProperty('oldestActive'), debugStr());
-    assert(
-        serverStatus.oldestActive.hasOwnProperty('recipientRemainingOperationTimeEstimatedMillis'),
-        debugStr());
+    assert(serverStatus.hasOwnProperty("oldestActive"), debugStr());
+    assert(serverStatus.oldestActive.hasOwnProperty("recipientRemainingOperationTimeEstimatedMillis"), debugStr());
 
-    assert(serverStatus.hasOwnProperty('latencies'), debugStr());
-    assert(serverStatus.latencies.hasOwnProperty('collectionCloningTotalLocalInsertTimeMillis'),
-           debugStr());
+    assert(serverStatus.hasOwnProperty("latencies"), debugStr());
+    assert(serverStatus.latencies.hasOwnProperty("collectionCloningTotalLocalInsertTimeMillis"), debugStr());
 
-    assert(serverStatus.hasOwnProperty('currentInSteps'), debugStr());
-    assert(serverStatus.currentInSteps.hasOwnProperty(
-               'countInstancesInRecipientState2CreatingCollection'),
-           debugStr());
+    assert(serverStatus.hasOwnProperty("currentInSteps"), debugStr());
+    assert(serverStatus.currentInSteps.hasOwnProperty("countInstancesInRecipientState2CreatingCollection"), debugStr());
 });
 
 reshardingTest.teardown();

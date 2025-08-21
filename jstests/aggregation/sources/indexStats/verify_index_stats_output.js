@@ -30,7 +30,7 @@ assert.commandWorked(bulk.execute());
 
 const indexKey = {
     _id: 1,
-    a: 1
+    a: 1,
 };
 const indexName = "testIndex";
 
@@ -65,9 +65,11 @@ let pausedOutput = coll.aggregate([{$indexStats: {}}, {$match: {name: indexName}
 
 let allShards = [];
 let shardsFound = [];
-db.getSiblingDB("config").shards.find().forEach(function(shard) {
-    allShards.push(shard._id);
-});
+db.getSiblingDB("config")
+    .shards.find()
+    .forEach(function (shard) {
+        allShards.push(shard._id);
+    });
 const isShardedCluster = !!allShards.length;
 
 for (const indexStats of pausedOutput) {

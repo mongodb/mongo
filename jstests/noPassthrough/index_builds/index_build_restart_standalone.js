@@ -20,14 +20,14 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
 });
 
 const nodes = rst.startSet();
 rst.initiate();
 
-const dbName = 'test';
-const collName = 'testColl';
+const dbName = "test";
+const collName = "testColl";
 
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
@@ -40,14 +40,12 @@ assert.commandWorked(primaryColl.insert({a: 1}));
 jsTest.log("Starting an index build on the primary and waiting for the secondary.");
 IndexBuildTest.pauseIndexBuilds(primary);
 const indexSpec = {
-    a: 1
+    a: 1,
 };
 const indexName = "a_1";
-const createIndexCmd = IndexBuildTest.startIndexBuild(primary,
-                                                      primaryColl.getFullName(),
-                                                      indexSpec,
-                                                      {},
-                                                      [ErrorCodes.InterruptedDueToReplStateChange]);
+const createIndexCmd = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), indexSpec, {}, [
+    ErrorCodes.InterruptedDueToReplStateChange,
+]);
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName, indexName);
 
 // Wait for the stable timestamps on each node to advance, so that the  write is included in the
@@ -67,7 +65,7 @@ function restartStandalone(node) {
         dbpath: node.dbpath,
         noReplSet: true,
         noCleanData: true,
-        setParameter: 'recoverFromOplogAsStandalone=true'
+        setParameter: "recoverFromOplogAsStandalone=true",
     });
 
     // We need to shutdown this instance of mongod as using the recoverFromOplogAsStandalone=true

@@ -14,7 +14,7 @@ import {
     runTestReplSet,
     runTestShardedCluster,
     runTestStandaloneParamsSetAtRuntime,
-    runTestStandaloneParamsSetAtStartup
+    runTestStandaloneParamsSetAtStartup,
 } from "jstests/noPassthrough/network/libs/conn_establishment_rate_limiter_helpers.js";
 
 // Return whether the left Number or NumberLong is equal to the right Number or NumberLong.
@@ -32,25 +32,30 @@ const maxIncomingConnections = 1000;
 const testRateLimiterStats = (conn) => {
     // Start maxQueueSize + 3 threads that will all try to connect to the server. The rate limiter
     // should allow maxQueueSize connections to be queued, and the rest should be rejected.
-    let connDelayFailPoint = configureFailPoint(conn, 'hangInRateLimiter');
+    let connDelayFailPoint = configureFailPoint(conn, "hangInRateLimiter");
     const extraConns = 3;
     const threads = [];
     for (let i = 0; i < maxQueueSize + extraConns; i++) {
-        threads.push(new Thread((host, threadId) => {
-            try {
-                jsTestLog("Thread " + threadId + " trying to connect to " + host);
-                // Set a socket timeout so that these threads can eventually be joined.
-                new Mongo(`mongodb://${host}/?socketTimeoutMS=8000`);
-            } catch (e) {
-                jsTestLog("Thread " + threadId + " caught error: " + e);
-            }
-        }, conn.host, i));
+        threads.push(
+            new Thread(
+                (host, threadId) => {
+                    try {
+                        jsTestLog("Thread " + threadId + " trying to connect to " + host);
+                        // Set a socket timeout so that these threads can eventually be joined.
+                        new Mongo(`mongodb://${host}/?socketTimeoutMS=8000`);
+                    } catch (e) {
+                        jsTestLog("Thread " + threadId + " caught error: " + e);
+                    }
+                },
+                conn.host,
+                i,
+            ),
+        );
         threads[i].start();
     }
 
     assert.soon(() => {
-        const {connections: cstats, ingressSessionEstablishmentQueues: qstats} =
-            getLimiterStats(conn, {log: false});
+        const {connections: cstats, ingressSessionEstablishmentQueues: qstats} = getLimiterStats(conn, {log: false});
 
         jsTestLog("stats: " + tojson({cstats, qstats}));
 
@@ -68,20 +73,19 @@ const testRateLimiterStats = (conn) => {
             // There is a correspondence between the connections stats and the session
             // establishment queue stats, because they use the same underlying rate limiter.
             () => equal(cstats["establishmentRateLimit"]["rejected"], qstats["rejectedAdmissions"]),
-            () => equal(cstats["queuedForEstablishment"],
-                        qstats["addedToQueue"] - qstats["removedFromQueue"]),
+            () => equal(cstats["queuedForEstablishment"], qstats["addedToQueue"] - qstats["removedFromQueue"]),
             // Somebody either waited or was admitted immediately, so there is an average wait
             // time.
-            () => qstats["averageTimeQueuedMicros"] >= 0
+            () => qstats["averageTimeQueuedMicros"] >= 0,
         ];
 
         // results :: {<body of check>: <boolean result of check>}
-        const results = Object.fromEntries(checks.map(check => [check.toString(), check()]));
+        const results = Object.fromEntries(checks.map((check) => [check.toString(), check()]));
 
         jsTestLog("checks: " + tojson(results));
 
         // "all of the checks passed"
-        return Object.values(results).every(result => result);
+        return Object.values(results).every((result) => result);
     });
 
     connDelayFailPoint.off();

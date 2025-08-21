@@ -24,31 +24,28 @@
  * ]
  */
 
-import {
-    assertWorkedHandleTxnErrors
-} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
+import {assertWorkedHandleTxnErrors} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 
 // WiredTiger eviction is slow on Windows debug variants and can cause timeouts when taking a
 // checkpoint through compaction.
 const buildInfo = getBuildInfo();
 const skipTest = buildInfo.debug && buildInfo.buildEnvironment.target_os == "windows";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         targetDocuments: 1000,
         nDocs: 0,
-        nIndexes: 1 + 1,    // The number of indexes created in createIndexes + 1 for { _id: 1 }
-        prefix: 'compact',  // Use filename for prefix because filename is assumed unique
-        autoCompactRunning: false
+        nIndexes: 1 + 1, // The number of indexes created in createIndexes + 1 for { _id: 1 }
+        prefix: "compact", // Use filename for prefix because filename is assumed unique
+        autoCompactRunning: false,
     };
 
-    var states = (function() {
+    var states = (function () {
         function insertDocuments(db, collName) {
-            var nDocumentsToInsert =
-                this.targetDocuments - db[this.threadCollName].find().itcount();
+            var nDocumentsToInsert = this.targetDocuments - db[this.threadCollName].find().itcount();
             var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
             for (var i = 0; i < nDocumentsToInsert; ++i) {
-                bulk.insert({a: Random.randInt(2), b: 'b'.repeat(100000), c: 'c'.repeat(100000)});
+                bulk.insert({a: Random.randInt(2), b: "b".repeat(100000), c: "c".repeat(100000)});
             }
             var res = bulk.execute();
             this.nDocs += res.nInserted;
@@ -74,7 +71,7 @@ export const $config = (function() {
         // This method is independent of collectionSetup to allow it to be overridden in
         // workloads that extend this one
         function init(db, collName) {
-            this.threadCollName = this.prefix + '_' + this.tid;
+            this.threadCollName = this.prefix + "_" + this.tid;
         }
 
         function collectionSetup(db, collName) {
@@ -88,12 +85,13 @@ export const $config = (function() {
                 let retries = 0;
                 const maxRetries = 10;
                 const runOnce = Math.random() < 0.5;
-                while ((res = assert.commandWorkedOrFailedWithCode(
-                            db.adminCommand(
-                                {autoCompact: true, freeSpaceTargetMB: 1, runOnce: runOnce}),
-                            ErrorCodes.ObjectIsBusy))
-                               .code == ErrorCodes.ObjectIsBusy &&
-                       retries < maxRetries) {
+                while (
+                    (res = assert.commandWorkedOrFailedWithCode(
+                        db.adminCommand({autoCompact: true, freeSpaceTargetMB: 1, runOnce: runOnce}),
+                        ErrorCodes.ObjectIsBusy,
+                    )).code == ErrorCodes.ObjectIsBusy &&
+                    retries < maxRetries
+                ) {
                     retries++;
                     sleep(1);
                 }
@@ -106,10 +104,13 @@ export const $config = (function() {
                 let res;
                 let retries = 0;
                 const maxRetries = 10;
-                while ((res = assert.commandWorkedOrFailedWithCode(
-                            db.adminCommand({autoCompact: false}), ErrorCodes.ObjectIsBusy))
-                               .code == ErrorCodes.ObjectIsBusy &&
-                       retries < maxRetries) {
+                while (
+                    (res = assert.commandWorkedOrFailedWithCode(
+                        db.adminCommand({autoCompact: false}),
+                        ErrorCodes.ObjectIsBusy,
+                    )).code == ErrorCodes.ObjectIsBusy &&
+                    retries < maxRetries
+                ) {
                     retries++;
                     sleep(1);
                 }
@@ -120,10 +121,11 @@ export const $config = (function() {
 
         function query(db, collName) {
             var count = db[this.threadCollName].find().itcount();
-            assert.eq(count,
-                      this.nDocs,
-                      'number of documents in ' +
-                          'collection should not change following a compact');
+            assert.eq(
+                count,
+                this.nDocs,
+                "number of documents in " + "collection should not change following a compact",
+            );
             var indexesCount = db[this.threadCollName].getIndexes().length;
             assert.eq(indexesCount, this.nIndexes);
         }
@@ -135,14 +137,15 @@ export const $config = (function() {
             disableAutoCompact: disableAutoCompact,
             query: query,
             removeDocuments: removeDocuments,
-            insertDocuments: insertDocuments
+            insertDocuments: insertDocuments,
         };
     })();
 
     function teardown(db, collName, cluster) {
-        while ((assert.commandWorkedOrFailedWithCode(db.adminCommand({autoCompact: false}),
-                                                     ErrorCodes.ObjectIsBusy))
-                   .code == ErrorCodes.ObjectIsBusy) {
+        while (
+            assert.commandWorkedOrFailedWithCode(db.adminCommand({autoCompact: false}), ErrorCodes.ObjectIsBusy).code ==
+            ErrorCodes.ObjectIsBusy
+        ) {
             sleep(1);
         }
     }
@@ -154,7 +157,7 @@ export const $config = (function() {
         disableAutoCompact: {query: 1},
         enableAutoCompact: {query: 1},
         query: {insertDocuments: 1},
-        insertDocuments: {removeDocuments: 1}
+        insertDocuments: {removeDocuments: 1},
     };
 
     return {
@@ -163,6 +166,6 @@ export const $config = (function() {
         states: states,
         transitions: transitions,
         data: data,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

@@ -17,8 +17,7 @@ const collUnsharded = db[jsTestName() + "_unsharded"];
 assert.commandWorked(db.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(
-    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 
 // Range-shard the test collection on _id.
 assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
@@ -29,32 +28,27 @@ assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0
 assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 100}}));
 
 // Move the [0, 100) and [100, MaxKey) chunks to shard1.
-assert.commandWorked(
-    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
-assert.commandWorked(
-    db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
+assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
+assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
 function runTest({testName}) {
     const p = 0.9;
     const percentileSpec = {$percentile: {p: [p], input: "$x", method: "approximate"}};
 
     const res = coll.aggregate([{$group: {_id: null, p: percentileSpec}}]).toArray();
-    const resUnsharded =
-        collUnsharded.aggregate([{$group: {_id: null, p: percentileSpec}}]).toArray();
+    const resUnsharded = collUnsharded.aggregate([{$group: {_id: null, p: percentileSpec}}]).toArray();
 
     // Compute the expected value of the percentile without using $percentile.
-    const expected =
-        collUnsharded
-            .aggregate(
-                [{$match: {x: {$type: "number"}}}, {$group: {_id: null, data: {$push: "$x"}}}])
-            .toArray();
+    const expected = collUnsharded
+        .aggregate([{$match: {x: {$type: "number"}}}, {$group: {_id: null, data: {$push: "$x"}}}])
+        .toArray();
 
     let expectedResult = [null];
     if (expected[0]) {
         const data = expected[0].data;
-        data.sort(function(a, b) {
+        data.sort(function (a, b) {
             return a - b;
-        });  // sort ASC
+        }); // sort ASC
         expectedResult = data[Math.ceil(p * data.length) - 1];
     }
 
@@ -74,7 +68,7 @@ function runTest({testName}) {
     // Write 400 documents across the 4 chunks. Values of 'val' field are distributed across both
     // shards such that their ranges overlap but the datasets aren't identical
     for (let i = -200; i < 200; i++) {
-        const val = (i + 200) % 270 + 1;  // [1, ..., 200] & [201, ..., 270, 1, ..., 130]
+        const val = ((i + 200) % 270) + 1; // [1, ..., 200] & [201, ..., 270, 1, ..., 130]
         assert.commandWorked(coll.insert({_id: i, x: val}));
         assert.commandWorked(collUnsharded.insert({_id: i, x: val}));
     }
@@ -115,16 +109,20 @@ function runTest({testName}) {
 // Setup for ShardTargetingTest().
 const shardProfileDBMap = {
     [st.shard0.shardName]: st.shard0.getDB(jsTestName()),
-    [st.shard1.shardName]: st.shard1.getDB(jsTestName())
+    [st.shard1.shardName]: st.shard1.getDB(jsTestName()),
 };
 const shardTargetingTest = new ShardTargetingTest(db, shardProfileDBMap);
 
 // Add data to test.
 const kShardedCollName = "sharded1";
-const kShardedCollDocs = [{_id: -1, a: 20, x: 0}, {_id: 0, a: 47, x: 1}, {_id: 1, a: -12, x: 2}];
+const kShardedCollDocs = [
+    {_id: -1, a: 20, x: 0},
+    {_id: 0, a: 47, x: 1},
+    {_id: 1, a: -12, x: 2},
+];
 const kShardedCollChunkList = [
     {min: {x: MinKey}, max: {x: 1}, shard: st.shard0.shardName},
-    {min: {x: 1}, max: {x: MaxKey}, shard: st.shard1.shardName}
+    {min: {x: 1}, max: {x: MaxKey}, shard: st.shard1.shardName},
 ];
 shardTargetingTest.setupColl({
     collName: kShardedCollName,
@@ -132,14 +130,13 @@ shardTargetingTest.setupColl({
     docs: kShardedCollDocs,
     collType: "sharded",
     shardKey: {x: 1},
-    chunkList: kShardedCollChunkList
+    chunkList: kShardedCollChunkList,
 });
 
 // $percentile with the approximate method should allow parallel computation on the shards,
 // therefore the $group will be pushed down. On a small dataset approximate will match discrete
 // solution.
-let pipeline =
-    [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "approximate"}}}}];
+let pipeline = [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "approximate"}}}}];
 let expectedResults = [{"_id": null, "p": [2]}];
 
 shardTargetingTest.assertShardTargeting({
@@ -148,10 +145,10 @@ shardTargetingTest.assertShardTargeting({
     explainAssertionObj: {
         expectRouter: true,
         expectedShardStages: ["$group"],
-        expectedMergingStages: ["$mergeCursors", "$group"]
+        expectedMergingStages: ["$mergeCursors", "$group"],
     },
     expectedResults: expectedResults,
-    comment: "approximate_percentile_sharded"
+    comment: "approximate_percentile_sharded",
 });
 
 pipeline = [{$group: {_id: null, p: {$median: {input: "$x", method: "approximate"}}}}];
@@ -163,18 +160,17 @@ shardTargetingTest.assertShardTargeting({
     explainAssertionObj: {
         expectRouter: true,
         expectedShardStages: ["$group"],
-        expectedMergingStages: ["$mergeCursors", "$group"]
+        expectedMergingStages: ["$mergeCursors", "$group"],
     },
     expectedResults: expectedResults,
-    comment: "approximate_median_sharded"
+    comment: "approximate_median_sharded",
 });
 
 if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
     // $percentile with the discrete method should not allow parallel computation on the shards,
     // therefore the $group cannot be pushed down. $project on the fields required by percentile can
     // be pushed down to reduce memory usage.
-    pipeline =
-        [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "discrete"}}}}];
+    pipeline = [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "discrete"}}}}];
     expectedResults = [{"_id": null, "p": [2]}];
 
     shardTargetingTest.assertShardTargeting({
@@ -183,10 +179,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         explainAssertionObj: {
             expectRouter: true,
             expectedShardStages: ["$project"],
-            expectedMergingStages: ["$mergeCursors", "$group"]
+            expectedMergingStages: ["$mergeCursors", "$group"],
         },
         expectedResults: expectedResults,
-        comment: "discrete_percentile_sharded"
+        comment: "discrete_percentile_sharded",
     });
 
     pipeline = [{$group: {_id: null, p: {$median: {input: "$x", method: "discrete"}}}}];
@@ -198,17 +194,16 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         explainAssertionObj: {
             expectRouter: true,
             expectedShardStages: ["$project"],
-            expectedMergingStages: ["$mergeCursors", "$group"]
+            expectedMergingStages: ["$mergeCursors", "$group"],
         },
         expectedResults: expectedResults,
-        comment: "discrete_median_sharded"
+        comment: "discrete_median_sharded",
     });
 
     // $percentile with the continuous method should not allow parallel computation on the shards,
     // therefore the $group cannot be pushed down. $project on the fields required by percentile can
     // be pushed down to reduce memory usage.
-    pipeline =
-        [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "continuous"}}}}];
+    pipeline = [{$group: {_id: null, p: {$percentile: {p: [0.9], input: "$x", method: "continuous"}}}}];
     expectedResults = [{"_id": null, "p": [1.8]}];
 
     shardTargetingTest.assertShardTargeting({
@@ -217,10 +212,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         explainAssertionObj: {
             expectRouter: true,
             expectedShardStages: ["$project"],
-            expectedMergingStages: ["$mergeCursors", "$group"]
+            expectedMergingStages: ["$mergeCursors", "$group"],
         },
         expectedResults: expectedResults,
-        comment: "continuous_percentile_sharded"
+        comment: "continuous_percentile_sharded",
     });
 
     pipeline = [{$group: {_id: null, p: {$median: {input: "$x", method: "continuous"}}}}];
@@ -232,10 +227,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "AccuratePercentiles")) {
         explainAssertionObj: {
             expectRouter: true,
             expectedShardStages: ["$project"],
-            expectedMergingStages: ["$mergeCursors", "$group"]
+            expectedMergingStages: ["$mergeCursors", "$group"],
         },
         expectedResults: expectedResults,
-        comment: "continuous_median_sharded"
+        comment: "continuous_median_sharded",
     });
 }
 

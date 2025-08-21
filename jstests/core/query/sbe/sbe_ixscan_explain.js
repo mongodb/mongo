@@ -19,18 +19,20 @@ const coll = db.sbe_ixscan_explain;
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}));
 
-assert.commandWorked(coll.insertMany([
-    {_id: 0, a: 1, b: 1, c: 1},
-    {_id: 1, a: 2, b: 1, c: 2},
-    {_id: 2, a: 3, b: 1, c: 3},
-    {_id: 3, a: 4, b: 2, c: 4}
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {_id: 0, a: 1, b: 1, c: 1},
+        {_id: 1, a: 2, b: 1, c: 2},
+        {_id: 2, a: 3, b: 1, c: 3},
+        {_id: 3, a: 4, b: 2, c: 4},
+    ]),
+);
 
 let explain = coll.find({a: 3}).hint({a: 1}).explain("executionStats");
 let queryPlanner = getQueryPlanner(explain);
 assert(isIxscan(db, queryPlanner.winningPlan));
 // Ensure the query is run on sbe engine.
-assert('slotBasedPlan' in queryPlanner.winningPlan);
+assert("slotBasedPlan" in queryPlanner.winningPlan);
 
 let ixscanStages = getPlanStages(explain.executionStats.executionStages, "ixseek");
 assert(ixscanStages.length !== 0);

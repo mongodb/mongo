@@ -5,7 +5,7 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 
 function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
     if (cmdName == "createIndexes") {
-        cmdObj["indexes"].forEach(index => {
+        cmdObj["indexes"].forEach((index) => {
             // Ignore empty specs
             if (Object.keys(index).length == 0) {
                 return;

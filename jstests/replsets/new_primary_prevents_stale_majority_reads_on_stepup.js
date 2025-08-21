@@ -10,8 +10,10 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Test the case where step-up and committing the "new primary" entry succeed.
 {
-    const rst = new ReplSetTest(
-        {nodes: 2, nodeOptions: {setParameter: {logComponentVerbosity: tojson({'command': 2})}}});
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {setParameter: {logComponentVerbosity: tojson({"command": 2})}},
+    });
     rst.startSet();
     rst.initiate();
 
@@ -27,14 +29,22 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     // write.
     const newPrimary = rst.getSecondaries()[0];
     assert.soon(() => {
-        return newPrimary.getDB(jsTestName()).getCollection(collectionName).countDocuments({x: 1}, {
-            readConcern: {level: "majority"}
-        }) == 1;
+        return (
+            newPrimary
+                .getDB(jsTestName())
+                .getCollection(collectionName)
+                .countDocuments(
+                    {x: 1},
+                    {
+                        readConcern: {level: "majority"},
+                    },
+                ) == 1
+        );
     });
 
     // Set the disableSnapshotting failpoint to prevent the future primary from advancing its
     // current committed snapshot to reflect the "new primary" no-op entry.
-    let failpoint = configureFailPoint(newPrimary, 'disableSnapshotting');
+    let failpoint = configureFailPoint(newPrimary, "disableSnapshotting");
 
     // Trigger the secondary to step up.
     rst.stepUp(newPrimary);
@@ -57,11 +67,13 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     // Start a new read. The read should block until we have a committed snapshot available that
     // reflects the "new primary" entry.
     function parallelFunc(host, dbName, collectionName) {
-        const res = assert.commandWorked(new Mongo(host).getDB(dbName).runCommand({
-            find: collectionName,
-            readConcern: {level: 'majority'},
-            $readPreference: {mode: 'primary'},
-        }));
+        const res = assert.commandWorked(
+            new Mongo(host).getDB(dbName).runCommand({
+                find: collectionName,
+                readConcern: {level: "majority"},
+                $readPreference: {mode: "primary"},
+            }),
+        );
         // Below, we do a write in order to trigger an update to the current committed snapshot.
         // This write will be unblocked once that snapshot becomes available, thus, this read
         // should always observe that write.
@@ -73,7 +85,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
     // Start the read and wait until we see it got to the point of waiting.
     const parallelResult = startParallelShell(
-        funWithArgs(parallelFunc, newPrimary.host, jsTestName(), collectionName), newPrimary.port);
+        funWithArgs(parallelFunc, newPrimary.host, jsTestName(), collectionName),
+        newPrimary.port,
+    );
     assert.soon(() => {
         return checkLog.checkContainsOnce(newPrimary, 5381300);
     });
@@ -82,8 +96,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     failpoint.off();
 
     // Do a write. This is needed to trigger us to update the current committed snapshot.
-    assert.commandWorked(
-        newPrimary.getDB(jsTestName()).runCommand({insert: collectionName, documents: [{x: 2}]}));
+    assert.commandWorked(newPrimary.getDB(jsTestName()).runCommand({insert: collectionName, documents: [{x: 2}]}));
 
     parallelResult();
     rst.stopSet();
@@ -94,8 +107,10 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // then ends up stepping down before that entry makes it into the majoritty committed snapshot and
 // we can actually start serving majority reads.
 {
-    const rst = new ReplSetTest(
-        {nodes: 2, nodeOptions: {setParameter: {logComponentVerbosity: tojson({'command': 2})}}});
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {setParameter: {logComponentVerbosity: tojson({"command": 2})}},
+    });
     rst.startSet();
     rst.initiate();
 
@@ -111,14 +126,22 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     // write.
     const newPrimary = rst.getSecondaries()[0];
     assert.soon(() => {
-        return newPrimary.getDB(jsTestName()).getCollection(collectionName).countDocuments({x: 1}, {
-            readConcern: {level: "majority"}
-        }) == 1;
+        return (
+            newPrimary
+                .getDB(jsTestName())
+                .getCollection(collectionName)
+                .countDocuments(
+                    {x: 1},
+                    {
+                        readConcern: {level: "majority"},
+                    },
+                ) == 1
+        );
     });
 
     // Set the disableSnapshotting failpoint to prevent the future primary from advancing its
     // current committed snapshot to reflect the "new primary" no-op entry.
-    let failpoint = configureFailPoint(newPrimary, 'disableSnapshotting');
+    let failpoint = configureFailPoint(newPrimary, "disableSnapshotting");
 
     // Trigger the secondary to step up.
     rst.stepUp(newPrimary);
@@ -126,17 +149,21 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
     // Start a new read. This should block waiting for the "new primary" entry to commit, and
     // eventually fail once we realize the node stepped down.
     function parallelFunc(host, dbName, collectionName) {
-        assert.commandFailedWithCode(new Mongo(host).getDB(dbName).runCommand({
-            find: collectionName,
-            readConcern: {level: 'majority'},
-            $readPreference: {mode: 'primary'},
-        }),
-                                     ErrorCodes.PrimarySteppedDown);
+        assert.commandFailedWithCode(
+            new Mongo(host).getDB(dbName).runCommand({
+                find: collectionName,
+                readConcern: {level: "majority"},
+                $readPreference: {mode: "primary"},
+            }),
+            ErrorCodes.PrimarySteppedDown,
+        );
     }
 
     // Start the read and wait until we see it got to the point of waiting.
     const parallelResult = startParallelShell(
-        funWithArgs(parallelFunc, newPrimary.host, jsTestName(), collectionName), newPrimary.port);
+        funWithArgs(parallelFunc, newPrimary.host, jsTestName(), collectionName),
+        newPrimary.port,
+    );
     assert.soon(() => {
         return checkLog.checkContainsOnce(newPrimary, 5381300);
     });

@@ -27,18 +27,18 @@ qsutils.assertRejection({
     unrelatedQuery: qsutils.makeDistinctQueryInstance({key: "k", query: {a: "string"}}),
 });
 
-let buildPipeline = (matchValue) => [{$match: {matchKey: matchValue}},
-                                     {
-                                         $group: {
-                                             _id: "groupID",
-                                             values: {$addToSet: "$value"},
-                                         },
-                                     },
+let buildPipeline = (matchValue) => [
+    {$match: {matchKey: matchValue}},
+    {
+        $group: {
+            _id: "groupID",
+            values: {$addToSet: "$value"},
+        },
+    },
 ];
 
 qsutils.assertRejection({
     query: qsutils.makeAggregateQueryInstance({pipeline: buildPipeline(1), cursor: {}}),
     queryPrime: qsutils.makeAggregateQueryInstance({pipeline: buildPipeline(12345), cursor: {}}),
-    unrelatedQuery:
-        qsutils.makeAggregateQueryInstance({pipeline: buildPipeline("string"), cursor: {}}),
+    unrelatedQuery: qsutils.makeAggregateQueryInstance({pipeline: buildPipeline("string"), cursor: {}}),
 });

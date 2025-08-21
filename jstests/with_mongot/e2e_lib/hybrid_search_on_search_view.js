@@ -1,4 +1,3 @@
-
 /**
  * Provides utilities to test that hybrid search stages on a view namespace, defined with a
  * search pipeline, is allowed and works correctly.
@@ -7,9 +6,7 @@
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {
-    assertDocArrExpectedFuzzy,
-} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
+import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -34,7 +31,7 @@ for (let i = 0; i < nDocs; i += 2) {
             y: i - 100,
             loc: [i, i],
             v: [1, 0, 8, 1, 8],
-            z: [2, 0, 1, 1, 4]
+            z: [2, 0, 1, 1, 4],
         });
     } else if (i % 4 === 0) {
         // If the index is only a multiple of 4 (ex: 4, 8, 12, 16, 24, 28, 32, 36, 44, 48), populate
@@ -47,7 +44,7 @@ for (let i = 0; i < nDocs; i += 2) {
             y: i + 100,
             loc: [i, i],
             v: [1, 0, 8, 1, 8],
-            z: [2, 0, 3, 1, 4]
+            z: [2, 0, 3, 1, 4],
         });
     } else {
         // If the index isn't a multiple of 4 (ex: 2, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46),
@@ -68,7 +65,7 @@ for (let i = 1; i < nDocs; i += 2) {
             y: i + 100,
             loc: [i, i],
             v: [1, 0, 8, 1, 8],
-            z: [2, -2, 1, 4, 4]
+            z: [2, -2, 1, 4, 4],
         });
     } else {
         // If the index isn't a multiple of 3 (ex: 1, 5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 35, 37,
@@ -81,7 +78,7 @@ for (let i = 1; i < nDocs; i += 2) {
             y: i - 100,
             loc: [-i, -i],
             v: [2, -2, 1, 4, 4],
-            z: [1, 0, 8, 1, 8]
+            z: [1, 0, 8, 1, 8],
         });
     }
 }
@@ -95,16 +92,15 @@ createSearchIndex(coll, {name: searchIndexFoo, definition: {"mappings": {"dynami
 createSearchIndex(coll, {
     name: vectorSearchIndexV,
     type: "vectorSearch",
-    definition:
-        {"fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}]}
+    definition: {"fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}]},
 });
 
 export const searchPipelineFoo = {
-    $search: {index: searchIndexFoo, text: {query: "foo", path: "a"}}
+    $search: {index: searchIndexFoo, text: {query: "foo", path: "a"}},
 };
 
 export const searchPipelineBar = {
-    $search: {index: "searchIndexBar", text: {query: "bar", path: "m"}}
+    $search: {index: "searchIndexBar", text: {query: "bar", path: "m"}},
 };
 
 export const vectorSearchPipelineV = {
@@ -114,7 +110,7 @@ export const vectorSearchPipelineV = {
         numCandidates: nDocs,
         index: vectorSearchIndexV,
         limit: nDocs,
-    }
+    },
 };
 
 export const vectorSearchPipelineZ = {
@@ -124,23 +120,26 @@ export const vectorSearchPipelineZ = {
         numCandidates: nDocs,
         index: "vectorSearchIndexZ",
         limit: nDocs,
-    }
+    },
 };
 
 const searchPipelineFooNoIndex = {
-    $search: {text: {query: "foo", path: "a"}}
+    $search: {text: {query: "foo", path: "a"}},
 };
 
 const searchIndexDef = {
     name: jsTestName() + "_index",
-    definition: {mappings: {dynamic: true}}
+    definition: {mappings: {dynamic: true}},
 };
 
-const mongotInputPipelines =
-    new Set([searchPipelineFoo, searchPipelineBar, vectorSearchPipelineV, vectorSearchPipelineZ]);
+const mongotInputPipelines = new Set([
+    searchPipelineFoo,
+    searchPipelineBar,
+    vectorSearchPipelineV,
+    vectorSearchPipelineZ,
+]);
 
-export function createHybridSearchPipeline(
-    inputPipelines, viewPipeline, stage, isRankFusion = true) {
+export function createHybridSearchPipeline(inputPipelines, viewPipeline, stage, isRankFusion = true) {
     let hybridSearchStage = stage.$rankFusion;
     if (!isRankFusion) {
         hybridSearchStage = stage.$scoreFusion;
@@ -182,8 +181,7 @@ const createViews = () => {
 
 const [viewNames, views] = createViews();
 
-export function runHybridSearchOnSearchViewsTest(
-    inputPipelines, checkCorrectness = true, createPipelineFn) {
+export function runHybridSearchOnSearchViewsTest(inputPipelines, checkCorrectness = true, createPipelineFn) {
     const hybridSearchPipeline = createPipelineFn(inputPipelines);
 
     // Check if any of the input pipelines are mongot input pipelines.
@@ -203,37 +201,42 @@ export function runHybridSearchOnSearchViewsTest(
         if (hasMongotPipeline) {
             assert.commandFailedWithCode(
                 searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, cursor: {}}),
-                10623000);
+                10623000,
+            );
             assert.commandFailedWithCode(
-                searchView.runCommand("aggregate",
-                                      {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
-                10623000);
+                searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
+                10623000,
+            );
         } else {
-            const hybridSearchPipelineWithViewPrepended =
-                createPipelineFn(inputPipelines, viewPipelines[i]);
+            const hybridSearchPipelineWithViewPrepended = createPipelineFn(inputPipelines, viewPipelines[i]);
 
-            const expectedResultsNoSearchIndexOnView =
-                coll.aggregate(hybridSearchPipelineWithViewPrepended);
+            const expectedResultsNoSearchIndexOnView = coll.aggregate(hybridSearchPipelineWithViewPrepended);
 
-            assert.commandWorked(coll.runCommand(
-                "aggregate",
-                {pipeline: hybridSearchPipelineWithViewPrepended, explain: true, cursor: {}}));
+            assert.commandWorked(
+                coll.runCommand("aggregate", {
+                    pipeline: hybridSearchPipelineWithViewPrepended,
+                    explain: true,
+                    cursor: {},
+                }),
+            );
 
             const viewResultsNoSearchIndexOnColl = searchView.aggregate(hybridSearchPipeline);
 
-            assert.commandWorked(searchView.runCommand(
-                "aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}));
+            assert.commandWorked(
+                searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
+            );
 
             if (checkCorrectness) {
-                assertDocArrExpectedFuzzy(expectedResultsNoSearchIndexOnView.toArray(),
-                                          viewResultsNoSearchIndexOnColl.toArray());
+                assertDocArrExpectedFuzzy(
+                    expectedResultsNoSearchIndexOnView.toArray(),
+                    viewResultsNoSearchIndexOnColl.toArray(),
+                );
             }
         }
     }
 }
 
-export function runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inputPipelines,
-                                                                            createPipelineFn) {
+export function runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inputPipelines, createPipelineFn) {
     const hybridSearchPipeline = createPipelineFn(inputPipelines);
     for (let i = 0; i < views.length; i++) {
         const searchView = views[i];
@@ -242,19 +245,21 @@ export function runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inpu
         // stage.
         assert.commandFailedWithCode(
             searchView.runCommand({createSearchIndexes: viewNames[i], indexes: [searchIndexDef]}),
-            10623000);
+            10623000,
+        );
 
         // Running a hybrid search query with mongot input pipelines aggregation query should fail
         // on views defined with search.
         assert.commandFailedWithCode(
             searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, cursor: {}}),
-            10623000);
+            10623000,
+        );
 
         // Explain for this query should fail.
         assert.commandFailedWithCode(
-            searchView.runCommand("aggregate",
-                                  {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
-            10623000);
+            searchView.runCommand("aggregate", {pipeline: hybridSearchPipeline, explain: true, cursor: {}}),
+            10623000,
+        );
     }
 }
 

@@ -9,7 +9,7 @@
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 const collectionConfig = {
-    storageEngine: {wiredTiger: {configString: "encryption=(keyid=key)"}}
+    storageEngine: {wiredTiger: {configString: "encryption=(keyid=key)"}},
 };
 const createResult = db.createCollection("coll", collectionConfig);
 assert.commandFailedWithCode(createResult, ErrorCodes.IllegalOperation);

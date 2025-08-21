@@ -19,19 +19,33 @@ function runTest(testQueryPred, cachedQueryPred) {
 
     // The 'testQueryPred' is always a null equality query of some form. All three of the documents
     // in the collection should match this not-equal-to-null predicate.
-    assert.eq(3,
-              coll.find({val: {$not: testQueryPred}}, {_id: 0, val: 1}).sort({val: 1}).itcount());
+    assert.eq(
+        3,
+        coll
+            .find({val: {$not: testQueryPred}}, {_id: 0, val: 1})
+            .sort({val: 1})
+            .itcount(),
+    );
 
     // Run a query twice to create an active plan cache entry.
     for (let i = 0; i < 2; ++i) {
         assert.eq(
             1,
-            coll.find({val: {$not: cachedQueryPred}}, {_id: 0, val: 1}).sort({val: 1}).itcount());
+            coll
+                .find({val: {$not: cachedQueryPred}}, {_id: 0, val: 1})
+                .sort({val: 1})
+                .itcount(),
+        );
     }
     // The results from the original query should not have changed, despite any possible changes in
     // the state of the plan cache from the previous query.
-    assert.eq(3,
-              coll.find({val: {$not: testQueryPred}}, {_id: 0, val: 1}).sort({val: 1}).itcount());
+    assert.eq(
+        3,
+        coll
+            .find({val: {$not: testQueryPred}}, {_id: 0, val: 1})
+            .sort({val: 1})
+            .itcount(),
+    );
 }
 
 runTest({$eq: null}, {$eq: true});

@@ -12,22 +12,26 @@ const st = new ShardingTest({shards: 1});
 
 // We should never override any read preference that was explicitly set.
 let err = assert.throws(() => {
-    assert.commandWorked(st.s.getDB('db').runCommand({
-        find: 'foo',
-        $readPreference: {mode: 'nearest'},
-    }));
+    assert.commandWorked(
+        st.s.getDB("db").runCommand({
+            find: "foo",
+            $readPreference: {mode: "nearest"},
+        }),
+    );
 });
 
-assert(err.message.startsWith('Cowardly refusing to override read preference'));
+assert(err.message.startsWith("Cowardly refusing to override read preference"));
 
 // Setting secondary read preference ourselves should work without error.
-assert.commandWorked(st.s.getDB('db').runCommand({
-    find: 'foo',
-    $readPreference: {mode: 'secondary'},
-}));
+assert.commandWorked(
+    st.s.getDB("db").runCommand({
+        find: "foo",
+        $readPreference: {mode: "secondary"},
+    }),
+);
 
 // An unset read preference should be overriden to secondary.
-assert.commandWorked(st.s.getDB('db').runCommand({find: 'foo'}));
+assert.commandWorked(st.s.getDB("db").runCommand({find: "foo"}));
 
 // Necessary to turn this off so that ShardingTest post-test hooks don't fail by erroneously
 // performing reads against secondary nodes.

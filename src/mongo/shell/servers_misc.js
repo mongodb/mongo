@@ -9,9 +9,9 @@ function ToolTest(name, extraOptions) {
     this.extFile = this.root + "_external/a";
     resetDbpath(this.dbpath);
     resetDbpath(this.ext);
-};
+}
 
-ToolTest.prototype.startDB = function(coll) {
+ToolTest.prototype.startDB = function (coll) {
     assert(!this.m, "db already running");
 
     let options = {port: this.port, dbpath: this.dbpath, bind_ip: "127.0.0.1"};
@@ -20,22 +20,20 @@ ToolTest.prototype.startDB = function(coll) {
 
     this.m = startMongoProgram.apply(null, MongoRunner.arrOptions("mongod", options));
     this.db = this.m.getDB(this.baseName);
-    if (coll)
-        return this.db.getCollection(coll);
+    if (coll) return this.db.getCollection(coll);
     return this.db;
 };
 
-ToolTest.prototype.stop = function() {
-    if (!this.m)
-        return;
+ToolTest.prototype.stop = function () {
+    if (!this.m) return;
     _stopMongoProgram(this.port);
     this.m = null;
     this.db = null;
 
-    print('*** ' + this.name + " completed successfully ***");
+    print("*** " + this.name + " completed successfully ***");
 };
 
-ToolTest.prototype.runTool = function() {
+ToolTest.prototype.runTool = function () {
     let a = ["mongo" + arguments[0]];
 
     let hasdbpath = false;
@@ -43,10 +41,8 @@ ToolTest.prototype.runTool = function() {
 
     for (let i = 1; i < arguments.length; i++) {
         a.push(arguments[i]);
-        if (arguments[i] === "--dbpath")
-            hasdbpath = true;
-        if (arguments[i] === "--dialTimeout")
-            hasDialTimeout = true;
+        if (arguments[i] === "--dbpath") hasdbpath = true;
+        if (arguments[i] === "--dialTimeout") hasDialTimeout = true;
     }
 
     if (!hasdbpath) {
@@ -81,7 +77,7 @@ function allocatePort() {
         throw new Error("Exceeded maximum port range in allocatePort()");
     }
     return nextPort++;
-};
+}
 
 /**
  * Resets the range of ports which have already been given out to callers of allocatePort().
@@ -94,12 +90,12 @@ function allocatePort() {
 function resetAllocatedPorts() {
     jsTest.log("Resetting the range of allocated ports");
     maxPort = nextPort = undefined;
-};
+}
 
 let parallelShellPids = [];
 function uncheckedParallelShellPidsString() {
     return parallelShellPids.join(", ");
-};
+}
 
 function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
     let shellPath = MongoRunner.getMongoShellPath();
@@ -113,12 +109,12 @@ function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
             // Strip port numbers from connect string.
             const uri = new MongoURI(globalThis.db.getMongo().host);
             let connString = uri.servers
-                                 .map(function(server) {
-                                     return server.host;
-                                 })
-                                 .join(',');
+                .map(function (server) {
+                    return server.host;
+                })
+                .join(",");
             if (uri.setName.length > 0) {
-                connString = uri.setName + '/' + connString;
+                connString = uri.setName + "/" + connString;
             }
             args.push("--host", connString);
         }
@@ -128,13 +124,13 @@ function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
     }
 
     // Convert function into call-string
-    if (typeof (jsCode) == "function") {
-        if (jsCode.constructor.name === 'AsyncFunction') {
+    if (typeof jsCode == "function") {
+        if (jsCode.constructor.name === "AsyncFunction") {
             jsCode = `await (${jsCode.toString()})();`;
         } else {
             jsCode = `(${jsCode.toString()})();`;
         }
-    } else if (typeof (jsCode) == "string") {
+    } else if (typeof jsCode == "string") {
         // do nothing
     } else {
         throw Error("bad first argument to startParallelShell");
@@ -142,7 +138,7 @@ function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
 
     if (noConnect) {
         args.push("--nodb");
-    } else if (typeof (globalThis.db) == "object") {
+    } else if (typeof globalThis.db == "object") {
         if (globalThis.db.getMongo().isGRPC()) {
             args.push("--gRPC");
         }
@@ -162,7 +158,7 @@ function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
     // Returns a function that when called waits for the parallel shell to exit and returns the exit
     // code of the process. By default an error is thrown if the parallel shell exits with a nonzero
     // exit code.
-    return function(options) {
+    return function (options) {
         if (arguments.length > 0) {
             if (typeof options !== "object") {
                 throw new Error("options must be an object");
@@ -179,7 +175,7 @@ function startParallelShell(jsCode, port, noConnect, ...optionArgs) {
         }
         return exitCode;
     };
-};
+}
 
 /**
  * Returns a list of 'numPorts' port numbers that have not been given out to any other caller from
@@ -192,7 +188,7 @@ function allocatePorts(numPorts) {
     }
 
     return ports;
-};
+}
 
 let testingReplication = false;
 

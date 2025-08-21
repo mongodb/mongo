@@ -7,11 +7,11 @@
 import {verifyCommonFTDCParameters, verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-let testPath1 = MongoRunner.toRealPath('ftdc_setdir1');
-let testPath2 = MongoRunner.toRealPath('ftdc_setdir2');
-let testPath3 = MongoRunner.toRealPath('ftdc_setdir3');
+let testPath1 = MongoRunner.toRealPath("ftdc_setdir1");
+let testPath2 = MongoRunner.toRealPath("ftdc_setdir2");
+let testPath3 = MongoRunner.toRealPath("ftdc_setdir3");
 // SERVER-30394: Use a directory relative to the current working directory.
-let testPath4 = 'ftdc_setdir4/';
+let testPath4 = "ftdc_setdir4/";
 let testLog3 = testPath3 + "mongos_ftdc.log";
 let testLog4 = testPath4 + "mongos_ftdc.log";
 
@@ -29,14 +29,14 @@ let st = new ShardingTest({
         s0: {verbose: 0},
         s1: {setParameter: {diagnosticDataCollectionDirectoryPath: testPath2}},
         s2: {logpath: testLog3},
-        s3: {logpath: testLog4}
-    }
+        s3: {logpath: testLog4},
+    },
 });
 
-let admin1 = st.s0.getDB('admin');
-let admin2 = st.s1.getDB('admin');
-let admin3 = st.s2.getDB('admin');
-let admin4 = st.s3.getDB('admin');
+let admin1 = st.s0.getDB("admin");
+let admin2 = st.s1.getDB("admin");
+let admin3 = st.s2.getDB("admin");
+let admin4 = st.s3.getDB("admin");
 
 function setParam(admin, obj) {
     var ret = admin.runCommand(Object.extend({setParameter: 1}, obj));

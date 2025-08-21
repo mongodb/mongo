@@ -21,8 +21,10 @@ assert.commandWorked(coll.insert({array: [[1], [2]]}));
 assert.commandWorked(coll.insert({array: [[1]]}));
 assert.commandWorked(coll.insert({array: [[2]]}));
 const explain = assert.commandWorked(
-    coll.find({array: {$all: [[1], [2]]}}).sort({num: 1}).explain('executionStats'));
-assert.gt(getPlanStages(getWinningPlanFromExplain(explain.queryPlanner), "SORT_MERGE").length,
-          0,
-          tojson(explain));
+    coll
+        .find({array: {$all: [[1], [2]]}})
+        .sort({num: 1})
+        .explain("executionStats"),
+);
+assert.gt(getPlanStages(getWinningPlanFromExplain(explain.queryPlanner), "SORT_MERGE").length, 0, tojson(explain));
 assert.eq(1, explain.executionStats.nReturned, tojson(explain));

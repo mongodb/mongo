@@ -17,14 +17,13 @@ import {
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 let st = new ShardingTest({mongos: 1, shards: 2});
-let kDbName = 'db';
+let kDbName = "db";
 let mongos = st.s0;
-let ns = kDbName + '.foo';
+let ns = kDbName + ".foo";
 let db = mongos.getDB(kDbName);
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
-assert.commandWorked(
-    mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
 // Shards the collection "db.foo" on shard key {"x" : 1} such that negative "x" values are on
 // shard0 and positive on shard1
@@ -58,15 +57,17 @@ let sessionDB2 = session2.getDatabase(kDbName);
 
 // Returns true if the command "cmdName" has started running on the server.
 function opStarted(cmdName) {
-    return mongos.getDB(kDbName).currentOp().inprog.some(op => {
-        return op.active && (op.ns === "db.foo") && (op.op === cmdName);
-    });
+    return mongos
+        .getDB(kDbName)
+        .currentOp()
+        .inprog.some((op) => {
+            return op.active && op.ns === "db.foo" && op.op === cmdName;
+        });
 }
 
 // Send update that will change the shard key causing the document to move shards. Wait to hit
 // failpoint specified.
-function setFailPointAndSendUpdateToShardKeyInParallelShell(
-    failpoint, failpointMode, shard, codeToRunInParallelShell) {
+function setFailPointAndSendUpdateToShardKeyInParallelShell(failpoint, failpointMode, shard, codeToRunInParallelShell) {
     assert.commandWorked(shard.adminCommand({configureFailPoint: failpoint, mode: failpointMode}));
     let awaitShell = startParallelShell(codeToRunInParallelShell, st.s.port);
     waitForFailpoint("Hit " + failpoint, 1);
@@ -86,22 +87,22 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     const updatedShardKeyValue = -10;
 
     session.startTransaction();
-    assert.commandWorked(
-        sessionDB.foo.update({"x": originalShardKeyValue}, {$set: {"x": updatedShardKeyValue}}));
+    assert.commandWorked(sessionDB.foo.update({"x": originalShardKeyValue}, {$set: {"x": updatedShardKeyValue}}));
     // Attempt to update the same doc not in a transaction, this update should timeout.
-    assert.commandFailedWithCode(db.runCommand({
-        update: "foo",
-        updates: [{q: {"x": originalShardKeyValue}, u: {$inc: {"a": 1}}}],
-        maxTimeMS: 100
-    }),
-                                 ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            update: "foo",
+            updates: [{q: {"x": originalShardKeyValue}, u: {$inc: {"a": 1}}}],
+            maxTimeMS: 100,
+        }),
+        ErrorCodes.MaxTimeMSExpired,
+    );
     // Run the non-transactional update again in a separate thread and wait for it to start.
     function conflictingUpdate(host, kDbName, query, update) {
         const mongosConn = new Mongo(host);
         return mongosConn.getDB(kDbName).foo.update(query, update);
     }
-    let thread = new Thread(
-        conflictingUpdate, st.s.host, kDbName, {"x": originalShardKeyValue}, {$inc: {"a": 1}});
+    let thread = new Thread(conflictingUpdate, st.s.host, kDbName, {"x": originalShardKeyValue}, {$inc: {"a": 1}});
     thread.start();
     // We check both update and bulkWrite since this test is run in bulk_write_targeted_override
     // which rewrites the updates as bulkWrites.
@@ -131,9 +132,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     // Run transactional update to change the shard key for the same doc as updated above
     assert.commandFailedWithCode(
         sessionDB.foo.update({"x": originalShardKeyValue}, {$set: {"x": updatedShardKeyValue}}),
-        ErrorCodes.WriteConflict);
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+        ErrorCodes.WriteConflict,
+    );
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     assert.eq(1, sessionDB.foo.find({"x": originalShardKeyValue, "a": 7}).itcount());
     assert.eq(0, sessionDB.foo.find({"x": updatedShardKeyValue}).itcount());
 
@@ -145,9 +146,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     // Run transactional update to change the shard key for the same doc as updated above
     assert.commandFailedWithCode(
         sessionDB.foo.update({"x": originalShardKeyValue}, {$set: {"x": updatedShardKeyValue}}),
-        ErrorCodes.WriteConflict);
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+        ErrorCodes.WriteConflict,
+    );
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     assert.eq(0, sessionDB.foo.find({"x": originalShardKeyValue}).itcount());
     assert.eq(0, sessionDB.foo.find({"x": updatedShardKeyValue}).itcount());
 })();
@@ -161,8 +162,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
 // Assert that if the concurrent update mutates the same document as the original update to the
 // shard key, we get a write conflict.
 (() => {
-    let codeToRunInParallelShell =
-        `{
+    let codeToRunInParallelShell = `{
                 let session = db.getMongo().startSession();
                 let sessionDB = session.getDatabase("db");
                 session.startTransaction();
@@ -172,14 +172,20 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
                     ErrorCodes.NoSuchTransaction);
             }`;
     let awaitShell = setFailPointAndSendUpdateToShardKeyInParallelShell(
-        "hangBeforeThrowWouldChangeOwningShard", "alwaysOn", st.shard0, codeToRunInParallelShell);
+        "hangBeforeThrowWouldChangeOwningShard",
+        "alwaysOn",
+        st.shard0,
+        codeToRunInParallelShell,
+    );
     // Send update that changes "a" so that the original update will no longer match this doc.
     // Turn off the failpoint so the server stops hanging.
     assert.commandWorked(sessionDB2.foo.update({"x": -50}, {$set: {"a": 300}}));
-    assert.commandWorked(st.shard0.adminCommand({
-        configureFailPoint: "hangBeforeThrowWouldChangeOwningShard",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.shard0.adminCommand({
+            configureFailPoint: "hangBeforeThrowWouldChangeOwningShard",
+            mode: "off",
+        }),
+    );
     awaitShell();
     assert.eq(1, sessionDB2.foo.find({"x": -50, "a": 300}).itcount());
     assert.eq(0, sessionDB2.foo.find({"a": 10}).itcount());
@@ -189,8 +195,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
 // Assert that if a concurrent delete removes the same document that the original update
 // attempts to modify the shard key for, we get a write conflict.
 (() => {
-    let codeToRunInParallelShell =
-        `{
+    let codeToRunInParallelShell = `{
                  let session = db.getMongo().startSession();
                  let sessionDB = session.getDatabase("db");
                  session.startTransaction();
@@ -200,14 +205,20 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
                     ErrorCodes.NoSuchTransaction);
              }`;
     let awaitShell = setFailPointAndSendUpdateToShardKeyInParallelShell(
-        "hangBeforeThrowWouldChangeOwningShard", "alwaysOn", st.shard1, codeToRunInParallelShell);
+        "hangBeforeThrowWouldChangeOwningShard",
+        "alwaysOn",
+        st.shard1,
+        codeToRunInParallelShell,
+    );
     // Send update that changes "a" so that the original update will no longer match this doc.
     // Turn off the failpoint so the server stops hanging.
     assert.commandWorked(sessionDB2.foo.remove({"x": 100}));
-    assert.commandWorked(st.shard1.adminCommand({
-        configureFailPoint: "hangBeforeThrowWouldChangeOwningShard",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.shard1.adminCommand({
+            configureFailPoint: "hangBeforeThrowWouldChangeOwningShard",
+            mode: "off",
+        }),
+    );
     awaitShell();
     assert.eq(0, sessionDB2.foo.find({"x": 100}).itcount());
     assert.eq(0, sessionDB2.foo.find({"x": -1}).itcount());
@@ -216,8 +227,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
 // Assert that if the concurrent update also mutates the shard key (and remains on the same
 // shard), the original update to the shard key will get a write conflict.
 (() => {
-    let codeToRunInParallelShell =
-        `{
+    let codeToRunInParallelShell = `{
                 let session = db.getMongo().startSession();
                 let sessionDB = session.getDatabase("db");
                 session.startTransaction();
@@ -227,15 +237,21 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
                     ErrorCodes.NoSuchTransaction);
             }`;
     let awaitShell = setFailPointAndSendUpdateToShardKeyInParallelShell(
-        "hangBeforeThrowWouldChangeOwningShard", "alwaysOn", st.shard0, codeToRunInParallelShell);
+        "hangBeforeThrowWouldChangeOwningShard",
+        "alwaysOn",
+        st.shard0,
+        codeToRunInParallelShell,
+    );
     // Send update that changes the shard key so that the original update will no longer match
     // this doc. This doc will still remain on its original shard. Turn off the failpoint so the
     // server stops hanging.
     assert.commandWorked(sessionDB2.foo.update({"x": -50}, {$set: {"x": -500}}));
-    assert.commandWorked(st.shard0.adminCommand({
-        configureFailPoint: "hangBeforeThrowWouldChangeOwningShard",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.shard0.adminCommand({
+            configureFailPoint: "hangBeforeThrowWouldChangeOwningShard",
+            mode: "off",
+        }),
+    );
     awaitShell();
     assert.eq(0, sessionDB2.foo.find({"x": -50}).itcount());
     assert.eq(1, sessionDB2.foo.find({"x": -500}).itcount());
@@ -252,8 +268,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
 // Assert that if the concurrent update mutates the same document as the original update to the
 // shard key, it does not match and documents.
 (() => {
-    let codeToRunInParallelShell =
-        `{
+    let codeToRunInParallelShell = `{
                 let session = db.getMongo().startSession();
                 let sessionDB = session.getDatabase("db");
                 session.startTransaction();
@@ -263,8 +278,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
                 assert.eq(1, res.nModified);
                 assert.commandWorked(session.commitTransaction_forTesting());
             }`;
-    let codeToRunInParallelShell2 =
-        `{
+    let codeToRunInParallelShell2 = `{
                 let session = db.getMongo().startSession();
                 let sessionDB = session.getDatabase("db");
                 let res = sessionDB.foo.update({"x": -100}, {$inc: {"a": 1}});
@@ -273,15 +287,21 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
                 assert.eq(0, res.nModified);
             }`;
     let awaitShell = setFailPointAndSendUpdateToShardKeyInParallelShell(
-        "hangBeforeInsertOnUpdateShardKey", "alwaysOn", st.s, codeToRunInParallelShell);
+        "hangBeforeInsertOnUpdateShardKey",
+        "alwaysOn",
+        st.s,
+        codeToRunInParallelShell,
+    );
     let awaitShell2 = startParallelShell(codeToRunInParallelShell2, st.s.port);
     // We check both update and bulkWrite since this test is run in bulk_write_targeted_override
     // which rewrites the updates as bulkWrites.
     assert.soon(() => opStarted("update") || opStarted("bulkWrite"));
-    assert.commandWorked(st.s.adminCommand({
-        configureFailPoint: "hangBeforeInsertOnUpdateShardKey",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            configureFailPoint: "hangBeforeInsertOnUpdateShardKey",
+            mode: "off",
+        }),
+    );
     awaitShell();
     awaitShell2();
     assert.soon(() => db.foo.find({"x": -100}).itcount() === 0);
@@ -293,8 +313,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
 // Assert that if a concurrent delete removes the same document that the original update
 // attempts to modify the shard key for, we get a write conflict.
 (() => {
-    let codeToRunInParallelShell =
-        `{
+    let codeToRunInParallelShell = `{
                 let session = db.getMongo().startSession();
                 let sessionDB = session.getDatabase("db");
                 session.startTransaction();
@@ -304,8 +323,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
                 assert.eq(1, res.nModified);
                 assert.commandWorked(session.commitTransaction_forTesting());
             }`;
-    let codeToRunInParallelShell2 =
-        `{
+    let codeToRunInParallelShell2 = `{
                 let session = db.getMongo().startSession();
                 let sessionDB = session.getDatabase("db");
                 let res = sessionDB.foo.remove({"x": 10});
@@ -314,15 +332,21 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
                 assert.eq(0, res.nModified);
             }`;
     let awaitShell = setFailPointAndSendUpdateToShardKeyInParallelShell(
-        "hangBeforeInsertOnUpdateShardKey", "alwaysOn", st.s, codeToRunInParallelShell);
+        "hangBeforeInsertOnUpdateShardKey",
+        "alwaysOn",
+        st.s,
+        codeToRunInParallelShell,
+    );
     let awaitShell2 = startParallelShell(codeToRunInParallelShell2, st.s.port);
     // We check both remove and bulkWrite since this test is run in bulk_write_targeted_override
     // which rewrites the removes as bulkWrites.
     assert.soon(() => opStarted("remove") || opStarted("bulkWrite"));
-    assert.commandWorked(st.s.adminCommand({
-        configureFailPoint: "hangBeforeInsertOnUpdateShardKey",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            configureFailPoint: "hangBeforeInsertOnUpdateShardKey",
+            mode: "off",
+        }),
+    );
     awaitShell();
     awaitShell2();
     assert.soon(() => db.foo.find({"x": 10}).itcount() === 0);
@@ -343,10 +367,8 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     session2.startTransaction();
     // The first update will complete and the second should get a write conflict
     assert.commandWorked(sessionDB2.foo.update({"x": -500}, {$set: {"x": 25}}));
-    assert.commandFailedWithCode(sessionDB.foo.update({"x": -500}, {$set: {"x": 250}}),
-                                 ErrorCodes.WriteConflict);
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(sessionDB.foo.update({"x": -500}, {$set: {"x": 250}}), ErrorCodes.WriteConflict);
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     assert.commandWorked(session2.commitTransaction_forTesting());
     assert.eq(1, sessionDB2.foo.find({"x": 25}).itcount());
     assert.eq(0, sessionDB2.foo.find({"x": 250}).itcount());
@@ -371,8 +393,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
 // Assert that if the concurrent update modifies the document so that the update which changes
 // the shard key no longer matches the doc, it does not modify the doc.
 (() => {
-    let codeToRunInParallelShell =
-        `{
+    let codeToRunInParallelShell = `{
                 let session = db.getMongo().startSession({retryWrites : true});
                 let sessionDB = session.getDatabase("db");
                 let res = sessionDB.foo.update({"x": -150, "a" : 15}, {$set: {"x": 1000}});
@@ -384,14 +405,17 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         "hangAfterThrowWouldChangeOwningShardRetryableWrite",
         "alwaysOn",
         st.s,
-        codeToRunInParallelShell);
+        codeToRunInParallelShell,
+    );
     // Send update that changes "a" so that the original update will no longer match this doc.
     // Turn off the failpoint so the server stops hanging.
     assert.commandWorked(sessionDB2.foo.update({"x": -150}, {$set: {"a": 3000}}));
-    assert.commandWorked(st.s.adminCommand({
-        configureFailPoint: "hangAfterThrowWouldChangeOwningShardRetryableWrite",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            configureFailPoint: "hangAfterThrowWouldChangeOwningShardRetryableWrite",
+            mode: "off",
+        }),
+    );
     awaitShell();
     assert.eq(1, sessionDB2.foo.find({"x": -150, "a": 3000}).itcount());
     assert.eq(0, sessionDB2.foo.find({"a": 15}).itcount());
@@ -401,8 +425,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
 // Assert that if the concurrent update modifies the document and the update which changes the
 // shard key still matches the doc, the final document reflects both updates.
 (() => {
-    let codeToRunInParallelShell =
-        `{
+    let codeToRunInParallelShell = `{
                 let session = db.getMongo().startSession({retryWrites : true});
                 let sessionDB = session.getDatabase("db");
                 let res = sessionDB.foo.update({"x": 150}, {$set: {"x": -1000}});
@@ -414,14 +437,17 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         "hangAfterThrowWouldChangeOwningShardRetryableWrite",
         "alwaysOn",
         st.s,
-        codeToRunInParallelShell);
+        codeToRunInParallelShell,
+    );
     // Send update that changes "a". The original update will still match this doc because it
     // queries only on the shard key. Turn off the failpoint so the server stops hanging.
     assert.commandWorked(sessionDB2.foo.update({"x": 150}, {$set: {"a": -200}}));
-    assert.commandWorked(st.s.adminCommand({
-        configureFailPoint: "hangAfterThrowWouldChangeOwningShardRetryableWrite",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            configureFailPoint: "hangAfterThrowWouldChangeOwningShardRetryableWrite",
+            mode: "off",
+        }),
+    );
     awaitShell();
     assert.soon(() => sessionDB2.foo.find({"x": -1000, "a": -200}).itcount() === 1);
     assert.eq(0, sessionDB2.foo.find({"a": 20}).itcount());
@@ -431,8 +457,7 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
 // Assert that if a concurrent delete removes the same document that the original update
 // attempts to modify the shard key for, we don't match any docs.
 (() => {
-    let codeToRunInParallelShell =
-        `{
+    let codeToRunInParallelShell = `{
                 let session = db.getMongo().startSession({retryWrites : true});
                 let sessionDB = session.getDatabase("db");
                 let res = sessionDB.foo.update({"x": -150}, {$set: {"x": 1000}});
@@ -444,14 +469,17 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
         "hangAfterThrowWouldChangeOwningShardRetryableWrite",
         "alwaysOn",
         st.s,
-        codeToRunInParallelShell);
+        codeToRunInParallelShell,
+    );
     // Remove this doc so that the original update will no longer match any doc.
     // Turn off the failpoint so the server stops hanging.
     assert.commandWorked(sessionDB2.foo.remove({"x": -150}));
-    assert.commandWorked(st.s.adminCommand({
-        configureFailPoint: "hangAfterThrowWouldChangeOwningShardRetryableWrite",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            configureFailPoint: "hangAfterThrowWouldChangeOwningShardRetryableWrite",
+            mode: "off",
+        }),
+    );
     awaitShell();
     assert.eq(0, sessionDB2.foo.find({"x": -150}).itcount());
     assert.eq(0, sessionDB2.foo.find({"a": 3000}).itcount());

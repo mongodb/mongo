@@ -1,7 +1,5 @@
 // Tests propagation of RWC defaults across a sharded cluster.
-import {
-    ReadWriteConcernDefaultsPropagation
-} from "jstests/libs/read_write_concern_defaults_propagation_common.js";
+import {ReadWriteConcernDefaultsPropagation} from "jstests/libs/read_write_concern_defaults_propagation_common.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({
@@ -25,7 +23,6 @@ ReadWriteConcernDefaultsPropagation.runTests(st.s0, mongosAndConfigNodes, true /
 
 ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(st.s0, mongosAndConfigNodes);
 
-ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(st.configRS.getPrimary(),
-                                                          mongosAndConfigNodes);
+ReadWriteConcernDefaultsPropagation.runDropAndDeleteTests(st.configRS.getPrimary(), mongosAndConfigNodes);
 
 st.stop();

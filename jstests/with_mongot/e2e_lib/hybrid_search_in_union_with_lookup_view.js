@@ -8,9 +8,7 @@
  */
 
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {
-    assertDocArrExpectedFuzzy,
-} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
+import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -41,7 +39,7 @@ function buildUnionPassthroughWithPipeline(viewName, hybridSearchPipeline) {
             // Intentionally matches nothing, so only output results are from the $unionWith.
             $match: {a: "baz"},
         },
-        {$unionWith: {coll: viewName, pipeline: hybridSearchPipeline}}
+        {$unionWith: {coll: viewName, pipeline: hybridSearchPipeline}},
     ];
 }
 
@@ -57,7 +55,7 @@ function buildLookupPassthroughPipeline(ns, hybridSearchPipeline) {
         },
         {$lookup: {from: ns, as: "matched_docs", pipeline: hybridSearchPipeline}},
         {$unwind: "$matched_docs"},
-        {$replaceRoot: {newRoot: "$matched_docs"}}
+        {$replaceRoot: {newRoot: "$matched_docs"}},
     ];
 }
 
@@ -65,7 +63,11 @@ function buildLookupPassthroughPipeline(ns, hybridSearchPipeline) {
 // and a view on the $unionWith/$lookup. Test queries like:
 // db.coll.aggregate([{$unionWith/$lookup: { from: "view", pipeline: [{$rank/scoreFusion}] }}])
 export function runHybridSearchInUnionWithLookupSubViewTest(
-    testName, viewPipeline, inputPipelines, createHybridSearchFn) {
+    testName,
+    viewPipeline,
+    inputPipelines,
+    createHybridSearchFn,
+) {
     createSearchIndex(coll, {name: searchIndexName, definition: {"mappings": {"dynamic": true}}});
 
     const viewName = jsTestName() + "sub_view_" + testName + "_view";
@@ -98,7 +100,11 @@ export function runHybridSearchInUnionWithLookupSubViewTest(
 // and a view on the $unionWith/$lookup. Test queries like:
 // db.view.aggregate([{$unionWith/$lookup: { from: "coll", pipeline: [{$rank/scoreFusion}] }}])
 export function runHybridSearchInUnionWithLookupTopLevelViewTest(
-    testName, viewPipeline, inputPipelines, createHybridSearchFn) {
+    testName,
+    viewPipeline,
+    inputPipelines,
+    createHybridSearchFn,
+) {
     createSearchIndex(coll, {name: searchIndexName, definition: {"mappings": {"dynamic": true}}});
 
     const viewName = jsTestName() + "top_level_view_" + testName + "_view";
@@ -131,7 +137,12 @@ export function runHybridSearchInUnionWithLookupTopLevelViewTest(
 // db.topLevelView.aggregate(
 //   [{$unionWith/$lookup: {from: "subView", pipeline: [{$rank/scoreFusion}] }}])
 export function runHybridSearchInUnionWithLookupViewTopAndSubTest(
-    testName, topLevelViewPipeline, subViewPipeline, inputPipelines, createHybridSearchFn) {
+    testName,
+    topLevelViewPipeline,
+    subViewPipeline,
+    inputPipelines,
+    createHybridSearchFn,
+) {
     createSearchIndex(coll, {name: searchIndexName, definition: {"mappings": {"dynamic": true}}});
 
     const topLevelViewName = jsTestName() + "both_views_" + testName + "_view_top_level";
@@ -147,8 +158,7 @@ export function runHybridSearchInUnionWithLookupViewTopAndSubTest(
     const lookupPipeline = buildLookupPassthroughPipeline(subViewName, hybridSearchPipeline);
 
     // Test $unionWith
-    const expectedUnionWithResults =
-        coll.aggregate([...topLevelViewPipeline, ...unionWithPipeline]);
+    const expectedUnionWithResults = coll.aggregate([...topLevelViewPipeline, ...unionWithPipeline]);
     const unionWithResults = topLevelView.aggregate(unionWithPipeline);
     assertDocArrExpectedFuzzy(expectedUnionWithResults.toArray(), unionWithResults.toArray());
 

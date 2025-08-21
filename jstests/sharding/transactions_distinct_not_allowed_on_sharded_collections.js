@@ -6,12 +6,10 @@
  */
 import {
     withAbortAndRetryOnTransientTxnError,
-    withTxnAndAutoRetryOnMongos
+    withTxnAndAutoRetryOnMongos,
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    flushRoutersAndRefreshShardMetadata
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 1});
 
@@ -39,17 +37,17 @@ flushRoutersAndRefreshShardMetadata(st, {ns: shardedNs, dbNames: [unshardedDbNam
 
 // Can run distinct on an unsharded collection.
 withTxnAndAutoRetryOnMongos(session, () => {
-    assert.eq(unshardedCollDB.runCommand({distinct: unshardedCollName, key: "_id"}).values,
-              ["jack"]);
+    assert.eq(unshardedCollDB.runCommand({distinct: unshardedCollName, key: "_id"}).values, ["jack"]);
 });
 
 // Cannot run distinct on a sharded collection.
 withAbortAndRetryOnTransientTxnError(session, () => {
     session.startTransaction();
-    assert.commandFailedWithCode(shardedCollDB.runCommand({distinct: shardedCollName, key: "_id"}),
-                                 ErrorCodes.OperationNotSupportedInTransaction);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        shardedCollDB.runCommand({distinct: shardedCollName, key: "_id"}),
+        ErrorCodes.OperationNotSupportedInTransaction,
+    );
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 });
 
 session.endSession();

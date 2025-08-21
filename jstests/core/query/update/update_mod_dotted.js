@@ -18,8 +18,8 @@ assert.commandWorked(f.update({}, {$set: {"a.b": 5}}));
 assert.eq(5, f.findOne().a.b, "C");
 
 assert(f.drop());
-assert.commandWorked(f.save({'_id': 0}));
-assert.commandFailedWithCode(f.update({}, {$set: {'_id': 5}}), ErrorCodes.ImmutableField);
+assert.commandWorked(f.save({"_id": 0}));
+assert.commandFailedWithCode(f.update({}, {$set: {"_id": 5}}), ErrorCodes.ImmutableField);
 assert.eq(0, f.findOne()._id, "D");
 
 assert(f.drop());

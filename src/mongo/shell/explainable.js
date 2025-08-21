@@ -3,14 +3,14 @@
 // normally.
 //
 
-let parseVerbosity = function(verbosity) {
+let parseVerbosity = function (verbosity) {
     // Truthy non-strings are interpreted as "allPlansExecution" verbosity.
-    if (verbosity && (typeof verbosity !== "string")) {
+    if (verbosity && typeof verbosity !== "string") {
         return "allPlansExecution";
     }
 
     // Falsy non-strings are interpreted as "queryPlanner" verbosity.
-    if (!verbosity && (typeof verbosity !== "string")) {
+    if (!verbosity && typeof verbosity !== "string") {
         return "queryPlanner";
     }
 
@@ -19,7 +19,7 @@ let parseVerbosity = function(verbosity) {
     return verbosity;
 };
 
-let throwOrReturn = function(explainResult) {
+let throwOrReturn = function (explainResult) {
     if (("ok" in explainResult && !explainResult.ok) || explainResult.$err) {
         throw _getErrorWithCode(explainResult, "explain failed: " + tojson(explainResult));
     }
@@ -27,7 +27,7 @@ let throwOrReturn = function(explainResult) {
     return explainResult;
 };
 
-let buildExplainCmd = function(innerCmd, verbosity) {
+let buildExplainCmd = function (innerCmd, verbosity) {
     let explainCmd = {"explain": innerCmd, "verbosity": verbosity};
     // If "maxTimeMS" is set on innerCmd, it needs to be propagated to the top-level
     // of explainCmd so that it has the intended effect.
@@ -54,20 +54,20 @@ function Explainable(collection, verbosity) {
     // Public methods.
     //
 
-    this.getCollection = function() {
+    this.getCollection = function () {
         return this._collection;
     };
 
-    this.getVerbosity = function() {
+    this.getVerbosity = function () {
         return this._verbosity;
     };
 
-    this.setVerbosity = function(verbosity) {
+    this.setVerbosity = function (verbosity) {
         this._verbosity = parseVerbosity(verbosity);
         return this;
     };
 
-    this.help = function() {
+    this.help = function () {
         print("Explainable operations");
         print("\t.aggregate(...) - explain an aggregation operation");
         print("\t.count(...) - explain a count operation");
@@ -88,11 +88,11 @@ function Explainable(collection, verbosity) {
     // Pretty representations.
     //
 
-    this.toString = function() {
+    this.toString = function () {
         return "Explainable(" + this._collection.getFullName() + ")";
     };
 
-    this.shellPrint = function() {
+    this.shellPrint = function () {
         return this.toString();
     };
 
@@ -100,7 +100,7 @@ function Explainable(collection, verbosity) {
     // Explainable operations.
     //
 
-    this.aggregate = function(pipeline, extraOpts) {
+    this.aggregate = function (pipeline, extraOpts) {
         if (!(pipeline instanceof Array)) {
             // Support legacy varargs form. (Also handles db.foo.aggregate())
             pipeline = Array.from(arguments);
@@ -108,7 +108,7 @@ function Explainable(collection, verbosity) {
         }
 
         // Add the explain option.
-        let extraOptsCopy = Object.extend({}, (extraOpts || {}));
+        let extraOptsCopy = Object.extend({}, extraOpts || {});
 
         // For compatibility with 3.4 and older versions, when the verbosity is "queryPlanner",
         // we use the explain option to the aggregate command. Otherwise we issue an explain
@@ -122,15 +122,14 @@ function Explainable(collection, verbosity) {
                 extraOptsCopy = Object.extend(extraOptsCopy, {cursor: {}});
             }
 
-            let aggCmd = Object.extend(
-                {"aggregate": this._collection.getName(), "pipeline": pipeline}, extraOptsCopy);
+            let aggCmd = Object.extend({"aggregate": this._collection.getName(), "pipeline": pipeline}, extraOptsCopy);
             let explainCmd = buildExplainCmd(aggCmd, this._verbosity);
             let explainResult = this._collection.runReadCommand(explainCmd);
             return throwOrReturn(explainResult);
         }
     };
 
-    this.count = function(query, options) {
+    this.count = function (query, options) {
         query = this.find(query);
         return QueryHelpers._applyCountOptions(query, options).count();
     };
@@ -140,23 +139,23 @@ function Explainable(collection, verbosity) {
      * the DBExplainQuery abstraction in order to construct the proper explain command to send
      * to the server.
      */
-    this.find = function() {
+    this.find = function () {
         let cursor = this._collection.find.apply(this._collection, arguments);
         return new DBExplainQuery(cursor, this._verbosity);
     };
 
-    this.findAndModify = function(params) {
+    this.findAndModify = function (params) {
         let famCmd = Object.extend({"findAndModify": this._collection.getName()}, params);
         let explainCmd = buildExplainCmd(famCmd, this._verbosity);
         let explainResult = this._collection.runReadCommand(explainCmd);
         return throwOrReturn(explainResult);
     };
 
-    this.distinct = function(keyString, query, options) {
+    this.distinct = function (keyString, query, options) {
         let distinctCmd = {
             distinct: this._collection.getName(),
             key: keyString,
-            query: query || {}
+            query: query || {},
         };
 
         if (options && options.hasOwnProperty("collation")) {
@@ -177,7 +176,7 @@ function Explainable(collection, verbosity) {
         return throwOrReturn(explainResult);
     };
 
-    this.remove = function() {
+    this.remove = function () {
         let parsed = this._collection._parseRemove.apply(this._collection, arguments);
         let query = parsed.query;
         let justOne = parsed.justOne;
@@ -207,7 +206,7 @@ function Explainable(collection, verbosity) {
         return throwOrReturn(explainResult);
     };
 
-    this.update = function() {
+    this.update = function () {
         let parsed = this._collection._parseUpdate.apply(this._collection, arguments);
         let query = parsed.query;
         let updateSpec = parsed.updateSpec;
@@ -253,15 +252,13 @@ function Explainable(collection, verbosity) {
         return throwOrReturn(explainResult);
     };
 
-    this.mapReduce = function(map, reduce, optionsObjOrOutString) {
+    this.mapReduce = function (map, reduce, optionsObjOrOutString) {
         assert(optionsObjOrOutString, "Must supply the 'optionsObjOrOutString ' argument");
 
         const mapReduceCmd = {mapreduce: this._collection.getName(), map: map, reduce: reduce};
 
-        if (typeof (optionsObjOrOutString) == "string")
-            mapReduceCmd["out"] = optionsObjOrOutString;
-        else
-            Object.extend(mapReduceCmd, optionsObjOrOutString);
+        if (typeof optionsObjOrOutString == "string") mapReduceCmd["out"] = optionsObjOrOutString;
+        else Object.extend(mapReduceCmd, optionsObjOrOutString);
 
         const explainCmd = buildExplainCmd(mapReduceCmd, this._verbosity);
         const explainResult = this._collection.runCommand(explainCmd);
@@ -366,17 +363,9 @@ function sbeReformatExperimental(explain, fieldsToKeep) {
         "totalDocsExamined",
     ];
 
-    const kTrialSummaryStats = [
-        "nReturned",
-        "executionTimeMillisEstimate",
-        "totalKeysExamined",
-        "totalDocsExamined",
-    ];
+    const kTrialSummaryStats = ["nReturned", "executionTimeMillisEstimate", "totalKeysExamined", "totalDocsExamined"];
 
-    const kAggregateStats = [
-        "seeks",
-        "numReads",
-    ];
+    const kAggregateStats = ["seeks", "numReads"];
 
     // Given either a query solution or an SBE tree represented by 'root', walks the tree and
     // calls 'callbackFn()' for each node. This is done in a bottom-up manner so that the
@@ -388,8 +377,7 @@ function sbeReformatExperimental(explain, fieldsToKeep) {
             }
         }
 
-        for (let childStageName
-                 of ["inputStage", "thenStage", "elseStage", "outerStage", "innerStage"]) {
+        for (let childStageName of ["inputStage", "thenStage", "elseStage", "outerStage", "innerStage"]) {
             if (childStageName in root) {
                 walkTree(root[childStageName], callbackFn);
             }
@@ -489,10 +477,8 @@ function sbeReformatExperimental(explain, fieldsToKeep) {
         for (let i = 0; i < reformatted.length; ++i) {
             assert(allPlansExecution[i].hasOwnProperty("executionStages"));
             reformatted[i].trialSlotBasedPlanVerbose = allPlansExecution[i].executionStages;
-            fillAggregatedExecStats(
-                allPlansExecution[i], reformatted[i].queryPlan, "trialExecStats");
-            addSummaryStats(
-                allPlansExecution[i], "trialSummaryStats", kTrialSummaryStats, reformatted[i]);
+            fillAggregatedExecStats(allPlansExecution[i], reformatted[i].queryPlan, "trialExecStats");
+            addSummaryStats(allPlansExecution[i], "trialSummaryStats", kTrialSummaryStats, reformatted[i]);
         }
     }
 
@@ -677,8 +663,7 @@ function sbeReformatExperimental(explain, fieldsToKeep) {
     }
 
     const queryPlanner = explain.queryPlanner;
-    const isShardedFind = queryPlanner && queryPlanner.winningPlan &&
-        queryPlanner.winningPlan.hasOwnProperty("shards");
+    const isShardedFind = queryPlanner && queryPlanner.winningPlan && queryPlanner.winningPlan.hasOwnProperty("shards");
     if (isShardedFind) {
         return doShardedFindReformatting(explain, fieldsToKeepSet);
     }
@@ -709,7 +694,8 @@ Explain.sbeReformatExperimental(<explain>, <fieldsToKeep>)
 
 \t<explain> - output from an explain operation
 \t<fieldsToKeep> - an optional array of field names to include for each candidate plan
-`);
+`,
+    );
     return __magicNoPrint;
 }
 
@@ -721,7 +707,7 @@ const Explain = {
 /**
  * This is the user-facing method for creating an Explainable from a collection.
  */
-DBCollection.prototype.explain = function(verbosity) {
+DBCollection.prototype.explain = function (verbosity) {
     return new Explainable(this, verbosity);
 };
 

@@ -23,9 +23,9 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 const isUnifiedWriteExecutor = db.adminCommand({
-                                     getParameter: 1,
-                                     internalQueryUnifiedWriteExecutor: 1
-                                 }).internalQueryUnifiedWriteExecutor;
+    getParameter: 1,
+    internalQueryUnifiedWriteExecutor: 1,
+}).internalQueryUnifiedWriteExecutor;
 
 const dbName = "test";
 const collName = "write_conflicts_with_non_txns";
@@ -38,7 +38,7 @@ testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -59,10 +59,13 @@ function singleDocWrite(dbName, collName, op) {
 function writeStarted(opType) {
     // In the unified write executor, the opType is 'bulkWrite' instead of 'insert', 'update', or
     // 'remove' due to an internal implementation detail.
-    return testDB.currentOp().inprog.some(op => {
-        return op.active && (op.ns === testColl.getFullName()) &&
+    return testDB.currentOp().inprog.some((op) => {
+        return (
+            op.active &&
+            op.ns === testColl.getFullName() &&
             (op.op === opType || (isUnifiedWriteExecutor && op.op === "bulkWrite")) &&
-            (op.writeConflicts > 0);
+            op.writeConflicts > 0
+        );
     });
 }
 
@@ -75,8 +78,12 @@ function validateWriteConflictsBeforeAndAfter(before, after, exact = false) {
         // a single op into multiple writes and causes multiple WCEs. In the unified write executor,
         // the opType is 'bulkWrite' instead of 'insert', 'update', or 'remove' due to an internal
         // implementation detail.
-        if (FixtureHelpers.isSharded(testColl) || TestData.runningWithBulkWriteOverride || !exact ||
-            isUnifiedWriteExecutor) {
+        if (
+            FixtureHelpers.isSharded(testColl) ||
+            TestData.runningWithBulkWriteOverride ||
+            !exact ||
+            isUnifiedWriteExecutor
+        ) {
             assert.gte(after, before + 1);
         } else {
             assert.eq(after, before + 1);
@@ -108,8 +115,7 @@ function TWriteFirst(txnOp, nonTxnOp, nonTxnOpType, expectedDocs, initOp) {
             assert.commandWorked(sessionColl.runCommand(txnOp));
 
             jsTestLog("Doing conflicting single document write in separate thread.");
-            const writeConflictsBefore =
-                WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
+            const writeConflictsBefore = WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
             let thread = new Thread(singleDocWrite, dbName, collName, nonTxnOp);
             thread.start();
 
@@ -124,13 +130,13 @@ function TWriteFirst(txnOp, nonTxnOp, nonTxnOpType, expectedDocs, initOp) {
             assert.commandWorked(thread.returnData());
 
             // Validate that a write conflict was detected
-            const writeConflictsAfter =
-                WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
+            const writeConflictsAfter = WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
             validateWriteConflictsBeforeAndAfter(writeConflictsBefore, writeConflictsAfter);
         },
         () => {
             session.abortTransaction_forTesting();
-        });
+        },
+    );
 
     // Check the final documents.
     assert.sameMembers(expectedDocs, testColl.find().toArray());
@@ -164,19 +170,16 @@ function TWriteSecond(txnOp, nonTxnOp, expectedDocs, initOp) {
             assert.commandWorked(testColl.runCommand(nonTxnOp));
 
             jsTestLog("Executing a conflicting document Op inside the multi-document transaction.");
-            const writeConflictsBefore =
-                WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
+            const writeConflictsBefore = WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
             assert.commandFailedWithCode(sessionColl.runCommand(txnOp), ErrorCodes.WriteConflict);
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                         ErrorCodes.NoSuchTransaction);
-            const writeConflictsAfter =
-                WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
-            validateWriteConflictsBeforeAndAfter(
-                writeConflictsBefore, writeConflictsAfter, true /*exact*/);
+            assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+            const writeConflictsAfter = WriteConflictHelpers.getWriteConflictsFromAllShards(testColl);
+            validateWriteConflictsBeforeAndAfter(writeConflictsBefore, writeConflictsAfter, true /*exact*/);
         },
         () => {
             session.abortTransaction_forTesting();
-        });
+        },
+    );
 
     // Check the final documents.
     assert.sameMembers(expectedDocs, testColl.find().toArray());
@@ -190,11 +193,11 @@ jsTestLog("insert-insert conflict.");
 // non-transactional write, respectively.
 txnOp = {
     insert: collName,
-    documents: [{_id: 1}]
+    documents: [{_id: 1}],
 };
 nonTxnOp = {
     insert: collName,
-    documents: [{_id: 1, nonTxn: true}]
+    documents: [{_id: 1, nonTxn: true}],
 };
 expectedDocs = [{_id: 1, nonTxn: true}];
 TWriteFirst(txnOp, nonTxnOp, "insert", expectedDocs);
@@ -203,15 +206,15 @@ TWriteSecond(txnOp, nonTxnOp, expectedDocs);
 jsTestLog("update-update conflict.");
 initOp = {
     insert: collName,
-    documents: [{_id: 1}]
-};  // the document to update.
+    documents: [{_id: 1}],
+}; // the document to update.
 txnOp = {
     update: collName,
-    updates: [{q: {_id: 1}, u: {$set: {t1: 1}}}]
+    updates: [{q: {_id: 1}, u: {$set: {t1: 1}}}],
 };
 nonTxnOp = {
     update: collName,
-    updates: [{q: {_id: 1}, u: {$set: {t2: 1}}}]
+    updates: [{q: {_id: 1}, u: {$set: {t2: 1}}}],
 };
 expectedDocs = [{_id: 1, t2: 1}];
 TWriteFirst(txnOp, nonTxnOp, "update", expectedDocs, initOp);
@@ -220,11 +223,11 @@ TWriteSecond(txnOp, nonTxnOp, expectedDocs, initOp);
 jsTestLog("upsert-upsert conflict");
 txnOp = {
     update: collName,
-    updates: [{q: {_id: 1}, u: {$set: {t1: 1}}, upsert: true}]
+    updates: [{q: {_id: 1}, u: {$set: {t1: 1}}, upsert: true}],
 };
 nonTxnOp = {
     update: collName,
-    updates: [{q: {_id: 1}, u: {$set: {t2: 1}}, upsert: true}]
+    updates: [{q: {_id: 1}, u: {$set: {t2: 1}}, upsert: true}],
 };
 expectedDocs = [{_id: 1, t2: 1}];
 TWriteFirst(txnOp, nonTxnOp, "update", expectedDocs);
@@ -233,15 +236,15 @@ TWriteSecond(txnOp, nonTxnOp, expectedDocs);
 jsTestLog("delete-delete conflict");
 initOp = {
     insert: collName,
-    documents: [{_id: 1}]
-};  // the document to delete.
+    documents: [{_id: 1}],
+}; // the document to delete.
 txnOp = {
     delete: collName,
-    deletes: [{q: {_id: 1}, limit: 1}]
+    deletes: [{q: {_id: 1}, limit: 1}],
 };
 nonTxnOp = {
     delete: collName,
-    deletes: [{q: {_id: 1}, limit: 1}]
+    deletes: [{q: {_id: 1}, limit: 1}],
 };
 expectedDocs = [];
 TWriteFirst(txnOp, nonTxnOp, "remove", expectedDocs, initOp);
@@ -250,15 +253,15 @@ TWriteSecond(txnOp, nonTxnOp, expectedDocs, initOp);
 jsTestLog("update-delete conflict");
 initOp = {
     insert: collName,
-    documents: [{_id: 1}]
-};  // the document to delete/update.
+    documents: [{_id: 1}],
+}; // the document to delete/update.
 txnOp = {
     update: collName,
-    updates: [{q: {_id: 1}, u: {$set: {t1: 1}}}]
+    updates: [{q: {_id: 1}, u: {$set: {t1: 1}}}],
 };
 nonTxnOp = {
     delete: collName,
-    deletes: [{q: {_id: 1}, limit: 1}]
+    deletes: [{q: {_id: 1}, limit: 1}],
 };
 expectedDocs = [];
 TWriteFirst(txnOp, nonTxnOp, "remove", expectedDocs, initOp);
@@ -267,15 +270,15 @@ TWriteSecond(txnOp, nonTxnOp, expectedDocs, initOp);
 jsTestLog("delete-update conflict");
 initOp = {
     insert: collName,
-    documents: [{_id: 1}]
-};  // the document to delete/update.
+    documents: [{_id: 1}],
+}; // the document to delete/update.
 txnOp = {
     delete: collName,
-    deletes: [{q: {_id: 1}, limit: 1}]
+    deletes: [{q: {_id: 1}, limit: 1}],
 };
 nonTxnOp = {
     update: collName,
-    updates: [{q: {_id: 1}, u: {$set: {t2: 1}}}]
+    updates: [{q: {_id: 1}, u: {$set: {t2: 1}}}],
 };
 expectedDocs = [{_id: 1, t2: 1}];
 TWriteFirst(txnOp, nonTxnOp, "update", expectedDocs, initOp);

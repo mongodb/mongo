@@ -9,7 +9,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {createSearchIndex} from "jstests/libs/search.js";
 import {
     createSearchIndexesAndExecuteTests,
-    validateSearchExplain
+    validateSearchExplain,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 // This test is only run once (not with both storedSource values) since the BSON size limit behavior
@@ -34,7 +34,7 @@ const fieldNamePrefix = "large_field_";
 let fieldNum = 0;
 let pipeline = [];
 
-for (let currentSize = 0; currentSize < targetSize;) {
+for (let currentSize = 0; currentSize < targetSize; ) {
     // Add large stage to pipeline.
     const stage = {$addFields: {[`${fieldNamePrefix}${fieldNum}`]: largeString}};
     pipeline.push(stage);
@@ -52,37 +52,44 @@ const view = testDb[viewName];
 
 const indexConfig = {
     coll: view,
-    definition: {name: "viewNameIndex", definition: {"mappings": {"dynamic": true}}}
+    definition: {name: "viewNameIndex", definition: {"mappings": {"dynamic": true}}},
 };
 
 const maxSizeRequestTestCases = (isStoredSource) => {
     // Error case 1: Index name too large.
-    assert.throwsWithCode(() => createSearchIndex(view, {
-                              name: "tooLargeNameIndex".repeat(1024 * 52),
-                              definition: {"mappings": {"dynamic": true}}
-                          }),
-                          ErrorCodes.BSONObjectTooLarge);
+    assert.throwsWithCode(
+        () =>
+            createSearchIndex(view, {
+                name: "tooLargeNameIndex".repeat(1024 * 52),
+                definition: {"mappings": {"dynamic": true}},
+            }),
+        ErrorCodes.BSONObjectTooLarge,
+    );
 
     // Error case 2: Index definition too large.
     assert.throwsWithCode(
-        () => createSearchIndex(view, {
-            name: "tooLargeDefinitionIndex",
-            definition: {
-                "mappings": {"dynamic": true},
-                "fields": {"large_metadata": {"type": "string", "meta": "b".repeat(1024 * 800)}}
-            }
-        }),
-        ErrorCodes.BSONObjectTooLarge);
+        () =>
+            createSearchIndex(view, {
+                name: "tooLargeDefinitionIndex",
+                definition: {
+                    "mappings": {"dynamic": true},
+                    "fields": {"large_metadata": {"type": "string", "meta": "b".repeat(1024 * 800)}},
+                },
+            }),
+        ErrorCodes.BSONObjectTooLarge,
+    );
 
     // Ensure that a simple query can be run on the successful search index after the expected
     // failures.
-    const normalSearchQuery = [{
-        $search: {
-            index: "viewNameIndex",
-            text: {query: "test", path: "category"},
-            returnStoredSource: isStoredSource
-        }
-    }];
+    const normalSearchQuery = [
+        {
+            $search: {
+                index: "viewNameIndex",
+                text: {query: "test", path: "category"},
+                returnStoredSource: isStoredSource,
+            },
+        },
+    ];
 
     // We can only assert that the view is applied correctly for the single_node suite and
     // single_shard suite (numberOfShardsForCollection() will return 1 in a single node

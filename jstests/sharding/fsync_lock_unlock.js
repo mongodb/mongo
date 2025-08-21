@@ -7,26 +7,21 @@
  */
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    moveDatabaseAndUnshardedColls
-} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
+import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 const dbName = "test";
 const collName = "collTest";
 const ns = dbName + "." + collName;
-const st =
-    new ShardingTest({shards: 2, mongos: 1, config: 1, configShard: true, enableBalancer: true});
-const adminDB = st.s.getDB('admin');
+const st = new ShardingTest({shards: 2, mongos: 1, config: 1, configShard: true, enableBalancer: true});
+const adminDB = st.s.getDB("admin");
 const distributed_txn_insert_count = 10;
 
 function waitUntilOpCountIs(opFilter, num, st) {
     assert.soon(() => {
-        let ops = st.s.getDB('admin')
-                      .aggregate([
-                          {$currentOp: {}},
-                          {$match: opFilter},
-                      ])
-                      .toArray();
+        let ops = st.s
+            .getDB("admin")
+            .aggregate([{$currentOp: {}}, {$match: opFilter}])
+            .toArray();
         if (ops.length != num) {
             jsTest.log("Num operations: " + ops.length + ", expected: " + num);
             jsTest.log(ops);
@@ -37,8 +32,7 @@ function waitUntilOpCountIs(opFilter, num, st) {
 }
 
 async function runTransaction() {
-    const {withTxnAndAutoRetryOnMongos} =
-        await import("jstests/libs/auto_retry_transaction_in_sharding.js");
+    const {withTxnAndAutoRetryOnMongos} = await import("jstests/libs/auto_retry_transaction_in_sharding.js");
 
     // Start the transaction and insert a document.
     const sessionOptions = {causalConsistency: false};
@@ -48,17 +42,21 @@ async function runTransaction() {
 
     session.endSession();
 
-    withTxnAndAutoRetryOnMongos(session, () => {
-        for (let i = 0; i < 10; i++) {
-            assert.commandWorked(sessionColl.insert({x: i}));
-        }
-    }, {});
+    withTxnAndAutoRetryOnMongos(
+        session,
+        () => {
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(sessionColl.insert({x: i}));
+            }
+        },
+        {},
+    );
 
     jsTest.log("END txn in parallel shell");
 }
 
 let collectionCount = 1;
-const performFsyncLockUnlockWithReadWriteOperations = function() {
+const performFsyncLockUnlockWithReadWriteOperations = function () {
     // lock then unlock
     assert.commandWorked(st.s.adminCommand({fsync: 1, lock: true}));
 
@@ -71,7 +69,7 @@ const performFsyncLockUnlockWithReadWriteOperations = function() {
 
     let writeOpHandle = startParallelShell(codeToRun, st.s.port);
 
-    waitUntilOpCountIs({op: 'insert', ns: 'test.collTest', waitingForLock: true}, 1, st);
+    waitUntilOpCountIs({op: "insert", ns: "test.collTest", waitingForLock: true}, 1, st);
 
     // Make sure reads can still run even though there is a pending write and also that the write
     // didn't get through.

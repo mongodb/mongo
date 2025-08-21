@@ -7,7 +7,7 @@
  */
 const originalStartWithArgs = MongoRunner._startWithArgs;
 
-MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
+MongoRunner._startWithArgs = function (argArray, env, waitForConnect) {
     // Remove all setParameters by iteratively matching the pattern ["--setParameter", "name=value"]
     // and deleting both entries from the arg array.
     let idx = argArray.indexOf("--setParameter");
@@ -37,13 +37,11 @@ MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
 };
 
 const conn = MongoRunner.runMongod();
-const db = conn.getDB('admin');
+const db = conn.getDB("admin");
 
 // We shouldn't be able to fetch test-only server or cluster parameters.
-assert.commandFailedWithCode(db.runCommand({getParameter: 1, requireApiVersion: 1}),
-                             ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(db.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(db.runCommand({getParameter: 1, requireApiVersion: 1}), ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(db.runCommand({getClusterParameter: "cwspTestNeedsLatestFCV"}), ErrorCodes.BadValue);
 
 MongoRunner.stopMongod(conn);
 MongoRunner._startWithArgs = originalStartWithArgs;

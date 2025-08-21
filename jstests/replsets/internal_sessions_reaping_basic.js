@@ -7,10 +7,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    makeCommitTransactionCmdObj,
-    makeLsidFilter
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {makeCommitTransactionCmdObj, makeLsidFilter} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // This test runs the reapLogicalSessionCacheNow command. That can lead to direct writes to the
 // config.transactions collection, which cannot be performed on a session.
@@ -23,9 +20,9 @@ const rst = new ReplSetTest({
             maxSessions: 1,
             // Make transaction records expire immediately.
             TransactionRecordMinimumLifetimeMinutes: 0,
-            internalSessionsReapThreshold: 0
-        }
-    }
+            internalSessionsReapThreshold: 0,
+        },
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -46,14 +43,16 @@ const collName = "testColl";
 const testDB = primary.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
-assert.commandWorked(testDB.runCommand({
-    insert: collName,
-    documents: [{_id: 0}, {_id: 1}],
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        insert: collName,
+        documents: [{_id: 0}, {_id: 1}],
+    }),
+);
 
 const sessionUUID = UUID();
 const parentLsid = {
-    id: sessionUUID
+    id: sessionUUID,
 };
 const parentLsidFilter = makeLsidFilter(parentLsid, "_id");
 let parentTxnNumber = 0;
@@ -62,17 +61,21 @@ const childTxnNumber = NumberLong(0);
 let numTransactionsCollEntriesReaped = 0;
 
 {
-    jsTest.log("Test reaping when there is an expired internal transaction session for a " +
-               "non-retryable write without an open transaction");
+    jsTest.log(
+        "Test reaping when there is an expired internal transaction session for a " +
+            "non-retryable write without an open transaction",
+    );
 
     parentTxnNumber++;
-    assert.commandWorked(testDB.runCommand({
-        findAndModify: collName,
-        query: {_id: 0},
-        update: {$set: {x: 0}},
-        lsid: parentLsid,
-        txnNumber: NumberLong(parentTxnNumber),
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            findAndModify: collName,
+            query: {_id: 0},
+            update: {$set: {x: 0}},
+            lsid: parentLsid,
+            txnNumber: NumberLong(parentTxnNumber),
+        }),
+    );
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
     assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
     assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
@@ -80,17 +83,18 @@ let numTransactionsCollEntriesReaped = 0;
 
     const childLsid = {id: sessionUUID, txnUUID: UUID()};
     const childLsidFilter = makeLsidFilter(childLsid, "_id");
-    assert.commandWorked(testDB.runCommand({
-        findAndModify: collName,
-        query: {_id: 0},
-        update: {$set: {y: 0}},
-        lsid: childLsid,
-        txnNumber: childTxnNumber,
-        startTransaction: true,
-        autocommit: false
-    }));
     assert.commandWorked(
-        testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        testDB.runCommand({
+            findAndModify: collName,
+            query: {_id: 0},
+            update: {$set: {y: 0}},
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
 
     assert.eq({_id: 0, x: 0, y: 0}, testColl.findOne({_id: 0}));
 
@@ -126,17 +130,21 @@ let numTransactionsCollEntriesReaped = 0;
 }
 
 {
-    jsTest.log("Test reaping when there is an expired internal transaction session for a " +
-               "previous retryable write (i.e. with an old txnNumber)");
+    jsTest.log(
+        "Test reaping when there is an expired internal transaction session for a " +
+            "previous retryable write (i.e. with an old txnNumber)",
+    );
 
     parentTxnNumber++;
-    assert.commandWorked(testDB.runCommand({
-        findAndModify: collName,
-        query: {_id: 1},
-        update: {$set: {x: 1}},
-        lsid: parentLsid,
-        txnNumber: NumberLong(parentTxnNumber),
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            findAndModify: collName,
+            query: {_id: 1},
+            update: {$set: {x: 1}},
+            lsid: parentLsid,
+            txnNumber: NumberLong(parentTxnNumber),
+        }),
+    );
     assert.commandWorked(primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
     assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
     assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
@@ -145,30 +153,33 @@ let numTransactionsCollEntriesReaped = 0;
     parentTxnNumber++;
     const childLsid = {id: sessionUUID, txnNumber: NumberLong(parentTxnNumber), txnUUID: UUID()};
     const childLsidFilter = makeLsidFilter(childLsid, "_id");
-    assert.commandWorked(testDB.runCommand({
-        findAndModify: collName,
-        query: {_id: 1},
-        update: {$set: {y: 1}},
-        lsid: childLsid,
-        txnNumber: childTxnNumber,
-        startTransaction: true,
-        autocommit: false
-    }));
     assert.commandWorked(
-        testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
+        testDB.runCommand({
+            findAndModify: collName,
+            query: {_id: 1},
+            update: {$set: {y: 1}},
+            lsid: childLsid,
+            txnNumber: childTxnNumber,
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(childLsid, childTxnNumber)));
 
     assert.eq({_id: 1, x: 1, y: 1}, testColl.findOne({_id: 1}));
 
     parentTxnNumber++;
-    assert.commandWorked(testDB.runCommand({
-        findAndModify: collName,
-        query: {_id: 1},
-        update: {$set: {y: 1}},
-        lsid: parentLsid,
-        txnNumber: NumberLong(parentTxnNumber),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            findAndModify: collName,
+            query: {_id: 1},
+            update: {$set: {y: 1}},
+            lsid: parentLsid,
+            txnNumber: NumberLong(parentTxnNumber),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
     // Verify that the config.transactions and config.image_collection entries for the internal
     // transaction session do not get reaped automatically when the new txnNumber started since
@@ -189,8 +200,7 @@ let numTransactionsCollEntriesReaped = 0;
     assert.eq(1, imageColl.find(parentLsidFilter).itcount());
     assert.eq(1, imageColl.find(childLsidFilter).itcount());
 
-    assert.commandWorked(
-        testDB.adminCommand(makeCommitTransactionCmdObj(parentLsid, parentTxnNumber)));
+    assert.commandWorked(testDB.adminCommand(makeCommitTransactionCmdObj(parentLsid, parentTxnNumber)));
     assert.eq({_id: 1, x: 1, y: 1}, testColl.findOne({_id: 1}));
     assert.eq(1, sessionsColl.find({"_id.id": sessionUUID}).itcount());
     assert.eq(1, transactionsColl.find(parentLsidFilter).itcount());
@@ -223,7 +233,7 @@ let numTransactionsCollEntriesReaped = 0;
 
 // Validate that writes to config.transactions do not generate oplog entries, with the exception of
 // deletions.
-assert.eq(numTransactionsCollEntriesReaped, oplogColl.find({op: 'd', ns: kConfigTxnsNs}).itcount());
-assert.eq(0, oplogColl.find({op: {'$ne': 'd'}, ns: kConfigTxnsNs}).itcount());
+assert.eq(numTransactionsCollEntriesReaped, oplogColl.find({op: "d", ns: kConfigTxnsNs}).itcount());
+assert.eq(0, oplogColl.find({op: {"$ne": "d"}, ns: kConfigTxnsNs}).itcount());
 
 rst.stopSet();

@@ -1,13 +1,13 @@
 /**
  * Tests that a null embedded malformed string is rejected gracefully.
  */
-var engine = 'wiredTiger';
+var engine = "wiredTiger";
 if (jsTest.options().storageEngine) {
     engine = jsTest.options().storageEngine;
 }
 
 // Skip this test if not running with the right storage engine.
-if (engine !== 'wiredTiger' && engine !== 'inMemory') {
+if (engine !== "wiredTiger" && engine !== "inMemory") {
     jsTest.log('Skipping test because storageEngine is not "wiredTiger" or "inMemory"');
     quit();
 }
@@ -20,7 +20,7 @@ var malformedStrings = ["\u0000000", "\0,", "bl\0ah", "split_pct=30,\0split_pct=
 runTest();
 
 function runTest() {
-    var dbpath = MongoRunner.dataPath + 'wt_malformed_creation_string';
+    var dbpath = MongoRunner.dataPath + "wt_malformed_creation_string";
     resetDbpath(dbpath);
 
     // Start a mongod
@@ -28,28 +28,33 @@ function runTest() {
         dbpath: dbpath,
         noCleanData: true,
     });
-    assert.neq(null, conn, 'mongod was unable to start up');
+    assert.neq(null, conn, "mongod was unable to start up");
 
-    var testDB = conn.getDB('test');
+    var testDB = conn.getDB("test");
 
     // Collection creation with malformed string should fail
     for (var i = 0; i < malformedStrings.length; i++) {
         assert.commandFailedWithCode(
-            testDB.createCollection(
-                'coll', {storageEngine: {[engine]: {configString: malformedStrings[i]}}}),
-            ErrorCodes.FailedToParse);
+            testDB.createCollection("coll", {storageEngine: {[engine]: {configString: malformedStrings[i]}}}),
+            ErrorCodes.FailedToParse,
+        );
     }
 
     // Create collection to test index creation on
-    assert.commandWorked(testDB.createCollection('coll'));
+    assert.commandWorked(testDB.createCollection("coll"));
 
     // Index creation with malformed string should fail
     for (var i = 0; i < malformedStrings.length; i++) {
-        assert.commandFailedWithCode(testDB.coll.createIndex({a: 1}, {
-            name: 'with_malformed_str',
-            storageEngine: {[engine]: {configString: malformedStrings[i]}}
-        }),
-                                     ErrorCodes.FailedToParse);
+        assert.commandFailedWithCode(
+            testDB.coll.createIndex(
+                {a: 1},
+                {
+                    name: "with_malformed_str",
+                    storageEngine: {[engine]: {configString: malformedStrings[i]}},
+                },
+            ),
+            ErrorCodes.FailedToParse,
+        );
     }
 
     MongoRunner.stopMongod(conn);

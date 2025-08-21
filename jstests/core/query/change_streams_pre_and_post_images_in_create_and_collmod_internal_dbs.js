@@ -13,7 +13,7 @@
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
-const collName = 'changeStreamPreAndPostImages';
+const collName = "changeStreamPreAndPostImages";
 
 if (!TestData.testingReplicaSetEndpoint) {
     const adminDB = db.getSiblingDB("admin");
@@ -26,11 +26,13 @@ if (!TestData.testingReplicaSetEndpoint) {
         assertDropCollection(db, collName);
         assert.commandFailedWithCode(
             db.runCommand({create: collName, changeStreamPreAndPostImages: {enabled: true}}),
-            ErrorCodes.InvalidOptions);
+            ErrorCodes.InvalidOptions,
+        );
 
         assert.commandWorked(db.runCommand({create: collName}));
         assert.commandFailedWithCode(
             db.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}),
-            ErrorCodes.InvalidOptions);
+            ErrorCodes.InvalidOptions,
+        );
     }
 }

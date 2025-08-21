@@ -22,16 +22,13 @@ assert.eq(t.count(), 2, "Not right length");
 // use simple index
 assert.commandWorked(t.createIndex({a: 1}));
 let plan = t.find({a: 1}).explain();
-assert(!isIndexOnly(db, getWinningPlanFromExplain(plan)),
-       "Find using covered index but all fields are returned");
+assert(!isIndexOnly(db, getWinningPlanFromExplain(plan)), "Find using covered index but all fields are returned");
 plan = t.find({a: 1}, {a: 1}).explain();
-assert(!isIndexOnly(db, getWinningPlanFromExplain(plan)),
-       "Find using covered index but _id is returned");
+assert(!isIndexOnly(db, getWinningPlanFromExplain(plan)), "Find using covered index but _id is returned");
 plan = t.find({a: 1}, {a: 1, _id: 0}).explain();
 assert(isIndexOnly(db, getWinningPlanFromExplain(plan)), "Find is not using covered index");
 
 // add multikey
 assert.commandWorked(t.insert({a: [3, 4]}));
 plan = t.find({a: 1}, {a: 1, _id: 0}).explain();
-assert(!isIndexOnly(db, getWinningPlanFromExplain(plan)),
-       "Find is using covered index even after multikey insert");
+assert(!isIndexOnly(db, getWinningPlanFromExplain(plan)), "Find is using covered index even after multikey insert");

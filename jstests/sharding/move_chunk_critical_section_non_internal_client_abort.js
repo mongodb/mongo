@@ -16,8 +16,7 @@ const ns = dbName + "." + collName;
 
 const st = new ShardingTest({shards: 2});
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 0}));
 assert.commandWorked(st.s.getDB(dbName).getCollection(collName).insert({_id: 1}));
@@ -25,17 +24,28 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 // Pause the moveChunk while it is in the critical section.
 const fp = configureFailPoint(st.shard0, "moveChunkHangAtStep5");
-const awaitResult =
-    startParallelShell(funWithArgs(function(ns, toShardName) {
-                           assert.commandFailedWithCode(
-                               db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
-                               ErrorCodes.Interrupted);
-                       }, ns, st.shard1.shardName), st.s.port);
+const awaitResult = startParallelShell(
+    funWithArgs(
+        function (ns, toShardName) {
+            assert.commandFailedWithCode(
+                db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
+                ErrorCodes.Interrupted,
+            );
+        },
+        ns,
+        st.shard1.shardName,
+    ),
+    st.s.port,
+);
 fp.wait();
 
 // Perform a collMod directly on the shard's primary to cause the moveChunk to abort.
-assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
-    {collMod: collName, validationLevel: "off", writeConcern: {w: 1}}));
+assert.commandWorked(
+    st.rs0
+        .getPrimary()
+        .getDB(dbName)
+        .runCommand({collMod: collName, validationLevel: "off", writeConcern: {w: 1}}),
+);
 
 fp.off();
 awaitResult();

@@ -19,7 +19,7 @@ testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 const sessionOptions = {
-    causalConsistency: true
+    causalConsistency: true,
 };
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);

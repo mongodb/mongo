@@ -35,7 +35,8 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
         assert.throws(() => {
             testColl.insert({a: 1});
         });
-    });
+    },
+);
 
 /**
  * Test 2. Corrupt the _mdb_catalog.
@@ -79,7 +80,8 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
     (testColl) => {
         // This insert will crash the server because it triggers the code path
         // of looking for the index file.
-        assert.throws(function() {
+        assert.throws(function () {
             testColl.insert({a: 1});
         });
-    });
+    },
+);

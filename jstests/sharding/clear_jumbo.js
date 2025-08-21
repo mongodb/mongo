@@ -11,11 +11,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 let st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
 const mongosSession = st.s.startSession({retryWrites: true});
-const adminDB = mongosSession.getDatabase('admin');
-const configDB = mongosSession.getDatabase('config');
-const testDB = mongosSession.getDatabase('test');
-const testColl = testDB.getCollection('range');
-const hashedTestColl = testDB.getCollection('hashed');
+const adminDB = mongosSession.getDatabase("admin");
+const configDB = mongosSession.getDatabase("config");
+const testDB = mongosSession.getDatabase("test");
+const testColl = testDB.getCollection("range");
+const hashedTestColl = testDB.getCollection("hashed");
 
 function runBalancer(coll) {
     st.startBalancer();
@@ -29,7 +29,7 @@ function runBalancer(coll) {
 }
 
 function createJumboChunk(coll, keyValue) {
-    const largeString = 'X'.repeat(1024 * 1024);  // 1 MB
+    const largeString = "X".repeat(1024 * 1024); // 1 MB
 
     // Create sufficient documents to create a jumbo chunk, and use the same shard key in all of
     // them so that the chunk cannot be split.
@@ -47,9 +47,8 @@ function validateJumboFlag(ns, query) {
 }
 
 // Initializing test database
-assert.commandWorked(
-    adminDB.runCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
-assert.commandWorked(adminDB.runCommand({addShardToZone: st.shard1.shardName, zone: 'ZoneShard1'}));
+assert.commandWorked(adminDB.runCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(adminDB.runCommand({addShardToZone: st.shard1.shardName, zone: "ZoneShard1"}));
 
 ////////////////////////////////////////////////////////////////////////////
 // Ranged shard key
@@ -84,7 +83,7 @@ assert.eq(docCount.n, 0);
 // Hashed shard key
 testNs = hashedTestColl.getFullName();
 
-assert.commandWorked(adminDB.runCommand({shardCollection: testNs, key: {x: 'hashed'}}));
+assert.commandWorked(adminDB.runCommand({shardCollection: testNs, key: {x: "hashed"}}));
 
 createJumboChunk(hashedTestColl, -1);
 validateJumboFlag(testNs, {min: {x: 0}});
@@ -94,15 +93,13 @@ jumboMajorVersionBefore = jumboChunk.lastmod.getTime();
 
 // Target non-jumbo chunk should not affect real jumbo chunk.
 let unrelatedChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: MinKey}});
-assert.commandWorked(
-    adminDB.runCommand({clearJumboFlag: testNs, bounds: [unrelatedChunk.min, unrelatedChunk.max]}));
+assert.commandWorked(adminDB.runCommand({clearJumboFlag: testNs, bounds: [unrelatedChunk.min, unrelatedChunk.max]}));
 jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(jumboChunk.jumbo, tojson(jumboChunk));
 assert.eq(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
 
 // Target real jumbo chunk should bump version.
-assert.commandWorked(
-    adminDB.runCommand({clearJumboFlag: testNs, bounds: [jumboChunk.min, jumboChunk.max]}));
+assert.commandWorked(adminDB.runCommand({clearJumboFlag: testNs, bounds: [jumboChunk.min, jumboChunk.max]}));
 jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(!jumboChunk.jumbo, tojson(jumboChunk));
 assert.lt(jumboMajorVersionBefore, jumboChunk.lastmod.getTime());
@@ -124,8 +121,9 @@ testNs = testColl.getFullName();
 
 st.stopBalancer();
 
-assert.commandWorked(adminDB.runCommand(
-    {updateZoneKeyRange: testNs, min: {x: 0}, max: {x: MaxKey}, zone: 'ZoneShard1'}));
+assert.commandWorked(
+    adminDB.runCommand({updateZoneKeyRange: testNs, min: {x: 0}, max: {x: MaxKey}, zone: "ZoneShard1"}),
+);
 
 createJumboChunk(testColl, 0);
 validateJumboFlag(testNs, {min: {x: 0}});

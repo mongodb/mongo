@@ -40,12 +40,12 @@ for (const updateType of ["modifier", "replacement", "pipeline"]) {
             const sampleId = UUID();
             const cmdObj = {
                 update: collName,
-                updates: [{q: {a: 1}, u: updateOp, multi: false, sampleId}]
+                updates: [{q: {a: 1}, u: updateOp, multi: false, sampleId}],
             };
             return {sampleId, cmdObj};
-        }
+        },
     ];
-    const expectedDiffs = [{a: 'u', b: 'i'}];
+    const expectedDiffs = [{a: "u", b: "i"}];
 
     testCases.push({preImageDocs, postImageDocs, updateType, makeCmdObjFuncs, expectedDiffs});
 }
@@ -53,7 +53,10 @@ for (const updateType of ["modifier", "replacement", "pipeline"]) {
 // multi=true update.
 for (const updateType of ["modifier", "pipeline"]) {
     const preImageDocs = [{a: 0}, {a: 1}];
-    const postImageDocs = [{a: 1, b: 0}, {a: 1, b: 0}];
+    const postImageDocs = [
+        {a: 1, b: 0},
+        {a: 1, b: 0},
+    ];
     const updateOp = (() => {
         switch (updateType) {
             case "modifier":
@@ -64,15 +67,17 @@ for (const updateType of ["modifier", "pipeline"]) {
                 throw "Unexpected update type";
         }
     })();
-    const makeCmdObjFuncs = [(collName) => {
-        const sampleId = UUID();
-        const cmdObj = {
-            update: collName,
-            updates: [{q: {a: {$gte: 0}}, u: updateOp, multi: true, sampleId}]
-        };
-        return {sampleId, cmdObj};
-    }];
-    const expectedDiffs = [{a: 'u', b: 'i'}, {b: 'i'}];
+    const makeCmdObjFuncs = [
+        (collName) => {
+            const sampleId = UUID();
+            const cmdObj = {
+                update: collName,
+                updates: [{q: {a: {$gte: 0}}, u: updateOp, multi: true, sampleId}],
+            };
+            return {sampleId, cmdObj};
+        },
+    ];
+    const expectedDiffs = [{a: "u", b: "i"}, {b: "i"}];
 
     testCases.push({preImageDocs, postImageDocs, updateType, makeCmdObjFuncs, expectedDiffs});
 }
@@ -93,14 +98,16 @@ for (const updateType of ["modifier", "replacement", "pipeline"]) {
                 throw "Unexpected update type";
         }
     })();
-    const makeCmdObjFuncs = [(collName) => {
-        const sampleId = UUID();
-        const cmdObj = {
-            update: collName,
-            updates: [{q: {a: 0}, u: updateOp, multi: false, sampleId}]
-        };
-        return {sampleId, cmdObj};
-    }];
+    const makeCmdObjFuncs = [
+        (collName) => {
+            const sampleId = UUID();
+            const cmdObj = {
+                update: collName,
+                updates: [{q: {a: 0}, u: updateOp, multi: false, sampleId}],
+            };
+            return {sampleId, cmdObj};
+        },
+    ];
     const expectedDiffs = [];
 
     testCases.push({preImageDocs, postImageDocs, updateType, makeCmdObjFuncs, expectedDiffs});
@@ -127,14 +134,16 @@ function testDiffs(rst, testCase, expectSampling) {
 
         const {sampleId, cmdObj} = makeCmdObjFunc(collName);
 
-        jsTest.log(`Testing test case ${tojson({
-            dbName,
-            collName,
-            preImageDocs: testCase.preImageDocs,
-            postImageDocs: testCase.postImageDocs,
-            updateType: testCase.updateType,
-            cmdObj
-        })}`);
+        jsTest.log(
+            `Testing test case ${tojson({
+                dbName,
+                collName,
+                preImageDocs: testCase.preImageDocs,
+                postImageDocs: testCase.postImageDocs,
+                updateType: testCase.updateType,
+                cmdObj,
+            })}`,
+        );
         const res = assert.commandWorked(db.runCommand(cmdObj));
 
         const cmdName = Object.keys(cmdObj)[0];
@@ -151,7 +160,12 @@ function testDiffs(rst, testCase, expectSampling) {
 
         if (expectSampling && testCase.expectedDiffs.length > 0) {
             QuerySamplingUtil.assertSoonSingleSampledDiffDocument(
-                primary, sampleId, ns, collectionUuid, testCase.expectedDiffs);
+                primary,
+                sampleId,
+                ns,
+                collectionUuid,
+                testCase.expectedDiffs,
+            );
         } else {
             // Wait for one interval before asserting to verify that the writes did not occur.
             sleep(queryAnalysisWriterIntervalSecs * 1000);

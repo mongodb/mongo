@@ -24,18 +24,18 @@ const ns = dbName + "." + collName;
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
 
 function waitForFsyncLockToWaitForLock(st, numThreads) {
     assert.soon(() => {
-        let ops = st.s.getDB('admin')
-                      .aggregate([
-                          {$currentOp: {allUsers: true, idleConnections: true}},
-                          {$match: {desc: "fsyncLockWorker", waitingForLock: true}},
-                      ])
-                      .toArray();
+        let ops = st.s
+            .getDB("admin")
+            .aggregate([
+                {$currentOp: {allUsers: true, idleConnections: true}},
+                {$match: {desc: "fsyncLockWorker", waitingForLock: true}},
+            ])
+            .toArray();
         if (ops.length != numThreads) {
             jsTest.log("Num operations: " + ops.length + ", expected: " + numThreads);
             jsTest.log(ops);
@@ -45,25 +45,30 @@ function waitForFsyncLockToWaitForLock(st, numThreads) {
     });
 }
 
-let runTxn = async function(mongosHost, dbName, collName) {
-    const {withTxnAndAutoRetryOnMongos} =
-        await import("jstests/libs/auto_retry_transaction_in_sharding.js");
+let runTxn = async function (mongosHost, dbName, collName) {
+    const {withTxnAndAutoRetryOnMongos} = await import("jstests/libs/auto_retry_transaction_in_sharding.js");
 
     const mongosConn = new Mongo(mongosHost);
-    jsTest.log("Starting a cross-shard transaction with shard0 and shard1 as the participants " +
-               "and shard0 as the coordinator shard");
+    jsTest.log(
+        "Starting a cross-shard transaction with shard0 and shard1 as the participants " +
+            "and shard0 as the coordinator shard",
+    );
 
     let session = mongosConn.startSession();
     withTxnAndAutoRetryOnMongos(session, () => {
-        assert.commandWorked(session.getDatabase(dbName).runCommand({
-            insert: collName,
-            documents: [{x: -1}],
-        }));
+        assert.commandWorked(
+            session.getDatabase(dbName).runCommand({
+                insert: collName,
+                documents: [{x: -1}],
+            }),
+        );
 
-        assert.commandWorked(session.getDatabase(dbName).runCommand({
-            insert: collName,
-            documents: [{x: 1}],
-        }));
+        assert.commandWorked(
+            session.getDatabase(dbName).runCommand({
+                insert: collName,
+                documents: [{x: 1}],
+            }),
+        );
     });
     jsTest.log("Committed the cross-shard transaction");
 };

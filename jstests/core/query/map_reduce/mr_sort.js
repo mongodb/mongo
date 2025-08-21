@@ -28,11 +28,11 @@ t.insert({x: 7});
 t.insert({x: 5});
 t.insert({x: 6});
 
-let m = function() {
+let m = function () {
     emit("a", this.x);
 };
 
-let r = function(k, v) {
+let r = function (k, v) {
     return Array.sum(v);
 };
 

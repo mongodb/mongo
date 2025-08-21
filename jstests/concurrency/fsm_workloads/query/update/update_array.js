@@ -10,8 +10,8 @@
 
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
-    var states = (function() {
+export const $config = (function () {
+    var states = (function () {
         // db: explicitly passed to avoid accidentally using the global `db`
         // res: WriteResult
         // nModifiedPossibilities: array of allowed values for res.nModified
@@ -41,17 +41,17 @@ export const $config = (function() {
             // find the doc and make sure it was updated
             var doc = db[collName].findOne({_id: docIndex});
             assert.neq(null, doc);
-            assert(doc.hasOwnProperty('arr'),
-                   'doc should have contained a field named "arr": ' + tojson(doc));
+            assert(doc.hasOwnProperty("arr"), 'doc should have contained a field named "arr": ' + tojson(doc));
 
             // If the document was invalidated during a yield, then we may not have updated
             // anything. The $push operator always modifies the matched document, so if we
             // matched something, then we must have updated it.
             if (res.nMatched > 0) {
-                assert.contains(value,
-                                doc.arr,
-                                "doc.arr doesn't contain value (" + value +
-                                    ') after $push: ' + tojson(doc.arr));
+                assert.contains(
+                    value,
+                    doc.arr,
+                    "doc.arr doesn't contain value (" + value + ") after $push: " + tojson(doc.arr),
+                );
             }
         }
 
@@ -70,10 +70,11 @@ export const $config = (function() {
             // removed all occurrences of 'value' from the array (meaning that there should be
             // none left).
             if (res.nMatched > 0) {
-                assert.eq(-1,
-                          doc.arr.indexOf(value),
-                          'doc.arr contains removed value (' + value +
-                              ') after $pull: ' + tojson(doc.arr));
+                assert.eq(
+                    -1,
+                    doc.arr.indexOf(value),
+                    "doc.arr contains removed value (" + value + ") after $pull: " + tojson(doc.arr),
+                );
             }
         }
 
@@ -90,7 +91,7 @@ export const $config = (function() {
                 var value = this.tid;
 
                 doPull(db, collName, docIndex, value);
-            }
+            },
         };
     })();
 
@@ -109,10 +110,10 @@ export const $config = (function() {
     return {
         threadCount: 5,
         iterations: 10,
-        startState: 'push',
+        startState: "push",
         states: states,
         transitions: transitions,
         data: {numDocs: 10},
-        setup: setup
+        setup: setup,
     };
 })();

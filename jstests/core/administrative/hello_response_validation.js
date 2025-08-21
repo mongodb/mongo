@@ -12,18 +12,21 @@
 function checkResponseFields(command, commandType) {
     var res = db.runCommand(command);
     // check that the fields that should be there are there and have proper values
-    assert(res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,
-           "maxBsonObjectSize possibly missing:" + tojson(res));
+    assert(
+        res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,
+        "maxBsonObjectSize possibly missing:" + tojson(res),
+    );
     assert(
         res.maxMessageSizeBytes && isNumber(res.maxMessageSizeBytes) && res.maxBsonObjectSize > 0,
-        "maxMessageSizeBytes possibly missing:" + tojson(res));
-    assert(res.maxWriteBatchSize && isNumber(res.maxWriteBatchSize) && res.maxWriteBatchSize > 0,
-           "maxWriteBatchSize possibly missing:" + tojson(res));
+        "maxMessageSizeBytes possibly missing:" + tojson(res),
+    );
+    assert(
+        res.maxWriteBatchSize && isNumber(res.maxWriteBatchSize) && res.maxWriteBatchSize > 0,
+        "maxWriteBatchSize possibly missing:" + tojson(res),
+    );
 
     if (commandType === "hello") {
-        assert.eq("boolean",
-                  typeof res.isWritablePrimary,
-                  "isWritablePrimary field is not a boolean" + tojson(res));
+        assert.eq("boolean", typeof res.isWritablePrimary, "isWritablePrimary field is not a boolean" + tojson(res));
         assert(res.isWritablePrimary === true, "isWritablePrimary field is false" + tojson(res));
     } else {
         assert.eq("boolean", typeof res.ismaster, "ismaster field is not a boolean" + tojson(res));
@@ -49,7 +52,7 @@ function checkResponseFields(command, commandType) {
             "hidden",
             "tags",
             "buildIndexes",
-            "me"
+            "me",
         ];
         var field;
         // check that the fields that shouldn't be there are not there
@@ -63,7 +66,8 @@ function checkResponseFields(command, commandType) {
         }
         assert(
             badFields.length === 0,
-            "\nthe result:\n" + tojson(res) + "\ncontained fields it shouldn't have: " + badFields);
+            "\nthe result:\n" + tojson(res) + "\ncontained fields it shouldn't have: " + badFields,
+        );
     }
 }
 

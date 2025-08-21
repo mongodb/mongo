@@ -7,11 +7,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({shards: 1});
 
-var configDB = st.s.getDB('config');
+var configDB = st.s.getDB("config");
 var shardName = configDB.shards.findOne()._id;
 
-assert.commandWorked(st.s.adminCommand({addShardToZone: shardName, zone: 'x'}));
-assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+assert.commandWorked(st.s.adminCommand({addShardToZone: shardName, zone: "x"}));
+assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
 
 var currentMinBoundary;
 var currentMaxBoundary;
@@ -24,8 +24,9 @@ function testZoneOnShard(ns, testParameters) {
     var errorCodes = testParameters["errorCodes"];
 
     if (errorCodes.length === 0) {
-        assert.commandWorked(st.s.adminCommand(
-            {updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}));
+        assert.commandWorked(
+            st.s.adminCommand({updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}),
+        );
         var tagDoc = configDB.tags.findOne();
         if (zone === null) {
             // Testing basic remove
@@ -39,9 +40,9 @@ function testZoneOnShard(ns, testParameters) {
         }
     } else {
         assert.commandFailedWithCode(
-            st.s.adminCommand(
-                {updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}),
-            errorCodes);
+            st.s.adminCommand({updateZoneKeyRange: ns, min: chunkMinBoundary, max: chunkMaxBoundary, zone: zone}),
+            errorCodes,
+        );
 
         let tagDoc = configDB.tags.findOne();
         verifyChunkBounds(tagDoc, ns, currentMinBoundary, currentMaxBoundary, currentZone);
@@ -56,16 +57,16 @@ function verifyChunkBounds(tagDoc, ns, minKey, maxKey, tag) {
 }
 
 var basicIntegrationTestCases = [
-    {'min': {x: 0}, 'max': {x: 10}, 'zone': 'x', 'errorCodes': []},
-    {'min': {x: -10}, 'max': {x: 20}, 'zone': 'x', 'errorCodes': [ErrorCodes.RangeOverlapConflict]},
+    {"min": {x: 0}, "max": {x: 10}, "zone": "x", "errorCodes": []},
+    {"min": {x: -10}, "max": {x: 20}, "zone": "x", "errorCodes": [ErrorCodes.RangeOverlapConflict]},
     {
-        'min': {x: 10},
-        'max': {x: 0},
-        'zone': 'x',
+        "min": {x: 10},
+        "max": {x: 0},
+        "zone": "x",
         // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
-        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
+        "errorCodes": [ErrorCodes.BadValue, ErrorCodes.FailedToParse],
     },
-    {'min': {x: 0}, 'max': {x: 10}, 'zone': null, 'errorCodes': []}
+    {"min": {x: 0}, "max": {x: 10}, "zone": null, "errorCodes": []},
 ];
 
 /**
@@ -85,9 +86,9 @@ var basicIntegrationTestCases = [
  *
  */
 
-assert.commandWorked(st.s.adminCommand({shardCollection: 'test.ranged', key: {x: 1}}));
-basicIntegrationTestCases.forEach(function(test) {
-    testZoneOnShard('test.ranged', test);
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.ranged", key: {x: 1}}));
+basicIntegrationTestCases.forEach(function (test) {
+    testZoneOnShard("test.ranged", test);
 });
 
 /**
@@ -96,8 +97,8 @@ basicIntegrationTestCases.forEach(function(test) {
  * before
  */
 
-basicIntegrationTestCases.forEach(function(test) {
-    testZoneOnShard('test.unsharded', test);
+basicIntegrationTestCases.forEach(function (test) {
+    testZoneOnShard("test.unsharded", test);
 });
 
 /**
@@ -122,41 +123,41 @@ basicIntegrationTestCases.forEach(function(test) {
  */
 
 var compoundKeyTestCases = [
-    {'min': {_id: 0, x: 0}, 'max': {_id: 100, x: 10}, 'zone': 'x', 'errorCodes': []},
+    {"min": {_id: 0, x: 0}, "max": {_id: 100, x: 10}, "zone": "x", "errorCodes": []},
     {
-        'min': {_id: 100, x: 10},
-        'max': {_id: 100, x: 1},
-        'zone': 'x',
+        "min": {_id: 100, x: 10},
+        "max": {_id: 100, x: 1},
+        "zone": "x",
         // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
-        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
+        "errorCodes": [ErrorCodes.BadValue, ErrorCodes.FailedToParse],
     },
     {
-        'min': {_id: 10, x: 1},
-        'max': {_id: 1, x: 10},
-        'zone': 'x',
+        "min": {_id: 10, x: 1},
+        "max": {_id: 1, x: 10},
+        "zone": "x",
         // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
-        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
+        "errorCodes": [ErrorCodes.BadValue, ErrorCodes.FailedToParse],
     },
     {
-        'min': {_id: 10, x: 10},
-        'max': {_id: 1, x: 1},
-        'zone': 'x',
+        "min": {_id: 10, x: 10},
+        "max": {_id: 1, x: 1},
+        "zone": "x",
         // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
-        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
+        "errorCodes": [ErrorCodes.BadValue, ErrorCodes.FailedToParse],
     },
     {
-        'min': {_id: 0, x: 0},
-        'max': {_id: 0, x: 0},
-        'zone': 'x',
+        "min": {_id: 0, x: 0},
+        "max": {_id: 0, x: 0},
+        "zone": "x",
         // TODO SERVER-96757: remove FailedToParse error code once 9.0 becomes last LTS
-        'errorCodes': [ErrorCodes.BadValue, ErrorCodes.FailedToParse]
+        "errorCodes": [ErrorCodes.BadValue, ErrorCodes.FailedToParse],
     },
-    {'min': {_id: 0, x: 0}, 'max': {_id: 100, x: 10}, 'zone': null, 'errorCodes': []}
+    {"min": {_id: 0, x: 0}, "max": {_id: 100, x: 10}, "zone": null, "errorCodes": []},
 ];
 
-assert.commandWorked(st.s.adminCommand({shardCollection: 'test.compound', key: {_id: 1, x: 1}}));
-compoundKeyTestCases.forEach(function(test) {
-    testZoneOnShard('test.compound', test);
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.compound", key: {_id: 1, x: 1}}));
+compoundKeyTestCases.forEach(function (test) {
+    testZoneOnShard("test.compound", test);
 });
 
 st.stop();

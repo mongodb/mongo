@@ -9,24 +9,18 @@
  *   requires_fcv_82
  * ]
  */
-import {
-    assertDropAndRecreateCollection,
-    assertDropCollection,
-} from "jstests/libs/collection_drop_recreate.js";
-import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
-const kLargeStr = 'x'.repeat(128);
+const kLargeStr = "x".repeat(128);
 const testDB = db.getSiblingDB(jsTestName());
 const dbName = testDB.getName();
-const collName = 'expanded_events_fields';
+const collName = "expanded_events_fields";
 const ns = {
     db: dbName,
-    coll: collName
+    coll: collName,
 };
-const renamedCollName = 'enriched_events_renamed';
+const renamedCollName = "enriched_events_renamed";
 const renamedNs = {
     db: dbName,
     coll: renamedCollName,
@@ -56,7 +50,7 @@ function assertChangeEvent(operation, expectedEvent) {
 // Test change stream event for 'insert' operation.
 assertChangeEvent(() => assert.commandWorked(coll.insert({_id: 0, a: 1})), {
     ns,
-    operationType: 'insert',
+    operationType: "insert",
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 1},
     collectionUUID: getCollectionUuid(ns.coll),
@@ -65,7 +59,7 @@ assertChangeEvent(() => assert.commandWorked(coll.insert({_id: 0, a: 1})), {
 // Test change stream event for replacement-style 'update' operation.
 assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {_id: 0, a: 2})), {
     ns,
-    operationType: 'replace',
+    operationType: "replace",
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 2},
     collectionUUID: getCollectionUuid(ns.coll),
@@ -74,40 +68,38 @@ assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {_id: 0, a: 2
 // Test change stream event for modifier style 'update' operation.
 assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {$inc: {a: 1}})), {
     ns,
-    operationType: 'update',
+    operationType: "update",
     documentKey: {_id: 0},
-    updateDescription:
-        {removedFields: [], updatedFields: {a: 3}, truncatedArrays: [], disambiguatedPaths: {}},
+    updateDescription: {removedFields: [], updatedFields: {a: 3}, truncatedArrays: [], disambiguatedPaths: {}},
     collectionUUID: getCollectionUuid(ns.coll),
 });
 
 // Test change stream event for modifier style 'update' operation with disambiguatedPaths.
 // Set up initial value.
 const update1 = {
-    "arrayWithNumericField": [[{'0': "numeric", a: {'b.c': 1}, field: kLargeStr}]]
+    "arrayWithNumericField": [[{"0": "numeric", a: {"b.c": 1}, field: kLargeStr}]],
 };
 assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {$set: update1})), {
     ns,
-    operationType: 'update',
+    operationType: "update",
     documentKey: {_id: 0},
-    updateDescription:
-        {removedFields: [], updatedFields: update1, truncatedArrays: [], disambiguatedPaths: {}},
+    updateDescription: {removedFields: [], updatedFields: update1, truncatedArrays: [], disambiguatedPaths: {}},
     collectionUUID: getCollectionUuid(ns.coll),
 });
 
 // Update document so that 'disambiguatedPaths' will be populated.
 const update2 = {
-    "arrayWithNumericField.0.0.1": {"b.c": 'z'.repeat(30)}
+    "arrayWithNumericField.0.0.1": {"b.c": "z".repeat(30)},
 };
 assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {$set: update2})), {
     ns,
-    operationType: 'update',
+    operationType: "update",
     documentKey: {_id: 0},
     updateDescription: {
         removedFields: [],
         updatedFields: update2,
         truncatedArrays: [],
-        disambiguatedPaths: {"arrayWithNumericField.0.0.1": ["arrayWithNumericField", 0, 0, "1"]}
+        disambiguatedPaths: {"arrayWithNumericField.0.0.1": ["arrayWithNumericField", 0, 0, "1"]},
     },
     collectionUUID: getCollectionUuid(ns.coll),
 });
@@ -115,7 +107,7 @@ assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {$set: update
 // Test change stream event for 'remove' operation.
 assertChangeEvent(() => assert.commandWorked(coll.remove({_id: 0})), {
     ns,
-    operationType: 'delete',
+    operationType: "delete",
     documentKey: {_id: 0},
     collectionUUID: getCollectionUuid(ns.coll),
 });
@@ -123,7 +115,7 @@ assertChangeEvent(() => assert.commandWorked(coll.remove({_id: 0})), {
 // Test change stream event for 'rename' operation with 'dropTarget: false'.
 assertChangeEvent(() => assert.commandWorked(coll.renameCollection(renamedCollName)), {
     ns,
-    operationType: 'rename',
+    operationType: "rename",
     to: renamedNs,
     operationDescription: {
         to: renamedNs,

@@ -27,16 +27,21 @@ function checkValidate(maxMemoryUsage, {minMissingKeys, maxMissingKeys}) {
     const res = coll.validate();
     assert.commandWorked(res);
     assert(!res.valid, tojson(res));
-    const notAllReportedPrefix =
-        "Not all index entry inconsistencies are reported due to memory limitations.";
+    const notAllReportedPrefix = "Not all index entry inconsistencies are reported due to memory limitations.";
     assert.containsPrefix(notAllReportedPrefix, res.errors, tojson(res));
     assert.gte(res.missingIndexEntries.length, minMissingKeys, tojson(res));
     assert.lte(res.missingIndexEntries.length, maxMissingKeys, tojson(res));
 }
 
 function checkValidateLogs() {
-    assert(checkLog.checkContainsWithAtLeastCountJson(
-        conn, 7463100, {"spec": {"v": 2, "key": {"_id": 1}, "name": "_id_"}}, 1));
+    assert(
+        checkLog.checkContainsWithAtLeastCountJson(
+            conn,
+            7463100,
+            {"spec": {"v": 2, "key": {"_id": 1}, "name": "_id_"}},
+            1,
+        ),
+    );
 }
 
 function checkValidateRepair() {

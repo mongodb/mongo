@@ -8,7 +8,7 @@ const collName = jsTestName();
 const coll = db[collName];
 coll.drop();
 
-const bigStr = Array(100 * 1000).toString();  // ~ 100KB of ','
+const bigStr = Array(100 * 1000).toString(); // ~ 100KB of ','
 const bigStr2 = bigStr + "2";
 const nDocs = 1000;
 const nGroups = 10;
@@ -28,7 +28,7 @@ const pipeline = [
     {
         $sort: {
             "c": NumberInt(-1),
-        }
+        },
     },
     {$group: {"_id": "$b", "doc": {"$first": "$$ROOT"}}},
 ];

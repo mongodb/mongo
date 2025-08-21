@@ -27,8 +27,10 @@ for (let i = 0; i < 300; i++) {
     inArray.push(Random.randInt(numDocs));
 }
 
-const explain =
-    coll.find({rd: {$gte: 7}, _id: {$in: inArray}}).sort({ard: 1}).explain("executionStats");
+const explain = coll
+    .find({rd: {$gte: 7}, _id: {$in: inArray}})
+    .sort({ard: 1})
+    .explain("executionStats");
 
 const ixscanStage = getPlanStage(explain, "IXSCAN");
 assert.eq(ixscanStage.indexName, "_id_1_rd_1_ard_1", ixscanStage);

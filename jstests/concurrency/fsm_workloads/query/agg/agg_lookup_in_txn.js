@@ -20,22 +20,20 @@
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {
-        numDocs: 500,  // > 101 so that we force getMore operations.
-        shardKey: {_id: 'hashed'},
+        numDocs: 500, // > 101 so that we force getMore operations.
+        shardKey: {_id: "hashed"},
     };
 
     function getAuxiliaryCollection(collName) {
         return `${collName}_aux`;
     }
 
-    const states = (function() {
+    const states = (function () {
         function query(db, collName) {
             // Run the aggregate with 'allowDiskUse' if it was configured during setup.
             const aggOptions = {allowDiskUse: this.allowDiskUse};
@@ -43,17 +41,19 @@ export const $config = (function() {
             function getQueryResults(collA, collB) {
                 let arr = null;
                 try {
-                    const cursor = collA
-                          .aggregate([
-                              {
-                                  $lookup: {
-                                      from: collB.getName(),
-                                      localField: "to",
-                                      foreignField: "_id",
-                                      as: "out",
-                                  }
-                              },
-                          ], aggOptions);
+                    const cursor = collA.aggregate(
+                        [
+                            {
+                                $lookup: {
+                                    from: collB.getName(),
+                                    localField: "to",
+                                    foreignField: "_id",
+                                    as: "out",
+                                },
+                            },
+                        ],
+                        aggOptions,
+                    );
 
                     arr = cursor.toArray();
                 } catch (e) {
@@ -71,8 +71,7 @@ export const $config = (function() {
             }
 
             withTxnAndAutoRetry(this.session, () => {
-                const coll_aux = this.session.getDatabase(db.getName())
-                                     .getCollection(getAuxiliaryCollection(collName));
+                const coll_aux = this.session.getDatabase(db.getName()).getCollection(getAuxiliaryCollection(collName));
                 const coll = this.session.getDatabase(db.getName()).getCollection(collName);
 
                 // We analyze the cycle from one direction or another so that we exercise more
@@ -92,16 +91,16 @@ export const $config = (function() {
                         // Only one element must be present as we maintain a 1:1 relationship
                         // between foreign and local collection.
                         const doc = res[i];
-                        assert.eq(doc.out.length,
-                                  1,
-                                  directionString +
-                                      `: Failed consistency, document returned was ${
-                                          JSON.stringify(doc)}`);
-                        assert.eq(doc._id,
-                                  doc.out[0].to,
-                                  directionString +
-                                      `: Failed consistency, document returned was ${
-                                          JSON.stringify(doc)}`);
+                        assert.eq(
+                            doc.out.length,
+                            1,
+                            directionString + `: Failed consistency, document returned was ${JSON.stringify(doc)}`,
+                        );
+                        assert.eq(
+                            doc._id,
+                            doc.out[0].to,
+                            directionString + `: Failed consistency, document returned was ${JSON.stringify(doc)}`,
+                        );
                     }
                 }
             });
@@ -120,25 +119,28 @@ export const $config = (function() {
             // ends.
             withTxnAndAutoRetry(this.session, () => {
                 const coll = this.session.getDatabase(db.getName()).getCollection(collName);
-                const coll_aux = this.session.getDatabase(db.getName())
-                                     .getCollection(getAuxiliaryCollection(collName));
+                const coll_aux = this.session.getDatabase(db.getName()).getCollection(getAuxiliaryCollection(collName));
                 const idToModify = Random.randInt(this.numDocs);
                 const docToModify = coll.findOne({_id: idToModify});
 
                 let res = coll_aux.deleteOne({_id: docToModify.to});
                 assert.commandWorked(res);
-                assert.eq(res.deletedCount,
-                          1,
-                          `Failed to delete associated doc to {_id: ${idToModify}, to: ${
-                              docToModify.to}}, received: ${JSON.stringify(res)}`);
+                assert.eq(
+                    res.deletedCount,
+                    1,
+                    `Failed to delete associated doc to {_id: ${idToModify}, to: ${
+                        docToModify.to
+                    }}, received: ${JSON.stringify(res)}`,
+                );
                 res = coll_aux.insertOne({to: idToModify});
                 assert.commandWorked(res);
                 res = coll.update({_id: idToModify}, {$set: {to: res.insertedId}});
                 assert.commandWorked(res);
-                assert.eq(res.nModified,
-                          1,
-                          `Failed to update doc with {_id: ${idToModify}}, received: ${
-                              JSON.stringify(res)}`);
+                assert.eq(
+                    res.nModified,
+                    1,
+                    `Failed to update doc with {_id: ${idToModify}}, received: ${JSON.stringify(res)}`,
+                );
             });
         }
 
@@ -152,7 +154,7 @@ export const $config = (function() {
     const transitions = {
         init: {query: 0.5, update: 0.5},
         query: {query: 0.5, update: 0.5},
-        update: {query: 0.5, update: 0.5}
+        update: {query: 0.5, update: 0.5},
     };
 
     function setup(db, collName, cluster) {
@@ -163,8 +165,7 @@ export const $config = (function() {
         // otherwise it will be 24 hours during testing.
         this.originalTransactionLifetimeLimitSeconds = {};
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(
-                db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
+            const res = assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
             this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
         });
 
@@ -200,7 +201,8 @@ export const $config = (function() {
         assert.eq(this.numDocs, coll_aux.find().itcount());
 
         const getParam = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
-        const isLookupPushdownEnabled = getParam.hasOwnProperty("internalQueryFrameworkControl") &&
+        const isLookupPushdownEnabled =
+            getParam.hasOwnProperty("internalQueryFrameworkControl") &&
             getParam.internalQueryFrameworkControl.value != "forceClassicEngine";
 
         this.allowDiskUse = true;
@@ -232,11 +234,12 @@ export const $config = (function() {
         // TODO SERVER-89663: We restore the original transaction lifetime limit since there may be
         // concurrent executions that relied on the old value.
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                transactionLifetimeLimitSeconds:
-                    this.originalTransactionLifetimeLimitSeconds[db.getMongo().host]
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    transactionLifetimeLimitSeconds: this.originalTransactionLifetimeLimitSeconds[db.getMongo().host],
+                }),
+            );
         });
     }
 

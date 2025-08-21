@@ -14,23 +14,26 @@ const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();
 
-const dbName = 'test';
+const dbName = "test";
 const numColls = 3;
 
-const testDB = function() {
+const testDB = function () {
     return replTest.getPrimary().getDB(dbName);
 };
 
-const coll = function(num) {
-    return testDB()[jsTestName() + '_' + num];
+const coll = function (num) {
+    return testDB()[jsTestName() + "_" + num];
 };
 
-const timeFieldName = 'time';
-const metaFieldName = 'meta';
+const timeFieldName = "time";
+const metaFieldName = "meta";
 
-const createColl = function(num) {
-    assert.commandWorked(testDB().createCollection(
-        coll(num).getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+const createColl = function (num) {
+    assert.commandWorked(
+        testDB().createCollection(coll(num).getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
+    );
 };
 
 for (let i = 0; i < numColls; i++) {
@@ -49,10 +52,12 @@ for (let i = 0; i < numColls; i++) {
 replTest.stepUp(replTest.getSecondary());
 
 // Manually update the bucket for collection 1.
-assert.commandWorked(getTimeseriesCollForRawOps(testDB(), coll(1))
-                         .update({}, {$set: {meta: 1}}, getRawOperationSpec(testDB())));
-assert.commandWorked(getTimeseriesCollForRawOps(testDB(), coll(1))
-                         .update({}, {$set: {meta: 0}}, getRawOperationSpec(testDB())));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB(), coll(1)).update({}, {$set: {meta: 1}}, getRawOperationSpec(testDB())),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB(), coll(1)).update({}, {$set: {meta: 0}}, getRawOperationSpec(testDB())),
+);
 
 // Drop, recreate, and reinsert the bucket for collection 2.
 assert(coll(2).drop());
@@ -66,13 +71,11 @@ for (let i = 0; i < numColls; i++) {
     assert.commandWorked(coll(i).insert(docs[1]));
 }
 
-const checkColl = function(num, numBuckets) {
-    jsTestLog('Checking collection ' + num);
+const checkColl = function (num, numBuckets) {
+    jsTestLog("Checking collection " + num);
     assert.docEq(docs, coll(num).find().sort({_id: 1}).toArray());
     const buckets = getTimeseriesCollForRawOps(testDB(), coll(num)).find().rawData().toArray();
-    assert.eq(buckets.length,
-              numBuckets,
-              'Expected ' + numBuckets + ' bucket(s) but found: ' + tojson(buckets));
+    assert.eq(buckets.length, numBuckets, "Expected " + numBuckets + " bucket(s) but found: " + tojson(buckets));
 };
 
 // For collection 0, the original bucket should still be usable.

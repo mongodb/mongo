@@ -18,7 +18,7 @@ function testAbortIndexBuild() {
     const createIdx = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {a: 1});
 
     // When the index build starts, find its op id.
-    const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
+    const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1");
 
     // Kill the index build.
     assert.commandWorked(testDB.killOp(opId));
@@ -31,12 +31,11 @@ function testAbortIndexBuild() {
     }
 
     const exitCode = createIdx({checkExitSuccess: false});
-    assert.neq(
-        0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
+    assert.neq(0, exitCode, "expected shell to exit abnormally due to index build being terminated");
 
     // Check that no new index has been created.  This verifies that the index build was aborted
     // rather than successfully completed.
-    IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+    IndexBuildTest.assertIndexes(coll, 1, ["_id_"]);
 }
 
 testAbortIndexBuild();

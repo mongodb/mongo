@@ -39,12 +39,14 @@ assert.eq(6, db.foo.find().count());
 assert.eq(6, db.foo.find().sort({name: 1}).count());
 
 // 4. Manually move chunks.  Now each shard should have 3 docs.
-assert.commandWorked(s.s0.adminCommand({
-    moveChunk: "test.foo",
-    find: {name: "eliot"},
-    to: secondary.getMongo().name,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    s.s0.adminCommand({
+        moveChunk: "test.foo",
+        find: {name: "eliot"},
+        to: secondary.getMongo().name,
+        _waitForDelete: true,
+    }),
+);
 
 assert.eq(3, primary.foo.find().toArray().length);
 assert.eq(3, secondary.foo.find().toArray().length);
@@ -110,8 +112,7 @@ function nameString(c) {
     let s = "";
     while (c.hasNext()) {
         let o = c.next();
-        if (s.length > 0)
-            s += ",";
+        if (s.length > 0) s += ",";
         s += o.name;
     }
     return s;
@@ -133,36 +134,54 @@ for (let i = 0; i < 10; i++) {
 }
 
 assert.eq(10, db.foo.find({name: {$gt: "z"}}).itcount());
-assert.eq(10, db.foo.find({name: {$gt: "z"}}).sort({_id: 1}).itcount());
-assert.eq(5, db.foo.find({name: {$gt: "z"}}).sort({_id: 1}).skip(5).itcount());
-assert.eq(3, db.foo.find({name: {$gt: "z"}}).sort({_id: 1}).skip(5).limit(3).itcount());
+assert.eq(
+    10,
+    db.foo
+        .find({name: {$gt: "z"}})
+        .sort({_id: 1})
+        .itcount(),
+);
+assert.eq(
+    5,
+    db.foo
+        .find({name: {$gt: "z"}})
+        .sort({_id: 1})
+        .skip(5)
+        .itcount(),
+);
+assert.eq(
+    3,
+    db.foo
+        .find({name: {$gt: "z"}})
+        .sort({_id: 1})
+        .skip(5)
+        .limit(3)
+        .itcount(),
+);
 
 // 7. Test invalid queries/values.
 
 // i. Make sure count command returns error for invalid queries.
-assert.commandFailedWithCode(db.runCommand({count: 'foo', query: {$c: {$abc: 3}}}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(db.runCommand({count: "foo", query: {$c: {$abc: 3}}}), ErrorCodes.BadValue);
 
 // ii. Negative skip values should return error.
-assert.commandFailedWithCode(db.runCommand({count: 'foo', skip: -2}), [
+assert.commandFailedWithCode(db.runCommand({count: "foo", skip: -2}), [
     ErrorCodes.BadValue,
     ErrorCodes.FailedToParse,
-    51024
-]);  // getting BadValue when binary is > 7.1, else 51024
+    51024,
+]); // getting BadValue when binary is > 7.1, else 51024
 
 // iii. Negative skip values with positive limit should return error.
-assert.commandFailedWithCode(db.runCommand({count: 'foo', skip: -2, limit: 1}), [
+assert.commandFailedWithCode(db.runCommand({count: "foo", skip: -2, limit: 1}), [
     ErrorCodes.BadValue,
     ErrorCodes.FailedToParse,
-    51024
-]);  // getting BadValue when binary is > 7.1, else 51024
+    51024,
+]); // getting BadValue when binary is > 7.1, else 51024
 
 // iv. Unknown options should return error.
-assert.commandFailedWithCode(db.runCommand({count: 'foo', random: true}),
-                             ErrorCodes.IDLUnknownField);
+assert.commandFailedWithCode(db.runCommand({count: "foo", random: true}), ErrorCodes.IDLUnknownField);
 
 // v. Unknown options should return error for explain.
-assert.commandFailedWithCode(db.runCommand({explain: {count: 'foo', random: true}}),
-                             ErrorCodes.IDLUnknownField);
+assert.commandFailedWithCode(db.runCommand({explain: {count: "foo", random: true}}), ErrorCodes.IDLUnknownField);
 
 s.stop();

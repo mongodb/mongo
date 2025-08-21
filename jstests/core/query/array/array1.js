@@ -2,7 +2,7 @@ const coll = db.array1;
 coll.drop();
 
 const x = {
-    a: [1, 2]
+    a: [1, 2],
 };
 
 assert.commandWorked(coll.insert({a: [[1, 2]]}));

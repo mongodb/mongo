@@ -19,12 +19,10 @@ db.setProfilingLevel(0);
 db.system.profile.drop();
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(db.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(db.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}));
 
 let oldTop = db.adminCommand("top");
-const pipeline =
-    [{$lookup: {from: foreignColl.getName(), as: "res", localField: "a", foreignField: "a"}}];
+const pipeline = [{$lookup: {from: foreignColl.getName(), as: "res", localField: "a", foreignField: "a"}}];
 localColl.aggregate(pipeline);
 
 db.setProfilingLevel(0);
@@ -35,12 +33,13 @@ assert.eq("test.local", profileDoc.ns);
 
 // Confirm that the local collection had one command added to Top.
 let newTop = db.adminCommand("top");
-assert.eq(1,
-          newTop.totals[localColl.getFullName()].commands.count -
-              oldTop.totals[localColl.getFullName()].commands.count);
+assert.eq(
+    1,
+    newTop.totals[localColl.getFullName()].commands.count - oldTop.totals[localColl.getFullName()].commands.count,
+);
 
-const actualCount = newTop.totals[foreignColl.getFullName()].commands.count -
-    oldTop.totals[foreignColl.getFullName()].commands.count;
+const actualCount =
+    newTop.totals[foreignColl.getFullName()].commands.count - oldTop.totals[foreignColl.getFullName()].commands.count;
 
 // Compute the expected count as follows:
 // 1) We expect the count to be at least one. This is because we will take a lock over 'foreignColl'

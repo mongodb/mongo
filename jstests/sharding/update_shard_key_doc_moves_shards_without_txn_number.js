@@ -9,9 +9,7 @@
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    isUpdateDocumentShardKeyUsingTransactionApiEnabled
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {isUpdateDocumentShardKeyUsingTransactionApiEnabled} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({shards: 2});
 
@@ -21,8 +19,7 @@ const ns = dbName + "." + collName;
 const db = st.getDB(dbName);
 const testColl = db.getCollection(collName);
 
-const updateDocumentShardKeyUsingTransactionApiEnabled =
-    isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
+const updateDocumentShardKeyUsingTransactionApiEnabled = isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
 
 // Set up a sharded collection with two shards:
 // shard0: [MinKey, 0]
@@ -30,8 +27,7 @@ const updateDocumentShardKeyUsingTransactionApiEnabled =
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
 
 /**
@@ -94,13 +90,13 @@ assert.commandWorked(db.runCommand({insert: collName, documents: [{x: -1}]}));
  * Test 1: update() inside session
  * Test 2: findAndModify() inside session
  */
-const lsid = ({id: UUID()});
+const lsid = {id: UUID()};
 (() => {
     assert.commandWorked(db.runCommand({insert: collName, documents: [{x: -5}]}));
     let cmdObj = {
         update: collName,
         updates: [{q: {x: -5}, u: {"$set": {x: 5}}, upsert: false}],
-        lsid: lsid
+        lsid: lsid,
     };
     runAndVerifyCommandChangingOwningShard(cmdObj, {x: 5});
 
@@ -110,7 +106,7 @@ const lsid = ({id: UUID()});
         query: {x: -6},
         update: {"$set": {x: 6}},
         upsert: false,
-        lsid: lsid
+        lsid: lsid,
     };
     runAndVerifyCommandChangingOwningShard(cmdObj, {x: 6});
 })();
@@ -125,7 +121,7 @@ const lsid = ({id: UUID()});
     let cmdObj = {
         update: collName,
         updates: [{q: {x: -7}, u: {"$set": {x: 7}}, upsert: true}],
-        lsid: lsid
+        lsid: lsid,
     };
     assert.eq(0, testColl.find({x: -7}).itcount());
     runAndVerifyCommandChangingOwningShard(cmdObj, {x: 7});
@@ -135,7 +131,7 @@ const lsid = ({id: UUID()});
         query: {x: -8},
         update: {"$set": {x: 8}},
         upsert: true,
-        lsid: lsid
+        lsid: lsid,
     };
     assert.eq(0, testColl.find({x: -8}).itcount());
     runAndVerifyCommandChangingOwningShard(cmdObj, {x: 8});

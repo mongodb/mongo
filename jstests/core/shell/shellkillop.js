@@ -5,7 +5,8 @@ const baseName = "jstests_shellkillop";
 let retry = false;
 
 function testShellAutokillop() {
-    if (true) {  // toggle to disable test
+    if (true) {
+        // toggle to disable test
         db[baseName].drop();
 
         print("shellkillop.js insert data");
@@ -16,23 +17,25 @@ function testShellAutokillop() {
 
         // mongo --autokillop suppressed the ctrl-c "do you want to kill current operation" message
         // it's just for testing purposes and thus not in the shell help
-        let evalStr = "print('SKO subtask started'); db." + baseName +
-            ".update( {}, {$set:{i:'abcdefghijkl'}}, false, true ); db." + baseName + ".count();";
+        let evalStr =
+            "print('SKO subtask started'); db." +
+            baseName +
+            ".update( {}, {$set:{i:'abcdefghijkl'}}, false, true ); db." +
+            baseName +
+            ".count();";
         print("shellkillop.js evalStr:" + evalStr);
-        let spawn = startMongoProgramNoConnect(
-            "mongo", "--autokillop", "--port", myPort(), "--eval", evalStr);
+        let spawn = startMongoProgramNoConnect("mongo", "--autokillop", "--port", myPort(), "--eval", evalStr);
 
         sleep(100);
         retry = true;
-        assert(db[baseName].find({i: 'abcdefghijkl'}).count() < 100_000,
-               "update ran too fast, test won't be valid");
+        assert(db[baseName].find({i: "abcdefghijkl"}).count() < 100_000, "update ran too fast, test won't be valid");
         retry = false;
 
         stopMongoProgramByPid(spawn);
 
         sleep(100);
 
-        print("count abcdefghijkl:" + db[baseName].find({i: 'abcdefghijkl'}).count());
+        print("count abcdefghijkl:" + db[baseName].find({i: "abcdefghijkl"}).count());
 
         let inprog = db.currentOp().inprog;
         for (let i in inprog) {
@@ -41,14 +44,13 @@ function testShellAutokillop() {
         }
 
         retry = true;
-        assert(db[baseName].find({i: 'abcdefghijkl'}).count() < 100_000,
-               "update ran too fast, test was not valid");
+        assert(db[baseName].find({i: "abcdefghijkl"}).count() < 100_000, "update ran too fast, test was not valid");
         retry = false;
     }
 }
 
 function myPort() {
-    const hosts = globalThis.db.getMongo().host.split(',');
+    const hosts = globalThis.db.getMongo().host.split(",");
 
     const ip6Numeric = hosts[0].match(/^\[[0-9A-Fa-f:]+\]:(\d+)$/);
     if (ip6Numeric) {
@@ -61,7 +63,7 @@ function myPort() {
     }
 
     return 27017;
-};
+}
 
 for (let nTries = 0; nTries < 10 && retry; ++nTries) {
     try {

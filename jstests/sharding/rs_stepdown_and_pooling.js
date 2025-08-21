@@ -11,7 +11,7 @@ var st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 // Stop balancer to eliminate weird conn stuff
@@ -22,11 +22,10 @@ var coll = mongos.getCollection("foo.bar");
 var db = coll.getDB();
 
 // Test is not valid for Win32
-var is32Bits = (db.getServerBuildInfo().getBits() == 32);
+var is32Bits = db.getServerBuildInfo().getBits() == 32;
 if (is32Bits && _isWindows()) {
     // Win32 doesn't provide the polling interface we need to implement the check tested here
     jsTest.log("Test is not valid on Win32 platform.");
-
 } else {
     // Non-Win32 platform
 
@@ -57,20 +56,15 @@ if (is32Bits && _isWindows()) {
 
     jsTest.log("Stepdown primary and then step back up...");
 
-    var stepDown = function(node, timeSecs) {
-        assert.commandWorked(
-            node.getDB("admin").runCommand({replSetStepDown: timeSecs, force: true}));
+    var stepDown = function (node, timeSecs) {
+        assert.commandWorked(node.getDB("admin").runCommand({replSetStepDown: timeSecs, force: true}));
     };
 
     stepDown(primary, 0);
 
     jsTest.log("Waiting for mongos to acknowledge stepdown...");
 
-    awaitRSClientHosts(mongos,
-                       secondary,
-                       {ismaster: true},
-                       st.rs0,
-                       2 * 60 * 1000);  // slow hosts can take longer to recognize sd
+    awaitRSClientHosts(mongos, secondary, {ismaster: true}, st.rs0, 2 * 60 * 1000); // slow hosts can take longer to recognize sd
 
     jsTest.log("Stepping back up...");
 
@@ -99,8 +93,7 @@ if (is32Bits && _isWindows()) {
     }
 
     assert.eq(0, numErrors);
-
-}  // End Win32 check
+} // End Win32 check
 
 jsTest.log("DONE!");
 

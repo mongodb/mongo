@@ -33,7 +33,7 @@ assert.neq(undefined, curResumeToken);
 assert.commandWorked(otherCollection.insert({}));
 let prevResumeToken = curResumeToken;
 assert.soon(() => {
-    assert(!csCursor.hasNext());  // Causes a getMore to be dispatched.
+    assert(!csCursor.hasNext()); // Causes a getMore to be dispatched.
     prevResumeToken = curResumeToken;
     curResumeToken = csCursor.getResumeToken();
     assert.neq(undefined, curResumeToken);
@@ -47,7 +47,7 @@ for (let i = 0; i < 9; ++i) {
 assert.commandWorked(otherCollection.insert({}));
 
 // Retrieve the first batch of events from the cursor.
-assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert.soon(() => csCursor.hasNext()); // Causes a getMore to be dispatched.
 
 // We have not yet iterated any of the events. Verify that the resume token is unchanged.
 assert.docEq(curResumeToken, csCursor.getResumeToken());
@@ -63,7 +63,7 @@ while (csCursor.objsLeftInBatch()) {
 }
 
 // Retrieve the second batch of events from the cursor.
-assert.soon(() => csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert.soon(() => csCursor.hasNext()); // Causes a getMore to be dispatched.
 
 // We haven't pulled any events out of the cursor yet, so the resumeToken should be unchanged.
 assert.docEq(curResumeToken, csCursor.getResumeToken());

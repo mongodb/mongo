@@ -17,7 +17,7 @@
 const node0 = MongoRunner.runMongod({
     setParameter: {
         featureFlagAllMongodsAreSharded: true,
-    }
+    },
 });
 
 // The shard replica set should auto-initiate, and the shard
@@ -25,7 +25,7 @@ const node0 = MongoRunner.runMongod({
 assert.soon(() => node0.adminCommand({hello: 1}).isWritablePrimary);
 
 let config = assert.commandWorked(node0.adminCommand({replSetGetConfig: 1})).config;
-assert(config.hasOwnProperty('configsvr') && config.configsvr, tojson(config));
+assert(config.hasOwnProperty("configsvr") && config.configsvr, tojson(config));
 
 let replSetName = assert.commandWorked(node0.adminCommand({replSetGetStatus: 1})).set;
 let url = `${replSetName}/${node0.name}`;
@@ -36,7 +36,7 @@ const mongos = MongoRunner.runMongos({configdb: url});
 assert.commandWorked(mongos.adminCommand({transitionFromDedicatedConfigServer: 1}));
 
 // Inserts into replicated collections should succeed.
-assert.commandWorked(mongos.getDB('testDB').runCommand({insert: 'testColl', documents: [{x: 1}]}));
+assert.commandWorked(mongos.getDB("testDB").runCommand({insert: "testColl", documents: [{x: 1}]}));
 
 // Starting a node with the feature flag and passing --replSet into the startup parameters
 // will override replication, and it will not auto-initiate.
@@ -44,12 +44,13 @@ const node1 = MongoRunner.runMongod({
     replSet: replSetName,
     setParameter: {
         featureFlagAllMongodsAreSharded: true,
-    }
+    },
 });
 
-assert.commandFailedWithCode(
-    node1.getDB('testDB').runCommand({insert: 'testColl', documents: [{x: 1}]}),
-    [ErrorCodes.NotWritablePrimary, ErrorCodes.PrimarySteppedDown]);
+assert.commandFailedWithCode(node1.getDB("testDB").runCommand({insert: "testColl", documents: [{x: 1}]}), [
+    ErrorCodes.NotWritablePrimary,
+    ErrorCodes.PrimarySteppedDown,
+]);
 
 // A replica set reconfig should succeed in adding the uninitiated node into the auto-initiated
 // config shard replica set.
@@ -66,14 +67,14 @@ const node2 = MongoRunner.runMongod({
     shardsvr: "",
     setParameter: {
         featureFlagAllMongodsAreSharded: true,
-    }
+    },
 });
 
 // Replication was not overridden, so this node should still auto-initiate replication.
 assert.soon(() => node2.adminCommand({hello: 1}).isWritablePrimary);
 // Since we passed in --shardsvr, this node will not default to being the config shard.
 config = assert.commandWorked(node2.adminCommand({replSetGetConfig: 1})).config;
-assert(!config.hasOwnProperty('configsvr'), tojson(config));
+assert(!config.hasOwnProperty("configsvr"), tojson(config));
 
 replSetName = assert.commandWorked(node2.adminCommand({replSetGetStatus: 1})).set;
 url = `${replSetName}/${node2.name}`;
@@ -87,11 +88,12 @@ const node3 = MongoRunner.runMongod({
     shardsvr: "",
     setParameter: {
         featureFlagAllMongodsAreSharded: true,
-    }
+    },
 });
-assert.commandFailedWithCode(
-    node3.getDB('testDB').runCommand({insert: 'testColl', documents: [{x: 1}]}),
-    [ErrorCodes.NotWritablePrimary, ErrorCodes.PrimarySteppedDown]);
+assert.commandFailedWithCode(node3.getDB("testDB").runCommand({insert: "testColl", documents: [{x: 1}]}), [
+    ErrorCodes.NotWritablePrimary,
+    ErrorCodes.PrimarySteppedDown,
+]);
 
 // An external replSetInitiate should initiate the replica set successfully.
 assert.commandWorked(node3.adminCommand({replSetInitiate: 1}));
@@ -101,7 +103,7 @@ replSetName = assert.commandWorked(node3.adminCommand({replSetGetStatus: 1})).se
 url = `${replSetName}/${node3.name}`;
 assert.commandWorked(mongos.adminCommand({addShard: url}));
 
-const numShards = assert.commandWorked(mongos.getDB('config').runCommand({count: 'shards'})).n;
+const numShards = assert.commandWorked(mongos.getDB("config").runCommand({count: "shards"})).n;
 assert.eq(numShards, 3);
 
 MongoRunner.stopMongod(node0);

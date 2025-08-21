@@ -25,14 +25,15 @@ const coll = testDB.getCollection(collName);
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDB.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
-const mapFunction = function() {
+const mapFunction = function () {
     emit(this.a, this.b);
 };
 
-const reduceFunction = function(a, b) {
+const reduceFunction = function (a, b) {
     return Array.sum(b);
 };
 
@@ -44,9 +45,7 @@ for (let i = 0; i < 3; i++) {
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-coll.mapReduce(mapFunction,
-               reduceFunction,
-               {query: {a: {$gte: 0}}, out: {inline: 1}, collation: {locale: "fr"}});
+coll.mapReduce(mapFunction, reduceFunction, {query: {a: {$gte: 0}}, out: {inline: 1}, collation: {locale: "fr"}});
 
 let profileObj = getLatestProfilerEntry(testDB);
 

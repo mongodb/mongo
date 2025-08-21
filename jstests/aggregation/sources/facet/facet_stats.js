@@ -19,14 +19,14 @@ const local = testDB.facetLookupLocal;
 const foreign = testDB.facetLookupForeign;
 testDB.dropDatabase();
 
-let runFacetPipeline = function() {
+let runFacetPipeline = function () {
     const lookup = {
         $lookup: {
             from: foreign.getName(),
             let: {id1: "$_id"},
             pipeline: [{$match: {$expr: {$eq: ["$$id1", "$foreignKey"]}}}],
-            as: "joined"
-        }
+            as: "joined",
+        },
     };
 
     return local.aggregate([{$facet: {nested: [lookup]}}]).itcount();

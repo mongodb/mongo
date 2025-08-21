@@ -24,8 +24,8 @@ const rst = new ReplSetTest({
             rsConfig: {
                 priority: 0,
             },
-        }
-    ]
+        },
+    ],
 });
 
 rst.startSet();
@@ -44,10 +44,12 @@ rst.awaitReplication();
 let secondary = rst.restart(1, {
     startClean: true,
     setParameter: {
-        'failpoint.initialSyncHangDuringCollectionClone': tojson(
-            {mode: 'alwaysOn', data: {namespace: "admin.system.version", numDocsToClone: 0}}),
-        'failpoint.initialSyncHangAfterDataCloning': tojson({mode: 'alwaysOn'}),
-    }
+        "failpoint.initialSyncHangDuringCollectionClone": tojson({
+            mode: "alwaysOn",
+            data: {namespace: "admin.system.version", numDocsToClone: 0},
+        }),
+        "failpoint.initialSyncHangAfterDataCloning": tojson({mode: "alwaysOn"}),
+    },
 });
 
 // Wait until we block on cloning 'admin.system.version'.
@@ -67,17 +69,16 @@ const awaitIndexBuild = startParallelShell(() => {
 IndexBuildTest.waitForIndexBuildToStart(db, collName, "b_1");
 
 // Finish the collection cloning phase on the initial syncing node.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
 // The initial syncing node is ready to enter the oplog replay phase.
 checkLog.containsJson(secondary, 21184);
 
 // The initial syncing node has {b: 1} in-progress.
 checkLog.containsJson(secondary, 20384, {
-    properties: function(properties) {
+    properties: function (properties) {
         return properties.name == "b_1";
-    }
+    },
 });
 
 // The initial syncing node will drop {a: 1} during the oplog replay phase, while having {b: 1}
@@ -85,11 +86,10 @@ checkLog.containsJson(secondary, 20384, {
 assert.commandWorked(coll.dropIndex({a: 1}));
 
 // Let the initial syncing node start the oplog replay phase.
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
 
 // Dropping {a: 1} on the initial syncing node.
-checkLog.containsJson(secondary, 20344, {indexes: "\"a_1\""});
+checkLog.containsJson(secondary, 20344, {indexes: '"a_1"'});
 
 rst.awaitReplication();
 rst.awaitSecondaryNodes();
@@ -98,11 +98,14 @@ IndexBuildTest.resumeIndexBuilds(secondary);
 
 awaitIndexBuild();
 
-IndexBuildTest.assertIndexes(
-    coll, /*numIndexes=*/ 2, /*readyIndexes=*/["_id_", "b_1"], /*notReadyIndexes=*/[]);
+IndexBuildTest.assertIndexes(coll, /*numIndexes=*/ 2, /*readyIndexes=*/ ["_id_", "b_1"], /*notReadyIndexes=*/ []);
 
 const secondaryColl = secondary.getDB(dbName).getCollection(collName);
 IndexBuildTest.assertIndexes(
-    secondaryColl, /*numIndexes=*/ 2, /*readyIndexes=*/["_id_", "b_1"], /*notReadyIndexes=*/[]);
+    secondaryColl,
+    /*numIndexes=*/ 2,
+    /*readyIndexes=*/ ["_id_", "b_1"],
+    /*notReadyIndexes=*/ [],
+);
 
 rst.stopSet();

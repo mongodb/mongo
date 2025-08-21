@@ -3,13 +3,15 @@
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {testPerformUpgradeReplSet} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
-import {
-    testPerformUpgradeSharded
-} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
+import {testPerformUpgradeSharded} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 const collName = jsTestName();
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
-const docs = [{_id: 0, foo: "xyz"}, {_id: 1, foo: "bar"}, {_id: 2, foo: "mongodb"}];
+const docs = [
+    {_id: 0, foo: "xyz"},
+    {_id: 1, foo: "bar"},
+    {_id: 2, foo: "mongodb"},
+];
 
 const viewName = "rank_fusion_view";
 
@@ -20,7 +22,7 @@ const viewPipeline = [{$match: {_id: {$gt: 0}}}];
 const rankFusionPipeline = [{$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}}}];
 const rankFusionPipelineWithScoreDetails = [
     {$rankFusion: {input: {pipelines: {field: [{$sort: {foo: 1}}]}}, scoreDetails: true}},
-    {$project: {scoreDetails: {$meta: "scoreDetails"}, score: {$meta: "score"}}}
+    {$project: {scoreDetails: {$meta: "scoreDetails"}, score: {$meta: "score"}}},
 ];
 
 const kUnrecognizedPipelineStageErrorCode = 40324;
@@ -39,34 +41,35 @@ function assertRankFusionCompletelyRejected(primaryConn) {
     db[viewName].drop();
 
     // $rankFusion is rejected in a plain aggregation command.
-    assert.commandFailedWithCode(
-        db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}),
-        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.QueryFeatureNotAllowed]);
+    assert.commandFailedWithCode(db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}), [
+        kUnrecognizedPipelineStageErrorCode,
+        ErrorCodes.QueryFeatureNotAllowed,
+    ]);
 
     // $rankFusion with scoreDetails is still rejected.
     assert.commandFailedWithCode(
-        db.runCommand(
-            {aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}),
-        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.QueryFeatureNotAllowed]);
+        db.runCommand({aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}),
+        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.QueryFeatureNotAllowed],
+    );
 
     // View creation is rejected when view pipeline has $rankFusion.
     assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipeline), [
         kUnrecognizedPipelineStageErrorCode,
         ErrorCodes.QueryFeatureNotAllowed,
-        ErrorCodes.OptionNotSupportedOnView
+        ErrorCodes.OptionNotSupportedOnView,
     ]);
-    assert.commandFailedWithCode(
-        db.createView(viewName, collName, rankFusionPipelineWithScoreDetails), [
-            kUnrecognizedPipelineStageErrorCode,
-            ErrorCodes.QueryFeatureNotAllowed,
-            ErrorCodes.OptionNotSupportedOnView
-        ]);
+    assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipelineWithScoreDetails), [
+        kUnrecognizedPipelineStageErrorCode,
+        ErrorCodes.QueryFeatureNotAllowed,
+        ErrorCodes.OptionNotSupportedOnView,
+    ]);
 
     // Running $rankFusion against a view is rejected.
     assert.commandWorked(db.createView(viewName, collName, viewPipeline));
-    assert.commandFailedWithCode(
-        db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}),
-        [kUnrecognizedPipelineStageErrorCode, ErrorCodes.OptionNotSupportedOnView]);
+    assert.commandFailedWithCode(db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}), [
+        kUnrecognizedPipelineStageErrorCode,
+        ErrorCodes.OptionNotSupportedOnView,
+    ]);
 }
 
 function assertRankFusionCompletelyAccepted(primaryConn) {
@@ -74,32 +77,31 @@ function assertRankFusionCompletelyAccepted(primaryConn) {
     db[viewName].drop();
 
     // $rankFusion succeeds in an aggregation command.
-    assert.commandWorked(
-        db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}));
+    assert.commandWorked(db.runCommand({aggregate: collName, pipeline: rankFusionPipeline, cursor: {}}));
 
     // $rankFusion with scoreDetails succeeds in an aggregation command.
-    assert.commandWorked(db.runCommand(
-        {aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}));
+    assert.commandWorked(
+        db.runCommand({aggregate: collName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}),
+    );
 
     // View creation is rejected when view pipeline has $rankFusion.
     assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipeline), [
         kUnrecognizedPipelineStageErrorCode,
         ErrorCodes.QueryFeatureNotAllowed,
-        ErrorCodes.OptionNotSupportedOnView
+        ErrorCodes.OptionNotSupportedOnView,
     ]);
-    assert.commandFailedWithCode(
-        db.createView(viewName, collName, rankFusionPipelineWithScoreDetails), [
-            kUnrecognizedPipelineStageErrorCode,
-            ErrorCodes.QueryFeatureNotAllowed,
-            ErrorCodes.OptionNotSupportedOnView
-        ]);
+    assert.commandFailedWithCode(db.createView(viewName, collName, rankFusionPipelineWithScoreDetails), [
+        kUnrecognizedPipelineStageErrorCode,
+        ErrorCodes.QueryFeatureNotAllowed,
+        ErrorCodes.OptionNotSupportedOnView,
+    ]);
 
     // Running $rankFusion against a view succeeds.
     assert.commandWorked(db.createView(viewName, collName, viewPipeline));
+    assert.commandWorked(db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}));
     assert.commandWorked(
-        db.runCommand({aggregate: viewName, pipeline: rankFusionPipeline, cursor: {}}));
-    assert.commandWorked(db.runCommand(
-        {aggregate: viewName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}));
+        db.runCommand({aggregate: viewName, pipeline: rankFusionPipelineWithScoreDetails, cursor: {}}),
+    );
 }
 
 testPerformUpgradeReplSet({

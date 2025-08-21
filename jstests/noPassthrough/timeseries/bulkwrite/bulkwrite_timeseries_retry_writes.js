@@ -8,5 +8,5 @@
  *   requires_replication,
  * ]
  */
-await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
-await import('jstests/noPassthrough/timeseries/write/timeseries_retry_writes.js');
+await import("jstests/libs/override_methods/single_crud_op_as_bulk_write.js");
+await import("jstests/noPassthrough/timeseries/write/timeseries_retry_writes.js");

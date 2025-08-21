@@ -19,11 +19,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.93615, 40.69791],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 0,
-            "review_score": 100
+            "review_score": 100,
         },
         {
             "name": "New York City - Upper West Side Apt",
@@ -45,20 +45,20 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.96523, 40.79962],
-                    "is_location_exact": false
-                }
+                    "is_location_exact": false,
+                },
             },
             "_id": 1,
-            "review_score": 94
+            "review_score": 94,
         },
         {
             "name": "Deluxe Loft Suite",
             "summary":
                 "Loft Suite Deluxe @ Henry Norman Hotel Located in Greenpoint, Brooklyn and housed in a converted 19th-century warehouse, the Henry Norman Hotel features modern lofts and suites with hardwood floors, antiques and contemporary art.",
             "space":
-                "This loft unit features a kitchenette and is fully equipped with everything you need for your stay. The Loft Suite Deluxe has an alcove bedroom area with a Queen size bed and a comfortable pull-out sofa in the living room area, which in total can easily sleep up to 4 guests. The loft is equipped with 42\" LCD HD TVs in both the living and bedroom areas with premium cable channels (HBO, Showtime & more). There are hardwood floors throughout and a full bathroom with shower/tub combination. Sleeps up to 4 guests.",
+                'This loft unit features a kitchenette and is fully equipped with everything you need for your stay. The Loft Suite Deluxe has an alcove bedroom area with a Queen size bed and a comfortable pull-out sofa in the living room area, which in total can easily sleep up to 4 guests. The loft is equipped with 42" LCD HD TVs in both the living and bedroom areas with premium cable channels (HBO, Showtime & more). There are hardwood floors throughout and a full bathroom with shower/tub combination. Sleeps up to 4 guests.',
             "description":
-                "Loft Suite Deluxe @ Henry Norman Hotel Located in Greenpoint, Brooklyn and housed in a converted 19th-century warehouse, the Henry Norman Hotel features modern lofts and suites with hardwood floors, antiques and contemporary art. This loft unit features a kitchenette and is fully equipped with everything you need for your stay. The Loft Suite Deluxe has an alcove bedroom area with a Queen size bed and a comfortable pull-out sofa in the living room area, which in total can easily sleep up to 4 guests. The loft is equipped with 42\" LCD HD TVs in both the living and bedroom areas with premium cable channels (HBO, Showtime & more). There are hardwood floors throughout and a full bathroom with shower/tub combination. Sleeps up to 4 guests. Guest will have access to common terraces, lounge area, business center with 2 iMac computers, fitness center with dry sauna and steam shower, and laundry room. Greenpoint is an artsy Brooklyn neighborhood filled with great restaurants, cafes, and shops.",
+                'Loft Suite Deluxe @ Henry Norman Hotel Located in Greenpoint, Brooklyn and housed in a converted 19th-century warehouse, the Henry Norman Hotel features modern lofts and suites with hardwood floors, antiques and contemporary art. This loft unit features a kitchenette and is fully equipped with everything you need for your stay. The Loft Suite Deluxe has an alcove bedroom area with a Queen size bed and a comfortable pull-out sofa in the living room area, which in total can easily sleep up to 4 guests. The loft is equipped with 42" LCD HD TVs in both the living and bedroom areas with premium cable channels (HBO, Showtime & more). There are hardwood floors throughout and a full bathroom with shower/tub combination. Sleeps up to 4 guests. Guest will have access to common terraces, lounge area, business center with 2 iMac computers, fitness center with dry sauna and steam shower, and laundry room. Greenpoint is an artsy Brooklyn neighborhood filled with great restaurants, cafes, and shops.',
             "neighborhood_overview":
                 "Greenpoint is an artsy Brooklyn neighborhood filled with great restaurants, cafes, and shops.",
             "number_of_reviews": 5,
@@ -72,11 +72,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.94472, 40.72778],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 2,
-            "review_score": 88
+            "review_score": 88,
         },
         {
             "name": "Easy 1 Bedroom in Chelsea",
@@ -86,8 +86,7 @@ export function getRentalData() {
                 "*I listed this place late so can be flexible for you. I'm quick to respond - contact me and let's discuss whether we can make something work for you asap* Sorry about the lack of pictures. Will link you to Streeteasy when you reply. There is a small (regular for NYC) bedroom, a living room with couches and a TV (with apple tv but only basic cable), a kitchen, and a bathroom. It is in a walk up building a couple of flights up. Need relatively quiet guests for this residential building - definitely not a place for your weekend party.",
             "description":
                 "A comfortable one bedroom for responsible guests. Plenty of natural light. Walk up building. You'll feel like a local staying in this residential neighborhood, right next to great food, bars, subways, the High Line, Chelsea Piers, etc. *I listed this place late so can be flexible for you. I'm quick to respond - contact me and let's discuss whether we can make something work for you asap* Sorry about the lack of pictures. Will link you to Streeteasy when you reply. There is a small (regular for NYC) bedroom, a living room with couches and a TV (with apple tv but only basic cable), a kitchen, and a bathroom. It is in a walk up building a couple of flights up. Need relatively quiet guests for this residential building - definitely not a place for your weekend party. I am available to help you any time and will provide a cell # for questions. When I let you in, I'll also be able to answer any questions and point you to restaurants and local attractions. Chelsea is considered a high end nei",
-            "neighborhood_overview":
-                "Chelsea is considered a high end neighborhood in NYC.  (URL HIDDEN)",
+            "neighborhood_overview": "Chelsea is considered a high end neighborhood in NYC.  (URL HIDDEN)",
             "number_of_reviews": 1,
             "address": {
                 "street": "New York, NY, United States",
@@ -99,11 +98,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-74.00074, 40.74577],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 3,
-            "review_score": 100
+            "review_score": 100,
         },
         {
             "name": "The LES Apartment",
@@ -126,10 +125,10 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.98944, 40.72063],
-                    "is_location_exact": false
-                }
+                    "is_location_exact": false,
+                },
             },
-            "_id": 4
+            "_id": 4,
         },
         {
             "name": "2 bedroom Upper east side",
@@ -152,18 +151,17 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.95854, 40.7664],
-                    "is_location_exact": false
-                }
+                    "is_location_exact": false,
+                },
             },
             "_id": 5,
-            "review_score": 90
+            "review_score": 90,
         },
         {
             "name": "Room Close to LGA and 35 mins to Times Square",
             "summary":
                 "A private small bedroom in a 2 BR 1BA apartment. There’s no living area as I converted to live in. The location is 2 minutes to Q33 bus stop, 5 minutes to 7 train station ( which directly takes you to Times Square in 35-40 minutes ).",
-            "space":
-                "The bedroom has a queen bed, a closet, a mini fridge, outlets, USB ports, wifi, and AC.",
+            "space": "The bedroom has a queen bed, a closet, a mini fridge, outlets, USB ports, wifi, and AC.",
             "description":
                 "A private small bedroom in a 2 BR 1BA apartment. There’s no living area as I converted to live in. The location is 2 minutes to Q33 bus stop, 5 minutes to 7 train station ( which directly takes you to Times Square in 35-40 minutes ). The bedroom has a queen bed, a closet, a mini fridge, outlets, USB ports, wifi, and AC. Kitchen is not provided to use. Guest have access to the bedroom and bathroom only. This apartment has my husband and me. This place also has a chinchilla and a French Bulldog. We are living in this apartment in a living area. And we are offering an actual room for your privacy. I would be very happy to welcome all dog lovers because our frenchie loves to interact with people. So feel free to contact me if you have any questions :) This elevator building is located in a great neighborhood where there are many great restaurants from all parts of the world ( Latin American, Indian, Thai, Japanese, Filipino and the list goes on) .  The building is also conveniently near ma",
             "neighborhood_overview":
@@ -179,11 +177,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.88025, 40.74953],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 6,
-            "review_score": 99
+            "review_score": 99,
         },
         {
             "name": "A bedroom far away from home",
@@ -206,11 +204,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.82257, 40.71485],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 7,
-            "review_score": 95
+            "review_score": 95,
         },
         {
             "name": "Large railroad style 3 bedroom apt in Manhattan!",
@@ -233,11 +231,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.93943, 40.79805],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 8,
-            "review_score": 95
+            "review_score": 95,
         },
         {
             "name": "Resort-like living in Williamsburg",
@@ -258,20 +256,20 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.93869, 40.71552],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 9,
-            "review_score": 100
+            "review_score": 100,
         },
         {
             "name": "UWS Brownstone Near Central Park",
             "summary":
                 "This spacious one bedroom apartment has a bonus space with two extra beds as well as a fold out sofa.  Close to the park, the subway, museums and restaurants.  This apartment is the perfect quiet getaway in the middle of Manhattan.",
             "space":
-                "This charming one-bedroom apartment in a landmark brownstone townhouse in the Upper West Side area of Manhattan has high-ceilings, a fireplace and two planted, south-facing balconies overlooking a beautiful garden.  (The balcony off of the living room is about 5\" X 8\" and has a small table and two chairs where two people can have a nice meal.  The balcony off of the bedroom is about 5\" X 14' and there is a chaise longue and a sitting chair, along with two side tables.  Both have outdoor lights, overlook a nice garden, and have plantings.)   There is a queen-sized bed in the private bedroom with closing door. There is also a very high quality full sized sofa bed in the living room.  This beautiful home is on an historic tree-lined block, between Central Park West and Columbus Avenue, near major museums, shopping, and subways.   The owner prefers to accommodate two adults.  Because of the circumstances, only guests who are comfortable being reasonably quiet are encouraged to stay.    Thi",
+                'This charming one-bedroom apartment in a landmark brownstone townhouse in the Upper West Side area of Manhattan has high-ceilings, a fireplace and two planted, south-facing balconies overlooking a beautiful garden.  (The balcony off of the living room is about 5" X 8" and has a small table and two chairs where two people can have a nice meal.  The balcony off of the bedroom is about 5" X 14\' and there is a chaise longue and a sitting chair, along with two side tables.  Both have outdoor lights, overlook a nice garden, and have plantings.)   There is a queen-sized bed in the private bedroom with closing door. There is also a very high quality full sized sofa bed in the living room.  This beautiful home is on an historic tree-lined block, between Central Park West and Columbus Avenue, near major museums, shopping, and subways.   The owner prefers to accommodate two adults.  Because of the circumstances, only guests who are comfortable being reasonably quiet are encouraged to stay.    Thi',
             "description":
-                "This spacious one bedroom apartment has a bonus space with two extra beds as well as a fold out sofa.  Close to the park, the subway, museums and restaurants.  This apartment is the perfect quiet getaway in the middle of Manhattan. This charming one-bedroom apartment in a landmark brownstone townhouse in the Upper West Side area of Manhattan has high-ceilings, a fireplace and two planted, south-facing balconies overlooking a beautiful garden.  (The balcony off of the living room is about 5\" X 8\" and has a small table and two chairs where two people can have a nice meal.  The balcony off of the bedroom is about 5\" X 14' and there is a chaise longue and a sitting chair, along with two side tables.  Both have outdoor lights, overlook a nice garden, and have plantings.)   There is a queen-sized bed in the private bedroom with closing door. There is also a very high quality full sized sofa bed in the living room.  This beautiful home is on an historic tree-lined block, between Central Park ",
+                'This spacious one bedroom apartment has a bonus space with two extra beds as well as a fold out sofa.  Close to the park, the subway, museums and restaurants.  This apartment is the perfect quiet getaway in the middle of Manhattan. This charming one-bedroom apartment in a landmark brownstone townhouse in the Upper West Side area of Manhattan has high-ceilings, a fireplace and two planted, south-facing balconies overlooking a beautiful garden.  (The balcony off of the living room is about 5" X 8" and has a small table and two chairs where two people can have a nice meal.  The balcony off of the bedroom is about 5" X 14\' and there is a chaise longue and a sitting chair, along with two side tables.  Both have outdoor lights, overlook a nice garden, and have plantings.)   There is a queen-sized bed in the private bedroom with closing door. There is also a very high quality full sized sofa bed in the living room.  This beautiful home is on an historic tree-lined block, between Central Park ',
             "neighborhood_overview": "",
             "number_of_reviews": 45,
             "address": {
@@ -284,11 +282,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.9696, 40.78558],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 10,
-            "review_score": 93
+            "review_score": 93,
         },
         {
             "name": "Cozy Art Top Floor Apt in PRIME Williamsburg!",
@@ -311,11 +309,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.96053, 40.71577],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 11,
-            "review_score": 96
+            "review_score": 96,
         },
         {
             "name": "A large sunny bedroom",
@@ -336,11 +334,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.90052, 40.85598],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 12,
-            "review_score": 90
+            "review_score": 90,
         },
         {
             "name": "Luxury 1-Bdrm in Downtown Brooklyn",
@@ -363,19 +361,19 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.98102, 40.69406],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
-            "_id": 13
+            "_id": 13,
         },
         {
             "name": "Whole Apt. in East Williamsburg",
             "summary":
                 "Beautiful open floor one bedroom apartment in small building. Located in a quiet street, only 10 min from downtown Manhattan on the L train and a short walk away from the heart of Williamsburg and Bushwick.",
             "space":
-                "Beautiful open floor one bedroom apartment in small building. Located in a quiet street, only 10 min from downtown Manhattan on the L train and a short walk away from the heart of Williamsburg and Bushwick. The apartment is on the second floor of a small building. The Amenities include: * Private apartment all to yourself! * Newly renovated bathroom with bathtub. * 3 Blocks from L Train Subway Line * High Speed Wireless Internet * Clean linens and towels * Fully functional kitchen and utensils. * Queen Size bed. * Street parking is free and easy to obtain.  * 48\" LED Roku Smart TV with access to Netflix and other streaming services as well as a DVD PLayer. * Bluetooth capable stereo receiver. * 3 Blocks from L Train Subway line for very easy and quick access to Manhattan. * Street parking is free and easy to obtain.",
+                'Beautiful open floor one bedroom apartment in small building. Located in a quiet street, only 10 min from downtown Manhattan on the L train and a short walk away from the heart of Williamsburg and Bushwick. The apartment is on the second floor of a small building. The Amenities include: * Private apartment all to yourself! * Newly renovated bathroom with bathtub. * 3 Blocks from L Train Subway Line * High Speed Wireless Internet * Clean linens and towels * Fully functional kitchen and utensils. * Queen Size bed. * Street parking is free and easy to obtain.  * 48" LED Roku Smart TV with access to Netflix and other streaming services as well as a DVD PLayer. * Bluetooth capable stereo receiver. * 3 Blocks from L Train Subway line for very easy and quick access to Manhattan. * Street parking is free and easy to obtain.',
             "description":
-                "Beautiful open floor one bedroom apartment in small building. Located in a quiet street, only 10 min from downtown Manhattan on the L train and a short walk away from the heart of Williamsburg and Bushwick. Beautiful open floor one bedroom apartment in small building. Located in a quiet street, only 10 min from downtown Manhattan on the L train and a short walk away from the heart of Williamsburg and Bushwick. The apartment is on the second floor of a small building. The Amenities include: * Private apartment all to yourself! * Newly renovated bathroom with bathtub. * 3 Blocks from L Train Subway Line * High Speed Wireless Internet * Clean linens and towels * Fully functional kitchen and utensils. * Queen Size bed. * Street parking is free and easy to obtain.  * 48\" LED Roku Smart TV with access to Netflix and other streaming services as well as a DVD PLayer. * Bluetooth capable stereo receiver. * 3 Blocks from L Train Subway line for very easy and quick access to Manhattan. * Street p",
+                'Beautiful open floor one bedroom apartment in small building. Located in a quiet street, only 10 min from downtown Manhattan on the L train and a short walk away from the heart of Williamsburg and Bushwick. Beautiful open floor one bedroom apartment in small building. Located in a quiet street, only 10 min from downtown Manhattan on the L train and a short walk away from the heart of Williamsburg and Bushwick. The apartment is on the second floor of a small building. The Amenities include: * Private apartment all to yourself! * Newly renovated bathroom with bathtub. * 3 Blocks from L Train Subway Line * High Speed Wireless Internet * Clean linens and towels * Fully functional kitchen and utensils. * Queen Size bed. * Street parking is free and easy to obtain.  * 48" LED Roku Smart TV with access to Netflix and other streaming services as well as a DVD PLayer. * Bluetooth capable stereo receiver. * 3 Blocks from L Train Subway line for very easy and quick access to Manhattan. * Street p',
             "neighborhood_overview":
                 "* Nearby Art Galleries, Restaurants, Bars, Shopping, Cafes in the East Williamsburg section of Brooklyn. * 24 hour natural food store 2 blocks away and close to other shopping.",
             "number_of_reviews": 126,
@@ -389,11 +387,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.93981, 40.70687],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 14,
-            "review_score": 96
+            "review_score": 96,
         },
         {
             "name": "Charming Spacious Park Slope Studio",
@@ -416,11 +414,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.98307, 40.6651],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 15,
-            "review_score": 98
+            "review_score": 98,
         },
         {
             "name": "Serene luxury in Harlem",
@@ -442,11 +440,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.95211, 40.80708],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 16,
-            "review_score": 100
+            "review_score": 100,
         },
         {
             "name": "Relaxing and Roomy in Crown Heights",
@@ -467,11 +465,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.95667, 40.67414],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 17,
-            "review_score": 96
+            "review_score": 96,
         },
         {
             "name": "HUGE Bedroom in Lower East Side",
@@ -492,10 +490,10 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.98319, 40.71823],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
-            "_id": 18
+            "_id": 18,
         },
         {
             "name": "well lit East Williamsburg apt.",
@@ -516,10 +514,10 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.94384, 40.70528],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
-            "_id": 19
+            "_id": 19,
         },
         {
             "name": "Big Private BR Steps to Barnard Columbia & Subways",
@@ -542,22 +540,22 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.9648, 40.80732],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 20,
-            "review_score": 99
+            "review_score": 99,
         },
         {
             "name": "Artist Garden Duplex Ft. Greene - 2.5 Bedroom",
             "summary":
-                "Beautifully renovated Brownstone garden duplex - BEST BLOCK in Ft. Greene (S Portland Ave). High end renovation: full kitchen, private entrance, master bedroom with Queen bed, glass partition, study (extra bed - the \"half bedroom\"), glass doors to patio/garden. Living room sofa opens to Queen. Cellar: TV room, extra sleep quarters (3 twins or  king), bath w shower . Perfect for 1 - 2 couples or families.  5 minutes to BAM, subways, restaurants, park, farmer's market. Superb base for NY vacation.",
+                'Beautifully renovated Brownstone garden duplex - BEST BLOCK in Ft. Greene (S Portland Ave). High end renovation: full kitchen, private entrance, master bedroom with Queen bed, glass partition, study (extra bed - the "half bedroom"), glass doors to patio/garden. Living room sofa opens to Queen. Cellar: TV room, extra sleep quarters (3 twins or  king), bath w shower . Perfect for 1 - 2 couples or families.  5 minutes to BAM, subways, restaurants, park, farmer\'s market. Superb base for NY vacation.',
             "space":
-                "Gorgeous brownstone garden duplex (private entrance) on best block - sleeps 8. Main floor comfortably sleeps 4: 1 queen in master bedroom, queen sleeper sofa in living room with luxurious high end kitchen and bathroom.  Cellar TV room has two regular twins that fit together to make a king bed (I add a foam strip to fill the gap between the two twins and belt the two mattresses together so they don't come apart when made into a king) and two extra long twin futons that sit on the floor;  full bathroom with tub and shower. Note: This is not a conventional 3 bedroom! Some guests prefer placing a futon in the extension and using it as another bedroom. This can work great with kids. The entrance to the bathroom is through the master bedroom so from the extension, you walk through the master bedroom to get to the kitchen or bathroom. Full backyard garden (gorgeous woodland feel - cool and shaded in summer) with BBQ and private patio.  Please read \"Other things to note\" below! The house is be",
+                'Gorgeous brownstone garden duplex (private entrance) on best block - sleeps 8. Main floor comfortably sleeps 4: 1 queen in master bedroom, queen sleeper sofa in living room with luxurious high end kitchen and bathroom.  Cellar TV room has two regular twins that fit together to make a king bed (I add a foam strip to fill the gap between the two twins and belt the two mattresses together so they don\'t come apart when made into a king) and two extra long twin futons that sit on the floor;  full bathroom with tub and shower. Note: This is not a conventional 3 bedroom! Some guests prefer placing a futon in the extension and using it as another bedroom. This can work great with kids. The entrance to the bathroom is through the master bedroom so from the extension, you walk through the master bedroom to get to the kitchen or bathroom. Full backyard garden (gorgeous woodland feel - cool and shaded in summer) with BBQ and private patio.  Please read "Other things to note" below! The house is be',
             "description":
                 "Beautifully renovated Brownstone garden duplex - BEST BLOCK in Ft. Greene (S Portland Ave). High end renovation: full kitchen, private entrance, master bedroom with Queen bed, glass partition, study (extra bed - the \"half bedroom\"), glass doors to patio/garden. Living room sofa opens to Queen. Cellar: TV room, extra sleep quarters (3 twins or  king), bath w shower . Perfect for 1 - 2 couples or families.  5 minutes to BAM, subways, restaurants, park, farmer's market. Superb base for NY vacation. Gorgeous brownstone garden duplex (private entrance) on best block - sleeps 8. Main floor comfortably sleeps 4: 1 queen in master bedroom, queen sleeper sofa in living room with luxurious high end kitchen and bathroom.  Cellar TV room has two regular twins that fit together to make a king bed (I add a foam strip to fill the gap between the two twins and belt the two mattresses together so they don't come apart when made into a king) and two extra long twin futons that sit on the floor;  full ba",
             "neighborhood_overview":
-                "Ft Greene is a fabulous neighborhood, accessible to everything. People love living in this part of NYC. My house is on what is considered the \"the best block,\" most central with elegant brownstones, Sycamores. Within just a couple blocks is the neighborhood park with playground , farmer's market, flea market, Brooklyn Academy of Music (dance, theater, movies, concerts), restaurants and cafes. Check out from NY Times real estate section - a promo piece: (URL HIDDEN)",
+                'Ft Greene is a fabulous neighborhood, accessible to everything. People love living in this part of NYC. My house is on what is considered the "the best block," most central with elegant brownstones, Sycamores. Within just a couple blocks is the neighborhood park with playground , farmer\'s market, flea market, Brooklyn Academy of Music (dance, theater, movies, concerts), restaurants and cafes. Check out from NY Times real estate section - a promo piece: (URL HIDDEN)',
             "number_of_reviews": 89,
             "address": {
                 "street": "Brooklyn, NY, United States",
@@ -569,11 +567,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.97527, 40.6884],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 21,
-            "review_score": 98
+            "review_score": 98,
         },
         {
             "name": "Cozy Hell's Kitchen Apt",
@@ -596,11 +594,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.99482, 40.76438],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 22,
-            "review_score": 95
+            "review_score": 95,
         },
         {
             "name": "Private Cozy Bedroom in Brooklyn",
@@ -623,11 +621,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.94883, 40.6536],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 23,
-            "review_score": 93
+            "review_score": 93,
         },
         {
             "name": "Private Entrance - Backyard Summer Dining - Enjoy",
@@ -650,20 +648,20 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.95321, 40.69034],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 24,
-            "review_score": 96
+            "review_score": 96,
         },
         {
             "name": "The Executive  Posh Room",
             "summary":
-                "Our Cozy Executive  Posh 1 large  bedroom in private house with queen size bed 42\" TV with cable and WiFi, close to both airport easy access to  buses and subways to Manhattan very quiet and safe neighborhood 10&15 minutes to JFK and LGA  airport",
+                'Our Cozy Executive  Posh 1 large  bedroom in private house with queen size bed 42" TV with cable and WiFi, close to both airport easy access to  buses and subways to Manhattan very quiet and safe neighborhood 10&15 minutes to JFK and LGA  airport',
             "space":
-                "Very large 1 bedroom with 42\" TV and queen size bed, and walk in closet,  share bathroom, kitchen and living room. Very spacious",
+                'Very large 1 bedroom with 42" TV and queen size bed, and walk in closet,  share bathroom, kitchen and living room. Very spacious',
             "description":
-                "Our Cozy Executive  Posh 1 large  bedroom in private house with queen size bed 42\" TV with cable and WiFi, close to both airport easy access to  buses and subways to Manhattan very quiet and safe neighborhood 10&15 minutes to JFK and LGA  airport Very large 1 bedroom with 42\" TV and queen size bed, and walk in closet,  share bathroom, kitchen and living room. Very spacious Guess will have access to bathroom kitchen living room dining room and WiFi, TV and refrigerator. We are family oriented so we will interact with the guess at their convenience, host will be present upon arrival of guest. Very quiet and safe neighborhood, 8 minutes from JFK  airport and 10minutes to LGA airport easy access to bus stop and subways 32 minutes to city via subways, laundry 5 mins from home. Convenient to all stores and laundromat and pharmacy. My home is fully secure with intelligence home security system and is safe to all. 4 minutes walk to Roy Wilkins Park where you can enjoy reggae show and nightlife",
+                'Our Cozy Executive  Posh 1 large  bedroom in private house with queen size bed 42" TV with cable and WiFi, close to both airport easy access to  buses and subways to Manhattan very quiet and safe neighborhood 10&15 minutes to JFK and LGA  airport Very large 1 bedroom with 42" TV and queen size bed, and walk in closet,  share bathroom, kitchen and living room. Very spacious Guess will have access to bathroom kitchen living room dining room and WiFi, TV and refrigerator. We are family oriented so we will interact with the guess at their convenience, host will be present upon arrival of guest. Very quiet and safe neighborhood, 8 minutes from JFK  airport and 10minutes to LGA airport easy access to bus stop and subways 32 minutes to city via subways, laundry 5 mins from home. Convenient to all stores and laundromat and pharmacy. My home is fully secure with intelligence home security system and is safe to all. 4 minutes walk to Roy Wilkins Park where you can enjoy reggae show and nightlife',
             "neighborhood_overview":
                 "Very quiet and safe neighborhood, 8 minutes from JFK  airport and 10minutes to LGA airport easy access to bus stop and subways 32 minutes to city via subways, laundry 5 mins from home. Convenient to all stores and laundromat and pharmacy. My home is fully secure with intelligence home security system and is safe to all. 4 minutes walk to Roy Wilkins Park where you can enjoy reggae show and nightlife.",
             "number_of_reviews": 21,
@@ -677,11 +675,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.77835, 40.68135],
-                    "is_location_exact": false
-                }
+                    "is_location_exact": false,
+                },
             },
             "_id": 25,
-            "review_score": 91
+            "review_score": 91,
         },
         {
             "name": "Brooklyn Artist Loft / Fun Location",
@@ -704,11 +702,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-74.02972, 40.63199],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 26,
-            "review_score": 98
+            "review_score": 98,
         },
         {
             "name": "East Village Sanctuary",
@@ -731,11 +729,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.98763, 40.72808],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 27,
-            "review_score": 100
+            "review_score": 100,
         },
         {
             "name": "Sunny 1 or 2 BR apt in Boerum Hill",
@@ -758,11 +756,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.98517, 40.68779],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 28,
-            "review_score": 98
+            "review_score": 98,
         },
         {
             "name": "Home, Sweet, Harlem. Welcome!",
@@ -785,11 +783,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.93955, 40.79733],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 29,
-            "review_score": 90
+            "review_score": 90,
         },
         {
             "name": "Cozy Chinatown studio apartment",
@@ -812,11 +810,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.99442, 40.7113],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 30,
-            "review_score": 97
+            "review_score": 97,
         },
         {
             "name": "Bright, Bohemian, Spacious Apt in Williamsburg",
@@ -838,11 +836,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.96216, 40.71353],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 31,
-            "review_score": 97
+            "review_score": 97,
         },
         {
             "name": "2 Bedroom in The East Village!",
@@ -863,11 +861,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.98161, 40.73598],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 32,
-            "review_score": 88
+            "review_score": 88,
         },
         {
             "name": "Large Duplex in Midtown East with backyard!",
@@ -890,11 +888,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.96776, 40.75482],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 33,
-            "review_score": 92
+            "review_score": 92,
         },
         {
             "name": "Amazing Upper West Side Loft-Studio",
@@ -915,11 +913,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.97589, 40.78898],
-                    "is_location_exact": false
-                }
+                    "is_location_exact": false,
+                },
             },
             "_id": 34,
-            "review_score": 93
+            "review_score": 93,
         },
         {
             "name": "Huge bedroom in luxurious apartment",
@@ -940,11 +938,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.94429, 40.78626],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 35,
-            "review_score": 100
+            "review_score": 100,
         },
         {
             "name": "Furnished Nolita Studio",
@@ -966,10 +964,10 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.99529, 40.72404],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
-            "_id": 36
+            "_id": 36,
         },
         {
             "name": "Luxury 1 Bedroom Central Park Views",
@@ -991,11 +989,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.96482, 40.79208],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 37,
-            "review_score": 98
+            "review_score": 98,
         },
         {
             "name": "Brooklyn Bushwhick Private Room",
@@ -1016,17 +1014,16 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.92081, 40.70017],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
-            "_id": 38
+            "_id": 38,
         },
         {
             "name": "1 BR 1/2 block to A/B/C/D trains",
             "summary":
                 "1BR in a 2BR apt -Ideal for tourists. Easy access to the city with the express trains (A,D)  -15 min. to Times Square -10 min. to Central Park -3 min. walk to 24 hs Supermarket, Starbucks, Duane reade and Banks   ",
-            "space":
-                "It is a bigger apartment than the standard NYC size. It is also a very quite one.",
+            "space": "It is a bigger apartment than the standard NYC size. It is also a very quite one.",
             "description":
                 "1BR in a 2BR apt -Ideal for tourists. Easy access to the city with the express trains (A,D)  -15 min. to Times Square -10 min. to Central Park -3 min. walk to 24 hs Supermarket, Starbucks, Duane reade and Banks    It is a bigger apartment than the standard NYC size. It is also a very quite one. You will have their own keys and access the apartment and all of its areas of the but my room 24hrs. The Neighbourhood is nice and safe day and night. The police station is around the corner (Inside the metro station). I never had a problem. A, B, C and D trains are around the corner. A and D are Express. 1 Train is 3 blocks away and M3 Bus is on the other side of the street. You would be sharing the apartment with me. I am a musician, very respectful, clean, and easy going.  You will have access to all the areas, kitchenware, oven and spices to cook. There is turbo speed Wi-fi in the Apartment. ",
             "neighborhood_overview":
@@ -1042,11 +1039,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.93957, 40.83307],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 39,
-            "review_score": 94
+            "review_score": 94,
         },
         {
             "name": "Brick House: Unique Garden Apartment! King Bed!",
@@ -1069,11 +1066,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.91365, 40.68174],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 40,
-            "review_score": 94
+            "review_score": 94,
         },
         {
             "name": "Big, glamorous, 4BR, 3-story house",
@@ -1083,7 +1080,8 @@ export function getRentalData() {
                 "Our Home  Our home is a classic Brooklyn brownstone with traditional detail but a modern renovation to give it a light and open feeling. An open living room, dining room and very modern kitchen makes up the 1st floor. Out the back door and down a stairway from the ground floor, you will find our beautiful back garden filled with herbs, flowers, and vegetables. The master bedroom, study/guest bedroom, walk-in closet, and master bathroom make up the second floor. The master bedroom has a king-sized bed and nice views to the backyard. The master bathroom has a beautiful pebble-floored, two-headed shower, and matching modern sinks.   The study/guest bedroom has a queen bed.   There is a heavy curtain separating the two bedrooms on this floor rather than a door so there is visual privacy but less sound separation.  On the top floor, you will have access to two more bedrooms, a laundry room, and a second, more basic, bathroom with a tub, great for kids.   The front bedroom on this floor has ",
             "description":
                 "Our 4-bedroom, 3-story beautiful Brooklyn townhouse is a great place to stay for your NYC trip.   Located in Fort Greene, right in the heart of Brownstone Brooklyn's Arts District and only 10 minutes by Subway to Manhattan. Our Home  Our home is a classic Brooklyn brownstone with traditional detail but a modern renovation to give it a light and open feeling. An open living room, dining room and very modern kitchen makes up the 1st floor. Out the back door and down a stairway from the ground floor, you will find our beautiful back garden filled with herbs, flowers, and vegetables. The master bedroom, study/guest bedroom, walk-in closet, and master bathroom make up the second floor. The master bedroom has a king-sized bed and nice views to the backyard. The master bathroom has a beautiful pebble-floored, two-headed shower, and matching modern sinks.   The study/guest bedroom has a queen bed.   There is a heavy curtain separating the two bedrooms on this floor rather than a door so there ",
-            "neighborhood_overview": "Fort Greene is one of the classic brownstone neighborhoods of Brooklyn, brimming with the energy of New York City.  Our house is one block from the world famous performance space Brooklyn Academy of Music and two blocks from the Frederick Law Olmsted-designed Fort Greene Park where you'll find a weekly farmer's market, a regular pickup soccer match, outdoor musical performances, tennis courts, playgrounds, and families picnicking. Along Fulton and DeKalb streets, you'll find restaurants with Manhattan-quality food but Brooklyn prices. Only 1 stop from Chinatown and 2 stops from Union Square on the Q train, you can easily spend your days touring busy Manhattan and retreat to our quiet, lovely house and garden for a more relaxed experience.  We love our house and our neighborhood and know that you will too.",
+            "neighborhood_overview":
+                "Fort Greene is one of the classic brownstone neighborhoods of Brooklyn, brimming with the energy of New York City.  Our house is one block from the world famous performance space Brooklyn Academy of Music and two blocks from the Frederick Law Olmsted-designed Fort Greene Park where you'll find a weekly farmer's market, a regular pickup soccer match, outdoor musical performances, tennis courts, playgrounds, and families picnicking. Along Fulton and DeKalb streets, you'll find restaurants with Manhattan-quality food but Brooklyn prices. Only 1 stop from Chinatown and 2 stops from Union Square on the Q train, you can easily spend your days touring busy Manhattan and retreat to our quiet, lovely house and garden for a more relaxed experience.  We love our house and our neighborhood and know that you will too.",
             "number_of_reviews": 104,
             "address": {
                 "street": "Brooklyn, NY, United States",
@@ -1095,11 +1093,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.97713, 40.68675],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 41,
-            "review_score": 97
+            "review_score": 97,
         },
         {
             "name": "Fresh and modern 1BR in Bed-Stuy",
@@ -1121,11 +1119,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.92922, 40.68683],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 42,
-            "review_score": 93
+            "review_score": 93,
         },
         {
             "name": "Bright, sunny quite room Bushwick",
@@ -1148,11 +1146,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.91932, 40.71112],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 43,
-            "review_score": 100
+            "review_score": 100,
         },
         {
             "name": "Bright, Modern, Spacious Duplex Apt",
@@ -1175,11 +1173,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.92117, 40.76964],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 44,
-            "review_score": 98
+            "review_score": 98,
         },
         {
             "name": "Museum Mile 1 BR - Madison Ave",
@@ -1202,11 +1200,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.95735, 40.78465],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 45,
-            "review_score": 80
+            "review_score": 80,
         },
         {
             "name": "1 bedroom in Astoria, Queens",
@@ -1227,10 +1225,10 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.93959, 40.76485],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
-            "_id": 46
+            "_id": 46,
         },
         {
             "name": "Charming Private Brooklyn Bedroom",
@@ -1253,11 +1251,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.95646, 40.72804],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 47,
-            "review_score": 98
+            "review_score": 98,
         },
         {
             "name": "*CoZy Private Williamsburg Home*",
@@ -1279,11 +1277,11 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.94854, 40.70998],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 48,
-            "review_score": 97
+            "review_score": 97,
         },
         {
             "name": "Cute apt in artist's home",
@@ -1305,12 +1303,12 @@ export function getRentalData() {
                 "location": {
                     "type": "Point",
                     "coordinates": [-73.92745, 40.70186],
-                    "is_location_exact": true
-                }
+                    "is_location_exact": true,
+                },
             },
             "_id": 49,
-            "review_score": 87
-        }
+            "review_score": 87,
+        },
     ];
     return data;
 }

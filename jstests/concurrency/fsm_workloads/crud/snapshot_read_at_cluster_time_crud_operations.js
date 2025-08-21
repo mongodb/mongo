@@ -19,10 +19,10 @@
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     doSnapshotFindAtClusterTime,
-    doSnapshotGetMoreAtClusterTime
+    doSnapshotGetMoreAtClusterTime,
 } from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {numIds: 100, numDocsToInsertPerThread: 5, batchSize: 10};
 
     const states = {
@@ -34,13 +34,11 @@ export const $config = (function() {
 
         snapshotScan: function snapshotScan(db, collName) {
             if (!this.cursorId || this.cursorId == 0) {
-                doSnapshotFindAtClusterTime(
-                    db, collName, this, [ErrorCodes.ShutdownInProgress], {_id: 1}, (res) => {
-                        let expectedDocs =
-                            [...Array(this.batchSize).keys()].map((i) => ({_id: i, x: 1}));
-                        assert.eq(res.cursor.firstBatch, expectedDocs, () => tojson(res));
-                        this.numDocScanned = this.batchSize;
-                    });
+                doSnapshotFindAtClusterTime(db, collName, this, [ErrorCodes.ShutdownInProgress], {_id: 1}, (res) => {
+                    let expectedDocs = [...Array(this.batchSize).keys()].map((i) => ({_id: i, x: 1}));
+                    assert.eq(res.cursor.firstBatch, expectedDocs, () => tojson(res));
+                    this.numDocScanned = this.batchSize;
+                });
             } else {
                 // The killOp() function below may cause Interrupted or CursorNotFound here, or the
                 // end of the test may cause ShutdownInProgress.
@@ -50,11 +48,14 @@ export const $config = (function() {
                     this,
                     [...interruptedQueryErrors, ErrorCodes.ShutdownInProgress],
                     (res) => {
-                        let expectedDocs = [...Array(this.batchSize).keys()].map(
-                            (i) => ({_id: i + this.numDocScanned, x: 1}));
+                        let expectedDocs = [...Array(this.batchSize).keys()].map((i) => ({
+                            _id: i + this.numDocScanned,
+                            x: 1,
+                        }));
                         assert.eq(res.cursor.nextBatch, expectedDocs, () => tojson(res));
                         this.numDocScanned = this.numDocScanned + this.batchSize;
-                    });
+                    },
+                );
             }
         },
 
@@ -87,9 +88,9 @@ export const $config = (function() {
             // Find the object ID of the getMore in the snapshot read, if it is running, and attempt
             // to kill the operation.
             const res = assert.commandWorkedOrFailedWithCode(
-                db.adminCommand(
-                    {currentOp: 1, ns: {$regex: db.getName() + "\." + collName}, op: "getmore"}),
-                [ErrorCodes.Interrupted]);
+                db.adminCommand({currentOp: 1, ns: {$regex: db.getName() + "\." + collName}, op: "getmore"}),
+                [ErrorCodes.Interrupted],
+            );
             if (res.hasOwnProperty("inprog") && res.inprog.length) {
                 const killOpCmd = {killOp: 1, op: res.inprog[0].opid};
                 const killRes = db.adminCommand(killOpCmd);
@@ -106,13 +107,12 @@ export const $config = (function() {
             deleteDocs: 0.2,
             readDocs: 0.2,
         },
-        snapshotScan:
-            {insertDocs: 0.2, updateDocs: 0.2, deleteDocs: 0.2, readDocs: 0.2, killOp: 0.2},
+        snapshotScan: {insertDocs: 0.2, updateDocs: 0.2, deleteDocs: 0.2, readDocs: 0.2, killOp: 0.2},
         insertDocs: {snapshotScan: 1.0},
         updateDocs: {snapshotScan: 1.0},
         readDocs: {snapshotScan: 1.0},
         deleteDocs: {snapshotScan: 1.0},
-        killOp: {snapshotScan: 1.0}
+        killOp: {snapshotScan: 1.0},
     };
 
     let minSnapshotHistoryWindowInSecondsDefault;
@@ -129,30 +129,32 @@ export const $config = (function() {
         // sharded clusters.
         if (cluster.isSharded()) {
             cluster.executeOnConfigNodes((db) => {
-                assert.commandWorked(
-                    db.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: 3600}));
+                assert.commandWorked(db.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: 3600}));
             });
         }
         assert.commandWorked(db.runCommand({create: collName}));
         const docs = [...Array(this.numIds).keys()].map((i) => ({_id: i, x: 1}));
-        this.clusterTime =
-            assert.commandWorked(db.runCommand({insert: collName, documents: docs})).operationTime;
+        this.clusterTime = assert.commandWorked(db.runCommand({insert: collName, documents: docs})).operationTime;
     }
 
     function teardown(db, collName, cluster) {
         assert.commandWorked(db.runCommand({drop: collName}));
-        cluster.executeOnMongodNodes(function(db) {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowInSecondsDefault
-            }));
+        cluster.executeOnMongodNodes(function (db) {
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowInSecondsDefault,
+                }),
+            );
         });
         if (cluster.isSharded()) {
             cluster.executeOnConfigNodes((db) => {
-                assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowInSecondsDefault
-                }));
+                assert.commandWorked(
+                    db.adminCommand({
+                        setParameter: 1,
+                        minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowInSecondsDefault,
+                    }),
+                );
             });
         }
     }
@@ -160,7 +162,7 @@ export const $config = (function() {
     return {
         threadCount: 5,
         iterations: 50,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         setup: setup,

@@ -22,8 +22,7 @@ assert.commandWorked(rollbackTest.getPrimary().getDB(dbName)[collName].insert({}
 
 let rollbackNode = rollbackTest.transitionToRollbackOperations();
 
-const failPointAfterTransition =
-    configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
+const failPointAfterTransition = configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
 
 // Start rollback.
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
@@ -48,9 +47,11 @@ assert.soon(() => {
 // entry point.
 configureFailPoint(rollbackNode, "skipCheckingForNotPrimaryInCommandDispatch");
 jsTestLog("Reading during rollback returns not master error message");
-let res = assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"find": collName}),
-                                       ErrorCodes.NotPrimaryOrSecondary,
-                                       "find did not fail with NotPrimaryOrSecondary");
+let res = assert.commandFailedWithCode(
+    rollbackNode.getDB(dbName).runCommand({"find": collName}),
+    ErrorCodes.NotPrimaryOrSecondary,
+    "find did not fail with NotPrimaryOrSecondary",
+);
 
 // Since we did not send "helloOk: true", the error message should include "not master or
 // secondary".
@@ -68,9 +69,11 @@ res = assert.commandWorked(rollbackNode.getDB(dbName).adminCommand({isMaster: 1,
 assert.eq(res.helloOk, true);
 
 jsTestLog("Reading during rollback returns not primary error message");
-res = assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"find": collName}),
-                                   ErrorCodes.NotPrimaryOrSecondary,
-                                   "find did not fail with NotPrimaryOrSecondary");
+res = assert.commandFailedWithCode(
+    rollbackNode.getDB(dbName).runCommand({"find": collName}),
+    ErrorCodes.NotPrimaryOrSecondary,
+    "find did not fail with NotPrimaryOrSecondary",
+);
 // Since we sent "helloOk: true", the error message should include "not primary or secondary".
 assert(res.errmsg.includes("not primary or secondary"), res);
 assert(!res.errmsg.includes("not master"), res);

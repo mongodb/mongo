@@ -53,10 +53,10 @@ assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2, 3]]}}}], 28667);
 assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2, 3], 4, 5, 6]}}}], 28667);
 
 // First argument is not an array.
-assertErrorCode(coll, [{$project: {x: {$slice: ['one', 2]}}}], 28724);
+assertErrorCode(coll, [{$project: {x: {$slice: ["one", 2]}}}], 28724);
 
 // Second argument is not numeric.
-assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], '2']}}}], 28725);
+assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], "2"]}}}], 28725);
 
 // Second argument is not integral.
 assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], 1.5]}}}], 28726);
@@ -64,7 +64,7 @@ assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], Math.pow(2, 32)]}}}], 28
 assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], -Math.pow(2, 31) - 1]}}}], 28726);
 
 // Third argument is not numeric.
-assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], 0, '2']}}}], 28727);
+assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], 0, "2"]}}}], 28727);
 
 // Third argument is not integral.
 assertErrorCode(coll, [{$project: {x: {$slice: [[1, 2], 0, 1.5]}}}], 28728);

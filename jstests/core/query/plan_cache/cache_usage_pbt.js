@@ -18,10 +18,7 @@
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
-import {
-    getPlanCache,
-    testProperty
-} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {getPlanCache, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getRejectedPlans} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -71,14 +68,14 @@ function repeatQueriesUseCache(getQuery, testHelpers) {
         }
         return {
             passed: false,
-            message: 'Plan cache hits failed to increment after running query several times.',
+            message: "Plan cache hits failed to increment after running query several times.",
             query,
             explain,
             classicHitsBefore,
             classicHitsAfter,
             sbeHitsBefore,
             sbeHitsAfter,
-            planCacheState: getPlanCache(experimentColl).list()
+            planCacheState: getPlanCache(experimentColl).list(),
         };
     }
     return {passed: true};
@@ -90,7 +87,8 @@ testProperty(
     repeatQueriesUseCache,
     {experimentColl},
     makeWorkloadModel({collModel: getCollectionModel({isTS: false}), aggModel, numQueriesPerRun}),
-    numRuns);
+    numRuns,
+);
 // TODO SERVER-103381 re-enable timeseries PBT testing.
 // testProperty(
 //     repeatQueriesUseCache,

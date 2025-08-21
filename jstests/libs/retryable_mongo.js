@@ -1,4 +1,3 @@
-
 /**
  * Construct a new Mongo instance, retrying multiple times in case of failure.
  * @param  {...any} args to be passed onto the Mongo constructor.

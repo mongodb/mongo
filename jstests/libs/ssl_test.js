@@ -16,7 +16,7 @@
  * "jstests/libs/ca.pem").
  */
 export function TLSTest(serverOpts, clientOpts) {
-    var canonicalServerOpts = function(userProvidedOpts) {
+    var canonicalServerOpts = function (userProvidedOpts) {
         var canonical = Object.extend({}, userProvidedOpts || {});
 
         if (!canonical.hasOwnProperty("tlsMode")) {
@@ -50,14 +50,14 @@ TLSTest.prototype.defaultTLSClientOptions = {
     "tls": "",
     "tlsCertificateKeyFile": "jstests/libs/client.pem",
     "tlsCAFile": "jstests/libs/ca.pem",
-    "eval": ";"  // prevent the shell from entering interactive mode
+    "eval": ";", // prevent the shell from entering interactive mode
 };
 
 /**
  * The default shell arguments for a shell without TLS enabled.
  */
 TLSTest.prototype.noTLSClientOptions = {
-    eval: ";"  // prevent the shell from entering interactive mode
+    eval: ";", // prevent the shell from entering interactive mode
 };
 
 /**
@@ -65,7 +65,7 @@ TLSTest.prototype.noTLSClientOptions = {
  * connect with a shell created with the configured options. Returns whether a connection
  * was successfully established.
  */
-TLSTest.prototype.connectWorked = function() {
+TLSTest.prototype.connectWorked = function () {
     var connectTimeoutMillis = 3 * 60 * 1000;
 
     var serverArgv = MongoRunner.arrOptions("mongod", this.serverOpts);
@@ -74,10 +74,15 @@ TLSTest.prototype.connectWorked = function() {
     var serverPID = _startMongoProgram.apply(null, serverArgv);
     try {
         // Don't run the hang analyzer because we don't expect connectWorked() to always succeed.
-        assert.soon(function() {
-            return checkProgram(serverPID).alive &&
-                (0 === _runMongoProgram.apply(null, clientArgv));
-        }, "connect failed", connectTimeoutMillis, undefined, {runHangAnalyzer: false});
+        assert.soon(
+            function () {
+                return checkProgram(serverPID).alive && 0 === _runMongoProgram.apply(null, clientArgv);
+            },
+            "connect failed",
+            connectTimeoutMillis,
+            undefined,
+            {runHangAnalyzer: false},
+        );
     } catch (ex) {
         return false;
     } finally {
@@ -91,7 +96,7 @@ TLSTest.prototype.connectWorked = function() {
  * connect with a shell created with the configured options. Returns immediately with true
  * if a connection cannot be established using the configured client options.
  */
-TLSTest.prototype.connectFails = function() {
+TLSTest.prototype.connectFails = function () {
     const connectTimeoutMillis = 3 * 60 * 1000;
 
     let waitForConnectClientOpts = this.noTLSClientOptions;
@@ -106,10 +111,13 @@ TLSTest.prototype.connectFails = function() {
     const serverPID = _startMongoProgram.apply(null, serverArgv);
 
     // Wait until we can connect to mongod using the working client args
-    assert.soon(function() {
-        return checkProgram(serverPID).alive &&
-            (0 === _runMongoProgram.apply(null, workingClientArgv));
-    }, "connect failed", connectTimeoutMillis);
+    assert.soon(
+        function () {
+            return checkProgram(serverPID).alive && 0 === _runMongoProgram.apply(null, workingClientArgv);
+        },
+        "connect failed",
+        connectTimeoutMillis,
+    );
     const result = _runMongoProgram.apply(null, failingClientArgv);
     _stopMongoProgram(this.port);
     return result !== 0;

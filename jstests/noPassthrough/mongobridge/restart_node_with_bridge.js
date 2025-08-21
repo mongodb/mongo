@@ -27,14 +27,14 @@ const primaryDB = primary.getDB("test");
 const primaryColl = primaryDB.getCollection("restart_node_with_bridge");
 
 function assertWriteReplicates() {
-    assert.commandWorked(
-        primaryColl.update({_id: 0}, {$inc: {counter: 1}}, {upsert: true, writeConcern: {w: 2}}));
+    assert.commandWorked(primaryColl.update({_id: 0}, {$inc: {counter: 1}}, {upsert: true, writeConcern: {w: 2}}));
 }
 
 function assertWriteFailsToReplicate() {
     assert.commandFailedWithCode(
         primaryColl.update({_id: 0}, {$inc: {counter: 1}}, {writeConcern: {w: 2, wtimeout: 1000}}),
-        ErrorCodes.WriteConcernTimeout);
+        ErrorCodes.WriteConcernTimeout,
+    );
 }
 
 // By default, the primary should be connected to the secondary. Replicating a write should

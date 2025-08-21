@@ -13,8 +13,7 @@ assert.eq(18, Object.bsonsize(t.findOne()), "A");
 let x = db.runCommand({features: 1});
 let y = db.runCommand({features: 1, oidReset: 1});
 
-if (!x.ok)
-    print("x: " + tojson(x));
+if (!x.ok) print("x: " + tojson(x));
 
 assert(x.oidMachine, "B1");
 assert.neq(x.oidMachine, y.oidMachine, "B2");

@@ -26,7 +26,7 @@ var isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || fa
 
 const caseInsensitive = {
     locale: "fr",
-    strength: 2
+    strength: 2,
 };
 coll.drop();
 // Create the collection with a default collation. This test also ensures that index filters will
@@ -47,8 +47,7 @@ function checkIndexFilterSet(explain, shouldBeSet) {
 // Now create an index filter on a query with no collation specified. The index filter does not
 // inherit the collection's default collation.
 assert.commandWorked(coll.createIndexes([{x: 1}, {x: 1, y: 1}]));
-assert.commandWorked(
-    db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}));
+assert.commandWorked(db.runCommand({planCacheSetFilter: collName, query: {"x": 3}, indexes: [{x: 1, y: 1}]}));
 
 const listFilters = assert.commandWorked(db.runCommand({planCacheListFilters: collName}));
 assert.eq(listFilters.filters.length, 1);
@@ -56,28 +55,34 @@ assert.eq(listFilters.filters[0].query, {x: 3});
 assert.eq(listFilters.filters[0].indexes, [{x: 1, y: 1}]);
 
 // Create an index filter on a query with the default collation specified.
-assert.commandWorked(db.runCommand({
-    planCacheSetFilter: collName,
-    query: {"x": 3},
-    collation: caseInsensitive,
-    indexes: [{x: 1}]
-}));
+assert.commandWorked(
+    db.runCommand({
+        planCacheSetFilter: collName,
+        query: {"x": 3},
+        collation: caseInsensitive,
+        indexes: [{x: 1}],
+    }),
+);
 
 // The index filters with projection are for testing distinct commands.
-assert.commandWorked(db.runCommand({
-    planCacheSetFilter: collName,
-    query: {"x": 5},
-    projection: {"_id": 1},
-    indexes: [{x: 1, y: 1}]
-}));
+assert.commandWorked(
+    db.runCommand({
+        planCacheSetFilter: collName,
+        query: {"x": 5},
+        projection: {"_id": 1},
+        indexes: [{x: 1, y: 1}],
+    }),
+);
 
-assert.commandWorked(db.runCommand({
-    planCacheSetFilter: collName,
-    query: {"x": 5},
-    projection: {"_id": 1},
-    collation: caseInsensitive,
-    indexes: [{x: 1}]
-}));
+assert.commandWorked(
+    db.runCommand({
+        planCacheSetFilter: collName,
+        query: {"x": 5},
+        projection: {"_id": 1},
+        collation: caseInsensitive,
+        indexes: [{x: 1}],
+    }),
+);
 
 // Although these two queries would run with the same collation, they have different "shapes"
 // so we expect there to be four index filters present.
@@ -86,13 +91,19 @@ assert.eq(res.filters.length, 4);
 
 // One of the filters should only be applied to queries with the "fr" collation
 // and use the {x: 1} index.
-assert(res.filters.some((filter) => filter.hasOwnProperty("collation") &&
-                            filter.collation.locale === "fr" &&
-                            friendlyEqual(filter.indexes, [{x: 1}])));
+assert(
+    res.filters.some(
+        (filter) =>
+            filter.hasOwnProperty("collation") &&
+            filter.collation.locale === "fr" &&
+            friendlyEqual(filter.indexes, [{x: 1}]),
+    ),
+);
 
 // The other should not have any collation, and allow the index {x: 1, y: 1}.
-assert(res.filters.some((filter) => !filter.hasOwnProperty("collation") &&
-                            friendlyEqual(filter.indexes, [{x: 1, y: 1}])));
+assert(
+    res.filters.some((filter) => !filter.hasOwnProperty("collation") && friendlyEqual(filter.indexes, [{x: 1, y: 1}])),
+);
 
 function assertIsIxScanOnIndex(winningPlan, keyPattern) {
     const ixScans = getPlanStages(winningPlan, "IXSCAN");

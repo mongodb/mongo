@@ -24,12 +24,12 @@ import {getAggPlanStages, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
-    setAvailableDiskSpaceMode
+    setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getSpillCounter() {
-    return accumulateServerStatusMetric(db, metrics => metrics.query.lookup.hashLookupSpills);
+    return accumulateServerStatusMetric(db, (metrics) => metrics.query.lookup.hashLookupSpills);
 }
 
 const memoryKnob = "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill";
@@ -59,14 +59,14 @@ const locationsDocs = [
     {
         name: "doghouse",
         coordinates: [25.0, 60.0],
-        extra: {breeds: ["terrier", "dachshund", "bulldog"]}
+        extra: {breeds: ["terrier", "dachshund", "bulldog"]},
     },
     {
         name: "bullpen",
         coordinates: [-25.0, -60.0],
-        extra: {breeds: "Scottish Highland", feeling: "bullish"}
+        extra: {breeds: "Scottish Highland", feeling: "bullish"},
     },
-    {name: "volcano", coordinates: [-1111.0, 2222.0], extra: {breeds: "basalt", feeling: "hot"}}
+    {name: "volcano", coordinates: [-1111.0, 2222.0], extra: {breeds: "basalt", feeling: "hot"}},
 ];
 const animasDocs = [
     {type: "dog", locationName: "doghouse", colors: ["chartreuse", "taupe", "green"]},
@@ -79,7 +79,7 @@ assert.commandWorked(animals.insertMany(animasDocs));
 
 const pipeline = [
     {
-        $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"}
+        $lookup: {from: locations.getName(), localField: "locationName", foreignField: "name", as: "location"},
     },
     {$unwind: "$location"},
     {
@@ -87,8 +87,8 @@ const pipeline = [
             locationName: false,
             "location.extra": false,
             "location.coordinates": false,
-            "colors": false
-        }
+            "colors": false,
+        },
     },
 ];
 
@@ -177,13 +177,13 @@ jsTest.log.info("Expected results: ", expectedResults);
     const cursorId = cursor.getId();
 
     // Release memory (i.e., spill)
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "alwaysOn");
     const releaseMemoryCmd = {releaseMemory: [cursorId]};
     jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
     assert.commandWorked(releaseMemoryRes);
     assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
 
     jsTest.log.info("Running getMore");
     assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);

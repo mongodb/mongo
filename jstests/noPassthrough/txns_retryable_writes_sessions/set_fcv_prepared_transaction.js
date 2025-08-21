@@ -25,41 +25,44 @@ const ns = dbName + "." + collName;
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
 
 function runTxn(mongosHost, dbName, collName) {
     const mongosConn = new Mongo(mongosHost);
-    jsTest.log("Starting a cross-shard transaction with shard0 and shard1 as the participants " +
-               "and shard0 as the coordinator shard");
+    jsTest.log(
+        "Starting a cross-shard transaction with shard0 and shard1 as the participants " +
+            "and shard0 as the coordinator shard",
+    );
     const lsid = {id: UUID()};
     const txnNumber = NumberLong(35);
-    assert.commandWorked(mongosConn.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{x: -1}],
-        lsid,
-        txnNumber,
-        startTransaction: true,
-        autocommit: false,
-    }));
-    assert.commandWorked(mongosConn.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{x: 1}],
-        lsid,
-        txnNumber,
-        autocommit: false,
-    }));
     assert.commandWorked(
-        mongosConn.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}));
+        mongosConn.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{x: -1}],
+            lsid,
+            txnNumber,
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(
+        mongosConn.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{x: 1}],
+            lsid,
+            txnNumber,
+            autocommit: false,
+        }),
+    );
+    assert.commandWorked(mongosConn.adminCommand({commitTransaction: 1, lsid, txnNumber, autocommit: false}));
     jsTest.log("Committed the cross-shard transaction");
 }
 
 function runSetFCV(primaryHost) {
     const primaryConn = new Mongo(primaryHost);
     jsTest.log("Starting a setFCV command on " + primaryHost);
-    assert.commandWorked(
-        primaryConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(primaryConn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     jsTest.log("Completed the setFCV command");
 }
 
@@ -77,9 +80,17 @@ writeDecisionFp.wait();
 const setFCVThread = new Thread(runSetFCV, shard0Primary.host);
 setFCVThread.start();
 assert.soon(() => {
-    return shard0Primary.getDB(dbName).currentOp().inprog.find(
-        op => op.command && op.command.setFeatureCompatibilityVersion && op.locks &&
-            op.locks.MultiDocumentTransactionsBarrier === "R" && op.waitingForLock === true);
+    return shard0Primary
+        .getDB(dbName)
+        .currentOp()
+        .inprog.find(
+            (op) =>
+                op.command &&
+                op.command.setFeatureCompatibilityVersion &&
+                op.locks &&
+                op.locks.MultiDocumentTransactionsBarrier === "R" &&
+                op.waitingForLock === true,
+        );
 });
 
 // Unpause the TransactionCoordinator. The transaction should be able to commit despite the fact

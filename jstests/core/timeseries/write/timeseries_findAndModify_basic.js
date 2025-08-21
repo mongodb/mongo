@@ -12,7 +12,7 @@
 const coll = db[jsTestName()];
 coll.drop();
 
-const timeFieldName = 'time';
+const timeFieldName = "time";
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
 const numDocs = 10;
@@ -34,16 +34,15 @@ toInsert.forEach((doc) => coll.insertOne(doc));
 
 // Test findAndModify rawData update queries.
 {
-    const doc =
-        coll.findAndModify({query: {}, update: {$set: {'control.max._id': 100}}, rawData: true});
-    assert.eq(1, coll.find({'control.max._id': 100}).rawData().toArray().length);
+    const doc = coll.findAndModify({query: {}, update: {$set: {"control.max._id": 100}}, rawData: true});
+    assert.eq(1, coll.find({"control.max._id": 100}).rawData().toArray().length);
     assert.eq(numDocs - 1, coll.find({_id: {$gt: 0}}).toArray().length);
 }
 
 // Test findAndModify delete queries.
 {
     const doc = coll.findAndModify({query: {t2: {$exists: true}}, remove: true});
-    assert.eq(true, 't2' in doc);
+    assert.eq(true, "t2" in doc);
     assert.eq(0, coll.find({t2: {$exists: true}}).toArray().length);
     // Restore the collection back to normal.
     coll.insertOne(doc);

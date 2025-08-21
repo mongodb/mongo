@@ -20,11 +20,13 @@ const secondary = replTest.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 
 function runAwaitableCmdBeforeHorizonChange(cmd, topologyVersionField) {
-    let res = assert.throws(() => db.runCommand({
-        [cmd]: 1,
-        topologyVersion: topologyVersionField,
-        maxAwaitTimeMS: 99999999,
-    }));
+    let res = assert.throws(() =>
+        db.runCommand({
+            [cmd]: 1,
+            topologyVersion: topologyVersionField,
+            maxAwaitTimeMS: 99999999,
+        }),
+    );
     assert(isNetworkError(res));
 
     // We should automatically reconnect after the failed command.
@@ -32,11 +34,13 @@ function runAwaitableCmdBeforeHorizonChange(cmd, topologyVersionField) {
 }
 
 function runAwaitableCmd(cmd, topologyVersionField) {
-    const result = assert.commandWorked(db.runCommand({
-        [cmd]: 1,
-        topologyVersion: topologyVersionField,
-        maxAwaitTimeMS: 99999999,
-    }));
+    const result = assert.commandWorked(
+        db.runCommand({
+            [cmd]: 1,
+            topologyVersion: topologyVersionField,
+            maxAwaitTimeMS: 99999999,
+        }),
+    );
     assert.eq(topologyVersionField.counter + 1, result.topologyVersion.counter);
 }
 
@@ -55,57 +59,55 @@ function runTest(cmd) {
     let secondaryFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
     // Send an awaitable hello/isMaster request. This will block until there is a topology change.
     const awaitCmdHorizonChangeOnPrimary = startParallelShell(
-        funWithArgs(runAwaitableCmdBeforeHorizonChange, cmd, primaryTopologyVersion), primary.port);
+        funWithArgs(runAwaitableCmdBeforeHorizonChange, cmd, primaryTopologyVersion),
+        primary.port,
+    );
     const awaitCmdHorizonChangeOnSecondary = startParallelShell(
         funWithArgs(runAwaitableCmdBeforeHorizonChange, cmd, secondaryTopologyVersion),
-        secondary.port);
+        secondary.port,
+    );
     primaryFailPoint.wait();
     secondaryFailPoint.wait();
 
     // Each node has one hello/isMaster request waiting on a topology change.
-    let numAwaitingTopologyChangeOnPrimary =
-        primaryDB.serverStatus().connections.awaitingTopologyChanges;
-    let numAwaitingTopologyChangeOnSecondary =
-        secondaryDB.serverStatus().connections.awaitingTopologyChanges;
+    let numAwaitingTopologyChangeOnPrimary = primaryDB.serverStatus().connections.awaitingTopologyChanges;
+    let numAwaitingTopologyChangeOnSecondary = secondaryDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(1, numAwaitingTopologyChangeOnPrimary);
     assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
     // Doing a reconfig that changes the horizon should respond to all waiting hello/isMaster
     // requests with an error.
     let rsConfig = primary.getDB("local").system.replset.findOne();
-    rsConfig.members.forEach(function(member) {
-        member.horizons = {specialHorizon: 'horizon.com:100' + idx};
+    rsConfig.members.forEach(function (member) {
+        member.horizons = {specialHorizon: "horizon.com:100" + idx};
         idx++;
     });
     rsConfig.version++;
 
-    jsTest.log('Calling replSetReconfig with config: ' + tojson(rsConfig));
+    jsTest.log("Calling replSetReconfig with config: " + tojson(rsConfig));
     assert.commandWorked(primary.adminCommand({replSetReconfig: rsConfig}));
     awaitCmdHorizonChangeOnPrimary();
     awaitCmdHorizonChangeOnSecondary();
 
     // All hello/isMaster requests should have been responded to after the reconfig.
-    numAwaitingTopologyChangeOnPrimary =
-        primaryDB.serverStatus().connections.awaitingTopologyChanges;
-    numAwaitingTopologyChangeOnSecondary =
-        secondaryDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnPrimary = primaryDB.serverStatus().connections.awaitingTopologyChanges;
+    numAwaitingTopologyChangeOnSecondary = secondaryDB.serverStatus().connections.awaitingTopologyChanges;
     assert.eq(0, numAwaitingTopologyChangeOnPrimary);
     assert.eq(0, numAwaitingTopologyChangeOnSecondary);
 
     const primaryRespAfterHorizonChange = assert.commandWorked(primaryDB.runCommand({[cmd]: 1}));
-    const secondaryRespAfterHorizonChange =
-        assert.commandWorked(secondaryDB.runCommand({[cmd]: 1}));
+    const secondaryRespAfterHorizonChange = assert.commandWorked(secondaryDB.runCommand({[cmd]: 1}));
     const primaryTopVersionAfterHorizonChange = primaryRespAfterHorizonChange.topologyVersion;
     const secondaryTopVersionAfterHorizonChange = secondaryRespAfterHorizonChange.topologyVersion;
 
     // Doing a reconfig that doesn't change the horizon should increment the topologyVersion and
     // reply to waiting hello/isMaster requests with a successful response.
     rsConfig = primary.getDB("local").system.replset.findOne();
-    rsConfig.members.forEach(function(member) {
+    rsConfig.members.forEach(function (member) {
         if (member.host == primary.host) {
-            member.tags = {dc: 'ny'};
+            member.tags = {dc: "ny"};
         } else {
-            member.tags = {dc: 'sf'};
+            member.tags = {dc: "sf"};
         }
     });
     rsConfig.version++;
@@ -116,13 +118,17 @@ function runTest(cmd) {
     // Send an awaitable hello/isMaster request. This will block until maxAwaitTimeMS has elapsed or
     // a topology change happens.
     let primaryAwaitCmdBeforeAddingTags = startParallelShell(
-        funWithArgs(runAwaitableCmd, cmd, primaryTopVersionAfterHorizonChange), primary.port);
+        funWithArgs(runAwaitableCmd, cmd, primaryTopVersionAfterHorizonChange),
+        primary.port,
+    );
     let secondaryAwaitCmdBeforeAddingTags = startParallelShell(
-        funWithArgs(runAwaitableCmd, cmd, secondaryTopVersionAfterHorizonChange), secondary.port);
+        funWithArgs(runAwaitableCmd, cmd, secondaryTopVersionAfterHorizonChange),
+        secondary.port,
+    );
     primaryFailPoint.wait();
     secondaryFailPoint.wait();
 
-    jsTest.log('Calling replSetReconfig with config: ' + tojson(rsConfig));
+    jsTest.log("Calling replSetReconfig with config: " + tojson(rsConfig));
     assert.commandWorked(primary.adminCommand({replSetReconfig: rsConfig}));
     primaryAwaitCmdBeforeAddingTags();
     secondaryAwaitCmdBeforeAddingTags();

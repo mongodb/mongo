@@ -14,79 +14,76 @@ import {reconfig} from "jstests/replsets/rslib.js";
 
 var five_minutes = 5 * 60 * 1000;
 
-var numRSHosts = function() {
+var numRSHosts = function () {
     var result = assert.commandWorked(rsObj.nodes[0].adminCommand({hello: 1}));
     return result.hosts.length + result.passives.length;
 };
 
-var numMongosHosts = function() {
+var numMongosHosts = function () {
     var commandResult = assert.commandWorked(mongos.adminCommand("connPoolStats"));
     var result = commandResult.replicaSets[rsObj.name];
     return result.hosts.length;
 };
 
-var configServerURL = function() {
+var configServerURL = function () {
     var result = config.shards.find().toArray()[0];
     return result.host;
 };
 
-var checkNumHosts = function(expectedNumHosts) {
+var checkNumHosts = function (expectedNumHosts) {
     jsTest.log("Waiting for the shard to discover that it now has " + expectedNumHosts + " hosts.");
     var numHostsSeenByShard;
 
     // Use a high timeout (5 minutes) because replica set refreshes are only done every 30
     // seconds.
     assert.soon(
-        function() {
+        function () {
             numHostsSeenByShard = numRSHosts();
             return numHostsSeenByShard === expectedNumHosts;
         },
-        function() {
-            return ("Expected shard to see " + expectedNumHosts + " hosts but found " +
-                    numHostsSeenByShard);
+        function () {
+            return "Expected shard to see " + expectedNumHosts + " hosts but found " + numHostsSeenByShard;
         },
-        five_minutes);
+        five_minutes,
+    );
 
-    jsTest.log("Waiting for the mongos to discover that the shard now has " + expectedNumHosts +
-               " hosts.");
+    jsTest.log("Waiting for the mongos to discover that the shard now has " + expectedNumHosts + " hosts.");
     var numHostsSeenByMongos;
 
     // Use a high timeout (5 minutes) because replica set refreshes are only done every 30
     // seconds.
     assert.soon(
-        function() {
+        function () {
             numHostsSeenByMongos = numMongosHosts();
             return numHostsSeenByMongos === expectedNumHosts;
         },
-        function() {
-            return ("Expected mongos to see " + expectedNumHosts + " hosts on shard but found " +
-                    numHostsSeenByMongos);
+        function () {
+            return "Expected mongos to see " + expectedNumHosts + " hosts on shard but found " + numHostsSeenByMongos;
         },
-        five_minutes);
+        five_minutes,
+    );
 };
 
 var st = new ShardingTest({
-    name: 'mongos_no_replica_set_refresh',
+    name: "mongos_no_replica_set_refresh",
     shards: 1,
     mongos: 1,
     other: {
         rs0: {
-            nodes: [
-                {},
-                {rsConfig: {priority: 0}},
-                {rsConfig: {priority: 0}},
-            ],
-        }
-    }
+            nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+        },
+    },
 });
 
 var rsObj = st.rs0;
-assert.commandWorked(rsObj.nodes[0].adminCommand({
-    replSetTest: 1,
-    waitForMemberState: ReplSetTest.State.PRIMARY,
-    timeoutMillis: 60 * 1000,
-}),
-                     'node 0 ' + rsObj.nodes[0].host + ' failed to become primary');
+assert.commandWorked(
+    rsObj.nodes[0].adminCommand({
+        replSetTest: 1,
+        waitForMemberState: ReplSetTest.State.PRIMARY,
+        timeoutMillis: 60 * 1000,
+    }),
+    "node 0 " + rsObj.nodes[0].host + " failed to become primary",
+);
 
 var mongos = st.s;
 var config = mongos.getDB("config");
@@ -108,13 +105,13 @@ checkNumHosts(rsConfig.members.length);
 
 jsTest.log("Waiting for config.shards to reflect that " + removedNode.host + " has been removed.");
 assert.soon(
-    function() {
+    function () {
         return configServerURL().indexOf(removedNode.host) < 0;
     },
-    function() {
-        return (removedNode.host + " was removed from " + rsObj.name +
-                ", but is still seen in config.shards");
-    });
+    function () {
+        return removedNode.host + " was removed from " + rsObj.name + ", but is still seen in config.shards";
+    },
+);
 
 jsTestLog("Adding the node back to the shard's replica set.");
 
@@ -129,12 +126,12 @@ checkNumHosts(rsConfig.members.length);
 
 jsTest.log("Waiting for config.shards to reflect that " + removedNode.host + " has been re-added.");
 assert.soon(
-    function() {
+    function () {
         return configServerURL().indexOf(removedNode.host) >= 0;
     },
-    function() {
-        return (removedNode.host + " was re-added to " + rsObj.name +
-                ", but is not seen in config.shards");
-    });
+    function () {
+        return removedNode.host + " was re-added to " + rsObj.name + ", but is not seen in config.shards";
+    },
+);
 
 st.stop({parallelSupported: false});

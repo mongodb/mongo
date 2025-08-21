@@ -39,11 +39,9 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-let st = new ShardingTest(
-    {shards: 2, configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}}});
+let st = new ShardingTest({shards: 2, configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}}});
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 let testColl = st.s.getDB(dbName).getCollection(collName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
@@ -55,10 +53,8 @@ donorReplSetTest.awaitNodesAgreeOnPrimary();
 let donorPrimary = donorReplSetTest.getPrimary();
 
 let moveChunkHangAtStep5FailPoint = configureFailPoint(donorPrimary, "moveChunkHangAtStep5");
-let metadataRefreshFailPoint =
-    configureFailPoint(donorPrimary, "hangBeforeFilteringMetadataRefresh");
-let moveChunkThread =
-    new Thread(runMoveChunk, st.s.host, ns, {_id: MinKey}, recipientShard.shardName);
+let metadataRefreshFailPoint = configureFailPoint(donorPrimary, "hangBeforeFilteringMetadataRefresh");
+let moveChunkThread = new Thread(runMoveChunk, st.s.host, ns, {_id: MinKey}, recipientShard.shardName);
 
 moveChunkThread.start();
 

@@ -3,7 +3,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 export function getNewNs(dbName) {
-    if (typeof getNewNs.counter == 'undefined') {
+    if (typeof getNewNs.counter == "undefined") {
         getNewNs.counter = 0;
     }
     getNewNs.counter++;
@@ -11,16 +11,24 @@ export function getNewNs(dbName) {
     return [collName, dbName + "." + collName];
 }
 
-export function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
-                                                            dbName,
-                                                            failpointName,
-                                                            shouldMakeMigrationFailToCommitOnConfig,
-                                                            expectAbortDecisionWithCode) {
+export function runMoveChunkMakeDonorStepDownAfterFailpoint(
+    st,
+    dbName,
+    failpointName,
+    shouldMakeMigrationFailToCommitOnConfig,
+    expectAbortDecisionWithCode,
+) {
     const [collName, ns] = getNewNs(dbName);
-    jsTest.log("Running migration, making donor step down after failpoint " + failpointName +
-               "; shouldMakeMigrationFailToCommitOnConfig is " +
-               shouldMakeMigrationFailToCommitOnConfig + "; expectAbortDecisionWithCode is " +
-               expectAbortDecisionWithCode + "; ns is " + ns);
+    jsTest.log(
+        "Running migration, making donor step down after failpoint " +
+            failpointName +
+            "; shouldMakeMigrationFailToCommitOnConfig is " +
+            shouldMakeMigrationFailToCommitOnConfig +
+            "; expectAbortDecisionWithCode is " +
+            expectAbortDecisionWithCode +
+            "; ns is " +
+            ns,
+    );
 
     // Wait for mongos to see a primary node on the primary shard, because mongos does not retry
     // writes on NotPrimary errors, and we are about to insert docs through mongos.
@@ -41,28 +49,36 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
     if (shouldMakeMigrationFailToCommitOnConfig) {
         // Turn on a failpoint to make the migration commit fail on the config server. Set failpoint
         // on each node in case configsvr is also acting as the donor in this test.
-        st.configRS.nodes.forEach(node => {
-            assert.commandWorked(node.adminCommand(
-                {configureFailPoint: "migrationCommitVersionError", mode: "alwaysOn"}));
+        st.configRS.nodes.forEach((node) => {
+            assert.commandWorked(
+                node.adminCommand({configureFailPoint: "migrationCommitVersionError", mode: "alwaysOn"}),
+            );
         });
     }
 
     jsTest.log("Run the moveChunk asynchronously and wait for " + failpointName + " to be hit.");
     let failpointHandle = configureFailPoint(st.rs0.getPrimary(), failpointName);
     const awaitResult = startParallelShell(
-        funWithArgs(function(ns, toShardName, expectAbortDecisionWithCode) {
-            if (expectAbortDecisionWithCode) {
-                assert.commandFailedWithCode(
-                    db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
-                    expectAbortDecisionWithCode);
-            } else {
-                assert.soonRetryOnAcceptableErrors(() => {
-                    assert.commandWorked(
-                        db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
-                    return true;
-                }, ErrorCodes.FailedToSatisfyReadPreference);
-            }
-        }, ns, st.shard1.shardName, expectAbortDecisionWithCode), st.s.port);
+        funWithArgs(
+            function (ns, toShardName, expectAbortDecisionWithCode) {
+                if (expectAbortDecisionWithCode) {
+                    assert.commandFailedWithCode(
+                        db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}),
+                        expectAbortDecisionWithCode,
+                    );
+                } else {
+                    assert.soonRetryOnAcceptableErrors(() => {
+                        assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+                        return true;
+                    }, ErrorCodes.FailedToSatisfyReadPreference);
+                }
+            },
+            ns,
+            st.shard1.shardName,
+            expectAbortDecisionWithCode,
+        ),
+        st.s.port,
+    );
     failpointHandle.wait();
 
     jsTest.log("Make the donor primary step down and an election occur");
@@ -80,7 +96,6 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
         assert.soon(() => {
             return 0 === st.rs1.getPrimary().getDB(dbName).getCollection(collName).count();
         });
-
     } else {
         jsTest.log("Expect commit decision, so wait for donor to clean up the orphans.");
         assert.soon(() => {
@@ -99,15 +114,13 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
 
     jsTest.log("Wait for the donor to delete the migration coordinator doc");
     assert.soon(() => {
-        return 0 ===
-            st.rs0.getPrimary().getDB("config").getCollection("migrationCoordinators").count();
+        return 0 === st.rs0.getPrimary().getDB("config").getCollection("migrationCoordinators").count();
     });
 
     if (shouldMakeMigrationFailToCommitOnConfig) {
         // Turn off the failpoint on the config server before returning.
-        st.configRS.nodes.forEach(node => {
-            assert.commandWorked(node.adminCommand(
-                {configureFailPoint: "migrationCommitVersionError", mode: "off"}));
+        st.configRS.nodes.forEach((node) => {
+            assert.commandWorked(node.adminCommand({configureFailPoint: "migrationCommitVersionError", mode: "off"}));
         });
     }
 }

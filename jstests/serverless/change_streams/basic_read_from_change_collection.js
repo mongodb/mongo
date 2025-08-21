@@ -6,9 +6,7 @@
 //   assumes_against_mongod_not_mongos,
 // ]
 
-import {
-    ChangeStreamMultitenantReplicaSetTest
-} from "jstests/serverless/libs/change_collection_util.js";
+import {ChangeStreamMultitenantReplicaSetTest} from "jstests/serverless/libs/change_collection_util.js";
 
 const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 2});
 const primary = replSetTest.getPrimary();
@@ -17,8 +15,7 @@ const primary = replSetTest.getPrimary();
 const tenantId = ObjectId("6303b6bb84305d2266d0b779");
 
 // Connection to the replica set primary that is stamped with the tenant id.
-const tenantConn =
-    ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, tenantId);
+const tenantConn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, tenantId);
 
 // Verify that the change stream observes expected events.
 function verifyChangeEvents(csCursor, expectedEvents) {
@@ -44,14 +41,21 @@ const testDb = tenantConn.getDB("test");
 const csCursor = testDb.stockPrice.watch([]);
 
 // Insert documents to the 'stockPrice' collection.
-const docs = [{_id: "mdb", price: 250}, {_id: "tsla", price: 650}];
-docs.forEach(doc => assert.commandWorked(testDb.stockPrice.insert(doc)));
+const docs = [
+    {_id: "mdb", price: 250},
+    {_id: "tsla", price: 650},
+];
+docs.forEach((doc) => assert.commandWorked(testDb.stockPrice.insert(doc)));
 
 // Drop the stock price collection to invalidate the change stream cursor.
 assert(testDb.stockPrice.drop());
 
 // Verify that the change stream observes the required event.
-verifyChangeEvents(csCursor, [["insert", docs[0]], ["insert", docs[1]], ["drop", []]]);
+verifyChangeEvents(csCursor, [
+    ["insert", docs[0]],
+    ["insert", docs[1]],
+    ["drop", []],
+]);
 
 // Disable and then enable the change stream.
 replSetTest.setChangeStreamState(tenantConn, false);
@@ -61,7 +65,7 @@ replSetTest.setChangeStreamState(tenantConn, true);
 // stream works correctly.
 const newCsCursor = testDb.stockPrice.watch([]);
 const newDocs = [{_id: "goog", price: 2000}];
-newDocs.forEach(doc => assert.commandWorked(testDb.stockPrice.insert(doc)));
+newDocs.forEach((doc) => assert.commandWorked(testDb.stockPrice.insert(doc)));
 verifyChangeEvents(newCsCursor, [["insert", newDocs[0]]]);
 
 // Disable the change stream while the change stream cursor is still opened.

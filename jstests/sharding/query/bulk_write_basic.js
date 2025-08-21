@@ -10,9 +10,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getDBNameAndCollNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    moveDatabaseAndUnshardedColls
-} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
+import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 function bulkWriteBasicTest(ordered) {
     jsTestLog(`Running bulkWrite command sharding test with ordered: ${ordered}`);
@@ -21,12 +19,13 @@ function bulkWriteBasicTest(ordered) {
         mongos: 2,
         config: 1,
         rs: {nodes: 1},
-        mongosOptions: {setParameter: {logComponentVerbosity: tojson({query: 4, sharding: 4})}}
+        mongosOptions: {setParameter: {logComponentVerbosity: tojson({query: 4, sharding: 4})}},
     });
 
-    const isUnifiedWriteExecutor =
-        st.s0.adminCommand({getParameter: 1, internalQueryUnifiedWriteExecutor: 1})
-            .internalQueryUnifiedWriteExecutor;
+    const isUnifiedWriteExecutor = st.s0.adminCommand({
+        getParameter: 1,
+        internalQueryUnifiedWriteExecutor: 1,
+    }).internalQueryUnifiedWriteExecutor;
 
     function getCollection(ns) {
         const [dbName, collName] = getDBNameAndCollNameFromFullNamespace(ns);
@@ -48,12 +47,17 @@ function bulkWriteBasicTest(ordered) {
     // Connect via the first mongos. We do this so that the second mongos remains unused until
     // a later test case.
     const db_s0 = st.s0.getDB("test");
-    assert.commandWorked(db_s0.adminCommand({
-        bulkWrite: 1,
-        ops: [{insert: 0, document: {a: 0}}, {insert: 0, document: {a: 1}}],
-        ordered,
-        nsInfo: [{ns: banana}]
-    }));
+    assert.commandWorked(
+        db_s0.adminCommand({
+            bulkWrite: 1,
+            ops: [
+                {insert: 0, document: {a: 0}},
+                {insert: 0, document: {a: 1}},
+            ],
+            ordered,
+            nsInfo: [{ns: banana}],
+        }),
+    );
 
     let insertedDocs = getCollection(banana).find({}).toArray();
     assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
@@ -62,21 +66,22 @@ function bulkWriteBasicTest(ordered) {
         // Check that the error for the 0th op was duplicated and used for the 1st op as well.
         // TODO SERVER-106418 This logic is currently not ported to the UWE project so skip the
         // assertion.
-        assert(
-            checkLog.checkContainsOnce(st.s0, /7695304.*Duplicating the error.*opIdx":1.*banana/));
+        assert(checkLog.checkContainsOnce(st.s0, /7695304.*Duplicating the error.*opIdx":1.*banana/));
     }
 
     jsTestLog("Case 2: The collection exists for some of writes, but not for others.");
-    assert.commandWorked(db_s0.adminCommand({
-        bulkWrite: 1,
-        ops: [
-            {insert: 0, document: {a: 2}},
-            {insert: 1, document: {a: 0}},
-            {insert: 0, document: {a: 3}}
-        ],
-        ordered,
-        nsInfo: [{ns: banana}, {ns: orange}]
-    }));
+    assert.commandWorked(
+        db_s0.adminCommand({
+            bulkWrite: 1,
+            ops: [
+                {insert: 0, document: {a: 2}},
+                {insert: 1, document: {a: 0}},
+                {insert: 0, document: {a: 3}},
+            ],
+            ordered,
+            nsInfo: [{ns: banana}, {ns: orange}],
+        }),
+    );
 
     insertedDocs = getCollection(banana).find({}).toArray();
     assert.eq(4, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
@@ -88,12 +93,13 @@ function bulkWriteBasicTest(ordered) {
 
     // Case 3: Move the 'test2' DB back and forth across shards. This will result in bulkWrite
     // getting a StaleDbVersion error. We run this on s1 so s0 doesn't know about the change.
-    moveDatabaseAndUnshardedColls(st.s1.getDB('test2'), st.shard0.shardName);
-    moveDatabaseAndUnshardedColls(st.s1.getDB('test2'), st.shard1.shardName);
+    moveDatabaseAndUnshardedColls(st.s1.getDB("test2"), st.shard0.shardName);
+    moveDatabaseAndUnshardedColls(st.s1.getDB("test2"), st.shard1.shardName);
 
     // Now run the bulk write command on s0.
-    assert.commandWorked(db_s0.adminCommand(
-        {bulkWrite: 1, ops: [{insert: 0, document: {a: 3}}], nsInfo: [{ns: orange}]}));
+    assert.commandWorked(
+        db_s0.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {a: 3}}], nsInfo: [{ns: orange}]}),
+    );
     insertedDocs = getCollection(orange).find({}).toArray();
     assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
 
@@ -112,22 +118,22 @@ function bulkWriteBasicTest(ordered) {
 
     jsTestLog("Create chunks, then move them.");
     assert.commandWorked(db_s0.adminCommand({split: banana, middle: {a: 2}}));
-    assert.commandWorked(
-        db_s0.adminCommand({moveChunk: banana, find: {a: 0}, to: st.shard0.shardName}));
-    assert.commandWorked(
-        db_s0.adminCommand({moveChunk: banana, find: {a: 3}, to: st.shard1.shardName}));
+    assert.commandWorked(db_s0.adminCommand({moveChunk: banana, find: {a: 0}, to: st.shard0.shardName}));
+    assert.commandWorked(db_s0.adminCommand({moveChunk: banana, find: {a: 3}, to: st.shard1.shardName}));
 
     jsTestLog("Running bulk write command.");
-    assert.commandWorked(db_s1.adminCommand({
-        bulkWrite: 1,
-        ops: [
-            {insert: 0, document: {a: -1}},
-            {insert: 1, document: {a: 1}},
-            {insert: 0, document: {a: 4}}
-        ],
-        ordered,
-        nsInfo: [{ns: banana}, {ns: orange}]
-    }));
+    assert.commandWorked(
+        db_s1.adminCommand({
+            bulkWrite: 1,
+            ops: [
+                {insert: 0, document: {a: -1}},
+                {insert: 1, document: {a: 1}},
+                {insert: 0, document: {a: 4}},
+            ],
+            ordered,
+            nsInfo: [{ns: banana}, {ns: orange}],
+        }),
+    );
 
     insertedDocs = getCollection(banana).find({}).toArray();
     assert.eq(6, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
@@ -152,20 +158,22 @@ function bulkWriteBasicTest(ordered) {
         // CannotImplicitlyCreateCollection error.
         // 6) Retry operation after creating second collection and refreshing
         // 7) And finally the operation is retried and succeeds.
-        const mango = 'test3.mango';
-        const strawberry = 'test3.strawberry';
-        assert.commandWorked(db_s0.adminCommand({
-            bulkWrite: 1,
-            ops: [
-                {insert: 0, document: {_id: 1}},
-                {insert: 0, document: {_id: 1}},  // DuplicateKeyError
-                {insert: 0, document: {a: 1}},
-                {insert: 1, document: {a: 1}},
-                {insert: 1, document: {a: 2}}
-            ],
-            ordered,
-            nsInfo: [{ns: mango}, {ns: strawberry}]
-        }));
+        const mango = "test3.mango";
+        const strawberry = "test3.strawberry";
+        assert.commandWorked(
+            db_s0.adminCommand({
+                bulkWrite: 1,
+                ops: [
+                    {insert: 0, document: {_id: 1}},
+                    {insert: 0, document: {_id: 1}}, // DuplicateKeyError
+                    {insert: 0, document: {a: 1}},
+                    {insert: 1, document: {a: 1}},
+                    {insert: 1, document: {a: 2}},
+                ],
+                ordered,
+                nsInfo: [{ns: mango}, {ns: strawberry}],
+            }),
+        );
         // The fact that more than one document was inserted proves that the bulkWrite advanced
         // past op 1's DuplicateKeyError.
         insertedDocs = getCollection(mango).find({}).toArray();
@@ -177,19 +185,20 @@ function bulkWriteBasicTest(ordered) {
             // The CannotImplicitlyCreateCollection error on op 0 should have been duplicated to all
             // operations.
             for (let i = 1; i < 5; i++) {
-                assert(checkLog.checkContainsOnce(
-                    st.s0, new RegExp(`7695304.*Duplicating the error.*opIdx":${i}.*mango`)));
+                assert(
+                    checkLog.checkContainsOnce(st.s0, new RegExp(`7695304.*Duplicating the error.*opIdx":${i}.*mango`)),
+                );
             }
 
             // The CannotImplicitlyCreateCollection error on op 3 should have been duplicated to
             // op 4.
-            assert(checkLog.checkContainsOnce(
-                       st.s0,
-                       /8037206.*Noting cannotImplicitlyCreateCollection response.*strawberry/) ||
-                   checkLog.checkContainsOnce(st.s0,
-                                              /7279201.*Noting stale config response.*strawberry/));
-            assert(checkLog.checkContainsOnce(
-                st.s0, /7695304.*Duplicating the error.*opIdx":4.*strawberry/));
+            assert(
+                checkLog.checkContainsOnce(
+                    st.s0,
+                    /8037206.*Noting cannotImplicitlyCreateCollection response.*strawberry/,
+                ) || checkLog.checkContainsOnce(st.s0, /7279201.*Noting stale config response.*strawberry/),
+            );
+            assert(checkLog.checkContainsOnce(st.s0, /7695304.*Duplicating the error.*opIdx":4.*strawberry/));
         }
     }
 

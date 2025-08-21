@@ -11,8 +11,7 @@ export function shardCollectionWithChunks(st, coll, numDocs) {
     var numberDoc = numDocs || 20;
     coll.createIndex({x: 1}, {unique: true});
 
-    st.shardColl(
-        coll.getName(), {x: 1}, {x: numberDoc / 2}, {x: numberDoc / 2}, _db.toString(), true);
+    st.shardColl(coll.getName(), {x: 1}, {x: numberDoc / 2}, {x: numberDoc / 2}, _db.toString(), true);
 
     for (var i = 0; i < numberDoc; i++) {
         coll.insert({x: i});
@@ -23,17 +22,16 @@ export function shardCollectionWithChunks(st, coll, numDocs) {
 // Stops replication on the given server(s).
 export function stopServerReplication(conn) {
     if (conn.length) {
-        conn.forEach(function(n) {
+        conn.forEach(function (n) {
             stopServerReplication(n);
         });
         return;
     }
-    const stopReplProducerFailPoint = configureFailPoint(conn, 'stopReplProducer');
+    const stopReplProducerFailPoint = configureFailPoint(conn, "stopReplProducer");
 
     // Wait until the fail point is actually hit. Don't wait if the node is the primary, because
     // the fail point won't be hit until the node transitions from being the primary.
-    if (assert.commandWorked(conn.adminCommand('replSetGetStatus')).myState !=
-        ReplSetTest.State.PRIMARY) {
+    if (assert.commandWorked(conn.adminCommand("replSetGetStatus")).myState != ReplSetTest.State.PRIMARY) {
         stopReplProducerFailPoint.wait();
     }
 }
@@ -43,8 +41,11 @@ export function stopServerReplication(conn) {
 export function stopReplicationOnSecondaries(rs, changeReplicaSetDefaultWCToLocal = true) {
     if (changeReplicaSetDefaultWCToLocal == true) {
         // The default WC is majority and this test can't satisfy majority writes.
-        assert.commandWorked(rs.getPrimary().adminCommand(
-            {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+        assert.commandWorked(
+            rs
+                .getPrimary()
+                .adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+        );
         rs.awaitReplication();
     }
     stopServerReplication(rs.getSecondaries());
@@ -53,24 +54,23 @@ export function stopReplicationOnSecondaries(rs, changeReplicaSetDefaultWCToLoca
 // Stops replication at all shard secondaries.
 export function stopReplicationOnSecondariesOfAllShards(st) {
     // The default WC is majority and this test can't satisfy majority writes.
-    assert.commandWorked(st.s.adminCommand(
-        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
-    st._rsObjects.forEach(rs => stopReplicationOnSecondaries(rs, false));
+    assert.commandWorked(
+        st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    );
+    st._rsObjects.forEach((rs) => stopReplicationOnSecondaries(rs, false));
 }
 
 // Restarts replication on the given server(s).
 export function restartServerReplication(conn) {
     if (conn.length) {
-        conn.forEach(function(n) {
+        conn.forEach(function (n) {
             restartServerReplication(n);
         });
         return;
     }
 
-    var errMsg = 'Failed to disable stopReplProducer failpoint.';
-    assert.commandWorked(
-        conn.getDB('admin').runCommand({configureFailPoint: 'stopReplProducer', mode: 'off'}),
-        errMsg);
+    var errMsg = "Failed to disable stopReplProducer failpoint.";
+    assert.commandWorked(conn.getDB("admin").runCommand({configureFailPoint: "stopReplProducer", mode: "off"}), errMsg);
 }
 
 // Restarts replication at all nodes in a replicaset.
@@ -124,8 +124,9 @@ export function runWriteConcernRetryabilityTest(priConn, secConn, cmd, kNodes, d
 
     // The default WC is majority and stopServerReplication will prevent the replica set from
     // fulfilling any majority writes
-    assert.commandWorked(priConn.adminCommand(
-        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        priConn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    );
 
     // Send a dummy write to this connection so it will have the Client object initialized.
     const secondPriConn = new Mongo(priConn.host);

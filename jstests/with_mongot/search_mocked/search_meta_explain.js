@@ -6,10 +6,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {
-    mongotCommandForQuery,
-    MongotMock,
-} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {mongotCommandForQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     getDefaultLastExplainContents,
     getMongotStagesAndValidateExplainExecutionStats,
@@ -30,8 +27,7 @@ coll.drop();
 const collName = coll.getName();
 const explainObject = getDefaultLastExplainContents();
 
-if (checkSbeRestrictedOrFullyEnabled(db) &&
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchInSbe')) {
+if (checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     MongoRunner.stopMongod(conn);
     mongotmock.stop();
@@ -48,7 +44,7 @@ const collUUID = getUUIDFromListCollections(db, coll.getName());
 
 const searchQuery = {
     query: "Chekhov",
-    path: "name"
+    path: "name",
 };
 
 function runExplainTest(verbosity) {
@@ -58,7 +54,7 @@ function runExplainTest(verbosity) {
         db: dbName,
         collectionUUID: collUUID,
         explainVerbosity: {verbosity},
-        optimizationFlags: {omitSearchDocumentResults: true}
+        optimizationFlags: {omitSearchDocumentResults: true},
     });
     const pipeline = [{$searchMeta: searchQuery}];
     {
@@ -80,8 +76,13 @@ function runExplainTest(verbosity) {
             });
         }
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getMongotStagesAndValidateExplainExecutionStats(
-            {result, stageType: "$searchMeta", verbosity, nReturned: NumberLong(0), explainObject});
+        getMongotStagesAndValidateExplainExecutionStats({
+            result,
+            stageType: "$searchMeta",
+            verbosity,
+            nReturned: NumberLong(0),
+            explainObject,
+        });
     }
     // TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is
     // removed.
@@ -94,12 +95,17 @@ function runExplainTest(verbosity) {
             nextBatch: [
                 {_id: 2, $searchScore: 0.654},
                 {_id: 1, $searchScore: 0.321},
-                {_id: 3, $searchScore: 0.123}
+                {_id: 3, $searchScore: 0.123},
             ],
         });
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getMongotStagesAndValidateExplainExecutionStats(
-            {result, stageType: "$searchMeta", verbosity, nReturned: NumberLong(1), explainObject});
+        getMongotStagesAndValidateExplainExecutionStats({
+            result,
+            stageType: "$searchMeta",
+            verbosity,
+            nReturned: NumberLong(1),
+            explainObject,
+        });
     }
 }
 

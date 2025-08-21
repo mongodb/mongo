@@ -32,8 +32,9 @@ assert.commandWorked(coll.insert({x: 1, _id: 1}));
 assert.commandWorked(coll.insert({x: 1, _id: 2}));
 
 function setPostCommandFailpoint({mode, options}) {
-    assert.commandWorked(db.adminCommand(
-        {configureFailPoint: "waitAfterCommandFinishesExecution", mode: mode, data: options}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "waitAfterCommandFinishesExecution", mode: mode, data: options}),
+    );
 }
 
 function restartProfiler() {
@@ -42,8 +43,9 @@ function restartProfiler() {
     testDB.system.profile.drop();
     // Don't profile the setFCV command, which could be run during this test in the
     // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-    assert.commandWorked(testDB.setProfilingLevel(
-        1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+    assert.commandWorked(
+        testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    );
 }
 
 function runCommentParamTest({coll, command, commentObj}) {
@@ -56,8 +58,7 @@ function runCommentParamTest({coll, command, commentObj}) {
 
     let parallelShell;
     try {
-        setPostCommandFailpoint(
-            {mode: "alwaysOn", options: {ns: coll.getFullName(), commands: [cmdName]}});
+        setPostCommandFailpoint({mode: "alwaysOn", options: {ns: coll.getFullName(), commands: [cmdName]}});
 
         const parallelFn = `
             const sourceDB = db.getSiblingDB(jsTestName());
@@ -73,8 +74,8 @@ function runCommentParamTest({coll, command, commentObj}) {
 
         assert.soon(
             () => adminDB.aggregate([{$currentOp: {}}, {$match: filter}]).toArray().length == 1,
-            () => tojson(adminDB.aggregate([{$currentOp: {}}]).toArray()));
-
+            () => tojson(adminDB.aggregate([{$currentOp: {}}]).toArray()),
+        );
     } finally {
         // Ensure that we unset the failpoint, regardless of the outcome of the test.
         setPostCommandFailpoint({mode: "off", options: {}});
@@ -83,8 +84,7 @@ function runCommentParamTest({coll, command, commentObj}) {
     parallelShell();
 
     // Verify that profile entry has 'comment' field.
-    profilerHasSingleMatchingEntryOrThrow(
-        {profileDB: testDB, filter: {"command.comment": commentObj}});
+    profilerHasSingleMatchingEntryOrThrow({profileDB: testDB, filter: {"command.comment": commentObj}});
 }
 
 // Verify that the comment attached to a find command appears in both currentOp and the profiler.
@@ -93,7 +93,7 @@ runCommentParamTest({coll: coll, command: {find: coll.getName(), filter: {}}});
 // Verify that the comment attached to an insert command appears in both currentOp and the profiler.
 runCommentParamTest({
     coll: coll,
-    command: {insert: coll.getName(), documents: [{x: 0.5}, {x: -0.5}], ordered: false}
+    command: {insert: coll.getName(), documents: [{x: 0.5}, {x: -0.5}], ordered: false},
 });
 
 // Verify that the comment attached to an aggregate command appears in both currentOp and the
@@ -106,18 +106,16 @@ runCommentParamTest({
 // Verify the 'comment' field on the aggreage command is propagated to the subsequent getMore
 // command.
 const comment = [{name: "agg_comment"}];
-const res = testDB.runCommand(
-    {aggregate: coll.getName(), pipeline: [], comment: comment, cursor: {batchSize: 1}});
+const res = testDB.runCommand({aggregate: coll.getName(), pipeline: [], comment: comment, cursor: {batchSize: 1}});
 runCommentParamTest({
     coll: coll,
     command: {getMore: res.cursor.id, collection: coll.getName(), batchSize: 1},
-    commentObj: comment
+    commentObj: comment,
 });
 
 // Verify the 'comment' field on the getMore command takes precedence over the 'comment' field on
 // the originating command.
-runCommentParamTest(
-    {coll: coll, command: {getMore: res.cursor.id, collection: coll.getName(), batchSize: 1}});
+runCommentParamTest({coll: coll, command: {getMore: res.cursor.id, collection: coll.getName(), batchSize: 1}});
 
 // Verify that comment field gets populated on the profiler for aggregate with explain:true.
 runCommentParamTest({
@@ -126,21 +124,20 @@ runCommentParamTest({
 });
 
 const innerComment = {
-    name: "innerComment_aggregation"
+    name: "innerComment_aggregation",
 };
 
 // Verify that a comment field attached to the inner command of an explain command gets populated in
 // profiler as top level 'comment'.
 runCommentParamTest({
     coll: coll,
-    command:
-        {explain: {aggregate: coll.getName(), pipeline: [], cursor: {}, comment: innerComment}},
-    commentObj: innerComment
+    command: {explain: {aggregate: coll.getName(), pipeline: [], cursor: {}, comment: innerComment}},
+    commentObj: innerComment,
 });
 
 // Verify that when a comment field is attached to the inner command of an explain command and there
 // is another 'comment' field at the top level, top level comment takes precedence.
 runCommentParamTest({
     coll: coll,
-    command: {explain: {aggregate: coll.getName(), pipeline: [], cursor: {}, comment: innerComment}}
+    command: {explain: {aggregate: coll.getName(), pipeline: [], cursor: {}, comment: innerComment}},
 });

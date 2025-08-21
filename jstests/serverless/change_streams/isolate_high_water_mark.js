@@ -7,19 +7,17 @@
  *     requires_fcv_71
  * ]
  */
-import {
-    ChangeStreamMultitenantReplicaSetTest
-} from "jstests/serverless/libs/change_collection_util.js";
+import {ChangeStreamMultitenantReplicaSetTest} from "jstests/serverless/libs/change_collection_util.js";
 
 const tenantIds = [ObjectId(), ObjectId()];
-const rst = new ChangeStreamMultitenantReplicaSetTest(
-    {nodes: 3, nodeOptions: {setParameter: {ttlMonitorSleepSecs: 1}}});
+const rst = new ChangeStreamMultitenantReplicaSetTest({
+    nodes: 3,
+    nodeOptions: {setParameter: {ttlMonitorSleepSecs: 1}},
+});
 
 const primary = rst.getPrimary();
-const tenant1Conn =
-    ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, tenantIds[0]);
-const tenant2Conn =
-    ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, tenantIds[1]);
+const tenant1Conn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, tenantIds[0]);
+const tenant2Conn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, tenantIds[1]);
 const tenant1DB = tenant1Conn.getDB("test");
 const tenant2DB = tenant2Conn.getDB("test");
 rst.setChangeStreamState(tenant1Conn, true);

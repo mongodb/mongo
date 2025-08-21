@@ -8,8 +8,8 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 export function checkRollbackFiles(dbPath, nss, uuid, expectedDocs) {
     // Check the path of the rollback directory.
-    const rollbackDir = dbPath + '/rollback';
-    assert(pathExists(rollbackDir), 'directory for rollback files does not exist: ' + rollbackDir);
+    const rollbackDir = dbPath + "/rollback";
+    assert(pathExists(rollbackDir), "directory for rollback files does not exist: " + rollbackDir);
 
     // The newer layout, used by recover-to-timestamp (RTT) rollback, places them inside a
     // 'rollback/<db>.<collection>' directory with a file naming scheme of
@@ -18,9 +18,11 @@ export function checkRollbackFiles(dbPath, nss, uuid, expectedDocs) {
 
     function getRTTRollbackFile() {
         let rollbackFiles = listFiles(rollbackDir + "/" + extractUUIDFromObject(uuid));
-        assert.gte(rollbackFiles.length,
-                   1,
-                   "No RTT rollback files found for namespace: " + nss + " with UUID: " + uuid);
+        assert.gte(
+            rollbackFiles.length,
+            1,
+            "No RTT rollback files found for namespace: " + nss + " with UUID: " + uuid,
+        );
         return rollbackFiles[0].name;
     }
 

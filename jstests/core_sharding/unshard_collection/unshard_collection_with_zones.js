@@ -31,7 +31,7 @@ assert.commandWorked(testDb.adminCommand({addShardToZone: shard0._id, zone: "zon
 assert.commandWorked(testDb.adminCommand({addShardToZone: shard1._id, zone: "zone2"}));
 
 const collName = jsTestName();
-const ns = dbName + '.' + collName;
+const ns = dbName + "." + collName;
 
 assert.commandWorked(testDb.createCollection(collName));
 assert.commandWorked(testDb.adminCommand({shardCollection: ns, key: {x: 1}}));
@@ -40,16 +40,14 @@ assert.commandWorked(testDb.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(testDb.adminCommand({moveChunk: ns, find: {x: 0}, to: shard1._id}));
 
 // Define zones for test collection.
-assert.commandWorked(
-    testDb.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey}, max: {x: 0}, zone: "zone1"}));
-assert.commandWorked(
-    testDb.adminCommand({updateZoneKeyRange: ns, min: {x: 0}, max: {x: MaxKey}, zone: "zone2"}));
+assert.commandWorked(testDb.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey}, max: {x: 0}, zone: "zone1"}));
+assert.commandWorked(testDb.adminCommand({updateZoneKeyRange: ns, min: {x: 0}, max: {x: MaxKey}, zone: "zone2"}));
 
 for (let i = 0; i < 5000; i++) {
     testDb.getCollection(ns).insert({x: i});
 }
 
-const unshardCollectionThread = function(host, ns) {
+const unshardCollectionThread = function (host, ns) {
     const mongos = new Mongo(host);
     mongos.adminCommand({unshardCollection: ns});
 };
@@ -65,13 +63,13 @@ testDb.adminCommand({abortUnshardCollection: ns});
 
 threadForTest.join();
 
-let configCollectionDoc = testDb.getSiblingDB('config').collections.findOne({_id: ns}).key;
-const tags = testDb.getSiblingDB('config').tags.find({ns: ns}).toArray();
+let configCollectionDoc = testDb.getSiblingDB("config").collections.findOne({_id: ns}).key;
+const tags = testDb.getSiblingDB("config").tags.find({ns: ns}).toArray();
 
 // If we successfully unsharded our collection, we should have 0 zones in config.tags.
 // If unsharding was unsuccessful, we should retain 2 tags since we specified 2 zones for
 // our test collection.
-if (configCollectionDoc.hasOwnProperty('_id')) {
+if (configCollectionDoc.hasOwnProperty("_id")) {
     assert.eq(0, tags.length);
 } else {
     assert.eq(2, tags.length);

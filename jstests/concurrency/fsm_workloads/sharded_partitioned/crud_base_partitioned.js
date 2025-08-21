@@ -20,7 +20,7 @@
  * ]
  */
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         partitionSize: 1,
         // We use a non-hashed shard key of { skey: 1 } so that documents reside on their expected
@@ -28,36 +28,38 @@ export const $config = (function() {
         // each shard its own numeric range to work with.
         shardKey: {skey: 1},
         shardKeyField: {},
-        defaultShardKeyField: 'skey',
+        defaultShardKeyField: "skey",
     };
 
     data.makePartition = function makePartition(ns, tid, partitionSize) {
         var partition = {ns: ns};
         partition.lower = tid * partitionSize;
-        partition.mid = (tid * partitionSize) + (partitionSize / 2);
-        partition.upper = (tid * partitionSize) + partitionSize;
+        partition.mid = tid * partitionSize + partitionSize / 2;
+        partition.upper = tid * partitionSize + partitionSize;
 
-        partition.isLowChunk = (tid === 0) ? true : false;
-        partition.isHighChunk = (tid === (this.threadCount - 1)) ? true : false;
+        partition.isLowChunk = tid === 0 ? true : false;
+        partition.isHighChunk = tid === this.threadCount - 1 ? true : false;
 
         partition.chunkLower = partition.isLowChunk ? MinKey : partition.lower;
         partition.chunkUpper = partition.isHighChunk ? MaxKey : partition.upper;
 
         // Unless only 1 thread, verify that we aren't both the high and low chunk.
         if (this.threadCount > 1) {
-            assert(!(partition.isLowChunk && partition.isHighChunk),
-                   'should not be both the high and low chunk when there is more than 1 ' +
-                       'thread:\n' + tojson(this));
+            assert(
+                !(partition.isLowChunk && partition.isHighChunk),
+                "should not be both the high and low chunk when there is more than 1 " + "thread:\n" + tojson(this),
+            );
         } else {
-            assert(partition.isLowChunk && partition.isHighChunk,
-                   'should be both the high and low chunk when there is only 1 thread:\n' +
-                       tojson(this));
+            assert(
+                partition.isLowChunk && partition.isHighChunk,
+                "should be both the high and low chunk when there is only 1 thread:\n" + tojson(this),
+            );
         }
 
         return partition;
     };
 
-    var states = (function() {
+    var states = (function () {
         // Inform this thread about its partition
         function init(db, collName, connCache) {
             var ns = db[collName].getFullName();
@@ -68,8 +70,7 @@ export const $config = (function() {
             Object.freeze(this.partition);
         }
 
-        function dummy(db, collName, connCache) {
-        }
+        function dummy(db, collName, connCache) {}
 
         return {init: init, dummy: dummy};
     })();
@@ -98,12 +99,12 @@ export const $config = (function() {
     return {
         threadCount: 1,
         iterations: 1,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         data: data,
         setup: setup,
         teardown: teardown,
-        passConnectionCache: true
+        passConnectionCache: true,
     };
 })();

@@ -10,12 +10,10 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.indexedField = 'indexed_insert_ordered_bulk';
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.indexedField = "indexed_insert_ordered_bulk";
     $config.data.shardKey = {};
     $config.data.shardKey[$config.data.indexedField] = 1;
 

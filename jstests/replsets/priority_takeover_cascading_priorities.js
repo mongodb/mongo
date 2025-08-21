@@ -6,7 +6,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitUntilAllNodesCaughtUp} from "jstests/replsets/rslib.js";
 
-var name = 'priority_takeover_cascading_priorities';
+var name = "priority_takeover_cascading_priorities";
 var replSet = new ReplSetTest({
     name: name,
     nodes: [
@@ -15,7 +15,7 @@ var replSet = new ReplSetTest({
         {rsConfig: {priority: 3}},
         {rsConfig: {priority: 2}},
         {rsConfig: {priority: 1}},
-    ]
+    ],
 });
 replSet.startSet();
 replSet.initiate(null, null, {initiateWithDefaultElectionTimeout: true});

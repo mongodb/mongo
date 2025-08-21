@@ -33,14 +33,17 @@ const experimentColl = db.match_pbt_experiment;
 
 const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
 
-const aggModel = fc.record({matchStage: getMatchArb(), restOfPipeline: getAggPipelineModel()})
-                     .map(({matchStage, restOfPipeline}) => {
-                         return [matchStage, ...restOfPipeline];
-                     });
+const aggModel = fc
+    .record({matchStage: getMatchArb(), restOfPipeline: getAggPipelineModel()})
+    .map(({matchStage, restOfPipeline}) => {
+        return [matchStage, ...restOfPipeline];
+    });
 
-testProperty(correctnessProperty,
-             {controlColl, experimentColl},
-             makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
-             numRuns);
+testProperty(
+    correctnessProperty,
+    {controlColl, experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
+    numRuns,
+);
 
 // TODO SERVER-103381 implement time-series PBT testing.

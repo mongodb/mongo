@@ -17,31 +17,67 @@ var bigCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:
 
 var bigPoly20 = {
     type: "Polygon",
-    coordinates: [[[10.0, 10.0], [-10.0, 10.0], [-10.0, -10.0], [10.0, -10.0], [10.0, 10.0]]],
-    crs: bigCRS
+    coordinates: [
+        [
+            [10.0, 10.0],
+            [-10.0, 10.0],
+            [-10.0, -10.0],
+            [10.0, -10.0],
+            [10.0, 10.0],
+        ],
+    ],
+    crs: bigCRS,
 };
 
 var bigPoly20Comp = {
     type: "Polygon",
-    coordinates: [[[10.0, 10.0], [10.0, -10.0], [-10.0, -10.0], [-10.0, 10.0], [10.0, 10.0]]],
-    crs: bigCRS
+    coordinates: [
+        [
+            [10.0, 10.0],
+            [10.0, -10.0],
+            [-10.0, -10.0],
+            [-10.0, 10.0],
+            [10.0, 10.0],
+        ],
+    ],
+    crs: bigCRS,
 };
 
 var poly10 = {
     type: "Polygon",
-    coordinates: [[[5.0, 5.0], [5.0, -5.0], [-5.0, -5.0], [-5.0, 5.0], [5.0, 5.0]]]
+    coordinates: [
+        [
+            [5.0, 5.0],
+            [5.0, -5.0],
+            [-5.0, -5.0],
+            [-5.0, 5.0],
+            [5.0, 5.0],
+        ],
+    ],
 };
 
 var line10 = {
     type: "LineString",
-    coordinates: [[5.0, 5.0], [5.0, -5.0], [-5.0, -5.0], [-5.0, 5.0], [5.0, 5.0]]
+    coordinates: [
+        [5.0, 5.0],
+        [5.0, -5.0],
+        [-5.0, -5.0],
+        [-5.0, 5.0],
+        [5.0, 5.0],
+    ],
 };
 
 var centerPoint = {type: "Point", coordinates: [0, 0]};
 
 var polarPoint = {type: "Point", coordinates: [85, 85]};
 
-var lineEquator = {type: "LineString", coordinates: [[-20, 0], [20, 0]]};
+var lineEquator = {
+    type: "LineString",
+    coordinates: [
+        [-20, 0],
+        [20, 0],
+    ],
+};
 
 assert.commandWorked(coll.insert({loc: poly10}));
 assert.commandWorked(coll.insert({loc: line10}));
@@ -70,8 +106,16 @@ assert.commandWorked(coll.dropIndexes());
 // 1. Without index, insert succeeds, but query ignores big polygon.
 var bigPoly10 = {
     type: "Polygon",
-    coordinates: [[[5.0, 5.0], [-5.0, 5.0], [-5.0, -5.0], [5.0, -5.0], [5.0, 5.0]]],
-    crs: bigCRS
+    coordinates: [
+        [
+            [5.0, 5.0],
+            [-5.0, 5.0],
+            [-5.0, -5.0],
+            [5.0, -5.0],
+            [5.0, 5.0],
+        ],
+    ],
+    crs: bigCRS,
 };
 
 assert.commandWorked(coll.insert({_id: "bigPoly10", loc: bigPoly10}));
@@ -93,11 +137,18 @@ assert.writeError(coll.insert({_id: "bigPoly10", loc: bigPoly10}));
 
 // Query geometries that don't support big CRS should error out.
 var bigPoint = {type: "Point", coordinates: [0, 0], crs: bigCRS};
-var bigLine = {type: "LineString", coordinates: [[-20, 0], [20, 0]], crs: bigCRS};
+var bigLine = {
+    type: "LineString",
+    coordinates: [
+        [-20, 0],
+        [20, 0],
+    ],
+    crs: bigCRS,
+};
 
-assert.throws(function() {
+assert.throws(function () {
     coll.find({loc: {$geoIntersects: {$geometry: bigPoint}}}).itcount();
 });
-assert.throws(function() {
+assert.throws(function () {
     coll.find({loc: {$geoIntersects: {$geometry: bigLine}}}).itcount();
 });

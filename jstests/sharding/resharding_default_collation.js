@@ -17,11 +17,13 @@ const kDbName = "reshardingDb";
 const kCollName = "coll";
 const ns = kDbName + "." + kCollName;
 
-assert.commandWorked(reshardingTest._st.s.getDB(kDbName).adminCommand(
-    {enableSharding: kDbName, primaryShard: donorShardNames[0]}));
+assert.commandWorked(
+    reshardingTest._st.s.getDB(kDbName).adminCommand({enableSharding: kDbName, primaryShard: donorShardNames[0]}),
+);
 
-assert.commandWorked(reshardingTest._st.s.getCollection(ns).runCommand(
-    "create", {collation: {locale: "en_US", strength: 2}}));
+assert.commandWorked(
+    reshardingTest._st.s.getCollection(ns).runCommand("create", {collation: {locale: "en_US", strength: 2}}),
+);
 
 const collection = reshardingTest.createShardedCollection({
     ns: ns,
@@ -31,14 +33,13 @@ const collection = reshardingTest.createShardedCollection({
 });
 
 const idxSimpleCollationName = "idxSimpleCollation";
-assert.commandWorked(
-    collection.createIndex({x: 1}, {name: idxSimpleCollationName, collation: {locale: "simple"}}));
+assert.commandWorked(collection.createIndex({x: 1}, {name: idxSimpleCollationName, collation: {locale: "simple"}}));
 const idx2Name = "idx2";
 assert.commandWorked(collection.createIndex({x: 1}, {name: idx2Name}));
 
 const preReshardingIndexes = collection.getIndexes();
 const preIdxDict = {};
-preReshardingIndexes.forEach(function(idx) {
+preReshardingIndexes.forEach(function (idx) {
     preIdxDict[idx.name] = idx;
 });
 
@@ -52,7 +53,7 @@ const postReshardingIndexes = collection.getIndexes();
 assert.eq(postReshardingIndexes.length, 5);
 
 for (const postIdxSpec of postReshardingIndexes) {
-    if ('newKey' in postIdxSpec.key) {
+    if ("newKey" in postIdxSpec.key) {
         // the index collation for post resharding key should be {locale: "simple"}. listIndexes
         // omits this collation.
         assert.eq(postIdxSpec.collation, undefined);

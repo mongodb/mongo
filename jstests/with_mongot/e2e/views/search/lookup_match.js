@@ -26,18 +26,21 @@ assert.commandWorked(localColl.insertMany([{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4
 
 const foreignColl = testDb.underlyingSourceCollection;
 foreignColl.drop();
-assert.commandWorked(foreignColl.insertMany([
-    {x: 2, debugMsg: "should match _id 2 in localColl", foobarRepeatedXTimes: "foobarfoobar"},
-    {x: 3, debugMsg: "should match _id 3 in localColl", foobarRepeatedXTimes: null},
-    {x: 4, debugMsg: "should match _id 4 in localColl", foobarRepeatedXTimes: null},
-    {x: 5, debugMsg: "should match _id 5 in localColl", foobarRepeatedXTimes: null},
-]));
+assert.commandWorked(
+    foreignColl.insertMany([
+        {x: 2, debugMsg: "should match _id 2 in localColl", foobarRepeatedXTimes: "foobarfoobar"},
+        {x: 3, debugMsg: "should match _id 3 in localColl", foobarRepeatedXTimes: null},
+        {x: 4, debugMsg: "should match _id 4 in localColl", foobarRepeatedXTimes: null},
+        {x: 5, debugMsg: "should match _id 5 in localColl", foobarRepeatedXTimes: null},
+    ]),
+);
 
 const viewName = "addFields";
 
 // This view enriches the foobarRepeatedXTimes field. If foobarRepeatedXTimes is null, the view
 // concatenates the string foobar x (the field in the doc) number of times.
-const viewPipeline = [{
+const viewPipeline = [
+    {
         $addFields: {
             foobarRepeatedXTimes: {
                 $cond: {
@@ -46,20 +49,21 @@ const viewPipeline = [{
                         $reduce: {
                             input: {$range: [0, "$x"]},
                             initialValue: "",
-                            in: {$concat: ["$$value", "foobar"]}
-                        }
+                            in: {$concat: ["$$value", "foobar"]},
+                        },
                     },
-                    else: "$foobarRepeatedXTimes"
-                }
-            }
-        }
-    }];
-assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', viewPipeline));
+                    else: "$foobarRepeatedXTimes",
+                },
+            },
+        },
+    },
+];
+assert.commandWorked(testDb.createView(viewName, "underlyingSourceCollection", viewPipeline));
 const addFieldsView = testDb[viewName];
 
 const indexConfig = {
     coll: addFieldsView,
-    definition: {name: "populationAddFieldsIndex", definition: {"mappings": {"dynamic": true}}}
+    definition: {name: "populationAddFieldsIndex", definition: {"mappings": {"dynamic": true}}},
 };
 
 const lookupMatchTestCases = (isStoredSource) => {
@@ -67,58 +71,63 @@ const lookupMatchTestCases = (isStoredSource) => {
     // This is to ensure that the equality match between "_id" in localColl and "x" in foreignColl
     // happens after $search and but before the rest of the user pipeline (e.g before that $set
     // stage). In other words, the check happens at _id === x and not _id === (x + 1).
-    const lookupPipeline = 
-            [
-                {
-                    $lookup: {
-                        from: addFieldsView.getName(),
-                        localField: "_id",
-                        foreignField: "x",
-                        pipeline: [
-                            {
-                                $search: {
-                                    index: "populationAddFieldsIndex",
-                                    exists: {
-                                        path: "foobarRepeatedXTimes",
-                                    },
-                                    returnStoredSource: isStoredSource
-                                }
+    const lookupPipeline = [
+        {
+            $lookup: {
+                from: addFieldsView.getName(),
+                localField: "_id",
+                foreignField: "x",
+                pipeline: [
+                    {
+                        $search: {
+                            index: "populationAddFieldsIndex",
+                            exists: {
+                                path: "foobarRepeatedXTimes",
                             },
-                            {$project: {_id: 0}},
-                            {$set: {x: {$add: [1, "$x"]}}},
-                        ],
-                        as: "anything"
+                            returnStoredSource: isStoredSource,
+                        },
                     },
-                }, 
-                {$sort: {_id: 1}}
-            ];
+                    {$project: {_id: 0}},
+                    {$set: {x: {$add: [1, "$x"]}}},
+                ],
+                as: "anything",
+            },
+        },
+        {$sort: {_id: 1}},
+    ];
 
     const expectedResults = [
         {_id: 1, anything: []},
         {
             _id: 2,
-            anything: [{
-                x: 3,
-                debugMsg: "should match _id 2 in localColl",
-                foobarRepeatedXTimes: "foobarfoobar"
-            }]
+            anything: [
+                {
+                    x: 3,
+                    debugMsg: "should match _id 2 in localColl",
+                    foobarRepeatedXTimes: "foobarfoobar",
+                },
+            ],
         },
         {
             _id: 3,
-            anything: [{
-                x: 4,
-                debugMsg: "should match _id 3 in localColl",
-                foobarRepeatedXTimes: "foobarfoobarfoobar"
-            }]
+            anything: [
+                {
+                    x: 4,
+                    debugMsg: "should match _id 3 in localColl",
+                    foobarRepeatedXTimes: "foobarfoobarfoobar",
+                },
+            ],
         },
         {
             _id: 4,
-            anything: [{
-                x: 5,
-                debugMsg: "should match _id 4 in localColl",
-                foobarRepeatedXTimes: "foobarfoobarfoobarfoobar"
-            }]
-        }
+            anything: [
+                {
+                    x: 5,
+                    debugMsg: "should match _id 4 in localColl",
+                    foobarRepeatedXTimes: "foobarfoobarfoobarfoobar",
+                },
+            ],
+        },
     ];
 
     validateSearchExplain(localColl, lookupPipeline, isStoredSource, null, (explain) => {

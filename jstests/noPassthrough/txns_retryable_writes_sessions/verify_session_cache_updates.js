@@ -18,10 +18,11 @@ function runTest(conn) {
 
     function getLatestSessionTime(conn) {
         conn.getDB("admin").runCommand({refreshLogicalSessionCacheNow: 1});
-        let lastSession = conn.getDB("config")
-                              .system.sessions.aggregate([{"$sort": {lastUse: -1}}, {$limit: 1}])
-                              .toArray();
-        return (lastSession.length ? lastSession[0].lastUse : new Date(0));
+        let lastSession = conn
+            .getDB("config")
+            .system.sessions.aggregate([{"$sort": {lastUse: -1}}, {$limit: 1}])
+            .toArray();
+        return lastSession.length ? lastSession[0].lastUse : new Date(0);
     }
 
     let origSessTime = getLatestSessionTime(conn);

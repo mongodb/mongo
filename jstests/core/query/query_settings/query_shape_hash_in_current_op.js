@@ -23,7 +23,7 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
 qsutils.removeAllQuerySettings();
 const queryFilter = {
     x: 1,
-    y: 1
+    y: 1,
 };
 const findQueryRepresentative = qsutils.makeFindQueryInstance({filter: queryFilter});
 const findQuery = qsutils.withoutDollarDB(findQueryRepresentative);
@@ -44,23 +44,25 @@ const joinParallelFindThread = startParallelShell(
             return assert.commandWorked(testDB.runCommand(findQuery));
         },
         db.getName(),
-        findQuery),
+        findQuery,
+    ),
     db.getMongo().port,
 );
 
 jsTestLog("Get query shape hash reported by '$currentOp' aggregation stage.");
 const queryShapeHashFromCurrentOp = (() => {
-    const currentOps = waitForCurOpByFailPoint(db,
-                                               coll.getFullName(),
-                                               kFailPointInFind,
-                                               {"command.filter": queryFilter},
-                                               {localOps: true});
-    assert.eq(1,
-              currentOps.length,
-              `expecting only 1 currentOp, 'currentOps': ${JSON.stringify(currentOps)}`);
-    assert(currentOps[0].queryShapeHash,
-           `expect 'currentOp' to have queryShapeHash field. 'currentOps': ${
-               JSON.stringify(currentOps)}`);
+    const currentOps = waitForCurOpByFailPoint(
+        db,
+        coll.getFullName(),
+        kFailPointInFind,
+        {"command.filter": queryFilter},
+        {localOps: true},
+    );
+    assert.eq(1, currentOps.length, `expecting only 1 currentOp, 'currentOps': ${JSON.stringify(currentOps)}`);
+    assert(
+        currentOps[0].queryShapeHash,
+        `expect 'currentOp' to have queryShapeHash field. 'currentOps': ${JSON.stringify(currentOps)}`,
+    );
     return currentOps[0].queryShapeHash;
 })();
 
@@ -73,14 +75,15 @@ const querySettings = {
     indexHints: {
         ns: {db: db.getName(), coll: coll.getName()},
         allowedIndexes: [{x: 1}],
-    }
+    },
 };
 
 jsTestLog("Make sure query shape hash from '$currentOp' matches the one from query settings.");
 qsutils.withQuerySettings(findQueryRepresentative, querySettings, () => {
-    const queryShapeHashFromQuerySettings =
-        qsutils.getQueryShapeHashFromQuerySettings(findQueryRepresentative);
-    assert.eq(queryShapeHashFromCurrentOp,
-              queryShapeHashFromQuerySettings,
-              "Query shape hash from the '$currentOp' doesn't match the one from query settings.");
+    const queryShapeHashFromQuerySettings = qsutils.getQueryShapeHashFromQuerySettings(findQueryRepresentative);
+    assert.eq(
+        queryShapeHashFromCurrentOp,
+        queryShapeHashFromQuerySettings,
+        "Query shape hash from the '$currentOp' doesn't match the one from query settings.",
+    );
 });

@@ -22,12 +22,82 @@ coll.insert({loc: [-2.220446049250313e-16, 0]});
 coll.insert({loc: [-1.0e-14, -50]});
 coll.insert({loc: [-5, -5.24e-20]});
 
-assert.eq(coll.find({loc: {$within: {$box: [[-180, -180], [0, 0]]}}}).itcount(), 7);
+assert.eq(
+    coll
+        .find({
+            loc: {
+                $within: {
+                    $box: [
+                        [-180, -180],
+                        [0, 0],
+                    ],
+                },
+            },
+        })
+        .itcount(),
+    7,
+);
 
-assert.eq(coll.find({loc: {$within: {$box: [[-10, -10], [10, 10]]}}}).itcount(), 3);
+assert.eq(
+    coll
+        .find({
+            loc: {
+                $within: {
+                    $box: [
+                        [-10, -10],
+                        [10, 10],
+                    ],
+                },
+            },
+        })
+        .itcount(),
+    3,
+);
 
-assert.eq(coll.find({loc: {$within: {$box: [[-180, -60], [0, -30]]}}}).itcount(), 4);
+assert.eq(
+    coll
+        .find({
+            loc: {
+                $within: {
+                    $box: [
+                        [-180, -60],
+                        [0, -30],
+                    ],
+                },
+            },
+        })
+        .itcount(),
+    4,
+);
 
-assert.eq(coll.find({loc: {$within: {$box: [[-10, -60], [0, -30]]}}}).itcount(), 2);
+assert.eq(
+    coll
+        .find({
+            loc: {
+                $within: {
+                    $box: [
+                        [-10, -60],
+                        [0, -30],
+                    ],
+                },
+            },
+        })
+        .itcount(),
+    2,
+);
 
-assert.eq(coll.find({loc: {$within: {$box: [[-5, -60], [0, 0]]}}}).itcount(), 5);
+assert.eq(
+    coll
+        .find({
+            loc: {
+                $within: {
+                    $box: [
+                        [-5, -60],
+                        [0, 0],
+                    ],
+                },
+            },
+        })
+        .itcount(),
+    5,
+);

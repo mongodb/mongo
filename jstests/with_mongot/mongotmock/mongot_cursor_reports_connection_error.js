@@ -21,17 +21,15 @@ prepCollection(conn, dbName, collName);
 const coll = conn.getDB(dbName).getCollection(collName);
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 const pipeline = [{$search: searchQuery}];
 
 // First, make sure mongod can properly communicate with mongot.
 {
     const collectionUUID = getUUIDFromListCollections(conn.getDB(dbName), collName);
-    const expectedCommand =
-        {search: collName, query: searchQuery, $db: dbName, collectionUUID: collectionUUID};
-    const expected =
-        prepMongotResponse(expectedCommand, coll, mongotConn, NumberLong(123) /* cursorId */);
+    const expectedCommand = {search: collName, query: searchQuery, $db: dbName, collectionUUID: collectionUUID};
+    const expected = prepMongotResponse(expectedCommand, coll, mongotConn, NumberLong(123) /* cursorId */);
     let cursor = coll.aggregate(pipeline, {cursor: {batchSize: 2}});
     assert.eq(expected, cursor.toArray());
 }

@@ -33,8 +33,7 @@ function testIndexVersionAutoUpgrades(commandFn, doesAutoUpgrade) {
     var coll = testDB[jsTestName()];
 
     // Create a v=1 _id index.
-    assert.commandWorked(
-        testDB.createCollection(jsTestName(), {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
+    assert.commandWorked(testDB.createCollection(jsTestName(), {idIndex: {key: {_id: 1}, name: "_id_", v: 1}}));
     var allIndexes = coll.getIndexes();
     var spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {_id: 1});
     assert.neq(null, spec, "Index with key pattern {_id: 1} not found: " + tojson(allIndexes));
@@ -43,12 +42,8 @@ function testIndexVersionAutoUpgrades(commandFn, doesAutoUpgrade) {
     assert.commandWorked(coll.createIndex({withoutAnyOptions: 1}));
     allIndexes = coll.getIndexes();
     spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, {withoutAnyOptions: 1});
-    assert.neq(null,
-               spec,
-               "Index with key pattern {withoutAnyOptions: 1} not found: " + tojson(allIndexes));
-    assert.eq(defaultIndexVersion,
-              spec.v,
-              "Expected an index with the default version to be built: " + tojson(spec));
+    assert.neq(null, spec, "Index with key pattern {withoutAnyOptions: 1} not found: " + tojson(allIndexes));
+    assert.eq(defaultIndexVersion, spec.v, "Expected an index with the default version to be built: " + tojson(spec));
 
     assert.commandWorked(coll.createIndex({withV1: 1}, {v: 1}));
     allIndexes = coll.getIndexes();
@@ -72,7 +67,6 @@ function testIndexVersionAutoUpgrades(commandFn, doesAutoUpgrade) {
             {keyPattern: {withV1: 1}, version: defaultIndexVersion},
             {keyPattern: {withV2: 1}, version: defaultIndexVersion},
         ];
-
     } else {
         expectedResults = [
             {keyPattern: {_id: 1}, version: 1},
@@ -82,36 +76,39 @@ function testIndexVersionAutoUpgrades(commandFn, doesAutoUpgrade) {
         ];
     }
 
-    expectedResults.forEach(function(expected) {
+    expectedResults.forEach(function (expected) {
         var allIndexes = collToVerify.getIndexes();
         var spec = IndexCatalogHelpers.findByKeyPattern(allIndexes, expected.keyPattern);
-        assert.neq(null,
-                   spec,
-                   "Index with key pattern " + tojson(expected.keyPattern) +
-                       " not found: " + tojson(allIndexes));
-        assert.eq(expected.version,
-                  spec.v,
-                  "Expected index to be rebuilt with " +
-                      (doesAutoUpgrade ? "the default" : "its original") +
-                      " version: " + tojson(spec));
+        assert.neq(
+            null,
+            spec,
+            "Index with key pattern " + tojson(expected.keyPattern) + " not found: " + tojson(allIndexes),
+        );
+        assert.eq(
+            expected.version,
+            spec.v,
+            "Expected index to be rebuilt with " +
+                (doesAutoUpgrade ? "the default" : "its original") +
+                " version: " +
+                tojson(spec),
+        );
     });
 }
 
 // Test that the "reIndex" command upgrades all existing indexes to the latest version.
-testIndexVersionAutoUpgrades(function(coll) {
+testIndexVersionAutoUpgrades(function (coll) {
     assert.commandWorked(coll.getDB().runCommand({reIndex: coll.getName()}));
     return coll;
 }, true);
 
 // Test that the "compact" command doesn't upgrade existing indexes to the latest version.
-testIndexVersionAutoUpgrades(function(coll) {
+testIndexVersionAutoUpgrades(function (coll) {
     var res = coll.getDB().runCommand({compact: coll.getName()});
     if (res.ok === 0) {
         // Ephemeral storage engines don't support the "compact" command. The existing indexes
         // should remain unchanged. Also, it's possible for compact to be interrupted due to cache
         // pressure or concurrent compact calls.
-        assert.commandFailedWithCode(
-            res, [ErrorCodes.CommandNotSupported, ErrorCodes.Interrupted], tojson(res));
+        assert.commandFailedWithCode(res, [ErrorCodes.CommandNotSupported, ErrorCodes.Interrupted], tojson(res));
     }
     return coll;
 }, false);

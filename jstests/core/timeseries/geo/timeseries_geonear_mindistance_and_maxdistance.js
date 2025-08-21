@@ -19,7 +19,7 @@ const normColl = db.getCollection("normal_coll");
 function setUpCollection(coll, options) {
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), options));
-    assert.commandWorked(coll.createIndex({'tags.loc': '2dsphere'}));
+    assert.commandWorked(coll.createIndex({"tags.loc": "2dsphere"}));
 
     const nMeasurements = 10;
     var docs = Array(nMeasurements);
@@ -39,17 +39,19 @@ setUpCollection(normColl);
 const kMaxDistance = Math.PI * 2.0;
 
 // Test minDistance and maxDistance work as constant expressions in timeseries.
-const pipeline = [{
-    $geoNear: {
-        near: {type: "Point", coordinates: [0, 0]},
-        key: "tags.loc",
-        distanceField: "tags.distance",
-        minDistance: "$$minVal",
-        maxDistance: "$$maxVal"
-    }
-}];
-const normRes = normColl.aggregate(pipeline, {let : {minVal: 0, maxVal: kMaxDistance}}).toArray();
-const tsRes = tsColl.aggregate(pipeline, {let : {minVal: 0, maxVal: kMaxDistance}}).toArray();
+const pipeline = [
+    {
+        $geoNear: {
+            near: {type: "Point", coordinates: [0, 0]},
+            key: "tags.loc",
+            distanceField: "tags.distance",
+            minDistance: "$$minVal",
+            maxDistance: "$$maxVal",
+        },
+    },
+];
+const normRes = normColl.aggregate(pipeline, {let: {minVal: 0, maxVal: kMaxDistance}}).toArray();
+const tsRes = tsColl.aggregate(pipeline, {let: {minVal: 0, maxVal: kMaxDistance}}).toArray();
 assert.eq(normRes.length, tsRes.length);
 
 for (let i = 0; i < normRes.length; i++) {
@@ -57,22 +59,32 @@ for (let i = 0; i < normRes.length; i++) {
 }
 
 // Test minDistance and maxDistance as non-constant expressions fails in timeseries.
-assert.throwsWithCode(() => tsColl.aggregate([{
-    $geoNear: {
-        near: {type: "Point", coordinates: [0, 0]},
-        key: "tags.loc",
-        distanceField: "tags.distance",
-        minDistance: "$tags.loc",
-    }
-}]),
-                      7555701);
+assert.throwsWithCode(
+    () =>
+        tsColl.aggregate([
+            {
+                $geoNear: {
+                    near: {type: "Point", coordinates: [0, 0]},
+                    key: "tags.loc",
+                    distanceField: "tags.distance",
+                    minDistance: "$tags.loc",
+                },
+            },
+        ]),
+    7555701,
+);
 
-assert.throwsWithCode(() => tsColl.aggregate([{
-    $geoNear: {
-        near: {type: "Point", coordinates: [0, 0]},
-        key: "tags.loc",
-        distanceField: "tags.distance",
-        maxDistance: "$tags.loc"
-    }
-}]),
-                      7555702);
+assert.throwsWithCode(
+    () =>
+        tsColl.aggregate([
+            {
+                $geoNear: {
+                    near: {type: "Point", coordinates: [0, 0]},
+                    key: "tags.loc",
+                    distanceField: "tags.distance",
+                    maxDistance: "$tags.loc",
+                },
+            },
+        ]),
+    7555702,
+);

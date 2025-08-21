@@ -5,19 +5,19 @@ import {Graph} from "jstests/libs/cycle_detection.js";
 
 (function testLinearChainHasNoCycle() {
     const graph = new Graph();
-    graph.addEdge('A', 'B');
-    graph.addEdge('B', 'C');
-    graph.addEdge('C', 'D');
+    graph.addEdge("A", "B");
+    graph.addEdge("B", "C");
+    graph.addEdge("C", "D");
 
     assert.eq([], graph.findCycle());
 })();
 
 (function testGraphWithoutCycleButCommonAncestor() {
     const graph = new Graph();
-    graph.addEdge('A', 'B');
-    graph.addEdge('A', 'C');
-    graph.addEdge('B', 'D');
-    graph.addEdge('C', 'D');
+    graph.addEdge("A", "B");
+    graph.addEdge("A", "C");
+    graph.addEdge("B", "D");
+    graph.addEdge("C", "D");
 
     assert.eq([], graph.findCycle());
 })();

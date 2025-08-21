@@ -11,8 +11,9 @@ const metaFieldName = "tags";
 const timeseriesCollName = jsTestName();
 const tsColl = db.getCollection(timeseriesCollName);
 assertDropCollection(db, timeseriesCollName);
-assert.commandWorked(db.createCollection(
-    timeseriesCollName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    db.createCollection(timeseriesCollName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 const nDocs = 10;
 const bulk = tsColl.initializeUnorderedBulkOp();
@@ -34,32 +35,37 @@ const searchPipelines = [
 // TODO SERVER-108560 remove the legacy timeseries error codes (10623000 and 40602), once 9.0
 // becomes last LTS.
 // Search stages should fail when querying the timeseries collection directly.
-searchPipelines.forEach(pipeline => {
-    assert.commandFailedWithCode(tsColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-                                 [10557302, 10623000],
-                                 `Expected failure for pipeline: ${tojson(pipeline)}`);
+searchPipelines.forEach((pipeline) => {
+    assert.commandFailedWithCode(
+        tsColl.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
+        [10557302, 10623000],
+        `Expected failure for pipeline: ${tojson(pipeline)}`,
+    );
 });
 
 // Search stages should fail when querying a view on a timeseries collection.
 const viewName = "view_" + timeseriesCollName;
-assert.commandWorked(
-    db.createView(viewName, timeseriesCollName, [{$match: {$expr: {$in: ["x", "$b"]}}}]));
-searchPipelines.forEach(pipeline => {
+assert.commandWorked(db.createView(viewName, timeseriesCollName, [{$match: {$expr: {$in: ["x", "$b"]}}}]));
+searchPipelines.forEach((pipeline) => {
     assert.commandFailedWithCode(
         db[viewName].runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
         [10557302, 10623000],
-        `Expected failure for pipeline: ${tojson(pipeline)}`);
+        `Expected failure for pipeline: ${tojson(pipeline)}`,
+    );
 });
 
 // All queries on a timeseries collection on a view with $search in the view definition should fail.
 const searchView = "searchview_" + timeseriesCollName;
-assert.commandWorked(db.createView(searchView, timeseriesCollName, [
-    {$search: {index: "default", text: {query: "example", path: metaFieldName}}}
-]));
+assert.commandWorked(
+    db.createView(searchView, timeseriesCollName, [
+        {$search: {index: "default", text: {query: "example", path: metaFieldName}}},
+    ]),
+);
 assert.commandFailedWithCode(
     db[searchView].runCommand("aggregate", {pipeline: [{$match: {}}], cursor: {}}),
     [10557302, 10623000, 40602],
-    `Expected failure for pipeline: ${tojson([{$match: {}}])}`);
+    `Expected failure for pipeline: ${tojson([{$match: {}}])}`,
+);
 
 // '$listSearchIndexes' should return an empty array for timeseries collections.
 const results = tsColl.aggregate([{$listSearchIndexes: {}}]).toArray();

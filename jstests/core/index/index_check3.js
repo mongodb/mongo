@@ -23,8 +23,7 @@ t.drop();
 
 for (let i = 0; i < 100; i++) {
     let o = {i: i};
-    if (i % 2 == 0)
-        o.foo = i;
+    if (i % 2 == 0) o.foo = i;
     t.save(o);
 }
 
@@ -36,30 +35,58 @@ explain = t.find({foo: {$gt: 50}}).explain("executionStats");
 assert.gt(30, explain.executionStats.totalKeysExamined, "gt");
 
 t.drop();
-t.save({i: 'a'});
+t.save({i: "a"});
 for (var i = 0; i < 10; ++i) {
     t.save({});
 }
 
 t.createIndex({i: 1});
 
-explain = t.find({i: {$lte: 'a'}}).explain("executionStats");
+explain = t.find({i: {$lte: "a"}}).explain("executionStats");
 assert.gt(3, explain.executionStats.totalKeysExamined, "lte");
 
 // bug SERVER-99
-explain = t.find({i: {$gte: 'a'}}).explain("executionStats");
+explain = t.find({i: {$gte: "a"}}).explain("executionStats");
 assert.gt(3, explain.executionStats.totalKeysExamined, "gte");
-assert.eq(1, t.find({i: {$gte: 'a'}}).count(), "gte a");
-assert.eq(1, t.find({i: {$gte: 'a'}}).itcount(), "gte b");
-assert.eq(1, t.find({i: {$gte: 'a'}}).sort({i: 1}).count(), "gte c");
-assert.eq(1, t.find({i: {$gte: 'a'}}).sort({i: 1}).itcount(), "gte d");
+assert.eq(1, t.find({i: {$gte: "a"}}).count(), "gte a");
+assert.eq(1, t.find({i: {$gte: "a"}}).itcount(), "gte b");
+assert.eq(
+    1,
+    t
+        .find({i: {$gte: "a"}})
+        .sort({i: 1})
+        .count(),
+    "gte c",
+);
+assert.eq(
+    1,
+    t
+        .find({i: {$gte: "a"}})
+        .sort({i: 1})
+        .itcount(),
+    "gte d",
+);
 
 t.save({i: "b"});
 
-explain = t.find({i: {$gte: 'a'}}).explain("executionStats");
+explain = t.find({i: {$gte: "a"}}).explain("executionStats");
 assert.gt(3, explain.executionStats.totalKeysExamined, "gte");
-assert.eq(2, t.find({i: {$gte: 'a'}}).count(), "gte a2");
-assert.eq(2, t.find({i: {$gte: 'a'}}).itcount(), "gte b2");
-assert.eq(2, t.find({i: {$gte: 'a', $lt: MaxKey}}).itcount(), "gte c2");
-assert.eq(2, t.find({i: {$gte: 'a', $lt: MaxKey}}).sort({i: -1}).itcount(), "gte d2");
-assert.eq(2, t.find({i: {$gte: 'a', $lt: MaxKey}}).sort({i: 1}).itcount(), "gte e2");
+assert.eq(2, t.find({i: {$gte: "a"}}).count(), "gte a2");
+assert.eq(2, t.find({i: {$gte: "a"}}).itcount(), "gte b2");
+assert.eq(2, t.find({i: {$gte: "a", $lt: MaxKey}}).itcount(), "gte c2");
+assert.eq(
+    2,
+    t
+        .find({i: {$gte: "a", $lt: MaxKey}})
+        .sort({i: -1})
+        .itcount(),
+    "gte d2",
+);
+assert.eq(
+    2,
+    t
+        .find({i: {$gte: "a", $lt: MaxKey}})
+        .sort({i: 1})
+        .itcount(),
+    "gte e2",
+);

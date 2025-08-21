@@ -19,7 +19,7 @@ function sortViolationsArray(arr) {
     for (let i = 0; i < arr.length; i++) {
         arr[i].ids = arr[i].ids.sort();
     }
-    return arr.sort(function(a, b) {
+    return arr.sort(function (a, b) {
         if (a.ids[0] < b.ids[0]) {
             return -1;
         }
@@ -30,25 +30,23 @@ function sortViolationsArray(arr) {
     });
 }
 
-const collName = 'collmod_convert_to_unique_violations';
+const collName = "collmod_convert_to_unique_violations";
 const coll = db.getCollection(collName);
 coll.drop();
 
 // Checks that the violations match what we expect.
 function assertFailedWithViolations(keyPattern, violations) {
     // First sets 'prepareUnique' before converting the index to unique.
-    assert.commandWorked(
-        db.runCommand({collMod: collName, index: {keyPattern: keyPattern, prepareUnique: true}}));
-    const result =
-        db.runCommand({collMod: collName, index: {keyPattern: keyPattern, unique: true}});
+    assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: keyPattern, prepareUnique: true}}));
+    const result = db.runCommand({collMod: collName, index: {keyPattern: keyPattern, unique: true}});
     assert.commandFailedWithCode(result, ErrorCodes.CannotConvertIndexToUnique);
     assert.eq(
         bsonWoCompare(sortViolationsArray(result.violations), sortViolationsArray(violations)),
         0,
-        tojson(result));
+        tojson(result),
+    );
     // Resets 'prepareUnique'.
-    assert.commandWorked(
-        db.runCommand({collMod: collName, index: {keyPattern: keyPattern, prepareUnique: false}}));
+    assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: keyPattern, prepareUnique: false}}));
 }
 
 assert.commandWorked(db.createCollection(collName));

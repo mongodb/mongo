@@ -3,18 +3,18 @@
  */
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
-export const WildcardIndexHelpers = (function() {
+export const WildcardIndexHelpers = (function () {
     /**
      * Asserts that the given explain contains the given expectedIndexName in the winningPlan.
      */
     function assertExpectedIndexIsUsed(explain, expectedIndexName) {
         const winningPlan = getWinningPlanFromExplain(explain);
-        const planStages = getPlanStages(winningPlan, 'IXSCAN');
+        const planStages = getPlanStages(winningPlan, "IXSCAN");
 
         assert.neq(0, planStages.length, explain);
 
         for (const stage of planStages) {
-            assert(stage.hasOwnProperty('indexName'), stage);
+            assert(stage.hasOwnProperty("indexName"), stage);
             assert.eq(stage.indexName, expectedIndexName, stage);
         }
     }
@@ -25,11 +25,11 @@ export const WildcardIndexHelpers = (function() {
      */
     function assertExpectedIndexIsNotUsed(explain, expectedIndexName) {
         const winningPlan = getWinningPlanFromExplain(explain);
-        const planStages = getPlanStages(winningPlan, 'IXSCAN');
+        const planStages = getPlanStages(winningPlan, "IXSCAN");
 
         // It is fine if no IXSCAN's were found for it is guarantee the index was not used.
         for (const stage of planStages) {
-            assert(stage.hasOwnProperty('indexName'), stage);
+            assert(stage.hasOwnProperty("indexName"), stage);
             assert.neq(stage.indexName, expectedIndexName, stage);
         }
     }
@@ -39,7 +39,7 @@ export const WildcardIndexHelpers = (function() {
      */
     function getIndexName(coll, keyPattern) {
         const indexes = coll.getIndexes();
-        const index = indexes.find(index => bsonWoCompare(index.key, keyPattern) == 0);
+        const index = indexes.find((index) => bsonWoCompare(index.key, keyPattern) == 0);
         if (index !== undefined) {
             return index.name;
         }

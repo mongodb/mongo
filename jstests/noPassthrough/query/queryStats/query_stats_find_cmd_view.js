@@ -50,7 +50,7 @@ withQueryStatsEnabled(jsTestName(), (coll) => {
         hasSortStage: false,
         usedDisk: false,
         fromMultiPlanner: false,
-        fromPlanCache: false
+        fromPlanCache: false,
     });
     assertExpectedResults({
         results: entry,
@@ -60,6 +60,6 @@ withQueryStatsEnabled(jsTestName(), (coll) => {
         expectedDocsReturnedMax: 2,
         expectedDocsReturnedMin: 2,
         expectedDocsReturnedSumOfSq: 4,
-        getMores: false
+        getMores: false,
     });
 });

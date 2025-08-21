@@ -8,9 +8,7 @@
 //   # The `dbstats` command builds in-memory structures that are not causally consistent.
 //   does_not_support_causal_consistency,
 // ]
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 function serverIsMongos() {
     const res = db.runCommand("hello");
@@ -34,14 +32,14 @@ let coll = testDB["testColl"];
 assert.commandWorked(coll.createIndex({x: 1}));
 const doc = {
     _id: 1,
-    x: 1
+    x: 1,
 };
 assert.commandWorked(coll.insert(doc));
 
 let dbStats = testDB.runCommand({dbStats: 1, freeStorage: 1});
 assert.commandWorked(dbStats);
 
-assert.eq(1, dbStats.objects, tojson(dbStats));  // Includes testColl only
+assert.eq(1, dbStats.objects, tojson(dbStats)); // Includes testColl only
 const dataSize = Object.bsonsize(doc);
 assert.eq(dataSize, dbStats.avgObjSize, tojson(dbStats));
 assert.eq(dataSize, dbStats.dataSize, tojson(dbStats));
@@ -88,7 +86,7 @@ if (!isMongoS) {
     dbStats = testDB.runCommand({dbStats: 1});
     assert.commandWorked(dbStats);
 
-    assert.eq(2, dbStats.collections, tojson(dbStats));  // testColl + system.views
+    assert.eq(2, dbStats.collections, tojson(dbStats)); // testColl + system.views
     assert.eq(1, dbStats.views, tojson(dbStats));
 
     // Scale should be truncated to 1 according to the manual entry for dbStats
@@ -119,6 +117,8 @@ const statsNonExistingDB = testEmptyAndNonExistingDB.runCommand({dbStats: 1, fre
 testEmptyAndNonExistingDB.runCommand({create: "test_empty_collection"});
 
 const statsEmptyDB = testEmptyAndNonExistingDB.runCommand({dbStats: 1, freeStorage: 1});
-assert.sameMembers(Object.keys(statsNonExistingDB),
-                   Object.keys(statsEmptyDB),
-                   "dbStats for non-existing and empty dbs should return the same fields");
+assert.sameMembers(
+    Object.keys(statsNonExistingDB),
+    Object.keys(statsEmptyDB),
+    "dbStats for non-existing and empty dbs should return the same fields",
+);

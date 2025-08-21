@@ -24,22 +24,25 @@ function assertWriteVisible({cursor, opType, docKey}) {
 // events eventually become available.
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const mongosDB = st.s.getDB(jsTestName());
 const mongosColl = mongosDB.test;
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard on {shard:1}, split at {shard:1}, and move the upper chunk to shard1.
 st.shardColl(mongosColl, {shard: 1}, {shard: 1}, {shard: 1}, mongosDB.getName(), true);
 
 // Seed each shard with one document.
 assert.commandWorked(
-    mongosColl.insert([{shard: 0, _id: "initial_doc"}, {shard: 1, _id: "initial doc"}]));
+    mongosColl.insert([
+        {shard: 0, _id: "initial_doc"},
+        {shard: 1, _id: "initial doc"},
+    ]),
+);
 
 // Start a transaction which will be used to write documents across both shards.
 const session = mongosDB.getMongo().startSession();
@@ -53,13 +56,29 @@ const changeList = [];
 
 // Insert four documents on each shard under the transaction.
 assert.commandWorked(
-    sessionColl.insert([{shard: 0, _id: "txn1-doc-0"}, {shard: 1, _id: "txn1-doc-1"}]));
+    sessionColl.insert([
+        {shard: 0, _id: "txn1-doc-0"},
+        {shard: 1, _id: "txn1-doc-1"},
+    ]),
+);
 assert.commandWorked(
-    sessionColl.insert([{shard: 0, _id: "txn1-doc-2"}, {shard: 1, _id: "txn1-doc-3"}]));
+    sessionColl.insert([
+        {shard: 0, _id: "txn1-doc-2"},
+        {shard: 1, _id: "txn1-doc-3"},
+    ]),
+);
 assert.commandWorked(
-    sessionColl.insert([{shard: 0, _id: "txn1-doc-4"}, {shard: 1, _id: "txn1-doc-5"}]));
+    sessionColl.insert([
+        {shard: 0, _id: "txn1-doc-4"},
+        {shard: 1, _id: "txn1-doc-5"},
+    ]),
+);
 assert.commandWorked(
-    sessionColl.insert([{shard: 0, _id: "txn1-doc-6"}, {shard: 1, _id: "txn1-doc-7"}]));
+    sessionColl.insert([
+        {shard: 0, _id: "txn1-doc-6"},
+        {shard: 1, _id: "txn1-doc-7"},
+    ]),
+);
 
 // Commit the transaction.
 assert.commandWorked(session.commitTransaction_forTesting());
@@ -85,12 +104,12 @@ for (let i = 0; i < changeList.length; ++i) {
     // Confirm that the first event in the resumed stream matches the next event recorded in
     // 'changeList' from the original stream. The order of the events should be stable across
     // resumes from any point.
-    for (let x = (i + 1); x < changeList.length; ++x) {
+    for (let x = i + 1; x < changeList.length; ++x) {
         const expectedChangeDoc = changeList[x];
         assertWriteVisible({
             cursor: resumeCursor,
             opType: expectedChangeDoc.operationType,
-            docKey: expectedChangeDoc.documentKey
+            docKey: expectedChangeDoc.documentKey,
         });
     }
     assert(!resumeCursor.hasNext(), () => `Unexpected event: ${tojson(resumeCursor.next())}`);

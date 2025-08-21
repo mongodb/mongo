@@ -12,7 +12,7 @@ const testDB = conn.getDB("test");
 
 // TODO SERVER-94613: Reenable this test once the stale reference issue is fixed. Early exiting
 // in the meantime.
-const debugBuild = testDB.adminCommand('buildInfo').debug;
+const debugBuild = testDB.adminCommand("buildInfo").debug;
 if (debugBuild) {
     jsTest.log("Skipping test as debug builds are susceptible to a consistent collection bug");
     MongoRunner.stopMongod(conn);
@@ -30,24 +30,26 @@ coll.drop();
 
 assert.commandWorked(coll.createIndex({"$**": 1}));
 
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: 'WTWriteConflictExceptionForReads', mode: {activationProbability: 0.01}}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "WTWriteConflictExceptionForReads", mode: {activationProbability: 0.01}}),
+);
 for (let i = 0; i < 1000; ++i) {
     // Insert documents with a couple different multikey paths to increase the number of records
     // scanned during multikey path computation in the wildcard index.
-    assert.commandWorked(coll.insert({
-        _id: i,
-        i: i,
-        a: [{x: i - 1}, {x: i}, {x: i + 1}],
-        b: [],
-        longerName: [{nested: [1, 2]}, {nested: 4}]
-    }));
+    assert.commandWorked(
+        coll.insert({
+            _id: i,
+            i: i,
+            a: [{x: i - 1}, {x: i}, {x: i + 1}],
+            b: [],
+            longerName: [{nested: [1, 2]}, {nested: 4}],
+        }),
+    );
     assert.eq(coll.find({i: i}).hint({"$**": 1}).itcount(), 1);
     if (i > 0) {
         assert.eq(coll.find({"a.x": i}).hint({"$**": 1}).itcount(), 2);
     }
 }
 
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: 'WTWriteConflictExceptionForReads', mode: "off"}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "WTWriteConflictExceptionForReads", mode: "off"}));
 MongoRunner.stopMongod(conn);

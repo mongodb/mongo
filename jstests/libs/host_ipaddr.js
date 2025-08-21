@@ -10,13 +10,11 @@ export function get_ipaddr() {
             // Terminate path with / if defined
             path += "/";
         }
-    } catch (err) {
-    }
+    } catch (err) {}
 
     var ipFile = path + "ipaddr-" + Random.srand() + ".log";
     var windowsCmd = "ipconfig > " + ipFile;
-    var unixCmd =
-        "(/sbin/ifconfig || /usr/sbin/ip addr) | grep 'inet ' | grep -v '127.0.0.1' > " + ipFile;
+    var unixCmd = "(/sbin/ifconfig || /usr/sbin/ip addr) | grep 'inet ' | grep -v '127.0.0.1' > " + ipFile;
     var ipAddr = null;
     var hostType = null;
 
@@ -25,12 +23,13 @@ export function get_ipaddr() {
 
         // os-specific methods
         if (hostType == "windows") {
-            runProgram('cmd.exe', '/c', windowsCmd);
+            runProgram("cmd.exe", "/c", windowsCmd);
             ipAddr = cat(ipFile).match(/IPv4.*: (.*)/)[1];
         } else {
-            runProgram('/bin/sh', '-c', unixCmd);
-            ipAddr =
-                cat(ipFile).replace(/addr:/g, "").match(/inet ([\d]+\.[\d]+\.[\d]+\.[\d]+)/)[1];
+            runProgram("/bin/sh", "-c", unixCmd);
+            ipAddr = cat(ipFile)
+                .replace(/addr:/g, "")
+                .match(/inet ([\d]+\.[\d]+\.[\d]+\.[\d]+)/)[1];
         }
     } finally {
         removeFile(ipFile);

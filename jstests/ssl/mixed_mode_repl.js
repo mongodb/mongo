@@ -2,13 +2,7 @@
 // the sslSpecial test set. This test must be run with --use-ssl
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    allowTLS,
-    preferTLS,
-    replShouldFail,
-    replShouldSucceed,
-    requireTLS
-} from "jstests/ssl/libs/ssl_helpers.js";
+import {allowTLS, preferTLS, replShouldFail, replShouldSucceed, requireTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Limit the amount of time we'll wait on a failure.
 // Apply equally to success tests as well so that

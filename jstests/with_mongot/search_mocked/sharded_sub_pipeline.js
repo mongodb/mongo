@@ -5,11 +5,9 @@
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     getDefaultProtocolVersionForPlanShardedSearch,
-    mongotCommandForQuery
+    mongotCommandForQuery,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = jsTestName();
 const collName = jsTestName();
@@ -32,23 +30,31 @@ assert.commandWorked(testDB.adminCommand({enableSharding: dbName, primaryShard: 
 const testColl = testDB.getCollection(collName);
 
 // Documents that end up on shard0.
-assert.commandWorked(testColl.insert({
-    _id: 1,
-    shardKey: 0,
-}));
-assert.commandWorked(testColl.insert({
-    _id: 2,
-    shardKey: 0,
-}));
+assert.commandWorked(
+    testColl.insert({
+        _id: 1,
+        shardKey: 0,
+    }),
+);
+assert.commandWorked(
+    testColl.insert({
+        _id: 2,
+        shardKey: 0,
+    }),
+);
 // Documents that end up on shard1.
-assert.commandWorked(testColl.insert({
-    _id: 11,
-    shardKey: 100,
-}));
-assert.commandWorked(testColl.insert({
-    _id: 12,
-    shardKey: 100,
-}));
+assert.commandWorked(
+    testColl.insert({
+        _id: 11,
+        shardKey: 100,
+    }),
+);
+assert.commandWorked(
+    testColl.insert({
+        _id: 12,
+        shardKey: 100,
+    }),
+);
 
 // Shard the test collection, split it at {shardKey: 10}, and move the higher chunk to shard1.
 assert.commandWorked(testColl.createIndex({shardKey: 1}));
@@ -56,35 +62,37 @@ st.shardColl(testColl, {shardKey: 1}, {shardKey: 10}, {shardKey: 10 + 1});
 
 const mongotQuery = {};
 function mockPlanShardedSearchResponseLocal(conn, cursorId = 1, maybeUnused = false) {
-    const mergingPipelineHistory = [{
-        expectedCommand: {
-            planShardedSearch: testColl.getName(),
-            query: mongotQuery,
-            $db: dbName,
-            searchFeatures: {shardedSort: 1}
-        },
-        response: {
-            ok: 1,
-            protocolVersion: protocolVersion,
-            // This does not represent an actual merging pipeline. The merging pipeline is
-            // arbitrary, it just must only generate one document.
-            metaPipeline: [
-                {
-                    "$group": {
-                        "_id": {
-                            "type": "$type",
+    const mergingPipelineHistory = [
+        {
+            expectedCommand: {
+                planShardedSearch: testColl.getName(),
+                query: mongotQuery,
+                $db: dbName,
+                searchFeatures: {shardedSort: 1},
+            },
+            response: {
+                ok: 1,
+                protocolVersion: protocolVersion,
+                // This does not represent an actual merging pipeline. The merging pipeline is
+                // arbitrary, it just must only generate one document.
+                metaPipeline: [
+                    {
+                        "$group": {
+                            "_id": {
+                                "type": "$type",
+                            },
+                            "sum": {
+                                "$sum": "$count",
+                            },
                         },
-                        "sum": {
-                            "$sum": "$count",
-                        }
-                    }
-                },
-                {$project: {_id: 0, type: "$_id.type", count: "$sum"}},
-                {$match: {"type": 1}}
-            ]
+                    },
+                    {$project: {_id: 0, type: "$_id.type", count: "$sum"}},
+                    {$match: {"type": 1}},
+                ],
+            },
+            maybeUnused: maybeUnused,
         },
-        maybeUnused: maybeUnused,
-    }];
+    ];
     const mongot = stWithMock.getMockConnectedToHost(conn);
     mongot.setMockResponses(mergingPipelineHistory, cursorId);
 }
@@ -106,7 +114,7 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
                 collName: testColl.getName(),
                 db: testDB.getName(),
                 collectionUUID: collUUID1,
-                protocolVersion: protocolVersion
+                protocolVersion: protocolVersion,
             }),
             response: {
                 ok: 1,
@@ -121,7 +129,7 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
                             ],
                             type: "results",
                         },
-                        ok: 1
+                        ok: 1,
                     },
                     {
                         cursor: {
@@ -130,10 +138,10 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
                             nextBatch: [{type: 1, count: 15}],
                             type: "meta",
                         },
-                        ok: 1
-                    }
-                ]
-            }
+                        ok: 1,
+                    },
+                ],
+            },
         },
     ];
 
@@ -144,7 +152,7 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
                 collName: testColl.getName(),
                 db: testDB.getName(),
                 collectionUUID: collUUID1,
-                protocolVersion: protocolVersion
+                protocolVersion: protocolVersion,
             }),
             response: {
                 ok: 1,
@@ -159,7 +167,7 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
                             ],
                             type: "results",
                         },
-                        ok: 1
+                        ok: 1,
                     },
                     {
                         cursor: {
@@ -168,10 +176,10 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
                             nextBatch: [{type: 1, count: 105}],
                             type: "meta",
                         },
-                        ok: 1
-                    }
-                ]
-            }
+                        ok: 1,
+                    },
+                ],
+            },
         },
     ];
 
@@ -195,7 +203,7 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
                 collName: testColl.getName(),
                 db: testDB.getName(),
                 collectionUUID: collUUID1,
-                protocolVersion: protocolVersion
+                protocolVersion: protocolVersion,
             }),
             response: {
                 ok: 1,
@@ -210,59 +218,59 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
                             ],
                             type: "results",
                         },
-                        ok: 1
+                        ok: 1,
                     },
                     {
                         cursor: {
                             id: NumberLong(0),
                             ns: testColl.getFullName(),
-                            nextBatch: [{type: 1, count: 25}
-
-                            ],
+                            nextBatch: [{type: 1, count: 25}],
                             type: "meta",
                         },
-                        ok: 1
+                        ok: 1,
                     },
-                ]
-            }
+                ],
+            },
         },
     ];
 
-    const shard1UnionHistory = [{
-        expectedCommand: mongotCommandForQuery({
-            query: mongotQuery,
-            collName: testColl.getName(),
-            db: testDB.getName(),
-            collectionUUID: collUUID1,
-            protocolVersion: protocolVersion
-        }),
-        response: {
-            ok: 1,
-            cursors: [
-                {
-                    cursor: {
-                        id: NumberLong(0),
-                        ns: testColl.getFullName(),
-                        nextBatch: [
-                            {_id: 11, $searchScore: 0.654},
-                            {_id: 12, $searchScore: 0.654},
-                        ],
-                        type: "results",
+    const shard1UnionHistory = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: testColl.getName(),
+                db: testDB.getName(),
+                collectionUUID: collUUID1,
+                protocolVersion: protocolVersion,
+            }),
+            response: {
+                ok: 1,
+                cursors: [
+                    {
+                        cursor: {
+                            id: NumberLong(0),
+                            ns: testColl.getFullName(),
+                            nextBatch: [
+                                {_id: 11, $searchScore: 0.654},
+                                {_id: 12, $searchScore: 0.654},
+                            ],
+                            type: "results",
+                        },
+                        ok: 1,
                     },
-                    ok: 1
-                },
-                {
-                    cursor: {
-                        id: NumberLong(0),
-                        ns: testColl.getFullName(),
-                        nextBatch: [{type: 1, count: 205}],
-                        type: "meta",
+                    {
+                        cursor: {
+                            id: NumberLong(0),
+                            ns: testColl.getFullName(),
+                            nextBatch: [{type: 1, count: 205}],
+                            type: "meta",
+                        },
+                        ok: 1,
                     },
-                    ok: 1
-                },
-            ]
-        }
-    }];
+                ],
+            },
+        },
+    ];
 
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(shard1MainHistory, NumberLong(127), NumberLong(129));
@@ -272,30 +280,29 @@ mockPlanShardedSearchResponseLocal(mongos, 1, false);
     s1Mongot.disableOrderCheck();
 }
 
-let result = assert.commandWorked(testDB.runCommand({
-    aggregate: testColl.getName(),
-    pipeline: [
-        {$search: mongotQuery},
-        {$project: {_id: 1, pipe: "outer", meta: "$$SEARCH_META"}},
-        {
-            $unionWith: {
-                coll: testColl.getName(),
-                pipeline: [
-                    {$search: mongotQuery},
-                    {$project: {_id: 1, pipe: "inner", meta: "$$SEARCH_META"}}
-                ]
-            }
-        }
-    ],
-    cursor: {}
-}));
+let result = assert.commandWorked(
+    testDB.runCommand({
+        aggregate: testColl.getName(),
+        pipeline: [
+            {$search: mongotQuery},
+            {$project: {_id: 1, pipe: "outer", meta: "$$SEARCH_META"}},
+            {
+                $unionWith: {
+                    coll: testColl.getName(),
+                    pipeline: [{$search: mongotQuery}, {$project: {_id: 1, pipe: "inner", meta: "$$SEARCH_META"}}],
+                },
+            },
+        ],
+        cursor: {},
+    }),
+);
 const outerMetadataDoc = {
     type: 1,
-    count: 40
+    count: 40,
 };
 const innerMetadataDoc = {
     type: 1,
-    count: 310
+    count: 310,
 };
 const expectedResults = [
     {_id: 1, pipe: "outer", meta: outerMetadataDoc},

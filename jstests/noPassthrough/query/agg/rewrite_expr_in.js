@@ -44,7 +44,7 @@ const docs = [
     {_id: 26, "category.a": "clothing"},
     {_id: 27, category: {a: "clothing"}},
     {_id: 28, category: {b: "clothing"}},
-    {_id: 29, category: [{a: "clothing"}, {a: "electronics"}, {}]}
+    {_id: 29, category: [{a: "clothing"}, {a: "electronics"}, {}]},
 ];
 assert.commandWorked(coll.insertMany(docs));
 
@@ -56,9 +56,9 @@ const testCases = [
     {$in: ["$category", [1]]},
     {$in: ["$category.a", ["clothing", "electronics"]]},
     {$in: ["$category", [{}]]},
-    {$in: ["$category", [{a: 'clothing'}]]},
+    {$in: ["$category", [{a: "clothing"}]]},
     {$in: ["$category", [{$toDouble: 1}]]},
-    {$in: ["$category", [{$literal: {$toDouble: 1}}]]}
+    {$in: ["$category", [{$literal: {$toDouble: 1}}]]},
 ];
 
 let optimizedFindResults = [];
@@ -70,10 +70,8 @@ testCases.forEach((expr) => {
 });
 
 // Verify that optimized results are equal to results when optimizations are disabled.
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}));
+assert.commandWorked(db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+assert.commandWorked(db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}));
 
 testCases.forEach((expr, i) => {
     const pipeline = [{$_internalInhibitOptimization: {}}, {$match: {$expr: expr}}];

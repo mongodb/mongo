@@ -21,12 +21,12 @@ const testOnlyCommandsSet = new Set(testOnlyCommands);
 const sysUser = {
     user: "admin",
     pwd: "password",
-    roles: ["__system"]
+    roles: ["__system"],
 };
 const noroleUser = {
     user: "testuser",
     pwd: "password",
-    roles: []
+    roles: [],
 };
 /**
  * internalCommandsMap contains tests for each internal command. For each command name there is
@@ -47,9 +47,7 @@ const internalCommandsMap = {
             _clusterQueryWithoutShardKey: 1,
             writeCmd: {
                 update: "foo",
-                updates: [
-                    {q: {x: 1}, u: {$set: {a: 90}, upsert: false}},
-                ]
+                updates: [{q: {x: 1}, u: {$set: {a: 90}, upsert: false}}],
             },
         },
     },
@@ -59,9 +57,9 @@ const internalCommandsMap = {
             _addShard: 1,
             shardIdentity: {
                 shardName: shard0name,
-                clusterId: ObjectId('5b2031806195dffd744258ee'),
-                configsvrConnectionString: "foobarbaz/host:20022,host:20023,host:20024"
-            }
+                clusterId: ObjectId("5b2031806195dffd744258ee"),
+                configsvrConnectionString: "foobarbaz/host:20022,host:20023,host:20024",
+            },
         },
     },
     _clusterWriteWithoutShardKey: {
@@ -78,13 +76,12 @@ const internalCommandsMap = {
     },
     _configsvrAddShardToZone: {
         testname: "_configsvrAddShardToZone",
-        command: {_configsvrAddShardToZone: shard0name, zone: 'z'},
+        command: {_configsvrAddShardToZone: shard0name, zone: "z"},
     },
 
     _configsvrBalancerStart: {
         testname: "_configsvrBalancerStart",
         command: {_configsvrBalancerStart: 1},
-
     },
     _configsvrBalancerStatus: {
         testname: "_configsvrBalancerStatus",
@@ -102,19 +99,19 @@ const internalCommandsMap = {
             toShard: "move_chunk_basic-rs1",
             migratedChunk: {
                 lastmod: {
-                    e: new ObjectId('62b052ac7f5653479a67a54f'),
+                    e: new ObjectId("62b052ac7f5653479a67a54f"),
                     t: new Timestamp(1655722668, 22),
-                    v: new Timestamp(1, 0)
+                    v: new Timestamp(1, 0),
                 },
                 min: {_id: MinKey},
-                max: {_id: 611686018427387902}
+                max: {_id: 611686018427387902},
             },
             fromShardCollectionVersion: {
-                e: new ObjectId('62b052ac7f5653479a67a54f'),
+                e: new ObjectId("62b052ac7f5653479a67a54f"),
                 t: new Timestamp(1655722668, 22),
-                v: new Timestamp(1, 3)
+                v: new Timestamp(1, 3),
             },
-            validAfter: new Timestamp(1655722670, 6)
+            validAfter: new Timestamp(1655722670, 6),
         },
     },
     _configsvrBalancerCollectionStatus: {
@@ -129,8 +126,7 @@ const internalCommandsMap = {
     },
     _configsvrClearJumboFlag: {
         testname: "_configsvrClearJumboFlag",
-        command:
-            {_configsvrClearJumboFlag: "x.y", epoch: ObjectId(), minKey: {x: 0}, maxKey: {x: 10}},
+        command: {_configsvrClearJumboFlag: "x.y", epoch: ObjectId(), minKey: {x: 0}, maxKey: {x: 10}},
     },
     _configsvrCommitChunksMerge: {
         testname: "_configsvrCommitChunksMerge",
@@ -138,9 +134,8 @@ const internalCommandsMap = {
             _configsvrCommitChunksMerge: "x.y",
             shard: shard0name,
             collUUID: {uuid: UUID()},
-            chunkRange: {min: {a: 1}, max: {a: 10}}
+            chunkRange: {min: {a: 1}, max: {a: 10}},
         },
-
     },
     _configsvrCommitChunkSplit: {
         testname: "_configsvrCommitChunkSplit",
@@ -153,7 +148,7 @@ const internalCommandsMap = {
             key: {aKey: 1},
             newEpoch: new ObjectId(),
             newTimestamp: Timestamp(),
-            oldTimestamp: Timestamp()
+            oldTimestamp: Timestamp(),
         },
     },
     _configsvrCommitMergeAllChunksOnShard: {
@@ -180,7 +175,7 @@ const internalCommandsMap = {
         },
     },
     _configsvrCheckMetadataConsistency: {
-        skip: true,  // This command doesn't accept to be run in the 'admin' database.
+        skip: true, // This command doesn't accept to be run in the 'admin' database.
         testname: "_configsvrCheckMetadataConsistency",
         command: {
             _configsvrCheckMetadataConsistency: "x.y",
@@ -203,7 +198,7 @@ const internalCommandsMap = {
                 timestamp: new Timestamp(1691525961, 12),
                 lastMod: NumberInt(5),
             },
-            to: shard0name
+            to: shard0name,
         },
     },
     _configsvrCommitShardRemoval: {
@@ -248,7 +243,7 @@ const internalCommandsMap = {
     },
     _configsvrRemoveShardFromZone: {
         testname: "_configsvrRemoveShardFromZone",
-        command: {_configsvrRemoveShardFromZone: 1, removeShard: shard0name, zone: 'z'},
+        command: {_configsvrRemoveShardFromZone: 1, removeShard: shard0name, zone: "z"},
     },
     _configsvrRemoveTags: {
         testname: "_configsvrRemoveTags",
@@ -275,7 +270,7 @@ const internalCommandsMap = {
         command: {
             _configsvrSetAllowMigrations: ns,
             allowMigrations: false,
-            writeConcern: {w: "majority"}
+            writeConcern: {w: "majority"},
         },
     },
     _configsvrSetClusterParameter: {
@@ -310,7 +305,7 @@ const internalCommandsMap = {
     },
     _configsvrUpdateZoneKeyRange: {
         testname: "_configsvrUpdateZoneKeyRange",
-        command: {_configsvrUpdateZoneKeyRange: 'test.foo', min: {x: 1}, max: {x: 5}, zone: 'z'},
+        command: {_configsvrUpdateZoneKeyRange: "test.foo", min: {x: 1}, max: {x: 5}, zone: "z"},
     },
     _dropConnectionsToMongot: {
         testname: "_dropConnectionsToMongot",
@@ -321,18 +316,18 @@ const internalCommandsMap = {
         command: {_dropMirrorMaestroConnections: 1, hostAndPort: []},
     },
     _flushDatabaseCacheUpdates: {
-        skip: true,  // This command isn't valid when the shards are authoritative for DB metadata.
-                     // Also, it can not be used during the FCV upgrade. The command will be removed
-                     // in the future.
+        skip: true, // This command isn't valid when the shards are authoritative for DB metadata.
+        // Also, it can not be used during the FCV upgrade. The command will be removed
+        // in the future.
         testname: "_flushDatabaseCacheUpdates",
-        command: {_flushDatabaseCacheUpdates: 'test'},
+        command: {_flushDatabaseCacheUpdates: "test"},
     },
     _flushDatabaseCacheUpdatesWithWriteConcern: {
-        skip: true,  // This command isn't valid when the shards are authoritative for DB metadata.
-                     // Also, it can not be used during the FCV upgrade. The command will be removed
-                     // in the future.
+        skip: true, // This command isn't valid when the shards are authoritative for DB metadata.
+        // Also, it can not be used during the FCV upgrade. The command will be removed
+        // in the future.
         testname: "_flushDatabaseCacheUpdatesWithWriteConcern",
-        command: {_flushDatabaseCacheUpdatesWithWriteConcern: 'test', writeConcern: {w: 2}},
+        command: {_flushDatabaseCacheUpdatesWithWriteConcern: "test", writeConcern: {w: 2}},
     },
     _flushReshardingStateChange: {
         testname: "_flushReshardingStateChange",
@@ -364,8 +359,8 @@ const internalCommandsMap = {
         command: {_hashBSONElement: 0, seed: 1},
     },
     _isSelf: {
-        skip: true,  // This command does not need '__system' role as it is currently used in atlas
-                     // tools.
+        skip: true, // This command does not need '__system' role as it is currently used in atlas
+        // tools.
         testname: "_isSelf",
         command: {_isSelf: 1},
     },
@@ -377,10 +372,10 @@ const internalCommandsMap = {
         testname: "_mergeAuthzCollections",
         command: {
             _mergeAuthzCollections: 1,
-            tempUsersCollection: 'admin.tempusers',
-            tempRolesCollection: 'admin.temproles',
+            tempUsersCollection: "admin.tempusers",
+            tempRolesCollection: "admin.temproles",
             db: "",
-            drop: false
+            drop: false,
         },
     },
     _migrateClone: {
@@ -417,8 +412,7 @@ const internalCommandsMap = {
     },
     _refreshQueryAnalyzerConfiguration: {
         testname: "_refreshQueryAnalyzerConfiguration",
-        command:
-            {_refreshQueryAnalyzerConfiguration: 1, name: "test", numQueriesExecutedPerSecond: 1},
+        command: {_refreshQueryAnalyzerConfiguration: 1, name: "test", numQueriesExecutedPerSecond: 1},
     },
     internalRenameIfOptionsAndIndexesMatch: {
         testname: "internalRenameIfOptionsAndIndexesMatch",
@@ -448,8 +442,9 @@ const internalCommandsMap = {
         testname: "_shardsvrBeginMigrationBlockingOperation",
         command: {_shardsvrBeginMigrationBlockingOperation: ns, operationId: migrationOperationId},
         postcommand: (db) => {
-            assert.commandWorked(db.runCommand(
-                {_shardsvrEndMigrationBlockingOperation: ns, operationId: migrationOperationId}));
+            assert.commandWorked(
+                db.runCommand({_shardsvrEndMigrationBlockingOperation: ns, operationId: migrationOperationId}),
+            );
         },
     },
     _shardsvrChangePrimary: {
@@ -461,7 +456,7 @@ const internalCommandsMap = {
                 timestamp: new Timestamp(1691525961, 12),
                 lastMod: NumberInt(5),
             },
-            to: shard0name
+            to: shard0name,
         },
     },
     _shardsvrCleanupStructuredEncryptionData: {
@@ -478,19 +473,19 @@ const internalCommandsMap = {
     },
     _shardsvrCloneCatalogData: {
         testname: "_shardsvrCloneCatalogData",
-        command: {_shardsvrCloneCatalogData: 'test', from: [], writeConcern: {w: "majority"}},
+        command: {_shardsvrCloneCatalogData: "test", from: [], writeConcern: {w: "majority"}},
     },
     _shardsvrFetchCollMetadata: {
         testname: "_shardsvrFetchCollMetadata",
-        command: {_shardsvrFetchCollMetadata: 'test', from: [], writeConcern: {w: "majority"}},
+        command: {_shardsvrFetchCollMetadata: "test", from: [], writeConcern: {w: "majority"}},
     },
     _shardsvrCompactStructuredEncryptionData: {
         testname: "_shardsvrCompactStructuredEncryptionData",
-        command: {_shardsvrCompactStructuredEncryptionData: 'test', compactionTokens: {}},
+        command: {_shardsvrCompactStructuredEncryptionData: "test", compactionTokens: {}},
     },
     _shardsvrConvertToCapped: {
         testname: "_shardsvrConvertToCapped",
-        command: {_shardsvrConvertToCapped: 'test', size: 0},
+        command: {_shardsvrConvertToCapped: "test", size: 0},
     },
     _shardsvrCommitReshardCollection: {
         testname: "_shardsvrCommitReshardCollection",
@@ -503,7 +498,7 @@ const internalCommandsMap = {
         testname: "_shardsvrCommitCreateDatabaseMetadata",
         command: {
             _shardsvrCommitCreateDatabaseMetadata: 1,
-            dbVersion: {uuid: new UUID(), timestamp: new Timestamp(1, 0), lastMod: NumberInt(1)}
+            dbVersion: {uuid: new UUID(), timestamp: new Timestamp(1, 0), lastMod: NumberInt(1)},
         },
     },
     _shardsvrCommitDropDatabaseMetadata: {
@@ -587,7 +582,7 @@ const internalCommandsMap = {
         command: {
             _shardsvrCoordinateMultiUpdate: collName,
             uuid: UUID(),
-            command: {update: collName, updates: [{q: {x: 1}, u: {$set: {y: 2}}, multi: true}]}
+            command: {update: collName, updates: [{q: {x: 1}, u: {$set: {y: 2}}, multi: true}]},
         },
     },
     _shardsvrEndMigrationBlockingOperation: {
@@ -614,7 +609,7 @@ const internalCommandsMap = {
         command: {
             _shardsvrMergeAllChunksOnShard: "x.y",
             shard: shard0name,
-            maxNumberOfChunksToMerge: NumberInt(2)
+            maxNumberOfChunksToMerge: NumberInt(2),
         },
     },
     _shardsvrMergeChunks: {
@@ -623,7 +618,7 @@ const internalCommandsMap = {
             _shardsvrMergeChunks: "x.y",
             bounds: [{x: 0}, {x: 10}],
             epoch: ObjectId(),
-            timestamp: Timestamp()
+            timestamp: Timestamp(),
         },
     },
     _shardsvrMovePrimary: {
@@ -635,7 +630,7 @@ const internalCommandsMap = {
                 timestamp: new Timestamp(1691525961, 12),
                 lastMod: NumberInt(5),
             },
-            to: shard0name
+            to: shard0name,
         },
     },
     _shardsvrMovePrimaryEnterCriticalSection: {
@@ -653,13 +648,12 @@ const internalCommandsMap = {
             collectionTimestamp: Timestamp(1, 0),
             fromShard: shard0name,
             toShard: "shard0001",
-            maxChunkSizeBytes: NumberInt(100)
+            maxChunkSizeBytes: NumberInt(100),
         },
     },
     _shardsvrNotifyShardingEvent: {
         testname: "_shardsvrNotifyShardingEvent",
-        command:
-            {_shardsvrNotifyShardingEvent: "test", eventType: "collectionResharded", details: {}},
+        command: {_shardsvrNotifyShardingEvent: "test", eventType: "collectionResharded", details: {}},
     },
     _shardsvrRenameCollection: {
         testname: "_shardsvrRenameCollection",
@@ -670,7 +664,7 @@ const internalCommandsMap = {
         command: {
             _shardsvrRenameCollectionParticipant: "test.collection",
             to: "db.collection_renamed",
-            sourceUUID: UUID()
+            sourceUUID: UUID(),
         },
     },
     _shardsvrRenameCollectionParticipantUnblock: {
@@ -678,7 +672,7 @@ const internalCommandsMap = {
         command: {
             _shardsvrRenameCollectionParticipantUnblock: "test.collection",
             to: "db.collection_renamed",
-            sourceUUID: UUID()
+            sourceUUID: UUID(),
         },
     },
     _shardsvrRenameIndexMetadata: {
@@ -734,7 +728,7 @@ const internalCommandsMap = {
             _shardsvrReshardRecipientClone: UUID(),
             cloneTimestamp: Timestamp(),
             approxCopySize: {},
-            donorShards: []
+            donorShards: [],
         },
     },
     _shardsvrRefineCollectionShardKey: {
@@ -754,7 +748,7 @@ const internalCommandsMap = {
         command: {
             _shardsvrSetUserWriteBlockMode: 1,
             global: true,
-            phase: 'complete',
+            phase: "complete",
         },
     },
     _shardsvrValidateShardKeyCandidate: {
@@ -782,7 +776,7 @@ const internalCommandsMap = {
     },
     _shardsvrUntrackUnsplittableCollection: {
         testname: "_shardsvrUntrackUnsplittableCollection",
-        command: {_shardsvrUntrackUnsplittableCollection: "x.y", writeConcern: {w: 'majority'}},
+        command: {_shardsvrUntrackUnsplittableCollection: "x.y", writeConcern: {w: "majority"}},
     },
     _shardsvrCheckMetadataConsistency: {
         testname: "_shardsvrCheckMetadataConsistency",
@@ -791,7 +785,7 @@ const internalCommandsMap = {
         },
     },
     _shardsvrCheckMetadataConsistencyParticipant: {
-        skip: true,  // This command doesn't accept to be run in the 'admin' database.
+        skip: true, // This command doesn't accept to be run in the 'admin' database.
         testname: "_shardsvrCheckMetadataConsistencyParticipant",
         command: {
             _shardsvrCheckMetadataConsistencyParticipant: 1,
@@ -851,8 +845,7 @@ function runOneCommandAuthorizationTest(testObject, commandName, db, secondDb, c
     assert(db.auth(noroleUser.user, noroleUser.pwd));
     result.noRoleRes = db.runCommand(testObject.command);
     db.logout();
-    if (result.noRoleRes.ok === cmdOK.commandWorked ||
-        result.noRoleRes.code !== ErrorCodes.Unauthorized) {
+    if (result.noRoleRes.ok === cmdOK.commandWorked || result.noRoleRes.code !== ErrorCodes.Unauthorized) {
         result.pass = false;
         return result;
     }
@@ -862,8 +855,7 @@ function runOneCommandAuthorizationTest(testObject, commandName, db, secondDb, c
         testObject.postcommand(db);
     }
     db.logout();
-    const sysRolePass = (result.sysRes.ok === cmdOK.commandWorked ||
-                         result.sysRes.code !== ErrorCodes.Unauthorized);
+    const sysRolePass = result.sysRes.ok === cmdOK.commandWorked || result.sysRes.code !== ErrorCodes.Unauthorized;
 
     assert(sysRolePass);
     return result;
@@ -898,15 +890,14 @@ function skipCommand(testObjectForCommand, commandName) {
 function runAuthorizationTestsOnAllInternalCommands(conn, firstDb, secondDb, coll) {
     let results = {};
     let fails = [];
-    const availableCommandsList =
-        AllCommandsTest.checkCommandCoverage(conn, internalCommandsMap, function(cmdName) {
-            // TODO(SERVER-104891): Remove this once this command is _renameIfOptionsAndIndexesMatch
-            if (cmdName == "internalRenameIfOptionsAndIndexesMatch") {
-                return false;
-            }
+    const availableCommandsList = AllCommandsTest.checkCommandCoverage(conn, internalCommandsMap, function (cmdName) {
+        // TODO(SERVER-104891): Remove this once this command is _renameIfOptionsAndIndexesMatch
+        if (cmdName == "internalRenameIfOptionsAndIndexesMatch") {
+            return false;
+        }
 
-            return !cmdName.startsWith('_') || testOnlyCommandsSet.hasOwnProperty(cmdName);
-        });
+        return !cmdName.startsWith("_") || testOnlyCommandsSet.hasOwnProperty(cmdName);
+    });
     for (const commandName of availableCommandsList) {
         const test = internalCommandsMap[commandName];
 
@@ -914,8 +905,7 @@ function runAuthorizationTestsOnAllInternalCommands(conn, firstDb, secondDb, col
         if (skipCommand(test, commandName)) {
             continue;
         }
-        results[commandName] =
-            runOneCommandAuthorizationTest(test, commandName, firstDb, secondDb, coll);
+        results[commandName] = runOneCommandAuthorizationTest(test, commandName, firstDb, secondDb, coll);
     }
     return results;
 }
@@ -933,11 +923,11 @@ function runStandaloneTest() {
         auth: "",
         setParameter: {
             trafficRecordingDirectory: dbPath,
-            mongotHost: "localhost:27017",  // We have to set the mongotHost parameter for the
-                                            // $search-relatead tests to pass configuration checks.
-            syncdelay: 0  // Disable checkpoints as this can cause some commands to fail
-                          // transiently.
-        }
+            mongotHost: "localhost:27017", // We have to set the mongotHost parameter for the
+            // $search-relatead tests to pass configuration checks.
+            syncdelay: 0, // Disable checkpoints as this can cause some commands to fail
+            // transiently.
+        },
     };
 
     const conn = MongoRunner.runMongod(opts);
@@ -960,11 +950,11 @@ function setupShardedClusterTest() {
         auth: "",
         setParameter: {
             trafficRecordingDirectory: dbPath,
-            mongotHost: "localhost:27017",  // We have to set the mongotHost parameter for the
-                                            // $search-related tests to pass configuration checks.
-            syncdelay: 0  // Disable checkpoints as this can cause some commands to fail
-                          // transiently.
-        }
+            mongotHost: "localhost:27017", // We have to set the mongotHost parameter for the
+            // $search-related tests to pass configuration checks.
+            syncdelay: 0, // Disable checkpoints as this can cause some commands to fail
+            // transiently.
+        },
     };
     return opts;
 }
@@ -983,9 +973,8 @@ function runMongosTest(opts) {
             rsOptions: opts,
             // We have to set the mongotHost parameter for the $search-related tests to pass
             // configuration checks.
-            mongosOptions:
-                {setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}}
-        }
+            mongosOptions: {setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}},
+        },
     });
     const mongos = shardingTest.s0;
     const mongosAdminDB = mongos.getDB("admin");
@@ -1009,9 +998,8 @@ function runShardedServerTest(opts) {
             rsOptions: opts,
             // We have to set the mongotHost parameter for the $search-related tests to pass
             // configuration checks.
-            mongosOptions:
-                {setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}}
-        }
+            mongosOptions: {setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}},
+        },
     });
     const shardPrimary = shardingTest.rs0.getPrimary();
     const shardAdminDB = shardPrimary.getDB("admin");
@@ -1022,8 +1010,7 @@ function runShardedServerTest(opts) {
         shardAdminDB.createUser({user: "admin", pwd: "password", roles: ["__system"]});
     }
     createUser(shardAdminDB, noroleUser.user, noroleUser.roles);
-    const results =
-        runAuthorizationTestsOnAllInternalCommands(shardPrimary, shardAdminDB, mongosDB, coll);
+    const results = runAuthorizationTestsOnAllInternalCommands(shardPrimary, shardAdminDB, mongosDB, coll);
     shardingTest.stop();
     return results;
 }
@@ -1040,9 +1027,8 @@ function runConfigServer(opts) {
             rsOptions: opts,
             // We have to set the mongotHost parameter for the $search-related tests to pass
             // configuration checks.
-            mongosOptions:
-                {setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}}
-        }
+            mongosOptions: {setParameter: {trafficRecordingDirectory: dbPath, mongotHost: "localhost:27017"}},
+        },
     });
 
     const configPrimary = shardingTest.configRS.getPrimary();
@@ -1076,8 +1062,9 @@ function singleCommandCheckResult(commandName, resultmap) {
         }
         singleCommandCombinedResult.absent = false;
         if (!resultsForSetup[commandName].pass) {
-            jsTestLog("Test Failure at setup:" + setupName + " command:" + commandName +
-                      tojson(resultsForSetup[commandName]));
+            jsTestLog(
+                "Test Failure at setup:" + setupName + " command:" + commandName + tojson(resultsForSetup[commandName]),
+            );
         }
     }
     return singleCommandCombinedResult;
@@ -1103,7 +1090,8 @@ function checkResults(resultmap) {
         if (currentResult.absent) {
             summaryResultsCount.absentCount++;
             jsTestLog(
-                "Command ${commandName} did not get tested. This may be because a feature flag is not enabled, or this command does not exist in mongod and mongos.");
+                "Command ${commandName} did not get tested. This may be because a feature flag is not enabled, or this command does not exist in mongod and mongos.",
+            );
         } else if (currentResult.pass === true) {
             summaryResultsCount.passCount++;
         } else {
@@ -1111,9 +1099,15 @@ function checkResults(resultmap) {
             summaryResultsCount.failCount++;
         }
     }
-    jsTest.log("Result: tests passed " + summaryResultsCount.passCount +
-               ". Failed Commands Count: " + summaryResultsCount.failCount +
-               ". Absent Commands Count: " + summaryResultsCount.absentCount + ".");
+    jsTest.log(
+        "Result: tests passed " +
+            summaryResultsCount.passCount +
+            ". Failed Commands Count: " +
+            summaryResultsCount.failCount +
+            ". Absent Commands Count: " +
+            summaryResultsCount.absentCount +
+            ".",
+    );
     assert.eq(0, summaryResultsCount.failCount);
 }
 

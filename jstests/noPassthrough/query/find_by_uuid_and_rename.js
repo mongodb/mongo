@@ -15,24 +15,25 @@ jsTestLog("Create collection.");
 let findRenameDB = conn.getDB(dbName);
 findRenameDB.dropDatabase();
 assert.commandWorked(findRenameDB.runCommand({"create": collName}));
-assert.commandWorked(findRenameDB.runCommand({insert: collName, documents: [{fooField: 'FOO'}]}));
+assert.commandWorked(findRenameDB.runCommand({insert: collName, documents: [{fooField: "FOO"}]}));
 
 let infos = findRenameDB.getCollectionInfos();
 let uuid = infos[0].info.uuid;
 const findCmd = {
-    "find": uuid
+    "find": uuid,
 };
 
 // Assert 'find' command by UUID works.
 assert.commandWorked(findRenameDB.runCommand(findCmd));
 
 jsTestLog("Start parallel shell for renames.");
-let renameShell =
-    startParallelShell(funWithArgs(doRenames, dbName, collName, otherName), conn.port);
+let renameShell = startParallelShell(funWithArgs(doRenames, dbName, collName, otherName), conn.port);
 
 // Wait until we receive confirmation that the parallel shell has started.
-assert.soon(() => conn.getDB("test").await_data.findOne({_id: "signal parent shell"}) !== null,
-            "Expected parallel shell to insert a document.");
+assert.soon(
+    () => conn.getDB("test").await_data.findOne({_id: "signal parent shell"}) !== null,
+    "Expected parallel shell to insert a document.",
+);
 
 jsTestLog("Start 'find' commands.");
 while (conn.getDB("test").await_data.findOne({_id: "rename has ended"}) == null) {
@@ -46,8 +47,7 @@ while (conn.getDB("test").await_data.findOne({_id: "rename has ended"}) == null)
         }
         assert.commandWorked(res, "could not run " + tojson(findCmd));
         let cursor = new DBCommandCursor(findRenameDB, res);
-        let errMsg =
-            "expected more data from command " + tojson(findCmd) + ", with result " + tojson(res);
+        let errMsg = "expected more data from command " + tojson(findCmd) + ", with result " + tojson(res);
         assert(cursor.hasNext(), errMsg);
         let doc = cursor.next();
         assert.eq(doc.fooField, "FOO");

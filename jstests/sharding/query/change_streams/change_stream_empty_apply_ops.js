@@ -8,9 +8,7 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -19,25 +17,26 @@ const namespace = dbName + "." + collName;
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const mongosConn = st.s;
 const db = mongosConn.getDB(dbName);
 const coll = db.getCollection(collName);
 
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(coll.createIndex({shard: 1}));
 // Shard the test collection and split it into two chunks: one that contains all {shard: 1}
 // documents and one that contains all {shard: 2} documents.
-st.shardColl(collName,
-             {shard: 1} /* shard key */,
-             {shard: 2} /* split at */,
-             {shard: 2} /* move the chunk containing {shard: 2} to its own shard */,
-             dbName,
-             true);
+st.shardColl(
+    collName,
+    {shard: 1} /* shard key */,
+    {shard: 2} /* split at */,
+    {shard: 2} /* move the chunk containing {shard: 2} to its own shard */,
+    dbName,
+    true,
+);
 // Seed each chunk with an initial document.
 assert.commandWorked(coll.insert({shard: 1}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(coll.insert({shard: 2}, {writeConcern: {w: "majority"}}));
@@ -67,8 +66,7 @@ withAbortAndRetryOnTransientTxnError(session, () => {
 });
 
 // Each change stream should see exactly one update, resulting from the valid write on shard 2.
-[changeStreamCursorColl, changeStreamCursorDB, changeStreamCursorCluster].forEach(function(
-    changeStreamCursor) {
+[changeStreamCursorColl, changeStreamCursorDB, changeStreamCursorCluster].forEach(function (changeStreamCursor) {
     assert.soon(() => changeStreamCursor.hasNext());
     const changeDoc = changeStreamCursor.next();
     assert.eq(changeDoc.documentKey.shard, 2);

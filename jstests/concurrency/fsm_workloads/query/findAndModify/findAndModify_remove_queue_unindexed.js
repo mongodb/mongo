@@ -17,11 +17,9 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_remove_queue.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_remove_queue.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Use the workload name as the database name, since the workload
     // name is assumed to be unique.
     $config.data.uniqueDBName = jsTestName();

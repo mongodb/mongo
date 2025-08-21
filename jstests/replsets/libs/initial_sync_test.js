@@ -25,27 +25,26 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
  * @param {Object} [replSet] the ReplSetTest instance to adopt
  * @param {int} [timeout] how long to wait for initial sync to start
  */
-export function InitialSyncTest(
-    name = "InitialSyncTest", replSet, timeout, replBatchLimitBytes = 100 * 1024 * 1024) {
+export function InitialSyncTest(name = "InitialSyncTest", replSet, timeout, replBatchLimitBytes = 100 * 1024 * 1024) {
     this.replBatchLimitBytes = replBatchLimitBytes;
     const State = {
         kBeforeInitialSync: "kBeforeInitialSync",
         kDuringInitialSync: "kDuringInitialSync",
         kInitialSyncCompleted: "kInitialSyncCompleted",
-        kStopped: "kStopped"
+        kStopped: "kStopped",
     };
 
     const AcceptableTransitions = {
         [State.kBeforeInitialSync]: [State.kDuringInitialSync],
         [State.kDuringInitialSync]: [State.kInitialSyncCompleted],
         [State.kInitialSyncCompleted]: [State.kStopped],
-        [State.kStopped]: []
+        [State.kStopped]: [],
     };
 
     let currState = State.kBeforeInitialSync;
 
     // Make sure we have a replica set up and running.
-    replSet = (replSet === undefined) ? performSetup() : replSet;
+    replSet = replSet === undefined ? performSetup() : replSet;
 
     assert.eq(2, replSet.nodes.length, "Replica set must contain exactly two nodes.");
 
@@ -72,7 +71,7 @@ export function InitialSyncTest(
         let replSet = new ReplSetTest({
             name: name,
             nodes: [{}, {rsConfig: {priority: 0, votes: 0}}],
-            nodeOptions: nodeOptions
+            nodeOptions: nodeOptions,
         });
         replSet.startSet();
         replSet.initiate();
@@ -101,12 +100,13 @@ export function InitialSyncTest(
     function isNodeInState(node, state) {
         // We suppress the initialSync field here, because initial sync is paused while holding the
         // mutex needed to report initial sync progress.
-        return state ===
-            assert
-                .commandWorkedOrFailedWithCode(
-                    node.adminCommand({replSetGetStatus: 1, initialSync: 0}),
-                    ErrorCodes.NotYetInitialized)
-                .myState;
+        return (
+            state ===
+            assert.commandWorkedOrFailedWithCode(
+                node.adminCommand({replSetGetStatus: 1, initialSync: 0}),
+                ErrorCodes.NotYetInitialized,
+            ).myState
+        );
     }
 
     function hasStartedInitialSync() {
@@ -116,9 +116,11 @@ export function InitialSyncTest(
 
     function hasCompletedInitialSync() {
         // Make sure this isn't called before the secondary starts initial sync.
-        assert.eq(currState,
-                  State.kDuringInitialSync,
-                  "Should not check if initial sync completed before node is restarted");
+        assert.eq(
+            currState,
+            State.kDuringInitialSync,
+            "Should not check if initial sync completed before node is restarted",
+        );
 
         // We know initial sync has completed if the node has transitioned to SECONDARY state.
         return isNodeInState(secondary, ReplSetTest.State.SECONDARY);
@@ -128,7 +130,7 @@ export function InitialSyncTest(
      * Asserts that there are no open transactions.
      */
     function assertNoOpenTxns() {
-        const status = assert.commandWorked(primary.adminCommand('serverStatus'));
+        const status = assert.commandWorked(primary.adminCommand("serverStatus"));
         assert(typeof status.transactions === "object", status);
         assert.eq(0, status.transactions.currentOpen, status.transactions);
     }
@@ -144,14 +146,13 @@ export function InitialSyncTest(
         const nodeOptions = {
             startClean: true,
             setParameter: {
-                'failpoint.initialSyncFuzzerSynchronizationPoint1': tojson({mode: 'alwaysOn'}),
-                'replBatchLimitBytes': replBatchLimitBytes,
+                "failpoint.initialSyncFuzzerSynchronizationPoint1": tojson({mode: "alwaysOn"}),
+                "replBatchLimitBytes": replBatchLimitBytes,
             },
         };
 
         if (TestData.logComponentVerbosity) {
-            nodeOptions.setParameter.logComponentVerbosity =
-                tojsononeline(TestData.logComponentVerbosity);
+            nodeOptions.setParameter.logComponentVerbosity = tojsononeline(TestData.logComponentVerbosity);
         }
 
         // Restart the node with the first synchronization failpoint enabled so that initial sync
@@ -164,9 +165,8 @@ export function InitialSyncTest(
      * or until initial sync has completed.
      */
     function waitUntilInitialSyncPausedOrCompleted() {
-        assert.soon(function() {
-            if (checkLog.checkContainsOnce(
-                    secondary, "initialSyncFuzzerSynchronizationPoint1 fail point enabled")) {
+        assert.soon(function () {
+            if (checkLog.checkContainsOnce(secondary, "initialSyncFuzzerSynchronizationPoint1 fail point enabled")) {
                 return true;
             }
             return hasCompletedInitialSync();
@@ -180,10 +180,15 @@ export function InitialSyncTest(
      * failpoint again.
      */
     function pauseBeforeSyncSourceCommand() {
-        assert.commandWorked(secondary.adminCommand(
-            {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint2', "mode": 'alwaysOn'}));
-        assert.commandWorked(secondary.adminCommand(
-            {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint1', "mode": 'off'}));
+        assert.commandWorked(
+            secondary.adminCommand({
+                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint2",
+                "mode": "alwaysOn",
+            }),
+        );
+        assert.commandWorked(
+            secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint1", "mode": "off"}),
+        );
         checkLog.contains(secondary, "initialSyncFuzzerSynchronizationPoint2 fail point enabled");
     }
 
@@ -193,10 +198,15 @@ export function InitialSyncTest(
      * can be issued.
      */
     function resumeAndPauseBeforeNextSyncSourceCommand() {
-        assert.commandWorked(secondary.adminCommand(
-            {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint1', "mode": 'alwaysOn'}));
-        assert.commandWorked(secondary.adminCommand(
-            {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint2', "mode": 'off'}));
+        assert.commandWorked(
+            secondary.adminCommand({
+                "configureFailPoint": "initialSyncFuzzerSynchronizationPoint1",
+                "mode": "alwaysOn",
+            }),
+        );
+        assert.commandWorked(
+            secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint2", "mode": "off"}),
+        );
 
         waitUntilInitialSyncPausedOrCompleted();
     }
@@ -218,7 +228,7 @@ export function InitialSyncTest(
      *
      * @return true if initial sync has completed
      */
-    this.step = function() {
+    this.step = function () {
         // If initial sync has not started yet, restart the node without data to cause it to go
         // through initial sync.
         if (currState === State.kBeforeInitialSync) {
@@ -228,8 +238,7 @@ export function InitialSyncTest(
             assert.soon(hasStartedInitialSync, "failed to start initial sync", initialSyncTimeout);
             transitionIfAllowed(State.kDuringInitialSync);
 
-            checkLog.contains(secondary,
-                              "initialSyncFuzzerSynchronizationPoint1 fail point enabled");
+            checkLog.contains(secondary, "initialSyncFuzzerSynchronizationPoint1 fail point enabled");
 
             return false;
         }
@@ -237,49 +246,50 @@ export function InitialSyncTest(
         // Make sure this wasn't called after the test fixture was stopped or this function already
         // returned that initial sync was completed.
         assert.neq(currState, State.kStopped, "Cannot call step() if the test fixture was stopped");
-        assert.neq(currState,
-                   State.kInitialSyncCompleted,
-                   "Cannot call step() if initial sync already completed");
+        assert.neq(currState, State.kInitialSyncCompleted, "Cannot call step() if initial sync already completed");
 
         pauseBeforeSyncSourceCommand();
 
         // Clear ramlog so checkLog can't find log messages from previous times either failpoint was
         // enabled.
-        assert.commandWorked(secondary.adminCommand({clearLog: 'global'}));
+        assert.commandWorked(secondary.adminCommand({clearLog: "global"}));
 
         resumeAndPauseBeforeNextSyncSourceCommand();
 
         // If initial sync is completed, let the caller know.
         if (hasCompletedInitialSync()) {
             transitionIfAllowed(State.kInitialSyncCompleted);
-            assert.commandWorked(secondary.adminCommand(
-                {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint1', "mode": 'off'}));
+            assert.commandWorked(
+                secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint1", "mode": "off"}),
+            );
             return true;
         }
 
         return false;
     };
 
-    this.getPrimary = function() {
+    this.getPrimary = function () {
         return primary;
     };
 
-    this.getSecondary = function() {
+    this.getSecondary = function () {
         return secondary;
     };
 
-    this.fail = function() {
-        assert.commandWorked(secondary.adminCommand(
-            {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint1', "mode": 'off'}));
-        assert.commandWorked(secondary.adminCommand(
-            {"configureFailPoint": 'initialSyncFuzzerSynchronizationPoint2', "mode": 'off'}));
+    this.fail = function () {
+        assert.commandWorked(
+            secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint1", "mode": "off"}),
+        );
+        assert.commandWorked(
+            secondary.adminCommand({"configureFailPoint": "initialSyncFuzzerSynchronizationPoint2", "mode": "off"}),
+        );
     };
 
     /**
      * Performs data consistency checks and then stops the replica set. Will fail if there is a
      * transaction that wasn't aborted or committed.
      */
-    this.stop = function() {
+    this.stop = function () {
         transitionIfAllowed(State.kStopped);
         assertNoOpenTxns();
         return replSet.stopSet();

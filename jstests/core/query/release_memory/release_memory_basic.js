@@ -67,7 +67,7 @@ db.dropDatabase();
 const coll = db[jsTestName()];
 setupCollection(coll);
 
-const createInactiveCursor = function(coll) {
+const createInactiveCursor = function (coll) {
     const findCmd = {find: coll.getName(), filter: {}, sort: {index: 1}, batchSize: 1};
     jsTest.log.info("Running findCmd: ", findCmd);
     const cmdRes = coll.getDB().runCommand(findCmd);
@@ -80,22 +80,25 @@ const createInactiveCursor = function(coll) {
     const cursorNotFoundId = NumberLong("123");
 
     const session = db.getMongo().startSession();
-    const cursorCurrentlyPinnedId =
-        createInactiveCursor(session.getDatabase(db.getName())[jsTestName()]);
+    const cursorCurrentlyPinnedId = createInactiveCursor(session.getDatabase(db.getName())[jsTestName()]);
     const getMoreFailpoint = configureFailPoint(db, "getMoreHangAfterPinCursor");
 
-    const joinGetMore = startParallelShell(funWithArgs(assertGetMore,
-                                                       cursorCurrentlyPinnedId,
-                                                       coll.getName(),
-                                                       session.getSessionId(),
-                                                       session.getTxnNumber_forTesting(),
-                                                       1 /*times*/));
+    const joinGetMore = startParallelShell(
+        funWithArgs(
+            assertGetMore,
+            cursorCurrentlyPinnedId,
+            coll.getName(),
+            session.getSessionId(),
+            session.getTxnNumber_forTesting(),
+            1 /*times*/,
+        ),
+    );
 
     getMoreFailpoint.wait();
     waitForLog({id: 20477, cursorId: cursorCurrentlyPinnedId});
 
     const releaseMemoryCmd = {
-        releaseMemory: [cursorToReleaseId, cursorNotFoundId, cursorCurrentlyPinnedId]
+        releaseMemory: [cursorToReleaseId, cursorNotFoundId, cursorCurrentlyPinnedId],
     };
     jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);

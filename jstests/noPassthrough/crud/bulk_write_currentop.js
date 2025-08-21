@@ -23,26 +23,30 @@ function runTest(conn) {
     // We fsync+lock the server to cause all subsequent write operations to block.
     assert.commandWorked(conn.getDB("test").fsyncLock());
 
-    const parallelShell = startParallelShell(function() {
-        const res = assert.commandWorked(db.adminCommand({
-            bulkWrite: 1,
-            ops: [
-                {insert: 0, document: {x: 1}},
-                {insert: 0, document: {x: 2}},
-                {insert: 0, document: {x: 3}},
-            ],
-            nsInfo: [{ns: "test.bulkWrite_currentop"}]
-        }));
+    const parallelShell = startParallelShell(function () {
+        const res = assert.commandWorked(
+            db.adminCommand({
+                bulkWrite: 1,
+                ops: [
+                    {insert: 0, document: {x: 1}},
+                    {insert: 0, document: {x: 2}},
+                    {insert: 0, document: {x: 3}},
+                ],
+                nsInfo: [{ns: "test.bulkWrite_currentop"}],
+            }),
+        );
         assert.commandWorked(res);
     }, conn.port);
 
     jsTestLog("Checking $currentOp in aggregate");
 
-    assert.soon(function() {
-        return conn.getDB("admin")
-                   .aggregate([{$currentOp: {localOps: true}}, {$match: {op: "bulkWrite"}}])
-                   .toArray()
-                   .length == 1;
+    assert.soon(function () {
+        return (
+            conn
+                .getDB("admin")
+                .aggregate([{$currentOp: {localOps: true}}, {$match: {op: "bulkWrite"}}])
+                .toArray().length == 1
+        );
     }, "currentOp did not find bulkWrite");
 
     assert.commandWorked(db.fsyncUnlock());

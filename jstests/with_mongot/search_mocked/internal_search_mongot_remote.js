@@ -6,7 +6,7 @@ import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mongotCommandForQuery,
     MongotMock,
-    mongotResponseForBatch
+    mongotResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 const dbName = "test";
@@ -39,11 +39,17 @@ coll.insert({_id: 0});
     const responseOk = 1;
     const expectedDocs = [{_id: 0}];
 
-    const history = [{
-        expectedCommand: mongotCommandForQuery(
-            {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
 }
@@ -57,11 +63,17 @@ coll.insert({_id: 0});
     const responseOk = 1;
     const expectedDocs = [{_id: 0, score: 1.234}];
 
-    const history = [{
-        expectedCommand: mongotCommandForQuery(
-            {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
 }
@@ -71,17 +83,22 @@ coll.insert({_id: 0});
     const mongotQuery = {scoreDetails: true};
     const cursorId = NumberLong(123);
     const searchScoreDetails = {value: 1.234, description: "great score", details: []};
-    const pipeline =
-        [{$search: mongotQuery}, {$project: {_id: 1, scoreInfo: {$meta: "searchScoreDetails"}}}];
+    const pipeline = [{$search: mongotQuery}, {$project: {_id: 1, scoreInfo: {$meta: "searchScoreDetails"}}}];
     const mongotResponseBatch = [{_id: 0, $searchScoreDetails: searchScoreDetails}];
     const responseOk = 1;
     const expectedDocs = [{_id: 0, scoreInfo: searchScoreDetails}];
 
-    const history = [{
-        expectedCommand: mongotCommandForQuery(
-            {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
 }
@@ -90,16 +107,21 @@ coll.insert({_id: 0});
 {
     const mongotQuery = {scoreDetails: true};
     const cursorId = NumberLong(123);
-    const pipeline =
-        [{$search: mongotQuery}, {$project: {_id: 1, scoreInfo: {$meta: "searchScoreDetails"}}}];
+    const pipeline = [{$search: mongotQuery}, {$project: {_id: 1, scoreInfo: {$meta: "searchScoreDetails"}}}];
     const mongotResponseBatch = [{_id: 0, $searchScoreDetails: "great score"}];
     const responseOk = 1;
 
-    const history = [{
-        expectedCommand: mongotCommandForQuery(
-            {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
     const res = assert.throws(() => testDB[collName].aggregate(pipeline));
 
@@ -118,8 +140,14 @@ coll.insert({_id: 20});
     const cursorId = NumberLong(123);
     const pipeline = [{$search: mongotQuery}, {$project: {_id: 1, score: {$meta: "searchScore"}}}];
 
-    const batchOne = [{_id: 0, $searchScore: 1.234}, {_id: 1, $searchScore: 1.21}];
-    const batchTwo = [{_id: 10, $searchScore: 1.1}, {_id: 11, $searchScore: 0.8}];
+    const batchOne = [
+        {_id: 0, $searchScore: 1.234},
+        {_id: 1, $searchScore: 1.21},
+    ];
+    const batchTwo = [
+        {_id: 10, $searchScore: 1.1},
+        {_id: 11, $searchScore: 0.8},
+    ];
     const batchThree = [{_id: 20, $searchScore: 0.2}];
     const expectedDocs = [
         {_id: 0, score: 1.234},
@@ -131,8 +159,12 @@ coll.insert({_id: 20});
 
     const history = [
         {
-            expectedCommand: mongotCommandForQuery(
-                {query: mongotQuery, collName: collName, db: dbName, collectionUUID: collUUID}),
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: collName,
+                db: dbName,
+                collectionUUID: collUUID,
+            }),
             response: mongotResponseForBatch(batchOne, cursorId, collNS, 1),
         },
         {
@@ -142,11 +174,10 @@ coll.insert({_id: 20});
         {
             expectedCommand: {getMore: cursorId, collection: collName},
             response: mongotResponseForBatch(batchThree, NumberLong(0), collNS, 1),
-        }
+        },
     ];
     mongotMock.setMockResponses(history, cursorId);
-    assert.eq(testDB[collName].aggregate(pipeline, {cursor: {batchSize: 2}}).toArray(),
-              expectedDocs);
+    assert.eq(testDB[collName].aggregate(pipeline, {cursor: {batchSize: 2}}).toArray(), expectedDocs);
 }
 
 mongotMock.stop();

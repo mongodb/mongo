@@ -19,16 +19,20 @@ const slowPublishColl = "coll";
 // List database should reflect an implicitly created database that has been committed but not
 // published into the local catalog yet. Use a failpoint to hang before publishing the catalog,
 // simulating a slow catalog publish.
-const failPoint = configureFailPoint(mongod,
-                                     "hangBeforePublishingCatalogUpdates",
-                                     {collectionNS: slowPublishDb + '.' + slowPublishColl});
-const waitDbCreate = startParallelShell(`{
+const failPoint = configureFailPoint(mongod, "hangBeforePublishingCatalogUpdates", {
+    collectionNS: slowPublishDb + "." + slowPublishColl,
+});
+const waitDbCreate = startParallelShell(
+    `{
     db.getSiblingDB('${slowPublishDb}')['${slowPublishColl}'].createIndex({a:1});
-}`, mongod.port);
+}`,
+    mongod.port,
+);
 failPoint.wait();
 
 let cmdRes = assert.commandWorked(
-    mongod.adminCommand({listDatabases: 1, filter: {$expr: {$eq: ["$name", slowPublishDb]}}}));
+    mongod.adminCommand({listDatabases: 1, filter: {$expr: {$eq: ["$name", slowPublishDb]}}}),
+);
 assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
 assert.eq(slowPublishDb, cmdRes.databases[0].name, tojson(cmdRes));
 

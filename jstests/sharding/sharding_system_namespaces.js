@@ -20,32 +20,31 @@ if (Array.contains(storageEngines, "wiredTiger")) {
     function checkCollectionOptions(database) {
         var collectionsInfos = database.getCollectionInfos();
         printjson(collectionsInfos);
-        var info = collectionsInfos.filter(function(c) {
+        var info = collectionsInfos.filter(function (c) {
             return c.name == "sharding_system_namespaces";
         })[0];
         assert.eq(info.options.storageEngine.wiredTiger.configString, "block_compressor=zlib");
     }
 
-    assert.commandWorked(
-        db.adminCommand({enableSharding: 'test', primaryShard: st.shard1.shardName}));
-    db.createCollection("sharding_system_namespaces",
-                        {storageEngine: {wiredTiger: {configString: "block_compressor=zlib"}}});
+    assert.commandWorked(db.adminCommand({enableSharding: "test", primaryShard: st.shard1.shardName}));
+    db.createCollection("sharding_system_namespaces", {
+        storageEngine: {wiredTiger: {configString: "block_compressor=zlib"}},
+    });
 
     checkCollectionOptions(db);
 
-    assert.commandWorked(db.adminCommand({shardCollection: coll + '', key: {x: 1}}));
+    assert.commandWorked(db.adminCommand({shardCollection: coll + "", key: {x: 1}}));
 
     coll.insert({x: 0});
     coll.insert({x: 10});
 
-    assert.commandWorked(db.adminCommand({split: coll + '', middle: {x: 5}}));
+    assert.commandWorked(db.adminCommand({split: coll + "", middle: {x: 5}}));
 
     st.printShardingStatus();
 
     var primaryShard = st.getPrimaryShard("test");
     let anotherShard = st.getOther(primaryShard);
-    assert.commandWorked(
-        db.adminCommand({movechunk: coll + '', find: {x: 5}, to: anotherShard.name}));
+    assert.commandWorked(db.adminCommand({movechunk: coll + "", find: {x: 5}, to: anotherShard.name}));
 
     st.printShardingStatus();
 

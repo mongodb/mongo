@@ -5,11 +5,10 @@ export function getPython3Binary() {
     // or else we will pick up a python that is not in our venv
     clearRawMongoProgramOutput();
     assert.eq(runNonMongoProgram("python", "--version"), 0);
-    const pythonVersion = rawMongoProgramOutput("Python");  // Will look like "Python 3.10.4\n"
+    const pythonVersion = rawMongoProgramOutput("Python"); // Will look like "Python 3.10.4\n"
     const usingPython310 = /Python 3\.10/.exec(pythonVersion);
     if (usingPython310) {
-        jsTest.log.info(
-            "Found python 3.10 by default. Likely this is because we are using a virtual enviorment.");
+        jsTest.log.info("Found python 3.10 by default. Likely this is because we are using a virtual enviorment.");
         return "python";
     }
 
@@ -17,7 +16,7 @@ export function getPython3Binary() {
         "/opt/mongodbtoolchain/v5/bin/python3",
         "/opt/mongodbtoolchain/v4/bin/python3",
         "/cygdrive/c/python/python310/python.exe",
-        "c:/python/python310/python.exe"
+        "c:/python/python310/python.exe",
     ];
     for (let p of paths) {
         if (fileExists(p)) {

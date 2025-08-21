@@ -32,51 +32,55 @@ assert.eq(1, result.key);
 let serverStatusBeforeTest = testDB.serverStatus();
 
 // Verify that the metrics.commands.findAndModify.pipeline counter is present.
-assert.gte(serverStatusBeforeTest.metrics.commands.findAndModify.pipeline,
-           0,
-           tojson(serverStatusBeforeTest));
+assert.gte(serverStatusBeforeTest.metrics.commands.findAndModify.pipeline, 0, tojson(serverStatusBeforeTest));
 
 // Verify that that findAndModify command without aggregation pipeline-style update does not
 // increment the counter.
 result = coll.findAndModify({query: {key: 1}, update: {$set: {value: 5}}});
 assert.eq(1, result.key);
 let serverStatusAfterTest = testDB.serverStatus();
-assert.eq(serverStatusBeforeTest.metrics.commands.findAndModify.pipeline,
-          serverStatusAfterTest.metrics.commands.findAndModify.pipeline,
-          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+assert.eq(
+    serverStatusBeforeTest.metrics.commands.findAndModify.pipeline,
+    serverStatusAfterTest.metrics.commands.findAndModify.pipeline,
+    `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`,
+);
 
 // Verify that that findAndModify command with aggregation pipeline-style update increments the
 // counter.
 result = coll.findAndModify({query: {key: 1}, update: [{$set: {value: 10}}]});
 assert.eq(1, result.key);
 serverStatusAfterTest = testDB.serverStatus();
-assert.eq(serverStatusBeforeTest.metrics.commands.findAndModify.pipeline + 1,
-          serverStatusAfterTest.metrics.commands.findAndModify.pipeline,
-          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+assert.eq(
+    serverStatusBeforeTest.metrics.commands.findAndModify.pipeline + 1,
+    serverStatusAfterTest.metrics.commands.findAndModify.pipeline,
+    `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`,
+);
 
 serverStatusBeforeTest = testDB.serverStatus();
 
 // Verify that the metrics.commands.findAndModify.arrayFilters counter is present.
-assert.gte(serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters,
-           0,
-           tojson(serverStatusBeforeTest));
+assert.gte(serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters, 0, tojson(serverStatusBeforeTest));
 
 // Verify that that findAndModify command without arrayFilters does not increment the counter.
 result = coll.findAndModify({query: {key: 1}, update: {$set: {value: 5}}});
 assert.eq(1, result.key);
 serverStatusAfterTest = testDB.serverStatus();
-assert.eq(serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters,
-          serverStatusAfterTest.metrics.commands.findAndModify.arrayFilters,
-          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+assert.eq(
+    serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters,
+    serverStatusAfterTest.metrics.commands.findAndModify.arrayFilters,
+    `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`,
+);
 
 // Verify that that findAndModify command with arrayFilters increments the counter.
 result = coll.findAndModify({
     query: {key: 1},
     update: {$set: {"array.$[element]": 20}},
-    arrayFilters: [{"element": {$gt: 6}}]
+    arrayFilters: [{"element": {$gt: 6}}],
 });
 assert.eq(1, result.key);
 serverStatusAfterTest = testDB.serverStatus();
-assert.eq(serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters + 1,
-          serverStatusAfterTest.metrics.commands.findAndModify.arrayFilters,
-          `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
+assert.eq(
+    serverStatusBeforeTest.metrics.commands.findAndModify.arrayFilters + 1,
+    serverStatusAfterTest.metrics.commands.findAndModify.arrayFilters,
+    `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`,
+);

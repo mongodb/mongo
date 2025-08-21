@@ -12,25 +12,25 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({name: jsTestName(), keyFile: "jstests/libs/key1", shards: 1});
 
-const dbName = 'test';
-const collName = 'foo';
+const dbName = "test";
+const collName = "foo";
 
 const shardConn = st.rs0.getPrimary();
 const shardAdminDB = shardConn.getDB("admin");
 
 // Set up connections, userTestDB will be the connection performing the direct reads and writes.
 // Give the admin user __system privileges to allow running _flushRoutingTableCacheUpdates.
-shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root", "__system"]});
-assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
+shardAdminDB.createUser({user: "admin", pwd: "x", roles: ["root", "__system"]});
+assert(shardAdminDB.auth("admin", "x"), "Authentication failed");
 shardAdminDB.getSiblingDB(dbName).createUser({user: "user", pwd: "y", roles: ["readWrite"]});
 
 // Set up shard to be added and mongoS connection to add the shard through.
 var newShard = new ReplSetTest({name: "additionalShard", nodes: 1});
 newShard.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
 newShard.initiate();
-let mongosAdminUser = st.s.getDB('admin');
+let mongosAdminUser = st.s.getDB("admin");
 if (!TestData.configShard) {
-    mongosAdminUser.createUser({user: "globalAdmin", pwd: 'a', roles: ["root"]});
+    mongosAdminUser.createUser({user: "globalAdmin", pwd: "a", roles: ["root"]});
     assert(mongosAdminUser.auth("globalAdmin", "a"), "Authentication failed");
 } else {
     assert(mongosAdminUser.auth("admin", "x"), "Authentication failed");
@@ -47,7 +47,8 @@ function runInsertViaDirectConnection(hostName, dbName, collName) {
         const cmdStartTimeMs = Date.now();
         assert.commandWorkedOrFailedWithCode(
             userTestDB.runCommand({insert: collName, documents: [{_id: counter++}]}),
-            ErrorCodes.Unauthorized);
+            ErrorCodes.Unauthorized,
+        );
         const cmdEndTimeMs = Date.now();
         sleep(Math.max(0, 100 - (cmdEndTimeMs - cmdStartTimeMs)));
     }
@@ -57,8 +58,7 @@ function runInsertViaDirectConnection(hostName, dbName, collName) {
 assert.commandWorked(mongosAdminUser.getSiblingDB(dbName).runCommand({create: collName}));
 
 // Trigger a refresh to ensure the filtering information is known
-assert.commandWorked(
-    shardAdminDB.runCommand({_flushRoutingTableCacheUpdates: dbName + '.' + collName}));
+assert.commandWorked(shardAdminDB.runCommand({_flushRoutingTableCacheUpdates: dbName + "." + collName}));
 
 // Begin the insertion thread via a direct connection.
 const insertThread = new Thread(runInsertViaDirectConnection, st.shard0.host, dbName, collName);
@@ -68,8 +68,7 @@ insertThread.start();
 // Moving the collection ensures that checkmetadataconsistency will fail if the inserts continue
 // executing.
 assert.commandWorked(mongosAdminUser.runCommand({addShard: newShard.getURL()}));
-assert.commandWorked(
-    mongosAdminUser.runCommand({moveCollection: dbName + '.' + collName, toShard: newShard.name}));
+assert.commandWorked(mongosAdminUser.runCommand({moveCollection: dbName + "." + collName, toShard: newShard.name}));
 
 insertThread.join();
 

@@ -8,11 +8,11 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 async function transactionFn(isPrepared) {
-    const collName = 'currentop_active_transaction';
+    const collName = "currentop_active_transaction";
     const session = db.getMongo().startSession({causalConsistency: false});
-    const sessionDB = session.getDatabase('test');
+    const sessionDB = session.getDatabase("test");
 
-    session.startTransaction({readConcern: {level: 'snapshot'}});
+    session.startTransaction({readConcern: {level: "snapshot"}});
     sessionDB[collName].update({}, {x: 2});
     if (isPrepared) {
         // Load the prepare helpers to be called in the parallel shell.
@@ -24,67 +24,106 @@ async function transactionFn(isPrepared) {
     }
 }
 
-function checkCurrentOpFields(currentOp,
-                              isPrepared,
-                              operationTime,
-                              timeBeforeTransactionStarts,
-                              timeAfterTransactionStarts,
-                              timeBeforeCurrentOp) {
+function checkCurrentOpFields(
+    currentOp,
+    isPrepared,
+    operationTime,
+    timeBeforeTransactionStarts,
+    timeAfterTransactionStarts,
+    timeBeforeCurrentOp,
+) {
     const transactionDocument = currentOp[0].transaction;
-    assert.eq(transactionDocument.parameters.txnNumber,
-              NumberLong(0),
-              "Expected 'txnNumber' to be NumberLong(0) but got " +
-                  transactionDocument.parameters.txnRetryCounter +
-                  " instead: " + tojson(transactionDocument));
-    assert.eq(transactionDocument.parameters.txnRetryCounter,
-              0,
-              "Expected 'txnRetryCounter' to be 0 but got " +
-                  transactionDocument.parameters.txnRetryCounter +
-                  " instead: " + tojson(transactionDocument));
-    assert.eq(transactionDocument.parameters.autocommit,
-              false,
-              "Expected 'autocommit' to be false but got " +
-                  transactionDocument.parameters.autocommit +
-                  " instead: " + tojson(transactionDocument));
-    assert.eq(transactionDocument.parameters.readConcern.level,
-              'snapshot',
-              "Expected 'readConcern' level to be snapshot but got " +
-                  tojson(transactionDocument.parameters.readConcern) +
-                  " instead: " + tojson(transactionDocument));
-    assert.gte(transactionDocument.readTimestamp,
-               operationTime,
-               "Expected 'readTimestamp' to be at least " + tojson(operationTime) + " but got " +
-                   tojson(transactionDocument.readTimestamp) +
-                   " instead: " + tojson(transactionDocument));
-    assert.gte(ISODate(transactionDocument.startWallClockTime),
-               timeBeforeTransactionStarts,
-               "Expected 'startWallClockTime' to be at least" +
-                   tojson(timeBeforeTransactionStarts) + " but got " +
-                   transactionDocument.startWallClockTime +
-                   " instead: " + tojson(transactionDocument));
+    assert.eq(
+        transactionDocument.parameters.txnNumber,
+        NumberLong(0),
+        "Expected 'txnNumber' to be NumberLong(0) but got " +
+            transactionDocument.parameters.txnRetryCounter +
+            " instead: " +
+            tojson(transactionDocument),
+    );
+    assert.eq(
+        transactionDocument.parameters.txnRetryCounter,
+        0,
+        "Expected 'txnRetryCounter' to be 0 but got " +
+            transactionDocument.parameters.txnRetryCounter +
+            " instead: " +
+            tojson(transactionDocument),
+    );
+    assert.eq(
+        transactionDocument.parameters.autocommit,
+        false,
+        "Expected 'autocommit' to be false but got " +
+            transactionDocument.parameters.autocommit +
+            " instead: " +
+            tojson(transactionDocument),
+    );
+    assert.eq(
+        transactionDocument.parameters.readConcern.level,
+        "snapshot",
+        "Expected 'readConcern' level to be snapshot but got " +
+            tojson(transactionDocument.parameters.readConcern) +
+            " instead: " +
+            tojson(transactionDocument),
+    );
+    assert.gte(
+        transactionDocument.readTimestamp,
+        operationTime,
+        "Expected 'readTimestamp' to be at least " +
+            tojson(operationTime) +
+            " but got " +
+            tojson(transactionDocument.readTimestamp) +
+            " instead: " +
+            tojson(transactionDocument),
+    );
+    assert.gte(
+        ISODate(transactionDocument.startWallClockTime),
+        timeBeforeTransactionStarts,
+        "Expected 'startWallClockTime' to be at least" +
+            tojson(timeBeforeTransactionStarts) +
+            " but got " +
+            transactionDocument.startWallClockTime +
+            " instead: " +
+            tojson(transactionDocument),
+    );
     const expectedTimeOpen = (timeBeforeCurrentOp - timeAfterTransactionStarts) * 1000;
-    assert.gt(transactionDocument.timeOpenMicros,
-              expectedTimeOpen,
-              "Expected 'timeOpenMicros' to be at least" + expectedTimeOpen + " but got " +
-                  transactionDocument.timeOpenMicros + " instead: " + tojson(transactionDocument));
-    assert.gte(transactionDocument.timeActiveMicros,
-               0,
-               "Expected 'timeActiveMicros' to be at least 0: " + tojson(transactionDocument));
-    assert.gte(transactionDocument.timeInactiveMicros,
-               0,
-               "Expected 'timeInactiveMicros' to be at least 0: " + tojson(transactionDocument));
+    assert.gt(
+        transactionDocument.timeOpenMicros,
+        expectedTimeOpen,
+        "Expected 'timeOpenMicros' to be at least" +
+            expectedTimeOpen +
+            " but got " +
+            transactionDocument.timeOpenMicros +
+            " instead: " +
+            tojson(transactionDocument),
+    );
+    assert.gte(
+        transactionDocument.timeActiveMicros,
+        0,
+        "Expected 'timeActiveMicros' to be at least 0: " + tojson(transactionDocument),
+    );
+    assert.gte(
+        transactionDocument.timeInactiveMicros,
+        0,
+        "Expected 'timeInactiveMicros' to be at least 0: " + tojson(transactionDocument),
+    );
     const actualExpiryTime = ISODate(transactionDocument.expiryTime).getTime();
-    const expectedExpiryTime =
-        ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000;
-    assert.eq(expectedExpiryTime,
-              actualExpiryTime,
-              "Expected 'expiryTime' to be " + expectedExpiryTime + " but got " + actualExpiryTime +
-                  " instead: " + tojson(transactionDocument));
+    const expectedExpiryTime = ISODate(transactionDocument.startWallClockTime).getTime() + transactionLifeTime * 1000;
+    assert.eq(
+        expectedExpiryTime,
+        actualExpiryTime,
+        "Expected 'expiryTime' to be " +
+            expectedExpiryTime +
+            " but got " +
+            actualExpiryTime +
+            " instead: " +
+            tojson(transactionDocument),
+    );
     if (isPrepared) {
         assert.gte(
             transactionDocument.timePreparedMicros,
             0,
-            "Expected 'timePreparedMicros' to be at least 0: " + tojson(transactionDocument));
+            "Expected 'timePreparedMicros' to be at least 0: " + tojson(transactionDocument),
+        );
     }
 }
 
@@ -92,9 +131,9 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const collName = 'currentop_active_transaction';
-const testDB = rst.getPrimary().getDB('test');
-const adminDB = rst.getPrimary().getDB('admin');
+const collName = "currentop_active_transaction";
+const testDB = rst.getPrimary().getDB("test");
+const adminDB = rst.getPrimary().getDB("admin");
 testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB[collName].insert({x: 1}, {writeConcern: {w: "majority"}}));
 
@@ -106,30 +145,26 @@ let res = assert.commandWorked(testDB.runCommand({insert: collName, documents: [
 // Set and save the transaction's lifetime. We will use this later to assert that our
 // transaction's expiry time is equal to its start time + lifetime.
 const transactionLifeTime = 10;
-assert.commandWorked(
-    testDB.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
+assert.commandWorked(testDB.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: transactionLifeTime}));
 
 // This will make the transaction hang.
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: 'hangAfterSettingPrepareStartTime', mode: 'alwaysOn'}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingPrepareStartTime", mode: "alwaysOn"}));
 
 let timeBeforeTransactionStarts = new ISODate();
 let isPrepared = true;
-const joinPreparedTransaction =
-    startParallelShell(funWithArgs(transactionFn, isPrepared), rst.ports[0]);
+const joinPreparedTransaction = startParallelShell(funWithArgs(transactionFn, isPrepared), rst.ports[0]);
 
 const prepareTransactionFilter = {
     active: true,
-    'lsid': {$exists: true},
-    'transaction.parameters.txnNumber': {$eq: 0},
-    'transaction.parameters.autocommit': {$eq: false},
-    'transaction.timePreparedMicros': {$exists: true}
+    "lsid": {$exists: true},
+    "transaction.parameters.txnNumber": {$eq: 0},
+    "transaction.parameters.autocommit": {$eq: false},
+    "transaction.timePreparedMicros": {$exists: true},
 };
 
 // Keep running currentOp() until we see the transaction subdocument.
-assert.soon(function() {
-    return 1 ===
-        adminDB.aggregate([{$currentOp: {}}, {$match: prepareTransactionFilter}]).itcount();
+assert.soon(function () {
+    return 1 === adminDB.aggregate([{$currentOp: {}}, {$match: prepareTransactionFilter}]).itcount();
 });
 
 let timeAfterTransactionStarts = new ISODate();
@@ -139,24 +174,24 @@ sleep(100);
 let timeBeforeCurrentOp = new ISODate();
 // Check that the currentOp's transaction subdocument's fields align with our expectations.
 let currentOp = adminDB.aggregate([{$currentOp: {}}, {$match: prepareTransactionFilter}]).toArray();
-checkCurrentOpFields(currentOp,
-                     isPrepared,
-                     res.operationTime,
-                     timeBeforeTransactionStarts,
-                     timeAfterTransactionStarts,
-                     timeBeforeCurrentOp);
+checkCurrentOpFields(
+    currentOp,
+    isPrepared,
+    res.operationTime,
+    timeBeforeTransactionStarts,
+    timeAfterTransactionStarts,
+    timeBeforeCurrentOp,
+);
 
 // Now the transaction can proceed.
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: 'hangAfterSettingPrepareStartTime', mode: 'off'}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterSettingPrepareStartTime", mode: "off"}));
 joinPreparedTransaction();
 
 // Conduct the same test but with a non-prepared transaction.
 res = assert.commandWorked(testDB.runCommand({insert: collName, documents: [{x: 1}]}));
 
 // This will make the transaction hang.
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: 'hangDuringBatchUpdate', mode: 'alwaysOn'}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}));
 
 timeBeforeTransactionStarts = new ISODate();
 isPrepared = false;
@@ -164,14 +199,14 @@ const joinTransaction = startParallelShell(funWithArgs(transactionFn, isPrepared
 
 const transactionFilter = {
     active: true,
-    'lsid': {$exists: true},
-    'transaction.parameters.txnNumber': {$eq: 0},
-    'transaction.parameters.autocommit': {$eq: false},
-    'transaction.timePreparedMicros': {$exists: false}
+    "lsid": {$exists: true},
+    "transaction.parameters.txnNumber": {$eq: 0},
+    "transaction.parameters.autocommit": {$eq: false},
+    "transaction.timePreparedMicros": {$exists: false},
 };
 
 // Keep running currentOp() until we see the transaction subdocument.
-assert.soon(function() {
+assert.soon(function () {
     return 1 === adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).itcount();
 });
 
@@ -182,16 +217,17 @@ sleep(100);
 timeBeforeCurrentOp = new ISODate();
 // Check that the currentOp's transaction subdocument's fields align with our expectations.
 currentOp = adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).toArray();
-checkCurrentOpFields(currentOp,
-                     isPrepared,
-                     res.operationTime,
-                     timeBeforeTransactionStarts,
-                     timeAfterTransactionStarts,
-                     timeBeforeCurrentOp);
+checkCurrentOpFields(
+    currentOp,
+    isPrepared,
+    res.operationTime,
+    timeBeforeTransactionStarts,
+    timeAfterTransactionStarts,
+    timeBeforeCurrentOp,
+);
 
 // Now the transaction can proceed.
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: 'hangDuringBatchUpdate', mode: 'off'}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
 joinTransaction();
 
 rst.stopSet();

@@ -13,13 +13,11 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {
     runWithManualRetries,
-    withSkipRetryOnNetworkError
+    withSkipRetryOnNetworkError,
 } from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 
@@ -31,21 +29,32 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // side-table.
     $config.data.writesCount = 0;
 
-    $config.states.multiUpdate = function(db, collName, connCache) {
+    $config.states.multiUpdate = function (db, collName, connCache) {
         const id = this.getIdForThread(collName);
 
         const doMultiUpdate = () => {
             // moveChunk can kill the multiupdate command and return QueryPlanKilled, so retry in
             // that case.
-            retryOnRetryableError(() => {
-                const result = db.runCommand({
-                    update: collName,
-                    updates: [{q: {x: id}, u: {$inc: {counter: 1}}, multi: true}]
-                });
-                assert.commandWorked(result);
-                jsTest.log("tid:" + this.tid + " multiUpdate _id: " + id +
-                           " at operationTime: " + tojson(result.operationTime));
-            }, 100, undefined, [ErrorCodes.QueryPlanKilled]);
+            retryOnRetryableError(
+                () => {
+                    const result = db.runCommand({
+                        update: collName,
+                        updates: [{q: {x: id}, u: {$inc: {counter: 1}}, multi: true}],
+                    });
+                    assert.commandWorked(result);
+                    jsTest.log(
+                        "tid:" +
+                            this.tid +
+                            " multiUpdate _id: " +
+                            id +
+                            " at operationTime: " +
+                            tojson(result.operationTime),
+                    );
+                },
+                100,
+                undefined,
+                [ErrorCodes.QueryPlanKilled],
+            );
         };
 
         if (TestData.runningWithShardStepdowns && !TestData.runInsideTransaction) {
@@ -62,19 +71,21 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // If the document existed, we expect a change stream event to be eventually seen regarding
         // this update.
-        const expectedDocsIndex = this.expectedDocs.findIndex(item => item._id === id);
+        const expectedDocsIndex = this.expectedDocs.findIndex((item) => item._id === id);
         if (expectedDocsIndex != -1) {
             // Log this operation on a side collection. It will be used later to validate the change
             // stream events.
-            assert.commandWorked(db["operations"].insert({
-                tid: this.tid,
-                iteration: this.writesCount,
-                operationDetails: {
-                    operationType: 'update',
-                    documentId: id,
-                    counter: this.expectedDocs[expectedDocsIndex].counter + 1
-                }
-            }));
+            assert.commandWorked(
+                db["operations"].insert({
+                    tid: this.tid,
+                    iteration: this.writesCount,
+                    operationDetails: {
+                        operationType: "update",
+                        documentId: id,
+                        counter: this.expectedDocs[expectedDocsIndex].counter + 1,
+                    },
+                }),
+            );
             this.writesCount++;
 
             // Update the in-memory representation of the updated document.
@@ -82,16 +93,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
     };
 
-    $config.states.multiDelete = function(db, collName, connCache) {
+    $config.states.multiDelete = function (db, collName, connCache) {
         const id = this.getIdForThread(collName);
 
         const doMultiDelete = () => {
-            const result = db.runCommand(
-                {delete: collName, deletes: [{q: {x: id}, limit: 0 /* multi:true */}]});
+            const result = db.runCommand({delete: collName, deletes: [{q: {x: id}, limit: 0 /* multi:true */}]});
             assert.commandWorked(result);
 
-            jsTest.log("tid:" + this.tid + " multiDelete _id: " + id +
-                       " at operationTime: " + tojson(result.operationTime));
+            jsTest.log(
+                "tid:" + this.tid + " multiDelete _id: " + id + " at operationTime: " + tojson(result.operationTime),
+            );
         };
 
         if (TestData.runningWithShardStepdowns && !TestData.runInsideTransaction) {
@@ -108,24 +119,26 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // If the document existed, we expect a change stream event to be eventually seen regarding
         // this delete.
-        if (this.expectedDocs.some(item => item._id === id)) {
+        if (this.expectedDocs.some((item) => item._id === id)) {
             // Log this operation on a side collection. It will be used later to validate the change
             // stream events.
-            assert.commandWorked(db["operations"].insert({
-                tid: this.tid,
-                iteration: this.writesCount,
-                operationDetails: {operationType: 'delete', documentId: id}
-            }));
+            assert.commandWorked(
+                db["operations"].insert({
+                    tid: this.tid,
+                    iteration: this.writesCount,
+                    operationDetails: {operationType: "delete", documentId: id},
+                }),
+            );
             this.writesCount++;
         }
 
         // Remove the in-memory representation of the deleted document.
-        this.expectedDocs = this.expectedDocs.filter(item => item._id !== id);
+        this.expectedDocs = this.expectedDocs.filter((item) => item._id !== id);
     };
 
     $config.states.init = function init(db, collName, connCache) {
         // Keep only this tid's documents
-        this.expectedDocs = this.expectedDocs.filter(item => item.tid === this.tid);
+        this.expectedDocs = this.expectedDocs.filter((item) => item.tid === this.tid);
 
         if (TestData.runningWithShardStepdowns) {
             fsm.forceRunningOutsideTransaction(this);
@@ -146,7 +159,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var seenDeletes = [];
 
         // Read the operations that the workload threads did.
-        var operationsByTid = {};  // tid -> [operations]
+        var operationsByTid = {}; // tid -> [operations]
         for (var tid = 0; tid < $config.threadCount; ++tid) {
             operationsByTid[tid] = db["operations"].find({tid: tid}).sort({iteration: 1}).toArray();
         }
@@ -157,13 +170,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             assert.soon(() => changeStream.hasNext());
             const event = changeStream.next();
 
-            if (event.operationType === 'drop') {
+            if (event.operationType === "drop") {
                 jsTest.log("tid: + " + tid + " checkChangeStream saw drop event");
                 break;
             }
 
-            jsTest.log("changeStream event: operationType: " + event.operationType +
-                       "; _id: " + tojson(event.documentKey));
+            jsTest.log(
+                "changeStream event: operationType: " + event.operationType + "; _id: " + tojson(event.documentKey),
+            );
 
             if (TestData.runInsideTransaction) {
                 // Check that this event corresponds to the next outstanding operation one of the
@@ -171,10 +185,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 var found = false;
                 for (let tid = 0; tid < $config.threadCount; ++tid) {
                     const nextOperationForTid = operationsByTid[tid][0];
-                    if (nextOperationForTid &&
-                        nextOperationForTid.operationDetails.operationType ===
-                            event.operationType &&
-                        nextOperationForTid.operationDetails.documentId === event.documentKey._id) {
+                    if (
+                        nextOperationForTid &&
+                        nextOperationForTid.operationDetails.operationType === event.operationType &&
+                        nextOperationForTid.operationDetails.documentId === event.documentKey._id
+                    ) {
                         found = true;
 
                         // Remove that operation from the array of outstanding operations.
@@ -182,9 +197,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                         break;
                     }
                 }
-                assert(found,
-                       "did not find worker thread operation matching the change stream event: " +
-                           tojson(event) + "; Outstanding operations: " + tojson(operationsByTid));
+                assert(
+                    found,
+                    "did not find worker thread operation matching the change stream event: " +
+                        tojson(event) +
+                        "; Outstanding operations: " +
+                        tojson(operationsByTid),
+                );
             } else {
                 // Check that no duplicate events are seen on the change stream.
                 // - For deletes this means that we should not see the same document deleted more
@@ -192,23 +211,29 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 // - For updates, this means that for each document, we should never see the same
                 // updated value more than once. This is because the updates are {$inc: 1}, so they
                 // must be strictly incrementing.
-                if (event.operationType === 'delete') {
-                    assert(!seenDeletes.includes(event.documentKey._id),
-                           "Found duplicate change stream event for delete on _id: " +
-                               event.documentKey._id);
+                if (event.operationType === "delete") {
+                    assert(
+                        !seenDeletes.includes(event.documentKey._id),
+                        "Found duplicate change stream event for delete on _id: " + event.documentKey._id,
+                    );
                     seenDeletes.push(event.documentKey._id);
-                } else if (event.operationType === 'update') {
+                } else if (event.operationType === "update") {
                     const idAndUpdate = {
                         _id: event.documentKey._id,
-                        updatedFields: event.updateDescription.updatedFields
+                        updatedFields: event.updateDescription.updatedFields,
                     };
 
-                    assert(!seenUpdates.some(item => item._id === idAndUpdate._id &&
-                                                 bsonWoCompare(item.updatedFields,
-                                                               idAndUpdate.updatedFields) == 0),
-                           "Found duplicate change stream event for update on _id: " +
-                               event.documentKey._id +
-                               ", update: " + tojson(event.updateDescription.updatedFields));
+                    assert(
+                        !seenUpdates.some(
+                            (item) =>
+                                item._id === idAndUpdate._id &&
+                                bsonWoCompare(item.updatedFields, idAndUpdate.updatedFields) == 0,
+                        ),
+                        "Found duplicate change stream event for update on _id: " +
+                            event.documentKey._id +
+                            ", update: " +
+                            tojson(event.updateDescription.updatedFields),
+                    );
                     seenUpdates.push(idAndUpdate);
                 }
             }
@@ -222,7 +247,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 assert(
                     operationsByTid[tid].length === 0,
                     "Did not observe change stream event for all worker thread operations. Outstanding operations: " +
-                        tojson(operationsByTid));
+                        tojson(operationsByTid),
+                );
             }
         }
     }
@@ -232,7 +258,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // Set the 'x' field to mirror the '_id' and 'skey' fields. 'x' will be used as query for
         // {multi: true} writes.
-        db[collName].find({}).forEach(doc => {
+        db[collName].find({}).forEach((doc) => {
             db[collName].update({_id: doc._id}, {$set: {x: doc._id, counter: 0}});
         });
 
@@ -273,18 +299,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             previousWritePeriodicNoopsOnConfigServer = res.was;
         });
 
-        var startAtOperationTime =
-            Timestamp(this.startAtOperationTime.t, this.startAtOperationTime.i);
+        var startAtOperationTime = Timestamp(this.startAtOperationTime.t, this.startAtOperationTime.i);
         checkChangeStream(db, collName, startAtOperationTime);
 
         // Restore the original configuration.
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand(
-                {setParameter: 1, writePeriodicNoops: previousWritePeriodicNoopsOnShards}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, writePeriodicNoops: previousWritePeriodicNoopsOnShards}),
+            );
         });
         cluster.executeOnConfigNodes((db) => {
-            assert.commandWorked(db.adminCommand(
-                {setParameter: 1, writePeriodicNoops: previousWritePeriodicNoopsOnConfigServer}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, writePeriodicNoops: previousWritePeriodicNoopsOnConfigServer}),
+            );
         });
 
         $super.teardown.apply(this, arguments);

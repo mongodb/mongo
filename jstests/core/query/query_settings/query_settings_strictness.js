@@ -29,6 +29,5 @@ const validSettings = {
 qsutils.withQuerySettings(query, {...validSettings, unknownField: "some value"}, () => {
     // Ensure that only the valid fields are present in both the $querySettings and explain output.
     // The 'unknownField' should be ignored.
-    qsutils.assertQueryShapeConfiguration(
-        [qsutils.makeQueryShapeConfiguration(validSettings, query)]);
+    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(validSettings, query)]);
 });

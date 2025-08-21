@@ -7,8 +7,8 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {Thread} from 'jstests/libs/parallelTester.js';
-import {ShardingTest} from 'jstests/libs/shardingtest.js';
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function pauseReshardingBeforeBlockingWrites(configRS) {
     const node = configRS.getPrimary();
@@ -36,10 +36,14 @@ function setFailWriteConcernFailpointOnAllNodes(listOfReplSets) {
     let failpoints = [];
     for (let replSetTest of listOfReplSets) {
         for (let node of replSetTest.nodes) {
-            failpoints.push(configureFailPoint(node,
-                                               "failWaitForWriteConcernIfTimeoutSet",
-                                               {errorCode: ErrorCodes.WriteConcernTimeout},
-                                               {activationProbability}));
+            failpoints.push(
+                configureFailPoint(
+                    node,
+                    "failWaitForWriteConcernIfTimeoutSet",
+                    {errorCode: ErrorCodes.WriteConcernTimeout},
+                    {activationProbability},
+                ),
+            );
         }
     }
     return failpoints;
@@ -49,7 +53,7 @@ function testWriteConcernBasic(st) {
     // Set up the collection to reshard.
     const dbName = "testDbBasic";
     const collName = "testColl";
-    const ns = dbName + '.' + collName;
+    const ns = dbName + "." + collName;
     const testColl = st.s.getCollection(ns);
 
     // This test verifies moveCollection is resilient against WriteConcernTimeout errors. It works
@@ -72,8 +76,7 @@ function testWriteConcernBasic(st) {
     // 3. Set the failWriteConcernFailpoint on shard 0, shard 2, and the config shard.
     // 4. Move the collection from shard 0 to shard 2.
 
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
     assert.commandWorked(testColl.insert([{x: -1}, {x: 0}, {x: 1}]));
     assert.commandWorked(testColl.createIndex({x: 1}));
 
@@ -106,13 +109,13 @@ function testWriteConcernBasic(st) {
     assert.commandWorked(moveThreadForTest.returnData());
     jsTest.log.info("Finished waiting for test moveCollection to finish");
 
-    failpoints.forEach(fp => fp.off());
+    failpoints.forEach((fp) => fp.off());
 }
 
 function testWriteConcernFailover(st) {
     const dbName = "testDbFailover";
     const collName = "testColl";
-    const ns = dbName + '.' + collName;
+    const ns = dbName + "." + collName;
     const testColl = st.s.getCollection(ns);
 
     // This test verifies moveCollection is resilient against WriteConcernTimeout errors. It works
@@ -135,8 +138,7 @@ function testWriteConcernFailover(st) {
     // 3. Set the failWriteConcernFailpoint on shard 0, shard 2, and the config shard.
     // 4. Move the collection from shard 0 to shard 2.
 
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
     assert.commandWorked(testColl.insert([{x: -1}, {x: 0}, {x: 1}]));
     assert.commandWorked(testColl.createIndex({x: 1}));
 
@@ -161,7 +163,7 @@ function testWriteConcernFailover(st) {
     assert.commandWorked(moveThreadForTest.returnData());
     jsTest.log.info("Finished waiting for test moveCollection to finish");
 
-    failpoints.forEach(fp => fp.off());
+    failpoints.forEach((fp) => fp.off());
 }
 
 function runTests() {
@@ -173,14 +175,13 @@ function runTests() {
         shards: 3,
         rs: {
             nodes: 3,
-            setParameter: {featureFlagReshardingVerification, featureFlagReshardingCloneNoRefresh}
+            setParameter: {featureFlagReshardingVerification, featureFlagReshardingCloneNoRefresh},
         },
         other: {
             configOptions: {
-                setParameter:
-                    {featureFlagReshardingVerification, featureFlagReshardingCloneNoRefresh}
-            }
-        }
+                setParameter: {featureFlagReshardingVerification, featureFlagReshardingCloneNoRefresh},
+            },
+        },
     });
     testWriteConcernBasic(st);
     testWriteConcernFailover(st);

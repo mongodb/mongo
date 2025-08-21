@@ -28,7 +28,8 @@ function memoryException(sortSpec, querySpec) {
     querySpec = querySpec || {};
     var ex = assert.throwsWithCode(
         () => t.find(querySpec).sort(sortSpec).allowDiskUse(false).batchSize(1000).itcount(),
-        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+    );
     assert(ex.toString().match(/Sort/));
 }
 

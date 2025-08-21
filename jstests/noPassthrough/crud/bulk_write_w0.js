@@ -14,25 +14,28 @@ function runTest(conn) {
     const db = conn.getDB("admin");
 
     // Run a {w: 0} bulkWrite with 3 operations while setting the return batchSize to 2.
-    const res = assert.commandWorked(db.adminCommand({
-        bulkWrite: 1,
-        ops: [
-            {insert: 0, document: {x: 1}},
-            {insert: 0, document: {x: 2}},
-            {insert: 0, document: {x: 3}},
-        ],
-        nsInfo: [{ns: "foo.bar"}],
-        cursor: {batchSize: 2},
-        writeConcern: {w: 0}
-    }));
+    const res = assert.commandWorked(
+        db.adminCommand({
+            bulkWrite: 1,
+            ops: [
+                {insert: 0, document: {x: 1}},
+                {insert: 0, document: {x: 2}},
+                {insert: 0, document: {x: 3}},
+            ],
+            nsInfo: [{ns: "foo.bar"}],
+            cursor: {batchSize: 2},
+            writeConcern: {w: 0},
+        }),
+    );
     assert.eq({ok: 1}, res);
 
     // Test that we skip creating the response cursor for unacknowledged write.
-    const bulkWriteCursors =
-        db.aggregate([
-              {$currentOp: {idleCursors: true}},
-              {$match: {"cursor.originatingCommand.bulkWrite": {$exists: true}}}
-          ]).toArray();
+    const bulkWriteCursors = db
+        .aggregate([
+            {$currentOp: {idleCursors: true}},
+            {$match: {"cursor.originatingCommand.bulkWrite": {$exists: true}}},
+        ])
+        .toArray();
     assert.eq(0, bulkWriteCursors.length, () => tojson(bulkWriteCursors));
 }
 

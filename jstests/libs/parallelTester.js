@@ -35,7 +35,7 @@ if (typeof _threadInject != "undefined") {
         return realStartFn.apply(this, newArgs);
     }
 
-    Thread = function() {
+    Thread = function () {
         var args = Array.prototype.slice.call(arguments);
         // Always pass TestData as the first argument.
         args.unshift(TestData);
@@ -45,7 +45,7 @@ if (typeof _threadInject != "undefined") {
     _threadInject(Thread.prototype);
 }
 
-globalThis.CountDownLatch = Object.extend(function(count) {
+globalThis.CountDownLatch = Object.extend(function (count) {
     if (!(this instanceof CountDownLatch)) {
         return new CountDownLatch(count);
     }
@@ -56,13 +56,13 @@ globalThis.CountDownLatch = Object.extend(function(count) {
     //       prototype are lost during the serialization to BSON that occurs
     //       when passing data to a child thread.
 
-    this.await = function() {
+    this.await = function () {
         CountDownLatch._await(this._descriptor);
     };
-    this.countDown = function() {
+    this.countDown = function () {
         CountDownLatch._countDown(this._descriptor);
     };
-    this.getCount = function() {
+    this.getCount = function () {
         return CountDownLatch._getCount(this._descriptor);
     };
 }, CountDownLatch);

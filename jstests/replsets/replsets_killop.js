@@ -7,33 +7,36 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 let numDocs = 1e5;
 
 // Set up a replica set.
-let replTest = new ReplSetTest({name: 'test', nodes: 3});
+let replTest = new ReplSetTest({name: "test", nodes: 3});
 replTest.startSet();
 replTest.initiate();
 let primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
-let testDb = primary.getDB('test');
+let testDb = primary.getDB("test");
 testDb.test.save({a: 0});
 replTest.awaitReplication();
-assert.soon(function() {
-    return secondary.getDB('test').test.find().itcount() == 1;
+assert.soon(function () {
+    return secondary.getDB("test").test.find().itcount() == 1;
 });
 
 // Start a parallel shell to insert new documents on the primary.
-let inserter = startParallelShell(funWithArgs(function(numDocs) {
-                                      var bulk = db.test.initializeUnorderedBulkOp();
-                                      for (let i = 1; i < numDocs; ++i) {
-                                          bulk.insert({a: i});
-                                      }
-                                      bulk.execute();
-                                  }, numDocs), primary.port);
+let inserter = startParallelShell(
+    funWithArgs(function (numDocs) {
+        var bulk = db.test.initializeUnorderedBulkOp();
+        for (let i = 1; i < numDocs; ++i) {
+            bulk.insert({a: i});
+        }
+        bulk.execute();
+    }, numDocs),
+    primary.port,
+);
 
 // Periodically kill replication get mores.
 for (let i = 0; i < 1e3; ++i) {
     let allOps = testDb.currentOp();
     for (let j in allOps.inprog) {
         let op = allOps.inprog[j];
-        if (op.ns == 'local.oplog.rs' && op.op == 'getmore') {
+        if (op.ns == "local.oplog.rs" && op.op == "getmore") {
             testDb.killOp(op.opid);
         }
     }
@@ -48,7 +51,7 @@ assert.eq(numDocs, testDb.test.find().itcount());
 // Return true when the correct number of documents are present on the secondary.  Otherwise print
 // which documents are missing and return false.
 function allReplicated() {
-    let count = secondary.getDB('test').test.find().itcount();
+    let count = secondary.getDB("test").test.find().itcount();
     if (count == numDocs) {
         // Return true if the count is as expected.
         return true;
@@ -56,17 +59,17 @@ function allReplicated() {
 
     // Identify and print the missing a-values.
     let foundSet = {};
-    let c = secondary.getDB('test').test.find();
+    let c = secondary.getDB("test").test.find();
     while (c.hasNext()) {
-        foundSet['' + c.next().a] = true;
+        foundSet["" + c.next().a] = true;
     }
     let missing = [];
     for (let i = 0; i < numDocs; ++i) {
-        if (!(('' + i) in foundSet)) {
+        if (!("" + i in foundSet)) {
             missing.push(i);
         }
     }
-    print('count: ' + count + ' missing: ' + missing);
+    print("count: " + count + " missing: " + missing);
     return false;
 }
 

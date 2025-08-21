@@ -4,13 +4,11 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {getNonPrimaryShardName} from "jstests/sharding/libs/sharding_util.js";
 
 export const setParameterOpts = {
-    analyzeShardKeyNumRanges: 100
+    analyzeShardKeyNumRanges: 100,
 };
 
 // The sampling-based initial split policy needs 10 samples per split point so
@@ -23,16 +21,14 @@ export function testNonExistingCollection(dbName, testCases) {
     const ns = dbName + "." + collName;
     const candidateKey = {candidateKey: 1};
 
-    testCases.forEach(testCase => {
-        jsTest.log(`Running analyzeShardKey command against a non-existing collection: ${
-            tojson(testCase)}`);
+    testCases.forEach((testCase) => {
+        jsTest.log(`Running analyzeShardKey command against a non-existing collection: ${tojson(testCase)}`);
         const cmdObj = {analyzeShardKey: ns, key: candidateKey};
         const res = testCase.conn.adminCommand(cmdObj);
         // If the command is not supported, it should fail even before the collection validation
         // step. That is, it should fail with an IllegalOperation error instead of a
         // NamespaceNotFound error.
-        const expectedErrorCode =
-            testCase.isSupported ? ErrorCodes.NamespaceNotFound : ErrorCodes.IllegalOperation;
+        const expectedErrorCode = testCase.isSupported ? ErrorCodes.NamespaceNotFound : ErrorCodes.IllegalOperation;
         assert.commandFailedWithCode(res, expectedErrorCode);
     });
 }
@@ -44,16 +40,15 @@ export function testExistingUnshardedCollection(dbName, writeConn, testCases) {
     const coll = db.getCollection(collName);
 
     const candidateKey0 = {candidateKey0: 1};
-    const candidateKey1 = {candidateKey1: 1};  // does not have a supporting index.
+    const candidateKey1 = {candidateKey1: 1}; // does not have a supporting index.
     assert.commandWorked(coll.createIndex(candidateKey0));
     if (!FixtureHelpers.isStandalone(db)) {
         FixtureHelpers.awaitReplication(db);
     }
 
     // Analyze shard keys while the collection is empty.
-    testCases.forEach(testCase => {
-        jsTest.log(`Running analyzeShardKey command against an empty unsharded collection: ${
-            tojson(testCase)}`);
+    testCases.forEach((testCase) => {
+        jsTest.log(`Running analyzeShardKey command against an empty unsharded collection: ${tojson(testCase)}`);
 
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
         const res1 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey1});
@@ -86,9 +81,8 @@ export function testExistingUnshardedCollection(dbName, writeConn, testCases) {
         FixtureHelpers.awaitReplication(db);
     }
 
-    testCases.forEach(testCase => {
-        jsTest.log(`Running analyzeShardKey command against a non-empty unsharded collection: ${
-            tojson(testCase)}`);
+    testCases.forEach((testCase) => {
+        jsTest.log(`Running analyzeShardKey command against a non-empty unsharded collection: ${tojson(testCase)}`);
 
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
         const res1 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey1});
@@ -120,18 +114,16 @@ export function testExistingShardedCollection(dbName, mongos, testCases) {
     const currentKeySplitPoint = {currentKey: 0};
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: currentKey}));
     assert.commandWorked(mongos.adminCommand({split: ns, middle: currentKeySplitPoint}));
-    assert.commandWorked(
-        mongos.adminCommand({moveChunk: ns, find: currentKeySplitPoint, to: nonPrimaryShard}));
+    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: currentKeySplitPoint, to: nonPrimaryShard}));
 
     const candidateKey0 = {candidateKey0: 1};
-    const candidateKey1 = {candidateKey1: 1};  // does not have a supporting index
+    const candidateKey1 = {candidateKey1: 1}; // does not have a supporting index
     assert.commandWorked(coll.createIndex(candidateKey0));
     FixtureHelpers.awaitReplication(db);
 
     // Analyze shard keys while the collection is empty.
-    testCases.forEach(testCase => {
-        jsTest.log(`Running analyzeShardKey command against an empty sharded collection: ${
-            tojson(testCase)}`);
+    testCases.forEach((testCase) => {
+        jsTest.log(`Running analyzeShardKey command against an empty sharded collection: ${tojson(testCase)}`);
 
         const res = testCase.conn.adminCommand({analyzeShardKey: ns, key: currentKey});
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
@@ -164,9 +156,8 @@ export function testExistingShardedCollection(dbName, mongos, testCases) {
     assert.commandWorked(coll.insert(docs));
     FixtureHelpers.awaitReplication(db);
 
-    testCases.forEach(testCase => {
-        jsTest.log(`Running analyzeShardKey command against a non-empty sharded collection: ${
-            tojson(testCase)}`);
+    testCases.forEach((testCase) => {
+        jsTest.log(`Running analyzeShardKey command against a non-empty sharded collection: ${tojson(testCase)}`);
 
         const res = testCase.conn.adminCommand({analyzeShardKey: ns, key: currentKey});
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});

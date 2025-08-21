@@ -12,13 +12,11 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_inserts.js';
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_inserts.js";
 
 const numValues = 10;
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.generateMetaFieldValueForInitialInserts = () => {
         let meta = {};
         // Insert a document with a field for every thread to test concurrent updates on the
@@ -34,15 +32,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     // Perform bucket level updates by updating the meta field of measurements.
-    $config.states.bucketLevelUpdate = function(db, collName, connCache) {
+    $config.states.bucketLevelUpdate = function (db, collName, connCache) {
         const shardedColl = db[collName];
         const updateField = this.metaField + ".tid" + this.tid;
         const oldValue = Random.randInt(numValues);
 
-        jsTestLog("Executing bucket level update on: " + collName + " on field '" + updateField +
-                  "'");
-        assert.commandWorked(shardedColl.update(
-            {[updateField]: {$gte: oldValue}}, {$inc: {[updateField]: 1}}, {multi: true}));
+        jsTestLog("Executing bucket level update on: " + collName + " on field '" + updateField + "'");
+        assert.commandWorked(
+            shardedColl.update({[updateField]: {$gte: oldValue}}, {$inc: {[updateField]: 1}}, {multi: true}),
+        );
     };
 
     $config.data.validateCollection = function validate(db, collName) {
@@ -50,10 +48,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // sharded collection may not see the exact same records as the non-sharded, so the
         // validation needs to be more lenient.
         const pipeline = [{$project: {_id: "$_id"}}, {$sort: {_id: 1}}];
-        const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
-                                                    db[this.nonShardCollName].aggregate(pipeline));
-        assert.eq(diff,
-                  {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
+        const diff = DataConsistencyChecker.getDiff(
+            db[collName].aggregate(pipeline),
+            db[this.nonShardCollName].aggregate(pipeline),
+        );
+        assert.eq(diff, {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
     };
 
     $config.transitions = {

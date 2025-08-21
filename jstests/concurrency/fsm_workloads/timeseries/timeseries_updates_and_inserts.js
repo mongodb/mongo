@@ -10,12 +10,12 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {
         nReadingsPerSensor: 1000,
         nSensors: 100,
         // 1000 to start + 5 threads * 1000 each
-        nTotalReadings: 1000 + 5 * 1000
+        nTotalReadings: 1000 + 5 * 1000,
     };
     const states = {
         init: function init(db, collName) {
@@ -28,15 +28,18 @@ export const $config = (function() {
         updateMany: function updateMany(db, collName) {
             const readingNo = Random.randInt(this.nTotalReadings);
 
-            retryOnRetryableError(() => {
-                assert.commandWorked(
-                    db[collName].updateMany({readingNo: readingNo}, {$inc: {updated: 1}}));
-            }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
+            retryOnRetryableError(
+                () => {
+                    assert.commandWorked(db[collName].updateMany({readingNo: readingNo}, {$inc: {updated: 1}}));
+                },
+                100,
+                undefined,
+                TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : [],
+            );
         },
         updateOne: function updateOne(db, collName) {
             const sensorId = Random.randInt(this.nSensors);
-            assert.commandWorked(
-                db[collName].updateOne({sensorId: sensorId}, {$inc: {updated: 1}}));
+            assert.commandWorked(db[collName].updateOne({sensorId: sensorId}, {$inc: {updated: 1}}));
         },
         insert: function insert(db, collName) {
             // Insert a new reading for every sensor.
@@ -47,7 +50,7 @@ export const $config = (function() {
                     _id: `${this.tid}${this.idCounter++}`,
                     sensorId: sensorId,
                     readingNo: readingNo,
-                    ts: new ISODate()
+                    ts: new ISODate(),
                 });
             }
 
@@ -60,33 +63,30 @@ export const $config = (function() {
                 }
                 TimeseriesTest.assertInsertWorked(e);
             }
-        }
+        },
     };
 
     const transitions = {
         init: {updateMany: 0.25, insert: 0.75},
         updateMany: {updateMany: 0.4, updateOne: 0.2, insert: 0.4},
         updateOne: {updateMany: 0.4, updateOne: 0.2, insert: 0.4},
-        insert: {updateMany: 0.4, updateOne: 0.2, insert: 0.4}
+        insert: {updateMany: 0.4, updateOne: 0.2, insert: 0.4},
     };
 
     function setup(db, collName, cluster) {
         // Lower the following parameter to force more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}));
         });
 
         db[collName].drop();
-        db.createCollection(
-            collName, {timeseries: {timeField: "ts", metaField: "sensorId", granularity: "hours"}});
+        db.createCollection(collName, {timeseries: {timeField: "ts", metaField: "sensorId", granularity: "hours"}});
 
         let bulk = db[collName].initializeUnorderedBulkOp();
         let idCounter = 0;
         for (let sensorId = 0; sensorId < data.nSensors; ++sensorId) {
             for (let i = 0; i < data.nReadingsPerSensor; ++i) {
-                bulk.insert(
-                    {_id: idCounter++, sensorId: sensorId, readingNo: i, ts: new ISODate()});
+                bulk.insert({_id: idCounter++, sensorId: sensorId, readingNo: i, ts: new ISODate()});
             }
         }
         bulk.execute();
@@ -95,8 +95,7 @@ export const $config = (function() {
     function teardown(db, collName, cluster) {
         // Reset the yield parameter.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1000}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1000}));
         });
     }
 

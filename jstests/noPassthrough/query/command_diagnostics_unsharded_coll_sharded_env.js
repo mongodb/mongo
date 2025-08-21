@@ -8,7 +8,7 @@
 import {
     assertOnDiagnosticLogContents,
     getQueryPlannerAlwaysFailsWithNamespace,
-    runWithFailpoint
+    runWithFailpoint,
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -21,7 +21,7 @@ const ns = dbName + "." + collName;
 const omittedShardKeyLog = "omitted: collection isn't sharded";
 const query = {
     a: 1,
-    b: 1
+    b: 1,
 };
 
 const st = new ShardingTest({shards: [{useLogFiles: true}], mongos: 1});
@@ -36,14 +36,13 @@ function runTest({description, command}) {
     const connAssert = st.rs0.getPrimary();
     jsTestLog("Running test case: " + tojson({description, command}));
     runWithFailpoint(connAssert.getDB(dbName), failpointName, failpointOpts, () => {
-        assert.commandFailedWithCode(
-            st.s.getDB(dbName).runCommand(command), errorCode, description);
+        assert.commandFailedWithCode(st.s.getDB(dbName).runCommand(command), errorCode, description);
     });
 
     assertOnDiagnosticLogContents({
         description: description,
         logFile: connAssert.fullOptions.logFile,
-        expectedDiagnosticInfo: [omittedShardKeyLog]
+        expectedDiagnosticInfo: [omittedShardKeyLog],
     });
 
     // We expect a non-zero exit code due to tassert triggered. Restarting will also clear the
@@ -65,7 +64,7 @@ runTest({
 
 // FindAndModify
 runTest({
-    description: 'findAndModify remove',
+    description: "findAndModify remove",
     command: {
         findAndModify: collName,
         query: query,

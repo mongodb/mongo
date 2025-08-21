@@ -11,7 +11,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({
     shards: 1,
     mongos: 1,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const mongosDB = st.s.getDB(jsTestName());
@@ -21,8 +21,7 @@ const shard0 = st.rs0;
 const shard0Coll = shard0.getPrimary().getCollection(mongosColl.getFullName());
 
 // Enable sharding on the the test database and ensure that the primary is shard0.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shard0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shard0.getURL()}));
 
 // Shard the source collection on {a: 1}. No need to split since it's single-shard.
 st.shardColl(mongosColl, {a: 1}, false);
@@ -35,8 +34,10 @@ assert.commandWorked(mongosColl.insert({_id: 0, a: -100}));
 assert.commandWorked(mongosColl.update({a: -100}, {$set: {updated: true}}));
 
 // Confirm that the stream opened against the shard mongoD sees both events.
-const expectedEvents =
-    [{op: "insert", doc: {_id: 0, a: -100}}, {op: "update", doc: {_id: 0, a: -100, updated: true}}];
+const expectedEvents = [
+    {op: "insert", doc: {_id: 0, a: -100}},
+    {op: "update", doc: {_id: 0, a: -100, updated: true}},
+];
 for (let event of expectedEvents) {
     assert.soon(() => csCursor.hasNext());
     const nextDoc = csCursor.next();

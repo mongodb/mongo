@@ -60,7 +60,7 @@ function setupArray() {
         {
             _id: 6,
             a: new DBRef("test." + collName, ObjectId("0102030405060708090A0B0C")),
-            ty: "DBRef"
+            ty: "DBRef",
         },
         {_id: 7, a: [[]], ty: "Empty Array"},
         {_id: 8, a: [[1, 2, "a", "B"]], ty: "Array"},
@@ -73,11 +73,11 @@ function setupArray() {
         {
             _id: 15,
             a: new DBPointer("test." + collName, new ObjectId("0102030405060708090A0B0C")),
-            ty: "DBPointer"
+            ty: "DBPointer",
         },
-        {_id: 16, a: function() {}, ty: "Code"},
+        {_id: 16, a: function () {}, ty: "Code"},
         // Code with Scope not implemented in JS
-        {_id: 17, a: MaxKey, ty: "MaxKey"}
+        {_id: 17, a: MaxKey, ty: "MaxKey"},
     ];
 }
 

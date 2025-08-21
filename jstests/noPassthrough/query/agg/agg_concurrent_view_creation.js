@@ -25,11 +25,9 @@ function concurrentAggregation(viewName) {
 
 // We now enable the failpoint so that the concurrent aggregation stops right after acquiring the
 // catalog.
-const fp =
-    configureFailPoint(primary, "hangAfterAcquiringCollectionCatalog", {collection: viewName});
+const fp = configureFailPoint(primary, "hangAfterAcquiringCollectionCatalog", {collection: viewName});
 
-const aggregateShell =
-    startParallelShell(funWithArgs(concurrentAggregation, viewName), primary.port);
+const aggregateShell = startParallelShell(funWithArgs(concurrentAggregation, viewName), primary.port);
 
 fp.wait();
 

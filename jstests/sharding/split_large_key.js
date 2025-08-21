@@ -16,30 +16,27 @@ var tests = [
 ];
 
 var st = new ShardingTest({shards: 1});
-var configDB = st.s.getDB('config');
+var configDB = st.s.getDB("config");
 
-assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
+assert.commandWorked(configDB.adminCommand({enableSharding: "test"}));
 
-tests.forEach(function(test) {
+tests.forEach(function (test) {
     var collName = "split_large_key_" + test.name;
     var midKey = {};
     var chunkKeys = {min: {}, max: {}};
     for (var k in test.key) {
-        midKey[k] = 'a'.repeat(test.keyFieldSize);
+        midKey[k] = "a".repeat(test.keyFieldSize);
         // min & max keys for each field in the index
         chunkKeys.min[k] = MinKey;
         chunkKeys.max[k] = MaxKey;
     }
 
-    assert.commandWorked(
-        configDB.adminCommand({shardCollection: "test." + collName, key: test.key}));
+    assert.commandWorked(configDB.adminCommand({shardCollection: "test." + collName, key: test.key}));
 
     var res = configDB.adminCommand({split: "test." + collName, middle: midKey});
     assert(res.ok, "Split: " + collName + " " + res.errmsg);
 
-    assert.eq(2,
-              findChunksUtil.findChunksByNs(configDB, "test." + collName).count(),
-              "Chunks count split");
+    assert.eq(2, findChunksUtil.findChunksByNs(configDB, "test." + collName).count(), "Chunks count split");
 
     st.s0.getCollection("test." + collName).drop();
 });

@@ -15,11 +15,11 @@ export function searchShardedExampleCursors1(dbName, collNS, collName, expectedC
                             type: "results",
                             ns: collNS,
                             nextBatch: [
-                                {_id: 1, val: 1, $searchScore: .4},
-                                {_id: 2, val: 2, $searchScore: .3},
+                                {_id: 1, val: 1, $searchScore: 0.4},
+                                {_id: 2, val: 2, $searchScore: 0.3},
                             ],
                         },
-                        ok: 1
+                        ok: 1,
                     },
                     {
                         cursor: {
@@ -28,10 +28,10 @@ export function searchShardedExampleCursors1(dbName, collNS, collName, expectedC
                             type: "meta",
                             nextBatch: [{metaVal: 1}, {metaVal: 2}],
                         },
-                        ok: 1
-                    }
-                ]
-            }
+                        ok: 1,
+                    },
+                ],
+            },
         },
         // GetMore for results cursor
         {
@@ -40,10 +40,10 @@ export function searchShardedExampleCursors1(dbName, collNS, collName, expectedC
                 cursor: {
                     id: NumberLong(0),
                     ns: collNS,
-                    nextBatch: [{_id: 3, val: 3, $searchScore: 0.123}]
+                    nextBatch: [{_id: 3, val: 3, $searchScore: 0.123}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
     const historyMeta = [
@@ -52,8 +52,8 @@ export function searchShardedExampleCursors1(dbName, collNS, collName, expectedC
             expectedCommand: {getMore: metaID, collection: collName},
             response: {
                 cursor: {id: NumberLong(0), ns: collNS, nextBatch: [{metaVal: 3}, {metaVal: 4}]},
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
     return {
@@ -79,10 +79,9 @@ export function searchShardedExampleCursors2(dbName, collNS, collName, expectedC
                             type: "results",
                             ns: collNS,
                             nextBatch: [
-                                {_id: 5, val: 5, $searchScore: .4},
-                                {_id: 6, val: 6, $searchScore: .3},
+                                {_id: 5, val: 5, $searchScore: 0.4},
+                                {_id: 6, val: 6, $searchScore: 0.3},
                             ],
-
                         },
                         ok: 1,
                     },
@@ -93,10 +92,10 @@ export function searchShardedExampleCursors2(dbName, collNS, collName, expectedC
                             type: "meta",
                             nextBatch: [{metaVal: 10}, {metaVal: 11}],
                         },
-                        ok: 1
-                    }
-                ]
-            }
+                        ok: 1,
+                    },
+                ],
+            },
         },
         // GetMore for results cursor
         {
@@ -105,10 +104,10 @@ export function searchShardedExampleCursors2(dbName, collNS, collName, expectedC
                 cursor: {
                     id: NumberLong(0),
                     ns: collNS,
-                    nextBatch: [{_id: 7, val: 7, $searchScore: 0.123}]
+                    nextBatch: [{_id: 7, val: 7, $searchScore: 0.123}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
     const historyMeta = [
@@ -117,8 +116,8 @@ export function searchShardedExampleCursors2(dbName, collNS, collName, expectedC
             expectedCommand: {getMore: metaID, collection: collName},
             response: {
                 cursor: {id: NumberLong(0), ns: collNS, nextBatch: [{metaVal: 12}, {metaVal: 13}]},
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
     return {

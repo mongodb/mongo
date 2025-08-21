@@ -15,38 +15,33 @@ import {
     makeBucketFilter,
     metaFieldName,
     testFindOneAndUpdate,
-    timeFieldName
+    timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
 /**
  * Tests op-style updates.
  */
 {
-    const doc_m1_a_b =
-        {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, a: 1, b: 1};
+    const doc_m1_a_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, a: 1, b: 1};
     const doc_a_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), _id: 1, a: 1, b: 1};
-    const doc_m1_b =
-        {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, b: 1};
-    const doc_m2_b =
-        {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 2, _id: 1, b: 1};
+    const doc_m1_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, b: 1};
+    const doc_m2_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 2, _id: 1, b: 1};
     const doc_m1_arrayA_b = {
         [timeFieldName]: ISODate("2023-02-06T19:19:01Z"),
         [metaFieldName]: 1,
         _id: 1,
         a: ["arr", "ay"],
-        b: 1
+        b: 1,
     };
     const doc_stringM1_a_b = {
         [timeFieldName]: ISODate("2023-02-06T19:19:01Z"),
         [metaFieldName]: "1",
         _id: 1,
         a: 1,
-        b: 1
+        b: 1,
     };
-    const doc_m1_c_d =
-        {[timeFieldName]: ISODate("2023-02-06T19:19:02Z"), [metaFieldName]: 1, _id: 2, c: 1, d: 1};
-    const doc_m1_a_b_later =
-        {[timeFieldName]: ISODate("2023-02-07T19:19:01Z"), [metaFieldName]: 1, _id: 1, a: 1, b: 1};
+    const doc_m1_c_d = {[timeFieldName]: ISODate("2023-02-06T19:19:02Z"), [metaFieldName]: 1, _id: 2, c: 1, d: 1};
+    const doc_m1_a_b_later = {[timeFieldName]: ISODate("2023-02-07T19:19:01Z"), [metaFieldName]: 1, _id: 1, a: 1, b: 1};
     const query_m1_a1 = {a: {$eq: 1}, [metaFieldName]: {$eq: 1}};
     const query_m1_b1 = {b: {$eq: 1}, [metaFieldName]: {$eq: 1}};
 
@@ -74,12 +69,12 @@ import {
             res: {
                 resultDocList: [doc_m1_b, doc_m1_c_d],
                 returnDoc: doc_m1_a_b,
-                bucketFilter: makeBucketFilter({meta: {$eq: 1}}, {
-                    $and: [
-                        {"control.min.a": {$_internalExprLte: 1}},
-                        {"control.max.a": {$_internalExprGte: 1}}
-                    ]
-                }),
+                bucketFilter: makeBucketFilter(
+                    {meta: {$eq: 1}},
+                    {
+                        $and: [{"control.min.a": {$_internalExprLte: 1}}, {"control.max.a": {$_internalExprGte: 1}}],
+                    },
+                ),
                 residualFilter: {a: {$eq: 1}},
                 nBucketsUnpacked: 1,
                 nMatched: 1,
@@ -96,12 +91,12 @@ import {
             res: {
                 resultDocList: [doc_m1_a_b, doc_m1_c_d],
                 returnDoc: doc_m1_a_b,
-                bucketFilter: makeBucketFilter({meta: {$eq: 1}}, {
-                    $and: [
-                        {"control.min.b": {$_internalExprLte: 1}},
-                        {"control.max.b": {$_internalExprGte: 1}}
-                    ]
-                }),
+                bucketFilter: makeBucketFilter(
+                    {meta: {$eq: 1}},
+                    {
+                        $and: [{"control.min.b": {$_internalExprLte: 1}}, {"control.max.b": {$_internalExprGte: 1}}],
+                    },
+                ),
                 residualFilter: {b: {$eq: 1}},
                 nBucketsUnpacked: 1,
                 nMatched: 1,
@@ -296,8 +291,7 @@ import {
 {
     const timestamp2023 = ISODate("2023-02-06T19:19:00Z");
     const doc_2023_m1_a1 = {[timeFieldName]: timestamp2023, [metaFieldName]: 1, _id: 1, a: 1};
-    const doc_2023_m2_a1_newField =
-        {[timeFieldName]: timestamp2023, [metaFieldName]: 2, _id: 1, a: 1, "newField": 42};
+    const doc_2023_m2_a1_newField = {[timeFieldName]: timestamp2023, [metaFieldName]: 2, _id: 1, a: 1, "newField": 42};
 
     // Update metaField and add a new field.
     (function testPipelineUpdateSetMultipleFields() {
@@ -305,20 +299,17 @@ import {
             initialDocList: [doc_2023_m1_a1],
             cmd: {
                 filter: {a: {$eq: 1}, [metaFieldName]: {$eq: 1}},
-                update: [
-                    {$set: {[metaFieldName]: 2}},
-                    {$set: {"newField": 42}},
-                ],
+                update: [{$set: {[metaFieldName]: 2}}, {$set: {"newField": 42}}],
             },
             res: {
                 resultDocList: [doc_2023_m2_a1_newField],
                 returnDoc: doc_2023_m1_a1,
-                bucketFilter: makeBucketFilter({meta: {$eq: 1}}, {
-                    $and: [
-                        {"control.min.a": {$_internalExprLte: 1}},
-                        {"control.max.a": {$_internalExprGte: 1}},
-                    ]
-                }),
+                bucketFilter: makeBucketFilter(
+                    {meta: {$eq: 1}},
+                    {
+                        $and: [{"control.min.a": {$_internalExprLte: 1}}, {"control.max.a": {$_internalExprGte: 1}}],
+                    },
+                ),
                 residualFilter: {a: {$eq: 1}},
                 nBucketsUnpacked: 1,
                 nMatched: 1,
@@ -391,10 +382,7 @@ import {
                 returnNew: true,
             },
             res: {
-                resultDocList: [
-                    doc_t2023_m2_id2_a2,
-                    returnDoc,
-                ],
+                resultDocList: [doc_t2023_m2_id2_a2, returnDoc],
                 returnDoc: returnDoc,
             },
         });
@@ -411,7 +399,7 @@ import {
             res: {
                 errorCode: ErrorCodes.BadValue,
                 resultDocList: [doc_t2023_m1_id1_a1, doc_t2023_m2_id2_a2],
-            }
+            },
         });
     })();
 

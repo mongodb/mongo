@@ -5,9 +5,7 @@
 //   not_allowed_with_signed_security_token,
 //   uses_transactions
 // ]
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "transaction_error_handling";
@@ -18,7 +16,7 @@ testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -33,8 +31,7 @@ try {
 }
 
 try {
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 } catch (e) {
     assert.eq(e.message, "There is no active transaction to abort on this session.");
 }
@@ -71,8 +68,7 @@ assert.commandWorked(session.commitTransaction_forTesting());
 jsTestLog("Test that we cannot abort a transaction that has already been committed");
 // We cannot call abortTransaction on a transaction that has already been committed.
 try {
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 } catch (e) {
     assert.eq(e.message, "Cannot call abortTransaction after calling commitTransaction.");
 }
@@ -96,14 +92,12 @@ try {
 jsTestLog("Test that we cannot abort a transaction that has already been aborted.");
 // We also cannot call abortTransaction on a transaction that has already been aborted.
 try {
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 } catch (e) {
     assert.eq(e.message, "Cannot call abortTransaction twice.");
 }
 
-jsTestLog(
-    "Test that a normal operation after committing a transaction changes the state to inactive.");
+jsTestLog("Test that a normal operation after committing a transaction changes the state to inactive.");
 withAbortAndRetryOnTransientTxnError(session, () => {
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
@@ -118,8 +112,7 @@ try {
     assert.eq(e.message, "There is no active transaction to commit on this session.");
 }
 
-jsTestLog(
-    "Test that a normal operation after aborting a transaction changes the state to inactive.");
+jsTestLog("Test that a normal operation after aborting a transaction changes the state to inactive.");
 withAbortAndRetryOnTransientTxnError(session, () => {
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "insert-4"}));
@@ -129,8 +122,7 @@ assert.commandWorked(session.abortTransaction_forTesting());
 // The transaction state should be changed to 'inactive'.
 assert.commandWorked(sessionColl.insert({_id: "normal-insert-2"}));
 try {
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 } catch (e) {
     assert.eq(e.message, "There is no active transaction to abort on this session.");
 }

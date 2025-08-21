@@ -10,19 +10,19 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var compare_configs = function(c1, c2) {
-    assert.eq(c1.version, c2.version, 'version same');
-    assert.eq(c1._id, c2._id, '_id same');
+var compare_configs = function (c1, c2) {
+    assert.eq(c1.version, c2.version, "version same");
+    assert.eq(c1._id, c2._id, "_id same");
 
     for (var i in c1.members) {
-        assert(c2.members[i] !== undefined, 'field ' + i + ' exists in both configs');
-        assert.eq(c1.members[i]._id, c2.members[i]._id, 'id is equal in both configs');
-        assert.eq(c1.members[i].host, c2.members[i].host, 'host is equal in both configs');
+        assert(c2.members[i] !== undefined, "field " + i + " exists in both configs");
+        assert.eq(c1.members[i]._id, c2.members[i]._id, "id is equal in both configs");
+        assert.eq(c1.members[i].host, c2.members[i].host, "host is equal in both configs");
     }
 };
 
 // Create a new replica set test. Specify set name and the number of nodes you want.
-var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
+var replTest = new ReplSetTest({name: "testSet", nodes: 3});
 
 // call startSet() to start each mongod in the replica set
 // this returns a list of nodes

@@ -26,12 +26,14 @@ assert(st.adminCommand({shardcollection: coll.getFullName(), key: {a: 1}}));
 line("Split point");
 code(tojson({a: 0}));
 assert(st.adminCommand({split: coll.getFullName(), middle: {a: 0}}));
-assert(st.adminCommand({
-    moveChunk: coll.getFullName(),
-    find: {a: 1},
-    to: st.getOther(st.getPrimaryShard("test")).name,
-    _waitForDelete: true
-}));
+assert(
+    st.adminCommand({
+        moveChunk: coll.getFullName(),
+        find: {a: 1},
+        to: st.getOther(st.getPrimaryShard("test")).name,
+        _waitForDelete: true,
+    }),
+);
 
 const docs = [
     {
@@ -48,17 +50,13 @@ const docs = [
         "_id": 2,
         "m": NumberInt(0),
         "a": NumberInt(-10),
-    }
+    },
 ];
 line("Inserting documents");
 code(tojson(docs));
 assert.commandWorked(coll.insert(docs));
 
-const pipeline = [
-    {"$sort": {"m": 1}},
-    {"$addFields": {"a": NumberInt(0)}},
-    {"$project": {"_id": 0, "a": 1}},
-];
+const pipeline = [{"$sort": {"m": 1}}, {"$addFields": {"a": NumberInt(0)}}, {"$project": {"_id": 0, "a": 1}}];
 
 subSection("Pipeline");
 code(tojson(pipeline));

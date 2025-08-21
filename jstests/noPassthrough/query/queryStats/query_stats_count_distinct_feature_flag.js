@@ -7,10 +7,12 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 const conn = MongoRunner.runMongod({
     setParameter: {featureFlagQueryStatsCountDistinct: false},
 });
-assert.neq(null, conn, 'failed to start mongod');
-const testDB = conn.getDB('test');
+assert.neq(null, conn, "failed to start mongod");
+const testDB = conn.getDB("test");
 
-assert(FeatureFlagUtil.isPresentAndDisabled(testDB, "QueryStatsCountDistinct"),
-       "featureFlagQueryStatsCountDistinct is undefined or enabled");
+assert(
+    FeatureFlagUtil.isPresentAndDisabled(testDB, "QueryStatsCountDistinct"),
+    "featureFlagQueryStatsCountDistinct is undefined or enabled",
+);
 
 MongoRunner.stopMongod(conn);

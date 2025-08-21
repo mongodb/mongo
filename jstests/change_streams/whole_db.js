@@ -9,10 +9,7 @@
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
-import {
-    assertInvalidChangeStreamNss,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
+import {assertInvalidChangeStreamNss, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDb.dropDatabase());
@@ -53,9 +50,8 @@ cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
 // Test that the change stream returns an inserted doc on a user-created collection whose name
 // includes "system" but is not considered an internal collection.
-const validSystemColls =
-    ["system", "systems.views", "ssystem.views", "test.system", "system_views"];
-validSystemColls.forEach(collName => {
+const validSystemColls = ["system", "systems.views", "ssystem.views", "test.system", "system_views"];
+validSystemColls.forEach((collName) => {
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
     const coll = testDb.getCollection(collName);
     assert.commandWorked(coll.insert({_id: 0, a: 1}));
@@ -93,8 +89,7 @@ if (!FixtureHelpers.isMongos(testDb)) {
     cst.getNextBatch(cursor);
     const profileEntry = getLatestProfilerEntry(testDb, {op: "getmore"});
     const firstStage = Object.keys(profileEntry.originatingCommand.pipeline[0])[0];
-    assert(["$changeStream", "$_internalChangeStreamOplogMatch"].includes(firstStage),
-           profileEntry);
+    assert(["$changeStream", "$_internalChangeStreamOplogMatch"].includes(firstStage), profileEntry);
 }
 
 cst.cleanUp();

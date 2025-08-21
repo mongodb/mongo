@@ -7,14 +7,19 @@ let s = "11235399833116571";
 for (let i = 10; i >= 0; --i) {
     let n = NumberLong(s + i);
     t.save({x: n});
-    if (0) {  // SERVER-3719
+    if (0) {
+        // SERVER-3719
         t.save({x: n.floatApprox});
     }
 }
 
-let ret = t.find().sort({x: 1}).toArray().filter(function(x) {
-    return typeof (x.x.floatApprox) != 'undefined';
-});
+let ret = t
+    .find()
+    .sort({x: 1})
+    .toArray()
+    .filter(function (x) {
+        return typeof x.x.floatApprox != "undefined";
+    });
 
 // printjson( ret );
 

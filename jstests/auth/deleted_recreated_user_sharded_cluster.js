@@ -10,7 +10,7 @@ const st = new ShardingTest({
     mongos: 2,
     config: 1,
     other: {
-        keyFile: 'jstests/libs/key1',
+        keyFile: "jstests/libs/key1",
         mongosOptions: {
             setParameter: {userCacheInvalidationIntervalSecs: kInvalidationIntervalSecs},
         },

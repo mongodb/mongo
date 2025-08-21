@@ -21,15 +21,16 @@ const config = replTest.getReplSetConfig();
 // Increase the election timeout so that we do not accidentally trigger an election while the
 // secondary is restarting.
 config.settings = {
-    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000,
 };
 replTest.initiate(config);
 
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "reconstruct_prepared_transactions_initial_sync_index_build";
@@ -51,19 +52,24 @@ secondary = replTest.start(
     {
         startClean: true,
         setParameter: {
-            'failpoint.initialSyncHangDuringCollectionClone': tojson(
-                {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 1}}),
-            'numInitialSyncAttempts': 1
-        }
+            "failpoint.initialSyncHangDuringCollectionClone": tojson({
+                mode: "alwaysOn",
+                data: {namespace: testColl.getFullName(), numDocsToClone: 1},
+            }),
+            "numInitialSyncAttempts": 1,
+        },
     },
-    true /* wait */);
+    true /* wait */,
+);
 
 // Wait for failpoint to be reached so we know that collection cloning is paused.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangDuringCollectionClone",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangDuringCollectionClone",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Running operations while collection cloning is paused");
 
@@ -95,8 +101,7 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session, {w: 1});
 jsTestLog("Resuming initial sync");
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
 // Unblock index build.
 // Let the primary finish its index build and replicate a commit to the secondary.

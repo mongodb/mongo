@@ -5,7 +5,7 @@
  */
 import "jstests/libs/parallelTester.js";
 
-export const $config = (function() {
+export const $config = (function () {
     // The organization of documents in every collection is as follows:
     //
     // (i)   Reserved for find:   {tid: tid, a:  0, b:  0} -->> {tid: tid, a: 24, b: 24}
@@ -20,8 +20,7 @@ export const $config = (function() {
         let bulk = coll.initializeUnorderedBulkOp();
 
         for (let i = 0; i < nDocsToInsert; ++i) {
-            bulk.insert(data.usingNestedKey ? {tid: data.tid, a: i, b: {c: i}}
-                                            : {tid: data.tid, a: i, b: i});
+            bulk.insert(data.usingNestedKey ? {tid: data.tid, a: i, b: {c: i}} : {tid: data.tid, a: i, b: i});
         }
 
         const res = bulk.execute();
@@ -37,7 +36,7 @@ export const $config = (function() {
             // Insert documents into all possible collections suffixed with this.latch.getCount()
             // that could receive CRUD operations over the course of the FSM workload.
             for (let i = this.latchCount; i >= 0; --i) {
-                let coll = db.getCollection(collName + '_' + i);
+                let coll = db.getCollection(collName + "_" + i);
                 insertDocs(this, coll);
             }
 
@@ -49,11 +48,10 @@ export const $config = (function() {
         insert: function insert(db, collName) {
             // Randomly add 1 to this.latch.getCount() to increase the odds of inserting into a
             // collection that has just been refined.
-            const collectionNumber = (Math.random() < 0.5)
-                ? this.latch.getCount()
-                : Math.min(this.latch.getCount() + 1, this.latchCount);
+            const collectionNumber =
+                Math.random() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
 
-            const coll = db.getCollection(collName + '_' + collectionNumber);
+            const coll = db.getCollection(collName + "_" + collectionNumber);
             const res = this.usingNestedKey
                 ? coll.insert({tid: this.tid, a: this.insertIdx, b: {c: this.insertIdx}})
                 : coll.insert({tid: this.tid, a: this.insertIdx, b: this.insertIdx});
@@ -66,12 +64,11 @@ export const $config = (function() {
         find: function find(db, collName) {
             // Randomly add 1 to this.latch.getCount() to increase the odds of finding in a
             // collection that has just been refined.
-            const collectionNumber = (Math.random() < 0.5)
-                ? this.latch.getCount()
-                : Math.min(this.latch.getCount() + 1, this.latchCount);
+            const collectionNumber =
+                Math.random() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
 
             const idx = Random.randInt(this.latchCount);
-            const coll = db.getCollection(collName + '_' + collectionNumber);
+            const coll = db.getCollection(collName + "_" + collectionNumber);
             const nFound = this.usingNestedKey
                 ? coll.find({tid: this.tid, a: idx, b: {c: idx}}).itcount()
                 : coll.find({tid: this.tid, a: idx, b: idx}).itcount();
@@ -82,25 +79,30 @@ export const $config = (function() {
         update: function update(db, collName) {
             // Randomly add 1 to this.latch.getCount() to increase the odds of updating in a
             // collection that has just been refined.
-            const collectionNumber = (Math.random() < 0.5)
-                ? this.latch.getCount()
-                : Math.min(this.latch.getCount() + 1, this.latchCount);
+            const collectionNumber =
+                Math.random() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
 
-            const coll = this.sessionDB.getCollection(collName + '_' + collectionNumber);
+            const coll = this.sessionDB.getCollection(collName + "_" + collectionNumber);
             const res = this.usingNestedKey
-                ? coll.update({tid: this.tid, a: this.updateIdx, b: {c: this.updateIdx}},
-                              {tid: this.tid, a: this.insertIdx, b: {c: this.insertIdx}})
-                : coll.update({tid: this.tid, a: this.updateIdx, b: this.updateIdx},
-                              {tid: this.tid, a: this.insertIdx, b: this.insertIdx});
+                ? coll.update(
+                      {tid: this.tid, a: this.updateIdx, b: {c: this.updateIdx}},
+                      {tid: this.tid, a: this.insertIdx, b: {c: this.insertIdx}},
+                  )
+                : coll.update(
+                      {tid: this.tid, a: this.updateIdx, b: this.updateIdx},
+                      {tid: this.tid, a: this.insertIdx, b: this.insertIdx},
+                  );
 
             if (res.hasWriteError()) {
                 let err = res.getWriteError();
-                if (TestData.runningWithBalancer && err.code === ErrorCodes.DuplicateKey &&
-                    err.errmsg.includes("Failed to update document's shard key field")) {
+                if (
+                    TestData.runningWithBalancer &&
+                    err.code === ErrorCodes.DuplicateKey &&
+                    err.errmsg.includes("Failed to update document's shard key field")
+                ) {
                     // If we are running with the balancer disabled, we might update the document so
                     // that it moves to a shard which contains an orphaned version of the document.
-                    jsTest.log(
-                        "Ignoring DuplicateKey error during update due to ongoing migrations");
+                    jsTest.log("Ignoring DuplicateKey error during update due to ongoing migrations");
                     return;
                 }
 
@@ -113,10 +115,13 @@ export const $config = (function() {
                     ErrorCodes.SnapshotUnavailable,
                     ErrorCodes.ExceededTimeLimit,
                 ]);
-                if (transientErrorCodes.has(err.code) &&
-                    err.errmsg.includes("was converted into a distributed transaction")) {
+                if (
+                    transientErrorCodes.has(err.code) &&
+                    err.errmsg.includes("was converted into a distributed transaction")
+                ) {
                     jsTest.log(
-                        "Ignoring transient error during an update operation after a WouldChangeOwningShard error");
+                        "Ignoring transient error during an update operation after a WouldChangeOwningShard error",
+                    );
                     return;
                 }
             }
@@ -132,16 +137,13 @@ export const $config = (function() {
         remove: function remove(db, collName) {
             // Randomly add 1 to this.latch.getCount() to increase the odds of removing from a
             // collection that has just been refined.
-            const collectionNumber = (Math.random() < 0.5)
-                ? this.latch.getCount()
-                : Math.min(this.latch.getCount() + 1, this.latchCount);
+            const collectionNumber =
+                Math.random() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
 
-            const coll = db.getCollection(collName + '_' + collectionNumber);
+            const coll = db.getCollection(collName + "_" + collectionNumber);
             const res = this.usingNestedKey
-                ? coll.remove({tid: this.tid, a: this.removeIdx, b: {c: this.removeIdx}},
-                              {justOne: true})
-                : coll.remove({tid: this.tid, a: this.removeIdx, b: this.removeIdx},
-                              {justOne: true});
+                ? coll.remove({tid: this.tid, a: this.removeIdx, b: {c: this.removeIdx}}, {justOne: true})
+                : coll.remove({tid: this.tid, a: this.removeIdx, b: this.removeIdx}, {justOne: true});
 
             assert.commandWorked(res);
             assert.eq(res.nRemoved, 1);
@@ -149,11 +151,12 @@ export const $config = (function() {
         },
 
         refineCollectionShardKey: function refineCollectionShardKey(db, collName) {
-            const coll = db.getCollection(collName + '_' + this.latch.getCount().toString());
+            const coll = db.getCollection(collName + "_" + this.latch.getCount().toString());
 
             try {
-                assert.commandWorked(db.adminCommand(
-                    {refineCollectionShardKey: coll.getFullName(), key: this.newShardKey}));
+                assert.commandWorked(
+                    db.adminCommand({refineCollectionShardKey: coll.getFullName(), key: this.newShardKey}),
+                );
             } catch (e) {
                 // There is a race that could occur where two threads run refineCollectionShardKey
                 // concurrently on the same collection. Since the epoch of the collection changes,
@@ -172,7 +175,7 @@ export const $config = (function() {
         // collections can be successfully loaded.
         flushRouterConfig: function flushRouterConfig(db, collName) {
             assert.commandWorked(db.adminCommand({flushRouterConfig: db.getName()}));
-        }
+        },
     };
 
     const transitions = {
@@ -183,7 +186,7 @@ export const $config = (function() {
             update: 0.18,
             remove: 0.18,
             refineCollectionShardKey: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         find: {
             insert: 0.18,
@@ -191,7 +194,7 @@ export const $config = (function() {
             update: 0.18,
             remove: 0.18,
             refineCollectionShardKey: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         update: {
             insert: 0.18,
@@ -199,7 +202,7 @@ export const $config = (function() {
             update: 0.18,
             remove: 0.18,
             refineCollectionShardKey: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         remove: {
             insert: 0.18,
@@ -207,7 +210,7 @@ export const $config = (function() {
             update: 0.18,
             remove: 0.18,
             refineCollectionShardKey: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         refineCollectionShardKey: {
             insert: 0.18,
@@ -215,10 +218,9 @@ export const $config = (function() {
             update: 0.18,
             remove: 0.18,
             refineCollectionShardKey: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
-        flushRouterConfig:
-            {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2},
+        flushRouterConfig: {insert: 0.2, find: 0.2, update: 0.2, remove: 0.2, refineCollectionShardKey: 0.2},
     };
 
     function setup(db, collName, cluster) {
@@ -237,9 +239,8 @@ export const $config = (function() {
         // race that could occur between sharding a collection and creating an index on the new
         // shard key (if this step were done after every refineCollectionShardKey).
         for (let i = this.latchCount; i >= 0; --i) {
-            let coll = db.getCollection(collName + '_' + i);
-            assert.commandWorked(
-                db.adminCommand({shardCollection: coll.getFullName(), key: this.oldShardKey}));
+            let coll = db.getCollection(collName + "_" + i);
+            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: this.oldShardKey}));
             assert.commandWorked(coll.createIndex(this.newShardKey));
         }
     }
@@ -247,7 +248,7 @@ export const $config = (function() {
     return {
         threadCount: 5,
         iterations: 25,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         setup: setup,
@@ -255,6 +256,6 @@ export const $config = (function() {
             newShardKey: {a: 1, b: 1},
             oldShardKey: {a: 1},
             usingNestedKey: false,
-        }
+        },
     };
 })();

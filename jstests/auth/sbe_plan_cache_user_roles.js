@@ -17,15 +17,13 @@ const db = mongod.getDB(dbName);
 const sbeEnabled = checkSbeFullyEnabled(db);
 
 // Create two users, each with different roles.
-assert.commandWorked(
-    db.runCommand({createUser: "user1", pwd: "pwd", roles: [{role: "read", db: dbName}]}));
-assert.commandWorked(
-    db.runCommand({createUser: "user2", pwd: "pwd", roles: [{role: "readWrite", db: dbName}]}));
+assert.commandWorked(db.runCommand({createUser: "user1", pwd: "pwd", roles: [{role: "read", db: dbName}]}));
+assert.commandWorked(db.runCommand({createUser: "user2", pwd: "pwd", roles: [{role: "readWrite", db: dbName}]}));
 
 const coll = db.sbe_plan_cache_user_roles;
 coll.drop();
 
-const verifyPlanCache = function(role) {
+const verifyPlanCache = function (role) {
     if (sbeEnabled) {
         const caches = coll.getPlanCache().list();
         assert.eq(1, caches.length, caches);

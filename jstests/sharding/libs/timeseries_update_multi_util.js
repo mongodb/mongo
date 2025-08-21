@@ -5,9 +5,9 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
-export const TimeseriesMultiUpdateUtil = (function() {
-    const timeField = 'time';
-    const metaField = 'hostid';
+export const TimeseriesMultiUpdateUtil = (function () {
+    const timeField = "time";
+    const metaField = "hostid";
 
     // The split point between two shards. This value guarantees that generated time values do not
     // fall on this boundary.
@@ -21,24 +21,24 @@ export const TimeseriesMultiUpdateUtil = (function() {
     const collectionConfigurations = {
         // Shard key only on meta field/subfields.
         metaShardKey: {
-            metaGenerator: (id => id),
+            metaGenerator: (id) => id,
             shardKey: {[metaField]: 1},
             splitPoint: {meta: 2},
         },
         metaShardKeyString: {
-            metaGenerator: (id => `string:${id}`),
+            metaGenerator: (id) => `string:${id}`,
             shardKey: {[metaField]: 1},
             splitPoint: {meta: `string:2`},
         },
         metaObjectShardKey: {
-            metaGenerator: (index => ({a: index})),
+            metaGenerator: (index) => ({a: index}),
             shardKey: {[metaField]: 1},
             splitPoint: {meta: {a: 2}},
         },
         metaSubFieldShardKey: {
-            metaGenerator: (index => ({a: index})),
-            shardKey: {[metaField + '.a']: 1},
-            splitPoint: {'meta.a': 2},
+            metaGenerator: (index) => ({a: index}),
+            shardKey: {[metaField + ".a"]: 1},
+            splitPoint: {"meta.a": 2},
         },
 
         // Shard key on time field.
@@ -49,20 +49,19 @@ export const TimeseriesMultiUpdateUtil = (function() {
 
         // Shard key on both meta and time field.
         metaTimeShardKey: {
-            metaGenerator: (id => id),
+            metaGenerator: (id) => id,
             shardKey: {[metaField]: 1, [timeField]: 1},
             splitPoint: {meta: 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
         },
         metaObjectTimeShardKey: {
-            metaGenerator: (index => ({a: index})),
+            metaGenerator: (index) => ({a: index}),
             shardKey: {[metaField]: 1, [timeField]: 1},
-            splitPoint:
-                {meta: {a: 2}, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
+            splitPoint: {meta: {a: 2}, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
         },
         metaSubFieldTimeShardKey: {
-            metaGenerator: (index => ({a: index})),
-            shardKey: {[metaField + '.a']: 1, [timeField]: 1},
-            splitPoint: {'meta.a': 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
+            metaGenerator: (index) => ({a: index}),
+            shardKey: {[metaField + ".a"]: 1, [timeField]: 1},
+            splitPoint: {"meta.a": 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
         },
     };
 
@@ -80,8 +79,7 @@ export const TimeseriesMultiUpdateUtil = (function() {
         return documents;
     }
 
-    function prepareShardedTimeseriesCollection(
-        mongos, shardingTest, db, collName, collConfig, insertFn) {
+    function prepareShardedTimeseriesCollection(mongos, shardingTest, db, collName, collConfig, insertFn) {
         // Ensures that the collection does not exist.
         const coll = db.getCollection(collName);
         coll.drop();
@@ -96,20 +94,24 @@ export const TimeseriesMultiUpdateUtil = (function() {
 
         // Shards timeseries collection.
         assert.commandWorked(coll.createIndex(collConfig.shardKey));
-        assert.commandWorked(mongos.adminCommand({
-            shardCollection: `${db.getName()}.${collName}`,
-            key: collConfig.shardKey,
-        }));
+        assert.commandWorked(
+            mongos.adminCommand({
+                shardCollection: `${db.getName()}.${collName}`,
+                key: collConfig.shardKey,
+            }),
+        );
 
         // Inserts initial set of documents.
         const documents = generateDocsForTestCase(collConfig);
         assert.commandWorked(insertFn(coll, documents));
 
         // Manually splits the data into two chunks.
-        assert.commandWorked(mongos.adminCommand({
-            split: getTimeseriesCollForDDLOps(db, coll).getFullName(),
-            middle: collConfig.splitPoint
-        }));
+        assert.commandWorked(
+            mongos.adminCommand({
+                split: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                middle: collConfig.splitPoint,
+            }),
+        );
 
         // Ensures that currently both chunks reside on the primary shard.
         let counts = shardingTest.chunkCounts(collName, db.getName());
@@ -118,12 +120,14 @@ export const TimeseriesMultiUpdateUtil = (function() {
 
         // Moves one of the chunks into the second shard.
         const otherShard = shardingTest.getOther(primaryShard);
-        assert.commandWorked(mongos.adminCommand({
-            movechunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
-            find: collConfig.splitPoint,
-            to: otherShard.name,
-            _waitForDelete: true
-        }));
+        assert.commandWorked(
+            mongos.adminCommand({
+                movechunk: getTimeseriesCollForDDLOps(db, coll).getFullName(),
+                find: collConfig.splitPoint,
+                to: otherShard.name,
+                _waitForDelete: true,
+            }),
+        );
 
         // Ensures that each shard owns one chunk.
         counts = shardingTest.chunkCounts(collName, db.getName());

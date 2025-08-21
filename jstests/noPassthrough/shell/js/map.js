@@ -1,8 +1,8 @@
 import {describe, it} from "jstests/libs/mochalite.js";
 
-describe("Map shims and polyfills", function() {
-    describe("built-in Map", function() {
-        it("should be able to create and compare Maps", function() {
+describe("Map shims and polyfills", function () {
+    describe("built-in Map", function () {
+        it("should be able to create and compare Maps", function () {
             let m = new Map();
             assert.eq(m, m);
             assert.eq(m, new Map());
@@ -17,24 +17,24 @@ describe("Map shims and polyfills", function() {
             assert.eq(m1, m2);
         });
 
-        it("converts to JSON", function() {
+        it("converts to JSON", function () {
             let m = new Map();
-            assert.eq(Map.tojson(m), 'new Map([ ])');
+            assert.eq(Map.tojson(m), "new Map([ ])");
 
             m.set("key1", 1);
             m.set("key2", 2);
-            assert.eq(Map.tojson(m, '', true), 'new Map([ [ "key1", 1 ], [ "key2", 2 ] ])');
+            assert.eq(Map.tojson(m, "", true), 'new Map([ [ "key1", 1 ], [ "key2", 2 ] ])');
         });
     });
 
-    describe("BSONAwareMap", function() {
-        it("should be able to create and compare BSONAwareMaps", function() {
+    describe("BSONAwareMap", function () {
+        it("should be able to create and compare BSONAwareMaps", function () {
             let m = new BSONAwareMap();
             assert.eq(m, m);
             assert.eq(m, new BSONAwareMap());
         });
 
-        it("should put and get", function() {
+        it("should put and get", function () {
             let m1 = new BSONAwareMap();
             assert.isnull(m1.get("key"));
 
@@ -52,7 +52,7 @@ describe("Map shims and polyfills", function() {
             assert.eq(m2.get("key"), 2);
         });
 
-        it("should put and get with object keys", function() {
+        it("should put and get with object keys", function () {
             let m = new BSONAwareMap();
 
             m.put({a: 1}, 17);
@@ -67,7 +67,7 @@ describe("Map shims and polyfills", function() {
             assert.isnull(m.get({b: 1, a: 1}));
         });
 
-        it("hash", function() {
+        it("hash", function () {
             let h, err;
 
             // nullish
@@ -98,7 +98,7 @@ describe("Map shims and polyfills", function() {
 
             // invalid
             err = assert.throws(() => {
-                BSONAwareMap.hash(function() {});
+                BSONAwareMap.hash(function () {});
             });
             assert.eq(err.message, "can't hash : function");
 
@@ -113,7 +113,7 @@ describe("Map shims and polyfills", function() {
             assert.eq(h, false);
         });
 
-        it("values", function() {
+        it("values", function () {
             let m = new BSONAwareMap();
             m.put("key1", 1);
             m.put("key2", "foo");

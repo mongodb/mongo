@@ -5,7 +5,7 @@
 import {
     assertOnDiagnosticLogContents,
     getQueryPlannerAlwaysFailsWithNamespace,
-    runWithFailpoint
+    runWithFailpoint,
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -24,7 +24,7 @@ const {failpointName, failpointOpts, errorCode} = getQueryPlannerAlwaysFailsWith
 const command = {
     aggregate: viewName,
     pipeline: [{$addFields: {b: 1}}],
-    cursor: {}
+    cursor: {},
 };
 
 function runTest(description, isSharded, connToRunCommand, connToCheckLogs) {
@@ -32,13 +32,15 @@ function runTest(description, isSharded, connToRunCommand, connToCheckLogs) {
         assert.commandFailedWithCode(
             connToRunCommand.getDB(dbName).runCommand(command),
             errorCode,
-            "Expected pipeline against sharded view to fail with queryPlannerAlwaysFails failpoint");
+            "Expected pipeline against sharded view to fail with queryPlannerAlwaysFails failpoint",
+        );
     });
 
     const shardedDiagnostics = [
         `\'opDescription\': { aggregate: \\"${
-                      collName}\\", pipeline: [ { $match: { a: 1.0 } }, { $addFields: { b: { $const: 1.0 } } } ]`,
-        `\'shardKeyPattern\': { a: 1.0 }`
+            collName
+        }\\", pipeline: [ { $match: { a: 1.0 } }, { $addFields: { b: { $const: 1.0 } } } ]`,
+        `\'shardKeyPattern\': { a: 1.0 }`,
     ];
     const unshardedDiagnostics = [
         `resolvedPipeline: [ { $match: { a: 1.0 } } ] } ]`,
@@ -51,7 +53,7 @@ function runTest(description, isSharded, connToRunCommand, connToCheckLogs) {
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
             ...(isSharded ? shardedDiagnostics : unshardedDiagnostics),
-        ]
+        ],
     });
 }
 

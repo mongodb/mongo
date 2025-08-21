@@ -24,17 +24,16 @@ const mongo = db.getMongo();
 /* The individual flavors of drop that we will be testing. */
 const dropOperations = [
     {
-        dropCommand: (function(db) {
+        dropCommand: function (db) {
             assert.commandWorked(db.runCommand({drop: collName}));
-        })
+        },
     },
     {
         dropsDatabase: true,
-        dropCommand: (function() {
+        dropCommand: function () {
             assert.commandWorked(mongo.getDB(dbName).dropDatabase());
-        })
-    }
-
+        },
+    },
 ];
 
 /*
@@ -45,172 +44,160 @@ const dropOperations = [
  */
 const commandValidatorsAfterCollDrop = [
     {
-        afterDrop: (function(_, coll, __) {
-            return coll.aggregate(
-                           {$match: {a: 2}},
-                           )
-                       .toArray()
-                       .length == 0;
-        })
+        afterDrop: function (_, coll, __) {
+            return coll.aggregate({$match: {a: 2}}).toArray().length == 0;
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.count({a: 2}) == 0;
-        })
-
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.countDocuments({a: 2}) == 0;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.deleteOne({a: 3}).deletedCount == 0;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.deleteMany({a: 3}).deletedCount == 0;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.distinct("a").length == 0;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.estimatedDocumentCount() == 0;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.find({a: 2}).toArray().length == 0;
-        })
-
+        },
     },
     // We also test find() with no condition in case it is handled differently.
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.find().toArray().length == 0;
-        })
-
+        },
     },
     // Test creating the cursor before the drop() with the default batch size.
     // No error expected since the entire result is populated prior to the drop().
     {
-        beforeDrop: (function(_, coll) {
+        beforeDrop: function (_, coll) {
             return coll.find({a: 2});
-        }),
+        },
 
-        afterDrop: (function(_, __, cur) {
+        afterDrop: function (_, __, cur) {
             return cur.toArray().length == 0;
-        })
+        },
     },
     // Test a cursor with a batchSize of 1. The getMore after the drop will error out.
     {
-        beforeDrop: (function(_, coll, __) {
+        beforeDrop: function (_, coll, __) {
             const cur = coll.find({a: 2}).batchSize(1);
             cur.next();
             return cur;
-        }),
+        },
 
-        afterDrop: (function(db, _, cur) {
+        afterDrop: function (db, _, cur) {
             assert.commandFailedWithCode(
                 db.runCommand("getMore", {getMore: cur._cursor._cursorid, collection: collName}),
-                ErrorCodes.QueryPlanKilled);
+                ErrorCodes.QueryPlanKilled,
+            );
             return true;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.find({a: 2}).batchSize(0).toArray().length == 0;
-        })
-
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.find({a: 2}).batchSize(1).toArray().length == 0;
-        })
-
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.find().limit(1).toArray().length == 0;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.find().skip(1).toArray().length == 0;
-        })
-
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.find().sort({"a": 1}).toArray().length == 0;
-        })
-
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.find().sort({"a": -1}).toArray().length == 0;
-        })
-
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
-            return coll.findAndModify({query: {a: 2}, update: {$inc: {a: 1}}, upsert: true}) ==
-                null;
-        })
+        afterDrop: function (_, coll, __) {
+            return coll.findAndModify({query: {a: 2}, update: {$inc: {a: 1}}, upsert: true}) == null;
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.findOne({a: 2}) == null;
-        })
-
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.findOneAndDelete({a: 2}) == null;
-        })
+        },
     },
     {
         // We skip this test if we are using dropDatabase() as there will be no database to write
         // the ouput mapReduce collection to.
         requiresUndroppedDatabase: true,
-        afterDrop: (function(db, coll) {
+        afterDrop: function (db, coll) {
             coll.mapReduce(
-                function() {
+                function () {
                     emit(this.a);
                 },
-                function(a) {
+                function (a) {
                     return Array.sum(a);
                 },
-                {out: "validate_commands_after_drop_map_reduce1"});
+                {out: "validate_commands_after_drop_map_reduce1"},
+            );
             return db.validate_commands_after_drop_map_reduce1.find().toArray().length == 0;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.replaceOne({a: 3}, {a: 5}).matchedCount == 0;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.update({a: 3}, {$set: {b: 3}}).nMatched == 0;
-        })
+        },
     },
 
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.updateOne({a: 3}, {$set: {b: 3}}).matchedCount == 0;
-        })
+        },
     },
     {
-        afterDrop: (function(_, coll, __) {
+        afterDrop: function (_, coll, __) {
             return coll.updateMany({a: 3}, {$set: {b: 3}}).matchedCount == 0;
-        })
+        },
     },
 
     //
@@ -218,12 +205,12 @@ const commandValidatorsAfterCollDrop = [
     //
 
     {
-        afterDrop: (function(_, coll) {
+        afterDrop: function (_, coll) {
             const explain = assert.commandWorked(coll.find().explain());
             let winningPlan = getWinningPlanFromExplain(explain);
             assert(isEofPlan(db, winningPlan));
             return explain != null;
-        })
+        },
     },
     /*
      * Calling mapReduce() before the drop(). The complete result can  still be retrieved after the
@@ -232,30 +219,26 @@ const commandValidatorsAfterCollDrop = [
      */
     {
         requiresUndroppedDatabase: true,
-        beforeDrop: (function(_, coll) {
+        beforeDrop: function (_, coll) {
             coll.mapReduce(
-                function() {
+                function () {
                     emit(this._id, this.a);
                 },
-                function(key, values) {
+                function (key, values) {
                     return Array.sum(values);
                 },
-                {out: "validate_commands_after_drop_map_reduce2"});
-        }),
-        afterDrop: (function(db, _, __) {
-            return db.validate_commands_after_drop_map_reduce2.find()
-                       .batchSize(0)
-                       .toArray()
-                       .length > 0;
-        })
+                {out: "validate_commands_after_drop_map_reduce2"},
+            );
+        },
+        afterDrop: function (db, _, __) {
+            return db.validate_commands_after_drop_map_reduce2.find().batchSize(0).toArray().length > 0;
+        },
     },
     {
-        afterDrop: (function(_, coll) {
+        afterDrop: function (_, coll) {
             return Object.keys(coll.stats()).length > 0;
-        })
-
+        },
     },
-
 ];
 
 for (const dropOperation of dropOperations) {
@@ -276,8 +259,9 @@ for (const dropOperation of dropOperations) {
             continue;
         }
 
-        assert(validator.afterDrop(db, coll, cur),
-               `Unexpected result from afterDrop: ${validator.afterDrop}, dropCommand: ${
-                   dropOperation.dropCommand};`);
+        assert(
+            validator.afterDrop(db, coll, cur),
+            `Unexpected result from afterDrop: ${validator.afterDrop}, dropCommand: ${dropOperation.dropCommand};`,
+        );
     }
 }

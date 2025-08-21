@@ -8,7 +8,7 @@ import {
     WriteCommandError,
     WriteConcern,
     WriteError,
-    WriteResult
+    WriteResult,
 } from "src/mongo/shell/bulk_api.js";
 
 globalThis.WriteConcern = WriteConcern;

@@ -45,9 +45,9 @@ export class ConfigExpandRestServer {
      * }
      */
     getStringReflectionURL(str, options = {}) {
-        let url = this.getURL() + '/reflect/string?string=' + encodeURI(str);
+        let url = this.getURL() + "/reflect/string?string=" + encodeURI(str);
         if (options.sleep !== undefined) {
-            url += '&sleep=' + encodeURI(options.sleep);
+            url += "&sleep=" + encodeURI(options.sleep);
         }
         return url;
     }
@@ -67,7 +67,7 @@ export class ConfigExpandRestServer {
         assert(checkProgram(this.pid));
 
         // Wait for the web server to start
-        assert.soon(function() {
+        assert.soon(function () {
             return rawMongoProgramOutput(".*").search("Mock Web Server Listening") !== -1;
         });
 
@@ -83,19 +83,29 @@ export class ConfigExpandRestServer {
 }
 
 export function makeReflectionCmd(arg, opts = {}) {
-    return function(arg, opts) {
+    return function (arg, opts) {
         let cmd = getPython3Binary();
-        cmd += ' jstests/noPassthrough/libs/configExpand/reflect.py';
+        cmd += " jstests/noPassthrough/libs/configExpand/reflect.py";
 
-        if (opts.sleep && (opts.sleep > 0)) {
-            cmd += ' -s ' + Number(opts.sleep);
+        if (opts.sleep && opts.sleep > 0) {
+            cmd += " -s " + Number(opts.sleep);
         }
 
         // Escape arguments to the shell by wrapping in OS appropriate quotes.
         if (_isWindows()) {
-            cmd += ' ' + arg.split('"').map(v => '"' + v + '"').join('\\"');
+            cmd +=
+                " " +
+                arg
+                    .split('"')
+                    .map((v) => '"' + v + '"')
+                    .join('\\"');
         } else {
-            cmd += ' ' + arg.split("'").map(v => "'" + v + "'").join("\\'");
+            cmd +=
+                " " +
+                arg
+                    .split("'")
+                    .map((v) => "'" + v + "'")
+                    .join("\\'");
         }
 
         return cmd;
@@ -103,29 +113,29 @@ export function makeReflectionCmd(arg, opts = {}) {
 }
 
 export function jsToYaml(config, toplevel = true) {
-    if (typeof config === 'object') {
+    if (typeof config === "object") {
         if (Array.isArray(config)) {
-            let delim = '';
-            let yaml = '';
-            config.forEach(function(v) {
+            let delim = "";
+            let yaml = "";
+            config.forEach(function (v) {
                 yaml += delim + jsToYaml(v, false);
-                delim = ',';
+                delim = ",";
             });
-            return '[' + yaml + ']';
+            return "[" + yaml + "]";
         } else {
-            let delim = '';
-            let yaml = '';
+            let delim = "";
+            let yaml = "";
             for (let k in config) {
                 yaml += delim + k + ": " + jsToYaml(config[k], false);
-                delim = toplevel ? "\n" : ',';
+                delim = toplevel ? "\n" : ",";
             }
             if (toplevel) {
                 return yaml;
             } else {
-                return '{' + yaml + '}';
+                return "{" + yaml + "}";
             }
         }
-    } else if (typeof config === 'string') {
+    } else if (typeof config === "string") {
         return "'" + config.replace(/'/g, "''") + "'";
     } else {
         // Simple scalar JSON types are close enough to YAML types.
@@ -134,7 +144,7 @@ export function jsToYaml(config, toplevel = true) {
 }
 
 export function configExpandSuccess(config, test = null, opts = {}) {
-    const configFile = MongoRunner.dataPath + '/configExpand.conf';
+    const configFile = MongoRunner.dataPath + "/configExpand.conf";
     writeFile(configFile, jsToYaml(config));
 
     let chmod = 0o600;
@@ -147,23 +157,27 @@ export function configExpandSuccess(config, test = null, opts = {}) {
         assert.eq(0, runNonMongoProgram("chmod", chmod.toString(8), configFile));
     }
 
-    const mongod = MongoRunner.runMongod(Object.assign({
-        configExpand: 'rest,exec',
-        config: configFile,
-    },
-                                                       opts));
+    const mongod = MongoRunner.runMongod(
+        Object.assign(
+            {
+                configExpand: "rest,exec",
+                config: configFile,
+            },
+            opts,
+        ),
+    );
 
     assert(mongod, "Mongod failed to start up with config: " + cat(configFile));
     removeFile(configFile);
 
     if (test) {
-        test(mongod.getDB('admin'));
+        test(mongod.getDB("admin"));
     }
     MongoRunner.stopMongod(mongod);
 }
 
 export function configExpandFailure(config, test = null, opts = {}) {
-    const configFile = MongoRunner.dataPath + '/configExpand.conf';
+    const configFile = MongoRunner.dataPath + "/configExpand.conf";
     writeFile(configFile, jsToYaml(config));
 
     let chmod = 0o600;
@@ -176,16 +190,18 @@ export function configExpandFailure(config, test = null, opts = {}) {
         assert.eq(0, runNonMongoProgram("chmod", chmod.toString(8), configFile));
     }
 
-    const options = Object.assign({
-        configExpand: 'rest,exec',
-        config: configFile,
-        port: allocatePort(),
-    },
-                                  opts);
+    const options = Object.assign(
+        {
+            configExpand: "rest,exec",
+            config: configFile,
+            port: allocatePort(),
+        },
+        opts,
+    );
     let args = [MongoRunner.getMongodPath()];
     for (let k in options) {
-        args.push('--' + k);
-        if (options[k] != '') {
+        args.push("--" + k);
+        if (options[k] != "") {
             args.push(String(options[k]));
         }
     }
@@ -193,7 +209,7 @@ export function configExpandFailure(config, test = null, opts = {}) {
     clearRawMongoProgramOutput();
     const mongod = _startMongoProgram({args: args});
 
-    assert.soon(function() {
+    assert.soon(function () {
         return rawMongoProgramOutput(".*").match(test);
     });
     if (mongod) {

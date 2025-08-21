@@ -7,7 +7,7 @@
  * ]
  */
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
-const coll = db.getCollection('test');
+const coll = db.getCollection("test");
 let fn = (val) => {
     coll.drop();
     for (let rhs of [val, {foo: val}, {eq: val}]) {

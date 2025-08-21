@@ -11,12 +11,14 @@ const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 
-assert.commandWorked(coll.insertMany([
-    {floor: 0, storeName: "Bob's Burger"},
-    {floor: 1, storeName: "Burgers Galore"},
-    {floor: 2, storeName: "Hot Dog Stand"},
-    {floor: 3, storeName: "Burger Wanna Burger"}
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {floor: 0, storeName: "Bob's Burger"},
+        {floor: 1, storeName: "Burgers Galore"},
+        {floor: 2, storeName: "Hot Dog Stand"},
+        {floor: 3, storeName: "Burger Wanna Burger"},
+    ]),
+);
 
 const indexName = "mall_stores_index";
 createSearchIndex(coll, {name: indexName, definition: {"mappings": {"dynamic": true}}});
@@ -24,7 +26,7 @@ createSearchIndex(coll, {name: indexName, definition: {"mappings": {"dynamic": t
 const searchQuery = {
     index: indexName,
     text: {query: "Burger", path: ["storeName"]},
-    scoreDetails: true
+    scoreDetails: true,
 };
 
 function runTest({forceProjectionOnMerger}) {
@@ -41,11 +43,14 @@ function runTest({forceProjectionOnMerger}) {
         return pipeline;
     }
 
-    let results = coll.aggregate(buildPipeline({
-                          scoreDetails: {$meta: "scoreDetails"},
-                          searchScoreDetails: {$meta: "searchScoreDetails"}
-                      }))
-                      .toArray();
+    let results = coll
+        .aggregate(
+            buildPipeline({
+                scoreDetails: {$meta: "scoreDetails"},
+                searchScoreDetails: {$meta: "searchScoreDetails"},
+            }),
+        )
+        .toArray();
     assert.eq(results.length, 2);
 
     // "scoreDetails" and "searchScoreDetails" should have the same contents populated by whatever
@@ -57,10 +62,13 @@ function runTest({forceProjectionOnMerger}) {
     }
 
     // We should also be able to project $scoreDetails by itself.
-    results = coll.aggregate(buildPipeline({
-                      scoreDetails: {$meta: "scoreDetails"},
-                  }))
-                  .toArray();
+    results = coll
+        .aggregate(
+            buildPipeline({
+                scoreDetails: {$meta: "scoreDetails"},
+            }),
+        )
+        .toArray();
     assert.eq(results.length, 2);
 
     for (let result of results) {

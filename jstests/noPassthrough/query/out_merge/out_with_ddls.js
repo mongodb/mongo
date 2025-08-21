@@ -16,20 +16,25 @@ function execDuringOutAgg(st, sourceColl, targetColl, failpointName, func) {
         cmdObj: {
             configureFailPoint: failpointName,
             mode: "alwaysOn",
-        }
+        },
     });
-    res.forEach(cmdResult => assert.commandWorked(cmdResult));
+    res.forEach((cmdResult) => assert.commandWorked(cmdResult));
 
     const aggCommand = {
         aggregate: sourceColl.getName(),
         pipeline: [{$out: {db: targetColl.getDB().getName(), coll: targetColl.getName()}}],
-        cursor: {}
+        cursor: {},
     };
 
-    let aggThread = new Thread((host, dbName, aggCommand) => {
-        const conn = new Mongo(host);
-        return conn.getDB(dbName).runCommand(aggCommand);
-    }, st.s.host, sourceColl.getDB().getName(), aggCommand);
+    let aggThread = new Thread(
+        (host, dbName, aggCommand) => {
+            const conn = new Mongo(host);
+            return conn.getDB(dbName).runCommand(aggCommand);
+        },
+        st.s.host,
+        sourceColl.getDB().getName(),
+        aggCommand,
+    );
     aggThread.start();
 
     waitForCurOpByFailPointNoNS(sourceColl.getDB(), failpointName);
@@ -41,24 +46,24 @@ function execDuringOutAgg(st, sourceColl, targetColl, failpointName, func) {
         cmdObj: {
             configureFailPoint: failpointName,
             mode: "off",
-        }
+        },
     });
 
     return aggThread.returnData();
 }
 
 const st = new ShardingTest({shards: 3, mongos: 1, rs: {nodes: 3}});
-const sourceDB = st.s.getDB('sourceDB');
-const sourceColl = sourceDB['sourceColl'];
-const targetDB = st.s.getDB('destDB');
-const targetColl = targetDB['destColl'];
+const sourceDB = st.s.getDB("sourceDB");
+const sourceColl = sourceDB["sourceColl"];
+const targetDB = st.s.getDB("destDB");
+const targetColl = targetDB["destColl"];
 
 function getTempOutColl() {
     const colls = targetDB.getCollectionNames();
     jsTest.log(`Collections: ${tojson(colls)}`);
     assert.eq(1, colls.length);
     const tmpAggCollName = colls[0];
-    assert(tmpAggCollName.startsWith('tmp.agg_out.'));
+    assert(tmpAggCollName.startsWith("tmp.agg_out."));
     const tmpAggColl = targetDB[tmpAggCollName];
     return tmpAggColl;
 }
@@ -88,7 +93,7 @@ function setupLargeDocs() {
 
     // Insert 20 ~1MB documents so they don't all fit in one 16MB out write batch.
     var batch = sourceColl.initializeUnorderedBulkOp();
-    let largeVal = 'a'.repeat(1024 * 1024);
+    let largeVal = "a".repeat(1024 * 1024);
     for (let i = 0; i < 20; i++) {
         batch.insert({val: i, x: largeVal});
     }
@@ -107,7 +112,7 @@ function assertSerializedOrError({desc, failpointName, setupFn, ddlFn, ignorePla
     const aggCommand = {
         aggregate: sourceColl.getName(),
         pipeline: [{$out: {db: targetColl.getDB().getName(), coll: targetColl.getName()}}],
-        cursor: {}
+        cursor: {},
     };
 
     if (!aggRes.ok) {
@@ -154,48 +159,53 @@ function assertSerializedOrError({desc, failpointName, setupFn, ddlFn, ignorePla
     if (!(sameAsAD || sameAsDA)) {
         throw doassert(
             `parallel $out and DDL operation test "${desc}" did not throw an error and the ` +
-            `state of the database after the command was not equivalent to running them in ` +
-            `serial.\n` +
-            `parallel: ${tojson(parallelState)}\n` +
-            `aggregate then DDL operation: ${tojson(serialADState)}\n` +
-            `DDL operation then aggregate: ${tojson(serialDAState)}`);
+                `state of the database after the command was not equivalent to running them in ` +
+                `serial.\n` +
+                `parallel: ${tojson(parallelState)}\n` +
+                `aggregate then DDL operation: ${tojson(serialADState)}\n` +
+                `DDL operation then aggregate: ${tojson(serialDAState)}`,
+        );
     }
     return aggRes;
 }
 
-assert.commandWorked(assertSerializedOrError({
-    desc: "Concurrent $out and moveCollection on target",
-    failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-    setupFn() {
-        setup();
-        st.s.adminCommand({enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
-        targetColl.insertOne({val: "should get overwritten"});
-    },
-    ddlFn() {
-        assert.commandWorked(st.s.adminCommand(
-            {moveCollection: targetColl.getFullName(), toShard: st.shard2.shardName}));
-    }
-}));
+assert.commandWorked(
+    assertSerializedOrError({
+        desc: "Concurrent $out and moveCollection on target",
+        failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+        setupFn() {
+            setup();
+            st.s.adminCommand({enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
+            targetColl.insertOne({val: "should get overwritten"});
+        },
+        ddlFn() {
+            assert.commandWorked(
+                st.s.adminCommand({moveCollection: targetColl.getFullName(), toShard: st.shard2.shardName}),
+            );
+        },
+    }),
+);
 
-assert.commandWorked(assertSerializedOrError({
-    desc: "Concurrent $out and drop target collection",
-    failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-    setupFn() {
-        setup();
-        st.s.adminCommand({enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
-        targetColl.insertOne({val: "should get overwritten"});
-    },
-    ddlFn() {
-        assert(sourceColl.drop());
-    }
-}));
+assert.commandWorked(
+    assertSerializedOrError({
+        desc: "Concurrent $out and drop target collection",
+        failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+        setupFn() {
+            setup();
+            st.s.adminCommand({enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
+            targetColl.insertOne({val: "should get overwritten"});
+        },
+        ddlFn() {
+            assert(sourceColl.drop());
+        },
+    }),
+);
 
 for (const targetDBExists of [true, false]) {
-    const targetDBDesc = ` and targetDB does${targetDBExists ? ' ' : ' not '}exist`;
+    const targetDBDesc = ` and targetDB does${targetDBExists ? " " : " not "}exist`;
     const maybeCreateTargetDB = () => {
         if (targetDBExists) {
-            st.s.adminCommand(
-                {enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
+            st.s.adminCommand({enableSharding: targetDB.getName(), primaryShard: st.shard1.shardName});
         }
     };
 
@@ -205,23 +215,26 @@ for (const targetDBExists of [true, false]) {
             cmdObj: {
                 configureFailPoint: "outImplictlyCreateDBOnSpecificShard",
                 mode: "alwaysOn",
-                data: {shardId: st.shard1.shardName}
-            }
+                data: {shardId: st.shard1.shardName},
+            },
         });
     }
 
-    assert.commandWorked(assertSerializedOrError({
-        desc: "Concurrent $out and moveCollection on source" + targetDBDesc,
-        failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-        setupFn() {
-            setup();
-            maybeCreateTargetDB();
-        },
-        ddlFn() {
-            assert.commandWorked(st.s.adminCommand(
-                {moveCollection: sourceColl.getFullName(), toShard: st.shard2.shardName}));
-        }
-    }));
+    assert.commandWorked(
+        assertSerializedOrError({
+            desc: "Concurrent $out and moveCollection on source" + targetDBDesc,
+            failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+            setupFn() {
+                setup();
+                maybeCreateTargetDB();
+            },
+            ddlFn() {
+                assert.commandWorked(
+                    st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: st.shard2.shardName}),
+                );
+            },
+        }),
+    );
 
     assert.commandFailedWithCode(
         assertSerializedOrError({
@@ -233,9 +246,10 @@ for (const targetDBExists of [true, false]) {
             },
             ddlFn() {
                 sourceDB.adminCommand({movePrimary: targetDB.getName(), to: st.shard2.shardName});
-            }
+            },
         }),
-        ErrorCodes.CollectionUUIDMismatch);
+        ErrorCodes.CollectionUUIDMismatch,
+    );
 
     assert.commandFailedWithCode(
         assertSerializedOrError({
@@ -250,21 +264,24 @@ for (const targetDBExists of [true, false]) {
             },
             // Because of the dropDatabase on the targetDB the target collection is implicitly
             // created on a random shard by the next insert from $out.
-            ignorePlacement: true
+            ignorePlacement: true,
         }),
-        ErrorCodes.CollectionUUIDMismatch);
+        ErrorCodes.CollectionUUIDMismatch,
+    );
 
-    assert.commandWorked(assertSerializedOrError({
-        desc: "Concurrent $out and dropDatabase on sourceDB" + targetDBDesc,
-        failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-        setupFn() {
-            setup();
-            maybeCreateTargetDB();
-        },
-        ddlFn() {
-            assert.commandWorked(sourceDB.dropDatabase());
-        }
-    }));
+    assert.commandWorked(
+        assertSerializedOrError({
+            desc: "Concurrent $out and dropDatabase on sourceDB" + targetDBDesc,
+            failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+            setupFn() {
+                setup();
+                maybeCreateTargetDB();
+            },
+            ddlFn() {
+                assert.commandWorked(sourceDB.dropDatabase());
+            },
+        }),
+    );
 
     // This should fail since uuid changes and the reincarnation gets detected.
     assert.commandFailedWithCode(
@@ -278,21 +295,24 @@ for (const targetDBExists of [true, false]) {
             ddlFn() {
                 assert.eq(10, getTempOutColl().countDocuments({}));
                 assert(getTempOutColl().drop());
-            }
+            },
         }),
-        ErrorCodes.NamespaceNotFound);
+        ErrorCodes.NamespaceNotFound,
+    );
 
-    assert.commandWorked(assertSerializedOrError({
-        desc: "Concurrent $out and drop source collection" + targetDBDesc,
-        failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-        setupFn() {
-            setup();
-            maybeCreateTargetDB();
-        },
-        ddlFn() {
-            assert(sourceColl.drop());
-        }
-    }));
+    assert.commandWorked(
+        assertSerializedOrError({
+            desc: "Concurrent $out and drop source collection" + targetDBDesc,
+            failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+            setupFn() {
+                setup();
+                maybeCreateTargetDB();
+            },
+            ddlFn() {
+                assert(sourceColl.drop());
+            },
+        }),
+    );
 
     assert.commandFailedWithCode(
         assertSerializedOrError({
@@ -304,23 +324,25 @@ for (const targetDBExists of [true, false]) {
             },
             ddlFn() {
                 assert(getTempOutColl().drop());
-            }
+            },
         }),
-        ErrorCodes.CollectionUUIDMismatch);
+        ErrorCodes.CollectionUUIDMismatch,
+    );
 
-    assert.commandWorked(assertSerializedOrError({
-        desc: "Concurrent $out and drop tracked source collection" + targetDBDesc,
-        failpointName: "hangWhileBuildingDocumentSourceOutBatch",
-        setupFn() {
-            setup();
-            st.s.adminCommand(
-                {moveCollection: sourceColl.getFullName(), toShard: st.shard0.shardName});
-            maybeCreateTargetDB();
-        },
-        ddlFn() {
-            assert(sourceColl.drop());
-        }
-    }));
+    assert.commandWorked(
+        assertSerializedOrError({
+            desc: "Concurrent $out and drop tracked source collection" + targetDBDesc,
+            failpointName: "hangWhileBuildingDocumentSourceOutBatch",
+            setupFn() {
+                setup();
+                st.s.adminCommand({moveCollection: sourceColl.getFullName(), toShard: st.shard0.shardName});
+                maybeCreateTargetDB();
+            },
+            ddlFn() {
+                assert(sourceColl.drop());
+            },
+        }),
+    );
 }
 
 st.stop();

@@ -15,9 +15,7 @@
  * ]
  */
 
-import {
-    withSkipRetryOnNetworkError
-} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
+import {withSkipRetryOnNetworkError} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
@@ -26,10 +24,10 @@ import {createChunks, getShardNames} from "jstests/sharding/libs/sharding_util.j
 
 const dbName = db.getName();
 const oldShardKey = {
-    oldKey: 1
+    oldKey: 1,
 };
 const newShardKey = {
-    newKey: 1
+    newKey: 1,
 };
 
 main();
@@ -74,8 +72,7 @@ function initializeCollection(collName) {
 
 function runResharding(collName, uuid) {
     jsTestLog(`Running resharding with user supplied UUID: ${tojson(uuid)}`);
-    return db.adminCommand(
-        {reshardCollection: `${dbName}.${collName}`, key: newShardKey, reshardingUUID: uuid});
+    return db.adminCommand({reshardCollection: `${dbName}.${collName}`, key: newShardKey, reshardingUUID: uuid});
 }
 
 function getAllReplicaSets() {
@@ -85,16 +82,18 @@ function getAllReplicaSets() {
     for (const shard of Object.values(topology.shards)) {
         allReplicaSets.push(shard.nodes);
     }
-    return allReplicaSets.map(rs => rs.map(host => new Mongo(host)));
+    return allReplicaSets.map((rs) => rs.map((host) => new Mongo(host)));
 }
 
 function setFailInPhase(phase) {
     const failpoints = [];
     for (const rs of getAllReplicaSets()) {
-        failpoints.push(configureFailPointForRS(
-            rs,
-            "reshardingRecipientFailInPhase",
-            {phase, errorMessage: "reshard_collection_atlas_log_ingestion.js"}));
+        failpoints.push(
+            configureFailPointForRS(rs, "reshardingRecipientFailInPhase", {
+                phase,
+                errorMessage: "reshard_collection_atlas_log_ingestion.js",
+            }),
+        );
     }
     return failpoints;
 }
@@ -132,17 +131,17 @@ function getCompletionLogs(uuid) {
     for (const node of configNodes) {
         logs.push(...getLogs(new Mongo(node)));
     }
-    return logs.filter(log => log.includes(`"id":7763800,`)).filter(log => {
-        return log.includes(extractUUIDFromObject(uuid));
-    });
+    return logs
+        .filter((log) => log.includes(`"id":7763800,`))
+        .filter((log) => {
+            return log.includes(extractUUIDFromObject(uuid));
+        });
 }
 
 function verifyCompletionLogs(collName, logs, expectedStatus) {
     // There could be multiple completion logs if deleting the coordinator state document is rolled
     // back.
-    assert.gt(logs.length,
-              0,
-              "No log lines with id 7763800 emitted on config server following resharding.");
+    assert.gt(logs.length, 0, "No log lines with id 7763800 emitted on config server following resharding.");
     const completionLog = JSON.parse(logs.pop());
     jsTestLog(`Completion log found: ${tojson(completionLog)}`);
     const info = completionLog.attr.info;
@@ -172,12 +171,10 @@ function verifyDonorMetrics(stats, success) {
         assert.gt(donor.bytesToClone, 0, "bytesToClone");
         assert.gt(donor.documentsToClone, 0, "documentsToClone");
         assert.gt(donor.indexCount, 0, "donor indexCount");
-        assert(donor.hasOwnProperty("writesDuringCriticalSection"),
-               "Missing writesDuringCriticalSection");
+        assert(donor.hasOwnProperty("writesDuringCriticalSection"), "Missing writesDuringCriticalSection");
         if (success) {
             assert(donor.hasOwnProperty("phaseDurations"), "Missing donor phaseDurations");
-            assert.gte(
-                donor.phaseDurations.criticalSectionDurationMs, 0, "criticalSectionDurationMs");
+            assert.gte(donor.phaseDurations.criticalSectionDurationMs, 0, "criticalSectionDurationMs");
             assert(donor.hasOwnProperty("criticalSectionInterval"));
             const interval = donor.criticalSectionInterval;
             assert(interval.hasOwnProperty("start"), "Missing criticalSectionInterval start");
@@ -204,10 +201,11 @@ function verifyRecipientMetrics(stats, success) {
             assert.gt(duration, 0, `Phase ${phase} had no duration`);
         }
         if (success) {
-            for (const expected
-                     of ["copyDurationMs", "applyDurationMs", "buildingIndexDurationMs"]) {
-                assert(recipient.phaseDurations.hasOwnProperty(expected),
-                       `Successful operation did not report ${expected}`);
+            for (const expected of ["copyDurationMs", "applyDurationMs", "buildingIndexDurationMs"]) {
+                assert(
+                    recipient.phaseDurations.hasOwnProperty(expected),
+                    `Successful operation did not report ${expected}`,
+                );
             }
             assert.gt(recipient.indexCount, 0, "recipient indexCount");
         }
@@ -246,8 +244,7 @@ function verifyTotals(stats, success) {
 }
 
 function verifyCriticalSection(stats, success) {
-    assert(stats.hasOwnProperty("criticalSection") === success,
-           "Incorrect critical section presence");
+    assert(stats.hasOwnProperty("criticalSection") === success, "Incorrect critical section presence");
     if (!success) {
         return;
     }
@@ -257,6 +254,8 @@ function verifyCriticalSection(stats, success) {
     assert(interval.hasOwnProperty("start"), "Missing criticalSection start");
     assert(interval.hasOwnProperty("stop"), "Missing criticalSection stop");
     assert(criticalSection.hasOwnProperty("expiration"), "Missing expiration");
-    assert(criticalSection.hasOwnProperty("totalWritesDuringCriticalSection"),
-           "Missing totalWritesDuringCriticalSection");
+    assert(
+        criticalSection.hasOwnProperty("totalWritesDuringCriticalSection"),
+        "Missing totalWritesDuringCriticalSection",
+    );
 }

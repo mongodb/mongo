@@ -5,10 +5,8 @@
  */
 import {leafs} from "jstests/query_golden/libs/example_data.js";
 
-const classicConn =
-    MongoRunner.runMongod({setParameter: {internalQueryFrameworkControl: "forceClassicEngine"}});
-const bpConn = MongoRunner.runMongod(
-    {setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
+const classicConn = MongoRunner.runMongod({setParameter: {internalQueryFrameworkControl: "forceClassicEngine"}});
+const bpConn = MongoRunner.runMongod({setParameter: {featureFlagSbeFull: true, featureFlagTimeSeriesInSbe: true}});
 
 assert.neq(null, classicConn, "classicConn mongod was unable to start up");
 assert.neq(null, bpConn, "bpConn mongod was unable to start up");
@@ -23,9 +21,11 @@ classicColl.drop();
 bpColl.drop();
 // Create a TS collection to get block processing running. Compare this against a classic
 // collection.
-assert.commandWorked(bpDb.createCollection(bpColl.getName(), {
-    timeseries: {timeField: 'time', metaField: 'meta'},
-}));
+assert.commandWorked(
+    bpDb.createCollection(bpColl.getName(), {
+        timeseries: {timeField: "time", metaField: "meta"},
+    }),
+);
 
 // 'bsonVals' is an array containing all types of BSON values, including extreme values per type.
 let bsonVals = leafs();
@@ -53,7 +53,7 @@ for (let metaIdx = 0; metaIdx < 10; ++metaIdx) {
             w: bsonVals[id % numBsonVals],
             x: bsonVals[(1 + 5 * id) % numBsonVals],
             y: bsonVals[(3 + 11 * id) % numBsonVals],
-            z: bsonVals[(7 + 19 * id) % numBsonVals]
+            z: bsonVals[(7 + 19 * id) % numBsonVals],
         });
         currentDate += 25;
     }
@@ -101,10 +101,10 @@ const complexNVals = [
     numTsDocs + 1,
     NumberInt(1),
     NumberInt(10),
-    NumberInt('+2147483647'),
+    NumberInt("+2147483647"),
     NumberLong(3),
     NumberLong(50),
-    NumberLong('+9223372036854775807'),
+    NumberLong("+9223372036854775807"),
 ];
 
 // sortBy values of varying complexities, including duplicate fields (which eslint doesn't like).
@@ -120,25 +120,24 @@ const complexSortBys = [
 // Define the $group stages.
 let sortDir = 1;
 let groupStages = [];
-for (const accumulator of ['$topN', '$bottomN']) {
+for (const accumulator of ["$topN", "$bottomN"]) {
     // Complex group ID.
     for (const group of complexGroups) {
         groupStages.push({
-            $group: {_id: group, acc: {[accumulator]: {n: 30, sortBy: {_id: 1}, output: ["$_id"]}}}
+            $group: {_id: group, acc: {[accumulator]: {n: 30, sortBy: {_id: 1}, output: ["$_id"]}}},
         });
     }
 
     // Complex n.
     for (const nVal of complexNVals) {
-        for (const sortBy of ['w', 'x', 'y', 'z']) {
+        for (const sortBy of ["w", "x", "y", "z"]) {
             groupStages.push({
                 $group: {
                     _id: null,
                     acc: {
-                        [accumulator]:
-                            {n: nVal, sortBy: {[sortBy]: sortDir, _id: 1}, output: ["$_id"]}
-                    }
-                }
+                        [accumulator]: {n: nVal, sortBy: {[sortBy]: sortDir, _id: 1}, output: ["$_id"]},
+                    },
+                },
             });
             sortDir *= -1;
         }
@@ -146,20 +145,18 @@ for (const accumulator of ['$topN', '$bottomN']) {
 
     // Complex sortBy.
     for (const sortBy of complexSortBys) {
-        groupStages.push(
-            {$group: {_id: null, acc: {[accumulator]: {n: 40, sortBy: sortBy, output: ["$_id"]}}}});
+        groupStages.push({$group: {_id: null, acc: {[accumulator]: {n: 40, sortBy: sortBy, output: ["$_id"]}}}});
     }
 
     // Complex group and sortBy.
     for (const group of complexGroups) {
         for (const sortBy of complexSortBys) {
             groupStages.push({
-                $group:
-                    {_id: group, acc: {[accumulator]: {n: 50, sortBy: sortBy, output: ["$_id"]}}}
+                $group: {_id: group, acc: {[accumulator]: {n: 50, sortBy: sortBy, output: ["$_id"]}}},
             });
         }
     }
-}  // for each accumulator
+} // for each accumulator
 
 // Add some queries with multiple $topN and/or $bottomN accumulators.
 groupStages.push({
@@ -167,7 +164,7 @@ groupStages.push({
         _id: {time: "$time", w: "$w"},
         acc1: {$topN: {n: 20, sortBy: {x: 1, _id: 1}, output: ["$_id"]}},
         acc2: {$bottomN: {n: 25, sortBy: {y: 1, z: -1, _id: 1}, output: ["$_id"]}},
-    }
+    },
 });
 groupStages.push({
     $group: {
@@ -176,13 +173,14 @@ groupStages.push({
         acc2: {$bottomN: {n: 13, sortBy: {w: 1, x: -1, _id: 1}, output: ["$_id"]}},
         acc3: {$topN: {n: 17, sortBy: {w: 1, x: 1, y: 1, _id: 1}, output: ["$_id"]}},
         acc4: {$bottomN: {n: 19, sortBy: {x: -1, y: -1, z: -1, _id: 1}, output: ["$_id"]}},
-    }
+    },
 });
 
 function runAggregations(allowDiskUse, forceSpilling) {
     // Don't set the flags on classic because it's already considered correct.
-    assert.commandWorked(bpDb.adminCommand(
-        {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}));
+    assert.commandWorked(
+        bpDb.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}),
+    );
     let pipe = 0;
     for (const groupStage of groupStages) {
         compareClassicAndBP([groupStage], allowDiskUse);
@@ -190,7 +188,7 @@ function runAggregations(allowDiskUse, forceSpilling) {
     }
     jsTestLog(`runAggregations: Ran ${pipe} pipelines with allowDisk=${allowDiskUse},
                 forceSpilling=${forceSpilling}`);
-}  // runAggregations
+} // runAggregations
 
 // Run with different combinations of allowDiskUse and increased spilling.
 runAggregations(false /* allowDiskUse */, "inDebug" /* increased spilling */);

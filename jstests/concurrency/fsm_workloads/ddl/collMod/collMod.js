@@ -11,18 +11,18 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         numDocs: 1000,
-        maxTTL: 5000  // max time to live
+        maxTTL: 5000, // max time to live
     };
 
-    var states = (function() {
+    var states = (function () {
         function collMod(db, collName) {
             var newTTL = Random.randInt(this.maxTTL);
             var res = db.runCommand({
                 collMod: this.threadCollName,
-                index: {keyPattern: {createdAt: 1}, expireAfterSeconds: newTTL}
+                index: {keyPattern: {createdAt: 1}, expireAfterSeconds: newTTL},
             });
             assert.commandWorkedOrFailedWithCode(res, [ErrorCodes.ConflictingOperationInProgress]);
             // Check that we are returning {ok: 1} rather than {ok: true}
@@ -30,7 +30,7 @@ export const $config = (function() {
                 assert(res.ok === 1);
             }
             // only assert if new expireAfterSeconds differs from old one
-            if (res.ok === 1 && res.hasOwnProperty('expireAfterSeconds_new')) {
+            if (res.ok === 1 && res.hasOwnProperty("expireAfterSeconds_new")) {
                 assert.eq(res.expireAfterSeconds_new, newTTL);
             }
 
@@ -41,9 +41,10 @@ export const $config = (function() {
                 db.runCommand({
                     collMod: this.threadCollName,
                     validator: encryptSchema,
-                    validationAction: "warn"
+                    validationAction: "warn",
                 }),
-                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryFeatureNotAllowed]);
+                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryFeatureNotAllowed],
+            );
             // Check that we are returning {ok: 1} rather than {ok: true}
             if (res.ok) {
                 assert(res.ok === 1);
@@ -53,9 +54,10 @@ export const $config = (function() {
                     db.runCommand({
                         collMod: this.threadCollName,
                         validator: encryptSchema,
-                        validationAction: "errorAndLog"
+                        validationAction: "errorAndLog",
                     }),
-                    [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryFeatureNotAllowed]);
+                    [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryFeatureNotAllowed],
+                );
                 // Check that we are returning {ok: 1} rather than {ok: true}
                 if (res.ok) {
                     assert(res.ok === 1);
@@ -89,9 +91,9 @@ export const $config = (function() {
         threadCount: 10,
         iterations: 20,
         data: data,
-        startState: 'collMod',
+        startState: "collMod",
         states: states,
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

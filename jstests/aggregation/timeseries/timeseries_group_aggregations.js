@@ -29,22 +29,24 @@ if (isSlowBuild(db)) {
     quit();
 }
 
-const classicColl = db[jsTestName() + '_classic'];
-const bpColl = db[jsTestName() + '_bp'];
+const classicColl = db[jsTestName() + "_classic"];
+const bpColl = db[jsTestName() + "_bp"];
 classicColl.drop();
 bpColl.drop();
 // Create a TS collection to get block processing running. Compare this against a classic
 // collection.
-assert.commandWorked(db.createCollection(bpColl.getName(), {
-    timeseries: {timeField: 't', metaField: 'm'},
-}));
+assert.commandWorked(
+    db.createCollection(bpColl.getName(), {
+        timeseries: {timeField: "t", metaField: "m"},
+    }),
+);
 
 const dateLowerBound = new Date(0);
 
 // Create time series buckets with different meta fields, time fields, and data.
-const allFields = ['t', 'm', 'a', 'b'];
+const allFields = ["t", "m", "a", "b"];
 const tsData = [];
-const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+const alphabet = "abcdefghijklmnopqrstuvwxyz";
 let id = 0;
 for (let metaIdx = 0; metaIdx < 5; metaIdx++) {
     // Mix of number and object meta values.
@@ -56,7 +58,7 @@ for (let metaIdx = 0; metaIdx < 5; metaIdx++) {
             t: metaIdx % 3 === 0 ? new Date(-1000 * i) : new Date(1000 * i),
             m: metaVal,
             a: i,
-            b: alphabet.charAt(i)
+            b: alphabet.charAt(i),
         });
         id++;
     }
@@ -96,52 +98,52 @@ function topLevelField(path) {
 
 // Create $project stages.
 const projectStages = [
-    {stage: {$project: {t: '$t'}}, uses: ['t'], produces: ['t']},
-    {stage: {$project: {m: '$m'}}, uses: ['m'], produces: ['m']},
+    {stage: {$project: {t: "$t"}}, uses: ["t"], produces: ["t"]},
+    {stage: {$project: {m: "$m"}}, uses: ["m"], produces: ["m"]},
 
     // This is banned until SERVER-87961 is resolved.
     //{stage: {$project: {m: '$m.metaA'}}, uses: ['m'], produces: ['m']},
-    {stage: {$project: {a: '$a'}}, uses: ['a'], produces: ['a']}
+    {stage: {$project: {a: "$a"}}, uses: ["a"], produces: ["a"]},
 ];
 for (const includeField of [0, 1]) {
     projectStages.push({
         stage: {$project: {t: includeField}},
-        uses: ['t'],
-        produces: includeField ? ['t'] : ['m', 'a', 'b']
+        uses: ["t"],
+        produces: includeField ? ["t"] : ["m", "a", "b"],
     });
     projectStages.push({
         stage: {$project: {m: includeField}},
-        uses: ['m'],
-        produces: includeField ? ['m'] : ['t', 'a', 'b']
+        uses: ["m"],
+        produces: includeField ? ["m"] : ["t", "a", "b"],
     });
     projectStages.push({
         stage: {$project: {a: includeField}},
-        uses: ['a'],
-        produces: includeField ? ['a'] : ['t', 'm', 'b']
+        uses: ["a"],
+        produces: includeField ? ["a"] : ["t", "m", "b"],
     });
 }
 
 const addFieldsStages = [
     {stage: {$addFields: {t: new Date(100)}}, uses: [], produces: allFields},
     {stage: {$addFields: {m: 5}}, uses: [], produces: allFields},
-    {stage: {$addFields: {a: 2}}, uses: [], produces: allFields}
+    {stage: {$addFields: {a: 2}}, uses: [], produces: allFields},
 ];
 
 // Create $match stages.
 const matchStages = [];
 const matchComparisons = [
-    {field: 't', comp: dateLowerBound},
-    {field: 'm', comp: {metaA: 1, metaB: 1}},
-    {field: 'm', comp: 3},
-    {field: 'm.metaA', comp: 6},
-    {field: 'a', comp: 2},
+    {field: "t", comp: dateLowerBound},
+    {field: "m", comp: {metaA: 1, metaB: 1}},
+    {field: "m", comp: 3},
+    {field: "m.metaA", comp: 6},
+    {field: "a", comp: 2},
 ];
 for (const matchComp of matchComparisons) {
-    for (const comparator of ['$gt', '$lte', '$eq']) {
+    for (const comparator of ["$gt", "$lte", "$eq"]) {
         matchStages.push({
             stage: {$match: {[matchComp.field]: {[comparator]: matchComp.comp}}},
             uses: [topLevelField(matchComp.field)],
-            produces: allFields
+            produces: allFields,
         });
     }
 }
@@ -149,32 +151,32 @@ for (const matchComp of matchComparisons) {
 // Create $group stages, which include one $count stage.
 const groupStages = [
     // $count.
-    {stage: {$count: 'c'}, uses: []},
+    {stage: {$count: "c"}, uses: []},
 
     // $group with single key cases for each target accumulator.
-    {stage: {$group: {_id: {m: '$m'}, gb: {$min: '$a'}}}, uses: ['m', 'a']},
+    {stage: {$group: {_id: {m: "$m"}, gb: {$min: "$a"}}}, uses: ["m", "a"]},
 
     // $group with compound key cases since we don't want to try every combination.
-    {stage: {$group: {_id: {t: '$t', m: '$m'}, gb: {$min: '$a'}}}, uses: ['t', 'm', 'a']},
-    {stage: {$group: {_id: {a: '$a', m: '$m'}, gb: {$avg: '$t'}}}, uses: ['t', 'm', 'a']},
-    {stage: {$group: {_id: {a: '$a', m: '$m.metaB'}, gb: {$avg: '$t'}}}, uses: ['t', 'm', 'a']},
+    {stage: {$group: {_id: {t: "$t", m: "$m"}, gb: {$min: "$a"}}}, uses: ["t", "m", "a"]},
+    {stage: {$group: {_id: {a: "$a", m: "$m"}, gb: {$avg: "$t"}}}, uses: ["t", "m", "a"]},
+    {stage: {$group: {_id: {a: "$a", m: "$m.metaB"}, gb: {$avg: "$t"}}}, uses: ["t", "m", "a"]},
 
     // $group with $dateTrunc.
     {
-        stage: {$group: {_id: {$dateTrunc: {date: "$t", unit: "hour"}}, gb: {$max: '$a'}}},
-        uses: ['t', 'a']
+        stage: {$group: {_id: {$dateTrunc: {date: "$t", unit: "hour"}}, gb: {$max: "$a"}}},
+        uses: ["t", "a"],
     },
 ];
 
-for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
-    const dollarGroupKey = groupKey === null ? null : '$' + groupKey;
-    for (const accumulatorData of ['t', 'm', 'm.metaA', 'a']) {
-        const dollarAccumulatorData = accumulatorData === null ? null : '$' + accumulatorData;
+for (const groupKey of [null, "t", "m", "m.metaA", "a"]) {
+    const dollarGroupKey = groupKey === null ? null : "$" + groupKey;
+    for (const accumulatorData of ["t", "m", "m.metaA", "a"]) {
+        const dollarAccumulatorData = accumulatorData === null ? null : "$" + accumulatorData;
         // If the groupKey and the accumulated field is the same, the query is nonsensical.
         if (groupKey === accumulatorData) {
             continue;
         }
-        for (const accumulator of ['$min', '$max', '$sum', '$avg']) {
+        for (const accumulator of ["$min", "$max", "$sum", "$avg"]) {
             const uses = [topLevelField(accumulatorData)];
             // "null" is not a field we need from previous stages.
             if (groupKey !== null) {
@@ -182,11 +184,11 @@ for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
             }
             groupStages.push({
                 stage: {$group: {_id: dollarGroupKey, gb: {[accumulator]: dollarAccumulatorData}}},
-                uses: uses
+                uses: uses,
             });
         }
         // $top/$bottom accumulators have different syntax.
-        for (const sortBy of ['t', 'm', 'a', 'm.metaA']) {
+        for (const sortBy of ["t", "m", "a", "m.metaA"]) {
             if (sortBy === groupKey) {
                 continue;
             }
@@ -194,21 +196,20 @@ for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
             if (groupKey !== null) {
                 uses.push(topLevelField(groupKey));
             }
-            for (const accumulator of ['$top', '$bottom']) {
+            for (const accumulator of ["$top", "$bottom"]) {
                 groupStages.push({
                     stage: {
                         $group: {
                             _id: dollarGroupKey,
                             gb: {
-                                [accumulator]:
-                                    {output: dollarAccumulatorData, sortBy: {[sortBy]: 1, _id: 1}}
-                            }
-                        }
+                                [accumulator]: {output: dollarAccumulatorData, sortBy: {[sortBy]: 1, _id: 1}},
+                            },
+                        },
                     },
-                    uses: uses
+                    uses: uses,
                 });
             }
-            for (const accumulator of ['$topN', '$bottomN']) {
+            for (const accumulator of ["$topN", "$bottomN"]) {
                 groupStages.push({
                     stage: {
                         $group: {
@@ -217,12 +218,12 @@ for (const groupKey of [null, 't', 'm', 'm.metaA', 'a']) {
                                 [accumulator]: {
                                     n: 3,
                                     output: dollarAccumulatorData,
-                                    sortBy: {[sortBy]: 1, _id: 1}
-                                }
-                            }
-                        }
+                                    sortBy: {[sortBy]: 1, _id: 1},
+                                },
+                            },
+                        },
                     },
-                    uses: uses
+                    uses: uses,
                 });
             }
         }
@@ -245,8 +246,9 @@ function stageRequirementsMatch(stage1, stage2) {
 
 function runAggregations(allowDiskUse, forceSpilling) {
     // Don't set the flags on classic because it's already considered correct.
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: forceSpilling}),
+    );
     /*
      * Try all combinations of $project and $match stages followed by a $group or $count at the end.
      * To avoid running unrealistic queries, we'll check what fields a stage needs to run. For
@@ -277,8 +279,7 @@ function runAggregations(allowDiskUse, forceSpilling) {
             for (const groupStage of groupStages) {
                 // Any prior stage doesn't satify the requirements of a following stage, don't run
                 // the query.
-                if (!stageRequirementsMatch(stage1, groupStage) ||
-                    !stageRequirementsMatch(stage2, groupStage)) {
+                if (!stageRequirementsMatch(stage1, groupStage) || !stageRequirementsMatch(stage2, groupStage)) {
                     continue;
                 }
                 const pipeline = [stage1.stage, stage2.stage, groupStage.stage];

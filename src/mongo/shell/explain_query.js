@@ -46,7 +46,7 @@ class DBExplainQuery {
         ];
 
         // Generate the delegation methods from the list of their names.
-        delegationFuncNames.forEach(name => {
+        delegationFuncNames.forEach((name) => {
             this[name] = this.#createDelegationFunc(name);
         });
     }
@@ -114,21 +114,21 @@ class DBExplainQuery {
         let explainResult = explainDb.runReadCommand(explainCmd, null, this._query._options);
 
         return Explainable.throwOrReturn(explainResult);
-    };
+    }
 
     next() {
         return this.finish();
-    };
+    }
 
     hasNext() {
         return !this._finished;
-    };
+    }
 
     forEach(func) {
         while (this.hasNext()) {
             func(this.next());
         }
-    };
+    }
 
     /**
      * Returns the explain resulting from running this query as a count operation.
@@ -142,7 +142,7 @@ class DBExplainQuery {
             this._applySkipLimit = true;
         }
         return this.finish();
-    };
+    }
 
     /**
      * This gets called automatically by the shell in interactive mode. It should
@@ -151,7 +151,7 @@ class DBExplainQuery {
     shellPrint() {
         let result = this.finish();
         return tojson(result);
-    };
+    }
 
     /**
      * Display help text.
@@ -178,7 +178,7 @@ class DBExplainQuery {
         print("\t.skip(n)");
         print("\t.sort(sortSpec)");
         return __magicNoPrint;
-    };
+    }
 }
 
 export {DBExplainQuery};

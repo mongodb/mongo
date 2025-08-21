@@ -11,16 +11,17 @@ function checkResponseFields(commandString) {
     var res = st.s0.getDB("admin").runCommand(commandString);
 
     // check that the fields that should be there are there and have proper values
-    assert(res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,
-           "maxBsonObjectSize possibly missing:" + tojson(res));
+    assert(
+        res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,
+        "maxBsonObjectSize possibly missing:" + tojson(res),
+    );
     assert(
         res.maxMessageSizeBytes && isNumber(res.maxMessageSizeBytes) && res.maxBsonObjectSize > 0,
-        "maxMessageSizeBytes possibly missing:" + tojson(res));
+        "maxMessageSizeBytes possibly missing:" + tojson(res),
+    );
 
     if (commandString === "hello") {
-        assert.eq("boolean",
-                  typeof res.isWritablePrimary,
-                  "isWritablePrimary field is not a boolean" + tojson(res));
+        assert.eq("boolean", typeof res.isWritablePrimary, "isWritablePrimary field is not a boolean" + tojson(res));
         assert(res.isWritablePrimary === true, "isWritablePrimary field is false" + tojson(res));
     } else {
         assert.eq("boolean", typeof res.ismaster, "ismaster field is not a boolean" + tojson(res));
@@ -44,7 +45,7 @@ function checkResponseFields(commandString) {
         "hidden",
         "tags",
         "buildIndexes",
-        "me"
+        "me",
     ];
     // check that the fields that shouldn't be there are not there
     var badFields = [];
@@ -57,8 +58,10 @@ function checkResponseFields(commandString) {
             badFields.push(field);
         }
     }
-    assert(badFields.length === 0,
-           "\nthe result:\n" + tojson(res) + "\ncontained fields it shouldn't have: " + badFields);
+    assert(
+        badFields.length === 0,
+        "\nthe result:\n" + tojson(res) + "\ncontained fields it shouldn't have: " + badFields,
+    );
 }
 
 checkResponseFields("hello");

@@ -14,7 +14,7 @@ function checkShellCursorFinalize(skip = true) {
         return adminDB
             .aggregate([
                 {$currentOp: {idleCursors: true}},
-                {$match: {$and: [{type: "idleCursor"}, {ns: coll.toString()}]}}
+                {$match: {$and: [{type: "idleCursor"}, {ns: coll.toString()}]}},
             ])
             .toArray();
     }
@@ -38,9 +38,11 @@ let awaitShell = startParallelShell("(" + checkShellCursorFinalize + ")(false);"
 awaitShell();
 
 // Start a shell with the skipShellCursorFinalize shell option.
-awaitShell = startParallelShell(checkShellCursorFinalize,
-                                undefined,
-                                false,
-                                "--setShellParameter",
-                                "skipShellCursorFinalize=true");
+awaitShell = startParallelShell(
+    checkShellCursorFinalize,
+    undefined,
+    false,
+    "--setShellParameter",
+    "skipShellCursorFinalize=true",
+);
 awaitShell();

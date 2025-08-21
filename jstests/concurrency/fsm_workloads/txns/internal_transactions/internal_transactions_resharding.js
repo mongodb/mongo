@@ -15,12 +15,9 @@
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {executeReshardCollection} from "jstests/concurrency/fsm_libs/reshard_collection_util.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_sharded.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_sharded.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const customShardKeyFieldName = "customShardKey";
     $config.data.shardKeys = [];
     $config.data.currentShardKeyIndex = -1;
@@ -46,16 +43,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.isAcceptableAggregateCmdError = function isAcceptableAggregateCmdError(res) {
         // The aggregate command is expected to involve running getMore commands which are not
         // retryable after a collection rename (done by resharding).
-        return $baseConfig.data.isAcceptableAggregateCmdError(res) ||
-            (res && (interruptedQueryErrors.includes(res.code)));
+        return (
+            $baseConfig.data.isAcceptableAggregateCmdError(res) || (res && interruptedQueryErrors.includes(res.code))
+        );
     };
 
     $config.data.isAcceptableRetryError = function isAcceptableRetryError(res) {
         // This workload does in-place resharding so a retry that is sent
         // reshardingMinimumOperationDurationMillis after resharding completes is expected to fail
         // with IncompleteTransactionHistory.
-        return (res.code == ErrorCodes.IncompleteTransactionHistory) &&
-            res.errmsg.includes("Incomplete history detected for transaction");
+        return (
+            res.code == ErrorCodes.IncompleteTransactionHistory &&
+            res.errmsg.includes("Incomplete history detected for transaction")
+        );
     };
 
     $config.states.init = function init(db, collName, connCache) {
@@ -70,8 +70,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         executeReshardCollection(this, db, collName, connCache, false /*sameKeyResharding*/);
     };
 
-    $config.states.reshardCollectionSameKey = function reshardCollectionSameKey(
-        db, collName, connCache) {
+    $config.states.reshardCollectionSameKey = function reshardCollectionSameKey(db, collName, connCache) {
         executeReshardCollection(this, db, collName, connCache, this._allowSameKeyResharding);
     };
 
@@ -87,14 +86,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             internalTransactionForUpdate: 0.2,
             internalTransactionForDelete: 0.2,
             internalTransactionForFindAndModify: 0.2,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         reshardCollectionSameKey: {
             internalTransactionForInsert: 0.2,
             internalTransactionForUpdate: 0.2,
             internalTransactionForDelete: 0.2,
             internalTransactionForFindAndModify: 0.2,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         internalTransactionForInsert: {
             reshardCollection: 0.1,
@@ -103,7 +102,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
             internalTransactionForFindAndModify: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         internalTransactionForUpdate: {
             reshardCollection: 0.1,
@@ -112,7 +111,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
             internalTransactionForFindAndModify: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         internalTransactionForDelete: {
             reshardCollection: 0.1,
@@ -121,7 +120,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
             internalTransactionForFindAndModify: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         internalTransactionForFindAndModify: {
             reshardCollection: 0.1,
@@ -130,7 +129,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
             internalTransactionForFindAndModify: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         verifyDocuments: {
             reshardCollection: 0.1,
@@ -139,7 +138,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             internalTransactionForUpdate: 0.2,
             internalTransactionForDelete: 0.2,
             internalTransactionForFindAndModify: 0.2,
-        }
+        },
     };
 
     return $config;

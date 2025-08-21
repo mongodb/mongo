@@ -17,27 +17,26 @@ const kDbName = "foo";
 const kCollName = "bar";
 const kNs = kDbName + "." + kCollName;
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
 function runTestSuccess(sessionOpts) {
     const commands = [
         {dbName: kDbName, command: {find: kCollName, singleBatch: true}},
         {
             dbName: kDbName,
-            command: {insert: kCollName, documents: [{_id: 2}, {_id: 3}], stmtId: NumberInt(0)}
+            command: {insert: kCollName, documents: [{_id: 2}, {_id: 3}], stmtId: NumberInt(0)},
         },
         {
             dbName: kDbName,
             command: {
                 update: kCollName,
                 updates: [{q: {_id: 2}, u: {$set: {updated: true}}}],
-                stmtId: NumberInt(2)
-            }
+                stmtId: NumberInt(2),
+            },
         },
         {
             dbName: kDbName,
-            command: {delete: kCollName, deletes: [{q: {_id: 3}, limit: 1}], stmtId: NumberInt(3)}
+            command: {delete: kCollName, deletes: [{q: {_id: 3}, limit: 1}], stmtId: NumberInt(3)},
         },
         {dbName: kDbName, command: {find: kCollName, singleBatch: true}},
         {dbName: kDbName, command: {aggregate: kCollName, pipeline: [{$match: {}}], cursor: {}}},
@@ -47,7 +46,9 @@ function runTestSuccess(sessionOpts) {
     assert.commandWorked(st.s.getCollection(kNs).insert([{_id: 1}]));
 
     let testCmd = Object.merge(
-        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}, sessionOpts);
+        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true},
+        sessionOpts,
+    );
     const res = assert.commandWorked(shard0Primary.adminCommand(testCmd));
     res.responses.forEach((innerRes) => {
         assert.commandWorked(innerRes, tojson(res));
@@ -58,16 +59,13 @@ function runTestSuccess(sessionOpts) {
     assert.eq(res.responses[1], {n: 2, ok: 1}, tojson(res));
     assert.eq(res.responses[2], {nModified: 1, n: 1, ok: 1}, tojson(res));
     assert.eq(res.responses[3], {n: 1, ok: 1}, tojson(res));
-    assert.sameMembers(
-        res.responses[4].cursor.firstBatch, [{_id: 1}, {_id: 2, updated: true}], tojson(res));
+    assert.sameMembers(res.responses[4].cursor.firstBatch, [{_id: 1}, {_id: 2, updated: true}], tojson(res));
     assert.eq(res.responses[4].cursor.id, 0, tojson(res));
-    assert.sameMembers(
-        res.responses[5].cursor.firstBatch, [{_id: 1}, {_id: 2, updated: true}], tojson(res));
+    assert.sameMembers(res.responses[5].cursor.firstBatch, [{_id: 1}, {_id: 2, updated: true}], tojson(res));
     assert.eq(res.responses[5].cursor.id, 0, tojson(res));
 
     // The written documents should be visible outside the transaction.
-    assert.sameMembers(st.s.getCollection(kNs).find().toArray(),
-                       [{_id: 1}, {_id: 2, updated: true}]);
+    assert.sameMembers(st.s.getCollection(kNs).find().toArray(), [{_id: 1}, {_id: 2, updated: true}]);
 
     // Clean up.
     assert.commandWorked(st.s.getCollection(kNs).remove({}, false /* justOne */));
@@ -77,7 +75,7 @@ function runTestFailure(sessionOpts) {
     const commands = [
         {
             dbName: kDbName,
-            command: {insert: kCollName, documents: [{_id: 2}, {_id: 3}], stmtId: NumberInt(0)}
+            command: {insert: kCollName, documents: [{_id: 2}, {_id: 3}], stmtId: NumberInt(0)},
         },
         {dbName: kDbName, command: {find: kCollName, singleBatch: true}},
         // clusterCount does not exist, so the API will reject this command without running it. This
@@ -89,11 +87,13 @@ function runTestFailure(sessionOpts) {
     assert.commandWorked(st.s.getCollection(kNs).insert([{_id: 1}]));
 
     let testCmd = Object.merge(
-        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}, sessionOpts);
+        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true},
+        sessionOpts,
+    );
 
     // TODO (SERVER-88107): Simplify this path once 9.0 becomes last LTS.
-    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-        Boolean(TestData.multiversionBinVersion);
+    const isMultiversion =
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
     if (!isMultiversion) {
         const res = assert.commandFailedWithCode(shard0Primary.adminCommand(testCmd), 6349501);
         assert(!res.hasOwnProperty("responses"));
@@ -126,7 +126,9 @@ function runTestGetMore(sessionOpts) {
     const commandMetricsBefore = shard0Primary.getDB(kDbName).serverStatus().metrics.commands;
 
     let testCmd = Object.merge(
-        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true}, sessionOpts);
+        {testInternalTransactions: 1, commandInfos: commands, useClusterClient: true},
+        sessionOpts,
+    );
     const res = assert.commandWorked(shard0Primary.adminCommand(testCmd));
     assert.eq(res.responses.length, 1, tojson(res));
 
@@ -141,16 +143,15 @@ function runTestGetMore(sessionOpts) {
     const commandMetricsAfter = shard0Primary.getDB(kDbName).serverStatus().metrics.commands;
 
     // TODO (SERVER-88107): Simplify this path once 9.0 becomes last LTS.
-    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-        Boolean(TestData.multiversionBinVersion);
+    const isMultiversion =
+        Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
     if (!isMultiversion) {
         assert.gt(commandMetricsAfter.clusterFind.total, commandMetricsBefore.clusterFind.total);
         if (!commandMetricsBefore.clusterGetMore) {
             // The unsharded case runs before any cluster getMores are run.
             assert.gt(commandMetricsAfter.clusterGetMore.total, 0);
         } else {
-            assert.gt(commandMetricsAfter.clusterGetMore.total,
-                      commandMetricsBefore.clusterGetMore.total);
+            assert.gt(commandMetricsAfter.clusterGetMore.total, commandMetricsBefore.clusterGetMore.total);
         }
     }
 

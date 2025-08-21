@@ -7,7 +7,7 @@
  * assumes_balancer_off,
  * ]
  */
-let dbTest = db.getSiblingDB('create_encrypted_indexes_db');
+let dbTest = db.getSiblingDB("create_encrypted_indexes_db");
 
 dbTest.basic.drop();
 
@@ -17,15 +17,15 @@ const sampleEncryptedFields = {
             "path": "firstName",
             "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
             "bsonType": "string",
-            "queries": {"queryType": "equality"}  // allow single object or array
+            "queries": {"queryType": "equality"}, // allow single object or array
         },
         {
             "path": "paymentMethods.creditCards.number",
             "keyId": UUID("12341234-1234-1234-1234-123412341234"),
             "bsonType": "string",
-            "queries": {"queryType": "equality"}
+            "queries": {"queryType": "equality"},
         },
-    ]
+    ],
 };
 
 let res = null;
@@ -42,13 +42,11 @@ assert.commandFailedWithCode(res, 6346502, "Create unique index on encrypted fie
 
 // Test create unique index fails on a prefix of an encrypted field
 res = dbTest.basic.createIndex({"paymentMethods.creditCards": 1}, {unique: true});
-assert.commandFailedWithCode(
-    res, 6346502, "Create unique index on prefix of encrypted field passed");
+assert.commandFailedWithCode(res, 6346502, "Create unique index on prefix of encrypted field passed");
 
 // Test create unique index fails if prefix is an encrypted field
 res = dbTest.basic.createIndex({"paymentMethods.creditCards.number.lastFour": 1}, {unique: true});
-assert.commandFailedWithCode(
-    res, 6346502, "Create unique index on key with encrypted field prefix passed");
+assert.commandFailedWithCode(res, 6346502, "Create unique index on key with encrypted field prefix passed");
 
 // Test create single-field index on an encrypted field or prefix of an encrypted field fails.
 res = dbTest.basic.createIndex({"firstName": 1});
@@ -58,8 +56,7 @@ res = dbTest.basic.createIndex({"paymentMethods.creditCards": 1});
 assert.commandFailedWithCode(res, 6346502, "Create index on prefix of encrypted field passed");
 
 res = dbTest.basic.createIndex({"firstName.$**": 1});
-assert.commandFailedWithCode(
-    res, 6346502, "Create wildcard index on prefix of encrypted field passed");
+assert.commandFailedWithCode(res, 6346502, "Create wildcard index on prefix of encrypted field passed");
 
 // Test that a compound index cannot contain an encrypted field.
 res = dbTest.basic.createIndex({"notEncrypted": 1, "paymentMethods.creditCards": 1});

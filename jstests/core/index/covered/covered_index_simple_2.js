@@ -22,27 +22,21 @@ coll.createIndex({foo: 1}, {unique: true});
 
 // Test equality with int value
 var plan = coll.find({foo: 1}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-       "simple.2.1 - indexOnly should be true on covered query");
-assert.eq(0,
-          plan.executionStats.totalDocsExamined,
-          "simple.2.1 - docs examined should be 0 for covered query");
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "simple.2.1 - indexOnly should be true on covered query");
+assert.eq(0, plan.executionStats.totalDocsExamined, "simple.2.1 - docs examined should be 0 for covered query");
 
 // Test equality with string value
 var plan = coll.find({foo: "string"}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-       "simple.2.2 - indexOnly should be true on covered query");
-assert.eq(0,
-          plan.executionStats.totalDocsExamined,
-          "simple.2.2 - docs examined should be 0 for covered query");
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "simple.2.2 - indexOnly should be true on covered query");
+assert.eq(0, plan.executionStats.totalDocsExamined, "simple.2.2 - docs examined should be 0 for covered query");
 
 // Test equality with int value on a dotted field
-var plan = coll.find({foo: {bar: 1}}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-       "simple.2.3 - indexOnly should be true on covered query");
-assert.eq(0,
-          plan.executionStats.totalDocsExamined,
-          "simple.2.3 - docs examined should be 0 for covered query");
+var plan = coll
+    .find({foo: {bar: 1}}, {foo: 1, _id: 0})
+    .hint({foo: 1})
+    .explain("executionStats");
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "simple.2.3 - indexOnly should be true on covered query");
+assert.eq(0, plan.executionStats.totalDocsExamined, "simple.2.3 - docs examined should be 0 for covered query");
 
 // Test no query
 if (!TestData.isHintsToQuerySettingsSuite) {
@@ -50,29 +44,24 @@ if (!TestData.isHintsToQuerySettingsSuite) {
     // suite. The suite replaces cursor hints with query settings. Query settings do not force
     // indexes, and therefore empty filter will result in collection scans.
     var plan = coll.find({}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
-    assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-           "simple.2.4 - indexOnly should be true on covered query");
-    assert.eq(0,
-              plan.executionStats.totalDocsExamined,
-              "simple.2.4 - docs examined should be 0 for covered query");
+    assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "simple.2.4 - indexOnly should be true on covered query");
+    assert.eq(0, plan.executionStats.totalDocsExamined, "simple.2.4 - docs examined should be 0 for covered query");
 }
 
 // Test range query
-var plan =
-    coll.find({foo: {$gt: 2, $lt: 6}}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-       "simple.2.5 - indexOnly should be true on covered query");
-assert.eq(0,
-          plan.executionStats.totalDocsExamined,
-          "simple.2.5 - docs examined should be 0 for covered query");
+var plan = coll
+    .find({foo: {$gt: 2, $lt: 6}}, {foo: 1, _id: 0})
+    .hint({foo: 1})
+    .explain("executionStats");
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "simple.2.5 - indexOnly should be true on covered query");
+assert.eq(0, plan.executionStats.totalDocsExamined, "simple.2.5 - docs examined should be 0 for covered query");
 
 // Test in query
-var plan =
-    coll.find({foo: {$in: [5, 8]}}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
-assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-       "simple.2.6 - indexOnly should be true on covered query");
-assert.eq(0,
-          plan.executionStats.totalDocsExamined,
-          "simple.2.6 - docs examined should be 0 for covered query");
+var plan = coll
+    .find({foo: {$in: [5, 8]}}, {foo: 1, _id: 0})
+    .hint({foo: 1})
+    .explain("executionStats");
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan), "simple.2.6 - indexOnly should be true on covered query");
+assert.eq(0, plan.executionStats.totalDocsExamined, "simple.2.6 - docs examined should be 0 for covered query");
 
-print('all tests pass');
+print("all tests pass");

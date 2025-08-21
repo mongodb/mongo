@@ -50,7 +50,7 @@ assert.commandWorked(coll.insert(kDocs));
         {_id: 2, "a": {"0": 42}},
         {_id: 4, "a": [{"0": 42}]},
         {_id: 5, "a": {"0": [42]}},
-        {_id: 9, "a": [{"0": [42]}]}
+        {_id: 9, "a": [{"0": [42]}]},
     ];
 
     assert.sameMembers(res, expected);
@@ -105,7 +105,7 @@ assert.commandWorked(coll.insert(kDocs));
         {_id: 17, "a": [[{"0": [42]}]]},
         {_id: 20, "a": [{"0": [{"0": 42}]}]},
         {_id: 21, "a": [{"0": {"0": [42]}}]},
-        {_id: 25, "a": {"0": [{"0": [42]}]}}
+        {_id: 25, "a": {"0": [{"0": [42]}]}},
     ];
 
     assert.sameMembers(res, expected);
@@ -119,7 +119,7 @@ assert.commandWorked(coll.insert(kDocs));
         {_id: 2, "a": {"0": 42}},
         {_id: 4, "a": [{"0": 42}]},
         {_id: 5, "a": {"0": [42]}},
-        {_id: 9, "a": [{"0": [42]}]}
+        {_id: 9, "a": [{"0": [42]}]},
     ];
 
     assert.sameMembers(res, expected);
@@ -133,7 +133,7 @@ assert.commandWorked(coll.insert(kDocs));
         {_id: 2, "a": {"0": 42}},
         {_id: 4, "a": [{"0": 42}]},
         {_id: 5, "a": {"0": [42]}},
-        {_id: 9, "a": [{"0": [42]}]}
+        {_id: 9, "a": [{"0": [42]}]},
     ];
 
     assert.sameMembers(res, expected);
@@ -257,7 +257,7 @@ assert.commandWorked(coll.insert(kDocs));
         {_id: 2, "a": {"0": 42}},
         {_id: 4, "a": [{"0": 42}]},
         {_id: 5, "a": {"0": [42]}},
-        {_id: 9, "a": [{"0": [42]}]}
+        {_id: 9, "a": [{"0": [42]}]},
     ];
 
     assert.sameMembers(res, expected);
@@ -290,7 +290,7 @@ assert.commandWorked(coll.insert(kDocs));
         {_id: 2, "a": {"0": 42}},
         {_id: 4, "a": [{"0": 42}]},
         {_id: 5, "a": {"0": [42]}},
-        {_id: 9, "a": [{"0": [42]}]}
+        {_id: 9, "a": [{"0": [42]}]},
     ];
 
     assert.sameMembers(res, expected);
@@ -303,7 +303,7 @@ assert.commandWorked(coll.insert(kDocs));
         {_id: 2, "a": {"0": 42}},
         {_id: 4, "a": [{"0": 42}]},
         {_id: 5, "a": {"0": [42]}},
-        {_id: 9, "a": [{"0": [42]}]}
+        {_id: 9, "a": [{"0": [42]}]},
     ];
 
     assert.sameMembers(res, expected);
@@ -317,7 +317,7 @@ assert.commandWorked(coll.insert(kDocs));
         {_id: 2, "a": {"0": 42}},
         {_id: 4, "a": [{"0": 42}]},
         {_id: 5, "a": {"0": [42]}},
-        {_id: 9, "a": [{"0": [42]}]}
+        {_id: 9, "a": [{"0": [42]}]},
     ];
 
     assert.sameMembers(res, expected);
@@ -326,15 +326,21 @@ assert.commandWorked(coll.insert(kDocs));
 const coll2 = db.match_numeric_components2;
 coll2.drop();
 
-const kRegexDocs =
-    [{_id: 1, "b": "hello"}, {_id: 2, "b": {"0": "hello"}}, {_id: 3, "b": ["hello", "abc", "abc"]}];
+const kRegexDocs = [
+    {_id: 1, "b": "hello"},
+    {_id: 2, "b": {"0": "hello"}},
+    {_id: 3, "b": ["hello", "abc", "abc"]},
+];
 
 assert.commandWorked(coll2.insert(kRegexDocs));
 
 // Regexes are often something of a special case.
 {
     const res = coll2.find({"b.0": {$regex: "hello"}}).toArray();
-    const expected = [{_id: 2, "b": {"0": "hello"}}, {_id: 3, "b": ["hello", "abc", "abc"]}];
+    const expected = [
+        {_id: 2, "b": {"0": "hello"}},
+        {_id: 3, "b": ["hello", "abc", "abc"]},
+    ];
 
     assert.sameMembers(res, expected);
 }
@@ -342,7 +348,10 @@ assert.commandWorked(coll2.insert(kRegexDocs));
 // $all with regexes.
 {
     const res = coll2.find({"b.0": {$all: [/^hello/]}}).toArray();
-    const expected = [{_id: 2, "b": {"0": "hello"}}, {_id: 3, "b": ["hello", "abc", "abc"]}];
+    const expected = [
+        {_id: 2, "b": {"0": "hello"}},
+        {_id: 3, "b": ["hello", "abc", "abc"]},
+    ];
     assert.sameMembers(res, expected);
 }
 
@@ -378,95 +387,178 @@ assert.commandWorked(coll2.insert(kRegexDocs));
 
 // Tests with equality. Add some data for the next few tests.
 coll.drop();
-assert.commandWorked(coll.insert({_id: 0, f0: 'zz', f1: 5}));
-assert.commandWorked(coll.insert({_id: 1, f0: 'zz', f1: [3, 5]}));
-assert.commandWorked(coll.insert({_id: 4, f0: 'zz', f1: [3, 5, [7, 9]]}));
-assert.commandWorked(coll.insert({_id: 2, f0: 'zz', f1: [[3, 5], [5, 7]]}));
-assert.commandWorked(coll.insert({_id: 3, f0: 'zz', f1: [[[0], [3, 5]], [[0], [5, 7]]]}));
+assert.commandWorked(coll.insert({_id: 0, f0: "zz", f1: 5}));
+assert.commandWorked(coll.insert({_id: 1, f0: "zz", f1: [3, 5]}));
+assert.commandWorked(coll.insert({_id: 4, f0: "zz", f1: [3, 5, [7, 9]]}));
+assert.commandWorked(
+    coll.insert({
+        _id: 2,
+        f0: "zz",
+        f1: [
+            [3, 5],
+            [5, 7],
+        ],
+    }),
+);
+assert.commandWorked(
+    coll.insert({
+        _id: 3,
+        f0: "zz",
+        f1: [
+            [[0], [3, 5]],
+            [[0], [5, 7]],
+        ],
+    }),
+);
 
 {
-    const res1 = coll.find({'f1.0': {$elemMatch: {$eq: 5}}}).toArray();
-    const res2 = coll.find({'f1.0': {$elemMatch: {$eq: [3, 5]}}}).toArray();
-    assert.commandWorked(coll.createIndex({'f1.0': 1}));
-    const res3 = coll.find({'f1.0': {$elemMatch: {$eq: 5}}}).toArray();
-    const res4 = coll.find({'f1.0': {$elemMatch: {$eq: [3, 5]}}}).toArray();
-    const expected1 = [{_id: 2, f0: 'zz', f1: [[3, 5], [5, 7]]}];
-    const expected2 = [{_id: 3, f0: 'zz', f1: [[[0], [3, 5]], [[0], [5, 7]]]}];
+    const res1 = coll.find({"f1.0": {$elemMatch: {$eq: 5}}}).toArray();
+    const res2 = coll.find({"f1.0": {$elemMatch: {$eq: [3, 5]}}}).toArray();
+    assert.commandWorked(coll.createIndex({"f1.0": 1}));
+    const res3 = coll.find({"f1.0": {$elemMatch: {$eq: 5}}}).toArray();
+    const res4 = coll.find({"f1.0": {$elemMatch: {$eq: [3, 5]}}}).toArray();
+    const expected1 = [
+        {
+            _id: 2,
+            f0: "zz",
+            f1: [
+                [3, 5],
+                [5, 7],
+            ],
+        },
+    ];
+    const expected2 = [
+        {
+            _id: 3,
+            f0: "zz",
+            f1: [
+                [[0], [3, 5]],
+                [[0], [5, 7]],
+            ],
+        },
+    ];
     assert.sameMembers(expected1, res1);
     assert.sameMembers(expected1, res3);
     assert.sameMembers(expected2, res2);
     assert.sameMembers(expected2, res4);
-    assert.commandWorked(coll.dropIndex({'f1.0': 1}));
+    assert.commandWorked(coll.dropIndex({"f1.0": 1}));
 }
 
 {
     // Compound index.
-    const res1 = coll.find({'f0': 'zz', 'f1.0': {$elemMatch: {$eq: 5}}}).toArray();
-    assert.commandWorked(coll.createIndex({'f0': 1, 'f1.0': 1}));
-    const res2 = coll.find({'f0': 'zz', 'f1.0': {$elemMatch: {$eq: 5}}}).toArray();
-    const expected = [{_id: 2, f0: 'zz', f1: [[3, 5], [5, 7]]}];
+    const res1 = coll.find({"f0": "zz", "f1.0": {$elemMatch: {$eq: 5}}}).toArray();
+    assert.commandWorked(coll.createIndex({"f0": 1, "f1.0": 1}));
+    const res2 = coll.find({"f0": "zz", "f1.0": {$elemMatch: {$eq: 5}}}).toArray();
+    const expected = [
+        {
+            _id: 2,
+            f0: "zz",
+            f1: [
+                [3, 5],
+                [5, 7],
+            ],
+        },
+    ];
     assert.sameMembers(expected, res1);
     assert.sameMembers(expected, res2);
-    assert.commandWorked(coll.dropIndex({'f0': 1, 'f1.0': 1}));
+    assert.commandWorked(coll.dropIndex({"f0": 1, "f1.0": 1}));
 }
 
 {
     // Two-levels of array nesting.
-    const res1 = coll.find({'f1.0.1': {$elemMatch: {$eq: 3}}}).toArray();
-    assert.commandWorked(coll.createIndex({'f1.0.1': 1}));
-    const res2 = coll.find({'f1.0.1': {$elemMatch: {$eq: 3}}}).toArray();
-    const expected = [{_id: 3, f0: 'zz', f1: [[[0], [3, 5]], [[0], [5, 7]]]}];
+    const res1 = coll.find({"f1.0.1": {$elemMatch: {$eq: 3}}}).toArray();
+    assert.commandWorked(coll.createIndex({"f1.0.1": 1}));
+    const res2 = coll.find({"f1.0.1": {$elemMatch: {$eq: 3}}}).toArray();
+    const expected = [
+        {
+            _id: 3,
+            f0: "zz",
+            f1: [
+                [[0], [3, 5]],
+                [[0], [5, 7]],
+            ],
+        },
+    ];
     assert.sameMembers(expected, res1);
     assert.sameMembers(expected, res2);
 }
 
 {
     assert(coll.drop());
-    assert.commandWorked(coll.createIndex({'f1.0': 1}));
-    assert.commandWorked(coll.insert({_id: 1, f1: [[42, 5], [77, 99]]}));
+    assert.commandWorked(coll.createIndex({"f1.0": 1}));
+    assert.commandWorked(
+        coll.insert({
+            _id: 1,
+            f1: [
+                [42, 5],
+                [77, 99],
+            ],
+        }),
+    );
 
-    const res1 = coll.find({'f1.0': {$elemMatch: {$eq: 5}}}).toArray();
-    assert.sameMembers([{_id: 1, f1: [[42, 5], [77, 99]]}], res1);
+    const res1 = coll.find({"f1.0": {$elemMatch: {$eq: 5}}}).toArray();
+    assert.sameMembers(
+        [
+            {
+                _id: 1,
+                f1: [
+                    [42, 5],
+                    [77, 99],
+                ],
+            },
+        ],
+        res1,
+    );
 
     // Object with numeric field component, and no nested arrays.
     assert.commandWorked(coll.insert({_id: 2, f1: {0: [42, 5], 1: [77, 99]}}));
-    const res2 = coll.find({'f1.0': {$elemMatch: {$eq: 5}}}).toArray();
+    const res2 = coll.find({"f1.0": {$elemMatch: {$eq: 5}}}).toArray();
     assert.sameMembers(
-        [{_id: 1, f1: [[42, 5], [77, 99]]}, {_id: 2, f1: {'0': [42, 5], '1': [77, 99]}}], res2);
+        [
+            {
+                _id: 1,
+                f1: [
+                    [42, 5],
+                    [77, 99],
+                ],
+            },
+            {_id: 2, f1: {"0": [42, 5], "1": [77, 99]}},
+        ],
+        res2,
+    );
 }
 
 {
     assert(coll.drop());
-    assert.commandWorked(coll.createIndex({'0': 1}));
+    assert.commandWorked(coll.createIndex({"0": 1}));
 
-    assert.commandWorked(coll.insert({_id: 1, '0': [42, 5]}));
-    const res1 = coll.find({'0': {$elemMatch: {$eq: 5}}}).toArray();
-    assert.sameMembers([{'0': [42, 5], _id: 1}], res1);
+    assert.commandWorked(coll.insert({_id: 1, "0": [42, 5]}));
+    const res1 = coll.find({"0": {$elemMatch: {$eq: 5}}}).toArray();
+    assert.sameMembers([{"0": [42, 5], _id: 1}], res1);
 
-    assert.commandWorked(coll.createIndex({'0.1': 1}));
-    assert.commandWorked(coll.insert({_id: 2, '0': {0: [42], 1: [5]}}));
-    const res2 = coll.find({'0.1': {$elemMatch: {$eq: 5}}}).toArray();
-    assert.sameMembers([{'0': {'0': [42], '1': [5]}, _id: 2}], res2);
+    assert.commandWorked(coll.createIndex({"0.1": 1}));
+    assert.commandWorked(coll.insert({_id: 2, "0": {0: [42], 1: [5]}}));
+    const res2 = coll.find({"0.1": {$elemMatch: {$eq: 5}}}).toArray();
+    assert.sameMembers([{"0": {"0": [42], "1": [5]}, _id: 2}], res2);
 }
 {
     assert(coll.drop());
     // Unreasonably large numerical components are treated as string field names.
-    assert.commandWorked(coll.insert({_id: 1, 'a': {'9223372036854776000': 42}}));
-    assert.commandWorked(coll.insert({_id: 2, 'a': {'9223372036854776000': [42]}}));
-    assert.commandWorked(coll.insert({_id: 3, 'a': {'9223372036854776000': [0, 42]}}));
-    assert.commandWorked(
-        coll.insert({_id: 4, 'a': {'9223372036854776000': [{'9223372036854776000': 42}]}}));
-    const res1 = coll.find({'a.9223372036854776000': 42}).toArray();
+    assert.commandWorked(coll.insert({_id: 1, "a": {"9223372036854776000": 42}}));
+    assert.commandWorked(coll.insert({_id: 2, "a": {"9223372036854776000": [42]}}));
+    assert.commandWorked(coll.insert({_id: 3, "a": {"9223372036854776000": [0, 42]}}));
+    assert.commandWorked(coll.insert({_id: 4, "a": {"9223372036854776000": [{"9223372036854776000": 42}]}}));
+    const res1 = coll.find({"a.9223372036854776000": 42}).toArray();
     const expected1 = [
-        {_id: 1, 'a': {'9223372036854776000': 42}},
-        {_id: 2, 'a': {'9223372036854776000': [42]}},
-        {_id: 3, 'a': {'9223372036854776000': [0, 42]}}
+        {_id: 1, "a": {"9223372036854776000": 42}},
+        {_id: 2, "a": {"9223372036854776000": [42]}},
+        {_id: 3, "a": {"9223372036854776000": [0, 42]}},
     ];
     assert.sameMembers(expected1, res1);
-    const res2 = coll.find({'a.9223372036854776000.1': 42}).toArray();
-    const expected2 = [{_id: 3, 'a': {'9223372036854776000': [0, 42]}}];
+    const res2 = coll.find({"a.9223372036854776000.1": 42}).toArray();
+    const expected2 = [{_id: 3, "a": {"9223372036854776000": [0, 42]}}];
     assert.sameMembers(expected2, res2);
-    const res3 = coll.find({'a.9223372036854776000.9223372036854776000': 42}).toArray();
-    const expected3 = [{_id: 4, 'a': {'9223372036854776000': [{'9223372036854776000': 42}]}}];
+    const res3 = coll.find({"a.9223372036854776000.9223372036854776000": 42}).toArray();
+    const expected3 = [{_id: 4, "a": {"9223372036854776000": [{"9223372036854776000": 42}]}}];
     assert.sameMembers(expected3, res3);
 }

@@ -21,8 +21,9 @@ function runOnReplsetAndShardedCluster(callbackFn) {
         const st = new ShardingTest(Object.assign({shards: 2}));
 
         const testDB = st.s.getDB("test");
-        assert.commandWorked(testDB.adminCommand(
-            {enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}),
+        );
 
         callbackFn(st.s);
 
@@ -35,17 +36,19 @@ function main(conn) {
 
     // Partial index, non-transactional upsert and findAndModify.
     assert(db.test.drop());
-    assert.commandWorked(
-        db.test.createIndex({userId: 1}, {unique: true, partialFilterExpression: {indexed: true}}));
+    assert.commandWorked(db.test.createIndex({userId: 1}, {unique: true, partialFilterExpression: {indexed: true}}));
     assert.commandWorked(db.test.insert({userId: 1}));
     assert.commandWorked(db.test.insert({userId: 1, indexed: true}));
     assert.writeError(db.test.update({userId: 1}, {$set: {indexed: true}}, {upsert: true}));
-    assert.throwsWithCode(() => db.test.findAndModify({
-        query: {userId: 1},
-        update: {$set: {userId: 1, indexed: true}},
-        upsert: true,
-    }),
-                          ErrorCodes.DuplicateKey);
+    assert.throwsWithCode(
+        () =>
+            db.test.findAndModify({
+                query: {userId: 1},
+                update: {$set: {userId: 1, indexed: true}},
+                upsert: true,
+            }),
+        ErrorCodes.DuplicateKey,
+    );
 
     // Sparse index, non-transactional upsert and findAndModify.
     assert(db.test.drop());
@@ -53,38 +56,43 @@ function main(conn) {
     assert.commandWorked(db.test.insert({}));
     assert.commandWorked(db.test.insert({userId: null}));
     assert.writeError(db.test.update({userId: null}, {$set: {userId: null}}, {upsert: true}));
-    assert.throwsWithCode(() => db.test.findAndModify({
-        query: {userId: null},
-        update: {$set: {userId: null}},
-        upsert: true,
-    }),
-                          ErrorCodes.DuplicateKey);
+    assert.throwsWithCode(
+        () =>
+            db.test.findAndModify({
+                query: {userId: null},
+                update: {$set: {userId: null}},
+                upsert: true,
+            }),
+        ErrorCodes.DuplicateKey,
+    );
     {
         // Partial index, transactional upsert and findAndModify.
         let session = conn.startSession();
-        let test = session.getDatabase('test').getCollection('test');
+        let test = session.getDatabase("test").getCollection("test");
         assert(test.drop());
-        assert.commandWorked(test.createIndex(
-            {userId: 1}, {unique: true, partialFilterExpression: {indexed: true}}));
+        assert.commandWorked(test.createIndex({userId: 1}, {unique: true, partialFilterExpression: {indexed: true}}));
         assert.commandWorked(test.insert({userId: 1}));
         assert.commandWorked(test.insert({userId: 1, indexed: true}));
         session.startTransaction();
         assert.writeError(test.update({userId: 1}, {$set: {indexed: true}}, {upsert: true}));
         assert.throwsWithCode(() => session.commitTransaction(), ErrorCodes.NoSuchTransaction);
         session.startTransaction();
-        assert.throwsWithCode(() => test.findAndModify({
-            query: {userId: 1},
-            update: {$set: {userId: 1, indexed: true}},
-            upsert: true,
-        }),
-                              ErrorCodes.DuplicateKey);
+        assert.throwsWithCode(
+            () =>
+                test.findAndModify({
+                    query: {userId: 1},
+                    update: {$set: {userId: 1, indexed: true}},
+                    upsert: true,
+                }),
+            ErrorCodes.DuplicateKey,
+        );
         assert.throwsWithCode(() => session.commitTransaction(), ErrorCodes.NoSuchTransaction);
     }
 
     {
         // Sparse index, transactional upsert and findAndModify.
         let session = conn.startSession();
-        let test = session.getDatabase('test').getCollection('test');
+        let test = session.getDatabase("test").getCollection("test");
         assert(test.drop());
         assert.commandWorked(test.createIndex({userId: 1}, {unique: true, sparse: true}));
         assert.commandWorked(test.insert({}));
@@ -93,12 +101,15 @@ function main(conn) {
         assert.writeError(test.update({userId: null}, {$set: {userId: null}}, {upsert: true}));
         assert.throwsWithCode(() => session.commitTransaction(), ErrorCodes.NoSuchTransaction);
         session.startTransaction();
-        assert.throwsWithCode(() => test.findAndModify({
-            query: {userId: null},
-            update: {$set: {userId: null}},
-            upsert: true,
-        }),
-                              ErrorCodes.DuplicateKey);
+        assert.throwsWithCode(
+            () =>
+                test.findAndModify({
+                    query: {userId: null},
+                    update: {$set: {userId: null}},
+                    upsert: true,
+                }),
+            ErrorCodes.DuplicateKey,
+        );
         assert.throwsWithCode(() => session.commitTransaction(), ErrorCodes.NoSuchTransaction);
     }
 }

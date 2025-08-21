@@ -10,21 +10,14 @@
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {setupShardedCollectionWithOrphans} from "jstests/libs/query_golden_sharding_utils.js";
 
-TestData.skipCheckOrphans = true;  // Deliberately inserts orphans.
+TestData.skipCheckOrphans = true; // Deliberately inserts orphans.
 
 function validateResults({results, nonOrphanDocuments, mayReturnOrphans}) {
-    const asStrings = results.map(x => tojson(x));
-    assert.eq(
-        new Set(asStrings).size,
-        results.length,
-        "Results are not distinct: " + tojson(results),
-    );
+    const asStrings = results.map((x) => tojson(x));
+    assert.eq(new Set(asStrings).size, results.length, "Results are not distinct: " + tojson(results));
 
-    const isOrphan = value => value.includes("orphan");
-    const nonOrphansFound = asStrings.reduce(
-        (acc, value) => acc + (isOrphan(value) ? 0 : 1),
-        0,
-    );
+    const isOrphan = (value) => value.includes("orphan");
+    const nonOrphansFound = asStrings.reduce((acc, value) => acc + (isOrphan(value) ? 0 : 1), 0);
     assert.eq(nonOrphansFound, nonOrphanDocuments, tojson(results));
 
     if (!mayReturnOrphans) {
@@ -59,12 +52,10 @@ function runDistinctTest({
     // though the command does support them.
     const cmdArgs = {distinct: coll.getName(), key, query: filter, ...options};
     const results = assert.commandWorked(coll.getDB().runCommand(cmdArgs)).values;
-    const explain = assert.commandWorked(
-        coll.getDB().runCommand({explain: cmdArgs, verbosity: "queryPlanner"}));
+    const explain = assert.commandWorked(coll.getDB().runCommand({explain: cmdArgs, verbosity: "queryPlanner"}));
 
     validateResults({results, mayReturnOrphans, nonOrphanDocuments});
-    validateExplain(
-        {explain, shouldHaveShardFilteringStage, shouldHaveDistinctScan: shouldHaveDistinctScan});
+    validateExplain({explain, shouldHaveShardFilteringStage, shouldHaveDistinctScan: shouldHaveDistinctScan});
 }
 
 function runAggregationTest({
@@ -78,7 +69,7 @@ function runAggregationTest({
     shouldHaveShardFilteringStage,
     shouldHaveDistinctScan,
 }) {
-    const runTest = pipe => {
+    const runTest = (pipe) => {
         const results = coll.aggregate(pipe, options).toArray();
         const explain = coll.explain().aggregate(pipe, options);
 
@@ -89,18 +80,15 @@ function runAggregationTest({
     runTest([{$match: filter}, {$group: {_id: "$" + key}}]);
     if (sort) {
         runTest([{$sort: sort}, {$match: filter}, {$group: {_id: "$" + key}}]);
-        runTest([
-            {$match: filter},
-            {$group: {_id: "$" + key, accum: {$top: {sortBy: sort, output: "$" + key}}}}
-        ]);
+        runTest([{$match: filter}, {$group: {_id: "$" + key, accum: {$top: {sortBy: sort, output: "$" + key}}}}]);
     }
 }
 
 const filterOnShardKey = {
-    shardKey: {$gte: "chunk1_s0_1"}
+    shardKey: {$gte: "chunk1_s0_1"},
 };
 const filterOnNonShardKey = {
-    notShardKey: {$gte: "1notShardKey_chunk1_s0_1"}
+    notShardKey: {$gte: "1notShardKey_chunk1_s0_1"},
 };
 
 const testCases = [
@@ -154,8 +142,7 @@ const testCases = [
     },
 ];
 
-function runTestsWithOptions(
-    {coll, options = {}, mayReturnOrphans, shouldHaveShardFilteringStage}) {
+function runTestsWithOptions({coll, options = {}, mayReturnOrphans, shouldHaveShardFilteringStage}) {
     const commonTestProps = {coll, options, mayReturnOrphans, shouldHaveShardFilteringStage};
     for (const testCase of testCases) {
         print("Running distinct test: " + tojson(testCase));
@@ -165,14 +152,13 @@ function runTestsWithOptions(
         runAggregationTest({
             ...commonTestProps,
             ...testCase,
-            shouldHaveDistinctScan:
-                testCase.shouldHaveDistinctScan && !testCase.shouldHaveDistinctScanDistinctOnly
+            shouldHaveDistinctScan: testCase.shouldHaveDistinctScan && !testCase.shouldHaveDistinctScanDistinctOnly,
         });
     }
 }
 
 const readConcernAvailable = {
-    level: "available"
+    level: "available",
 };
 
 const {shardingTest, coll} = setupShardedCollectionWithOrphans();

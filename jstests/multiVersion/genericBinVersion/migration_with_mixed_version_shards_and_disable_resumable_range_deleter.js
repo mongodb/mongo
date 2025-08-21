@@ -11,7 +11,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const dbName = "test";
 
 function getNewNs(dbName) {
-    if (typeof getNewNs.counter == 'undefined') {
+    if (typeof getNewNs.counter == "undefined") {
         getNewNs.counter = 0;
     }
     getNewNs.counter++;
@@ -20,8 +20,7 @@ function getNewNs(dbName) {
 }
 
 function setDisableResumableRangeDeleter(value, rs) {
-    const getParameterRes =
-        rs.getPrimary().adminCommand({getParameter: 1, disableResumableRangeDeleter: 1});
+    const getParameterRes = rs.getPrimary().adminCommand({getParameter: 1, disableResumableRangeDeleter: 1});
     assert.commandWorked(getParameterRes);
     if (getParameterRes.disableResumableRangeDeleter == value) {
         return;
@@ -32,10 +31,9 @@ function setDisableResumableRangeDeleter(value, rs) {
 
 const st = new ShardingTest({
     shards: {rs0: {nodes: [{binVersion: "latest"}]}, rs1: {nodes: [{binVersion: "last-lts"}]}},
-    other: {mongosOptions: {binVersion: "last-lts"}}
+    other: {mongosOptions: {binVersion: "last-lts"}},
 });
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 const vLatestShard = st.rs0;
 const v44shard = st.rs1;
@@ -55,7 +53,8 @@ const v44shard = st.rs1;
 
 (() => {
     jsTestLog(
-        "v4.7+ donor with disableResumableRangeDeleter=true, v4.4 recipient with disableResumableRangeDeleter=false");
+        "v4.7+ donor with disableResumableRangeDeleter=true, v4.4 recipient with disableResumableRangeDeleter=false",
+    );
     setDisableResumableRangeDeleter(true, vLatestShard);
     setDisableResumableRangeDeleter(false, v44shard);
     const [collName, ns] = getNewNs(dbName);
@@ -74,7 +73,8 @@ const v44shard = st.rs1;
 
 (() => {
     jsTestLog(
-        "v4.7+ donor with disableResumableRangeDeleter=false, v4.4 recipient with disableResumableRangeDeleter=true");
+        "v4.7+ donor with disableResumableRangeDeleter=false, v4.4 recipient with disableResumableRangeDeleter=true",
+    );
     setDisableResumableRangeDeleter(false, vLatestShard);
     setDisableResumableRangeDeleter(true, v44shard);
     const [collName, ns] = getNewNs(dbName);
@@ -99,7 +99,8 @@ assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shard
 
 (() => {
     jsTestLog(
-        "v4.4 donor with disableResumableRangeDeleter=true, v4.7+ recipient with disableResumableRangeDeleter=false");
+        "v4.4 donor with disableResumableRangeDeleter=true, v4.7+ recipient with disableResumableRangeDeleter=false",
+    );
     setDisableResumableRangeDeleter(true, v44shard);
     setDisableResumableRangeDeleter(false, vLatestShard);
     const [collName, ns] = getNewNs(dbName);
@@ -118,7 +119,8 @@ assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shard
 
 (() => {
     jsTestLog(
-        "v4.4 donor with disableResumableRangeDeleter=false, v4.7+ recipient with disableResumableRangeDeleter=true");
+        "v4.4 donor with disableResumableRangeDeleter=false, v4.7+ recipient with disableResumableRangeDeleter=true",
+    );
     setDisableResumableRangeDeleter(false, v44shard);
     setDisableResumableRangeDeleter(true, vLatestShard);
     const [collName, ns] = getNewNs(dbName);

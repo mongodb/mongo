@@ -5,10 +5,9 @@
 const pathsep = _isWindows() ? "\\" : "/";
 const recordingDirGlobal = MongoRunner.toRealDir("$dataDir" + pathsep + "traffic_recording");
 const recordingDirCustom = "recordings";
-const recordingDir =
-    MongoRunner.toRealDir(recordingDirGlobal + pathsep + recordingDirCustom + pathsep);
+const recordingDir = MongoRunner.toRealDir(recordingDirGlobal + pathsep + recordingDirCustom + pathsep);
 
-assert.throws(function() {
+assert.throws(function () {
     convertTrafficRecordingToBSON("notarealfileatall");
 });
 
@@ -33,8 +32,7 @@ adminDB.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
 adminDB.auth("admin", "pass");
 
 // Start recording traffic
-assert.commandWorked(
-    adminDB.runCommand({'startTrafficRecording': 1, 'destination': recordingDirCustom}));
+assert.commandWorked(adminDB.runCommand({"startTrafficRecording": 1, "destination": recordingDirCustom}));
 
 // Run a few commands
 assert.commandWorked(testDB.runCommand({"serverStatus": 1}));
@@ -48,13 +46,13 @@ assert.commandWorked(coll.update({}, {}));
 
 let serverStatus = testDB.runCommand({"serverStatus": 1});
 assert("trafficRecording" in serverStatus, serverStatus);
-let recordingFilePath = serverStatus["trafficRecording"]['recordingDir'];
+let recordingFilePath = serverStatus["trafficRecording"]["recordingDir"];
 
 // Stop recording traffic
-assert.commandWorked(testDB.runCommand({'stopTrafficRecording': 1}));
+assert.commandWorked(testDB.runCommand({"stopTrafficRecording": 1}));
 
 // Shutdown Mongod
-MongoRunner.stopMongod(m, null, {user: 'admin', pwd: 'password'});
+MongoRunner.stopMongod(m, null, {user: "admin", pwd: "password"});
 
 // Counters
 var numRequest = 0;
@@ -76,10 +74,10 @@ res.forEach((obj) => {
 assert.eq(numResponse, numRequest);
 
 // Assert the opTypes were correct
-assert.eq(opTypes['isMaster'], opTypes["ismaster"]);
-assert.eq(opTypes['find'], 2);
-assert.eq(opTypes['insert'], 2);
-assert.eq(opTypes['delete'], 1);
-assert.eq(opTypes['update'], 1);
-assert.eq(opTypes['aggregate'], 1);
-assert.eq(opTypes['stopTrafficRecording'], 1);
+assert.eq(opTypes["isMaster"], opTypes["ismaster"]);
+assert.eq(opTypes["find"], 2);
+assert.eq(opTypes["insert"], 2);
+assert.eq(opTypes["delete"], 1);
+assert.eq(opTypes["update"], 1);
+assert.eq(opTypes["aggregate"], 1);
+assert.eq(opTypes["stopTrafficRecording"], 1);

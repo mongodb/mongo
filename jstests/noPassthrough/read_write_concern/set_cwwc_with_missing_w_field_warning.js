@@ -12,13 +12,14 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function restartAndCheckLogs(conn, primary, replTest, shouldExist) {
-    const includesStartupWarning = (line) => line.includes(
-        "The default cluster-wide write concern is configured with the 'w' field set to 1 and" +
-        " 'wtimeout' set to a value greater than 0");
+    const includesStartupWarning = (line) =>
+        line.includes(
+            "The default cluster-wide write concern is configured with the 'w' field set to 1 and" +
+                " 'wtimeout' set to a value greater than 0",
+        );
     replTest.restart(primary);
     let newPrimaryConn = replTest.getPrimary();
-    const startupWarnings =
-        assert.commandWorked(newPrimaryConn.adminCommand({getLog: "startupWarnings"}));
+    const startupWarnings = assert.commandWorked(newPrimaryConn.adminCommand({getLog: "startupWarnings"}));
     if (shouldExist) {
         assert(startupWarnings.log.some(includesStartupWarning));
     } else {
@@ -34,29 +35,34 @@ function restartAndCheckLogs(conn, primary, replTest, shouldExist) {
 
 function runTest(conn, primary, replTest) {
     jsTestLog("No warning should be issued if CWWC is set to {w: 1, wtimeout: 0}.");
-    assert.commandWorked(conn.adminCommand(
-        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    );
     let res = conn.adminCommand({getDefaultRWConcern: 1});
     assert.eq(res.defaultWriteConcern, {"w": 1, "wtimeout": 0});
     [conn, primary] = restartAndCheckLogs(conn, primary, replTest, false);
 
     jsTestLog("warning should be issued if CWWC is set to {w: 1, wtimeout: 100}.");
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultWriteConcern: {w: 1, "wtimeout": 100},
-        // WC: majority implies journaling.
-        writeConcern: {w: "majority"}
-    }));
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1, "wtimeout": 100},
+            // WC: majority implies journaling.
+            writeConcern: {w: "majority"},
+        }),
+    );
     res = conn.adminCommand({getDefaultRWConcern: 1});
     assert.eq(res.defaultWriteConcern, {"w": 1, "wtimeout": 100});
     [conn, primary] = restartAndCheckLogs(conn, primary, replTest, true);
 
     jsTestLog("No warning should be issued if CWWC is set to {w: 1, j: false}.");
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultWriteConcern: {w: 1, j: false},
-        writeConcern: {w: "majority"}
-    }));
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1, j: false},
+            writeConcern: {w: "majority"},
+        }),
+    );
     res = conn.adminCommand({getDefaultRWConcern: 1});
     assert.eq(res.defaultWriteConcern, {"w": 1, "j": false, "wtimeout": 0});
     [conn, primary] = restartAndCheckLogs(conn, primary, replTest, false);

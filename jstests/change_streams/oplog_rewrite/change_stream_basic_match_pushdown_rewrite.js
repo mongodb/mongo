@@ -24,7 +24,7 @@ const collNameAlternate = "change_stream_match_pushdown_and_rewrite_alternate";
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const mongosConn = st.s;
@@ -69,10 +69,9 @@ changeStream.close();
 // information about how many documents are processed by each stage. Note that 'event1' will not
 // be included in the results set this time, because we are using it as the resume point, but
 // will still be returned from the shard and get processed on the mongoS.
-const stats = coll.explain("executionStats").aggregate([
-    {$changeStream: {resumeAfter: event1._id}},
-    {$match: {operationType: "insert"}}
-]);
+const stats = coll
+    .explain("executionStats")
+    .aggregate([{$changeStream: {resumeAfter: event1._id}}, {$match: {operationType: "insert"}}]);
 
 // Verify the number of documents seen from each shard by the mongoS pipeline. Because we expect
 // the $match to be pushed down to the shards, we expect to only see the 1 "insert" operation on
@@ -109,8 +108,10 @@ assert.commandWorked(session.commitTransaction_forTesting());
 // Repeat the change stream from before, using a resume token to pick up from where the previous
 // change stream left off. This change stream will only observe the 6 operations that occur in the
 // transaction and will filter out everything except the 2 inserts.
-const txnChangeStream = coll.aggregate(
-    [{$changeStream: {resumeAfter: event2._id}}, {$match: {operationType: "insert"}}]);
+const txnChangeStream = coll.aggregate([
+    {$changeStream: {resumeAfter: event2._id}},
+    {$match: {operationType: "insert"}},
+]);
 
 // Verify correct operation of the change stream.
 assert.soon(() => txnChangeStream.hasNext());
@@ -129,10 +130,9 @@ assert(!txnChangeStream.hasNext());
 txnChangeStream.close();
 
 // Run explain on the change stream to get more detailed execution information.
-const txnStatsAfterEvent2 = coll.explain("executionStats").aggregate([
-    {$changeStream: {resumeAfter: event2._id}},
-    {$match: {operationType: "insert"}}
-]);
+const txnStatsAfterEvent2 = coll
+    .explain("executionStats")
+    .aggregate([{$changeStream: {resumeAfter: event2._id}}, {$match: {operationType: "insert"}}]);
 
 // Verify the number of documents seen from each shard by the mongoS pipeline. As before, we expect
 // that everything except the inserts will be filtered on the shard, limiting the number of events
@@ -156,10 +156,13 @@ assert.commandWorked(sessionColl.remove({_id: 2}));
 assert.commandWorked(session.commitTransaction_forTesting());
 
 // This change stream targets transactions from this session but filters out the first transaction.
-const txnStatsAfterEvent1 = () => coll.explain("executionStats").aggregate([
-    {$changeStream: {resumeAfter: event1._id}},
-    {$match: {operationType: "insert", lsid: event3.lsid, txnNumber: {$ne: event3.txnNumber}}}
-]);
+const txnStatsAfterEvent1 = () =>
+    coll
+        .explain("executionStats")
+        .aggregate([
+            {$changeStream: {resumeAfter: event1._id}},
+            {$match: {operationType: "insert", lsid: event3.lsid, txnNumber: {$ne: event3.txnNumber}}},
+        ]);
 
 // The "lsid" and "txnNumber" filters should get pushed all the way to the initial oplog query
 // in the $cursor stage, meaning that every oplog entry gets filtered out except the
@@ -174,23 +177,24 @@ if (!FeatureFlagUtil.isEnabled(db, "EndOfTransactionChangeEvent")) {
     assert.soon(
         () => {
             const stats = txnStatsAfterEvent1();
-            const oplogEventsOnShard0 =
-                getExecutionStatsForShard(stats, st.shard0.shardName).nReturned;
-            const oplogEventsOnShard1 =
-                getExecutionStatsForShard(stats, st.shard1.shardName).nReturned;
-            return oplogEventsOnShard0 > 0 && oplogEventsOnShard1 > 0 &&
-                oplogEventsOnShard0 + oplogEventsOnShard1 === 3;
+            const oplogEventsOnShard0 = getExecutionStatsForShard(stats, st.shard0.shardName).nReturned;
+            const oplogEventsOnShard1 = getExecutionStatsForShard(stats, st.shard1.shardName).nReturned;
+            return (
+                oplogEventsOnShard0 > 0 && oplogEventsOnShard1 > 0 && oplogEventsOnShard0 + oplogEventsOnShard1 === 3
+            );
         },
-        () => `Expected 3 events in total on all shard. Execution stats:\nshard0:\n${
-            tojson(
-                getExecutionStatsForShard(txnStatsAfterEvent1(), st.shard0.shardName))}\nshard1:\n${
-            tojson(getExecutionStatsForShard(txnStatsAfterEvent1(), st.shard1.shardName))}`);
+        () =>
+            `Expected 3 events in total on all shard. Execution stats:\nshard0:\n${tojson(
+                getExecutionStatsForShard(txnStatsAfterEvent1(), st.shard0.shardName),
+            )}\nshard1:\n${tojson(getExecutionStatsForShard(txnStatsAfterEvent1(), st.shard1.shardName))}`,
+    );
 }
 
 // Ensure that optimization does not attempt to create a filter that disregards the collation.
 const collationChangeStream = coll.aggregate(
     [{$changeStream: {resumeAfter: resumeAfterToken}}, {$match: {"fullDocument.string": "value"}}],
-    {collation: {locale: "en_US", strength: 2}});
+    {collation: {locale: "en_US", strength: 2}},
+);
 
 let stringValues = [];
 for (let i = 0; i < 4; ++i) {

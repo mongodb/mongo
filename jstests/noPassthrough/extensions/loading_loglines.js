@@ -19,18 +19,18 @@ if (!isLinux()) {
 const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
 const extOpts = {
     loadExtensions: pathToExtensionFoo,
-    setParameter: {featureFlagExtensionsAPI: true}
+    setParameter: {featureFlagExtensionsAPI: true},
 };
 
 // Helper to verify the three log-based conditions on any connection
 function assertExtensionsLoaded(conn) {
     const res = assert.commandWorked(conn.getDB("admin").runCommand({getLog: "global"}));
     const lines = res.log;
-    const extensionLogs = lines.filter(l => l.includes("EXTENSION"));
+    const extensionLogs = lines.filter((l) => l.includes("EXTENSION"));
 
-    const loaded = extensionLogs.filter(l => l.includes("Loading extension"));
-    const success = extensionLogs.filter(l => l.includes("Successfully loaded extension"));
-    const errors = extensionLogs.filter(l => l.includes("Error loading extension"));
+    const loaded = extensionLogs.filter((l) => l.includes("Loading extension"));
+    const success = extensionLogs.filter((l) => l.includes("Successfully loaded extension"));
+    const errors = extensionLogs.filter((l) => l.includes("Error loading extension"));
 
     assert.gt(loaded.length, 0, 'Did not see "Loading extension" in ' + conn + " log");
     assert.gt(success.length, 0, 'Did not see "Successfully loaded extension" in ' + conn + " log");
@@ -39,7 +39,7 @@ function assertExtensionsLoaded(conn) {
 
 // 1) Standalone mongod
 const conn = MongoRunner.runMongod(extOpts);
-let coll = conn.getCollection('test.foo');
+let coll = conn.getCollection("test.foo");
 assert.commandWorked(coll.insert({ok: 1}));
 assert.eq(1, coll.countDocuments({ok: 1}));
 assertExtensionsLoaded(conn);
@@ -53,10 +53,10 @@ const st = new ShardingTest({
     config: 1,
     mongosOptions: extOpts,
     configOptions: extOpts,
-    rsOptions: extOpts
+    rsOptions: extOpts,
 });
 
-coll = st.s0.getCollection('test.foo');
+coll = st.s0.getCollection("test.foo");
 assert.commandWorked(coll.insert({ok: 1}));
 assert.eq(1, coll.countDocuments({ok: 1}));
 assertExtensionsLoaded(st.s0);

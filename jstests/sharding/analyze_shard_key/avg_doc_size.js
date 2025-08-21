@@ -16,13 +16,15 @@ function testUnshardedCollection(conn) {
     assert.commandWorked(coll.createIndex(candidateKey));
     assert.commandWorked(coll.insert([{candidateKey: "a"}, {candidateKey: "a".repeat(999)}]));
 
-    const res = assert.commandWorked(conn.adminCommand({
-        analyzeShardKey: ns,
-        key: candidateKey,
-        // Skip calculating the read and write distribution metrics since they are not needed by
-        // this test.
-        readWriteDistribution: false
-    }));
+    const res = assert.commandWorked(
+        conn.adminCommand({
+            analyzeShardKey: ns,
+            key: candidateKey,
+            // Skip calculating the read and write distribution metrics since they are not needed by
+            // this test.
+            readWriteDistribution: false,
+        }),
+    );
     assert.lt(res.keyCharacteristics.avgDocSizeBytes, 1000, res);
     assert.gt(res.keyCharacteristics.avgDocSizeBytes, 1000 / 2, res);
 
@@ -34,8 +36,7 @@ function testShardedCollection(st) {
     const collName = "testCollSharded";
     const ns = dbName + "." + collName;
 
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
     const coll = st.s.getCollection(ns);
     const currentKey = {currentKey: 1};
@@ -50,23 +51,24 @@ function testShardedCollection(st) {
     // shard0: [MinKey, 0]
     // shard1: [0, MaxKey]
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: 0}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {currentKey: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {currentKey: 0}, to: st.shard1.shardName}));
 
-    assert.commandWorked(coll.insert([
-        {currentKey: -10, candidateKey: "a"},
-        {currentKey: -5, candidateKey: "a"},
-        {currentKey: 0, candidateKey: "a".repeat(999)},
-        {currentKey: 5, candidateKey: "a".repeat(999)},
-        {currentKey: 10, candidateKey: "a".repeat(999)},
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {currentKey: -10, candidateKey: "a"},
+            {currentKey: -5, candidateKey: "a"},
+            {currentKey: 0, candidateKey: "a".repeat(999)},
+            {currentKey: 5, candidateKey: "a".repeat(999)},
+            {currentKey: 10, candidateKey: "a".repeat(999)},
+        ]),
+    );
 
     const res = st.s.adminCommand({
         analyzeShardKey: ns,
         key: candidateKey,
         // Skip calculating the read and write distribution metrics since they are not needed by
         // this test.
-        readWriteDistribution: false
+        readWriteDistribution: false,
     });
     assert.lt(res.keyCharacteristics.avgDocSizeBytes, 1000, res);
     assert.gt(res.keyCharacteristics.avgDocSizeBytes, 3000 / 5, res);
@@ -83,7 +85,8 @@ function testShardedCollection(st) {
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet();
     rst.initiate();

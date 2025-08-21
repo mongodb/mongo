@@ -8,7 +8,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
@@ -37,30 +37,32 @@ let testQuery = [
         $rankFusion: {
             input: {
                 pipelines: {
-                    vector: [{
-                        $vectorSearch: {
-                            // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
-                            queryVector: getMoviePlotEmbeddingById(6),
-                            path: "plot_embedding",
-                            numCandidates: limit * vectorSearchOverrequestFactor,
-                            index: getMovieVectorSearchIndexSpec().name,
-                            limit: limit,
-                        }
-                    }],
+                    vector: [
+                        {
+                            $vectorSearch: {
+                                // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
+                                queryVector: getMoviePlotEmbeddingById(6),
+                                path: "plot_embedding",
+                                numCandidates: limit * vectorSearchOverrequestFactor,
+                                index: getMovieVectorSearchIndexSpec().name,
+                                limit: limit,
+                            },
+                        },
+                    ],
                     search: [
                         {
                             $search: {
                                 index: getMovieSearchIndexSpec().name,
                                 text: {query: "ape", path: ["fullplot", "title"]},
-                            }
+                            },
                         },
-                        {$limit: limit}
-                    ]
-                }
-            }
+                        {$limit: limit},
+                    ],
+                },
+            },
         },
     },
-    {$limit: limit}
+    {$limit: limit},
 ];
 
 let results = coll.aggregate(testQuery).toArray();

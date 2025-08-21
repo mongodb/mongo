@@ -9,8 +9,7 @@ const coll = testDb.agg_opt;
 
 const kTestZip = 44100;
 for (let i = 0; i < 25; ++i) {
-    assert.commandWorked(coll.insert(
-        {_id: kTestZip + i, city: "Cleveland", pop: Random.randInt(100000), state: "OH"}));
+    assert.commandWorked(coll.insert({_id: kTestZip + i, city: "Cleveland", pop: Random.randInt(100000), state: "OH"}));
 }
 
 const pipeline = [{$match: {_id: {$in: [kTestZip]}}}, {$sort: {_id: 1}}];
@@ -22,8 +21,7 @@ assert.eq(enabledPlan.queryPlanner.parsedQuery._id.$eq, kTestZip);
 const enabledResult = coll.aggregate(pipeline).toArray();
 
 // Enable a failpoint that will cause match expression optimizations to be skipped.
-assert.commandWorked(testDb.adminCommand(
-    {configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+assert.commandWorked(testDb.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
 
 const disabledPlan = coll.explain().aggregate(pipeline);
 // Test that the $in query still exists and hasn't been optimized to an $eq.

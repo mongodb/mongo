@@ -2,13 +2,9 @@
 // the clientSourceAuthenticationRestrictionMode server parameter.
 
 import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
-import {
-    isLinux,
-} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    ProxyProtocolServer,
-} from "jstests/sharding/libs/proxy_protocol.js";
+import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 
 // TODO: SERVER-100859: remove
 // Proxy protocol server does not work on non-Linux platforms.
@@ -27,30 +23,31 @@ function runTest(mongosCon, mode, proxyIngressAddress, proxyIngressPort, restric
     // address does not.
     assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
     assert(adminDB.auth("admin", "admin"));
-    assert.commandWorked(adminDB.runCommand({
-        createUser: "testUser",
-        pwd: "testUser",
-        roles: ["root"],
-        authenticationRestrictions: [{clientSource: [restrictionAddress]}]
-    }));
+    assert.commandWorked(
+        adminDB.runCommand({
+            createUser: "testUser",
+            pwd: "testUser",
+            roles: ["root"],
+            authenticationRestrictions: [{clientSource: [restrictionAddress]}],
+        }),
+    );
 
     // Authenticate as testUser via a separate connection that passes through the proxy server.
-    const proxyServerUri =
-        `mongodb://${proxyIngressAddress}:${proxyIngressPort}/?loadBalanced=true`;
+    const proxyServerUri = `mongodb://${proxyIngressAddress}:${proxyIngressPort}/?loadBalanced=true`;
     const proxiedMongo = new Mongo(proxyServerUri);
     const proxiedAdminDB = proxiedMongo.getDB("admin");
 
-    assert(mode === 'origin' || mode === 'peer');
+    assert(mode === "origin" || mode === "peer");
     if (mode === "origin") {
-        assert(proxiedAdminDB.auth('testUser', 'testUser'));
+        assert(proxiedAdminDB.auth("testUser", "testUser"));
     } else {
-        assert(!proxiedAdminDB.auth('testUser', 'testUser'));
+        assert(!proxiedAdminDB.auth("testUser", "testUser"));
     }
 }
 
 // Interface for mongo shell <-> proxy protocol server ingress is 127.0.0.1
 // Interface for proxy protocol server egress <-> mongos is public IP address of the host.
-const ingressAddress = '127.0.0.1';
+const ingressAddress = "127.0.0.1";
 const egressAddress = get_ipaddr();
 const restrictionAddress = ingressAddress;
 const ingressPort = allocatePort();
@@ -66,12 +63,11 @@ proxyServer.start();
         config: 1,
         shards: 1,
         mongosOptions: {
-            setParameter:
-                {loadBalancerPort: egressPort, clientSourceAuthenticationRestrictionMode: 'origin'}
+            setParameter: {loadBalancerPort: egressPort, clientSourceAuthenticationRestrictionMode: "origin"},
         },
     };
     const fixture = new ShardingTest(opts);
-    runTest(fixture.s0, 'origin', ingressAddress, ingressPort, restrictionAddress);
+    runTest(fixture.s0, "origin", ingressAddress, ingressPort, restrictionAddress);
     fixture.stop();
 }
 
@@ -81,12 +77,11 @@ proxyServer.start();
         config: 1,
         shards: 1,
         mongosOptions: {
-            setParameter:
-                {loadBalancerPort: egressPort, clientSourceAuthenticationRestrictionMode: 'peer'}
+            setParameter: {loadBalancerPort: egressPort, clientSourceAuthenticationRestrictionMode: "peer"},
         },
     };
     const fixture = new ShardingTest(opts);
-    runTest(fixture.s0, 'peer', ingressAddress, ingressPort, restrictionAddress);
+    runTest(fixture.s0, "peer", ingressAddress, ingressPort, restrictionAddress);
     fixture.stop();
 }
 

@@ -35,14 +35,14 @@ function hasIndexBuildAbortedError(res) {
 }
 
 function shouldRetryOnInterruptedError(errOrRes) {
-    return errOrRes.code === ErrorCodes.Interrupted &&
-        ((errOrRes.errmsg.indexOf("Database") === 0 &&
-          errOrRes.errmsg.indexOf("could not be created") > 0) ||
-         errOrRes.errmsg.indexOf("Failed to read local metadata.") === 0 ||
-         errOrRes.errmsg.indexOf("split failed") === 0 ||
-         errOrRes.errmsg.indexOf(
-             "Failed to read highest version persisted chunk for collection") === 0 ||
-         errOrRes.errmsg.indexOf("Command request failed on source shard.") === 0);
+    return (
+        errOrRes.code === ErrorCodes.Interrupted &&
+        ((errOrRes.errmsg.indexOf("Database") === 0 && errOrRes.errmsg.indexOf("could not be created") > 0) ||
+            errOrRes.errmsg.indexOf("Failed to read local metadata.") === 0 ||
+            errOrRes.errmsg.indexOf("split failed") === 0 ||
+            errOrRes.errmsg.indexOf("Failed to read highest version persisted chunk for collection") === 0 ||
+            errOrRes.errmsg.indexOf("Command request failed on source shard.") === 0)
+    );
 }
 
 /* Run client command with the ability to retry on a IndexBuildAborted Code
@@ -57,15 +57,13 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
             return res;
         } else if (hasIndexBuildAbortedError(res)) {
             if (shouldRetryIndexCreateCmd(cmdObj)) {
-                jsTest.log.info("-=-=-=- Retrying after IndexBuildAborted error response",
-                                {cmdObj, res});
+                jsTest.log.info("-=-=-=- Retrying after IndexBuildAborted error response", {cmdObj, res});
                 continue;
             } else {
                 return res;
             }
         } else if (shouldRetryOnInterruptedError(res)) {
-            jsTest.log.info("-=-=-=- Retrying after receiving Interrupted Error code",
-                            {cmdObj, res});
+            jsTest.log.info("-=-=-=- Retrying after receiving Interrupted Error code", {cmdObj, res});
             continue;
         }
 
@@ -73,5 +71,4 @@ function runWithRetries(mongo, cmdObj, clientFunction, clientFunctionArguments) 
     }
 }
 
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");

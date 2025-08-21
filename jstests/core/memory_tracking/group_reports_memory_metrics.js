@@ -22,26 +22,26 @@ const coll = db[collName];
 db[collName].drop();
 
 // Setup test collection.
-assert.commandWorked(coll.insertMany([
-    {groupKey: 1, val: "a"},
-    {groupKey: 1, val: "b"},
-    {groupKey: 2, val: "c"},
-    {groupKey: 2, val: "d"},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {groupKey: 1, val: "a"},
+        {groupKey: 1, val: "b"},
+        {groupKey: 2, val: "c"},
+        {groupKey: 2, val: "d"},
+    ]),
+);
 const pipeline = [{$group: {_id: "$groupKey", values: {$push: "$val"}}}];
 const pipelineWithLimit = [{$group: {_id: "$groupKey", values: {$push: "$val"}}}, {$limit: 2}];
 
 // Get the current value of the query framework server parameter so we can restore it at the end of
 // the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl =
-    assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-        .internalQueryFrameworkControl;
+const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+).internalQueryFrameworkControl;
 // 'forceIncreasedSpilling' should not be enabled for the following tests.
-const kOriginalForceIncreasedSpilling =
-    assert
-        .commandWorked(db.adminCommand(
-            {setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}))
-        .was;
+const kOriginalForceIncreasedSpilling = assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionHashAggIncreasedSpilling: "never"}),
+).was;
 const configs = [
     {
         name: "DocumentSourceGroup",
@@ -52,15 +52,14 @@ const configs = [
     {
         name: "SBE Group",
         framework: "trySbeEngine",
-        stageName: "group",  // SBE group stage appears without the dollar sign
+        stageName: "group", // SBE group stage appears without the dollar sign
         knobName: "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill",
     },
 ];
 
 try {
     for (const config of configs) {
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: config.framework}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: config.framework}));
 
         {
             runMemoryStatsTest({
@@ -71,7 +70,7 @@ try {
                     pipeline: pipeline,
                     comment: "memory stats group test",
                     cursor: {batchSize: 1},
-                    allowDiskUse: false
+                    allowDiskUse: false,
                 },
                 stageName: config.stageName,
                 expectedNumGetMores: 2,
@@ -87,7 +86,7 @@ try {
                     pipeline: pipelineWithLimit,
                     cursor: {batchSize: 1},
                     comment: "memory stats group limit test",
-                    allowDiskUse: false
+                    allowDiskUse: false,
                 },
                 stageName: config.stageName,
                 expectedNumGetMores: 1,
@@ -99,7 +98,8 @@ try {
             const memoryLimitKnob = config.knobName;
             // Set maxMemory low to force spill to disk.
             const originalMemoryLimit = assert.commandWorked(
-                db.adminCommand({setParameter: 1, [memoryLimitKnob]: lowMaxMemoryLimit}));
+                db.adminCommand({setParameter: 1, [memoryLimitKnob]: lowMaxMemoryLimit}),
+            );
 
             try {
                 runMemoryStatsTest({
@@ -110,7 +110,7 @@ try {
                         pipeline: pipeline,
                         cursor: {batchSize: 1},
                         comment: "memory stats group spilling test",
-                        allowDiskUse: true
+                        allowDiskUse: true,
                     },
                     stageName: config.stageName,
                     expectedNumGetMores: 2,
@@ -120,17 +120,19 @@ try {
                 });
             } finally {
                 // Set maxMemory back to the original value.
-                assert.commandWorked(
-                    db.adminCommand({setParameter: 1, [memoryLimitKnob]: originalMemoryLimit.was}));
+                assert.commandWorked(db.adminCommand({setParameter: 1, [memoryLimitKnob]: originalMemoryLimit.was}));
             }
         }
     }
 } finally {
     db[collName].drop();
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}));
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQuerySlotBasedExecutionHashAggIncreasedSpilling: kOriginalForceIncreasedSpilling
-    }));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
+    );
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggIncreasedSpilling: kOriginalForceIncreasedSpilling,
+        }),
+    );
 }

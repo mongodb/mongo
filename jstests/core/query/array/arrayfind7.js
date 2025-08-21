@@ -11,7 +11,7 @@ function checkElemMatchMatches() {
 
 // The document is matched using nested $elemMatch expressions, with and without an index.
 checkElemMatchMatches();
-t.createIndex({'a.b.c': 1});
+t.createIndex({"a.b.c": 1});
 checkElemMatchMatches();
 
 function checkElemMatch(index, document, query) {
@@ -21,31 +21,31 @@ function checkElemMatch(index, document, query) {
     assert.eq(1, t.count(query));
     t.createIndex(index);
     assert.eq(1, t.count(query));
-    t.save({a: {b: {c: [10, 11]}}});  // Make the index multikey.
+    t.save({a: {b: {c: [10, 11]}}}); // Make the index multikey.
     assert.eq(1, t.count(query));
 }
 
 // Two constraints within a nested $elemMatch expression.
-checkElemMatch({'a.b.c': 1},
-               {a: [{b: [{c: 1}]}]},
-               {a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $lte: 1}}}}}});
+checkElemMatch({"a.b.c": 1}, {a: [{b: [{c: 1}]}]}, {a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $lte: 1}}}}}});
 
 // Two constraints within a nested $elemMatch expression, one of which contains the other.
-checkElemMatch({'a.b.c': 1},
-               {a: [{b: [{c: 2}]}]},
-               {a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $in: [2]}}}}}});
+checkElemMatch({"a.b.c": 1}, {a: [{b: [{c: 2}]}]}, {a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1, $in: [2]}}}}}});
 
 // Two nested $elemMatch expressions.
-checkElemMatch({'a.d.e': 1, 'a.b.c': 1}, {a: [{b: [{c: 1}], d: [{e: 1}]}]}, {
-    a: {$elemMatch: {d: {$elemMatch: {e: {$lte: 1}}}, b: {$elemMatch: {c: {$gte: 1}}}}}
-});
+checkElemMatch(
+    {"a.d.e": 1, "a.b.c": 1},
+    {a: [{b: [{c: 1}], d: [{e: 1}]}]},
+    {
+        a: {$elemMatch: {d: {$elemMatch: {e: {$lte: 1}}}, b: {$elemMatch: {c: {$gte: 1}}}}},
+    },
+);
 
 // A non $elemMatch expression and a nested $elemMatch expression.
-checkElemMatch({'a.x': 1, 'a.b.c': 1},
-               {a: [{b: [{c: 1}], x: 1}]},
-               {'a.x': 1, a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1}}}}}});
+checkElemMatch(
+    {"a.x": 1, "a.b.c": 1},
+    {a: [{b: [{c: 1}], x: 1}]},
+    {"a.x": 1, a: {$elemMatch: {b: {$elemMatch: {c: {$gte: 1}}}}}},
+);
 
 // $elemMatch is applied directly to a top level field.
-checkElemMatch({'a.b.c': 1},
-               {a: [{b: [{c: [1]}]}]},
-               {a: {$elemMatch: {'b.c': {$elemMatch: {$gte: 1, $lte: 1}}}}});
+checkElemMatch({"a.b.c": 1}, {a: [{b: [{c: [1]}]}]}, {a: {$elemMatch: {"b.c": {$elemMatch: {$gte: 1, $lte: 1}}}}});

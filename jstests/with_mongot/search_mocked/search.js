@@ -26,13 +26,13 @@ assert.commandWorked(coll.insert({"_id": 8, "title": "cakes and kale"}));
 const collUUID = getUUIDFromListCollections(db, coll.getName());
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 const searchCmd = {
     search: coll.getName(),
     collectionUUID: collUUID,
     query: searchQuery,
-    $db: "test"
+    $db: "test",
 };
 
 // Give mongotmock some stuff to return.
@@ -48,11 +48,11 @@ const searchCmd = {
                     nextBatch: [
                         {_id: 1, $searchScore: 0.321},
                         {_id: 2, $searchScore: 0.654},
-                        {_id: 5, $searchScore: 0.789}
-                    ]
+                        {_id: 5, $searchScore: 0.789},
+                    ],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -60,10 +60,10 @@ const searchCmd = {
                 cursor: {
                     id: cursorId,
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 6, $searchScore: 0.123}]
+                    nextBatch: [{_id: 6, $searchScore: 0.123}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -72,14 +72,13 @@ const searchCmd = {
                 cursor: {
                     id: NumberLong(0),
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 8, $searchScore: 0.345}]
+                    nextBatch: [{_id: 8, $searchScore: 0.345}],
                 },
-            }
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 // Perform a $search query.
@@ -92,7 +91,7 @@ const expected = [
     {"_id": 2, "title": "cookies and cakes"},
     {"_id": 5, "title": "cakes and oranges"},
     {"_id": 6, "title": "cakes and apples"},
-    {"_id": 8, "title": "cakes and kale"}
+    {"_id": 8, "title": "cakes and kale"},
 ];
 assert.eq(expected, cursor.toArray());
 
@@ -105,13 +104,12 @@ assert.eq(expected, cursor.toArray());
                 ok: 0,
                 errmsg: "mongot error",
                 code: ErrorCodes.InternalError,
-                codeName: "InternalError"
-            }
+                codeName: "InternalError",
+            },
         },
     ];
 
-    assert.commandWorked(mongotConn.adminCommand(
-        {setMockResponses: 1, cursorId: NumberLong(123), history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(123), history: history}));
     const err = assert.throws(() => coll.aggregate([{$search: searchQuery}]));
     assert.commandFailedWithCode(err, ErrorCodes.InternalError);
 }
@@ -130,11 +128,11 @@ assert.eq(expected, cursor.toArray());
                         {_id: 1, $searchScore: 0.321},
                         {_id: 2, $searchScore: 0.654},
                         {_id: 3, $searchScore: 0.654},
-                        {_id: 4, $searchScore: 0.789}
-                    ]
+                        {_id: 4, $searchScore: 0.789},
+                    ],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -142,13 +140,12 @@ assert.eq(expected, cursor.toArray());
                 ok: 0,
                 errmsg: "mongot error",
                 code: ErrorCodes.InternalError,
-                codeName: "InternalError"
-            }
+                codeName: "InternalError",
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 
     // The aggregate() (and search command) should succeed.
     // Note that 'batchSize' here only tells mongod how many docs to return per batch and has
@@ -175,10 +172,8 @@ assert.eq(expected, cursor.toArray());
 }
 
 // Fail on non-local read concern.
-const err =
-    assert.throws(() => coll.aggregate([{$search: {}}], {readConcern: {level: "majority"}}));
-assert.commandFailedWithCode(err,
-                             [ErrorCodes.InvalidOptions, ErrorCodes.ReadConcernMajorityNotEnabled]);
+const err = assert.throws(() => coll.aggregate([{$search: {}}], {readConcern: {level: "majority"}}));
+assert.commandFailedWithCode(err, [ErrorCodes.InvalidOptions, ErrorCodes.ReadConcernMajorityNotEnabled]);
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();

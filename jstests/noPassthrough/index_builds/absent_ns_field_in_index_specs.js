@@ -8,10 +8,10 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const dbName = 'test';
+const dbName = "test";
 const collName = jsTestName();
 
-let replSet = new ReplSetTest({name: 'absentNsField', nodes: 2});
+let replSet = new ReplSetTest({name: "absentNsField", nodes: 2});
 replSet.startSet();
 replSet.initiate();
 
@@ -27,38 +27,36 @@ assert.commandWorked(primaryColl.createIndex({x: 1}));
 
 replSet.awaitReplication();
 
-let specPrimary =
-    assert.commandWorked(primaryDB.runCommand({listIndexes: collName})).cursor.firstBatch[1];
-let specSecondary =
-    assert.commandWorked(secondaryDB.runCommand({listIndexes: collName})).cursor.firstBatch[1];
+let specPrimary = assert.commandWorked(primaryDB.runCommand({listIndexes: collName})).cursor.firstBatch[1];
+let specSecondary = assert.commandWorked(secondaryDB.runCommand({listIndexes: collName})).cursor.firstBatch[1];
 
-assert.eq(false, specPrimary.hasOwnProperty('ns'));
-assert.eq(false, specSecondary.hasOwnProperty('ns'));
+assert.eq(false, specPrimary.hasOwnProperty("ns"));
+assert.eq(false, specSecondary.hasOwnProperty("ns"));
 
 replSet.stopSet(/*signal=*/ null, /*forRestart=*/ true);
 
 // Both nodes should have no 'ns' field in the index spec on restart.
 const options = {
     dbpath: primary.dbpath,
-    noCleanData: true
+    noCleanData: true,
 };
 let conn = MongoRunner.runMongod(options);
-assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
 
 let db = conn.getDB(dbName);
 let spec = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor.firstBatch[1];
 
-assert.eq(false, spec.hasOwnProperty('ns'));
+assert.eq(false, spec.hasOwnProperty("ns"));
 
 MongoRunner.stopMongod(conn);
 
 options.dbpath = secondary.dbpath;
 conn = MongoRunner.runMongod(options);
-assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
 
 db = conn.getDB(dbName);
 spec = assert.commandWorked(db.runCommand({listIndexes: collName})).cursor.firstBatch[1];
 
-assert.eq(false, spec.hasOwnProperty('ns'));
+assert.eq(false, spec.hasOwnProperty("ns"));
 
 MongoRunner.stopMongod(conn);

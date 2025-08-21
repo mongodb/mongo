@@ -8,7 +8,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
@@ -41,36 +41,37 @@ let collATestQuery = [
         $rankFusion: {
             input: {
                 pipelines: {
-                    vector: [{
-                        $vectorSearch: {
-                            // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
-                            queryVector: getMoviePlotEmbeddingById(6),
-                            path: "plot_embedding",
-                            numCandidates: limit * vectorSearchOverrequestFactor,
-                            index: getMovieVectorSearchIndexSpec().name,
-                            limit: limit,
-                        }
-                    }],
+                    vector: [
+                        {
+                            $vectorSearch: {
+                                // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
+                                queryVector: getMoviePlotEmbeddingById(6),
+                                path: "plot_embedding",
+                                numCandidates: limit * vectorSearchOverrequestFactor,
+                                index: getMovieVectorSearchIndexSpec().name,
+                                limit: limit,
+                            },
+                        },
+                    ],
                     search: [
                         {
                             $search: {
                                 index: getMovieSearchIndexSpec().name,
                                 text: {query: "ape", path: ["fullplot", "title"]},
-                            }
+                            },
                         },
-                        {$limit: limit}
-                    ]
-                }
-            }
+                        {$limit: limit},
+                    ],
+                },
+            },
         },
     },
-    {$limit: limit}
+    {$limit: limit},
 ];
 
 // Perform an identity $unionWith query. collB has no documents inside of it meaning that anything
 // we "union" it with will just be the union-ed collection (in this case, srcColl).
-let results =
-    collB.aggregate([{$unionWith: {coll: collA.getName(), pipeline: collATestQuery}}]).toArray();
+let results = collB.aggregate([{$unionWith: {coll: collA.getName(), pipeline: collATestQuery}}]).toArray();
 
 let expectedResultIds = [6, 4, 1, 5, 2, 3, 8, 9, 10, 12, 13, 14, 11, 7, 15];
 assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), results);
@@ -91,16 +92,16 @@ let collBTestQuery = [
                             $search: {
                                 index: getMovieSearchIndexSpec().name,
                                 text: {query: "romance", path: ["fullplot", "title"]},
-                            }
+                            },
                         },
-                        {$limit: 5}
-                    ]
-                }
-            }
+                        {$limit: 5},
+                    ],
+                },
+            },
         },
     },
     {$unionWith: {coll: collA.getName(), pipeline: collATestQuery}},
-    {$limit: 10}
+    {$limit: 10},
 ];
 
 createSearchIndex(collB, getMovieSearchIndexSpec());

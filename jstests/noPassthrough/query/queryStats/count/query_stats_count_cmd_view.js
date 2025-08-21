@@ -52,7 +52,7 @@ withQueryStatsEnabled(jsTestName(), (coll) => {
         // but this test is not concerned with validating that.
         usedDisk: entry.metrics.usedDisk["true"] > 0,
         fromMultiPlanner: false,
-        fromPlanCache: false
+        fromPlanCache: false,
     });
     assertExpectedResults({
         results: entry,
@@ -62,6 +62,6 @@ withQueryStatsEnabled(jsTestName(), (coll) => {
         expectedDocsReturnedMax: 1,
         expectedDocsReturnedMin: 1,
         expectedDocsReturnedSumOfSq: 1,
-        getMores: false
+        getMores: false,
     });
 });

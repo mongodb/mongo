@@ -14,17 +14,16 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {ShardingTest} from 'jstests/libs/shardingtest.js';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 3}});
 
 function getDbMetadataFromGlobalCatalog(db) {
-    return db.getSiblingDB('config').databases.findOne({_id: db.getName()});
+    return db.getSiblingDB("config").databases.findOne({_id: db.getName()});
 }
 
 function validateShardCatalog(dbName, shard, expectedDbMetadata) {
-    const dbMetadataFromShard =
-        shard.getDB('config').shard.catalog.databases.findOne({_id: dbName});
+    const dbMetadataFromShard = shard.getDB("config").shard.catalog.databases.findOne({_id: dbName});
     assert.eq(expectedDbMetadata, dbMetadataFromShard);
 }
 
@@ -40,30 +39,30 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
 }
 
 function runCloningDDL(conn) {
-    assert.commandWorked(conn.adminCommand({
-        _shardsvrCloneAuthoritativeMetadata: 1,
-        databaseVersion: {
-            uuid: new UUID(),
-            timestamp: new Timestamp(1, 0),
-            lastMod: NumberInt(1),
-        },
-        writeConcern: {w: "majority"}
-    }));
+    assert.commandWorked(
+        conn.adminCommand({
+            _shardsvrCloneAuthoritativeMetadata: 1,
+            databaseVersion: {
+                uuid: new UUID(),
+                timestamp: new Timestamp(1, 0),
+                lastMod: NumberInt(1),
+            },
+            writeConcern: {w: "majority"},
+        }),
+    );
 }
 
 {
-    jsTest.log('Validate how the cloning DDL clones all databases from the global catalog');
+    jsTest.log("Validate how the cloning DDL clones all databases from the global catalog");
 
-    const fooDbName = 'foo';
-    const barDbName = 'bar';
+    const fooDbName = "foo";
+    const barDbName = "bar";
 
     const fooDb = st.s.getDB(fooDbName);
     const barDb = st.s.getDB(barDbName);
 
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: fooDbName, primaryShard: st.shard1.shardName}));
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: barDbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: fooDbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: barDbName, primaryShard: st.shard1.shardName}));
 
     runCloningDDL(st.shard1);
 
@@ -73,24 +72,23 @@ function runCloningDDL(conn) {
     // Validate that db metadata in the shard catalog and cache matches the global catalog.
     let dbMetadataFromConfig = getDbMetadataFromGlobalCatalog(fooDb);
     validateShardCatalog(fooDbName, st.shard1, dbMetadataFromConfig);
-    st.rs1.nodes.forEach(node => {
+    st.rs1.nodes.forEach((node) => {
         validateShardCatalogCache(fooDbName, node, dbMetadataFromConfig);
     });
 
     dbMetadataFromConfig = getDbMetadataFromGlobalCatalog(barDb);
     validateShardCatalog(barDbName, st.shard1, dbMetadataFromConfig);
-    st.rs1.nodes.forEach(node => {
+    st.rs1.nodes.forEach((node) => {
         validateShardCatalogCache(barDbName, node, dbMetadataFromConfig);
     });
 }
 
 {
-    jsTest.log('Validate idempotency of the cloning DDL');
+    jsTest.log("Validate idempotency of the cloning DDL");
 
-    const dbName = 'idempotentDb';
+    const dbName = "idempotentDb";
 
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
     runCloningDDL(st.shard0);
     runCloningDDL(st.shard0);
@@ -99,28 +97,30 @@ function runCloningDDL(conn) {
 
     const dbMetadataFromConfig = getDbMetadataFromGlobalCatalog(st.s.getDB(dbName));
     validateShardCatalog(dbName, st.shard0, dbMetadataFromConfig);
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         validateShardCatalogCache(dbName, node, dbMetadataFromConfig);
     });
 }
 
 function validateCloningDDLWithConcurrentOperation(dbName, op) {
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
-    const fp = configureFailPoint(
-        st.shard0, "hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL", {dbName: dbName});
+    const fp = configureFailPoint(st.shard0, "hangAfterEnterInShardRoleCloneAuthoritativeMetadataDDL", {
+        dbName: dbName,
+    });
 
     const awaitShardClone = startParallelShell(() => {
-        assert.commandWorked(db.adminCommand({
-            _shardsvrCloneAuthoritativeMetadata: 1,
-            databaseVersion: {
-                uuid: new UUID(),
-                timestamp: new Timestamp(1, 0),
-                lastMod: NumberInt(1),
-            },
-            writeConcern: {w: "majority"}
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                _shardsvrCloneAuthoritativeMetadata: 1,
+                databaseVersion: {
+                    uuid: new UUID(),
+                    timestamp: new Timestamp(1, 0),
+                    lastMod: NumberInt(1),
+                },
+                writeConcern: {w: "majority"},
+            }),
+        );
     }, st.rs0.getPrimary().port);
 
     fp.wait();
@@ -133,25 +133,24 @@ function validateCloningDDLWithConcurrentOperation(dbName, op) {
     // Validate that in shard0 we haven't cloned anything.
     st.awaitReplicationOnShards();
     validateShardCatalog(dbName, st.shard0, null /* expectedDbMetadata */);
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         validateShardCatalogCache(dbName, node, null /* expectedDbMetadata */);
     });
 }
 
 {
-    jsTest.log('Validate concurrent movePrimary when running the cloning DDL');
+    jsTest.log("Validate concurrent movePrimary when running the cloning DDL");
 
     const dbName = "staleDb";
     const db = st.s.getDB(dbName);
 
-    const movePrimary = () =>
-        assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+    const movePrimary = () => assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 
     validateCloningDDLWithConcurrentOperation(dbName, movePrimary);
 }
 
 {
-    jsTest.log('Validate concurrent dropDatabase when running the cloning DDL');
+    jsTest.log("Validate concurrent dropDatabase when running the cloning DDL");
 
     const dbName = "droppedDb";
     const db = st.s.getDB(dbName);

@@ -28,10 +28,14 @@ export const kRateLimiterExemptAppName = "testRateLimiter";
  */
 export const kConfigLogsAndFailPointsForRateLimiterTests = {
     logComponentVerbosity: tojson({command: 2}),
-    "failpoint.ingressRequestRateLimiterFractionalRateOverride":
-        tojson({mode: "alwaysOn", data: {rate: kSlowestRefreshRateSecs}}),
-    "failpoint.skipRateLimiterForTestClient":
-        tojson({mode: "alwaysOn", data: {exemptAppName: kRateLimiterExemptAppName}}),
+    "failpoint.ingressRequestRateLimiterFractionalRateOverride": tojson({
+        mode: "alwaysOn",
+        data: {rate: kSlowestRefreshRateSecs},
+    }),
+    "failpoint.skipRateLimiterForTestClient": tojson({
+        mode: "alwaysOn",
+        data: {exemptAppName: kRateLimiterExemptAppName},
+    }),
 };
 
 const kUser = "admin";
@@ -45,16 +49,16 @@ const kPass = "pwd";
  */
 function setupAuth(conn, exemptConn) {
     // Since rate limiting only applies when authenticated, create a user and authenticate.
-    const admin = conn.getDB('admin');
-    admin.createUser({user: kUser, pwd: kPass, roles: ['root']});
-    exemptConn.getDB('admin').auth(kUser, kPass);
+    const admin = conn.getDB("admin");
+    admin.createUser({user: kUser, pwd: kPass, roles: ["root"]});
+    exemptConn.getDB("admin").auth(kUser, kPass);
 }
 
 /**
  * Authenticate the connection using a predefined admin user.
  */
 export function authenticateConnection(conn) {
-    const admin = conn.getDB('admin');
+    const admin = conn.getDB("admin");
     admin.auth(kUser, kPass);
 }
 
@@ -73,7 +77,7 @@ export function getRateLimiterStats(exemptConn) {
 export function runTestStandalone({startupParams, auth, cmdParams = {}}, testFunction) {
     const mongod = MongoRunner.runMongod({
         ...cmdParams,
-        auth: auth ? '' : undefined,
+        auth: auth ? "" : undefined,
         setParameter: {
             ...kConfigLogsAndFailPointsForRateLimiterTests,
             ...startupParams,
@@ -101,11 +105,11 @@ export function runTestReplSet({startupParams, auth, cmdParams = {}}, testFuncti
         keyFile: "jstests/libs/key1",
         nodeOptions: {
             ...cmdParams,
-            auth: auth ? '' : undefined,
+            auth: auth ? "" : undefined,
             setParameter: {
                 ...kConfigLogsAndFailPointsForRateLimiterTests,
                 ...startupParams,
-                ingressRequestRateLimiterEnabled: 0,  // kept disabled during repl set setup
+                ingressRequestRateLimiterEnabled: 0, // kept disabled during repl set setup
             },
         },
     });
@@ -121,8 +125,7 @@ export function runTestReplSet({startupParams, auth, cmdParams = {}}, testFuncti
 
     const {ingressRequestRateLimiterEnabled} = startupParams;
     if ((ingressRequestRateLimiterEnabled ?? 0) !== 0) {
-        assert.commandWorked(
-            exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled}));
+        assert.commandWorked(exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled}));
     }
 
     testFunction(primary, exemptConn);
@@ -134,20 +137,19 @@ export function runTestReplSet({startupParams, auth, cmdParams = {}}, testFuncti
 /**
  * Runs a test for the ingress admission rate limiter using sharding.
  */
-export function runTestSharded({startupParams, auth, cmdParamsMongos = {}, cmdParamsMongod = {}},
-                               testFunction) {
+export function runTestSharded({startupParams, auth, cmdParamsMongos = {}, cmdParamsMongod = {}}, testFunction) {
     const st = new ShardingTest({
         mongos: 1,
         shards: 1,
         other: {
-            auth: auth ? '' : undefined,
+            auth: auth ? "" : undefined,
             keyFile: "jstests/libs/key1",
             mongosOptions: {
                 ...cmdParamsMongos,
                 setParameter: {
                     ...kConfigLogsAndFailPointsForRateLimiterTests,
                     ...startupParams,
-                    ingressRequestRateLimiterEnabled: 0,  // kept disabled during sharding setup
+                    ingressRequestRateLimiterEnabled: 0, // kept disabled during sharding setup
                 },
             },
             rsOptions: {
@@ -155,10 +157,10 @@ export function runTestSharded({startupParams, auth, cmdParamsMongos = {}, cmdPa
                 setParameter: {
                     ...kConfigLogsAndFailPointsForRateLimiterTests,
                     ...startupParams,
-                    ingressRequestRateLimiterEnabled: 0,  // kept disabled during sharding setup
+                    ingressRequestRateLimiterEnabled: 0, // kept disabled during sharding setup
                 },
             },
-        }
+        },
     });
 
     const exemptConn = new Mongo(`mongodb://${st.s.host}/?appName=${kRateLimiterExemptAppName}`);
@@ -167,8 +169,7 @@ export function runTestSharded({startupParams, auth, cmdParamsMongos = {}, cmdPa
 
     const {ingressRequestRateLimiterEnabled} = startupParams;
     if ((ingressRequestRateLimiterEnabled ?? 0) !== 0) {
-        assert.commandWorked(
-            exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled}));
+        assert.commandWorked(exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterEnabled}));
     }
 
     testFunction(st.s, exemptConn);

@@ -14,8 +14,8 @@ rst.startSet();
 rst.initiate();
 const node = rst.getPrimary();
 
-const name = 'hang_before_releasing_transaction_oplog_hole';
-const dbName = 'test';
+const name = "hang_before_releasing_transaction_oplog_hole";
+const dbName = "test";
 const collName = name;
 const testDB = node.getDB(dbName);
 const coll = testDB[collName];
@@ -30,35 +30,37 @@ assert.commandWorked(coll.insert({a: 1}));
 async function transactionFn() {
     const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
 
-    const name = 'hang_before_releasing_transaction_oplog_hole';
-    const dbName = 'test';
+    const name = "hang_before_releasing_transaction_oplog_hole";
+    const dbName = "test";
     const collName = name;
     const session = db.getMongo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(dbName);
 
-    session.startTransaction({readConcern: {level: 'snapshot'}});
+    session.startTransaction({readConcern: {level: "snapshot"}});
     sessionDB[collName].update({}, {a: 2});
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
     // Hang before releasing the 'commitTransaction' oplog entry hole.
-    assert.commandWorked(db.adminCommand(
-        {configureFailPoint: 'hangBeforeReleasingTransactionOplogHole', mode: 'alwaysOn'}));
+    assert.commandWorked(
+        db.adminCommand({configureFailPoint: "hangBeforeReleasingTransactionOplogHole", mode: "alwaysOn"}),
+    );
 
     PrepareHelpers.commitTransaction(session, prepareTimestamp);
 }
 const joinTransaction = startParallelShell(transactionFn, rst.ports[0]);
 
 jsTestLog("Waiting to hang with the oplog hole held open.");
-assert.commandWorked(testDB.adminCommand({
-    waitForFailPoint: 'hangBeforeReleasingTransactionOplogHole',
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        waitForFailPoint: "hangBeforeReleasingTransactionOplogHole",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Waiting for 'commitTransaction' to advance lastApplied.");
 sleep(5 * 1000);
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: 'hangBeforeReleasingTransactionOplogHole', mode: 'off'}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeReleasingTransactionOplogHole", mode: "off"}));
 
 jsTestLog("Joining the transaction.");
 joinTransaction();

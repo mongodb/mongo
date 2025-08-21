@@ -2,4 +2,4 @@
  * @tags: [featureFlagToaster]
  */
 
-(function() {})();
+(function () {})();

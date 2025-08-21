@@ -22,7 +22,7 @@ assert.commandWorked(coll.insert(documents));
 let pipeline = [
     {$project: {_id: 0}},
     {$densify: {field: "val", range: {step: 1, bounds: "full"}}},
-    {$fill: {output: {toFill: {method: "locf"}}}}
+    {$fill: {output: {toFill: {method: "locf"}}}},
 ];
 
 let result = coll.aggregate(pipeline).toArray();
@@ -87,22 +87,33 @@ assertArrayEq({actual: result, expected: expected});
 pipeline = [
     {$project: {_id: 0}},
     {$densify: {field: "val", range: {step: 1, bounds: "full"}, partitionByFields: ["part"]}},
-    {$fill: {sortBy: {val: 1}, output: {toFill: {method: "locf"}}, partitionByFields: ["part"]}}
+    {$fill: {sortBy: {val: 1}, output: {toFill: {method: "locf"}}, partitionByFields: ["part"]}},
 ];
 result = coll.aggregate(pipeline).toArray();
 
 expected = [
-    {"val": 0, "toFill": 1, "part": 1},    {"part": 1, "val": 1, "toFill": 1},
-    {"part": 1, "val": 2, "toFill": 1},    {"part": 1, "val": 3, "toFill": 1},
-    {"part": 1, "val": 4, "toFill": 1},    {"val": 5, "toFill": 3, "part": 1},
-    {"part": 1, "val": 6, "toFill": 3},    {"part": 1, "val": 7, "toFill": 3},
-    {"part": 1, "val": 8, "toFill": 3},    {"part": 1, "val": 9, "toFill": 3},
-    {"val": 10, "toFill": 5, "part": 1},   {"part": 2, "val": 0, "toFill": null},
-    {"part": 2, "val": 1, "toFill": null}, {"part": 2, "val": 2, "toFill": null},
-    {"val": 3, "toFill": 10, "part": 2},   {"part": 2, "val": 4, "toFill": 10},
-    {"part": 2, "val": 5, "toFill": 10},   {"val": 6, "toFill": 13, "part": 2},
-    {"part": 2, "val": 7, "toFill": 13},   {"part": 2, "val": 8, "toFill": 13},
-    {"val": 9, "toFill": 16, "part": 2},   {"part": 2, "val": 10, "toFill": 16}
+    {"val": 0, "toFill": 1, "part": 1},
+    {"part": 1, "val": 1, "toFill": 1},
+    {"part": 1, "val": 2, "toFill": 1},
+    {"part": 1, "val": 3, "toFill": 1},
+    {"part": 1, "val": 4, "toFill": 1},
+    {"val": 5, "toFill": 3, "part": 1},
+    {"part": 1, "val": 6, "toFill": 3},
+    {"part": 1, "val": 7, "toFill": 3},
+    {"part": 1, "val": 8, "toFill": 3},
+    {"part": 1, "val": 9, "toFill": 3},
+    {"val": 10, "toFill": 5, "part": 1},
+    {"part": 2, "val": 0, "toFill": null},
+    {"part": 2, "val": 1, "toFill": null},
+    {"part": 2, "val": 2, "toFill": null},
+    {"val": 3, "toFill": 10, "part": 2},
+    {"part": 2, "val": 4, "toFill": 10},
+    {"part": 2, "val": 5, "toFill": 10},
+    {"val": 6, "toFill": 13, "part": 2},
+    {"part": 2, "val": 7, "toFill": 13},
+    {"part": 2, "val": 8, "toFill": 13},
+    {"val": 9, "toFill": 16, "part": 2},
+    {"part": 2, "val": 10, "toFill": 16},
 ];
 assertArrayEq({actual: result, expected: expected});
 
@@ -124,9 +135,9 @@ pipeline = [
         $fill: {
             sortBy: {val: 1},
             output: {toFill: {method: "locf"}, possible: {method: "linear"}},
-            partitionByFields: ["part"]
-        }
-    }
+            partitionByFields: ["part"],
+        },
+    },
 ];
 result = coll.aggregate(pipeline).toArray();
 expected = [
@@ -147,6 +158,6 @@ expected = [
     {"val": 6, "toFill": 13, "possible": 4.5, "part": 2},
     {"part": 2, "val": 7, "toFill": 13, "possible": 5.666666666666667},
     {"part": 2, "val": 8, "toFill": 13, "possible": 6.833333333333334},
-    {"val": 9, "toFill": 16, "possible": 8, "part": 2}
+    {"val": 9, "toFill": 16, "possible": 8, "part": 2},
 ];
 assertArrayEq({actual: result, expected: expected});

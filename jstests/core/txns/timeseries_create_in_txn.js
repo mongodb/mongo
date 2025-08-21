@@ -7,8 +7,9 @@
 const session = db.getMongo().startSession();
 // Use a custom database, to avoid conflict with other tests that use the system.js collection.
 session.startTransaction();
-const sessionDB = session.getDatabase('test');
+const sessionDB = session.getDatabase("test");
 assert.commandFailedWithCode(
-    sessionDB.createCollection('timeseries_create_in_txn', {timeseries: {timeField: 'time'}}),
-    ErrorCodes.OperationNotSupportedInTransaction);
+    sessionDB.createCollection("timeseries_create_in_txn", {timeseries: {timeField: "time"}}),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);

@@ -11,16 +11,19 @@
 
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
-const dbName = 'db';
-const collName = 'foo';
-const ns = dbName + '.' + collName;
+const dbName = "db";
+const collName = "foo";
+const ns = dbName + "." + collName;
 
 const reshardingTest = new ReshardingTest();
 reshardingTest.setup();
 
 const donorShardNames = reshardingTest.donorShardNames;
-const sourceCollection = reshardingTest.createUnshardedCollection(
-    {ns: ns, primaryShardName: donorShardNames[0], collOptions: {capped: true, size: 4096}});
+const sourceCollection = reshardingTest.createUnshardedCollection({
+    ns: ns,
+    primaryShardName: donorShardNames[0],
+    collOptions: {capped: true, size: 4096},
+});
 
 // Insert more than one document to it. This tests that capped collections can clone multiple docs.
 const numDocs = 30;
@@ -40,10 +43,11 @@ reshardingTest.withMoveCollectionInBackground(
         reshardingTest.awaitCloneTimestampChosen();
         // Test delete oplog application rules.
         assert.commandWorked(sourceCollection.remove({x: 31}, {justOne: true}));
-    });
+    },
+);
 
 const st = reshardingTest._st;
-let collEntry = st.s.getDB('config').getCollection('collections').findOne({_id: ns});
+let collEntry = st.s.getDB("config").getCollection("collections").findOne({_id: ns});
 assert.eq(collEntry._id, ns);
 assert.eq(collEntry.unsplittable, true);
 assert.eq(collEntry.key, {_id: 1});

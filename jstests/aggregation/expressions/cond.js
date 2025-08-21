@@ -46,39 +46,42 @@ assertResult(1, [{$and: []}, {$add: [1]}, {$add: [1, 1]}]);
 assertResult(2, [{$or: []}, {$add: [1]}, {$add: [1, 1]}]);
 
 assert(coll.drop());
-assert.commandWorked(coll.insert({t: true, f: false, x: 'foo', y: 'bar'}));
+assert.commandWorked(coll.insert({t: true, f: false, x: "foo", y: "bar"}));
 
 // Field path expressions.
-assertResult('foo', ['$t', '$x', '$y']);
-assertResult('bar', ['$f', '$x', '$y']);
+assertResult("foo", ["$t", "$x", "$y"]);
+assertResult("bar", ["$f", "$x", "$y"]);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({}));
 
 // Coerce to bool.
-assertResult('a', [1, 'a', 'b']);
-assertResult('a', ['', 'a', 'b']);
-assertResult('b', [0, 'a', 'b']);
+assertResult("a", [1, "a", "b"]);
+assertResult("a", ["", "a", "b"]);
+assertResult("b", [0, "a", "b"]);
 
 // Nested.
 assert(coll.drop());
-assert.commandWorked(coll.insert({noonSense: 'am', mealCombined: 'no'}));
-assert.commandWorked(coll.insert({noonSense: 'am', mealCombined: 'yes'}));
-assert.commandWorked(coll.insert({noonSense: 'pm', mealCombined: 'yes'}));
-assert.commandWorked(coll.insert({noonSense: 'pm', mealCombined: 'no'}));
-assert.eq(['breakfast', 'brunch', 'dinner', 'linner'],
-          coll.aggregate([
-                  {
-                      $project: {
-                          meal: {
-                              $cond: [
-                                  {$eq: ['$noonSense', 'am']},
-                                  {$cond: [{$eq: ['$mealCombined', 'yes']}, 'brunch', 'breakfast']},
-                                  {$cond: [{$eq: ['$mealCombined', 'yes']}, 'linner', 'dinner']}
-                              ]
-                          }
-                      }
-                  },
-                  {$sort: {meal: 1}}
-              ])
-              .map(doc => doc.meal));
+assert.commandWorked(coll.insert({noonSense: "am", mealCombined: "no"}));
+assert.commandWorked(coll.insert({noonSense: "am", mealCombined: "yes"}));
+assert.commandWorked(coll.insert({noonSense: "pm", mealCombined: "yes"}));
+assert.commandWorked(coll.insert({noonSense: "pm", mealCombined: "no"}));
+assert.eq(
+    ["breakfast", "brunch", "dinner", "linner"],
+    coll
+        .aggregate([
+            {
+                $project: {
+                    meal: {
+                        $cond: [
+                            {$eq: ["$noonSense", "am"]},
+                            {$cond: [{$eq: ["$mealCombined", "yes"]}, "brunch", "breakfast"]},
+                            {$cond: [{$eq: ["$mealCombined", "yes"]}, "linner", "dinner"]},
+                        ],
+                    },
+                },
+            },
+            {$sort: {meal: 1}},
+        ])
+        .map((doc) => doc.meal),
+);

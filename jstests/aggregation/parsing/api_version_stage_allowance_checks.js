@@ -21,10 +21,12 @@ const collName = "testColl";
 const testInternalClient = (function createInternalClient() {
     const connInternal = new Mongo(testDB.getMongo().host);
     const curDB = connInternal.getDB(dbName);
-    assert.commandWorked(curDB.runCommand({
-        ["hello"]: 1,
-        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}
-    }));
+    assert.commandWorked(
+        curDB.runCommand({
+            ["hello"]: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
     return connInternal;
 })();
 
@@ -34,20 +36,22 @@ const curDB = testInternalClient.getDB(dbName);
 // client and 'apiStrict' set to true.
 let result = curDB.runCommand({
     aggregate: collName,
-    pipeline: [{
-        $mergeCursors: {
-            sort: {y: 1, z: 1},
-            compareWholeSortKey: false,
-            remotes: [],
-            nss: "test.mergeCursors",
-            allowPartialResults: false,
-        }
-    }],
+    pipeline: [
+        {
+            $mergeCursors: {
+                sort: {y: 1, z: 1},
+                compareWholeSortKey: false,
+                remotes: [],
+                nss: "test.mergeCursors",
+                allowPartialResults: false,
+            },
+        },
+    ],
     cursor: {},
     writeConcern: {w: "majority"},
     readConcern: {},
     apiVersion: "1",
-    apiStrict: true
+    apiStrict: true,
 });
 assert.commandWorked(result);
 
@@ -55,19 +59,21 @@ assert.commandWorked(result);
 // external client when 'apiStrict' is set to true.
 result = testDB.runCommand({
     aggregate: collName,
-    pipeline: [{
-        $mergeCursors: {
-            sort: {y: 1, z: 1},
-            compareWholeSortKey: false,
-            remotes: [],
-            nss: "test.mergeCursors",
-            allowPartialResults: false,
-        }
-    }],
+    pipeline: [
+        {
+            $mergeCursors: {
+                sort: {y: 1, z: 1},
+                compareWholeSortKey: false,
+                remotes: [],
+                nss: "test.mergeCursors",
+                allowPartialResults: false,
+            },
+        },
+    ],
     cursor: {},
     writeConcern: {w: "majority"},
     apiVersion: "1",
-    apiStrict: true
+    apiStrict: true,
 });
 assert.commandFailedWithCode(result, 5491300);
 
@@ -75,18 +81,20 @@ assert.commandFailedWithCode(result, 5491300);
 // external client without specifying 'apiStrict' flag.
 result = testDB.runCommand({
     aggregate: collName,
-    pipeline: [{
-        $mergeCursors: {
-            sort: {y: 1, z: 1},
-            compareWholeSortKey: false,
-            remotes: [],
-            nss: "test.mergeCursors",
-            allowPartialResults: false,
-        }
-    }],
+    pipeline: [
+        {
+            $mergeCursors: {
+                sort: {y: 1, z: 1},
+                compareWholeSortKey: false,
+                remotes: [],
+                nss: "test.mergeCursors",
+                allowPartialResults: false,
+            },
+        },
+    ],
     cursor: {},
     writeConcern: {w: "majority"},
-    apiVersion: "1"
+    apiVersion: "1",
 });
 assert.commandFailedWithCode(result, 5491300);
 
@@ -99,7 +107,7 @@ result = testDB.runCommand({
     writeConcern: {w: "majority"},
     apiVersion: "1",
     apiStrict: true,
-    exchange: {policy: "broadcast", consumers: NumberInt(10)}
+    exchange: {policy: "broadcast", consumers: NumberInt(10)},
 });
 assert.commandFailedWithCode(result, ErrorCodes.APIStrictError);
 
@@ -112,7 +120,7 @@ result = testDB.runCommand({
     writeConcern: {w: "majority"},
     apiVersion: "1",
     apiStrict: true,
-    fromRouter: true
+    fromRouter: true,
 });
 assert.commandFailedWithCode(result, ErrorCodes.APIStrictError);
 
@@ -125,7 +133,7 @@ result = curDB.runCommand({
     writeConcern: {w: "majority"},
     readConcern: {},
     apiVersion: "1",
-    apiStrict: true
+    apiStrict: true,
 });
 assert.commandWorked(result);
 
@@ -136,31 +144,34 @@ result = testDB.runCommand({
     cursor: {},
     writeConcern: {w: "majority"},
     apiVersion: "1",
-    apiStrict: true
+    apiStrict: true,
 });
 assert.commandWorked(result);
 
 // Tests that time-series collection can be queried (invoking $_internalUnpackBucket stage)
 // from an external client with 'apiStrict'.
 (function testInternalUnpackBucketAllowance() {
-    const collName = 'timeseriesColl';
-    const timeField = 'tm';
+    const collName = "timeseriesColl";
+    const timeField = "tm";
     assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: timeField}}));
     const coll = testDB[collName];
-    assert.commandWorked(coll.insert({[timeField]: ISODate('2021-01-01')}));
-    assert.commandWorked(testDB.runCommand({
-        find: collName,
-        apiVersion: "1",
-        apiStrict: true,
-    }));
-    assert.commandWorked(testDB.runCommand({
-        aggregate: collName,
-        pipeline: [{$match: {}}],
-        cursor: {},
-        apiVersion: "1",
-        apiStrict: true,
-    }));
+    assert.commandWorked(coll.insert({[timeField]: ISODate("2021-01-01")}));
+    assert.commandWorked(
+        testDB.runCommand({
+            find: collName,
+            apiVersion: "1",
+            apiStrict: true,
+        }),
+    );
+    assert.commandWorked(
+        testDB.runCommand({
+            aggregate: collName,
+            pipeline: [{$match: {}}],
+            cursor: {},
+            apiVersion: "1",
+            apiStrict: true,
+        }),
+    );
     const plans = [coll.find().explain(), coll.explain().aggregate([{$match: {}}])];
-    assert(plans.every(
-        plan => plan.stages.map(x => Object.keys(x)[0]).includes("$_internalUnpackBucket")));
+    assert(plans.every((plan) => plan.stages.map((x) => Object.keys(x)[0]).includes("$_internalUnpackBucket")));
 })();

@@ -9,7 +9,7 @@ s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 s.adminCommand({shardcollection: "test.data", key: {num: 1}});
 
 var version = s.getDB("admin").runCommand({buildinfo: 1}).versionArray;
-var post32 = (version[0] > 4) || ((version[0] == 3) && (version[1] > 2));
+var post32 = version[0] > 4 || (version[0] == 3 && version[1] > 2);
 
 var db = s.getDB("test");
 
@@ -62,12 +62,16 @@ for (var i = 1; i < 10; i++) {
 poolStats("limit test done");
 
 function assertOrder(start, num) {
-    var a = db.data.find().skip(start).limit(num).sort({num: 1}).map(function(z) {
-        return z.num;
-    });
+    var a = db.data
+        .find()
+        .skip(start)
+        .limit(num)
+        .sort({num: 1})
+        .map(function (z) {
+            return z.num;
+        });
     var c = [];
-    for (var i = 0; i < num; i++)
-        c.push(start + i);
+    for (var i = 0; i < num; i++) c.push(start + i);
     assert.eq(c, a, "assertOrder start: " + start + " num: " + num);
 }
 
@@ -78,12 +82,9 @@ poolStats("after checking order");
 
 function doItCount(skip, sort, batchSize) {
     var c = db.data.find();
-    if (skip)
-        c.skip(skip);
-    if (sort)
-        c.sort(sort);
-    if (batchSize)
-        c.batchSize(batchSize);
+    if (skip) c.skip(skip);
+    if (sort) c.sort(sort);
+    if (batchSize) c.batchSize(batchSize);
     return c.itcount();
 }
 
@@ -106,7 +107,7 @@ poolStats("at end");
 
 print(summary);
 
-assert.throws(function() {
+assert.throws(function () {
     s.adminCommand({enablesharding: "admin"});
 });
 

@@ -15,13 +15,17 @@ export function assertReleaseMemoryFailedWithCode(result, cursorId, codes) {
             assert.contains(
                 releaseMemoryError.status.code,
                 codes,
-                "the following release memory error contains an unexpected error code: " +
-                    tojson(releaseMemoryError));
+                "the following release memory error contains an unexpected error code: " + tojson(releaseMemoryError),
+            );
             return;
         }
     }
-    doassert("Cursor " + tojsononeline(cursorId) +
-             " did not fail during release memory. Full command result: " + tojson(result));
+    doassert(
+        "Cursor " +
+            tojsononeline(cursorId) +
+            " did not fail during release memory. Full command result: " +
+            tojson(result),
+    );
 }
 
 /**
@@ -36,34 +40,43 @@ export function assertReleaseMemoryWorked(result, cursorId) {
             return;
         }
     }
-    doassert("Releasing memory from cursor " + tojsononeline(cursorId) +
-             " did not succeed during release memory. Full command result: " + tojson(result));
+    doassert(
+        "Releasing memory from cursor " +
+            tojsononeline(cursorId) +
+            " did not succeed during release memory. Full command result: " +
+            tojson(result),
+    );
 }
 
 /**
  * Accumulate metric from a server status
  */
 export function accumulateServerStatusMetric(db, metricGetter) {
-    return retryOnRetryableError(() => {
-        let total = 0;
-        FixtureHelpers.mapOnEachShardNode({
-            db: db,
-            func: (db) => {
-                const serverStatus = db.serverStatus();
-                if (!serverStatus.hasOwnProperty("metrics")) {
-                    return;
-                }
-                total += metricGetter(serverStatus.metrics);
-            }
-        });
-        return total;
-    }, 10, 100, [ErrorCodes.InterruptedDueToStorageChange]);
+    return retryOnRetryableError(
+        () => {
+            let total = 0;
+            FixtureHelpers.mapOnEachShardNode({
+                db: db,
+                func: (db) => {
+                    const serverStatus = db.serverStatus();
+                    if (!serverStatus.hasOwnProperty("metrics")) {
+                        return;
+                    }
+                    total += metricGetter(serverStatus.metrics);
+                },
+            });
+            return total;
+        },
+        10,
+        100,
+        [ErrorCodes.InterruptedDueToStorageChange],
+    );
 }
 
 // Sets the mode of the simulateAvailableDiskSpace failpoint.
 export function setAvailableDiskSpaceMode(db, mode, bytes = 450 * 1024 * 1024) {
     FixtureHelpers.runCommandOnEachPrimary({
         db: db,
-        cmdObj: {configureFailPoint: 'simulateAvailableDiskSpace', mode, 'data': {bytes: bytes}}
+        cmdObj: {configureFailPoint: "simulateAvailableDiskSpace", mode, "data": {bytes: bytes}},
     });
 }

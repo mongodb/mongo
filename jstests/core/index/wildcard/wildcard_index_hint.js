@@ -33,7 +33,9 @@ assert.commandWorked(db.createCollection(coll.getName()));
 
 // Check that error is thrown if the hinted index doesn't exist.
 assert.commandFailedWithCode(
-    db.runCommand({find: coll.getName(), filter: {"a": 1}, hint: {"$**": 1}}), ErrorCodes.BadValue);
+    db.runCommand({find: coll.getName(), filter: {"a": 1}, hint: {"$**": 1}}),
+    ErrorCodes.BadValue,
+);
 
 assert.commandWorked(coll.createIndex({"$**": 1}));
 
@@ -44,29 +46,33 @@ assert.commandWorked(coll.insert({a: 2, b: 1, c: {d: 2, e: 2}}));
 assert.commandWorked(coll.insert({a: 2, b: 2, c: {e: 2}}));
 
 // Hint a $** index without a competing index.
-assertExpectedIndexAnswersQueryWithHint(
-    {"a": 1}, {"$**": 1}, "$**_1", [{a: 1, b: 1, c: {d: 1, e: 1}}, {a: 1, b: 2, c: {d: 2, e: 2}}]);
+assertExpectedIndexAnswersQueryWithHint({"a": 1}, {"$**": 1}, "$**_1", [
+    {a: 1, b: 1, c: {d: 1, e: 1}},
+    {a: 1, b: 2, c: {d: 2, e: 2}},
+]);
 
 assert.commandWorked(coll.createIndex({"a": 1}));
 
 // Hint a $** index with a competing index.
-assertExpectedIndexAnswersQueryWithHint(
-    {"a": 1}, {"$**": 1}, "$**_1", [{a: 1, b: 1, c: {d: 1, e: 1}}, {a: 1, b: 2, c: {d: 2, e: 2}}]);
+assertExpectedIndexAnswersQueryWithHint({"a": 1}, {"$**": 1}, "$**_1", [
+    {a: 1, b: 1, c: {d: 1, e: 1}},
+    {a: 1, b: 2, c: {d: 2, e: 2}},
+]);
 
 // Hint a $** index with a competing _id index.
-assertExpectedIndexAnswersQueryWithHint(
-    {"a": 1, "_id": 10}, {"$**": 1}, "$**_1", [{a: 1, b: 1, c: {d: 1, e: 1}}]);
+assertExpectedIndexAnswersQueryWithHint({"a": 1, "_id": 10}, {"$**": 1}, "$**_1", [{a: 1, b: 1, c: {d: 1, e: 1}}]);
 
 // Hint a regular index with a competing $** index.
-assertExpectedIndexAnswersQueryWithHint(
-    {"a": 1}, {"a": 1}, "a_1", [{a: 1, b: 1, c: {d: 1, e: 1}}, {a: 1, b: 2, c: {d: 2, e: 2}}]);
+assertExpectedIndexAnswersQueryWithHint({"a": 1}, {"a": 1}, "a_1", [
+    {a: 1, b: 1, c: {d: 1, e: 1}},
+    {a: 1, b: 2, c: {d: 2, e: 2}},
+]);
 
 // Query on fields that not all documents in the collection have with $** index hint.
-assertExpectedIndexAnswersQueryWithHint(
-    {"c.d": 1},
-    {"$**": 1},
-    "$**_1",
-    [{a: 1, b: 1, c: {d: 1, e: 1}}, {a: 2, b: 2, c: {d: 1, e: 2}}]);
+assertExpectedIndexAnswersQueryWithHint({"c.d": 1}, {"$**": 1}, "$**_1", [
+    {a: 1, b: 1, c: {d: 1, e: 1}},
+    {a: 2, b: 2, c: {d: 1, e: 2}},
+]);
 
 // Adding another wildcard index with a path specified.
 assert.commandWorked(coll.createIndex({"c.$**": 1}));
@@ -74,24 +80,26 @@ assert.commandWorked(coll.createIndex({"c.$**": 1}));
 // Hint on path that is not in query argument.
 assert.commandFailedWithCode(
     db.runCommand({find: coll.getName(), filter: {"a": 1}, hint: {"c.$**": 1}}),
-    ErrorCodes.NoQueryExecutionPlans);
+    ErrorCodes.NoQueryExecutionPlans,
+);
 
 // Hint on a path specified $** index.
-assertExpectedIndexAnswersQueryWithHint(
-    {"c.d": 1},
-    {"c.$**": 1},
-    "c.$**_1",
-    [{a: 2, b: 2, c: {d: 1, e: 2}}, {a: 1, b: 1, c: {d: 1, e: 1}}]);
+assertExpectedIndexAnswersQueryWithHint({"c.d": 1}, {"c.$**": 1}, "c.$**_1", [
+    {a: 2, b: 2, c: {d: 1, e: 2}},
+    {a: 1, b: 1, c: {d: 1, e: 1}},
+]);
 
 // Min/max with $** index hint.
 assert.commandFailedWithCode(
     db.runCommand({find: coll.getName(), filter: {"b": 1}, min: {"a": 1}, hint: {"$**": 1}}),
-    51174);
+    51174,
+);
 
 // Hint a $** index on a query with compound fields.
-assertExpectedIndexAnswersQueryWithHint(
-    {"a": 1, "c.e": 1}, {"$**": 1}, "$**_1", [{a: 1, b: 1, c: {d: 1, e: 1}}]);
+assertExpectedIndexAnswersQueryWithHint({"a": 1, "c.e": 1}, {"$**": 1}, "$**_1", [{a: 1, b: 1, c: {d: 1, e: 1}}]);
 
 // Hint a $** index by name.
-assertExpectedIndexAnswersQueryWithHint(
-    {"a": 1}, "$**_1", "$**_1", [{a: 1, b: 1, c: {d: 1, e: 1}}, {a: 1, b: 2, c: {d: 2, e: 2}}]);
+assertExpectedIndexAnswersQueryWithHint({"a": 1}, "$**_1", "$**_1", [
+    {a: 1, b: 1, c: {d: 1, e: 1}},
+    {a: 1, b: 2, c: {d: 2, e: 2}},
+]);

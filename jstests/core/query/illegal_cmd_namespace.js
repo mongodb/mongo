@@ -13,7 +13,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 // returning an empty batch.
 if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Create database
-    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
+    assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }
 
 function testBadNamespace(collName) {

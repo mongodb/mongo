@@ -10,16 +10,15 @@ import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const rollbackTest = new RollbackTest(jsTestName());
 
-const testDB = function() {
-    return rollbackTest.getPrimary().getDB('test');
+const testDB = function () {
+    return rollbackTest.getPrimary().getDB("test");
 };
 
-const coll = function() {
+const coll = function () {
     return testDB().getCollection(jsTestName());
 };
 
-assert.commandWorked(
-    testDB().createCollection(coll().getName(), {capped: true, size: 100, max: 1}));
+assert.commandWorked(testDB().createCollection(coll().getName(), {capped: true, size: 100, max: 1}));
 assert.commandWorked(coll().insert({a: 1}));
 
 rollbackTest.transitionToRollbackOperations();

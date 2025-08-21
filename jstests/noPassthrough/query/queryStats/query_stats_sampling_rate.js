@@ -10,7 +10,7 @@ let options = {
 };
 
 const conn = MongoRunner.runMongod(options);
-const testdb = conn.getDB('test');
+const testdb = conn.getDB("test");
 var coll = testdb[jsTestName()];
 coll.drop();
 for (var i = 0; i < 20; i++) {

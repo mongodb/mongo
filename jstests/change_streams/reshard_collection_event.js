@@ -12,28 +12,25 @@
  */
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({
     shards: 2,
     rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
     other: {
-        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}}
-    }
+        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}},
+    },
 });
 
 const mongos = st.s0;
 const primaryShard = st.shard0.shardName;
 const nonPrimaryShard = st.shard1.shardName;
 const kDbName = jsTestName();
-const kCollName = 'coll';
-const kNsName = kDbName + '.' + kCollName;
+const kCollName = "coll";
+const kNsName = kDbName + "." + kCollName;
 const numDocs = 1;
-const zoneName = 'zone1';
+const zoneName = "zone1";
 
 const db = mongos.getDB(kDbName);
 const test = new ChangeStreamTest(db);
@@ -45,7 +42,7 @@ function getCollectionUuid(coll) {
 
 const ns = {
     db: kDbName,
-    coll: kCollName
+    coll: kCollName,
 };
 
 function prepareShardedCollection() {
@@ -60,14 +57,16 @@ function prepareUnshardedCollection() {
 }
 
 function reshardCollectionCmd() {
-    assert.commandWorked(mongos.adminCommand({
-        reshardCollection: kNsName,
-        key: {newKey: 1},
-        unique: false,
-        numInitialChunks: 1,
-        collation: {locale: 'simple'},
-        zones: [{zone: zoneName, min: {newKey: MinKey}, max: {newKey: MaxKey}}]
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            reshardCollection: kNsName,
+            key: {newKey: 1},
+            unique: false,
+            numInitialChunks: 1,
+            collation: {locale: "simple"},
+            zones: [{zone: zoneName, min: {newKey: MinKey}, max: {newKey: MaxKey}}],
+        }),
+    );
 }
 
 function moveCollectionCmd() {
@@ -75,8 +74,7 @@ function moveCollectionCmd() {
 }
 
 function unshardCollectionCmd() {
-    assert.commandWorked(
-        mongos.adminCommand({unshardCollection: kNsName, toShard: nonPrimaryShard}));
+    assert.commandWorked(mongos.adminCommand({unshardCollection: kNsName, toShard: nonPrimaryShard}));
 }
 
 function assertExpectedEventObserved(cursor, expectedEvent) {
@@ -90,18 +88,20 @@ function assertExpectedEventObserved(cursor, expectedEvent) {
     return event._id;
 }
 
-function validateExpectedEventAndConfirmResumability(
-    setupFn, userCmdFn, collParam, expectedOutput) {
+function validateExpectedEventAndConfirmResumability(setupFn, userCmdFn, collParam, expectedOutput) {
     setupFn();
     let collectionUUID = getCollectionUuid(kCollName);
 
     let pipeline = [
         {$changeStream: {showExpandedEvents: true}},
-        {$match: {operationType: {$nin: ["create", "createIndexes"]}}}
+        {$match: {operationType: {$nin: ["create", "createIndexes"]}}},
     ];
 
-    let cursor = test.startWatchingChanges(
-        {pipeline: pipeline, collection: collParam, aggregateOptions: {cursor: {batchSize: 0}}});
+    let cursor = test.startWatchingChanges({
+        pipeline: pipeline,
+        collection: collParam,
+        aggregateOptions: {cursor: {batchSize: 0}},
+    });
 
     userCmdFn();
 
@@ -125,7 +125,7 @@ function validateExpectedEventAndConfirmResumability(
             ns: ns,
             fullDocument: {_id: numDocs + 1},
             documentKey: {_id: numDocs + 1},
-        }
+        },
     });
 }
 
@@ -133,12 +133,14 @@ assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard:
 
 for (let watchCollectionParameter of [kCollName, 1]) {
     const watchLevel = watchCollectionParameter === 1 ? kDbName : watchCollectionParameter;
-    jsTest.log(`Validate behavior of reshardCollection against a change stream watching at '${
-        watchLevel}' level`);
+    jsTest.log(`Validate behavior of reshardCollection against a change stream watching at '${watchLevel}' level`);
 
     // The values of 'collectionUUID' and 'reshardUUID' will be filled in by the validate function.
     validateExpectedEventAndConfirmResumability(
-        prepareShardedCollection, reshardCollectionCmd, watchCollectionParameter, {
+        prepareShardedCollection,
+        reshardCollectionCmd,
+        watchCollectionParameter,
+        {
             "operationType": "reshardCollection",
             "collectionUUID": 0,
             "ns": {"db": "reshard_collection_event", "coll": "coll"},
@@ -150,18 +152,23 @@ for (let watchCollectionParameter of [kCollName, 1]) {
                 "numInitialChunks": NumberLong(1),
                 "collation": {"locale": "simple"},
                 "provenance": "reshardCollection",
-                "zones": [{
-                    "zone": "zone1",
-                    "min": {"newKey": {"$minKey": 1}},
-                    "max": {"newKey": {"$maxKey": 1}}
-                }]
-            }
-        });
+                "zones": [
+                    {
+                        "zone": "zone1",
+                        "min": {"newKey": {"$minKey": 1}},
+                        "max": {"newKey": {"$maxKey": 1}},
+                    },
+                ],
+            },
+        },
+    );
 
-    jsTest.log(`Validate behavior of moveCollection against a change stream watching at '${
-        watchLevel}' level`);
+    jsTest.log(`Validate behavior of moveCollection against a change stream watching at '${watchLevel}' level`);
     validateExpectedEventAndConfirmResumability(
-        prepareUnshardedCollection, moveCollectionCmd, watchCollectionParameter, {
+        prepareUnshardedCollection,
+        moveCollectionCmd,
+        watchCollectionParameter,
+        {
             "operationType": "reshardCollection",
             "collectionUUID": 0,
             "ns": {"db": "reshard_collection_event", "coll": "coll"},
@@ -172,13 +179,16 @@ for (let watchCollectionParameter of [kCollName, 1]) {
                 "unique": false,
                 "numInitialChunks": NumberLong(1),
                 "provenance": "moveCollection",
-            }
-        });
+            },
+        },
+    );
 
-    jsTest.log(`Validate behavior of unshardCollection against a change stream watching at '${
-        watchLevel}' level`);
+    jsTest.log(`Validate behavior of unshardCollection against a change stream watching at '${watchLevel}' level`);
     validateExpectedEventAndConfirmResumability(
-        prepareShardedCollection, unshardCollectionCmd, watchCollectionParameter, {
+        prepareShardedCollection,
+        unshardCollectionCmd,
+        watchCollectionParameter,
+        {
             "operationType": "reshardCollection",
             "collectionUUID": 0,
             "ns": {"db": "reshard_collection_event", "coll": "coll"},
@@ -189,8 +199,9 @@ for (let watchCollectionParameter of [kCollName, 1]) {
                 "unique": false,
                 "numInitialChunks": NumberLong(1),
                 "provenance": "unshardCollection",
-            }
-        });
+            },
+        },
+    );
 }
 
 st.stop();

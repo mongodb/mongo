@@ -15,8 +15,8 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runTest(numDocs) {
-    const dbName = 'test';
-    const collectionName = 'coll-' + numDocs;
+    const dbName = "test";
+    const collectionName = "coll-" + numDocs;
 
     // Start one-node repl-set.
     const rst = new ReplSetTest({nodes: 1});
@@ -39,7 +39,7 @@ function runTest(numDocs) {
     // While the secondary is hung, we create the same index multiple times to
     // reproduce the interaction between single and two phase index builds on the
     // same index.
-    const failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
+    const failPoint = configureFailPoint(secondary, "initialSyncHangBeforeCopyingDatabases");
     rst.reInitiate();
     failPoint.wait();
 
@@ -49,7 +49,7 @@ function runTest(numDocs) {
         // converted to a whole number (12 in this case) when initial sync recreates the indexes on
         // the collection during the cloning phase. However, the oplog entry generated would still
         // contain the floating point value 12.345.
-        assert.commandWorked(primaryColl.createIndex({a: '2d'}, {bits: 12.345}));
+        assert.commandWorked(primaryColl.createIndex({a: "2d"}, {bits: 12.345}));
 
         for (let i = 0; i < numDocs; i++) {
             assert.commandWorked(primaryColl.insert({_id: i, a: i}));
@@ -65,24 +65,26 @@ function runTest(numDocs) {
     const attr = {
         namespace: primaryColl.getFullName(),
         spec: (spec) => {
-            jsTestLog('Checking index spec in oplog application log message: ' + tojson(spec));
-            return spec.name === 'a_2d';
-        }
+            jsTestLog("Checking index spec in oplog application log message: " + tojson(spec));
+            return spec.name === "a_2d";
+        },
     };
     const timeoutMillis = 5 * 60 * 1000;
 
     // Older versions logged 7261800 for empty collections and 4718200 for non-empty. We now always
     // log 4718200 but multiversion tests can still produce the old id.
     assert.soon(
-        function() {
-            return checkLog.checkContainsOnceJson(secondary, 4718200, attr) ||
-                checkLog.checkContainsOnceJson(secondary, 7261800, attr);
+        function () {
+            return (
+                checkLog.checkContainsOnceJson(secondary, 4718200, attr) ||
+                checkLog.checkContainsOnceJson(secondary, 7261800, attr)
+            );
         },
-        'Could not find log entries containing the id: 4718200 or 7261800, and attrs: ' +
-            tojson(attr),
+        "Could not find log entries containing the id: 4718200 or 7261800, and attrs: " + tojson(attr),
         timeoutMillis,
         300,
-        {runHangAnalyzer: false});
+        {runHangAnalyzer: false},
+    );
 
     // We rely on the replica set test fixture shutdown to compare the collection contents
     // (including index specs) between the two nodes in the cluster.

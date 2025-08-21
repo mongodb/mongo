@@ -60,7 +60,8 @@ withRetryOnTransientTxnError(
     },
     () => {
         session.abortTransaction_forTesting();
-    });
+    },
+);
 assert.sameMembers(sessionColl.find().toArray(), [doc1, doc2]);
 
 // Test aborting an unprepared large transaction with two 10MB inserts.
@@ -75,6 +76,7 @@ withRetryOnTransientTxnError(
     },
     () => {
         session.abortTransaction_forTesting();
-    });
+    },
+);
 
 assert.sameMembers(sessionColl.find({_id: {$gt: 2}}).toArray(), []);

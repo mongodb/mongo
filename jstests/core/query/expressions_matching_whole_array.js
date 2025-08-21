@@ -33,9 +33,9 @@ function assertDoesNotMatch(document, query) {
 }
 
 // $type
-assertMatches({a: [1, 2, 3]}, {a: {$type: 'array'}});
-assertMatches({a: []}, {a: {$type: 'array'}});
-assertDoesNotMatch({a: 1}, {a: {$type: 'array'}});
+assertMatches({a: [1, 2, 3]}, {a: {$type: "array"}});
+assertMatches({a: []}, {a: {$type: "array"}});
+assertDoesNotMatch({a: 1}, {a: {$type: "array"}});
 
 // $in
 assertMatches({a: [1, 2, 3]}, {a: {$in: [[1, 2, 3]]}});
@@ -45,8 +45,8 @@ assertMatches({a: []}, {a: {$in: [[]]}});
 assertDoesNotMatch({a: []}, {a: {$in: [[1]]}});
 
 // $where matches ONLY against whole arrays.
-assertMatches({a: [1]}, {$where: 'Array.isArray(this.a) && this.a.length == 1 && this.a[0] == 1'});
-assertDoesNotMatch({a: [1, 2, 3]}, {$where: 'this.a == 1'});
+assertMatches({a: [1]}, {$where: "Array.isArray(this.a) && this.a.length == 1 && this.a[0] == 1"});
+assertDoesNotMatch({a: [1, 2, 3]}, {$where: "this.a == 1"});
 
 // Comparison expressions match whole array only when RHS has array, MaxKey or MinKey types.
 assertMatches({a: [1, 2, 3]}, {a: [1, 2, 3]});

@@ -13,26 +13,32 @@ import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_
 // Disable testing diagnostics because bucket compression failure results in a tripwire assertion.
 TestData.testingDiagnosticsEnabled = false;
 
-const corruptBucket = function(db, coll, bucketId) {
+const corruptBucket = function (db, coll, bucketId) {
     // Corrupt the bucket by adding an out-of-order index in the "a" column. This will make the
     // bucket uncompressible.
-    let res = assert.commandWorked(getTimeseriesCollForRawOps(db, coll).updateOne(
-        {_id: bucketId}, {$set: {"data.a.0": 0, "control.min.a": 0}}, getRawOperationSpec(db)));
+    let res = assert.commandWorked(
+        getTimeseriesCollForRawOps(db, coll).updateOne(
+            {_id: bucketId},
+            {$set: {"data.a.0": 0, "control.min.a": 0}},
+            getRawOperationSpec(db),
+        ),
+    );
     assert.eq(res.modifiedCount, 1);
 };
 
-const runTest = function(ordered) {
+const runTest = function (ordered) {
     jsTestLog("Ordered: [" + ordered.toString() + "]");
     const conn = MongoRunner.runMongod();
 
     const db = conn.getDB(jsTestName());
     const collName = ordered ? "ordered" : "unordered";
     const coll = db[collName];
-    const timeFieldName = 't';
-    const metaFieldName = 'm';
+    const timeFieldName = "t";
+    const metaFieldName = "m";
 
-    assert.commandWorked(db.createCollection(
-        collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     const timestamps = [
         ISODate("2024-01-16T20:48:39.448Z"),
@@ -70,10 +76,9 @@ const runTest = function(ordered) {
             a: {
                 1: 1,
             },
-        }
+        },
     };
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(db, coll).insertOne(bucket, getRawOperationSpec(db)));
+    assert.commandWorked(getTimeseriesCollForRawOps(db, coll).insertOne(bucket, getRawOperationSpec(db)));
 
     corruptBucket(db, coll, bucket._id);
 
@@ -93,28 +98,26 @@ const runTest = function(ordered) {
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToReopening"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToTimeBackward"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
+    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
+    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numDuplicateBucketsReopened"));
     TimeseriesTest.checkBucketReopeningsFailedCounters(stats.timeseries, {});
 
-    const insert = function(docs) {
+    const insert = function (docs) {
         return db.runCommand({insert: coll.getName(), documents: docs, ordered: ordered});
     };
 
     const docs = [
-        {[timeFieldName]: timestamps[0], [metaFieldName]: 1, a: 2},  // Bucket 1
-        {[timeFieldName]: timestamps[1], [metaFieldName]: 0, a: 2},  // Bucket 0 (corrupt)
-        {[timeFieldName]: timestamps[2], [metaFieldName]: 2, a: 2},  // Bucket 2
-        {[timeFieldName]: timestamps[3], [metaFieldName]: 1, a: 3},  // Bucket 1
-        {[timeFieldName]: timestamps[4], [metaFieldName]: 0, a: 3},  // Bucket 0 (corrupt)
-        {[timeFieldName]: timestamps[5], [metaFieldName]: 1, a: 4},  // Bucket 1
+        {[timeFieldName]: timestamps[0], [metaFieldName]: 1, a: 2}, // Bucket 1
+        {[timeFieldName]: timestamps[1], [metaFieldName]: 0, a: 2}, // Bucket 0 (corrupt)
+        {[timeFieldName]: timestamps[2], [metaFieldName]: 2, a: 2}, // Bucket 2
+        {[timeFieldName]: timestamps[3], [metaFieldName]: 1, a: 3}, // Bucket 1
+        {[timeFieldName]: timestamps[4], [metaFieldName]: 0, a: 3}, // Bucket 0 (corrupt)
+        {[timeFieldName]: timestamps[5], [metaFieldName]: 1, a: 4}, // Bucket 1
     ];
     assert.eq(coll.find().itcount(), 2);
 
@@ -141,11 +144,9 @@ const runTest = function(ordered) {
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToReopening"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToTimeBackward"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
+    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
+    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
@@ -173,11 +174,9 @@ const runTest = function(ordered) {
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsClosedDueToReopening"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToTimeBackward"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"));
-    assert.eq(0,
-              TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
+    assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsKeptOpenDueToLargeMeasurements"));
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsFrozen"));
-    assert.eq(2,
-              TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
+    assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numCompressedBucketsConvertedToUnsorted"));
     assert.eq(0, TimeseriesTest.getStat(stats.timeseries, "numBucketsFetched"));
     assert.eq(1, TimeseriesTest.getStat(stats.timeseries, "numBucketsQueried"));
     assert.eq(2, TimeseriesTest.getStat(stats.timeseries, "numBucketQueriesFailed"));
@@ -190,10 +189,10 @@ const runTest = function(ordered) {
     assert.eq(coll.find({[metaFieldName]: 2}).itcount(), 2);
 
     const buckets = getTimeseriesCollForRawOps(db, coll)
-                        .find({meta: bucket.meta})
-                        .rawData()
-                        .sort({"control.version": 1})
-                        .toArray();
+        .find({meta: bucket.meta})
+        .rawData()
+        .sort({"control.version": 1})
+        .toArray();
     assert.eq(buckets.length, 2);
     assert.eq(buckets[0].control.version, TimeseriesTest.BucketVersion.kUncompressed);
     assert(buckets[0].data.t.hasOwnProperty("0"));
@@ -205,9 +204,9 @@ const runTest = function(ordered) {
 
     // Check logs for bucket corruption log message.
     checkLog.containsJson(db, 8654201, {
-        bucketId: function(bucketId) {
+        bucketId: function (bucketId) {
             return bucketId["$oid"] === bucket._id.valueOf();
-        }
+        },
     });
 
     // Skip validation due to the corrupt buckets.

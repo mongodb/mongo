@@ -4,7 +4,7 @@ const docsPerBatch = 3;
 coll.drop();
 
 // Initialize collection with eight 1M documents, and index on field "a".
-const longString = 'x'.repeat(1024 * 1024);
+const longString = "x".repeat(1024 * 1024);
 for (let i = 0; i < 100; ++i) {
     assert.commandWorked(coll.insert({a: 1, bigField: longString}));
 }
@@ -25,8 +25,7 @@ assert.commandWorked(coll.dropIndex({a: 1}));
 try {
     cursor.hasNext();
     cursor.next();
-} catch (e) {
-}
+} catch (e) {}
 
 // Verify that the server hasn't crashed.
 assert.commandWorked(db.adminCommand({ping: 1}));

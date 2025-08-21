@@ -1,4 +1,3 @@
-
 let t = db.in2;
 
 function go(name, index) {
@@ -16,8 +15,7 @@ function go(name, index) {
     t.save({a: 2, b: 1});
     t.save({a: 3, b: 1});
 
-    if (index)
-        t.createIndex(index);
+    if (index) t.createIndex(index);
 
     assert.eq(7, t.find({a: {$in: [1, 2]}}).count(), name + " A");
 

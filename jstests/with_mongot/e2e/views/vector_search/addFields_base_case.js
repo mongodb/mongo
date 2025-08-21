@@ -10,20 +10,20 @@ import {
     createMoviesViewAndIndex,
     enrichedTitleViewPipeline,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery
+    makeMovieVectorQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
     buildExpectedResults,
     datasets,
-    validateSearchExplain
+    validateSearchExplain,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const view = createMoviesViewAndIndex(datasets.MOVIES_WITH_ENRICHED_TITLE);
 const vectorSearchQuery = makeMovieVectorQuery({
     queryVector: getMoviePlotEmbeddingById(6),
     limit: 5,
-    indexName: datasets.MOVIES_WITH_ENRICHED_TITLE.indexName
+    indexName: datasets.MOVIES_WITH_ENRICHED_TITLE.indexName,
 });
 
 // ===============================================================================
@@ -57,9 +57,9 @@ const filterPipeline = [
             "enriched_title": {
                 // Find all enriched titles that contain the specified value.
                 "$regex": "6",
-            }
-        }
-    }
+            },
+        },
+    },
 ];
 
 validateSearchExplain(view, filterPipeline, false, enrichedTitleViewPipeline);

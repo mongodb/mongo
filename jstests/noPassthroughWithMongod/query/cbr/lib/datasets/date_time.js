@@ -8,13 +8,13 @@ export class DateDataset {
 
         // Vary the year component of the date
         for (let i = 0; i < 1000; i++) {
-            i = String(i).padStart(3, '0');
+            i = String(i).padStart(3, "0");
             date_docs.push({a: ISODate(`2${i}-01-01T01:01:01.001`)});
         }
 
         // Vary the subsecond component of the date
         for (let i = 0; i < 1000; i++) {
-            i = String(i).padStart(3, '0');
+            i = String(i).padStart(3, "0");
             date_docs.push({a: ISODate(`2050-05-05T05:05:05.${i}`)});
         }
 

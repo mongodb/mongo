@@ -20,9 +20,9 @@
  *   assumes_balancer_off
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     function mapper() {
-        if (this.hasOwnProperty('key') && this.hasOwnProperty('value')) {
+        if (this.hasOwnProperty("key") && this.hasOwnProperty("value")) {
             var obj = {};
             obj[this.value] = 1;
             emit(this.key, obj);
@@ -32,8 +32,8 @@ export const $config = (function() {
     function reducer(key, values) {
         var res = {};
 
-        values.forEach(function(obj) {
-            Object.keys(obj).forEach(function(value) {
+        values.forEach(function (obj) {
+            Object.keys(obj).forEach(function (value) {
                 if (!res.hasOwnProperty(value)) {
                     res[value] = 0;
                 }
@@ -50,7 +50,7 @@ export const $config = (function() {
 
     var data = {numDocs: 2000, mapper: mapper, reducer: reducer, finalizer: finalizer};
 
-    var states = (function() {
+    var states = (function () {
         function init(db, collName) {
             // no-op
             // other workloads that extend this workload use this method
@@ -75,7 +75,7 @@ export const $config = (function() {
             bulk.insert({
                 _id: i,
                 key: Random.randInt(this.numDocs / 100),
-                value: Random.randInt(this.numDocs / 10)
+                value: Random.randInt(this.numDocs / 10),
             });
         }
 
@@ -90,6 +90,6 @@ export const $config = (function() {
         data: data,
         states: states,
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

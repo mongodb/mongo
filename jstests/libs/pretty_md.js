@@ -40,7 +40,7 @@ export function linebreak() {
 }
 
 function stripFields(obj, fields) {
-    if (typeof obj === 'object') {
+    if (typeof obj === "object") {
         for (let name of fields) {
             delete obj[name];
         }
@@ -61,8 +61,7 @@ export function outputShardedFindSummaryAndResults(queryObj) {
     const explain = queryObj.explain();
     const winningPlan = explain.queryPlanner.winningPlan;
 
-    subSection(`Find : "${tojson(queryObj._filter)}", additional params: ${
-        tojson(queryObj._additionalCmdParams)}`);
+    subSection(`Find : "${tojson(queryObj._filter)}", additional params: ${tojson(queryObj._additionalCmdParams)}`);
 
     subSection("Stage");
     codeOneLine(winningPlan.stage);

@@ -19,7 +19,7 @@ import {
     testConfigurationDeletionDropCollection,
     testConfigurationDeletionDropDatabase,
     testConfigurationDeletionRenameCollection,
-    testPersistingConfiguration
+    testPersistingConfiguration,
 } from "jstests/sharding/analyze_shard_key/libs/configure_query_analyzer_common.js";
 import {getShardNames} from "jstests/sharding/libs/sharding_util.js";
 
@@ -35,10 +35,18 @@ testPersistingConfiguration(mongos);
 for (let isShardedColl of [true, false]) {
     testConfigurationDeletionDropCollection(mongos, {isShardedColl, shardNames, isShardedCluster});
     testConfigurationDeletionDropDatabase(mongos, {isShardedColl, shardNames, isShardedCluster});
-    testConfigurationDeletionRenameCollection(
-        mongos, {sameDatabase: true, isShardedColl, shardNames, isShardedCluster});
+    testConfigurationDeletionRenameCollection(mongos, {
+        sameDatabase: true,
+        isShardedColl,
+        shardNames,
+        isShardedCluster,
+    });
 }
 // During renameCollection, the source database is only allowed to be different from the
 // destination database when the collection being renamed is unsharded.
-testConfigurationDeletionRenameCollection(
-    mongos, {sameDatabase: false, isShardedColl: false, isShardedCluster, shardNames});
+testConfigurationDeletionRenameCollection(mongos, {
+    sameDatabase: false,
+    isShardedColl: false,
+    isShardedCluster,
+    shardNames,
+});

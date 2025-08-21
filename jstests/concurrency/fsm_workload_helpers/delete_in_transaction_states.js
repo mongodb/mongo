@@ -5,9 +5,7 @@
  * collection. This includes multi=true deletes and multi=false deletes with exact _id queries.
  */
 
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 
 // In-memory representation of the documents owned by this thread for all given collections. Used to
 // verify the expected documents are deleted in the collection.
@@ -45,8 +43,7 @@ export function getIdForDelete(collName) {
 export function exactIdDelete(db, collName, session) {
     // If no documents remain in our partition, there is nothing to do.
     if (!expectedDocuments[collName].length) {
-        print('This thread owns no more documents for collection ' + db[collName] +
-              ', skipping exactIdDelete stage');
+        print("This thread owns no more documents for collection " + db[collName] + ", skipping exactIdDelete stage");
         return;
     }
 
@@ -58,7 +55,7 @@ export function exactIdDelete(db, collName, session) {
     });
 
     // Remove the deleted document from the in-memory representation.
-    expectedDocuments[collName] = expectedDocuments[collName].filter(obj => {
+    expectedDocuments[collName] = expectedDocuments[collName].filter((obj) => {
         return obj._id !== idToDelete;
     });
 }
@@ -70,8 +67,7 @@ export function exactIdDelete(db, collName, session) {
 export function multiDelete(db, collName, session, tid, partitionSize) {
     // If no documents remain in our partition, there is nothing to do.
     if (!expectedDocuments[collName].length) {
-        print('This thread owns no more documents for collection ' + db[collName] +
-              ', skipping multiDelete stage');
+        print("This thread owns no more documents for collection " + db[collName] + ", skipping multiDelete stage");
         return;
     }
 
@@ -80,12 +76,11 @@ export function multiDelete(db, collName, session, tid, partitionSize) {
 
     const collection = session.getDatabase(db.getName()).getCollection(collName);
     withTxnAndAutoRetry(session, () => {
-        assert.commandWorked(
-            collection.remove({tid: tid, groupId: groupIdToDelete}, {multi: true}));
+        assert.commandWorked(collection.remove({tid: tid, groupId: groupIdToDelete}, {multi: true}));
     });
 
     // Remove the deleted documents from the in-memory representation.
-    expectedDocuments[collName] = expectedDocuments[collName].filter(obj => {
+    expectedDocuments[collName] = expectedDocuments[collName].filter((obj) => {
         return obj.groupId !== groupIdToDelete;
     });
 }
@@ -96,24 +91,33 @@ export function multiDelete(db, collName, session, tid, partitionSize) {
 export function verifyDocuments(db, collName, tid) {
     const docs = db[collName].find({tid: tid}).toArray();
     assert.eq(expectedDocuments[collName].length, docs.length, () => {
-        return 'unexpected number of documents for ' + db[collName] + ', docs: ' + tojson(docs) +
-            ', expected docs: ' + tojson(expectedDocuments[collName]);
+        return (
+            "unexpected number of documents for " +
+            db[collName] +
+            ", docs: " +
+            tojson(docs) +
+            ", expected docs: " +
+            tojson(expectedDocuments[collName])
+        );
     });
 
     // Verify only the documents we haven't tried to delete were found.
-    const expectedDocIds = new Set(expectedDocuments[collName].map(doc => doc._id));
-    docs.forEach(doc => {
+    const expectedDocIds = new Set(expectedDocuments[collName].map((doc) => doc._id));
+    docs.forEach((doc) => {
         assert(expectedDocIds.has(doc._id), () => {
-            return 'expected document for collection ' + db[collName] +
-                ' to be deleted, doc: ' + tojson(doc);
+            return "expected document for collection " + db[collName] + " to be deleted, doc: " + tojson(doc);
         });
         expectedDocIds.delete(doc._id);
     });
 
     // All expected document ids should have been found in the collection.
     assert.eq(0, expectedDocIds.size, () => {
-        return 'did not find all expected documents for collection ' + db[collName] +
-            ', _ids not found: ' + tojson(expectedDocIds);
+        return (
+            "did not find all expected documents for collection " +
+            db[collName] +
+            ", _ids not found: " +
+            tojson(expectedDocIds)
+        );
     });
 }
 
@@ -129,10 +133,9 @@ export function initDeleteInTransactionStates(db, collName, tid, partitionSize) 
 
     // Assign each document owned by this thread to a different "group" so they can be multi
     // deleted by group later.
-    let nextGroupIdForInit = nextGroupId[collName] = 0;
-    db[collName].find({tid: tid}).forEach(doc => {
-        assert.commandWorked(
-            db[collName].update({_id: doc._id}, {$set: {groupId: nextGroupIdForInit}}));
+    let nextGroupIdForInit = (nextGroupId[collName] = 0);
+    db[collName].find({tid: tid}).forEach((doc) => {
+        assert.commandWorked(db[collName].update({_id: doc._id}, {$set: {groupId: nextGroupIdForInit}}));
         nextGroupIdForInit = (nextGroupIdForInit + 1) % numGroupsWithinThread;
     });
 

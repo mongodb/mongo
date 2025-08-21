@@ -18,9 +18,7 @@ function loadDummyData() {
 }
 
 export class DbCheckOldFormatKeysTest {
-    constructor({
-        name = "DbCheckOldFormatKeysTest",
-    }) {
+    constructor({name = "DbCheckOldFormatKeysTest"}) {
         const rst = new ReplSetTest({name, nodes: 3});
         rst.startSet();
         rst.initiate();
@@ -57,7 +55,8 @@ export class DbCheckOldFormatKeysTest {
 
         jsTestLog(`Inserting documents into collection ${dbName}.${collName}`);
         const res = assert.commandWorked(
-            db.runCommand({insert: collName, documents: data, writeConcern: {w: 'majority'}}));
+            db.runCommand({insert: collName, documents: data, writeConcern: {w: "majority"}}),
+        );
         this.getRst().awaitReplication();
         assert.eq(db.getCollection(collName).find({}).count(), data.length);
         jsTestLog(`Inserted with w: majority, opTime ${tojson(res.operationTime)}`);
@@ -66,12 +65,14 @@ export class DbCheckOldFormatKeysTest {
             fp.off();
         }
 
-        forEachNonArbiterNode(this.getRst(), function(node) {
-            assert.commandWorked(node.adminCommand({
-                setParameter: 1,
-                logComponentVerbosity: {command: 3},
-                dbCheckHealthLogEveryNBatches: 1
-            }));
+        forEachNonArbiterNode(this.getRst(), function (node) {
+            assert.commandWorked(
+                node.adminCommand({
+                    setParameter: 1,
+                    logComponentVerbosity: {command: 3},
+                    dbCheckHealthLogEveryNBatches: 1,
+                }),
+            );
         });
     }
 
@@ -79,10 +80,7 @@ export class DbCheckOldFormatKeysTest {
      * Inserts data into the replica set across all nodes. To insert old format unique index keys,
      * this function must be called in v4.2 or earlier, prior to upgrading.
      */
-    insertOldFormatKeyStrings(dbName,
-                              collName,
-                              indexSpecs = [{a: 1}, {b: -1}],
-                              data = loadDummyData()) {
+    insertOldFormatKeyStrings(dbName, collName, indexSpecs = [{a: 1}, {b: -1}], data = loadDummyData()) {
         this.insertIndexAndData(dbName, collName, indexSpecs, data);
     }
 
@@ -97,8 +95,9 @@ export class DbCheckOldFormatKeysTest {
         for (const node of nodes) {
             // Skip deleting records and the _id index when running a deletion commmand.
             const skipDeleteRecordFp = configureFailPoint(node, "skipDeleteRecord");
-            const skipUnindexingDocWhenDeletedFp =
-                configureFailPoint(node, "skipUnindexingDocumentWhenDeleted", {indexName: "_id_"});
+            const skipUnindexingDocWhenDeletedFp = configureFailPoint(node, "skipUnindexingDocumentWhenDeleted", {
+                indexName: "_id_",
+            });
             fps.push(skipDeleteRecordFp);
             fps.push(skipUnindexingDocWhenDeletedFp);
         }
@@ -146,7 +145,6 @@ export class DbCheckOldFormatKeysTest {
             // that haven't set the failpoints will simply delete all documents.
 
             assert.commandWorked(coll.deleteMany(docFilter));
-
         } else if (failpointName == "skipUpdatingIndexDocument") {
             assert.commandWorked(coll.updateMany(docFilter, {$unset: {"a": ""}}));
         }
@@ -160,8 +158,7 @@ export class DbCheckOldFormatKeysTest {
     }
 
     createExtraKeysRecordNotFound(nodes, dbName, collName, docFilter = {}) {
-        this.createExtraKeys(
-            nodes, dbName, collName, "skipUnindexingDocumentWhenDeleted", docFilter);
+        this.createExtraKeys(nodes, dbName, collName, "skipUnindexingDocumentWhenDeleted", docFilter);
     }
 
     createExtraKeysRecordDoesNotMatch(nodes, dbName, collName, docFilter = {}) {

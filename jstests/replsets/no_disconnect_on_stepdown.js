@@ -21,12 +21,14 @@ const coll = primaryDb[collname];
 // Never retry on network error, because this test needs to detect the network error.
 TestData.skipRetryOnNetworkError = true;
 
-assert.commandWorked(coll.insert([
-    {_id: 'update0', updateme: true},
-    {_id: 'update1', updateme: true},
-    {_id: 'remove0', removeme: true},
-    {_id: 'remove1', removeme: true}
-]));
+assert.commandWorked(
+    coll.insert([
+        {_id: "update0", updateme: true},
+        {_id: "update1", updateme: true},
+        {_id: "remove0", removeme: true},
+        {_id: "remove1", removeme: true},
+    ]),
+);
 rst.awaitReplication();
 
 jsTestLog("Stepping down with no command in progress.  Should not disconnect.");
@@ -47,11 +49,13 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
     rst.waitForPrimaryOnlyServices(primary);
 
     jsTestLog(`Trying ${description} on a stepping-down primary`);
-    assert.commandWorked(primaryAdmin.adminCommand({
-        configureFailPoint: failpoint,
-        mode: "alwaysOn",
-        data: {shouldContinueOnInterrupt: true}
-    }));
+    assert.commandWorked(
+        primaryAdmin.adminCommand({
+            configureFailPoint: failpoint,
+            mode: "alwaysOn",
+            data: {shouldContinueOnInterrupt: true},
+        }),
+    );
 
     errorCode = [ErrorCodes.InterruptedDueToReplStateChange, ErrorCodes.NotWritablePrimary];
     const writeCommand = `assert.commandFailedWithCode(${operation}, ${errorCode});
@@ -71,8 +75,7 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
 
     // Validate the number of operations killed on step down and number of failed unacknowledged
     // writes resulted in network disconnection.
-    const replMetrics =
-        assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
+    const replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
     assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
     assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, 0);
 
@@ -84,23 +87,22 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
 // Reduce the max batch size so the insert is reliably interrupted.
 assert.commandWorked(primaryAdmin.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
 // Make updates and removes yield more often.
-assert.commandWorked(
-    primaryAdmin.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 3}));
+assert.commandWorked(primaryAdmin.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 3}));
 
 runStepDownTest({
     description: "insert",
     failpoint: "hangWithLockDuringBatchInsert",
-    operation: "db['" + collname + "'].insert([{_id:0}, {_id:1}, {_id:2}])"
+    operation: "db['" + collname + "'].insert([{_id:0}, {_id:1}, {_id:2}])",
 });
 
 runStepDownTest({
     description: "update",
     failpoint: "hangWithLockDuringBatchUpdate",
-    operation: "db['" + collname + "'].update({updateme: true}, {'$set': {x: 1}})"
+    operation: "db['" + collname + "'].update({updateme: true}, {'$set': {x: 1}})",
 });
 runStepDownTest({
     description: "remove",
     failpoint: "hangWithLockDuringBatchRemove",
-    operation: "db['" + collname + "'].remove({removeme: true})"
+    operation: "db['" + collname + "'].remove({removeme: true})",
 });
 rst.stopSet();

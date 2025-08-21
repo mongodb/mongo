@@ -7,7 +7,7 @@
 
 import {waitUntilAllNodesCaughtUp} from "jstests/replsets/rslib.js";
 
-export var CSRSUpgradeCoordinator = function() {
+export var CSRSUpgradeCoordinator = function () {
     var testDBName = jsTestName();
     var dataCollectionName = testDBName + ".data";
     var csrsName = jsTestName() + "-csrs";
@@ -18,49 +18,49 @@ export var CSRSUpgradeCoordinator = function() {
     var csrs;
     var csrs0Opts;
 
-    this.getTestDBName = function() {
+    this.getTestDBName = function () {
         return testDBName;
     };
 
-    this.getDataCollectionName = function() {
+    this.getDataCollectionName = function () {
         return dataCollectionName;
     };
 
     /**
      * Returns an array of connections to the CSRS nodes.
      */
-    this.getCSRSNodes = function() {
+    this.getCSRSNodes = function () {
         return csrs;
     };
 
     /**
      * Returns the replica set name of the config server replica set.
      */
-    this.getCSRSName = function() {
+    this.getCSRSName = function () {
         return csrsName;
     };
 
     /**
      * Returns a copy of the options used for starting a mongos in the coordinator's cluster.
      */
-    this.getMongosConfig = function() {
+    this.getMongosConfig = function () {
         var sconfig = Object.extend({}, st.s0.fullOptions, /* deep */ true);
         delete sconfig.port;
         return sconfig;
     };
 
-    this.getMongos = function(n) {
+    this.getMongos = function (n) {
         return st._mongos[n];
     };
 
-    this.getShardName = function(n) {
+    this.getShardName = function (n) {
         return shardConfigs[n]._id;
     };
 
     /**
      * Returns the ShardingTest fixture backing this CSRSUpgradeCoordinator.
      */
-    this.getShardingTestFixture = function() {
+    this.getShardingTestFixture = function () {
         return st;
     };
 
@@ -68,17 +68,17 @@ export var CSRSUpgradeCoordinator = function() {
      * Private helper method for waiting for a given node to return ismaster:true in its ismaster
      * command response.
      */
-    var _waitUntilMaster = function(dnode) {
+    var _waitUntilMaster = function (dnode) {
         var isMasterReply;
         assert.soon(
-            function() {
+            function () {
                 isMasterReply = dnode.adminCommand({ismaster: 1});
                 return isMasterReply.ismaster;
             },
-            function() {
-                return "Expected " + dnode.name + " to respond ismaster:true, but got " +
-                    tojson(isMasterReply);
-            });
+            function () {
+                return "Expected " + dnode.name + " to respond ismaster:true, but got " + tojson(isMasterReply);
+            },
+        );
     };
 
     /**
@@ -86,14 +86,13 @@ export var CSRSUpgradeCoordinator = function() {
      * cluster
      * operating in SCCC mode.
      */
-    this.restartFirstConfigAsReplSet = function() {
+    this.restartFirstConfigAsReplSet = function () {
         jsTest.log("Restarting " + st.c0.name + " as a standalone replica set");
-        csrsConfig =
-            {_id: csrsName, version: 1, configsvr: true, members: [{_id: 0, host: st.c0.name}]};
+        csrsConfig = {_id: csrsName, version: 1, configsvr: true, members: [{_id: 0, host: st.c0.name}]};
         assert.commandWorked(st.c0.adminCommand({replSetInitiate: csrsConfig}));
         csrs = [];
         csrs0Opts = Object.extend({}, st.c0.fullOptions, /* deep */ true);
-        csrs0Opts.restart = true;  // Don't clean the data files from the old c0.
+        csrs0Opts.restart = true; // Don't clean the data files from the old c0.
         csrs0Opts.replSet = csrsName;
         csrs0Opts.configsvrMode = "sccc";
         MongoRunner.stopMongod(st.c0);
@@ -105,11 +104,10 @@ export var CSRSUpgradeCoordinator = function() {
      * Starts up the new members of the config server replica set as non-voting, priority zero
      * nodes.
      */
-    this.startNewCSRSNodes = function() {
+    this.startNewCSRSNodes = function () {
         jsTest.log("Starting new CSRS nodes");
         for (var i = 1; i < numCsrsMembers; ++i) {
-            csrs.push(MongoRunner.runMongod(
-                {replSet: csrsName, configsvr: "", storageEngine: "wiredTiger"}));
+            csrs.push(MongoRunner.runMongod({replSet: csrsName, configsvr: "", storageEngine: "wiredTiger"}));
             csrsConfig.members.push({_id: i, host: csrs[i].name, votes: 0, priority: 0});
         }
         csrsConfig.version = 2;
@@ -117,7 +115,7 @@ export var CSRSUpgradeCoordinator = function() {
         assert.commandWorked(csrs[0].adminCommand({replSetReconfig: csrsConfig}));
     };
 
-    this.waitUntilConfigsCaughtUp = function() {
+    this.waitUntilConfigsCaughtUp = function () {
         waitUntilAllNodesCaughtUp(csrs, 60000);
     };
 
@@ -126,7 +124,7 @@ export var CSRSUpgradeCoordinator = function() {
      * preventing
      * any further writes to the config servers until the upgrade to CSRS is completed.
      */
-    this.shutdownOneSCCCNode = function() {
+    this.shutdownOneSCCCNode = function () {
         // Only shut down one of the SCCC config servers to avoid any period without any config
         // servers
         // online.
@@ -137,8 +135,8 @@ export var CSRSUpgradeCoordinator = function() {
     /**
      * Allows all CSRS members to vote, in preparation for switching fully to CSRS mode.
      */
-    this.allowAllCSRSNodesToVote = function() {
-        csrsConfig.members.forEach(function(member) {
+    this.allowAllCSRSNodesToVote = function () {
+        csrsConfig.members.forEach(function (member) {
             member.votes = 1;
             member.priority = 1;
         });
@@ -153,7 +151,7 @@ export var CSRSUpgradeCoordinator = function() {
      * support readCommitted, waits for it to automatically go into the REMOVED state.  Finally,
      * it shuts down the one remaining SCCC config server node now that it is no longer needed.
      */
-    this.switchToCSRSMode = function() {
+    this.switchToCSRSMode = function () {
         jsTest.log("Restarting " + csrs[0].name + " in csrs mode");
         delete csrs0Opts.configsvrMode;
         assert.commandWorked(csrs[0].adminCommand({replSetStepDown: 60}));
@@ -161,11 +159,13 @@ export var CSRSUpgradeCoordinator = function() {
         csrs[0] = MongoRunner.runMongod(csrs0Opts);
         var csrsStatus;
         assert.soon(
-            function() {
+            function () {
                 csrsStatus = csrs[0].adminCommand({replSetGetStatus: 1});
-                if (csrsStatus.members[0].stateStr == "STARTUP" ||
+                if (
+                    csrsStatus.members[0].stateStr == "STARTUP" ||
                     csrsStatus.members[0].stateStr == "STARTUP2" ||
-                    csrsStatus.members[0].stateStr == "RECOVERING") {
+                    csrsStatus.members[0].stateStr == "RECOVERING"
+                ) {
                     // Make sure first node is fully online or else mongoses still in SCCC mode
                     // might not
                     // find any node online to talk to.
@@ -175,10 +175,8 @@ export var CSRSUpgradeCoordinator = function() {
                 var i;
                 for (i = 0; i < csrsStatus.members.length; ++i) {
                     if (csrsStatus.members[i].name == csrs[0].name) {
-                        var supportsCommitted = csrs[0]
-                                                    .getDB("admin")
-                                                    .serverStatus()
-                                                    .storageEngine.supportsCommittedReads;
+                        var supportsCommitted = csrs[0].getDB("admin").serverStatus()
+                            .storageEngine.supportsCommittedReads;
                         var stateIsRemoved = csrsStatus.members[i].stateStr == "REMOVED";
                         // If the storage engine supports committed reads, it shouldn't go into
                         // REMOVED
@@ -195,9 +193,10 @@ export var CSRSUpgradeCoordinator = function() {
                 }
                 return false;
             },
-            function() {
+            function () {
                 return "No primary or non-WT engine not removed in " + tojson(csrsStatus);
-            });
+            },
+        );
 
         jsTest.log("Shutting down final SCCC config server now that upgrade is complete");
         MongoRunner.stopMongod(st.c1);

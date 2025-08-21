@@ -5,7 +5,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({});
-const coll = st.s.getDB(jsTestName())['coll'];
+const coll = st.s.getDB(jsTestName())["coll"];
 
 assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
 

@@ -7,58 +7,59 @@ if (!Mongo.prototype) {
 }
 
 if (!Mongo.prototype.find)
-    Mongo.prototype.find = function(ns, query, fields, limit, skip, batchSize, options) {
+    Mongo.prototype.find = function (ns, query, fields, limit, skip, batchSize, options) {
         throw Error("find not implemented");
     };
 if (!Mongo.prototype.insert)
-    Mongo.prototype.insert = function(ns, obj) {
+    Mongo.prototype.insert = function (ns, obj) {
         throw Error("insert not implemented");
     };
 if (!Mongo.prototype.remove)
-    Mongo.prototype.remove = function(ns, pattern) {
+    Mongo.prototype.remove = function (ns, pattern) {
         throw Error("remove not implemented");
     };
 if (!Mongo.prototype.update)
-    Mongo.prototype.update = function(ns, query, obj, upsert) {
+    Mongo.prototype.update = function (ns, query, obj, upsert) {
         throw Error("update not implemented");
     };
 
-Mongo.prototype.setSlaveOk = function(value) {
+Mongo.prototype.setSlaveOk = function (value) {
     print(
-        "WARNING: setSlaveOk() is deprecated and may be removed in the next major release. Please use setSecondaryOk() instead.");
+        "WARNING: setSlaveOk() is deprecated and may be removed in the next major release. Please use setSecondaryOk() instead.",
+    );
     this.setSecondaryOk(value);
 };
 
-Mongo.prototype.getSlaveOk = function() {
+Mongo.prototype.getSlaveOk = function () {
     print(
-        "WARNING: getSlaveOk() is deprecated and may be removed in the next major release. Please use getSecondaryOk() instead.");
+        "WARNING: getSlaveOk() is deprecated and may be removed in the next major release. Please use getSecondaryOk() instead.",
+    );
     return this.getSecondaryOk();
 };
 
-Mongo.prototype.setSecondaryOk = function(value = true) {
+Mongo.prototype.setSecondaryOk = function (value = true) {
     this.secondaryOk = value;
 };
 
-Mongo.prototype.getSecondaryOk = function() {
+Mongo.prototype.getSecondaryOk = function () {
     return this.secondaryOk || false;
 };
 
-Mongo.prototype.getDB = function(name) {
-    if ((jsTest.options().keyFile) &&
-        ((typeof this.authenticated == 'undefined') || !this.authenticated)) {
+Mongo.prototype.getDB = function (name) {
+    if (jsTest.options().keyFile && (typeof this.authenticated == "undefined" || !this.authenticated)) {
         jsTest.authenticate(this);
     }
     // There is a weird issue where typeof(db._name) !== "string" when the db name
     // is created from objects returned from native C++ methods.
     // This hack ensures that the db._name is always a string.
-    if (typeof (name) === "object") {
+    if (typeof name === "object") {
         name = name.toString();
     }
     return new DB(this, name);
 };
 
-Mongo.prototype._getDatabaseNamesFromPrivileges = function() {
-    'use strict';
+Mongo.prototype._getDatabaseNamesFromPrivileges = function () {
+    "use strict";
 
     const ret = this.adminCommand({connectionStatus: 1, showPrivileges: 1});
     if (!ret.ok) {
@@ -71,27 +72,29 @@ Mongo.prototype._getDatabaseNamesFromPrivileges = function() {
     }
 
     return privileges
-        .filter(function(priv) {
+        .filter(function (priv) {
             // Find all named databases in priv list.
-            return ((priv.resource || {}).db || '').length > 0;
+            return ((priv.resource || {}).db || "").length > 0;
         })
-        .map(function(priv) {
+        .map(function (priv) {
             // Return just the names.
             return priv.resource.db;
         })
-        .filter(function(db, idx, arr) {
+        .filter(function (db, idx, arr) {
             // Make sure the list is unique
             return arr.indexOf(db) === idx;
         })
         .sort();
 };
 
-Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
-                                  filter = undefined,
-                                  nameOnly = undefined,
-                                  authorizedDatabases = undefined) {
-    return function(driverSession, filter, nameOnly, authorizedDatabases) {
-        'use strict';
+Mongo.prototype.getDBs = function (
+    driverSession = this._getDefaultSession(),
+    filter = undefined,
+    nameOnly = undefined,
+    authorizedDatabases = undefined,
+) {
+    return function (driverSession, filter, nameOnly, authorizedDatabases) {
+        "use strict";
 
         const multitenancyRes = this.adminCommand({getParameter: 1, multitenancySupport: 1});
         const multitenancy = multitenancyRes.ok && multitenancyRes["multitenancySupport"];
@@ -99,8 +102,7 @@ Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
         // Calling listDatases is only valid if we have a security token in multitenancy mode.
         // Otherwise we call listDatabasesForAllTenants which list db.name and db.tenantId
         // separately. The result never has a tenant prefix.
-        let cmdObj = multitenancy && !this._securityToken ? {listDatabasesForAllTenants: 1}
-                                                          : {listDatabases: 1};
+        let cmdObj = multitenancy && !this._securityToken ? {listDatabasesForAllTenants: 1} : {listDatabases: 1};
         if (filter !== undefined) {
             cmdObj.filter = filter;
         }
@@ -132,14 +134,18 @@ Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
             // If nameOnly is undefined, we come as close as we can to what the
             // server would return by supplying the databases key of the returned
             // object.  Other information is unavailable.
-            if ((res.code === ErrorCodes.Unauthorized) && (filter === undefined) &&
-                (nameOnly !== false) && (authorizedDatabases !== false)) {
+            if (
+                res.code === ErrorCodes.Unauthorized &&
+                filter === undefined &&
+                nameOnly !== false &&
+                authorizedDatabases !== false
+            ) {
                 const names = this._getDatabaseNamesFromPrivileges();
                 if (nameOnly === true) {
                     return names;
                 } else {
                     return {
-                        databases: names.map(function(x) {
+                        databases: names.map(function (x) {
                             return {name: x};
                         }),
                     };
@@ -149,7 +155,7 @@ Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
         }
 
         if (nameOnly) {
-            return res.databases.map(function(db) {
+            return res.databases.map(function (db) {
                 return db.name;
             });
         }
@@ -158,30 +164,29 @@ Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession(),
     }.call(this, driverSession, filter, nameOnly, authorizedDatabases);
 };
 
-Mongo.prototype.adminCommand = function(cmd) {
+Mongo.prototype.adminCommand = function (cmd) {
     return this.getDB("admin").runCommand(cmd);
 };
 
-Mongo.prototype._setSecurityToken = function(token) {
+Mongo.prototype._setSecurityToken = function (token) {
     this._securityToken = token;
 };
 
-Mongo.prototype.runCommand = function(dbname, cmd, options) {
+Mongo.prototype.runCommand = function (dbname, cmd, options) {
     return this._runCommandImpl(dbname, cmd, options, this._securityToken);
 };
 
 /**
  * Returns all log components and current verbosity values
  */
-Mongo.prototype.getLogComponents = function(driverSession = this._getDefaultSession()) {
+Mongo.prototype.getLogComponents = function (driverSession = this._getDefaultSession()) {
     let cmdObj = {getParameter: 1, logComponentVerbosity: 1};
     if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
         cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
     }
 
     let res = this.adminCommand(cmdObj);
-    if (!res.ok)
-        throw _getErrorWithCode(res, "getLogComponents failed:" + tojson(res));
+    if (!res.ok) throw _getErrorWithCode(res, "getLogComponents failed:" + tojson(res));
     return res.logComponentVerbosity;
 };
 
@@ -189,8 +194,7 @@ Mongo.prototype.getLogComponents = function(driverSession = this._getDefaultSess
  * Accepts optional second argument "component",
  * string of form "storage.journaling"
  */
-Mongo.prototype.setLogLevel = function(
-    logLevel, component, driverSession = this._getDefaultSession()) {
+Mongo.prototype.setLogLevel = function (logLevel, component, driverSession = this._getDefaultSession()) {
     let componentNames = [];
     if (typeof component === "string") {
         componentNames = component.split(".");
@@ -200,7 +204,7 @@ Mongo.prototype.setLogLevel = function(
     let vDoc = {verbosity: logLevel};
 
     // nest vDoc
-    for (let key, obj; componentNames.length > 0;) {
+    for (let key, obj; componentNames.length > 0; ) {
         obj = {};
         key = componentNames.pop();
         obj[key] = vDoc;
@@ -213,27 +217,25 @@ Mongo.prototype.setLogLevel = function(
     }
 
     let res = this.adminCommand(cmdObj);
-    if (!res.ok)
-        throw _getErrorWithCode(res, "setLogLevel failed:" + tojson(res));
+    if (!res.ok) throw _getErrorWithCode(res, "setLogLevel failed:" + tojson(res));
     return res;
 };
 
-Mongo.prototype.getDBNames = function() {
-    return this.getDBs().databases.map(function(z) {
+Mongo.prototype.getDBNames = function () {
+    return this.getDBs().databases.map(function (z) {
         return z.name;
     });
 };
 
-Mongo.prototype.getCollection = function(ns) {
+Mongo.prototype.getCollection = function (ns) {
     let idx = ns.indexOf(".");
-    if (idx < 0)
-        throw Error("need . in ns");
+    if (idx < 0) throw Error("need . in ns");
     let db = ns.substring(0, idx);
     let c = ns.substring(idx + 1);
     return this.getDB(db).getCollection(c);
 };
 
-Mongo.prototype.toString = function() {
+Mongo.prototype.toString = function () {
     return "connection to " + this.host;
 };
 Mongo.prototype.tojson = Mongo.prototype.toString;
@@ -245,35 +247,34 @@ Mongo.prototype.tojson = Mongo.prototype.toString;
  *     preference.
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
  */
-Mongo.prototype.setReadPref = function(mode, tagSet) {
-    if (this._readPrefMode === "primary" && typeof tagSet !== "undefined" &&
-        Object.keys(tagSet).length > 0) {
+Mongo.prototype.setReadPref = function (mode, tagSet) {
+    if (this._readPrefMode === "primary" && typeof tagSet !== "undefined" && Object.keys(tagSet).length > 0) {
         // we allow empty arrays/objects or no tagSet for compatibility reasons
-        throw Error("Cannot supply tagSet with readPref mode \"primary\"");
+        throw Error('Cannot supply tagSet with readPref mode "primary"');
     }
     this._setReadPrefUnsafe(mode, tagSet);
 };
 
 // Set readPref without validating. Exposed so we can test the server's readPref validation.
-Mongo.prototype._setReadPrefUnsafe = function(mode, tagSet) {
+Mongo.prototype._setReadPrefUnsafe = function (mode, tagSet) {
     this._readPrefMode = mode;
     this._readPrefTagSet = tagSet;
 };
 
-Mongo.prototype.getReadPrefMode = function() {
+Mongo.prototype.getReadPrefMode = function () {
     return this._readPrefMode;
 };
 
-Mongo.prototype.getReadPrefTagSet = function() {
+Mongo.prototype.getReadPrefTagSet = function () {
     return this._readPrefTagSet;
 };
 
 // Returns a readPreference object of the type expected by mongos.
-Mongo.prototype.getReadPref = function() {
+Mongo.prototype.getReadPref = function () {
     let obj = {};
 
     const mode = this.getReadPrefMode();
-    if (typeof (mode) === "string") {
+    if (typeof mode === "string") {
         obj.mode = mode;
     } else {
         return null;
@@ -294,7 +295,7 @@ Mongo.prototype.getReadPref = function() {
  *
  * @param level {string} read concern level to use. Pass null to disable read concern.
  */
-Mongo.prototype.setReadConcern = function(level) {
+Mongo.prototype.setReadConcern = function (level) {
     if (!level) {
         this._readConcernLevel = undefined;
     } else if (level === "local" || level === "majority") {
@@ -307,19 +308,21 @@ Mongo.prototype.setReadConcern = function(level) {
 /**
  * Gets the read concern.
  */
-Mongo.prototype.getReadConcern = function() {
+Mongo.prototype.getReadConcern = function () {
     return this._readConcernLevel;
 };
 
-globalThis.connect = function(url, user, pass, apiParameters) {
+globalThis.connect = function (url, user, pass, apiParameters) {
     if (url instanceof MongoURI) {
         user = url.user;
         pass = url.password;
         url = url.uri;
     }
     if (user && !pass)
-        throw Error("you specified a user and not a password.  " +
-                    "either you need a password, or you're using the old connect api");
+        throw Error(
+            "you specified a user and not a password.  " +
+                "either you need a password, or you're using the old connect api",
+        );
 
     // Validate connection string "url" as "hostName:portNumber/databaseName"
     //                                  or "hostName/databaseName"
@@ -330,8 +333,7 @@ globalThis.connect = function(url, user, pass, apiParameters) {
         throw Error("Missing connection string");
     }
     if (urlType != "string") {
-        throw Error("Incorrect type \"" + urlType + "\" for connection string \"" + tojson(url) +
-                    "\"");
+        throw Error('Incorrect type "' + urlType + '" for connection string "' + tojson(url) + '"');
     }
     url = url.trim();
     if (0 == url.length) {
@@ -373,8 +375,10 @@ globalThis.connect = function(url, user, pass, apiParameters) {
         }
 
         if (dest) {
-            print(`\n\n*** You have failed to connect to a ${dest}. Please ensure` +
-                  " that your IP allowlist allows connections from your network.\n\n");
+            print(
+                `\n\n*** You have failed to connect to a ${dest}. Please ensure` +
+                    " that your IP allowlist allows connections from your network.\n\n",
+            );
         }
 
         throw e;
@@ -421,7 +425,7 @@ globalThis.connect = function(url, user, pass, apiParameters) {
 // overridden at the collection level.
 //
 
-Mongo.prototype.setWriteConcern = function(wc) {
+Mongo.prototype.setWriteConcern = function (wc) {
     if (wc instanceof WriteConcern) {
         this._writeConcern = wc;
     } else {
@@ -429,34 +433,34 @@ Mongo.prototype.setWriteConcern = function(wc) {
     }
 };
 
-Mongo.prototype.getWriteConcern = function() {
+Mongo.prototype.getWriteConcern = function () {
     return this._writeConcern;
 };
 
-Mongo.prototype.unsetWriteConcern = function() {
+Mongo.prototype.unsetWriteConcern = function () {
     delete this._writeConcern;
 };
 
-Mongo.prototype.advanceClusterTime = function(newTime) {
+Mongo.prototype.advanceClusterTime = function (newTime) {
     if (!newTime.hasOwnProperty("clusterTime")) {
         throw new Error("missing clusterTime field in setClusterTime argument");
     }
 
     if (typeof this._clusterTime === "object" && this._clusterTime !== null) {
         this._clusterTime =
-            (bsonWoCompare({_: this._clusterTime.clusterTime}, {_: newTime.clusterTime}) >= 0)
-            ? this._clusterTime
-            : newTime;
+            bsonWoCompare({_: this._clusterTime.clusterTime}, {_: newTime.clusterTime}) >= 0
+                ? this._clusterTime
+                : newTime;
     } else {
         this._clusterTime = newTime;
     }
 };
 
-Mongo.prototype.resetClusterTime_forTesting = function() {
+Mongo.prototype.resetClusterTime_forTesting = function () {
     delete this._clusterTime;
 };
 
-Mongo.prototype.getClusterTime = function() {
+Mongo.prototype.getClusterTime = function () {
     return this._clusterTime;
 };
 
@@ -469,9 +473,12 @@ Mongo.prototype.startSession = function startSession(options = {}) {
 
     // Only log this message if we are running a test
     if (typeof TestData === "object" && TestData.testName) {
-        print("New session started with sessionID: " +
-              tojsononeline(newDriverSession.getSessionId()) +
-              " and options: " + tojsononeline(options));
+        print(
+            "New session started with sessionID: " +
+                tojsononeline(newDriverSession.getSessionId()) +
+                " and options: " +
+                tojsononeline(options),
+        );
     }
 
     return newDriverSession;
@@ -491,7 +498,7 @@ Mongo.prototype._getDefaultSession = function getDefaultSession() {
                     this._setDummyDefaultSession();
                 } else {
                     print("ERROR: Implicit session failed: " + e.message);
-                    throw (e);
+                    throw e;
                 }
             }
         } else {
@@ -522,8 +529,7 @@ Mongo.prototype.waitForClusterTime = function waitForClusterTime(maxRetries = 10
     let count = 0;
     while (count < maxRetries) {
         if (typeof this._clusterTime === "object" && this._clusterTime !== null) {
-            if (this._clusterTime.hasOwnProperty("signature") &&
-                this._clusterTime.signature.keyId > 0) {
+            if (this._clusterTime.hasOwnProperty("signature") && this._clusterTime.signature.keyId > 0) {
                 return;
             }
         }
@@ -543,7 +549,7 @@ Mongo.prototype.waitForClusterTime = function waitForClusterTime(maxRetries = 10
  * stream stage, and which apply to the aggregate overall. Returns two objects: the change
  * stream stage specification and the options for the aggregate command, respectively.
  */
-Mongo.prototype._extractChangeStreamOptions = function(options) {
+Mongo.prototype._extractChangeStreamOptions = function (options) {
     options = options || {};
     assert(options instanceof Object, "'options' argument must be an object");
 
@@ -610,12 +616,11 @@ Mongo.prototype._extractChangeStreamOptions = function(options) {
     return [{$changeStream: changeStreamOptions}, options];
 };
 
-Mongo.prototype.watch = function(pipeline, options) {
+Mongo.prototype.watch = function (pipeline, options) {
     pipeline = pipeline || [];
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
 
     const [changeStreamStage, aggOptions] = this._extractChangeStreamOptions(options);
     changeStreamStage.$changeStream.allChangesForCluster = true;
-    return this.getDB("admin")._runAggregate(
-        {aggregate: 1, pipeline: [changeStreamStage, ...pipeline]}, aggOptions);
+    return this.getDB("admin")._runAggregate({aggregate: 1, pipeline: [changeStreamStage, ...pipeline]}, aggOptions);
 };

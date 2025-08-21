@@ -9,13 +9,14 @@ const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
-const coll = testDB.getCollection('t');
+const coll = testDB.getCollection("t");
 
-const timeFieldName = 'time';
-const metaFieldName = 'meta';
+const timeFieldName = "time";
+const metaFieldName = "meta";
 
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 const expectedMetrics = {
     numBuckets: 0,
@@ -23,10 +24,10 @@ const expectedMetrics = {
     numIdleBuckets: 0,
 };
 
-const checkServerStatus = function() {
+const checkServerStatus = function () {
     const metrics = assert.commandWorked(testDB.serverStatus()).bucketCatalog;
 
-    const invalidMetricMsg = function(metric) {
+    const invalidMetricMsg = function (metric) {
         return "Invalid '" + metric + "' value in serverStatus: " + tojson(metrics);
     };
 
@@ -34,17 +35,18 @@ const checkServerStatus = function() {
         assert.eq(metrics[metric], value, invalidMetricMsg(metric));
     }
 
-    assert.gt(metrics.memoryUsage, 0, invalidMetricMsg('memoryUsage'));
+    assert.gt(metrics.memoryUsage, 0, invalidMetricMsg("memoryUsage"));
 };
 
-const checkNoServerStatus = function() {
+const checkNoServerStatus = function () {
     const serverStatus = assert.commandWorked(testDB.serverStatus());
-    assert(!serverStatus.hasOwnProperty('bucketCatalog'),
-           'Found unexpected bucketCatalog section in serverStatus: ' +
-               tojson(serverStatus.bucketCatalog));
+    assert(
+        !serverStatus.hasOwnProperty("bucketCatalog"),
+        "Found unexpected bucketCatalog section in serverStatus: " + tojson(serverStatus.bucketCatalog),
+    );
 };
 
-const insertDoc = function(doc) {
+const insertDoc = function (doc) {
     assert.commandWorked(coll.insert(doc, {ordered: false}));
 };
 

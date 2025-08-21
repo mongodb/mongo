@@ -17,14 +17,13 @@ function generateNestedPipeline(foreignCollName, numLevels) {
 }
 
 function runTest(lookup) {
-    const db = null;  // Using the db variable is banned in this function.
+    const db = null; // Using the db variable is banned in this function.
     const lookupName = lookup.getName();
 
     // Deeply nested $lookup pipeline. Confirm that we can execute an aggregation with nested
     // $lookup sub-pipelines up to the maximum depth, but not beyond.
     let nestedPipeline = generateNestedPipeline("lookup", 20);
-    assert.commandWorked(
-        lookup.getDB().runCommand({aggregate: lookupName, pipeline: nestedPipeline, cursor: {}}));
+    assert.commandWorked(lookup.getDB().runCommand({aggregate: lookupName, pipeline: nestedPipeline, cursor: {}}));
 
     nestedPipeline = generateNestedPipeline("lookup", 21);
     assertErrorCode(lookup, nestedPipeline, ErrorCodes.MaxSubPipelineDepthExceeded);
@@ -34,21 +33,20 @@ function runTest(lookup) {
     nestedPipeline = generateNestedPipeline(lookupName, 10);
 
     assertDropCollection(lookup.getDB(), "view1");
-    assert.commandWorked(
-        lookup.getDB().runCommand({create: "view1", viewOn: lookupName, pipeline: nestedPipeline}));
+    assert.commandWorked(lookup.getDB().runCommand({create: "view1", viewOn: lookupName, pipeline: nestedPipeline}));
 
     nestedPipeline = generateNestedPipeline("view1", 10);
     assertDropCollection(lookup.getDB(), "view2");
-    assert.commandWorked(
-        lookup.getDB().runCommand({create: "view2", viewOn: "view1", pipeline: nestedPipeline}));
+    assert.commandWorked(lookup.getDB().runCommand({create: "view2", viewOn: "view1", pipeline: nestedPipeline}));
 
     // Confirm that a composite sub-pipeline depth of 20 is allowed.
     assert.commandWorked(lookup.getDB().runCommand({aggregate: "view2", pipeline: [], cursor: {}}));
 
     const pipelineWhichExceedsNestingLimit = generateNestedPipeline("view2", 1);
     assertDropCollection(lookup.getDB(), "view3");
-    assert.commandWorked(lookup.getDB().runCommand(
-        {create: "view3", viewOn: "view2", pipeline: pipelineWhichExceedsNestingLimit}));
+    assert.commandWorked(
+        lookup.getDB().runCommand({create: "view3", viewOn: "view2", pipeline: pipelineWhichExceedsNestingLimit}),
+    );
 
     // Confirm that a composite sub-pipeline depth greater than 20 fails.
     assertErrorCode(lookup.getDB().view3, [], ErrorCodes.MaxSubPipelineDepthExceeded);
@@ -65,8 +63,8 @@ MongoRunner.stopMongod(standalone);
 const sharded = new ShardingTest({mongos: 1, shards: 2});
 
 assert(sharded.adminCommand({enableSharding: "test"}));
-assert(sharded.adminCommand({shardCollection: "test.lookup", key: {_id: 'hashed'}}));
+assert(sharded.adminCommand({shardCollection: "test.lookup", key: {_id: "hashed"}}));
 
-runTest(sharded.getDB('test').lookup);
+runTest(sharded.getDB("test").lookup);
 
 sharded.stop();

@@ -15,8 +15,7 @@ let dbName = "test";
 let collName = "user";
 let ns = dbName + "." + collName;
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zoneA"}));
@@ -27,10 +26,8 @@ assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zon
 removeShard(st, st.shard1.shardName);
 
 // Cannot remove the only shard for a zone if that zone has chunk ranges associated with it.
-assert.commandWorked(
-    st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey}, max: {x: MaxKey}, zone: "zoneC"}));
-assert.commandFailedWithCode(st.s.adminCommand({removeShard: st.shard2.shardName}),
-                             ErrorCodes.ZoneStillInUse);
+assert.commandWorked(st.s.adminCommand({updateZoneKeyRange: ns, min: {x: MinKey}, max: {x: MaxKey}, zone: "zoneC"}));
+assert.commandFailedWithCode(st.s.adminCommand({removeShard: st.shard2.shardName}), ErrorCodes.ZoneStillInUse);
 
 // Can remove a shard is if it is not the only shard for any zone.
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zoneC"}));

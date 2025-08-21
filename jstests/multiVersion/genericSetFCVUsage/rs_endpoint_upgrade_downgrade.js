@@ -17,7 +17,7 @@ import {
     extractReplicaSetNameAndHosts,
     makeReplicaSetConnectionString,
     makeStandaloneConnectionString,
-    waitForAutoBootstrap
+    waitForAutoBootstrap,
 } from "jstests/noPassthrough/rs_endpoint/lib/util.js";
 
 function reconnect(conn) {
@@ -37,14 +37,15 @@ function runTest(connString, getShard0PrimaryFunc, upgradeFunc, downgradeFunc, t
     const collName = "testColl";
 
     let conn = new Mongo(connString);
-    conn.getDB(dbName).getCollection(collName).insert([{x: 1}]);
+    conn.getDB(dbName)
+        .getCollection(collName)
+        .insert([{x: 1}]);
 
     jsTest.log("Start upgrading");
     upgradeFunc();
     jsTest.log("Finished upgrading");
     let shard0Primary = getShard0PrimaryFunc();
-    assert.commandWorked(
-        shard0Primary.adminCommand({transitionToShardedCluster: 1, writeConcern: {w: "majority"}}));
+    assert.commandWorked(shard0Primary.adminCommand({transitionToShardedCluster: 1, writeConcern: {w: "majority"}}));
     waitForAutoBootstrap(shard0Primary);
 
     // Reconnect after the connection was closed due to restart.
@@ -80,21 +81,18 @@ function runStandaloneTest(oldBinVersion, oldFCVVersion) {
             binVersion: "latest",
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
-            }
+            },
         });
         assert.soon(() => {
             const res = assert.commandWorked(node.adminCommand({hello: 1}));
             return res.isWritablePrimary;
         });
-        assert.commandWorked(
-            node.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(node.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     };
     const downgradeFunc = () => {
-        assert.commandWorked(
-            node.adminCommand({setFeatureCompatibilityVersion: oldFCVVersion, confirm: true}));
+        assert.commandWorked(node.adminCommand({setFeatureCompatibilityVersion: oldFCVVersion, confirm: true}));
         MongoRunner.stopMongod(node, null, {noCleanData: true});
-        node =
-            MongoRunner.runMongod({noCleanData: true, port: node.port, binVersion: oldBinVersion});
+        node = MongoRunner.runMongod({noCleanData: true, port: node.port, binVersion: oldBinVersion});
     };
     const tearDownFunc = () => MongoRunner.stopMongod(node);
     runTest(connString, getShard0PrimaryFunc, upgradeFunc, downgradeFunc, tearDownFunc);
@@ -107,7 +105,10 @@ function runReplicaSetTest(oldBinVersion, oldFCVVersion) {
 
     const connStringOpts = extractReplicaSetNameAndHosts(rst.getPrimary());
     const connString = makeReplicaSetConnectionString(
-        connStringOpts.rsName, connStringOpts.rsHosts, "admin" /* defaultDbName */);
+        connStringOpts.rsName,
+        connStringOpts.rsHosts,
+        "admin" /* defaultDbName */,
+    );
     const getShard0PrimaryFunc = () => {
         return rst.getPrimary();
     };
@@ -116,14 +117,14 @@ function runReplicaSetTest(oldBinVersion, oldFCVVersion) {
             binVersion: "latest",
             setParameter: {
                 featureFlagAllMongodsAreSharded: true,
-            }
+            },
         });
-        assert.commandWorked(rst.getPrimary().adminCommand(
-            {setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+        assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     };
     const downgradeFunc = () => {
-        assert.commandWorked(rst.getPrimary().adminCommand(
-            {setFeatureCompatibilityVersion: oldFCVVersion, confirm: true}));
+        assert.commandWorked(
+            rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: oldFCVVersion, confirm: true}),
+        );
         rst.upgradeSet({binVersion: oldBinVersion, setParameter: {}});
     };
     const tearDownFunc = () => rst.stopSet();
@@ -133,13 +134,11 @@ function runReplicaSetTest(oldBinVersion, oldFCVVersion) {
 jsTest.log("Running tests for a 'last-lts' standalone bootstrapped as a single-shard cluster");
 runStandaloneTest("last-lts", lastLTSFCV);
 
-jsTest.log(
-    "Running tests for a 'last-continuous' standalone bootstrapped as a single-shard cluster");
+jsTest.log("Running tests for a 'last-continuous' standalone bootstrapped as a single-shard cluster");
 runStandaloneTest("last-continuous", lastContinuousFCV);
 
 jsTest.log("Running tests for a 'last-lts' replica set bootstrapped as a single-shard cluster");
 runReplicaSetTest("last-lts", lastLTSFCV);
 
-jsTest.log(
-    "Running tests for a 'last-continuous' replica set bootstrapped as a single-shard cluster");
+jsTest.log("Running tests for a 'last-continuous' replica set bootstrapped as a single-shard cluster");
 runReplicaSetTest("last-continuous", lastContinuousFCV);

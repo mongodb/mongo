@@ -24,7 +24,7 @@ const clusterCommandsCases = [
     {cmd: {clusterFind: kCollName}},
     {
         cmd: {clusterGetMore: NumberLong(1), collection: kCollName},
-        expectedErr: ErrorCodes.CursorNotFound
+        expectedErr: ErrorCodes.CursorNotFound,
     },
     {cmd: {clusterInsert: kCollName, documents: [{x: 1}]}},
     {cmd: {clusterUpdate: kCollName, updates: [{q: {doesNotExist: 1}, u: {x: 1}}]}},
@@ -32,8 +32,8 @@ const clusterCommandsCases = [
         cmd: {
             clusterBulkWrite: 1,
             ops: [{insert: 0, document: {x: 1}}],
-            nsInfo: [{ns: kDBName + "." + kCollName}]
-        }
+            nsInfo: [{ns: kDBName + "." + kCollName}],
+        },
     },
 ];
 
@@ -83,8 +83,7 @@ function runTestCaseExpectSuccess(conn, testCase) {
     shardsvrRst.initiate();
 
     for (let testCase of clusterCommandsCases) {
-        runTestCaseExpectFail(
-            shardsvrRst.getPrimary(), testCase, ErrorCodes.ShardingStateNotInitialized);
+        runTestCaseExpectFail(shardsvrRst.getPrimary(), testCase, ErrorCodes.ShardingStateNotInitialized);
     }
 
     shardsvrRst.stopSet();

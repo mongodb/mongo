@@ -5,12 +5,8 @@
  * @tags: [requires_capped]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    makeCapped
-} from "jstests/concurrency/fsm_workload_modifiers/collection_write_path/make_capped.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
+import {makeCapped} from "jstests/concurrency/fsm_workload_modifiers/collection_write_path/make_capped.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
 
 export const $config = extendWorkload($baseConfig, makeCapped);
 

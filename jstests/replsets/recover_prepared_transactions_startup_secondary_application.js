@@ -20,8 +20,9 @@ const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "recover_prepared_transactions_startup_secondary_application";
@@ -47,8 +48,9 @@ jsTestLog("Disable snapshotting on all nodes");
 
 // Disable snapshotting on all members of the replica set so that further operations do not
 // enter the majority snapshot.
-nodes.forEach(node => assert.commandWorked(node.adminCommand(
-                  {configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})));
+nodes.forEach((node) =>
+    assert.commandWorked(node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})),
+);
 
 session.startTransaction();
 assert.commandWorked(sessionColl.update({_id: 1}, {_id: 1, a: 1}));
@@ -75,8 +77,7 @@ secondary = replTest.start(secondary, {}, true);
 
 jsTestLog("Secondary was restarted");
 
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
 
 // It's illegal to commit a prepared transaction before its prepare oplog entry has been
 // majority committed. So wait for prepare oplog entry to be majority committed before issuing

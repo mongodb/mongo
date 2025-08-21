@@ -42,9 +42,7 @@
  * ]
  */
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     getPlanCacheKeyFromPipeline,
@@ -60,10 +58,7 @@ import {
     isIxscan,
     planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
-import {
-    checkSbeFullFeatureFlagEnabled,
-    checkSbeRestrictedOrFullyEnabled
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // Flag indicating if index filter commands are running through the query settings interface.
 var isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
@@ -106,9 +101,9 @@ function getFilters(collection) {
     if (collection == undefined) {
         collection = coll;
     }
-    var res = collection.runCommand('planCacheListFilters');
-    assert.commandWorked(res, 'planCacheListFilters failed');
-    assert(res.hasOwnProperty('filters'), 'filters missing from planCacheListFilters result');
+    var res = collection.runCommand("planCacheListFilters");
+    assert.commandWorked(res, "planCacheListFilters failed");
+    assert(res.hasOwnProperty("filters"), "filters missing from planCacheListFilters result");
     return res.filters;
 }
 
@@ -120,16 +115,14 @@ function clearFilters(collection, queryShape, isPipeline = false) {
     }
 
     // Clear the filters set earlier.
-    assert.commandWorked(collection.runCommand('planCacheClearFilters'));
+    assert.commandWorked(collection.runCommand("planCacheClearFilters"));
     filters = getFilters(collection);
-    assert.eq(
-        0, filters.length, 'filters not cleared after successful planCacheClearFilters command');
+    assert.eq(0, filters.length, "filters not cleared after successful planCacheClearFilters command");
 
     // Plans should be removed after clearing filters.
     if (queryShape) {
         const planCacheEntryFunc = isPipeline ? planCacheEntryForPipeline : planCacheEntryForQuery;
-        assert.eq(
-            null, planCacheEntryFunc(queryShape, collection), collection.getPlanCache().list());
+        assert.eq(null, planCacheEntryFunc(queryShape, collection), collection.getPlanCache().list());
     }
 }
 
@@ -172,16 +165,18 @@ function planCacheEntryForPipeline(pipeline, collection) {
 // will return empty results.
 var missingCollection = db.jstests_index_filter_commands_missing;
 missingCollection.drop();
-assert.eq(0,
-          getFilters(missingCollection),
-          'planCacheListFilters should return empty array on non-existent collection');
+assert.eq(
+    0,
+    getFilters(missingCollection),
+    "planCacheListFilters should return empty array on non-existent collection",
+);
 
 // Retrieve index filters from an empty test collection.
 var filters = getFilters();
-assert.eq(0, filters.length, 'unexpected number of index filters in planCacheListFilters result');
+assert.eq(0, filters.length, "unexpected number of index filters in planCacheListFilters result");
 
 // Check details of winning plan in plan cache before setting index filter.
-assert.eq(1, coll.find(queryA1, projectionA1).sort(sortA1).itcount(), 'unexpected document count');
+assert.eq(1, coll.find(queryA1, projectionA1).sort(sortA1).itcount(), "unexpected document count");
 var shape = {query: queryA1, sort: sortA1, projection: projectionA1};
 var planBeforeSetFilter = planCacheEntryForQuery(shape);
 assert.neq(null, planBeforeSetFilter, coll.getPlanCache().list());
@@ -189,29 +184,38 @@ assert.neq(null, planBeforeSetFilter, coll.getPlanCache().list());
 assert.eq(false, planBeforeSetFilter.indexFilterSet, planBeforeSetFilter);
 
 // Adding index filters to a non-existent collection should be an error.
-assert.commandFailed(missingCollection.runCommand(
-    'planCacheSetFilter',
-    {query: queryA1, sort: sortA1, projection: projectionA1, indexes: [indexA1B1, indexA1C1]}));
+assert.commandFailed(
+    missingCollection.runCommand("planCacheSetFilter", {
+        query: queryA1,
+        sort: sortA1,
+        projection: projectionA1,
+        indexes: [indexA1B1, indexA1C1],
+    }),
+);
 
 // Add index filters for simple query.
-assert.commandWorked(coll.runCommand(
-    'planCacheSetFilter',
-    {query: queryA1, sort: sortA1, projection: projectionA1, indexes: [indexA1B1, indexA1C1]}));
+assert.commandWorked(
+    coll.runCommand("planCacheSetFilter", {
+        query: queryA1,
+        sort: sortA1,
+        projection: projectionA1,
+        indexes: [indexA1B1, indexA1C1],
+    }),
+);
 filters = getFilters();
-assert.eq(
-    1, filters.length, 'no change in query settings after successfully setting index filters');
-assert.eq(queryA1, filters[0].query, 'unexpected query in filters');
-assert.eq(sortA1, filters[0].sort, 'unexpected sort in filters');
-assert.eq(projectionA1, filters[0].projection, 'unexpected projection in filters');
-assert.eq(2, filters[0].indexes.length, 'unexpected number of indexes in filters');
-assert.eq(indexA1B1, filters[0].indexes[0], 'unexpected first index');
-assert.eq(indexA1C1, filters[0].indexes[1], 'unexpected first index');
+assert.eq(1, filters.length, "no change in query settings after successfully setting index filters");
+assert.eq(queryA1, filters[0].query, "unexpected query in filters");
+assert.eq(sortA1, filters[0].sort, "unexpected sort in filters");
+assert.eq(projectionA1, filters[0].projection, "unexpected projection in filters");
+assert.eq(2, filters[0].indexes.length, "unexpected number of indexes in filters");
+assert.eq(indexA1B1, filters[0].indexes[0], "unexpected first index");
+assert.eq(indexA1C1, filters[0].indexes[1], "unexpected first index");
 
 // Plans for query shape should be removed after setting index filter.
 assert.eq(null, planCacheEntryForQuery(shape), coll.getPlanCache().list());
 
 // Check details of winning plan in plan cache after setting filter and re-executing query.
-assert.eq(1, coll.find(queryA1, projectionA1).sort(sortA1).itcount(), 'unexpected document count');
+assert.eq(1, coll.find(queryA1, projectionA1).sort(sortA1).itcount(), "unexpected document count");
 let planAfterSetFilter = planCacheEntryForQuery(shape);
 assert.neq(null, planAfterSetFilter, coll.getPlanCache().list());
 // Check 'indexFilterSet' field in plan details
@@ -224,7 +228,7 @@ assert.eq(true, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
 coll.find(queryA1, projectionA1).sort(sortA1).hint(indexA1).itcount();
 
 // Test that index filters are ignored for idhack queries.
-assert.commandWorked(coll.runCommand('planCacheSetFilter', {query: queryID, indexes: [indexA1]}));
+assert.commandWorked(coll.runCommand("planCacheSetFilter", {query: queryID, indexes: [indexA1]}));
 var explain = coll.explain("executionStats").find(queryID).finish();
 assert.commandWorked(explain);
 
@@ -233,23 +237,22 @@ const queryPlanner = getQueryPlanner(explain);
 const winningPlan = getWinningPlanFromExplain(explain);
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 if (collectionIsClustered) {
-    assert(isExpress(db, getWinningPlanFromExplain(explain)),
-           "Expected Express: " + tojson(explain));
+    assert(isExpress(db, getWinningPlanFromExplain(explain)), "Expected Express: " + tojson(explain));
 } else {
     assert(isIdhackOrExpress(db, winningPlan), winningPlan);
 }
 
 // Clearing filters on a missing collection should be a no-op.
-assert.commandWorked(missingCollection.runCommand('planCacheClearFilters'));
+assert.commandWorked(missingCollection.runCommand("planCacheClearFilters"));
 
-print('Plan details before setting filter = ' + tojson(planBeforeSetFilter.details, '', true));
-print('Plan details after setting filter = ' + tojson(planAfterSetFilter.details, '', true));
+print("Plan details before setting filter = " + tojson(planBeforeSetFilter.details, "", true));
+print("Plan details after setting filter = " + tojson(planAfterSetFilter.details, "", true));
 
 //
 // Tests for the 'indexFilterSet' explain field.
 //
 if (!FixtureHelpers.isMongos(db)) {
-    ['queryPlanner', 'executionStats', 'allPlansExecution'].forEach((verbosity) => {
+    ["queryPlanner", "executionStats", "allPlansExecution"].forEach((verbosity) => {
         // Make sure to clean index filters before we run the test for each verbosity level.
         clearFilters(coll, shape);
 
@@ -257,30 +260,28 @@ if (!FixtureHelpers.isMongos(db)) {
         coll.getPlanCache().clear();
         explain = getSingleNodeExplain(coll.find({z: 1}).explain(verbosity));
         assert.eq(false, getQueryPlanner(explain).indexFilterSet, explain);
-        explain =
-            getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity));
+        explain = getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity));
         assert.eq(false, getQueryPlanner(explain).indexFilterSet, explain);
 
         // With one filter set.
-        assert.commandWorked(
-            coll.runCommand('planCacheSetFilter', {query: {z: 1}, indexes: [{z: 1}]}));
+        assert.commandWorked(coll.runCommand("planCacheSetFilter", {query: {z: 1}, indexes: [{z: 1}]}));
         explain = getSingleNodeExplain(coll.find({z: 1}).explain(verbosity));
         assert.eq(true, getQueryPlanner(explain).indexFilterSet, explain);
-        explain =
-            getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity));
+        explain = getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity));
         assert.eq(false, getQueryPlanner(explain).indexFilterSet, verbosity);
 
         // With two filters set.
-        assert.commandWorked(coll.runCommand('planCacheSetFilter', {
-            query: queryA1,
-            projection: projectionA1,
-            sort: sortA1,
-            indexes: [indexA1B1, indexA1C1]
-        }));
+        assert.commandWorked(
+            coll.runCommand("planCacheSetFilter", {
+                query: queryA1,
+                projection: projectionA1,
+                sort: sortA1,
+                indexes: [indexA1B1, indexA1C1],
+            }),
+        );
         explain = getSingleNodeExplain(coll.find({z: 1}).explain(verbosity));
         assert.eq(true, getQueryPlanner(explain).indexFilterSet, explain);
-        explain =
-            getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity));
+        explain = getSingleNodeExplain(coll.find(queryA1, projectionA1).sort(sortA1).explain(verbosity));
         assert.eq(true, getQueryPlanner(explain).indexFilterSet, verbosity);
     });
 } else {
@@ -299,10 +300,11 @@ assert.commandWorked(coll.createIndex(indexA1, {name: "a_1"}));
 
 assert.commandWorked(coll.insert({a: "a"}));
 
-assert.commandWorked(coll.runCommand('planCacheSetFilter', {query: queryAA, indexes: [indexA1]}));
+assert.commandWorked(coll.runCommand("planCacheSetFilter", {query: queryAA, indexes: [indexA1]}));
 
-assert.commandWorked(coll.runCommand('planCacheSetFilter',
-                                     {query: queryAA, collation: collationEN, indexes: [indexA1]}));
+assert.commandWorked(
+    coll.runCommand("planCacheSetFilter", {query: queryAA, collation: collationEN, indexes: [indexA1]}),
+);
 
 // Ensure that index key patterns in planCacheSetFilter select any index with a matching key
 // pattern.
@@ -315,8 +317,7 @@ assert(isIxscan(db, getWinningPlanFromExplain(explain)), "Expected index scan: "
 
 // Ensure that index names in planCacheSetFilter only select matching names.
 
-assert.commandWorked(coll.runCommand('planCacheSetFilter',
-                                     {query: queryAA, collation: collationEN, indexes: ["a_1"]}));
+assert.commandWorked(coll.runCommand("planCacheSetFilter", {query: queryAA, collation: collationEN, indexes: ["a_1"]}));
 
 explain = getSingleNodeExplain(coll.find(queryAA).collation(collationEN).explain());
 assert(isCollscan(db, getWinningPlanFromExplain(explain)), "Expected collscan: " + tojson(explain));
@@ -329,14 +330,14 @@ assert(coll.drop());
 assert.commandWorked(coll.insert({a: "a"}));
 assert.commandWorked(coll.createIndex(indexA1, {name: "a_1"}));
 
-assert.commandWorked(coll.runCommand(
-    "planCacheSetFilter", {query: {a: "a", $expr: {$eq: ["$a", "a"]}}, indexes: [indexA1]}));
+assert.commandWorked(
+    coll.runCommand("planCacheSetFilter", {query: {a: "a", $expr: {$eq: ["$a", "a"]}}, indexes: [indexA1]}),
+);
 filters = getFilters();
 assert.eq(1, filters.length, tojson(filters));
 assert.eq({a: "a", $expr: {$eq: ["$a", "a"]}}, filters[0].query, tojson(filters[0]));
 
-assert.commandWorked(
-    coll.runCommand("planCacheClearFilters", {query: {a: "a", $expr: {$eq: ["$a", "a"]}}}));
+assert.commandWorked(coll.runCommand("planCacheClearFilters", {query: {a: "a", $expr: {$eq: ["$a", "a"]}}}));
 filters = getFilters();
 assert.eq(0, filters.length, tojson(filters));
 
@@ -355,13 +356,12 @@ assert.commandWorked(coll.insert({a: "a"}));
 assert.commandWorked(coll.createIndex(indexA1, {name: "a_1"}));
 
 assert.commandFailed(
-    coll.runCommand("planCacheSetFilter",
-                    {query: {a: "a", $expr: {$eq: ["$a", "$$unbound"]}}, indexes: [indexA1]}));
+    coll.runCommand("planCacheSetFilter", {query: {a: "a", $expr: {$eq: ["$a", "$$unbound"]}}, indexes: [indexA1]}),
+);
 filters = getFilters();
 assert.eq(0, filters.length, tojson(filters));
 
-assert.commandFailed(
-    coll.runCommand("planCacheClearFilters", {query: {a: "a", $expr: {$eq: ["$a", "$$unbound"]}}}));
+assert.commandFailed(coll.runCommand("planCacheClearFilters", {query: {a: "a", $expr: {$eq: ["$a", "$$unbound"]}}}));
 filters = getFilters();
 assert.eq(0, filters.length, tojson(filters));
 
@@ -382,8 +382,7 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
 
     // Add an index filter on the foreign collection that would hypothetically affect the selection
     // of an INLJ plan.
-    assert.commandWorked(
-        foreignColl.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
+    assert.commandWorked(foreignColl.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
     filters = getFilters(foreignColl);
     assert.eq(1, filters.length, filters);
     assert.eq(queryA1, filters[0].query, filters);
@@ -398,7 +397,7 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     // same shape as the filter on the main collection: {a: <val>} and run it.
     const pipeline = [
         {$match: queryA1},
-        {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "a", as: "matched"}}
+        {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "a", as: "matched"}},
     ];
     // Have to run the pipeline to refresh foreign coll routing info, it is possible to have stale
     // info indicate it is a non-local collection, which can cause us to generate a different query
@@ -440,8 +439,7 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         assert.commandWorked(coll.createIndex(indexA1C1, {name: "main_a_1_c_1"}));
 
         // Add the same index filter on the main collection as defined on the foreign collection.
-        assert.commandWorked(
-            coll.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
+        assert.commandWorked(coll.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
         filters = getFilters(coll);
         assert.eq(1, filters.length, filters);
         assert.eq(queryA1, filters[0].query, filters);
@@ -449,8 +447,7 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         assert.eq(indexA1C1, filters[0].indexes[0], filters);
 
         // Make sure we still have one index filter defined on the foreign collection.
-        assert.commandWorked(
-            foreignColl.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
+        assert.commandWorked(foreignColl.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
         filters = getFilters(foreignColl);
         assert.eq(1, filters.length, filters);
 

@@ -26,10 +26,12 @@ const sourceCollection = reshardingTest.createShardedCollection({
 });
 
 // Perform some inserts before resharding starts so there's data to clone.
-assert.commandWorked(sourceCollection.insert([
-    {_id: "moves to recipient0", oldKey: -10, newKey: -10},
-    {_id: "moves to recipient1", oldKey: 10, newKey: 10},
-]));
+assert.commandWorked(
+    sourceCollection.insert([
+        {_id: "moves to recipient0", oldKey: -10, newKey: -10},
+        {_id: "moves to recipient1", oldKey: 10, newKey: 10},
+    ]),
+);
 
 const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
@@ -62,10 +64,12 @@ const err = assert.throws(() => {
 
         // Insert a document directly into recipient0 that is truly owned by recipient1.
         const tempColl = recipient0.getCollection(tempNs);
-        assert.commandWorked(tempColl.runCommand("insert", {
-            documents: [{_id: "unowned by recipient0", oldKey: 10, newKey: 10}],
-            shardVersion: ShardVersioningUtil.kIgnoredShardVersion
-        }));
+        assert.commandWorked(
+            tempColl.runCommand("insert", {
+                documents: [{_id: "unowned by recipient0", oldKey: 10, newKey: 10}],
+                shardVersion: ShardVersioningUtil.kIgnoredShardVersion,
+            }),
+        );
     });
 });
 

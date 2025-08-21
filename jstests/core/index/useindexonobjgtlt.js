@@ -7,6 +7,18 @@ t.createIndex({metro: 1});
 
 assert(db.factories.find().count());
 
-assert.eq(1, db.factories.find({metro: {city: "New York", state: "NY"}}).hint({metro: 1}).count());
+assert.eq(
+    1,
+    db.factories
+        .find({metro: {city: "New York", state: "NY"}})
+        .hint({metro: 1})
+        .count(),
+);
 
-assert.eq(1, db.factories.find({metro: {$gte: {city: "New York"}}}).hint({metro: 1}).count());
+assert.eq(
+    1,
+    db.factories
+        .find({metro: {$gte: {city: "New York"}}})
+        .hint({metro: 1})
+        .count(),
+);

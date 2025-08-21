@@ -18,6 +18,5 @@ TTLUtil.waitForPass(coll.getDB());
 
 // Confirm the document was not removed because it was in a <database>.system.resharding.*
 // namespace.
-assert.eq(
-    1, coll.find().itcount(), "Wrong number of documents in collection, after TTL monitor run");
+assert.eq(1, coll.find().itcount(), "Wrong number of documents in collection, after TTL monitor run");
 MongoRunner.stopMongod(runner);

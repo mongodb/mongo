@@ -4,7 +4,7 @@ let t = db[jsTestName()];
 t.drop();
 
 for (let i = 0; i < 1000; i++) {
-    assert.commandWorked(t.insert({_id: i, k: i % 12, v: "v" + i % 12}));
+    assert.commandWorked(t.insert({_id: i, k: i % 12, v: "v" + (i % 12)}));
 }
 
 assert.commandWorked(t.createIndex({k: 1}));

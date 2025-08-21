@@ -6,16 +6,16 @@
  * Each thread operates on the same collection.
  *
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         randRange: function randRange(low, high) {
             assert.gt(high, low);
             return low + Random.randInt(high - low + 1);
         },
-        numDocs: 1000
+        numDocs: 1000,
     };
 
-    var states = (function() {
+    var states = (function () {
         function init(db, collName) {
             this.modulus = this.randRange(5, 15);
 
@@ -29,7 +29,7 @@ export const $config = (function() {
         }
 
         function distinct(db, collName) {
-            assert.eq(this.modulus, db[collName].distinct('i', {tid: this.tid}).length);
+            assert.eq(this.modulus, db[collName].distinct("i", {tid: this.tid}).length);
         }
 
         return {init: init, distinct: distinct};

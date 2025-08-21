@@ -19,14 +19,13 @@ const st = new ShardingTest({
             setParameter: {
                 ttlMonitorEnabled: false,
                 disableLogicalSessionCacheRefresh: false,
-                logicalSessionRefreshMillis: 1000 * 60 * 60 *
-                    24,  // 24 hours, to avoid refreshing the cache before the test calls it
+                logicalSessionRefreshMillis: 1000 * 60 * 60 * 24, // 24 hours, to avoid refreshing the cache before the test calls it
                 TransactionRecordMinimumLifetimeMinutes: 0,
                 localLogicalSessionTimeoutMinutes: 0,
                 internalSessionsReapThreshold: 5,
-            }
-        }
-    }
+            },
+        },
+    },
 });
 assert.commandWorked(st.s.adminCommand({shardCollection: "config.system.sessions", key: {_id: 1}}));
 
@@ -54,8 +53,7 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 // Check how many sessions have been reaped by the logical session cache on the
 // secondary before calling reapLogicalSessionCacheNow.
 let serverStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
-const numSessionsReapedBefore =
-    serverStatus.logicalSessionRecordCache.lastTransactionReaperJobEntriesCleanedUp;
+const numSessionsReapedBefore = serverStatus.logicalSessionRecordCache.lastTransactionReaperJobEntriesCleanedUp;
 const numReaperJobCountBefore = serverStatus.logicalSessionRecordCache.transactionReaperJobCount;
 
 // Refreshing the logical session cache on the secondary. This will try to reap
@@ -67,14 +65,15 @@ assert.commandWorked(secondary.adminCommand({reapLogicalSessionCacheNow: 1}));
 
 // Check that no sessions were reaped.
 serverStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
-const numSessionsReapedAfter =
-    serverStatus.logicalSessionRecordCache.lastTransactionReaperJobEntriesCleanedUp;
+const numSessionsReapedAfter = serverStatus.logicalSessionRecordCache.lastTransactionReaperJobEntriesCleanedUp;
 const numReaperJobCountAfter = serverStatus.logicalSessionRecordCache.transactionReaperJobCount;
 
 // Make sure that the reaper actually ran.
-assert.gte(1,
-           numReaperJobCountAfter - numReaperJobCountBefore,
-           "Reaper should have run at least once after the reapLogicalSessionCacheNow command.");
+assert.gte(
+    1,
+    numReaperJobCountAfter - numReaperJobCountBefore,
+    "Reaper should have run at least once after the reapLogicalSessionCacheNow command.",
+);
 assert.eq(numSessionsReapedBefore, numSessionsReapedAfter, "No sessions should have been reaped.");
 
 // Make sure that we can still commit the transaction after attempting to reap

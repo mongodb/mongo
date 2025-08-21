@@ -12,7 +12,7 @@ const numNodes = 3;
 const rst = new ReplSetTest({
     name: testName,
     nodes: numNodes,
-    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"}
+    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"},
 });
 const nodes = rst.nodeList();
 rst.startSet();

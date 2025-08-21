@@ -28,21 +28,22 @@ assert.commandWorked(otherColl.insert({_id: 0, notsecret: 1, secret: "really sec
 
 // Create a view on 'testDB' that will have the same name as the collection that $merge/$out
 // will create.
-assert.commandWorked(testDB.runCommand(
-    {create: collidingCollName, viewOn: otherCollName, pipeline: [{$project: {secret: 0}}]}));
+assert.commandWorked(
+    testDB.runCommand({create: collidingCollName, viewOn: otherCollName, pipeline: [{$project: {secret: 0}}]}),
+);
 
 // Verify that the view gets resolved correctly when performing a cross database aggregation where
 // the $lookup references a view on the source database and the $merge/$out references a collection
 // on the target database with the same name as the view.
 const lookupStage = {
-    $lookup: {from: collidingCollName, localField: "_id", foreignField: "_id", as: "matches"}
+    $lookup: {from: collidingCollName, localField: "_id", foreignField: "_id", as: "matches"},
 };
 const withoutWrite = sourceColl.aggregate([lookupStage]).toArray();
 const mergeStage = {
-    $merge: {into: {db: siblingDBName, coll: collidingCollName}}
+    $merge: {into: {db: siblingDBName, coll: collidingCollName}},
 };
 const outStage = {
-    $out: {db: siblingDBName, coll: collidingCollName}
+    $out: {db: siblingDBName, coll: collidingCollName},
 };
 
 // The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'.

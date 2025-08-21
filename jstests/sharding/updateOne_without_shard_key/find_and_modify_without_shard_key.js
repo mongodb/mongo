@@ -22,8 +22,7 @@ const testColl = st.getDB(dbName).getCollection(collectionName);
 // Set up.
 // shard0 -- x: (-inf, 0)
 // shard1 -- x: [0, inf)
-assert.commandWorked(
-    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
@@ -34,7 +33,7 @@ function verifyResult(testCase, res) {
     } else {
         assert.commandWorked(res);
 
-        let noMod = testCase.insertDoc ? (testCase.insertDoc.y != testCase.cmdObj.query.y) : false;
+        let noMod = testCase.insertDoc ? testCase.insertDoc.y != testCase.cmdObj.query.y : false;
         if (testCase.cmdObj.upsert) {
             assert.eq(1, res.lastErrorObject.n, res);
             assert.eq(false, res.lastErrorObject.updatedExisting);
@@ -78,7 +77,7 @@ function verifySingleModification(testCase, res) {
     var modifiedDoc;
     if (testCase.errorCode) {
         assert.commandFailedWithCode(res, testCase.errorCode);
-        modifiedDocId = -1;  // No document should be modified, none will match on -1.
+        modifiedDocId = -1; // No document should be modified, none will match on -1.
     } else {
         assert.commandWorked(res);
 
@@ -87,7 +86,7 @@ function verifySingleModification(testCase, res) {
             assert.eq(0, res.lastErrorObject.n, res);
             assert.eq(false, res.lastErrorObject.updatedExisting);
 
-            modifiedDocId = -1;  // No document should be modified, none will match on -1.
+            modifiedDocId = -1; // No document should be modified, none will match on -1.
         } else {
             assert.eq(1, res.lastErrorObject.n, res);
 
@@ -99,7 +98,7 @@ function verifySingleModification(testCase, res) {
         }
     }
 
-    testCase.insertDoc.forEach(doc => {
+    testCase.insertDoc.forEach((doc) => {
         if (doc._id == modifiedDocId) {
             // This is the document that got modified. Check for pre/post image in command response.
             if (testCase.cmdObj.new) {
@@ -127,12 +126,14 @@ function runCommandAndVerify(testCase, additionalCmdFields = {}) {
     const res = st.getDB(dbName).runCommand(cmdObjWithAdditionalFields);
 
     if (cmdObjWithAdditionalFields.hasOwnProperty("autocommit") && !testCase.errorCode) {
-        assert.commandWorked(st.s.getDB(dbName).adminCommand({
-            commitTransaction: 1,
-            lsid: cmdObjWithAdditionalFields.lsid,
-            txnNumber: cmdObjWithAdditionalFields.txnNumber,
-            autocommit: false
-        }));
+        assert.commandWorked(
+            st.s.getDB(dbName).adminCommand({
+                commitTransaction: 1,
+                lsid: cmdObjWithAdditionalFields.lsid,
+                txnNumber: cmdObjWithAdditionalFields.txnNumber,
+                autocommit: false,
+            }),
+        );
     }
 
     if (testCase.insertDoc && testCase.insertDoc.length > 1) {
@@ -152,7 +153,7 @@ const testCases = [
             query: {y: 5},
             update: {_id: 0, x: -1, y: 7},
             new: true,
-        }
+        },
     },
     {
         logMessage: "Upsert document.",
@@ -185,7 +186,7 @@ const testCases = [
             findAndModify: collectionName,
             query: {y: 4},
             update: [{$set: {y: 0}}, {$set: {y: 1}}],
-        }
+        },
     },
     {
         logMessage: "Modification style update, no sort filter, preimage.",
@@ -195,7 +196,7 @@ const testCases = [
             findAndModify: collectionName,
             query: {y: 6},
             update: {$inc: {y: 3}},
-        }
+        },
     },
     {
         logMessage: "Query does not match, no update.",
@@ -205,7 +206,7 @@ const testCases = [
             findAndModify: collectionName,
             query: {y: 5},
             update: {$inc: {y: 3}},
-        }
+        },
     },
     {
         logMessage: "Remove, no sort filter, preimage.",
@@ -215,47 +216,55 @@ const testCases = [
             findAndModify: collectionName,
             query: {y: 5},
             remove: true,
-        }
+        },
     },
     {
         logMessage:
             "Insert two documents matching on the query, one on each shard, ensure only one is updated (modification).",
-        insertDoc: [{_id: 0, x: -2, y: 5}, {_id: 1, x: 2, y: 5}],
+        insertDoc: [
+            {_id: 0, x: -2, y: 5},
+            {_id: 1, x: 2, y: 5},
+        ],
         resultDoc: {y: 8},
         cmdObj: {
             findAndModify: collectionName,
             query: {y: 5},
             update: {$inc: {y: 3}},
             new: true,
-        }
+        },
     },
     {
         logMessage:
             "Insert two documents matching on the query, one on each shard, ensure only one is updated (aggregation).",
-        insertDoc: [{_id: 0, x: -2, y: 5}, {_id: 1, x: 2, y: 5}],
+        insertDoc: [
+            {_id: 0, x: -2, y: 5},
+            {_id: 1, x: 2, y: 5},
+        ],
         resultDoc: {y: 1},
         cmdObj: {
             findAndModify: collectionName,
             query: {y: 5},
             update: [{$set: {y: 0}}, {$set: {y: 1}}],
             new: true,
-        }
+        },
     },
     {
         logMessage:
             "Insert two documents matching on the query, one on each shard, ensure only one is updated (replacement).",
-        insertDoc: [{_id: 0, x: -2, y: 5}, {_id: 1, x: 2, y: 5}],
+        insertDoc: [
+            {_id: 0, x: -2, y: 5},
+            {_id: 1, x: 2, y: 5},
+        ],
         resultDoc: {y: 8},
         cmdObj: {
             findAndModify: collectionName,
             query: {y: 5},
             update: {$inc: {y: 3}},
             new: true,
-        }
+        },
     },
     {
-        logMessage:
-            "Insert two documents matching on the query, one on each shard, ensure only one is removed.",
+        logMessage: "Insert two documents matching on the query, one on each shard, ensure only one is removed.",
         insertDoc: [
             {_id: 0, x: -2, y: 3},
             {_id: 1, x: 2, y: 3},
@@ -265,23 +274,25 @@ const testCases = [
             findAndModify: collectionName,
             query: {y: 3},
             remove: true,
-        }
+        },
     },
     {
-        logMessage:
-            "Insert two documents, one on each shard, ensure neither is modified when query does not match.",
-        insertDoc: [{_id: 0, x: -2, y: 5}, {_id: 1, x: 2, y: 5}],
+        logMessage: "Insert two documents, one on each shard, ensure neither is modified when query does not match.",
+        insertDoc: [
+            {_id: 0, x: -2, y: 5},
+            {_id: 1, x: 2, y: 5},
+        ],
         resultDoc: {y: 5},
         cmdObj: {
             findAndModify: collectionName,
             query: {y: 4},
             update: {$inc: {y: 3}},
-        }
+        },
     },
 ];
 
 jsTest.log("Testing findAndModify without a shard key commands in various configurations.");
-testCases.forEach(testCase => {
+testCases.forEach((testCase) => {
     jsTest.log(testCase.logMessage);
     runCommandAndVerify(testCase);
 
@@ -291,12 +302,11 @@ testCases.forEach(testCase => {
     const retryableWriteFields = {
         lsid: {id: UUID()},
         txnNumber: NumberLong(0),
-        stmtId: NumberInt(1)
+        stmtId: NumberInt(1),
     };
     runCommandAndVerify(testCase, retryableWriteFields);
 
-    const transactionFields =
-        {lsid: {id: UUID()}, txnNumber: NumberLong(0), startTransaction: true, autocommit: false};
+    const transactionFields = {lsid: {id: UUID()}, txnNumber: NumberLong(0), startTransaction: true, autocommit: false};
     runCommandAndVerify(testCase, transactionFields);
 });
 

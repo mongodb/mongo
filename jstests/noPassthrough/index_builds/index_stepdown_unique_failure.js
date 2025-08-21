@@ -9,17 +9,14 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const rst = new ReplSetTest({
-    nodes: [
-        {},
-        {},
-    ]
+    nodes: [{}, {}],
 });
 const nodes = rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const primary = rst.getPrimary();
-const dbName = 'test';
-const collName = 'coll';
+const dbName = "test";
+const collName = "coll";
 const testDB = primary.getDB(dbName);
 const coll = testDB.getCollection(collName);
 
@@ -28,11 +25,10 @@ assert.commandWorked(coll.insert({a: 1}));
 IndexBuildTest.pauseIndexBuilds(primary);
 IndexBuildTest.pauseIndexBuilds(rst.getSecondary());
 
-const createIdx =
-    IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {unique: true});
+const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {unique: true});
 
 // When the index build starts, find its op id.
-const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
+const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1");
 
 IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId);
 
@@ -53,19 +49,19 @@ IndexBuildTest.waitForIndexBuildToStop(testDB);
 IndexBuildTest.waitForIndexBuildToStop(newPrimary.getDB(dbName));
 
 const exitCode = createIdx({checkExitSuccess: false});
-assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being interrupted');
+assert.neq(0, exitCode, "expected shell to exit abnormally due to index build being interrupted");
 
 // The index build should have failed because of the duplicate key violation.
 rst.awaitReplication();
 const primaryColl = rst.getPrimary().getDB(dbName).getCollection(collName);
 let res = assert.commandWorked(primaryColl.validate());
-assert(res.valid, 'expected validation to succeed: ' + tojson(res));
+assert(res.valid, "expected validation to succeed: " + tojson(res));
 
 const secondaryColl = rst.getSecondary().getDB(dbName).getCollection(collName);
 res = assert.commandWorked(secondaryColl.validate());
-assert(res.valid, 'expected validation to succeed: ' + tojson(res));
+assert(res.valid, "expected validation to succeed: " + tojson(res));
 
-IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
-IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexes(primaryColl, 1, ["_id_"]);
+IndexBuildTest.assertIndexes(secondaryColl, 1, ["_id_"]);
 
 rst.stopSet();

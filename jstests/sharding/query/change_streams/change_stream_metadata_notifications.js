@@ -8,27 +8,25 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard the test collection on a field called 'shardKey'.
-assert.commandWorked(
-    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
+assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
 
 // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey].
-assert.commandWorked(
-    mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: 0}}));
+assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: 0}}));
 
 // Move the [0, MaxKey] chunk to st.shard1.shardName.
-assert.commandWorked(mongosDB.adminCommand(
-    {moveChunk: mongosColl.getFullName(), find: {shardKey: 1}, to: st.rs1.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {shardKey: 1}, to: st.rs1.getURL()}),
+);
 
 // Write a document to each chunk.
 assert.commandWorked(mongosColl.insert({shardKey: -1, _id: -1}, {writeConcern: {w: "majority"}}));
@@ -79,8 +77,9 @@ assert(changeStream.isExhausted());
 
 // Verify that even after filtering out all events, the cursor still returns the invalidate resume
 // token of the dropped collection.
-const resumeStream = mongosColl.watch([{$match: {operationType: "DummyOperationType"}}],
-                                      {resumeAfter: resumeTokenFromFirstUpdate});
+const resumeStream = mongosColl.watch([{$match: {operationType: "DummyOperationType"}}], {
+    resumeAfter: resumeTokenFromFirstUpdate,
+});
 assert.soon(() => {
     assert(!resumeStream.hasNext());
     return resumeStream.isExhausted();
@@ -88,8 +87,7 @@ assert.soon(() => {
 assert.eq(resumeStream.getResumeToken(), collectionDropinvalidateToken);
 
 // With an explicit collation, test that we can resume from before the collection drop.
-changeStream =
-    mongosColl.watch([], {resumeAfter: resumeTokenFromFirstUpdate, collation: {locale: "simple"}});
+changeStream = mongosColl.watch([], {resumeAfter: resumeTokenFromFirstUpdate, collation: {locale: "simple"}});
 
 assert.soon(() => changeStream.hasNext());
 next = changeStream.next();
@@ -113,26 +111,29 @@ assert(!changeStream.hasNext());
 assert(changeStream.isExhausted());
 
 // Test that we can resume the change stream without specifying an explicit collation.
-assert.commandWorked(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
-    cursor: {}
-}));
+assert.commandWorked(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
+        cursor: {},
+    }),
+);
 
 // Recreate and shard the collection.
 assert.commandWorked(mongosDB.createCollection(mongosColl.getName()));
 
 // Shard the test collection on shardKey.
-assert.commandWorked(
-    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
+assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
 
 // Test that resuming the change stream on the recreated collection succeeds, since we will not
 // attempt to inherit the collection's default collation and can therefore ignore the new UUID.
-assert.commandWorked(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
-    cursor: {}
-}));
+assert.commandWorked(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
+        cursor: {},
+    }),
+);
 
 // Recreate the collection as unsharded and open a change stream on it.
 assertDropAndRecreateCollection(mongosDB, mongosColl.getName());
@@ -163,8 +164,9 @@ const dbDropInvalidateToken = next._id;
 
 // Verify that even after filtering out all events, the cursor still returns the invalidate resume
 // token of the dropped database.
-const resumeStream1 = mongosColl.watch([{$match: {operationType: "DummyOperationType"}}],
-                                       {resumeAfter: resumeTokenAfterDbDrop});
+const resumeStream1 = mongosColl.watch([{$match: {operationType: "DummyOperationType"}}], {
+    resumeAfter: resumeTokenAfterDbDrop,
+});
 assert.soon(() => {
     assert(!resumeStream1.hasNext());
     return resumeStream1.isExhausted();

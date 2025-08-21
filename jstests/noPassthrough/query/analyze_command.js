@@ -84,7 +84,7 @@ setup();
         coll.insertMany(docs);
 
         // Check the stats collection is created, data is inserted, and the index is created.
-        const key = keyPath.join('.');
+        const key = keyPath.join(".");
         res = db.runCommand({analyze: coll.getName(), key: key});
         assert.commandWorked(res);
         assert.eq(syscoll.find({_id: key}).count(), 1);
@@ -110,8 +110,7 @@ setup();
     assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleRate: 1.5});
-    assert.commandFailedWithCode(
-        res, [ErrorCodes.BadValue, 51024]);  // getting BadValue when binary is > 7.1, else 51024
+    assert.commandFailedWithCode(res, [ErrorCodes.BadValue, 51024]); // getting BadValue when binary is > 7.1, else 51024
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleRate: null});
     assert.commandWorked(res);
@@ -123,8 +122,7 @@ setup();
     assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleSize: -5});
-    assert.commandFailedWithCode(
-        res, [ErrorCodes.BadValue, 51024]);  // getting BadValue when binary is > 7.1, else 51024
+    assert.commandFailedWithCode(res, [ErrorCodes.BadValue, 51024]); // getting BadValue when binary is > 7.1, else 51024
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleSize: null});
     assert.commandWorked(res);
@@ -140,13 +138,9 @@ assert.commandWorked(res);
 
 cleanup();
 
-assert.commandWorked(coll.insert([
-    {a: 1},
-    {a: 1.5},
-    {a: NumberDecimal("2.1")},
-    {a: "string"},
-    {a: ISODate("2023-01-18T20:09:36.325Z")},
-]));
+assert.commandWorked(
+    coll.insert([{a: 1}, {a: 1.5}, {a: NumberDecimal("2.1")}, {a: "string"}, {a: ISODate("2023-01-18T20:09:36.325Z")}]),
+);
 
 (function validateBuckets() {
     for (let i = 0; i <= 2; i++) {
@@ -182,37 +176,28 @@ cleanup();
         assert.commandWorked(coll.insert({a: NumberDecimal(365)}));
         assert.commandWorked(coll.insert({a: NumberDecimal(37987)}));
 
-        assert.commandFailedWithCode(
-            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 1}), 7299701);
-        assert.commandWorked(
-            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 2}));
+        assert.commandFailedWithCode(coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 1}), 7299701);
+        assert.commandWorked(coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 2}));
 
-        assert.commandWorked(coll.insert({a: 'a'}));
-        assert.commandWorked(coll.insert({a: 'b'}));
-        assert.commandWorked(coll.insert({a: 'asdasdafsadfsaasdasdasddf'}));
+        assert.commandWorked(coll.insert({a: "a"}));
+        assert.commandWorked(coll.insert({a: "b"}));
+        assert.commandWorked(coll.insert({a: "asdasdafsadfsaasdasdasddf"}));
 
         // Test CE histogram creation: Number of collection types 2, Number of histogram buckets 2
         // (fail) and 3 (success).
-        assert.commandFailedWithCode(
-            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 2}), 7299701);
-        assert.commandWorked(
-            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 3}));
+        assert.commandFailedWithCode(coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 2}), 7299701);
+        assert.commandWorked(coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 3}));
 
         assert.commandWorked(coll.insert({a: null}));
         assert.commandWorked(coll.insert({a: true}));
         assert.commandWorked(coll.insert({a: [1, 2, 3, 4]}));
-        assert.commandWorked(
-            coll.insert({a: Timestamp(new Date(Date.UTC(1984, 0, 1)).getTime() / 1000, 0)}));
+        assert.commandWorked(coll.insert({a: Timestamp(new Date(Date.UTC(1984, 0, 1)).getTime() / 1000, 0)}));
 
         // Test CE histogram creation: Number of collection types 3, Number of histogram buckets 2,
         // 3 (fail) and 4 (success).
-        assert.commandFailedWithCode(
-            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 2}), 7299701);
-        assert.commandFailedWithCode(
-            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 3}), 7299701);
-        assert.commandWorked(
-            coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 4}));
-
+        assert.commandFailedWithCode(coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 2}), 7299701);
+        assert.commandFailedWithCode(coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 3}), 7299701);
+        assert.commandWorked(coll.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 4}));
     } finally {
         // Ensure that query knob doesn't leak into other testcases in the suite.
         cleanup();

@@ -13,23 +13,21 @@
  * @tags: [does_not_support_stepdowns, requires_capped, requires_getmore]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/ddl/create_collection/create_capped_collection.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/create_collection/create_capped_collection.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Use the workload name as a prefix for the collection name,
     // since the workload name is assumed to be unique.
-    $config.data.prefix = 'create_capped_collection_maxdocs';
+    $config.data.prefix = "create_capped_collection_maxdocs";
 
     var options = {
         capped: true,
-        size: 8192,  // multiple of 256; larger than 4096 default
-        max: 3
+        size: 8192, // multiple of 256; larger than 4096 default
+        max: 3,
     };
 
     function uniqueCollectionName(prefix, tid, num) {
-        return prefix + tid + '_' + num;
+        return prefix + tid + "_" + num;
     }
 
     // TODO: how to avoid having too many files open?
@@ -57,10 +55,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
             var foundIds = this.getObjectIds(db, myCollName);
             var count = foundIds.length;
-            assert.eq(3, count, 'expected truncation to occur due to number of docs');
-            assert.eq(insertedIds.slice(insertedIds.length - count),
-                      foundIds,
-                      'expected truncation to remove the oldest documents');
+            assert.eq(3, count, "expected truncation to occur due to number of docs");
+            assert.eq(
+                insertedIds.slice(insertedIds.length - count),
+                foundIds,
+                "expected truncation to remove the oldest documents",
+            );
         }
     }
 

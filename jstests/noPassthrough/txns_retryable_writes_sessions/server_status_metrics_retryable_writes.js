@@ -8,21 +8,32 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn) {
     const externalServerStatus = assert.commandWorked(externalConn.adminCommand({serverStatus: 1}));
-    assert.eq(expectedServerStatusMetrics['external']['internalRetryableWriteCount'],
-              externalServerStatus.metrics.query.internalRetryableWriteCount);
-    assert.eq(expectedServerStatusMetrics['external']['externalRetryableWriteCount'],
-              externalServerStatus.metrics.query.externalRetryableWriteCount);
-    assert.eq(expectedServerStatusMetrics['external']['retryableInternalTransactionCount'],
-              externalServerStatus.metrics.query.retryableInternalTransactionCount);
+    assert.eq(
+        expectedServerStatusMetrics["external"]["internalRetryableWriteCount"],
+        externalServerStatus.metrics.query.internalRetryableWriteCount,
+    );
+    assert.eq(
+        expectedServerStatusMetrics["external"]["externalRetryableWriteCount"],
+        externalServerStatus.metrics.query.externalRetryableWriteCount,
+    );
+    assert.eq(
+        expectedServerStatusMetrics["external"]["retryableInternalTransactionCount"],
+        externalServerStatus.metrics.query.retryableInternalTransactionCount,
+    );
     if (internalConn) {
-        const internalServerStatus =
-            assert.commandWorked(internalConn.adminCommand({serverStatus: 1}));
-        assert.eq(expectedServerStatusMetrics['internal']['internalRetryableWriteCount'],
-                  internalServerStatus.metrics.query.internalRetryableWriteCount);
-        assert.eq(expectedServerStatusMetrics['internal']['externalRetryableWriteCount'],
-                  internalServerStatus.metrics.query.externalRetryableWriteCount);
-        assert.eq(expectedServerStatusMetrics['internal']['retryableInternalTransactionCount'],
-                  internalServerStatus.metrics.query.retryableInternalTransactionCount);
+        const internalServerStatus = assert.commandWorked(internalConn.adminCommand({serverStatus: 1}));
+        assert.eq(
+            expectedServerStatusMetrics["internal"]["internalRetryableWriteCount"],
+            internalServerStatus.metrics.query.internalRetryableWriteCount,
+        );
+        assert.eq(
+            expectedServerStatusMetrics["internal"]["externalRetryableWriteCount"],
+            internalServerStatus.metrics.query.externalRetryableWriteCount,
+        );
+        assert.eq(
+            expectedServerStatusMetrics["internal"]["retryableInternalTransactionCount"],
+            internalServerStatus.metrics.query.retryableInternalTransactionCount,
+        );
     }
 }
 
@@ -47,20 +58,17 @@ function runTest(externalConn, internalConn = undefined) {
 
     // Check initial metrics.
     let expectedServerStatusMetrics = {};
-    expectedServerStatusMetrics['external'] = {
-        'internalRetryableWriteCount': 0,
-        'externalRetryableWriteCount': 0,
-        'retryableInternalTransactionCount': 0
+    expectedServerStatusMetrics["external"] = {
+        "internalRetryableWriteCount": 0,
+        "externalRetryableWriteCount": 0,
+        "retryableInternalTransactionCount": 0,
     };
     if (internalConn) {
-        const internalServerStatus =
-            assert.commandWorked(internalConn.adminCommand({serverStatus: 1}));
-        expectedServerStatusMetrics['internal'] = {
-            'internalRetryableWriteCount':
-                internalServerStatus.metrics.query.internalRetryableWriteCount,
-            'externalRetryableWriteCount': 0,
-            'retryableInternalTransactionCount':
-                internalServerStatus.metrics.query.retryableInternalTransactionCount
+        const internalServerStatus = assert.commandWorked(internalConn.adminCommand({serverStatus: 1}));
+        expectedServerStatusMetrics["internal"] = {
+            "internalRetryableWriteCount": internalServerStatus.metrics.query.internalRetryableWriteCount,
+            "externalRetryableWriteCount": 0,
+            "retryableInternalTransactionCount": internalServerStatus.metrics.query.retryableInternalTransactionCount,
         };
     }
 
@@ -72,70 +80,76 @@ function runTest(externalConn, internalConn = undefined) {
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
     // Non-retryable write with session
-    assert.commandWorked(
-        testDB.runCommand({update: coll.getName(), updates: [update], lsid: lsid}));
+    assert.commandWorked(testDB.runCommand({update: coll.getName(), updates: [update], lsid: lsid}));
 
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
     // Retryable write with session
-    assert.commandWorked(testDB.runCommand({
-        update: coll.getName(),
-        updates: [update],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber++)
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            update: coll.getName(),
+            updates: [update],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber++),
+        }),
+    );
 
-    expectedServerStatusMetrics['external']['externalRetryableWriteCount'] += 1;
+    expectedServerStatusMetrics["external"]["externalRetryableWriteCount"] += 1;
     if (internalConn) {
-        expectedServerStatusMetrics['internal']['internalRetryableWriteCount'] += 1;
+        expectedServerStatusMetrics["internal"]["internalRetryableWriteCount"] += 1;
     }
 
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
     // Write with session and in transaction, lsid with id.
-    assert.commandWorked(testDB.runCommand({
-        update: coll.getName(),
-        updates: [update],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber++),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            update: coll.getName(),
+            updates: [update],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber++),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
     // Write with session and in transaction, lsid with id and txnUUID.
-    assert.commandWorked(testDB.runCommand({
-        update: coll.getName(),
-        updates: [update],
-        lsid: lsidWithUUID,
-        txnNumber: NumberLong(txnNumber++),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            update: coll.getName(),
+            updates: [update],
+            lsid: lsidWithUUID,
+            txnNumber: NumberLong(txnNumber++),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 
     // Write with session and in transaction, lsid with id, txnUUID and txnNumber.
-    assert.commandWorked(testDB.runCommand({
-        update: coll.getName(),
-        updates: [update],
-        lsid: lsidWithUUIDAndTxnNum,
-        txnNumber: NumberLong(txnNumber++),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            update: coll.getName(),
+            updates: [update],
+            lsid: lsidWithUUIDAndTxnNum,
+            txnNumber: NumberLong(txnNumber++),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
-    expectedServerStatusMetrics['external']['retryableInternalTransactionCount'] += 1;
+    expectedServerStatusMetrics["external"]["retryableInternalTransactionCount"] += 1;
     if (internalConn) {
-        expectedServerStatusMetrics['internal']['retryableInternalTransactionCount'] += 1;
+        expectedServerStatusMetrics["internal"]["retryableInternalTransactionCount"] += 1;
     }
 
     assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn);
 }
 
-jsTest.log(
-    "Tests the retryable write counts in mongos and mongod serverStatus output for a sharded cluster.");
+jsTest.log("Tests the retryable write counts in mongos and mongod serverStatus output for a sharded cluster.");
 {
     const st = new ShardingTest({shards: 1, mongos: 1});
     const mongos = st.s0;

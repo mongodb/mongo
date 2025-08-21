@@ -1,7 +1,7 @@
 // $or clause deduping with result set sizes > 101 (smaller result sets are now also deduped by the
 // query optimizer cursor).
 
-const collNamePrefix = 'jstests_orp_';
+const collNamePrefix = "jstests_orp_";
 let collCount = 0;
 let docId = 0;
 
@@ -37,8 +37,15 @@ for (let i = 0; i < k; ++i) {
     }
 }
 assert.commandWorked(t.insert(docs));
-assert.eq(k * k,
-          t.countDocuments({$or: [{a: {$gte: 0}, b: {$gte: 0}}, {a: {$lte: k}, b: {$lte: k}}]}));
+assert.eq(
+    k * k,
+    t.countDocuments({
+        $or: [
+            {a: {$gte: 0}, b: {$gte: 0}},
+            {a: {$lte: k}, b: {$lte: k}},
+        ],
+    }),
+);
 
 // Deduping results from a clause that completed before the multi cursor takeover.
 t = db.getCollection(collNamePrefix + collCount++);

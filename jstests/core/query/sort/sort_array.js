@@ -32,12 +32,7 @@ function testAggAndFindSort({filter, sort, project, hint, expected, expectBlocki
         assert(!planHasStage(db, explain, "SORT"));
     }
 
-    let pipeline = [
-        {$_internalInhibitOptimization: {}},
-        {$match: filter},
-        {$sort: sort},
-        {$project: project},
-    ];
+    let pipeline = [{$_internalInhibitOptimization: {}}, {$match: filter}, {$sort: sort}, {$project: project}];
     cursor = coll.aggregate(pipeline);
     assert.eq(cursor.toArray(), expected);
     explain = coll.explain().aggregate(pipeline);
@@ -61,8 +56,11 @@ testAggAndFindSort({
     filter: {a: {$gte: 2}},
     sort: {a: 1},
     project: {_id: 1, a: 1},
-    expected: [{_id: 1, a: [8, 4, -1]}, {_id: 0, a: [3, 0, 1]}],
-    expectBlockingSort: true
+    expected: [
+        {_id: 1, a: [8, 4, -1]},
+        {_id: 0, a: [3, 0, 1]},
+    ],
+    expectBlockingSort: true,
 });
 
 assert.commandWorked(coll.remove({}));
@@ -74,8 +72,11 @@ testAggAndFindSort({
     filter: {a: {$gte: 2}},
     sort: {a: -1},
     project: {_id: 1, a: 1},
-    expected: [{_id: 1, a: [0, 4, -1]}, {_id: 0, a: [3, 0, 1]}],
-    expectBlockingSort: true
+    expected: [
+        {_id: 1, a: [0, 4, -1]},
+        {_id: 0, a: [3, 0, 1]},
+    ],
+    expectBlockingSort: true,
 });
 
 assert.commandWorked(coll.remove({}));
@@ -88,8 +89,11 @@ testAggAndFindSort({
     filter: {a: {$gte: 2}},
     sort: {a: -1},
     project: {_id: 1, a: 1},
-    expected: [{_id: 1, a: [0, 4, -1]}, {_id: 0, a: [3, 0, 1]}],
-    expectBlockingSort: true
+    expected: [
+        {_id: 1, a: [0, 4, -1]},
+        {_id: 0, a: [3, 0, 1]},
+    ],
+    expectBlockingSort: true,
 });
 
 // Descending sort, in the presence of an index with [minKey, maxKey] bounds has a non-blocking
@@ -98,8 +102,11 @@ testAggAndFindSort({
     filter: {},
     sort: {a: -1},
     project: {_id: 1, a: 1},
-    expected: [{_id: 1, a: [0, 4, -1]}, {_id: 0, a: [3, 0, 1]}],
-    expectBlockingSort: false
+    expected: [
+        {_id: 1, a: [0, 4, -1]},
+        {_id: 0, a: [3, 0, 1]},
+    ],
+    expectBlockingSort: false,
 });
 
 // Ascending sort, in the presence of an index with [minKey, maxKey] bounds has a non-blocking sort.
@@ -107,13 +114,32 @@ testAggAndFindSort({
     filter: {},
     sort: {a: 1},
     project: {_id: 1, a: 1},
-    expected: [{_id: 1, a: [0, 4, -1]}, {_id: 0, a: [3, 0, 1]}],
-    expectBlockingSort: false
+    expected: [
+        {_id: 1, a: [0, 4, -1]},
+        {_id: 0, a: [3, 0, 1]},
+    ],
+    expectBlockingSort: false,
 });
 
 assert.commandWorked(coll.remove({}));
-assert.commandWorked(coll.insert({_id: 0, x: [{y: [4, 0, 1], z: 7}, {y: 0, z: 9}]}));
-assert.commandWorked(coll.insert({_id: 1, x: [{y: 1, z: 7}, {y: 0, z: [8, 6]}]}));
+assert.commandWorked(
+    coll.insert({
+        _id: 0,
+        x: [
+            {y: [4, 0, 1], z: 7},
+            {y: 0, z: 9},
+        ],
+    }),
+);
+assert.commandWorked(
+    coll.insert({
+        _id: 1,
+        x: [
+            {y: 1, z: 7},
+            {y: 0, z: [8, 6]},
+        ],
+    }),
+);
 
 // Compound mixed ascending/descending sorts, without an index. Sort key for doc with _id: 0 is
 // {'': 0, '': 9}. Sort key for doc with _id: 1 is {'': 0, '': 8}.
@@ -122,7 +148,7 @@ testAggAndFindSort({
     sort: {"x.y": 1, "x.z": -1},
     project: {_id: 1},
     expected: [{_id: 0}, {_id: 1}],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 
 // Sort key for doc with _id: 0 is {'': 4, '': 7}. Sort key for doc with _id: 1 is {'': 1, '':
@@ -132,7 +158,7 @@ testAggAndFindSort({
     sort: {"x.y": -1, "x.z": 1},
     project: {_id: 1},
     expected: [{_id: 0}, {_id: 1}],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 
 assert.commandWorked(coll.createIndex({"x.y": 1, "x.z": -1}));
@@ -144,14 +170,14 @@ testAggAndFindSort({
     sort: {"x.y": 1, "x.z": -1},
     project: {_id: 1},
     expected: [{_id: 0}, {_id: 1}],
-    expectBlockingSort: false
+    expectBlockingSort: false,
 });
 testAggAndFindSort({
     filter: {},
     sort: {"x.y": -1, "x.z": 1},
     project: {_id: 1},
     expected: [{_id: 0}, {_id: 1}],
-    expectBlockingSort: false
+    expectBlockingSort: false,
 });
 // Since there are bounds on "x.y", and since "x.y" shares a prefix with "x.z", this index cannot
 // provide the sort.
@@ -160,7 +186,7 @@ testAggAndFindSort({
     sort: {"x.z": -1},
     project: {_id: 1},
     expected: [{_id: 0}, {_id: 1}],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 
 // Since there are bounds on "x.y" this index cannot provide the sort.
@@ -169,7 +195,7 @@ testAggAndFindSort({
     sort: {"x.y": -1},
     project: {_id: 1},
     expected: [{_id: 0}, {_id: 1}],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 
 // Since there are bounds on "x.y" and "x.z", this index cannot provide the sort.
@@ -178,7 +204,7 @@ testAggAndFindSort({
     sort: {"x.y": -1, "x.z": -1},
     project: {_id: 1},
     expected: [],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 
 assert.commandWorked(coll.createIndex({"x.y": 1, "x": -1}));
@@ -190,7 +216,7 @@ testAggAndFindSort({
     sort: {"x": -1},
     project: {_id: 1},
     expected: [{_id: 0}, {_id: 1}],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 
 // Since multikey index,'d', has no shared prefixes with 'e', the index can provide a sort on the
@@ -199,8 +225,7 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 0, d: 3, e: [1, 2, 3]}));
 assert.commandWorked(coll.insert({_id: 1, d: [0, 4, -1], e: 4}));
 assert.commandWorked(coll.createIndex({d: 1, e: 1}));
-testAggAndFindSort(
-    {filter: {d: 1}, sort: {e: 1}, project: {_id: 1}, expected: [], expectBlockingSort: false});
+testAggAndFindSort({filter: {d: 1}, sort: {e: 1}, project: {_id: 1}, expected: [], expectBlockingSort: false});
 
 // Test that a multikey index can provide a sort over a non-multikey field.
 coll.drop();
@@ -219,32 +244,54 @@ assert(!planHasStage(db, explain, "SORT"));
 // Test that we can correctly sort by an array field in agg when there are additional fields not
 // involved in the sort pattern.
 coll.drop();
-assert.commandWorked(
-    coll.insert({_id: 0, a: 1, b: {c: 1}, d: [{e: {f: 1, g: [6, 5, 4]}}, {e: {g: [3, 2, 1]}}]}));
-assert.commandWorked(
-    coll.insert({_id: 1, a: 2, b: {c: 2}, d: [{e: {f: 2, g: [5, 4, 3]}}, {e: {g: [2, 1, 0]}}]}));
+assert.commandWorked(coll.insert({_id: 0, a: 1, b: {c: 1}, d: [{e: {f: 1, g: [6, 5, 4]}}, {e: {g: [3, 2, 1]}}]}));
+assert.commandWorked(coll.insert({_id: 1, a: 2, b: {c: 2}, d: [{e: {f: 2, g: [5, 4, 3]}}, {e: {g: [2, 1, 0]}}]}));
 
 testAggAndFindSort({
     filter: {},
     sort: {"d.e.g": 1},
     project: {_id: 1},
     expected: [{_id: 1}, {_id: 0}],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 
 // Test a sort over the trailing field of a compound index, where the two fields of the index
 // share a path prefix. This is designed as a regression test for SERVER-31858.
 coll.drop();
-assert.commandWorked(coll.insert({_id: 2, a: [{b: 1, c: 2}, {b: 2, c: 3}]}));
-assert.commandWorked(coll.insert({_id: 0, a: [{b: 2, c: 0}, {b: 1, c: 4}]}));
-assert.commandWorked(coll.insert({_id: 1, a: [{b: 1, c: 5}, {b: 2, c: 1}]}));
+assert.commandWorked(
+    coll.insert({
+        _id: 2,
+        a: [
+            {b: 1, c: 2},
+            {b: 2, c: 3},
+        ],
+    }),
+);
+assert.commandWorked(
+    coll.insert({
+        _id: 0,
+        a: [
+            {b: 2, c: 0},
+            {b: 1, c: 4},
+        ],
+    }),
+);
+assert.commandWorked(
+    coll.insert({
+        _id: 1,
+        a: [
+            {b: 1, c: 5},
+            {b: 2, c: 1},
+        ],
+    }),
+);
 assert.commandWorked(coll.createIndex({"a.b": 1, "a.c": 1}));
 testAggAndFindSort({
     filter: {"a.b": 1},
     project: {_id: 1},
     sort: {"a.c": 1},
     expected: [{_id: 0}, {_id: 1}, {_id: 2}],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 
 // Test that an indexed and unindexed sort return the same thing for a path "a.x" which
@@ -258,7 +305,7 @@ testAggAndFindSort({
     project: {_id: 1},
     sort: {"a.x": 1},
     expected: [{_id: 1}, {_id: 0}, {_id: 2}],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 assert.commandWorked(coll.createIndex({"a.x": 1}));
 testAggAndFindSort({
@@ -266,7 +313,7 @@ testAggAndFindSort({
     project: {_id: 1},
     sort: {"a.x": 1},
     expected: [{_id: 1}, {_id: 0}, {_id: 2}],
-    expectBlockingSort: false
+    expectBlockingSort: false,
 });
 testAggAndFindSort({
     filter: {},
@@ -274,7 +321,7 @@ testAggAndFindSort({
     sort: {"a.x": 1},
     hint: {"a.x": 1},
     expected: [{_id: 1}, {_id: 0}, {_id: 2}],
-    expectBlockingSort: false
+    expectBlockingSort: false,
 });
 
 // Now repeat the test with multiple entries along the path "a.x".
@@ -287,7 +334,7 @@ testAggAndFindSort({
     project: {_id: 1},
     sort: {"a.x": 1},
     expected: [{_id: 1}, {_id: 0}, {_id: 2}],
-    expectBlockingSort: true
+    expectBlockingSort: true,
 });
 assert.commandWorked(coll.createIndex({"a.x": 1}));
 // Sort with an index on "a.x".
@@ -296,7 +343,7 @@ testAggAndFindSort({
     project: {_id: 1},
     sort: {"a.x": 1},
     expected: [{_id: 1}, {_id: 0}, {_id: 2}],
-    expectBlockingSort: false
+    expectBlockingSort: false,
 });
 testAggAndFindSort({
     filter: {},
@@ -304,5 +351,5 @@ testAggAndFindSort({
     sort: {"a.x": 1},
     hint: {"a.x": 1},
     expected: [{_id: 1}, {_id: 0}, {_id: 2}],
-    expectBlockingSort: false
+    expectBlockingSort: false,
 });

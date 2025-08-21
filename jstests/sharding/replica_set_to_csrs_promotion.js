@@ -7,7 +7,7 @@
 import {afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-describe("replicaSetConfigShardMaintenanceMode startup flag incompatibility tests", function() {
+describe("replicaSetConfigShardMaintenanceMode startup flag incompatibility tests", function () {
     it("incompatible with standalone", () => {
         const error = assert.throws(() => {
             MongoRunner.runMongod({replicaSetConfigShardMaintenanceMode: ""});
@@ -37,17 +37,19 @@ describe("replicaSetConfigShardMaintenanceMode startup flag incompatibility test
         });
         rs.initiate();
 
-        assert.commandFailedWithCode(rs.getPrimary().adminCommand({
-            setFeatureCompatibilityVersion: lastLTSFCV,
-            confirm: true,
-        }),
-                                     ErrorCodes.IllegalOperation);
+        assert.commandFailedWithCode(
+            rs.getPrimary().adminCommand({
+                setFeatureCompatibilityVersion: lastLTSFCV,
+                confirm: true,
+            }),
+            ErrorCodes.IllegalOperation,
+        );
 
         rs.stopSet();
     });
 });
 
-describe("replicaSetConfigShardMaintenanceMode startup flag compatibility tests", function() {
+describe("replicaSetConfigShardMaintenanceMode startup flag compatibility tests", function () {
     before(() => {
         this.rs = new ReplSetTest({nodes: 1});
     });
@@ -75,7 +77,7 @@ describe("replicaSetConfigShardMaintenanceMode startup flag compatibility tests"
     });
 });
 
-describe("restarting replicaset as configserver", function() {
+describe("restarting replicaset as configserver", function () {
     before(() => {
         this.rs = new ReplSetTest({nodes: 1});
     });
@@ -95,11 +97,13 @@ describe("restarting replicaset as configserver", function() {
         TestData.cleanUpCoreDumpsFromExpectedCrash = true;
         try {
             assert.throws(() => {
-                this.rs.startSet({
-                    configsvr: "",
-                    remember: false,
-                },
-                                 true);
+                this.rs.startSet(
+                    {
+                        configsvr: "",
+                        remember: false,
+                    },
+                    true,
+                );
             });
         } finally {
             TestData.cleanUpCoreDumpsFromExpectedCrash = false;
@@ -111,17 +115,19 @@ describe("restarting replicaset as configserver", function() {
 
     it("restarting with replicaSetConfigShardMaintenanceMode flag succeeds", () => {
         assert.doesNotThrow(() => {
-            this.rs.startSet({
-                configsvr: "",
-                replicaSetConfigShardMaintenanceMode: "",
-                remember: false,
-            },
-                             true);
+            this.rs.startSet(
+                {
+                    configsvr: "",
+                    replicaSetConfigShardMaintenanceMode: "",
+                    remember: false,
+                },
+                true,
+            );
         });
     });
 });
 
-describe("restarting a configserver as a replicaset", function() {
+describe("restarting a configserver as a replicaset", function () {
     before(() => {
         this.rs = new ReplSetTest({nodes: 1});
     });
@@ -146,11 +152,13 @@ describe("restarting a configserver as a replicaset", function() {
         TestData.cleanUpCoreDumpsFromExpectedCrash = true;
         try {
             assert.throws(() => {
-                this.rs.startSet({
-                    replSet: "replica_set_to_csrs_promotion",
-                    remember: false,
-                },
-                                 true);
+                this.rs.startSet(
+                    {
+                        replSet: "replica_set_to_csrs_promotion",
+                        remember: false,
+                    },
+                    true,
+                );
             });
         } finally {
             TestData.cleanUpCoreDumpsFromExpectedCrash = false;
@@ -162,26 +170,33 @@ describe("restarting a configserver as a replicaset", function() {
 
     it("restarting with replicaSetConfigShardMaintenanceMode flag succeeds", () => {
         assert.doesNotThrow(() => {
-            this.rs.startSet({
-                replSet: "replica_set_to_csrs_promotion",
-                replicaSetConfigShardMaintenanceMode: "",
-                remember: false,
-            },
-                             true);
+            this.rs.startSet(
+                {
+                    replSet: "replica_set_to_csrs_promotion",
+                    replicaSetConfigShardMaintenanceMode: "",
+                    remember: false,
+                },
+                true,
+            );
         });
     });
 });
 
-describe("transitions", function() {
+describe("transitions", function () {
     before(() => {
         this.doRollingRestart = (rs, startupFlags) => {
             rs.awaitReplication();
             for (const node of rs.getSecondaries()) {
                 const id = rs.getNodeId(node);
-                rs.stop(id, null, {}, {
-                    forRestart: true,
-                    waitPid: true,
-                });
+                rs.stop(
+                    id,
+                    null,
+                    {},
+                    {
+                        forRestart: true,
+                        waitPid: true,
+                    },
+                );
                 assert.doesNotThrow(() => {
                     rs.start(id, {
                         ...startupFlags,
@@ -191,10 +206,15 @@ describe("transitions", function() {
             }
             const primaryId = rs.getNodeId(rs.getPrimary());
             rs.stepUp(rs.getSecondary());
-            rs.stop(primaryId, null, {}, {
-                forRestart: true,
-                waitPid: true,
-            });
+            rs.stop(
+                primaryId,
+                null,
+                {},
+                {
+                    forRestart: true,
+                    waitPid: true,
+                },
+            );
             assert.doesNotThrow(() => {
                 rs.start(primaryId, {
                     ...startupFlags,
@@ -308,8 +328,7 @@ describe("transitions", function() {
         });
 
         let mongos = MongoRunner.runMongos({configdb: this.rs.getURL()});
-        assert.commandWorked(
-            mongos.getDB("admin").runCommand({"transitionFromDedicatedConfigServer": 1}));
+        assert.commandWorked(mongos.getDB("admin").runCommand({"transitionFromDedicatedConfigServer": 1}));
 
         this.doRollingRestart(this.rs, {
             replSet: "replica_set_to_csrs_promotion",
@@ -329,16 +348,21 @@ describe("transitions", function() {
     });
 });
 
-describe("operations during rolling restart", function() {
+describe("operations during rolling restart", function () {
     before(() => {
         this.restartASecondaryAndStepItUp = (rs, startupFlags) => {
             rs.awaitReplication();
             const secondary = rs.getSecondary();
             const id = rs.getNodeId(secondary);
-            rs.stop(id, null, {}, {
-                forRestart: true,
-                waitPid: true,
-            });
+            rs.stop(
+                id,
+                null,
+                {},
+                {
+                    forRestart: true,
+                    waitPid: true,
+                },
+            );
             assert.doesNotThrow(() => {
                 rs.start(id, {
                     ...startupFlags,
@@ -352,10 +376,15 @@ describe("operations during rolling restart", function() {
             rs.awaitReplication();
             for (const secondary of rs.getSecondaries()) {
                 const id = rs.getNodeId(secondary);
-                rs.stop(id, null, {}, {
-                    forRestart: true,
-                    waitPid: true,
-                });
+                rs.stop(
+                    id,
+                    null,
+                    {},
+                    {
+                        forRestart: true,
+                        waitPid: true,
+                    },
+                );
                 assert.doesNotThrow(() => {
                     rs.start(id, {
                         ...startupFlags,
@@ -426,7 +455,11 @@ describe("operations during rolling restart", function() {
         });
 
         assert.commandWorked(
-            this.rs.getPrimary().getDB("foo").bar.insertOne({a: 42}, {writeConcern: {w: 3}}));
+            this.rs
+                .getPrimary()
+                .getDB("foo")
+                .bar.insertOne({a: 42}, {writeConcern: {w: 3}}),
+        );
 
         assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
         assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);
@@ -447,7 +480,11 @@ describe("operations during rolling restart", function() {
         });
 
         assert.commandWorked(
-            this.rs.getPrimary().getDB("foo").bar.insertOne({a: 42}, {writeConcern: {w: 3}}));
+            this.rs
+                .getPrimary()
+                .getDB("foo")
+                .bar.insertOne({a: 42}, {writeConcern: {w: 3}}),
+        );
 
         assert.eq(this.rs.getPrimary().getDB("foo").bar.count({}), 1);
         assert.eq(this.rs.getSecondary().getDB("foo").bar.count({}), 1);

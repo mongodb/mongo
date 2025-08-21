@@ -4,11 +4,8 @@
  * @tags: [requires_sharding]
  */
 
-export const $config = (function() {
-    const shardKeys = [
-        {a: 1},
-        {b: 1},
-    ];
+export const $config = (function () {
+    const shardKeys = [{a: 1}, {b: 1}];
 
     const data = {
         shardKey: shardKeys[0],
@@ -33,24 +30,27 @@ export const $config = (function() {
 
     function executeReshardCommand(db, collName, newShardKey, forceRedistribution) {
         const coll = db.getCollection(collName);
-        print(`Started Resharding Collection ${coll.getFullName()}. New Shard Key ${
-            tojson(newShardKey)}, Same key resharding ${forceRedistribution}`);
+        print(
+            `Started Resharding Collection ${coll.getFullName()}. New Shard Key ${tojson(
+                newShardKey,
+            )}, Same key resharding ${forceRedistribution}`,
+        );
         let reshardCollectionCmd = {
             reshardCollection: coll.getFullName(),
             key: newShardKey,
-            numInitialChunks: 1
+            numInitialChunks: 1,
         };
         if (forceRedistribution) {
             reshardCollectionCmd.forceRedistribution = forceRedistribution;
         }
         if (TestData.runningWithShardStepdowns) {
-            assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd),
-                                                 [ErrorCodes.SnapshotUnavailable]);
+            assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd), [
+                ErrorCodes.SnapshotUnavailable,
+            ]);
         } else {
             assert.commandWorked(db.adminCommand(reshardCollectionCmd));
         }
-        print(`Finished Resharding Collection ${coll.getFullName()}. New Shard Key ${
-            tojson(newShardKey)}`);
+        print(`Finished Resharding Collection ${coll.getFullName()}. New Shard Key ${tojson(newShardKey)}`);
     }
 
     const states = {
@@ -114,30 +114,34 @@ export const $config = (function() {
         },
         checkReshardingMetrics: function checkReshardingMetrics(db, collName) {
             const ns = db.getName() + "." + collName;
-            const currentOps = db.getSiblingDB("admin")
-                                   .aggregate([
-                                       {$currentOp: {allUsers: true, localOps: false}},
-                                       {
-                                           $match: {
-                                               type: "op",
-                                               "originatingCommand.reshardCollection": ns,
-                                               recipientState: {$exists: true}
-                                           }
-                                       },
-                                   ])
-                                   .toArray();
-            currentOps.forEach(op => {
-                print("Checking resharding metrics " + tojsononeline({
-                          approxDocumentsToCopy: op.approxDocumentsToCopy,
-                          documentsCopied: op.documentsCopied,
-                          approxBytesToCopy: op.approxBytesToCopy,
-                          bytesCopied: op.bytesCopied,
-                          oplogEntriesFetched: op.oplogEntriesFetched,
-                          oplogEntriesApplied: op.oplogEntriesApplied,
-                      }));
+            const currentOps = db
+                .getSiblingDB("admin")
+                .aggregate([
+                    {$currentOp: {allUsers: true, localOps: false}},
+                    {
+                        $match: {
+                            type: "op",
+                            "originatingCommand.reshardCollection": ns,
+                            recipientState: {$exists: true},
+                        },
+                    },
+                ])
+                .toArray();
+            currentOps.forEach((op) => {
+                print(
+                    "Checking resharding metrics " +
+                        tojsononeline({
+                            approxDocumentsToCopy: op.approxDocumentsToCopy,
+                            documentsCopied: op.documentsCopied,
+                            approxBytesToCopy: op.approxBytesToCopy,
+                            bytesCopied: op.bytesCopied,
+                            oplogEntriesFetched: op.oplogEntriesFetched,
+                            oplogEntriesApplied: op.oplogEntriesApplied,
+                        }),
+                );
                 assert.gte(op.oplogEntriesFetched, op.oplogEntriesApplied, op);
             });
-        }
+        },
     };
 
     const transitions = {
@@ -147,9 +151,9 @@ export const $config = (function() {
             insert: 0.45,
             reshardCollection: 0.2,
             reshardCollectionSameKey: 0.2,
-            checkReshardingMetrics: 0.15
+            checkReshardingMetrics: 0.15,
         },
-        checkReshardingMetrics: {insert: 1}
+        checkReshardingMetrics: {insert: 1},
     };
 
     function setup(db, collName, _cluster) {
@@ -161,10 +165,10 @@ export const $config = (function() {
     return {
         threadCount: 20,
         iterations: iterations,
-        startState: 'reshardCollection',
+        startState: "reshardCollection",
         states: states,
         transitions: transitions,
         setup: setup,
-        data: data
+        data: data,
     };
 })();

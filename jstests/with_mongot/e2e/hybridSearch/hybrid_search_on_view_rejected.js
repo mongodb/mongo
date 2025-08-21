@@ -20,20 +20,22 @@ createSearchIndex(coll, {
     name: vectorSearchIndexName,
     type: "vectorSearch",
     definition: {
-        "fields": [{
-            "type": "vector",
-            "numDimensions": 1536,
-            "path": "plot_embedding",
-            "similarity": "euclidean"
-        }]
-    }
+        "fields": [
+            {
+                "type": "vector",
+                "numDimensions": 1536,
+                "path": "plot_embedding",
+                "similarity": "euclidean",
+            },
+        ],
+    },
 });
 
 assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
 const matchViewName = collName + "_match_view";
 const matchViewPipeline = {
-    $match: {a: "foo"}
+    $match: {a: "foo"},
 };
 
 // Create a view with $match.
@@ -42,18 +44,18 @@ assert.commandWorked(db.createView(matchViewName, coll.getName(), [matchViewPipe
 // Cannot create a search index of the same name on both the view and underlying collection.
 const matchExprViewName = collName + "_match_expr_view";
 const matchExprViewPipeline = {
-    $match: {$expr: {$eq: ["$a", "bar"]}}
+    $match: {$expr: {$eq: ["$a", "bar"]}},
 };
 assert.commandWorked(db.createView(matchExprViewName, coll.getName(), [matchExprViewPipeline]));
 const matchExprView = db[matchExprViewName];
 assert.throwsWithCode(
-    () => createSearchIndex(matchExprView,
-                            {name: searchIndexName, definition: {"mappings": {"dynamic": true}}}),
-    ErrorCodes.BadValue);
+    () => createSearchIndex(matchExprView, {name: searchIndexName, definition: {"mappings": {"dynamic": true}}}),
+    ErrorCodes.BadValue,
+);
 assert.throwsWithCode(
-    () => createSearchIndex(
-        matchExprView, {name: vectorSearchIndexName, definition: {"mappings": {"dynamic": true}}}),
-    ErrorCodes.BadValue);
+    () => createSearchIndex(matchExprView, {name: vectorSearchIndexName, definition: {"mappings": {"dynamic": true}}}),
+    ErrorCodes.BadValue,
+);
 
 dropSearchIndex(coll, {name: searchIndexName});
 dropSearchIndex(coll, {name: vectorSearchIndexName});

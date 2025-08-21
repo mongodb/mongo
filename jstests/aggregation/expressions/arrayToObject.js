@@ -16,9 +16,7 @@ assert.commandWorked(coll.insert({_id: "sentinel", a: 1}));
 function assertCollapsed(expanded, expectedCollapsed) {
     assert(coll.drop());
     assert.commandWorked(coll.insert({expanded: expanded}));
-    const result = coll.aggregate([{$project: {collapsed: {$arrayToObject: "$expanded"}}}])
-                       .toArray()[0]
-                       .collapsed;
+    const result = coll.aggregate([{$project: {collapsed: {$arrayToObject: "$expanded"}}}]).toArray()[0].collapsed;
     assert.eq(result, expectedCollapsed);
 }
 
@@ -26,10 +24,11 @@ function assertCollapsed(expanded, expectedCollapsed) {
 function assertCollapsedWithCollation(expanded, expectedCollapsed) {
     assert(coll.drop());
     assert.commandWorked(coll.insert({expanded: expanded}));
-    const result = coll.aggregate([{$project: {collapsed: {$arrayToObject: "$expanded"}}}],
-                                  {collation: {locale: "en_US", strength: 2}})
-                       .toArray()[0]
-                       .collapsed;
+    const result = coll
+        .aggregate([{$project: {collapsed: {$arrayToObject: "$expanded"}}}], {
+            collation: {locale: "en_US", strength: 2},
+        })
+        .toArray()[0].collapsed;
     assert.eq(result, expectedCollapsed);
 }
 
@@ -43,19 +42,59 @@ function assertPipelineErrors(expanded, errorCode) {
 }
 
 // $arrayToObject correctly converts a key-value pairs to an object.
-assertCollapsed([["price", 24], ["item", "apple"]], {"price": 24, "item": "apple"});
-assertCollapsed([{"k": "price", "v": 24}, {"k": "item", "v": "apple"}],
-                {"price": 24, "item": "apple"});
+assertCollapsed(
+    [
+        ["price", 24],
+        ["item", "apple"],
+    ],
+    {"price": 24, "item": "apple"},
+);
+assertCollapsed(
+    [
+        {"k": "price", "v": 24},
+        {"k": "item", "v": "apple"},
+    ],
+    {"price": 24, "item": "apple"},
+);
 // If duplicate field names are in the array, $arrayToObject should use value from the last one.
-assertCollapsed([{"k": "price", "v": 24}, {"k": "price", "v": 100}], {"price": 100});
-assertCollapsed([["price", 24], ["price", 100]], {"price": 100});
+assertCollapsed(
+    [
+        {"k": "price", "v": 24},
+        {"k": "price", "v": 100},
+    ],
+    {"price": 100},
+);
+assertCollapsed(
+    [
+        ["price", 24],
+        ["price", 100],
+    ],
+    {"price": 100},
+);
 
 // Test with collation
-assertCollapsedWithCollation([{"k": "price", "v": 24}, {"k": "PRICE", "v": 100}],
-                             {"price": 24, "PRICE": 100});
-assertCollapsedWithCollation([["price", 24], ["PRICE", 100]], {"price": 24, "PRICE": 100});
+assertCollapsedWithCollation(
+    [
+        {"k": "price", "v": 24},
+        {"k": "PRICE", "v": 100},
+    ],
+    {"price": 24, "PRICE": 100},
+);
+assertCollapsedWithCollation(
+    [
+        ["price", 24],
+        ["PRICE", 100],
+    ],
+    {"price": 24, "PRICE": 100},
+);
 
-assertCollapsed([["price", 24], ["item", "apple"]], {"price": 24, "item": "apple"});
+assertCollapsed(
+    [
+        ["price", 24],
+        ["item", "apple"],
+    ],
+    {"price": 24, "item": "apple"},
+);
 assertCollapsed([], {});
 
 assertCollapsed(null, null);
@@ -90,15 +129,15 @@ assertPipelineErrors(NaN, 40386);
 assertPipelineErrors([["a\0b", "abra cadabra"]], 4940400);
 assertPipelineErrors([{k: "a\0b", v: "blah"}], 4940401);
 
-assertErrorCode(
-    coll, [{$replaceWith: {$arrayToObject: {$literal: [["a\0b", "abra cadabra"]]}}}], 4940400);
-assertErrorCode(
-    coll, [{$replaceWith: {$arrayToObject: {$literal: [{k: "a\0b", v: "blah"}]}}}], 4940401);
+assertErrorCode(coll, [{$replaceWith: {$arrayToObject: {$literal: [["a\0b", "abra cadabra"]]}}}], 4940400);
+assertErrorCode(coll, [{$replaceWith: {$arrayToObject: {$literal: [{k: "a\0b", v: "blah"}]}}}], 4940401);
 assertErrorCode(
     coll,
     [{$replaceWith: {$arrayToObject: {$literal: [["a\0b", "abra cadabra"]]}}}, {$out: "output"}],
-    4940400);
+    4940400,
+);
 assertErrorCode(
     coll,
     [{$replaceWith: {$arrayToObject: {$literal: [{k: "a\0b", v: "blah"}]}}}, {$out: "output"}],
-    4940401);
+    4940401,
+);

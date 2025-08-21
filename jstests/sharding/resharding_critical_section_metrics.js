@@ -16,21 +16,22 @@ const donorName = reshardingTest.donorShardNames[0];
 const recipientName = reshardingTest.recipientShardNames[0];
 const donorShard = reshardingTest.getReplSetForShard(donorName).getPrimary();
 const sourceCollection = reshardingTest.createShardedCollection({
-    ns: 'reshardingDb.coll',
+    ns: "reshardingDb.coll",
     shardKeyPattern: {oldKey: 1},
-    chunks: [
-        {min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorName},
-    ]
+    chunks: [{min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorName}],
 });
 const mongos = sourceCollection.getMongo();
 
-const kWritesDuringCriticalSection = 'countWritesDuringCriticalSection';
-const kReadsDuringCriticalSection = 'countReadsDuringCriticalSection';
+const kWritesDuringCriticalSection = "countWritesDuringCriticalSection";
+const kReadsDuringCriticalSection = "countReadsDuringCriticalSection";
 
 function attemptFromParallelShell(fn) {
-    const join = startParallelShell(funWithArgs((fn) => {
-                                        fn(db.getSiblingDB('reshardingDb').coll);
-                                    }, fn), mongos.port);
+    const join = startParallelShell(
+        funWithArgs((fn) => {
+            fn(db.getSiblingDB("reshardingDb").coll);
+        }, fn),
+        mongos.port,
+    );
     return join;
 }
 
@@ -47,7 +48,7 @@ function attemptReadFromParallelShell() {
 }
 
 function getActiveSectionMetric(fieldName) {
-    const stats = donorShard.getDB('admin').serverStatus({});
+    const stats = donorShard.getDB("admin").serverStatus({});
     const active = stats.shardingStatistics.resharding.active;
     return active[fieldName];
 }
@@ -61,30 +62,30 @@ function assertIncrementsActiveSectionMetricSoon(fn, metricFieldName) {
     });
 }
 
-const hangWhileBlockingReads =
-    configureFailPoint(donorShard, "reshardingPauseDonorAfterBlockingReads");
+const hangWhileBlockingReads = configureFailPoint(donorShard, "reshardingPauseDonorAfterBlockingReads");
 
 let waitForWrite;
 let waitForRead;
 
-reshardingTest.withReshardingInBackground({
-    newShardKeyPattern: {newKey: 1},
-    newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientName}],
-},
-                                          () => {},
-                                          {
-                                              postDecisionPersistedFn: () => {
-                                                  hangWhileBlockingReads.wait();
-                                                  assertIncrementsActiveSectionMetricSoon(() => {
-                                                      waitForWrite =
-                                                          attemptWriteFromParallelShell();
-                                                  }, kWritesDuringCriticalSection);
-                                                  assertIncrementsActiveSectionMetricSoon(() => {
-                                                      waitForRead = attemptReadFromParallelShell();
-                                                  }, kReadsDuringCriticalSection);
-                                                  hangWhileBlockingReads.off();
-                                              }
-                                          });
+reshardingTest.withReshardingInBackground(
+    {
+        newShardKeyPattern: {newKey: 1},
+        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientName}],
+    },
+    () => {},
+    {
+        postDecisionPersistedFn: () => {
+            hangWhileBlockingReads.wait();
+            assertIncrementsActiveSectionMetricSoon(() => {
+                waitForWrite = attemptWriteFromParallelShell();
+            }, kWritesDuringCriticalSection);
+            assertIncrementsActiveSectionMetricSoon(() => {
+                waitForRead = attemptReadFromParallelShell();
+            }, kReadsDuringCriticalSection);
+            hangWhileBlockingReads.off();
+        },
+    },
+);
 
 waitForWrite();
 waitForRead();

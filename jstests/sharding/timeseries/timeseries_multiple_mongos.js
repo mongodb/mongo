@@ -14,10 +14,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
 
-const dbName = 'testDB';
-const collName = 'testColl';
-const timeField = 'time';
-const metaField = 'hostid';
+const dbName = "testDB";
+const collName = "testColl";
+const timeField = "time";
+const metaField = "hostid";
 const testTimestamp = ISODate();
 
 // Connections.
@@ -41,27 +41,33 @@ function runTest({shardKey, cmdObj}) {
 
     // Drop and shard the collection with 'mongos0' as the router.
     assert(mongos0.getCollection(collName).drop());
-    assert.commandWorked(mongos0.createCollection(
-        collName, {timeseries: {timeField: timeField, metaField: metaField}}));
-    assert.commandWorked(st.s0.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
-        key: shardKey,
-    }));
+    assert.commandWorked(
+        mongos0.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}),
+    );
+    assert.commandWorked(
+        st.s0.adminCommand({
+            shardCollection: `${dbName}.${collName}`,
+            key: shardKey,
+        }),
+    );
 
     // Move one of the chunks into the second shard. Note that we can only do this if the meta field
     // is part of the shard key.
     const middle = shardKeyHasMetaField ? {meta: 1} : {"meta.a": 1};
-    assert.commandWorked(mongos0.adminCommand(
-        {split: `${dbName}.${getTimeseriesCollForDDLOps(mongos0, collName)}`, middle}));
+    assert.commandWorked(
+        mongos0.adminCommand({split: `${dbName}.${getTimeseriesCollForDDLOps(mongos0, collName)}`, middle}),
+    );
 
     const primaryShard = st.getPrimaryShard(dbName);
     const otherShard = st.getOther(primaryShard);
-    assert.commandWorked(mongos0.adminCommand({
-        movechunk: `${dbName}.${getTimeseriesCollForDDLOps(mongos0, collName)}`,
-        find: middle,
-        to: otherShard.name,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        mongos0.adminCommand({
+            movechunk: `${dbName}.${getTimeseriesCollForDDLOps(mongos0, collName)}`,
+            find: middle,
+            to: otherShard.name,
+            _waitForDelete: true,
+        }),
+    );
 
     assert.commandWorked(mongos1.runCommand(cmdObj));
 
@@ -70,8 +76,9 @@ function runTest({shardKey, cmdObj}) {
 
     // Drop and recreate an unsharded collection with 'mongos0' as the router.
     assert(mongos0.getCollection(collName).drop());
-    assert.commandWorked(mongos0.createCollection(
-        collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        mongos0.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}),
+    );
 
     assert.commandWorked(mongos1.runCommand(cmdObj));
 }
@@ -84,7 +91,7 @@ runTest({
     cmdObj: {
         createIndexes: collName,
         indexes: [{key: {[timeField]: 1}, name: "index_on_time"}],
-    }
+    },
 });
 
 runTest({shardKey: {[metaField]: 1}, cmdObj: {listIndexes: collName}});
@@ -94,19 +101,19 @@ runTest({
     cmdObj: {
         dropIndexes: collName,
         index: "*",
-    }
+    },
 });
 
 runTest({shardKey: {[metaField]: 1}, cmdObj: {collMod: collName, expireAfterSeconds: 3600}});
 
 runTest({
     shardKey: {[metaField]: 1},
-    cmdObj: {insert: collName, documents: [{[timeField]: ISODate()}]}
+    cmdObj: {insert: collName, documents: [{[timeField]: ISODate()}]},
 });
 
 runTest({
     shardKey: {[metaField]: 1},
-    cmdObj: {insert: collName, documents: [{[timeField]: ISODate()}]}
+    cmdObj: {insert: collName, documents: [{[timeField]: ISODate()}]},
 });
 
 runTest({shardKey: {[metaField]: 1}, cmdObj: {aggregate: collName, pipeline: [], cursor: {}}});
@@ -121,16 +128,16 @@ runTest({
     cmdObj: {
         createIndexes: getTimeseriesCollForRawOps(mongos0, collName),
         indexes: [{key: {[timeField]: 1}, name: "index_on_time"}],
-        ...getRawOperationSpec(mongos0)
-    }
+        ...getRawOperationSpec(mongos0),
+    },
 });
 
 runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
         listIndexes: getTimeseriesCollForRawOps(mongos0, collName),
-        ...getRawOperationSpec(mongos0)
-    }
+        ...getRawOperationSpec(mongos0),
+    },
 });
 
 runTest({
@@ -138,8 +145,8 @@ runTest({
     cmdObj: {
         dropIndexes: getTimeseriesCollForRawOps(mongos0, collName),
         index: "*",
-        ...getRawOperationSpec(mongos0)
-    }
+        ...getRawOperationSpec(mongos0),
+    },
 });
 
 runTest({
@@ -148,25 +155,27 @@ runTest({
         aggregate: getTimeseriesCollForRawOps(mongos0, collName),
         pipeline: [],
         cursor: {},
-        ...getRawOperationSpec(mongos0)
-    }
+        ...getRawOperationSpec(mongos0),
+    },
 });
 
 runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
         insert: getTimeseriesCollForRawOps(mongos0, collName),
-        documents: [{
-            _id: ObjectId(),
-            control: {
-                min: {time: testTimestamp},
-                max: {time: testTimestamp},
-                version: TimeseriesTest.BucketVersion.kUncompressed
+        documents: [
+            {
+                _id: ObjectId(),
+                control: {
+                    min: {time: testTimestamp},
+                    max: {time: testTimestamp},
+                    version: TimeseriesTest.BucketVersion.kUncompressed,
+                },
+                data: {[timeField]: {0: testTimestamp}},
             },
-            data: {[timeField]: {0: testTimestamp}},
-        }],
-        ...getRawOperationSpec(mongos0)
-    }
+        ],
+        ...getRawOperationSpec(mongos0),
+    },
 });
 
 // Tests for updates.
@@ -174,25 +183,29 @@ runTest({
     shardKey: {[metaField + ".a"]: 1},
     cmdObj: {
         update: collName,
-        updates: [{
-            q: {[metaField + ".a"]: 1},
-            u: {$inc: {[metaField + ".b"]: -1}},
-            multi: true,
-        }]
-    }
+        updates: [
+            {
+                q: {[metaField + ".a"]: 1},
+                u: {$inc: {[metaField + ".b"]: -1}},
+                multi: true,
+            },
+        ],
+    },
 });
 
 runTest({
     shardKey: {[metaField + ".a"]: 1},
     cmdObj: {
         update: getTimeseriesCollForRawOps(mongos0, collName),
-        updates: [{
-            q: {["meta.a"]: 1},
-            u: {$inc: {["meta.b"]: -1}},
-            multi: true,
-        }],
-        ...getRawOperationSpec(mongos0)
-    }
+        updates: [
+            {
+                q: {["meta.a"]: 1},
+                u: {$inc: {["meta.b"]: -1}},
+                multi: true,
+            },
+        ],
+        ...getRawOperationSpec(mongos0),
+    },
 });
 
 // Tests for deletes.
@@ -200,23 +213,27 @@ runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
         delete: collName,
-        deletes: [{
-            q: {[metaField]: 0},
-            limit: 0,
-        }],
-    }
+        deletes: [
+            {
+                q: {[metaField]: 0},
+                limit: 0,
+            },
+        ],
+    },
 });
 
 runTest({
     shardKey: {[metaField]: 1},
     cmdObj: {
         delete: getTimeseriesCollForRawOps(mongos0, collName),
-        deletes: [{
-            q: {meta: 0},
-            limit: 0,
-        }],
-        ...getRawOperationSpec(mongos0)
-    }
+        deletes: [
+            {
+                q: {meta: 0},
+                limit: 0,
+            },
+        ],
+        ...getRawOperationSpec(mongos0),
+    },
 });
 
 st.stop();

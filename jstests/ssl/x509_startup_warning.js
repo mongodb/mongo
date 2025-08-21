@@ -15,31 +15,42 @@ function runTest(checkMongos, opts, expectWarningCertifcates, expectWarningHostn
     let mongo;
 
     if (checkMongos) {
-        mongo = MongoRunner.runMongos(Object.assign({
-            configdb: "fakeRS/localhost:27017",
-            waitForConnect: false,
-        },
-                                                    opts));
+        mongo = MongoRunner.runMongos(
+            Object.assign(
+                {
+                    configdb: "fakeRS/localhost:27017",
+                    waitForConnect: false,
+                },
+                opts,
+            ),
+        );
     } else {
-        mongo = MongoRunner.runMongod(Object.assign({
-            auth: '',
-            tlsMode: 'preferTLS',
-            tlsCertificateKeyFile: 'jstests/libs/server.pem',
-            tlsCAFile: 'jstests/libs/ca.pem',
-            waitForConnect: false,
-        },
-                                                    opts));
+        mongo = MongoRunner.runMongod(
+            Object.assign(
+                {
+                    auth: "",
+                    tlsMode: "preferTLS",
+                    tlsCertificateKeyFile: "jstests/libs/server.pem",
+                    tlsCAFile: "jstests/libs/ca.pem",
+                    waitForConnect: false,
+                },
+                opts,
+            ),
+        );
     }
 
-    assert.soon(function() {
+    assert.soon(function () {
         const output = rawMongoProgramOutput(".*");
         return (
             expectWarningCertifcates ==
                 output.includes(
-                    'While invalid X509 certificates may be used to connect to this server, they will not be considered permissible for authentication') &&
+                    "While invalid X509 certificates may be used to connect to this server, they will not be considered permissible for authentication",
+                ) &&
             expectWarningHostnames ==
                 output.includes(
-                    'This server will not perform X.509 hostname validation. This may allow your server to make or accept connections to untrusted parties'));
+                    "This server will not perform X.509 hostname validation. This may allow your server to make or accept connections to untrusted parties",
+                )
+        );
     });
 
     stopMongoProgramByPid(mongo.pid);
@@ -51,14 +62,13 @@ function runTests(checkMongos) {
     runTest(checkMongos, {}, false, false);
 
     // Do expect a warning for certificates when we're combining options.
-    runTest(checkMongos, {tlsAllowInvalidCertificates: ''}, true, false);
+    runTest(checkMongos, {tlsAllowInvalidCertificates: ""}, true, false);
 
     // Do expect a warning for hostnames.
-    runTest(checkMongos, {tlsAllowInvalidHostnames: ''}, false, true);
+    runTest(checkMongos, {tlsAllowInvalidHostnames: ""}, false, true);
 
     // Do expect a warning for certificates and hostnames.
-    runTest(
-        checkMongos, {tlsAllowInvalidCertificates: '', tlsAllowInvalidHostnames: ''}, true, true);
+    runTest(checkMongos, {tlsAllowInvalidCertificates: "", tlsAllowInvalidHostnames: ""}, true, true);
 }
 
 // Run tests on mongos

@@ -9,7 +9,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
@@ -47,7 +47,7 @@ function runTest(expectedResultIds) {
                 numCandidates: limit * vectorSearchOverrequestFactor,
                 index: getMovieVectorSearchIndexSpec().name,
                 limit: limit,
-            }
+            },
         },
         // The $group and $unwind is used to create a rank.
         {$group: {_id: null, docs: {$push: "$$ROOT"}}},
@@ -55,8 +55,8 @@ function runTest(expectedResultIds) {
         {
             $addFields: {
                 // RRF: 1 divided by rank + vector search rank constant.
-                vs_score: {$divide: [1.0, {$add: ["$vs_rank", kRankConstant]}]}
-            }
+                vs_score: {$divide: [1.0, {$add: ["$vs_rank", kRankConstant]}]},
+            },
         },
         {
             $unionWith: {
@@ -66,7 +66,7 @@ function runTest(expectedResultIds) {
                         $search: {
                             index: getMovieSearchIndexSpec().name,
                             text: {query: "ape", path: ["fullplot", "title"]},
-                        }
+                        },
                     },
                     {$limit: limit},
                     {$group: {_id: null, docs: {$push: "$$ROOT"}}},
@@ -74,24 +74,24 @@ function runTest(expectedResultIds) {
                     {
                         $addFields: {
                             // RRF: 1 divided by rank + full text search rank constant.
-                            fts_score: {$divide: [1.0, {$add: ["$fts_rank", kRankConstant]}]}
-                        }
-                    }
-                ]
-            }
+                            fts_score: {$divide: [1.0, {$add: ["$fts_rank", kRankConstant]}]},
+                        },
+                    },
+                ],
+            },
         },
         {
             $group: {
                 _id: "$docs._id",
                 docs: {$first: "$docs"},
                 vs_score: {$max: {$ifNull: ["$vs_score", 0]}},
-                fts_score: {$max: {$ifNull: ["$fts_score", 0]}}
-            }
+                fts_score: {$max: {$ifNull: ["$fts_score", 0]}},
+            },
         },
         {$addFields: {score: {$add: ["$fts_score", "$vs_score"]}}},
         {$sort: {score: -1, _id: 1}},
         {$limit: limit},
-        {$replaceRoot: {newRoot: "$docs"}}
+        {$replaceRoot: {newRoot: "$docs"}},
     ];
     let results = coll.aggregate(hybridSearchQuery).toArray();
 

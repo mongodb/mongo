@@ -47,35 +47,37 @@ function testMrOutput({inputSharded, outputSharded}) {
         assert.commandWorked(inputColl.mapReduce(mapFn, reduceFn, outOptions));
     }
 
-    runMRTestWithOutput(
-        {out: Object.assign({merge: outputColl.getName()}, outputSharded ? {sharded: true} : {})});
+    runMRTestWithOutput({out: Object.assign({merge: outputColl.getName()}, outputSharded ? {sharded: true} : {})});
 
     assert.commandWorked(outputColl.remove({}));
-    runMRTestWithOutput(
-        {out: Object.assign({reduce: outputColl.getName()}, outputSharded ? {sharded: true} : {})});
+    runMRTestWithOutput({out: Object.assign({reduce: outputColl.getName()}, outputSharded ? {sharded: true} : {})});
     // Test the same thing using runCommand directly.
-    assert.commandWorked(testDB.runCommand({
-        mapReduce: inputColl.getName(),
-        map: mapFn,
-        reduce: reduceFn,
-        out: Object.assign({reduce: outputColl.getName()}, outputSharded ? {sharded: true} : {})
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            mapReduce: inputColl.getName(),
+            map: mapFn,
+            reduce: reduceFn,
+            out: Object.assign({reduce: outputColl.getName()}, outputSharded ? {sharded: true} : {}),
+        }),
+    );
 
     const output = inputColl.mapReduce(mapFn, reduceFn, {out: {inline: 1}});
     assert.commandWorked(output);
-    assert(output.results != 'undefined', "no results for inline");
+    assert(output.results != "undefined", "no results for inline");
 
     if (!outputSharded) {
         // We don't support replacing an existing sharded collection.
         runMRTestWithOutput(outputColl.getName());
         runMRTestWithOutput({out: {replace: outputColl.getName()}});
         runMRTestWithOutput({out: {replace: outputColl.getName(), db: "mrShardOtherDB"}});
-        assert.commandWorked(testDB.runCommand({
-            mapReduce: inputColl.getName(),
-            map: mapFn,
-            reduce: reduceFn,
-            out: {replace: outputColl.getName()}
-        }));
+        assert.commandWorked(
+            testDB.runCommand({
+                mapReduce: inputColl.getName(),
+                map: mapFn,
+                reduce: reduceFn,
+                out: {replace: outputColl.getName()},
+            }),
+        );
     }
 }
 
@@ -87,7 +89,7 @@ testMrOutput({inputSharded: true, outputSharded: true});
 // Ensure that mapReduce with a sharded input collection can accept the collation option.
 let output = inputColl.mapReduce(mapFn, reduceFn, {out: {inline: 1}, collation: {locale: "en_US"}});
 assert.commandWorked(output);
-assert(output.results != 'undefined', "no results for inline with collation");
+assert(output.results != "undefined", "no results for inline with collation");
 
 assert.commandWorked(inputColl.remove({}));
 
@@ -96,10 +98,11 @@ assert.commandWorked(inputColl.remove({}));
 // collation is passed along to the shards.
 assert.eq(inputColl.find().itcount(), 0);
 assert.commandWorked(inputColl.insert({key: 0, value: 0, str: "FOO"}));
-output = inputColl.mapReduce(
-    mapFn,
-    reduceFn,
-    {out: {inline: 1}, query: {str: "foo"}, collation: {locale: "en_US", strength: 2}});
+output = inputColl.mapReduce(mapFn, reduceFn, {
+    out: {inline: 1},
+    query: {str: "foo"},
+    collation: {locale: "en_US", strength: 2},
+});
 assert.commandWorked(output);
 assert.eq(output.results, [{_id: 0, value: 1}]);
 

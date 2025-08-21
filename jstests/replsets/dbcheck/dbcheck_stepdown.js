@@ -12,12 +12,12 @@ import {
     clearHealthLog,
     dbCheckCompleted,
     logEveryBatch,
-    runDbCheck
+    runDbCheck,
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
 const rst = new ReplSetTest({
     nodes: 2,
-    nodeOptions: {setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    nodeOptions: {setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
@@ -27,32 +27,36 @@ const dbName = "dbCheck_stepdown";
 const collName = "coll";
 let primary = rst.getPrimary();
 let testDB = primary.getDB(dbName);
-assert.commandWorked(testDB.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {a: 1}, name: "a_1"}],
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {a: 1}, name: "a_1"}],
+    }),
+);
 
 // Insert nDocs, each slightly larger than the maxDbCheckMBperSec value (1MB), which is the
 // default value, while maxBatchTimeMillis is defaulted to 1 second. Consequently, we will
 // have only 1MB per batch and each batch will take at least 1 second on primary.
 const nDocs = 5;
-const chars = ['a', 'b', 'c', 'd', 'e'];
+const chars = ["a", "b", "c", "d", "e"];
 testDB[collName].insertMany(
-    [...Array(nDocs).keys()].map(x => ({a: chars[x].repeat(1024 * 1024 * 2)})), {ordered: false});
+    [...Array(nDocs).keys()].map((x) => ({a: chars[x].repeat(1024 * 1024 * 2)})),
+    {ordered: false},
+);
 rst.awaitReplication();
 Random.setRandomSeed();
 
 const stepdownWarningQuery = {
     severity: "warning",
-    "msg": "abandoning dbCheck batch due to stepdown"
+    "msg": "abandoning dbCheck batch due to stepdown",
 };
 const dbCheckStartQuery = {
     severity: "info",
-    operation: "dbCheckStart"
+    operation: "dbCheckStart",
 };
 const dbCheckStopQuery = {
     severity: "info",
-    operation: "dbCheckStop"
+    operation: "dbCheckStop",
 };
 
 const runTest = (parameters) => {
@@ -92,7 +96,7 @@ const runTest = (parameters) => {
 
     // And that our dbCheck completed.
     assert(dbCheckCompleted(db), "dbCheck failed to terminate on stepdown");
-    const healthlog = node.getDB('local').system.healthlog;
+    const healthlog = node.getDB("local").system.healthlog;
     // Test health log has the expected logs after the stepdown.
     checkHealthLog(healthlog, dbCheckStartQuery, 1);
     checkHealthLog(healthlog, stepdownWarningQuery, 1);
@@ -104,25 +108,25 @@ const dbCheckParameters = [
         validateMode: "dataConsistency",
         maxDocsPerBatch: 1,
         maxBatchTimeMillis: 1000,
-        batchWriteConcern: {w: 1}
+        batchWriteConcern: {w: 1},
     },
     {
         validateMode: "dataConsistencyAndMissingIndexKeysCheck",
         maxDocsPerBatch: 1,
         bsonValidateMode: "kFull",
         maxBatchTimeMillis: 1000,
-        batchWriteConcern: {w: 1}
+        batchWriteConcern: {w: 1},
     },
     {
         validateMode: "extraIndexKeysCheck",
         maxDocsPerBatch: 1,
         secondaryIndex: "a_1",
         maxBatchTimeMillis: 1000,
-        batchWriteConcern: {w: 1}
+        batchWriteConcern: {w: 1},
     },
 ];
 // Execute the test multiple times to assess the randomization of when stepdown occurs while dbcheck
 // is running.
-[...Array(5).keys()].map(_ => dbCheckParameters.forEach(parameters => runTest(parameters)));
+[...Array(5).keys()].map((_) => dbCheckParameters.forEach((parameters) => runTest(parameters)));
 
 rst.stopSet();

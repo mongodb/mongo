@@ -39,12 +39,13 @@ rst.awaitReplication();
 
 jsTestLog("Hang primary on step down");
 const joinStepDownThread = startParallelShell(() => {
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "alwaysOn"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "alwaysOn"}));
 
-    const freezeSecs = 24 * 60 * 60;  // 24 hours
-    assert.commandFailedWithCode(db.adminCommand({"replSetStepDown": freezeSecs, "force": true}),
-                                 ErrorCodes.NotWritablePrimary);
+    const freezeSecs = 24 * 60 * 60; // 24 hours
+    assert.commandFailedWithCode(
+        db.adminCommand({"replSetStepDown": freezeSecs, "force": true}),
+        ErrorCodes.NotWritablePrimary,
+    );
 }, primary.port);
 
 waitForCurOpByFailPointNoNS(primaryDB, "stepdownHangBeforeRSTLEnqueue");
@@ -82,11 +83,9 @@ assert.commandWorked(sessionColl.update({_id: 0}, {$set: {"b": 1}}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 jsTestLog("Get a cluster time for afterClusterTime reads");
-TestData.clusterTimeAfterPrepare =
-    assert
-        .commandWorked(newPrimary.getDB(dbName)[collName].runCommand(
-            "insert", {documents: [{_id: "clusterTimeAfterPrepare"}]}))
-        .operationTime;
+TestData.clusterTimeAfterPrepare = assert.commandWorked(
+    newPrimary.getDB(dbName)[collName].runCommand("insert", {documents: [{_id: "clusterTimeAfterPrepare"}]}),
+).operationTime;
 
 // Make sure the insert gets replicated to the old primary (current secondary) so that its
 // clusterTime advances before we try to do an afterClusterTime read at the time of the insert.
@@ -99,20 +98,21 @@ const joinReadThread = startParallelShell(() => {
     db.getMongo().setSecondaryOk();
     let oldPrimaryDB = db.getSiblingDB(TestData.dbName);
 
-    assert.commandFailedWithCode(oldPrimaryDB.runCommand({
-        find: TestData.collName,
-        filter: {_id: 0},
-        readConcern: {level: "local", afterClusterTime: TestData.clusterTimeAfterPrepare},
-    }),
-                                 ErrorCodes.InterruptedDueToReplStateChange);
+    assert.commandFailedWithCode(
+        oldPrimaryDB.runCommand({
+            find: TestData.collName,
+            filter: {_id: 0},
+            readConcern: {level: "local", afterClusterTime: TestData.clusterTimeAfterPrepare},
+        }),
+        ErrorCodes.InterruptedDueToReplStateChange,
+    );
 }, primary.port);
 
 jsTestLog("Wait to hit a prepare conflict");
 wTPrintPrepareConflictLogFailPoint.wait();
 
 jsTestLog("Allow step down to complete");
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "off"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "stepdownHangBeforeRSTLEnqueue", mode: "off"}));
 
 jsTestLog("Wait for step down to start killing operations");
 checkLog.contains(primary, "Starting to kill user operations");

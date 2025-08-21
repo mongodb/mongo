@@ -28,51 +28,55 @@ for (let i = 0; i < 10; i++) {
     nestedCmd = {op: "c", ns: "admin.$cmd", o: {applyOps: [nestedCmd]}};
 }
 
-assert.commandFailedWithCode(primaryDB.adminCommand({"applyOps": [nestedCmd]}),
-                             ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(primaryDB.adminCommand({"applyOps": [nestedCmd]}), ErrorCodes.FailedToParse);
 
 // Adding an empty entry to existing command. Empty entry requires a superuser, but we expect
 // parsing failure now too.
 assert.commandFailedWithCode(
-    primaryDB.adminCommand(
-        {"applyOps": [nestedCmd, {op: "c", ns: "admin.$cmd", o: {"applyOps": []}}]}),
-    ErrorCodes.FailedToParse);
+    primaryDB.adminCommand({"applyOps": [nestedCmd, {op: "c", ns: "admin.$cmd", o: {"applyOps": []}}]}),
+    ErrorCodes.FailedToParse,
+);
 
 // Prepending a "create" command to our nested command, without the fix we would have succeeded here
 // because of early return
-assert.commandFailedWithCode(primaryDB.adminCommand({
-    "applyOps": [{
-        op: "c",
-        ns: "admin.$cmd",
-        o: {
-            "applyOps": [
-                {
-                    "op": "c",
-                    "ns": "admin.$cmd",
-                    "o": {
-                        "create": "x",
-                    }
+assert.commandFailedWithCode(
+    primaryDB.adminCommand({
+        "applyOps": [
+            {
+                op: "c",
+                ns: "admin.$cmd",
+                o: {
+                    "applyOps": [
+                        {
+                            "op": "c",
+                            "ns": "admin.$cmd",
+                            "o": {
+                                "create": "x",
+                            },
+                        },
+                        nestedCmd,
+                    ],
                 },
-                nestedCmd
-            ]
-        }
-    }]
-}),
-                             ErrorCodes.FailedToParse);
+            },
+        ],
+    }),
+    ErrorCodes.FailedToParse,
+);
 // Prepending a "renameCollection" command to our nested command, without the fix we would have
 // succeeded here because of early return
 
-assert.commandFailedWithCode(primaryDB.adminCommand({
-    "applyOps": [{
-        op: "c",
-        ns: "admin.$cmd",
-        o: {
-            "applyOps": [
-                {"op": "c", "ns": "admin.$cmd", "o": {renameCollection: "", to: "test.b"}},
-                nestedCmd
-            ]
-        }
-    }]
-}),
-                             ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(
+    primaryDB.adminCommand({
+        "applyOps": [
+            {
+                op: "c",
+                ns: "admin.$cmd",
+                o: {
+                    "applyOps": [{"op": "c", "ns": "admin.$cmd", "o": {renameCollection: "", to: "test.b"}}, nestedCmd],
+                },
+            },
+        ],
+    }),
+    ErrorCodes.FailedToParse,
+);
 rst.stopSet();

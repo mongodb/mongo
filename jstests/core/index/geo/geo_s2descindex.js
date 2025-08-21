@@ -8,13 +8,17 @@
 
 var coll = db.getCollection("twodspheredesc");
 
-var descriptors = [["field1", -1], ["field2", -1], ["coordinates", "2dsphere"]];
+var descriptors = [
+    ["field1", -1],
+    ["field2", -1],
+    ["coordinates", "2dsphere"],
+];
 var docA = {field1: "a", field2: 1, coordinates: [-118.2400013, 34.073893]};
 var docB = {field1: "b", field2: 1, coordinates: [-118.2400012, 34.073894]};
 
 // Try both regular and near index cursors
 var query = {
-    coordinates: {$geoWithin: {$centerSphere: [[-118.240013, 34.073893], 0.44915760491198753]}}
+    coordinates: {$geoWithin: {$centerSphere: [[-118.240013, 34.073893], 0.44915760491198753]}},
 };
 var queryNear = {coordinates: {$geoNear: {"type": "Point", "coordinates": [0, 0]}}};
 
@@ -58,7 +62,7 @@ coll.createIndex({coordinates: "2dsphere", field: -1});
 coll.insert({coordinates: [-118.240013, 34.073893]});
 var query = {
     coordinates: {$geoWithin: {$centerSphere: [[-118.240013, 34.073893], 0.44915760491198753]}},
-    field: 1
+    field: 1,
 };
 
 assert.eq(null, coll.findOne(query));

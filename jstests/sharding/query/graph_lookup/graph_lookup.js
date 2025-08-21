@@ -13,19 +13,21 @@ assert.commandWorked(db.bar.insert({_id: 1, x: 1}));
 
 {
     const res = db.foo
-                        .aggregate([{
-                            $graphLookup: {
-                                from: "bar",
-                                startWith: {$literal: 1},
-                                connectFromField: "x",
-                                connectToField: "_id",
-                                as: "res"
-                            }
-                        }])
-                        .toArray();
+        .aggregate([
+            {
+                $graphLookup: {
+                    from: "bar",
+                    startWith: {$literal: 1},
+                    connectFromField: "x",
+                    connectToField: "_id",
+                    as: "res",
+                },
+            },
+        ])
+        .toArray();
 
     assert.eq(res.length, 4);
-    res.forEach(function(c) {
+    res.forEach(function (c) {
         assert.eq(c.res.length, 1);
         assert.eq(c.res[0]._id, 1);
         assert.eq(c.res[0].x, 1);
@@ -39,19 +41,21 @@ assert.commandWorked(db.baz.insert({_id: 1, x: 1}));
 
 {
     const res = db.foo
-                    .aggregate([{
-                        $graphLookup: {
-                            from: "bar",
-                            startWith: {$literal: 1},
-                            connectFromField: "x",
-                            connectToField: "_id",
-                            as: "res"
-                        }
-                    }])
-                    .toArray();
+        .aggregate([
+            {
+                $graphLookup: {
+                    from: "bar",
+                    startWith: {$literal: 1},
+                    connectFromField: "x",
+                    connectToField: "_id",
+                    as: "res",
+                },
+            },
+        ])
+        .toArray();
 
     assert.eq(res.length, 4);
-    res.forEach(function(c) {
+    res.forEach(function (c) {
         assert.eq(c.res.length, 1);
         assert.eq(c.res[0]._id, 1);
         assert.eq(c.res[0].x, 1);

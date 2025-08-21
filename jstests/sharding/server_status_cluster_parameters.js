@@ -17,11 +17,12 @@ function getShardingStats(conn) {
 function verifyClusterParametersReported(expected, connTypeName, conn) {
     const stats = getShardingStats(conn);
     const reported = "clusterParameters" in stats;
-    assert(reported === expected,
-           `Expected cluster parameters to ${
-               expected
-                   ? ""
-                   : "not "} be reported in sharding section by ${connTypeName}: ${tojson(stats)}`);
+    assert(
+        reported === expected,
+        `Expected cluster parameters to ${
+            expected ? "" : "not "
+        } be reported in sharding section by ${connTypeName}: ${tojson(stats)}`,
+    );
 }
 
 function verifyClusterParameterReportedOnAllNodeTypes(expected) {
@@ -32,8 +33,7 @@ function verifyClusterParameterReportedOnAllNodeTypes(expected) {
 
 verifyClusterParameterReportedOnAllNodeTypes(false);
 
-assert.commandWorked(
-    st.s.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}));
+assert.commandWorked(st.s.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}));
 assert.commandWorked(st.s.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
 
 verifyClusterParameterReportedOnAllNodeTypes(true);

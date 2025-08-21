@@ -26,7 +26,7 @@ const rst = new ReplSetTest({
     name: testName,
     nodes: [{}, {}, {rsConfig: {priority: 0}}],
     settings: {chainingAllowed: false},
-    useBridge: true
+    useBridge: true,
 });
 rst.startSet();
 rst.initiate();
@@ -38,8 +38,7 @@ const primaryColl = primaryDb.getCollection(collName);
 // We did two automatic reconfigs to remove 'newlyAdded' fields (for members 1 and 2).
 const replMetricsAtStart = primaryDb.serverStatus().metrics.repl;
 assert(replMetricsAtStart.hasOwnProperty("reconfig"));
-const numAutoReconfigsAtStart =
-    replMetricsAtStart.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields;
+const numAutoReconfigsAtStart = replMetricsAtStart.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields;
 // We did two automatic reconfigs while setting up the original replset.
 assert.eq(2, numAutoReconfigsAtStart, replMetricsAtStart);
 
@@ -49,16 +48,18 @@ jsTestLog("Adding a new node to the replica set");
 const secondary = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Checking for 'newlyAdded' field (should be set)");
 assert(isMemberNewlyAdded(primary, 3));
@@ -85,8 +86,7 @@ assert.commandWorked(primaryColl.insert({a: 0}, {writeConcern: {w: 3}}));
 assert.commandWorked(primaryColl.insert({a: 1}, {writeConcern: {w: "majority"}}));
 
 // Initial syncing nodes do not acknowledge replication.
-let res = primaryDb.runCommand(
-    {insert: collName, documents: [{a: 2}], writeConcern: {w: 4, wtimeout: 1000}});
+let res = primaryDb.runCommand({insert: collName, documents: [{a: 2}], writeConcern: {w: 4, wtimeout: 1000}});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 checkWriteConcernTimedOut(res);
 
@@ -116,22 +116,19 @@ rst.waitForConfigReplication(rst.nodes[0], [rst.nodes[0], rst.nodes[1], rst.node
 
 // Initial syncing nodes do not acknowledge replication.
 rst.nodes[1].disconnect(rst.nodes);
-res = primaryDb.runCommand(
-    {insert: collName, documents: [{a: 2}], writeConcern: {w: "majority", wtimeout: 1000}});
+res = primaryDb.runCommand({insert: collName, documents: [{a: 2}], writeConcern: {w: "majority", wtimeout: 1000}});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 checkWriteConcernTimedOut(res);
 
 // 'newlyAdded' nodes don't vote.
 rst.nodes[1].reconnect(rst.nodes[3]);
-assert.commandFailedWithCode(rst.nodes[1].adminCommand({replSetStepUp: 1}),
-                             ErrorCodes.CommandFailed);
+assert.commandFailedWithCode(rst.nodes[1].adminCommand({replSetStepUp: 1}), ErrorCodes.CommandFailed);
 rst.nodes[1].reconnect(rst.nodes);
 rst.nodes[2].reconnect(rst.nodes);
 
 jsTestLog("Waiting for initial sync to complete");
 let doNotRemoveNewlyAddedFP = configureFailPoint(primaryDb, "doNotRemoveNewlyAddedOnHeartbeats");
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 rst.awaitSecondaryNodes(null, [secondary]);
 
 jsTestLog("Checking that the 'newlyAdded' field is still set");
@@ -170,8 +167,7 @@ rst.waitForConfigReplication(rst.nodes[0], [rst.nodes[0], rst.nodes[1]]);
 // 'newlyAdded' nodes cannot be one of the two nodes to satisfy w:majority.
 rst.nodes[3].reconnect(rst.nodes);
 rst.nodes[1].disconnect(rst.nodes);
-res = primaryDb.runCommand(
-    {insert: collName, documents: [{a: 7}], writeConcern: {w: "majority", wtimeout: 1000}});
+res = primaryDb.runCommand({insert: collName, documents: [{a: 7}], writeConcern: {w: "majority", wtimeout: 1000}});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 checkWriteConcernTimedOut(res);
 rst.nodes[1].reconnect(rst.nodes);
@@ -179,8 +175,7 @@ rst.nodes[1].reconnect(rst.nodes);
 // 'newlyAdded' nodes don't vote.
 rst.nodes[2].disconnect(rst.nodes);
 rst.nodes[0].disconnect(rst.nodes);
-assert.commandFailedWithCode(rst.nodes[1].adminCommand({replSetStepUp: 1}),
-                             ErrorCodes.CommandFailed);
+assert.commandFailedWithCode(rst.nodes[1].adminCommand({replSetStepUp: 1}), ErrorCodes.CommandFailed);
 
 rst.nodes[0].reconnect(rst.nodes);
 rst.nodes[2].reconnect(rst.nodes);
@@ -188,8 +183,7 @@ rst.nodes[2].reconnect(rst.nodes);
 // Record metric for number of automatic reconfigs before we perform the next one.
 const replMetricsBefore = primaryDb.serverStatus().metrics.repl;
 assert(replMetricsBefore.hasOwnProperty("reconfig"));
-const numAutoReconfigsBefore =
-    replMetricsBefore.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields;
+const numAutoReconfigsBefore = replMetricsBefore.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields;
 // We did two automatic reconfigs while setting up the original replset.
 assert.eq(2, numAutoReconfigsBefore, replMetricsBefore);
 
@@ -207,8 +201,7 @@ assertVoteCount(primary, {
 jsTestLog("Checking that the metric for removal of 'newlyAdded' fields was incremented");
 const replMetricsAfter = primaryDb.serverStatus().metrics.repl;
 assert(replMetricsAfter.hasOwnProperty("reconfig"), replMetricsAfter);
-const numAutoReconfigsAfter =
-    replMetricsAfter.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields;
+const numAutoReconfigsAfter = replMetricsAfter.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields;
 assert.eq(3, numAutoReconfigsAfter, replMetricsAfter);
 
 jsTestLog("Testing behavior during steady state");
@@ -231,14 +224,12 @@ rst.waitForConfigReplication(rst.nodes[0], [rst.nodes[0], rst.nodes[1], rst.node
 
 // 3 nodes are needed for a w:majority write.
 rst.nodes[3].disconnect(rst.nodes);
-res = primaryDb.runCommand(
-    {insert: collName, documents: [{a: 9}], writeConcern: {w: "majority", wtimeout: 1000}});
+res = primaryDb.runCommand({insert: collName, documents: [{a: 9}], writeConcern: {w: "majority", wtimeout: 1000}});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 checkWriteConcernTimedOut(res);
 
 // 3 nodes are needed to win an election
-assert.commandFailedWithCode(rst.nodes[1].adminCommand({replSetStepUp: 1}),
-                             ErrorCodes.CommandFailed);
+assert.commandFailedWithCode(rst.nodes[1].adminCommand({replSetStepUp: 1}), ErrorCodes.CommandFailed);
 
 rst.nodes[2].reconnect(rst.nodes);
 rst.nodes[3].reconnect(rst.nodes);

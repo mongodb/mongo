@@ -43,15 +43,12 @@ const bucket = {
             0: "a",
             1: 1,
         },
-    }
+    },
 };
 
-assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
-assert.commandWorked(
-    db.runCommand({collMod: coll.getName(), timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.commandWorked(
-    getTimeseriesCollForRawOps(db, coll).insertOne(bucket, getRawOperationSpec(db)));
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(db.runCommand({collMod: coll.getName(), timeseriesBucketsMayHaveMixedSchemaData: true}));
+assert.commandWorked(getTimeseriesCollForRawOps(db, coll).insertOne(bucket, getRawOperationSpec(db)));
 
 const secondary = replTest.add();
 replTest.reInitiate();

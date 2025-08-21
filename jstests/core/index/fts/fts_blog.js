@@ -10,7 +10,7 @@ t.save({_id: 3, title: "knives are Fun", text: "this is a new blog i am writing.
 t.createIndex({"title": "text", text: "text"}, {weights: {title: 10}});
 
 let res = t.find({"$text": {"$search": "blog"}}, {score: {"$meta": "textScore"}}).sort({
-    score: {"$meta": "textScore"}
+    score: {"$meta": "textScore"},
 });
 assert.eq(3, res.length());
 assert.eq(1, res[0]._id);

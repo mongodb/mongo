@@ -14,12 +14,9 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_refine_collection_shard_key_broadcast_delete_transaction.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_refine_collection_shard_key_broadcast_delete_transaction.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.newShardKey = {a: 1, "b.c": 1};
     $config.data.newShardKeyFields = ["a", "b.c"];
     return $config;

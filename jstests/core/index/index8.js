@@ -23,7 +23,7 @@ t.drop();
     const checkIndexUniqueness = () => {
         let indexes = t.getIndexes();
         assert.eq(4, indexes.length);
-        indexes = Object.fromEntries(indexes.map(idx => [idx.name, idx]));
+        indexes = Object.fromEntries(indexes.map((idx) => [idx.name, idx]));
         assert.sameMembers(Object.keys(indexes), ["_id_", "a_1", "b_1", "cIndex"], tojson(indexes));
         assert(!indexes["a_1"].unique);
         assert(indexes["b_1"].unique);
@@ -34,7 +34,7 @@ t.drop();
 
     // The reIndex command is only supported in standalone mode.
     const hello = db.runCommand({hello: 1});
-    const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty('setName');
+    const isStandalone = hello.msg !== "isdbgrid" && !hello.hasOwnProperty("setName");
     if (isStandalone) {
         jsTest.log("Re-index and check index key uniqueness");
         assert.commandWorked(t.reIndex());

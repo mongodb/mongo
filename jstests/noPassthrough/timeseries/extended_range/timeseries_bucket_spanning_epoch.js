@@ -24,8 +24,9 @@ const db = conn.getDB(dbName);
     let coll = db[jsTestName()];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', metaField: 'm', granularity: 'hours'}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m", granularity: "hours"}}),
+    );
 
     // All measurements land in the same bucket.
     assert.commandWorked(coll.insert({m: 1, t: ISODate("1969-12-31T23:00:00.000Z")}));
@@ -38,8 +39,9 @@ const db = conn.getDB(dbName);
     let coll = db[jsTestName()];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', metaField: 'm', granularity: 'hours'}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m", granularity: "hours"}}),
+    );
 
     // Measurements land in same buckets.
     assert.commandWorked(coll.insert({m: 1, t: ISODate("1900-01-01T00:00:00.000Z")}));
@@ -61,8 +63,9 @@ const db = conn.getDB(dbName);
     let coll = db[jsTestName()];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', metaField: 'm', granularity: 'hours'}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m", granularity: "hours"}}),
+    );
 
     // Measurements land in different buckets.
     assert.commandWorked(coll.insert({m: 2, t: ISODate("2106-07-02T06:28:16.000Z")}));
@@ -76,8 +79,9 @@ const db = conn.getDB(dbName);
     let coll = db[jsTestName()];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', metaField: 'm', granularity: 'hours'}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m", granularity: "hours"}}),
+    );
 
     // Measurements land in different buckets.
     assert.commandWorked(coll.insert({m: 2, t: ISODate("2105-06-24T06:28:16Z")}));

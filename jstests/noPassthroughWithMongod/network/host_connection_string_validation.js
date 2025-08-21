@@ -23,7 +23,7 @@ if ("undefined" == typeof inner_mode) {
         mongod.port,
         "--eval",
         "inner_mode=true;port=" + mongod.port + ";",
-        "jstests/noPassthroughWithMongod/network/host_connection_string_validation.js"
+        "jstests/noPassthroughWithMongod/network/host_connection_string_validation.js",
     ];
     var exitCode = _runMongoProgram.apply(null, args);
     jsTest.log("Inner mode test finished, exit code was " + exitCode);
@@ -36,12 +36,11 @@ if ("undefined" == typeof inner_mode) {
     quit();
 }
 
-var testHost = function(host, shouldSucceed) {
-    var exitCode = runMongoProgram('mongo', '--ipv6', '--eval', ';', '--host', host);
+var testHost = function (host, shouldSucceed) {
+    var exitCode = runMongoProgram("mongo", "--ipv6", "--eval", ";", "--host", host);
     if (shouldSucceed) {
         if (exitCode !== 0) {
-            doassert("failed to connect with `--host " + host +
-                     "`, but expected success. Exit code: " + exitCode);
+            doassert("failed to connect with `--host " + host + "`, but expected success. Exit code: " + exitCode);
         }
     } else {
         if (exitCode === 0) {
@@ -58,9 +57,7 @@ var goodStrings = [
     "[0000:0000:0000:0000:0000:0000:0000:0001]:27999",
 ];
 
-var goodSocketStrings = [
-    "/tmp/mongodb-27999.sock",
-];
+var goodSocketStrings = ["/tmp/mongodb-27999.sock"];
 
 var badStrings = [
     "::1:27999",

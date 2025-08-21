@@ -21,59 +21,63 @@ assert.commandWorked(coll.insert({"_id": 3, "title": "vegetables"}));
 const collUUID = getUUIDFromListCollections(db, coll.getName());
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 const searchCmd = {
     search: coll.getName(),
     collectionUUID: collUUID,
     query: searchQuery,
-    $db: "test"
+    $db: "test",
 };
 
 // Give mongotmock some stuff to return.
 var cursorId = NumberLong(123);
 
 function setupMocks(searchMetaValue) {
-    const history = [{
-        expectedCommand: searchCmd,
-        response: {
-            ok: 1,
-            cursor: {
-                id: NumberLong(0),
-                ns: coll.getFullName(),
-                nextBatch: [
-                    {_id: 2, $searchScore: 0.654},
-                    {_id: 1, $searchScore: 0.321},
-                    {_id: 3, $searchScore: 0.123}
-                ]
+    const history = [
+        {
+            expectedCommand: searchCmd,
+            response: {
+                ok: 1,
+                cursor: {
+                    id: NumberLong(0),
+                    ns: coll.getFullName(),
+                    nextBatch: [
+                        {_id: 2, $searchScore: 0.654},
+                        {_id: 1, $searchScore: 0.321},
+                        {_id: 3, $searchScore: 0.123},
+                    ],
+                },
+                vars: {SEARCH_META: {value: searchMetaValue}},
             },
-            vars: {SEARCH_META: {value: searchMetaValue}}
-        }
-    }];
+        },
+    ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
     cursorId = NumberLong(cursorId + 1);
 }
 
 // $search present in the “same pipeline” but only before a sub-pipeline.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$search: searchQuery},
-        {$unionWith: {pipeline: [{$documents: [{a: 1}]}]}},
-        {$project: {_id: 1, meta: "$$SEARCH_META"}}
-    ],
-    cursor: {}
-}),
-                             6347901);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$search: searchQuery},
+            {$unionWith: {pipeline: [{$documents: [{a: 1}]}]}},
+            {$project: {_id: 1, meta: "$$SEARCH_META"}},
+        ],
+        cursor: {},
+    }),
+    6347901,
+);
 
 setupMocks(17);
 setupMocks(19);
 // $search present in local and later child pipeline.
 assert.sameMembers(
-    coll.aggregate(
+    coll
+        .aggregate(
             [
                 {$search: searchQuery},
                 {$project: {_id: 1, meta: "$$SEARCH_META"}},
@@ -83,11 +87,12 @@ assert.sameMembers(
                         pipeline: [
                             {$search: searchQuery},
                             {$project: {_id: {$add: [100, "$_id"]}, meta: "$$SEARCH_META"}},
-                        ]
-                    }
-                }
+                        ],
+                    },
+                },
             ],
-            {cursor: {}})
+            {cursor: {}},
+        )
         .toArray(),
     [
         {"_id": 2, "meta": {"value": 17}},
@@ -96,32 +101,34 @@ assert.sameMembers(
         {"_id": 102, "meta": {"value": 19}},
         {"_id": 101, "meta": {"value": 19}},
         {"_id": 103, "meta": {"value": 19}},
-    ]);
+    ],
+);
 
 // $search present in local and earlier child pipeline.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$search: searchQuery},
-        {
-            $unionWith: {
-                coll: coll.getName(),
-                pipeline: [
-                    {$search: searchQuery},
-                ]
-            }
-        },
-        {$project: {meta: "$$SEARCH_META"}}
-    ],
-    cursor: {}
-}),
-                             6347901);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$search: searchQuery},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$search: searchQuery}],
+                },
+            },
+            {$project: {meta: "$$SEARCH_META"}},
+        ],
+        cursor: {},
+    }),
+    6347901,
+);
 
 setupMocks(17);
 setupMocks(19);
 // $search present in local and parent pipeline.
 assert.sameMembers(
-    coll.aggregate(
+    coll
+        .aggregate(
             [
                 {$search: searchQuery},
                 {$project: {_id: 1}},
@@ -131,11 +138,12 @@ assert.sameMembers(
                         pipeline: [
                             {$search: searchQuery},
                             {$project: {_id: {$add: [100, "$_id"]}, meta: "$$SEARCH_META"}},
-                        ]
-                    }
-                }
+                        ],
+                    },
+                },
             ],
-            {cursor: {}})
+            {cursor: {}},
+        )
         .toArray(),
     [
         {"_id": 2},
@@ -144,7 +152,8 @@ assert.sameMembers(
         {"_id": 102, "meta": {"value": 19}},
         {"_id": 101, "meta": {"value": 19}},
         {"_id": 103, "meta": {"value": 19}},
-    ]);
+    ],
+);
 
 setupMocks(17);
 setupMocks(18);
@@ -171,108 +180,107 @@ for (let i = 1; i < 4; i++) {
     cursor = 17;
 }
 // $search present only in parent pipeline but carried through correlated $lookup subquery.
-assert.sameMembers(coll.aggregate(
-        [
-            {$project: {_id: 1}},
-            {
-                $lookup: {
-                    from: coll.getName(),
-                    pipeline: [
-                        {$search: searchQuery},
-                        {$project: {meta: "$$SEARCH_META"}}
-                    ],
-                    as: "lookup1"
+assert.sameMembers(
+    coll
+        .aggregate(
+            [
+                {$project: {_id: 1}},
+                {
+                    $lookup: {
+                        from: coll.getName(),
+                        pipeline: [{$search: searchQuery}, {$project: {meta: "$$SEARCH_META"}}],
+                        as: "lookup1",
+                    },
+                },
+                {
+                    $lookup: {
+                        from: coll.getName(),
+                        pipeline: [{$search: searchQuery}, {$project: {meta: "$$SEARCH_META"}}],
+                        as: "lookup2",
+                    },
+                },
+            ],
+            {cursor: {}},
+        )
+        .toArray(),
+    expected,
+);
 
-                }
+// $search is present only in an earlier child pipeline.
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$match: {}},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$search: searchQuery}],
+                },
             },
-            {
-                $lookup: {
-                    from: coll.getName(),
-                    pipeline: [
-                        {$search: searchQuery},
-                        {$project: {meta: "$$SEARCH_META"}}
-                    ],
-                    as: "lookup2"
-
-                }
-            }
+            {$project: {meta: "$$SEARCH_META"}},
         ],
-        {cursor: {}}
-    ).toArray(),
-    expected);
+        cursor: {},
+    }),
+    6347901,
+);
 
 // $search is present only in an earlier child pipeline.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$match: {}},
-        {
-            $unionWith: {
-                coll: coll.getName(),
-                pipeline: [
-                    {$search: searchQuery},
-                ]
-            }
-        },
-        {$project: {meta: "$$SEARCH_META"}}
-    ],
-    cursor: {}
-}),
-                             6347901);
-
-// $search is present only in an earlier child pipeline.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$project: {meta: "$$SEARCH_META"}},
-        {
-            $unionWith: {
-                coll: coll.getName(),
-                pipeline: [
-                    {$search: searchQuery},
-                ]
-            }
-        }
-    ],
-    cursor: {}
-}),
-                             6347902);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$project: {meta: "$$SEARCH_META"}},
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$search: searchQuery}],
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    6347902,
+);
 
 // $search present only in an earlier parent pipeline.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$search: searchQuery},
-        {$unionWith: {coll: coll.getName(), pipeline: [{$project: {meta: "$$SEARCH_META"}}]}}
-    ],
-    cursor: {}
-}),
-                             6347902);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$search: searchQuery},
+            {$unionWith: {coll: coll.getName(), pipeline: [{$project: {meta: "$$SEARCH_META"}}]}},
+        ],
+        cursor: {},
+    }),
+    6347902,
+);
 
 setupMocks(17);
 // $search present only in parent pipeline but carried through correlated $lookup subquery.
-assert.sameMembers(coll.aggregate(
-        [
-            {$search: searchQuery},
-            {$project: {_id: 1}},
-            {
-                $lookup: {
-                    let: {mySearchMeta: "$$SEARCH_META"},
-                    pipeline: [
-                        {$documents: [{a: "$$mySearchMeta"}]}
-                    ],
-                    as: "lookup"
-
-                }
-            }
-        ],
-        {cursor: {}}
-    ).toArray(),
+assert.sameMembers(
+    coll
+        .aggregate(
+            [
+                {$search: searchQuery},
+                {$project: {_id: 1}},
+                {
+                    $lookup: {
+                        let: {mySearchMeta: "$$SEARCH_META"},
+                        pipeline: [{$documents: [{a: "$$mySearchMeta"}]}],
+                        as: "lookup",
+                    },
+                },
+            ],
+            {cursor: {}},
+        )
+        .toArray(),
     [
         {"_id": 2, "lookup": [{a: {value: 17}}]},
         {"_id": 1, "lookup": [{a: {value: 17}}]},
         {"_id": 3, "lookup": [{a: {value: 17}}]},
-    ]);
+    ],
+);
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();

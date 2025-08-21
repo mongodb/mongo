@@ -13,26 +13,23 @@ const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
-const collName = 'test';
+const collName = "test";
 
-const timeFieldName = 'time';
-const metaFieldName = 'tag';
-const times = [
-    ISODate('2021-01-01T01:00:00Z'),
-    ISODate('2021-01-01T01:10:00Z'),
-    ISODate('2021-01-01T01:20:00Z')
-];
+const timeFieldName = "time";
+const metaFieldName = "tag";
+const times = [ISODate("2021-01-01T01:00:00Z"), ISODate("2021-01-01T01:10:00Z"), ISODate("2021-01-01T01:20:00Z")];
 let docs = [
     {_id: 0, [timeFieldName]: times[0], [metaFieldName]: "A", f: 0},
     {_id: 1, [timeFieldName]: times[1], [metaFieldName]: "B", f: 1},
-    {_id: 2, [timeFieldName]: times[2], [metaFieldName]: "C", f: 2}
+    {_id: 2, [timeFieldName]: times[2], [metaFieldName]: "C", f: 2},
 ];
 
 const coll = testDB.getCollection(collName);
 coll.drop();
 
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 assert.commandWorked(coll.insert(docs[0]));
 assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());
@@ -44,9 +41,9 @@ assert.eq(buckets[0].control.max[timeFieldName], times[0]);
 
 let modified = buckets[0];
 modified.control.closed = true;
-let updateResult =
-    assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll)
-                             .update({_id: buckets[0]._id}, modified, getRawOperationSpec(testDB)));
+let updateResult = assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).update({_id: buckets[0]._id}, modified, getRawOperationSpec(testDB)),
+);
 assert.eq(updateResult.nMatched, 1);
 assert.eq(updateResult.nModified, 1);
 
@@ -66,17 +63,24 @@ assert.eq(buckets[1].control.max[timeFieldName], times[1]);
 
 let fpInsert = configureFailPoint(conn, "hangTimeseriesInsertBeforeCommit");
 let awaitInsert = startParallelShell(
-    funWithArgs(function(dbName, collName, doc) {
-        assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).insert(doc));
-    }, dbName, coll.getName(), docs[2]), conn.port);
+    funWithArgs(
+        function (dbName, collName, doc) {
+            assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).insert(doc));
+        },
+        dbName,
+        coll.getName(),
+        docs[2],
+    ),
+    conn.port,
+);
 
 fpInsert.wait();
 
 modified = buckets[1];
 modified.control.closed = true;
-updateResult =
-    assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll)
-                             .update({_id: buckets[1]._id}, modified, getRawOperationSpec(testDB)));
+updateResult = assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).update({_id: buckets[1]._id}, modified, getRawOperationSpec(testDB)),
+);
 assert.eq(updateResult.nMatched, 1);
 assert.eq(updateResult.nModified, 1);
 
@@ -101,9 +105,11 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
     const result = assert.commandWorked(coll.updateMany({}, {$set: {newField: 123}}));
     assert.eq(result.matchedCount, 1, result);
     assert.eq(result.modifiedCount, 1, result);
-    assert.docEq(docs.slice(2, 3),
-                 coll.find({newField: 123}, {newField: 0}).toArray(),
-                 `Expected exactly one document to be updated. ${coll.find().toArray()}`);
+    assert.docEq(
+        docs.slice(2, 3),
+        coll.find({newField: 123}, {newField: 0}).toArray(),
+        `Expected exactly one document to be updated. ${coll.find().toArray()}`,
+    );
 }
 
 if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport")) {
@@ -119,8 +125,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport")) {
     // A completely empty filter should also skip closed buckets.
     result = assert.commandWorked(coll.deleteMany({}));
     assert.eq(result.deletedCount, 0);
-    assert.docEq(docs.slice(0, 2),
-                 coll.find().sort({_id: 1}).toArray(),
-                 `Expected exactly one document to be deleted. ${coll.find().toArray()}`);
+    assert.docEq(
+        docs.slice(0, 2),
+        coll.find().sort({_id: 1}).toArray(),
+        `Expected exactly one document to be deleted. ${coll.find().toArray()}`,
+    );
 }
 MongoRunner.stopMongod(conn);

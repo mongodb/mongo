@@ -4,7 +4,7 @@
  */
 
 export function hasError(res) {
-    const hasExecutionStatsErrorCode = function() {
+    const hasExecutionStatsErrorCode = (function () {
         if (!res.hasOwnProperty("executionStats")) {
             return false;
         }
@@ -20,9 +20,13 @@ export function hasError(res) {
         }
 
         return false;
-    }();
-    return res.ok !== 1 || res.writeErrors || (res.hasOwnProperty("nErrors") && res.nErrors != 0) ||
-        hasExecutionStatsErrorCode;
+    })();
+    return (
+        res.ok !== 1 ||
+        res.writeErrors ||
+        (res.hasOwnProperty("nErrors") && res.nErrors != 0) ||
+        hasExecutionStatsErrorCode
+    );
 }
 
 export function hasWriteConcernError(res) {
@@ -109,7 +113,7 @@ export class RetryTracker {
         this.timeoutExceeded = false;
     }
 
-    * [Symbol.iterator]() {
+    *[Symbol.iterator]() {
         while (true) {
             let elapsed = Date.now() - this.startTime;
             if (elapsed > this.timeout) {

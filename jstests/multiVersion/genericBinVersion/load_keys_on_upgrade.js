@@ -7,7 +7,7 @@ var oldVersion = "last-lts";
 var nodes = {
     n1: {binVersion: oldVersion},
     n2: {binVersion: oldVersion},
-    n3: {binVersion: oldVersion}
+    n3: {binVersion: oldVersion},
 };
 
 var keyFile = "jstests/libs/key1";
@@ -15,9 +15,9 @@ var rst = new ReplSetTest({nodes: nodes, keyFile: keyFile});
 
 rst.startSet();
 
-rst.initiate(Object.extend(rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: true}),
-             null,
-             {initiateWithDefaultElectionTimeout: true});
+rst.initiate(Object.extend(rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: true}), null, {
+    initiateWithDefaultElectionTimeout: true,
+});
 
 // Wait for a primary node...
 var primary = rst.getPrimary();
@@ -44,8 +44,7 @@ TestData.keyFile = undefined;
 
 try {
     rsConn.adminCommand({hello: 1});
-} catch (e) {
-}
+} catch (e) {}
 
 assert.eq(1, rsConn.getDB("admin").auth("root", "root"));
 assert.commandWorked(rsConn.adminCommand({hello: 1}));

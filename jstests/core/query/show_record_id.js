@@ -10,7 +10,7 @@ t.drop();
 function checkResults(arr) {
     for (let i in arr) {
         let a = arr[i];
-        assert(a['$recordId']);
+        assert(a["$recordId"]);
     }
 }
 

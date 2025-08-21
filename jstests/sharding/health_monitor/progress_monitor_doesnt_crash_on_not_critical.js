@@ -10,14 +10,11 @@ const PROGRESS_TIMEOUT_SECONDS = 3;
 const params = {
     setParameter: {
         healthMonitoringIntensities: tojson({
-            values: [
-                {type: "test", intensity: "non-critical"},
-            ]
+            values: [{type: "test", intensity: "non-critical"}],
         }),
         healthMonitoringIntervals: tojson({values: [{type: "test", interval: NumberInt(500)}]}),
-        progressMonitor:
-            tojson({interval: PROGRESS_TIMEOUT_SECONDS * 1000, deadline: PROGRESS_TIMEOUT_SECONDS}),
-    }
+        progressMonitor: tojson({interval: PROGRESS_TIMEOUT_SECONDS * 1000, deadline: PROGRESS_TIMEOUT_SECONDS}),
+    },
 };
 let st = new ShardingTest({
     mongos: [params, params],
@@ -26,8 +23,7 @@ let st = new ShardingTest({
 
 function changeObserverIntensity(conn, observer, intensity) {
     let paramValue = {"values": [{"type": observer, "intensity": intensity}]};
-    assert.commandWorked(
-        conn.adminCommand({"setParameter": 1, healthMonitoringIntensities: paramValue}));
+    assert.commandWorked(conn.adminCommand({"setParameter": 1, healthMonitoringIntensities: paramValue}));
 }
 
 // After cluster startup, make sure both mongos's are available.
@@ -38,12 +34,10 @@ let pingServers = (servers) => {
 };
 
 pingServers([st.s0, st.s1]);
-assert.commandWorked(st.s1.adminCommand(
-    {"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 2}}}));
+assert.commandWorked(st.s1.adminCommand({"setParameter": 1, logComponentVerbosity: {processHealth: {verbosity: 2}}}));
 
 jsTestLog("Block test health observer on " + st.s1.host);
-assert.commandWorked(
-    st.s1.adminCommand({"configureFailPoint": 'hangTestHealthObserver', "mode": "alwaysOn"}));
+assert.commandWorked(st.s1.adminCommand({"configureFailPoint": "hangTestHealthObserver", "mode": "alwaysOn"}));
 
 // Wait for the progress monitor timeout to elapse.
 sleep(2.1 * PROGRESS_TIMEOUT_SECONDS * 1000);
@@ -53,10 +47,10 @@ jsTestLog("Expect mongos processes to still be alive");
 pingServers([st.s0, st.s1]);
 
 jsTestLog("Change observer to critical");
-changeObserverIntensity(st.s1, 'test', 'critical');
+changeObserverIntensity(st.s1, "test", "critical");
 
 // Wait for the progress monitor timeout to elapse.
-sleep((2.1 * PROGRESS_TIMEOUT_SECONDS * 1000) + 1000);
+sleep(2.1 * PROGRESS_TIMEOUT_SECONDS * 1000 + 1000);
 
 jsTestLog("Done sleeping");
 // Server should be still be alive.

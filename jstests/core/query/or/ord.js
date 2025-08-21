@@ -32,8 +32,10 @@ for (let i = 0; i < 1000; ++i) {
 const explainRes = assert.commandWorked(coll.find({$or: [{a: 1}, {b: 1}]}).explain());
 const orStages = getPlanStages(getWinningPlanFromExplain(explainRes), "OR");
 assert(orStages.length > 0, "Expected to find OR stage in explain: " + tojson(explainRes));
-assert(orStages.every(orStage => (getPlanStages(orStage, "IXSCAN").length > 0)),
-       "Expected the plan to be an OR which has (at least) one IXSCAN: " + tojson(explainRes));
+assert(
+    orStages.every((orStage) => getPlanStages(orStage, "IXSCAN").length > 0),
+    "Expected the plan to be an OR which has (at least) one IXSCAN: " + tojson(explainRes),
+);
 
 // This query should match 180 out of 1180 total documents.
 const cursor = coll.find({$or: [{a: 1}, {b: 1}]}).batchSize(100);
@@ -50,10 +52,10 @@ assert.commandWorked(coll.dropIndex({b: 1}));
 if (FixtureHelpers.isMongos(db)) {
     // mongos may have some data left from a previous batch stored in memory, so it might not
     // return an error immediately, but it should eventually.
-    assert.soon(function() {
+    assert.soon(function () {
         try {
             cursor.next();
-            return false;  // We didn't throw an error yet.
+            return false; // We didn't throw an error yet.
         } catch (e) {
             return true;
         }

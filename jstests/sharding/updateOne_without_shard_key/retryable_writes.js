@@ -10,9 +10,7 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
+import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // Make sure we're testing with no implicit session.
 TestData.disableImplicitSessions = true;
@@ -23,13 +21,22 @@ const dbName = "testDb";
 const collName = "testColl";
 const nss = dbName + "." + collName;
 const splitPoint = 0;
-const docsToInsert =
-    [{_id: 0, x: -2, y: 1}, {_id: 1, x: -1, y: 1}, {_id: 2, x: 1, y: 1}, {_id: 3, x: 2, y: 1}];
+const docsToInsert = [
+    {_id: 0, x: -2, y: 1},
+    {_id: 1, x: -1, y: 1},
+    {_id: 2, x: 1, y: 1},
+    {_id: 3, x: 2, y: 1},
+];
 
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 0.
 WriteWithoutShardKeyTestUtil.setupShardedCollection(
-    st, nss, {x: 1}, [{x: splitPoint}], [{query: {x: splitPoint}, shard: st.shard1.shardName}]);
+    st,
+    nss,
+    {x: 1},
+    [{x: splitPoint}],
+    [{query: {x: splitPoint}, shard: st.shard1.shardName}],
+);
 
 let testCases = [
     {
@@ -41,9 +48,7 @@ let testCases = [
             stmtId: NumberInt(1),
         },
         retryableWriteTest: true,
-        expectedMods: [
-            {'z': 3},
-        ],
+        expectedMods: [{"z": 3}],
         expectedResponse: {n: 1, nModified: 1},
         expectedRetryResponse: {n: 1, nModified: 1, retriedStmtIds: [1]},
         dbName: dbName,
@@ -60,9 +65,7 @@ let testCases = [
             stmtId: NumberInt(2),
         },
         retryableWriteTest: true,
-        expectedMods: [
-            {'z': 4},
-        ],
+        expectedMods: [{"z": 4}],
         expectedResponse: {lastErrorObject: {n: 1, updatedExisting: true}},
         expectedRetryResponse: {lastErrorObject: {n: 1, updatedExisting: true}, retriedStmtId: 2},
         dbName: dbName,
@@ -99,17 +102,20 @@ let testCases = [
         dbName: dbName,
         collName: collName,
         opType: WriteWithoutShardKeyTestUtil.OperationType.deleteOne,
-    }
+    },
 ];
 
 let conn = WriteWithoutShardKeyTestUtil.getClusterConnection(
-    st, WriteWithoutShardKeyTestUtil.Configurations.sessionRetryableWrite);
-testCases.forEach(testCase => {
+    st,
+    WriteWithoutShardKeyTestUtil.Configurations.sessionRetryableWrite,
+);
+testCases.forEach((testCase) => {
     WriteWithoutShardKeyTestUtil.runTestWithConfig(
         conn,
         testCase,
         WriteWithoutShardKeyTestUtil.Configurations.sessionRetryableWrite,
-        testCase.opType);
+        testCase.opType,
+    );
 });
 
 st.stop();

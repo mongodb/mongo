@@ -42,8 +42,8 @@ if (TestData.configShard) {
     replTest = st.rs0;
 }
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: "test"}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: "test.user", key: {x: 1}}));
 
 // The cluster now has the shard information. Then kill the replica set so when mongos restarts
 // and tries to create a ReplSetMonitor for that shard, it will not be able to connect to any of
@@ -60,6 +60,6 @@ replTest.awaitSecondaryNodes();
 awaitRSClientHosts(st.s0, replTest.nodes, {ok: true});
 replTest.awaitNodesAgreeOnPrimary();
 
-assert.commandWorked(st.s0.getDB('test').user.insert({x: 1}));
+assert.commandWorked(st.s0.getDB("test").user.insert({x: 1}));
 
 st.stop();

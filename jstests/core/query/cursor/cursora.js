@@ -17,24 +17,22 @@ function run(n) {
     t.drop();
 
     let bulk = t.initializeUnorderedBulkOp();
-    for (let i = 0; i < n; i++)
-        bulk.insert({_id: i});
+    for (let i = 0; i < n; i++) bulk.insert({_id: i});
     assert.commandWorked(bulk.execute());
 
-    const join = startParallelShell("sleep(50);" +
-                                    "db.cursora.remove({});");
+    const join = startParallelShell("sleep(50);" + "db.cursora.remove({});");
 
     let num;
     try {
         let start = new Date();
-        num = t.find(function() {
-                   let num = 2;
-                   for (let x = 0; x < 1000; x++)
-                       num += 2;
-                   return num > 0;
-               })
-                  .sort({_id: -1})
-                  .itcount();
+        num = t
+            .find(function () {
+                let num = 2;
+                for (let x = 0; x < 1000; x++) num += 2;
+                return num > 0;
+            })
+            .sort({_id: -1})
+            .itcount();
     } catch (e) {
         print("cursora.js FAIL " + e);
         join();
@@ -44,8 +42,7 @@ function run(n) {
     join();
 
     assert.eq(0, t.count());
-    if (n == num)
-        print("cursora.js warning: shouldn't have counted all  n: " + n + " num: " + num);
+    if (n == num) print("cursora.js warning: shouldn't have counted all  n: " + n + " num: " + num);
 }
 
 run(1500);

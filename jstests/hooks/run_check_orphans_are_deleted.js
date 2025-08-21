@@ -7,7 +7,7 @@ import {CheckOrphansAreDeletedHelpers} from "jstests/libs/check_orphans_are_dele
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
-assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
+assert.neq(typeof db, "undefined", "No `db` object, is the shell connected to a server?");
 
 const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
@@ -22,17 +22,13 @@ if (topology.type == Topology.kShardedCluster) {
         } else if (shard.type === Topology.kReplicaSet) {
             shardPrimary = shard.primary;
         } else {
-            throw new Error('Unrecognized topology format: ' + tojson(topology));
+            throw new Error("Unrecognized topology format: " + tojson(topology));
         }
 
-        CheckOrphansAreDeletedHelpers.runCheck(
-            db.getMongo(), newMongoWithRetry(shardPrimary), shardName);
+        CheckOrphansAreDeletedHelpers.runCheck(db.getMongo(), newMongoWithRetry(shardPrimary), shardName);
     }
-} else if (topology.type == Topology.kReplicaSet && topology.configsvr &&
-           TestData.testingReplicaSetEndpoint) {
-    CheckOrphansAreDeletedHelpers.runCheck(
-        db.getMongo(), newMongoWithRetry(topology.primary), "config");
+} else if (topology.type == Topology.kReplicaSet && topology.configsvr && TestData.testingReplicaSetEndpoint) {
+    CheckOrphansAreDeletedHelpers.runCheck(db.getMongo(), newMongoWithRetry(topology.primary), "config");
 } else {
-    throw new Error('Orphan documents check must be run against a sharded cluster, but got: ' +
-                    tojson(topology));
+    throw new Error("Orphan documents check must be run against a sharded cluster, but got: " + tojson(topology));
 }

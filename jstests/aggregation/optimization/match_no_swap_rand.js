@@ -47,17 +47,16 @@ function assertScanFilterEq({coll, pipeline, filter}) {
 
     assertScanFilterEq({
         coll,
-        pipeline:
-            [{$group: {_id: "$a.b", first: {$first: "$$CURRENT"}}}, {$match: {$sampleRate: 0.25}}]
+        pipeline: [{$group: {_id: "$a.b", first: {$first: "$$CURRENT"}}}, {$match: {$sampleRate: 0.25}}],
     });
 
     assertScanFilterEq({
         coll,
         pipeline: [
             {$group: {_id: "$a.b", first: {$first: "$$CURRENT"}}},
-            {$replaceRoot: {newRoot: '$first'}},
+            {$replaceRoot: {newRoot: "$first"}},
             {$match: {$sampleRate: 0.25}},
-        ]
+        ],
     });
 
     assertScanFilterEq({
@@ -65,8 +64,8 @@ function assertScanFilterEq({coll, pipeline, filter}) {
         pipeline: [
             {$group: {_id: "$a.b", first: {$first: "$$CURRENT"}}},
             {$match: {$sampleRate: 0.25}},
-            {$replaceRoot: {newRoot: '$first'}},
-        ]
+            {$replaceRoot: {newRoot: "$first"}},
+        ],
     });
 
     assertScanFilterEq({
@@ -76,7 +75,7 @@ function assertScanFilterEq({coll, pipeline, filter}) {
             {$group: {_id: "$a.b", first: {$first: "$$CURRENT"}}},
             {$match: {$sampleRate: 0.25}},
         ],
-        filter: {c: {$gt: 500}}
+        filter: {c: {$gt: 500}},
     });
 
     assertScanFilterEq({
@@ -90,23 +89,20 @@ function assertScanFilterEq({coll, pipeline, filter}) {
                     from: coll.getName(),
                     localField: "c",
                     foreignField: "c",
-                }
+                },
             },
             {
                 $match: {
                     $and: [
-                        {$expr: {$lt: ["$c", 800]}},                   // Should split me out.
-                        {$expr: {$lt: [{$rand: {}}, {$const: 0.25}]}}  // Can't split me out.
-                    ]
-                }
+                        {$expr: {$lt: ["$c", 800]}}, // Should split me out.
+                        {$expr: {$lt: [{$rand: {}}, {$const: 0.25}]}}, // Can't split me out.
+                    ],
+                },
             },
         ],
         filter: {
-            $and: [
-                {c: {$gt: 500}},
-                {$expr: {$lt: ["$c", {$const: 800}]}},
-            ]
-        }
+            $and: [{c: {$gt: 500}}, {$expr: {$lt: ["$c", {$const: 800}]}}],
+        },
     });
 }
 
@@ -114,12 +110,14 @@ function assertScanFilterEq({coll, pipeline, filter}) {
 {
     const collName = jsTestName() + "_ts";
     db[collName].drop();
-    assert.commandWorked(db.createCollection(collName, {
-        timeseries: {
-            timeField: "t",
-            metaField: "m",
-        }
-    }));
+    assert.commandWorked(
+        db.createCollection(collName, {
+            timeseries: {
+                timeField: "t",
+                metaField: "m",
+            },
+        }),
+    );
     const coll = db[collName];
 
     let bulk = coll.initializeUnorderedBulkOp();
@@ -130,8 +128,6 @@ function assertScanFilterEq({coll, pipeline, filter}) {
 
     assertScanFilterEq({
         coll,
-        pipeline: [
-            {$match: {$sampleRate: 0.25}},
-        ]
+        pipeline: [{$match: {$sampleRate: 0.25}}],
     });
 }

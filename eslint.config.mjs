@@ -17,11 +17,7 @@ const compat = new FlatCompat({
 export default [
     ...compat.extends("eslint:recommended"),
     {
-        ignores: [
-            "src/mongo/gotools/*",
-            "**/*.tpl.js",
-            "jstests/third_party/**/*.js",
-        ],
+        ignores: ["src/mongo/gotools/*", "**/*.tpl.js", "jstests/third_party/**/*.js"],
     },
     {
         languageOptions: {
@@ -336,13 +332,13 @@ export default [
             "no-redeclare": 0,
             "no-constant-condition": 0,
             "no-loss-of-precision": 0,
+            "no-unexpected-multiline": 0,
             semi: 2,
 
             "no-restricted-syntax": [
                 "error",
                 {
-                    message:
-                        "Invalid load call. Please convert your library to a module and import it instead.",
+                    message: "Invalid load call. Please convert your library to a module and import it instead.",
                     selector: 'CallExpression > Identifier[name="load"]',
                 },
             ],
@@ -381,11 +377,7 @@ export default [
     },
     {
         // Shell-specific: extra strict!
-        files: [
-            "jstests/core/js/**",
-            "jstests/noPassthrough/shell/**",
-            "src/mongo/shell/**",
-        ],
+        files: ["jstests/core/js/**", "jstests/noPassthrough/shell/**", "src/mongo/shell/**"],
         rules: {
             "no-var": 2,
             "no-unused-vars": [2, {args: "none", caughtErrors: "none"}],

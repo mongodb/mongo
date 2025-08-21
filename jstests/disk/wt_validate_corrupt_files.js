@@ -5,11 +5,7 @@
  * @tags: [requires_wiredtiger]
  */
 
-import {
-    corruptFile,
-    getUriForColl,
-    getUriForIndex,
-} from "jstests/disk/libs/wt_file_helper.js";
+import {corruptFile, getUriForColl, getUriForIndex} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = jsTestName();
 const collName = "test";

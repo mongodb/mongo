@@ -19,7 +19,7 @@ export const assertNodeAllowedToSyncFromSource = (node, syncSource) => {
         assert.neq(currHost, node.host);
 
         // Set 'currHost' to the next upstream node.
-        const member = syncSourceStatus.members.find(member => (currHost === member.name));
+        const member = syncSourceStatus.members.find((member) => currHost === member.name);
         assert(member);
         currHost = member.syncSourceHost;
     }
@@ -44,8 +44,7 @@ export const forceSyncSource = (rst, node, syncSource) => {
 
     // Stop replication on the node, so that we can advance the optime on the sync source.
     const stopReplProducer = configureFailPoint(node, "stopReplProducer");
-    const forceSyncSource =
-        configureFailPoint(node, "forceSyncSourceCandidate", {"hostAndPort": syncSource.host});
+    const forceSyncSource = configureFailPoint(node, "forceSyncSourceCandidate", {"hostAndPort": syncSource.host});
 
     const primaryDB = primary.getDB("forceSyncSourceDB");
     const primaryColl = primaryDB["forceSyncSourceColl"];
@@ -70,10 +69,13 @@ export const forceSyncSource = (rst, node, syncSource) => {
  * arguments are passed to the assert.soon.
  */
 export const assertSyncSourceMatchesSoon = (node, syncSourceName, ...assertSoonArgs) => {
-    return assert.soon(() => {
-        const res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
-        return res.syncSourceHost === syncSourceName;
-    }, ...assertSoonArgs);
+    return assert.soon(
+        () => {
+            const res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+            return res.syncSourceHost === syncSourceName;
+        },
+        ...assertSoonArgs,
+    );
 };
 
 /**
@@ -93,12 +95,20 @@ export function assertSyncSourceChangesTo(rst, secondary, expectedSyncSource) {
     // shouldChangeSyncSource.
     stopServerReplication(secondary);
     assert.commandWorked(
-        rst.getPrimary().getDB("testSyncSourceChangesDb").getCollection("coll").insert({a: 1}, {
-            writeConcern: {w: 1}
-        }));
+        rst
+            .getPrimary()
+            .getDB("testSyncSourceChangesDb")
+            .getCollection("coll")
+            .insert(
+                {a: 1},
+                {
+                    writeConcern: {w: 1},
+                },
+            ),
+    );
     const sourceId = rst.getNodeId(expectedSyncSource);
     // Waits for the secondary to see the expected sync source advance beyond it.
-    assert.soon(function() {
+    assert.soon(function () {
         const status = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
         const appliedTimestamp = status.optimes.appliedOpTime.ts;
         const sourceMember = status.members.find((x) => x._id == sourceId);
@@ -122,13 +132,16 @@ export const delayMessagesBetweenDataCenters = (firstDataCenter, secondDataCente
     const firstDataCenterNodes = firstDataCenter.nodes;
     const secondDataCenterNodes = secondDataCenter.nodes;
 
-    firstDataCenterNodes.forEach(node => {
+    firstDataCenterNodes.forEach((node) => {
         node.delayMessagesFrom(secondDataCenterNodes, delayMillis);
     });
-    secondDataCenterNodes.forEach(node => {
+    secondDataCenterNodes.forEach((node) => {
         node.delayMessagesFrom(firstDataCenterNodes, delayMillis);
     });
 
-    jsTestLog(`Delaying messages between ${firstDataCenter.name} and ${secondDataCenter.name} by ${
-        delayMillis} milliseconds.`);
+    jsTestLog(
+        `Delaying messages between ${firstDataCenter.name} and ${secondDataCenter.name} by ${
+            delayMillis
+        } milliseconds.`,
+    );
 };

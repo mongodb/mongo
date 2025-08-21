@@ -11,9 +11,7 @@
  *   assumes_no_track_upon_creation,
  * ]
  */
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName1 = "test1";
@@ -62,19 +60,18 @@ withAbortAndRetryOnTransientTxnError(session, () => {
 
         // However, trying to perform a write will cause a write conflict.
         assert.commandFailedWithCode(
-            sessionDB2.runCommand(
-                {findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
-            ErrorCodes.WriteConflict);
+            sessionDB2.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
+            ErrorCodes.WriteConflict,
+        );
     } else {
         // TODO (SERVER-39704): See if we can match the replicaset behaviour.
         assert.commandFailedWithCode(
-            sessionDB2.runCommand(
-                {findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
-            ErrorCodes.StaleConfig);
+            sessionDB2.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
+            ErrorCodes.StaleConfig,
+        );
     }
 
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 });
 
 //
@@ -101,16 +98,15 @@ if (!db.getMongo().isCausalConsistency()) {
         // Start the transaction with a write to collection A. Use an explicit atClusterTime
         // with a timestamp at which collectionB existed and contained one document.
         sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
-        session.startTransaction(
-            {readConcern: {level: "snapshot", atClusterTime: txnReadTimestamp}});
+        session.startTransaction({readConcern: {level: "snapshot", atClusterTime: txnReadTimestamp}});
 
         // Expect a conflict to be thrown, because the collection was dropped at a logical
         // timestamp greater than the one the transaction is reading at.
         assert.commandFailedWithCode(
             sessionDB2.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}}),
-            ErrorCodes.WriteConflict);
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+            ErrorCodes.WriteConflict,
+        );
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     });
 }
 

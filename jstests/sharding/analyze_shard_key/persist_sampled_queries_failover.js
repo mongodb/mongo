@@ -20,21 +20,19 @@ function testStepDown(rst) {
     assert.commandWorked(primaryDB.getCollection(collName).insert({a: 0}));
     const collectionUuid = QuerySamplingUtil.getCollectionUuid(primaryDB, collName);
 
-    const localWriteFp = configureFailPoint(
-        primary, "queryAnalysisClientHangExecutingCommandLocally", {}, {times: 1});
+    const localWriteFp = configureFailPoint(primary, "queryAnalysisClientHangExecutingCommandLocally", {}, {times: 1});
 
-    const originalCmdObj =
-        {findAndModify: collName, query: {a: 0}, update: {a: 1}, sampleId: UUID()};
-    const expectedSampledQueryDocs =
-        [{sampleId: originalCmdObj.sampleId, cmdName: "findAndModify", cmdObj: originalCmdObj}];
+    const originalCmdObj = {findAndModify: collName, query: {a: 0}, update: {a: 1}, sampleId: UUID()};
+    const expectedSampledQueryDocs = [
+        {sampleId: originalCmdObj.sampleId, cmdName: "findAndModify", cmdObj: originalCmdObj},
+    ];
     const expectedDiff = {a: "u"};
 
     assert.commandWorked(primaryDB.getCollection(collName).runCommand(originalCmdObj));
 
     localWriteFp.wait();
 
-    assert.commandWorked(
-        primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
     primary = rst.getPrimary();
     primaryDB = primary.getDB(dbName);
 
@@ -42,10 +40,10 @@ function testStepDown(rst) {
 
     // Verify that the sampled query above did not go missing because of the retryable error caused
     // by stepdown.
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(
-        primary, ns, collectionUuid, expectedSampledQueryDocs);
-    QuerySamplingUtil.assertSoonSingleSampledDiffDocument(
-        primary, originalCmdObj.sampleId, ns, collectionUuid, [expectedDiff]);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSingleSampledDiffDocument(primary, originalCmdObj.sampleId, ns, collectionUuid, [
+        expectedDiff,
+    ]);
 }
 
 function testStepUp(rst) {
@@ -64,27 +62,26 @@ function testStepUp(rst) {
     rst.awaitReplication();
 
     const originalCmdObj = {count: collName, query: {a: 2}, sampleId: UUID()};
-    const expectedSampledQueryDocs = [{
-        sampleId: originalCmdObj.sampleId,
-        cmdName: "count",
-        cmdObj: {filter: originalCmdObj.query}
-    }];
+    const expectedSampledQueryDocs = [
+        {
+            sampleId: originalCmdObj.sampleId,
+            cmdName: "count",
+            cmdObj: {filter: originalCmdObj.query},
+        },
+    ];
 
-    const remoteWriteFp =
-        configureFailPoint(secondary, "queryAnalysisClientHangExecutingCommandRemotely");
+    const remoteWriteFp = configureFailPoint(secondary, "queryAnalysisClientHangExecutingCommandRemotely");
     assert.commandWorked(secondaryTestDB.getCollection(collName).runCommand(originalCmdObj));
 
     remoteWriteFp.wait();
     assert.commandWorked(secondary.adminCommand({replSetFreeze: 0}));
-    assert.commandWorked(
-        primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
     primary = rst.getPrimary();
 
     remoteWriteFp.off();
 
     // Verify that the sampled query above did not go missing because the node stepped up.
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(
-        primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
 }
 
 const st = new ShardingTest({
@@ -93,13 +90,13 @@ const st = new ShardingTest({
         nodes: 2,
         // Make the periodic job for writing sampled queries have a period of 1 second to speed up
         // the test.
-        setParameter: {queryAnalysisWriterIntervalSecs: 1}
+        setParameter: {queryAnalysisWriterIntervalSecs: 1},
     },
     // By default, our test infrastructure sets the election timeout to a very high value (24
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 // Force samples to get persisted even though query sampling is not enabled.

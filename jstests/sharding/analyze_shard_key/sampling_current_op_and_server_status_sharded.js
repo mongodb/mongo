@@ -30,21 +30,20 @@ const st = new ShardingTest({
         {
             setParameter: {
                 queryAnalysisSamplerConfigurationRefreshSecs,
-                logComponentVerbosity: tojson({sharding: 2})
-            }
+                logComponentVerbosity: tojson({sharding: 2}),
+            },
         },
         {
             setParameter: {
                 // This failpoint will force this mongos to not count any queries that it runs.
                 // This will force its local sample rate to be exactly 0.
-                "failpoint.overwriteQueryAnalysisSamplerAvgLastCountToZero":
-                    tojson({mode: "alwaysOn"}),
+                "failpoint.overwriteQueryAnalysisSamplerAvgLastCountToZero": tojson({mode: "alwaysOn"}),
                 queryAnalysisSamplerConfigurationRefreshSecs,
-                logComponentVerbosity: tojson({sharding: 2})
-            }
-        }
+                logComponentVerbosity: tojson({sharding: 2}),
+            },
+        },
     ],
-    rs: {nodes: 1, setParameter: {logComponentVerbosity: tojson({sharding: 2})}}
+    rs: {nodes: 1, setParameter: {logComponentVerbosity: tojson({sharding: 2})}},
 });
 
 const dbName = "testDb";
@@ -76,7 +75,7 @@ function getCurrentOpAndServerStatus() {
     return {
         mongos0: getCurrentOpAndServerStatusMongos(st.s0),
         mongos1: getCurrentOpAndServerStatusMongos(st.s1),
-        mongod: getCurrentOpAndServerStatusMongod(st.rs0.getPrimary())
+        mongod: getCurrentOpAndServerStatusMongod(st.rs0.getPrimary()),
     };
 }
 
@@ -87,15 +86,13 @@ function runCommandAndAssertCurrentOpAndServerStatus(opKind, cmdObj, oldState) {
     let newState;
     assert.soon(() => {
         newState = getCurrentOpAndServerStatus();
-        return assertCurrentOpAndServerStatusMongos(
-                   ns, opKind, oldState.mongos0, newState.mongos0) &&
-            assertCurrentOpAndServerStatusMongos(ns,
-                                                 opKindNoop,
-                                                 oldState.mongos1,
-                                                 newState.mongos1,
-                                                 {expectedSamplesPerSecond: 0}) &&
-            assertCurrentOpAndServerStatusMongod(
-                   ns, opKind, oldState.mongod, newState.mongod, true /* isShardSvr */);
+        return (
+            assertCurrentOpAndServerStatusMongos(ns, opKind, oldState.mongos0, newState.mongos0) &&
+            assertCurrentOpAndServerStatusMongos(ns, opKindNoop, oldState.mongos1, newState.mongos1, {
+                expectedSamplesPerSecond: 0,
+            }) &&
+            assertCurrentOpAndServerStatusMongod(ns, opKind, oldState.mongod, newState.mongod, true /* isShardSvr */)
+        );
     });
     return newState;
 }
@@ -104,8 +101,9 @@ let currentState = getCurrentOpAndServerStatus();
 assert.eq(bsonWoCompare(currentState, makeInitialCurrentOpAndServerStatus(0)), 0, {currentState});
 
 // Start query sampling.
-assert.commandWorked(st.s0.adminCommand(
-    {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}));
+assert.commandWorked(
+    st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}),
+);
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collUuid);
 
 // Execute different kinds of queries and check counters.
@@ -113,8 +111,7 @@ const cmdObj0 = {
     find: collName,
     filter: {x: 1},
 };
-const state0 = runCommandAndAssertCurrentOpAndServerStatus(
-    opKindRead, cmdObj0, makeInitialCurrentOpAndServerStatus(1));
+const state0 = runCommandAndAssertCurrentOpAndServerStatus(opKindRead, cmdObj0, makeInitialCurrentOpAndServerStatus(1));
 
 const cmdObj1 = {
     count: collName,
@@ -130,7 +127,7 @@ const state2 = runCommandAndAssertCurrentOpAndServerStatus(opKindWrite, cmdObj2,
 const cmdObj3 = {
     findAndModify: collName,
     query: {updated: true},
-    update: {$set: {modified: 1}}
+    update: {$set: {modified: 1}},
 };
 const state3 = runCommandAndAssertCurrentOpAndServerStatus(opKindWrite, cmdObj3, state2);
 
@@ -153,7 +150,6 @@ expectedFinalState.mongos1.serverStatus.activeCollections = 0;
 expectedFinalState.mongod.serverStatus.activeCollections = 0;
 
 const actualFinalState = getCurrentOpAndServerStatus();
-assert.eq(
-    0, bsonWoCompare(actualFinalState, expectedFinalState), {actualFinalState, expectedFinalState});
+assert.eq(0, bsonWoCompare(actualFinalState, expectedFinalState), {actualFinalState, expectedFinalState});
 
 st.stop();

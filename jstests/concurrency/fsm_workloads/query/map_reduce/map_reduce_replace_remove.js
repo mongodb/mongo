@@ -23,11 +23,9 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.remove = function remove(db, collName) {
         for (var i = 0; i < 20; ++i) {
             var res = db[collName].remove({_id: Random.randInt(this.numDocs)}, {justOne: true});
@@ -39,7 +37,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.transitions = {
         init: {mapReduce: 0.5, remove: 0.5},
         mapReduce: {mapReduce: 0.5, remove: 0.5},
-        remove: {mapReduce: 0.5, remove: 0.5}
+        remove: {mapReduce: 0.5, remove: 0.5},
     };
 
     return $config;

@@ -5,10 +5,7 @@
 
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test constants.
@@ -57,7 +54,8 @@ function createAndShardTimeseriesCollectionThenAssertShardCollectionFormat(st, p
             // The only possible other events are create collection or index.
             assert(
                 events[0].operationType == "create" || events[0].operationType == "createIndexes",
-                "got event type other than 'create' or 'createIndexes'");
+                "got event type other than 'create' or 'createIndexes'",
+            );
             events = test.getNextChanges(cursor, 1);
         }
         assert(events.length != 0, "no 'shardCollection' event found");
@@ -75,7 +73,7 @@ function createAndShardTimeseriesCollectionThenAssertShardCollectionFormat(st, p
     findAndAssertShardCollectionEvent({
         "operationType": "shardCollection",
         "ns": {db: dbName, coll: getTimeseriesCollForDDLOps(db, collName)},
-        "operationDescription": params.expectedShardCollectionEventOperationDescription
+        "operationDescription": params.expectedShardCollectionEventOperationDescription,
     });
 
     // Clean up to re-use the sharding test.
@@ -90,7 +88,7 @@ let timeFieldShardKey = timeFieldShardKeyPrefix + timeFieldName;
 
 var st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 {
@@ -103,8 +101,8 @@ var st = new ShardingTest({
             "shardKey": {[timeFieldShardKey]: 1},
             "unique": false,
             "presplitHashedZones": false,
-            "capped": false
-        }
+            "capped": false,
+        },
     });
 
     // 'metaField' range-based sharding.
@@ -115,8 +113,8 @@ var st = new ShardingTest({
             "shardKey": {"meta": 1},
             "unique": false,
             "presplitHashedZones": false,
-            "capped": false
-        }
+            "capped": false,
+        },
     });
 
     // 'metaField' hashed-based sharding.
@@ -127,8 +125,8 @@ var st = new ShardingTest({
             "shardKey": {"meta": "hashed"},
             "unique": false,
             "presplitHashedZones": false,
-            "capped": false
-        }
+            "capped": false,
+        },
     });
 
     // 'metaField' range-based compound key sharding.
@@ -139,21 +137,20 @@ var st = new ShardingTest({
             "shardKey": {"meta.x": 1, "meta.y": 1},
             "unique": false,
             "presplitHashedZones": false,
-            "capped": false
-        }
+            "capped": false,
+        },
     });
 
     // 'metaField' mixed range and hash based compound key sharding.
     createAndShardTimeseriesCollectionThenAssertShardCollectionFormat(st, {
         createCollectionCommand: {timeseries: {timeField: timeFieldName, metaField: "metadata"}},
-        shardCollectionCommand:
-            {shardCollection: collNS, key: {"metadata.x": 1, "metadata.y": "hashed"}},
+        shardCollectionCommand: {shardCollection: collNS, key: {"metadata.x": 1, "metadata.y": "hashed"}},
         expectedShardCollectionEventOperationDescription: {
             "shardKey": {"meta.x": 1, "meta.y": "hashed"},
             "unique": false,
             "presplitHashedZones": false,
-            "capped": false
-        }
+            "capped": false,
+        },
     });
 
     // 'metaField' mixed range and hash based compound (meta and time) key sharding.
@@ -161,14 +158,14 @@ var st = new ShardingTest({
         createCollectionCommand: {timeseries: {timeField: timeFieldName, metaField: "metadata"}},
         shardCollectionCommand: {
             shardCollection: collNS,
-            key: {"metadata.x": 1, "metadata.y": "hashed", [timeFieldName]: 1}
+            key: {"metadata.x": 1, "metadata.y": "hashed", [timeFieldName]: 1},
         },
         expectedShardCollectionEventOperationDescription: {
             "shardKey": {"meta.x": 1, "meta.y": "hashed", [timeFieldShardKey]: 1},
             "unique": false,
             "presplitHashedZones": false,
-            "capped": false
-        }
+            "capped": false,
+        },
     });
 
     // Testing unique shardKey option.
@@ -180,7 +177,7 @@ var st = new ShardingTest({
             "unique": true,
             "presplitHashedZones": false,
             "capped": false,
-        }
+        },
     });
 }
 

@@ -20,7 +20,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 // of a error.
 if (FixtureHelpers.isMongos(db)) {
     // Create database
-    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
+    assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }
 
 const collName = jsTestName();
@@ -96,34 +96,46 @@ for (let i = 0; i < densifyUnits.length; i++) {
 
         // Different off-step documents.
         coll.drop();
-        insertDocumentsOnPredicate(
-            {base, min: 0, max: 25, pred: i => i % 3 == 0 || i % 7 == 0, addFunc: add, coll: coll});
+        insertDocumentsOnPredicate({
+            base,
+            min: 0,
+            max: 25,
+            pred: (i) => i % 3 == 0 || i % 7 == 0,
+            addFunc: add,
+            coll: coll,
+        });
         stage = {field: "val", range: {step: step, bounds: getBounds(10, 20), unit: unit}};
         testDensifyStage(stage, coll);
 
         // Lots of off-step documents with nulls sprinkled in to confirm that a null value is
         // treated the same as a missing value.
         coll.drop();
-        insertDocumentsOnPredicate(
-            {base, min: 0, max: 10, pred: i => i % 3 == 0 || i % 7 == 0, addFunc: add, coll: coll});
+        insertDocumentsOnPredicate({
+            base,
+            min: 0,
+            max: 10,
+            pred: (i) => i % 3 == 0 || i % 7 == 0,
+            addFunc: add,
+            coll: coll,
+        });
         coll.insert({val: null});
         insertDocumentsOnPredicate({
             base,
             min: 10,
             max: 20,
-            pred: i => i % 3 == 0 || i % 7 == 0,
+            pred: (i) => i % 3 == 0 || i % 7 == 0,
             addFunc: add,
-            coll: coll
+            coll: coll,
         });
         coll.insert({val: null});
-        coll.insert({blah: base});  // Missing "val" key.
+        coll.insert({blah: base}); // Missing "val" key.
         insertDocumentsOnPredicate({
             base,
             min: 20,
             max: 30,
-            pred: i => i % 3 == 0 || i % 7 == 0,
+            pred: (i) => i % 3 == 0 || i % 7 == 0,
             addFunc: add,
-            coll: coll
+            coll: coll,
         });
         stage = {field: "val", range: {step: step, bounds: getBounds(10, 25), unit: unit}};
         testDensifyStage(stage, coll);
@@ -133,19 +145,14 @@ for (let i = 0; i < densifyUnits.length; i++) {
 // Run a test where there are no documents in the range to ensure we don't generate anything before
 // the range.
 coll.drop();
-let documents = [
-    {"date": ISODate("2022-10-29T23:00:00Z")},
-];
+let documents = [{"date": ISODate("2022-10-29T23:00:00Z")}];
 coll.insert(documents);
 let stage = {
     field: "date",
     range: {
         step: 1,
         unit: "month",
-        bounds: [
-            ISODate("2022-10-31T23:00:00.000Z"),
-            ISODate("2022-11-30T23:00:00.000Z"),
-        ],
+        bounds: [ISODate("2022-10-31T23:00:00.000Z"), ISODate("2022-11-30T23:00:00.000Z")],
     },
 };
 testDensifyStage(stage, coll, "Ensure no docs before range");

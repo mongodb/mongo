@@ -16,7 +16,7 @@ import {getCollectionModel} from "jstests/libs/property_test_helpers/models/coll
 import {
     computedProjectArb,
     getAggPipelineModel,
-    simpleProjectArb
+    simpleProjectArb,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
@@ -37,14 +37,17 @@ const experimentColl = db.project_pbt_experiment;
 const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
 
 const projectArb = fc.oneof(simpleProjectArb, computedProjectArb);
-const aggModel = fc.record({projectStage: projectArb, restOfPipeline: getAggPipelineModel()})
-                     .map(({projectStage, restOfPipeline}) => {
-                         return [projectStage, ...restOfPipeline];
-                     });
+const aggModel = fc
+    .record({projectStage: projectArb, restOfPipeline: getAggPipelineModel()})
+    .map(({projectStage, restOfPipeline}) => {
+        return [projectStage, ...restOfPipeline];
+    });
 
-testProperty(correctnessProperty,
-             {controlColl, experimentColl},
-             makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
-             numRuns);
+testProperty(
+    correctnessProperty,
+    {controlColl, experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
+    numRuns,
+);
 
 // TODO SERVER-103381 implement time-series PBT testing.

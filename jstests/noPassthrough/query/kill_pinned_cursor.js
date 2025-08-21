@@ -44,7 +44,7 @@ function runPinnedCursorKillTest({conn, failPointName, runGetMoreFunc}) {
         assertFunction: assertFunction,
         runGetMoreFunc: runGetMoreFunc,
         failPointName: failPointName,
-        assertEndCounts: true
+        assertEndCounts: true,
     });
 }
 
@@ -54,41 +54,42 @@ const rs0Conn = st.rs0.getPrimary();
 const testParameters = {
     conn: rs0Conn,
     failPointName: "waitAfterPinningCursorBeforeGetMoreBatch",
-    runGetMoreFunc: function(collName, cursorId) {
+    runGetMoreFunc: function (collName, cursorId) {
         const response = db.runCommand({getMore: cursorId, collection: collName});
         // We expect that the operation will get interrupted and fail.
         assert.commandFailedWithCode(response, ErrorCodes.CursorKilled);
-    }
+    },
 };
 runPinnedCursorKillTest(testParameters);
 
 // Check the case where a killCursor is run as we're building a getMore batch on mongod.
-(function() {
-testParameters.conn = rs0Conn;
-testParameters.failPointName = "waitWithPinnedCursorDuringGetMoreBatch";
+(function () {
+    testParameters.conn = rs0Conn;
+    testParameters.failPointName = "waitWithPinnedCursorDuringGetMoreBatch";
 
-// Force yield to occur on every PlanExecutor iteration, so that the getMore is guaranteed
-// to check for interrupts.
-assert.commandWorked(testParameters.conn.getDB("admin").runCommand(
-    {setParameter: 1, internalQueryExecYieldIterations: 1}));
-runPinnedCursorKillTest(testParameters);
+    // Force yield to occur on every PlanExecutor iteration, so that the getMore is guaranteed
+    // to check for interrupts.
+    assert.commandWorked(
+        testParameters.conn.getDB("admin").runCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+    );
+    runPinnedCursorKillTest(testParameters);
 })();
 
-(function() {
-// Run the equivalent test on the mongos. This time, we will force the shards to hang as
-// well. This is so that we can guarantee that the mongos is checking for interruption at
-// the appropriate time, and not just propagating an error it receives from the mongods.
-testParameters.failPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
-FixtureHelpers.runCommandOnEachPrimary({
-    db: st.s.getDB("admin"),
-    cmdObj: {configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "alwaysOn"}
-});
-testParameters.conn = st.s;
-runPinnedCursorKillTest(testParameters);
-FixtureHelpers.runCommandOnEachPrimary({
-    db: st.s.getDB("admin"),
-    cmdObj: {configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "off"}
-});
+(function () {
+    // Run the equivalent test on the mongos. This time, we will force the shards to hang as
+    // well. This is so that we can guarantee that the mongos is checking for interruption at
+    // the appropriate time, and not just propagating an error it receives from the mongods.
+    testParameters.failPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: st.s.getDB("admin"),
+        cmdObj: {configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "alwaysOn"},
+    });
+    testParameters.conn = st.s;
+    runPinnedCursorKillTest(testParameters);
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: st.s.getDB("admin"),
+        cmdObj: {configureFailPoint: "waitAfterPinningCursorBeforeGetMoreBatch", mode: "off"},
+    });
 })();
 
 // Check this case where the interrupt comes in after the batch has been built, and is about to
@@ -101,7 +102,7 @@ for (let conn of connsToRunOn) {
     // batch is returned to the client but a subsequent getMore will fail with a
     // 'CursorNotFound' error.
     testParameters.failPointName = "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch";
-    testParameters.runGetMoreFunc = function(collName, cursorId) {
+    testParameters.runGetMoreFunc = function (collName, cursorId) {
         const getMoreCmd = {getMore: cursorId, collection: collName, batchSize: 2};
         // We expect that the first getMore will succeed, while the second fails because the
         // cursor has been killed.

@@ -6,7 +6,7 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 const configDB = st.s.getDB("config");
-const dbName = 'AllowMigrations';
+const dbName = "AllowMigrations";
 const primaryShard = st.shard0.shardName;
 
 const setUpDb = function setUpDatabaseAndEnableSharding() {
@@ -14,19 +14,19 @@ const setUpDb = function setUpDatabaseAndEnableSharding() {
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard}));
 };
 
-const setAllowMigrationsCmd = function(ns, allow) {
+const setAllowMigrationsCmd = function (ns, allow) {
     assert.commandWorked(st.s.adminCommand({setAllowMigrations: ns, allowMigrations: allow}));
 };
 
 // Test the effects of setAllowMigrations on the balancing of the targeted collection (having the
 // 'enableBalancing' setting specified).
-const testSetAllowMigrationsVsConfigureCollectionBalancing = function(enableBalancingSetting) {
+const testSetAllowMigrationsVsConfigureCollectionBalancing = function (enableBalancingSetting) {
     setUpDb();
 
     const testCollName = "testColl";
     const testColl = st.s.getCollection(`${dbName}.${testCollName}`);
 
-    const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+    const bigString = "X".repeat(1024 * 1024); // 1MB
 
     // Split into 4 chunks so balancing can occur.
     testColl.insert({_id: 1, s: bigString});
@@ -34,8 +34,7 @@ const testSetAllowMigrationsVsConfigureCollectionBalancing = function(enableBala
     testColl.insert({_id: 20, s: bigString});
     testColl.insert({_id: 30, s: bigString});
 
-    assert.commandWorked(
-        st.s.adminCommand({shardCollection: testColl.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: testColl.getFullName(), key: {_id: 1}}));
 
     assert.commandWorked(st.splitAt(testColl.getFullName(), {_id: 10}));
     assert.commandWorked(st.splitAt(testColl.getFullName(), {_id: 20}));
@@ -43,39 +42,34 @@ const testSetAllowMigrationsVsConfigureCollectionBalancing = function(enableBala
 
     // Confirm the chunks are initially unbalanced. All chunks should start out on shard0
     // (primary shard for the database).
-    const balancerStatus = assert.commandWorked(
-        st.s0.adminCommand({balancerCollectionStatus: testColl.getFullName()}));
+    const balancerStatus = assert.commandWorked(st.s0.adminCommand({balancerCollectionStatus: testColl.getFullName()}));
     assert.eq(balancerStatus.balancerCompliant, false);
-    assert.eq(balancerStatus.firstComplianceViolation, 'chunksImbalance');
-    assert.eq(4,
-              findChunksUtil.findChunksByNs(configDB, testColl.getFullName(), {shard: primaryShard})
-                  .count());
+    assert.eq(balancerStatus.firstComplianceViolation, "chunksImbalance");
+    assert.eq(4, findChunksUtil.findChunksByNs(configDB, testColl.getFullName(), {shard: primaryShard}).count());
 
-    jsTestLog(`{setAllowMigrations: false} has higher priority than {enableBalancing: ${
-        enableBalancingSetting}}`);
+    jsTestLog(`{setAllowMigrations: false} has higher priority than {enableBalancing: ${enableBalancingSetting}}`);
     if (enableBalancingSetting === null) {
-        assert.commandWorked(
-            configDB.collections.update({_id: testColl.getFullName()}, {$unset: {noBalance: 1}}));
+        assert.commandWorked(configDB.collections.update({_id: testColl.getFullName()}, {$unset: {noBalance: 1}}));
     } else {
-        assert.commandWorked(st.s.adminCommand({
-            configureCollectionBalancing: testColl.getFullName(),
-            enableBalancing: enableBalancingSetting
-        }));
+        assert.commandWorked(
+            st.s.adminCommand({
+                configureCollectionBalancing: testColl.getFullName(),
+                enableBalancing: enableBalancingSetting,
+            }),
+        );
     }
 
     setAllowMigrationsCmd(testColl.getFullName(), false);
 
     // Test that testColl remains unbalanced.
-    const testCollBalanceStatus =
-        assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: testColl.getFullName()}));
+    const testCollBalanceStatus = assert.commandWorked(
+        st.s.adminCommand({balancerCollectionStatus: testColl.getFullName()}),
+    );
     assert.eq(testCollBalanceStatus.balancerCompliant, false);
-    assert.eq(testCollBalanceStatus.firstComplianceViolation, 'chunksImbalance');
-    assert.eq(4,
-              findChunksUtil.findChunksByNs(configDB, testColl.getFullName(), {shard: primaryShard})
-                  .count());
+    assert.eq(testCollBalanceStatus.firstComplianceViolation, "chunksImbalance");
+    assert.eq(4, findChunksUtil.findChunksByNs(configDB, testColl.getFullName(), {shard: primaryShard}).count());
 
-    jsTestLog(`{setAllowMigrations: true} allows {enableBalancing: ${
-        enableBalancingSetting}'} to be applied`);
+    jsTestLog(`{setAllowMigrations: true} allows {enableBalancing: ${enableBalancingSetting}'} to be applied`);
     setAllowMigrationsCmd(testColl.getFullName(), true);
     st.startBalancer();
 
@@ -86,10 +80,7 @@ const testSetAllowMigrationsVsConfigureCollectionBalancing = function(enableBala
     } else {
         st.awaitBalancerRound();
         st.stopBalancer();
-        assert.eq(
-            4,
-            findChunksUtil.findChunksByNs(configDB, testColl.getFullName(), {shard: primaryShard})
-                .count());
+        assert.eq(4, findChunksUtil.findChunksByNs(configDB, testColl.getFullName(), {shard: primaryShard}).count());
     }
 };
 
@@ -97,7 +88,7 @@ testSetAllowMigrationsVsConfigureCollectionBalancing(null /*enableBalancingSetti
 testSetAllowMigrationsVsConfigureCollectionBalancing(false /*enableBalancingSetting*/);
 testSetAllowMigrationsVsConfigureCollectionBalancing(true /*enableBalancingSetting*/);
 
-jsTest.log('setAllowMigration has only effects on the targeted namespace');
+jsTest.log("setAllowMigration has only effects on the targeted namespace");
 {
     setUpDb();
 
@@ -106,12 +97,11 @@ jsTest.log('setAllowMigration has only effects on the targeted namespace');
     const nonTargetedCollName = "nonTargetedColl";
     const nonTargetedColl = st.s.getCollection(`${dbName}.${nonTargetedCollName}`);
 
-    const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+    const bigString = "X".repeat(1024 * 1024); // 1MB
 
     // Split both collections into 4 chunks so balancing can occur.
     for (let coll of [nonTargetedColl, targetedColl]) {
-        assert.commandWorked(
-            st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+        assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
         assert.commandWorked(st.splitAt(coll.getFullName(), {_id: 10}));
         assert.commandWorked(st.splitAt(coll.getFullName(), {_id: 20}));
@@ -125,13 +115,11 @@ jsTest.log('setAllowMigration has only effects on the targeted namespace');
     // Confirm the chunks are initially unbalanced. All chunks should start out on the collection
     // primary shard.
     const balancerStatus = assert.commandWorked(
-        st.s0.adminCommand({balancerCollectionStatus: nonTargetedColl.getFullName()}));
+        st.s0.adminCommand({balancerCollectionStatus: nonTargetedColl.getFullName()}),
+    );
     assert.eq(balancerStatus.balancerCompliant, false);
-    assert.eq(balancerStatus.firstComplianceViolation, 'chunksImbalance');
-    assert.eq(4,
-              findChunksUtil
-                  .findChunksByNs(configDB, nonTargetedColl.getFullName(), {shard: primaryShard})
-                  .count());
+    assert.eq(balancerStatus.firstComplianceViolation, "chunksImbalance");
+    assert.eq(4, findChunksUtil.findChunksByNs(configDB, nonTargetedColl.getFullName(), {shard: primaryShard}).count());
 
     setAllowMigrationsCmd(targetedColl.getFullName(), false);
 
@@ -141,7 +129,8 @@ jsTest.log('setAllowMigration has only effects on the targeted namespace');
     st.verifyCollectionIsBalanced(nonTargetedColl);
 
     const nonTargetedCollBalanceStatus = assert.commandWorked(
-        st.s.adminCommand({balancerCollectionStatus: nonTargetedColl.getFullName()}));
+        st.s.adminCommand({balancerCollectionStatus: nonTargetedColl.getFullName()}),
+    );
     assert.eq(nonTargetedCollBalanceStatus.balancerCompliant, true);
 }
 

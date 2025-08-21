@@ -23,8 +23,7 @@ let indexes = res.cursor.firstBatch;
 assert.eq(indexes.length, 2);
 indexes.forEach((index) => {
     if (bsonWoCompare(index.key, {"_id": 1}) !== 0) {
-        assert.eq(bsonWoCompare(index.key, {"collectionUuid": 1, "range.min": 1, "range.max": 1}),
-                  0);
+        assert.eq(bsonWoCompare(index.key, {"collectionUuid": 1, "range.min": 1, "range.max": 1}), 0);
     }
 });
 

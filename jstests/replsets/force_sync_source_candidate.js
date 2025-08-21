@@ -13,7 +13,7 @@ const rst = new ReplSetTest({
     // Allow many initial sync attempts. Initial sync may fail if the sync source does not have
     // an oplog yet because it has not conducted its own initial sync yet.
     // We turn on the noop writer to encourage successful sync source selection.
-    nodeOptions: {setParameter: {numInitialSyncAttempts: 100, writePeriodicNoops: true}}
+    nodeOptions: {setParameter: {numInitialSyncAttempts: 100, writePeriodicNoops: true}},
 });
 const nodes = rst.startSet();
 

@@ -8,15 +8,13 @@
  *      uses_transactions,
  * ]
  */
-import {
-    withRetryOnTransientTxnErrorIncrementTxnNum
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnErrorIncrementTxnNum} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shard: 1});
 
-let dbName = 'test';
-let collName = 'testColl';
+let dbName = "test";
+let collName = "testColl";
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
 
@@ -25,8 +23,7 @@ let txnNumber = 0;
 let stmtId = 0;
 let shard0db = st.getPrimaryShard(dbName).getDB(dbName);
 
-let insertResult =
-    shard0db.runCommand({insert: collName, documents: [{a: 1}], writeConcern: {w: "majority"}});
+let insertResult = shard0db.runCommand({insert: collName, documents: [{a: 1}], writeConcern: {w: "majority"}});
 assert.commandWorked(insertResult);
 let clusterTime = shard0db.getSession().getOperationTime();
 
@@ -58,12 +55,14 @@ withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
     });
     assert.commandWorked(getMoreResult);
 
-    assert.commandWorked(shard0db.adminCommand({
-        abortTransaction: 1,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNum),
-        autocommit: false,
-    }));
+    assert.commandWorked(
+        shard0db.adminCommand({
+            abortTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNum),
+            autocommit: false,
+        }),
+    );
 });
 
 st.stop();

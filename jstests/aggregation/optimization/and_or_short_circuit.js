@@ -41,31 +41,31 @@ function assertNotOptimized(expression) {
     const optimized = optimize(expression);
     // 'optimized' may be simpler than 'expression', but we assert it did not optimize to a
     // constant.
-    assert.neq(Object.keys(optimized), ['$const'], "ensure no short-circuiting", optimized);
+    assert.neq(Object.keys(optimized), ["$const"], "ensure no short-circuiting", optimized);
 }
 
 // short-circuiting for $and
-assertOptimized({$and: [0, '$x']}, false);
-assertOptimized({$and: [0, 1, '$x']}, false);
-assertOptimized({$and: [0, 1, '', '$x']}, false);
+assertOptimized({$and: [0, "$x"]}, false);
+assertOptimized({$and: [0, 1, "$x"]}, false);
+assertOptimized({$and: [0, 1, "", "$x"]}, false);
 
-assertOptimized({$and: [1, 0, '$x']}, false);
-assertOptimized({$and: [1, '', 0, '$x']}, false);
+assertOptimized({$and: [1, 0, "$x"]}, false);
+assertOptimized({$and: [1, "", 0, "$x"]}, false);
 assertOptimized({$and: [1, 1, 0, 1]}, false);
 
 // short-circuiting for $or
-assertOptimized({$or: [1, '$x']}, true);
-assertOptimized({$or: [1, 0, '$x']}, true);
-assertOptimized({$or: [1, '', '$x']}, true);
+assertOptimized({$or: [1, "$x"]}, true);
+assertOptimized({$or: [1, 0, "$x"]}, true);
+assertOptimized({$or: [1, "", "$x"]}, true);
 
-assertOptimized({$or: [0, 1, '$x']}, true);
-assertOptimized({$or: ['', 0, 1, '$x']}, true);
+assertOptimized({$or: [0, 1, "$x"]}, true);
+assertOptimized({$or: ["", 0, 1, "$x"]}, true);
 assertOptimized({$or: [0, 0, 0, 1]}, true);
 
 // examples that should not short-circuit
-assertNotOptimized({$and: [1, '$x']});
-assertNotOptimized({$or: [0, '$x']});
-assertNotOptimized({$and: ['$x', '$x']});
-assertNotOptimized({$or: ['$x', '$x']});
-assertNotOptimized({$and: ['$x']});
-assertNotOptimized({$or: ['$x']});
+assertNotOptimized({$and: [1, "$x"]});
+assertNotOptimized({$or: [0, "$x"]});
+assertNotOptimized({$and: ["$x", "$x"]});
+assertNotOptimized({$or: ["$x", "$x"]});
+assertNotOptimized({$and: ["$x"]});
+assertNotOptimized({$or: ["$x"]});

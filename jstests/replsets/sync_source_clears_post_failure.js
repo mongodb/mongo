@@ -33,8 +33,7 @@ assertSyncSourceChangesTo(rst, newNode, rst.nodes[0]);
 jsTestLog("Node 1 is syncing from Node 0");
 
 // Simulate a shut down.
-let failfirstOplogEntryFetcherCallback =
-    configureFailPoint(newNode, "failfirstOplogEntryFetcherCallback");
+let failfirstOplogEntryFetcherCallback = configureFailPoint(newNode, "failfirstOplogEntryFetcherCallback");
 
 jsTestLog("Calling replSetSyncFrom while failfirstOplogEntryFetcherCallback is enabled");
 assert.commandWorked(newNode.adminCommand({replSetSyncFrom: primary.name}));
@@ -42,7 +41,7 @@ assert.commandWorked(newNode.adminCommand({replSetSyncFrom: primary.name}));
 failfirstOplogEntryFetcherCallback.wait();
 
 jsTestLog("Waiting for syncSource to be unset");
-assert.soon(function() {
+assert.soon(function () {
     const {members} = assert.commandWorked(newNode.adminCommand({replSetGetStatus: 1}));
     for (const member of members) {
         if (member.syncSourceId != -1) {

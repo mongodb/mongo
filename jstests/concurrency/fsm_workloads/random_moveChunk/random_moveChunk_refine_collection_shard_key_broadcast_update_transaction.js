@@ -22,27 +22,24 @@ import {
     exactIdUpdate,
     initUpdateInTransactionStates,
     multiUpdate,
-    verifyDocuments
+    verifyDocuments,
 } from "jstests/concurrency/fsm_workload_helpers/update_in_transaction_states.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_refine_collection_shard_key.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_refine_collection_shard_key.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 10;
 
-    $config.states.exactIdUpdate = function(db, collName, connCache) {
+    $config.states.exactIdUpdate = function (db, collName, connCache) {
         const latchCollName = this.getCurrentOrPreviousLatchCollName(collName);
         exactIdUpdate(db, latchCollName, this.session, this.getIdForThread(latchCollName));
     };
 
-    $config.states.multiUpdate = function(db, collName, connCache) {
+    $config.states.multiUpdate = function (db, collName, connCache) {
         multiUpdate(db, this.getCurrentOrPreviousLatchCollName(collName), this.session, this.tid);
     };
 
-    $config.states.verifyDocuments = function(db, collName, connCache) {
+    $config.states.verifyDocuments = function (db, collName, connCache) {
         verifyDocuments(db, this.getCurrentOrPreviousLatchCollName(collName), this.tid);
     };
 
@@ -57,7 +54,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.session = db.getMongo().startSession({causalConsistency: false});
 
         for (let i = this.latchCount; i >= 0; --i) {
-            const latchCollName = collName + '_' + i;
+            const latchCollName = collName + "_" + i;
             initUpdateInTransactionStates(db, latchCollName, this.tid);
         }
     };
@@ -68,7 +65,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             refineCollectionShardKey: 0.2,
             exactIdUpdate: 0.25,
             multiUpdate: 0.25,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         moveChunk: {
             moveChunk: 0.18,
@@ -76,7 +73,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             exactIdUpdate: 0.18,
             multiUpdate: 0.18,
             verifyDocuments: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         refineCollectionShardKey: {
             moveChunk: 0.2,
@@ -84,7 +81,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             exactIdUpdate: 0.2,
             multiUpdate: 0.2,
             verifyDocuments: 0.2,
-            flushRouterConfig: 0.2
+            flushRouterConfig: 0.2,
         },
         exactIdUpdate: {
             moveChunk: 0.18,
@@ -92,7 +89,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             exactIdUpdate: 0.18,
             multiUpdate: 0.18,
             verifyDocuments: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         multiUpdate: {
             moveChunk: 0.18,
@@ -100,21 +97,21 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             exactIdUpdate: 0.18,
             multiUpdate: 0.18,
             verifyDocuments: 0.18,
-            flushRouterConfig: 0.1
+            flushRouterConfig: 0.1,
         },
         verifyDocuments: {
             moveChunk: 0.2,
             refineCollectionShardKey: 0.2,
             exactIdUpdate: 0.2,
             multiUpdate: 0.2,
-            flushRouterConfig: 0.2
+            flushRouterConfig: 0.2,
         },
         flushRouterConfig: {
             moveChunk: 0.2,
             refineCollectionShardKey: 0.2,
             exactIdUpdate: 0.2,
             multiUpdate: 0.2,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
     };
 

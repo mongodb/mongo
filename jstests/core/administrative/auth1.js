@@ -9,7 +9,7 @@
 //   requires_non_retryable_commands,
 // ]
 
-var mydb = db.getSiblingDB('auth1_db');
+var mydb = db.getSiblingDB("auth1_db");
 mydb.dropAllUsers();
 
 let pass = "a" + Math.random();
@@ -49,12 +49,20 @@ assert.commandFailed(mydb.runCommand({authenticate: 1, user: "eliot", nonce: "fo
 
 var before = a.system.users.count({db: mydb.getName()});
 
-assert.throws(function() {
-    mydb.createUser({user: "", pwd: "abc", roles: jsTest.basicUserRoles});
-}, [], "C1");
-assert.throws(function() {
-    mydb.createUser({user: "abc", pwd: "", roles: jsTest.basicUserRoles});
-}, [], "C2");
+assert.throws(
+    function () {
+        mydb.createUser({user: "", pwd: "abc", roles: jsTest.basicUserRoles});
+    },
+    [],
+    "C1",
+);
+assert.throws(
+    function () {
+        mydb.createUser({user: "abc", pwd: "", roles: jsTest.basicUserRoles});
+    },
+    [],
+    "C2",
+);
 
 var after = a.system.users.count({db: mydb.getName()});
 assert(before > 0, "C3");

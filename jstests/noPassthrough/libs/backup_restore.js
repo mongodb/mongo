@@ -27,7 +27,7 @@ import {backupData} from "jstests/libs/backup_utils.js";
 import {getPython3Binary} from "jstests/libs/python.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-export const BackupRestoreTest = function(options) {
+export const BackupRestoreTest = function (options) {
     if (!(this instanceof BackupRestoreTest)) {
         return new BackupRestoreTest(options);
     }
@@ -41,7 +41,7 @@ export const BackupRestoreTest = function(options) {
      * Runs a command in the bash shell.
      */
     function _runCmd(cmd) {
-        runProgram('bash', '-c', cmd);
+        runProgram("bash", "-c", cmd);
     }
 
     /**
@@ -49,7 +49,7 @@ export const BackupRestoreTest = function(options) {
      */
     function _crudClient(host, dbName, collectionName, numNodes) {
         // Launch CRUD client
-        let crudClientCmds = function(dbName, collectionName, numNodes) {
+        let crudClientCmds = function (dbName, collectionName, numNodes) {
             let bulkNum = 1000;
             let baseNum = 100000;
 
@@ -58,7 +58,7 @@ export const BackupRestoreTest = function(options) {
             let coll = db.getSiblingDB(dbName).getCollection(collectionName);
             coll.createIndex({x: 1});
 
-            let largeValue = 'L'.repeat(1023);
+            let largeValue = "L".repeat(1023);
 
             Random.setRandomSeed();
 
@@ -75,7 +75,7 @@ export const BackupRestoreTest = function(options) {
                 // although the updates performed by the CRUD client may in the worst case modify
                 // every document, the oplog entries produced as a result are 10x smaller than the
                 // document itself.
-                const writeConcern = (iteration % 100 === 0) ? {w: numNodes} : {w: 1};
+                const writeConcern = iteration % 100 === 0 ? {w: numNodes} : {w: 1};
 
                 try {
                     let op = Random.rand();
@@ -93,17 +93,16 @@ export const BackupRestoreTest = function(options) {
                     } else if (op < 0.4) {
                         // 20% of the operations: update docs.
                         let updateOpts = {upsert: true, multi: true, writeConcern: writeConcern};
-                        assert.commandWorked(coll.update({x: {$gte: match}},
-                                                         {$inc: {x: baseNum}, $set: {n: 'hello'}},
-                                                         updateOpts));
+                        assert.commandWorked(
+                            coll.update({x: {$gte: match}}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts),
+                        );
                     } else if (op < 0.9) {
                         // 50% of the operations: find matchings docs.
                         // itcount() consumes the cursor
                         coll.find({x: {$gte: match}}).itcount();
                     } else {
                         // 10% of the operations: remove matching docs.
-                        assert.commandWorked(
-                            coll.remove({x: {$gte: match}}, {writeConcern: writeConcern}));
+                        assert.commandWorked(coll.remove({x: {$gte: match}}, {writeConcern: writeConcern}));
                     }
                 } catch (e) {
                     if (e instanceof ReferenceError || e instanceof TypeError) {
@@ -116,11 +115,12 @@ export const BackupRestoreTest = function(options) {
         // Returns the pid of the started mongo shell so the CRUD test client can be terminated
         // without waiting for its execution to finish.
         let shellPath = MongoRunner.getMongoShellPath();
-        return startMongoProgramNoConnect(shellPath,
-                                          '--eval',
-                                          '(' + crudClientCmds + ')("' + dbName + '", "' +
-                                              collectionName + '", ' + numNodes + ')',
-                                          host);
+        return startMongoProgramNoConnect(
+            shellPath,
+            "--eval",
+            "(" + crudClientCmds + ')("' + dbName + '", "' + collectionName + '", ' + numNodes + ")",
+            host,
+        );
     }
 
     /**
@@ -128,41 +128,48 @@ export const BackupRestoreTest = function(options) {
      */
     function _fsmClient(host) {
         // Launch FSM client
-        const suite = 'concurrency_replication_for_backup_restore';
-        const resmokeCmd = getPython3Binary() +
-            ' buildscripts/resmoke.py run --shuffle --continueOnFailure' +
-            ' --repeat=99999 --internalParam=is_inner_level --mongo=' +
-            MongoRunner.getMongoShellPath() + ' --shellConnString=mongodb://' + host +
-            ' --suites=' + suite;
+        const suite = "concurrency_replication_for_backup_restore";
+        const resmokeCmd =
+            getPython3Binary() +
+            " buildscripts/resmoke.py run --shuffle --continueOnFailure" +
+            " --repeat=99999 --internalParam=is_inner_level --mongo=" +
+            MongoRunner.getMongoShellPath() +
+            " --shellConnString=mongodb://" +
+            host +
+            " --suites=" +
+            suite;
 
         // Returns the pid of the FSM test client so it can be terminated without waiting for its
         // execution to finish.
-        return _startMongoProgram({args: resmokeCmd.split(' ')});
+        return _startMongoProgram({args: resmokeCmd.split(" ")});
     }
 
     /**
      * Runs the test.
      */
-    this.run = function() {
+    this.run = function () {
         let options = this.options;
 
         jsTestLog("Backup restore " + tojson(options));
 
         // skipValidationOnNamespaceNotFound must be set to true for correct operation of this test.
-        assert(typeof TestData.skipValidationOnNamespaceNotFound === 'undefined' ||
-               TestData.skipValidationOnNamespaceNotFound);
+        assert(
+            typeof TestData.skipValidationOnNamespaceNotFound === "undefined" ||
+                TestData.skipValidationOnNamespaceNotFound,
+        );
 
         // Test options
         // Test name
         let testName = jsTest.name();
 
         // Backup type (must be specified)
-        let allowedBackupKeys = ['fsyncLock', 'stopStart', 'rolling', 'backupCursor'];
+        let allowedBackupKeys = ["fsyncLock", "stopStart", "rolling", "backupCursor"];
         assert(options.backup, "Backup option not supplied");
-        assert.contains(options.backup,
-                        allowedBackupKeys,
-                        'invalid option: ' + tojson(options.backup) +
-                            '; valid options are: ' + tojson(allowedBackupKeys));
+        assert.contains(
+            options.backup,
+            allowedBackupKeys,
+            "invalid option: " + tojson(options.backup) + "; valid options are: " + tojson(allowedBackupKeys),
+        );
 
         // Number of nodes in initial replica set (default 3)
         let numNodes = options.nodes || 3;
@@ -171,18 +178,18 @@ export const BackupRestoreTest = function(options) {
         let clientTime = options.clientTime || 10000;
 
         // Set the dbpath for the replica set
-        let dbpathPrefix = MongoRunner.dataPath + 'backupRestore';
+        let dbpathPrefix = MongoRunner.dataPath + "backupRestore";
         resetDbpath(dbpathPrefix);
-        let dbpathFormat = dbpathPrefix + '/mongod-$port';
+        let dbpathFormat = dbpathPrefix + "/mongod-$port";
 
         // Start numNodes node replSet
         let rst = new ReplSetTest({
             nodes: numNodes,
             nodeOptions: {
                 dbpath: dbpathFormat,
-                setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}
+                setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})},
             },
-            oplogSize: 1024
+            oplogSize: 1024,
         });
 
         // Avoid stepdowns due to heavy workloads on slow machines.
@@ -226,13 +233,13 @@ export const BackupRestoreTest = function(options) {
 
         if (!ret.ok) {
             assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
-            jsTestLog('Skipping test of ' + options.backup + ' as it does not support fsync.');
+            jsTestLog("Skipping test of " + options.backup + " as it does not support fsync.");
             return;
         }
 
         // Configure new hidden secondary
         let dbpathSecondary = secondary.dbpath;
-        let hiddenDbpath = dbpathPrefix + '/mongod-hiddensecondary';
+        let hiddenDbpath = dbpathPrefix + "/mongod-hiddensecondary";
         resetDbpath(hiddenDbpath);
 
         let sourcePath = dbpathSecondary + "/";
@@ -245,25 +252,24 @@ export const BackupRestoreTest = function(options) {
         let copiedFiles;
 
         // Perform the data backup to new secondary
-        if (options.backup == 'fsyncLock') {
+        if (options.backup == "fsyncLock") {
             rst.awaitSecondaryNodes();
             // Test that the secondary supports fsyncLock
             let ret = secondary.getDB("admin").fsyncLock();
             if (!ret.ok) {
                 assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
-                jsTestLog('Skipping test of ' + options.backup + ' as it does not support fsync.');
+                jsTestLog("Skipping test of " + options.backup + " as it does not support fsync.");
                 return;
             }
 
             copyDbpath(dbpathSecondary, hiddenDbpath);
-            removeFile(hiddenDbpath + '/mongod.lock');
+            removeFile(hiddenDbpath + "/mongod.lock");
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));
-            assert.gt(copiedFiles.length, 0, testName + ' no files copied');
-            assert.commandWorked(secondary.getDB("admin").fsyncUnlock(),
-                                 testName + ' failed to fsyncUnlock');
-        } else if (options.backup == 'rolling') {
+            assert.gt(copiedFiles.length, 0, testName + " no files copied");
+            assert.commandWorked(secondary.getDB("admin").fsyncUnlock(), testName + " failed to fsyncUnlock");
+        } else if (options.backup == "rolling") {
             let rsyncCmd = "rsync -aKkz --del " + sourcePath + " " + destPath;
             // Simulate a rolling rsync, do it 3 times before stopping process
             for (let i = 0; i < 3; i++) {
@@ -276,43 +282,47 @@ export const BackupRestoreTest = function(options) {
 
             // One final rsync
             _runCmd(rsyncCmd);
-            removeFile(hiddenDbpath + '/mongod.lock');
+            removeFile(hiddenDbpath + "/mongod.lock");
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));
-            assert.gt(copiedFiles.length, 0, testName + ' no files copied');
+            assert.gt(copiedFiles.length, 0, testName + " no files copied");
             rst.start(secondary.nodeId, {}, true);
-        } else if (options.backup == 'stopStart') {
+        } else if (options.backup == "stopStart") {
             // Stop the mongod process
             rst.stop(secondary.nodeId);
 
             copyDbpath(dbpathSecondary, hiddenDbpath);
-            removeFile(hiddenDbpath + '/mongod.lock');
+            removeFile(hiddenDbpath + "/mongod.lock");
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));
-            assert.gt(copiedFiles.length, 0, testName + ' no files copied');
+            assert.gt(copiedFiles.length, 0, testName + " no files copied");
             rst.start(secondary.nodeId, {}, true);
-        } else if (options.backup == 'backupCursor') {
+        } else if (options.backup == "backupCursor") {
             backupData(secondary, hiddenDbpath);
             copiedFiles = ls(hiddenDbpath);
-            jsTestLog("Copying End: " + tojson({
-                          destinationFiles: copiedFiles,
-                          destinationJournal: ls(hiddenDbpath + '/journal')
-                      }));
-            assert.gt(copiedFiles.length, 0, testName + ' no files copied');
+            jsTestLog(
+                "Copying End: " +
+                    tojson({
+                        destinationFiles: copiedFiles,
+                        destinationJournal: ls(hiddenDbpath + "/journal"),
+                    }),
+            );
+            assert.gt(copiedFiles.length, 0, testName + " no files copied");
         }
 
         // Wait up to 5 minutes until restarted node is in state secondary.
         rst.awaitSecondaryNodes();
 
-        jsTestLog('Stopping CRUD and FSM clients');
+        jsTestLog("Stopping CRUD and FSM clients");
 
         // Stop CRUD client and FSM client.
         let crudStatus = checkProgram(crudPid);
-        assert(crudStatus.alive,
-               testName + ' CRUD client was not running at end of test and exited with code: ' +
-                   crudStatus.exitCode);
+        assert(
+            crudStatus.alive,
+            testName + " CRUD client was not running at end of test and exited with code: " + crudStatus.exitCode,
+        );
         stopMongoProgramByPid(crudPid);
 
         const fsmStatus = checkProgram(fsmPid);
@@ -331,13 +341,13 @@ export const BackupRestoreTest = function(options) {
                 // stopMongoProgramByPid returns -SIGINT. See SERVER-67390 and SERVER-72449.
                 assert(
                     exitCode == 130 || exitCode == -kSIGINT || exitCode == kSIGINT,
-                    'expected resmoke.py to exit due to being interrupted, but exited with code: ' +
-                        exitCode);
+                    "expected resmoke.py to exit due to being interrupted, but exited with code: " + exitCode,
+                );
             }
         } else {
-            jsTestLog(testName +
-                      ' FSM client was not running at end of test and exited with code: ' +
-                      fsmStatus.exitCode);
+            jsTestLog(
+                testName + " FSM client was not running at end of test and exited with code: " + fsmStatus.exitCode,
+            );
         }
 
         // Make sure the databases are not in a drop-pending state. This can happen if we
@@ -345,19 +355,19 @@ export const BackupRestoreTest = function(options) {
         let result = primary.adminCommand({
             listDatabases: 1,
             nameOnly: true,
-            filter: {'name': {$nin: ['admin', 'config', 'local', '$external']}}
+            filter: {"name": {$nin: ["admin", "config", "local", "$external"]}},
         });
         assert.commandWorked(result);
 
-        const databases = result.databases.map(dbs => dbs.name);
-        databases.forEach(dbName => {
-            assert.commandWorked(primary.getDB(dbName).afterClientKills.insert(
-                {'a': 1}, {writeConcern: {w: 'majority'}}));
+        const databases = result.databases.map((dbs) => dbs.name);
+        databases.forEach((dbName) => {
+            assert.commandWorked(
+                primary.getDB(dbName).afterClientKills.insert({"a": 1}, {writeConcern: {w: "majority"}}),
+            );
         });
 
         // Add the new hidden node to replSetTest.
-        jsTestLog('Starting new hidden node (but do not add to replica set) with dbpath ' +
-                  hiddenDbpath + '.');
+        jsTestLog("Starting new hidden node (but do not add to replica set) with dbpath " + hiddenDbpath + ".");
         let nodesBeforeAddingHiddenMember = rst.nodes.slice();
         // ReplSetTest.add() will use default values for --oplogSize and --replSet consistent with
         // existing nodes.
@@ -368,42 +378,50 @@ export const BackupRestoreTest = function(options) {
         // Add the new hidden secondary to the replica set. This triggers an election, so it must be
         // done after stopping the background workloads to prevent the workloads from failing if a
         // new primary is elected.
-        jsTestLog('Adding new hidden node ' + hiddenHost + ' to replica set.');
+        jsTestLog("Adding new hidden node " + hiddenHost + " to replica set.");
         rst.awaitNodesAgreeOnPrimary(ReplSetTest.kDefaultTimeoutMS, nodesBeforeAddingHiddenMember);
         primary = rst.getPrimary();
         let rsConfig = primary.getDB("local").system.replset.findOne();
         rsConfig.version += 1;
         let hiddenMember = {_id: numNodes, host: hiddenHost, priority: 0, hidden: true};
         rsConfig.members.push(hiddenMember);
-        assert.commandWorked(primary.adminCommand({replSetReconfig: rsConfig}),
-                             testName + ' failed to reconfigure replSet ' + tojson(rsConfig));
+        assert.commandWorked(
+            primary.adminCommand({replSetReconfig: rsConfig}),
+            testName + " failed to reconfigure replSet " + tojson(rsConfig),
+        );
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
-        jsTestLog('CRUD and FSM clients stopped. Waiting for hidden node ' + hiddenHost +
-                  ' to become SECONDARY');
+        jsTestLog("CRUD and FSM clients stopped. Waiting for hidden node " + hiddenHost + " to become SECONDARY");
         rst.awaitSecondaryNodes(null, [hiddenNode]);
 
         // Wait for secondaries to finish catching up before shutting down.
         jsTestLog(
-            'Hidden node ' + hiddenHost +
-            ' is now SECONDARY. Waiting for CRUD and FSM operations to be applied on all nodes.');
+            "Hidden node " +
+                hiddenHost +
+                " is now SECONDARY. Waiting for CRUD and FSM operations to be applied on all nodes.",
+        );
         rst.awaitReplication();
 
-        jsTestLog('CRUD and FSM operations successfully applied on all nodes. ' +
-                  'Waiting for all nodes to agree on the primary.');
+        jsTestLog(
+            "CRUD and FSM operations successfully applied on all nodes. " +
+                "Waiting for all nodes to agree on the primary.",
+        );
         rst.awaitNodesAgreeOnPrimary();
 
-        jsTestLog('All nodes agree on the primary. Getting current primary.');
+        jsTestLog("All nodes agree on the primary. Getting current primary.");
         primary = rst.getPrimary();
 
-        jsTestLog('Inserting single document into primary ' + primary.host +
-                  ' with writeConcern w:' + rst.nodes.length);
-        let writeResult = assert.commandWorked(primary.getDB("test").foo.insert(
-            {}, {writeConcern: {w: rst.nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+        jsTestLog(
+            "Inserting single document into primary " + primary.host + " with writeConcern w:" + rst.nodes.length,
+        );
+        let writeResult = assert.commandWorked(
+            primary
+                .getDB("test")
+                .foo.insert({}, {writeConcern: {w: rst.nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+        );
 
         // Stop set.
-        jsTestLog('Insert operation successful: ' + tojson(writeResult) +
-                  '. Stopping replica set.');
+        jsTestLog("Insert operation successful: " + tojson(writeResult) + ". Stopping replica set.");
         rst.stopSet();
 
         // Cleanup the files from the test

@@ -8,13 +8,10 @@
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_simple.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_simple.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.majorityWriteCollName = 'majority_writes';
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.majorityWriteCollName = "majority_writes";
     $config.data.counter = 0;
 
     /**
@@ -24,8 +21,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        assert.commandWorked(db[this.majorityWriteCollName].insert(
-            {_id: this.tid, counter: this.counter}, {writeConcern: {w: 'majority'}}));
+        assert.commandWorked(
+            db[this.majorityWriteCollName].insert(
+                {_id: this.tid, counter: this.counter},
+                {writeConcern: {w: "majority"}},
+            ),
+        );
     };
 
     /**
@@ -35,12 +36,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.majorityWriteUnrelatedDoc = function majorityWriteUnrelatedDoc(db, collName) {
         this.counter += 1;
-        assert.commandWorked(db[this.majorityWriteCollName].update(
-            {_id: this.tid}, {$set: {counter: this.counter}}, {writeConcern: {w: 'majority'}}));
+        assert.commandWorked(
+            db[this.majorityWriteCollName].update(
+                {_id: this.tid},
+                {$set: {counter: this.counter}},
+                {writeConcern: {w: "majority"}},
+            ),
+        );
 
         // As soon as the write returns, its effects should be visible in the majority snapshot.
         const doc = db[this.majorityWriteCollName].findOne({_id: this.tid});
-        assert.eq(this.counter, doc.counter, 'unexpected counter value, doc: ' + tojson(doc));
+        assert.eq(this.counter, doc.counter, "unexpected counter value, doc: " + tojson(doc));
     };
 
     /**
@@ -55,17 +61,22 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // contains documents with _id ranging from 0 to the number of accounts. Update a field
         // based on the thread's id, since threads may concurrently write to the same document.
         const transactionDocId = Random.randInt(this.numAccounts);
-        const threadUniqueField = 'thread' + this.tid;
-        assert.commandWorked(db[collName].update({_id: transactionDocId},
-                                                 {$set: {[threadUniqueField]: this.counter}},
-                                                 {writeConcern: {w: 'majority'}}));
+        const threadUniqueField = "thread" + this.tid;
+        assert.commandWorked(
+            db[collName].update(
+                {_id: transactionDocId},
+                {$set: {[threadUniqueField]: this.counter}},
+                {writeConcern: {w: "majority"}},
+            ),
+        );
 
         // As soon as the write returns, its effects should be visible in the majority snapshot.
         const doc = db[collName].findOne({_id: transactionDocId});
         assert.eq(
             this.counter,
             doc[threadUniqueField],
-            'unexpected thread unique field value, thread: ' + this.tid + ', doc: ' + tojson(doc));
+            "unexpected thread unique field value, thread: " + this.tid + ", doc: " + tojson(doc),
+        );
     };
 
     /**
@@ -79,7 +90,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // The database will already have had sharding enabled by the fsm infrastructure.
             db.adminCommand({
                 shardCollection: db[this.majorityWriteCollName].getFullName(),
-                key: {_id: 'hashed'}
+                key: {_id: "hashed"},
             });
         }
     };
@@ -90,14 +101,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             transferMoney: 0.5,
             checkMoneyBalance: 0.1,
             majorityWriteUnrelatedDoc: 0.2,
-            majorityWriteTxnDoc: 0.2
+            majorityWriteTxnDoc: 0.2,
         },
-        checkMoneyBalance:
-            {transferMoney: 0.5, majorityWriteUnrelatedDoc: 0.25, majorityWriteTxnDoc: 0.25},
-        majorityWriteUnrelatedDoc:
-            {transferMoney: 0.5, majorityWriteUnrelatedDoc: 0.25, majorityWriteTxnDoc: 0.25},
-        majorityWriteTxnDoc:
-            {transferMoney: 0.5, majorityWriteUnrelatedDoc: 0.25, majorityWriteTxnDoc: 0.25},
+        checkMoneyBalance: {transferMoney: 0.5, majorityWriteUnrelatedDoc: 0.25, majorityWriteTxnDoc: 0.25},
+        majorityWriteUnrelatedDoc: {transferMoney: 0.5, majorityWriteUnrelatedDoc: 0.25, majorityWriteTxnDoc: 0.25},
+        majorityWriteTxnDoc: {transferMoney: 0.5, majorityWriteUnrelatedDoc: 0.25, majorityWriteTxnDoc: 0.25},
     };
 
     return $config;

@@ -11,10 +11,8 @@ let locObj = [];
 // Add locations everywhere
 for (let i = 0; i < 10; i++) {
     for (let j = 0; j < 10; j++) {
-        if (j % 2 == 0)
-            locObj.push([i, j]);
-        else
-            locObj.push({x: i, y: j});
+        if (j % 2 == 0) locObj.push([i, j]);
+        else locObj.push({x: i, y: j});
     }
 }
 
@@ -24,11 +22,11 @@ for (let i = 0; i < numLocations; i++) {
     docs.push({_id: i, loc: locObj});
 }
 
-const collNamePrefix = 'geo_array1_';
+const collNamePrefix = "geo_array1_";
 let collCount = 0;
 
 function test(conn, index) {
-    const testDB = conn.getDB('test');
+    const testDB = conn.getDB("test");
     let t = testDB.getCollection(collNamePrefix + collCount++);
     t.drop();
 
@@ -41,13 +39,23 @@ function test(conn, index) {
     // Pull them back
     for (let i = 0; i < 10; i++) {
         for (let j = 0; j < 10; j++) {
-            const locations = t.find({
-                                   loc: {$within: {$box: [[i - 0.5, j - 0.5], [i + 0.5, j + 0.5]]}}
-                               }).toArray();
-            assert.eq(numLocations,
-                      locations.length,
-                      'index: ' + index + '; i: ' + i + '; j: ' + j +
-                          '; locations: ' + tojson(locations));
+            const locations = t
+                .find({
+                    loc: {
+                        $within: {
+                            $box: [
+                                [i - 0.5, j - 0.5],
+                                [i + 0.5, j + 0.5],
+                            ],
+                        },
+                    },
+                })
+                .toArray();
+            assert.eq(
+                numLocations,
+                locations.length,
+                "index: " + index + "; i: " + i + "; j: " + j + "; locations: " + tojson(locations),
+            );
         }
     }
 }

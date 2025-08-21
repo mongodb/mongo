@@ -4,22 +4,14 @@
  *
  * @tags: [requires_wiredtiger]
  */
-import {
-    assertRepairSucceeds,
-    getUriForColl,
-    startMongodOnExistingPath
-} from "jstests/disk/libs/wt_file_helper.js";
-import {
-    assertCreateCollection,
-    assertDropCollection
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertRepairSucceeds, getUriForColl, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
+import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const dbName = jsTestName();
 const collName = "test";
 const dbpath = MongoRunner.dataPath + dbName + "/";
 
-const runRepairTest = function runRepairTestOnMongoDInstance(
-    collectionOptions, docToInsert, isTimeseries) {
+const runRepairTest = function runRepairTestOnMongoDInstance(collectionOptions, docToInsert, isTimeseries) {
     let mongod = startMongodOnExistingPath(dbpath);
     let db = mongod.getDB(dbName);
 
@@ -36,8 +28,7 @@ const runRepairTest = function runRepairTestOnMongoDInstance(
     // original document. This is because the timeseries's system.views collection will be not be
     // associated with the orphaned clustered collection. Thus, the data will show up as it would
     // have in the raw system.buckets collection for the timeseries collection.
-    const expectedOrphanDoc =
-        isTimeseries ? db["system.buckets." + collName].findOne() : testColl.findOne();
+    const expectedOrphanDoc = isTimeseries ? db["system.buckets." + collName].findOne() : testColl.findOne();
 
     MongoRunner.stopMongod(mongod);
 
@@ -62,10 +53,13 @@ const runRepairTest = function runRepairTestOnMongoDInstance(
     const localDb = mongod.getDB("local");
     let orphanedCollection = localDb[orphanedImportantCollName];
     assert(orphanedCollection.exists());
-    assert.eq(orphanedCollection.count(expectedOrphanDoc),
-              1,
-              `Expected to find document ${tojson(expectedOrphanDoc)} but collection has contents ${
-                  tojson(orphanedCollection.find().toArray())}`);
+    assert.eq(
+        orphanedCollection.count(expectedOrphanDoc),
+        1,
+        `Expected to find document ${tojson(expectedOrphanDoc)} but collection has contents ${tojson(
+            orphanedCollection.find().toArray(),
+        )}`,
+    );
 
     const validateResult = orphanedCollection.validate();
     assert(validateResult.valid);
@@ -81,11 +75,11 @@ runRepairTest(clusteredCollOptions, docToInsert, isTimeseries);
 // Timeseries test since all timeseries collections are implicitly clustered.
 isTimeseries = true;
 clusteredCollOptions = {
-    timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}
+    timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
 };
 docToInsert = {
     "metadata": {"sensorId": 5578, "type": "temperature"},
     "timestamp": ISODate("2021-05-18T00:00:00.000Z"),
-    "temp": 12
+    "temp": 12,
 };
 runRepairTest(clusteredCollOptions, docToInsert, isTimeseries);

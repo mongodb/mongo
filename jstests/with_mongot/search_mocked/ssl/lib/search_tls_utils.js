@@ -1,9 +1,5 @@
-
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {
-    CA_CERT,
-    CLIENT_CERT,
-} from "jstests/ssl/libs/ssl_helpers.js";
+import {CA_CERT, CLIENT_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 /**
@@ -13,13 +9,16 @@ import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
  */
 function shouldSkipWithGRPC({mongotMockTLSMode, mongodTLSMode, searchTLSMode}) {
     if (TestData && TestData.setParameters && TestData.setParameters.useGrpcForSearch) {
-        if ((mongotMockTLSMode == "disabled") ||
+        if (
+            mongotMockTLSMode == "disabled" ||
             (searchTLSMode == "globalTLS" && ["allowTLS", "disabled"].includes(mongodTLSMode)) ||
-            (["allowTLS", "disabled"].includes(searchTLSMode))) {
+            ["allowTLS", "disabled"].includes(searchTLSMode)
+        ) {
             jsTestLog(
                 `Skipping test with the following configurations due to incompatibility with mongotmock gRPC server: mongotMockTLSMode: ${
-                    mongotMockTLSMode}, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${
-                    searchTLSMode}`);
+                    mongotMockTLSMode
+                }, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${searchTLSMode}`,
+            );
             return true;
         }
     }
@@ -27,8 +26,7 @@ function shouldSkipWithGRPC({mongotMockTLSMode, mongodTLSMode, searchTLSMode}) {
     return false;
 }
 
-function setUpMongotAndMongodWithTLSOptions(
-    {mongotMockTLSMode, mongodTLSMode = "disabled", searchTLSMode = null}) {
+function setUpMongotAndMongodWithTLSOptions({mongotMockTLSMode, mongodTLSMode = "disabled", searchTLSMode = null}) {
     const mongotmock = new MongotMock();
     mongotmock.start({bypassAuth: false, tlsMode: mongotMockTLSMode});
     const mongotConn = mongotmock.getConnection();
@@ -56,11 +54,17 @@ export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, 
         return;
     }
 
-    jsTestLog(`Verifying that the following TLS configurations are supported: mongotMockTLSMode: ${
-        mongotMockTLSMode}, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${searchTLSMode}`);
+    jsTestLog(
+        `Verifying that the following TLS configurations are supported: mongotMockTLSMode: ${
+            mongotMockTLSMode
+        }, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${searchTLSMode}`,
+    );
 
-    var [mongotmock, mongodConn] =
-        setUpMongotAndMongodWithTLSOptions({mongotMockTLSMode, mongodTLSMode, searchTLSMode});
+    var [mongotmock, mongodConn] = setUpMongotAndMongodWithTLSOptions({
+        mongotMockTLSMode,
+        mongodTLSMode,
+        searchTLSMode,
+    });
     const mongotConn = mongotmock.getConnection();
 
     const db = mongodConn.getDB("test");
@@ -78,8 +82,7 @@ export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, 
 
     const collUUID = getUUIDFromListCollections(db, coll.getName());
     const searchQuery = {query: "cakes", path: "title"};
-    const searchCmd =
-        {search: coll.getName(), collectionUUID: collUUID, query: searchQuery, $db: "test"};
+    const searchCmd = {search: coll.getName(), collectionUUID: collUUID, query: searchQuery, $db: "test"};
 
     {
         const cursorId = NumberLong(123);
@@ -93,11 +96,11 @@ export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, 
                         nextBatch: [
                             {_id: 1, $searchScore: 0.321},
                             {_id: 2, $searchScore: 0.654},
-                            {_id: 5, $searchScore: 0.789}
-                        ]
+                            {_id: 5, $searchScore: 0.789},
+                        ],
                     },
-                    ok: 1
-                }
+                    ok: 1,
+                },
             },
             {
                 expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -105,10 +108,10 @@ export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, 
                     cursor: {
                         id: cursorId,
                         ns: coll.getFullName(),
-                        nextBatch: [{_id: 6, $searchScore: 0.123}]
+                        nextBatch: [{_id: 6, $searchScore: 0.123}],
                     },
-                    ok: 1
-                }
+                    ok: 1,
+                },
             },
             {
                 expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -117,14 +120,13 @@ export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, 
                     cursor: {
                         id: NumberLong(0),
                         ns: coll.getFullName(),
-                        nextBatch: [{_id: 8, $searchScore: 0.345}]
+                        nextBatch: [{_id: 8, $searchScore: 0.345}],
                     },
-                }
+                },
             },
         ];
 
-        assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
     }
 
     // Perform a $search query.
@@ -135,26 +137,28 @@ export function verifyTLSConfigurationPasses({mongotMockTLSMode, mongodTLSMode, 
         {"_id": 2, "title": "cookies and cakes"},
         {"_id": 5, "title": "cakes and oranges"},
         {"_id": 6, "title": "cakes and apples"},
-        {"_id": 8, "title": "cakes and kale"}
+        {"_id": 8, "title": "cakes and kale"},
     ];
     assert.eq(expected, cursor.toArray());
     MongoRunner.stopMongod(mongodConn);
     mongotmock.stop();
 }
 
-export function verifyTLSConfigurationFails({
-    mongotMockTLSMode,
-    mongodTLSMode,
-    searchTLSMode,
-}) {
+export function verifyTLSConfigurationFails({mongotMockTLSMode, mongodTLSMode, searchTLSMode}) {
     if (shouldSkipWithGRPC({mongotMockTLSMode, mongodTLSMode, searchTLSMode})) {
         return;
     }
 
-    jsTestLog(`Verifying that the following TLS configurations fail: mongotMockTLSMode: ${
-        mongotMockTLSMode}, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${searchTLSMode}`);
-    var [mongotmock, mongodConn] =
-        setUpMongotAndMongodWithTLSOptions({mongotMockTLSMode, mongodTLSMode, searchTLSMode});
+    jsTestLog(
+        `Verifying that the following TLS configurations fail: mongotMockTLSMode: ${
+            mongotMockTLSMode
+        }, mongodTLSMode: ${mongodTLSMode}, searchTLSMode: ${searchTLSMode}`,
+    );
+    var [mongotmock, mongodConn] = setUpMongotAndMongodWithTLSOptions({
+        mongotMockTLSMode,
+        mongodTLSMode,
+        searchTLSMode,
+    });
 
     const db = mongodConn.getDB("test");
     const coll = db.search;
@@ -169,8 +173,9 @@ export function verifyTLSConfigurationFails({
     // Perform a $search query. It should fail with 'HostUnreachable' since the TLS mode of mongod
     // doesn't match what mongot expects.
     assert.commandFailedWithCode(
-        db.runCommand({aggregate: 'search', pipeline: [{$search: searchQuery}], cursor: {}}),
-        ErrorCodes.HostUnreachable);
+        db.runCommand({aggregate: "search", pipeline: [{$search: searchQuery}], cursor: {}}),
+        ErrorCodes.HostUnreachable,
+    );
 
     MongoRunner.stopMongod(mongodConn);
     mongotmock.stop();

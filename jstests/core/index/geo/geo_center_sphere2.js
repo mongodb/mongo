@@ -12,16 +12,24 @@
 import {deg2rad, rad2deg} from "jstests/libs/query/geo_math.js";
 
 function computexscandist(y, maxDistDegrees) {
-    return maxDistDegrees /
-        Math.min(Math.cos(deg2rad(Math.min(89.0, y + maxDistDegrees))),
-                 Math.cos(deg2rad(Math.max(-89.0, y - maxDistDegrees))));
+    return (
+        maxDistDegrees /
+        Math.min(
+            Math.cos(deg2rad(Math.min(89.0, y + maxDistDegrees))),
+            Math.cos(deg2rad(Math.max(-89.0, y - maxDistDegrees))),
+        )
+    );
 }
 
 function pointIsOK(startPoint, radius) {
     let yscandist = rad2deg(radius) + 0.01;
     let xscandist = computexscandist(startPoint[1], yscandist);
-    return (startPoint[0] + xscandist < 180) && (startPoint[0] - xscandist > -180) &&
-        (startPoint[1] + yscandist < 90) && (startPoint[1] - yscandist > -90);
+    return (
+        startPoint[0] + xscandist < 180 &&
+        startPoint[0] - xscandist > -180 &&
+        startPoint[1] + yscandist < 90 &&
+        startPoint[1] - yscandist > -90
+    );
 }
 
 var numTests = 30;
@@ -29,8 +37,8 @@ var numTests = 30;
 for (var test = 0; test < numTests; test++) {
     Random.srand(1337 + test);
 
-    var radius = 5000 * Random.rand();  // km
-    radius = radius / 6378.1;           // radians; earth radius from geoconstants.h
+    var radius = 5000 * Random.rand(); // km
+    radius = radius / 6378.1; // radians; earth radius from geoconstants.h
     var numDocs = Math.floor(400 * Random.rand());
     // TODO: Wrapping uses the error value to figure out what would overlap...
     var bits = Math.floor(5 + Random.rand() * 28);
@@ -38,7 +46,7 @@ for (var test = 0; test < numTests; test++) {
 
     var t = db.sphere;
 
-    var randomPoint = function() {
+    var randomPoint = function () {
         return [Random.rand() * 360 - 180, Random.rand() * 180 - 90];
     };
 
@@ -80,10 +88,8 @@ for (var test = 0; test < numTests; test++) {
 
         bulk.insert({loc: multiPoint});
 
-        if (docIn)
-            docsIn++;
-        else
-            docsOut++;
+        if (docIn) docsIn++;
+        else docsOut++;
     }
 
     printjson({
@@ -94,7 +100,7 @@ for (var test = 0; test < numTests; test++) {
         pointsIn: pointsIn,
         docsIn: docsIn,
         pointsOut: pointsOut,
-        docsOut: docsOut
+        docsOut: docsOut,
     });
 
     assert.commandWorked(bulk.execute());
@@ -129,14 +135,16 @@ for (var test = 0; test < numTests; test++) {
     }
 
     // Test $geoNear.
-    results = t.aggregate({
-                   $geoNear: {
-                       near: startPoint,
-                       distanceField: "dis",
-                       maxDistance: radius,
-                       spherical: true,
-                   }
-               }).toArray();
+    results = t
+        .aggregate({
+            $geoNear: {
+                near: startPoint,
+                distanceField: "dis",
+                maxDistance: radius,
+                spherical: true,
+            },
+        })
+        .toArray();
     assert.eq(docsIn, results.length, tojson(results));
 
     var distance = 0;
@@ -146,8 +154,7 @@ for (var test = 0; test < numTests; test++) {
         var distInObj = false;
         for (var j = 0; j < results[i].loc.length && distInObj == false; j++) {
             var newDistance = Geo.sphereDistance(startPoint, results[i].loc[j]);
-            distInObj =
-                (newDistance >= retDistance - 0.0001 && newDistance <= retDistance + 0.0001);
+            distInObj = newDistance >= retDistance - 0.0001 && newDistance <= retDistance + 0.0001;
         }
 
         assert(distInObj);

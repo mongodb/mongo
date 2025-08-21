@@ -15,29 +15,15 @@ import {WildcardIndexHelpers} from "jstests/libs/query/wildcard_index_helpers.js
 const coll = db.query_on_prefix_of_compound_wildcard_index;
 
 const indexSpec = {
-    keyPattern: {a: 1, b: 1, "sub.$**": 1, c: 1}
+    keyPattern: {a: 1, b: 1, "sub.$**": 1, c: 1},
 };
-const supportedQueries = [
-    {a: 1},
-    {a: 1, b: 1},
-    {a: 1, b: {$gt: 1}},
-];
+const supportedQueries = [{a: 1}, {a: 1, b: 1}, {a: 1, b: {$gt: 1}}];
 
-const notSupportedQueries = [
-    {b: 1},
-    {c: 1},
-];
+const notSupportedQueries = [{b: 1}, {c: 1}];
 
-const nonBlockingSorts = [
-    {a: 1},
-    {a: 1, b: 1},
-];
+const nonBlockingSorts = [{a: 1}, {a: 1, b: 1}];
 
-const blockingSorts = [
-    {a: 1, c: 1},
-    {a: 1, b: 1, c: 1},
-    {c: 1},
-];
+const blockingSorts = [{a: 1, c: 1}, {a: 1, b: 1, c: 1}, {c: 1}];
 
 // Create the compound wildcard index and store the 'indexName' in 'indexSpec'.
 WildcardIndexHelpers.createIndex(coll, indexSpec);
@@ -59,19 +45,18 @@ function assertBlockingSort(explain, isBlocking) {
 }
 
 for (const query of notSupportedQueries) {
-    let explainRes = assert.commandWorked(coll.find(query).explain('executionStats'));
+    let explainRes = assert.commandWorked(coll.find(query).explain("executionStats"));
 
     WildcardIndexHelpers.assertExpectedIndexIsNotUsed(explainRes, indexSpec.indexName);
 }
 
 for (const query of supportedQueries) {
-    let explainRes = assert.commandWorked(coll.find(query).explain('executionStats'));
+    let explainRes = assert.commandWorked(coll.find(query).explain("executionStats"));
 
     WildcardIndexHelpers.assertExpectedIndexIsUsed(explainRes, indexSpec.indexName);
 
     for (const sortOrder of nonBlockingSorts) {
-        explainRes =
-            assert.commandWorked(coll.find(query).sort(sortOrder).explain('executionStats'));
+        explainRes = assert.commandWorked(coll.find(query).sort(sortOrder).explain("executionStats"));
 
         WildcardIndexHelpers.assertExpectedIndexIsUsed(explainRes, indexSpec.indexName);
         assertBlockingSort(explainRes, false);
@@ -83,8 +68,7 @@ for (const query of supportedQueries) {
     }
 
     for (const sortOrder of blockingSorts) {
-        explainRes =
-            assert.commandWorked(coll.find(query).sort(sortOrder).explain('executionStats'));
+        explainRes = assert.commandWorked(coll.find(query).sort(sortOrder).explain("executionStats"));
 
         WildcardIndexHelpers.assertExpectedIndexIsUsed(explainRes, indexSpec.indexName);
         assertBlockingSort(explainRes, true);

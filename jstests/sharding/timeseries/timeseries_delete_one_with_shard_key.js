@@ -13,18 +13,18 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 //
 // Constants used throughout all tests.
 //
-const dbName = 'testDB';
-const collName = 'weather';
+const dbName = "testDB";
+const collName = "weather";
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const primary = st.shard0;
 const otherShard = st.shard1;
 
-assert.commandWorked(
-    mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
+assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
 
-assert.commandWorked(testDB.createCollection(
-    collName, {timeseries: {timeField: "time", metaField: "location", granularity: "hours"}}));
+assert.commandWorked(
+    testDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "location", granularity: "hours"}}),
+);
 
 const testColl = testDB[collName];
 
@@ -76,24 +76,29 @@ const data = [
 
 // Set up a sharded time-series collection and split up the data points across 2 shards.
 {
-    assert.commandWorked(testDB.adminCommand(
-        {shardCollection: testColl.getFullName(), key: {"location.shardNumber": 1}}));
+    assert.commandWorked(
+        testDB.adminCommand({shardCollection: testColl.getFullName(), key: {"location.shardNumber": 1}}),
+    );
     assert.commandWorked(testColl.insertMany(data, {ordered: false}));
 
     // Shard 0 : 2 Corks, 2 Dublins
     // Shard 1 : 2 Dublins, 2 Galways
-    assert.commandWorked(st.s.adminCommand({
-        split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
-        middle: {"meta.shardNumber": 1}
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
+            middle: {"meta.shardNumber": 1},
+        }),
+    );
 
     // Move chunks to the other shard.
-    assert.commandWorked(st.s.adminCommand({
-        movechunk: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
-        find: {"meta.shardNumber": 1},
-        to: otherShard.shardName,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            movechunk: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
+            find: {"meta.shardNumber": 1},
+            to: otherShard.shardName,
+            _waitForDelete: true,
+        }),
+    );
 
     // Ensures that each shard owns one chunk.
     const counts = st.chunkCounts(collName, dbName);
@@ -102,14 +107,16 @@ const data = [
 }
 
 let numOfDeletedMeasurements = 0;
-const runDeleteOneWithShardKey = function(query, expectedN = 1) {
+const runDeleteOneWithShardKey = function (query, expectedN = 1) {
     jsTestLog(`Expecting ${expectedN} deletion(s) for 'deleteOne' with query = ${tojson(query)}`);
     const deleteCommand = {
         delete: testColl.getName(),
-        deletes: [{
-            q: query,
-            limit: 1,
-        }]
+        deletes: [
+            {
+                q: query,
+                limit: 1,
+            },
+        ],
     };
     const result = assert.commandWorked(testDB.runCommand(deleteCommand));
 
@@ -133,8 +140,10 @@ runDeleteOneWithShardKey({"location.shardNumber": 1, "location.city": "Cork"}, 0
 
 // Verify the expected number of documents exist.
 const remainingDocuments = testColl.find({}).toArray();
-assert.eq(originalCount - numOfDeletedMeasurements,
-          remainingDocuments.length,
-          "Remaining Documents: " + tojson(remainingDocuments));
+assert.eq(
+    originalCount - numOfDeletedMeasurements,
+    remainingDocuments.length,
+    "Remaining Documents: " + tojson(remainingDocuments),
+);
 
 st.stop();

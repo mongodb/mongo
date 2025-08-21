@@ -89,10 +89,15 @@ export function getProjectionDocs() {
                 // No "a.b".
                 {bNot: [{c: "str"}, {c: "str"}]},
                 // No "a.b.c".
-                {b: [{cNot: "str", d: 1}, {cNot: "str", d: 2}]},
+                {
+                    b: [
+                        {cNot: "str", d: 1},
+                        {cNot: "str", d: 2},
+                    ],
+                },
                 // Only some "a.b.c"s.
                 {b: [{c: 3, d: 3}, {cNot: "str", d: 4}, {c: 5}]},
-            ]
+            ],
         },
 
         //
@@ -100,35 +105,67 @@ export function getProjectionDocs() {
         //
 
         // Exactly one array along the "a.b.c" path.
-        {a: [{b: {c: 2, d: 3}, e: 4}, {b: {c: 5, d: 6}, e: 7}]},
-        {a: {b: [{c: 1, d: 1}, {c: 2, d: 2}]}},
+        {
+            a: [
+                {b: {c: 2, d: 3}, e: 4},
+                {b: {c: 5, d: 6}, e: 7},
+            ],
+        },
+        {
+            a: {
+                b: [
+                    {c: 1, d: 1},
+                    {c: 2, d: 2},
+                ],
+            },
+        },
         {a: {b: {c: [1, 2, {d: 3}]}}},
         {a: ["str", {b: 1}, {c: 1}, {b: 1, c: 1, d: 1}], x: "str"},
 
         // Two arrays along the "a.b.c" path.
-        {a: [{b: [{c: 1, d: 1}, {c: 2, d: 2}]}, {b: [{c: 3, d: 3}, {c: 4, d: 4}]}]},
+        {
+            a: [
+                {
+                    b: [
+                        {c: 1, d: 1},
+                        {c: 2, d: 2},
+                    ],
+                },
+                {
+                    b: [
+                        {c: 3, d: 3},
+                        {c: 4, d: 4},
+                    ],
+                },
+            ],
+        },
         {a: [{b: {c: [1, {d: 1}]}}, {b: {c: []}}]},
         {a: {b: [{c: [1, {d: 1}]}, {c: []}]}},
 
         // "a", "a.b", and "a.b.c" are arrays.
         {
             a: [
-                {b: [{c: [1, 2, 3], d: 1}, {c: [2, 3, 4], d: 2}]},
-                {b: [{c: [3, 4, 5], d: 3}, {c: [4, 5, 6], d: 4}]}
-            ]
+                {
+                    b: [
+                        {c: [1, 2, 3], d: 1},
+                        {c: [2, 3, 4], d: 2},
+                    ],
+                },
+                {
+                    b: [
+                        {c: [3, 4, 5], d: 3},
+                        {c: [4, 5, 6], d: 4},
+                    ],
+                },
+            ],
         },
 
         // Multiple nested arrays encountered between field path components.
         {a: [[1, {b: 1}, {b: 2, c: 2}, "str"]]},
         {a: [[[{b: [[[{c: [[["str"]]], d: "str"}]]]}]]]},
         {
-            a: [
-                ["str", {b: 1}, {b: 2, c: 2}, "str"],
-                [[{b: 1}]],
-                [{b: 1}, [{b: 2}], [[{b: [2]}]]],
-            ]
+            a: [["str", {b: 1}, {b: 2, c: 2}, "str"], [[{b: 1}]], [{b: 1}, [{b: 2}], [[{b: [2]}]]]],
         },
-
     ];
 }
 

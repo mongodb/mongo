@@ -10,9 +10,9 @@ const st = new ShardingTest({shards: 2});
 
 const dbName = "test";
 const testDB = st.getDB(dbName);
-const sourceColl = testDB['source'];
-const destColl = testDB['dest'];
-const inexistentColl = testDB['inexistentColl'];
+const sourceColl = testDB["source"];
+const destColl = testDB["dest"];
+const inexistentColl = testDB["inexistentColl"];
 
 function setupCollections() {
     sourceColl.drop();
@@ -28,7 +28,7 @@ setupCollections();
 const dbPrimaryShardConn = st.getPrimaryShard(dbName);
 
 function makeCorrectCommand(sourceColl, destColl) {
-    const dbVersion = st.s.getDB('config')['databases'].findOne({_id: dbName}).version;
+    const dbVersion = st.s.getDB("config")["databases"].findOne({_id: dbName}).version;
 
     let collectionInfos = testDB.getCollectionInfos({name: destColl.getName()});
     let collectionOptions = collectionInfos.length === 1 ? collectionInfos[0].options : {};
@@ -39,7 +39,7 @@ function makeCorrectCommand(sourceColl, destColl) {
         to: destColl.getFullName(),
         indexes: destColl.getIndexes(),
         collectionOptions: collectionOptions,
-        databaseVersion: dbVersion
+        databaseVersion: dbVersion,
     };
 }
 
@@ -60,8 +60,7 @@ function makeCorrectCommand(sourceColl, destColl) {
 // If source collection does not exist, command fails.
 {
     let cmd = makeCorrectCommand(inexistentColl, destColl);
-    assert.commandFailedWithCode(dbPrimaryShardConn.adminCommand(cmd),
-                                 ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(dbPrimaryShardConn.adminCommand(cmd), ErrorCodes.NamespaceNotFound);
 }
 
 // If expected indexes don't match, command fails.
@@ -99,9 +98,8 @@ setupCollections();
 
 // If target collection is sharded, fails
 {
-    let shardedColl = testDB['sharded'];
-    assert.commandWorked(
-        st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {x: 1}}));
+    let shardedColl = testDB["sharded"];
+    assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {x: 1}}));
     let cmd = makeCorrectCommand(sourceColl, shardedColl);
     assert.commandFailedWithCode(dbPrimaryShardConn.adminCommand(cmd), ErrorCodes.IllegalOperation);
 }

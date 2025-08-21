@@ -52,8 +52,7 @@ export function insertIndexKeysByUpdateDocs(testDB, collName, keys) {
         assert.commandWorked(testDB[collName].insert({_id: i, k: i}));
     }
     for (let i = 0; i < keys.length; i++) {
-        let res = testDB.runCommand(
-            {update: collName, updates: [{q: {_id: i}, u: {$set: {k: keys[i]}}}]});
+        let res = testDB.runCommand({update: collName, updates: [{q: {_id: i}, u: {$set: {k: keys[i]}}}]});
         assert.commandWorked(res);
         assert.eq(1, res.nModified);
     }
@@ -69,8 +68,7 @@ export function deleteIndexKeysByRemoveDocs(testDB, collName, keys) {
 
 export function deleteIndexKeysByUpdateDocs(testDB, collName, keys) {
     for (let i = 0; i < keys.length; i++) {
-        let res =
-            testDB.runCommand({update: collName, updates: [{q: {k: keys[i]}, u: {$set: {k: i}}}]});
+        let res = testDB.runCommand({update: collName, updates: [{q: {k: keys[i]}, u: {$set: {k: i}}}]});
         assert.commandWorked(res);
         assert.eq(1, res.nModified);
 
@@ -97,8 +95,8 @@ export function dropIndex(testColl) {
  * This test makes sure we can insert, read, update and delete big index keys.
  */
 export function testAllInteractionsWithBigIndexKeys(testDB, collName) {
-    [true, false].forEach(function(uniqueIndex) {
-        [true, false].forEach(function(createIndexFirst) {
+    [true, false].forEach(function (uniqueIndex) {
+        [true, false].forEach(function (createIndexFirst) {
             for (let i = 0; i < bigKeyGroups.length; i++) {
                 let keys = bigKeyGroups[i];
                 let keyPattern = bigKeyPatterns[i];

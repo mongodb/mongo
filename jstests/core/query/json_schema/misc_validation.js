@@ -35,15 +35,15 @@ const coll = testDB.getCollection(testName);
 coll.drop();
 
 // Test that $jsonSchema is rejected in an $elemMatch projection.
-assert.throws(function() {
+assert.throws(function () {
     coll.find({}, {a: {$elemMatch: {$jsonSchema: {}}}}).itcount();
 });
 
 // Test that an invalid $jsonSchema fails to parse in a count command.
 const invalidSchema = {
-    invalid: {}
+    invalid: {},
 };
-assert.throws(function() {
+assert.throws(function () {
     coll.count({$jsonSchema: invalidSchema});
 });
 
@@ -52,21 +52,25 @@ assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 let res = testDB.runCommand({
     aggregate: coll.getName(),
     cursor: {},
-    pipeline: [{
-        $geoNear: {
-            near: [30, 40],
-            distanceField: "dis",
-            query: {$jsonSchema: invalidSchema},
-        }
-    }],
+    pipeline: [
+        {
+            $geoNear: {
+                near: [30, 40],
+                distanceField: "dis",
+                query: {$jsonSchema: invalidSchema},
+            },
+        },
+    ],
 });
 assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
-assert.neq(-1,
-           res.errmsg.indexOf("Unknown $jsonSchema keyword"),
-           `$geoNear failed for a reason other than invalid query: ${tojson(res)}`);
+assert.neq(
+    -1,
+    res.errmsg.indexOf("Unknown $jsonSchema keyword"),
+    `$geoNear failed for a reason other than invalid query: ${tojson(res)}`,
+);
 
 // Test that an invalid $jsonSchema fails to parse in a distinct command.
-assert.throws(function() {
+assert.throws(function () {
     coll.distinct("a", {$jsonSchema: invalidSchema});
 });
 
@@ -87,21 +91,22 @@ assert.eq(1, coll.count({$jsonSchema: {properties: {a: {type: "number"}, b: {typ
 // Test that a valid $jsonSchema is legal in a $geoNear stage.
 const point = {
     type: "Point",
-    coordinates: [31.0, 41.0]
+    coordinates: [31.0, 41.0],
 };
 assert.commandWorked(coll.insert({geo: point, a: 1}));
 assert.commandWorked(coll.insert({geo: point, a: 0}));
 assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
-res = coll.aggregate({
-              $geoNear: {
-                  near: [30, 40],
-                  spherical: true,
-                  query: {$jsonSchema: {properties: {a: {minimum: 1}}}},
-                  distanceField: "dis",
-                  includeLocs: "loc",
-              }
-          })
-          .toArray();
+res = coll
+    .aggregate({
+        $geoNear: {
+            near: [30, 40],
+            spherical: true,
+            query: {$jsonSchema: {properties: {a: {minimum: 1}}}},
+            distanceField: "dis",
+            includeLocs: "loc",
+        },
+    })
+    .toArray();
 assert.eq(1, res.length, tojson(res));
 assert.eq(res[0].loc, point, tojson(res));
 
@@ -118,11 +123,10 @@ assert(arrayEq([1, 2], coll.distinct("a", {$jsonSchema: {properties: {a: {type: 
 let schema = {properties: {a: {enum: ["STR"]}}};
 const caseInsensitiveCollation = {
     locale: "en_US",
-    strength: 1
+    strength: 1,
 };
 coll.drop();
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {collation: caseInsensitiveCollation}));
+assert.commandWorked(testDB.createCollection(coll.getName(), {collation: caseInsensitiveCollation}));
 assert.commandWorked(coll.insert({a: "str"}));
 assert.commandWorked(coll.insert({a: ["STR", "sTr"]}));
 assert.eq(0, coll.find({$jsonSchema: schema}).itcount());
@@ -135,10 +139,13 @@ assert.commandWorked(coll.insert({a: "str"}));
 assert.commandWorked(coll.insert({a: ["STR", "sTr"]}));
 
 assert.eq(0, coll.find({$jsonSchema: schema}).collation(caseInsensitiveCollation).itcount());
-assert.eq(2,
-          coll.find({$jsonSchema: {properties: {a: {uniqueItems: true}}}})
-              .collation(caseInsensitiveCollation)
-              .itcount());
+assert.eq(
+    2,
+    coll
+        .find({$jsonSchema: {properties: {a: {uniqueItems: true}}}})
+        .collation(caseInsensitiveCollation)
+        .itcount(),
+);
 assert.eq(2, coll.find({a: "STR"}).collation(caseInsensitiveCollation).itcount());
 
 // Test that $jsonSchema can be used in a $match stage within a view.
@@ -152,26 +159,27 @@ bulk.insert({name: "Mark"});
 bulk.insert({});
 assert.commandWorked(bulk.execute());
 
-assert.commandWorked(testDB.createView(
-    "seniorCitizens", coll.getName(), [{
-        $match: {
-            $jsonSchema: {
-                required: ["name", "age"],
-                properties: {name: {type: "string"}, age: {type: "number", minimum: 65}}
-            }
-        }
-    }]));
+assert.commandWorked(
+    testDB.createView("seniorCitizens", coll.getName(), [
+        {
+            $match: {
+                $jsonSchema: {
+                    required: ["name", "age"],
+                    properties: {name: {type: "string"}, age: {type: "number", minimum: 65}},
+                },
+            },
+        },
+    ]),
+);
 assert.eq(2, testDB.seniorCitizens.find().itcount());
 
 // Test that $jsonSchema can be used in the listCollections filter.
-res = testDB.runCommand(
-    {listCollections: 1, filter: {$jsonSchema: {properties: {name: {enum: [coll.getName()]}}}}});
+res = testDB.runCommand({listCollections: 1, filter: {$jsonSchema: {properties: {name: {enum: [coll.getName()]}}}}});
 assert.commandWorked(res);
 assert.eq(1, res.cursor.firstBatch.length);
 
 // Test that $jsonSchema can be used in the listDatabases filter.
-res = testDB.adminCommand(
-    {listDatabases: 1, filter: {$jsonSchema: {properties: {name: {enum: [coll.getName()]}}}}});
+res = testDB.adminCommand({listDatabases: 1, filter: {$jsonSchema: {properties: {name: {enum: [coll.getName()]}}}}});
 assert.commandWorked(res);
 assert.eq(1, res.databases.length);
 
@@ -184,17 +192,18 @@ for (let i = 0; i < 10; i++) {
 }
 assert.commandWorked(coll.insert({starting: 0}));
 
-res = coll.aggregate({
-                  $graphLookup: {
-                      from: foreign.getName(),
-                      startWith: "$starting",
-                      connectFromField: "n",
-                      connectToField: "_id",
-                      as: "integers",
-                      restrictSearchWithMatch: {$jsonSchema: {properties: {_id: {maximum: 4}}}}
-                  }
-              })
-              .toArray();
+res = coll
+    .aggregate({
+        $graphLookup: {
+            from: foreign.getName(),
+            startWith: "$starting",
+            connectFromField: "n",
+            connectToField: "_id",
+            as: "integers",
+            restrictSearchWithMatch: {$jsonSchema: {properties: {_id: {maximum: 4}}}},
+        },
+    })
+    .toArray();
 assert.eq(1, res.length);
 assert.eq(res[0].integers.length, 5);
 
@@ -206,7 +215,7 @@ assert.commandWorked(coll.insert({a: "str"}));
 assert.commandWorked(coll.insert({a: [3]}));
 
 schema = {
-    properties: {a: {type: "number", maximum: 2}}
+    properties: {a: {type: "number", maximum: 2}},
 };
 
 res = coll.deleteMany({$jsonSchema: schema});
@@ -214,8 +223,7 @@ assert.eq(2, res.deletedCount);
 assert.eq(0, coll.find({$jsonSchema: schema}).itcount());
 
 // Test that $jsonSchema does not respect the collation specified in a delete command.
-res = coll.deleteMany({$jsonSchema: {properties: {a: {enum: ["STR"]}}}},
-                      {collation: caseInsensitiveCollation});
+res = coll.deleteMany({$jsonSchema: {properties: {a: {enum: ["STR"]}}}}, {collation: caseInsensitiveCollation});
 assert.eq(0, res.deletedCount);
 
 // Test that $jsonSchema is legal in an update command.
@@ -234,7 +242,7 @@ assert.commandWorked(coll.insert({a: "long_string"}));
 assert.commandWorked(coll.insert({a: "short"}));
 
 schema = {
-    properties: {a: {type: "string", minLength: 6}}
+    properties: {a: {type: "string", minLength: 6}},
 };
 res = coll.findAndModify({query: {$jsonSchema: schema}, update: {$set: {a: "extra_long_string"}}});
 assert.eq("long_string", res.a);
@@ -249,8 +257,7 @@ assert.commandWorked(coll.insert({_id: 3, a: "temp text test"}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq(3, coll.find({$jsonSchema: {}}).itcount());
 assert.eq(2, coll.find({$jsonSchema: {properties: {a: {type: "number"}}}}).itcount());
-assert.eq(2,
-          coll.find({$jsonSchema: {required: ["a"], properties: {a: {type: "number"}}}}).itcount());
+assert.eq(2, coll.find({$jsonSchema: {required: ["a"], properties: {a: {type: "number"}}}}).itcount());
 assert.eq(2, coll.find({$or: [{$jsonSchema: {properties: {a: {minimum: 2}}}}, {b: 2}]}).itcount());
 
 // Test that $jsonSchema works correctly in the presence of a geo index.
@@ -258,32 +265,41 @@ coll.dropIndexes();
 assert.commandWorked(coll.createIndex({point: "2dsphere"}));
 assert.eq(1, coll.find({$jsonSchema: {required: ["point"]}}).itcount());
 
-assert.eq(1,
-          coll.find({
-                  $jsonSchema: {properties: {point: {minItems: 2}}},
-                  point: {$geoNear: {$geometry: {type: "Point", coordinates: [5, 5]}}}
-              })
-              .itcount());
+assert.eq(
+    1,
+    coll
+        .find({
+            $jsonSchema: {properties: {point: {minItems: 2}}},
+            point: {$geoNear: {$geometry: {type: "Point", coordinates: [5, 5]}}},
+        })
+        .itcount(),
+);
 
 coll.dropIndexes();
 assert.commandWorked(coll.createIndex({a: 1, point: "2dsphere"}));
 assert.eq(1, coll.find({$jsonSchema: {required: ["a", "point"]}}).itcount());
 
-assert.eq(1,
-          coll.find({
-                  $jsonSchema: {required: ["a"], properties: {a: {minLength: 3}}},
-                  point: {$geoNear: {$geometry: {type: "Point", coordinates: [5, 5]}}}
-              })
-              .itcount());
+assert.eq(
+    1,
+    coll
+        .find({
+            $jsonSchema: {required: ["a"], properties: {a: {minLength: 3}}},
+            point: {$geoNear: {$geometry: {type: "Point", coordinates: [5, 5]}}},
+        })
+        .itcount(),
+);
 
-assert.eq(1,
-          coll.find({
-                  $and: [
-                      {$jsonSchema: {properties: {point: {maxItems: 2}}}},
-                      {point: {$geoNear: {$geometry: {type: "Point", coordinates: [5, 5]}}}, a: 2}
-                  ]
-              })
-              .itcount());
+assert.eq(
+    1,
+    coll
+        .find({
+            $and: [
+                {$jsonSchema: {properties: {point: {maxItems: 2}}}},
+                {point: {$geoNear: {$geometry: {type: "Point", coordinates: [5, 5]}}}, a: 2},
+            ],
+        })
+        .itcount(),
+);
 
 // Test that $jsonSchema works correctly in the presence of a text index.
 coll.dropIndexes();
@@ -291,6 +307,5 @@ assert.commandWorked(coll.createIndex({a: "text"}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq(3, coll.find({$jsonSchema: {properties: {a: {minLength: 5}}}}).itcount());
 assert.eq(1, coll.find({$jsonSchema: {required: ["a"]}, $text: {$search: "test"}}).itcount());
-assert.eq(
-    3, coll.find({$or: [{$jsonSchema: {required: ["a"]}}, {$text: {$search: "TEST"}}]}).itcount());
+assert.eq(3, coll.find({$or: [{$jsonSchema: {required: ["a"]}}, {$text: {$search: "TEST"}}]}).itcount());
 assert.eq(1, coll.find({$and: [{$jsonSchema: {}}, {$text: {$search: "TEST"}}]}).itcount());

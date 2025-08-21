@@ -27,8 +27,8 @@ function checkOplogEntry(entry, lsid, txnNum, stmtId, prevTs, retryImageArgs) {
 }
 
 function checkSessionCatalog(conn, sessionId, txnNum, expectedTs) {
-    const coll = conn.getDB('config').transactions;
-    const sessionDoc = coll.findOne({'_id.id': sessionId});
+    const coll = conn.getDB("config").transactions;
+    const sessionDoc = coll.findOne({"_id.id": sessionId});
 
     assert.eq(txnNum, sessionDoc.txnNum);
     const writeTs = sessionDoc.lastWriteOpTime.ts;
@@ -36,8 +36,8 @@ function checkSessionCatalog(conn, sessionId, txnNum, expectedTs) {
 }
 
 function checkImageCollection(conn, sessionInfo, expectedTs, expectedImage, expectedImageKind) {
-    const coll = conn.getDB('config').image_collection;
-    const imageDoc = coll.findOne({'_id.id': sessionInfo.sessionId});
+    const coll = conn.getDB("config").image_collection;
+    const imageDoc = coll.findOne({"_id.id": sessionInfo.sessionId});
 
     assert.eq(sessionInfo.txnNum, imageDoc.txnNum, imageDoc);
     assert.eq(expectedImage, imageDoc.image, imageDoc);
@@ -59,13 +59,13 @@ function assertRetryCommand(cmdResponse, retryResponse) {
 }
 
 function checkProfilingLogs(primary) {
-    let db = primary.getDB('for_profiling');
-    let configDB = primary.getDB('config');
+    let db = primary.getDB("for_profiling");
+    let configDB = primary.getDB("config");
     assert.commandWorked(db.user.insert({_id: 1}));
     assert.commandWorked(configDB.setProfilingLevel(2));
 
     let cmd = {
-        findAndModify: 'user',
+        findAndModify: "user",
         query: {_id: 1},
         update: {$inc: {x: 1}},
         new: false,
@@ -73,12 +73,11 @@ function checkProfilingLogs(primary) {
         lsid: {id: UUID()},
         txnNumber: NumberLong(10),
         writeConcern: {w: 1},
-        comment: "original command"
+        comment: "original command",
     };
     assert.commandWorked(db.runCommand(cmd));
     let userProfileDocs = db.system.profile.find({"command.comment": cmd["comment"]}).toArray();
-    let configProfileDocs =
-        configDB.system.profile.find({"command.comment": cmd["comment"]}).toArray();
+    let configProfileDocs = configDB.system.profile.find({"command.comment": cmd["comment"]}).toArray();
     // The write performed by the findAndModify must show up on the `for_profiling` database's
     // `system.profile` collection. And it must not show up in the `config` database, associated
     // with `config.image_collection`.
@@ -99,17 +98,17 @@ function checkProfilingLogs(primary) {
 
 function runTests(lsid, mainConn, primary, secondary, docId) {
     let txnNumber = NumberLong(docId);
-    let incrementTxnNumber = function() {
+    let incrementTxnNumber = function () {
         txnNumber = NumberLong(txnNumber + 1);
     };
 
-    const oplog = primary.getDB('local').oplog.rs;
+    const oplog = primary.getDB("local").oplog.rs;
 
     // ////////////////////////////////////////////////////////////////////////
     // // Test findAndModify command (upsert)
 
     let cmd = {
-        findAndModify: 'user',
+        findAndModify: "user",
         query: {_id: docId},
         update: {$set: {x: 1}},
         new: true,
@@ -119,14 +118,14 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
         writeConcern: {w: numNodes},
     };
 
-    assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
 
     ////////////////////////////////////////////////////////////////////////
     // Test findAndModify command (in-place update, return pre-image)
 
     incrementTxnNumber();
     cmd = {
-        findAndModify: 'user',
+        findAndModify: "user",
         query: {_id: docId},
         update: {$inc: {x: 1}},
         new: false,
@@ -136,11 +135,11 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
         writeConcern: {w: numNodes},
     };
 
-    let expectedPreImage = mainConn.getDB('test').user.findOne({_id: docId});
-    let res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    let expectedPreImage = mainConn.getDB("test").user.findOne({_id: docId});
+    let res = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
     assert.eq(res.value, expectedPreImage);
     // Get update entry.
-    let updateOp = oplog.findOne({ns: 'test.user', op: 'u', txnNumber: txnNumber});
+    let updateOp = oplog.findOne({ns: "test.user", op: "u", txnNumber: txnNumber});
     // Check that the findAndModify oplog entry and sessions record has the appropriate fields
     // and values.
     const expectedWriteTs = Timestamp(0, 0);
@@ -155,7 +154,7 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
     checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPreImage, "preImage");
 
     // Assert that retrying the command will produce the same response.
-    let retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    let retryRes = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
     assertRetryCommand(res, retryRes);
 
     ////////////////////////////////////////////////////////////////////////
@@ -163,7 +162,7 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
 
     incrementTxnNumber();
     cmd = {
-        findAndModify: 'user',
+        findAndModify: "user",
         query: {_id: docId},
         update: {$inc: {x: 1}},
         new: true,
@@ -172,11 +171,11 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
         txnNumber: txnNumber,
         writeConcern: {w: numNodes},
     };
-    expectedPreImage = mainConn.getDB('test').user.findOne({_id: docId});
-    res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
-    let expectedPostImage = mainConn.getDB('test').user.findOne({_id: docId});
+    expectedPreImage = mainConn.getDB("test").user.findOne({_id: docId});
+    res = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
+    let expectedPostImage = mainConn.getDB("test").user.findOne({_id: docId});
     // Get update entry.
-    updateOp = oplog.findOne({ns: 'test.user', op: 'u', txnNumber: txnNumber});
+    updateOp = oplog.findOne({ns: "test.user", op: "u", txnNumber: txnNumber});
     // Check that the findAndModify oplog entry and sessions record has the appropriate fields
     // and values.
     retryArgs = {needsRetryImage: true, imageKind: "postImage"};
@@ -189,14 +188,14 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
     checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
 
     // Assert that retrying the command will produce the same response.
-    retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    retryRes = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
     assertRetryCommand(res, retryRes);
 
     ////////////////////////////////////////////////////////////////////////
     // Test findAndModify command (replacement update, return pre-image)
     incrementTxnNumber();
     cmd = {
-        findAndModify: 'user',
+        findAndModify: "user",
         query: {_id: docId},
         update: {y: 1},
         new: false,
@@ -206,10 +205,10 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
         writeConcern: {w: numNodes},
     };
 
-    expectedPreImage = mainConn.getDB('test').user.findOne({_id: docId});
-    res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    expectedPreImage = mainConn.getDB("test").user.findOne({_id: docId});
+    res = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
     // Get update entry.
-    updateOp = oplog.findOne({ns: 'test.user', op: 'u', txnNumber: txnNumber});
+    updateOp = oplog.findOne({ns: "test.user", op: "u", txnNumber: txnNumber});
     retryArgs = {needsRetryImage: true, imageKind: "preImage"};
     // Check that the findAndModify oplog entry and sessions record has the appropriate fields
     // and values.
@@ -221,7 +220,7 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
     checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPreImage, "preImage");
 
     // Assert that retrying the command will produce the same response.
-    retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    retryRes = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
     assertRetryCommand(res, retryRes);
 
     ////////////////////////////////////////////////////////////////////////
@@ -229,7 +228,7 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
 
     incrementTxnNumber();
     cmd = {
-        findAndModify: 'user',
+        findAndModify: "user",
         query: {_id: docId},
         update: {z: 1},
         new: true,
@@ -238,12 +237,12 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
         txnNumber: txnNumber,
         writeConcern: {w: numNodes},
     };
-    expectedPreImage = mainConn.getDB('test').user.findOne({_id: docId});
-    res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
-    expectedPostImage = mainConn.getDB('test').user.findOne({_id: docId});
+    expectedPreImage = mainConn.getDB("test").user.findOne({_id: docId});
+    res = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
+    expectedPostImage = mainConn.getDB("test").user.findOne({_id: docId});
 
     // Get update entry.
-    updateOp = oplog.findOne({ns: 'test.user', op: 'u', txnNumber: txnNumber});
+    updateOp = oplog.findOne({ns: "test.user", op: "u", txnNumber: txnNumber});
     retryArgs = {needsRetryImage: true, imageKind: "postImage"};
 
     // Check that the findAndModify oplog entry and sessions record has the appropriate fields
@@ -257,14 +256,14 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
     checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
 
     // Assert that retrying the command will produce the same response.
-    retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    retryRes = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
     assertRetryCommand(res, retryRes);
 
     ////////////////////////////////////////////////////////////////////////
     // Test findAndModify command (remove, return pre-image)
     incrementTxnNumber();
     cmd = {
-        findAndModify: 'user',
+        findAndModify: "user",
         query: {_id: docId},
         remove: true,
         new: false,
@@ -273,11 +272,11 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
         writeConcern: {w: numNodes},
     };
 
-    expectedPreImage = mainConn.getDB('test').user.findOne({_id: docId});
-    res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    expectedPreImage = mainConn.getDB("test").user.findOne({_id: docId});
+    res = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
 
     // Get delete entry from top of oplog.
-    const deleteOp = oplog.findOne({ns: 'test.user', op: 'd', txnNumber: txnNumber});
+    const deleteOp = oplog.findOne({ns: "test.user", op: "d", txnNumber: txnNumber});
     retryArgs = {needsRetryImage: true, imageKind: "preImage"};
     checkOplogEntry(deleteOp, lsid, txnNumber, expectedStmtId, expectedWriteTs, retryArgs);
     checkSessionCatalog(primary, lsid, txnNumber, deleteOp.ts);
@@ -287,14 +286,14 @@ function runTests(lsid, mainConn, primary, secondary, docId) {
     checkImageCollection(secondary, sessionInfo, deleteOp.ts, expectedPreImage, "preImage");
 
     // Assert that retrying the command will produce the same response.
-    retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
+    retryRes = assert.commandWorked(mainConn.getDB("test").runCommand(cmd));
     assertRetryCommand(res, retryRes);
 
     // Because the config.image_collection table is implicitly replicated, validate that writes do
     // not generate oplog entries, with the exception of deletions.
-    assert.eq(0, oplog.find({ns: "config.image_collection", op: {'$ne': 'd'}}).itcount());
+    assert.eq(0, oplog.find({ns: "config.image_collection", op: {"$ne": "d"}}).itcount());
 
-    assert(mainConn.getDB('test').user.drop());
+    assert(mainConn.getDB("test").user.drop());
 }
 
 const lsid = UUID();

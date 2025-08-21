@@ -3,8 +3,7 @@
 function createDirectories(baseDir, customSubDir) {
     const pathSep = _isWindows() ? "\\" : "/";
     const recordingDirGlobal = MongoRunner.toRealDir("$dataDir" + pathSep + baseDir);
-    const recordingDir =
-        MongoRunner.toRealDir(recordingDirGlobal + pathSep + customSubDir + pathSep);
+    const recordingDir = MongoRunner.toRealDir(recordingDirGlobal + pathSep + customSubDir + pathSep);
     jsTest.log("Creating a new directory: " + recordingDirGlobal);
     jsTest.log("Creating a new directory: " + recordingDir);
     assert(mkdir(recordingDirGlobal));
@@ -14,7 +13,7 @@ function createDirectories(baseDir, customSubDir) {
 
 function cleanUpDirectory(directoryPath) {
     jsTest.log(`Cleaning up directory: ${directoryPath}`);
-    removeFile(directoryPath);  // Deletes the directory and its contents
+    removeFile(directoryPath); // Deletes the directory and its contents
 }
 
 function parseRecordedTraffic(recordingFilePath) {
@@ -38,8 +37,7 @@ function recordOperations(recordingDirGlobal, customRecordingDir, workflowCallba
     adminDB.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
     adminDB.auth("admin", "pass");
 
-    assert.commandWorked(
-        adminDB.runCommand({startTrafficRecording: 1, destination: customRecordingDir}));
+    assert.commandWorked(adminDB.runCommand({startTrafficRecording: 1, destination: customRecordingDir}));
 
     const dbContext = {adminDB, testDB, coll, serverURI: `mongodb://${mongodInstance.host}`};
 
@@ -89,21 +87,19 @@ assert.throwsWithCode(() => replayWorkloadRecordingFile(), ErrorCodes.FailedToPa
 assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf"), ErrorCodes.FailedToParse);
 
 // Too many arguments
-assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"),
-                      ErrorCodes.FailedToParse);
+assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"), ErrorCodes.FailedToParse);
 
 // Invalid argument types
 const invalidValues = [1.1, {}, [], null, undefined, MinKey, MaxKey];
 for (let dirName of invalidValues) {
     for (let clusterSpec of invalidValues) {
-        assert.throwsWithCode(() => replayWorkloadRecordingFile(dirName, clusterSpec),
-                              ErrorCodes.FailedToParse,
-                              [],
-                              {dirName, clusterSpec});
+        assert.throwsWithCode(() => replayWorkloadRecordingFile(dirName, clusterSpec), ErrorCodes.FailedToParse, [], {
+            dirName,
+            clusterSpec,
+        });
     }
 }
-assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"),
-                      ErrorCodes.FailedToParse);
+assert.throwsWithCode(() => replayWorkloadRecordingFile("foo", "bar", "baz"), ErrorCodes.FailedToParse);
 
 // Invalid directory
 assert.throwsWithCode(() => replayWorkloadRecordingFile("asdf", "asdf"), ErrorCodes.FileOpenFailed);
@@ -120,39 +116,37 @@ removeFile(realDirectory);
 
 // ======================================================================================== //
 // Recording
-const initialResults =
-    runInstances("traffic_recording_" + UUID().hex(), "recordings", defaultOperationsLambda);
-assert.eq(initialResults.opTypes['serverStatus'], 1);
-assert.eq(initialResults.opTypes['insert'], 2);
-assert.eq(initialResults.opTypes['find'], 2);
-assert.eq(initialResults.opTypes['delete'], 1);
-assert.eq(initialResults.opTypes['aggregate'], 1);
-assert.eq(initialResults.opTypes['update'], 1);
-assert.eq(initialResults.opTypes['stopTrafficRecording'], 1);
+const initialResults = runInstances("traffic_recording_" + UUID().hex(), "recordings", defaultOperationsLambda);
+assert.eq(initialResults.opTypes["serverStatus"], 1);
+assert.eq(initialResults.opTypes["insert"], 2);
+assert.eq(initialResults.opTypes["find"], 2);
+assert.eq(initialResults.opTypes["delete"], 1);
+assert.eq(initialResults.opTypes["aggregate"], 1);
+assert.eq(initialResults.opTypes["update"], 1);
+assert.eq(initialResults.opTypes["stopTrafficRecording"], 1);
 // ======================================================================================== //
 
 // ======================================================================================== //
 // Replaying
-const replayResults =
-    runInstances("replayed_recording_" + UUID().hex(), "replayed_recordings", (dbContext) => {
-        const {
-            testDB,
-            coll,
-            serverURI  // uri of the shadow cluster server.
-        } = dbContext;
-        const recordingFilePath = initialResults.recordingFilePath;
-        const replayingFilePath = replayWorkloadLambda(recordingFilePath, serverURI);
-        return replayingFilePath;
-    });
+const replayResults = runInstances("replayed_recording_" + UUID().hex(), "replayed_recordings", (dbContext) => {
+    const {
+        testDB,
+        coll,
+        serverURI, // uri of the shadow cluster server.
+    } = dbContext;
+    const recordingFilePath = initialResults.recordingFilePath;
+    const replayingFilePath = replayWorkloadLambda(recordingFilePath, serverURI);
+    return replayingFilePath;
+});
 // in order to compute the filepath, we issue a server status inside runInstances, this plus the
 // one recorded will bring total count to 2.
-assert.eq(replayResults.opTypes['serverStatus'], 2);
-assert.eq(replayResults.opTypes['insert'], 2);
-assert.eq(replayResults.opTypes['find'], 2);
-assert.eq(replayResults.opTypes['delete'], 1);
-assert.eq(replayResults.opTypes['aggregate'], 1);
-assert.eq(replayResults.opTypes['update'], 1);
-assert.eq(replayResults.opTypes['stopTrafficRecording'], 1);
+assert.eq(replayResults.opTypes["serverStatus"], 2);
+assert.eq(replayResults.opTypes["insert"], 2);
+assert.eq(replayResults.opTypes["find"], 2);
+assert.eq(replayResults.opTypes["delete"], 1);
+assert.eq(replayResults.opTypes["aggregate"], 1);
+assert.eq(replayResults.opTypes["update"], 1);
+assert.eq(replayResults.opTypes["stopTrafficRecording"], 1);
 // ======================================================================================== //
 
 cleanUpDirectory(initialResults.recordingDirGlobal);

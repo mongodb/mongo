@@ -37,8 +37,7 @@ checkChangeStreamMetrics(db, 3, 1);
 coll.explain().aggregate([{$changeStream: {showExpandedEvents: true}}]);
 checkChangeStreamMetrics(db, 4, 2);
 
-function checkOplogMetrics(
-    db, changeStream, previousMetrics, expectedDocsReturned, expectedDocsScanned) {
+function checkOplogMetrics(db, changeStream, previousMetrics, expectedDocsReturned, expectedDocsScanned) {
     assert.soon(() => changeStream.hasNext());
     // Consume the events.
     while (changeStream.hasNext()) {
@@ -46,20 +45,16 @@ function checkOplogMetrics(
     }
 
     const newMetrics = db.serverStatus().metrics;
-    const oplogDocsReturned =
-        newMetrics.oplogStats.document.returned - previousMetrics.oplogStats.document.returned;
-    const oplogDocsScanned = newMetrics.oplogStats.queryExecutor.scannedObjects -
-        previousMetrics.oplogStats.queryExecutor.scannedObjects;
+    const oplogDocsReturned = newMetrics.oplogStats.document.returned - previousMetrics.oplogStats.document.returned;
+    const oplogDocsScanned =
+        newMetrics.oplogStats.queryExecutor.scannedObjects - previousMetrics.oplogStats.queryExecutor.scannedObjects;
     assert.gte(newMetrics.document.returned, newMetrics.oplogStats.document.returned);
-    assert.gte(newMetrics.queryExecutor.scannedObjects,
-               newMetrics.oplogStats.queryExecutor.scannedObjects);
+    assert.gte(newMetrics.queryExecutor.scannedObjects, newMetrics.oplogStats.queryExecutor.scannedObjects);
     assert.eq(expectedDocsReturned, oplogDocsReturned);
     assert.eq(expectedDocsScanned, oplogDocsScanned);
     // Check oplog stats are added to total stats.
     assert.eq(oplogDocsReturned, newMetrics.document.returned - previousMetrics.document.returned);
-    assert.eq(
-        oplogDocsScanned,
-        newMetrics.queryExecutor.scannedObjects - previousMetrics.queryExecutor.scannedObjects);
+    assert.eq(oplogDocsScanned, newMetrics.queryExecutor.scannedObjects - previousMetrics.queryExecutor.scannedObjects);
 
     changeStream.close();
 }

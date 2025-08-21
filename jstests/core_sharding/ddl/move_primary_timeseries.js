@@ -14,7 +14,7 @@
  * ]
  */
 
-import {getRandomShardName} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 const coll = db[jsTestName()];
 
@@ -35,8 +35,7 @@ assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
 const initPrimaryShard = db.getDatabasePrimaryShardId();
 
 // Create a timeseries collection
-assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: 't', metaField: 'm'}}));
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 assert.commandWorked(coll.createIndex({temp: 1, t: 1}));
 doInserts(N);
 assert.eq(N, coll.countDocuments({}));
@@ -59,4 +58,10 @@ assert.eq(3 * N, coll.countDocuments({}));
 
 // Run some sanity checks on the metadata
 assert.eq("timeseries", coll.getMetadata().type);
-assert.sameMembers([{m: 1, t: 1}, {temp: 1, t: 1}], coll.getIndexKeys());
+assert.sameMembers(
+    [
+        {m: 1, t: 1},
+        {temp: 1, t: 1},
+    ],
+    coll.getIndexKeys(),
+);

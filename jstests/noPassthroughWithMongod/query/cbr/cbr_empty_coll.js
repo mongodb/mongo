@@ -29,7 +29,7 @@ function testNonExistentColl() {
 }
 
 function assertAllPlansHaveZeroCE(explainRoot) {
-    [getWinningPlanFromExplain(explainRoot), ...getRejectedPlans(explainRoot)].forEach(plan => {
+    [getWinningPlanFromExplain(explainRoot), ...getRejectedPlans(explainRoot)].forEach((plan) => {
         assert.eq(plan.cardinalityEstimate, 0, plan);
     });
 }
@@ -60,13 +60,11 @@ function testEmptyColl() {
     assertAllPlansHaveZeroCE(emptyCollIntersectionExp);
 
     // Index union
-    const emptyCollUnionExp = coll.find({
-                                      $and: [
-                                          {$or: [{a: 10}, {b: {$gt: 99}}]},
-                                          {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}
-                                      ]
-                                  })
-                                  .explain();
+    const emptyCollUnionExp = coll
+        .find({
+            $and: [{$or: [{a: 10}, {b: {$gt: 99}}]}, {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}],
+        })
+        .explain();
     assertAllPlansHaveZeroCE(emptyCollUnionExp);
 
     // Test limit and skip with empty collection

@@ -16,8 +16,9 @@ TimeseriesTest.run((insert) => {
 
     function runTest(measurementsToInsert, queryFilter, expectedUnsuccessfulQueryFilter) {
         coll.drop();
-        assert.commandWorked(db.createCollection(
-            coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        );
 
         for (let i = 0; i < measurementsToInsert.length; i++) {
             assert.commandWorked(insert(coll, measurementsToInsert[i]));
@@ -36,122 +37,134 @@ TimeseriesTest.run((insert) => {
     }
 
     // All subfields in normalized order
-    runTest(/* measurementsToInsert = */
-            [
-                {
-                    _id: 0,
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {a: 1, b: 1}
-                },
-                {
-                    _id: 1,
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {a: 1, b: 1}
-                },
-                {
-                    _id: 2,
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {a: 1, b: 1}
-                }
-            ],
-            /* queryFilter = */ {[metaFieldName]: {a: 1, b: 1}},
-            /* expectedUnsuccessfulQuery= */ {[metaFieldName]: {b: 1, a: 1}});
+    runTest(
+        /* measurementsToInsert = */
+        [
+            {
+                _id: 0,
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {a: 1, b: 1},
+            },
+            {
+                _id: 1,
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {a: 1, b: 1},
+            },
+            {
+                _id: 2,
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {a: 1, b: 1},
+            },
+        ],
+        /* queryFilter = */ {[metaFieldName]: {a: 1, b: 1}},
+        /* expectedUnsuccessfulQuery= */ {[metaFieldName]: {b: 1, a: 1}},
+    );
 
     // Mixed ordering
-    runTest(/* measurementsToInsert = */
-            [
-                {
-                    _id: 0,
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {a: 1, b: 1}
-                },
-                {
-                    _id: 1,
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {b: 1, a: 1}
-                },
-                {
-                    _id: 2,
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {b: 1, a: 1}
-                }
-            ],
-            /* queryFilter = */ {[metaFieldName]: {a: 1, b: 1}},
-            /* expectedUnsuccessfulQuery=*/ {[metaFieldName]: {b: 1, a: 1}});
+    runTest(
+        /* measurementsToInsert = */
+        [
+            {
+                _id: 0,
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {a: 1, b: 1},
+            },
+            {
+                _id: 1,
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {b: 1, a: 1},
+            },
+            {
+                _id: 2,
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {b: 1, a: 1},
+            },
+        ],
+        /* queryFilter = */ {[metaFieldName]: {a: 1, b: 1}},
+        /* expectedUnsuccessfulQuery=*/ {[metaFieldName]: {b: 1, a: 1}},
+    );
 
     // No subfields in normalized order
-    runTest(/* measurementsToInsert = */
-            [
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {b: 1, a: 1}
-                },
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {b: 1, a: 1}
-                },
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {b: 1, a: 1}
-                }
-            ],
-            /* queryFilter = */ {[metaFieldName]: {a: 1, b: 1}},
-            /* expectedUnsuccessfulQuery=*/ {[metaFieldName]: {b: 1, a: 1}});
+    runTest(
+        /* measurementsToInsert = */
+        [
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {b: 1, a: 1},
+            },
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {b: 1, a: 1},
+            },
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {b: 1, a: 1},
+            },
+        ],
+        /* queryFilter = */ {[metaFieldName]: {a: 1, b: 1}},
+        /* expectedUnsuccessfulQuery=*/ {[metaFieldName]: {b: 1, a: 1}},
+    );
 
     // All subfields in normalized order, nested object
-    runTest(/* measurementsToInsert = */
-            [
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {nested: {a: 1, b: 1}}
-                },
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {nested: {a: 1, b: 1}}
-                },
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {nested: {a: 1, b: 1}}
-                }
-            ],
-            /* queryFilter = */ {[metaFieldName + ".nested"]: {a: 1, b: 1}},
-            /* expectedUnsuccessfulQueryFilter=*/ {[metaFieldName + ".nested"]: {b: 1, a: 1}});
+    runTest(
+        /* measurementsToInsert = */
+        [
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {nested: {a: 1, b: 1}},
+            },
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {nested: {a: 1, b: 1}},
+            },
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {nested: {a: 1, b: 1}},
+            },
+        ],
+        /* queryFilter = */ {[metaFieldName + ".nested"]: {a: 1, b: 1}},
+        /* expectedUnsuccessfulQueryFilter=*/ {[metaFieldName + ".nested"]: {b: 1, a: 1}},
+    );
 
     // Mixed ordering, nested object
-    runTest(/* measurementsToInsert = */
-            [
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {nested: {a: 1, b: 1}}
-                },
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {nested: {b: 1, a: 1}}
-                },
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {nested: {b: 1, a: 1}}
-                }
-            ],
-            /* queryFilter = */ {[metaFieldName + ".nested"]: {a: 1, b: 1}},
-            /* expectedUnsuccessfulQueryFilter=*/ {[metaFieldName + ".nested"]: {b: 1, a: 1}});
+    runTest(
+        /* measurementsToInsert = */
+        [
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {nested: {a: 1, b: 1}},
+            },
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {nested: {b: 1, a: 1}},
+            },
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {nested: {b: 1, a: 1}},
+            },
+        ],
+        /* queryFilter = */ {[metaFieldName + ".nested"]: {a: 1, b: 1}},
+        /* expectedUnsuccessfulQueryFilter=*/ {[metaFieldName + ".nested"]: {b: 1, a: 1}},
+    );
 
     // No subfields in normalized order, nested object
-    runTest(/* measurementsToInsert = */
-            [
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {nested: {b: 1, a: 1}}
-                },
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {nested: {b: 1, a: 1}}
-                },
-                {
-                    [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-                    [metaFieldName]: {nested: {b: 1, a: 1}}
-                }
-            ],
-            /* queryFilter = */ {[metaFieldName + ".nested"]: {a: 1, b: 1}},
-            /* expectedUnsuccessfulQueryFilter=*/ {[metaFieldName + ".nested"]: {b: 1, a: 1}});
+    runTest(
+        /* measurementsToInsert = */
+        [
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {nested: {b: 1, a: 1}},
+            },
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {nested: {b: 1, a: 1}},
+            },
+            {
+                [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
+                [metaFieldName]: {nested: {b: 1, a: 1}},
+            },
+        ],
+        /* queryFilter = */ {[metaFieldName + ".nested"]: {a: 1, b: 1}},
+        /* expectedUnsuccessfulQueryFilter=*/ {[metaFieldName + ".nested"]: {b: 1, a: 1}},
+    );
 });

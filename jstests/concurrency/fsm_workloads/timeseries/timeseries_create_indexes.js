@@ -12,14 +12,12 @@
  * ]
  */
 
-import {
-    uniformDistTransitions
-} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
+import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-const dbPrefix = jsTestName() + '_DB_';
+const dbPrefix = jsTestName() + "_DB_";
 const dbCount = 2;
-const collPrefix = 'coll_';
+const collPrefix = "coll_";
 const collCount = 2;
 const timeFieldName = "time";
 const metaFieldName = "meta";
@@ -32,23 +30,24 @@ function getRandomCollection(db) {
     return db[collPrefix + Random.randInt(collCount)];
 }
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {nsPrefix: "create_idx_", numCollections: 5};
 
     var states = {
-        createNormalColl: function(db, collname) {
+        createNormalColl: function (db, collname) {
             const coll = getRandomCollection(db);
-            assert.commandWorkedOrFailedWithCode(db.createCollection(coll.getName()),
-                                                 [ErrorCodes.NamespaceExists]);
+            assert.commandWorkedOrFailedWithCode(db.createCollection(coll.getName()), [ErrorCodes.NamespaceExists]);
         },
-        createTimeseriesColl: function(db, collname) {
+        createTimeseriesColl: function (db, collname) {
             const coll = getRandomCollection(db);
-            assert.commandWorkedOrFailedWithCode(db.createCollection(coll.getName(), {
-                timeseries: {timeField: timeFieldName, metaField: metaFieldName}
-            }),
-                                                 [ErrorCodes.NamespaceExists]);
+            assert.commandWorkedOrFailedWithCode(
+                db.createCollection(coll.getName(), {
+                    timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                }),
+                [ErrorCodes.NamespaceExists],
+            );
         },
-        insert: function(db, collName) {
+        insert: function (db, collName) {
             const coll = getRandomCollection(db);
             assert.commandWorkedOrFailedWithCode(
                 coll.insert({
@@ -84,19 +83,15 @@ export const $config = (function() {
                     // Can occur when mongos exhausts its retries on StaleConfig errors from the
                     // shard and returns the StaleConfig error to the client.
                     ErrorCodes.StaleConfig,
-                ]);
+                ],
+            );
         },
-        drop: function(db, collName) {
+        drop: function (db, collName) {
             const coll = getRandomCollection(db);
             coll.drop();
         },
-        createIndex: function(db, collName) {
-            const allIndexSpecs = [
-                {[metaFieldName]: 1},
-                {[timeFieldName]: 1},
-                {'measurement': 1},
-                {'other': 1},
-            ];
+        createIndex: function (db, collName) {
+            const allIndexSpecs = [{[metaFieldName]: 1}, {[timeFieldName]: 1}, {"measurement": 1}, {"other": 1}];
 
             const coll = getRandomCollection(db);
             const indexSpec = allIndexSpecs[Math.floor(Math.random() * allIndexSpecs.length)];
@@ -128,14 +123,15 @@ export const $config = (function() {
                 ErrorCodes.StaleConfig,
             ]);
         },
-        checkIndexes: function(db, collName) {
+        checkIndexes: function (db, collName) {
             const coll = getRandomCollection(db);
             const indexes = coll.getIndexes();
-            indexes.forEach(index => {
-                Object.keys(index.key).forEach(indexKey => {
-                    assert(!indexKey.startsWith('control.'),
-                           `Found buckets index spec on timeseries collection ${coll.getName()}: ${
-                               tojson(index)}`);
+            indexes.forEach((index) => {
+                Object.keys(index.key).forEach((indexKey) => {
+                    assert(
+                        !indexKey.startsWith("control."),
+                        `Found buckets index spec on timeseries collection ${coll.getName()}: ${tojson(index)}`,
+                    );
                 });
             });
         },
@@ -145,7 +141,7 @@ export const $config = (function() {
         threadCount: 12,
         iterations: 1000,
         states: states,
-        startState: 'createTimeseriesColl',
+        startState: "createTimeseriesColl",
         transitions: uniformDistTransitions(states),
     };
 })();

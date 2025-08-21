@@ -12,11 +12,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 const buildInfo = assert.commandWorked(st.s.adminCommand({"buildInfo": 1}));
-const isCodeCoverageEnabled = buildInfo.buildEnvironment.ccflags.includes('-ftest-coverage');
+const isCodeCoverageEnabled = buildInfo.buildEnvironment.ccflags.includes("-ftest-coverage");
 const isStepdownSuite = TestData.runningWithConfigStepdowns;
 if (isStepdownSuite && isCodeCoverageEnabled) {
     st.stop();
-    print('Skipping test during stepdown suite because splitChunk command would take too long');
+    print("Skipping test during stepdown suite because splitChunk command would take too long");
     quit();
 }
 
@@ -31,15 +31,14 @@ const primaryShard = st.shard0;
 const otherShard = st.shard1;
 const min = {
     x: MinKey,
-    y: MinKey
+    y: MinKey,
 };
 const max = {
     x: MaxKey,
-    y: MaxKey
+    y: MaxKey,
 };
 
-assert.commandWorked(
-    st.s.adminCommand({enablesharding: dbName, primaryShard: primaryShard.shardName}));
+assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: primaryShard.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1, y: 1}}));
 
 // Check shard version.
@@ -61,7 +60,7 @@ assert.eq(max, res.chunks[0][1]);
 // Split the existing chunks to create a large number of chunks (> 16MB).
 // This needs to be done twice since the BSONObj size limit also applies
 // to command objects for commands like splitChunk.
-const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+const bigString = "X".repeat(1024 * 1024); // 1MB
 
 // Run splitChunk on the shards directly since the split command for mongos doesn't have an option
 // to specify multiple split points or number of splits.
@@ -69,30 +68,40 @@ let splitPoints = [];
 for (let i = 0; i < 7; i++) {
     splitPoints.push({x: i, y: bigString});
 }
-assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand({
-    splitChunk: ns,
-    from: st.shard0.shardName,
-    min: min,
-    max: max,
-    keyPattern: {x: 1},
-    splitKeys: splitPoints,
-    epoch: res.versionEpoch,
-}));
+assert.commandWorked(
+    st.rs0
+        .getPrimary()
+        .getDB("admin")
+        .runCommand({
+            splitChunk: ns,
+            from: st.shard0.shardName,
+            min: min,
+            max: max,
+            keyPattern: {x: 1},
+            splitKeys: splitPoints,
+            epoch: res.versionEpoch,
+        }),
+);
 
 let prevMin = splitPoints[splitPoints.length - 1];
 splitPoints = [];
 for (let i = 7; i < 14; i++) {
     splitPoints.push({x: i, y: bigString});
 }
-assert.commandWorked(st.rs0.getPrimary().getDB('admin').runCommand({
-    splitChunk: ns,
-    from: st.shard0.shardName,
-    min: prevMin,
-    max: max,
-    keyPattern: {x: 1},
-    splitKeys: splitPoints,
-    epoch: res.versionEpoch,
-}));
+assert.commandWorked(
+    st.rs0
+        .getPrimary()
+        .getDB("admin")
+        .runCommand({
+            splitChunk: ns,
+            from: st.shard0.shardName,
+            min: prevMin,
+            max: max,
+            keyPattern: {x: 1},
+            splitKeys: splitPoints,
+            epoch: res.versionEpoch,
+        }),
+);
 
 // Ensure all the config nodes agree on a config optime that reflects the second split in case a new
 // primary config server steps up.
@@ -100,11 +109,10 @@ st.configRS.awaitLastOpCommitted();
 
 // Perform a read on the config primary to have the mongos get the latest config optime since the
 // last two splits were performed directly on the shards.
-assert.neq(null, st.s.getDB('config').databases.findOne());
+assert.neq(null, st.s.getDB("config").databases.findOne());
 
 // Trigger a refresh on the mongos through a moveChunk command.
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: ns, find: {x: 0, y: bigString}, to: otherShard.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0, y: bigString}, to: otherShard.shardName}));
 
 // Chunks should not be included in the response because the chunk size exceeds the limit.
 res = st.s.adminCommand({getShardVersion: ns, fullMetadata: true});

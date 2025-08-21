@@ -14,16 +14,14 @@ import {
     createMoviesViewAndIndex,
     enrichedTitleViewPipeline,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery
+    makeMovieVectorQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
-import {
-    assertUnionWithSearchSubPipelineAppliedViews
-} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {assertUnionWithSearchSubPipelineAppliedViews} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 import {
     assertDocArrExpectedFuzzy,
     buildExpectedResults,
     datasets,
-    validateSearchExplain
+    validateSearchExplain,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const moviesWithEnrichedTitle = createMoviesViewAndIndex(datasets.MOVIES_WITH_ENRICHED_TITLE);
@@ -31,12 +29,12 @@ const actionMovies = createMoviesViewAndIndex(datasets.ACTION_MOVIES);
 const moviesWithEnrichedTitleQuery = makeMovieVectorQuery({
     queryVector: getMoviePlotEmbeddingById(6),
     limit: 5,
-    indexName: datasets.MOVIES_WITH_ENRICHED_TITLE.indexName
+    indexName: datasets.MOVIES_WITH_ENRICHED_TITLE.indexName,
 });
 const actionMoviesQuery = makeMovieVectorQuery({
     queryVector: getMoviePlotEmbeddingById(11),
     limit: 2,
-    indexName: datasets.ACTION_MOVIES.indexName
+    indexName: datasets.ACTION_MOVIES.indexName,
 });
 const moviesColl = createMoviesCollAndIndex();
 
@@ -52,19 +50,17 @@ const pipeline = [
                 {
                     $unionWith: {
                         coll: moviesWithEnrichedTitle.getName(),
-                        pipeline: [moviesWithEnrichedTitleQuery]
-                    }
-                }
-            ]
-        }
-    }
+                        pipeline: [moviesWithEnrichedTitleQuery],
+                    },
+                },
+            ],
+        },
+    },
 ];
 
-validateSearchExplain(
-    moviesWithEnrichedTitle, pipeline, false, enrichedTitleViewPipeline, (explain) => {
-        assertUnionWithSearchSubPipelineAppliedViews(
-            explain, moviesColl, actionMovies.getName(), actionMoviesViewPipeline);
-    });
+validateSearchExplain(moviesWithEnrichedTitle, pipeline, false, enrichedTitleViewPipeline, (explain) => {
+    assertUnionWithSearchSubPipelineAppliedViews(explain, moviesColl, actionMovies.getName(), actionMoviesViewPipeline);
+});
 
 // Gather the expected results for all parts of the pipeline.
 const topLevelExpected = buildExpectedResults([0, 1, 2, 3], datasets.MOVIES_WITH_ENRICHED_TITLE);

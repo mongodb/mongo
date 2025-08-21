@@ -12,8 +12,7 @@ t.drop();
 let x = t.runCommand("create", {capped: true, size: 10000});
 assert(x.ok);
 
-for (let i = 0; i < 100; i++)
-    t.insert({_id: i, x: 1});
+for (let i = 0; i < 100; i++) t.insert({_id: i, x: 1});
 
 function q() {
     return t.findOne({_id: 5});
@@ -21,8 +20,7 @@ function q() {
 
 function u() {
     var res = t.update({_id: 5}, {$set: {x: 2}});
-    if (res.hasWriteError())
-        throw res;
+    if (res.hasWriteError()) throw res;
 }
 
 // SERVER-3064

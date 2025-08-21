@@ -12,7 +12,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 
 const coll = db[jsTestName()];
@@ -33,8 +33,8 @@ const searchStage = {
     $search: {
         index: getMovieSearchIndexSpec().name,
         text: {query: "ape", path: ["fullplot", "title"]},
-        scoreDetails: true
-    }
+        scoreDetails: true,
+    },
 };
 
 const vectorSearchStage = {
@@ -45,17 +45,17 @@ const vectorSearchStage = {
         numCandidates: limit * vectorSearchOverrequestFactor,
         index: getMovieVectorSearchIndexSpec().name,
         limit: limit,
-    }
+    },
 };
 
 const simpleMatchStage = {
     $match: {
         genres: {$in: ["Action"]},
-    }
+    },
 };
 
 const reverseSortByIdStage = {
-    $sort: {_id: -1}
+    $sort: {_id: -1},
 };
 
 const scoreMinMaxScalerNormalizationStage = {
@@ -64,7 +64,7 @@ const scoreMinMaxScalerNormalizationStage = {
         normalization: "minMaxScaler",
         weight: 0.5,
         scoreDetails: true,
-    }
+    },
 };
 
 const scoreSigmoidNormalizationStage = {
@@ -73,7 +73,7 @@ const scoreSigmoidNormalizationStage = {
         normalization: "sigmoid",
         weight: 0.4,
         scoreDetails: true,
-    }
+    },
 };
 
 const recursiveScoreStage = {
@@ -82,7 +82,7 @@ const recursiveScoreStage = {
         normalization: "none",
         weight: 0.9,
         scoreDetails: true,
-    }
+    },
 };
 
 const createScoreFusionPipeline = (inputPipelines) => {
@@ -94,9 +94,9 @@ const createScoreFusionPipeline = (inputPipelines) => {
                     normalization: "none",
                 },
                 scoreDetails: true,
-            }
+            },
         },
-        {$project: {score: {$meta: "score"}, scoreDetails: {$meta: "scoreDetails"}}}
+        {$project: {score: {$meta: "score"}, scoreDetails: {$meta: "scoreDetails"}}},
     ];
 };
 
@@ -108,11 +108,11 @@ const maxIdVectorSearch = 15;
 const minIdVectorSearch = 1;
 
 const buildSigmoidScore = (id, mult, weight) => {
-    return 1 / (1 + Math.exp(-(id * mult))) * weight;
+    return (1 / (1 + Math.exp(-(id * mult)))) * weight;
 };
 
 const buildMinMaxScalerScore = (id, mult, min, max, weight) => {
-    return ((id * mult) - (min * mult)) / ((max * mult) - (min * mult)) * weight;
+    return ((id * mult - min * mult) / (max * mult - min * mult)) * weight;
 };
 
 const buildRecursiveScore = (previousScore, mult, weight) => {
@@ -154,11 +154,13 @@ const buildRecursiveScore = (previousScore, mult, weight) => {
         ]
     }
  */
-const runMultipleScoreTest = (inputPipelines,
-                              inputPipeline1Normalization,
-                              inputPipeline2Normalization,
-                              inputPipeline1ExpectedScore,
-                              inputPipeline2ExpectedScore) => {
+const runMultipleScoreTest = (
+    inputPipelines,
+    inputPipeline1Normalization,
+    inputPipeline2Normalization,
+    inputPipeline1ExpectedScore,
+    inputPipeline2ExpectedScore,
+) => {
     const pipeline = createScoreFusionPipeline(inputPipelines);
     const res = coll.aggregate(pipeline).toArray();
 
@@ -187,42 +189,48 @@ const runMultipleScoreTest = (inputPipelines,
     assert.eq(res[0].score, (inputPipeline1ExpectedScore + inputPipeline2ExpectedScore) / 2);
 };
 
-runMultipleScoreTest({
-    a: [searchStage, scoreSigmoidNormalizationStage],
-    b: [vectorSearchStage, scoreMinMaxScalerNormalizationStage],
-},
-                     "sigmoid",
-                     "minMaxScaler",
-                     buildSigmoidScore(6, 5.1, 0.4),
-                     buildMinMaxScalerScore(6, 5.0, minIdVectorSearch, maxIdVectorSearch, 0.5));
+runMultipleScoreTest(
+    {
+        a: [searchStage, scoreSigmoidNormalizationStage],
+        b: [vectorSearchStage, scoreMinMaxScalerNormalizationStage],
+    },
+    "sigmoid",
+    "minMaxScaler",
+    buildSigmoidScore(6, 5.1, 0.4),
+    buildMinMaxScalerScore(6, 5.0, minIdVectorSearch, maxIdVectorSearch, 0.5),
+);
 
-runMultipleScoreTest({
-    a: [searchStage, scoreSigmoidNormalizationStage, scoreMinMaxScalerNormalizationStage],
-    b: [vectorSearchStage, scoreMinMaxScalerNormalizationStage, scoreSigmoidNormalizationStage],
-},
-                     "minMaxScaler",
-                     "sigmoid",
-                     buildMinMaxScalerScore(6, 5.0, minIdSearch, maxIdSearch, 0.5),
-                     buildSigmoidScore(6, 5.1, 0.4));
+runMultipleScoreTest(
+    {
+        a: [searchStage, scoreSigmoidNormalizationStage, scoreMinMaxScalerNormalizationStage],
+        b: [vectorSearchStage, scoreMinMaxScalerNormalizationStage, scoreSigmoidNormalizationStage],
+    },
+    "minMaxScaler",
+    "sigmoid",
+    buildMinMaxScalerScore(6, 5.0, minIdSearch, maxIdSearch, 0.5),
+    buildSigmoidScore(6, 5.1, 0.4),
+);
 
-runMultipleScoreTest({
-    a: [
-        simpleMatchStage,
-        reverseSortByIdStage,
-        scoreSigmoidNormalizationStage,
-        scoreMinMaxScalerNormalizationStage
-    ],
-    b: [
-        simpleMatchStage,
-        reverseSortByIdStage,
-        scoreMinMaxScalerNormalizationStage,
-        scoreSigmoidNormalizationStage
-    ],
-},
-                     "minMaxScaler",
-                     "sigmoid",
-                     buildMinMaxScalerScore(15, 5.0, minIdMatch, maxIdMatch, 0.5),
-                     buildSigmoidScore(15, 5.1, 0.4));
+runMultipleScoreTest(
+    {
+        a: [
+            simpleMatchStage,
+            reverseSortByIdStage,
+            scoreSigmoidNormalizationStage,
+            scoreMinMaxScalerNormalizationStage,
+        ],
+        b: [
+            simpleMatchStage,
+            reverseSortByIdStage,
+            scoreMinMaxScalerNormalizationStage,
+            scoreSigmoidNormalizationStage,
+        ],
+    },
+    "minMaxScaler",
+    "sigmoid",
+    buildMinMaxScalerScore(15, 5.0, minIdMatch, maxIdMatch, 0.5),
+    buildSigmoidScore(15, 5.1, 0.4),
+);
 
 runMultipleScoreTest(
     {
@@ -232,8 +240,8 @@ runMultipleScoreTest(
     "none",
     "none",
     buildRecursiveScore(buildSigmoidScore(6, 5.1, 0.4), 10.0, 0.9),
-    buildRecursiveScore(
-        buildMinMaxScalerScore(6, 5.0, minIdVectorSearch, maxIdVectorSearch, 0.5), 10.0, 0.9));
+    buildRecursiveScore(buildMinMaxScalerScore(6, 5.0, minIdVectorSearch, maxIdVectorSearch, 0.5), 10.0, 0.9),
+);
 
 dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});
 dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});

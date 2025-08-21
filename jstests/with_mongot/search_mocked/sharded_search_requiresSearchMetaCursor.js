@@ -9,9 +9,7 @@ import {
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const shardedCollName = "sharded_coll";
@@ -26,7 +24,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     mongos: 1,
     other: {
         rsOptions: {setParameter: {enableTestCommands: 1}},
-    }
+    },
 });
 
 stWithMock.start();
@@ -40,16 +38,18 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: 
 const shardedColl = testDB.getCollection(shardedCollName);
 const shardedCollNS = shardedColl.getFullName();
 const unshardedColl = testDB.getCollection(unshardedCollName);
-assert.commandWorked(shardedColl.insert([
-    {_id: 1, x: "ow"},
-    {_id: 2, x: "now", y: "lorem"},
-    {_id: 3, x: "brown", y: "ipsum"},
-    {_id: 4, x: "cow", y: "lorem ipsum"},
-    {_id: 11, x: "brown", y: "ipsum"},
-    {_id: 12, x: "cow", y: "lorem ipsum"},
-    {_id: 13, x: "brown", y: "ipsum"},
-    {_id: 14, x: "cow", y: "lorem ipsum"}
-]));
+assert.commandWorked(
+    shardedColl.insert([
+        {_id: 1, x: "ow"},
+        {_id: 2, x: "now", y: "lorem"},
+        {_id: 3, x: "brown", y: "ipsum"},
+        {_id: 4, x: "cow", y: "lorem ipsum"},
+        {_id: 11, x: "brown", y: "ipsum"},
+        {_id: 12, x: "cow", y: "lorem ipsum"},
+        {_id: 13, x: "brown", y: "ipsum"},
+        {_id: 14, x: "cow", y: "lorem ipsum"},
+    ]),
+);
 assert.commandWorked(unshardedColl.insert([{b: 1}, {b: 3}, {b: 5}]));
 
 // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
@@ -89,15 +89,19 @@ function mockShards(hasSearchMetaStage = false) {
         expectedMongotCommand.optimizationFlags = {omitSearchDocumentResults: true};
     }
 
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(mongot0ResponseBatch,
-                                                    NumberLong(0),
-                                                    [{val: 1}],
-                                                    NumberLong(0),
-                                                    shardedCollNS,
-                                                    responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot0ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                shardedCollNS,
+                responseOk,
+            ),
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId, metaCursorId);
 
@@ -108,15 +112,19 @@ function mockShards(hasSearchMetaStage = false) {
         {_id: 12, $searchScore: 29},
         {_id: 14, $searchScore: 28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(mongot1ResponseBatch,
-                                                    NumberLong(0),
-                                                    [{val: 1}],
-                                                    NumberLong(0),
-                                                    shardedCollNS,
-                                                    responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot1ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                shardedCollNS,
+                responseOk,
+            ),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId, metaCursorId);
 }
@@ -131,26 +139,35 @@ function resetShardProfilers() {
 
 // Sets up the mock responses, runs the given pipeline, then confirms via system.profile that the
 // requiresSearchMetaCursor field is set properly when commands are dispatched to shards.
-function runRequiresSearchMetaCursorTest(
-    {pipeline, coll, expectedDocs, shouldRequireSearchMetaCursor, hasSearchMetaStage = false}) {
+function runRequiresSearchMetaCursorTest({
+    pipeline,
+    coll,
+    expectedDocs,
+    shouldRequireSearchMetaCursor,
+    hasSearchMetaStage = false,
+}) {
     // Mock planShardedSearch responses.
     if (coll.getName() === shardedCollName) {
-        mockPlanShardedSearchResponse(shardedColl.getName(),
-                                      mongotQuery,
-                                      dbName,
-                                      undefined /*sortSpec*/,
-                                      stWithMock,
-                                      hasSearchMetaStage);
+        mockPlanShardedSearchResponse(
+            shardedColl.getName(),
+            mongotQuery,
+            dbName,
+            undefined /*sortSpec*/,
+            stWithMock,
+            hasSearchMetaStage,
+        );
     } else {
         // For queries where $search is in the subpipeline, we mock planShardedSearch on the shard
         // that has the unsharded collection, rather than mongos.
-        mockPlanShardedSearchResponseOnConn(shardedColl.getName(),
-                                            mongotQuery,
-                                            dbName,
-                                            undefined /*sortSpec*/,
-                                            stWithMock,
-                                            shard0Conn,
-                                            hasSearchMetaStage);
+        mockPlanShardedSearchResponseOnConn(
+            shardedColl.getName(),
+            mongotQuery,
+            dbName,
+            undefined /*sortSpec*/,
+            stWithMock,
+            shard0Conn,
+            hasSearchMetaStage,
+        );
     }
 
     mockShards(hasSearchMetaStage);
@@ -162,17 +179,17 @@ function runRequiresSearchMetaCursorTest(
 
     for (let shardDB of [shard0DB, shard1DB]) {
         const res = shardDB.system.profile
-                        .find({"command.comment": comment, "command.aggregate": shardedCollName})
-                        .toArray();
+            .find({"command.comment": comment, "command.aggregate": shardedCollName})
+            .toArray();
         assert.eq(1, res.length, res);
         if (hasSearchMetaStage) {
-            assert.eq(shouldRequireSearchMetaCursor,
-                      res[0].command.pipeline[0].$searchMeta.requiresSearchMetaCursor,
-                      res);
+            assert.eq(
+                shouldRequireSearchMetaCursor,
+                res[0].command.pipeline[0].$searchMeta.requiresSearchMetaCursor,
+                res,
+            );
         } else {
-            assert.eq(shouldRequireSearchMetaCursor,
-                      res[0].command.pipeline[0].$search.requiresSearchMetaCursor,
-                      res);
+            assert.eq(shouldRequireSearchMetaCursor, res[0].command.pipeline[0].$search.requiresSearchMetaCursor, res);
         }
     }
 }
@@ -199,19 +216,21 @@ runRequiresSearchMetaCursorTest({
     pipeline: [{$search: mongotQuery}, {$limit: 1}, {$project: {meta: "$$SEARCH_META"}}],
     coll: shardedColl,
     expectedDocs: [{_id: 11, meta: {val: 1}}],
-    shouldRequireSearchMetaCursor: true
+    shouldRequireSearchMetaCursor: true,
 });
 
 runRequiresSearchMetaCursorTest({
     pipeline: [{$search: mongotQuery}, {$sort: {_id: -1}}, {$limit: 2}],
     coll: shardedColl,
-    expectedDocs: [{_id: 14, x: "cow", y: "lorem ipsum"}, {_id: 13, x: "brown", y: "ipsum"}],
-    shouldRequireSearchMetaCursor: false
+    expectedDocs: [
+        {_id: 14, x: "cow", y: "lorem ipsum"},
+        {_id: 13, x: "brown", y: "ipsum"},
+    ],
+    shouldRequireSearchMetaCursor: false,
 });
 
 runRequiresSearchMetaCursorTest({
-    pipeline:
-        [{$search: mongotQuery}, {$sort: {_id: -1}}, {$project: {_id: 0, foo: "$$SEARCH_META"}}],
+    pipeline: [{$search: mongotQuery}, {$sort: {_id: -1}}, {$project: {_id: 0, foo: "$$SEARCH_META"}}],
     coll: shardedColl,
     expectedDocs: [
         {foo: {val: 1}},
@@ -221,23 +240,23 @@ runRequiresSearchMetaCursorTest({
         {foo: {val: 1}},
         {foo: {val: 1}},
         {foo: {val: 1}},
-        {foo: {val: 1}}
+        {foo: {val: 1}},
     ],
-    shouldRequireSearchMetaCursor: true
+    shouldRequireSearchMetaCursor: true,
 });
 
 runRequiresSearchMetaCursorTest({
     pipeline: [{$search: mongotQuery}, {$sort: {_id: -1}}, {$limit: 4}, {$project: {_id: 1}}],
     coll: shardedColl,
     expectedDocs: [{_id: 14}, {_id: 13}, {_id: 12}, {_id: 11}],
-    shouldRequireSearchMetaCursor: false
+    shouldRequireSearchMetaCursor: false,
 });
 
 runRequiresSearchMetaCursorTest({
     pipeline: [{$search: mongotQuery}, {$limit: 1}, {$addFields: {meta: "$$SEARCH_META.val"}}],
     coll: shardedColl,
     expectedDocs: [{_id: 11, x: "brown", y: "ipsum", meta: 1}],
-    shouldRequireSearchMetaCursor: true
+    shouldRequireSearchMetaCursor: true,
 });
 
 runRequiresSearchMetaCursorTest({
@@ -245,15 +264,15 @@ runRequiresSearchMetaCursorTest({
         {$search: mongotQuery},
         {$group: {_id: "$y", x: {$addToSet: "$x"}}},
         {$match: {_id: {$ne: null}}},
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
     coll: shardedColl,
     expectedDocs: [
         {_id: "ipsum", x: ["brown"]},
         {_id: "lorem", x: ["now"]},
-        {_id: "lorem ipsum", x: ["cow"]}
+        {_id: "lorem ipsum", x: ["cow"]},
     ],
-    shouldRequireSearchMetaCursor: false
+    shouldRequireSearchMetaCursor: false,
 });
 
 runRequiresSearchMetaCursorTest({
@@ -261,11 +280,14 @@ runRequiresSearchMetaCursorTest({
         {$search: mongotQuery},
         {$group: {_id: "$x", meta: {$first: "$$SEARCH_META"}}},
         {$sort: {_id: -1}},
-        {$limit: 2}
+        {$limit: 2},
     ],
     coll: shardedColl,
-    expectedDocs: [{_id: "ow", meta: {val: 1}}, {_id: "now", meta: {val: 1}}],
-    shouldRequireSearchMetaCursor: true
+    expectedDocs: [
+        {_id: "ow", meta: {val: 1}},
+        {_id: "now", meta: {val: 1}},
+    ],
+    shouldRequireSearchMetaCursor: true,
 });
 
 runRequiresSearchMetaCursorTest({
@@ -275,11 +297,11 @@ runRequiresSearchMetaCursorTest({
         {$group: {_id: "$x", y: {$first: "$y"}}},
         {$sort: {_id: 1}},
         {$limit: 1},
-        {$project: {_id: 1, y: 1, meta: "$$SEARCH_META"}}
+        {$project: {_id: 1, y: 1, meta: "$$SEARCH_META"}},
     ],
     coll: shardedColl,
     expectedDocs: [{_id: "brown", y: "ipsum", meta: {val: 1}}],
-    shouldRequireSearchMetaCursor: true
+    shouldRequireSearchMetaCursor: true,
 });
 
 runRequiresSearchMetaCursorTest({
@@ -287,7 +309,7 @@ runRequiresSearchMetaCursorTest({
     coll: shardedColl,
     expectedDocs: [{val: 1}],
     shouldRequireSearchMetaCursor: true,
-    hasSearchMetaStage: true
+    hasSearchMetaStage: true,
 });
 
 runRequiresSearchMetaCursorTest({
@@ -295,7 +317,7 @@ runRequiresSearchMetaCursorTest({
     coll: shardedColl,
     expectedDocs: [{}],
     shouldRequireSearchMetaCursor: true,
-    hasSearchMetaStage: true
+    hasSearchMetaStage: true,
 });
 
 // Before running the following pipeline, make sure shard0 has up-to-date routing information.
@@ -312,16 +334,16 @@ runRequiresSearchMetaCursorTest({
                 pipeline: [
                     {$search: mongotQuery},
                     {$match: {y: "ipsum"}},
-                    {$project : {_id: 1, meta: "$$SEARCH_META"}},
-                    {$limit: 1}
+                    {$project: {_id: 1, meta: "$$SEARCH_META"}},
+                    {$limit: 1},
                 ],
-                as: "out"
-            }
+                as: "out",
+            },
         },
-        {$project: {_id: 0, b: 1, out: 1}}
+        {$project: {_id: 0, b: 1, out: 1}},
     ],
     coll: unshardedColl,
-    expectedDocs:  [{b: 3, out: [{_id: 11, meta: {val: 1}}]}],
+    expectedDocs: [{b: 3, out: [{_id: 11, meta: {val: 1}}]}],
     shouldRequireSearchMetaCursor: true,
 });
 
@@ -332,13 +354,9 @@ runRequiresSearchMetaCursorTest({
         {
             $unionWith: {
                 coll: shardedCollName,
-                pipeline: [
-                    {$search: mongotQuery},
-                    {$project: {_id: 0, x: 1, meta: "$$SEARCH_META"}},
-                    {$limit: 1}
-                ]
-            }
-        }
+                pipeline: [{$search: mongotQuery}, {$project: {_id: 0, x: 1, meta: "$$SEARCH_META"}}, {$limit: 1}],
+            },
+        },
     ],
     coll: unshardedColl,
     expectedDocs: [{b: 5}, {x: "brown", meta: {val: 1}}],
@@ -352,9 +370,9 @@ runRequiresSearchMetaCursorTest({
         {
             $unionWith: {
                 coll: shardedCollName,
-                pipeline: [{$search: mongotQuery}, {$project: {_id: 0, x: 1}}, {$limit: 3}]
-            }
-        }
+                pipeline: [{$search: mongotQuery}, {$project: {_id: 0, x: 1}}, {$limit: 3}],
+            },
+        },
     ],
     coll: unshardedColl,
     expectedDocs: [{b: 5}, {x: "brown"}, {x: "brown"}, {x: "brown"}],
@@ -369,12 +387,12 @@ runRequiresSearchMetaCursorTest({
             $lookup: {
                 from: shardedCollName,
                 pipeline: [{$search: mongotQuery}, {$project: {_id: 0, x: 1}}, {$limit: 1}],
-                as: "out"
-            }
-        }
+                as: "out",
+            },
+        },
     ],
     coll: unshardedColl,
-    expectedDocs:  [{b: 5, out: [{x: "brown"}]}],
+    expectedDocs: [{b: 5, out: [{x: "brown"}]}],
     shouldRequireSearchMetaCursor: false,
 });
 

@@ -23,14 +23,12 @@ let rollbackNode = rollbackTest.transitionToRollbackOperations();
 
 // Open a cursor on 'rollbackNode' which returns partial results, but will remain open and idle
 // during the rollback process.
-const findCmdRes =
-    assert.commandWorked(rollbackNode.getDB(dbName).runCommand({"find": collName, batchSize: 2}));
+const findCmdRes = assert.commandWorked(rollbackNode.getDB(dbName).runCommand({"find": collName, batchSize: 2}));
 assert.eq(2, findCmdRes.cursor.firstBatch.length, findCmdRes);
 const idleCursorId = findCmdRes.cursor.id;
 assert.neq(0, idleCursorId, findCmdRes);
 
-const failPointAfterTransition =
-    configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
+const failPointAfterTransition = configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
 const failPointAfterPinCursor = configureFailPoint(rollbackNode, "getMoreHangAfterPinCursor");
 
 const joinGetMoreThread = startParallelShell(() => {
@@ -42,16 +40,18 @@ const joinGetMoreThread = startParallelShell(() => {
     // (InterruptedDueToReplStateChange) if the error message is sent out and received before
     // the connection is closed or a network error exception.
     try {
-        assert.commandFailedWithCode(db.runCommand({"getMore": cursorID, collection: "coll"}),
-                                     ErrorCodes.InterruptedDueToReplStateChange);
+        assert.commandFailedWithCode(
+            db.runCommand({"getMore": cursorID, collection: "coll"}),
+            ErrorCodes.InterruptedDueToReplStateChange,
+        );
     } catch (e) {
         assert.includes(e.toString(), "network error while attempting to run command");
     }
 }, rollbackNode.port);
 
-const cursorIdToBeReadDuringRollback =
-    assert.commandWorked(rollbackNode.getDB(dbName).runCommand({"find": collName, batchSize: 0}))
-        .cursor.id;
+const cursorIdToBeReadDuringRollback = assert.commandWorked(
+    rollbackNode.getDB(dbName).runCommand({"find": collName, batchSize: 0}),
+).cursor.id;
 
 // Wait for 'getMore' to hang on the test collection.
 assert.soonNoExcept(() => {
@@ -84,22 +84,28 @@ joinGetMoreThread();
 
 jsTestLog("Reading during rollback.");
 // Make sure that read operations fail during rollback.
-assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"find": collName}),
-                             ErrorCodes.NotPrimaryOrSecondary);
-assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand(
-                                 {"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
-                             ErrorCodes.NotPrimaryOrSecondary);
+assert.commandFailedWithCode(
+    rollbackNode.getDB(dbName).runCommand({"find": collName}),
+    ErrorCodes.NotPrimaryOrSecondary,
+);
+assert.commandFailedWithCode(
+    rollbackNode.getDB(dbName).runCommand({"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
+    ErrorCodes.NotPrimaryOrSecondary,
+);
 
 // Disable the best-effort check for primary-ness in the service entry point, so that we
 // exercise the real check for primary-ness in 'find' and 'getMore' commands.
 configureFailPoint(rollbackNode, "skipCheckingForNotPrimaryInCommandDispatch");
 
 jsTestLog("Reading during rollback (again with command dispatch checks disabled).");
-assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"find": collName}),
-                             ErrorCodes.NotPrimaryOrSecondary);
-assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand(
-                                 {"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
-                             ErrorCodes.NotPrimaryOrSecondary);
+assert.commandFailedWithCode(
+    rollbackNode.getDB(dbName).runCommand({"find": collName}),
+    ErrorCodes.NotPrimaryOrSecondary,
+);
+assert.commandFailedWithCode(
+    rollbackNode.getDB(dbName).runCommand({"getMore": cursorIdToBeReadDuringRollback, collection: collName}),
+    ErrorCodes.NotPrimaryOrSecondary,
+);
 
 failPointAfterTransition.off();
 
@@ -109,23 +115,24 @@ const replMetrics = assert.commandWorked(rollbackNode.adminCommand({serverStatus
 assert.eq(replMetrics.stateTransition.lastStateTransition, "rollback");
 // TODO (SERVER-85259): Remove references to replMetrics.stateTransition.userOperations*
 assert(
-    replMetrics.stateTransition.totalOperationsRunning ||
-        replMetrics.stateTransition.userOperationsRunning,
+    replMetrics.stateTransition.totalOperationsRunning || replMetrics.stateTransition.userOperationsRunning,
     () =>
         "Response should have a 'stateTransition.totalOperationsRunning' or 'stateTransition.userOperationsRunning' (bin <= 7.2) field: " +
-        tojson(replMetrics));
+        tojson(replMetrics),
+);
 assert(
-    replMetrics.stateTransition.totalOperationsKilled ||
-        replMetrics.stateTransition.userOperationsKilled,
+    replMetrics.stateTransition.totalOperationsKilled || replMetrics.stateTransition.userOperationsKilled,
     () =>
         "Response should have a 'stateTransition.totalOperationsKilled' or 'stateTransition.userOperationsKilled' (bin <= 7.2) field: " +
-        tojson(replMetrics));
+        tojson(replMetrics),
+);
 
 // Run a getMore against the idle cursor that remained open throughout the rollback. The getMore
 // should fail since the cursor has been invalidated by the rollback.
 assert.commandFailedWithCode(
     rollbackNode.getDB(dbName).runCommand({"getMore": idleCursorId, collection: collName}),
-    ErrorCodes.QueryPlanKilled);
+    ErrorCodes.QueryPlanKilled,
+);
 
 // Check the replica set.
 rollbackTest.stop();

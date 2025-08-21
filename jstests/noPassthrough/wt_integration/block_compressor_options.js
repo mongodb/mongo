@@ -17,14 +17,14 @@
 // On the first iteration, start a mongod. Subsequent iterations will close and restart on the
 // same dbpath.
 let firstIteration = true;
-let compressors = ['none', 'snappy', 'zlib', 'zstd'];
+let compressors = ["none", "snappy", "zlib", "zstd"];
 let mongo;
 for (let compressor of compressors) {
     jsTestLog({"Starting with compressor": compressor});
     if (firstIteration) {
         mongo = MongoRunner.runMongod({
             wiredTigerCollectionBlockCompressor: compressor,
-            wiredTigerJournalCompressor: compressor
+            wiredTigerJournalCompressor: compressor,
         });
         firstIteration = false;
     } else {
@@ -33,16 +33,16 @@ for (let compressor of compressors) {
             restart: true,
             dbpath: mongo.dbpath,
             cleanData: false,
-            wiredTigerCollectionBlockCompressor: compressor
+            wiredTigerCollectionBlockCompressor: compressor,
         });
     }
-    mongo.getDB('db')[compressor].insert({});
+    mongo.getDB("db")[compressor].insert({});
 }
 
 for (let compressor of compressors) {
     jsTestLog({"Asserting collection compressor": compressor});
-    let stats = mongo.getDB('db')[compressor].stats();
-    assert(stats['wiredTiger']['creationString'].search('block_compressor=' + compressor) > -1);
+    let stats = mongo.getDB("db")[compressor].stats();
+    assert(stats["wiredTiger"]["creationString"].search("block_compressor=" + compressor) > -1);
 }
 
 MongoRunner.stopMongod(mongo);

@@ -13,10 +13,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function assertContainsOnceJsonStringMatch(connOrFile, id, attrName, attrText, errorMsg) {
     const quote = JSON.stringify;
-    const foundMatch =
-        checkLog.checkContainsOnceJsonStringMatch(connOrFile, id, attrName, attrText);
-    const fullErrorMsg = `${errorMsg}: ${quote(attrText)} not found in the ${
-        quote(attrName)} attribute of log messages having ID ${id}`;
+    const foundMatch = checkLog.checkContainsOnceJsonStringMatch(connOrFile, id, attrName, attrText);
+    const fullErrorMsg = `${errorMsg}: ${quote(attrText)} not found in the ${quote(
+        attrName,
+    )} attribute of log messages having ID ${id}`;
     assert(foundMatch, fullErrorMsg);
 }
 
@@ -25,32 +25,33 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
     let proxy_server = new ProxyProtocolServer(ingressPort, egressPort, version);
     proxy_server.start();
 
-    let st = new ShardingTest(
-        {shards: 1, mongos: 1, mongosOptions: {setParameter: {"loadBalancerPort": egressPort}}});
+    let st = new ShardingTest({shards: 1, mongos: 1, mongosOptions: {setParameter: {"loadBalancerPort": egressPort}}});
 
     const uri = `mongodb://127.0.0.1:${ingressPort}/?loadBalanced=true`;
     const conn = new Mongo(uri);
     const mongoShellPort = conn.getShellPort();
     const proxyServerPort = proxy_server.getServerPort();
 
-    assert.neq(null, conn, 'Client was unable to connect to the load balancer port');
-    assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
+    assert.neq(null, conn, "Client was unable to connect to the load balancer port");
+    assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
 
     const fcv = conn.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1});
     if (fcv.featureCompatibilityVersion.version === latestFCV) {
+        assertContainsOnceJsonStringMatch(st.s, 22943, "isLoadBalanced", "true", "isLoadBalanced was set to false");
         assertContainsOnceJsonStringMatch(
-            st.s, 22943, "isLoadBalanced", "true", "isLoadBalanced was set to false");
-        assertContainsOnceJsonStringMatch(st.s,
-                                          22943,
-                                          "remote",
-                                          `127.0.0.1:${proxyServerPort}`,
-                                          "Remote had a different address");
+            st.s,
+            22943,
+            "remote",
+            `127.0.0.1:${proxyServerPort}`,
+            "Remote had a different address",
+        );
         assertContainsOnceJsonStringMatch(
             st.s,
             22943,
             "sourceClient",
             `127.0.0.1:${mongoShellPort}`,
-            "Source client was not included, or had a different address");
+            "Source client was not included, or had a different address",
+        );
     }
 
     proxy_server.stop();
@@ -59,18 +60,23 @@ function testProxyProtocolConnect(ingressPort, egressPort, version) {
 
 // Test that you can't connect to the load balancer port without being proxied.
 function testProxyProtocolConnectFailure(lbPort, sendLoadBalanced) {
-    let st = new ShardingTest(
-        {shards: 1, mongos: 1, mongosOptions: {setParameter: {"loadBalancerPort": lbPort}}});
+    let st = new ShardingTest({shards: 1, mongos: 1, mongosOptions: {setParameter: {"loadBalancerPort": lbPort}}});
 
     const hostName = st.s.host.substring(0, st.s.host.indexOf(":"));
     const uri = `mongodb://${hostName}:${lbPort}/?loadBalanced=${sendLoadBalanced}`;
     try {
         new Mongo(uri);
-        assert(false, 'Client was unable to connect to the load balancer port');
+        assert(false, "Client was unable to connect to the load balancer port");
     } catch (err) {
-        assert(checkLog.checkContainsOnceJsonStringMatch(
-                   st.s, 6067900, "msg", "Error while parsing proxy protocol header"),
-               "Connection failed for some reason other than lacking a proxy protocol header");
+        assert(
+            checkLog.checkContainsOnceJsonStringMatch(
+                st.s,
+                6067900,
+                "msg",
+                "Error while parsing proxy protocol header",
+            ),
+            "Connection failed for some reason other than lacking a proxy protocol header",
+        );
     }
     st.stop();
 }

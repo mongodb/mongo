@@ -8,9 +8,7 @@
 // This test induces failovers on shards.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-import {
-    runMoveChunkMakeDonorStepDownAfterFailpoint
-} from "jstests/sharding/migration_coordinator_failover_include.js";
+import {runMoveChunkMakeDonorStepDownAfterFailpoint} from "jstests/sharding/migration_coordinator_failover_include.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
@@ -24,78 +22,102 @@ var st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
-    st, dbName, "moveChunkHangAtStep3", false /* shouldMakeMigrationFailToCommitOnConfig */);
+    st,
+    dbName,
+    "moveChunkHangAtStep3",
+    false /* shouldMakeMigrationFailToCommitOnConfig */,
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
-    st, dbName, "moveChunkHangAtStep4", false /* shouldMakeMigrationFailToCommitOnConfig */);
+    st,
+    dbName,
+    "moveChunkHangAtStep4",
+    false /* shouldMakeMigrationFailToCommitOnConfig */,
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
-    st, dbName, "moveChunkHangAtStep5", false /* shouldMakeMigrationFailToCommitOnConfig */);
+    st,
+    dbName,
+    "moveChunkHangAtStep5",
+    false /* shouldMakeMigrationFailToCommitOnConfig */,
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
     "hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch]);
+    [ErrorCodes.StaleEpoch],
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
     "hangInRefreshFilteringMetadataUntilSuccessThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch]);
+    [ErrorCodes.StaleEpoch],
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
     "hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch]);
+    [ErrorCodes.StaleEpoch],
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
     "hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch]);
+    [ErrorCodes.StaleEpoch],
+);
 
 runMoveChunkMakeDonorStepDownAfterFailpoint(
     st,
     dbName,
     "hangInReadyRangeDeletionOnRecipientThenSimulateErrorUninterruptible",
     true /* shouldMakeMigrationFailToCommitOnConfig */,
-    [ErrorCodes.StaleEpoch]);
+    [ErrorCodes.StaleEpoch],
+);
 
-runMoveChunkMakeDonorStepDownAfterFailpoint(st,
-                                            dbName,
-                                            "hangInAdvanceTxnNumThenSimulateErrorUninterruptible",
-                                            true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            [ErrorCodes.StaleEpoch]);
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    st,
+    dbName,
+    "hangInAdvanceTxnNumThenSimulateErrorUninterruptible",
+    true /* shouldMakeMigrationFailToCommitOnConfig */,
+    [ErrorCodes.StaleEpoch],
+);
 
-runMoveChunkMakeDonorStepDownAfterFailpoint(st,
-                                            dbName,
-                                            "hangBeforeMakingAbortDecisionDurable",
-                                            true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            [ErrorCodes.StaleEpoch]);
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    st,
+    dbName,
+    "hangBeforeMakingAbortDecisionDurable",
+    true /* shouldMakeMigrationFailToCommitOnConfig */,
+    [ErrorCodes.StaleEpoch],
+);
 
-runMoveChunkMakeDonorStepDownAfterFailpoint(st,
-                                            dbName,
-                                            "hangBeforeSendingAbortDecision",
-                                            true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            [ErrorCodes.StaleEpoch]);
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    st,
+    dbName,
+    "hangBeforeSendingAbortDecision",
+    true /* shouldMakeMigrationFailToCommitOnConfig */,
+    [ErrorCodes.StaleEpoch],
+);
 
-runMoveChunkMakeDonorStepDownAfterFailpoint(st,
-                                            dbName,
-                                            "hangBeforeForgettingMigrationAfterAbortDecision",
-                                            true /* shouldMakeMigrationFailToCommitOnConfig */,
-                                            [ErrorCodes.StaleEpoch]);
+runMoveChunkMakeDonorStepDownAfterFailpoint(
+    st,
+    dbName,
+    "hangBeforeForgettingMigrationAfterAbortDecision",
+    true /* shouldMakeMigrationFailToCommitOnConfig */,
+    [ErrorCodes.StaleEpoch],
+);
 
 st.stop();

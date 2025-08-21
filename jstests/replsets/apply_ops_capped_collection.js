@@ -34,7 +34,8 @@ for (let i = 0; i < 20; i++) {
 assert.commandWorked(db.runCommand({applyOps: ops}));
 
 // Test that capped deletes via applyOps are permitted.
-assert.commandWorked(db.runCommand(
-    {applyOps: [{op: "d", ns: nss(dbName, collName), ts: Timestamp(20, 0), o: {_id: 19}}]}));
+assert.commandWorked(
+    db.runCommand({applyOps: [{op: "d", ns: nss(dbName, collName), ts: Timestamp(20, 0), o: {_id: 19}}]}),
+);
 
 rst.stopSet();

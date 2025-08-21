@@ -7,7 +7,7 @@ const t = db.removetest2;
 function f() {
     t.save({
         x: [3, 3, 3, 3, 3, 3, 3, 3, 4, 5, 6],
-        z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     });
     t.save({x: 9});
     t.save({x: 1});

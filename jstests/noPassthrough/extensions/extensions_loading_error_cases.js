@@ -15,8 +15,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const pathToExtensionFoo = MongoRunner.getExtensionPath("libfoo_mongo_extension.so");
 const pathToMissingSymbolExtension = MongoRunner.getExtensionPath("libno_symbol_bad_extension.so");
-const pathToDuplicateStageExtension =
-    MongoRunner.getExtensionPath("libduplicate_stage_descriptor_bad_extension.so");
+const pathToDuplicateStageExtension = MongoRunner.getExtensionPath("libduplicate_stage_descriptor_bad_extension.so");
 
 // Create a ShardingTest so that we have a config DB for mongos to point to in our test. We don't
 // use ShardingTest directly because repeated failed ShardingTest startups causes issues in the test
@@ -43,8 +42,7 @@ function runTest({options, validateExitCode = true}) {
     });
     // Test mongos.
     tryStartup(() => {
-        const conn =
-            MongoRunner.runMongos(Object.assign({configdb: st.configRS.getURL()}, options));
+        const conn = MongoRunner.runMongos(Object.assign({configdb: st.configRS.getURL()}, options));
         MongoRunner.stopMongos(conn);
     });
 }
@@ -55,8 +53,7 @@ if (isLinux()) {
     runTest({options: {loadExtensions: ""}, validateExitCode: false});
     // Extensions parameter is not allowed when the feature flag is disabled.
     runTest({
-        options:
-            {loadExtensions: pathToExtensionFoo, setParameter: {featureFlagExtensionsAPI: false}}
+        options: {loadExtensions: pathToExtensionFoo, setParameter: {featureFlagExtensionsAPI: false}},
     });
     // Extensions is a scalar, non-string.
     runTest({options: {loadExtensions: 12345}});

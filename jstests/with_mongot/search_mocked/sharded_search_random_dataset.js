@@ -8,9 +8,7 @@ import {
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const collName = "internal_search_mongot_remote";
@@ -24,14 +22,13 @@ const stWithMock = new ShardingTestWithMongotMock({
     mongos: 1,
     other: {
         rsOptions: {setParameter: {enableTestCommands: 1}},
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
 const mongos = st.s;
 const testDb = mongos.getDB(dbName);
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const testColl = testDb.getCollection(collName);
 const collNS = testColl.getFullName();
@@ -75,9 +72,7 @@ const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), 
 const mongotQuery = {};
 const cursorId = NumberLong(123);
 const metaCursorId = NumberLong(0);
-const pipeline = [
-    {$search: mongotQuery},
-];
+const pipeline = [{$search: mongotQuery}];
 
 // Given an array of ids and a range, create an array of the form:
 // [{_id: <first id in array>, $searchScore: <score for _id>}, ...].
@@ -96,7 +91,7 @@ const expectedMongotCommand = mongotCommandForQuery({
     collName: collName,
     db: dbName,
     collectionUUID: collUUID0,
-    protocolVersion: protocolVersion
+    protocolVersion: protocolVersion,
 });
 
 // Set up history for the mock associated with the primary of shard 0.
@@ -110,7 +105,8 @@ const expectedMongotCommand = mongotCommandForQuery({
                 [{val: 1}],
                 metaCursorId,
                 collNS,
-                responseOk),
+                responseOk,
+            ),
         },
         {
             expectedCommand: {getMore: cursorId, collection: collName},
@@ -120,7 +116,8 @@ const expectedMongotCommand = mongotCommandForQuery({
                 [{val: 1}],
                 metaCursorId,
                 collNS,
-                responseOk),
+                responseOk,
+            ),
         },
         {
             expectedCommand: {getMore: cursorId, collection: collName},
@@ -130,8 +127,9 @@ const expectedMongotCommand = mongotCommandForQuery({
                 [{val: 1}],
                 metaCursorId,
                 collNS,
-                responseOk)
-        }
+                responseOk,
+            ),
+        },
     ];
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
     s0Mongot.setMockResponses(history, cursorId, NumberLong(cursorId + 1001));
@@ -148,7 +146,8 @@ const expectedMongotCommand = mongotCommandForQuery({
                 [{val: 1}],
                 metaCursorId,
                 collNS,
-                responseOk),
+                responseOk,
+            ),
         },
         {
             expectedCommand: {getMore: cursorId, collection: collName},
@@ -158,7 +157,8 @@ const expectedMongotCommand = mongotCommandForQuery({
                 [{val: 1}],
                 metaCursorId,
                 collNS,
-                responseOk),
+                responseOk,
+            ),
         },
         {
             expectedCommand: {getMore: cursorId, collection: collName},
@@ -168,8 +168,9 @@ const expectedMongotCommand = mongotCommandForQuery({
                 [{val: 1}],
                 metaCursorId,
                 collNS,
-                responseOk)
-        }
+                responseOk,
+            ),
+        },
     ];
     print("this is the history");
     printjson(history);
@@ -177,8 +178,7 @@ const expectedMongotCommand = mongotCommandForQuery({
     s1Mongot.setMockResponses(history, cursorId, NumberLong(cursorId + 1001));
 }
 
-mockPlanShardedSearchResponse(
-    testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
 
 // Be sure the searchScore results are in decreasing order.
 const queryResults = testColl.aggregate(pipeline).toArray();

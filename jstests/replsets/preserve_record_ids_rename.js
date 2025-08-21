@@ -11,17 +11,9 @@
  *   uses_rename,
  * ]
  */
-import {
-    arrayEq,
-    assertArrayEq,
-} from "jstests/aggregation/extras/utils.js";
-import {
-    assertDropAndRecreateCollection,
-    assertDropCollection
-} from "jstests/libs/collection_drop_recreate.js";
-import {
-    validateShowRecordIdReplicatesAcrossNodes,
-} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
+import {arrayEq, assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {validateShowRecordIdReplicatesAcrossNodes} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replSet = new ReplSetTest({nodes: 2});
@@ -46,18 +38,15 @@ function makeSrcAndDstNames() {
 }
 
 function assertRecordIdsReplicated(coll) {
-    const collOptions = assert
-                            .commandWorked(coll.getDB().runCommand(
-                                {listCollections: 1, filter: {name: coll.getName()}}))
-                            .cursor.firstBatch[0]
-                            .options;
+    const collOptions = assert.commandWorked(
+        coll.getDB().runCommand({listCollections: 1, filter: {name: coll.getName()}}),
+    ).cursor.firstBatch[0].options;
     assert(collOptions.recordIdsReplicated);
 }
 
 function validateRidsAcrossNodes(coll) {
     replSet.awaitReplication();
-    validateShowRecordIdReplicatesAcrossNodes(
-        replSet.nodes, coll.getDB().getName(), coll.getName());
+    validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, coll.getDB().getName(), coll.getName());
 }
 
 // Returns the full set of documents in 'coll' with their $recordId sorted by $recordId.
@@ -72,33 +61,32 @@ function getDocsWithRids(coll) {
 // Populates the 'src' collection such that there aren't consecutive RecordIds in its remaining
 // documents.
 function initSrcCollectionWithGapsInRids(src) {
-    assert.commandWorked(src.insert([
-        {name: 'Alice', numKittens: 2},   // record ID: 1
-        {name: 'Bob', numKittens: 0},     // record ID: 2
-        {name: 'Bart', numKittens: 300},  // record ID: 3
-        {name: 'Lisa', numKittens: .5},   // record ID: 4
-        {name: 'Tom', numKittens: 5},     // record ID: 5
-    ]));
+    assert.commandWorked(
+        src.insert([
+            {name: "Alice", numKittens: 2}, // record ID: 1
+            {name: "Bob", numKittens: 0}, // record ID: 2
+            {name: "Bart", numKittens: 300}, // record ID: 3
+            {name: "Lisa", numKittens: 0.5}, // record ID: 4
+            {name: "Tom", numKittens: 5}, // record ID: 5
+        ]),
+    );
     // Remove some of the initial docs to generate gaps in the replicated recordIds.
-    assert.commandWorked(src.remove({name: {$in: ['Bart', 'Tom']}}));
+    assert.commandWorked(src.remove({name: {$in: ["Bart", "Tom"]}}));
     assert.eq(3, src.countDocuments({}));
 }
 
 // Tests rename behavior on a 'src' collection with 'recordIdsReplicated': true.
 // Validates that replicated RecordIds are preserved on rename within the same database, and
 // re-generated on rename across databases.
-function testRenameReplRidBehavior(
-    srcDB,
-    dstDB,
-    dropTarget,
-) {
+function testRenameReplRidBehavior(srcDB, dstDB, dropTarget) {
     const src = srcDB[srcCollName];
     const dst = dstDB[dstCollName];
 
     const docsBeforeWithRids = getDocsWithRids(src);
 
-    assert.commandWorked(primary.getDB('admin').runCommand(
-        {renameCollection: src.getFullName(), to: dst.getFullName(), dropTarget}));
+    assert.commandWorked(
+        primary.getDB("admin").runCommand({renameCollection: src.getFullName(), to: dst.getFullName(), dropTarget}),
+    );
 
     assertRecordIdsReplicated(dst);
 
@@ -117,11 +105,14 @@ function testRenameReplRidBehavior(
         assertArrayEq({
             actual: docsAfterWithRids,
             expected: docsBeforeWithRids,
-            fieldsToSkip: ['$recordId'],
+            fieldsToSkip: ["$recordId"],
         });
-        assert(!arrayEq(docsBeforeWithRids, docsAfterWithRids),
-               `Expected $recordId fields to be reassigned after rename. Before rename: ${
-                   tojson(docsBeforeWithRids)}, After: ${tojson(docsAfterWithRids)}`);
+        assert(
+            !arrayEq(docsBeforeWithRids, docsAfterWithRids),
+            `Expected $recordId fields to be reassigned after rename. Before rename: ${tojson(
+                docsBeforeWithRids,
+            )}, After: ${tojson(docsAfterWithRids)}`,
+        );
     }
     assert(!src.exists());
     validateRidsAcrossNodes(dst);
@@ -170,10 +161,8 @@ testRenameDropTargetTrue(dbA, dbA, {recordIdsReplicated: true});
 testRenameDropTargetTrue(dbA, dbB, {recordIdsReplicated: true});
 testRenameDropTargetTrue(dbA, dbA, {clusteredIndex: {key: {_id: 1}, unique: true}});
 testRenameDropTargetTrue(dbA, dbB, {clusteredIndex: {key: {_id: 1}, unique: true}});
-testRenameDropTargetTrue(
-    dbA, dbA, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 1});
-testRenameDropTargetTrue(
-    dbA, dbB, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 1});
+testRenameDropTargetTrue(dbA, dbA, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 1});
+testRenameDropTargetTrue(dbA, dbB, {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds: 1});
 
 testRenameWithIndexesAndPostInsert(dbA, dbA);
 testRenameWithIndexesAndPostInsert(dbA, dbB);

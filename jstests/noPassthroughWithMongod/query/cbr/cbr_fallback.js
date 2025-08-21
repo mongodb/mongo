@@ -1,11 +1,7 @@
 /**
  * Verify that collection, index and query types unsupported by CBR fallback to multiplanning.
  */
-import {
-    getAllPlans,
-    getPlanStages,
-    isExpress,
-} from "jstests/libs/query/analyze_plan.js";
+import {getAllPlans, getPlanStages, isExpress} from "jstests/libs/query/analyze_plan.js";
 import {assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -20,16 +16,16 @@ const coll = db[collName];
 coll.drop();
 // Ensure the collection is non-empty
 assert.commandWorked(coll.insert({a: 1}));
-assert.commandWorked(coll.insert({'2dsphere_loc': {type: 'Point', coordinates: [-73, 40]}}));
+assert.commandWorked(coll.insert({"2dsphere_loc": {type: "Point", coordinates: [-73, 40]}}));
 
 /**
  * Return a boolean predicate function which takes a plan as a parameter and returns true if the
  * plan contains an IXSCAN stage over the given 'keyPattern'.
  */
 function isPlanWithIndexScan(keyPattern) {
-    return function(plan) {
+    return function (plan) {
         const stages = getPlanStages(plan, "IXSCAN");
-        return stages.some(stage => {
+        return stages.some((stage) => {
             // bsonWoCompare returns 0 when the objects are equal
             return bsonWoCompare(stage.keyPattern, keyPattern) === 0;
         });
@@ -39,13 +35,13 @@ function isPlanWithIndexScan(keyPattern) {
 function testHashedIndex() {
     // Create hashed and non-hashed indexes on 'a'. Run a query on 'a' and check there are two
     // plans, one using either index.
-    assert.commandWorked(coll.createIndexes([{a: 1}, {a: 'hashed'}]));
+    assert.commandWorked(coll.createIndexes([{a: 1}, {a: "hashed"}]));
     const explain = coll.find({a: 1}).explain();
     const plans = getAllPlans(explain);
     assert.eq(plans.length, 2);
 
     // Assert the plan not costed used the hashed index.
-    plans.filter(isPlanWithIndexScan({a: 'hashed'})).forEach(assertPlanNotCosted);
+    plans.filter(isPlanWithIndexScan({a: "hashed"})).forEach(assertPlanNotCosted);
 
     assert.commandWorked(coll.dropIndexes());
 }
@@ -81,7 +77,7 @@ function testSparseIndex() {
 
 function testWildcardIndex() {
     assert.commandWorked(coll.createIndex({a: 1}));
-    assert.commandWorked(coll.createIndex({'$**': 1}));
+    assert.commandWorked(coll.createIndex({"$**": 1}));
     const explain = coll.find({a: 20}).explain();
     const plans = getAllPlans(explain);
     // Verify wildcard index was not costed
@@ -91,12 +87,14 @@ function testWildcardIndex() {
 }
 
 function testV1Index() {
-    assert.commandWorked(coll.runCommand('createIndexes', {
-        indexes: [
-            {key: {a: 1}, name: 'a_1', v: 1},
-            {key: {b: 1, a: 1}, name: 'a1_b1'},  // v2 is the default
-        ]
-    }));
+    assert.commandWorked(
+        coll.runCommand("createIndexes", {
+            indexes: [
+                {key: {a: 1}, name: "a_1", v: 1},
+                {key: {b: 1, a: 1}, name: "a1_b1"}, // v2 is the default
+            ],
+        }),
+    );
     const explain = coll.find({a: 1, b: 1}).explain();
     const plans = getAllPlans(explain);
     // Verify v1 index was not costed
@@ -109,17 +107,16 @@ function testTextIndex() {
     // It seems that we never multi-plan with $text predicates which only ever enumerate a single
     // plan using the text index (of which there can only be one per collection). As a result, this
     // testcase just verifies that we don't cost the plan.
-    assert.commandWorked(coll.createIndex({a: 'text'}));
+    assert.commandWorked(coll.createIndex({a: "text"}));
     {
         // Test fallback on TEXT_MATCH
-        const explain = coll.find({$text: {$search: 'abc'}}).explain();
+        const explain = coll.find({$text: {$search: "abc"}}).explain();
         const plans = getAllPlans(explain);
         plans.forEach(assertPlanNotCosted);
     }
     {
         // Test fallback on TEXT_OR
-        const explain =
-            coll.find({$text: {$search: 'a b c'}}, {score: {$meta: 'textScore'}}).explain();
+        const explain = coll.find({$text: {$search: "a b c"}}, {score: {$meta: "textScore"}}).explain();
         const plans = getAllPlans(explain);
         plans.forEach(assertPlanNotCosted);
     }
@@ -127,8 +124,8 @@ function testTextIndex() {
 }
 
 function test2dGeoIndex() {
-    assert.commandWorked(coll.createIndex({a: '2d'}));
-    assert.commandWorked(coll.createIndex({a: '2d', b: 1}));
+    assert.commandWorked(coll.createIndex({a: "2d"}));
+    assert.commandWorked(coll.createIndex({a: "2d", b: 1}));
     const explain = coll.find({a: {$near: [-73, 40], $maxDistance: 2}, b: 1}).explain();
     const plans = getAllPlans(explain);
     // Every plan must use the geo index, so assert that every plan is not costed
@@ -137,15 +134,14 @@ function test2dGeoIndex() {
 }
 
 function test2dSphereGeoIndex() {
-    assert.commandWorked(coll.createIndex({'2dsphere_loc': '2dsphere'}));
-    assert.commandWorked(coll.createIndex({'2dsphere_loc': '2dsphere', b: 1}));
-    const explain =
-        coll.find({
-                '2dsphere_loc':
-                    {$near: {$geometry: {type: 'Point', coordinates: [-73, 40]}, $maxDistance: 2}},
-                b: 1
-            })
-            .explain();
+    assert.commandWorked(coll.createIndex({"2dsphere_loc": "2dsphere"}));
+    assert.commandWorked(coll.createIndex({"2dsphere_loc": "2dsphere", b: 1}));
+    const explain = coll
+        .find({
+            "2dsphere_loc": {$near: {$geometry: {type: "Point", coordinates: [-73, 40]}, $maxDistance: 2}},
+            b: 1,
+        })
+        .explain();
     const plans = getAllPlans(explain);
     // Every plan must use the geo index, so assert that every plan is not costed
     plans.forEach(assertPlanNotCosted);
@@ -153,7 +149,7 @@ function test2dSphereGeoIndex() {
 }
 
 function testIndexCollation() {
-    const collation = {locale: 'en', strength: 2};
+    const collation = {locale: "en", strength: 2};
     assert.commandWorked(coll.createIndex({a: 1}, {collation: collation}));
     const explain = coll.find({a: "abc"}).collation(collation).explain();
     const plans = getAllPlans(explain);
@@ -162,9 +158,11 @@ function testIndexCollation() {
 }
 
 function testClusteredIndex() {
-    assert.commandWorked(db.createCollection(
-        "clusteredColl",
-        {clusteredIndex: {"key": {_id: 1}, unique: true, name: "clustered_index"}}));
+    assert.commandWorked(
+        db.createCollection("clusteredColl", {
+            clusteredIndex: {"key": {_id: 1}, unique: true, name: "clustered_index"},
+        }),
+    );
     const clusteredColl = db.clusteredColl;
     clusteredColl.insert({_id: 1});
     {
@@ -175,10 +173,10 @@ function testClusteredIndex() {
     {
         // This query is not eligible for express and runs through the query planner, verify that we
         // do not cost it. This is a regression test for SERVER-99690.
-        const explain = clusteredColl.find({_id: 1}, {'a.b': 1}).explain();
+        const explain = clusteredColl.find({_id: 1}, {"a.b": 1}).explain();
         const plans = getAllPlans(explain);
         plans
-            .filter(plan => {
+            .filter((plan) => {
                 assert(!isExpress(db, plan), plan);
                 return getPlanStages(plan, "CLUSTERED_IXSCAN").length > 0;
             })
@@ -205,18 +203,20 @@ function testReturnKey() {
 
 function testSortKeyGenerator() {
     assert.commandWorked(coll.createIndex({a: 1}));
-    const explain = coll.find({}, {a: {$meta: "sortKey"}}).sort({a: 1}).explain();
+    const explain = coll
+        .find({}, {a: {$meta: "sortKey"}})
+        .sort({a: 1})
+        .explain();
     getAllPlans(explain).forEach(assertPlanNotCosted);
     assert.commandWorked(coll.dropIndexes());
 }
 
 function testDistictScan() {
     assert.commandWorked(coll.createIndex({a: 1, b: 1}));
-    const explain =
-        coll.explain().aggregate([{$sort: {a: 1, b: 1}}, {$group: {_id: '$a', f: {$first: '$b'}}}]);
+    const explain = coll.explain().aggregate([{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", f: {$first: "$b"}}}]);
     const plans = getAllPlans(explain);
     assert.gt(plans.length, 0);
-    plans.forEach(plan => {
+    plans.forEach((plan) => {
         const distinctScanStages = getPlanStages(plan, "DISTINCT_SCAN");
         assert.neq(0, distinctScanStages.length, plan);
     });

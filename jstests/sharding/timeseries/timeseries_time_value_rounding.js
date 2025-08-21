@@ -12,10 +12,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
 
-const dbName = 'testDB';
-const collName = 'testColl';
-const timeField = 'time';
-const metaField = 'hostId';
+const dbName = "testDB";
+const collName = "testColl";
+const timeField = "time";
+const metaField = "hostId";
 
 // Connections.
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -41,17 +41,23 @@ function makeDocument(metaValue, timeValue) {
 }
 
 function getDocumentsFromShard(shard, id) {
-    return shard.getDB(dbName).getCollection(collName).aggregate([{$match: {_id: id}}]).toArray();
+    return shard
+        .getDB(dbName)
+        .getCollection(collName)
+        .aggregate([{$match: {_id: id}}])
+        .toArray();
 }
 
 function runTest() {
     // Create and shard timeseries collection.
     const shardKey = {[timeField]: 1};
-    assert.commandWorked(mongos.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
-        key: shardKey,
-        timeseries: {timeField, metaField, granularity: "hours"}
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            shardCollection: `${dbName}.${collName}`,
+            key: shardKey,
+            timeseries: {timeField, metaField, granularity: "hours"},
+        }),
+    );
     const coll = mainDB.getCollection(collName);
 
     // Insert initial set of documents.
@@ -59,15 +65,16 @@ function runTest() {
         ISODate("2000-01-01T00:00"),
         ISODate("2000-01-01T05:00"),
         ISODate("2000-01-01T15:00"),
-        ISODate("2000-01-01T20:00")
+        ISODate("2000-01-01T20:00"),
     ];
     const documents = Array.from(timeValues, (time, index) => makeDocument(index, time));
     assert.commandWorked(coll.insert(documents));
 
     // Manually split the data into two chunks.
     const splitPoint = {[`control.min.${timeField}`]: ISODate("2000-01-01T10:30")};
-    assert.commandWorked(mongos.adminCommand(
-        {split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(), middle: splitPoint}));
+    assert.commandWorked(
+        mongos.adminCommand({split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(), middle: splitPoint}),
+    );
 
     // Ensure that currently both chunks reside on the primary shard.
     let counts = st.chunkCounts(collName, dbName);
@@ -76,12 +83,14 @@ function runTest() {
 
     // Move one of the chunks into the second shard.
     const otherShard = st.getOther(primaryShard);
-    assert.commandWorked(mongos.adminCommand({
-        movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
-        find: splitPoint,
-        to: otherShard.name,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
+            find: splitPoint,
+            to: otherShard.name,
+            _waitForDelete: true,
+        }),
+    );
 
     // Ensure that each shard owns one chunk.
     counts = st.chunkCounts(collName, dbName);

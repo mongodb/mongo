@@ -13,12 +13,16 @@ rst.initiate();
 const primary = rst.getPrimary();
 const secondary = rst.getSecondary();
 
-assert(primary.adminCommand({getParameter: 1,
-                             oplogApplicationEnforcesSteadyStateConstraints:
-                                 1})["oplogApplicationEnforcesSteadyStateConstraints"]);
+assert(
+    primary.adminCommand({getParameter: 1, oplogApplicationEnforcesSteadyStateConstraints: 1})[
+        "oplogApplicationEnforcesSteadyStateConstraints"
+    ],
+);
 
-assert(secondary.adminCommand({getParameter: 1,
-                               oplogApplicationEnforcesSteadyStateConstraints:
-                                   1})["oplogApplicationEnforcesSteadyStateConstraints"]);
+assert(
+    secondary.adminCommand({getParameter: 1, oplogApplicationEnforcesSteadyStateConstraints: 1})[
+        "oplogApplicationEnforcesSteadyStateConstraints"
+    ],
+);
 
 rst.stopSet();

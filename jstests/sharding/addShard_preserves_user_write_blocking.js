@@ -44,8 +44,7 @@ rs0.restart(0, {shardsvr: ""});
 
 // Test that adding the replica set to the cluster fails since the replica set has data (BYOD no
 // longer supported)
-assert.commandFailedWithCode(st.s.adminCommand({addShard: rs0.getURL()}),
-                             ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(st.s.adminCommand({addShard: rs0.getURL()}), ErrorCodes.IllegalOperation);
 
 // Test that writing to the replica set again fails
 jsTest.log("Testing a write on the replica set should fail again");
@@ -72,8 +71,7 @@ rs1.restart(0, {shardsvr: ""});
 
 // Test that adding the replica set to the cluster fails since the replica set has data (BYOD no
 // longer supported)
-assert.commandFailedWithCode(st.s.adminCommand({addShard: rs1.getURL()}),
-                             ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(st.s.adminCommand({addShard: rs1.getURL()}), ErrorCodes.IllegalOperation);
 
 // Test that writing to the replica set again works
 jsTest.log("Testing a write on the replica set should work");

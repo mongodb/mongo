@@ -19,56 +19,61 @@ assert.commandWorked(db.dropDatabase());
 
 const coll = db[jsTestName()];
 
-const timeFieldName = 'time';
-const metaFieldName = 'meta';
-const valueFieldName = 'value';
+const timeFieldName = "time";
+const metaFieldName = "meta";
+const valueFieldName = "value";
 
 coll.drop();
-assert.commandWorked(db.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 // Insert enough documents with large enough metadata so that the bucket catalog memory
 // threshold is reached and idle buckets are expired.
 const numDocs = 100;
-const metaValue = 'a'.repeat(1024 * 1024);
+const metaValue = "a".repeat(1024 * 1024);
 for (let i = 0; i < numDocs; i++) {
     // Insert a couple of measurements in the bucket to make sure compression is triggered if
     // enabled
-    assert.commandWorked(coll.insert([
-        {
-            [timeFieldName]: ISODate(),
-            [metaFieldName]: {[i.toString()]: metaValue},
-            [valueFieldName]: 0
-        },
-        {
-            [timeFieldName]: ISODate(),
-            [metaFieldName]: {[i.toString()]: metaValue},
-            [valueFieldName]: 1
-        },
-        {
-            [timeFieldName]: ISODate(),
-            [metaFieldName]: {[i.toString()]: metaValue},
-            [valueFieldName]: 3
-        }
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {
+                [timeFieldName]: ISODate(),
+                [metaFieldName]: {[i.toString()]: metaValue},
+                [valueFieldName]: 0,
+            },
+            {
+                [timeFieldName]: ISODate(),
+                [metaFieldName]: {[i.toString()]: metaValue},
+                [valueFieldName]: 1,
+            },
+            {
+                [timeFieldName]: ISODate(),
+                [metaFieldName]: {[i.toString()]: metaValue},
+                [valueFieldName]: 3,
+            },
+        ]),
+    );
 }
 
 // Now go back and insert documents with the same metadata, and verify that we at some point
 // insert into a new bucket, indicating the old one was expired.
 let foundExpiredBucket = false;
 for (let i = 0; i < numDocs; i++) {
-    assert.commandWorked(coll.insert({
-        [timeFieldName]: ISODate(),
-        [metaFieldName]: {[i.toString()]: metaValue},
-        [valueFieldName]: 3
-    }));
+    assert.commandWorked(
+        coll.insert({
+            [timeFieldName]: ISODate(),
+            [metaFieldName]: {[i.toString()]: metaValue},
+            [valueFieldName]: 3,
+        }),
+    );
 
     // Check buckets.
     let bucketDocs = getTimeseriesCollForRawOps(db, coll)
-                         .find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
-                         .rawData()
-                         .limit(1)
-                         .toArray();
+        .find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
+        .rawData()
+        .limit(1)
+        .toArray();
     if (bucketDocs.length > 0) {
         foundExpiredBucket = true;
     }

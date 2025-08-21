@@ -14,26 +14,26 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/update/updateOne_with_sort_update_queue.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/update/updateOne_with_sort_update_queue.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Use the same workload name as the database name, since the workload
     // name is assumed to be unique.
     $config.data.uniqueDBName = jsTestName();
 
     $config.iterations = 1;
 
-    $config.states.updateOne = function(db, collName) {
+    $config.states.updateOne = function (db, collName) {
         const updateCmd = {
             update: collName,
-            updates: [{
-                q: {sortField: 1, queryField: 1},
-                u: {$inc: {sortField: 1}},
-                multi: false,
-                sort: {sortField: -1}
-            }]
+            updates: [
+                {
+                    q: {sortField: 1, queryField: 1},
+                    u: {$inc: {sortField: 1}},
+                    multi: false,
+                    sort: {sortField: -1},
+                },
+            ],
         };
 
         // Update field 'a' to avoid matching the same document again.
@@ -43,15 +43,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
     };
 
-    $config.setup = function(db, collName) {
+    $config.setup = function (db, collName) {
         var bulk = db[collName].initializeUnorderedBulkOp();
         var doc = this.newDocForInsert(1);
         // Require that documents inserted by this workload use _id values that can be compared
         // using the default JS comparator.
-        assert.neq(typeof doc._id,
-                   'object',
-                   'default comparator of' +
-                       ' Array.prototype.sort() is not well-ordered for JS objects');
+        assert.neq(
+            typeof doc._id,
+            "object",
+            "default comparator of" + " Array.prototype.sort() is not well-ordered for JS objects",
+        );
         bulk.insert(doc);
         var res = bulk.execute();
         assert.commandWorked(res);
@@ -63,7 +64,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         });
     };
 
-    $config.teardown = function(db, collName) {
+    $config.teardown = function (db, collName) {
         var docs = db[collName].find().toArray();
         // Assert that while 10 threads attempted an updateOne on a single matching document, it was
         // only updated once with the correct update. All updateOne operations look for a document

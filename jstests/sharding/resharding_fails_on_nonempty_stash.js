@@ -28,14 +28,14 @@ reshardingTest.withReshardingInBackground(
         newShardKeyPattern: {newKey: 1},
         newChunks: [
             {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
-            {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]}
+            {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
     () => {
         const mongos = inputCollection.getMongo();
         assert.soon(() => {
             const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: inputCollection.getFullName()
+                ns: inputCollection.getFullName(),
             });
             return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
@@ -44,13 +44,16 @@ reshardingTest.withReshardingInBackground(
         // collections. It is possible to construct such a sharded collection due to how each shard
         // independently enforces the uniqueness of _id values for only the documents it owns. The
         // resharding operation is expected to abort upon discovering this violation.
-        assert.commandWorked(inputCollection.insert([
-            {_id: 0, info: `moves from ${donorShardNames[0]}`, oldKey: -10, newKey: 10},
-            {_id: 0, info: `moves from ${donorShardNames[1]}`, oldKey: 10, newKey: 10},
-        ]));
+        assert.commandWorked(
+            inputCollection.insert([
+                {_id: 0, info: `moves from ${donorShardNames[0]}`, oldKey: -10, newKey: 10},
+                {_id: 0, info: `moves from ${donorShardNames[1]}`, oldKey: 10, newKey: 10},
+            ]),
+        );
     },
     {
         expectedErrorCode: 5356800,
-    });
+    },
+);
 
 reshardingTest.teardown();

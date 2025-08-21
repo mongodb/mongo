@@ -11,7 +11,7 @@
  */
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         randRange: function randRange(low, high) {
             // return random number in range [low, high]
@@ -24,10 +24,10 @@ export const $config = (function() {
         getCount: function getCount(db, predicate) {
             var query = Object.extend({tid: this.tid}, predicate);
             return db[this.threadCollName].count(query);
-        }
+        },
     };
 
-    var states = (function() {
+    var states = (function () {
         function init(db, collName) {
             this.modulus = this.randRange(5, 10);
             this.countPerNum = this.randRange(50, 100);

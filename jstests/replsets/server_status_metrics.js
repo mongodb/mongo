@@ -12,14 +12,13 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkWriteConcernTimedOut,
     restartServerReplication,
-    stopServerReplication
+    stopServerReplication,
 } from "jstests/libs/write_concern_util.js";
 
 /**
  * Test replication metrics
  */
-function _testSecondaryMetricsHelper(
-    secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten) {
+function _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten) {
     var ss = secondary.getDB("test").serverStatus();
     jsTestLog(`Secondary ${secondary.host} metrics: ${tojson(ss.metrics)}`);
 
@@ -30,22 +29,16 @@ function _testSecondaryMetricsHelper(
     // n ops (initiate and new primary) before steady replication starts.
     // Sometimes, we disconnect from our sync source and since our find is a gte query, we may
     // double count an oplog entry, so we need some wiggle room for that.
-    assert.lte(
-        ss.metrics.repl.network.ops, opCount + baseOpsApplied + 5, "wrong number of ops retrieved");
-    assert.gte(
-        ss.metrics.repl.network.ops, opCount + baseOpsApplied, "wrong number of ops retrieved");
+    assert.lte(ss.metrics.repl.network.ops, opCount + baseOpsApplied + 5, "wrong number of ops retrieved");
+    assert.gte(ss.metrics.repl.network.ops, opCount + baseOpsApplied, "wrong number of ops retrieved");
     assert(ss.metrics.repl.network.bytes > 0, "zero or missing network bytes");
 
-    assert.gt(
-        ss.metrics.repl.network.replSetUpdatePosition.num, 0, "no update position commands sent");
+    assert.gt(ss.metrics.repl.network.replSetUpdatePosition.num, 0, "no update position commands sent");
 
     // Under a two-node replica set setting, the secondary should not have received or processed any
     // oplog getMore requests from the primary.
-    assert.eq(
-        ss.metrics.repl.network.oplogGetMoresProcessed.num, 0, "non-zero oplog getMore processed");
-    assert.eq(ss.metrics.repl.network.oplogGetMoresProcessed.totalMillis,
-              0,
-              "non-zero oplog getMore process time");
+    assert.eq(ss.metrics.repl.network.oplogGetMoresProcessed.num, 0, "non-zero oplog getMore processed");
+    assert.eq(ss.metrics.repl.network.oplogGetMoresProcessed.totalMillis, 0, "non-zero oplog getMore process time");
 
     assert.gt(ss.metrics.repl.syncSource.numSelections, 0, "num selections not incremented");
     assert.gt(ss.metrics.repl.syncSource.numTimesChoseDifferent, 0, "no new sync source chosen");
@@ -53,12 +46,10 @@ function _testSecondaryMetricsHelper(
     if (FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")) {
         assert(ss.metrics.repl.buffer.write.count >= 0, "write buffer count missing");
         assert(ss.metrics.repl.buffer.write.sizeBytes >= 0, "write buffer size (bytes)] missing");
-        assert(ss.metrics.repl.buffer.write.maxSizeBytes >= 0,
-               "write buffer maxSize (bytes) missing");
+        assert(ss.metrics.repl.buffer.write.maxSizeBytes >= 0, "write buffer maxSize (bytes) missing");
         assert(ss.metrics.repl.buffer.apply.count >= 0, "apply buffer count missing");
         assert(ss.metrics.repl.buffer.apply.sizeBytes >= 0, "apply buffer size (bytes)] missing");
-        assert(ss.metrics.repl.buffer.apply.maxSizeBytes >= 0,
-               "apply buffer maxSize (bytes) missing");
+        assert(ss.metrics.repl.buffer.apply.maxSizeBytes >= 0, "apply buffer maxSize (bytes) missing");
         assert(!ss.metrics.repl.buffer.count, "repl.buffer.count shoud not exist");
     } else {
         assert(ss.metrics.repl.buffer.count >= 0, "buffer count missing");
@@ -68,17 +59,13 @@ function _testSecondaryMetricsHelper(
         assert(!ss.metrics.repl.buffer.apply, "repl.buffer.apply should not exist");
     }
 
-    assert.eq(ss.metrics.repl.apply.batchSize,
-              opCount + baseOpsReceived,
-              "apply ops batch size mismatch");
+    assert.eq(ss.metrics.repl.apply.batchSize, opCount + baseOpsReceived, "apply ops batch size mismatch");
     assert(ss.metrics.repl.apply.batches.num > 0, "no applied batches");
     assert(ss.metrics.repl.apply.batches.totalMillis >= 0, "missing applied batch time");
     assert.eq(ss.metrics.repl.apply.ops, opCount + baseOpsApplied, "wrong number of applied ops");
 
     if (FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")) {
-        assert.eq(ss.metrics.repl.write.batchSize,
-                  opCount + baseOpsWritten,
-                  "write ops batch size mismatch");
+        assert.eq(ss.metrics.repl.write.batchSize, opCount + baseOpsWritten, "write ops batch size mismatch");
         assert(ss.metrics.repl.write.batches.num > 0, "no write batches");
         assert(ss.metrics.repl.write.batches.totalMillis >= 0, "missing write batch time");
     } else {
@@ -91,8 +78,7 @@ function _testSecondaryMetricsHelper(
 function testSecondaryMetrics(secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten) {
     assert.soon(() => {
         try {
-            _testSecondaryMetricsHelper(
-                secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten);
+            _testSecondaryMetricsHelper(secondary, opCount, baseOpsApplied, baseOpsReceived, baseOpsWritten);
             return true;
         } catch (exc) {
             jsTestLog(`Caught ${exc}, retrying`);
@@ -125,16 +111,16 @@ var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Record the base oplogGetMoresProcessed on primary and the base oplog getmores on secondary.
-const primaryBaseOplogGetMoresProcessedNum =
-    primary.getDB("test").serverStatus().metrics.repl.network.oplogGetMoresProcessed.num;
-const secondaryBaseGetMoresNum =
-    secondary.getDB("test").serverStatus().metrics.repl.network.getmores.num;
+const primaryBaseOplogGetMoresProcessedNum = primary.getDB("test").serverStatus().metrics.repl.network
+    .oplogGetMoresProcessed.num;
+const secondaryBaseGetMoresNum = secondary.getDB("test").serverStatus().metrics.repl.network.getmores.num;
 
-assert.commandWorked(testDB.createCollection('a'));
+assert.commandWorked(testDB.createCollection("a"));
 assert.commandWorked(testDB.b.insert({}, {writeConcern: {w: 2}}));
 
 var ss = secondary.getDB("test").serverStatus();
@@ -143,8 +129,7 @@ var ss = secondary.getDB("test").serverStatus();
 // optime is greater than OplogApplier::Options::beginApplyingOpTime.
 var secondaryBaseOplogOpsApplied = ss.metrics.repl.apply.ops;
 var secondaryBaseOplogOpsReceived = ss.metrics.repl.apply.batchSize;
-var secondaryBaseOplogOpsWritten =
-    FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")
+var secondaryBaseOplogOpsWritten = FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency")
     ? ss.metrics.repl.write.batchSize
     : undefined;
 
@@ -158,49 +143,57 @@ for (let x = 0; x < 1000; x++) {
 }
 assert.commandWorked(bulk.execute({w: 2}));
 
-testSecondaryMetrics(secondary,
-                     1000,
-                     secondaryBaseOplogOpsApplied,
-                     secondaryBaseOplogOpsReceived,
-                     secondaryBaseOplogOpsWritten);
+testSecondaryMetrics(
+    secondary,
+    1000,
+    secondaryBaseOplogOpsApplied,
+    secondaryBaseOplogOpsReceived,
+    secondaryBaseOplogOpsWritten,
+);
 
 var options = {writeConcern: {w: 2}, multi: true, upsert: true};
 assert.commandWorked(testDB.a.update({}, {$set: {d: new Date()}}, options));
 
-testSecondaryMetrics(secondary,
-                     2000,
-                     secondaryBaseOplogOpsApplied,
-                     secondaryBaseOplogOpsReceived,
-                     secondaryBaseOplogOpsWritten);
+testSecondaryMetrics(
+    secondary,
+    2000,
+    secondaryBaseOplogOpsApplied,
+    secondaryBaseOplogOpsReceived,
+    secondaryBaseOplogOpsWritten,
+);
 
 // Test that the number of oplog getMore requested by the secondary and processed by the primary has
 // increased since the start of the test.
-const primaryOplogGetMoresProcessedNum =
-    primary.getDB("test").serverStatus().metrics.repl.network.oplogGetMoresProcessed.num;
-const secondaryGetMoresNum =
-    secondary.getDB("test").serverStatus().metrics.repl.network.getmores.num;
-assert.gt(primaryOplogGetMoresProcessedNum,
-          primaryBaseOplogGetMoresProcessedNum,
-          `primary getMores processed have not increased; final: ${
-              primaryOplogGetMoresProcessedNum}, base: ${primaryBaseOplogGetMoresProcessedNum}`);
-assert.gt(secondaryGetMoresNum,
-          secondaryBaseGetMoresNum,
-          `secondary getMores received have not increased; final: ${secondaryGetMoresNum}, base: ${
-              secondaryBaseGetMoresNum}`);
+const primaryOplogGetMoresProcessedNum = primary.getDB("test").serverStatus().metrics.repl.network
+    .oplogGetMoresProcessed.num;
+const secondaryGetMoresNum = secondary.getDB("test").serverStatus().metrics.repl.network.getmores.num;
+assert.gt(
+    primaryOplogGetMoresProcessedNum,
+    primaryBaseOplogGetMoresProcessedNum,
+    `primary getMores processed have not increased; final: ${
+        primaryOplogGetMoresProcessedNum
+    }, base: ${primaryBaseOplogGetMoresProcessedNum}`,
+);
+assert.gt(
+    secondaryGetMoresNum,
+    secondaryBaseGetMoresNum,
+    `secondary getMores received have not increased; final: ${secondaryGetMoresNum}, base: ${secondaryBaseGetMoresNum}`,
+);
 
 // Test getLastError.wtime and that it only records stats for w > 1, see SERVER-9005
 var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis;
 var startNum = testDB.serverStatus().metrics.getLastError.wtime.num;
 
-jsTestLog(
-    `Primary ${primary.host} metrics #1: ${tojson(primary.getDB("test").serverStatus().metrics)}`);
+jsTestLog(`Primary ${primary.host} metrics #1: ${tojson(primary.getDB("test").serverStatus().metrics)}`);
 
 assert.commandWorked(testDB.a.insert({x: 1}, {writeConcern: {w: 1, wtimeout: 5000}}));
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
-assert.commandFailedWithCode(testDB.a.insert({x: 1}, {writeConcern: {w: -11, wtimeout: 5000}}),
-                             ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(
+    testDB.a.insert({x: 1}, {writeConcern: {w: -11, wtimeout: 5000}}),
+    ErrorCodes.FailedToParse,
+);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.totalMillis, startMillis);
 assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum);
 
@@ -216,9 +209,10 @@ assert.eq(testDB.serverStatus().metrics.getLastError.wtime.num, startNum + 2);
 var startGLEMetrics = testDB.serverStatus().metrics.getLastError;
 
 // Set the default WC to timeout.
-assert.commandWorked(testDB.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 2, wtimeout: 1000}, writeConcern: {w: 1}}));
-var stopReplProducer = configureFailPoint(secondary, 'stopReplProducer');
+assert.commandWorked(
+    testDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 2, wtimeout: 1000}, writeConcern: {w: 1}}),
+);
+var stopReplProducer = configureFailPoint(secondary, "stopReplProducer");
 stopReplProducer.wait();
 
 // Explicit timeout - increments wtimeouts.
@@ -235,8 +229,7 @@ assert.eq(res.getWriteConcernError().errInfo.writeConcern.provenance, "customDef
 
 // Set the default WC to unsatisfiable.
 stopReplProducer.off();
-assert.commandWorked(testDB.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 3}, writeConcern: {w: 1}}));
+assert.commandWorked(testDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 3}, writeConcern: {w: 1}}));
 
 // Explicit unsatisfiable - no counters incremented.
 var res = testDB.a.insert({x: 1}, {writeConcern: {w: 3}});
@@ -249,18 +242,17 @@ assert.commandFailedWithCode(res, ErrorCodes.UnsatisfiableWriteConcern);
 assert.eq(res.getWriteConcernError().errInfo.writeConcern.provenance, "customDefault");
 
 // Set the default WC back to {w: 1, wtimeout: 0}.
-assert.commandWorked(testDB.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, wtimeout: 0}, writeConcern: {w: 1}}));
+assert.commandWorked(
+    testDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, wtimeout: 0}, writeConcern: {w: 1}}),
+);
 
 // Validate counters.
 var endGLEMetrics = testDB.serverStatus().metrics.getLastError;
 assert.eq(endGLEMetrics.wtimeouts.floatApprox, startGLEMetrics.wtimeouts + 2);
 assert.eq(endGLEMetrics.default.wtimeouts.floatApprox, startGLEMetrics.default.wtimeouts + 1);
-assert.eq(endGLEMetrics.default.unsatisfiable.floatApprox,
-          startGLEMetrics.default.unsatisfiable + 1);
+assert.eq(endGLEMetrics.default.unsatisfiable.floatApprox, startGLEMetrics.default.unsatisfiable + 1);
 
-jsTestLog(
-    `Primary ${primary.host} metrics #2: ${tojson(primary.getDB("test").serverStatus().metrics)}`);
+jsTestLog(`Primary ${primary.host} metrics #2: ${tojson(primary.getDB("test").serverStatus().metrics)}`);
 
 let ssOld = secondary.getDB("test").serverStatus().metrics.repl.syncSource;
 jsTestLog(`Secondary ${secondary.host} metrics before restarting replication: ${tojson(ssOld)}`);
@@ -272,7 +264,7 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, writePeriodicNoops: 
 // a small awaitData timeout for oplog fetching after re-choosing the sync source. This is needed to
 // make sync source return empty batches more frequently in order to test the metric
 // numEmptyBatches.
-configureFailPoint(secondary, 'setSmallOplogGetMoreMaxTimeMS');
+configureFailPoint(secondary, "setSmallOplogGetMoreMaxTimeMS");
 
 // Wait for the secondary to sync from the primary before asserting that the secondary increments
 // numTimesChoseSame. Otherwise, the secondary may go into the loop with an empty sync source, which
@@ -285,21 +277,20 @@ rt.awaitSyncSource(secondary, primary, 5 * 1000 /* timeout */);
 // increment numTimesChoseSame, so we do this in a loop.
 let ssNew;
 assert.soon(
-    function() {
+    function () {
         stopServerReplication(secondary);
         restartServerReplication(secondary);
 
         // Do a dummy write to choose a new sync source and replicate the write to block on that.
-        assert.commandWorked(
-            primary.getDB("test").bar.insert({"dummy_write": 3}, {writeConcern: {w: 2}}));
+        assert.commandWorked(primary.getDB("test").bar.insert({"dummy_write": 3}, {writeConcern: {w: 2}}));
         ssNew = secondary.getDB("test").serverStatus().metrics.repl.syncSource;
-        jsTestLog(
-            `Secondary ${secondary.host} metrics after restarting replication: ${tojson(ssNew)}`);
+        jsTestLog(`Secondary ${secondary.host} metrics after restarting replication: ${tojson(ssNew)}`);
         return ssNew.numTimesChoseSame > ssOld.numTimesChoseSame;
     },
     "timed out waiting to re-choose same sync source",
     null,
-    5 * 1000 /* 5sec interval to wait for noop */);
+    5 * 1000 /* 5sec interval to wait for noop */,
+);
 
 assert.gt(ssNew.numSelections, ssOld.numSelections, "num selections not incremented");
 assert.gt(ssNew.numTimesChoseSame, ssOld.numTimesChoseSame, "same sync source not chosen");
@@ -307,20 +298,20 @@ assert.gt(ssNew.numTimesChoseSame, ssOld.numTimesChoseSame, "same sync source no
 // Get the base number of empty batches after the secondary is up to date. Assert that the secondary
 // eventually gets an empty batch due to awaitData timeout.
 rt.awaitLastOpCommitted();
-const targetNumEmptyBatches =
-    secondary.getDB("test").serverStatus().metrics.repl.network.getmores.numEmptyBatches + 1;
+const targetNumEmptyBatches = secondary.getDB("test").serverStatus().metrics.repl.network.getmores.numEmptyBatches + 1;
 assert.soon(
-    () => secondary.getDB("test").serverStatus().metrics.repl.network.getmores.numEmptyBatches >=
-        targetNumEmptyBatches,
+    () => secondary.getDB("test").serverStatus().metrics.repl.network.getmores.numEmptyBatches >= targetNumEmptyBatches,
     `Timed out waiting for numEmptyBatches reach ${targetNumEmptyBatches}, current ${
-        secondary.getDB("test").serverStatus().metrics.repl.network.getmores.numEmptyBatches}`);
+        secondary.getDB("test").serverStatus().metrics.repl.network.getmores.numEmptyBatches
+    }`,
+);
 
 // Stop the primary so the secondary cannot choose a sync source.
 ssOld = ssNew;
 rt.stop(primary);
 stopServerReplication(secondary);
 restartServerReplication(secondary);
-assert.soon(function() {
+assert.soon(function () {
     ssNew = secondary.getDB("test").serverStatus().metrics.repl.syncSource;
     jsTestLog(`Secondary ${secondary.host} metrics after stopping primary: ${tojson(ssNew)}`);
     return ssNew.numTimesCouldNotFind > ssOld.numTimesCouldNotFind;

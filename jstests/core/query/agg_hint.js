@@ -19,12 +19,12 @@ const coll = testDB.getCollection(collName);
 const viewName = jsTestName() + "_view";
 const view = testDB.getCollection(viewName);
 
-function confirmWinningPlanUsesExpectedIndex(
-    explainResult, expectedKeyPattern, stageName, pipelineOptimizedAway) {
-    const planStages = pipelineOptimizedAway ? getPlanStages(explainResult, stageName)
-                                             : getAggPlanStages(explainResult, stageName);
+function confirmWinningPlanUsesExpectedIndex(explainResult, expectedKeyPattern, stageName, pipelineOptimizedAway) {
+    const planStages = pipelineOptimizedAway
+        ? getPlanStages(explainResult, stageName)
+        : getAggPlanStages(explainResult, stageName);
     assert.neq(null, planStages, tojson(explainResult));
-    planStages.forEach(planStage => {
+    planStages.forEach((planStage) => {
         assert.eq(planStage.keyPattern, expectedKeyPattern, tojson(planStage));
     });
 }
@@ -38,13 +38,12 @@ function confirmCommandUsesIndex({
     hintKeyPattern = null,
     expectedKeyPattern = null,
     stageName = "IXSCAN",
-    pipelineOptimizedAway = false
+    pipelineOptimizedAway = false,
 } = {}) {
     if (hintKeyPattern) {
         command["hint"] = hintKeyPattern;
     }
-    const res =
-        assert.commandWorked(testDB.runCommand({explain: command, verbosity: "queryPlanner"}));
+    const res = assert.commandWorked(testDB.runCommand({explain: command, verbosity: "queryPlanner"}));
     confirmWinningPlanUsesExpectedIndex(res, expectedKeyPattern, stageName, pipelineOptimizedAway);
 }
 
@@ -61,7 +60,7 @@ function confirmAggUsesIndex({
     hintKeyPattern = null,
     expectedKeyPattern = null,
     stageName = "IXSCAN",
-    pipelineOptimizedAway = false
+    pipelineOptimizedAway = false,
 } = {}) {
     let options = {};
 
@@ -69,7 +68,8 @@ function confirmAggUsesIndex({
         options = {hint: hintKeyPattern};
     }
     const res = assert.commandWorked(
-        testDB.getCollection(collName).explain("executionStats").aggregate(aggPipeline, options));
+        testDB.getCollection(collName).explain("executionStats").aggregate(aggPipeline, options),
+    );
     confirmWinningPlanUsesExpectedIndex(res, expectedKeyPattern, stageName, pipelineOptimizedAway);
 }
 
@@ -84,7 +84,7 @@ confirmAggUsesIndex({
     aggPipeline: [{$match: {x: 3}}],
     hintKeyPattern: "x_1",
     expectedKeyPattern: {x: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 
 //
@@ -105,14 +105,14 @@ confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: 3}}],
     expectedKeyPattern: {x: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: 3}}],
     hintKeyPattern: {x: 1},
     expectedKeyPattern: {x: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 
 // Query settings do not force indexes and therefore '_id' index is not used when filtering on 'x'.
@@ -122,7 +122,7 @@ if (!isHintsToQuerySettingsSuite) {
         aggPipeline: [{$match: {x: 3}}],
         hintKeyPattern: {_id: 1},
         expectedKeyPattern: {_id: 1},
-        pipelineOptimizedAway: true
+        pipelineOptimizedAway: true,
     });
 }
 
@@ -140,21 +140,21 @@ confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: {$gte: 0}}}, {$sort: {y: 1}}],
     expectedKeyPattern: {y: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: {$gte: 0}}}, {$sort: {y: 1}}],
     hintKeyPattern: {y: 1},
     expectedKeyPattern: {y: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: {$gte: 0}}}, {$sort: {y: 1}}],
     hintKeyPattern: {x: 1},
     expectedKeyPattern: {x: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 
 // With no hint specified, aggregation will always prefer an index that provides a covered
@@ -171,21 +171,21 @@ confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: {$gte: 0}}}, {$project: {x: 1, y: 1, _id: 0}}],
     expectedKeyPattern: {x: 1, y: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: {$gte: 0}}}, {$project: {x: 1, y: 1, _id: 0}}],
     hintKeyPattern: {x: 1, y: 1},
     expectedKeyPattern: {x: 1, y: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: {$gte: 0}}}, {$project: {x: 1, y: 1, _id: 0}}],
     hintKeyPattern: {x: 1},
     expectedKeyPattern: {x: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 
 // Confirm that a hinted agg can be executed against a view.
@@ -201,14 +201,14 @@ confirmAggUsesIndex({
     collName: view.getName(),
     aggPipeline: [{$match: {x: 3}}],
     expectedKeyPattern: {x: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 confirmAggUsesIndex({
     collName: view.getName(),
     aggPipeline: [{$match: {x: 3}}],
     hintKeyPattern: {x: 1},
     expectedKeyPattern: {x: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 
 // Query settings do not force indexes and therefore '_id' index is not used when filtering on 'x'.
@@ -218,7 +218,7 @@ if (!isHintsToQuerySettingsSuite) {
         aggPipeline: [{$match: {x: 3}}],
         hintKeyPattern: {_id: 1},
         expectedKeyPattern: {_id: 1},
-        pipelineOptimizedAway: true
+        pipelineOptimizedAway: true,
     });
 }
 
@@ -234,13 +234,13 @@ assert.commandWorked(testDB.createView(viewName, collName, []));
 confirmCommandUsesIndex({
     command: {find: view.getName(), filter: {x: 3}},
     expectedKeyPattern: {x: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 confirmCommandUsesIndex({
     command: {find: view.getName(), filter: {x: 3}},
     hintKeyPattern: {x: 1},
     expectedKeyPattern: {x: 1},
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 
 // Query settings do not force indexes and therefore '_id' index is not used when filtering on 'x'.
@@ -249,7 +249,7 @@ if (!isHintsToQuerySettingsSuite) {
         command: {find: view.getName(), filter: {x: 3}},
         hintKeyPattern: {_id: 1},
         expectedKeyPattern: {_id: 1},
-        pipelineOptimizedAway: true
+        pipelineOptimizedAway: true,
     });
 }
 

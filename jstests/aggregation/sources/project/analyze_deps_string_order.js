@@ -5,13 +5,13 @@ coll.drop();
 
 coll.save({
     _id: 1,
-    type: 'PRODUCT',
-    status: 'VALID',
+    type: "PRODUCT",
+    status: "VALID",
     locale: {
-        en: 'INSTRUMENT PANEL',
-        es: 'INSTRUMENTOS DEL CUADRO',
-        fr: 'INSTRUMENT TABLEAU DE BORD',
-    }
+        en: "INSTRUMENT PANEL",
+        es: "INSTRUMENTOS DEL CUADRO",
+        fr: "INSTRUMENT TABLEAU DE BORD",
+    },
 });
 
 // before SERVER-66418, this incorrectly threw a PathCollision error
@@ -22,13 +22,15 @@ coll.aggregate([
         "$project": {
             "designation": {
                 "$switch": {
-                    "branches": [{
-                        "case": {"$eq": ["$type", "PRODUCT"]},
-                        "then": {"$ifNull": ["$locale.en-GB.name", "$locale.en.name"]}
-                    }],
-                    "default": {"$ifNull": ["$locale.en-GB", "$locale.en"]}
-                }
-            }
-        }
-    }
+                    "branches": [
+                        {
+                            "case": {"$eq": ["$type", "PRODUCT"]},
+                            "then": {"$ifNull": ["$locale.en-GB.name", "$locale.en.name"]},
+                        },
+                    ],
+                    "default": {"$ifNull": ["$locale.en-GB", "$locale.en"]},
+                },
+            },
+        },
+    },
 ]);

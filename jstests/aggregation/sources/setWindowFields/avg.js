@@ -4,7 +4,7 @@
 import {
     computeAsGroup,
     seedWithTickerData,
-    testAccumAgainstGroup
+    testAccumAgainstGroup,
 } from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
@@ -18,20 +18,20 @@ seedWithTickerData(coll, nDocsPerTicker);
 testAccumAgainstGroup(coll, "$avg");
 
 // Test a combination of two different runnning averages.
-let results =
-    coll.aggregate([
-            {
-                $setWindowFields: {
-                    sortBy: {_id: 1},
-                    partitionBy: "$ticker",
-                    output: {
-                        runningAvg: {$avg: "$price", window: {documents: ["unbounded", "current"]}},
-                        runningAvgLead: {$avg: "$price", window: {documents: ["unbounded", 3]}},
-                    }
+let results = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                partitionBy: "$ticker",
+                output: {
+                    runningAvg: {$avg: "$price", window: {documents: ["unbounded", "current"]}},
+                    runningAvgLead: {$avg: "$price", window: {documents: ["unbounded", 3]}},
                 },
             },
-        ])
-        .toArray();
+        },
+    ])
+    .toArray();
 for (let index = 0; index < results.length; index++) {
     // First compute the 'runningAvg' with 0 as the upper bound.
     let groupRes = computeAsGroup({
@@ -40,7 +40,7 @@ for (let index = 0; index < results.length; index++) {
         accumSpec: {"$avg": "$price"},
         bounds: ["unbounded", 0],
         indexInPartition: results[index].partIndex,
-        defaultValue: null
+        defaultValue: null,
     });
     assert.eq(groupRes, results[index].runningAvg);
 
@@ -51,7 +51,7 @@ for (let index = 0; index < results.length; index++) {
         accumSpec: {"$avg": "$price"},
         bounds: ["unbounded", 3],
         indexInPartition: results[index].partIndex,
-        defaultValue: null
+        defaultValue: null,
     });
     assert.eq(groupRes, results[index].runningAvgLead);
 }

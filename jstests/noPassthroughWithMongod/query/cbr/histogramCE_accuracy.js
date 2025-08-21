@@ -8,30 +8,23 @@
    (except for the occasional off-by-one errors)
 */
 
-import {
-    getAllPlans,
-} from "jstests/libs/query/analyze_plan.js";
+import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
-import {ArrayDataset} from 'jstests/noPassthroughWithMongod/query/cbr/lib/datasets/array.js';
-import {BooleanDataset} from 'jstests/noPassthroughWithMongod/query/cbr/lib/datasets/boolean.js';
-import {
-    DateDataset,
-    TimestampDataset
-} from 'jstests/noPassthroughWithMongod/query/cbr/lib/datasets/date_time.js';
+import {ArrayDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/array.js";
+import {BooleanDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/boolean.js";
+import {DateDataset, TimestampDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/date_time.js";
 import {
     OneHoleDataset,
     OnePeakDataset,
     SkewedDataset,
     ThreePeakDataset,
-    UniformDataset
+    UniformDataset,
 } from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/distributions.js";
 import {
     MixedNumbersDataset,
-    MixedTypesDataset
+    MixedTypesDataset,
 } from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/mixed_types.js";
-import {
-    TwoFieldDataset
-} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/multifield.js";
+import {TwoFieldDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/multifield.js";
 import {NumberDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/number.js";
 import {StringDataset} from "jstests/noPassthroughWithMongod/query/cbr/lib/datasets/string.js";
 
@@ -73,22 +66,26 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
 
                 // 'Histogram', 'Code' and 'Metadata' all imply a confident estimate,
                 // so we accept all of them.
-                assert(plan.estimatesMetadata.ceSource === "Histogram" ||
-                           plan.estimatesMetadata.ceSource === "Code" ||
-                           plan.estimatesMetadata.ceSource === "Metadata",
-                       predicate);
+                assert(
+                    plan.estimatesMetadata.ceSource === "Histogram" ||
+                        plan.estimatesMetadata.ceSource === "Code" ||
+                        plan.estimatesMetadata.ceSource === "Metadata",
+                    predicate,
+                );
 
                 printjsononeline(predicate);
-                print(`actualDocuments: ${actualDocuments}; cardinalityEstimate: ${
-                    cardinalityEstimate}`);
+                print(`actualDocuments: ${actualDocuments}; cardinalityEstimate: ${cardinalityEstimate}`);
 
                 if (Math.abs(actualDocuments - cardinalityEstimate) > 1) {
                     printjsononeline(plan);
                     assert(
                         false,
                         `Got cardinalityEstimate = ${cardinalityEstimate} but actualDocuments = ${
-                            actualDocuments} for predicate: ${tojson(predicate)}; dataset: ${
-                            dataset.constructor.name}; indexes: ${indexes};`);
+                            actualDocuments
+                        } for predicate: ${tojson(predicate)}; dataset: ${
+                            dataset.constructor.name
+                        }; indexes: ${indexes};`,
+                    );
                 }
             }
         }
@@ -99,26 +96,30 @@ function runOneTest({dataset, indexes, analyze, numberBuckets = 1000}) {
 }
 
 for (const indexes of [[], [{a: 1}]]) {
-    for (const dataset of [new ArrayDataset(),
-                           new BooleanDataset(),
-                           new DateDataset(),
-                           new TimestampDataset(),
-                           new SkewedDataset(),
-                           new MixedTypesDataset(),
-                           new MixedNumbersDataset(),
-                           new NumberDataset(),
-                           new StringDataset()]) {
+    for (const dataset of [
+        new ArrayDataset(),
+        new BooleanDataset(),
+        new DateDataset(),
+        new TimestampDataset(),
+        new SkewedDataset(),
+        new MixedTypesDataset(),
+        new MixedNumbersDataset(),
+        new NumberDataset(),
+        new StringDataset(),
+    ]) {
         runOneTest({dataset: dataset, indexes: indexes});
     }
 
     /* Skewed datasets under a constrained number of buckets. We give each
        dataset just enough buckets for it can be estimated accurately.
     */
-    for (const test of [{dataset: new UniformDataset(), numberBuckets: 2},
-                        {dataset: new OnePeakDataset(), numberBuckets: 4},
-                        {dataset: new OneHoleDataset(), numberBuckets: 3},
-                        {dataset: new ThreePeakDataset(), numberBuckets: 8},
-                        {dataset: new SkewedDataset(), numberBuckets: 10}]) {
+    for (const test of [
+        {dataset: new UniformDataset(), numberBuckets: 2},
+        {dataset: new OnePeakDataset(), numberBuckets: 4},
+        {dataset: new OneHoleDataset(), numberBuckets: 3},
+        {dataset: new ThreePeakDataset(), numberBuckets: 8},
+        {dataset: new SkewedDataset(), numberBuckets: 10},
+    ]) {
         test.indexes = indexes;
         runOneTest(test);
     }

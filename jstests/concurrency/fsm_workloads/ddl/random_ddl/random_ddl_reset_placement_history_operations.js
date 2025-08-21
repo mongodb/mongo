@@ -18,15 +18,15 @@
 
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 
-export const $config = (function() {
-    const testCollectionsState = 'testCollectionsState';
-    const resetPlacementHistoryState = 'resetPlacementHistoryState';
-    const resetPlacementHistoryStateId = 'x';
+export const $config = (function () {
+    const testCollectionsState = "testCollectionsState";
+    const resetPlacementHistoryState = "resetPlacementHistoryState";
+    const resetPlacementHistoryStateId = "x";
     const numThreads = 12;
     const numTestCollections = numThreads + 5;
 
     function getConfig(db) {
-        return db.getSiblingDB('config');
+        return db.getSiblingDB("config");
     }
 
     /**
@@ -34,7 +34,7 @@ export const $config = (function() {
      */
     function acquireCollectionName(db, mustBeAlreadyCreated = true) {
         let acquiredCollDoc = null;
-        assert.soon(function() {
+        assert.soon(function () {
             const query = {acquired: false};
             if (mustBeAlreadyCreated) {
                 query.created = true;
@@ -42,7 +42,7 @@ export const $config = (function() {
             acquiredCollDoc = db[testCollectionsState].findAndModify({
                 query: query,
                 sort: {lastAcquired: 1},
-                update: {$set: {acquired: true, lastAcquired: new Date()}}
+                update: {$set: {acquired: true, lastAcquired: new Date()}},
             });
             return acquiredCollDoc !== null;
         });
@@ -52,31 +52,29 @@ export const $config = (function() {
     function releaseCollectionName(db, collName, wasDropped = false) {
         // in case of collection dropped, leave a chance of reusing the same name during the next
         // shardCollection
-        const newExtension = wasDropped && Math.random() < 0.5 ? 'e' : '';
+        const newExtension = wasDropped && Math.random() < 0.5 ? "e" : "";
         const match = db[testCollectionsState].findAndModify({
             query: {collName: collName, acquired: true},
-            update:
-                {$set: {collName: collName + newExtension, acquired: false, created: !wasDropped}}
+            update: {$set: {collName: collName + newExtension, acquired: false, created: !wasDropped}},
         });
         assert(match !== null);
     }
 
     let states = {
-        shardCollection: function(db, _, connCache) {
+        shardCollection: function (db, _, connCache) {
             // To avoid starvation problems during the execution of the FSM, it is OK to pick
             // up an already sharded collection.
             const collName = acquireCollectionName(db, false /*mustBeAlreadyCreated*/);
             try {
                 jsTestLog(`Beginning shardCollection state for ${collName}`);
-                assert.commandWorked(
-                    db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}));
+                assert.commandWorked(db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}));
                 jsTestLog(`shardCollection state for ${collName} completed`);
             } finally {
                 releaseCollectionName(db, collName);
             }
         },
 
-        dropCollection: function(db, _, connCache) {
+        dropCollection: function (db, _, connCache) {
             // To avoid starvation problems during the execution of the FSM, it is OK to pick
             // up an already dropped collection.
             const collName = acquireCollectionName(db, false /*mustBeAlreadyCreated*/);
@@ -90,9 +88,9 @@ export const $config = (function() {
             }
         },
 
-        renameCollection: function(db, _, connCache) {
+        renameCollection: function (db, _, connCache) {
             const collName = acquireCollectionName(db);
-            const renamedCollName = collName + '_renamed';
+            const renamedCollName = collName + "_renamed";
             try {
                 jsTestLog(`Beginning renameCollection state for ${collName}`);
                 assert.commandWorked(db[collName].renameCollection(renamedCollName));
@@ -104,32 +102,29 @@ export const $config = (function() {
             }
         },
 
-        moveChunk: function(db, _, connCache) {
+        moveChunk: function (db, _, connCache) {
             const collName = acquireCollectionName(db);
             try {
                 jsTestLog(`Beginning moveChunk state for ${collName}`);
-                const collUUID =
-                    getConfig(db).collections.findOne({_id: db[collName].getFullName()}).uuid;
+                const collUUID = getConfig(db).collections.findOne({_id: db[collName].getFullName()}).uuid;
                 assert(collUUID);
                 const shards = getConfig(db).shards.find().toArray();
                 const chunkToMove = getConfig(db).chunks.findOne({uuid: collUUID});
-                const destination = shards.filter(
-                    s => s._id !==
-                        chunkToMove.shard)[Math.floor(Math.random() * (shards.length - 1))];
-                ChunkHelper.moveChunk(
-                    db, collName, [chunkToMove.min, chunkToMove.max], destination._id, true);
+                const destination = shards.filter((s) => s._id !== chunkToMove.shard)[
+                    Math.floor(Math.random() * (shards.length - 1))
+                ];
+                ChunkHelper.moveChunk(db, collName, [chunkToMove.min, chunkToMove.max], destination._id, true);
                 jsTestLog(`moveChunk state for ${collName} completed`);
             } finally {
                 releaseCollectionName(db, collName);
             }
         },
 
-        resetPlacementHistory: function(db, collName, connCache) {
+        resetPlacementHistory: function (db, collName, connCache) {
             jsTestLog(`Beginning resetPlacementHistory state`);
             assert.commandWorked(db.adminCommand({resetPlacementHistory: 1}));
             jsTestLog(`resetPlacementHistory state completed`);
         },
-
     };
 
     let transitions = {
@@ -138,28 +133,28 @@ export const $config = (function() {
             dropCollection: 0.22,
             renameCollection: 0.22,
             moveChunk: 0.22,
-            resetPlacementHistory: 0.12
+            resetPlacementHistory: 0.12,
         },
         dropCollection: {
             shardCollection: 0.22,
             dropCollection: 0.22,
             renameCollection: 0.22,
             moveChunk: 0.22,
-            resetPlacementHistory: 0.12
+            resetPlacementHistory: 0.12,
         },
         renameCollection: {
             shardCollection: 0.22,
             dropCollection: 0.22,
             renameCollection: 0.22,
             moveChunk: 0.22,
-            resetPlacementHistory: 0.12
+            resetPlacementHistory: 0.12,
         },
         moveChunk: {
             shardCollection: 0.22,
             dropCollection: 0.22,
             renameCollection: 0.22,
             moveChunk: 0.22,
-            resetPlacementHistory: 0.12
+            resetPlacementHistory: 0.12,
         },
         resetPlacementHistory: {
             shardCollection: 0.22,
@@ -169,29 +164,29 @@ export const $config = (function() {
         },
     };
 
-    let setup = function(db, _, cluster) {
+    let setup = function (db, _, cluster) {
         for (let i = 0; i < numTestCollections; ++i) {
             db[testCollectionsState].insert({
                 collName: `testColl_${i}`,
                 acquired: false,
                 lastAcquired: new Date(),
-                created: false
+                created: false,
             });
         }
 
         db[resetPlacementHistoryState].insert({_id: resetPlacementHistoryStateId, ongoing: false});
     };
 
-    let teardown = function(db, collName, cluster) {};
+    let teardown = function (db, collName, cluster) {};
 
     return {
         threadCount: numThreads,
         iterations: 32,
-        startState: 'shardCollection',
+        startState: "shardCollection",
         states: states,
         transitions: transitions,
         setup: setup,
         teardown: teardown,
-        passConnectionCache: true
+        passConnectionCache: true,
     };
 })();

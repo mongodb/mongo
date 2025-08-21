@@ -21,8 +21,7 @@ TimeseriesTest.run((insert) => {
     // TODO SERVER-93961: It may be possible to remove this when the shard role API is ready.
     // In slower builds, inserts may get stuck behind resharding operations. This fix lowers the
     // chance for that to occur.
-    assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 10}));
+    assert.commandWorked(testDB.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 10}));
     assert.commandWorked(testDB.dropDatabase());
     const timeFieldName = "time";
     const tagFieldName = "tag";
@@ -33,7 +32,7 @@ TimeseriesTest.run((insert) => {
     Random.setRandomSeed();
     const hosts = TimeseriesTest.generateHosts(numHosts);
 
-    let testFunc = function(collAOption, collBOption) {
+    let testFunc = function (collAOption, collBOption) {
         // Prepare two time-series collections.
         const collA = testDB.getCollection("a");
         const collB = testDB.getCollection("b");
@@ -42,13 +41,15 @@ TimeseriesTest.run((insert) => {
         assert.commandWorked(testDB.createCollection(collA.getName(), collAOption));
         assert.commandWorked(testDB.createCollection(collB.getName(), collBOption));
         let entryCountPerHost = new Array(numHosts).fill(0);
-        let insertTimeseriesDoc = function(coll) {
+        let insertTimeseriesDoc = function (coll) {
             let host = TimeseriesTest.getRandomElem(hosts);
-            assert.commandWorked(insert(coll, {
-                measurement: "cpu",
-                time: ISODate(),
-                tags: host.tags,
-            }));
+            assert.commandWorked(
+                insert(coll, {
+                    measurement: "cpu",
+                    time: ISODate(),
+                    tags: host.tags,
+                }),
+            );
             // Here we extract the hostId from "host.tags.hostname". It is expected that the
             // "host.tags.hostname" is in the form of 'host_<hostNum>'.
             return parseInt(host.tags.hostname.substring(5, host.tags.hostname.length));
@@ -64,33 +65,31 @@ TimeseriesTest.run((insert) => {
             }
         }
 
-        const results =
-            collA
-                .aggregate([
-                    {
-                        $unionWith: {
-                            coll: collB.getName(),
-                            pipeline: [{
+        const results = collA
+            .aggregate([
+                {
+                    $unionWith: {
+                        coll: collB.getName(),
+                        pipeline: [
+                            {
                                 $match: {
                                     $expr: {
                                         $eq: [
                                             {
-                                                $mod: [
-                                                    {$toInt: {$substr: ["$tags.hostname", 5, -1]}},
-                                                    2
-                                                ]
+                                                $mod: [{$toInt: {$substr: ["$tags.hostname", 5, -1]}}, 2],
                                             },
-                                            0
-                                        ]
-                                    }
-                                }
-                            }]
-                        }
+                                            0,
+                                        ],
+                                    },
+                                },
+                            },
+                        ],
                     },
-                    {$group: {_id: "$tags.hostname", count: {$sum: 1}}},
-                    {$sort: {_id: 1}}
-                ])
-                .toArray();
+                },
+                {$group: {_id: "$tags.hostname", count: {$sum: 1}}},
+                {$sort: {_id: 1}},
+            ])
+            .toArray();
         assert.eq(numHosts, results.length, results);
         for (let i = 0; i < numHosts; i++) {
             assert.eq({_id: "host_" + i, count: entryCountPerHost[i]}, results[i], results);
@@ -99,8 +98,8 @@ TimeseriesTest.run((insert) => {
 
     // Exhaust the combinations of non-time-series and time-series collections for $unionWith
     // parameters.
-    collOptions.forEach(function(collAOption) {
-        collOptions.forEach(function(collBOption) {
+    collOptions.forEach(function (collAOption) {
+        collOptions.forEach(function (collBOption) {
             if (collAOption == null && collBOption == null) {
                 // Normal $unionWith call, both inner and outer collections are non-time-series
                 // collections.

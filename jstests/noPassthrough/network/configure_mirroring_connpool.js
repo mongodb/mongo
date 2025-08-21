@@ -31,7 +31,7 @@ function updateMaxPoolSizeAndVerify(conn, size) {
 function runTest(conn, secondaryHosts, numFindQueries, expectedConns, checkStatsFunc = undefined) {
     let threads = [];
     launchFinds(conn, threads, {times: numFindQueries, readPref: "primary"});
-    threads.forEach(function(thread) {
+    threads.forEach(function (thread) {
         thread.join();
     });
 
@@ -41,12 +41,16 @@ function runTest(conn, secondaryHosts, numFindQueries, expectedConns, checkStats
     }
 
     currentCheckNum = assertHasConnPoolStats(
-        conn, secondaryHosts, args, currentCheckNum, "_mirrorMaestroConnPoolStats");
+        conn,
+        secondaryHosts,
+        args,
+        currentCheckNum,
+        "_mirrorMaestroConnPoolStats",
+    );
 }
 
 function testMinAndMax(primary, secondaries) {
-    primary.adminCommand(
-        {configureFailPoint: "connectionPoolAlwaysRequestsNewConn", mode: "alwaysOn"});
+    primary.adminCommand({configureFailPoint: "connectionPoolAlwaysRequestsNewConn", mode: "alwaysOn"});
 
     const coll = primary.getDB(kDbName)[kCollName];
     assert.commandWorked(coll.insert({x: 1}));
@@ -59,10 +63,9 @@ function testMinAndMax(primary, secondaries) {
     // Launch an initial find query to trigger to min. Since some internal replset operations may
     // also be mirrored during this test, we have to assert on a range of available connections
     // rather than a specific number.
-    runTest(
-        primary, hostsToAssertStatsOn, kDefaultPoolMinSize, kDefaultPoolMinSize, function(stats) {
-            return stats.available >= kDefaultPoolMinSize && stats.available <= kDefaultPoolMaxSize;
-        });
+    runTest(primary, hostsToAssertStatsOn, kDefaultPoolMinSize, kDefaultPoolMinSize, function (stats) {
+        return stats.available >= kDefaultPoolMinSize && stats.available <= kDefaultPoolMaxSize;
+    });
 
     // Launch find quieries to fill the pool to max.
     const numFindQueries = kDefaultPoolMaxSize + 20;
@@ -74,8 +77,7 @@ function testMinAndMax(primary, secondaries) {
 
     // Decrease max pool size to min.
     updateMaxPoolSizeAndVerify(primary, kDefaultPoolMinSize);
-    assert.commandWorked(primary.adminCommand(
-        {_dropMirrorMaestroConnections: 1, hostAndPort: hostsToAssertStatsOn}));
+    assert.commandWorked(primary.adminCommand({_dropMirrorMaestroConnections: 1, hostAndPort: hostsToAssertStatsOn}));
     runTest(primary, hostsToAssertStatsOn, numFindQueries, kDefaultPoolMinSize);
 
     // Invalid max pool size.

@@ -24,7 +24,7 @@ const staticMongod = MongoRunner.runMongod({});
 const st = new ShardingTest({shards: {rs0: {nodes: 2}, rs1: {nodes: 1}}});
 const collection = st.s.getDB(dbName).getCollection(collName);
 const lsid = {
-    id: UUID()
+    id: UUID(),
 };
 const txnNumber = 0;
 
@@ -40,26 +40,30 @@ function setup() {
 }
 
 function prepareTransactionAndTriggerFailover() {
-    assert.commandWorked(st.s.getDB(dbName).runCommand({
-        update: collName,
-        updates: [
-            {q: {_id: 1}, u: {$set: {x: 5}}},
-            {q: {_id: 2}, u: {$set: {x: -10}}},
-        ],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-    }));
+    assert.commandWorked(
+        st.s.getDB(dbName).runCommand({
+            update: collName,
+            updates: [
+                {q: {_id: 1}, u: {$set: {x: 5}}},
+                {q: {_id: 2}, u: {$set: {x: -10}}},
+            ],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
-    const result = assert.commandWorked(st.shard0.getDB(dbName).adminCommand({
-        prepareTransaction: 1,
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: {w: "majority"},
-    }));
+    const result = assert.commandWorked(
+        st.shard0.getDB(dbName).adminCommand({
+            prepareTransaction: 1,
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            writeConcern: {w: "majority"},
+        }),
+    );
 
     let oldSecondary = st.rs0.getSecondary();
 
@@ -72,18 +76,22 @@ function prepareTransactionAndTriggerFailover() {
 
 function commitPreparedTransaction(prepareTimestamp) {
     assert.commandWorked(
-        st.shard0.getDB(dbName).adminCommand(Object.assign({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            autocommit: false,
-        },
-                                                           {commitTimestamp: prepareTimestamp})));
+        st.shard0.getDB(dbName).adminCommand(
+            Object.assign(
+                {
+                    commitTransaction: 1,
+                    lsid: lsid,
+                    txnNumber: NumberLong(txnNumber),
+                    autocommit: false,
+                },
+                {commitTimestamp: prepareTimestamp},
+            ),
+        ),
+    );
 }
 
 function runMoveChunkAndCommitTransaction() {
-    const joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s.host, {_id: 1}, null, 'test.user', st.shard1.shardName);
+    const joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {_id: 1}, null, "test.user", st.shard1.shardName);
     pauseMigrateAtStep(st.shard1, migrateStepNames.catchup);
     waitForMoveChunkStep(st.shard0, moveChunkStepNames.startedMoveChunk);
     commitPreparedTransaction(prepareTimestamp);
@@ -93,10 +101,13 @@ function runMoveChunkAndCommitTransaction() {
 
 setup();
 const prepareTimestamp = prepareTransactionAndTriggerFailover();
-const processingDeferredXferModsFp =
-    configureFailPoint(st.rs0.getPrimary(), "hangAfterProcessingDeferredXferMods");
-const pauseBeforeCriticalSectionFp =
-    configureFailPoint(st.rs0.getPrimary(), "hangBeforeEnteringCriticalSection", {}, "alwaysOn");
+const processingDeferredXferModsFp = configureFailPoint(st.rs0.getPrimary(), "hangAfterProcessingDeferredXferMods");
+const pauseBeforeCriticalSectionFp = configureFailPoint(
+    st.rs0.getPrimary(),
+    "hangBeforeEnteringCriticalSection",
+    {},
+    "alwaysOn",
+);
 const joinMoveChunk = runMoveChunkAndCommitTransaction();
 processingDeferredXferModsFp.wait();
 assert.commandWorked(collection.update({_id: 4}, {$set: {x: 501}}));

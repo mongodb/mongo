@@ -22,4 +22,10 @@ for (var i = 7; i < 11; i++) {
 assert(!cursor.hasNext());
 
 // SERVER-13715
-assert.eq(4, t.find({$or: [{a: 1}, {b: 2}]}).sort({a: 1}).itcount());
+assert.eq(
+    4,
+    t
+        .find({$or: [{a: 1}, {b: 2}]})
+        .sort({a: 1})
+        .itcount(),
+);

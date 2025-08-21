@@ -3,7 +3,7 @@
 //
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-ReplSetTest.prototype._stablePrimaryOnRestarts = function() {
+ReplSetTest.prototype._stablePrimaryOnRestarts = function () {
     // In a 2-node replica set the secondary can step up after a restart. In fact while the
     // secondary is being restarted, the primary may end up stepping down (due to heartbeats not
     // being received) and for the restarted node to run for and win the election.
@@ -17,7 +17,7 @@ ReplSetTest.prototype._stablePrimaryOnRestarts = function() {
  * @param user {string} optional, user name for authentication.
  * @param pwd {string} optional, password for authentication. Must be set if user is set.
  */
-ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
+ReplSetTest.prototype.upgradeSet = function (options, user, pwd) {
     this.awaitNodesAgreeOnPrimary();
     let primary = this.getPrimary();
 
@@ -47,7 +47,7 @@ export function mergeNodeOptions(nodeOptions, options) {
     return nodeOptions;
 }
 
-ReplSetTest.prototype.upgradeMembers = function(members, options, user, pwd) {
+ReplSetTest.prototype.upgradeMembers = function (members, options, user, pwd) {
     // Merge new options into node settings.
     this.nodeOptions = mergeNodeOptions(this.nodeOptions, options);
 
@@ -56,20 +56,20 @@ ReplSetTest.prototype.upgradeMembers = function(members, options, user, pwd) {
     }
 };
 
-ReplSetTest.prototype.getNonArbiterSecondaries = function() {
+ReplSetTest.prototype.getNonArbiterSecondaries = function () {
     let secs = this.getSecondaries();
     let arbiters = this.getArbiters();
-    let nonArbiters = secs.filter(x => !arbiters.includes(x));
+    let nonArbiters = secs.filter((x) => !arbiters.includes(x));
     return nonArbiters;
 };
 
-ReplSetTest.prototype.upgradeSecondaries = function(options, user, pwd) {
+ReplSetTest.prototype.upgradeSecondaries = function (options, user, pwd) {
     this.upgradeMembers(this.getNonArbiterSecondaries(), options, user, pwd);
 };
 
-ReplSetTest.prototype.upgradeArbiters = function(options, user, pwd) {
+ReplSetTest.prototype.upgradeArbiters = function (options, user, pwd) {
     // We don't support downgrading data files for arbiters. We need to instead delete the dbpath.
-    const oldStartClean = {startClean: (options && !!options["startClean"])};
+    const oldStartClean = {startClean: options && !!options["startClean"]};
     if (options && options.binVersion == "last-lts") {
         options["startClean"] = true;
     }
@@ -78,10 +78,10 @@ ReplSetTest.prototype.upgradeArbiters = function(options, user, pwd) {
     this.nodeOptions = mergeNodeOptions(this.nodeOptions, oldStartClean);
 };
 
-ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
+ReplSetTest.prototype.upgradePrimary = function (primary, options, user, pwd) {
     function authNode(node) {
         if (user !== undefined) {
-            assert(node.getDB('admin').auth(user, pwd));
+            assert(node.getDB("admin").auth(user, pwd));
         } else {
             jsTest.authenticate(node);
         }
@@ -97,8 +97,7 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
 
     // we need to re-authenticate on all connections before calling awaitNodesAgreeOnPrimary().
     for (const node of this.nodes) {
-        const connStatus =
-            assert.commandWorked(node.adminCommand({connectionStatus: 1, showPrivileges: true}));
+        const connStatus = assert.commandWorked(node.adminCommand({connectionStatus: 1, showPrivileges: true}));
 
         const connIsAuthenticated = connStatus.authInfo.authenticatedUsers.length > 0;
         if (connIsAuthenticated) {
@@ -116,25 +115,24 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
     let newPrimary = this.getPrimary();
 
     if (this._stablePrimaryOnRestarts()) {
-        assert.eq(
-            newPrimary, primary, "Primary changed unexpectedly after upgrading old primary node");
+        assert.eq(newPrimary, primary, "Primary changed unexpectedly after upgrading old primary node");
     }
     return newPrimary;
 };
 
-ReplSetTest.prototype.upgradeNode = function(node, opts = {}, user, pwd) {
+ReplSetTest.prototype.upgradeNode = function (node, opts = {}, user, pwd) {
     if (user !== undefined) {
         assert.eq(1, node.getDB("admin").auth(user, pwd));
     }
     jsTest.authenticate(node);
 
-    var isMaster = node.getDB('admin').runCommand({isMaster: 1});
+    var isMaster = node.getDB("admin").runCommand({isMaster: 1});
 
     if (!isMaster.arbiterOnly) {
         // Must retry this command, as it might return "currently running for election" and fail.
         // Node might still be running for an election that will fail because it lost the election
         // race with another node, at test initialization.  See SERVER-23133.
-        assert.soonNoExcept(function() {
+        assert.soonNoExcept(function () {
             assert.commandWorked(node.adminCommand("replSetMaintenance"));
             return true;
         });
@@ -146,23 +144,22 @@ ReplSetTest.prototype.upgradeNode = function(node, opts = {}, user, pwd) {
         newNode.getDB("admin").auth(user, pwd);
     }
 
-    var waitForStates =
-        [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY, ReplSetTest.State.ARBITER];
+    var waitForStates = [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY, ReplSetTest.State.ARBITER];
     this.waitForState(newNode, waitForStates);
 
     if (user !== undefined) {
-        newNode.getDB('admin').logout();
+        newNode.getDB("admin").logout();
     }
 
     return newNode;
 };
 
-ReplSetTest.prototype.stepdown = function(nodeId) {
+ReplSetTest.prototype.stepdown = function (nodeId) {
     nodeId = this.getNodeId(nodeId);
     assert.eq(this.getNodeId(this.getPrimary()), nodeId, "Trying to stepdown a non primary node");
     var node = this.nodes[nodeId];
 
-    assert.soonNoExcept(function() {
+    assert.soonNoExcept(function () {
         // Due to a rare race condition in stepdown, it's possible the secondary just replicated
         // the most recent write and sent replSetUpdatePosition to the primary, and that
         // replSetUpdatePosition command gets interrupted by the stepdown.  In that case,
@@ -172,16 +169,15 @@ ReplSetTest.prototype.stepdown = function(nodeId) {
         // stepdown.  Adding a garbage write here ensures that the secondary will be able to
         // resume syncing from the primary in this case, which in turn will let the primary
         // finish stepping down successfully.
-        node.getDB('admin').garbageWriteToAdvanceOpTime.insert({a: 1});
-        assert.adminCommandWorkedAllowingNetworkError(
-            node, {replSetStepDown: 5 * 60, secondaryCatchUpPeriodSecs: 60});
+        node.getDB("admin").garbageWriteToAdvanceOpTime.insert({a: 1});
+        assert.adminCommandWorkedAllowingNetworkError(node, {replSetStepDown: 5 * 60, secondaryCatchUpPeriodSecs: 60});
         return true;
     });
 
     return this.reconnect(node);
 };
 
-ReplSetTest.prototype.reconnect = function(node) {
+ReplSetTest.prototype.reconnect = function (node) {
     var nodeId = this.getNodeId(node);
     this.nodes[nodeId] = new Mongo(node.host);
     // Skip the 'authenticated' property because the new connection hasn't been authenticated even
@@ -193,22 +189,19 @@ ReplSetTest.prototype.reconnect = function(node) {
     // the original connection despite methods being called on DB objects from the new connection.
     const except = new Set(["authenticated", "_defaultSession"]);
     for (var i in node) {
-        if (typeof (node[i]) == "function" || except.has(i))
-            continue;
+        if (typeof node[i] == "function" || except.has(i)) continue;
         this.nodes[nodeId][i] = node[i];
     }
 
     return this.nodes[nodeId];
 };
 
-ReplSetTest.prototype.conf = function() {
-    var admin = this.getPrimary().getDB('admin');
+ReplSetTest.prototype.conf = function () {
+    var admin = this.getPrimary().getDB("admin");
 
     var resp = admin.runCommand({replSetGetConfig: 1});
 
-    if (resp.ok && !(resp.errmsg) && resp.config)
-        return resp.config;
-
+    if (resp.ok && !resp.errmsg && resp.config) return resp.config;
     else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
         return admin.getSiblingDB("local").system.replset.findOne();
 

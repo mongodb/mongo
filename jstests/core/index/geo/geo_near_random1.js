@@ -35,8 +35,8 @@ test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);
 
 // Test $nearSphere with a 2dsphere index
-assert.commandWorked(db.geo_near_random1.dropIndex({loc: '2d'}));
-assert.commandWorked(db.geo_near_random1.createIndex({loc: '2dsphere'}));
+assert.commandWorked(db.geo_near_random1.dropIndex({loc: "2d"}));
+assert.commandWorked(db.geo_near_random1.createIndex({loc: "2dsphere"}));
 test.testPt([0, 0], opts);
 test.testPt(test.mkPt(), opts);
 test.testPt(test.mkPt(), opts);

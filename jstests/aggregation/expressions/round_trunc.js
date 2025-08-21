@@ -54,12 +54,8 @@ testTrunc(NumberDecimal("1.298"), NumberDecimal("1"), 0);
 testTrunc(NumberDecimal("1.298"), NumberDecimal("1.2"), 1);
 testTrunc(NumberDecimal("23.298"), NumberDecimal("2E+1"), -1);
 testTrunc(1.298, 1.298, 100);
-testTrunc(NumberDecimal("1.298912343250054252245154325"),
-          NumberDecimal("1.29891234325005425224"),
-          NumberLong("20"));
-testTrunc(NumberDecimal("1.298"),
-          NumberDecimal("1.298000000000000000000000000000000"),
-          NumberDecimal("100"));
+testTrunc(NumberDecimal("1.298912343250054252245154325"), NumberDecimal("1.29891234325005425224"), NumberLong("20"));
+testTrunc(NumberDecimal("1.298"), NumberDecimal("1.298000000000000000000000000000000"), NumberDecimal("100"));
 
 testRound(1.298, 1, 0);
 testRound(1.298, 1.3, 1);
@@ -68,12 +64,8 @@ testRound(NumberDecimal("1.298"), NumberDecimal("1"), 0);
 testRound(NumberDecimal("1.298"), NumberDecimal("1.3"), 1);
 testRound(NumberDecimal("23.298"), NumberDecimal("2E+1"), -1);
 testRound(1.298, 1.298, 100);
-testRound(NumberDecimal("1.298912343250054252245154325"),
-          NumberDecimal("1.29891234325005425225"),
-          NumberLong("20"));
-testRound(NumberDecimal("1.298"),
-          NumberDecimal("1.298000000000000000000000000000000"),
-          NumberDecimal("100"));
+testRound(NumberDecimal("1.298912343250054252245154325"), NumberDecimal("1.29891234325005425225"), NumberLong("20"));
+testRound(NumberDecimal("1.298"), NumberDecimal("1.298000000000000000000000000000000"), NumberDecimal("100"));
 
 // Test $round overflow.
 testRound(NumberInt("2147483647"), NumberLong("2147483650"), -1);

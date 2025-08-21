@@ -8,26 +8,27 @@ var md = MongoRunner.runMongod({
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: "jstests/libs/server.pem",
     tlsCAFile: "jstests/libs/ca.pem",
-    tlsAllowConnectionsWithoutCertificates: ""
+    tlsAllowConnectionsWithoutCertificates: "",
 });
 
-var mongo = runMongoProgram(
-    "mongo", "--port", md.port, "--tls", "--tlsCAFile", "jstests/libs/ca.pem", "--eval", ";");
+var mongo = runMongoProgram("mongo", "--port", md.port, "--tls", "--tlsCAFile", "jstests/libs/ca.pem", "--eval", ";");
 
 // 0 is the exit code for success
 assert(mongo == 0);
 
 // Test that connecting with a valid client certificate connects successfully.
-mongo = runMongoProgram("mongo",
-                        "--port",
-                        md.port,
-                        "--tls",
-                        "--tlsCAFile",
-                        "jstests/libs/ca.pem",
-                        "--tlsCertificateKeyFile",
-                        "jstests/libs/client.pem",
-                        "--eval",
-                        ";");
+mongo = runMongoProgram(
+    "mongo",
+    "--port",
+    md.port,
+    "--tls",
+    "--tlsCAFile",
+    "jstests/libs/ca.pem",
+    "--tlsCertificateKeyFile",
+    "jstests/libs/client.pem",
+    "--eval",
+    ";",
+);
 
 // 0 is the exit code for success
 assert(mongo == 0);
@@ -37,11 +38,10 @@ MongoRunner.stopMongod(md);
 var md2 = MongoRunner.runMongod({
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: "jstests/libs/server.pem",
-    tlsCAFile: "jstests/libs/ca.pem"
+    tlsCAFile: "jstests/libs/ca.pem",
 });
 
-mongo = runMongoProgram(
-    "mongo", "--port", md2.port, "--tls", "--tlsCAFile", "jstests/libs/ca.pem", "--eval", ";");
+mongo = runMongoProgram("mongo", "--port", md2.port, "--tls", "--tlsCAFile", "jstests/libs/ca.pem", "--eval", ";");
 
 // 1 is the exit code for failure
 assert(mongo == 1);

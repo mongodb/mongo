@@ -16,34 +16,34 @@ assert.commandWorked(local.insert({starting: 0}));
 
 // Assert that the graphLookup only retrieves ten documents, with _id from 0 to 9.
 var res = local
-                .aggregate({
-                    $graphLookup: {
-                        from: "foreign",
-                        startWith: "$starting",
-                        connectFromField: "neighbors",
-                        connectToField: "_id",
-                        as: "integers",
-                        restrictSearchWithMatch: {_id: {$lt: 10}}
-                    }
-                })
-                .toArray()[0];
+    .aggregate({
+        $graphLookup: {
+            from: "foreign",
+            startWith: "$starting",
+            connectFromField: "neighbors",
+            connectToField: "_id",
+            as: "integers",
+            restrictSearchWithMatch: {_id: {$lt: 10}},
+        },
+    })
+    .toArray()[0];
 
 assert.eq(res.integers.length, 10);
 
 // Assert that the graphLookup doesn't retrieve any documents, as to do so it would need to
 // traverse nodes in the graph that don't match the 'restrictSearchWithMatch' predicate.
 res = local
-            .aggregate({
-                $graphLookup: {
-                    from: "foreign",
-                    startWith: "$starting",
-                    connectFromField: "neighbors",
-                    connectToField: "_id",
-                    as: "integers",
-                    restrictSearchWithMatch: {_id: {$gt: 10}}
-                }
-            })
-            .toArray()[0];
+    .aggregate({
+        $graphLookup: {
+            from: "foreign",
+            startWith: "$starting",
+            connectFromField: "neighbors",
+            connectToField: "_id",
+            as: "integers",
+            restrictSearchWithMatch: {_id: {$gt: 10}},
+        },
+    })
+    .toArray()[0];
 
 assert.eq(res.integers.length, 0);
 
@@ -55,69 +55,77 @@ assert.commandWorked(foreign.insert({from: 2, to: 3, shouldBeIncluded: true}));
 // Assert that the $graphLookup stops exploring when it finds a document that doesn't match the
 // filter.
 res = local
-              .aggregate({
-                  $graphLookup: {
-                      from: "foreign",
-                      startWith: "$starting",
-                      connectFromField: "to",
-                      connectToField: "from",
-                      as: "results",
-                      restrictSearchWithMatch: {shouldBeIncluded: true}
-                  }
-              })
-              .toArray()[0];
+    .aggregate({
+        $graphLookup: {
+            from: "foreign",
+            startWith: "$starting",
+            connectFromField: "to",
+            connectToField: "from",
+            as: "results",
+            restrictSearchWithMatch: {shouldBeIncluded: true},
+        },
+    })
+    .toArray()[0];
 
 assert.eq(res.results.length, 1);
 
 // $expr is allowed inside the 'restrictSearchWithMatch' match expression.
 res = local
-              .aggregate({
-                  $graphLookup: {
-                      from: "foreign",
-                      startWith: "$starting",
-                      connectFromField: "to",
-                      connectToField: "from",
-                      as: "results",
-                      restrictSearchWithMatch: {$expr: {$eq: ["$shouldBeIncluded", true]}}
-                  }
-              })
-              .toArray()[0];
+    .aggregate({
+        $graphLookup: {
+            from: "foreign",
+            startWith: "$starting",
+            connectFromField: "to",
+            connectToField: "from",
+            as: "results",
+            restrictSearchWithMatch: {$expr: {$eq: ["$shouldBeIncluded", true]}},
+        },
+    })
+    .toArray()[0];
 
 assert.eq(res.results.length, 1);
 
 // $expr within `restrictSearchWithMatch` has access to variables declared at a higher level.
 res = local
-                .aggregate([{
-                    $lookup: {
-                        from: "local",
-                        let : {foo: true},
-                        pipeline: [{
-                            $graphLookup: {
-                                from: "foreign",
-                                startWith: "$starting",
-                                connectFromField: "to",
-                                connectToField: "from",
-                                as: "results",
-                                restrictSearchWithMatch:
-                                    {$expr: {$eq: ["$shouldBeIncluded", "$$foo"]}}
-                            }
-                        }],
-                        as: "array"
-                    }
-                }])
-                .toArray()[0];
+    .aggregate([
+        {
+            $lookup: {
+                from: "local",
+                let: {foo: true},
+                pipeline: [
+                    {
+                        $graphLookup: {
+                            from: "foreign",
+                            startWith: "$starting",
+                            connectFromField: "to",
+                            connectToField: "from",
+                            as: "results",
+                            restrictSearchWithMatch: {$expr: {$eq: ["$shouldBeIncluded", "$$foo"]}},
+                        },
+                    },
+                ],
+                as: "array",
+            },
+        },
+    ])
+    .toArray()[0];
 
 assert.eq(res.array[0].results.length, 1);
 
 // Geo operators are not allowed within a $match as they require a sort on the data.
-assert.throwsWithCode(() => local
-                .aggregate([{
-                        $graphLookup: {
-                            from: "foreign",
-                            startWith: "$starting",
-                            connectFromField: "neighbors",
-                            connectToField: "_id",
-                            as: "integers",
-                            restrictSearchWithMatch: {neighbors: {$near: [10, 20]}}
-                            }
-                        }]), 5626500);
+assert.throwsWithCode(
+    () =>
+        local.aggregate([
+            {
+                $graphLookup: {
+                    from: "foreign",
+                    startWith: "$starting",
+                    connectFromField: "neighbors",
+                    connectToField: "_id",
+                    as: "integers",
+                    restrictSearchWithMatch: {neighbors: {$near: [10, 20]}},
+                },
+            },
+        ]),
+    5626500,
+);

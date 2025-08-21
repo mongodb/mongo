@@ -20,16 +20,22 @@ import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Generates a new thread to run _configsvrReshardCollection.
 const makeConfigsvrReshardCollectionThread = (configsvrConnString, ns) => {
-    return new Thread((configsvrConnString, ns) => {
-        const configsvr = new Mongo(configsvrConnString);
-        assert.commandFailedWithCode(configsvr.adminCommand({
-            _configsvrReshardCollection: ns,
-            key: {_id: 1},
-            writeConcern: {w: "majority"},
-            provenance: "reshardCollection"
-        }),
-                                     ErrorCodes.ReshardCollectionInProgress);
-    }, configsvrConnString, ns);
+    return new Thread(
+        (configsvrConnString, ns) => {
+            const configsvr = new Mongo(configsvrConnString);
+            assert.commandFailedWithCode(
+                configsvr.adminCommand({
+                    _configsvrReshardCollection: ns,
+                    key: {_id: 1},
+                    writeConcern: {w: "majority"},
+                    provenance: "reshardCollection",
+                }),
+                ErrorCodes.ReshardCollectionInProgress,
+            );
+        },
+        configsvrConnString,
+        ns,
+    );
 };
 
 const getTempUUID = (tempNs) => {
@@ -51,11 +57,12 @@ const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-const pauseBeforeCloningFP =
-    configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
+const pauseBeforeCloningFP = configureFailPoint(configsvr, "reshardingPauseCoordinatorBeforeCloning");
 
 const configsvrReshardCollectionThread = makeConfigsvrReshardCollectionThread(
-    topology.configsvr.nodes[0], sourceCollection.getFullName());
+    topology.configsvr.nodes[0],
+    sourceCollection.getFullName(),
+);
 
 // Fulfilled once the unshardCollection command creates the temporary collection.
 let expectedUUIDAfterReshardingCompletes = undefined;
@@ -76,8 +83,7 @@ configsvrReshardCollectionThread.join();
 // Confirm the UUID for the namespace that was resharded is the same as the temporary collection's
 // UUID before the second reshardCollection command was issued.
 assert.neq(expectedUUIDAfterReshardingCompletes, undefined);
-const finalSourceCollectionUUID =
-    getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+const finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 reshardingTest.teardown();

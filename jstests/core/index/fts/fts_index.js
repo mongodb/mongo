@@ -19,7 +19,7 @@
 
 const indexName = "textIndex";
 
-const collNamePrefix = 'fts_index1_';
+const collNamePrefix = "fts_index1_";
 let collCount = 0;
 
 let coll = db.getCollection(collNamePrefix + collCount++);
@@ -34,77 +34,76 @@ coll.getDB().createCollection(coll.getName());
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 assert.commandWorked(coll.createIndex({a: "text"}, {name: indexName, default_language: "spanish"}));
-assert.eq(1,
-          coll.getIndexes()
-              .filter(function(z) {
-                  return z.name == indexName;
-              })
-              .length);
+assert.eq(
+    1,
+    coll.getIndexes().filter(function (z) {
+        return z.name == indexName;
+    }).length,
+);
 
 // Spec fails text-specific index validation ("spanglish" unrecognized).
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailed(
-    coll.createIndex({a: "text"}, {name: indexName, default_language: "spanglish"}));
-assert.eq(0,
-          coll.getIndexes()
-              .filter(function(z) {
-                  return z.name == indexName;
-              })
-              .length);
+assert.commandFailed(coll.createIndex({a: "text"}, {name: indexName, default_language: "spanglish"}));
+assert.eq(
+    0,
+    coll.getIndexes().filter(function (z) {
+        return z.name == indexName;
+    }).length,
+);
 
 // Spec passes general index validation.
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 assert.commandWorked(coll.createIndex({"$**": "text"}, {name: indexName}));
-assert.eq(1,
-          coll.getIndexes()
-              .filter(function(z) {
-                  return z.name == indexName;
-              })
-              .length);
+assert.eq(
+    1,
+    coll.getIndexes().filter(function (z) {
+        return z.name == indexName;
+    }).length,
+);
 
 // Spec fails general index validation ("a.$**" invalid field name for key).
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 assert.commandFailed(coll.createIndex({"a.$**": "text"}, {name: indexName}));
-assert.eq(0,
-          coll.getIndexes()
-              .filter(function(z) {
-                  return z.name == indexName;
-              })
-              .length);
+assert.eq(
+    0,
+    coll.getIndexes().filter(function (z) {
+        return z.name == indexName;
+    }).length,
+);
 
 // $-prefixed fields cannot be indexed.
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 assert.commandFailed(coll.createIndex({"a.$custom": "text"}, {name: indexName}));
-assert.eq(0,
-          coll.getIndexes()
-              .filter(function(z) {
-                  return z.name == indexName;
-              })
-              .length);
+assert.eq(
+    0,
+    coll.getIndexes().filter(function (z) {
+        return z.name == indexName;
+    }).length,
+);
 
 // SERVER-19519 Spec fails if '_fts' is specified on a non-text index.
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 assert.commandFailed(coll.createIndex({_fts: 1}, {name: indexName}));
-assert.eq(0,
-          coll.getIndexes()
-              .filter(function(z) {
-                  return z.name == indexName;
-              })
-              .length);
+assert.eq(
+    0,
+    coll.getIndexes().filter(function (z) {
+        return z.name == indexName;
+    }).length,
+);
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 assert.commandFailed(coll.createIndex({_fts: "text"}, {name: indexName}));
-assert.eq(0,
-          coll.getIndexes()
-              .filter(function(z) {
-                  return z.name == indexName;
-              })
-              .length);
+assert.eq(
+    0,
+    coll.getIndexes().filter(function (z) {
+        return z.name == indexName;
+    }).length,
+);
 
 //
 // 2. Text indexes properly enforce a schema on the language_override field.
@@ -151,11 +150,11 @@ assert.commandWorked(coll.createIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.createIndex({a: 1, b: "text", c: 1}));
 assert.eq(2, coll.getIndexes().length);
-assert.commandFailedWithCode(coll.createIndex({a: 1, b: 1, c: "text"}),
-                             ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(coll.createIndex({a: 1, b: 1, c: "text"}), ErrorCodes.CannotCreateIndex);
 assert.commandFailedWithCode(
     coll.createIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {b: 1}}),
-    ErrorCodes.IndexOptionsConflict);
+    ErrorCodes.IndexOptionsConflict,
+);
 assert.eq(2, coll.getIndexes().length);
 assert.commandWorked(coll.createIndex({a: 1, b: "text", c: 1}, {default_language: "english"}));
 assert.eq(2, coll.getIndexes().length);
@@ -238,41 +237,39 @@ assert.commandFailed(coll.createIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}));
 // The 'weights' parameter should only be allowed when the index is a text index.
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: {d: 1}}),
-                             ErrorCodes.CannotCreateIndex);
-jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
+assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: {d: 1}}), ErrorCodes.CannotCreateIndex);
+jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$**"}),
-                             ErrorCodes.CannotCreateIndex);
-jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
+assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$**"}), ErrorCodes.CannotCreateIndex);
+jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: {}}),
-                             ErrorCodes.CannotCreateIndex);
-jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
+assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: {}}), ErrorCodes.CannotCreateIndex);
+jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$foo"}),
-                             ErrorCodes.CannotCreateIndex);
-jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
+assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$foo"}), ErrorCodes.CannotCreateIndex);
+jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandWorked(coll.insert({_id: 0, a: 'abc', b: 100}));
-assert.commandFailedWithCode(coll.createIndex({a: 'text'}, {weights: {b: Number.MAX_VALUE}}),
-                             ErrorCodes.CannotCreateIndex);
-jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
-assert.commandFailedWithCode(coll.createIndex({a: 'text'}, {weights: {b: -Number.MAX_VALUE}}),
-                             ErrorCodes.CannotCreateIndex);
-jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
+assert.commandWorked(coll.insert({_id: 0, a: "abc", b: 100}));
+assert.commandFailedWithCode(
+    coll.createIndex({a: "text"}, {weights: {b: Number.MAX_VALUE}}),
+    ErrorCodes.CannotCreateIndex,
+);
+jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
+assert.commandFailedWithCode(
+    coll.createIndex({a: "text"}, {weights: {b: -Number.MAX_VALUE}}),
+    ErrorCodes.CannotCreateIndex,
+);
+jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));
 
 //
 // 6. Bad direction value for non-text key in compound index.
 //
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: "text", b: Number.MAX_VALUE}),
-                             ErrorCodes.CannotCreateIndex);
-assert.commandFailedWithCode(coll.createIndex({a: "text", b: -Number.MAX_VALUE}),
-                             ErrorCodes.CannotCreateIndex);
-jsTestLog('indexes ' + coll.getFullName() + ':' + tojson(coll.getIndexes()));
+assert.commandFailedWithCode(coll.createIndex({a: "text", b: Number.MAX_VALUE}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(coll.createIndex({a: "text", b: -Number.MAX_VALUE}), ErrorCodes.CannotCreateIndex);
+jsTestLog("indexes " + coll.getFullName() + ":" + tojson(coll.getIndexes()));

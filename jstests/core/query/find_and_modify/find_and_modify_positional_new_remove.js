@@ -25,21 +25,21 @@ function testFAMWorked(insert, cmdObj, expected) {
 
     let res;
 
-    if (!cmdObj['new']) {
+    if (!cmdObj["new"]) {
         // Test that the find operation returns the expected result.
-        res = t.findOne(cmdObj['query'], cmdObj['fields']);
-        assert.docEq(expected, res, 'positional projection failed for find');
+        res = t.findOne(cmdObj["query"], cmdObj["fields"]);
+        assert.docEq(expected, res, "positional projection failed for find");
     }
 
     // Test that the findAndModify command returns the expected result.
-    res = t.runCommand('findAndModify', cmdObj);
-    assert.commandWorked(res, 'findAndModify command failed');
-    assert.eq(res.value, expected, 'positional projection failed for findAndModify');
+    res = t.runCommand("findAndModify", cmdObj);
+    assert.commandWorked(res, "findAndModify command failed");
+    assert.eq(res.value, expected, "positional projection failed for findAndModify");
 
-    if (cmdObj['new']) {
+    if (cmdObj["new"]) {
         // Test that the find operation returns the expected result.
-        res = t.findOne(cmdObj['query'], cmdObj['fields']);
-        assert.docEq(expected, res, 'positional projection failed for find');
+        res = t.findOne(cmdObj["query"], cmdObj["fields"]);
+        assert.docEq(expected, res, "positional projection failed for find");
     }
 }
 
@@ -50,8 +50,8 @@ function testFAMFailed(insert, cmdObj) {
     t.drop();
     assert.commandWorked(t.insert(insert));
 
-    var res = t.runCommand('findAndModify', cmdObj);
-    assert.commandFailed(res, 'findAndModify command unexpectedly succeeded');
+    var res = t.runCommand("findAndModify", cmdObj);
+    assert.commandFailed(res, "findAndModify command unexpectedly succeeded");
 }
 
 //
@@ -59,227 +59,341 @@ function testFAMFailed(insert, cmdObj) {
 //
 
 // Simple query that uses an inclusion projection.
-testFAMWorked(
-    {_id: 42, a: [1, 2], b: 3}, {query: {_id: 42}, fields: {_id: 0, b: 1}, remove: true}, {b: 3});
+testFAMWorked({_id: 42, a: [1, 2], b: 3}, {query: {_id: 42}, fields: {_id: 0, b: 1}, remove: true}, {b: 3});
 
 // Simple query that uses an exclusion projection.
-testFAMWorked({_id: 42, a: [1, 2], b: 3, c: 4},
-              {query: {_id: 42}, fields: {a: 0, b: 0}, remove: true},
-              {_id: 42, c: 4});
+testFAMWorked(
+    {_id: 42, a: [1, 2], b: 3, c: 4},
+    {query: {_id: 42}, fields: {a: 0, b: 0}, remove: true},
+    {_id: 42, c: 4},
+);
 
 // Simple query that uses $elemMatch in the projection.
-testFAMWorked({
-    _id: 42,
-    b: [{name: 'first', value: 1}, {name: 'second', value: 2}, {name: 'third', value: 3}]
-},
-              {query: {_id: 42}, fields: {b: {$elemMatch: {value: 2}}}, remove: true},
-              {_id: 42, b: [{name: 'second', value: 2}]});
+testFAMWorked(
+    {
+        _id: 42,
+        b: [
+            {name: "first", value: 1},
+            {name: "second", value: 2},
+            {name: "third", value: 3},
+        ],
+    },
+    {query: {_id: 42}, fields: {b: {$elemMatch: {value: 2}}}, remove: true},
+    {_id: 42, b: [{name: "second", value: 2}]},
+);
 
 // Query on an array of values while using a positional projection.
+testFAMWorked({_id: 42, a: [1, 2]}, {query: {a: 2}, fields: {"a.$": 1}, remove: true}, {_id: 42, a: [2]});
+
+// Query on an array of objects while using a positional projection.
 testFAMWorked(
-    {_id: 42, a: [1, 2]}, {query: {a: 2}, fields: {'a.$': 1}, remove: true}, {_id: 42, a: [2]});
+    {
+        _id: 42,
+        b: [
+            {name: "first", value: 1},
+            {name: "second", value: 2},
+            {name: "third", value: 3},
+        ],
+    },
+    {query: {_id: 42, "b.name": "third"}, fields: {"b.$": 1}, remove: true},
+    {_id: 42, b: [{name: "third", value: 3}]},
+);
 
 // Query on an array of objects while using a positional projection.
-testFAMWorked({
-    _id: 42,
-    b: [{name: 'first', value: 1}, {name: 'second', value: 2}, {name: 'third', value: 3}]
-},
-              {query: {_id: 42, 'b.name': 'third'}, fields: {'b.$': 1}, remove: true},
-              {_id: 42, b: [{name: 'third', value: 3}]});
-
-// Query on an array of objects while using a positional projection.
-testFAMWorked({
-    _id: 42,
-    b: [{name: 'first', value: 1}, {name: 'second', value: 2}, {name: 'third', value: 3}]
-},
-              {query: {_id: 42, 'b.name': 'third'}, fields: {'b.$': 1}, remove: true},
-              {_id: 42, b: [{name: 'third', value: 3}]});
+testFAMWorked(
+    {
+        _id: 42,
+        b: [
+            {name: "first", value: 1},
+            {name: "second", value: 2},
+            {name: "third", value: 3},
+        ],
+    },
+    {query: {_id: 42, "b.name": "third"}, fields: {"b.$": 1}, remove: true},
+    {_id: 42, b: [{name: "third", value: 3}]},
+);
 
 // Query on an array of objects using $elemMatch while using an inclusion projection.
-testFAMWorked({
-    _id: 42,
-    a: 5,
-    b: [{name: 'john', value: 1}, {name: 'jess', value: 2}, {name: 'jeff', value: 3}]
-},
-              {
-                  query: {b: {$elemMatch: {name: 'john', value: {$lt: 2}}}},
-                  fields: {_id: 0, a: 5},
-                  remove: true
-              },
-              {a: 5});
+testFAMWorked(
+    {
+        _id: 42,
+        a: 5,
+        b: [
+            {name: "john", value: 1},
+            {name: "jess", value: 2},
+            {name: "jeff", value: 3},
+        ],
+    },
+    {
+        query: {b: {$elemMatch: {name: "john", value: {$lt: 2}}}},
+        fields: {_id: 0, a: 5},
+        remove: true,
+    },
+    {a: 5},
+);
 
 // Query on an array of objects using $elemMatch while using the positional
 // operator in the projection.
 testFAMWorked(
-    {_id: 42, b: [{name: 'john', value: 1}, {name: 'jess', value: 2}, {name: 'jeff', value: 3}]},
     {
-        query: {b: {$elemMatch: {name: 'john', value: {$lt: 2}}}},
-        fields: {_id: 0, 'b.$': 1},
-        remove: true
+        _id: 42,
+        b: [
+            {name: "john", value: 1},
+            {name: "jess", value: 2},
+            {name: "jeff", value: 3},
+        ],
     },
-    {b: [{name: 'john', value: 1}]});
+    {
+        query: {b: {$elemMatch: {name: "john", value: {$lt: 2}}}},
+        fields: {_id: 0, "b.$": 1},
+        remove: true,
+    },
+    {b: [{name: "john", value: 1}]},
+);
 
 //
 // Update operations with new=false
 //
 
 // Simple query that uses an inclusion projection.
-testFAMWorked({_id: 42, a: [1, 2], b: 3},
-              {query: {_id: 42}, fields: {_id: 0, b: 1}, update: {$inc: {b: 1}}, new: false},
-              {b: 3});
+testFAMWorked(
+    {_id: 42, a: [1, 2], b: 3},
+    {query: {_id: 42}, fields: {_id: 0, b: 1}, update: {$inc: {b: 1}}, new: false},
+    {b: 3},
+);
 
 // Simple query that uses an exclusion projection.
-testFAMWorked({_id: 42, a: [1, 2], b: 3, c: 4},
-              {query: {_id: 42}, fields: {a: 0, b: 0}, update: {$set: {c: 5}}, new: false},
-              {_id: 42, c: 4});
+testFAMWorked(
+    {_id: 42, a: [1, 2], b: 3, c: 4},
+    {query: {_id: 42}, fields: {a: 0, b: 0}, update: {$set: {c: 5}}, new: false},
+    {_id: 42, c: 4},
+);
 
 // Simple query that uses $elemMatch in the projection.
-testFAMWorked({
-    _id: 42,
-    b: [{name: 'first', value: 1}, {name: 'second', value: 2}, {name: 'third', value: 3}]
-},
-              {
-                  query: {_id: 42},
-                  fields: {b: {$elemMatch: {value: 2}}},
-                  update: {$set: {name: '2nd'}},
-                  new: false
-              },
-              {_id: 42, b: [{name: 'second', value: 2}]});
+testFAMWorked(
+    {
+        _id: 42,
+        b: [
+            {name: "first", value: 1},
+            {name: "second", value: 2},
+            {name: "third", value: 3},
+        ],
+    },
+    {
+        query: {_id: 42},
+        fields: {b: {$elemMatch: {value: 2}}},
+        update: {$set: {name: "2nd"}},
+        new: false,
+    },
+    {_id: 42, b: [{name: "second", value: 2}]},
+);
 
 // Query on an array of values while using a positional projection.
-testFAMWorked({_id: 42, a: [1, 2]},
-              {query: {a: 2}, fields: {'a.$': 1}, update: {$set: {'b.kind': 'xyz'}}, new: false},
-              {_id: 42, a: [2]});
+testFAMWorked(
+    {_id: 42, a: [1, 2]},
+    {query: {a: 2}, fields: {"a.$": 1}, update: {$set: {"b.kind": "xyz"}}, new: false},
+    {_id: 42, a: [2]},
+);
 
 // Query on an array of objects while using a positional projection.
-testFAMWorked({
-    _id: 42,
-    b: [{name: 'first', value: 1}, {name: 'second', value: 2}, {name: 'third', value: 3}]
-},
-              {
-                  query: {_id: 42, 'b.name': 'third'},
-                  fields: {'b.$': 1},
-                  update: {$set: {'b.$.kind': 'xyz'}},
-                  new: false
-              },
-              {_id: 42, b: [{name: 'third', value: 3}]});
+testFAMWorked(
+    {
+        _id: 42,
+        b: [
+            {name: "first", value: 1},
+            {name: "second", value: 2},
+            {name: "third", value: 3},
+        ],
+    },
+    {
+        query: {_id: 42, "b.name": "third"},
+        fields: {"b.$": 1},
+        update: {$set: {"b.$.kind": "xyz"}},
+        new: false,
+    },
+    {_id: 42, b: [{name: "third", value: 3}]},
+);
 
 // Query on an array of objects while using $elemMatch in the projection,
 // where the matched array element is modified.
 testFAMWorked(
-    {_id: 1, a: [{x: 1, y: 1}, {x: 1, y: 2}]},
+    {
+        _id: 1,
+        a: [
+            {x: 1, y: 1},
+            {x: 1, y: 2},
+        ],
+    },
     {query: {_id: 1}, fields: {a: {$elemMatch: {x: 1}}}, update: {$pop: {a: -1}}, new: false},
-    {_id: 1, a: [{x: 1, y: 1}]});
+    {_id: 1, a: [{x: 1, y: 1}]},
+);
 
 // Query on an array of objects using $elemMatch while using an inclusion projection.
-testFAMWorked({
-    _id: 42,
-    a: 5,
-    b: [{name: 'john', value: 1}, {name: 'jess', value: 2}, {name: 'jeff', value: 3}]
-},
-              {
-                  query: {b: {$elemMatch: {name: 'john', value: {$lt: 2}}}},
-                  fields: {_id: 0, a: 5},
-                  update: {$inc: {a: 6}},
-                  new: false
-              },
-              {a: 5});
+testFAMWorked(
+    {
+        _id: 42,
+        a: 5,
+        b: [
+            {name: "john", value: 1},
+            {name: "jess", value: 2},
+            {name: "jeff", value: 3},
+        ],
+    },
+    {
+        query: {b: {$elemMatch: {name: "john", value: {$lt: 2}}}},
+        fields: {_id: 0, a: 5},
+        update: {$inc: {a: 6}},
+        new: false,
+    },
+    {a: 5},
+);
 
 // Query on an array of objects using $elemMatch while using the positional
 // operator in the projection.
 testFAMWorked(
-    {_id: 42, b: [{name: 'john', value: 1}, {name: 'jess', value: 2}, {name: 'jeff', value: 3}]},
     {
-        query: {b: {$elemMatch: {name: 'john', value: {$lt: 2}}}},
-        fields: {_id: 0, 'b.$': 1},
-        update: {$set: {name: 'james'}},
-        new: false
+        _id: 42,
+        b: [
+            {name: "john", value: 1},
+            {name: "jess", value: 2},
+            {name: "jeff", value: 3},
+        ],
     },
-    {b: [{name: 'john', value: 1}]});
+    {
+        query: {b: {$elemMatch: {name: "john", value: {$lt: 2}}}},
+        fields: {_id: 0, "b.$": 1},
+        update: {$set: {name: "james"}},
+        new: false,
+    },
+    {b: [{name: "john", value: 1}]},
+);
 
 //
 // Update operations with new=true
 //
 
 // Simple query that uses an inclusion projection.
-testFAMWorked({_id: 42, a: [1, 2], b: 3},
-              {query: {_id: 42}, fields: {_id: 0, b: 1}, update: {$inc: {b: 1}}, new: true},
-              {b: 4});
+testFAMWorked(
+    {_id: 42, a: [1, 2], b: 3},
+    {query: {_id: 42}, fields: {_id: 0, b: 1}, update: {$inc: {b: 1}}, new: true},
+    {b: 4},
+);
 
 // Simple query that uses an exclusion projection.
-testFAMWorked({_id: 42, a: [1, 2], b: 3, c: 4},
-              {query: {_id: 42}, fields: {a: 0, b: 0}, update: {$set: {c: 5}}, new: true},
-              {_id: 42, c: 5});
+testFAMWorked(
+    {_id: 42, a: [1, 2], b: 3, c: 4},
+    {query: {_id: 42}, fields: {a: 0, b: 0}, update: {$set: {c: 5}}, new: true},
+    {_id: 42, c: 5},
+);
 
 // Simple query that uses $elemMatch in the projection.
-testFAMWorked({
-    _id: 42,
-    b: [{name: 'first', value: 1}, {name: 'second', value: 2}, {name: 'third', value: 3}]
-},
-              {
-                  query: {_id: 42},
-                  fields: {b: {$elemMatch: {value: 2}}},
-                  update: {$set: {'b.1.name': '2nd'}},
-                  new: true
-              },
-              {_id: 42, b: [{name: '2nd', value: 2}]});
+testFAMWorked(
+    {
+        _id: 42,
+        b: [
+            {name: "first", value: 1},
+            {name: "second", value: 2},
+            {name: "third", value: 3},
+        ],
+    },
+    {
+        query: {_id: 42},
+        fields: {b: {$elemMatch: {value: 2}}},
+        update: {$set: {"b.1.name": "2nd"}},
+        new: true,
+    },
+    {_id: 42, b: [{name: "2nd", value: 2}]},
+);
 
 // Query on an array of values while using a positional projection.
-testFAMFailed({_id: 42, a: [1, 2]},
-              {query: {a: 2}, fields: {'a.$': 1}, update: {$set: {'b.kind': 'xyz'}}, new: true});
+testFAMFailed({_id: 42, a: [1, 2]}, {query: {a: 2}, fields: {"a.$": 1}, update: {$set: {"b.kind": "xyz"}}, new: true});
 
 // Query on an array of objects while using a positional projection.
-testFAMFailed({
-    _id: 42,
-    b: [{name: 'first', value: 1}, {name: 'second', value: 2}, {name: 'third', value: 3}]
-},
-              {
-                  query: {_id: 42, 'b.name': 'third'},
-                  fields: {'b.$': 1},
-                  update: {$set: {'b.$.kind': 'xyz'}},
-                  new: true
-              });
+testFAMFailed(
+    {
+        _id: 42,
+        b: [
+            {name: "first", value: 1},
+            {name: "second", value: 2},
+            {name: "third", value: 3},
+        ],
+    },
+    {
+        query: {_id: 42, "b.name": "third"},
+        fields: {"b.$": 1},
+        update: {$set: {"b.$.kind": "xyz"}},
+        new: true,
+    },
+);
 
 // Query on an array of objects while using $elemMatch in the projection.
-testFAMWorked({
-    _id: 42,
-    b: [{name: 'first', value: 1}, {name: 'second', value: 2}, {name: 'third', value: 3}]
-},
-              {
-                  query: {_id: 42},
-                  fields: {b: {$elemMatch: {value: 2}}, c: 1},
-                  update: {$set: {c: 'xyz'}},
-                  new: true
-              },
-              {_id: 42, c: 'xyz', b: [{name: 'second', value: 2}]});
+testFAMWorked(
+    {
+        _id: 42,
+        b: [
+            {name: "first", value: 1},
+            {name: "second", value: 2},
+            {name: "third", value: 3},
+        ],
+    },
+    {
+        query: {_id: 42},
+        fields: {b: {$elemMatch: {value: 2}}, c: 1},
+        update: {$set: {c: "xyz"}},
+        new: true,
+    },
+    {_id: 42, c: "xyz", b: [{name: "second", value: 2}]},
+);
 
 // Query on an array of objects while using $elemMatch in the projection,
 // where the matched array element is modified.
 testFAMWorked(
-    {_id: 1, a: [{x: 1, y: 1}, {x: 1, y: 2}]},
+    {
+        _id: 1,
+        a: [
+            {x: 1, y: 1},
+            {x: 1, y: 2},
+        ],
+    },
     {query: {_id: 1}, fields: {a: {$elemMatch: {x: 1}}}, update: {$pop: {a: -1}}, new: true},
-    {_id: 1, a: [{x: 1, y: 2}]});
+    {_id: 1, a: [{x: 1, y: 2}]},
+);
 
 // Query on an array of objects using $elemMatch while using an inclusion projection.
-testFAMWorked({
-    _id: 42,
-    a: 5,
-    b: [{name: 'john', value: 1}, {name: 'jess', value: 2}, {name: 'jeff', value: 3}]
-},
-              {
-                  query: {b: {$elemMatch: {name: 'john', value: {$lt: 2}}}},
-                  fields: {_id: 0, a: 5},
-                  update: {$inc: {a: 6}},
-                  new: true
-              },
-              {a: 11});
+testFAMWorked(
+    {
+        _id: 42,
+        a: 5,
+        b: [
+            {name: "john", value: 1},
+            {name: "jess", value: 2},
+            {name: "jeff", value: 3},
+        ],
+    },
+    {
+        query: {b: {$elemMatch: {name: "john", value: {$lt: 2}}}},
+        fields: {_id: 0, a: 5},
+        update: {$inc: {a: 6}},
+        new: true,
+    },
+    {a: 11},
+);
 
 // Query on an array of objects using $elemMatch while using the positional
 // operator in the projection.
 testFAMFailed(
-    {_id: 42, b: [{name: 'john', value: 1}, {name: 'jess', value: 2}, {name: 'jeff', value: 3}]}, {
-        query: {b: {$elemMatch: {name: 'john', value: {$lt: 2}}}},
-        fields: {_id: 0, 'b.$': 1},
-        update: {$set: {name: 'james'}},
-        new: true
-    });
+    {
+        _id: 42,
+        b: [
+            {name: "john", value: 1},
+            {name: "jess", value: 2},
+            {name: "jeff", value: 3},
+        ],
+    },
+    {
+        query: {b: {$elemMatch: {name: "john", value: {$lt: 2}}}},
+        fields: {_id: 0, "b.$": 1},
+        update: {$set: {name: "james"}},
+        new: true,
+    },
+);

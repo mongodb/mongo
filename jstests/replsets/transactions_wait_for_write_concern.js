@@ -11,10 +11,7 @@
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    restartReplicationOnSecondaries,
-    stopReplicationOnSecondaries
-} from "jstests/libs/write_concern_util.js";
+import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";
 const collNameBase = "coll";
@@ -35,8 +32,9 @@ function runTest(readConcernLevel) {
     jsTestLog("Testing " + readConcernLevel);
 
     const collName = `${collNameBase}_${readConcernLevel}`;
-    assert.commandWorked(primaryDB[collName].insert(
-        [{x: 1}, {x: 2}, {x: 3}, {x: 4}, {x: 5}, {x: 6}], {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        primaryDB[collName].insert([{x: 1}, {x: 2}, {x: 3}, {x: 4}, {x: 5}, {x: 6}], {writeConcern: {w: "majority"}}),
+    );
 
     jsTestLog("Unprepared Abort Setup");
     const mongo1 = new Mongo(primary.host);
@@ -48,9 +46,9 @@ function runTest(readConcernLevel) {
     session1.startTransaction({
         writeConcern: {
             w: "majority",
-            wtimeout: versionSupportsAbortWaitingForWC ? failTimeoutMS : successTimeoutMS
+            wtimeout: versionSupportsAbortWaitingForWC ? failTimeoutMS : successTimeoutMS,
         },
-        readConcern: {level: readConcernLevel}
+        readConcern: {level: readConcernLevel},
     });
     const fruitlessUpdate1 = {update: collName, updates: [{q: {x: 1}, u: {$set: {x: 1}}}]};
     printjson(assert.commandWorked(sessionDB1.runCommand(fruitlessUpdate1)));
@@ -61,7 +59,7 @@ function runTest(readConcernLevel) {
     const sessionDB2 = session2.getDatabase(dbName);
     session2.startTransaction({
         writeConcern: {w: "majority", wtimeout: failTimeoutMS},
-        readConcern: {level: readConcernLevel}
+        readConcern: {level: readConcernLevel},
     });
     const fruitlessUpdate2 = {update: collName, updates: [{q: {x: 2}, u: {$set: {x: 2}}}]};
     printjson(assert.commandWorked(sessionDB2.runCommand(fruitlessUpdate2)));
@@ -73,7 +71,7 @@ function runTest(readConcernLevel) {
     const sessionDB3 = session3.getDatabase(dbName);
     session3.startTransaction({
         writeConcern: {w: "majority", wtimeout: failTimeoutMS},
-        readConcern: {level: readConcernLevel}
+        readConcern: {level: readConcernLevel},
     });
     const fruitlessUpdate3 = {update: collName, updates: [{q: {x: 3}, u: {$set: {x: 3}}}]};
     printjson(assert.commandWorked(sessionDB3.runCommand(fruitlessUpdate3)));
@@ -84,7 +82,7 @@ function runTest(readConcernLevel) {
     const sessionDB4 = session4.getDatabase(dbName);
     session4.startTransaction({
         writeConcern: {w: "majority", wtimeout: failTimeoutMS},
-        readConcern: {level: readConcernLevel}
+        readConcern: {level: readConcernLevel},
     });
     const fruitlessUpdate4 = {update: collName, updates: [{q: {x: 4}, u: {$set: {x: 4}}}]};
     printjson(assert.commandWorked(sessionDB4.runCommand(fruitlessUpdate4)));
@@ -95,7 +93,7 @@ function runTest(readConcernLevel) {
     const sessionDB5 = session5.getDatabase(dbName);
     session5.startTransaction({
         writeConcern: {w: "majority", wtimeout: failTimeoutMS},
-        readConcern: {level: readConcernLevel}
+        readConcern: {level: readConcernLevel},
     });
     const fruitlessUpdate5 = {update: collName, updates: [{q: {x: 5}, u: {$set: {x: 5}}}]};
     printjson(assert.commandWorked(sessionDB5.runCommand(fruitlessUpdate5)));
@@ -113,38 +111,37 @@ function runTest(readConcernLevel) {
     jsTestLog("Unprepared Abort Test");
     // TODO (SERVER-100669): Remove version check once 9.0 becomes last LTS.
     if (versionSupportsAbortWaitingForWC) {
-        assert.commandFailedWithCode(session1.abortTransaction_forTesting(),
-                                     ErrorCodes.WriteConcernTimeout);
+        assert.commandFailedWithCode(session1.abortTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
     } else {
         assert.commandWorked(session1.abortTransaction_forTesting());
     }
 
     jsTestLog("Prepared Abort Test");
-    assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(session2.abortTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
 
     jsTestLog("Prepare Test");
     assert.commandFailedWithCode(
-        session3.getDatabase('admin').adminCommand(
-            {prepareTransaction: 1, writeConcern: {w: "majority", wtimeout: failTimeoutMS}}),
-        ErrorCodes.WriteConcernTimeout);
-    assert.commandFailedWithCode(session3.abortTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernTimeout);
+        session3
+            .getDatabase("admin")
+            .adminCommand({prepareTransaction: 1, writeConcern: {w: "majority", wtimeout: failTimeoutMS}}),
+        ErrorCodes.WriteConcernTimeout,
+    );
+    assert.commandFailedWithCode(session3.abortTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
 
     jsTestLog("Unprepared Commit Test");
-    assert.commandFailedWithCode(session4.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(session4.commitTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
 
     jsTestLog("Prepared Commit Test");
-    assert.commandFailedWithCode(session5.getDatabase('admin').adminCommand({
-        commitTransaction: 1,
-        commitTimestamp: prepareTS5,
-        writeConcern: {w: "majority", wtimeout: failTimeoutMS}
-    }),
-                                 ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(
+        session5.getDatabase("admin").adminCommand({
+            commitTransaction: 1,
+            commitTimestamp: prepareTS5,
+            writeConcern: {w: "majority", wtimeout: failTimeoutMS},
+        }),
+        ErrorCodes.WriteConcernTimeout,
+    );
     // Send commit with the shell helper to reset the shell's state.
-    assert.commandFailedWithCode(session5.commitTransaction_forTesting(),
-                                 ErrorCodes.WriteConcernTimeout);
+    assert.commandFailedWithCode(session5.commitTransaction_forTesting(), ErrorCodes.WriteConcernTimeout);
 
     jsTestLog("Restart replication");
     restartReplicationOnSecondaries(rst);
@@ -154,7 +151,7 @@ function runTest(readConcernLevel) {
     // Unprepared Abort.
     session1.startTransaction({
         writeConcern: {w: "majority", wtimeout: successTimeoutMS},
-        readConcern: {level: readConcernLevel}
+        readConcern: {level: readConcernLevel},
     });
     assert.commandWorked(sessionDB1.runCommand(fruitlessUpdate1));
     assert.commandWorked(session1.abortTransaction_forTesting());
@@ -162,7 +159,7 @@ function runTest(readConcernLevel) {
     // Prepared Abort.
     session2.startTransaction({
         writeConcern: {w: "majority", wtimeout: successTimeoutMS},
-        readConcern: {level: readConcernLevel}
+        readConcern: {level: readConcernLevel},
     });
     assert.commandWorked(sessionDB2.runCommand(fruitlessUpdate2));
     PrepareHelpers.prepareTransaction(session2);
@@ -173,7 +170,7 @@ function runTest(readConcernLevel) {
     // Unprepared Commit.
     session4.startTransaction({
         writeConcern: {w: "majority", wtimeout: successTimeoutMS},
-        readConcern: {level: readConcernLevel}
+        readConcern: {level: readConcernLevel},
     });
     assert.commandWorked(sessionDB4.runCommand(fruitlessUpdate4));
     assert.commandWorked(session4.commitTransaction_forTesting());
@@ -181,15 +178,17 @@ function runTest(readConcernLevel) {
     // Prepared Commit.
     session5.startTransaction({
         writeConcern: {w: "majority", wtimeout: successTimeoutMS},
-        readConcern: {level: readConcernLevel}
+        readConcern: {level: readConcernLevel},
     });
     assert.commandWorked(sessionDB5.runCommand(fruitlessUpdate5));
     prepareTS5 = PrepareHelpers.prepareTransaction(session5);
-    assert.commandWorked(session5.getDatabase('admin').adminCommand({
-        commitTransaction: 1,
-        commitTimestamp: prepareTS5,
-        writeConcern: {w: "majority", wtimeout: successTimeoutMS}
-    }));
+    assert.commandWorked(
+        session5.getDatabase("admin").adminCommand({
+            commitTransaction: 1,
+            commitTimestamp: prepareTS5,
+            writeConcern: {w: "majority", wtimeout: successTimeoutMS},
+        }),
+    );
     // Send commit with the shell helper to reset the shell's state.
     assert.commandWorked(session5.commitTransaction_forTesting());
 

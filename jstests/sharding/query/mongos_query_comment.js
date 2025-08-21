@@ -31,20 +31,26 @@ for (let i = 0; i < 5; ++i) {
 assert.commandWorked(shardDB.setProfilingLevel(2));
 
 // TEST CASE: Verify that find.comment and non-string find.filter.$comment propagate.
-assert.eq(mongosColl.find({a: 1, $comment: {b: "TEST"}}).comment("TEST").itcount(), 1);
+assert.eq(
+    mongosColl
+        .find({a: 1, $comment: {b: "TEST"}})
+        .comment("TEST")
+        .itcount(),
+    1,
+);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shardDB,
-    filter:
-        {op: "query", ns: collNS, "command.comment": "TEST", "command.filter.$comment": {b: "TEST"}}
+    filter: {op: "query", ns: collNS, "command.comment": "TEST", "command.filter.$comment": {b: "TEST"}},
 });
 
 // TEST CASE: Verify that find command with a non-string comment parameter gets propagated.
-assert.commandWorked(mongosDB.runCommand(
-    {"find": mongosColl.getName(), "filter": {a: 1}, "comment": {b: "TEST_BSONOBJ"}}));
+assert.commandWorked(
+    mongosDB.runCommand({"find": mongosColl.getName(), "filter": {a: 1}, "comment": {b: "TEST_BSONOBJ"}}),
+);
 
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: shardDB,
-    filter: {op: "query", ns: collNS, "command.comment": {b: "TEST_BSONOBJ"}}
+    filter: {op: "query", ns: collNS, "command.comment": {b: "TEST_BSONOBJ"}},
 });
 
 st.stop();

@@ -92,12 +92,11 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
         // hours). For this test, we need a shorter election timeout because it relies on nodes
         // running an election when they do not detect an active primary. Therefore, we are setting
         // the electionTimeoutMillis to its default value.
-        initiateWithDefaultElectionTimeout: true
+        initiateWithDefaultElectionTimeout: true,
     });
     const stepDownShard0PrimaryFunc = () => {
         const oldPrimary = st.rs0.getPrimary();
-        assert.commandWorked(
-            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
         assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
     };
 
@@ -105,24 +104,24 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: false,
         abortTxnAfterFailover: false,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: false,
         abortTxnAfterFailover: true,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
 
     // Test findAnModify with pre/post image when the image collection is enabled.
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: false,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: true,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
 
     st.stop();
@@ -137,36 +136,37 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
         // hours). For this test, we need a shorter election timeout because it relies on nodes
         // running an election when they do not detect an active primary. Therefore, we are setting
         // the electionTimeoutMillis to its default value.
-        initiateWithDefaultElectionTimeout: true
+        initiateWithDefaultElectionTimeout: true,
     });
     const stepDownShard0PrimaryFunc = () => {
         assert.commandWorked(st.rs0.getSecondary().adminCommand({replSetFreeze: 0}));
-        assert.commandWorked(st.rs0.getPrimary().adminCommand(
-            {replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(
+            st.rs0.getPrimary().adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}),
+        );
     };
 
     // Test findAnModify without pre/post image.
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: false,
         abortTxnAfterFailover: false,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: false,
         abortTxnAfterFailover: true,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
 
     // Test findAnModify with pre/post image when the image collection is enabled.
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: false,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
     runTest(st, stepDownShard0PrimaryFunc, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: true,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
 
     st.stop();
@@ -188,24 +188,24 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
     runTest(st, restartShard0Func, {
         runFindAndModifyWithPreOrPostImage: false,
         abortTxnAfterFailover: false,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
     runTest(st, restartShard0Func, {
         runFindAndModifyWithPreOrPostImage: false,
         abortTxnAfterFailover: true,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
 
     // Test findAnModify with pre/post image when the image collection is enabled.
     runTest(st, restartShard0Func, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: false,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
     runTest(st, restartShard0Func, {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: true,
-        enableFindAndModifyImageCollection: true
+        enableFindAndModifyImageCollection: true,
     });
 
     st.stop();

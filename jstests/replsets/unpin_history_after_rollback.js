@@ -21,13 +21,13 @@ let rst = new ReplSetTest({
     name: "history_rollback_test",
     nodes: 3,
     useBridge: true,
-    nodeOptions: {setParameter: {logComponentVerbosity: tojson({storage: {recovery: 2}})}}
+    nodeOptions: {setParameter: {logComponentVerbosity: tojson({storage: {recovery: 2}})}},
 });
 rst.startSet();
 const config = rst.getReplSetConfig();
 config.members[2].priority = 0;
 config.settings = {
-    chainingAllowed: false
+    chainingAllowed: false,
 };
 rst.initiate(config);
 
@@ -38,12 +38,10 @@ rollbackTest.transitionToRollbackOperations();
 let serverStatus = rollbackNode.adminCommand("serverStatus");
 // When there is no pin, the `min pinned timestamp` value is `Timestamp::max()`. I don't believe
 // there is a JS constant for `Timestamp::max()`, so we capture it now for later.
-let maxTimestampValue =
-    serverStatus["wiredTiger"]["snapshot-window-settings"]["min pinned timestamp"];
+let maxTimestampValue = serverStatus["wiredTiger"]["snapshot-window-settings"]["min pinned timestamp"];
 
 // Perform a write that pins history. This write will be rolled back.
-let result = assert.commandWorked(
-    rollbackNode.adminCommand({"pinHistoryReplicated": Timestamp(100, 1), round: true}));
+let result = assert.commandWorked(rollbackNode.adminCommand({"pinHistoryReplicated": Timestamp(100, 1), round: true}));
 let origPinTs = result["pinTs"];
 
 serverStatus = rollbackNode.adminCommand("serverStatus");

@@ -25,11 +25,11 @@ db[collName].drop();
 
 // Get the current value of the query framework server parameter so we can restore it at the end of
 // the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl =
-    assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-        .internalQueryFrameworkControl;
+const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+).internalQueryFrameworkControl;
 
-const bigStr = Array(1025).toString();  // 1KB of ','
+const bigStr = Array(1025).toString(); // 1KB of ','
 const lowMaxMemoryLimit = 5000;
 const nDocs = 50;
 
@@ -57,13 +57,13 @@ const configs = [
             // Add $_internalInhibitOptimization to prevent $sort pushdown, keeping it in SBE
             pipeline.unshift({$_internalInhibitOptimization: {}});
         },
-        stageName: "sort",  // SBE sort stage appears without the dollar sign
+        stageName: "sort", // SBE sort stage appears without the dollar sign
     },
     {
         name: "PlanStage Sort",
         framework: "forceClassicEngine",
-        stageName: "SORT",  // PlanStage sort appears as uppercase SORT in explain output
-    }
+        stageName: "SORT", // PlanStage sort appears as uppercase SORT in explain output
+    },
 ];
 
 for (const config of configs) {
@@ -72,8 +72,7 @@ for (const config of configs) {
 
         // Setup for this configuration
         before(() => {
-            assert.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryFrameworkControl: config.framework}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: config.framework}));
 
             // Define base pipelines without inhibit optimization
             pipeline = [{$sort: {_id: 1, b: -1}}];
@@ -95,7 +94,7 @@ for (const config of configs) {
                     pipeline: pipeline,
                     cursor: {batchSize: 10},
                     comment: "memory stats sort test",
-                    allowDiskUse: false
+                    allowDiskUse: false,
                 },
                 stageName: config.stageName,
                 expectedNumGetMores: 5,
@@ -111,7 +110,7 @@ for (const config of configs) {
                     pipeline: pipelineWithLimit,
                     cursor: {batchSize: 1},
                     comment: "memory stats sort limit test",
-                    allowDiskUse: false
+                    allowDiskUse: false,
                 },
                 stageName: config.stageName,
                 expectedNumGetMores: 5,
@@ -120,10 +119,12 @@ for (const config of configs) {
 
         it("should track memory for sort with spilling", () => {
             // Set maxMemory low to force spill to disk.
-            const originalMemoryLimit = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit
-            }));
+            const originalMemoryLimit = assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit,
+                }),
+            );
 
             try {
                 runMemoryStatsTest({
@@ -134,7 +135,7 @@ for (const config of configs) {
                         pipeline: pipeline,
                         cursor: {batchSize: 10},
                         comment: "memory stats sort spilling test",
-                        allowDiskUse: true
+                        allowDiskUse: true,
                     },
                     stageName: config.stageName,
                     expectedNumGetMores: 5,
@@ -144,10 +145,12 @@ for (const config of configs) {
                 });
             } finally {
                 // Set maxMemory back to the original value.
-                assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was
-                }));
+                assert.commandWorked(
+                    db.adminCommand({
+                        setParameter: 1,
+                        internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was,
+                    }),
+                );
             }
         });
     });
@@ -155,6 +158,7 @@ for (const config of configs) {
 
 // Clean up.
 after(() => {
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
+    );
 });

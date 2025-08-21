@@ -21,29 +21,31 @@ import {
     kCommandsSupportingSnapshot,
     kCommandsSupportingWriteConcern,
     kCommandsSupportingWriteConcernInTransaction,
-    kWriteCommandsSupportingSnapshotInTransaction
+    kWriteCommandsSupportingSnapshotInTransaction,
 } from "jstests/libs/override_methods/read_and_write_concern_helpers.js";
 
 if (typeof TestData === "undefined" || !TestData.hasOwnProperty("defaultReadConcernLevel")) {
-    throw new Error("The readConcern level to use must be set as the 'defaultReadConcernLevel'" +
-                    " property on the global TestData object");
+    throw new Error(
+        "The readConcern level to use must be set as the 'defaultReadConcernLevel'" +
+            " property on the global TestData object",
+    );
 }
 
 // If the default read concern level is null, that indicates that no read concern overrides
 // should be applied.
 const kDefaultReadConcern = {
-    level: TestData.defaultReadConcernLevel
+    level: TestData.defaultReadConcernLevel,
 };
-const kDefaultWriteConcern =
-    (TestData.hasOwnProperty("defaultWriteConcern")) ? TestData.defaultWriteConcern : {
-        w: "majority",
-        // Use a "signature" value that won't typically match a value assigned in normal use.
-        // This way the wtimeout set by this override is distinguishable in the server logs.
-        wtimeout: 5 * 60 * 1000 + 321,  // 300321ms
-    };
+const kDefaultWriteConcern = TestData.hasOwnProperty("defaultWriteConcern")
+    ? TestData.defaultWriteConcern
+    : {
+          w: "majority",
+          // Use a "signature" value that won't typically match a value assigned in normal use.
+          // This way the wtimeout set by this override is distinguishable in the server logs.
+          wtimeout: 5 * 60 * 1000 + 321, // 300321ms
+      };
 
-function runCommandWithReadAndWriteConcerns(
-    conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandWithReadAndWriteConcerns(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
@@ -51,8 +53,11 @@ function runCommandWithReadAndWriteConcerns(
     let shouldForceReadConcern = kCommandsSupportingReadConcern.has(commandName);
     if (kDefaultReadConcern.level === "snapshot" && !kCommandsSupportingSnapshot.has(commandName)) {
         shouldForceReadConcern = false;
-    } else if (TestData.disallowSnapshotDistinct && kDefaultReadConcern.level === "snapshot" &&
-               commandName === "distinct") {
+    } else if (
+        TestData.disallowSnapshotDistinct &&
+        kDefaultReadConcern.level === "snapshot" &&
+        commandName === "distinct"
+    ) {
         shouldForceReadConcern = false;
     }
 
@@ -120,14 +125,16 @@ function runCommandWithReadAndWriteConcerns(
         shouldForceWriteConcern = false;
     }
 
-    if (commandObj.hasOwnProperty("autocommit") &&
+    if (
+        commandObj.hasOwnProperty("autocommit") &&
         kWriteCommandsSupportingSnapshotInTransaction.has(commandName) &&
-        kDefaultReadConcern.level === "snapshot") {
+        kDefaultReadConcern.level === "snapshot"
+    ) {
         shouldForceReadConcern = true;
     }
 
     // Only override read concern if an override level was specified.
-    if (shouldForceReadConcern && (kDefaultReadConcern.level !== null)) {
+    if (shouldForceReadConcern && kDefaultReadConcern.level !== null) {
         // We create a copy of 'commandObj' to avoid mutating the parameter the caller specified.
         commandObj = Object.assign({}, commandObj);
 
@@ -135,13 +142,15 @@ function runCommandWithReadAndWriteConcerns(
         if (commandObj.hasOwnProperty("readConcern")) {
             readConcern = commandObj.readConcern;
 
-            if (typeof readConcern !== "object" || readConcern === null ||
+            if (
+                typeof readConcern !== "object" ||
+                readConcern === null ||
                 (readConcern.hasOwnProperty("level") &&
-                 bsonWoCompare({_: readConcern.level}, {_: kDefaultReadConcern.level}) !== 0 &&
-                 bsonWoCompare({_: readConcern.level}, {_: "local"}) !== 0 &&
-                 bsonWoCompare({_: readConcern.level}, {_: "available"}) !== 0)) {
-                throw new Error("Cowardly refusing to override read concern of command: " +
-                                tojson(commandObj));
+                    bsonWoCompare({_: readConcern.level}, {_: kDefaultReadConcern.level}) !== 0 &&
+                    bsonWoCompare({_: readConcern.level}, {_: "local"}) !== 0 &&
+                    bsonWoCompare({_: readConcern.level}, {_: "available"}) !== 0)
+            ) {
+                throw new Error("Cowardly refusing to override read concern of command: " + tojson(commandObj));
             }
         }
 
@@ -159,12 +168,14 @@ function runCommandWithReadAndWriteConcerns(
         if (commandObj.hasOwnProperty("writeConcern")) {
             writeConcern = commandObj.writeConcern;
 
-            if (typeof writeConcern !== "object" || writeConcern === null ||
+            if (
+                typeof writeConcern !== "object" ||
+                writeConcern === null ||
                 (writeConcern.hasOwnProperty("w") &&
-                 bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcern.w}) !== 0 &&
-                 bsonWoCompare({_: writeConcern.w}, {_: 1}) !== 0)) {
-                throw new Error("Cowardly refusing to override write concern of command: " +
-                                tojson(commandObj));
+                    bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcern.w}) !== 0 &&
+                    bsonWoCompare({_: writeConcern.w}, {_: 1}) !== 0)
+            ) {
+                throw new Error("Cowardly refusing to override write concern of command: " + tojson(commandObj));
             }
         }
 
@@ -176,7 +187,6 @@ function runCommandWithReadAndWriteConcerns(
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/set_read_and_write_concerns.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/set_read_and_write_concerns.js");
 
 OverrideHelpers.overrideRunCommand(runCommandWithReadAndWriteConcerns);

@@ -4,8 +4,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function testReadLoadBalancing(numReplicas) {
-    var s =
-        new ShardingTest({shards: {rs0: {nodes: numReplicas}}, verbose: 2, other: {chunkSize: 1}});
+    var s = new ShardingTest({shards: {rs0: {nodes: numReplicas}}, verbose: 2, other: {chunkSize: 1}});
 
     s.adminCommand({enablesharding: "test"});
     s.config.settings.find().forEach(printjson);
@@ -24,30 +23,26 @@ function testReadLoadBalancing(numReplicas) {
     assert.eq(numReplicas, rsStats().hosts.length);
 
     function isPrimaryOrSecondary(info) {
-        if (!info.ok)
-            return false;
-        if (info.ismaster)
-            return true;
+        if (!info.ok) return false;
+        if (info.ismaster) return true;
         return info.secondary && !info.hidden;
     }
 
-    assert.soon(function() {
+    assert.soon(function () {
         var x = rsStats().hosts;
         printjson(x);
-        for (var i = 0; i < x.length; i++)
-            if (!isPrimaryOrSecondary(x[i]))
-                return false;
+        for (var i = 0; i < x.length; i++) if (!isPrimaryOrSecondary(x[i])) return false;
         return true;
     });
 
     for (var i = 0; i < secondaries.length; i++) {
-        assert.soon(function() {
+        assert.soon(function () {
             return secondaries[i].getDB("test").foo.count() > 0;
         });
-        secondaries[i].getDB('test').setProfilingLevel(2);
+        secondaries[i].getDB("test").setProfilingLevel(2);
     }
     // Primary may change with reconfig
-    primary.getDB('test').setProfilingLevel(2);
+    primary.getDB("test").setProfilingLevel(2);
 
     // Store references to the connection so they won't be garbage collected.
     var connections = [];
@@ -55,18 +50,19 @@ function testReadLoadBalancing(numReplicas) {
     for (var i = 0; i < secondaries.length * 10; i++) {
         let conn = new Mongo(s._mongos[0].host);
         conn.setSecondaryOk();
-        conn.getDB('test').foo.findOne();
+        conn.getDB("test").foo.findOne();
         connections.push(conn);
     }
 
-    var profileCriteria = {op: 'query', ns: 'test.foo'};
+    var profileCriteria = {op: "query", ns: "test.foo"};
 
     for (var i = 0; i < secondaries.length; i++) {
-        var profileCollection = secondaries[i].getDB('test').system.profile;
-        assert.eq(10,
-                  profileCollection.find(profileCriteria).count(),
-                  "Wrong number of read queries sent to secondary " + i + " " +
-                      tojson(profileCollection.find().toArray()));
+        var profileCollection = secondaries[i].getDB("test").system.profile;
+        assert.eq(
+            10,
+            profileCollection.find(profileCriteria).count(),
+            "Wrong number of read queries sent to secondary " + i + " " + tojson(profileCollection.find().toArray()),
+        );
     }
 
     const db = primary.getDB("test");
@@ -75,8 +71,7 @@ function testReadLoadBalancing(numReplicas) {
     let c = rs.conf();
     print("config before: " + tojson(c));
     for (i = 0; i < c.members.length; i++) {
-        if (c.members[i].host == db.runCommand("hello").primary)
-            continue;
+        if (c.members[i].host == db.runCommand("hello").primary) continue;
         c.members[i].hidden = true;
         c.members[i].priority = 0;
         break;
@@ -84,21 +79,25 @@ function testReadLoadBalancing(numReplicas) {
     rs.reconfig(c);
     print("config after: " + tojson(rs.conf()));
 
-    assert.soon(function() {
-        var x = rsStats();
-        printjson(x);
-        var numOk = 0;
-        // Now wait until the host disappears, since now we actually update our
-        // replica sets via isMaster in mongos
-        if (x.hosts.length == c["members"].length - 1)
-            return true;
-        /*
+    assert.soon(
+        function () {
+            var x = rsStats();
+            printjson(x);
+            var numOk = 0;
+            // Now wait until the host disappears, since now we actually update our
+            // replica sets via isMaster in mongos
+            if (x.hosts.length == c["members"].length - 1) return true;
+            /*
         for ( var i=0; i<x.hosts.length; i++ )
             if ( x.hosts[i].hidden )
                 return true;
         */
-        return false;
-    }, "one secondary not ok", 180000, 5000);
+            return false;
+        },
+        "one secondary not ok",
+        180000,
+        5000,
+    );
 
     // Secondaries may change here
     secondaries = s.rs0.getSecondaries();
@@ -106,13 +105,13 @@ function testReadLoadBalancing(numReplicas) {
     for (var i = 0; i < secondaries.length * 10; i++) {
         let conn = new Mongo(s._mongos[0].host);
         conn.setSecondaryOk();
-        conn.getDB('test').foo.findOne();
+        conn.getDB("test").foo.findOne();
         connections.push(conn);
     }
 
     var counts = [];
     for (var i = 0; i < secondaries.length; i++) {
-        var profileCollection = secondaries[i].getDB('test').system.profile;
+        var profileCollection = secondaries[i].getDB("test").system.profile;
         counts.push(profileCollection.find(profileCriteria).count());
     }
 

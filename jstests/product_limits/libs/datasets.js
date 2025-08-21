@@ -31,7 +31,7 @@ export class Dataset {
         this.populate(sessionDb);
         print("Population complete.");
         for (const workload of this.workloads()) {
-            const wl = new workload;
+            const wl = new workload();
             print(`Running workload ${this.constructor.name}.${wl.constructor.name}`);
             wl.runWorkload(this, session, sessionDb);
         }
@@ -91,10 +91,7 @@ export class DatasetOneField extends Dataset {
 }
 export class DatasetOneStringField extends Dataset {
     workloads() {
-        return [
-            MatchWorkloads.WorkloadRegex,
-            MatchWorkloads.WorkloadRegexInIn,
-        ];
+        return [MatchWorkloads.WorkloadRegex, MatchWorkloads.WorkloadRegexInIn];
     }
 
     populate(db) {
@@ -123,16 +120,21 @@ export class DatasetOneDocumentOneField extends Dataset {
 export class DatasetOneFieldIndex extends DatasetOneField {
     populate(db) {
         super.populate(db);
-        assert.commandWorked(db.getCollection(this.collection()).createIndex({'f0': 1}));
+        assert.commandWorked(db.getCollection(this.collection()).createIndex({"f0": 1}));
     }
 }
 export class DatasetOneFieldPartialIndex extends DatasetOneField {
     populate(db) {
         super.populate(db);
 
-        assert.commandWorked(db.getCollection(this.collection()).createIndex({f0: 1}, {
-            partialFilterExpression: {f0: {$in: range(this.scale())}}
-        }));
+        assert.commandWorked(
+            db.getCollection(this.collection()).createIndex(
+                {f0: 1},
+                {
+                    partialFilterExpression: {f0: {$in: range(this.scale())}},
+                },
+            ),
+        );
     }
 }
 export class DatasetWideArray extends Dataset {
@@ -173,7 +175,7 @@ export class DatasetWideArray extends Dataset {
 export class DatasetWideArrayIndex extends DatasetWideArray {
     populate(db) {
         super.populate(db);
-        assert.commandWorked(db.getCollection(this.collection()).createIndex({'f0': 1}));
+        assert.commandWorked(db.getCollection(this.collection()).createIndex({"f0": 1}));
     }
 }
 export class DatasetManyCollections extends Dataset {
@@ -288,9 +290,11 @@ export class DatasetManyFieldsPartialIndex extends DatasetManyFields {
             indexConds[`f${i}`] = i;
         }
 
-        assert.commandWorked(db.getCollection(this.collection()).createIndex(indexColumns, {
-            partialFilterExpression: indexConds
-        }));
+        assert.commandWorked(
+            db.getCollection(this.collection()).createIndex(indexColumns, {
+                partialFilterExpression: indexConds,
+            }),
+        );
     }
 }
 export class DatasetManyFieldsIndexes extends DatasetManyFields {
@@ -305,7 +309,7 @@ export class DatasetManyFieldsIndexes extends DatasetManyFields {
 export class DatasetManyFieldsWildcardIndex extends DatasetManyFields {
     populate(db) {
         super.populate(db);
-        assert.commandWorked(db.getCollection(this.collection()).createIndex({'$**': 1}));
+        assert.commandWorked(db.getCollection(this.collection()).createIndex({"$**": 1}));
     }
 }
 export class DatasetNestedJSON extends Dataset {
@@ -331,8 +335,8 @@ export class DatasetNestedJSON extends Dataset {
                 $out: {
                     db: this.constructor.name,
                     coll: collName,
-                }
-            }
+                },
+            },
         ];
 
         db.aggregate(pipeline).toArray();
@@ -354,22 +358,24 @@ export class DatasetLongValue extends Dataset {
     }
 
     data() {
-        return [{
-            // We need one stand-alone 'x' for the fulltext search workloads below
-            f0: 'x'.repeat(this.scale()) + ' x'
-        }];
+        return [
+            {
+                // We need one stand-alone 'x' for the fulltext search workloads below
+                f0: "x".repeat(this.scale()) + " x",
+            },
+        ];
     }
 }
 export class DatasetLongValueIndex extends DatasetLongValue {
     populate(db) {
         super.populate(db);
-        assert.commandWorked(db.getCollection(this.collection()).createIndex({'f0': 1}));
+        assert.commandWorked(db.getCollection(this.collection()).createIndex({"f0": 1}));
     }
 }
 export class DatasetLongValueHashed extends DatasetLongValue {
     populate(db) {
         super.populate(db);
-        assert.commandWorked(db.getCollection(this.collection()).createIndex({'f0': "hashed"}));
+        assert.commandWorked(db.getCollection(this.collection()).createIndex({"f0": "hashed"}));
     }
 }
 export class DatasetLongValueTextIndex extends DatasetLongValue {
@@ -377,12 +383,12 @@ export class DatasetLongValueTextIndex extends DatasetLongValue {
         return [
             TextSearchWorkloads.WorkloadTextSearchLongString,
             TextSearchWorkloads.WorkloadTextSearchManyWords,
-            TextSearchWorkloads.WorkloadTextSearchNegation
+            TextSearchWorkloads.WorkloadTextSearchNegation,
         ];
     }
     populate(db) {
         super.populate(db);
-        assert.commandWorked(db.getCollection(this.collection()).createIndex({'f0': "text"}));
+        assert.commandWorked(db.getCollection(this.collection()).createIndex({"f0": "text"}));
     }
 }
 export class DatasetSharded extends DatasetManyFields {
@@ -393,8 +399,9 @@ export class DatasetSharded extends DatasetManyFields {
         const dbName = this.constructor.name;
         const db = this.shardedTest.s.getDB(dbName);
 
-        assert.commandWorked(this.shardedTest.s.adminCommand(
-            {enableSharding: dbName, primaryShard: primaryShard.shardName}));
+        assert.commandWorked(
+            this.shardedTest.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}),
+        );
 
         let collName = this.collection();
 
@@ -404,8 +411,9 @@ export class DatasetSharded extends DatasetManyFields {
         }
 
         db.createCollection(collName);
-        assert.commandWorked(this.shardedTest.s.adminCommand(
-            {shardCollection: `${dbName}.${collName}`, key: shardKey}));
+        assert.commandWorked(
+            this.shardedTest.s.adminCommand({shardCollection: `${dbName}.${collName}`, key: shardKey}),
+        );
 
         return db;
     }
@@ -433,5 +441,5 @@ export const DATASETS = [
     DatasetLongValueHashed,
     DatasetLongValueTextIndex,
     DatasetSharded,
-    DatasetNestedJSON
+    DatasetNestedJSON,
 ];

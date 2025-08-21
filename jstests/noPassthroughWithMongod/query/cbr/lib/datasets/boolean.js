@@ -23,9 +23,10 @@ export class BooleanDataset {
     predicates() {
         let boolean_predicates = [];
 
-        for (let val of [true,
-                         false,
-                         // TODO(SERVER-98094): null
+        for (let val of [
+            true,
+            false,
+            // TODO(SERVER-98094): null
         ]) {
             boolean_predicates.push({a: val});
             boolean_predicates.push({a: {$gt: val}});

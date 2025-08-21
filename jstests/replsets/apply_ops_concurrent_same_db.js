@@ -6,4 +6,4 @@
  */
 import {ApplyOpsConcurrentTest} from "jstests/replsets/libs/apply_ops_concurrent.js";
 
-new ApplyOpsConcurrentTest({ns1: 'test.coll1', ns2: 'test.coll2'}).run();
+new ApplyOpsConcurrentTest({ns1: "test.coll1", ns2: "test.coll2"}).run();

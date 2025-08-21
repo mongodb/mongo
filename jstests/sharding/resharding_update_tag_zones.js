@@ -6,42 +6,44 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     shard: 2,
-    configOptions:
-        {setParameter:
-             {'reshardingCriticalSectionTimeoutMillis': 24 * 60 * 60 * 1000 /* 1 day */}}
+    configOptions: {setParameter: {"reshardingCriticalSectionTimeoutMillis": 24 * 60 * 60 * 1000 /* 1 day */}},
 });
 const dbName = "testDb";
 const collName = "testColl";
 const ns = dbName + "." + collName;
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(
-    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {oldKey: "hashed"}}));
 
-const existingZoneName = 'x1';
+const existingZoneName = "x1";
+assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: existingZoneName}));
+
 assert.commandWorked(
-    st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: existingZoneName}));
-
-assert.commandWorked(st.s.adminCommand({
-    updateZoneKeyRange: ns,
-    min: {oldKey: NumberLong("4470791281878691347")},
-    max: {oldKey: NumberLong("7766103514953448109")},
-    zone: existingZoneName
-}));
-
-assert.commandWorked(st.s.adminCommand({
-    reshardCollection: ns,
-    key: {oldKey: 1},
-    unique: false,
-    collation: {locale: 'simple'},
-    zones: [{
+    st.s.adminCommand({
+        updateZoneKeyRange: ns,
+        min: {oldKey: NumberLong("4470791281878691347")},
+        max: {oldKey: NumberLong("7766103514953448109")},
         zone: existingZoneName,
-        min: {oldKey: NumberLong("4470791281878691346")},
-        max: {oldKey: NumberLong("7766103514953448108")}
-    }],
-    numInitialChunks: 2,
-}));
+    }),
+);
+
+assert.commandWorked(
+    st.s.adminCommand({
+        reshardCollection: ns,
+        key: {oldKey: 1},
+        unique: false,
+        collation: {locale: "simple"},
+        zones: [
+            {
+                zone: existingZoneName,
+                min: {oldKey: NumberLong("4470791281878691346")},
+                max: {oldKey: NumberLong("7766103514953448108")},
+            },
+        ],
+        numInitialChunks: 2,
+    }),
+);
 
 // Find the tags docs.
 var configDB = st.s.getDB("config");

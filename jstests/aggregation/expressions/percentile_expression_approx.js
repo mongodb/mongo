@@ -4,11 +4,7 @@
  *   requires_fcv_70,
  * ]
  */
-import {
-    testLargeInput,
-    testLargeNonNumericInput,
-    testWithProject
-} from "jstests/aggregation/libs/percentiles_util.js";
+import {testLargeInput, testLargeNonNumericInput, testWithProject} from "jstests/aggregation/libs/percentiles_util.js";
 
 const coll = db[jsTestName()];
 
@@ -20,7 +16,7 @@ testWithProject({
     doc: {x: [0, "non-numeric", 1, 2]},
     percentileSpec: {$percentile: {p: [0.5], input: "$x", method: "approximate"}},
     expectedResult: [1],
-    msg: "Non-numeric data in input field which evaluates to an array should be ignored"
+    msg: "Non-numeric data in input field which evaluates to an array should be ignored",
 });
 
 testWithProject({
@@ -28,7 +24,7 @@ testWithProject({
     doc: {x: [10, 5, 27], x1: 5},
     percentileSpec: {$percentile: {p: [0], input: "$x", method: "approximate"}},
     expectedResult: [5],
-    msg: "Minimum percentile"
+    msg: "Minimum percentile",
 });
 
 testWithProject({
@@ -36,7 +32,7 @@ testWithProject({
     doc: {x: [0, 1, 2]},
     percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: "approximate"}},
     expectedResult: [1, 2, 0],
-    msg: "Multiple percentiles when input field evaluates to an array"
+    msg: "Multiple percentiles when input field evaluates to an array",
 });
 
 /**
@@ -45,10 +41,9 @@ testWithProject({
 testWithProject({
     coll: coll,
     doc: {x: 0, x1: "non-numeric", x2: 1, x3: 2, x4: [2, 2, 2]},
-    percentileSpec:
-        {$percentile: {p: [0.5], input: ["$x", "$x1", "$x2", "$x3", "$x4"], method: "approximate"}},
+    percentileSpec: {$percentile: {p: [0.5], input: ["$x", "$x1", "$x2", "$x3", "$x4"], method: "approximate"}},
     expectedResult: [1],
-    msg: "Non-numeric data in input field passed in as an array should be ignored"
+    msg: "Non-numeric data in input field passed in as an array should be ignored",
 });
 
 testWithProject({
@@ -56,16 +51,15 @@ testWithProject({
     doc: {x: "non-numeric"},
     percentileSpec: {$percentile: {p: [0.5], input: ["$x"], method: "approximate"}},
     expectedResult: [null],
-    msg: "Percentile of completely non-numeric data when input field is an array"
+    msg: "Percentile of completely non-numeric data when input field is an array",
 });
 
 testWithProject({
     coll: coll,
     doc: {x: "non-numeric", x1: "also non-numeric", x2: [1, 2, 3]},
-    percentileSpec:
-        {$percentile: {p: [0.5, 0.9], input: ["$x", "$x1", "$x2"], method: "approximate"}},
+    percentileSpec: {$percentile: {p: [0.5, 0.9], input: ["$x", "$x1", "$x2"], method: "approximate"}},
     expectedResult: [null, null],
-    msg: "Multiple percentiles of completely non-numeric data in input field passed as an array"
+    msg: "Multiple percentiles of completely non-numeric data in input field passed as an array",
 });
 
 testWithProject({
@@ -73,7 +67,7 @@ testWithProject({
     doc: {x: [-Infinity, Infinity, Infinity, Infinity]},
     percentileSpec: {$percentile: {p: [0.1, 0.5], input: "$x", method: "approximate"}},
     expectedResult: [-Infinity, Infinity],
-    msg: "Percentile of all infinities"
+    msg: "Percentile of all infinities",
 });
 
 testWithProject({
@@ -81,7 +75,7 @@ testWithProject({
     doc: {x: [0, "non-numeric", 1, 2, 3, Infinity]},
     percentileSpec: {$percentile: {p: [0.5], input: "$x", method: "approximate"}},
     expectedResult: [2],
-    msg: "Rank not that of infinity returns numeric, counts infinity as number"
+    msg: "Rank not that of infinity returns numeric, counts infinity as number",
 });
 
 testWithProject({
@@ -89,16 +83,15 @@ testWithProject({
     doc: {x: 10, x1: 5, x2: 27},
     percentileSpec: {$percentile: {p: [1], input: ["$x", "$x1", "$x2"], method: "approximate"}},
     expectedResult: [27],
-    msg: "Maximum percentile"
+    msg: "Maximum percentile",
 });
 
 testWithProject({
     coll: coll,
     doc: {x: 0, x1: 1, x2: 2},
-    percentileSpec:
-        {$percentile: {p: [0.5, 0.9, 0.1], input: ["$x", "$x1", "$x2"], method: "approximate"}},
+    percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: ["$x", "$x1", "$x2"], method: "approximate"}},
     expectedResult: [1, 2, 0],
-    msg: "Multiple percentiles when input field is passed as an array"
+    msg: "Multiple percentiles when input field is passed as an array",
 });
 
 /**
@@ -109,7 +102,7 @@ testWithProject({
     doc: {x: 0, x1: 1, x2: 2},
     percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: "approximate"}},
     expectedResult: [0, 0, 0],
-    msg: "Multiple percentiles when single input expression resolves to a numeric scalar"
+    msg: "Multiple percentiles when single input expression resolves to a numeric scalar",
 });
 
 testWithProject({
@@ -117,7 +110,7 @@ testWithProject({
     doc: {x: 0, x1: "non-numeric", x2: 2},
     percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x1", method: "approximate"}},
     expectedResult: [null, null, null],
-    msg: "Multiple percentiles when single input expression resolves to a non-numeric scalar"
+    msg: "Multiple percentiles when single input expression resolves to a non-numeric scalar",
 });
 
 testWithProject({
@@ -127,11 +120,11 @@ testWithProject({
         $percentile: {
             p: [0.5, 0.9],
             input: {$concatArrays: ["$x", [{$add: [42, "$y"]}]]},
-            method: "approximate"
-        }
+            method: "approximate",
+        },
     },
     expectedResult: [2, 42 + 3],
-    msg: "Input as complex expression"
+    msg: "Input as complex expression",
 });
 
 testWithProject({
@@ -140,7 +133,7 @@ testWithProject({
     percentileSpec: {$percentile: {p: "$$ps", input: "$x", method: "approximate"}},
     letSpec: {ps: [0.1, 0.5, 0.9]},
     expectedResult: [1, 2, 3],
-    msg: "'p' specified as a variable"
+    msg: "'p' specified as a variable",
 });
 
 /**

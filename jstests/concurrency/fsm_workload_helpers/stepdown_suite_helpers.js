@@ -44,6 +44,5 @@ export function runWithManualRetries(fn) {
 // stepdown/kill/terminate. This will find only one batch to avoid calling getMore; ensure that
 // the batchSize is large enough for the number of documents expected to be returned.
 export function findFirstBatch(db, collName, filter, batchSize) {
-    return assert.commandWorked(db.runCommand({find: collName, filter, batchSize}))
-        .cursor.firstBatch;
+    return assert.commandWorked(db.runCommand({find: collName, filter, batchSize})).cursor.firstBatch;
 }

@@ -15,10 +15,7 @@ var rst = new ReplSetTest({
     name: TestData.testName,
     // The long election timeout results in a 30-second getMore, plenty of time to hit bugs.
     settings: {chainingAllowed: true, electionTimeoutMillis: 60 * 1000},
-    nodes: [
-        {},
-        {},
-    ],
+    nodes: [{}, {}],
 });
 const nodes = rst.startSet();
 // Initiate in two steps so that the first two nodes finish initial sync before the third begins
@@ -27,19 +24,22 @@ const nodes = rst.startSet();
 rst.initiate();
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(rst.getPrimary().adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const oldPrimary = nodes[0];
 const newPrimary = nodes[1];
 const secondary = rst.add({rsConfig: {priority: 0}});
 
 // Make sure this secondary syncs only from the node bound to be the new primary.
-assert.commandWorked(secondary.adminCommand({
-    configureFailPoint: "forceSyncSourceCandidate",
-    mode: "alwaysOn",
-    data: {hostAndPort: newPrimary.host}
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        configureFailPoint: "forceSyncSourceCandidate",
+        mode: "alwaysOn",
+        data: {hostAndPort: newPrimary.host},
+    }),
+);
 rst.reInitiate();
 
 // Wait for all 'newlyAdded' field removals to prevent auto reconfigs from interfering with the
@@ -48,11 +48,13 @@ rst.waitForAllNewlyAddedRemovals();
 
 // Make sure when the original primary syncs, it's only from the secondary; this avoids spurious log
 // messages.
-assert.commandWorked(oldPrimary.adminCommand({
-    configureFailPoint: "forceSyncSourceCandidate",
-    mode: "alwaysOn",
-    data: {hostAndPort: secondary.host}
-}));
+assert.commandWorked(
+    oldPrimary.adminCommand({
+        configureFailPoint: "forceSyncSourceCandidate",
+        mode: "alwaysOn",
+        data: {hostAndPort: secondary.host},
+    }),
+);
 
 assert.commandWorked(oldPrimary.getDB(TestData.testName).test.insert({x: 1}));
 rst.awaitReplication();

@@ -20,12 +20,12 @@ const logLevel = tojson({storage: {recovery: 2, wt: {wtCheckpoint: 1}}});
 
 const rst = new ReplSetTest({
     nodes: [{}, {}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
-    settings: {chainingAllowed: false}
+    settings: {chainingAllowed: false},
 });
 
 const startParams = {
     logComponentVerbosity: logLevel,
-    replBatchLimitOperations: 100
+    replBatchLimitOperations: 100,
 };
 const nodes = rst.startSet({setParameter: startParams});
 let restoreNode = nodes[1];
@@ -39,8 +39,9 @@ const sentinelColl = db[sentinelCollName];
 const paddingStr = "XXXXXXXXX";
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Pre-load some documents.
 
@@ -55,19 +56,21 @@ rst.awaitReplication();
 const holdOpTime = assert.commandWorked(db.runCommand({find: collName, limit: 1})).operationTime;
 
 // Keep the stable timestamp from moving on the node we're going to restart in restore mode.
-assert.commandWorked(restoreNode.adminCommand({
-    configureFailPoint: 'holdStableTimestampAtSpecificTimestamp',
-    mode: 'alwaysOn',
-    data: {"timestamp": holdOpTime}
-}));
+assert.commandWorked(
+    restoreNode.adminCommand({
+        configureFailPoint: "holdStableTimestampAtSpecificTimestamp",
+        mode: "alwaysOn",
+        data: {"timestamp": holdOpTime},
+    }),
+);
 
 // Do a bunch of updates, which are chosen so if one is missed, we'll know.
 bulk = coll.initializeUnorderedBulkOp();
 const nUpdates = 1000;
-const writeSentinelsAfter = 650;  // This should be set to get us to the middle of a batch.
+const writeSentinelsAfter = 650; // This should be set to get us to the middle of a batch.
 jsTestLog("Making " + nUpdates + " updates with snapshotting disabled on one node.");
 for (let updateNo = 1; updateNo <= nUpdates; updateNo++) {
-    let id = (updateNo - 1) % nDocs + 1;
+    let id = ((updateNo - 1) % nDocs) + 1;
     let updateField = "u" + updateNo;
     let setDoc = {};
     setDoc[updateField] = updateNo;
@@ -88,24 +91,23 @@ bulk.execute();
 rst.awaitReplication();
 
 jsTestLog("Stopping replication on secondaries to hold back majority commit point.");
-let stopReplProducer2 = configureFailPoint(nodes[2], 'stopReplProducer');
-let stopReplProducer3 = configureFailPoint(nodes[3], 'stopReplProducer');
+let stopReplProducer2 = configureFailPoint(nodes[2], "stopReplProducer");
+let stopReplProducer3 = configureFailPoint(nodes[3], "stopReplProducer");
 
 const nExtraDocs = 50;
 jsTestLog("Inserting " + nExtraDocs + " documents with majority point held back.");
 bulk = coll.initializeUnorderedBulkOp();
 const lastId = nDocs + nExtraDocs;
 for (let id = 1; id <= nExtraDocs; id++) {
-    bulk.insert({_id: (id + nDocs), paddingStr: paddingStr});
+    bulk.insert({_id: id + nDocs, paddingStr: paddingStr});
 }
 bulk.execute();
 
-const penultimateOpTime =
-    assert.commandWorked(db.runCommand({find: collName, limit: 1})).operationTime;
+const penultimateOpTime = assert.commandWorked(db.runCommand({find: collName, limit: 1})).operationTime;
 
-const sentinel2Timestamp =
-    assert.commandWorked(db.runCommand({insert: sentinelCollName, documents: [{_id: "s2"}]}))
-        .operationTime;
+const sentinel2Timestamp = assert.commandWorked(
+    db.runCommand({insert: sentinelCollName, documents: [{_id: "s2"}]}),
+).operationTime;
 
 rst.awaitReplication(undefined, undefined, [restoreNode]);
 
@@ -113,23 +115,27 @@ jsTestLog("Restarting restore node with the --startupRecoveryForRestore flag");
 // Must use stop/start with waitForConnect: false.  See SERVER-56446
 rst.stop(restoreNode, undefined, undefined, {forRestart: true});
 clearRawMongoProgramOutput();
-rst.start(restoreNode,
-          {
-              noReplSet: true,
-              waitForConnect: false,
-              syncdelay: 1,  // Take a lot of unstable checkpoints.
-              setParameter: Object.merge(startParams, {
-                  startupRecoveryForRestore: true,
-                  recoverFromOplogAsStandalone: true,
-                  takeUnstableCheckpointOnShutdown: true,
-                  'failpoint.hangAfterCollectionInserts':
-                      tojson({mode: 'alwaysOn', data: {collectionNS: sentinelColl.getFullName()}}),
-
-              })
-          },
-          true /* restart */);
+rst.start(
+    restoreNode,
+    {
+        noReplSet: true,
+        waitForConnect: false,
+        syncdelay: 1, // Take a lot of unstable checkpoints.
+        setParameter: Object.merge(startParams, {
+            startupRecoveryForRestore: true,
+            recoverFromOplogAsStandalone: true,
+            takeUnstableCheckpointOnShutdown: true,
+            "failpoint.hangAfterCollectionInserts": tojson({
+                mode: "alwaysOn",
+                data: {collectionNS: sentinelColl.getFullName()},
+            }),
+        }),
+    },
+    true /* restart */,
+);
 let subStr = "hangAfterCollectionInserts fail point enabled";
-assert.soon(() => {  // Can't use checklog because we can't connect to the mongo in startup mode.
+assert.soon(() => {
+    // Can't use checklog because we can't connect to the mongo in startup mode.
     return rawMongoProgramOutput(subStr).search(subStr) !== -1;
 });
 // We need to make sure we get a checkpoint after the failpoint is hit, so we clear the output after
@@ -151,16 +157,18 @@ assert.soon(() => {
 
 jsTestLog("Restarting restore node uncleanly");
 rst.stop(restoreNode, SIGKILL, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
-restoreNode = rst.start(restoreNode,
-                        {
-                            noReplSet: true,
-                            setParameter: Object.merge(startParams, {
-                                startupRecoveryForRestore: true,
-                                recoverFromOplogAsStandalone: true,
-                                takeUnstableCheckpointOnShutdown: true
-                            })
-                        },
-                        true /* restart */);
+restoreNode = rst.start(
+    restoreNode,
+    {
+        noReplSet: true,
+        setParameter: Object.merge(startParams, {
+            startupRecoveryForRestore: true,
+            recoverFromOplogAsStandalone: true,
+            takeUnstableCheckpointOnShutdown: true,
+        }),
+    },
+    true /* restart */,
+);
 // Make sure we can read something after standalone recovery.
 assert.eq(1, restoreNode.getDB(dbName)[sentinelCollName].find({}).limit(1).itcount());
 
@@ -180,12 +188,13 @@ rst.stepUp(restoreNode, {awaitReplicationBeforeStepUp: false});
 const restoreNodeSession = restoreNode.startSession({causalConsistency: false});
 const restoreNodeSessionDb = restoreNodeSession.getDatabase(dbName);
 jsTestLog(
-    "Checking restore node top-of-oplog minus 1 read, which should fail, because the restore node does not have that history.");
-restoreNodeSession.startTransaction(
-    {readConcern: {level: "snapshot", atClusterTime: penultimateOpTime}});
+    "Checking restore node top-of-oplog minus 1 read, which should fail, because the restore node does not have that history.",
+);
+restoreNodeSession.startTransaction({readConcern: {level: "snapshot", atClusterTime: penultimateOpTime}});
 assert.commandFailedWithCode(
     restoreNodeSessionDb.runCommand({find: collName, filter: {"_id": lastId}}),
-    ErrorCodes.SnapshotTooOld);
+    ErrorCodes.SnapshotTooOld,
+);
 restoreNodeSession.abortTransaction();
 
 // Should see that very last document.

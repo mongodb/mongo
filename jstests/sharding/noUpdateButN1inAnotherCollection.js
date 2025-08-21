@@ -1,4 +1,3 @@
-
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function debug(str) {
@@ -27,7 +26,7 @@ try {
     print("coundn't stop balancer via command");
 }
 
-adminSA.settings.update({_id: 'balancer'}, {$set: {stopped: true}});
+adminSA.settings.update({_id: "balancer"}, {$set: {stopped: true}});
 
 var db = mongosA.getDB("test");
 var coll = db.coll;

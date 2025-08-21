@@ -9,5 +9,5 @@ let result = db.s6232.aggregate({$project: {a: {$and: [{}]}}});
 assert.eq(result.toArray()[0].a, true);
 
 // case where result should contain a new empty object
-result = db.s6232.aggregate({$project: {a: {$ifNull: ['$b', {}]}}});
+result = db.s6232.aggregate({$project: {a: {$ifNull: ["$b", {}]}}});
 assert.eq(result.toArray()[0].a, {});

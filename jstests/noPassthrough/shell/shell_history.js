@@ -34,7 +34,6 @@ if (_isWindows()) {
         tmpHomePath = tmpHome;
     }
     env = {USERPROFILE: tmpHome, HOMEDRIVE: tmpHomeDrive, HOMEPATH: tmpHomePath};
-
 } else {
     args.push("sh");
     args.push("-c");
@@ -69,7 +68,7 @@ assert.eq(rc, 0);
 let files = listFiles(tmpHome);
 jsTestLog(tojson(files));
 
-let findFile = function(baseName) {
+let findFile = function (baseName) {
     for (let i = 0; i < files.length; i++) {
         if (files[i].baseName === baseName) {
             return files[i];
@@ -81,7 +80,7 @@ let findFile = function(baseName) {
 let targetFile = ".dbshell";
 let file = findFile(targetFile);
 
-assert.neq(typeof (file), "undefined", targetFile + " should exist, but it doesn't");
+assert.neq(typeof file, "undefined", targetFile + " should exist, but it doesn't");
 assert.eq(file.isDirectory, false, targetFile + " should not be a directory, but it is");
 assert.eq(file.size, 0, targetFile + " should be empty, but it isn't");
 

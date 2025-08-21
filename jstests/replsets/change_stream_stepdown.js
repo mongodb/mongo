@@ -30,14 +30,13 @@ let res = primaryDb.runCommand({
     pipeline: [{$changeStream: {}}],
     cursor: {},
     comment: changeStreamComment,
-    maxTimeMS: 5000
+    maxTimeMS: 5000,
 });
 assert.commandWorked(res);
 let cursorId = res.cursor.id;
 
 // Insert several documents on primary and let them majority commit.
-assert.commandWorked(
-    primaryColl.insert([{_id: 1}, {_id: 2}, {_id: 3}], {writeConcern: {w: "majority"}}));
+assert.commandWorked(primaryColl.insert([{_id: 1}, {_id: 2}, {_id: 3}], {writeConcern: {w: "majority"}}));
 replTest.awaitReplication();
 
 jsTestLog("Testing that changestream survives stepdown between find and getmore");
@@ -46,8 +45,7 @@ assert.commandWorked(primaryDb.adminCommand({replSetStepDown: 60, force: true}))
 replTest.awaitSecondaryNodes(null, [primary]);
 
 // Receive the first change event.  This tests stepdown between find and getmore.
-res = assert.commandWorked(
-    primaryDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1}));
+res = assert.commandWorked(primaryDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1}));
 let changes = res.cursor.nextBatch;
 assert.eq(changes.length, 1);
 assert.eq(changes[0]["fullDocument"], {_id: 1});
@@ -58,8 +56,7 @@ jsTestLog("Testing that changestream survives step-up");
 stepUp(replTest, primary);
 
 // Get the next one.  This tests that changestreams survives a step-up.
-res = assert.commandWorked(
-    primaryDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1}));
+res = assert.commandWorked(primaryDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1}));
 changes = res.cursor.nextBatch;
 assert.eq(changes.length, 1);
 assert.eq(changes[0]["fullDocument"], {_id: 2});
@@ -71,8 +68,7 @@ assert.commandWorked(primaryDb.adminCommand({replSetStepDown: 60, force: true}))
 replTest.awaitSecondaryNodes(null, [primary]);
 
 // Get the next one.  This tests that changestreams survives a step down between getmores.
-res = assert.commandWorked(
-    primaryDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1}));
+res = assert.commandWorked(primaryDb.runCommand({getMore: cursorId, collection: collName, batchSize: 1}));
 changes = res.cursor.nextBatch;
 assert.eq(changes.length, 1);
 assert.eq(changes[0]["fullDocument"], {_id: 3});
@@ -83,23 +79,27 @@ stepUp(replTest, primary);
 
 jsTestLog("Testing that changestream waiting on old primary sees docs inserted on new primary");
 
-replTest.awaitReplication();  // Ensure secondary is up to date and can win an election.
+replTest.awaitReplication(); // Ensure secondary is up to date and can win an election.
 
 async function shellFn(dbName, collName, changeStreamComment, stepUpFn) {
     const {ReplSetTest} = await import("jstests/libs/replsettest.js");
     // Wait for the getMore to be in progress.
     const primary = db.getMongo();
-    assert.soon(() => primary.getDB("admin")
-                          .aggregate([
-                              {'$currentOp': {}},
-                              {
-                                  '$match': {
-                                      op: 'getmore',
-                                      'cursor.originatingCommand.comment': changeStreamComment
-                                  }
-                              }
-                          ])
-                          .itcount() == 1);
+    assert.soon(
+        () =>
+            primary
+                .getDB("admin")
+                .aggregate([
+                    {"$currentOp": {}},
+                    {
+                        "$match": {
+                            op: "getmore",
+                            "cursor.originatingCommand.comment": changeStreamComment,
+                        },
+                    },
+                ])
+                .itcount() == 1,
+    );
 
     const replTest = new ReplSetTest(primary.host);
 
@@ -112,14 +112,18 @@ async function shellFn(dbName, collName, changeStreamComment, stepUpFn) {
     assert.commandWorked(newPrimaryDB[collName].insert({_id: 4}), {writeConcern: {w: "majority"}});
 }
 let waitForShell = startParallelShell(
-    funWithArgs(shellFn, dbName, collName, changeStreamComment, stepUp), primary.port);
+    funWithArgs(shellFn, dbName, collName, changeStreamComment, stepUp),
+    primary.port,
+);
 
-res = assert.commandWorked(primaryDb.runCommand({
-    getMore: cursorId,
-    collection: collName,
-    batchSize: 1,
-    maxTimeMS: ReplSetTest.kDefaultTimeoutMS
-}));
+res = assert.commandWorked(
+    primaryDb.runCommand({
+        getMore: cursorId,
+        collection: collName,
+        batchSize: 1,
+        maxTimeMS: ReplSetTest.kDefaultTimeoutMS,
+    }),
+);
 changes = res.cursor.nextBatch;
 assert.eq(changes.length, 1);
 assert.eq(changes[0]["fullDocument"], {_id: 4});

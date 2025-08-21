@@ -17,27 +17,24 @@ const recipientShardNames = reshardingTest.recipientShardNames;
 const inputCollection = reshardingTest.createShardedCollection({
     ns: sourceNs,
     shardKeyPattern: {oldKey: 1},
-    chunks: [
-        {min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorShardNames[0]},
-    ],
+    chunks: [{min: {oldKey: MinKey}, max: {oldKey: MaxKey}, shard: donorShardNames[0]}],
 });
 
 const mongos = inputCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donorPrimary = new Mongo(topology.shards[donorShardNames[0]].primary);
 
-const failpoint =
-    configureFailPoint(donorPrimary, "reshardingInterruptAfterInsertStateMachineDocument");
+const failpoint = configureFailPoint(donorPrimary, "reshardingInterruptAfterInsertStateMachineDocument");
 
-reshardingTest.withReshardingInBackground({
-    newShardKeyPattern: {newKey: 1},
-    newChunks: [
-        {min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]},
-    ]
-},
-                                          () => {
-                                              failpoint.wait();
-                                              failpoint.off();
-                                          });
+reshardingTest.withReshardingInBackground(
+    {
+        newShardKeyPattern: {newKey: 1},
+        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
+    },
+    () => {
+        failpoint.wait();
+        failpoint.off();
+    },
+);
 
 reshardingTest.teardown();

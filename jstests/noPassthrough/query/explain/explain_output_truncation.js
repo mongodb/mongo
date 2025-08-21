@@ -1,11 +1,7 @@
 /**
  * Test that explain output is correctly truncated when it grows too large.
  */
-import {
-    getPlanStage,
-    getWinningPlanFromExplain,
-    planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const dbName = "test";
 const collName = jsTestName();
@@ -46,8 +42,7 @@ fetchStage = getPlanStage(getWinningPlanFromExplain(explain), "FETCH");
 assert.neq(fetchStage, null, explain);
 assert(fetchStage.hasOwnProperty("inputStage"), explain);
 assert(fetchStage.inputStage.hasOwnProperty("warning"), explain);
-assert.eq(
-    fetchStage.inputStage.warning, "stats tree exceeded BSON size limit for explain", explain);
+assert.eq(fetchStage.inputStage.warning, "stats tree exceeded BSON size limit for explain", explain);
 assert(!planHasStage(testDb, explain, "IXSCAN"), explain);
 
 MongoRunner.stopMongod(conn);

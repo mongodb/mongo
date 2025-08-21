@@ -64,6 +64,6 @@ t.save({foo: []});
 checkOperators([[]], true);
 
 t.remove({});
-t.save({foo: 'foo'});
+t.save({foo: "foo"});
 // Check regex match.
 checkOperators([/o/], true);

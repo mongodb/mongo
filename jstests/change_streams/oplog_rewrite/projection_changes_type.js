@@ -6,7 +6,7 @@
 import {
     generateChangeStreamWriteWorkload,
     getAllChangeStreamEvents,
-    isPlainObject
+    isPlainObject,
 } from "jstests/libs/query/change_stream_rewrite_util.js";
 
 const dbName = jsTestName();
@@ -56,11 +56,17 @@ function assertProjection(testProjection) {
 
         // Read all events from the stream and apply the projection to each of them.
         const projectedEvents = getAllChangeStreamEvents(
-            testDB, [{[projType]: testProjection}], {showExpandedEvents: true}, startPoint);
+            testDB,
+            [{[projType]: testProjection}],
+            {showExpandedEvents: true},
+            startPoint,
+        );
 
         // Assert that we see the same events in the projected stream as in the original.
-        assert.eq(projectedEvents.map(elem => ({_id: elem._id})),
-                  fullEvents.map(elem => ({_id: elem._id})));
+        assert.eq(
+            projectedEvents.map((elem) => ({_id: elem._id})),
+            fullEvents.map((elem) => ({_id: elem._id})),
+        );
     }
 }
 
@@ -68,11 +74,11 @@ function assertProjection(testProjection) {
 // that, over time, every combination of fields will be tested without having to generate a power
 // set each time this test runs.
 const gitHash = assert.commandWorked(testDB.runCommand("buildInfo")).gitVersion;
-Random.setRandomSeed(Number("0x" + gitHash.substring(0, 13)));  // max 2^52-1
+Random.setRandomSeed(Number("0x" + gitHash.substring(0, 13))); // max 2^52-1
 const fieldsToInclude = Object.keys(computedProjection)
-                            .map(value => ({value, sort: Random.rand()}))
-                            .sort((a, b) => a.sort - b.sort)
-                            .map(({value}) => value);
+    .map((value) => ({value, sort: Random.rand()}))
+    .sort((a, b) => a.sort - b.sort)
+    .map(({value}) => value);
 
 // Now iterate through each field and test both projection of that single field, and projection of
 // all accumulated fields encountered so far.

@@ -15,20 +15,22 @@ function assertQueryStatsKeyWithoutHmac(queryStatsKey) {
 }
 
 function runTest(conn) {
-    const testDB = conn.getDB('test');
+    const testDB = conn.getDB("test");
     const coll = testDB[jsTestName()];
     coll.drop();
 
     coll.insert({foo: 1});
-    coll.find({foo: {$lte: 2}}).sort({bar: -1}).limit(2).toArray();
+    coll.find({foo: {$lte: 2}})
+        .sort({bar: -1})
+        .limit(2)
+        .toArray();
     // Default is no hmac.
     assertQueryStatsKeyWithoutHmac(getQueryStatsFindCmd(conn)[0].key.queryShape);
 
     // Turning on hmac should apply hmac to all field names on all entries, even previously cached
     // ones.
     const queryStatsKey = getQueryStatsFindCmd(conn, {transformIdentifiers: true})[0]["key"];
-    assert.eq(queryStatsKey.queryShape.filter,
-              {"fNWkKfogMv6MJ77LpBcuPrO7Nq+R+7TqtD+Lgu3Umc4=": {"$lte": "?number"}});
+    assert.eq(queryStatsKey.queryShape.filter, {"fNWkKfogMv6MJ77LpBcuPrO7Nq+R+7TqtD+Lgu3Umc4=": {"$lte": "?number"}});
     assert.eq(queryStatsKey.queryShape.sort, {"CDDQIXZmDehLKmQcRxtdOQjMqoNqfI2nGt2r4CgJ52o=": -1});
     assert.eq(queryStatsKey.queryShape.limit, "?number");
 
@@ -38,8 +40,7 @@ function runTest(conn) {
     assertQueryStatsKeyWithoutHmac(queryStats.queryShape);
 
     // Explicitly set transformIdentifiers to false.
-    assertQueryStatsKeyWithoutHmac(
-        getQueryStatsFindCmd(conn, {transformIdentifiers: false})[0]["key"].queryShape);
+    assertQueryStatsKeyWithoutHmac(getQueryStatsFindCmd(conn, {transformIdentifiers: false})[0]["key"].queryShape);
 
     // Wrong parameter name throws error.
     let pipeline = [{$queryStats: {redactFields: true}}];
@@ -47,7 +48,8 @@ function runTest(conn) {
         coll,
         pipeline,
         ErrorCodes.IDLUnknownField,
-        "BSON field '$queryStats.redactFields' is an unknown field.");
+        "BSON field '$queryStats.redactFields' is an unknown field.",
+    );
 
     // Wrong parameter name throws error.
     pipeline = [{$queryStats: {algorithm: "hmac-sha-256"}}];
@@ -55,7 +57,8 @@ function runTest(conn) {
         coll,
         pipeline,
         ErrorCodes.IDLUnknownField,
-        "BSON field '$queryStats.algorithm' is an unknown field.");
+        "BSON field '$queryStats.algorithm' is an unknown field.",
+    );
 
     // Wrong parameter type throws error.
     pipeline = [{$queryStats: {transformIdentifiers: {algorithm: 1}}}];
@@ -63,14 +66,16 @@ function runTest(conn) {
         coll,
         pipeline,
         ErrorCodes.TypeMismatch,
-        "BSON field '$queryStats.transformIdentifiers.algorithm' is the wrong type 'double', expected type 'string'");
+        "BSON field '$queryStats.transformIdentifiers.algorithm' is the wrong type 'double', expected type 'string'",
+    );
 
     pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey: 1}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.TypeMismatch,
-        "BSON field '$queryStats.transformIdentifiers.hmacKey' is the wrong type 'double', expected type 'binData'");
+        "BSON field '$queryStats.transformIdentifiers.hmacKey' is the wrong type 'double', expected type 'binData'",
+    );
 
     // Unsupported algorithm throws error.
     pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-1"}}}];
@@ -78,7 +83,8 @@ function runTest(conn) {
         coll,
         pipeline,
         ErrorCodes.BadValue,
-        "Enumeration value 'hmac-sha-1' for field '$queryStats.transformIdentifiers.algorithm' is not a valid value.");
+        "Enumeration value 'hmac-sha-1' for field '$queryStats.transformIdentifiers.algorithm' is not a valid value.",
+    );
 
     // TransformIdentifiers with missing algorithm throws error.
     pipeline = [{$queryStats: {transformIdentifiers: {}}}];
@@ -86,7 +92,8 @@ function runTest(conn) {
         coll,
         pipeline,
         ErrorCodes.IDLFailedToParse,
-        "BSON field '$queryStats.transformIdentifiers.algorithm' is missing but a required field");
+        "BSON field '$queryStats.transformIdentifiers.algorithm' is missing but a required field",
+    );
 
     // TransformIdentifiers with algorithm but missing hmacKey throws error.
     pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256"}}}];
@@ -94,22 +101,23 @@ function runTest(conn) {
         coll,
         pipeline,
         ErrorCodes.FailedToParse,
-        "The 'hmacKey' parameter of the $queryStats stage must be specified when applying the hmac-sha-256 algorithm");
+        "The 'hmacKey' parameter of the $queryStats stage must be specified when applying the hmac-sha-256 algorithm",
+    );
 
     // Parameter object with unrecognized key throws error.
-    pipeline =
-        [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacStrategy: "on"}}}];
+    pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacStrategy: "on"}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
         ErrorCodes.IDLUnknownField,
-        "BSON field '$queryStats.transformIdentifiers.hmacStrategy' is an unknown field.");
+        "BSON field '$queryStats.transformIdentifiers.hmacStrategy' is an unknown field.",
+    );
 }
 
 const conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsRateLimit: -1,
-    }
+    },
 });
 runTest(conn);
 MongoRunner.stopMongod(conn);
@@ -122,8 +130,8 @@ const st = new ShardingTest({
     mongosOptions: {
         setParameter: {
             internalQueryStatsRateLimit: -1,
-            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-        }
+            "failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}",
+        },
     },
 });
 runTest(st.s);

@@ -6,9 +6,7 @@
  *
  */
 
-import {
-    isLinux,
-} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/os_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 if (!isLinux()) {
@@ -18,7 +16,11 @@ const bytesPerKB = 1024;
 const bytesPerMB = bytesPerKB * 1024;
 const bytesPerGB = bytesPerMB * 1024;
 const totalCacheKB = Number(
-    cat("/proc/meminfo").split("\n").filter((str) => str.includes("MemTotal"))[0].split(/\s+/)[1]);
+    cat("/proc/meminfo")
+        .split("\n")
+        .filter((str) => str.includes("MemTotal"))[0]
+        .split(/\s+/)[1],
+);
 jsTestLog("Total process RAM available: " + totalCacheKB);
 
 function runTest(expectedCacheSizeBytes, serverConfig, fuzzyGBCheck = false) {
@@ -26,13 +28,13 @@ function runTest(expectedCacheSizeBytes, serverConfig, fuzzyGBCheck = false) {
     rst.startSet(serverConfig);
     rst.initiate();
     let primary = rst.getPrimary();
-    let actualCacheSizeBytes = assert.commandWorked(primary.adminCommand({serverStatus: 1}))
-                                   .wiredTiger.cache["maximum bytes configured"];
+    let actualCacheSizeBytes = assert.commandWorked(primary.adminCommand({serverStatus: 1})).wiredTiger.cache[
+        "maximum bytes configured"
+    ];
 
     // Verify storage engine cache size in effect
     if (fuzzyGBCheck) {
-        assert.eq(Math.round(expectedCacheSizeBytes / bytesPerGB),
-                  Math.round(actualCacheSizeBytes / bytesPerGB));
+        assert.eq(Math.round(expectedCacheSizeBytes / bytesPerGB), Math.round(actualCacheSizeBytes / bytesPerGB));
     } else {
         assert.eq(expectedCacheSizeBytes, actualCacheSizeBytes);
     }
@@ -56,7 +58,7 @@ runTest(0.3 * bytesPerGB, {wiredTigerCacheSizeGB: "0.3"}, true);
 runTest(10 * 1000 * 1000 * bytesPerMB, {wiredTigerCacheSizeGB: "10000"}, false);
 
 // Test default value
-runTest(Math.max(((totalCacheKB / bytesPerKB) - 1024) * 0.5, 256.0) * bytesPerMB, {}, true);
+runTest(Math.max((totalCacheKB / bytesPerKB - 1024) * 0.5, 256.0) * bytesPerMB, {}, true);
 
 //
 // Percentage-based tests.

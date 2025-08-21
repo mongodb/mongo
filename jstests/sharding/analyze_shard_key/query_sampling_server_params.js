@@ -12,7 +12,7 @@ const numNodesPerRS = 2;
 // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
 // command with readPreference "secondaryPreferred".
 const writeConcern = {
-    w: numNodesPerRS
+    w: numNodesPerRS,
 };
 
 function testQuerySampling(conn, {rst, st}) {
@@ -30,8 +30,7 @@ function testQuerySampling(conn, {rst, st}) {
     assert.commandWorked(coll.insert(docs, {writeConcern}));
     const collUuid = QuerySamplingUtil.getCollectionUuid(db, collName);
 
-    assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
     QuerySamplingUtil.waitForActiveSampling(ns, collUuid, {rst, st});
 
     assert.commandWorked(coll.update({x: 1}, {$mul: {x: -1}}));
@@ -45,7 +44,7 @@ function testQuerySampling(conn, {rst, st}) {
             analyzeShardKey: ns,
             key: {x: 1},
             keyCharacteristics: false,
-            readWriteDistribution: true
+            readWriteDistribution: true,
         });
 
         if (res.readDistribution.sampleSize.total == 0) {
@@ -82,7 +81,7 @@ const mongodSetParameterOptsStartup = {
 };
 const mongosSetParameterOptsStartup = {
     queryAnalysisSamplerConfigurationRefreshSecs: 6 * 3600,
-    logComponentVerbosity: tojson({sharding: 3})
+    logComponentVerbosity: tojson({sharding: 3}),
 };
 
 const mongodSetParameterCmdObj = {
@@ -100,7 +99,7 @@ const mongosSetParameterCmdObj = {
     const st = new ShardingTest({
         shards: 1,
         rs: {nodes: numNodesPerRS, setParameter: mongodSetParameterOptsStartup},
-        mongosOptions: {setParameter: mongosSetParameterOptsStartup}
+        mongosOptions: {setParameter: mongosSetParameterOptsStartup},
     });
 
     assert.commandWorked(st.s.adminCommand(mongosSetParameterCmdObj));
@@ -113,8 +112,7 @@ const mongosSetParameterCmdObj = {
 }
 
 {
-    const rst = new ReplSetTest(
-        {nodes: numNodesPerRS, nodeOptions: {setParameter: mongodSetParameterOptsStartup}});
+    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: mongodSetParameterOptsStartup}});
     rst.startSet();
     rst.initiate();
 

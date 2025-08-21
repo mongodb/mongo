@@ -14,7 +14,7 @@ for (let i = 0; i < 10; i++) {
 }
 
 assert.commandWorked(t.update({k: "x"}, {$push: {a: "y"}}, {multi: true}));
-t.find({k: "x"}).forEach(function(z) {
+t.find({k: "x"}).forEach(function (z) {
     assert.eq(["y"], z.a, "multi update using object arg");
 });
 
@@ -49,7 +49,7 @@ for (let i = 0; i < 10; i++) {
 }
 
 assert.commandWorked(t.update({k: "x"}, {$push: {a: "y"}}, {upsert: true, multi: true}));
-t.find({k: "x"}).forEach(function(z) {
+t.find({k: "x"}).forEach(function (z) {
     assert.eq(["y"], z.a, "multi + upsert (found) using object arg");
 });
 

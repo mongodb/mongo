@@ -22,8 +22,7 @@ db.foreignColl.drop();
 assert.commandWorked(db.localColl.insert({_id: 1, a: 5}));
 assert.commandWorked(db.foreignColl.insert({_id: 2, b: 5}));
 
-const pipeline =
-    [{$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "result"}}];
+const pipeline = [{$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "result"}}];
 let explain = db.localColl.explain().aggregate(pipeline);
 assert(aggPlanHasStage(explain, "EQ_LOOKUP"), explain);
 
@@ -31,7 +30,7 @@ assert(aggPlanHasStage(explain, "EQ_LOOKUP"), explain);
 db.nonExistingForeignColl.drop();
 const pipelineWithNonExistentForeign = [
     {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "result"}},
-    {$lookup: {from: "nonExistingForeignColl", localField: "a", foreignField: "b", as: "result2"}}
+    {$lookup: {from: "nonExistingForeignColl", localField: "a", foreignField: "b", as: "result2"}},
 ];
 let results = db.localColl.aggregate(pipelineWithNonExistentForeign).toArray();
 assert.eq(results.length, 1, results);

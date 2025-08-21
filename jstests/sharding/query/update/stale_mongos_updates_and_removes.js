@@ -50,20 +50,21 @@ function makeStaleMongosTargetMultipleShardsWhenAllChunksAreOnOneShard() {
     resetCollection();
 
     // Make sure staleMongos sees all data on first shard.
-    const chunk =
-        staleMongos.getCollection("config.chunks").findOne({min: {x: MinKey}, max: {x: MaxKey}});
+    const chunk = staleMongos.getCollection("config.chunks").findOne({min: {x: MinKey}, max: {x: MaxKey}});
     assert(chunk.shard === st.shard0.shardName);
 
     // Make sure staleMongos sees two chunks on two different shards.
     assert.commandWorked(staleMongos.adminCommand({split: collNS, middle: {x: splitPoint}}));
-    assert.commandWorked(staleMongos.adminCommand(
-        {moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
+    assert.commandWorked(
+        staleMongos.adminCommand({moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+    );
 
     st.configRS.awaitLastOpCommitted();
 
     // Use freshMongos to consolidate the chunks on one shard.
-    assert.commandWorked(freshMongos.adminCommand(
-        {moveChunk: collNS, find: {x: 0}, to: st.shard0.shardName, _waitForDelete: true}));
+    assert.commandWorked(
+        freshMongos.adminCommand({moveChunk: collNS, find: {x: 0}, to: st.shard0.shardName, _waitForDelete: true}),
+    );
 }
 
 // Create a new sharded collection with a single chunk, then move that chunk from the primary
@@ -78,13 +79,13 @@ function makeStaleMongosTargetOneShardWhenAllChunksAreOnAnotherShard() {
     resetCollection();
 
     // Make sure staleMongos sees all data on first shard.
-    const chunk =
-        staleMongos.getCollection("config.chunks").findOne({min: {x: MinKey}, max: {x: MaxKey}});
+    const chunk = staleMongos.getCollection("config.chunks").findOne({min: {x: MinKey}, max: {x: MaxKey}});
     assert(chunk.shard === st.shard0.shardName);
 
     // Use freshMongos to move chunk to another shard.
-    assert.commandWorked(freshMongos.adminCommand(
-        {moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
+    assert.commandWorked(
+        freshMongos.adminCommand({moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+    );
 }
 
 // Create a new sharded collection, then split it into two chunks on different shards using the
@@ -99,14 +100,14 @@ function makeStaleMongosTargetOneShardWhenChunksAreOnMultipleShards() {
     resetCollection();
 
     // Make sure staleMongos sees all data on first shard.
-    const chunk =
-        staleMongos.getCollection("config.chunks").findOne({min: {x: MinKey}, max: {x: MaxKey}});
+    const chunk = staleMongos.getCollection("config.chunks").findOne({min: {x: MinKey}, max: {x: MaxKey}});
     assert(chunk.shard === st.shard0.shardName);
 
     // Use freshMongos to split and move chunks to both shards.
     assert.commandWorked(freshMongos.adminCommand({split: collNS, middle: {x: splitPoint}}));
-    assert.commandWorked(freshMongos.adminCommand(
-        {moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}));
+    assert.commandWorked(
+        freshMongos.adminCommand({moveChunk: collNS, find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true}),
+    );
 
     st.configRS.awaitLastOpCommitted();
 }
@@ -141,8 +142,8 @@ function checkAllRemoveQueries(makeMongosStaleFunc) {
 }
 
 function checkAllUpdateQueries(makeMongosStaleFunc) {
-    const oUpdate = {$inc: {fieldToUpdate: 1}};  // op-style update (non-idempotent)
-    const rUpdate = {x: 0, fieldToUpdate: 1};    // replacement-style update (idempotent)
+    const oUpdate = {$inc: {fieldToUpdate: 1}}; // op-style update (non-idempotent)
+    const rUpdate = {x: 0, fieldToUpdate: 1}; // replacement-style update (idempotent)
     const queryAfterUpdate = {fieldToUpdate: 1};
 
     const multi = {multi: true};
@@ -153,8 +154,10 @@ function checkAllUpdateQueries(makeMongosStaleFunc) {
         assert.commandWorked(staleMongos.getCollection(collNS).update(query, update, multiOption));
         if (multiOption.multi) {
             // All documents matching the query should have been updated.
-            assert.eq(staleMongos.getCollection(collNS).find(query).itcount(),
-                      staleMongos.getCollection(collNS).find(queryAfterUpdate).itcount());
+            assert.eq(
+                staleMongos.getCollection(collNS).find(query).itcount(),
+                staleMongos.getCollection(collNS).find(queryAfterUpdate).itcount(),
+            );
         } else {
             // A total of one document should have been updated.
             assert.eq(1, staleMongos.getCollection(collNS).find(queryAfterUpdate).itcount());
@@ -167,8 +170,7 @@ function checkAllUpdateQueries(makeMongosStaleFunc) {
         assert.writeError(res);
     }
 
-    function assertUpdateIsValidIfAllChunksOnSingleShard(
-        query, update, multiOption, makeMongosStaleFunc) {
+    function assertUpdateIsValidIfAllChunksOnSingleShard(query, update, multiOption, makeMongosStaleFunc) {
         doUpdate(query, update, multiOption, makeMongosStaleFunc);
     }
 
@@ -210,21 +212,19 @@ function checkAllUpdateQueries(makeMongosStaleFunc) {
     assertUpdateIsInvalid(multiPointQuery, rUpdate, multi, makeMongosStaleFunc);
 
     // Multi-point single-doc update succeeds if all points are on a single shard.
-    assertUpdateIsValidIfAllChunksOnSingleShard(
-        multiPointQuery, oUpdate, single, makeMongosStaleFunc);
+    assertUpdateIsValidIfAllChunksOnSingleShard(multiPointQuery, oUpdate, single, makeMongosStaleFunc);
     doUpdate(multiPointQuery, oUpdate, multi, makeMongosStaleFunc);
 }
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 
-const dbName = 'test';
-const collNS = dbName + '.foo';
+const dbName = "test";
+const collNS = dbName + ".foo";
 const numShardKeys = 10;
 const numDocs = numShardKeys * 2;
 const splitPoint = numShardKeys / 2;
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: collNS, key: {x: 1}}));
 
 const freshMongos = st.s0;
@@ -232,18 +232,18 @@ const staleMongos = st.s1;
 
 const emptyQuery = {};
 const pointQuery = {
-    x: 0
+    x: 0,
 };
 
 // Choose a range that would fall on only one shard.
 // Use (splitPoint - 1) because of SERVER-20768.
 const rangeQuery = {
-    x: {$gte: 0, $lt: splitPoint - 1}
+    x: {$gte: 0, $lt: splitPoint - 1},
 };
 
 // Choose points that would fall on two different shards.
 const multiPointQuery = {
-    $or: [{x: 0}, {x: numShardKeys}]
+    $or: [{x: 0}, {x: numShardKeys}],
 };
 
 checkAllRemoveQueries(makeStaleMongosTargetOneShardWhenAllChunksAreOnAnotherShard);

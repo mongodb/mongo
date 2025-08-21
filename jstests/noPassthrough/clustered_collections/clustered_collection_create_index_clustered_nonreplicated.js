@@ -8,9 +8,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {
-    CreateIndexesClusteredTest
-} from "jstests/libs/clustered_collections/clustered_collection_create_index_clustered_common.js";
+import {CreateIndexesClusteredTest} from "jstests/libs/clustered_collections/clustered_collection_create_index_clustered_common.js";
 
 const conn = MongoRunner.runMongod();
 

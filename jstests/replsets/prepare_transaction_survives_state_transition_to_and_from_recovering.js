@@ -78,19 +78,22 @@ assert.eq(newPrimaryDB.getCollection(collName).find().toArray(), [{_id: 1}, {_id
 // Make sure that another write on the same document from the second transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    newPrimaryDB.runCommand(
-        {update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 1}}}], maxTimeMS: 5 * 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    newPrimaryDB.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 1}}}], maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Make sure that we cannot add other operations to the second transaction since it is prepared.
 assert.commandFailedWithCode(
     newSession.getDatabase(dbName).getCollection(collName).insert({_id: 3}),
-    ErrorCodes.PreparedTransactionInProgress);
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Verify that the locks from the prepared transaction are still held");
 
-assert.commandFailedWithCode(newPrimaryDB.runCommand({drop: collName, maxTimeMS: 5 * 1000}),
-                             ErrorCodes.MaxTimeMSExpired);
+assert.commandFailedWithCode(
+    newPrimaryDB.runCommand({drop: collName, maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 jsTestLog("Committing transaction");
 

@@ -9,7 +9,7 @@ import {
     assertForDbCheckErrorsForAllNodes,
     clearHealthLog,
     forEachNonArbiterNode,
-    runDbCheck
+    runDbCheck,
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
 // This test injects inconsistencies between replica set members; do not fail because of expected
@@ -25,10 +25,13 @@ function testDbCheckInvocationParameters(replSet) {
 
     const primary = replSet.getPrimary();
     const db = primary.getDB(dbName);
-    db[collName].insertMany([...Array(10000).keys()].map(x => ({_id: x})), {ordered: false});
+    db[collName].insertMany(
+        [...Array(10000).keys()].map((x) => ({_id: x})),
+        {ordered: false},
+    );
 
     function checkEntryBounds(start, end) {
-        forEachNonArbiterNode(replSet, function(node) {
+        forEachNonArbiterNode(replSet, function (node) {
             const healthlog = node.getDB("local").system.healthlog;
             const keyBoundsResult = healthlog.aggregate([
                 {$match: {operation: "dbCheckBatch"}},
@@ -36,9 +39,9 @@ function testDbCheckInvocationParameters(replSet) {
                     $group: {
                         _id: null,
                         batchStart: {$min: "$data.batchStart._id"},
-                        batchEnd: {$max: "$data.batchEnd._id"}
-                    }
-                }
+                        batchEnd: {$max: "$data.batchEnd._id"},
+                    },
+                },
             ]);
 
             assert(keyBoundsResult.hasNext(), "dbCheck put no batches in health log");
@@ -54,17 +57,13 @@ function testDbCheckInvocationParameters(replSet) {
     const end = 9000;
 
     let dbCheckParameters = {minKey: start, maxKey: end};
-    if (FeatureFlagUtil.isPresentAndEnabled(
-            primary,
-            "SecondaryIndexChecksInDbCheck",
-            )) {
+    if (FeatureFlagUtil.isPresentAndEnabled(primary, "SecondaryIndexChecksInDbCheck")) {
         dbCheckParameters = {start: {_id: start}, end: {_id: end}};
     }
     runDbCheck(replSet, db, collName, dbCheckParameters, true /*awaitCompletion*/);
 
     checkEntryBounds(start, end);
-    assertForDbCheckErrorsForAllNodes(
-        replSet, true /*assertForErrors*/, true /*assertForWarnings*/);
+    assertForDbCheckErrorsForAllNodes(replSet, true /*assertForErrors*/, true /*assertForWarnings*/);
 
     // Now, clear the health logs again,
     clearHealthLog(replSet);
@@ -76,7 +75,7 @@ const latestLastLTSReplSet = new ReplSetTest({
     nodes: [{binVersion: "latest"}, {binVersion: "last-lts", rsConfig: {priority: 0}}],
     nodeOptions: {
         setParameter: {dbCheckHealthLogEveryNBatches: 1},
-    }
+    },
 });
 
 latestLastLTSReplSet.startSet();
@@ -93,7 +92,7 @@ const lastLTSLatestReplSet = new ReplSetTest({
     nodes: [{binVersion: "last-lts"}, {binVersion: "latest", rsConfig: {priority: 0}}],
     nodeOptions: {
         setParameter: {dbCheckHealthLogEveryNBatches: 1},
-    }
+    },
 });
 
 lastLTSLatestReplSet.startSet();

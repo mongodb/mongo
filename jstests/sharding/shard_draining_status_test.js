@@ -10,29 +10,25 @@
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-describe("shardDrainingStatus correct functionality test", function() {
+describe("shardDrainingStatus correct functionality test", function () {
     before(() => {
         this.st = new ShardingTest({shards: 2, other: {enableBalancer: true}});
     });
 
     beforeEach(() => {
         // Add sharded collections
-        assert.commandWorked(this.st.s.adminCommand(
-            {enableSharding: 'TestDB', primaryShard: this.st.shard1.shardName}));
         assert.commandWorked(
-            this.st.s.adminCommand({shardCollection: 'TestDB.Coll', key: {_id: 1}}));
-        assert.commandWorked(
-            this.st.s.getDB('TestDB').Coll.insert({_id: -1, value: 'Negative value'}));
-        assert.commandWorked(
-            this.st.s.getDB('TestDB').Coll.insert({_id: 1, value: 'Positive value'}));
+            this.st.s.adminCommand({enableSharding: "TestDB", primaryShard: this.st.shard1.shardName}),
+        );
+        assert.commandWorked(this.st.s.adminCommand({shardCollection: "TestDB.Coll", key: {_id: 1}}));
+        assert.commandWorked(this.st.s.getDB("TestDB").Coll.insert({_id: -1, value: "Negative value"}));
+        assert.commandWorked(this.st.s.getDB("TestDB").Coll.insert({_id: 1, value: "Positive value"}));
 
         // Add unsharded collections
-        assert.commandWorked(
-            this.st.s.getDB('TestDB').CollUnsharded.insert({_id: 1, value: 'Pos'}));
+        assert.commandWorked(this.st.s.getDB("TestDB").CollUnsharded.insert({_id: 1, value: "Pos"}));
 
         // Start shard draining
-        assert.commandWorked(
-            this.st.s.adminCommand({startShardDraining: this.st.shard1.shardName}));
+        assert.commandWorked(this.st.s.adminCommand({startShardDraining: this.st.shard1.shardName}));
         this.st.configRS.awaitReplication();
     });
 
@@ -40,7 +36,7 @@ describe("shardDrainingStatus correct functionality test", function() {
         assert.commandWorked(this.st.s.adminCommand({stopShardDraining: this.st.shard1.shardName}));
 
         // Clean the data
-        assert.commandWorked(this.st.s.getDB('TestDB').dropDatabase());
+        assert.commandWorked(this.st.s.getDB("TestDB").dropDatabase());
     });
 
     after(() => {
@@ -50,13 +46,13 @@ describe("shardDrainingStatus correct functionality test", function() {
     it("draining status is 'ongoing", () => {
         const res = this.st.s.adminCommand({shardDrainingStatus: this.st.shard1.shardName});
         assert.commandWorked(res);
-        assert.eq(res.state, 'ongoing');
+        assert.eq(res.state, "ongoing");
     });
 
     it("msg is 'draining ongoing'", () => {
         const res = this.st.s.adminCommand({shardDrainingStatus: this.st.shard1.shardName});
         assert.commandWorked(res);
-        assert.eq(res.msg, 'draining ongoing');
+        assert.eq(res.msg, "draining ongoing");
     });
 
     it("TestDB is listed as db to move", () => {
@@ -70,7 +66,8 @@ describe("shardDrainingStatus correct functionality test", function() {
         assert.commandWorked(res);
         assert.eq(
             res.note,
-            "you need to call moveCollection for collectionsToMove and afterwards movePrimary for the dbsToMove");
+            "you need to call moveCollection for collectionsToMove and afterwards movePrimary for the dbsToMove",
+        );
     });
 
     it("TestDB.Coll is listed as collection to move", () => {
@@ -81,27 +78,25 @@ describe("shardDrainingStatus correct functionality test", function() {
 
     it("draining status is 'drainingComplete' when shard is completely drained", () => {
         // Move the unsharded collections
-        assert.commandWorked(
-            this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}));
+        assert.commandWorked(this.st.s.adminCommand({movePrimary: "TestDB", to: this.st.shard0.shardName}));
 
         // Wait for the shard to be completely drained, then shardDrainingStatus must return
         // completed.
         assert.soon(() => {
-            const drainingStatus_completed =
-                this.st.s.adminCommand({shardDrainingStatus: this.st.shard1.shardName});
+            const drainingStatus_completed = this.st.s.adminCommand({shardDrainingStatus: this.st.shard1.shardName});
             assert.commandWorked(drainingStatus_completed);
-            return 'drainingComplete' == drainingStatus_completed.state;
+            return "drainingComplete" == drainingStatus_completed.state;
         }, "shardDrainingStatus did not return 'drainingCompleted' status within the timeout.");
     });
 
     it("status not returned for non existent shard", () => {
-        assert.commandFailedWithCode(this.st.s.adminCommand({shardDrainingStatus: "shard1"}),
-                                     ErrorCodes.ShardNotFound);
+        assert.commandFailedWithCode(this.st.s.adminCommand({shardDrainingStatus: "shard1"}), ErrorCodes.ShardNotFound);
     });
 
     it("status not returned for non-draining shard", () => {
         assert.commandFailedWithCode(
             this.st.s.adminCommand({shardDrainingStatus: this.st.shard0.shardName}),
-            ErrorCodes.IllegalOperation);
+            ErrorCodes.IllegalOperation,
+        );
     });
 });

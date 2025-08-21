@@ -17,8 +17,7 @@ import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_builds/i
 
 const dbName = "test";
 
-const rst = new ReplSetTest(
-    {nodes: 1, nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: 50}}});
+const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: 50}}});
 rst.startSet();
 rst.initiate();
 
@@ -39,6 +38,7 @@ ResumableIndexBuildTest.run(
     [{name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400}],
     50,
     ["bulk load"],
-    [{skippedPhaseLogID: 20391}]);
+    [{skippedPhaseLogID: 20391}],
+);
 
 rst.stopSet();

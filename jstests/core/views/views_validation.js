@@ -15,8 +15,7 @@ function makeView(viewName, viewOn, pipeline, expectedErrorCode) {
     }
     let res = viewsDb.runCommand(options);
     if (expectedErrorCode !== undefined) {
-        assert.commandFailedWithCode(
-            res, expectedErrorCode, "Invalid view created " + tojson(options));
+        assert.commandFailedWithCode(res, expectedErrorCode, "Invalid view created " + tojson(options));
     } else {
         assert.commandWorked(res, "Could not create view " + tojson(options));
     }
@@ -24,20 +23,20 @@ function makeView(viewName, viewOn, pipeline, expectedErrorCode) {
 
 function makeLookup(from) {
     return {
-        $lookup: {from: from, as: "as", localField: "localField", foreignField: "foreignField"}
+        $lookup: {from: from, as: "as", localField: "localField", foreignField: "foreignField"},
     };
 }
 
 function makeGraphLookup(from) {
     return {
-            $graphLookup: {
-                from: from,
-                as: "as",
-                startWith: "startWith",
-                connectFromField: "connectFromField",
-                connectToField: "connectToField"
-            }
-        };
+        $graphLookup: {
+            from: from,
+            as: "as",
+            startWith: "startWith",
+            connectFromField: "connectFromField",
+            connectToField: "connectToField",
+        },
+    };
 }
 
 function makeFacet(from) {
@@ -94,10 +93,7 @@ makeView("b", "c", [makeUnion("a")], ErrorCodes.GraphContainsCycle);
 clear();
 
 // Test that $unionWith checks for cycles within a nested $unionWith.
-makeView("a",
-         "b",
-         [{$unionWith: {coll: "c", pipeline: [{$unionWith: "a"}]}}],
-         ErrorCodes.GraphContainsCycle);
+makeView("a", "b", [{$unionWith: {coll: "c", pipeline: [{$unionWith: "a"}]}}], ErrorCodes.GraphContainsCycle);
 
 /*
  * Check that view validation does not naively recurse on already visited views.
@@ -149,15 +145,13 @@ function detectViewError(aggStage) {
     let detectedViewError = false;
     for (let i = 0; i < kMaxRetries; ++i) {
         const res = viewsDb.runCommand({aggregate: "v10", pipeline: [aggStage], cursor: {}});
-        assert.commandFailedWithCode(res,
-                                     [ErrorCodes.ViewDepthLimitExceeded, ErrorCodes.StaleConfig]);
+        assert.commandFailedWithCode(res, [ErrorCodes.ViewDepthLimitExceeded, ErrorCodes.StaleConfig]);
         if (res.code === ErrorCodes.ViewDepthLimitExceeded) {
             detectedViewError = true;
             break;
         }
     }
-    assert(detectedViewError,
-           "Did not detect view error after " + kMaxRetries + " retries of the aggregation");
+    assert(detectedViewError, "Did not detect view error after " + kMaxRetries + " retries of the aggregation");
 }
 
 detectViewError(makeUnion("v1"));
@@ -170,25 +164,28 @@ clear();
 // Check that collMod also checks for cycles.
 makeView("a", "b");
 makeView("b", "c");
-assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", viewOn: "a", pipeline: []}),
-                             ErrorCodes.GraphContainsCycle,
-                             "collmod changed view to create a cycle");
+assert.commandFailedWithCode(
+    viewsDb.runCommand({collMod: "b", viewOn: "a", pipeline: []}),
+    ErrorCodes.GraphContainsCycle,
+    "collmod changed view to create a cycle",
+);
 
 // Check that collMod disallows the specification of invalid pipelines.
 assert.commandFailedWithCode(
     viewsDb.runCommand({collMod: "b", viewOn: "c", pipeline: {}}),
     ErrorCodes.TypeMismatch,
-    "BSON field 'collMod.pipeline' is the wrong type 'object', expected type 'array'");
+    "BSON field 'collMod.pipeline' is the wrong type 'object', expected type 'array'",
+);
 assert.commandFailedWithCode(
     viewsDb.runCommand({collMod: "b", viewOn: "c", pipeline: {0: {$limit: 7}}}),
     ErrorCodes.TypeMismatch,
-    "BSON field 'collMod.pipeline' is the wrong type 'object', expected type 'array'");
+    "BSON field 'collMod.pipeline' is the wrong type 'object', expected type 'array'",
+);
 clear();
 
 // Check that collMod disallows the 'expireAfterSeconds' option over a view.
 makeView("a", "b");
-assert.commandFailedWithCode(viewsDb.runCommand({collMod: "a", expireAfterSeconds: 1}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(viewsDb.runCommand({collMod: "a", expireAfterSeconds: 1}), ErrorCodes.InvalidOptions);
 clear();
 
 // For the assert below with multiple error codes, SERVER-93055 changes the parse error codes to an
@@ -197,18 +194,22 @@ clear();
 
 // Check that invalid pipelines are disallowed. The following $lookup is missing the 'as' field.
 // TODO SERVER-106081: Remove ErrorCodes.FailedToParse.
-makeView("a",
-         "b",
-         [{"$lookup": {from: "a", localField: "b", foreignField: "c"}}],
-         [ErrorCodes.IDLFailedToParse, ErrorCodes.FailedToParse]);
+makeView(
+    "a",
+    "b",
+    [{"$lookup": {from: "a", localField: "b", foreignField: "c"}}],
+    [ErrorCodes.IDLFailedToParse, ErrorCodes.FailedToParse],
+);
 
 // Check that free variables in view pipeline are disallowed.
 makeView("a", "b", [{"$project": {field: "$$undef"}}], 17276);
 makeView("a", "b", [{"$addFields": {field: "$$undef"}}], 17276);
 
 const invalidDb = db.getSiblingDB("$gt");
-assert.commandFailedWithCode(
-    invalidDb.createView('testView', 'testColl', []),
-    [17320, ErrorCodes.InvalidNamespace, ErrorCodes.InvalidViewDefinition]);
+assert.commandFailedWithCode(invalidDb.createView("testView", "testColl", []), [
+    17320,
+    ErrorCodes.InvalidNamespace,
+    ErrorCodes.InvalidViewDefinition,
+]);
 // Delete the invalid view (by dropping the database) so that the validate hook succeeds.
 assert.commandWorked(invalidDb.dropDatabase());

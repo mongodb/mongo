@@ -24,13 +24,12 @@ let st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 // Create a sharded collection with three chunks:
 //     [-inf, -10), [-10, 10), [10, inf)
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: -10}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 10}}));
@@ -75,7 +74,7 @@ assert.eq(shard1Coll.find().itcount(), expectedNumDocsShard1Before);
 
 // Pause range deletion.
 let originalShard0Primary = st.rs0.getPrimary();
-originalShard0Primary.adminCommand({configureFailPoint: 'suspendRangeDeletion', mode: 'alwaysOn'});
+originalShard0Primary.adminCommand({configureFailPoint: "suspendRangeDeletion", mode: "alwaysOn"});
 
 // Move chunk [-10, 10) to shard1.
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: -10}, to: st.shard1.shardName}));
@@ -94,7 +93,7 @@ assert.eq(shard1Coll.find().itcount(), expectedNumDocsShard1After);
 assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 60, force: 1}));
 
 // Allow the range deleter to run.
-originalShard0Primary.adminCommand({configureFailPoint: 'suspendRangeDeletion', mode: 'off'});
+originalShard0Primary.adminCommand({configureFailPoint: "suspendRangeDeletion", mode: "off"});
 
 // Connect to new primary for shard0.
 let shard0Primary = st.rs0.getPrimary();

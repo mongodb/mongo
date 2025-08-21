@@ -14,7 +14,7 @@ for (let shardCount = 1; shardCount <= 2; shardCount++) {
     const st = new ShardingTest({
         name: jsTestName(),
         shards: shardCount,
-        rs: {nodes: 2, setParameter: {mirrorReads: tojson({samplingRate: 0.0})}}
+        rs: {nodes: 2, setParameter: {mirrorReads: tojson({samplingRate: 0.0})}},
     });
     st.waitForShardingInitialized();
 
@@ -38,15 +38,13 @@ for (let shardCount = 1; shardCount <= 2; shardCount++) {
     planCache.clear();
     assert.eq(0, coll.aggregate({$planCacheStats: {}}).itcount());
 
-    assert.eq(
-        2, st.shard0.rs.getReplSetConfig()["members"].length, st.shard0.rs.getReplSetConfig());
+    assert.eq(2, st.shard0.rs.getReplSetConfig()["members"].length, st.shard0.rs.getReplSetConfig());
     // This ensure that secondaries have identified their roles before executing the queries.
     // Sending a query with secondary read pref without this wait could result in an error.
     st.shard0.rs.awaitSecondaryNodes();
 
     if (shardCount === 2) {
-        assert.eq(
-            2, st.shard1.rs.getReplSetConfig()["members"].length, st.shard1.rs.getReplSetConfig());
+        assert.eq(2, st.shard1.rs.getReplSetConfig()["members"].length, st.shard1.rs.getReplSetConfig());
         st.shard1.rs.awaitSecondaryNodes();
     }
 
@@ -61,9 +59,11 @@ for (let shardCount = 1; shardCount <= 2; shardCount++) {
     assert.eq(1, coll.aggregate({$planCacheStats: {}}).itcount());
     // On secondaries there is a plan for each shard
     db.getMongo().setReadPref("secondary");
-    assert.eq(shardCount,
-              coll.aggregate({$planCacheStats: {}}).itcount(),
-              coll.aggregate([{$planCacheStats: {}}]).toArray());
+    assert.eq(
+        shardCount,
+        coll.aggregate({$planCacheStats: {}}).itcount(),
+        coll.aggregate([{$planCacheStats: {}}]).toArray(),
+    );
 
     // If we set allHosts: true, we return all plans despite any read preference setting.
     const totalPlans = 1 + shardCount;

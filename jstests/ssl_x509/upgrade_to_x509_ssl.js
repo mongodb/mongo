@@ -25,11 +25,11 @@ let opts = {
     tlsAllowInvalidCertificates: "",
     clusterAuthMode: "sendKeyFile",
     keyFile: KEYFILE,
-    tlsCAFile: CA_CERT
+    tlsCAFile: CA_CERT,
 };
 var NUM_NODES = 3;
 var rst = new ReplSetTest({
-    name: 'tlsSet',
+    name: "tlsSet",
     nodes: NUM_NODES,
     nodeOptions: opts,
     waitForKeys: false,
@@ -50,16 +50,18 @@ assert.eq(2, rstConn1.getDB("test").a.count(), "Error interacting with replSet")
 print("===== UPGRADE allowTLS,sendKeyfile -> preferTLS,sendX509 =====");
 authAllNodes();
 rst.awaitReplication();
-rst.upgradeSet({
-    tlsMode: "preferTLS",
-    tlsCertificateKeyFile: SERVER_CERT,
-    tlsAllowInvalidCertificates: "",
-    clusterAuthMode: "sendX509",
-    keyFile: KEYFILE,
-    tlsCAFile: CA_CERT
-},
-               "root",
-               "pwd");
+rst.upgradeSet(
+    {
+        tlsMode: "preferTLS",
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsAllowInvalidCertificates: "",
+        clusterAuthMode: "sendX509",
+        keyFile: KEYFILE,
+        tlsCAFile: CA_CERT,
+    },
+    "root",
+    "pwd",
+);
 // The upgradeSet call restarts the nodes so we need to reauthenticate.
 authAllNodes();
 var rstConn3 = rst.getPrimary();
@@ -71,16 +73,18 @@ var canConnectNoSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--eval",
 assert.eq(0, canConnectNoSSL, "SSL Connection attempt failed when it should succeed");
 
 print("===== UPGRADE preferTLS,sendX509 -> requireTLS,x509 =====");
-rst.upgradeSet({
-    tlsMode: "requireTLS",
-    tlsCertificateKeyFile: SERVER_CERT,
-    tlsAllowInvalidCertificates: "",
-    clusterAuthMode: "x509",
-    keyFile: KEYFILE,
-    tlsCAFile: CA_CERT
-},
-               "root",
-               "pwd");
+rst.upgradeSet(
+    {
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsAllowInvalidCertificates: "",
+        clusterAuthMode: "x509",
+        keyFile: KEYFILE,
+        tlsCAFile: CA_CERT,
+    },
+    "root",
+    "pwd",
+);
 authAllNodes();
 var rstConn4 = rst.getPrimary();
 rstConn4.getDB("test").a.insert({a: 4, str: "TESTTESTTEST"});

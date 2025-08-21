@@ -17,13 +17,10 @@ import "jstests/libs/override_methods/retry_on_killed_session.js";
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_sharded_from_mongod.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/internal_transactions/internal_transactions_sharded_from_mongod.js";
 import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.retryOnKilledSession = true;
 
     // Insert initial documents during setup instead of the init state, otherwise the insert could
@@ -49,14 +46,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.killCountdown = new CountDownLatch($config.threadCount);
 
     $config.data.runInternalTransaction = function runInternalTransaction(
-        defaultDb, collName, executionCtxType, crudOp) {
+        defaultDb,
+        collName,
+        executionCtxType,
+        crudOp,
+    ) {
         assert.neq(executionCtxType, this.executionContextTypes.kClientRetryableWrite);
         assert.neq(executionCtxType, this.executionContextTypes.kClientTransaction);
         try {
             $super.data.runInternalTransaction.apply(this, arguments);
         } catch (e) {
-            if (KilledSessionUtil.hasKilledSessionError(e) ||
-                KilledSessionUtil.hasKilledSessionWCError(e)) {
+            if (KilledSessionUtil.hasKilledSessionError(e) || KilledSessionUtil.hasKilledSessionWCError(e)) {
                 return;
             }
             throw e;
@@ -72,7 +72,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         });
     };
 
-    $config.states.killSession = function(db, collName, connCache) {
+    $config.states.killSession = function (db, collName, connCache) {
         if ($config.data.killCountdown.getCount() > 0) {
             return;
         }
@@ -105,22 +105,21 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 print("Finished refreshLogicalSessionCacheNow command");
 
                 print("Starting listSessions");
-                const sessions =
-                    db.getSiblingDB("config")
-                        .system.sessions
-                        .aggregate([
-                            {$listSessions: {}},
-                            {
-                                $match: {
-                                    $and: [
-                                        {lastUse: {$gt: this.initTime}},
-                                        {"_id.id": {$ne: db.getSession().getSessionId().id}}
-                                    ]
-                                }
+                const sessions = db
+                    .getSiblingDB("config")
+                    .system.sessions.aggregate([
+                        {$listSessions: {}},
+                        {
+                            $match: {
+                                $and: [
+                                    {lastUse: {$gt: this.initTime}},
+                                    {"_id.id": {$ne: db.getSession().getSessionId().id}},
+                                ],
                             },
-                            {$sample: {size: 1}},
-                        ])
-                        .toArray();
+                        },
+                        {$sample: {size: 1}},
+                    ])
+                    .toArray();
                 print("Finished listSessions " + tojsononeline(sessions));
 
                 if (sessions.length === 0) {
@@ -175,42 +174,42 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             internalTransactionForInsert: 0.25,
             internalTransactionForUpdate: 0.25,
             internalTransactionForDelete: 0.25,
-            verifyDocuments: 0.25
+            verifyDocuments: 0.25,
         },
         internalTransactionForInsert: {
             killSession: 0.4,
             internalTransactionForInsert: 0.15,
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
-            verifyDocuments: 0.15
+            verifyDocuments: 0.15,
         },
         internalTransactionForUpdate: {
             killSession: 0.4,
             internalTransactionForInsert: 0.15,
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
-            verifyDocuments: 0.15
+            verifyDocuments: 0.15,
         },
         internalTransactionForDelete: {
             killSession: 0.4,
             internalTransactionForInsert: 0.15,
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
-            verifyDocuments: 0.15
+            verifyDocuments: 0.15,
         },
         internalTransactionForFindAndModify: {
             killSession: 0.4,
             internalTransactionForInsert: 0.15,
             internalTransactionForUpdate: 0.15,
             internalTransactionForDelete: 0.15,
-            verifyDocuments: 0.15
+            verifyDocuments: 0.15,
         },
         verifyDocuments: {
             killSession: 0.25,
             internalTransactionForInsert: 0.25,
             internalTransactionForUpdate: 0.25,
             internalTransactionForDelete: 0.25,
-        }
+        },
     };
 
     return $config;

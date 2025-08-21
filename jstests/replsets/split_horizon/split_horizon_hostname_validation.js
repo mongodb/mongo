@@ -10,7 +10,7 @@ function testConfig(hostName, horizonName, expectedReject, options = {}) {
 
     const config = {
         _id: "test",
-        members: [{_id: 0, host: hostName, horizons: {"horizon_name": horizonName}}]
+        members: [{_id: 0, host: hostName, horizons: {"horizon_name": horizonName}}],
     };
 
     // Make sure replSetInitiate fails with correct error
@@ -20,8 +20,9 @@ function testConfig(hostName, horizonName, expectedReject, options = {}) {
     assert.eq(output.errmsg.includes("Found split horizon configuration using IP"), expectedReject);
 
     // Correctly start up a replset with the mongod as its node, and wait until it becomes primary
-    assert.commandWorked(mongod.adminCommand(
-        {replSetInitiate: {_id: "test", members: [{_id: 0, host: "localhost:" + mongod.port}]}}));
+    assert.commandWorked(
+        mongod.adminCommand({replSetInitiate: {_id: "test", members: [{_id: 0, host: "localhost:" + mongod.port}]}}),
+    );
     assert.soon(() => {
         return assert.commandWorked(mongod.adminCommand({hello: 1})).isWritablePrimary;
     });

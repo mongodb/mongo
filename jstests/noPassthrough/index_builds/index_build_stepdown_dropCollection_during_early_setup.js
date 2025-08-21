@@ -30,8 +30,9 @@ rst.awaitReplication();
 // index build is registered, but not yet replicated.
 const fp = configureFailPoint(primary, "hangIndexBuildOnSetupBeforeTakingLocks");
 
-const waitForIndexBuildToErrorOut = IndexBuildTest.startIndexBuild(
-    primary, primaryColl.getFullName(), {a: 1}, {}, [ErrorCodes.InterruptedDueToReplStateChange]);
+const waitForIndexBuildToErrorOut = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, {}, [
+    ErrorCodes.InterruptedDueToReplStateChange,
+]);
 
 fp.wait();
 
@@ -43,7 +44,7 @@ rst.waitForPrimary();
 
 // Drop the collection on the new primary. The new primary is not aware of the index build, because
 // the old primary hadn't been able to replicate the "startIndexBuild" oplog entry.
-const waitForDropCollection = startParallelShell(function() {
+const waitForDropCollection = startParallelShell(function () {
     db.getCollection("coll").drop();
 }, rst.getPrimary().port);
 

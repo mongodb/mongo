@@ -5,8 +5,8 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 2}});
-var kDbName = 'test';
-var ns = 'test.foo';
+var kDbName = "test";
+var ns = "test.foo";
 var mongos = st.s0;
 var testColl = mongos.getCollection(ns);
 
@@ -15,7 +15,7 @@ assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 // Since this test is timing sensitive, retry on failures since they could be transient.
 // If broken, this would *always* fail so if it ever passes this build is fine (or time went
 // backwards).
-const retryOnFailureUpToFiveTimes = function(name, f) {
+const retryOnFailureUpToFiveTimes = function (name, f) {
     jsTestLog(`Starting test ${name}`);
 
     for (let trial = 1; trial <= 5; trial++) {
@@ -28,14 +28,13 @@ const retryOnFailureUpToFiveTimes = function(name, f) {
                 continue;
             }
 
-            jsTestLog(`Failed 5 times in test ${
-                name}. There is probably a bug here. Latest assertion: ${tojson(e)}`);
+            jsTestLog(`Failed 5 times in test ${name}. There is probably a bug here. Latest assertion: ${tojson(e)}`);
             throw e;
         }
     }
 };
 
-const runTest = function() {
+const runTest = function () {
     // Sanity Check
     assert.eq(testColl.find({_id: 1}).next(), {_id: 1});
 
@@ -47,15 +46,16 @@ const runTest = function() {
     // MaxTimeMS with unsatisfiable readPref
     const time = Date.timeFunc(() => {
         ex = assert.throws(() => {
-            testColl.find({_id: 1})
+            testColl
+                .find({_id: 1})
                 .readPref("secondary", [{tag: "noSuchTag"}])
                 .maxTimeMS(1000)
                 .next();
         });
     });
 
-    assert.gte(time, 1000);      // Make sure we at least waited 1 second.
-    assert.lt(time, 15 * 1000);  // We used to wait 20 seconds before timing out.
+    assert.gte(time, 1000); // Make sure we at least waited 1 second.
+    assert.lt(time, 15 * 1000); // We used to wait 20 seconds before timing out.
 
     assert.eq(ex.code, ErrorCodes.MaxTimeMSExpired);
 };

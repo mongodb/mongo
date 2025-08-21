@@ -21,8 +21,7 @@ const collName = "ts";
 
 // Create a time-series collection containing a mixed-schema bucket
 assert.commandWorked(testDB.runCommand({drop: collName}));
-assert.commandWorked(
-    testDB.createCollection(collName, {timeseries: {timeField: 't', metaField: 'm'}}));
+assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
 const coll = testDB[collName];
 
 const bucket = {
@@ -57,23 +56,20 @@ const bucket = {
     },
 };
 
-assert.commandWorked(
-    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)));
+assert.commandWorked(testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
+assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)));
 
 // Set the mixed-schema flag only set on the top-level catalog metadata field
 // (md.timeseriesBucketsMayHaveMixedSchemaData), but not on the collection options
 // (inside md.options.storageEngine.wiredTiger.configString).
-const fpsimulateLegacyTimeseriesMixedSchemaFlag =
-    configureFailPoint(conn, "simulateLegacyTimeseriesMixedSchemaFlag");
-assert.commandWorked(
-    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
+const fpsimulateLegacyTimeseriesMixedSchemaFlag = configureFailPoint(conn, "simulateLegacyTimeseriesMixedSchemaFlag");
+assert.commandWorked(testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
 fpsimulateLegacyTimeseriesMixedSchemaFlag.off();
 
-const bucketsCatalogEntry =
-    getTimeseriesCollForDDLOps(testDB, coll).aggregate([{$listCatalog: {}}]).toArray()[0];
-const wtConfigStr = bucketsCatalogEntry.md.options.storageEngine?.wiredTiger?.configString ?? '';
+const bucketsCatalogEntry = getTimeseriesCollForDDLOps(testDB, coll)
+    .aggregate([{$listCatalog: {}}])
+    .toArray()[0];
+const wtConfigStr = bucketsCatalogEntry.md.options.storageEngine?.wiredTiger?.configString ?? "";
 assert.eq(true, bucketsCatalogEntry.md.timeseriesBucketsMayHaveMixedSchemaData);
 assert(!wtConfigStr.includes("timeseriesBucketsMayHaveMixedSchemaData"));
 
@@ -85,19 +81,25 @@ assert.gt(res.errors.length, 0, "Validation should return at least one error.");
 assert.containsPrefix(
     "Detected a time-series bucket with mixed schema data",
     res.errors,
-    "Validation of mixed schema buckets when they are not allowed should return an error stating such");
+    "Validation of mixed schema buckets when they are not allowed should return an error stating such",
+);
 
 // Direct insertion or update of mixed-schema buckets is forbidden
-assert.commandFailedWithCode(getTimeseriesCollForRawOps(testDB, coll)
-                                 .update({_id: bucket._id},
-                                         {$set: {"control.max.a": "x", "data.a.0": "x"}},
-                                         getRawOperationSpec(testDB)),
-                             ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema);
+assert.commandFailedWithCode(
+    getTimeseriesCollForRawOps(testDB, coll).update(
+        {_id: bucket._id},
+        {$set: {"control.max.a": "x", "data.a.0": "x"}},
+        getRawOperationSpec(testDB),
+    ),
+    ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema,
+);
 
-assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll)
-                         .deleteOne({_id: bucket._id}, getRawOperationSpec(testDB)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).deleteOne({_id: bucket._id}, getRawOperationSpec(testDB)),
+);
 assert.throwsWithCode(
     () => getTimeseriesCollForRawOps(testDB, coll).insertOne(bucket, getRawOperationSpec(testDB)),
-    ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema);
+    ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema,
+);
 
 MongoRunner.stopMongod(conn);

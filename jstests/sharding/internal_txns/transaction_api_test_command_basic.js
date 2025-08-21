@@ -27,11 +27,11 @@ let stColl = st.s.getCollection(kNs);
 
 function verifyCompletedInsertCommandResult(commandInfos, response, collection) {
     let i = 0;
-    commandInfos.forEach(commandInfo => {
+    commandInfos.forEach((commandInfo) => {
         // Verifies command response.
         assert.eq(1, response.responses[i].ok);
         assert.eq(commandInfo.command.documents.length, response.responses[i].n);
-        commandInfo.command.documents.forEach(document => {
+        commandInfo.command.documents.forEach((document) => {
             // Verifies documents were successfully inserted.
             assert.eq(document, collection.findOne(document));
         });
@@ -41,18 +41,21 @@ function verifyCompletedInsertCommandResult(commandInfos, response, collection) 
 
 function runTxn(connection, commandInfos, collection) {
     const res = assert.commandWorked(
-        connection.adminCommand({testInternalTransactions: 1, commandInfos: commandInfos}));
+        connection.adminCommand({testInternalTransactions: 1, commandInfos: commandInfos}),
+    );
     verifyCompletedInsertCommandResult(commandInfos, res, collection);
 }
 
 function runRetryableWrite(connection, commandInfos, lsid) {
     const txnNumber = NumberLong(0);
-    return assert.commandWorked(connection.adminCommand({
-        testInternalTransactions: 1,
-        commandInfos: commandInfos,
-        lsid: {id: lsid},
-        txnNumber: txnNumber
-    }));
+    return assert.commandWorked(
+        connection.adminCommand({
+            testInternalTransactions: 1,
+            commandInfos: commandInfos,
+            lsid: {id: lsid},
+            txnNumber: txnNumber,
+        }),
+    );
 }
 
 function runRetryableInsert(connection, commandInfos, lsid, collection) {
@@ -111,7 +114,7 @@ function runTestGetMore(conn, sessionOpts, inTxn) {
         {
             dbName: kDbName,
             command: {find: kCollName, batchSize: 17, sort: {_id: 1}},
-            exhaustCursor: true
+            exhaustCursor: true,
         },
     ];
 
@@ -141,13 +144,15 @@ assert.commandWorked(stColl.insert([{_id: 0}]));
 assert.commandWorked(rstColl.insert([{_id: 0}]));
 
 // Set of commandInfos that will be used in tests below.
-const commandInfosSingleInsert = [{
-    dbName: kDbName,
-    command: {
-        insert: kCollName,
-        documents: [{_id: 1}],
-    }
-}];
+const commandInfosSingleInsert = [
+    {
+        dbName: kDbName,
+        command: {
+            insert: kCollName,
+            documents: [{_id: 1}],
+        },
+    },
+];
 
 const commandInfosBatchInsert = [
     {
@@ -155,15 +160,15 @@ const commandInfosBatchInsert = [
         command: {
             insert: kCollName,
             documents: [{_id: 2}],
-        }
+        },
     },
     {
         dbName: kDbName,
         command: {
             insert: kCollName,
             documents: [{_id: 3}, {_id: 4}],
-        }
-    }
+        },
+    },
 ];
 
 const commandInfosRetryableBatchInsert = [
@@ -173,7 +178,7 @@ const commandInfosRetryableBatchInsert = [
             insert: kCollName,
             documents: [{_id: 5}],
             stmtId: NumberInt(0),
-        }
+        },
     },
     {
         dbName: kDbName,
@@ -181,8 +186,8 @@ const commandInfosRetryableBatchInsert = [
             insert: kCollName,
             documents: [{_id: 6}, {_id: 7}],
             stmtId: NumberInt(1),
-        }
-    }
+        },
+    },
 ];
 
 function commandInfosRetryableFindAndModify(collection) {
@@ -195,7 +200,7 @@ function commandInfosRetryableFindAndModify(collection) {
                 update: {},
                 upsert: true,
                 stmtId: NumberInt(0),
-            }
+            },
         },
         {
             dbName: kDbName,
@@ -203,18 +208,16 @@ function commandInfosRetryableFindAndModify(collection) {
                 insert: collection.getName(),
                 documents: [{_id: 9}],
                 stmtId: NumberInt(1),
-            }
-        }
+            },
+        },
     ];
 }
 
-jsTest.log(
-    "Insert documents without a session into a sharded cluster, using internal transactions test command.");
+jsTest.log("Insert documents without a session into a sharded cluster, using internal transactions test command.");
 runTxn(st.s, commandInfosSingleInsert, stColl);
 runTxn(st.s, commandInfosBatchInsert, stColl);
 
-jsTest.log(
-    "Insert documents without a session into a replica set, using internal transactions test command.");
+jsTest.log("Insert documents without a session into a replica set, using internal transactions test command.");
 runTxn(primary, commandInfosSingleInsert, rstColl);
 runTxn(primary, commandInfosBatchInsert, rstColl);
 

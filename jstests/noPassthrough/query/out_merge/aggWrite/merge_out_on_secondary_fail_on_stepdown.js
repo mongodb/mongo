@@ -35,7 +35,7 @@ replTest.awaitReplication();
  * verifies that the aggregate fails with a 'NotWritablePrimary' error when the primary is forced to
  * step down.
  */
-let runTest = function(writeStage, failpoint) {
+let runTest = function (writeStage, failpoint) {
     let outFn = `
     const sourceDB = db.getSiblingDB("${dbName}");
     let cmdRes = sourceDB.runCommand({

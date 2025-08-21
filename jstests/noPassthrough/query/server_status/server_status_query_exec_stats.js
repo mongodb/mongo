@@ -39,7 +39,7 @@ for (let i = 0; i < nDocs; i++) {
 // Run a query which will require the client to fetch multiple batches from the server. Ensure
 // that the getMore commands don't increment the counter of collection scans.
 assert.eq(coll.find({}).batchSize(2).itcount(), nDocs);
-assert.eq((nDocs * 2) + 1, getCollectionScans());
+assert.eq(nDocs * 2 + 1, getCollectionScans());
 assert.eq(nDocs + 1, getCollectionScansNonTailable());
 
 // Create index to test that index scans don't up the collection scan counter.
@@ -49,7 +49,7 @@ for (let i = 0; i < nDocs; i++) {
     assert.eq(coll.find({a: i}).itcount(), 1);
 }
 // Assert that the number of collection scans hasn't increased.
-assert.eq((nDocs * 2) + 1, getCollectionScans());
+assert.eq(nDocs * 2 + 1, getCollectionScans());
 assert.eq(nDocs + 1, getCollectionScansNonTailable());
 
 MongoRunner.stopMongod(conn);

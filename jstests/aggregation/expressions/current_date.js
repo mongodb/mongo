@@ -32,7 +32,7 @@ function basicTest() {
         // Evaluate a $group with another $currentDate expression.
         {$group: {_id: "$time1", time2: {$first: {$currentDate: {}}}}},
         {$project: {time1: "$_id", time2: 1}},
-        {$project: {_id: 0}}
+        {$project: {_id: 0}},
     ];
 
     const resultArray = coll.aggregate(pipeline).toArray();
@@ -55,13 +55,15 @@ try {
         func: (db) => configureFailPoint(db, "sleepBeforeCurrentDateEvaluation", {ms: 2}),
         primaryNodeOnly: false,
     });
-    failPoints.push(...FixtureHelpers.mapOnEachShardNode({
-        db: db.getSiblingDB("admin"),
-        func: (db) => configureFailPoint(db, "sleepBeforeCurrentDateEvaluationSBE", {ms: 2}),
-        primaryNodeOnly: false,
-    }));
+    failPoints.push(
+        ...FixtureHelpers.mapOnEachShardNode({
+            db: db.getSiblingDB("admin"),
+            func: (db) => configureFailPoint(db, "sleepBeforeCurrentDateEvaluationSBE", {ms: 2}),
+            primaryNodeOnly: false,
+        }),
+    );
 
     basicTest();
 } finally {
-    failPoints.forEach(failPoint => failPoint.off());
+    failPoints.forEach((failPoint) => failPoint.off());
 }

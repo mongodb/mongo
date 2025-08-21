@@ -15,8 +15,10 @@ const reshardingTest = new ReshardingTest();
 reshardingTest.setup();
 
 const donorShardNames = reshardingTest.donorShardNames;
-const sourceCollection = reshardingTest.createUnshardedCollection(
-    {ns: "reshardingDb.coll", primaryShardName: donorShardNames[0]});
+const sourceCollection = reshardingTest.createUnshardedCollection({
+    ns: "reshardingDb.coll",
+    primaryShardName: donorShardNames[0],
+});
 
 assert.commandWorked(sourceCollection.insert([{x: 1}, {x: 3}, {x: 3}, {x: 1}]));
 

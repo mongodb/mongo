@@ -30,7 +30,7 @@ function doTest(doTransactionWork, numDocuments) {
     replSet.startSet();
     replSet.initiate();
     const primary = replSet.getPrimary();
-    const dbName = 'test';
+    const dbName = "test";
     const collectionName = jsTestName();
     let coll = primary.getDB(dbName).getCollection(collectionName);
     assert.commandWorked(coll.insert({_id: 0, x: 1}));
@@ -67,8 +67,8 @@ function doTest(doTransactionWork, numDocuments) {
     // second document was deleted in the prepared transaction that was aborted. Therefore, it
     // should have been properly replication.
     coll = secondary.getDB(dbName).getCollection(collectionName);
-    assert.docEq(null, coll.findOne({_id: 0}), 'document on secondary matches primary');
-    assert.docEq({_id: 1, x: 1}, coll.findOne({_id: 1}), 'document on secondary matches primary');
+    assert.docEq(null, coll.findOne({_id: 0}), "document on secondary matches primary");
+    assert.docEq({_id: 1, x: 1}, coll.findOne({_id: 1}), "document on secondary matches primary");
 
     replSet.stopSet();
 }

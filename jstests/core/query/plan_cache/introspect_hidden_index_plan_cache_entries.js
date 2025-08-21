@@ -15,8 +15,8 @@
 
 import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
 
-const collName = 'introspect_hidden_index_plan_cache_entries';
-const collNotAffectedName = 'introspect_hidden_index_plan_cache_entries_unaffected';
+const collName = "introspect_hidden_index_plan_cache_entries";
+const collNotAffectedName = "introspect_hidden_index_plan_cache_entries_unaffected";
 db[collName].drop();
 const coll = db[collName];
 
@@ -31,18 +31,18 @@ function getPlansForCacheEntry(queryShape, collection) {
         projection: queryShape.projection,
         sort: queryShape.sort,
         collection: collection,
-        db: db
+        db: db,
     });
 
     const match = {
         $or: [
             {
-                'createdFromQuery.query': queryShape.query,
-                'createdFromQuery.sort': queryShape.sort,
-                'createdFromQuery.projection': queryShape.projection
+                "createdFromQuery.query": queryShape.query,
+                "createdFromQuery.sort": queryShape.sort,
+                "createdFromQuery.projection": queryShape.projection,
             },
-            {planCacheKey: keyHash}
-        ]
+            {planCacheKey: keyHash},
+        ],
     };
 
     return collection.aggregate([{$planCacheStats: {}}, {$match: match}]).toArray();
@@ -51,11 +51,17 @@ function getPlansForCacheEntry(queryShape, collection) {
 const queryShape = {
     query: {a: 1},
     sort: {a: -1},
-    projection: {_id: 0, a: 1}
+    projection: {_id: 0, a: 1},
 };
 
 function initCollection(collection) {
-    assert.commandWorked(collection.insert([{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}]));
+    assert.commandWorked(
+        collection.insert([
+            {a: 1, b: 1},
+            {a: 1, b: 2},
+            {a: 2, b: 2},
+        ]),
+    );
 
     // We need three indices so that the MultiPlanRunner will still be executed after we hide one of
     // the indexes.

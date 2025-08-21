@@ -9,43 +9,45 @@
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const dbName = 'testDB';
-const collName = 'testColl';
+const dbName = "testDB";
+const collName = "testColl";
 
 const whereCmdObj = {
     find: collName,
     filter: {
-        $where: function() {
+        $where: function () {
             return this.cust_id.split("").reverse().join("") == "FED";
-        }
-    }
+        },
+    },
 };
 
 const accumulatorCmdObj = {
     aggregate: collName,
     cursor: {},
-    pipeline: [{
-        $group: {
-            _id: "$cust_id",
-            idCount: {
-                $accumulator: {
-                    init: function() {
-                        return 0;
+    pipeline: [
+        {
+            $group: {
+                _id: "$cust_id",
+                idCount: {
+                    $accumulator: {
+                        init: function () {
+                            return 0;
+                        },
+                        accumulateArgs: ["$val"],
+                        accumulate: function (state, val) {
+                            return state + val;
+                        },
+                        merge: function (state1, state2) {
+                            return state1 + state2;
+                        },
+                        finalize: function (state) {
+                            return state;
+                        },
                     },
-                    accumulateArgs: ["$val"],
-                    accumulate: function(state, val) {
-                        return state + val;
-                    },
-                    merge: function(state1, state2) {
-                        return state1 + state2;
-                    },
-                    finalize: function(state) {
-                        return state;
-                    }
-                }
-            }
-        }
-    }],
+                },
+            },
+        },
+    ],
 };
 
 const functionFindCmdObj = {
@@ -53,48 +55,47 @@ const functionFindCmdObj = {
     filter: {
         $expr: {
             $function: {
-                body: function(id) {
+                body: function (id) {
                     return id.split("").reverse().join("") == "FED";
                 },
                 args: ["$cust_id"],
-                lang: "js"
-            }
-        }
-    }
+                lang: "js",
+            },
+        },
+    },
 };
 
 const functionAggCmdObj = {
     aggregate: collName,
     cursor: {},
-    pipeline: [{
-        $project: {
-            newValue: {
-                $function: {
-                    args: ["$amount", -1],
-                    body: function(first, second) {
-                        return first + second;
+    pipeline: [
+        {
+            $project: {
+                newValue: {
+                    $function: {
+                        args: ["$amount", -1],
+                        body: function (first, second) {
+                            return first + second;
+                        },
+                        lang: "js",
                     },
-                    lang: "js",
                 },
+                _id: 0,
             },
-            _id: 0,
-        }
-    }],
+        },
+    ],
 };
 
 const whereDeprecationMsg = {
-    msg:
-        "$where is deprecated. For more information, see https://www.mongodb.com/docs/manual/reference/operator/query/where/"
+    msg: "$where is deprecated. For more information, see https://www.mongodb.com/docs/manual/reference/operator/query/where/",
 };
 
 const functionDeprecationMsg = {
-    msg:
-        "$function is deprecated. For more information, see https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/"
+    msg: "$function is deprecated. For more information, see https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/",
 };
 
 const accumulatorDeprecationMsg = {
-    msg:
-        "$accumulator is deprecated. For more information, see https://www.mongodb.com/docs/manual/reference/operator/aggregation/accumulator/"
+    msg: "$accumulator is deprecated. For more information, see https://www.mongodb.com/docs/manual/reference/operator/aggregation/accumulator/",
 };
 
 const data = [
@@ -107,7 +108,7 @@ const data = [
 ];
 
 function checkLogs(db, deprecationMsg, numLogLines) {
-    const globalLogs = db.adminCommand({getLog: 'global'});
+    const globalLogs = db.adminCommand({getLog: "global"});
     const matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, deprecationMsg)];
     assert.eq(matchingLogLines.length, numLogLines, matchingLogLines);
 }
@@ -165,7 +166,7 @@ function deprecationTest(db, deprecationMsg, command, shards = null) {
     }
 }
 
-jsTest.log('Test standalone');
+jsTest.log("Test standalone");
 
 const standalone = MongoRunner.runMongod({});
 const standaloneDB = standalone.getDB(dbName);
@@ -180,21 +181,21 @@ deprecationTest(standaloneDB, functionDeprecationMsg, functionFindCmdObj);
 
 MongoRunner.stopMongod(standalone);
 
-jsTest.log('Test sharded');
+jsTest.log("Test sharded");
 
 const shards = new ShardingTest({shards: 2, mongos: 1});
 const session = shards.s.getDB(dbName).getMongo().startSession();
 const shardedDB = session.getDatabase(dbName);
 
-assert.commandWorked(shards.s0.adminCommand(
-    {enableSharding: shardedDB.getName(), primaryShard: shards.shard0.shardName}));
+assert.commandWorked(
+    shards.s0.adminCommand({enableSharding: shardedDB.getName(), primaryShard: shards.shard0.shardName}),
+);
 
 const shardedColl = shardedDB.testColl;
 
 assert.commandWorked(shardedDB.createCollection(shardedColl.getName()));
 
-assert.commandWorked(
-    shards.s0.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(shards.s0.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}));
 
 assert.commandWorked(shardedColl.insert(data));
 

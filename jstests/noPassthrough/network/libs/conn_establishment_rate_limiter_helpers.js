@@ -6,7 +6,7 @@ export const getLimiterStats = (conn, {log = false}) => {
     assert(serverStatus, "Failed to get server status");
     const result = {
         connections: serverStatus.connections,
-        ingressSessionEstablishmentQueues: serverStatus.queues.ingressSessionEstablishment
+        ingressSessionEstablishmentQueues: serverStatus.queues.ingressSessionEstablishment,
     };
     if (log) {
         jsTestLog("Limiter stats: " + tojson(result));
@@ -74,9 +74,8 @@ export const runTestReplSet = (setParams, testCase) => {
                 ...setParams,
                 featureFlagRateLimitIngressConnectionEstablishment: true,
             },
-            config:
-                "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
-        }
+            config: "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
+        },
     });
     replSet.startSet();
     replSet.initiate();
@@ -98,7 +97,7 @@ export const runTestShardedCluster = (setParams, testCase) => {
         shards: 1,
         mongos: 1,
         config: 1,
-        keyFile: 'jstests/libs/key1',
+        keyFile: "jstests/libs/key1",
         useHostname: false,
         other: {
             mongosOptions: {
@@ -106,16 +105,15 @@ export const runTestShardedCluster = (setParams, testCase) => {
                     ...setParams,
                     featureFlagRateLimitIngressConnectionEstablishment: true,
                 },
-                config:
-                    "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
-            }
-        }
+                config: "jstests/noPassthrough/network/libs/net.max_incoming_connections_rate_limiter.yaml",
+            },
+        },
     });
 
     // The connection has to be authed to run checkLog.
     const admin = st.s0.getDB("admin");
-    admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
-    assert(admin.auth('admin', 'pass'));
+    admin.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
+    assert(admin.auth("admin", "pass"));
 
     testCase(st.s0);
 

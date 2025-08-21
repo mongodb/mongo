@@ -46,8 +46,7 @@ function runCommandsWithSessionOpts(db, cmdObjs, sessionOpts) {
         cmdResponses.push(assert.commandWorked(db.runCommand(cmdObjWithTxnFields)));
     });
     if (sessionOpts.isTransaction) {
-        assert.commandWorked(
-            db.adminCommand(makeCommitTransactionCmdObj(sessionOpts.lsid, sessionOpts.txnNumber)));
+        assert.commandWorked(db.adminCommand(makeCommitTransactionCmdObj(sessionOpts.lsid, sessionOpts.txnNumber)));
     }
 
     return cmdResponses;
@@ -60,21 +59,25 @@ function runCommandsWithSessionOpts(db, cmdObjs, sessionOpts) {
 function runInsertTestRetryStatementsSeparately(db, coll, makeSessionOptionsFunc) {
     const {initialSessionOpts, retrySessionOpts} = makeSessionOptionsFunc();
 
-    jsTest.log(`Test executing two insert statements in a single command in ${
-        tojson(initialSessionOpts)} then retrying them in two separate commands in ${
-        tojson(retrySessionOpts)}`);
+    jsTest.log(
+        `Test executing two insert statements in a single command in ${tojson(
+            initialSessionOpts,
+        )} then retrying them in two separate commands in ${tojson(retrySessionOpts)}`,
+    );
 
     const [initialRes] = runCommandsWithSessionOpts(
         db,
         [{insert: kCollName, documents: [{_id: 1}, {_id: 2}], stmtIds: [stmtId1, stmtId2]}],
-        initialSessionOpts);
+        initialSessionOpts,
+    );
     const [retryRes1, retryRes2] = runCommandsWithSessionOpts(
         db,
         [
             {insert: kCollName, documents: [{_id: 1}], stmtIds: [stmtId1]},
-            {insert: kCollName, documents: [{_id: 2}], stmtIds: [stmtId2]}
+            {insert: kCollName, documents: [{_id: 2}], stmtIds: [stmtId2]},
         ],
-        retrySessionOpts);
+        retrySessionOpts,
+    );
 
     assert.eq(initialRes.n, 2);
     assert(!initialRes.hasOwnProperty("retriedStmtIds"));
@@ -91,27 +94,41 @@ function runInsertTestRetryStatementsSeparately(db, coll, makeSessionOptionsFunc
 function runUpdateTestRetryStatementsSeparately(db, coll, makeSessionOptionsFunc) {
     const {initialSessionOpts, retrySessionOpts} = makeSessionOptionsFunc();
 
-    jsTest.log(`Test executing two update statements in a single command in ${
-        tojson(initialSessionOpts)} then retrying them in two separate commands in ${
-        tojson(retrySessionOpts)}`);
+    jsTest.log(
+        `Test executing two update statements in a single command in ${tojson(
+            initialSessionOpts,
+        )} then retrying them in two separate commands in ${tojson(retrySessionOpts)}`,
+    );
 
-    assert.commandWorked(coll.insert([{_id: 1, x: 0}, {_id: 2, x: 0}]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, x: 0},
+            {_id: 2, x: 0},
+        ]),
+    );
 
     const [initialRes] = runCommandsWithSessionOpts(
         db,
-        [{
-            update: kCollName,
-            updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}, {q: {_id: 2}, u: {$inc: {x: 1}}}],
-            stmtIds: [stmtId1, stmtId2]
-        }],
-        initialSessionOpts);
+        [
+            {
+                update: kCollName,
+                updates: [
+                    {q: {_id: 1}, u: {$inc: {x: 1}}},
+                    {q: {_id: 2}, u: {$inc: {x: 1}}},
+                ],
+                stmtIds: [stmtId1, stmtId2],
+            },
+        ],
+        initialSessionOpts,
+    );
     const [retryRes1, retryRes2] = runCommandsWithSessionOpts(
         db,
         [
             {update: kCollName, updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}], stmtIds: [stmtId1]},
-            {update: kCollName, updates: [{q: {_id: 2}, u: {$inc: {x: 1}}}], stmtIds: [stmtId2]}
+            {update: kCollName, updates: [{q: {_id: 2}, u: {$inc: {x: 1}}}], stmtIds: [stmtId2]},
         ],
-        retrySessionOpts);
+        retrySessionOpts,
+    );
 
     assert.eq(initialRes.nModified, 2);
     assert(!initialRes.hasOwnProperty("retriedStmtIds"));
@@ -128,27 +145,36 @@ function runUpdateTestRetryStatementsSeparately(db, coll, makeSessionOptionsFunc
 function runDeleteTestRetryStatementsSeparately(db, coll, makeSessionOptionsFunc) {
     const {initialSessionOpts, retrySessionOpts} = makeSessionOptionsFunc();
 
-    jsTest.log(`Test executing two delete statements in a single command in ${
-        tojson(initialSessionOpts)} then retrying them in two separate commands in ${
-        tojson(retrySessionOpts)}`);
+    jsTest.log(
+        `Test executing two delete statements in a single command in ${tojson(
+            initialSessionOpts,
+        )} then retrying them in two separate commands in ${tojson(retrySessionOpts)}`,
+    );
 
     assert.commandWorked(coll.insert([{_id: 1}, {_id: 2}]));
 
-    const [initialRes] =
-        runCommandsWithSessionOpts(db,
-                                   [{
-                                       delete: kCollName,
-                                       deletes: [{q: {_id: 1}, limit: 1}, {q: {_id: 2}, limit: 1}],
-                                       stmtIds: [stmtId1, stmtId2]
-                                   }],
-                                   initialSessionOpts);
+    const [initialRes] = runCommandsWithSessionOpts(
+        db,
+        [
+            {
+                delete: kCollName,
+                deletes: [
+                    {q: {_id: 1}, limit: 1},
+                    {q: {_id: 2}, limit: 1},
+                ],
+                stmtIds: [stmtId1, stmtId2],
+            },
+        ],
+        initialSessionOpts,
+    );
     const [retryRes1, retryRes2] = runCommandsWithSessionOpts(
         db,
         [
             {delete: kCollName, deletes: [{q: {_id: 1}, limit: 1}], stmtIds: [stmtId1]},
-            {delete: kCollName, deletes: [{q: {_id: 2}, limit: 1}], stmtIds: [stmtId2]}
+            {delete: kCollName, deletes: [{q: {_id: 2}, limit: 1}], stmtIds: [stmtId2]},
         ],
-        retrySessionOpts);
+        retrySessionOpts,
+    );
 
     assert.eq(initialRes.n, 2);
     assert(!initialRes.hasOwnProperty("retriedStmtIds"));
@@ -169,16 +195,22 @@ function runDeleteTestRetryStatementsSeparately(db, coll, makeSessionOptionsFunc
 function runInsertTestRetryWithAdditionalStatement(db, coll, makeSessionOptionsFunc) {
     const {initialSessionOpts, retrySessionOpts} = makeSessionOptionsFunc();
 
-    jsTest.log(`Test executing an insert statement in a command in ${
-        tojson(initialSessionOpts)} then retrying it with un-executed insert statement in a command in ${
-        tojson(retrySessionOpts)}`);
+    jsTest.log(
+        `Test executing an insert statement in a command in ${tojson(
+            initialSessionOpts,
+        )} then retrying it with un-executed insert statement in a command in ${tojson(retrySessionOpts)}`,
+    );
 
     const [initialRes] = runCommandsWithSessionOpts(
-        db, [{insert: kCollName, documents: [{_id: 1}], stmtIds: [stmtId1]}], initialSessionOpts);
+        db,
+        [{insert: kCollName, documents: [{_id: 1}], stmtIds: [stmtId1]}],
+        initialSessionOpts,
+    );
     const [retryRes] = runCommandsWithSessionOpts(
         db,
         [{insert: kCollName, documents: [{_id: 1}, {_id: 2}], stmtIds: [stmtId1, stmtId2]}],
-        retrySessionOpts);
+        retrySessionOpts,
+    );
 
     assert.eq(initialRes.n, 1);
     assert(!initialRes.hasOwnProperty("retriedStmtIds"));
@@ -193,24 +225,38 @@ function runInsertTestRetryWithAdditionalStatement(db, coll, makeSessionOptionsF
 function runUpdateTestRetryWithAdditionalStatement(db, coll, makeSessionOptionsFunc) {
     const {initialSessionOpts, retrySessionOpts} = makeSessionOptionsFunc();
 
-    jsTest.log(`Test executing an update statement in a command in ${
-        tojson(initialSessionOpts)} then retrying it with an un-executed update statement in a command in ${
-        tojson(retrySessionOpts)}`);
+    jsTest.log(
+        `Test executing an update statement in a command in ${tojson(
+            initialSessionOpts,
+        )} then retrying it with an un-executed update statement in a command in ${tojson(retrySessionOpts)}`,
+    );
 
-    assert.commandWorked(coll.insert([{_id: 1, x: 0}, {_id: 2, x: 0}]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, x: 0},
+            {_id: 2, x: 0},
+        ]),
+    );
 
     const [initialRes] = runCommandsWithSessionOpts(
         db,
         [{update: kCollName, updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}], stmtIds: [stmtId1]}],
-        initialSessionOpts);
+        initialSessionOpts,
+    );
     const [retryRes] = runCommandsWithSessionOpts(
         db,
-        [{
-            update: kCollName,
-            updates: [{q: {_id: 1}, u: {$inc: {x: 1}}}, {q: {_id: 2}, u: {$inc: {x: 1}}}],
-            stmtIds: [stmtId1, stmtId2]
-        }],
-        retrySessionOpts);
+        [
+            {
+                update: kCollName,
+                updates: [
+                    {q: {_id: 1}, u: {$inc: {x: 1}}},
+                    {q: {_id: 2}, u: {$inc: {x: 1}}},
+                ],
+                stmtIds: [stmtId1, stmtId2],
+            },
+        ],
+        retrySessionOpts,
+    );
 
     assert.eq(initialRes.nModified, 1);
     assert(!initialRes.hasOwnProperty("retriedStmtIds"));
@@ -225,24 +271,33 @@ function runUpdateTestRetryWithAdditionalStatement(db, coll, makeSessionOptionsF
 function runDeleteTestRetryWithAdditionalStatement(db, coll, makeSessionOptionsFunc) {
     const {initialSessionOpts, retrySessionOpts} = makeSessionOptionsFunc();
 
-    jsTest.log(`Test executing a delete statement in a command in ${
-        tojson(initialSessionOpts)} then retrying it with an un-executed delete statement in a command in ${
-        tojson(retrySessionOpts)}`);
+    jsTest.log(
+        `Test executing a delete statement in a command in ${tojson(
+            initialSessionOpts,
+        )} then retrying it with an un-executed delete statement in a command in ${tojson(retrySessionOpts)}`,
+    );
 
     assert.commandWorked(coll.insert([{_id: 1}, {_id: 2}]));
 
     const [initialRes] = runCommandsWithSessionOpts(
         db,
         [{delete: kCollName, deletes: [{q: {_id: 1}, limit: 1}], stmtIds: [stmtId1]}],
-        initialSessionOpts);
-    const [retryRes] =
-        runCommandsWithSessionOpts(db,
-                                   [{
-                                       delete: kCollName,
-                                       deletes: [{q: {_id: 1}, limit: 1}, {q: {_id: 2}, limit: 1}],
-                                       stmtIds: [stmtId1, stmtId2]
-                                   }],
-                                   retrySessionOpts);
+        initialSessionOpts,
+    );
+    const [retryRes] = runCommandsWithSessionOpts(
+        db,
+        [
+            {
+                delete: kCollName,
+                deletes: [
+                    {q: {_id: 1}, limit: 1},
+                    {q: {_id: 2}, limit: 1},
+                ],
+                stmtIds: [stmtId1, stmtId2],
+            },
+        ],
+        retrySessionOpts,
+    );
 
     assert.eq(initialRes.n, 1);
     assert(!initialRes.hasOwnProperty("retriedStmtIds"));
@@ -259,15 +314,18 @@ function runDeleteTestRetryWithAdditionalStatement(db, coll, makeSessionOptionsF
 function runFindAndModifyTest(db, coll, makeSessionOptionsFunc) {
     const {initialSessionOpts, retrySessionOpts} = makeSessionOptionsFunc();
 
-    jsTest.log(`Test executing a findAndModify statement in a command in ${
-        tojson(initialSessionOpts)} then retrying it in a command in ${tojson(retrySessionOpts)}`);
+    jsTest.log(
+        `Test executing a findAndModify statement in a command in ${tojson(
+            initialSessionOpts,
+        )} then retrying it in a command in ${tojson(retrySessionOpts)}`,
+    );
 
     const cmdObj = {
         findAndModify: kCollName,
         query: {_id: 1, x: 0},
         update: {$inc: {x: 1}},
         upsert: true,
-        stmtId: stmtId1
+        stmtId: stmtId1,
     };
     const [initialRes] = runCommandsWithSessionOpts(db, [cmdObj], initialSessionOpts);
     const [retryRes] = runCommandsWithSessionOpts(db, [cmdObj], retrySessionOpts);
@@ -303,13 +361,13 @@ function runTests(conn, makeSessionOptionsFunc) {
         const initialSessionOpts = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(5),
-            isTransaction: false
+            isTransaction: false,
         };
         // Retryable writes in the parent session.
         const retrySessionOpts = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(5),
-            isTransaction: false
+            isTransaction: false,
         };
         return {initialSessionOpts, retrySessionOpts};
     };
@@ -325,13 +383,13 @@ function runTests(conn, makeSessionOptionsFunc) {
         const initialSessionOpts = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(5),
-            isTransaction: false
+            isTransaction: false,
         };
         // Internal transaction for retryable writes in a child session.
         const retrySessionOpts = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(5), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         return {initialSessionOpts, retrySessionOpts};
     };
@@ -347,13 +405,13 @@ function runTests(conn, makeSessionOptionsFunc) {
         const initialSessionOpts = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(5), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         // Retryable writes in the parent session.
         const retrySessionOpts = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(5),
-            isTransaction: false
+            isTransaction: false,
         };
         return {initialSessionOpts, retrySessionOpts};
     };
@@ -369,13 +427,13 @@ function runTests(conn, makeSessionOptionsFunc) {
         const initialSessionOpts = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(5), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         // Retryable writes in the parent session.
         const retrySessionOpts = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(5), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         return {initialSessionOpts, retrySessionOpts};
     };

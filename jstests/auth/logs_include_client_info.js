@@ -19,19 +19,26 @@ assert(admin.auth("root", "root"));
 const failConn = new Mongo(conn.host);
 failConn.getDB("admin").auth("root", "toot");
 
-assert(checkLog.checkContainsWithCountJson(conn,
-                                           kAuthenticationSucceeded,
-                                           {user: "root", db: "admin", client: kIpAndPortRegex},
-                                           1,
-                                           null,
-                                           true));
+assert(
+    checkLog.checkContainsWithCountJson(
+        conn,
+        kAuthenticationSucceeded,
+        {user: "root", db: "admin", client: kIpAndPortRegex},
+        1,
+        null,
+        true,
+    ),
+);
 
-assert(checkLog.checkContainsWithCountJson(
-    conn,
-    kAuthenticationFailed,
-    {user: "root", db: "admin", mechanism: kScramShaRegex, client: kIpAndPortRegex},
-    1,
-    null,
-    true));
+assert(
+    checkLog.checkContainsWithCountJson(
+        conn,
+        kAuthenticationFailed,
+        {user: "root", db: "admin", mechanism: kScramShaRegex, client: kIpAndPortRegex},
+        1,
+        null,
+        true,
+    ),
+);
 
 MongoRunner.stopMongod(conn);

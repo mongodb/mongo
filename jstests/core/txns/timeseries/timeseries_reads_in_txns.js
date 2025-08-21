@@ -19,8 +19,7 @@ const timeFieldName = "time";
 
 // Create the time-series collection with data outside of a txn session because createCollection
 // commands for time-series will throw ErrorCodes.OperationNotSupportedInTransaction.
-assert.commandWorked(
-    db.createCollection(tsTestColl.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(db.createCollection(tsTestColl.getName(), {timeseries: {timeField: timeFieldName}}));
 
 let doc1 = {[timeFieldName]: ISODate("2021-03-01T00:00:00.000Z"), x: 1, _id: 1};
 let doc2 = {[timeFieldName]: ISODate("2021-03-01T01:00:00.000Z"), x: 2, _id: 2};

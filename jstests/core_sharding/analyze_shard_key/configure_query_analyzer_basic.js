@@ -11,7 +11,7 @@
 
 import {
     testExistingCollection,
-    testNonExistingCollection
+    testNonExistingCollection,
 } from "jstests/sharding/analyze_shard_key/libs/configure_query_analyzer_common.js";
 
 const dbName = jsTestName();

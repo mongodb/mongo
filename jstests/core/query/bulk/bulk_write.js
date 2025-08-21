@@ -18,8 +18,9 @@ coll.drop();
 coll1.drop();
 
 // Make sure a properly formed request has successful result
-assert.commandWorked(db.adminCommand(
-    {bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: [{ns: collName}]}));
+assert.commandWorked(
+    db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: [{ns: collName}]}),
+);
 
 assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 0);
@@ -32,7 +33,7 @@ let res = db.adminCommand({
     nsInfo: [{ns: collName}],
     cursor: {batchSize: 1024},
     bypassDocumentValidation: true,
-    ordered: false
+    ordered: false,
 });
 
 assert.commandWorked(res);
@@ -48,9 +49,9 @@ res = db.adminCommand({
     ops: [
         {insert: 1, document: {skey: "MongoDB"}},
         {insert: 0, document: {skey: "MongoDB"}},
-        {insert: 1, document: {_id: 1}}
+        {insert: 1, document: {_id: 1}},
     ],
-    nsInfo: [{ns: collName}, {ns: coll1Name}]
+    nsInfo: [{ns: collName}, {ns: coll1Name}],
 });
 
 assert.commandWorked(res);
@@ -64,8 +65,11 @@ assert(coll1.drop());
 // Test 2 inserts into the same namespace
 res = db.adminCommand({
     bulkWrite: 1,
-    ops: [{insert: 0, document: {skey: "MongoDB"}}, {insert: 0, document: {skey: "MongoDB"}}],
-    nsInfo: [{ns: collName}]
+    ops: [
+        {insert: 0, document: {skey: "MongoDB"}},
+        {insert: 0, document: {skey: "MongoDB"}},
+    ],
+    nsInfo: [{ns: collName}],
 });
 
 assert.commandWorked(res);

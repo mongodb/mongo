@@ -10,7 +10,7 @@ assert.commandWorked(db[jsTestName()].insert({dummy: 1}));
 
 let windowResults = db.aggregate([
     {$documents: [{_id: 0, obj: {k1: "v1", k2: "v2"}}]},
-    {$setWindowFields: {sortBy: {_id: 1}, output: {obj: {$last: {newSubObject: 1}}}}}
+    {$setWindowFields: {sortBy: {_id: 1}, output: {obj: {$last: {newSubObject: 1}}}}},
 ]);
 
 // The 'newSubObject' should overwrite the existing 'k1' and 'k2' object.
@@ -20,7 +20,7 @@ assert.eq(windowResults.toArray(), [{_id: 0, obj: {newSubObject: 1}}]);
 // function result in the target value (1 here) instead of an object literal.
 windowResults = db.aggregate([
     {$documents: [{_id: 0, obj: {k1: "v1", k2: "v2"}}]},
-    {$setWindowFields: {sortBy: {_id: 1}, output: {'obj.subPath': {$last: 1}}}}
+    {$setWindowFields: {sortBy: {_id: 1}, output: {"obj.subPath": {$last: 1}}}},
 ]);
 
 assert.eq(windowResults.toArray(), [{_id: 0, obj: {k1: "v1", k2: "v2", subPath: 1}}]);

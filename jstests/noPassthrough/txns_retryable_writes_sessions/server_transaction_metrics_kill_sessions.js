@@ -4,10 +4,18 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function verifyMetricsChange(initialStats, newStats, valueName, expectedIncrement) {
-    assert.eq(initialStats[valueName] + expectedIncrement,
-              newStats[valueName],
-              "expected " + valueName + " to increase by " + expectedIncrement +
-                  ".\nInitial stats: " + tojson(initialStats) + "; New stats: " + tojson(newStats));
+    assert.eq(
+        initialStats[valueName] + expectedIncrement,
+        newStats[valueName],
+        "expected " +
+            valueName +
+            " to increase by " +
+            expectedIncrement +
+            ".\nInitial stats: " +
+            tojson(initialStats) +
+            "; New stats: " +
+            tojson(newStats),
+    );
 }
 
 // Set up the replica set and enable majority read concern for atClusterTime snapshot reads.
@@ -21,7 +29,7 @@ const testDB = rst.getPrimary().getDB(dbName);
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 let session = testDB.getMongo().startSession(sessionOptions);
 let sessionDb = session.getDatabase(dbName);

@@ -22,17 +22,16 @@ export function abortTransaction(sessionAwareDB, txnNumber) {
         8027900,
         // Ignore errors that can occur when shards are removed in the background
         ErrorCodes.HostUnreachable,
-        ErrorCodes.ShardNotFound
+        ErrorCodes.ShardNotFound,
     ];
     const abortCmd = {
         abortTransaction: 1,
         lsid: sessionAwareDB.getSession().getSessionId(),
         txnNumber: NumberLong(txnNumber),
-        autocommit: false
+        autocommit: false,
     };
     const res = rawDB.adminCommand(abortCmd);
-    return assert.commandWorkedOrFailedWithCode(
-        res, abortErrorCodes, () => `cmd: ${tojson(abortCmd)}`);
+    return assert.commandWorkedOrFailedWithCode(res, abortErrorCodes, () => `cmd: ${tojson(abortCmd)}`);
 }
 
 /**
@@ -63,9 +62,12 @@ export function cleanupOnLastIteration(data, func) {
                     }
                 } catch (exceptionDuringAbort) {
                     if (activeException !== null) {
-                        print('Exception occurred: in finally block while another exception ' +
-                              'is active: ' + tojson(activeException));
-                        print('Original exception stack trace: ' + activeException.stack);
+                        print(
+                            "Exception occurred: in finally block while another exception " +
+                                "is active: " +
+                                tojson(activeException),
+                        );
+                        print("Original exception stack trace: " + activeException.stack);
                     }
 
                     /* eslint-disable-next-line */

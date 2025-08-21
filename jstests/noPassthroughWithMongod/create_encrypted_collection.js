@@ -7,7 +7,7 @@
  *  no_selinux
  * ]
  */
-let dbTest = db.getSiblingDB('create_encrypted_collection_db');
+let dbTest = db.getSiblingDB("create_encrypted_collection_db");
 
 dbTest.basic.drop();
 
@@ -17,12 +17,13 @@ const sampleEncryptedFields = {
             "path": "firstName",
             "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
             "bsonType": "string",
-            "queries": {"queryType": "equality"}  // allow single object or array
+            "queries": {"queryType": "equality"}, // allow single object or array
         },
-    ]
+    ],
 };
 
 assert.commandFailedWithCode(
     db.runCommand({create: "basic", encryptedFields: sampleEncryptedFields}),
     6346402,
-    "Create with encryptedFields passed on standalone");
+    "Create with encryptedFields passed on standalone",
+);

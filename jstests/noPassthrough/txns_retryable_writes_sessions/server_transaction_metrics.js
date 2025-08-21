@@ -5,35 +5,50 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {
-    assert(serverStatusResponse.hasOwnProperty("transactions"),
-           "Expected the serverStatus response to have a 'transactions' field\n" +
-               tojson(serverStatusResponse));
-    assert(serverStatusResponse.transactions.hasOwnProperty("currentActive"),
-           "The 'transactions' field in serverStatus did not have the 'currentActive' field\n" +
-               tojson(serverStatusResponse.transactions));
-    assert(serverStatusResponse.transactions.hasOwnProperty("currentInactive"),
-           "The 'transactions' field in serverStatus did not have the 'currentInactive' field\n" +
-               tojson(serverStatusResponse.transactions));
-    assert(serverStatusResponse.transactions.hasOwnProperty("currentOpen"),
-           "The 'transactions' field in serverStatus did not have the 'currentOpen' field\n" +
-               tojson(serverStatusResponse.transactions));
-    assert(serverStatusResponse.transactions.hasOwnProperty("totalAborted"),
-           "The 'transactions' field in serverStatus did not have the 'totalAborted' field\n" +
-               tojson(serverStatusResponse.transactions));
-    assert(serverStatusResponse.transactions.hasOwnProperty("totalCommitted"),
-           "The 'transactions' field in serverStatus did not have the 'totalCommitted' field\n" +
-               tojson(serverStatusResponse.transactions));
-    assert(serverStatusResponse.transactions.hasOwnProperty("totalStarted"),
-           "The 'transactions' field in serverStatus did not have the 'totalStarted' field\n" +
-               tojson(serverStatusResponse.transactions));
+    assert(
+        serverStatusResponse.hasOwnProperty("transactions"),
+        "Expected the serverStatus response to have a 'transactions' field\n" + tojson(serverStatusResponse),
+    );
+    assert(
+        serverStatusResponse.transactions.hasOwnProperty("currentActive"),
+        "The 'transactions' field in serverStatus did not have the 'currentActive' field\n" +
+            tojson(serverStatusResponse.transactions),
+    );
+    assert(
+        serverStatusResponse.transactions.hasOwnProperty("currentInactive"),
+        "The 'transactions' field in serverStatus did not have the 'currentInactive' field\n" +
+            tojson(serverStatusResponse.transactions),
+    );
+    assert(
+        serverStatusResponse.transactions.hasOwnProperty("currentOpen"),
+        "The 'transactions' field in serverStatus did not have the 'currentOpen' field\n" +
+            tojson(serverStatusResponse.transactions),
+    );
+    assert(
+        serverStatusResponse.transactions.hasOwnProperty("totalAborted"),
+        "The 'transactions' field in serverStatus did not have the 'totalAborted' field\n" +
+            tojson(serverStatusResponse.transactions),
+    );
+    assert(
+        serverStatusResponse.transactions.hasOwnProperty("totalCommitted"),
+        "The 'transactions' field in serverStatus did not have the 'totalCommitted' field\n" +
+            tojson(serverStatusResponse.transactions),
+    );
+    assert(
+        serverStatusResponse.transactions.hasOwnProperty("totalStarted"),
+        "The 'transactions' field in serverStatus did not have the 'totalStarted' field\n" +
+            tojson(serverStatusResponse.transactions),
+    );
 }
 
 // Verifies that the given value of the server status response is incremented in the way
 // we expect.
 function verifyServerStatusChange(initialStats, newStats, valueName, expectedIncrement) {
-    assert.eq(initialStats[valueName] + expectedIncrement,
-              newStats[valueName],
-              "expected " + valueName + " to increase by " + expectedIncrement);
+    assert.eq(
+        initialStats[valueName] + expectedIncrement,
+        newStats[valueName],
+        "expected " + valueName + " to increase by " + expectedIncrement,
+    );
 }
 
 // Set up the replica set.
@@ -46,13 +61,13 @@ const primary = rst.getPrimary();
 const dbName = "test";
 const collName = "server_transactions_metrics";
 const testDB = primary.getDB(dbName);
-const adminDB = rst.getPrimary().getDB('admin');
+const adminDB = rst.getPrimary().getDB("admin");
 testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 // Start the session.
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -152,26 +167,26 @@ verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "cu
 // Hang the transaction on a failpoint in the middle of an operation to check active and
 // inactive counters while operation is running inside a transaction.
 jsTest.log("Start a transaction that will hang in the middle of an operation due to a fail point.");
-const fpHangDuringBatchUpdate = configureFailPoint(primary, 'hangDuringBatchUpdate');
+const fpHangDuringBatchUpdate = configureFailPoint(primary, "hangDuringBatchUpdate");
 
-const transactionFn = function() {
-    const collName = 'server_transactions_metrics';
+const transactionFn = function () {
+    const collName = "server_transactions_metrics";
     const session = db.getMongo().startSession({causalConsistency: false});
-    const sessionDb = session.getDatabase('test');
+    const sessionDb = session.getDatabase("test");
     const sessionColl = sessionDb[collName];
 
-    session.startTransaction({readConcern: {level: 'snapshot'}});
+    session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandWorked(sessionColl.update({}, {"update-1": 2}));
     assert.commandWorked(session.commitTransaction_forTesting());
 };
 const transactionProcess = startParallelShell(transactionFn, primary.port);
 
 // Keep running currentOp() until we see the transaction subdocument.
-assert.soon(function() {
+assert.soon(function () {
     const transactionFilter = {
         active: true,
-        'lsid': {$exists: true},
-        'transaction.parameters.txnNumber': {$eq: 0}
+        "lsid": {$exists: true},
+        "transaction.parameters.txnNumber": {$eq: 0},
     };
     return 1 === adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).itcount();
 });

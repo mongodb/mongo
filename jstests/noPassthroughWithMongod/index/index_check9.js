@@ -15,7 +15,7 @@ function doIt() {
         return sort;
     }
 
-    var fields = ['a', 'b', 'c', 'd', 'e'];
+    var fields = ["a", "b", "c", "d", "e"];
     let n = Random.randInt(5) + 1;
     var idx = sort();
 
@@ -90,8 +90,8 @@ function doIt() {
                     spec[fields[i]] = r(alphas[i]);
                     break;
                 }
-                default /* no predicate */:
-                    break;
+                default:
+                    /* no predicate */ break;
             }
         }
         s = sort();
@@ -118,7 +118,7 @@ function doIt() {
         if (Random.rand() > 0.9) {
             bulk.insert(obj());
         } else {
-            bulk.find(obj()).remove();  // improve
+            bulk.find(obj()).remove(); // improve
         }
         if (Random.rand() > 0.999) {
             print(i);

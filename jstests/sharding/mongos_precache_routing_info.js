@@ -4,16 +4,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 var s = new ShardingTest({
     shards: 2,
     other: {
-        mongosOptions:
-            {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
-    }
+        mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
+    },
 });
 var db = s.getDB("test");
 var ss = db.serverStatus();
 
 const shardCommand = {
     shardcollection: "test.foo",
-    key: {num: 1}
+    key: {num: 1},
 };
 
 // shard
@@ -41,7 +40,7 @@ s.restartMongos(0, {
     restart: true,
     setParameter: {
         loadRoutingTableOnStartup: false,
-        'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
+        "failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}",
     },
 });
 db = s.getDB("test");

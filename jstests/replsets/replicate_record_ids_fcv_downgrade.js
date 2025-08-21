@@ -18,9 +18,9 @@ replSet.initiate();
 
 const primary = replSet.getPrimary();
 
-const collName = 'replRecIdCollForDowngrade';
+const collName = "replRecIdCollForDowngrade";
 
-const testDB = primary.getDB('test');
+const testDB = primary.getDB("test");
 testDB.runCommand({create: collName, recordIdsReplicated: true});
 const coll = testDB.getCollection(collName);
 assert.commandWorked(coll.insert({_id: 1}));
@@ -31,16 +31,17 @@ const doc = coll.find().showRecordId().toArray()[0];
 assert.eq(
     primOplog.rid,
     doc["$recordId"],
-    `Mismatching recordIds. Primary's oplog entry: ${tojson(primOplog)}, on disk: ${tojson(doc)}`);
+    `Mismatching recordIds. Primary's oplog entry: ${tojson(primOplog)}, on disk: ${tojson(doc)}`,
+);
 
 const error = assert.commandFailedWithCode(
     testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-    ErrorCodes.CannotDowngrade);
-jsTestLog('Error from failed setFCV command: ' + tojson(error));
+    ErrorCodes.CannotDowngrade,
+);
+jsTestLog("Error from failed setFCV command: " + tojson(error));
 
 // Downgrade should work after dropping the collection.
 coll.drop();
-assert.commandWorked(
-    testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
 replSet.stopSet();

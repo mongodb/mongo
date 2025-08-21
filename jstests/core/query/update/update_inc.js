@@ -20,8 +20,7 @@ function go(key) {
     check(3, "C");
 
     let ik = {};
-    for (let k in key)
-        ik[k] = 1;
+    for (let k in key) ik[k] = 1;
     assert.commandWorked(t.createIndex(ik));
 
     assert.commandWorked(t.update(key, {$inc: {n: 1}}, true));
@@ -34,7 +33,7 @@ go({a: 5});
 go({a: 5, b: 7});
 go({a: null, b: 7});
 
-go({referer: 'blah'});
-go({referer: 'blah', lame: 'bar'});
-go({referer: 'blah', name: 'bar'});
-go({date: null, referer: 'blah', name: 'bar'});
+go({referer: "blah"});
+go({referer: "blah", lame: "bar"});
+go({referer: "blah", name: "bar"});
+go({date: null, referer: "blah", name: "bar"});

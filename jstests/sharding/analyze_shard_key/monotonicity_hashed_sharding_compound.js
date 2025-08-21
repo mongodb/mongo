@@ -6,9 +6,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {
     kOrderTypes,
     numNodesPerRS,
@@ -45,9 +43,9 @@ for (let orderType0 of kOrderTypes) {
             indexKey: {[fieldName0]: "hashed", [fieldName1]: 1},
             fieldOpts: [
                 {name: fieldName0, type: fieldType0, order: orderType0.name},
-                {name: fieldName1, type: fieldType1, order: orderType1.name}
+                {name: fieldName1, type: fieldType1, order: orderType1.name},
             ],
-            expected: "not monotonic"
+            expected: "not monotonic",
         });
 
         // Test compound shard key without a hashed prefix.
@@ -56,9 +54,9 @@ for (let orderType0 of kOrderTypes) {
             indexKey: {[fieldName0]: 1, [fieldName1]: "hashed"},
             fieldOpts: [
                 {name: fieldName0, type: fieldType0, order: orderType0.name},
-                {name: fieldName1, type: fieldType1, order: orderType1.name}
+                {name: fieldName1, type: fieldType1, order: orderType1.name},
             ],
-            expected: "unknown"
+            expected: "unknown",
         });
     }
 }
@@ -69,7 +67,7 @@ const testProbability = 0.2;
 // the insertion order noise caused by parallel oplog application on secondaries.
 const numDocsRange = {
     min: 7500,
-    max: 10000
+    max: 10000,
 };
 
 {
@@ -81,7 +79,8 @@ const numDocsRange = {
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: numNodesPerRS});
     rst.startSet();
     rst.initiate();

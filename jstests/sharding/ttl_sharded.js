@@ -24,10 +24,10 @@ let t = s.getDB(dbname).getCollection(coll);
 s.adminCommand({shardcollection: ns, key: {_id: 1}});
 
 // insert 24 docs, with timestamps at one hour intervals
-var now = (new Date()).getTime();
+var now = new Date().getTime();
 var bulk = t.initializeUnorderedBulkOp();
 for (var i = 0; i < 24; i++) {
-    var past = new Date(now - (3600 * 1000 * i));
+    var past = new Date(now - 3600 * 1000 * i);
     bulk.insert({_id: i, x: past});
 }
 assert.commandWorked(bulk.execute());
@@ -42,14 +42,14 @@ s.adminCommand({moveChunk: ns, find: {_id: 0}, to: s.getOther(s.getPrimaryShard(
 
 // Check that all expired documents are deleted.
 assert.soon(
-    function() {
+    function () {
         return t.count() === 6 && t.find({x: {$lt: new Date(now - 20000000)}}).count() === 0;
     },
-    function() {
-        return "TTL index did not successfully delete expired documents, all documents: " +
-            tojson(t.find().toArray());
+    function () {
+        return "TTL index did not successfully delete expired documents, all documents: " + tojson(t.find().toArray());
     },
-    70 * 1000);
+    70 * 1000,
+);
 
 // now lets check things explicily on each shard
 var shard0 = s._connections[0].getDB(dbname);
@@ -63,8 +63,7 @@ printjson(shard1.getCollection(coll).stats());
 function getTTLTime(theCollection, theKey) {
     var indexes = theCollection.getIndexes();
     for (var i = 0; i < indexes.length; i++) {
-        if (friendlyEqual(theKey, indexes[i].key))
-            return indexes[i].expireAfterSeconds;
+        if (friendlyEqual(theKey, indexes[i].key)) return indexes[i].expireAfterSeconds;
     }
     throw "not found";
 }
@@ -80,11 +79,12 @@ assert.eq(10000, getTTLTime(shard1.getCollection(coll), {x: 1}));
 
 // Check that all expired documents are deleted.
 assert.soon(
-    function() {
+    function () {
         return t.count() === 3 && t.find({x: {$lt: new Date(now - 10000000)}}).count() === 0;
     },
     "new expireAfterSeconds did not successfully delete expired documents, all documents: " +
         tojson(t.find().toArray()),
-    70 * 1000);
+    70 * 1000,
+);
 
 s.stop();

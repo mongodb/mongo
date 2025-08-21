@@ -16,7 +16,7 @@ assert.commandWorked(coll.createIndex({filterKey: 1, num: 1, foo: 1}));
 assert.commandWorked(coll.createIndex({filterKey: 1, num: 1}));
 
 const sortSpec = {
-    num: 1
+    num: 1,
 };
 
 const kExpectedNums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -25,7 +25,9 @@ const kExpectedNums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     // We do a "client side projection," to avoid printing out the massive BinData string if
     // there's an error.
     const nums = [];
-    coll.find({filterKey: 1}).sort(sortSpec).forEach(doc => nums.push(doc.num));
+    coll.find({filterKey: 1})
+        .sort(sortSpec)
+        .forEach((doc) => nums.push(doc.num));
 
     // The results should be in order.
     assert.eq(nums, kExpectedNums);
@@ -34,8 +36,7 @@ const kExpectedNums = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 // Same test, but with aggregation.
 {
     const nums = [];
-    coll.aggregate([{$match: {filterKey: 1}}, {$sort: sortSpec}])
-        .forEach(doc => nums.push(doc.num));
+    coll.aggregate([{$match: {filterKey: 1}}, {$sort: sortSpec}]).forEach((doc) => nums.push(doc.num));
 
     // The results should be in order.
     assert.eq(nums, kExpectedNums);

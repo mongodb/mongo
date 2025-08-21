@@ -24,8 +24,7 @@ const db = conn.getDB(dbName);
 const coll = db.search;
 coll.drop();
 
-if (checkSbeRestrictedOrFullyEnabled(db) &&
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchInSbe')) {
+if (checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe")) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     MongoRunner.stopMongod(conn);
     mongotmock.stop();
@@ -42,7 +41,7 @@ const collUUID = getUUIDFromListCollections(db, coll.getName());
 
 const searchQuery = {
     query: "Chekhov",
-    path: "name"
+    path: "name",
 };
 const explainContents = getDefaultLastExplainContents();
 
@@ -60,7 +59,7 @@ function runExplainTest(currentVerbosity) {
         collectionUUID: collUUID,
         query: searchQuery,
         explain: {verbosity: currentVerbosity},
-        $db: dbName
+        $db: dbName,
     };
     // Give mongotmock some stuff to return.
     setUpMongotReturnExplain({
@@ -77,15 +76,13 @@ function runExplainAndCursorTest(currentVerbosity) {
         collectionUUID: collUUID,
         query: searchQuery,
         explain: {verbosity: currentVerbosity},
-        $db: dbName
+        $db: dbName,
     };
     setUpMongotReturnExplainAndCursor({
         mongotMock: mongotmock,
         coll,
         searchCmd,
-        nextBatch: [
-            {_id: 1, $searchScore: 0.321},
-        ],
+        nextBatch: [{_id: 1, $searchScore: 0.321}],
     });
     const result = coll.explain(currentVerbosity).aggregate([{$search: searchQuery}]);
     checkExplain(result);
@@ -94,7 +91,7 @@ function runExplainAndCursorTest(currentVerbosity) {
 runExplainTest("queryPlanner");
 // TODO SERVER-85637 Remove the gated tests when the feature flag is removed, as they will fail.
 // They are tested with the feature flag enabled in search_explain_execution_stats.js.
-if (!FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchExplainExecutionStats')) {
+if (!FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchExplainExecutionStats")) {
     // TODO SERVER-91594: Testing "executionStats" and "allPlansExecution" for runExplainTest() is
     // not necessary after mongot will always return a cursor for execution stats verbosties.
     runExplainTest("executionStats");

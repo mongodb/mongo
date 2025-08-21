@@ -14,7 +14,7 @@ let initObj = {
     _id: 1,
     arrayField: [1, {subField: [2, {}]}, [1]],
     objField: {p: {q: 1}, subArr: [1]},
-    otherField: "value"
+    otherField: "value",
 };
 assert.commandWorked(coll.insert(initObj));
 
@@ -35,7 +35,7 @@ assertAddFieldsResult({"otherField": {"b": {}}}, initObj);
 initObj["otherField"] = [];
 assertAddFieldsResult({"otherField": []}, initObj);
 
-initObj["otherField"] = "value";  // Reset the input object.
+initObj["otherField"] = "value"; // Reset the input object.
 
 // Test that a new empty field is permitted.
 initObj["newField"] = {};

@@ -1,7 +1,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
-export const getBackupCursorDB = function(mongo) {
+export const getBackupCursorDB = function (mongo) {
     const dbName = FeatureFlagUtil.isEnabled(mongo, "ReplicaSetEndpoint") ? "local" : "admin";
     return mongo.getDB(dbName);
 };
@@ -10,8 +10,7 @@ export function backupData(mongo, destinationDirectory) {
     const backupCursorDB = getBackupCursorDB(mongo);
     let backupCursor = openBackupCursor(backupCursorDB);
     let metadata = getBackupCursorMetadata(backupCursor);
-    copyBackupCursorFiles(
-        backupCursor, /*namespacesToSkip=*/[], metadata.dbpath, destinationDirectory);
+    copyBackupCursorFiles(backupCursor, /*namespacesToSkip=*/ [], metadata.dbpath, destinationDirectory);
     backupCursor.close();
     return metadata;
 }
@@ -35,9 +34,9 @@ export function openBackupCursor(db, backupOptions, aggregateOptions) {
 
 export function extendBackupCursor(mongo, backupId, extendTo) {
     const backupCursorDB = getBackupCursorDB(mongo);
-    return backupCursorDB.aggregate(
-        [{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}],
-        {maxTimeMS: 180 * 1000});
+    return backupCursorDB.aggregate([{$backupCursorExtend: {backupId: backupId, timestamp: extendTo}}], {
+        maxTimeMS: 180 * 1000,
+    });
 }
 
 export function startHeartbeatThread(host, backupCursor, session, stopCounter) {
@@ -47,21 +46,22 @@ export function startHeartbeatThread(host, backupCursor, session, stopCounter) {
     const conn = new Mongo(host);
     const backupCursorDB = getBackupCursorDB(conn);
 
-    let heartbeatBackupCursor = function(host, backupCursorDbName, cursorId, lsid, stopCounter) {
+    let heartbeatBackupCursor = function (host, backupCursorDbName, cursorId, lsid, stopCounter) {
         const conn = new Mongo(host);
         const db = conn.getDB(backupCursorDbName);
         while (stopCounter.getCount() > 0) {
-            let res = assert.commandWorked(db.runCommand({
-                getMore: eval("(" + cursorId + ")"),
-                collection: "$cmd.aggregate",
-                lsid: eval("(" + lsid + ")")
-            }));
+            let res = assert.commandWorked(
+                db.runCommand({
+                    getMore: eval("(" + cursorId + ")"),
+                    collection: "$cmd.aggregate",
+                    lsid: eval("(" + lsid + ")"),
+                }),
+            );
             sleep(10 * 1000);
         }
     };
 
-    const heartbeater = new Thread(
-        heartbeatBackupCursor, host, backupCursorDB.getName(), cursorId, lsid, stopCounter);
+    const heartbeater = new Thread(heartbeatBackupCursor, host, backupCursorDB.getName(), cursorId, lsid, stopCounter);
     heartbeater.start();
     return heartbeater;
 }
@@ -79,28 +79,44 @@ export function getBackupCursorMetadata(backupCursor) {
  * with the backup cursor metadata. The caller should `join` the thread when appropriate.
  */
 export function copyBackupCursorFiles(
-    backupCursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback) {
+    backupCursor,
+    namespacesToSkip,
+    dbpath,
+    destinationDirectory,
+    async,
+    fileCopiedCallback,
+) {
     resetDbpath(destinationDirectory);
-    let separator = _isWindows() ? '\\' : '/';
+    let separator = _isWindows() ? "\\" : "/";
     // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
     mkdir(destinationDirectory + separator + "journal");
 
     let copyThread = copyBackupCursorExtendFiles(
-        backupCursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback);
+        backupCursor,
+        namespacesToSkip,
+        dbpath,
+        destinationDirectory,
+        async,
+        fileCopiedCallback,
+    );
     return copyThread;
 }
 
-export function copyBackupCursorFilesForIncremental(
-    backupCursor, namespacesToSkip, dbpath, destinationDirectory) {
+export function copyBackupCursorFilesForIncremental(backupCursor, namespacesToSkip, dbpath, destinationDirectory) {
     // Remove any existing journal files from previous incremental backups.
     resetDbpath(destinationDirectory + "/journal");
 
-    return copyBackupCursorExtendFiles(
-        backupCursor, namespacesToSkip, dbpath, destinationDirectory, /*async=*/ true);
+    return copyBackupCursorExtendFiles(backupCursor, namespacesToSkip, dbpath, destinationDirectory, /*async=*/ true);
 }
 
 export function copyBackupCursorExtendFiles(
-    cursor, namespacesToSkip, dbpath, destinationDirectory, async, fileCopiedCallback) {
+    cursor,
+    namespacesToSkip,
+    dbpath,
+    destinationDirectory,
+    async,
+    fileCopiedCallback,
+) {
     let files = _cursorToFiles(cursor, namespacesToSkip, fileCopiedCallback);
     let copyThread;
     if (async) {
@@ -155,7 +171,7 @@ export function _copyFiles(files, dbpath, destinationDirectory, copyFileHelper) 
         msg: "Directory contents on destination after $backupCursorExtend finished",
         destination: destinationDirectory,
         dbpath: listFiles(destinationDirectory),
-        journal: listFiles(destinationDirectory + "/journal")
+        journal: listFiles(destinationDirectory + "/journal"),
     });
 }
 
@@ -163,15 +179,15 @@ export function copyFileHelper(file, sourceDbPath, destinationDirectory) {
     let absoluteFilePath = file.filename;
 
     // Ensure the dbpath ends with an OS appropriate slash.
-    let separator = '/';
+    let separator = "/";
     if (_isWindows()) {
-        separator = '\\';
+        separator = "\\";
         // Convert dbpath which may contain directoryperdb/wiredTigerDirectoryForIndexes
         // subdirectory in POSIX style.
         absoluteFilePath = absoluteFilePath.replace(/[\/]/g, separator);
     }
     let lastChar = sourceDbPath[sourceDbPath.length - 1];
-    if (lastChar !== '/' && lastChar !== '\\') {
+    if (lastChar !== "/" && lastChar !== "\\") {
         sourceDbPath += separator;
     }
 
@@ -189,8 +205,7 @@ export function copyFileHelper(file, sourceDbPath, destinationDirectory) {
     if (!pathExists(destination)) {
         // If the file hasn't had an initial backup yet, then a full file copy is needed.
         copyFile(absoluteFilePath, destination);
-    } else if (file.fileSize == undefined || file.length == undefined ||
-               file.fileSize == file.length) {
+    } else if (file.fileSize == undefined || file.length == undefined || file.fileSize == file.length) {
         // - $backupCursorExtend, which only returns journal files does not report a 'fileSize'.
         // - 'length' is only reported for incremental backups.
         // - When 'fileSize' == 'length', that's used as an indicator to do a full file copy. Mostly
@@ -201,8 +216,7 @@ export function copyFileHelper(file, sourceDbPath, destinationDirectory) {
             // journal files we've already copied at an earlier time. We should remove these old
             // journal files so that we can copy them over again in the event that their contents
             // have changed over time.
-            jsTestLog(`Removing existing file ${
-                destination} in preparation of copying a newer version of it`);
+            jsTestLog(`Removing existing file ${destination} in preparation of copying a newer version of it`);
             removeFile(destination);
         }
 
@@ -211,15 +225,14 @@ export function copyFileHelper(file, sourceDbPath, destinationDirectory) {
         assert(file.offset != undefined);
         assert(file.length != undefined);
         msg = "Range copy, offset: " + file.offset + ", length: " + file.length;
-        _copyFileRange(
-            absoluteFilePath, destination, NumberLong(file.offset), NumberLong(file.length));
+        _copyFileRange(absoluteFilePath, destination, NumberLong(file.offset), NumberLong(file.length));
     }
 
     return {
         fileSource: absoluteFilePath,
         relativePath: relativePath,
         fileDestination: destination,
-        msg: msg
+        msg: msg,
     };
 }
 
@@ -241,7 +254,7 @@ export function checkBackup(backupCursor) {
             assert.neq(doc.ns, "");
             assert.neq(doc.uuid, "");
         } else {
-            let pathsep = _isWindows() ? '\\' : '/';
+            let pathsep = _isWindows() ? "\\" : "/";
             let stem = doc.filename.substr(doc.filename.lastIndexOf(pathsep) + 1);
             // Denylisting internal files that don't need to have ns/uuid set. Denylisting known
             // patterns will help catch subtle API changes if new filename patterns are added that

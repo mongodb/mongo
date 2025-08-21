@@ -14,18 +14,20 @@ t.drop();
 
 t.createIndex({x: 1}, true);
 
-t.insert({'x': 'A'});
-t.insert({'x': 'B'});
-t.insert({'x': 'A'});
+t.insert({"x": "A"});
+t.insert({"x": "B"});
+t.insert({"x": "A"});
 
 assert.eq(2, t.count(), "indexa 1");
 
-t.update({x: 'B'}, {x: 'A'});
+t.update({x: "B"}, {x: "A"});
 
 let a = t.find().toArray();
-let u = Array.unique(a.map(function(z) {
-    return z.x;
-}));
+let u = Array.unique(
+    a.map(function (z) {
+        return z.x;
+    }),
+);
 assert.eq(2, t.count(), "indexa 2");
 
 assert(a.length == u.length, "unique index update is broken");

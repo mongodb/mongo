@@ -21,7 +21,7 @@ const dbpath = MongoRunner.dataPath + baseName + "/";
  * The expectation is that the metadata salvage will be successful, and that the collection will
  * be recreated with all of its data.
  */
-let runTest = function(mongodOptions) {
+let runTest = function (mongodOptions) {
     resetDbpath(dbpath);
     jsTestLog("Running test with args: " + tojson(mongodOptions));
 
@@ -31,12 +31,11 @@ let runTest = function(mongodOptions) {
     let mongod = startMongodOnExistingPath(dbpath, mongodOptions);
 
     const buildInfo = assert.commandWorked(mongod.getDB(baseName).adminCommand({"buildInfo": 1}));
-    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
+    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes("-fsanitize");
 
     // Force a checkpoint and make a copy of the turtle file.
     assert.commandWorked(mongod.getDB(baseName).adminCommand({fsync: 1}));
-    jsTestLog("Making copy of metadata file before creating the collection: " +
-              turtleFileWithoutCollection);
+    jsTestLog("Making copy of metadata file before creating the collection: " + turtleFileWithoutCollection);
     copyFile(turtleFile, turtleFileWithoutCollection);
 
     let testColl = mongod.getDB(baseName)[collName];
@@ -81,7 +80,7 @@ let runTest = function(mongodOptions) {
     let re = /checkpoint_lsn=\(([0-9,]+)\)/g;
     let newData = data.replace(re, "checkpoint_lsn=(1,2)");
 
-    print('writing data to new turtle file: \n' + newData);
+    print("writing data to new turtle file: \n" + newData);
     removeFile(turtleFile);
     writeFile(turtleFile, newData, true /* useBinaryMode */);
 

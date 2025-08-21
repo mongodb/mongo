@@ -22,23 +22,24 @@ const testDB = primary.getDB(jsTestName());
 const cst = new ChangeStreamTest(testDB);
 
 const collName = "coll_with_pre_images";
-const coll = assertDropAndRecreateCollection(
-    testDB, collName, {changeStreamPreAndPostImages: {enabled: true}});
+const coll = assertDropAndRecreateCollection(testDB, collName, {changeStreamPreAndPostImages: {enabled: true}});
 
 const doc0 = {
     _id: 0,
-    lastModifiedDate: new Date()
+    lastModifiedDate: new Date(),
 };
 const doc1 = {
     _id: 1,
-    lastModifiedDate: new Date()
+    lastModifiedDate: new Date(),
 };
 
 coll.insert(doc0);
 coll.insert(doc1);
 
-const csCursor = cst.startWatchingChanges(
-    {collection: coll, pipeline: [{$changeStream: {"fullDocumentBeforeChange": "whenAvailable"}}]});
+const csCursor = cst.startWatchingChanges({
+    collection: coll,
+    pipeline: [{$changeStream: {"fullDocumentBeforeChange": "whenAvailable"}}],
+});
 
 coll.createIndex({lastModifiedDate: 1}, {"expireAfterSeconds": 1});
 
@@ -51,13 +52,13 @@ const expectedChanges = [
         documentKey: {_id: doc0._id},
         ns: {db: testDB.getName(), coll: coll.getName()},
         operationType: "delete",
-        fullDocumentBeforeChange: doc0
+        fullDocumentBeforeChange: doc0,
     },
     {
         documentKey: {_id: doc1._id},
         ns: {db: testDB.getName(), coll: coll.getName()},
         operationType: "delete",
-        fullDocumentBeforeChange: doc1
+        fullDocumentBeforeChange: doc1,
     },
 ];
 cst.assertNextChangesEqualUnordered({cursor: csCursor, expectedChanges});

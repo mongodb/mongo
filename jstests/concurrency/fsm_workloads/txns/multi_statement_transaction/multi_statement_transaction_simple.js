@@ -6,23 +6,25 @@
  * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 
-export const $config = (function() {
+export const $config = (function () {
     function computeTotalOfAllBalances(documents) {
         return documents.reduce((total, account) => total + account.balance, 0);
     }
 
-    var states = (function() {
+    var states = (function () {
         function getAllDocuments(session, collection, numDocs, txnHelperOptions) {
             let documents;
-            withTxnAndAutoRetry(session, () => {
-                documents = collection.find().toArray();
+            withTxnAndAutoRetry(
+                session,
+                () => {
+                    documents = collection.find().toArray();
 
-                assert.eq(numDocs, documents.length, () => tojson(documents));
-            }, txnHelperOptions);
+                    assert.eq(numDocs, documents.length, () => tojson(documents));
+                },
+                txnHelperOptions,
+            );
             return documents;
         }
 
@@ -33,11 +35,11 @@ export const $config = (function() {
         function checkMoneyBalance(db, collName) {
             const collection = this.session.getDatabase(db.getName()).getCollection(collName);
             const documents = getAllDocuments(this.session, collection, this.numAccounts, {
-                retryOnKilledSession: this.retryOnKilledSession
+                retryOnKilledSession: this.retryOnKilledSession,
             });
-            assert.eq(this.numAccounts * this.initialValue,
-                      computeTotalOfAllBalances(documents),
-                      () => tojson(documents));
+            assert.eq(this.numAccounts * this.initialValue, computeTotalOfAllBalances(documents), () =>
+                tojson(documents),
+            );
         }
 
         function transferMoney(db, collName) {
@@ -52,23 +54,27 @@ export const $config = (function() {
             const transferAmount = Random.randInt(this.initialValue / 10) + 1;
 
             const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-            withTxnAndAutoRetry(this.session, () => {
-                let res = collection.runCommand('update', {
-                    updates: [{q: {_id: transferFrom}, u: {$inc: {balance: -transferAmount}}}],
-                });
+            withTxnAndAutoRetry(
+                this.session,
+                () => {
+                    let res = collection.runCommand("update", {
+                        updates: [{q: {_id: transferFrom}, u: {$inc: {balance: -transferAmount}}}],
+                    });
 
-                assert.commandWorked(res);
-                assert.eq(res.n, 1, () => tojson(res));
-                assert.eq(res.nModified, 1, () => tojson(res));
+                    assert.commandWorked(res);
+                    assert.eq(res.n, 1, () => tojson(res));
+                    assert.eq(res.nModified, 1, () => tojson(res));
 
-                res = collection.runCommand('update', {
-                    updates: [{q: {_id: transferTo}, u: {$inc: {balance: transferAmount}}}],
-                });
+                    res = collection.runCommand("update", {
+                        updates: [{q: {_id: transferTo}, u: {$inc: {balance: transferAmount}}}],
+                    });
 
-                assert.commandWorked(res);
-                assert.eq(res.n, 1, () => tojson(res));
-                assert.eq(res.nModified, 1, () => tojson(res));
-            }, {retryOnKilledSession: this.retryOnKilledSession});
+                    assert.commandWorked(res);
+                    assert.eq(res.n, 1, () => tojson(res));
+                    assert.eq(res.nModified, 1, () => tojson(res));
+                },
+                {retryOnKilledSession: this.retryOnKilledSession},
+            );
         }
 
         return {init: init, transferMoney: transferMoney, checkMoneyBalance: checkMoneyBalance};
@@ -77,19 +83,23 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         // The default WC is majority and this workload may not be able to satisfy majority writes.
         if (cluster.isSharded()) {
-            cluster.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.adminCommand({
-                    setDefaultRWConcern: 1,
-                    defaultWriteConcern: {w: 1},
-                    writeConcern: {w: "majority"}
-                }));
+            cluster.executeOnMongosNodes(function (db) {
+                assert.commandWorked(
+                    db.adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {w: 1},
+                        writeConcern: {w: "majority"},
+                    }),
+                );
             });
         } else if (cluster.isReplication()) {
-            assert.commandWorked(db.adminCommand({
-                setDefaultRWConcern: 1,
-                defaultWriteConcern: {w: 1},
-                writeConcern: {w: "majority"}
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: 1},
+                    writeConcern: {w: "majority"},
+                }),
+            );
         }
 
         assert.commandWorked(db.runCommand({create: collName}));
@@ -99,50 +109,52 @@ export const $config = (function() {
             bulk.insert({_id: i, balance: this.initialValue});
         }
 
-        const res = bulk.execute({w: 'majority'});
+        const res = bulk.execute({w: "majority"});
         assert.commandWorked(res);
         assert.eq(this.numAccounts, res.nInserted);
     }
 
     function teardown(db, collName, cluster) {
         const documents = db[collName].find().toArray();
-        assert.eq(this.numAccounts * this.initialValue,
-                  computeTotalOfAllBalances(documents),
-                  () => tojson(documents));
+        assert.eq(this.numAccounts * this.initialValue, computeTotalOfAllBalances(documents), () => tojson(documents));
 
         // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
         // majority by setting CWWC to {w: majority}.
         if (cluster.isSharded()) {
-            cluster.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.adminCommand({
-                    setDefaultRWConcern: 1,
-                    defaultWriteConcern: {w: "majority"},
-                    writeConcern: {w: "majority"}
-                }));
+            cluster.executeOnMongosNodes(function (db) {
+                assert.commandWorked(
+                    db.adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {w: "majority"},
+                        writeConcern: {w: "majority"},
+                    }),
+                );
             });
         } else if (cluster.isReplication()) {
-            assert.commandWorked(db.adminCommand({
-                setDefaultRWConcern: 1,
-                defaultWriteConcern: {w: "majority"},
-                writeConcern: {w: "majority"}
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: "majority"},
+                    writeConcern: {w: "majority"},
+                }),
+            );
         }
     }
 
     var transitions = {
         init: {transferMoney: 1},
         transferMoney: {transferMoney: 0.9, checkMoneyBalance: 0.1},
-        checkMoneyBalance: {transferMoney: 1}
+        checkMoneyBalance: {transferMoney: 1},
     };
 
     return {
         threadCount: 10,
         iterations: 100,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         data: {numAccounts: 20, initialValue: 2000, retryOnKilledSession: false},
         setup: setup,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

@@ -11,36 +11,26 @@
  *   requires_timeseries,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: 't', metaField: 'm'}}));
-const unpackStage = getAggPlanStage(coll.explain().aggregate(), '$_internalUnpackBucket');
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+const unpackStage = getAggPlanStage(coll.explain().aggregate(), "$_internalUnpackBucket");
 assert(unpackStage.$_internalUnpackBucket);
 
 // Insert some data: two events far enough apart that their difference in ms can overflow an int.
-const docs = [
-    {t: ISODate('2000-01-01T00:00:00Z')},
-    {t: ISODate('2000-02-01T00:00:00Z')},
-];
+const docs = [{t: ISODate("2000-01-01T00:00:00Z")}, {t: ISODate("2000-02-01T00:00:00Z")}];
 assert.commandWorked(coll.insert(docs));
 
 // Make sure $_internalBoundedSort accepts it.
 const result = getTimeseriesCollForRawOps(coll)
-                   .aggregate(
-                       [
-                           {$sort: {'control.min.t': 1}},
-                           unpackStage,
-                           {$_internalBoundedSort: {sortKey: {t: 1}, bound: {base: "min"}}},
-                       ],
-                       kRawOperationSpec)
-                   .toArray();
+    .aggregate(
+        [{$sort: {"control.min.t": 1}}, unpackStage, {$_internalBoundedSort: {sortKey: {t: 1}, bound: {base: "min"}}}],
+        kRawOperationSpec,
+    )
+    .toArray();
 
 // Make sure the result is in order.
 assert.eq(result[0].t, docs[0].t);

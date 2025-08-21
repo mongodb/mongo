@@ -9,16 +9,13 @@ var st = new ShardingTest({shards: 3, mongos: 2});
 var admin = st.s0.getDB("admin");
 var coll = st.s0.getCollection("foo.bar");
 
-assert.commandWorked(
-    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {skey: 1}}));
 
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {skey: 0}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {skey: 100}}));
-assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {skey: 0}, to: st.shard1.shardName}));
-assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {skey: 100}, to: st.shard2.shardName}));
+assert.commandWorked(admin.runCommand({moveChunk: coll + "", find: {skey: 0}, to: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({moveChunk: coll + "", find: {skey: 100}, to: st.shard2.shardName}));
 
 jsTest.log("Testing multi-update...");
 
@@ -39,12 +36,14 @@ assert.neq(null, st.shard1.getCollection(coll.toString()).findOne({updated: true
 assert.neq(null, st.shard2.getCollection(coll.toString()).findOne({updated: true}));
 
 // _id update works, and goes to all shards even on the stale mongos
-var staleColl = st.s1.getCollection('foo.bar');
+var staleColl = st.s1.getCollection("foo.bar");
 assert.commandWorked(staleColl.update({_id: 0}, {$set: {updatedById: true}}, {multi: false}));
 
 // Ensure _id update goes to at least one shard
-assert(st.shard0.getCollection(coll.toString()).findOne({updatedById: true}) != null ||
-       st.shard2.getCollection(coll.toString()).findOne({updatedById: true}) != null);
+assert(
+    st.shard0.getCollection(coll.toString()).findOne({updatedById: true}) != null ||
+        st.shard2.getCollection(coll.toString()).findOne({updatedById: true}) != null,
+);
 
 jsTest.log("Testing multi-delete...");
 

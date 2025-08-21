@@ -17,40 +17,40 @@ const st = new ShardingTest({
     rs: {
         nodes: 1,
         // Use a higher frequency for periodic noops to speed up the test.
-        setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
-    }
+        setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
+    },
 });
 
 const mongosDB = st.s0.getDB(jsTestName());
 // Ensure the test db primary is st.shard0.shardName.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 const mongosColl = mongosDB[jsTestName()];
 
 const caseInsensitive = {
     locale: "en_US",
-    strength: 2
+    strength: 2,
 };
-assert.commandWorked(
-    mongosDB.runCommand({create: mongosColl.getName(), collation: caseInsensitive}));
+assert.commandWorked(mongosDB.runCommand({create: mongosColl.getName(), collation: caseInsensitive}));
 
 // Shard the test collection on 'shardKey'. The shard key must use the simple collation.
-assert.commandWorked(mongosDB.adminCommand({
-    shardCollection: mongosColl.getFullName(),
-    key: {shardKey: 1},
-    collation: {locale: "simple"}
-}));
+assert.commandWorked(
+    mongosDB.adminCommand({
+        shardCollection: mongosColl.getFullName(),
+        key: {shardKey: 1},
+        collation: {locale: "simple"},
+    }),
+);
 
 // Split the collection into 2 chunks: [MinKey, "aBC"), ["aBC", MaxKey). Note that there will be
 // documents in each chunk that will have the same shard key according to the collection's
 // default collation, but not according to the simple collation (e.g. "abc" and "ABC").
-assert.commandWorked(
-    mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: "aBC"}}));
+assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: "aBC"}}));
 
 // Move the [MinKey, 'aBC') chunk to st.shard1.shardName.
-assert.commandWorked(mongosDB.adminCommand(
-    {moveChunk: mongosColl.getFullName(), find: {shardKey: "ABC"}, to: st.rs1.getURL()}));
+assert.commandWorked(
+    mongosDB.adminCommand({moveChunk: mongosColl.getFullName(), find: {shardKey: "ABC"}, to: st.rs1.getURL()}),
+);
 
 // Make sure that "ABC" and "abc" go to different shards - we rely on that to make sure the _ids
 // are unique on each shard.
@@ -76,24 +76,33 @@ const changeStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updat
 // clusterTime sent from mongos will ensure that each corresponding oplog entry has a distinct
 // timestamp and so will appear in the change stream in the order we expect.
 let updateResult = mongosColl.updateOne(
-    {shardKey: "abc", _id: "abc_1"}, {$set: {updatedCount: 1}}, {collation: {locale: "simple"}});
+    {shardKey: "abc", _id: "abc_1"},
+    {$set: {updatedCount: 1}},
+    {collation: {locale: "simple"}},
+);
 assert.eq(1, updateResult.modifiedCount);
 updateResult = mongosColl.updateOne(
-    {shardKey: "ABC", _id: "abc_1"}, {$set: {updatedCount: 1}}, {collation: {locale: "simple"}});
+    {shardKey: "ABC", _id: "abc_1"},
+    {$set: {updatedCount: 1}},
+    {collation: {locale: "simple"}},
+);
 assert.eq(1, updateResult.modifiedCount);
 
 function numIdIndexUsages(host) {
-    return host.getCollection(mongosColl.getFullName())
+    return host
+        .getCollection(mongosColl.getFullName())
         .aggregate([{$indexStats: {}}, {$match: {name: "_id_"}}])
-        .toArray()[0]
-        .accesses.ops;
+        .toArray()[0].accesses.ops;
 }
 let idIndexUsagesPreIteration = {
     shard0: numIdIndexUsages(st.rs0.getPrimary()),
-    shard1: numIdIndexUsages(st.rs1.getPrimary())
+    shard1: numIdIndexUsages(st.rs1.getPrimary()),
 };
 
-for (let nextDocKey of [{shardKey: "abc", _id: "abc_1"}, {shardKey: "ABC", _id: "abc_1"}]) {
+for (let nextDocKey of [
+    {shardKey: "abc", _id: "abc_1"},
+    {shardKey: "ABC", _id: "abc_1"},
+]) {
     assert.soon(() => changeStream.hasNext());
     let next = changeStream.next();
     assert.eq(next.operationType, "update");
@@ -112,7 +121,7 @@ changeStream.close();
 // Strength 1 will consider "ç" equal to "c" and "C".
 const strengthOneCollation = {
     locale: "en_US",
-    strength: 1
+    strength: 1,
 };
 
 // Insert some documents that might be confused with existing documents under the change
@@ -126,20 +135,30 @@ assert.eq(mongosColl.find({shardKey: "abc"}).collation(strengthOneCollation).itc
 
 const strengthOneChangeStream = mongosColl.aggregate(
     [{$changeStream: {fullDocument: "updateLookup"}}, {$match: {"fullDocument.shardKey": "abc"}}],
-    {collation: strengthOneCollation});
+    {collation: strengthOneCollation},
+);
 
 updateResult = mongosColl.updateOne(
-    {shardKey: "ABC", _id: "abc_1"}, {$set: {updatedCount: 2}}, {collation: {locale: "simple"}});
+    {shardKey: "ABC", _id: "abc_1"},
+    {$set: {updatedCount: 2}},
+    {collation: {locale: "simple"}},
+);
 assert.eq(1, updateResult.modifiedCount);
 updateResult = mongosColl.updateOne(
-    {shardKey: "abc", _id: "abc_1"}, {$set: {updatedCount: 2}}, {collation: {locale: "simple"}});
+    {shardKey: "abc", _id: "abc_1"},
+    {$set: {updatedCount: 2}},
+    {collation: {locale: "simple"}},
+);
 assert.eq(1, updateResult.modifiedCount);
 
 idIndexUsagesPreIteration = {
     shard0: numIdIndexUsages(st.rs0.getPrimary()),
-    shard1: numIdIndexUsages(st.rs1.getPrimary())
+    shard1: numIdIndexUsages(st.rs1.getPrimary()),
 };
-for (let nextDocKey of [{shardKey: "ABC", _id: "abc_1"}, {shardKey: "abc", _id: "abc_1"}]) {
+for (let nextDocKey of [
+    {shardKey: "ABC", _id: "abc_1"},
+    {shardKey: "abc", _id: "abc_1"},
+]) {
     assert.soon(() => strengthOneChangeStream.hasNext());
     let next = strengthOneChangeStream.next();
     assert.eq(next.operationType, "update");

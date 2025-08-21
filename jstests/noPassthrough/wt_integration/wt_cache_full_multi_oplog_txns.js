@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const rst = new ReplSetTest({
     nodes: [
         {
-            slowms: 30000,  // Don't log slow operations on primary.
+            slowms: 30000, // Don't log slow operations on primary.
         },
         {
             // Disallow elections on secondary.
@@ -30,28 +30,32 @@ const nodes = rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const mydb = primary.getDB('test');
-const coll = mydb.getCollection('t');
+const mydb = primary.getDB("test");
+const coll = mydb.getCollection("t");
 
 const numDocs = 2;
 const minDocSizeMB = 10;
 
 for (let i = 0; i < numDocs; ++i) {
     assert.commandWorked(
-        coll.save({_id: i, i: 0, x: 'x'.repeat(minDocSizeMB * 1024 * 1024)},
-                  {writeConcern: {w: nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+        coll.save(
+            {_id: i, i: 0, x: "x".repeat(minDocSizeMB * 1024 * 1024)},
+            {writeConcern: {w: nodes.length, wtimeout: ReplSetTest.kDefaultTimeoutMS}},
+        ),
+    );
 }
 assert.eq(numDocs, coll.find().itcount());
 
 const numUpdates = 500;
 const secondary = rst.getSecondary();
-const batchOpsLimit =
-    assert.commandWorked(secondary.adminCommand({getParameter: 1, replBatchLimitOperations: 1}))
-        .replBatchLimitOperations;
-jsTestLog('Oplog application on secondary ' + secondary.host + ' is limited to ' + batchOpsLimit +
-          ' operations per batch.');
+const batchOpsLimit = assert.commandWorked(
+    secondary.adminCommand({getParameter: 1, replBatchLimitOperations: 1}),
+).replBatchLimitOperations;
+jsTestLog(
+    "Oplog application on secondary " + secondary.host + " is limited to " + batchOpsLimit + " operations per batch.",
+);
 
-jsTestLog('Buffering ' + numUpdates + ' updates to ' + numDocs + ' documents on secondary.');
+jsTestLog("Buffering " + numUpdates + " updates to " + numDocs + " documents on secondary.");
 const session = primary.startSession();
 const sessionDB = session.getDatabase(mydb.getName());
 const sessionColl = sessionDB.getCollection(coll.getName());
@@ -64,7 +68,7 @@ for (let i = 0; i < numDocs; ++i) {
 assert.commandWorked(session.commitTransaction_forTesting());
 session.endSession();
 
-jsTestLog('Applying updates on secondary ' + secondary.host);
+jsTestLog("Applying updates on secondary " + secondary.host);
 
 // If the secondary is unable to apply all the operations in the unprepared transaction within
 // a single batch with the constrained cache settings, the replica set will not reach a stable

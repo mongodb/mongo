@@ -53,7 +53,7 @@ const expectedHashes = [
     "6B176CB8BD92EF3FD08C81CCEF150A22BD5186BD432B0F5F9FE3ABC10B7EBA0C",
     "27963738A360C40177C24B43DD6240C8AFAF96FAF76F88BFB528BE052D540716",
     "27963738A360C40177C24B43DD6240C8AFAF96FAF76F88BFB528BE052D540716",
-    "1F9156066E7D4AE2DE2B4F1E696DB6121ADBD2818E58CC2CB3372223B8D184BA"
+    "1F9156066E7D4AE2DE2B4F1E696DB6121ADBD2818E58CC2CB3372223B8D184BA",
 ];
 
 function commandWorked(cmd) {
@@ -92,19 +92,27 @@ function testAggAndDistinct(key, query, expected, hints = []) {
         pipeline.push({$match: query});
     }
     pipeline.push({$group: {_id: `$${key}`}});
-    testCmd({aggregate: coll.getName(), pipeline, cursor: {}},
-            expected.map(e => {
-                return {_id: e};
-            }),
-            hints);
+    testCmd(
+        {aggregate: coll.getName(), pipeline, cursor: {}},
+        expected.map((e) => {
+            return {_id: e};
+        }),
+        hints,
+    );
 }
 
 {
     //
     // Test distinct() with $regex.
     //
-    assert.commandWorked(coll.insertMany(
-        [{a: "abc", b: "foo"}, {a: "abc", b: "bar"}, {a: "abd", b: "far"}, {a: "aeb", b: "car"}]));
+    assert.commandWorked(
+        coll.insertMany([
+            {a: "abc", b: "foo"},
+            {a: "abc", b: "bar"},
+            {a: "abd", b: "far"},
+            {a: "aeb", b: "car"},
+        ]),
+    );
     assert.commandWorked(coll.createIndex({a: 1}));
     testAggAndDistinct("a", {a: {"$regex": "^ab.*"}}, ["abc", "abd"], [{a: 1}, {$natural: 1}], []);
 }
@@ -118,13 +126,15 @@ assert(coll.drop());
     const docs = [];
     const aValues = [];
     const bValues = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-    bValues.push(...bValues.slice().map(b => {
-        return {subObj: "str_" + b};
-    }));
+    bValues.push(
+        ...bValues.slice().map((b) => {
+            return {subObj: "str_" + b};
+        }),
+    );
     const cValues = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     for (let i = 0; i < 100; i++) {
         docs.push({a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)});
-        docs.push({a: i, b: (i % 13), c: NumberInt(i % 10)});
+        docs.push({a: i, b: i % 13, c: NumberInt(i % 10)});
         aValues.push(i);
     }
     assert.commandWorked(coll.insertMany(docs));
@@ -172,9 +182,7 @@ assert(coll.drop());
     assert.commandWorked(coll.insert({a: {b: [1, 2, 3]}}));
     assert.commandWorked(coll.insert({a: {b: [2, 3, 4]}}));
 
-    testCmd({distinct: coll.getName(), key: "a.b", query: {"a.b": 3}},
-            [1, 2, 3, 4],
-            [{"a.b": 1}, {$natural: 1}]);
+    testCmd({distinct: coll.getName(), key: "a.b", query: {"a.b": 3}}, [1, 2, 3, 4], [{"a.b": 1}, {$natural: 1}]);
 
     // Test a distinct which can use a multikey index, where the field being distinct'ed is not
     // multikey.
@@ -184,14 +192,10 @@ assert(coll.drop());
     assert.commandWorked(coll.insert({a: 8, b: [3, 4]}));
     assert.commandWorked(coll.insert({a: 7, b: [4, 5]}));
 
-    testCmd({distinct: coll.getName(), key: "a", query: {a: {$gte: 2}}},
-            [7, 8],
-            [{a: 1, b: 1}, {$natural: -1}]);
+    testCmd({distinct: coll.getName(), key: "a", query: {a: {$gte: 2}}}, [7, 8], [{a: 1, b: 1}, {$natural: -1}]);
 
     // Test distinct over a trailing multikey field.
-    testCmd({distinct: coll.getName(), key: "b", query: {a: {$gte: 2}}},
-            [3, 4, 5],
-            [{a: 1, b: 1}, {$natural: 1}]);
+    testCmd({distinct: coll.getName(), key: "b", query: {a: {$gte: 2}}}, [3, 4, 5], [{a: 1, b: 1}, {$natural: 1}]);
 
     // Test distinct over a trailing non-multikey field, where the leading field is multikey.
     assert(coll.drop());
@@ -200,9 +204,7 @@ assert(coll.drop());
     assert.commandWorked(coll.insert({a: [3, 4], b: 8}));
     assert.commandWorked(coll.insert({a: [3, 5], b: 7}));
 
-    testCmd({distinct: coll.getName(), key: "b", query: {a: 3}},
-            [1, 7, 8],
-            [{a: 1, b: 1}, {$natural: 1}]);
+    testCmd({distinct: coll.getName(), key: "b", query: {a: 3}}, [1, 7, 8], [{a: 1, b: 1}, {$natural: 1}]);
 
     // Test distinct over a trailing non-multikey dotted path where the leading field is multikey.
     assert(coll.drop());
@@ -211,9 +213,7 @@ assert(coll.drop());
     assert.commandWorked(coll.insert({a: [3, 4], b: {c: 8}}));
     assert.commandWorked(coll.insert({a: [3, 5], b: {c: 7}}));
 
-    testCmd({distinct: coll.getName(), key: "b.c", query: {a: 3}},
-            [1, 7, 8],
-            [{a: 1, "b.c": 1}, {$natural: 1}]);
+    testCmd({distinct: coll.getName(), key: "b.c", query: {a: 3}}, [1, 7, 8], [{a: 1, "b.c": 1}, {$natural: 1}]);
 }
 
 assert(coll.drop());
@@ -223,13 +223,15 @@ assert(coll.drop());
     // Tests for multikey indexes with a dotted path.
     //
     assert.commandWorked(coll.createIndex({"a.b.c": 1}));
-    assert.commandWorked(coll.insertMany([
-        {a: {b: {c: 1}}},
-        {a: {b: {c: 2}}},
-        {a: {b: {c: 3}}},
-        {a: {b: {notRelevant: 3}}},
-        {a: {notRelevant: 3}}
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            {a: {b: {c: 1}}},
+            {a: {b: {c: 2}}},
+            {a: {b: {c: 3}}},
+            {a: {b: {notRelevant: 3}}},
+            {a: {notRelevant: 3}},
+        ]),
+    );
 
     // TODO SERVER-14832: Returning 'null' here is inconsistent with the behavior when no index is
     // present. However, on sharded passthroughs, we sometimes omit it, since whichever shard has
@@ -238,13 +240,15 @@ assert(coll.drop());
 
     testAggAndDistinct("a.b.c", {"a.b.c": {$gt: 0}}, [1, 2, 3], [{"a.b.c": 1}, {$natural: -1}]);
 
-    assert.commandWorked(coll.insertMany([
-        // Make the index multi-key.
-        {a: {b: [{c: 4}, {c: 5}]}},
-        {a: {b: [{c: 4}, {c: 6}]}},
-        // Empty array is indexed as 'undefined'.
-        {a: {b: {c: []}}}
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            // Make the index multi-key.
+            {a: {b: [{c: 4}, {c: 5}]}},
+            {a: {b: [{c: 4}, {c: 6}]}},
+            // Empty array is indexed as 'undefined'.
+            {a: {b: {c: []}}},
+        ]),
+    );
 
     // Not running same query with $group now that the field is multikey- agg & distinct differ.
 
@@ -254,9 +258,7 @@ assert(coll.drop());
     // testCmd({distinct: coll.getName(), key: "a.b.c"}, [1, 2, 3, 4, 5, 6, null, undefined],
     // [{"a.b.c": 1}]);
 
-    testCmd({distinct: coll.getName(), key: "a.b.c", query: {"a.b.c": 4}},
-            [4, 5, 6],
-            [{"a.b.c": 1}, {$natural: 1}]);
+    testCmd({distinct: coll.getName(), key: "a.b.c", query: {"a.b.c": 4}}, [4, 5, 6], [{"a.b.c": 1}, {$natural: 1}]);
 
     // Index where last component of path is multikey.
     assert.commandWorked(coll.createIndex({"a.b": 1}));
@@ -276,13 +278,11 @@ assert(coll.drop());
     //     {notRelevant: 3}
     // ], [{"a.b": 1}]);
 
-    testCmd({distinct: coll.getName(), key: "a.b", query: {"a.b": {$type: "array"}}},
-            [
-                {c: 4},
-                {c: 5},
-                {c: 6},
-            ],
-            [{"a.b": 1}, {$natural: 1}]);
+    testCmd(
+        {distinct: coll.getName(), key: "a.b", query: {"a.b": {$type: "array"}}},
+        [{c: 4}, {c: 5}, {c: 6}],
+        [{"a.b": 1}, {$natural: 1}],
+    );
     testCmd({distinct: coll.getName(), key: "a.b.0"}, [{c: 4}], []);
 
     assert.commandWorked(coll.createIndex({"a.b.0": 1}));
@@ -291,6 +291,5 @@ assert(coll.drop());
     // Will not attempt the equivalent query with aggregation, since $group by "a.b.0" will
     // only treat '0' as a field name (not array index).
     testCmd({distinct: coll.getName(), key: "a.b.0"}, [{c: 4}, "hello world"]);
-    testCmd({distinct: coll.getName(), key: "a.b.0", query: {"a.b.0": {$type: "object"}}},
-            [{c: 4}]);
+    testCmd({distinct: coll.getName(), key: "a.b.0", query: {"a.b.0": {$type: "object"}}}, [{c: 4}]);
 }

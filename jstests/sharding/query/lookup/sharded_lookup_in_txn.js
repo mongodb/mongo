@@ -4,9 +4,7 @@
  *   uses_transactions,
  * ]
  */
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -15,10 +13,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     const testName = "sharded_lookup_in_txn";
 
     const featureFlagAllowAdditionalParticipants = FeatureFlagUtil.isEnabled(
-        st.configRS.getPrimary().getDB('admin'), "AllowAdditionalParticipants");
+        st.configRS.getPrimary().getDB("admin"),
+        "AllowAdditionalParticipants",
+    );
     if (featureFlagAllowAdditionalParticipants) {
         jsTestLog(
-            "Skipping as featureFlagAllowAdditionalParticipants is enabled, so $lookup against a sharded collection will not throw");
+            "Skipping as featureFlagAllowAdditionalParticipants is enabled, so $lookup against a sharded collection will not throw",
+        );
         st.stop();
         return;
     }
@@ -47,26 +48,34 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
     }
 
     // $lookup and $graphLookup against a sharded foreign collection in a transaction should fail.
-    assertFailsInTransaction([{
-        $lookup: {
-            from: fromColl.getName(),
-            localField: "a",
-            foreignField: "b",
-            as: "res",
-        }
-    }],
-    28769);
+    assertFailsInTransaction(
+        [
+            {
+                $lookup: {
+                    from: fromColl.getName(),
+                    localField: "a",
+                    foreignField: "b",
+                    as: "res",
+                },
+            },
+        ],
+        28769,
+    );
 
-    assertFailsInTransaction([{
-        $graphLookup: {
-            from: fromColl.getName(),
-            startWith: "$a",
-            connectFromField: "b",
-            connectToField: "_id",
-            as: "res"
-        }
-    }],
-    28769);
+    assertFailsInTransaction(
+        [
+            {
+                $graphLookup: {
+                    from: fromColl.getName(),
+                    startWith: "$a",
+                    connectFromField: "b",
+                    connectToField: "_id",
+                    as: "res",
+                },
+            },
+        ],
+        28769,
+    );
 
     st.stop();
 })();

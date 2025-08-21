@@ -1,14 +1,10 @@
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
-import {
-    moveDatabaseAndUnshardedColls
-} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 export function getReplicaSetURL(db) {
     const rsConfig = assert.commandWorked(db.adminCommand({replSetGetConfig: 1})).config;
     const rsName = rsConfig._id;
-    const rsHosts = rsConfig.members.map(member => member.host);
+    const rsHosts = rsConfig.members.map((member) => member.host);
     return `${rsName}/${rsHosts.join(",")}`;
 }
 
@@ -24,17 +20,15 @@ export function extractReplicaSetNameAndHosts(primary, rsURL) {
     return {rsURL, rsName, rsHosts, primaryHost, host};
 }
 
-export function makeReplicaSetConnectionString(
-    rsName, rsHosts, defaultDbName, {authDbName, user} = {}) {
+export function makeReplicaSetConnectionString(rsName, rsHosts, defaultDbName, {authDbName, user} = {}) {
     if (authDbName && !user.securityToken) {
         // For tenant users, auth is performed through attaching the security token to each
         // command.
         assert(user.userName);
         assert(user.password);
         return `mongodb://${
-            user.userName + ":" + user.password +
-            "@"}${rsHosts.join(",")}/${defaultDbName}?authSource=${authDbName}&replicaSet=${
-            rsName}&readPreference=secondary`;
+            user.userName + ":" + user.password + "@"
+        }${rsHosts.join(",")}/${defaultDbName}?authSource=${authDbName}&replicaSet=${rsName}&readPreference=secondary`;
     }
     return `mongodb://${rsHosts.join(",")}/${defaultDbName}?replicaSet=${rsName}`;
 }
@@ -46,8 +40,8 @@ export function makeStandaloneConnectionString(nodeHost, defaultDbName, {authDbN
         assert(user.userName);
         assert(user.password);
         return `mongodb://${
-            user.userName + ":" + user.password +
-            "@"}${nodeHost}/${defaultDbName}?authSource=${authDbName}`;
+            user.userName + ":" + user.password + "@"
+        }${nodeHost}/${defaultDbName}?authSource=${authDbName}`;
     }
     return `mongodb://${nodeHost}/${defaultDbName}`;
 }
@@ -55,20 +49,18 @@ export function makeStandaloneConnectionString(nodeHost, defaultDbName, {authDbN
 export function waitForAutoBootstrap(node, keyFile) {
     assert.soon(() => node.adminCommand({hello: 1}).isWritablePrimary);
 
-    const getConfigShardDoc = function() {
+    const getConfigShardDoc = function () {
         return node.getDB("config").shards.findOne({_id: "config"});
     };
     assert.soonNoExcept(() => {
-        const configShardDoc =
-            keyFile ? authutil.asCluster(node, keyFile, getConfigShardDoc) : getConfigShardDoc();
+        const configShardDoc = keyFile ? authutil.asCluster(node, keyFile, getConfigShardDoc) : getConfigShardDoc();
         return configShardDoc != null;
     });
 
-    const getShardIdentityDoc = function() {
+    const getShardIdentityDoc = function () {
         return node.getDB("admin").system.version.findOne({_id: "shardIdentity"});
     };
-    const shardIdentityDoc =
-        keyFile ? authutil.asCluster(node, keyFile, getShardIdentityDoc) : getShardIdentityDoc();
+    const shardIdentityDoc = keyFile ? authutil.asCluster(node, keyFile, getShardIdentityDoc) : getShardIdentityDoc();
     assert.eq(shardIdentityDoc.shardName, "config", shardIdentityDoc);
 }
 
@@ -76,7 +68,7 @@ export const execCtxTypes = {
     kNoSession: 1,
     kNonRetryableWrite: 2,
     kRetryableWrite: 3,
-    kTransaction: 4
+    kTransaction: 4,
 };
 
 export function runCommands(conn, execCtxType, dbName, collName, cmdFunc) {
@@ -118,7 +110,8 @@ export function runCommands(conn, execCtxType, dbName, collName, cmdFunc) {
 
 export function getCollectionUuid(db, dbName, collName) {
     const listCollectionRes = assert.commandWorked(
-        db.getSiblingDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}));
+        db.getSiblingDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}),
+    );
     return listCollectionRes.cursor.firstBatch[0].info.uuid;
 }
 
@@ -165,24 +158,27 @@ export function makeCreateRoleCmdObj(role) {
  * after moving the data to 'otherShardName'.
  */
 export function transitionToDedicatedConfigServer(router, configRSPrimary, otherShardName) {
-    const transitionRes0 =
-        assert.commandWorked(router.adminCommand({transitionToDedicatedConfigServer: 1}));
+    const transitionRes0 = assert.commandWorked(router.adminCommand({transitionToDedicatedConfigServer: 1}));
 
     // Move data out of the config shard.
-    const setParameterRes = assert.commandWorked(configRSPrimary.adminCommand({
-        setParameter: 1,
-        // Set this to 0 to make the moveCollection commands below faster.
-        reshardingMinimumOperationDurationMillis: 0,
-    }));
+    const setParameterRes = assert.commandWorked(
+        configRSPrimary.adminCommand({
+            setParameter: 1,
+            // Set this to 0 to make the moveCollection commands below faster.
+            reshardingMinimumOperationDurationMillis: 0,
+        }),
+    );
     const originalReshardingMinimumOperationDurationMillis = setParameterRes.was;
     for (const dbName of transitionRes0.dbsToMove) {
         moveDatabaseAndUnshardedColls(router.getDB(dbName), otherShardName);
     }
-    assert.commandWorked(configRSPrimary.adminCommand({
-        setParameter: 1,
-        // Restore the original value.
-        reshardingMinimumOperationDurationMillis: originalReshardingMinimumOperationDurationMillis,
-    }));
+    assert.commandWorked(
+        configRSPrimary.adminCommand({
+            setParameter: 1,
+            // Restore the original value.
+            reshardingMinimumOperationDurationMillis: originalReshardingMinimumOperationDurationMillis,
+        }),
+    );
     // Rely on the balancer to move chunks for config.system.sessions.
     assert.commandWorked(router.adminCommand({balancerStart: 1}));
 
@@ -202,7 +198,10 @@ export function transitionToDedicatedConfigServer(router, configRSPrimary, other
                     dbDocs = router.getCollection("config.databases").find().toArray();
                 }
             }
-            return "Timed out waiting for the transition to dedicated config server " +
-                tojson({response: transitionRes1, chunkDocs, dbDocs});
-        });
+            return (
+                "Timed out waiting for the transition to dedicated config server " +
+                tojson({response: transitionRes1, chunkDocs, dbDocs})
+            );
+        },
+    );
 }

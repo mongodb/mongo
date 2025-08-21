@@ -4,7 +4,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const caseInsensitive = {
     locale: "en_US",
-    strength: 2
+    strength: 2,
 };
 
 var explain;
@@ -13,8 +13,7 @@ var writeRes;
 // Create a cluster with 3 shards.
 var st = new ShardingTest({shards: 3});
 var testDB = st.s.getDB("test");
-assert.commandWorked(
-    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}));
+assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}));
 
 // Create a collection with a case-insensitive default collation sharded on {a: 1}.
 var collCaseInsensitive = testDB.getCollection("case_insensitive");
@@ -22,26 +21,29 @@ collCaseInsensitive.drop();
 assert.commandWorked(testDB.createCollection("case_insensitive", {collation: caseInsensitive}));
 assert.commandWorked(collCaseInsensitive.createIndex({a: 1}, {collation: {locale: "simple"}}));
 assert.commandWorked(collCaseInsensitive.createIndex({geo: "2dsphere"}));
-assert.commandWorked(testDB.adminCommand({
-    shardCollection: collCaseInsensitive.getFullName(),
-    key: {a: 1},
-    collation: {locale: "simple"}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        shardCollection: collCaseInsensitive.getFullName(),
+        key: {a: 1},
+        collation: {locale: "simple"},
+    }),
+);
 
 // Split the collection.
 // st.shard0.shardName: { "a" : { "$minKey" : 1 } } -->> { "a" : 10 }
 // st.shard1.shardName: { "a" : 10 } -->> { "a" : "a"}
 // shard0002: { "a" : "a" } -->> { "a" : { "$maxKey" : 1 }}
+assert.commandWorked(testDB.adminCommand({split: collCaseInsensitive.getFullName(), middle: {a: 10}}));
+assert.commandWorked(testDB.adminCommand({split: collCaseInsensitive.getFullName(), middle: {a: "a"}}));
 assert.commandWorked(
-    testDB.adminCommand({split: collCaseInsensitive.getFullName(), middle: {a: 10}}));
+    testDB.adminCommand({moveChunk: collCaseInsensitive.getFullName(), find: {a: 1}, to: st.shard0.shardName}),
+);
 assert.commandWorked(
-    testDB.adminCommand({split: collCaseInsensitive.getFullName(), middle: {a: "a"}}));
-assert.commandWorked(testDB.adminCommand(
-    {moveChunk: collCaseInsensitive.getFullName(), find: {a: 1}, to: st.shard0.shardName}));
-assert.commandWorked(testDB.adminCommand(
-    {moveChunk: collCaseInsensitive.getFullName(), find: {a: "FOO"}, to: st.shard1.shardName}));
-assert.commandWorked(testDB.adminCommand(
-    {moveChunk: collCaseInsensitive.getFullName(), find: {a: "foo"}, to: st.shard2.shardName}));
+    testDB.adminCommand({moveChunk: collCaseInsensitive.getFullName(), find: {a: "FOO"}, to: st.shard1.shardName}),
+);
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: collCaseInsensitive.getFullName(), find: {a: "foo"}, to: st.shard2.shardName}),
+);
 
 // Put data on each shard.
 // Note that the balancer is off by default, so the chunks will stay put.
@@ -68,11 +70,8 @@ assert.commandWorked(explain);
 assert.eq(3, Object.keys(explain.shards).length);
 
 // Test an aggregate command with a simple collation. This should be single-shard.
-assert.eq(1,
-          collCaseInsensitive.aggregate([{$match: {a: "foo"}}], {collation: {locale: "simple"}})
-              .itcount());
-explain = collCaseInsensitive.explain().aggregate([{$match: {a: "foo"}}],
-                                                  {collation: {locale: "simple"}});
+assert.eq(1, collCaseInsensitive.aggregate([{$match: {a: "foo"}}], {collation: {locale: "simple"}}).itcount());
+explain = collCaseInsensitive.explain().aggregate([{$match: {a: "foo"}}], {collation: {locale: "simple"}});
 assert.commandWorked(explain);
 assert.eq(1, Object.keys(explain.shards).length);
 
@@ -86,43 +85,44 @@ assert.eq(1, Object.keys(explain.shards).length);
 // Aggregate with $geoNear.
 const geoJSONPoint = {
     type: "Point",
-    coordinates: [0, 0]
+    coordinates: [0, 0],
 };
 
 // Test $geoNear with a query on strings with a non-simple collation inherited from the
 // collection default. This should scatter-gather.
-const geoNearStageStringQuery = [{
-    $geoNear: {
-        near: geoJSONPoint,
-        distanceField: "dist",
-        spherical: true,
-        query: {a: "foo"},
-    }
-}];
+const geoNearStageStringQuery = [
+    {
+        $geoNear: {
+            near: geoJSONPoint,
+            distanceField: "dist",
+            spherical: true,
+            query: {a: "foo"},
+        },
+    },
+];
 assert.eq(2, collCaseInsensitive.aggregate(geoNearStageStringQuery).itcount());
 explain = collCaseInsensitive.explain().aggregate(geoNearStageStringQuery);
 assert.commandWorked(explain);
 assert.eq(3, Object.keys(explain.shards).length);
 
 // Test $geoNear with a query on strings with a simple collation. This should be single-shard.
-assert.eq(1,
-          collCaseInsensitive.aggregate(geoNearStageStringQuery, {collation: {locale: "simple"}})
-              .itcount());
-explain = collCaseInsensitive.explain().aggregate(geoNearStageStringQuery,
-                                                  {collation: {locale: "simple"}});
+assert.eq(1, collCaseInsensitive.aggregate(geoNearStageStringQuery, {collation: {locale: "simple"}}).itcount());
+explain = collCaseInsensitive.explain().aggregate(geoNearStageStringQuery, {collation: {locale: "simple"}});
 assert.commandWorked(explain);
 assert.eq(1, Object.keys(explain.shards).length);
 
 // Test a $geoNear with a query on numbers with a non-simple collation inherited from the
 // collection default. This should be single-shard.
-const geoNearStageNumericalQuery = [{
-    $geoNear: {
-        near: geoJSONPoint,
-        distanceField: "dist",
-        spherical: true,
-        query: {a: 100},
-    }
-}];
+const geoNearStageNumericalQuery = [
+    {
+        $geoNear: {
+            near: geoJSONPoint,
+            distanceField: "dist",
+            spherical: true,
+            query: {a: 100},
+        },
+    },
+];
 assert.eq(1, collCaseInsensitive.aggregate(geoNearStageNumericalQuery).itcount());
 explain = collCaseInsensitive.explain().aggregate(geoNearStageNumericalQuery);
 assert.commandWorked(explain);
@@ -163,10 +163,8 @@ assert.eq(3, explain.queryPlanner.winningPlan.shards.length);
 assert.eq(1, collCaseInsensitive.distinct("a", {a: "foo"}).length);
 
 // Test a distinct command with a simple collation. This should be single-shard.
-assert.eq(1,
-          collCaseInsensitive.distinct("_id", {a: "foo"}, {collation: {locale: "simple"}}).length);
-explain =
-    collCaseInsensitive.explain().distinct("_id", {a: "foo"}, {collation: {locale: "simple"}});
+assert.eq(1, collCaseInsensitive.distinct("_id", {a: "foo"}, {collation: {locale: "simple"}}).length);
+explain = collCaseInsensitive.explain().distinct("_id", {a: "foo"}, {collation: {locale: "simple"}});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
@@ -213,11 +211,11 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 // single-shard.
 assert.eq(
     "foo",
-    collCaseInsensitive
-        .findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: {locale: "simple"}})
-        .a);
-explain = collCaseInsensitive.explain().findAndModify(
-    {query: {a: "foo"}, update: {$set: {b: 1}}, collation: {locale: "simple"}});
+    collCaseInsensitive.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: {locale: "simple"}}).a,
+);
+explain = collCaseInsensitive
+    .explain()
+    .findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}, collation: {locale: "simple"}});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
@@ -232,57 +230,69 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Test that the filter on mapReduce respects the non-simple collation inherited from the
 // collection default.
-assert.eq(2,
-          assert
-              .commandWorked(collCaseInsensitive.mapReduce(
-                  function() {
-                      emit(this._id, 1);
-                  },
-                  function(key, values) {
-                      return Array.sum(values);
-                  },
-                  {out: {inline: 1}, query: {a: "foo"}}))
-              .results.length);
+assert.eq(
+    2,
+    assert.commandWorked(
+        collCaseInsensitive.mapReduce(
+            function () {
+                emit(this._id, 1);
+            },
+            function (key, values) {
+                return Array.sum(values);
+            },
+            {out: {inline: 1}, query: {a: "foo"}},
+        ),
+    ).results.length,
+);
 
 // Test that mapReduce respects the non-simple default collation for the emitted keys. In this
 // case, the emitted keys "foo" and "FOO" should be considered equal.
-assert.eq(1,
-          assert
-              .commandWorked(collCaseInsensitive.mapReduce(
-                  function() {
-                      emit(this.a, 1);
-                  },
-                  function(key, values) {
-                      return Array.sum(values);
-                  },
-                  {out: {inline: 1}, query: {a: "foo"}}))
-              .results.length);
+assert.eq(
+    1,
+    assert.commandWorked(
+        collCaseInsensitive.mapReduce(
+            function () {
+                emit(this.a, 1);
+            },
+            function (key, values) {
+                return Array.sum(values);
+            },
+            {out: {inline: 1}, query: {a: "foo"}},
+        ),
+    ).results.length,
+);
 
 // Test that the filter on mapReduce respects the simple collation if specified.
-assert.eq(1,
-          assert
-              .commandWorked(collCaseInsensitive.mapReduce(
-                  function() {
-                      emit(this.a, 1);
-                  },
-                  function(key, values) {
-                      return Array.sum(values);
-                  },
-                  {out: {inline: 1}, query: {a: "foo"}, collation: {locale: "simple"}}))
-              .results.length);
+assert.eq(
+    1,
+    assert.commandWorked(
+        collCaseInsensitive.mapReduce(
+            function () {
+                emit(this.a, 1);
+            },
+            function (key, values) {
+                return Array.sum(values);
+            },
+            {out: {inline: 1}, query: {a: "foo"}, collation: {locale: "simple"}},
+        ),
+    ).results.length,
+);
 
 // Test that mapReduce respects the user-specified simple collation for the emitted keys.
-assert.eq(2,
-          assert
-              .commandWorked(collCaseInsensitive.mapReduce(
-                  function() {
-                      emit(this.a, 1);
-                  },
-                  function(key, values) {
-                      return Array.sum(values);
-                  },
-                  {out: {inline: 1}, query: {a: {$type: "string"}}, collation: {locale: "simple"}}))
-              .results.length);
+assert.eq(
+    2,
+    assert.commandWorked(
+        collCaseInsensitive.mapReduce(
+            function () {
+                emit(this.a, 1);
+            },
+            function (key, values) {
+                return Array.sum(values);
+            },
+            {out: {inline: 1}, query: {a: {$type: "string"}}, collation: {locale: "simple"}},
+        ),
+    ).results.length,
+);
 
 // Remove.
 
@@ -344,8 +354,7 @@ assert.commandWorked(collCaseInsensitive.insert(a_100));
 // Sharded deleteOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
 assert.commandWorked(collCaseInsensitive.insert({_id: "foo_scoped", a: "bar"}));
-writeRes =
-    collCaseInsensitive.remove({_id: "foo_scoped"}, {justOne: true, collation: {locale: "simple"}});
+writeRes = collCaseInsensitive.remove({_id: "foo_scoped"}, {justOne: true, collation: {locale: "simple"}});
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nRemoved);
 
@@ -365,8 +374,7 @@ assert.eq(1, writeRes.nRemoved);
 
 // Single remove on number _id with non-collection-default collation should succeed, because it
 // is an exact-ID query.
-writeRes =
-    collCaseInsensitive.remove({_id: a_100._id}, {justOne: true, collation: {locale: "simple"}});
+writeRes = collCaseInsensitive.remove({_id: a_100._id}, {justOne: true, collation: {locale: "simple"}});
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nRemoved);
 assert.commandWorked(collCaseInsensitive.insert(a_100));
@@ -383,12 +391,12 @@ assert.commandWorked(explain);
 assert.eq(3, explain.queryPlanner.winningPlan.shards.length);
 
 // Test an update command on strings with simple collation. This should be single-shard.
-writeRes = collCaseInsensitive.update(
-    {a: "foo"}, {$set: {b: 1}}, {multi: true, collation: {locale: "simple"}});
+writeRes = collCaseInsensitive.update({a: "foo"}, {$set: {b: 1}}, {multi: true, collation: {locale: "simple"}});
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
-explain = collCaseInsensitive.explain().update(
-    {a: "foo"}, {$set: {b: 1}}, {multi: true, collation: {locale: "simple"}});
+explain = collCaseInsensitive
+    .explain()
+    .update({a: "foo"}, {$set: {b: 1}}, {multi: true, collation: {locale: "simple"}});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
@@ -414,8 +422,7 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 writeRes = collCaseInsensitive.update({a: "foo"}, {$set: {b: 1}}, {collation: {locale: "simple"}});
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
-explain = collCaseInsensitive.explain().update(
-    {a: "foo"}, {$set: {b: 1}}, {collation: {locale: "simple"}});
+explain = collCaseInsensitive.explain().update({a: "foo"}, {$set: {b: 1}}, {collation: {locale: "simple"}});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
@@ -430,8 +437,7 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // Sharded updateOne that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
-assert.commandWorked(
-    collCaseInsensitive.update({_id: "foo"}, {$set: {b: 1}}, {collation: {locale: "simple"}}));
+assert.commandWorked(collCaseInsensitive.update({_id: "foo"}, {$set: {b: 1}}, {collation: {locale: "simple"}}));
 
 // Single update on string _id with collection-default collation should succeed, because it is
 // an exact-ID query.
@@ -451,8 +457,7 @@ assert.commandWorked(collCaseInsensitive.remove({_id: "foo"}, {justOne: true}));
 
 // Single update on number _id with non-collection-default collation inherited from collection
 // default should succeed, because it is an exact-ID query.
-writeRes =
-    collCaseInsensitive.update({_id: a_foo._id}, {$set: {b: 1}}, {collation: {locale: "simple"}});
+writeRes = collCaseInsensitive.update({_id: a_foo._id}, {$set: {b: 1}}, {collation: {locale: "simple"}});
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
 
@@ -464,11 +469,15 @@ assert.eq(1, writeRes.nUpserted);
 
 // Upsert on strings with simple collation should succeed, because it is single-shard.
 writeRes = collCaseInsensitive.update(
-    {a: "foo"}, {$set: {b: 1}}, {multi: true, upsert: true, collation: {locale: "simple"}});
+    {a: "foo"},
+    {$set: {b: 1}},
+    {multi: true, upsert: true, collation: {locale: "simple"}},
+);
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
-explain = collCaseInsensitive.explain().update(
-    {a: "foo"}, {$set: {b: 1}}, {multi: true, upsert: true, collation: {locale: "simple"}});
+explain = collCaseInsensitive
+    .explain()
+    .update({a: "foo"}, {$set: {b: 1}}, {multi: true, upsert: true, collation: {locale: "simple"}});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
@@ -477,8 +486,7 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 writeRes = collCaseInsensitive.update({a: 100}, {$set: {b: 1}}, {multi: true, upsert: true});
 assert.commandWorked(writeRes);
 assert.eq(1, writeRes.nMatched);
-explain =
-    collCaseInsensitive.explain().update({a: 100}, {$set: {b: 1}}, {multi: true, upsert: true});
+explain = collCaseInsensitive.explain().update({a: 100}, {$set: {b: 1}}, {multi: true, upsert: true});
 assert.commandWorked(explain);
 assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 

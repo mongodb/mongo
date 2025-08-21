@@ -33,7 +33,7 @@ var operations = {
     "remove multi": 15,
     "remove one": 15,
     "upsert one": 15,
-    "upsert multi": 5
+    "upsert multi": 5,
 };
 
 Random.setRandomSeed();
@@ -61,61 +61,66 @@ while (shouldLoopForever || numLoops > 0) {
 
     var info = db.hostInfo();
     var serverStatus = db.serverStatus();
-    print("(" + collectionName + ") dbHostInfo status:",
-          info.ok,
-          serverStatus.version,
-          "uptime:",
-          serverStatus.uptime);
+    print("(" + collectionName + ") dbHostInfo status:", info.ok, serverStatus.version, "uptime:", serverStatus.uptime);
     var match = Random.randInt(baseNum);
-    var matchQuery = {$gte: match, $lt: match + (baseNum * 0.01)};
+    var matchQuery = {$gte: match, $lt: match + baseNum * 0.01};
 
     var operation = weightedChoice(operations);
 
     if (operation == "upsert multi") {
         var updateOpts = {upsert: true, multi: true};
-        print("(" + collectionName + ") Upsert multi docs",
-              tojsononeline(matchQuery),
-              tojsononeline(updateOpts),
-              tojsononeline(coll.update(
-                  {x: matchQuery}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts)));
+        print(
+            "(" + collectionName + ") Upsert multi docs",
+            tojsononeline(matchQuery),
+            tojsononeline(updateOpts),
+            tojsononeline(coll.update({x: matchQuery}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts)),
+        );
     } else if (operation == "upsert one") {
         var updateOpts = {upsert: true, multi: false};
-        print("(" + collectionName + ") Upsert single doc",
-              match,
-              tojsononeline(updateOpts),
-              tojsononeline(
-                  coll.update({x: match}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts)));
+        print(
+            "(" + collectionName + ") Upsert single doc",
+            match,
+            tojsononeline(updateOpts),
+            tojsononeline(coll.update({x: match}, {$inc: {x: baseNum}, $set: {n: "hello"}}, updateOpts)),
+        );
     } else if (operation == "bulk insert") {
         var bulk = coll.initializeUnorderedBulkOp();
         for (var i = 0; i < bulkNum; i++) {
             bulk.insert({x: (match + i) % baseNum, doc: randString()});
         }
-        print(
-            "(" + collectionName + ") Bulk insert", bulkNum, "docs", tojsononeline(bulk.execute()));
+        print("(" + collectionName + ") Bulk insert", bulkNum, "docs", tojsononeline(bulk.execute()));
     } else if (operation == "count") {
         var countOpts = {count: collectionName, query: {x: matchQuery}};
-        print("(" + collectionName + ") Count docs",
-              tojsononeline(matchQuery),
-              tojsononeline(db.runCommand(countOpts)));
+        print(
+            "(" + collectionName + ") Count docs",
+            tojsononeline(matchQuery),
+            tojsononeline(db.runCommand(countOpts)),
+        );
     } else if (operation == "find") {
         var findOpts = {find: collectionName, singleBatch: true, filter: {x: matchQuery}};
-        print("(" + collectionName + ") Find docs",
-              tojsononeline(matchQuery),
-              "find status",
-              db.runCommand(findOpts).ok);
+        print(
+            "(" + collectionName + ") Find docs",
+            tojsononeline(matchQuery),
+            "find status",
+            db.runCommand(findOpts).ok,
+        );
     } else if (operation == "remove multi") {
         var removeOpts = {};
         var removeQuery = {x: matchQuery, justOne: false};
-        print("(" + collectionName + ") Remove docs",
-              tojsononeline(removeQuery),
-              tojsononeline(removeOpts),
-              tojsononeline(coll.remove(removeQuery, removeOpts)));
+        print(
+            "(" + collectionName + ") Remove docs",
+            tojsononeline(removeQuery),
+            tojsononeline(removeOpts),
+            tojsononeline(coll.remove(removeQuery, removeOpts)),
+        );
     } else if (operation == "remove one") {
         var removeOpts = {};
         var removeQuery = {x: match, justOne: true};
-        print("(" + collectionName + ") Remove docs",
-              tojsononeline(removeQuery),
-              tojsononeline(removeOpts),
-              tojsononeline(coll.remove(removeQuery, removeOpts)));
+        print(
+            "(" + collectionName + ") Remove docs",
+            tojsononeline(removeQuery),
+            tojsononeline(removeOpts),
+            tojsononeline(coll.remove(removeQuery, removeOpts)),
+        );
     }
 }

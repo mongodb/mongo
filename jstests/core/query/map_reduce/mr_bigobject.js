@@ -18,16 +18,15 @@ outputColl.drop();
 const largeString = "a".repeat(6 * 1024 * 1024);
 
 const bulk = coll.initializeUnorderedBulkOp();
-for (let i = 0; i < 5; i++)
-    bulk.insert({_id: i, s: largeString});
+for (let i = 0; i < 5; i++) bulk.insert({_id: i, s: largeString});
 assert.commandWorked(bulk.execute());
 
 // MapReduce succeeds when the reduce function processes single-key data sets larger than 16MB.
-const mapFn = function() {
+const mapFn = function () {
     emit(1, this.s);
 };
 
-let reduceFn = function(k, v) {
+let reduceFn = function (k, v) {
     return 1;
 };
 
@@ -35,14 +34,12 @@ assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {"merge": outputColl.
 assert.eq([{_id: 1, value: 1}], outputColl.find().toArray());
 
 // The reduce function processes the expected amount of data.
-reduceFn = function(k, v) {
+reduceFn = function (k, v) {
     let total = 0;
     for (let i = 0; i < v.length; i++) {
         const x = v[i];
-        if (typeof (x) == "number")
-            total += x;
-        else
-            total += x.length;
+        if (typeof x == "number") total += x;
+        else total += x.length;
     }
     return total;
 };

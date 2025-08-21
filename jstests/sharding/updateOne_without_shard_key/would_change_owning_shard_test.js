@@ -12,9 +12,7 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
+import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // Make sure we're testing with no implicit session.
 TestData.disableImplicitSessions = true;
@@ -32,7 +30,12 @@ const docsToInsert = [{_id: 0, x: shardKey1, y: 1}];
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 0.
 WriteWithoutShardKeyTestUtil.setupShardedCollection(
-    st, nss, {x: 1}, [{x: splitPoint}], [{query: {x: splitPoint}, shard: st.shard1.shardName}]);
+    st,
+    nss,
+    {x: 1},
+    [{x: splitPoint}],
+    [{query: {x: splitPoint}, shard: st.shard1.shardName}],
+);
 
 let testCases = [
     {
@@ -71,18 +74,24 @@ const configurations = [
     WriteWithoutShardKeyTestUtil.Configurations.noSession,
     WriteWithoutShardKeyTestUtil.Configurations.sessionNotRetryableWrite,
     WriteWithoutShardKeyTestUtil.Configurations.sessionRetryableWrite,
-    WriteWithoutShardKeyTestUtil.Configurations.transaction
+    WriteWithoutShardKeyTestUtil.Configurations.transaction,
 ];
 
 const isTxnApiEnabled = FeatureFlagUtil.isEnabled(
-    st.s, "UpdateDocumentShardKeyUsingTransactionApi", undefined /* user */, true /* ignoreFCV */);
+    st.s,
+    "UpdateDocumentShardKeyUsingTransactionApi",
+    undefined /* user */,
+    true /* ignoreFCV */,
+);
 
-configurations.forEach(config => {
+configurations.forEach((config) => {
     let conn = WriteWithoutShardKeyTestUtil.getClusterConnection(st, config);
-    testCases.forEach(testCase => {
-        if (!isTxnApiEnabled &&
+    testCases.forEach((testCase) => {
+        if (
+            !isTxnApiEnabled &&
             (config === WriteWithoutShardKeyTestUtil.Configurations.noSession ||
-             config === WriteWithoutShardKeyTestUtil.Configurations.sessionNotRetryableWrite)) {
+                config === WriteWithoutShardKeyTestUtil.Configurations.sessionNotRetryableWrite)
+        ) {
             return;
         }
 

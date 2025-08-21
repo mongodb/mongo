@@ -12,8 +12,8 @@ const st = new ShardingTest({
     rs: {
         nodes: 1,
         // Use a higher frequency for periodic noops to speed up the test.
-        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}
-    }
+        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
+    },
 });
 
 const mongosDB = st.s0.getDB("test");
@@ -59,7 +59,7 @@ expected = [
         fullDocument: {_id: 1, x: 1},
         ns: {db: mongosDB.getName(), coll: mongosCollShardedOnX.getName()},
         operationType: "insert",
-    }
+    },
 ];
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
@@ -81,7 +81,7 @@ expected = [
         fullDocument: {_id: 1},
         ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
         operationType: "insert",
-    }
+    },
 ];
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
@@ -90,11 +90,13 @@ mongosDB.createCollection(jsTestName() + "_sharded_compound");
 const mongosCollShardedCompound = mongosDB[jsTestName() + "_sharded_compound"];
 
 // Shard, split, and move one chunk to shard1.
-st.shardColl(mongosCollShardedCompound.getName(),
-             {y: 1, x: 1},
-             {y: 1, x: MinKey},
-             {y: 1, x: MinKey},
-             mongosDB.getName());
+st.shardColl(
+    mongosCollShardedCompound.getName(),
+    {y: 1, x: 1},
+    {y: 1, x: MinKey},
+    {y: 1, x: MinKey},
+    mongosDB.getName(),
+);
 
 // Write a document to each chunk.
 assert.commandWorked(mongosCollShardedCompound.insert({_id: 0, y: -1, x: 0}));
@@ -113,7 +115,7 @@ expected = [
         fullDocument: {_id: 1, y: 1, x: 0},
         ns: {db: mongosDB.getName(), coll: mongosCollShardedCompound.getName()},
         operationType: "insert",
-    }
+    },
 ];
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
@@ -161,9 +163,9 @@ assertDropCollection(mongosDB, mongosCollShardedOnX.getName());
 cursor = cst.startWatchingChanges({
     pipeline: [
         {$changeStream: {resumeAfter: resumeTokenBeforeDrop}},
-        {$match: {"ns.coll": mongosCollShardedOnX.getName()}}
+        {$match: {"ns.coll": mongosCollShardedOnX.getName()}},
     ],
-    collection: 1
+    collection: 1,
 });
 cst.assertNextChangesEqual({
     cursor: cursor,
@@ -174,7 +176,7 @@ cst.assertNextChangesEqual({
             ns: {db: mongosDB.getName(), coll: mongosCollShardedOnX.getName()},
             operationType: "insert",
         },
-    ]
+    ],
 });
 
 cst.cleanUp();

@@ -35,9 +35,9 @@ let pipeline = [
             connectFromField: "to",
             connectToField: "_id",
             as: "output",
-        }
+        },
     },
-    {$unwind: "$output"}
+    {$unwind: "$output"},
 ];
 
 runMemoryStatsTest({
@@ -48,8 +48,8 @@ runMemoryStatsTest({
         pipeline,
         comment: "memory stats graphLookup test",
         allowDiskUse: false,
-        cursor: {batchSize: 1}
+        cursor: {batchSize: 1},
     },
     stageName: "$graphLookup",
-    expectedNumGetMores: 8
+    expectedNumGetMores: 8,
 });

@@ -10,27 +10,30 @@ import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 assertDropAndRecreateCollection(db, "t1");
 
-const kLargeStr = '*'.repeat(512);
+const kLargeStr = "*".repeat(512);
 
-assert.commandWorked(db.t1.insert({
-    _id: 100,
-    "a": 1,
-    "b": 2,
-    "obj": {"a": 1, "b": 2, "str": kLargeStr},
-}));
+assert.commandWorked(
+    db.t1.insert({
+        _id: 100,
+        "a": 1,
+        "b": 2,
+        "obj": {"a": 1, "b": 2, "str": kLargeStr},
+    }),
+);
 
 const cst = new ChangeStreamTest(db);
-const changeStreamCursor =
-    cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
+const changeStreamCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
 
 function testPipelineStyleUpdate(pipeline, expectedChange, operationType) {
     assert.commandWorked(db.t1.update({_id: 100}, pipeline));
-    const expected = Object.assign({
-        documentKey: {_id: 100},
-        ns: {db: "test", coll: "t1"},
-        operationType: operationType,
-    },
-                                   expectedChange);
+    const expected = Object.assign(
+        {
+            documentKey: {_id: 100},
+            ns: {db: "test", coll: "t1"},
+            operationType: operationType,
+        },
+        expectedChange,
+    );
     cst.assertNextChangesEqual({cursor: changeStreamCursor, expectedChanges: [expected]});
 }
 
@@ -57,8 +60,7 @@ expected = {
 testPipelineStyleUpdate(updatePipeline, expected, "update");
 
 jsTestLog("Testing pipeline-based update with $replaceRoot.");
-updatePipeline =
-    [{$replaceRoot: {newRoot: {_id: 100, b: 2, "obj": {"a": 2, "b": 2, "str": kLargeStr}}}}];
+updatePipeline = [{$replaceRoot: {newRoot: {_id: 100, b: 2, "obj": {"a": 2, "b": 2, "str": kLargeStr}}}}];
 expected = {
     updateDescription: {
         updatedFields: {"obj.a": 2},

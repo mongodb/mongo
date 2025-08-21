@@ -29,11 +29,13 @@ function runCompact(dbName, collectionName) {
 // Start compaction on "a".
 const awaitCompactA = startParallelShell(funWithArgs(runCompact, "test", "a"), conn.port);
 
-assert.commandWorked(adminDb.runCommand({
-    waitForFailPoint: "pauseCompactCommandBeforeWTCompact",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    adminDb.runCommand({
+        waitForFailPoint: "pauseCompactCommandBeforeWTCompact",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 // Compaction already in progress on "a".
 assert.commandFailedWithCode(db.runCommand({compact: "a"}), ErrorCodes.OperationFailed);
@@ -41,11 +43,13 @@ assert.commandFailedWithCode(db.runCommand({compact: "a"}), ErrorCodes.Operation
 // No compaction in progress on "b".
 const awaitCompactB = startParallelShell(funWithArgs(runCompact, "test", "b"), conn.port);
 
-assert.commandWorked(adminDb.runCommand({
-    waitForFailPoint: "pauseCompactCommandBeforeWTCompact",
-    timesEntered: 2,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    adminDb.runCommand({
+        waitForFailPoint: "pauseCompactCommandBeforeWTCompact",
+        timesEntered: 2,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 fp.off();
 

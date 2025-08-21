@@ -12,7 +12,7 @@ source.drop();
 const target = db[`${jsTest.name()}_target`];
 target.drop();
 const mergeStage = {
-    $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"}
+    $merge: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"},
 };
 const pipeline = [mergeStage];
 
@@ -20,10 +20,27 @@ const pipeline = [mergeStage];
 // the target collection. The merge operation should succeed and unmatched documents discarded.
 (function testMergeIfMatchingDocumentNotFound() {
     // Single document without a match.
-    assert.commandWorked(source.insert([{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}]));
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 3, b: 3}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+            {_id: 3, a: 3},
+        ]),
+    );
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 3, b: 3},
+        ]),
+    );
     assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 1}, {_id: 3, a: 3}]});
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, a: 1},
+            {_id: 3, a: 3},
+        ],
+    });
 
     // Multiple documents without a match.
     assert(target.drop());
@@ -39,19 +56,45 @@ const pipeline = [mergeStage];
     assert(source.drop());
     assert(target.drop());
     assert.commandWorked(source.insert({_id: 3, a: 3}));
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 3, b: 3}]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 3, b: 3},
+        ]),
+    );
     assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, b: 1}, {_id: 3, a: 3}]});
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, b: 1},
+            {_id: 3, a: 3},
+        ],
+    });
 
     // Source has multiple documents with matches in the target.
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1}, {_id: 2, a: 2}]));
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 2, b: 2}, {_id: 3, b: 3}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+        ]),
+    );
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+            {_id: 3, b: 3},
+        ]),
+    );
     assert.doesNotThrow(() => source.aggregate(pipeline));
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, b: 3}]
+        expected: [
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+            {_id: 3, b: 3},
+        ],
     });
 })();
 
@@ -60,9 +103,20 @@ const pipeline = [mergeStage];
 (function testMergeWhenSourceIsEmpty() {
     assert.commandWorked(source.deleteMany({}));
     assert(target.drop());
-    assert.commandWorked(target.insert([{_id: 1, b: 1}, {_id: 2, b: 2}]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+        ]),
+    );
     assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, b: 1}, {_id: 2, b: 2}]});
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+        ],
+    });
 })();
 
 // Test $merge does not insert a new document into the target collection if it was inserted
@@ -71,14 +125,26 @@ const pipeline = [mergeStage];
     // Insert and merge a single document.
     assert.commandWorked(source.insert({_id: 3, a: 3, b: "c"}));
     assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, b: 1}, {_id: 2, b: 2}]});
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+        ],
+    });
     assert.commandWorked(source.deleteOne({_id: 3}));
 
     // Insert and merge multiple documents.
     assert.commandWorked(source.insert({_id: 3, a: 3, b: "c"}));
     assert.commandWorked(source.insert({_id: 4, a: 4, c: "d"}));
     assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, b: 1}, {_id: 2, b: 2}]});
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+        ],
+    });
     assert.commandWorked(source.deleteMany({_id: {$in: [3, 4]}}));
 })();
 
@@ -87,7 +153,13 @@ const pipeline = [mergeStage];
 (function testMergeDoesNotUpdateDeletedDocument() {
     assert.commandWorked(source.deleteOne({_id: 1}));
     assert.doesNotThrow(() => source.aggregate(pipeline));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, b: 1}, {_id: 2, b: 2}]});
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, b: 1},
+            {_id: 2, b: 2},
+        ],
+    });
 })();
 
 // Test $merge with an explicit 'on' field over a single or multiple document fields which
@@ -106,15 +178,29 @@ const pipeline = [mergeStage];
     assert.commandWorked(source.createIndex({a: 1}, {unique: true}));
     assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
     assert.commandWorked(
-        source.insert([{_id: 1, a: 1, b: "a"}, {_id: 2, a: 2, b: "b"}, {_id: 3, a: 30, b: "c"}]));
+        source.insert([
+            {_id: 1, a: 1, b: "a"},
+            {_id: 2, a: 2, b: "b"},
+            {_id: 3, a: 30, b: "c"},
+        ]),
+    );
     assert.commandWorked(
-        target.insert([{_id: 1, a: 1, c: "x"}, {_id: 4, a: 30, c: "y"}, {_id: 5, a: 40, c: "z"}]));
-    assert.doesNotThrow(
-        () => source.aggregate(
-            [{$project: {_id: 0}}, {$merge: Object.assign({on: "a"}, mergeStage.$merge)}]));
+        target.insert([
+            {_id: 1, a: 1, c: "x"},
+            {_id: 4, a: 30, c: "y"},
+            {_id: 5, a: 40, c: "z"},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate([{$project: {_id: 0}}, {$merge: Object.assign({on: "a"}, mergeStage.$merge)}]),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, a: 1, b: "a"}, {_id: 4, a: 30, b: "c"}, {_id: 5, a: 40, c: "z"}]
+        expected: [
+            {_id: 1, a: 1, b: "a"},
+            {_id: 4, a: 30, b: "c"},
+            {_id: 5, a: 40, c: "z"},
+        ],
     });
 
     // The 'on' fields contains multiple document fields.
@@ -122,16 +208,30 @@ const pipeline = [mergeStage];
     dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({a: 1, b: 1}, {unique: true}));
     assert.commandWorked(target.createIndex({a: 1, b: 1}, {unique: true}));
-    assert.commandWorked(source.insert(
-        [{_id: 1, a: 1, b: "a", c: "x"}, {_id: 2, a: 2, b: "b"}, {_id: 3, a: 30, b: "c"}]));
-    assert.commandWorked(target.insert(
-        [{_id: 1, a: 1, b: "a"}, {_id: 4, a: 30, b: "c", c: "y"}, {_id: 5, a: 40, c: "z"}]));
-    assert.doesNotThrow(
-        () => source.aggregate(
-            [{$project: {_id: 0}}, {$merge: Object.assign({on: ["a", "b"]}, mergeStage.$merge)}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: "a", c: "x"},
+            {_id: 2, a: 2, b: "b"},
+            {_id: 3, a: 30, b: "c"},
+        ]),
+    );
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, a: 1, b: "a"},
+            {_id: 4, a: 30, b: "c", c: "y"},
+            {_id: 5, a: 40, c: "z"},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate([{$project: {_id: 0}}, {$merge: Object.assign({on: ["a", "b"]}, mergeStage.$merge)}]),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, a: 1, b: "a", c: "x"}, {_id: 4, a: 30, b: "c"}, {_id: 5, a: 40, c: "z"}]
+        expected: [
+            {_id: 1, a: 1, b: "a", c: "x"},
+            {_id: 4, a: 30, b: "c"},
+            {_id: 5, a: 40, c: "z"},
+        ],
     });
     assert.commandWorked(source.dropIndex({a: 1, b: 1}));
     assert.commandWorked(target.dropIndex({a: 1, b: 1}));
@@ -150,20 +250,20 @@ const pipeline = [mergeStage];
     dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({"a.b": 1}, {unique: true}));
     assert.commandWorked(target.createIndex({"a.b": 1}, {unique: true}));
-    assert.commandWorked(source.insert([
-        {_id: 1, a: {b: "b"}, c: "x"},
-        {_id: 2, a: {b: "c"}, c: "y"},
-        {_id: 3, a: {b: 30}, b: "c"}
-    ]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: {b: "b"}, c: "x"},
+            {_id: 2, a: {b: "c"}, c: "y"},
+            {_id: 3, a: {b: 30}, b: "c"},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 2, a: {b: "c"}}));
-    assert.doesNotThrow(
-        () => source.aggregate(
-            [{$project: {_id: 0}}, {$merge: Object.assign({on: "a.b"}, mergeStage.$merge)}]));
+    assert.doesNotThrow(() =>
+        source.aggregate([{$project: {_id: 0}}, {$merge: Object.assign({on: "a.b"}, mergeStage.$merge)}]),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [
-            {_id: 2, a: {b: "c"}, c: "y"},
-        ]
+        expected: [{_id: 2, a: {b: "c"}, c: "y"}],
     });
 })();
 
@@ -173,7 +273,12 @@ const pipeline = [mergeStage];
     // The _id is a single 'on' field (a default one).
     dropWithoutImplicitRecreate(source.getName());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: "a"}, {_id: 2, a: 2, b: "b"}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: "a"},
+            {_id: 2, a: 2, b: "b"},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, b: "c"}));
     assert.doesNotThrow(() => source.aggregate([{$project: {_id: 0}}, mergeStage]));
     assertArrayEq({actual: target.find({}, {_id: 0}).toArray(), expected: [{b: "c"}]});
@@ -183,10 +288,9 @@ const pipeline = [mergeStage];
     assert.commandWorked(target.insert({_id: 1, b: "c"}));
     assert.commandWorked(source.createIndex({_id: 1, a: -1}, {unique: true}));
     assert.commandWorked(target.createIndex({_id: 1, a: -1}, {unique: true}));
-    assert.doesNotThrow(() => source.aggregate([
-        {$project: {_id: 0}},
-        {$merge: Object.assign({on: ["_id", "a"]}, mergeStage.$merge)}
-    ]));
+    assert.doesNotThrow(() =>
+        source.aggregate([{$project: {_id: 0}}, {$merge: Object.assign({on: ["_id", "a"]}, mergeStage.$merge)}]),
+    );
     assertArrayEq({actual: target.find({}, {_id: 0}).toArray(), expected: [{b: "c"}]});
     assert.commandWorked(source.dropIndex({_id: 1, a: -1}));
     assert.commandWorked(target.dropIndex({_id: 1, a: -1}));

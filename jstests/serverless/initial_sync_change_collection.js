@@ -9,7 +9,7 @@ import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     ChangeStreamMultitenantReplicaSetTest,
-    verifyChangeCollectionEntries
+    verifyChangeCollectionEntries,
 } from "jstests/serverless/libs/change_collection_util.js";
 
 const replSetTest = new ChangeStreamMultitenantReplicaSetTest({nodes: 1});
@@ -18,12 +18,15 @@ const primary = replSetTest.getPrimary();
 // User id and the associated tenant id.
 const userInfo = {
     tenantId: ObjectId(),
-    user: ObjectId().str
+    user: ObjectId().str,
 };
 
 // Create a connection to the primary node for the tenant.
 const tenantPrimaryNode = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-    primary.host, userInfo.tenantId, userInfo.user);
+    primary.host,
+    userInfo.tenantId,
+    userInfo.user,
+);
 
 // Enable the change stream for the tenant.
 replSetTest.setChangeStreamState(tenantPrimaryNode, true);
@@ -33,7 +36,7 @@ const primaryChangeColl = tenantPrimaryNode.getDB("config").system.change_collec
 
 const mdbStockPriceDoc = {
     _id: "mdb",
-    price: 250
+    price: 250,
 };
 
 // The document 'mdbStockPriceDoc' is inserted before starting the initial sync. As such the
@@ -45,22 +48,24 @@ assert.eq(primaryChangeColl.find({o: mdbStockPriceDoc}).toArray().length, 1);
 const secondary = replSetTest.add({
     setParameter: {
         // Hang after the data cloning phase is completed.
-        "failpoint.initialSyncHangAfterDataCloning": tojson({mode: "alwaysOn"})
-    }
+        "failpoint.initialSyncHangAfterDataCloning": tojson({mode: "alwaysOn"}),
+    },
 });
 replSetTest.reInitiate();
 
 // Wait for the cloning phase to complete. The cloning phase should not clone documents of the
 // change collection from the primary.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangAfterDataCloning",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangAfterDataCloning",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 const tslaStockPriceDoc = {
     _id: "tsla",
-    price: 650
+    price: 650,
 };
 
 // The document 'tslaStockPriceDoc' is inserted in the primary after the data cloning phase has
@@ -69,22 +74,26 @@ assert.commandWorked(tenantPrimaryNode.getDB("test").stockPrice.insert(tslaStock
 assert.eq(primaryChangeColl.find({o: tslaStockPriceDoc}).toArray().length, 1);
 
 // Unblock the initial sync process.
-assert.commandWorked(secondary.getDB("test").adminCommand(
-    {configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(
+    secondary.getDB("test").adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+);
 
 // Wait for the initial sync to complete.
 replSetTest.awaitSecondaryNodes(null, [secondary]);
 
 // Create a connection to the secondary node for the tenant.
 const tenantSecondaryNode = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-    secondary.host, userInfo.tenantId, userInfo.user);
+    secondary.host,
+    userInfo.tenantId,
+    userInfo.user,
+);
 
 // Verify that the document 'mdbStockPriceDoc' does not exist and the document 'tslaStockPriceDoc'
 // exists in the secondary's change collection.
-const changeCollDocs =
-    tenantSecondaryNode.getDB("config")
-        .system.change_collection.find({$or: [{o: mdbStockPriceDoc}, {o: tslaStockPriceDoc}]})
-        .toArray();
+const changeCollDocs = tenantSecondaryNode
+    .getDB("config")
+    .system.change_collection.find({$or: [{o: mdbStockPriceDoc}, {o: tslaStockPriceDoc}]})
+    .toArray();
 assert.eq(changeCollDocs.length, 1);
 assert.eq(changeCollDocs[0].o, tslaStockPriceDoc);
 
@@ -98,11 +107,13 @@ const endOplogTimestamp = oplogDocs.at(-1).ts;
 // oplog only after the data cloning is done. And so, the change collection already exists in place
 // to capture oplog entries. As such, the change collection entries and the oplog entries for
 // timestamp range ('startOplogTimestamp', 'endOplogTimestamp'] must be the same.
-verifyChangeCollectionEntries(secondary,
-                              startOplogTimestamp,
-                              endOplogTimestamp,
-                              userInfo.tenantId,
-                              _createTenantToken({tenant: userInfo.tenantId}));
+verifyChangeCollectionEntries(
+    secondary,
+    startOplogTimestamp,
+    endOplogTimestamp,
+    userInfo.tenantId,
+    _createTenantToken({tenant: userInfo.tenantId}),
+);
 
 // The state of the change collection after the initial sync is not consistent with the primary.
 // This is because the change collection's data is never cloned to the secondary, only it's creation

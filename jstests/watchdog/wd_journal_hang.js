@@ -5,7 +5,7 @@ import {CharybdefsControl} from "jstests/watchdog/lib/charybdefs_lib.js";
 import {testFuseAndMongoD} from "jstests/watchdog/lib/wd_test_common.js";
 
 function trimTrailingSlash(dir) {
-    if (dir.endsWith('/')) {
+    if (dir.endsWith("/")) {
         return dir.substring(0, dir.length - 1);
     }
 

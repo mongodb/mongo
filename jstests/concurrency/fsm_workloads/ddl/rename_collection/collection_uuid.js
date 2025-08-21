@@ -18,19 +18,17 @@ const otherDbName = "otherDb";
 const otherDbCollName = "otherDbColl";
 const sameDbCollName = "sameDbColl";
 
-const adminCommands =
-    ["renameCollection", "shardCollection", "reshardCollection", "refineCollectionShardKey"];
-const isAdminCommand = function(cmdName) {
+const adminCommands = ["renameCollection", "shardCollection", "reshardCollection", "refineCollectionShardKey"];
+const isAdminCommand = function (cmdName) {
     return adminCommands.includes(cmdName);
 };
 
-const getUUID = function(database, collName) {
-    return database.runCommand({listCollections: 1})
-        .cursor.firstBatch.find(c => c.name.startsWith(collName))
-        .info.uuid;
+const getUUID = function (database, collName) {
+    return database.runCommand({listCollections: 1}).cursor.firstBatch.find((c) => c.name.startsWith(collName)).info
+        .uuid;
 };
 
-const executeCommand = function(db, namespace, cmdName, cmdObj) {
+const executeCommand = function (db, namespace, cmdName, cmdObj) {
     if (isAdminCommand(cmdName)) {
         cmdObj[cmdName] = namespace;
         return db.adminCommand(cmdObj);
@@ -40,8 +38,7 @@ const executeCommand = function(db, namespace, cmdName, cmdObj) {
     return db.runCommand(cmdObj);
 };
 
-const runCommandInLoop = function(
-    db, namespace, cmdName, cmdObj, data, expectedNonRetryableErrors = []) {
+const runCommandInLoop = function (db, namespace, cmdName, cmdObj, data, expectedNonRetryableErrors = []) {
     let cmdResult;
     let currentNamespace = namespace;
 
@@ -59,8 +56,14 @@ const runCommandInLoop = function(
     ];
 
     let iteration = 0;
-    jsTestLog("Thread: " + data.tid + " started to run command: " + cmdName +
-              " with expectation to fail with errors: " + tojson(expectedNonRetryableErrors));
+    jsTestLog(
+        "Thread: " +
+            data.tid +
+            " started to run command: " +
+            cmdName +
+            " with expectation to fail with errors: " +
+            tojson(expectedNonRetryableErrors),
+    );
     while (true) {
         iteration++;
         cmdResult = executeCommand(db, currentNamespace, cmdName, cmdObj);
@@ -89,9 +92,11 @@ const runCommandInLoop = function(
             continue;
         }
 
-        if (cmdResult.code === ErrorCodes.OplogOperationUnsupported &&
+        if (
+            cmdResult.code === ErrorCodes.OplogOperationUnsupported &&
             cmdResult.errmsg.includes("Command not supported during resharding") &&
-            cmdResult.errmsg.includes("commitIndexBuild")) {
+            cmdResult.errmsg.includes("commitIndexBuild")
+        ) {
             // TODO (SERVER-91708): Resharding should consider queued index builds waiting for
             // active number of index builds to be below the threshold.
             continue;
@@ -119,21 +124,33 @@ const runCommandInLoop = function(
         }
 
         // Raise exception otherwise.
-        throw new Error('Command: ' + tojson(cmdObj) +
-                        ' failed with unexpected error: ' + tojson(cmdResult));
+        throw new Error("Command: " + tojson(cmdObj) + " failed with unexpected error: " + tojson(cmdResult));
     }
 
-    jsTestLog("Thread: " + data.tid + " needed " + iteration +
-              " iterations to run command: " + cmdName +
-              " with expectation to fail with errors: " + tojson(expectedNonRetryableErrors));
+    jsTestLog(
+        "Thread: " +
+            data.tid +
+            " needed " +
+            iteration +
+            " iterations to run command: " +
+            cmdName +
+            " with expectation to fail with errors: " +
+            tojson(expectedNonRetryableErrors),
+    );
     return cmdResult;
 };
 
-const verifyFailingWithCollectionUUIDMismatch = function(
-    db, cmdName, cmdObj, collectionUUID, actualCollection, expectedNamespace, data) {
+const verifyFailingWithCollectionUUIDMismatch = function (
+    db,
+    cmdName,
+    cmdObj,
+    collectionUUID,
+    actualCollection,
+    expectedNamespace,
+    data,
+) {
     cmdObj["collectionUUID"] = collectionUUID;
-    let res = runCommandInLoop(
-        db, expectedNamespace, cmdName, cmdObj, data, [ErrorCodes.CollectionUUIDMismatch]);
+    let res = runCommandInLoop(db, expectedNamespace, cmdName, cmdObj, data, [ErrorCodes.CollectionUUIDMismatch]);
 
     assert.eq(res.db, db.getName());
     assert.eq(res.collectionUUID, collectionUUID);
@@ -141,29 +158,29 @@ const verifyFailingWithCollectionUUIDMismatch = function(
     assert.eq(res.actualCollection, actualCollection);
 };
 
-export const testCommand = function(
-    db, namespace, cmdName, cmdObj, data, expectedNonRetryableErrors = []) {
-    verifyFailingWithCollectionUUIDMismatch(
-        db, cmdName, cmdObj, data.sameDbCollUUID, sameDbCollName, namespace, data);
+export const testCommand = function (db, namespace, cmdName, cmdObj, data, expectedNonRetryableErrors = []) {
+    verifyFailingWithCollectionUUIDMismatch(db, cmdName, cmdObj, data.sameDbCollUUID, sameDbCollName, namespace, data);
 
-    verifyFailingWithCollectionUUIDMismatch(db,
-                                            cmdName,
-                                            cmdObj,
-                                            data.otherDbCollUUID,
-                                            // Collection resides on different db won't be returned.
-                                            null,
-                                            namespace,
-                                            data);
+    verifyFailingWithCollectionUUIDMismatch(
+        db,
+        cmdName,
+        cmdObj,
+        data.otherDbCollUUID,
+        // Collection resides on different db won't be returned.
+        null,
+        namespace,
+        data,
+    );
 
     // Verify command eventually succeeds.
     cmdObj["collectionUUID"] = data.collUUID;
     runCommandInLoop(db, namespace, cmdName, cmdObj, data, expectedNonRetryableErrors);
 };
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {};
 
-    const states = (function() {
+    const states = (function () {
         function init(db, collName) {
             this.Id = 0;
             this.collUUID = getUUID(db, collName);
@@ -175,14 +192,13 @@ export const $config = (function() {
 
         function rename(db, collName) {
             // Create an unique namespace by appending the thread id and the incremented local id.
-            const targetNamespace =
-                db.getName() + "." + collName + "_" + this.tid + "_" + this.Id++;
+            const targetNamespace = db.getName() + "." + collName + "_" + this.tid + "_" + this.Id++;
             const srcNamespace = db.getName() + "." + collName;
             const renameCmd = {
                 renameCollection: srcNamespace,
                 to: targetNamespace,
                 dropTarget: false,
-                collectionUUID: this.collUUID
+                collectionUUID: this.collUUID,
             };
             testCommand(db, srcNamespace, "renameCollection", renameCmd, this);
         }
@@ -200,7 +216,7 @@ export const $config = (function() {
             const updateCmd = {
                 update: namespace,
                 updates: [{q: {x: this.tid}, u: {$set: {updated: id}}, multi: true}],
-                collectionUUID: this.collUUID
+                collectionUUID: this.collUUID,
             };
             testCommand(db, namespace, "update", updateCmd, this);
 
@@ -209,7 +225,7 @@ export const $config = (function() {
                 aggregate: namespace,
                 pipeline: [{$collStats: {latencyStats: {}}}],
                 cursor: {},
-                collectionUUID: this.collUUID
+                collectionUUID: this.collUUID,
             };
             testCommand(db, namespace, "aggregate", aggCmd, this);
         }
@@ -222,7 +238,7 @@ export const $config = (function() {
             const createIndexCmd = {
                 createIndexes: namespace,
                 indexes: [{name: indexField, key: {[indexField]: 1}}],
-                collectionUUID: this.collUUID
+                collectionUUID: this.collUUID,
             };
             testCommand(db, namespace, "createIndexes", createIndexCmd, this);
 
@@ -230,7 +246,7 @@ export const $config = (function() {
             const collModCmd = {
                 collMod: namespace,
                 index: {keyPattern: {[indexField]: 1}, hidden: true},
-                collectionUUID: this.collUUID
+                collectionUUID: this.collUUID,
             };
             testCommand(db, namespace, "collMod", collModCmd, this);
 
@@ -238,18 +254,17 @@ export const $config = (function() {
             const dropIndexCmd = {
                 dropIndexes: namespace,
                 index: {[indexField]: 1},
-                collectionUUID: this.collUUID
+                collectionUUID: this.collUUID,
             };
             // Consecutive drop commands can results in 'IndexNotFound' error, so on retry some
             // shards can fail while others succeed.
-            testCommand(
-                db, namespace, "dropIndexes", dropIndexCmd, this, [ErrorCodes.IndexNotFound]);
+            testCommand(db, namespace, "dropIndexes", dropIndexCmd, this, [ErrorCodes.IndexNotFound]);
         }
 
         return {init: init, rename: rename, crud: crud, indexCommands: indexCommands};
     })();
 
-    const setup = function(db, collName, cluster) {
+    const setup = function (db, collName, cluster) {
         if (isMongos(db)) {
             db.getSiblingDB(otherDbName).dropDatabase();
             db[sameDbCollName].drop();
@@ -258,7 +273,7 @@ export const $config = (function() {
             let otherDbShard;
 
             if (numShards > 1) {
-                const currDb = db.getSiblingDB('config')['databases'].findOne({_id: db.getName()});
+                const currDb = db.getSiblingDB("config")["databases"].findOne({_id: db.getName()});
                 shardNames.some((shard) => {
                     if (shard != currDb.primary) {
                         otherDbShard = shard;
@@ -269,8 +284,7 @@ export const $config = (function() {
             } else {
                 otherDbShard = shardNames[0];
             }
-            assert.commandWorked(
-                db.adminCommand({enableSharding: otherDbName, primaryShard: otherDbShard}));
+            assert.commandWorked(db.adminCommand({enableSharding: otherDbName, primaryShard: otherDbShard}));
         } else {
             db[sameDbCollName].drop();
             db.getSiblingDB(otherDbName)[otherDbCollName].drop();
@@ -281,15 +295,16 @@ export const $config = (function() {
         for (let i = 0; i < this.threadCount; ++i) {
             for (let j = 0; j < 100; ++j) {
                 const uniqueNum = i * 100 + j;
-                assert.commandWorked(db[collName].insert(
-                    {_id: uniqueNum, x: i, ["y_" + i]: uniqueNum, a: uniqueNum, b: uniqueNum}));
+                assert.commandWorked(
+                    db[collName].insert({_id: uniqueNum, x: i, ["y_" + i]: uniqueNum, a: uniqueNum, b: uniqueNum}),
+                );
             }
         }
         assert.commandWorked(db[sameDbCollName].insert({_id: 0}));
         assert.commandWorked(db.getSiblingDB(otherDbName)[otherDbCollName].insert({_id: 0}));
     };
 
-    const teardown = function(db, collName, cluster) {
+    const teardown = function (db, collName, cluster) {
         assert.eq(2, db.getCollectionNames().length);
         assert.eq(1, db.getSiblingDB(otherDbName).getCollectionNames().length);
     };
@@ -305,7 +320,7 @@ export const $config = (function() {
         threadCount: 10,
         iterations: 64,
         states: states,
-        startState: 'init',
+        startState: "init",
         transitions: transitions,
         setup: setup,
         teardown: teardown,

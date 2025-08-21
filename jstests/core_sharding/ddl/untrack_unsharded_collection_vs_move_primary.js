@@ -14,17 +14,14 @@
  *   does_not_support_stepdowns,
  * ]
  */
-import {
-    getRandomShardName,
-    verifyCollectionTrackingState
-} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {getRandomShardName, verifyCollectionTrackingState} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 // Setup an untracked collection
 db.dropDatabase();
 
 const kDbName = db.getName();
-const kCollName = 'coll';
-const kNss = kDbName + '.' + kCollName;
+const kCollName = "coll";
+const kNss = kDbName + "." + kCollName;
 
 assert.commandWorked(db[kCollName].insert({x: 1}));
 
@@ -38,10 +35,8 @@ jsTest.log("Untrack a collection after performing movePrimary commands works as 
 
     // then move and track the collection, placing it outside the current primary...
     assert.commandWorked(db.adminCommand({moveCollection: kNss, toShard: originalPrimaryShard}));
-    assert.commandFailedWithCode(db.adminCommand({untrackUnshardedCollection: kNss}),
-                                 ErrorCodes.OperationFailed);
-    verifyCollectionTrackingState(
-        db, kNss, true /*expectedToBeTracked*/, true /*expectedToBeUnsplittable*/);
+    assert.commandFailedWithCode(db.adminCommand({untrackUnshardedCollection: kNss}), ErrorCodes.OperationFailed);
+    verifyCollectionTrackingState(db, kNss, true /*expectedToBeTracked*/, true /*expectedToBeUnsplittable*/);
 
     // ... and invoke movePrimary once again to allow untrackCollection to succeed.
     assert.commandWorked(db.adminCommand({movePrimary: kDbName, to: originalPrimaryShard}));

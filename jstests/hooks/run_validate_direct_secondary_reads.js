@@ -6,7 +6,7 @@
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {
     getTotalNumProfilerDocs,
-    validateProfilerCollections
+    validateProfilerCollections,
 } from "jstests/noPassthrough/rs_endpoint/lib/validate_direct_secondary_reads.js";
 
 assert(TestData.connectDirectlyToRandomSubsetOfSecondaries);
@@ -24,9 +24,8 @@ print("Validating profiler collections on hosts " + tojsononeline(hostDocs));
 
 // Count the number of profiler docs to verify that that profiling is enabled.
 const numProfilerDocsPerHost = {};
-hostDocs.forEach(hostDoc => {
+hostDocs.forEach((hostDoc) => {
     validateProfilerCollections(hostDoc, hostDocs, numProfilerDocsPerHost);
 });
-jsTest.log("Finished validating profiler collections on hosts " +
-           tojsononeline({numProfilerDocsPerHost}));
+jsTest.log("Finished validating profiler collections on hosts " + tojsononeline({numProfilerDocsPerHost}));
 assert.gt(getTotalNumProfilerDocs(numProfilerDocsPerHost), 0);

@@ -21,7 +21,7 @@ TestData.disableImplicitSessions = true;
 const st = new ShardingTest({
     name: jsTestName(),
     shards: 2,
-    rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}}
+    rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}},
 });
 
 // Obtain one mongoS connection and a second direct to the shard.
@@ -32,14 +32,13 @@ const mongosDB = mongosConn.getDB("currentop_query");
 const mongosColl = mongosDB.currentop_query;
 
 // Enable sharding on the the test database and ensure that the primary is on shard0.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: rsConn.name}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: rsConn.name}));
 
 // On a sharded cluster, aggregations which are dispatched to multiple shards first establish
 // zero-batch cursors and only hit the failpoints on the following getMore. This helper takes a
 // generic command object and creates an appropriate filter given the use-case.
 function commandOrOriginatingCommand(cmdObj, isRemoteShardCurOp) {
-    const cmdFieldName = (isRemoteShardCurOp ? "cursor.originatingCommand" : "command");
+    const cmdFieldName = isRemoteShardCurOp ? "cursor.originatingCommand" : "command";
     const cmdFilter = {};
     for (let subFieldName in cmdObj) {
         cmdFilter[`${cmdFieldName}.${subFieldName}`] = cmdObj[subFieldName];
@@ -50,12 +49,10 @@ function commandOrOriginatingCommand(cmdObj, isRemoteShardCurOp) {
 // Drops and re-creates the sharded test collection.
 function dropAndRecreateTestCollection() {
     assert(mongosColl.drop());
-    assert.commandWorked(
-        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: "hashed"}}));
+    assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: "hashed"}}));
     // The insert via direct connection will fail with stale config if the metadata is unknown, so
     // we forcefully refresh it.
-    assert.commandWorked(
-        rsConn.adminCommand({_flushRoutingTableCacheUpdates: mongosColl.getFullName()}));
+    assert.commandWorked(rsConn.adminCommand({_flushRoutingTableCacheUpdates: mongosColl.getFullName()}));
 }
 
 /**
@@ -79,8 +76,8 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         assert.commandWorked(coll.insert({_id: i, a: i}));
     }
 
-    const isLocalMongosCurOp = (FixtureHelpers.isMongos(testDB) && localOps);
-    const isRemoteShardCurOp = (FixtureHelpers.isMongos(testDB) && !localOps);
+    const isLocalMongosCurOp = FixtureHelpers.isMongos(testDB) && localOps;
+    const isRemoteShardCurOp = FixtureHelpers.isMongos(testDB) && !localOps;
 
     const sbeEnabled = checkSbeFullyEnabled(testDB);
 
@@ -123,8 +120,8 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
             cmdObj: {
                 configureFailPoint: "setYieldAllLocksHang",
                 mode: "alwaysOn",
-                data: {namespace: mongosColl.getFullName()}
-            }
+                data: {namespace: mongosColl.getFullName()},
+            },
         });
 
         // Set the test configuration in TestData for the parallel shell test.
@@ -161,34 +158,37 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         // 'queryFramework' fields contain the content expected. We are indirectly testing the 'ns'
         // field as well with the currentOp query argument.
         assert.soon(
-            function() {
+            function () {
                 var result = currentOp(testDB, testObj.currentOpFilter, truncatedOps, localOps);
                 assert.commandWorked(result);
 
                 if (result.inprog.length > 0) {
                     result.inprog.forEach((op) => {
                         assert.eq(op.appName, "MongoDB Shell", tojson(result));
-                        assert.eq(
-                            op.clientMetadata.application.name, "MongoDB Shell", tojson(result));
+                        assert.eq(op.clientMetadata.application.name, "MongoDB Shell", tojson(result));
                     });
                     return true;
                 }
 
                 return false;
             },
-            function() {
-                return "Failed to find operation from " + tojson(testObj.currentOpFilter) +
+            function () {
+                return (
+                    "Failed to find operation from " +
+                    tojson(testObj.currentOpFilter) +
                     " in currentOp() output: " +
                     tojson(currentOp(testDB, {}, truncatedOps, localOps)) +
-                    (isLocalMongosCurOp ? ", with localOps=false: " +
-                             tojson(currentOp(testDB, {}, truncatedOps, false))
-                                        : "");
-            });
+                    (isLocalMongosCurOp
+                        ? ", with localOps=false: " + tojson(currentOp(testDB, {}, truncatedOps, false))
+                        : "")
+                );
+            },
+        );
 
         // Allow the query to complete.
         FixtureHelpers.runCommandOnEachPrimary({
             db: conn.getDB("admin"),
-            cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "off"}
+            cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "off"},
         });
 
         awaitShell();
@@ -207,73 +207,77 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         //
         var testList = [
             {
-                test: function(db) {
-                    assert.eq(db.currentop_query
-                                  .aggregate([{$match: {a: 1}}], {
-                                      collation: {locale: "fr"},
-                                      hint: {_id: 1},
-                                      comment: "currentop_query"
-                                  })
-                                  .itcount(),
-                              1);
+                test: function (db) {
+                    assert.eq(
+                        db.currentop_query
+                            .aggregate([{$match: {a: 1}}], {
+                                collation: {locale: "fr"},
+                                hint: {_id: 1},
+                                comment: "currentop_query",
+                            })
+                            .itcount(),
+                        1,
+                    );
                 },
                 planSummary: "IXSCAN { _id: 1 }",
                 queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: commandOrOriginatingCommand({
-                    "aggregate": {$exists: true},
-                    "comment": "currentop_query",
-                    "collation.locale": "fr",
-                    "hint": {_id: 1}
-                },
-                                                             isRemoteShardCurOp),
+                currentOpFilter: commandOrOriginatingCommand(
+                    {
+                        "aggregate": {$exists: true},
+                        "comment": "currentop_query",
+                        "collation.locale": "fr",
+                        "hint": {_id: 1},
+                    },
+                    isRemoteShardCurOp,
+                ),
             },
             {
-                test: function(db) {
-                    assert.eq(db.currentop_query.find({_id: {$lte: 1}})
-                                  .hint({_id: 1})
-                                  .comment("currentop_query_id_hint")
-                                  .itcount(),
-                              2);
+                test: function (db) {
+                    assert.eq(
+                        db.currentop_query
+                            .find({_id: {$lte: 1}})
+                            .hint({_id: 1})
+                            .comment("currentop_query_id_hint")
+                            .itcount(),
+                        2,
+                    );
                 },
                 planSummary: "IXSCAN { _id: 1 }",
                 queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: {"command.comment": "currentop_query_id_hint"}
+                currentOpFilter: {"command.comment": "currentop_query_id_hint"},
             },
             {
-                test: function(db) {
-                    assert.eq(db.currentop_query.count(
-                                  {a: 1}, {comment: "currentop_query", collation: {locale: "fr"}}),
-                              1);
+                test: function (db) {
+                    assert.eq(
+                        db.currentop_query.count({a: 1}, {comment: "currentop_query", collation: {locale: "fr"}}),
+                        1,
+                    );
                 },
                 command: "count",
                 planSummary: "COLLSCAN",
-                currentOpFilter:
-                    {"command.comment": "currentop_query", "command.collation.locale": "fr"}
+                currentOpFilter: {"command.comment": "currentop_query", "command.collation.locale": "fr"},
             },
             {
-                test: function(db) {
-                    assert.eq(db.currentop_query.distinct("a", {a: 1}, {collation: {locale: "fr"}}),
-                              [1]);
+                test: function (db) {
+                    assert.eq(db.currentop_query.distinct("a", {a: 1}, {collation: {locale: "fr"}}), [1]);
                 },
                 command: "distinct",
                 planSummary: "COLLSCAN",
                 queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: {"command.collation.locale": "fr"}
+                currentOpFilter: {"command.collation.locale": "fr"},
             },
             {
-                test: function(db) {
-                    assert.eq(db.currentop_query.find({a: 1}).comment("currentop_query").itcount(),
-                              1);
+                test: function (db) {
+                    assert.eq(db.currentop_query.find({a: 1}).comment("currentop_query").itcount(), 1);
                 },
                 command: "find",
                 planSummary: "COLLSCAN",
                 queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: {"command.comment": "currentop_query"}
+                currentOpFilter: {"command.comment": "currentop_query"},
             },
             {
-                test: function(db) {
-                    assert.eq(db.currentop_query.find({a: 1}).comment("currentop_query").itcount(),
-                              1);
+                test: function (db) {
+                    assert.eq(db.currentop_query.find({a: 1}).comment("currentop_query").itcount(), 1);
                 },
                 command: "find",
                 // Yields only take place on a mongod. Since this test depends on checking that the
@@ -282,65 +286,70 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 skipMongosLocalOps: true,
                 planSummary: "COLLSCAN",
                 queryFramework: sbeEnabled ? "sbe" : "classic",
-                currentOpFilter: {"command.comment": "currentop_query", numYields: {$gt: 0}}
+                currentOpFilter: {"command.comment": "currentop_query", numYields: {$gt: 0}},
             },
             {
-                test: function(db) {
-                    assert.eq(db.currentop_query.findAndModify({
-                        query: {_id: 1, a: 1},
-                        update: {$inc: {b: 1}},
-                        collation: {locale: "fr"},
-                        comment: "currentop_query",
-                    }),
-                              {"_id": 1, "a": 1});
+                test: function (db) {
+                    assert.eq(
+                        db.currentop_query.findAndModify({
+                            query: {_id: 1, a: 1},
+                            update: {$inc: {b: 1}},
+                            collation: {locale: "fr"},
+                            comment: "currentop_query",
+                        }),
+                        {"_id": 1, "a": 1},
+                    );
                 },
                 command: "findandmodify",
                 planSummary: "IXSCAN { _id: 1 }",
-                currentOpFilter:
-                    {"command.comment": "currentop_query", "command.collation.locale": "fr"}
+                currentOpFilter: {"command.comment": "currentop_query", "command.collation.locale": "fr"},
             },
             {
-                test: function(db) {
-                    assert.commandWorked(db.currentop_query.mapReduce(
-                        () => {},
-                        (a, b) => {},
-                        {query: {a: 1}, out: {inline: 1}, comment: "currentop_query_mr"}));
+                test: function (db) {
+                    assert.commandWorked(
+                        db.currentop_query.mapReduce(
+                            () => {},
+                            (a, b) => {},
+                            {query: {a: 1}, out: {inline: 1}, comment: "currentop_query_mr"},
+                        ),
+                    );
                 },
                 planSummary: "COLLSCAN",
                 queryFramework: "classic",
                 // A mapReduce which gets sent to the shards is internally translated to an
                 // aggregation.
-                currentOpFilter: (isRemoteShardCurOp ? {
-                    "cursor.originatingCommand.aggregate": "currentop_query",
-                    "cursor.originatingCommand.comment": "currentop_query_mr"
-                }
-                                                     : {
-                                                           "command.comment": "currentop_query_mr",
-                                                           "ns": /^currentop_query.*currentop_query/
-                                                       }),
+                currentOpFilter: isRemoteShardCurOp
+                    ? {
+                          "cursor.originatingCommand.aggregate": "currentop_query",
+                          "cursor.originatingCommand.comment": "currentop_query_mr",
+                      }
+                    : {
+                          "command.comment": "currentop_query_mr",
+                          "ns": /^currentop_query.*currentop_query/,
+                      },
             },
             {
-                test: function(db) {
-                    assert.commandWorked(
-                        db.currentop_query.remove({a: 2}, {collation: {locale: "fr"}}));
+                test: function (db) {
+                    assert.commandWorked(db.currentop_query.remove({a: 2}, {collation: {locale: "fr"}}));
                 },
                 operation: "remove",
                 planSummary: "COLLSCAN",
-                currentOpFilter: (isLocalMongosCurOp
-                                      ? {"command.delete": coll.getName(), "command.ordered": true}
-                                      : {"command.collation.locale": "fr"})
+                currentOpFilter: isLocalMongosCurOp
+                    ? {"command.delete": coll.getName(), "command.ordered": true}
+                    : {"command.collation.locale": "fr"},
             },
             {
-                test: function(db) {
-                    assert.commandWorked(db.currentop_query.update(
-                        {a: 1}, {$inc: {b: 1}}, {collation: {locale: "fr"}, multi: true}));
+                test: function (db) {
+                    assert.commandWorked(
+                        db.currentop_query.update({a: 1}, {$inc: {b: 1}}, {collation: {locale: "fr"}, multi: true}),
+                    );
                 },
                 operation: "update",
                 planSummary: "COLLSCAN",
-                currentOpFilter: (isLocalMongosCurOp
-                                      ? {"command.update": coll.getName(), "command.ordered": true}
-                                      : {"command.collation.locale": "fr"})
-            }
+                currentOpFilter: isLocalMongosCurOp
+                    ? {"command.update": coll.getName(), "command.ordered": true}
+                    : {"command.collation.locale": "fr"},
+            },
         ];
 
         testList.forEach(confirmCurrentOpContents);
@@ -349,18 +358,16 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         // Confirm currentOp contains collation for find command.
         //
         confirmCurrentOpContents({
-            test: function(db) {
-                assert.eq(db.currentop_query.find({a: 1})
-                              .comment("currentop_query")
-                              .collation({locale: "fr"})
-                              .itcount(),
-                          1);
+            test: function (db) {
+                assert.eq(
+                    db.currentop_query.find({a: 1}).comment("currentop_query").collation({locale: "fr"}).itcount(),
+                    1,
+                );
             },
             command: "find",
             planSummary: "COLLSCAN",
             queryFramework: sbeEnabled ? "sbe" : "classic",
-            currentOpFilter:
-                {"command.comment": "currentop_query", "command.collation.locale": "fr"}
+            currentOpFilter: {"command.comment": "currentop_query", "command.collation.locale": "fr"},
         });
 
         //
@@ -372,30 +379,36 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         }
         assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
         confirmCurrentOpContents({
-            test: function(db) {
-                assert.commandWorked(db.runCommand({
-                    aggregate: "currentop_query",
-                    cursor: {},
-                    pipeline: [{
-                        $geoNear: {
-                            near: {type: "Point", coordinates: [1, 1]},
-                            distanceField: "dist",
-                            spherical: true,
-                            query: {},
-                        }
-                    }],
-                    collation: {locale: "fr"},
-                    comment: "currentop_query",
-                }));
+            test: function (db) {
+                assert.commandWorked(
+                    db.runCommand({
+                        aggregate: "currentop_query",
+                        cursor: {},
+                        pipeline: [
+                            {
+                                $geoNear: {
+                                    near: {type: "Point", coordinates: [1, 1]},
+                                    distanceField: "dist",
+                                    spherical: true,
+                                    query: {},
+                                },
+                            },
+                        ],
+                        collation: {locale: "fr"},
+                        comment: "currentop_query",
+                    }),
+                );
             },
-            planSummary: "GEO_NEAR_2DSPHERE { loc: \"2dsphere\" }",
+            planSummary: 'GEO_NEAR_2DSPHERE { loc: "2dsphere" }',
             queryFramework: "classic",
-            currentOpFilter: commandOrOriginatingCommand({
-                "aggregate": {$exists: true},
-                "collation.locale": "fr",
-                "comment": "currentop_query",
-            },
-                                                         isRemoteShardCurOp),
+            currentOpFilter: commandOrOriginatingCommand(
+                {
+                    "aggregate": {$exists: true},
+                    "collation.locale": "fr",
+                    "comment": "currentop_query",
+                },
+                isRemoteShardCurOp,
+            ),
         });
 
         //
@@ -413,7 +426,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     find: "currentop_query",
                     filter: {},
                     comment: "currentop_query_find_getmore",
-                    batchSize: 0
+                    batchSize: 0,
                 },
                 queryFramework: sbeEnabled ? "sbe" : "classic",
                 cmdName: "find",
@@ -423,7 +436,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     aggregate: "currentop_query",
                     pipeline: [{$match: {}}],
                     comment: "currentop_query_agg_getmore",
-                    cursor: {batchSize: 0}
+                    cursor: {batchSize: 0},
                 },
                 queryFramework: sbeEnabled ? "sbe" : "classic",
                 cmdName: "aggregate",
@@ -442,14 +455,13 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
             // therefore don't perform an exact match on 'command.getMore', but only
             // verify that the cursor ID is non-zero.
             const filter = {
-                "command.getMore":
-                    (isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id),
+                "command.getMore": isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id,
                 [`cursor.originatingCommand.${test.cmdName}`]: {$exists: true},
                 "cursor.originatingCommand.comment": test.command.comment,
             };
 
             confirmCurrentOpContents({
-                test: function(db) {
+                test: function (db) {
                     const cursor = new DBCommandCursor(db, TestData.commandResult, 5);
                     assert.eq(cursor.itcount(), 10);
                 },
@@ -484,9 +496,10 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
             "7": "7".repeat(149),
         };
 
-        var truncatedQueryString = "^\\{ find: \"currentop_query\", filter: \\{ " +
-            "1: \"1{149}\", 2: \"2{149}\", 3: \"3{149}\", 4: \"4{149}\", 5: \"5{149}\", " +
-            "6: \"6{149}\", 7: \"7+\\.\\.\\.";
+        var truncatedQueryString =
+            '^\\{ find: "currentop_query", filter: \\{ ' +
+            '1: "1{149}", 2: "2{149}", 3: "3{149}", 4: "4{149}", 5: "5{149}", ' +
+            '6: "6{149}", 7: "7+\\.\\.\\.';
 
         let currentOpFilter;
 
@@ -495,41 +508,42 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         // be represented as {$truncated: "{find: <coll>, filter: {XY...", comment: <comment>}.
         currentOpFilter = {
             "command.$truncated": {$regex: truncatedQueryString},
-            "command.comment": "currentop_query"
+            "command.comment": "currentop_query",
         };
 
         confirmCurrentOpContents({
-            test: function(db) {
+            test: function (db) {
                 // We put the 'comment' field before the large 'filter' in the command object so
                 // that, when the object is truncated in the currentOp output, we can confirm that
                 // the 'comment' field has been removed from the object and promoted to a top-level
                 // field.
-                assert.commandWorked(db.runCommand({
-                    find: "currentop_query",
-                    comment: "currentop_query",
-                    filter: TestData.queryFilter
-                }));
+                assert.commandWorked(
+                    db.runCommand({
+                        find: "currentop_query",
+                        comment: "currentop_query",
+                        filter: TestData.queryFilter,
+                    }),
+                );
             },
             planSummary: "COLLSCAN",
             queryFramework: "classic",
-            currentOpFilter: currentOpFilter
+            currentOpFilter: currentOpFilter,
         });
 
         // Verify that a command without the "comment" field appears as {$truncated: <string>} when
         // truncated by currentOp.
         currentOpFilter = {
             "command.$truncated": {$regex: truncatedQueryString},
-            "command.comment": {$exists: false}
+            "command.comment": {$exists: false},
         };
 
         confirmCurrentOpContents({
-            test: function(db) {
-                assert.commandWorked(
-                    db.runCommand({find: "currentop_query", filter: TestData.queryFilter}));
+            test: function (db) {
+                assert.commandWorked(db.runCommand({find: "currentop_query", filter: TestData.queryFilter}));
             },
             planSummary: "COLLSCAN",
             queryFramework: "classic",
-            currentOpFilter: currentOpFilter
+            currentOpFilter: currentOpFilter,
         });
 
         // Verify that an originatingCommand truncated by currentOp appears as { $truncated:
@@ -538,20 +552,20 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
             find: "currentop_query",
             comment: "currentop_query",
             filter: TestData.queryFilter,
-            batchSize: 0
+            batchSize: 0,
         });
         assert.commandWorked(cmdRes);
 
         TestData.commandResult = cmdRes;
 
         currentOpFilter = {
-            "command.getMore": (isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id),
+            "command.getMore": isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id,
             "cursor.originatingCommand.$truncated": {$regex: truncatedQueryString},
-            "cursor.originatingCommand.comment": "currentop_query"
+            "cursor.originatingCommand.comment": "currentop_query",
         };
 
         confirmCurrentOpContents({
-            test: function(db) {
+            test: function (db) {
                 var cursor = new DBCommandCursor(db, TestData.commandResult, 5);
                 assert.eq(cursor.itcount(), 0);
             },
@@ -565,22 +579,25 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
         // Verify that an aggregation truncated by currentOp appears as { $truncated: <string>,
         // comment: <string> } when a comment parameter is present.
         truncatedQueryString =
-            "^\\{ aggregate: \"currentop_query\", pipeline: \\[ \\{ \\$match: \\{ " +
-            "1: \"1{149}\", 2: \"2{149}\", 3: \"3{149}\", 4: \"4{149}\", 5: \"5{149}\", " +
-            "6: \"6{149}\", 7: \"7+\\.\\.\\.";
+            '^\\{ aggregate: "currentop_query", pipeline: \\[ \\{ \\$match: \\{ ' +
+            '1: "1{149}", 2: "2{149}", 3: "3{149}", 4: "4{149}", 5: "5{149}", ' +
+            '6: "6{149}", 7: "7+\\.\\.\\.';
 
         currentOpFilter = commandOrOriginatingCommand(
             {"$truncated": {$regex: truncatedQueryString}, "comment": "currentop_query"},
-            isRemoteShardCurOp);
+            isRemoteShardCurOp,
+        );
 
         confirmCurrentOpContents({
-            test: function(db) {
-                assert.commandWorked(db.runCommand({
-                    aggregate: "currentop_query",
-                    comment: "currentop_query",
-                    pipeline: [{$match: TestData.queryFilter}],
-                    cursor: {}
-                }));
+            test: function (db) {
+                assert.commandWorked(
+                    db.runCommand({
+                        aggregate: "currentop_query",
+                        comment: "currentop_query",
+                        pipeline: [{$match: TestData.queryFilter}],
+                        cursor: {},
+                    }),
+                );
             },
             planSummary: "COLLSCAN",
             queryFramework: "classic",
@@ -592,23 +609,23 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
 }
 
 function currentOpCommand(inputDB, filter, truncatedOps, localOps) {
-    return inputDB.getSiblingDB("admin").runCommand(
-        Object.assign({currentOp: true, $truncateOps: truncatedOps}, filter));
+    return inputDB
+        .getSiblingDB("admin")
+        .runCommand(Object.assign({currentOp: true, $truncateOps: truncatedOps}, filter));
 }
 
 function currentOpAgg(inputDB, filter, truncatedOps, localOps) {
     return {
-        inprog:
-            inputDB.getSiblingDB("admin")
-                .aggregate([
-                    {
-                        $currentOp:
-                            {localOps: (localOps || false), truncateOps: (truncatedOps || false)}
-                    },
-                    {$match: filter}
-                ])
-                .toArray(),
-        ok: 1
+        inprog: inputDB
+            .getSiblingDB("admin")
+            .aggregate([
+                {
+                    $currentOp: {localOps: localOps || false, truncateOps: truncatedOps || false},
+                },
+                {$match: filter},
+            ])
+            .toArray(),
+        ok: 1,
     };
 }
 
@@ -620,7 +637,7 @@ for (let connType of [rsConn, mongosConn]) {
                 conn: connType,
                 currentOp: currentOpAgg,
                 localOps: localOps,
-                truncatedOps: truncatedOps
+                truncatedOps: truncatedOps,
             });
         }
         // Run tests using the currentOp command. The 'localOps' parameter is not supported.
@@ -628,7 +645,7 @@ for (let connType of [rsConn, mongosConn]) {
             conn: connType,
             currentOp: currentOpCommand,
             localOps: false,
-            truncatedOps: truncatedOps
+            truncatedOps: truncatedOps,
         });
     }
 }

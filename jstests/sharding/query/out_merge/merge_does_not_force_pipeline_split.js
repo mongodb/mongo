@@ -39,9 +39,10 @@ function assertMergeRunsOnShards(explain) {
     assert(explain.hasOwnProperty("splitPipeline"), tojson(explain));
     assert(explain.splitPipeline.hasOwnProperty("shardsPart"), tojson(explain));
     assert.eq(
-        explain.splitPipeline.shardsPart.filter(stage => stage.hasOwnProperty("$merge")).length,
+        explain.splitPipeline.shardsPart.filter((stage) => stage.hasOwnProperty("$merge")).length,
         1,
-        tojson(explain));
+        tojson(explain),
+    );
     assert(explain.splitPipeline.hasOwnProperty("mergerPart"), tojson(explain));
     // Since merge runs on each shard, the mergerPart should only have a $mergeCursors stage.
     assert.eq(1, explain.splitPipeline.mergerPart.length, tojson(explain));
@@ -56,13 +57,15 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     assert.commandWorked(outCollById.remove({}));
     assert.commandWorked(outCollBySK.remove({}));
 
-    let explain = inColl.explain().aggregate([{
-        $merge: {
-            into: outCollById.getName(),
-            whenMatched: whenMatchedMode,
-            whenNotMatched: whenNotMatchedMode
-        }
-    }]);
+    let explain = inColl.explain().aggregate([
+        {
+            $merge: {
+                into: outCollById.getName(),
+                whenMatched: whenMatchedMode,
+                whenNotMatched: whenNotMatchedMode,
+            },
+        },
+    ]);
     assertMergeRunsOnShards(explain);
     assert.eq(outCollById.find().itcount(), 0);
     // We expect the test to succeed for all $merge modes. However, the 'whenNotMatched: fail'
@@ -75,24 +78,30 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     }
 
     // Actually execute the pipeline and make sure it works as expected.
-    assert.doesNotThrow(() => inColl.aggregate([{
-        $merge: {
-            into: outCollById.getName(),
-            whenMatched: whenMatchedMode,
-            whenNotMatched: whenNotMatchedMode
-        }
-    }]));
+    assert.doesNotThrow(() =>
+        inColl.aggregate([
+            {
+                $merge: {
+                    into: outCollById.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                },
+            },
+        ]),
+    );
     assert.eq(outCollById.find().itcount(), numDocs);
 
     // Test the same thing but in a pipeline where the output collection's shard key differs
     // from the input collection's.
-    explain = inColl.explain().aggregate([{
-        $merge: {
-            into: outCollBySK.getName(),
-            whenMatched: whenMatchedMode,
-            whenNotMatched: whenNotMatchedMode
-        }
-    }]);
+    explain = inColl.explain().aggregate([
+        {
+            $merge: {
+                into: outCollBySK.getName(),
+                whenMatched: whenMatchedMode,
+                whenNotMatched: whenNotMatchedMode,
+            },
+        },
+    ]);
     assertMergeRunsOnShards(explain);
     // Again, test that execution works as expected.
     assert.eq(outCollBySK.find().itcount(), 0);
@@ -100,13 +109,17 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     if (whenNotMatchedMode == "fail" || whenNotMatchedMode == "discard") {
         insertData(outCollBySK);
     }
-    assert.doesNotThrow(() => inColl.aggregate([{
-        $merge: {
-            into: outCollBySK.getName(),
-            whenMatched: whenMatchedMode,
-            whenNotMatched: whenNotMatchedMode
-        }
-    }]));
+    assert.doesNotThrow(() =>
+        inColl.aggregate([
+            {
+                $merge: {
+                    into: outCollBySK.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                },
+            },
+        ]),
+    );
     assert.eq(outCollBySK.find().itcount(), numDocs);
 });
 

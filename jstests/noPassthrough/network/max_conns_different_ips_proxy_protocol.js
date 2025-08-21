@@ -28,8 +28,8 @@ const kConfiguredMaxConns = 5;
         nodes: 1,
         nodeOptions: {
             "proxyPort": egressPort,
-            config: "jstests/noPassthrough/libs/max_conns_override_config.yaml"
-        }
+            config: "jstests/noPassthrough/libs/max_conns_override_config.yaml",
+        },
     });
     rs.startSet();
     rs.initiate();
@@ -43,15 +43,15 @@ const kConfiguredMaxConns = 5;
     // Go up to maxConns
     for (let i = 0; i < kConfiguredMaxConns - 1; i++) {
         const conn = new Mongo(`mongodb://127.0.0.1:${ingressPort}`);
-        assert.neq(null, conn, 'Client was unable to connect');
-        assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
+        assert.neq(null, conn, "Client was unable to connect");
+        assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
         conns.push(conn);
     }
 
     // Make sure the connection past maxConns succeeds.
     const conn = new Mongo(`mongodb://127.0.0.1:${ingressPort}`);
-    assert.neq(null, conn, 'Client was unable to connect');
-    assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
+    assert.neq(null, conn, "Client was unable to connect");
+    assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
 
     proxy_server.stop();
 
@@ -65,8 +65,8 @@ const kConfiguredMaxConns = 5;
         nodes: 1,
         nodeOptions: {
             "proxyPort": egressPort,
-            config: "jstests/noPassthrough/libs/max_conns_override_config.yaml"
-        }
+            config: "jstests/noPassthrough/libs/max_conns_override_config.yaml",
+        },
     });
     rs.startSet();
     rs.initiate();
@@ -80,8 +80,8 @@ const kConfiguredMaxConns = 5;
     // Go up to maxConns
     for (let i = 0; i < kConfiguredMaxConns - 1; i++) {
         const conn = new Mongo(`mongodb://${ip}:${ingressPort}`);
-        assert.neq(null, conn, 'Client was unable to connect');
-        assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
+        assert.neq(null, conn, "Client was unable to connect");
+        assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
         conns.push(conn);
     }
 
@@ -89,9 +89,8 @@ const kConfiguredMaxConns = 5;
     let conn;
     try {
         conn = new Mongo(`mongodb://${ip}:${ingressPort}`);
-    } catch (e) {
-    }
-    assert.eq(null, conn, 'Client connected when it should have failed');
+    } catch (e) {}
+    assert.eq(null, conn, "Client connected when it should have failed");
 
     proxy_server.stop();
 

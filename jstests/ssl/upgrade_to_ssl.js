@@ -16,9 +16,9 @@ var opts = {
     tlsCertificateKeyFile: SERVER_CERT,
     tlsAllowInvalidCertificates: "",
     tlsAllowConnectionsWithoutCertificates: "",
-    tlsCAFile: "jstests/libs/ca.pem"
+    tlsCAFile: "jstests/libs/ca.pem",
 };
-var rst = new ReplSetTest({name: 'tlsSet', nodes: 3, nodeOptions: opts});
+var rst = new ReplSetTest({name: "tlsSet", nodes: 3, nodeOptions: opts});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
@@ -45,7 +45,6 @@ rstConn3.getDB("test").a.insert({a: 3, str: "GREENEGGSANDHAM"});
 assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");
 
 // Check that ssl connections can be made
-var canConnectSSL = runMongoProgram(
-    "mongo", "--port", rst.ports[0], "--tls", "--tlsCAFile", CA_CERT, "--eval", ";");
+var canConnectSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--tls", "--tlsCAFile", CA_CERT, "--eval", ";");
 assert.eq(0, canConnectSSL, "SSL Connection attempt failed when it should succeed");
 rst.stopSet();

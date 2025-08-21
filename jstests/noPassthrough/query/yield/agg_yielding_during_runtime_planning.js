@@ -20,8 +20,7 @@ assert(db.coll.drop());
 assert(db.foreignColl.drop());
 
 assert.commandWorked(db.coll.insert(Array.from({length: 10}, (_, i) => ({_id: i, a: i, b: i}))));
-assert.commandWorked(
-    db.foreignColl.insert(Array.from({length: 1}, (_, i) => ({_id: i, a: i, b: i}))));
+assert.commandWorked(db.foreignColl.insert(Array.from({length: 1}, (_, i) => ({_id: i, a: i, b: i}))));
 
 assert.commandWorked(db.coll.createIndexes([{a: 1}, {b: 1}]));
 assert.commandWorked(db.foreignColl.createIndex({x: 1}));
@@ -33,17 +32,22 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIte
  * Drop a foreign collection index during query yield
  */
 let fp = configureFailPoint(conn, "setYieldAllLocksHang", {namespace: db.coll.getFullName()});
-let awaitShell =
-    startParallelShell(funWithArgs(function(dbName, collName) {
-                           const pipeline = [
-                                {$match: {a: {$gte: 0}, b: {$gte: 0}}},
-                                {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "out"}},
-                                {$project: {a: 1, out: 1}}
-                            ];
-                           let result =
-                               db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray();
-                           assert(result.length === 10);
-                       }, db.getName(), db.coll.getName()), conn.port);
+let awaitShell = startParallelShell(
+    funWithArgs(
+        function (dbName, collName) {
+            const pipeline = [
+                {$match: {a: {$gte: 0}, b: {$gte: 0}}},
+                {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "out"}},
+                {$project: {a: 1, out: 1}},
+            ];
+            let result = db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray();
+            assert(result.length === 10);
+        },
+        db.getName(),
+        db.coll.getName(),
+    ),
+    conn.port,
+);
 
 fp.wait();
 assert.commandWorked(db.foreignColl.dropIndex({x: 1}));
@@ -54,16 +58,24 @@ awaitShell();
  * Rename the foreign collection during query yield
  */
 fp = configureFailPoint(conn, "setYieldAllLocksHang", {namespace: db.coll.getFullName()});
-awaitShell = startParallelShell(funWithArgs(function(dbName, collName) {
-                                    const pipeline = [
-                                        {$match: {a: {$gte: 0}, b: {$gte: 0}}},
-                                        {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "out"}},
-                                        {$project: {a: 1, out: 1}}
-                                    ];
-                                    assert.throwsWithCode(
-                                        () => db.getSiblingDB(dbName)[collName].aggregate(pipeline),
-                                        ErrorCodes.QueryPlanKilled);
-                                }, db.getName(), db.coll.getName()), conn.port);
+awaitShell = startParallelShell(
+    funWithArgs(
+        function (dbName, collName) {
+            const pipeline = [
+                {$match: {a: {$gte: 0}, b: {$gte: 0}}},
+                {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "out"}},
+                {$project: {a: 1, out: 1}},
+            ];
+            assert.throwsWithCode(
+                () => db.getSiblingDB(dbName)[collName].aggregate(pipeline),
+                ErrorCodes.QueryPlanKilled,
+            );
+        },
+        db.getName(),
+        db.coll.getName(),
+    ),
+    conn.port,
+);
 
 fp.wait();
 assert.commandWorked(db.foreignColl.renameCollection("newColl"));
@@ -76,16 +88,24 @@ awaitShell();
 // rename back
 assert.commandWorked(db.newColl.renameCollection("foreignColl"));
 fp = configureFailPoint(conn, "setYieldAllLocksHang", {namespace: db.coll.getFullName()});
-awaitShell = startParallelShell(funWithArgs(function(dbName, collName) {
-                                    const pipeline = [
-                                        {$match: {a: {$gte: 0}, b: {$gte: 0}}},
-                                        {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "out"}},
-                                        {$project: {a: 1, out: 1}}
-                                    ];
-                                    assert.throwsWithCode(
-                                        () => db.getSiblingDB(dbName)[collName].aggregate(pipeline),
-                                        [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled]);
-                                }, db.getName(), db.coll.getName()), conn.port);
+awaitShell = startParallelShell(
+    funWithArgs(
+        function (dbName, collName) {
+            const pipeline = [
+                {$match: {a: {$gte: 0}, b: {$gte: 0}}},
+                {$lookup: {from: "foreignColl", localField: "a", foreignField: "b", as: "out"}},
+                {$project: {a: 1, out: 1}},
+            ];
+            assert.throwsWithCode(
+                () => db.getSiblingDB(dbName)[collName].aggregate(pipeline),
+                [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled],
+            );
+        },
+        db.getName(),
+        db.coll.getName(),
+    ),
+    conn.port,
+);
 
 fp.wait();
 assert(db.foreignColl.drop());

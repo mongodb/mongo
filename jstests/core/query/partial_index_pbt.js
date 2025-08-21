@@ -19,25 +19,18 @@
  * requires_getmore,
  * ]
  */
-import {
-    createCacheCorrectnessProperty
-} from "jstests/libs/property_test_helpers/common_properties.js";
+import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getDatasetModel} from "jstests/libs/property_test_helpers/models/document_models.js";
 import {getIndexModel} from "jstests/libs/property_test_helpers/models/index_models.js";
-import {
-    getPartialFilterPredicateArb
-} from "jstests/libs/property_test_helpers/models/match_models.js";
+import {getPartialFilterPredicateArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {partialIndexCounterexamples} from "jstests/libs/property_test_helpers/pbt_resolved_bugs.js";
-import {
-    concreteQueryFromFamily,
-    testProperty
-} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {concreteQueryFromFamily, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 if (isSlowBuild(db)) {
-    jsTestLog('Exiting early because debug is on, opt is off, or a sanitizer is enabled.');
+    jsTestLog("Exiting early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 
@@ -50,17 +43,20 @@ const experimentColl = db.partial_index_pbt_experiment;
 // partial indexes.
 const correctnessProperty = createCacheCorrectnessProperty(controlColl, experimentColl);
 
-const workloadModel =
-    fc.record({
-          // This filter will be used for the partial index filter, and to prefix queries with
-          // {$match: filter} so that every query is eligible to use the partial indexes.
-          partialFilterPredShape: getPartialFilterPredicateArb(),
-          docs: getDatasetModel(),
-          indexes: fc.array(getIndexModel({allowPartialIndexes: false, allowSparse: false}),
-                            {minLength: 0, maxLength: 15, size: '+2'}),
-          pipelines: fc.array(getAggPipelineModel(),
-                              {minLength: 1, maxLength: numQueriesPerRun, size: '+2'})
-      }).map(({partialFilterPredShape, docs, indexes, pipelines}) => {
+const workloadModel = fc
+    .record({
+        // This filter will be used for the partial index filter, and to prefix queries with
+        // {$match: filter} so that every query is eligible to use the partial indexes.
+        partialFilterPredShape: getPartialFilterPredicateArb(),
+        docs: getDatasetModel(),
+        indexes: fc.array(getIndexModel({allowPartialIndexes: false, allowSparse: false}), {
+            minLength: 0,
+            maxLength: 15,
+            size: "+2",
+        }),
+        pipelines: fc.array(getAggPipelineModel(), {minLength: 1, maxLength: numQueriesPerRun, size: "+2"}),
+    })
+    .map(({partialFilterPredShape, docs, indexes, pipelines}) => {
         // The predicate model generates a family of predicates of the same shape, with different
         // parameter options at the leaf nodes. For all indexes, we use the first predicate from the
         // family as the partial filter expression.
@@ -68,8 +64,7 @@ const workloadModel =
         const partialIndexes = indexes.map(({def, options}) => {
             return {
                 def,
-                options:
-                    Object.assign({}, options, {partialFilterExpression: firstPartialFilterPred})
+                options: Object.assign({}, options, {partialFilterExpression: firstPartialFilterPred}),
             };
         });
 
@@ -78,14 +73,10 @@ const workloadModel =
         // behave correctly. In general our queries are modeled as families of shapes, so including
         // the predicate family in the $match rather than one specific predicate makes sense.
         const match = {$match: partialFilterPredShape};
-        const queriesWithMatch = pipelines.map(p => [match, ...p]);
+        const queriesWithMatch = pipelines.map((p) => [match, ...p]);
         return {collSpec: {isTS: false, docs, indexes: partialIndexes}, queries: queriesWithMatch};
     });
 
 // Test with a regular collection.
-testProperty(correctnessProperty,
-             {controlColl, experimentColl},
-             workloadModel,
-             numRuns,
-             partialIndexCounterexamples);
+testProperty(correctnessProperty, {controlColl, experimentColl}, workloadModel, numRuns, partialIndexCounterexamples);
 // TODO SERVER-103381 extend this test to use time-series collections.

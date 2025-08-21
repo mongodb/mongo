@@ -11,17 +11,19 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    let coll = db[jsTestName() + '_ts'];
-    let collNotTs = db[jsTestName() + '_not_ts'];
+    let coll = db[jsTestName() + "_ts"];
+    let collNotTs = db[jsTestName() + "_not_ts"];
 
     coll.drop();
     collNotTs.drop();
 
     // Create a TS collection to get block processing running. Compare this against a classic
     // collection.
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: 'time', metaField: 'meta'},
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: "time", metaField: "meta"},
+        }),
+    );
 
     assert.commandWorked(db.createCollection(collNotTs.getName()));
 
@@ -38,13 +40,12 @@ TimeseriesTest.run((insert) => {
             let docOffsetSign = doc % 2 == 0 ? -1 : 1;
             tsDocs.push({
                 _id: id,
-                time: new Date(datePrefix + currentDate +
-                               id),  // Use id to ensure uniqueness of each time stamp
+                time: new Date(datePrefix + currentDate + id), // Use id to ensure uniqueness of each time stamp
                 meta: metaIdx,
-                x: NumberLong((200 * metaIdx * metaOffsetSign) + (doc * docOffsetSign)),
-                y: (1000 * metaIdx * metaOffsetSign) + (doc * docOffsetSign),
+                x: NumberLong(200 * metaIdx * metaOffsetSign + doc * docOffsetSign),
+                y: 1000 * metaIdx * metaOffsetSign + doc * docOffsetSign,
                 z: NumberLong(id++),
-                t: new Date(datePrefix + (10000 * metaIdx * metaOffsetSign) + (doc * docOffsetSign))
+                t: new Date(datePrefix + 10000 * metaIdx * metaOffsetSign + doc * docOffsetSign),
             });
             currentDate += 500;
         }
@@ -55,14 +56,12 @@ TimeseriesTest.run((insert) => {
                 let docOffsetSign = doc % 2 == 0 ? -1 : 1;
                 tsDocs.push({
                     _id: id,
-                    time: new Date(datePrefix + currentDate +
-                                   id),  // Use id to ensure uniqueness of each time stamp
+                    time: new Date(datePrefix + currentDate + id), // Use id to ensure uniqueness of each time stamp
                     meta: metaIdx,
-                    x: NumberLong((200 * metaIdx * metaOffsetSign) + (doc * docOffsetSign)),
+                    x: NumberLong(200 * metaIdx * metaOffsetSign + doc * docOffsetSign),
                     y: dbl,
                     z: NumberInt(id++),
-                    t: new Date(datePrefix + (10000 * metaIdx * metaOffsetSign) +
-                                (doc * docOffsetSign))
+                    t: new Date(datePrefix + 10000 * metaIdx * metaOffsetSign + doc * docOffsetSign),
                 });
                 currentDate += 500;
                 doc++;
@@ -79,10 +78,10 @@ TimeseriesTest.run((insert) => {
         const bpResults = coll.aggregate(pipeline, {allowDiskUse}).toArray();
 
         // Sort order is not guaranteed, so let's sort by the object itself before comparing.
-        const cmpFn = function(doc1, doc2) {
+        const cmpFn = function (doc1, doc2) {
             const doc1Json = tojson(doc1);
             const doc2Json = tojson(doc2);
-            return doc1Json < doc2Json ? -1 : (doc1Json > doc2Json ? 1 : 0);
+            return doc1Json < doc2Json ? -1 : doc1Json > doc2Json ? 1 : 0;
         };
         classicResults.sort(cmpFn);
         bpResults.sort(cmpFn);
@@ -96,14 +95,10 @@ TimeseriesTest.run((insert) => {
         assert.eq(classicResults, bpResults, errFn);
     }
 
-    const nVals = [
-        NumberInt(1),
-        NumberInt(10),
-    ];
+    const nVals = [NumberInt(1), NumberInt(10)];
 
     // Since we're only sorting on single fields, every sort field must be unique.
-    const sortBys =
-        [{time: 1}, {time: -1}, {x: 1}, {x: -1}, {y: 1}, {y: -1}, {z: 1}, {z: -1}, {t: 1}, {t: -1}];
+    const sortBys = [{time: 1}, {time: -1}, {x: 1}, {x: -1}, {y: 1}, {y: -1}, {z: 1}, {z: -1}, {t: 1}, {t: -1}];
 
     const groupBys = [
         {time: {"$dateTrunc": {"date": "$time", "unit": "second", binSize: 3}}},
@@ -115,7 +110,7 @@ TimeseriesTest.run((insert) => {
     ];
 
     let groupStages = [];
-    for (const accumulator of ['$topN', '$bottomN']) {
+    for (const accumulator of ["$topN", "$bottomN"]) {
         for (const nVal of nVals) {
             for (const sortBy of sortBys) {
                 for (const groupBy of groupBys) {
@@ -124,9 +119,9 @@ TimeseriesTest.run((insert) => {
                         {
                             $group: {
                                 _id: groupBy,
-                                acc: {[accumulator]: {n: nVal, sortBy: sortBy, output: "$_id"}}
-                            }
-                        }
+                                acc: {[accumulator]: {n: nVal, sortBy: sortBy, output: "$_id"}},
+                            },
+                        },
                     ]);
                 }
             }

@@ -9,7 +9,7 @@
 
 import {
     withRetryOnTransientTxnError,
-    withTxnAndAutoRetryOnMongos
+    withTxnAndAutoRetryOnMongos,
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
@@ -29,12 +29,16 @@ for (let i = 0; i < 4; ++i) {
 
 jsTest.log("Test that the killCursors command is allowed in transactions.");
 
-withTxnAndAutoRetryOnMongos(session, () => {
-    let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
-    assert(res.hasOwnProperty("cursor"), tojson(res));
-    assert(res.cursor.hasOwnProperty("id"), tojson(res));
-    assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
-}, /* txnOpts = */ {});
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+        assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+    },
+    /* txnOpts = */ {},
+);
 
 jsTest.log("Test that the killCursors cannot be the first operation in a transaction.");
 let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
@@ -45,20 +49,20 @@ withRetryOnTransientTxnError(
         session.startTransaction();
         assert.commandFailedWithCode(
             sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
-            ErrorCodes.OperationNotSupportedInTransaction);
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+            ErrorCodes.OperationNotSupportedInTransaction,
+        );
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     },
     () => {
         session.abortTransaction_forTesting();
-    });
+    },
+);
 
 // TODO SERVER-102866 remove when 9.0 becomes last-lts
-const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-    Boolean(TestData.multiversionBinVersion);
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
 if (!isMultiversion) {
-    jsTest.log(
-        "killcursors in session but not transaction can kill cursor in a transaction in another session");
+    jsTest.log("killcursors in session but not transaction can kill cursor in a transaction in another session");
     withRetryOnTransientTxnError(
         () => {
             session.startTransaction();
@@ -68,17 +72,18 @@ if (!isMultiversion) {
             assert(res.hasOwnProperty("cursor"), tojson(res));
             assert(res.cursor.hasOwnProperty("id"), tojson(res));
 
-            assert.commandWorked(
-                sessionDb2.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+            assert.commandWorked(sessionDb2.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
         },
         () => {
             session.abortTransaction_forTesting();
-        });
+        },
+    );
     session.abortTransaction_forTesting();
 
     jsTest.log(
         "killcursors in session1 in transaction should not be able to kill cursor in session2 since " +
-        "it's not from the same transaction");
+            "it's not from the same transaction",
+    );
     withRetryOnTransientTxnError(
         () => {
             session.startTransaction();
@@ -92,15 +97,19 @@ if (!isMultiversion) {
             assert(res.cursor.hasOwnProperty("id"), tojson(res));
 
             assert.commandFailedWithCode(
-                sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}), 8912345);
+                sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
+                8912345,
+            );
         },
         () => {
             session.abortTransaction_forTesting();
-        });
+        },
+    );
     session.abortTransaction_forTesting();
 
-    jsTest.log("killcursors in transaction should not be able to kill cursor" +
-               "in another transaction in the same session");
+    jsTest.log(
+        "killcursors in transaction should not be able to kill cursor" + "in another transaction in the same session",
+    );
     withRetryOnTransientTxnError(
         () => {
             session.startTransaction();
@@ -110,7 +119,8 @@ if (!isMultiversion) {
         },
         () => {
             session.abortTransaction_forTesting();
-        });
+        },
+    );
 
     withRetryOnTransientTxnError(
         () => {
@@ -120,11 +130,14 @@ if (!isMultiversion) {
             assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
 
             assert.commandFailedWithCode(
-                sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}), 8912321);
+                sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
+                8912321,
+            );
         },
         () => {
             session.abortTransaction_forTesting();
-        });
+        },
+    );
     session.abortTransaction_forTesting();
 }
 
@@ -141,34 +154,37 @@ withRetryOnTransientTxnError(
     },
     () => {
         session.abortTransaction_forTesting();
-    });
+    },
+);
 
 // Start a drop, which will hang.
-let awaitDrop = startParallelShell(function() {
+let awaitDrop = startParallelShell(function () {
     db.getSiblingDB("test")["kill_cursors_in_transaction"].drop({writeConcern: {w: "majority"}});
 });
 
 // Wait for the drop to have a pending MODE_X lock on the database.
 assert.soon(
-    function() {
-        return adminDB
-                   .aggregate([
-                       {$currentOp: {}},
-                       {
-                           $match: {
-                               $or: [
-                                   {'command.drop': collName, waitingForLock: true},
-                                   {'command._shardsvrParticipantBlock': collName},
-                               ]
-                           }
-                       }
-                   ])
-                   .itcount() > 0;
+    function () {
+        return (
+            adminDB
+                .aggregate([
+                    {$currentOp: {}},
+                    {
+                        $match: {
+                            $or: [
+                                {"command.drop": collName, waitingForLock: true},
+                                {"command._shardsvrParticipantBlock": collName},
+                            ],
+                        },
+                    },
+                ])
+                .itcount() > 0
+        );
     },
-    function() {
-        return "Failed to find drop in currentOp output: " +
-            tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
-    });
+    function () {
+        return "Failed to find drop in currentOp output: " + tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
+    },
+);
 
 // killCursors does not block behind the pending MODE_X lock. It is possible that due to ticket
 // exhaustion we end up detecting a deadlocked state, where the drop operation is waiting for
@@ -186,8 +202,7 @@ if (res.ok) {
     assert(isTransientTxnError, res);
     assert(isLockTimeout, res);
     // The transaction should have implicitly been aborted.
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 }
 
 // Once the transaction has committed, the drop can proceed.

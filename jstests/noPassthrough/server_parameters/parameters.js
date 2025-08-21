@@ -57,13 +57,10 @@ ensureSetParameterFailure(dbConn, "journalCommitInterval", 1000);
 ensureSetParameterFailure(dbConn, "journalCommitInterval", 0);
 ensureSetParameterFailure(dbConn, "syncdelay", 10 * 1000 * 1000);
 ensureSetParameterFailure(dbConn, "syncdelay", -10 * 1000 * 1000);
-ensureSetParameterFailure(
-    dbConn, "scramSHA256IterationCount", 18446744073709551616, 'Out of bounds');
-ensureSetParameterFailure(
-    dbConn, "scramSHA256IterationCount", -18446744073709551616, 'Out of bounds');
-ensureSetParameterFailure(dbConn, "scramSHA256IterationCount", NaN, 'Unable to coerce NaN/Inf');
-ensureSetParameterFailure(
-    dbConn, "scramSHA256IterationCount", Infinity, 'Unable to coerce NaN/Inf');
+ensureSetParameterFailure(dbConn, "scramSHA256IterationCount", 18446744073709551616, "Out of bounds");
+ensureSetParameterFailure(dbConn, "scramSHA256IterationCount", -18446744073709551616, "Out of bounds");
+ensureSetParameterFailure(dbConn, "scramSHA256IterationCount", NaN, "Unable to coerce NaN/Inf");
+ensureSetParameterFailure(dbConn, "scramSHA256IterationCount", Infinity, "Unable to coerce NaN/Inf");
 ensureSetParameterFailure(dbConn, "wiredTigerCursorCacheSize", 5);
 
 MongoRunner.stopMongod(dbConn);

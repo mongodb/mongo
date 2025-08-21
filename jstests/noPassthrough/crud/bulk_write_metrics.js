@@ -14,8 +14,11 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     // We are ok with the randomness here since we clearly log the state.
     // TODO SERVER-105762: Remove the 'uweEnabled' check once errorsOnly is enabled.
     const errorsOnly = uweEnabled ? false : Math.random() < 0.5;
-    print(`Running on a ${isMongos ? "ShardingTest" : "ReplSetTest"} with bulkWrite = ${
-        bulkWrite}, errorsOnly = ${errorsOnly} and timeseries = ${timeseries}.`);
+    print(
+        `Running on a ${isMongos ? "ShardingTest" : "ReplSetTest"} with bulkWrite = ${
+            bulkWrite
+        }, errorsOnly = ${errorsOnly} and timeseries = ${timeseries}.`,
+    );
 
     const dbName = "testDB";
     const collName1 = "testColl1";
@@ -29,136 +32,158 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
 
     // The chunks below are [$minKey, key1) on shard0, [key1, key2) on shard1 and [key2, $maxKey) on
     // shard2.
-    const key0 = ISODate("2024-01-02T00:00:00.00Z");  // On shard0.
-    const key1 = ISODate("2024-01-05T00:00:00.00Z");  // On shard1.
-    const key2 = ISODate("2024-01-20T00:00:00.00Z");  // On shard2.
+    const key0 = ISODate("2024-01-02T00:00:00.00Z"); // On shard0.
+    const key1 = ISODate("2024-01-05T00:00:00.00Z"); // On shard1.
+    const key2 = ISODate("2024-01-20T00:00:00.00Z"); // On shard2.
 
     if (timeseries) {
-        assert.commandWorked(testDB.createCollection(collName1, {
-            timeseries: {timeField: "timestamp", bucketMaxSpanSeconds: 1, bucketRoundingSeconds: 1}
-        }));
+        assert.commandWorked(
+            testDB.createCollection(collName1, {
+                timeseries: {timeField: "timestamp", bucketMaxSpanSeconds: 1, bucketRoundingSeconds: 1},
+            }),
+        );
     }
 
     if (isMongos) {
-        assert.commandWorked(testDB.adminCommand({'enableSharding': dbName}));
-        assert.commandWorked(
-            testDB.adminCommand({shardCollection: namespace1, key: {timestamp: 1}}));
-        assert.commandWorked(
-            testDB.adminCommand({shardCollection: namespace2, key: {timestamp: 1}}));
+        assert.commandWorked(testDB.adminCommand({"enableSharding": dbName}));
+        assert.commandWorked(testDB.adminCommand({shardCollection: namespace1, key: {timestamp: 1}}));
+        assert.commandWorked(testDB.adminCommand({shardCollection: namespace2, key: {timestamp: 1}}));
 
         // TODO(SERVER-101609): Remove `splitNs` and replace with `namespace1`
-        const splitNs =
-            (timeseries ? getTimeseriesCollForDDLOps(testDB, coll) : coll).getFullName();
+        const splitNs = (timeseries ? getTimeseriesCollForDDLOps(testDB, coll) : coll).getFullName();
         const splitKey = timeseries ? "control.min.timestamp" : "timestamp";
 
         assert.commandWorked(testDB.adminCommand({split: splitNs, middle: {[splitKey]: key1}}));
         assert.commandWorked(testDB.adminCommand({split: splitNs, middle: {[splitKey]: key2}}));
 
         // Move chunks so each shard has one chunk.
-        assert.commandWorked(testDB.adminCommand({
-            moveChunk: splitNs,
-            find: {[splitKey]: key0},
-            to: cluster.shard0.shardName,
-            _waitForDelete: true
-        }));
-        assert.commandWorked(testDB.adminCommand({
-            moveChunk: splitNs,
-            find: {[splitKey]: key1},
-            to: cluster.shard1.shardName,
-            _waitForDelete: true
-        }));
-        assert.commandWorked(testDB.adminCommand({
-            moveChunk: splitNs,
-            find: {[splitKey]: key2},
-            to: cluster.shard2.shardName,
-            _waitForDelete: true
-        }));
+        assert.commandWorked(
+            testDB.adminCommand({
+                moveChunk: splitNs,
+                find: {[splitKey]: key0},
+                to: cluster.shard0.shardName,
+                _waitForDelete: true,
+            }),
+        );
+        assert.commandWorked(
+            testDB.adminCommand({
+                moveChunk: splitNs,
+                find: {[splitKey]: key1},
+                to: cluster.shard1.shardName,
+                _waitForDelete: true,
+            }),
+        );
+        assert.commandWorked(
+            testDB.adminCommand({
+                moveChunk: splitNs,
+                find: {[splitKey]: key2},
+                to: cluster.shard2.shardName,
+                _waitForDelete: true,
+            }),
+        );
     }
 
     const defaultTimestamp = ISODate("2021-05-18T00:00:00.000Z");
 
-    const metricChecker = new BulkWriteMetricChecker(testDB,
-                                                     [namespace1, namespace2],
-                                                     bulkWrite,
-                                                     isMongos,
-                                                     false /*fle*/,
-                                                     errorsOnly,
-                                                     retryCount,
-                                                     timeseries,
-                                                     defaultTimestamp);
+    const metricChecker = new BulkWriteMetricChecker(
+        testDB,
+        [namespace1, namespace2],
+        bulkWrite,
+        isMongos,
+        false /*fle*/,
+        errorsOnly,
+        retryCount,
+        timeseries,
+        defaultTimestamp,
+    );
 
     // Simplifies implementation of checkBulkWriteMetrics:
     // totals["testDB.testColl"] will not be undefined on first top call below.
     metricChecker.executeCommand({insert: collName1, documents: [{_id: 99}]});
     metricChecker.executeCommand({insert: collName2, documents: [{_id: 99}]});
 
-    metricChecker.checkMetrics("Simple insert",
-                               [{insert: 0, document: {_id: 0}}],
-                               [{insert: collName1, documents: [{_id: 0}]}],
-                               {inserted: 1});
+    metricChecker.checkMetrics(
+        "Simple insert",
+        [{insert: 0, document: {_id: 0}}],
+        [{insert: collName1, documents: [{_id: 0}]}],
+        {inserted: 1},
+    );
 
-    metricChecker.checkMetrics("Update with pipeline",
-                               [{update: 0, filter: {_id: 0}, updateMods: [{$set: {x: 1}}]}],
-                               [{update: collName1, updates: [{q: {_id: 0}, u: [{$set: {x: 1}}]}]}],
-                               {updated: 1, updatePipeline: 1});
+    metricChecker.checkMetrics(
+        "Update with pipeline",
+        [{update: 0, filter: {_id: 0}, updateMods: [{$set: {x: 1}}]}],
+        [{update: collName1, updates: [{q: {_id: 0}, u: [{$set: {x: 1}}]}]}],
+        {updated: 1, updatePipeline: 1},
+    );
 
-    metricChecker.executeCommand(
-        {insert: collName1, documents: [{_id: 1, a: [{b: 5}, {b: 1}, {b: 2}]}]});
+    metricChecker.executeCommand({insert: collName1, documents: [{_id: 1, a: [{b: 5}, {b: 1}, {b: 2}]}]});
 
     metricChecker.checkMetrics(
         "Update with arrayFilters",
-        [{
-            update: 0,
-            filter: {_id: 1},
-            updateMods: {$set: {"a.$[i].b": 6}},
-            arrayFilters: [{"i.b": 5}]
-        }],
-        [{
-            update: collName1,
-            updates: [{q: {_id: 1}, u: {$set: {"a.$[i].b": 6}}, arrayFilters: [{"i.b": 5}]}]
-        }],
-        {updated: 1, updateArrayFilters: 1});
+        [
+            {
+                update: 0,
+                filter: {_id: 1},
+                updateMods: {$set: {"a.$[i].b": 6}},
+                arrayFilters: [{"i.b": 5}],
+            },
+        ],
+        [
+            {
+                update: collName1,
+                updates: [{q: {_id: 1}, u: {$set: {"a.$[i].b": 6}}, arrayFilters: [{"i.b": 5}]}],
+            },
+        ],
+        {updated: 1, updateArrayFilters: 1},
+    );
 
     let query = timeseries ? {_id: 0, timestamp: defaultTimestamp} : {_id: 0};
-    metricChecker.checkMetrics("Simple delete",
-                               [{delete: 0, filter: query}],
-                               [{delete: collName1, deletes: [{q: query, limit: 1}]}],
-                               {deleted: 1});
+    metricChecker.checkMetrics(
+        "Simple delete",
+        [{delete: 0, filter: query}],
+        [{delete: collName1, deletes: [{q: query, limit: 1}]}],
+        {deleted: 1},
+    );
 
-    metricChecker.checkMetricsWithRetries("Simple insert with retry",
-                                          [{insert: 0, document: {_id: 3}}],
-                                          {
-                                              insert: collName1,
-                                              documents: [{_id: 3}],
-                                          },
-                                          {inserted: 1, retriedInsert: retryCount - 1},
-                                          session.getSessionId(),
-                                          NumberLong(10));
+    metricChecker.checkMetricsWithRetries(
+        "Simple insert with retry",
+        [{insert: 0, document: {_id: 3}}],
+        {
+            insert: collName1,
+            documents: [{_id: 3}],
+        },
+        {inserted: 1, retriedInsert: retryCount - 1},
+        session.getSessionId(),
+        NumberLong(10),
+    );
 
     if (!isMongos) {
         metricChecker.checkMetricsWithRetries(
             "Simple update with retry",
-            [{
-                update: 0,
-                filter: {_id: 1},
-                updateMods: {$set: {"a.$[i].b": 7}},
-                arrayFilters: [{"i.b": 6}]
-            }],
+            [
+                {
+                    update: 0,
+                    filter: {_id: 1},
+                    updateMods: {$set: {"a.$[i].b": 7}},
+                    arrayFilters: [{"i.b": 6}],
+                },
+            ],
             {
                 update: collName1,
-                updates: [{q: {_id: 1}, u: {$set: {"a.$[i].b": 7}}, arrayFilters: [{"i.b": 6}]}]
+                updates: [{q: {_id: 1}, u: {$set: {"a.$[i].b": 7}}, arrayFilters: [{"i.b": 6}]}],
             },
             {
                 updated: 1,
-                updateArrayFilters: retryCount  // This is incremented even on a retry.
+                updateArrayFilters: retryCount, // This is incremented even on a retry.
             },
             session.getSessionId(),
-            NumberLong(11));
+            NumberLong(11),
+        );
     } else {
         // Execute the writes to get the same documents on Repl and Mongos for next test.
         metricChecker.executeCommand({
             update: collName1,
-            updates: [{q: {_id: 1}, u: {$set: {"a.$[i].b": 7}}, arrayFilters: [{"i.b": 6}]}]
+            updates: [{q: {_id: 1}, u: {$set: {"a.$[i].b": 7}}, arrayFilters: [{"i.b": 6}]}],
         });
     }
 
@@ -168,8 +193,8 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     let insertShardField = bulkWrite ? "allShards" : "oneShard";
     let updateShardField = bulkWrite ? "manyShards" : "oneShard";
 
-    const key3 = ISODate("2024-01-10T00:00:00.00Z");  // On shard1.
-    const key4 = ISODate("2024-01-30T00:00:00.00Z");  // On shard2.
+    const key3 = ISODate("2024-01-10T00:00:00.00Z"); // On shard1.
+    const key4 = ISODate("2024-01-30T00:00:00.00Z"); // On shard2.
 
     metricChecker.checkMetrics(
         "Multiple operations",
@@ -179,7 +204,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
             {insert: 0, document: {timestamp: key3}},
             {update: 0, filter: {timestamp: key3}, updateMods: {$set: {x: 2}}},
             {insert: 0, document: {timestamp: key4}},
-            {delete: 0, filter: {_id: 4, timestamp: key0}}
+            {delete: 0, filter: {_id: 4, timestamp: key0}},
         ],
         [
             {insert: collName1, documents: [{_id: 4, timestamp: key0}]},
@@ -187,7 +212,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
             {insert: collName1, documents: [{timestamp: key3}]},
             {update: collName1, updates: [{q: {timestamp: key3}, u: {$set: {x: 2}}}]},
             {insert: collName1, documents: [{timestamp: key4}]},
-            {delete: collName1, deletes: [{q: {_id: 4, timestamp: key0}, limit: 1}]}
+            {delete: collName1, deletes: [{q: {_id: 4, timestamp: key0}, limit: 1}]},
         ],
         {
             updated: 2,
@@ -197,8 +222,9 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
             singleInsertForBulkWrite: true,
             insertShardField: insertShardField,
             updateShardField: updateShardField,
-            deleteShardField: "oneShard"
-        });
+            deleteShardField: "oneShard",
+        },
+    );
 
     // TODO SERVER-104131: Enable when 'WouldChangeOwningShard' writes are supported.
     if (isMongos && !uweEnabled) {
@@ -207,13 +233,12 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         metricChecker.retryCount = 1;
         metricChecker.checkMetricsWithRetries(
             "Update modifying owning shard",
-            [
-                {update: 0, filter: {timestamp: key3}, updateMods: {$set: {timestamp: key4}}},
-            ],
+            [{update: 0, filter: {timestamp: key3}, updateMods: {$set: {timestamp: key4}}}],
             {update: collName1, updates: [{q: {timestamp: key3}, u: {$set: {timestamp: key4}}}]},
             {updated: 1, updateShardField: "manyShards"},
             session.getSessionId(),
-            NumberLong(12));
+            NumberLong(12),
+        );
     } else {
         // Execute the writes to get the same documents on Repl and Mongos for next test.
         metricChecker.executeCommand({insert: collName1, documents: [{timestamp: key4, x: 2}]});
@@ -224,11 +249,14 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         metricChecker.checkMetrics(
             "Simple update with multi: true",
             [{update: 0, filter: {timestamp: key4}, updateMods: {$set: {x: 3}}, multi: true}],
-            [{
-                update: collName1,
-                updates: [{q: {timestamp: key4}, u: {$set: {x: 3}}, multi: true}]
-            }],
-            {updated: 2, updateCount: 1, updateManyCount: 1, updateShardField: "oneShard"});
+            [
+                {
+                    update: collName1,
+                    updates: [{q: {timestamp: key4}, u: {$set: {x: 3}}, multi: true}],
+                },
+            ],
+            {updated: 2, updateCount: 1, updateManyCount: 1, updateShardField: "oneShard"},
+        );
 
         metricChecker.checkMetrics(
             "Multiple namespaces",
@@ -240,7 +268,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
                     update: 0,
                     filter: {timestamp: key4},
                     updateMods: {$set: {y: "tree"}},
-                    multi: true
+                    multi: true,
                 },
                 {delete: 0, filter: {_id: 5, timestamp: key0}},
             ],
@@ -250,7 +278,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
                 {update: collName2, updates: [{q: {timestamp: key0}, u: {$set: {x: 2}}}]},
                 {
                     update: collName1,
-                    updates: [{q: {timestamp: key4}, u: {$set: {y: "tree"}}, multi: true}]
+                    updates: [{q: {timestamp: key4}, u: {$set: {y: "tree"}}, multi: true}],
                 },
                 {delete: collName1, deletes: [{q: {_id: 5, timestamp: key0}, limit: 1}]},
             ],
@@ -263,11 +291,11 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
                 updateShardField: "oneShard",
                 deleteShardField: "oneShard",
                 perNamespaceMetrics: {
-                    [namespace1]:
-                        {inserted: 1, deleted: 1, deleteCount: 1, updated: 2, updateCount: 1},
-                    [namespace2]: {inserted: 1, updateCount: 1, updated: 1}
-                }
-            });
+                    [namespace1]: {inserted: 1, deleted: 1, deleteCount: 1, updated: 2, updateCount: 1},
+                    [namespace2]: {inserted: 1, updateCount: 1, updated: 1},
+                },
+            },
+        );
 
         metricChecker.checkMetrics(
             "Simple delete with multi: true on one shard",
@@ -278,8 +306,9 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
                 deleteCount: 1,
                 deleteManyCount: 1,
                 deleteShardField: "oneShard",
-                singleDeleteForBulkWrite: true
-            });
+                singleDeleteForBulkWrite: true,
+            },
+        );
 
         metricChecker.checkMetrics(
             "Simple delete with multi: true across shards",
@@ -306,9 +335,9 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         nodeOptions: {
             setParameter: {
                 // Required for serverStatus() to have opWriteConcernCounters.
-                reportOpWriteConcernCountersInServerStatus: true
-            }
-        }
+                reportOpWriteConcernCountersInServerStatus: true,
+            },
+        },
     });
 
     replTest.startSet();

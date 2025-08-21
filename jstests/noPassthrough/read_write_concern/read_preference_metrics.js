@@ -12,11 +12,14 @@ const collName = "collName";
 
 function getReadPreferenceMetrics(conn) {
     const serverStatus = assert.commandWorked(conn.getDB("admin").runCommand({serverStatus: 1}));
-    assert(serverStatus.process.startsWith("mongod"),
-           "Server status 'process' field does not start with 'mongod'. process: " +
-               serverStatus.process);
-    assert(serverStatus.hasOwnProperty("readPreferenceCounters"),
-           "Server status object is missing 'readPreferenceCounters' field");
+    assert(
+        serverStatus.process.startsWith("mongod"),
+        "Server status 'process' field does not start with 'mongod'. process: " + serverStatus.process,
+    );
+    assert(
+        serverStatus.hasOwnProperty("readPreferenceCounters"),
+        "Server status object is missing 'readPreferenceCounters' field",
+    );
     return serverStatus.readPreferenceCounters;
 }
 
@@ -36,16 +39,20 @@ function verifyMetricIncrement(conn, readPref, executedOn, tagged) {
     const expectedCount = preMetrics[executedOn][readPref].external + 1;
     const count = postMetrics[executedOn][readPref].external;
 
-    assert(expectedCount == count,
-           `Actual count ${count} did not equal expected count ${
-               expectedCount} for readPreference ${readPref}.`);
+    assert(
+        expectedCount == count,
+        `Actual count ${count} did not equal expected count ${expectedCount} for readPreference ${readPref}.`,
+    );
 
     if (tagged) {
         const expectedTaggedCount = preMetrics[executedOn].tagged.external + 1;
         const taggedCount = postMetrics[executedOn].tagged.external;
-        assert(expectedTaggedCount == taggedCount,
-               `Actual tagged count ${taggedCount} did not equal to expected tagged count ${
-                   expectedTaggedCount} for read preference ${readPref}.`);
+        assert(
+            expectedTaggedCount == taggedCount,
+            `Actual tagged count ${taggedCount} did not equal to expected tagged count ${
+                expectedTaggedCount
+            } for read preference ${readPref}.`,
+        );
     }
 }
 
@@ -53,13 +60,7 @@ function runTest(fixture) {
     const primary = fixture.getPrimary();
     const secondary = fixture.getSecondary();
 
-    const preferences = [
-        "primary",
-        "primaryPreferred",
-        "secondary",
-        "secondaryPreferred",
-        "nearest",
-    ];
+    const preferences = ["primary", "primaryPreferred", "secondary", "secondaryPreferred", "nearest"];
 
     for (const readPref of preferences) {
         verifyMetricIncrement(primary, readPref, "executedOnPrimary");

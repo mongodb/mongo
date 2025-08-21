@@ -4,7 +4,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
-var name = 'stepup_increments_config_term';
+var name = "stepup_increments_config_term";
 var replTest = new ReplSetTest({name: name, nodes: 3, settings: {chainingAllowed: false}});
 
 replTest.startSet();

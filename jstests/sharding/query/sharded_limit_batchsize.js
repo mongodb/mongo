@@ -42,13 +42,11 @@ function testLimit(coll) {
     assert(!cursor.hasNext());
 
     // Ensure that in the limit 1 case the server does not leave a cursor open.
-    var openCursorsBefore =
-        assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
+    var openCursorsBefore = assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
     cursor = coll.find().sort({x: 1}).limit(1);
     assert(cursor.hasNext());
     assert.eq(-10, cursor.next()["_id"]);
-    var openCursorsAfter =
-        assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
+    var openCursorsAfter = assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
     assert.eq(openCursorsBefore, openCursorsAfter);
 }
 
@@ -59,18 +57,26 @@ function testSingleBatch(coll, numShards) {
     // Ensure that singleBatch queries that require multiple batches from individual shards
     // return complete results.
     var batchSize = 5;
-    var res = assert.commandWorked(coll.getDB().runCommand({
-        find: coll.getName(),
-        filter: {x: {$lte: 10}},
-        skip: numShards * batchSize,
-        singleBatch: true,
-        batchSize: batchSize
-    }));
+    var res = assert.commandWorked(
+        coll.getDB().runCommand({
+            find: coll.getName(),
+            filter: {x: {$lte: 10}},
+            skip: numShards * batchSize,
+            singleBatch: true,
+            batchSize: batchSize,
+        }),
+    );
     assert.eq(batchSize, res.cursor.firstBatch.length);
     assert.eq(0, res.cursor.id);
-    var cursor = coll.find().skip(numShards * batchSize).limit(-1 * batchSize);
+    var cursor = coll
+        .find()
+        .skip(numShards * batchSize)
+        .limit(-1 * batchSize);
     assert.eq(batchSize, cursor.itcount());
-    cursor = coll.find().skip(numShards * batchSize).batchSize(-1 * batchSize);
+    cursor = coll
+        .find()
+        .skip(numShards * batchSize)
+        .batchSize(-1 * batchSize);
     assert.eq(batchSize, cursor.itcount());
 }
 
@@ -78,8 +84,7 @@ function testSingleBatch(coll, numShards) {
 // Create a two-shard cluster. Have an unsharded collection and a sharded collection.
 //
 
-var st =
-    new ShardingTest({shards: 2, other: {rsOptions: {setParameter: {"enableTestCommands": 1}}}});
+var st = new ShardingTest({shards: 2, other: {rsOptions: {setParameter: {"enableTestCommands": 1}}}});
 
 var db = st.s.getDB("test");
 var shardedCol = db.getCollection("sharded_limit_batchsize");
@@ -88,12 +93,10 @@ shardedCol.drop();
 unshardedCol.drop();
 
 // Enable sharding and pre-split the sharded collection.
-assert.commandWorked(
-    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 db.adminCommand({shardCollection: shardedCol.getFullName(), key: {_id: 1}});
 assert.commandWorked(db.adminCommand({split: shardedCol.getFullName(), middle: {_id: 0}}));
-assert.commandWorked(db.adminCommand(
-    {moveChunk: shardedCol.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(db.adminCommand({moveChunk: shardedCol.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
 
 // Write 10 documents to shard 0, and 10 documents to shard 1 inside the sharded collection.
 // Write 20 documents which all go to the primary shard in the unsharded collection.
@@ -133,11 +136,13 @@ testBatchSize(unshardedCol);
 // by enabling the getmore failpoint on the shards.
 //
 
-assert.commandWorked(st.shard0.getDB("test").adminCommand(
-    {configureFailPoint: "failReceivedGetmore", mode: "alwaysOn"}));
+assert.commandWorked(
+    st.shard0.getDB("test").adminCommand({configureFailPoint: "failReceivedGetmore", mode: "alwaysOn"}),
+);
 
-assert.commandWorked(st.shard1.getDB("test").adminCommand(
-    {configureFailPoint: "failReceivedGetmore", mode: "alwaysOn"}));
+assert.commandWorked(
+    st.shard1.getDB("test").adminCommand({configureFailPoint: "failReceivedGetmore", mode: "alwaysOn"}),
+);
 
 jsTest.log("Running limit tests against sharded collection.");
 testLimit(shardedCol, st.shard0);

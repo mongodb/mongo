@@ -3,9 +3,7 @@
 //  requires_replication,
 // ]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    testTimeBasedPreImageRetentionPolicy
-} from "jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_utils.js";
+import {testTimeBasedPreImageRetentionPolicy} from "jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_utils.js";
 
 // Tests pre-image time based expiration on a replica-set.
 (function testChangeStreamPreImagesforTimeBasedExpirationOnReplicaSet() {
@@ -14,7 +12,7 @@ import {
         nodes: 3,
         // Test expects an exact number of pre-images to be deleted. Thus, the pre-images truncate
         // markers must only contain 1 document at most.
-        nodeOptions: {setParameter: {preImagesCollectionTruncateMarkersMinBytes: 1}}
+        nodeOptions: {setParameter: {preImagesCollectionTruncateMarkersMinBytes: 1}},
     });
     replSetTest.startSet();
     replSetTest.initiate();

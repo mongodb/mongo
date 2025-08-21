@@ -12,9 +12,7 @@
 //   run_getLatestProfilerEntry,
 // ]
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {getLatestProfilerEntry, getNLatestProfilerEntries} from "jstests/libs/profiler.js";
 
 // Setup test db and collection.
@@ -25,8 +23,9 @@ var coll = testDB.getCollection(collName);
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDB.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
 //
 // Confirm metrics for single document update.
@@ -64,8 +63,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [0]}));
 
-assert.commandWorked(coll.update(
-    {_id: 0}, {$set: {"a.$[i]": 1}}, {collation: {locale: "fr"}, arrayFilters: [{i: 0}]}));
+assert.commandWorked(coll.update({_id: 0}, {$set: {"a.$[i]": 1}}, {collation: {locale: "fr"}, arrayFilters: [{i: 0}]}));
 
 profileObj = getLatestProfilerEntry(testDB);
 
@@ -114,9 +112,11 @@ const expectedKeysExamined = 0;
 const expectedDocsExamined = collectionIsClustered ? 1 : 0;
 const expectedKeysInserted = collectionIsClustered ? 1 : 2;
 
-assert.eq(profileObj.command,
-          {q: {_id: "new value", a: 4}, u: {$inc: {b: 1}}, multi: false, upsert: true},
-          tojson(profileObj));
+assert.eq(
+    profileObj.command,
+    {q: {_id: "new value", a: 4}, u: {$inc: {b: 1}}, multi: false, upsert: true},
+    tojson(profileObj),
+);
 assert.eq(profileObj.keysExamined, expectedKeysExamined, tojson(profileObj));
 assert.eq(profileObj.docsExamined, expectedDocsExamined, tojson(profileObj));
 assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));
@@ -136,15 +136,17 @@ for (i = 0; i < 10; ++i) {
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-assert.commandWorked(testDB.runCommand({
-    update: coll.getName(),
-    updates: [
-        {q: {_id: "new value 4", a: 4}, u: {$inc: {b: 1}}, upsert: true},
-        {q: {_id: "new value 5", a: 5}, u: {$inc: {b: 1}}, upsert: true},
-        {q: {_id: "new value 6", a: 6}, u: {$inc: {b: 1}}, upsert: true}
-    ],
-    ordered: true
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        update: coll.getName(),
+        updates: [
+            {q: {_id: "new value 4", a: 4}, u: {$inc: {b: 1}}, upsert: true},
+            {q: {_id: "new value 5", a: 5}, u: {$inc: {b: 1}}, upsert: true},
+            {q: {_id: "new value 6", a: 6}, u: {$inc: {b: 1}}, upsert: true},
+        ],
+        ordered: true,
+    }),
+);
 
 // We need to check profiles for each individual update because they are logged separately.
 const profiles = getNLatestProfilerEntries(testDB, 3);
@@ -170,7 +172,8 @@ for (var i = 0; i < indices.length; i++) {
     assert.eq(
         profileObj.command,
         {q: {_id: `new value ${index}`, a: index}, u: {$inc: {b: 1}}, multi: false, upsert: true},
-        tojson(profileObj));
+        tojson(profileObj),
+    );
     assert.eq(profileObj.keysExamined, expectedKeysExamined, tojson(profileObj));
     assert.eq(profileObj.docsExamined, expectedDocsExamined, tojson(profileObj));
     assert.eq(profileObj.keysInserted, expectedKeysInserted, tojson(profileObj));

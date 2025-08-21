@@ -9,8 +9,8 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
-const kDbName = 'db';
-const collName = 'foo';
+const kDbName = "db";
+const collName = "foo";
 const mongos = st.s0;
 const numInitialDocs = 10;
 const db = st.rs0.getPrimary().getDB(kDbName);
@@ -24,26 +24,28 @@ assert.commandWorked(bulk.execute());
 jsTest.log("aggregate with $requestResumeToken should fail without hint: {$natural: 1}.");
 assert.commandFailedWithCode(
     db.runCommand({aggregate: collName, pipeline: [], $_requestResumeToken: true, cursor: {}}),
-    ErrorCodes.BadValue);
+    ErrorCodes.BadValue,
+);
 
 jsTest.log("aggregate with $requestResumeToken should fail if the hint is not {$natural: 1}.");
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: collName,
-    pipeline: [],
-    $_requestResumeToken: true,
-    cursor: {},
-    hint: {oldKey: 1}
-}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [],
+        $_requestResumeToken: true,
+        cursor: {},
+        hint: {oldKey: 1},
+    }),
+    ErrorCodes.BadValue,
+);
 
-jsTest.log(
-    "aggregate with $requestResumeToken should return PBRT with recordId and an initialSyncId.");
+jsTest.log("aggregate with $requestResumeToken should return PBRT with recordId and an initialSyncId.");
 let res = db.runCommand({
     aggregate: collName,
     pipeline: [],
     $_requestResumeToken: true,
     hint: {$natural: 1},
-    cursor: {batchSize: 1}
+    cursor: {batchSize: 1},
 });
 assert.hasFields(res.cursor, ["postBatchResumeToken"]);
 assert.hasFields(res.cursor.postBatchResumeToken, ["$recordId"]);
@@ -51,25 +53,29 @@ assert.hasFields(res.cursor.postBatchResumeToken, ["$initialSyncId"]);
 const resumeToken = res.cursor.postBatchResumeToken;
 
 jsTest.log("aggregate with wrong $recordId type in $resumeAfter should fail");
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: collName,
-    pipeline: [],
-    hint: {$natural: 1},
-    $_requestResumeToken: true,
-    $_resumeAfter: {$recordId: 1, $initialSyncId: UUID("81fd5473-1747-4c9d-8743-f10642b3bb99")},
-    cursor: {batchSize: 1}
-}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [],
+        hint: {$natural: 1},
+        $_requestResumeToken: true,
+        $_resumeAfter: {$recordId: 1, $initialSyncId: UUID("81fd5473-1747-4c9d-8743-f10642b3bb99")},
+        cursor: {batchSize: 1},
+    }),
+    ErrorCodes.BadValue,
+);
 
 jsTest.log("aggregate with $resumeAfter should fail without {$_requestResumeToken: true}.");
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: collName,
-    pipeline: [],
-    hint: {$natural: 1},
-    $_resumeAfter: resumeToken,
-    cursor: {batchSize: 1}
-}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [],
+        hint: {$natural: 1},
+        $_resumeAfter: resumeToken,
+        cursor: {batchSize: 1},
+    }),
+    ErrorCodes.BadValue,
+);
 
 res = db.runCommand({
     aggregate: collName,
@@ -77,6 +83,6 @@ res = db.runCommand({
     $_requestResumeToken: true,
     hint: {$natural: 1},
     $_resumeAfter: resumeToken,
-    cursor: {batchSize: 1}
+    cursor: {batchSize: 1},
 });
 st.stop();

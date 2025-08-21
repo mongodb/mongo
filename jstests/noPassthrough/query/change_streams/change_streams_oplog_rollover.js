@@ -8,7 +8,7 @@ import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
-const oplogSize = 1;  // size in MB
+const oplogSize = 1; // size in MB
 const rst = new ReplSetTest({nodes: 1, oplogSize: oplogSize});
 
 rst.startSet();
@@ -22,8 +22,11 @@ const cst = new ChangeStreamTest(testDB);
 // Write a document to the test collection.
 assert.commandWorked(testColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
-let changeStream = cst.startWatchingChanges(
-    {pipeline: [{$changeStream: {}}], collection: testColl.getName(), includeToken: true});
+let changeStream = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {}}],
+    collection: testColl.getName(),
+    includeToken: true,
+});
 
 // We awaited the replication of the insert, so the change stream shouldn't return them.
 assert.commandWorked(testColl.update({_id: 1}, {$set: {updated: true}}));
@@ -46,7 +49,7 @@ assert.commandWorked(testColl.insert({_id: 3}, {writeConcern: {w: "majority"}}))
 changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
     aggregateOptions: {cursor: {batchSize: 0}},
-    collection: testColl.getName()
+    collection: testColl.getName(),
 });
 
 for (let nextExpectedId of [2, 3]) {
@@ -70,7 +73,7 @@ assert.eq(firstOplogEntry.op, "n");
 const startAtDawnOfTimeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {startAtOperationTime: Timestamp(1, 1)}}],
     aggregateOptions: {cursor: {batchSize: 0}},
-    collection: testColl.getName()
+    collection: testColl.getName(),
 });
 
 // The first entry we see should be the initial insert into the collection.
@@ -84,14 +87,13 @@ assert.eq(firstStreamEntry.documentKey._id, 1);
 const primaryNode = rst.getPrimary();
 const mostRecentOplogEntry = getLatestOp(primaryNode);
 assert.neq(mostRecentOplogEntry, null);
-const largeStr = 'abcdefghi'.repeat(4 * 1024 * oplogSize);
+const largeStr = "abcdefghi".repeat(4 * 1024 * oplogSize);
 
 function oplogIsRolledOver() {
     // The oplog has rolled over if the op that used to be newest is now older than the
     // oplog's current oldest entry. Said another way, the oplog is rolled over when
     // everything in the oplog is newer than what used to be the newest entry.
-    return bsonWoCompare(mostRecentOplogEntry.ts,
-                         getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) < 0;
+    return bsonWoCompare(mostRecentOplogEntry.ts, getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) < 0;
 }
 
 while (!oplogIsRolledOver()) {
@@ -99,22 +101,21 @@ while (!oplogIsRolledOver()) {
 }
 
 // Confirm that attempting to continue reading an existing change stream throws CappedPositionLost.
-assert.throwsWithCode(() => cst.getNextBatch(startAtDawnOfTimeStream),
-                      ErrorCodes.CappedPositionLost);
+assert.throwsWithCode(() => cst.getNextBatch(startAtDawnOfTimeStream), ErrorCodes.CappedPositionLost);
 
 // Now confirm that attempting to resumeAfter or startAtOperationTime fails.
 ChangeStreamTest.assertChangeStreamThrowsCode({
     db: testDB,
     collName: testColl.getName(),
     pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
-    expectedCode: ErrorCodes.ChangeStreamHistoryLost
+    expectedCode: ErrorCodes.ChangeStreamHistoryLost,
 });
 
 ChangeStreamTest.assertChangeStreamThrowsCode({
     db: testDB,
     collName: testColl.getName(),
     pipeline: [{$changeStream: {startAtOperationTime: resumeTimeFirstUpdate}}],
-    expectedCode: ErrorCodes.ChangeStreamHistoryLost
+    expectedCode: ErrorCodes.ChangeStreamHistoryLost,
 });
 
 // We also can't start a stream from the "dawn of time" any more, since the first entry in the
@@ -123,7 +124,7 @@ ChangeStreamTest.assertChangeStreamThrowsCode({
     db: testDB,
     collName: testColl.getName(),
     pipeline: [{$changeStream: {startAtOperationTime: Timestamp(1, 1)}}],
-    expectedCode: ErrorCodes.ChangeStreamHistoryLost
+    expectedCode: ErrorCodes.ChangeStreamHistoryLost,
 });
 
 cst.cleanUp();

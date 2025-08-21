@@ -25,15 +25,13 @@ assert.commandWorked(coll.insert({"_id": 7}));
 assert.commandWorked(coll.insert({"_id": 8}));
 
 const collUUID = getUUIDFromListCollections(db, coll.getName());
-const searchQuery = {
-
-};
+const searchQuery = {};
 const searchCmd = {
     search: coll.getName(),
     collectionUUID: collUUID,
     query: searchQuery,
     $db: "test",
-    cursorOptions: {requiresSearchSequenceToken: true}
+    cursorOptions: {requiresSearchSequenceToken: true},
 };
 
 // Give mongotmock some stuff to return.
@@ -55,18 +53,14 @@ const history = [
                     {_id: 6, $searchSequenceToken: "fffffff=="},
                     {_id: 7, $searchSequenceToken: "ggggggg=="},
                     {_id: 8, $searchSequenceToken: "hhhhhhh=="},
-                ]
+                ],
             },
-        }
+        },
     },
-
 ];
 
-assert.commandWorked(
-    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
-let results =
-    coll.aggregate([{$search: searchQuery}, {$group: {"_id": {$meta: "searchSequenceToken"}}}])
-        .toArray();
+assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+let results = coll.aggregate([{$search: searchQuery}, {$group: {"_id": {$meta: "searchSequenceToken"}}}]).toArray();
 
 const expected = [
     {"_id": 1, "myToken": "aaaaaaa=="},
@@ -76,7 +70,7 @@ const expected = [
     {"_id": 5, "myToken": "eeeeeee=="},
     {"_id": 6, "myToken": "fffffff=="},
     {"_id": 7, "myToken": "ggggggg=="},
-    {"_id": 8, "myToken": "hhhhhhh=="}
+    {"_id": 8, "myToken": "hhhhhhh=="},
 ];
 // base64 does not preserve sort order of unencoded strings, so the $group query will have
 // nondeterministic results.

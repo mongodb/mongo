@@ -12,10 +12,7 @@
  *
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    restartReplicationOnSecondaries,
-    stopReplicationOnSecondaries
-} from "jstests/libs/write_concern_util.js";
+import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
 
 // restartReplicationOnSecondaries
 var name = "shutdown_primary";
@@ -36,15 +33,17 @@ jsTestLog("Executing write to primary.");
 assert.commandWorked(testDB.foo.insert({x: 2}));
 
 jsTestLog("Attempting to shut down primary.");
-assert.commandFailedWithCode(primary.adminCommand({shutdown: 1}),
-                             ErrorCodes.ExceededTimeLimit,
-                             "shut down did not fail with 'ExceededTimeLimit'");
+assert.commandFailedWithCode(
+    primary.adminCommand({shutdown: 1}),
+    ErrorCodes.ExceededTimeLimit,
+    "shut down did not fail with 'ExceededTimeLimit'",
+);
 
 jsTestLog("Verifying primary did not shut down.");
 assert.commandWorked(testDB.foo.insert({x: 3}));
 
 jsTestLog("Shutting down primary in a parallel shell");
-var awaitShell = startParallelShell(function() {
+var awaitShell = startParallelShell(function () {
     db.adminCommand({shutdown: 1, timeoutSecs: 200});
 }, primary.port);
 
@@ -55,11 +54,11 @@ jsTestLog("Verifying primary shut down and cannot be connected to.");
 // Successfully starting shutdown throws a network error.
 var exitCode = awaitShell({checkExitSuccess: false});
 assert.neq(0, exitCode, "expected shutdown to close the shell's connection");
-assert.soonNoExcept(function() {
+assert.soonNoExcept(function () {
     // The parallel shell exits while shutdown is in progress, and if this happens early enough,
     // the primary can still accept connections despite successfully starting to shutdown.
     // So, retry connecting until connections cannot be established and an error is thrown.
-    assert.throws(function() {
+    assert.throws(function () {
         new Mongo(primary.host);
     });
     return true;

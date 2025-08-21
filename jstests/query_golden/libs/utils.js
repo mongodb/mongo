@@ -31,10 +31,9 @@ export function resetCollection(coll, docs, indexes = []) {
  * query plan on a single line.
  */
 export function trimPlanToStagesAndIndexes(obj) {
-    const fieldsToKeep =
-        ['stage', 'inputStage', 'inputStages', 'indexName', 'indexBounds', 'filter'];
+    const fieldsToKeep = ["stage", "inputStage", "inputStages", "indexName", "indexBounds", "filter"];
 
-    if (typeof obj !== 'object' || obj === null) {
+    if (typeof obj !== "object" || obj === null) {
         return obj;
     }
     for (let key in obj) {
@@ -44,7 +43,7 @@ export function trimPlanToStagesAndIndexes(obj) {
             // Preserve the presence of a filter without retaining the actual expression
             obj[key] = true;
         } else {
-            if (typeof obj[key] === 'object' && obj[key] !== null && key !== 'indexBounds') {
+            if (typeof obj[key] === "object" && obj[key] !== null && key !== "indexBounds") {
                 trimPlanToStagesAndIndexes(obj[key]);
             }
         }
@@ -53,7 +52,7 @@ export function trimPlanToStagesAndIndexes(obj) {
 }
 
 export function padNumber(num) {
-    return num.toString().padStart(6, ' ');
+    return num.toString().padStart(6, " ");
 }
 /**
  * Computes an abstract sort effort for the query, defined as

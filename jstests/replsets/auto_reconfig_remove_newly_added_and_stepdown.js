@@ -29,8 +29,7 @@ const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst =
-    new ReplSetTest({name: testName, nodes: [{}, {}, {rsConfig: {priority: 0}}], useBridge: true});
+const rst = new ReplSetTest({name: testName, nodes: [{}, {}, {rsConfig: {priority: 0}}], useBridge: true});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
@@ -56,13 +55,13 @@ assert.eq(1, configBeforeTermBump.config.term, () => tojson(configBeforeTermBump
 rst.awaitReplication();
 assert.eq(nodes[0], primary);
 function waitForNewPrimary() {
-    assert.soon(function() {
-        return nodes[1].adminCommand('hello').isWritablePrimary;
+    assert.soon(function () {
+        return nodes[1].adminCommand("hello").isWritablePrimary;
     });
 }
 
 // Stop the secondaries from replicating so that the primary steps down.
-const blockHeartbeatStepdownFailPoint = configureFailPoint(nodes[0], 'blockHeartbeatStepdown');
+const blockHeartbeatStepdownFailPoint = configureFailPoint(nodes[0], "blockHeartbeatStepdown");
 nodes[1].disconnect(nodes[0]);
 nodes[2].disconnect(nodes[0]);
 jsTestLog("Waiting for a new primary");
@@ -78,7 +77,7 @@ jsTestLog("Proceeding with newlyAdded field removal");
 // primary should fail the automatic reconfig to remove the 'newlyAdded' field due to the pending
 // term update on stepdown."
 
-checkLog.contains(primary, 'Safe reconfig rejected due to detected pending stepdown');
+checkLog.contains(primary, "Safe reconfig rejected due to detected pending stepdown");
 checkLog.containsJson(nodes[1], 4634504, {"memberId": 3});
 blockHeartbeatStepdownFailPoint.off();
 rst.stopSet();

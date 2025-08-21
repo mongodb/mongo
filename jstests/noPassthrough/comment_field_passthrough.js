@@ -38,18 +38,19 @@ function runTests(tests, conn, impls, options) {
 }
 
 const impls = {
-    runOneTest: function(conn, testObj) {
+    runOneTest: function (conn, testObj) {
         // Some tests requires mongot, however, setting this failpoint will make search queries to
         // return EOF, that way all the hassle of setting it up can be avoided.
         let disableSearchFailpoint;
         let mongosDisableSearchFailpoint;
         if (testObj.disableSearch) {
-            disableSearchFailpoint = configureFailPoint(conn.rs0 ? conn.rs0.getPrimary() : conn,
-                                                        'searchReturnEofImmediately');
+            disableSearchFailpoint = configureFailPoint(
+                conn.rs0 ? conn.rs0.getPrimary() : conn,
+                "searchReturnEofImmediately",
+            );
             // In a sharded environment, the failpoint must be set on mongos and mongod.
             if (conn.s0) {
-                mongosDisableSearchFailpoint =
-                    configureFailPoint(conn.s0, 'searchReturnEofImmediately');
+                mongosDisableSearchFailpoint = configureFailPoint(conn.s0, "searchReturnEofImmediately");
             }
         }
         const testCase = testObj.testcases[0];
@@ -59,17 +60,15 @@ const impls = {
 
         let cmdDb = runOnDb;
         if (testObj.hasOwnProperty("runOnDb")) {
-            assert.eq(typeof (testObj.runOnDb), "function");
+            assert.eq(typeof testObj.runOnDb, "function");
             cmdDb = runOnDb.getSiblingDB(testObj.runOnDb(state));
         }
 
-        const command = (typeof (testObj.command) === "function")
-            ? testObj.command(state, testCase.commandArgs)
-            : testObj.command;
-        command['comment'] = {comment: true};
+        const command =
+            typeof testObj.command === "function" ? testObj.command(state, testCase.commandArgs) : testObj.command;
+        command["comment"] = {comment: true};
         const res = cmdDb.runCommand(command);
-        assert(res.ok == 1 || testCase.expectFail || res.code == ErrorCodes.CommandNotSupported,
-               tojson(res));
+        assert(res.ok == 1 || testCase.expectFail || res.code == ErrorCodes.CommandNotSupported, tojson(res));
 
         if (testObj.teardown) {
             testObj.teardown(cmdDb, res);
@@ -81,7 +80,7 @@ const impls = {
         if (mongosDisableSearchFailpoint) {
             mongosDisableSearchFailpoint.off();
         }
-    }
+    },
 };
 
 let mongotmock;
@@ -95,7 +94,7 @@ if (!_isWindows()) {
 // We have to set the mongotHost parameter for the $search-relatead tests to pass configuration
 // checks.
 const opts = {
-    setParameter: {mongotHost}
+    setParameter: {mongotHost},
 };
 let conn = MongoRunner.runMongod(opts);
 

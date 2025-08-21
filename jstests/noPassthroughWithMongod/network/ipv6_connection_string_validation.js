@@ -26,7 +26,7 @@ if ("undefined" == typeof inner_mode) {
         mongod.port,
         "--eval",
         "inner_mode=true;port=" + mongod.port + ";",
-        "jstests/noPassthroughWithMongod/network/ipv6_connection_string_validation.js"
+        "jstests/noPassthroughWithMongod/network/ipv6_connection_string_validation.js",
     ];
     var exitCode = _runMongoProgram.apply(null, args);
     jsTest.log("Inner mode test finished, exit code was " + exitCode);
@@ -92,7 +92,7 @@ var badStrings = [
     {s: "::1]:27999/", r: noOpenBracket},
 ];
 
-var substitutePort = function(connectionString) {
+var substitutePort = function (connectionString) {
     // This will be called with non-strings as well as strings, so we need to catch exceptions
     try {
         return connectionString.replace("27999", "" + port);
@@ -101,8 +101,8 @@ var substitutePort = function(connectionString) {
     }
 };
 
-var testGood = function(i, connectionString) {
-    print("\n---\nTesting good connection string " + i + " (\"" + connectionString + "\") ...");
+var testGood = function (i, connectionString) {
+    print("\n---\nTesting good connection string " + i + ' ("' + connectionString + '") ...');
     var gotException = false;
     var exception;
     try {
@@ -113,17 +113,22 @@ var testGood = function(i, connectionString) {
         exception = e;
     }
     if (!gotException) {
-        print("Good connection string " + i + " (\"" + connectionString +
-              "\") correctly validated");
+        print("Good connection string " + i + ' ("' + connectionString + '") correctly validated');
         return;
     }
-    var message = "FAILED to correctly validate goodString " + i + " (\"" + connectionString +
-        "\"):  exception was \"" + tojson(exception) + "\"";
+    var message =
+        "FAILED to correctly validate goodString " +
+        i +
+        ' ("' +
+        connectionString +
+        '"):  exception was "' +
+        tojson(exception) +
+        '"';
     doassert(message);
 };
 
-var testBad = function(i, connectionString, errorRegex, errorCode) {
-    print("\n---\nTesting bad connection string " + i + " (\"" + connectionString + "\") ...");
+var testBad = function (i, connectionString, errorRegex, errorCode) {
+    print("\n---\nTesting bad connection string " + i + ' ("' + connectionString + '") ...');
     var gotException = false;
     var gotCorrectErrorText = false;
     var gotCorrectErrorCode = false;
@@ -142,15 +147,12 @@ var testBad = function(i, connectionString, errorRegex, errorCode) {
         }
     }
     if (gotCorrectErrorText || gotCorrectErrorCode) {
-        print("Bad connection string " + i + " (\"" + connectionString +
-              "\") correctly rejected:\n" + tojson(exception));
+        print("Bad connection string " + i + ' ("' + connectionString + '") correctly rejected:\n' + tojson(exception));
         return;
     }
-    var message = "FAILED to generate correct exception for badString " + i + " (\"" +
-        connectionString + "\"): ";
+    var message = "FAILED to generate correct exception for badString " + i + ' ("' + connectionString + '"): ';
     if (gotException) {
-        message += "exception was \"" + tojson(exception) + "\", it should have matched \"" +
-            errorRegex.toString() + "\"";
+        message += 'exception was "' + tojson(exception) + '", it should have matched "' + errorRegex.toString() + '"';
     } else {
         message += "no exception was thrown";
     }

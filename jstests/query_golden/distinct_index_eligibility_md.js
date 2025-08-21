@@ -7,10 +7,7 @@
  * ]
  */
 import {section, subSection} from "jstests/libs/pretty_md.js";
-import {
-    outputAggregationPlanAndResults,
-    outputDistinctPlanAndResults
-} from "jstests/libs/query/golden_test_utils.js";
+import {outputAggregationPlanAndResults, outputDistinctPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 
 const coll = db[jsTestName()];
 
@@ -20,30 +17,25 @@ subSection("flip && multikey => no DISTINCT_SCAN");
 coll.drop();
 coll.insert({a: [1, 2, 3], b: 5});
 coll.createIndex({a: 1, b: 1});
-outputAggregationPlanAndResults(
-    coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
+outputAggregationPlanAndResults(coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
 
 subSection("flip && !multikey => DISTINCT_SCAN");
 coll.drop();
 coll.insert({a: 1, b: 5});
 coll.createIndex({a: 1, b: 1});
-outputAggregationPlanAndResults(
-    coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
+outputAggregationPlanAndResults(coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
 
 subSection("!flip && strict && multikey on distinct field => no DISTINCT_SCAN");
 coll.drop();
 coll.insert({a: [1, 2, 3], b: 5});
 coll.createIndex({a: 1, b: 1});
-outputAggregationPlanAndResults(
-    coll, [{$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}]);
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}]);
 
-subSection(
-    "!flip && strict && the index is only multikey on the non-distinct field => DISTINCT_SCAN");
+subSection("!flip && strict && the index is only multikey on the non-distinct field => DISTINCT_SCAN");
 coll.drop();
 coll.insert({a: 1, b: [1, 2, 3]});
 coll.createIndex({a: 1, b: 1});
-outputAggregationPlanAndResults(
-    coll, [{$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}]);
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$top: {output: "$b", sortBy: {a: 1, b: 1}}}}}]);
 
 subSection("!flip && !strict && !multikey on distinct field => DISTINCT_SCAN");
 coll.drop();

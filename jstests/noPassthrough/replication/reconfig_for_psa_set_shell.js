@@ -29,40 +29,36 @@ config.members[1].votes = 1;
 config.members[1].priority = 1;
 
 jsTestLog("Testing standard rs.reconfig() function");
-const reconfigScript = `assert.commandFailedWithCode(rs.reconfig(${
-    tojson(config)}), ErrorCodes.NewReplicaSetConfigurationIncompatible)`;
-const result = runMongoProgram('mongo', '--port', primary.port, '--eval', reconfigScript);
+const reconfigScript = `assert.commandFailedWithCode(rs.reconfig(${tojson(
+    config,
+)}), ErrorCodes.NewReplicaSetConfigurationIncompatible)`;
+const result = runMongoProgram("mongo", "--port", primary.port, "--eval", reconfigScript);
 assert.eq(0, result, `reconfig did not fail with expected error code`);
 
 const runReconfigForPSASet = (memberIndex, config, shouldSucceed, endPriority = 1) => {
     jsTestLog(`Testing with memberIndex ${memberIndex} and config ${tojson(config)}`);
 
-    const reconfigScript =
-        `assert.commandWorked(rs.reconfigForPSASet(${memberIndex}, ${tojson(config)}))`;
-    const result = runMongoProgram('mongo', '--port', primary.port, '--eval', reconfigScript);
+    const reconfigScript = `assert.commandWorked(rs.reconfigForPSASet(${memberIndex}, ${tojson(config)}))`;
+    const result = runMongoProgram("mongo", "--port", primary.port, "--eval", reconfigScript);
     if (shouldSucceed) {
-        assert.eq(0, result, 'expected reconfigToPSASet to succeed, but it failed');
+        assert.eq(0, result, "expected reconfigToPSASet to succeed, but it failed");
 
         // Wait for all 'newlyAdded' fields to be removed and for the new config to be committed.
         rst.waitForAllNewlyAddedRemovals();
         assert.soonNoExcept(() => isConfigCommitted(primary));
 
-        const replSetGetConfig =
-            assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
+        const replSetGetConfig = assert.commandWorked(primary.adminCommand({replSetGetConfig: 1})).config;
         assert.eq(1, replSetGetConfig.members[1].votes);
         assert.eq(endPriority, replSetGetConfig.members[1].priority);
 
         // Reset the config back to the original config.
         originalConfig.members[memberIndex].votes = 0;
         originalConfig.members[memberIndex].priority = 0;
-        const reconfigToOriginalConfig =
-            `assert.commandWorked(rs.reconfig(${tojson(originalConfig)}))`;
-        assert.eq(
-            0,
-            runMongoProgram('mongo', '--port', primary.port, '--eval', reconfigToOriginalConfig));
+        const reconfigToOriginalConfig = `assert.commandWorked(rs.reconfig(${tojson(originalConfig)}))`;
+        assert.eq(0, runMongoProgram("mongo", "--port", primary.port, "--eval", reconfigToOriginalConfig));
         assert.soonNoExcept(() => isConfigCommitted(primary));
     } else {
-        assert.neq(0, result, 'expected reconfigToPSASet to fail, but it succeeded');
+        assert.neq(0, result, "expected reconfigToPSASet to fail, but it succeeded");
     }
 };
 
@@ -87,7 +83,7 @@ jsTestLog("Testing reconfigForPSASet() succeeded: adding new node");
 
 // First remove the node at index 1 to simulate a two-node replica set.
 config = rst.getReplSetConfigFromNode();
-const filteredMembers = config.members.filter(member => member._id !== 1);
+const filteredMembers = config.members.filter((member) => member._id !== 1);
 config.members = filteredMembers;
 config.version += 1;
 assert.commandWorked(primary.adminCommand({replSetReconfig: config}));

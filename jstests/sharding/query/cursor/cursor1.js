@@ -21,9 +21,11 @@ for (let i = 0; i < numObjs; i++) {
     bulk.insert({_id: i});
 }
 assert.commandWorked(bulk.execute());
-assert.eq(1,
-          findChunksUtil.countChunksForNs(s.config, "test.foo"),
-          "test requires collection to have one chunk initially");
+assert.eq(
+    1,
+    findChunksUtil.countChunksForNs(s.config, "test.foo"),
+    "test requires collection to have one chunk initially",
+);
 
 // Cursor timeout only occurs outside of sessions. Otherwise we rely on the session timeout
 // mechanism to kill cursors.
@@ -53,21 +55,28 @@ assert.eq(numObjs, cursor3.itcount(), "c3");
 var cur = db.foo.find().batchSize(2);
 assert(cur.next(), "T1");
 assert(cur.next(), "T2");
-assert.commandWorked(s.admin.runCommand({
-    setParameter: 1,
-    cursorTimeoutMillis: 1000  // 1 second.
-}));
+assert.commandWorked(
+    s.admin.runCommand({
+        setParameter: 1,
+        cursorTimeoutMillis: 1000, // 1 second.
+    }),
+);
 
-assert.soon(function() {
-    try {
-        cur.next();
-        cur.next();
-        print("cursor still alive");
-        return false;
-    } catch (e) {
-        return true;
-    }
-}, "cursor failed to time out", /*timeout*/ 30000, /*interval*/ 5000);
+assert.soon(
+    function () {
+        try {
+            cur.next();
+            cur.next();
+            print("cursor still alive");
+            return false;
+        } catch (e) {
+            return true;
+        }
+    },
+    "cursor failed to time out",
+    /*timeout*/ 30000,
+    /*interval*/ 5000,
+);
 
 TestData.disableImplicitSessions = false;
 

@@ -5,7 +5,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
-const kDbName = 'wildcard_index_banned_for_shard_key';
+const kDbName = "wildcard_index_banned_for_shard_key";
 const mongos = st.s0;
 
 function assertCannotShardCollectionOnWildcardIndex(keyDoc) {
@@ -13,11 +13,10 @@ function assertCannotShardCollectionOnWildcardIndex(keyDoc) {
 
     assert.commandFailedWithCode(
         mongos.adminCommand({shardCollection: `${kDbName}.foo`, key: keyDoc}),
-        ErrorCodes.InvalidOptions);
+        ErrorCodes.InvalidOptions,
+    );
 
-    assert.eq(mongos.getDB('config').collections.countDocuments(
-                  {_id: `${kDbName}.foo`, unsplittable: {$ne: true}}),
-              0);
+    assert.eq(mongos.getDB("config").collections.countDocuments({_id: `${kDbName}.foo`, unsplittable: {$ne: true}}), 0);
     assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 }
 
@@ -32,8 +31,7 @@ assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1}));
 assertCannotShardCollectionOnWildcardIndex({a: 1});
 
 // Can't shard on a path supported by wildcard index with projection option.
-assert.commandWorked(
-    mongos.getDB(kDbName).foo.createIndex({"$**": 1}, {wildcardProjection: {a: 1}}));
+assert.commandWorked(mongos.getDB(kDbName).foo.createIndex({"$**": 1}, {wildcardProjection: {a: 1}}));
 assert.commandWorked(mongos.getDB(kDbName).foo.insert({a: 1}));
 assertCannotShardCollectionOnWildcardIndex({a: 1});
 

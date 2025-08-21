@@ -1,4 +1,3 @@
-
 let t = db.inc2;
 t.drop();
 
@@ -7,9 +6,12 @@ t.save({_id: 2, x: 2});
 t.save({_id: 3, x: 3});
 
 function order() {
-    return t.find().sort({x: 1}).map(function(z) {
-        return z._id;
-    });
+    return t
+        .find()
+        .sort({x: 1})
+        .map(function (z) {
+            return z._id;
+        });
 }
 
 assert.eq("1,2,3", order(), "A");

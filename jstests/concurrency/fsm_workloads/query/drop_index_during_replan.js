@@ -6,13 +6,10 @@
  * time, other threads may be dropping {b: 1}. This tests that the replanning process is robust to
  * index drops.
  */
-export const $config = (function() {
+export const $config = (function () {
     let data = {
-        collName: 'drop_index_during_replan',
-        indexSpecs: [
-            {a: 1},
-            {b: 1},
-        ],
+        collName: "drop_index_during_replan",
+        indexSpecs: [{a: 1}, {b: 1}],
     };
 
     let states = {
@@ -46,21 +43,19 @@ export const $config = (function() {
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ]);
-        }
+        },
     };
 
     let transitions = {query: {query: 0.8, dropIndex: 0.2}, dropIndex: {query: 1}};
 
     function setup(db, collName, cluster) {
-        this.indexSpecs.forEach(indexSpec => {
+        this.indexSpecs.forEach((indexSpec) => {
             assert.commandWorked(db[collName].createIndex(indexSpec));
         });
 
         for (let i = 0; i < 200; ++i) {
-            assert.commandWorked(
-                db[collName].insert({a: "common_value_a", b: "unique_value_" + i}));
-            assert.commandWorked(
-                db[collName].insert({a: "unique_value_" + i, b: "common_value_b"}));
+            assert.commandWorked(db[collName].insert({a: "common_value_a", b: "unique_value_" + i}));
+            assert.commandWorked(db[collName].insert({a: "unique_value_" + i, b: "common_value_b"}));
         }
     }
 
@@ -69,8 +64,8 @@ export const $config = (function() {
         iterations: 50,
         data: data,
         states: states,
-        startState: 'query',
+        startState: "query",
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

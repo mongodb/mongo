@@ -24,16 +24,16 @@ testDB.runCommand({drop: collName});
 function performUpsert() {
     // This function is called from startParallelShell(), so closed-over variables will not be
     // available. We must re-obtain the value of 'testColl' in the function body.
-    const testColl =
-        db.getMongo().getDB("test").getCollection("upsert_duplicate_key_retry_findAndModify");
+    const testColl = db.getMongo().getDB("test").getCollection("upsert_duplicate_key_retry_findAndModify");
     testColl.findAndModify({query: {x: 3}, update: {$inc: {y: 1}}, upsert: true});
 }
 
 assert.commandWorked(testColl.createIndex({x: 1}, {unique: true}));
 
 // Will hang upsert operations just prior to performing an insert.
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: "hangBeforeFindAndModifyPerformsUpdate", mode: "alwaysOn"}));
+assert.commandWorked(
+    testDB.adminCommand({configureFailPoint: "hangBeforeFindAndModifyPerformsUpdate", mode: "alwaysOn"}),
+);
 
 const awaitUpdate1 = startParallelShell(performUpsert, rst.ports[0]);
 const awaitUpdate2 = startParallelShell(performUpsert, rst.ports[0]);
@@ -44,8 +44,7 @@ assert.soon(() => {
     return curOps.length === 2;
 });
 
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: "hangBeforeFindAndModifyPerformsUpdate", mode: "off"}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeFindAndModifyPerformsUpdate", mode: "off"}));
 
 awaitUpdate1();
 awaitUpdate2();
@@ -56,12 +55,8 @@ assert(!cursor.hasNext(), cursor.toArray());
 
 // Confirm that oplog entries exist for both insert and update operation.
 const oplogColl = testDB.getSiblingDB("local").getCollection("oplog.rs");
-assert.eq(
-    1,
-    oplogColl.find({"op": "i", "ns": "test.upsert_duplicate_key_retry_findAndModify"}).itcount());
-assert.eq(
-    1,
-    oplogColl.find({"op": "u", "ns": "test.upsert_duplicate_key_retry_findAndModify"}).itcount());
+assert.eq(1, oplogColl.find({"op": "i", "ns": "test.upsert_duplicate_key_retry_findAndModify"}).itcount());
+assert.eq(1, oplogColl.find({"op": "u", "ns": "test.upsert_duplicate_key_retry_findAndModify"}).itcount());
 
 //
 // Confirm DuplicateKey error for cases that should not be retried.
@@ -71,8 +66,8 @@ assert.commandWorked(testColl.createIndex({x: 1}, {unique: true}));
 
 // DuplicateKey error on replacement-style upsert, where the unique index key value to be
 // written does not match the value of the query predicate.
-assert.commandWorked(testColl.insert({_id: 1, 'a': 12345}));
-assert.throws(function() {
+assert.commandWorked(testColl.insert({_id: 1, "a": 12345}));
+assert.throws(function () {
     testColl.findAndModify({query: {x: 3}, update: {}, upsert: true});
 }, []);
 
@@ -81,7 +76,7 @@ assert.throws(function() {
 assert.commandWorked(testColl.remove({}));
 assert.commandWorked(testColl.insert({x: 3}));
 assert.commandWorked(testColl.insert({x: 4}));
-assert.throws(function() {
+assert.throws(function () {
     testColl.findAndModify({query: {x: 3}, update: {$inc: {x: 1}}, upsert: true});
 }, []);
 

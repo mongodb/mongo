@@ -5,7 +5,7 @@ var baseName = "jstests_slowNightly_command_line_parsing";
 // test notablescan
 var m = MongoRunner.runMongod({notablescan: ""});
 m.getDB(baseName).getCollection(baseName).save({a: 1});
-assert.throws(function() {
+assert.throws(function () {
     m.getDB(baseName).getCollection(baseName).find({a: 1}).toArray();
 });
 MongoRunner.stopMongod(m);
@@ -20,8 +20,8 @@ var m2expected = {
         "net": {"bindIp": "0.0.0.0", "port": m2.port},
         "help": false,
         "version": false,
-        "sysinfo": false
-    }
+        "sysinfo": false,
+    },
 };
 var m2result = m2.getDB("admin").runCommand("getCmdLineOpts");
 MongoRunner.stopMongod(m2);
@@ -45,8 +45,8 @@ var m3expected = {
         "net": {"bindIp": "0.0.0.0", "port": m3.port},
         "help": false,
         "version": false,
-        "sysinfo": false
-    }
+        "sysinfo": false,
+    },
 };
 var m3result = m3.getDB("admin").runCommand("getCmdLineOpts");
 MongoRunner.stopMongod(m3);

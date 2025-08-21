@@ -21,26 +21,33 @@ const allDocs = [{_id: 0}, {_id: 1, a: 3}, {_id: 2, a: "3"}];
 assert.commandWorked(coll.insert(allDocs));
 assert.commandWorked(coll.createIndex({a: "hashed"}));
 
-let results = coll.aggregate(
-    [
-        {$set: {
-            hashVal: {
-                $let: {
-                    vars: {key: {$meta: "indexKey"}},
-                    in: "$$key.a"
-                }
-            }
-        }},
-        {$lookup: {
-            from: coll.getName(),
-            let: {correlated_hash: "$hashVal"},
-            as: "relookup",
-            pipeline: [{$match: {$expr: {$eq: [{$toHashedIndexKey: "$a"}, "$$correlated_hash"]}}}]
-        }},
-        {$unset: "hashVal"},
-    ],
-    {hint: {a: "hashed"}}).toArray();
+let results = coll
+    .aggregate(
+        [
+            {
+                $set: {
+                    hashVal: {
+                        $let: {
+                            vars: {key: {$meta: "indexKey"}},
+                            in: "$$key.a",
+                        },
+                    },
+                },
+            },
+            {
+                $lookup: {
+                    from: coll.getName(),
+                    let: {correlated_hash: "$hashVal"},
+                    as: "relookup",
+                    pipeline: [{$match: {$expr: {$eq: [{$toHashedIndexKey: "$a"}, "$$correlated_hash"]}}}],
+                },
+            },
+            {$unset: "hashVal"},
+        ],
+        {hint: {a: "hashed"}},
+    )
+    .toArray();
 
 // We essentially just looked up ourselves for each document.
-let expected = allDocs.map(doc => Object.merge(doc, {relookup: [doc]}));
+let expected = allDocs.map((doc) => Object.merge(doc, {relookup: [doc]}));
 assert(resultsEq(results, expected, true), [results, expected]);

@@ -16,7 +16,7 @@ function doIt() {
         return sort;
     }
 
-    var fields = ['a', 'b', 'c', 'd', 'e'];
+    var fields = ["a", "b", "c", "d", "e"];
     let n = Random.randInt(5) + 1;
     var idx = sort();
 
@@ -79,7 +79,7 @@ function doIt() {
         } catch (e) {
             // may assert if too much data for in memory sort
             print("retrying check...");
-            check();  // retry with different bounds
+            check(); // retry with different bounds
             return;
         }
 
@@ -94,7 +94,7 @@ function doIt() {
                     size -= f.length;
                 }
 
-                var max = 818;  // KeyMax
+                var max = 818; // KeyMax
                 if (size <= max) {
                     assert.eq(c1, c3, "size: " + size);
                 }
@@ -116,7 +116,7 @@ function doIt() {
         if (Random.rand() > 0.9) {
             bulk.insert(obj());
         } else {
-            bulk.find(obj()).remove();  // improve
+            bulk.find(obj()).remove(); // improve
         }
         if (Random.rand() > 0.999) {
             print(i);

@@ -23,13 +23,13 @@
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
-import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/query/agg/agg_out.js';
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_out.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    const timeFieldName = 'time';
-    const metaFieldName = 'tag';
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    const timeFieldName = "time";
+    const metaFieldName = "tag";
     const numDocs = 100;
-    $config.data.outputCollName = 'timeseries_agg_out';
+    $config.data.outputCollName = "timeseries_agg_out";
     $config.data.shardKey = {[metaFieldName]: 1};
 
     /**
@@ -45,11 +45,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     $out: {
                         db: db.getName(),
                         coll: this.outputCollName,
-                        timeseries: {timeField: timeFieldName, metaField: metaFieldName}
-                    }
-                }
+                        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                    },
+                },
             ],
-            cursor: {}
+            cursor: {},
         });
 
         let allowedErrorCodes = [
@@ -69,7 +69,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // This error is returned if output collection doesn't exist when $out first fetches
             // collection options, but then created by another thread before $out finished
             // timeseries options validation.
-            7268700
+            7268700,
         ];
 
         // TODO (SERVER-88275) a moveCollection can cause the original collection to be dropped and
@@ -87,7 +87,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
         if (res.ok) {
             const cursor = new DBCommandCursor(db, res);
-            assert.eq(0, cursor.itcount());  // No matter how many documents were in the
+            assert.eq(0, cursor.itcount()); // No matter how many documents were in the
             // original input stream, $out should never return any results.
         }
     };
@@ -102,11 +102,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             expireAfterSeconds = Random.rand();
         }
 
-        jsTestLog(`Running collMod: coll=${this.outputCollName} expireAfterSeconds=${
-            expireAfterSeconds}`);
+        jsTestLog(`Running collMod: coll=${this.outputCollName} expireAfterSeconds=${expireAfterSeconds}`);
         assert.commandWorkedOrFailedWithCode(
             db.runCommand({collMod: this.outputCollName, expireAfterSeconds: expireAfterSeconds}),
-            [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.NamespaceNotFound]);
+            [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.NamespaceNotFound],
+        );
     };
 
     /**
@@ -114,16 +114,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
-        assert.commandFailedWithCode(
-            db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
-                ErrorCodes.MovePrimaryInProgress,
-                ErrorCodes.NamespaceNotFound,
-                ErrorCodes.NamespaceCannotBeSharded,
-                // Can't convert a timeseries collection to a capped collection
-                ErrorCodes.IllegalOperation,
-                // TODO(SERVER-108560): Remove CommandNotSupportedOnView after 9.0 becomes last LTS
-                ErrorCodes.CommandNotSupportedOnView,
-            ]);
+        assert.commandFailedWithCode(db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
+            ErrorCodes.MovePrimaryInProgress,
+            ErrorCodes.NamespaceNotFound,
+            ErrorCodes.NamespaceCannotBeSharded,
+            // Can't convert a timeseries collection to a capped collection
+            ErrorCodes.IllegalOperation,
+            // TODO(SERVER-108560): Remove CommandNotSupportedOnView after 9.0 becomes last LTS
+            ErrorCodes.CommandNotSupportedOnView,
+        ]);
     };
 
     /**
@@ -134,16 +133,18 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         if (isMongos(db) && this.tid === 0) {
             jsTestLog(`Running shardCollection: coll=${this.outputCollName} key=${this.shardKey}`);
 
-            assert.commandWorkedOrFailedWithCode(db.adminCommand({
-                shardCollection: db[this.outputCollName].getFullName(),
-                key: this.shardKey,
-                timeseries: {timeField: timeFieldName, metaField: metaFieldName}
-            }),
-                                                 [
-                                                     ErrorCodes.ConflictingOperationInProgress,
-                                                     // Can't shard a capped collection.
-                                                     ErrorCodes.InvalidOptions
-                                                 ]);
+            assert.commandWorkedOrFailedWithCode(
+                db.adminCommand({
+                    shardCollection: db[this.outputCollName].getFullName(),
+                    key: this.shardKey,
+                    timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                }),
+                [
+                    ErrorCodes.ConflictingOperationInProgress,
+                    // Can't shard a capped collection.
+                    ErrorCodes.InvalidOptions,
+                ],
+            );
         }
     };
 
@@ -155,15 +156,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Create timeseries_agg_out as timeseries before running createIndex to prevent the case
         // the collection is created for the first time by the createIndex itself.
         assert.commandWorkedOrFailedWithCode(
-            db.createCollection(this.outputCollName,
-                                {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
-            [ErrorCodes.NamespaceExists]);
+            db.createCollection(this.outputCollName, {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            }),
+            [ErrorCodes.NamespaceExists],
+        );
 
         for (var i = 0; i < this.indexSpecs; ++i) {
             const indexSpecs = this.indexSpecs[i];
             jsTestLog(`Running createIndex: coll=${this.outputCollName} indexSpec=${indexSpecs}`);
-            assert.commandWorkedOrFailedWithCode(db[this.outputCollName].createIndex(indexSpecs),
-                                                 ErrorCodes.MovePrimaryInProgress);
+            assert.commandWorkedOrFailedWithCode(
+                db[this.outputCollName].createIndex(indexSpecs),
+                ErrorCodes.MovePrimaryInProgress,
+            );
         }
     };
 
@@ -171,8 +176,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const collNames = db.getCollectionNames();
 
         // Ensure that for the buckets collection there is a corresponding view.
-        assert(!(collNames.includes('system.buckets.timeseries_agg_out') &&
-                 !collNames.includes('timeseries_agg_out')));
+        assert(!(collNames.includes("system.buckets.timeseries_agg_out") && !collNames.includes("timeseries_agg_out")));
     };
 
     /**
@@ -180,13 +184,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.setup = function setup(db, collName, cluster) {
         db[collName].drop();
-        assert.commandWorked(db.createCollection(
-            collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        assert.commandWorked(
+            db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        );
         const docs = [];
         for (let i = 0; i < numDocs; ++i) {
             docs.push({
                 [timeFieldName]: ISODate(),
-                [metaFieldName]: (this.tid * numDocs) + i,
+                [metaFieldName]: this.tid * numDocs + i,
             });
         }
         assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: false}));

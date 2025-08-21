@@ -7,11 +7,7 @@
 //   incompatible_with_views,
 // ]
 // Include helpers for analyzing explain output.
-import {
-    getWinningPlanFromExplain,
-    isExpress,
-    isIdhackOrExpress
-} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isExpress, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const t = db.idhack;
@@ -38,7 +34,7 @@ assert.eq(8, t.findOne({_id: 3}).z);
 
 // explain output should show that the ID hack was applied.
 const query = {
-    _id: {x: 2}
+    _id: {x: 2},
 };
 let explain = t.find(query).explain("allPlansExecution");
 assert.eq(1, explain.executionStats.nReturned, explain);

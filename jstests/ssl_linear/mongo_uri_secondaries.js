@@ -15,7 +15,7 @@ if (HOST_TYPE == "macOS") {
     // Ensure trusted-ca.pem is properly installed on MacOS hosts.
     // (MacOS is the only OS where it is installed outside of this test)
     let exitCode = runProgram("security", "verify-cert", "-c", "./jstests/libs/trusted-client.pem");
-    assert.eq(0, exitCode, 'Check for proper installation of Trusted CA on MacOS host');
+    assert.eq(0, exitCode, "Check for proper installation of Trusted CA on MacOS host");
 }
 if (HOST_TYPE == "windows") {
     assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
@@ -30,11 +30,11 @@ if (HOST_TYPE == "windows") {
 
 try {
     const x509Options = {
-        tlsMode: 'requireTLS',
-        tlsCertificateKeyFile: 'jstests/libs/trusted-server.pem',
-        tlsCAFile: 'jstests/libs/trusted-ca.pem',
-        tlsAllowInvalidCertificates: '',
-        tlsWeakCertificateValidation: '',
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
+        tlsCAFile: "jstests/libs/trusted-ca.pem",
+        tlsAllowInvalidCertificates: "",
+        tlsWeakCertificateValidation: "",
     };
 
     const rst = new ReplSetTest({
@@ -42,16 +42,15 @@ try {
         name: "tlsSet",
         useHostName: false,
         nodeOptions: x509Options,
-        waitForKeys: false
+        waitForKeys: false,
     });
     rst.startSet();
     rst.initiate();
 
-    const subShellCommand = function(hosts) {
+    const subShellCommand = function (hosts) {
         var Ms = [];
         for (let i = 0; i < 10; i++) {
-            Ms.push(new Mongo("mongodb://" + hosts[0] + "," + hosts[1] +
-                              "/?ssl=true&replicaSet=tlsSet"));
+            Ms.push(new Mongo("mongodb://" + hosts[0] + "," + hosts[1] + "/?ssl=true&replicaSet=tlsSet"));
         }
 
         for (let i = 0; i < 10; i++) {
@@ -61,7 +60,7 @@ try {
         }
     };
 
-    const subShellCommandFormatter = function(replSet) {
+    const subShellCommandFormatter = function (replSet) {
         var hosts = [];
         replSet.nodes.forEach((node) => {
             hosts.push("localhost:" + node.port);
@@ -82,15 +81,15 @@ try {
         return waitProgram(pid);
     }
 
-    const subShellArgs = ['mongo', '--nodb', '--eval', subShellCommandFormatter(rst)];
+    const subShellArgs = ["mongo", "--nodb", "--eval", subShellCommandFormatter(rst)];
 
     const retVal = runWithEnv(subShellArgs, {"SSL_CERT_FILE": "jstests/libs/trusted-ca.pem"});
-    assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
+    assert.eq(retVal, 0, "mongo shell did not succeed with exit code 0");
 
     rst.stopSet();
 } finally {
     if (HOST_TYPE == "windows") {
-        const trusted_ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
+        const trusted_ca_thumbprint = cat("jstests/libs/trusted-ca.pem.digest.sha1");
         runProgram("certutil.exe", "-delstore", "-f", "Root", trusted_ca_thumbprint);
         runProgram("certutil.exe", "-delstore", "-user", "-f", "CA", trusted_ca_thumbprint);
     }

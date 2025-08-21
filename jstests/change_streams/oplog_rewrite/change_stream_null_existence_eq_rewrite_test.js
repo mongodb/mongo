@@ -12,7 +12,7 @@
 import {
     generateChangeStreamWriteWorkload,
     getAllChangeStreamEvents,
-    isPlainObject
+    isPlainObject,
 } from "jstests/libs/query/change_stream_rewrite_util.js";
 
 const dbName = jsTestName();
@@ -51,8 +51,7 @@ function traverseEvent(event, outputMap, prefixPath = "") {
 
         // Helper function to add a new value into the fields list.
         function addToPredicatesList(fieldPath, fieldVal) {
-            const alreadyExists =
-                outputMap[fieldPath].values.some((elem) => friendlyEqual(elem, fieldVal));
+            const alreadyExists = outputMap[fieldPath].values.some((elem) => friendlyEqual(elem, fieldVal));
             const numValues = outputMap[fieldPath].values.length;
             if (!alreadyExists && numValues < maxValuesPerPath) {
                 outputMap[fieldPath].values.push(fieldVal);
@@ -85,7 +84,11 @@ function traverseEvent(event, outputMap, prefixPath = "") {
 
 // Obtain a list of all events that occurred during the write workload.
 const allEvents = getAllChangeStreamEvents(
-    testDB, [], {fullDocument: "updateLookup", showExpandedEvents: true}, startPoint);
+    testDB,
+    [],
+    {fullDocument: "updateLookup", showExpandedEvents: true},
+    startPoint,
+);
 
 jsTestLog(`All events: ${tojson(allEvents)}`);
 
@@ -104,7 +107,7 @@ jsTestLog(`All events: ${tojson(allEvents)}`);
 const fieldsToBeTested = {
     // Test documentKey with a field that is in the full object but not in the documentKey.
     "documentKey": {extraValues: [{f2: null, _id: 1}], values: []},
-    "documentKey.f1": {extraValues: [{subField: true}], values: []}
+    "documentKey.f1": {extraValues: [{subField: true}], values: []},
 };
 
 // Always test these subfields for all parent fields.
@@ -117,8 +120,7 @@ jsTestLog(`Final set of fields to test: ${tojson(fieldsToBeTested)}`);
 
 // Define the filters that we want to apply to each field.
 function generateMatchFilters(fieldPath) {
-    const valuesToTest =
-        fieldsToBeTested[fieldPath].values.concat(fieldsToBeTested[fieldPath].extraValues);
+    const valuesToTest = fieldsToBeTested[fieldPath].values.concat(fieldsToBeTested[fieldPath].extraValues);
 
     const filters = [
         {[fieldPath]: {$eq: null}},
@@ -126,7 +128,7 @@ function generateMatchFilters(fieldPath) {
         {[fieldPath]: {$lte: null}},
         {[fieldPath]: {$gte: null}},
         {[fieldPath]: {$exists: true}},
-        {[fieldPath]: {$exists: false}}
+        {[fieldPath]: {$exists: false}},
     ];
 
     for (let value of valuesToTest) {
@@ -136,8 +138,7 @@ function generateMatchFilters(fieldPath) {
     return filters;
 }
 function generateExprFilters(fieldPath) {
-    const valuesToTest =
-        fieldsToBeTested[fieldPath].values.concat(fieldsToBeTested[fieldPath].extraValues);
+    const valuesToTest = fieldsToBeTested[fieldPath].values.concat(fieldsToBeTested[fieldPath].extraValues);
 
     const exprFieldPath = "$" + fieldPath;
     const exprs = [
@@ -148,7 +149,7 @@ function generateExprFilters(fieldPath) {
         {$expr: {$eq: [exprFieldPath, "$$REMOVE"]}},
         {$expr: {$ne: [exprFieldPath, "$$REMOVE"]}},
         {$expr: {$lte: [exprFieldPath, "$$REMOVE"]}},
-        {$expr: {$gte: [exprFieldPath, "$$REMOVE"]}}
+        {$expr: {$gte: [exprFieldPath, "$$REMOVE"]}},
     ];
 
     for (let value of valuesToTest) {
@@ -164,8 +165,7 @@ const failedTestCases = [];
 // Confirm that the output of an optimized change stream matches an unoptimized stream.
 for (let csConfig of [{fullDocument: "updateLookup", showExpandedEvents: true}]) {
     for (let fieldToTest in fieldsToBeTested) {
-        const predicatesToTest =
-            generateMatchFilters(fieldToTest).concat(generateExprFilters(fieldToTest));
+        const predicatesToTest = generateMatchFilters(fieldToTest).concat(generateExprFilters(fieldToTest));
         for (let predicate of predicatesToTest) {
             // Create a $match expression for the current predicate.
             const matchExpr = {$match: predicate};
@@ -177,14 +177,14 @@ for (let csConfig of [{fullDocument: "updateLookup", showExpandedEvents: true}])
             const optimizedPipeline = [matchExpr];
 
             // Extract all results from each of the pipelines.
-            const nonOptimizedOutput =
-                getAllChangeStreamEvents(testDB, nonOptimizedPipeline, csConfig, startPoint);
-            const optimizedOutput =
-                getAllChangeStreamEvents(testDB, optimizedPipeline, csConfig, startPoint);
+            const nonOptimizedOutput = getAllChangeStreamEvents(testDB, nonOptimizedPipeline, csConfig, startPoint);
+            const optimizedOutput = getAllChangeStreamEvents(testDB, optimizedPipeline, csConfig, startPoint);
 
             // We never expect to see more optimized results than unoptimized.
-            assert(optimizedOutput.length <= nonOptimizedOutput.length,
-                   {optimizedOutput: optimizedOutput, nonOptimizedOutput: nonOptimizedOutput});
+            assert(optimizedOutput.length <= nonOptimizedOutput.length, {
+                optimizedOutput: optimizedOutput,
+                nonOptimizedOutput: nonOptimizedOutput,
+            });
 
             // Check the unoptimized results against the optimized results. If we observe an entry
             // in the non-optimized array that is not present in the optimized, add the details to
@@ -192,8 +192,10 @@ for (let csConfig of [{fullDocument: "updateLookup", showExpandedEvents: true}])
             for (let i = 0; i < nonOptimizedOutput.length; ++i) {
                 try {
                     assert(i < optimizedOutput.length);
-                    if (optimizedOutput[i].hasOwnProperty("wallTime") &&
-                        nonOptimizedOutput[i].hasOwnProperty("wallTime")) {
+                    if (
+                        optimizedOutput[i].hasOwnProperty("wallTime") &&
+                        nonOptimizedOutput[i].hasOwnProperty("wallTime")
+                    ) {
                         optimizedOutput[i].wallTime = nonOptimizedOutput[i].wallTime;
                     }
                     assert(friendlyEqual(optimizedOutput[i], nonOptimizedOutput[i]));
@@ -201,7 +203,7 @@ for (let csConfig of [{fullDocument: "updateLookup", showExpandedEvents: true}])
                     failedTestCases.push({
                         matchExpr: matchExpr,
                         csConfig: csConfig,
-                        events: {nonOptimized: nonOptimizedOutput[i], optimized: optimizedOutput[i]}
+                        events: {nonOptimized: nonOptimizedOutput[i], optimized: optimizedOutput[i]},
                     });
                     jsTestLog(`Total failures: ${failedTestCases.length}`);
                     break;

@@ -22,12 +22,12 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
-    setAvailableDiskSpaceMode
+    setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getSpillCounter() {
-    return accumulateServerStatusMetric(db, metrics => metrics.query.graphLookup.spills);
+    return accumulateServerStatusMetric(db, (metrics) => metrics.query.graphLookup.spills);
 }
 
 const memoryLimitKnob = "internalDocumentSourceGraphLookupMaxMemoryBytes";
@@ -60,8 +60,7 @@ assert.commandWorked(local.insertOne({start: 1}));
 const docCount = 64;
 const string1MB = Array(1024 * 1024).toString();
 for (let i = 1; i <= docCount; ++i) {
-    assert.commandWorked(
-        foreign.insertOne({index: i, children: [2 * i, 2 * i + 1], payload: string1MB}));
+    assert.commandWorked(foreign.insertOne({index: i, children: [2 * i, 2 * i + 1], payload: string1MB}));
 }
 
 const pipeline = [
@@ -71,8 +70,8 @@ const pipeline = [
             startWith: "$start",
             connectFromField: "children",
             connectToField: "index",
-            as: "output"
-        }
+            as: "output",
+        },
     },
     {$unwind: {path: "$output"}},
     {$replaceRoot: {newRoot: "$output"}},
@@ -82,12 +81,11 @@ function sortPipelineResults(results) {
     results.forEach((e) => {
         delete e.payload;
     });
-    return results.sort((a, b) => (a.index - b.index));
+    return results.sort((a, b) => a.index - b.index);
 }
 
 // Get all the results to use as a reference.
-const expectedResults =
-    sortPipelineResults(local.aggregate(pipeline, {"allowDiskUse": false}).toArray());
+const expectedResults = sortPipelineResults(local.aggregate(pipeline, {"allowDiskUse": false}).toArray());
 
 {
     jsTest.log(`Running releaseMemory after first batch`);
@@ -145,13 +143,13 @@ const expectedResults =
     const cursorId = cursor.getId();
 
     // Release memory (i.e., spill)
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "alwaysOn");
     const releaseMemoryCmd = {releaseMemory: [cursorId]};
     jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
     assert.commandWorked(releaseMemoryRes);
     assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
 
     jsTest.log.info("Running getMore");
     assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);
@@ -168,10 +166,10 @@ const expectedResults =
     jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
     assert.commandWorked(releaseMemoryRes);
-    assertReleaseMemoryFailedWithCode(
-        releaseMemoryRes,
-        cursorId,
-        [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ReleaseMemoryShardError]);
+    assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, [
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        ErrorCodes.ReleaseMemoryShardError,
+    ]);
 
     jsTest.log.info("Running getMore");
     const results = sortPipelineResults(cursor.toArray());

@@ -5,8 +5,8 @@ var db = mongod.getDB("admin");
 db.createUser({user: "root", pwd: "root", roles: ["userAdminAnyDatabase"]});
 db.auth("root", "root");
 db.createUser({user: "readOnlyUser", pwd: "foobar", roles: ["readAnyDatabase"]});
-var readUserCache = function() {
-    var ret = db.aggregate([{$listCachedAndActiveUsers: {}}, {$sort: {'active': -1}}]).toArray();
+var readUserCache = function () {
+    var ret = db.aggregate([{$listCachedAndActiveUsers: {}}, {$sort: {"active": -1}}]).toArray();
     print(tojson(ret));
     return ret;
 };
@@ -27,7 +27,7 @@ assert.eq(expectedBothActive, readUserCache());
 newConn.close();
 */
 
-var awaitShell = startParallelShell(function() {
+var awaitShell = startParallelShell(function () {
     assert.eq(db.getSiblingDB("admin").auth("readOnlyUser", "foobar"), 1);
 }, mongod.port);
 
@@ -35,7 +35,7 @@ const expectedReadOnlyInactive = [
     {username: "root", db: "admin", active: true},
     {username: "readOnlyUser", db: "admin", active: false},
 ];
-assert.soon(function() {
+assert.soon(function () {
     return friendlyEqual(expectedReadOnlyInactive, readUserCache());
 });
 

@@ -13,16 +13,14 @@ import "jstests/libs/override_methods/retry_on_killed_session.js";
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {killSession} from "jstests/concurrency/fsm_workload_helpers/kill_session.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_update_shard_key.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_update_shard_key.js";
 
 // By default retry_on_killed_session.js will only retry known retryable operations like reads and
 // retryable writes, but the moveChunks in this test may be interrupted and are safe to retry so opt
 // into always retrying killed operations.
 TestData.alwaysRetryOnKillSessionErrors = true;
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.retryOnKilledSession = true;
 
     // The base workload uses connCache, so wrap killSessions so the fsm runner doesn't complain
@@ -47,7 +45,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             findAndModifyWithTransactionAcrossChunks: 0.15,
             updateWithRetryableWriteAcrossChunks: 0.15,
             updateWithTransactionAcrossChunks: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         moveChunk: {
             killSession: 0.1,
@@ -56,7 +54,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             findAndModifyWithTransactionAcrossChunks: 0.15,
             updateWithRetryableWriteAcrossChunks: 0.15,
             updateWithTransactionAcrossChunks: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         findAndModifyWithRetryableWriteAcrossChunks: {
             killSession: 0.1,
@@ -65,7 +63,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             findAndModifyWithTransactionAcrossChunks: 0.15,
             updateWithRetryableWriteAcrossChunks: 0.15,
             updateWithTransactionAcrossChunks: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         findAndModifyWithTransactionAcrossChunks: {
             killSession: 0.1,
@@ -74,7 +72,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             findAndModifyWithTransactionAcrossChunks: 0.15,
             updateWithRetryableWriteAcrossChunks: 0.15,
             updateWithTransactionAcrossChunks: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         updateWithRetryableWriteAcrossChunks: {
             killSession: 0.1,
@@ -83,7 +81,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             findAndModifyWithTransactionAcrossChunks: 0.15,
             updateWithRetryableWriteAcrossChunks: 0.15,
             updateWithTransactionAcrossChunks: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         updateWithTransactionAcrossChunks: {
             killSession: 0.1,
@@ -92,7 +90,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             findAndModifyWithTransactionAcrossChunks: 0.15,
             updateWithRetryableWriteAcrossChunks: 0.15,
             updateWithTransactionAcrossChunks: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
         verifyDocuments: {
             killSession: 0.1,
@@ -101,7 +99,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             findAndModifyWithTransactionAcrossChunks: 0.15,
             updateWithRetryableWriteAcrossChunks: 0.15,
             updateWithTransactionAcrossChunks: 0.15,
-            verifyDocuments: 0.2
+            verifyDocuments: 0.2,
         },
     };
 

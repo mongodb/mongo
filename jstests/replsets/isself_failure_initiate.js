@@ -17,8 +17,7 @@ const failPoint = configureFailPoint(nodes[1], "failIsSelfCheck");
 const config = rst.getReplSetConfig();
 assert.commandWorked(nodes[0].adminCommand({replSetInitiate: config}));
 failPoint.wait();
-assert.commandFailedWithCode(nodes[1].adminCommand({replSetGetStatus: 1}),
-                             ErrorCodes.NotYetInitialized);
+assert.commandFailedWithCode(nodes[1].adminCommand({replSetGetStatus: 1}), ErrorCodes.NotYetInitialized);
 failPoint.off();
 // Node 1 re-checks isSelf on next heartbeat and succeeds.
 waitForState(nodes[1], ReplSetTest.State.SECONDARY);

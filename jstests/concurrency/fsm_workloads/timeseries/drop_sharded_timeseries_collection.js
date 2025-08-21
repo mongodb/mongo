@@ -11,10 +11,10 @@
  */
 const dbPrefix = jsTestName();
 const dbCount = 2;
-const collPrefix = 'sharded_timeseries_collection_';
+const collPrefix = "sharded_timeseries_collection_";
 const collCount = 2;
-const timeField = 'time';
-const metaField = 'hostId';
+const timeField = "time";
+const metaField = "hostId";
 
 function getRandomDb(db) {
     return db.getSiblingDB(dbPrefix + Random.randInt(dbCount));
@@ -24,8 +24,8 @@ function getRandomTimeseriesView(db) {
     return getRandomDb(db)[collPrefix + Random.randInt(collCount)];
 }
 
-export const $config = (function() {
-    const setup = function(db, collName, cluster) {
+export const $config = (function () {
+    const setup = function (db, collName, cluster) {
         // Enable sharding for the test databases.
         for (var i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
@@ -34,17 +34,19 @@ export const $config = (function() {
     };
 
     const states = {
-        init: function(db, collName) {},
-        create: function(db, collName) {
+        init: function (db, collName) {},
+        create: function (db, collName) {
             const coll = getRandomTimeseriesView(db);
             jsTestLog("Executing create state on: " + coll.getFullName());
-            assert.commandWorked(db.adminCommand({
-                shardCollection: coll.getFullName(),
-                key: {[metaField]: 1, [timeField]: 1},
-                timeseries: {timeField: timeField, metaField: metaField}
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    shardCollection: coll.getFullName(),
+                    key: {[metaField]: 1, [timeField]: 1},
+                    timeseries: {timeField: timeField, metaField: metaField},
+                }),
+            );
         },
-        dropView: function(db, collName) {
+        dropView: function (db, collName) {
             const coll = getRandomTimeseriesView(db);
             jsTestLog("Executing dropView state on: " + coll.getFullName());
             assert.commandWorked(coll.getDB().runCommand({drop: coll.getName()}));
@@ -60,10 +62,10 @@ export const $config = (function() {
     return {
         threadCount: 12,
         iterations: 64,
-        startState: 'init',
+        startState: "init",
         data: {},
         states: states,
         setup: setup,
-        transitions: transitions
+        transitions: transitions,
     };
 })();

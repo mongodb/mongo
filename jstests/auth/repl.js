@@ -7,7 +7,7 @@ var rsName = baseName + "_rs";
 var mongoOptions = {auth: null, keyFile: "jstests/libs/key1"};
 var authErrCode = 13;
 
-var AuthReplTest = function(spec) {
+var AuthReplTest = function (spec) {
     var that = {};
 
     // argument validation
@@ -17,7 +17,9 @@ var AuthReplTest = function(spec) {
     // private vars
     var primaryConn, secondaryConn;
     var adminPri, adminSec;
-    var testUser = "testUser", testRole = "testRole", testRole2 = "testRole2";
+    var testUser = "testUser",
+        testRole = "testRole",
+        testRole2 = "testRole2";
 
     primaryConn = spec.primaryConn;
     secondaryConn = spec.secondaryConn;
@@ -33,7 +35,7 @@ var AuthReplTest = function(spec) {
 
     /* --- private functions --- */
 
-    var authOnSecondary = function() {
+    var authOnSecondary = function () {
         assert(adminSec.auth(testUser, testUser), "could not authenticate as test user");
     };
 
@@ -41,7 +43,7 @@ var AuthReplTest = function(spec) {
      * Use the rolesInfo command to check that the test
      * role is as expected on the secondary
      */
-    var confirmRolesInfo = function(actionType) {
+    var confirmRolesInfo = function (actionType) {
         var role = adminSec.getRole(testRole, {showPrivileges: true});
         assert.eq(1, role.privileges.length);
         assert.eq(role.privileges[0].actions[0], actionType);
@@ -51,7 +53,7 @@ var AuthReplTest = function(spec) {
      * Use the usersInfo command to check that the test
      * user is as expected on the secondary
      */
-    var confirmUsersInfo = function(roleName) {
+    var confirmUsersInfo = function (roleName) {
         var user = adminSec.getUser(testUser);
         assert.eq(1, user.roles.length);
         assert.eq(user.roles[0].role, roleName);
@@ -61,7 +63,7 @@ var AuthReplTest = function(spec) {
      * Ensure that the test user has the proper privileges
      * on the secondary
      */
-    var confirmPrivilegeBeforeUpdate = function() {
+    var confirmPrivilegeBeforeUpdate = function () {
         // can run hostInfo
         var res = adminSec.runCommand({hostInfo: 1});
         assert.commandWorked(res);
@@ -71,18 +73,21 @@ var AuthReplTest = function(spec) {
         assert.commandFailedWithCode(res, authErrCode);
     };
 
-    var updateRole = function() {
+    var updateRole = function () {
         var res = adminPri.runCommand({
             updateRole: testRole,
             privileges: [{resource: {cluster: true}, actions: ["listDatabases"]}],
-            writeConcern: {w: 2, wtimeout: 15000}
+            writeConcern: {w: 2, wtimeout: 15000},
         });
         assert.commandWorked(res);
     };
 
-    var updateUser = function() {
-        var res = adminPri.runCommand(
-            {updateUser: testUser, roles: [testRole2], writeConcern: {w: 2, wtimeout: 15000}});
+    var updateUser = function () {
+        var res = adminPri.runCommand({
+            updateUser: testUser,
+            roles: [testRole2],
+            writeConcern: {w: 2, wtimeout: 15000},
+        });
         assert.commandWorked(res);
     };
 
@@ -90,7 +95,7 @@ var AuthReplTest = function(spec) {
      * Ensure that the auth changes have taken effect
      * properly on the secondary
      */
-    var confirmPrivilegeAfterUpdate = function() {
+    var confirmPrivilegeAfterUpdate = function () {
         // cannot run hostInfo
         var res = adminSec.runCommand({hostInfo: 1});
         assert.commandFailedWithCode(res, authErrCode);
@@ -103,11 +108,10 @@ var AuthReplTest = function(spec) {
     /**
      * Remove test users and roles
      */
-    var cleanup = function() {
+    var cleanup = function () {
         var res = adminPri.runCommand({dropUser: testUser, writeConcern: {w: 2, wtimeout: 15000}});
         assert.commandWorked(res);
-        res = adminPri.runCommand(
-            {dropAllRolesFromDatabase: 1, writeConcern: {w: 2, wtimeout: 15000}});
+        res = adminPri.runCommand({dropAllRolesFromDatabase: 1, writeConcern: {w: 2, wtimeout: 15000}});
         assert.commandWorked(res);
     };
 
@@ -116,7 +120,7 @@ var AuthReplTest = function(spec) {
     /**
      * Set the secondary for the test
      */
-    that.setSecondary = function(secondary) {
+    that.setSecondary = function (secondary) {
         secondaryConn = secondary;
         secondaryConn.setSecondaryOk();
         adminSec = secondaryConn.getDB("admin");
@@ -126,7 +130,7 @@ var AuthReplTest = function(spec) {
      * Create user and roles in preparation
      * for the test.
      */
-    that.createUserAndRoles = function(numNodes) {
+    that.createUserAndRoles = function (numNodes) {
         var roles = [testRole, testRole2];
         var actions = ["hostInfo", "listDatabases"];
         for (var i = 0; i < roles.length; i++) {
@@ -134,7 +138,7 @@ var AuthReplTest = function(spec) {
                 createRole: roles[i],
                 privileges: [{resource: {cluster: true}, actions: [actions[i]]}],
                 roles: [],
-                writeConcern: {w: numNodes, wtimeout: 15000}
+                writeConcern: {w: numNodes, wtimeout: 15000},
             });
             assert.commandWorked(res);
         }
@@ -143,7 +147,7 @@ var AuthReplTest = function(spec) {
             createUser: testUser,
             pwd: testUser,
             roles: [testRole],
-            writeConcern: {w: numNodes, wtimeout: 15000}
+            writeConcern: {w: numNodes, wtimeout: 15000},
         });
         assert.commandWorked(res);
     };
@@ -152,7 +156,7 @@ var AuthReplTest = function(spec) {
      * Top-level test for updating users and roles and ensuring that the update
      * has the correct effect on the secondary
      */
-    that.testAll = function() {
+    that.testAll = function () {
         authOnSecondary();
         confirmPrivilegeBeforeUpdate();
         confirmUsersInfo(testRole);
@@ -176,7 +180,7 @@ jsTest.log("1 test replica sets");
 let rs = new ReplSetTest({name: rsName, nodes: 2});
 var nodes = rs.startSet(mongoOptions);
 rs.initiate();
-authutil.asCluster(nodes, "jstests/libs/key1", function() {
+authutil.asCluster(nodes, "jstests/libs/key1", function () {
     rs.awaitReplication();
 });
 
@@ -192,7 +196,7 @@ jsTest.log("2 test initial sync");
 rs = new ReplSetTest({name: rsName, nodes: 1, nodeOptions: mongoOptions});
 nodes = rs.startSet();
 rs.initiate();
-authutil.asCluster(nodes, "jstests/libs/key1", function() {
+authutil.asCluster(nodes, "jstests/libs/key1", function () {
     rs.awaitReplication();
 });
 

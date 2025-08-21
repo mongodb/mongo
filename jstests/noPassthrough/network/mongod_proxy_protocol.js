@@ -12,7 +12,7 @@ if (_isWindows()) {
 import {
     emptyMessageTest,
     fuzzingTest,
-    testProxyProtocolReplicaSet
+    testProxyProtocolReplicaSet,
 } from "jstests/noPassthrough/libs/proxy_protocol_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
@@ -20,32 +20,36 @@ import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 function sendHelloMaybeLB(node, port, loadBalanced, count) {
     const kLoadBalancerNoOpMessage = 10107800;
     let uri = `mongodb://127.0.0.1:${port}`;
-    if (typeof loadBalanced != 'undefined') {
+    if (typeof loadBalanced != "undefined") {
         uri += `/?loadBalanced=${loadBalanced}`;
     }
     const conn = new Mongo(uri);
-    assert.neq(null, conn, 'Client was unable to connect to the load balancer port');
-    assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
+    assert.neq(null, conn, "Client was unable to connect to the load balancer port");
+    assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
 
     if (loadBalanced) {
-        assert(checkLog.checkContainsWithCountJson(
-                   node, kLoadBalancerNoOpMessage, {}, count, undefined, true),
-               `Did not find log id ${kLoadBalancerNoOpMessage} ${tojson(count)} times in the log`);
+        assert(
+            checkLog.checkContainsWithCountJson(node, kLoadBalancerNoOpMessage, {}, count, undefined, true),
+            `Did not find log id ${kLoadBalancerNoOpMessage} ${tojson(count)} times in the log`,
+        );
     }
 }
 
 function failInvalidProtocol(node, port, id, attrs, loadBalanced, count) {
     let uri = `mongodb://127.0.0.1:${port}`;
-    if (typeof loadBalanced != 'undefined') {
+    if (typeof loadBalanced != "undefined") {
         uri += `/?loadBalanced=${tojson(loadBalanced)}`;
     }
     try {
         new Mongo(uri);
-        assert(false, 'Client was unable to connect to the load balancer port');
+        assert(false, "Client was unable to connect to the load balancer port");
     } catch (err) {
-        assert(checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true),
-               `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} ${
-                   tojson(count)} times in the log -- failed with this error: ${tojson(err)}`);
+        assert(
+            checkLog.checkContainsWithCountJson(node, id, attrs, count, undefined, true),
+            `Did not find log id ${tojson(id)} with attr ${tojson(attrs)} ${tojson(
+                count,
+            )} times in the log -- failed with this error: ${tojson(err)}`,
+        );
     }
 }
 
@@ -86,7 +90,7 @@ function standardPortTest(ingressPort, egressPort, version) {
             "code": ErrorCodes.OperationFailed,
             "codeName": "OperationFailed",
             "errmsg": "ProxyProtocol message detected on mongorpc port",
-        }
+        },
     };
     failInvalidProtocol(node, ingressPort, 22988, attrs, true, 1);
     failInvalidProtocol(node, ingressPort, 22988, attrs, false, 2);

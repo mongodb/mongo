@@ -19,4 +19,4 @@ assert.commandWorked(coll.createIndex({a: 1}));
 // But the index will contain separate entries for {x: 1} and {y: 1}.
 // An incorrect plan would force each index entry to match both predicates,
 // returning an empty result-set.
-show(coll.find({'a.x': 1, 'a.y': 1}, {_id: 0}));
+show(coll.find({"a.x": 1, "a.y": 1}, {_id: 0}));

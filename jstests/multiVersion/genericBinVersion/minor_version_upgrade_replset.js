@@ -9,7 +9,7 @@ var oldVersion = "last-lts";
 var nodes = {
     n1: {binVersion: oldVersion},
     n2: {binVersion: oldVersion},
-    a3: {binVersion: oldVersion}
+    a3: {binVersion: oldVersion},
 };
 
 var rst = new ReplSetTest({nodes: nodes});
@@ -45,10 +45,11 @@ function findAndInsert(rsURL, coll) {
     return count;
 }
 
-var joinFindInsert =
-    startParallelOps(primary,  // The connection where the test info is passed and stored
-                     findAndInsert,
-                     [rst.getURL(), insertNS]);
+var joinFindInsert = startParallelOps(
+    primary, // The connection where the test info is passed and stored
+    findAndInsert,
+    [rst.getURL(), insertNS],
+);
 
 jsTest.log("Upgrading replica set...");
 

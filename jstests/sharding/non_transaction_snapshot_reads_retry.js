@@ -25,25 +25,23 @@ const historyWindowSecs = 10;
 const testMarginSecs = 1;
 const st = new ShardingTest({
     shards: {rs0: {nodes: 1}},
-    other: {rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: historyWindowSecs}}}
+    other: {rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: historyWindowSecs}}},
 });
 
 const primary = st.rs0.getPrimary();
 const primaryAdmin = primary.getDB("admin");
-assert.eq(assert
-              .commandWorked(
-                  primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
-              .minSnapshotHistoryWindowInSeconds,
-          historyWindowSecs);
+assert.eq(
+    assert.commandWorked(primaryAdmin.runCommand({getParameter: 1, minSnapshotHistoryWindowInSeconds: 1}))
+        .minSnapshotHistoryWindowInSeconds,
+    historyWindowSecs,
+);
 
 const mongosDB = st.s.getDB("test");
 const mongosColl = mongosDB.test;
 
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 st.shardColl(mongosColl, {_id: 1}, false);
-let result =
-    mongosDB.runCommand({insert: "test", documents: [{_id: 0}], writeConcern: {w: "majority"}});
+let result = mongosDB.runCommand({insert: "test", documents: [{_id: 0}], writeConcern: {w: "majority"}});
 const insertTS = assert.commandWorked(result).operationTime;
 jsTestLog(`Inserted document at ${tojson(insertTS)}`);
 
@@ -56,17 +54,19 @@ function read(insertTS, enableCausal, updatedValue, retries) {
         readConcern.afterClusterTime = insertTS;
     }
 
-    const result = assert.commandWorked(db.runCommand({
-        find: "test",
-        filter: {_id: 0},
-        projection: {
-            _id: 1,
-            x: 1,
-            "foo.bar": 1
-        },  // use non-simple projection to avoid Express fast-path; it doesn't yield
-        singleBatch: true,
-        readConcern: readConcern
-    }));
+    const result = assert.commandWorked(
+        db.runCommand({
+            find: "test",
+            filter: {_id: 0},
+            projection: {
+                _id: 1,
+                x: 1,
+                "foo.bar": 1,
+            }, // use non-simple projection to avoid Express fast-path; it doesn't yield
+            singleBatch: true,
+            readConcern: readConcern,
+        }),
+    );
 
     jsTestLog(`find result for enableCausal=${enableCausal}: ${tojson(result)}`);
     const act = result.cursor.atClusterTime;
@@ -87,10 +87,8 @@ function read(insertTS, enableCausal, updatedValue, retries) {
 }
 
 const updatedValue = "updatedValue";
-const waitForShell =
-    startParallelShell(funWithArgs(read, insertTS, false, updatedValue, 0), st.s.port);
-const waitForShellCausal =
-    startParallelShell(funWithArgs(read, insertTS, true, updatedValue, 0), st.s.port);
+const waitForShell = startParallelShell(funWithArgs(read, insertTS, false, updatedValue, 0), st.s.port);
+const waitForShellCausal = startParallelShell(funWithArgs(read, insertTS, true, updatedValue, 0), st.s.port);
 
 jsTestLog("Wait for shells to hit waitInFindBeforeMakingBatch failpoint");
 fp.wait(kDefaultWaitForFailPointTimeout, 2);
@@ -99,7 +97,7 @@ jsTestLog("Update document");
 result = mongosDB.runCommand({
     update: "test",
     updates: [{q: {_id: 0}, u: {$set: {x: updatedValue}}}],
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 });
 
 const updateTS = assert.commandWorked(result).operationTime;
@@ -111,7 +109,8 @@ sleep((historyWindowSecs + testMarginSecs) * 1000);
 
 jsTestLog("Trigger history cleanup with a w-majority insert");
 result = assert.commandWorked(
-    mongosDB.runCommand({insert: "test", documents: [{_id: 1}], writeConcern: {w: "majority"}}));
+    mongosDB.runCommand({insert: "test", documents: [{_id: 1}], writeConcern: {w: "majority"}}),
+);
 const historyCleanupTS = result.operationTime;
 jsTestLog(`History cleanup at ${tojson(historyCleanupTS)}`);
 

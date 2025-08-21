@@ -11,7 +11,7 @@
  * ]
  */
 
-export const $config = (function() {
+export const $config = (function () {
     const kTotalWorkingDocuments = 500;
     const iterations = 20;
     // In the duration moveCollection takes to complete, all the other threads finish running their
@@ -35,7 +35,7 @@ export const $config = (function() {
     }
 
     function calculateToShard(conn, ns) {
-        var config = conn.rsConns.config.getDB('config');
+        var config = conn.rsConns.config.getDB("config");
         var unshardedColl = config.collections.findOne({_id: ns});
         // In case the collection is untracked the current shard is the primary shard.
         let currentShardFn = () => {
@@ -51,7 +51,7 @@ export const $config = (function() {
         };
         var currentShard = currentShardFn();
         var shards = Object.keys(conn.shards);
-        var destinationShards = shards.filter(function(shard) {
+        var destinationShards = shards.filter(function (shard) {
             if (shard !== currentShard) {
                 return shard;
             }
@@ -101,8 +101,7 @@ export const $config = (function() {
             print(`Finished inserting documents.`);
         },
         moveCollection: function moveCollection(db, collName, connCache) {
-            const shouldContinueMoveCollection =
-                this.moveCollectionCount <= kMaxMoveCollectionExecutions;
+            const shouldContinueMoveCollection = this.moveCollectionCount <= kMaxMoveCollectionExecutions;
             if (this.tid === 0 && shouldContinueMoveCollection) {
                 const coll = db.getCollection(collName);
                 const toShard = calculateToShard(connCache, coll.getFullName());
@@ -114,25 +113,24 @@ export const $config = (function() {
         untrackUnshardedCollection: function untrackUnshardedCollection(db, collName, connCache) {
             const namespace = `${db}.${collName}`;
             print(`Started to untrack collection ${namespace}`);
-            assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({untrackUnshardedCollection: namespace}), [
-                    // Handles the case where the collection is not located on its primary
-                    ErrorCodes.OperationFailed,
-                    // Handles the case where the collection is sharded
-                    ErrorCodes.InvalidNamespace,
-                ]);
+            assert.commandWorkedOrFailedWithCode(db.adminCommand({untrackUnshardedCollection: namespace}), [
+                // Handles the case where the collection is not located on its primary
+                ErrorCodes.OperationFailed,
+                // Handles the case where the collection is sharded
+                ErrorCodes.InvalidNamespace,
+            ]);
             print(`Untrack collection completed`);
-        }
+        },
     };
 
     const transitions = {
         moveCollection: {insert: 1.0},
         untrackUnshardedCollection: {insert: 1.0},
-        insert: {insert: 0.75, moveCollection: 0.15, untrackUnshardedCollection: 0.10},
+        insert: {insert: 0.75, moveCollection: 0.15, untrackUnshardedCollection: 0.1},
     };
 
     function setup(db, collName, _cluster) {
-        const ns = db + '.' + collName;
+        const ns = db + "." + collName;
         print(`Started unshardCollection on ${ns}`);
         assert.commandWorked(db.adminCommand({unshardCollection: ns}));
         print(`Finished unshardCollection on ${ns}`);
@@ -149,11 +147,11 @@ export const $config = (function() {
     return {
         threadCount: 15,
         iterations: iterations,
-        startState: 'moveCollection',
+        startState: "moveCollection",
         states: states,
         transitions: transitions,
         setup: setup,
         data: data,
-        passConnectionCache: true
+        passConnectionCache: true,
     };
 })();

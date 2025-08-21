@@ -2,8 +2,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var s = new ShardingTest({name: "migrateBig", shards: 2, other: {chunkSize: 1}});
 
-assert.commandWorked(
-    s.config.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true));
+assert.commandWorked(s.config.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true));
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {x: 1}}));
 
@@ -11,8 +10,7 @@ var db = s.getDB("test");
 var coll = db.foo;
 
 var big = "";
-while (big.length < 10000)
-    big += "eliot";
+while (big.length < 10000) big += "eliot";
 
 var bulk = coll.initializeUnorderedBulkOp();
 for (var x = 0; x < 100; x++) {
@@ -22,8 +20,9 @@ assert.commandWorked(bulk.execute());
 
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {x: 30}}));
 assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {x: 66}}));
-assert.commandWorked(s.s0.adminCommand(
-    {movechunk: "test.foo", find: {x: 90}, to: s.getOther(s.getPrimaryShard("test")).name}));
+assert.commandWorked(
+    s.s0.adminCommand({movechunk: "test.foo", find: {x: 90}, to: s.getOther(s.getPrimaryShard("test")).name}),
+);
 
 s.printShardingStatus();
 
@@ -40,8 +39,9 @@ for (var done = 0; done < 2 * 1024 * 1024; done += big.length) {
 s.printShardingStatus();
 
 // This is a large chunk, which should not be able to move
-assert.commandFailed(s.s0.adminCommand(
-    {movechunk: "test.foo", find: {x: 50}, to: s.getOther(s.getPrimaryShard("test")).name}));
+assert.commandFailed(
+    s.s0.adminCommand({movechunk: "test.foo", find: {x: 50}, to: s.getOther(s.getPrimaryShard("test")).name}),
+);
 
 for (var i = 0; i < 20; i += 2) {
     try {
@@ -56,6 +56,6 @@ s.printShardingStatus();
 
 s.startBalancer();
 
-s.awaitBalance('foo', 'test', 60 * 1000);
+s.awaitBalance("foo", "test", 60 * 1000);
 
 s.stop();

@@ -13,8 +13,7 @@ import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const cst = new ChangeStreamTest(testDB);
-const coll = assertDropAndRecreateCollection(
-    testDB, "coll", {changeStreamPreAndPostImages: {enabled: true}});
+const coll = assertDropAndRecreateCollection(testDB, "coll", {changeStreamPreAndPostImages: {enabled: true}});
 const collOther = assertDropAndRecreateCollection(testDB, "coll_regular");
 
 // Verifies that change stream cursor 'changeStreamCursor' returns events defined in array
@@ -35,18 +34,24 @@ function assertChangeEventsReturned(changeStreamCursor, expectedEvents) {
         }
         return result;
     }
-    cst.assertNextChangesEqualUnordered(
-        {cursor: changeStreamCursor, expectedChanges: expectedEvents.map(toChangeEvent)});
+    cst.assertNextChangesEqualUnordered({
+        cursor: changeStreamCursor,
+        expectedChanges: expectedEvents.map(toChangeEvent),
+    });
 }
 
-assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 2, a: 1}, {_id: 3, a: 1}]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 1, a: 1},
+        {_id: 2, a: 1},
+        {_id: 3, a: 1},
+    ]),
+);
 
 // Open a change stream on the test collection with pre- and post-images requested.
 const changeStreamCursor = cst.startWatchingChanges({
-    pipeline: [
-        {$changeStream: {fullDocumentBeforeChange: 'whenAvailable', fullDocument: 'whenAvailable'}}
-    ],
-    collection: coll
+    pipeline: [{$changeStream: {fullDocumentBeforeChange: "whenAvailable", fullDocument: "whenAvailable"}}],
+    collection: coll,
 });
 
 // Gets collections used in the test for database 'db'. In some passthroughs the collections get
@@ -56,7 +61,7 @@ function getCollections(db) {
 }
 
 jsTestLog("Testing a transaction consisting of a single 'applyOps' entry.");
-TxnUtil.runInTransaction(testDB, getCollections, function(db, {coll, otherColl}) {
+TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
     assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
     assert.commandWorked(coll.replaceOne({_id: 2}, {a: "Long string"}));
     assert.commandWorked(coll.deleteOne({_id: 3}));
@@ -67,7 +72,7 @@ assertChangeEventsReturned(changeStreamCursor, [
         _id: 2,
         operationType: "replace",
         preImage: {_id: 2, a: 1},
-        postImage: {_id: 2, a: "Long string"}
+        postImage: {_id: 2, a: "Long string"},
     },
     {_id: 3, operationType: "delete", preImage: {_id: 3, a: 1}},
 ]);
@@ -76,7 +81,7 @@ jsTestLog("Testing a transaction consisting of multiple 'applyOps' entries.");
 const largeStringSizeInBytes = 15 * 1024 * 1024;
 const largeString = "b".repeat(largeStringSizeInBytes);
 assert.commandWorked(coll.insert([{_id: 3, a: 1}]));
-TxnUtil.runInTransaction(testDB, getCollections, function(db, {coll, otherColl}) {
+TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
     assert.commandWorked(otherColl.insert({b: largeString}));
     assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
 
@@ -96,7 +101,7 @@ assertChangeEventsReturned(changeStreamCursor, [
         _id: 2,
         operationType: "replace",
         preImage: {_id: 2, a: "Long string"},
-        postImage: {_id: 2, a: 1}
+        postImage: {_id: 2, a: 1},
     },
     {_id: 2, operationType: "update", preImage: {_id: 2, a: 1}, postImage: {_id: 2, a: 2}},
     {_id: 3, operationType: "delete", preImage: {_id: 3, a: 1}},
@@ -106,7 +111,7 @@ jsTestLog("Testing a transaction consisting of multiple 'applyOps' entries with 
 const largePreImageSizeInBytes = 7 * 1024 * 1024;
 const largePreImageValue = "c".repeat(largePreImageSizeInBytes);
 assert.commandWorked(coll.insert([{_id: 3, a: largePreImageValue}]));
-TxnUtil.runInTransaction(testDB, getCollections, function(db, {coll, otherColl}) {
+TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
     assert.commandWorked(coll.updateOne({_id: 3}, {$set: {b: 1}}));
     assert.commandWorked(coll.deleteOne({_id: 3}));
 });
@@ -116,7 +121,7 @@ assertChangeEventsReturned(changeStreamCursor, [
         _id: 3,
         operationType: "update",
         preImage: {_id: 3, a: largePreImageValue},
-        postImage: {_id: 3, a: largePreImageValue, b: 1}
+        postImage: {_id: 3, a: largePreImageValue, b: 1},
     },
     {
         _id: 3,
@@ -128,13 +133,20 @@ assertChangeEventsReturned(changeStreamCursor, [
 // "applyOps" command can only be issued on a replica set.
 if (!FixtureHelpers.isMongos(testDB)) {
     jsTestLog("Testing 'applyOps' command.");
-    assert.commandWorked(coll.insert([{_id: 5, a: 1}, {_id: 6, a: 1}]));
-    assert.commandWorked(testDB.runCommand({
-        applyOps: [
-            {op: "u", ns: coll.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {a: 2}}}},
-            {op: "d", ns: coll.getFullName(), o: {_id: 6}}
-        ]
-    }));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 5, a: 1},
+            {_id: 6, a: 1},
+        ]),
+    );
+    assert.commandWorked(
+        testDB.runCommand({
+            applyOps: [
+                {op: "u", ns: coll.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {a: 2}}}},
+                {op: "d", ns: coll.getFullName(), o: {_id: 6}},
+            ],
+        }),
+    );
     assertChangeEventsReturned(changeStreamCursor, [
         {_id: 5, operationType: "insert", postImage: {_id: 5, a: 1}},
         {_id: 6, operationType: "insert", postImage: {_id: 6, a: 1}},

@@ -4,16 +4,12 @@
  * exercises the fix for SERVER-41290.
  * @tags: [requires_sharding, requires_profiling]
  */
-import {
-    profilerHasSingleMatchingEntryOrThrow,
-    profilerHasZeroMatchingEntriesOrThrow,
-} from "jstests/libs/profiler.js";
+import {profilerHasSingleMatchingEntryOrThrow, profilerHasZeroMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 const mongosDB = st.s0.getDB(jsTestName());
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}));
 const mongosColl = mongosDB.test;
 const mongosOtherColl = mongosDB.otherEmptyCollection;
 const primaryShard = st.shard0.getDB(jsTestName());
@@ -21,7 +17,7 @@ const shard1DB = st.shard1.getDB(jsTestName());
 
 // Ensure shard0 has the source collection created and is aware of its shard version in order for
 // the profiler entry counts to not get offset due to StaleShardVersion
-assert.commandWorked(mongosColl.insert({val: 'TestValue'}));
+assert.commandWorked(mongosColl.insert({val: "TestValue"}));
 
 assert.commandWorked(primaryShard.setProfilingLevel(2));
 assert.commandWorked(shard1DB.setProfilingLevel(2));
@@ -29,24 +25,25 @@ assert.commandWorked(shard1DB.setProfilingLevel(2));
 // Verify that the $lookup is passed through to the primary shard when all its sub-pipeline
 // stages can be passed through.
 let testName = "sub_pipeline_can_be_passed_through";
-assert.commandWorked(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline:
-        [{$lookup: {pipeline: [{$match: {a: "val"}}], from: mongosOtherColl.getName(), as: "c"}}],
-    cursor: {},
-    comment: testName
-}));
+assert.commandWorked(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [{$lookup: {pipeline: [{$match: {a: "val"}}], from: mongosOtherColl.getName(), as: "c"}}],
+        cursor: {},
+        comment: testName,
+    }),
+);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: primaryShard,
     filter: {
         "command.aggregate": mongosColl.getName(),
         "command.comment": testName,
-        errCode: {$exists: false}
-    }
+        errCode: {$exists: false},
+    },
 });
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: shard1DB,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
 });
 
 // Test to verify that the mongoS doesn't pass the pipeline through to the primary shard when
@@ -56,60 +53,68 @@ profilerHasZeroMatchingEntriesOrThrow({
 // mongoS without ever reaching a shard. This test-case exercises the bug described in
 // SERVER-41290.
 const pipelineForLookup = [
-        {
-          $lookup: {
-              pipeline: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}],
-              from: mongosOtherColl.getName(),
-              as: "c",
-          }
+    {
+        $lookup: {
+            pipeline: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}],
+            from: mongosOtherColl.getName(),
+            as: "c",
         },
-    ];
+    },
+];
 testName = "lookup_with_merge_cannot_be_passed_through";
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: pipelineForLookup,
-    cursor: {},
-    comment: testName
-}),
-                             51047);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: pipelineForLookup,
+        cursor: {},
+        comment: testName,
+    }),
+    51047,
+);
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: primaryShard,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
 });
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: shard1DB,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
 });
 
 // Same test as the above with another level of nested $lookup.
-const pipelineForNestedLookup = [{
+const pipelineForNestedLookup = [
+    {
         $lookup: {
             from: mongosOtherColl.getName(),
             as: "field",
-            pipeline: [{
-                $lookup: {
-                    pipeline: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}],
-                    from: mongosDB.nested.getName(),
-                    as: "c",
-                }
-            }]
-        }
-    }];
+            pipeline: [
+                {
+                    $lookup: {
+                        pipeline: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}],
+                        from: mongosDB.nested.getName(),
+                        as: "c",
+                    },
+                },
+            ],
+        },
+    },
+];
 testName = "nested_lookup_with_merge_cannot_be_passed_through";
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: pipelineForNestedLookup,
-    cursor: {},
-    comment: testName
-}),
-                             51047);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: pipelineForNestedLookup,
+        cursor: {},
+        comment: testName,
+    }),
+    51047,
+);
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: primaryShard,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
 });
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: shard1DB,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
 });
 
 // Test to verify that the mongoS doesn't pass the pipeline through to the primary shard when
@@ -123,24 +128,26 @@ const pipelineForFacet = [
         $facet: {
             field0: [{$match: {a: "val"}}],
             field1: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}],
-        }
+        },
     },
 ];
 testName = "facet_with_merge_cannot_be_passed_through";
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: pipelineForFacet,
-    cursor: {},
-    comment: testName
-}),
-                             40600);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: pipelineForFacet,
+        cursor: {},
+        comment: testName,
+    }),
+    40600,
+);
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: primaryShard,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
 });
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: shard1DB,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
 });
 
 // Same test as the above with another level of nested $facet.
@@ -148,26 +155,27 @@ const pipelineForNestedFacet = [
     {
         $facet: {
             field0: [{$match: {a: "val"}}],
-            field1:
-                [{$facet: {field2: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}]}}],
-        }
+            field1: [{$facet: {field2: [{$match: {a: "val"}}, {$merge: {into: "merge_collection"}}]}}],
+        },
     },
 ];
 testName = "facet_with_merge_cannot_be_passed_through";
-assert.commandFailedWithCode(mongosDB.runCommand({
-    aggregate: mongosColl.getName(),
-    pipeline: pipelineForNestedFacet,
-    cursor: {},
-    comment: testName
-}),
-                             40600);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: pipelineForNestedFacet,
+        cursor: {},
+        comment: testName,
+    }),
+    40600,
+);
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: primaryShard,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
 });
 profilerHasZeroMatchingEntriesOrThrow({
     profileDB: shard1DB,
-    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName}
+    filter: {"command.aggregate": mongosColl.getName(), "command.comment": testName},
 });
 
 st.stop();

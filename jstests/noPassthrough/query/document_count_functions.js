@@ -44,16 +44,17 @@ assert.commandWorked(coll.createIndex({i: 1}));
 assert.eq(4, coll.countDocuments({i: 1}, {hint: {i: 1}}));
 
 // Set fail point to make sure estimatedDocumentCount times out.
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: 'maxTimeAlwaysTimeOut', mode: 'alwaysOn'}));
+assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
 
 // maxTimeMS case: Expect an error if an operation times out.
-assert.commandFailedWithCode(assert.throws(function() {
-                                              coll.estimatedDocumentCount({maxTimeMS: 100});
-                                          }),
-                                          ErrorCodes.MaxTimeMSExpired);
+assert.commandFailedWithCode(
+    assert.throws(function () {
+        coll.estimatedDocumentCount({maxTimeMS: 100});
+    }),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Disable fail point.
-assert.commandWorked(db.adminCommand({configureFailPoint: 'maxTimeAlwaysTimeOut', mode: 'off'}));
+assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));
 
 MongoRunner.stopMongod(standalone);

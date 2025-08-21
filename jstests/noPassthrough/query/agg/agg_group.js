@@ -21,33 +21,29 @@ const db = st.getDB(jsTestName());
 const dbAtShard = st.shard0.getDB(jsTestName());
 
 // Makes sure that the test db is sharded and the data is stored into the only shard.
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 
 let assertShardedGroupResultsMatch = (coll, pipeline) => {
     // Turns to the classic engine at the shard before figuring out its result.
-    assert.commandWorked(dbAtShard.adminCommand(
-        {setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+    assert.commandWorked(
+        dbAtShard.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}),
+    );
 
     // Collects the classic engine's result as the expected result, executing the pipeline at the
     // mongos.
-    const classicalRes =
-        coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}})
-            .cursor.firstBatch;
+    const classicalRes = coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}).cursor.firstBatch;
 
     // Turns to the SBE engine at the shard.
-    assert.commandWorked(
-        dbAtShard.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+    assert.commandWorked(dbAtShard.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 
     // Verifies that the SBE engine's results are same as the expected results, executing the
     // pipeline at the mongos.
-    const sbeRes = coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}})
-                       .cursor.firstBatch;
+    const sbeRes = coll.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}).cursor.firstBatch;
 
     assert.sameMembers(sbeRes, classicalRes);
 };
 
-let prepareCollection = coll => {
+let prepareCollection = (coll) => {
     coll.drop();
 
     // Makes sure that the collection is sharded.
@@ -64,7 +60,11 @@ let coll = prepareCollection(db.partial_sum);
 // sum as a doc with 'subTotal' and 'subTotalError' fields to the mongos. All data go to the only
 // shard and so overflow will happen.
 assert.commandWorked(
-    coll.insert([{a: 1, b: NumberLong("9223372036854775807")}, {a: 2, b: NumberLong("10")}]));
+    coll.insert([
+        {a: 1, b: NumberLong("9223372036854775807")},
+        {a: 2, b: NumberLong("10")},
+    ]),
+);
 
 assertShardedGroupResultsMatch(coll, [{$group: {_id: "$a", s: {$sum: "$b"}}}]);
 assertShardedGroupResultsMatch(coll, [{$group: {_id: null, s: {$sum: "$b"}}}]);
@@ -72,13 +72,15 @@ assertShardedGroupResultsMatch(coll, [{$group: {_id: null, s: {$sum: "$b"}}}]);
 // Test cases for a sharded $stdDevPop and $stdDevSamp
 
 coll = prepareCollection(db.partial_std_dev);
-assert.commandWorked(coll.insert([
-    {"item": "a", "price": 10},
-    {"item": "b", "price": 20},
-    {"item": "a", "price": 5},
-    {"item": "b", "price": 10},
-    {"item": "c", "price": 5},
-]));
+assert.commandWorked(
+    coll.insert([
+        {"item": "a", "price": 10},
+        {"item": "b", "price": 20},
+        {"item": "a", "price": 5},
+        {"item": "b", "price": 10},
+        {"item": "c", "price": 5},
+    ]),
+);
 assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", sd: {$stdDevSamp: "$price"}}}]);
 assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", sd: {$stdDevSamp: "$missing"}}}]);
 assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", sd: {$stdDevPop: "$price"}}}]);
@@ -91,13 +93,26 @@ coll = prepareCollection(db.partial_avg);
 // Prepares dataset so that each group has different numeric data types for price field which
 // will excercise different code paths in generated SBE plan stages.
 // Prices for group "a" are all decimals.
-assert.commandWorked(coll.insert(
-    [{item: "a", price: NumberDecimal("10.7")}, {item: "a", price: NumberDecimal("20.3")}]));
+assert.commandWorked(
+    coll.insert([
+        {item: "a", price: NumberDecimal("10.7")},
+        {item: "a", price: NumberDecimal("20.3")},
+    ]),
+);
 // Prices for group "b" are one decimal and one non-decimal.
 assert.commandWorked(
-    coll.insert([{item: "b", price: NumberDecimal("3.7")}, {item: "b", price: 2.3}]));
+    coll.insert([
+        {item: "b", price: NumberDecimal("3.7")},
+        {item: "b", price: 2.3},
+    ]),
+);
 // Prices for group "c" are all non-decimals.
-assert.commandWorked(coll.insert([{item: "c", price: 3}, {item: "b", price: 1}]));
+assert.commandWorked(
+    coll.insert([
+        {item: "c", price: 3},
+        {item: "b", price: 1},
+    ]),
+);
 
 // Verifies that SBE group pushdown with $avg works in a sharded environment.
 assertShardedGroupResultsMatch(coll, [{$group: {_id: "$item", a: {$avg: "$price"}}}]);

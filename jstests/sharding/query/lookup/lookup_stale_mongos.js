@@ -25,17 +25,16 @@ const mongos1ForeignColl = mongos1DB[testName + "_foreign"];
 
 const pipeline = [
     {$lookup: {localField: "a", foreignField: "b", from: mongos1ForeignColl.getName(), as: "same"}},
-    {$sort: {_id: 1}}
+    {$sort: {_id: 1}},
 ];
 const expectedResults = [
     {_id: 0, a: 1, "same": [{_id: 0, b: 1}]},
     {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
-    {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
+    {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]},
 ];
 
 // Ensure that shard0 is the primary shard.
-assert.commandWorked(mongos0DB.adminCommand(
-    {enableSharding: mongos0DB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongos0DB.adminCommand({enableSharding: mongos0DB.getName(), primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(mongos0LocalColl.insert({_id: 0, a: 1}));
 assert.commandWorked(mongos0LocalColl.insert({_id: 1, a: null}));
@@ -54,20 +53,20 @@ assert.commandWorked(mongos1ForeignColl.insert({_id: 2}));
 //
 
 // Shard the foreign collection through mongos0.
-assert.commandWorked(
-    mongos0DB.adminCommand({shardCollection: mongos0ForeignColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(mongos0DB.adminCommand({shardCollection: mongos0ForeignColl.getFullName(), key: {_id: 1}}));
 
 // Split the collection into 2 chunks: [MinKey, 1), [1, MaxKey).
-assert.commandWorked(
-    mongos0DB.adminCommand({split: mongos0ForeignColl.getFullName(), middle: {_id: 1}}));
+assert.commandWorked(mongos0DB.adminCommand({split: mongos0ForeignColl.getFullName(), middle: {_id: 1}}));
 
 // Move the [minKey, 1) chunk to shard1.
-assert.commandWorked(mongos0DB.adminCommand({
-    moveChunk: mongos0ForeignColl.getFullName(),
-    find: {_id: 0},
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    mongos0DB.adminCommand({
+        moveChunk: mongos0ForeignColl.getFullName(),
+        find: {_id: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
 
 // Issue a $lookup through mongos1, which is unaware that the foreign collection is sharded.
 assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
@@ -78,20 +77,20 @@ assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 //
 
 // Shard the local collection through mongos0.
-assert.commandWorked(
-    mongos0DB.adminCommand({shardCollection: mongos0LocalColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(mongos0DB.adminCommand({shardCollection: mongos0LocalColl.getFullName(), key: {_id: 1}}));
 
 // Split the collection into 2 chunks: [MinKey, 1), [1, MaxKey).
-assert.commandWorked(
-    mongos0DB.adminCommand({split: mongos0LocalColl.getFullName(), middle: {_id: 1}}));
+assert.commandWorked(mongos0DB.adminCommand({split: mongos0LocalColl.getFullName(), middle: {_id: 1}}));
 
 // Move the [minKey, 1) chunk to shard1.
-assert.commandWorked(mongos0DB.adminCommand({
-    moveChunk: mongos0LocalColl.getFullName(),
-    find: {_id: 0},
-    to: st.shard1.shardName,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    mongos0DB.adminCommand({
+        moveChunk: mongos0LocalColl.getFullName(),
+        find: {_id: 0},
+        to: st.shard1.shardName,
+        _waitForDelete: true,
+    }),
+);
 
 // Issue a $lookup through mongos1, which is unaware that the local collection is sharded.
 assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);

@@ -12,15 +12,14 @@
  * ]
  */
 
-export const $config = (function() {
+export const $config = (function () {
     // The explain used to build the assertion message in advanceCursor() is the only command not
     // allowed in a transaction used in the query state function. With shard stepdowns, getMores
     // aren't allowed outside a transaction, so if the explain runs when the suite is configured to
     // run with transactions and shard stepdowns, the query state function will be retried outside a
     // transaction, which fails the test. This can be avoided by not running explain with this
     // configuration.
-    const skipExplainInErrorMessage =
-        TestData.runInsideTransaction && TestData.runningWithShardStepdowns;
+    const skipExplainInErrorMessage = TestData.runInsideTransaction && TestData.runningWithShardStepdowns;
 
     var data = {
         // Number of docs to insert at the beginning.
@@ -28,7 +27,7 @@ export const $config = (function() {
         // Batch size of queries to introduce more saving and restoring of states.
         batchSize: 3,
         // The words that can be found in the collection.
-        words: ['these', 'are', 'test', 'words'],
+        words: ["these", "are", "test", "words"],
         /*
          * Helper function to advance a cursor, and verify that the documents that come out are
          * what we'd expect.
@@ -50,12 +49,17 @@ export const $config = (function() {
                 doc = cursor.next();
                 assert(
                     verifier(doc, prevDoc),
-                    'Verifier failed!\nQuery: ' + tojson(cursor._query) + '\n' +
-                        (skipExplainInErrorMessage ? ''
-                                                   : 'Query plan: ' + tojson(safeExplain(cursor))) +
-                        '\n' +
-                        'Previous doc: ' + tojson(prevDoc) + '\n' +
-                        'This doc: ' + tojson(doc));
+                    "Verifier failed!\nQuery: " +
+                        tojson(cursor._query) +
+                        "\n" +
+                        (skipExplainInErrorMessage ? "" : "Query plan: " + tojson(safeExplain(cursor))) +
+                        "\n" +
+                        "Previous doc: " +
+                        tojson(prevDoc) +
+                        "\n" +
+                        "This doc: " +
+                        tojson(doc),
+                );
             }
             assert.eq(cursor.itcount(), 0);
         },
@@ -67,7 +71,7 @@ export const $config = (function() {
         genUpdateDoc: function genUpdateDoc() {
             var newVal = Random.randInt(this.nDocs);
             return {$set: {a: newVal}};
-        }
+        },
     };
 
     var states = {
@@ -112,7 +116,7 @@ export const $config = (function() {
             };
 
             this.advanceCursor(cursor, collScanVerifier);
-        }
+        },
     };
 
     /*
@@ -133,7 +137,7 @@ export const $config = (function() {
     var transitions = {
         update: {update: 0.334, remove: 0.333, query: 0.333},
         remove: {update: 0.333, remove: 0.334, query: 0.333},
-        query: {update: 0.333, remove: 0.333, query: 0.334}
+        query: {update: 0.333, remove: 0.333, query: 0.334},
     };
 
     /*
@@ -143,10 +147,8 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         // Lower the following parameters to force even more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}));
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}));
         });
         // Set up some data to query.
         var N = this.nDocs;
@@ -154,8 +156,9 @@ export const $config = (function() {
         for (var i = 0; i < N; i++) {
             // Give each doc some word of text
             var word = this.words[i % this.words.length];
-            bulk.find({_id: i}).upsert().updateOne(
-                {$set: {a: i, b: N - i, c: i, d: N - i, yield_text: word}});
+            bulk.find({_id: i})
+                .upsert()
+                .updateOne({$set: {a: i, b: N - i, c: i, d: N - i, yield_text: word}});
         }
         assert.commandWorked(bulk.execute());
     }
@@ -165,21 +168,19 @@ export const $config = (function() {
      */
     function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function resetYieldParams(db) {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 128}));
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 10}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 128}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 10}));
         });
     }
 
     return {
         threadCount: 5,
         iterations: 50,
-        startState: 'update',
+        startState: "update",
         states: states,
         transitions: transitions,
         setup: setup,
         teardown: teardown,
-        data: data
+        data: data,
     };
 })();

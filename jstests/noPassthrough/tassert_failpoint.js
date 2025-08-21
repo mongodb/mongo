@@ -20,15 +20,17 @@ const mongoRunnerExitHelper = (exitCode) => {
 // test with a tassert: true and closeConnection:true configuration. This should fire a tassert.
 mongoRunnerSetupHelper();
 
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        failCommands: ["ping"],
-        closeConnection: true,
-        tassert: true,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            failCommands: ["ping"],
+            closeConnection: true,
+            tassert: true,
+        },
+    }),
+);
 
 assert.throws(() => testDB.runCommand({ping: 1}));
 mongoRunnerExitHelper(MongoRunner.EXIT_ABRUPT);
@@ -36,18 +38,20 @@ mongoRunnerExitHelper(MongoRunner.EXIT_ABRUPT);
 // test with a tassert:true and extraInfo:true configuration. This should fire a tassert.
 mongoRunnerSetupHelper();
 
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.CannotImplicitlyCreateCollection,
-        failCommands: ["create"],
-        tassert: true,
-        errorExtraInfo: {
-            "ns": "namespace error",
-        }
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.CannotImplicitlyCreateCollection,
+            failCommands: ["create"],
+            tassert: true,
+            errorExtraInfo: {
+                "ns": "namespace error",
+            },
+        },
+    }),
+);
 
 {
     let result = testDB.runCommand({create: "collection"});
@@ -61,15 +65,17 @@ mongoRunnerExitHelper(MongoRunner.EXIT_ABRUPT);
 // test with a tassert:true and errorCode-only configuration. This should fire a tassert.
 mongoRunnerSetupHelper();
 
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.InvalidNamespace,
-        failCommands: ["ping"],
-        tassert: true,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.InvalidNamespace,
+            failCommands: ["ping"],
+            tassert: true,
+        },
+    }),
+);
 
 {
     let result = testDB.runCommand({ping: 1});
@@ -82,15 +88,17 @@ mongoRunnerExitHelper(MongoRunner.EXIT_ABRUPT);
 // tassert.
 mongoRunnerSetupHelper();
 
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        failCommands: ["ping"],
-        closeConnection: true,
-        tassert: false,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            failCommands: ["ping"],
+            closeConnection: true,
+            tassert: false,
+        },
+    }),
+);
 
 assert.throws(() => testDB.runCommand({ping: 1}));
 mongoRunnerExitHelper(MongoRunner.EXIT_CLEAN);
@@ -99,18 +107,20 @@ mongoRunnerExitHelper(MongoRunner.EXIT_CLEAN);
 // This should NOT fire a tassert and should instead produce a uassert.
 mongoRunnerSetupHelper();
 
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.CannotImplicitlyCreateCollection,
-        failCommands: ["create"],
-        tassert: false,
-        errorExtraInfo: {
-            "ns": "namespace error",
-        }
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.CannotImplicitlyCreateCollection,
+            failCommands: ["create"],
+            tassert: false,
+            errorExtraInfo: {
+                "ns": "namespace error",
+            },
+        },
+    }),
+);
 
 {
     let result = testDB.runCommand({create: "collection"});
@@ -124,15 +134,17 @@ mongoRunnerExitHelper(MongoRunner.EXIT_CLEAN);
 // This should NOT fire a tassert and should instead produce a uassert..
 mongoRunnerSetupHelper();
 
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        errorCode: ErrorCodes.InvalidNamespace,
-        failCommands: ["ping"],
-        tassert: false,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            errorCode: ErrorCodes.InvalidNamespace,
+            failCommands: ["ping"],
+            tassert: false,
+        },
+    }),
+);
 
 {
     let result = testDB.runCommand({ping: 1});
@@ -146,14 +158,16 @@ mongoRunnerExitHelper(MongoRunner.EXIT_CLEAN);
 // tassert should only be fired with one of the other settings.
 mongoRunnerSetupHelper();
 
-assert.commandWorked(adminDB.runCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        failCommands: ["ping"],
-        tassert: true,
-    }
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {
+            failCommands: ["ping"],
+            tassert: true,
+        },
+    }),
+);
 
 assert.commandWorked(testDB.runCommand({ping: 1}));
 

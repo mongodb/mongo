@@ -61,14 +61,14 @@ resetDbpath(dbpath);
     db.createCollection(collName);
     let coll = db[collName];
 
-    jsTestLog(
-        "Checks that warnings are triggered when validating UUIDs that are either too short or too long.");
+    jsTestLog("Checks that warnings are triggered when validating UUIDs that are either too short or too long.");
     coll.insert({u: HexData(4, "deadbeefdeadbeefdeadbeefdeadbeef")});
     coll.insert({u: HexData(4, "deadbeef")});
     coll.insert({
         u: HexData(
             4,
-            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+        ),
     });
 
     let res = coll.validate({checkBSONConformance: true});
@@ -92,8 +92,7 @@ resetDbpath(dbpath);
     assert.commandWorked(db.createCollection(collName));
     let coll = db[collName];
 
-    jsTestLog(
-        "Checks that issues are found when we validate regex expressions with invalid options.");
+    jsTestLog("Checks that issues are found when we validate regex expressions with invalid options.");
     insertInvalidRegex(coll, mongod, 5);
     mongod = startMongodOnExistingPath(dbpath);
     db = mongod.getDB(baseName);
@@ -169,19 +168,21 @@ resetDbpath(dbpath);
     testColl = db[collName];
 
     assert.commandWorked(testColl.insert({a: undefined}));
-    assert.commandWorked(
-        testColl.insert({b: DBPointer("db", new ObjectId("dbdbdbdbdbdbdbdbdbdbdbdb"))}));
+    assert.commandWorked(testColl.insert({b: DBPointer("db", new ObjectId("dbdbdbdbdbdbdbdbdbdbdbdb"))}));
     assert.commandWorked(testColl.insert({c: Code("function(){return 1;}", {})}));
-    assert.commandWorked(testColl.insert(
-        {d: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=")}));
+    assert.commandWorked(
+        testColl.insert({d: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c=")}),
+    );
     assert.commandWorked(testColl.insert({e: BinData(3, "000102030405060708090a0b0c0d0e0f")}));
-    assert.commandWorked(testColl.insert({
-        a: undefined,
-        b: DBPointer("db", new ObjectId("dbdbdbdbdbdbdbdbdbdbdbdb")),
-        c: Code("function(){return 1;}", {}),
-        d: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c="),
-        e: BinData(3, "000102030405060708090a0b0c0d0e0f")
-    }));
+    assert.commandWorked(
+        testColl.insert({
+            a: undefined,
+            b: DBPointer("db", new ObjectId("dbdbdbdbdbdbdbdbdbdbdbdb")),
+            c: Code("function(){return 1;}", {}),
+            d: BinData(2, "KwAAAFRoZSBxdWljayBicm93biBmb3gganVtcHMgb3ZlciB0aGUgbGF6eSBkb2c="),
+            e: BinData(3, "000102030405060708090a0b0c0d0e0f"),
+        }),
+    );
 
     let res = assert.commandWorked(testColl.validate());
     assert(res.valid, tojson(res));
@@ -208,8 +209,7 @@ resetDbpath(dbpath);
     // Inserts a rubbish (random string) BSON Column (should fail validation to insert)
     testColl.insert({a: BinData(7, "O2FkZmdqYWtsamhnJ2xhamhkZzthaCdmZGphZ2hkYQ==")});
     // Inserts one valid BSON Column to check that it doesn't cause a false positive.
-    testColl.insert(
-        {a: BinData(7, "AQAAAAAAAAAAQJN/AAAAAAAAAAIAAAAAAAAABwAAAAAAAAAOAAAAAAAAAAA=")});
+    testColl.insert({a: BinData(7, "AQAAAAAAAAAAQJN/AAAAAAAAAAIAAAAAAAAABwAAAAAAAAAOAAAAAAAAAAA=")});
 
     // Calling validate without 'checkBSONConformance' should not return any warnings.
     let res = assert.commandWorked(testColl.validate());
@@ -307,13 +307,15 @@ resetDbpath(dbpath);
     // Short Encrypted BSON Value.
     const improperFLE4 = HexData(6, "0601");
 
-    assert.commandWorked(testColl.insertMany([
-        {"fle": properFLE},
-        {"fle": improperFLE1},
-        {"fle": improperFLE2},
-        {"fle": improperFLE3},
-        {"fle": improperFLE4},
-    ]));
+    assert.commandWorked(
+        testColl.insertMany([
+            {"fle": properFLE},
+            {"fle": improperFLE1},
+            {"fle": improperFLE2},
+            {"fle": improperFLE3},
+            {"fle": improperFLE4},
+        ]),
+    );
 
     let res = assert.commandWorked(testColl.validate());
     assert(res.valid, tojson(res));

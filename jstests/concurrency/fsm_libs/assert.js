@@ -10,5 +10,5 @@ export var interruptedQueryErrors = [
     ErrorCodes.CursorNotFound,
     ErrorCodes.CursorKilled,
     ErrorCodes.Interrupted,
-    ErrorCodes.QueryPlanKilled
+    ErrorCodes.QueryPlanKilled,
 ];

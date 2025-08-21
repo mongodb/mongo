@@ -11,7 +11,7 @@
  * ]
  */
 
-var collName = 'leaves';
+var collName = "leaves";
 
 var commands = [];
 
@@ -19,19 +19,19 @@ commands.push({find: collName, filter: {_id: 1}});
 
 commands.push({distinct: collName, key: "_id"});
 
-commands.push({count: collName, query: {type: 'oak'}});
+commands.push({count: collName, query: {type: "oak"}});
 
 commands.push({
     mapReduce: collName,
-    map: function() {
-        this.tags.forEach(function(z) {
+    map: function () {
+        this.tags.forEach(function (z) {
             emit(z, 1);
         });
     },
-    reduce: function(key, values) {
+    reduce: function (key, values) {
         return {count: values.length};
     },
-    out: {inline: 1}
+    out: {inline: 1},
 });
 
 function assertWriteConcernNotSupportedError(res) {
@@ -42,7 +42,7 @@ function assertWriteConcernNotSupportedError(res) {
 
 // Test a variety of valid and invalid writeConcerns to confirm that they still all get
 // the correct error.
-var writeConcerns = [{w: 'invalid'}, {w: 1}];
+var writeConcerns = [{w: "invalid"}, {w: 1}];
 
 function testUnsupportedWriteConcern(wc, cmd) {
     cmd.writeConcern = wc;
@@ -53,8 +53,8 @@ function testUnsupportedWriteConcern(wc, cmd) {
 }
 
 // Verify that each command gets a writeConcernNotSupported error.
-commands.forEach(function(cmd) {
-    writeConcerns.forEach(function(wc) {
+commands.forEach(function (cmd) {
+    writeConcerns.forEach(function (wc) {
         testUnsupportedWriteConcern(wc, cmd);
     });
 });

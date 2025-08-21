@@ -16,13 +16,14 @@ assert.commandWorked(db.getCollection(coll.getName()).insert({x: 1}));
 const kFailPointName = "waitInFindBeforeMakingBatch";
 const fp = configureFailPoint(conn, kFailPointName);
 
-const queryToKill = `assert.commandFailedWithCode(db.getSiblingDB('${db.getName()}')` +
+const queryToKill =
+    `assert.commandFailedWithCode(db.getSiblingDB('${db.getName()}')` +
     `.runCommand({find: '${coll.getName()}', filter: {x: 1}}), ErrorCodes.Interrupted);`;
 const awaitShell = startParallelShell(queryToKill, conn.port);
 
 const curOpFilter = {
     ns: coll.getFullName(),
-    "command.filter": {x: 1}
+    "command.filter": {x: 1},
 };
 
 // Wait for the operation to start.

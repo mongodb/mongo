@@ -6,8 +6,8 @@
  * and the second shard returned is the one that does not have the session chunk.
  */
 export function getShardsWithAndWithoutChunk(st, shard0, shard1) {
-    let configDB = st.s.getDB('config');
-    let configSessionsUUID = configDB.collections.findOne({_id: 'config.system.sessions'}).uuid;
+    let configDB = st.s.getDB("config");
+    let configSessionsUUID = configDB.collections.findOne({_id: "config.system.sessions"}).uuid;
     let sessionChunks = configDB.chunks.find({uuid: configSessionsUUID}).toArray();
 
     assert.eq(1, sessionChunks.length, tojson(sessionChunks));

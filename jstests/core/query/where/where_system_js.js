@@ -17,27 +17,38 @@ const systemJsColl = testDB.getCollection("system.js");
 
 assert.commandWorked(testDB.dropDatabase());
 
-assert.commandWorked(testColl.insert([{x: 1, y: 1}, {x: 2, y: 1}]));
+assert.commandWorked(
+    testColl.insert([
+        {x: 1, y: 1},
+        {x: 2, y: 1},
+    ]),
+);
 
-assert.commandWorked(testColl.update({
-    $where: function() {
-        return this.x == 1;
-    }
-},
-                                     {$inc: {y: 1}},
-                                     false,
-                                     true));
+assert.commandWorked(
+    testColl.update(
+        {
+            $where: function () {
+                return this.x == 1;
+            },
+        },
+        {$inc: {y: 1}},
+        false,
+        true,
+    ),
+);
 
 assert.eq(2, testColl.findOne({x: 1}).y);
 assert.eq(1, testColl.findOne({x: 2}).y);
 
 // Test that where queries work with stored javascript
-assert.commandWorked(systemJsColl.insert({
-    _id: "addOne",
-    value: function(x) {
-        return x + 1;
-    }
-}));
+assert.commandWorked(
+    systemJsColl.insert({
+        _id: "addOne",
+        value: function (x) {
+            return x + 1;
+        },
+    }),
+);
 
 assert.commandWorked(testColl.update({$where: "addOne(this.x) == 2"}, {$inc: {y: 1}}, false, true));
 
@@ -45,9 +56,9 @@ assert.eq(3, testColl.findOne({x: 1}).y);
 assert.eq(1, testColl.findOne({x: 2}).y);
 
 // Test that $where rejects a system.js script of type CodeWithScope.
-assert.commandWorked(
-    systemJsColl.insert({_id: "code_with_scope", value: Code("function(){return 1;}", {})}));
+assert.commandWorked(systemJsColl.insert({_id: "code_with_scope", value: Code("function(){return 1;}", {})}));
 
 assert.commandFailedWithCode(
     testDB.runCommand({find: testColl.getName(), filter: {$where: "code_with_scope(this.x)"}}),
-    4546000);
+    4546000,
+);

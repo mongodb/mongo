@@ -32,24 +32,23 @@ import {
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    commandsRemovedFromMongosSinceLastLTS
-} from "jstests/sharding/libs/last_lts_mongos_commands.js";
+import {commandsRemovedFromMongosSinceLastLTS} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
 let db = "test";
 let coll = "foo";
 let nss = db + "." + coll;
 
 // Check that a test case is well-formed.
-let validateTestCase = function(test) {
-    assert(test.setUp && typeof (test.setUp) === "function");
-    assert(test.command && typeof (test.command) === "object");
-    assert(test.checkResults && typeof (test.checkResults) === "function");
-    assert(test.checkAvailableReadConcernResults &&
-           typeof (test.checkAvailableReadConcernResults) === "function");
-    assert(test.behavior === "unshardedOnly" ||
-           test.behavior === "targetsPrimaryUsesConnectionVersioning" ||
-           test.behavior === "versioned");
+let validateTestCase = function (test) {
+    assert(test.setUp && typeof test.setUp === "function");
+    assert(test.command && typeof test.command === "object");
+    assert(test.checkResults && typeof test.checkResults === "function");
+    assert(test.checkAvailableReadConcernResults && typeof test.checkAvailableReadConcernResults === "function");
+    assert(
+        test.behavior === "unshardedOnly" ||
+            test.behavior === "targetsPrimaryUsesConnectionVersioning" ||
+            test.behavior === "versioned",
+    );
 };
 
 let testCases = {
@@ -123,21 +122,21 @@ let testCases = {
     addShard: {skip: "primary only"},
     addShardToZone: {skip: "primary only"},
     aggregate: {
-        setUp: function(mongosConn) {
+        setUp: function (mongosConn) {
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {aggregate: coll, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}},
-        checkResults: function(res) {
+        checkResults: function (res) {
             // The command should work and return correct results.
             assert.commandWorked(res);
             assert.eq(1, res.cursor.firstBatch.length, tojson(res));
         },
-        checkAvailableReadConcernResults: function(res) {
+        checkAvailableReadConcernResults: function (res) {
             // The command should work and return orphaned results.
             assert.commandWorked(res);
             assert.eq(1, res.cursor.firstBatch.length, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
     analyze: {skip: "primary only"},
     analyzeShardKey: {skip: "only support readConcern 'local'"},
@@ -189,21 +188,21 @@ let testCases = {
     convertToCapped: {skip: "primary only"},
     coordinateCommitTransaction: {skip: "unimplemented. Serves only as a stub."},
     count: {
-        setUp: function(mongosConn) {
+        setUp: function (mongosConn) {
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {count: coll, query: {x: 1}},
-        checkResults: function(res) {
+        checkResults: function (res) {
             // The command should work and return correct results.
             assert.commandWorked(res);
             assert.eq(1, res.n, tojson(res));
         },
-        checkAvailableReadConcernResults: function(res) {
+        checkAvailableReadConcernResults: function (res) {
             // The command should work and return orphaned results.
             assert.commandWorked(res);
             assert.eq(1, res.n, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
     cpuload: {skip: "does not return user data"},
     create: {skip: "primary only"},
@@ -218,21 +217,21 @@ let testCases = {
     dbStats: {skip: "does not return user data"},
     delete: {skip: "primary only"},
     distinct: {
-        setUp: function(mongosConn) {
+        setUp: function (mongosConn) {
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {distinct: coll, key: "x"},
-        checkResults: function(res) {
+        checkResults: function (res) {
             assert.commandWorked(res);
             assert.eq(1, res.values.length, tojson(res));
         },
-        checkAvailableReadConcernResults: function(res) {
+        checkAvailableReadConcernResults: function (res) {
             // The command should work and return orphaned results.
             assert.commandWorked(res);
             assert.eq(1, res.values.length, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
     drop: {skip: "primary only"},
     dropAllRolesFromDatabase: {skip: "primary only"},
@@ -250,21 +249,21 @@ let testCases = {
     features: {skip: "does not return user data"},
     filemd5: {skip: "does not return user data"},
     find: {
-        setUp: function(mongosConn) {
+        setUp: function (mongosConn) {
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {find: coll, filter: {x: 1}},
-        checkResults: function(res) {
+        checkResults: function (res) {
             // The command should work and return correct results.
             assert.commandWorked(res);
             assert.eq(1, res.cursor.firstBatch.length, tojson(res));
         },
-        checkAvailableReadConcernResults: function(res) {
+        checkAvailableReadConcernResults: function (res) {
             // The command should work and return orphaned results.
             assert.commandWorked(res);
             assert.eq(1, res.cursor.firstBatch.length, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
     findAndModify: {skip: "primary only"},
     flushRouterConfig: {skip: "does not return user data"},
@@ -314,19 +313,19 @@ let testCases = {
     logout: {skip: "does not return user data"},
     makeSnapshot: {skip: "does not return user data"},
     mapReduce: {
-        setUp: function(mongosConn) {
+        setUp: function (mongosConn) {
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
             assert.commandWorked(mongosConn.getCollection(nss).insert({x: 1}));
         },
         command: {
             mapReduce: coll,
-            map: function() {
+            map: function () {
                 emit(this.x, 1);
             },
-            reduce: function(key, values) {
+            reduce: function (key, values) {
                 return Array.sum(values);
             },
-            out: {inline: 1}
+            out: {inline: 1},
         },
         filter: {
             aggregate: coll,
@@ -341,13 +340,12 @@ let testCases = {
                             "$project": {
                                 "emits": {
                                     "$_internalJsEmit": {
-                                        "eval":
-                                            "function() {\n                emit(this.x, 1);\n            }",
-                                        "this": "$$ROOT"
-                                    }
+                                        "eval": "function() {\n                emit(this.x, 1);\n            }",
+                                        "this": "$$ROOT",
+                                    },
                                 },
-                                "_id": false
-                            }
+                                "_id": false,
+                            },
                         },
                         {"$unwind": {"path": "$emits"}},
                         {
@@ -356,25 +354,23 @@ let testCases = {
                                 "value": {
                                     "$_internalJsReduce": {
                                         "data": "$emits",
-                                        "eval":
-                                            "function(key, values) {\n                return Array.sum(values);\n            }"
-                                    }
-                                }
-                            }
-                        }
+                                        "eval": "function(key, values) {\n                return Array.sum(values);\n            }",
+                                    },
+                                },
+                            },
+                        },
                     ],
                     [
                         {
                             "$project": {
                                 "emits": {
                                     "$_internalJsEmit": {
-                                        "eval":
-                                            "function() {\n                emit(this.x, 1);\n            }",
-                                        "this": "$$ROOT"
-                                    }
+                                        "eval": "function() {\n                emit(this.x, 1);\n            }",
+                                        "this": "$$ROOT",
+                                    },
                                 },
-                                "_id": false
-                            }
+                                "_id": false,
+                            },
                         },
                         {"$unwind": {"path": "$emits"}},
                         {
@@ -383,30 +379,29 @@ let testCases = {
                                 "value": {
                                     "$_internalJsReduce": {
                                         "data": "$emits",
-                                        "eval":
-                                            "function(key, values) {\n                return Array.sum(values);\n            }"
-                                    }
+                                        "eval": "function(key, values) {\n                return Array.sum(values);\n            }",
+                                    },
                                 },
                                 "$willBeMerged": false,
-                            }
-                        }
+                            },
+                        },
                     ],
-                ]
+                ],
             },
         },
-        checkResults: function(res) {
+        checkResults: function (res) {
             assert.commandWorked(res);
             assert.eq(1, res.results.length, tojson(res));
             assert.eq(1, res.results[0]._id, tojson(res));
             assert.eq(2, res.results[0].value, tojson(res));
         },
-        checkAvailableReadConcernResults: function(res) {
+        checkAvailableReadConcernResults: function (res) {
             assert.commandWorked(res);
             assert.eq(1, res.results.length, tojson(res));
             assert.eq(1, res.results[0]._id, tojson(res));
             assert.eq(2, res.results[0].value, tojson(res));
         },
-        behavior: "versioned"
+        behavior: "versioned",
     },
     mergeAllChunksOnShard: {skip: "primary only"},
     mergeChunks: {skip: "primary only"},
@@ -515,10 +510,10 @@ let testCases = {
     validateDBMetadata: {skip: "does not return user data"},
     waitForFailPoint: {skip: "does not return user data"},
     getShardingReady: {skip: "does not return user data"},
-    whatsmyuri: {skip: "does not return user data"}
+    whatsmyuri: {skip: "does not return user data"},
 };
 
-commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
+commandsRemovedFromMongosSinceLastLTS.forEach(function (cmd) {
     testCases[cmd] = {skip: "must define test coverage for backwards compatibility"};
 });
 
@@ -540,8 +535,7 @@ assert.commandWorked(res);
 let commands = Object.keys(res.commands);
 for (let command of commands) {
     let test = testCases[command];
-    assert(test !== undefined,
-           "coverage failure: must define a safe secondary reads test for " + command);
+    assert(test !== undefined, "coverage failure: must define a safe secondary reads test for " + command);
 
     if (test.skip !== undefined) {
         print("skipping " + command + ": " + test.skip);
@@ -551,8 +545,7 @@ for (let command of commands) {
 
     jsTest.log("testing command " + tojson(test.command));
 
-    assert.commandWorked(
-        freshMongos.adminCommand({enableSharding: db, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(freshMongos.adminCommand({enableSharding: db, primaryShard: st.shard0.shardName}));
     assert.commandWorked(freshMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
 
     // We do this because we expect staleMongos to see that the collection is sharded, which
@@ -567,8 +560,11 @@ for (let command of commands) {
     // routing table -- the first read to the primary will refresh the mongos' shardVersion,
     // which will then be used against the secondary to ensure the secondary is fresh.
     assert.commandWorked(staleMongos.getDB(db).runCommand({find: coll}));
-    assert.commandWorked(freshMongos.getDB(db).runCommand(
-        {find: coll, $readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
+    assert.commandWorked(
+        freshMongos
+            .getDB(db)
+            .runCommand({find: coll, $readPreference: {mode: "secondary"}, readConcern: {"level": "local"}}),
+    );
 
     // Do any test-specific setup.
     test.setUp(staleMongos);
@@ -583,28 +579,26 @@ for (let command of commands) {
     assert.commandWorked(recipientShardSecondary.getDB(db).setProfilingLevel(2));
 
     // Suspend range deletion on the donor shard.
-    donorShardPrimary.adminCommand({configureFailPoint: 'suspendRangeDeletion', mode: 'alwaysOn'});
+    donorShardPrimary.adminCommand({configureFailPoint: "suspendRangeDeletion", mode: "alwaysOn"});
 
     // Do a moveChunk from the fresh mongos to make the other mongos stale.
     // Use {w:2} (all) write concern so the metadata change gets persisted to the secondary
     // before stalely versioned commands are sent against the secondary.
-    assert.commandWorked(freshMongos.adminCommand({
-        moveChunk: nss,
-        find: {x: 0},
-        to: st.shard1.shardName,
-        _secondaryThrottle: true,
-        writeConcern: {w: 2},
-    }));
+    assert.commandWorked(
+        freshMongos.adminCommand({
+            moveChunk: nss,
+            find: {x: 0},
+            to: st.shard1.shardName,
+            _secondaryThrottle: true,
+            writeConcern: {w: 2},
+        }),
+    );
 
-    let cmdReadPrefSecondary =
-        Object.assign({}, test.command, {$readPreference: {mode: 'secondary'}});
-    let cmdPrefSecondaryConcernAvailable =
-        Object.assign({}, cmdReadPrefSecondary, {readConcern: {level: 'available'}});
-    let cmdPrefSecondaryConcernLocal =
-        Object.assign({}, cmdReadPrefSecondary, {readConcern: {level: 'local'}});
+    let cmdReadPrefSecondary = Object.assign({}, test.command, {$readPreference: {mode: "secondary"}});
+    let cmdPrefSecondaryConcernAvailable = Object.assign({}, cmdReadPrefSecondary, {readConcern: {level: "available"}});
+    let cmdPrefSecondaryConcernLocal = Object.assign({}, cmdReadPrefSecondary, {readConcern: {level: "local"}});
 
-    let availableReadConcernRes =
-        staleMongos.getDB(db).runCommand(cmdPrefSecondaryConcernAvailable);
+    let availableReadConcernRes = staleMongos.getDB(db).runCommand(cmdPrefSecondaryConcernAvailable);
     test.checkAvailableReadConcernResults(availableReadConcernRes);
 
     // Secondaries default to 'local' readConcern
@@ -624,68 +618,74 @@ for (let command of commands) {
 
     if (test.behavior === "unshardedOnly") {
         // Check that neither the donor nor recipient shard secondaries received either request.
-        profilerHasZeroMatchingEntriesOrThrow(
-            {profileDB: donorShardSecondary.getDB(db), filter: commandProfile});
-        profilerHasZeroMatchingEntriesOrThrow(
-            {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
+        profilerHasZeroMatchingEntriesOrThrow({profileDB: donorShardSecondary.getDB(db), filter: commandProfile});
+        profilerHasZeroMatchingEntriesOrThrow({profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
     } else if (test.behavior === "targetsPrimaryUsesConnectionVersioning") {
         // Check that the recipient shard primary received the request without a shardVersion
         // field and returned success.
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: recipientShardPrimary.getDB(db),
-            filter: Object.extend({
-                "command.shardVersion": {"$exists": false},
-                "command.$readPreference": {$exists: false},
-                "command.readConcern": {"level": "local"},
-                "errCode": {"$exists": false},
-            },
-                                  commandProfile)
+            filter: Object.extend(
+                {
+                    "command.shardVersion": {"$exists": false},
+                    "command.$readPreference": {$exists: false},
+                    "command.readConcern": {"level": "local"},
+                    "errCode": {"$exists": false},
+                },
+                commandProfile,
+            ),
         });
     } else if (test.behavior === "versioned") {
         // Check that the donor shard secondary received the 'available' read concern
         // request and returned success, despite the mongos' stale routing table.
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: donorShardSecondary.getDB(db),
-            filter: Object.extend({
-                "command.shardVersion": {"$exists": true},
-                "command.$readPreference": {"mode": "secondary"},
-                "command.readConcern": {"level": "available"},
-                "errCode": {"$ne": ErrorCodes.StaleConfig},
-            },
-                                  commandProfile)
+            filter: Object.extend(
+                {
+                    "command.shardVersion": {"$exists": true},
+                    "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": "available"},
+                    "errCode": {"$ne": ErrorCodes.StaleConfig},
+                },
+                commandProfile,
+            ),
         });
 
         // Check that the donor shard secondary then returned stale shardVersion for the request
         // that did not specify read concern, so used the implicit default of local.
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: donorShardSecondary.getDB(db),
-            filter: Object.extend({
-                "command.shardVersion": {"$exists": true},
-                "command.$readPreference": {"mode": "secondary"},
-                "$or": [
-                    {"command.readConcern": {"$exists": false}},
-                    {"command.readConcern.provenance": "implicitDefault"},
-                ],
-                "errCode": ErrorCodes.StaleConfig,
-            },
-                                  commandProfile)
+            filter: Object.extend(
+                {
+                    "command.shardVersion": {"$exists": true},
+                    "command.$readPreference": {"mode": "secondary"},
+                    "$or": [
+                        {"command.readConcern": {"$exists": false}},
+                        {"command.readConcern.provenance": "implicitDefault"},
+                    ],
+                    "errCode": ErrorCodes.StaleConfig,
+                },
+                commandProfile,
+            ),
         });
 
         // Check that the recipient shard secondary received the request with local read concern
         // and returned success, since the previous command refreshed the metadata.
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: recipientShardSecondary.getDB(db),
-            filter: Object.extend({
-                "command.shardVersion": {"$exists": true},
-                "command.$readPreference": {"mode": "secondary"},
-                "command.readConcern": {"level": "local"},
-                "errCode": {"$ne": ErrorCodes.StaleConfig},
-            },
-                                  commandProfile)
+            filter: Object.extend(
+                {
+                    "command.shardVersion": {"$exists": true},
+                    "command.$readPreference": {"mode": "secondary"},
+                    "command.readConcern": {"level": "local"},
+                    "errCode": {"$ne": ErrorCodes.StaleConfig},
+                },
+                commandProfile,
+            ),
         });
     }
 
-    donorShardPrimary.adminCommand({configureFailPoint: 'suspendRangeDeletion', mode: 'off'});
+    donorShardPrimary.adminCommand({configureFailPoint: "suspendRangeDeletion", mode: "off"});
 
     // Clean up the collection by dropping the DB. This also drops all associated indexes and
     // clears the profiler collection.

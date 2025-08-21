@@ -14,21 +14,23 @@ coll.drop();
 const outputColl = db.mr_scope_out;
 outputColl.drop();
 
-assert.commandWorked(coll.insert([
-    {x: 1, tags: ["a", "b"]},
-    {x: 2, tags: ["b", "c"]},
-    {x: 3, tags: ["c", "a"]},
-    {x: 4, tags: ["b", "c"]}
-]));
+assert.commandWorked(
+    coll.insert([
+        {x: 1, tags: ["a", "b"]},
+        {x: 2, tags: ["b", "c"]},
+        {x: 3, tags: ["c", "a"]},
+        {x: 4, tags: ["b", "c"]},
+    ]),
+);
 
-const mapFn = function() {
-    this.tags.forEach(tag => {
+const mapFn = function () {
+    this.tags.forEach((tag) => {
         // eslint-disable-next-line
         emit(tag, {count: xx.val});
     });
 };
 
-const reduceFn = function(key, values) {
+const reduceFn = function (key, values) {
     let total = 0;
     for (let value of values) {
         total += value.count;
@@ -36,8 +38,7 @@ const reduceFn = function(key, values) {
     return {count: total};
 };
 
-assert.commandWorked(
-    coll.mapReduce(mapFn, reduceFn, {out: {merge: outputColl.getName()}, scope: {xx: {val: 1}}}));
+assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {out: {merge: outputColl.getName()}, scope: {xx: {val: 1}}}));
 
 assert.eq(3, outputColl.find().itcount());
 assert.eq(1, outputColl.count({_id: "a", "value.count": 2}));
@@ -45,8 +46,7 @@ assert.eq(1, outputColl.count({_id: "b", "value.count": 3}));
 assert.eq(1, outputColl.count({_id: "c", "value.count": 3}));
 
 outputColl.drop();
-assert.commandWorked(
-    coll.mapReduce(mapFn, reduceFn, {scope: {xx: {val: 2}}, out: {merge: outputColl.getName()}}));
+assert.commandWorked(coll.mapReduce(mapFn, reduceFn, {scope: {xx: {val: 2}}, out: {merge: outputColl.getName()}}));
 
 assert.eq(3, outputColl.find().itcount());
 assert.eq(1, outputColl.count({_id: "a", "value.count": 4}));

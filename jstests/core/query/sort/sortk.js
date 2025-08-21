@@ -63,7 +63,7 @@ assert.eq(6, simpleQueryWithLimit(0).explain(true).executionStats.totalKeysExami
 assert.eq(5, simpleQueryWithLimit(0).skip(1).itcount());
 
 // The query has additional constriants, preventing limit optimization.
-assert.eq(2, simpleQuery({$where: 'this.b>=2'}).limit(-1)[0].b);
+assert.eq(2, simpleQuery({$where: "this.b>=2"}).limit(-1)[0].b);
 
 // The sort order is the reverse of the index order.
 assert.eq(5, simpleQuery({}, {b: -1}).limit(-1)[0].b);
@@ -72,8 +72,18 @@ assert.eq(5, simpleQuery({}, {b: -1}).limit(-1)[0].b);
 assert.eq(0, simpleQuery({}, {a: -1, b: 1}).limit(-1)[0].b);
 
 // Without a hint, multiple cursors are attempted.
-assert.eq(0, t.find({a: {$in: [1, 2]}}).sort({b: 1}).limit(-1)[0].b);
-let explain = t.find({a: {$in: [1, 2]}}).sort({b: 1}).limit(-1).explain(true);
+assert.eq(
+    0,
+    t
+        .find({a: {$in: [1, 2]}})
+        .sort({b: 1})
+        .limit(-1)[0].b,
+);
+let explain = t
+    .find({a: {$in: [1, 2]}})
+    .sort({b: 1})
+    .limit(-1)
+    .explain(true);
 assert.eq(1, explain.executionStats.nReturned);
 
 // The expected first result now comes from the first interval.
@@ -83,7 +93,11 @@ assert.eq(1, simpleQueryWithLimit(-1)[0].b);
 // With three intervals.
 
 function inThreeIntervalQueryWithLimit(limit) {
-    return t.find({a: {$in: [1, 2, 3]}}).sort({b: 1}).hint({a: 1, b: 1}).limit(limit);
+    return t
+        .find({a: {$in: [1, 2, 3]}})
+        .sort({b: 1})
+        .hint({a: 1, b: 1})
+        .limit(limit);
 }
 
 assert.eq(1, inThreeIntervalQueryWithLimit(-1)[0].b);
@@ -124,11 +138,16 @@ t.save({a: 1, b: 2, c: 5});
 t.save({a: 1, b: 2, c: 0});
 
 function eqInQueryWithLimit(limit) {
-    return t.find({a: 1, b: {$in: [1, 2]}}).sort({c: 1}).hint({a: 1, b: 1, c: 1}).limit(limit);
+    return t
+        .find({a: 1, b: {$in: [1, 2]}})
+        .sort({c: 1})
+        .hint({a: 1, b: 1, c: 1})
+        .limit(limit);
 }
 
 function andEqInQueryWithLimit(limit) {
-    return t.find({$and: [{a: 1}, {b: {$in: [1, 2]}}]})
+    return t
+        .find({$and: [{a: 1}, {b: {$in: [1, 2]}}]})
         .sort({c: 1})
         .hint({a: 1, b: 1, c: 1})
         .limit(limit);
@@ -146,7 +165,11 @@ assert.eq(1, andEqInQueryWithLimit(-2)[1].c);
 
 function inQueryWithLimit(limit, sort) {
     sort = sort || {b: 1};
-    return t.find({a: {$in: [0, 1]}}).sort(sort).hint({a: 1, b: 1, c: 1}).limit(limit);
+    return t
+        .find({a: {$in: [0, 1]}})
+        .sort(sort)
+        .hint({a: 1, b: 1, c: 1})
+        .limit(limit);
 }
 
 // The index has two suffix fields unconstrained by the query.

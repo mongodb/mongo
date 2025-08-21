@@ -7,7 +7,7 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 let st = new ShardingTest({shards: 3});
 let dbName = "test";
-let configDB = st.s.getDB('config');
+let configDB = st.s.getDB("config");
 let testDB = st.s.getDB(dbName);
 let sourceColl = testDB.source;
 let targetColl = testDB.target;
@@ -15,7 +15,7 @@ let sourceNs = sourceColl.getFullName();
 let targetNs = targetColl.getFullName();
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({shardCollection: targetNs, key: {x: 'hashed'}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: targetNs, key: {x: "hashed"}}));
 
 let chunkDocsForTargetColl = findChunksUtil.findChunksByNs(configDB, targetNs).toArray();
 let shardChunkBoundsForTargetColl = chunkBoundsUtil.findShardChunkBounds(chunkDocsForTargetColl);
@@ -27,15 +27,17 @@ let shards = docs.map((doc) => {
     let hash = convertShardKeyToHashed(doc.x);
     return chunkBoundsUtil.findShardForShardKey(st, shardChunkBoundsForTargetColl, {x: hash});
 });
-assert.eq(3, (new Set(shards)).size);
+assert.eq(3, new Set(shards).size);
 
 // Run aggregation with $merge. Use $set to differentiate between the original and
 // merged docs.
-assert.commandWorked(sourceColl.runCommand({
-    aggregate: sourceColl.getName(),
-    pipeline: [{$match: {}}, {$set: {y: 1}}, {$merge: {into: targetColl.getName()}}],
-    cursor: {}
-}));
+assert.commandWorked(
+    sourceColl.runCommand({
+        aggregate: sourceColl.getName(),
+        pipeline: [{$match: {}}, {$set: {y: 1}}, {$merge: {into: targetColl.getName()}}],
+        cursor: {},
+    }),
+);
 
 // Check that the merged docs end up on the right shards and that the original docs are still
 // on the primary shard.

@@ -9,19 +9,19 @@
  */
 
 const collName = jsTestName();
-const tsCollName = jsTestName() + '_with_meta';
+const tsCollName = jsTestName() + "_with_meta";
 
 function insertData() {
     let doc1 = {
         "ts": ISODate("2024-07-18T00:52:47.169Z"),
         "metafields": {"m": "123456789"},
-        "Data": "One"
+        "Data": "One",
     };
 
     let doc2 = {
         "ts": ISODate("2024-07-18T00:52:47.169Z"),
         "metafields": {"m": "123456789"},
-        "Data": "Two"
+        "Data": "Two",
     };
 
     assert.commandWorked(db.getCollection(tsCollName).insertMany([doc1, doc2]));
@@ -29,27 +29,30 @@ function insertData() {
 }
 
 function genPipeline(collection) {
-    return [{
-        "$facet": {
-            "foo": [
-                {"$match": {"Data": "One"}},
-                {
-                    "$lookup": {
-                        "from": collection,
-                        "as": "moredata",
-                        "pipeline": [{"$match": {"m.foo": "123456789"}}]
-                    }
-                }
-            ]
-        }
-    }];
+    return [
+        {
+            "$facet": {
+                "foo": [
+                    {"$match": {"Data": "One"}},
+                    {
+                        "$lookup": {
+                            "from": collection,
+                            "as": "moredata",
+                            "pipeline": [{"$match": {"m.foo": "123456789"}}],
+                        },
+                    },
+                ],
+            },
+        },
+    ];
 }
 
 function setup() {
     assert(db[collName].drop());
     assert(db[tsCollName].drop());
-    assert.commandWorked(db.createCollection(
-        tsCollName, {timeseries: {timeField: "ts", metaField: "m", granularity: "seconds"}}));
+    assert.commandWorked(
+        db.createCollection(tsCollName, {timeseries: {timeField: "ts", metaField: "m", granularity: "seconds"}}),
+    );
     insertData();
 }
 

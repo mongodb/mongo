@@ -13,15 +13,15 @@ const st = new ShardingTest({shards: 2});
 const mongos = st.s0;
 const primaryShard = st.shard0.shardName;
 const secondaryShard = st.shard1.shardName;
-const kDbName = 'db';
-const kCollName = 'foo';
-const kNsName = kDbName + '.' + kCollName;
+const kDbName = "db";
+const kCollName = "foo";
+const kNsName = kDbName + "." + kCollName;
 const kOldKeyDoc = {
-    a: 1
+    a: 1,
 };
 const kNewKeyDoc = {
     a: 1,
-    b: 1
+    b: 1,
 };
 
 function orphanDocCount() {
@@ -48,12 +48,13 @@ function dropAndReshardColl() {
 
 function isOwnedByShard(shardName, doc) {
     let isOwned = false;
-    mongos.getCollection(kNsName)
+    mongos
+        .getCollection(kNsName)
         .find(doc)
-        .explain('executionStats')
+        .explain("executionStats")
         .executionStats.executionStages.shards.forEach((shard) => {
             if (shard.shardName.localeCompare(shardName) === 0) {
-                isOwned = (1 === shard.nReturned);
+                isOwned = 1 === shard.nReturned;
             }
         });
     return isOwned;
@@ -69,7 +70,7 @@ function isOwnedBySecondaryShard(doc) {
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: primaryShard}));
 
-jsTestLog('********** ORPHAN FILTERING **********');
+jsTestLog("********** ORPHAN FILTERING **********");
 
 dropAndReshardColl();
 
@@ -83,7 +84,7 @@ assert.lte(orphanDocCount(), 2);
 assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: kNsName, key: kNewKeyDoc}));
 assert.lte(orphanDocCount(), 2);
 
-jsTestLog('********** REQUEST TARGETING **********');
+jsTestLog("********** REQUEST TARGETING **********");
 
 dropAndReshardColl();
 
@@ -115,7 +116,7 @@ assert.eq({a: 10, b: 1}, docsArr[2]);
 assert.eq(3, mongos.getCollection(kNsName).count({b: 1}));
 
 // Verify that distinct targets shards without treating missing shard key fields as null values.
-const valuesArr = mongos.getCollection(kNsName).distinct('a').sort();
+const valuesArr = mongos.getCollection(kNsName).distinct("a").sort();
 assert.eq(3, valuesArr.length);
 assert.eq(1, valuesArr[0]);
 assert.eq(10, valuesArr[1]);
@@ -159,16 +160,16 @@ const sessionColl = sessionDB[kCollName];
 
 assert.commandWorked(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}));
 
-let res = assert.commandWorked(
-    mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}));
+let res = assert.commandWorked(mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}));
 assert.eq(0, res.nMatched);
 assert.eq(1, res.nUpserted);
 docsArr = mongos.getCollection(kNsName).find({b: 2}).toArray();
 assert.eq(1, docsArr.length);
 
 assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
-res = assert.commandWorked(sessionDB.runCommand(
-    {findAndModify: kCollName, query: {a: 2}, update: {$set: {updated: true}}, upsert: true}));
+res = assert.commandWorked(
+    sessionDB.runCommand({findAndModify: kCollName, query: {a: 2}, update: {$set: {updated: true}}, upsert: true}),
+);
 assert.eq(1, res.lastErrorObject.n);
 assert.eq(0, res.lastErrorObject.updatedExisting);
 assert(res.lastErrorObject.upserted);

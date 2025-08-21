@@ -20,8 +20,7 @@ const decimalQueryResults = coll.find({a: NumberDecimal("5.01")}, {_id: 0}).toAr
 // The double query will only match the single double value, and the decimal query will only match
 // the decimal values.
 assert.eq(doubleQueryResults, [{a: 5.01}], doubleQueryResults);
-assert(arrayEq(decimalQueryResults, [{a: NumberDecimal("5.01")}, {a: NumberDecimal("5.0100")}]),
-       decimalQueryResults);
+assert(arrayEq(decimalQueryResults, [{a: NumberDecimal("5.01")}, {a: NumberDecimal("5.0100")}]), decimalQueryResults);
 
 assert.commandWorked(coll.createIndex({a: 1}));
 const doubleQueryIndexResults = coll.find({a: 5.01}, {_id: 0}).toArray();
@@ -32,4 +31,5 @@ const decimalQueryIndexResults = coll.find({a: NumberDecimal("5.01")}, {_id: 0})
 assert.eq(doubleQueryIndexResults, [{a: 5.01}], doubleQueryIndexResults);
 assert(
     arrayEq(decimalQueryIndexResults, [{a: NumberDecimal("5.01")}, {a: NumberDecimal("5.0100")}]),
-    decimalQueryIndexResults);
+    decimalQueryIndexResults,
+);

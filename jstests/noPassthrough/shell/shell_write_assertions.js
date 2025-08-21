@@ -86,8 +86,10 @@ tests.push(function writeErrorUnsuccessfulWriteDoesNotCallMsgFunction() {
 });
 
 tests.push(function writeConcernErrorIsCaughtFromInsert() {
-    const result = db.coll.insert({data: "hello world"},
-                                  {writeConcern: {w: 'invalid', wtimeout: kReallyShortTimeoutMS}});
+    const result = db.coll.insert(
+        {data: "hello world"},
+        {writeConcern: {w: "invalid", wtimeout: kReallyShortTimeoutMS}},
+    );
 
     assert.throws(() => {
         assert.writeOK(result);
@@ -95,11 +97,13 @@ tests.push(function writeConcernErrorIsCaughtFromInsert() {
 });
 
 tests.push(function writeConcernErrorCanBeIgnored() {
-    const result = db.coll.insert({data: "hello world"},
-                                  {writeConcern: {w: 'invalid', wtimeout: kReallyShortTimeoutMS}});
+    const result = db.coll.insert(
+        {data: "hello world"},
+        {writeConcern: {w: "invalid", wtimeout: kReallyShortTimeoutMS}},
+    );
 
     assert.doesNotThrow(() => {
-        assert.writeOK(result, 'write can ignore writeConcern', {ignoreWriteConcernErrors: true});
+        assert.writeOK(result, "write can ignore writeConcern", {ignoreWriteConcernErrors: true});
     });
 });
 

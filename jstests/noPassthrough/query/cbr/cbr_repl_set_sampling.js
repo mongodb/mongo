@@ -4,9 +4,7 @@
  */
 
 import {getAllPlans} from "jstests/libs/query/analyze_plan.js";
-import {
-    checkSbeFullyEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let docs = [];
@@ -15,9 +13,9 @@ for (let i = 0; i < 1000; i++) {
 }
 
 const samplingConfigs = [
-    {setParameter: {planRankerMode: 'samplingCE'}},
-    {setParameter: {planRankerMode: 'samplingCE', internalQuerySamplingCEMethod: 'chunk'}},
-    {setParameter: {planRankerMode: 'samplingCE', internalQuerySamplingBySequentialScan: true}},
+    {setParameter: {planRankerMode: "samplingCE"}},
+    {setParameter: {planRankerMode: "samplingCE", internalQuerySamplingCEMethod: "chunk"}},
+    {setParameter: {planRankerMode: "samplingCE", internalQuerySamplingBySequentialScan: true}},
 ];
 
 for (const config of samplingConfigs) {
@@ -43,7 +41,7 @@ for (const config of samplingConfigs) {
 
     // Run a query with explain and check that the plans are costed using samplingCE.
     const explain = coll.find({a: {$gt: 500}, b: {$lt: 5}}).explain();
-    getAllPlans(explain).forEach(plan => {
+    getAllPlans(explain).forEach((plan) => {
         assert.eq(plan.estimatesMetadata.ceSource, "Sampling", plan);
         assert(plan.hasOwnProperty("cardinalityEstimate"));
     });

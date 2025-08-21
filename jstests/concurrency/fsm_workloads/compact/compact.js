@@ -19,9 +19,7 @@
  * ]
  */
 
-import {
-    assertWorkedHandleTxnErrors
-} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
+import {assertWorkedHandleTxnErrors} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // WiredTiger eviction is slow on Windows debug variants and can cause timeouts when taking a
@@ -29,12 +27,12 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 const buildInfo = getBuildInfo();
 const skipTest = buildInfo.debug && buildInfo.buildEnvironment.target_os == "windows";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         targetDocuments: 1000,
         nDocs: 0,
-        nIndexes: 1 + 1,   // The number of indexes created in createIndexes + 1 for { _id: 1 }
-        prefix: 'compact'  // Use filename for prefix because filename is assumed unique
+        nIndexes: 1 + 1, // The number of indexes created in createIndexes + 1 for { _id: 1 }
+        prefix: "compact", // Use filename for prefix because filename is assumed unique
     };
 
     function runCompact(db, config) {
@@ -45,13 +43,12 @@ export const $config = (function() {
         assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
     }
 
-    var states = (function() {
+    var states = (function () {
         function insertDocuments(db, collName) {
-            var nDocumentsToInsert =
-                this.targetDocuments - db[this.threadCollName].find().itcount();
+            var nDocumentsToInsert = this.targetDocuments - db[this.threadCollName].find().itcount();
             var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
             for (var i = 0; i < nDocumentsToInsert; ++i) {
-                bulk.insert({a: Random.randInt(2), b: 'b'.repeat(100000), c: 'c'.repeat(100000)});
+                bulk.insert({a: Random.randInt(2), b: "b".repeat(100000), c: "c".repeat(100000)});
             }
             var res = bulk.execute();
             this.nDocs += res.nInserted;
@@ -77,7 +74,7 @@ export const $config = (function() {
         // This method is independent of collectionSetup to allow it to be overridden in
         // workloads that extend this one
         function init(db, collName) {
-            this.threadCollName = this.prefix + '_' + this.tid;
+            this.threadCollName = this.prefix + "_" + this.tid;
         }
 
         function collectionSetup(db, collName) {
@@ -87,7 +84,7 @@ export const $config = (function() {
 
         function compact(db, collName) {
             let config;
-            if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'CompactOptions')) {
+            if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompactOptions")) {
                 config = {compact: this.threadCollName, force: true, freeSpaceTargetMB: 1};
             } else {
                 config = {compact: this.threadCollName, force: true};
@@ -96,19 +93,18 @@ export const $config = (function() {
         }
 
         function dryCompact(db, collName) {
-            if (!FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'CompactOptions'))
-                return;
-            const config =
-                {compact: this.threadCollName, force: true, dryRun: true, freeSpaceTargetMB: 1};
+            if (!FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "CompactOptions")) return;
+            const config = {compact: this.threadCollName, force: true, dryRun: true, freeSpaceTargetMB: 1};
             runCompact(db, config);
         }
 
         function query(db, collName) {
             var count = db[this.threadCollName].find().itcount();
-            assert.eq(count,
-                      this.nDocs,
-                      'number of documents in ' +
-                          'collection should not change following a compact');
+            assert.eq(
+                count,
+                this.nDocs,
+                "number of documents in " + "collection should not change following a compact",
+            );
             var indexesCount = db[this.threadCollName].getIndexes().length;
             assert.eq(indexesCount, this.nIndexes);
         }
@@ -120,7 +116,7 @@ export const $config = (function() {
             compact: compact,
             query: query,
             removeDocuments: removeDocuments,
-            insertDocuments: insertDocuments
+            insertDocuments: insertDocuments,
         };
     })();
 
@@ -131,7 +127,7 @@ export const $config = (function() {
         dryCompact: {compact: 1},
         compact: {query: 1},
         query: {insertDocuments: 1},
-        insertDocuments: {removeDocuments: 1}
+        insertDocuments: {removeDocuments: 1},
     };
 
     return {

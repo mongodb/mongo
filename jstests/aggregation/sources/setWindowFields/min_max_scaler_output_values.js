@@ -16,7 +16,7 @@ let documents = [
     {_id: 4, "x": 2, "y": 3, "partition": "B"},
     {_id: 5, "x": -6, "y": 6, "partition": "A"},
     {_id: 6, "x": 0, "y": -8, "partition": "B"},
-    {_id: 7, "x": 4, "y": 10, "partition": "A"}
+    {_id: 7, "x": 4, "y": 10, "partition": "A"},
 ];
 assert.commandWorked(coll.insertMany(documents));
 
@@ -40,12 +40,13 @@ function validateTestCase(testCase) {
     let results = coll.aggregate([{$setWindowFields: testCase.setWindowFieldsArgs}]).toArray();
     // Check for each entry in result, the output field value is as expected
     for (let result of results) {
-        assert(result.relativeXValue.toFixed(2) ==
-                       testCase.docIdToOutputFieldValue[result._id].toFixed(2),
-                   `'relativeXValue' of '${result.relativeXValue.toFixed(2)}' does not match
+        assert(
+            result.relativeXValue.toFixed(2) == testCase.docIdToOutputFieldValue[result._id].toFixed(2),
+            `'relativeXValue' of '${result.relativeXValue.toFixed(2)}' does not match
                     expected value of '${testCase.docIdToOutputFieldValue[result._id].toFixed(2)}'
                     for doc '_id': '${result._id}', for test with setWindowFieldsArgs =
-                   '${JSON.stringify(testCase.setWindowFieldsArgs)}'`);
+                   '${JSON.stringify(testCase.setWindowFieldsArgs)}'`,
+        );
     }
 }
 
@@ -73,11 +74,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+            },
         },
-        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
     });
     // Same as last case, but not specifying bounds (which default to the same as above).
     validateTestCase({
@@ -85,9 +85,9 @@ function testDocumentBasedNonRemovableQueries() {
             sortBy: {_id: 1},
             output: {
                 "relativeXValue": {$minMaxScaler: {input: "$x"}},
-            }
+            },
         },
-        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
     });
     // Tests reverse sorting in unbounded case. In an unbounded case, the results should not depend
     // on sorting field (so results are same as above).
@@ -95,11 +95,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: -1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+            },
         },
-        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
     });
     // Tests reverse sorting in unbounded case. In an unbounded case, the results should not depend
     // on sorting field (so results are same as above).
@@ -107,11 +106,10 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: -1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+            },
         },
-        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
     });
     // Left and right unbounded query should not depend on sorting field
     // (so results are same as above).
@@ -119,20 +117,18 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+            },
         },
-        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
     });
     // Testing right non-unbounded windows.
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "current"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "current"]}},
+            },
         },
         docIdToOutputFieldValue: {
             1: 0,
@@ -142,15 +138,14 @@ function testDocumentBasedNonRemovableQueries() {
             5: 0,
             6: 6 / 16,
             7: 10 / 16,
-        }
+        },
     });
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+            },
         },
         docIdToOutputFieldValue: {
             1: 0,
@@ -160,25 +155,24 @@ function testDocumentBasedNonRemovableQueries() {
             5: 0,
             6: 6 / 16,
             7: 10 / 16,
-        }
+        },
     });
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: -1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+            },
         },
         docIdToOutputFieldValue: {
-            1: 3 / 16,  // includes all
-            2: 1,       // includes all
-            3: 9 / 16,  // includes [4, 0, -6, 2, 3, 10]
-            4: 8 / 10,  // includes [4, 0, -6, 2, 3]
-            5: 0,       // includes [4, 0, -6, 2]
-            6: 6 / 10,  // includes [4, 0, -6]
-            7: 1,       // includes [4, 0]
-        }
+            1: 3 / 16, // includes all
+            2: 1, // includes all
+            3: 9 / 16, // includes [4, 0, -6, 2, 3, 10]
+            4: 8 / 10, // includes [4, 0, -6, 2, 3]
+            5: 0, // includes [4, 0, -6, 2]
+            6: 6 / 10, // includes [4, 0, -6]
+            7: 1, // includes [4, 0]
+        },
     });
     // List of documents with y sorted descending:
     // {_id: 7, "x": 4, "y": 10, "partition": "A"},
@@ -192,19 +186,18 @@ function testDocumentBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: -1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+            },
         },
         docIdToOutputFieldValue: {
-            1: 3 / 10,  // includes [4, -3, -6]
-            2: 1,       // includes [4, -3, -6, 10, 2]
-            3: 9 / 16,  // includes all
-            4: 1 / 2,   // includes [4, -3, -6, 10, 2, 3]
-            5: 0,       // includes [4, -3, -6, 10]
-            6: 3 / 8,   // includes all
-            7: 1,       // includes [4, -3]
-        }
+            1: 3 / 10, // includes [4, -3, -6]
+            2: 1, // includes [4, -3, -6, 10, 2]
+            3: 9 / 16, // includes all
+            4: 1 / 2, // includes [4, -3, -6, 10, 2, 3]
+            5: 0, // includes [4, -3, -6, 10]
+            6: 3 / 8, // includes all
+            7: 1, // includes [4, -3]
+        },
     });
     validateTestCase(
         // Previous case with scaled domain.
@@ -214,9 +207,9 @@ function testDocumentBasedNonRemovableQueries() {
                 output: {
                     "relativeXValue": {
                         $minMaxScaler: {input: "$x", min: 10000, max: 20000},
-                        window: {documents: ["unbounded", 1]}
+                        window: {documents: ["unbounded", 1]},
                     },
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 10000,
@@ -226,17 +219,17 @@ function testDocumentBasedNonRemovableQueries() {
                 5: 10000,
                 6: 13750,
                 7: 16250,
-            }
-        });
+            },
+        },
+    );
 
     validateTestCase({
         // Sort by a field 'y' instead of '_id'.
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "current"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "current"]}},
+            },
         },
         docIdToOutputFieldValue: {
             1: 3 / 16,
@@ -246,16 +239,15 @@ function testDocumentBasedNonRemovableQueries() {
             5: 0,
             6: 0,
             7: 10 / 16,
-        }
+        },
     });
     validateTestCase({
         // Sort by a field 'y' instead of '_id'.
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+            },
         },
         docIdToOutputFieldValue: {
             1: 3 / 16,
@@ -265,7 +257,7 @@ function testDocumentBasedNonRemovableQueries() {
             5: 0,
             6: 0,
             7: 10 / 16,
-        }
+        },
     });
     // Testing other / more complex input expressions
     validateTestCase(
@@ -278,9 +270,9 @@ function testDocumentBasedNonRemovableQueries() {
                 output: {
                     "relativeXValue": {
                         $minMaxScaler: {input: {$const: 1}},
-                        window: {documents: ["unbounded", 1]}
+                        window: {documents: ["unbounded", 1]},
                     },
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 0,
@@ -290,8 +282,9 @@ function testDocumentBasedNonRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 0,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Testing a more complex input expression.
         {
@@ -300,9 +293,9 @@ function testDocumentBasedNonRemovableQueries() {
                 output: {
                     "relativeXValue": {
                         $minMaxScaler: {input: {$add: ["$x", "$y"]}},
-                        window: {documents: ["unbounded", 2]}
+                        window: {documents: ["unbounded", 2]},
                     },
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 4 / 13,
@@ -312,17 +305,17 @@ function testDocumentBasedNonRemovableQueries() {
                 5: 8 / 22,
                 6: 0,
                 7: 1,
-            }
-        });
+            },
+        },
+    );
     // Testing partitions
     validateTestCase({
         setWindowFieldsArgs: {
             partitionBy: "$partition",
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", "unbounded"]}},
+            },
         },
         docIdToOutputFieldValue: {
             1: 3 / 10,
@@ -332,16 +325,15 @@ function testDocumentBasedNonRemovableQueries() {
             5: 0,
             6: 0,
             7: 1,
-        }
+        },
     });
     validateTestCase({
         setWindowFieldsArgs: {
             partitionBy: "$partition",
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["unbounded", 1]}},
+            },
         },
         docIdToOutputFieldValue: {
             1: 0,
@@ -351,7 +343,7 @@ function testDocumentBasedNonRemovableQueries() {
             5: 0,
             6: 0,
             7: 1,
-        }
+        },
     });
 }
 
@@ -363,11 +355,10 @@ function testRangeBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+            },
         },
-        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
     });
     // Left and right unbounded ranges should not depend on sorting field
     // (so results are same as above).
@@ -375,11 +366,10 @@ function testRangeBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+            },
         },
-        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
     });
     // Testing right non-unbounded windows.
     // Range based window sorted by '_id' is equivalent to document bounds sorted by '_id'
@@ -387,9 +377,8 @@ function testRangeBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "current"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "current"]}},
+            },
         },
         docIdToOutputFieldValue: {
             1: 0,
@@ -399,14 +388,14 @@ function testRangeBasedNonRemovableQueries() {
             5: 0,
             6: 6 / 16,
             7: 10 / 16,
-        }
+        },
     });
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
                 "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", 1]}},
-            }
+            },
         },
         docIdToOutputFieldValue: {
             1: 0,
@@ -416,18 +405,17 @@ function testRangeBasedNonRemovableQueries() {
             5: 0,
             6: 6 / 16,
             7: 10 / 16,
-        }
+        },
     });
     // Testing left and right unbounded windows.
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+            },
         },
-        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
     });
     // Left and right unbounded ranges should not depend on sorting field
     // (so results are same as above).
@@ -435,11 +423,10 @@ function testRangeBasedNonRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+            },
         },
-        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries
+        docIdToOutputFieldValue: expectedDocIdToOutputFieldValueForUnboundedQueries,
     });
     validateTestCase(
         // Previous case with scaled domain.
@@ -449,9 +436,9 @@ function testRangeBasedNonRemovableQueries() {
                 output: {
                     "relativeXValue": {
                         $minMaxScaler: {input: "$x", min: 10000, max: 20000},
-                        window: {range: ["unbounded", "unbounded"]}
+                        window: {range: ["unbounded", "unbounded"]},
                     },
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 11875,
@@ -461,17 +448,17 @@ function testRangeBasedNonRemovableQueries() {
                 5: 10000,
                 6: 13750,
                 7: 16250,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Sort by a field 'y' instead of '_id'.
         {
             setWindowFieldsArgs: {
                 sortBy: {y: 1},
                 output: {
-                    "relativeXValue":
-                        {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "current"]}},
-                }
+                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "current"]}},
+                },
             },
             docIdToOutputFieldValue: {
                 1: 3 / 16,
@@ -481,17 +468,17 @@ function testRangeBasedNonRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 10 / 16,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Sort by a field 'y' instead of '_id'.
         {
             setWindowFieldsArgs: {
                 sortBy: {y: 1},
                 output: {
-                    "relativeXValue":
-                        {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", 5]}},
-                }
+                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", 5]}},
+                },
             },
             docIdToOutputFieldValue: {
                 1: 3 / 16,
@@ -501,8 +488,9 @@ function testRangeBasedNonRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 10 / 16,
-            }
-        });
+            },
+        },
+    );
     // Testing other / more complex input expressions
     validateTestCase(
         // Testing a constant input expression.
@@ -512,9 +500,8 @@ function testRangeBasedNonRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {y: 1},
                 output: {
-                    "relativeXValue":
-                        {$minMaxScaler: {input: {$const: 1}}, window: {range: ["unbounded", 1]}},
-                }
+                    "relativeXValue": {$minMaxScaler: {input: {$const: 1}}, window: {range: ["unbounded", 1]}},
+                },
             },
             docIdToOutputFieldValue: {
                 1: 0,
@@ -524,8 +511,9 @@ function testRangeBasedNonRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 0,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Testing a more complex input expression.
         {
@@ -534,9 +522,9 @@ function testRangeBasedNonRemovableQueries() {
                 output: {
                     "relativeXValue": {
                         $minMaxScaler: {input: {$add: ["$x", "$y"]}},
-                        window: {range: ["unbounded", 5]}
+                        window: {range: ["unbounded", 5]},
                     },
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 13 / 22,
@@ -546,17 +534,17 @@ function testRangeBasedNonRemovableQueries() {
                 5: 8 / 22,
                 6: 0,
                 7: 1,
-            }
-        });
+            },
+        },
+    );
     // Testing partitions
     validateTestCase({
         setWindowFieldsArgs: {
             partitionBy: "$partition",
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", "unbounded"]}},
+            },
         },
         docIdToOutputFieldValue: {
             1: 3 / 10,
@@ -566,7 +554,7 @@ function testRangeBasedNonRemovableQueries() {
             5: 0,
             6: 0,
             7: 1,
-        }
+        },
     });
     validateTestCase({
         setWindowFieldsArgs: {
@@ -574,7 +562,7 @@ function testRangeBasedNonRemovableQueries() {
             sortBy: {y: 1},
             output: {
                 "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["unbounded", 2]}},
-            }
+            },
         },
         docIdToOutputFieldValue: {
             1: 3 / 10,
@@ -584,7 +572,7 @@ function testRangeBasedNonRemovableQueries() {
             5: 0,
             6: 0,
             7: 1,
-        }
+        },
     });
 }
 
@@ -599,9 +587,8 @@ function testDocumentBasedRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {_id: 1},
                 output: {
-                    "relativeXValue":
-                        {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
-                }
+                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
+                },
             },
             docIdToOutputFieldValue: {
                 1: 0,
@@ -611,8 +598,9 @@ function testDocumentBasedRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 0,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Windows that only ever include a single document should return 0 for every
         // document.
@@ -620,9 +608,8 @@ function testDocumentBasedRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {_id: -1},
                 output: {
-                    "relativeXValue":
-                        {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
-                }
+                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
+                },
             },
             docIdToOutputFieldValue: {
                 1: 0,
@@ -632,8 +619,9 @@ function testDocumentBasedRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 0,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Windows that only ever include a single document should return 0 for every
         // document.
@@ -641,9 +629,8 @@ function testDocumentBasedRemovableQueries() {
             setWindowFieldsArgs: {
                 sortBy: {y: -1},
                 output: {
-                    "relativeXValue":
-                        {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
-                }
+                    "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "current"]}},
+                },
             },
             docIdToOutputFieldValue: {
                 1: 0,
@@ -653,15 +640,15 @@ function testDocumentBasedRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 0,
-            }
-        });
+            },
+        },
+    );
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+            },
         },
         docIdToOutputFieldValue: {
             1: 3 / 16,
@@ -671,43 +658,41 @@ function testDocumentBasedRemovableQueries() {
             5: 0,
             6: 0,
             7: 0,
-        }
+        },
     });
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: -1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+            },
         },
         docIdToOutputFieldValue: {
-            1: 0,       // includes [-3]
-            2: 1,       // includes [10, -3]
-            3: 6 / 13,  // includes [3, 10, -3]
-            4: 5 / 13,  // includes [2, 3, 10, -3]
-            5: 0,       // includes [-6, 2, 3, 10, -3]
-            6: 3 / 8,   // includes [0, -6, 2, 3, 10, -3]
-            7: 5 / 8,   // includes [4, 0, -6, 2, 3, 10, -3]
-        }
+            1: 0, // includes [-3]
+            2: 1, // includes [10, -3]
+            3: 6 / 13, // includes [3, 10, -3]
+            4: 5 / 13, // includes [2, 3, 10, -3]
+            5: 0, // includes [-6, 2, 3, 10, -3]
+            6: 3 / 8, // includes [0, -6, 2, 3, 10, -3]
+            7: 5 / 8, // includes [4, 0, -6, 2, 3, 10, -3]
+        },
     });
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: -1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: [-1, "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [-1, "unbounded"]}},
+            },
         },
         docIdToOutputFieldValue: {
-            1: 0,       // includes [10, -3]
-            2: 1,       // includes [3, 10, -3]
-            3: 6 / 13,  // includes [2, 3, 10, -3]
-            4: 1 / 2,   // includes [-6, 2, 3, 10, -3]
-            5: 0,       // includes [0, -6, 2, 3, 10, -3]
-            6: 3 / 8,   // includes [4, 0, -6, 2, 3, 10, -3]
-            7: 5 / 8,   // includes [4, 0, -6, 2, 3, 10, -3]
-        }
+            1: 0, // includes [10, -3]
+            2: 1, // includes [3, 10, -3]
+            3: 6 / 13, // includes [2, 3, 10, -3]
+            4: 1 / 2, // includes [-6, 2, 3, 10, -3]
+            5: 0, // includes [0, -6, 2, 3, 10, -3]
+            6: 3 / 8, // includes [4, 0, -6, 2, 3, 10, -3]
+            7: 5 / 8, // includes [4, 0, -6, 2, 3, 10, -3]
+        },
     });
     // List of documents with y sorted descending:
     // {_id: 7, "x": 4, "y": 10, "partition": "A"},
@@ -721,26 +706,25 @@ function testDocumentBasedRemovableQueries() {
         setWindowFieldsArgs: {
             sortBy: {y: -1},
             output: {
-                "relativeXValue":
-                    {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
-            }
+                "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: ["current", "unbounded"]}},
+            },
         },
         docIdToOutputFieldValue: {
-            1: 3 / 16,  // includes [-3, -6, 10, 2, 3, 0]
-            2: 1,       // includes [10, 2, 3, 0]
-            3: 1,       // includes [3, 0]
-            4: 2 / 3,   // includes [2, 3, 0]
-            5: 0,       // includes [-6, 10, 2, 3, 0]
-            6: 0,       // includes [0]
-            7: 5 / 8,   // includes all
-        }
+            1: 3 / 16, // includes [-3, -6, 10, 2, 3, 0]
+            2: 1, // includes [10, 2, 3, 0]
+            3: 1, // includes [3, 0]
+            4: 2 / 3, // includes [2, 3, 0]
+            5: 0, // includes [-6, 10, 2, 3, 0]
+            6: 0, // includes [0]
+            7: 5 / 8, // includes all
+        },
     });
     validateTestCase({
         setWindowFieldsArgs: {
             sortBy: {_id: 1},
             output: {
                 "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [-2, 2]}},
-            }
+            },
         },
         docIdToOutputFieldValue: {
             1: 0,
@@ -750,7 +734,7 @@ function testDocumentBasedRemovableQueries() {
             5: 0,
             6: 6 / 10,
             7: 1,
-        }
+        },
     });
     validateTestCase(
         // Sort by 'y' instead of '_id'.
@@ -760,9 +744,9 @@ function testDocumentBasedRemovableQueries() {
                 output: {
                     "relativeXValue": {
                         $minMaxScaler: {input: "$x"},
-                        window: {documents: ["current", "unbounded"]}
+                        window: {documents: ["current", "unbounded"]},
                     },
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 0,
@@ -772,8 +756,9 @@ function testDocumentBasedRemovableQueries() {
                 5: 0,
                 6: 6 / 16,
                 7: 0,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Previous case with scaled domain.
         {
@@ -782,9 +767,9 @@ function testDocumentBasedRemovableQueries() {
                 output: {
                     "relativeXValue": {
                         $minMaxScaler: {input: "$x", min: 10000, max: 20000},
-                        window: {documents: ["current", "unbounded"]}
+                        window: {documents: ["current", "unbounded"]},
                     },
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 10000,
@@ -794,8 +779,9 @@ function testDocumentBasedRemovableQueries() {
                 5: 10000,
                 6: 13750,
                 7: 10000,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Testing a more complex input expression.
         {
@@ -804,9 +790,9 @@ function testDocumentBasedRemovableQueries() {
                 output: {
                     "relativeXValue": {
                         $minMaxScaler: {input: {$add: [1, "$x"]}},
-                        window: {documents: ["current", "unbounded"]}
+                        window: {documents: ["current", "unbounded"]},
                     },
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 3 / 16,
@@ -816,8 +802,9 @@ function testDocumentBasedRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 0,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Testing a constant input expression.
         // Every output value of the window should always be 0 for any constant,
@@ -828,9 +815,9 @@ function testDocumentBasedRemovableQueries() {
                 output: {
                     "relativeXValue": {
                         $minMaxScaler: {input: {$const: 1}},
-                        window: {documents: ["current", "unbounded"]}
+                        window: {documents: ["current", "unbounded"]},
                     },
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 0,
@@ -840,8 +827,9 @@ function testDocumentBasedRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 0,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Testing partitions.
         {
@@ -850,7 +838,7 @@ function testDocumentBasedRemovableQueries() {
                 sortBy: {_id: 1},
                 output: {
                     "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {documents: [-1, 2]}},
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 3 / 9,
@@ -860,8 +848,9 @@ function testDocumentBasedRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 1,
-            }
-        });
+            },
+        },
+    );
 }
 
 // Tests that range based bounds queries with removable windows produce the correct output
@@ -873,7 +862,7 @@ function testRangeBasedRemovableQueries() {
             sortBy: {_id: 1},
             output: {
                 "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: ["current", 2]}},
-            }
+            },
         },
         docIdToOutputFieldValue: {
             1: 0,
@@ -883,7 +872,7 @@ function testRangeBasedRemovableQueries() {
             5: 0,
             6: 0,
             7: 0,
-        }
+        },
     });
     validateTestCase(
         // Sort by a field 'y' instead of '_id'.
@@ -892,7 +881,7 @@ function testRangeBasedRemovableQueries() {
                 sortBy: {y: 1},
                 output: {
                     "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [-5, 5]}},
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 3 / 16,
@@ -902,8 +891,9 @@ function testRangeBasedRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 1,
-            }
-        });
+            },
+        },
+    );
     validateTestCase(
         // Testing partitions.
         {
@@ -912,7 +902,7 @@ function testRangeBasedRemovableQueries() {
                 sortBy: {y: 1},
                 output: {
                     "relativeXValue": {$minMaxScaler: {input: "$x"}, window: {range: [-3, 4]}},
-                }
+                },
             },
             docIdToOutputFieldValue: {
                 1: 3 / 10,
@@ -922,8 +912,9 @@ function testRangeBasedRemovableQueries() {
                 5: 0,
                 6: 0,
                 7: 1,
-            }
-        });
+            },
+        },
+    );
 }
 
 testDocumentBasedNonRemovableQueries();

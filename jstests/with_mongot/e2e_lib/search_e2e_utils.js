@@ -3,15 +3,9 @@
  */
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
-import {
-    getMovieData,
-    getMovieDataWithEnrichedTitle
-} from "jstests/with_mongot/e2e_lib/data/movies.js";
+import {getMovieData, getMovieDataWithEnrichedTitle} from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {getRentalData} from "jstests/with_mongot/e2e_lib/data/rentals.js";
-import {
-    assertViewAppliedCorrectly,
-    assertViewNotApplied
-} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {assertViewAppliedCorrectly, assertViewNotApplied} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 /**
  * This function is used in place of direct assertions between expected and actual document array
@@ -57,23 +51,31 @@ export const FuzzingStrategy = Object.freeze({
     ShareToleranceAcrossDocs: 1,
 });
 export const defaultFuzzingStrategy = FuzzingStrategy.EnforceTolerancePerDoc;
-export function assertDocArrExpectedFuzzy(expectedDocArr,
-                                          actualDocArr,
-                                          showVerboseResults = false,
-                                          tolerancePercentage = defaultTolerancePercentage,
-                                          fuzzingStrategy = defaultFuzzingStrategy) {
+export function assertDocArrExpectedFuzzy(
+    expectedDocArr,
+    actualDocArr,
+    showVerboseResults = false,
+    tolerancePercentage = defaultTolerancePercentage,
+    fuzzingStrategy = defaultFuzzingStrategy,
+) {
     // Helper functions that stringify input arrays for developer observablity in assertion logs.
     function stringifyExpectedArray(showFullArray) {
         if (showFullArray) {
             return stringifyArray(expectedDocArr, "expected");
         }
-        return stringifyArray(expectedDocArr.map(obj => obj._id), "expected");
+        return stringifyArray(
+            expectedDocArr.map((obj) => obj._id),
+            "expected",
+        );
     }
     function stringifyActualArray(showFullArray) {
         if (showFullArray) {
             return stringifyArray(actualDocArr, "actual");
         }
-        return stringifyArray(actualDocArr.map(obj => obj._id), "actual");
+        return stringifyArray(
+            actualDocArr.map((obj) => obj._id),
+            "actual",
+        );
     }
     function stringifyArrays(showFullArray) {
         return stringifyExpectedArray(showFullArray) + stringifyActualArray(showFullArray);
@@ -82,19 +84,27 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
     // Validate user inputs.
     assert(Array.isArray(expectedDocArr), "'expectedDocArr' must be of type array.");
     assert(Array.isArray(actualDocArr), "'actualDocArr' must be of type array.");
-    assert(tolerancePercentage >= 0 && tolerancePercentage <= 1,
-           "'tolerancePercentage' must be between 0 and 1 (inclusive), but instead is: '" +
-               tolerancePercentage + "'.");
-    assert((fuzzingStrategy == FuzzingStrategy.EnforceTolerancePerDoc) ||
-               (fuzzingStrategy == FuzzingStrategy.ShareToleranceAcrossDocs),
-           "invalid FuzzingStrategy requested.");
+    assert(
+        tolerancePercentage >= 0 && tolerancePercentage <= 1,
+        "'tolerancePercentage' must be between 0 and 1 (inclusive), but instead is: '" + tolerancePercentage + "'.",
+    );
+    assert(
+        fuzzingStrategy == FuzzingStrategy.EnforceTolerancePerDoc ||
+            fuzzingStrategy == FuzzingStrategy.ShareToleranceAcrossDocs,
+        "invalid FuzzingStrategy requested.",
+    );
 
     // Results can never be as expected if array lengths don't match.
-    assert.eq(expectedDocArr.length,
-              actualDocArr.length,
-              "expected and actual array lengths are not equal. Expected array len = '" +
-                  expectedDocArr.length + "' and actual array len = '" + actualDocArr.length +
-                  "'.\n" + stringifyArrays(showVerboseResults));
+    assert.eq(
+        expectedDocArr.length,
+        actualDocArr.length,
+        "expected and actual array lengths are not equal. Expected array len = '" +
+            expectedDocArr.length +
+            "' and actual array len = '" +
+            actualDocArr.length +
+            "'.\n" +
+            stringifyArrays(showVerboseResults),
+    );
 
     // Construct a map about the known information of each doc in the expected array,
     // searchable by id.
@@ -107,12 +117,17 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
     let expectedDocMap = new Map();
     for (let i = 0; i < expectedDocArr.length; i++) {
         let id = expectedDocArr[i]["_id"];
-        assert.neq(id,
-                   undefined,
-                   "'_id' field of document at index '" + i +
-                       "' in expected array is undefined.\n" +
-                       "document with undefined key: " + tojson(expectedDocArr[i]) + "\n" +
-                       stringifyExpectedArray(showVerboseResults));
+        assert.neq(
+            id,
+            undefined,
+            "'_id' field of document at index '" +
+                i +
+                "' in expected array is undefined.\n" +
+                "document with undefined key: " +
+                tojson(expectedDocArr[i]) +
+                "\n" +
+                stringifyExpectedArray(showVerboseResults),
+        );
 
         // Ensure this key has never been seen (no duplicates allowed in expected array).
         {
@@ -124,12 +139,25 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
                 assert.eq(
                     expectedDocMapEntry,
                     undefined,
-                    "duplicate '_id' key of '" + id + "' found in expected array at indicies '" +
-                        dupPos + "' and '" + i + "'.\n" +
-                        "duplicated document at index '" + dupPos +
-                        "': " + tojson(expectedDocArr[dupPos]) + "\n" +
-                        "duplicated document at index '" + i + "': " + tojson(expectedDocArr[i]) +
-                        "\n" + stringifyExpectedArray(showVerboseResults));
+                    "duplicate '_id' key of '" +
+                        id +
+                        "' found in expected array at indicies '" +
+                        dupPos +
+                        "' and '" +
+                        i +
+                        "'.\n" +
+                        "duplicated document at index '" +
+                        dupPos +
+                        "': " +
+                        tojson(expectedDocArr[dupPos]) +
+                        "\n" +
+                        "duplicated document at index '" +
+                        i +
+                        "': " +
+                        tojson(expectedDocArr[i]) +
+                        "\n" +
+                        stringifyExpectedArray(showVerboseResults),
+                );
             }
         }
         expectedDocMap.set(id, {expectedPos: i, seenInActual: false, actualPos: -1});
@@ -141,17 +169,15 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
     if (tolerancePercentage != 0) {
         // If tolerance percentage is not 0, positional tolerance per doc should be at least 1.
         // Otherwise, round the resulting decimal to the nearest whole number.
-        positionalTolerancePerDoc =
-            Math.max(Math.round(expectedDocArr.length * tolerancePercentage), 1);
+        positionalTolerancePerDoc = Math.max(Math.round(expectedDocArr.length * tolerancePercentage), 1);
     }
 
     // Helper function when the FuzzingStrategy is 'EnforceTolerancePerDoc'.
     // Returns a boolean for if each doc is within positional tolerance.
     function withinTolerance(expectedPos, actualPos) {
         let lowerLimit = Math.max(0, expectedPos - positionalTolerancePerDoc);
-        let upperLimit =
-            Math.min(expectedDocArr.length - 1, expectedPos + positionalTolerancePerDoc);
-        if ((actualPos < lowerLimit) || (actualPos > upperLimit)) {
+        let upperLimit = Math.min(expectedDocArr.length - 1, expectedPos + positionalTolerancePerDoc);
+        if (actualPos < lowerLimit || actualPos > upperLimit) {
             return false;
         }
         return true;
@@ -171,52 +197,94 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
     // counterpart, and is within the alloted positional tolerance (depending on fuzzing strategy).
     for (let i = 0; i < actualDocArr.length; i++) {
         let actualId = actualDocArr[i]["_id"];
-        assert.neq(actualId,
-                   undefined,
-                   "'_id' field of document at index '" + i +
-                       "' in actual array is not defined.\n" +
-                       "document with undefined key: " + tojson(actualDocArr[i]) + "\n" +
-                       stringifyActualArray(showVerboseResults));
+        assert.neq(
+            actualId,
+            undefined,
+            "'_id' field of document at index '" +
+                i +
+                "' in actual array is not defined.\n" +
+                "document with undefined key: " +
+                tojson(actualDocArr[i]) +
+                "\n" +
+                stringifyActualArray(showVerboseResults),
+        );
 
         let expectedDocEntry = expectedDocMap.get(actualId);
-        assert.neq(expectedDocEntry,
-                   undefined,
-                   "actual array document with '_id' of '" + actualId + "' at index '" + i +
-                       "' is not found in expected array.\n" +
-                       "document with not found id in expected array: " + tojson(actualDocArr[i]) +
-                       "\n" + stringifyArrays(showVerboseResults));
-        assert(!expectedDocEntry.seenInActual,
-               "duplicate '_id' key of '" + actualId + "' found in actual array at indices '" +
-                   expectedDocEntry.actualPos + "' and " +
-                   "'" + i + "'.\n" +
-                   "duplicate document at index '" + expectedDocEntry.actualPos +
-                   "': " + tojson(actualDocArr[expectedDocEntry.actualPos]) + "\n" +
-                   "duplicate document at index '" + i + "': " + tojson(actualDocArr[i]) + "\n" +
-                   stringifyActualArray(showVerboseResults));
+        assert.neq(
+            expectedDocEntry,
+            undefined,
+            "actual array document with '_id' of '" +
+                actualId +
+                "' at index '" +
+                i +
+                "' is not found in expected array.\n" +
+                "document with not found id in expected array: " +
+                tojson(actualDocArr[i]) +
+                "\n" +
+                stringifyArrays(showVerboseResults),
+        );
+        assert(
+            !expectedDocEntry.seenInActual,
+            "duplicate '_id' key of '" +
+                actualId +
+                "' found in actual array at indices '" +
+                expectedDocEntry.actualPos +
+                "' and " +
+                "'" +
+                i +
+                "'.\n" +
+                "duplicate document at index '" +
+                expectedDocEntry.actualPos +
+                "': " +
+                tojson(actualDocArr[expectedDocEntry.actualPos]) +
+                "\n" +
+                "duplicate document at index '" +
+                i +
+                "': " +
+                tojson(actualDocArr[i]) +
+                "\n" +
+                stringifyActualArray(showVerboseResults),
+        );
 
         // Set this entry back as seen for future duplication checks.
-        expectedDocMap.set(actualId,
-                           {pos: expectedDocEntry.expectedPos, seenInActual: true, actualPos: i});
+        expectedDocMap.set(actualId, {pos: expectedDocEntry.expectedPos, seenInActual: true, actualPos: i});
 
         // Ensure that the entire actual document matches the expected document.
-        assert.docEq(expectedDocArr[expectedDocEntry.expectedPos],
-                     actualDocArr[i],
-                     "document with '_id' of '" + actualId +
-                         "' does not match the fields of its expected document counterpart.\n" +
-                         "expected array doc at index '" + expectedDocEntry.expectedPos +
-                         "': " + tojson(expectedDocArr[expectedDocEntry.expectedPos]) + "\n" +
-                         "actual array doc at index '" + i + "': " + tojson(actualDocArr[i]) +
-                         "\n");
+        assert.docEq(
+            expectedDocArr[expectedDocEntry.expectedPos],
+            actualDocArr[i],
+            "document with '_id' of '" +
+                actualId +
+                "' does not match the fields of its expected document counterpart.\n" +
+                "expected array doc at index '" +
+                expectedDocEntry.expectedPos +
+                "': " +
+                tojson(expectedDocArr[expectedDocEntry.expectedPos]) +
+                "\n" +
+                "actual array doc at index '" +
+                i +
+                "': " +
+                tojson(actualDocArr[i]) +
+                "\n",
+        );
 
         // Tolerance check depends on fuzzing strategy.
         if (fuzzingStrategy == FuzzingStrategy.EnforceTolerancePerDoc) {
             // This document must individually be within its positional tolerance.
-            assert(withinTolerance(expectedDocEntry.expectedPos, i),
-                   "actual array document with '_id' of '" + actualId + "' at index '" + i +
-                       "' is not within the tolerance of its associated expected document " +
-                       "at expected array index '" + expectedDocEntry.expectedPos +
-                       "'. The tolerance amount is '" + positionalTolerancePerDoc +
-                       "' position(s).\n" + stringifyArrays(showVerboseResults));
+            assert(
+                withinTolerance(expectedDocEntry.expectedPos, i),
+                "actual array document with '_id' of '" +
+                    actualId +
+                    "' at index '" +
+                    i +
+                    "' is not within the tolerance of its associated expected document " +
+                    "at expected array index '" +
+                    expectedDocEntry.expectedPos +
+                    "'. The tolerance amount is '" +
+                    positionalTolerancePerDoc +
+                    "' position(s).\n" +
+                    stringifyArrays(showVerboseResults),
+            );
         } else if (fuzzingStrategy == FuzzingStrategy.ShareToleranceAcrossDocs) {
             accumulatePositionalDrift(expectedDocEntry.expectedPos, i);
             // Assert total positional drift is under tolerance once all docs have been
@@ -227,12 +295,17 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
 
     if (fuzzingStrategy == FuzzingStrategy.ShareToleranceAcrossDocs) {
         // Total positional drift aggregated across all documents has been computed.
-        assert.lte(totalPositionalDrift,
-                   positionalDriftTolerance,
-                   "total positional drift across all docs is above the alloted tolerance. " +
-                       "Total positional drift is '" + totalPositionalDrift +
-                       "', but the alloted tolerance is '" + positionalDriftTolerance + "'.\n" +
-                       stringifyArrays(showVerboseResults));
+        assert.lte(
+            totalPositionalDrift,
+            positionalDriftTolerance,
+            "total positional drift across all docs is above the alloted tolerance. " +
+                "Total positional drift is '" +
+                totalPositionalDrift +
+                "', but the alloted tolerance is '" +
+                positionalDriftTolerance +
+                "'.\n" +
+                stringifyArrays(showVerboseResults),
+        );
     }
 
     // All assertions passed.
@@ -257,22 +330,20 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
  *     later use to examine this document.
  */
 export function waitUntilDocIsVisibleByQuery({docId, coll, queryPipeline}) {
-    assert.soon(() =>
-                    coll.aggregate(queryPipeline.concat([{$match: {_id: docId}}])).itcount() === 1);
+    assert.soon(() => coll.aggregate(queryPipeline.concat([{$match: {_id: docId}}])).itcount() === 1);
 }
 
 export const datasets = {
     MOVIES: {id: 1, indexName: "moviesIndex"},
     RENTALS: {id: 2},
-    MOVIES_WITH_ENRICHED_TITLE:
-        {id: 3, viewName: "moviesWithEnrichedTitle", indexName: "moviesWithEnrichedTitleIndex"},
+    MOVIES_WITH_ENRICHED_TITLE: {id: 3, viewName: "moviesWithEnrichedTitle", indexName: "moviesWithEnrichedTitleIndex"},
     ACTION_MOVIES: {id: 4, viewName: "actionMovies", indexName: "actionMoviesIndex"},
     // Nested view.
     ACTION_MOVIES_WITH_ENRICHED_TITLE: {
         id: 5,
         viewName: "actionMoviesWithEnrichedTitle",
-        indexName: "actionMoviesWithEnrichedTitleIndex"
-    }
+        indexName: "actionMoviesWithEnrichedTitleIndex",
+    },
 };
 
 /**
@@ -338,7 +409,7 @@ export function createSearchIndexesWithCleanup(config, isStoredSource = true) {
 
     // Return a unified cleanup function.
     return () => {
-        cleanupFunctions.forEach(cleanupFn => {
+        cleanupFunctions.forEach((cleanupFn) => {
             cleanupFn();
         });
     };
@@ -354,8 +425,7 @@ export function createSearchIndexesWithCleanup(config, isStoredSource = true) {
  * @param {Function} testFn - The test function to execute with the created indexes. This function
  *     must take in one parameter which specifies whether the tests are storedSource or not.
  */
-export function createSearchIndexesAndExecuteTests(
-    indexConfig, testFn, runWithStoredSource = true) {
+export function createSearchIndexesAndExecuteTests(indexConfig, testFn, runWithStoredSource = true) {
     // Create indexes with cleanup function.
     const cleanup = createSearchIndexesWithCleanup(indexConfig);
     try {
@@ -379,7 +449,12 @@ export function createSearchIndexesAndExecuteTests(
  * @param {Function} explainValidationFn - Optional additional function to validate explain output.
  */
 export function validateSearchExplain(
-    coll, userPipeline, isStoredSource, viewPipeline = null, explainValidationFn = null) {
+    coll,
+    userPipeline,
+    isStoredSource,
+    viewPipeline = null,
+    explainValidationFn = null,
+) {
     const explain = assert.commandWorked(coll.explain().aggregate(userPipeline));
 
     // If coll is a view, assert that the view is applied correctly based on the storedSource value

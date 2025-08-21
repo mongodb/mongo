@@ -49,8 +49,9 @@ for (let iteration = 0; iteration < nIterations; iteration++) {
     assert.commandWorked(testDB.runCommand({update: collName, updates: updates}));
 
     // Create a background unique index on the collection.
-    assert.commandWorked(testDB.runCommand(
-        {createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}));
+    assert.commandWorked(
+        testDB.runCommand({createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}),
+    );
 
     // Generate updates that increment x on each document backwards by _id to avoid conflicts
     // when applied in-order.

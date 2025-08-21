@@ -5,7 +5,7 @@
  * and returns its 'uuid' field, which may be undefined.
  */
 export function getUUIDFromConfigCollections(conn, nss) {
-    const configDB = conn.getSiblingDB ? conn.getSiblingDB('config') : conn.getDB('config');
+    const configDB = conn.getSiblingDB ? conn.getSiblingDB("config") : conn.getDB("config");
     let collEntry = configDB.collections.findOne({_id: nss});
     assert.neq(undefined, collEntry);
     return collEntry.uuid;

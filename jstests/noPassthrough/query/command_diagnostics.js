@@ -6,7 +6,7 @@ import {
     failAllInserts,
     getDiagnosticLogs,
     planExecutorAlwaysFails,
-    runWithFailpoint
+    runWithFailpoint,
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -77,11 +77,12 @@ function runTest({
         }
     });
 
-    const commandDiagnostics =
-        getDiagnosticLogs({description: description, logFile: conn.fullOptions.logFile});
-    assert.eq(commandDiagnostics.length,
-              0,
-              `${description}: found an unexpected log line containing command diagnostics`);
+    const commandDiagnostics = getDiagnosticLogs({description: description, logFile: conn.fullOptions.logFile});
+    assert.eq(
+        commandDiagnostics.length,
+        0,
+        `${description}: found an unexpected log line containing command diagnostics`,
+    );
 
     // Now enable the knob and ensure that we do see the expected logs.
     setParameter(conn, "enableDiagnosticLogging", true);
@@ -97,7 +98,7 @@ function runTest({
     assertOnDiagnosticLogContents({
         description: description,
         logFile: conn.fullOptions.logFile,
-        expectedDiagnosticInfo: expectedDiagnosticInfo
+        expectedDiagnosticInfo: expectedDiagnosticInfo,
     });
 
     // We expect a non-zero exit code due to tassert triggered.
@@ -122,29 +123,33 @@ const commonQueryDiagnostics = [
     'planSummary: \\"IXSCAN',
     omittedShardKeyLog,
 ];
-const expectedExplainCollscanDiagnostic =
-    ["'winningPlan': ", 'stage: \\"IXSCAN\\"', 'stage: \\"FETCH\\"', "'executionStats': "];
+const expectedExplainCollscanDiagnostic = [
+    "'winningPlan': ",
+    'stage: \\"IXSCAN\\"',
+    'stage: \\"FETCH\\"',
+    "'executionStats': ",
+];
 
 const failAllRemoves = {
     failpointName: "failAllRemoves",
-    failpointOpts: {'tassert': true},
+    failpointOpts: {"tassert": true},
     errorCode: [9276703, 9276704],
 };
 
 const defaultExpCtxLog = [
-    'ExpCtxDiagnostics\: {collator: ',
-    'uuid: ',
-    'needsMerge: ',
-    'allowDiskUse: ',
-    'isMapReduceCommand: ',
-    'inLookup: ',
-    'inUnionWith: ',
-    'forcePlanCache: ',
-    'sbeCompatibility: ',
-    'sbeGroupCompatibility: ',
-    'sbeWindowCompatibility: ',
-    'sbePipelineCompatibility: ',
-    'subPipelineDepth: '
+    "ExpCtxDiagnostics\: {collator: ",
+    "uuid: ",
+    "needsMerge: ",
+    "allowDiskUse: ",
+    "isMapReduceCommand: ",
+    "inLookup: ",
+    "inUnionWith: ",
+    "forcePlanCache: ",
+    "sbeCompatibility: ",
+    "sbeGroupCompatibility: ",
+    "sbeWindowCompatibility: ",
+    "sbePipelineCompatibility: ",
+    "subPipelineDepth: ",
 ];
 
 // Test the find command.
@@ -155,7 +160,7 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonQueryDiagnostics,
         `{\'currentOp\': { op: \\"query\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { find: \\"command_diagnostics\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0',
+        "'opDescription': { find: \\\"command_diagnostics\\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0",
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
     ],
@@ -187,19 +192,19 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonQueryDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { aggregate: \\"command_diagnostics\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } } ]',
+        "'opDescription': { aggregate: \\\"command_diagnostics\\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } } ]",
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
-    ]
+    ],
 });
 const outCmd = {
     aggregate: collName,
     pipeline: [{$match: {a: 1, b: 1}}, {$out: outColl}],
-    cursor: {}
+    cursor: {},
 };
-const outCmdDescription =
-    `\'opDescription\': { aggregate: \\"command_diagnostics\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $out: \\"${
-        outColl}\\" } ]`;
+const outCmdDescription = `\'opDescription\': { aggregate: \\"command_diagnostics\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $out: \\"${
+    outColl
+}\\" } ]`;
 runTest({
     ...planExecutorAlwaysFails,
     description: "agg with $out, planExecutor fails",
@@ -210,7 +215,7 @@ runTest({
         '{\'currentOp\': { op: \\"command\\", ns: \\"test.tmp.agg_out.',
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
-    ]
+    ],
 });
 runTest({
     ...failAllInserts,
@@ -220,10 +225,10 @@ runTest({
         ...commonQueryDiagnostics,
         outCmdDescription,
         '{\'currentOp\': { op: \\"insert\\", ns: \\"test.tmp.agg_out.',
-        'ninserted: 0',
+        "ninserted: 0",
         // Not expecting any explain diagnostics for inserts.
         ...defaultExpCtxLog,
-    ]
+    ],
 });
 
 // Test the count command.
@@ -234,11 +239,11 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { count: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 }',
+        "'opDescription': { count: \\\"command_diagnostics\\\", query: { a: 1.0, b: 1.0 }",
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 
 // Test the distinct command.
@@ -252,7 +257,7 @@ runTest({
         '\'opDescription\': { distinct: \\"command_diagnostics\\", key: \\"a\\", query: { a: 1.0, b: 1.0 }',
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
-    ]
+    ],
 });
 
 // Test the mapReduce command.
@@ -268,13 +273,13 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { mapReduce: \\"command_diagnostics\\", map: () => emit(0, 0), reduce: () => 1, out: { inline: 1.0 }',
+        "'opDescription': { mapReduce: \\\"command_diagnostics\\\", map: () => emit(0, 0), reduce: () => 1, out: { inline: 1.0 }",
         // Explain diagnostics
         "'winningPlan': ",
         'stage: \\"COLLSCAN\\"',
         "'executionStats': ",
-        ...defaultExpCtxLog
-    ]
+        ...defaultExpCtxLog,
+    ],
 });
 
 // Test the insert command.
@@ -285,17 +290,17 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"insert\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { insert: \\"command_diagnostics\\", ordered: false',
-        'ninserted: 0',
+        "'opDescription': { insert: \\\"command_diagnostics\\\", ordered: false",
+        "ninserted: 0",
         // Not expecting any explain diagnostics for inserts.
         omittedShardKeyLog,
-    ]
+    ],
 });
 
 // Test the delete command.
 runTest({
     ...planExecutorAlwaysFails,
-    description: 'delete',
+    description: "delete",
     command: {
         delete: collName,
         deletes: [{q: {a: 1, b: 1}, limit: 1}],
@@ -303,17 +308,17 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"remove\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { q: { a: 1.0, b: 1.0 }, limit: 1 }',
+        "'opDescription': { q: { a: 1.0, b: 1.0 }, limit: 1 }",
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 
 // Test the update command.
 runTest({
     ...planExecutorAlwaysFails,
-    description: 'update with simple filter',
+    description: "update with simple filter",
     command: {
         update: collName,
         updates: [{q: {a: 1, b: 1}, u: {a: 2, b: 2}}],
@@ -321,17 +326,17 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"update\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { q: { a: 1.0, b: 1.0 }, u: { a: 2.0, b: 2.0 }',
+        "'opDescription': { q: { a: 1.0, b: 1.0 }, u: { a: 2.0, b: 2.0 }",
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 
 // Test the findAndModify command.
 runTest({
     ...planExecutorAlwaysFails,
-    description: 'findAndModify remove',
+    description: "findAndModify remove",
     command: {
         findAndModify: collName,
         query: {a: 1, b: 1},
@@ -340,15 +345,15 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { findAndModify: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 }, remove: true',
+        "'opDescription': { findAndModify: \\\"command_diagnostics\\\", query: { a: 1.0, b: 1.0 }, remove: true",
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 runTest({
     ...planExecutorAlwaysFails,
-    description: 'findAndModify update',
+    description: "findAndModify update",
     command: {
         findAndModify: collName,
         query: {a: 1, b: 1},
@@ -357,16 +362,16 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { findAndModify: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 }, update: { a: 2.0, b: 2.0 }',
+        "'opDescription': { findAndModify: \\\"command_diagnostics\\\", query: { a: 1.0, b: 1.0 }, update: { a: 2.0, b: 2.0 }",
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 
 // Test the bulkWrite command.
 const bulkWriteTestSpec = {
-    targetDb: 'admin',
+    targetDb: "admin",
     command: {
         bulkWrite: 1,
         ops: [
@@ -380,64 +385,63 @@ const bulkWriteTestSpec = {
 runTest({
     ...failAllRemoves,
     ...bulkWriteTestSpec,
-    description: 'bulkWrite, delete fails',
+    description: "bulkWrite, delete fails",
     // The top-level command doesn't fail when a delete fails.
     errorCode: 0,
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"bulkWrite\\", ns: \\"test.${jsTestName()}\\"`,
         // Ensure the failing sub-operation is included in the diagnostic log.
-        '\'opDescription\': { delete: 0, filter: { a: 1.0 }',
+        "'opDescription': { delete: 0, filter: { a: 1.0 }",
         // Not expecting explain diagnostics here; this failpoint is reached before we have a query
         // plan to explain.
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 runTest({
     ...planExecutorAlwaysFails,
     ...bulkWriteTestSpec,
-    description: 'bulkWrite, update fails',
+    description: "bulkWrite, update fails",
     // The top-level command doesn't fail when an update fails.
     errorCode: 0,
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"bulkWrite\\", ns: \\"test.${jsTestName()}\\"`,
         // Ensure the failing sub-operation is included in the diagnostic log.
-        '\'opDescription\': { update: 0, filter: { a: 1.0, b: 1.0 }, multi: false, updateMods: { a: 1.0 }',
+        "'opDescription': { update: 0, filter: { a: 1.0, b: 1.0 }, multi: false, updateMods: { a: 1.0 }",
         // Explain diagnostics
         "'winningPlan': ",
         'stage: \\"UPDATE\\"',
         "'executionStats': ",
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 runTest({
     ...failAllInserts,
     ...bulkWriteTestSpec,
-    description: 'bulkWrite, insert fails',
+    description: "bulkWrite, insert fails",
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"bulkWrite\\", ns: \\"test.${jsTestName()}\\"`,
         // Ensure the failing sub-operation is included in the diagnostic log.
-        '\'opDescription\': { insert: 0, documents: [ { a: 0.0 } ] }',
+        "'opDescription': { insert: 0, documents: [ { a: 0.0 } ] }",
         // Not expecting any explain diagnostics for inserts.
         omittedShardKeyLog,
-    ]
+    ],
 });
 
 // Explain
 runTest({
     ...planExecutorAlwaysFails,
     description: "explain find",
-    command:
-        {explain: {find: collName, filter: {a: 1, b: 1}, limit: 1}, verbosity: "executionStats"},
+    command: {explain: {find: collName, filter: {a: 1, b: 1}, limit: 1}, verbosity: "executionStats"},
     // The top-level command doesn't fail when the plan executor fails.
     errorCode: 0,
     expectedDiagnosticInfo: [
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { explain: { find: \\"command_diagnostics\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0',
+        "'opDescription': { explain: { find: \\\"command_diagnostics\\\", filter: { a: 1.0, b: 1.0 }, limit: 1.0",
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
         omittedShardKeyLog,
@@ -450,9 +454,9 @@ runTest({
         explain: {
             aggregate: collName,
             pipeline: [{$match: {a: 1, b: 1}}, {$unwind: "$arr"}],
-            cursor: {}
+            cursor: {},
         },
-        verbosity: "executionStats"
+        verbosity: "executionStats",
     },
     expectedDiagnosticInfo: [
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
@@ -460,7 +464,7 @@ runTest({
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 runTest({
     ...planExecutorAlwaysFails,
@@ -471,17 +475,16 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         `{\'currentOp\': { op: \\"command\\", ns: \\"test.${jsTestName()}\\"`,
-        '\'opDescription\': { explain: { count: \\"command_diagnostics\\", query: { a: 1.0, b: 1.0 } }',
+        "'opDescription': { explain: { count: \\\"command_diagnostics\\\", query: { a: 1.0, b: 1.0 } }",
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 runTest({
     ...planExecutorAlwaysFails,
     description: "explain distinct",
-    command:
-        {explain: {distinct: collName, key: "a", query: {a: 1, b: 1}}, verbosity: "executionStats"},
+    command: {explain: {distinct: collName, key: "a", query: {a: 1, b: 1}}, verbosity: "executionStats"},
     // The top-level command doesn't fail when the plan executor fails.
     errorCode: 0,
     expectedDiagnosticInfo: [
@@ -490,7 +493,7 @@ runTest({
         ...expectedExplainCollscanDiagnostic,
         ...defaultExpCtxLog,
         omittedShardKeyLog,
-    ]
+    ],
 });
 
 // Test the getMore command.
@@ -504,8 +507,7 @@ runTest({
     const {cursor} = assert.commandWorked(db.runCommand({find: collName, batchSize: 0}));
     runWithFailpoint(db, failpointName, failpointOpts, () => {
         jsTestLog("Testing getMore");
-        assert.commandFailedWithCode(
-            db.runCommand({getMore: cursor.id, collection: collName}), errorCode, description);
+        assert.commandFailedWithCode(db.runCommand({getMore: cursor.id, collection: collName}), errorCode, description);
     });
 
     // Get e.g. "2233240269355766922" from 'NumberLong("2233240269355766922")'.
@@ -516,10 +518,9 @@ runTest({
         expectedDiagnosticInfo: [
             ...commonDiagnostics,
             `{\'currentOp\': { op: \\"getmore\\", ns: \\"test.${jsTestName()}\\"`,
-            `\'opDescription\': { getMore: ${
-                cursorIdAsString}, collection: \\"command_diagnostics\\"`,
-            '\'originatingCommand\': { find: \\"command_diagnostics\\"'
-        ]
+            `\'opDescription\': { getMore: ${cursorIdAsString}, collection: \\"command_diagnostics\\"`,
+            "'originatingCommand': { find: \\\"command_diagnostics\\\"",
+        ],
     });
 
     // We expect a non-zero exit code due to tassert triggered.
@@ -528,7 +529,7 @@ runTest({
 
 // Test that large commands are handled properly.
 const bsonMaxUserSize = 16 * 1024 * 1024;
-const bsonMaxInternalSize = bsonMaxUserSize + (16 * 1024);
+const bsonMaxInternalSize = bsonMaxUserSize + 16 * 1024;
 
 function createLargeObject({inListLength}) {
     // Use a large $in-list, since BSONObj.toString() can automatically truncate strings.
@@ -540,7 +541,7 @@ function createLargeObjectCloseToUserLimit() {
     // '1000000': val}), which makes coming up with formula to calculate the desired length a
     // bit tedious. The in-list length is chosen such that the size of resulting predicate is as
     // close to the max size as possible.
-    const result = createLargeObject({inListLength: (1024 * 1024) + 3676});
+    const result = createLargeObject({inListLength: 1024 * 1024 + 3676});
     const remainingBytes = bsonMaxUserSize - Object.bsonsize(result);
     assert.eq(remainingBytes, 4);
     return result;
@@ -549,7 +550,7 @@ function createLargeObjectCloseToUserLimit() {
 function createLargeObjectCloseToInternalLimit() {
     // The in-list length is chosen such that the size of resulting predicate is as close to the
     // max size as possible. See the comment in the above function for further explanation.
-    const result = createLargeObject({inListLength: (1024 * 1024) + 4639});
+    const result = createLargeObject({inListLength: 1024 * 1024 + 4639});
     const remainingBytes = bsonMaxInternalSize - Object.bsonsize(result);
     assert.eq(remainingBytes, 17);
     return result;
@@ -562,7 +563,7 @@ runTest({
     expectedDiagnosticInfo: [
         ...commonDiagnostics,
         // Log the full command untruncated.
-        '\'opDescription\': { find: \\"command_diagnostics\\", filter: { a: { $in: [ 1.0, 1.0, 1.0',
+        "'opDescription': { find: \\\"command_diagnostics\\\", filter: { a: { $in: [ 1.0, 1.0, 1.0",
         'afterIn: \\"b\\"',
         ...defaultExpCtxLog,
         "'winningPlan': ",

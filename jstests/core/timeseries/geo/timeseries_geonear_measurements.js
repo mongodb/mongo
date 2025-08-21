@@ -23,17 +23,14 @@
  * ]
  */
 
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {aggPlanHasStage, getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 Random.setRandomSeed();
 
 // Value is taken from geoconstants.h.
-const earthRadiusMeters = (6378.1 * 1000);
+const earthRadiusMeters = 6378.1 * 1000;
 const earthCircumferenceMeters = earthRadiusMeters * Math.PI * 2;
 function degreesToMeters(degrees) {
     return degrees * (earthCircumferenceMeters / 360);
@@ -69,9 +66,9 @@ function runFlatExamples(coll, isTimeseries) {
         {
             $geoNear: {
                 near: [180, 0],
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
-            }
+            },
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: "$distance"}}},
         {$limit: 1},
@@ -85,9 +82,9 @@ function runFlatExamples(coll, isTimeseries) {
         {
             $geoNear: {
                 near: [0, 0],
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
-            }
+            },
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
@@ -104,14 +101,15 @@ function runFlatExamples(coll, isTimeseries) {
             {loc: [0, 8], distance: 8},
             {loc: [0, 9], distance: 9},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     // Since we don't support '2d' index on time-series metrics, and '2dsphere' indexes can't
     // answer flat queries, we always expect a collscan for timeseries.
     if (isTimeseries) {
-        assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+        assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2D'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2D"), plan);
     }
 
     // Limit number of results with $limit.
@@ -119,9 +117,9 @@ function runFlatExamples(coll, isTimeseries) {
         {
             $geoNear: {
                 near: [0, 0],
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
-            }
+            },
         },
         {$limit: 5},
         {$project: {_id: 0, loc: 1, distance: 1}},
@@ -134,12 +132,13 @@ function runFlatExamples(coll, isTimeseries) {
             {loc: [0, 3], distance: 3},
             {loc: [0, 4], distance: 4},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
-        assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+        assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2D'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2D"), plan);
     }
 
     // Upper bound distance with maxDistance.
@@ -147,10 +146,10 @@ function runFlatExamples(coll, isTimeseries) {
         {
             $geoNear: {
                 near: [0, 0],
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
                 maxDistance: 6,
-            }
+            },
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
@@ -164,12 +163,13 @@ function runFlatExamples(coll, isTimeseries) {
             {loc: [0, 5], distance: 5},
             {loc: [0, 6], distance: 6},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
-        assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+        assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2D'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2D"), plan);
     }
 
     // Lower bound distance with minDistance.
@@ -177,10 +177,10 @@ function runFlatExamples(coll, isTimeseries) {
         {
             $geoNear: {
                 near: [0, 0],
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
                 minDistance: 3,
-            }
+            },
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
@@ -194,12 +194,13 @@ function runFlatExamples(coll, isTimeseries) {
             {loc: [0, 8], distance: 8},
             {loc: [0, 9], distance: 9},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
-        assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+        assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2D'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2D"), plan);
     }
 
     // Bound distance with both minDistance/maxDistance.
@@ -207,11 +208,11 @@ function runFlatExamples(coll, isTimeseries) {
         {
             $geoNear: {
                 near: [0, 0],
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
                 minDistance: 3,
                 maxDistance: 6,
-            }
+            },
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
@@ -222,12 +223,13 @@ function runFlatExamples(coll, isTimeseries) {
             {loc: [0, 5], distance: 5},
             {loc: [0, 6], distance: 6},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
-        assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+        assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2D'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2D"), plan);
     }
 
     // Test interaction of distanceMultiplier with minDistance/maxDistance.
@@ -235,12 +237,12 @@ function runFlatExamples(coll, isTimeseries) {
         {
             $geoNear: {
                 near: [0, 0],
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
                 distanceMultiplier: 10,
                 minDistance: 3,
                 maxDistance: 6,
-            }
+            },
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
@@ -251,12 +253,13 @@ function runFlatExamples(coll, isTimeseries) {
             {loc: [0, 5], distance: 50},
             {loc: [0, 6], distance: 60},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
-        assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+        assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2D'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2D"), plan);
     }
 
     // 'query' option is not allowed on time-series collection.
@@ -264,18 +267,20 @@ function runFlatExamples(coll, isTimeseries) {
         {
             $geoNear: {
                 near: [0, 0],
-                key: 'loc',
-                distanceField: 'distance',
+                key: "loc",
+                distanceField: "distance",
                 query: {no_such_field: 123},
-            }
+            },
         },
     ];
     if (isTimeseries) {
-        assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), [
-            // Must not specify 'query' for $geoNear on a time-series collection; use $match instead
-            1938439,
-            5860207,
-        ]);
+        assert.throwsWithCode(
+            () => coll.aggregate(pipeline).toArray(),
+            [
+                // Must not specify 'query' for $geoNear on a time-series collection; use $match instead
+                1938439, 5860207,
+            ],
+        );
     } else {
         assert.docEq([], coll.aggregate(pipeline).toArray());
     }
@@ -285,10 +290,10 @@ function runFlatExamples(coll, isTimeseries) {
         {
             $geoNear: {
                 near: [0, 0],
-                key: 'loc',
-                distanceField: 'distance',
+                key: "loc",
+                distanceField: "distance",
                 includeLocs: "abc",
-            }
+            },
         },
     ];
     if (isTimeseries) {
@@ -306,9 +311,9 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
     pipeline = [
         {
             $geoNear: Object.assign({}, query, {
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
-            })
+            }),
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
@@ -325,7 +330,8 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
             {loc: [0, 1], distance: Math.floor(degreesToMeters(180 - 1))},
             {loc: [0, 0], distance: Math.floor(degreesToMeters(180 - 0))},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         // Without a maxDistance we have to unpack every bucket and sort the events.
@@ -333,22 +339,22 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
         // This means we end up doing an index scan, which might or might not be beneficial
         // depending on how many buckets it allows us to exclude.
         if (has2dsphereIndex) {
-            assert(aggPlanHasStage(plan, 'IXSCAN'), plan);
+            assert(aggPlanHasStage(plan, "IXSCAN"), plan);
         } else {
-            assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+            assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
         }
     } else {
         // We progressively scan larger and larger portions of the index.
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2DSPHERE'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2DSPHERE"), plan);
     }
 
     // Limit number of results with $limit.
     pipeline = [
         {
             $geoNear: Object.assign({}, query, {
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
-            })
+            }),
         },
         {$limit: 5},
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
@@ -361,29 +367,30 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
             {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
             {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         // Without a maxDistance we have to unpack every bucket and sort the events.
         // But, at least with a $limit stage we can do a top-k sort (although this doesn't
         // seem to show up in explain()).
         if (has2dsphereIndex) {
-            assert(aggPlanHasStage(plan, 'IXSCAN'), plan);
+            assert(aggPlanHasStage(plan, "IXSCAN"), plan);
         } else {
-            assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+            assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
         }
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2DSPHERE'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2DSPHERE"), plan);
     }
 
     // Upper bound distance with maxDistance.
     pipeline = [
         {
             $geoNear: Object.assign({}, query, {
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
                 maxDistance: Math.ceil(degreesToMeters(180 - 3)) / scaleResult,
-            })
+            }),
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
@@ -397,28 +404,29 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
             {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
             {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         // With maxDistance we can generate a $geoWithin predicate, which can use an index when
         // available.
         if (has2dsphereIndex) {
-            assert(aggPlanHasStage(plan, 'IXSCAN'), plan);
+            assert(aggPlanHasStage(plan, "IXSCAN"), plan);
         } else {
-            assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+            assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
         }
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2DSPHERE'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2DSPHERE"), plan);
     }
 
     // Lower bound distance with minDistance.
     pipeline = [
         {
             $geoNear: Object.assign({}, query, {
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
                 minDistance: Math.floor(degreesToMeters(180 - 7)) / scaleResult,
-            })
+            }),
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
@@ -433,27 +441,28 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
             {loc: [0, 1], distance: Math.floor(degreesToMeters(180 - 1))},
             {loc: [0, 0], distance: Math.floor(degreesToMeters(180 - 0))},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         if (has2dsphereIndex) {
-            assert(aggPlanHasStage(plan, 'IXSCAN'), plan);
+            assert(aggPlanHasStage(plan, "IXSCAN"), plan);
         } else {
-            assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+            assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
         }
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2DSPHERE'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2DSPHERE"), plan);
     }
 
     // Bound distance with both minDistance/maxDistance.
     pipeline = [
         {
             $geoNear: Object.assign({}, query, {
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
                 minDistance: Math.floor(degreesToMeters(180 - 7)) / scaleResult,
                 maxDistance: Math.ceil(degreesToMeters(180 - 3)) / scaleResult,
-            })
+            }),
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
@@ -465,28 +474,29 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
             {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
             {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         if (has2dsphereIndex) {
-            assert(aggPlanHasStage(plan, 'IXSCAN'), plan);
+            assert(aggPlanHasStage(plan, "IXSCAN"), plan);
         } else {
-            assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+            assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
         }
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2DSPHERE'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2DSPHERE"), plan);
     }
 
     // Test interaction of distanceMultiplier with minDistance/maxDistance.
     pipeline = [
         {
             $geoNear: Object.assign({}, query, {
-                key: 'loc',
+                key: "loc",
                 distanceField: "distance",
                 distanceMultiplier: 10,
                 minDistance: Math.floor(degreesToMeters(180 - 7)) / scaleResult,
                 maxDistance: Math.ceil(degreesToMeters(180 - 3)) / scaleResult,
-            })
+            }),
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
@@ -498,34 +508,37 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
             {loc: [0, 4], distance: Math.floor(10 * degreesToMeters(180 - 4))},
             {loc: [0, 3], distance: Math.floor(10 * degreesToMeters(180 - 3))},
         ],
-        coll.aggregate(pipeline).toArray());
+        coll.aggregate(pipeline).toArray(),
+    );
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         if (has2dsphereIndex) {
-            assert(aggPlanHasStage(plan, 'IXSCAN'), plan);
+            assert(aggPlanHasStage(plan, "IXSCAN"), plan);
         } else {
-            assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+            assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
         }
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2DSPHERE'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2DSPHERE"), plan);
     }
 
     // 'query' option is not allowed on time-series collections.
     pipeline = [
         {
             $geoNear: Object.assign({}, query, {
-                key: 'loc',
-                distanceField: 'distance',
+                key: "loc",
+                distanceField: "distance",
                 query: {no_such_field: 123},
-            })
+            }),
         },
     ];
     if (isTimeseries) {
-        assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), [
-            // Must not specify 'query' for $geoNear on a time-series collection; use $match instead
-            1938439,
-            5860207,
-        ]);
+        assert.throwsWithCode(
+            () => coll.aggregate(pipeline).toArray(),
+            [
+                // Must not specify 'query' for $geoNear on a time-series collection; use $match instead
+                1938439, 5860207,
+            ],
+        );
     } else {
         assert.docEq([], coll.aggregate(pipeline).toArray());
     }
@@ -533,9 +546,9 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
     pipeline = [
         {
             $geoNear: Object.assign({}, query, {
-                key: 'loc',
-                distanceField: 'distance',
-            })
+                key: "loc",
+                distanceField: "distance",
+            }),
         },
         {$match: {no_such_field: 456}},
     ];
@@ -543,30 +556,30 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         if (has2dsphereIndex) {
-            assert(aggPlanHasStage(plan, 'IXSCAN'), plan);
+            assert(aggPlanHasStage(plan, "IXSCAN"), plan);
         } else {
-            assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
+            assert(aggPlanHasStage(plan, "COLLSCAN"), plan);
         }
         // The additional $match predicate should be pushed down and combined with the geo
         // predicate. That is, the initial $cursor stage should include both.
-        const cursorStage = getAggPlanStage(plan, '$cursor');
+        const cursorStage = getAggPlanStage(plan, "$cursor");
         const parsedQuery = cursorStage.$cursor.queryPlanner.parsedQuery;
         const parsedQueryString = tojson(parsedQuery);
         const planString = tojson(plan);
-        assert.includes(parsedQueryString, 'no_such_field', planString);
-        assert.includes(parsedQueryString, '_internalBucketGeoWithin', planString);
+        assert.includes(parsedQueryString, "no_such_field", planString);
+        assert.includes(parsedQueryString, "_internalBucketGeoWithin", planString);
     } else {
-        assert(aggPlanHasStage(plan, 'GEO_NEAR_2DSPHERE'), plan);
+        assert(aggPlanHasStage(plan, "GEO_NEAR_2DSPHERE"), plan);
     }
 
     // 'includeLocs' is not implemented.
     pipeline = [
         {
             $geoNear: Object.assign({}, query, {
-                key: 'loc',
-                distanceField: 'distance',
+                key: "loc",
+                distanceField: "distance",
                 includeLocs: "abc",
-            })
+            }),
         },
     ];
     if (isTimeseries) {
@@ -583,8 +596,7 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
     // There are three different ways to specify a spherical query.
 
     // GeoJSON, implicitly uses spherical geometry.
-    runSphereExamples(
-        coll, isTimeseries, has2dsphereIndex, 1, {near: {type: "Point", coordinates: [180, 0]}});
+    runSphereExamples(coll, isTimeseries, has2dsphereIndex, 1, {near: {type: "Point", coordinates: [180, 0]}});
 
     // GeoJSON, with explicit spherical: true.
     runSphereExamples(coll, isTimeseries, has2dsphereIndex, 1, {
@@ -612,10 +624,10 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
 {
     const coll = db.getCollection(jsTestName() + "_baseline");
     coll.drop();
-    assert.commandWorked(coll.createIndex({loc: '2dsphere'}));
+    assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
     // Actually, we also need a '2d' index for the flat examples to succeed.
-    assert.commandWorked(coll.createIndex({loc: '2d'}));
+    assert.commandWorked(coll.createIndex({loc: "2d"}));
 
     insertTestData(coll);
     runExamples(coll, false /* isTimeseries */, true /* has2dsphereIndex */);
@@ -627,7 +639,7 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
 {
     const coll = db.getCollection(jsTestName() + "_noindex");
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 'time'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
 
     insertTestData(coll);
     runExamples(coll, true /* isTimeseries */, false /* has2dsphereIndex */);
@@ -638,17 +650,21 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
 {
     const coll = db.getCollection(jsTestName() + "_indexed");
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 'time'}}));
-    assert.commandWorked(coll.createIndex({loc: '2dsphere'}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
+    assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
     // Make sure the 2dsphere index exists. (If the collection is implicitly sharded then we will
     // also see an implicitly created index.)
-    let extraIndexesForSharding = {'control.min.time': 1, 'control.max.time': 1};
+    let extraIndexesForSharding = {"control.min.time": 1, "control.max.time": 1};
 
     assert.sameMembers(
-        getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec).map(i => i.key),
-        isShardedTimeseries(coll) ? [{'data.loc': '2dsphere_bucket'}, extraIndexesForSharding]
-                                  : [{'data.loc': '2dsphere_bucket'}]);
+        getTimeseriesCollForRawOps(coll)
+            .getIndexes(kRawOperationSpec)
+            .map((i) => i.key),
+        isShardedTimeseries(coll)
+            ? [{"data.loc": "2dsphere_bucket"}, extraIndexesForSharding]
+            : [{"data.loc": "2dsphere_bucket"}],
+    );
 
     insertTestData(coll);
     runExamples(coll, true /* isTimeseries */, true /* has2dsphereIndex */);

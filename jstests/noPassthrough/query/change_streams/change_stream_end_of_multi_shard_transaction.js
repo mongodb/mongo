@@ -1,4 +1,3 @@
-
 /**
  * Tests that a change stream will correctly generate endOfTransaction event for prepared
  * transactions.
@@ -19,9 +18,9 @@ const st = new ShardingTest({
         setParameter: {
             writePeriodicNoops: true,
             periodicNoopIntervalSecs: 1,
-            featureFlagEndOfTransactionChangeEvent: true
-        }
-    }
+            featureFlagEndOfTransactionChangeEvent: true,
+        },
+    },
 });
 
 const db = st.s.getDB(jsTestName());
@@ -35,7 +34,7 @@ st.shardColl(db[collName], {_id: 1}, {_id: 10}, {_id: 10});
 st.shardColl(db[coll2Name], {_id: 1}, {_id: 10}, {_id: 10});
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 
 const session = db.getMongo().startSession(sessionOptions);
@@ -44,29 +43,29 @@ let cst = new ChangeStreamTest(db);
 let collChangeStream = cst.startWatchingChanges({
     pipeline: [
         {$changeStream: {showExpandedEvents: true}},
-        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}}
+        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}},
     ],
     collection: db[collName],
-    doNotModifyInPassthroughs: true
+    doNotModifyInPassthroughs: true,
 });
 
 let collSessionChangeStream = cst.startWatchingChanges({
     pipeline: [
         {$changeStream: {showExpandedEvents: true}},
         {$match: {"lsid.id": session.getSessionId().id}},
-        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}}
+        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}},
     ],
     collection: db[collName],
-    doNotModifyInPassthroughs: true
+    doNotModifyInPassthroughs: true,
 });
 
 let dbChangeStream = cst.startWatchingChanges({
     pipeline: [
         {$changeStream: {showExpandedEvents: true}},
-        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}}
+        {$project: {"lsid.uid": 0, "operationDescription.lsid.uid": 0}},
     ],
     collection: 1,
-    doNotModifyInPassthroughs: true
+    doNotModifyInPassthroughs: true,
 });
 
 // Create these variables before starting the transaction. In sharded passthroughs, accessing
@@ -77,7 +76,7 @@ const sessionColl2 = sessionDb[coll2Name];
 
 const txnOptions = {
     readConcern: {level: "snapshot"},
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 
 const txnNumbers = [];
@@ -148,10 +147,7 @@ const expectedChangesCollSession = [
     endOfTransactionEvent(2),
 ];
 
-const expectedChangesColl = expectedChangesCollSession.concat([
-    dropEvent(collName),
-    {operationType: "invalidate"},
-]);
+const expectedChangesColl = expectedChangesCollSession.concat([dropEvent(collName), {operationType: "invalidate"}]);
 
 const expectedChangesDb = [
     insertEvent(collName, 0, 1),
@@ -171,19 +167,25 @@ const expectedChangesDb = [
     {operationType: "invalidate"},
 ];
 
-const collChanges = cst.assertNextChangesEqualUnordered(
-    {cursor: collChangeStream, expectedChanges: expectedChangesColl, expectInvalidate: true});
+const collChanges = cst.assertNextChangesEqualUnordered({
+    cursor: collChangeStream,
+    expectedChanges: expectedChangesColl,
+    expectInvalidate: true,
+});
 assertEndOfTransaction(collChanges);
 
 const collSessionChanges = cst.assertNextChangesEqualUnordered({
     cursor: collSessionChangeStream,
     expectedChanges: expectedChangesCollSession,
-    expectInvalidate: false
+    expectInvalidate: false,
 });
 assertEndOfTransaction(collSessionChanges);
 
-const dbChanges = cst.assertNextChangesEqualUnordered(
-    {cursor: dbChangeStream, expectedChanges: expectedChangesDb, expectInvalidate: true});
+const dbChanges = cst.assertNextChangesEqualUnordered({
+    cursor: dbChangeStream,
+    expectedChanges: expectedChangesDb,
+    expectInvalidate: true,
+});
 assertEndOfTransaction(dbChanges);
 
 cst.cleanUp();

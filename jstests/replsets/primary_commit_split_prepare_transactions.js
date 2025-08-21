@@ -23,7 +23,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Verify that the documents updated in the transaction are found or not, depending on expectOld.
-const checkDocuments = function(docCount, testColl, expectOld, readConcern = null) {
+const checkDocuments = function (docCount, testColl, expectOld, readConcern = null) {
     for (let i = 1; i <= docCount; ++i) {
         const doc = {_id: i, x: 1};
         const expected = expectOld ? doc : {_id: i, x: 1, y: 1};
@@ -39,8 +39,8 @@ const replTest = new ReplSetTest({
         syncdelay: 1,
         setParameter: {
             logComponentVerbosity: tojsononeline({replication: 3, command: 2}),
-        }
-    }
+        },
+    },
 });
 replTest.startSet();
 
@@ -58,23 +58,26 @@ let testColl = testDB.getCollection(collName);
 
 // Verify that we can't insert in the transaction if it is in prepared/committed state.
 // Also checks the config.transactions entry.
-const checkTransaction = function(sessionDB, lsid, txnNumber, expectedState) {
-    const expectedError = expectedState == "prepared" ? ErrorCodes.PreparedTransactionInProgress
-                                                      : ErrorCodes.TransactionCommitted;
-    assert.commandFailedWithCode(sessionDB.runCommand({
-        insert: collName,
-        documents: [{x: 2}],
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false
-    }),
-                                 expectedError);
+const checkTransaction = function (sessionDB, lsid, txnNumber, expectedState) {
+    const expectedError =
+        expectedState == "prepared" ? ErrorCodes.PreparedTransactionInProgress : ErrorCodes.TransactionCommitted;
+    assert.commandFailedWithCode(
+        sessionDB.runCommand({
+            insert: collName,
+            documents: [{x: 2}],
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+        }),
+        expectedError,
+    );
 
-    const res = replTest.getPrimary()
-                    .getDB("config")
-                    .getCollection("transactions")
-                    .find({"_id.id": lsid["id"], "txnNum": txnNumber})
-                    .readConcern("majority")
-                    .toArray();
+    const res = replTest
+        .getPrimary()
+        .getDB("config")
+        .getCollection("transactions")
+        .find({"_id.id": lsid["id"], "txnNum": txnNumber})
+        .readConcern("majority")
+        .toArray();
     assert.eq(1, res.length);
     assert.eq(expectedState, res[0]["state"]);
 };
@@ -115,16 +118,22 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 // Wait until lastStableRecoveryTimestamp >= prepareTimestamp on all nodes.
 assert.soon(() => {
-    const primaryLastStableRecoveryTimestamp = assert.commandWorked(
-        primary.adminCommand({replSetGetStatus: 1}))["lastStableRecoveryTimestamp"];
-    const secondaryLastStableRecoveryTimestamp = assert.commandWorked(
-        secondary.adminCommand({replSetGetStatus: 1}))["lastStableRecoveryTimestamp"];
-    jsTestLog("Awaiting last stable recovery timestamp " +
-              `(primary last stable recovery: ${tojson(primaryLastStableRecoveryTimestamp)}, ` +
-              `secondary last stable recovery: ${tojson(secondaryLastStableRecoveryTimestamp)}) ` +
-              `prepareTimestamp: ${tojson(prepareTimestamp)}`);
-    return timestampCmp(primaryLastStableRecoveryTimestamp, prepareTimestamp) >= 0 &&
-        timestampCmp(secondaryLastStableRecoveryTimestamp, prepareTimestamp) >= 0;
+    const primaryLastStableRecoveryTimestamp = assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}))[
+        "lastStableRecoveryTimestamp"
+    ];
+    const secondaryLastStableRecoveryTimestamp = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}))[
+        "lastStableRecoveryTimestamp"
+    ];
+    jsTestLog(
+        "Awaiting last stable recovery timestamp " +
+            `(primary last stable recovery: ${tojson(primaryLastStableRecoveryTimestamp)}, ` +
+            `secondary last stable recovery: ${tojson(secondaryLastStableRecoveryTimestamp)}) ` +
+            `prepareTimestamp: ${tojson(prepareTimestamp)}`,
+    );
+    return (
+        timestampCmp(primaryLastStableRecoveryTimestamp, prepareTimestamp) >= 0 &&
+        timestampCmp(secondaryLastStableRecoveryTimestamp, prepareTimestamp) >= 0
+    );
 });
 
 checkTransaction(sessionDB, lsid, txnNumber, "prepared");
@@ -165,24 +174,28 @@ jsTestLog("Committing transaction (with failpoint to pause split transaction com
 const failPointName = "hangInCommitSplitPreparedTxnOnPrimary";
 const failPoint = configureFailPoint(testDB, failPointName, {}, {skip: 2});
 
-const commitTxnFunc = async function(dbName, prepareTimestamp, lsid, txnNumber) {
+const commitTxnFunc = async function (dbName, prepareTimestamp, lsid, txnNumber) {
     const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
     const session = PrepareHelpers.createSessionWithGivenId(db.getMongo(), lsid);
     session.setTxnNumber_forTesting(txnNumber);
     const sessionDB = session.getDatabase(dbName);
 
-    const err = assert.throws(() => sessionDB.adminCommand({
-        commitTransaction: 1,
-        commitTimestamp: prepareTimestamp,
-        txnNumber: txnNumber,
-        autocommit: false,
-    }));
+    const err = assert.throws(() =>
+        sessionDB.adminCommand({
+            commitTransaction: 1,
+            commitTimestamp: prepareTimestamp,
+            txnNumber: txnNumber,
+            autocommit: false,
+        }),
+    );
 
     assert(isNetworkError(err), tojson(err));
 };
 
 const awaitCommitTransaction = startParallelShell(
-    funWithArgs(commitTxnFunc, dbName, prepareTimestamp, lsid, txnNumber), newPrimary.port);
+    funWithArgs(commitTxnFunc, dbName, prepareTimestamp, lsid, txnNumber),
+    newPrimary.port,
+);
 
 failPoint.wait();
 
@@ -190,9 +203,9 @@ jsTestLog("Transaction is blocked on failpoint in the middle of a split transact
 
 // 4) Test that reads (under certain read concerns) would be blocked on prepare conflicts.
 {
-    const shortTimeout = 1 * 1000;  // 1 second.
+    const shortTimeout = 1 * 1000; // 1 second.
     const longTimeout = ReplSetTest.kForeverMillis;
-    const read = function(readConcern, timeout) {
+    const read = function (readConcern, timeout) {
         return testDB.runCommand({
             find: collName,
             filter: {y: 1},
@@ -202,31 +215,31 @@ jsTestLog("Transaction is blocked on failpoint in the middle of a split transact
     };
 
     jsTestLog("Test read with read concern 'local' doesn't block on prepared conflicts.");
-    assert.commandWorked(read({level: 'local'}, longTimeout));
+    assert.commandWorked(read({level: "local"}, longTimeout));
 
     jsTestLog("Test read with read concern 'majority' doesn't block on prepared conflicts.");
-    assert.commandWorked(read({level: 'majority'}, longTimeout));
+    assert.commandWorked(read({level: "majority"}, longTimeout));
 
     jsTestLog("Test read with read concern 'linearizable' blocks on prepared conflicts.");
-    assert.commandFailedWithCode(read({level: 'linearizable'}, shortTimeout),
-                                 ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(read({level: "linearizable"}, shortTimeout), ErrorCodes.MaxTimeMSExpired);
 
     jsTestLog("Test afterClusterTime read after prepareTimestamp blocks on prepare conflicts.");
     assert.commandFailedWithCode(
-        read({level: 'local', afterClusterTime: prepareTimestamp}, shortTimeout),
-        ErrorCodes.MaxTimeMSExpired);
+        read({level: "local", afterClusterTime: prepareTimestamp}, shortTimeout),
+        ErrorCodes.MaxTimeMSExpired,
+    );
 
     jsTestLog("Test snapshot read at prepareTimestamp blocks on prepare conflicts.");
     assert.commandFailedWithCode(
-        read({level: 'snapshot', atClusterTime: prepareTimestamp}, shortTimeout),
-        ErrorCodes.MaxTimeMSExpired);
+        read({level: "snapshot", atClusterTime: prepareTimestamp}, shortTimeout),
+        ErrorCodes.MaxTimeMSExpired,
+    );
 }
 
 // 5) Restart the new primary node and wait for it to be a primary again.
 jsTestLog("Restarting the primary node");
 // Restart newPrimary.
-replTest.stop(
-    newPrimary, 9 /* signal */, {forRestart: true, allowedExitCode: MongoRunner.EXIT_SIGKILL});
+replTest.stop(newPrimary, 9 /* signal */, {forRestart: true, allowedExitCode: MongoRunner.EXIT_SIGKILL});
 replTest.start(newPrimary, {waitForConnect: true}, true /* waitForHealth */);
 jsTestLog("Restarted the primary node");
 
@@ -261,12 +274,14 @@ testColl = testDB.getCollection(collName);
 
 // 6) Commit the (split) prepared transaction again.
 jsTestLog("Committing transaction (this one is expected to succeed)");
-assert.commandWorked(sessionDB.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: prepareTimestamp,
-    txnNumber: txnNumber,
-    autocommit: false,
-}));
+assert.commandWorked(
+    sessionDB.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: prepareTimestamp,
+        txnNumber: txnNumber,
+        autocommit: false,
+    }),
+);
 
 checkTransaction(sessionDB, lsid, txnNumber, "committed");
 

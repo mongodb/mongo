@@ -67,8 +67,8 @@ cursor = oplog.find({
         {ts: {$gte: timestamps[2]}},
         {ts: {$gt: timestamps[3]}},
         {ts: {$lte: timestamps[7]}},
-        {ts: {$lt: timestamps[7]}}
-    ]
+        {ts: {$lt: timestamps[7]}},
+    ],
 });
 assert.eq(4, cursor.next().o["_id"]);
 assert.eq(5, cursor.next().o["_id"]);
@@ -84,8 +84,8 @@ cursor = oplog.find({
         {ts: {$gt: timestamps[2]}},
         {ts: {$eq: timestamps[5]}},
         {ts: {$lte: timestamps[8]}},
-        {ts: {$lt: timestamps[8]}}
-    ]
+        {ts: {$lt: timestamps[8]}},
+    ],
 });
 assert.eq(5, cursor.next().o["_id"]);
 assert(!cursor.hasNext());
@@ -100,8 +100,7 @@ assert.neq(null, collScanStage, "no collection scan found in explain output: " +
 assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), res);
 
 // An AND with an $lt predicate stops scanning after passing the max timestamp.
-res = oplog.find({$and: [{ts: {$gte: timestamps[51]}}, {ts: {$lt: timestamps[60]}}]})
-          .explain("executionStats");
+res = oplog.find({$and: [{ts: {$gte: timestamps[51]}}, {ts: {$lt: timestamps[60]}}]}).explain("executionStats");
 assert.commandWorked(res);
 assert.lte(res.executionStats.totalDocsExamined, res.executionStats.nReturned + 2, res);
 collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
@@ -110,8 +109,7 @@ assert.eq(timestamps[60], longToTs(collScanStage.maxRecord), res);
 assert.eq(timestamps[51], longToTs(collScanStage.minRecord), res);
 
 // An AND with an $lte predicate stops scanning after passing the max timestamp.
-res = oplog.find({$and: [{ts: {$gte: timestamps[51]}}, {ts: {$lte: timestamps[60]}}]})
-          .explain("executionStats");
+res = oplog.find({$and: [{ts: {$gte: timestamps[51]}}, {ts: {$lte: timestamps[60]}}]}).explain("executionStats");
 assert.commandWorked(res);
 assert.lte(res.executionStats.totalDocsExamined, res.executionStats.nReturned + 2, res);
 collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
@@ -121,8 +119,9 @@ assert.eq(timestamps[51], longToTs(collScanStage.minRecord), res);
 
 // The max timestamp is respected even when the min timestamp is smaller than the lowest
 // timestamp in the collection.
-res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[0]}}, {ts: {$lte: timestamps[10]}}]})
-          .explain("executionStats");
+res = oplog
+    .find({$and: [{ns: collNs}, {ts: {$gte: timestamps[0]}}, {ts: {$lte: timestamps[10]}}]})
+    .explain("executionStats");
 assert.commandWorked(res);
 collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
@@ -131,16 +130,16 @@ assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), res);
 // An AND with redundant $eq/$lt/$lte predicates stops scanning after passing the max
 // timestamp.
 res = oplog
-          .find({
-              $and: [
-                  {ns: collNs},
-                  {ts: {$gte: timestamps[0]}},
-                  {ts: {$lte: timestamps[10]}},
-                  {ts: {$eq: timestamps[5]}},
-                  {ts: {$lt: timestamps[20]}}
-              ]
-          })
-          .explain("executionStats");
+    .find({
+        $and: [
+            {ns: collNs},
+            {ts: {$gte: timestamps[0]}},
+            {ts: {$lte: timestamps[10]}},
+            {ts: {$eq: timestamps[5]}},
+            {ts: {$lt: timestamps[20]}},
+        ],
+    })
+    .explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the entry with a 'ts' of 5.
 collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
@@ -158,8 +157,9 @@ assert.eq(makeTS(200), longToTs(collScanStage.maxRecord), res);
 
 // When the filter matches the last document within the timestamp range, the collection scan
 // examines at most one more document.
-res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[4]}}, {ts: {$lte: timestamps[8]}}]})
-          .explain("executionStats");
+res = oplog
+    .find({$and: [{ns: collNs}, {ts: {$gte: timestamps[4]}}, {ts: {$lte: timestamps[8]}}]})
+    .explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the start of the 'ts' range.
 collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");
@@ -178,25 +178,26 @@ assert.eq(timestamps[4], longToTs(collScanStage.maxRecord), res);
 res = oplog.find({ns: collNs, ts: {$lte: timestamps[4]}}).projection({op: 0});
 while (res.hasNext()) {
     const next = res.next();
-    assert(!next.hasOwnProperty('op'));
-    assert(next.hasOwnProperty('ts'));
+    assert(!next.hasOwnProperty("op"));
+    assert(next.hasOwnProperty("ts"));
 }
 res = res.explain("executionStats");
 assert.commandWorked(res);
 
-res = oplog.find({ns: collNs, ts: {$gte: timestamps[90]}}).projection({'op': 0});
+res = oplog.find({ns: collNs, ts: {$gte: timestamps[90]}}).projection({"op": 0});
 while (res.hasNext()) {
     const next = res.next();
-    assert(!next.hasOwnProperty('op'));
-    assert(next.hasOwnProperty('ts'));
+    assert(!next.hasOwnProperty("op"));
+    assert(next.hasOwnProperty("ts"));
 }
 res = res.explain("executionStats");
 assert.commandWorked(res);
 
 // Oplog replay optimization should work with limit.
-res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[4]}}, {ts: {$lte: timestamps[8]}}]})
-          .limit(2)
-          .explain("executionStats");
+res = oplog
+    .find({$and: [{ns: collNs}, {ts: {$gte: timestamps[4]}}, {ts: {$lte: timestamps[8]}}]})
+    .limit(2)
+    .explain("executionStats");
 assert.commandWorked(res);
 assert.eq(2, res.executionStats.totalDocsExamined);
 collScanStage = getPlanStage(res.executionStats.executionStages, "COLLSCAN");
@@ -214,20 +215,21 @@ assert.commandWorked(oplog.runCommand({find: oplog.getName(), oplogReplay: true}
 // 'oplogreplay' flag is allowed but ignored on capped collections.
 const cappedColl = testDB.cappedColl_jstests_query_oplogreplay;
 cappedColl.drop();
-assert.commandWorked(
-    testDB.createCollection(cappedColl.getName(), {capped: true, size: 16 * 1024}));
+assert.commandWorked(testDB.createCollection(cappedColl.getName(), {capped: true, size: 16 * 1024}));
 for (let i = 1; i <= 100; i++) {
     assert.commandWorked(cappedColl.insert({_id: i, ts: makeTS(i)}));
 }
-res = cappedColl.runCommand(
-    {explain: {find: cappedColl.getName(), filter: {ts: {$eq: makeTS(200)}}, oplogReplay: true}});
+res = cappedColl.runCommand({
+    explain: {find: cappedColl.getName(), filter: {ts: {$eq: makeTS(200)}}, oplogReplay: true},
+});
 assert.commandWorked(res);
 assert.eq(res.executionStats.totalDocsExamined, 100);
 
 // Ensure oplog replay hack does not work for backward scans.
-res = oplog.find({ns: collNs, ts: {$lt: timestamps[4]}})
-          .sort({$natural: -1})
-          .explain("executionStats");
+res = oplog
+    .find({ns: collNs, ts: {$lt: timestamps[4]}})
+    .sort({$natural: -1})
+    .explain("executionStats");
 assert.commandWorked(res);
 assert.gte(res.executionStats.totalDocsExamined, 100, res);
 collScanStage = getPlanStage(getWinningPlanFromExplain(res), "COLLSCAN");

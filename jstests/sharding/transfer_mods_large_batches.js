@@ -6,9 +6,7 @@
  *
  * @tags: [uses_transactions]
  */
-import {
-    withRetryOnTransientTxnErrorIncrementTxnNum
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnErrorIncrementTxnNum} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {
     moveChunkParallel,
     moveChunkStepNames,
@@ -20,7 +18,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
-const staticMongod = MongoRunner.runMongod({});  // Mongod used for startParallelOps().
+const staticMongod = MongoRunner.runMongod({}); // Mongod used for startParallelOps().
 const st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}});
 
 const dbName = "test";
@@ -48,7 +46,7 @@ function insertLargeDocsInTransaction(collection, docIds, shardKey) {
                 documents: [docToInsert],
                 lsid: lsid,
                 txnNumber: NumberLong(txnNum),
-                autocommit: false
+                autocommit: false,
             };
 
             if (i === 0) {
@@ -58,26 +56,36 @@ function insertLargeDocsInTransaction(collection, docIds, shardKey) {
             assert.commandWorked(collection.runCommand("insert", commandObj));
         }
 
-        assert.commandWorked(collection.getDB().adminCommand(
-            {commitTransaction: 1, lsid: lsid, txnNumber: NumberLong(txnNum), autocommit: false}));
+        assert.commandWorked(
+            collection
+                .getDB()
+                .adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: NumberLong(txnNum), autocommit: false}),
+        );
     });
 }
 
-assert.commandWorked(collection.insert([
-    {_id: 1, x: -2, note: "keep out of chunk range being migrated"},
-    {_id: 2, x: 100, note: "keep in chunk range being migrated"},
-]));
+assert.commandWorked(
+    collection.insert([
+        {_id: 1, x: -2, note: "keep out of chunk range being migrated"},
+        {_id: 2, x: 100, note: "keep in chunk range being migrated"},
+    ]),
+);
 
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 const fp = configureFailPoint(st.shard1.rs.getPrimary(), "migrateThreadHangAfterSteadyTransition");
 
 const joinMoveChunk = moveChunkParallel(
-    staticMongod, st.s.host, {x: 1}, undefined, collection.getFullName(), st.shard1.shardName);
+    staticMongod,
+    st.s.host,
+    {x: 1},
+    undefined,
+    collection.getFullName(),
+    st.shard1.shardName,
+);
 
 waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 insertLargeDocsInTransaction(collection, [{_id: 3}, {_id: 4}], {x: -1000});
-assert.commandWorked(
-    collection.insert({_id: 5, x: 1, note: "inserted into range after large _transferMods"}));
+assert.commandWorked(collection.insert({_id: 5, x: 1, note: "inserted into range after large _transferMods"}));
 
 unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
@@ -119,14 +127,14 @@ const expected = new ArrayCursor([
 
 const diff = ((diff) => {
     return {
-        docsWithDifferentContents: diff.docsWithDifferentContents.map(
-            ({first, second}) => ({expected: first, actual: second})),
+        docsWithDifferentContents: diff.docsWithDifferentContents.map(({first, second}) => ({
+            expected: first,
+            actual: second,
+        })),
         docsExtraAfterMigration: diff.docsMissingOnFirst,
         docsMissingAfterMigration: diff.docsMissingOnSecond,
     };
-})(
-    DataConsistencyChecker.getDiff(
-        expected, collection.find({}, {_id: 1, x: 1, note: 1}).sort({_id: 1, x: 1})));
+})(DataConsistencyChecker.getDiff(expected, collection.find({}, {_id: 1, x: 1, note: 1}).sort({_id: 1, x: 1})));
 
 assert.eq(diff, {
     docsWithDifferentContents: [],

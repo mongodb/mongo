@@ -2,7 +2,7 @@
 
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
-requireSSLProvider('openssl', function() {
+requireSSLProvider("openssl", function () {
     const baseName = "jstests_ssl_ssl_options";
 
     jsTest.log("Testing censorship of ssl options");
@@ -12,7 +12,7 @@ requireSSLProvider('openssl', function() {
         tlsMode: "requireTLS",
         tlsCertificateKeyFilePassword: "qwerty",
         tlsClusterPassword: "qwerty",
-        tlsCAFile: "jstests/libs/ca.pem"
+        tlsCAFile: "jstests/libs/ca.pem",
     };
     const mongodSource = MongoRunner.runMongod(mongodConfig);
 
@@ -22,25 +22,33 @@ requireSSLProvider('openssl', function() {
     let isPassword = false;
     for (i = 0; i < getCmdLineOptsResult.argv.length; i++) {
         if (isPassword) {
-            assert.eq(getCmdLineOptsResult.argv[i],
-                      "<password>",
-                      "Password not properly censored: " + tojson(getCmdLineOptsResult));
+            assert.eq(
+                getCmdLineOptsResult.argv[i],
+                "<password>",
+                "Password not properly censored: " + tojson(getCmdLineOptsResult),
+            );
             isPassword = false;
             continue;
         }
 
-        if (getCmdLineOptsResult.argv[i] === "--tlsPEMKeyPassword" ||
-            getCmdLineOptsResult.argv[i] === "--tlsClusterPassword") {
+        if (
+            getCmdLineOptsResult.argv[i] === "--tlsPEMKeyPassword" ||
+            getCmdLineOptsResult.argv[i] === "--tlsClusterPassword"
+        ) {
             isPassword = true;
         }
     }
 
-    assert.eq(getCmdLineOptsResult.parsed.net.tls.certificateKeyFilePassword,
-              "<password>",
-              "Password not properly censored: " + tojson(getCmdLineOptsResult));
-    assert.eq(getCmdLineOptsResult.parsed.net.tls.clusterPassword,
-              "<password>",
-              "Password not properly censored: " + tojson(getCmdLineOptsResult));
+    assert.eq(
+        getCmdLineOptsResult.parsed.net.tls.certificateKeyFilePassword,
+        "<password>",
+        "Password not properly censored: " + tojson(getCmdLineOptsResult),
+    );
+    assert.eq(
+        getCmdLineOptsResult.parsed.net.tls.clusterPassword,
+        "<password>",
+        "Password not properly censored: " + tojson(getCmdLineOptsResult),
+    );
 
     MongoRunner.stopMongod(mongodSource);
 

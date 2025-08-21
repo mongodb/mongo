@@ -9,13 +9,13 @@
 import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
 // Run TTL monitor constantly to speed up this test.
-const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
+const conn = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
 
 const dbName = jsTestName();
 const replicatedDB = conn.getDB(dbName);
-const replicatedColl = replicatedDB.getCollection('coll');
-const nonReplicatedDB = conn.getDB('local');
-const nonReplicatedColl = nonReplicatedDB.getCollection('coll');
+const replicatedColl = replicatedDB.getCollection("coll");
+const nonReplicatedDB = conn.getDB("local");
+const nonReplicatedColl = nonReplicatedDB.getCollection("coll");
 
 // Set expireAfterSeconds to a day to safely test that only expired documents are deleted.
 const expireAfterSeconds = 60 * 60 * 24;
@@ -85,15 +85,20 @@ const insertAndValidateTTL = (coll, ttlFieldName) => {
 };
 
 jsTest.log(`Test TTL on cluster key _id`);
-assert.commandWorked(replicatedDB.createCollection(
-    replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}, expireAfterSeconds}));
+assert.commandWorked(
+    replicatedDB.createCollection(replicatedColl.getName(), {
+        clusteredIndex: {key: {_id: 1}, unique: true},
+        expireAfterSeconds,
+    }),
+);
 insertAndValidateTTL(replicatedColl, "_id");
 replicatedColl.drop();
 
 jsTest.log(`Test TTL on secondary index`);
 // The collection is clustered, but not TTL on cluster key _id.
-assert.commandWorked(replicatedDB.createCollection(
-    replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(
+    replicatedDB.createCollection(replicatedColl.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}),
+);
 assert.commandWorked(replicatedColl.createIndex({ttlField: 1}, {expireAfterSeconds}));
 insertAndValidateTTL(replicatedColl, "ttlField");
 replicatedColl.drop();

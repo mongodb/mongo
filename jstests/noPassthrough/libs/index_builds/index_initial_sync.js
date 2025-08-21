@@ -4,7 +4,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
-export var IndexInitialSyncTest = function(options) {
+export var IndexInitialSyncTest = function (options) {
     if (!(this instanceof IndexInitialSyncTest)) {
         return new IndexInitialSyncTest(options);
     }
@@ -17,7 +17,7 @@ export var IndexInitialSyncTest = function(options) {
     /**
      * Runs the test.
      */
-    this.run = function() {
+    this.run = function () {
         const options = this.options;
 
         jsTestLog("IndexInitialSyncTest - " + tojson(options));
@@ -29,15 +29,15 @@ export var IndexInitialSyncTest = function(options) {
         rst.initiate();
 
         const primary = rst.getPrimary();
-        const testDB = primary.getDB('test');
-        const coll = testDB.getCollection('test');
+        const testDB = primary.getDB("test");
+        const coll = testDB.getCollection("test");
 
         assert.commandWorked(coll.insert({a: 1}));
 
         IndexBuildTest.pauseIndexBuilds(primary);
 
         const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
-        IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
+        IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1");
 
         // Restart the secondary with a clean data directory to start the initial sync process.
         const secondary = rst.restart(1, {
@@ -52,8 +52,7 @@ export var IndexInitialSyncTest = function(options) {
         const secondaryDB = secondary.getDB(testDB.getName());
         const secondaryColl = secondaryDB.getCollection(coll.getName());
         try {
-            IndexBuildTest.assertIndexes(
-                secondaryColl, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true});
+            IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
         } finally {
             IndexBuildTest.resumeIndexBuilds(primary);
         }
@@ -62,10 +61,10 @@ export var IndexInitialSyncTest = function(options) {
 
         createIdx();
 
-        IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+        IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 
         rst.awaitReplication();
-        IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
+        IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"]);
 
         rst.stopSet();
     };

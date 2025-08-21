@@ -24,7 +24,7 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
 });
 rst.startSet();
 rst.initiate();
@@ -39,8 +39,7 @@ for (let i = 0; i < 10; i++) {
 }
 
 // Hang the collection scan phase of the index build when it's halfway finished.
-let fp = configureFailPoint(
-    primary, "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", {fieldsToMatch: {a: 5}});
+let fp = configureFailPoint(primary, "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", {fieldsToMatch: {a: 5}});
 
 const awaitCreateIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 fp.wait();
@@ -62,11 +61,11 @@ assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: config,
 
 fp.off();
 checkLog.containsJson(primary, 5470300, {
-    error: function(error) {
+    error: function (error) {
         return error.code === ErrorCodes.ReadConcernMajorityNotAvailableYet;
-    }
-});                                                         // Collection scan restarted.
-checkLog.containsJson(primary, 20391, {totalRecords: 10});  // Collection scan complete.
+    },
+}); // Collection scan restarted.
+checkLog.containsJson(primary, 20391, {totalRecords: 10}); // Collection scan complete.
 
 awaitCreateIndex();
 

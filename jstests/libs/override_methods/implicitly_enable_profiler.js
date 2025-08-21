@@ -20,20 +20,19 @@ if (topology.type === Topology.kReplicaSet) {
     hosts.push(...topology.nodes);
     new ReplSetTest(topology.nodes[0]).awaitSecondaryNodes();
 } else {
-    throw new Error("Can only enabling profiler on a replica set. Unrecognized topology format: " +
-                    tojson(topology));
+    throw new Error("Can only enabling profiler on a replica set. Unrecognized topology format: " + tojson(topology));
 }
 jsTest.log.info("Implicitly enabling profiler", {hosts});
 
-function runCommandAfterEnablingProfiler(
-    conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandAfterEnablingProfiler(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     if (!excludedCommandNames.includes(commandName) && !enabledDbNames.has(dbName)) {
         // Implicitly enable profiling for this database on all the nodes in the replica set.
-        hosts.forEach(host => {
+        hosts.forEach((host) => {
             const conn = new Mongo(host);
-            assert.commandWorkedOrFailedWithCode(
-                func.apply(conn, makeFuncArgs({profile: 2})),
-                [ErrorCodes.InvalidNamespace, ErrorCodes.DatabaseDifferCase]);
+            assert.commandWorkedOrFailedWithCode(func.apply(conn, makeFuncArgs({profile: 2})), [
+                ErrorCodes.InvalidNamespace,
+                ErrorCodes.DatabaseDifferCase,
+            ]);
         });
         enabledDbNames.add(dbName);
     }
@@ -56,8 +55,10 @@ function runCommandAfterEnablingProfiler(
         }
     }
     if (commandName == "aggregate") {
-        if (OverrideHelpers.isAggregationWithInternalListCollections(commandName, commandObj) ||
-            OverrideHelpers.isAggregationWithListClusterCatalog(commandName, commandObj)) {
+        if (
+            OverrideHelpers.isAggregationWithInternalListCollections(commandName, commandObj) ||
+            OverrideHelpers.isAggregationWithListClusterCatalog(commandName, commandObj)
+        ) {
             // Note that $match will be optimized and pushed on top of the pipeline.
             commandObj.pipeline.push({$match: {ns: {$not: /system.profile/}}});
         }
@@ -65,7 +66,6 @@ function runCommandAfterEnablingProfiler(
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicitly_enable_profiler.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicitly_enable_profiler.js");
 
 OverrideHelpers.overrideRunCommand(runCommandAfterEnablingProfiler);

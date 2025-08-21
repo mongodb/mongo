@@ -53,14 +53,13 @@ assert.commandWorked(coll.createIndex({a: 1}));
 
 const filter = {
     a: 1,
-    b: 1
+    b: 1,
 };
 const cacheKey = getPlanCacheKeyFromShape({query: filter, collection: coll, db: db});
 
 function createCacheEntry() {
     assert.eq(0, coll.find(filter).itcount());
-    const cacheContents =
-        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: cacheKey}}]).toArray();
+    const cacheContents = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: cacheKey}}]).toArray();
     // We expect to see a single SBE cache entry.
     assert.eq(cacheContents.length, 1, cacheContents);
     const cacheEntry = cacheContents[0];

@@ -6,19 +6,19 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var doTest = function(mongo, callSetParam) {
-    var TEST_USER = 'foo';
-    var TEST_PWD = 'bar';
-    var testDB = mongo.getDB('test');
+var doTest = function (mongo, callSetParam) {
+    var TEST_USER = "foo";
+    var TEST_PWD = "bar";
+    var testDB = mongo.getDB("test");
 
     testDB.createUser({user: TEST_USER, pwd: TEST_PWD, roles: jsTest.basicUserRoles});
     testDB.auth(TEST_USER, TEST_PWD);
 
     testDB.runCommand({dbStats: 1});
 
-    var log = testDB.adminCommand({getLog: 'global'});
-    log.log.forEach(function(line) {
-        assert.eq(-1, line.indexOf('user: foo@'), 'user logged: ' + line);
+    var log = testDB.adminCommand({getLog: "global"});
+    log.log.forEach(function (line) {
+        assert.eq(-1, line.indexOf("user: foo@"), "user logged: " + line);
     });
 
     // logUserIds should not be settable
@@ -27,9 +27,9 @@ var doTest = function(mongo, callSetParam) {
 
     testDB.runCommand({dbStats: 1});
 
-    log = testDB.adminCommand({getLog: 'global'});
-    log.log.forEach(function(line) {
-        assert.eq(-1, line.indexOf('user: foo@'), 'user logged: ' + line);
+    log = testDB.adminCommand({getLog: "global"});
+    log.log.forEach(function (line) {
+        assert.eq(-1, line.indexOf("user: foo@"), "user logged: " + line);
     });
 };
 

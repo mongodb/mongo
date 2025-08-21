@@ -60,7 +60,7 @@ rst.stopSet();
 //
 // Start a mongod.
 let conn = MongoRunner.runMongod();
-assert.neq(null, conn, 'mongod was unable to start up');
+assert.neq(null, conn, "mongod was unable to start up");
 let db = conn.getDB(dbName);
 db.coll.drop();
 

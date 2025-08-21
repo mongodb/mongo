@@ -61,10 +61,10 @@ assert(cursor.hasNext());
 assert.eq(7, cursor.next()["_id"]);
 
 // Tailable with negative limit is an error.
-assert.throws(function() {
+assert.throws(function () {
     t.find().addOption(2).limit(-100).next();
 });
-assert.throws(function() {
+assert.throws(function () {
     t.find().addOption(2).limit(-1).itcount();
 });
 

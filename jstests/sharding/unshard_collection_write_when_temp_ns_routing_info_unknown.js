@@ -18,8 +18,7 @@ reshardingTest.setup();
 
 const testCases = [
     {
-        desc: "Test ordinary insert when donor does not have temporary resharding collection " +
-            "routing info cached",
+        desc: "Test ordinary insert when donor does not have temporary resharding collection " + "routing info cached",
         ns: "unshardDb.coll_no_txn",
         opFn: (sourceCollection) => {
             const docToInsert = {_id: 0, oldKey: 5};
@@ -28,14 +27,16 @@ const testCases = [
         },
     },
     {
-        desc: ("Test insert in a multi-statement transaction when donor does not have temporary " +
-               "resharding collection routing info cached"),
+        desc:
+            "Test insert in a multi-statement transaction when donor does not have temporary " +
+            "resharding collection routing info cached",
         ns: "unshardDb.coll_in_txn_first_stmt",
         opFn: (sourceCollection) => {
             const mongos = sourceCollection.getMongo();
             const session = mongos.startSession();
-            const sessionCollection = session.getDatabase(sourceCollection.getDB().getName())
-                                          .getCollection(sourceCollection.getName());
+            const sessionCollection = session
+                .getDatabase(sourceCollection.getDB().getName())
+                .getCollection(sourceCollection.getName());
 
             const docToInsert = {_id: 0, oldKey: 5};
             withTxnAndAutoRetryOnMongos(session, () => {
@@ -45,17 +46,18 @@ const testCases = [
         },
     },
     {
-        desc: ("Test insert in second statement of a multi-statement transaction when donor does " +
-               "not have temporary resharding collection routing info cached"),
+        desc:
+            "Test insert in second statement of a multi-statement transaction when donor does " +
+            "not have temporary resharding collection routing info cached",
         ns: "unshardDb.coll_in_txn_second_stmt",
         opFn: (sourceCollection) => {
             const mongos = sourceCollection.getMongo();
             const session = mongos.startSession();
-            const sessionCollection = session.getDatabase(sourceCollection.getDB().getName())
-                                          .getCollection(sourceCollection.getName());
+            const sessionCollection = session
+                .getDatabase(sourceCollection.getDB().getName())
+                .getCollection(sourceCollection.getName());
 
-            const sessionCollectionB =
-                session.getDatabase(sourceCollection.getDB().getName()).getCollection('foo');
+            const sessionCollectionB = session.getDatabase(sourceCollection.getDB().getName()).getCollection("foo");
             assert.commandWorked(sessionCollectionB.insert({a: 1}));
 
             const docToInsert = {_id: 0, oldKey: 5};
@@ -65,7 +67,7 @@ const testCases = [
             });
             assert.eq(sourceCollection.findOne({_id: 0}), docToInsert);
         },
-    }
+    },
 ];
 
 for (const {desc, ns, opFn} of testCases) {
@@ -83,23 +85,22 @@ for (const {desc, ns, opFn} of testCases) {
     const donor0 = new Mongo(topology.shards[donorShardNames[0]].primary);
 
     const recipientShardNames = reshardingTest.recipientShardNames;
-    reshardingTest.withUnshardCollectionInBackground(
-        {toShard: recipientShardNames[0]}, (tempNs) => {
-            // Wait for the recipients to have finished cloning so the temporary resharding
-            // collection is known to exist.
-            assert.soon(() => {
-                const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                    ns: sourceCollection.getFullName()
-                });
-
-                return coordinatorDoc !== null && coordinatorDoc.state === "applying";
+    reshardingTest.withUnshardCollectionInBackground({toShard: recipientShardNames[0]}, (tempNs) => {
+        // Wait for the recipients to have finished cloning so the temporary resharding
+        // collection is known to exist.
+        assert.soon(() => {
+            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
+                ns: sourceCollection.getFullName(),
             });
 
-            // Make the routing info for the temporary sharding collection unknown
-            donor0.adminCommand({flushRouterConfig: tempNs});
-
-            opFn(sourceCollection);
+            return coordinatorDoc !== null && coordinatorDoc.state === "applying";
         });
+
+        // Make the routing info for the temporary sharding collection unknown
+        donor0.adminCommand({flushRouterConfig: tempNs});
+
+        opFn(sourceCollection);
+    });
 }
 
 reshardingTest.teardown();

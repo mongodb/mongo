@@ -36,7 +36,7 @@ function testPaginationInLookup(mongotConn, db, coll) {
         collectionUUID: collUUID,
         query: searchQuery,
         $db: "test",
-        cursorOptions: {requiresSearchSequenceToken: true}
+        cursorOptions: {requiresSearchSequenceToken: true},
     };
 
     const cursorId = NumberLong(124);
@@ -55,19 +55,19 @@ function testPaginationInLookup(mongotConn, db, coll) {
                     {_id: 6, $searchSequenceToken: "fffffff=="},
                     {_id: 7, $searchSequenceToken: "ggggggg=="},
                     {_id: 8, $searchSequenceToken: "hhhhhhh=="},
-                ]
+                ],
             },
-            ok: 1
-        }
+            ok: 1,
+        },
     };
 
     let history = [historyObj];
     for (let i = 0; i < 8; i++) {
-        assert.commandWorked(mongotConn.adminCommand(
-            {setMockResponses: 1, cursorId: NumberLong(cursorId + i), history: history}));
-
         assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(cursorId + i), history: history}),
+        );
+
+        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
     }
     const pipeline = [
         {
@@ -83,11 +83,11 @@ function testPaginationInLookup(mongotConn, db, coll) {
                         "$project": {
                             "name": 1,
                             "paginationToken": {"$meta": "searchSequenceToken"},
-                            "score": {$meta: "searchScore"}
-                        }
-                    }
-                ]
-            }
+                            "score": {$meta: "searchScore"},
+                        },
+                    },
+                ],
+            },
         },
     ];
     let cursor = coll.aggregate(pipeline);
@@ -100,7 +100,7 @@ function testPaginationInLookup(mongotConn, db, coll) {
         {"_id": 5, "test": 100, "JoinedIDs": [{"_id": 5, "paginationToken": "eeeeeee=="}]},
         {"_id": 6, "test": 100, "JoinedIDs": [{"_id": 6, "paginationToken": "fffffff=="}]},
         {"_id": 7, "test": 10, "JoinedIDs": [{"_id": 7, "paginationToken": "ggggggg=="}]},
-        {"_id": 8, "test": 100, "JoinedIDs": [{"_id": 8, "paginationToken": "hhhhhhh=="}]}
+        {"_id": 8, "test": 100, "JoinedIDs": [{"_id": 8, "paginationToken": "hhhhhhh=="}]},
     ];
 
     assert.eq(expectedResults, cursor.toArray());
@@ -113,8 +113,9 @@ const mongotmockClassic = new MongotMock();
 mongotmockClassic.start();
 const mongotConnClassic = mongotmockClassic.getConnection();
 
-const connClassic = MongoRunner.runMongod(
-    {setParameter: {mongotHost: mongotConnClassic.host, featureFlagSearchInSbe: false}});
+const connClassic = MongoRunner.runMongod({
+    setParameter: {mongotHost: mongotConnClassic.host, featureFlagSearchInSbe: false},
+});
 const dbClassic = connClassic.getDB("test");
 const collClassic = dbClassic[jsTestName()];
 insertDocs(collClassic);

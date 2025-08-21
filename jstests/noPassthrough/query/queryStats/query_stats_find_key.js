@@ -6,7 +6,7 @@
 import {
     getLatestQueryStatsEntry,
     runCommandAndValidateQueryStats,
-    withQueryStatsEnabled
+    withQueryStatsEnabled,
 } from "jstests/libs/query/query_stats_utils.js";
 
 const collName = jsTestName();
@@ -34,7 +34,7 @@ const findCommandObj = {
     readConcern: {level: "local"},
     batchSize: 2,
     singleBatch: true,
-    let : {},
+    let: {},
     projection: {_id: 0},
     apiDeprecationErrors: false,
     apiVersion: "1",
@@ -59,7 +59,7 @@ const queryShapeFindFields = [
     "awaitData",
     "collation",
     "allowDiskUse",
-    "let"
+    "let",
 ];
 
 // The outer fields not nested inside queryShape.
@@ -76,7 +76,7 @@ const findKeyFields = [
     "apiStrict",
     "collectionType",
     "client",
-    "hint"
+    "hint",
 ];
 
 /**
@@ -90,10 +90,12 @@ function validateInvalidHint(testDB) {
     var coll = testDB[collName];
     coll.drop();
     // $hint is supposed to be a string or object, but this works:
-    assert.commandWorked(testDB.runCommand({
-        find: collName,
-        hint: {$hint: -1.0},
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            find: collName,
+            hint: {$hint: -1.0},
+        }),
+    );
     const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: collName});
     assert.eq(entry.key.hint, {$hint: "?number"});
 }

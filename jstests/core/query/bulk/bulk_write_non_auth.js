@@ -29,15 +29,14 @@ let res = db.adminCommand({
             updateMods: {$set: {skey: "MongoDB2"}},
         },
     ],
-    nsInfo: [{ns: "test.system.profile"}]
+    nsInfo: [{ns: "test.system.profile"}],
 });
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
 assert.eq(res.nErrors, 1, "bulkWrite command response: " + tojson(res));
 
-cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.InvalidNamespace});
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.InvalidNamespace});
 
 // Test delete fails userAllowedWriteNS.
 res = db.adminCommand({
@@ -48,15 +47,14 @@ res = db.adminCommand({
             filter: {_id: 1},
         },
     ],
-    nsInfo: [{ns: "test.system.profile"}]
+    nsInfo: [{ns: "test.system.profile"}],
 });
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
 assert.eq(res.nErrors, 1, "bulkWrite command response: " + tojson(res));
 
-cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
 
 // Test delete continues on error with ordered:false.
 assert.commandWorked(coll.insert({_id: 1, skey: "MongoDB"}));
@@ -67,18 +65,17 @@ res = db.adminCommand({
             delete: 0,
             filter: {_id: 0},
         },
-        {delete: 1, filter: {_id: 1}}
+        {delete: 1, filter: {_id: 1}},
     ],
     nsInfo: [{ns: "test.system.profile"}, {ns: "test.coll"}],
-    ordered: false
+    ordered: false,
 });
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
 assert.eq(res.nErrors, 1, "bulkWrite command response: " + tojson(res));
 
-cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 
 assert(!coll.findOne());
@@ -104,8 +101,7 @@ assert.commandWorked(res);
 cursorSizeValidator(res, 1);
 assert.eq(res.nErrors, 1, "bulkWrite command response: " + tojson(res));
 
-cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
 
 assert.eq(coll.findOne().skey, "MongoDB");
 
@@ -127,7 +123,7 @@ res = db.adminCommand({
         {update: 0, filter: {_id: 0}, updateMods: {$blah: {x: 1}}},
     ],
     nsInfo: [{ns: "test.coll"}, {ns: "test.system.profile"}],
-    ordered: false
+    ordered: false,
 });
 
 assert.commandWorked(res);

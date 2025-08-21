@@ -11,7 +11,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {getRentalData, getRentalSearchIndexSpec} from "jstests/with_mongot/e2e_lib/data/rentals.js";
 
@@ -39,31 +39,31 @@ const vectorStageSpec = {
     limit: limit,
 };
 const vectorStage = {
-    $vectorSearch: vectorStageSpec
+    $vectorSearch: vectorStageSpec,
 };
 
 const searchStageSpec = {
     index: getMovieSearchIndexSpec().name,
     text: {query: "ape", path: ["fullplot", "title"]},
-    scoreDetails: true
+    scoreDetails: true,
 };
 
 const searchStage = {
-    $search: searchStageSpec
+    $search: searchStageSpec,
 };
 
 const searchStageSpecNoDetails = {
     index: getMovieSearchIndexSpec().name,
     text: {query: "ape", path: ["fullplot", "title"]},
-    scoreDetails: false
+    scoreDetails: false,
 };
 
 const searchStageNoDetails = {
-    $search: searchStageSpecNoDetails
+    $search: searchStageSpecNoDetails,
 };
 
 const calculateReciprocalRankFusionScore = (weight, rank) => {
-    return (weight * (1 / (60 + rank)));
+    return weight * (1 / (60 + rank));
 };
 
 const scoreDetailsDescription =
@@ -90,8 +90,7 @@ function checkDefaultPipelineScoreDetails(assertFieldPresent, subDetails, pipeli
  * enabled, check the description field is accurate and that the pipeline's scoreDetails aren't
  * empty. Returns the RRF score for this input pipeline.
  */
-function checkSearchScoreDetails(
-    assertFieldPresent, subDetails, pipelineName, weight, isScoreDetails) {
+function checkSearchScoreDetails(assertFieldPresent, subDetails, pipelineName, weight, isScoreDetails) {
     assertFieldPresent("inputPipelineName", subDetails);
     assert.eq(subDetails["inputPipelineName"], pipelineName);
     assertFieldPresent("rank", subDetails);
@@ -100,7 +99,7 @@ function checkSearchScoreDetails(
     if (subDetails.hasOwnProperty("value")) {
         assertFieldPresent("weight", subDetails);
         assert.eq(subDetails["weight"], weight);
-        assertFieldPresent("value", subDetails);  // Output of rank calculation.
+        assertFieldPresent("value", subDetails); // Output of rank calculation.
         assertFieldPresent("details", subDetails);
         if (isScoreDetails) {
             assertFieldPresent("description", subDetails);
@@ -124,11 +123,10 @@ function checkSearchScoreDetails(
  */
 function checkVectorScoreDetails(assertFieldPresent, subDetails, pipelineName, weight) {
     checkDefaultPipelineScoreDetails(assertFieldPresent, subDetails, pipelineName, weight);
-    assertFieldPresent("value", subDetails);  // Original 'score' AKA vectorSearchScore.
+    assertFieldPresent("value", subDetails); // Original 'score' AKA vectorSearchScore.
     assertFieldPresent("details", subDetails);
     assert.eq(subDetails["details"], []);
-    const vectorSearchScore =
-        calculateReciprocalRankFusionScore(subDetails["weight"], subDetails["rank"]);
+    const vectorSearchScore = calculateReciprocalRankFusionScore(subDetails["weight"], subDetails["rank"]);
     return vectorSearchScore;
 }
 
@@ -141,8 +139,7 @@ function checkGeoNearScoreDetails(assertFieldPresent, subDetails, pipelineName, 
     checkDefaultPipelineScoreDetails(assertFieldPresent, subDetails, pipelineName, weight);
     assertFieldPresent("details", subDetails);
     assert.eq(subDetails["details"], []);
-    const geoNearScore =
-        calculateReciprocalRankFusionScore(subDetails["weight"], subDetails["rank"]);
+    const geoNearScore = calculateReciprocalRankFusionScore(subDetails["weight"], subDetails["rank"]);
     return geoNearScore;
 }
 
@@ -166,8 +163,7 @@ function checkOuterScoreDetails(foundDoc, numInputPipelines) {
     assert.eq(details["description"], scoreDetailsDescription);
 
     function assertFieldPresent(field, obj) {
-        assert(fieldPresent(field, obj),
-               `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
+        assert(fieldPresent(field, obj), `Looked for ${field} in ${tojson(obj)}. Full details: ${tojson(details)}`);
     }
     // Description of rank fusion. Wrapper on both search / vector.
     assertFieldPresent("details", details);
@@ -217,7 +213,7 @@ function fieldPresent(field, containingObj) {
                 scoreDetails: true,
             },
         },
-        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
+        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
     ];
 
     const results = coll.aggregate(testQuery).toArray();
@@ -226,11 +222,9 @@ function fieldPresent(field, containingObj) {
         const [assertFieldPresent, subDetails, score] = checkOuterScoreDetails(foundDoc, 2);
 
         const searchDetails = subDetails[0];
-        const searchScore =
-            checkSearchScoreDetails(assertFieldPresent, searchDetails, "search", 2, true);
+        const searchScore = checkSearchScoreDetails(assertFieldPresent, searchDetails, "search", 2, true);
         const vectorDetails = subDetails[1];
-        const vectorSearchScore =
-            checkVectorScoreDetails(assertFieldPresent, vectorDetails, "vector", 1);
+        const vectorSearchScore = checkVectorScoreDetails(assertFieldPresent, vectorDetails, "vector", 1);
         assert.eq(score, searchScore + vectorSearchScore);
     }
 })();
@@ -268,7 +262,7 @@ function fieldPresent(field, containingObj) {
                 scoreDetails: true,
             },
         },
-        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
+        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
     ];
 
     const results = coll.aggregate(testQuery).toArray();
@@ -277,11 +271,14 @@ function fieldPresent(field, containingObj) {
         const [assertFieldPresent, subDetails, score] = checkOuterScoreDetails(foundDoc, 2);
 
         const secondVectorDetails = subDetails[0];
-        const secondVectorSearchScore =
-            checkVectorScoreDetails(assertFieldPresent, secondVectorDetails, "secondVector", 2.8);
+        const secondVectorSearchScore = checkVectorScoreDetails(
+            assertFieldPresent,
+            secondVectorDetails,
+            "secondVector",
+            2.8,
+        );
         const vectorDetails = subDetails[1];
-        const vectorSearchScore =
-            checkVectorScoreDetails(assertFieldPresent, vectorDetails, "vector", 0.5);
+        const vectorSearchScore = checkVectorScoreDetails(assertFieldPresent, vectorDetails, "vector", 0.5);
         assert.eq(score, secondVectorSearchScore + vectorSearchScore);
     }
 })();
@@ -315,13 +312,12 @@ function fieldPresent(field, containingObj) {
         {
             $rankFusion: {
                 input: {
-                    pipelines:
-                        {vector: [vectorStage], search: [searchStageNoDetails, {$limit: limit}]}
+                    pipelines: {vector: [vectorStage], search: [searchStageNoDetails, {$limit: limit}]},
                 },
                 scoreDetails: true,
             },
         },
-        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
+        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
     ];
 
     const results = coll.aggregate(testQuery).toArray();
@@ -330,11 +326,9 @@ function fieldPresent(field, containingObj) {
         const [assertFieldPresent, subDetails, score] = checkOuterScoreDetails(foundDoc, 2);
 
         const searchDetails = subDetails[0];
-        const searchScore =
-            checkSearchScoreDetails(assertFieldPresent, searchDetails, "search", 1, false);
+        const searchScore = checkSearchScoreDetails(assertFieldPresent, searchDetails, "search", 1, false);
         const vectorDetails = subDetails[1];
-        const vectorSearchScore =
-            checkVectorScoreDetails(assertFieldPresent, vectorDetails, "vector", 1);
+        const vectorSearchScore = checkVectorScoreDetails(assertFieldPresent, vectorDetails, "vector", 1);
         assert.eq(score, searchScore + vectorSearchScore);
     }
 })();
@@ -367,7 +361,7 @@ function fieldPresent(field, containingObj) {
                 scoreDetails: true,
             },
         },
-        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
+        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
     ];
 
     const results = coll.aggregate(testQuery).toArray();
@@ -376,8 +370,7 @@ function fieldPresent(field, containingObj) {
         const [assertFieldPresent, subDetails, score] = checkOuterScoreDetails(foundDoc, 1);
 
         const searchDetails = subDetails[0];
-        const searchScore =
-            checkSearchScoreDetails(assertFieldPresent, searchDetails, "search", 1, true);
+        const searchScore = checkSearchScoreDetails(assertFieldPresent, searchDetails, "search", 1, true);
         assert.eq(score, searchScore);
     }
 })();
@@ -391,13 +384,12 @@ function fieldPresent(field, containingObj) {
         {
             $rankFusion: {
                 input: {
-                    pipelines:
-                        {vector: [vectorStage], search: [searchStageNoDetails, {$limit: limit}]}
+                    pipelines: {vector: [vectorStage], search: [searchStageNoDetails, {$limit: limit}]},
                 },
                 scoreDetails: false,
             },
         },
-        {$project: {score: {$meta: "score"}}}
+        {$project: {score: {$meta: "score"}}},
     ];
 
     const results = coll.aggregate(testQuery).toArray();
@@ -423,7 +415,7 @@ function fieldPresent(field, containingObj) {
                 scoreDetails: false,
             },
         },
-        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
+        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
     ];
 
     assertErrCodeAndErrMsgContains(coll, testQuery, 40218, "query requires scoreDetails metadata");
@@ -435,13 +427,15 @@ function fieldPresent(field, containingObj) {
  * out.
  */
 (function testQueryWithoutScoreDetailsMetadataProjectionWorksWhenRankFusionHasNoScoreDetails() {
-    const testQuery = [{
-        $rankFusion: {
-            input: {pipelines: {search: [searchStage, {$limit: limit}]}},
-            combination: {weights: {search: 2}},
-            scoreDetails: false,
+    const testQuery = [
+        {
+            $rankFusion: {
+                input: {pipelines: {search: [searchStage, {$limit: limit}]}},
+                combination: {weights: {search: 2}},
+                scoreDetails: false,
+            },
         },
-    }];
+    ];
 
     assert.commandWorked(db.runCommand({aggregate: collName, pipeline: testQuery, cursor: {}}));
 })();
@@ -455,13 +449,13 @@ function fieldPresent(field, containingObj) {
         {
             $rankFusion: {
                 input: {
-                    pipelines: {matchAndSort: [{$match: {fullplot: "ape"}}, {$sort: {fullplot: 1}}]}
+                    pipelines: {matchAndSort: [{$match: {fullplot: "ape"}}, {$sort: {fullplot: 1}}]},
                 },
                 combination: {weights: {matchAndSort: 2}},
                 scoreDetails: true,
             },
         },
-        {$project: {details: {$meta: "scoreDetails"}}}
+        {$project: {details: {$meta: "scoreDetails"}}},
     ];
     assert.commandWorked(db.runCommand({aggregate: collName, pipeline: testQuery, cursor: {}}));
     const results = coll.aggregate(testQuery).toArray();
@@ -518,29 +512,26 @@ dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});
                                     index: getRentalSearchIndexSpec().name,
                                     text: {
                                         query: "brooklyn",
-                                        path: [
-                                            "name",
-                                            "summary",
-                                            "description",
-                                            "neighborhood_overview",
-                                        ],
+                                        path: ["name", "summary", "description", "neighborhood_overview"],
                                     },
-                                }
+                                },
                             },
-                            {$limit: limit}
+                            {$limit: limit},
                         ],
-                        geoNear: [{
-                            $geoNear: {
-                                near: [-73.97713, 40.68675],
-                            }
-                        }],
-                    }
+                        geoNear: [
+                            {
+                                $geoNear: {
+                                    near: [-73.97713, 40.68675],
+                                },
+                            },
+                        ],
+                    },
                 },
                 combination: {weights: {geoNear: 2}},
                 scoreDetails: true,
             },
         },
-        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}}
+        {$project: {score: {$meta: "score"}, details: {$meta: "scoreDetails"}}},
     ];
     assert.commandWorked(db.runCommand({aggregate: collName, pipeline: testQuery, cursor: {}}));
     const results = coll.aggregate(testQuery).toArray();
@@ -548,12 +539,10 @@ dropSearchIndex(coll, {name: getMovieVectorSearchIndexSpec().name});
         const [assertFieldPresent, subDetails, score] = checkOuterScoreDetails(foundDoc, 2);
 
         // Check geoNear input pipeline details.
-        const geoNearScore =
-            checkGeoNearScoreDetails(assertFieldPresent, subDetails[0], "geoNear", 2);
+        const geoNearScore = checkGeoNearScoreDetails(assertFieldPresent, subDetails[0], "geoNear", 2);
 
         // Check search input pipeline details.
-        const searchScore =
-            checkSearchScoreDetails(assertFieldPresent, subDetails[1], "search", 1, false);
+        const searchScore = checkSearchScoreDetails(assertFieldPresent, subDetails[1], "search", 1, false);
 
         assert.eq(score, geoNearScore + searchScore);
     }

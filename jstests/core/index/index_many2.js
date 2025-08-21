@@ -2,9 +2,7 @@
 // collection.
 // @tags: [assumes_no_implicit_index_creation]
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 
@@ -38,7 +36,7 @@ assert.soon(() => {
         for (let i = numCurrentIndexes + 1; i <= maxNumIndexesAllowed; i++) {
             const key = make(i);
             const res = assert.commandWorked(t.createIndex(key));
-            jsTestLog('createIndex: ' + tojson(key) + ': ' + tojson(res));
+            jsTestLog("createIndex: " + tojson(key) + ": " + tojson(res));
         }
         assert.eq(t.getIndexKeys().length, maxNumIndexesAllowed);
         return true;
@@ -55,18 +53,20 @@ assert.eq(maxNumIndexesAllowed, num, "Expected 64 keys, found: " + num);
 assert.commandFailedWithCode(t.createIndex({y: 1}), ErrorCodes.CannotCreateIndex);
 
 // Drop one of the indexes.
-const indexToDrop = indexKeys.filter(key => key._id !== 1)[num - 2];
+const indexToDrop = indexKeys.filter((key) => key._id !== 1)[num - 2];
 
 jsTestLog("Dropping index: '" + tojson(indexToDrop) + "'");
 
 t.dropIndex(indexToDrop);
-assert.eq(num - 1,
-          t.getIndexKeys().length,
-          "After dropping an index, there should be " + (maxNumIndexesAllowed - 1) + " left.");
+assert.eq(
+    num - 1,
+    t.getIndexKeys().length,
+    "After dropping an index, there should be " + (maxNumIndexesAllowed - 1) + " left.",
+);
 
 // Create another index.
 const indexToCreate = {
-    z: 1
+    z: 1,
 };
 
 jsTestLog("Creating an index: '" + tojson(indexToCreate) + "'");

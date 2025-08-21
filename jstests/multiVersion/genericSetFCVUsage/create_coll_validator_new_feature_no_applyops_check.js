@@ -21,29 +21,32 @@ const collName = jsTestName();
 
 // '$_testFeatureFlagLatest' is an expression that is permanently enabled in the latest FCV.
 const validatorSpec = {
-    $expr: {$eq: ["$stuff", {$_testFeatureFlagLatest: 1}]}
+    $expr: {$eq: ["$stuff", {$_testFeatureFlagLatest: 1}]},
 };
 
 // Start creating a collection that has a validator with new query features.
 // Hang it after the validator has been parsed, but before the create entry has been put in the
 // oplog.
-const fpCreate = configureFailPoint(primary, 'hangAfterParsingValidator');
+const fpCreate = configureFailPoint(primary, "hangAfterParsingValidator");
 
-const awaitCreate = assertCommandWorkedInParallelShell(
-    primary, primary.getDB("test"), {create: collName, validator: validatorSpec});
+const awaitCreate = assertCommandWorkedInParallelShell(primary, primary.getDB("test"), {
+    create: collName,
+    validator: validatorSpec,
+});
 fpCreate.wait();
 
 // Start downgrading to last LTS. Wait until the transition has started, at which point the
 // feature flags controlling the query features will have been disabled. We need to do this in
 // background because the downgrade will hang on the global lock barrier, which happens *after*
 // transitioning.
-const awaitSetFCV = assertCommandWorkedInParallelShell(
-    primary, primary.getDB("admin"), {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true});
+const awaitSetFCV = assertCommandWorkedInParallelShell(primary, primary.getDB("admin"), {
+    setFeatureCompatibilityVersion: lastLTSFCV,
+    confirm: true,
+});
 assert.soon(() => {
-    const fcvDoc =
-        assert
-            .commandWorked(primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}))
-            .featureCompatibilityVersion;
+    const fcvDoc = assert.commandWorked(
+        primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
+    ).featureCompatibilityVersion;
     return fcvDoc.version == lastLTSFCV;
 });
 
@@ -57,7 +60,6 @@ awaitSetFCV();
 
 // Reset for the next test.
 assertDropCollection(primary.getDB("test"), collName);
-assert.commandWorked(
-    primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
 rst.stopSet();

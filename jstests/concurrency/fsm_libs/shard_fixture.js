@@ -36,7 +36,7 @@ export var FSMShardingTest = class {
         const conn = new Mongo(connStr);
 
         const topology = DiscoverTopology.findConnectedNodes(conn);
-        assert.eq(topology.type, Topology.kShardedCluster, 'Topology must be a sharded cluster');
+        assert.eq(topology.type, Topology.kShardedCluster, "Topology must be a sharded cluster");
 
         this._mongoses = [];
         for (let connStr of topology.mongos.nodes) {
@@ -67,10 +67,11 @@ export var FSMShardingTest = class {
                     shard_rst = new ReplSetTest(shardTopology.nodes[0]);
                 }
                 // TODO(SERVER-98556): Debug statements turned on temporarily for BF diagnosability.
-                shard_rst.asCluster(conn, function() {
+                shard_rst.asCluster(conn, function () {
                     for (const node of shard_rst.nodes) {
-                        assert.commandWorked(node.adminCommand(
-                            {"setParameter": 1, logComponentVerbosity: {test: {verbosity: 1}}}));
+                        assert.commandWorked(
+                            node.adminCommand({"setParameter": 1, logComponentVerbosity: {test: {verbosity: 1}}}),
+                        );
                     }
                 });
                 this._shard_rsts.push(shard_rst);
@@ -127,12 +128,15 @@ export var FSMShardingTest = class {
      */
 
     shardColl(coll, shardKey, unique) {
-        assert.commandWorked(this.s(0).adminCommand({
-            enableSharding: coll.getDB().toString(),
-        }));
+        assert.commandWorked(
+            this.s(0).adminCommand({
+                enableSharding: coll.getDB().toString(),
+            }),
+        );
 
-        assert.commandWorked(this.s(0).adminCommand(
-            {shardCollection: coll.toString(), key: shardKey, unique: unique || false}));
+        assert.commandWorked(
+            this.s(0).adminCommand({shardCollection: coll.toString(), key: shardKey, unique: unique || false}),
+        );
     }
 
     /*

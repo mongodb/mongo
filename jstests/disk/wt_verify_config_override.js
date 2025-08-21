@@ -28,17 +28,20 @@ db.adminCommand({fsync: 1});
 // Only full validations can override the config (it has no effect otherwise).
 assert.commandFailedWithCode(
     coll.validate({wiredtigerVerifyConfigurationOverride: "dump_tree_shape"}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 // Invalid configuration strings
 assert.commandFailedWithCode(
     coll.validate({full: true, wiredtigerVerifyConfigurationOverride: "blahblah"}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 // Even strings which are configuration options that aren't in our allowlist.
 assert.commandFailedWithCode(
     coll.validate({full: true, wiredtigerVerifyConfigurationOverride: "dump_all_data"}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 // Empty string is allowed.
 assert.commandWorked(coll.validate({full: true, wiredtigerVerifyConfigurationOverride: ""}));
@@ -46,13 +49,14 @@ assert.commandWorked(coll.validate({full: true, wiredtigerVerifyConfigurationOve
 clearRawMongoProgramOutput();
 
 // Here's a real one.
-assert.commandWorked(
-    coll.validate({full: true, wiredtigerVerifyConfigurationOverride: "dump_tree_shape"}));
+assert.commandWorked(coll.validate({full: true, wiredtigerVerifyConfigurationOverride: "dump_tree_shape"}));
 
 // Check for the kinds of additional logs that are printed when "dump_tree_shape" is in the config.
 const waitForLogsTimeoutMs = 10 * 1000;
-assert.soon(() => rawMongoProgramOutput(".*WT_PAGE_ROW_LEAF.*") != "",
-            "Log output must show evidence that wiredtiger dumped the tree's shape",
-            waitForLogsTimeoutMs);
+assert.soon(
+    () => rawMongoProgramOutput(".*WT_PAGE_ROW_LEAF.*") != "",
+    "Log output must show evidence that wiredtiger dumped the tree's shape",
+    waitForLogsTimeoutMs,
+);
 
 MongoRunner.stopMongod(conn);

@@ -26,7 +26,7 @@ const _id = "randomId";
  * Checks that basic CRUD operations work as expected. Expects the collection to have a
  * { _id: _id } document.
  */
-const checkBasicCRUD = function(withCollection, _id, isReplSetConnection) {
+const checkBasicCRUD = function (withCollection, _id, isReplSetConnection) {
     const sleepMs = 1;
     const numRetries = 99999;
     const NUM_NODES = 3;
@@ -39,8 +39,7 @@ const checkBasicCRUD = function(withCollection, _id, isReplSetConnection) {
         additionalCodesToRetry.push(ErrorCodes.FailedToSatisfyReadPreference);
     }
 
-    const runWithRetries = (fn) =>
-        retryOnRetryableError(fn, numRetries, sleepMs, additionalCodesToRetry);
+    const runWithRetries = (fn) => retryOnRetryableError(fn, numRetries, sleepMs, additionalCodesToRetry);
 
     const runFindOneWithRetries = (coll, filter) => runWithRetries(() => coll.findOne(filter));
 
@@ -60,13 +59,12 @@ const checkBasicCRUD = function(withCollection, _id, isReplSetConnection) {
     });
 
     withCollection((coll) => {
-        assert.commandWorked(
-            runWithRetries(() => coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}})));
+        assert.commandWorked(runWithRetries(() => coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}})));
         assert.eq(_id, runFindOneWithRetries(coll, {_id: _id})._id);
     });
 };
 
-const checkCRUDThread = function(replSetHost, ns, _id, countdownLatch, checkBasicCRUD) {
+const checkCRUDThread = function (replSetHost, ns, _id, countdownLatch, checkBasicCRUD) {
     const [dbName, collName] = ns.split(".");
     const replSet = new Mongo(replSetHost);
     const replSetSession = replSet.startSession({retryWrites: true, causalConsistency: true});
@@ -80,7 +78,7 @@ const checkCRUDThread = function(replSetHost, ns, _id, countdownLatch, checkBasi
 
     while (countdownLatch.getCount() > 0) {
         checkBasicCRUD(withCollection, _id, isReplSetConnection);
-        sleep(1);  // milliseconds.
+        sleep(1); // milliseconds.
     }
 };
 
@@ -89,7 +87,7 @@ const checkCRUDThread = function(replSetHost, ns, _id, countdownLatch, checkBasi
 const nodeOptions = {
     setParameter: {
         logComponentVerbosity: tojson({storage: {verbosity: 2}}),
-    }
+    },
 };
 
 jsTestLog("Starting up replica set");
@@ -103,7 +101,13 @@ assert.commandWorked(rstPrimary.getDB(dbName)[unshardedColl].insert({_id: _id}))
 
 const crudStopLatchUnsharded = new CountDownLatch(1);
 let crudThreadUnsharded = new Thread(
-    checkCRUDThread, replSet.getURL(), unshardedNs, _id, crudStopLatchUnsharded, checkBasicCRUD);
+    checkCRUDThread,
+    replSet.getURL(),
+    unshardedNs,
+    _id,
+    crudStopLatchUnsharded,
+    checkBasicCRUD,
+);
 
 jsTestLog("Starting up our CRUD thread");
 crudThreadUnsharded.start();
@@ -111,18 +115,17 @@ crudThreadUnsharded.start();
 for (let i = 0; i < NUM_ITERATIONS; i++) {
     jsTestLog("Restarting secondaries");
     const secondaries = replSet.getSecondaries();
-    secondaries.forEach(secondary => {
+    secondaries.forEach((secondary) => {
         replSet.restart(secondary);
     });
 
-    jsTestLog(
-        "Stepping down and restarting current primary and awaiting replica set to elect new primary");
+    jsTestLog("Stepping down and restarting current primary and awaiting replica set to elect new primary");
     let primary = replSet.getPrimary();
     primary.adminCommand({replSetStepDown: 600});
     replSet.restart(primary);
     replSet.awaitNodesAgreeOnPrimary();
 
-    sleep(1000);  // Let the background CRUD operations run for a while.
+    sleep(1000); // Let the background CRUD operations run for a while.
 }
 
 jsTestLog("Joining background CRUD ops thread.");

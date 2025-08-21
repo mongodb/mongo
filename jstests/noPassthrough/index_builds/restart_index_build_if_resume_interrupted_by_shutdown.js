@@ -28,24 +28,26 @@ ResumableIndexBuildTest.runResumeInterruptedByShutdown(
     rst,
     dbName,
     collName + "_collscan_drain",
-    {a: 1},                    // index key pattern
-    "resumable_index_build1",  // index name
+    {a: 1}, // index key pattern
+    "resumable_index_build1", // index name
     {name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386},
     "collection scan",
-    {a: 1},  // initial doc
+    {a: 1}, // initial doc
     [{a: 2}, {a: 3}],
-    [{a: 4}, {a: 5}]);
+    [{a: 4}, {a: 5}],
+);
 
 ResumableIndexBuildTest.runResumeInterruptedByShutdown(
     rst,
     dbName,
     collName + "_bulkload_drain_multikey",
-    {a: 1},                    // index key pattern
-    "resumable_index_build2",  // index name
+    {a: 1}, // index key pattern
+    "resumable_index_build2", // index name
     {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400},
     "bulk load",
-    {a: [11, 22, 33]},  // initial doc
+    {a: [11, 22, 33]}, // initial doc
     [{a: 77}, {a: 88}],
-    [{a: 99}, {a: 100}]);
+    [{a: 99}, {a: 100}],
+);
 
 rst.stopSet();

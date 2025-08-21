@@ -13,7 +13,7 @@ function getChangeStreamResults(cursor, n) {
         assert.soon(() => cursor.hasNext(), "Timed out waiting for change stream result " + i);
         results.push(cursor.next());
     }
-    assert(!cursor.hasNext());  // The change stream should always have exactly 'n' results.
+    assert(!cursor.hasNext()); // The change stream should always have exactly 'n' results.
     return results;
 }
 
@@ -64,7 +64,7 @@ function performDBOps(mongod) {
 // Resume a change stream from each of the resume tokens in the 'changeStreamDocs' array and
 // verify that we always see the same set of changes.
 function resumeChangeStreamFromEachToken(mongod, changeStreamDocs, expectedChanges) {
-    changeStreamDocs.forEach(function(changeDoc, i) {
+    changeStreamDocs.forEach(function (changeDoc, i) {
         const testDB = mongod.getDB(dbName);
         const resumedCursor = testDB[watchedCollName].watch([], {resumeAfter: changeDoc._id});
 
@@ -73,7 +73,8 @@ function resumeChangeStreamFromEachToken(mongod, changeStreamDocs, expectedChang
         const expectedChangesAfterResumeToken = expectedChanges.slice(i + 1);
         compareChanges(
             expectedChangesAfterResumeToken,
-            getChangeStreamResults(resumedCursor, expectedChangesAfterResumeToken.length));
+            getChangeStreamResults(resumedCursor, expectedChangesAfterResumeToken.length),
+        );
     });
 }
 
@@ -116,8 +117,7 @@ function runTest(downgradeVersion) {
 
     // Upgrade the featureCompatibilityVersion and verify that we can correctly resume from any
     // resume token.
-    assert.commandWorked(
-        rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkFCV(rst.getPrimary().getDB("admin"), latestFCV);
     resumeChangeStreamFromEachToken(rst.getPrimary(), changeStreamDocs, expectedChanges);
 

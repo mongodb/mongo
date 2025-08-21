@@ -26,12 +26,14 @@ assert.commandWorked(t.createIndex({x: 1}, {unique: true}));
 // convert the second op to an update on the primary, or reject the applyOps on the primary.
 if (false) {
     // Check that duplicate _id fields don't cause an error
-    var a = assert.commandWorked(db.adminCommand({
-        applyOps: [
-            {"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: -1}},
-            {"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 0}}
-        ]
-    }));
+    var a = assert.commandWorked(
+        db.adminCommand({
+            applyOps: [
+                {"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: -1}},
+                {"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 0}},
+            ],
+        }),
+    );
     printjson(a);
     printjson(t.find().toArray());
     assert.eq(2, t.find().count(), "Invalid insert worked");
@@ -43,13 +45,15 @@ if (false) {
 const prevCount = t.find().count();
 
 // Check that dups on non-id cause errors
-var a = assert.commandFailedWithCode(db.adminCommand({
-    applyOps: [
-        {"op": "i", "ns": t.getFullName(), "o": {_id: 1, x: 0}},
-        {"op": "i", "ns": t.getFullName(), "o": {_id: 2, x: 1}}
-    ]
-}),
-                                     ErrorCodes.DuplicateKey);
+var a = assert.commandFailedWithCode(
+    db.adminCommand({
+        applyOps: [
+            {"op": "i", "ns": t.getFullName(), "o": {_id: 1, x: 0}},
+            {"op": "i", "ns": t.getFullName(), "o": {_id: 2, x: 1}},
+        ],
+    }),
+    ErrorCodes.DuplicateKey,
+);
 // We do not applyOps atomically, so the first op is applied and the second is not. The total number
 // is now 2.
 assert.eq(2, t.find().count(), "Expected 2 documents after applyOps");

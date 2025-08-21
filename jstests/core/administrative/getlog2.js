@@ -36,8 +36,7 @@ function contains(arr, func) {
 }
 
 function stringContains(haystack, needle) {
-    if (needle.indexOf(":"))
-        needle = '"' + needle.replace(':', "\":");
+    if (needle.indexOf(":")) needle = '"' + needle.replace(":", '":');
     needle = needle.replace(/ /g, "");
     return haystack.indexOf(needle) != -1;
 }
@@ -49,43 +48,63 @@ if (db.hello().msg === "isdbgrid") {
 
 // 1. Run a slow query
 assert.commandWorked(glcol.save({"SENTINEL": 1}));
-assert.neq(null, glcol.findOne({
-    "SENTINEL": 1,
-    "$where": function() {
-        sleep(1000);
-        return true;
-    }
-}));
+assert.neq(
+    null,
+    glcol.findOne({
+        "SENTINEL": 1,
+        "$where": function () {
+            sleep(1000);
+            return true;
+        },
+    }),
+);
 
 const query = assert.commandWorked(db.adminCommand({getLog: "global"}));
 assert(query.log, "no log field");
 assert.gt(query.log.length, 0, "no log lines");
 
 // Ensure that slow query is logged in detail.
-assert(contains(query.log, function(v) {
-    print(v);
-    return stringContains(v, " find ") && stringContains(v, "filter:") &&
-        stringContains(v, "keysExamined:") && stringContains(v, "docsExamined:") &&
-        stringContains(v, "queues") && v.indexOf("SENTINEL") != -1;
-}));
+assert(
+    contains(query.log, function (v) {
+        print(v);
+        return (
+            stringContains(v, " find ") &&
+            stringContains(v, "filter:") &&
+            stringContains(v, "keysExamined:") &&
+            stringContains(v, "docsExamined:") &&
+            stringContains(v, "queues") &&
+            v.indexOf("SENTINEL") != -1
+        );
+    }),
+);
 
 // 2. Run a slow update
-assert.commandWorked(glcol.update({
-    "SENTINEL": 1,
-    "$where": function() {
-        sleep(1000);
-        return true;
-    }
-},
-                                  {"x": "x"}));
+assert.commandWorked(
+    glcol.update(
+        {
+            "SENTINEL": 1,
+            "$where": function () {
+                sleep(1000);
+                return true;
+            },
+        },
+        {"x": "x"},
+    ),
+);
 
 const update = assert.commandWorked(db.adminCommand({getLog: "global"}));
 assert(update.log, "no log field");
 assert.gt(update.log.length, 0, "no log lines");
 
 // Ensure that slow update is logged in deail.
-assert(contains(update.log, function(v) {
-    return stringContains(v, " update ") != -1 && stringContains(v, "command") &&
-        stringContains(v, "keysExamined:") && stringContains(v, "docsExamined:") &&
-        v.indexOf("SENTINEL") != -1;
-}));
+assert(
+    contains(update.log, function (v) {
+        return (
+            stringContains(v, " update ") != -1 &&
+            stringContains(v, "command") &&
+            stringContains(v, "keysExamined:") &&
+            stringContains(v, "docsExamined:") &&
+            v.indexOf("SENTINEL") != -1
+        );
+    }),
+);

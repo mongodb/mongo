@@ -13,7 +13,7 @@ function someData() {
 function moreData() {
     someData();
     t.save({key: [1]});
-    t.save({key: ['1']});
+    t.save({key: ["1"]});
     t.save({key: null});
     t.save({});
 }

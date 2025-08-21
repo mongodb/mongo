@@ -11,25 +11,23 @@
 
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     let data = {
-        getUpdateArgument: function(fieldName) {
+        getUpdateArgument: function (fieldName) {
             return {$inc: {[fieldName]: 1}};
         },
     };
 
     var states = {
-
         init: function init(db, collName) {
-            this.fieldName = 't' + this.tid;
+            this.fieldName = "t" + this.tid;
             this.count = 0;
         },
 
         update: function update(db, collName) {
             var updateDoc = this.getUpdateArgument(this.fieldName);
 
-            var res = db.runCommand(
-                {findAndModify: collName, query: {_id: 'findAndModify_inc'}, update: updateDoc});
+            var res = db.runCommand({findAndModify: collName, query: {_id: "findAndModify_inc"}, update: updateDoc});
             assert.commandWorked(res);
 
             // If the document was invalidated during a yield, then we wouldn't have modified it.
@@ -40,8 +38,7 @@ export const $config = (function() {
                 // is retried internally. We never expect to see a null value returned by the
                 // "findAndModify" command when it is known that a matching document exists in the
                 // collection.
-                assert(res.value !== null,
-                       'query spec should have matched a document, returned ' + tojson(res));
+                assert(res.value !== null, "query spec should have matched a document, returned " + tojson(res));
             }
 
             if (res.value !== null) {
@@ -58,17 +55,16 @@ export const $config = (function() {
             } else {
                 assert.eq(this.count, 0);
             }
-        }
-
+        },
     };
 
     var transitions = {init: {update: 1}, update: {find: 1}, find: {update: 1}};
 
     function setup(db, collName, cluster) {
-        const doc = {_id: 'findAndModify_inc'};
+        const doc = {_id: "findAndModify_inc"};
         // Initialize the fields used to a count of 0.
         for (let i = 0; i < this.threadCount; ++i) {
-            doc['t' + i] = 0;
+            doc["t" + i] = 0;
         }
         db[collName].insert(doc);
     }
@@ -79,6 +75,6 @@ export const $config = (function() {
         data: data,
         states: states,
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

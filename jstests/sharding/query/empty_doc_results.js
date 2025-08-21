@@ -7,21 +7,18 @@ var mongos = st.s0;
 var coll = mongos.getCollection("foo.bar");
 var admin = mongos.getDB("admin");
 
-assert.commandWorked(
-    admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
 assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {_id: 0}}));
-assert.commandWorked(
-    admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
 
 st.printShardingStatus();
 
 // Insert 100 documents, half of which have an extra field
 for (var i = -50; i < 50; i++) {
     var doc = {};
-    if (i >= 0)
-        doc.positiveId = true;
+    if (i >= 0) doc.positiveId = true;
     assert.commandWorked(coll.insert(doc));
 }
 
@@ -37,7 +34,7 @@ assert.eq(100, coll.find({}, {_id: 0}).sort({positiveId: 1}).itcount());
 //
 //
 // Ensure projecting out all fields still returns the same ordering of documents
-var assertLast50Positive = function(sortedDocs) {
+var assertLast50Positive = function (sortedDocs) {
     assert.eq(100, sortedDocs.length);
     var positiveCount = 0;
     for (var i = 0; i < sortedDocs.length; ++i) {

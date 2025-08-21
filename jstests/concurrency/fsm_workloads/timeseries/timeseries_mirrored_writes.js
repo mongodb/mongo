@@ -17,7 +17,7 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {
         timeFieldName: "time",
         metaFieldName: "meta",
@@ -28,15 +28,15 @@ export const $config = (function() {
         // Used to generate unique _id's for measurements across multiple threads.
         nextIds: {},
 
-        getRegularCollectionName: function() {
+        getRegularCollectionName: function () {
             return "regular_mirrored_writes";
         },
 
-        getTimeseriesCollectionName: function() {
+        getTimeseriesCollectionName: function () {
             return "timeseries_mirrored_writes";
         },
 
-        generateMeasurement: function() {
+        generateMeasurement: function () {
             const idPrefix = this.tid.toString();
             let id = undefined;
             if (this.nextIds.hasOwnProperty(idPrefix)) {
@@ -61,7 +61,7 @@ export const $config = (function() {
             return doc;
         },
 
-        insertDocs: function(db, ordered) {
+        insertDocs: function (db, ordered) {
             const docsToInsert = Math.floor(Math.random() * this.maxDocsPerBatch) + 1;
             const docs = [];
             for (let i = 0; i < docsToInsert; i++) {
@@ -77,17 +77,17 @@ export const $config = (function() {
             res = tsColl.insertMany(docs, {ordered: ordered});
             TimeseriesTest.assertInsertWorked(res);
             assert.eq(res.insertedIds.length, docsToInsert);
-        }
+        },
     };
 
     const states = {
-        init: function(db, collName) {},
+        init: function (db, collName) {},
 
-        insertSlow: function(db, collName) {
+        insertSlow: function (db, collName) {
             this.insertDocs(db, /*ordered=*/ true);
         },
 
-        insertFast: function(db, collName) {
+        insertFast: function (db, collName) {
             this.insertDocs(db, /*ordered=*/ false);
         },
     };
@@ -105,27 +105,33 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         assert.commandWorked(db.createCollection(this.getRegularCollectionName()));
-        assert.commandWorked(db.createCollection(this.getTimeseriesCollectionName(), {
-            timeseries: {
-                timeField: this.timeFieldName,
-                metaField: this.metaFieldName,
-            }
-        }));
+        assert.commandWorked(
+            db.createCollection(this.getTimeseriesCollectionName(), {
+                timeseries: {
+                    timeField: this.timeFieldName,
+                    metaField: this.metaFieldName,
+                },
+            }),
+        );
     }
 
     function teardown(db, collName, cluster) {
         // Both collections have the same number of documents.
-        assert.eq(db.getCollection(this.getTimeseriesCollectionName()).find().itcount(),
-                  db.getCollection(this.getRegularCollectionName()).find().itcount());
+        assert.eq(
+            db.getCollection(this.getTimeseriesCollectionName()).find().itcount(),
+            db.getCollection(this.getRegularCollectionName()).find().itcount(),
+        );
 
         // Iterate over all measurements in the time-series collection and ensure there is an
         // identical one in the mirrored regular collection.
         const cursor = db.getCollection(this.getTimeseriesCollectionName()).find();
         while (cursor.hasNext()) {
             const docToFind = cursor.next();
-            assert.eq(1,
-                      db.getCollection(this.getRegularCollectionName()).find(docToFind).itcount(),
-                      "Could not find measurement " + tojson(docToFind));
+            assert.eq(
+                1,
+                db.getCollection(this.getRegularCollectionName()).find(docToFind).itcount(),
+                "Could not find measurement " + tojson(docToFind),
+            );
         }
     }
 

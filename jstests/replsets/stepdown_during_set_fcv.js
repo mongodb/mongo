@@ -18,10 +18,11 @@ function runTest(downgradeFCV) {
 
     let primary = rst.getPrimary();
 
-    const failpoint = configureFailPoint(primary, 'hangBeforeUpdatingFcvDoc');
+    const failpoint = configureFailPoint(primary, "hangBeforeUpdatingFcvDoc");
 
-    jsTestLog("Issue a setFeatureCompatibilityVersion command that will wait on the " +
-              "hangBeforeUpdatingFcvDoc failpoint");
+    jsTestLog(
+        "Issue a setFeatureCompatibilityVersion command that will wait on the " + "hangBeforeUpdatingFcvDoc failpoint",
+    );
 
     const parallelFn = `
     assert.commandFailedWithCode(
@@ -41,12 +42,10 @@ function runTest(downgradeFCV) {
     const secondary = rst.getSecondaries()[0];
 
     jsTestLog("Issue a setFeatureCompatibilityVersion command on the new primary");
-    assert.commandWorked(
-        primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
     rst.awaitReplication();
 
-    jsTestLog("Unset the failpoint on the former primary so it finishes running " +
-              "setFeatureCompatibilityVersion");
+    jsTestLog("Unset the failpoint on the former primary so it finishes running " + "setFeatureCompatibilityVersion");
     failpoint.off();
     awaitShell();
 

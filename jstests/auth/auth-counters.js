@@ -3,46 +3,40 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const keyfile = 'jstests/libs/key1';
-const badKeyfile = 'jstests/libs/key2';
+const keyfile = "jstests/libs/key1";
+const badKeyfile = "jstests/libs/key2";
 let replTest = new ReplSetTest({nodes: 1, keyFile: keyfile, nodeOptions: {auth: ""}});
 replTest.startSet();
 replTest.initiate();
 let primary = replTest.getPrimary();
 
-const admin = primary.getDB('admin');
-const test = primary.getDB('test');
+const admin = primary.getDB("admin");
+const test = primary.getDB("test");
 
-admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root'], mechanisms: ['SCRAM-SHA-256']});
-admin.auth('admin', 'pwd');
+admin.createUser({user: "admin", pwd: "pwd", roles: ["root"], mechanisms: ["SCRAM-SHA-256"]});
+admin.auth("admin", "pwd");
 
-test.createUser({user: 'user1', pwd: 'pwd', roles: [], mechanisms: ['SCRAM-SHA-1']});
-test.createUser({user: 'user256', pwd: 'pwd', roles: [], mechanisms: ['SCRAM-SHA-256']});
-test.createUser(
-    {user: 'user', pwd: 'pwd', roles: [], mechanisms: ['SCRAM-SHA-1', 'SCRAM-SHA-256']});
+test.createUser({user: "user1", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"]});
+test.createUser({user: "user256", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-256"]});
+test.createUser({user: "user", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1", "SCRAM-SHA-256"]});
 
 // Count the number of authentications performed during setup
-const expected =
-    assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+const expected = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
 admin.logout();
 
 function assertStats() {
     // Need to be authenticated to run serverStatus.
-    assert(admin.auth('admin', 'pwd'));
-    ++expected['SCRAM-SHA-256'].authenticate.successful;
-    ++expected['SCRAM-SHA-256'].authenticate.received;
+    assert(admin.auth("admin", "pwd"));
+    ++expected["SCRAM-SHA-256"].authenticate.successful;
+    ++expected["SCRAM-SHA-256"].authenticate.received;
 
-    const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1}))
-                          .security.authentication.mechanisms;
-    Object.keys(expected).forEach(function(mech) {
+    const mechStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+    Object.keys(expected).forEach(function (mech) {
         try {
             assert.eq(mechStats[mech].authenticate.received, expected[mech].authenticate.received);
-            assert.eq(mechStats[mech].authenticate.successful,
-                      expected[mech].authenticate.successful);
-            assert.eq(mechStats[mech].clusterAuthenticate.received,
-                      expected[mech].clusterAuthenticate.received);
-            assert.eq(mechStats[mech].clusterAuthenticate.successful,
-                      expected[mech].clusterAuthenticate.successful);
+            assert.eq(mechStats[mech].authenticate.successful, expected[mech].authenticate.successful);
+            assert.eq(mechStats[mech].clusterAuthenticate.received, expected[mech].clusterAuthenticate.received);
+            assert.eq(mechStats[mech].clusterAuthenticate.successful, expected[mech].clusterAuthenticate.successful);
         } catch (e) {
             print("Mechanism: " + mech);
             print("mechStats: " + tojson(mechStats));
@@ -71,13 +65,16 @@ function assertFailure(creds, mech, db = test) {
 function assertSuccessInternal() {
     const mech = "SCRAM-SHA-256";
     // asCluster exiting cleanly indicates successful auth
-    assert.eq(authutil.asCluster(replTest.nodes, keyfile, () => true), true);
+    assert.eq(
+        authutil.asCluster(replTest.nodes, keyfile, () => true),
+        true,
+    );
     ++expected[mech].authenticate.received;
     ++expected[mech].authenticate.successful;
     ++expected[mech].clusterAuthenticate.received;
     ++expected[mech].clusterAuthenticate.successful;
     // we have to re-auth as admin to get stats, which are validated at the end of assertSuccess
-    assertSuccess({user: 'admin', pwd: 'pwd'}, 'SCRAM-SHA-256', admin);
+    assertSuccess({user: "admin", pwd: "pwd"}, "SCRAM-SHA-256", admin);
 }
 
 // Because authutil.asCluster utilizes SCRAM-SHA-256 as a default keyfile mechanism, we will attempt
@@ -90,7 +87,7 @@ function assertFailureInternal() {
     ++expected[mech].authenticate.received;
     ++expected[mech].clusterAuthenticate.received;
     // we have to re-auth as admin to get stats, which are validated at the end of assertSuccess
-    assertSuccess({user: 'admin', pwd: 'pwd'}, 'SCRAM-SHA-256', admin);
+    assertSuccess({user: "admin", pwd: "pwd"}, "SCRAM-SHA-256", admin);
     assertStats();
 }
 
@@ -99,37 +96,36 @@ function assertFailureInternal() {
 assertStats();
 
 // user1 should negotiate and succeed at SHA1
-assertSuccess({user: 'user1', pwd: 'pwd'}, 'SCRAM-SHA-1');
+assertSuccess({user: "user1", pwd: "pwd"}, "SCRAM-SHA-1");
 
 // user and user256 should both negotiate and success at SHA256
-assertSuccess({user: 'user256', pwd: 'pwd'}, 'SCRAM-SHA-256');
-assertSuccess({user: 'user', pwd: 'pwd'}, 'SCRAM-SHA-256');
+assertSuccess({user: "user256", pwd: "pwd"}, "SCRAM-SHA-256");
+assertSuccess({user: "user", pwd: "pwd"}, "SCRAM-SHA-256");
 
 // user, user1, and user256 as above, but explicitly asking for mechanisms.
-assertSuccess({user: 'user1', pwd: 'pwd', mechanism: 'SCRAM-SHA-1'}, 'SCRAM-SHA-1');
-assertSuccess({user: 'user256', pwd: 'pwd', mechanism: 'SCRAM-SHA-256'}, 'SCRAM-SHA-256');
-assertSuccess({user: 'user', pwd: 'pwd', mechanism: 'SCRAM-SHA-1'}, 'SCRAM-SHA-1');
-assertSuccess({user: 'user', pwd: 'pwd', mechanism: 'SCRAM-SHA-256'}, 'SCRAM-SHA-256');
+assertSuccess({user: "user1", pwd: "pwd", mechanism: "SCRAM-SHA-1"}, "SCRAM-SHA-1");
+assertSuccess({user: "user256", pwd: "pwd", mechanism: "SCRAM-SHA-256"}, "SCRAM-SHA-256");
+assertSuccess({user: "user", pwd: "pwd", mechanism: "SCRAM-SHA-1"}, "SCRAM-SHA-1");
+assertSuccess({user: "user", pwd: "pwd", mechanism: "SCRAM-SHA-256"}, "SCRAM-SHA-256");
 
 // Incorrect password.
-assertFailure({user: 'user1', pwd: 'haxx'}, 'SCRAM-SHA-1');
-assertFailure({user: 'user256', pwd: 'haxx'}, 'SCRAM-SHA-256');
-assertFailure({user: 'user', pwd: 'haxx'}, 'SCRAM-SHA-256');
-assertFailure({user: 'user', pwd: 'haxx', mechanism: 'SCRAM-SHA-1'}, 'SCRAM-SHA-1');
+assertFailure({user: "user1", pwd: "haxx"}, "SCRAM-SHA-1");
+assertFailure({user: "user256", pwd: "haxx"}, "SCRAM-SHA-256");
+assertFailure({user: "user", pwd: "haxx"}, "SCRAM-SHA-256");
+assertFailure({user: "user", pwd: "haxx", mechanism: "SCRAM-SHA-1"}, "SCRAM-SHA-1");
 
 // Incorrect mechanism.
-assertFailure({user: 'user1', pwd: 'pwd', mechanism: 'SCRAM-SHA-256'}, 'SCRAM-SHA-256');
-assertFailure({user: 'user256', pwd: 'pwd', mechanism: 'SCRAM-SHA-1'}, 'SCRAM-SHA-1');
+assertFailure({user: "user1", pwd: "pwd", mechanism: "SCRAM-SHA-256"}, "SCRAM-SHA-256");
+assertFailure({user: "user256", pwd: "pwd", mechanism: "SCRAM-SHA-1"}, "SCRAM-SHA-1");
 
 // Cluster auth counter checks.
 assertSuccessInternal();
 assertFailureInternal();
 
 // Need to auth as admin one more time to get final stats.
-admin.auth('admin', 'pwd');
+admin.auth("admin", "pwd");
 
-const finalStats =
-    assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
+const finalStats = assert.commandWorked(admin.runCommand({serverStatus: 1})).security.authentication.mechanisms;
 replTest.stopSet();
 
 printjson(finalStats);

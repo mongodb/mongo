@@ -18,27 +18,26 @@ const st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
-const dbName = 'test';
-const collName = 'testColl';
-const ns = dbName + '.' + collName;
+const dbName = "test";
+const collName = "testColl";
+const ns = dbName + "." + collName;
 
 const db = st.getDB(dbName);
 const coll = db.getCollection(collName);
 const mongos = st.s0;
 
-assert.commandWorked(
-    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(db.coll.insert({x: 1}));
 assert.commandWorked(db.coll.insert({x: -1}));
 
 let s0primary = st.rs0.getPrimary();
-let fp = configureFailPoint(s0primary, 'moveChunkHangAtStep1');
+let fp = configureFailPoint(s0primary, "moveChunkHangAtStep1");
 
-assert.commandWorked(mongos.adminCommand({clearLog: 'global'}));
+assert.commandWorked(mongos.adminCommand({clearLog: "global"}));
 
 /*
  * After completion of the following `moveRange` command, "shard0" will own documents with the shard

@@ -19,7 +19,7 @@ import {
     getPlanStages,
     getQueryPlanner,
     getRejectedPlans,
-    getWinningPlanFromExplain
+    getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.index_deduplication;
@@ -45,7 +45,7 @@ const interestingScenarios = [
         index2: {a: 1},
         find: {},
         project: {_id: 0, a: 1, c: 1},
-        dedup: false
+        dedup: false,
     },
     // One index can cover projection/sort.
     {
@@ -53,7 +53,7 @@ const interestingScenarios = [
         index2: {a: 1},
         find: {a: 1},
         project: {_id: 0, a: 1, b: 1},
-        dedup: false
+        dedup: false,
     },
     {index1: {a: 1, b: 1}, index2: {a: 1}, find: {}, sort: {a: 1, b: 1}, dedup: false},
     // TODO SERVER-86639 for now indexes can't be deduped because of different sort order on the
@@ -65,7 +65,7 @@ const interestingScenarios = [
         index1: {a: 1, b: 1, c: 1},
         index2: {a: -1, b: 1, c: -1, d: 1},
         find: {a: 1, c: 1},
-        dedup: false
+        dedup: false,
     },
     // Indexes can't be deduped.
     {index1: {a: 1}, index2: {b: 1}, find: {a: 1}, dedup: false},
@@ -81,7 +81,7 @@ const interestingScenarios = [
         find: {a: 1, b: 1},
         dedup: true,
         multikey: true,
-        expected: {a: 1, b: 1, c: 1}
+        expected: {a: 1, b: 1, c: 1},
     },
     // If both are multikey, we must multiplan.
     {
@@ -89,7 +89,7 @@ const interestingScenarios = [
         index2: {a: 1, m: 1, c: 1},
         find: {a: 1},
         dedup: false,
-        multikey: true
+        multikey: true,
     },
     // If the shorter index is multikey, we should multiplan.
     {index1: {a: 1, m: 1}, index2: {a: 1, b: 1, c: 1}, find: {a: 1}, dedup: false, multikey: true},
@@ -100,7 +100,7 @@ const interestingScenarios = [
         find: {a: 1},
         dedup: true,
         multikey: true,
-        expected: {a: 1, b: 1}
+        expected: {a: 1, b: 1},
     },
 ];
 
@@ -121,12 +121,10 @@ function getExplain(query, hint) {
 
 // Run the given query with index pruning disabled and then enabled, and returns the explains.
 function getExplainBeforeAfterPruning(query) {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: 0}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: 0}));
     const explainNoPruning = getExplain(query);
 
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: 1}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: 1}));
     const explainWithPruning = getExplain(query);
     return {before: explainNoPruning, after: explainWithPruning};
 }
@@ -215,14 +213,14 @@ function neverDedupSpecialIndexes() {
             continue;
         }
         coll.dropIndexes();
-        const index1WithZHashed = Object.assign({z: 'hashed'}, setup.index1);
+        const index1WithZHashed = Object.assign({z: "hashed"}, setup.index1);
         assert.commandWorked(coll.createIndex(index1WithZHashed));
         assert.commandWorked(coll.createIndex(setup.index2));
         doesNotDedup(setup);
 
         // Same scenario but the other index has the special options.
         coll.dropIndexes();
-        const index2WithZHashed = Object.assign({z: 'hashed'}, setup.index2);
+        const index2WithZHashed = Object.assign({z: "hashed"}, setup.index2);
         assert.commandWorked(coll.createIndex(index2WithZHashed));
         assert.commandWorked(coll.createIndex(setup.index1));
         doesNotDedup(setup);

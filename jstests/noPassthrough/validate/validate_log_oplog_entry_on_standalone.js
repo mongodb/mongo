@@ -20,21 +20,24 @@ replSet.initiate();
 const primary = replSet.getPrimary();
 
 let db = primary.getDB(dbName);
-assert.commandWorked(db.adminCommand({
-    configureFailPoint: "skipUnindexingDocumentWhenDeleted",
-    mode: "alwaysOn",
-    data: {indexName: "abcText"}
-}));
+assert.commandWorked(
+    db.adminCommand({
+        configureFailPoint: "skipUnindexingDocumentWhenDeleted",
+        mode: "alwaysOn",
+        data: {indexName: "abcText"},
+    }),
+);
 
 let coll = db.getCollection(collName);
 assert.commandWorked(db.createCollection(collName, {writeConcern: {w: "majority"}}));
-assert.commandWorked(coll.createIndex({a: "text", b: "text", c: "text"},
-                                      {weights: {a: 5, b: 5, c: 10}, name: "abcText"}));
+assert.commandWorked(
+    coll.createIndex({a: "text", b: "text", c: "text"}, {weights: {a: 5, b: 5, c: 10}, name: "abcText"}),
+);
 
 const doc = {
     a: "a",
     b: "b",
-    c: "c"
+    c: "c",
 };
 // Corrupt the collection by inserting a document and then deleting it without deleting its index
 // entry (thanks to the "skipUnindexingDocumentWhenDeleted" failpoint).
@@ -75,14 +78,14 @@ checkLog.containsJson(db.getMongo(), 7464202, {
         if (!oplogDocId.equals(docId)) {
             return false;
         }
-        jsTestLog('Found oplog entry for corrupted index entry: ' + tojson(oplogDoc));
-        if (oplogDoc.op === 'd') {
+        jsTestLog("Found oplog entry for corrupted index entry: " + tojson(oplogDoc));
+        if (oplogDoc.op === "d") {
             foundDelete = true;
-        } else if (oplogDoc.op === 'i') {
+        } else if (oplogDoc.op === "i") {
             foundInsert = true;
         }
         return foundDelete && foundInsert;
-    }
+    },
 });
 
 // Skip validation.

@@ -3,10 +3,7 @@
  * and none are missing when running an explain query.
  * @tags: [requires_fcv_72]
  */
-import {
-    runCommandAndValidateQueryStats,
-    withQueryStatsEnabled
-} from "jstests/libs/query/query_stats_utils.js";
+import {runCommandAndValidateQueryStats, withQueryStatsEnabled} from "jstests/libs/query/query_stats_utils.js";
 
 const collName = jsTestName();
 
@@ -23,14 +20,13 @@ const aggregateCommandObj = {
     collation: {locale: "en_US", strength: 2},
     hint: {"v": 1},
     comment: "",
-    let : {},
+    let: {},
     apiDeprecationErrors: false,
     apiVersion: "1",
     apiStrict: false,
 };
 
-const queryShapeAggregateFields =
-    ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
+const queryShapeAggregateFields = ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
 
 // The outer fields not nested inside queryShape.
 const queryStatsAggregateKeyFields = [
@@ -57,8 +53,7 @@ aggregateCommandObjExplainFalse.explain = false;
 
 // Setting the explain flag to 'false' has the same behavior as having no explain flag at all,
 // making it not appear on the key.
-const queryStatsAggregateKeyFieldsExplainFalse =
-    queryStatsAggregateKeyFields.filter(e => e !== "explain");
+const queryStatsAggregateKeyFieldsExplainFalse = queryStatsAggregateKeyFields.filter((e) => e !== "explain");
 
 withQueryStatsEnabled(collName, (coll) => {
     // Create an index for hint not to fail.
@@ -71,7 +66,7 @@ withQueryStatsEnabled(collName, (coll) => {
         commandName: "aggregate",
         commandObj: aggregateCommandObj,
         shapeFields: queryShapeAggregateFields,
-        keyFields: queryStatsAggregateKeyFields
+        keyFields: queryStatsAggregateKeyFields,
     });
 
     // Run an aggregate with {explain: false} and make sure that the 'explain'
@@ -82,6 +77,6 @@ withQueryStatsEnabled(collName, (coll) => {
         commandObj: aggregateCommandObjExplainFalse,
         // The shape remains the same since 'explain' is at the key level.
         shapeFields: queryShapeAggregateFields,
-        keyFields: queryStatsAggregateKeyFieldsExplainFalse
+        keyFields: queryStatsAggregateKeyFieldsExplainFalse,
     });
 });

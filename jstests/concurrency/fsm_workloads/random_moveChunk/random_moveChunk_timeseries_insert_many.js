@@ -11,13 +11,11 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
-import {
-    $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js';
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // A random non-round start value was chosen so that we can verify the rounding behavior that
     // occurs while routing on mongos.
     $config.data.startTime = 1021;
@@ -28,8 +26,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // This should generate documents for a span of one month.
     $config.data.numInitialDocs = 60 * 24 * 30;
 
-    $config.data.metaField = 'm';
-    $config.data.timeField = 't';
+    $config.data.metaField = "m";
+    $config.data.timeField = "t";
 
     $config.threadCount = 10;
     $config.iterations = 40;
@@ -42,8 +40,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var docs = [];
         for (let i = 0; i < 10; i++) {
             // Generate a random timestamp between 'startTime' and largest timestamp we inserted.
-            const timer =
-                this.startTime + Math.floor(Random.rand() * this.numInitialDocs * this.increment);
+            const timer = this.startTime + Math.floor(Random.rand() * this.numInitialDocs * this.increment);
             const doc = {
                 _id: new ObjectId(),
                 [this.metaField]: 0,
@@ -63,7 +60,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Moves a random chunk in the target collection.
      */
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
-        const configDB = db.getSiblingDB('config');
+        const configDB = db.getSiblingDB("config");
         const coll = getTimeseriesCollForDDLOps(db, db[collName]);
         const chunks = findChunksUtil.findChunksByNs(configDB, coll.getFullName()).toArray();
         const chunkToMove = chunks[this.tid];
@@ -71,15 +68,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // Choose a random shard to move the chunk to.
         const shardNames = Object.keys(connCache.shards);
-        const destinationShards = shardNames.filter(function(shard) {
+        const destinationShards = shardNames.filter(function (shard) {
             if (shard !== fromShard) {
                 return shard;
             }
         });
         const toShard = destinationShards[Random.randInt(destinationShards.length)];
         const waitForDelete = false;
-        ChunkHelper.moveChunk(
-            db, coll.getName(), [chunkToMove.min, chunkToMove.max], toShard, waitForDelete);
+        ChunkHelper.moveChunk(db, coll.getName(), [chunkToMove.min, chunkToMove.max], toShard, waitForDelete);
     };
 
     $config.states.init = function init(db, collName, connCache) {};
@@ -87,14 +83,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.transitions = {
         init: {insert: 1},
         insert: {insert: 7, moveChunk: 1},
-        moveChunk: {insert: 1, moveChunk: 0}
+        moveChunk: {insert: 1, moveChunk: 0},
     };
 
     $config.setup = function setup(db, collName, cluster) {
         db[collName].drop();
 
-        assert.commandWorked(db.createCollection(
-            collName, {timeseries: {metaField: this.metaField, timeField: this.timeField}}));
+        assert.commandWorked(
+            db.createCollection(collName, {timeseries: {metaField: this.metaField, timeField: this.timeField}}),
+        );
         cluster.shardCollection(db[collName], {t: 1}, false);
 
         const bulk = db[collName].initializeUnorderedBulkOp();
@@ -121,12 +118,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Pick 'this.threadCount - 1' split points so that we have 'this.threadCount' chunks.
         const chunkRange = (currentTimeStamp - this.startTime) / this.threadCount;
         currentTimeStamp = this.startTime;
-        for (let i = 0; i < (this.threadCount - 1); ++i) {
+        for (let i = 0; i < this.threadCount - 1; ++i) {
             currentTimeStamp += chunkRange;
             assert.commandWorked(
-                ChunkHelper.splitChunkAt(db,
-                                         getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-                                         {'control.min.t': new Date(currentTimeStamp)}));
+                ChunkHelper.splitChunkAt(db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {
+                    "control.min.t": new Date(currentTimeStamp),
+                }),
+            );
         }
 
         // Create an extra chunk on each shard to make sure multi:true operations return correct
@@ -135,16 +133,18 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         for (const destinationShard of destinationShards) {
             currentTimeStamp += chunkRange;
             assert.commandWorked(
-                ChunkHelper.splitChunkAt(db,
-                                         getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-                                         {'control.min.t': new Date(currentTimeStamp)}));
+                ChunkHelper.splitChunkAt(db, getTimeseriesCollForDDLOps(db, db[collName]).getName(), {
+                    "control.min.t": new Date(currentTimeStamp),
+                }),
+            );
 
             ChunkHelper.moveChunk(
                 db,
                 getTimeseriesCollForDDLOps(db, db[collName]).getName(),
-                [{'control.min.t': new Date(currentTimeStamp)}, {'control.min.t': MaxKey}],
+                [{"control.min.t": new Date(currentTimeStamp)}, {"control.min.t": MaxKey}],
                 destinationShard,
-                /*waitForDelete=*/ false);
+                /*waitForDelete=*/ false,
+            );
         }
     };
 

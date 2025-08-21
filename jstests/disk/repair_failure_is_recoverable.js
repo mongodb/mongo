@@ -41,7 +41,7 @@ assertErrorOnStartupAfterIncompleteRepair(dbpath, port);
 
 assertRepairSucceeds(dbpath, port);
 
-assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(nodeDB[collName].exists());
     assert.eq(nodeDB[collName].find().itcount(), 1);
@@ -57,7 +57,7 @@ assertErrorOnStartupAfterIncompleteRepair(dbpath, port);
 
 assertRepairSucceeds(dbpath, port);
 
-assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
+assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function (node) {
     let nodeDB = node.getDB(dbName);
     assert(nodeDB[collName].exists());
     assert.eq(nodeDB[collName].find().itcount(), 1);

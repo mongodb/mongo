@@ -4,10 +4,10 @@
  * Each thread repeatedly inserts a document, and subsequently performs
  * the findAndModify command to remove it.
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {shardKey: {tid: 1}};
 
-    var states = (function() {
+    var states = (function () {
         function init(db, collName) {
             this.iter = 0;
         }
@@ -21,13 +21,12 @@ export const $config = (function() {
                 findandmodify: db[collName].getName(),
                 query: {tid: this.tid},
                 sort: {iter: -1},
-                remove: true
+                remove: true,
             });
             assert.commandWorked(res);
 
             var doc = res.value;
-            assert(doc !== null,
-                   'query spec should have matched a document, returned ' + tojson(res));
+            assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
 
             if (doc !== null) {
                 assert.eq(this.tid, doc.tid);

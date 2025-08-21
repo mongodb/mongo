@@ -6,9 +6,9 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 function typeCheckSingleAggModel(aggregation) {
     // Should be a list of objects.
-    assert(Array.isArray(aggregation), 'Each aggregation pipeline should be an array.');
+    assert(Array.isArray(aggregation), "Each aggregation pipeline should be an array.");
     for (const aggStage of aggregation) {
-        assert.eq(typeof aggStage, 'object', 'Each aggregation stage should be an object.');
+        assert.eq(typeof aggStage, "object", "Each aggregation stage should be an object.");
     }
 }
 
@@ -17,9 +17,9 @@ function typeCheckSingleAggModel(aggregation) {
 function typeCheckManyAggsModel(aggsModel) {
     const aggregations = fc.sample(aggsModel, {numRuns: 1})[0];
     // Should be a list of aggregation pipelines.
-    assert(Array.isArray(aggregations), 'aggsModel should generate an array');
-    assert.gt(aggregations.length, 0, 'aggsModel should generate a non-empty array');
-    aggregations.forEach(agg => typeCheckSingleAggModel(agg));
+    assert(Array.isArray(aggregations), "aggsModel should generate an array");
+    assert.gt(aggregations.length, 0, "aggsModel should generate a non-empty array");
+    aggregations.forEach((agg) => typeCheckSingleAggModel(agg));
 }
 
 /*
@@ -28,14 +28,14 @@ function typeCheckManyAggsModel(aggsModel) {
  *    - `aggsModel` which generates multiple aggregation pipelines at a time or
  *    - `aggModel` and `numQueriesPerRun` which will be used to create an `aggsModel`
  */
-export function makeWorkloadModel(
-    {collModel, aggModel, aggsModel, numQueriesPerRun, extraParamsModel} = {}) {
-    assert(!aggsModel || !aggModel, 'Cannot  specify both `aggsModel` and `aggModel`');
+export function makeWorkloadModel({collModel, aggModel, aggsModel, numQueriesPerRun, extraParamsModel} = {}) {
+    assert(!aggsModel || !aggModel, "Cannot  specify both `aggsModel` and `aggModel`");
     assert(
         !aggsModel || !numQueriesPerRun,
-        'Cannot specify `aggsModel` and `numQueriesPerRun`, since `numQueriesPerRun` is only used when provided `aggModel`.');
+        "Cannot specify `aggsModel` and `numQueriesPerRun`, since `numQueriesPerRun` is only used when provided `aggModel`.",
+    );
     if (aggModel) {
-        aggsModel = fc.array(aggModel, {minLength: 1, maxLength: numQueriesPerRun, size: '+2'});
+        aggsModel = fc.array(aggModel, {minLength: 1, maxLength: numQueriesPerRun, size: "+2"});
     }
     typeCheckManyAggsModel(aggsModel);
     if (!extraParamsModel) {

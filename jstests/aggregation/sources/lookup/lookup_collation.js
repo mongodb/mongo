@@ -14,19 +14,19 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAggPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 // ToDo: SERVER-103530. Remove multiversion check when 9.0 becomes last-lts
-const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-    Boolean(TestData.multiversionBinVersion);
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
 const caseInsensitive = {
     locale: "en_US",
-    strength: 1
+    strength: 1,
 };
 
 const caseSensitive = {
-    locale: "simple"
+    locale: "simple",
 };
 
 // When no collation is specified for a collection, it uses the default, case-sensitive collation.
@@ -38,7 +38,10 @@ const collAa_indexed = testDB.case_sensitive_indexed;
 assert.commandWorked(testDB.createCollection("case_insensitive", {collation: caseInsensitive}));
 const collAA = testDB.case_insensitive;
 
-const records = [{_id: 0, key: "a"}, {_id: 1, key: "A"}];
+const records = [
+    {_id: 0, key: "a"},
+    {_id: 1, key: "A"},
+];
 assert.commandWorked(collAa.insert(records));
 assert.commandWorked(collAA.insert(records));
 assert.commandWorked(collAa_indexed.insert(records));
@@ -53,14 +56,13 @@ const lookupWithPipeline = (foreignColl) => {
             from: foreignColl.getName(),
             as: "matched",
             let: {l_key: "$key"},
-            pipeline: [{$match: {$expr: {$eq: ["$key", "$$l_key"]}}}]
-        }
+            pipeline: [{$match: {$expr: {$eq: ["$key", "$$l_key"]}}}],
+        },
     };
 };
 const lookupNoPipeline = (foreignColl) => {
     return {
-        $lookup:
-            {from: foreignColl.getName(), localField: "key", foreignField: "key", as: "matched"}
+        $lookup: {from: foreignColl.getName(), localField: "key", foreignField: "key", as: "matched"},
     };
 };
 
@@ -69,8 +71,22 @@ const resultCaseSensitive = [
     {_id: 1, key: "A", matched: [{_id: 1, key: "A"}]},
 ];
 const resultCaseInsensitive = [
-    {_id: 0, key: "a", matched: [{_id: 0, key: "a"}, {_id: 1, key: "A"}]},
-    {_id: 1, key: "A", matched: [{_id: 0, key: "a"}, {_id: 1, key: "A"}]},
+    {
+        _id: 0,
+        key: "a",
+        matched: [
+            {_id: 0, key: "a"},
+            {_id: 1, key: "A"},
+        ],
+    },
+    {
+        _id: 1,
+        key: "A",
+        matched: [
+            {_id: 0, key: "a"},
+            {_id: 1, key: "A"},
+        ],
+    },
 ];
 let results = [];
 let explain;
@@ -82,14 +98,14 @@ let explain;
         assertArrayEq({
             actual: results,
             expected: resultCaseSensitive,
-            extraErrorMsg: " Default collation on local, running: " + tojson(lookupInto)
+            extraErrorMsg: " Default collation on local, running: " + tojson(lookupInto),
         });
 
         results = collAA.aggregate([lookupInto(collAa)], {allowDiskUse: false}).toArray();
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on local, running: " + tojson(lookupInto)
+            extraErrorMsg: " Case-insensitive collation on local, running: " + tojson(lookupInto),
         });
 
         // When lowering to SBE a different join algorithm (HashJoin) is used if 'allowDiskUse' is
@@ -99,8 +115,7 @@ let explain;
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on local, disk use allowed, running: " +
-                tojson(lookupInto)
+            extraErrorMsg: " Case-insensitive collation on local, disk use allowed, running: " + tojson(lookupInto),
         });
     }
 })();
@@ -112,14 +127,14 @@ let explain;
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on command, running: " + tojson(lookupInto)
+            extraErrorMsg: " Case-insensitive collation on command, running: " + tojson(lookupInto),
         });
 
         results = collAA.aggregate([lookupInto(collAa)], {collation: caseSensitive}).toArray();
         assertArrayEq({
             actual: results,
             expected: resultCaseSensitive,
-            extraErrorMsg: " Case-sensitive collation on command, running: " + tojson(lookupInto)
+            extraErrorMsg: " Case-sensitive collation on command, running: " + tojson(lookupInto),
         });
     }
 })();
@@ -149,8 +164,7 @@ let explain;
         if (getAggPlanStages(explain, "$cursor").length === 0) {
             const winningPlan = getWinningPlanFromExplain(explain);
             if (winningPlan.stage === "EQ_LOOKUP") {
-                const strategies =
-                    Array.isArray(expectedStrategies) ? expectedStrategies : [expectedStrategies];
+                const strategies = Array.isArray(expectedStrategies) ? expectedStrategies : [expectedStrategies];
 
                 let foundMatch = false;
                 for (const expectedStrategy of strategies) {
@@ -176,11 +190,9 @@ let explain;
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on local, foreign is indexed, running: " +
-                tojson(lookupInto)
+            extraErrorMsg: " Case-insensitive collation on local, foreign is indexed, running: " + tojson(lookupInto),
         });
-        let areCollectionsColocated =
-            FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
+        let areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAA, collAa_indexed]);
         if (areCollectionsColocated) {
             explain = collAA.explain().aggregate([lookupInto(collAa_indexed)]);
             assertJoinStrategy(explain, "IndexedLoopJoin", "key_1_x_1");
@@ -188,41 +200,37 @@ let explain;
 
         // Command-level collation overrides the local collation and foreign has an index with
         // compatible collation (case insensitive).
-        results =
-            collAa.aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive}).toArray();
+        results = collAa.aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive}).toArray();
         assertArrayEq({
             actual: results,
             expected: resultCaseInsensitive,
-            extraErrorMsg: " Case-insensitive collation on command, foreign is indexed, running:" +
-                tojson(lookupInto)
+            extraErrorMsg: " Case-insensitive collation on command, foreign is indexed, running:" + tojson(lookupInto),
         });
         areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
         if (areCollectionsColocated) {
-            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
-                                                 {collation: caseInsensitive});
+            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)], {collation: caseInsensitive});
             assertJoinStrategy(explain, "IndexedLoopJoin", "key_1_x_1");
         }
 
         // Command-level collation, {locale: "fr"}, overrides the local collation and foreign has an
         // index with incompatible collation.
-        results =
-            collAa.aggregate([lookupInto(collAa_indexed)], {collation: {locale: "fr"}}).toArray();
+        results = collAa.aggregate([lookupInto(collAa_indexed)], {collation: {locale: "fr"}}).toArray();
         assertArrayEq({
             actual: results,
             expected: resultCaseSensitive,
-            extraErrorMsg:
-                " locale fr collation on local, foreign is indexed,running: " + tojson(lookupInto)
+            extraErrorMsg: " locale fr collation on local, foreign is indexed,running: " + tojson(lookupInto),
         });
         areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAa_indexed]);
         if (areCollectionsColocated) {
             // If there is an index but it is not compatible with the requested collation and disk
             // usage is not allowed, dynamic indexed loop join will be chosen.
-            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
-                                                 {allowDiskUse: false, collation: {locale: "fr"}});
+            explain = collAa
+                .explain()
+                .aggregate([lookupInto(collAa_indexed)], {allowDiskUse: false, collation: {locale: "fr"}});
             if (isMultiversion) {
                 assertJoinStrategyMulti(explain, [
                     {name: "NestedLoopJoin", index: null},
-                    {name: "DynamicIndexedLoopJoin", index: "key_1"}
+                    {name: "DynamicIndexedLoopJoin", index: "key_1"},
                 ]);
             } else {
                 assertJoinStrategy(explain, "DynamicIndexedLoopJoin", "key_1");
@@ -232,8 +240,9 @@ let explain;
         if (areCollectionsColocated) {
             // If there is an index but it is not compatible with the requested collation and disk
             // usage is allowed, hash join will be chosen.
-            explain = collAa.explain().aggregate([lookupInto(collAa_indexed)],
-                                                 {allowDiskUse: true, collation: {locale: "fr"}});
+            explain = collAa
+                .explain()
+                .aggregate([lookupInto(collAa_indexed)], {allowDiskUse: true, collation: {locale: "fr"}});
             assertJoinStrategy(explain, "HashJoin", null);
         }
 
@@ -260,8 +269,8 @@ let explain;
             from: collAA.getName(),
             as: "matched",
             let: {l_key: "$_id"},
-            pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_key"]}}}]
-        }
+            pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_key"]}}}],
+        },
     };
     let areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);
     if (areCollectionsColocated) {
@@ -270,7 +279,7 @@ let explain;
     }
 
     pipeline = {
-        $lookup: {from: collAA.getName(), localField: "_id", foreignField: "_id", as: "matched"}
+        $lookup: {from: collAA.getName(), localField: "_id", foreignField: "_id", as: "matched"},
     };
     jsTest.log.info("Running pipeline: ", pipeline);
     areCollectionsColocated = FixtureHelpers.areCollectionsColocated([collAa, collAA]);

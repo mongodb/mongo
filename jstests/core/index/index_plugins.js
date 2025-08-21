@@ -30,7 +30,7 @@ assert.commandWorked(coll.createIndex({a: "hashed", b: 1}));
 assert.commandWorked(coll.createIndex({a: 1, b: "hashed"}));
 
 coll.dropIndexes();
-assert.commandFailed(coll.createIndex({a: 1, b: "2d"}));  // unsupported
+assert.commandFailed(coll.createIndex({a: 1, b: "2d"})); // unsupported
 
 // Test compound index where multiple fields have same special index type.
 coll.dropIndexes();
@@ -48,15 +48,19 @@ for (let indexType1 of incompatableIndexTypes) {
         if (indexType1 == indexType2) {
             continue;
         }
-        assert.commandFailedWithCode(coll.createIndex({a: indexType1, b: indexType2}),
-                                     ErrorCodes.CannotCreateIndex);
-        assert.commandFailedWithCode(coll.createIndex({a: indexType1, b: indexType2, c: 1}),
-                                     ErrorCodes.CannotCreateIndex);
-        assert.commandFailedWithCode(coll.createIndex({c: -1, a: indexType1, b: indexType2}),
-                                     ErrorCodes.CannotCreateIndex);
-        assert.commandFailedWithCode(coll.createIndex({a: indexType1, c: 1, b: indexType2}),
-                                     ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(coll.createIndex({a: indexType1, b: indexType2}), ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(
+            coll.createIndex({a: indexType1, b: indexType2, c: 1}),
+            ErrorCodes.CannotCreateIndex,
+        );
+        assert.commandFailedWithCode(
+            coll.createIndex({c: -1, a: indexType1, b: indexType2}),
+            ErrorCodes.CannotCreateIndex,
+        );
+        assert.commandFailedWithCode(
+            coll.createIndex({a: indexType1, c: 1, b: indexType2}),
+            ErrorCodes.CannotCreateIndex,
+        );
     }
-    assert.commandFailedWithCode(coll.createIndex({"$**": 1, b: indexType1}),
-                                 ErrorCodes.CannotCreateIndex);
+    assert.commandFailedWithCode(coll.createIndex({"$**": 1, b: indexType1}), ErrorCodes.CannotCreateIndex);
 }

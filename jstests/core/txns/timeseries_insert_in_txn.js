@@ -13,16 +13,16 @@ TimeseriesTest.run((insert) => {
     const testDB = session.getDatabase(jsTestName());
 
     // Create time-series collection outside transaction.
-    const collForCreate = testDB.getCollection('t');
+    const collForCreate = testDB.getCollection("t");
     collForCreate.drop();
-    const timeFieldName = 'time';
-    assert.commandWorked(
-        testDB.createCollection(collForCreate.getName(), {timeseries: {timeField: timeFieldName}}));
+    const timeFieldName = "time";
+    assert.commandWorked(testDB.createCollection(collForCreate.getName(), {timeseries: {timeField: timeFieldName}}));
 
     session.startTransaction();
     const coll = testDB.getCollection(collForCreate.getName());
-    assert.commandFailedWithCode(insert(coll, {_id: 0, [timeFieldName]: ISODate()}),
-                                 ErrorCodes.OperationNotSupportedInTransaction);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(
+        insert(coll, {_id: 0, [timeFieldName]: ISODate()}),
+        ErrorCodes.OperationNotSupportedInTransaction,
+    );
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 });

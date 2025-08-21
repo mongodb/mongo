@@ -41,26 +41,18 @@ rst.awaitNodesAgreeOnPrimary();
 
 const primary = rst.getPrimary();
 
-assert.commandWorked(
-    primary.getDB("test").test.insert({key0: "value0"}, {writeConcern: {w: 3}}),
-);
+assert.commandWorked(primary.getDB("test").test.insert({key0: "value0"}, {writeConcern: {w: 3}}));
 
 // Pause the journal flusher so that N0 will be behind N1 and N2 after a restart.
 const pauseJournalFlusherThreadName = "pauseJournalFlusherThread";
-const pauseJournalFlusherThreadFp = configureFailPoint(
-    primary,
-    pauseJournalFlusherThreadName,
-);
+const pauseJournalFlusherThreadFp = configureFailPoint(primary, pauseJournalFlusherThreadName);
 pauseJournalFlusherThreadFp.wait();
 
 assert.commandWorked(primary.getDB("test").test.insert({key1: "value1"}));
 
 rst.stop(primary);
 
-rst.awaitNoPrimary(
-    "Ensure that the primary was successfully terminated.",
-    timeoutMS,
-);
+rst.awaitNoPrimary("Ensure that the primary was successfully terminated.", timeoutMS);
 
 rst.start(primary, {waitForConnect: true}, true, true);
 

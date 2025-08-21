@@ -16,14 +16,15 @@ function runConfigsvrRemoveChunksWithRetries(conn, uuid, lsid, txnNumber) {
             collectionUUID: uuid,
             lsid: lsid,
             txnNumber: txnNumber,
-            writeConcern: {w: "majority"}
+            writeConcern: {w: "majority"},
         });
 
-        if (RetryableWritesUtil.isRetryableCode(res.code) ||
+        if (
+            RetryableWritesUtil.isRetryableCode(res.code) ||
             RetryableWritesUtil.errmsgContainsRetryableCodeName(res.errmsg) ||
-            (res.writeConcernError &&
-             RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))) {
-            return false;  // Retry
+            (res.writeConcernError && RetryableWritesUtil.isRetryableCode(res.writeConcernError.code))
+        ) {
+            return false; // Retry
         }
 
         return true;
@@ -35,14 +36,13 @@ function runConfigsvrRemoveChunksWithRetries(conn, uuid, lsid, txnNumber) {
 function insertLeftoverChunks(configDB, uuid) {
     const chunkDocsForNs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
     var chunksToInsert = [];
-    chunkDocsForNs.forEach(originalChunk => {
+    chunkDocsForNs.forEach((originalChunk) => {
         var newChunk = originalChunk;
         newChunk._id = ObjectId();
         newChunk.uuid = otherCollectionUUID;
         chunksToInsert.push(newChunk);
     });
-    assert.commandWorked(
-        configDB.getCollection("chunks").insertMany(chunksToInsert, {ordered: false}));
+    assert.commandWorked(configDB.getCollection("chunks").insertMany(chunksToInsert, {ordered: false}));
 }
 
 let st = new ShardingTest({mongos: 1, shards: 1});
@@ -67,8 +67,9 @@ insertLeftoverChunks(configDB, otherCollectionUUID);
 assert.eq(1, configDB.getCollection("chunks").find({uuid: otherCollectionUUID}).itcount());
 
 // Remove the leftover chunks matching 'otherCollectionUUID'
-assert.commandWorked(runConfigsvrRemoveChunksWithRetries(
-    st.configRS.getPrimary(), otherCollectionUUID, lsid, NumberLong(1)));
+assert.commandWorked(
+    runConfigsvrRemoveChunksWithRetries(st.configRS.getPrimary(), otherCollectionUUID, lsid, NumberLong(1)),
+);
 
 assert.eq(0, configDB.getCollection("chunks").find({uuid: otherCollectionUUID}).itcount());
 
@@ -79,9 +80,9 @@ assert.eq(1, configDB.getCollection("chunks").find({uuid: otherCollectionUUID}).
 // Check that _configsvrRemoveChunks with a txnNumber lesser than the previous one won't remove the
 // chunk documents
 assert.commandFailedWithCode(
-    runConfigsvrRemoveChunksWithRetries(
-        st.configRS.getPrimary(), otherCollectionUUID, lsid, NumberLong(0)),
-    ErrorCodes.TransactionTooOld);
+    runConfigsvrRemoveChunksWithRetries(st.configRS.getPrimary(), otherCollectionUUID, lsid, NumberLong(0)),
+    ErrorCodes.TransactionTooOld,
+);
 
 assert.eq(1, configDB.getCollection("chunks").find({uuid: otherCollectionUUID}).itcount());
 

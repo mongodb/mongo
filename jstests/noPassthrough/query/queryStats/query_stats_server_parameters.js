@@ -6,7 +6,7 @@ import {getExecCount, resetQueryStatsStore} from "jstests/libs/query/query_stats
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
-    const testDB = conn.getDB('test');
+    const testDB = conn.getDB("test");
     var coll = testDB[jsTestName()];
     coll.drop();
 
@@ -25,28 +25,32 @@ function runTest(conn) {
         assert.eq(getExecCount(testDB, coll.getName()), expectedCount);
     }
 
-    {  // Test sample-based rate limiting.
+    {
+        // Test sample-based rate limiting.
         resetQueryStatsStore(conn, "1MB");
         conn.adminCommand({setParameter: 1, internalQueryStatsSampleRate: 1.0});
         conn.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 0});
         assertSampleCount(10);
     }
 
-    {  // Test window-based rate limiting.
+    {
+        // Test window-based rate limiting.
         resetQueryStatsStore(conn, "1MB");
         conn.adminCommand({setParameter: 1, internalQueryStatsSampleRate: 0.0});
         conn.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 3});
         assertSampleCount(3);
     }
 
-    {  // Test sampling-based takes precedence over window-based rate limiting.
+    {
+        // Test sampling-based takes precedence over window-based rate limiting.
         resetQueryStatsStore(conn, "1MB");
         conn.adminCommand({setParameter: 1, internalQueryStatsSampleRate: 1.0});
         conn.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 1});
         assertSampleCount(10);
     }
 
-    {  // Test idempotency of setParameter commands.
+    {
+        // Test idempotency of setParameter commands.
         resetQueryStatsStore(conn, "1MB");
         conn.adminCommand({setParameter: 1, internalQueryStatsSampleRate: 1.0});
         conn.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 0});
@@ -59,14 +63,16 @@ function runTest(conn) {
         assertSampleCount(10);
     }
 
-    {  // Test query stats is disabled when both parameters are set to 0.
+    {
+        // Test query stats is disabled when both parameters are set to 0.
         resetQueryStatsStore(conn, "1MB");
         conn.adminCommand({setParameter: 1, internalQueryStatsSampleRate: 0.0});
         conn.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 0});
         assertSampleCount(0);
     }
 
-    {  // Test sample-based rate limiting with 50% sampling rate.
+    {
+        // Test sample-based rate limiting with 50% sampling rate.
         resetQueryStatsStore(conn, "1MB");
         conn.adminCommand({setParameter: 1, internalQueryStatsSampleRate: 0.5});
         conn.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 0});

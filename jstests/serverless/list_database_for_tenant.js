@@ -4,26 +4,26 @@ function setupReplSet() {
     const rst = new ReplSetTest({
         nodes: 1,
         nodeOptions: {
-            auth: '',
+            auth: "",
             setParameter: {
                 multitenancySupport: true,
                 featureFlagSecurityToken: true,
-                testOnlyValidatedTenancyScopeKey: 'secret',
-            }
-        }
+                testOnlyValidatedTenancyScopeKey: "secret",
+            },
+        },
     });
-    rst.startSet({keyFile: 'jstests/libs/key1'});
+    rst.startSet({keyFile: "jstests/libs/key1"});
     rst.initiate();
 
     let primary = rst.getPrimary();
-    let adminDb = primary.getDB('admin');
-    assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-    assert(adminDb.auth('admin', 'pwd'));
+    let adminDb = primary.getDB("admin");
+    assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["root"]}));
+    assert(adminDb.auth("admin", "pwd"));
     return rst;
 }
 
 function createAndSetSecurityToken(conn, tenantId, bExpectPrefix) {
-    if (typeof conn._securityToken == 'undefined') {
+    if (typeof conn._securityToken == "undefined") {
         const tenantToken = _createTenantToken({tenant: tenantId, expectPrefix: bExpectPrefix});
         conn._setSecurityToken(tenantToken);
     }
@@ -31,7 +31,7 @@ function createAndSetSecurityToken(conn, tenantId, bExpectPrefix) {
 
 function insertDb(conn, dbName) {
     const db = conn.getDB(dbName);
-    assert.commandWorked(db.runCommand({insert: 'some_collection', documents: [{_id: 0}]}));
+    assert.commandWorked(db.runCommand({insert: "some_collection", documents: [{_id: 0}]}));
 }
 
 function checkDbNum(conn, dbNum) {
@@ -54,7 +54,7 @@ function runTests() {
 
     {
         const conn = Mongo(primary.host);
-        assert(conn.getDB("admin").auth('admin', 'pwd'));
+        assert(conn.getDB("admin").auth("admin", "pwd"));
         createAndSetSecurityToken(conn, tenant, true);
         insertDb(conn, tenant + "_firstRegDb");
         checkDbNum(conn, 1);
@@ -101,8 +101,7 @@ function runTestExpectPrefixTrue() {
 
     // will fail if prefix not provided on insert
     const nonPrefixDb = primary.getDB("_fourthRegDb");
-    assert.commandFailedWithCode(
-        nonPrefixDb.runCommand({insert: 'some_collection', documents: [{_id: 0}]}), 8423386);
+    assert.commandFailedWithCode(nonPrefixDb.runCommand({insert: "some_collection", documents: [{_id: 0}]}), 8423386);
 
     rst.stopSet();
 }

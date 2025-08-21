@@ -32,7 +32,7 @@ var st = new ShardingTest({
     other: {rs0: {nodes: 3}, rs1: {nodes: 3}, useBridge: true},
     mongos: 1,
     config: TestData.configShard ? undefined : 1,
-    enableBalancer: false
+    enableBalancer: false,
 });
 
 jsTestLog("Setting up sharded cluster.");
@@ -71,25 +71,29 @@ jsTestLog("Testing linearizable read from secondaries");
 
 // Execute a linearizable read from secondaries (targeting both shards) which should fail.
 st.s.setReadPref("secondary");
-var res = assert.commandFailed(testDB.runReadCommand({
-    find: collName,
-    filter: dualShardQueryFilter,
-    readConcern: {level: "linearizable"},
-    maxTimeMS: shard0ReplTest.timeoutMS
-}));
+var res = assert.commandFailed(
+    testDB.runReadCommand({
+        find: collName,
+        filter: dualShardQueryFilter,
+        readConcern: {level: "linearizable"},
+        maxTimeMS: shard0ReplTest.timeoutMS,
+    }),
+);
 assert.eq(res.code, ErrorCodes.doMongosRewrite(st.s, ErrorCodes.NotWritablePrimary));
 
 jsTestLog("Testing linearizable read from primaries.");
 
 // Execute a linearizable read from primaries (targeting both shards) which should succeed.
 st.s.setReadPref("primary");
-var res = assert.commandWorked(testDB.runReadCommand({
-    find: collName,
-    sort: {x: 1},
-    filter: dualShardQueryFilter,
-    readConcern: {level: "linearizable"},
-    maxTimeMS: shard0ReplTest.timeoutMS
-}));
+var res = assert.commandWorked(
+    testDB.runReadCommand({
+        find: collName,
+        sort: {x: 1},
+        filter: dualShardQueryFilter,
+        readConcern: {level: "linearizable"},
+        maxTimeMS: shard0ReplTest.timeoutMS,
+    }),
+);
 
 // Make sure data was returned from both shards correctly.
 assert.eq(res.cursor.firstBatch[0].x, shard0DocKey);
@@ -112,7 +116,7 @@ var result = testDB.runReadCommand({
     find: collName,
     filter: dualShardQueryFilter,
     readConcern: {level: "linearizable"},
-    maxTimeMS: 3000
+    maxTimeMS: 3000,
 });
 assert.commandFailedWithCode(result, ErrorCodes.MaxTimeMSExpired);
 

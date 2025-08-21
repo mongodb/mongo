@@ -23,8 +23,10 @@ TestData.setParameters = TestData.setParameters || {};
 TestData.setParameters.logComponentVerbosity = TestData.setParameters.logComponentVerbosity || {};
 TestData.setParameters.logComponentVerbosity.replication =
     TestData.setParameters.logComponentVerbosity.replication || {};
-TestData.setParameters.logComponentVerbosity.replication =
-    Object.merge(TestData.setParameters.logComponentVerbosity.replication, {verbosity: 2});
+TestData.setParameters.logComponentVerbosity.replication = Object.merge(
+    TestData.setParameters.logComponentVerbosity.replication,
+    {verbosity: 2},
+);
 
 // There are a limited number of voting nodes allowed in a replica set. We use as many voting nodes
 // as possible and fill in the rest with non-voting nodes.
@@ -34,7 +36,7 @@ let allNodes = [];
 for (let i = 0; i < numNodes; i++) {
     allNodes.push(i < maxNumVotingNodes ? {} : {rsConfig: {votes: 0, priority: 0}});
 }
-const replTest = new ReplSetTest({name: 'replsettest_control_12_nodes', nodes: allNodes});
+const replTest = new ReplSetTest({name: "replsettest_control_12_nodes", nodes: allNodes});
 replTest.startSet();
 replTest.initiate();
 replTest.stopSet();

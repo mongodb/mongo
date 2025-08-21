@@ -23,20 +23,14 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    assertSetFCVSoon
-} from "jstests/concurrency/fsm_workload_helpers/query/assert_fcv_reset_soon.js";
-import {
-    uniformDistTransitions
-} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_setFCV_operations.js";
+import {assertSetFCVSoon} from "jstests/concurrency/fsm_workload_helpers/query/assert_fcv_reset_soon.js";
+import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_setFCV_operations.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Counts the number of time the setFeatureCompatibility command succeeds.
-    $config.data.succesfullSetFCVDbName = 'fcv';
-    $config.data.succesfullSetFCVCollName = 'executions';
+    $config.data.succesfullSetFCVDbName = "fcv";
+    $config.data.succesfullSetFCVCollName = "executions";
     $config.data.expectedSetFCVExecutions = 2;
     // Auxiliary helper to move a collection and capture all expected errors of the test.
     $config.data.kAcceptedMoveCollectionErrors = [
@@ -98,7 +92,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.kMovePrimaryAllowedErrorCodes.push(ErrorCodes.NamespaceNotFound);
 
     // Auxiliary function to catch and handle the move collection errors.
-    $config.data.moveCollectionHelper = function(db, nss, destinationShard) {
+    $config.data.moveCollectionHelper = function (db, nss, destinationShard) {
         try {
             assert.commandWorked(db.adminCommand({moveCollection: nss, toShard: destinationShard}));
         } catch (e) {
@@ -109,12 +103,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     // Override create state to create unsharded collections instead of sharded collections.
-    $config.states.create = function(db, collName, connCache) {
+    $config.states.create = function (db, collName, connCache) {
         db = $config.data.getRandomDb(db);
         const coll = $config.data.getRandomCollection(db);
         const fullNs = coll.getFullName();
 
-        jsTestLog('STATE:create collection: ' + fullNs);
+        jsTestLog("STATE:create collection: " + fullNs);
         try {
             assert.commandWorked(db.createCollection(coll.getName()));
         } catch (e) {
@@ -122,63 +116,63 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 throw e;
             }
         }
-        jsTestLog('STATE:create finished succesfully');
+        jsTestLog("STATE:create finished succesfully");
     };
 
     // Move a random collection to a random shard, effectively tracking it.
-    $config.states.moveCollection = function(db, collName, connCache) {
+    $config.states.moveCollection = function (db, collName, connCache) {
         db = $config.data.getRandomDb(db);
         const coll = $config.data.getRandomCollection(db);
         const fullNs = coll.getFullName();
         // The config server might stepdown while getting the shards.
         try {
-            let shards = db.getSiblingDB('config').shards.find().toArray();
+            let shards = db.getSiblingDB("config").shards.find().toArray();
             const shardId = shards[Random.randInt(shards.length)]._id;
 
-            jsTestLog('STATE:moveCollection  collection ' + fullNs + ' to shardId: ' + shardId);
+            jsTestLog("STATE:moveCollection  collection " + fullNs + " to shardId: " + shardId);
             $config.data.moveCollectionHelper(db, fullNs, shardId);
         } catch (e) {
             if (!$config.data.kAcceptedMoveCollectionErrors.includes(e.code)) {
                 throw e;
             }
         }
-        jsTestLog('STATE:moveCollection finished succesfully');
+        jsTestLog("STATE:moveCollection finished succesfully");
     };
 
-    $config.states.setFCV = function(db, collName, connCache) {
+    $config.states.setFCV = function (db, collName, connCache) {
         try {
             const fcvValues = [latestFCV, lastContinuousFCV, lastLTSFCV];
             const targetFCV = fcvValues[Random.randInt(3)];
             // Ensure we're in the latest version.
-            jsTestLog('STATE:setFCV setting FCV to ' + targetFCV);
-            assert.commandWorked(
-                db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
-            db.getSiblingDB(
-                  $config.data.succesfullSetFCVDbName)[$config.data.succesfullSetFCVCollName]
-                .update({}, {$inc: {count: 1}});
+            jsTestLog("STATE:setFCV setting FCV to " + targetFCV);
+            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
+            db.getSiblingDB($config.data.succesfullSetFCVDbName)[$config.data.succesfullSetFCVCollName].update(
+                {},
+                {$inc: {count: 1}},
+            );
         } catch (e) {
             if (!$config.data.kAcceptedSetFCVErrors.includes(e.code)) {
                 throw e;
             }
         }
-        jsTestLog('STATE:setFCV finished succesfully');
+        jsTestLog("STATE:setFCV finished succesfully");
     };
 
     // This jstests adds new errors that can occur due to concurrent execution with resharding.
     // Unfortunately, the way extending works on fsm, we can't modify the error list for the
     // parent states, so, we need to also reimplement the states.
-    $config.states.movePrimary = function(db, collName, connCache) {
+    $config.states.movePrimary = function (db, collName, connCache) {
         db = $config.data.getRandomDb(db);
         const shardId = $config.data.getRandomShard(connCache);
 
-        jsTestLog('STATE:movePrimary moving: ' + db.getName() + ' to ' + shardId);
+        jsTestLog("STATE:movePrimary moving: " + db.getName() + " to " + shardId);
         const res = db.adminCommand({movePrimary: db.getName(), to: shardId});
         assert.commandWorkedOrFailedWithCode(res, $config.data.kMovePrimaryAllowedErrorCodes);
     };
 
-    $config.states.checkDatabaseMetadataConsistency = function(db, collName, connCache) {
+    $config.states.checkDatabaseMetadataConsistency = function (db, collName, connCache) {
         db = $config.data.getRandomDb(db);
-        jsTestLog('STATE:checkDatabaseMetadataConsistency for database: ' + db.getName());
+        jsTestLog("STATE:checkDatabaseMetadataConsistency for database: " + db.getName());
         try {
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
@@ -189,10 +183,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
     };
 
-    $config.states.checkCollectionMetadataConsistency = function(db, collName, connCache) {
+    $config.states.checkCollectionMetadataConsistency = function (db, collName, connCache) {
         db = $config.data.getRandomDb(db);
         const coll = $config.data.getRandomCollection(db);
-        jsTestLog('STATE:checkCollectionMetadataConsistency for collection: ' + coll.getFullName());
+        jsTestLog("STATE:checkCollectionMetadataConsistency for collection: " + coll.getFullName());
         try {
             const inconsistencies = coll.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
@@ -205,22 +199,20 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.transitions = uniformDistTransitions($config.states);
 
-    $config.setup = function(db, collName, cluster) {
-        db.getSiblingDB($config.data.succesfullSetFCVDbName)[$config.data.succesfullSetFCVCollName]
-            .insert({count: 0});
+    $config.setup = function (db, collName, cluster) {
+        db.getSiblingDB($config.data.succesfullSetFCVDbName)[$config.data.succesfullSetFCVCollName].insert({count: 0});
     };
 
-    $config.teardown = function(db, collName, cluster) {
+    $config.teardown = function (db, collName, cluster) {
         assertSetFCVSoon(db, latestFCV);
 
-        const fcvExecutions =
-            db.getSiblingDB(
-                  $config.data.succesfullSetFCVDbName)[$config.data.succesfullSetFCVCollName]
-                .findOne({})
-                .count;
-        assert(fcvExecutions >= $config.data.expectedSetFCVExecutions,
-               'Expected setFeatureCompatibility to run at least 2 times, but it ran ' +
-                   fcvExecutions + ' times');
+        const fcvExecutions = db
+            .getSiblingDB($config.data.succesfullSetFCVDbName)
+            [$config.data.succesfullSetFCVCollName].findOne({}).count;
+        assert(
+            fcvExecutions >= $config.data.expectedSetFCVExecutions,
+            "Expected setFeatureCompatibility to run at least 2 times, but it ran " + fcvExecutions + " times",
+        );
     };
 
     // Do more iterations than usual to ensure setFeatureCompatibility is called enough times to

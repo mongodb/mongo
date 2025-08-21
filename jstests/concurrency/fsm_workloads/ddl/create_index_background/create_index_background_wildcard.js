@@ -12,12 +12,10 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.getIndexSpec = function() {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.getIndexSpec = function () {
         return {"$**": 1};
     };
 

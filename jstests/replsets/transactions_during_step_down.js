@@ -23,7 +23,7 @@ var primaryColl = db[collName];
 var collNss = primaryColl.getFullName();
 
 jsTestLog("Writing data to collection.");
-assert.commandWorked(primaryColl.insert({_id: 'readOp'}, {"writeConcern": {"w": 2}}));
+assert.commandWorked(primaryColl.insert({_id: "readOp"}, {"writeConcern": {"w": 2}}));
 
 TestData.dbName = dbName;
 TestData.collName = collName;
@@ -50,7 +50,7 @@ function runStepDown() {
     rst.awaitSecondaryNodes(null, [primary]);
 
     jsTestLog("Validating data.");
-    assert.docEq([{_id: 'readOp'}], primaryColl.find().toArray());
+    assert.docEq([{_id: "readOp"}], primaryColl.find().toArray());
 
     jsTestLog("Making old primary eligible to be re-elected.");
     assert.commandWorked(primaryAdmin.runCommand({replSetFreeze: 0}));
@@ -59,20 +59,21 @@ function runStepDown() {
 
 function testTxnFailsWithCode({
     op,
-    failPoint: failPoint = 'hangAfterPreallocateSnapshot',
-    nss: nss = dbName + '.$cmd',
-    preOp: preOp = ''
+    failPoint: failPoint = "hangAfterPreallocateSnapshot",
+    nss: nss = dbName + ".$cmd",
+    preOp: preOp = "",
 }) {
     jsTestLog("Enabling failPoint '" + failPoint + "' on primary.");
-    assert.commandWorked(primary.adminCommand({
-        configureFailPoint: failPoint,
-        data: {shouldContinueOnInterrupt: true},
-        mode: "alwaysOn"
-    }));
+    assert.commandWorked(
+        primary.adminCommand({
+            configureFailPoint: failPoint,
+            data: {shouldContinueOnInterrupt: true},
+            mode: "alwaysOn",
+        }),
+    );
 
     // Start transaction.
-    TestData.cmd =
-        preOp + `assert.commandFailedWithCode(${op}, ErrorCodes.InterruptedDueToReplStateChange);`;
+    TestData.cmd = preOp + `assert.commandFailedWithCode(${op}, ErrorCodes.InterruptedDueToReplStateChange);`;
     const waitForTxnShell = startParallelShell(txnFunc, primary.port);
 
     jsTestLog("Waiting for primary to reach failPoint '" + failPoint + "'.");
@@ -85,7 +86,7 @@ function testTxnFailsWithCode({
     waitForTxnShell();
 
     // Disable fail point.
-    assert.commandWorked(primaryAdmin.runCommand({configureFailPoint: failPoint, mode: 'off'}));
+    assert.commandWorked(primaryAdmin.runCommand({configureFailPoint: failPoint, mode: "off"}));
 }
 
 function testAbortOrCommitTxnFailsWithCode(params) {
@@ -102,13 +103,11 @@ testTxnFailsWithCode({op: "sessionColl.insert({_id: 'writeOp'})"});
 
 jsTestLog("Testing stepdown during read-write transaction.");
 testTxnFailsWithCode({
-    op: "sessionDb.runCommand({findAndModify: '" + collName +
-        "', query: {_id: 'readOp'}, remove: true})"
+    op: "sessionDb.runCommand({findAndModify: '" + collName + "', query: {_id: 'readOp'}, remove: true})",
 });
 
 jsTestLog("Testing stepdown during commit transaction.");
-testAbortOrCommitTxnFailsWithCode(
-    {failPoint: "hangBeforeCommitingTxn", op: "session.commitTransaction_forTesting()"});
+testAbortOrCommitTxnFailsWithCode({failPoint: "hangBeforeCommitingTxn", op: "session.commitTransaction_forTesting()"});
 
 jsTestLog("Testing stepdown during running transaction in inactive state.");
 // Do not start the transaction in parallel shell because when the parallel
@@ -119,7 +118,7 @@ const session = db.getMongo().startSession();
 const sessionDb = session.getDatabase(TestData.dbName);
 const sessionColl = sessionDb[TestData.collName];
 session.startTransaction({writeConcern: {w: "majority"}});
-assert.commandWorked(sessionColl.insert({_id: 'inactiveTxnOp'}));
+assert.commandWorked(sessionColl.insert({_id: "inactiveTxnOp"}));
 
 // Call step down & validate data.
 runStepDown();

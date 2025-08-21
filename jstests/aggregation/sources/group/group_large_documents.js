@@ -14,7 +14,7 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 const coll = db.group_large_documents_local;
 coll.drop();
 
-const largeString = 'x'.repeat(10 * 1024 * 1024);
+const largeString = "x".repeat(10 * 1024 * 1024);
 for (let i = 0; i < 7; ++i) {
     assert.commandWorked(coll.insert({key: 1, largeField: largeString}));
 }
@@ -28,6 +28,5 @@ for (let preventProjectPushdown of [false, true]) {
 
     const results = coll.aggregate(pipeline).toArray();
 
-    assert(arrayEq(results, [{a: 2}]),
-           "Pipeline:\n" + tojson(pipeline) + "Actual results:\n" + tojson(results));
+    assert(arrayEq(results, [{a: 2}]), "Pipeline:\n" + tojson(pipeline) + "Actual results:\n" + tojson(results));
 }

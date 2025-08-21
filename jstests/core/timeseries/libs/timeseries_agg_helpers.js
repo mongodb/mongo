@@ -20,10 +20,12 @@ export var TimeseriesAggTests = class {
      * @returns An array of a time-series collection and a non time-series collection,
      *     respectively in this order.
      */
-    static prepareInputCollections(numHosts,
-                                   numIterations,
-                                   includeIdleMeasurements = true,
-                                   testDB = TimeseriesAggTests.getTestDb()) {
+    static prepareInputCollections(
+        numHosts,
+        numIterations,
+        includeIdleMeasurements = true,
+        testDB = TimeseriesAggTests.getTestDb(),
+    ) {
         const timeseriesCollOption = {timeseries: {timeField: "time", metaField: "tags"}};
 
         Random.setRandomSeed();
@@ -56,16 +58,16 @@ export var TimeseriesAggTests = class {
                     usage_softirq: TimeseriesTest.getRandomUsage(),
                     usage_steal: TimeseriesTest.getRandomUsage(),
                     usage_system: TimeseriesTest.getRandomUsage(),
-                    usage_user: userUsage
+                    usage_user: userUsage,
                 };
                 assert.commandWorked(inColl.insert(newMeasurement));
                 assert.commandWorked(observerInColl.insert(newMeasurement));
 
-                if (includeIdleMeasurements && (i % 2)) {
+                if (includeIdleMeasurements && i % 2) {
                     let idleMeasurement = {
                         tags: host.tags,
                         time: new Date(currTime++),
-                        idle_user: 100 - userUsage
+                        idle_user: 100 - userUsage,
                     };
                     assert.commandWorked(inColl.insert(idleMeasurement));
                     assert.commandWorked(observerInColl.insert(idleMeasurement));
@@ -105,17 +107,19 @@ export var TimeseriesAggTests = class {
      * Returns sorted data by "time" field. The sorted result data will help simplify comparison
      * logic.
      */
-    static getOutputAggregateResults(inColl,
-                                     pipeline,
-                                     prepareAction = null,
-                                     shouldDrop = true,
-                                     testDB = TimeseriesAggTests.getTestDb()) {
+    static getOutputAggregateResults(
+        inColl,
+        pipeline,
+        prepareAction = null,
+        shouldDrop = true,
+        testDB = TimeseriesAggTests.getTestDb(),
+    ) {
         // Figures out the output collection name from the last pipeline stage.
         var outCollName = "out";
         if (pipeline[pipeline.length - 1]["$out"] != undefined) {
             // If the last stage is "$out", gets the output collection name from the string or
             // object input.
-            if (typeof pipeline[pipeline.length - 1]["$out"] == 'string') {
+            if (typeof pipeline[pipeline.length - 1]["$out"] == "string") {
                 outCollName = pipeline[pipeline.length - 1]["$out"];
             } else {
                 outCollName = pipeline[pipeline.length - 1]["$out"]["coll"];
@@ -133,9 +137,7 @@ export var TimeseriesAggTests = class {
         // Assumes that the pipeline's last stage outputs result into 'outColl'.
         assert.doesNotThrow(() => retryOnRetryableError(() => inColl.aggregate(pipeline)));
 
-        return outColl.find({}, {"_id": 0, "time": 1, "hostid": 1, "cpu": 1, "idle": 1})
-            .sort({"time": 1})
-            .toArray();
+        return outColl.find({}, {"_id": 0, "time": 1, "hostid": 1, "cpu": 1, "idle": 1}).sort({"time": 1}).toArray();
     }
 
     static verifyResults(actualResults, expectedResults) {

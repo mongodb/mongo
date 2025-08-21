@@ -19,7 +19,7 @@ const testCases = [
     {document: {left: 12.5, right: NumberLong("5")}, expected: 2.5},
     {
         document: {left: 12.5, right: NumberDecimal("2.5")},
-        expected: NumberDecimal("5.000000000000")
+        expected: NumberDecimal("5.000000000000"),
     },
     {document: {left: 12.5, right: null}, expected: null},
 
@@ -32,11 +32,11 @@ const testCases = [
     {document: {left: NumberDecimal("12.5"), right: 2.5}, expected: NumberDecimal("5")},
     {
         document: {left: NumberDecimal("12.5"), right: NumberLong("5")},
-        expected: NumberDecimal("2.5")
+        expected: NumberDecimal("2.5"),
     },
     {
         document: {left: NumberDecimal("12.5"), right: NumberDecimal("2.5")},
-        expected: NumberDecimal("5")
+        expected: NumberDecimal("5"),
     },
     {document: {left: NumberDecimal("12.5"), right: null}, expected: null},
 
@@ -57,11 +57,11 @@ const testCases = [
     // Decimal values are not converted to doubles before division and represent result accurately.
     {
         document: {left: NumberDecimal("9223372036854775807"), right: 1},
-        expected: NumberDecimal("9223372036854775807")
+        expected: NumberDecimal("9223372036854775807"),
     },
 ];
 
-testCases.forEach(function(testCase) {
+testCases.forEach(function (testCase) {
     assert.commandWorked(coll.insert(testCase.document));
 
     const result = coll.aggregate({$project: {computed: {$divide: ["$left", "$right"]}}}).toArray();
@@ -83,11 +83,10 @@ const errorTestCases = [
     {document: {left: "not a number", right: 1}, errorCodes: [16609, ErrorCodes.TypeMismatch]},
 ];
 
-errorTestCases.forEach(function(testCase) {
+errorTestCases.forEach(function (testCase) {
     assert.commandWorked(coll.insert(testCase.document));
 
-    assertErrorCode(
-        coll, {$project: {computed: {$divide: ["$left", "$right"]}}}, testCase.errorCodes);
+    assertErrorCode(coll, {$project: {computed: {$divide: ["$left", "$right"]}}}, testCase.errorCodes);
 
     assert(coll.drop());
 });

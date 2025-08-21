@@ -28,7 +28,7 @@ let c = t.find({$or: orClause}, {_id: 0, a: 1});
 while (c.hasNext()) {
     let o = c.next();
     if (o.a) {
-        assert.eq(0, o.a % 2, 'unexpected result: ' + tojson(o));
+        assert.eq(0, o.a % 2, "unexpected result: " + tojson(o));
     }
 }
 
@@ -38,6 +38,6 @@ c = t.find({$or: orClause}, {_id: 0, b: 1});
 while (c.hasNext()) {
     let o = c.next();
     if (o.b) {
-        assert.eq(1, o.b % 2, 'unexpected result: ' + tojson(o));
+        assert.eq(1, o.b % 2, "unexpected result: " + tojson(o));
     }
 }

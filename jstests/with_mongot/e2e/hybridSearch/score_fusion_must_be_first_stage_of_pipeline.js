@@ -8,7 +8,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 
 const collName = "score_fusion";
@@ -31,20 +31,17 @@ let matchStage = {
         number_of_reviews: {
             $gte: 25,
         },
-    }
+    },
 };
 
 let scoreFusionWithoutSearchStage = {
     $scoreFusion: {
         input: {
             pipelines: {
-                a: [
-                    {$sort: {_id: 1}},
-                    {$score: {score: "$number_of_reviews", normalization: "none"}},
-                ],
+                a: [{$sort: {_id: 1}}, {$score: {score: "$number_of_reviews", normalization: "none"}}],
             },
-            normalization: "none"
-        }
+            normalization: "none",
+        },
     },
 };
 
@@ -52,34 +49,38 @@ let scoreFusionWithSearchStage = {
     $scoreFusion: {
         input: {
             pipelines: {
-                vector: [{
-                    $vectorSearch: {
-                        // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
-                        queryVector: getMoviePlotEmbeddingById(6),
-                        path: "plot_embedding",
-                        numCandidates: limit * vectorSearchOverrequestFactor,
-                        index: getMovieVectorSearchIndexSpec().name,
-                        limit: limit,
-                    }
-                }],
+                vector: [
+                    {
+                        $vectorSearch: {
+                            // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
+                            queryVector: getMoviePlotEmbeddingById(6),
+                            path: "plot_embedding",
+                            numCandidates: limit * vectorSearchOverrequestFactor,
+                            index: getMovieVectorSearchIndexSpec().name,
+                            limit: limit,
+                        },
+                    },
+                ],
                 search: [
                     {
                         $search: {
                             index: getMovieSearchIndexSpec().name,
                             text: {query: "ape", path: ["fullplot", "title"]},
-                        }
+                        },
                     },
-                    {$limit: limit}
-                ]
+                    {$limit: limit},
+                ],
             },
-            normalization: "none"
-        }
+            normalization: "none",
+        },
     },
 };
 
 function assertScoreFusionMustBeFirstStageInPipeline(pipeline) {
-    assert.commandFailedWithCode(coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-                                 ScoreFusionMustBeFirstStageOfPipelineErrCode);
+    assert.commandFailedWithCode(
+        coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
+        ScoreFusionMustBeFirstStageOfPipelineErrCode,
+    );
 }
 
 // Simple case where a typical search-based $scoreFusion is preceded by a filter (match stage).
@@ -90,14 +91,17 @@ assertScoreFusionMustBeFirstStageInPipeline([matchStage, scoreFusionWithSearchSt
 
 // In this case where the desugared output of the aggregation would be a valid query,
 // but we should still reject because we catch that $scoreFusion is the first stage.
-assertScoreFusionMustBeFirstStageInPipeline(
-    [matchStage, scoreFusionWithoutSearchStage, limitStage]);
+assertScoreFusionMustBeFirstStageInPipeline([matchStage, scoreFusionWithoutSearchStage, limitStage]);
 
 // Tests that its not sufficient for $scoreFusion to be the first stage of the pipeline,
 // it must also not be any stage other than the first.
 // (i.e. if we have 2 different $scoreFusion in a pipeline, even if one is the first,
 // the query still fails).
-assertScoreFusionMustBeFirstStageInPipeline(
-    [scoreFusionWithoutSearchStage, matchStage, scoreFusionWithSearchStage, limitStage]);
+assertScoreFusionMustBeFirstStageInPipeline([
+    scoreFusionWithoutSearchStage,
+    matchStage,
+    scoreFusionWithSearchStage,
+    limitStage,
+]);
 
 dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});

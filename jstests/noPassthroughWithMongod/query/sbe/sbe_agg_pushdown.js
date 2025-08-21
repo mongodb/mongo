@@ -9,7 +9,7 @@
 // Storing the expression we assume is unsupported as a constant, so we can easily change it when we
 // implement $toBool in SBE.
 const kUnsupportedExpression = {
-    $toBool: {date: "$b"}
+    $toBool: {date: "$b"},
 };
 
 const coll = db.jstests_sbe_pushdown;
@@ -26,11 +26,13 @@ function assertPushdownQueryExecMode(pipeline, expectedExplainVersion) {
     assert.eq(actualExplainVersion, expectedExplainVersion);
 }
 
-assert.commandWorked(coll.insertMany([
-    {_id: 0, a: 1, b: ISODate("2021-04-28T00:00:00Z")},
-    {_id: 1, a: 2, b: ISODate("2021-04-28T10:00:00Z")},
-    {_id: 2, a: 3, b: ISODate("2021-04-28T20:00:00Z")},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {_id: 0, a: 1, b: ISODate("2021-04-28T00:00:00Z")},
+        {_id: 1, a: 2, b: ISODate("2021-04-28T10:00:00Z")},
+        {_id: 2, a: 3, b: ISODate("2021-04-28T20:00:00Z")},
+    ]),
+);
 
 // Test query with no supported expressions is executed with the classic engine.
 assertPushdownQueryExecMode([{$project: {_id: 0, c: {kUnsupportedExpression}}}], "1");
@@ -38,18 +40,13 @@ assertPushdownQueryExecMode([{$project: {_id: 0, c: {kUnsupportedExpression}}}],
 // Test query that contains an expression unsupported by SBE that isn't pushed down. In this case,
 // we still expect SBE to be used if the unsupported expression isn't pushed down.
 assertPushdownQueryExecMode(
-    [
-        {$match: {a: 2}},
-        {$_internalInhibitOptimization: {}},
-        {$project: {_id: 0, c: {kUnsupportedExpression}}}
-    ],
-    "2");
+    [{$match: {a: 2}}, {$_internalInhibitOptimization: {}}, {$project: {_id: 0, c: {kUnsupportedExpression}}}],
+    "2",
+);
 
 // Test query with an unsupported expression in a $project stage that's pushed down executes with
 // the classic engine.
-assertPushdownQueryExecMode([{$match: {a: 2}}, {$project: {_id: 0, c: {kUnsupportedExpression}}}],
-                            "1");
+assertPushdownQueryExecMode([{$match: {a: 2}}, {$project: {_id: 0, c: {kUnsupportedExpression}}}], "1");
 
 // Test query with fully supported expressions are executed with SBE when pushed down.
-assertPushdownQueryExecMode(
-    [{$match: {$expr: {$eq: ["$b", {$dateFromParts: {year: 2021, month: 4, day: 28}}]}}}], "2");
+assertPushdownQueryExecMode([{$match: {$expr: {$eq: ["$b", {$dateFromParts: {year: 2021, month: 4, day: 28}}]}}}], "2");

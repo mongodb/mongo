@@ -3,9 +3,7 @@
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = jsTestName();
 const collName = jsTestName();
@@ -21,7 +19,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     other: {
         rsOptions: nodeOptions,
         mongosOptions: nodeOptions,
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
@@ -61,7 +59,7 @@ const collNS = testColl.getFullName();
 
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 const expectedCommand = mongotCommandForQuery({
@@ -69,7 +67,7 @@ const expectedCommand = mongotCommandForQuery({
     collName: testColl.getName(),
     db: testDB.getName(),
     collectionUUID: collUUID,
-    protocolVersion: NumberInt(42)
+    protocolVersion: NumberInt(42),
 });
 
 // History for shard 1.
@@ -88,25 +86,28 @@ const expectedCommand = mongotCommandForQuery({
                             type: "results",
                             ns: collNS,
                             nextBatch: [
-                                {_id: 1, val: 1, $searchScore: .41},
-                                {_id: 2, val: 2, $searchScore: .31},
-                                {_id: 3, val: 3, $searchScore: .28},
-                                {_id: 4, val: 4, $searchScore: .11},
+                                {_id: 1, val: 1, $searchScore: 0.41},
+                                {_id: 2, val: 2, $searchScore: 0.31},
+                                {_id: 3, val: 3, $searchScore: 0.28},
+                                {_id: 4, val: 4, $searchScore: 0.11},
                             ],
                         },
-                        ok: 1
+                        ok: 1,
                     },
                     {
                         cursor: {
                             id: NumberLong(0),
                             ns: collNS,
                             type: "meta",
-                            nextBatch: [{type: 1, count: 2}, {type: 2, count: 17}],
+                            nextBatch: [
+                                {type: 1, count: 2},
+                                {type: 2, count: 17},
+                            ],
                         },
-                        ok: 1
-                    }
-                ]
-            }
+                        ok: 1,
+                    },
+                ],
+            },
         },
     ];
     const mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
@@ -129,25 +130,28 @@ const expectedCommand = mongotCommandForQuery({
                             type: "results",
                             ns: collNS,
                             nextBatch: [
-                                {_id: 11, val: 11, $searchScore: .4},
-                                {_id: 12, val: 12, $searchScore: .3},
-                                {_id: 13, val: 13, $searchScore: .2},
-                                {_id: 14, val: 14, $searchScore: .1},
+                                {_id: 11, val: 11, $searchScore: 0.4},
+                                {_id: 12, val: 12, $searchScore: 0.3},
+                                {_id: 13, val: 13, $searchScore: 0.2},
+                                {_id: 14, val: 14, $searchScore: 0.1},
                             ],
                         },
-                        ok: 1
+                        ok: 1,
                     },
                     {
                         cursor: {
                             id: NumberLong(0),
                             ns: collNS,
                             type: "meta",
-                            nextBatch: [{type: 1, count: 5}, {type: 2, count: 10}],
+                            nextBatch: [
+                                {type: 1, count: 5},
+                                {type: 2, count: 10},
+                            ],
                         },
-                        ok: 1
-                    }
-                ]
-            }
+                        ok: 1,
+                    },
+                ],
+            },
         },
     ];
     const mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
@@ -156,46 +160,45 @@ const expectedCommand = mongotCommandForQuery({
 
 // History for mongos
 {
-    const mergingPipelineHistory = [{
-        expectedCommand: {
-            planShardedSearch: collName,
-            query: searchQuery,
-            $db: dbName,
-            searchFeatures: {shardedSort: 1}
-        },
-        response: {
-            ok: 1,
-            protocolVersion: NumberInt(42),
-            // This does not represent an actual merging pipeline. The merging pipeline is
-            // arbitrary, it just must only generate one document.
-            metaPipeline: [
-                {
-                    "$group": {
-                        "_id": {
-                            "type": "$type",
+    const mergingPipelineHistory = [
+        {
+            expectedCommand: {
+                planShardedSearch: collName,
+                query: searchQuery,
+                $db: dbName,
+                searchFeatures: {shardedSort: 1},
+            },
+            response: {
+                ok: 1,
+                protocolVersion: NumberInt(42),
+                // This does not represent an actual merging pipeline. The merging pipeline is
+                // arbitrary, it just must only generate one document.
+                metaPipeline: [
+                    {
+                        "$group": {
+                            "_id": {
+                                "type": "$type",
+                            },
+                            "sum": {
+                                "$sum": "$count",
+                            },
                         },
-                        "sum": {
-                            "$sum": "$count",
-                        }
-                    }
-                },
-                {$project: {_id: 0, type: "$_id.type", count: "$sum"}},
-                {$match: {"type": 1}}
-            ]
-        }
-    }];
+                    },
+                    {$project: {_id: 0, type: "$_id.type", count: "$sum"}},
+                    {$match: {"type": 1}},
+                ],
+            },
+        },
+    ];
     const mongot = stWithMock.getMockConnectedToHost(stWithMock.st.s);
     mongot.setMockResponses(mergingPipelineHistory, 1);
 }
 
-let cursor = testColl.aggregate([
-    {$search: searchQuery},
-    {$project: {_id: 1, meta: "$$SEARCH_META"}},
-]);
+let cursor = testColl.aggregate([{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}]);
 
 const metaDoc = {
     type: 1,
-    count: 7
+    count: 7,
 };
 const expected = [
     {"_id": 1, "meta": metaDoc},
@@ -205,7 +208,7 @@ const expected = [
     {"_id": 3, "meta": metaDoc},
     {"_id": 13, "meta": metaDoc},
     {"_id": 4, "meta": metaDoc},
-    {"_id": 14, "meta": metaDoc}
+    {"_id": 14, "meta": metaDoc},
 ];
 
 assert.eq(expected, cursor.toArray());

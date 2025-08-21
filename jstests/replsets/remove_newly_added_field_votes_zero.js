@@ -32,17 +32,19 @@ jsTestLog("Adding a new non-voting node to the replica set");
 const secondary0 = rst.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
 
-assert.commandWorked(secondary0.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary0.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Checking that 'newlyAdded' field is not set");
 assert(!isMemberNewlyAdded(primary, 1));
@@ -56,8 +58,7 @@ assertVoteCount(primary, {
 });
 
 jsTestLog("Waiting for initial sync to complete");
-assert.commandWorked(
-    secondary0.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(secondary0.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 rst.awaitSecondaryNodes(null, [secondary0]);
 
 jsTestLog("Checking that 'newlyAdded' field is still not set");
@@ -78,17 +79,19 @@ jsTestLog("Adding a new voting node to the replica set");
 const secondary1 = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
 
-assert.commandWorked(secondary1.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary1.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Checking that 'newlyAdded' field is set");
 assert.eq(0, rst.getReplSetConfigFromNode(primary.nodeId).members[1].votes);
@@ -107,8 +110,7 @@ jsTestLog("Reconfiguring new node to have 0 votes");
 let cfg = rst.getReplSetConfigFromNode(primary.nodeId);
 cfg.version += 1;
 cfg.members[2].votes = 0;
-assert.commandWorked(
-    primary.adminCommand({replSetReconfig: cfg, maxTimeMS: ReplSetTest.kDefaultTimeoutMS}));
+assert.commandWorked(primary.adminCommand({replSetReconfig: cfg, maxTimeMS: ReplSetTest.kDefaultTimeoutMS}));
 
 assert.eq(0, rst.getReplSetConfigFromNode(primary.nodeId).members[1].votes);
 assert.eq(0, rst.getReplSetConfigFromNode(primary.nodeId).members[2].votes);
@@ -123,8 +125,7 @@ assertVoteCount(primary, {
 });
 
 jsTestLog("Waiting for second initial sync to complete");
-assert.commandWorked(
-    secondary1.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(secondary1.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 rst.awaitSecondaryNodes(null, [secondary1]);
 
 jsTestLog("Checking that 'newlyAdded' field was removed");

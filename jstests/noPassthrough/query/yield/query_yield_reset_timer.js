@@ -7,16 +7,16 @@ var coll = mongod.getDB("test").getCollection(jsTest.name());
 // Configure the server so that queries are expected to yield after every 10 work cycles, or
 // after every 500 milliseconds (whichever comes first). In addition, enable a failpoint that
 // introduces a sleep delay of 1 second during each yield.
+assert.commandWorked(coll.getDB().adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}));
+assert.commandWorked(coll.getDB().adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 500}));
 assert.commandWorked(
-    coll.getDB().adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}));
-assert.commandWorked(
-    coll.getDB().adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 500}));
-assert.commandWorked(coll.getDB().adminCommand({
-    configureFailPoint: "setYieldAllLocksWait",
-    namespace: coll.getFullName(),
-    mode: "alwaysOn",
-    data: {waitForMillis: 1000}
-}));
+    coll.getDB().adminCommand({
+        configureFailPoint: "setYieldAllLocksWait",
+        namespace: coll.getFullName(),
+        mode: "alwaysOn",
+        data: {waitForMillis: 1000},
+    }),
+);
 
 // Insert 40 documents in the collection, perform a collection scan, and verify that it yields
 // about 4 times. Since each group of 10 documents should always be processed in less than 500

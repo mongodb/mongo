@@ -20,16 +20,13 @@ assert(admin.runCommand({split: coll + "", middle: {_id: 0}}).ok);
 jsTest.log("Preparing large insert...");
 
 var data1MB = "x";
-while (data1MB.length < 1024 * 1024)
-    data1MB += data1MB;
+while (data1MB.length < 1024 * 1024) data1MB += data1MB;
 
 var data15MB = "";
-for (var i = 0; i < 15; i++)
-    data15MB += data1MB;
+for (var i = 0; i < 15; i++) data15MB += data1MB;
 
 var data15PlusMB = data15MB;
-for (var i = 0; i < 1023 * 1024; i++)
-    data15PlusMB += "x";
+for (var i = 0; i < 1023 * 1024; i++) data15PlusMB += "x";
 
 print("~15MB object size is : " + Object.bsonsize({_id: 0, d: data15PlusMB}));
 

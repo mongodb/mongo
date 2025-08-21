@@ -15,12 +15,11 @@ replSet.startSet();
 replSet.initiate();
 
 const collName = "coll";
-const primaryDB = replSet.getPrimary().getDB('test');
+const primaryDB = replSet.getPrimary().getDB("test");
 const collection = primaryDB[collName];
 
 const docs = [...Array(10).keys()].map((i) => ({"_id": i}));
-const insertTimestamp =
-    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs})).operationTime;
+const insertTimestamp = assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs})).operationTime;
 jsTestLog("Inserted 10 documents at: " + tojson(insertTimestamp));
 
 // Test find with atClusterTime.
@@ -49,8 +48,7 @@ cursor = collection.find();
 assert.eq(cursor.getClusterTime(), undefined);
 
 // Test aggregate with atClusterTime.
-cursor = collection.aggregate([{$sort: {_id: 1}}],
-                              {readConcern: {level: "snapshot", atClusterTime: insertTimestamp}});
+cursor = collection.aggregate([{$sort: {_id: 1}}], {readConcern: {level: "snapshot", atClusterTime: insertTimestamp}});
 assert.eq(cursor.getClusterTime(), insertTimestamp);
 
 // Test aggregate with snapshot readConcern. Similarly to the find with snapshot readConcern and no

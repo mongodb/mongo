@@ -24,10 +24,10 @@ bulk.insert({_id: "Trenton", state: "NJ", pop: 5});
 assert.commandWorked(bulk.execute());
 
 const viewName = "baseView";
-const viewPipeline = [{"$addFields": {aa_type: {$ifNull: ['$aa_type', 'foo']}}}];
-assert.commandWorked(testDb.createView(viewName, 'underlyingSourceCollection', viewPipeline));
+const viewPipeline = [{"$addFields": {aa_type: {$ifNull: ["$aa_type", "foo"]}}}];
+assert.commandWorked(testDb.createView(viewName, "underlyingSourceCollection", viewPipeline));
 
-const nestedViewPipeline = [{"$addFields": {bb_type: {$ifNull: ['$bb_type', 'foo']}}}];
+const nestedViewPipeline = [{"$addFields": {bb_type: {$ifNull: ["$bb_type", "foo"]}}}];
 assert.commandWorked(testDb.createView("nestedView", viewName, nestedViewPipeline));
 
 const nestedView = testDb["nestedView"];
@@ -35,7 +35,7 @@ const combinedViewPipeline = viewPipeline.concat(nestedViewPipeline);
 
 const indexConfig = {
     coll: nestedView,
-    definition: {name: "foo", definition: {"mappings": {"dynamic": true}}}
+    definition: {name: "foo", definition: {"mappings": {"dynamic": true}}},
 };
 
 const nestedViewTestCases = () => {
@@ -46,21 +46,23 @@ const nestedViewTestCases = () => {
     // =========================================================================================
     // Case 1: Basic search query on nested view.
     // =========================================================================================
-    const basicSearchPipeline = [{
-        $search: {
-            index: "foo",
-            exists: {
-                path: "state",
-            }
-        }
-    }];
+    const basicSearchPipeline = [
+        {
+            $search: {
+                index: "foo",
+                exists: {
+                    path: "state",
+                },
+            },
+        },
+    ];
 
     const expectedResults = [
         {"_id": "Oakland", "state": "CA", "pop": 3, "aa_type": "foo", "bb_type": "foo"},
         {"_id": "San Francisco", "state": "CA", "pop": 4, "aa_type": "foo", "bb_type": "foo"},
         {"_id": "Trenton", "state": "NJ", "pop": 5, "aa_type": "foo", "bb_type": "foo"},
         {"_id": "Palo Alto", "state": "CA", "pop": 10, "aa_type": "foo", "bb_type": "foo"},
-        {"_id": "New York", "state": "NY", "pop": 7, "aa_type": "foo", "bb_type": "foo"}
+        {"_id": "New York", "state": "NY", "pop": 7, "aa_type": "foo", "bb_type": "foo"},
     ];
 
     validateSearchExplain(nestedView, basicSearchPipeline, false, combinedViewPipeline);
@@ -74,24 +76,26 @@ const nestedViewTestCases = () => {
     const indexDef = {mappings: {dynamic: true, fields: {}}, storedSource: {exclude: ["state"]}};
     updateSearchIndex(nestedView, {name: "foo", definition: indexDef});
 
-    const wildcardSearchPipeline = [{
-        $search: {
-            index: "foo",
-            wildcard: {
-                query: "*",  // This matches all documents.
-                path: "_id",
-                allowAnalyzedField: true,
+    const wildcardSearchPipeline = [
+        {
+            $search: {
+                index: "foo",
+                wildcard: {
+                    query: "*", // This matches all documents.
+                    path: "_id",
+                    allowAnalyzedField: true,
+                },
+                returnStoredSource: true,
             },
-            returnStoredSource: true
-        }
-    }];
+        },
+    ];
 
     const expectedStoredSourceResults = [
         {_id: "Palo Alto", pop: 10, aa_type: "foo", bb_type: "foo"},
         {_id: "Oakland", pop: 3, aa_type: "foo", bb_type: "foo"},
         {_id: "Trenton", pop: 5, aa_type: "foo", bb_type: "foo"},
         {_id: "New York", pop: 7, aa_type: "foo", bb_type: "foo"},
-        {_id: "San Francisco", pop: 4, aa_type: "foo", bb_type: "foo"}
+        {_id: "San Francisco", pop: 4, aa_type: "foo", bb_type: "foo"},
     ];
 
     validateSearchExplain(nestedView, wildcardSearchPipeline, true, combinedViewPipeline);

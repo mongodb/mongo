@@ -52,8 +52,10 @@ assert("ok" in currentOpRes, "Result contains 'ok' field");
 //
 const error = assert.throws(() => currentOpRes.fsyncLock);
 assert(
-    /fsyncLock is no longer included in the currentOp shell helper, run db\.runCommand\({currentOp: 1}\) instead/
-        .test(error));
+    /fsyncLock is no longer included in the currentOp shell helper, run db\.runCommand\({currentOp: 1}\) instead/.test(
+        error,
+    ),
+);
 
 //
 // Start a pipeline with a large command object in a parallel shell and then test three different
@@ -71,18 +73,22 @@ function startLongRunningAggregation(collName, comment) {
         return doc;
     }
 
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: collName,
-        pipeline: [{
-            $addFields: {
-                newVal: {$function: {args: [], body: "sleep(1000000)", lang: "js"}},
-                bigDoc: createLargeDoc()
-            }
-        }],
-        comment: comment,
-        cursor: {}
-    }),
-                                 ErrorCodes.Interrupted);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: collName,
+            pipeline: [
+                {
+                    $addFields: {
+                        newVal: {$function: {args: [], body: "sleep(1000000)", lang: "js"}},
+                        bigDoc: createLargeDoc(),
+                    },
+                },
+            ],
+            comment: comment,
+            cursor: {},
+        }),
+        ErrorCodes.Interrupted,
+    );
 }
 
 // Repeatedly executes 'getOperationsFunction()' until it returns exactly one operation for each
@@ -90,7 +96,7 @@ function startLongRunningAggregation(collName, comment) {
 function awaitOperations(getOperationsFunction) {
     let operations;
     assert.soon(
-        function() {
+        function () {
             const numShards = FixtureHelpers.numberOfShardsForCollection(coll);
             operations = getOperationsFunction();
 
@@ -100,17 +106,14 @@ function awaitOperations(getOperationsFunction) {
 
             // Also explicitly check that each shard appears no more than once in the list of
             // operations.
-            const distinctShardNames = new Set(operations.map(op => "shard" in op ? op.shard : ""));
+            const distinctShardNames = new Set(operations.map((op) => ("shard" in op ? op.shard : "")));
             assert.eq(operations.length, distinctShardNames.size, {operations, numShards});
 
             if (operations.length < numShards) {
-                print(`Found ${operations.length} operation(s); waiting until there are ${
-                    numShards} operation(s)`);
+                print(`Found ${operations.length} operation(s); waiting until there are ${numShards} operation(s)`);
                 return false;
-            } else if (operations.some(op => op.op !== "getmore" && "cursor" in op &&
-                                           op.cursor.batchSize === 0)) {
-                print(`Found command with empty 'batchSize' value; waiting for getmore: ${
-                    tojson(operations)}`);
+            } else if (operations.some((op) => op.op !== "getmore" && "cursor" in op && op.cursor.batchSize === 0)) {
+                print(`Found command with empty 'batchSize' value; waiting for getmore: ${tojson(operations)}`);
                 return false;
             } else if (!operations.every(getCommandFromCurrentOpEntry)) {
                 print(`Waiting until all operations have a command: ${tojson(operations)}`);
@@ -119,10 +122,10 @@ function awaitOperations(getOperationsFunction) {
 
             return true;
         },
-        function() {
-            return "Failed to find parallel shell operation in $currentOp output: " +
-                tojson(db.currentOp());
-        });
+        function () {
+            return "Failed to find parallel shell operation in $currentOp output: " + tojson(db.currentOp());
+        },
+    );
 
     return operations;
 }
@@ -130,8 +133,7 @@ function awaitOperations(getOperationsFunction) {
 function getCommandFromCurrentOpEntry(entry) {
     if (entry.op === "command" && "command" in entry) {
         return entry.command;
-    } else if (entry.op === "getmore" && "cursor" in entry &&
-               "originatingCommand" in entry.cursor) {
+    } else if (entry.op === "getmore" && "cursor" in entry && "originatingCommand" in entry.cursor) {
         return entry.cursor.originatingCommand;
     } else {
         return null;
@@ -139,8 +141,7 @@ function getCommandFromCurrentOpEntry(entry) {
 }
 
 const comment = "long_running_aggregation";
-const awaitShell =
-    startParallelShell(funWithArgs(startLongRunningAggregation, coll.getName(), comment));
+const awaitShell = startParallelShell(funWithArgs(startLongRunningAggregation, coll.getName(), comment));
 
 const filter = {
     ns: coll.getFullName(),
@@ -148,43 +149,47 @@ const filter = {
 
     // On the replica set endpoint, currentOp reports both router and shard operations. So filter
     // out one of them.
-    role: TestData.testingReplicaSetEndpoint ? "ClusterRole{router}" : {$exists: false}
+    role: TestData.testingReplicaSetEndpoint ? "ClusterRole{router}" : {$exists: false},
 };
 
 // 1. The $currentOp aggregation stage should _not_ truncate the command.
-const operationsViaAggStage = awaitOperations(function() {
-    return db.getSiblingDB("admin")
-        .aggregate([
-            {$currentOp: {}},
-            {$match: filter},
-        ])
+const operationsViaAggStage = awaitOperations(function () {
+    return db
+        .getSiblingDB("admin")
+        .aggregate([{$currentOp: {}}, {$match: filter}])
         .toArray();
 });
-assert(operationsViaAggStage.every(op => {
-    const command = getCommandFromCurrentOpEntry(op);
-    return !("$truncated" in command) && command.aggregate == coll.getName();
-}),
-       operationsViaAggStage);
+assert(
+    operationsViaAggStage.every((op) => {
+        const command = getCommandFromCurrentOpEntry(op);
+        return !("$truncated" in command) && command.aggregate == coll.getName();
+    }),
+    operationsViaAggStage,
+);
 
 // 2. Directly executing 'currentOp' _should_ truncate the command.
-const operationsViaCurrentOpCommand = awaitOperations(function() {
+const operationsViaCurrentOpCommand = awaitOperations(function () {
     return assert.commandWorked(db.adminCommand(Object.assign({currentOp: true}, filter))).inprog;
 });
-assert(operationsViaCurrentOpCommand.every(op => {
-    const command = getCommandFromCurrentOpEntry(op);
-    return ("$truncated" in command) && !("aggregate" in command);
-}),
-       operationsViaCurrentOpCommand);
+assert(
+    operationsViaCurrentOpCommand.every((op) => {
+        const command = getCommandFromCurrentOpEntry(op);
+        return "$truncated" in command && !("aggregate" in command);
+    }),
+    operationsViaCurrentOpCommand,
+);
 
 // 3. The 'currentOp' shell helper should _not_ truncate the command.
-const operationsViaCurrentOpShellHelper = awaitOperations(function() {
+const operationsViaCurrentOpShellHelper = awaitOperations(function () {
     return db.currentOp(filter).inprog;
 });
-assert(operationsViaCurrentOpShellHelper.every(op => {
-    const command = getCommandFromCurrentOpEntry(op);
-    return !("$truncated" in command) && command.aggregate == coll.getName();
-}),
-       operationsViaCurrentOpShellHelper);
+assert(
+    operationsViaCurrentOpShellHelper.every((op) => {
+        const command = getCommandFromCurrentOpEntry(op);
+        return !("$truncated" in command) && command.aggregate == coll.getName();
+    }),
+    operationsViaCurrentOpShellHelper,
+);
 
 // Finish the test by killing the long-running aggregation pipeline and joining the parallel shell
 // that launched it.

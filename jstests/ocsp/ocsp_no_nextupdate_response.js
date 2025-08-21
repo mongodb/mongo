@@ -8,7 +8,7 @@ import {
     OCSP_SERVER_CERT,
     OCSP_SERVER_MUSTSTAPLE_CERT,
     supportsStapling,
-    waitForServer
+    waitForServer,
 } from "jstests/ocsp/lib/ocsp_helpers.js";
 
 if (!supportsStapling()) {
@@ -17,7 +17,7 @@ if (!supportsStapling()) {
 
 // Setting the seconds to 0 in the mock responder will cause it to omit
 // the nextUpdate field in the response.
-const RESPONSE_VALIDITY = 0;  // seconds
+const RESPONSE_VALIDITY = 0; // seconds
 
 let mock_ocsp = new MockOCSPServer("", RESPONSE_VALIDITY);
 let conn = null;
@@ -42,9 +42,11 @@ sleep(10000);
 // validate that fetchAndStaple was invoked at least 5 times in the 10+ seconds
 // since the mongod process started.
 const FETCH_LOG_ID = 6144500;
-assert.eq(true,
-          checkLog.checkContainsWithAtLeastCountJson(conn, FETCH_LOG_ID, {}, 5),
-          'Number of log lines with ID ' + FETCH_LOG_ID + ' is less than expected');
+assert.eq(
+    true,
+    checkLog.checkContainsWithAtLeastCountJson(conn, FETCH_LOG_ID, {}, 5),
+    "Number of log lines with ID " + FETCH_LOG_ID + " is less than expected",
+);
 
 MongoRunner.stopMongod(conn);
 

@@ -12,9 +12,9 @@ const rst = new ReplSetTest({
         setParameter: {
             // Disable the checkpoint thread.
             syncdelay: 0,
-            logComponentVerbosity: tojson({storage: {wt: {wtCheckpoint: 1}}})
-        }
-    }
+            logComponentVerbosity: tojson({storage: {wt: {wtCheckpoint: 1}}}),
+        },
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -39,25 +39,26 @@ let res = assert.commandWorked(coll.validate({background: true}));
 assert(res.valid);
 assert.eq(2, res.nrecords);
 
-assert.commandWorked(
-    db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
+assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, prepareUnique: true}}));
 
 assert.commandWorked(coll.remove({_id: 2}));
-assert.commandWorked(db.adminCommand({
-    applyOps: [
-        {
-            op: 'c',
-            ns: db.$cmd.getFullName(),
-            o: {
-                collMod: coll.getName(),
-                index: {
-                    keyPattern: {a: 1},
-                    unique: true,
+assert.commandWorked(
+    db.adminCommand({
+        applyOps: [
+            {
+                op: "c",
+                ns: db.$cmd.getFullName(),
+                o: {
+                    collMod: coll.getName(),
+                    index: {
+                        keyPattern: {a: 1},
+                        unique: true,
+                    },
                 },
             },
-        },
-    ]
-}));
+        ],
+    }),
+);
 
 res = assert.commandWorked(coll.validate({background: true}));
 assert(res.valid);

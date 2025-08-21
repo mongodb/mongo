@@ -10,7 +10,7 @@
 
 let t = db.jstests_js3;
 
-let debug = function(s) {
+let debug = function (s) {
     // printjson( s );
 };
 
@@ -27,25 +27,30 @@ for (let z = 0; z < 2; z++) {
     for (let i = 0; i < 1000; i++)
         t.save({
             i: i,
-            z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         });
 
-    assert(2 == t.find({
-                     $where: function() {
-                         // eslint-disable-next-line
-                         return obj.i == 7 || obj.i == 8;
-                     }
-                 }).length());
+    assert(
+        2 ==
+            t
+                .find({
+                    $where: function () {
+                        // eslint-disable-next-line
+                        return obj.i == 7 || obj.i == 8;
+                    },
+                })
+                .length(),
+    );
     assert.eq(1000, t.count());
 
     // NPE test
     var ok = false;
     try {
         var x = t.find({
-            $where: function() {
+            $where: function () {
                 // eslint-disable-next-line
                 asdf.asdf.f.s.s();
-            }
+            },
         });
         debug(x.length());
         debug(tojson(x));
@@ -60,12 +65,14 @@ for (let z = 0; z < 2; z++) {
 
     debug("before indexed find");
 
-    let arr = t.find({
-                   $where: function() {
-                       // eslint-disable-next-line
-                       return obj.i == 7 || obj.i == 8;
-                   }
-               }).toArray();
+    let arr = t
+        .find({
+            $where: function () {
+                // eslint-disable-next-line
+                return obj.i == 7 || obj.i == 8;
+            },
+        })
+        .toArray();
     debug(arr);
     assert.eq(2, arr.length);
 
@@ -74,7 +81,7 @@ for (let z = 0; z < 2; z++) {
     for (let i = 1000; i < 2000; i++)
         t.save({
             i: i,
-            z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         });
 
     assert(t.find().count() == 2000);

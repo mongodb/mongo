@@ -50,10 +50,9 @@ if (!TestData.fuzzMongodConfigs) {
 //  ["$listSearchIndexes", db, coll.getName()],
 
 // Agg queries containing the above stages.
-const queries =
-    stages.map(([stage, db, collection]) =>
-                   new QuerySettingsUtils(db, collection)
-                       .makeAggregateQueryInstance({pipeline: [{[stage]: {}}], cursor: {}}));
+const queries = stages.map(([stage, db, collection]) =>
+    new QuerySettingsUtils(db, collection).makeAggregateQueryInstance({pipeline: [{[stage]: {}}], cursor: {}}),
+);
 
 // Reset query settings.
 qsutils.removeAllQuerySettings();
@@ -67,15 +66,15 @@ for (const query of queries) {
     assert.commandFailedWithCode(
         db.adminCommand({setQuerySettings: query, settings: {reject: true}}),
         [8584900 /* internal */, 8705200 /* forbidden by stage */],
-        "It should not be possible to set reject=true for query: " + JSON.stringify(query));
+        "It should not be possible to set reject=true for query: " + JSON.stringify(query),
+    );
 
     // To be able to conveniently test what happens if reject _is_ set (e.g., in production, by
     // query shape hash), temporarily bypass restrictions on setQuerySettings.
     qsutils.withFailpoint("allowAllSetQuerySettings", {}, () => {
         qsutils.withQuerySettings(query, {reject: true}, () => {
             // Verify the query still works, despite reject=true being set.
-            assert.commandWorked(
-                db.getSiblingDB(dbName).runCommand(qsutils.withoutDollarDB(query)));
+            assert.commandWorked(db.getSiblingDB(dbName).runCommand(qsutils.withoutDollarDB(query)));
         });
     });
 }

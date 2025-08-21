@@ -26,9 +26,7 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
 
     function assertPartialIndexExists(node) {
         const configDB = node.getDB("config");
-        const indexSpecs =
-            assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"}))
-                .cursor.firstBatch;
+        const indexSpecs = assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"})).cursor.firstBatch;
         indexSpecs.sort((index0, index1) => index0.name > index1.name);
         assert.eq(indexSpecs.length, 2);
         const idIndexSpec = indexSpecs[0];
@@ -43,55 +41,50 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         const childSessionDoc = configTxnColl.findOne({
             "_id.id": sessionUUID,
             "_id.txnNumber": childLsid.txnNumber,
-            "_id.txnUUID": childLsid.txnUUID
+            "_id.txnUUID": childLsid.txnUUID,
         });
 
         const explainRes = assert.commandWorked(
-            configTxnColl.explain()
-                .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
-                      {_id: 1})
-                .finish());
+            configTxnColl
+                .explain()
+                .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber}, {_id: 1})
+                .finish(),
+        );
         const winningPlan = getWinningPlanFromExplain(explainRes);
         assert.eq(winningPlan.stage, "PROJECTION_COVERED");
         assert.eq(winningPlan.inputStage.stage, "IXSCAN");
 
-        const findRes =
-            configTxnColl
-                .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber},
-                      {_id: 1})
-                .toArray();
+        const findRes = configTxnColl
+            .find({"parentLsid": parentSessionDoc._id, "_id.txnNumber": childLsid.txnNumber}, {_id: 1})
+            .toArray();
         assert.eq(findRes.length, 1);
         assert.eq(findRes[0]._id, childSessionDoc._id);
     }
 
     function assertPartialIndexDoesNotExist(node) {
         const configDB = node.getDB("config");
-        const indexSpecs =
-            assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"}))
-                .cursor.firstBatch;
+        const indexSpecs = assert.commandWorked(configDB.runCommand({"listIndexes": "transactions"})).cursor.firstBatch;
         assert.eq(indexSpecs.length, 1, indexSpecs);
         const idIndexSpec = indexSpecs[0];
         assert.eq(idIndexSpec.key, {"_id": 1});
     }
 
     function indexRecreationTest(expectRecreateAfterDrop) {
-        assert.commandWorked(
-            st.rs0.getPrimary().getCollection(kConfigTxnNs).dropIndex(kPartialIndexName));
+        assert.commandWorked(st.rs0.getPrimary().getCollection(kConfigTxnNs).dropIndex(kPartialIndexName));
         st.rs0.awaitReplication();
 
-        st.rs0.nodes.forEach(node => {
+        st.rs0.nodes.forEach((node) => {
             assertPartialIndexDoesNotExist(node);
         });
 
         let primary = st.rs0.getPrimary();
-        assert.commandWorked(
-            primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
         assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
 
         st.rs0.awaitNodesAgreeOnPrimary();
         st.rs0.awaitReplication();
 
-        st.rs0.nodes.forEach(node => {
+        st.rs0.nodes.forEach((node) => {
             if (expectRecreateAfterDrop) {
                 assertPartialIndexExists(node);
             } else {
@@ -123,13 +116,15 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     const parentTxnNumber = 35;
     let stmtId = 0;
 
-    assert.commandWorked(mongosTestDB.runCommand({
-        insert: kCollName,
-        documents: [{_id: 0}],
-        lsid: parentLsid,
-        txnNumber: NumberLong(parentTxnNumber),
-        stmtId: NumberInt(stmtId++)
-    }));
+    assert.commandWorked(
+        mongosTestDB.runCommand({
+            insert: kCollName,
+            documents: [{_id: 0}],
+            lsid: parentLsid,
+            txnNumber: NumberLong(parentTxnNumber),
+            stmtId: NumberInt(stmtId++),
+        }),
+    );
     st.rs0.awaitReplication();
     const parentSessionDoc = shard0PrimaryConfigTxnColl.findOne({"_id.id": sessionUUID});
 
@@ -139,21 +134,25 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     function runRetryableInternalTransaction(txnNumber) {
         withRetryOnTransientTxnError(() => {
             txnNumber++;
-            assert.commandWorked(mongosTestDB.runCommand({
-                insert: kCollName,
-                documents: [{x: 1}],
-                lsid: childLsid,
-                txnNumber: NumberLong(txnNumber),
-                stmtId: NumberInt(stmtId++),
-                autocommit: false,
-                startTransaction: true
-            }));
-            assert.commandWorked(mongosTestDB.adminCommand({
-                commitTransaction: 1,
-                lsid: childLsid,
-                txnNumber: NumberLong(txnNumber),
-                autocommit: false
-            }));
+            assert.commandWorked(
+                mongosTestDB.runCommand({
+                    insert: kCollName,
+                    documents: [{x: 1}],
+                    lsid: childLsid,
+                    txnNumber: NumberLong(txnNumber),
+                    stmtId: NumberInt(stmtId++),
+                    autocommit: false,
+                    startTransaction: true,
+                }),
+            );
+            assert.commandWorked(
+                mongosTestDB.adminCommand({
+                    commitTransaction: 1,
+                    lsid: childLsid,
+                    txnNumber: NumberLong(txnNumber),
+                    autocommit: false,
+                }),
+            );
         });
     }
 
@@ -161,7 +160,7 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     st.rs0.awaitReplication();
     assert.eq(shard0PrimaryConfigTxnColl.count({"_id.id": sessionUUID}), 2);
 
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         assertPartialIndexExists(node);
         assertFindUsesCoveredQuery(node);
     });
@@ -171,7 +170,7 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     st.rs0.awaitReplication();
     assert.eq(shard0PrimaryConfigTxnColl.count({"_id.id": sessionUUID}), 2);
 
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         assertPartialIndexExists(node);
         assertFindUsesCoveredQuery(node);
     });
@@ -182,36 +181,40 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     //
 
     const indexConn = st.rs0.getPrimary();
-    assert.commandWorked(
-        indexConn.getCollection("config.transactions").dropIndex(kPartialIndexName));
+    assert.commandWorked(indexConn.getCollection("config.transactions").dropIndex(kPartialIndexName));
 
     // Normal writes don't involve config.transactions, so they succeed.
-    assert.commandWorked(indexConn.getDB(kDbName).runCommand(
-        {insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}}));
+    assert.commandWorked(
+        indexConn.getDB(kDbName).runCommand({insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}}),
+    );
 
     // Retryable writes read from the partial index, so they fail.
-    let res = assert.commandFailedWithCode(indexConn.getDB(kDbName).runCommand({
-        insert: kCollName,
-        documents: [{x: 1}],
-        lsid: {id: UUID()},
-        txnNumber: NumberLong(11)
-    }),
-                                           ErrorCodes.BadValue);
+    let res = assert.commandFailedWithCode(
+        indexConn.getDB(kDbName).runCommand({
+            insert: kCollName,
+            documents: [{x: 1}],
+            lsid: {id: UUID()},
+            txnNumber: NumberLong(11),
+        }),
+        ErrorCodes.BadValue,
+    );
     assert(res.errmsg.includes("Please create an index directly "), tojson(res));
 
     // User transactions read from the partial index, so they fail.
     let txnNum = 11;
     withRetryOnTransientTxnError(() => {
         txnNum++;
-        assert.commandFailedWithCode(indexConn.getDB(kDbName).runCommand({
-            insert: kCollName,
-            documents: [{x: 1}],
-            lsid: {id: UUID()},
-            txnNumber: NumberLong(txnNum),
-            startTransaction: true,
-            autocommit: false
-        }),
-                                     ErrorCodes.BadValue);
+        assert.commandFailedWithCode(
+            indexConn.getDB(kDbName).runCommand({
+                insert: kCollName,
+                documents: [{x: 1}],
+                lsid: {id: UUID()},
+                txnNumber: NumberLong(txnNum),
+                startTransaction: true,
+                autocommit: false,
+            }),
+            ErrorCodes.BadValue,
+        );
     });
 
     // Non retryable internal transactions do not read from or update the partial index, so they can
@@ -220,123 +223,151 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     txnNum = 11;
     withRetryOnTransientTxnError(() => {
         txnNum++;
-        assert.commandWorked(indexConn.getDB(kDbName).runCommand({
-            insert: kCollName,
-            documents: [{x: 1}],
-            lsid: nonRetryableTxnSession,
-            txnNumber: NumberLong(txnNum),
-            stmtId: NumberInt(0),
-            startTransaction: true,
-            autocommit: false
-        }));
-        assert.commandWorked(indexConn.adminCommand({
-            commitTransaction: 1,
-            lsid: nonRetryableTxnSession,
-            txnNumber: NumberLong(txnNum),
-            autocommit: false
-        }));
+        assert.commandWorked(
+            indexConn.getDB(kDbName).runCommand({
+                insert: kCollName,
+                documents: [{x: 1}],
+                lsid: nonRetryableTxnSession,
+                txnNumber: NumberLong(txnNum),
+                stmtId: NumberInt(0),
+                startTransaction: true,
+                autocommit: false,
+            }),
+        );
+        assert.commandWorked(
+            indexConn.adminCommand({
+                commitTransaction: 1,
+                lsid: nonRetryableTxnSession,
+                txnNumber: NumberLong(txnNum),
+                autocommit: false,
+            }),
+        );
     });
 
     // Retryable transactions read from the partial index, so they fail.
     txnNum = 11;
     withRetryOnTransientTxnError(() => {
         txnNum++;
-        assert.commandFailedWithCode(indexConn.getDB(kDbName).runCommand({
-            insert: kCollName,
-            documents: [{x: 1}],
-            lsid: {id: UUID(), txnUUID: UUID(), txnNumber: NumberLong(2)},
-            txnNumber: NumberLong(txnNum),
-            stmtId: NumberInt(0),
-            startTransaction: true,
-            autocommit: false
-        }),
-                                     ErrorCodes.BadValue);
+        assert.commandFailedWithCode(
+            indexConn.getDB(kDbName).runCommand({
+                insert: kCollName,
+                documents: [{x: 1}],
+                lsid: {id: UUID(), txnUUID: UUID(), txnNumber: NumberLong(2)},
+                txnNumber: NumberLong(txnNum),
+                stmtId: NumberInt(0),
+                startTransaction: true,
+                autocommit: false,
+            }),
+            ErrorCodes.BadValue,
+        );
     });
 
     // Recreating the partial index requires the exact options used internally, but in any order.
-    assert.commandFailedWithCode(indexConn.getDB("config").runCommand({
-        createIndexes: "transactions",
-        indexes: [{v: 2, name: "parent_lsid", key: {parentLsid: 1, "_id.txnNumber": 1, _id: 1}}],
-    }),
-                                 ErrorCodes.IllegalOperation);
-    assert.commandWorked(indexConn.getDB("config").runCommand({
-        createIndexes: "transactions",
-        indexes: [{
-            name: "parent_lsid",
-            key: {parentLsid: 1, "_id.txnNumber": 1, _id: 1},
-            partialFilterExpression: {parentLsid: {$exists: true}},
-            v: 2,
-        }],
-    }));
+    assert.commandFailedWithCode(
+        indexConn.getDB("config").runCommand({
+            createIndexes: "transactions",
+            indexes: [{v: 2, name: "parent_lsid", key: {parentLsid: 1, "_id.txnNumber": 1, _id: 1}}],
+        }),
+        ErrorCodes.IllegalOperation,
+    );
+    assert.commandWorked(
+        indexConn.getDB("config").runCommand({
+            createIndexes: "transactions",
+            indexes: [
+                {
+                    name: "parent_lsid",
+                    key: {parentLsid: 1, "_id.txnNumber": 1, _id: 1},
+                    partialFilterExpression: {parentLsid: {$exists: true}},
+                    v: 2,
+                },
+            ],
+        }),
+    );
 
     // Operations involving the index should succeed now.
 
-    assert.commandWorked(indexConn.getDB(kDbName).runCommand(
-        {insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}}));
+    assert.commandWorked(
+        indexConn.getDB(kDbName).runCommand({insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}}),
+    );
 
-    assert.commandWorked(indexConn.getDB(kDbName).runCommand(
-        {insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}, txnNumber: NumberLong(11)}));
+    assert.commandWorked(
+        indexConn
+            .getDB(kDbName)
+            .runCommand({insert: kCollName, documents: [{x: 1}], lsid: {id: UUID()}, txnNumber: NumberLong(11)}),
+    );
 
     let userSessionAfter = {id: UUID()};
     txnNum = 11;
     withRetryOnTransientTxnError(() => {
         txnNum++;
-        assert.commandWorked(indexConn.getDB(kDbName).runCommand({
-            insert: kCollName,
-            documents: [{x: 1}],
-            lsid: userSessionAfter,
-            txnNumber: NumberLong(txnNum),
-            startTransaction: true,
-            autocommit: false
-        }));
-        assert.commandWorked(indexConn.adminCommand({
-            commitTransaction: 1,
-            lsid: userSessionAfter,
-            txnNumber: NumberLong(txnNum),
-            autocommit: false
-        }));
+        assert.commandWorked(
+            indexConn.getDB(kDbName).runCommand({
+                insert: kCollName,
+                documents: [{x: 1}],
+                lsid: userSessionAfter,
+                txnNumber: NumberLong(txnNum),
+                startTransaction: true,
+                autocommit: false,
+            }),
+        );
+        assert.commandWorked(
+            indexConn.adminCommand({
+                commitTransaction: 1,
+                lsid: userSessionAfter,
+                txnNumber: NumberLong(txnNum),
+                autocommit: false,
+            }),
+        );
     });
 
     let nonRetryableTxnSessionAfter = {id: UUID(), txnUUID: UUID()};
     txnNum = 11;
     withRetryOnTransientTxnError(() => {
         txnNum++;
-        assert.commandWorked(indexConn.getDB(kDbName).runCommand({
-            insert: kCollName,
-            documents: [{x: 1}],
-            lsid: nonRetryableTxnSessionAfter,
-            txnNumber: NumberLong(txnNum),
-            stmtId: NumberInt(0),
-            startTransaction: true,
-            autocommit: false
-        }));
-        assert.commandWorked(indexConn.adminCommand({
-            commitTransaction: 1,
-            lsid: nonRetryableTxnSessionAfter,
-            txnNumber: NumberLong(txnNum),
-            autocommit: false
-        }));
+        assert.commandWorked(
+            indexConn.getDB(kDbName).runCommand({
+                insert: kCollName,
+                documents: [{x: 1}],
+                lsid: nonRetryableTxnSessionAfter,
+                txnNumber: NumberLong(txnNum),
+                stmtId: NumberInt(0),
+                startTransaction: true,
+                autocommit: false,
+            }),
+        );
+        assert.commandWorked(
+            indexConn.adminCommand({
+                commitTransaction: 1,
+                lsid: nonRetryableTxnSessionAfter,
+                txnNumber: NumberLong(txnNum),
+                autocommit: false,
+            }),
+        );
     });
 
     let retryableTxnSessionAfter = {id: UUID(), txnUUID: UUID(), txnNumber: NumberLong(2)};
     txnNum = 11;
     withRetryOnTransientTxnError(() => {
         txnNum++;
-        assert.commandWorked(indexConn.getDB(kDbName).runCommand({
-            insert: kCollName,
-            documents: [{x: 1}],
-            lsid: retryableTxnSessionAfter,
-            txnNumber: NumberLong(txnNum),
-            stmtId: NumberInt(0),
-            startTransaction: true,
-            autocommit: false
-        }));
-        assert.commandWorked(indexConn.adminCommand({
-            commitTransaction: 1,
-            lsid: retryableTxnSessionAfter,
-            txnNumber: NumberLong(txnNum),
-            autocommit: false
-        }));
+        assert.commandWorked(
+            indexConn.getDB(kDbName).runCommand({
+                insert: kCollName,
+                documents: [{x: 1}],
+                lsid: retryableTxnSessionAfter,
+                txnNumber: NumberLong(txnNum),
+                stmtId: NumberInt(0),
+                startTransaction: true,
+                autocommit: false,
+            }),
+        );
+        assert.commandWorked(
+            indexConn.adminCommand({
+                commitTransaction: 1,
+                lsid: retryableTxnSessionAfter,
+                txnNumber: NumberLong(txnNum),
+                autocommit: false,
+            }),
+        );
     });
 
     if (!alwaysCreateFeatureFlagEnabled) {
@@ -357,7 +388,7 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         // hours). For this test, we need a shorter election timeout because it relies on nodes
         // running an election when they do not detect an active primary. Therefore, we are setting
         // the electionTimeoutMillis to its default value.
-        initiateWithDefaultElectionTimeout: true
+        initiateWithDefaultElectionTimeout: true,
     });
     runTest(st, false /* alwaysCreateFeatureFlagEnabled */);
     st.stop();
@@ -368,29 +399,32 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         shards: 1,
         other: {
             rs: {nodes: 2},
-            rsOptions:
-                {setParameter: "featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp=true"}
+            rsOptions: {setParameter: "featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp=true"},
         },
         // By default, our test infrastructure sets the election timeout to a very high value (24
         // hours). For this test, we need a shorter election timeout because it relies on nodes
         // running an election when they do not detect an active primary. Therefore, we are setting
         // the electionTimeoutMillis to its default value.
-        initiateWithDefaultElectionTimeout: true
+        initiateWithDefaultElectionTimeout: true,
     });
 
     // Sanity check the feature flag was enabled.
-    assert(assert
-               .commandWorked(featureFlagSt.rs0.getPrimary().adminCommand({
-                   getParameter: 1,
-                   featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp: 1
-               }))
-               .featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp.value);
-    assert(assert
-               .commandWorked(featureFlagSt.rs0.getSecondary().adminCommand({
-                   getParameter: 1,
-                   featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp: 1
-               }))
-               .featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp.value);
+    assert(
+        assert.commandWorked(
+            featureFlagSt.rs0.getPrimary().adminCommand({
+                getParameter: 1,
+                featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp: 1,
+            }),
+        ).featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp.value,
+    );
+    assert(
+        assert.commandWorked(
+            featureFlagSt.rs0.getSecondary().adminCommand({
+                getParameter: 1,
+                featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp: 1,
+            }),
+        ).featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp.value,
+    );
 
     runTest(featureFlagSt, true /* alwaysCreateFeatureFlagEnabled */);
     featureFlagSt.stop();

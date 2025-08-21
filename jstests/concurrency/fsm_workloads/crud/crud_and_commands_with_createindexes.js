@@ -9,41 +9,43 @@ import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/crud/cru
 // TODO(SERVER-46971) combine with crud_and_commands.js and remove `local` readConcern.
 TestData.defaultTransactionReadConcernLevel = "local";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const origStates = Object.keys($config.states);
-    $config.states = Object.extend({
-        createIndex: function createIndex(db, collName) {
-            db[collName].createIndex({value: 1});
-        },
-        createIdIndex: function createIdIndex(db, collName) {
-            let created = false;
-            while (!created) {
-                try {
-                    assert.commandWorked(db[collName].createIndex({_id: 1}));
-                    created = true;
-                } catch (e) {
-                    if (e.code != ErrorCodes.ConflictingOperationInProgress) {
-                        // unexpected error, rethrow
-                        throw e;
+    $config.states = Object.extend(
+        {
+            createIndex: function createIndex(db, collName) {
+                db[collName].createIndex({value: 1});
+            },
+            createIdIndex: function createIdIndex(db, collName) {
+                let created = false;
+                while (!created) {
+                    try {
+                        assert.commandWorked(db[collName].createIndex({_id: 1}));
+                        created = true;
+                    } catch (e) {
+                        if (e.code != ErrorCodes.ConflictingOperationInProgress) {
+                            // unexpected error, rethrow
+                            throw e;
+                        }
+                        // createIndex concurrently with dropCollection can throw a conflict.
+                        // fall through to retry
                     }
-                    // createIndex concurrently with dropCollection can throw a conflict.
-                    // fall through to retry
                 }
-            }
-        },
+            },
 
-        dropIndex: function dropIndex(db, collName) {
-            db[collName].dropIndex({value: 1});
-        }
-    },
-                                   $super.states);
+            dropIndex: function dropIndex(db, collName) {
+                db[collName].dropIndex({value: 1});
+            },
+        },
+        $super.states,
+    );
 
     let newTransitions = Object.extend({}, $super.transitions);
     let exampleState = {};
-    origStates.forEach(function(state) {
-        newTransitions[state]["createIndex"] = 0.10;
-        newTransitions[state]["createIdIndex"] = 0.10;
-        newTransitions[state]["dropIndex"] = 0.10;
+    origStates.forEach(function (state) {
+        newTransitions[state]["createIndex"] = 0.1;
+        newTransitions[state]["createIdIndex"] = 0.1;
+        newTransitions[state]["dropIndex"] = 0.1;
         if (state !== "init" && state !== "dropCollection") {
             exampleState = $config.transitions[state];
         }

@@ -13,22 +13,23 @@ import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 const rollbackTest = new RollbackTest(jsTestName());
 
 const primary = rollbackTest.getPrimary();
-const testDB = primary.getDB('test');
+const testDB = primary.getDB("test");
 const coll = testDB[jsTestName()];
 
-const timeFieldName = 'time';
-const metaFieldName = 'meta';
+const timeFieldName = "time";
+const metaFieldName = "meta";
 
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 rollbackTest.transitionToRollbackOperations();
 
 const docs = [
-    {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: 'ordered'},
-    {_id: 1, [timeFieldName]: ISODate(), [metaFieldName]: 'unordered'},
-    {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: 'ordered'},
-    {_id: 3, [timeFieldName]: ISODate(), [metaFieldName]: 'unordered'},
+    {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: "ordered"},
+    {_id: 1, [timeFieldName]: ISODate(), [metaFieldName]: "unordered"},
+    {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: "ordered"},
+    {_id: 3, [timeFieldName]: ISODate(), [metaFieldName]: "unordered"},
 ];
 
 // Insert new buckets that will be rolled back.
@@ -53,6 +54,6 @@ assert.commandWorked(coll.insert(docs[3], {ordered: false}));
 
 assert.sameMembers(docs.slice(2), coll.find().toArray());
 const buckets = getTimeseriesCollForRawOps(testDB, coll).find().rawData().toArray();
-assert.eq(buckets.length, 2, 'Expected two bucket but found: ' + tojson(buckets));
+assert.eq(buckets.length, 2, "Expected two bucket but found: " + tojson(buckets));
 
 rollbackTest.stop();

@@ -35,8 +35,7 @@ const bigDocSize = 16 * 1024 * 1024 - 4096;
 const bigDocPayload = "x".repeat(bigDocSize);
 
 let st = new ShardingTest({shards: 2});
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 jsTest.log("Sharding collection with one chunk on each shard.");
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
@@ -44,23 +43,24 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
 
 function assertDocsExist(shardKeys, numDocs, payloadSize) {
-    shardKeys.forEach(key => {
+    shardKeys.forEach((key) => {
         for (let i = 0; i < numDocs; i++) {
             let db = st.rs0.getPrimary().getDB(dbName);
             let query = {x: key, seq: i};
             let doc = db.getCollection(collName).findOne(query);
             assert(doc);
             let payload = doc.data;
-            assert.eq(payload.length,
-                      payloadSize,
-                      tojson(query) + " does not have the expected payload length of " +
-                          payloadSize + " bytes");
+            assert.eq(
+                payload.length,
+                payloadSize,
+                tojson(query) + " does not have the expected payload length of " + payloadSize + " bytes",
+            );
         }
     });
 }
 
 jsTest.log("Insert " + numDocs + " documents with " + bigDocSize + " bytes each.");
-shardKeys.forEach(key => {
+shardKeys.forEach((key) => {
     for (let i = 0; i < numDocs; i++) {
         let doc = {x: key, seq: i, data: bigDocPayload};
         assert.commandWorked(st.s.getCollection(ns).insert(doc));
@@ -68,8 +68,9 @@ shardKeys.forEach(key => {
 });
 
 // Start balancer to migrate chunks from the removed shard.
-assert.commandWorked(st.s.getDB("config").settings.update(
-    {_id: "balancer"}, {$set: {attemptToBalanceJumboChunks: true}}, true));
+assert.commandWorked(
+    st.s.getDB("config").settings.update({_id: "balancer"}, {$set: {attemptToBalanceJumboChunks: true}}, true),
+);
 st.startBalancer();
 
 removeShard(st, st.shard1.shardName);

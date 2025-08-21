@@ -58,8 +58,7 @@ function getNewColl() {
     assert.commandWorked(src.createIndexes([{a: 1}, {b: 1}]));
 
     assert.commandWorked(existingDst.insert({a: 100}));
-    assert.commandFailed(
-        db.adminCommand({renameCollection: src.getFullName(), to: existingDst.getFullName()}));
+    assert.commandFailed(db.adminCommand({renameCollection: src.getFullName(), to: existingDst.getFullName()}));
 
     const originalNumberOfIndexes = src.getIndexes().length;
     assert.commandWorked(src.renameCollection(dstName));
@@ -99,13 +98,13 @@ function getNewColl() {
 }
 
 {
-    jsTest.log('Testing renameCollection with toNss == fromNss');
+    jsTest.log("Testing renameCollection with toNss == fromNss");
     const sameColl = getNewColl();
     assert.commandWorked(sameColl.insert({a: 1}));
 
-    assert.commandFailedWithCode(
-        sameColl.renameCollection(sameColl.getName(), true /* dropTarget */),
-        [ErrorCodes.IllegalOperation]);
+    assert.commandFailedWithCode(sameColl.renameCollection(sameColl.getName(), true /* dropTarget */), [
+        ErrorCodes.IllegalOperation,
+    ]);
 
     assert.eq(1, sameColl.countDocuments({}), "Rename a collection to itself must not lose data");
 
@@ -116,13 +115,14 @@ function getNewColl() {
 // fail with NamespaceNotFound. Make sure the check on the source is done before any check on
 // the target for consistency with replicaset.
 {
-    jsTest.log('Testing renameCollection on non-existing source namespaces');
+    jsTest.log("Testing renameCollection on non-existing source namespaces");
     const dbName = db.getName();
 
     // Rename non-existing source to non-existing target
     assert.commandFailedWithCode(
         db.adminCommand({renameCollection: dbName + ".nonExistingsource", to: dbName + ".target"}),
-        ErrorCodes.NamespaceNotFound);
+        ErrorCodes.NamespaceNotFound,
+    );
 
     // Rename non-existing source to existing collection
     const toColl = getNewColl();
@@ -131,7 +131,8 @@ function getNewColl() {
 
     assert.commandFailedWithCode(
         db.adminCommand({renameCollection: dbName + ".nonExistingsource", to: toCollName}),
-        ErrorCodes.NamespaceNotFound);
+        ErrorCodes.NamespaceNotFound,
+    );
 
     // Rename non-existing source to existing view
     const toViewName = dbName + ".target_view";
@@ -139,5 +140,6 @@ function getNewColl() {
 
     assert.commandFailedWithCode(
         db.adminCommand({renameCollection: dbName + ".nonExistingsource", to: toViewName}),
-        ErrorCodes.NamespaceNotFound);
+        ErrorCodes.NamespaceNotFound,
+    );
 }

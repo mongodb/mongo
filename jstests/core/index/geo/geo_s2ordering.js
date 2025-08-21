@@ -22,7 +22,7 @@ function makepoints(needle) {
         for (let y = -points; y < points; y += 1) {
             bulk.insert({
                 nongeo: x.toString() + "," + y.toString(),
-                geo: {type: "Point", coordinates: [lng + x / points, lat + y / points]}
+                geo: {type: "Point", coordinates: [lng + x / points, lat + y / points]},
             });
         }
     }
@@ -32,8 +32,7 @@ function makepoints(needle) {
 
 function runTest(index) {
     assert.commandWorked(coll.createIndex(index));
-    const cursor =
-        coll.find({nongeo: needle, geo: {$within: {$centerSphere: [[0, 0], Math.PI / 180.0]}}});
+    const cursor = coll.find({nongeo: needle, geo: {$within: {$centerSphere: [[0, 0], Math.PI / 180.0]}}});
     const stats = cursor.explain("executionStats").executionStats;
     assert.commandWorked(coll.dropIndex(index));
     return stats;

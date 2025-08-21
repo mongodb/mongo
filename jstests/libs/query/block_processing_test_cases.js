@@ -6,39 +6,37 @@ export function generateMetaVals() {
     return metaVals;
 }
 
-export function blockProcessingTestCases(timeFieldName,
-                                         metaFieldName,
-                                         datePrefix,
-                                         dateUpperBound,
-                                         dateLowerBound,
-                                         featureFlagsAllowBlockHashAgg,
-                                         sbeFullEnabled) {
+export function blockProcessingTestCases(
+    timeFieldName,
+    metaFieldName,
+    datePrefix,
+    dateUpperBound,
+    dateLowerBound,
+    featureFlagsAllowBlockHashAgg,
+    sbeFullEnabled,
+) {
     const dateMidPoint = new Date((dateLowerBound.getTime() + dateUpperBound.getTime()) / 2);
-    const dollarPrefixedTime = '$' + timeFieldName;
-    const dollarPrefixedMeta = '$' + metaFieldName;
+    const dollarPrefixedTime = "$" + timeFieldName;
+    const dollarPrefixedMeta = "$" + metaFieldName;
 
-    const metaDotRegion = dollarPrefixedMeta + '.region';
-    const metaDotNonExistent = dollarPrefixedMeta + '.NON_EXISTENT';
-    const metaDotSeries = dollarPrefixedMeta + '.series';
+    const metaDotRegion = dollarPrefixedMeta + ".region";
+    const metaDotNonExistent = dollarPrefixedMeta + ".NON_EXISTENT";
+    const metaDotSeries = dollarPrefixedMeta + ".series";
 
     return [
         {
             name: "GroupByNull",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null}},
-                {$project: {_id: 1}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$group: {_id: null}}, {$project: {_id: 1}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "Count",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$count: "count"},
-                {$project: {_id: 1, count: 1}}
+                {$project: {_id: 1, count: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "Count_FilterHalf",
@@ -46,143 +44,131 @@ export function blockProcessingTestCases(timeFieldName,
                 {
                     $match: {
                         [timeFieldName]: {
-                            $lt: new Date((dateLowerBound.getTime() + dateUpperBound.getTime()) / 2)
-                        }
-                    }
+                            $lt: new Date((dateLowerBound.getTime() + dateUpperBound.getTime()) / 2),
+                        },
+                    },
                 },
                 {$count: "count"},
-                {$project: {_id: 1, count: 1}}
+                {$project: {_id: 1, count: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MinWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$min: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: null, a: {$min: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MinWithoutIdAllPass",
             pipeline: [
                 {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
-                {$group: {_id: null, a: {$min: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: null, a: {$min: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_Min",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$min: '$y'}}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$group: {_id: null, a: {$min: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MaxWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$max: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: null, a: {$max: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MaxWithoutIdAllPass",
             pipeline: [
                 {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
-                {$group: {_id: null, a: {$max: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: null, a: {$max: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_Max",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$max: '$y'}}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$group: {_id: null, a: {$max: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MinAndMaxWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}},
-                {$project: {_id: 0, a: 1, b: 1}}
+                {$group: {_id: null, a: {$min: "$y"}, b: {$max: "$y"}}},
+                {$project: {_id: 0, a: 1, b: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MinAndMaxWithoutIdAllPass",
             pipeline: [
                 {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
-                {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}},
-                {$project: {_id: 0, a: 1, b: 1}}
+                {$group: {_id: null, a: {$min: "$y"}, b: {$max: "$y"}}},
+                {$project: {_id: 0, a: 1, b: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MinAndMax",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}}
+                {$group: {_id: null, a: {$min: "$y"}, b: {$max: "$y"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MinWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$min: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: "$x", a: {$min: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_Min",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$min: '$y'}}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$group: {_id: "$x", a: {$min: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MaxWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$max: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: "$x", a: {$max: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_Max",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$max: '$y'}}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$group: {_id: "$x", a: {$max: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MinAndMaxWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}},
-                {$project: {_id: 0, a: 1, b: 1}}
+                {$group: {_id: "$x", a: {$min: "$y"}, b: {$max: "$y"}}},
+                {$project: {_id: 0, a: 1, b: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MinAndMax",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}}
+                {$group: {_id: "$x", a: {$min: "$y"}, b: {$max: "$y"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateTrunc_MinAndMax",
@@ -191,13 +177,13 @@ export function blockProcessingTestCases(timeFieldName,
                 {
                     $group: {
                         _id: {$dateTrunc: {date: dollarPrefixedTime, unit: "hour"}},
-                        a: {$min: '$y'},
-                        b: {$max: '$y'}
-                    }
+                        a: {$min: "$y"},
+                        b: {$max: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: 1, b: 1}}
+                {$project: {_id: 1, a: 1, b: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateAdd_Min",
@@ -206,15 +192,14 @@ export function blockProcessingTestCases(timeFieldName,
                 {
                     $group: {
                         _id: {
-                            $dateAdd:
-                                {startDate: dollarPrefixedTime, unit: "millisecond", amount: 100}
+                            $dateAdd: {startDate: dollarPrefixedTime, unit: "millisecond", amount: 100},
                         },
-                        a: {$min: '$y'}
-                    }
+                        a: {$min: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: '$a'}}
+                {$project: {_id: 1, a: "$a"}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateAddAndDateDiff_Min",
@@ -230,17 +215,17 @@ export function blockProcessingTestCases(timeFieldName,
                                     $dateDiff: {
                                         startDate: new Date(datePrefix),
                                         endDate: dollarPrefixedTime,
-                                        unit: "millisecond"
-                                    }
-                                }
-                            }
+                                        unit: "millisecond",
+                                    },
+                                },
+                            },
                         },
-                        a: {$min: '$y'}
-                    }
+                        a: {$min: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: '$a'}}
+                {$project: {_id: 1, a: "$a"}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
             name: "GroupByDateSubtract_Min",
@@ -249,15 +234,14 @@ export function blockProcessingTestCases(timeFieldName,
                 {
                     $group: {
                         _id: {
-                            $dateSubtract:
-                                {startDate: dollarPrefixedTime, unit: "millisecond", amount: 100}
+                            $dateSubtract: {startDate: dollarPrefixedTime, unit: "millisecond", amount: 100},
                         },
-                        a: {$min: '$y'}
-                    }
+                        a: {$min: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: '$a'}}
+                {$project: {_id: 1, a: "$a"}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateSubtractAndDateDiff_Min",
@@ -273,17 +257,17 @@ export function blockProcessingTestCases(timeFieldName,
                                     $dateDiff: {
                                         startDate: new Date(datePrefix),
                                         endDate: dollarPrefixedTime,
-                                        unit: "millisecond"
-                                    }
-                                }
-                            }
+                                        unit: "millisecond",
+                                    },
+                                },
+                            },
                         },
-                        a: {$min: '$y'}
-                    }
+                        a: {$min: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: '$a'}}
+                {$project: {_id: 1, a: "$a"}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
             name: "GroupByNull_MaxAndMinOfDateDiff",
@@ -297,42 +281,42 @@ export function blockProcessingTestCases(timeFieldName,
                                 $dateDiff: {
                                     startDate: new Date(datePrefix),
                                     endDate: dollarPrefixedTime,
-                                    unit: "millisecond"
-                                }
-                            }
+                                    unit: "millisecond",
+                                },
+                            },
                         },
                         b: {
                             $max: {
                                 $dateDiff: {
                                     startDate: new Date(datePrefix),
                                     endDate: dollarPrefixedTime,
-                                    unit: "millisecond"
-                                }
-                            }
+                                    unit: "millisecond",
+                                },
+                            },
                         },
                         c: {
                             $min: {
                                 $dateDiff: {
                                     startDate: dollarPrefixedTime,
                                     endDate: new Date(datePrefix),
-                                    unit: "millisecond"
-                                }
-                            }
+                                    unit: "millisecond",
+                                },
+                            },
                         },
                         d: {
                             $max: {
                                 $dateDiff: {
                                     startDate: dollarPrefixedTime,
                                     endDate: new Date(datePrefix),
-                                    unit: "millisecond"
-                                }
-                            }
+                                    unit: "millisecond",
+                                },
+                            },
                         },
-                    }
+                    },
                 },
-                {$project: {_id: 0, a: 1, b: 1, c: 1, d: 1}}
+                {$project: {_id: 0, a: 1, b: 1, c: 1, d: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MaxAndMinOfDateAddDateSubtractDateTrunc",
@@ -346,25 +330,25 @@ export function blockProcessingTestCases(timeFieldName,
                                 $dateAdd: {
                                     startDate: dollarPrefixedTime,
                                     unit: "millisecond",
-                                    amount: 100
-                                }
-                            }
+                                    amount: 100,
+                                },
+                            },
                         },
                         b: {
                             $max: {
                                 $dateSubtract: {
                                     startDate: dollarPrefixedTime,
                                     unit: "millisecond",
-                                    amount: 100
-                                }
-                            }
+                                    amount: 100,
+                                },
+                            },
                         },
                         c: {$max: {$dateTrunc: {date: dollarPrefixedTime, unit: "second"}}},
-                    }
+                    },
                 },
-                {$project: {_id: 0, a: 1, b: 1, c: 1}}
+                {$project: {_id: 0, a: 1, b: 1, c: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateTruncAndDateAdd_MinAndMax",
@@ -378,19 +362,19 @@ export function blockProcessingTestCases(timeFieldName,
                                     $dateAdd: {
                                         startDate: dollarPrefixedTime,
                                         unit: "millisecond",
-                                        amount: 100
-                                    }
+                                        amount: 100,
+                                    },
                                 },
-                                unit: "hour"
-                            }
+                                unit: "hour",
+                            },
                         },
-                        a: {$min: '$y'},
-                        b: {$max: '$y'}
-                    }
+                        a: {$min: "$y"},
+                        b: {$max: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: 1, b: 1}}
+                {$project: {_id: 1, a: 1, b: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateTruncAndDateSubtract_MinAndMax",
@@ -404,19 +388,19 @@ export function blockProcessingTestCases(timeFieldName,
                                     $dateSubtract: {
                                         startDate: dollarPrefixedTime,
                                         unit: "millisecond",
-                                        amount: 100
-                                    }
+                                        amount: 100,
+                                    },
                                 },
-                                unit: "hour"
-                            }
+                                unit: "hour",
+                            },
                         },
-                        a: {$min: '$y'},
-                        b: {$max: '$y'}
-                    }
+                        a: {$min: "$y"},
+                        b: {$max: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: 1, b: 1}}
+                {$project: {_id: 1, a: 1, b: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateDiffAndDateAdd_Min",
@@ -431,18 +415,18 @@ export function blockProcessingTestCases(timeFieldName,
                                     $dateAdd: {
                                         startDate: dollarPrefixedTime,
                                         unit: "millisecond",
-                                        amount: 100
-                                    }
+                                        amount: 100,
+                                    },
                                 },
-                                unit: "millisecond"
-                            }
+                                unit: "millisecond",
+                            },
                         },
-                        a: {$min: '$y'},
-                    }
+                        a: {$min: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: 1}}
+                {$project: {_id: 1, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MinOfDateDiff_InvalidDate",
@@ -456,16 +440,16 @@ export function blockProcessingTestCases(timeFieldName,
                                 $dateDiff: {
                                     startDate: new Date(datePrefix),
                                     endDate: "$y",
-                                    unit: "millisecond"
-                                }
-                            }
+                                    unit: "millisecond",
+                                },
+                            },
                         },
-                    }
+                    },
                 },
-                {$project: {_id: 0, a: 1}}
+                {$project: {_id: 0, a: 1}},
             ],
             expectedErrorCode: 7157922,
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_MinOfDateAdd_MissingAmount",
@@ -479,15 +463,15 @@ export function blockProcessingTestCases(timeFieldName,
                                 $dateAdd: {
                                     startDate: new Date(datePrefix),
                                     unit: "millisecond",
-                                    amount: "$k"
-                                }
-                            }
+                                    amount: "$k",
+                                },
+                            },
                         },
-                    }
+                    },
                 },
-                {$project: {_id: 0, a: 1}}
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
             name: "GroupByDateDiff_MinPlusMax",
@@ -499,27 +483,23 @@ export function blockProcessingTestCases(timeFieldName,
                             $dateDiff: {
                                 startDate: new Date(datePrefix),
                                 endDate: dollarPrefixedTime,
-                                unit: "millisecond"
-                            }
+                                unit: "millisecond",
+                            },
                         },
-                        a: {$min: '$y'},
-                        b: {$max: '$y'}
-                    }
+                        a: {$min: "$y"},
+                        b: {$max: "$y"},
+                    },
                 },
                 {
                     $project: {
                         _id: 1,
                         a: {
-                            $cond: [
-                                {$and: [{$isNumber: '$a'}, {$isNumber: '$b'}]},
-                                {$add: ['$a', '$b']},
-                                null
-                            ]
-                        }
-                    }
-                }
+                            $cond: [{$and: [{$isNumber: "$a"}, {$isNumber: "$b"}]}, {$add: ["$a", "$b"]}, null],
+                        },
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByFilteredComputedDateDiff_MinPlusMax",
@@ -531,60 +511,53 @@ export function blockProcessingTestCases(timeFieldName,
                             $dateDiff: {
                                 startDate: new Date(datePrefix),
                                 endDate: dollarPrefixedTime,
-                                unit: "millisecond"
-                            }
-                        }
-                    }
+                                unit: "millisecond",
+                            },
+                        },
+                    },
                 },
                 {$match: {msDiff: {$gte: 300}}},
-                {$group: {_id: "$msDiff", a: {$min: '$y'}, b: {$max: '$y'}}},
+                {$group: {_id: "$msDiff", a: {$min: "$y"}, b: {$max: "$y"}}},
                 {
                     $project: {
                         _id: 1,
                         a: {
-                            $cond: [
-                                {$and: [{$isNumber: '$a'}, {$isNumber: '$b'}]},
-                                {$add: ['$a', '$b']},
-                                null
-                            ]
-                        }
-                    }
-                }
+                            $cond: [{$and: [{$isNumber: "$a"}, {$isNumber: "$b"}]}, {$add: ["$a", "$b"]}, null],
+                        },
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MinWithoutId_NoFilter",
-            pipeline: [{$group: {_id: '$x', a: {$min: '$y'}}}, {$project: {_id: 0, a: 1}}],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$group: {_id: "$x", a: {$min: "$y"}}}, {$project: {_id: 0, a: 1}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_Min_NoFilter",
-            pipeline: [{$group: {_id: '$x', a: {$min: '$y'}}}],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$group: {_id: "$x", a: {$min: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MaxWithoutId_NoFilter",
-            pipeline: [{$group: {_id: '$x', a: {$max: '$y'}}}, {$project: {_id: 0, a: 1}}],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$group: {_id: "$x", a: {$max: "$y"}}}, {$project: {_id: 0, a: 1}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_Max_NoFilter",
-            pipeline: [{$group: {_id: '$x', a: {$max: '$y'}}}],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$group: {_id: "$x", a: {$max: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MinAndMaxWithoutId_NoFilter",
-            pipeline: [
-                {$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}},
-                {$project: {_id: 0, a: 1, b: 1}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$group: {_id: "$x", a: {$min: "$y"}, b: {$max: "$y"}}}, {$project: {_id: 0, a: 1, b: 1}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MinAndMax_NoFilter",
-            pipeline: [{$group: {_id: '$x', a: {$min: '$y'}, b: {$max: '$y'}}}],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$group: {_id: "$x", a: {$min: "$y"}, b: {$max: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateTrunc_MinAndMax_NoFilter",
@@ -592,13 +565,13 @@ export function blockProcessingTestCases(timeFieldName,
                 {
                     $group: {
                         _id: {"$dateTrunc": {date: dollarPrefixedTime, unit: "minute", binSize: 1}},
-                        a: {$min: '$y'},
-                        b: {$max: '$y'}
-                    }
+                        a: {$min: "$y"},
+                        b: {$max: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: 1, b: 1}}
+                {$project: {_id: 1, a: 1, b: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateTruncAndDateDiff_MinAndMax_NoFilter",
@@ -607,24 +580,23 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {
                             date: {
-                                $dateTrunc:
-                                    {date: dollarPrefixedTime, unit: "millisecond", binSize: 200}
+                                $dateTrunc: {date: dollarPrefixedTime, unit: "millisecond", binSize: 200},
                             },
                             delta: {
                                 $dateDiff: {
                                     startDate: new Date(datePrefix),
                                     endDate: dollarPrefixedTime,
-                                    unit: "millisecond"
-                                }
-                            }
+                                    unit: "millisecond",
+                                },
+                            },
                         },
-                        a: {$min: '$y'},
-                        b: {$max: '$y'}
-                    }
+                        a: {$min: "$y"},
+                        b: {$max: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: 1, b: 1}}
+                {$project: {_id: 1, a: 1, b: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByDateTruncAndMeta_MinAndMax_NoFilter",
@@ -633,59 +605,59 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {
                             date: {
-                                $dateTrunc: {date: dollarPrefixedTime, unit: "minute", binSize: 1}
+                                $dateTrunc: {date: dollarPrefixedTime, unit: "minute", binSize: 1},
                             },
-                            symbol: dollarPrefixedMeta
+                            symbol: dollarPrefixedMeta,
                         },
-                        a: {$min: '$y'},
-                        b: {$max: '$y'}
-                    }
+                        a: {$min: "$y"},
+                        b: {$max: "$y"},
+                    },
                 },
-                {$project: {_id: 1, a: 1, b: 1}}
+                {$project: {_id: 1, a: 1, b: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMeta_MinAndMax_NoFilter",
             pipeline: [
-                {$group: {_id: dollarPrefixedMeta, a: {$min: '$y'}, b: {$max: '$y'}}},
-                {$project: {_id: 1, a: 1, b: 1}}
+                {$group: {_id: dollarPrefixedMeta, a: {$min: "$y"}, b: {$max: "$y"}}},
+                {$project: {_id: 1, a: 1, b: 1}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
             name: "GroupByXAndY_MinWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {x: '$x', y: '$y'}, a: {$min: '$z'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: {x: "$x", y: "$y"}, a: {$min: "$z"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_Min",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {x: '$x', y: '$y'}, a: {$min: '$z'}}}
+                {$group: {_id: {x: "$x", y: "$y"}, a: {$min: "$z"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_MaxWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {x: '$x', y: '$y'}, a: {$max: '$z'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: {x: "$x", y: "$y"}, a: {$max: "$z"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_Max",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {x: '$x', y: '$y'}, a: {$max: '$z'}}}
+                {$group: {_id: {x: "$x", y: "$y"}, a: {$max: "$z"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_MultipleMinsAndMaxs",
@@ -693,33 +665,33 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {
                     $group: {
-                        _id: {x: '$x', y: '$y'},
-                        a: {$min: '$z'},
-                        b: {$max: '$z'},
-                        c: {$min: '$p'},
-                        d: {$max: '$q'}
-                    }
-                }
+                        _id: {x: "$x", y: "$y"},
+                        a: {$min: "$z"},
+                        b: {$max: "$z"},
+                        c: {$min: "$p"},
+                        d: {$max: "$q"},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaIndexKey_MinWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {$meta: 'indexKey'}, a: {$min: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: {$meta: "indexKey"}, a: {$min: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
             name: "GroupByX_MinOfMetaIndexKeyWithoutId",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$min: {$meta: 'indexKey'}}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: "$x", a: {$min: {$meta: "indexKey"}}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
 
         //
@@ -727,78 +699,72 @@ export function blockProcessingTestCases(timeFieldName,
         //
         {
             name: "GroupByNull_Sum",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$sum: '$y'}}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$group: {_id: null, a: {$sum: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "DateUpper_GroupByNull_Sum_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$sum: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: null, a: {$sum: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "DateLower_GroupByNull_Sum_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
-                {$group: {_id: null, a: {$sum: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: null, a: {$sum: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_Sum",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$sum: '$y'}}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$group: {_id: "$x", a: {$sum: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_Sum_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$sum: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: "$x", a: {$sum: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MultipleSums",
-            pipeline: [{$group: {_id: '$x', a: {$sum: '$x'}, b: {$sum: '$y'}, c: {$sum: '$z'}}}],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$group: {_id: "$x", a: {$sum: "$x"}, b: {$sum: "$y"}, c: {$sum: "$z"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_Sum_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {x: '$x', y: '$y'}, a: {$sum: '$z'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: {x: "$x", y: "$y"}, a: {$sum: "$z"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaSortKey_Sum_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {$meta: 'sortKey'}, a: {$sum: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: {$meta: "sortKey"}, a: {$sum: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
             name: "GroupByX_SumOfMetaSortKey_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$sum: {$meta: 'sortKey'}}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: "$x", a: {$sum: {$meta: "sortKey"}}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
 
         //
@@ -806,78 +772,72 @@ export function blockProcessingTestCases(timeFieldName,
         //
         {
             name: "GroupByNull_Avg",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$avg: '$y'}}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$group: {_id: null, a: {$avg: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "DateUpper_GroupByNull_Avg_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: null, a: {$avg: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: null, a: {$avg: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "DateLower_GroupByNull_Avg_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
-                {$group: {_id: null, a: {$avg: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: null, a: {$avg: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_Avg",
-            pipeline: [
-                {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$avg: '$y'}}}
-            ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$match: {[timeFieldName]: {$lt: dateUpperBound}}}, {$group: {_id: "$x", a: {$avg: "$y"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_Avg_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$avg: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: "$x", a: {$avg: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_MultipleAvgs",
-            pipeline: [{$group: {_id: '$x', a: {$avg: '$x'}, b: {$avg: '$y'}, c: {$avg: '$z'}}}],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            pipeline: [{$group: {_id: "$x", a: {$avg: "$x"}, b: {$avg: "$y"}, c: {$avg: "$z"}}}],
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_Avg_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {x: '$x', y: '$y'}, a: {$avg: '$z'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: {x: "$x", y: "$y"}, a: {$avg: "$z"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaSortKey_Avg_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: {$meta: 'sortKey'}, a: {$avg: '$y'}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: {$meta: "sortKey"}, a: {$avg: "$y"}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
             name: "GroupByX_AvgOfMetaSortKey_Project",
             pipeline: [
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
-                {$group: {_id: '$x', a: {$avg: {$meta: 'sortKey'}}}},
-                {$project: {_id: 0, a: 1}}
+                {$group: {_id: "$x", a: {$avg: {$meta: "sortKey"}}}},
+                {$project: {_id: 0, a: 1}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
 
         //
@@ -890,7 +850,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[metaFieldName]: "foo"}},
                 {$group: {_id: null, minY: {$min: "$y"}}},
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: sbeFullEnabled,
         },
         {
             name: "MatchTimeGroupWithProjectedOutFieldInAccumulator",
@@ -899,7 +859,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
                 {$group: {_id: null, minY: {$min: "$y"}}},
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: sbeFullEnabled,
         },
         {
             name: "GroupWithProjectedOutFieldInGb",
@@ -908,25 +868,25 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[metaFieldName]: "foo"}},
                 {$group: {_id: "$y", a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: sbeFullEnabled,
         },
         {
             name: "GroupWithMixOfProjectedOutField",
             pipeline: [
-                {$project: {_id: 0, x: 1}},  // y not included
+                {$project: {_id: 0, x: 1}}, // y not included
                 {$match: {[metaFieldName]: "foo"}},
                 {$group: {_id: "$y", a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
             name: "ProjectedOutCompoundGroupKeys",
             pipeline: [
                 {$project: {t: "$t"}},
                 {$project: {m: "$m"}},
-                {$group: {_id: {t: "$t", m: "$m"}, gb: {$min: "$a"}}}
+                {$group: {_id: {t: "$t", m: "$m"}, gb: {$min: "$a"}}},
             ],
-            usesBlockProcessing: sbeFullEnabled
+            usesBlockProcessing: sbeFullEnabled,
         },
         {
             name: "GroupByNull_TopAndBottomSortByZ_OutputVariable",
@@ -936,11 +896,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$top: {sortBy: {z: 1}, output: "$w"}},
-                        b: {$bottom: {sortBy: {z: 1}, output: "$w"}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1}, output: "$w"}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZ_OutputVariable",
@@ -950,11 +910,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$topN: {sortBy: {z: 1}, output: "$w", n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: "$w", n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: "$w", n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopAndBottomSortByZ_OutputOneElemArray",
@@ -964,11 +924,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$top: {sortBy: {z: 1}, output: ["$w"]}},
-                        b: {$bottom: {sortBy: {z: 1}, output: ["$w"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZ_OutputOneElemArray",
@@ -978,11 +938,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$topN: {sortBy: {z: 1}, output: ["$w"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopAndBottomSortByZ_OutputTwoElemArray",
@@ -992,11 +952,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$top: {sortBy: {z: 1}, output: ["$w", "$z"]}},
-                        b: {$bottom: {sortBy: {z: 1}, output: ["$w", "$z"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w", "$z"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZ_OutputTwoElemArray",
@@ -1006,11 +966,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$topN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopAndBottomSortByZ_OutputVariable",
@@ -1020,11 +980,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$top: {sortBy: {z: 1}, output: "$w"}},
-                        b: {$bottom: {sortBy: {z: 1}, output: "$w"}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1}, output: "$w"}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZ_OutputVariable",
@@ -1034,11 +994,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$topN: {sortBy: {z: 1}, output: "$w", n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: "$w", n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: "$w", n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopAndBottomSortByZ_OutputOneElemArray",
@@ -1048,11 +1008,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$top: {sortBy: {z: 1}, output: ["$w"]}},
-                        b: {$bottom: {sortBy: {z: 1}, output: ["$w"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZ_OutputOneElemArray",
@@ -1062,11 +1022,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$topN: {sortBy: {z: 1}, output: ["$w"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopAndBottomSortByZ_OutputTwoElemArray",
@@ -1076,11 +1036,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$top: {sortBy: {z: 1}, output: ["$w", "$z"]}},
-                        b: {$bottom: {sortBy: {z: 1}, output: ["$w", "$z"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w", "$z"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZ_OutputTwoElemArray",
@@ -1090,11 +1050,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$topN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZ_OutputVariable",
@@ -1104,11 +1064,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$top: {sortBy: {z: 1}, output: "$w"}},
-                        b: {$bottom: {sortBy: {z: 1}, output: "$w"}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1}, output: "$w"}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputVariable",
@@ -1118,11 +1078,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {z: 1}, output: "$w", n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: "$w", n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: "$w", n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZ_OutputOneElemArray",
@@ -1132,11 +1092,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$top: {sortBy: {z: 1}, output: ["$w"]}},
-                        b: {$bottom: {sortBy: {z: 1}, output: ["$w"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputOneElemArray",
@@ -1146,11 +1106,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {z: 1}, output: ["$w"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZ_OutputTwoElemArray",
@@ -1160,11 +1120,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$top: {sortBy: {z: 1}, output: ["$w", "$z"]}},
-                        b: {$bottom: {sortBy: {z: 1}, output: ["$w", "$z"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1}, output: ["$w", "$z"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputTwoElemArray",
@@ -1174,11 +1134,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: ["$w", "$z"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopAndBottomSortByZAndW_OutputVariable",
@@ -1188,11 +1148,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$top: {sortBy: {z: 1, w: -1}, output: "$w"}},
-                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: "$w"}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: "$w"}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZAndW_OutputVariable",
@@ -1202,11 +1162,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopAndBottomSortByZAndW_OutputOneElemArray",
@@ -1216,11 +1176,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w"]}},
-                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZAndW_OutputOneElemArray",
@@ -1230,11 +1190,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopAndBottomSortByZAndW_OutputTwoElemArray",
@@ -1244,11 +1204,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}},
-                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByZAndW_OutputTwoElemArray",
@@ -1258,11 +1218,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopAndBottomSortByZAndW_OutputVariable",
@@ -1272,11 +1232,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$top: {sortBy: {z: 1, w: -1}, output: "$w"}},
-                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: "$w"}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: "$w"}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZAndW_OutputVariable",
@@ -1286,11 +1246,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopAndBottomSortByZAndW_OutputOneElemArray",
@@ -1300,11 +1260,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w"]}},
-                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZAndW_OutputOneElemArray",
@@ -1314,11 +1274,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopAndBottomSortByZAndW_OutputTwoElemArray",
@@ -1328,11 +1288,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}},
-                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopNAndBottomNSortByZAndW_OutputTwoElemArray",
@@ -1342,11 +1302,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZAndW_OutputVariable",
@@ -1356,11 +1316,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$top: {sortBy: {z: 1, w: -1}, output: "$w"}},
-                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: "$w"}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: "$w"}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputVariable",
@@ -1370,11 +1330,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: "$w", n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZAndW_OutputOneElemArray",
@@ -1384,11 +1344,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w"]}},
-                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputOneElemArray",
@@ -1398,11 +1358,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByZAndW_OutputTwoElemArray",
@@ -1412,11 +1372,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$top: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}},
-                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputTwoElemArray",
@@ -1426,11 +1386,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: ["$w", "$z"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopAndBottomSortByPAndQ_OutputVariable",
@@ -1440,11 +1400,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$top: {sortBy: {p: -1, q: 1}, output: "$p"}},
-                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: "$p"}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: "$p"}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByPAndQ_OutputVariable",
@@ -1454,11 +1414,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$topN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}},
-                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopAndBottomSortByPAndQ_OutputOneElemArray",
@@ -1468,11 +1428,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p"]}},
-                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByPAndQ_OutputOneElemArray",
@@ -1482,11 +1442,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}},
-                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopAndBottomSortByPAndQ_OutputTwoElemArray",
@@ -1496,11 +1456,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}},
-                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByNull_TopNAndBottomNSortByPAndQ_OutputTwoElemArray",
@@ -1510,11 +1470,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: null,
                         a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}},
-                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopAndBottomSortByPAndQ_OutputVariable",
@@ -1524,11 +1484,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$top: {sortBy: {p: -1, q: 1}, output: "$p"}},
-                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: "$p"}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: "$p"}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopNAndBottomNSortByPAndQ_OutputVariable",
@@ -1538,11 +1498,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$topN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}},
-                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopAndBottomSortByPAndQ_OutputOneElemArray",
@@ -1552,11 +1512,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p"]}},
-                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopNAndBottomNSortByPAndQ_OutputOneElemArray",
@@ -1566,11 +1526,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}},
-                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopAndBottomSortByPAndQ_OutputTwoElemArray",
@@ -1580,11 +1540,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}},
-                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByX_TopNAndBottomNSortByPAndQ_OutputTwoElemArray",
@@ -1594,11 +1554,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: "$x",
                         a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}},
-                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByPAndQ_OutputVariable",
@@ -1608,11 +1568,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$top: {sortBy: {p: -1, q: 1}, output: "$p"}},
-                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: "$p"}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: "$p"}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByPAndQ_OutputVariable",
@@ -1622,11 +1582,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}},
-                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: "$p", n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByPAndQ_OutputOneElemArray",
@@ -1636,11 +1596,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p"]}},
-                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByPAndQ_OutputOneElemArray",
@@ -1650,11 +1610,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}},
-                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopAndBottomSortByPAndQ_OutputTwoElemArray",
@@ -1664,11 +1624,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$top: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}},
-                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}}
-                    }
-                }
+                        b: {$bottom: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"]}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByPAndQ_OutputTwoElemArray",
@@ -1678,11 +1638,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}},
-                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {p: -1, q: 1}, output: ["$p", "$q"], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZ_OutputEmptyArray",
@@ -1692,11 +1652,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {z: 1}, output: [], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1}, output: [], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1}, output: [], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAndY_TopNAndBottomNSortByZAndW_OutputEmptyArray",
@@ -1706,11 +1666,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {x: "$x", y: "$y"},
                         a: {$topN: {sortBy: {z: 1, w: -1}, output: [], n: 3}},
-                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: [], n: 3}}
-                    }
-                }
+                        b: {$bottomN: {sortBy: {z: 1, w: -1}, output: [], n: 3}},
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaSubField",
@@ -1718,7 +1678,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: metaDotRegion, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaSubFields",
@@ -1726,7 +1686,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: {region: metaDotRegion, series: metaDotSeries}, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaMultipleSubFields",
@@ -1734,7 +1694,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: {region: metaDotRegion, series: metaDotSeries}, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaSubFieldExpression",
@@ -1743,11 +1703,11 @@ export function blockProcessingTestCases(timeFieldName,
                 {
                     $group: {
                         _id: {region: {$ifNull: [metaDotRegion, "foo"]}, series: metaDotSeries},
-                        a: {$min: "$x"}
-                    }
+                        a: {$min: "$x"},
+                    },
                 },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByIfNullAlwaysNull",
@@ -1755,12 +1715,12 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {
                     $group: {
-                        _id: {gb: {$ifNull: ['$x', '$z', null]}, series: metaDotSeries},
-                        a: {$sum: "$y"}
-                    }
+                        _id: {gb: {$ifNull: ["$x", "$z", null]}, series: metaDotSeries},
+                        a: {$sum: "$y"},
+                    },
                 },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByIfNullDifferentFinalType",
@@ -1768,13 +1728,12 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {
                     $group: {
-                        _id:
-                            {gb: {$ifNull: ["$x", "$z", NumberDecimal(37)]}, series: metaDotSeries},
-                        a: {$sum: "$y"}
-                    }
+                        _id: {gb: {$ifNull: ["$x", "$z", NumberDecimal(37)]}, series: metaDotSeries},
+                        a: {$sum: "$y"},
+                    },
                 },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByIfNullNeverNull",
@@ -1783,11 +1742,11 @@ export function blockProcessingTestCases(timeFieldName,
                 {
                     $group: {
                         _id: {gb: {$ifNull: ["$p", "$q", "$z"]}, series: metaDotSeries},
-                        a: {$max: "$x"}
-                    }
+                        a: {$max: "$x"},
+                    },
                 },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByAccumulateIfNullSum",
@@ -1795,7 +1754,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: {gb: metaDotRegion}, a: {$sum: {$ifNull: ["$z", "$y", "$p"]}}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByAccumulateIfNullMinMax",
@@ -1805,11 +1764,11 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {gb: metaDotRegion},
                         a: {$min: {$ifNull: ["$z", 6]}},
-                        b: {$max: {$ifNull: ["$y", "$missing", -4]}}
-                    }
+                        b: {$max: {$ifNull: ["$y", "$missing", -4]}},
+                    },
                 },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByAccumulateIfNullManyArgs",
@@ -1828,14 +1787,14 @@ export function blockProcessingTestCases(timeFieldName,
                                     "$missing3",
                                     "$y",
                                     "$missing1",
-                                    [1, 2, 3]
-                                ]
-                            }
+                                    [1, 2, 3],
+                                ],
+                            },
                         },
-                    }
+                    },
                 },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaNonExistent",
@@ -1843,7 +1802,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: metaDotNonExistent, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByExpressionOnMetaNonExistent",
@@ -1851,7 +1810,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: {$toLower: metaDotNonExistent}, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaAndMeasurement",
@@ -1859,7 +1818,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: {region: metaDotRegion, y: "$y"}, a: {$min: "$x"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByMetaSubFieldAndTime",
@@ -1869,14 +1828,14 @@ export function blockProcessingTestCases(timeFieldName,
                     $group: {
                         _id: {
                             region: metaDotRegion,
-                            time: {$dateTrunc: {date: dollarPrefixedTime, unit: "hour"}}
+                            time: {$dateTrunc: {date: dollarPrefixedTime, unit: "hour"}},
                         },
                         a: {$min: "$x"},
-                        b: {$max: "$y"}
-                    }
+                        b: {$max: "$y"},
+                    },
                 },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXMinOfMeta",
@@ -1884,7 +1843,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$x", a: {$min: dollarPrefixedMeta}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXMinOfMetaSubField",
@@ -1892,7 +1851,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$x", a: {$min: metaDotSeries}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXMinOfExpressionOfMeta",
@@ -1900,7 +1859,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$x", a: {$min: {$toLower: metaDotSeries}}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAvgOfMeta",
@@ -1908,7 +1867,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$x", a: {$avg: dollarPrefixedMeta}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByXAvgOfMetaSubField",
@@ -1916,7 +1875,7 @@ export function blockProcessingTestCases(timeFieldName,
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}}},
                 {$group: {_id: "$x", a: {$avg: metaDotSeries}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByComputedField",
@@ -1924,18 +1883,14 @@ export function blockProcessingTestCases(timeFieldName,
                 {
                     $addFields: {
                         computedField: {
-                            $cond: [
-                                {$and: [{$isNumber: '$a'}, {$isNumber: '$b'}]},
-                                {$add: ['$a', '$b']},
-                                null
-                            ]
-                        }
-                    }
+                            $cond: [{$and: [{$isNumber: "$a"}, {$isNumber: "$b"}]}, {$add: ["$a", "$b"]}, null],
+                        },
+                    },
                 },
                 {$match: {[timeFieldName]: {$lt: dateMidPoint}, computedField: 999}},
                 {$group: {_id: "$computedField", a: {$min: "$y"}}},
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
         {
             name: "GroupByWithComplexIdExpr",
@@ -1944,10 +1899,10 @@ export function blockProcessingTestCases(timeFieldName,
                 {
                     $group: {
                         _id: {$lt: [29336, {$mod: ["$b", 1.0]}]},
-                    }
-                }
+                    },
+                },
             ],
-            usesBlockProcessing: featureFlagsAllowBlockHashAgg
+            usesBlockProcessing: featureFlagsAllowBlockHashAgg,
         },
     ];
 }

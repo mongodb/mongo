@@ -57,11 +57,8 @@ function runTests() {
     assert.eq([2, 4, 5], extractSortedIdsFromCursor(coll.find({a: {$type: ["long", "array"]}})));
 
     // Test that duplicate types are allowed in the array.
-    assert.eq(
-        [2, 4, 5],
-        extractSortedIdsFromCursor(coll.find({a: {$type: ["long", "array", "long", "array"]}})));
-    assert.eq([2, 4, 5],
-              extractSortedIdsFromCursor(coll.find({a: {$type: ["long", "array", 18, 4]}})));
+    assert.eq([2, 4, 5], extractSortedIdsFromCursor(coll.find({a: {$type: ["long", "array", "long", "array"]}})));
+    assert.eq([2, 4, 5], extractSortedIdsFromCursor(coll.find({a: {$type: ["long", "array", 18, 4]}})));
 }
 
 // Verify $type queries both with and without an index.

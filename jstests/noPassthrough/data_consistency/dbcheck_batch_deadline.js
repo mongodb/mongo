@@ -15,11 +15,11 @@ replTest.startSet();
 replTest.initiate();
 
 const primary = replTest.getPrimary();
-const db = primary.getDB('test');
+const db = primary.getDB("test");
 const coll = db.c;
-const healthlog = primary.getDB('local').system.healthlog;
+const healthlog = primary.getDB("local").system.healthlog;
 
-const debugBuild = db.adminCommand('buildInfo').debug;
+const debugBuild = db.adminCommand("buildInfo").debug;
 
 // Populate collection.
 const collCount = 3;
@@ -29,14 +29,18 @@ for (let i = 0; i < collCount; i++) {
 
 // Run dbCheck with a failpoint configured so that we're only ever able to process 1 document per
 // batch before hitting the 1-second maxBatchTimeMillis.
-const fp = configureFailPoint(primary, 'SleepDbCheckInBatch', {sleepMs: 2000});
+const fp = configureFailPoint(primary, "SleepDbCheckInBatch", {sleepMs: 2000});
 const timesEntered = fp.count;
 assert.commandWorked(db.runCommand({dbCheck: coll.getName(), maxBatchTimeMillis: 1000}));
 
 // Wait for dbCheck to complete and disable the failpoint.
-assert.soon(function() {
-    return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
-}, "dbCheck command didn't complete - missing healthlog entries", 30 * 1000);
+assert.soon(
+    function () {
+        return healthlog.find({"operation": "dbCheckStop"}).itcount() == 1;
+    },
+    "dbCheck command didn't complete - missing healthlog entries",
+    30 * 1000,
+);
 fp.off();
 
 if (debugBuild) {
@@ -44,24 +48,28 @@ if (debugBuild) {
     // all info-level batch results.
 
     // Confirm each batch consists of 1 document, except for the last (maxKey) batch being empty.
-    assert.eq(collCount,
-              healthlog
-                  .find({
-                      operation: "dbCheckBatch",
-                      namespace: coll.getFullName(),
-                      msg: "dbCheck batch consistent",
-                      "data.count": 1
-                  })
-                  .itcount());
-    assert.eq(1,
-              healthlog
-                  .find({
-                      operation: "dbCheckBatch",
-                      namespace: coll.getFullName(),
-                      msg: "dbCheck batch consistent",
-                      "data.count": 0
-                  })
-                  .itcount());
+    assert.eq(
+        collCount,
+        healthlog
+            .find({
+                operation: "dbCheckBatch",
+                namespace: coll.getFullName(),
+                msg: "dbCheck batch consistent",
+                "data.count": 1,
+            })
+            .itcount(),
+    );
+    assert.eq(
+        1,
+        healthlog
+            .find({
+                operation: "dbCheckBatch",
+                namespace: coll.getFullName(),
+                msg: "dbCheck batch consistent",
+                "data.count": 0,
+            })
+            .itcount(),
+    );
 }
 
 assert.eq(0, healthlog.find({"severity": {$ne: "info"}}).itcount());

@@ -14,8 +14,8 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 // Constants used throughout all tests.
 //
 
-const dbName = 'testDB';
-const collName = 'weather';
+const dbName = "testDB";
+const collName = "weather";
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
@@ -25,11 +25,11 @@ const otherShard = st.shard1;
 const otherShardDB = otherShard.getDB(dbName);
 
 testDB.dropDatabase();
-assert.commandWorked(
-    mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
+assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
 
-assert.commandWorked(testDB.createCollection(
-    collName, {timeseries: {timeField: "time", metaField: "location", granularity: "hours"}}));
+assert.commandWorked(
+    testDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "location", granularity: "hours"}}),
+);
 
 const testColl = testDB[collName];
 
@@ -54,10 +54,7 @@ function testUpdateRouting({updates, nModified, shardsTargetedCount}) {
     // Verify profiling output.
     if (shardsTargetedCount > 0) {
         let filter = {
-            $or: [
-                {op: 'update'},
-                {op: 'bulkWrite', "command.update": {$exists: true}},
-            ],
+            $or: [{op: "update"}, {op: "bulkWrite", "command.update": {$exists: true}}],
             ns: "testDB.weather",
         };
         let actualCount = 0;
@@ -70,8 +67,9 @@ function testUpdateRouting({updates, nModified, shardsTargetedCount}) {
 }
 
 (function setUpTestColl() {
-    assert.commandWorked(testDB.adminCommand(
-        {shardCollection: testColl.getFullName(), key: {"location.city": 1, time: 1}}));
+    assert.commandWorked(
+        testDB.adminCommand({shardCollection: testColl.getFullName(), key: {"location.city": 1, time: 1}}),
+    );
 
     const data = [
         // Cork.
@@ -123,16 +121,20 @@ function testUpdateRouting({updates, nModified, shardsTargetedCount}) {
 
 (function defineChunks() {
     function splitAndMove(city, minTime, destination) {
-        assert.commandWorked(st.s.adminCommand({
-            split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
-            middle: {"meta.city": city, 'control.min.time': minTime}
-        }));
-        assert.commandWorked(st.s.adminCommand({
-            movechunk: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
-            find: {"meta.city": city, 'control.min.time': minTime},
-            to: destination.shardName,
-            _waitForDelete: true
-        }));
+        assert.commandWorked(
+            st.s.adminCommand({
+                split: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
+                middle: {"meta.city": city, "control.min.time": minTime},
+            }),
+        );
+        assert.commandWorked(
+            st.s.adminCommand({
+                movechunk: getTimeseriesCollForDDLOps(testDB, testColl).getFullName(),
+                find: {"meta.city": city, "control.min.time": minTime},
+                to: destination.shardName,
+                _waitForDelete: true,
+            }),
+        );
     }
 
     // Place the 'Dublin' measurements on the primary and split the other
@@ -144,35 +146,41 @@ function testUpdateRouting({updates, nModified, shardsTargetedCount}) {
 
 // All Dublin documents exist on the primary, so we should only target the one shard.
 testUpdateRouting({
-    updates: [{
-        q: {"location.city": "Dublin"},
-        u: {$set: {"location.coordinates": [123, -123]}},
-        multi: true,
-    }],
+    updates: [
+        {
+            q: {"location.city": "Dublin"},
+            u: {$set: {"location.coordinates": [123, -123]}},
+            multi: true,
+        },
+    ],
     nModified: 4,
-    shardsTargetedCount: 1
+    shardsTargetedCount: 1,
 });
 
 // Galway documents exist on both shards, so we should target both.
 testUpdateRouting({
-    updates: [{
-        q: {"location.city": "Galway"},
-        u: {$set: {"location.coordinates": [6, 7]}},
-        multi: true,
-    }],
+    updates: [
+        {
+            q: {"location.city": "Galway"},
+            u: {$set: {"location.coordinates": [6, 7]}},
+            multi: true,
+        },
+    ],
     nModified: 2,
-    shardsTargetedCount: 2
+    shardsTargetedCount: 2,
 });
 
 // All shards need to be targeted for an empty query.
 testUpdateRouting({
-    updates: [{
-        q: {},
-        u: {$set: {"location.coordinates": [222, 111]}},
-        multi: true,
-    }],
+    updates: [
+        {
+            q: {},
+            u: {$set: {"location.coordinates": [222, 111]}},
+            multi: true,
+        },
+    ],
     nModified: 8,
-    shardsTargetedCount: 2
+    shardsTargetedCount: 2,
 });
 
 st.stop();

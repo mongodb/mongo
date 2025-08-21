@@ -13,7 +13,7 @@ coll.drop();
 
 for (let i = 0; i < 5; i++) {
     for (let j = 0; j < 5; j++) {
-        assert.commandWorked(coll.insert({_id: (10 * i) + j, a: i, b: j, c: i + j, d: i - j}));
+        assert.commandWorked(coll.insert({_id: 10 * i + j, a: i, b: j, c: i + j, d: i - j}));
     }
 }
 
@@ -23,16 +23,21 @@ for (let i = 0; i < 5; i++) {
  * command, validates that all the 'expectedStages' are present in the plan returned and all the
  * 'stagesNotExpected' are not present in the plan.
  */
-function validateFindCmdOutputAndPlan(
-    {filter, project: project, sort: sort, expectedStages, stagesNotExpected, expectedOutput}) {
+function validateFindCmdOutputAndPlan({
+    filter,
+    project: project,
+    sort: sort,
+    expectedStages,
+    stagesNotExpected,
+    expectedOutput,
+}) {
     const cmdObj = {
         find: coll.getName(),
         filter: filter,
         sort: sort,
-        projection: project ||
-            {
-                _id: 0
-            }
+        projection: project || {
+            _id: 0,
+        },
     };
     if (expectedOutput) {
         const res = assert.commandWorked(coll.runCommand(cmdObj));
@@ -45,7 +50,7 @@ function validateFindCmdOutputAndPlan(
         coll: coll,
         cmdObj: cmdObj,
         expectedStages: expectedStages,
-        stagesNotExpected: stagesNotExpected
+        stagesNotExpected: stagesNotExpected,
     });
 }
 
@@ -68,7 +73,7 @@ validateFindCmdOutputAndPlan({
         {b: 4, c: 5},
     ],
     expectedStages: ["IXSCAN", "FETCH"],
-    stagesNotExpected: ["SORT_MERGE", "SORT"]
+    stagesNotExpected: ["SORT_MERGE", "SORT"],
 });
 
 // Verify that a list of exact match predicates on hashed field (prefix) and sort with an immediate
@@ -77,10 +82,9 @@ validateFindCmdOutputAndPlan({
     filter: {a: {$in: [1, 2]}},
     project: {b: 1, _id: 0},
     sort: {b: 1},
-    expectedOutput:
-        [{b: 0}, {b: 0}, {b: 1}, {b: 1}, {b: 2}, {b: 2}, {b: 3}, {b: 3}, {b: 4}, {b: 4}],
+    expectedOutput: [{b: 0}, {b: 0}, {b: 1}, {b: 1}, {b: 2}, {b: 2}, {b: 3}, {b: 3}, {b: 4}, {b: 4}],
     expectedStages: ["FETCH", "SORT_MERGE"],
-    stagesNotExpected: ["COLLSCAN"]
+    stagesNotExpected: ["COLLSCAN"],
 });
 
 // Sort on index fields which do not immediately follow the hashed field cannot use SORT_MERGE.
@@ -95,7 +99,7 @@ validateFindCmdOutputAndPlan({
         {a: 1, b: 3, c: 4, d: -2},
         {a: 1, b: 4, c: 5, d: -3},
     ],
-    expectedStages: ["IXSCAN", "SORT"]
+    expectedStages: ["IXSCAN", "SORT"],
 });
 
 /**
@@ -119,7 +123,7 @@ validateFindCmdOutputAndPlan({
         {a: 1, b: 4},
     ],
     expectedStages: ["IXSCAN"],
-    stagesNotExpected: ["SORT_MERGE", "SORT", "FETCH"]
+    stagesNotExpected: ["SORT_MERGE", "SORT", "FETCH"],
 });
 
 // Verify that an exact match predicate on range field (prefix) and sort with an immediate range
@@ -131,7 +135,7 @@ validateFindCmdOutputAndPlan({
     sort: {b: 1, d: -1},
     expectedOutput: [{a: 1, b: 1}],
     expectedStages: ["IXSCAN", "FETCH"],
-    stagesNotExpected: ["SORT_MERGE", "SORT"]
+    stagesNotExpected: ["SORT_MERGE", "SORT"],
 });
 
 // Verify that the sort can use index when there is no filter and the sort order is a non-hashed
@@ -141,14 +145,34 @@ validateFindCmdOutputAndPlan({
     project: {_id: 0, a: 1, b: 1},
     sort: {a: 1, b: -1},
     expectedOutput: [
-        {a: 0, b: 4}, {a: 0, b: 3}, {a: 0, b: 2}, {a: 0, b: 1}, {a: 0, b: 0},
-        {a: 1, b: 4}, {a: 1, b: 3}, {a: 1, b: 2}, {a: 1, b: 1}, {a: 1, b: 0},
-        {a: 2, b: 4}, {a: 2, b: 3}, {a: 2, b: 2}, {a: 2, b: 1}, {a: 2, b: 0},
-        {a: 3, b: 4}, {a: 3, b: 3}, {a: 3, b: 2}, {a: 3, b: 1}, {a: 3, b: 0},
-        {a: 4, b: 4}, {a: 4, b: 3}, {a: 4, b: 2}, {a: 4, b: 1}, {a: 4, b: 0},
+        {a: 0, b: 4},
+        {a: 0, b: 3},
+        {a: 0, b: 2},
+        {a: 0, b: 1},
+        {a: 0, b: 0},
+        {a: 1, b: 4},
+        {a: 1, b: 3},
+        {a: 1, b: 2},
+        {a: 1, b: 1},
+        {a: 1, b: 0},
+        {a: 2, b: 4},
+        {a: 2, b: 3},
+        {a: 2, b: 2},
+        {a: 2, b: 1},
+        {a: 2, b: 0},
+        {a: 3, b: 4},
+        {a: 3, b: 3},
+        {a: 3, b: 2},
+        {a: 3, b: 1},
+        {a: 3, b: 0},
+        {a: 4, b: 4},
+        {a: 4, b: 3},
+        {a: 4, b: 2},
+        {a: 4, b: 1},
+        {a: 4, b: 0},
     ],
     expectedStages: ["IXSCAN"],
-    stagesNotExpected: ["SORT_MERGE", "SORT", "FETCH"]
+    stagesNotExpected: ["SORT_MERGE", "SORT", "FETCH"],
 });
 
 // Verify that the sort cannot use index when there is no filter and the sort order uses a hashed
@@ -169,7 +193,7 @@ validateFindCmdOutputAndPlan({
     nReturned: 20,
     docsExamined: 0,
     expectedStages: ["SORT_MERGE"],
-    stagesNotExpected: ["COLLSCAN", "FETCH"]
+    stagesNotExpected: ["COLLSCAN", "FETCH"],
 });
 
 // Verify that query predicate and sort on non-hashed fields can be answered by the index but
@@ -178,9 +202,15 @@ validateFindCmdOutputAndPlan({
     filter: {a: 1},
     project: {_id: 0, d: 1, b: 1},
     sort: {d: 1},
-    expectedOutput: [{b: 4, d: -3}, {b: 3, d: -2}, {b: 2, d: -1}, {b: 1, d: 0}, {b: 0, d: 1}],
+    expectedOutput: [
+        {b: 4, d: -3},
+        {b: 3, d: -2},
+        {b: 2, d: -1},
+        {b: 1, d: 0},
+        {b: 0, d: 1},
+    ],
     expectedStages: ["IXSCAN", "SORT"],
-    stagesNotExpected: ["COLLSCAN", "FETCH"]
+    stagesNotExpected: ["COLLSCAN", "FETCH"],
 });
 
 //  Verify that sort on a hashed field required a FETCH and a SORT stage.
@@ -189,5 +219,5 @@ validateFindCmdOutputAndPlan({
     project: {_id: 0, c: 1},
     sort: {c: 1},
     expectedOutput: [{c: 2}],
-    expectedStages: ["IXSCAN", "FETCH", "SORT"]
+    expectedStages: ["IXSCAN", "FETCH", "SORT"],
 });

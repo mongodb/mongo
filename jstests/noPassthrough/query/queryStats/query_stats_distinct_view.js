@@ -16,7 +16,7 @@ const viewName = "testView";
 
 const distinctCommandObj = {
     distinct: viewName,
-    key: "v"
+    key: "v",
 };
 
 function runViewTest(conn, coll) {
@@ -45,7 +45,7 @@ function runViewTest(conn, coll) {
         hasSortStage: false,
         usedDisk: aggressiveSpillsInGroup,
         fromMultiPlanner: false,
-        fromPlanCache: false
+        fromPlanCache: false,
     });
     assertExpectedResults({
         results: firstEntry,
@@ -55,7 +55,7 @@ function runViewTest(conn, coll) {
         expectedDocsReturnedMax: 2,
         expectedDocsReturnedMin: 2,
         expectedDocsReturnedSumOfSq: 4,
-        getMores: false
+        getMores: false,
     });
 }
 

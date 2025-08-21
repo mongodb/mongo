@@ -22,18 +22,19 @@ const coll1 = testDB.getCollection(jsTestName());
 const coll2 = testDB.getCollection(jsTestName() + "2");
 
 // Verify that the 'apiParameters' field is required.
-const res = assert.commandFailedWithCode(testDB.runCommand({validateDBMetadata: 1}),
-                                         ErrorCodes.IDLFailedToParse);
+const res = assert.commandFailedWithCode(testDB.runCommand({validateDBMetadata: 1}), ErrorCodes.IDLFailedToParse);
 
 function validate({dbName, coll, apiStrict, error}) {
     dbName = dbName ? dbName : null;
     coll = coll ? coll : null;
-    const res = assert.commandWorked(testDB.runCommand({
-        validateDBMetadata: 1,
-        db: dbName,
-        collection: coll,
-        apiParameters: {version: "1", strict: apiStrict}
-    }));
+    const res = assert.commandWorked(
+        testDB.runCommand({
+            validateDBMetadata: 1,
+            db: dbName,
+            collection: coll,
+            apiParameters: {version: "1", strict: apiStrict},
+        }),
+    );
 
     assert(res.apiVersionErrors);
     const foundError = res.apiVersionErrors.length > 0;
@@ -78,7 +79,7 @@ validate({
     dbName: testDB.getName(),
     coll: coll1.getName(),
     apiStrict: true,
-    error: {code: ErrorCodes.APIStrictError}
+    error: {code: ErrorCodes.APIStrictError},
 });
 validate({dbName: testDB.getName(), apiStrict: true, error: true});
 
@@ -91,8 +92,7 @@ validate({coll: coll1.getName(), apiStrict: true});
 // Create a view which uses unstable expression and verify that validateDBMetadata commands throws
 // an assertion.
 const viewName = jsTestName() + "view1";
-const view = testDB.createView(
-    viewName, coll2.getName(), [{$project: {v: {$_testApiVersion: {unstable: true}}}}]);
+const view = testDB.createView(viewName, coll2.getName(), [{$project: {v: {$_testApiVersion: {unstable: true}}}}]);
 
 validate({coll: viewName, apiStrict: true, error: true});
 validate({dbName: dbName, apiStrict: true, error: true});
@@ -102,8 +102,7 @@ validate({dbName: dbName, coll: coll1.getName(), apiStrict: true});
 
 // With view name in the input.
 validate({coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
-validate(
-    {dbName: dbName, coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
+validate({dbName: dbName, coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
 
 validate({dbName: "new", coll: viewName, apiStrict: true});
 
@@ -116,8 +115,9 @@ validate({coll: viewName, apiStrict: true, error: {code: ErrorCodes.APIStrictErr
 assert.commandWorked(testDB.dropDatabase());
 
 const validatorCollName = jsTestName() + "validator";
-assert.commandWorked(testDB.createCollection(
-    validatorCollName, {validator: {$expr: {$_testApiVersion: {unstable: true}}}}));
+assert.commandWorked(
+    testDB.createCollection(validatorCollName, {validator: {$expr: {$_testApiVersion: {unstable: true}}}}),
+);
 
 validate({dbName: testDB.getName(), apiStrict: true, error: true});
 
@@ -132,10 +132,9 @@ assert.commandWorked(testDB.runCommand({drop: validatorCollName}));
 //
 (function maybeValidateWithTimeseriesCollection() {
     const coll = "timeseriesCollectionMetaDataValidation";
-    assert.commandWorked(
-        testDB.createCollection(coll, {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(testDB.createCollection(coll, {timeseries: {timeField: "time", metaField: "meta"}}));
     validate({dbName: testDB.getName(), apiStrict: true});
-}());
+})();
 
 // Clean up all the data for next run.
 assert.commandWorked(testDB.dropDatabase());

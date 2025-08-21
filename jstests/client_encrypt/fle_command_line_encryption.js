@@ -6,7 +6,7 @@ import {CA_CERT, CLIENT_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js
 const x509_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT
+    sslCAFile: CA_CERT,
 };
 const conn = MongoRunner.runMongod(x509_options);
 
@@ -32,9 +32,7 @@ const shellOpts = [
     "https://localhost:8000",
 ];
 
-const testFiles = [
-    "jstests/client_encrypt/lib/fle_command_line_explicit_encryption.js",
-];
+const testFiles = ["jstests/client_encrypt/lib/fle_command_line_explicit_encryption.js"];
 
 for (const file of testFiles) {
     runMongoProgram(...shellOpts, file);

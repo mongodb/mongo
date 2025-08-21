@@ -1,11 +1,10 @@
-
 /**
  * Tests behavior that is common to all rate limiters.
  * @tags: [requires_fcv_80]
  */
 
 const testBurstCapacityIncrease = () => {
-    const marginOfError = 5;  // +/- 5 tokens just in case there is rounding errors/clock skew
+    const marginOfError = 5; // +/- 5 tokens just in case there is rounding errors/clock skew
     const initialRatePerSec = 10000;
     const initialBurstCapacitySecs = 0.5;
     const initialTargetTokens = initialRatePerSec * initialBurstCapacitySecs;
@@ -15,7 +14,7 @@ const testBurstCapacityIncrease = () => {
         return {
             parameterName,
             newValue: newBurstCapacitySecs,
-            newTargetTokens: initialRatePerSec * newBurstCapacitySecs
+            newTargetTokens: initialRatePerSec * newBurstCapacitySecs,
         };
     };
 
@@ -34,8 +33,7 @@ const testBurstCapacityIncrease = () => {
                 ingressConnectionEstablishmentRatePerSec: initialRatePerSec,
                 ingressConnectionEstablishmentBurstCapacitySecs: initialBurstCapacitySecs,
             },
-            serverStatusSection: (conn) =>
-                conn.adminCommand({serverStatus: 1}).queues.ingressSessionEstablishment,
+            serverStatusSection: (conn) => conn.adminCommand({serverStatus: 1}).queues.ingressSessionEstablishment,
             tests: [
                 burstCapacityTest("ingressConnectionEstablishmentBurstCapacitySecs"),
                 ratePerSecTest("ingressConnectionEstablishmentRatePerSec"),
@@ -47,13 +45,12 @@ const testBurstCapacityIncrease = () => {
                 ingressRequestAdmissionBurstCapacitySecs: initialBurstCapacitySecs,
                 ingressRequestRateLimiterEnabled: true,
             },
-            serverStatusSection: (conn) =>
-                conn.adminCommand({serverStatus: 1}).network.ingressRequestRateLimiter,
+            serverStatusSection: (conn) => conn.adminCommand({serverStatus: 1}).network.ingressRequestRateLimiter,
             tests: [
                 burstCapacityTest("ingressRequestAdmissionBurstCapacitySecs"),
                 ratePerSecTest("ingressRequestAdmissionRatePerSec"),
             ],
-        }
+        },
     };
 
     for (const [name, rateLimiter] of Object.entries(rateLimiterConfigurations)) {
@@ -62,23 +59,21 @@ const testBurstCapacityIncrease = () => {
         let mongo = MongoRunner.runMongod({setParameter: {featureFlagIngressRateLimiting: true}});
 
         for (const test of rateLimiter.tests) {
-            assert.commandWorked(
-                mongo.adminCommand({setParameter: 1, ...rateLimiter.startupServerParameters}));
+            assert.commandWorked(mongo.adminCommand({setParameter: 1, ...rateLimiter.startupServerParameters}));
 
             let initialTokens = rateLimiter.serverStatusSection(mongo).totalAvailableTokens;
-            assert.between(initialTargetTokens - marginOfError,
-                           initialTokens,
-                           initialTargetTokens + marginOfError);
+            assert.between(initialTargetTokens - marginOfError, initialTokens, initialTargetTokens + marginOfError);
 
             jsTestLog("Setting " + test.parameterName + " to " + test.newValue);
-            assert.commandWorked(
-                mongo.adminCommand({setParameter: 1, [test.parameterName]: test.newValue}));
+            assert.commandWorked(mongo.adminCommand({setParameter: 1, [test.parameterName]: test.newValue}));
 
             assert.soon(() => {
                 const newTokens = rateLimiter.serverStatusSection(mongo).totalAvailableTokens;
                 jsTestLog("New tokens: " + newTokens);
-                return test.newTargetTokens - marginOfError <= newTokens &&
-                    newTokens <= test.newTargetTokens + marginOfError;
+                return (
+                    test.newTargetTokens - marginOfError <= newTokens &&
+                    newTokens <= test.newTargetTokens + marginOfError
+                );
             });
         }
 

@@ -27,19 +27,20 @@ let lsidWithStmtId;
 
 const txnNumber = NumberLong(0);
 const document = {
-    _id: 0
+    _id: 0,
 };
 
 const txnNumberWithStmtId = NumberLong(1);
 const documentWithStmtId = {
-    _id: 1
+    _id: 1,
 };
 const initializedStmtId = NumberInt(1);
 
 withRetryOnTransientTxnError(
     () => {
         jsTest.log(
-            "Insert documents in a retryable write with uninitialized and initialized stmtIds. Expect DuplicateKey error upon retry of insert after restarting the mongos and primary shard of command with uninitialized stmtId. Expect command with initialized stmtId to return that it has previously been tried.");
+            "Insert documents in a retryable write with uninitialized and initialized stmtIds. Expect DuplicateKey error upon retry of insert after restarting the mongos and primary shard of command with uninitialized stmtId. Expect command with initialized stmtId to return that it has previously been tried.",
+        );
 
         lsid = {id: UUID(), txnNumber: NumberLong(5), txnUUID: UUID()};
         lsidWithStmtId = {id: UUID(), txnNumber: NumberLong(5), txnUUID: UUID()};
@@ -51,7 +52,7 @@ withRetryOnTransientTxnError(
             txnNumber: txnNumber,
             startTransaction: true,
             autocommit: false,
-            stmtId: NumberInt(-1)
+            stmtId: NumberInt(-1),
         };
 
         const retryableInsertCommandObjInitializedStmtId = {
@@ -61,22 +62,23 @@ withRetryOnTransientTxnError(
             txnNumber: txnNumberWithStmtId,
             startTransaction: true,
             autocommit: false,
-            stmtId: initializedStmtId
+            stmtId: initializedStmtId,
         };
 
         // Insert both documents, with and without initialized stmtIds.
+        assert.commandWorked(st.s.getDB(dbName).runCommand(retryableInsertCommandObjUninitializedStmtId));
         assert.commandWorked(
-            st.s.getDB(dbName).runCommand(retryableInsertCommandObjUninitializedStmtId));
-        assert.commandWorked(st.s.adminCommand(
-            {commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}));
+            st.s.adminCommand({commitTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false}),
+        );
+        assert.commandWorked(st.s.getDB(dbName).runCommand(retryableInsertCommandObjInitializedStmtId));
         assert.commandWorked(
-            st.s.getDB(dbName).runCommand(retryableInsertCommandObjInitializedStmtId));
-        assert.commandWorked(st.s.adminCommand({
-            commitTransaction: 1,
-            lsid: lsidWithStmtId,
-            txnNumber: txnNumberWithStmtId,
-            autocommit: false
-        }));
+            st.s.adminCommand({
+                commitTransaction: 1,
+                lsid: lsidWithStmtId,
+                txnNumber: txnNumberWithStmtId,
+                autocommit: false,
+            }),
+        );
 
         // Confirm documents were inserted.
         assert.eq(document, st.s.getCollection(ns).findOne(document));
@@ -98,29 +100,29 @@ withRetryOnTransientTxnError(
         // Retry the insert command with stmtId = -1. Expect the insert to be unsuccessful.
         let res = assert.commandFailedWithCode(
             st.s.getDB(dbName).runCommand(retryableInsertCommandObjUninitializedStmtId),
-            ErrorCodes.DuplicateKey);
+            ErrorCodes.DuplicateKey,
+        );
 
         // retriedStmtIds field should not be set.
         assert(!res.hasOwnProperty("retriedStmtIds"));
 
         // Retry insert command with stmtId = 1. Insert should be successful with the retriedStmtIds
         // field populated.
-        res = assert.commandWorked(
-            st.s.getDB(dbName).runCommand(retryableInsertCommandObjInitializedStmtId));
+        res = assert.commandWorked(st.s.getDB(dbName).runCommand(retryableInsertCommandObjInitializedStmtId));
         assert.eq(initializedStmtId, res.retriedStmtIds[0]);
     },
     () => {
-        st.s.adminCommand(
-            {abortTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false});
+        st.s.adminCommand({abortTransaction: 1, lsid: lsid, txnNumber: txnNumber, autocommit: false});
         st.s.adminCommand({
             abortTransaction: 1,
             lsid: lsidWithStmtId,
             txnNumber: txnNumberWithStmtId,
-            autocommit: false
+            autocommit: false,
         });
         st.s.getCollection(ns).drop();
         st.s.getCollection(ns).insert([{x: 0}]);
-    });
+    },
+);
 
 // Confirm that documents are in the collection.
 assert.eq(document, st.s.getCollection(ns).findOne(document));

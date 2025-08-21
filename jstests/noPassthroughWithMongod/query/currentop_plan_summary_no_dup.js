@@ -11,21 +11,22 @@ for (let i = 0; i < 200; i++) {
 }
 
 // Create a long-running getMore operation by sleeping for every document.
-const cmdRes = assert.commandWorked(db.runCommand({
-    find: collName,
-    filter: {
-        $where: function() {
-            sleep(100);
-            return true;
-        }
-    },
-    batchSize: 0
-}));
-const cmdStr =
-    'db.runCommand({getMore: ' + cmdRes.cursor.id.toString() + ', collection: "' + collName + '"})';
+const cmdRes = assert.commandWorked(
+    db.runCommand({
+        find: collName,
+        filter: {
+            $where: function () {
+                sleep(100);
+                return true;
+            },
+        },
+        batchSize: 0,
+    }),
+);
+const cmdStr = "db.runCommand({getMore: " + cmdRes.cursor.id.toString() + ', collection: "' + collName + '"})';
 const awaitShell = startParallelShell(cmdStr);
 
-assert.soon(function() {
+assert.soon(function () {
     const currOp = db.currentOp({"op": "getmore"});
 
     assert("inprog" in currOp);
@@ -42,8 +43,10 @@ assert.soon(function() {
 
     // getmoreOp should only contain a top-level plan summary.
     // Check that it doesn't contain a sub-level duplicate.
-    assert(!getmoreOp.cursor.hasOwnProperty("planSummary"),
-           "getmore contains duplicated planSummary: " + tojson(getmoreOp));
+    assert(
+        !getmoreOp.cursor.hasOwnProperty("planSummary"),
+        "getmore contains duplicated planSummary: " + tojson(getmoreOp),
+    );
 
     // Kill the op so that the test won't run for a long time.
     db.killOp(getmoreOp.opid);

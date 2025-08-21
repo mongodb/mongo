@@ -9,17 +9,13 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
-import {
-    runWithManualRetries
-} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
+import {runWithManualRetries} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 
-const dbNames = ['db0', 'db1', 'db2'];
-const collNames = ['collA', 'collB', 'collC'];
+const dbNames = ["db0", "db1", "db2"];
+const collNames = ["collA", "collB", "collC"];
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = dbNames.length * collNames.length;
     $config.iterations = 64;
 
@@ -67,7 +63,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // Initialize `collNames.length` sharded collections per db
             for (var j = 0; j < collNames.length; j++) {
                 collName = collNames[j];
-                const ns = dbName + '.' + collName;
+                const ns = dbName + "." + collName;
                 assert.commandWorked(db.adminCommand({shardCollection: ns, key: this.shardKey}));
                 $super.setup.apply(this, [db, collName, cluster]);
             }

@@ -11,13 +11,13 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const initData = {
-        getCollectionName: function(collName) {
-            return jsTestName() + '_' + collName;
+        getCollectionName: function (collName) {
+            return jsTestName() + "_" + collName;
         },
 
-        getCollection: function(db, collName) {
+        getCollection: function (db, collName) {
             return db.getCollection(this.getCollectionName(collName));
         },
     };
@@ -39,8 +39,7 @@ export const $config = (function() {
 
             // Cache the collection name and command options to use for rawData in order to prevent
             // the workload threads from having to re-determine them during their execution.
-            this.collNameForRawOps =
-                getTimeseriesCollForRawOps(db, this.getCollectionName(collName));
+            this.collNameForRawOps = getTimeseriesCollForRawOps(db, this.getCollectionName(collName));
             this.rawOperationSpec = getRawOperationSpec(db);
         },
 
@@ -81,12 +80,14 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         collName = this.getCollectionName(collName);
-        assert.commandWorked(db.createCollection(collName, {
-            timeseries: {
-                timeField: timeFieldName,
-                metaField: metaFieldName,
-            }
-        }));
+        assert.commandWorked(
+            db.createCollection(collName, {
+                timeseries: {
+                    timeField: timeFieldName,
+                    metaField: metaFieldName,
+                },
+            }),
+        );
     }
 
     const standardTransition = {
@@ -105,7 +106,7 @@ export const $config = (function() {
     return {
         threadCount: 10,
         iterations: 1000,
-        startState: 'init',
+        startState: "init",
         states: states,
         data: initData,
         transitions: transitions,

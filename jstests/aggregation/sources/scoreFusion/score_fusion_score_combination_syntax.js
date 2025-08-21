@@ -26,20 +26,22 @@ const weights = [0.2, 1];
 const combinationMethods = ["avg", "expression"];
 
 const combinationExpressionForSinglePipeline = {
-    $add: ["$$pipeline1"]
+    $add: ["$$pipeline1"],
 };
 
 const combinationExpressionForMultiPipeline = {
-    $add: ["$$pipeline1", "$$pipeline2"]
+    $add: ["$$pipeline1", "$$pipeline2"],
 };
 
 const scoreSpecs = ["$single", {$add: ["$single", 5]}];
 
-function runSingleInputPipelineScoreFusion(scoreFusionNormalization,
-                                           inputPipelineWeight,
-                                           scoreNormalization,
-                                           combinationMethod,
-                                           scoreSpec) {
+function runSingleInputPipelineScoreFusion(
+    scoreFusionNormalization,
+    inputPipelineWeight,
+    scoreNormalization,
+    combinationMethod,
+    scoreSpec,
+) {
     let combinationSpec = {method: combinationMethod};
 
     if (combinationMethod === "expression") {
@@ -51,11 +53,10 @@ function runSingleInputPipelineScoreFusion(scoreFusionNormalization,
     let query = {
         $scoreFusion: {
             input: {
-                pipelines:
-                    {pipeline1: [{$score: {score: scoreSpec, normalization: scoreNormalization}}]},
-                normalization: scoreFusionNormalization
+                pipelines: {pipeline1: [{$score: {score: scoreSpec, normalization: scoreNormalization}}]},
+                normalization: scoreFusionNormalization,
             },
-            combination: combinationSpec
+            combination: combinationSpec,
         },
     };
 
@@ -63,31 +64,33 @@ function runSingleInputPipelineScoreFusion(scoreFusionNormalization,
 }
 
 // Test syntax options for a single input pipeline.
-for (const [scoreFusionNormalization,
-            firstPipelineWeight,
-            scoreNormalization,
-            combinationMethod,
-            scoreSpec] of crossProduct(normalizationOptions,
-                                       weights,
-                                       normalizationOptions,
-                                       combinationMethods,
-                                       scoreSpecs)) {
-    runSingleInputPipelineScoreFusion(scoreFusionNormalization,
-                                      firstPipelineWeight,
-                                      scoreNormalization,
-                                      combinationMethod,
-                                      scoreSpec);
+for (const [
+    scoreFusionNormalization,
+    firstPipelineWeight,
+    scoreNormalization,
+    combinationMethod,
+    scoreSpec,
+] of crossProduct(normalizationOptions, weights, normalizationOptions, combinationMethods, scoreSpecs)) {
+    runSingleInputPipelineScoreFusion(
+        scoreFusionNormalization,
+        firstPipelineWeight,
+        scoreNormalization,
+        combinationMethod,
+        scoreSpec,
+    );
 }
 
 // Test syntax options for multiple input pipelines.
-function runMultipleInputPipelineScoreFusion(scoreFusionNormalization,
-                                             firstPipelineWeight,
-                                             secondPipelineWeight,
-                                             firstScoreNormalization,
-                                             secondScoreNormalization,
-                                             firstScoreSpec,
-                                             secondScoreSpec,
-                                             combinationMethod) {
+function runMultipleInputPipelineScoreFusion(
+    scoreFusionNormalization,
+    firstPipelineWeight,
+    secondPipelineWeight,
+    firstScoreNormalization,
+    secondScoreNormalization,
+    firstScoreSpec,
+    secondScoreSpec,
+    combinationMethod,
+) {
     let combinationSpec = {method: combinationMethod};
 
     if (combinationMethod === "expression") {
@@ -95,7 +98,7 @@ function runMultipleInputPipelineScoreFusion(scoreFusionNormalization,
     } else if (combinationMethod === "avg") {
         combinationSpec["weights"] = {
             pipeline1: firstPipelineWeight,
-            pipeline2: secondPipelineWeight
+            pipeline2: secondPipelineWeight,
         };
     }
 
@@ -103,43 +106,48 @@ function runMultipleInputPipelineScoreFusion(scoreFusionNormalization,
         $scoreFusion: {
             input: {
                 pipelines: {
-                    pipeline1:
-                        [{$score: {score: firstScoreSpec, normalization: firstScoreNormalization}}],
+                    pipeline1: [{$score: {score: firstScoreSpec, normalization: firstScoreNormalization}}],
                     pipeline2: [
                         {$match: {single: {$gt: 5}}},
-                        {$score: {score: secondScoreSpec, normalization: secondScoreNormalization}}
-                    ]
+                        {$score: {score: secondScoreSpec, normalization: secondScoreNormalization}},
+                    ],
                 },
-                normalization: scoreFusionNormalization
+                normalization: scoreFusionNormalization,
             },
-            combination: combinationSpec
+            combination: combinationSpec,
         },
     };
 
     coll.aggregate([query]).toArray();
 }
 
-for (const [scoreFusionNormalization,
-            firstPipelineWeight,
-            secondPipelineWeight,
-            firstScoreNormalization,
-            secondScoreNormalization,
-            firstScoreSpec,
-            secondScoreSpec,
-            combinationMethod] of crossProduct(normalizationOptions,
-                                               weights,
-                                               weights,
-                                               normalizationOptions,
-                                               normalizationOptions,
-                                               scoreSpecs,
-                                               scoreSpecs,
-                                               combinationMethods)) {
-    runMultipleInputPipelineScoreFusion(scoreFusionNormalization,
-                                        firstPipelineWeight,
-                                        secondPipelineWeight,
-                                        firstScoreNormalization,
-                                        secondScoreNormalization,
-                                        firstScoreSpec,
-                                        secondScoreSpec,
-                                        combinationMethod);
+for (const [
+    scoreFusionNormalization,
+    firstPipelineWeight,
+    secondPipelineWeight,
+    firstScoreNormalization,
+    secondScoreNormalization,
+    firstScoreSpec,
+    secondScoreSpec,
+    combinationMethod,
+] of crossProduct(
+    normalizationOptions,
+    weights,
+    weights,
+    normalizationOptions,
+    normalizationOptions,
+    scoreSpecs,
+    scoreSpecs,
+    combinationMethods,
+)) {
+    runMultipleInputPipelineScoreFusion(
+        scoreFusionNormalization,
+        firstPipelineWeight,
+        secondPipelineWeight,
+        firstScoreNormalization,
+        secondScoreNormalization,
+        firstScoreSpec,
+        secondScoreSpec,
+        combinationMethod,
+    );
 }

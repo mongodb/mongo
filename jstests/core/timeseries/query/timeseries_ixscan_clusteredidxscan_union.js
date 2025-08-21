@@ -26,9 +26,11 @@ TimeseriesTest.run((insert) => {
     coll.drop();
 
     // Create a timeseries collection with some documents.
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: 'time', metaField: 'measurement'},
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: "time", metaField: "measurement"},
+        }),
+    );
 
     assert.commandWorked(coll.createIndex({x: 1}));
     assert.commandWorked(coll.createIndex({x: 1, time: 1}));
@@ -47,7 +49,7 @@ TimeseriesTest.run((insert) => {
     function compareResultEntries(lhs, rhs) {
         const lhsJson = tojson(lhs);
         const rhsJson = tojson(rhs);
-        return lhsJson < rhsJson ? -1 : (lhsJson > rhsJson ? 1 : 0);
+        return lhsJson < rhsJson ? -1 : lhsJson > rhsJson ? 1 : 0;
     }
 
     // Create a list of testcases where the planner would typically generate a QSN tree containing a
@@ -60,10 +62,7 @@ TimeseriesTest.run((insert) => {
     //   --CLUSTERED_IDXSCAN
 
     const filter = {
-        $or: [
-            {time: {$lte: new Date(datePrefix + 100)}},
-            {$and: [{x: {$lt: 3}}, {x: {$in: [1, 2, 4]}}]}
-        ]
+        $or: [{time: {$lte: new Date(datePrefix + 100)}}, {$and: [{x: {$lt: 3}}, {x: {$in: [1, 2, 4]}}]}],
     };
 
     const testcases = [
@@ -71,26 +70,23 @@ TimeseriesTest.run((insert) => {
         {pipeline: [{$match: filter}, {$project: {_id: 0, x: "$x"}}], expected: [{x: 1}, {}]},
         {
             pipeline: [{$match: filter}, {$group: {_id: null, count: {$sum: NumberInt(1)}}}],
-            expected: [{_id: null, count: NumberInt(2)}]
+            expected: [{_id: null, count: NumberInt(2)}],
         },
         {
             pipeline: [{$match: filter}, {$project: {_id: 0, time: 1}}],
-            expected: [{time: new Date(datePrefix + 100)}, {time: new Date(datePrefix + 450)}]
+            expected: [{time: new Date(datePrefix + 100)}, {time: new Date(datePrefix + 450)}],
         },
         {
             pipeline: [{$match: filter}, {$project: {_id: 0, time: "$time"}}],
-            expected: [{time: new Date(datePrefix + 100)}, {time: new Date(datePrefix + 450)}]
+            expected: [{time: new Date(datePrefix + 100)}, {time: new Date(datePrefix + 450)}],
         },
         {
-            pipeline: [
-                {$match: filter},
-                {$group: {_id: null, count: {$sum: NumberInt(1)}, x: {$max: "$x"}}}
-            ],
-            expected: [{_id: null, count: NumberInt(2), x: 1}]
+            pipeline: [{$match: filter}, {$group: {_id: null, count: {$sum: NumberInt(1)}, x: {$max: "$x"}}}],
+            expected: [{_id: null, count: NumberInt(2), x: 1}],
         },
         {
             pipeline: [{$match: filter}, {$group: {_id: null, time: {$max: "$time"}}}],
-            expected: [{_id: null, time: new Date(datePrefix + 450)}]
+            expected: [{_id: null, time: new Date(datePrefix + 450)}],
         },
     ];
 
@@ -99,7 +95,6 @@ TimeseriesTest.run((insert) => {
         const pipeline = testcase.pipeline;
         const expected = testcase.expected;
 
-        assert.eq(coll.aggregate(pipeline).toArray().sort(compareResultEntries),
-                  expected.sort(compareResultEntries));
+        assert.eq(coll.aggregate(pipeline).toArray().sort(compareResultEntries), expected.sort(compareResultEntries));
     }
 });

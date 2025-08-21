@@ -46,8 +46,7 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session1);
 
 // Prevent the stable timestamp from moving beyond the following prepared transactions so
 // that when we replay the oplog from the stable timestamp, we correctly recover them.
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
 
 // The following transactions will be prepared before the common point, so they must be in
 // prepare after rollback recovery.
@@ -64,7 +63,7 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session1, prepareTimestamp
 assert.commandWorked(session2.abortTransaction_forTesting());
 
 // Check that we have two transactions in the transactions table.
-assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
+assert.eq(primary.getDB("config")["transactions"].find().itcount(), 2);
 
 // The following write will be rolled back.
 rollbackTest.transitionToRollbackOperations();
@@ -76,12 +75,11 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 try {
     rollbackTest.transitionToSteadyStateOperations();
 } finally {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'}));
+    assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"}));
 }
 
 // Make sure there are two transactions in the transactions table.
-assert.eq(primary.getDB('config')['transactions'].find().itcount(), 2);
+assert.eq(primary.getDB("config")["transactions"].find().itcount(), 2);
 
 // Make sure we can see the first two writes and the insert from the first prepared transaction.
 // Make sure we cannot see the insert from the second prepared transaction or the writes after
@@ -119,12 +117,14 @@ assert.commandWorked(sessionColl1.insert({_id: 6}));
 PrepareHelpers.prepareTransaction(session1);
 assert.commandWorked(session1.abortTransaction_forTesting());
 // Retrying the abortTransaction command should fail with a NoSuchTransaction error.
-assert.commandFailedWithCode(sessionDB1.adminCommand({
-    abortTransaction: 1,
-    txnNumber: NumberLong(session1.getTxnNumber_forTesting()),
-    autocommit: false,
-}),
-                             ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(
+    sessionDB1.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(session1.getTxnNumber_forTesting()),
+        autocommit: false,
+    }),
+    ErrorCodes.NoSuchTransaction,
+);
 
 // Make sure we can see the insert after committing the prepared transaction.
 assert.sameMembers(testColl.find().toArray(), [{_id: 1}, {_id: 2}, {_id: 5}]);

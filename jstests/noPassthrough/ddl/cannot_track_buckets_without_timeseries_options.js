@@ -17,25 +17,25 @@ const db = st.s.getDB(jsTestName());
 const coll = db.coll;
 const bucketsColl = db.system.buckets.coll;
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 
 configureFailPoint(st.rs0.getPrimary(), "skipCreateTimeseriesBucketsWithoutOptionsCheck");
 
 assert.commandWorked(db.createCollection(bucketsColl.getName()));
 
 // Attempting to shard the collection either directly or through the buckets namespace will fail.
-assert.commandFailedWithCode(db.adminCommand({shardCollection: coll.getFullName(), key: {meta: 1}}),
-                             9934501);
-assert.commandFailedWithCode(
-    db.adminCommand({shardCollection: bucketsColl.getFullName(), key: {meta: 1}}), 5731501);
+assert.commandFailedWithCode(db.adminCommand({shardCollection: coll.getFullName(), key: {meta: 1}}), 9934501);
+assert.commandFailedWithCode(db.adminCommand({shardCollection: bucketsColl.getFullName(), key: {meta: 1}}), 5731501);
 
 // Attempting to move the collection either directly or through the buckets namespace will fail.
 assert.commandFailedWithCode(
-    db.adminCommand({moveCollection: coll.getFullName(), toShard: st.shard1.shardName}), 9934501);
+    db.adminCommand({moveCollection: coll.getFullName(), toShard: st.shard1.shardName}),
+    9934501,
+);
 assert.commandFailedWithCode(
     db.adminCommand({moveCollection: bucketsColl.getFullName(), toShard: st.shard1.shardName}),
-    9934501);
+    9934501,
+);
 
 // Make sure none of the operations tracked the collection despite failing.
 assert(!FixtureHelpers.isTracked(coll));
@@ -43,8 +43,9 @@ assert(!FixtureHelpers.isTracked(bucketsColl));
 
 // The view can't be created as the buckets collection is incompatible.
 assert.commandFailedWithCode(
-    db.createCollection(coll.getName(), {timeseries: {timeField: 't', metaField: 'm'}}),
-    ErrorCodes.NamespaceExists);
+    db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}),
+    ErrorCodes.NamespaceExists,
+);
 
 assert(bucketsColl.drop());
 

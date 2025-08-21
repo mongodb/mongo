@@ -7,9 +7,9 @@ assert.commandWorked(res);
 res = t.createIndex({b: 1});
 assert.commandWorked(res);
 
-res = t.insert({non_indexed_field: 'x'});
+res = t.insert({non_indexed_field: "x"});
 assert.commandWorked(res);
 
 res = t.validate({full: true});
 assert.commandWorked(res);
-assert(res.valid, 'Validate failed with response:\n' + tojson(res));
+assert(res.valid, "Validate failed with response:\n" + tojson(res));

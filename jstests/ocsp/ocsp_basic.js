@@ -9,7 +9,7 @@ import {
     OCSP_CA_PEM,
     OCSP_SERVER_CERT,
     OCSP_SERVER_CERT_REVOKED,
-    waitForServer
+    waitForServer,
 } from "jstests/ocsp/lib/ocsp_helpers.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 

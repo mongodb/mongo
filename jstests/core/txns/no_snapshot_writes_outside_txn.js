@@ -20,7 +20,7 @@ assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "major
 
 // Initiate the session.
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 let session = db.getMongo().startSession(sessionOptions);
 let sessionDb = session.getDatabase(dbName);

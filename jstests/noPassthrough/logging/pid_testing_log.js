@@ -19,7 +19,9 @@ const baselineParameters = {
 };
 
 const mongosParameters = Object.assign(
-    {logComponentVerbosity: tojson({network: {connectionPool: 5}})}, baselineParameters);
+    {logComponentVerbosity: tojson({network: {connectionPool: 5}})},
+    baselineParameters,
+);
 
 const st = new ShardingTest({
     config: {nodes: 1},
@@ -30,7 +32,7 @@ const st = new ShardingTest({
 const mongos = st.s0;
 
 const populateTestDb = () => {
-    const db = mongos.getDB('test');
+    const db = mongos.getDB("test");
     const coll = db.test;
     assert.commandWorked(coll.insert({x: 1}));
 };
@@ -38,9 +40,10 @@ const populateTestDb = () => {
 populateTestDb();
 
 let log = checkLog.getGlobalLog(mongos);
-let hits = log.map(line => JSON.parse(line))
-               .filter(o => o.msg == "client metadata")
-               .filter(o => o.attr.doc.application.pid !== null);
+let hits = log
+    .map((line) => JSON.parse(line))
+    .filter((o) => o.msg == "client metadata")
+    .filter((o) => o.attr.doc.application.pid !== null);
 
 assert(hits.length > 0);
 

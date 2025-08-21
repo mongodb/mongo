@@ -19,7 +19,7 @@ t.drop();
 // of a error.
 if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Create database
-    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
+    assert.commandWorked(db.adminCommand({"enableSharding": db.getName()}));
 }
 
 var validQuery = {a: 1};
@@ -33,7 +33,7 @@ assert.eq(0, t.find().itcount());
 // Returns 0 on valid syntax query.
 // Fails on invalid syntax query.
 assert.eq(0, t.find(validQuery).count());
-assert.throws(function() {
+assert.throws(function () {
     t.find(invalidQuery).count();
 });
 
@@ -42,6 +42,6 @@ assert.throws(function() {
 // Fails on invalid syntax query.
 assert.commandWorked(db.createCollection(t.getName()));
 assert.eq(0, t.find(validQuery).count());
-assert.throws(function() {
+assert.throws(function () {
     t.find(invalidQuery).count();
 });

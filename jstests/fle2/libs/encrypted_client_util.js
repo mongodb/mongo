@@ -20,9 +20,11 @@ export function runWithEncryption(edb, func) {
     try {
         assertEnterpriseShell();
 
-        assert(!edb.getMongo().isAutoEncryptionEnabled(),
-               "Cannot switch to encrypted connection on already encrypted connection. Do not " +
-                   "nest calls to runWithEncryption.");
+        assert(
+            !edb.getMongo().isAutoEncryptionEnabled(),
+            "Cannot switch to encrypted connection on already encrypted connection. Do not " +
+                "nest calls to runWithEncryption.",
+        );
 
         edb.getMongo().toggleAutoEncryption(true);
 
@@ -35,61 +37,61 @@ export function runWithEncryption(edb, func) {
 /**
  * A series of extensions to DBCollection and DB that toggle encryption on and off per operation.
  */
-DBCollection.prototype.einsert = function(obj, options) {
+DBCollection.prototype.einsert = function (obj, options) {
     return runWithEncryption(this, () => {
         return this.insert(obj, options);
     });
 };
 
-DBCollection.prototype.einsertOne = function(document, options) {
+DBCollection.prototype.einsertOne = function (document, options) {
     return runWithEncryption(this, () => {
         return this.insertOne(document, options);
     });
 };
 
-DBCollection.prototype.eupdateOne = function(filter, update, options) {
+DBCollection.prototype.eupdateOne = function (filter, update, options) {
     return runWithEncryption(this, () => {
         return this.updateOne(filter, update, options);
     });
 };
 
-DBCollection.prototype.eupdate = function(query, updateSpec, upsert, multi) {
+DBCollection.prototype.eupdate = function (query, updateSpec, upsert, multi) {
     return runWithEncryption(this, () => {
         return this.update(query, updateSpec, upsert, multi);
     });
 };
 
-DBCollection.prototype.edeleteOne = function(filter, options) {
+DBCollection.prototype.edeleteOne = function (filter, options) {
     return runWithEncryption(this, () => {
         return this.deleteOne(filter, options);
     });
 };
 
-DBCollection.prototype.edeleteMany = function(filter, options) {
+DBCollection.prototype.edeleteMany = function (filter, options) {
     return runWithEncryption(this, () => {
         return this.deleteMany(filter, options);
     });
 };
 
-DBCollection.prototype.ereplaceOne = function(filter, replacement, options) {
+DBCollection.prototype.ereplaceOne = function (filter, replacement, options) {
     return runWithEncryption(this, () => {
         return this.replaceOne(filter, replacement, options);
     });
 };
 
-DB.prototype.erunCommand = function(cmd, params) {
+DB.prototype.erunCommand = function (cmd, params) {
     return runWithEncryption(this, () => {
         return this.runCommand(cmd, params);
     });
 };
 
-DB.prototype.eadminCommand = function(cmd, params) {
+DB.prototype.eadminCommand = function (cmd, params) {
     return runWithEncryption(this, () => {
         return this.adminCommand(cmd, params);
     });
 };
 
-DBCollection.prototype.ecount = function(filter) {
+DBCollection.prototype.ecount = function (filter) {
     return runWithEncryption(this, () => {
         return this.find(filter).toArray().length;
     });
@@ -97,13 +99,13 @@ DBCollection.prototype.ecount = function(filter) {
 
 // Note that efind does not exist since find executes
 // lazily, not eagerly
-DBCollection.prototype.efindOne = function(filter, projection, options, readConcern, collation) {
+DBCollection.prototype.efindOne = function (filter, projection, options, readConcern, collation) {
     return runWithEncryption(this, () => {
         return this.findOne(filter, projection, options, readConcern, collation);
     });
 };
 
-DBCollection.prototype.erunCommand = function(cmd, params) {
+DBCollection.prototype.erunCommand = function (cmd, params) {
     return runWithEncryption(this, () => {
         return this.runCommand(cmd, params);
     });
@@ -126,8 +128,7 @@ export var EncryptedClient = class {
     constructor(conn, dbName, userName = undefined, adminPwd = undefined) {
         // Detect if jstests/libs/override_methods/implicitly_shard_accessed_collections.js is in
         // use
-        this.useImplicitSharding =
-            typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
+        this.useImplicitSharding = typeof globalThis.ImplicitlyShardAccessCollSettings !== "undefined";
 
         if (conn.isAutoEncryptionEnabled()) {
             this._keyVault = conn.getKeyVault();
@@ -139,7 +140,8 @@ export var EncryptedClient = class {
         const localKMS = {
             key: BinData(
                 0,
-                "/tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6dr")
+                "/tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6dr",
+            ),
         };
 
         const clientSideFLEOptions = {
@@ -250,12 +252,11 @@ export var EncryptedClient = class {
             }
         });
 
-        assert.neq(options,
-                   undefined,
-                   `createEncryptedCollection expected an options object, it is undefined`);
+        assert.neq(options, undefined, `createEncryptedCollection expected an options object, it is undefined`);
         assert(
             options.hasOwnProperty("encryptedFields") && typeof options.encryptedFields == "object",
-            `options must contain an encryptedFields document'`);
+            `options must contain an encryptedFields document'`,
+        );
 
         const res = this.runEncryptionOperation(() => {
             return assert.commandWorked(this._db.createCollection(name, options));
@@ -263,14 +264,12 @@ export var EncryptedClient = class {
         let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
         const cis = assert.commandWorked(this._db.runCommand(listCollCmdObj));
 
-        assert.eq(
-            cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
+        assert.eq(cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
 
         const ci = cis.cursor.firstBatch[0];
         assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
         const storedOptions = ci.options;
-        assert(options.hasOwnProperty("encryptedFields"),
-               `Expected collection '${name}' to have 'encryptedFields'`);
+        assert(options.hasOwnProperty("encryptedFields"), `Expected collection '${name}' to have 'encryptedFields'`);
         const ef = storedOptions.encryptedFields;
 
         // All our tests use "last" as the key to query on so shard on "last" instead of "_id"
@@ -282,7 +281,7 @@ export var EncryptedClient = class {
             let shardCollCmd = {
                 shardCollection: this._db.getName() + "." + name,
                 key: shardKey,
-                collation: {locale: "simple"}
+                collation: {locale: "simple"},
             };
 
             let resShard = this._db.adminCommand(shardCollCmd);
@@ -308,19 +307,16 @@ export var EncryptedClient = class {
      * @param {number} esc Number of documents in ESC
      * @param {number} ecoc Number of documents in ECOC
      */
-    assertEncryptedCollectionCountsByObject(
-        sessionDB, name, expectedEdc, expectedEsc, expectedEcoc) {
+    assertEncryptedCollectionCountsByObject(sessionDB, name, expectedEdc, expectedEsc, expectedEcoc) {
         let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
 
         const cis = assert.commandWorked(this._db.runCommand(listCollCmdObj));
-        assert.eq(
-            cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
+        assert.eq(cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
 
         const ci = cis.cursor.firstBatch[0];
         assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
         const options = ci.options;
-        assert(options.hasOwnProperty("encryptedFields"),
-               `Expected collection '${name}' to have 'encryptedFields'`);
+        assert(options.hasOwnProperty("encryptedFields"), `Expected collection '${name}' to have 'encryptedFields'`);
 
         function countDocuments(sessionDB, name) {
             // FLE2 tests are testing transactions and using the count command is not supported.
@@ -331,20 +327,26 @@ export var EncryptedClient = class {
         }
 
         const actualEdc = countDocuments(sessionDB, name);
-        assert.eq(actualEdc,
-                  expectedEdc,
-                  `EDC document count is wrong: Actual ${actualEdc} vs Expected ${expectedEdc}`);
+        assert.eq(
+            actualEdc,
+            expectedEdc,
+            `EDC document count is wrong: Actual ${actualEdc} vs Expected ${expectedEdc}`,
+        );
 
         const ef = options.encryptedFields;
         const actualEsc = countDocuments(sessionDB, ef.escCollection);
-        assert.eq(actualEsc,
-                  expectedEsc,
-                  `ESC document count is wrong: Actual ${actualEsc} vs Expected ${expectedEsc}`);
+        assert.eq(
+            actualEsc,
+            expectedEsc,
+            `ESC document count is wrong: Actual ${actualEsc} vs Expected ${expectedEsc}`,
+        );
 
         const actualEcoc = countDocuments(sessionDB, ef.ecocCollection);
-        assert.eq(actualEcoc,
-                  expectedEcoc,
-                  `ECOC document count is wrong: Actual ${actualEcoc} vs Expected ${expectedEcoc}`);
+        assert.eq(
+            actualEcoc,
+            expectedEcoc,
+            `ECOC document count is wrong: Actual ${actualEcoc} vs Expected ${expectedEcoc}`,
+        );
     }
 
     /**
@@ -356,8 +358,7 @@ export var EncryptedClient = class {
      * @param {number} ecoc Number of documents in ECOC
      */
     assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcoc) {
-        this.assertEncryptedCollectionCountsByObject(
-            this._db, name, expectedEdc, expectedEsc, expectedEcoc);
+        this.assertEncryptedCollectionCountsByObject(this._db, name, expectedEdc, expectedEsc, expectedEcoc);
     }
 
     /**
@@ -369,12 +370,12 @@ export var EncryptedClient = class {
      */
     assertESCNonAnchorCount(name, expectedCount) {
         const escName = this.getStateCollectionNamespaces(name).esc;
-        const actualCount =
-            this._db.getCollection(escName).countDocuments({"value": {"$exists": false}});
+        const actualCount = this._db.getCollection(escName).countDocuments({"value": {"$exists": false}});
         assert.eq(
             actualCount,
             expectedCount,
-            `ESC non-anchor count is wrong: Actual ${actualCount} vs Expected ${expectedCount}`);
+            `ESC non-anchor count is wrong: Actual ${actualCount} vs Expected ${expectedCount}`,
+        );
     }
 
     /**
@@ -391,10 +392,11 @@ export var EncryptedClient = class {
             cmd.filter = query;
         }
         const encryptedDocs = assert.commandWorked(this._db.runCommand(cmd)).cursor.firstBatch;
-        assert.eq(encryptedDocs.length,
-                  1,
-                  `Expected query ${tojson(query)} to only return one document. Found ${
-                      encryptedDocs.length}`);
+        assert.eq(
+            encryptedDocs.length,
+            1,
+            `Expected query ${tojson(query)} to only return one document. Found ${encryptedDocs.length}`,
+        );
         const unEncryptedDocs = assert.commandWorked(this._db.erunCommand(cmd)).cursor.firstBatch;
         assert.eq(unEncryptedDocs.length, 1);
 
@@ -404,10 +406,11 @@ export var EncryptedClient = class {
         assert(encryptedDoc[kSafeContentField] !== undefined);
 
         for (let field in fields) {
-            assert(encryptedDoc.hasOwnProperty(field),
-                   `Could not find ${field} in encrypted ${tojson(encryptedDoc)}`);
-            assert(unEncryptedDoc.hasOwnProperty(field),
-                   `Could not find ${field} in unEncrypted ${tojson(unEncryptedDoc)}`);
+            assert(encryptedDoc.hasOwnProperty(field), `Could not find ${field} in encrypted ${tojson(encryptedDoc)}`);
+            assert(
+                unEncryptedDoc.hasOwnProperty(field),
+                `Could not find ${field} in unEncrypted ${tojson(unEncryptedDoc)}`,
+            );
 
             let rawField = encryptedDoc[field];
             assertIsIndexedEncryptedField(rawField);
@@ -451,20 +454,29 @@ export var EncryptedClient = class {
         let afterDocuments = coll.find({}).sort({_id: 1}).toArray();
 
         for (let unchangedDocumentIndex of unchangedDocumentIndexArray) {
-            assert.eq(beforeDocuments[unchangedDocumentIndex],
-                      afterDocuments[unchangedDocumentIndex],
-                      "Expected document index '" + unchangedDocumentIndex + "' to be the same." +
-                          tojson(beforeDocuments[unchangedDocumentIndex]) + "\n==========\n" +
-                          tojson(afterDocuments[unchangedDocumentIndex]));
+            assert.eq(
+                beforeDocuments[unchangedDocumentIndex],
+                afterDocuments[unchangedDocumentIndex],
+                "Expected document index '" +
+                    unchangedDocumentIndex +
+                    "' to be the same." +
+                    tojson(beforeDocuments[unchangedDocumentIndex]) +
+                    "\n==========\n" +
+                    tojson(afterDocuments[unchangedDocumentIndex]),
+            );
         }
 
         for (let changedDocumentIndex of changedDocumentIndexArray) {
             assert.neq(
                 beforeDocuments[changedDocumentIndex],
                 afterDocuments[changedDocumentIndex],
-                "Expected document index '" + changedDocumentIndex +
-                    "' to be different. == " + tojson(beforeDocuments[changedDocumentIndex]) +
-                    "\n==========\n" + tojson(afterDocuments[changedDocumentIndex]));
+                "Expected document index '" +
+                    changedDocumentIndex +
+                    "' to be different. == " +
+                    tojson(beforeDocuments[changedDocumentIndex]) +
+                    "\n==========\n" +
+                    tojson(afterDocuments[changedDocumentIndex]),
+            );
         }
 
         return x;
@@ -481,7 +493,10 @@ export var EncryptedClient = class {
         this.runEncryptionOperation(() => {
             let coll = this._db.getCollection(collName);
 
-            let onDiskDocs = coll.find({}, {[kSafeContentField]: 0}).sort({_id: 1}).toArray();
+            let onDiskDocs = coll
+                .find({}, {[kSafeContentField]: 0})
+                .sort({_id: 1})
+                .toArray();
 
             assert.docEq(docs, onDiskDocs);
         });
@@ -501,7 +516,7 @@ export var EncryptedClient = class {
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection + ".compact"] = ecocTempExists;
 
         const db = this._db;
-        Object.keys(checkMap).forEach(function(coll) {
+        Object.keys(checkMap).forEach(function (coll) {
             const info = db.getCollectionInfos({"name": coll});
             const msg = coll + (checkMap[coll] ? " does not exist" : " exists") + " after compact";
             assert.eq(info.length, checkMap[coll], msg);
@@ -528,8 +543,7 @@ export function runEncryptedTest(db, dbName, collNames, encryptedFields, runTest
     }
 
     for (let collName of collNames) {
-        assert.commandWorked(
-            client.createEncryptionCollection(collName, {encryptedFields: encryptedFields}));
+        assert.commandWorked(client.createEncryptionCollection(collName, {encryptedFields: encryptedFields}));
     }
 
     let edb = client.getDB();
@@ -542,7 +556,7 @@ export function runEncryptedTest(db, dbName, collNames, encryptedFields, runTest
  * @returns Returns true if talking to a replica set
  */
 export function isFLE2ReplicationEnabled() {
-    return typeof (testingReplication) == "undefined" || testingReplication === true;
+    return typeof testingReplication == "undefined" || testingReplication === true;
 }
 
 /**
@@ -550,8 +564,9 @@ export function isFLE2ReplicationEnabled() {
  */
 export function isFLE2AlwaysUseCollScanModeEnabled(db) {
     const doc = assert.commandWorked(
-        db.adminCommand({getParameter: 1, internalQueryFLEAlwaysUseEncryptedCollScanMode: 1}));
-    return (doc.internalQueryFLEAlwaysUseEncryptedCollScanMode === true);
+        db.adminCommand({getParameter: 1, internalQueryFLEAlwaysUseEncryptedCollScanMode: 1}),
+    );
+    return doc.internalQueryFLEAlwaysUseEncryptedCollScanMode === true;
 }
 
 /**
@@ -563,9 +578,10 @@ export function isFLE2AlwaysUseCollScanModeEnabled(db) {
 export function assertIsIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("0e") || value.hex().startsWith("0f") ||
-               value.hex().startsWith("11"),
-           "Expected subtype 14, 15, or 17 but found the wrong type: " + value.hex());
+    assert(
+        value.hex().startsWith("0e") || value.hex().startsWith("0f") || value.hex().startsWith("11"),
+        "Expected subtype 14, 15, or 17 but found the wrong type: " + value.hex(),
+    );
 }
 
 /**
@@ -576,8 +592,7 @@ export function assertIsIndexedEncryptedField(value) {
 export function assertIsEqualityIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("0e"),
-           "Expected subtype 14 but found the wrong type: " + value.hex());
+    assert(value.hex().startsWith("0e"), "Expected subtype 14 but found the wrong type: " + value.hex());
 }
 
 /**
@@ -588,8 +603,7 @@ export function assertIsEqualityIndexedEncryptedField(value) {
 export function assertIsRangeIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("0f"),
-           "Expected subtype 15 but found the wrong type: " + value.hex());
+    assert(value.hex().startsWith("0f"), "Expected subtype 15 but found the wrong type: " + value.hex());
 }
 
 /**
@@ -600,8 +614,7 @@ export function assertIsRangeIndexedEncryptedField(value) {
 export function assertIsTextIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("11"),
-           "Expected subtype 17 but found the wrong type: " + value.hex());
+    assert(value.hex().startsWith("11"), "Expected subtype 17 but found the wrong type: " + value.hex());
 }
 
 /**
@@ -612,8 +625,7 @@ export function assertIsTextIndexedEncryptedField(value) {
 export function assertIsUnindexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    assert(value.hex().startsWith("10"),
-           "Expected subtype 16 but found the wrong type: " + value.hex());
+    assert(value.hex().startsWith("10"), "Expected subtype 16 but found the wrong type: " + value.hex());
 }
 
 /**
@@ -627,7 +639,7 @@ export function codeFailsInClientWithError(callback, expectedErrorStr) {
         return false;
     } catch (e) {
         jsTestLog(`Test callback threw error: ${tojson(e)}`);
-        return (!expectedErrorStr || (e.message.indexOf(expectedErrorStr) !== -1));
+        return !expectedErrorStr || e.message.indexOf(expectedErrorStr) !== -1;
     }
 }
 
@@ -642,7 +654,9 @@ export function codeFailsInQueryAnalysisWithError(callback, expectedErrorStr) {
         return false;
     } catch (e) {
         jsTestLog(`Test callback threw error: ${tojson(e)}`);
-        return (e.message.indexOf("Client Side Field Level Encryption Error") !== -1) &&
-            (!expectedErrorStr || (e.message.indexOf(expectedErrorStr) !== -1));
+        return (
+            e.message.indexOf("Client Side Field Level Encryption Error") !== -1 &&
+            (!expectedErrorStr || e.message.indexOf(expectedErrorStr) !== -1)
+        );
     }
 }

@@ -50,7 +50,10 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
     // output collection.
     const kOneMB = 1024 * 1024;
     const kDataString = "a".repeat(4 * kOneMB);
-    const kDocs = [{_id: 2, data: kDataString}, {_id: -2, data: kDataString}];
+    const kDocs = [
+        {_id: 2, data: kDataString},
+        {_id: -2, data: kDataString},
+    ];
     assert.commandWorked(coll.insertMany(kDocs));
     assert.commandWorked(outColl.insertMany(kDocs));
 
@@ -61,16 +64,18 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
     // split the two documents into separate batches of 14MB each.
     const outFieldValue = "a".repeat(10 * kOneMB);
     let aggCommand = {
-        pipeline: [{
-            $merge: {
-                into: {db: "db", coll: outCollName},
-                on: "_id",
-                whenMatched: [{$addFields: {out: "$$outField"}}],
-                whenNotMatched: "insert"
-            }
-        }],
+        pipeline: [
+            {
+                $merge: {
+                    into: {db: "db", coll: outCollName},
+                    on: "_id",
+                    whenMatched: [{$addFields: {out: "$$outField"}}],
+                    whenNotMatched: "insert",
+                },
+            },
+        ],
         cursor: {},
-        let : {"outField": outFieldValue}
+        let: {"outField": outFieldValue},
     };
 
     // If this is a replica set, we need to target a secondary node to force writes to go over
@@ -128,8 +133,10 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
 
     // If the documents and the let parameters are large enough, the $merge is expected to fail.
     const kVeryLargeDataString = "a".repeat(10 * kOneMB);
-    const kLargeDocs =
-        [{_id: 2, data: kVeryLargeDataString}, {_id: -2, data: kVeryLargeDataString}];
+    const kLargeDocs = [
+        {_id: 2, data: kVeryLargeDataString},
+        {_id: -2, data: kVeryLargeDataString},
+    ];
     assert.commandWorked(coll.insertMany(kLargeDocs));
     assert.commandWorked(outColl.insertMany(kLargeDocs));
 
@@ -137,11 +144,11 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
         testFixture.awaitReplication();
     }
 
-    assert.commandFailedWithCode(aggColl.runCommand("aggregate", aggCommand),
-                                 ErrorCodes.BSONObjectTooLarge);
+    assert.commandFailedWithCode(aggColl.runCommand("aggregate", aggCommand), ErrorCodes.BSONObjectTooLarge);
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete block
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Delete block
     // Test against a replica set.
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet();

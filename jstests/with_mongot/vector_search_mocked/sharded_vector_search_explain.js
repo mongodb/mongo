@@ -8,9 +8,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForVectorSearchQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     getDefaultLastExplainContents,
     getShardedMongotStagesAndValidateExplainExecutionStats,
@@ -35,8 +33,7 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const coll = testDB.getCollection(collName);
 assert.commandWorked(coll.insert({_id: 1, name: "Sozin", element: "fire"}));
@@ -126,26 +123,21 @@ function testLimit(shard0Conn, shard1Conn, verbosity, userLimit) {
             ],
         });
     }
-    const result = coll.explain(verbosity).aggregate(
-        [{$vectorSearch: vectorSearchQuery}, {$limit: userLimit}]);
+    const result = coll.explain(verbosity).aggregate([{$vectorSearch: vectorSearchQuery}, {$limit: userLimit}]);
     // We should have a $limit on each shard.
     const limitStages = getAggPlanStages(result, "$limit");
     assert.eq(limitStages.length, 2, tojson(result));
     // The $limits will take on the value of the $vectorSearch limit unless we have a smaller
     // user-specified $limit.
-    const expectedLimitVal =
-        userLimit ? Math.min(userLimit, vectorSearchQuery.limit) : vectorSearchQuery.limit;
+    const expectedLimitVal = userLimit ? Math.min(userLimit, vectorSearchQuery.limit) : vectorSearchQuery.limit;
     for (const limitStage of limitStages) {
         assert.eq(expectedLimitVal, limitStage["$limit"], tojson(result));
     }
     // The merging pipeline should also have a $limit with the minimum of the $vectorSearch limit
     // and user-specified $limit.
-    assert(result.splitPipeline.mergerPart[0].hasOwnProperty("$mergeCursors"),
-           tojson(result.splitPipeline));
-    assert(result.splitPipeline.mergerPart[1].hasOwnProperty("$limit"),
-           tojson(result.splitPipeline));
-    assert.eq(
-        result.splitPipeline.mergerPart[1].$limit, expectedLimitVal, tojson(result.splitPipeline));
+    assert(result.splitPipeline.mergerPart[0].hasOwnProperty("$mergeCursors"), tojson(result.splitPipeline));
+    assert(result.splitPipeline.mergerPart[1].hasOwnProperty("$limit"), tojson(result.splitPipeline));
+    assert.eq(result.splitPipeline.mergerPart[1].$limit, expectedLimitVal, tojson(result.splitPipeline));
 }
 function runExplainTest(verbosity) {
     // Ensure there is never a staleShardVersionException to cause a retry on any shard.
@@ -241,7 +233,7 @@ function runExplainTest(verbosity) {
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
                 verbosity,
-                nReturnedList: [NumberLong(0), NumberLong(0)]
+                nReturnedList: [NumberLong(0), NumberLong(0)],
             });
         }
         {
@@ -290,18 +282,27 @@ function runExplainTest(verbosity) {
                 mongotMock: s0Mongot,
                 coll: coll,
                 batchList: [
-                    [{_id: 60, $vectorSearchScore: 100}, {_id: 2, $vectorSearchScore: 1}],
-                    [{_id: 40, $vectorSearchScore: 0.99}, {_id: 1, $vectorSearchScore: 0.98}],
-                ]
+                    [
+                        {_id: 60, $vectorSearchScore: 100},
+                        {_id: 2, $vectorSearchScore: 1},
+                    ],
+                    [
+                        {_id: 40, $vectorSearchScore: 0.99},
+                        {_id: 1, $vectorSearchScore: 0.98},
+                    ],
+                ],
             });
             setUpMongotReturnExplainAndCursorGetMore({
                 searchCmd: vectorSearchCmd,
                 mongotMock: s1Mongot,
                 coll: coll,
                 batchList: [
-                    [{_id: 11, $vectorSearchScore: 100}, {_id: 12, $vectorSearchScore: 1}],
+                    [
+                        {_id: 11, $vectorSearchScore: 100},
+                        {_id: 12, $vectorSearchScore: 1},
+                    ],
                     [{_id: 21, $vectorSearchScore: 0.99}],
-                ]
+                ],
             });
             const result = coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
             getShardedMongotStagesAndValidateExplainExecutionStats({
@@ -333,22 +334,22 @@ function runExplainTest(verbosity) {
 
 // Test that $vectorSearch works with each explain verbosity.
 runExplainTest("queryPlanner");
-runTestOnPrimaries((shard0Conn, shard1Conn) =>
-                       testLimit(shard0Conn, shard1Conn, "queryPlanner", lowerUserLimit));
-runTestOnPrimaries((shard0Conn, shard1Conn) =>
-                       testLimit(shard0Conn, shard1Conn, "queryPlanner", higherUserLimit));
+runTestOnPrimaries((shard0Conn, shard1Conn) => testLimit(shard0Conn, shard1Conn, "queryPlanner", lowerUserLimit));
+runTestOnPrimaries((shard0Conn, shard1Conn) => testLimit(shard0Conn, shard1Conn, "queryPlanner", higherUserLimit));
 
-if (FeatureFlagUtil.isEnabled(testDB.getMongo(), 'SearchExplainExecutionStats')) {
+if (FeatureFlagUtil.isEnabled(testDB.getMongo(), "SearchExplainExecutionStats")) {
     runExplainTest("executionStats");
+    runTestOnPrimaries((shard0Conn, shard1Conn) => testLimit(shard0Conn, shard1Conn, "executionStats", lowerUserLimit));
     runTestOnPrimaries((shard0Conn, shard1Conn) =>
-                           testLimit(shard0Conn, shard1Conn, "executionStats", lowerUserLimit));
-    runTestOnPrimaries((shard0Conn, shard1Conn) =>
-                           testLimit(shard0Conn, shard1Conn, "executionStats", higherUserLimit));
+        testLimit(shard0Conn, shard1Conn, "executionStats", higherUserLimit),
+    );
 
     runExplainTest("allPlansExecution");
     runTestOnPrimaries((shard0Conn, shard1Conn) =>
-                           testLimit(shard0Conn, shard1Conn, "allPlansExecution", lowerUserLimit));
+        testLimit(shard0Conn, shard1Conn, "allPlansExecution", lowerUserLimit),
+    );
     runTestOnPrimaries((shard0Conn, shard1Conn) =>
-                           testLimit(shard0Conn, shard1Conn, "allPlansExecution", higherUserLimit));
+        testLimit(shard0Conn, shard1Conn, "allPlansExecution", higherUserLimit),
+    );
 }
 stWithMock.stop();

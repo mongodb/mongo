@@ -9,13 +9,15 @@
 TestData.cleanUpCoreDumpsFromExpectedCrash = true;
 
 function waitFailedToStart(pid, exitCode) {
-    assert.soon(function() {
-        return !checkProgram(pid).alive;
-    }, `Failed to wait for ${pid} to die`, 3 * 60 * 1000);
+    assert.soon(
+        function () {
+            return !checkProgram(pid).alive;
+        },
+        `Failed to wait for ${pid} to die`,
+        3 * 60 * 1000,
+    );
 
-    assert.eq(exitCode,
-              checkProgram(pid).exitCode,
-              `Failed to wait for ${pid} to die with exit code ${exitCode}`);
+    assert.eq(exitCode, checkProgram(pid).exitCode, `Failed to wait for ${pid} to die with exit code ${exitCode}`);
 }
 
 function parseLogFile(file) {
@@ -53,9 +55,9 @@ const command = `echo xxxxxxxxxxxxxxxxxxxxx > ${dbpath}/WiredTiger.turtle`;
 
 let ret;
 if (_isWindows()) {
-    ret = runProgram('cmd.exe', '/c', command);
+    ret = runProgram("cmd.exe", "/c", command);
 } else {
-    ret = runProgram('/bin/sh', '-c', command);
+    ret = runProgram("/bin/sh", "-c", command);
 }
 
 assert.eq(ret, 0);
@@ -66,13 +68,13 @@ m = MongoRunner.runMongod({
     dbpath: dbpath,
     restart: true,
     cleanData: false,
-    waitForConnect: false
+    waitForConnect: false,
 });
 
 if (_isWindows()) {
-    waitFailedToStart(m.pid, 14);  // MongoRunner.EXIT_ABORT
+    waitFailedToStart(m.pid, 14); // MongoRunner.EXIT_ABORT
 } else {
-    waitFailedToStart(m.pid, 6);  // MongoRunner.EXIT_ABORT
+    waitFailedToStart(m.pid, 6); // MongoRunner.EXIT_ABORT
 }
 
 // Check we have one log line

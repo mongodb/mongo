@@ -21,7 +21,7 @@ function isShardingReady(conn) {
 let configPrimary = MongoRunner.runMongod({
     setParameter: {
         featureFlagAllMongodsAreSharded: true,
-    }
+    },
 });
 assert.soon(() => isShardingReady(configPrimary));
 
@@ -40,7 +40,7 @@ let configSecondary = MongoRunner.runMongod({
     replSet: replSetName,
     setParameter: {
         featureFlagAllMongodsAreSharded: true,
-    }
+    },
 });
 assert(!isShardingReady(configSecondary));
 let config = assert.commandWorked(configPrimary.adminCommand({replSetGetConfig: 1})).config;
@@ -59,7 +59,7 @@ let shardPrimary = MongoRunner.runMongod({
     shardsvr: "",
     setParameter: {
         featureFlagAllMongodsAreSharded: true,
-    }
+    },
 });
 assert(isShardingReady(shardPrimary));
 replSetName = assert.commandWorked(shardPrimary.adminCommand({replSetGetStatus: 1})).set;
@@ -77,7 +77,7 @@ let shardSecondary = MongoRunner.runMongod({
     replSet: replSetName,
     setParameter: {
         featureFlagAllMongodsAreSharded: true,
-    }
+    },
 });
 assert(isShardingReady(shardSecondary));
 config = assert.commandWorked(shardPrimary.adminCommand({replSetGetConfig: 1})).config;

@@ -12,8 +12,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // implicit sessions.
 TestData.disableImplicitSessions = true;
 
-const st = new ShardingTest(
-    {shards: 1, rsOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: 0}}});
+const st = new ShardingTest({shards: 1, rsOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: 0}}});
 
 const shard0Rst = st.rs0;
 const shard0Primary = shard0Rst.getPrimary();
@@ -32,7 +31,7 @@ let testDB = shard0Primary.getDB(kDbName);
 
 const sessionUUID = UUID();
 const parentLsid = {
-    id: sessionUUID
+    id: sessionUUID,
 };
 
 const kInitialInternalTxnNumber = 50123;
@@ -41,91 +40,101 @@ let currentInternalTxnNumber = kInitialInternalTxnNumber;
 let numTransactionsCollEntries = 0;
 let numImageCollEntries = 0;
 
-assert.commandWorked(
-    testDB.runCommand({insert: kCollName, documents: [{_id: 0}], lsid: parentLsid}));
+assert.commandWorked(testDB.runCommand({insert: kCollName, documents: [{_id: 0}], lsid: parentLsid}));
 
 const childLsid0 = {
     id: sessionUUID,
-    txnUUID: UUID()
+    txnUUID: UUID(),
 };
 
 withRetryOnTransientTxnError(() => {
     currentInternalTxnNumber++;
 
-    assert.commandWorked(testDB.runCommand({
-        update: kCollName,
-        updates: [{q: {_id: 0}, u: {$set: {a: 0}}}],
-        lsid: childLsid0,
-        txnNumber: NumberLong(currentInternalTxnNumber),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            update: kCollName,
+            updates: [{q: {_id: 0}, u: {$set: {a: 0}}}],
+            lsid: childLsid0,
+            txnNumber: NumberLong(currentInternalTxnNumber),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
-    assert.commandWorked(testDB.adminCommand({
-        commitTransaction: 1,
-        lsid: childLsid0,
-        txnNumber: NumberLong(currentInternalTxnNumber),
-        autocommit: false
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            commitTransaction: 1,
+            lsid: childLsid0,
+            txnNumber: NumberLong(currentInternalTxnNumber),
+            autocommit: false,
+        }),
+    );
 });
 numTransactionsCollEntries++;
 
 // Use a filter to skip transactions from internal metadata operations if we're running in catalog
 // shard mode.
-assert.eq(numTransactionsCollEntries,
-          transactionsCollOnPrimary.find({txnNum: currentInternalTxnNumber}).itcount());
+assert.eq(numTransactionsCollEntries, transactionsCollOnPrimary.find({txnNum: currentInternalTxnNumber}).itcount());
 
 const parentTxnNumber1 = NumberLong(55123);
 
-assert.commandWorked(testDB.runCommand({
-    update: kCollName,
-    updates: [{q: {_id: 0}, u: {$set: {b: 0}}}],
-    lsid: parentLsid,
-    txnNumber: parentTxnNumber1,
-    stmtId: NumberInt(0)
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        update: kCollName,
+        updates: [{q: {_id: 0}, u: {$set: {b: 0}}}],
+        lsid: parentLsid,
+        txnNumber: parentTxnNumber1,
+        stmtId: NumberInt(0),
+    }),
+);
 numTransactionsCollEntries++;
 
 const childLsid1 = {
     id: sessionUUID,
     txnNumber: parentTxnNumber1,
-    txnUUID: UUID()
+    txnUUID: UUID(),
 };
 
 withRetryOnTransientTxnError(() => {
     currentInternalTxnNumber++;
 
-    assert.commandWorked(testDB.runCommand({
-        findAndModify: kCollName,
-        query: {_id: 0},
-        update: {$set: {c: 0}},
-        lsid: childLsid1,
-        txnNumber: NumberLong(currentInternalTxnNumber),
-        stmtId: NumberInt(1),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            findAndModify: kCollName,
+            query: {_id: 0},
+            update: {$set: {c: 0}},
+            lsid: childLsid1,
+            txnNumber: NumberLong(currentInternalTxnNumber),
+            stmtId: NumberInt(1),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
-    assert.commandWorked(testDB.adminCommand({
-        commitTransaction: 1,
-        lsid: childLsid1,
-        txnNumber: NumberLong(currentInternalTxnNumber),
-        autocommit: false
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            commitTransaction: 1,
+            lsid: childLsid1,
+            txnNumber: NumberLong(currentInternalTxnNumber),
+            autocommit: false,
+        }),
+    );
 });
 
 numTransactionsCollEntries++;
 numImageCollEntries++;
 
-assert.eq(numTransactionsCollEntries,
-          transactionsCollOnPrimary
-              .find({
-                  $or: [
-                      {txnNum: {$gte: kInitialInternalTxnNumber, $lte: currentInternalTxnNumber}},
-                      {txnNum: parentTxnNumber1}
-                  ]
-              })
-              .itcount());
+assert.eq(
+    numTransactionsCollEntries,
+    transactionsCollOnPrimary
+        .find({
+            $or: [
+                {txnNum: {$gte: kInitialInternalTxnNumber, $lte: currentInternalTxnNumber}},
+                {txnNum: parentTxnNumber1},
+            ],
+        })
+        .itcount(),
+);
 assert.eq(numImageCollEntries, imageCollOnPrimary.find().itcount());
 
 assert.commandWorked(shard0Primary.adminCommand({refreshLogicalSessionCacheNow: 1}));
@@ -139,12 +148,10 @@ assert.eq(0, sessionsCollOnPrimary.find({"_id.id": sessionUUID}).itcount());
 assert.commandWorked(shard0Primary.adminCommand({reapLogicalSessionCacheNow: 1}));
 jsTest.log(
     "Verify that the config.transactions entries and config.image_collection got reaped " +
-    "since the config.system.sessions entry for the parent session had already been deleted");
+        "since the config.system.sessions entry for the parent session had already been deleted",
+);
 let txnsOnPrimary = transactionsCollOnPrimary.find({
-    $or: [
-        {txnNum: {$gte: kInitialInternalTxnNumber, $lte: currentInternalTxnNumber}},
-        {txnNum: parentTxnNumber1}
-    ]
+    $or: [{txnNum: {$gte: kInitialInternalTxnNumber, $lte: currentInternalTxnNumber}}, {txnNum: parentTxnNumber1}],
 });
 assert.eq(0, txnsOnPrimary.itcount(), tojson(txnsOnPrimary.toArray()));
 assert.eq(0, imageCollOnPrimary.find().itcount());

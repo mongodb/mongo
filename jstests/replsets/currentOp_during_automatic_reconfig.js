@@ -7,17 +7,13 @@
 
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    isMemberNewlyAdded,
-    waitForNewlyAddedRemovalForNodeToBeCommitted
-} from "jstests/replsets/rslib.js";
+import {isMemberNewlyAdded, waitForNewlyAddedRemovalForNodeToBeCommitted} from "jstests/replsets/rslib.js";
 
 const testName = jsTestName();
 const dbName = "testdb";
 const collName = "testcoll";
 
-const rst = new ReplSetTest(
-    {name: testName, nodes: [{}], settings: {chainingAllowed: false}, useBridge: true});
+const rst = new ReplSetTest({name: testName, nodes: [{}], settings: {chainingAllowed: false}, useBridge: true});
 rst.startSet();
 rst.initiate();
 
@@ -31,24 +27,25 @@ jsTestLog("Adding a new node to the replica set");
 const secondary = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Checking that the 'newlyAdded' field is set on the new node");
 assert(isMemberNewlyAdded(primary, 1));
 
 jsTestLog("Allowing primary to initiate the 'newlyAdded' field removal");
 let hangDuringAutomaticReconfigFP = configureFailPoint(primaryDb, "hangDuringAutomaticReconfig");
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 rst.awaitSecondaryNodes(null, [secondary]);
 
 hangDuringAutomaticReconfigFP.wait();
@@ -69,7 +66,7 @@ for (let i = 0; i < ops.length; i++) {
             assert.eq(1, commandField["memberId"], op);
 
             assert(op.hasOwnProperty("desc"), op);
-            assert(op["desc"].startsWith("ReplCoord"));  // client name
+            assert(op["desc"].startsWith("ReplCoord")); // client name
 
             jsTestLog("Found automatic reconfig: " + tojson(op));
             found = true;

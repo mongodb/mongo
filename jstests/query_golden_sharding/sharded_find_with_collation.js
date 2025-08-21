@@ -3,13 +3,8 @@
  * be single shard targeted.
  * TODO SERVER-94611: Extend testing once sharding may have non-simple collation.
  */
-import {configureFailPoint} from 'jstests/libs/fail_point_util.js';
-import {
-    code,
-    outputShardedFindSummaryAndResults,
-    section,
-    subSection
-} from "jstests/libs/pretty_md.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {code, outputShardedFindSummaryAndResults, section, subSection} from "jstests/libs/pretty_md.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
@@ -43,12 +38,15 @@ const setupCollection = ({shardKey, splits}) => {
         assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: mid}));
     }
 
-    assert.commandWorked(db.adminCommand(
-        {moveChunk: coll.getFullName(), find: {[shardField]: MinKey}, to: st.shard0.shardName}));
-    assert.commandWorked(db.adminCommand(
-        {moveChunk: coll.getFullName(), find: {[shardField]: doc.a}, to: st.shard0.shardName}));
-    assert.commandWorked(db.adminCommand(
-        {moveChunk: coll.getFullName(), find: {[shardField]: MaxKey}, to: st.shard1.shardName}));
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {[shardField]: MinKey}, to: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {[shardField]: doc.a}, to: st.shard0.shardName}),
+    );
+    assert.commandWorked(
+        db.adminCommand({moveChunk: coll.getFullName(), find: {[shardField]: MaxKey}, to: st.shard1.shardName}),
+    );
 
     // Put data on shard0, that will go into chunk 2.
     assert.commandWorked(coll.insert(doc));
@@ -59,8 +57,8 @@ const setupCollection = ({shardKey, splits}) => {
 };
 
 const caseInsensitive = {
-    locale: 'en_US',
-    strength: 2
+    locale: "en_US",
+    strength: 2,
 };
 
 const doQueries = (withCollation) => {
@@ -94,10 +92,11 @@ let suspendRangeDeletionShard0;
 for (let shardKey of [{a: 1}, {_id: 1}, {a: "hashed"}, {_id: "hashed"}]) {
     let shardKeyJson = tojson(shardKey);
     let key = Object.keys(shardKey)[0];
-    let splitPoints = Object.values(shardKey)[0] == "hashed"
-        ? [{[key]: convertShardKeyToHashed(0)}, {[key]: convertShardKeyToHashed('b')}]
-        : [{[key]: 0}, {[key]: 'b'}];
-    suspendRangeDeletionShard0 = configureFailPoint(st.shard0, 'suspendRangeDeletion');
+    let splitPoints =
+        Object.values(shardKey)[0] == "hashed"
+            ? [{[key]: convertShardKeyToHashed(0)}, {[key]: convertShardKeyToHashed("b")}]
+            : [{[key]: 0}, {[key]: "b"}];
+    suspendRangeDeletionShard0 = configureFailPoint(st.shard0, "suspendRangeDeletion");
     setupCollection({shardKey: shardKey, splits: splitPoints});
 
     section(`Find *without* collation on collection sharded on ${shardKeyJson}`);

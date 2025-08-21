@@ -17,9 +17,9 @@ const rst = new ReplSetTest({
         setParameter: {
             // Set the history window to zero to explicitly control the oldest timestamp.
             minSnapshotHistoryWindowInSeconds: 0,
-            logComponentVerbosity: tojson({storage: 1})
-        }
-    }
+            logComponentVerbosity: tojson({storage: 1}),
+        },
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -30,8 +30,7 @@ const dbName = "test";
 const db = primary.getDB(dbName);
 
 // Pause the checkpoint thread to control the checkpoint timestamp.
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "alwaysOn"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "alwaysOn"}));
 
 const collName = "a";
 assert.commandWorked(db.createCollection(collName));
@@ -57,14 +56,14 @@ coll.dropIndex({x: 1});
 
 // Deferring table drop for index.
 checkLog.containsJson(primary, 22206, {
-    ident: function(ident) {
+    ident: function (ident) {
         return ident == xIndexUri;
-    }
+    },
 });
 
 // Wait until majority read concern optime has advanced past the given timestamp. Then take a
 // checkpoint and assert that the checkpoint's stable time is past the oplog entry.
-const advanceMajorityThenCheckpoint = function(timestamp) {
+const advanceMajorityThenCheckpoint = function (timestamp) {
     rst.waitForStableTimestampTobeAdvanced(primary, timestamp);
 
     assert.commandWorked(db.adminCommand({fsync: 1}));
@@ -76,13 +75,13 @@ const advanceMajorityThenCheckpoint = function(timestamp) {
 
 // Advance the timestamp and wait for journaling, so that by completion, the stable timestamp will
 // include this command.
-const advTimeIdxDrop = assert
-                           .commandWorked(db.adminCommand({
-                               appendOplogNote: 1,
-                               data: {msg: "advance timestamp after dropping index"},
-                               writeConcern: {w: "majority", j: true}
-                           }))
-                           .operationTime;
+const advTimeIdxDrop = assert.commandWorked(
+    db.adminCommand({
+        appendOplogNote: 1,
+        data: {msg: "advance timestamp after dropping index"},
+        writeConcern: {w: "majority", j: true},
+    }),
+).operationTime;
 
 // Wait for the read concern majority time to advance. Then trigger a checkpoint. This will advance
 // the checkpoint timestamp to the stable timestamp, and allows for the timestamp monitor to notify
@@ -91,9 +90,9 @@ advanceMajorityThenCheckpoint(advTimeIdxDrop);
 
 // "The ident was successfully dropped".
 checkLog.containsJson(primary, 6776600, {
-    ident: function(ident) {
+    ident: function (ident) {
         return ident == xIndexUri;
-    }
+    },
 });
 
 jsTestLog("Starting a two-phase collection drop");
@@ -101,27 +100,27 @@ coll.drop();
 
 // Deferring table drop for index.
 checkLog.containsJson(primary, 22206, {
-    ident: function(ident) {
+    ident: function (ident) {
         return ident == idIndexUri;
-    }
+    },
 });
 
 // Deferring table drop for collection.
 checkLog.containsJson(primary, 22214, {
-    ident: function(ident) {
+    ident: function (ident) {
         return ident == collUri;
-    }
+    },
 });
 
 // Advance the timestamp and wait for journaling, so that by completion, the stable timestamp will
 // include this command.
-const advTimeCollDrop = assert
-                            .commandWorked(db.adminCommand({
-                                appendOplogNote: 1,
-                                data: {msg: "advance timestamp after dropping collection"},
-                                writeConcern: {w: "majority", j: true}
-                            }))
-                            .operationTime;
+const advTimeCollDrop = assert.commandWorked(
+    db.adminCommand({
+        appendOplogNote: 1,
+        data: {msg: "advance timestamp after dropping collection"},
+        writeConcern: {w: "majority", j: true},
+    }),
+).operationTime;
 
 // Wait for the read concern majority time to advance. Then trigger a checkpoint. This will advance
 // the checkpoint timestamp to the stable timestamp, and allows for the timestamp monitor to notify
@@ -130,17 +129,16 @@ advanceMajorityThenCheckpoint(advTimeCollDrop);
 
 // "The ident was successfully dropped".
 checkLog.containsJson(primary, 6776600, {
-    ident: function(ident) {
+    ident: function (ident) {
         return ident == collUri;
-    }
+    },
 });
 checkLog.containsJson(primary, 6776600, {
-    ident: function(ident) {
+    ident: function (ident) {
         return ident == idIndexUri;
-    }
+    },
 });
 
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}));
 
 rst.stopSet();

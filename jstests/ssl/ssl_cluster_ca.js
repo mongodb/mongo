@@ -14,7 +14,7 @@ function testRS(node0_opts, node1_opts, succeed) {
     rs.startSet();
     if (succeed) {
         rs.initiate();
-        assert.commandWorked(rs.getPrimary().getDB('admin').runCommand({hello: 1}));
+        assert.commandWorked(rs.getPrimary().getDB("admin").runCommand({hello: 1}));
     } else {
         // By default, rs.initiate takes a very long time to timeout. We should shorten this
         // period, because we expect it to fail. ReplSetTest has both a static and local copy
@@ -27,7 +27,7 @@ function testRS(node0_opts, node1_opts, succeed) {
         // analyzer.  We don't want that to happen, so we disable it here.
         MongoRunner.runHangAnalyzer.disable();
         try {
-            assert.throws(function() {
+            assert.throws(function () {
                 rs.initiate();
             });
         } finally {
@@ -45,27 +45,25 @@ function testRS(node0_opts, node1_opts, succeed) {
 // ca.pem signed client.pem and server.pem
 // trusted-ca.pem signed trusted-client.pem and trusted-server.pem
 const valid_options = {
-    tlsMode: 'requireTLS',
+    tlsMode: "requireTLS",
     // Servers present trusted-server.pem to clients and each other for inbound connections.
     // Peers validate trusted-server.pem using trusted-ca.pem when making those connections.
-    tlsCertificateKeyFile: 'jstests/libs/trusted-server.pem',
-    tlsCAFile: 'jstests/libs/trusted-ca.pem',
+    tlsCertificateKeyFile: "jstests/libs/trusted-server.pem",
+    tlsCAFile: "jstests/libs/trusted-ca.pem",
     // Servers making outbound connections to other servers present server.pem to their peers
     // which their peers validate using ca.pem.
-    tlsClusterFile: 'jstests/libs/server.pem',
-    tlsClusterCAFile: 'jstests/libs/ca.pem',
+    tlsClusterFile: "jstests/libs/server.pem",
+    tlsClusterCAFile: "jstests/libs/ca.pem",
     // SERVER-36895: IP based hostname validation with SubjectAlternateName
-    tlsAllowInvalidHostnames: '',
+    tlsAllowInvalidHostnames: "",
 };
 
 testRS(valid_options, valid_options, true);
 
-const wrong_cluster_file =
-    Object.assign({}, valid_options, {tlsClusterFile: valid_options.tlsCertificateKeyFile});
+const wrong_cluster_file = Object.assign({}, valid_options, {tlsClusterFile: valid_options.tlsCertificateKeyFile});
 testRS(wrong_cluster_file, wrong_cluster_file, false);
 
-const wrong_key_file =
-    Object.assign({}, valid_options, {tlsCertificateKeyFile: valid_options.tlsClusterFile});
+const wrong_key_file = Object.assign({}, valid_options, {tlsCertificateKeyFile: valid_options.tlsClusterFile});
 testRS(wrong_key_file, wrong_key_file, false);
 
 // Test self-signed clusterFile validated against peer's CAFile
@@ -74,34 +72,35 @@ const cafile_only_options = {
     tlsCertificateKeyFile: "jstests/libs/server.pem",
     tlsCAFile: "jstests/libs/ca.pem",
     tlsAllowInvalidHostnames: "",
-    clusterAuthMode: "x509"
+    clusterAuthMode: "x509",
 };
-const selfsigned_cluster_file =
-    Object.merge(cafile_only_options, {tlsClusterFile: "jstests/libs/smoke.pem"});
+const selfsigned_cluster_file = Object.merge(cafile_only_options, {tlsClusterFile: "jstests/libs/smoke.pem"});
 testRS(cafile_only_options, selfsigned_cluster_file, false);
 
 const mongod = MongoRunner.runMongod(valid_options);
 assert(mongod, "Failed starting standalone mongod with alternate CA");
 
 function testConnect(cert, succeed) {
-    const mongo = runMongoProgram("mongo",
-                                  "--host",
-                                  "localhost",
-                                  "--port",
-                                  mongod.port,
-                                  "--tls",
-                                  "--tlsCAFile",
-                                  valid_options.tlsCAFile,
-                                  "--tlsCertificateKeyFile",
-                                  cert,
-                                  "--eval",
-                                  ";");
+    const mongo = runMongoProgram(
+        "mongo",
+        "--host",
+        "localhost",
+        "--port",
+        mongod.port,
+        "--tls",
+        "--tlsCAFile",
+        valid_options.tlsCAFile,
+        "--tlsCertificateKeyFile",
+        cert,
+        "--eval",
+        ";",
+    );
 
     // runMongoProgram returns 0 on success
     assert.eq(mongo === 0, succeed);
 }
 
-testConnect('jstests/libs/client.pem', true);
-testConnect('jstests/libs/trusted-client.pem', false);
+testConnect("jstests/libs/client.pem", true);
+testConnect("jstests/libs/trusted-client.pem", false);
 
 MongoRunner.stopMongod(mongod);

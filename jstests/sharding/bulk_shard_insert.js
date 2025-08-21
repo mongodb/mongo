@@ -20,15 +20,14 @@ var st = new ShardingTest({
     // Ensures that the test does not run out of stale shard version retries.
     other: {
         configOptions: {setParameter: {balancerMigrationsThrottlingMs: 2000}},
-        rsOptions: {setParameter: {useBatchedDeletesForRangeDeletion: true}}
-    }
+        rsOptions: {setParameter: {useBatchedDeletesForRangeDeletion: true}},
+    },
 });
 
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: 'TestDB', primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {Counter: 1}}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: "TestDB.TestColl", key: {Counter: 1}}));
 
-var db = st.s0.getDB('TestDB');
+var db = st.s0.getDB("TestDB");
 var coll = db.TestColl;
 
 // Insert lots of bulk documents
@@ -56,10 +55,9 @@ function checkDocuments() {
     var count = coll.find().count();
 
     if (docsFound.length != docsInserted) {
-        print("Inserted " + docsInserted + " count : " + count +
-              " doc count : " + docsFound.length);
+        print("Inserted " + docsInserted + " count : " + count + " doc count : " + docsFound.length);
 
-        var allFoundDocsSorted = docsFound.sort(function(a, b) {
+        var allFoundDocsSorted = docsFound.sort(function (a, b) {
             return a.Counter - b.Counter;
         });
 
@@ -74,14 +72,12 @@ function checkDocuments() {
 
         st.printShardingStatus();
 
-        assert(
-            false,
-            'Inserted number of documents does not match the actual: ' + tojson(missingValueInfo));
+        assert(false, "Inserted number of documents does not match the actual: " + tojson(missingValueInfo));
     }
 }
 
 while (docsInserted < numDocs) {
-    var currBulkSize = (numDocs - docsInserted > bulkSize) ? bulkSize : (numDocs - docsInserted);
+    var currBulkSize = numDocs - docsInserted > bulkSize ? bulkSize : numDocs - docsInserted;
 
     var bulk = [];
     for (var i = 0; i < currBulkSize; i++) {
@@ -99,7 +95,7 @@ while (docsInserted < numDocs) {
     if (docsInserted > numDocs / 3 && !balancerOn) {
         // Do one check before we turn balancer on
         checkDocuments();
-        print('Turning on balancer after ' + docsInserted + ' documents inserted.');
+        print("Turning on balancer after " + docsInserted + " documents inserted.");
         st.startBalancer();
         balancerOn = true;
     }

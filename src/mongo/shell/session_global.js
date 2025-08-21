@@ -5,7 +5,7 @@ import {
     _DummyDriverSession,
     _ServerSession,
     DriverSession,
-    SessionOptions
+    SessionOptions,
 } from "src/mongo/shell/session.js";
 
 globalThis.DriverSession = DriverSession;

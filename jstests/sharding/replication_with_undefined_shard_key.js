@@ -9,21 +9,21 @@ const mongosColl = mongosDB.mycoll;
 
 // Shard the test collection on the "x" field.
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-assert.commandWorked(mongosDB.adminCommand({
-    shardCollection: mongosColl.getFullName(),
-    key: {x: 1},
-}));
+assert.commandWorked(
+    mongosDB.adminCommand({
+        shardCollection: mongosColl.getFullName(),
+        key: {x: 1},
+    }),
+);
 
 // Insert a document with a literal undefined value.
 assert.commandWorked(mongosColl.insert({x: undefined}));
 
 jsTestLog("Doing writes that generate oplog entries including undefined document key");
 
-assert.commandWorked(mongosColl.update(
-    {},
-    {$set: {a: 1}},
-    {multi: true, writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 assert.commandWorked(
-    mongosColl.remove({}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+    mongosColl.update({}, {$set: {a: 1}}, {multi: true, writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
+assert.commandWorked(mongosColl.remove({}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 st.stop();

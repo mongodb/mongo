@@ -10,10 +10,11 @@ function check() {
     assert.eq(1, t.count({a: /^zz|./}));
 }
 
-t.save({a: 'a'});
+t.save({a: "a"});
 
 check();
 t.createIndex({a: 1});
-if (1) {  // SERVER-3298
+if (1) {
+    // SERVER-3298
     check();
 }

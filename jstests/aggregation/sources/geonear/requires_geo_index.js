@@ -11,19 +11,17 @@ const from = db.from;
 coll.drop();
 from.drop();
 
-const geonearPipeline = [
-    {$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}},
-];
+const geonearPipeline = [{$geoNear: {near: [0, 0], distanceField: "distance", spherical: true}}];
 
 const geonearWithinLookupPipeline = [
-        {
-          $lookup: {
-              pipeline: geonearPipeline,
-              from: from.getName(),
-              as: "c",
-          }
+    {
+        $lookup: {
+            pipeline: geonearPipeline,
+            from: from.getName(),
+            as: "c",
         },
-    ];
+    },
+];
 
 assert.commandWorked(coll.insert({_id: 5, x: 5, geo: [1, 1]}));
 assert.commandWorked(from.insert({_id: 1, x: 5, geo: [0, 0]}));

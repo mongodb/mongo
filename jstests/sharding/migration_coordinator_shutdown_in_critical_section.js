@@ -24,7 +24,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getNewNs(dbName) {
-    if (typeof getNewNs.counter == 'undefined') {
+    if (typeof getNewNs.counter == "undefined") {
         getNewNs.counter = 0;
     }
     getNewNs.counter++;
@@ -36,8 +36,7 @@ const dbName = "test";
 const st = new ShardingTest({shards: 2});
 const donorShard = st.shard0;
 const recipientShard = st.shard1;
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: donorShard.shardName}));
 
 function testShutDownAfterFailPoint(failPointName) {
     const [collName, ns] = getNewNs(dbName);
@@ -60,9 +59,15 @@ function testShutDownAfterFailPoint(failPointName) {
     // Set the requested failpoint and launch the moveChunk asynchronously.
     let failPoint = configureFailPoint(donorShard.rs.getPrimary(), failPointName);
     const awaitResult = startParallelShell(
-        funWithArgs(function(ns, toShardName) {
-            assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
-        }, ns, recipientShard.shardName), st.s.port);
+        funWithArgs(
+            function (ns, toShardName) {
+                assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: toShardName}));
+            },
+            ns,
+            recipientShard.shardName,
+        ),
+        st.s.port,
+    );
 
     jsTest.log("Waiting for moveChunk to reach " + failPointName + " failpoint");
     failPoint.wait();

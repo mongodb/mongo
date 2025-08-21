@@ -6,18 +6,18 @@ import {getPlanStage, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 Random.setRandomSeed();
 
-const testConnection =
-    MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
-const testDb = testConnection.getDB('local');
+const testConnection = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
+const testDb = testConnection.getDB("local");
 const collectionSize = 10;
-const clusteredCollName = jsTestName() + '_coll';
+const clusteredCollName = jsTestName() + "_coll";
 const clusterField = "_id";
 
 let nonClusteredCollName = clusteredCollName + "_nc";
 
 // Generate a clustered collection for the remainder of the testing
-assert.commandWorked(testDb.createCollection(
-    clusteredCollName, {clusteredIndex: {key: {[clusterField]: 1}, unique: true}}));
+assert.commandWorked(
+    testDb.createCollection(clusteredCollName, {clusteredIndex: {key: {[clusterField]: 1}, unique: true}}),
+);
 let clusteredColl = testDb[clusteredCollName];
 
 // Generate a non-clustered collection for comparison
@@ -53,16 +53,16 @@ function runTest(isClustered, hasFilter, hasHint, direction) {
 
     let plan = query.explain();
     if (isClustered) {
-        let collScan =
-            hasFilter ? getPlanStage(plan, "CLUSTERED_IXSCAN") : getPlanStage(plan, "COLLSCAN");
+        let collScan = hasFilter ? getPlanStage(plan, "CLUSTERED_IXSCAN") : getPlanStage(plan, "COLLSCAN");
 
         assert.neq(collScan, null, "Expected collscan in " + formatParamsAndPlan(plan));
-        assert.eq(collScan.direction,
-                  (direction > 0) ? "forward" : "backward",
-                  "Incorrect scan direction in " + formatParamsAndPlan(plan));
+        assert.eq(
+            collScan.direction,
+            direction > 0 ? "forward" : "backward",
+            "Incorrect scan direction in " + formatParamsAndPlan(plan),
+        );
     } else {
-        assert(planHasStage(testDb, plan, "FETCH"),
-               "Expected fetch in " + formatParamsAndPlan(plan));
+        assert(planHasStage(testDb, plan, "FETCH"), "Expected fetch in " + formatParamsAndPlan(plan));
     }
     assert(!planHasStage(testDb, plan, "SORT"), "Unexpected sort in " + formatParamsAndPlan(plan));
 }
@@ -73,10 +73,12 @@ function testCollations(collectionCollation, queryCollation, direction) {
     let strCollName = clusteredCollName + "_str";
 
     // Generate a clustered collection for the remainder of the testing
-    assert.commandWorked(testDb.createCollection(strCollName, {
-        clusteredIndex: {key: {[clusterField]: 1}, unique: true},
-        collation: collectionCollation
-    }));
+    assert.commandWorked(
+        testDb.createCollection(strCollName, {
+            clusteredIndex: {key: {[clusterField]: 1}, unique: true},
+            collation: collectionCollation,
+        }),
+    );
 
     let tsColl = testDb[strCollName];
 
@@ -86,7 +88,8 @@ function testCollations(collectionCollation, queryCollation, direction) {
     }
 
     function runExplain(filter) {
-        return tsColl.find(filter)
+        return tsColl
+            .find(filter)
             .sort({[clusterField]: direction})
             .collation(queryCollation)
             .explain();
@@ -117,8 +120,7 @@ function testCollations(collectionCollation, queryCollation, direction) {
 
     // Conjunction with one child which is an unsupported match expression and another which is a
     // comparison against a field other than the cluster field.
-    plan = runExplain(
-        {$and: [{$or: [{[clusterField]: {$lt: 2}}, {[clusterField]: {$gt: 5}}]}, {a: {$gt: -1}}]});
+    plan = runExplain({$and: [{$or: [{[clusterField]: {$lt: 2}}, {[clusterField]: {$gt: 5}}]}, {a: {$gt: -1}}]});
     assertPlanOnlyHasSortIfCollationsDontMatch(plan);
 
     // Match which compares the cluster field to a string.
@@ -181,10 +183,7 @@ function testCollations(collectionCollation, queryCollation, direction) {
     // Conjunction with one child which is an unsupported match expression and another which is
     // a comparison against the cluster field. The second conjunct omits strings.
     plan = runExplain({
-        $and: [
-            {$or: [{[clusterField]: {$lt: 2}}, {[clusterField]: {$gt: 5}}]},
-            {[clusterField]: {$gt: -1}}
-        ]
+        $and: [{$or: [{[clusterField]: {$lt: 2}}, {[clusterField]: {$gt: 5}}]}, {[clusterField]: {$gt: -1}}],
     });
     assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
 
@@ -195,8 +194,7 @@ function testCollations(collectionCollation, queryCollation, direction) {
 
     // Conjunction which contains a $in comparison of the cluster field to a string and a $in
     // comparison of the cluster field to a number. The second conjunct omits strings.
-    plan = runExplain(
-        {$and: [{[clusterField]: {$in: [1, "2", 3]}}, {[clusterField]: {$in: [1, 3, 4]}}]});
+    plan = runExplain({$and: [{[clusterField]: {$in: [1, "2", 3]}}, {[clusterField]: {$in: [1, 3, 4]}}]});
     assert(!planHasStage(testDb, plan, "SORT"), "Unxpected sort in " + tojson(plan));
 
     tsColl.drop();
@@ -206,29 +204,27 @@ function testMinMax() {
     // Min and max are only supported on forward collection scans.
     const direction = 1;
     // Min and max should be between 0 and collection size
-    const minResult = 5;  // inclusive
-    const maxResult = 8;  // not inclusive
+    const minResult = 5; // inclusive
+    const maxResult = 8; // not inclusive
     const resultCount = maxResult - minResult;
 
-    let normalCursor = nonClusteredColl.find()
-                           .hint({[clusterField]: 1})
-                           .min({[clusterField]: minResult})
-                           .max({[clusterField]: maxResult})
-                           .sort({[clusterField]: direction});
+    let normalCursor = nonClusteredColl
+        .find()
+        .hint({[clusterField]: 1})
+        .min({[clusterField]: minResult})
+        .max({[clusterField]: maxResult})
+        .sort({[clusterField]: direction});
     let normalResult = normalCursor.toArray();
-    assert.eq(normalResult.length,
-              resultCount,
-              tojson(normalResult) + " " + tojson(normalCursor.explain()));
+    assert.eq(normalResult.length, resultCount, tojson(normalResult) + " " + tojson(normalCursor.explain()));
 
-    let clusterCursor = clusteredColl.find()
-                            .hint({[clusterField]: 1})
-                            .min({[clusterField]: minResult})
-                            .max({[clusterField]: maxResult})
-                            .sort({[clusterField]: direction});
+    let clusterCursor = clusteredColl
+        .find()
+        .hint({[clusterField]: 1})
+        .min({[clusterField]: minResult})
+        .max({[clusterField]: maxResult})
+        .sort({[clusterField]: direction});
     let clusterResult = clusterCursor.toArray();
-    assert.eq(clusterResult.length,
-              resultCount,
-              tojson(clusterResult) + " " + tojson(clusterCursor.explain()));
+    assert.eq(clusterResult.length, resultCount, tojson(clusterResult) + " " + tojson(clusterCursor.explain()));
 
     for (let i = 0; i < clusterResult.length; ++i) {
         assert.eq(clusterResult[i][clusterField], normalResult[i][clusterField]);
@@ -259,20 +255,13 @@ function testPlanCache(direction) {
 
     // Now run the query and verify that the results are expected. Run it a few times so that the
     // cached plan will be used.
-    assert.eq(nonClusteredResults,
-              clusteredColl.find(filter, projection).sort(sort).toArray(),
-              tojson(plan));
-    assert.eq(nonClusteredResults,
-              clusteredColl.find(filter, projection).sort(sort).toArray(),
-              tojson(plan));
-    assert.eq(nonClusteredResults,
-              clusteredColl.find(filter, projection).sort(sort).toArray(),
-              tojson(plan));
+    assert.eq(nonClusteredResults, clusteredColl.find(filter, projection).sort(sort).toArray(), tojson(plan));
+    assert.eq(nonClusteredResults, clusteredColl.find(filter, projection).sort(sort).toArray(), tojson(plan));
+    assert.eq(nonClusteredResults, clusteredColl.find(filter, projection).sort(sort).toArray(), tojson(plan));
 
     // Verify that there's a cache entry for this query
     let cacheEntries = clusteredColl.getPlanCache().list();
-    let cachedPlan =
-        cacheEntries.find(e => e.planCacheShapeHash == plan.queryPlanner.planCacheShapeHash);
+    let cachedPlan = cacheEntries.find((e) => e.planCacheShapeHash == plan.queryPlanner.planCacheShapeHash);
     assert.neq(cachedPlan, null, "Plan not in cache");
 
     assert.commandWorked(clusteredColl.dropIndex(indexName));
@@ -298,21 +287,15 @@ const defaultCollation = {
 };
 const faroeseCollation = {
     locale: "fo",
-    caseLevel: true
+    caseLevel: true,
 };
 
-testCollations(
-    defaultCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ 1);
-testCollations(
-    defaultCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ -1);
-testCollations(
-    faroeseCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ 1);
-testCollations(
-    faroeseCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ -1);
-testCollations(
-    defaultCollation /* for collection */, defaultCollation /* for query */, /* direction = */ 1);
-testCollations(
-    defaultCollation /* for collection */, defaultCollation /* for query */, /* direction = */ -1);
+testCollations(defaultCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ 1);
+testCollations(defaultCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ -1);
+testCollations(faroeseCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ 1);
+testCollations(faroeseCollation /* for collection */, faroeseCollation /* for query */, /* direction = */ -1);
+testCollations(defaultCollation /* for collection */, defaultCollation /* for query */, /* direction = */ 1);
+testCollations(defaultCollation /* for collection */, defaultCollation /* for query */, /* direction = */ -1);
 
 testMinMax();
 
@@ -320,7 +303,10 @@ testPlanCache(/* direction = */ 1);
 testPlanCache(/* direction = */ -1);
 
 // If we're sorting on multiple columns, we still need an explicit sort
-let plan = clusteredColl.find().sort({[clusterField]: 1, a: 1}).explain();
+let plan = clusteredColl
+    .find()
+    .sort({[clusterField]: 1, a: 1})
+    .explain();
 assert(planHasStage(testDb, plan, "SORT"), "Expected sort in " + tojson(plan));
 
 clusteredColl.drop();

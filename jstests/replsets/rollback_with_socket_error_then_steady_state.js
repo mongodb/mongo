@@ -16,7 +16,7 @@ var collName = "test.coll";
 var counter = 0;
 
 var rst = new ReplSetTest({
-    name: 'rollback_with_socket_error_then_steady_state',
+    name: "rollback_with_socket_error_then_steady_state",
     nodes: [
         // Primary flops between nodes 0 and 1.
         {},
@@ -25,17 +25,18 @@ var rst = new ReplSetTest({
         {rsConfig: {priority: 0}},
         // Arbiters to sway elections.
         {rsConfig: {arbiterOnly: true}},
-        {rsConfig: {arbiterOnly: true}}
+        {rsConfig: {arbiterOnly: true}},
     ],
-    useBridge: true
+    useBridge: true,
 });
 var nodes = rst.startSet({setParameter: {allowMultipleArbiters: true}});
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
-assert.commandWorked(rst.getPrimary().adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 rst.awaitReplication();
 
 function stepUp(rst, node) {
@@ -50,8 +51,11 @@ jsTestLog("Make sure node 0 is primary.");
 stepUp(rst, nodes[0]);
 assert.eq(nodes[0], rst.getPrimary());
 // Wait for all data bearing nodes to get up to date.
-assert.commandWorked(nodes[0].getCollection(collName).insert(
-    {a: counter++}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    nodes[0]
+        .getCollection(collName)
+        .insert({a: counter++}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 
 jsTestLog("Create two partitions: [1] and [0,2,3,4].");
 nodes[1].disconnect(nodes[0]);
@@ -60,8 +64,11 @@ nodes[1].disconnect(nodes[3]);
 nodes[1].disconnect(nodes[4]);
 
 jsTestLog("Do a write that is replicated to [0,2,3,4].");
-assert.commandWorked(nodes[0].getCollection(collName).insert(
-    {a: counter++}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    nodes[0]
+        .getCollection(collName)
+        .insert({a: counter++}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 
 jsTestLog("Repartition to: [0,2] and [1,3,4].");
 nodes[1].reconnect(nodes[3]);
@@ -80,7 +87,7 @@ jsTestLog("Do a write to node 1 on the [1,3,4] side of the partition.");
 assert.commandWorked(nodes[1].getCollection(collName).insert({a: counter++}));
 
 // Turn on failpoint on node 2 to pause rollback before doing anything.
-let failPoint = configureFailPoint(nodes[2], 'rollbackHangBeforeStart');
+let failPoint = configureFailPoint(nodes[2], "rollbackHangBeforeStart");
 
 jsTestLog("Repartition to: [0] and [1,2,3,4].");
 nodes[2].disconnect(nodes[0]);
@@ -119,17 +126,22 @@ waitForState(nodes[0], ReplSetTest.State.PRIMARY);
 assert.eq(nodes[0], rst.getPrimary());
 
 jsTestLog("w:2 write to node 0 (replicated to node 2)");
-assert.commandWorked(nodes[0].getCollection(collName).insert(
-    {a: counter++}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    nodes[0]
+        .getCollection(collName)
+        .insert({a: counter++}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 
 // At this point node 2 has failed rollback before making any durable changes, including writing
 // to minValid. That means that it is free to pick any sync source and will pick node 0 where it
 // can pick up where it left off without rolling back. Ensure that it is able to reach SECONDARY
 // and doesn't do steady-state replication in ROLLBACK state.
 jsTestLog("Wait for node 2 to go into SECONDARY");
-assert.neq(nodes[2].adminCommand('replSetGetStatus').myState,
-           ReplSetTest.State.ROLLBACK,
-           "node 2 is doing steady-state replication with state=ROLLBACK!");
+assert.neq(
+    nodes[2].adminCommand("replSetGetStatus").myState,
+    ReplSetTest.State.ROLLBACK,
+    "node 2 is doing steady-state replication with state=ROLLBACK!",
+);
 waitForState(nodes[2], ReplSetTest.State.SECONDARY);
 
 // Re-connect all nodes and await secondary nodes so we can check data consistency.

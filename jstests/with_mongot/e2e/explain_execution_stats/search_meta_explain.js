@@ -23,11 +23,11 @@ let genres = [
     "Crime",
     "Adventure",
     "Horror",
-    "Biography"
+    "Biography",
 ];
 for (let i = 0; i < numDocs; i++) {
     // We increment by one day each time.
-    const time = new Date(startTime.getTime() + (i * 1000 * 60 * 60 * 24));
+    const time = new Date(startTime.getTime() + i * 1000 * 60 * 60 * 24);
     const genre = genres[i % 10];
     docs.push({_id: i, index: i, released: time, genre: genre});
 }
@@ -40,18 +40,18 @@ createSearchIndex(coll, {
             "fields": {
                 "index": {"type": "number"},
                 "released": [{"type": "dateFacet"}, {"type": "date"}],
-                "genre": {"type": "stringFacet"}
-            }
-        }
-    }
+                "genre": {"type": "stringFacet"},
+            },
+        },
+    },
 });
 
 const countQuery = {
     "$searchMeta": {
         "index": "facet-index",
         "range": {"path": "index", "gte": 100, "lt": 9000},
-        "count": {"type": "total"}
-    }
+        "count": {"type": "total"},
+    },
 };
 
 const facetQuery = {
@@ -62,8 +62,8 @@ const facetQuery = {
                 "range": {
                     "path": "released",
                     "gte": ISODate("2000-01-01T00:00:00.000Z"),
-                    "lte": ISODate("2015-01-31T00:00:00.000Z")
-                }
+                    "lte": ISODate("2015-01-31T00:00:00.000Z"),
+                },
             },
             "facets": {
                 "yearFacet": {
@@ -73,27 +73,25 @@ const facetQuery = {
                         ISODate("2000-01-01"),
                         ISODate("2005-01-01"),
                         ISODate("2010-01-01"),
-                        ISODate("2015-01-01")
+                        ISODate("2015-01-01"),
                     ],
-                    "default": "other"
+                    "default": "other",
                 },
-                "genresFacet": {"type": "string", "path": "genre"}
+                "genresFacet": {"type": "string", "path": "genre"},
             },
         },
-    }
+    },
 };
 
 function runExplainTest(verbosity) {
     // Count Query Test.
     let result = coll.explain(verbosity).aggregate([countQuery]);
-    verifyE2ESearchMetaExplainOutput(
-        {explainOutput: result, numFacetBucketsAndCount: 1, verbosity: verbosity});
+    verifyE2ESearchMetaExplainOutput({explainOutput: result, numFacetBucketsAndCount: 1, verbosity: verbosity});
 
     // Facet Query Test.
     result = coll.explain(verbosity).aggregate([facetQuery]);
     // numFacetBucketsAndCount is 15, 14 from facet buckets (10 genre, 4 year) and 1 from count
-    verifyE2ESearchMetaExplainOutput(
-        {explainOutput: result, numFacetBucketsAndCount: 15, verbosity: verbosity});
+    verifyE2ESearchMetaExplainOutput({explainOutput: result, numFacetBucketsAndCount: 15, verbosity: verbosity});
 }
 
 runExplainTest("queryPlanner");

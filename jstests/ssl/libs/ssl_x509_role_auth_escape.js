@@ -5,6 +5,6 @@
 // It validates leading space, and the 7 magic characters
 const ret = db.getSiblingDB("$external").auth({
     mechanism: "MONGODB-X509",
-    user: "CN=Test,OU=Escape,O=\\;\\ ,L=\\ \\>,ST=\\\"\\\\\\<,C=\\,\\+"
+    user: 'CN=Test,OU=Escape,O=\\;\\ ,L=\\ \\>,ST=\\"\\\\\\<,C=\\,\\+',
 });
 assert.eq(ret, 1, "Auth failed");

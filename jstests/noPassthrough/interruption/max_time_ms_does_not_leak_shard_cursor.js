@@ -14,10 +14,11 @@ const coll = st.s.getCollection(dbName + "." + collName);
 const db = st.s.getDB(dbName);
 
 function getIdleCursors(conn, collName) {
-    return conn.getDB('admin')
+    return conn
+        .getDB("admin")
         .aggregate([
             {$currentOp: {idleCursors: true}},
-            {$match: {$and: [{type: "idleCursor"}, {"cursor.originatingCommand.find": collName}]}}
+            {$match: {$and: [{type: "idleCursor"}, {"cursor.originatingCommand.find": collName}]}},
         ])
         .toArray();
 }
@@ -25,11 +26,13 @@ function getIdleCursors(conn, collName) {
 function assertNoIdleCursors(conn, collName, curToKill = null) {
     const sleepTimeMS = 20 * 1000;
     const retries = 4;
-    assert.soon(() => (getIdleCursors(conn, collName).length === 0),
-                () => tojson(getIdleCursors(conn, collName)),
-                retries * sleepTimeMS,
-                sleepTimeMS,
-                {runHangAnalyzer: false});
+    assert.soon(
+        () => getIdleCursors(conn, collName).length === 0,
+        () => tojson(getIdleCursors(conn, collName)),
+        retries * sleepTimeMS,
+        sleepTimeMS,
+        {runHangAnalyzer: false},
+    );
 
     if (curToKill !== null && curToKill._cursor) {
         db.runCommand({killCursors: collName, cursors: [curToKill.getId()]});
@@ -41,7 +44,7 @@ st.s.getDB("admin").setLogLevel(3);
 st.shard0.getDB("admin").setLogLevel(3);
 
 // Insert some data (1000 simple documents) into the collection.
-assert.commandWorked(coll.insert(Array.from({length: 1000}, _ => ({a: 1}))));
+assert.commandWorked(coll.insert(Array.from({length: 1000}, (_) => ({a: 1}))));
 
 // Ensure there are no idle cursors on shart0 before tests begin.
 assertNoIdleCursors(st.shard0, collName);
@@ -50,18 +53,20 @@ assertNoIdleCursors(st.shard0, collName);
 // specified maxTimeMS limit. The timeout may happen either on mongoS or on shard. The query might
 // occasionally return the 'NetworkInterfaceExceededTimeLimit' error.
 {
-    const curs = coll.find({
-                         $where: function() {
-                             sleep(1);
-                             return true;
-                         }
-                     })
-                     .batchSize(2)
-                     .maxTimeMS(100);
+    const curs = coll
+        .find({
+            $where: function () {
+                sleep(1);
+                return true;
+            },
+        })
+        .batchSize(2)
+        .maxTimeMS(100);
     assert.eq(getIdleCursors(st.shard0, collName).length, 0);
     assert.throwsWithCode(
         () => curs.itcount(),
-        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit]);
+        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit],
+    );
     assertNoIdleCursors(st.shard0, collName, curs);
 }
 
@@ -69,12 +74,13 @@ assertNoIdleCursors(st.shard0, collName);
 // occasionally return the 'NetworkInterfaceExceededTimeLimit' error.
 {
     const curs = coll.find().batchSize(2).maxTimeMS(100);
-    const fp = configureFailPoint(st.shard0,
-                                  "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch",
-                                  {shouldCheckForInterrupt: true});
+    const fp = configureFailPoint(st.shard0, "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch", {
+        shouldCheckForInterrupt: true,
+    });
     assert.throwsWithCode(
         () => curs.itcount(),
-        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit]);
+        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit],
+    );
     fp.off();
     assertNoIdleCursors(st.shard0, collName, curs);
 }

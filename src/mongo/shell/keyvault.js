@@ -1,7 +1,7 @@
 //  Class that allows the mongo shell to talk to the mongodb KeyVault.
 //  Loaded only into the enterprise module.
 
-Mongo.prototype.getKeyVault = function() {
+Mongo.prototype.getKeyVault = function () {
     return new KeyVault(this);
 };
 
@@ -19,7 +19,7 @@ class KeyVault {
                     throw e;
                 }
 
-                const res = this.mongo.getDB('admin')._helloOrLegacyHello();
+                const res = this.mongo.getDB("admin")._helloOrLegacyHello();
                 if (!res) {
                     jsTest.log("KeyVault: We do not have a connection to the database. Throwing.");
                     throw e;
@@ -35,7 +35,7 @@ class KeyVault {
         this.keyColl = collection;
         this._runCommand(this.keyColl, this.keyColl.createIndex, [
             {keyAltNames: 1},
-            {unique: true, partialFilterExpression: {keyAltNames: {$exists: true}}}
+            {unique: true, partialFilterExpression: {keyAltNames: {$exists: true}}},
         ]);
     }
 
@@ -44,7 +44,7 @@ class KeyVault {
             if (kmsProvider !== "local") {
                 return "ValueError: customerMasterKey must be defined if kmsProvider is not local.";
             }
-            return this._createKey(kmsProvider, '', param2);
+            return this._createKey(kmsProvider, "", param2);
         }
 
         return this._createKey(kmsProvider, param2, param3);
@@ -59,8 +59,10 @@ class KeyVault {
             return "TypeError: customer master key must be of String type.";
         }
 
-        let masterKeyAndMaterial = this._runCommand(
-            this.mongo, this.mongo.generateDataKey, [kmsProvider, customerMasterKey]);
+        let masterKeyAndMaterial = this._runCommand(this.mongo, this.mongo.generateDataKey, [
+            kmsProvider,
+            customerMasterKey,
+        ]);
         let masterKey = masterKeyAndMaterial.masterKey;
 
         let current = ISODate();
@@ -94,11 +96,10 @@ class KeyVault {
         let insertCmdObj = {
             insert: this.keyColl.getName(),
             documents: [doc],
-            writeConcern: {w: "majority"}
+            writeConcern: {w: "majority"},
         };
 
-        assert.commandWorked(this._runCommand(
-            this.keyColl.getDB(), this.keyColl.getDB().runCommand, [insertCmdObj]));
+        assert.commandWorked(this._runCommand(this.keyColl.getDB(), this.keyColl.getDB().runCommand, [insertCmdObj]));
         return uuid;
     }
 
@@ -124,11 +125,12 @@ class KeyVault {
         if (typeof keyAltName === "object") {
             return "TypeError: key alternate name cannot be object or array type.";
         }
-        return this._runCommand(
-            this.keyColl, this.keyColl.findAndModify, [{
+        return this._runCommand(this.keyColl, this.keyColl.findAndModify, [
+            {
                 query: {"_id": keyId},
                 update: {$push: {"keyAltNames": keyAltName}, $currentDate: {"updateDate": true}},
-            }]);
+            },
+        ]);
     }
 
     removeKeyAlternateName(keyId, keyAltName) {
@@ -136,19 +138,21 @@ class KeyVault {
             return "TypeError: key alternate name cannot be object or array type.";
         }
 
-        const ret = this._runCommand(
-            this.keyColl, this.keyColl.findAndModify, [{
+        const ret = this._runCommand(this.keyColl, this.keyColl.findAndModify, [
+            {
                 query: {"_id": keyId},
-                update: {$pull: {"keyAltNames": keyAltName}, $currentDate: {"updateDate": true}}
-            }]);
+                update: {$pull: {"keyAltNames": keyAltName}, $currentDate: {"updateDate": true}},
+            },
+        ]);
 
         if (ret != null && ret.keyAltNames.length === 1 && ret.keyAltNames[0] === keyAltName) {
             // Remove the empty array to prevent duplicate key violations
-            return this._runCommand(
-                this.keyColl, this.keyColl.findAndModify, [{
+            return this._runCommand(this.keyColl, this.keyColl.findAndModify, [
+                {
                     query: {"_id": keyId, "keyAltNames": undefined},
-                    update: {$unset: {"keyAltNames": ""}, $currentDate: {"updateDate": true}}
-                }]);
+                    update: {$unset: {"keyAltNames": ""}, $currentDate: {"updateDate": true}},
+                },
+            ]);
         }
         return ret;
     }
@@ -168,6 +172,6 @@ class ClientEncryption {
     }
 }
 
-Mongo.prototype.getClientEncryption = function() {
+Mongo.prototype.getClientEncryption = function () {
     return new ClientEncryption(this);
 };

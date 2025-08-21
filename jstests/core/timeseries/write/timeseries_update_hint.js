@@ -36,46 +36,58 @@ const dbName = jsTestName();
  * Confirms that the given update on the collection with the given indexes returns the expected set
  * of documents and uses the correct query plan.
  */
-const testUpdateHintSucceeded =
-    ({initialDocList, indexes, updateList, resultDocList, nModifiedBuckets, expectedPlan}) => {
-        const testDB = db.getSiblingDB(dbName);
-        const coll = testDB.getCollection(collName);
+const testUpdateHintSucceeded = ({
+    initialDocList,
+    indexes,
+    updateList,
+    resultDocList,
+    nModifiedBuckets,
+    expectedPlan,
+}) => {
+    const testDB = db.getSiblingDB(dbName);
+    const coll = testDB.getCollection(collName);
 
-        const awaitTestUpdate = startParallelShell(funWithArgs(
-            function(dbName,
-                     collName,
-                     timeFieldName,
-                     metaFieldName,
-                     initialDocList,
-                     indexes,
-                     updateList,
-                     resultDocList,
-                     nModifiedBuckets) {
+    const awaitTestUpdate = startParallelShell(
+        funWithArgs(
+            function (
+                dbName,
+                collName,
+                timeFieldName,
+                metaFieldName,
+                initialDocList,
+                indexes,
+                updateList,
+                resultDocList,
+                nModifiedBuckets,
+            ) {
                 const testDB = db.getSiblingDB(dbName);
                 const coll = testDB.getCollection(collName);
 
-                assert.commandWorked(testDB.createCollection(
-                    coll.getName(),
-                    {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+                assert.commandWorked(
+                    testDB.createCollection(coll.getName(), {
+                        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                    }),
+                );
 
                 assert.commandWorked(coll.createIndexes(indexes));
 
                 assert.commandWorked(coll.insert(initialDocList));
 
-                assert.commandWorked(testDB.adminCommand(
-                    {configureFailPoint: "hangAfterBatchUpdate", mode: "alwaysOn"}));
+                assert.commandWorked(
+                    testDB.adminCommand({configureFailPoint: "hangAfterBatchUpdate", mode: "alwaysOn"}),
+                );
 
-                const res = assert.commandWorked(
-                    testDB.runCommand({update: coll.getName(), updates: updateList}));
+                const res = assert.commandWorked(testDB.runCommand({update: coll.getName(), updates: updateList}));
 
                 assert.eq(nModifiedBuckets, res.n);
                 assert.eq(initialDocList.length, resultDocList.length);
 
-                resultDocList.forEach(resultDoc => {
+                resultDocList.forEach((resultDoc) => {
                     const actualDoc = coll.findOne(resultDoc);
-                    assert(actualDoc,
-                           "Document " + tojson(resultDoc) +
-                               " is not found in the result collection as expected ");
+                    assert(
+                        actualDoc,
+                        "Document " + tojson(resultDoc) + " is not found in the result collection as expected ",
+                    );
                     assert.docEq(resultDoc, actualDoc);
                 });
 
@@ -89,47 +101,47 @@ const testUpdateHintSucceeded =
             indexes,
             updateList,
             resultDocList,
-            nModifiedBuckets));
-        try {
-            const childCurOp =
-                waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangAfterBatchUpdate")[0];
+            nModifiedBuckets,
+        ),
+    );
+    try {
+        const childCurOp = waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangAfterBatchUpdate")[0];
 
-            // Verify that the query plan uses the expected index.
-            assert.eq(childCurOp.planSummary, expectedPlan);
-        } finally {
-            assert.commandWorked(
-                testDB.adminCommand({configureFailPoint: "hangAfterBatchUpdate", mode: "off"}));
+        // Verify that the query plan uses the expected index.
+        assert.eq(childCurOp.planSummary, expectedPlan);
+    } finally {
+        assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterBatchUpdate", mode: "off"}));
 
-            awaitTestUpdate();
-        }
-    };
+        awaitTestUpdate();
+    }
+};
 
 /**
  * Confirms that the given update on the collection with the given indexes fails.
  */
-function testUpdateHintFailed(
-    {initialDocList, indexes, updateList, resultDocList, nModifiedBuckets, failCode}) {
+function testUpdateHintFailed({initialDocList, indexes, updateList, resultDocList, nModifiedBuckets, failCode}) {
     const testDB = db.getSiblingDB(dbName);
     const coll = testDB.getCollection(collName);
 
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     assert.commandWorked(coll.createIndexes(indexes));
 
     assert.commandWorked(coll.insert(initialDocList));
 
     const res = assert.commandFailedWithCode(
-        testDB.runCommand({update: coll.getName(), updates: updateList}), failCode);
+        testDB.runCommand({update: coll.getName(), updates: updateList}),
+        failCode,
+    );
 
     assert.eq(nModifiedBuckets, res.n);
     assert.eq(initialDocList.length, resultDocList.length);
 
-    resultDocList.forEach(resultDoc => {
+    resultDocList.forEach((resultDoc) => {
         const actualDoc = coll.findOne(resultDoc);
-        assert(actualDoc,
-               "Document " + tojson(resultDoc) +
-                   " is not found in the result collection as expected ");
+        assert(actualDoc, "Document " + tojson(resultDoc) + " is not found in the result collection as expected ");
         assert.docEq(resultDoc, actualDoc);
     });
 
@@ -139,17 +151,17 @@ function testUpdateHintFailed(
 const hintDoc1 = {
     _id: 1,
     [timeFieldName]: dateTime,
-    [metaFieldName]: {"a": 1}
+    [metaFieldName]: {"a": 1},
 };
 const hintDoc2 = {
     _id: 2,
     [timeFieldName]: dateTime,
-    [metaFieldName]: {"a": 2}
+    [metaFieldName]: {"a": 2},
 };
 const hintDoc3 = {
     _id: 3,
     [timeFieldName]: dateTime,
-    [metaFieldName]: {"a": 3}
+    [metaFieldName]: {"a": 3},
 };
 
 /************* Tests passing a hint to an update on a collection with a single index. *************/
@@ -157,16 +169,18 @@ const hintDoc3 = {
 testUpdateHintSucceeded({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName]: 1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$lte: 2}},
-        u: {$inc: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: {$natural: 1}
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$lte: 2}},
+            u: {$inc: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: {$natural: 1},
+        },
+    ],
     resultDocList: [
         {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {"a": 11}},
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}},
-        hintDoc3
+        hintDoc3,
     ],
     nModifiedBuckets: 2,
     expectedPlan: "COLLSCAN",
@@ -176,16 +190,18 @@ testUpdateHintSucceeded({
 testUpdateHintSucceeded({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName]: 1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$lte: 2}},
-        u: {$inc: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: {$natural: -1}
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$lte: 2}},
+            u: {$inc: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: {$natural: -1},
+        },
+    ],
     resultDocList: [
         {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {"a": 11}},
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}},
-        hintDoc3
+        hintDoc3,
     ],
     nModifiedBuckets: 2,
     expectedPlan: "COLLSCAN",
@@ -196,16 +212,18 @@ testUpdateHintSucceeded({
 testUpdateHintSucceeded({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName]: 1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$lte: 2}},
-        u: {$inc: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: {[metaFieldName]: 1}
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$lte: 2}},
+            u: {$inc: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: {[metaFieldName]: 1},
+        },
+    ],
     resultDocList: [
         {_id: 1, [timeFieldName]: dateTime, [metaFieldName]: {"a": 11}},
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}},
-        hintDoc3
+        hintDoc3,
     ],
     nModifiedBuckets: 2,
     expectedPlan: "IXSCAN { meta: 1 }",
@@ -216,14 +234,15 @@ testUpdateHintSucceeded({
 testUpdateHintSucceeded({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName]: 1, [timeFieldName]: 1}],
-    updateList: [{
-        q: {[metaFieldName]: {a: 2}},
-        u: {$inc: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: {[metaFieldName]: 1, [timeFieldName]: 1}
-    }],
-    resultDocList:
-        [hintDoc1, {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}}, hintDoc3],
+    updateList: [
+        {
+            q: {[metaFieldName]: {a: 2}},
+            u: {$inc: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: {[metaFieldName]: 1, [timeFieldName]: 1},
+        },
+    ],
+    resultDocList: [hintDoc1, {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}}, hintDoc3],
     nModifiedBuckets: 1,
     expectedPlan: "IXSCAN { meta: 1, control.min.time: 1, control.max.time: 1 }",
 });
@@ -231,16 +250,18 @@ testUpdateHintSucceeded({
 testUpdateHintSucceeded({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName]: -1, [timeFieldName]: 1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$gte: 2}},
-        u: {$inc: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: {[metaFieldName]: -1, [timeFieldName]: 1}
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$gte: 2}},
+            u: {$inc: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: {[metaFieldName]: -1, [timeFieldName]: 1},
+        },
+    ],
     resultDocList: [
         hintDoc1,
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}},
-        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 13}}
+        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 13}},
     ],
     nModifiedBuckets: 2,
     expectedPlan: "IXSCAN { meta: -1, control.min.time: 1, control.max.time: 1 }",
@@ -251,16 +272,18 @@ testUpdateHintSucceeded({
 testUpdateHintSucceeded({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName]: 1, [timeFieldName]: 1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$gte: 2}},
-        u: {$inc: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: metaFieldName + "_1_" + timeFieldName + "_1"
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$gte: 2}},
+            u: {$inc: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: metaFieldName + "_1_" + timeFieldName + "_1",
+        },
+    ],
     resultDocList: [
         hintDoc1,
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 12}},
-        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 13}}
+        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 13}},
     ],
     nModifiedBuckets: 2,
     expectedPlan: "IXSCAN { meta: 1, control.min.time: 1, control.max.time: 1 }",
@@ -271,16 +294,18 @@ testUpdateHintSucceeded({
 testUpdateHintSucceeded({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName + ".a"]: -1, [timeFieldName]: 1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$gte: 2}},
-        u: {$set: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: metaFieldName + ".a_-1_" + timeFieldName + "_1"
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$gte: 2}},
+            u: {$set: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: metaFieldName + ".a_-1_" + timeFieldName + "_1",
+        },
+    ],
     resultDocList: [
         hintDoc1,
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 10}},
-        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 10}}
+        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 10}},
     ],
     nModifiedBuckets: 2,
     expectedPlan: "IXSCAN { meta.a: -1, control.min.time: 1, control.max.time: 1 }",
@@ -292,15 +317,17 @@ testUpdateHintSucceeded({
 testUpdateHintSucceeded({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName + ".a"]: 1}, {[timeFieldName]: -1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$gte: 2}},
-        u: {$set: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$gte: 2}},
+            u: {$set: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+        },
+    ],
     resultDocList: [
         hintDoc1,
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 10}},
-        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 10}}
+        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 10}},
     ],
     nModifiedBuckets: 2,
     expectedPlan: "IXSCAN { meta.a: 1 }",
@@ -312,16 +339,18 @@ testUpdateHintSucceeded({
 testUpdateHintSucceeded({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName + ".a"]: 1}, {[timeFieldName]: -1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$gte: 2}},
-        u: {$set: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: {[timeFieldName]: -1}
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$gte: 2}},
+            u: {$set: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: {[timeFieldName]: -1},
+        },
+    ],
     resultDocList: [
         hintDoc1,
         {_id: 2, [timeFieldName]: dateTime, [metaFieldName]: {"a": 10}},
-        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 10}}
+        {_id: 3, [timeFieldName]: dateTime, [metaFieldName]: {"a": 10}},
     ],
     nModifiedBuckets: 2,
     expectedPlan: "IXSCAN { control.max.time: -1, control.min.time: -1 }",
@@ -331,12 +360,14 @@ testUpdateHintSucceeded({
 testUpdateHintFailed({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName + ".a"]: 1}, {[timeFieldName]: -1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$gte: 2}},
-        u: {$set: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: {"badIndexName": -1}
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$gte: 2}},
+            u: {$set: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: {"badIndexName": -1},
+        },
+    ],
     resultDocList: [hintDoc1, hintDoc2, hintDoc3],
     nModifiedBuckets: 0,
     failCode: ErrorCodes.BadValue,
@@ -346,12 +377,14 @@ testUpdateHintFailed({
 testUpdateHintFailed({
     initialDocList: [hintDoc1, hintDoc2, hintDoc3],
     indexes: [{[metaFieldName + ".a"]: 1}, {[timeFieldName]: -1}],
-    updateList: [{
-        q: {[metaFieldName + ".a"]: {$gte: 2}},
-        u: {$set: {[metaFieldName + ".a"]: 10}},
-        multi: true,
-        hint: "bad_index_name"
-    }],
+    updateList: [
+        {
+            q: {[metaFieldName + ".a"]: {$gte: 2}},
+            u: {$set: {[metaFieldName + ".a"]: 10}},
+            multi: true,
+            hint: "bad_index_name",
+        },
+    ],
     resultDocList: [hintDoc1, hintDoc2, hintDoc3],
     nModifiedBuckets: 0,
     failCode: ErrorCodes.BadValue,

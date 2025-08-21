@@ -34,44 +34,46 @@ const coll = db.getCollection(collName);
 coll.drop();
 const isSharded = FixtureHelpers.isSharded(coll);
 
-assert.commandWorked(coll.insertMany([
-    {
-        _id: 0,
-        a: 3,
-        textField: "three blind mice",
-        geoField: [23, 51],
-        vector: [0.006585975, -0.03453151, -0.0073834695, -0.032803606, -0.0032448056]
-    },
-    {
-        _id: 1,
-        a: 2,
-        textField: "the three stooges",
-        geoField: [25, 49],
-        vector: [0.015856847, -0.0032713888, 0.011949126, -0.0062968833, 0.0032148995]
-    },
-    {
-        _id: 2,
-        a: 3,
-        textField: "we three kings",
-        geoField: [30, 51],
-        vector: [0.0071708043, 0.0016248949, 0.014487816, -0.000010448943, 0.027673058]
-    }
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {
+            _id: 0,
+            a: 3,
+            textField: "three blind mice",
+            geoField: [23, 51],
+            vector: [0.006585975, -0.03453151, -0.0073834695, -0.032803606, -0.0032448056],
+        },
+        {
+            _id: 1,
+            a: 2,
+            textField: "the three stooges",
+            geoField: [25, 49],
+            vector: [0.015856847, -0.0032713888, 0.011949126, -0.0062968833, 0.0032148995],
+        },
+        {
+            _id: 2,
+            a: 3,
+            textField: "we three kings",
+            geoField: [30, 51],
+            vector: [0.0071708043, 0.0016248949, 0.014487816, -0.000010448943, 0.027673058],
+        },
+    ]),
+);
 assert.commandWorked(coll.createIndex({textField: "text"}));
 assert.commandWorked(coll.createIndex({geoField: "2d"}));
+assert.commandWorked(createSearchIndex(coll, {name: "search-index", definition: {mappings: {dynamic: true}}}));
 assert.commandWorked(
-    createSearchIndex(coll, {name: "search-index", definition: {mappings: {dynamic: true}}}));
-assert.commandWorked(createSearchIndex(coll, {
-    name: "vector-search-index",
-    type: "vectorSearch",
-    definition:
-        {fields: [{type: "vector", numDimensions: 5, path: "vector", similarity: "euclidean"}]}
-}));
+    createSearchIndex(coll, {
+        name: "vector-search-index",
+        type: "vectorSearch",
+        definition: {fields: [{type: "vector", numDimensions: 5, path: "vector", similarity: "euclidean"}]},
+    }),
+);
 
 const kUnavailableMetadataErrCode = 40218;
 
 const searchStage = {
-    $search: {index: "search-index", exists: {path: "textField"}}
+    $search: {index: "search-index", exists: {path: "textField"}},
 };
 
 // The set of stages that may be generated as the initial stage of the pipeline.
@@ -80,29 +82,25 @@ const FirstStageOptions = Object.freeze({
     FTS_MATCH: {$match: {$text: {$search: "three"}}},
     NON_FTS_MATCH: {$match: {a: {$gt: 3}}},
     SEARCH: searchStage,
-    SEARCH_W_DETAILS:
-        {$search: {index: "search-index", exists: {path: "textField"}, scoreDetails: true}},
+    SEARCH_W_DETAILS: {$search: {index: "search-index", exists: {path: "textField"}, scoreDetails: true}},
     VECTOR_SEARCH: {
         $vectorSearch: {
             queryVector: [-0.012674698, 0.013308106, -0.005494981, -0.008286549, -0.00289768],
             path: "vector",
             exact: true,
             index: "vector-search-index",
-            limit: 10
-        }
+            limit: 10,
+        },
     },
     RANK_FUSION: {$rankFusion: {input: {pipelines: {search: [searchStage]}}}},
-    RANK_FUSION_W_DETAILS:
-        {$rankFusion: {input: {pipelines: {search: [searchStage]}}, scoreDetails: true}},
-    SCORE_FUSION:
-        {$scoreFusion: {input: {pipelines: {search: [searchStage]}, normalization: "none"}}},
+    RANK_FUSION_W_DETAILS: {$rankFusion: {input: {pipelines: {search: [searchStage]}}, scoreDetails: true}},
+    SCORE_FUSION: {$scoreFusion: {input: {pipelines: {search: [searchStage]}, normalization: "none"}}},
     SCORE_FUSION_W_DETAILS: {
-        $scoreFusion:
-            {input: {pipelines: {search: [searchStage]}, normalization: "none"}, scoreDetails: true}
+        $scoreFusion: {input: {pipelines: {search: [searchStage]}, normalization: "none"}, scoreDetails: true},
     },
     SORT: {$sort: {a: -1}},
     SCORE: {$score: {score: {$divide: [1, "$a"]}}},
-    SCORE_W_DETAILS: {$score: {score: {$divide: [1, "$a"]}, scoreDetails: true}}
+    SCORE_W_DETAILS: {$score: {score: {$divide: [1, "$a"]}, scoreDetails: true}},
 });
 
 // The set of metadata fields that can be referenced inside $meta, alongside information used to
@@ -113,24 +111,23 @@ const MetaFields = Object.freeze({
         shouldBeValidated: true,
         debugName: "text score",
         validSortKey: true,
-        firstStageRequired: [FirstStageOptions.FTS_MATCH]
+        firstStageRequired: [FirstStageOptions.FTS_MATCH],
     },
     GEO_NEAR_DIST: {
         name: "geoNearDistance",
         shouldBeValidated: true,
         debugName: "$geoNear distance",
         validSortKey: true,
-        firstStageRequired: [FirstStageOptions.GEO_NEAR]
+        firstStageRequired: [FirstStageOptions.GEO_NEAR],
     },
     GEO_NEAR_PT: {
         name: "geoNearPoint",
         shouldBeValidated: true,
         debugName: "$geoNear point",
         validSortKey: false,
-        firstStageRequired: [FirstStageOptions.GEO_NEAR]
+        firstStageRequired: [FirstStageOptions.GEO_NEAR],
     },
-    RAND_VAL:
-        {name: "randVal", shouldBeValidated: false, debugName: "rand val", validSortKey: true},
+    RAND_VAL: {name: "randVal", shouldBeValidated: false, debugName: "rand val", validSortKey: true},
     SEARCH_SCORE: {
         name: "searchScore",
         shouldBeValidated: true,
@@ -145,19 +142,17 @@ const MetaFields = Object.freeze({
             FirstStageOptions.RANK_FUSION,
             FirstStageOptions.RANK_FUSION_W_DETAILS,
             FirstStageOptions.SCORE_FUSION,
-            FirstStageOptions.SCORE_FUSION_W_DETAILS
-        ]
+            FirstStageOptions.SCORE_FUSION_W_DETAILS,
+        ],
     },
     SEARCH_HIGHLIGHTS: {
         name: "searchHighlights",
         shouldBeValidated: false,
         debugName: "$search highlights",
-        validSortKey: false
+        validSortKey: false,
     },
-    RECORD_ID:
-        {name: "recordId", shouldBeValidated: false, debugName: "record ID", validSortKey: false},
-    INDEX_KEY:
-        {name: "indexKey", shouldBeValidated: false, debugName: "index key", validSortKey: false},
+    RECORD_ID: {name: "recordId", shouldBeValidated: false, debugName: "record ID", validSortKey: false},
+    INDEX_KEY: {name: "indexKey", shouldBeValidated: false, debugName: "index key", validSortKey: false},
     SORT_KEY: {
         name: "sortKey",
         shouldBeValidated: true,
@@ -175,38 +170,38 @@ const MetaFields = Object.freeze({
             FirstStageOptions.VECTOR_SEARCH,
             FirstStageOptions.SCORE_FUSION,
             FirstStageOptions.SCORE_FUSION_W_DETAILS,
-        ]
+        ],
     },
     SEARCH_SCORE_DETAIS: {
         name: "searchScoreDetails",
         shouldBeValidated: false,
         debugName: "$search score details",
-        validSortKey: false
+        validSortKey: false,
     },
     SEARCH_SEQUENCE_TOKEN: {
         name: "searchSequenceToken",
         shouldBeValidated: false,
         debugName: "$search sequence token",
-        validSortKey: false
+        validSortKey: false,
     },
     TIMESERIES_BUCKET_MIN_TIME: {
         name: "timeseriesBucketMinTime",
         shouldBeValidated: false,
         debugName: "timeseries bucket min time",
-        validSortKey: false
+        validSortKey: false,
     },
     TIMESERIES_BUCKET_MAX_TIME: {
         name: "timeseriesBucketMaxTime",
         shouldBeValidated: false,
         debugName: "timeseries bucket max time",
-        validSortKey: false
+        validSortKey: false,
     },
     VECTOR_SEARCH_SCORE: {
         name: "vectorSearchScore",
         shouldBeValidated: true,
         debugName: "$vectorSearch score",
         validSortKey: true,
-        firstStageRequired: [FirstStageOptions.VECTOR_SEARCH]
+        firstStageRequired: [FirstStageOptions.VECTOR_SEARCH],
     },
     SCORE: {
         name: "score",
@@ -224,7 +219,7 @@ const MetaFields = Object.freeze({
             FirstStageOptions.RANK_FUSION_W_DETAILS,
             FirstStageOptions.SCORE_FUSION,
             FirstStageOptions.SCORE_FUSION_W_DETAILS,
-        ]
+        ],
     },
     SCORE_DETAILS: {
         name: "scoreDetails",
@@ -236,8 +231,8 @@ const MetaFields = Object.freeze({
             FirstStageOptions.RANK_FUSION_W_DETAILS,
             FirstStageOptions.SCORE_W_DETAILS,
             FirstStageOptions.SCORE_FUSION_W_DETAILS,
-        ]
-    }
+        ],
+    },
 });
 
 // Each test case chooses one arbitrary from the FirstStageOptions, one MetaField arbitrary, and an
@@ -254,13 +249,13 @@ const metaReferencingStageNameArb = fc.constantFrom("$project", "$sort", "$group
 let testCaseArb = fc.record({
     firstStage: firstStageArb,
     metaField: metaFieldArb,
-    metaReferencingStageName: metaReferencingStageNameArb
+    metaReferencingStageName: metaReferencingStageNameArb,
 });
 
 // Filter out cases where we use a $sort with a meta field that is not a valid sort key.
-testCaseArb =
-    testCaseArb.filter(({metaField, metaReferencingStageName}) =>
-                           (metaReferencingStageName !== "$sort" || metaField.validSortKey));
+testCaseArb = testCaseArb.filter(
+    ({metaField, metaReferencingStageName}) => metaReferencingStageName !== "$sort" || metaField.validSortKey,
+);
 
 function generateMetaReferencingStages(stageName, metaFieldName) {
     if (stageName === "$project") {
@@ -278,7 +273,11 @@ function generateMetaReferencingStages(stageName, metaFieldName) {
 }
 
 function shouldQuerySucceed(
-    metaField, firstStage, metaReferencingStageName, hasBlockingStageBeforeMetaReference = false) {
+    metaField,
+    firstStage,
+    metaReferencingStageName,
+    hasBlockingStageBeforeMetaReference = false,
+) {
     if (!metaField.shouldBeValidated) {
         return true;
     }
@@ -288,8 +287,7 @@ function shouldQuerySucceed(
         // TODO SERVER-100404: If you have a query with a $sort but no $geoNear on a sharded
         // collection, then try to reference $geoNear-related metadata from within a $project or
         // $group (but not $sort), the query will not throw an error as expected.
-        if (isSharded && firstStage === FirstStageOptions.SORT &&
-            metaReferencingStageName !== "$sort") {
+        if (isSharded && firstStage === FirstStageOptions.SORT && metaReferencingStageName !== "$sort") {
             return true;
         }
 
@@ -302,13 +300,15 @@ function shouldQuerySucceed(
         }
 
         // TODO SERVER-99965 Mongot queries skip validation for "geoNearDist" and "geoNearPoint".
-        if (firstStage === FirstStageOptions.SEARCH ||
+        if (
+            firstStage === FirstStageOptions.SEARCH ||
             firstStage === FirstStageOptions.SEARCH_W_DETAILS ||
             firstStage === FirstStageOptions.VECTOR_SEARCH ||
             firstStage == FirstStageOptions.RANK_FUSION ||
             firstStage == FirstStageOptions.RANK_FUSION_W_DETAILS ||
             firstStage == FirstStageOptions.SCORE_FUSION ||
-            firstStage == FirstStageOptions.SCORE_FUSION_W_DETAILS) {
+            firstStage == FirstStageOptions.SCORE_FUSION_W_DETAILS
+        ) {
             return true;
         }
     }
@@ -334,36 +334,42 @@ const expectedErrCodes = [kUnavailableMetadataErrCode, ErrorCodes.BadValue];
 
 // First, test just the pipeline with two stages: the first stage may or may not generate metadtata
 // fields, and the second stage attempts to reference some metadata field.
-fc.assert(fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStageName}) => {
-    let metaStages = generateMetaReferencingStages(metaReferencingStageName, metaField.name);
+fc.assert(
+    fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStageName}) => {
+        let metaStages = generateMetaReferencingStages(metaReferencingStageName, metaField.name);
 
-    let pipeline = [firstStage, ...metaStages];
-    if (shouldQuerySucceed(metaField, firstStage, metaReferencingStageName)) {
-        assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
-    } else {
-        assertErrCodeAndErrMsgContains(coll, pipeline, expectedErrCodes, metaField.debugName);
-    }
-}), {seed: 5, numRuns: 500});
+        let pipeline = [firstStage, ...metaStages];
+        if (shouldQuerySucceed(metaField, firstStage, metaReferencingStageName)) {
+            assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
+        } else {
+            assertErrCodeAndErrMsgContains(coll, pipeline, expectedErrCodes, metaField.debugName);
+        }
+    }),
+    {seed: 5, numRuns: 500},
+);
 
 // Also test when we insert a $group stage (which drops all metadata) between the stage that
 // generates the metadata and the stage that attempts to reference the metadata.
-fc.assert(fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStageName}) => {
-    let metaStages = generateMetaReferencingStages(metaReferencingStageName, metaField.name);
-    let pipeline = [firstStage, {$group: {_id: null}}, ...metaStages];
+fc.assert(
+    fc.property(testCaseArb, ({firstStage, metaField, metaReferencingStageName}) => {
+        let metaStages = generateMetaReferencingStages(metaReferencingStageName, metaField.name);
+        let pipeline = [firstStage, {$group: {_id: null}}, ...metaStages];
 
-    // TODO SERVER-100443 Since the $group drops per-document metadata, this should always fail for
-    // every meta stage that is validated, not just "score" and "scoreDetails".
-    const hasBlockingStageBeforeMetaReference = true;
-    if (metaField == MetaFields.SCORE || metaField == MetaFields.SCORE_DETAILS ||
-        (!shouldQuerySucceed(metaField,
-                             firstStage,
-                             metaReferencingStageName,
-                             hasBlockingStageBeforeMetaReference))) {
-        assertErrCodeAndErrMsgContains(coll, pipeline, expectedErrCodes, metaField.debugName);
-    } else {
-        assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
-    }
-}), {seed: 5, numRuns: 500});
+        // TODO SERVER-100443 Since the $group drops per-document metadata, this should always fail for
+        // every meta stage that is validated, not just "score" and "scoreDetails".
+        const hasBlockingStageBeforeMetaReference = true;
+        if (
+            metaField == MetaFields.SCORE ||
+            metaField == MetaFields.SCORE_DETAILS ||
+            !shouldQuerySucceed(metaField, firstStage, metaReferencingStageName, hasBlockingStageBeforeMetaReference)
+        ) {
+            assertErrCodeAndErrMsgContains(coll, pipeline, expectedErrCodes, metaField.debugName);
+        } else {
+            assert.commandWorked(db.runCommand({aggregate: collName, pipeline, cursor: {}}));
+        }
+    }),
+    {seed: 5, numRuns: 500},
+);
 
 dropSearchIndex(coll, {name: "search-index"});
 dropSearchIndex(coll, {name: "vector-search-index"});

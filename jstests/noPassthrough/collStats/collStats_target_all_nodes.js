@@ -23,19 +23,22 @@ assert.commandWorked(admin.runCommand({enableSharding: jsTestName(), primaryShar
 assert.commandWorked(admin.adminCommand({shardCollection: namespace, key: {a: 1}}));
 
 function runCollStatsAgg(db, targetAllNodesOption) {
-    const targetAllNodes = assert.commandWorked(db.runCommand({
-        aggregate: collName,
-        pipeline: [{"$collStats": {"targetAllNodes": targetAllNodesOption}}],
-        cursor: {}
-    }));
+    const targetAllNodes = assert.commandWorked(
+        db.runCommand({
+            aggregate: collName,
+            pipeline: [{"$collStats": {"targetAllNodes": targetAllNodesOption}}],
+            cursor: {},
+        }),
+    );
     return targetAllNodes.cursor;
 }
 
 // Shard collection.
 for (let i = 0; i < numShards; i++) {
     assert.commandWorked(st.splitAt(namespace, {a: i + 1}));
-    assert.commandWorked(admin.runCommand(
-        {moveChunk: namespace, find: {a: i + 2}, to: shards[(i + 1) % numShards]._id}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: namespace, find: {a: i + 2}, to: shards[(i + 1) % numShards]._id}),
+    );
 }
 
 // Tests targetAllNodes options.

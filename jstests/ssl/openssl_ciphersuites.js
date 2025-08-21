@@ -21,35 +21,37 @@ const baseParams = {
 };
 
 function testConn() {
-    const mongo = runMongoProgram('mongo',
-                                  '--host',
-                                  'localhost',
-                                  '--port',
-                                  mongod.port,
-                                  '--tls',
-                                  '--tlsCAFile',
-                                  'jstests/libs/ca.pem',
-                                  '--tlsCertificateKeyFile',
-                                  'jstests/libs/trusted-client.pem',
-                                  '--eval',
-                                  ';');
+    const mongo = runMongoProgram(
+        "mongo",
+        "--host",
+        "localhost",
+        "--port",
+        mongod.port,
+        "--tls",
+        "--tlsCAFile",
+        "jstests/libs/ca.pem",
+        "--tlsCertificateKeyFile",
+        "jstests/libs/trusted-client.pem",
+        "--eval",
+        ";",
+    );
     return mongo === 0;
 }
 
 // test a successful connection when setting cipher suites
 jsTestLog("Testing for successful connection with valid cipher suite config");
 let mongod = MongoRunner.runMongod(
-    Object.merge(baseParams, {setParameter: {opensslCipherSuiteConfig: "TLS_AES_256_GCM_SHA384"}}));
+    Object.merge(baseParams, {setParameter: {opensslCipherSuiteConfig: "TLS_AES_256_GCM_SHA384"}}),
+);
 assert.soon(testConn, "Client could not connect to server with valid ciphersuite config.");
 MongoRunner.stopMongod(mongod);
 
 // test an unsuccessful connection when mandating a cipher suite which OpenSSL disables by default
-jsTestLog(
-    "Testing for unsuccessful connection with cipher suite config which OpenSSL disables by default.");
-mongod = MongoRunner.runMongod(Object.merge(
-    baseParams, {setParameter: {opensslCipherSuiteConfig: "TLS_AES_128_CCM_8_SHA256"}}));
+jsTestLog("Testing for unsuccessful connection with cipher suite config which OpenSSL disables by default.");
+mongod = MongoRunner.runMongod(
+    Object.merge(baseParams, {setParameter: {opensslCipherSuiteConfig: "TLS_AES_128_CCM_8_SHA256"}}),
+);
 sleep(30000);
 
-assert.eq(
-    false, testConn(), "Client successfully connected to server with invalid ciphersuite config.");
+assert.eq(false, testConn(), "Client successfully connected to server with invalid ciphersuite config.");
 MongoRunner.stopMongod(mongod);

@@ -18,7 +18,7 @@ const dbName = testDB.getName();
 const collName = jsTestName();
 const ns = {
     db: dbName,
-    coll: collName
+    coll: collName,
 };
 
 const pipeline = [{$changeStream: {showExpandedEvents: true}}];
@@ -41,27 +41,26 @@ function runTest(startChangeStream) {
         let cursor = startChangeStream();
         let options = {
             schemaValidator: {
-                '$jsonSchema': {
-                    'bsonType': "object",
-                    'properties': {
-                        'a': {
-                            'bsonType': "number",
+                "$jsonSchema": {
+                    "bsonType": "object",
+                    "properties": {
+                        "a": {
+                            "bsonType": "number",
                         },
-                        'b': {
-                            'bsonType': "number",
+                        "b": {
+                            "bsonType": "number",
                         },
-                        'c': {
-                            'bsonType': "number",
+                        "c": {
+                            "bsonType": "number",
                         },
-                    }
-                }
+                    },
+                },
             },
             validationLevel: "strict",
-            validationAction: "error"
+            validationAction: "error",
         };
 
-        assert.commandWorked(
-            testDB[collName].runCommand({collMod: collName, validator: options.schemaValidator}));
+        assert.commandWorked(testDB[collName].runCommand({collMod: collName, validator: options.schemaValidator}));
 
         const numShards = FixtureHelpers.numberOfShardsForCollection(testDB[collName]);
 
@@ -73,15 +72,14 @@ function runTest(startChangeStream) {
                 operationDescription: {validator: options.schemaValidator},
                 stateBeforeChange: {
                     collectionOptions: {uuid: getCollectionUuid(collName)},
-                }
+                },
             });
         }
         assertNextChangeEvent(cursor, expectedChanges);
 
         // Modify the validation level.
         const newValidationLevel = "off";
-        assert.commandWorked(
-            testDB[collName].runCommand({collMod: collName, validationLevel: newValidationLevel}));
+        assert.commandWorked(testDB[collName].runCommand({collMod: collName, validationLevel: newValidationLevel}));
 
         expectedChanges = [];
         for (let i = 0; i < numShards; ++i) {
@@ -94,9 +92,9 @@ function runTest(startChangeStream) {
                         uuid: getCollectionUuid(collName),
                         validator: options.schemaValidator,
                         validationLevel: options.validationLevel,
-                        validationAction: options.validationAction
-                    }
-                }
+                        validationAction: options.validationAction,
+                    },
+                },
             });
         }
         assertNextChangeEvent(cursor, expectedChanges);
@@ -106,8 +104,7 @@ function runTest(startChangeStream) {
         // Modify the validation action, i.e. the parameter which determined whether to error on
         // invalid documents or warn.
         const newValidationAction = "warn";
-        assert.commandWorked(testDB[collName].runCommand(
-            {collMod: collName, validationAction: newValidationAction}));
+        assert.commandWorked(testDB[collName].runCommand({collMod: collName, validationAction: newValidationAction}));
 
         expectedChanges = [];
         for (let i = 0; i < numShards; ++i) {
@@ -120,9 +117,9 @@ function runTest(startChangeStream) {
                         uuid: getCollectionUuid(collName),
                         validator: options.schemaValidator,
                         validationLevel: options.validationLevel,
-                        validationAction: options.validationAction
-                    }
-                }
+                        validationAction: options.validationAction,
+                    },
+                },
             });
         }
         assertNextChangeEvent(cursor, expectedChanges);
@@ -150,18 +147,16 @@ function runTest(startChangeStream) {
             index: {
                 name: indexName,
                 hidden: options.hidden ? false : true,
-            }
+            },
         };
         const undoToggleIndexHiddenOp = {
             index: {
                 name: indexName,
                 hidden: options.hidden ? true : false,
-            }
+            },
         };
-        assert.commandWorked(
-            testDB[collName].runCommand({collMod: collName, index: toggleIndexHiddenOp.index}));
-        assert.commandWorked(
-            testDB[collName].runCommand({collMod: collName, index: undoToggleIndexHiddenOp.index}));
+        assert.commandWorked(testDB[collName].runCommand({collMod: collName, index: toggleIndexHiddenOp.index}));
+        assert.commandWorked(testDB[collName].runCommand({collMod: collName, index: undoToggleIndexHiddenOp.index}));
 
         const numShards = FixtureHelpers.numberOfShardsForCollection(testDB[collName]);
 
@@ -173,8 +168,8 @@ function runTest(startChangeStream) {
                 operationDescription: toggleIndexHiddenOp,
                 stateBeforeChange: {
                     collectionOptions: {uuid: getCollectionUuid(collName)},
-                    indexOptions: {hidden: !toggleIndexHiddenOp.index.hidden}
-                }
+                    indexOptions: {hidden: !toggleIndexHiddenOp.index.hidden},
+                },
             });
         }
         // First event toggling the 'hidden' option on the index.
@@ -188,8 +183,8 @@ function runTest(startChangeStream) {
                 operationDescription: undoToggleIndexHiddenOp,
                 stateBeforeChange: {
                     collectionOptions: {uuid: getCollectionUuid(collName)},
-                    indexOptions: {hidden: !undoToggleIndexHiddenOp.index.hidden}
-                }
+                    indexOptions: {hidden: !undoToggleIndexHiddenOp.index.hidden},
+                },
             });
         }
         // Second event restoring the 'hidden' option on the index to the initial state.
@@ -199,10 +194,11 @@ function runTest(startChangeStream) {
         // TTL expiration threshold.
         if (options.expireAfterSeconds) {
             const modifyIndexExpireAfterSecondsOp = {
-                index: {name: indexName, expireAfterSeconds: NumberLong(100000)}
+                index: {name: indexName, expireAfterSeconds: NumberLong(100000)},
             };
-            assert.commandWorked(testDB[collName].runCommand(
-                {collMod: collName, index: modifyIndexExpireAfterSecondsOp.index}));
+            assert.commandWorked(
+                testDB[collName].runCommand({collMod: collName, index: modifyIndexExpireAfterSecondsOp.index}),
+            );
 
             expectedChanges = [];
             for (let i = 0; i < numShards; ++i) {
@@ -212,8 +208,8 @@ function runTest(startChangeStream) {
                     operationDescription: modifyIndexExpireAfterSecondsOp,
                     stateBeforeChange: {
                         collectionOptions: {uuid: getCollectionUuid(collName)},
-                        indexOptions: options
-                    }
+                        indexOptions: options,
+                    },
                 });
             }
             assertNextChangeEvent(cursor, expectedChanges);
@@ -240,7 +236,7 @@ function runTest(startChangeStream) {
 }
 
 // Run the test using a whole-db collection change stream.
-runTest((() => cst.startWatchingChanges({pipeline, collection: 1})));
+runTest(() => cst.startWatchingChanges({pipeline, collection: 1}));
 
 // Run the test using a single collection change stream.
-runTest((() => cst.startWatchingChanges({pipeline, collection: collName})));
+runTest(() => cst.startWatchingChanges({pipeline, collection: collName}));

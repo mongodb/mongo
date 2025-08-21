@@ -33,7 +33,7 @@ print("Average docs sampled: ", avg);
 // Test that the average number of sampled docs is within 10 standard deviations using the
 // binomial distribution over k runs, 10 * sqrt(N * p * (1 - p) / k).
 const mu = p * N;
-const err = 10.0 * Math.sqrt(mu * (1 - p) / k);
+const err = 10.0 * Math.sqrt((mu * (1 - p)) / k);
 assert.between(mu - err, avg, mu + err);
 
 // Test that we accept 0.0 and 1.0.
@@ -54,21 +54,24 @@ assert.eq(resultArray[0]["n"], N);
 // Test parser failure cases.
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$match: {$sampleRate: -1}}]}),
-    ErrorCodes.BadValue);
+    ErrorCodes.BadValue,
+);
 
 assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: coll.getName(), cursor: {}, pipeline: [{$match: {$sampleRate: -1.0}}]}),
-    ErrorCodes.BadValue);
+    db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$match: {$sampleRate: -1.0}}]}),
+    ErrorCodes.BadValue,
+);
 
 assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: coll.getName(), cursor: {}, pipeline: [{$match: {$sampleRate: 2.0}}]}),
-    ErrorCodes.BadValue);
+    db.runCommand({aggregate: coll.getName(), cursor: {}, pipeline: [{$match: {$sampleRate: 2.0}}]}),
+    ErrorCodes.BadValue,
+);
 
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    cursor: {},
-    pipeline: [{$match: {$sampleRate: {$const: 0.25}}}]
-}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [{$match: {$sampleRate: {$const: 0.25}}}],
+    }),
+    ErrorCodes.BadValue,
+);

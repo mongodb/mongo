@@ -14,7 +14,7 @@ jsTest.log("Starting bulk api ordered tests...");
  */
 let bulkOp = coll.initializeOrderedBulkOp();
 
-assert.throws(function() {
+assert.throws(function () {
     bulkOp.find();
 });
 
@@ -26,11 +26,20 @@ bulkOp.insert({a: 1});
 bulkOp.find({a: 1}).updateOne({$set: {b: 1}});
 // no-op, should increment nMatched but not nModified
 bulkOp.find({a: 1}).updateOne({$set: {b: 1}});
-bulkOp.find({a: 2}).upsert().updateOne({$set: {b: 2}});
+bulkOp
+    .find({a: 2})
+    .upsert()
+    .updateOne({$set: {b: 2}});
 bulkOp.insert({a: 3});
 bulkOp.find({a: 3}).update({$set: {b: 1}});
-bulkOp.find({a: 3}).upsert().update({$set: {b: 2}});
-bulkOp.find({a: 10}).upsert().update({$set: {b: 2}});
+bulkOp
+    .find({a: 3})
+    .upsert()
+    .update({$set: {b: 2}});
+bulkOp
+    .find({a: 10})
+    .upsert()
+    .update({$set: {b: 2}});
 bulkOp.find({a: 2}).replaceOne({a: 11});
 bulkOp.find({a: 11}).removeOne();
 bulkOp.find({a: 3}).remove({a: 3});
@@ -50,18 +59,21 @@ assert(upsert._id != null);
 assert.eq(2, coll.find({}).itcount(), "find should return two documents");
 
 // illegal to try to convert a multi-op batch into a SingleWriteResult
-assert.throws(function() {
+assert.throws(function () {
     result.toSingleResult();
 });
 
 // attempt to re-run bulk operation
-assert.throws(function() {
+assert.throws(function () {
     bulkOp.execute();
 });
 
 // Test SingleWriteResult
 let singleBatch = coll.initializeOrderedBulkOp();
-singleBatch.find({a: 4}).upsert().updateOne({$set: {b: 1}});
+singleBatch
+    .find({a: 4})
+    .upsert()
+    .updateOne({$set: {b: 1}});
 let singleResult = singleBatch.execute().toSingleResult();
 assert(singleResult.getUpsertedId() != null);
 
@@ -74,9 +86,12 @@ coll.createIndex({a: 1}, {unique: true});
  */
 bulkOp = coll.initializeOrderedBulkOp();
 bulkOp.insert({b: 1, a: 1});
-bulkOp.find({b: 2}).upsert().updateOne({$set: {a: 1}});
+bulkOp
+    .find({b: 2})
+    .upsert()
+    .updateOne({$set: {a: 1}});
 bulkOp.insert({b: 3, a: 2});
-result = assert.throws(function() {
+result = assert.throws(function () {
     bulkOp.execute();
 });
 assert(result instanceof BulkWriteError);
@@ -94,7 +109,7 @@ assert(error.errmsg != null);
 // Get the operation that caused the error
 let op = error.getOperation();
 assert.eq(2, op.q.b);
-assert.eq(1, op.u['$set'].a);
+assert.eq(1, op.u["$set"].a);
 assert.eq(false, op.multi);
 assert.eq(true, op.upsert);
 
@@ -112,12 +127,21 @@ coll.createIndex({a: 1}, {unique: true});
  */
 bulkOp = coll.initializeOrderedBulkOp();
 bulkOp.insert({b: 1, a: 1});
-bulkOp.find({b: 2}).upsert().updateOne({$set: {a: 1}});
-bulkOp.find({b: 3}).upsert().updateOne({$set: {a: 2}});
-bulkOp.find({b: 2}).upsert().updateOne({$set: {a: 1}});
+bulkOp
+    .find({b: 2})
+    .upsert()
+    .updateOne({$set: {a: 1}});
+bulkOp
+    .find({b: 3})
+    .upsert()
+    .updateOne({$set: {a: 2}});
+bulkOp
+    .find({b: 2})
+    .upsert()
+    .updateOne({$set: {a: 1}});
 bulkOp.insert({b: 4, a: 3});
 bulkOp.insert({b: 5, a: 1});
-result = assert.throws(function() {
+result = assert.throws(function () {
     bulkOp.execute();
 });
 
@@ -132,7 +156,7 @@ assert.eq(1, error.index);
 assert.eq(11000, error.code);
 assert(error.errmsg != null);
 assert.eq(2, error.getOperation().q.b);
-assert.eq(1, error.getOperation().u['$set'].a);
+assert.eq(1, error.getOperation().u["$set"].a);
 assert.eq(false, error.getOperation().multi);
 assert.eq(true, error.getOperation().upsert);
 

@@ -11,7 +11,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    rs: {nodes: 1, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
+    rs: {nodes: 1, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}},
 });
 
 const mongosDB = st.s0.getDB(jsTestName());

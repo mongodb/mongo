@@ -53,10 +53,11 @@ function serverSupportsTfo(db) {
 /** Test tcpFastOpenServer by setting the flag and connecting to it as a TFO client. */
 function testTcpFastOpenServer() {
     let exitEarly = false;
-    for (let [expect, params] of [         //
-             [1, {}],                      //
-             [1, {tcpFastOpenServer: 1}],  //
-             [0, {tcpFastOpenServer: 0}],  //
+    for (let [expect, params] of [
+        //
+        [1, {}], //
+        [1, {tcpFastOpenServer: 1}], //
+        [0, {tcpFastOpenServer: 0}], //
     ]) {
         jsTestLog(`==Running testTcpFastOpenServer test ${JSON.stringify(params)} => ${expect}`);
         const conn = MongoRunner.runMongod({setParameter: params});
@@ -70,17 +71,19 @@ function testTcpFastOpenServer() {
             // "network.tcpFastOpen.accepted" counter changes. The first
             // connection is a warmup to exchange TFO cookies.
             for (let i = 0; i < 2; ++i) {
-                const shellExit = runMongoProgram('mongo', db.getMongo().host, '--eval', ';');
+                const shellExit = runMongoProgram("mongo", db.getMongo().host, "--eval", ";");
                 assert.eq(0, shellExit, "cannot connect");
                 tfoStatusRecords.push(getTfoStatus(db));
             }
-            let lastAcceptedCount = tfoStatusRecords[tfoStatusRecords.length - 1].accepted -
+            let lastAcceptedCount =
+                tfoStatusRecords[tfoStatusRecords.length - 1].accepted -
                 tfoStatusRecords[tfoStatusRecords.length - 2].accepted;
             if (lastAcceptedCount < expect) {
                 jsTestLog(
                     "We find that in practice we sometimes do not get TFO when we expect to. " +
-                    "We are logging these events but not failing the test (See SERVER-83978). " +
-                    `tfoStatusRecords: ${JSON.stringify(tfoStatusRecords)}`);
+                        "We are logging these events but not failing the test (See SERVER-83978). " +
+                        `tfoStatusRecords: ${JSON.stringify(tfoStatusRecords)}`,
+                );
             } else {
                 assert.eq(lastAcceptedCount, expect, "unexpected TFO triggering");
             }

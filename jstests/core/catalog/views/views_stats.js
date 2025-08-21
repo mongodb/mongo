@@ -15,12 +15,7 @@
 // ]
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    assertHistogramDiffEq,
-    assertTopDiffEq,
-    getHistogramStats,
-    getTop
-} from "jstests/libs/stats.js";
+import {assertHistogramDiffEq, assertTopDiffEq, getHistogramStats, getTop} from "jstests/libs/stats.js";
 
 let viewsDB = db.getSiblingDB("views_stats");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -29,7 +24,7 @@ assert.commandWorked(viewsDB.runCommand({create: "view", viewOn: "collection"}))
 let view = viewsDB["view"];
 let coll = viewsDB["collection"];
 
-assert.commandWorked(coll.insert({val: 'TestValue'}));
+assert.commandWorked(coll.insert({val: "TestValue"}));
 
 // Check the histogram counters.
 let lastHistogram = getHistogramStats(view);

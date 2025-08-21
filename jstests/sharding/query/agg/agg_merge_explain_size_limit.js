@@ -20,32 +20,34 @@ st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0});
     assert.commandWorked(coll.insert({groupBy: 2, largeField: "a".repeat(1000)}));
     const largeAccumulator = {
         $accumulator: {
-            init: function() {
+            init: function () {
                 return "";
             },
             accumulateArgs: [{fieldName: "$a"}],
-            accumulate: function(state, args) {
+            accumulate: function (state, args) {
                 return state + "a";
             },
-            merge: function(state1, state2) {
+            merge: function (state1, state2) {
                 return state1 + state2;
             },
-            finalize: function(state) {
+            finalize: function (state) {
                 return state.length;
-            }
-        }
+            },
+        },
     };
-    assert.commandWorked(mongosDB.runCommand({
-        explain: {
-            aggregate: coll.getName(),
-            pipeline: [
-                {$addFields: {a: {$range: [0, 1000000]}}},
-                {$unwind: "$a"},  // Create a number of documents to be executed by the accumulator.
-                {$group: {_id: "$groupBy", count: largeAccumulator}}
-            ],
-            cursor: {}
-        }
-    }));
+    assert.commandWorked(
+        mongosDB.runCommand({
+            explain: {
+                aggregate: coll.getName(),
+                pipeline: [
+                    {$addFields: {a: {$range: [0, 1000000]}}},
+                    {$unwind: "$a"}, // Create a number of documents to be executed by the accumulator.
+                    {$group: {_id: "$groupBy", count: largeAccumulator}},
+                ],
+                cursor: {},
+            },
+        }),
+    );
 }
 
 st.stop();

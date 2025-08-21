@@ -7,7 +7,7 @@
  * assumes_balancer_off,
  * ]
  */
-let dbTest = db.getSiblingDB('modify_encrypted_collection_db');
+let dbTest = db.getSiblingDB("modify_encrypted_collection_db");
 
 dbTest.basic.drop();
 
@@ -17,21 +17,17 @@ const sampleEncryptedFields = {
             "path": "firstName",
             "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
             "bsonType": "string",
-            "queries": {"queryType": "equality"}
+            "queries": {"queryType": "equality"},
         },
-    ]
+    ],
 };
 
 assert.commandWorked(dbTest.createCollection("basic", {encryptedFields: sampleEncryptedFields}));
 
-assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationAction: "warn"}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationAction: "warn"}), ErrorCodes.BadValue);
 
-assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationLevel: "off"}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationLevel: "off"}), ErrorCodes.BadValue);
 
-assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationLevel: "moderate"}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationLevel: "moderate"}), ErrorCodes.BadValue);
 
-assert.commandWorked(
-    dbTest.runCommand({collMod: "basic", validationLevel: "strict", validationAction: "error"}));
+assert.commandWorked(dbTest.runCommand({collMod: "basic", validationLevel: "strict", validationAction: "error"}));

@@ -26,7 +26,7 @@ coll.drop();
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
 res = coll.runCommand("listIndexes");
 assert.commandWorked(res);
-assert.eq("object", typeof (res.cursor));
+assert.eq("object", typeof res.cursor);
 assert.eq(0, res.cursor.id);
 assert.eq(coll.getFullName(), res.cursor.ns);
 assert.eq(1, res.cursor.firstBatch.length);
@@ -36,19 +36,18 @@ assert.eq("_id_", res.cursor.firstBatch[0].name);
 // Test basic usage with DBCommandCursor.
 //
 
-var getListIndexesCursor = function(coll, options, subsequentBatchSize) {
-    return new DBCommandCursor(
-        coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
+var getListIndexesCursor = function (coll, options, subsequentBatchSize) {
+    return new DBCommandCursor(coll.getDB(), coll.runCommand("listIndexes", options), subsequentBatchSize);
 };
 
-var cursorGetIndexSpecs = function(cursor) {
-    return cursor.toArray().sort(function(a, b) {
+var cursorGetIndexSpecs = function (cursor) {
+    return cursor.toArray().sort(function (a, b) {
         return a.name > b.name;
     });
 };
 
-var cursorGetIndexNames = function(cursor) {
-    return cursorGetIndexSpecs(cursor).map(function(spec) {
+var cursorGetIndexNames = function (cursor) {
+    return cursorGetIndexSpecs(cursor).map(function (spec) {
         return spec.name;
     });
 };
@@ -166,6 +165,6 @@ res = coll.runCommand("listIndexes", {cursor: {batchSize: 0}});
 cursor = new DBCommandCursor(coll.getDB(), res, 2);
 cursor.close();
 cursor = new DBCommandCursor(coll.getDB(), res, 2);
-assert.throws(function() {
+assert.throws(function () {
     cursor.hasNext();
 });

@@ -11,7 +11,9 @@
  * so do not pass a collection whose contents you wish to preserve.
  */
 export function assertSchemaMatch(coll, schema, doc, valid) {
-    const errmsg = "Document " + tojson(doc) +
+    const errmsg =
+        "Document " +
+        tojson(doc) +
         (valid ? " should have matched the schema " : " unexpectedly matched the schema ") +
         tojson(schema);
 
@@ -36,17 +38,18 @@ export function assertSchemaMatch(coll, schema, doc, valid) {
     if (valid) {
         assert.commandWorked(res, errmsg + " during insert document validation");
     } else {
-        assert.writeErrorWithCode(res,
-                                  ErrorCodes.DocumentValidationFailure,
-                                  errmsg + " during insert document validation");
+        assert.writeErrorWithCode(
+            res,
+            ErrorCodes.DocumentValidationFailure,
+            errmsg + " during insert document validation",
+        );
     }
 
     // Test that we can update an existing document to look like 'doc' when the collection has
     // 'schema' as its document validator in "strict" mode iff 'valid' is true.
     assert.commandWorked(coll.runCommand("drop"));
     assert.commandWorked(coll.insert({_id: 0}));
-    assert.commandWorked(
-        coll.runCommand("collMod", {validator: {$jsonSchema: schema}, validationLevel: "strict"}));
+    assert.commandWorked(coll.runCommand("collMod", {validator: {$jsonSchema: schema}, validationLevel: "strict"}));
 
     // Before applying the update, remove the _id field if it exists, or the replacement-style
     // update will fail.
@@ -56,8 +59,10 @@ export function assertSchemaMatch(coll, schema, doc, valid) {
     if (valid) {
         assert.commandWorked(res, errmsg + " during update document validation in strict mode");
     } else {
-        assert.writeErrorWithCode(res,
-                                  ErrorCodes.DocumentValidationFailure,
-                                  errmsg + " during update document validation in strict mode");
+        assert.writeErrorWithCode(
+            res,
+            ErrorCodes.DocumentValidationFailure,
+            errmsg + " during update document validation in strict mode",
+        );
     }
 }

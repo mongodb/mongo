@@ -22,12 +22,14 @@ const inputCollection = reshardingTest.createShardedCollection({
     ],
 });
 
-assert.commandWorked(inputCollection.insert([
-    {_id: "stays on shard0", oldKey: -10, newKey: -10},
-    {_id: "moves to shard0", oldKey: 10, newKey: -10},
-    {_id: "moves to shard1", oldKey: -10, newKey: 10},
-    {_id: "stays on shard1", oldKey: 10, newKey: 10},
-]));
+assert.commandWorked(
+    inputCollection.insert([
+        {_id: "stays on shard0", oldKey: -10, newKey: -10},
+        {_id: "moves to shard0", oldKey: 10, newKey: -10},
+        {_id: "moves to shard1", oldKey: -10, newKey: 10},
+        {_id: "stays on shard1", oldKey: 10, newKey: 10},
+    ]),
+);
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 reshardingTest.withReshardingInBackground({
@@ -40,9 +42,7 @@ reshardingTest.withReshardingInBackground({
 
 function assertClonedContents(shardConn, expectedDocs) {
     // We sort by oldKey so the order of `expectedDocs` can be deterministic.
-    assert.eq(
-        expectedDocs,
-        shardConn.getCollection(inputCollection.getFullName()).find().sort({oldKey: 1}).toArray());
+    assert.eq(expectedDocs, shardConn.getCollection(inputCollection.getFullName()).find().sort({oldKey: 1}).toArray());
 }
 
 const mongos = inputCollection.getMongo();

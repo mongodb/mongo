@@ -8,11 +8,7 @@
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    getPlanStages,
-    getWinningPlanFromExplain,
-    planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStages, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
@@ -32,8 +28,8 @@ function insertTestData(fieldName, listOfValues) {
     const bulk = coll.initializeUnorderedBulkOp();
     coll.drop();
     for (let i = 0; i < 200; i++) {
-        const didx = (i % listOfValues.length);
-        bulk.insert({[fieldName]: listOfValues[didx], b: didx, c: (-i)});
+        const didx = i % listOfValues.length;
+        bulk.insert({[fieldName]: listOfValues[didx], b: didx, c: -i});
     }
     assert.commandWorked(bulk.execute());
 }
@@ -43,11 +39,17 @@ function insertTestData(fieldName, listOfValues) {
  * is an indexed solution that uses the $** index with the given path string. If 'expectedPath'
  * is null, verifies that no indexed solution was found.
  */
-function assertWildcardDistinctScan(
-    {distinctKey, query, pathProjection, expectedScanType, expectedResults, expectedPath}) {
+function assertWildcardDistinctScan({
+    distinctKey,
+    query,
+    pathProjection,
+    expectedScanType,
+    expectedResults,
+    expectedPath,
+}) {
     const wildcardIndexes = [
         {keyPattern: {"$**": 1}},
-        {keyPattern: {"$**": 1, other: 1}, wildcardProjection: {other: 0}}
+        {keyPattern: {"$**": 1, other: 1}, wildcardProjection: {other: 0}},
     ];
     for (const indexSpec of wildcardIndexes) {
         // Drop all indexes before running the test. This allows us to perform the distinct with a
@@ -60,20 +62,20 @@ function assertWildcardDistinctScan(
         // Run the distinct and confirm that it produces the expected results.
         assertArrayEq(coll.distinct(distinctKey, query), expectedResults);
 
-        const expectedKeyPattern =
-            indexSpec.wildcardProjection ? {$_path: 1, other: 1} : {$_path: 1};
+        const expectedKeyPattern = indexSpec.wildcardProjection ? {$_path: 1, other: 1} : {$_path: 1};
         if (expectedPath) {
             expectedKeyPattern[expectedPath] = 1;
         }
 
-        const wildcardProjection =
-            Object.assign(indexSpec.wildcardProjection || {}, pathProjection || {});
+        const wildcardProjection = Object.assign(indexSpec.wildcardProjection || {}, pathProjection || {});
 
         // Build a wildcard index on the collection and re-run the test.
-        assert.commandWorked(coll.createIndex(indexSpec.keyPattern,
-                                              Object.keys(wildcardProjection).length === 0
-                                                  ? {}
-                                                  : {wildcardProjection: wildcardProjection}));
+        assert.commandWorked(
+            coll.createIndex(
+                indexSpec.keyPattern,
+                Object.keys(wildcardProjection).length === 0 ? {} : {wildcardProjection: wildcardProjection},
+            ),
+        );
 
         // We expect the following outcomes for a 'distinct' that attempts to use a $** index:
         // - No query: COLLSCAN.
@@ -81,7 +83,7 @@ function assertWildcardDistinctScan(
         // - Query for non-object value on non-multikey distinct field: DISTINCT_SCAN.
         // - Query for non-object value on multikey distinct field: IXSCAN with FETCH.
         // - Query for non-object value on field other than the distinct field: IXSCAN with FETCH.
-        const fetchIsExpected = (expectedScanType !== "DISTINCT_SCAN");
+        const fetchIsExpected = expectedScanType !== "DISTINCT_SCAN";
 
         // Explain the query, and determine whether an indexed solution is available. If
         // 'expectedPath' is null, then we do not expect the $** index to provide a plan.
@@ -101,8 +103,7 @@ function assertWildcardDistinctScan(
             assert.eq(planHasStage(coll.getDB(), winningPlan, "FETCH"), fetchIsExpected);
         }
         assert(planHasStage(coll.getDB(), winningPlan, expectedScanType));
-        assert.docEq(expectedKeyPattern,
-                     getPlanStages(winningPlan, expectedScanType).shift().keyPattern);
+        assert.docEq(expectedKeyPattern, getPlanStages(winningPlan, expectedScanType).shift().keyPattern);
     }
 }
 
@@ -116,14 +117,14 @@ const testCases = [
     {
         insertField: "a",
         queryField: "a",
-        fieldValues: [1, 2, "3", null, {c: 5, d: 6}, {d: 6, c: 5}, {}, 9, 10, {e: 11}]
+        fieldValues: [1, 2, "3", null, {c: 5, d: 6}, {d: 6, c: 5}, {}, 9, 10, {e: 11}],
     },
     // Multikey field values. Note that values within arrays are unwrapped by the distinct
     // scan, and empty arrays are thus not included.
     {
         insertField: "a",
         queryField: "a",
-        fieldValues: [1, 2, "3", null, {c: 5, d: 6}, {d: 6, c: 5}, {}, [], [9, 10], [{e: 11}]]
+        fieldValues: [1, 2, "3", null, {c: 5, d: 6}, {d: 6, c: 5}, {}, [], [9, 10], [{e: 11}]],
     },
     // Non-multikey dotted field values.
     {
@@ -139,8 +140,8 @@ const testCases = [
             {x: {}},
             {x: 9},
             {x: 10},
-            {x: {e: 11}}
-        ]
+            {x: {e: 11}},
+        ],
     },
     // Multikey dotted field values.
     {
@@ -156,9 +157,9 @@ const testCases = [
             [{x: {}}],
             [{x: []}],
             [{x: 9}, {x: 10}],
-            [{x: [{e: 11}]}]
-        ]
-    }
+            [{x: [{e: 11}]}],
+        ],
+    },
 ];
 
 // Run all combinations of query, no-query, multikey and non-multikey distinct tests.
@@ -173,16 +174,16 @@ for (let testCase of testCases) {
         query: {},
         expectedScanType: "COLLSCAN",
         expectedResults: distinctValues,
-        expectedPath: null
+        expectedPath: null,
     });
 
     // Test that a $** index can provide an indexed 'distinct' for distinct-key queries.
     assertWildcardDistinctScan({
         distinctKey: testCase.queryField,
         query: {[testCase.queryField]: {$lt: 3}},
-        expectedScanType: (distinctFieldIsMultikey ? "IXSCAN" : "DISTINCT_SCAN"),
+        expectedScanType: distinctFieldIsMultikey ? "IXSCAN" : "DISTINCT_SCAN",
         expectedResults: [1, 2],
-        expectedPath: testCase.queryField
+        expectedPath: testCase.queryField,
     });
 
     // Test that a $** index can provide an indexed 'distinct' for a query on another field.
@@ -192,7 +193,7 @@ for (let testCase of testCases) {
         query: {b: {$gte: offset}},
         expectedScanType: "IXSCAN",
         expectedResults: distinctValues.slice(offset),
-        expectedPath: "b"
+        expectedPath: "b",
     });
 
     // Test that a $** index cannot provide an indexed 'distinct' for object value queries.
@@ -201,7 +202,7 @@ for (let testCase of testCases) {
         query: {[testCase.queryField]: {$gte: {c: 5}}},
         expectedScanType: "COLLSCAN",
         expectedResults: [{c: 5, d: 6}, {d: 6, c: 5}, {e: 11}],
-        expectedPath: null
+        expectedPath: null,
     });
 
     // Test that a $** index can provide an indexed 'distinct' for a MinMax query.
@@ -210,7 +211,7 @@ for (let testCase of testCases) {
         query: {[testCase.queryField]: {$gte: MinKey, $lte: MaxKey}},
         expectedScanType: "IXSCAN",
         expectedResults: distinctValues,
-        expectedPath: testCase.queryField
+        expectedPath: testCase.queryField,
     });
 
     // Test that a $** index cannot provide an indexed 'distinct' for excluded fields.
@@ -220,6 +221,6 @@ for (let testCase of testCases) {
         pathProjection: {c: 0},
         expectedScanType: "COLLSCAN",
         expectedResults: distinctValues,
-        expectedPath: null
+        expectedPath: null,
     });
 }

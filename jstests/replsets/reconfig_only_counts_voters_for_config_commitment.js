@@ -13,9 +13,9 @@ var replTest = new ReplSetTest({
         {rsConfig: {priority: 0, votes: 1}},
         {rsConfig: {priority: 0, votes: 1}},
         {rsConfig: {priority: 0, votes: 0}},
-        {rsConfig: {priority: 0, votes: 0}}
+        {rsConfig: {priority: 0, votes: 0}},
     ],
-    useBridge: true
+    useBridge: true,
 });
 var nodes = replTest.startSet();
 replTest.initiate();
@@ -33,7 +33,8 @@ var config = primary.getDB("local").system.replset.findOne();
 config.version++;
 assert.commandFailedWithCode(
     primary.getDB("admin").runCommand({replSetReconfig: config, maxTimeMS: 5000}),
-    ErrorCodes.MaxTimeMSExpired);
+    ErrorCodes.MaxTimeMSExpired,
+);
 assert.eq(isConfigCommitted(primary), false);
 
 // Turn off failpoints so that heartbeat reconfigs on the voting nodes can succeed.

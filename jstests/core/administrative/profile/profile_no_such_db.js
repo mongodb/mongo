@@ -11,7 +11,7 @@ function dbExists(db) {
     return Array.contains(db.getMongo().getDBNames(), db.getName());
 }
 
-const testDb = db.getSiblingDB('profile_no_such_db');  // Note: changes db argument not global var.
+const testDb = db.getSiblingDB("profile_no_such_db"); // Note: changes db argument not global var.
 assert.commandWorked(testDb.dropDatabase());
 assert(!dbExists(testDb));
 
@@ -22,8 +22,8 @@ assert(!dbExists(testDb));
 // This test assumes that the default profiling level hasn't been changed.
 assert.eq(defaultProfilingLevel, 0);
 
-[0, 1, 2].forEach(function(level) {
-    jsTest.log('Testing profiling level ' + level);
+[0, 1, 2].forEach(function (level) {
+    jsTest.log("Testing profiling level " + level);
 
     // Setting the profiling level creates the database.
     // Note: setting the profiling level to 0 puts the database in a weird state where it

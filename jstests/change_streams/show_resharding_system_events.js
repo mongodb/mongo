@@ -20,8 +20,8 @@ const st = new ShardingTest({
     shards: 1,
     rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
     other: {
-        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}}
-    }
+        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}},
+    },
 });
 
 const testDB = st.s.getDB(jsTestName());
@@ -50,11 +50,13 @@ const startPoint = testDB.watch().getResumeToken();
 const oldUUID = getCollectionUuid(testColl);
 
 // Reshard the collection.
-assert.commandWorked(st.s.adminCommand({
-    reshardCollection: testColl.getFullName(),
-    key: {a: 1},
-    numInitialChunks: 1,
-}));
+assert.commandWorked(
+    st.s.adminCommand({
+        reshardCollection: testColl.getFullName(),
+        key: {a: 1},
+        numInitialChunks: 1,
+    }),
+);
 
 // Get the UUID of the collection after resharding.
 const newUUID = getCollectionUuid(testColl);
@@ -66,11 +68,11 @@ assert.commandWorked(testColl.insert({_id: 2, a: 2}));
 const reshardingCollName = `system.resharding.${oldUUID.toString().match(/\"([^\"]+)\"/)[1]}`;
 const reshardingNs = {
     db: testDB.getName(),
-    coll: reshardingCollName
+    coll: reshardingCollName,
 };
 const origNs = {
     db: testDB.getName(),
-    coll: testColl.getName()
+    coll: testColl.getName(),
 };
 
 let expectedReshardingEvents = [
@@ -79,21 +81,21 @@ let expectedReshardingEvents = [
         ns: reshardingNs,
         collectionUUID: newUUID,
         operationType: "shardCollection",
-        operationDescription: {shardKey: {a: 1}}
+        operationDescription: {shardKey: {a: 1}},
     },
     {
         ns: reshardingNs,
         collectionUUID: newUUID,
         operationType: "insert",
         fullDocument: {_id: 0, a: 0},
-        documentKey: {a: 0, _id: 0}
+        documentKey: {a: 0, _id: 0},
     },
     {
         ns: reshardingNs,
         collectionUUID: newUUID,
         operationType: "insert",
         fullDocument: {_id: 1, a: 1},
-        documentKey: {a: 1, _id: 1}
+        documentKey: {a: 1, _id: 1},
     },
     {
         operationType: "endOfTransaction",
@@ -108,14 +110,14 @@ let expectedReshardingEvents = [
         ns: reshardingNs,
         collectionUUID: newUUID,
         operationType: "createIndexes",
-        operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]}
+        operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]},
     },
     {
         ns: origNs,
         collectionUUID: oldUUID,
         reshardingUUID: newUUID,
         operationType: "reshardBlockingWrites",
-        operationDescription: {reshardingUUID: newUUID, type: "reshardFinalOp"}
+        operationDescription: {reshardingUUID: newUUID, type: "reshardFinalOp"},
     },
     {
         ns: origNs,
@@ -127,27 +129,25 @@ let expectedReshardingEvents = [
             oldShardKey: {_id: 1},
             unique: false,
             numInitialChunks: NumberLong(1),
-            provenance: "reshardCollection"
-        }
+            provenance: "reshardCollection",
+        },
     },
     {
         ns: origNs,
         collectionUUID: newUUID,
         operationType: "insert",
         fullDocument: {_id: 2, a: 2},
-        documentKey: {a: 2, _id: 2}
+        documentKey: {a: 2, _id: 2},
     },
 ];
 if (!FeatureFlagUtil.isEnabled(st.s, "EndOfTransactionChangeEvent")) {
-    expectedReshardingEvents =
-        expectedReshardingEvents.filter((event) => (event.operationType !== "endOfTransaction"));
+    expectedReshardingEvents = expectedReshardingEvents.filter((event) => event.operationType !== "endOfTransaction");
 }
 
 // Helper to confirm the sequence of events observed in the change stream.
 function assertChangeStreamEventSequence(csConfig, expectedEvents) {
     // Open a change stream on the test DB using the given configuration.
-    const finalConfig =
-        Object.assign({resumeAfter: startPoint, showExpandedEvents: true}, csConfig);
+    const finalConfig = Object.assign({resumeAfter: startPoint, showExpandedEvents: true}, csConfig);
     const csCursor = testDB.watch([], finalConfig);
 
     // Confirm that we see the expected sequence of events.
@@ -162,9 +162,9 @@ assertChangeStreamEventSequence({showSystemEvents: true}, expectedReshardingEven
 
 // With showSystemEvents set to false, we expect to only see events on the original namespace and
 // not see the "reshardBlockingWrites" event.
-const nonSystemEvents =
-    expectedReshardingEvents.filter((event) => (event.ns && event.ns.coll === testColl.getName() &&
-                                                event.operationType != "reshardBlockingWrites"));
+const nonSystemEvents = expectedReshardingEvents.filter(
+    (event) => event.ns && event.ns.coll === testColl.getName() && event.operationType != "reshardBlockingWrites",
+);
 assertChangeStreamEventSequence({showSystemEvents: false}, nonSystemEvents);
 
 st.stop();

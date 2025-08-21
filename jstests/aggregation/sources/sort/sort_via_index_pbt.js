@@ -27,10 +27,7 @@
 
 import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {
-    getAggPipelineModel,
-    getSortArb
-} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getAggPipelineModel, getSortArb} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
@@ -55,14 +52,13 @@ let totalNumPlans = 0;
 let numPlansUsedIndex = 0;
 function statsCollectorFn(explain) {
     totalNumPlans++;
-    const ixscanStages = getPlanStages(getWinningPlanFromExplain(explain), 'IXSCAN');
+    const ixscanStages = getPlanStages(getWinningPlanFromExplain(explain), "IXSCAN");
     // We place the sort index first, so it will be given the name 'index_0'.
-    if (ixscanStages.every(stage => stage.indexName === 'index_0')) {
+    if (ixscanStages.every((stage) => stage.indexName === "index_0")) {
         numPlansUsedIndex++;
     }
 }
-const correctnessProperty =
-    createCorrectnessProperty(controlColl, experimentColl, statsCollectorFn);
+const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl, statsCollectorFn);
 
 /*
  * Generate a random $sort, aggregation pipelines, and collection. Using the $sort, create an
@@ -73,13 +69,12 @@ function getWorkloadModel(isTS) {
     return fc
         .record({
             sort: getSortArb(8 /* maxNumSortComponents */),
-            pipelines: fc.array(getAggPipelineModel(),
-                                {minLength: 0, maxLength: numQueriesPerRun, size: '+2'}),
-            collSpec: getCollectionModel({isTS})
+            pipelines: fc.array(getAggPipelineModel(), {minLength: 0, maxLength: numQueriesPerRun, size: "+2"}),
+            collSpec: getCollectionModel({isTS}),
         })
         .map(({sort, pipelines, collSpec}) => {
             // Prefix every pipeline with the sort operation.
-            const pipelinesWithSort = pipelines.map(pipeline => [sort, ...pipeline]);
+            const pipelinesWithSort = pipelines.map((pipeline) => [sort, ...pipeline]);
             // Create an index that will satisfy this sort.
             // TODO SERVER-105223 use other kinds of indexes to satisfy the sort (hashed, wildcard).
             // The server won't let us create an index with pattern {_id: -1}. If we see a sort
@@ -95,10 +90,7 @@ function getWorkloadModel(isTS) {
         });
 }
 
-testProperty(correctnessProperty,
-             {controlColl, experimentColl},
-             getWorkloadModel(false /* isTS */),
-             numRuns);
+testProperty(correctnessProperty, {controlColl, experimentColl}, getWorkloadModel(false /* isTS */), numRuns);
 
 // Assert that the number of plans that used the index for the sort is >= 80%
 assert.gt(totalNumPlans, 0);

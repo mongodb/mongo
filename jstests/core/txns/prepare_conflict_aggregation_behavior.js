@@ -15,7 +15,7 @@
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 
-const failureTimeout = 5 * 1000;  // 5 seconds.
+const failureTimeout = 5 * 1000; // 5 seconds.
 const dbName = "test";
 const collName = "prepare_conflict_aggregation_behavior";
 const outCollName = collName + "_out";
@@ -41,11 +41,10 @@ assert.commandWorked(sessionColl.update({_id: 1}, {a: 1}));
 assert.commandWorked(sessionOutColl.update({_id: 0}, {a: 1}));
 let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-jsTestLog("Test that reads from an aggregation pipeline with $merge don't block on prepare" +
-          " conflicts");
+jsTestLog("Test that reads from an aggregation pipeline with $merge don't block on prepare" + " conflicts");
 testColl.aggregate([
     {$addFields: {b: 1}},
-    {$merge: {into: outCollName, whenMatched: "fail", whenNotMatched: "insert"}}
+    {$merge: {into: outCollName, whenMatched: "fail", whenNotMatched: "insert"}},
 ]);
 
 // Make sure that we can see the inserts from the aggregation but not the updates from the
@@ -58,17 +57,16 @@ assert.commandWorked(sessionOutColl.update({_id: 1}, {_id: 1, a: 1}));
 prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 jsTestLog("Test that writes from an aggregation pipeline block on prepare conflicts");
-let pipeline = [
-    {$addFields: {c: 1}},
-    {$merge: {into: outCollName, whenMatched: "replace", whenNotMatched: "insert"}}
-];
-assert.commandFailedWithCode(testDB.runCommand({
-    aggregate: collName,
-    pipeline: pipeline,
-    cursor: {},
-    maxTimeMS: failureTimeout,
-}),
-                             ErrorCodes.MaxTimeMSExpired);
+let pipeline = [{$addFields: {c: 1}}, {$merge: {into: outCollName, whenMatched: "replace", whenNotMatched: "insert"}}];
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        aggregate: collName,
+        pipeline: pipeline,
+        cursor: {},
+        maxTimeMS: failureTimeout,
+    }),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Make sure that we can't see the update from the aggregation or the prepared transaction.
 assert.eq([{_id: 0}, {_id: 1, b: 1}], outColl.find().toArray());
@@ -84,12 +82,14 @@ assert.eq([{_id: 0}, {_id: 1, c: 1}], outColl.find().toArray());
 // doing this, we assume that a change stream with a stage which performs writes is not allowed.
 // Test that this is true.
 pipeline = [{$changeStream: {}}, {$addFields: {d: 1}}, {$out: outCollName}];
-assert.commandFailedWithCode(testDB.runCommand({
-    aggregate: collName,
-    pipeline: pipeline,
-    cursor: {},
-    maxTimeMS: failureTimeout,
-}),
-                             ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        aggregate: collName,
+        pipeline: pipeline,
+        cursor: {},
+        maxTimeMS: failureTimeout,
+    }),
+    ErrorCodes.IllegalOperation,
+);
 
 session.endSession();

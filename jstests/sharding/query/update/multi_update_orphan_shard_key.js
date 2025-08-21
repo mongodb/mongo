@@ -15,8 +15,7 @@ const collName = "update_orphan_shard_key";
 const collection = st.s.getDB(dbName).getCollection(collName);
 
 // Create a sharded collection with two chunks on shard0, split at the key {x: -1}.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: collection.getFullName(), key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: collection.getFullName(), middle: {x: -1}}));
 
@@ -28,12 +27,14 @@ const suspendRangeDeletionFailpoint = configureFailPoint(st.shard0, "suspendRang
 
 // Note: Use _waitForDelete=false to ensure the command completes since the test intentionally
 // causes range deletion to hang.
-assert.commandWorked(st.s.adminCommand({
-    moveChunk: collection.getFullName(),
-    find: {x: 1},
-    to: st.shard1.shardName,
-    _waitForDelete: false,
-}));
+assert.commandWorked(
+    st.s.adminCommand({
+        moveChunk: collection.getFullName(),
+        find: {x: 1},
+        to: st.shard1.shardName,
+        _waitForDelete: false,
+    }),
+);
 
 let res = assert.commandWorked(collection.update({x: 0}, {$set: {y: 1}}));
 assert.eq(1, res.nMatched, res);
@@ -42,7 +43,8 @@ assert.eq(1, res.nModified, res);
 // Do a multi=true update that will target both shards but not update any documents on the shard
 // which owns the range [-1, MaxKey].
 res = assert.commandWorked(
-    collection.update({x: {$lte: 0}, y: {$exists: false}}, {$set: {x: -10, y: 2}}, {multi: true}));
+    collection.update({x: {$lte: 0}, y: {$exists: false}}, {$set: {x: -10, y: 2}}, {multi: true}),
+);
 assert.eq(0, res.nMatched, res);
 assert.eq(0, res.nModified, res);
 assert.eq(0, res.nUpserted, res);

@@ -11,13 +11,12 @@ import {
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 function runTest({st, numShards, closeConnection}) {
-    const hostArray =
-        Array.from({length: numShards}, (_, i) => st["rs" + i].getPrimary().host).sort();
+    const hostArray = Array.from({length: numShards}, (_, i) => st["rs" + i].getPrimary().host).sort();
 
     const data = {
         errorCode: ErrorCodes.CommandFailed,
         failCommands: ["killAllSessionsByPattern"],
-        closeConnection: closeConnection
+        closeConnection: closeConnection,
     };
     setFailCommandOnShards(st, "alwaysOn", data, numShards);
 
@@ -30,7 +29,7 @@ function runTest({st, numShards, closeConnection}) {
     assert.eq(relevantLog[0].attr.failedHosts.sort(), hostArray, relevantLog);
 
     unsetFailCommandOnEachShard(st, numShards);
-    assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(st.s.adminCommand({clearLog: "global"}));
 }
 
 const st = new ShardingTest({mongos: 1, rs: {nodes: 1}, shards: 2});

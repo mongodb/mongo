@@ -24,8 +24,8 @@ const pipeline = [
     {
         $project: {
             "newAndUnrelatedField": "$dummy",
-        }
-    }
+        },
+    },
 ];
 
 assert.throwsWithCode(() => coll.aggregate(pipeline), 16410);

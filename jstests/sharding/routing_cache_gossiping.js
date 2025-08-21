@@ -30,14 +30,16 @@ const nonexistentNs = dbName + ".nonexistent";
 // specified on array 'requestGossipCollections'. Returns 'routingCacheGossip' field of the command
 // response, which is of form [{nss: foo, collectionVersion: x}, ...].
 function runCommandRequestingGossiping(conn, requestGossipCollections) {
-    let response = assert.commandWorked(conn.getDB(dbName).runCommand({
-        aggregate: collName1,
-        pipeline: [],
-        cursor: {},
-        requestGossipRoutingCache: requestGossipCollections
-    }));
+    let response = assert.commandWorked(
+        conn.getDB(dbName).runCommand({
+            aggregate: collName1,
+            pipeline: [],
+            cursor: {},
+            requestGossipRoutingCache: requestGossipCollections,
+        }),
+    );
 
-    return response['routingCacheGossip'];
+    return response["routingCacheGossip"];
 }
 
 // Given a 'routingCacheGossip' response array, find the collectionVersion corresponding to
@@ -56,12 +58,12 @@ function getExpectedCollectionVersion(nss) {
     return {
         e: shardMetadata.collVersionEpoch,
         t: shardMetadata.collVersionTimestamp,
-        v: shardMetadata.collVersion
+        v: shardMetadata.collVersion,
     };
 }
 
-assert.commandWorked(st.s.adminCommand({shardCollection: ns1, key: {x: 'hashed'}}));
-assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: 'hashed'}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns1, key: {x: "hashed"}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: "hashed"}}));
 
 const ns1CollectionVersion = getExpectedCollectionVersion(ns1);
 const ns2CollectionVersion = getExpectedCollectionVersion(ns2);
@@ -77,10 +79,8 @@ const ns2CollectionVersion = getExpectedCollectionVersion(ns2);
 
     // Run $lookup with each namespace as secondary collection. The shard will need to route for
     // that collection, so it will refresh its routing cache.
-    coll1.aggregate(
-        [{$lookup: {from: coll2.getName(), localField: 'x', foreignField: 'x', as: 'out'}}]);
-    coll2.aggregate(
-        [{$lookup: {from: coll1.getName(), localField: 'x', foreignField: 'x', as: 'out'}}]);
+    coll1.aggregate([{$lookup: {from: coll2.getName(), localField: "x", foreignField: "x", as: "out"}}]);
+    coll2.aggregate([{$lookup: {from: coll1.getName(), localField: "x", foreignField: "x", as: "out"}}]);
 }
 
 // Check that when no gossip is requested to the shard, then the shard does not gossip back

@@ -15,16 +15,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // test restarts a shard, so the cached connection is not usable.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-var st = new ShardingTest(
-    {shards: 2, other: {keyFile: 'jstests/libs/key1', useHostname: true, chunkSize: 1}});
+var st = new ShardingTest({shards: 2, other: {keyFile: "jstests/libs/key1", useHostname: true, chunkSize: 1}});
 
 var mongos = st.s;
-var adminDB = mongos.getDB('admin');
-var db = mongos.getDB('test');
+var adminDB = mongos.getDB("admin");
+var db = mongos.getDB("test");
 
-adminDB.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
+adminDB.createUser({user: "admin", pwd: "password", roles: jsTest.adminUserRoles});
 
-adminDB.auth('admin', 'password');
+adminDB.auth("admin", "password");
 
 adminDB.runCommand({enableSharding: "test", primaryShard: st.shard1.shardName});
 adminDB.runCommand({shardCollection: "test.foo", key: {x: 1}});
@@ -44,7 +43,7 @@ st.rs0.stopSet(undefined, true);
 st.rs0.startSet({}, true);
 
 // May fail the first couple times due to socket exceptions
-assert.soon(function() {
+assert.soon(function () {
     var res = adminDB.runCommand({moveChunk: "test.foo", find: {x: 75}, to: otherShard});
     printjson(res);
     return res.ok;

@@ -1,11 +1,12 @@
 // Ensure that multi-update and multi-remove operations yield regularly.
 // @tags: [requires_profiling]
 function countOpYields(coll, op) {
-    const profileEntry = coll.getDB()
-                             .system.profile.find({ns: coll.getFullName()})
-                             .sort({$natural: -1})
-                             .limit(1)
-                             .next();
+    const profileEntry = coll
+        .getDB()
+        .system.profile.find({ns: coll.getFullName()})
+        .sort({$natural: -1})
+        .limit(1)
+        .next();
     assert.eq(profileEntry.op, op);
     return profileEntry.numYield;
 }
@@ -18,9 +19,9 @@ const mongod = MongoRunner.runMongod({
     setParameter: `internalQueryExecYieldIterations=${worksPerYield}`,
     profile: 2,
 });
-assert.neq(null, mongod, 'mongod was unable to start up');
+assert.neq(null, mongod, "mongod was unable to start up");
 
-const coll = mongod.getDB('test').yield_during_writes;
+const coll = mongod.getDB("test").yield_during_writes;
 coll.drop();
 
 for (let i = 0; i < nDocsToInsert; i++) {
@@ -30,10 +31,10 @@ for (let i = 0; i < nDocsToInsert; i++) {
 // A multi-update doing a collection scan should yield about nDocsToInsert / worksPerYield
 // times.
 assert.commandWorked(coll.update({}, {$inc: {counter: 1}}, {multi: true}));
-assert.gt(countOpYields(coll, 'update'), (nDocsToInsert / worksPerYield) - 2);
+assert.gt(countOpYields(coll, "update"), nDocsToInsert / worksPerYield - 2);
 
 // Likewise, a multi-remove should also yield approximately every worksPerYield documents.
 assert.commandWorked(coll.remove({}, {multi: true}));
-assert.gt(countOpYields(coll, 'remove'), (nDocsToInsert / worksPerYield) - 2);
+assert.gt(countOpYields(coll, "remove"), nDocsToInsert / worksPerYield - 2);
 
 MongoRunner.stopMongod(mongod);

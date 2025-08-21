@@ -10,13 +10,9 @@
  * ]
  */
 
-import {
-    withRetryOnTransientTxnErrorIncrementTxnNum
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnErrorIncrementTxnNum} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
+import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // 2 shards single node, 1 mongos, 1 config server 3-node
 const st = new ShardingTest({});
@@ -28,7 +24,12 @@ const splitPoint = 0;
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // the splitpoint and Shard 1 >= splitpoint.
 WriteWithoutShardKeyTestUtil.setupShardedCollection(
-    st, nss, {x: 1}, [{x: splitPoint}], [{query: {x: splitPoint}, shard: st.shard1.shardName}]);
+    st,
+    nss,
+    {x: 1},
+    [{x: splitPoint}],
+    [{query: {x: splitPoint}, shard: st.shard1.shardName}],
+);
 
 const testCases = [
     {
@@ -45,9 +46,9 @@ const testCases = [
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
-        expectedMods: [{'x': -1}, {'y': 7}],
+        expectedMods: [{"x": -1}, {"y": 7}],
         upsertRequired: true,
     },
     {
@@ -64,9 +65,9 @@ const testCases = [
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
-        expectedMods: [{'a': 0}, {'x': 5}, {'y': 3}],
+        expectedMods: [{"a": 0}, {"x": 5}, {"y": 3}],
         upsertRequired: true,
     },
     {
@@ -83,9 +84,9 @@ const testCases = [
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
-        expectedMods: [{'a': 0}],
+        expectedMods: [{"a": 0}],
         upsertRequired: true,
     },
     {
@@ -100,9 +101,9 @@ const testCases = [
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
-        expectedMods: [{'x': -1}, {'y': 7}],
+        expectedMods: [{"x": -1}, {"y": 7}],
         upsertRequired: true,
     },
     {
@@ -117,9 +118,9 @@ const testCases = [
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
-        expectedMods: [{'a': 0}, {'x': 5}, {'y': 3}],
+        expectedMods: [{"a": 0}, {"x": 5}, {"y": 3}],
         upsertRequired: true,
     },
     {
@@ -134,9 +135,9 @@ const testCases = [
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
-        expectedMods: [{'a': 1}],
+        expectedMods: [{"a": 1}],
         upsertRequired: true,
     },
     {
@@ -145,19 +146,21 @@ const testCases = [
             _clusterQueryWithoutShardKey: 1,
             writeCmd: {
                 update: collectionName,
-                updates: [{
-                    q: {x: ["bar", "BAR", "foo"]},
-                    u: {$set: {'x.$[b]': 'FOO'}},
-                    upsert: true,
-                    arrayFilters: [{'b': {$eq: 'bar'}}],
-                    collation: {locale: 'en_US', strength: 2},
-                }],
+                updates: [
+                    {
+                        q: {x: ["bar", "BAR", "foo"]},
+                        u: {$set: {"x.$[b]": "FOO"}},
+                        upsert: true,
+                        arrayFilters: [{"b": {$eq: "bar"}}],
+                        collation: {locale: "en_US", strength: 2},
+                    },
+                ],
             },
             stmtId: NumberInt(0),
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
         expectedMods: [{x: ["FOO", "FOO", "foo"]}],
         upsertRequired: true,
@@ -174,7 +177,7 @@ const testCases = [
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
         expectedMods: [],
         upsertRequired: false,
@@ -191,7 +194,7 @@ const testCases = [
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
         errorCode: ErrorCodes.FailedToParse,
     },
@@ -209,25 +212,24 @@ const testCases = [
             txnNumber: NumberLong(0),
             lsid: {id: UUID()},
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         },
         errorCode: ErrorCodes.ImmutableField,
     },
 ];
 
-testCases.forEach(testCase => {
-    jsTest.log(testCase.logMessage + '\n' + tojson(testCase.cmdObj));
+testCases.forEach((testCase) => {
+    jsTest.log(testCase.logMessage + "\n" + tojson(testCase.cmdObj));
 
     let txnNumber = 0;
     withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
         testCase.cmdObj.txnNumber = NumberLong(txnNum);
         if (testCase.errorCode) {
-            assert.commandFailedWithCode(st.getDB(dbName).runCommand(testCase.cmdObj),
-                                         testCase.errorCode);
+            assert.commandFailedWithCode(st.getDB(dbName).runCommand(testCase.cmdObj), testCase.errorCode);
         } else {
             const res = assert.commandWorked(st.getDB(dbName).runCommand(testCase.cmdObj));
             assert.eq(res.upsertRequired, testCase.upsertRequired, res);
-            testCase.expectedMods.forEach(mod => {
+            testCase.expectedMods.forEach((mod) => {
                 let field = Object.keys(mod)[0];
                 assert.eq(res.targetDoc[field], mod[field]);
             });

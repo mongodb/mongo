@@ -1,17 +1,15 @@
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
-export var fsm = (function() {
-    const kIsRunningInsideTransaction = Symbol('isRunningInsideTransaction');
+export var fsm = (function () {
+    const kIsRunningInsideTransaction = Symbol("isRunningInsideTransaction");
 
     function forceRunningOutsideTransaction(data) {
         if (data[kIsRunningInsideTransaction]) {
-            const err =
-                new Error('Intentionally thrown to stop state function from running inside of a' +
-                          ' multi-statement transaction');
+            const err = new Error(
+                "Intentionally thrown to stop state function from running inside of a" + " multi-statement transaction",
+            );
             err.isNotSupported = true;
             throw err;
         }
@@ -49,7 +47,7 @@ export var fsm = (function() {
             // In order to ensure that all operations performed by a worker thread happen on the
             // same session, we override the "_defaultSession" property of the connections in the
             // cache to be the same as the session underlying 'args.db'.
-            const makeNewConnWithExistingSession = function(connStr) {
+            const makeNewConnWithExistingSession = function (connStr) {
                 // We may fail to connect if the continuous stepdown thread had just terminated
                 // or killed a primary. We therefore use the connect() function defined in
                 // network_error_and_transaction_override.js to add automatic retries to
@@ -63,23 +61,21 @@ export var fsm = (function() {
                 let res;
                 assert.soonNoExcept(
                     () => {
-                        res = conn.getDB('admin').runCommand({isMaster: 1});
+                        res = conn.getDB("admin").runCommand({isMaster: 1});
                         return true;
                     },
                     "Failed to establish a connection to the replica set",
-                    undefined,  // default timeout is 10 mins
-                    2 * 1000);  // retry on a 2 second interval
+                    undefined, // default timeout is 10 mins
+                    2 * 1000,
+                ); // retry on a 2 second interval
 
                 assert.commandWorked(res);
-                assert.eq('string',
-                          typeof res.setName,
-                          () => `not connected to a replica set: ${tojson(res)}`);
+                assert.eq("string", typeof res.setName, () => `not connected to a replica set: ${tojson(res)}`);
                 return res.setName;
             };
 
             const makeReplSetConnWithExistingSession = (connStrList, replSetName) => {
-                let connStr = `mongodb://${connStrList.join(',')}/?appName=tid:${
-                    args.tid}&replicaSet=${replSetName}`;
+                let connStr = `mongodb://${connStrList.join(",")}/?appName=tid:${args.tid}&replicaSet=${replSetName}`;
                 if (jsTestOptions().shellGRPC) {
                     connStr += "&grpc=false";
                 }
@@ -87,17 +83,18 @@ export var fsm = (function() {
             };
 
             // Config shard conn strings do not use gRPC.
-            const kNonGrpcConnStr = (connStr) => jsTestOptions().shellGRPC
-                ? `mongodb://${connStr}/?grpc=false`
-                : `mongodb://${connStr}`;
+            const kNonGrpcConnStr = (connStr) =>
+                jsTestOptions().shellGRPC ? `mongodb://${connStr}/?grpc=false` : `mongodb://${connStr}`;
 
-            connCache =
-                {mongos: [], config: [], shards: {}, rsConns: {config: undefined, shards: {}}};
+            connCache = {mongos: [], config: [], shards: {}, rsConns: {config: undefined, shards: {}}};
             connCache.mongos = args.cluster.mongos.map(makeNewConnWithExistingSession);
-            connCache.config = args.cluster.config.map(connStr => kNonGrpcConnStr(connStr))
-                                   .map(makeNewConnWithExistingSession);
+            connCache.config = args.cluster.config
+                .map((connStr) => kNonGrpcConnStr(connStr))
+                .map(makeNewConnWithExistingSession);
             connCache.rsConns.config = makeReplSetConnWithExistingSession(
-                args.cluster.config, getReplSetName(connCache.config[0]));
+                args.cluster.config,
+                getReplSetName(connCache.config[0]),
+            );
 
             // We set _isConfigServer=true on the Mongo connection object so
             // set_read_preference_secondary.js knows to avoid overriding the read preference as the
@@ -106,12 +103,14 @@ export var fsm = (function() {
 
             var shardNames = Object.keys(args.cluster.shards);
 
-            shardNames.forEach(name => {
+            shardNames.forEach((name) => {
                 connCache.shards[name] = args.cluster.shards[name]
-                                             .map(connStr => kNonGrpcConnStr(connStr))
-                                             .map(makeNewConnWithExistingSession);
+                    .map((connStr) => kNonGrpcConnStr(connStr))
+                    .map(makeNewConnWithExistingSession);
                 connCache.rsConns.shards[name] = makeReplSetConnWithExistingSession(
-                    args.cluster.shards[name], getReplSetName(connCache.shards[name][0]));
+                    args.cluster.shards[name],
+                    getReplSetName(connCache.shards[name][0]),
+                );
             });
         }
 
@@ -122,7 +121,7 @@ export var fsm = (function() {
 
             var fn = args.states[currentState];
 
-            assert.eq('function', typeof fn, 'states.' + currentState + ' is not a function');
+            assert.eq("function", typeof fn, "states." + currentState + " is not a function");
 
             if (TestData.runInsideTransaction) {
                 try {
@@ -130,33 +129,37 @@ export var fsm = (function() {
                     // transaction so that if the transaction aborts, then we haven't speculatively
                     // modified the thread-local state.
                     let data;
-                    withTxnAndAutoRetry(args.db.getSession(), () => {
-                        data = TxnUtil.deepCopyObject({}, args.data);
-                        data[kIsRunningInsideTransaction] = true;
+                    withTxnAndAutoRetry(
+                        args.db.getSession(),
+                        () => {
+                            data = TxnUtil.deepCopyObject({}, args.data);
+                            data[kIsRunningInsideTransaction] = true;
 
-                        // The state function is given a Proxy object to the connection cache which
-                        // intercepts property accesses (e.g. `connCacheProxy.rsConns`) and causes
-                        // the state function to fall back to being called outside of
-                        // withTxnAndAutoRetry() as if an operation within the transaction had
-                        // failed with OperationNotSupportedInTransaction or InvalidOptions. Usage
-                        // of the connection cache isn't compatible with
-                        // `TestData.runInsideTransaction === true`. This is because the
-                        // withTxnAndAutoRetry() function isn't aware of transactions started
-                        // directly on replica set shards or the config server replica set to
-                        // automatically commit them and leaked transactions would stall the test
-                        // indefinitely.
-                        let connCacheProxy;
-                        if (connCache !== undefined) {
-                            connCacheProxy = new Proxy(connCache, {
-                                get: function(target, prop, receiver) {
-                                    forceRunningOutsideTransaction(data);
-                                    return target[prop];
-                                }
-                            });
-                        }
+                            // The state function is given a Proxy object to the connection cache which
+                            // intercepts property accesses (e.g. `connCacheProxy.rsConns`) and causes
+                            // the state function to fall back to being called outside of
+                            // withTxnAndAutoRetry() as if an operation within the transaction had
+                            // failed with OperationNotSupportedInTransaction or InvalidOptions. Usage
+                            // of the connection cache isn't compatible with
+                            // `TestData.runInsideTransaction === true`. This is because the
+                            // withTxnAndAutoRetry() function isn't aware of transactions started
+                            // directly on replica set shards or the config server replica set to
+                            // automatically commit them and leaked transactions would stall the test
+                            // indefinitely.
+                            let connCacheProxy;
+                            if (connCache !== undefined) {
+                                connCacheProxy = new Proxy(connCache, {
+                                    get: function (target, prop, receiver) {
+                                        forceRunningOutsideTransaction(data);
+                                        return target[prop];
+                                    },
+                                });
+                            }
 
-                        fn.call(data, args.db, args.collName, connCacheProxy);
-                    }, {retryOnKilledSession: args.data.retryOnKilledSession});
+                            fn.call(data, args.db, args.collName, connCacheProxy);
+                        },
+                        {retryOnKilledSession: args.data.retryOnKilledSession},
+                    );
                     delete data[kIsRunningInsideTransaction];
                     args.data = data;
                 } catch (e) {
@@ -181,10 +184,8 @@ export var fsm = (function() {
                 fn.call(args.data, args.db, args.collName, connCache);
             }
 
-            assert(args.transitions.hasOwnProperty(currentState),
-                   `No transitions defined for state: ${currentState}`);
-            const nextState =
-                getWeightedRandomChoice(args.transitions[currentState], Random.rand());
+            assert(args.transitions.hasOwnProperty(currentState), `No transitions defined for state: ${currentState}`);
+            const nextState = getWeightedRandomChoice(args.transitions[currentState], Random.rand());
             currentState = nextState;
         }
 
@@ -206,22 +207,22 @@ export var fsm = (function() {
         assert.lt(randVal, 1);
 
         var states = Object.keys(doc);
-        assert.gt(states.length, 0, 'transition must have at least one state to transition to');
+        assert.gt(states.length, 0, "transition must have at least one state to transition to");
 
         // weights = [ 0.25, 0.5, 0.25 ]
         // => accumulated = [ 0.25, 0.75, 1 ]
-        var weights = states.map(function(k) {
+        var weights = states.map(function (k) {
             return doc[k];
         });
 
         var accumulated = [];
-        var sum = weights.reduce(function(a, b, i) {
+        var sum = weights.reduce(function (a, b, i) {
             accumulated[i] = a + b;
             return accumulated[i];
         }, 0);
 
         // Scale the random value by the sum of the weights
-        randVal *= sum;  // ~ U[0, sum)
+        randVal *= sum; // ~ U[0, sum)
 
         // Find the state corresponding to randVal
         for (var i = 0; i < accumulated.length; ++i) {
@@ -229,7 +230,7 @@ export var fsm = (function() {
                 return states[i];
             }
         }
-        assert(false, 'not reached');
+        assert(false, "not reached");
     }
 
     return {

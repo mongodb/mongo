@@ -54,17 +54,16 @@ replSet.stop(secondary);
         // entries since the last shutdown. This "smooths out" a race condition in this test where
         // the secondary can shut down without fully applying the 'startIndexBuild' oplog entry, and
         // not advancing the stable timestamp to the top of the oplog.
-        {setParameter: 'recoverFromOplogAsStandalone=true'});
-    IndexBuildTest.assertIndexes(mongod.getDB(dbName).getCollection(collName),
-                                 2,
-                                 ["_id_"],
-                                 ["a_1"],
-                                 {includeBuildUUIDs: true});
+        {setParameter: "recoverFromOplogAsStandalone=true"},
+    );
+    IndexBuildTest.assertIndexes(mongod.getDB(dbName).getCollection(collName), 2, ["_id_"], ["a_1"], {
+        includeBuildUUIDs: true,
+    });
     MongoRunner.stopMongod(mongod);
 })();
 
 const exitCode = createIdx({checkExitSuccess: false});
-assert.neq(0, exitCode, 'expected shell to exit abnormally due to shutdown');
+assert.neq(0, exitCode, "expected shell to exit abnormally due to shutdown");
 
 const secondaryCollFile = secondaryDbpath + "/" + secondaryCollUri + ".wt";
 jsTestLog("Corrupting secondary collection file: " + secondaryCollFile);
@@ -75,26 +74,30 @@ assertRepairSucceeds(secondaryDbpath, secondaryPort);
 (function startAsStandaloneAfterRepair() {
     jsTestLog("Starting secondary as standalone after repair");
     const mongod = startMongodOnExistingPath(secondaryDbpath);
-    IndexBuildTest.assertIndexes(
-        mongod.getDB(dbName).getCollection(collName), 1, ["_id_"], [], {includeBuildUUIDs: true});
+    IndexBuildTest.assertIndexes(mongod.getDB(dbName).getCollection(collName), 1, ["_id_"], [], {
+        includeBuildUUIDs: true,
+    });
     MongoRunner.stopMongod(mongod);
 })();
 
 // The secondary may not be reintroduced because data was modified.
-assertErrorOnStartupWhenStartingAsReplSet(
-    secondaryDbpath, secondaryPort, replSet.getReplSetConfig()._id);
+assertErrorOnStartupWhenStartingAsReplSet(secondaryDbpath, secondaryPort, replSet.getReplSetConfig()._id);
 
 (function reSyncSecondary() {
     jsTestLog("Wiping dbpath and re-syncing secondary");
     const newSecondary = assertStartInReplSet(
-        replSet, secondary, true /* cleanData */, true /* expectResync */, function(node) {});
+        replSet,
+        secondary,
+        true /* cleanData */,
+        true /* expectResync */,
+        function (node) {},
+    );
 
     IndexBuildTest.resumeIndexBuilds(primary);
     IndexBuildTest.waitForIndexBuildToStop(primaryDB);
     replSet.awaitReplication();
     IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", "a_1"]);
-    IndexBuildTest.assertIndexes(
-        newSecondary.getDB(dbName).getCollection(collName), 2, ["_id_", "a_1"]);
+    IndexBuildTest.assertIndexes(newSecondary.getDB(dbName).getCollection(collName), 2, ["_id_", "a_1"]);
 })();
 
 replSet.stopSet();

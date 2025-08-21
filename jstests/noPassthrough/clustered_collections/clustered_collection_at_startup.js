@@ -21,8 +21,7 @@ replSet.initiate();
     assert.neq(null, conn, "mongod was unable to start up");
 
     const testDB = conn.getDB("test");
-    assert.commandWorked(
-        testDB.createCollection(coll, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    assert.commandWorked(testDB.createCollection(coll, {clusteredIndex: {key: {_id: 1}, unique: true}}));
     assert.commandWorked(testDB[coll].insert({_id: 0, a: 2}));
 
     replSet.restart(conn);

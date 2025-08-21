@@ -30,10 +30,7 @@ import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/co
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
-import {
-    runDeoptimized,
-    testProperty
-} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {runDeoptimized, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 
 if (isSlowBuild(db)) {
@@ -71,22 +68,22 @@ function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
             if (res.err && res.err !== ErrorCodes.NoQueryExecutionPlans) {
                 return {
                     passed: false,
-                    message: 'Hinting index led to unexpected error.',
+                    message: "Hinting index led to unexpected error.",
                     query,
                     error: res.err,
-                    index
+                    index,
                 };
             } else if (res.docs && !testHelpers.comp(controlResults, res.docs)) {
                 return {
                     passed: false,
                     message:
-                        'Query results from hinted experiment collection did not match plain collection using collscan.',
+                        "Query results from hinted experiment collection did not match plain collection using collscan.",
                     query,
                     index,
                     explain: experimentColl.explain().aggregate(query, {hint: index.name}),
                     controlResults,
                     docsInCollection: controlColl.find().toArray(),
-                    experimentalResults: res.docs
+                    experimentalResults: res.docs,
                 };
             }
         }
@@ -102,9 +99,9 @@ testProperty(
     {controlColl, experimentColl},
     // Hinting a partial index can return incorrect results due to SERVER-26413.
     // TODO SERVER-26413 re-enable partial index coverage.
-    makeWorkloadModel(
-        {collModel: getCollectionModel({allowPartialIndexes: false}), aggModel, numQueriesPerRun}),
-    numRuns);
+    makeWorkloadModel({collModel: getCollectionModel({allowPartialIndexes: false}), aggModel, numQueriesPerRun}),
+    numRuns,
+);
 
 // TODO SERVER-103381 re-enable timeseries PBT testing.
 // Test with a TS collection.

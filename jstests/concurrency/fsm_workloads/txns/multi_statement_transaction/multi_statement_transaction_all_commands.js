@@ -7,7 +7,7 @@ import {cleanupOnLastIteration} from "jstests/concurrency/fsm_workload_helpers/c
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 import {kSnapshotErrors} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
-export const $config = (function() {
+export const $config = (function () {
     function quietly(func) {
         const printOriginal = print;
         try {
@@ -48,7 +48,7 @@ export const $config = (function() {
                 const txnCompletedErrorCodes = [
                     ErrorCodes.TransactionTooOld,
                     ErrorCodes.NoSuchTransaction,
-                    ErrorCodes.TransactionCommitted
+                    ErrorCodes.TransactionCommitted,
                 ];
                 if (TestData.testingReplicaSetEndpoint) {
                     // The replica set endpoint uses embedded router, which yields sessions before
@@ -59,23 +59,23 @@ export const $config = (function() {
                     txnCompletedErrorCodes.push(51113);
                 }
 
-                if (txnCompletedErrorCodes.includes(errorCode) ||
-                    kSnapshotErrors.includes(errorCode)) {
+                if (txnCompletedErrorCodes.includes(errorCode) || kSnapshotErrors.includes(errorCode)) {
                     // We pass `ignoreActiveTxn = true` to startTransaction so that we will not
                     // throw `Transaction already in progress on this session` when trying to start
                     // a new transaction on this client session that already has an active
                     // transaction on it. We instead will catch the ConflictingOperationInProgress
                     // error that the server later throws, and will re-run the command with
                     // 'startTransaction = false' so that we join the already running transaction.
-                    data.session.startTransaction_forTesting({readConcern: {level: 'snapshot'}},
-                                                             {ignoreActiveTxn: true});
+                    data.session.startTransaction_forTesting(
+                        {readConcern: {level: "snapshot"}},
+                        {ignoreActiveTxn: true},
+                    );
                     data.txnNumber++;
                     joinAndRetry = true;
                     continue;
                 }
 
-                if (TxnUtil.isTransientTransactionError(e) ||
-                    errorCode === ErrorCodes.ConflictingOperationInProgress) {
+                if (TxnUtil.isTransientTransactionError(e) || errorCode === ErrorCodes.ConflictingOperationInProgress) {
                     joinAndRetry = true;
                     continue;
                 }
@@ -86,39 +86,43 @@ export const $config = (function() {
     }
 
     const states = {
-
         init: function init(db, collName) {
             this.session = db.getMongo().startSession({causalConsistency: true});
             this.sessionDb = this.session.getDatabase(db.getName());
             this.iteration = 1;
 
-            this.session.startTransaction_forTesting({readConcern: {level: 'snapshot'}});
+            this.session.startTransaction_forTesting({readConcern: {level: "snapshot"}});
             this.txnNumber = 0;
         },
 
         runFindAndModify: function runFindAndModify(db, collName) {
             autoRetryTxn(this, () => {
                 const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-                assert.commandWorked(collection.runCommand(
-                    'findAndModify', {query: {_id: this.tid}, update: {$inc: {x: 1}}, new: true}));
+                assert.commandWorked(
+                    collection.runCommand("findAndModify", {query: {_id: this.tid}, update: {$inc: {x: 1}}, new: true}),
+                );
             });
         },
 
         runUpdate: function runUpdate(db, collName) {
             autoRetryTxn(this, () => {
                 const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-                assert.commandWorked(collection.runCommand('update', {
-                    updates: [{q: {_id: this.tid}, u: {$inc: {x: 1}}}],
-                }));
+                assert.commandWorked(
+                    collection.runCommand("update", {
+                        updates: [{q: {_id: this.tid}, u: {$inc: {x: 1}}}],
+                    }),
+                );
             });
         },
 
         runDelete: function runDelete(db, collName) {
             autoRetryTxn(this, () => {
                 const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-                assert.commandWorked(collection.runCommand('delete', {
-                    deletes: [{q: {_id: this.tid}, limit: 1}],
-                }));
+                assert.commandWorked(
+                    collection.runCommand("delete", {
+                        deletes: [{q: {_id: this.tid}, limit: 1}],
+                    }),
+                );
             });
         },
 
@@ -139,19 +143,22 @@ export const $config = (function() {
             do {
                 try {
                     shouldJoin = false;
-                    quietly(() =>
-                                assert.commandWorked(this.session.commitTransaction_forTesting()));
+                    quietly(() => assert.commandWorked(this.session.commitTransaction_forTesting()));
                 } catch (e) {
-                    if (e.code === ErrorCodes.TransactionTooOld ||
+                    if (
+                        e.code === ErrorCodes.TransactionTooOld ||
                         e.code === ErrorCodes.TransactionCommitted ||
-                        e.code === ErrorCodes.NoSuchTransaction) {
+                        e.code === ErrorCodes.NoSuchTransaction
+                    ) {
                         // If we get TransactionTooOld, TransactionCommitted, or NoSuchTransaction
                         // we do not try to commit this transaction.
                         break;
                     }
 
-                    if (TxnUtil.isTransientTransactionError(e) ||
-                        e.code === ErrorCodes.ConflictingOperationInProgress) {
+                    if (
+                        TxnUtil.isTransientTransactionError(e) ||
+                        e.code === ErrorCodes.ConflictingOperationInProgress
+                    ) {
                         shouldJoin = true;
                         continue;
                     }
@@ -160,7 +167,7 @@ export const $config = (function() {
                 }
             } while (shouldJoin);
 
-            this.session.startTransaction_forTesting({readConcern: {level: 'snapshot'}});
+            this.session.startTransaction_forTesting({readConcern: {level: "snapshot"}});
             this.txnNumber++;
         },
     };
@@ -168,7 +175,7 @@ export const $config = (function() {
     // Wrap each state in a cleanupOnLastIteration() invocation.
     for (let stateName of Object.keys(states)) {
         const stateFn = states[stateName];
-        states[stateName] = function(db, collName) {
+        states[stateName] = function (db, collName) {
             cleanupOnLastIteration(this, () => stateFn.apply(this, arguments));
         };
     }
@@ -181,45 +188,44 @@ export const $config = (function() {
             bulk.insert({_id: i, x: i});
         }
 
-        const res = bulk.execute({w: 'majority'});
+        const res = bulk.execute({w: "majority"});
         assert.commandWorked(res);
         assert.eq(this.numDocs, res.nInserted);
     }
 
-    function teardown(db, collName, cluster) {
-    }
+    function teardown(db, collName, cluster) {}
 
     const transitions = {
-        init: {runFindAndModify: .25, runUpdate: .25, runDelete: .25, runFindAndGetMore: .25},
+        init: {runFindAndModify: 0.25, runUpdate: 0.25, runDelete: 0.25, runFindAndGetMore: 0.25},
         runFindAndModify: {
-            runFindAndModify: .2,
-            runUpdate: .2,
-            runDelete: .2,
-            runFindAndGetMore: .2,
-            commitTxn: .2
+            runFindAndModify: 0.2,
+            runUpdate: 0.2,
+            runDelete: 0.2,
+            runFindAndGetMore: 0.2,
+            commitTxn: 0.2,
         },
         runUpdate: {
-            runFindAndModify: .2,
-            runUpdate: .2,
-            runDelete: .2,
-            runFindAndGetMore: .2,
-            commitTxn: .2
+            runFindAndModify: 0.2,
+            runUpdate: 0.2,
+            runDelete: 0.2,
+            runFindAndGetMore: 0.2,
+            commitTxn: 0.2,
         },
         runDelete: {
-            runFindAndModify: .2,
-            runUpdate: .2,
-            runDelete: .2,
-            runFindAndGetMore: .2,
-            commitTxn: .2
+            runFindAndModify: 0.2,
+            runUpdate: 0.2,
+            runDelete: 0.2,
+            runFindAndGetMore: 0.2,
+            commitTxn: 0.2,
         },
         runFindAndGetMore: {
-            runFindAndModify: .2,
-            runUpdate: .2,
-            runDelete: .2,
-            runFindAndGetMore: .2,
-            commitTxn: .2
+            runFindAndModify: 0.2,
+            runUpdate: 0.2,
+            runDelete: 0.2,
+            runFindAndGetMore: 0.2,
+            commitTxn: 0.2,
         },
-        commitTxn: {runFindAndModify: .25, runUpdate: .25, runDelete: .25, runFindAndGetMore: .25},
+        commitTxn: {runFindAndModify: 0.25, runUpdate: 0.25, runDelete: 0.25, runFindAndGetMore: 0.25},
     };
 
     return {
@@ -232,6 +238,6 @@ export const $config = (function() {
             ignoreActiveTxn: false,
         },
         setup: setup,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

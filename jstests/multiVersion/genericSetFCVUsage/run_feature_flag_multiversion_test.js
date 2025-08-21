@@ -21,11 +21,11 @@ function runTest(downgradeFCV) {
 
     let primary = rst.getPrimary();
     let adminDB = primary.getDB("admin");
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
+    assert.commandWorked(primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
     assert.commandFailedWithCode(
         adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
-        549181);
+        549181,
+    );
     checkFCV(adminDB, downgradeFCV, downgradeFCV);
     if (downgradeFCV === lastLTSFCV) {
         numLastLTSRuns++;
@@ -39,8 +39,7 @@ function runTest(downgradeFCV) {
 try {
     // We expect the test run to fail when using a non-existent feature flag.
     runFeatureFlagMultiversionTest("nonExistentFeatureFlag", runTest);
-} catch (error) {
-}
+} catch (error) {}
 
 // No tests should have been run when a non-existent feature flag is passed in.
 assert.eq(numLastLTSRuns, 0);

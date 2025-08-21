@@ -10,15 +10,14 @@
 // create a cluster with just one shard to ensure the test never blocks for another shard.
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const st = new ShardingTest(
-    {shards: 1, mongos: 1, rs: {nodes: 1, setParameter: {writePeriodicNoops: false}}});
+const st = new ShardingTest({shards: 1, mongos: 1, rs: {nodes: 1, setParameter: {writePeriodicNoops: false}}});
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
 (function testStartAfterInvalidate() {
     // Start a change stream that matches on the invalidate event.
-    const changeStream = mongosColl.watch([{'$match': {'operationType': 'invalidate'}}]);
+    const changeStream = mongosColl.watch([{"$match": {"operationType": "invalidate"}}]);
 
     // Create the collection by inserting into it and then drop the collection, thereby generating
     // an invalidate event.

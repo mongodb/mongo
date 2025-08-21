@@ -5,15 +5,7 @@
 const coll = db.jstests_in_with_mixed_values;
 
 // Exercise mixed regex and scalar integer cases.
-let docs = [
-    {x: 1},
-    {x: 2},
-    {x: 3},
-    {x: 'ab'},
-    {x: 'ac'},
-    {x: 'ad'},
-    {x: /^ab/},
-];
+let docs = [{x: 1}, {x: 2}, {x: 3}, {x: "ab"}, {x: "ac"}, {x: "ad"}, {x: /^ab/}];
 assert.commandWorked(coll.insert(docs));
 
 assert.eq(4, coll.find({x: {$in: [1, /^a/]}}).itcount());
@@ -32,16 +24,16 @@ docs = [
     {x: 1},
     {x: 2},
     {x: 3},
-    {x: 'ab'},
-    {x: 'ac'},
-    {x: 'ad'},
+    {x: "ab"},
+    {x: "ac"},
+    {x: "ad"},
     {x: [1]},
     {x: [1, 2]},
-    {x: [1, 'ab']},
-    {x: ['ac', 2]},
+    {x: [1, "ab"]},
+    {x: ["ac", 2]},
     {x: {y: 1}},
-    {x: {y: 'ab'}},
-    {x: {y: [99, {z: 1}]}}
+    {x: {y: "ab"}},
+    {x: {y: [99, {z: 1}]}},
 ];
 assert.commandWorked(coll.insert(docs));
 
@@ -49,40 +41,40 @@ assert.eq(8, coll.find({x: {$in: [1, /^a/]}}).itcount());
 assert.eq(7, coll.find({x: {$in: [2, /^a/]}}).itcount());
 assert.eq(6, coll.find({x: {$in: [[1, 2], /^a/]}}).itcount());
 assert.eq(5, coll.find({x: {$in: [/^a/]}}).itcount());
-assert.eq(1, coll.find({'x.y': {$in: [1, 2]}}).itcount());
-assert.eq(2, coll.find({'x.y': {$in: [1, /^a/]}}).itcount());
-assert.eq(1, coll.find({'x': {$in: [{y: 1}, /^z/]}}).itcount());
-assert.eq(0, coll.find({'x': {$in: [{z: 1}, /^z/]}}).itcount());
-assert.eq(0, coll.find({'x': {$in: [{y: 99}, /^z/]}}).itcount());
-assert.eq(1, coll.find({'x.y': {$in: [{z: 10}, {z: 1}, /^z/]}}).itcount());
-assert.eq(0, coll.find({'x.y': {$in: [{z: 10}, {z: 11}, /^z/]}}).itcount());
+assert.eq(1, coll.find({"x.y": {$in: [1, 2]}}).itcount());
+assert.eq(2, coll.find({"x.y": {$in: [1, /^a/]}}).itcount());
+assert.eq(1, coll.find({"x": {$in: [{y: 1}, /^z/]}}).itcount());
+assert.eq(0, coll.find({"x": {$in: [{z: 1}, /^z/]}}).itcount());
+assert.eq(0, coll.find({"x": {$in: [{y: 99}, /^z/]}}).itcount());
+assert.eq(1, coll.find({"x.y": {$in: [{z: 10}, {z: 1}, /^z/]}}).itcount());
+assert.eq(0, coll.find({"x.y": {$in: [{z: 10}, {z: 11}, /^z/]}}).itcount());
 
 // Exercise dotted field paths with mixed scalar integers, strings and regular expressions.
 docs = [
     {x: 1, y: {z: 1}},
     {x: 1, y: {z: 2}},
     {x: 1, y: {z: 3}},
-    {x: 2, y: {z: 'ab'}},
-    {x: 2, y: {z: 'ac'}},
-    {x: 2, y: {z: 'ad'}},
+    {x: 2, y: {z: "ab"}},
+    {x: 2, y: {z: "ac"}},
+    {x: 2, y: {z: "ad"}},
 ];
 assert.commandWorked(coll.insert(docs));
 
-assert.eq(4, coll.find({'y.z': {$in: [1, /^a/]}}).itcount());
-assert.eq(4, coll.find({'y.z': {$in: [/^a/, 1]}}).itcount());
-assert.eq(2, coll.find({'y.z': {$in: [1, /^ab/]}}).itcount());
-assert.eq(3, coll.find({'y.z': {$in: [1, 2, /^ab/]}}).itcount());
-assert.eq(4, coll.find({'y.z': {$in: [1, 2, 3, /^ab/]}}).itcount());
-assert.eq(5, coll.find({'y.z': {$in: [1, 2, 3, /^ab/, /^ac/]}}).itcount());
-assert.eq(6, coll.find({'y.z': {$in: [1, 2, 3, /^a/]}}).itcount());
-assert.eq(6, coll.find({'y.z': {$in: [/^a/, 1, 2, 3]}}).itcount());
-assert.eq(6, coll.find({'y.z': {$in: ["ab", "ac", "ad", 1, 2, 3]}}).itcount());
-assert.eq(5, coll.find({'y.z': {$in: ["ac", "ad", 1, 2, 3]}}).itcount());
-assert.eq(4, coll.find({'y.z': {$in: ["ad", 1, 2, 3]}}).itcount());
-assert.eq(3, coll.find({'y.z': {$in: ["ad", /^a/]}}).itcount());
-assert.eq(0, coll.find({'y.z': {$in: ["foo", 999]}}).itcount());
-assert.eq(0, coll.find({'y.z': {$in: [999, /no/]}}).itcount());
-assert.eq(0, coll.find({'y.z': {$in: ["bar", /0-9/]}}).itcount());
+assert.eq(4, coll.find({"y.z": {$in: [1, /^a/]}}).itcount());
+assert.eq(4, coll.find({"y.z": {$in: [/^a/, 1]}}).itcount());
+assert.eq(2, coll.find({"y.z": {$in: [1, /^ab/]}}).itcount());
+assert.eq(3, coll.find({"y.z": {$in: [1, 2, /^ab/]}}).itcount());
+assert.eq(4, coll.find({"y.z": {$in: [1, 2, 3, /^ab/]}}).itcount());
+assert.eq(5, coll.find({"y.z": {$in: [1, 2, 3, /^ab/, /^ac/]}}).itcount());
+assert.eq(6, coll.find({"y.z": {$in: [1, 2, 3, /^a/]}}).itcount());
+assert.eq(6, coll.find({"y.z": {$in: [/^a/, 1, 2, 3]}}).itcount());
+assert.eq(6, coll.find({"y.z": {$in: ["ab", "ac", "ad", 1, 2, 3]}}).itcount());
+assert.eq(5, coll.find({"y.z": {$in: ["ac", "ad", 1, 2, 3]}}).itcount());
+assert.eq(4, coll.find({"y.z": {$in: ["ad", 1, 2, 3]}}).itcount());
+assert.eq(3, coll.find({"y.z": {$in: ["ad", /^a/]}}).itcount());
+assert.eq(0, coll.find({"y.z": {$in: ["foo", 999]}}).itcount());
+assert.eq(0, coll.find({"y.z": {$in: [999, /no/]}}).itcount());
+assert.eq(0, coll.find({"y.z": {$in: ["bar", /0-9/]}}).itcount());
 assert(coll.drop());
 
 // Exercise binary and other types.

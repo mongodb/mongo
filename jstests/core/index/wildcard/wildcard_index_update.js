@@ -19,7 +19,7 @@ assert.commandWorked(coll.createIndex({"a.b.c.d.$**": 1, "other": 1}));
 assert.commandWorked(coll.createIndex({"pre": 1, "a.b.c.d.$**": 1, "other": 1}));
 assert.commandWorked(coll.createIndex({"pre": 1, "a.b.c.d.$**": -1}));
 
-const validate = function() {
+const validate = function () {
     const validateRes = coll.validate({full: true});
     assert.eq(validateRes.valid, true, tojson(validateRes));
 };

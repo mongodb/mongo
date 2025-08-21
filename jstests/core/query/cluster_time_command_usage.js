@@ -17,7 +17,8 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
         assert.commandFailedWithCode(
             testDB.runCommand({find: collName, filter: {}, projection: {"a": "$$CLUSTER_TIME"}}),
             10071200,
-            "system variable $$CLUSTER_TIME is not available in standalone mode");
+            "system variable $$CLUSTER_TIME is not available in standalone mode",
+        );
     } else {
         // Assert that the $$CLUSTER_TIME is available in queries in replica set or sharded cluster.
         assert.eq(1, coll.find({}, {"a": "$$CLUSTER_TIME"}).itcount());
@@ -32,13 +33,14 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
         assert.commandFailedWithCode(
             testDB.runCommand({find: collName, filter: {}, projection: {"a": "$$CLUSTER_TIME"}}),
             10071200,
-            "system variable $$CLUSTER_TIME is not available in standalone mode");
+            "system variable $$CLUSTER_TIME is not available in standalone mode",
+        );
 
         assert.commandFailedWithCode(
-            testDB.runCommand(
-                {aggregate: collName, pipeline: [{$project: {"a": "$$CLUSTER_TIME"}}], cursor: {}}),
+            testDB.runCommand({aggregate: collName, pipeline: [{$project: {"a": "$$CLUSTER_TIME"}}], cursor: {}}),
             10071200,
-            "system variable $$CLUSTER_TIME is not available in standalone mode");
+            "system variable $$CLUSTER_TIME is not available in standalone mode",
+        );
     } else {
         assert.eq(1, coll.find({}, {"a": "$$CLUSTER_TIME"}).itcount());
     }

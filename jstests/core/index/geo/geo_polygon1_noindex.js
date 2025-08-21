@@ -11,25 +11,42 @@ for (let x = 1; x < 9; x++) {
     }
 }
 
-let triangle = [[0, 0], [1, 1], [0, 2]];
+let triangle = [
+    [0, 0],
+    [1, 1],
+    [0, 2],
+];
 
 // Look at only a small slice of the data within a triangle
 assert.eq(1, t.find({loc: {"$within": {"$polygon": triangle}}}).count(), "Triangle Test");
 
-let boxBounds = [[0, 0], [0, 10], [10, 10], [10, 0]];
+let boxBounds = [
+    [0, 0],
+    [0, 10],
+    [10, 10],
+    [10, 0],
+];
 
 assert.eq(num, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Bounding Box Test");
 
 // Make sure we can add object-based polygons
-assert.eq(num,
-          t.find({
-               loc: {$within: {$polygon: {a: [-10, -10], b: [-10, 10], c: [10, 10], d: [10, -10]}}}
-           }).count());
+assert.eq(
+    num,
+    t
+        .find({
+            loc: {$within: {$polygon: {a: [-10, -10], b: [-10, 10], c: [10, 10], d: [10, -10]}}},
+        })
+        .count(),
+);
 
 // Look in a box much bigger than the one we have data in
-boxBounds = [[-100, -100], [-100, 100], [100, 100], [100, -100]];
-assert.eq(
-    num, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Big Bounding Box Test");
+boxBounds = [
+    [-100, -100],
+    [-100, 100],
+    [100, 100],
+    [100, -100],
+];
+assert.eq(num, t.find({loc: {"$within": {"$polygon": boxBounds}}}).count(), "Big Bounding Box Test");
 
 t.drop();
 
@@ -37,20 +54,20 @@ let pacman = [
     [0, 2],
     [0, 4],
     [2, 6],
-    [4, 6],  // Head
+    [4, 6], // Head
     [6, 4],
     [4, 3],
-    [6, 2],  // Mouth
+    [6, 2], // Mouth
     [4, 0],
-    [2, 0]  // Bottom
+    [2, 0], // Bottom
 ];
 
-assert.commandWorked(t.save({loc: [1, 3]}));  // Add a point that's in
+assert.commandWorked(t.save({loc: [1, 3]})); // Add a point that's in
 
 assert.eq(1, t.find({loc: {$within: {$polygon: pacman}}}).count(), "Pacman single point");
 
-t.save({loc: [5, 3]});   // Add a point that's out right in the mouth opening
-t.save({loc: [3, 7]});   // Add a point above the center of the head
-t.save({loc: [3, -1]});  // Add a point below the center of the bottom
+t.save({loc: [5, 3]}); // Add a point that's out right in the mouth opening
+t.save({loc: [3, 7]}); // Add a point above the center of the head
+t.save({loc: [3, -1]}); // Add a point below the center of the bottom
 
 assert.eq(1, t.find({loc: {$within: {$polygon: pacman}}}).count(), "Pacman double point");

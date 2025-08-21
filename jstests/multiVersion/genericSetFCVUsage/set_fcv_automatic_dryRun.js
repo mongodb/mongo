@@ -28,8 +28,7 @@ const failCases = [
  * Tests the behavior when automatic dry-run fails during FCV transitions.
  * Ensures the FCV remains unchanged.
  */
-function testDryRunFailStopsTransition(
-    conn, shardConn, fromFCV, toFCV, failPointName, expectedError) {
+function testDryRunFailStopsTransition(conn, shardConn, fromFCV, toFCV, failPointName, expectedError) {
     const db = conn.getDB("admin");
 
     jsTestLog(`Setting initial FCV to ${fromFCV}.`);
@@ -37,11 +36,10 @@ function testDryRunFailStopsTransition(
 
     let failpoint = configureFailPoint(shardConn, failPointName);
 
-    jsTestLog(`Testing automatic dry-run during FCV transition: ${fromFCV} → ${
-        toFCV}, expecting failure`);
+    jsTestLog(`Testing automatic dry-run during FCV transition: ${fromFCV} → ${toFCV}, expecting failure`);
     const result = db.runCommand({setFeatureCompatibilityVersion: toFCV, confirm: true});
     assert.commandFailedWithCode(result, expectedError);
-    checkFCV(db, fromFCV);  // FCV should remain unchanged
+    checkFCV(db, fromFCV); // FCV should remain unchanged
 
     failpoint.off();
     jsTestLog("Automatic dry-run failure test completed.");
@@ -65,7 +63,7 @@ function testConflictingParametersWithSkipDryRun(conn) {
     });
     assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
 
-    checkFCV(db, latestFCV);  // FCV should remain unchanged when the command fails.
+    checkFCV(db, latestFCV); // FCV should remain unchanged when the command fails.
 
     jsTestLog("Conflicting parameter tests completed.");
 }
@@ -75,8 +73,7 @@ function testConflictingParametersWithSkipDryRun(conn) {
 function testSuccessWithSkipDryRun(conn) {
     const db = conn.getDB("admin");
 
-    jsTestLog(
-        "Testing successful FCV downgrade using `skipDryRun` parameter: latestFCV → lastLTSFCV.");
+    jsTestLog("Testing successful FCV downgrade using `skipDryRun` parameter: latestFCV → lastLTSFCV.");
     const skipDryRunSuccessResult = db.runCommand({
         setFeatureCompatibilityVersion: lastLTSFCV,
         skipDryRun: true,
@@ -84,7 +81,7 @@ function testSuccessWithSkipDryRun(conn) {
     });
 
     assert.commandWorked(skipDryRunSuccessResult);
-    checkFCV(db, lastLTSFCV);  // Ensure the FCV transitioned successfully.
+    checkFCV(db, lastLTSFCV); // Ensure the FCV transitioned successfully.
 
     // Reset FCV to latestFCV for consistency across tests
     assert.commandWorked(db.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
@@ -99,8 +96,7 @@ function testFailureWithSkipDryRun(conn, shardConn, failPointName, expectedError
 
     let failpoint = configureFailPoint(shardConn, failPointName);
 
-    jsTestLog(
-        "Testing unsuccessful FCV downgrade using `skipDryRun` parameter: latestFCV → lastLTSFCV.");
+    jsTestLog("Testing unsuccessful FCV downgrade using `skipDryRun` parameter: latestFCV → lastLTSFCV.");
     const skipDryRunFailResult = db.runCommand({
         setFeatureCompatibilityVersion: lastLTSFCV,
         skipDryRun: true,
@@ -108,16 +104,18 @@ function testFailureWithSkipDryRun(conn, shardConn, failPointName, expectedError
     });
     assert.commandFailedWithCode(skipDryRunFailResult, expectedError);
 
-    checkFCV(db, lastLTSFCV, lastLTSFCV);  // if dryRun is skipped and an error is raised, the FCV
-                                           // remains in a transitional downgrading state.
+    checkFCV(db, lastLTSFCV, lastLTSFCV); // if dryRun is skipped and an error is raised, the FCV
+    // remains in a transitional downgrading state.
 
     // If the user runs an explicit dryRun at this point, an error will be thrown and their FCV
     // stays in the transitional state
-    assert.commandFailedWithCode(db.runCommand({
-        setFeatureCompatibilityVersion: lastLTSFCV,
-        dryRun: true,
-    }),
-                                 expectedError);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            setFeatureCompatibilityVersion: lastLTSFCV,
+            dryRun: true,
+        }),
+        expectedError,
+    );
     checkFCV(db, lastLTSFCV, lastLTSFCV);
 
     failpoint.off();
@@ -137,15 +135,16 @@ function testFailureWithSkipDryRun(conn, shardConn, failPointName, expectedError
 function runDryRunTests(conn, shardConn) {
     jsTestLog(">>> Testing skipDryRun parameter");
     testSuccessWithSkipDryRun(conn);
-    testFailureWithSkipDryRun(conn,
-                              shardConn,
-                              "failDowngradeValidationDueToIncompatibleFeature",
-                              ErrorCodes.CannotDowngrade);
+    testFailureWithSkipDryRun(
+        conn,
+        shardConn,
+        "failDowngradeValidationDueToIncompatibleFeature",
+        ErrorCodes.CannotDowngrade,
+    );
 
     for (const {fromFCV, toFCV, failPointName, expectedError} of failCases) {
         jsTestLog(">>> Testing expected dryRun failure scenario");
-        testDryRunFailStopsTransition(
-            conn, shardConn, fromFCV, toFCV, failPointName, expectedError);
+        testDryRunFailStopsTransition(conn, shardConn, fromFCV, toFCV, failPointName, expectedError);
     }
 
     jsTestLog(">>> Testing conflicting parameters dryRun and skipDryRun");

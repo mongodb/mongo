@@ -9,7 +9,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const rst = new ReplSetTest({
     name: "recoveryAfterCleanShutdown",
     nodes: 2,
-    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}}
+    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}},
 });
 const nodes = rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
@@ -18,11 +18,12 @@ const dbName = "recovery_clean_shutdown";
 let primaryDB = rst.getPrimary().getDB(dbName);
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
-assert.commandWorked(primaryDB.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primaryDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const wMajority = {
-    writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}
+    writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS},
 };
 
 // Create a collection that will have all of its writes in the stable checkpoint.
@@ -47,10 +48,11 @@ rst.awaitLastOpCommitted();
 
 // Disable snapshotting on all members of the replica set so that further operations do not
 // enter the majority snapshot.
-nodes.forEach(node => assert.commandWorked(node.adminCommand(
-                  {configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})));
+nodes.forEach((node) =>
+    assert.commandWorked(node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})),
+);
 const w1 = {
-    writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}
+    writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS},
 };
 
 // Set up a collection whose creation is not in the stable checkpoint.
@@ -59,21 +61,20 @@ assert.commandWorked(primaryDB[collNoStableCreation].runCommand("create", w1));
 
 // Perform writes on collections that replicate to each node but do not enter the majority
 // snapshot. These commands will be replayed during replication recovery during restart.
-[collSomeStableWrites, collNoStableWrites, collNoStableCreation].forEach(
-    coll => assert.commandWorked(
-        primaryDB[coll].insert({_id: "insertedAfterSnapshottingDisabled"}, w1)));
+[collSomeStableWrites, collNoStableWrites, collNoStableCreation].forEach((coll) =>
+    assert.commandWorked(primaryDB[coll].insert({_id: "insertedAfterSnapshottingDisabled"}, w1)),
+);
 rst.awaitReplication();
 
 // Perform a clean shutdown and restart. Note that the 'disableSnapshotting' failpoint will be
 // unset on each node following the restart.
-nodes.forEach(node => rst.restart(node));
+nodes.forEach((node) => rst.restart(node));
 rst.awaitNodesAgreeOnPrimary();
 primaryDB = rst.getPrimary().getDB(dbName);
 
 // Perform a majority write to ensure that both nodes agree on the majority commit point.
 const collCreatedAfterRestart = "createdAfterRestart";
-assert.commandWorked(
-    primaryDB[collCreatedAfterRestart].insert({_id: "insertedAfterRestart", wMajority}));
+assert.commandWorked(primaryDB[collCreatedAfterRestart].insert({_id: "insertedAfterRestart", wMajority}));
 
 // Fast metadata count should be correct after restart in the face of a clean shutdown.
 rst.stopSet();

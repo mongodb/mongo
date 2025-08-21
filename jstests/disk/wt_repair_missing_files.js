@@ -28,7 +28,7 @@ let mongod = startMongodOnExistingPath(dbpath);
 let testColl = mongod.getDB(baseName)[collName];
 
 const doc = {
-    a: 1
+    a: 1,
 };
 assert.commandWorked(testColl.insert(doc));
 

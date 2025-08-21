@@ -24,26 +24,34 @@ const opts = {
     clusterAuthMode: "keyFile",
 };
 const NUM_NODES = 3;
-const rst = new ReplSetTest(
-    {name: 'tlsSet', nodes: NUM_NODES, waitForKeys: false, keyFile: KEYFILE, nodeOptions: opts});
+const rst = new ReplSetTest({
+    name: "tlsSet",
+    nodes: NUM_NODES,
+    waitForKeys: false,
+    keyFile: KEYFILE,
+    nodeOptions: opts,
+});
 rst.startSet();
-rst.initiate(Object.extend(rst.getReplSetConfig(), {
-    writeConcernMajorityJournalDefault: wcMajorityJournalDefault,
-}),
-             null,
-             {allNodesAuthorizedToRunRSGetStatus: false});
+rst.initiate(
+    Object.extend(rst.getReplSetConfig(), {
+        writeConcernMajorityJournalDefault: wcMajorityJournalDefault,
+    }),
+    null,
+    {allNodesAuthorizedToRunRSGetStatus: false},
+);
 
 // Make administrative user other than local.__system
-rst.getPrimary().getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["root"]},
-                                           {w: NUM_NODES});
+rst.getPrimary()
+    .getDB("admin")
+    .createUser({user: "root", pwd: "pwd", roles: ["root"]}, {w: NUM_NODES});
 
 let entriesWritten = 0;
 function testWrite(str) {
     const entry = ++entriesWritten;
 
     const conn = rst.getPrimary();
-    assert(conn.getDB('admin').auth('root', 'pwd'));
-    const test = conn.getDB('test');
+    assert(conn.getDB("admin").auth("root", "pwd"));
+    const test = conn.getDB("test");
     assert.writeOK(test.a.insert({a: entry, str: str}));
     assert.eq(entry, test.a.find().itcount(), "Error interacting with replSet");
 }
@@ -56,7 +64,7 @@ function authAllNodes(nodes) {
 
 function upgradeAndWrite(newOpts, str) {
     authAllNodes(rst.nodes);
-    rst.upgradeSet(newOpts, 'root', 'pwd');
+    rst.upgradeSet(newOpts, "root", "pwd");
     authAllNodes(rst.nodes);
     rst.awaitReplication();
     testWrite(str);
@@ -65,54 +73,64 @@ function upgradeAndWrite(newOpts, str) {
 function upgradeWriteAndConnect(newOpts, str) {
     upgradeAndWrite(newOpts, str);
 
-    assert.eq(0,
-              runMongoProgram("mongo",
-                              "--port",
-                              rst.ports[0],
-                              "--ssl",
-                              "--tlsCAFile",
-                              CA_CERT,
-                              "--tlsCertificateKeyFile",
-                              CLIENT_CERT,
-                              "--eval",
-                              ";"),
-              "SSL Connection attempt failed when it should succeed");
+    assert.eq(
+        0,
+        runMongoProgram(
+            "mongo",
+            "--port",
+            rst.ports[0],
+            "--ssl",
+            "--tlsCAFile",
+            CA_CERT,
+            "--tlsCertificateKeyFile",
+            CLIENT_CERT,
+            "--eval",
+            ";",
+        ),
+        "SSL Connection attempt failed when it should succeed",
+    );
 }
 
-testWrite(rst.getPrimary(), 'TESTTESTTEST');
+testWrite(rst.getPrimary(), "TESTTESTTEST");
 
 jsTest.log("===== UPGRADE disabled,keyFile -> allowTLS,sendKeyfile =====");
-upgradeAndWrite({
-    tlsMode: "allowTLS",
-    tlsCertificateKeyFile: SERVER_CERT,
-    tlsAllowInvalidCertificates: "",
-    clusterAuthMode: "sendKeyFile",
-    keyFile: KEYFILE,
-    tlsCAFile: CA_CERT
-},
-                'CHECKCHECKCHECK');
+upgradeAndWrite(
+    {
+        tlsMode: "allowTLS",
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsAllowInvalidCertificates: "",
+        clusterAuthMode: "sendKeyFile",
+        keyFile: KEYFILE,
+        tlsCAFile: CA_CERT,
+    },
+    "CHECKCHECKCHECK",
+);
 
 jsTest.log("===== UPGRADE allowTLS,sendKeyfile -> preferTLS,sendX509 =====");
-upgradeWriteAndConnect({
-    tlsMode: "preferTLS",
-    tlsCertificateKeyFile: SERVER_CERT,
-    tlsAllowInvalidCertificates: "",
-    clusterAuthMode: "sendX509",
-    keyFile: KEYFILE,
-    tlsCAFile: CA_CERT
-},
-                       'PEASandCARROTS');
+upgradeWriteAndConnect(
+    {
+        tlsMode: "preferTLS",
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsAllowInvalidCertificates: "",
+        clusterAuthMode: "sendX509",
+        keyFile: KEYFILE,
+        tlsCAFile: CA_CERT,
+    },
+    "PEASandCARROTS",
+);
 
 jsTest.log("===== UPGRADE preferTLS,sendX509 -> preferTLS,x509 =====");
 // we cannot upgrade past preferTLS here because it will break the test client
-upgradeWriteAndConnect({
-    tlsMode: "preferTLS",
-    tlsCertificateKeyFile: SERVER_CERT,
-    tlsAllowInvalidCertificates: "",
-    clusterAuthMode: "x509",
-    keyFile: KEYFILE,
-    tlsCAFile: CA_CERT
-},
-                       'BEEP BOOP');
+upgradeWriteAndConnect(
+    {
+        tlsMode: "preferTLS",
+        tlsCertificateKeyFile: SERVER_CERT,
+        tlsAllowInvalidCertificates: "",
+        clusterAuthMode: "x509",
+        keyFile: KEYFILE,
+        tlsCAFile: CA_CERT,
+    },
+    "BEEP BOOP",
+);
 
 rst.stopSet();

@@ -22,8 +22,20 @@ t.save({a: [1, 2, 3, 4, 5]});
 t.save({a: 10});
 t.createIndex({a: 1});
 
-assert.eq(2, t.find({a: {$gt: 0}}).sort({a: 1}).itcount());
-assert.eq(2, t.find({a: {$gt: 0}, b: null}).sort({a: 1}).itcount());
+assert.eq(
+    2,
+    t
+        .find({a: {$gt: 0}})
+        .sort({a: 1})
+        .itcount(),
+);
+assert.eq(
+    2,
+    t
+        .find({a: {$gt: 0}, b: null})
+        .sort({a: 1})
+        .itcount(),
+);
 
 // Test results added by ordered and unordered plans, ordered plan finishes.
 
@@ -70,4 +82,10 @@ for (let i = 399; i >= 0; --i) {
 }
 t.createIndex({a: 1});
 
-checkNumSorted(400, t.find({a: {$gte: 0, $lte: 400}, b: null}).batchSize(50).sort({a: 1}));
+checkNumSorted(
+    400,
+    t
+        .find({a: {$gte: 0, $lte: 400}, b: null})
+        .batchSize(50)
+        .sort({a: 1}),
+);

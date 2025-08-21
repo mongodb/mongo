@@ -10,20 +10,20 @@ const oldVersion = "last-lts";
 const newVersion = "latest";
 
 function verifyProfilerEntries(testDB, comment, expectedSchema) {
-    const profileEntry =
-        testDB.system.profile.find({"command.comment": comment}).hint({$natural: 1}).toArray()[0];
+    const profileEntry = testDB.system.profile.find({"command.comment": comment}).hint({$natural: 1}).toArray()[0];
 
     assert.neq(profileEntry, null, `No matching profile entry found on shard`);
-    assert.docEq(
-        expectedSchema, profileEntry.command.$audit, `Expected metadata doesn't match on shard`);
+    assert.docEq(expectedSchema, profileEntry.command.$audit, `Expected metadata doesn't match on shard`);
 }
 
 function forceMetadataPropagation(testDB, comment) {
     assert.commandWorked(testDB.user.insert({_id: 1, value: "test"}, {comment: comment}));
-    assert.commandWorked(testDB.runCommand({
-        find: "user",
-        comment: comment,
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            find: "user",
+            comment: comment,
+        }),
+    );
 }
 
 function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_server = null) {
@@ -52,11 +52,11 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
 
     let dollarAuditMetadata = {
         $impersonatedUser: {user: "testUser", db: "test"},
-        $impersonatedRoles: [{role: "readWrite", db: "test"}]
+        $impersonatedRoles: [{role: "readWrite", db: "test"}],
     };
     if (fcv === latestFCV) {
         dollarAuditMetadata.$impersonatedClient = {
-            hosts: [`127.0.0.1:${shellPort}`, `127.0.0.1:${mongosPort}`]
+            hosts: [`127.0.0.1:${shellPort}`, `127.0.0.1:${mongosPort}`],
         };
         if (isLoadBalanced) {
             dollarAuditMetadata.$impersonatedClient.hosts.push(`127.0.0.1:${ingressPort}`);
@@ -65,8 +65,7 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
 
     assert.commandWorked(shard.setProfilingLevel(2));
 
-    assert.commandWorked(
-        testDB.runCommand({createUser: 'testUser', pwd: 'testUser', roles: ['readWrite']}));
+    assert.commandWorked(testDB.runCommand({createUser: "testUser", pwd: "testUser", roles: ["readWrite"]}));
     assert.eq(1, testDB.auth("testUser", "testUser"));
 
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: fcv, confirm: true}));
@@ -97,17 +96,17 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
         other: {
             mongosOptions: {
                 binVersion: newVersion,
-                auditDestination: 'console',
+                auditDestination: "console",
             },
             configOptions: {
                 binVersion: newVersion,
-                auditDestination: 'console',
+                auditDestination: "console",
             },
             shardOptions: {
                 binVersion: newVersion,
-                auditDestination: 'console',
-            }
-        }
+                auditDestination: "console",
+            },
+        },
     });
 
     testDollarAuditPropagation(st, latestFCV);
@@ -116,17 +115,16 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
 
 {
     // Test the expected metadata is propagated in a cluster using the lastLTS fcv.
-    jsTest.log(
-        `Testing FCV ${lastLTSFCV} metadata propagation in sharded cluster with mixed versions`);
+    jsTest.log(`Testing FCV ${lastLTSFCV} metadata propagation in sharded cluster with mixed versions`);
     const st = new ShardingTest({
         shards: 1,
         mongos: 1,
         config: 1,
         other: {
-            mongosOptions: {binVersion: oldVersion, auditDestination: 'console'},
-            configOptions: {binVersion: oldVersion, auditDestination: 'console'},
-            shardOptions: {binVersion: oldVersion, auditDestination: 'console'}
-        }
+            mongosOptions: {binVersion: oldVersion, auditDestination: "console"},
+            configOptions: {binVersion: oldVersion, auditDestination: "console"},
+            shardOptions: {binVersion: oldVersion, auditDestination: "console"},
+        },
     });
 
     testDollarAuditPropagation(st, lastLTSFCV);
@@ -135,23 +133,22 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
 
 {
     // Test the expected metadata is propagated in a cluster using the lastLTS fcv.
-    jsTest.log(
-        `Testing FCV ${lastLTSFCV} metadata propagation in sharded cluster with mixed versions`);
+    jsTest.log(`Testing FCV ${lastLTSFCV} metadata propagation in sharded cluster with mixed versions`);
     const st = new ShardingTest({
         shards: 1,
         mongos: 1,
         config: 1,
         other: {
-            mongosOptions: {binVersion: oldVersion, auditDestination: 'console'},
+            mongosOptions: {binVersion: oldVersion, auditDestination: "console"},
             configOptions: {
                 binVersion: newVersion,
-                auditDestination: 'console',
+                auditDestination: "console",
             },
             shardOptions: {
                 binVersion: newVersion,
-                auditDestination: 'console',
-            }
-        }
+                auditDestination: "console",
+            },
+        },
     });
 
     testDollarAuditPropagation(st, lastLTSFCV);
@@ -161,7 +158,8 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
 {
     // Test the expected metadata is propagated in a load balanced cluster using the latestFCV.
     jsTest.log(
-        `Testing FCV ${latestFCV} metadata propagation in sharded cluster with mixed versions with a load balanced connection`);
+        `Testing FCV ${latestFCV} metadata propagation in sharded cluster with mixed versions with a load balanced connection`,
+    );
 
     const ingressPort = allocatePort();
     const egressPort = allocatePort();
@@ -176,19 +174,19 @@ function testDollarAuditPropagation(st, fcv, isLoadBalanced = false, proxy_serve
         other: {
             mongosOptions: {
                 binVersion: newVersion,
-                auditDestination: 'console',
+                auditDestination: "console",
                 setParameter: {
                     "loadBalancerPort": egressPort,
                 },
             },
             configOptions: {
                 binVersion: newVersion,
-                auditDestination: 'console',
+                auditDestination: "console",
             },
             shardOptions: {
                 binVersion: newVersion,
-            }
-        }
+            },
+        },
     });
 
     testDollarAuditPropagation(st, latestFCV, true /* isLoadBalanced */, proxy_server);

@@ -9,11 +9,7 @@
 //   assumes_against_mongod_not_mongos,
 // ]
 
-import {
-    getRejectedPlan,
-    getRejectedPlans,
-    getWinningPlanFromExplain
-} from "jstests/libs/query/analyze_plan.js";
+import {getRejectedPlan, getRejectedPlans, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_plan_scores;
 coll.drop();
@@ -56,7 +52,7 @@ assert.commandWorked(coll.createIndex({a: 1}));
 // Create descending index to avoid index deduplication.
 assert.commandWorked(coll.createIndex({a: -1, b: 1}));
 
-["queryPlanner", "executionStats", "allPlansExecution"].forEach(verbosity => {
+["queryPlanner", "executionStats", "allPlansExecution"].forEach((verbosity) => {
     const explain = coll.find({a: {$gte: 0}}).explain(verbosity);
     assert.commandWorked(explain);
     checkExplainOutput(explain, verbosity);

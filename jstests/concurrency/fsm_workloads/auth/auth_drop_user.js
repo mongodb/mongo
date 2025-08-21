@@ -13,16 +13,16 @@ TestData.runInsideTransaction = false;
  * ]
  */
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         // Use the workload name as a prefix for the username,
         // since the workload name is assumed to be unique.
-        prefix: 'auth_drop_user'
+        prefix: "auth_drop_user",
     };
 
-    var states = (function() {
+    var states = (function () {
         function uniqueUsername(prefix, tid, num) {
-            return prefix + tid + '_' + num;
+            return prefix + tid + "_" + num;
         }
 
         function init(db, collName) {
@@ -35,10 +35,9 @@ export const $config = (function() {
             const kCreateUserRetries = 5;
             const kCreateUserRetryInterval = 5 * 1000;
             assert.retry(
-                function() {
+                function () {
                     try {
-                        db.createUser(
-                            {user: username, pwd: 'password', roles: ['readWrite', 'dbAdmin']});
+                        db.createUser({user: username, pwd: "password", roles: ["readWrite", "dbAdmin"]});
                         return true;
                     } catch (e) {
                         jsTest.log("Caught createUser exception: " + tojson(e));
@@ -47,7 +46,8 @@ export const $config = (function() {
                 },
                 "Failed creating user '" + username + "'",
                 kCreateUserRetries,
-                kCreateUserRetryInterval);
+                kCreateUserRetryInterval,
+            );
 
             const res = db.getUser(username);
             assert(res !== null, "user '" + username + "' should exist");
@@ -56,15 +56,20 @@ export const $config = (function() {
 
             const kDropUserRetries = 5;
             const kDropUserRetryInterval = 5 * 1000;
-            assert.retry(function() {
-                try {
-                    db.dropUser(username);
-                    return true;
-                } catch (e) {
-                    jsTest.log("Caught dropUser exception: " + tojson(e));
-                    return false;
-                }
-            }, "Failed dropping user '" + username + "'", kDropUserRetries, kDropUserRetryInterval);
+            assert.retry(
+                function () {
+                    try {
+                        db.dropUser(username);
+                        return true;
+                    } catch (e) {
+                        jsTest.log("Caught dropUser exception: " + tojson(e));
+                        return false;
+                    }
+                },
+                "Failed dropping user '" + username + "'",
+                kDropUserRetries,
+                kDropUserRetryInterval,
+            );
             assert.isnull(db.getUser(username), "user '" + username + "' should not exist");
         }
 

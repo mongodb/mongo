@@ -28,8 +28,7 @@ const txnFpBefore = configureFailPoint(primary, "hangBeforeSettingTxnInterruptFl
 // The second critical part of the race is when the transaction thread has already passed
 // the regular "not primary" checks by the time stepDown has completed and updated
 // writability. (This is the reason we check writability again in the accompanying patch.)
-const txnFpAfter =
-    configureFailPoint(primary, "hangAfterCheckingWritabilityForMultiDocumentTransactions");
+const txnFpAfter = configureFailPoint(primary, "hangAfterCheckingWritabilityForMultiDocumentTransactions");
 
 jsTestLog("Start the transaction in a parallel shell");
 const txn = startParallelShell(() => {

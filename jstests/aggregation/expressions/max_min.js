@@ -15,14 +15,17 @@ coll.insertOne({
     "arr3": [1, 2, "string", null],
     "arr4": [],
     "arrNest1": [[1, 2]],
-    "arrNest2": [[1, 2], [3, 4]],
+    "arrNest2": [
+        [1, 2],
+        [3, 4],
+    ],
     "arrNest3": [[[1, 2, 3]]],
     "arrNest4": [[[1, 2, 3]], 1],
     "arrMixed1": [[], "hello", ["c"]],
     "arrMixed2": [[], "hello", ["c"], null],
     "null": null,
     "undefined1": [undefined],
-    "undefined2": [undefined, 2, "string"]
+    "undefined2": [undefined, 2, "string"],
 });
 
 function assertResultMax(expected, params) {

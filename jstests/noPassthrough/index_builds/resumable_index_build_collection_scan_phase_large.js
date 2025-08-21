@@ -22,7 +22,7 @@ const maxIndexBuildMemoryUsageMB = 50;
 
 const rst = new ReplSetTest({
     nodes: 1,
-    nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB}}
+    nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB}},
 });
 rst.startSet();
 rst.initiate();
@@ -47,6 +47,7 @@ ResumableIndexBuildTest.run(
     // Each document is at least 1 MB, so the index build must have spilled to disk by this point.
     maxIndexBuildMemoryUsageMB,
     ["collection scan"],
-    [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB}]);
+    [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB}],
+);
 
 rst.stopSet();

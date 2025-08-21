@@ -20,22 +20,21 @@ _setShellFailPoint({
 const rst = new ReplSetTest({
     nodes: 3,
     nodeOptions: {
-        setParameter:
-            {"failpoint.respondWithNotPrimaryInCommandDispatch": tojson({mode: "alwaysOn"})}
-    }
+        setParameter: {"failpoint.respondWithNotPrimaryInCommandDispatch": tojson({mode: "alwaysOn"})},
+    },
 });
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const directConn = rst.getPrimary();
 const rsConn = new Mongo(rst.getURL());
-assert(rsConn.isReplicaSetConnection(),
-       "expected " + rsConn.host + " to be a replica set connection string");
+assert(rsConn.isReplicaSetConnection(), "expected " + rsConn.host + " to be a replica set connection string");
 
 function stepDownPrimary(rst) {
     const awaitShell = startParallelShell(
         () => assert.commandWorked(db.adminCommand({replSetStepDown: 60, force: true})),
-        directConn.port);
+        directConn.port,
+    );
 
     // We wait for the primary to transition to the SECONDARY state to ensure we're waiting
     // until after the parallel shell has started the replSetStepDown command.

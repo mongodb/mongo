@@ -32,12 +32,12 @@ res = assert.commandWorked(joinColl.insert(items));
 let cursor = testColl.aggregate([
     {
         $lookup: {
-            as: 'items_check',
+            as: "items_check",
             from: joinColl.getName(),
-            let : {id: '$_id'},
+            let: {id: "$_id"},
             pipeline: [
-                {$addFields: {id: '$_id'}},
-                {$match: {$expr: {$eq: ['$$id', '$owner']}}},
+                {$addFields: {id: "$_id"}},
+                {$match: {$expr: {$eq: ["$$id", "$owner"]}}},
                 {
                     $facet: {
                         all: [{$match: {}}],
@@ -48,32 +48,29 @@ let cursor = testColl.aggregate([
     },
 ]);
 assert(cursor.hasNext());
-cursor.toArray().forEach(user => {
-    const joinedDocs = user['items_check'][0]['all'];
+cursor.toArray().forEach((user) => {
+    const joinedDocs = user["items_check"][0]["all"];
     assert.neq(null, joinedDocs);
     assert.eq(1, joinedDocs.length);
-    assert.eq(user['_id'], joinedDocs[0].owner);
+    assert.eq(user["_id"], joinedDocs[0].owner);
 });
 
 cursor = testColl.aggregate([
     {
         $lookup: {
-            as: 'items_check',
+            as: "items_check",
             from: joinColl.getName(),
-            let : {id: '$_id'},
-            pipeline: [
-                {$addFields: {id: '$_id'}},
-                {$match: {$expr: {$eq: ['$$id', '$owner']}}},
-            ],
+            let: {id: "$_id"},
+            pipeline: [{$addFields: {id: "$_id"}}, {$match: {$expr: {$eq: ["$$id", "$owner"]}}}],
         },
     },
 ]);
 assert(cursor.hasNext());
-cursor.toArray().forEach(user => {
-    const joinedDocs = user['items_check'];
+cursor.toArray().forEach((user) => {
+    const joinedDocs = user["items_check"];
     assert.neq(null, joinedDocs);
     assert.eq(1, joinedDocs.length);
-    assert.eq(user['_id'], joinedDocs[0].owner);
+    assert.eq(user["_id"], joinedDocs[0].owner);
 });
 
 // Test for a non-correlated prefix followed by a $facet pipeline that contains a correlated
@@ -81,19 +78,20 @@ cursor.toArray().forEach(user => {
 cursor = testColl.aggregate([
     {
         $lookup: {
-            as: 'items_check',
+            as: "items_check",
             from: joinColl.getName(),
-            let : {id: '$_id'},
+            let: {id: "$_id"},
             pipeline: [
                 {$match: {owner: "user_1"}},
                 {
                     $facet: {
-                        all: [{
-                            $redact: {
-                                $cond:
-                                    {if: {$eq: ["$$id", "user_1"]}, then: "$$KEEP", else: "$$PRUNE"}
-                            }
-                        }],
+                        all: [
+                            {
+                                $redact: {
+                                    $cond: {if: {$eq: ["$$id", "user_1"]}, then: "$$KEEP", else: "$$PRUNE"},
+                                },
+                            },
+                        ],
                     },
                 },
             ],
@@ -102,27 +100,29 @@ cursor = testColl.aggregate([
 ]);
 res = cursor.toArray();
 assert(
-    arrayEq(res,
-            [
-                {"_id": "user_1", "items_check": [{"all": [{"_id": "item_1", "owner": "user_1"}]}]},
-                {"_id": "user_2", "items_check": [{"all": []}]}
-            ]),
-    res);
+    arrayEq(res, [
+        {"_id": "user_1", "items_check": [{"all": [{"_id": "item_1", "owner": "user_1"}]}]},
+        {"_id": "user_2", "items_check": [{"all": []}]},
+    ]),
+    res,
+);
 
 // SERVER-57000: Test handling of lack of correlation (addFields with empty set of columns)
-assert.doesNotThrow(() => testColl.aggregate([
-    {
-        $lookup: {
-            as: 'items_check',
-            from: joinColl.getName(),
-            pipeline: [
-                {$addFields: {}},
-                {
-                    $facet: {
-                        all: [{$match: {}}],
+assert.doesNotThrow(() =>
+    testColl.aggregate([
+        {
+            $lookup: {
+                as: "items_check",
+                from: joinColl.getName(),
+                pipeline: [
+                    {$addFields: {}},
+                    {
+                        $facet: {
+                            all: [{$match: {}}],
+                        },
                     },
-                },
-            ],
+                ],
+            },
         },
-    },
-]));
+    ]),
+);

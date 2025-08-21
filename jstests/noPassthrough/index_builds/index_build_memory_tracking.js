@@ -9,27 +9,26 @@ const replSet = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             maxIndexBuildMemoryUsageMegabytes: maxMemUsageMB,
-        }
+        },
     },
-
 });
 
 replSet.startSet();
 replSet.initiate();
 
 const primary = replSet.getPrimary();
-const testDB = primary.getDB('test');
+const testDB = primary.getDB("test");
 const coll = testDB[jsTestName()];
 
 const docs = 50;
-const bigArr = new Array(100000).fill('x'.repeat(10));
+const bigArr = new Array(100000).fill("x".repeat(10));
 const batchSize = 10;
-const padding = 'x'.repeat(1000);
+const padding = "x".repeat(1000);
 let d = 0;
 while (d < docs) {
     const bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < batchSize; i++) {
-        bulk.insert({a: (d + i) + padding, arr: bigArr});
+        bulk.insert({a: d + i + padding, arr: bigArr});
     }
     d += batchSize;
     assert.commandWorked(bulk.execute());
@@ -37,7 +36,7 @@ while (d < docs) {
 
 // While we build the index, we must never exceed our memory limit.
 const awaitShell = startParallelShell(() => {
-    while (!db.getSiblingDB('test').signal.findOne()) {
+    while (!db.getSiblingDB("test").signal.findOne()) {
         const memUsage = assert.commandWorked(db.serverStatus()).indexBulkBuilder.memUsage;
         print("mem usage: " + memUsage);
         // The index build memory usage is actually a high-water mark. Include a buffer into our
@@ -57,8 +56,7 @@ assert.commandWorked(testDB.signal.insert({done: true}));
 awaitShell();
 
 // After the index build completion the indexBulkBuilder.memUsage should reset back to zero
-const memUsage =
-    assert.commandWorked(primary.getDB('admin').serverStatus()).indexBulkBuilder.memUsage;
+const memUsage = assert.commandWorked(primary.getDB("admin").serverStatus()).indexBulkBuilder.memUsage;
 assert.eq(memUsage, 0);
 
 replSet.stopSet();

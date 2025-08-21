@@ -20,12 +20,11 @@ const st = new ShardingTest({
     rs: {
         nodes: 1,
         // Use a higher frequency for periodic noops to speed up the test.
-        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}
-    }
+        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
+    },
 });
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
 const mongosDB = st.s0.getDB("test");
 const mongosColl = mongosDB[testName];
 
@@ -46,7 +45,7 @@ function testUnshardedBecomesSharded(collToWatch) {
 
     let cursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {}}, {$match: {"ns.coll": mongosColl.getName()}}],
-        collection: collToWatch
+        collection: collToWatch,
     });
     assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
@@ -56,12 +55,14 @@ function testUnshardedBecomesSharded(collToWatch) {
     assert.commandWorked(mongosCollOther.insert({_id: 0, y: 0}));
     const [preShardCollectionChange] = cst.assertNextChangesEqual({
         cursor: cursor,
-        expectedChanges: [{
-            documentKey: {_id: 0},
-            fullDocument: {_id: 0, x: 0},
-            ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
-            operationType: "insert",
-        }]
+        expectedChanges: [
+            {
+                documentKey: {_id: 0},
+                fullDocument: {_id: 0, x: 0},
+                ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
+                operationType: "insert",
+            },
+        ],
     });
 
     // Record the resume token for this change, before the collection is sharded.
@@ -88,7 +89,7 @@ function testUnshardedBecomesSharded(collToWatch) {
             fullDocument: {_id: -1, x: -1},
             ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
             operationType: "insert",
-        }
+        },
     ];
 
     // Verify that the cursor on the original shard is still valid and sees new inserted
@@ -98,18 +99,22 @@ function testUnshardedBecomesSharded(collToWatch) {
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [postShardCollectionChanges[0]]});
 
     // Move the [minKey, 0) chunk to shard1.
-    assert.commandWorked(mongosDB.adminCommand({
-        moveChunk: mongosColl.getFullName(),
-        find: {x: -1},
-        to: st.rs1.getURL(),
-        _waitForDelete: true
-    }));
-    assert.commandWorked(mongosDB.adminCommand({
-        moveChunk: mongosCollOther.getFullName(),
-        find: {y: -1},
-        to: st.rs1.getURL(),
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        mongosDB.adminCommand({
+            moveChunk: mongosColl.getFullName(),
+            find: {x: -1},
+            to: st.rs1.getURL(),
+            _waitForDelete: true,
+        }),
+    );
+    assert.commandWorked(
+        mongosDB.adminCommand({
+            moveChunk: mongosCollOther.getFullName(),
+            find: {y: -1},
+            to: st.rs1.getURL(),
+            _waitForDelete: true,
+        }),
+    );
 
     // Make sure the change stream cursor sees a document inserted on the recipient shard.
     assert.commandWorked(mongosColl.insert({_id: -1, x: -1}));
@@ -121,18 +126,17 @@ function testUnshardedBecomesSharded(collToWatch) {
     // shard key.
     let resumedCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: preShardCollectionResumeToken}}],
-        collection: mongosColl
+        collection: mongosColl,
     });
 
     // Verify that we see both of the insertions which occurred after the collection was
     // sharded.
-    cst.assertNextChangesEqual(
-        {cursor: resumedCursor, expectedChanges: postShardCollectionChanges});
+    cst.assertNextChangesEqual({cursor: resumedCursor, expectedChanges: postShardCollectionChanges});
 
     // Test the behavior of a change stream when a sharded collection is dropped and recreated.
     cursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {}}, {$match: {"ns.coll": mongosColl.getName()}}],
-        collection: collToWatch
+        collection: collToWatch,
     });
     assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
@@ -168,27 +172,22 @@ function testUnshardedBecomesSharded(collToWatch) {
                 fullDocument: {_id: -3, x: -3},
                 ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
                 operationType: "insert",
-            }
-        ]
+            },
+        ],
     });
 
     // Verify that the kNewShardDetected event is successfully delivered to mongoS even in cases
     // where the event does not match the user's filter.
     // TODO SERVER-30784: remove this test-case, or rework it without the failpoint, when the
     // kNewShardDetected event is the only way we detect a new shard for the collection.
-    mongosDB.adminCommand(
-        {configureFailPoint: "throwChangeStreamTopologyChangeExceptionToClient", mode: "alwaysOn"});
+    mongosDB.adminCommand({configureFailPoint: "throwChangeStreamTopologyChangeExceptionToClient", mode: "alwaysOn"});
     ChangeStreamTest.assertChangeStreamThrowsCode({
         db: mongosDB,
         collName: collToWatch,
-        pipeline: [
-            {$changeStream: {resumeAfter: preShardCollectionResumeToken}},
-            {$match: {operationType: "delete"}}
-        ],
-        expectedCode: ErrorCodes.ChangeStreamTopologyChange
+        pipeline: [{$changeStream: {resumeAfter: preShardCollectionResumeToken}}, {$match: {operationType: "delete"}}],
+        expectedCode: ErrorCodes.ChangeStreamTopologyChange,
     });
-    mongosDB.adminCommand(
-        {configureFailPoint: "throwChangeStreamTopologyChangeExceptionToClient", mode: "off"});
+    mongosDB.adminCommand({configureFailPoint: "throwChangeStreamTopologyChangeExceptionToClient", mode: "off"});
 
     cst.cleanUp();
 }

@@ -15,14 +15,13 @@
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     doSnapshotFindAtClusterTime,
-    doSnapshotGetMoreAtClusterTime
+    doSnapshotGetMoreAtClusterTime,
 } from "jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {numIds: 100, numDocsToInsertPerThread: 5, batchSize: 10};
 
     const states = {
-
         snapshotScan: function snapshotScan(db, collName) {
             const readErrorCodes = [...interruptedQueryErrors, ErrorCodes.ShutdownInProgress];
             if (!this.cursorId || this.cursorId == 0) {
@@ -46,9 +45,11 @@ export const $config = (function() {
                     db[collName].update({a: i}, {$inc: {x: 1}});
                 } catch (e) {
                     // dropIndex can cause queries to throw if these queries yield.
-                    assert.contains(e.code,
-                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                    'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(
+                        e.code,
+                        [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                        "unexpected error code: " + e.code + ": " + e.message,
+                    );
                 }
             }
         },
@@ -59,9 +60,11 @@ export const $config = (function() {
                     db[collName].findOne({a: i});
                 } catch (e) {
                     // dropIndex can cause queries to throw if these queries yield.
-                    assert.contains(e.code,
-                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                    'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(
+                        e.code,
+                        [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                        "unexpected error code: " + e.code + ": " + e.message,
+                    );
                 }
             }
         },
@@ -72,9 +75,11 @@ export const $config = (function() {
                 db[collName].deleteOne({a: indexToDelete});
             } catch (e) {
                 // dropIndex can cause queries to throw if these queries yield.
-                assert.contains(e.code,
-                                [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                'unexpected error code: ' + e.code + ': ' + e.message);
+                assert.contains(
+                    e.code,
+                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                    "unexpected error code: " + e.code + ": " + e.message,
+                );
             }
         },
 
@@ -85,7 +90,6 @@ export const $config = (function() {
         dropIndex: function dropIndex(db, collName) {
             db[collName].dropIndex({a: 1});
         },
-
     };
 
     const transitions = {
@@ -119,30 +123,32 @@ export const $config = (function() {
         // sharded clusters.
         if (cluster.isSharded()) {
             cluster.executeOnConfigNodes((db) => {
-                assert.commandWorked(
-                    db.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: 3600}));
+                assert.commandWorked(db.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: 3600}));
             });
         }
         assert.commandWorked(db.runCommand({create: collName}));
         const docs = [...Array(this.numIds).keys()].map((i) => ({a: i, x: 1}));
         assert.commandWorked(db.runCommand({insert: collName, documents: docs}));
-        assert.commandWorked(
-            db.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+        assert.commandWorked(db.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
     }
 
     function teardown(db, collName, cluster) {
-        cluster.executeOnMongodNodes(function(db) {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowInSecondsDefault
-            }));
+        cluster.executeOnMongodNodes(function (db) {
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowInSecondsDefault,
+                }),
+            );
         });
         if (cluster.isSharded()) {
             cluster.executeOnConfigNodes((db) => {
-                assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowInSecondsDefault
-                }));
+                assert.commandWorked(
+                    db.adminCommand({
+                        setParameter: 1,
+                        minSnapshotHistoryWindowInSeconds: minSnapshotHistoryWindowInSecondsDefault,
+                    }),
+                );
             });
         }
     }
@@ -150,7 +156,7 @@ export const $config = (function() {
     return {
         threadCount: 5,
         iterations: 50,
-        startState: 'snapshotScan',
+        startState: "snapshotScan",
         states: states,
         transitions: transitions,
         setup: setup,

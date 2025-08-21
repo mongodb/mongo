@@ -20,8 +20,7 @@ const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 
 jsTestLog("Do a document write.");
-assert.commandWorked(
-        primaryColl.insert({_id: 0, x: 0}, {"writeConcern": {"w": "majority"}}));
+assert.commandWorked(primaryColl.insert({_id: 0, x: 0}, {"writeConcern": {"w": "majority"}}));
 rst.awaitReplication();
 
 // This makes sure the index build on primary hangs before receiving any votes from itself and
@@ -30,14 +29,15 @@ IndexBuildTest.pauseIndexBuilds(secondary);
 IndexBuildTest.pauseIndexBuilds(primary);
 
 jsTestLog("Start index build.");
-const awaitBuild = IndexBuildTest.startIndexBuild(
-    primary, collNss, {i: 1}, {}, [ErrorCodes.InterruptedDueToReplStateChange]);
+const awaitBuild = IndexBuildTest.startIndexBuild(primary, collNss, {i: 1}, {}, [
+    ErrorCodes.InterruptedDueToReplStateChange,
+]);
 
 jsTestLog("Wait for secondary to reach collection scan phase.");
-IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, collName, 'i_1');
+IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, collName, "i_1");
 
 jsTestLog("Wait for primary to reach collection scan phase.");
-IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, collName, 'i_1');
+IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, collName, "i_1");
 
 jsTestLog("Restarting the primary");
 rst.stop(primary, undefined, {skipValidation: true});
@@ -55,6 +55,6 @@ IndexBuildTest.waitForIndexBuildToStop(primaryDB, collName, "i_1");
 rst.awaitReplication();
 
 // Check to see if the index was successfully created.
-IndexBuildTest.assertIndexes(primaryDB[collName], 2, ['_id_', 'i_1']);
+IndexBuildTest.assertIndexes(primaryDB[collName], 2, ["_id_", "i_1"]);
 
 rst.stopSet();

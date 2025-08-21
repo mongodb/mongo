@@ -12,20 +12,24 @@ replTest.initiate();
 var mongod = replTest.getPrimary();
 mongod.adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 1});
 
-var local = mongod.getDB('local');
+var local = mongod.getDB("local");
 
 // Start inserting documents in test.capped and local.capped capped collections.
-var shells = ['test', 'local'].map(function(dbname) {
+var shells = ["test", "local"].map(function (dbname) {
     var mydb = local.getSiblingDB(dbname);
     mydb.capped.drop();
-    mydb.createCollection('capped', {capped: true, size: 20 * 1000});
-    return startParallelShell('var mydb=db.getSiblingDB("' + dbname + '"); ' +
-                                  '(function() { ' +
-                                  '    for(var i=0; i < 10*1000; i++) { ' +
-                                  '        mydb.capped.insert({ x: i }); ' +
-                                  '    } ' +
-                                  '})();',
-                              mongod.port);
+    mydb.createCollection("capped", {capped: true, size: 20 * 1000});
+    return startParallelShell(
+        'var mydb=db.getSiblingDB("' +
+            dbname +
+            '"); ' +
+            "(function() { " +
+            "    for(var i=0; i < 10*1000; i++) { " +
+            "        mydb.capped.insert({ x: i }); " +
+            "    } " +
+            "})();",
+        mongod.port,
+    );
 });
 
 // The following causes inconsistent locking order in the ticket system, depending on
@@ -37,7 +41,7 @@ for (var i = 0; i < 1000; i++) {
 }
 
 // Wait for parallel shells to terminate and stop our replset.
-shells.forEach((function(f) {
+shells.forEach(function (f) {
     f();
-}));
+});
 replTest.stopSet();

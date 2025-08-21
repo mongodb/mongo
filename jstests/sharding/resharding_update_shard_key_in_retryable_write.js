@@ -18,12 +18,12 @@ function runTest(reshardInPlace) {
         oldShardKeyPattern: {oldShardKey: 1},
         oldShardKeyChunks: [
             {min: {oldShardKey: MinKey}, max: {oldShardKey: 0}, shard: donorShardNames[0]},
-            {min: {oldShardKey: 0}, max: {oldShardKey: MaxKey}, shard: donorShardNames[1]}
+            {min: {oldShardKey: 0}, max: {oldShardKey: MaxKey}, shard: donorShardNames[1]},
         ],
         newShardKeyPattern: {newShardKey: 1},
         newShardKeyChunks: [
             {min: {newShardKey: MinKey}, max: {newShardKey: 0}, shard: recipientShardNames[0]},
-            {min: {newShardKey: 0}, max: {newShardKey: MaxKey}, shard: recipientShardNames[1]}
+            {min: {newShardKey: 0}, max: {newShardKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     };
 
@@ -45,9 +45,7 @@ function runTest(reshardInPlace) {
     // being deleted.
     const updateCmdObj = {
         update: collName,
-        updates: [
-            {q: {oldShardKey: -1, newShardKey: -1}, u: {$set: {oldShardKey: 1}}},
-        ],
+        updates: [{q: {oldShardKey: -1, newShardKey: -1}, u: {$set: {oldShardKey: 1}}}],
         ordered: false,
         lsid: {id: UUID()},
         txnNumber: NumberLong(1),
@@ -84,8 +82,10 @@ function runTest(reshardInPlace) {
         assert.soon(() => {
             res = db.runCommand(cmdObj);
 
-            if (expectedTransientErrors.has(res.code) ||
-                (res.writeErrors && expectedTransientErrors.has(res.writeErrors[0].code))) {
+            if (
+                expectedTransientErrors.has(res.code) ||
+                (res.writeErrors && expectedTransientErrors.has(res.writeErrors[0].code))
+            ) {
                 cmdObj.txnNumber = NumberLong(cmdObj.txnNumber + 1);
                 return false;
             }
@@ -107,8 +107,7 @@ function runTest(reshardInPlace) {
             // The cloneTimestamp is the boundary for whether a retryable write statement will
             // be retryable after the resharding operation completes.
             assert.soon(() => {
-                const coordinatorDoc =
-                    mongosConn.getCollection("config.reshardingOperations").findOne({ns: ns});
+                const coordinatorDoc = mongosConn.getCollection("config.reshardingOperations").findOne({ns: ns});
 
                 return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
             });
@@ -119,23 +118,18 @@ function runTest(reshardInPlace) {
             assert.eq(updateRes.n, 1, tojson(updateRes));
             assert.eq(updateRes.nModified, 1, tojson(updateRes));
 
-            const findAndModifyUpdateRes =
-                runCommandRetryOnTransientErrors(mongosTestDB, findAndModifyUpdateCmdObj);
+            const findAndModifyUpdateRes = runCommandRetryOnTransientErrors(mongosTestDB, findAndModifyUpdateCmdObj);
             assert.eq(findAndModifyUpdateRes.lastErrorObject.n, 1, tojson(findAndModifyUpdateRes));
-            assert.eq(findAndModifyUpdateRes.lastErrorObject.updatedExisting,
-                      true,
-                      tojson(findAndModifyUpdateRes));
+            assert.eq(findAndModifyUpdateRes.lastErrorObject.updatedExisting, true, tojson(findAndModifyUpdateRes));
 
-            let findAndModifyUpsertRes =
-                runCommandRetryOnTransientErrors(mongosTestDB, findAndModifyUpsertCmdObj);
+            let findAndModifyUpsertRes = runCommandRetryOnTransientErrors(mongosTestDB, findAndModifyUpsertCmdObj);
             assert.eq(findAndModifyUpsertRes.lastErrorObject.n, 1, tojson(findAndModifyUpsertRes));
-            assert.eq(findAndModifyUpsertRes.lastErrorObject.updatedExisting,
-                      false,
-                      tojson(findAndModifyUpsertRes));
+            assert.eq(findAndModifyUpsertRes.lastErrorObject.updatedExisting, false, tojson(findAndModifyUpsertRes));
             assert(findAndModifyUpsertRes.lastErrorObject.upserted, tojson(findAndModifyUpsertRes));
 
             jsTest.log("Finished running retryable writes during resharding");
-        });
+        },
+    );
 
     assert.eq(mongosTestColl.find({oldShardKey: -1, newShardKey: -1}).itcount(), 0);
     assert.eq(mongosTestColl.find({oldShardKey: -2, newShardKey: -2}).itcount(), 0);
@@ -144,12 +138,15 @@ function runTest(reshardInPlace) {
     assert.eq(mongosTestColl.find({oldShardKey: 3, newShardKey: -3}).itcount(), 1);
 
     jsTest.log("Start retrying retryable writes after resharding");
-    assert.commandFailedWithCode(mongosTestDB.runCommand(updateCmdObj),
-                                 ErrorCodes.IncompleteTransactionHistory);
-    assert.commandFailedWithCode(mongosTestDB.runCommand(findAndModifyUpdateCmdObj),
-                                 ErrorCodes.IncompleteTransactionHistory);
-    assert.commandFailedWithCode(mongosTestDB.runCommand(findAndModifyUpsertCmdObj),
-                                 ErrorCodes.IncompleteTransactionHistory);
+    assert.commandFailedWithCode(mongosTestDB.runCommand(updateCmdObj), ErrorCodes.IncompleteTransactionHistory);
+    assert.commandFailedWithCode(
+        mongosTestDB.runCommand(findAndModifyUpdateCmdObj),
+        ErrorCodes.IncompleteTransactionHistory,
+    );
+    assert.commandFailedWithCode(
+        mongosTestDB.runCommand(findAndModifyUpsertCmdObj),
+        ErrorCodes.IncompleteTransactionHistory,
+    );
     jsTest.log("Finished retrying retryable writes after resharding");
 
     assert.eq(mongosTestColl.find({oldShardKey: -1, newShardKey: -1}).itcount(), 0);

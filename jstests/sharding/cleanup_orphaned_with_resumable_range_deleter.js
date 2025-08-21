@@ -18,8 +18,7 @@ const ns = dbName + "." + collName;
 var st = new ShardingTest({shards: 2});
 
 jsTest.log("Shard and split a collection");
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 1}}));
@@ -44,26 +43,30 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.sh
 
 jsTest.log("Since the recipient does not have orphaned ranges, cleanupOrphaned should return");
 assert.eq(0, st.shard1.getDB("config").getCollection("rangeDeletions").count());
-assert.commandWorked(st.shard1.adminCommand({
-    cleanupOrphaned: ns,
-    startingFromKey: {_id: 50} /* The startingFromKey parameter should be ignored */
-}));
+assert.commandWorked(
+    st.shard1.adminCommand({
+        cleanupOrphaned: ns,
+        startingFromKey: {_id: 50} /* The startingFromKey parameter should be ignored */,
+    }),
+);
 
 jsTest.log("Since the donor has two orphaned ranges, cleanupOrphaned should block");
 assert.eq(2, st.shard0.getDB("config").getCollection("rangeDeletions").count());
-assert.commandFailedWithCode(st.shard0.adminCommand({
-    cleanupOrphaned: ns,
-    startingFromKey: {_id: 50} /* The startingFromKey parameter should be ignored */,
-    maxTimeMS: 10 * 1000
-}),
-                             ErrorCodes.MaxTimeMSExpired);
+assert.commandFailedWithCode(
+    st.shard0.adminCommand({
+        cleanupOrphaned: ns,
+        startingFromKey: {_id: 50} /* The startingFromKey parameter should be ignored */,
+        maxTimeMS: 10 * 1000,
+    }),
+    ErrorCodes.MaxTimeMSExpired,
+);
 assert.eq(numDocs, st.shard0.getDB(dbName).getCollection(collName).count());
 
 jsTest.log("Once the donor can cleans up the ranges, cleanupOrphaned should eventually return.");
 suspendRangeDeletionShard0.off();
 const res = st.shard0.adminCommand({
     cleanupOrphaned: ns,
-    startingFromKey: {_id: 50} /* The startingFromKey parameter should be ignored */
+    startingFromKey: {_id: 50} /* The startingFromKey parameter should be ignored */,
 });
 assert.commandWorked(res);
 assert.eq(0, st.shard0.getDB("config").getCollection("rangeDeletions").count());

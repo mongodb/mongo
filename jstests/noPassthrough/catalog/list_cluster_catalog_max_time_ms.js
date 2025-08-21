@@ -25,13 +25,14 @@ function runTest(conn, failPointNode) {
 
     let fp = configureFailPoint(failPointNode, "hangBeforeListCollections");
     const awaitListClusterCatalog = startParallelShell(
-        funWithArgs(function(timeout) {
+        funWithArgs(function (timeout) {
             assert.commandFailedWithCode(
-                db.adminCommand(
-                    "aggregate",
-                    {pipeline: [{$listClusterCatalog: {}}], cursor: {}, maxTimeMS: timeout}),
-                [ErrorCodes.MaxTimeMSExpired]);
-        }, kTimeoutMs), conn.port);
+                db.adminCommand("aggregate", {pipeline: [{$listClusterCatalog: {}}], cursor: {}, maxTimeMS: timeout}),
+                [ErrorCodes.MaxTimeMSExpired],
+            );
+        }, kTimeoutMs),
+        conn.port,
+    );
 
     // Run the first listCollection and wait for it to complete
     jsTest.log("Waiting for hangBeforeListCollections");

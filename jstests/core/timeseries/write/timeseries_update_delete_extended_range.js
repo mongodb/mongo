@@ -20,7 +20,7 @@ import {
     metaFieldName,
     testFindOneAndRemove,
     testFindOneAndUpdate,
-    timeFieldName
+    timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
 {
@@ -124,12 +124,12 @@ import {
                     "$and": [
                         // No _id predicate due to extended range data in the collection.
                         {"control.max.time": {"$_internalExprGt": ISODate("1972-01-01T00:00:00Z")}},
-                        {"control.min.time": {"$_internalExprGt": ISODate("1971-12-31T23:00:00Z")}}
-                    ]
+                        {"control.min.time": {"$_internalExprGt": ISODate("1971-12-31T23:00:00Z")}},
+                    ],
                 }),
                 residualFilter: {"time": {"$gt": ISODate("1972-01-01T00:00:00Z")}},
                 nBucketsUnpacked: 1,
-                nModified: 1
+                nModified: 1,
             },
         });
     })();
@@ -171,12 +171,12 @@ import {
                     "$and": [
                         // No _id predicate due to extended range data in the collection.
                         {"control.max.time": {"$_internalExprGt": ISODate("1972-01-01T00:00:00Z")}},
-                        {"control.min.time": {"$_internalExprGt": ISODate("1971-12-31T23:00:00Z")}}
-                    ]
+                        {"control.min.time": {"$_internalExprGt": ISODate("1971-12-31T23:00:00Z")}},
+                    ],
                 }),
                 residualFilter: {"time": {"$gt": ISODate("1972-01-01T00:00:00Z")}},
                 nBucketsUnpacked: 1,
-                nDeleted: 1
+                nDeleted: 1,
             },
         });
     })();
@@ -227,11 +227,11 @@ import {
                         {"_id": {"$gt": ObjectId("03c258f0ffffffffffffffff")}},
                         {"control.max.time": {"$_internalExprGt": ISODate("1972-01-01T00:00:00Z")}},
                         {"control.min.time": {"$_internalExprGt": ISODate("1971-12-31T23:00:00Z")}},
-                    ]
+                    ],
                 }),
                 residualFilter: {"time": {"$gt": ISODate("1972-01-01T00:00:00Z")}},
                 nBucketsUnpacked: 1,
-                nModified: 1
+                nModified: 1,
             },
         });
     })();
@@ -275,11 +275,11 @@ import {
                         {"_id": {"$gt": ObjectId("03c258f0ffffffffffffffff")}},
                         {"control.max.time": {"$_internalExprGt": ISODate("1972-01-01T00:00:00Z")}},
                         {"control.min.time": {"$_internalExprGt": ISODate("1971-12-31T23:00:00Z")}},
-                    ]
+                    ],
                 }),
                 residualFilter: {"time": {"$gt": ISODate("1972-01-01T00:00:00Z")}},
                 nBucketsUnpacked: 1,
-                nDeleted: 1
+                nDeleted: 1,
             },
         });
     })();
@@ -329,7 +329,7 @@ import {
                 bucketFilter: makeBucketFilter({}),
                 residualFilter: {"time": {"$gt": ISODate("1950-01-01T00:00:00Z")}},
                 nBucketsUnpacked: 1,
-                nModified: 1
+                nModified: 1,
             },
         });
     })();
@@ -372,7 +372,7 @@ import {
                 bucketFilter: makeBucketFilter({}),
                 residualFilter: {"time": {"$gt": ISODate("1950-01-01T00:00:00Z")}},
                 nBucketsUnpacked: 1,
-                nDeleted: 1
+                nDeleted: 1,
             },
         });
     })();
@@ -391,7 +391,7 @@ import {
                 bucketFilter: makeBucketFilter({$alwaysFalse: 1}),
                 residualFilter: {"time": {"$lt": ISODate("1950-01-01T00:00:00Z")}},
                 nBucketsUnpacked: 0,
-                nModified: 0
+                nModified: 0,
             },
         });
     })();
@@ -409,7 +409,7 @@ import {
                 bucketFilter: makeBucketFilter({$alwaysFalse: 1}),
                 residualFilter: {"time": {"$lt": ISODate("1950-01-01T00:00:00Z")}},
                 nBucketsUnpacked: 0,
-                nDeleted: 0
+                nDeleted: 0,
             },
         });
     })();

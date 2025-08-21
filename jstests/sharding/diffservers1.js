@@ -15,9 +15,11 @@ assert.commandFailed(s.s0.adminCommand({addshard: "sdd$%", maxTimeMS: 60000}), "
 var portWithoutHostRunning = allocatePort();
 assert.commandFailed(
     s.s0.adminCommand({addshard: "127.0.0.1:" + portWithoutHostRunning, maxTimeMS: 60000}),
-    "Host which is not up");
+    "Host which is not up",
+);
 assert.commandFailed(
     s.s0.adminCommand({addshard: "10.0.0.1:" + portWithoutHostRunning, maxTimeMS: 60000}),
-    "Allowed shard in IP when config is localhost");
+    "Allowed shard in IP when config is localhost",
+);
 
 s.stop();

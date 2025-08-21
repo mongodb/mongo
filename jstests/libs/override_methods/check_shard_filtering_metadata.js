@@ -1,9 +1,7 @@
-import {
-    CheckShardFilteringMetadataHelpers
-} from "jstests/libs/check_shard_filtering_metadata_helpers.js";
+import {CheckShardFilteringMetadataHelpers} from "jstests/libs/check_shard_filtering_metadata_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-ShardingTest.prototype.checkShardFilteringMetadata = function() {
+ShardingTest.prototype.checkShardFilteringMetadata = function () {
     if (jsTest.options().skipCheckShardFilteringMetadata) {
         jsTest.log("Skipping shard filtering metadata check");
         return;
@@ -15,13 +13,13 @@ ShardingTest.prototype.checkShardFilteringMetadata = function() {
     mongosConn.fullOptions = Object.merge(this.s.fullOptions, {});
 
     const keyFile = this.keyFile;
-    const useAuth = keyFile || mongosConn.fullOptions.clusterAuthMode === 'x509';
+    const useAuth = keyFile || mongosConn.fullOptions.clusterAuthMode === "x509";
 
-    let getConn = function(connStr) {
+    let getConn = function (connStr) {
         try {
             return new Mongo(connStr);
         } catch (exp) {
-            jsTest.log('CheckShardFilteringMetadata: Unable to connect to ' + connStr);
+            jsTest.log("CheckShardFilteringMetadata: Unable to connect to " + connStr);
             return null;
         }
     };
@@ -39,40 +37,43 @@ ShardingTest.prototype.checkShardFilteringMetadata = function() {
         assert.commandWorked(mongosConn.adminCommand({balancerStop: 1}));
 
         // For each shard
-        mongosConn.getDB('config').shards.find().forEach(shardDoc => {
-            const shardName = shardDoc._id;
-            const shardConn = getConn(shardDoc.host);
-            if (shardConn === null) {
-                jsTest.log('CheckShardFilteringMetadata: Skipping check on shard' + shardDoc.host);
-                return;
-            }
-            shardConn.fullOptions = Object.merge(this.s.fullOptions, {});
-
-            // Await replication to ensure that metadata on secondary nodes is up-to-date.
-            this.awaitReplicationOnShards();
-
-            // Get nodes for this shard
-            shardConn.setSecondaryOk();
-            const shardNodesHosts = executeAuthenticatedIfNeeded(shardConn, () => {
-                return shardConn.adminCommand({replSetGetConfig: 1})
-                    .config.members.filter(member => member.arbiterOnly === false)
-                    .map(member => member.host);
-            });
-
-            // Run check on each node
-            shardNodesHosts.forEach(host => {
-                const shardNodeConn = getConn(host);
-                if (shardNodeConn === null) {
-                    jsTest.log('CheckShardFilteringMetadata: Skipping check on node' +
-                               shardDoc.host);
+        mongosConn
+            .getDB("config")
+            .shards.find()
+            .forEach((shardDoc) => {
+                const shardName = shardDoc._id;
+                const shardConn = getConn(shardDoc.host);
+                if (shardConn === null) {
+                    jsTest.log("CheckShardFilteringMetadata: Skipping check on shard" + shardDoc.host);
                     return;
                 }
-                shardNodeConn.fullOptions = Object.merge(this.s.fullOptions, {});
+                shardConn.fullOptions = Object.merge(this.s.fullOptions, {});
 
-                executeAuthenticatedIfNeeded(shardNodeConn, () => {
-                    CheckShardFilteringMetadataHelpers.run(mongosConn, shardNodeConn, shardName);
+                // Await replication to ensure that metadata on secondary nodes is up-to-date.
+                this.awaitReplicationOnShards();
+
+                // Get nodes for this shard
+                shardConn.setSecondaryOk();
+                const shardNodesHosts = executeAuthenticatedIfNeeded(shardConn, () => {
+                    return shardConn
+                        .adminCommand({replSetGetConfig: 1})
+                        .config.members.filter((member) => member.arbiterOnly === false)
+                        .map((member) => member.host);
+                });
+
+                // Run check on each node
+                shardNodesHosts.forEach((host) => {
+                    const shardNodeConn = getConn(host);
+                    if (shardNodeConn === null) {
+                        jsTest.log("CheckShardFilteringMetadata: Skipping check on node" + shardDoc.host);
+                        return;
+                    }
+                    shardNodeConn.fullOptions = Object.merge(this.s.fullOptions, {});
+
+                    executeAuthenticatedIfNeeded(shardNodeConn, () => {
+                        CheckShardFilteringMetadataHelpers.run(mongosConn, shardNodeConn, shardName);
+                    });
                 });
             });
-        });
     });
 };

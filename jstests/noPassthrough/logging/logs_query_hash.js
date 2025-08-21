@@ -15,11 +15,21 @@ db.foo.drop();
 assert.commandWorked(db.foo.insert({a: 1, b: 1, c: 1}));
 assert.commandWorked(db.foo.insert({d: 1}));
 assert.commandWorked(db.foo.insert({d: 2}));
-assert.commandWorked(db.foo.createIndexes([{a: 1, b: 1}, {b: 1, a: 1}]));
+assert.commandWorked(
+    db.foo.createIndexes([
+        {a: 1, b: 1},
+        {b: 1, a: 1},
+    ]),
+);
 
 db.bar.drop();
 assert.commandWorked(db.bar.insert({a: 1, b: 1, c: 1}));
-assert.commandWorked(db.bar.createIndexes([{a: 1, b: 1, c: 1}, {b: 1, a: 1, c: 1}]));
+assert.commandWorked(
+    db.bar.createIndexes([
+        {a: 1, b: 1, c: 1},
+        {b: 1, a: 1, c: 1},
+    ]),
+);
 
 function buildAggCommand(pipeline, comment, hint) {
     const command = {
@@ -37,10 +47,12 @@ function buildAggCommand(pipeline, comment, hint) {
 function buildUpdateCommand(query, update, comment) {
     return {
         update: "foo",
-        updates: [{
-            q: query,
-            u: update,
-        }],
+        updates: [
+            {
+                q: query,
+                u: update,
+            },
+        ],
         comment,
     };
 }
@@ -48,10 +60,12 @@ function buildUpdateCommand(query, update, comment) {
 function buildDeleteCommand(query, comment) {
     return {
         delete: "foo",
-        deletes: [{
-            q: query,
-            limit: 1,
-        }],
+        deletes: [
+            {
+                q: query,
+                limit: 1,
+            },
+        ],
         comment,
     };
 }
@@ -84,8 +98,10 @@ function runAndVerifySlowQueryLog(command) {
     expectedLog.command.comment = command.comment;
     expectedLog.planCacheShapeHash = queryPlanner.planCacheShapeHash;
     expectedLog.planCacheKey = queryPlanner.planCacheKey;
-    assert(checkLog.checkContainsWithCountJson(db, logId, expectedLog, 2, null, true),
-           "failed to find [" + tojson(expectedLog) + "] in the slow query log");
+    assert(
+        checkLog.checkContainsWithCountJson(db, logId, expectedLog, 2, null, true),
+        "failed to find [" + tojson(expectedLog) + "] in the slow query log",
+    );
 }
 
 const lookupStage = {
@@ -94,49 +110,64 @@ const lookupStage = {
         "let": {"b": {"$ifNull": ["$b", null]}},
         "pipeline": [
             {"$match": {"$or": [{"a": {"$exists": false}}, {"a": 1}]}},
-            {"$match": {"$expr": {"$eq": ["$b", "$$b"]}}}
+            {"$match": {"$expr": {"$eq": ["$b", "$$b"]}}},
         ],
-        "as": "bar"
-    }
+        "as": "bar",
+    },
 };
 
 // Aggregation $match-$lookup
-runAndVerifySlowQueryLog(buildAggCommand(
-    [{"$match": {$or: [{a: 1}, {b: 1}]}}, lookupStage] /* pipeline */, "pipeline1" /* comment */));
 runAndVerifySlowQueryLog(
-    buildAggCommand([{"$match": {a: {$in: [1, 2, 3, 4, 5]}}}, lookupStage] /* pipeline */,
-                    "pipeline2" /* comment */));
+    buildAggCommand([{"$match": {$or: [{a: 1}, {b: 1}]}}, lookupStage] /* pipeline */, "pipeline1" /* comment */),
+);
 runAndVerifySlowQueryLog(
-    buildAggCommand([{"$match": {b: 1}}, lookupStage] /* pipeline */, "pipeline3" /* comment */));
+    buildAggCommand([{"$match": {a: {$in: [1, 2, 3, 4, 5]}}}, lookupStage] /* pipeline */, "pipeline2" /* comment */),
+);
+runAndVerifySlowQueryLog(buildAggCommand([{"$match": {b: 1}}, lookupStage] /* pipeline */, "pipeline3" /* comment */));
 
 // Aggregation $match-$lookup with hint
 const hint = {
     "a": 1,
-    "b": 1
+    "b": 1,
 };
 runAndVerifySlowQueryLog(
-    buildAggCommand([{"$match": {$or: [{a: 1}, {b: 1}]}}, lookupStage] /* pipeline */,
-                    "pipelineWithHint1" /* comment */,
-                    hint));
+    buildAggCommand(
+        [{"$match": {$or: [{a: 1}, {b: 1}]}}, lookupStage] /* pipeline */,
+        "pipelineWithHint1" /* comment */,
+        hint,
+    ),
+);
 runAndVerifySlowQueryLog(
-    buildAggCommand([{"$match": {a: {$in: [1, 2, 3, 4, 5]}}}, lookupStage] /* pipeline */,
-                    "pipelineWithHint2" /* comment */,
-                    hint));
-runAndVerifySlowQueryLog(buildAggCommand(
-    [{"$match": {b: 1}}, lookupStage] /* pipeline */, "pipelineWithHint3" /* comment */, hint));
+    buildAggCommand(
+        [{"$match": {a: {$in: [1, 2, 3, 4, 5]}}}, lookupStage] /* pipeline */,
+        "pipelineWithHint2" /* comment */,
+        hint,
+    ),
+);
+runAndVerifySlowQueryLog(
+    buildAggCommand([{"$match": {b: 1}}, lookupStage] /* pipeline */, "pipelineWithHint3" /* comment */, hint),
+);
 
 // Update
-runAndVerifySlowQueryLog(
-    buildUpdateCommand({d: 1} /* query */, {$set: {d: 1}} /* update */, "update" /* comment */));
+runAndVerifySlowQueryLog(buildUpdateCommand({d: 1} /* query */, {$set: {d: 1}} /* update */, "update" /* comment */));
 
 // Delete
 runAndVerifySlowQueryLog(buildDeleteCommand({d: 1} /* query */, "delete" /* comment */));
 
 // FindAndModify
-runAndVerifySlowQueryLog(buildFindAndModifyCommand({d: 2} /* query */,
-                                                   {update: {$set: {d: 2}}} /* updateOrRemove */,
-                                                   "findAndModifyUpdate" /* comment */));
-runAndVerifySlowQueryLog(buildFindAndModifyCommand(
-    {d: 2} /* query */, {remove: true} /* updateOrRemove */, "findAndModifyRemove" /* comment */));
+runAndVerifySlowQueryLog(
+    buildFindAndModifyCommand(
+        {d: 2} /* query */,
+        {update: {$set: {d: 2}}} /* updateOrRemove */,
+        "findAndModifyUpdate" /* comment */,
+    ),
+);
+runAndVerifySlowQueryLog(
+    buildFindAndModifyCommand(
+        {d: 2} /* query */,
+        {remove: true} /* updateOrRemove */,
+        "findAndModifyRemove" /* comment */,
+    ),
+);
 
 MongoRunner.stopMongod(conn);

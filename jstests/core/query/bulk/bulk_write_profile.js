@@ -15,9 +15,7 @@
  * ]
  */
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getNLatestProfilerEntries} from "jstests/libs/profiler.js";
 
@@ -39,28 +37,30 @@ assert.commandWorked(coll2.createIndex({a: 1}));
 testDB.setProfilingLevel(1, {
     filter: {
         ns: {$in: [coll1.getFullName(), coll2.getFullName()]},
-        'command.setFeatureCompatibilityVersion': {'$exists': false}
-    }
+        "command.setFeatureCompatibilityVersion": {"$exists": false},
+    },
 });
 
-assert.commandWorked(testDB.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {insert: 1, document: {a: 10}},
-        {insert: 1, document: {a: 11}},
-        {insert: 1, document: {a: 12}},
-        {insert: 0, document: {b: 1}},
-        {
-            update: 1,
-            filter: {a: {$lt: 4}},
-            updateMods: {$push: {b: "mdb"}},
-            multi: true,
-            upsert: false
-        },
-        {delete: 1, filter: {a: {$gte: 8}}, multi: true, hint: {a: 1}}
-    ],
-    nsInfo: [{ns: coll1.getFullName()}, {ns: coll2.getFullName()}]
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        bulkWrite: 1,
+        ops: [
+            {insert: 1, document: {a: 10}},
+            {insert: 1, document: {a: 11}},
+            {insert: 1, document: {a: 12}},
+            {insert: 0, document: {b: 1}},
+            {
+                update: 1,
+                filter: {a: {$lt: 4}},
+                updateMods: {$push: {b: "mdb"}},
+                multi: true,
+                upsert: false,
+            },
+            {delete: 1, filter: {a: {$gte: 8}}, multi: true, hint: {a: 1}},
+        ],
+        nsInfo: [{ns: coll1.getFullName()}, {ns: coll2.getFullName()}],
+    }),
+);
 
 jsTestLog("Verifying bulkWrite command profiling outputs");
 

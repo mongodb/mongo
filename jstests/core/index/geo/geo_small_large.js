@@ -30,7 +30,7 @@ test = new GeoNearRandomTest("geo_small_large");
 
 bounds = {
     min: -Math.pow(2, -34),
-    max: Math.pow(2, -34)
+    max: Math.pow(2, -34),
 };
 
 test.insertPts(50, bounds);
@@ -56,7 +56,7 @@ for (let i = 0; i < scales.length; i++) {
     const range = max - min;
     const bits = 2 + Math.random() * 30;
 
-    const t = db.getCollection('geo_small_large_' + i);
+    const t = db.getCollection("geo_small_large_" + i);
     t.drop();
     assert.commandWorked(t.createIndex({p: "2d"}, {min: min, max: max, bits: bits}));
 
@@ -67,25 +67,35 @@ for (let i = 0; i < scales.length; i++) {
 
     // Put a point slightly inside and outside our range
     for (let j = 0; j < 2; j++) {
-        const currRad = (j % 2 == 0 ? radius + eps : radius - eps);
+        const currRad = j % 2 == 0 ? radius + eps : radius - eps;
         const res = t.insert({p: {x: currRad, y: 0}});
         print(res.toString());
     }
 
     printjson(t.find().toArray());
 
+    assert.eq(t.count({p: {$within: {$center: [[0, 0], radius]}}}), 1, "Incorrect center points found!");
     assert.eq(
-        t.count({p: {$within: {$center: [[0, 0], radius]}}}), 1, "Incorrect center points found!");
-    assert.eq(t.count({p: {$within: {$box: [[-radius, -radius], [radius, radius]]}}}),
-              1,
-              "Incorrect box points found!");
+        t.count({
+            p: {
+                $within: {
+                    $box: [
+                        [-radius, -radius],
+                        [radius, radius],
+                    ],
+                },
+            },
+        }),
+        1,
+        "Incorrect box points found!",
+    );
 
     let shouldFind = [];
     let randoms = [];
 
     for (let j = 0; j < 2; j++) {
-        const randX = Math.random();  // randoms[j].randX
-        const randY = Math.random();  // randoms[j].randY
+        const randX = Math.random(); // randoms[j].randX
+        const randY = Math.random(); // randoms[j].randY
 
         randoms.push({randX: randX, randY: randY});
 
@@ -140,9 +150,11 @@ for (let i = 0; i < scales.length; i++) {
     printDiff( shouldFind, didFind )
     */
 
-    assert.eq(t.count({p: {$within: {$center: [[0, 0], radius]}}}),
-              1 + inPoints,
-              "Incorrect random center points found!\n" + tojson(randoms));
+    assert.eq(
+        t.count({p: {$within: {$center: [[0, 0], radius]}}}),
+        1 + inPoints,
+        "Incorrect random center points found!\n" + tojson(randoms),
+    );
 
     print("Found " + inPoints + " points in and " + outPoints + " points out.");
 
@@ -151,11 +163,12 @@ for (let i = 0; i < scales.length; i++) {
     for (let f = 0; f < found.length; f++) {
         let x = found[f].p.x != undefined ? found[f].p.x : found[f].p[0];
         let y = found[f].p.y != undefined ? found[f].p.y : found[f].p[1];
-        print("Dist: x : " + x + " y : " + y + " dist : " + Math.sqrt(x * x + y * y) +
-              " radius : " + radius);
+        print("Dist: x : " + x + " y : " + y + " dist : " + Math.sqrt(x * x + y * y) + " radius : " + radius);
     }
 
-    assert.eq(t.count({p: {$near: [0, 0], $maxDistance: radius}}),
-              1 + inPoints,
-              "Incorrect random center points found near!\n" + tojson(randoms));
+    assert.eq(
+        t.count({p: {$near: [0, 0], $maxDistance: radius}}),
+        1 + inPoints,
+        "Incorrect random center points found near!\n" + tojson(randoms),
+    );
 }

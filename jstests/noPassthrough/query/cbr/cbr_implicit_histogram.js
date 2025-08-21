@@ -13,12 +13,7 @@ const collName = jsTestName();
 const coll = db[collName];
 const statsColl = db.system.statistics[collName];
 
-assert.commandWorked(coll.createIndexes([
-    {a: 1},
-    {a: 1, b: 1},
-    {'c.d': 1},
-    {e: 'hashed'},
-]));
+assert.commandWorked(coll.createIndexes([{a: 1}, {a: 1, b: 1}, {"c.d": 1}, {e: "hashed"}]));
 
 assert.commandWorked(coll.insert({a: 1}));
 
@@ -42,7 +37,7 @@ for (const tc of testCases) {
     statsColl.drop();
     assert.commandWorked(coll.runCommand(tc.command));
     const res = statsColl.find({}, {_id: 1}).sort({_id: 1}).toArray();
-    const paths = res.map(e => e._id);
+    const paths = res.map((e) => e._id);
     if (tc.analyzeIsRun) {
         assert.eq(["_id", "a", "b", "c.d", "e"], paths);
     } else {

@@ -11,7 +11,7 @@ const replSet = new ReplSetTest({
     // We will turn on the noop writer after newPrimary is elected to ensure that newPrimary will
     // eventually be an eligible sync source for the secondary. We don't turn it on at the start of
     // the test because the noop writer could cause newPrimary to lose the election.
-    nodeOptions: {setParameter: {writePeriodicNoops: false, periodicNoopIntervalSecs: 1}}
+    nodeOptions: {setParameter: {writePeriodicNoops: false, periodicNoopIntervalSecs: 1}},
 });
 replSet.startSet();
 replSet.initiate();

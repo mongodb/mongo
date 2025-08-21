@@ -19,8 +19,8 @@ const replTest = new ReplSetTest({
         {rsConfig: {priority: 0}},
         {rsConfig: {priority: 0}},
         {rsConfig: {priority: 0}},
-        {rsConfig: {priority: 0, votes: 0}}
-    ]
+        {rsConfig: {priority: 0, votes: 0}},
+    ],
 });
 replTest.startSet();
 let conf = replTest.getReplSetConfig();

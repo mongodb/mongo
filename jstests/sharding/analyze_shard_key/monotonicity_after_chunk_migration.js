@@ -15,8 +15,7 @@ const ns = dbName + "." + collName;
 const db = st.s.getDB(dbName);
 const coll = db.getCollection(collName);
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 // Make the collection have the following chunks:
 // shard0: [MinKey, 0] (-11000 documents)
@@ -33,19 +32,19 @@ for (let i = minVal; i < maxVal; i++) {
 }
 assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: true}));
 
-const listCollectionRes =
-    assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-const isClusteredColl =
-    listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
+const listCollectionRes = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+const isClusteredColl = listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
 const expectedType = isClusteredColl ? "unknown" : "monotonic";
 
-const res0 = assert.commandWorked(st.s.adminCommand({
-    analyzeShardKey: ns,
-    key: {x: 1},
-    // Skip calculating the read and write distribution metrics since there are not needed by
-    // this test.
-    readWriteDistribution: false
-}));
+const res0 = assert.commandWorked(
+    st.s.adminCommand({
+        analyzeShardKey: ns,
+        key: {x: 1},
+        // Skip calculating the read and write distribution metrics since there are not needed by
+        // this test.
+        readWriteDistribution: false,
+    }),
+);
 assert.eq(res0.keyCharacteristics.monotonicity.type, expectedType, res0);
 
 // Make the collection have the following chunks:
@@ -57,13 +56,15 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.
 // If mongos forwards the command to shard1 instead of shard0 (primary shard), the monotonicity
 // check will find that the documents [0, 2000] were inserted before the documents [-1000, 0] and
 // return that the shard key is not monotonically changing.
-const res1 = assert.commandWorked(st.s.adminCommand({
-    analyzeShardKey: ns,
-    key: {x: 1},
-    // Skip calculating the read and write distribution metrics since there are not needed by
-    // this test.
-    readWriteDistribution: false
-}));
+const res1 = assert.commandWorked(
+    st.s.adminCommand({
+        analyzeShardKey: ns,
+        key: {x: 1},
+        // Skip calculating the read and write distribution metrics since there are not needed by
+        // this test.
+        readWriteDistribution: false,
+    }),
+);
 assert.eq(res1.keyCharacteristics.monotonicity.type, expectedType, res1);
 
 st.stop();

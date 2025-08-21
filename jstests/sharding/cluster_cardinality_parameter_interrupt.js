@@ -19,24 +19,21 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkClusterParameter,
     interruptConfigsvrAddShard,
-    interruptConfigsvrRemoveShard
+    interruptConfigsvrRemoveShard,
 } from "jstests/sharding/libs/cluster_cardinality_parameter_util.js";
 
 const st = new ShardingTest({shards: 1});
 
 // Create an unsharded and a sharded collection to be used later on in the test.
-const dbName = 'test';
-const unshardedCollName = 'unsharded';
-const shardedCollName1 = 'sharded1';
-const shardedCollName2 = 'sharded2';
-const shardedCollName3 = 'sharded3';
+const dbName = "test";
+const unshardedCollName = "unsharded";
+const shardedCollName1 = "sharded1";
+const shardedCollName2 = "sharded2";
+const shardedCollName3 = "sharded3";
 assert.commandWorked(st.s.getDB(dbName).createCollection(unshardedCollName));
-assert.commandWorked(
-    st.s.adminCommand({shardCollection: dbName + '.' + shardedCollName1, key: {_id: 1}}));
-assert.commandWorked(
-    st.s.adminCommand({shardCollection: dbName + '.' + shardedCollName2, key: {_id: 1}}));
-assert.commandWorked(
-    st.s.adminCommand({shardCollection: dbName + '.' + shardedCollName3, key: {_id: 1}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: dbName + "." + shardedCollName1, key: {_id: 1}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: dbName + "." + shardedCollName2, key: {_id: 1}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: dbName + "." + shardedCollName3, key: {_id: 1}}));
 
 jsTest.log("Checking the cluster parameter while the cluster contains one shard");
 // There is only one shard in the cluster, so the cluster parameter should be false.
@@ -73,11 +70,9 @@ const shard1Rst = new ReplSetTest({name: shard1Name, nodes: 1});
 shard1Rst.startSet({shardsvr: ""});
 shard1Rst.initiate();
 
-jsTest.log(
-    "Run an addShard command but interrupt it before it updates the cluster cardinality parameter");
+jsTest.log("Run an addShard command but interrupt it before it updates the cluster cardinality parameter");
 const configPrimary = st.configRS.getPrimary();
-const addShardFp =
-    configureFailPoint(configPrimary, "hangAddShardBeforeUpdatingClusterCardinalityParameter");
+const addShardFp = configureFailPoint(configPrimary, "hangAddShardBeforeUpdatingClusterCardinalityParameter");
 const addShardThread = new Thread(addShard, st.s.host, shard1Rst.getURL(), shard1Name);
 addShardThread.start();
 addShardFp.wait();
@@ -93,52 +88,56 @@ checkClusterParameter(shard1Rst, false);
 jsTest.log("Ensure that data cannot be moved yet even though the second shard is visible");
 assert.commandFailedWithCode(
     st.s.adminCommand({moveCollection: dbName + "." + unshardedCollName, toShard: shard1Rst.name}),
-    ErrorCodes.IllegalOperation);
+    ErrorCodes.IllegalOperation,
+);
 assert.commandFailedWithCode(
-    st.s.adminCommand(
-        {moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}),
-    ErrorCodes.IllegalOperation);
-assert.commandFailedWithCode(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}),
-                             ErrorCodes.IllegalOperation);
+    st.s.adminCommand({moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}),
+    ErrorCodes.IllegalOperation,
+);
+assert.commandFailedWithCode(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}), ErrorCodes.IllegalOperation);
 
 addShardFp.off();
 
 jsTest.log("Checking the cluster parameter after hang");
 // Even if the command is interrupted the coordinator adds the shard eventually
 assert.soon(() => {
-    let res = assert.commandWorked(st.configRS.getPrimary().adminCommand(
-        {getClusterParameter: "shardedClusterCardinalityForDirectConns"}));
+    let res = assert.commandWorked(
+        st.configRS.getPrimary().adminCommand({getClusterParameter: "shardedClusterCardinalityForDirectConns"}),
+    );
     return res.clusterParameters[0].hasTwoOrMoreShards === true;
 });
 
 jsTest.log("Ensure that data can be moved");
+assert.commandWorked(st.s.adminCommand({moveCollection: dbName + "." + unshardedCollName, toShard: shard1Rst.name}));
 assert.commandWorked(
-    st.s.adminCommand({moveCollection: dbName + "." + unshardedCollName, toShard: shard1Rst.name}));
-assert.commandWorked(st.s.adminCommand(
-    {moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}));
+    st.s.adminCommand({moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}),
+);
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}));
 // The collection should be able to be resharded locally
-assert.commandWorked(st.s.adminCommand({
-    reshardCollection: dbName + '.' + shardedCollName2,
-    key: {_id: 1},
-    forceRedistribution: true,
-    shardDistribution: [{shard: st.shard0.shardName, min: {_id: MinKey}, max: {_id: MaxKey}}]
-}));
-// The collection should be able to be resharded to another shard
-assert.commandWorked(st.s.adminCommand({
-    reshardCollection: dbName + '.' + shardedCollName2,
-    key: {_id: 1},
-    forceRedistribution: true,
-    shardDistribution: [{shard: shard1Rst.name, min: {_id: MinKey}, max: {_id: MaxKey}}]
-}));
-// The collection should be able to be unsharded locally
-assert.commandWorked(st.s.adminCommand(
-    {unshardCollection: dbName + '.' + shardedCollName3, toShard: st.shard0.shardName}));
 assert.commandWorked(
-    st.s.adminCommand({shardCollection: dbName + '.' + shardedCollName3, key: {_id: 1}}));
+    st.s.adminCommand({
+        reshardCollection: dbName + "." + shardedCollName2,
+        key: {_id: 1},
+        forceRedistribution: true,
+        shardDistribution: [{shard: st.shard0.shardName, min: {_id: MinKey}, max: {_id: MaxKey}}],
+    }),
+);
+// The collection should be able to be resharded to another shard
+assert.commandWorked(
+    st.s.adminCommand({
+        reshardCollection: dbName + "." + shardedCollName2,
+        key: {_id: 1},
+        forceRedistribution: true,
+        shardDistribution: [{shard: shard1Rst.name, min: {_id: MinKey}, max: {_id: MaxKey}}],
+    }),
+);
+// The collection should be able to be unsharded locally
+assert.commandWorked(
+    st.s.adminCommand({unshardCollection: dbName + "." + shardedCollName3, toShard: st.shard0.shardName}),
+);
+assert.commandWorked(st.s.adminCommand({shardCollection: dbName + "." + shardedCollName3, key: {_id: 1}}));
 // The collection should be able to be unsharded to another shard
-assert.commandWorked(st.s.adminCommand(
-    {unshardCollection: dbName + '.' + shardedCollName3, toShard: shard1Rst.name}));
+assert.commandWorked(st.s.adminCommand({unshardCollection: dbName + "." + shardedCollName3, toShard: shard1Rst.name}));
 
 jsTest.log("Retry the addShard command");
 assert.commandWorked(st.s.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
@@ -150,39 +149,44 @@ checkClusterParameter(st.rs0, true);
 checkClusterParameter(shard1Rst, true);
 
 jsTest.log("Check that data movement is now allowed");
+assert.commandWorked(st.s.adminCommand({moveCollection: dbName + "." + unshardedCollName, toShard: shard1Rst.name}));
 assert.commandWorked(
-    st.s.adminCommand({moveCollection: dbName + '.' + unshardedCollName, toShard: shard1Rst.name}));
-assert.commandWorked(st.s.adminCommand(
-    {moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}));
+    st.s.adminCommand({moveChunk: dbName + "." + shardedCollName1, find: {_id: 0}, to: shard1Rst.name}),
+);
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: shard1Rst.name}));
-assert.commandWorked(st.s.adminCommand({
-    reshardCollection: dbName + '.' + shardedCollName2,
-    key: {_id: 1},
-    forceRedistribution: true,
-    shardDistribution: [{shard: shard1Rst.name, min: {_id: MinKey}, max: {_id: MaxKey}}]
-}));
-assert.commandWorked(st.s.adminCommand(
-    {unshardCollection: dbName + '.' + shardedCollName3, toShard: shard1Rst.name}));
+assert.commandWorked(
+    st.s.adminCommand({
+        reshardCollection: dbName + "." + shardedCollName2,
+        key: {_id: 1},
+        forceRedistribution: true,
+        shardDistribution: [{shard: shard1Rst.name, min: {_id: MinKey}, max: {_id: MaxKey}}],
+    }),
+);
+assert.commandWorked(st.s.adminCommand({unshardCollection: dbName + "." + shardedCollName3, toShard: shard1Rst.name}));
 
 // TODO (SERVER-91070) Enable these tests in multiversion once v9.0 become last-lts.
 const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 if (!isMultiversion) {
     // Move the remaining data out of shard0 so it can be removed.
-    assert.commandWorked(st.s.adminCommand({
-        moveChunk: "config.system.sessions",
-        find: {_id: 0},
-        to: shard1Name,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        st.s.adminCommand({
+            moveChunk: "config.system.sessions",
+            find: {_id: 0},
+            to: shard1Name,
+            _waitForDelete: true,
+        }),
+    );
 
-    jsTest.log(
-        "Run a removeShard command but interrupt it before it updates the cluster cardinality parameter");
-    const removeShardCmdName =
-        (st.shard0.shardName == "config") ? "transitionToDedicatedConfigServer" : "removeShard";
-    const removeShardFp = configureFailPoint(
-        configPrimary, "hangRemoveShardBeforeUpdatingClusterCardinalityParameter");
+    jsTest.log("Run a removeShard command but interrupt it before it updates the cluster cardinality parameter");
+    const removeShardCmdName = st.shard0.shardName == "config" ? "transitionToDedicatedConfigServer" : "removeShard";
+    const removeShardFp = configureFailPoint(configPrimary, "hangRemoveShardBeforeUpdatingClusterCardinalityParameter");
     const removeShardThread = new Thread(
-        removeShard, st.s.host, removeShardCmdName, st.shard0.shardName, ErrorCodes.Interrupted);
+        removeShard,
+        st.s.host,
+        removeShardCmdName,
+        st.shard0.shardName,
+        ErrorCodes.Interrupted,
+    );
     removeShardThread.start();
     removeShardFp.wait();
     interruptConfigsvrRemoveShard(configPrimary);
@@ -200,11 +204,11 @@ if (!isMultiversion) {
     // Even if the command is interrupted the coordinator removes the shard eventually.
     // The removeShard command should set to cluster parameter to false if the replica set endpoint
     // feature flag is enabled.
-    const expectedHasTwoOrMoreShards =
-        !FeatureFlagUtil.isPresentAndEnabled(configPrimary, "ReplicaSetEndpoint");
+    const expectedHasTwoOrMoreShards = !FeatureFlagUtil.isPresentAndEnabled(configPrimary, "ReplicaSetEndpoint");
     assert.soon(() => {
-        let res = assert.commandWorked(st.configRS.getPrimary().adminCommand(
-            {getClusterParameter: "shardedClusterCardinalityForDirectConns"}));
+        let res = assert.commandWorked(
+            st.configRS.getPrimary().adminCommand({getClusterParameter: "shardedClusterCardinalityForDirectConns"}),
+        );
         return res.clusterParameters[0].hasTwoOrMoreShards === expectedHasTwoOrMoreShards;
     });
 
@@ -216,7 +220,8 @@ if (!isMultiversion) {
     } else {
         assert.commandWorkedOrFailedWithCode(
             st.s.adminCommand({[removeShardCmdName]: st.shard0.shardName}),
-            ErrorCodes.ShardNotFound);
+            ErrorCodes.ShardNotFound,
+        );
     }
 
     jsTest.log("Checking the cluster parameter");

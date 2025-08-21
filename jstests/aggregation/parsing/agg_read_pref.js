@@ -11,8 +11,8 @@ assert.commandWorked(collection.insert({foo: 1}));
 let res = db.runCommand({
     aggregate: collection.getName(),
     pipeline: [{$project: {_id: false, foo: true}}],
-    $readPreference: {mode: 'primary'},
-    cursor: {}
+    $readPreference: {mode: "primary"},
+    cursor: {},
 });
 
 assert.commandWorked(res);

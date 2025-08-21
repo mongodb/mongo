@@ -12,8 +12,8 @@ const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
         syncdelay: 0,
-        setParameter: {logComponentVerbosity: tojson({storage: {wt: {wtCheckpoint: 1}}})}
-    }
+        setParameter: {logComponentVerbosity: tojson({storage: {wt: {wtCheckpoint: 1}}})},
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -28,29 +28,25 @@ const coll = db.getCollection(collName);
 
 // Set write concern such that we ensure the stable timestamp advances to include our most recent
 // writes before we take a checkpoint. This is to avoid running into a possible race.
-assert.commandWorked(
-    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, j: true}}));
+assert.commandWorked(rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, j: true}}));
 
 // Validate errors if the collection doesn't exist.
-(function() {
-assert.commandFailedWithCode(db.runCommand({validate: collName, background: false}),
-                             ErrorCodes.NamespaceNotFound);
-assert.commandFailedWithCode(db.runCommand({validate: collName, background: true}),
-                             ErrorCodes.NamespaceNotFound);
-}());
+(function () {
+    assert.commandFailedWithCode(db.runCommand({validate: collName, background: false}), ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(db.runCommand({validate: collName, background: true}), ErrorCodes.NamespaceNotFound);
+})();
 
 // Validate with {background: true} fails to find an uncheckpoint'ed collection.
-(function() {
-assert.commandWorked(db.createCollection(collName));
-let res = assert.commandWorked(db.runCommand({validate: collName, background: false}));
-assert(res.valid);
+(function () {
+    assert.commandWorked(db.createCollection(collName));
+    let res = assert.commandWorked(db.runCommand({validate: collName, background: false}));
+    assert(res.valid);
 
-assert.commandFailedWithCode(db.runCommand({validate: collName, background: true}),
-                             ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(db.runCommand({validate: collName, background: true}), ErrorCodes.NamespaceNotFound);
 
-coll.drop();
-assert.commandWorked(db.adminCommand({fsync: 1}));
-}());
+    coll.drop();
+    assert.commandWorked(db.adminCommand({fsync: 1}));
+})();
 
 function checkValidationResponse(res, numExpectedIndexes) {
     jsTestLog(res);
@@ -61,52 +57,46 @@ function checkValidationResponse(res, numExpectedIndexes) {
 
 // Validate with {background: true} skips validating indexes that are not part of the same
 // checkpoint that the collection is.
-(function() {
-assert.commandWorked(db.createCollection(collName));
-assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({b: 1}));
+(function () {
+    assert.commandWorked(db.createCollection(collName));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.createIndex({b: 1}));
 
-assert.commandWorked(db.adminCommand({fsync: 1}));
+    assert.commandWorked(db.adminCommand({fsync: 1}));
 
-assert.commandWorked(coll.createIndex({c: 1}));
-assert.commandWorked(coll.createIndex({d: 1}));
+    assert.commandWorked(coll.createIndex({c: 1}));
+    assert.commandWorked(coll.createIndex({d: 1}));
 
-checkValidationResponse(db.runCommand({validate: collName, background: false}),
-                        /*numExpectedIndexes=*/ 5);
-checkValidationResponse(db.runCommand({validate: collName, background: true}),
-                        /*numExpectedIndexes=*/ 3);
+    checkValidationResponse(db.runCommand({validate: collName, background: false}), /*numExpectedIndexes=*/ 5);
+    checkValidationResponse(db.runCommand({validate: collName, background: true}), /*numExpectedIndexes=*/ 3);
 
-assert.commandWorked(db.adminCommand({fsync: 1}));
+    assert.commandWorked(db.adminCommand({fsync: 1}));
 
-checkValidationResponse(db.runCommand({validate: collName, background: true}),
-                        /*numExpectedIndexes=*/ 5);
+    checkValidationResponse(db.runCommand({validate: collName, background: true}), /*numExpectedIndexes=*/ 5);
 
-coll.drop();
-assert.commandWorked(db.adminCommand({fsync: 1}));
-}());
+    coll.drop();
+    assert.commandWorked(db.adminCommand({fsync: 1}));
+})();
 
 // Validate with {background: true} validates indexes that are dropped but still part of the
 // checkpoint.
-(function() {
-assert.commandWorked(db.createCollection(collName));
-assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({b: 1}));
+(function () {
+    assert.commandWorked(db.createCollection(collName));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.commandWorked(coll.createIndex({b: 1}));
 
-assert.commandWorked(db.adminCommand({fsync: 1}));
+    assert.commandWorked(db.adminCommand({fsync: 1}));
 
-checkValidationResponse(db.runCommand({validate: collName, background: true}),
-                        /*numExpectedIndexes=*/ 3);
+    checkValidationResponse(db.runCommand({validate: collName, background: true}), /*numExpectedIndexes=*/ 3);
 
-assert.commandWorked(coll.dropIndex({a: 1}));
-assert.commandWorked(coll.dropIndex({b: 1}));
+    assert.commandWorked(coll.dropIndex({a: 1}));
+    assert.commandWorked(coll.dropIndex({b: 1}));
 
-checkValidationResponse(db.runCommand({validate: collName, background: true}),
-                        /*numExpectedIndexes=*/ 3);
+    checkValidationResponse(db.runCommand({validate: collName, background: true}), /*numExpectedIndexes=*/ 3);
 
-assert.commandWorked(db.adminCommand({fsync: 1}));
+    assert.commandWorked(db.adminCommand({fsync: 1}));
 
-checkValidationResponse(db.runCommand({validate: collName, background: true}),
-                        /*numExpectedIndexes=*/ 1);
-}());
+    checkValidationResponse(db.runCommand({validate: collName, background: true}), /*numExpectedIndexes=*/ 1);
+})();
 
 rst.stopSet();

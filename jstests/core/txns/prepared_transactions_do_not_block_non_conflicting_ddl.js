@@ -39,7 +39,7 @@ function testSuccess(cmdDBName, ddlCmd) {
 
 jsTest.log("Test 'create'.");
 const createCmd = {
-    create: collName
+    create: collName,
 };
 testSuccess(otherDBName, createCmd);
 
@@ -47,32 +47,34 @@ jsTest.log("Test 'createIndexes'.");
 const createIndexesCmd = {
     createIndexes: collName,
     indexes: [{key: {x: 1}, name: "x_1"}],
-    writeConcern: {w: 'majority'},
+    writeConcern: {w: "majority"},
 };
 testSuccess(otherDBName, createIndexesCmd);
 
 jsTest.log("Test 'dropIndexes'.");
 const dropIndexesCmd = {
     dropIndexes: collName,
-    index: "x_1"
+    index: "x_1",
 };
 testSuccess(otherDBName, dropIndexesCmd);
 
-assert.commandWorked(sessionDB.runCommand({
-    createIndexes: collName,
-    indexes: [{name: 'multiKeyField_1', key: {multiKeyField: 1}}],
-    writeConcern: {w: 'majority'},
-}));
+assert.commandWorked(
+    sessionDB.runCommand({
+        createIndexes: collName,
+        indexes: [{name: "multiKeyField_1", key: {multiKeyField: 1}}],
+        writeConcern: {w: "majority"},
+    }),
+);
 jsTest.log("Test 'insert' that enables multi-key index on the same collection.");
 const insertAndSetMultiKeyCmd = {
     insert: collName,
-    documents: [{multiKeyField: [1, 2]}]
+    documents: [{multiKeyField: [1, 2]}],
 };
 testSuccess(dbName, insertAndSetMultiKeyCmd);
 
 jsTest.log("Test 'drop'.");
 const dropCmd = {
-    drop: collName
+    drop: collName,
 };
 testSuccess(otherDBName, dropCmd);
 
@@ -81,7 +83,7 @@ assert.commandWorked(otherDB.getCollection(collName).insert({x: "doc-for-rename-
 otherDB.runCommand({drop: otherCollName});
 const renameCollectionCmd = {
     renameCollection: otherDBName + "." + collName,
-    to: otherDBName + "." + otherCollName
+    to: otherDBName + "." + otherCollName,
 };
 testSuccess("admin", renameCollectionCmd);
 

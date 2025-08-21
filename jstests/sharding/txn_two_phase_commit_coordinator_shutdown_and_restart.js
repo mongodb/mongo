@@ -17,31 +17,27 @@ TestData.skipCheckDBHashes = true;
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    runCommitThroughMongosInParallelThread
-} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
+import {runCommitThroughMongosInParallelThread} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const rs0_opts = {
-    nodes: [{}, {}]
+    nodes: [{}, {}],
 };
 // Start the participant replSet with one node as a priority 0 node to avoid flip flopping.
 const rs1_opts = {
-    nodes: [{}, {rsConfig: {priority: 0}}]
+    nodes: [{}, {rsConfig: {priority: 0}}],
 };
-const st =
-    new ShardingTest({shards: {rs0: rs0_opts, rs1: rs1_opts}, mongos: 1, causallyConsistent: true});
+const st = new ShardingTest({shards: {rs0: rs0_opts, rs1: rs1_opts}, mongos: 1, causallyConsistent: true});
 
 // Create a sharded collection:
 // shard0: [-inf, 0)
 // shard1: [0, inf)
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard0.name}));
-assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
-assert.commandWorked(st.s0.adminCommand({split: 'test.user', middle: {x: 0}}));
-assert.commandWorked(
-    st.s0.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard1.name}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: "test", primaryShard: st.shard0.name}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: "test.user", key: {x: 1}}));
+assert.commandWorked(st.s0.adminCommand({split: "test.user", middle: {x: 0}}));
+assert.commandWorked(st.s0.adminCommand({moveChunk: "test.user", find: {x: 0}, to: st.shard1.name}));
 
-const testDB = st.s0.getDB('test');
-assert.commandWorked(testDB.runCommand({insert: 'user', documents: [{x: -10}, {x: 10}]}));
+const testDB = st.s0.getDB("test");
+assert.commandWorked(testDB.runCommand({insert: "user", documents: [{x: -10}, {x: 10}]}));
 
 const coordinatorReplSetTest = st.rs0;
 const participantReplSetTest = st.rs1;
@@ -50,7 +46,7 @@ let coordinatorPrimaryConn = coordinatorReplSetTest.getPrimary();
 let participantPrimaryConn = participantReplSetTest.getPrimary();
 
 const lsid = {
-    id: UUID()
+    id: UUID(),
 };
 let txnNumber = 0;
 
@@ -59,23 +55,25 @@ jsTest.log("Starting a cross-shard transaction");
 const updateDocumentOnShard0 = {
     q: {x: -1},
     u: {"$set": {a: 1}},
-    upsert: true
+    upsert: true,
 };
 
 const updateDocumentOnShard1 = {
     q: {x: 1},
     u: {"$set": {a: 1}},
-    upsert: true
+    upsert: true,
 };
 
-assert.commandWorked(testDB.runCommand({
-    update: 'user',
-    updates: [updateDocumentOnShard0, updateDocumentOnShard1],
-    lsid: lsid,
-    txnNumber: NumberLong(txnNumber),
-    autocommit: false,
-    startTransaction: true
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        update: "user",
+        updates: [updateDocumentOnShard0, updateDocumentOnShard1],
+        lsid: lsid,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+        startTransaction: true,
+    }),
+);
 
 jsTest.log("Turn on hangBeforeWritingDecision failpoint");
 // Make the commit coordination hang before writing the decision, and send commitTransaction.
@@ -84,8 +82,7 @@ let failPoint = configureFailPoint(coordinatorPrimaryConn, "hangBeforeWritingDec
 
 // Run commit through mongos in a parallel thread. This should timeout since we have set the
 // failpoint.
-const commitThread =
-    runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host, ErrorCodes.MaxTimeMSExpired);
+const commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host, ErrorCodes.MaxTimeMSExpired);
 commitThread.start();
 failPoint.wait();
 commitThread.join();
@@ -126,12 +123,14 @@ coordinatorPrimaryConn = coordinatorReplSetTest.getPrimary();
 
 jsTest.log("Committing transaction");
 // Now, commitTransaction should succeed.
-assert.commandWorked(st.s.adminCommand({
-    commitTransaction: 1,
-    lsid: lsid,
-    txnNumber: NumberLong(txnNumber),
-    stmtId: NumberInt(0),
-    autocommit: false
-}));
+assert.commandWorked(
+    st.s.adminCommand({
+        commitTransaction: 1,
+        lsid: lsid,
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(0),
+        autocommit: false,
+    }),
+);
 
 st.stop();

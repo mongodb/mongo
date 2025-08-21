@@ -7,7 +7,7 @@
 
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const prefix = "create_collection_and_view";
 
     const allowedErrorCodes = [ErrorCodes.NamespaceExists];
@@ -53,19 +53,19 @@ export const $config = (function() {
         },
         createView: (db, collName) => {
             assert.commandWorkedOrFailedWithCode(
-                db.createCollection(
-                    getCollectionName(collName),
-                    {viewOn: getBaseCollectionName(collName), pipeline: [{$match: {}}]}),
-                allowedErrorCodes);
+                db.createCollection(getCollectionName(collName), {
+                    viewOn: getBaseCollectionName(collName),
+                    pipeline: [{$match: {}}],
+                }),
+                allowedErrorCodes,
+            );
         },
         createCollection: (db, collName) => {
-            assert.commandWorkedOrFailedWithCode(db.createCollection(getCollectionName(collName)),
-                                                 allowedErrorCodes);
+            assert.commandWorkedOrFailedWithCode(db.createCollection(getCollectionName(collName)), allowedErrorCodes);
         },
         verifyNoDuplicates: (db, collName) => {
             // Check how many collections/views match our namespace.
-            const res =
-                db.runCommand("listCollections", {filter: {name: getCollectionName(collName)}});
+            const res = db.runCommand("listCollections", {filter: {name: getCollectionName(collName)}});
             assert.commandWorked(res);
             // We expect that we only ever find 0 or 1. If we find 2 or more, then we managed to
             // create a view and collection on the same namespace simultaneously, which is a bug.
@@ -85,7 +85,7 @@ export const $config = (function() {
         createView: {verifyNoDuplicates: 1.0},
 
         verifyNoDuplicates: {dropNamespace: 1.0},
-        dropNamespace: {createCollection: 0.5, createView: 0.5}
+        dropNamespace: {createCollection: 0.5, createView: 0.5},
     };
 
     return {

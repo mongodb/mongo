@@ -12,11 +12,11 @@ assert.eq(0, coll.find({$expr: {$eq: ["$foo", "$bar"]}}).itcount());
 assert.eq(0, coll.find({$or: [{$expr: {$eq: ["$foo", "$bar"]}}, {b: {$gt: 3}}]}).itcount());
 
 // Fails inside an elemMatch.
-assert.throws(function() {
+assert.throws(function () {
     coll.find({a: {$elemMatch: {$expr: {$eq: ["$foo", "$bar"]}}}}).itcount();
 });
 
 // Fails inside an _internalSchemaObjectMatch.
-assert.throws(function() {
+assert.throws(function () {
     coll.find({a: {$_internalSchemaObjectMatch: {$expr: {$eq: ["$foo", "$bar"]}}}}).itcount();
 });

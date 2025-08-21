@@ -19,21 +19,23 @@ const coll = db.search;
 coll.drop();
 db.search2.insertOne({name: "foo"});
 
-assert.commandWorked(coll.insert([
-    {'_id': ObjectId('65c2cef405d33a7aa3a1cd7a'), 'name': 'apple jam'},
-    {'_id': ObjectId('65c2cef405d33a7aa3a1cd7c'), 'name': 'apple blueberry jam'}
-]));
+assert.commandWorked(
+    coll.insert([
+        {"_id": ObjectId("65c2cef405d33a7aa3a1cd7a"), "name": "apple jam"},
+        {"_id": ObjectId("65c2cef405d33a7aa3a1cd7c"), "name": "apple blueberry jam"},
+    ]),
+);
 
 const collUUID = getUUIDFromListCollections(db, coll.getName());
 const searchQuery = {
     path: "name",
-    query: "apple"
+    query: "apple",
 };
 const searchCmd = {
     search: coll.getName(),
     collectionUUID: collUUID,
     query: searchQuery,
-    $db: "test"
+    $db: "test",
 };
 
 // Give mongotmock some docs to return.
@@ -48,25 +50,24 @@ function prepareForSearch() {
                     ns: coll.getFullName(),
                     nextBatch: [
                         {
-                            '_id': ObjectId('65c2cef405d33a7aa3a1cd7a'),
-                            'name': 'apple jam',
-                            '$searchScore': 0.22689829766750336,
+                            "_id": ObjectId("65c2cef405d33a7aa3a1cd7a"),
+                            "name": "apple jam",
+                            "$searchScore": 0.22689829766750336,
                         },
                         {
-                            '_id': ObjectId('65c2cef405d33a7aa3a1cd7c'),
-                            'name': 'apple blueberry jam',
-                            '$searchScore': 0.1912805438041687,
-                        }
-                    ]
+                            "_id": ObjectId("65c2cef405d33a7aa3a1cd7c"),
+                            "name": "apple blueberry jam",
+                            "$searchScore": 0.1912805438041687,
+                        },
+                    ],
                 },
-                vars: {'SEARCH_META': {'count': {'lowerBound': 2}}},
-                ok: 1
-            }
+                vars: {"SEARCH_META": {"count": {"lowerBound": 2}}},
+                ok: 1,
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(1), history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(1), history: history}));
 }
 prepareForSearch();
 
@@ -74,25 +75,25 @@ prepareForSearch();
 const pipeline = [
     {$search: searchQuery},
     {$addFields: {score: {$meta: "searchScore"}, searchMeta: "$$SEARCH_META"}},
-    {$lookup: {from: "search2", localField: "name", foreignField: "name", as: "match"}}
+    {$lookup: {from: "search2", localField: "name", foreignField: "name", as: "match"}},
 ];
 let results = coll.aggregate(pipeline).toArray();
 
 const expected = [
     {
-        '_id': ObjectId('65c2cef405d33a7aa3a1cd7a'),
-        'name': 'apple jam',
-        'score': 0.22689829766750336,
-        'searchMeta': {'count': {'lowerBound': 2}},
-        match: []
+        "_id": ObjectId("65c2cef405d33a7aa3a1cd7a"),
+        "name": "apple jam",
+        "score": 0.22689829766750336,
+        "searchMeta": {"count": {"lowerBound": 2}},
+        match: [],
     },
     {
-        '_id': ObjectId('65c2cef405d33a7aa3a1cd7c'),
-        'name': 'apple blueberry jam',
-        'score': 0.1912805438041687,
-        'searchMeta': {'count': {'lowerBound': 2}},
-        match: []
-    }
+        "_id": ObjectId("65c2cef405d33a7aa3a1cd7c"),
+        "name": "apple blueberry jam",
+        "score": 0.1912805438041687,
+        "searchMeta": {"count": {"lowerBound": 2}},
+        match: [],
+    },
 ];
 assert.eq(expected, results);
 

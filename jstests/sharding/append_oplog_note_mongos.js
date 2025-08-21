@@ -17,9 +17,8 @@ function checkOplogEntry(actualOplogEntry) {
 
 // We need to disable the periodic no-op writer so we can verify that the 'appendOplogNote'
 // no-op is the latest operation on the oplog.
-const st = new ShardingTest(
-    {mongos: 1, shards: 2, rs: {nodes: 2, setParameter: {writePeriodicNoops: false}}});
-const admin = st.getDB('admin');
+const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 2, setParameter: {writePeriodicNoops: false}}});
+const admin = st.getDB("admin");
 const shardOnePrimary = st.rs0.getPrimary();
 const shardTwoPrimary = st.rs1.getPrimary();
 
@@ -32,7 +31,7 @@ assert(res.hasOwnProperty("raw"), res);
 const appendOplogNoteFailpoint = configureFailPoint(shardOnePrimary, "failCommand", {
     errorCode: ErrorCodes.HostUnreachable,
     failCommands: ["appendOplogNote"],
-    failInternalCommands: true
+    failInternalCommands: true,
 });
 
 res = assert.commandFailed(admin.runCommand({appendOplogNote: 1, data: {a: 1}}));
@@ -45,26 +44,20 @@ appendOplogNoteFailpoint.off();
 
 // Test that a successful 'appendOplogNote' command performs a no-op write and advances the
 // $clusterTime.
-const shardOneBefore =
-    assert.commandWorked(shardOnePrimary.getDB("admin").runCommand({replSetGetStatus: 1}));
-const shardTwoBefore =
-    assert.commandWorked(shardTwoPrimary.getDB("admin").runCommand({replSetGetStatus: 1}));
+const shardOneBefore = assert.commandWorked(shardOnePrimary.getDB("admin").runCommand({replSetGetStatus: 1}));
+const shardTwoBefore = assert.commandWorked(shardTwoPrimary.getDB("admin").runCommand({replSetGetStatus: 1}));
 
 res = assert.commandWorked(admin.runCommand({appendOplogNote: 1, data: {a: 2}}));
 assert(res.hasOwnProperty("raw"), res);
 
-const shardOneAfter =
-    assert.commandWorked(shardOnePrimary.getDB("admin").runCommand({replSetGetStatus: 1}));
-const shardTwoAfter =
-    assert.commandWorked(shardTwoPrimary.getDB("admin").runCommand({replSetGetStatus: 1}));
+const shardOneAfter = assert.commandWorked(shardOnePrimary.getDB("admin").runCommand({replSetGetStatus: 1}));
+const shardTwoAfter = assert.commandWorked(shardTwoPrimary.getDB("admin").runCommand({replSetGetStatus: 1}));
 
 assert.lt(shardOneBefore.members[0].optime.ts, shardOneAfter.members[0].optime.ts);
 assert.lt(shardTwoBefore.members[0].optime.ts, shardTwoAfter.members[0].optime.ts);
 
-let lastEntryShardOne =
-    shardOnePrimary.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).toArray()[0];
-let lastEntryShardTwo =
-    shardTwoPrimary.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).toArray()[0];
+let lastEntryShardOne = shardOnePrimary.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).toArray()[0];
+let lastEntryShardTwo = shardTwoPrimary.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).toArray()[0];
 
 // The $clusterTime in the 'replSetGetStatus' response should be equal to the timestamp of
 // 'appendOplogNote' command no-op write, which is the last operation on the shard oplogs.

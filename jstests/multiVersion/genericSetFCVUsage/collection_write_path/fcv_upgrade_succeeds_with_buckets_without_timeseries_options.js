@@ -28,7 +28,7 @@ function testUpgradeFromFCV(conn, fromFCV) {
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: fromFCV, confirm: true}));
 
     // Create a normal collection
-    assert.commandWorked(db.createCollection('normalColl'));
+    assert.commandWorked(db.createCollection("normalColl"));
 
     // Create bucket collection without timeseries options
     assert.commandWorked(db.createCollection(bucketCollName));
@@ -36,8 +36,7 @@ function testUpgradeFromFCV(conn, fromFCV) {
     assert.commandWorked(db[bucketCollName].insertOne({doc: 1}));
 
     // Upgrade succeeds even though we have an invalid bucket collection
-    assert.commandWorked(
-        db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     assert.eq(1, db[bucketCollName].countDocuments({}));
     db[bucketCollName].drop();

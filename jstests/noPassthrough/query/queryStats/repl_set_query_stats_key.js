@@ -4,18 +4,12 @@
  * versioning are included for good measure.
  * @tags: [requires_fcv_71]
  */
-import {
-    getLatestQueryStatsEntry,
-    getQueryStatsServerParameters
-} from "jstests/libs/query/query_stats_utils.js";
+import {getLatestQueryStatsEntry, getQueryStatsServerParameters} from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({
-    name: 'queryStatsTest',
-    nodes: [
-        {rsConfig: {tags: {dc: "east"}}},
-        {rsConfig: {tags: {dc: "west"}}},
-    ]
+    name: "queryStatsTest",
+    nodes: [{rsConfig: {tags: {dc: "east"}}}, {rsConfig: {tags: {dc: "west"}}}],
 });
 
 // Turn on the collecting of query stats metrics.
@@ -31,9 +25,9 @@ const primaryColl = primaryDB.getCollection(collName);
 
 primaryColl.drop();
 
-const clusterTime =
-    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{a: 1000}]}))
-        .operationTime;
+const clusterTime = assert.commandWorked(
+    primaryDB.runCommand({insert: collName, documents: [{a: 1000}]}),
+).operationTime;
 
 replTest.awaitReplication();
 
@@ -42,9 +36,12 @@ function confirmCommandFieldsPresent(queryStatsKey, commandObj) {
         if (field == "queryShape" || field == "client" || field == "command") {
             continue;
         }
-        assert(commandObj.hasOwnProperty(field),
-               `${field} is present in the query stats key but not present in command obj: ${
-                   tojson(queryStatsKey)}, ${tojson(commandObj)}`);
+        assert(
+            commandObj.hasOwnProperty(field),
+            `${field} is present in the query stats key but not present in command obj: ${tojson(
+                queryStatsKey,
+            )}, ${tojson(commandObj)}`,
+        );
     }
     assert.eq(Object.keys(queryStatsKey).length, Object.keys(commandObj).length, queryStatsKey);
 }
@@ -67,13 +64,15 @@ confirmCommandFieldsPresent(stats.key, commandObj);
 assert.eq(stats.key.readConcern.afterClusterTime, "?timestamp", tojson(stats.key.readConcern));
 
 // Check that $readPreference.tags are sorted.
-assert.eq(stats.key.$readPreference.tags,
-          [{dc: "east"}, {dc: "north pole"}, {some: "tag"}],
-          tojson(stats.key.$readPreference));
+assert.eq(
+    stats.key.$readPreference.tags,
+    [{dc: "east"}, {dc: "north pole"}, {some: "tag"}],
+    tojson(stats.key.$readPreference),
+);
 
 // Check that readConcern just has an afterClusterTime field.
 commandObj["readConcern"] = {
-    afterClusterTime: new Timestamp(1, 0)
+    afterClusterTime: new Timestamp(1, 0),
 };
 delete commandObj["$readPreference"];
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
@@ -85,7 +84,7 @@ assert.eq(stats.key["readConcern"], {"afterClusterTime": "?timestamp"});
 
 // Check that readConcern has no afterClusterTime and fields related to api usage are not present.
 commandObj["readConcern"] = {
-    level: "local"
+    level: "local",
 };
 delete commandObj["apiDeprecationErrors"];
 delete commandObj["apiVersion"];
@@ -98,10 +97,10 @@ delete stats.key["collectionType"];
 confirmCommandFieldsPresent(stats.key, commandObj);
 
 // Check that the 'atClusterTime' parameter is shapified correctly.
-commandObj.readConcern = {
+(commandObj.readConcern = {
     level: "snapshot",
-    atClusterTime: clusterTime
-},
+    atClusterTime: clusterTime,
+}),
     assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
 stats = getLatestQueryStatsEntry(replSetConn, {collName: collName});
 assert.eq(stats.key["readConcern"], {level: "snapshot", atClusterTime: "?timestamp"});

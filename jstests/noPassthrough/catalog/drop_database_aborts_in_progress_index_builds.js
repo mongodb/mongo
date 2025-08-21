@@ -35,17 +35,19 @@ assert.commandWorked(secondColl.createIndex({a: 1}));
 jsTest.log("Starting an index build on each collection and freezing them.");
 IndexBuildTest.pauseIndexBuilds(testDB.getMongo());
 
-const awaitFirstIndexBuild = IndexBuildTest.startIndexBuild(
-    testDB.getMongo(), firstColl.getFullName(), {b: 1}, {}, [ErrorCodes.IndexBuildAborted]);
+const awaitFirstIndexBuild = IndexBuildTest.startIndexBuild(testDB.getMongo(), firstColl.getFullName(), {b: 1}, {}, [
+    ErrorCodes.IndexBuildAborted,
+]);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, firstCollName, "b_1");
 
-const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(
-    testDB.getMongo(), secondColl.getFullName(), {b: 1}, {}, [ErrorCodes.IndexBuildAborted]);
+const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(testDB.getMongo(), secondColl.getFullName(), {b: 1}, {}, [
+    ErrorCodes.IndexBuildAborted,
+]);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, secondCollName, "b_1");
 
 jsTest.log("Dropping database " + dbName + " with in-progress index builds on its collections.");
 
-const failPoint = configureFailPoint(testDB, 'dropDatabaseHangAfterWaitingForIndexBuilds');
+const failPoint = configureFailPoint(testDB, "dropDatabaseHangAfterWaitingForIndexBuilds");
 
 const awaitDropDatabase = startParallelShell(() => {
     const testDB = db.getSiblingDB(TestData.dbName);
@@ -54,7 +56,8 @@ const awaitDropDatabase = startParallelShell(() => {
 try {
     checkLog.contains(
         testDB.getMongo(),
-        "About to abort all index builders running for collections in the given database");
+        "About to abort all index builders running for collections in the given database",
+    );
     IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 
     failPoint.wait();

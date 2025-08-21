@@ -38,7 +38,7 @@ const kUnsplittable1CollName = "unsplittable_1";
 const kUnsplittable1Docs = [
     {_id: 0, a: "AA", unsplittable: 1},
     {_id: 1, a: "Aa", unsplittable: 1},
-    {_id: 2, a: "aa", unsplittable: 1}
+    {_id: 2, a: "aa", unsplittable: 1},
 ];
 shardTargetingTest.setupColl({
     collName: kUnsplittable1CollName,
@@ -48,9 +48,17 @@ shardTargetingTest.setupColl({
 });
 
 const kLookupStage = {
-    $lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out"}
+    $lookup: {from: kUnsplittable1CollName, localField: "a", foreignField: "a", as: "out"},
 };
-const kGraphLookupStage = {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "a", as: "out"}};
+const kGraphLookupStage = {
+    $graphLookup: {
+        from: kUnsplittable1CollName,
+        startWith: "$a",
+        connectFromField: "a",
+        connectToField: "a",
+        as: "out",
+    },
+};
 for (const stage of [kLookupStage, kGraphLookupStage]) {
     const stageName = Object.keys(stage)[0];
     jsTestLog("Testing stage " + stageName);
@@ -60,7 +68,7 @@ for (const stage of [kLookupStage, kGraphLookupStage]) {
     const kUntrackedDocs = [
         {_id: 0, a: "AA", untracked: 1},
         {_id: 1, a: "Aa", untracked: 1},
-        {_id: 2, a: "aa", untracked: 1}
+        {_id: 2, a: "aa", untracked: 1},
     ];
     assert.commandWorked(db.runCommand({create: kUntrackedCollName}));
     assert.commandWorked(db.runCommand({insert: kUntrackedCollName, documents: kUntrackedDocs}));
@@ -71,19 +79,15 @@ for (const stage of [kLookupStage, kGraphLookupStage]) {
             _id: 0,
             a: "AA",
             untracked: 1,
-            out: [
-                {_id: 0, a: "AA", unsplittable: 1},
-            ]
+            out: [{_id: 0, a: "AA", unsplittable: 1}],
         },
         {
             _id: 1,
             a: "Aa",
             untracked: 1,
-            out: [
-                {_id: 1, a: "Aa", unsplittable: 1},
-            ]
+            out: [{_id: 1, a: "Aa", unsplittable: 1}],
         },
-        {_id: 2, a: "aa", untracked: 1, out: [{_id: 2, a: "aa", unsplittable: 1}]}
+        {_id: 2, a: "aa", untracked: 1, out: [{_id: 2, a: "aa", unsplittable: 1}]},
     ];
     const profileFilters = {
         [shard0]: [{ns: kUntrackedCollName, expectedStages: []}],
@@ -91,7 +95,7 @@ for (const stage of [kLookupStage, kGraphLookupStage]) {
     };
     const explainObj = {
         expectedMergingShard: shard1,
-        expectedMergingStages: ["$mergeCursors", stageName]
+        expectedMergingStages: ["$mergeCursors", stageName],
     };
 
     // Outer collection is untracked and lives on the primary shard. Inner collection is tracked and
@@ -122,8 +126,8 @@ for (const stage of [kLookupStage, kGraphLookupStage]) {
             out: [
                 {_id: 0, a: "AA", unsplittable: 1},
                 {_id: 1, a: "Aa", unsplittable: 1},
-                {_id: 2, a: "aa", unsplittable: 1}
-            ]
+                {_id: 2, a: "aa", unsplittable: 1},
+            ],
         },
         {
             _id: 1,
@@ -132,8 +136,8 @@ for (const stage of [kLookupStage, kGraphLookupStage]) {
             out: [
                 {_id: 0, a: "AA", unsplittable: 1},
                 {_id: 1, a: "Aa", unsplittable: 1},
-                {_id: 2, a: "aa", unsplittable: 1}
-            ]
+                {_id: 2, a: "aa", unsplittable: 1},
+            ],
         },
         {
             _id: 2,
@@ -142,9 +146,9 @@ for (const stage of [kLookupStage, kGraphLookupStage]) {
             out: [
                 {_id: 0, a: "AA", unsplittable: 1},
                 {_id: 1, a: "Aa", unsplittable: 1},
-                {_id: 2, a: "aa", unsplittable: 1}
-            ]
-        }
+                {_id: 2, a: "aa", unsplittable: 1},
+            ],
+        },
     ];
 
     // Outer collection is untracked and lives on the primary shard. Inner collection is tracked and

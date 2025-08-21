@@ -6,12 +6,10 @@
  * value is a 1-character string based on the thread's id.
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.indexedField = 'indexed_insert_1char';
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.indexedField = "indexed_insert_1char";
     $config.data.shardKey = {};
     $config.data.shardKey[$config.data.indexedField] = 1;
 

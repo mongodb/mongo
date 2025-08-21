@@ -10,9 +10,7 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
+import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // 2 shards single node, 1 mongos, 1 config server 3-node.
 const st = new ShardingTest({});
@@ -32,7 +30,12 @@ const coll = dbConn.getCollection(collName);
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 0.
 WriteWithoutShardKeyTestUtil.setupShardedCollection(
-    st, nss, {x: 1}, [{x: splitPoint}], [{query: {x: splitPoint}, shard: st.shard1.shardName}]);
+    st,
+    nss,
+    {x: 1},
+    [{x: splitPoint}],
+    [{query: {x: splitPoint}, shard: st.shard1.shardName}],
+);
 
 assert.commandWorked(coll.insert(docsToInsert));
 
@@ -79,10 +82,10 @@ let testCases = [
             delete: collName,
             deletes: [{q: {y: 1}, limit: 1, hint: {a: 1}}],
         },
-    }
+    },
 ];
 
-testCases.forEach(testCase => {
+testCases.forEach((testCase) => {
     jsTestLog(testCase.logMessage);
     runTest(testCase);
 });

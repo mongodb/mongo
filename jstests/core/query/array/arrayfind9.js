@@ -22,16 +22,22 @@ assert.eq(1, t.count({a: {$elemMatch: {$in: [[]]}}}));
 
 // Matching by array index.
 t.drop();
-t.save({a: [['x']]});
-assert.eq(1, t.count({a: {$elemMatch: {'0': 'x'}}}));
+t.save({a: [["x"]]});
+assert.eq(1, t.count({a: {$elemMatch: {"0": "x"}}}));
 
 // Matching multiple values of a nested array.
 t.drop();
 t.save({a: [{b: [0, 2]}]});
 t.createIndex({a: 1});
-t.createIndex({'a.b': 1});
-let plans = [{$natural: 1}, {a: 1}, {'a.b': 1}];
+t.createIndex({"a.b": 1});
+let plans = [{$natural: 1}, {a: 1}, {"a.b": 1}];
 for (let i in plans) {
     let p = plans[i];
-    assert.eq(1, t.find({a: {$elemMatch: {b: {$gte: 1, $lte: 1}}}}).hint(p).itcount());
+    assert.eq(
+        1,
+        t
+            .find({a: {$elemMatch: {b: {$gte: 1, $lte: 1}}}})
+            .hint(p)
+            .itcount(),
+    );
 }

@@ -18,14 +18,14 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
 });
 const nodes = rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const testDB = primary.getDB("test");
+const coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({a: 1}));
 
@@ -36,12 +36,14 @@ const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a
 
 const secondaryDB = secondary.getDB(testDB.getName());
 const secondaryColl = secondaryDB.getCollection(coll.getName());
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), 'a_1');
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), "a_1");
 
 // Stop the secondary using the shutdown command without {force: true}.
 try {
-    assert.commandFailedWithCode(secondary.adminCommand({shutdown: 1, force: false}),
-                                 ErrorCodes.ConflictingOperationInProgress);
+    assert.commandFailedWithCode(
+        secondary.adminCommand({shutdown: 1, force: false}),
+        ErrorCodes.ConflictingOperationInProgress,
+    );
 } finally {
     IndexBuildTest.resumeIndexBuilds(secondary);
 }
@@ -50,7 +52,7 @@ IndexBuildTest.waitForIndexBuildToStop(secondaryDB);
 
 createIdx();
 
-IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"]);
 
 // This runs the shutdown command without {force: true} with additional handling for expected
 // network errors when the command succeeds.

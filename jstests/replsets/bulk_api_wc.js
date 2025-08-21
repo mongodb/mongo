@@ -32,7 +32,7 @@ coll.remove({});
 var bulk = coll.initializeOrderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
-assert.throws(function() {
+assert.throws(function () {
     bulk.execute({j: true});
 });
 
@@ -42,7 +42,7 @@ coll.remove({});
 var bulk = coll.initializeOrderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
-assert.throws(function() {
+assert.throws(function () {
     bulk.execute({x: 1});
 });
 
@@ -53,8 +53,8 @@ var bulk = coll.initializeOrderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
 bulk.insert({a: 2});
-result = assert.throws(function() {
-    bulk.execute({w: 'invalid'});
+result = assert.throws(function () {
+    bulk.execute({w: "invalid"});
 });
 assert.eq(result.nInserted, 2);
 assert.eq(result.getWriteErrors()[0].index, 2);
@@ -72,8 +72,8 @@ var bulk = coll.initializeUnorderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
 bulk.insert({a: 2});
-var result = assert.throws(function() {
-    bulk.execute({w: 'invalid'});
+var result = assert.throws(function () {
+    bulk.execute({w: "invalid"});
 });
 assert.eq(result.nInserted, 2);
 assert.eq(result.getWriteErrors()[0].index, 2);
@@ -88,7 +88,7 @@ var bulk = coll.initializeUnorderedBulkOp();
 bulk.insert({a: 1});
 bulk.insert({a: 2});
 bulk.insert({a: 2});
-var result = assert.throws(function() {
+var result = assert.throws(function () {
     bulk.execute({w: 3, wtimeout: 1});
 });
 assert.eq(result.nInserted, 2);
@@ -104,8 +104,8 @@ bulk.insert({a: 1});
 bulk.insert({a: 2});
 bulk.find({a: 3}).upsert().updateOne({a: 3});
 bulk.insert({a: 3});
-var result = assert.throws(function() {
-    bulk.execute({w: 'invalid'});
+var result = assert.throws(function () {
+    bulk.execute({w: "invalid"});
 });
 assert.eq(result.nInserted, 2);
 assert.eq(result.nUpserted, 1);

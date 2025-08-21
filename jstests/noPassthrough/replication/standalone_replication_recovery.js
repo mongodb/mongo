@@ -14,9 +14,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
-const name = 'standalone_replication_recovery';
+const name = "standalone_replication_recovery";
 const dbName = name;
-const collName = 'srr_coll';
+const collName = "srr_coll";
 const logLevel = tojson({storage: {recovery: 2}});
 
 const rst = new ReplSetTest({
@@ -37,8 +37,7 @@ function assertDocsInColl(node, nums) {
 }
 
 jsTestLog("Test that an empty standalone fails trying to recover.");
-assert.throws(
-    () => rst.start(0, {noReplSet: true, setParameter: {recoverFromOplogAsStandalone: true}}));
+assert.throws(() => rst.start(0, {noReplSet: true, setParameter: {recoverFromOplogAsStandalone: true}}));
 
 jsTestLog("Initiating as a replica set.");
 // Restart as a replica set node without the flag so we can add operations to the oplog.
@@ -46,18 +45,29 @@ let nodes = rst.startSet({setParameter: {logComponentVerbosity: logLevel}});
 let node = nodes[0];
 let secondary = nodes[1];
 rst.initiate(
-    {_id: name, members: [{_id: 0, host: node.host}, {_id: 2, host: secondary.host, priority: 0}]},
+    {
+        _id: name,
+        members: [
+            {_id: 0, host: node.host},
+            {_id: 2, host: secondary.host, priority: 0},
+        ],
+    },
     null,
-    {initiateWithDefaultElectionTimeout: true});
+    {initiateWithDefaultElectionTimeout: true},
+);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(rst.getPrimary().adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Create the collection with w:majority and then perform a clean restart to ensure that
 // the collection is in a stable checkpoint.
-assert.commandWorked(node.getDB(dbName).runCommand(
-    {create: collName, writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(
+    node
+        .getDB(dbName)
+        .runCommand({create: collName, writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}}),
+);
 assertDocsInColl(node, []);
 node = rst.restart(node, {"noReplSet": false});
 reconnect(node);
@@ -79,9 +89,9 @@ assert.eq(rst.getPrimary(), node);
 assertDocsInColl(node, [3, 4, 5]);
 
 jsTestLog("Test that a replica set node cannot start up with the parameter set.");
-assert.throws(
-    () => rst.restart(
-        0, {setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}}));
+assert.throws(() =>
+    rst.restart(0, {setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}}),
+);
 
 jsTestLog("Test that on restart as a standalone we only see committed writes by default.");
 node = rst.start(node, {noReplSet: true, setParameter: {logComponentVerbosity: logLevel}}, true);
@@ -94,7 +104,7 @@ assert.commandWorked(node.getDB(dbName).runCommand({"validate": collName}));
 jsTestLog("Test that on restart with the flag set we play recovery.");
 node = rst.restart(node, {
     noReplSet: true,
-    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel},
 });
 reconnect(node);
 assertDocsInColl(node, [3, 4, 5]);
@@ -112,7 +122,7 @@ assert.commandFailed(node.adminCommand({setParameter: 1, recoverFromOplogAsStand
 jsTestLog("Test that on restart after standalone recovery we do not see replicated writes.");
 node = rst.restart(node, {
     noReplSet: true,
-    setParameter: {recoverFromOplogAsStandalone: false, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: false, logComponentVerbosity: logLevel},
 });
 reconnect(node);
 assertDocsInColl(node, []);
@@ -123,22 +133,26 @@ assertDocsInColl(node, []);
 // committed documents, the test must take care to make sure the document inserted as a standalone
 // doesn't use a recordId that collides with the non-majority committed documents' recordIds.
 if (node.getDB(dbName).getCollectionInfos({name: collName})[0].options.recordIdsReplicated) {
-    assert.commandWorked(node.getDB(dbName).runCommand({
-        applyOps: [{
-            op: 'i',
-            ns: getColl(node).getFullName(),
-            o: {_id: 6},
-            // This happens to be a recordId that doesn't clash.
-            rid: NumberLong(6)
-        }]
-    }));
+    assert.commandWorked(
+        node.getDB(dbName).runCommand({
+            applyOps: [
+                {
+                    op: "i",
+                    ns: getColl(node).getFullName(),
+                    o: {_id: 6},
+                    // This happens to be a recordId that doesn't clash.
+                    rid: NumberLong(6),
+                },
+            ],
+        }),
+    );
 } else {
     assert.commandWorked(getColl(node).insert({_id: 6}));
 }
 assertDocsInColl(node, [6]);
 node = rst.restart(node, {
     noReplSet: true,
-    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel},
 });
 reconnect(node);
 assertDocsInColl(node, [3, 4, 5, 6]);
@@ -146,7 +160,7 @@ assertDocsInColl(node, [3, 4, 5, 6]);
 jsTestLog("Test that we can restart again as a replica set node.");
 node = rst.restart(node, {
     noReplSet: false,
-    setParameter: {recoverFromOplogAsStandalone: false, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: false, logComponentVerbosity: logLevel},
 });
 reconnect(node);
 assert.eq(rst.getPrimary(), node);
@@ -161,13 +175,13 @@ assert.commandWorked(getColl(node).insert({_id: 7}));
 assertDocsInColl(node, [3, 4, 5, 6, 7]);
 node = rst.restart(node, {
     noReplSet: true,
-    setParameter: {recoverFromOplogAsStandalone: false, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: false, logComponentVerbosity: logLevel},
 });
 reconnect(node);
 assertDocsInColl(node, [6]);
 node = rst.restart(node, {
     noReplSet: true,
-    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel},
 });
 reconnect(node);
 assertDocsInColl(node, [3, 4, 5, 6, 7]);
@@ -175,7 +189,7 @@ assertDocsInColl(node, [3, 4, 5, 6, 7]);
 jsTestLog("Restart as a replica set node so that the test can complete successfully.");
 node = rst.restart(node, {
     noReplSet: false,
-    setParameter: {recoverFromOplogAsStandalone: false, logComponentVerbosity: logLevel}
+    setParameter: {recoverFromOplogAsStandalone: false, logComponentVerbosity: logLevel},
 });
 reconnect(node);
 assert.eq(rst.getPrimary(), node);

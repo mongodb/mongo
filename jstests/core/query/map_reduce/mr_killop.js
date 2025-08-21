@@ -37,20 +37,22 @@ function getOpCode() {
         const cmdBody = op.command;
         if (cmdBody.$truncated) {
             const stringifiedCmd = cmdBody.$truncated;
-            return (stringifiedCmd.search('mapreduce') >= 0 ||
-                    stringifiedCmd.search('aggregate') >= 0) &&
-                stringifiedCmd.search(source.getName()) >= 0;
+            return (
+                (stringifiedCmd.search("mapreduce") >= 0 || stringifiedCmd.search("aggregate") >= 0) &&
+                stringifiedCmd.search(source.getName()) >= 0
+            );
         }
 
-        return (cmdBody.mapreduce && cmdBody.mapreduce == source.getName()) ||
-            (cmdBody.isMapReduceCommand && cmdBody.aggregate == source.getName());
+        return (
+            (cmdBody.mapreduce && cmdBody.mapreduce == source.getName()) ||
+            (cmdBody.isMapReduceCommand && cmdBody.aggregate == source.getName())
+        );
     }
 
     for (let i in inProg) {
         const o = inProg[i];
         // Identify a map/reduce operation by its collection, whether or not it is currently active.
-        if ((o.active || o.waitingForLock) && isMapReduce(o))
-            return o.opid;
+        if ((o.active || o.waitingForLock) && isMapReduce(o)) return o.opid;
     }
     return -1;
 }
@@ -75,19 +77,18 @@ function runTest(map, reduce, finalize, scope, wait) {
     }
 
     // Windows shell strips all double quotes from command line, so use single quotes.
-    const stringifiedSpec = tojson(spec).toString().replace(/\n/g, ' ').replace(/\"/g, "\'");
+    const stringifiedSpec = tojson(spec).toString().replace(/\n/g, " ").replace(/\"/g, "\'");
 
     // The assert below won't be caught by this test script, but it will cause error messages to be
     // printed.
-    const awaitShell =
-        startParallelShell("assert.commandWorked( db.runCommand( " + stringifiedSpec + " ) );");
+    const awaitShell = startParallelShell("assert.commandWorked( db.runCommand( " + stringifiedSpec + " ) );");
 
     if (wait) {
         sleep(20);
     }
 
     let opCode = null;
-    assert.soon(function() {
+    assert.soon(function () {
         opCode = getOpCode();
         return opCode != -1;
     });
@@ -96,9 +97,7 @@ function runTest(map, reduce, finalize, scope, wait) {
 
     // When the map reduce op is killed, the spawned shell will exit
     const exitCode = awaitShell({checkExitSuccess: false});
-    assert.neq(0,
-               exitCode,
-               "expected shell to exit abnormally due to map-reduce execution being terminated");
+    assert.neq(0, exitCode, "expected shell to exit abnormally due to map-reduce execution being terminated");
     assert.eq(-1, getOpCode());
 }
 
@@ -112,24 +111,24 @@ function runTests(map, reduce, finalize, scope) {
 function runMapTests(loop) {
     // Without scope.
     runTests(
-        loop,  // map
-        function(k, v) {
+        loop, // map
+        function (k, v) {
             return v[0];
-        },     // reduce
-        null,  // finalize
-        null   // scope
+        }, // reduce
+        null, // finalize
+        null, // scope
     );
 
     // With scope.
     runTests(
-        function() {
+        function () {
             loop();
-        },  // map
-        function(k, v) {
+        }, // map
+        function (k, v) {
             return v[0];
-        },            // reduce
-        null,         // finalize
-        {loop: loop}  // scope
+        }, // reduce
+        null, // finalize
+        {loop: loop}, // scope
     );
 }
 
@@ -137,24 +136,24 @@ function runMapTests(loop) {
 function runReduceTests(loop) {
     // Without scope.
     runTests(
-        function() {
+        function () {
             emit(this.a, 1);
-        },     // map
-        loop,  // reduce
-        null,  // finalize
-        null   // scope
+        }, // map
+        loop, // reduce
+        null, // finalize
+        null, // scope
     );
 
     // With scope.
     runTests(
-        function() {
+        function () {
             emit(this.a, 1);
-        },  // map
-        function() {
+        }, // map
+        function () {
             loop();
-        },            // reduce
-        null,         // finalize
-        {loop: loop}  // scope
+        }, // reduce
+        null, // finalize
+        {loop: loop}, // scope
     );
 }
 
@@ -162,32 +161,32 @@ function runReduceTests(loop) {
 function runFinalizeTests(loop) {
     // Without scope.
     runTests(
-        function() {
+        function () {
             emit(this.a, 1);
-        },  // map
-        function(k, v) {
+        }, // map
+        function (k, v) {
             return v[0];
-        },     // reduce
-        loop,  // finalize
-        null   // scope
+        }, // reduce
+        loop, // finalize
+        null, // scope
     );
 
     // With scope.
     runTests(
-        function() {
+        function () {
             emit(this.a, 1);
-        },  // map
-        function(k, v) {
+        }, // map
+        function (k, v) {
             return v[0];
-        },  // reduce
-        function(a, b) {
+        }, // reduce
+        function (a, b) {
             loop();
-        },            // finalize
-        {loop: loop}  // scope
+        }, // finalize
+        {loop: loop}, // scope
     );
 }
 
-const loop = function() {
+const loop = function () {
     while (1) {
         sleep(10);
     }

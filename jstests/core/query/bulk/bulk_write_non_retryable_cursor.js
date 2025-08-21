@@ -12,11 +12,7 @@
  *   requires_fcv_80
  * ]
  */
-import {
-    cursorEntryValidator,
-    cursorSizeValidator,
-    summaryFieldsValidator
-} from "jstests/libs/bulk_write_utils.js";
+import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
 
 const coll = db[jsTestName()];
 const collName = coll.getFullName();
@@ -34,19 +30,21 @@ let res = db.adminCommand({
         {insert: 0, document: {_id: 1, skey: "MongoDB"}},
         {update: 0, filter: {skey: "MongoDB"}, updateMods: {$set: {skey: "MongoDB2"}}, multi: true},
     ],
-    nsInfo: [{ns: collName}]
+    nsInfo: [{ns: collName}],
 });
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-summaryFieldsValidator(
-    res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 2, nModified: 2, nUpserted: 0});
+summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 2, nModified: 2, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 2, nModified: 2});
 
-assert.sameMembers(coll.find().toArray(), [{_id: 0, skey: "MongoDB2"}, {_id: 1, skey: "MongoDB2"}]);
+assert.sameMembers(coll.find().toArray(), [
+    {_id: 0, skey: "MongoDB2"},
+    {_id: 1, skey: "MongoDB2"},
+]);
 
 assert(coll.drop());
 
@@ -58,13 +56,12 @@ res = db.adminCommand({
         {insert: 0, document: {_id: 1, skey: "MongoDB"}},
         {delete: 0, filter: {skey: "MongoDB"}, multi: true},
     ],
-    nsInfo: [{ns: collName}]
+    nsInfo: [{ns: collName}],
 });
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-summaryFieldsValidator(
-    res, {nErrors: 0, nInserted: 2, nDeleted: 2, nMatched: 0, nModified: 0, nUpserted: 0});
+summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 2, nMatched: 0, nModified: 0, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -83,28 +80,27 @@ res = db.adminCommand({
             update: 0,
             filter: {$expr: {$eq: ["$skey", "$$targetKey1"]}},
             updateMods: [{$set: {skey: "$$replacedKey1"}}],
-            constants: {replacedKey1: "MongoDB4"}
+            constants: {replacedKey1: "MongoDB4"},
         },
         {
             update: 0,
             filter: {$expr: {$eq: ["$skey", "$$targetKey2"]}},
-            updateMods: [{$set: {skey: "MongoDB"}}]
+            updateMods: [{$set: {skey: "MongoDB"}}],
         },
-        {delete: 0, filter: {$expr: {$eq: ["$skey", "$$replacedKey2"]}}}
+        {delete: 0, filter: {$expr: {$eq: ["$skey", "$$replacedKey2"]}}},
     ],
     nsInfo: [{ns: collName}],
-    let : {
+    let: {
         targetKey1: "MongoDB",
         targetKey2: "MongoDB2",
         replacedKey1: "MongoDB",
-        replacedKey2: "MongoDB4"
-    }
+        replacedKey2: "MongoDB4",
+    },
 });
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 5);
-summaryFieldsValidator(
-    res, {nErrors: 0, nInserted: 2, nDeleted: 1, nMatched: 2, nModified: 2, nUpserted: 0});
+summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 1, nMatched: 2, nModified: 2, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});

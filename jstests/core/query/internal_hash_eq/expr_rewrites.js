@@ -9,12 +9,7 @@
  *   requires_getmore,
  * ]
  */
-import {
-    getExecutionStages,
-    getPlanStages,
-    isCollscan,
-    isIxscan
-} from "jstests/libs/query/analyze_plan.js";
+import {getExecutionStages, getPlanStages, isCollscan, isIxscan} from "jstests/libs/query/analyze_plan.js";
 
 const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 
@@ -32,11 +27,9 @@ const coll = db.getCollection(collName);
  */
 function getHash(coll, filterSpec, field, indexSpec) {
     const res = coll.aggregate(
-        [
-            {$match: filterSpec},
-            {$set: {hashVal: {$let: {vars: {key: {$meta: "indexKey"}}, in : `$$key.${field}`}}}},
-        ],
-        {hint: indexSpec});
+        [{$match: filterSpec}, {$set: {hashVal: {$let: {vars: {key: {$meta: "indexKey"}}, in: `$$key.${field}`}}}}],
+        {hint: indexSpec},
+    );
     return res.toArray()[0].hashVal;
 }
 
@@ -50,7 +43,7 @@ function getHash(coll, filterSpec, field, indexSpec) {
 function assertExplainIxscan(explainPlan, expectedIndexSpec, expectedKeysExamined = 1) {
     assert(isIxscan(db, explainPlan), explainPlan);
     let execStages = getExecutionStages(explainPlan);
-    execStages.forEach(execStage => {
+    execStages.forEach((execStage) => {
         if (execStage.stage == "SHARDING_FILTER" && execStage.nReturned == 0) {
             return;
         }
@@ -63,16 +56,18 @@ function assertExplainIxscan(explainPlan, expectedIndexSpec, expectedKeysExamine
 
 (function testSingleFieldHashedIndex() {
     coll.drop();
-    assert.commandWorked(coll.insert([
-        {_id: 1, a: "foo"},
-        {_id: 2, a: 123},
-        {_id: 3, a: new Date()},
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, a: "foo"},
+            {_id: 2, a: 123},
+            {_id: 3, a: new Date()},
+        ]),
+    );
     const indexSpec = {a: "hashed"};
     assert.commandWorked(coll.createIndex(indexSpec));
 
     const hash = getHash(coll, {a: "foo"}, "a", indexSpec);
-    const testQuery = {$expr: {$eq: [{$toHashedIndexKey: '$a'}, hash]}};
+    const testQuery = {$expr: {$eq: [{$toHashedIndexKey: "$a"}, hash]}};
     const explainPlan = coll.find(testQuery).hint(indexSpec).explain("executionStats");
 
     assertExplainIxscan(explainPlan, indexSpec);
@@ -80,70 +75,67 @@ function assertExplainIxscan(explainPlan, expectedIndexSpec, expectedKeysExamine
 
 (function testCompoundIndexFirstFieldHashed() {
     coll.drop();
-    assert.commandWorked(coll.insert([
-        {_id: 1, a: 10, b: "foo"},
-        {_id: 2, a: 20, b: "bar"},
-        {_id: 3, a: 30, b: "baz"},
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, a: 10, b: "foo"},
+            {_id: 2, a: 20, b: "bar"},
+            {_id: 3, a: 30, b: "baz"},
+        ]),
+    );
     const indexSpec = {a: "hashed", b: 1};
     assert.commandWorked(coll.createIndex(indexSpec));
 
     const hash = getHash(coll, {a: 10}, "a", indexSpec);
     const testQuery = {
-        $and: [
-            {$expr: {$eq: [{$toHashedIndexKey: '$a'}, hash]}},
-            {$expr: {$eq: ['$b', "foo"]}},
-        ]
+        $and: [{$expr: {$eq: [{$toHashedIndexKey: "$a"}, hash]}}, {$expr: {$eq: ["$b", "foo"]}}],
     };
-    const explainPlan =
-        coll.explain("executionStats").aggregate([{$match: testQuery}], {hint: indexSpec});
+    const explainPlan = coll.explain("executionStats").aggregate([{$match: testQuery}], {hint: indexSpec});
 
     assertExplainIxscan(explainPlan, indexSpec);
 })();
 
 (function testCompoundIndexLastFieldHashed() {
     coll.drop();
-    assert.commandWorked(coll.insert([
-        {_id: 1, a: 10, b: "foo"},
-        {_id: 2, a: 20, b: "bar"},
-        {_id: 3, a: 30, b: "baz"},
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, a: 10, b: "foo"},
+            {_id: 2, a: 20, b: "bar"},
+            {_id: 3, a: 30, b: "baz"},
+        ]),
+    );
     const indexSpec = {b: 1, a: "hashed"};
     assert.commandWorked(coll.createIndex(indexSpec));
 
     const hash = getHash(coll, {a: 10}, "a", indexSpec);
     const testQuery = {
-        $and: [
-            {$expr: {$eq: [{$toHashedIndexKey: '$a'}, hash]}},
-            {$expr: {$eq: ['$b', "foo"]}},
-        ]
+        $and: [{$expr: {$eq: [{$toHashedIndexKey: "$a"}, hash]}}, {$expr: {$eq: ["$b", "foo"]}}],
     };
-    const explainPlan =
-        coll.explain("executionStats").aggregate([{$match: testQuery}], {hint: indexSpec});
+    const explainPlan = coll.explain("executionStats").aggregate([{$match: testQuery}], {hint: indexSpec});
 
     assertExplainIxscan(explainPlan, indexSpec);
 })();
 
 (function testCompoundIndexMiddleFieldHashed() {
     coll.drop();
-    assert.commandWorked(coll.insert([
-        {_id: 1, a: 10, b: "foo", c: "fred"},
-        {_id: 2, a: 20, b: "bar", c: "waldo"},
-        {_id: 3, a: 30, b: "baz", c: "thud"},
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, a: 10, b: "foo", c: "fred"},
+            {_id: 2, a: 20, b: "bar", c: "waldo"},
+            {_id: 3, a: 30, b: "baz", c: "thud"},
+        ]),
+    );
     const indexSpec = {b: 1, a: "hashed", c: 1};
     assert.commandWorked(coll.createIndex(indexSpec));
 
     const hash = getHash(coll, {a: 10}, "a", indexSpec);
     const testQuery = {
         $and: [
-            {$expr: {$eq: [{$toHashedIndexKey: '$a'}, hash]}},
-            {$expr: {$eq: ['$b', "foo"]}},
-            {$expr: {$eq: ['$c', "fred"]}},
-        ]
+            {$expr: {$eq: [{$toHashedIndexKey: "$a"}, hash]}},
+            {$expr: {$eq: ["$b", "foo"]}},
+            {$expr: {$eq: ["$c", "fred"]}},
+        ],
     };
-    const explainPlan =
-        coll.explain("executionStats").aggregate([{$match: testQuery}], {hint: indexSpec});
+    const explainPlan = coll.explain("executionStats").aggregate([{$match: testQuery}], {hint: indexSpec});
 
     assertExplainIxscan(explainPlan, indexSpec);
 })();
@@ -157,11 +149,13 @@ function assertExplainIxscan(explainPlan, expectedIndexSpec, expectedKeysExamine
 
     coll.drop();
     coll.dropIndexes();
-    assert.commandWorked(coll.insert([
-        {_id: 1, a: 10},
-        {_id: 2, a: 20},
-        {_id: 3, a: 30},
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, a: 10},
+            {_id: 2, a: 20},
+            {_id: 3, a: 30},
+        ]),
+    );
     const hashIndexSpec = {a: 1};
     assert.commandWorked(coll.createIndex(hashIndexSpec));
     const hash = getHash(coll, {a: 10}, "a", hashIndexSpec);
@@ -171,12 +165,11 @@ function assertExplainIxscan(explainPlan, expectedIndexSpec, expectedKeysExamine
     const indexSpec = {a: 1};
     assert.commandWorked(coll.createIndex(indexSpec));
 
-    const testQuery = {$expr: {$eq: [{$toHashedIndexKey: '$a'}, hash]}};
+    const testQuery = {$expr: {$eq: [{$toHashedIndexKey: "$a"}, hash]}};
     // Note that this query is hinting a bad index. Since it is not hashed, the plan degenerates
     // into a IXSCAN + FETCH, whereas if we didn't hint the index, the plan enumerator wouldn't have
     // even considered the '{a: 1}' index as eligible.
-    const explainPlan =
-        coll.explain("executionStats").aggregate([{$match: testQuery}], {hint: indexSpec});
+    const explainPlan = coll.explain("executionStats").aggregate([{$match: testQuery}], {hint: indexSpec});
 
     // We couldn't create a tight bound for the index scan as the index is not hashed.
     assertExplainIxscan(explainPlan, indexSpec, 3 /* keyExamined */);

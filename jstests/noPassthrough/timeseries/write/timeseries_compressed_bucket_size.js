@@ -24,15 +24,15 @@ coll.drop();
 const timeFieldName = "time";
 assert.commandWorked(db.createCollection(jsTestName(), {timeseries: {timeField: timeFieldName}}));
 
-const measurementLength = 1 * 1024;  // 1KB
-const numMeasurements = 121;  // The number of measurements before the bucket rolls over due to size
+const measurementLength = 1 * 1024; // 1KB
+const numMeasurements = 121; // The number of measurements before the bucket rolls over due to size
 for (let i = 0; i < numMeasurements; i++) {
     // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
-    const value = (i % 2 == 0 ? "a" : "b");
+    const value = i % 2 == 0 ? "a" : "b";
     const doc = {
         _id: i,
         [timeFieldName]: ISODate("2024-03-11T00:00:00.000Z"),
-        value: value.repeat(measurementLength)
+        value: value.repeat(measurementLength),
     };
     assert.commandWorked(coll.insert(doc));
 }
@@ -46,8 +46,7 @@ let timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
 jsTestLog("Bucket size: " + timeseriesStats.avgBucketSize);
 
 const timeseriesBucketMaxSize = (() => {
-    const res =
-        assert.commandWorked(db.adminCommand({getParameter: 1, timeseriesBucketMaxSize: 1}));
+    const res = assert.commandWorked(db.adminCommand({getParameter: 1, timeseriesBucketMaxSize: 1}));
     return res.timeseriesBucketMaxSize;
 })();
 
@@ -61,11 +60,13 @@ assert.eq(0, timeseriesStats.numBucketsFrozen);
 assert.lte(timeseriesStats.avgBucketSize, timeseriesBucketMaxSize);
 
 // Inserting an additional measurement will open a second bucket.
-assert.commandWorked(coll.insert({
-    _id: 121,
-    [timeFieldName]: ISODate("2024-03-11T00:00:00.000Z"),
-    value: "c".repeat(measurementLength)
-}));
+assert.commandWorked(
+    coll.insert({
+        _id: 121,
+        [timeFieldName]: ISODate("2024-03-11T00:00:00.000Z"),
+        value: "c".repeat(measurementLength),
+    }),
+);
 buckets = getTimeseriesCollForRawOps(db, coll).find().rawData().toArray();
 assert.eq(2, buckets.length);
 

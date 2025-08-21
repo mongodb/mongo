@@ -16,22 +16,23 @@ const outName = "mr_preserve_indexes_out";
 const out = db[outName];
 out.drop();
 
-assert.commandWorked(coll.insert([
-    {tags: [1]},
-    {tags: [1, 2]},
-    {tags: [1, 2, 3]},
-    {tags: [3]},
-    {tags: [2, 3]},
-    {tags: [2, 3]},
-    {tags: [1, 2]}
-]));
+assert.commandWorked(
+    coll.insert([
+        {tags: [1]},
+        {tags: [1, 2]},
+        {tags: [1, 2, 3]},
+        {tags: [3]},
+        {tags: [2, 3]},
+        {tags: [2, 3]},
+        {tags: [1, 2]},
+    ]),
+);
 
-const mapFn = function() {
-    for (let tag of this.tags)
-        emit(tag, 1);
+const mapFn = function () {
+    for (let tag of this.tags) emit(tag, 1);
 };
 
-const reduceFn = function(k, vs) {
+const reduceFn = function (k, vs) {
     return Array.sum(vs);
 };
 

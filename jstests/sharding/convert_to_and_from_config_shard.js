@@ -16,7 +16,8 @@ import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 // TODO: SERVER-89292 Re-enable test.
 quit();
 
-if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test.
+if (jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Delete test.
     quit();
 }
 
@@ -40,13 +41,12 @@ const _id = "randomId";
 /**
  * Checks that basic CRUD operations work as expected.
  */
-const checkBasicCRUD = function(coll, _id) {
+const checkBasicCRUD = function (coll, _id) {
     const sleepMs = 1;
     const numRetries = 99999;
     const NUM_NODES = 3;
 
-    const retryableFindOne = (coll, filter) =>
-        retryOnRetryableError(() => coll.findOne(filter), numRetries, sleepMs);
+    const retryableFindOne = (coll, filter) => retryOnRetryableError(() => coll.findOne(filter), numRetries, sleepMs);
 
     const doc = retryableFindOne(coll, {_id: _id, y: {$exists: false}});
     assert.neq(null, doc);
@@ -61,14 +61,14 @@ const checkBasicCRUD = function(coll, _id) {
     assert.eq(_id, retryableFindOne(coll, {_id: _id})._id);
 };
 
-const checkCRUDThread = function(host, ns, _id, countdownLatch, checkBasicCRUD) {
+const checkCRUDThread = function (host, ns, _id, countdownLatch, checkBasicCRUD) {
     const mongo = new Mongo(host);
     const session = mongo.startSession({retryWrites: true});
     const [dbName, collName] = ns.split(".");
     const db = session.getDatabase(dbName);
     while (countdownLatch.getCount() > 0) {
         checkBasicCRUD(db[collName], _id);
-        sleep(1);  // milliseconds
+        sleep(1); // milliseconds
     }
 };
 
@@ -85,37 +85,39 @@ jsTestLog("Starting background CRUD operations on the replica set.");
 // be retried until they succeed.
 TestData.overrideRetryAttempts = 99999;
 const replStopLatch = new CountDownLatch(1);
-let replThread =
-    new Thread(checkCRUDThread, replSet.getURL(), unshardedNs, _id, replStopLatch, checkBasicCRUD);
+let replThread = new Thread(checkCRUDThread, replSet.getURL(), unshardedNs, _id, replStopLatch, checkBasicCRUD);
 replThread.start();
 
 jsTestLog("Restarting secondaries with --configsvr.");
 const secondaries = replSet.getSecondaries();
-secondaries.forEach(secondary => {
+secondaries.forEach((secondary) => {
     // TODO SERVER-88880: Remove feature flag.
-    replSet.restart(secondary,
-                    {configsvr: "", setParameter: {featureFlagTransitionToCatalogShard: true}});
+    replSet.restart(secondary, {configsvr: "", setParameter: {featureFlagTransitionToCatalogShard: true}});
 });
 
 jsTestLog("Restarting primary with --configsvr and waiting for new primary.");
 let primary = replSet.getPrimary();
 // TODO SERVER-88880: Remove feature flag.
-replSet.restart(primary,
-                {configsvr: "", setParameter: {featureFlagTransitionToCatalogShard: true}});
+replSet.restart(primary, {configsvr: "", setParameter: {featureFlagTransitionToCatalogShard: true}});
 replSet.awaitNodesAgreeOnPrimary();
 
 jsTestLog("Starting a mongos.");
 const replConnStr = replSet.getURL();
 // TODO SERVER-88880: Remove feature flag.
-const mongos = MongoRunner.runMongos(
-    {configdb: replConnStr, setParameter: {featureFlagTransitionToCatalogShard: true}});
+const mongos = MongoRunner.runMongos({
+    configdb: replConnStr,
+    setParameter: {featureFlagTransitionToCatalogShard: true},
+});
 
 jsTestLog("Creating administrative user.");
 const mongosAdminDB = mongos.getDB("admin");
 mongosAdminDB.createUser({
     user: "admin01",
     pwd: "test",
-    roles: [{role: "clusterManager", db: "admin"}, {role: "restore", db: "admin"}]
+    roles: [
+        {role: "clusterManager", db: "admin"},
+        {role: "restore", db: "admin"},
+    ],
 });
 assert(mongosAdminDB.logout());
 assert(mongosAdminDB.auth("admin01", "test"));
@@ -129,12 +131,24 @@ replThread.join();
 
 const mongosStopLatchUnsharded = new CountDownLatch(1);
 const mongosThreadUnsharded = new Thread(
-    checkCRUDThread, mongos.name, unshardedNs, _id, mongosStopLatchUnsharded, checkBasicCRUD);
+    checkCRUDThread,
+    mongos.name,
+    unshardedNs,
+    _id,
+    mongosStopLatchUnsharded,
+    checkBasicCRUD,
+);
 mongosThreadUnsharded.start();
 
 const mongosStopLatchSharded = new CountDownLatch(1);
 const mongosThreadSharded = new Thread(
-    checkCRUDThread, mongos.name, shardedNs, _id, mongosStopLatchSharded, checkBasicCRUD);
+    checkCRUDThread,
+    mongos.name,
+    shardedNs,
+    _id,
+    mongosStopLatchSharded,
+    checkBasicCRUD,
+);
 mongosThreadSharded.start();
 
 jsTestLog("Sharding a collection and creating chunks.");
@@ -155,8 +169,7 @@ mongos.adminCommand({addShard: newShard.getURL(), name: "toRemoveLater"});
 
 jsTestLog("Moving chunks to second shard.");
 for (let x = 0; x < 2; x++) {
-    assert.commandWorked(
-        mongos.adminCommand({moveChunk: shardedNs, find: {_id: x}, to: "toRemoveLater"}));
+    assert.commandWorked(mongos.adminCommand({moveChunk: shardedNs, find: {_id: x}, to: "toRemoveLater"}));
 }
 
 jsTestLog("Removing second shard.");
@@ -175,7 +188,7 @@ MongoRunner.stopMongos(mongos);
 
 jsTestLog("Restarting replica set without --configsvr");
 // Rolling restart is not needed because converting back to replica set can have downtime.
-replSet.nodes.forEach(function(node) {
+replSet.nodes.forEach(function (node) {
     delete node.fullOptions.configsvr;
 });
 // TODO (SERVER-83433): Add back the test coverage for running db hash check and validation

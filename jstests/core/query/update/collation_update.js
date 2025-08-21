@@ -6,13 +6,13 @@
 const coll = db[jsTestName()];
 
 const caseInsensitive = {
-    collation: {locale: "en_US", strength: 2}
+    collation: {locale: "en_US", strength: 2},
 };
 const caseSensitive = {
-    collation: {locale: "en_US", strength: 3}
+    collation: {locale: "en_US", strength: 3},
 };
 const numericOrdering = {
-    collation: {locale: "en_US", numericOrdering: true}
+    collation: {locale: "en_US", numericOrdering: true},
 };
 
 // Update modifiers respect collection default collation on simple _id query.
@@ -88,8 +88,7 @@ assert(coll.drop());
 
 // $each and $addToSet respect collation
 assert.commandWorked(coll.insert({a: ["foo", "bar", "FOO"]}));
-assert.commandWorked(
-    coll.update({}, {$addToSet: {a: {$each: ["FOO", "BAR", "str"]}}}, caseInsensitive));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: ["FOO", "BAR", "str"]}}}, caseInsensitive));
 set = coll.findOne().a;
 assert.eq(set.length, 4);
 assert(set.includes("foo"));
@@ -245,71 +244,77 @@ assert.eq(coll.findOne().newField, 3, `actual=${coll.findOne()}`);
 // Case sensitive $indexOfArray on "B" matches "B".
 assert(coll.drop());
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-assert.commandWorked(
-    coll.update({}, [{$addFields: {newField: {$indexOfArray: ["$x", "B"]}}}], caseSensitive));
+assert.commandWorked(coll.update({}, [{$addFields: {newField: {$indexOfArray: ["$x", "B"]}}}], caseSensitive));
 assert.eq(coll.findOne().newField, 5, `actual=${coll.findOne()}`);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-assert.commandWorked(
-    coll.update({}, [{$project: {newField: {$indexOfArray: ["$x", "B"]}}}], caseSensitive));
+assert.commandWorked(coll.update({}, [{$project: {newField: {$indexOfArray: ["$x", "B"]}}}], caseSensitive));
 assert.eq(coll.findOne().newField, 5, `actual=${coll.findOne()}`);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-assert.commandWorked(
-    coll.update({}, [{$replaceWith: {newField: {$indexOfArray: ["$x", "B"]}}}], caseSensitive));
+assert.commandWorked(coll.update({}, [{$replaceWith: {newField: {$indexOfArray: ["$x", "B"]}}}], caseSensitive));
 assert.eq(coll.findOne().newField, 5, `actual=${coll.findOne()}`);
 
 // Case insensitive $indexOfArray on "B" matches "b".
 assert(coll.drop());
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-assert.commandWorked(
-    coll.update({}, [{$addFields: {newField: {$indexOfArray: ["$x", "B"]}}}], caseInsensitive));
+assert.commandWorked(coll.update({}, [{$addFields: {newField: {$indexOfArray: ["$x", "B"]}}}], caseInsensitive));
 assert.eq(coll.findOne().newField, 3, `actual=${coll.findOne()}`);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-assert.commandWorked(
-    coll.update({}, [{$project: {newField: {$indexOfArray: ["$x", "B"]}}}], caseInsensitive));
+assert.commandWorked(coll.update({}, [{$project: {newField: {$indexOfArray: ["$x", "B"]}}}], caseInsensitive));
 assert.eq(coll.findOne().newField, 3, `actual=${coll.findOne()}`);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-assert.commandWorked(
-    coll.update({}, [{$replaceWith: {newField: {$indexOfArray: ["$x", "B"]}}}], caseInsensitive));
+assert.commandWorked(coll.update({}, [{$replaceWith: {newField: {$indexOfArray: ["$x", "B"]}}}], caseInsensitive));
 assert.eq(coll.findOne().newField, 3, `actual=${coll.findOne()}`);
 
 // Collation is respected for pipeline-style bulk update.
 assert(coll.drop());
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-assert.commandWorked(coll.bulkWrite([{
-    updateOne: {
-        filter: {},
-        update: [{$addFields: {newField: {$indexOfArray: ["$x", "B"]}}}],
-        collation: caseInsensitive.collation
-    }
-}]));
+assert.commandWorked(
+    coll.bulkWrite([
+        {
+            updateOne: {
+                filter: {},
+                update: [{$addFields: {newField: {$indexOfArray: ["$x", "B"]}}}],
+                collation: caseInsensitive.collation,
+            },
+        },
+    ]),
+);
 assert.eq(coll.findOne().newField, 3, `actual=${coll.findOne()}`);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-assert.commandWorked(coll.bulkWrite([{
-    updateOne: {
-        filter: {},
-        update: [{$project: {newField: {$indexOfArray: ["$x", "B"]}}}],
-        collation: caseInsensitive.collation
-    }
-}]));
+assert.commandWorked(
+    coll.bulkWrite([
+        {
+            updateOne: {
+                filter: {},
+                update: [{$project: {newField: {$indexOfArray: ["$x", "B"]}}}],
+                collation: caseInsensitive.collation,
+            },
+        },
+    ]),
+);
 assert.eq(coll.findOne().newField, 3, `actual=${coll.findOne()}`);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({x: [1, 2, "a", "b", "c", "B"]}));
-assert.commandWorked(coll.bulkWrite([{
-    updateOne: {
-        filter: {},
-        update: [{$replaceWith: {newField: {$indexOfArray: ["$x", "B"]}}}],
-        collation: caseInsensitive.collation
-    }
-}]));
+assert.commandWorked(
+    coll.bulkWrite([
+        {
+            updateOne: {
+                filter: {},
+                update: [{$replaceWith: {newField: {$indexOfArray: ["$x", "B"]}}}],
+                collation: caseInsensitive.collation,
+            },
+        },
+    ]),
+);
 assert.eq(coll.findOne().newField, 3, `actual=${coll.findOne()}`);

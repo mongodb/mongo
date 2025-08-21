@@ -4,18 +4,15 @@
 import {hangTestToAttachGDB} from "jstests/libs/hang_test_to_attach_gdb.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     expectedSearchMeta,
     expectPlanShardedSearch,
-    searchQuery
+    searchQuery,
 } from "jstests/with_mongot/search_mocked/lib/server_85694_query_constants.js";
 
 let nodeOptions = {
-    setParameter:
-        {enableTestCommands: 1, logComponentVerbosity: tojson({query: 5, command: 2, network: 0})}
+    setParameter: {enableTestCommands: 1, logComponentVerbosity: tojson({query: 5, command: 2, network: 0})},
 };
 
 const stWithMock = new ShardingTestWithMongotMock({
@@ -23,7 +20,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     shards: {rs0: {nodes: 1}},
     config: 1,
     mongos: 1,
-    other: {rsOptions: nodeOptions, mongosOptions: nodeOptions}
+    other: {rsOptions: nodeOptions, mongosOptions: nodeOptions},
 });
 
 stWithMock.start();
@@ -41,8 +38,7 @@ const coll = testDB.getCollection(collName);
 
 const singleResultId = ObjectId("65ba75afca88f584bdbac735");
 
-assert.commandWorked(coll.insertOne(
-    {_id: singleResultId, openfda: {manufacturer_name: 'Factory', route: ['ORAL']}}));
+assert.commandWorked(coll.insertOne({_id: singleResultId, openfda: {manufacturer_name: "Factory", route: ["ORAL"]}}));
 
 // Set the mock responses for a query which includes the result cursors.
 function setQueryMockResponses(isSearchMeta) {
@@ -51,7 +47,7 @@ function setQueryMockResponses(isSearchMeta) {
     const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
     const shard0MongoT = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
 
-    const throwawayCursorID = NumberLong(1);  // Mongot wants a cursor ID even if we don't use it.
+    const throwawayCursorID = NumberLong(1); // Mongot wants a cursor ID even if we don't use it.
     shard0MongoT.setMockResponses(
         [
             {
@@ -63,7 +59,7 @@ function setQueryMockResponses(isSearchMeta) {
                     collName: collName,
                     db: dbName,
                     collectionUUID: collUUID0,
-                    optimizationFlags: isSearchMeta ? {omitSearchDocumentResults: true} : null
+                    optimizationFlags: isSearchMeta ? {omitSearchDocumentResults: true} : null,
                 }),
                 response: {
                     "cursor": {
@@ -72,19 +68,19 @@ function setQueryMockResponses(isSearchMeta) {
                         "ns": coll.getFullName(),
                     },
                     "vars": {"SEARCH_META": expectedSearchMeta},
-                    "ok": 1
-                }
+                    "ok": 1,
+                },
             },
         ],
-        throwawayCursorID);
+        throwawayCursorID,
+    );
 }
 
 // Test that a $search query properly computes the $$SEARCH_META value according to the pipeline
 // returned by mongot(mock).
 function testSearchQuery() {
     setQueryMockResponses(false);
-    let queryResult =
-        coll.aggregate([{$search: searchQuery}, {$project: {meta: "$$SEARCH_META"}}]).toArray();
+    let queryResult = coll.aggregate([{$search: searchQuery}, {$project: {meta: "$$SEARCH_META"}}]).toArray();
     assert.eq([{_id: singleResultId, meta: expectedSearchMeta}], queryResult);
 }
 

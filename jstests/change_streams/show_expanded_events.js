@@ -16,32 +16,32 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection,
 } from "jstests/libs/collection_drop_recreate.js";
-import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
 // Assert that the flag is not allowed with 'apiStrict'.
-assert.commandFailedWithCode(testDB.runCommand({
-    aggregate: 1,
-    pipeline: [{$changeStream: {showExpandedEvents: true}}],
-    cursor: {},
-    apiVersion: "1",
-    apiStrict: true
-}),
-                             ErrorCodes.APIStrictError);
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        aggregate: 1,
+        pipeline: [{$changeStream: {showExpandedEvents: true}}],
+        cursor: {},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
+    ErrorCodes.APIStrictError,
+);
 
-assert.commandWorked(testDB.runCommand(
-    {aggregate: 1, pipeline: [{$changeStream: {showExpandedEvents: true}}], cursor: {}}));
+assert.commandWorked(
+    testDB.runCommand({aggregate: 1, pipeline: [{$changeStream: {showExpandedEvents: true}}], cursor: {}}),
+);
 
 const dbName = testDB.getName();
-const collName = 'enriched_events';
-const renamedCollName = 'enriched_events_renamed';
+const collName = "enriched_events";
+const renamedCollName = "enriched_events_renamed";
 const ns = {
     db: dbName,
-    coll: collName
+    coll: collName,
 };
 const renamedNs = {
     db: dbName,
@@ -86,7 +86,7 @@ function assertChangeEvent(operation, expectedEvent, checkUuid = true) {
 // Test change stream event for 'insert' operation.
 assertChangeEvent(() => assert.commandWorked(coll.insert({_id: 0, a: 1})), {
     ns,
-    operationType: 'insert',
+    operationType: "insert",
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 1},
 });
@@ -94,7 +94,7 @@ assertChangeEvent(() => assert.commandWorked(coll.insert({_id: 0, a: 1})), {
 // Test change stream event for replacement-style 'update' operation.
 assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {_id: 0, a: 2})), {
     ns,
-    operationType: 'replace',
+    operationType: "replace",
     documentKey: {_id: 0},
     fullDocument: {_id: 0, a: 2},
 });
@@ -102,23 +102,22 @@ assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {_id: 0, a: 2
 // Test change stream event for regular 'update' operation.
 assertChangeEvent(() => assert.commandWorked(coll.update({_id: 0}, {$inc: {a: 1}})), {
     ns,
-    operationType: 'update',
+    operationType: "update",
     documentKey: {_id: 0},
-    updateDescription:
-        {removedFields: [], updatedFields: {a: 3}, truncatedArrays: [], disambiguatedPaths: {}},
+    updateDescription: {removedFields: [], updatedFields: {a: 3}, truncatedArrays: [], disambiguatedPaths: {}},
 });
 
 // Test change stream event for 'remove' operation.
 assertChangeEvent(() => assert.commandWorked(coll.remove({_id: 0})), {
     ns,
-    operationType: 'delete',
+    operationType: "delete",
     documentKey: {_id: 0},
 });
 
 // Test change stream event for 'drop' operation.
 assertChangeEvent(() => assertDropCollection(testDB, collName), {
     ns,
-    operationType: 'drop',
+    operationType: "drop",
 });
 assertCreateCollection(testDB, collName);
 cursor = openChangeStreamCursor();
@@ -126,7 +125,7 @@ cursor = openChangeStreamCursor();
 // Test change stream event for 'rename' operation with 'dropTarget: false'.
 assertChangeEvent(() => assert.commandWorked(coll.renameCollection(renamedCollName)), {
     ns,
-    operationType: 'rename',
+    operationType: "rename",
     to: renamedNs,
     operationDescription: {
         to: renamedNs,
@@ -140,7 +139,7 @@ cursor = openChangeStreamCursor();
 // does not exist.
 assertChangeEvent(() => assert.commandWorked(coll.renameCollection(renamedCollName, true)), {
     ns,
-    operationType: 'rename',
+    operationType: "rename",
     to: renamedNs,
     operationDescription: {
         to: renamedNs,
@@ -155,14 +154,13 @@ cursor = openChangeStreamCursor();
 assertCreateCollection(testDB, renamedCollName);
 assertNextChangeEvent({
     ns: renamedNs,
-    operationType: 'create',
+    operationType: "create",
     operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
     nsType: "collection",
-
 });
 assertChangeEvent(() => assert.commandWorked(coll.renameCollection(renamedCollName, true)), {
     ns,
-    operationType: 'rename',
+    operationType: "rename",
     to: renamedNs,
     operationDescription: {
         dropTarget: getCollectionUuid(renamedCollName),
@@ -179,7 +177,7 @@ assertChangeEvent(
         ns: {
             db: dbName,
         },
-        operationType: 'dropDatabase',
+        operationType: "dropDatabase",
     },
-    false /* checkUuid */
+    false /* checkUuid */,
 );

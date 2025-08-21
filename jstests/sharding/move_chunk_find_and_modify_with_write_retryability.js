@@ -1,7 +1,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {testMoveChunkWithSession} from "jstests/sharding/move_chunk_with_session_helper.js";
 
-var checkFindAndModifyResult = function(expected, toCheck) {
+var checkFindAndModifyResult = function (expected, toCheck) {
     assert.eq(expected.ok, toCheck.ok);
     assert.eq(expected.value, toCheck.value);
     assert.eq(expected.lastErrorObject, toCheck.lastErrorObject);
@@ -10,9 +10,9 @@ var checkFindAndModifyResult = function(expected, toCheck) {
 var lsid = UUID();
 var tests = [
     {
-        coll: 'findAndMod-upsert',
+        coll: "findAndMod-upsert",
         cmd: {
-            findAndModify: 'findAndMod-upsert',
+            findAndModify: "findAndMod-upsert",
             query: {x: 60},
             update: {$inc: {y: 1}},
             new: true,
@@ -20,18 +20,18 @@ var tests = [
             lsid: {id: lsid},
             txnNumber: NumberLong(37),
         },
-        setup: function(coll) {},
-        checkRetryResult: function(result, retryResult) {
+        setup: function (coll) {},
+        checkRetryResult: function (result, retryResult) {
             checkFindAndModifyResult(result, retryResult);
         },
-        checkDocuments: function(coll) {
+        checkDocuments: function (coll) {
             assert.eq(1, coll.findOne({x: 60}).y);
         },
     },
     {
-        coll: 'findAndMod-update-preImage',
+        coll: "findAndMod-update-preImage",
         cmd: {
-            findAndModify: 'findAndMod-update-preImage',
+            findAndModify: "findAndMod-update-preImage",
             query: {x: 60},
             update: {$inc: {y: 1}},
             new: false,
@@ -39,20 +39,20 @@ var tests = [
             lsid: {id: lsid},
             txnNumber: NumberLong(38),
         },
-        setup: function(coll) {
+        setup: function (coll) {
             coll.insert({x: 60});
         },
-        checkRetryResult: function(result, retryResult) {
+        checkRetryResult: function (result, retryResult) {
             checkFindAndModifyResult(result, retryResult);
         },
-        checkDocuments: function(coll) {
+        checkDocuments: function (coll) {
             assert.eq(1, coll.findOne({x: 60}).y);
         },
     },
     {
-        coll: 'findAndMod-update-postImage',
+        coll: "findAndMod-update-postImage",
         cmd: {
-            findAndModify: 'findAndMod-update-postImage',
+            findAndModify: "findAndMod-update-postImage",
             query: {x: 60},
             update: {$inc: {y: 1}},
             new: true,
@@ -60,36 +60,36 @@ var tests = [
             lsid: {id: lsid},
             txnNumber: NumberLong(39),
         },
-        setup: function(coll) {
+        setup: function (coll) {
             coll.insert({x: 60});
         },
-        checkRetryResult: function(result, retryResult) {
+        checkRetryResult: function (result, retryResult) {
             checkFindAndModifyResult(result, retryResult);
         },
-        checkDocuments: function(coll) {
+        checkDocuments: function (coll) {
             assert.eq(1, coll.findOne({x: 60}).y);
         },
     },
     {
-        coll: 'findAndMod-delete',
+        coll: "findAndMod-delete",
         cmd: {
-            findAndModify: 'findAndMod-delete',
+            findAndModify: "findAndMod-delete",
             query: {x: 10},
             remove: true,
             lsid: {id: lsid},
             txnNumber: NumberLong(40),
         },
-        setup: function(coll) {
+        setup: function (coll) {
             var bulk = coll.initializeUnorderedBulkOp();
             for (let i = 0; i < 10; i++) {
                 bulk.insert({x: 10});
             }
             assert.commandWorked(bulk.execute());
         },
-        checkRetryResult: function(result, retryResult) {
+        checkRetryResult: function (result, retryResult) {
             checkFindAndModifyResult(result, retryResult);
         },
-        checkDocuments: function(coll) {
+        checkDocuments: function (coll) {
             assert.eq(9, coll.find({x: 10}).itcount());
         },
     },
@@ -101,15 +101,13 @@ var st = new ShardingTest({
     mongos: 2,
     shards: {
         rs0: {nodes: [{rsConfig: {}}, {rsConfig: {priority: 0}}]},
-        rs1: {nodes: [{rsConfig: {}}, {rsConfig: {}}]}
-    }
+        rs1: {nodes: [{rsConfig: {}}, {rsConfig: {}}]},
+    },
 });
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
 
-tests.forEach(function(test) {
-    testMoveChunkWithSession(
-        st, test.coll, test.cmd, test.setup, test.checkRetryResult, test.checkDocuments);
+tests.forEach(function (test) {
+    testMoveChunkWithSession(st, test.coll, test.cmd, test.setup, test.checkRetryResult, test.checkDocuments);
 });
 
 st.stop();

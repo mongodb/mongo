@@ -15,8 +15,8 @@ function assertFirstLast(expectedFirst, expectedLast, stages, expression) {
         pipeline = pipeline.concat(stages);
     }
 
-    expression = expression || '$b';
-    pipeline.push({$group: {_id: '$a', first: {$first: expression}, last: {$last: expression}}});
+    expression = expression || "$b";
+    pipeline.push({$group: {_id: "$a", first: {$first: expression}, last: {$last: expression}}});
 
     const result = coll.aggregate(pipeline).toArray();
     for (let i = 0; i < result.length; ++i) {
@@ -52,7 +52,7 @@ assert.commandWorked(coll.insert({a: 2, b: 0}));
 assertFirstLast(1, 3);
 
 // Additional pipeline stages do not affect outcome if order is maintained.
-assertFirstLast(1, 3, [{$project: {x: '$a', y: '$b'}}, {$project: {a: '$x', b: '$y'}}]);
+assertFirstLast(1, 3, [{$project: {x: "$a", y: "$b"}}, {$project: {a: "$x", b: "$y"}}]);
 
 // Additional pipeline stages affect outcome if order is modified.
 assertFirstLast(3, 1, [{$sort: {b: -1}}]);
@@ -67,13 +67,13 @@ assertFirstLast(2, 3, [{$skip: 1}, {$limit: 2}]);
 assertFirstLast(2, 2, [{$skip: 1}, {$limit: 1}]);
 
 // Mixed type values.
-assert.commandWorked(coll.insert({a: 1, b: 'foo'}));
-assertFirstLast(1, 'foo');
+assert.commandWorked(coll.insert({a: 1, b: "foo"}));
+assertFirstLast(1, "foo");
 
 assert(coll.drop());
-assert.commandWorked(coll.insert({a: 1, b: 'bar'}));
+assert.commandWorked(coll.insert({a: 1, b: "bar"}));
 assert.commandWorked(coll.insert({a: 1, b: true}));
-assertFirstLast('bar', true);
+assertFirstLast("bar", true);
 
 // Value null.
 assert(coll.drop());
@@ -111,14 +111,14 @@ assertFirstLast(undefined, undefined);
 assert(coll.drop());
 assert.commandWorked(coll.insert({a: 1, b: [{c: 1}, {c: 2}]}));
 assert.commandWorked(coll.insert({a: 1, b: [{c: 6}, {}]}));
-assertFirstLast([1, 2], [6], [], '$b.c');
+assertFirstLast([1, 2], [6], [], "$b.c");
 
 // Computed expressions.
 assert(coll.drop());
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(coll.insert({a: 1, b: 2}));
-assertFirstLast(1, 0, [], {$mod: ['$b', 2]});
-assertFirstLast(0, 1, [], {$mod: [{$add: ['$b', 1]}, 2]});
+assertFirstLast(1, 0, [], {$mod: ["$b", 2]});
+assertFirstLast(0, 1, [], {$mod: [{$add: ["$b", 1]}, 2]});
 
 // Multikey projections without sort. Sort-handling logic correctly preserves the projection if some
 // sort exists. Here, we ensure that arrays do not get unwound.
@@ -134,5 +134,7 @@ const runAndConfirmResult = (pipeline, expected) => {
 
 runAndConfirmResult([{$group: {_id: "$notMk", acc: {$first: "$mk"}}}], [{_id: 4, acc: [1, 2, 3]}]);
 runAndConfirmResult([{$group: {_id: "$notMk", acc: {$last: "$mk"}}}], [{_id: 4, acc: [1, 2, 3]}]);
-runAndConfirmResult([{$match: {notMk: {$eq: 4}}}, {$group: {_id: "$notMk", acc: {$last: "$mk"}}}],
-                    [{_id: 4, acc: [1, 2, 3]}]);
+runAndConfirmResult(
+    [{$match: {notMk: {$eq: 4}}}, {$group: {_id: "$notMk", acc: {$last: "$mk"}}}],
+    [{_id: 4, acc: [1, 2, 3]}],
+);

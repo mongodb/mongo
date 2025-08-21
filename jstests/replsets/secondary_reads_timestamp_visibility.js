@@ -25,8 +25,9 @@ let primaryColl = primaryDB.getCollection(collName);
 // Create a collection and an index. Insert some data.
 primaryDB.runCommand({drop: collName});
 assert.commandWorked(primaryDB.runCommand({create: collName}));
-assert.commandWorked(primaryDB.runCommand(
-    {createIndexes: collName, indexes: [{key: {y: 1}, name: "y_1", unique: true}]}));
+assert.commandWorked(
+    primaryDB.runCommand({createIndexes: collName, indexes: [{key: {y: 1}, name: "y_1", unique: true}]}),
+);
 for (let i = 0; i < 100; i++) {
     assert.commandWorked(primaryColl.insert({_id: i, x: 0, y: i + 1}));
 }
@@ -37,7 +38,13 @@ replSet.awaitReplication();
 
 // Sanity check.
 assert.eq(secondaryDB.getCollection(collName).find({x: 0}).itcount(), 100);
-assert.eq(secondaryDB.getCollection(collName).find({y: {$gte: 1, $lt: 101}}).itcount(), 100);
+assert.eq(
+    secondaryDB
+        .getCollection(collName)
+        .find({y: {$gte: 1, $lt: 101}})
+        .itcount(),
+    100,
+);
 
 // Prevent a batch from completing on the secondary.
 let pauseAwait = secondaryReadsTest.pauseSecondaryBatchApplication();
@@ -64,14 +71,16 @@ if (!primaryDB.serverStatus().storageEngine.supportsCommittedReads) {
 // We should see the previous, un-replicated state on the secondary with every readconcern.
 for (let i in levels) {
     print("Checking that no new updates are visible yet for readConcern: " + levels[i]);
-    assert.eq(secondaryDB.getCollection(collName).find({x: 0}).readConcern(levels[i]).itcount(),
-              100);
+    assert.eq(secondaryDB.getCollection(collName).find({x: 0}).readConcern(levels[i]).itcount(), 100);
     assert.eq(secondaryDB.getCollection(collName).find({x: 1}).readConcern(levels[i]).itcount(), 0);
-    assert.eq(secondaryDB.getCollection(collName)
-                  .find({y: {$gte: 1, $lt: 101}})
-                  .readConcern(levels[i])
-                  .itcount(),
-              100);
+    assert.eq(
+        secondaryDB
+            .getCollection(collName)
+            .find({y: {$gte: 1, $lt: 101}})
+            .readConcern(levels[i])
+            .itcount(),
+        100,
+    );
 }
 
 // Disable the failpoint and let the batch complete.
@@ -90,7 +99,6 @@ for (let i in levels) {
     print("Checking that new updates are visible for readConcern: " + levels[i]);
     // We should see the new state on the secondary with every readconcern.
     assert.eq(secondaryDB.getCollection(collName).find({x: 0}).readConcern(levels[i]).itcount(), 0);
-    assert.eq(secondaryDB.getCollection(collName).find({x: 1}).readConcern(levels[i]).itcount(),
-              100);
+    assert.eq(secondaryDB.getCollection(collName).find({x: 1}).readConcern(levels[i]).itcount(), 100);
 }
 secondaryReadsTest.stop();

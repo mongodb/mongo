@@ -1,18 +1,18 @@
-
 import {CA_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: SERVER_CERT,
     sslCAFile: CA_CERT,
-    vvvvv: ""
+    vvvvv: "",
 };
 
 const conn = MongoRunner.runMongod(x509_options);
 const localKMS = {
     key: BinData(
         0,
-        "tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6drp"),
+        "tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6drp",
+    ),
 };
 
 const clientSideFLEOptionsFail = [
@@ -28,7 +28,7 @@ const clientSideFLEOptionsFail = [
     },
 ];
 
-clientSideFLEOptionsFail.forEach(element => {
+clientSideFLEOptionsFail.forEach((element) => {
     assert.throws(Mongo, [conn.host, element]);
 });
 
@@ -42,7 +42,7 @@ const clientSideFLEOptionsPass = [
     },
 ];
 
-clientSideFLEOptionsPass.forEach(element => {
+clientSideFLEOptionsPass.forEach((element) => {
     assert.doesNotThrow(() => {
         Mongo(conn.host, element);
     });

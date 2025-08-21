@@ -2,7 +2,7 @@
  * Utility functions used to convert CRUD ops into a bulkWrite command.
  * Converts the bulkWrite responses into the original CRUD response.
  */
-export const BulkWriteUtils = (function() {
+export const BulkWriteUtils = (function () {
     const commandsToBulkWriteOverride = new Set(["insert", "update", "delete"]);
 
     let numOpsPerResponse = [];
@@ -54,14 +54,20 @@ export const BulkWriteUtils = (function() {
             "bulkWrite": 1,
             "ops": bufferedOps,
             "nsInfo": nsInfos,
-            "ordered": (ordered != null) ? ordered : true,
+            "ordered": ordered != null ? ordered : true,
             "bypassDocumentValidation": bypassDocumentValidation,
             "rawData": rawData,
         };
     }
 
     function flushCurrentBulkWriteBatch(
-        conn, lsid, originalRunCommand, makeRunCommandArgs, isMultiOp, additionalParameters = {}) {
+        conn,
+        lsid,
+        originalRunCommand,
+        makeRunCommandArgs,
+        isMultiOp,
+        additionalParameters = {},
+    ) {
         // Should not be possible to reach if bypassDocumentValidation is not set.
         assert(bypassDocumentValidation != null);
 
@@ -69,7 +75,7 @@ export const BulkWriteUtils = (function() {
             "bulkWrite": 1,
             "ops": bufferedOps,
             "nsInfo": nsInfos,
-            "ordered": (ordered != null) ? ordered : true,
+            "ordered": ordered != null ? ordered : true,
             "bypassDocumentValidation": bypassDocumentValidation,
             "rawData": rawData,
         };
@@ -111,7 +117,7 @@ export const BulkWriteUtils = (function() {
             // For errorsOnly we will only ever have items in the response cursor if an operation
             // failed. We also always run batched bulkWrites as ordered:true so only one command can
             // fail. Once we get a bulkWrite with no errors then we have executed all ops.
-            while ((resp.cursor == null) || (resp.cursor.firstBatch.length != 0)) {
+            while (resp.cursor == null || resp.cursor.firstBatch.length != 0) {
                 let idx = resp.cursor ? resp.cursor.firstBatch[0].idx : 0;
                 let i = 0;
                 while (i <= idx) {
@@ -199,19 +205,20 @@ export const BulkWriteUtils = (function() {
             throw new Error("Invalid bulkWrite op type. " + cmd.ops[0]);
         }
 
-        ["writeConcernError",
-         "retriedStmtIds",
-         "opTime",
-         "$clusterTime",
-         "electionId",
-         "operationTime",
-         "errorLabels",
-         "_mongo"]
-            .forEach(property => {
-                if (bulkWriteResponse.hasOwnProperty(property)) {
-                    response[property] = bulkWriteResponse[property];
-                }
-            });
+        [
+            "writeConcernError",
+            "retriedStmtIds",
+            "opTime",
+            "$clusterTime",
+            "electionId",
+            "operationTime",
+            "errorLabels",
+            "_mongo",
+        ].forEach((property) => {
+            if (bulkWriteResponse.hasOwnProperty(property)) {
+                response[property] = bulkWriteResponse[property];
+            }
+        });
 
         // Need to loop through any errors now.
         if (bulkWriteResponse.cursor.firstBatch.length != 0) {
@@ -219,9 +226,7 @@ export const BulkWriteUtils = (function() {
             while (cursorIdx < bulkWriteResponse.cursor.firstBatch.length) {
                 let current = bulkWriteResponse.cursor.firstBatch[cursorIdx];
                 // For errorsOnly every cursor element must be an error.
-                assert.eq(0,
-                          current.ok,
-                          "command: " + tojson(cmd) + " : response: " + tojson(bulkWriteResponse));
+                assert.eq(0, current.ok, "command: " + tojson(cmd) + " : response: " + tojson(bulkWriteResponse));
 
                 if (!response.hasOwnProperty("writeErrors")) {
                     response["writeErrors"] = [];
@@ -229,12 +234,11 @@ export const BulkWriteUtils = (function() {
                 let writeError = {index: current.idx, code: current.code, errmsg: current.errmsg};
 
                 // Include optional error fields if they exist.
-                ["errInfo", "db", "collectionUUID", "expectedCollection", "actualCollection"]
-                    .forEach(property => {
-                        if (current.hasOwnProperty(property)) {
-                            writeError[property] = current[property];
-                        }
-                    });
+                ["errInfo", "db", "collectionUUID", "expectedCollection", "actualCollection"].forEach((property) => {
+                    if (current.hasOwnProperty(property)) {
+                        writeError[property] = current[property];
+                    }
+                });
 
                 response["writeErrors"].push(writeError);
                 cursorIdx++;
@@ -296,16 +300,13 @@ export const BulkWriteUtils = (function() {
                         let writeError = {index: num, code: current.code, errmsg: current.errmsg};
 
                         // Include optional error fields if they exist.
-                        ["errInfo",
-                         "db",
-                         "collectionUUID",
-                         "expectedCollection",
-                         "actualCollection"]
-                            .forEach(property => {
+                        ["errInfo", "db", "collectionUUID", "expectedCollection", "actualCollection"].forEach(
+                            (property) => {
                                 if (current.hasOwnProperty(property)) {
                                     writeError[property] = current[property];
                                 }
-                            });
+                            },
+                        );
 
                         resp["writeErrors"].push(writeError);
                     } else {
@@ -322,19 +323,20 @@ export const BulkWriteUtils = (function() {
                         }
                     }
 
-                    ["writeConcernError",
-                     "retriedStmtIds",
-                     "opTime",
-                     "$clusterTime",
-                     "electionId",
-                     "operationTime",
-                     "errorLabels",
-                     "_mongo"]
-                        .forEach(property => {
-                            if (bulkWriteResponse.hasOwnProperty(property)) {
-                                resp[property] = bulkWriteResponse[property];
-                            }
-                        });
+                    [
+                        "writeConcernError",
+                        "retriedStmtIds",
+                        "opTime",
+                        "$clusterTime",
+                        "electionId",
+                        "operationTime",
+                        "errorLabels",
+                        "_mongo",
+                    ].forEach((property) => {
+                        if (bulkWriteResponse.hasOwnProperty(property)) {
+                            resp[property] = bulkWriteResponse[property];
+                        }
+                    });
 
                     cursorIdx += 1;
                     num += 1;
@@ -345,8 +347,7 @@ export const BulkWriteUtils = (function() {
         return responses;
     }
 
-    function getNsInfoIdx(
-        nsInfoEntry, collectionUUID, encryptionInformation, isTimeseriesNamespace) {
+    function getNsInfoIdx(nsInfoEntry, collectionUUID, encryptionInformation, isTimeseriesNamespace) {
         let idx = nsInfos.findIndex((element) => element.ns == nsInfoEntry);
         if (idx == -1) {
             idx = nsInfos.length;
@@ -375,15 +376,14 @@ export const BulkWriteUtils = (function() {
             "filter": update.q,
             "updateMods": update.u,
             "multi": update.multi ? update.multi : false,
-            "upsert": update.upsert ? update.upsert : false
+            "upsert": update.upsert ? update.upsert : false,
         };
 
-        ["arrayFilters", "collation", "hint", "sampleId", "sort", "upsertSupplied"].forEach(
-            property => {
-                if (update.hasOwnProperty(property)) {
-                    op[property] = update[property];
-                }
-            });
+        ["arrayFilters", "collation", "hint", "sampleId", "sort", "upsertSupplied"].forEach((property) => {
+            if (update.hasOwnProperty(property)) {
+                op[property] = update[property];
+            }
+        });
 
         if (update.hasOwnProperty("c")) {
             op["constants"] = update.c;
@@ -403,7 +403,7 @@ export const BulkWriteUtils = (function() {
     function processDeleteOp(nsInfoIdx, cmdObj, deleteCmd) {
         let op = {"delete": nsInfoIdx, "filter": deleteCmd.q, "multi": deleteCmd.limit == 0};
 
-        ["sampleId", "collation", "hint"].forEach(property => {
+        ["sampleId", "collation", "hint"].forEach((property) => {
             if (deleteCmd.hasOwnProperty(property)) {
                 op[property] = deleteCmd[property];
             }
@@ -433,10 +433,12 @@ export const BulkWriteUtils = (function() {
         rawData = cmdObj.hasOwnProperty("rawData") ? cmdObj.rawData : false;
 
         let nsInfoEntry = dbName + "." + cmdObj[cmdName];
-        let nsInfoIdx = getNsInfoIdx(nsInfoEntry,
-                                     cmdObj.collectionUUID,
-                                     cmdObj.encryptionInformation,
-                                     cmdObj.isTimeseriesNamespace);
+        let nsInfoIdx = getNsInfoIdx(
+            nsInfoEntry,
+            cmdObj.collectionUUID,
+            cmdObj.encryptionInformation,
+            cmdObj.isTimeseriesNamespace,
+        );
 
         let numOps = 0;
 
@@ -474,6 +476,6 @@ export const BulkWriteUtils = (function() {
         getCurrentBatchSize: getCurrentBatchSize,
         getBulkWriteState: getBulkWriteState,
         getNamespaces: getNamespaces,
-        getBulkWriteCmd: getBulkWriteCmd
+        getBulkWriteCmd: getBulkWriteCmd,
     };
 })();

@@ -14,7 +14,7 @@ const kNoTextScoreAvailableErrCode = 40218;
 // begin with a $text search.
 let pipeline = [
     {$match: {$text: {$search: "foo"}}},
-    {$lookup: {from: "inner", as: "as", pipeline: [{$project: {score: {$meta: "textScore"}}}]}}
+    {$lookup: {from: "inner", as: "as", pipeline: [{$project: {score: {$meta: "textScore"}}}]}},
 ];
 
 assert.commandWorked(outer.insert({_id: 100, a: "foo"}));
@@ -38,30 +38,32 @@ assertErrorCode(outer, pipeline, kNoTextScoreAvailableErrCode);
 
 // A pipeline with two text searches, one within a $lookup, will work.
 pipeline = [
-        {$match: {$text: {$search: "foo"}}},
-        {
-          $lookup: {
-              from: "inner",
-              as: "as",
-              pipeline: [
-                  {$match: {$text: {$search: "bar apple banana hello"}}},
-                  {$project: {score: {$meta: "textScore"}}}
-              ]
-          }
-        }
-    ];
+    {$match: {$text: {$search: "foo"}}},
+    {
+        $lookup: {
+            from: "inner",
+            as: "as",
+            pipeline: [
+                {$match: {$text: {$search: "bar apple banana hello"}}},
+                {$project: {score: {$meta: "textScore"}}},
+            ],
+        },
+    },
+];
 
 let expected = [{"_id": 100, "a": "foo", "as": [{"_id": 100, "score": 2}]}];
 assert.eq(outer.aggregate(pipeline).toArray(), expected);
 
 // A lookup with a text search in the subpipeline will correctly perform that search on 'from'.
-pipeline = [{
+pipeline = [
+    {
         $lookup: {
             from: "inner",
             as: "as",
-            pipeline: [{$match: {$text: {$search: "bar apple banana hello"}}}]
-        }
-    }];
+            pipeline: [{$match: {$text: {$search: "bar apple banana hello"}}}],
+        },
+    },
+];
 expected = [{"_id": 100, "a": "foo", "as": [{"_id": 100, "a": "bar apple banana"}]}];
 
 assert.eq(outer.aggregate(pipeline).toArray(), expected);
@@ -69,19 +71,19 @@ assert.eq(outer.aggregate(pipeline).toArray(), expected);
 // A lookup with two text searches and two text score $projects will have the text scores
 // reference the relevant text search.
 pipeline = [
-        {$match: {$text: {$search: "foo"}}},
-        {
-          $lookup: {
-              from: "inner",
-              as: "as",
-              pipeline: [
-                  {$match: {$text: {$search: "bar apple banana hello"}}},
-                  {$project: {score: {$meta: "textScore"}}}
-              ]
-          }
+    {$match: {$text: {$search: "foo"}}},
+    {
+        $lookup: {
+            from: "inner",
+            as: "as",
+            pipeline: [
+                {$match: {$text: {$search: "bar apple banana hello"}}},
+                {$project: {score: {$meta: "textScore"}}},
+            ],
         },
-        {$project: {score: {$meta: "textScore"}, as: 1}},
-    ];
+    },
+    {$project: {score: {$meta: "textScore"}, as: 1}},
+];
 
 expected = [{"_id": 100, "as": [{"_id": 100, "score": 2}], "score": 1.1}];
 
@@ -90,14 +92,14 @@ assert.eq(outer.aggregate(pipeline).toArray(), expected);
 // Given a $text stage in the 'from' pipeline, the outer pipeline will not be able to access
 // this $text stage's text score.
 pipeline = [
-        {
-          $lookup: {
-              from: "inner",
-              as: "as",
-              pipeline: [{$match: {$text: {$search: "bar apple banana hello"}}}]
-          }
+    {
+        $lookup: {
+            from: "inner",
+            as: "as",
+            pipeline: [{$match: {$text: {$search: "bar apple banana hello"}}}],
         },
-        {$project: {score: {$meta: "textScore"}, as: 1}},
-    ];
+    },
+    {$project: {score: {$meta: "textScore"}, as: 1}},
+];
 
 assertErrorCode(outer, pipeline, kNoTextScoreAvailableErrCode);

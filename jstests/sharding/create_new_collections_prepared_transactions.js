@@ -24,16 +24,12 @@ const versionSupportsSingleWriteShardCommitOptimization =
     MongoRunner.compareBinVersions(jsTestOptions().mongosBinVersion, "7.1") >= 0;
 
 // Create two databases with different shards as their primaries.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbNameShard0, primaryShard: st.shard0.shardName}));
-assert.commandWorked(
-    st.s.getDB(dbNameShard0)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbNameShard0, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.getDB(dbNameShard0)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
 
 // Set up another collection with a different shard (shard2) as its primary shard.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbNameShard2, primaryShard: st.shard2.shardName}));
-assert.commandWorked(
-    st.s.getDB(dbNameShard2)[collName].insert({_id: 4}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbNameShard2, primaryShard: st.shard2.shardName}));
+assert.commandWorked(st.s.getDB(dbNameShard2)[collName].insert({_id: 4}, {writeConcern: {w: "majority"}}));
 
 const session = st.s.getDB(dbNameShard0).getMongo().startSession({causalConsistency: false});
 
@@ -49,7 +45,7 @@ assert.eq(doc2._id, 4);
 
 jsTest.log("Testing collection creation in a cross-shard write transaction.");
 const txnOptions = {
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 withRetryOnTransientTxnError(
     () => {
@@ -64,13 +60,16 @@ withRetryOnTransientTxnError(
             assertDropCollection(st.s.getDB(dbNameShard0), newCollName);
             assertDropCollection(st.s.getDB(dbNameShard2), newCollName);
         } else {
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                         ErrorCodes.OperationNotSupportedInTransaction);
+            assert.commandFailedWithCode(
+                session.commitTransaction_forTesting(),
+                ErrorCodes.OperationNotSupportedInTransaction,
+            );
         }
     },
     () => {
         session.abortTransaction();
-    });
+    },
+);
 
 jsTest.log("Testing collection creation in a single-shard write transaction.");
 withRetryOnTransientTxnError(
@@ -80,14 +79,17 @@ withRetryOnTransientTxnError(
         doc2 = sessionDBShard2.getCollection(collName).findOne({_id: 4});
         assert.eq(doc2._id, 4);
         if (!versionSupportsSingleWriteShardCommitOptimization) {
-            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                         ErrorCodes.OperationNotSupportedInTransaction);
+            assert.commandFailedWithCode(
+                session.commitTransaction_forTesting(),
+                ErrorCodes.OperationNotSupportedInTransaction,
+            );
         } else {
             assert.commandWorked(session.commitTransaction_forTesting());
         }
     },
     () => {
         session.abortTransaction();
-    });
+    },
+);
 
 st.stop();

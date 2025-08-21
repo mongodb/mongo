@@ -33,18 +33,22 @@ function calculateNumReads(execStages) {
 }
 
 function getTotalDocsExaminedAndTotalKeysExaminedSum(executionStats) {
-    return NumberInt(executionStats.totalDocsExamined) +
-        NumberInt(executionStats.totalKeysExamined);
+    return NumberInt(executionStats.totalDocsExamined) + NumberInt(executionStats.totalKeysExamined);
 }
 
 /**
  * Asserts that the difference between 'lhs' and 'rhs' is at most 1.
  */
 function assertAlmostEqual(lhs, rhs) {
-    assert.lte(Math.abs(lhs - rhs),
-               1,
-               "Classic stats totalDocsExamined + totalKeysExamined (=" + lhs +
-                   ") and SBE stat numReads (=" + rhs + ") are not approximately equal");
+    assert.lte(
+        Math.abs(lhs - rhs),
+        1,
+        "Classic stats totalDocsExamined + totalKeysExamined (=" +
+            lhs +
+            ") and SBE stat numReads (=" +
+            rhs +
+            ") are not approximately equal",
+    );
 }
 
 /**
@@ -56,18 +60,18 @@ function checkStatsAreCorrect(db, coll, filter, proj = {}, sort = {}) {
     let classicExplain;
     let sbeEngineExplain;
 
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
     classicExplain = runExplain(coll, filter, proj, sort);
     assert(classicExplain.hasOwnProperty("executionStats"), classicExplain);
 
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
     sbeEngineExplain = runExplain(coll, filter, proj, sort);
     assert(sbeEngineExplain.hasOwnProperty("executionStats"), sbeEngineExplain);
 
-    assertAlmostEqual(getTotalDocsExaminedAndTotalKeysExaminedSum(classicExplain.executionStats),
-                      calculateNumReads(sbeEngineExplain.executionStats.executionStages));
+    assertAlmostEqual(
+        getTotalDocsExaminedAndTotalKeysExaminedSum(classicExplain.executionStats),
+        calculateNumReads(sbeEngineExplain.executionStats.executionStages),
+    );
 }
 
 function test(db) {
@@ -114,7 +118,7 @@ function test(db) {
 
 {
     const conn = MongoRunner.runMongod();
-    test(conn.getDB('MongoD'));
+    test(conn.getDB("MongoD"));
     MongoRunner.stopMongod(conn);
 }
 

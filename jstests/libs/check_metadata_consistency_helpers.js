@@ -1,19 +1,21 @@
-
-export var MetadataConsistencyChecker = (function() {
+export var MetadataConsistencyChecker = (function () {
     const run = (mongos) => {
-        const adminDB = mongos.getDB('admin');
+        const adminDB = mongos.getDB("admin");
 
         // The isTransientError() function is responsible for setting an error as transient and
         // abort the metadata consistency check to be retried in the future.
-        const isTransientError = function(e) {
+        const isTransientError = function (e) {
             // TODO SERVER-105255 Remove the exception for ingress gRPC.
             if (mongos.isGRPC() && e.code == ErrorCodes.CallbackCanceled) {
                 jsTest.log("Treating `CallbackCanceled` as transient for gRPC streams!");
                 return true;
             }
 
-            if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code) ||
-                ErrorCodes.isNetworkTimeoutError(e.code)) {
+            if (
+                ErrorCodes.isRetriableError(e.code) ||
+                ErrorCodes.isInterruption(e.code) ||
+                ErrorCodes.isNetworkTimeoutError(e.code)
+            ) {
                 return true;
             }
 
@@ -43,14 +45,14 @@ export var MetadataConsistencyChecker = (function() {
             return false;
         };
 
-        const checkMetadataConsistency = function() {
-            jsTest.log('Started metadata consistency check');
+        const checkMetadataConsistency = function () {
+            jsTest.log("Started metadata consistency check");
 
             let checkOptions = {};
             // TODO SERVER-75675 unconditionally perform index consistency checks and
             // remove the skip flag from all tests
             if (!jsTest.options().skipCheckingIndexesConsistentAcrossCluster) {
-                checkOptions['checkIndexes'] = true;
+                checkOptions["checkIndexes"] = true;
             } else {
                 jsTest.log.info("Skipping index consistency check across the cluster");
             }
@@ -62,7 +64,7 @@ export var MetadataConsistencyChecker = (function() {
             if (isMultiVersion) {
                 for (let i = inconsistencies.length - 1; i >= 0; i--) {
                     if (inconsistencies[i].type == "CorruptedChunkHistory") {
-                        inconsistencies.splice(i, 1);  // Remove inconsistency
+                        inconsistencies.splice(i, 1); // Remove inconsistency
                     }
                 }
             }
@@ -73,7 +75,7 @@ export var MetadataConsistencyChecker = (function() {
             if (isStepdownSuite) {
                 for (let i = inconsistencies.length - 1; i >= 0; i--) {
                     if (inconsistencies[i].type == "MalformedTimeseriesBucketsCollection") {
-                        inconsistencies.splice(i, 1);  // Remove inconsistency
+                        inconsistencies.splice(i, 1); // Remove inconsistency
                     }
                 }
             }
@@ -87,16 +89,14 @@ export var MetadataConsistencyChecker = (function() {
             if (isSessionsCollectionDropSuite) {
                 for (let i = inconsistencies.length - 1; i >= 0; i--) {
                     if (inconsistencies[i].details.namespace == "config.system.sessions") {
-                        inconsistencies.splice(i, 1);  // Remove inconsistency
+                        inconsistencies.splice(i, 1); // Remove inconsistency
                     }
                 }
             }
 
-            assert.eq(0,
-                      inconsistencies.length,
-                      `Found metadata inconsistencies: ${tojson(inconsistencies)}`);
+            assert.eq(0, inconsistencies.length, `Found metadata inconsistencies: ${tojson(inconsistencies)}`);
 
-            jsTest.log('Completed metadata consistency check');
+            jsTest.log("Completed metadata consistency check");
         };
 
         try {
@@ -106,19 +106,19 @@ export var MetadataConsistencyChecker = (function() {
                 jsTest.log(`Aborted metadata consistency check due to retriable error: ${e}`);
             } else if (e.code === ErrorCodes.LockBusy) {
                 const buildInfo = adminDB.getServerBuildInfo();
-                const slowBuild = buildInfo.isAddressSanitizerActive() ||
-                    buildInfo.isThreadSanitizerActive() || buildInfo.isDebug();
+                const slowBuild =
+                    buildInfo.isAddressSanitizerActive() || buildInfo.isThreadSanitizerActive() || buildInfo.isDebug();
                 if (slowBuild) {
                     jsTest.log(
-                        `Ignoring LockBusy error on checkMetadataConsistency because we are running with very slow build (e.g. ASAN enabled)`);
+                        `Ignoring LockBusy error on checkMetadataConsistency because we are running with very slow build (e.g. ASAN enabled)`,
+                    );
                 } else {
                     throw e;
                 }
             } else if (e.code === ErrorCodes.ConflictingOperationInProgress) {
                 // If this were an unexpected collection disappearance, the test would tassert so
                 // simply accept the error here.
-                jsTest.log(
-                    "Ignoring ConflictingOperationInProgress error during checkMetadataConsistency");
+                jsTest.log("Ignoring ConflictingOperationInProgress error during checkMetadataConsistency");
             } else {
                 // For all the other errors re-throw the exception
                 throw e;

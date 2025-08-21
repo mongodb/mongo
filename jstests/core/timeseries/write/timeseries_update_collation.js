@@ -25,17 +25,17 @@ assert.commandWorked(testDB.dropDatabase());
 
 const caseSensitive = {
     locale: "en",
-    strength: 3
+    strength: 3,
 };
 const caseInsensitive = {
     locale: "en",
-    strength: 2
+    strength: 2,
 };
 const simple = {
-    locale: "simple"
+    locale: "simple",
 };
 const closedBucketFilter = {
-    "control.closed": {"$not": {"$eq": true}}
+    "control.closed": {"$not": {"$eq": true}},
 };
 
 const docs = [
@@ -56,21 +56,20 @@ const docs = [
 /**
  * Confirms that updates return the expected set of documents and run the correct bucket query.
  */
-function runTest({
-    updateFilter,
-    queryCollation,
-    collectionCollation,
-    nModified,
-    expectedBucketQuery,
-}) {
-    jsTestLog(`Running ${tojson(updateFilter)} with queryCollation: ${
-        tojson(queryCollation)} and collectionCollation: ${tojson(collectionCollation)}`);
+function runTest({updateFilter, queryCollation, collectionCollation, nModified, expectedBucketQuery}) {
+    jsTestLog(
+        `Running ${tojson(updateFilter)} with queryCollation: ${tojson(
+            queryCollation,
+        )} and collectionCollation: ${tojson(collectionCollation)}`,
+    );
 
     const coll = testDB.getCollection(collNamePrefix + testCaseId++);
-    assert.commandWorked(testDB.createCollection(coll.getName(), {
-        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
-        collation: collectionCollation
-    }));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            collation: collectionCollation,
+        }),
+    );
     assert.commandWorked(coll.insert(docs));
 
     testCollation({
@@ -81,7 +80,7 @@ function runTest({
         queryCollation: queryCollation,
         nModified: nModified,
         expectedBucketQuery: expectedBucketQuery,
-        expectedStage: "TS_MODIFY"
+        expectedStage: "TS_MODIFY",
     });
 }
 
@@ -94,8 +93,8 @@ function runTest({
             $and: [
                 closedBucketFilter,
                 {"control.max.str": {$_internalExprGte: "Hello"}},
-                {"control.min.str": {$_internalExprLte: "Hello"}}
-            ]
+                {"control.min.str": {$_internalExprLte: "Hello"}},
+            ],
         },
     });
     runTest({
@@ -105,8 +104,8 @@ function runTest({
             $and: [
                 closedBucketFilter,
                 {"control.max.str": {$_internalExprGte: "hello"}},
-                {"control.min.str": {$_internalExprLte: "hello"}}
-            ]
+                {"control.min.str": {$_internalExprLte: "hello"}},
+            ],
         },
     });
 
@@ -115,20 +114,14 @@ function runTest({
         updateFilter: {[metaFieldName]: "a"},
         nModified: 0,
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "a"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "a"}}, closedBucketFilter],
         },
     });
     runTest({
         updateFilter: {[metaFieldName]: "A"},
         nModified: 4,
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "A"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "A"}}, closedBucketFilter],
         },
     });
 })();
@@ -157,10 +150,7 @@ function runTest({
         queryCollation: caseSensitive,
         nModified: 0,
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "a"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "a"}}, closedBucketFilter],
         },
     });
     runTest({
@@ -168,10 +158,7 @@ function runTest({
         queryCollation: caseInsensitive,
         nModified: 4,
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "a"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "a"}}, closedBucketFilter],
         },
     });
 })();
@@ -186,8 +173,8 @@ function runTest({
             $and: [
                 closedBucketFilter,
                 {"control.max.str": {$_internalExprGte: "Hello"}},
-                {"control.min.str": {$_internalExprLte: "Hello"}}
-            ]
+                {"control.min.str": {$_internalExprLte: "Hello"}},
+            ],
         },
     });
     runTest({
@@ -198,8 +185,8 @@ function runTest({
             $and: [
                 closedBucketFilter,
                 {"control.max.str": {$_internalExprGte: "Hello"}},
-                {"control.min.str": {$_internalExprLte: "Hello"}}
-            ]
+                {"control.min.str": {$_internalExprLte: "Hello"}},
+            ],
         },
     });
 
@@ -209,10 +196,7 @@ function runTest({
         collectionCollation: caseSensitive,
         nModified: 0,
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "a"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "a"}}, closedBucketFilter],
         },
     });
     runTest({
@@ -220,10 +204,7 @@ function runTest({
         collectionCollation: caseInsensitive,
         nModified: 4,
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "a"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "a"}}, closedBucketFilter],
         },
     });
 })();
@@ -239,8 +220,8 @@ function runTest({
             $and: [
                 closedBucketFilter,
                 {"control.max.str": {$_internalExprGte: "Hello"}},
-                {"control.min.str": {$_internalExprLte: "Hello"}}
-            ]
+                {"control.min.str": {$_internalExprLte: "Hello"}},
+            ],
         },
     });
     runTest({
@@ -260,10 +241,7 @@ function runTest({
         // We cannot push down bucket metric predicate for TS_MODIFY stage when the query level
         // collation overrides the collection level collation.
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "A"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "A"}}, closedBucketFilter],
         },
     });
 
@@ -275,10 +253,7 @@ function runTest({
         nModified: 4,
         // We can push down bucket filter with the query level collation.
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "a"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "a"}}, closedBucketFilter],
         },
     });
     runTest({
@@ -288,10 +263,7 @@ function runTest({
         nModified: 4,
         // We can push down bucket filter with the query level collation.
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "a"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "a"}}, closedBucketFilter],
         },
     });
 })();
@@ -324,10 +296,7 @@ function runTest({
         // We cannot push down bucket metric predicate for TS_MODIFY stage when the query level
         // collation overrides the collection level collation.
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "a"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "a"}}, closedBucketFilter],
         },
     });
     runTest({
@@ -338,10 +307,7 @@ function runTest({
         // We cannot push down bucket metric predicate for TS_MODIFY stage when the query level
         // collation overrides the collection level collation.
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "A"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "A"}}, closedBucketFilter],
         },
     });
 
@@ -353,10 +319,7 @@ function runTest({
         nModified: 0,
         // We can push down bucket filter with the query level collation.
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "a"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "a"}}, closedBucketFilter],
         },
     });
     runTest({
@@ -366,10 +329,7 @@ function runTest({
         nModified: 4,
         // We can push down bucket filter with the query level collation.
         expectedBucketQuery: {
-            $and: [
-                {meta: {$eq: "A"}},
-                closedBucketFilter,
-            ]
+            $and: [{meta: {$eq: "A"}}, closedBucketFilter],
         },
     });
 })();

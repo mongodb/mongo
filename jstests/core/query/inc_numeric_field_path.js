@@ -1,4 +1,3 @@
-
 let t = db[jsTestName()];
 t.drop();
 

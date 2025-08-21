@@ -16,22 +16,22 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 2});
 
 const kDbName = jsTestName();
-const kOutCollName = 'out';
-const kSourceCollName = 'foo';
+const kOutCollName = "out";
+const kSourceCollName = "foo";
 const kLookUpCollName = "lookup";
-const kOutBucketsCollName = 'system.buckets.out';
+const kOutBucketsCollName = "system.buckets.out";
 const testDB = st.s.getDB(kDbName);
 const kSourceDocument = {
     x: 1,
-    t: ISODate()
+    t: ISODate(),
 };
-const kOutPipeline = [{$out: {db: kDbName, coll: kOutCollName, timeseries: {timeField: 't'}}}];
+const kOutPipeline = [{$out: {db: kDbName, coll: kOutCollName, timeseries: {timeField: "t"}}}];
 const kPrimary = st.shard0.shardName;
 const kOther = st.shard1.shardName;
 assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: kPrimary}));
 
 function listCollections(collName) {
-    return testDB.getCollectionNames().filter(coll => coll === collName);
+    return testDB.getCollectionNames().filter((coll) => coll === collName);
 }
 
 function dropCollections() {
@@ -46,19 +46,19 @@ function dropCollections() {
 function killOp(comment) {
     const adminDB = st.s.getDB("admin");
     const curOps = adminDB
-                       .aggregate([
-                           {$currentOp: {allUsers: true}},
-                           {
-                               $match: {
-                                   "command.comment": comment,
-                                   // The create coordinator issues fire and forget refreshes after
-                                   // creating a collection. We filter these out to ensure we are
-                                   // killing the correct operation.
-                                   "command._flushRoutingTableCacheUpdates": {$exists: false}
-                               }
-                           }
-                       ])
-                       .toArray();
+        .aggregate([
+            {$currentOp: {allUsers: true}},
+            {
+                $match: {
+                    "command.comment": comment,
+                    // The create coordinator issues fire and forget refreshes after
+                    // creating a collection. We filter these out to ensure we are
+                    // killing the correct operation.
+                    "command._flushRoutingTableCacheUpdates": {$exists: false},
+                },
+            },
+        ])
+        .toArray();
     assert.eq(1, curOps.length, curOps);
     assert.commandWorked(adminDB.killOp(curOps[0].opid));
 }
@@ -74,12 +74,11 @@ function runOut(dbName, sourceCollName, pipeline, comment) {
 }
 
 function runOutAndInterrupt(mergeShard, pipeline = kOutPipeline, comment = "testComment") {
-    const fp = configureFailPoint(mergeShard.rs.getPrimary(),
-                                  'outWaitAfterTempCollectionRenameBeforeView',
-                                  {shouldCheckForInterrupt: true});
+    const fp = configureFailPoint(mergeShard.rs.getPrimary(), "outWaitAfterTempCollectionRenameBeforeView", {
+        shouldCheckForInterrupt: true,
+    });
 
-    let outShell = startParallelShell(
-        funWithArgs(runOut, kDbName, kSourceCollName, pipeline, comment), st.s.port);
+    let outShell = startParallelShell(funWithArgs(runOut, kDbName, kSourceCollName, pipeline, comment), st.s.port);
 
     fp.wait();
 
@@ -92,9 +91,8 @@ function runOutAndInterrupt(mergeShard, pipeline = kOutPipeline, comment = "test
     outShell();
 
     // Assert that the temporary collections has been garbage collected.
-    const tempCollections =
-        testDB.getCollectionNames().filter(coll => coll.includes('tmp.agg_out'));
-    const garbageCollectionEntries = st.s.getDB('config')['agg_temp_collections'].count();
+    const tempCollections = testDB.getCollectionNames().filter((coll) => coll.includes("tmp.agg_out"));
+    const garbageCollectionEntries = st.s.getDB("config")["agg_temp_collections"].count();
     assert(tempCollections.length === 0 && garbageCollectionEntries === 0);
 }
 
@@ -107,8 +105,9 @@ function testCreatingNewCollection(sourceShard) {
     // Create source collection and move to the correct shard.
     assert.commandWorked(testDB.runCommand({create: kSourceCollName}));
     assert.commandWorked(testDB[kSourceCollName].insert(kSourceDocument));
-    assert.commandWorked(st.s.adminCommand(
-        {moveCollection: testDB[kSourceCollName].getFullName(), toShard: sourceShard}));
+    assert.commandWorked(
+        st.s.adminCommand({moveCollection: testDB[kSourceCollName].getFullName(), toShard: sourceShard}),
+    );
 
     let bucketCollections = listCollections(kOutBucketsCollName);
     assert.eq(0, bucketCollections, bucketCollections);
@@ -135,15 +134,13 @@ function testReplacingExistingCollectionOnSameShard(shard) {
     // Create source collection and move to the correct shard.
     assert.commandWorked(testDB.runCommand({create: kSourceCollName}));
     assert.commandWorked(testDB[kSourceCollName].insert(kSourceDocument));
-    assert.commandWorked(
-        st.s.adminCommand({moveCollection: testDB[kSourceCollName].getFullName(), toShard: shard}));
+    assert.commandWorked(st.s.adminCommand({moveCollection: testDB[kSourceCollName].getFullName(), toShard: shard}));
 
     // Create the time-series collection $out will replace. The buckets collection will be on the
     // same shard, but the view will always exist on the primary shard.
     assert.commandWorked(testDB.runCommand({create: kOutCollName, timeseries: {timeField: "t"}}));
     assert.commandWorked(testDB[kOutCollName].insert({a: 1, t: ISODate()}));
-    assert.commandWorked(
-        st.s.adminCommand({moveCollection: testDB[kOutCollName].getFullName(), toShard: shard}));
+    assert.commandWorked(st.s.adminCommand({moveCollection: testDB[kOutCollName].getFullName(), toShard: shard}));
 
     let bucketCollections = listCollections(kOutBucketsCollName);
     assert.eq(1, bucketCollections.length, bucketCollections);
@@ -173,13 +170,11 @@ function testReplacingExistingCollectionOnDifferentShard() {
     // Create the source and foreign collection on the non-primary shard.
     assert.commandWorked(testDB.runCommand({create: kSourceCollName}));
     assert.commandWorked(testDB[kSourceCollName].insert(kSourceDocument));
-    assert.commandWorked(st.s.adminCommand(
-        {moveCollection: testDB[kSourceCollName].getFullName(), toShard: kOther}));
+    assert.commandWorked(st.s.adminCommand({moveCollection: testDB[kSourceCollName].getFullName(), toShard: kOther}));
 
     assert.commandWorked(testDB.runCommand({create: kLookUpCollName}));
     assert.commandWorked(testDB[kLookUpCollName].insert([{x: 1, t: ISODate(), lookup: 2}]));
-    assert.commandWorked(st.s.adminCommand(
-        {moveCollection: testDB[kLookUpCollName].getFullName(), toShard: kOther}));
+    assert.commandWorked(st.s.adminCommand({moveCollection: testDB[kLookUpCollName].getFullName(), toShard: kOther}));
 
     // Create the time-series collection $out will replace. Both the buckets collection and the view
     // will be on the primary shard, since all views live on the primary shard. To ensure this
@@ -187,15 +182,14 @@ function testReplacingExistingCollectionOnDifferentShard() {
     // supported.
     assert.commandWorked(testDB.runCommand({create: kOutCollName, timeseries: {timeField: "t"}}));
     assert.commandWorked(testDB[kOutCollName].insert({a: 1, t: ISODate()}));
-    assert.commandWorked(
-        st.s.adminCommand({moveCollection: testDB[kOutCollName].getFullName(), toShard: kPrimary}));
+    assert.commandWorked(st.s.adminCommand({moveCollection: testDB[kOutCollName].getFullName(), toShard: kPrimary}));
 
     let bucketCollections = listCollections(kOutBucketsCollName);
     assert.eq(1, bucketCollections.length, bucketCollections);
 
     const lookUpPipeline = [
         {$lookup: {from: kLookUpCollName, localField: "x", foreignField: "x", as: "bb"}},
-        {$out: {db: kDbName, coll: kOutCollName, timeseries: {timeField: 't'}}}
+        {$out: {db: kDbName, coll: kOutCollName, timeseries: {timeField: "t"}}},
     ];
 
     // Must reset the profiler for all shards before running the aggregation.

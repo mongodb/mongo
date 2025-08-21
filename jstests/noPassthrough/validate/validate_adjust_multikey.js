@@ -5,7 +5,7 @@ import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const dbName = jsTestName();
-const collName = 'test';
+const collName = "test";
 const db = conn.getDB(dbName);
 
 const assertValidate = (coll, assertFn) => {
@@ -18,9 +18,11 @@ const assertIndexMultikey = (coll, hint, expectMultikey) => {
     const plan = getWinningPlanFromExplain(explain);
     assert.eq("FETCH", plan.stage, explain);
     assert.eq("IXSCAN", plan.inputStage.stage, explain);
-    assert.eq(expectMultikey,
-              plan.inputStage.isMultiKey,
-              `Index multikey state "${plan.inputStage.isMultiKey}" was not "${expectMultikey}"`);
+    assert.eq(
+        expectMultikey,
+        plan.inputStage.isMultiKey,
+        `Index multikey state "${plan.inputStage.isMultiKey}" was not "${expectMultikey}"`,
+    );
 };
 
 const runTest = (testCase) => {
@@ -85,19 +87,19 @@ runTest((coll) => {
 // metadata.
 runTest((coll) => {
     // Create an index, make the index multikey on 'a', and expect normal validation behavior.
-    assert.commandWorked(coll.createIndex({a: 'text'}));
-    assert.commandWorked(coll.insert({_id: 1, a: 'hello world'}));
+    assert.commandWorked(coll.createIndex({a: "text"}));
+    assert.commandWorked(coll.insert({_id: 1, a: "hello world"}));
     assertValidate(coll, (res) => {
         assert(res.valid);
         assert(!res.repaired);
         assert.eq(0, res.warnings.length);
         assert.eq(0, res.errors.length);
     });
-    assertIndexMultikey(coll, 'a_text', true);
+    assertIndexMultikey(coll, "a_text", true);
 
     // Insert a document, remove the document that makes the index multikey. Expect repair to
     // unset the multikey flag.
-    assert.commandWorked(coll.insert({_id: 2, a: 'test'}));
+    assert.commandWorked(coll.insert({_id: 2, a: "test"}));
     assert.commandWorked(coll.remove({_id: 1}));
     assertValidate(coll, (res) => {
         assert(res.valid);
@@ -105,7 +107,7 @@ runTest((coll) => {
         assert.eq(1, res.warnings.length);
         assert.eq(0, res.errors.length);
     });
-    assertIndexMultikey(coll, 'a_text', false);
+    assertIndexMultikey(coll, "a_text", false);
 });
 
 MongoRunner.stopMongod(conn);

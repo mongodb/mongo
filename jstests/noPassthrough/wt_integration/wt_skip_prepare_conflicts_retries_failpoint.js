@@ -27,11 +27,9 @@ assert.commandWorked(testDB.runCommand({profile: 2}));
 
 assert.commandWorked(testColl.insert({_id: 1, note: "from before transaction"}, {w: "majority"}));
 
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "WTSkipPrepareConflictRetries", mode: "alwaysOn"}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "WTSkipPrepareConflictRetries", mode: "alwaysOn"}));
 
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "skipWriteConflictRetries", mode: "alwaysOn"}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "skipWriteConflictRetries", mode: "alwaysOn"}));
 
 // A non-transactional operation conflicting with a write operation performed inside a
 // multistatement transaction can encounter a WT_PREPARE_CONFLICT in the wiredtiger
@@ -50,19 +48,17 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 assert.commandFailedWithCode(
     testColl.update({_id: 1}, {$set: {note: "outside prepared transaction"}}),
-    ErrorCodes.WriteConflict);
+    ErrorCodes.WriteConflict,
+);
 
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
-const profileEntry =
-    testDB.system.profile.findOne({"command.u.$set.note": "outside prepared transaction"});
+const profileEntry = testDB.system.profile.findOne({"command.u.$set.note": "outside prepared transaction"});
 assert.gte(profileEntry.prepareReadConflicts, 1);
 
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "WTSkipPrepareConflictRetries", mode: "off"}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "WTSkipPrepareConflictRetries", mode: "off"}));
 
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "skipWriteConflictRetries", mode: "off"}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "skipWriteConflictRetries", mode: "off"}));
 
 session.endSession();
 rst.stopSet();

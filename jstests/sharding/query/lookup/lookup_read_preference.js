@@ -7,13 +7,12 @@ import {
 } from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const st = new ShardingTest({name: 'lookup_read_preference', mongos: 1, shards: 2, rs: {nodes: 2}});
+const st = new ShardingTest({name: "lookup_read_preference", mongos: 1, shards: 2, rs: {nodes: 2}});
 
 // In this test we perform writes which we expect to read on a secondary, so we need to enable
 // causal consistency.
-const dbName = jsTestName() + '_db';
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+const dbName = jsTestName() + "_db";
+assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 
 st.s0.setCausalConsistency(true);
 const mongosDB = st.s0.getDB(dbName);
@@ -32,20 +31,39 @@ for (let rs of [st.rs0, st.rs1]) {
     const primary = rs.getPrimary();
     const secondary = rs.getSecondary();
     assert.commandWorked(primary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(
-        primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(primary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
     assert.commandWorked(secondary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(
-        secondary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
+    assert.commandWorked(secondary.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 3}}}));
 }
 
 // Write a document to each chunk.
 assert.commandWorked(
-    local.insert([{_id: -1, a: 1}, {_id: 1, a: 2}], {writeConcern: {w: 'majority'}}));
+    local.insert(
+        [
+            {_id: -1, a: 1},
+            {_id: 1, a: 2},
+        ],
+        {writeConcern: {w: "majority"}},
+    ),
+);
 assert.commandWorked(
-    foreign.insert([{_id: -1, b: 2}, {_id: 1, b: 1}], {writeConcern: {w: 'majority'}}));
+    foreign.insert(
+        [
+            {_id: -1, b: 2},
+            {_id: 1, b: 1},
+        ],
+        {writeConcern: {w: "majority"}},
+    ),
+);
 assert.commandWorked(
-    otherForeign.insert([{_id: -1, c: 1}, {_id: 1, c: 2}], {writeConcern: {w: 'majority'}}));
+    otherForeign.insert(
+        [
+            {_id: -1, c: 1},
+            {_id: 1, c: 2},
+        ],
+        {writeConcern: {w: "majority"}},
+    ),
+);
 
 function assertAggRouting(pipeline, expectedResults, comment, readPrefSecondary) {
     // Ensure the query with the given read preference returns expected results. We specify
@@ -53,13 +71,11 @@ function assertAggRouting(pipeline, expectedResults, comment, readPrefSecondary)
     // getMore. This way, we can ensure sub-operations in a getMore have the right read preference.
     let options = {comment: comment, batchSize: 1};
     if (readPrefSecondary) {
-        Object.assign(options,
-                      {$readPreference: {mode: 'secondary'}, readConcern: {level: 'majority'}});
+        Object.assign(options, {$readPreference: {mode: "secondary"}, readConcern: {level: "majority"}});
     }
     assert(arrayEq(expectedResults, local.aggregate(pipeline, options).toArray()));
 
-    const isNestedLookup =
-        pipeline[0].$lookup.pipeline && pipeline[0].$lookup.pipeline[0].hasOwnProperty('$lookup');
+    const isNestedLookup = pipeline[0].$lookup.pipeline && pipeline[0].$lookup.pipeline[0].hasOwnProperty("$lookup");
     const involvedColls = isNestedLookup ? [local, foreign, otherForeign] : [local, foreign];
 
     // For each replica set and for each involved collection, ensure queries are routed to the
@@ -74,9 +90,9 @@ function assertAggRouting(pipeline, expectedResults, comment, readPrefSecondary)
                 profileDB: targetedNode.getDB(dbName),
                 filter: {
                     ns: coll.getFullName(),
-                    'command.aggregate': coll.getName(),
-                    'command.comment': comment,
-                }
+                    "command.aggregate": coll.getName(),
+                    "command.comment": comment,
+                },
             });
 
             // Check that no aggregates are sent to the other node in the replica set.
@@ -84,40 +100,48 @@ function assertAggRouting(pipeline, expectedResults, comment, readPrefSecondary)
                 profileDB: otherNode.getDB(dbName),
                 filter: {
                     ns: coll.getFullName(),
-                    'command.aggregate': coll.getName(),
-                    'command.comment': comment,
-                }
+                    "command.aggregate": coll.getName(),
+                    "command.comment": comment,
+                },
             });
         }
     }
 }
 
 // Test that $lookup and its subpipelines go to the primaries by default.
-let pipeline = [{$lookup: {from: foreign.getName(), as: 'bs', localField: 'a', foreignField: 'b'}}];
-let expectedRes = [{_id: -1, a: 1, bs: [{_id: 1, b: 1}]}, {_id: 1, a: 2, bs: [{_id: -1, b: 2}]}];
-assertAggRouting(pipeline, expectedRes, 'lookup against primary', false);
+let pipeline = [{$lookup: {from: foreign.getName(), as: "bs", localField: "a", foreignField: "b"}}];
+let expectedRes = [
+    {_id: -1, a: 1, bs: [{_id: 1, b: 1}]},
+    {_id: 1, a: 2, bs: [{_id: -1, b: 2}]},
+];
+assertAggRouting(pipeline, expectedRes, "lookup against primary", false);
 
 // Test that $lookup and its subpipelines go to the secondaries when the readPreference is
 // secondary.
-assertAggRouting(pipeline, expectedRes, 'lookup against secondary', true);
+assertAggRouting(pipeline, expectedRes, "lookup against secondary", true);
 
 // Test that $lookup, its subpipelines, and a nested $lookup's subpipelines go to the secondaries
 // if the read preference is secondary.
 pipeline = [
-    {$lookup: {
-        from: foreign.getName(),
-        as: 'bs',
-        localField: 'a',
-        foreignField: 'b',
-        pipeline: [
-            {$lookup: {from: otherForeign.getName(), localField: 'b', foreignField: 'c', as: 'cs'}},
-            {$unwind: '$cs'},
-        ]
-    }},
-    {$unwind: '$bs'},
-    {$project: {'bs._id': 1, 'bs.cs._id': 1}}
+    {
+        $lookup: {
+            from: foreign.getName(),
+            as: "bs",
+            localField: "a",
+            foreignField: "b",
+            pipeline: [
+                {$lookup: {from: otherForeign.getName(), localField: "b", foreignField: "c", as: "cs"}},
+                {$unwind: "$cs"},
+            ],
+        },
+    },
+    {$unwind: "$bs"},
+    {$project: {"bs._id": 1, "bs.cs._id": 1}},
 ];
-expectedRes = [{_id: -1, bs: {_id: 1, cs: {_id: -1}}}, {_id: 1, bs: {_id: -1, cs: {_id: 1}}}];
-assertAggRouting(pipeline, expectedRes, 'nested lookup against secondary', true);
+expectedRes = [
+    {_id: -1, bs: {_id: 1, cs: {_id: -1}}},
+    {_id: 1, bs: {_id: -1, cs: {_id: 1}}},
+];
+assertAggRouting(pipeline, expectedRes, "nested lookup against secondary", true);
 
 st.stop();

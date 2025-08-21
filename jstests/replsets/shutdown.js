@@ -19,9 +19,10 @@ rst.awaitReplication();
 
 let secondary = rst.getSecondary();
 rst.stop(secondary);
-let program = rst.start(
-    secondary,
-    {waitForConnect: false, setParameter: "failpoint.shutdownAtStartup={mode:'alwaysOn'}"});
+let program = rst.start(secondary, {
+    waitForConnect: false,
+    setParameter: "failpoint.shutdownAtStartup={mode:'alwaysOn'}",
+});
 // mongod should exit automatically, since failpoint was set.
 let exitCode = waitProgram(program.pid);
 assert.eq(0, exitCode);

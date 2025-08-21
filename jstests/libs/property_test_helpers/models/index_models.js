@@ -3,9 +3,7 @@
  * See property_test_helpers/README.md for more detail on the design.
  */
 import {fieldArb, getScalarArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
-import {
-    getPartialFilterPredicateArb
-} from "jstests/libs/property_test_helpers/models/match_models.js";
+import {getPartialFilterPredicateArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -52,18 +50,20 @@ function replaceKeyValAtPosition(obj, ix, {newKey, newVal}) {
 const singleIndexDefArb = fc.record({field: fieldArb, dir: fc.constantFrom(1, -1)});
 // Unique array of [[a, true], [b, false], ...] to be mapped to an index definition. Unique on the
 // indexed field. Filter out any indexes that only use the _id field.
-const arrayOfSingleIndexDefsArb = fc.uniqueArray(singleIndexDefArb, {
-                                        minLength: 1,
-                                        maxLength: 5,
-                                        selector: fieldAndSort => fieldAndSort.field,
-                                    }).filter(arrayOfIndexDefs => {
-    // We can run into errors if we try to make an {_id: -1} index.
-    if (arrayOfIndexDefs.length === 1 && arrayOfIndexDefs[0].field === '_id') {
-        return false;
-    }
-    return true;
-});
-const simpleIndexDefArb = arrayOfSingleIndexDefsArb.map(arrayOfIndexDefs => {
+const arrayOfSingleIndexDefsArb = fc
+    .uniqueArray(singleIndexDefArb, {
+        minLength: 1,
+        maxLength: 5,
+        selector: (fieldAndSort) => fieldAndSort.field,
+    })
+    .filter((arrayOfIndexDefs) => {
+        // We can run into errors if we try to make an {_id: -1} index.
+        if (arrayOfIndexDefs.length === 1 && arrayOfIndexDefs[0].field === "_id") {
+            return false;
+        }
+        return true;
+    });
+const simpleIndexDefArb = arrayOfSingleIndexDefsArb.map((arrayOfIndexDefs) => {
     // Convert to a valid index definition structure.
     const fullDef = {};
     for (const {field, dir} of arrayOfIndexDefs) {
@@ -76,7 +76,7 @@ const emptyOptionsArb = fc.constant({});
 
 // Generates an index option for partial filters. Since predicate models by default have a list of
 // parameters at their leaves, we specify we want a single scalar at the leaves.
-const partialFilterOptionArb = getPartialFilterPredicateArb({leafArb: getScalarArb()}).map(pred => {
+const partialFilterOptionArb = getPartialFilterPredicateArb({leafArb: getScalarArb()}).map((pred) => {
     return {partialFilterExpression: pred};
 });
 
@@ -99,65 +99,68 @@ function getSimpleIndexModel({allowPartialIndexes, allowSparse}) {
  * Generate a simple index definition, an position into that definition, and replace the value at
  * that position with the value 'hashed'
  */
-const hashedIndexDefArb =
-    fc.record({indexDef: simpleIndexDefArb, hashedIx: fc.integer({min: 0, max: 4 /* Inclusive */})})
-        .map(({indexDef, hashedIx}) => {
-            hashedIx %= Object.keys(indexDef).length;
-            return replaceKeyValAtPosition(indexDef, hashedIx, {newVal: 'hashed'});
-        })
-        .filter(fullDef => {
-            // Can't create hashed index on array field.
-            return !Object.keys(fullDef).includes('array');
-        });
+const hashedIndexDefArb = fc
+    .record({indexDef: simpleIndexDefArb, hashedIx: fc.integer({min: 0, max: 4 /* Inclusive */})})
+    .map(({indexDef, hashedIx}) => {
+        hashedIx %= Object.keys(indexDef).length;
+        return replaceKeyValAtPosition(indexDef, hashedIx, {newVal: "hashed"});
+    })
+    .filter((fullDef) => {
+        // Can't create hashed index on array field.
+        return !Object.keys(fullDef).includes("array");
+    });
 
 function getHashedIndexModel(allowPartialIndexes) {
-    const optionsArb =
-        allowPartialIndexes ? oneof(emptyOptionsArb, partialFilterOptionArb) : emptyOptionsArb;
+    const optionsArb = allowPartialIndexes ? oneof(emptyOptionsArb, partialFilterOptionArb) : emptyOptionsArb;
     return fc.record({def: hashedIndexDefArb, options: optionsArb});
 }
 
 // This models wildcard indexes where the wildcard field is at the top-level, like "$**" rather than
 // "a.$**". These definitions are allowed to specify a `wildcardProjection` in the index options.
 const wildcardProjectionOptionsArb = fc.record({
-    wildcardProjection: fc.uniqueArray(fieldArb, {minLength: 1, maxLength: 8}).map(fields => {
+    wildcardProjection: fc.uniqueArray(fieldArb, {minLength: 1, maxLength: 8}).map((fields) => {
         const options = {};
         for (const field of fields) {
             options[field] = 1;
         }
         return options;
-    })
+    }),
 });
 
 /*
  * Generate a simple index definition, a position into that definition, and replace the key at the
  * position with '$**'.
  */
-const fullWildcardDefArb = fc.record({
-                                 indexDef: simpleIndexDefArb,
-                                 wcIx: fc.integer({min: 0, max: 4})
-                             }).map(({indexDef, wcIx}) => {
-    wcIx %= Object.keys(indexDef).length;
-    return replaceKeyValAtPosition(indexDef, wcIx, {newKey: '$**'});
-});
+const fullWildcardDefArb = fc
+    .record({
+        indexDef: simpleIndexDefArb,
+        wcIx: fc.integer({min: 0, max: 4}),
+    })
+    .map(({indexDef, wcIx}) => {
+        wcIx %= Object.keys(indexDef).length;
+        return replaceKeyValAtPosition(indexDef, wcIx, {newKey: "$**"});
+    });
 
 /*
  * Models a wildcard index where the wildcard field is not at the top-level. So for example "a.$**".
  * Generate a simple index definition, a position into that definition, a field, and replace the key
  * at the position with `field + '.$**'`.
  */
-const dottedWildcardDefArb = fc.record({
-                                   indexDef: simpleIndexDefArb,
-                                   fieldPrefix: fieldArb,
-                                   wcIx: fc.integer({min: 0, max: 4})
-                               }).map(({indexDef, fieldPrefix, wcIx}) => {
-    wcIx %= Object.keys(indexDef).length;
-    const wcFieldName = fieldPrefix + '.$**';
-    return replaceKeyValAtPosition(indexDef, wcIx, {newKey: wcFieldName});
-});
+const dottedWildcardDefArb = fc
+    .record({
+        indexDef: simpleIndexDefArb,
+        fieldPrefix: fieldArb,
+        wcIx: fc.integer({min: 0, max: 4}),
+    })
+    .map(({indexDef, fieldPrefix, wcIx}) => {
+        wcIx %= Object.keys(indexDef).length;
+        const wcFieldName = fieldPrefix + ".$**";
+        return replaceKeyValAtPosition(indexDef, wcIx, {newKey: wcFieldName});
+    });
 
 function isMultikey(indexDef) {
     for (const field of Object.keys(indexDef)) {
-        if (field === 'array') {
+        if (field === "array") {
             return true;
         }
     }
@@ -172,12 +175,14 @@ function getWildCardIndexModel(allowPartialIndexes) {
     // indexes are allowed.
     let fullWcOptionsArb;
     if (allowPartialIndexes) {
-        fullWcOptionsArb = fc.record({
-                                 wcOptions: wildcardProjectionOptionsArb,
-                                 partialFilterOptions: fc.option(partialFilterOptionArb, {nil: {}})
-                             }).map(({wcOptions, partialFilterOptions}) => {
-            return Object.assign({}, wcOptions, partialFilterOptions);
-        });
+        fullWcOptionsArb = fc
+            .record({
+                wcOptions: wildcardProjectionOptionsArb,
+                partialFilterOptions: fc.option(partialFilterOptionArb, {nil: {}}),
+            })
+            .map(({wcOptions, partialFilterOptions}) => {
+                return Object.assign({}, wcOptions, partialFilterOptions);
+            });
     } else {
         fullWcOptionsArb = wildcardProjectionOptionsArb;
     }
@@ -185,8 +190,7 @@ function getWildCardIndexModel(allowPartialIndexes) {
 
     // Dotted wildcard indexes don't allow wildcard projection options, but can be partial if that's
     // allowed.
-    const dottedWcOptionsArb =
-        allowPartialIndexes ? oneof(emptyOptionsArb, partialFilterOptionArb) : emptyOptionsArb;
+    const dottedWcOptionsArb = allowPartialIndexes ? oneof(emptyOptionsArb, partialFilterOptionArb) : emptyOptionsArb;
     const dottedWcModel = fc.record({def: dottedWildcardDefArb, options: dottedWcOptionsArb});
 
     return oneof(fullWcModel, dottedWcModel).filter(({def, options}) => {
@@ -207,9 +211,11 @@ function getWildCardIndexModel(allowPartialIndexes) {
  * Wildcard, hashed, sparse, and multikey indexes are not compatible with time-series collections.
  */
 export function getIndexModel({allowPartialIndexes = false, allowSparse = true} = {}) {
-    return oneof(getSimpleIndexModel({allowPartialIndexes, allowSparse}),
-                 getWildCardIndexModel(allowPartialIndexes),
-                 getHashedIndexModel(allowPartialIndexes));
+    return oneof(
+        getSimpleIndexModel({allowPartialIndexes, allowSparse}),
+        getWildCardIndexModel(allowPartialIndexes),
+        getHashedIndexModel(allowPartialIndexes),
+    );
 }
 export function getTimeSeriesIndexModel({allowPartialIndexes = false} = {}) {
     // TODO SERVER-102738 support more time-series index types.

@@ -17,5 +17,7 @@ assert.commandWorked(createRawTimeseriesIndex(coll, {"_id": 1}));
 assert.commandWorked(createRawTimeseriesIndex(coll, {"_id": 1}, {clustered: true, unique: true}));
 
 // Passing 'clustered' without unique, regardless of the type of clustered collection, is illegal.
-assert.commandFailedWithCode(createRawTimeseriesIndex(coll, {"_id": 1}, {clustered: true}),
-                             ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    createRawTimeseriesIndex(coll, {"_id": 1}, {clustered: true}),
+    ErrorCodes.CannotCreateIndex,
+);

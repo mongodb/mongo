@@ -1,7 +1,8 @@
 // query.js
 
-const DBQuery = globalThis.DBQuery ??
-    function(mongo, db, collection, ns, filter, projection, limit, skip, batchSize, options) {
+const DBQuery =
+    globalThis.DBQuery ??
+    function (mongo, db, collection, ns, filter, projection, limit, skip, batchSize, options) {
         this._mongo = mongo;
         this._db = db;
         this._collection = collection;
@@ -24,7 +25,7 @@ const DBQuery = globalThis.DBQuery ??
         this._prettyShell = false;
     };
 
-DBQuery.prototype.help = function() {
+DBQuery.prototype.help = function () {
     print("find(<predicate>, <projection>) modifiers");
     print("\t.sort({...})");
     print("\t.limit(<n>)");
@@ -34,11 +35,9 @@ DBQuery.prototype.help = function() {
     print("\t.hint({...})");
     print("\t.readConcern(<level>)");
     print("\t.readPref(<mode>, <tagset>)");
-    print(
-        "\t.count(<applySkipLimit>) - total # of objects matching query. by default ignores skip,limit");
+    print("\t.count(<applySkipLimit>) - total # of objects matching query. by default ignores skip,limit");
     print("\t.size() - total # of objects cursor would return, honors skip,limit");
-    print(
-        "\t.explain(<verbosity>) - accepted verbosities are {'queryPlanner', 'executionStats', 'allPlansExecution'}");
+    print("\t.explain(<verbosity>) - accepted verbosities are {'queryPlanner', 'executionStats', 'allPlansExecution'}");
     print("\t.min({...})");
     print("\t.max({...})");
     print("\t.maxTimeMS(<n>)");
@@ -58,37 +57,39 @@ DBQuery.prototype.help = function() {
     print("\t.next()");
     print("\t.close()");
     print(
-        "\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)");
+        "\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)",
+    );
     print("\t.itcount() - iterates through documents and counts them");
     print("\t.getClusterTime() - returns the read timestamp for snapshot reads");
     print("\t.pretty() - pretty print each document, possibly over multiple lines");
 };
 
-DBQuery.prototype.clone = function() {
-    const cloneResult = new DBQuery(this._mongo,
-                                    this._db,
-                                    this._collection,
-                                    this._ns,
-                                    this._filter,
-                                    this._projection,
-                                    this._limit,
-                                    this._skip,
-                                    this._batchSize,
-                                    this._options);
+DBQuery.prototype.clone = function () {
+    const cloneResult = new DBQuery(
+        this._mongo,
+        this._db,
+        this._collection,
+        this._ns,
+        this._filter,
+        this._projection,
+        this._limit,
+        this._skip,
+        this._batchSize,
+        this._options,
+    );
     cloneResult._additionalCmdParams = this._additionalCmdParams;
     return cloneResult;
 };
 
-DBQuery.prototype._checkModify = function() {
-    if (this._cursor)
-        throw Error("query already executed");
+DBQuery.prototype._checkModify = function () {
+    if (this._cursor) throw Error("query already executed");
 };
 
-DBQuery.prototype._isExhaustCursor = function() {
+DBQuery.prototype._isExhaustCursor = function () {
     return (this._options & DBQuery.Option.exhaust) !== 0;
 };
 
-DBQuery.prototype._isTailableCursor = function() {
+DBQuery.prototype._isTailableCursor = function () {
     return (this._options & DBQuery.Option.tailable) !== 0;
 };
 
@@ -99,7 +100,7 @@ DBQuery.prototype._isTailableCursor = function() {
  * for the cursor. Should always return false unless the 'exhaust' option was set when creating the
  * cursor.
  */
-DBQuery.prototype._hasMoreToCome = function() {
+DBQuery.prototype._hasMoreToCome = function () {
     this._exec();
 
     if (this._cursor instanceof DBCommandCursor) {
@@ -109,7 +110,7 @@ DBQuery.prototype._hasMoreToCome = function() {
     return this._cursor.hasMoreToCome();
 };
 
-DBQuery.prototype._exec = function() {
+DBQuery.prototype._exec = function () {
     if (!this._cursor) {
         assert.eq(0, this._numReturned);
         this._cursorSeen = 0;
@@ -160,7 +161,7 @@ DBQuery.prototype._exec = function() {
 /**
  * Internal helper used to convert this cursor into the format required by the find command.
  */
-DBQuery.prototype._convertToCommand = function() {
+DBQuery.prototype._convertToCommand = function () {
     let cmd = {};
 
     cmd["find"] = this._collection.getName();
@@ -217,30 +218,30 @@ DBQuery.prototype._convertToCommand = function() {
     return cmd;
 };
 
-DBQuery.prototype.limit = function(limit) {
+DBQuery.prototype.limit = function (limit) {
     this._checkModify();
     this._limit = limit;
     return this;
 };
 
-DBQuery.prototype.batchSize = function(batchSize) {
+DBQuery.prototype.batchSize = function (batchSize) {
     this._checkModify();
     this._batchSize = batchSize;
     return this;
 };
 
-DBQuery.prototype.addOption = function(option) {
+DBQuery.prototype.addOption = function (option) {
     this._options |= option;
     return this;
 };
 
-DBQuery.prototype.skip = function(skip) {
+DBQuery.prototype.skip = function (skip) {
     this._checkModify();
     this._skip = skip;
     return this;
 };
 
-DBQuery.prototype.hasNext = function() {
+DBQuery.prototype.hasNext = function () {
     this._exec();
 
     // Return when limit is reached for tailable cursors. For other cursor options, like an exhaust
@@ -252,14 +253,12 @@ DBQuery.prototype.hasNext = function() {
     return this._cursor.hasNext();
 };
 
-DBQuery.prototype.next = function() {
+DBQuery.prototype.next = function () {
     this._exec();
 
     let o = this.hasNext();
-    if (o)
-        this._cursorSeen++;
-    else
-        throw Error("error hasNext: " + o);
+    if (o) this._cursorSeen++;
+    else throw Error("error hasNext: " + o);
 
     let ret = this._cursor.next();
     if (ret.$err) {
@@ -270,39 +269,36 @@ DBQuery.prototype.next = function() {
     return ret;
 };
 
-DBQuery.prototype.objsLeftInBatch = function() {
+DBQuery.prototype.objsLeftInBatch = function () {
     this._exec();
 
     let ret = this._cursor.objsLeftInBatch();
-    if (ret.$err)
-        throw _getErrorWithCode(ret, "error: " + tojson(ret));
+    if (ret.$err) throw _getErrorWithCode(ret, "error: " + tojson(ret));
 
     return ret;
 };
 
-DBQuery.prototype.readOnly = function() {
+DBQuery.prototype.readOnly = function () {
     this._exec();
     this._cursor.readOnly();
     return this;
 };
 
-DBQuery.prototype.getId = function() {
+DBQuery.prototype.getId = function () {
     this._exec();
     return this._cursor.getId();
 };
 
-DBQuery.prototype.toArray = function() {
-    if (this._arr)
-        return this._arr;
+DBQuery.prototype.toArray = function () {
+    if (this._arr) return this._arr;
 
     let a = [];
-    while (this.hasNext())
-        a.push(this.next());
+    while (this.hasNext()) a.push(this.next());
     this._arr = a;
     return a;
 };
 
-DBQuery.prototype._convertToCountCmd = function(applySkipLimit) {
+DBQuery.prototype._convertToCountCmd = function (applySkipLimit) {
     let cmd = {count: this._collection.getName()};
 
     if (this._filter) {
@@ -337,23 +333,22 @@ DBQuery.prototype._convertToCountCmd = function(applySkipLimit) {
     return cmd;
 };
 
-DBQuery.prototype.count = function(applySkipLimit) {
+DBQuery.prototype.count = function (applySkipLimit) {
     let cmd = this._convertToCountCmd(applySkipLimit);
 
     let res = this._db.runReadCommand(cmd);
-    if (res && res.n != null)
-        return res.n;
+    if (res && res.n != null) return res.n;
     throw _getErrorWithCode(res, "count failed: " + tojson(res));
 };
 
-DBQuery.prototype.size = function() {
+DBQuery.prototype.size = function () {
     return this.count(true);
 };
 
 /**
  * iterative count - only for testing
  */
-DBQuery.prototype.itcount = function() {
+DBQuery.prototype.itcount = function () {
     let num = 0;
 
     // Track how many bytes we've used this cursor to iterate iterated.  This function can be called
@@ -369,7 +364,7 @@ DBQuery.prototype.itcount = function() {
         bytesSinceGC += Object.bsonsize(nextDoc);
 
         // Garbage collect every 10 MB.
-        if (bytesSinceGC > (10 * 1024 * 1024)) {
+        if (bytesSinceGC > 10 * 1024 * 1024) {
             bytesSinceGC = 0;
             gc();
         }
@@ -377,29 +372,29 @@ DBQuery.prototype.itcount = function() {
     return num;
 };
 
-DBQuery.prototype.length = function() {
+DBQuery.prototype.length = function () {
     return this.toArray().length;
 };
 
-DBQuery.prototype.sort = function(sortBy) {
+DBQuery.prototype.sort = function (sortBy) {
     this._checkModify();
     this._additionalCmdParams["sort"] = sortBy;
     return this;
 };
 
-DBQuery.prototype.hint = function(hint) {
+DBQuery.prototype.hint = function (hint) {
     this._checkModify();
     this._additionalCmdParams["hint"] = hint;
     return this;
 };
 
-DBQuery.prototype.min = function(min) {
+DBQuery.prototype.min = function (min) {
     this._checkModify();
     this._additionalCmdParams["min"] = min;
     return this;
 };
 
-DBQuery.prototype.max = function(max) {
+DBQuery.prototype.max = function (max) {
     this._checkModify();
     this._additionalCmdParams["max"] = max;
     return this;
@@ -408,46 +403,45 @@ DBQuery.prototype.max = function(max) {
 /**
  * Deprecated. Use showRecordId().
  */
-DBQuery.prototype.showDiskLoc = function() {
+DBQuery.prototype.showDiskLoc = function () {
     return this.showRecordId();
 };
 
-DBQuery.prototype.showRecordId = function() {
+DBQuery.prototype.showRecordId = function () {
     this._checkModify();
     this._additionalCmdParams["showRecordId"] = true;
     return this;
 };
 
-DBQuery.prototype.maxTimeMS = function(maxTimeMS) {
+DBQuery.prototype.maxTimeMS = function (maxTimeMS) {
     this._checkModify();
     this._additionalCmdParams["maxTimeMS"] = maxTimeMS;
     return this;
 };
 
-DBQuery.prototype.readConcern = function(level, atClusterTime = undefined) {
+DBQuery.prototype.readConcern = function (level, atClusterTime = undefined) {
     this._checkModify();
-    let readConcernObj =
-        atClusterTime ? {level: level, atClusterTime: atClusterTime} : {level: level};
+    let readConcernObj = atClusterTime ? {level: level, atClusterTime: atClusterTime} : {level: level};
     this._additionalCmdParams["readConcern"] = readConcernObj;
     return this;
 };
 
-DBQuery.prototype.collation = function(collationSpec) {
+DBQuery.prototype.collation = function (collationSpec) {
     this._checkModify();
     this._additionalCmdParams["collation"] = collationSpec;
     return this;
 };
 
-DBQuery.prototype.allowDiskUse = function(value) {
+DBQuery.prototype.allowDiskUse = function (value) {
     this._checkModify();
-    value = (value === undefined) ? true : value;
+    value = value === undefined ? true : value;
     this._additionalCmdParams["allowDiskUse"] = value;
     return this;
 };
 
-DBQuery.prototype.rawData = function(value) {
+DBQuery.prototype.rawData = function (value) {
     this._checkModify();
-    value = (value === undefined) ? true : value;
+    value = value === undefined ? true : value;
     this._additionalCmdParams["rawData"] = value;
     return this;
 };
@@ -460,7 +454,7 @@ DBQuery.prototype.rawData = function(value) {
  *
  * Returns 'this'.
  */
-DBQuery.prototype.readPref = function(mode, tagSet) {
+DBQuery.prototype.readPref = function (mode, tagSet) {
     let readPrefObj = {mode: mode};
 
     if (tagSet) {
@@ -471,45 +465,43 @@ DBQuery.prototype.readPref = function(mode, tagSet) {
     return this;
 };
 
-DBQuery.prototype.forEach = function(func) {
-    while (this.hasNext())
-        func(this.next());
+DBQuery.prototype.forEach = function (func) {
+    while (this.hasNext()) func(this.next());
 };
 
-DBQuery.prototype.map = function(func) {
+DBQuery.prototype.map = function (func) {
     let a = [];
-    while (this.hasNext())
-        a.push(func(this.next()));
+    while (this.hasNext()) a.push(func(this.next()));
     return a;
 };
 
-DBQuery.prototype.arrayAccess = function(idx) {
+DBQuery.prototype.arrayAccess = function (idx) {
     return this.toArray()[idx];
 };
 
-DBQuery.prototype.comment = function(comment) {
+DBQuery.prototype.comment = function (comment) {
     this._checkModify();
     this._additionalCmdParams["comment"] = comment;
     return this;
 };
 
-DBQuery.prototype.explain = function(verbose) {
+DBQuery.prototype.explain = function (verbose) {
     let explainQuery = new DBExplainQuery(this, verbose);
     return explainQuery.finish();
 };
 
-DBQuery.prototype.returnKey = function() {
+DBQuery.prototype.returnKey = function () {
     this._checkModify();
     this._additionalCmdParams["returnKey"] = true;
     return this;
 };
 
-DBQuery.prototype.pretty = function() {
+DBQuery.prototype.pretty = function () {
     this._prettyShell = true;
     return this;
 };
 
-DBQuery.prototype.shellPrint = function() {
+DBQuery.prototype.shellPrint = function () {
     try {
         let start = new Date().getTime();
         let n = 0;
@@ -518,12 +510,12 @@ DBQuery.prototype.shellPrint = function() {
             print(s);
             n++;
         }
-        if (typeof _verboseShell !== 'undefined' && _verboseShell) {
+        if (typeof _verboseShell !== "undefined" && _verboseShell) {
             let time = new Date().getTime() - start;
             print("Fetched " + n + " record(s) in " + time + "ms");
         }
         if (this.hasNext()) {
-            print("Type \"it\" for more");
+            print('Type "it" for more');
             globalThis.___it___ = this;
         } else {
             globalThis.___it___ = null;
@@ -533,7 +525,7 @@ DBQuery.prototype.shellPrint = function() {
     }
 };
 
-DBQuery.prototype.toString = function() {
+DBQuery.prototype.toString = function () {
     return "DBQuery: " + this._ns + " -> " + tojson(this._filter);
 };
 
@@ -548,7 +540,7 @@ DBQuery.prototype.toString = function() {
  * @see http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-query
  * @return {DBQuery}
  */
-DBQuery.prototype.allowPartialResults = function() {
+DBQuery.prototype.allowPartialResults = function () {
     this._checkModify();
     this.addOption(DBQuery.Option.partial);
     return this;
@@ -562,7 +554,7 @@ DBQuery.prototype.allowPartialResults = function() {
  * @see http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-query
  * @return {DBQuery}
  */
-DBQuery.prototype.noCursorTimeout = function() {
+DBQuery.prototype.noCursorTimeout = function () {
     this._checkModify();
     this.addOption(DBQuery.Option.noTimeout);
     return this;
@@ -576,7 +568,7 @@ DBQuery.prototype.noCursorTimeout = function() {
  * @param {object} document Document specifying the projection of the resulting documents.
  * @return {DBQuery}
  */
-DBQuery.prototype.projection = function(document) {
+DBQuery.prototype.projection = function (document) {
     this._checkModify();
     this._projection = document;
     return this;
@@ -591,7 +583,7 @@ DBQuery.prototype.projection = function(document) {
  *documents found.
  * @return {DBQuery}
  */
-DBQuery.prototype.tailable = function(awaitData) {
+DBQuery.prototype.tailable = function (awaitData) {
     this._checkModify();
     this.addOption(DBQuery.Option.tailable);
 
@@ -603,23 +595,23 @@ DBQuery.prototype.tailable = function(awaitData) {
     return this;
 };
 
-DBQuery.prototype.close = function() {
+DBQuery.prototype.close = function () {
     if (this._cursor) {
         this._cursor.close();
     }
 };
 
-DBQuery.prototype.isClosed = function() {
+DBQuery.prototype.isClosed = function () {
     this._exec();
     return this._cursor.isClosed();
 };
 
-DBQuery.prototype.isExhausted = function() {
+DBQuery.prototype.isExhausted = function () {
     this._exec();
     return this._cursor.isClosed() && this._cursor.objsLeftInBatch() === 0;
 };
 
-DBQuery.prototype.getClusterTime = function() {
+DBQuery.prototype.getClusterTime = function () {
     // Return the read timestamp for snapshot reads, or undefined for other readConcern levels.
     this._exec();
     return this._cursor.getClusterTime();
@@ -640,7 +632,7 @@ DBQuery.Option = {
     noTimeout: 0x10,
     awaitData: 0x20,
     exhaust: 0x40,
-    partial: 0x80
+    partial: 0x80,
 };
 
 function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
@@ -653,7 +645,7 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
         throw _getErrorWithCode(cmdResult, "error: " + tojson(cmdResult));
     }
 
-    this._batch = cmdResult.cursor.firstBatch.reverse();  // modifies input to allow popping
+    this._batch = cmdResult.cursor.firstBatch.reverse(); // modifies input to allow popping
 
     // If the command result represents a snapshot read cursor, update our atClusterTime. And this
     // atClusterTime should not change over the lifetime of the cursor.
@@ -676,8 +668,7 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
     if (cmdResult.cursor.id) {
         // Note that setting this._cursorid to 0 should be accompanied by
         // this._cursorHandle.zeroCursorId().
-        this._cursorHandle =
-            this._db.getMongo().cursorHandleFromId(cmdResult.cursor.ns, cmdResult.cursor.id);
+        this._cursorHandle = this._db.getMongo().cursorHandleFromId(cmdResult.cursor.ns, cmdResult.cursor.id);
     }
 }
 
@@ -686,18 +677,18 @@ DBCommandCursor.prototype = {};
 /**
  * Returns whether the cursor id is zero.
  */
-DBCommandCursor.prototype.isClosed = function() {
+DBCommandCursor.prototype.isClosed = function () {
     return bsonWoCompare({_: this._cursorid}, {_: NumberLong(0)}) === 0;
 };
 
 /**
  * Returns whether the cursor has closed and has nothing in the batch.
  */
-DBCommandCursor.prototype.isExhausted = function() {
+DBCommandCursor.prototype.isExhausted = function () {
     return this.isClosed() && this.objsLeftInBatch() === 0;
 };
 
-DBCommandCursor.prototype.close = function() {
+DBCommandCursor.prototype.close = function () {
     if (bsonWoCompare({_: this._cursorid}, {_: NumberLong(0)}) !== 0) {
         let killCursorCmd = {
             killCursors: this._collName,
@@ -715,7 +706,7 @@ DBCommandCursor.prototype.close = function() {
 
 // Record the postBatchResumeToken from the given cursor object, if it exists. If the current batch
 // is empty then this function also updates the current resume token to be the postBatchResumeToken.
-DBCommandCursor.prototype._updatePostBatchResumeToken = function(cursorObj) {
+DBCommandCursor.prototype._updatePostBatchResumeToken = function (cursorObj) {
     if (cursorObj.postBatchResumeToken) {
         this._postBatchResumeToken = cursorObj.postBatchResumeToken;
         if ((cursorObj.firstBatch || cursorObj.nextBatch).length === 0) {
@@ -731,7 +722,7 @@ DBCommandCursor.prototype._updatePostBatchResumeToken = function(cursorObj) {
  *
  * Throws on error.
  */
-DBCommandCursor.prototype._runGetMoreCommand = function() {
+DBCommandCursor.prototype._runGetMoreCommand = function () {
     // Construct the getMore command.
     let getMoreCmd = {getMore: this._cursorid, collection: this._collName};
 
@@ -754,16 +745,14 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
     assert.commandWorked(cmdRes, () => "getMore command failed: " + tojson(cmdRes));
 
     if (this._ns !== cmdRes.cursor.ns) {
-        throw Error("unexpected collection in getMore response: " + this._ns +
-                    " != " + cmdRes.cursor.ns);
+        throw Error("unexpected collection in getMore response: " + this._ns + " != " + cmdRes.cursor.ns);
     }
 
     if (!cmdRes.cursor.id.compare(NumberLong("0"))) {
         this._cursorHandle.zeroCursorId();
         this._cursorid = NumberLong("0");
     } else if (this._cursorid.compare(cmdRes.cursor.id)) {
-        throw Error("unexpected cursor id: " + this._cursorid.toString() +
-                    " != " + cmdRes.cursor.id.toString());
+        throw Error("unexpected cursor id: " + this._cursorid.toString() + " != " + cmdRes.cursor.id.toString());
     }
 
     // If the command result represents a change stream cursor, update our postBatchResumeToken.
@@ -779,7 +768,7 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
     }
 };
 
-DBCommandCursor.prototype.hasNext = function() {
+DBCommandCursor.prototype.hasNext = function () {
     if (!this._batch.length) {
         if (!this._cursorid.compare(NumberLong("0"))) {
             return false;
@@ -791,41 +780,40 @@ DBCommandCursor.prototype.hasNext = function() {
     return this._batch.length > 0;
 };
 
-DBCommandCursor.prototype.next = function() {
+DBCommandCursor.prototype.next = function () {
     if (this._batch.length) {
         // Pop the next result off the batch.
         const nextDoc = this._batch.pop();
         if (this._isChangeStream) {
             // If this is the last result in the batch, the postBatchResumeToken becomes the current
             // resume token for the cursor. Otherwise, the resume token is the _id of 'nextDoc'.
-            this._resumeToken = (this._batch.length ? nextDoc._id : this._postBatchResumeToken);
+            this._resumeToken = this._batch.length ? nextDoc._id : this._postBatchResumeToken;
         }
         return nextDoc;
     } else {
         // Have to call hasNext() here, as this is where we may issue a getMore in order to retrieve
         // the next batch of results.
-        if (!this.hasNext())
-            throw Error("error hasNext: false");
+        if (!this.hasNext()) throw Error("error hasNext: false");
         return this._batch.pop();
     }
 };
-DBCommandCursor.prototype.objsLeftInBatch = function() {
+DBCommandCursor.prototype.objsLeftInBatch = function () {
     return this._batch.length;
 };
-DBCommandCursor.prototype.getId = function() {
+DBCommandCursor.prototype.getId = function () {
     return this._cursorid;
 };
-DBCommandCursor.prototype.getResumeToken = function() {
+DBCommandCursor.prototype.getResumeToken = function () {
     // Return the most recent recorded resume token, if such a token exists.
     return this._resumeToken;
 };
 
-DBCommandCursor.prototype.getClusterTime = function() {
+DBCommandCursor.prototype.getClusterTime = function () {
     // Return the read timestamp for snapshot reads, or undefined for other readConcern levels.
     return this._atClusterTime;
 };
 
-DBCommandCursor.prototype.help = function() {
+DBCommandCursor.prototype.help = function () {
     // This is the same as the "Cursor Methods" section of DBQuery.help().
     print("\nCursor methods");
     print("\t.toArray() - iterates through docs and returns an array of the results");
@@ -834,10 +822,12 @@ DBCommandCursor.prototype.help = function() {
     print("\t.hasNext()");
     print("\t.next()");
     print(
-        "\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)");
+        "\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)",
+    );
     print("\t.itcount() - iterates through documents and counts them");
     print(
-        "\t.getResumeToken() - for a change stream cursor, obtains the most recent valid resume token, if it exists.");
+        "\t.getResumeToken() - for a change stream cursor, obtains the most recent valid resume token, if it exists.",
+    );
     print("\t.getClusterTime() - returns the read timestamp for snapshot reads.");
     print("\t.pretty() - pretty print each document, possibly over multiple lines");
     print("\t.close()");
@@ -855,15 +845,15 @@ const QueryHelpers = {
     _applyCountOptions: function _applyCountOptions(query, options) {
         const opts = Object.extend({}, options || {});
 
-        if (typeof opts.skip == 'number') {
+        if (typeof opts.skip == "number") {
             query.skip(opts.skip);
         }
 
-        if (typeof opts.limit == 'number') {
+        if (typeof opts.limit == "number") {
             query.limit(opts.limit);
         }
 
-        if (typeof opts.maxTimeMS == 'number') {
+        if (typeof opts.maxTimeMS == "number") {
             query.maxTimeMS(opts.maxTimeMS);
         }
 
@@ -871,11 +861,11 @@ const QueryHelpers = {
             query.hint(opts.hint);
         }
 
-        if (typeof opts.readConcern == 'string') {
+        if (typeof opts.readConcern == "string") {
             query.readConcern(opts.readConcern);
         }
 
-        if (typeof opts.collation == 'object') {
+        if (typeof opts.collation == "object") {
             query.collation(opts.collation);
         }
 
@@ -884,11 +874,7 @@ const QueryHelpers = {
         }
 
         return query;
-    }
+    },
 };
 
-export {
-    DBQuery,
-    DBCommandCursor,
-    QueryHelpers,
-};
+export {DBQuery, DBCommandCursor, QueryHelpers};

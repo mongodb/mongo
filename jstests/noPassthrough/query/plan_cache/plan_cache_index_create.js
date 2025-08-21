@@ -17,10 +17,9 @@ function indexBuildIsRunning(testDB, indexName) {
     const indexBuildFilter = {
         "command.createIndexes": collName,
         "command.indexes.0.name": indexName,
-        "msg": /^Index Build/
+        "msg": /^Index Build/,
     };
-    const curOp =
-        testDB.getSiblingDB("admin").aggregate([{$currentOp: {}}, {$match: indexBuildFilter}]);
+    const curOp = testDB.getSiblingDB("admin").aggregate([{$currentOp: {}}, {$match: indexBuildFilter}]);
     return curOp.hasNext();
 }
 
@@ -57,11 +56,16 @@ function runTest({rst, readDB, writeDB}) {
     assert.commandWorked(bulk.execute({w: "majority"}));
     // We start with a baseline of 2 existing indexes as we will not cache plans when only a
     // single plan exists.
-    assert.commandWorked(writeDB.runCommand({
-        createIndexes: collName,
-        indexes: [{key: {y: 1}, name: "less_selective"}, {key: {z: 1}, name: "least_selective"}],
-        writeConcern: {w: "majority"}
-    }));
+    assert.commandWorked(
+        writeDB.runCommand({
+            createIndexes: collName,
+            indexes: [
+                {key: {y: 1}, name: "less_selective"},
+                {key: {z: 1}, name: "least_selective"},
+            ],
+            writeConcern: {w: "majority"},
+        }),
+    );
 
     rst.awaitReplication();
 
@@ -76,24 +80,27 @@ function runTest({rst, readDB, writeDB}) {
 
     // Enable a failpoint that will cause an index build to block just after start. This will
     // allow us to examine PlanCache contents while index creation is in flight.
-    assert.commandWorked(
-        readDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'alwaysOn'}));
+    assert.commandWorked(readDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
 
     // Build a "most selective" index in the background.
     TestData.dbName = dbName;
     TestData.collName = collName;
-    const createIdxShell = startParallelShell(function() {
+    const createIdxShell = startParallelShell(function () {
         const testDB = db.getSiblingDB(TestData.dbName);
-        assert.commandWorked(testDB.runCommand({
-            createIndexes: TestData.collName,
-            indexes: [{key: {x: 1}, name: "most_selective"}],
-            writeConcern: {w: "majority"}
-        }));
+        assert.commandWorked(
+            testDB.runCommand({
+                createIndexes: TestData.collName,
+                indexes: [{key: {x: 1}, name: "most_selective"}],
+                writeConcern: {w: "majority"},
+            }),
+        );
     }, writeDB.getMongo().port);
 
     // Confirm that the index build has started.
-    assert.soon(() => indexBuildIsRunning(readDB, "most_selective"),
-                "Index build operation not found after starting via parallelShell");
+    assert.soon(
+        () => indexBuildIsRunning(readDB, "most_selective"),
+        "Index build operation not found after starting via parallelShell",
+    );
 
     // Confirm that there are no cached plans post index build start.
     assertDoesNotHaveCachedPlan(readColl, filter);
@@ -103,8 +110,7 @@ function runTest({rst, readDB, writeDB}) {
     assert.eq("less_selective", getIndexNameForCachedPlan(readColl, filter));
 
     // Disable the hang and wait for the index build to complete.
-    assert.commandWorked(
-        readDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
+    assert.commandWorked(readDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
 
     assert.soon(() => !indexBuildIsRunning(readDB, "most_selective"));
     createIdxShell({checkExitSuccess: true});
@@ -120,8 +126,7 @@ function runTest({rst, readDB, writeDB}) {
     assert.eq("most_selective", getIndexNameForCachedPlan(readColl, filter));
 
     // Drop the newly created index and confirm that the plan cache has been cleared.
-    assert.commandWorked(
-        writeDB.runCommand({dropIndexes: collName, index: {x: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(writeDB.runCommand({dropIndexes: collName, index: {x: 1}, writeConcern: {w: "majority"}}));
 
     rst.awaitReplication();
 
@@ -136,11 +141,13 @@ function runTest({rst, readDB, writeDB}) {
     assert.eq("less_selective", getIndexNameForCachedPlan(readColl, filter));
 
     // Build a "most selective" index in the foreground.
-    assert.commandWorked(writeDB.runCommand({
-        createIndexes: collName,
-        indexes: [{key: {x: 1}, name: "most_selective"}],
-        writeConcern: {w: "majority"}
-    }));
+    assert.commandWorked(
+        writeDB.runCommand({
+            createIndexes: collName,
+            indexes: [{key: {x: 1}, name: "most_selective"}],
+            writeConcern: {w: "majority"},
+        }),
+    );
 
     rst.awaitReplication();
 
@@ -152,8 +159,7 @@ function runTest({rst, readDB, writeDB}) {
     assert.eq("most_selective", getIndexNameForCachedPlan(readColl, filter));
 
     // Drop the newly created index and confirm that the plan cache has been cleared.
-    assert.commandWorked(
-        writeDB.runCommand({dropIndexes: collName, index: {x: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(writeDB.runCommand({dropIndexes: collName, index: {x: 1}, writeConcern: {w: "majority"}}));
 
     rst.awaitReplication();
 

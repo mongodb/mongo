@@ -45,21 +45,23 @@ function testConsecutiveQueriesWork(firstQuery, secondQuery) {
 
 function testCountLikeStage(stage) {
     testConsecutiveQueriesWork(
-        function() {
+        function () {
             coll.aggregate([{$match: {a: 0}}, stage]).toArray();
         },
-        function() {
+        function () {
             coll.aggregate([{$match: {$or: [{a: 0}, {b: 0}]}}, stage]).toArray();
-        });
+        },
+    );
 }
 
 testConsecutiveQueriesWork(
-    function() {
+    function () {
         coll.find({a: 0}).count();
     },
-    function() {
+    function () {
         coll.find({$or: [{a: 0}, {b: 0}]}).count();
-    });
+    },
+);
 // Replacing root with {} and $count are both count-like as well.
 testCountLikeStage({$replaceRoot: {newRoot: {}}});
 testCountLikeStage({$count: "c"});

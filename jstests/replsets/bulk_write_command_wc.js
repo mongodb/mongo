@@ -36,12 +36,14 @@ var coll = mongod.getCollection("test.bulk_write_command_wc");
 //
 // Basic bulkWrite, default WC
 coll.remove({});
-printjson(request = {
-    bulkWrite: 1,
-    ops: [{insert: 0, document: {a: 1}}],
-    nsInfo: [{ns: "test.bulk_write_command_wc"}]
-});
-printjson(result = mongod.adminCommand(request));
+printjson(
+    (request = {
+        bulkWrite: 1,
+        ops: [{insert: 0, document: {a: 1}}],
+        nsInfo: [{ns: "test.bulk_write_command_wc"}],
+    }),
+);
+printjson((result = mongod.adminCommand(request)));
 assert(result.ok);
 assert.eq(1, result.cursor.firstBatch[0].n);
 assert.eq(1, coll.find().itcount());
@@ -49,13 +51,15 @@ assert.eq(1, coll.find().itcount());
 //
 // Basic bulkWrite, majority WC
 coll.remove({});
-printjson(request = {
-    bulkWrite: 1,
-    ops: [{insert: 0, document: {a: 1}}],
-    nsInfo: [{ns: "test.bulk_write_command_wc"}],
-    writeConcern: {w: 'majority'}
-});
-printjson(result = mongod.adminCommand(request));
+printjson(
+    (request = {
+        bulkWrite: 1,
+        ops: [{insert: 0, document: {a: 1}}],
+        nsInfo: [{ns: "test.bulk_write_command_wc"}],
+        writeConcern: {w: "majority"},
+    }),
+);
+printjson((result = mongod.adminCommand(request)));
 assert(result.ok);
 assert.eq(1, result.cursor.firstBatch[0].n);
 assert.eq(1, coll.find().itcount());
@@ -63,13 +67,15 @@ assert.eq(1, coll.find().itcount());
 //
 // Basic bulkWrite,  w:2 WC
 coll.remove({});
-printjson(request = {
-    bulkWrite: 1,
-    ops: [{insert: 0, document: {a: 1}}],
-    nsInfo: [{ns: "test.bulk_write_command_wc"}],
-    writeConcern: {w: 2}
-});
-printjson(result = mongod.adminCommand(request));
+printjson(
+    (request = {
+        bulkWrite: 1,
+        ops: [{insert: 0, document: {a: 1}}],
+        nsInfo: [{ns: "test.bulk_write_command_wc"}],
+        writeConcern: {w: 2},
+    }),
+);
+printjson((result = mongod.adminCommand(request)));
 assert(result.ok);
 assert.eq(1, result.cursor.firstBatch[0].n);
 assert.eq(1, coll.find().itcount());
@@ -77,26 +83,30 @@ assert.eq(1, coll.find().itcount());
 //
 // Basic bulkWrite, immediate nojournal error
 coll.remove({});
-printjson(request = {
-    bulkWrite: 1,
-    ops: [{insert: 0, document: {a: 1}}],
-    nsInfo: [{ns: "test.bulk_write_command_wc"}],
-    writeConcern: {j: true}
-});
-printjson(result = mongod.adminCommand(request));
+printjson(
+    (request = {
+        bulkWrite: 1,
+        ops: [{insert: 0, document: {a: 1}}],
+        nsInfo: [{ns: "test.bulk_write_command_wc"}],
+        writeConcern: {j: true},
+    }),
+);
+printjson((result = mongod.adminCommand(request)));
 assert(!result.ok);
 assert.eq(0, coll.find().itcount());
 
 //
 // Basic bulkWrite, timeout wc error
 coll.remove({});
-printjson(request = {
-    bulkWrite: 1,
-    ops: [{insert: 0, document: {a: 1}}],
-    nsInfo: [{ns: "test.bulk_write_command_wc"}],
-    writeConcern: {w: 3, wtimeout: 1}
-});
-printjson(result = mongod.adminCommand(request));
+printjson(
+    (request = {
+        bulkWrite: 1,
+        ops: [{insert: 0, document: {a: 1}}],
+        nsInfo: [{ns: "test.bulk_write_command_wc"}],
+        writeConcern: {w: 3, wtimeout: 1},
+    }),
+);
+printjson((result = mongod.adminCommand(request)));
 assert(result.ok);
 assert.eq(1, result.cursor.firstBatch[0].n);
 assert(result.writeConcernError);
@@ -106,13 +116,15 @@ assert.eq(1, coll.find().itcount());
 //
 // Basic bulkWrite, wmode wc error
 coll.remove({});
-printjson(request = {
-    bulkWrite: 1,
-    ops: [{insert: 0, document: {a: 1}}],
-    nsInfo: [{ns: "test.bulk_write_command_wc"}],
-    writeConcern: {w: 'invalid'}
-});
-printjson(result = mongod.adminCommand(request));
+printjson(
+    (request = {
+        bulkWrite: 1,
+        ops: [{insert: 0, document: {a: 1}}],
+        nsInfo: [{ns: "test.bulk_write_command_wc"}],
+        writeConcern: {w: "invalid"},
+    }),
+);
+printjson((result = mongod.adminCommand(request)));
 assert(result.ok);
 assert.eq(1, result.cursor.firstBatch[0].n);
 assert(result.writeConcernError);
@@ -121,13 +133,18 @@ assert.eq(1, coll.find().itcount());
 //
 // Two ordered inserts, write error and wc error both reported
 coll.remove({});
-printjson(request = {
-    bulkWrite: 1,
-    ops: [{insert: 0, document: {a: 1}}, {insert: 0, document: {_id: /a/}}],
-    nsInfo: [{ns: "test.bulk_write_command_wc"}],
-    writeConcern: {w: 'invalid'}
-});
-printjson(result = mongod.adminCommand(request));
+printjson(
+    (request = {
+        bulkWrite: 1,
+        ops: [
+            {insert: 0, document: {a: 1}},
+            {insert: 0, document: {_id: /a/}},
+        ],
+        nsInfo: [{ns: "test.bulk_write_command_wc"}],
+        writeConcern: {w: "invalid"},
+    }),
+);
+printjson((result = mongod.adminCommand(request)));
 assert(result.ok);
 assert.eq(1, result.cursor.firstBatch[0].n);
 assert.eq(0, result.cursor.firstBatch[1].ok);
@@ -138,14 +155,19 @@ assert.eq(1, coll.find().itcount());
 //
 // Two unordered inserts, write error and wc error reported
 coll.remove({});
-printjson(request = {
-    bulkWrite: 1,
-    ops: [{insert: 0, document: {a: 1}}, {insert: 0, document: {_id: /a/}}],
-    nsInfo: [{ns: "test.bulk_write_command_wc"}],
-    ordered: false,
-    writeConcern: {w: 'invalid'}
-});
-printjson(result = mongod.adminCommand(request));
+printjson(
+    (request = {
+        bulkWrite: 1,
+        ops: [
+            {insert: 0, document: {a: 1}},
+            {insert: 0, document: {_id: /a/}},
+        ],
+        nsInfo: [{ns: "test.bulk_write_command_wc"}],
+        ordered: false,
+        writeConcern: {w: "invalid"},
+    }),
+);
+printjson((result = mongod.adminCommand(request)));
 assert(result.ok);
 assert.eq(1, result.cursor.firstBatch[0].n);
 assert.eq(0, result.cursor.firstBatch[1].ok);
@@ -158,10 +180,13 @@ assert.eq(1, coll.find().itcount());
 coll.remove({});
 request = {
     bulkWrite: 1,
-    ops: [{insert: 0, document: {_id: 1}}, {insert: 0, document: {_id: 1}}],
+    ops: [
+        {insert: 0, document: {_id: 1}},
+        {insert: 0, document: {_id: 1}},
+    ],
     nsInfo: [{ns: "test.bulk_write_command_wc"}],
     ordered: false,
-    writeConcern: {}
+    writeConcern: {},
 };
 result = mongod.adminCommand(request);
 assert(result.ok);
@@ -176,10 +201,13 @@ assert.eq(1, coll.find().itcount());
 coll.remove({});
 request = {
     bulkWrite: 1,
-    ops: [{insert: 0, document: {_id: 1}}, {insert: 0, document: {_id: 1}}],
+    ops: [
+        {insert: 0, document: {_id: 1}},
+        {insert: 0, document: {_id: 1}},
+    ],
     nsInfo: [{ns: "test.bulk_write_command_wc"}],
     ordered: false,
-    writeConcern: {wtimeout: 1}
+    writeConcern: {wtimeout: 1},
 };
 result = assert.commandWorkedIgnoringWriteErrors(mongod.adminCommand(request));
 assert.eq(1, result.cursor.firstBatch[0].n);

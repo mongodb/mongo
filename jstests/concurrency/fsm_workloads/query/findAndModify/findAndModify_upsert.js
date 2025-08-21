@@ -6,10 +6,10 @@
  * created) based on the 'query' specification, and updated using the
  * $push operator.
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {sort: false, shardKey: {tid: 1}};
 
-    var states = (function() {
+    var states = (function () {
         // Returns true if the specified array is sorted in ascending order,
         // and false otherwise.
         function isSorted(arr) {
@@ -41,7 +41,7 @@ export const $config = (function() {
                 query: query,
                 update: {$setOnInsert: {values: [updatedValue]}},
                 new: true,
-                upsert: true
+                upsert: true,
             };
 
             if (this.sort) {
@@ -53,10 +53,10 @@ export const $config = (function() {
 
             if (res.ok === 1) {
                 var doc = res.value;
-                assert(doc !== null, 'a document should have been inserted');
+                assert(doc !== null, "a document should have been inserted");
 
                 assert.eq(this.tid, doc.tid);
-                assert(Array.isArray(doc.values), 'expected values to be an array');
+                assert(Array.isArray(doc.values), "expected values to be an array");
                 assert.eq(1, doc.values.length);
                 assert.eq(updatedValue, doc.values[0]);
             }
@@ -70,7 +70,7 @@ export const $config = (function() {
                 query: {tid: this.tid},
                 update: {$push: {values: updatedValue}},
                 new: true,
-                upsert: false
+                upsert: false,
             };
 
             if (this.sort) {
@@ -82,14 +82,13 @@ export const $config = (function() {
 
             if (res.ok === 1) {
                 var doc = res.value;
-                assert(doc !== null,
-                       'query spec should have matched a document, returned ' + tojson(res));
+                assert(doc !== null, "query spec should have matched a document, returned " + tojson(res));
 
                 assert.eq(this.tid, doc.tid);
-                assert(Array.isArray(doc.values), 'expected values to be an array');
+                assert(Array.isArray(doc.values), "expected values to be an array");
                 assert.gte(doc.values.length, 2);
                 assert.eq(updatedValue, doc.values[doc.values.length - 1]);
-                assert(isSorted(doc.values), 'expected values to be sorted: ' + tojson(doc.values));
+                assert(isSorted(doc.values), "expected values to be sorted: " + tojson(doc.values));
             }
         }
 
@@ -99,7 +98,7 @@ export const $config = (function() {
     var transitions = {
         init: {upsert: 0.1, update: 0.9},
         upsert: {upsert: 0.1, update: 0.9},
-        update: {upsert: 0.1, update: 0.9}
+        update: {upsert: 0.1, update: 0.9},
     };
 
     return {threadCount: 20, iterations: 20, data: data, states: states, transitions: transitions};

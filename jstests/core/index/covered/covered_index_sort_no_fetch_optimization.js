@@ -9,11 +9,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {
-    getWinningPlanFromExplain,
-    isIndexOnly,
-    planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, isIndexOnly, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const collName = "covered_index_sort_no_fetch_optimization";
 const coll = db.getCollection(collName);
@@ -21,13 +17,15 @@ coll.drop();
 
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
-assert.commandWorked(coll.insert([
-    {a: 1, b: 1, c: 1},
-    {a: 1, b: 2, c: 2},
-    {a: 2, b: 1, c: 3},
-    {a: 2, b: 2, c: 4},
-    {a: -1, b: 1, c: 5}
-]));
+assert.commandWorked(
+    coll.insert([
+        {a: 1, b: 1, c: 1},
+        {a: 1, b: 2, c: 2},
+        {a: 2, b: 1, c: 3},
+        {a: 2, b: 2, c: 4},
+        {a: -1, b: 1, c: 5},
+    ]),
+);
 
 const kIsCovered = true;
 const kNotCovered = false;
@@ -44,16 +42,12 @@ function assertExpectedResult(findCmd, expectedResult, isCovered, isBlockingSort
     // Use coll.find() syntax instead of db.runCommand() so we can use the toArray() function. This
     // is important when 'internalQueryFindCommandBatchSize' is less than the result size and the
     // cursor.firstBatch returned from db.runCommand() doesn't contain all the results.
-    const result =
-        coll.find(filter, projection).collation(collation).hint(hint).sort(sort).toArray();
+    const result = coll.find(filter, projection).collation(collation).hint(hint).sort(sort).toArray();
     assert.eq(result, expectedResult, result);
 
-    const explainResult =
-        assert.commandWorked(db.runCommand({explain: findCmd, verbosity: "executionStats"}));
+    const explainResult = assert.commandWorked(db.runCommand({explain: findCmd, verbosity: "executionStats"}));
     assert.eq(isCovered, isIndexOnly(db, getWinningPlanFromExplain(explainResult)), explainResult);
-    assert.eq(isBlockingSort,
-              planHasStage(db, getWinningPlanFromExplain(explainResult), "SORT"),
-              explainResult);
+    assert.eq(isBlockingSort, planHasStage(db, getWinningPlanFromExplain(explainResult), "SORT"), explainResult);
 }
 
 // Test correctness of basic covered queries. Here, the sort predicate is not the same order
@@ -66,18 +60,28 @@ findCmd = {
     find: collName,
     filter: {a: {$gt: 0}},
     projection: {a: 1, b: 1, _id: 0},
-    sort: {b: 1, a: 1}
+    sort: {b: 1, a: 1},
 };
-expected = [{"a": 1, "b": 1}, {"a": 2, "b": 1}, {"a": 1, "b": 2}, {"a": 2, "b": 2}];
+expected = [
+    {"a": 1, "b": 1},
+    {"a": 2, "b": 1},
+    {"a": 1, "b": 2},
+    {"a": 2, "b": 2},
+];
 assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);
 
 findCmd = {
     find: collName,
     filter: {a: {$gt: 0}},
     projection: {a: 1, b: 1, _id: 0},
-    sort: {b: 1, a: -1}
+    sort: {b: 1, a: -1},
 };
-expected = [{"a": 2, "b": 1}, {"a": 1, "b": 1}, {"a": 2, "b": 2}, {"a": 1, "b": 2}];
+expected = [
+    {"a": 2, "b": 1},
+    {"a": 1, "b": 1},
+    {"a": 2, "b": 2},
+    {"a": 1, "b": 2},
+];
 assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);
 
 // Test correctness of queries where sort is not covered because not all sort keys are in the
@@ -86,16 +90,21 @@ findCmd = {
     find: collName,
     filter: {a: {$gt: 0}},
     projection: {b: 1, c: 1, _id: 0},
-    sort: {c: 1, b: 1}
+    sort: {c: 1, b: 1},
 };
-expected = [{"b": 1, "c": 1}, {"b": 2, "c": 2}, {"b": 1, "c": 3}, {"b": 2, "c": 4}];
+expected = [
+    {"b": 1, "c": 1},
+    {"b": 2, "c": 2},
+    {"b": 1, "c": 3},
+    {"b": 2, "c": 4},
+];
 assertExpectedResult(findCmd, expected, kNotCovered, kBlockingSort);
 
 findCmd = {
     find: collName,
     filter: {a: {$gt: 0}},
     projection: {b: 1, _id: 0},
-    sort: {c: 1, b: 1}
+    sort: {c: 1, b: 1},
 };
 expected = [{"b": 1}, {"b": 2}, {"b": 1}, {"b": 2}];
 assertExpectedResult(findCmd, expected, kNotCovered, kBlockingSort);
@@ -107,7 +116,7 @@ findCmd = {
     find: collName,
     filter: {a: {$gt: 0}},
     projection: {b: 1, _id: 0},
-    sort: {b: 1}
+    sort: {b: 1},
 };
 expected = [{"b": [-1, 11, 12]}, {"b": 1}, {"b": 1}, {"b": 2}, {"b": 2}, {"b": [4, 5, 6]}];
 assertExpectedResult(findCmd, expected, kNotCovered, kBlockingSort);
@@ -122,7 +131,14 @@ assert(coll.drop());
 // puts uppercase first.
 assert.commandWorked(coll.createIndex({a: 1, b: 1}, {collation: {locale: "en_US", strength: 3}}));
 assert.commandWorked(
-    coll.insert([{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "A"}, {a: 1, b: "a"}, {a: 2, b: 2}]));
+    coll.insert([
+        {a: 1, b: 1},
+        {a: 1, b: 2},
+        {a: 1, b: "A"},
+        {a: 1, b: "a"},
+        {a: 2, b: 2},
+    ]),
+);
 
 findCmd = {
     find: collName,
@@ -130,10 +146,15 @@ findCmd = {
     projection: {a: 1, b: 1, _id: 0},
     collation: {locale: "en_US", strength: 3},
     sort: {a: 1, b: 1},
-    hint: {a: 1, b: 1}
+    hint: {a: 1, b: 1},
 };
-expected =
-    [{"a": 1, "b": 1}, {"a": 1, "b": 2}, {"a": 1, "b": "a"}, {"a": 1, "b": "A"}, {"a": 2, "b": 2}];
+expected = [
+    {"a": 1, "b": 1},
+    {"a": 1, "b": 2},
+    {"a": 1, "b": "a"},
+    {"a": 1, "b": "A"},
+    {"a": 2, "b": 2},
+];
 assertExpectedResult(findCmd, expected, kNotCovered, kNonBlockingSort);
 
 // This tests the case where there is a collation, and we need to do a blocking SORT, but that
@@ -145,14 +166,9 @@ findCmd = {
     projection: {b: 1, _id: 0},
     collation: {locale: "en_US", strength: 3},
     sort: {b: 1},
-    hint: {a: 1, b: 1}
+    hint: {a: 1, b: 1},
 };
-expected = [
-    {"b": 1},
-    {"b": 2},
-    {"b": "a"},
-    {"b": "A"},
-];
+expected = [{"b": 1}, {"b": 2}, {"b": "a"}, {"b": "A"}];
 assertExpectedResult(findCmd, expected, kNotCovered, kBlockingSort);
 
 // The index has the same key pattern as the sort but a different collation.
@@ -166,9 +182,15 @@ findCmd = {
     projection: {a: 1, b: 1, _id: 0},
     collation: {locale: "en_US", strength: 3},
     sort: {a: 1, b: 1},
-    hint: {a: 1, b: 1}
+    hint: {a: 1, b: 1},
 };
-expected = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "a"}, {a: 1, b: "A"}, {a: 2, b: 2}];
+expected = [
+    {a: 1, b: 1},
+    {a: 1, b: 2},
+    {a: 1, b: "a"},
+    {a: 1, b: "A"},
+    {a: 2, b: 2},
+];
 assertExpectedResult(findCmd, expected, kNotCovered, kBlockingSort);
 
 // The index has a collation but the query sort does not.
@@ -180,9 +202,15 @@ findCmd = {
     filter: {},
     projection: {a: 1, b: 1, _id: 0},
     sort: {a: 1, b: 1},
-    hint: {a: 1, b: 1}
+    hint: {a: 1, b: 1},
 };
-expected = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "A"}, {a: 1, b: "a"}, {a: 2, b: 2}];
+expected = [
+    {a: 1, b: 1},
+    {a: 1, b: 2},
+    {a: 1, b: "A"},
+    {a: 1, b: "a"},
+    {a: 2, b: 2},
+];
 assertExpectedResult(findCmd, expected, kNotCovered, kBlockingSort);
 
 // The index has a collation but the query does not. However, our index bounds do not contain
@@ -192,9 +220,12 @@ findCmd = {
     filter: {a: {$gte: 1}, b: 2},
     projection: {a: 1, b: 1, _id: 0},
     sort: {b: 1, a: 1},
-    hint: {a: 1, b: 1}
+    hint: {a: 1, b: 1},
 };
-expected = [{a: 1, b: 2}, {a: 2, b: 2}];
+expected = [
+    {a: 1, b: 2},
+    {a: 2, b: 2},
+];
 assertExpectedResult(findCmd, expected, kIsCovered, kNonBlockingSort);
 
 // The index does not have a special collation, but the query asks for one. The no-fetch
@@ -213,35 +244,43 @@ if (!TestData.isHintsToQuerySettingsSuite) {
         projection: {a: 1, b: 1, _id: 0},
         collation: {locale: "en_US", strength: 3},
         sort: {a: 1, b: 1},
-        hint: {a: 1, b: 1}
+        hint: {a: 1, b: 1},
     };
 
-    expected = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "a"}, {a: 1, b: "A"}, {a: 2, b: 2}];
+    expected = [
+        {a: 1, b: 1},
+        {a: 1, b: 2},
+        {a: 1, b: "a"},
+        {a: 1, b: "A"},
+        {a: 2, b: 2},
+    ];
     assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);
 }
 
 // Test covered sort plan possible with non-multikey dotted field in sort key.
 assert(coll.drop());
 assert.commandWorked(coll.createIndex({a: 1, "b.c": 1}));
-assert.commandWorked(coll.insert([
-    {a: 0, b: {c: 1}},
-    {a: 1, b: {c: 2}},
-    {a: 2, b: {c: "A"}},
-    {a: 3, b: {c: "a"}},
-    {a: 4, b: {c: 3}}
-]));
+assert.commandWorked(
+    coll.insert([
+        {a: 0, b: {c: 1}},
+        {a: 1, b: {c: 2}},
+        {a: 2, b: {c: "A"}},
+        {a: 3, b: {c: "a"}},
+        {a: 4, b: {c: 3}},
+    ]),
+);
 
 findCmd = {
     find: collName,
     filter: {a: {$gt: 0}},
     projection: {a: 1, "b.c": 1, _id: 0},
-    sort: {"b.c": 1}
+    sort: {"b.c": 1},
 };
 expected = [
     {"a": 1, "b": {"c": 2}},
     {"a": 4, "b": {"c": 3}},
     {"a": 2, "b": {"c": "A"}},
-    {"a": 3, "b": {"c": "a"}}
+    {"a": 3, "b": {"c": "a"}},
 ];
 assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);
 
@@ -250,8 +289,7 @@ findCmd = {
     find: collName,
     filter: {a: {$gt: 0}},
     projection: {"b.c": 1, _id: 0},
-    sort: {"b.c": 1}
+    sort: {"b.c": 1},
 };
-expected =
-    [{"b": {"c": 1}}, {"b": {"c": 2}}, {"b": {"c": 3}}, {"b": {"c": "A"}}, {"b": {"c": "a"}}];
+expected = [{"b": {"c": 1}}, {"b": {"c": 2}}, {"b": {"c": 3}}, {"b": {"c": "A"}}, {"b": {"c": "a"}}];
 assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);

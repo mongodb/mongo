@@ -39,6 +39,7 @@ reshardingTest.withReshardingInBackground(
         const mongos = inputCollection.getMongo();
         reshardingTest.awaitCloneTimestampChosen();
         assert.commandWorked(mongos.adminCommand({commitReshardCollection: sourceNs}));
-    });
+    },
+);
 
 reshardingTest.teardown();

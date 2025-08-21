@@ -21,8 +21,8 @@ const rst = new ReplSetTest({
             rsConfig: {
                 priority: 0,
             },
-        }
-    ]
+        },
+    ],
 });
 
 rst.startSet();
@@ -45,17 +45,21 @@ rst.awaitReplication();
 let secondary = rst.restart(1, {
     startClean: true,
     setParameter: {
-        'failpoint.initialSyncHangDuringCollectionClone': tojson(
-            {mode: 'alwaysOn', data: {namespace: dbName + "." + collName, numDocsToClone: 0}})
-    }
+        "failpoint.initialSyncHangDuringCollectionClone": tojson({
+            mode: "alwaysOn",
+            data: {namespace: dbName + "." + collName, numDocsToClone: 0},
+        }),
+    },
 });
 
 // Wait until we block on cloning the collection. The index builders are initialized at this point.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangDuringCollectionClone",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangDuringCollectionClone",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 // Take a checkpoint. This is necessary in order for the index entries to be durably written in the
 // catalog with 'ready: false' before crashing the node.
@@ -68,9 +72,10 @@ secondary = rst.restart(
     {
         startClean: false,
         allowedExitCode: MongoRunner.EXIT_SIGKILL,
-        setParameter: {'failpoint.initialSyncHangDuringCollectionClone': tojson({mode: 'off'})}
+        setParameter: {"failpoint.initialSyncHangDuringCollectionClone": tojson({mode: "off"})},
     },
-    SIGKILL);
+    SIGKILL,
+);
 
 // Wait for initial sync to finish.
 rst.awaitSecondaryNodes(null, [secondary]);

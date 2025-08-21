@@ -14,7 +14,7 @@ const primary = rs.getPrimary();
 const secondary = rs.getSecondary();
 const collName = primary.getDB(jsTestName()).getCollection("coll").getFullName();
 
-const verifyNoError = res => {
+const verifyNoError = (res) => {
     assert.eq(res.errCount, 0);
     assert.gt(res.totalOps, 0);
 };
@@ -23,75 +23,77 @@ const benchArgArray = [
     {
         ops: [{op: "find", readCmd: true, query: {}, ns: collName, readPrefMode: "primary"}],
         parallel: 1,
-        host: primary.host
+        host: primary.host,
     },
     {
-        ops: [{
-            op: "findOne",
-            readCmd: true,
-            query: {},
-            ns: collName,
-            readPrefMode: "primaryPreferred"
-        }],
+        ops: [
+            {
+                op: "findOne",
+                readCmd: true,
+                query: {},
+                ns: collName,
+                readPrefMode: "primaryPreferred",
+            },
+        ],
         parallel: 1,
-        host: primary.host
+        host: primary.host,
     },
     {
         ops: [{op: "find", readCmd: true, query: {}, ns: collName, readPrefMode: "secondary"}],
         parallel: 1,
-        host: secondary.host
+        host: secondary.host,
     },
     {
-        ops: [{
-            op: "findOne",
-            readCmd: true,
-            query: {},
-            ns: collName,
-            readPrefMode: "secondaryPreferred"
-        }],
+        ops: [
+            {
+                op: "findOne",
+                readCmd: true,
+                query: {},
+                ns: collName,
+                readPrefMode: "secondaryPreferred",
+            },
+        ],
         parallel: 1,
-        host: secondary.host
+        host: secondary.host,
     },
     {
         ops: [{op: "query", readCmd: true, query: {}, ns: collName, readPrefMode: "nearest"}],
         parallel: 1,
-        host: secondary.host
+        host: secondary.host,
     },
 ];
 
-benchArgArray.forEach(benchArg => verifyNoError(benchRun(benchArg)));
+benchArgArray.forEach((benchArg) => verifyNoError(benchRun(benchArg)));
 
 const invalidArgAndError = [
     {
         benchArg: {
             ops: [{op: "find", readCmd: true, query: {}, ns: collName, readPrefMode: 1}],
             parallel: 1,
-            host: primary.host
+            host: primary.host,
         },
-        error: ErrorCodes.BadValue
+        error: ErrorCodes.BadValue,
     },
     {
         benchArg: {
-            ops:
-                [{op: "find", readCmd: true, query: {}, ns: collName, readPrefMode: "invalidPref"}],
+            ops: [{op: "find", readCmd: true, query: {}, ns: collName, readPrefMode: "invalidPref"}],
             parallel: 1,
-            host: primary.host
+            host: primary.host,
         },
-        error: ErrorCodes.BadValue
+        error: ErrorCodes.BadValue,
     },
     {
         benchArg: {
-            ops: [
-                {op: "insert", writeCmd: true, doc: {a: 1}, ns: collName, readPrefMode: "primary"}
-            ],
+            ops: [{op: "insert", writeCmd: true, doc: {a: 1}, ns: collName, readPrefMode: "primary"}],
             parallel: 1,
-            host: primary.host
+            host: primary.host,
         },
-        error: ErrorCodes.InvalidOptions
+        error: ErrorCodes.InvalidOptions,
     },
 ];
 
-invalidArgAndError.forEach(
-    argAndError => assert.throwsWithCode(() => benchRun(argAndError.benchArg), argAndError.error));
+invalidArgAndError.forEach((argAndError) =>
+    assert.throwsWithCode(() => benchRun(argAndError.benchArg), argAndError.error),
+);
 
 rs.stopSet();

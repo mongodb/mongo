@@ -18,7 +18,7 @@ assert.commandWorked(coll.insert({a: MinKey}));
 // Test that queries involving comparison operators with MinKey are covered.
 const proj = {
     a: 1,
-    _id: 0
+    _id: 0,
 };
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gt: MinKey}}, project: proj, count: 0});
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gte: MinKey}}, project: proj, count: 1});

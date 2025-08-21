@@ -22,8 +22,9 @@ var coll = testDB.getCollection(collName);
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDB.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
 //
 // Collection-level count.
@@ -82,7 +83,7 @@ for (i = 0; i < 10; ++i) {
 assert.commandWorked(coll.createIndex({a: 1}));
 
 query = {
-    a: {$gte: 5}
+    a: {$gte: 5},
 };
 assert.eq(5, coll.count(query));
 profileObj = getLatestProfilerEntry(testDB);

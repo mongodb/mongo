@@ -9,36 +9,36 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const rsNodeOptions = {
     // Use a higher frequency for periodic noops to speed up the test.
-    setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}
+    setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
 };
-const st =
-    new ShardingTest({shards: 1, mongos: 1, rs: {nodes: 1}, other: {rsOptions: rsNodeOptions}});
+const st = new ShardingTest({shards: 1, mongos: 1, rs: {nodes: 1}, other: {rsOptions: rsNodeOptions}});
 
 jsTestLog("Starting new shard (but not adding to shard set yet)");
 const newShard = new ReplSetTest({name: "newShard", nodes: 1, nodeOptions: rsNodeOptions});
-newShard.startSet({shardsvr: ''});
+newShard.startSet({shardsvr: ""});
 newShard.initiate();
 
 const mongos = st.s;
-const mongosColl = mongos.getCollection('test.foo');
+const mongosColl = mongos.getCollection("test.foo");
 const mongosDB = mongos.getDB("test");
 
 // Enable sharding to inform mongos of the database, allowing us to open a cursor.
 assert.commandWorked(mongos.adminCommand({enableSharding: mongosDB.getName()}));
 
 // Shard the collection.
-assert.commandWorked(
-    mongos.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(mongos.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
 
 // Split the collection into two chunks: [MinKey, 10) and [10, MaxKey].
 assert.commandWorked(mongos.adminCommand({split: mongosColl.getFullName(), middle: {_id: 10}}));
 
 // Enable the failpoint.
-assert.commandWorked(mongos.adminCommand(
-    {configureFailPoint: "shardedAggregateHangBeforeEstablishingShardCursors", mode: "alwaysOn"}));
+assert.commandWorked(
+    mongos.adminCommand({configureFailPoint: "shardedAggregateHangBeforeEstablishingShardCursors", mode: "alwaysOn"}),
+);
 
 // While opening the cursor, wait for the failpoint and add the new shard.
-const awaitNewShard = startParallelShell(`
+const awaitNewShard = startParallelShell(
+    `
         checkLog.contains(db,
             "shardedAggregateHangBeforeEstablishingShardCursors fail point enabled");
         assert.commandWorked(
@@ -52,7 +52,8 @@ const awaitNewShard = startParallelShell(`
             db.adminCommand(
                 {configureFailPoint: "shardedAggregateHangBeforeEstablishingShardCursors",
                  mode: "off"}));`,
-                                             mongos.port);
+    mongos.port,
+);
 
 jsTestLog("Opening $changeStream cursor");
 const changeStream = mongosColl.aggregate([{$changeStream: {}}]);

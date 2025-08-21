@@ -11,7 +11,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 // Shrink the WiredTiger cache so we can easily fill it up
 let replSet = new ReplSetTest({
     nodes: 1,
-    nodeOptions: {wiredTigerEngineConfigString: "cache_size=256M,cache_stuck_timeout_ms=600000"}
+    nodeOptions: {wiredTigerEngineConfigString: "cache_size=256M,cache_stuck_timeout_ms=600000"},
 });
 
 replSet.startSet();
@@ -19,26 +19,27 @@ replSet.initiate();
 const db = replSet.getPrimary().getDB("test");
 
 // Ensure the thread is turned on.
-assert.commandWorked(db.adminCommand({
-    setParameter: 1,
-    cachePressureQueryPeriodMilliseconds: 1000,
-}));
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        cachePressureQueryPeriodMilliseconds: 1000,
+    }),
+);
 
 // Reduce the tracking window so we can detect cache pressure quicker.
-assert.commandWorked(db.adminCommand({
-    setParameter: 1,
-    cachePressureEvictionStallDetectionWindowSeconds: 1,
-}));
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        cachePressureEvictionStallDetectionWindowSeconds: 1,
+    }),
+);
 
 // Log cache pressure metrics.
 function logCacheStatus() {
     const status = db.serverStatus();
-    jsTestLog(`Cache pressue wait time threshold exceeded: ${
-        status.metrics.cachePressure.waitTimeThresholdExceeded}`);
-    jsTestLog(`Cache pressue cache updates threshold exceeded: ${
-        status.metrics.cachePressure.cacheUpdatesThreshold}`);
-    jsTestLog(`Cache pressue cache dirty threshold exceeded: ${
-        status.metrics.cachePressure.cacheDirtyThreshold}`);
+    jsTestLog(`Cache pressue wait time threshold exceeded: ${status.metrics.cachePressure.waitTimeThresholdExceeded}`);
+    jsTestLog(`Cache pressue cache updates threshold exceeded: ${status.metrics.cachePressure.cacheUpdatesThreshold}`);
+    jsTestLog(`Cache pressue cache dirty threshold exceeded: ${status.metrics.cachePressure.cacheDirtyThreshold}`);
 }
 
 // Create a large document to pin dirty data in WiredTiger.
@@ -52,7 +53,7 @@ let firstPreparedTxn = true;
 jsTestLog("Starting large inserts to create cache pressure...");
 
 let successfulKills = 0;
-const timeoutTimestamp = Date.now() + 10 * 60 * 1000;  // 10 minutes timeout
+const timeoutTimestamp = Date.now() + 10 * 60 * 1000; // 10 minutes timeout
 
 // Insert multiple large documents without committing.
 while (true) {
@@ -64,14 +65,12 @@ while (true) {
     let session = db.getMongo().startSession();
     session.startTransaction();
     try {
-        assert.commandWorked(
-            session.getDatabase("test").runCommand({"insert": "c", documents: [largeDoc]}));
+        assert.commandWorked(session.getDatabase("test").runCommand({"insert": "c", documents: [largeDoc]}));
         if (firstPreparedTxn) {
             firstPreparedTxn = false;
             PrepareHelpers.prepareTransaction(session);
         }
-    } catch (e) {
-    }
+    } catch (e) {}
     sessions.push(session);
 
     jsTestLog(`Large inserts completed: ${sessions.length}`);
@@ -91,8 +90,7 @@ while (true) {
 
 // Check we did not abort the prepared transaction.
 let res = assert.commandWorked(db.adminCommand({serverStatus: 1}));
-assert.eq(
-    res.transactions.totalPreparedThenAborted, 0, "Prepared transaction was aborted unexpectedly");
+assert.eq(res.transactions.totalPreparedThenAborted, 0, "Prepared transaction was aborted unexpectedly");
 
 jsTestLog("Aborting remaining transactions...");
 

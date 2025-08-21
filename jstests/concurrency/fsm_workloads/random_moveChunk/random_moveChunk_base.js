@@ -12,11 +12,9 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {findFirstBatch} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_base_partitioned.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_base_partitioned.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 1;
     $config.iterations = 1;
 
@@ -25,7 +23,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     // A 'default' field needs to be specified because the 'setup' phase of the workload
     // won't have access to each collection's current specified shard key.
-    $config.data.defaultShardKeyField = 'skey';
+    $config.data.defaultShardKeyField = "skey";
 
     // Which skey and _id values are owned by this thread (they are equal by default) for each
     // collection, populated in init().
@@ -50,8 +48,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * secondary shard key fields exist as a result of the refineCollectionShardKey command, and
      * thus fills in those fields with the corresponding MinKey/MaxKey values.
      */
-    $config.data.calculateChunkBoundsForShardKey = function calculateChunkBoundsForShardKey(
-        collName, chunk) {
+    $config.data.calculateChunkBoundsForShardKey = function calculateChunkBoundsForShardKey(collName, chunk) {
         const shardKeyField = this.shardKeyField[collName];
         let minBound = {};
         let maxBound = {};
@@ -88,7 +85,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // Choose a random shard to move the chunk to.
         const shardNames = Object.keys(connCache.shards);
-        const destinationShards = shardNames.filter(function(shard) {
+        const destinationShards = shardNames.filter(function (shard) {
             if (shard !== fromShard) {
                 return shard;
             }
@@ -130,7 +127,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Search the collection to find the _ids of docs assigned to this thread.
         const docsOwnedByThread = findFirstBatch(db, collName, {tid: this.tid}, 1000);
         assert.neq(0, docsOwnedByThread.size);
-        docsOwnedByThread.forEach(doc => {
+        docsOwnedByThread.forEach((doc) => {
             this.ownedIds[collName].push(doc._id);
         });
 
@@ -171,8 +168,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // Create a chunk with boundaries matching the partition's. The low chunk's lower bound
             // is minKey, so a split is not necessary.
             if (!partition.isLowChunk) {
-                assert.commandWorked(db.adminCommand(
-                    {split: ns, middle: {[this.defaultShardKeyField]: partition.lower}}));
+                assert.commandWorked(
+                    db.adminCommand({split: ns, middle: {[this.defaultShardKeyField]: partition.lower}}),
+                );
             }
         }
     };

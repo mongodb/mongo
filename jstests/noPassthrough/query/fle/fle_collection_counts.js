@@ -16,9 +16,7 @@ function assertCollectionCounts(db, qe, fle1) {
     const cs = db.serverStatus().catalogStats;
 
     assert.eq(cs.csfle, fle1, "Mismatch in actual vs expected for csfle1 collections");
-    assert.eq(cs.queryableEncryption,
-              qe,
-              "Mismatch in actual vs expected for queryableEncryption collections");
+    assert.eq(cs.queryableEncryption, qe, "Mismatch in actual vs expected for queryableEncryption collections");
 }
 
 function runTest(conn) {
@@ -30,15 +28,17 @@ function runTest(conn) {
     assertCollectionCounts(db, 0, 0);
 
     // Check we count correctly.
-    assert.commandWorked(client.createEncryptionCollection("basic_qe", {
-        encryptedFields: {
-            "fields": [
-                {"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}},
-                {"path": "middle", "bsonType": "string"},
-                {"path": "aka", "bsonType": "string", "queries": {"queryType": "equality"}},
-            ]
-        }
-    }));
+    assert.commandWorked(
+        client.createEncryptionCollection("basic_qe", {
+            encryptedFields: {
+                "fields": [
+                    {"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}},
+                    {"path": "middle", "bsonType": "string"},
+                    {"path": "aka", "bsonType": "string", "queries": {"queryType": "equality"}},
+                ],
+            },
+        }),
+    );
 
     assertCollectionCounts(db, 1, 0);
 
@@ -51,16 +51,18 @@ function runTest(conn) {
             keyId: [defaultKeyId],
         },
         type: "object",
-        properties: {ssn: {encrypt: {bsonType: "string"}}}
+        properties: {ssn: {encrypt: {bsonType: "string"}}},
     };
 
     let edb = client.getDB();
 
     // In FLE 1, encrypted collections are defined by their jsonSchema validator.
-    assert.commandWorked(edb.runCommand({
-        create: "basic_csfle1",
-        validator: {$jsonSchema: schema},
-    }));
+    assert.commandWorked(
+        edb.runCommand({
+            create: "basic_csfle1",
+            validator: {$jsonSchema: schema},
+        }),
+    );
 
     // Check it is decremented
     //

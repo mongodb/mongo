@@ -24,7 +24,7 @@ function assertWriteVisible({cursor, opType, docKey}) {
 // over the ordering of events across the cluster.
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: false, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: false, periodicNoopIntervalSecs: 1}},
 });
 
 // Create two databases. We will place one of these on each shard.
@@ -33,12 +33,10 @@ const mongosDB1 = st.s.getDB(`${jsTestName()}_1`);
 const adminDB = st.s.getDB("admin");
 
 // Enable sharding on mongosDB0 and ensure its primary is shard0.
-assert.commandWorked(
-    mongosDB0.adminCommand({enableSharding: mongosDB0.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB0.adminCommand({enableSharding: mongosDB0.getName(), primaryShard: st.rs0.getURL()}));
 
 // Enable sharding on mongosDB1 and ensure its primary is shard1.
-assert.commandWorked(
-    mongosDB1.adminCommand({enableSharding: mongosDB1.getName(), primaryShard: st.rs1.getURL()}));
+assert.commandWorked(mongosDB1.adminCommand({enableSharding: mongosDB1.getName(), primaryShard: st.rs1.getURL()}));
 
 // Open a connection to a different collection on each shard. We use direct connections to
 // ensure that the oplog timestamps across the shards overlap.
@@ -51,8 +49,8 @@ const changeList = [];
 
 // Insert ten documents on each shard, alternating between the two collections.
 for (let i = 0; i < 20; ++i) {
-    const coll = (i % 2 ? coll1 : coll0);
-    assert.commandWorked(coll.insert({shard: (i % 2)}));
+    const coll = i % 2 ? coll1 : coll0;
+    assert.commandWorked(coll.insert({shard: i % 2}));
 }
 
 // Verify that each shard now has ten total documents present in the associated collection.
@@ -60,8 +58,7 @@ assert.eq(st.rs0.getPrimary().getCollection(coll0.getFullName()).count(), 10);
 assert.eq(st.rs1.getPrimary().getCollection(coll1.getFullName()).count(), 10);
 
 // Re-enable 'writePeriodicNoops' to ensure that all change stream events are returned.
-FixtureHelpers.runCommandOnEachPrimary(
-    {db: adminDB, cmdObj: {setParameter: 1, writePeriodicNoops: true}});
+FixtureHelpers.runCommandOnEachPrimary({db: adminDB, cmdObj: {setParameter: 1, writePeriodicNoops: true}});
 
 // Read the stream of events, capture them in 'changeList', and confirm that all events occurred
 // at or later than the clusterTime of the first event. Unfortunately, we cannot guarantee that
@@ -78,18 +75,19 @@ for (let event of changeList) {
 
 // Test that resuming from each event returns the expected set of subsequent documents.
 for (let i = 0; i < changeList.length; ++i) {
-    const resumeCursor = adminDB.aggregate(
-        [{$changeStream: {allChangesForCluster: true, resumeAfter: changeList[i]._id}}]);
+    const resumeCursor = adminDB.aggregate([
+        {$changeStream: {allChangesForCluster: true, resumeAfter: changeList[i]._id}},
+    ]);
 
     // Confirm that the first event in the resumed stream matches the next event recorded in
     // 'changeList' from the original stream. The order of the events should be stable across
     // resumes from any point.
-    for (let x = (i + 1); x < changeList.length; ++x) {
+    for (let x = i + 1; x < changeList.length; ++x) {
         const expectedChangeDoc = changeList[x];
         assertWriteVisible({
             cursor: resumeCursor,
             opType: expectedChangeDoc.operationType,
-            docKey: expectedChangeDoc.documentKey
+            docKey: expectedChangeDoc.documentKey,
         });
     }
     resumeCursor.close();

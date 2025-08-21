@@ -10,7 +10,7 @@ import {
     authCommandsLib,
     authErrCode,
     commandNotSupportedCode,
-    firstDbName
+    firstDbName,
 } from "jstests/auth/lib/commands_lib.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
@@ -39,7 +39,7 @@ export const roles = [
     {key: "restore", role: "restore", dbname: adminDbName},
     {key: "root", role: "root", dbname: adminDbName},
     {key: "searchCoordinator", role: "searchCoordinator", dbname: adminDbName},
-    {key: "__system", role: "__system", dbname: adminDbName}
+    {key: "__system", role: "__system", dbname: adminDbName},
 ];
 
 /**
@@ -62,35 +62,43 @@ function testProperAuthorization(conn, t, testcase, r) {
     assert(r.db.auth("user|" + r.key, "password"));
     authCommandsLib.authenticatedSetup(t, authDb);
     var command = t.command;
-    if (typeof (command) === "function") {
+    if (typeof command === "function") {
         command = t.command(state, testcase.commandArgs);
     }
     var cmdDb = authDb;
     if (t.hasOwnProperty("runOnDb")) {
-        assert.eq(typeof (t.runOnDb), "function");
+        assert.eq(typeof t.runOnDb, "function");
         cmdDb = authDb.getSiblingDB(t.runOnDb(state));
     }
     var res = cmdDb.runCommand(command);
 
     if (testcase.roles[r.key]) {
         if (res.ok == 0 && res.code == authErrCode) {
-            out = "expected authorization success" +
-                " but received " + tojson(res) + " on db " + testcase.runOnDb + " with role " +
+            out =
+                "expected authorization success" +
+                " but received " +
+                tojson(res) +
+                " on db " +
+                testcase.runOnDb +
+                " with role " +
                 r.key;
         } else if (res.ok == 0 && !testcase.expectFail && res.code != commandNotSupportedCode) {
             // don't error if the test failed with code commandNotSupported since
             // some storage engines don't support some commands.
-            out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb +
-                " with role " + r.key;
+            out = "command failed with " + tojson(res) + " on db " + testcase.runOnDb + " with role " + r.key;
         }
     } else {
         // Don't error if the test failed with CommandNotFound rather than an authorization failure
         // because some commands may be guarded by feature flags.
-        if (res.ok == 1 ||
-            (res.ok == 0 && res.code != authErrCode && res.code !== ErrorCodes.CommandNotFound)) {
-            out = "expected authorization failure" +
-                " but received result " + tojson(res) + " on db " + testcase.runOnDb +
-                " with role " + r.key;
+        if (res.ok == 1 || (res.ok == 0 && res.code != authErrCode && res.code !== ErrorCodes.CommandNotFound)) {
+            out =
+                "expected authorization failure" +
+                " but received result " +
+                tojson(res) +
+                " on db " +
+                testcase.runOnDb +
+                " with role " +
+                r.key;
         }
     }
 
@@ -110,10 +118,12 @@ export function runOneTest(conn, t) {
     // return EOF, that way all the hassle of setting it up can be avoided.
     let disableSearchFailpointShard, disableSearchFailpointRouter;
     if (t.disableSearch) {
-        disableSearchFailpointShard = configureFailPoint(conn.rs0 ? conn.rs0.getPrimary() : conn,
-                                                         'searchReturnEofImmediately');
+        disableSearchFailpointShard = configureFailPoint(
+            conn.rs0 ? conn.rs0.getPrimary() : conn,
+            "searchReturnEofImmediately",
+        );
         if (conn.s) {
-            disableSearchFailpointRouter = configureFailPoint(conn.s, 'searchReturnEofImmediately');
+            disableSearchFailpointRouter = configureFailPoint(conn.s, "searchReturnEofImmediately");
         }
     }
 

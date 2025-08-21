@@ -26,25 +26,31 @@ function loadData(conn, dbName, collName, coll) {
 
     const threads = [];
     for (let t = 0; t < kThreads; t++) {
-        let thread = new Thread(function(t, port, dbName, collName) {
-            const mongo = new Mongo('localhost:' + port);
-            const testDB = mongo.getDB(dbName);
-            const testColl = testDB.getCollection(collName);
+        let thread = new Thread(
+            function (t, port, dbName, collName) {
+                const mongo = new Mongo("localhost:" + port);
+                const testDB = mongo.getDB(dbName);
+                const testColl = testDB.getCollection(collName);
 
-            // This is a sufficient amount of data for WT::compact to run. If the data size is too
-            // small, WT::compact skips.
-            // This also needs to be large enough to pass the "available bytes" check in WT-11332.
-            const size = 4096;
-            const count = 25000;
-            const doc = {a: -1, x: 'x'.repeat(size), b: -1, t: t};
+                // This is a sufficient amount of data for WT::compact to run. If the data size is too
+                // small, WT::compact skips.
+                // This also needs to be large enough to pass the "available bytes" check in WT-11332.
+                const size = 4096;
+                const count = 25000;
+                const doc = {a: -1, x: "x".repeat(size), b: -1, t: t};
 
-            let bulkInsert = testColl.initializeUnorderedBulkOp();
-            for (var i = 0; i < count; ++i) {
-                bulkInsert.insert(doc);
-            }
-            jsTestLog("Committing inserts, t: " + t);
-            assert.commandWorked(bulkInsert.execute());
-        }, t, conn.port, dbName, collName);
+                let bulkInsert = testColl.initializeUnorderedBulkOp();
+                for (var i = 0; i < count; ++i) {
+                    bulkInsert.insert(doc);
+                }
+                jsTestLog("Committing inserts, t: " + t);
+                assert.commandWorked(bulkInsert.execute());
+            },
+            t,
+            conn.port,
+            dbName,
+            collName,
+        );
         threads.push(thread);
         thread.start();
     }
@@ -62,7 +68,7 @@ function loadData(conn, dbName, collName, coll) {
 }
 
 const dbName = jsTestName();
-const collName = 'testColl';
+const collName = "testColl";
 
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null);
@@ -83,9 +89,9 @@ try {
     let compactJoin = startParallelShell(() => {
         jsTestLog("Starting the compact command, which should stall on a failpoint...");
         assert.commandFailedWithCode(
-            db.getSiblingDB(TestData.dbName)
-                .runCommand({"compact": "testColl", "comment": TestData.comment}),
-            ErrorCodes.Interrupted);
+            db.getSiblingDB(TestData.dbName).runCommand({"compact": "testColl", "comment": TestData.comment}),
+            ErrorCodes.Interrupted,
+        );
     }, conn.port);
 
     jsTestLog("Waiting for the compact command to hit the failpoint...");
@@ -93,13 +99,11 @@ try {
 
     jsTestLog("Finding the compact command opId in order to call killOp...");
     let opId = null;
-    assert.soon(function() {
-        const ops = testDB.getSiblingDB("admin")
-                        .aggregate([
-                            {$currentOp: {allUsers: true}},
-                            {$match: {"command.comment": TestData.comment}}
-                        ])
-                        .toArray();
+    assert.soon(function () {
+        const ops = testDB
+            .getSiblingDB("admin")
+            .aggregate([{$currentOp: {allUsers: true}}, {$match: {"command.comment": TestData.comment}}])
+            .toArray();
         if (ops.length == 0) {
             return false;
         }
@@ -117,8 +121,7 @@ try {
     compactJoin();
 
     // Make sure that WT::compact did not skip because of too little data.
-    assert(
-        !checkLog.checkContainsOnce(testDB, "there is no useful work to do - skipping compaction"));
+    assert(!checkLog.checkContainsOnce(testDB, "there is no useful work to do - skipping compaction"));
 } finally {
     if (fpOn) {
         jsTestLog("Release the failpoint");

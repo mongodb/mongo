@@ -10,10 +10,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 1, keyFile: "jstests/libs/key1"});
 
-assert.commandFailedWithCode(st.s.adminCommand({
-    configureFailPoint: "throwClientDisconnectInSignLogicalTimeForExternalClients",
-    mode: {times: 1}
-}),
-                             ErrorCodes.ClientDisconnect);
+assert.commandFailedWithCode(
+    st.s.adminCommand({
+        configureFailPoint: "throwClientDisconnectInSignLogicalTimeForExternalClients",
+        mode: {times: 1},
+    }),
+    ErrorCodes.ClientDisconnect,
+);
 
 st.stop();

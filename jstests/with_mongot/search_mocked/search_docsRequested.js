@@ -13,11 +13,9 @@ import {
     getDefaultProtocolVersionForPlanShardedSearch,
     mockPlanShardedSearchResponse,
     mongotCommandForQuery,
-    MongotMock
+    MongotMock,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const collName = "search_docsrequested";
@@ -55,7 +53,7 @@ const foreignChunkBoundary = 3;
 
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 // All the documents that would be returned by the search query above.
@@ -63,7 +61,7 @@ let relevantDocs = [];
 let relevantSearchDocs = [];
 let relevantSearchDocsShard0 = [];
 let relevantSearchDocsShard1 = [];
-let searchScore = 0.300;
+let searchScore = 0.3;
 for (let i = 0; i < docs.length; i++) {
     if (docs[i]["title"].includes(searchQuery.query)) {
         relevantDocs.push(docs[i]);
@@ -103,7 +101,7 @@ function buildHistoryStandalone(coll, collUUID, extractedLimit, mongotConn) {
                     collName: collName,
                     db: dbName,
                     collectionUUID: collUUID,
-                    cursorOptions: {docsRequested: NumberInt(extractedLimit)}
+                    cursorOptions: {docsRequested: NumberInt(extractedLimit)},
                 }),
                 response: {
                     cursor: {
@@ -111,12 +109,11 @@ function buildHistoryStandalone(coll, collUUID, extractedLimit, mongotConn) {
                         ns: coll.getFullName(),
                         nextBatch: relevantSearchDocs.slice(0, mongotReturnedDocs),
                     },
-                    ok: 1
-                }
+                    ok: 1,
+                },
             },
         ];
-        assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
     }
 }
 
@@ -135,7 +132,7 @@ function buildHistoryShardedEnv(coll, collUUID, extractedLimit, stWithMock) {
                     db: dbName,
                     collectionUUID: collUUID,
                     protocolVersion: protocolVersion,
-                    cursorOptions: {docsRequested: NumberInt(extractedLimit)}
+                    cursorOptions: {docsRequested: NumberInt(extractedLimit)},
                 }),
                 response: {
                     cursors: [
@@ -146,7 +143,7 @@ function buildHistoryShardedEnv(coll, collUUID, extractedLimit, stWithMock) {
                                 ns: coll.getFullName(),
                                 nextBatch: relevantSearchDocsShard0.slice(0, mongotReturnedDocs),
                             },
-                            ok: 1
+                            ok: 1,
                         },
                         {
                             cursor: {
@@ -155,11 +152,10 @@ function buildHistoryShardedEnv(coll, collUUID, extractedLimit, stWithMock) {
                                 type: "meta",
                                 nextBatch: [{metaVal: 1}],
                             },
-                            ok: 1
-                        }
-                    ]
-
-                }
+                            ok: 1,
+                        },
+                    ],
+                },
             },
         ];
         const s0Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs0.getPrimary());
@@ -174,7 +170,7 @@ function buildHistoryShardedEnv(coll, collUUID, extractedLimit, stWithMock) {
                     db: dbName,
                     collectionUUID: collUUID,
                     protocolVersion: protocolVersion,
-                    cursorOptions: {docsRequested: NumberInt(extractedLimit)}
+                    cursorOptions: {docsRequested: NumberInt(extractedLimit)},
                 }),
                 response: {
                     cursors: [
@@ -185,7 +181,7 @@ function buildHistoryShardedEnv(coll, collUUID, extractedLimit, stWithMock) {
                                 ns: coll.getFullName(),
                                 nextBatch: relevantSearchDocsShard1.slice(0, mongotReturnedDocs),
                             },
-                            ok: 1
+                            ok: 1,
                         },
                         {
                             cursor: {
@@ -194,22 +190,20 @@ function buildHistoryShardedEnv(coll, collUUID, extractedLimit, stWithMock) {
                                 type: "meta",
                                 nextBatch: [{metaVal: 2}],
                             },
-                            ok: 1
-                        }
-                    ]
-                }
+                            ok: 1,
+                        },
+                    ],
+                },
             },
         ];
         const s1Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs1.getPrimary());
         s1Mongot.setMockResponses(history1, cursorId, metaId);
 
-        mockPlanShardedSearchResponse(
-            collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
+        mockPlanShardedSearchResponse(collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
     }
 }
 
-function runAndAssert(
-    pipeline, extractedLimit, expectedResults, coll, collUUID, standaloneConn, stConn) {
+function runAndAssert(pipeline, extractedLimit, expectedResults, coll, collUUID, standaloneConn, stConn) {
     // Only one of standaloneConn and stConn can be non-null.
     if (standaloneConn != null) {
         assert(stConn == null);
@@ -247,14 +241,13 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                         nextBatch: [
                             {_id: 15, $searchScore: 0.789},
                             {_id: 16, $searchScore: 0.123},
-                        ]
+                        ],
                     },
-                    ok: 1
-                }
+                    ok: 1,
+                },
             },
         ];
-        assert.commandWorked(
-            mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+        assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
     } else {
         assert(mongotConn == null);
         const metaId = NumberLong(2);
@@ -266,7 +259,7 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                     collectionUUID: collUUID,
                     query: searchQuery,
                     $db: dbName,
-                    intermediate: protocolVersion
+                    intermediate: protocolVersion,
                 },
                 response: {
                     cursors: [
@@ -277,7 +270,7 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                                 ns: coll.getFullName(),
                                 nextBatch: [],
                             },
-                            ok: 1
+                            ok: 1,
                         },
                         {
                             cursor: {
@@ -286,10 +279,10 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                                 type: "meta",
                                 nextBatch: [{metaVal: 1}],
                             },
-                            ok: 1
-                        }
-                    ]
-                }
+                            ok: 1,
+                        },
+                    ],
+                },
             },
         ];
         const s0Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs0.getPrimary());
@@ -303,7 +296,7 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                     collectionUUID: collUUID,
                     query: searchQuery,
                     $db: dbName,
-                    intermediate: protocolVersion
+                    intermediate: protocolVersion,
                 },
                 response: {
                     cursors: [
@@ -315,9 +308,9 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                                 nextBatch: [
                                     {_id: 15, $searchScore: 0.789},
                                     {_id: 16, $searchScore: 0.123},
-                                ]
+                                ],
                             },
-                            ok: 1
+                            ok: 1,
                         },
                         {
                             cursor: {
@@ -326,22 +319,19 @@ function expectNoDocsRequestedInCommand(coll, collUUID, mongotConn, stWithMock) 
                                 type: "meta",
                                 nextBatch: [{metaVal: 1}],
                             },
-                            ok: 1
-                        }
-                    ]
-                }
+                            ok: 1,
+                        },
+                    ],
+                },
             },
         ];
         const s1Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs1.getPrimary());
         s1Mongot.setMockResponses(history1, cursorId, metaId);
 
-        mockPlanShardedSearchResponse(
-            collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
+        mockPlanShardedSearchResponse(collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
     }
     let cursor = coll.aggregate(pipeline);
-    const expected = [
-        {"_id": 15, "title": "cakes and more cakes"},
-    ];
+    const expected = [{"_id": 15, "title": "cakes and more cakes"}];
     assert.eq(expected, cursor.toArray());
 }
 
@@ -351,8 +341,7 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
     let limit = 3;
     let mongotReturnedDocs = calcNumDocsMongotShouldReturn(limit);
 
-    let pipeline =
-        [{$search: searchQuery}, {$limit: limit}, {$project: {_id: 1, meta: "$$SEARCH_META"}}];
+    let pipeline = [{$search: searchQuery}, {$limit: limit}, {$project: {_id: 1, meta: "$$SEARCH_META"}}];
     let expected = relevantDocs.slice(0, limit);
     // Modify the expected documents to reflect the $project stage in the pipeline.
     for (let i = 0; i < expected.length; i++) {
@@ -371,7 +360,7 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
                     db: dbName,
                     collectionUUID: collUUID,
                     protocolVersion: protocolVersion,
-                    cursorOptions: {docsRequested: NumberInt(limit)}
+                    cursorOptions: {docsRequested: NumberInt(limit)},
                 }),
                 response: {
                     ok: 1,
@@ -381,9 +370,9 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
                                 id: NumberLong(0),
                                 type: "results",
                                 ns: coll.getFullName(),
-                                nextBatch: relevantSearchDocsShard0.slice(0, mongotReturnedDocs)
+                                nextBatch: relevantSearchDocsShard0.slice(0, mongotReturnedDocs),
                             },
-                            ok: 1
+                            ok: 1,
                         },
                         {
                             cursor: {
@@ -392,10 +381,10 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
                                 type: "meta",
                                 nextBatch: [{value: 0}],
                             },
-                            ok: 1
-                        }
-                    ]
-                }
+                            ok: 1,
+                        },
+                    ],
+                },
             },
         ];
         const mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
@@ -414,7 +403,7 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
                     db: dbName,
                     collectionUUID: collUUID,
                     protocolVersion: protocolVersion,
-                    cursorOptions: {docsRequested: NumberInt(limit)}
+                    cursorOptions: {docsRequested: NumberInt(limit)},
                 }),
                 response: {
                     ok: 1,
@@ -424,10 +413,9 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
                                 id: NumberLong(0),
                                 type: "results",
                                 ns: coll.getFullName(),
-                                nextBatch: relevantSearchDocsShard1.slice(0, mongotReturnedDocs)
-
+                                nextBatch: relevantSearchDocsShard1.slice(0, mongotReturnedDocs),
                             },
-                            ok: 1
+                            ok: 1,
                         },
                         {
                             cursor: {
@@ -436,10 +424,10 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
                                 type: "meta",
                                 nextBatch: [{value: 0}],
                             },
-                            ok: 1
-                        }
-                    ]
-                }
+                            ok: 1,
+                        },
+                    ],
+                },
             },
         ];
         const mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
@@ -448,21 +436,23 @@ function searchMetaAfterLimit(coll, collUUID, stWithMock) {
 
     // Set history for mongos.
     {
-        const mergingPipelineHistory = [{
-            expectedCommand: {
-                planShardedSearch: collName,
-                query: searchQuery,
-                $db: dbName,
-                searchFeatures: {shardedSort: 1}
+        const mergingPipelineHistory = [
+            {
+                expectedCommand: {
+                    planShardedSearch: collName,
+                    query: searchQuery,
+                    $db: dbName,
+                    searchFeatures: {shardedSort: 1},
+                },
+                response: {
+                    ok: 1,
+                    protocolVersion: NumberInt(1),
+                    // This does not represent an actual merging pipeline. The merging pipeline is
+                    // arbitrary, it just must only generate one document.
+                    metaPipeline: [{$limit: 1}],
+                },
             },
-            response: {
-                ok: 1,
-                protocolVersion: NumberInt(1),
-                // This does not represent an actual merging pipeline. The merging pipeline is
-                // arbitrary, it just must only generate one document.
-                metaPipeline: [{$limit: 1}]
-            }
-        }];
+        ];
         const mongot = stWithMock.getMockConnectedToHost(stWithMock.st.s);
         mongot.setMockResponses(mergingPipelineHistory, 1);
     }
@@ -491,7 +481,7 @@ function buildHistorySearchWithinLookupStandalone(db, mongotConn, searchLookupQu
                         id: NumberLong(0),
                         ns: foreignColl.getFullName(),
                         nextBatch: [
-                            {"_id": 1, "$searchScore": 0.300},
+                            {"_id": 1, "$searchScore": 0.3},
                             {"_id": 2, "$searchScore": 0.299},
                             {"_id": 3, "$searchScore": 0.298},
                             {"_id": 4, "$searchScore": 0.297},
@@ -501,13 +491,14 @@ function buildHistorySearchWithinLookupStandalone(db, mongotConn, searchLookupQu
                             // that satisfy the query so we return those 4).
                         ],
                     },
-                    ok: 1
-                }
+                    ok: 1,
+                },
             },
         ];
         // Only one response is needed, as $lookup executes $search once and caches the response.
-        assert.commandWorked(mongotConn.adminCommand(
-            {setMockResponses: 1, cursorId: NumberLong(123), history: history}));
+        assert.commandWorked(
+            mongotConn.adminCommand({setMockResponses: 1, cursorId: NumberLong(123), history: history}),
+        );
     }
 }
 
@@ -516,22 +507,22 @@ function buildHistorySearchWithinLookupShardedEnv(db, stWithMock, searchLookupQu
 
     let foreignColl = db.getCollection(foreignCollName);
     assert.commandWorked(foreignColl.insertMany(foreignCollectionDocs));
-    let foreignCollUUID =
-        getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), foreignCollName);
+    let foreignCollUUID = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), foreignCollName);
 
     // Shard the foreign collection for the $lookup test and move the higher chunk to shard1.
-    st.shardColl(
-        foreignColl, {_id: 1}, {_id: foreignChunkBoundary}, {_id: foreignChunkBoundary + 1});
+    st.shardColl(foreignColl, {_id: 1}, {_id: foreignChunkBoundary}, {_id: foreignChunkBoundary + 1});
 
-    const planShardedSearchHistory = [{
-        expectedCommand: {
-            planShardedSearch: foreignCollName,
-            query: searchLookupQuery,
-            $db: dbName,
-            searchFeatures: {shardedSort: 1}
+    const planShardedSearchHistory = [
+        {
+            expectedCommand: {
+                planShardedSearch: foreignCollName,
+                query: searchLookupQuery,
+                $db: dbName,
+                searchFeatures: {shardedSort: 1},
+            },
+            response: {ok: 1, protocolVersion: NumberInt(1), metaPipeline: [{$limit: 1}]},
         },
-        response: {ok: 1, protocolVersion: NumberInt(1), metaPipeline: [{$limit: 1}]}
-    }];
+    ];
 
     function history(cursorId, docsToReturn) {
         // We will set mongotmock to return 2 of the documents given in the first batch, and the
@@ -547,7 +538,7 @@ function buildHistorySearchWithinLookupShardedEnv(db, stWithMock, searchLookupQu
                     query: searchLookupQuery,
                     $db: dbName,
                     cursorOptions: {docsRequested: numBerries},
-                    intermediate: protocolVersion
+                    intermediate: protocolVersion,
                 },
                 response: {
                     cursors: [
@@ -558,7 +549,7 @@ function buildHistorySearchWithinLookupShardedEnv(db, stWithMock, searchLookupQu
                                 ns: foreignColl.getFullName(),
                                 nextBatch: docsToReturn.slice(0, 2),
                             },
-                            ok: 1
+                            ok: 1,
                         },
                         {
                             cursor: {
@@ -567,16 +558,16 @@ function buildHistorySearchWithinLookupShardedEnv(db, stWithMock, searchLookupQu
                                 type: "meta",
                                 nextBatch: [{metaVal: 1}],
                             },
-                            ok: 1
-                        }
-                    ]
-                }
+                            ok: 1,
+                        },
+                    ],
+                },
             },
             {
                 expectedCommand: {
                     getMore: NumberLong(cursorId),
                     collection: foreignCollName,
-                    cursorOptions: {docsRequested: numBerries - docsInFirstBatch}
+                    cursorOptions: {docsRequested: numBerries - docsInFirstBatch},
                 },
                 response: {
                     cursor: {
@@ -584,10 +575,9 @@ function buildHistorySearchWithinLookupShardedEnv(db, stWithMock, searchLookupQu
                         ns: foreignColl.getFullName(),
                         nextBatch: docsToReturn.slice(2),
                     },
-                    ok: 1
-                }
+                    ok: 1,
+                },
             },
-
         ];
     }
 
@@ -614,14 +604,22 @@ function buildHistorySearchWithinLookupShardedEnv(db, stWithMock, searchLookupQu
     // other shard. Only occurs once per shard as $search is executed once and cached.
     for (let i = 0; i < 2; i++) {
         s0Mongot.setMockResponses(
-            history(cursorId, [{_id: 1, $searchScore: 0.3}, {_id: 2, $searchScore: 0.299}]),
+            history(cursorId, [
+                {_id: 1, $searchScore: 0.3},
+                {_id: 2, $searchScore: 0.299},
+            ]),
             NumberLong(cursorId++),
-            NumberLong(metaId++));
+            NumberLong(metaId++),
+        );
 
         s1Mongot.setMockResponses(
-            history(cursorId, [{_id: 3, $searchScore: 0.298}, {_id: 4, $searchScore: 0.297}]),
+            history(cursorId, [
+                {_id: 3, $searchScore: 0.298},
+                {_id: 4, $searchScore: 0.297},
+            ]),
             NumberLong(cursorId++),
-            NumberLong(metaId++));
+            NumberLong(metaId++),
+        );
     }
 
     stWithMock.getMockConnectedToHost(stWithMock.st.rs0.getPrimary()).disableOrderCheck();
@@ -652,15 +650,15 @@ function testSearchWithinLookup(db, coll, mongotConn, stWithMock) {
                     {$search: searchLookupQuery},
                     {$limit: numBerries},
                     {$group: {_id: null, berries: {$addToSet: "$fruit"}}},
-                    {$project: {_id: 0}}
+                    {$project: {_id: 0}},
                 ],
-                as: "three_berries"
-            }
+                as: "three_berries",
+            },
         },
         {$unwind: {path: "$three_berries"}},
         {$unwind: {path: "$three_berries.berries"}},
         {$match: {$expr: {$ne: [{$indexOfCP: ["$title", "$three_berries.berries"]}, -1]}}},
-        {$project: {_id: 0, title: 1}}
+        {$project: {_id: 0, title: 1}},
     ];
 
     // Exactly one of mongotConn and stWithMock is expected to be null.
@@ -708,7 +706,7 @@ function getMoreCaseBuildHistoryStandalone(coll, collUUID, mongotConn, limitVal,
                 collName: collName,
                 db: dbName,
                 collectionUUID: collUUID,
-                cursorOptions: {docsRequested: NumberInt(limitVal)}
+                cursorOptions: {docsRequested: NumberInt(limitVal)},
             }),
             response: {
                 cursor: {
@@ -716,12 +714,11 @@ function getMoreCaseBuildHistoryStandalone(coll, collUUID, mongotConn, limitVal,
                     ns: coll.getFullName(),
                     nextBatch: batch1,
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
         {
-            expectedCommand:
-                {getMore: cursorId, collection: coll.getName(), cursorOptions: {docsRequested: 5}},
+            expectedCommand: {getMore: cursorId, collection: coll.getName(), cursorOptions: {docsRequested: 5}},
             response: {
                 ok: 1,
                 cursor: {
@@ -729,11 +726,10 @@ function getMoreCaseBuildHistoryStandalone(coll, collUUID, mongotConn, limitVal,
                     ns: coll.getFullName(),
                     nextBatch: batch2,
                 },
-            }
+            },
         },
         {
-            expectedCommand:
-                {getMore: cursorId, collection: coll.getName(), cursorOptions: {docsRequested: 5}},
+            expectedCommand: {getMore: cursorId, collection: coll.getName(), cursorOptions: {docsRequested: 5}},
             response: {
                 ok: 1,
                 cursor: {
@@ -741,23 +737,21 @@ function getMoreCaseBuildHistoryStandalone(coll, collUUID, mongotConn, limitVal,
                     ns: coll.getFullName(),
                     nextBatch: batch3,
                 },
-            }
+            },
         },
         {
-            expectedCommand:
-                {getMore: cursorId, collection: coll.getName(), cursorOptions: {docsRequested: 4}},
+            expectedCommand: {getMore: cursorId, collection: coll.getName(), cursorOptions: {docsRequested: 4}},
             response: {
                 ok: 1,
                 cursor: {
-                    id: NumberLong(0),  // We have exhausted the cursor.
+                    id: NumberLong(0), // We have exhausted the cursor.
                     ns: coll.getFullName(),
                     nextBatch: batch4,
                 },
-            }
+            },
         },
     ];
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal, orphanDocs) {
@@ -799,7 +793,7 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                 db: dbName,
                 collectionUUID: collUUID,
                 protocolVersion: protocolVersion,
-                cursorOptions: {docsRequested: limitVal}
+                cursorOptions: {docsRequested: limitVal},
             }),
             response: {
                 cursors: [
@@ -810,7 +804,7 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                             ns: coll.getFullName(),
                             nextBatch: batch1shard0,
                         },
-                        ok: 1
+                        ok: 1,
                     },
                     {
                         cursor: {
@@ -819,16 +813,16 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                             type: "meta",
                             nextBatch: [{metaVal: 1}],
                         },
-                        ok: 1
-                    }
-                ]
-            }
+                        ok: 1,
+                    },
+                ],
+            },
         },
         {
             expectedCommand: {
                 getMore: cursorId,
                 collection: coll.getName(),
-                cursorOptions: {docsRequested: docsRequestedShard0}
+                cursorOptions: {docsRequested: docsRequestedShard0},
             },
             response: {
                 ok: 1,
@@ -837,13 +831,13 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                     ns: coll.getFullName(),
                     nextBatch: batch2shard0,
                 },
-            }
+            },
         },
         {
             expectedCommand: {
                 getMore: cursorId,
                 collection: coll.getName(),
-                cursorOptions: {docsRequested: docsRequestedShard0}
+                cursorOptions: {docsRequested: docsRequestedShard0},
             },
             response: {
                 ok: 1,
@@ -852,7 +846,7 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                     ns: coll.getFullName(),
                     nextBatch: batch3shard0,
                 },
-            }
+            },
         },
         {
             expectedCommand: {
@@ -860,16 +854,16 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                 collection: coll.getName(),
                 // Since the previous batch returned no documents for this shard, this docsRequested
                 // value will be the same as the previous.
-                cursorOptions: {docsRequested: docsRequestedShard0}
+                cursorOptions: {docsRequested: docsRequestedShard0},
             },
             response: {
                 ok: 1,
                 cursor: {
-                    id: NumberLong(0),  // We have exhausted the cursor.
+                    id: NumberLong(0), // We have exhausted the cursor.
                     ns: coll.getFullName(),
                     nextBatch: batch4shard0,
                 },
-            }
+            },
         },
     ];
     const s0Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs0.getPrimary());
@@ -884,7 +878,7 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                 db: dbName,
                 collectionUUID: collUUID,
                 protocolVersion: protocolVersion,
-                cursorOptions: {docsRequested: NumberInt(limitVal)}
+                cursorOptions: {docsRequested: NumberInt(limitVal)},
             }),
             response: {
                 cursors: [
@@ -895,7 +889,7 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                             ns: coll.getFullName(),
                             nextBatch: batch1shard1,
                         },
-                        ok: 1
+                        ok: 1,
                     },
                     {
                         cursor: {
@@ -904,17 +898,16 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                             type: "meta",
                             nextBatch: [{metaVal: 1}],
                         },
-                        ok: 1
-                    }
-                ]
-
-            }
+                        ok: 1,
+                    },
+                ],
+            },
         },
         {
             expectedCommand: {
                 getMore: cursorId,
                 collection: coll.getName(),
-                cursorOptions: {docsRequested: docsRequestedShard1}
+                cursorOptions: {docsRequested: docsRequestedShard1},
             },
             response: {
                 ok: 1,
@@ -923,13 +916,13 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                     ns: coll.getFullName(),
                     nextBatch: batch2shard1,
                 },
-            }
+            },
         },
         {
             expectedCommand: {
                 getMore: cursorId,
                 collection: coll.getName(),
-                cursorOptions: {docsRequested: docsRequestedShard1}
+                cursorOptions: {docsRequested: docsRequestedShard1},
             },
             response: {
                 ok: 1,
@@ -938,7 +931,7 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                     ns: coll.getFullName(),
                     nextBatch: batch3shard1,
                 },
-            }
+            },
         },
         {
             expectedCommand: {
@@ -946,23 +939,22 @@ function getMoreCaseBuildHistoryShardedEnv(coll, collUUID, stWithMock, limitVal,
                 collection: coll.getName(),
                 // Since the previous batch returned one valid document for this shard, this
                 // docsRequested value will be one less than the previous.
-                cursorOptions: {docsRequested: docsRequestedShard1 - 1}
+                cursorOptions: {docsRequested: docsRequestedShard1 - 1},
             },
             response: {
                 ok: 1,
                 cursor: {
-                    id: NumberLong(0),  // We have exhausted the cursor.
+                    id: NumberLong(0), // We have exhausted the cursor.
                     ns: coll.getFullName(),
                     nextBatch: batch4shard1,
                 },
-            }
+            },
         },
     ];
     const s1Mongot = stWithMock.getMockConnectedToHost(stWithMock.st.rs1.getPrimary());
     s1Mongot.setMockResponses(history1, cursorId, metaId);
 
-    mockPlanShardedSearchResponse(
-        collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(collName, searchQuery, dbName, undefined /*sortSpec*/, stWithMock);
 }
 
 // Perform a $search query where a getMore is required.
@@ -1004,33 +996,20 @@ function runTest(db, collUUID, standaloneConn, stConn) {
         pipeline = [{$search: searchQuery}, {$skip: skipVal}, {$limit: limitVal}];
         // The extracted limit here comes from the sum of the limit and skip values in the pipeline.
         expected = relevantDocs.slice(skipVal).slice(0, limitVal);
-        runAndAssert(
-            pipeline, limitVal + skipVal, expected, coll, collUUID, standaloneConn, stConn);
+        runAndAssert(pipeline, limitVal + skipVal, expected, coll, collUUID, standaloneConn, stConn);
 
         // Perform a $search query with multiple limit stages.
         pipeline = [{$search: searchQuery}, {$limit: limitVal}, {$limit: otherLimitVal}];
         // The extracted limit here comes from the minimum of the two limit values in the pipeline.
         expected = relevantDocs.slice(0, Math.min(limitVal, otherLimitVal));
-        runAndAssert(pipeline,
-                     Math.min(limitVal, otherLimitVal),
-                     expected,
-                     coll,
-                     collUUID,
-                     standaloneConn,
-                     stConn);
+        runAndAssert(pipeline, Math.min(limitVal, otherLimitVal), expected, coll, collUUID, standaloneConn, stConn);
 
         // Perform a $search query with a limit and multiple skip stages.
         pipeline = [{$search: searchQuery}, {$skip: skipVal}, {$skip: skipVal}, {$limit: limitVal}];
         // The extracted limit here comes from the value of the limit plus the values of the two
         // skip stages in the pipeline.
         expected = relevantDocs.slice(skipVal + skipVal).slice(0, limitVal);
-        runAndAssert(pipeline,
-                     skipVal + skipVal + limitVal,
-                     expected,
-                     coll,
-                     collUUID,
-                     standaloneConn,
-                     stConn);
+        runAndAssert(pipeline, skipVal + skipVal + limitVal, expected, coll, collUUID, standaloneConn, stConn);
 
         // Perform a $search query with multiple limit stages and multiple skip stages.
         pipeline = [
@@ -1038,19 +1017,20 @@ function runTest(db, collUUID, standaloneConn, stConn) {
             {$skip: skipVal},
             {$skip: skipVal},
             {$limit: limitVal},
-            {$limit: otherLimitVal}
+            {$limit: otherLimitVal},
         ];
         // The extracted limit here comes from the minimum of the two limit values plus the values
         // of the two skip stages in the pipeline.
-        expected =
-            relevantDocs.slice(skipVal + skipVal).slice(0, Math.min(limitVal, otherLimitVal));
-        runAndAssert(pipeline,
-                     skipVal + skipVal + Math.min(limitVal, otherLimitVal),
-                     expected,
-                     coll,
-                     collUUID,
-                     standaloneConn,
-                     stConn);
+        expected = relevantDocs.slice(skipVal + skipVal).slice(0, Math.min(limitVal, otherLimitVal));
+        runAndAssert(
+            pipeline,
+            skipVal + skipVal + Math.min(limitVal, otherLimitVal),
+            expected,
+            coll,
+            collUUID,
+            standaloneConn,
+            stConn,
+        );
     }
 
     // Run the search queries with limit and skip values such that mongod will extract a user limit
@@ -1066,8 +1046,7 @@ function runTest(db, collUUID, standaloneConn, stConn) {
     expectNoDocsRequestedInCommand(coll, collUUID, standaloneConn, stConn);
 
     // SERVER-80648 $search in SBE doesn't support the batch size optimization, so skip the tests.
-    if (!(checkSbeRestrictedOrFullyEnabled(db) &&
-          FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchInSbe'))) {
+    if (!(checkSbeRestrictedOrFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchInSbe"))) {
         // Tests that getMore has a correct cursorOptions field.
         getMoreCase(coll, collUUID, standaloneConn, stConn);
 
@@ -1087,7 +1066,7 @@ function setupAndRunTestStandalone() {
     const mongotConn = mongotmock.getConnection();
     const conn = MongoRunner.runMongod({setParameter: {mongotHost: mongotConn.host}});
     let db = conn.getDB(dbName);
-    if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchBatchSizeTuning')) {
+    if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchBatchSizeTuning")) {
         jsTestLog("Skipping the test because it only applies when batchSize isn't enabled.");
     } else {
         let coll = db.getCollection(collName);
@@ -1112,17 +1091,16 @@ function setupAndRunTestShardedEnv() {
         mongos: 1,
         other: {
             rsOptions: {setParameter: {enableTestCommands: 1}},
-        }
+        },
     });
     stWithMock.start();
     let st = stWithMock.st;
     let mongos = st.s;
     let db = mongos.getDB(dbName);
-    if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchBatchSizeTuning')) {
+    if (FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "SearchBatchSizeTuning")) {
         jsTestLog("Skipping the test because it only applies when batchSize isn't enabled.");
     } else {
-        assert.commandWorked(mongos.getDB("admin").runCommand(
-            {enableSharding: dbName, primaryShard: st.shard0.name}));
+        assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
         let coll = db.getCollection(collName);
 

@@ -13,7 +13,7 @@
  * ]
  */
 
-export const $config = (function() {
+export const $config = (function () {
     const threadCount = 20;
     // These buckets are not deleted during the test.
     const initialBucketCount = 500;
@@ -25,27 +25,27 @@ export const $config = (function() {
         metaFieldName: "meta",
         thisThreadKey: "meta.thread",
 
-        getSideCollectionName: function() {
+        getSideCollectionName: function () {
             return "side_" + jsTestName();
         },
 
-        getMainCollection: function(db) {
+        getMainCollection: function (db) {
             return db.getCollection(jsTestName());
         },
 
-        getSideCollection: function(db) {
+        getSideCollection: function (db) {
             return db.getCollection(this.getSideCollectionName());
         },
 
         nextMetaFieldCounter: 0,
-        getNextMetaField: function() {
+        getNextMetaField: function () {
             return {
                 nextMetaFieldCounter: this.nextMetaFieldCounter++,
                 thread: this.tid,
             };
         },
 
-        getNewBucket: function(db) {
+        getNewBucket: function (db) {
             const sideCollection = this.getSideCollection(db);
             const meta = this.getNextMetaField();
             sideCollection.insert({
@@ -53,8 +53,7 @@ export const $config = (function() {
                 [this.metaFieldName]: meta,
                 data: Random.rand(),
             });
-            return sideCollection.findOne(
-                {[this.metaFieldName]: meta}, null, null, null, null, true /* rawData */);
+            return sideCollection.findOne({[this.metaFieldName]: meta}, null, null, null, null, true /* rawData */);
         },
     };
 
@@ -94,10 +93,12 @@ export const $config = (function() {
 
         deleteOne: function deleteOne(db, collName) {
             const coll = this.getMainCollection(db);
-            const res = coll.deleteOne({
-                [this.thisThreadKey]: this.tid,
-            },
-                                       {rawData: true});
+            const res = coll.deleteOne(
+                {
+                    [this.thisThreadKey]: this.tid,
+                },
+                {rawData: true},
+            );
             assert.commandWorked(res);
             this.addedBucketCount -= res.deletedCount;
         },
@@ -105,22 +106,22 @@ export const $config = (function() {
         count: function count(db, collName) {
             const coll = this.getMainCollection(db);
             const count = coll.count({[this.thisThreadKey]: this.tid}, {rawData: true});
-            assert.eq(count,
-                      this.addedBucketCount,
-                      `T${this.tid} - count - expected ${this.addedBucketCount}, got ${count}`);
+            assert.eq(
+                count,
+                this.addedBucketCount,
+                `T${this.tid} - count - expected ${this.addedBucketCount}, got ${count}`,
+            );
         },
 
         aggregate: function aggregate(db, collName) {
             const coll = this.getMainCollection(db);
-            const agg = coll.aggregate(
-                [
-                    {$match: {[this.thisThreadKey]: this.tid}},
-                ],
-                {rawData: true});
-            assert.eq(agg.toArray().length,
-                      this.addedBucketCount,
-                      `T${this.tid} - Expected ${this.addedBucketCount} buckets, got:
-                          ${tojson(this.getMainCollection(db).find().rawData().toArray())}`);
+            const agg = coll.aggregate([{$match: {[this.thisThreadKey]: this.tid}}], {rawData: true});
+            assert.eq(
+                agg.toArray().length,
+                this.addedBucketCount,
+                `T${this.tid} - Expected ${this.addedBucketCount} buckets, got:
+                          ${tojson(this.getMainCollection(db).find().rawData().toArray())}`,
+            );
         },
 
         distinct: function distinct(db, collName) {
@@ -129,35 +130,43 @@ export const $config = (function() {
             // threads, it's possible that some threads have transiently deleted all of their
             // buckets, so we can only place an upper bound.
             const numNonSeedBuckets = coll.distinct(this.thisThreadKey, {}, {rawData: true}).length;
-            assert.lte(numNonSeedBuckets,
-                       threadCount,
-                       `T${this.tid} - Expected at most ${
-                           threadCount} distinct non-seed meta fields, got ${numNonSeedBuckets}`);
+            assert.lte(
+                numNonSeedBuckets,
+                threadCount,
+                `T${this.tid} - Expected at most ${
+                    threadCount
+                } distinct non-seed meta fields, got ${numNonSeedBuckets}`,
+            );
 
             const numBuckets = coll.distinct("control", {}, {rawData: true}).length;
-            assert.gte(numBuckets,
-                       initialBucketCount,
-                       `T${this.tid} - Expected at least ${
-                           initialBucketCount} distinct bucket document, got ${numBuckets}`);
+            assert.gte(
+                numBuckets,
+                initialBucketCount,
+                `T${this.tid} - Expected at least ${initialBucketCount} distinct bucket document, got ${numBuckets}`,
+            );
         },
     };
 
     function setup(db, collName, cluster) {
         // This collection is for generating buckets to be inserted into the main collection.
-        assert.commandWorked(db.createCollection(this.getSideCollectionName(), {
-            timeseries: {
-                timeField: this.timeFieldName,
-                metaField: this.metaFieldName,
-            }
-        }));
+        assert.commandWorked(
+            db.createCollection(this.getSideCollectionName(), {
+                timeseries: {
+                    timeField: this.timeFieldName,
+                    metaField: this.metaFieldName,
+                },
+            }),
+        );
 
         // This collection is for the FSM test.
-        assert.commandWorked(db.createCollection(jsTestName(), {
-            timeseries: {
-                timeField: this.timeFieldName,
-                metaField: this.metaFieldName,
-            }
-        }));
+        assert.commandWorked(
+            db.createCollection(jsTestName(), {
+                timeseries: {
+                    timeField: this.timeFieldName,
+                    metaField: this.metaFieldName,
+                },
+            }),
+        );
 
         const bulk = this.getMainCollection(db).initializeOrderedBulkOp();
 
@@ -169,7 +178,7 @@ export const $config = (function() {
             });
         }
         assert.commandWorked(bulk.execute());
-    };
+    }
 
     function teardown(db, collName, cluster) {
         const coll = this.getMainCollection(db);
@@ -178,7 +187,7 @@ export const $config = (function() {
         for (let bucket of buckets) {
             assert.eq(bucket.control.count, 1);
         }
-    };
+    }
 
     const standardTransition = {
         findInitial: 1,

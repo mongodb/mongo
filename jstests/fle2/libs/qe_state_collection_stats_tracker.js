@@ -56,10 +56,9 @@ export class QEStateCollectionStatsTracker {
      * @param {string} keys list of field names that were compacted
      */
     updateStatsPostCompactForFields(...keys) {
-        keys.forEach(key => {
+        keys.forEach((key) => {
             if (!this.fieldStats.hasOwnProperty(key)) {
-                print("Skipping field " + key +
-                      " in updateStatsPostCompact because it is not tracked");
+                print("Skipping field " + key + " in updateStatsPostCompact because it is not tracked");
                 return;
             }
             const field = this.fieldStats[key];
@@ -89,10 +88,9 @@ export class QEStateCollectionStatsTracker {
      * @param {string} keys list of field names that were compacted
      */
     updateStatsPostCleanupForFields(...keys) {
-        keys.forEach(key => {
+        keys.forEach((key) => {
             if (!this.fieldStats.hasOwnProperty(key)) {
-                print("Skipping field " + key +
-                      " in updateStatsPostCleanup because it is not tracked");
+                print("Skipping field " + key + " in updateStatsPostCleanup because it is not tracked");
                 return;
             }
             const field = this.fieldStats[key];
@@ -117,32 +115,32 @@ export class QEStateCollectionStatsTracker {
      */
     calculateTotalStatsForFields(...keys) {
         const totals = {
-            esc: 0,                   // # of ESC entries
-            escNonAnchors: 0,         // # of ESC non-anchors
-            escAnchors: 0,            // # of ESC anchors
-            escNullAnchors: 0,        // # of ESC null anchors
-            escDeletableAnchors: 0,   // # of ESC anchors that may be deleted in the next cleanup
-            escFutureNullAnchors: 0,  // # of null anchors that may be inserted in the next cleanup
-            ecoc: 0,                  // # of ECOC entries
-            ecocUnique: 0,            // # of ECOC entries that are unique
-            new: 0,                   // # of new values
+            esc: 0, // # of ESC entries
+            escNonAnchors: 0, // # of ESC non-anchors
+            escAnchors: 0, // # of ESC anchors
+            escNullAnchors: 0, // # of ESC null anchors
+            escDeletableAnchors: 0, // # of ESC anchors that may be deleted in the next cleanup
+            escFutureNullAnchors: 0, // # of null anchors that may be inserted in the next cleanup
+            ecoc: 0, // # of ECOC entries
+            ecocUnique: 0, // # of ECOC entries that are unique
+            new: 0, // # of new values
         };
-        keys.forEach(key => {
+        keys.forEach((key) => {
             if (!this.fieldStats.hasOwnProperty(key)) {
                 print("Skipping field " + key + " in stats aggregation because it is not tracked");
                 return;
             }
             const field = this.fieldStats[key];
             Object.entries(field).forEach(([value, stats]) => {
-                totals.esc += (stats.nonAnchors + stats.anchors + (stats.nullAnchor ? 1 : 0));
+                totals.esc += stats.nonAnchors + stats.anchors + (stats.nullAnchor ? 1 : 0);
                 totals.escNonAnchors += stats.nonAnchors;
                 totals.escAnchors += stats.anchors;
-                totals.escNullAnchors += (stats.nullAnchor ? 1 : 0);
-                totals.escDeletableAnchors += ((stats.ecoc > 0) ? stats.anchors : 0);
-                totals.escFutureNullAnchors += ((stats.ecoc > 0 && stats.nullAnchor == 0) ? 1 : 0);
+                totals.escNullAnchors += stats.nullAnchor ? 1 : 0;
+                totals.escDeletableAnchors += stats.ecoc > 0 ? stats.anchors : 0;
+                totals.escFutureNullAnchors += stats.ecoc > 0 && stats.nullAnchor == 0 ? 1 : 0;
                 totals.ecoc += stats.ecoc;
-                totals.ecocUnique += ((stats.ecoc > 0) ? 1 : 0);
-                totals.new += (stats.new ? 1 : 0);
+                totals.ecocUnique += stats.ecoc > 0 ? 1 : 0;
+                totals.new += stats.new ? 1 : 0;
             });
         });
 
@@ -154,22 +152,22 @@ export class QEStateCollectionStatsTracker {
 
         // anchor binary hops
         //
-        total += 1;  // null anchor read for lambda
+        total += 1; // null anchor read for lambda
         let rho = 2;
         if (nAnchors > 0) {
             rho = Math.pow(2, Math.floor(Math.log2(nAnchors)) + 1);
         }
-        total += Math.log2(rho);           // # reads to find rho
-        total += Math.log2(rho);           // # reads in the binary search iterations
-        total += (nAnchors == 0 ? 1 : 0);  // extra read if no anchors exist
+        total += Math.log2(rho); // # reads to find rho
+        total += Math.log2(rho); // # reads in the binary search iterations
+        total += nAnchors == 0 ? 1 : 0; // extra read if no anchors exist
 
         // binary hops
         //
-        total += (nAnchors > 0 || hasNullAnchor) ? 1 : 0;  // anchor read for lambda
+        total += nAnchors > 0 || hasNullAnchor ? 1 : 0; // anchor read for lambda
         rho = Math.max(2, escSize);
-        total += 1;                           // estimated # of reads to find final value of rho
-        total += Math.ceil(Math.log2(rho));   // estimated # of binary search iterations
-        total += (nNonAnchors == 0 ? 1 : 0);  // extra read if no non-anchors exist
+        total += 1; // estimated # of reads to find final value of rho
+        total += Math.ceil(Math.log2(rho)); // estimated # of binary search iterations
+        total += nNonAnchors == 0 ? 1 : 0; // extra read if no non-anchors exist
         return total;
     }
 
@@ -186,20 +184,24 @@ export class QEStateCollectionStatsTracker {
         let totals = this.calculateTotalStatsForFields(keys);
         let estimate = 0;
 
-        estimate += totals.escNonAnchors;  // # of reads into in-mem delete set
+        estimate += totals.escNonAnchors; // # of reads into in-mem delete set
 
-        keys.forEach(key => {
+        keys.forEach((key) => {
             if (!this.fieldStats.hasOwnProperty(key)) {
                 return;
             }
             const field = this.fieldStats[key];
             Object.entries(field).forEach(([value, stats]) => {
                 if (stats.ecoc == 0) {
-                    return;  // value not compacted
+                    return; // value not compacted
                 }
-                estimate += 1;  // null anchor read
+                estimate += 1; // null anchor read
                 estimate += this._calculateEstimatedEmuBinaryReads(
-                    stats.anchors, stats.nonAnchors, stats.nullAnchor, totals.esc);
+                    stats.anchors,
+                    stats.nonAnchors,
+                    stats.nullAnchor,
+                    totals.esc,
+                );
             });
         });
         return estimate;
@@ -218,20 +220,24 @@ export class QEStateCollectionStatsTracker {
         let totals = this.calculateTotalStatsForFields(keys);
         let estimate = 0;
 
-        estimate += totals.escNonAnchors;  // # of reads into in-mem delete set
+        estimate += totals.escNonAnchors; // # of reads into in-mem delete set
 
-        keys.forEach(key => {
+        keys.forEach((key) => {
             if (!this.fieldStats.hasOwnProperty(key)) {
                 return;
             }
             const field = this.fieldStats[key];
             Object.entries(field).forEach(([value, stats]) => {
                 if (stats.ecoc == 0) {
-                    return;  // value not compacted
+                    return; // value not compacted
                 }
-                estimate += (stats.nullAnchor ? 1 : 0);  // null anchor read
+                estimate += stats.nullAnchor ? 1 : 0; // null anchor read
                 estimate += this._calculateEstimatedEmuBinaryReads(
-                    stats.anchors, stats.nonAnchors, stats.nullAnchor, totals.esc);
+                    stats.anchors,
+                    stats.nonAnchors,
+                    stats.nullAnchor,
+                    totals.esc,
+                );
             });
         });
         return estimate;

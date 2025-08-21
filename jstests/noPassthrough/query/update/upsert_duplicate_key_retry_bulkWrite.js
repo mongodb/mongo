@@ -13,7 +13,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const rst = new ReplSetTest({
     nodes: {
         node0: {setParameter: {enableTestCommands: 1, featureFlagBulkWriteCommand: true}},
-    }
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -31,18 +31,15 @@ function performUpsert() {
     const testDB = db.getMongo().getDB("test");
     var res = testDB.adminCommand({
         bulkWrite: 1,
-        ops: [
-            {update: 0, filter: {x: 3}, updateMods: {$inc: {y: 1}}, upsert: true},
-        ],
-        nsInfo: [{ns: "test.upsert_duplicate_key_retry_bulkWrite"}]
+        ops: [{update: 0, filter: {x: 3}, updateMods: {$inc: {y: 1}}, upsert: true}],
+        nsInfo: [{ns: "test.upsert_duplicate_key_retry_bulkWrite"}],
     });
 }
 
 assert.commandWorked(testColl.createIndex({x: 1}, {unique: true}));
 
 // Will hang upsert operations just prior to performing an insert.
-assert.commandWorked(testDB.adminCommand(
-    {configureFailPoint: "hangBeforeBulkWritePerformsUpdate", mode: "alwaysOn"}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeBulkWritePerformsUpdate", mode: "alwaysOn"}));
 
 const awaitUpdate1 = startParallelShell(performUpsert, rst.ports[0]);
 const awaitUpdate2 = startParallelShell(performUpsert, rst.ports[0]);
@@ -53,8 +50,7 @@ assert.soon(() => {
     return curOps.length === 2;
 });
 
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: "hangBeforeBulkWritePerformsUpdate", mode: "off"}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeBulkWritePerformsUpdate", mode: "off"}));
 
 awaitUpdate1();
 awaitUpdate2();
@@ -65,10 +61,8 @@ assert(!cursor.hasNext(), cursor.toArray());
 
 // Confirm that oplog entries exist for both insert and update operation.
 const oplogColl = testDB.getSiblingDB("local").getCollection("oplog.rs");
-assert.eq(1,
-          oplogColl.find({"op": "i", "ns": "test.upsert_duplicate_key_retry_bulkWrite"}).itcount());
-assert.eq(1,
-          oplogColl.find({"op": "u", "ns": "test.upsert_duplicate_key_retry_bulkWrite"}).itcount());
+assert.eq(1, oplogColl.find({"op": "i", "ns": "test.upsert_duplicate_key_retry_bulkWrite"}).itcount());
+assert.eq(1, oplogColl.find({"op": "u", "ns": "test.upsert_duplicate_key_retry_bulkWrite"}).itcount());
 
 //
 // Confirm DuplicateKey error for cases that should not be retried.
@@ -78,13 +72,11 @@ assert.commandWorked(testColl.createIndex({x: 1}, {unique: true}));
 
 // DuplicateKey error on replacement-style upsert, where the unique index key value to be
 // written does not match the value of the query predicate.
-assert.commandWorked(testColl.insert({_id: 1, 'a': 12345}));
+assert.commandWorked(testColl.insert({_id: 1, "a": 12345}));
 var res = testDB.adminCommand({
     bulkWrite: 1,
-    ops: [
-        {update: 0, filter: {x: 3}, updateMods: {}, upsert: true},
-    ],
-    nsInfo: [{ns: "test.upsert_duplicate_key_retry_bulkWrite"}]
+    ops: [{update: 0, filter: {x: 3}, updateMods: {}, upsert: true}],
+    nsInfo: [{ns: "test.upsert_duplicate_key_retry_bulkWrite"}],
 });
 
 assert(res.cursor.firstBatch[0].code == 11000);
@@ -96,10 +88,8 @@ assert.commandWorked(testColl.insert({x: 3}));
 assert.commandWorked(testColl.insert({x: 4}));
 res = testDB.adminCommand({
     bulkWrite: 1,
-    ops: [
-        {update: 0, filter: {x: 3}, updateMods: {$inc: {x: 1}}, upsert: true},
-    ],
-    nsInfo: [{ns: "test.upsert_duplicate_key_retry_bulkWrite"}]
+    ops: [{update: 0, filter: {x: 3}, updateMods: {$inc: {x: 1}}, upsert: true}],
+    nsInfo: [{ns: "test.upsert_duplicate_key_retry_bulkWrite"}],
 });
 
 assert(res.cursor.firstBatch[0].code == ErrorCodes.DuplicateKey);

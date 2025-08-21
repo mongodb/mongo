@@ -9,7 +9,7 @@ assert.commandWorked(coll.insert({_id: null}));
 
 const obj = {
     foo: 1,
-    nullElem: null
+    nullElem: null,
 };
 
 assert.writeErrorWithCode(coll.remove({x: obj.bar}), ErrorCodes.BadValue);

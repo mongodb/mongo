@@ -16,10 +16,10 @@ const pipeline = [{$count: "count"}];
 
 // '$_testFeatureFlagLatest' is an expression that is permanently enabled in the latest FCV.
 const filter = {
-    $expr: {$eq: [1, {$_testFeatureFlagLatest: 1}]}
+    $expr: {$eq: [1, {$_testFeatureFlagLatest: 1}]},
 };
 const parsedFilter = {
-    $expr: {$eq: [{$const: 1}, {$_testFeatureFlagLatest: 1}]}
+    $expr: {$eq: [{$const: 1}, {$_testFeatureFlagLatest: 1}]},
 };
 
 function runAggregationAndDowngradeFCV(coll, adminDB) {
@@ -29,14 +29,13 @@ function runAggregationAndDowngradeFCV(coll, adminDB) {
     assert.eq(coll.aggregate(pipeline).toArray(), [{"count": 1}]);
 
     // Downgrade the feature compatibility version to 8.0.
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     checkFCV(adminDB, lastLTSFCV);
 
     // Run the pipeline again. The profile filter is persisted, which is validated later in the
     // test, and will work in the background.
     assert.eq(coll.aggregate(pipeline).toArray(), [{"count": 1}]);
-};
+}
 
 function testProfileCommand(conn, isMongos) {
     const profileLevel = isMongos ? 0 : 1;
@@ -61,22 +60,25 @@ function testProfileCommand(conn, isMongos) {
         assert.commandWorked(testDB.runCommand({profile: profileLevel, filter: filter}));
     } else {
         // We should not be able to make a profiler entry with the filter on the downgraded FCV.
-        assert.commandFailedWithCode(testDB.runCommand({profile: profileLevel, filter: filter}),
-                                     ErrorCodes.QueryFeatureNotAllowed);
+        assert.commandFailedWithCode(
+            testDB.runCommand({profile: profileLevel, filter: filter}),
+            ErrorCodes.QueryFeatureNotAllowed,
+        );
     }
 
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 }
 
 function checkGlobalProfilerIsUpdated({testDB, oldFilter, newFilter}) {
     const log = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
-    assert(!!findMatchingLogLine(log, {
-        msg: "Profiler settings changed globally",
-        from: {filter: oldFilter},
-        to: {filter: newFilter}
-    }),
-           "expected log line was not found");
+    assert(
+        !!findMatchingLogLine(log, {
+            msg: "Profiler settings changed globally",
+            from: {filter: oldFilter},
+            to: {filter: newFilter},
+        }),
+        "expected log line was not found",
+    );
 }
 
 function testGlobalFilterCommand(conn, isMongos) {
@@ -102,20 +104,21 @@ function testGlobalFilterCommand(conn, isMongos) {
         assert.commandWorked(testDB.runCommand({profile: profileLevel, filter: filter}));
     } else {
         // We should not be able to make a profiler entry with the filter on the downgraded FCV.
-        assert.commandFailedWithCode(testDB.runCommand({profile: profileLevel, filter: filter}),
-                                     ErrorCodes.QueryFeatureNotAllowed);
+        assert.commandFailedWithCode(
+            testDB.runCommand({profile: profileLevel, filter: filter}),
+            ErrorCodes.QueryFeatureNotAllowed,
+        );
     }
 
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 }
 
 (function testReplicaSet() {
     const rst = new ReplSetTest({
         nodes: [
             {setParameter: {internalQueryGlobalProfilingFilter: 1}},
-            {setParameter: {internalQueryGlobalProfilingFilter: 1}}
-        ]
+            {setParameter: {internalQueryGlobalProfilingFilter: 1}},
+        ],
     });
     rst.startSet();
     rst.initiate();
@@ -131,7 +134,7 @@ function testGlobalFilterCommand(conn, isMongos) {
         shards: 1,
         rs: {nodes: 1},
         config: 1,
-        mongosOptions: {setParameter: {internalQueryGlobalProfilingFilter: 1}}
+        mongosOptions: {setParameter: {internalQueryGlobalProfilingFilter: 1}},
     });
     testProfileCommand(st.s, true /* isMongos */);
     testGlobalFilterCommand(st.s, true /* isMongos */);

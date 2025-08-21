@@ -6,12 +6,12 @@
  * Each thread operates on a separate collection.
  *
  */
-export const $config = (function() {
-    var data = {numDocs: 1000, prefix: 'distinct_fsm', shardKey: {i: 1}};
+export const $config = (function () {
+    var data = {numDocs: 1000, prefix: "distinct_fsm", shardKey: {i: 1}};
 
-    var states = (function() {
+    var states = (function () {
         function init(db, collName) {
-            this.threadCollName = this.prefix + '_' + this.tid;
+            this.threadCollName = this.prefix + "_" + this.tid;
             var bulk = db[this.threadCollName].initializeUnorderedBulkOp();
             for (var i = 0; i < this.numDocs; ++i) {
                 bulk.insert({i: i});
@@ -24,14 +24,15 @@ export const $config = (function() {
 
         function distinct(db, collName) {
             try {
-                assert.eq(this.numDocs, db[this.threadCollName].distinct('i').length);
+                assert.eq(this.numDocs, db[this.threadCollName].distinct("i").length);
             } catch (e) {
                 // Range deletion completing may (correctly) cause this query plan to be killed.
                 // TODO SERVER-97712: On transaction passthroughs this may fail with
                 // ExceededTimeLimit.
-                assert([ErrorCodes.QueryPlanKilled, ErrorCodes.ExceededTimeLimit].includes(e.code),
-                       "Expected a QueryPlanKilled or ExceededTimeLimit error, but encountered: " +
-                           e.message);
+                assert(
+                    [ErrorCodes.QueryPlanKilled, ErrorCodes.ExceededTimeLimit].includes(e.code),
+                    "Expected a QueryPlanKilled or ExceededTimeLimit error, but encountered: " + e.message,
+                );
             }
         }
 

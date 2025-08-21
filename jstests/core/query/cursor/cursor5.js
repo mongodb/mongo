@@ -20,19 +20,30 @@ function testBoundsWithSubobjectIndexes(db) {
         {a: {b: 1, c: 2, d: 4}, e: 4},
         {a: {b: 1, c: 2, d: 4}, e: 5},
         {a: {b: 2, c: 2, d: 3}, e: 4},
-        {a: {b: 2, c: 2, d: 3}, e: 5}
+        {a: {b: 2, c: 2, d: 3}, e: 5},
     ];
-    for (let i = 0; i < z.length; ++i)
-        r.save(z[i]);
+    for (let i = 0; i < z.length; ++i) r.save(z[i]);
     let idx = {"a.d": 1, a: 1, e: -1};
     let rIdx = {"a.d": -1, a: -1, e: 1};
     assert.commandWorked(r.createIndex(idx));
 
     checkResults([z[0], z[4], z[2]], r.find({e: 4}).sort(idx).hint(idx));
-    checkResults([z[1], z[3]], r.find({e: {$gt: 4}, "a.b": 1}).sort(idx).hint(idx));
+    checkResults(
+        [z[1], z[3]],
+        r
+            .find({e: {$gt: 4}, "a.b": 1})
+            .sort(idx)
+            .hint(idx),
+    );
 
     checkResults([z[2], z[4], z[0]], r.find({e: 4}).sort(rIdx).hint(idx));
-    checkResults([z[3], z[1]], r.find({e: {$gt: 4}, "a.b": 1}).sort(rIdx).hint(idx));
+    checkResults(
+        [z[3], z[1]],
+        r
+            .find({e: {$gt: 4}, "a.b": 1})
+            .sort(rIdx)
+            .hint(idx),
+    );
 }
 
 testBoundsWithSubobjectIndexes(db);

@@ -13,8 +13,8 @@ const dbName = db.getName();
 const collName = jsTestName();
 const coll = db.getCollection(collName);
 const ns = dbName + "." + collName;
-const config = db.getSiblingDB('config');
-const shardNames = db.adminCommand({listShards: 1}).shards.map(shard => shard._id);
+const config = db.getSiblingDB("config");
+const shardNames = db.adminCommand({listShards: 1}).shards.map((shard) => shard._id);
 
 if (shardNames.length < 2) {
     print(jsTestName() + " will not run; at least 2 shards are required.");
@@ -22,11 +22,12 @@ if (shardNames.length < 2) {
 }
 
 function allChunksWithUUID() {
-    const matchChunksWithoutUUID = {'uuid': null};
-    assert.eq(0,
-              config.chunks.countDocuments(matchChunksWithoutUUID),
-              "Found chunks with wrong UUID " +
-                  tojson(config.chunks.find(matchChunksWithoutUUID).toArray()));
+    const matchChunksWithoutUUID = {"uuid": null};
+    assert.eq(
+        0,
+        config.chunks.countDocuments(matchChunksWithoutUUID),
+        "Found chunks with wrong UUID " + tojson(config.chunks.find(matchChunksWithoutUUID).toArray()),
+    );
 }
 
 print(jsTestName() + " is running on " + shardNames.length + " shards.");

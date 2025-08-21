@@ -7,18 +7,14 @@
  *   requires_timeseries,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "ts";
 
 assert.commandWorked(testDB.runCommand({drop: collName}));
-assert.commandWorked(
-    testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
 const coll = testDB[collName];
 
 const bucket = {
@@ -50,32 +46,24 @@ const bucket = {
             0: 0,
             1: 1,
         },
-    }
+    },
 };
 
-const update = function() {
+const update = function () {
     return getTimeseriesCollForRawOps(coll).update(
         {_id: bucket._id},
         {$set: {"control.min.a": 1, "control.max.a": "a", "data.a.0": "a"}},
-        kRawOperationSpec);
+        kRawOperationSpec,
+    );
 };
 
 assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(bucket, kRawOperationSpec));
 assert.commandFailedWithCode(update(), ErrorCodes.CannotInsertTimeseriesBucketsWithMixedSchema);
-assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(coll),
-                                                       kRawOperationSpec),
-          false);
-assert.commandWorked(
-    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
-assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(coll),
-                                                       kRawOperationSpec),
-          true);
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(coll), kRawOperationSpec), false);
+assert.commandWorked(testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: true}));
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(coll), kRawOperationSpec), true);
 assert.commandWorked(update());
-assert.commandWorked(
-    getTimeseriesCollForRawOps(coll).deleteOne({_id: bucket._id}, kRawOperationSpec));
+assert.commandWorked(getTimeseriesCollForRawOps(coll).deleteOne({_id: bucket._id}, kRawOperationSpec));
 
-assert.commandWorked(
-    testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}));
-assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(coll),
-                                                       kRawOperationSpec),
-          false);
+assert.commandWorked(testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}));
+assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(getTimeseriesCollForRawOps(coll), kRawOperationSpec), false);

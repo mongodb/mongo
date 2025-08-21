@@ -9,7 +9,7 @@ import {isConfigCommitted} from "jstests/replsets/rslib.js";
 TestData.skipCheckDBHashes = true;
 
 var numNodes = 5;
-var replTest = new ReplSetTest({name: 'testSet', nodes: numNodes});
+var replTest = new ReplSetTest({name: "testSet", nodes: numNodes});
 var nodes = replTest.startSet();
 replTest.initiate();
 
@@ -26,10 +26,10 @@ assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: config}
 // Successful reconfig writes a no-op into the oplog.
 const expectedNoOp = {
     op: "n",
-    o: {msg: "Reconfig set", version: config.version}
+    o: {msg: "Reconfig set", version: config.version},
 };
-const primaryOplog = primary.getDB("local")['oplog.rs'];
-const lastOp = primaryOplog.find(expectedNoOp).sort({'$natural': -1}).limit(1).toArray();
+const primaryOplog = primary.getDB("local")["oplog.rs"];
+const lastOp = primaryOplog.find(expectedNoOp).sort({"$natural": -1}).limit(1).toArray();
 assert(lastOp.length > 0);
 replTest.awaitReplication();
 
@@ -58,8 +58,7 @@ assert.commandWorked(admin.runCommand({replSetReconfig: config, force: true}));
 // Wait for the last node to know it is REMOVED before stopping the test.
 jsTestLog("Waiting for the last node to be REMOVED.");
 assert.soonNoExcept(() => {
-    assert.commandFailedWithCode(nodes[4].adminCommand({'replSetGetStatus': 1}),
-                                 ErrorCodes.InvalidReplicaSetConfig);
+    assert.commandFailedWithCode(nodes[4].adminCommand({"replSetGetStatus": 1}), ErrorCodes.InvalidReplicaSetConfig);
     return true;
 });
 jsTestLog("Finished waiting for the last node to be REMOVED.");

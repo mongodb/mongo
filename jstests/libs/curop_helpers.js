@@ -9,9 +9,14 @@ export function waitForCurOpByFilter(db, filter, options = {}) {
         },
         () => {
             let allResults = adminDB.aggregate([{$currentOp: options}]).toArray();
-            return "Failed to find a matching op for filter: " + tojson(filter) +
-                "in currentOp output: " + tojson(allResults);
-        });
+            return (
+                "Failed to find a matching op for filter: " +
+                tojson(filter) +
+                "in currentOp output: " +
+                tojson(allResults)
+            );
+        },
+    );
     return results;
 }
 
@@ -20,7 +25,7 @@ export function waitForCurOpByFilter(db, filter, options = {}) {
 // array of operations.
 export function waitForCurOpByFailPoint(db, nss, failPoint, filter = {}, options = {}) {
     const adjustedFilter = {
-        $and: [{ns: nss}, filter, {$or: [{failpointMsg: failPoint}, {msg: failPoint}]}]
+        $and: [{ns: nss}, filter, {$or: [{failpointMsg: failPoint}, {msg: failPoint}]}],
     };
     return waitForCurOpByFilter(db, adjustedFilter, options);
 }

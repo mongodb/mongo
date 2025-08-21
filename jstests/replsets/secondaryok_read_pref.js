@@ -2,8 +2,7 @@
 // other than 'primary', and that queries which do have 'primary' read preference fail.
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const readPrefs =
-    [undefined, "primary", "secondary", "primaryPreferred", "secondaryPreferred", "nearest"];
+const readPrefs = [undefined, "primary", "secondary", "primaryPreferred", "secondaryPreferred", "nearest"];
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
@@ -14,8 +13,8 @@ rst.initiate({
     members: [
         {_id: 0, host: nodes[0]},
         {_id: 1, host: nodes[1], priority: 0},
-        {_id: 2, host: nodes[2], arbiterOnly: true}
-    ]
+        {_id: 2, host: nodes[2], arbiterOnly: true},
+    ],
 });
 
 const priDB = rst.getPrimary().getDB(jsTestName());
@@ -31,7 +30,7 @@ for (let readPref of readPrefs) {
 
         secDB.getMongo().setSecondaryOk(secondaryOk);
 
-        const cursor = (readPref ? secDB.test.find().readPref(readPref) : secDB.test.find());
+        const cursor = readPref ? secDB.test.find().readPref(readPref) : secDB.test.find();
 
         if (readPref === "primary" || (!readPref && !secondaryOk)) {
             // Attempting to run the query throws an error of type NotPrimaryNoSecondaryOk.
@@ -56,15 +55,17 @@ function assertNotPrimaryNoSecondaryOk(func) {
 // directed at a secondary with "primary" read preference.
 const secondaryColl = secDB.secondaryok_read_pref;
 assertNotPrimaryNoSecondaryOk(() => secondaryColl.aggregate([{$out: "target"}]).itcount());
-assertNotPrimaryNoSecondaryOk(
-    () =>
-        secondaryColl
-            .aggregate([{$merge: {into: "target", whenMatched: "fail", whenNotMatched: "insert"}}])
-            .itcount());
+assertNotPrimaryNoSecondaryOk(() =>
+    secondaryColl.aggregate([{$merge: {into: "target", whenMatched: "fail", whenNotMatched: "insert"}}]).itcount(),
+);
 /* eslint-disable */
-assertNotPrimaryNoSecondaryOk(() => secondaryColl.mapReduce(() => emit(this.a),
-                                                            (k, v) => Array.sum(b),
-                                                            {out: {replace: "target"}}));
+assertNotPrimaryNoSecondaryOk(() =>
+    secondaryColl.mapReduce(
+        () => emit(this.a),
+        (k, v) => Array.sum(b),
+        {out: {replace: "target"}},
+    ),
+);
 /* eslint-enable */
 
 rst.stopSet();

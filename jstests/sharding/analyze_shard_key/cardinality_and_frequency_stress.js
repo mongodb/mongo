@@ -6,9 +6,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const kSize100kB = 100 * 1024;
 
@@ -20,7 +18,7 @@ const internalDocumentSourceGroupMaxMemoryBytes = 1024 * 1024;
 // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
 // command with readPreference "secondaryPreferred".
 const writeConcern = {
-    w: numNodesPerRS
+    w: numNodesPerRS,
 };
 
 /**
@@ -29,41 +27,40 @@ const writeConcern = {
  * that they spilled to disk.
  */
 function assertAggregationPlan(mongodConns, dbName, collName, isShardedColl, comment) {
-    mongodConns.forEach(conn => {
+    mongodConns.forEach((conn) => {
         const profilerColl = conn.getDB(dbName).system.profile;
-        profilerColl.find({"command.aggregate": collName, "command.comment": comment})
-            .forEach(doc => {
-                if (doc.hasOwnProperty("ok") && (doc.ok === 0)) {
-                    return;
-                }
+        profilerColl.find({"command.aggregate": collName, "command.comment": comment}).forEach((doc) => {
+            if (doc.hasOwnProperty("ok") && doc.ok === 0) {
+                return;
+            }
 
-                const firstStage = doc.command.pipeline[0];
+            const firstStage = doc.command.pipeline[0];
 
-                if (firstStage.hasOwnProperty("$collStats")) {
-                    return;
-                }
+            if (firstStage.hasOwnProperty("$collStats")) {
+                return;
+            }
 
-                if (isShardedColl) {
-                    if (firstStage.hasOwnProperty("$mergeCursors")) {
-                        // The profiler output for $mergeCursors aggregate commands is not expected
-                        // to have a "planSummary" field.
-                        assert(doc.usedDisk, doc);
-                    } else {
-                        assert(doc.hasOwnProperty("planSummary"), doc);
-                        assert(doc.planSummary.includes("IXSCAN"), doc);
-                        assert(!doc.usedDisk, doc);
-                    }
+            if (isShardedColl) {
+                if (firstStage.hasOwnProperty("$mergeCursors")) {
+                    // The profiler output for $mergeCursors aggregate commands is not expected
+                    // to have a "planSummary" field.
+                    assert(doc.usedDisk, doc);
                 } else {
                     assert(doc.hasOwnProperty("planSummary"), doc);
                     assert(doc.planSummary.includes("IXSCAN"), doc);
-                    assert(doc.usedDisk, doc);
+                    assert(!doc.usedDisk, doc);
                 }
+            } else {
+                assert(doc.hasOwnProperty("planSummary"), doc);
+                assert(doc.planSummary.includes("IXSCAN"), doc);
+                assert(doc.usedDisk, doc);
+            }
 
-                // Verify that it did not fetch any documents.
-                assert.eq(doc.docsExamined, 0, doc);
-                // Verify that it opted out of shard filtering.
-                assert.eq(doc.readConcern.level, "available", doc);
-            });
+            // Verify that it did not fetch any documents.
+            assert.eq(doc.docsExamined, 0, doc);
+            // Verify that it opted out of shard filtering.
+            assert.eq(doc.readConcern.level, "available", doc);
+        });
     });
 }
 
@@ -72,15 +69,14 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
     const collName = "testCollUnsharded";
     const ns = dbName + "." + collName;
     const candidateShardKey = {a: 1};
-    const numDocs = 15;  // ~1.5MB in total.
+    const numDocs = 15; // ~1.5MB in total.
     // Used to identify the operations performed by the analyzeShardKey commands in this test case.
     const comment = UUID();
 
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
 
-    jsTest.log(
-        `Testing analyzing a shard key for an unsharded collection: ${tojson({dbName, collName})}`);
+    jsTest.log(`Testing analyzing a shard key for an unsharded collection: ${tojson({dbName, collName})}`);
 
     assert.commandWorked(coll.createIndex(candidateShardKey));
 
@@ -93,27 +89,29 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
         docs.push(doc);
         mostCommonValues.push({
             value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(doc, candidateShardKey),
-            frequency: 1
+            frequency: 1,
         });
     }
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
-    const res = assert.commandWorked(conn.adminCommand({
-        analyzeShardKey: ns,
-        key: candidateShardKey,
-        comment,
-        // Skip calculating the read and write distribution metrics since they are not needed by
-        // this test.
-        readWriteDistribution: false
-    }));
+    const res = assert.commandWorked(
+        conn.adminCommand({
+            analyzeShardKey: ns,
+            key: candidateShardKey,
+            comment,
+            // Skip calculating the read and write distribution metrics since they are not needed by
+            // this test.
+            readWriteDistribution: false,
+        }),
+    );
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, {
         numDocs,
         isUnique: false,
         numDistinctValues: numDocs,
         mostCommonValues,
-        numMostCommonValues
+        numMostCommonValues,
     });
 
     AnalyzeShardKeyUtil.disableProfiler(mongodConns, dbName);
@@ -129,21 +127,19 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
     const currentShardKey = {skey: 1};
     const currentShardKeySplitPoint = {skey: 0};
     const candidateShardKey = {a: 1};
-    const numDocs = 30;  // ~1.5MB per shard.
+    const numDocs = 30; // ~1.5MB per shard.
     // Used to identify the operations performed by the analyzeShardKey commands in this test case.
     const comment = UUID();
 
     const db = st.s.getDB(dbName);
     const coll = db.getCollection(collName);
 
-    jsTest.log(
-        `Testing analyzing a shard key for a sharded collection: ${tojson({dbName, collName})}`);
+    jsTest.log(`Testing analyzing a shard key for a sharded collection: ${tojson({dbName, collName})}`);
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentShardKey}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: currentShardKeySplitPoint, to: st.shard1.shardName}));
     assert.commandWorked(coll.createIndex(candidateShardKey));
 
     const docs = [];
@@ -156,7 +152,7 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
         docs.push(doc);
         mostCommonValues.push({
             value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(doc, candidateShardKey),
-            frequency: 1
+            frequency: 1,
         });
 
         sign *= -1;
@@ -165,20 +161,22 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
-    const res = assert.commandWorked(st.s.adminCommand({
-        analyzeShardKey: ns,
-        key: candidateShardKey,
-        comment,
-        // Skip calculating the read and write distribution metrics since they are not needed by
-        // this test.
-        readWriteDistribution: false
-    }));
+    const res = assert.commandWorked(
+        st.s.adminCommand({
+            analyzeShardKey: ns,
+            key: candidateShardKey,
+            comment,
+            // Skip calculating the read and write distribution metrics since they are not needed by
+            // this test.
+            readWriteDistribution: false,
+        }),
+    );
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, {
         numDocs,
         isUnique: false,
         numDistinctValues: numDocs,
         mostCommonValues,
-        numMostCommonValues
+        numMostCommonValues,
     });
 
     AnalyzeShardKeyUtil.disableProfiler(mongodConns, dbName);
@@ -189,18 +187,18 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
 const setParameterOpts = {
     internalDocumentSourceGroupMaxMemoryBytes,
-    analyzeShardKeyNumMostCommonValues: numMostCommonValues
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
 };
 
 {
     const st = new ShardingTest({
         shards: numNodesPerRS,
         rs: {nodes: 2},
-        other: {rsOptions: {setParameter: setParameterOpts}}
+        other: {rsOptions: {setParameter: setParameterOpts}},
     });
     const mongodConns = [];
-    st.rs0.nodes.forEach(node => mongodConns.push(node));
-    st.rs1.nodes.forEach(node => mongodConns.push(node));
+    st.rs0.nodes.forEach((node) => mongodConns.push(node));
+    st.rs1.nodes.forEach((node) => mongodConns.push(node));
 
     testAnalyzeShardKeysUnshardedCollection(st.s, mongodConns);
     testAnalyzeShardKeysShardedCollection(st, mongodConns);
@@ -208,9 +206,9 @@ const setParameterOpts = {
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
-    const rst =
-        new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
+    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();
     const mongodConns = rst.nodes;

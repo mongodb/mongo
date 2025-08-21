@@ -7,9 +7,7 @@
  * ]
  */
 
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -37,118 +35,138 @@ import {
 const st = new ShardingTest({
     mongos: 1,
     shards: {rs0: {nodes: 3}, rs1: {nodes: 3}},
-    rsOptions:
-        {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}}
+    rsOptions: {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}},
 });
 
-const kDbName = 'db';
+const kDbName = "db";
 const mongos = st.s0;
 const shard0 = st.shard0.shardName;
-const ns = kDbName + '.foo';
+const ns = kDbName + ".foo";
 
-const updateDocumentShardKeyUsingTransactionApiEnabled =
-    isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
+const updateDocumentShardKeyUsingTransactionApiEnabled = isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
 
-function changeShardKeyWhenFailpointsSet(session,
-                                         sessionDB,
-                                         runInTxn,
-                                         isFindAndModify,
-                                         updateDocumentShardKeyUsingTransactionApiEnabled) {
+function changeShardKeyWhenFailpointsSet(
+    session,
+    sessionDB,
+    runInTxn,
+    isFindAndModify,
+    updateDocumentShardKeyUsingTransactionApiEnabled,
+) {
     const docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
     const splitDoc = {x: 100};
     shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, splitDoc, {"x": 300});
 
     // Assert that the document is updated when the delete fails.
-    assert.commandWorked(st.rs1.getPrimary().getDB(kDbName).adminCommand({
-        configureFailPoint: "failCommand",
-        mode: {times: 2},
-        data: {
-            errorCode: ErrorCodes.WriteConflict,
-            failCommands: ["delete"],
-            failInternalCommands: true
-        }
-    }));
+    assert.commandWorked(
+        st.rs1
+            .getPrimary()
+            .getDB(kDbName)
+            .adminCommand({
+                configureFailPoint: "failCommand",
+                mode: {times: 2},
+                data: {
+                    errorCode: ErrorCodes.WriteConflict,
+                    failCommands: ["delete"],
+                    failInternalCommands: true,
+                },
+            }),
+    );
     if (isFindAndModify) {
         if (!runInTxn && updateDocumentShardKeyUsingTransactionApiEnabled) {
             // Internal transactions will retry internally with the transaction API.
-            runFindAndModifyCmdSuccess(st,
-                                       kDbName,
-                                       session,
-                                       sessionDB,
-                                       runInTxn,
-                                       [{x: 300}],
-                                       [{$set: {x: 30}}],
-                                       false /* upsert */,
-                                       false /* returnNew */,
-                                       splitDoc);
+            runFindAndModifyCmdSuccess(
+                st,
+                kDbName,
+                session,
+                sessionDB,
+                runInTxn,
+                [{x: 300}],
+                [{$set: {x: 30}}],
+                false /* upsert */,
+                false /* returnNew */,
+                splitDoc,
+            );
         } else {
-            runFindAndModifyCmdFail(
-                st, kDbName, session, sessionDB, runInTxn, {x: 300}, {$set: {x: 30}}, false);
+            runFindAndModifyCmdFail(st, kDbName, session, sessionDB, runInTxn, {x: 300}, {$set: {x: 30}}, false);
         }
     } else {
         if (!runInTxn && updateDocumentShardKeyUsingTransactionApiEnabled) {
             // Internal transactions will retry internally with the transaction API.
-            runUpdateCmdSuccess(st,
-                                kDbName,
-                                session,
-                                sessionDB,
-                                runInTxn,
-                                [{x: 300}],
-                                [{$set: {x: 30}}],
-                                false /* upsert */,
-                                splitDoc);
+            runUpdateCmdSuccess(
+                st,
+                kDbName,
+                session,
+                sessionDB,
+                runInTxn,
+                [{x: 300}],
+                [{$set: {x: 30}}],
+                false /* upsert */,
+                splitDoc,
+            );
         } else {
-            runUpdateCmdFail(st,
-                             kDbName,
-                             session,
-                             sessionDB,
-                             runInTxn,
-                             {x: 300},
-                             {$set: {x: 30}},
-                             false,
-                             ErrorCodes.WriteConflict);
+            runUpdateCmdFail(
+                st,
+                kDbName,
+                session,
+                sessionDB,
+                runInTxn,
+                {x: 300},
+                {$set: {x: 30}},
+                false,
+                ErrorCodes.WriteConflict,
+            );
         }
     }
-    assert.commandWorked(st.rs1.getPrimary().getDB(kDbName).adminCommand({
-        configureFailPoint: "failCommand",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.rs1.getPrimary().getDB(kDbName).adminCommand({
+            configureFailPoint: "failCommand",
+            mode: "off",
+        }),
+    );
 
     // Reset the collection's documents.
     assert.commandWorked(st.s.getDB(kDbName).foo.remove({}));
     assert.commandWorked(st.s.getDB(kDbName).foo.insert(docsToInsert));
 
     // Assert that the document is not updated when the insert fails for a non transient reason.
-    assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
-        configureFailPoint: "failCommand",
-        mode: "alwaysOn",
-        data: {
-            errorCode: ErrorCodes.NamespaceNotFound,
-            failCommands: ["insert"],
-            failInternalCommands: true
-        }
-    }));
+    assert.commandWorked(
+        st.rs0
+            .getPrimary()
+            .getDB(kDbName)
+            .adminCommand({
+                configureFailPoint: "failCommand",
+                mode: "alwaysOn",
+                data: {
+                    errorCode: ErrorCodes.NamespaceNotFound,
+                    failCommands: ["insert"],
+                    failInternalCommands: true,
+                },
+            }),
+    );
     if (isFindAndModify) {
-        runFindAndModifyCmdFail(
-            st, kDbName, session, sessionDB, runInTxn, {"x": 300}, {"$set": {"x": 30}}, false);
+        runFindAndModifyCmdFail(st, kDbName, session, sessionDB, runInTxn, {"x": 300}, {"$set": {"x": 30}}, false);
     } else {
-        runUpdateCmdFail(st,
-                         kDbName,
-                         session,
-                         sessionDB,
-                         runInTxn,
-                         {"x": 300},
-                         {"$set": {"x": 30}},
-                         false,
-                         ErrorCodes.NamespaceNotFound);
+        runUpdateCmdFail(
+            st,
+            kDbName,
+            session,
+            sessionDB,
+            runInTxn,
+            {"x": 300},
+            {"$set": {"x": 30}},
+            false,
+            ErrorCodes.NamespaceNotFound,
+        );
     }
-    assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
-        configureFailPoint: "failCommand",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        st.rs0.getPrimary().getDB(kDbName).adminCommand({
+            configureFailPoint: "failCommand",
+            mode: "off",
+        }),
+    );
 
     // Reset the collection's documents.
     assert.commandWorked(st.s.getDB(kDbName).foo.remove({}));
@@ -187,92 +205,142 @@ const changeShardKeyOptions = [
     [false, false, true],
     [true, false, true],
     [false, true, true],
-    [true, true, true]
+    [true, true, true],
 ];
 
 //
 //  Tests for op-style updates.
 //
 
-changeShardKeyOptions.forEach(function(updateConfig) {
+changeShardKeyOptions.forEach(function (updateConfig) {
     let runInTxn, isFindAndModify, upsert;
     [runInTxn, isFindAndModify, upsert] = [updateConfig[0], updateConfig[1], updateConfig[2]];
 
-    jsTestLog("Testing changing the shard key using op style update and " +
-              (isFindAndModify ? "findAndModify command " : "update command ") +
-              (runInTxn ? "in transaction " : "as retryable write"));
+    jsTestLog(
+        "Testing changing the shard key using op style update and " +
+            (isFindAndModify ? "findAndModify command " : "update command ") +
+            (runInTxn ? "in transaction " : "as retryable write"),
+    );
 
     let session = st.s.startSession({retryWrites: runInTxn ? false : true});
     let sessionDB = session.getDatabase(kDbName);
 
-    assertCanUpdatePrimitiveShardKey(st,
-                                     kDbName,
-                                     ns,
-                                     session,
-                                     sessionDB,
-                                     runInTxn,
-                                     isFindAndModify,
-                                     [{"x": 300}, {"x": 4}],
-                                     [{"$set": {"x": 30}}, {"$set": {"x": 600}}],
-                                     upsert);
-    assertCanUpdateDottedPath(st,
-                              kDbName,
-                              ns,
-                              session,
-                              sessionDB,
-                              runInTxn,
-                              isFindAndModify,
-                              [{"x.a": 300}, {"x.a": 4}],
-                              [{"$set": {"x": {"a": 30}}}, {"$set": {"x": {"a": 600}}}],
-                              upsert);
-    assertCanUpdatePartialShardKey(st,
-                                   kDbName,
-                                   ns,
-                                   session,
-                                   sessionDB,
-                                   runInTxn,
-                                   isFindAndModify,
-                                   [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                                   [{"$set": {"x": 30}}, {"$set": {"x": 600}}],
-                                   upsert);
+    assertCanUpdatePrimitiveShardKey(
+        st,
+        kDbName,
+        ns,
+        session,
+        sessionDB,
+        runInTxn,
+        isFindAndModify,
+        [{"x": 300}, {"x": 4}],
+        [{"$set": {"x": 30}}, {"$set": {"x": 600}}],
+        upsert,
+    );
+    assertCanUpdateDottedPath(
+        st,
+        kDbName,
+        ns,
+        session,
+        sessionDB,
+        runInTxn,
+        isFindAndModify,
+        [{"x.a": 300}, {"x.a": 4}],
+        [{"$set": {"x": {"a": 30}}}, {"$set": {"x": {"a": 600}}}],
+        upsert,
+    );
+    assertCanUpdatePartialShardKey(
+        st,
+        kDbName,
+        ns,
+        session,
+        sessionDB,
+        runInTxn,
+        isFindAndModify,
+        [
+            {"x": 300, "y": 80},
+            {"x": 4, "y": 3},
+        ],
+        [{"$set": {"x": 30}}, {"$set": {"x": 600}}],
+        upsert,
+    );
 
-    assertCanUnsetSKField(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          runInTxn,
-                          isFindAndModify,
-                          {"x": 300},
-                          {"$unset": {"x": 1}},
-                          upsert);
+    assertCanUnsetSKField(
+        st,
+        kDbName,
+        ns,
+        session,
+        sessionDB,
+        runInTxn,
+        isFindAndModify,
+        {"x": 300},
+        {"$unset": {"x": 1}},
+        upsert,
+    );
 
     // Failure cases. These tests do not take 'upsert' as an option so we do not need to test
     // them for both upsert true and false.
     if (!upsert) {
         assertCannotUpdate_id(
-            st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"_id": 300}, {
-                "$set": {"_id": 30}
-            });
+            st,
+            kDbName,
+            ns,
+            session,
+            sessionDB,
+            runInTxn,
+            isFindAndModify,
+            {"_id": 300},
+            {
+                "$set": {"_id": 30},
+            },
+        );
         assertCannotUpdate_idDottedPath(
-            st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"_id.a": 300}, {
-                "$set": {"_id": {"a": 30}}
-            });
+            st,
+            kDbName,
+            ns,
+            session,
+            sessionDB,
+            runInTxn,
+            isFindAndModify,
+            {"_id.a": 300},
+            {
+                "$set": {"_id": {"a": 30}},
+            },
+        );
         assertCannotUpdateSKToArray(
-            st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {
-                "$set": {"x": [30]}
-            });
+            st,
+            kDbName,
+            ns,
+            session,
+            sessionDB,
+            runInTxn,
+            isFindAndModify,
+            {"x": 300},
+            {
+                "$set": {"x": [30]},
+            },
+        );
 
         if (!isFindAndModify) {
             assertCannotUpdateWithMultiTrue(
-                st, kDbName, ns, session, sessionDB, runInTxn, {"x": 300}, {"$set": {"x": 30}});
+                st,
+                kDbName,
+                ns,
+                session,
+                sessionDB,
+                runInTxn,
+                {"x": 300},
+                {"$set": {"x": 30}},
+            );
         }
 
-        changeShardKeyWhenFailpointsSet(session,
-                                        sessionDB,
-                                        runInTxn,
-                                        isFindAndModify,
-                                        updateDocumentShardKeyUsingTransactionApiEnabled);
+        changeShardKeyWhenFailpointsSet(
+            session,
+            sessionDB,
+            runInTxn,
+            isFindAndModify,
+            updateDocumentShardKeyUsingTransactionApiEnabled,
+        );
     }
 });
 
@@ -280,78 +348,116 @@ changeShardKeyOptions.forEach(function(updateConfig) {
 // Tests for replacement style updates.
 //
 
-changeShardKeyOptions.forEach(function(updateConfig) {
+changeShardKeyOptions.forEach(function (updateConfig) {
     let runInTxn, isFindAndModify, upsert;
     [runInTxn, isFindAndModify, upsert] = [updateConfig[0], updateConfig[1], updateConfig[2]];
 
-    jsTestLog("Testing changing the shard key using replacement style update and " +
-              (isFindAndModify ? "findAndModify command " : "update command ") +
-              (runInTxn ? "in transaction " : "as retryable write"));
+    jsTestLog(
+        "Testing changing the shard key using replacement style update and " +
+            (isFindAndModify ? "findAndModify command " : "update command ") +
+            (runInTxn ? "in transaction " : "as retryable write"),
+    );
 
     let session = st.s.startSession({retryWrites: runInTxn ? false : true});
     let sessionDB = session.getDatabase(kDbName);
 
-    assertCanUpdatePrimitiveShardKey(st,
-                                     kDbName,
-                                     ns,
-                                     session,
-                                     sessionDB,
-                                     runInTxn,
-                                     isFindAndModify,
-                                     [{"x": 300}, {"x": 4}],
-                                     [{"x": 30}, {"x": 600}],
-                                     upsert);
-    assertCanUpdateDottedPath(st,
-                              kDbName,
-                              ns,
-                              session,
-                              sessionDB,
-                              runInTxn,
-                              isFindAndModify,
-                              [{"x.a": 300}, {"x.a": 4}],
-                              [{"x": {"a": 30}}, {"x": {"a": 600}}],
-                              upsert);
-    assertCanUpdatePartialShardKey(st,
-                                   kDbName,
-                                   ns,
-                                   session,
-                                   sessionDB,
-                                   runInTxn,
-                                   isFindAndModify,
-                                   [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                                   [{"x": 30, "y": 80}, {"x": 600, "y": 3}],
-                                   upsert);
+    assertCanUpdatePrimitiveShardKey(
+        st,
+        kDbName,
+        ns,
+        session,
+        sessionDB,
+        runInTxn,
+        isFindAndModify,
+        [{"x": 300}, {"x": 4}],
+        [{"x": 30}, {"x": 600}],
+        upsert,
+    );
+    assertCanUpdateDottedPath(
+        st,
+        kDbName,
+        ns,
+        session,
+        sessionDB,
+        runInTxn,
+        isFindAndModify,
+        [{"x.a": 300}, {"x.a": 4}],
+        [{"x": {"a": 30}}, {"x": {"a": 600}}],
+        upsert,
+    );
+    assertCanUpdatePartialShardKey(
+        st,
+        kDbName,
+        ns,
+        session,
+        sessionDB,
+        runInTxn,
+        isFindAndModify,
+        [
+            {"x": 300, "y": 80},
+            {"x": 4, "y": 3},
+        ],
+        [
+            {"x": 30, "y": 80},
+            {"x": 600, "y": 3},
+        ],
+        upsert,
+    );
 
-    assertCanUnsetSKField(
-        st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {}, upsert);
+    assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {}, upsert);
 
     // Failure cases. These tests do not take 'upsert' as an option so we do not need to test
     // them for both upsert true and false.
     if (!upsert) {
         assertCannotUpdate_id(
-            st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"_id": 300}, {
-                "_id": 30
-            });
+            st,
+            kDbName,
+            ns,
+            session,
+            sessionDB,
+            runInTxn,
+            isFindAndModify,
+            {"_id": 300},
+            {
+                "_id": 30,
+            },
+        );
         assertCannotUpdate_idDottedPath(
-            st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"_id.a": 300}, {
-                "_id": {"a": 30}
-            });
+            st,
+            kDbName,
+            ns,
+            session,
+            sessionDB,
+            runInTxn,
+            isFindAndModify,
+            {"_id.a": 300},
+            {
+                "_id": {"a": 30},
+            },
+        );
         if (!isFindAndModify) {
-            assertCannotUpdateWithMultiTrue(
-                st, kDbName, ns, session, sessionDB, runInTxn, {"x": 300}, {"x": 30});
+            assertCannotUpdateWithMultiTrue(st, kDbName, ns, session, sessionDB, runInTxn, {"x": 300}, {"x": 30});
         }
         assertCannotUpdateSKToArray(
-            st, kDbName, ns, session, sessionDB, runInTxn, isFindAndModify, {"x": 300}, {
-                "x": [30]
-            });
+            st,
+            kDbName,
+            ns,
+            session,
+            sessionDB,
+            runInTxn,
+            isFindAndModify,
+            {"x": 300},
+            {
+                "x": [30],
+            },
+        );
     }
 });
 
 let session = st.s.startSession({retryWrites: true});
 let sessionDB = session.getDatabase(kDbName);
 
-let docsToInsert =
-    [{"x": 4, "a": 3}, {"x": 78}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
+let docsToInsert = [{"x": 4, "a": 3}, {"x": 78}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
 
 // ----Assert correct behavior when collection is hash sharded----
 
@@ -369,16 +475,24 @@ assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).foo.insert({"x": 2, "_id
 
 let res = sessionDB.foo.update({"x": 505}, {"$set": {"x": 20}});
 assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
-assert(res.getWriteError().errmsg.includes(
-    "There is either an orphan for this document or _id for this collection is not globally unique."));
+assert(
+    res
+        .getWriteError()
+        .errmsg.includes(
+            "There is either an orphan for this document or _id for this collection is not globally unique.",
+        ),
+);
 
 withAbortAndRetryOnTransientTxnError(session, () => {
     session.startTransaction();
     res = sessionDB.foo.update({"x": 505}, {"$set": {"x": 20}});
     assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
 });
-assert(res.errmsg.includes(
-    "There is either an orphan for this document or _id for this collection is not globally unique."));
+assert(
+    res.errmsg.includes(
+        "There is either an orphan for this document or _id for this collection is not globally unique.",
+    ),
+);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 mongos.getDB(kDbName).foo.drop();
@@ -389,14 +503,16 @@ shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {
 
 assert.commandWorked(sessionDB.foo.update({x: 4}, {$set: {x: 1000}}, {writeConcern: {w: 1}}));
 
-assert.commandWorked(sessionDB.runCommand({
-    findAndModify: 'foo',
-    query: {x: 78},
-    update: {$set: {x: 250}},
-    lsid: {id: UUID()},
-    txnNumber: NumberLong(1),
-    writeConcern: {w: 1},
-}));
+assert.commandWorked(
+    sessionDB.runCommand({
+        findAndModify: "foo",
+        query: {x: 78},
+        update: {$set: {x: 250}},
+        lsid: {id: UUID()},
+        txnNumber: NumberLong(1),
+        writeConcern: {w: 1},
+    }),
+);
 
 mongos.getDB(kDbName).foo.drop();
 
@@ -405,22 +521,27 @@ mongos.getDB(kDbName).foo.drop();
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
 // Turn on failcommand fail point to fail CoordinateCommitTransaction
-assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {
-        writeConcernError: {code: NumberInt(12345), errmsg: "dummy error"},
-        failCommands: ["coordinateCommitTransaction"],
-        failInternalCommands: true
-    }
-}));
+assert.commandWorked(
+    st.rs0
+        .getPrimary()
+        .getDB(kDbName)
+        .adminCommand({
+            configureFailPoint: "failCommand",
+            mode: "alwaysOn",
+            data: {
+                writeConcernError: {code: NumberInt(12345), errmsg: "dummy error"},
+                failCommands: ["coordinateCommitTransaction"],
+                failInternalCommands: true,
+            },
+        }),
+);
 
 res = sessionDB.foo.update({x: 4}, {$set: {x: 1000}});
 assert.commandWorkedIgnoringWriteConcernErrors(res);
 assert.eq(12345, res.getWriteConcernError().code);
 
 res = sessionDB.runCommand({
-    findAndModify: 'foo',
+    findAndModify: "foo",
     query: {x: 78},
     update: {$set: {x: 250}},
     lsid: {id: UUID()},
@@ -430,10 +551,12 @@ assert.commandWorkedIgnoringWriteConcernErrors(res);
 assert.eq(res.writeConcernError.code, 12345);
 assert(res.writeConcernError.errmsg.includes("dummy error"));
 
-assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "off",
-}));
+assert.commandWorked(
+    st.rs0.getPrimary().getDB(kDbName).adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "off",
+    }),
+);
 
 mongos.getDB(kDbName).foo.drop();
 
@@ -443,11 +566,16 @@ shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {
 
 // Set this failpoint on the coordinator shard so that sending prepareTransaction to
 // participating shards will fail.
-assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
-    configureFailPoint: "failRemoteTransactionCommand",
-    mode: "alwaysOn",
-    data: {command: "prepareTransaction", code: ErrorCodes.TransactionTooOld}
-}));
+assert.commandWorked(
+    st.rs0
+        .getPrimary()
+        .getDB(kDbName)
+        .adminCommand({
+            configureFailPoint: "failRemoteTransactionCommand",
+            mode: "alwaysOn",
+            data: {command: "prepareTransaction", code: ErrorCodes.TransactionTooOld},
+        }),
+);
 
 res = sessionDB.foo.update({x: 4}, {$set: {x: 1000}});
 
@@ -459,7 +587,7 @@ assert.eq(res.nMatched, 0);
 assert.eq(res.nUpserted, 0);
 
 res = sessionDB.runCommand({
-    findAndModify: 'foo',
+    findAndModify: "foo",
     query: {x: 78},
     update: {$set: {x: 250}},
     lsid: {id: UUID()},
@@ -469,10 +597,12 @@ res = sessionDB.runCommand({
 // findAndModify reports the failure as a top-level error.
 assert.commandFailedWithCode(res, ErrorCodes.TransactionTooOld);
 
-assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).adminCommand({
-    configureFailPoint: "failRemoteTransactionCommand",
-    mode: "off",
-}));
+assert.commandWorked(
+    st.rs0.getPrimary().getDB(kDbName).adminCommand({
+        configureFailPoint: "failRemoteTransactionCommand",
+        mode: "off",
+    }),
+);
 
 mongos.getDB(kDbName).foo.drop();
 

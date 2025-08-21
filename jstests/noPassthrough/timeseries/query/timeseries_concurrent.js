@@ -18,15 +18,18 @@ import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 function runAndAssertAggregation(coll, pred, ids) {
     const pipe = [{$match: pred}, {$project: {_id: 1}}];
 
-    const results = coll.aggregate(pipe).toArray().map((x) => x._id);
+    const results = coll
+        .aggregate(pipe)
+        .toArray()
+        .map((x) => x._id);
     results.sort();
     assert.eq(ids, results, () => "Aggregate " + tojson(pipe));
 }
 
 function runTests(conn, db, coll, testCases) {
     // $match pushdown requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.
-    const sbeEnabled = checkSbeFullyEnabled(db) &&
-        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
+    const sbeEnabled =
+        checkSbeFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
 
     for (let testCase of testCases) {
         let preds = testCase.preds;
@@ -41,8 +44,12 @@ function runTests(conn, db, coll, testCases) {
         const engineUsed = getEngine(explain);
         const singleNodeQueryPlanner = getQueryPlanner(explain);
         function testCaseAndExplainFn(description) {
-            return () => description + " for predicate " + tojson(preds[0]) +
-                " failed with explain " + tojson(singleNodeQueryPlanner);
+            return () =>
+                description +
+                " for predicate " +
+                tojson(preds[0]) +
+                " failed with explain " +
+                tojson(singleNodeQueryPlanner);
         }
 
         if (sbeEnabled || singleNodeQueryPlanner.winningPlan.slotBasedPlan) {
@@ -52,31 +59,38 @@ function runTests(conn, db, coll, testCases) {
                 assert.eq(engineUsed, "sbe");
 
                 // Check for the fold function.
-                assert(sbePlan.includes("cellFoldValues_F"),
-                       testCaseAndExplainFn("Expected explain to use block processing"));
+                assert(
+                    sbePlan.includes("cellFoldValues_F"),
+                    testCaseAndExplainFn("Expected explain to use block processing"),
+                );
             } else {
-                assert(!sbePlan.includes("cellFoldValues_F"),
-                       testCaseAndExplainFn("Expected explain not to use block processing"));
+                assert(
+                    !sbePlan.includes("cellFoldValues_F"),
+                    testCaseAndExplainFn("Expected explain not to use block processing"),
+                );
             }
         }
 
         // Run and assert the aggregations with different constants parallelly in separate threads
         let threads = [];
         for (let i = 0; i < preds.length; i++) {
-            let thread = new Thread(function(connStr, i, runAndAssertAggregation, pred, ids) {
-                let conn = new Mongo(connStr);
-                let db = conn.getDB('test');
-                let coll = db[jsTestName()];
+            let thread = new Thread(
+                function (connStr, i, runAndAssertAggregation, pred, ids) {
+                    let conn = new Mongo(connStr);
+                    let db = conn.getDB("test");
+                    let coll = db[jsTestName()];
 
-                // Run each aggregation 500 times to ensure concurrent execution
-                for (let times = 0; times < 500; ++times) {
-                    runAndAssertAggregation(
-                        coll,
-                        pred,
-                        ids,
-                    );
-                }
-            }, conn.name, i, runAndAssertAggregation, preds[i], ids[i]);
+                    // Run each aggregation 500 times to ensure concurrent execution
+                    for (let times = 0; times < 500; ++times) {
+                        runAndAssertAggregation(coll, pred, ids);
+                    }
+                },
+                conn.name,
+                i,
+                runAndAssertAggregation,
+                preds[i],
+                ids[i],
+            );
             threads.push(thread);
             thread.start();
         }
@@ -97,13 +111,15 @@ TimeseriesTest.run((insert) => {
 
     let coll = db[jsTestName()];
 
-    const timeFieldName = 'time';
-    const metaFieldName = 'measurement';
+    const timeFieldName = "time";
+    const metaFieldName = "measurement";
 
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
+    );
 
     insert(coll, {
         _id: 0,
@@ -114,7 +130,7 @@ TimeseriesTest.run((insert) => {
         arrOfObj: [{x: 1}, {x: 2}, {x: 3}, {x: 4}],
         emptyArray: [],
         nestedArray: [{subField: [1]}, {subField: [2]}, {subField: 3}],
-        sometimesDoublyNestedArray: [[1], [2], [3], []]
+        sometimesDoublyNestedArray: [[1], [2], [3], []],
     });
     insert(coll, {
         _id: 1,
@@ -125,7 +141,7 @@ TimeseriesTest.run((insert) => {
         arrOfObj: [{x: 101}, {x: 102}, {x: 103}, {x: 104}],
         emptyArray: [],
         nestedArray: [{subField: [101]}, {subField: [102]}, {subField: 103}],
-        sometimesDoublyNestedArray: [[101], 102, [103]]
+        sometimesDoublyNestedArray: [[101], 102, [103]],
     });
     insert(coll, {
         _id: 2,
@@ -155,32 +171,32 @@ TimeseriesTest.run((insert) => {
 
     const kTestCases = [
         {
-            preds: constants.map(constant => ({"topLevelScalar": {$gt: constant}})),
+            preds: constants.map((constant) => ({"topLevelScalar": {$gt: constant}})),
             ids: [[0, 1], [0, 1], [0, 1], [1], [1], [1], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"topLevelScalar": {$gte: constant}})),
+            preds: constants.map((constant) => ({"topLevelScalar": {$gte: constant}})),
             ids: [[0, 1], [0, 1], [0, 1], [0, 1], [1], [1], [1], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"topLevelScalar": {$lt: constant}})),
+            preds: constants.map((constant) => ({"topLevelScalar": {$lt: constant}})),
             ids: [[], [], [], [], [0], [0], [0], [0, 1]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"topLevelScalar": {$lte: constant}})),
+            preds: constants.map((constant) => ({"topLevelScalar": {$lte: constant}})),
             ids: [[], [], [], [0], [0], [0], [0, 1], [0, 1]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"topLevelScalar": {$eq: constant}})),
+            preds: constants.map((constant) => ({"topLevelScalar": {$eq: constant}})),
             ids: [[], [], [], [0], [], [], [1], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"topLevelScalar": {$ne: constant}})),
+            preds: constants.map((constant) => ({"topLevelScalar": {$ne: constant}})),
             ids: [
                 [0, 1, 2, 3, 4],
                 [0, 1, 2, 3, 4],
@@ -189,64 +205,64 @@ TimeseriesTest.run((insert) => {
                 [0, 1, 2, 3, 4],
                 [0, 1, 2, 3, 4],
                 [0, 2, 3, 4],
-                [0, 1, 2, 3, 4]
+                [0, 1, 2, 3, 4],
             ],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
 
         {
-            preds: constants.map(constant => ({"topLevelArray": {$gt: constant}})),
+            preds: constants.map((constant) => ({"topLevelArray": {$gt: constant}})),
             ids: [[1], [1], [1], [], [], [], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"topLevelArray": {$gte: constant}})),
+            preds: constants.map((constant) => ({"topLevelArray": {$gte: constant}})),
             ids: [[0, 1], [1], [1], [], [], [], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"topLevelArray": {$lt: constant}})),
+            preds: constants.map((constant) => ({"topLevelArray": {$lt: constant}})),
             ids: [[0], [0], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"topLevelArray": {$lte: constant}})),
+            preds: constants.map((constant) => ({"topLevelArray": {$lte: constant}})),
             ids: [[0], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1], [0, 1]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"topLevelArray": {$eq: constant}})),
+            preds: constants.map((constant) => ({"topLevelArray": {$eq: constant}})),
             ids: [[0], [1], [1], [], [], [], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
 
         {
-            preds: constants.map(constant => ({"arrOfObj.x": {$gt: constant}})),
+            preds: constants.map((constant) => ({"arrOfObj.x": {$gt: constant}})),
             ids: [[1, 4], [1, 4], [1, 4], [], [], [], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"arrOfObj.x": {$gte: constant}})),
+            preds: constants.map((constant) => ({"arrOfObj.x": {$gte: constant}})),
             ids: [[0, 1, 4], [1, 4], [1, 4], [], [], [], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"arrOfObj.x": {$lt: constant}})),
+            preds: constants.map((constant) => ({"arrOfObj.x": {$lt: constant}})),
             ids: [[0], [0], [0, 1, 4], [0, 1, 4], [0, 1, 4], [0, 1, 4], [0, 1, 4], [0, 1, 4]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"arrOfObj.x": {$lte: constant}})),
+            preds: constants.map((constant) => ({"arrOfObj.x": {$lte: constant}})),
             ids: [[0], [0, 1, 4], [0, 1, 4], [0, 1, 4], [0, 1, 4], [0, 1, 4], [0, 1, 4], [0, 1, 4]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"arrOfObj.x": {$eq: constant}})),
+            preds: constants.map((constant) => ({"arrOfObj.x": {$eq: constant}})),
             ids: [[0], [1, 4], [1, 4], [], [], [], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"arrOfObj.x": {$ne: constant}})),
+            preds: constants.map((constant) => ({"arrOfObj.x": {$ne: constant}})),
             ids: [
                 [1, 2, 3, 4],
                 [0, 2, 3],
@@ -255,56 +271,38 @@ TimeseriesTest.run((insert) => {
                 [0, 1, 2, 3, 4],
                 [0, 1, 2, 3, 4],
                 [0, 1, 2, 3, 4],
-                [0, 1, 2, 3, 4]
+                [0, 1, 2, 3, 4],
             ],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
 
         {
-            preds: constants.map(constant => ({"time": {$gt: new Date(datePrefix + constant)}})),
-            ids: [
-                [0, 1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [3, 4],
-                [4],
-                []
-            ],
-            usesBlockProcessing: true
+            preds: constants.map((constant) => ({"time": {$gt: new Date(datePrefix + constant)}})),
+            ids: [[0, 1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [3, 4], [4], []],
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"time": {$gte: new Date(datePrefix + constant)}})),
-            ids: [
-                [0, 1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [2, 3, 4],
-                [4],
-                []
-            ],
-            usesBlockProcessing: true
+            preds: constants.map((constant) => ({"time": {$gte: new Date(datePrefix + constant)}})),
+            ids: [[0, 1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [2, 3, 4], [4], []],
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"time": {$lt: new Date(datePrefix + constant)}})),
+            preds: constants.map((constant) => ({"time": {$lt: new Date(datePrefix + constant)}})),
             ids: [[], [0], [0], [0], [0], [0, 1], [0, 1, 2, 3], [0, 1, 2, 3, 4]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"time": {$lte: new Date(datePrefix + constant)}})),
+            preds: constants.map((constant) => ({"time": {$lte: new Date(datePrefix + constant)}})),
             ids: [[], [0], [0], [0], [0], [0, 1, 2], [0, 1, 2, 3], [0, 1, 2, 3, 4]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"time": {$eq: new Date(datePrefix + constant)}})),
+            preds: constants.map((constant) => ({"time": {$eq: new Date(datePrefix + constant)}})),
             ids: [[], [], [], [], [], [2], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"time": {$ne: new Date(datePrefix + constant)}})),
+            preds: constants.map((constant) => ({"time": {$ne: new Date(datePrefix + constant)}})),
             ids: [
                 [0, 1, 2, 3, 4],
                 [0, 1, 2, 3, 4],
@@ -313,101 +311,74 @@ TimeseriesTest.run((insert) => {
                 [0, 1, 2, 3, 4],
                 [0, 1, 3, 4],
                 [0, 1, 2, 3, 4],
-                [0, 1, 2, 3, 4]
+                [0, 1, 2, 3, 4],
             ],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(
-                constant => ({
-                    "time": {$gt: new Date(datePrefix + constant), $lt: new Date(datePrefix + 300)}
-                })),
+            preds: constants.map((constant) => ({
+                "time": {$gt: new Date(datePrefix + constant), $lt: new Date(datePrefix + 300)},
+            })),
             ids: [[0, 1], [1], [1], [1], [1], [], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(
-                constant => ({
-                    $or: [
-                        {
-                            $and: [
-                                {"time": {$gte: new Date("2019-09-27T21:14:45.654Z")}},
-                                {"time": {$gt: new Date(datePrefix + constant)}}
-                            ]
-                        },
-                        {"time": {$eq: new Date(datePrefix + constant)}}
-                    ]
-                })),
+            preds: constants.map((constant) => ({
+                $or: [
+                    {
+                        $and: [
+                            {"time": {$gte: new Date("2019-09-27T21:14:45.654Z")}},
+                            {"time": {$gt: new Date(datePrefix + constant)}},
+                        ],
+                    },
+                    {"time": {$eq: new Date(datePrefix + constant)}},
+                ],
+            })),
             ids: [[], [], [], [], [], [2], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(
-                constant => ({
-                    $or: [
-                        {$expr: {$regexFind: {input: "$measurement", regex: "^2", options: ""}}},
-                        {"topLevelScalar": {$lte: constant}}
-                    ]
-                })),
+            preds: constants.map((constant) => ({
+                $or: [
+                    {$expr: {$regexFind: {input: "$measurement", regex: "^2", options: ""}}},
+                    {"topLevelScalar": {$lte: constant}},
+                ],
+            })),
             ids: [[], [], [], [0], [0], [0], [0, 1], [0, 1]],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
-            preds: constants.map(constant => ({$expr: {$lt: [constant, "$topLevelScalar"]}})),
+            preds: constants.map((constant) => ({$expr: {$lt: [constant, "$topLevelScalar"]}})),
             ids: [[0, 1], [0, 1], [0, 1], [1], [1], [1], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant =>
-                                     ({$expr: {$lt: [new Date(datePrefix + constant), "$time"]}})),
-            ids: [
-                [0, 1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [3, 4],
-                [4],
-                []
-            ],
-            usesBlockProcessing: true
+            preds: constants.map((constant) => ({$expr: {$lt: [new Date(datePrefix + constant), "$time"]}})),
+            ids: [[0, 1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [3, 4], [4], []],
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant =>
-                                     ({$expr: {$lte: [new Date(datePrefix + constant), "$time"]}})),
-            ids: [
-                [0, 1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [1, 2, 3, 4],
-                [2, 3, 4],
-                [4],
-                []
-            ],
-            usesBlockProcessing: true
+            preds: constants.map((constant) => ({$expr: {$lte: [new Date(datePrefix + constant), "$time"]}})),
+            ids: [[0, 1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4], [2, 3, 4], [4], []],
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant =>
-                                     ({$expr: {$gt: [new Date(datePrefix + constant), "$time"]}})),
+            preds: constants.map((constant) => ({$expr: {$gt: [new Date(datePrefix + constant), "$time"]}})),
             ids: [[], [0], [0], [0], [0], [0, 1], [0, 1, 2, 3], [0, 1, 2, 3, 4]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant =>
-                                     ({$expr: {$gte: [new Date(datePrefix + constant), "$time"]}})),
+            preds: constants.map((constant) => ({$expr: {$gte: [new Date(datePrefix + constant), "$time"]}})),
             ids: [[], [0], [0], [0], [0], [0, 1, 2], [0, 1, 2, 3], [0, 1, 2, 3, 4]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant =>
-                                     ({$expr: {$eq: [new Date(datePrefix + constant), "$time"]}})),
+            preds: constants.map((constant) => ({$expr: {$eq: [new Date(datePrefix + constant), "$time"]}})),
             ids: [[], [], [], [], [], [2], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant =>
-                                     ({$expr: {$ne: [new Date(datePrefix + constant), "$time"]}})),
+            preds: constants.map((constant) => ({$expr: {$ne: [new Date(datePrefix + constant), "$time"]}})),
             ids: [
                 [0, 1, 2, 3, 4],
                 [0, 1, 2, 3, 4],
@@ -416,44 +387,44 @@ TimeseriesTest.run((insert) => {
                 [0, 1, 2, 3, 4],
                 [0, 1, 3, 4],
                 [0, 1, 2, 3, 4],
-                [0, 1, 2, 3, 4]
+                [0, 1, 2, 3, 4],
             ],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
 
         {
-            preds: constants.map(constant => ({
-                                     "$expr": {
-                                         "$gt": [
-                                             {
-                                                 "$dateDiff": {
-                                                     "startDate": "$time",
-                                                     "endDate": new Date(datePrefix + constant),
-                                                     "unit": "millisecond"
-                                                 }
-                                             },
-                                             0
-                                         ]
-                                     }
-                                 })),
+            preds: constants.map((constant) => ({
+                "$expr": {
+                    "$gt": [
+                        {
+                            "$dateDiff": {
+                                "startDate": "$time",
+                                "endDate": new Date(datePrefix + constant),
+                                "unit": "millisecond",
+                            },
+                        },
+                        0,
+                    ],
+                },
+            })),
             ids: [[], [0], [0], [0], [0], [0, 1], [0, 1, 2, 3], [0, 1, 2, 3, 4]],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({
-                                     "$expr": {
-                                         "$gt": [
-                                             {
-                                                 "$dateDiff": {
-                                                     "startDate": new Date(datePrefix + constant),
-                                                     "endDate": "$time",
-                                                     "unit": "millisecond"
-                                                 }
-                                             },
-                                             -60
-                                         ]
-                                     }
-                                 })),
+            preds: constants.map((constant) => ({
+                "$expr": {
+                    "$gt": [
+                        {
+                            "$dateDiff": {
+                                "startDate": new Date(datePrefix + constant),
+                                "endDate": "$time",
+                                "unit": "millisecond",
+                            },
+                        },
+                        -60,
+                    ],
+                },
+            })),
             ids: [
                 [0, 1, 2, 3, 4],
                 [0, 1, 2, 3, 4],
@@ -462,57 +433,53 @@ TimeseriesTest.run((insert) => {
                 [0, 1, 2, 3, 4],
                 [2, 3, 4],
                 [3, 4],
-                [4]
+                [4],
             ],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(
-                constant => ({
-                    "$expr": {
-                        "$eq": [
-                            {
-                                "$dateAdd":
-                                    {"startDate": "$time", "unit": "millisecond", amount: 100}
-                            },
-                            new Date(datePrefix + constant)
-                        ]
-                    }
-                })),
+            preds: constants.map((constant) => ({
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$dateAdd": {"startDate": "$time", "unit": "millisecond", amount: 100},
+                        },
+                        new Date(datePrefix + constant),
+                    ],
+                },
+            })),
             ids: [[], [], [], [], [], [1], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(
-                constant => ({
-                    "$expr": {
-                        "$eq": [
-                            {
-                                "$dateSubtract":
-                                    {"startDate": "$time", "unit": "millisecond", amount: constant}
-                            },
-                            new Date(datePrefix)
-                        ]
-                    }
-                })),
+            preds: constants.map((constant) => ({
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$dateSubtract": {"startDate": "$time", "unit": "millisecond", amount: constant},
+                        },
+                        new Date(datePrefix),
+                    ],
+                },
+            })),
             ids: [[], [], [], [], [], [2], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
 
         {
-            preds: constants.map(constant => ({"nestedArray.subField": constant})),
+            preds: constants.map((constant) => ({"nestedArray.subField": constant})),
             ids: [[], [1], [1], [], [], [], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"sometimesDoublyNestedArray": constant})),
+            preds: constants.map((constant) => ({"sometimesDoublyNestedArray": constant})),
             ids: [[], [], [1], [], [], [], [], []],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
-            preds: constants.map(constant => ({"sometimesDoublyNestedArray": [constant]})),
+            preds: constants.map((constant) => ({"sometimesDoublyNestedArray": [constant]})),
             ids: [[], [1], [], [], [], [], [], []],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
     ];
 

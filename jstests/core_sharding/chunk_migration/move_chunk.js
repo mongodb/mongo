@@ -9,8 +9,8 @@
 
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-const configDB = db.getSiblingDB('config');
-const shardNames = db.adminCommand({listShards: 1}).shards.map(shard => shard._id);
+const configDB = db.getSiblingDB("config");
+const shardNames = db.adminCommand({listShards: 1}).shards.map((shard) => shard._id);
 
 if (shardNames.length < 2) {
     print(jsTestName() + " will not run; at least 2 shards are required.");
@@ -44,29 +44,26 @@ function getInitialChunkAndShardNames(configDB, ns, shardNames) {
 
 function testErrorOnInvalidNamespace(db) {
     jsTestLog("Test moveChunk fails for invalid namespace.");
-    assert.commandFailed(db.adminCommand({moveChunk: '', find: {_id: 1}, to: shardNames[1]}));
+    assert.commandFailed(db.adminCommand({moveChunk: "", find: {_id: 1}, to: shardNames[1]}));
 }
 
 function testErrorOnDatabaseDNE(db) {
     jsTestLog("Test moveChunk fails for namespace that does not exist.");
-    assert.commandFailed(
-        db.adminCommand({moveChunk: 'nonexistent.namespace', find: {_id: 1}, to: shardNames[1]}));
+    assert.commandFailed(db.adminCommand({moveChunk: "nonexistent.namespace", find: {_id: 1}, to: shardNames[1]}));
 }
 
 function testErrorOnUnshardedCollection(db) {
     jsTestLog("Test moveChunk fails for an unsharded collection.");
-    assert.commandFailed(db.adminCommand(
-        {moveChunk: db.getName() + '.unsharded', find: {_id: 1}, to: shardNames[1]}));
+    assert.commandFailed(db.adminCommand({moveChunk: db.getName() + ".unsharded", find: {_id: 1}, to: shardNames[1]}));
 }
 
 function testHashed(db) {
     jsTestLog("Test moveChunk on sharded collection with hashed key using find and bounds.");
     const collName = jsTestName() + "_hashed";
-    const ns = db.getName() + '.' + collName;
+    const ns = db.getName() + "." + collName;
     const coll = db.getCollection(collName);
 
-    assert.commandWorked(
-        db.adminCommand({shardCollection: ns, key: {_id: 'hashed'}, numInitialChunks: 1}));
+    assert.commandWorked(db.adminCommand({shardCollection: ns, key: {_id: "hashed"}, numInitialChunks: 1}));
 
     var aChunk;
     var shard0;
@@ -75,17 +72,13 @@ function testHashed(db) {
     assert(aChunk);
 
     // Error if either of the bounds is not a valid shard key (BSON object - 1 yields a NaN)
-    assert.commandFailed(
-        db.adminCommand({moveChunk: ns, bounds: [MinKey - 1, MaxKey], to: shard1}));
-    assert.commandFailed(
-        db.adminCommand({moveChunk: ns, bounds: [MinKey, MaxKey - 1], to: shard1}));
+    assert.commandFailed(db.adminCommand({moveChunk: ns, bounds: [MinKey - 1, MaxKey], to: shard1}));
+    assert.commandFailed(db.adminCommand({moveChunk: ns, bounds: [MinKey, MaxKey - 1], to: shard1}));
 
     // Fail if find and bounds are both set.
-    assert.commandFailed(
-        db.adminCommand({moveChunk: ns, find: {_id: 1}, bounds: [MinKey, MaxKey], to: shard1}));
+    assert.commandFailed(db.adminCommand({moveChunk: ns, find: {_id: 1}, bounds: [MinKey, MaxKey], to: shard1}));
 
-    assert.commandWorked(
-        db.adminCommand({moveChunk: ns, bounds: [aChunk.min, aChunk.max], to: shard1}));
+    assert.commandWorked(db.adminCommand({moveChunk: ns, bounds: [aChunk.min, aChunk.max], to: shard1}));
 
     assert.eq(0, configDB.chunks.count({_id: aChunk._id, shard: shard0}));
     assert.eq(1, configDB.chunks.count({_id: aChunk._id, shard: shard1}));
@@ -94,10 +87,9 @@ function testHashed(db) {
 }
 
 function testNotHashed(db, keyDoc) {
-    jsTestLog("Test moveChunk on sharded collection with key " + tojson(keyDoc) +
-              " using find and bounds.");
+    jsTestLog("Test moveChunk on sharded collection with key " + tojson(keyDoc) + " using find and bounds.");
     const collName = jsTestName();
-    const ns = db.getName() + '.' + collName;
+    const ns = db.getName() + "." + collName;
     const coll = db.getCollection(collName);
 
     // Fail if find is not a valid shard key.
@@ -122,7 +114,7 @@ function testNotHashed(db, keyDoc) {
     assert.eq(shard1, configDB.chunks.findOne({_id: chunkId}).shard);
 
     // Fail if to shard that does not exist.
-    assert.commandFailed(db.adminCommand({moveChunk: ns, find: keyDoc, to: 'WrongShard'}));
+    assert.commandFailed(db.adminCommand({moveChunk: ns, find: keyDoc, to: "WrongShard"}));
 
     // Fail if chunk is already at shard.
     assert.eq(shard1, configDB.chunks.findOne({_id: chunkId}).shard);

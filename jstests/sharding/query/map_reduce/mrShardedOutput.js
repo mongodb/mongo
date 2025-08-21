@@ -13,7 +13,7 @@ const inputColl = testDB.foo;
 const outputColl = testDB.mr_sharded_out;
 
 const numDocs = 500;
-const str = 'a'.repeat(1023);
+const str = "a".repeat(1023);
 // Shard the input collection by "a" and split into two chunks, one on each shard.
 st.shardColl(inputColl, {a: 1}, {a: numDocs / 2}, {a: numDocs});
 
@@ -24,8 +24,8 @@ function reduce(key, values) {
     // 'values' can contain a null entry if we're using reduce for output mode "reduce" and the
     // target doesn't exist.
     return {
-        count: Array.sum(values.map(val => val === null ? 0 : val.count)),
-        y: values.map(val => val === null ? "" : val.y).join("")
+        count: Array.sum(values.map((val) => (val === null ? 0 : val.count))),
+        y: values.map((val) => (val === null ? "" : val.y)).join(""),
     };
 }
 
@@ -38,17 +38,20 @@ assert.commandWorked(bulk.execute());
 // Should not be able to replace to a sharded collection.
 assert.throwsWithCode(
     () => inputColl.mapReduce(map, reduce, {out: {replace: outputColl.getName(), sharded: true}}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 // Should fail if we specify "merge" or "reduce" with sharded: true and the collection does not yet
 // exist as sharded.
 assert.throwsWithCode(
     () => inputColl.mapReduce(map, reduce, {out: {merge: outputColl.getName(), sharded: true}}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 assert.throwsWithCode(
     () => inputColl.mapReduce(map, reduce, {out: {reduce: outputColl.getName(), sharded: true}}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 // Now create and shard the output collection, again with one chunk on each shard.
 st.shardColl(outputColl, {_id: 1}, {_id: numDocs / 2}, {_id: numDocs / 2});
@@ -73,6 +76,7 @@ assert.eq(evenResult.value.count * 2, oddResult.value.count, [evenResult, oddRes
 // 'sharded' option is not specified.
 assert.throwsWithCode(
     () => inputColl.mapReduce(map, reduce, {out: {replace: outputColl.getName()}}),
-    ErrorCodes.IllegalOperation);
+    ErrorCodes.IllegalOperation,
+);
 
 st.stop();

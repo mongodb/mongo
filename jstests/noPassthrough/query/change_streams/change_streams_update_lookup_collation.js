@@ -15,7 +15,7 @@ const db = rst.getPrimary().getDB("test");
 const coll = db[jsTestName()];
 const caseInsensitive = {
     locale: "en_US",
-    strength: 2
+    strength: 2,
 };
 assert.commandWorked(db.createCollection(coll.getName(), {collation: caseInsensitive}));
 
@@ -28,16 +28,18 @@ assert.commandWorked(coll.insert({_id: "åbC", x: "AbÇ"}));
 
 const changeStreamDefaultCollation = coll.aggregate(
     [{$changeStream: {fullDocument: "updateLookup"}}, {$match: {"fullDocument.x": "abc"}}],
-    {collation: caseInsensitive});
+    {collation: caseInsensitive},
+);
 
 // Strength one will consider "ç" equal to "c" and "C".
 const strengthOneCollation = {
     locale: "en_US",
-    strength: 1
+    strength: 1,
 };
 const strengthOneChangeStream = coll.aggregate(
     [{$changeStream: {fullDocument: "updateLookup"}}, {$match: {"fullDocument.x": "abc"}}],
-    {collation: strengthOneCollation});
+    {collation: strengthOneCollation},
+);
 
 assert.commandWorked(coll.update({_id: "abc"}, {$set: {updated: true}}));
 
@@ -51,8 +53,7 @@ const idIndexUsagesBeforeIteration = numIdIndexUsages();
 // Both cursors should produce a document describing this update, since the "x" value of the
 // first document will match both filters.
 assert.soon(() => changeStreamDefaultCollation.hasNext());
-assert.docEq({_id: "abc", x: "abc", updated: true},
-             changeStreamDefaultCollation.next().fullDocument);
+assert.docEq({_id: "abc", x: "abc", updated: true}, changeStreamDefaultCollation.next().fullDocument);
 assert.eq(numIdIndexUsages(), idIndexUsagesBeforeIteration + 1);
 assert.soon(() => strengthOneChangeStream.hasNext());
 assert.docEq({_id: "abc", x: "abc", updated: true}, strengthOneChangeStream.next().fullDocument);
@@ -63,8 +64,7 @@ assert.eq(numIdIndexUsages(), idIndexUsagesBeforeIteration + 3);
 
 // Again, both cursors should produce a document describing this update.
 assert.soon(() => changeStreamDefaultCollation.hasNext());
-assert.docEq({_id: "abç", x: "ABC", updated: true},
-             changeStreamDefaultCollation.next().fullDocument);
+assert.docEq({_id: "abç", x: "ABC", updated: true}, changeStreamDefaultCollation.next().fullDocument);
 assert.eq(numIdIndexUsages(), idIndexUsagesBeforeIteration + 4);
 assert.soon(() => strengthOneChangeStream.hasNext());
 assert.docEq({_id: "abç", x: "ABC", updated: true}, strengthOneChangeStream.next().fullDocument);

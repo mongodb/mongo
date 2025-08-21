@@ -5,7 +5,12 @@
 const coll = db.group_by_empty_obj;
 coll.drop();
 
-assert.commandWorked(coll.insert([{_id: 1, x: 1}, {_id: 2, x: 2}]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 1, x: 1},
+        {_id: 2, x: 2},
+    ]),
+);
 
 function assertIsEmptyObjId(groupSpec) {
     assert.eq([{_id: {}}], coll.aggregate([groupSpec]).toArray());

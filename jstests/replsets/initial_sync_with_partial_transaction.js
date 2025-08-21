@@ -16,7 +16,7 @@ const replTest = new ReplSetTest({
         setParameter:
             // We want two entries in each oplog batch, so the beginning of the transaction is not
             // the end of the batch.
-            {maxNumberOfTransactionOperationsInSingleOplogEntry: 1, bgSyncOplogFetcherBatchSize: 2}
+            {maxNumberOfTransactionOperationsInSingleOplogEntry: 1, bgSyncOplogFetcherBatchSize: 2},
     },
 });
 
@@ -29,10 +29,10 @@ jsTestLog("Adding initial sync node");
 const initialSyncNode = replTest.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
-        'initialSyncSourceReadPreference': 'secondary',
-        'failpoint.initialSyncHangBeforeChoosingSyncSource': tojson({mode: 'alwaysOn'}),
-        'logComponentVerbosity': tojsononeline({replication: {initialSync: 1}})
-    }
+        "initialSyncSourceReadPreference": "secondary",
+        "failpoint.initialSyncHangBeforeChoosingSyncSource": tojson({mode: "alwaysOn"}),
+        "logComponentVerbosity": tojsononeline({replication: {initialSync: 1}}),
+    },
 });
 replTest.reInitiate();
 
@@ -48,13 +48,16 @@ assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "maj
 jsTest.log("Stop secondary oplog replication before the last operation in the transaction.");
 // The stopReplProducerOnDocument failpoint ensures that secondary stops replicating before
 // accepting the last two operations in the transaction.
-const stopReplProducerOnDocumentFailPoint = configureFailPoint(
-    syncSource, "stopReplProducerOnDocument", {document: {"applyOps.o._id": "next-last in txn"}});
+const stopReplProducerOnDocumentFailPoint = configureFailPoint(syncSource, "stopReplProducerOnDocument", {
+    document: {"applyOps.o._id": "next-last in txn"},
+});
 
 // This will cause us to pause batch application at a critical point, with "first in txn" and
 // "next in txn" in the oplog but not applied.
-const pauseBatchApplicationAfterWritingOplogEntriesFailPoint =
-    configureFailPoint(syncSource, "pauseBatchApplicationAfterWritingOplogEntries");
+const pauseBatchApplicationAfterWritingOplogEntriesFailPoint = configureFailPoint(
+    syncSource,
+    "pauseBatchApplicationAfterWritingOplogEntries",
+);
 
 jsTestLog("Starting transaction");
 const session = primary.startSession({causalConsistency: false});
@@ -72,8 +75,9 @@ stopReplProducerOnDocumentFailPoint.wait();
 pauseBatchApplicationAfterWritingOplogEntriesFailPoint.wait();
 
 jsTestLog("Starting initial sync");
-assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeChoosingSyncSource", mode: "off"}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeChoosingSyncSource", mode: "off"}),
+);
 
 // The bug we're testing for is a race.  The way we fix the race is to wait until it resolves.
 // So it's very difficult to test it deterministically; if we use failpoints to force the race to

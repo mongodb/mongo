@@ -22,8 +22,7 @@ var shards = [st.shard0, st.shard1, st.shard2];
 
 jsTest.log("Enabling sharding for the first time...");
 
-assert.commandWorked(
-    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 var bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
@@ -31,7 +30,13 @@ for (var i = 0; i < 100; i++) {
     bulk.insert({_id: i, test: "a"});
 }
 assert.commandWorked(bulk.execute());
-assert.eq(100, staleMongos.getCollection(coll + "").find({test: "a"}).itcount());
+assert.eq(
+    100,
+    staleMongos
+        .getCollection(coll + "")
+        .find({test: "a"})
+        .itcount(),
+);
 
 assert(coll.drop());
 st.configRS.awaitLastOpCommitted();
@@ -51,8 +56,20 @@ for (var i = 0; i < 100; i++) {
     bulk.insert({notId: i, test: "b"});
 }
 assert.commandWorked(bulk.execute());
-assert.eq(100, staleMongos.getCollection(coll + "").find({test: "b"}).itcount());
-assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a"]}}).itcount());
+assert.eq(
+    100,
+    staleMongos
+        .getCollection(coll + "")
+        .find({test: "b"})
+        .itcount(),
+);
+assert.eq(
+    0,
+    staleMongos
+        .getCollection(coll + "")
+        .find({test: {$in: ["a"]}})
+        .itcount(),
+);
 
 assert(coll.drop());
 st.configRS.awaitLastOpCommitted();
@@ -70,7 +87,19 @@ for (var i = 0; i < 100; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-assert.eq(100, staleMongos.getCollection(coll + "").find({test: "c"}).itcount());
-assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a", "b"]}}).itcount());
+assert.eq(
+    100,
+    staleMongos
+        .getCollection(coll + "")
+        .find({test: "c"})
+        .itcount(),
+);
+assert.eq(
+    0,
+    staleMongos
+        .getCollection(coll + "")
+        .find({test: {$in: ["a", "b"]}})
+        .itcount(),
+);
 
 st.stop();

@@ -21,7 +21,7 @@ const rst = new ReplSetTest({
             rsConfig: {
                 priority: 0,
             },
-            slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
+            slowms: 30000, // Don't log slow operations on secondary. See SERVER-44821.
         },
         {
             // The arbiter prevents the primary from stepping down due to lack of majority in the
@@ -31,14 +31,14 @@ const rst = new ReplSetTest({
                 arbiterOnly: true,
             },
         },
-    ]
+    ],
 });
 const nodes = rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
-let primaryDB = primary.getDB('test');
-let primaryColl = primaryDB.getCollection('test');
+let primaryDB = primary.getDB("test");
+let primaryColl = primaryDB.getCollection("test");
 
 assert.commandWorked(primaryColl.insert({a: 1}));
 
@@ -46,18 +46,24 @@ let secondary = rst.getSecondary();
 IndexBuildTest.pauseIndexBuilds(secondary);
 
 const createIdx = IndexBuildTest.startIndexBuild(
-    primary, primaryColl.getFullName(), {a: 1}, {}, ErrorCodes.IndexBuildAborted);
+    primary,
+    primaryColl.getFullName(),
+    {a: 1},
+    {},
+    ErrorCodes.IndexBuildAborted,
+);
 
 // When the index build starts, find its op id.
 let secondaryDB = secondary.getDB(primaryDB.getName());
-const opId =
-    IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, primaryColl.getName(), "a_1");
+const opId = IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, primaryColl.getName(), "a_1");
 
 IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
-    jsTestLog('Inspecting db.currentOp() entry for index build: ' + tojson(op));
-    assert.eq(primaryColl.getFullName(),
-              op.ns,
-              'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
+    jsTestLog("Inspecting db.currentOp() entry for index build: " + tojson(op));
+    assert.eq(
+        primaryColl.getFullName(),
+        op.ns,
+        "Unexpected ns field value in db.currentOp() result for index build: " + tojson(op),
+    );
 });
 
 // Kill the index build on the secondary. With the feature flag enabled, this should signal the
@@ -69,8 +75,8 @@ checkLog.containsJson(secondary, 20655);
 
 primary = rst.getPrimary();
 rst.awaitSecondaryNodes();
-primaryDB = primary.getDB('test');
-primaryColl = primaryDB.getCollection('test');
+primaryDB = primary.getDB("test");
+primaryColl = primaryDB.getCollection("test");
 
 secondary = rst.getSecondary();
 secondaryDB = secondary.getDB(primaryDB.getName());
@@ -84,7 +90,7 @@ rst.awaitReplication();
 createIdx();
 
 // Check that index was aborted by the killOp().
-IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
-IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexes(primaryColl, 1, ["_id_"]);
+IndexBuildTest.assertIndexes(secondaryColl, 1, ["_id_"]);
 
 rst.stopSet();

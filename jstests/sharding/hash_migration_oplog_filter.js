@@ -11,7 +11,7 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
  * that there is only one such oplog entry.
  */
 function findOplogEntry(shard, query) {
-    let oplogDocs = shard.getDB('local').oplog.rs.find(query).toArray();
+    let oplogDocs = shard.getDB("local").oplog.rs.find(query).toArray();
     assert.eq(1, oplogDocs.length);
     return oplogDocs[0];
 }
@@ -21,10 +21,10 @@ function findOplogEntry(shard, query) {
  * that there is only one oplog entry containing a matching operation.
  */
 function findOplogOperationForBatchedVectoredInserts(shard, query) {
-    let outerQuery = {op: 'c', txnNumber: query.txnNumber};
+    let outerQuery = {op: "c", txnNumber: query.txnNumber};
     delete query.txnNumber;
     query = Object.merge(outerQuery, {"o.applyOps": {$elemMatch: query}});
-    let oplogDocs = shard.getDB('local').oplog.rs.find(query, {"o.applyOps.$": 1}).toArray();
+    let oplogDocs = shard.getDB("local").oplog.rs.find(query, {"o.applyOps.$": 1}).toArray();
     assert.eq(1, oplogDocs.length);
     assert.eq(1, oplogDocs[0].o.applyOps.length);
     return oplogDocs[0].o.applyOps[0];
@@ -36,14 +36,13 @@ let collName = "user";
 let ns = dbName + "." + collName;
 let collName2 = "user2";
 let ns2 = dbName + "." + collName2;
-let configDB = st.s.getDB('config');
+let configDB = st.s.getDB("config");
 let testDB = st.s.getDB(dbName);
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
-assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: "hashed"}}));
 
-assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: 'hashed'}}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {x: "hashed"}}));
 
 // Docs are expected to go to the same shards but different chunks.
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(10)}}));
@@ -56,14 +55,12 @@ let docChunkBounds = [];
 let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
-docs.forEach(function(doc) {
+docs.forEach(function (doc) {
     let hashDoc = {x: convertShardKeyToHashed(doc.x)};
 
     // Check that chunks for the doc and its hash are different.
-    let originalShardBoundsPair =
-        chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, doc);
-    let hashShardBoundsPair =
-        chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, hashDoc);
+    let originalShardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, doc);
+    let hashShardBoundsPair = chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, hashDoc);
     assert.neq(originalShardBoundsPair.bounds, hashShardBoundsPair.bounds);
 
     shards.push(hashShardBoundsPair.shard);
@@ -81,7 +78,7 @@ function testChunkMove(dbName, collName, findSourceOperation) {
         documents: docs,
         ordered: false,
         lsid: {id: UUID()},
-        txnNumber: NumberLong(35)
+        txnNumber: NumberLong(35),
     };
     assert.commandWorked(testDB.runCommand(cmd));
     assert.eq(2, testDB.user.find({}).count());
@@ -90,8 +87,9 @@ function testChunkMove(dbName, collName, findSourceOperation) {
     // Move the chunk for docs[0].
     let fromShard = shards[0];
     let toShard = st.getOther(fromShard);
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: ns, bounds: docChunkBounds[0], to: toShard.shardName, _waitForDelete: true}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, bounds: docChunkBounds[0], to: toShard.shardName, _waitForDelete: true}),
+    );
 
     // Check that only the oplog entries for docs[0] are copied onto the recipient shard.
     let oplogQuery = {"op": "i", "o.x": docs[0].x};

@@ -14,13 +14,11 @@ import {
     exactIdUpdate,
     initUpdateInTransactionStates,
     multiUpdate,
-    verifyDocuments
+    verifyDocuments,
 } from "jstests/concurrency/fsm_workload_helpers/update_in_transaction_states.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 
@@ -33,18 +31,20 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // migrated back in. The particular error code is replaced with a more generic one, so this is
     // identified by the failed migration's error message.
     $config.data.isMoveChunkErrorAcceptable = (err) => {
-        return err.message &&
+        return (
+            err.message &&
             (err.message.indexOf("CommandFailed") > -1 ||
-             err.message.indexOf("Documents in target range may still be in use") > -1);
+                err.message.indexOf("Documents in target range may still be in use") > -1)
+        );
     };
 
-    $config.states.exactIdUpdate = function(db, collName, connCache) {
+    $config.states.exactIdUpdate = function (db, collName, connCache) {
         exactIdUpdate(db, collName, this.session, this.getIdForThread(collName));
     };
-    $config.states.multiUpdate = function(db, collName, connCache) {
+    $config.states.multiUpdate = function (db, collName, connCache) {
         multiUpdate(db, collName, this.session, this.tid);
     };
-    $config.states.verifyDocuments = function(db, collName, connCache) {
+    $config.states.verifyDocuments = function (db, collName, connCache) {
         verifyDocuments(db, collName, this.tid);
     };
 

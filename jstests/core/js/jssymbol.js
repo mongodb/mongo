@@ -7,7 +7,7 @@
 // ]
 
 // Exercise Symbol.toPrimitive on DB objects
-assert(`${db}` === 'test');
+assert(`${db}` === "test");
 assert(isNaN(+db));
 
 // Exercise the special Symbol methods and make sure DB.getProperty handles them
@@ -24,7 +24,7 @@ let a = db.getCollection("jssymbol_col").getIndexes()[0];
 assert(isNaN(+a));
 assert(+a.v >= 1);
 assert(`${a.v}` >= 1);
-assert(`${a}` == '[object BSON]');
+assert(`${a}` == "[object BSON]");
 
 // Exercise the special Symbol methods and make sure BSON.resolve handles them
 assert(db[Symbol.iterator] != 1);

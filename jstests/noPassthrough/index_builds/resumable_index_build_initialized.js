@@ -21,11 +21,14 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const runTests = function(docs, indexSpecsFlat, collNameSuffix) {
-    const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName() + collNameSuffix);
+const runTests = function (docs, indexSpecsFlat, collNameSuffix) {
+    const coll = rst
+        .getPrimary()
+        .getDB(dbName)
+        .getCollection(jsTestName() + collNameSuffix);
     assert.commandWorked(coll.insert(docs));
 
-    const runTest = function(indexSpecs) {
+    const runTest = function (indexSpecs) {
         ResumableIndexBuildTest.run(
             rst,
             dbName,
@@ -34,7 +37,8 @@ const runTests = function(docs, indexSpecsFlat, collNameSuffix) {
             [{name: "hangIndexBuildBeforeWaitingUntilMajorityOpTime", logIdWithBuildUUID: 4940901}],
             {},
             ["initialized"],
-            [{numScannedAfterResume: 1}]);
+            [{numScannedAfterResume: 1}],
+        );
     };
 
     runTest([[indexSpecsFlat[0]]]);

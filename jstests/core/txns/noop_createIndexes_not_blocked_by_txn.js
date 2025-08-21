@@ -4,8 +4,8 @@
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-const dbName = 'noop_createIndexes_not_blocked';
-const collName = 'test';
+const dbName = "noop_createIndexes_not_blocked";
+const collName = "test";
 const testDB = db.getSiblingDB(dbName);
 
 testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
@@ -21,13 +21,13 @@ if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
 const createIndexesCommand = {
     createIndexes: collName,
     indexes: [{key: {a: 1}, name: "a_1"}],
-    writeConcern: {w: 'majority'},
+    writeConcern: {w: "majority"},
 };
 assert.commandWorked(sessionDB.runCommand(createIndexesCommand));
 
 // Default read concern level to use for transactions.
-if (!TestData.hasOwnProperty('defaultTransactionReadConcernLevel')) {
-    TestData.defaultTransactionReadConcernLevel = 'snapshot';
+if (!TestData.hasOwnProperty("defaultTransactionReadConcernLevel")) {
+    TestData.defaultTransactionReadConcernLevel = "snapshot";
 }
 
 // TODO(SERVER-39704): We use the withTxnAndAutoRetryOnMongos
@@ -50,15 +50,17 @@ withTxnAndAutoRetryOnMongos(session, () => {
     assert.commandFailedWithCode(res, ErrorCodes.IndexOptionsConflict);
 
     // This should block and time out because the index does not already exist.
-    res = testDB.runCommand(
-        {createIndexes: collName, indexes: [{key: {b: 1}, name: "b_1"}], maxTimeMS: 500});
+    res = testDB.runCommand({createIndexes: collName, indexes: [{key: {b: 1}, name: "b_1"}], maxTimeMS: 500});
     assert(ErrorCodes.isExceededTimeLimitError(res.code));
 
     // This should block and time out because one of the indexes does not already exist.
     res = testDB.runCommand({
         createIndexes: collName,
-        indexes: [{key: {a: 1}, name: "a_1"}, {key: {b: 1}, name: "b_1"}],
-        maxTimeMS: 500
+        indexes: [
+            {key: {a: 1}, name: "a_1"},
+            {key: {b: 1}, name: "b_1"},
+        ],
+        maxTimeMS: 500,
     });
     assert(ErrorCodes.isExceededTimeLimitError(res.code));
 });

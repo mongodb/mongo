@@ -14,7 +14,10 @@ const nodes = rst.nodeList();
 rst.startSet();
 rst.initiate({
     "_id": name,
-    "members": [{"_id": 0, "host": nodes[0]}, {"_id": 1, "host": nodes[1], "arbiterOnly": true}]
+    "members": [
+        {"_id": 0, "host": nodes[0]},
+        {"_id": 1, "host": nodes[1], "arbiterOnly": true},
+    ],
 });
 
 const dbName = "test";
@@ -32,7 +35,6 @@ const sessionColl = sessionDB.getCollection(collName);
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: 42}));
 
-assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}),
-                             ErrorCodes.ReadConcernMajorityNotEnabled);
+assert.commandFailedWithCode(sessionDB.adminCommand({prepareTransaction: 1}), ErrorCodes.ReadConcernMajorityNotEnabled);
 
 rst.stopSet();

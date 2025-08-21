@@ -1,10 +1,7 @@
 /**
  * Tests various failure cases when using certificate selectors on Windows.
  */
-import {
-    requireSSLProvider,
-    TRUSTED_SERVER_CERT,
-} from "jstests/ssl/libs/ssl_helpers.js";
+import {requireSSLProvider, TRUSTED_SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 const notFoundError = "failed to find cert";
 const badValueError = "Invalid certificate selector value";
@@ -15,12 +12,12 @@ const startupFailureTestCases = [
     {
         keyFile: TRUSTED_SERVER_CERT,
         clusterSelector: `thumbprint=DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF`,
-        error: notFoundError
+        error: notFoundError,
     },
     {
         keyFile: TRUSTED_SERVER_CERT,
         clusterSelector: `subject=Unknown Test Client`,
-        error: notFoundError
+        error: notFoundError,
     },
     {keyFile: TRUSTED_SERVER_CERT, clusterSelector: `thumbprint=LOL`, error: badValueError},
 ];
@@ -28,7 +25,7 @@ const startupFailureTestCases = [
 function testStartupFails(testCase) {
     jsTestLog(`Running testStartupFails with test case: ${tojson(testCase)}`);
     const opts = {
-        tlsMode: 'requireTLS',
+        tlsMode: "requireTLS",
         tlsCertificateKeyFile: testCase.keyFile,
         tlsCertificateSelector: testCase.selector,
         tlsClusterCertificateSelector: testCase.clusterSelector,
@@ -43,6 +40,6 @@ function testStartupFails(testCase) {
     assert(rawMongoProgramOutput(".*").includes(testCase.error));
 }
 
-requireSSLProvider('windows', function() {
-    startupFailureTestCases.forEach(test => testStartupFails(test));
+requireSSLProvider("windows", function () {
+    startupFailureTestCases.forEach((test) => testStartupFails(test));
 });

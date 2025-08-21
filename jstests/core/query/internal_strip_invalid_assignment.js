@@ -9,12 +9,12 @@
  *    assumes_read_concern_local,
  * ]
  */
-import {planHasStage} from 'jstests/libs/query/analyze_plan.js';
+import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.getCollection(jsTestName());
 
-assert.commandWorked(coll.createIndex({a: 1, foo: '2dsphere'}));
-assert.commandWorked(coll.createIndex({a: 1, '$**': 'text'}));
+assert.commandWorked(coll.createIndex({a: 1, foo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({a: 1, "$**": "text"}));
 assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {foo: 123}}));
 
 const query = {
@@ -34,10 +34,10 @@ const query = {
                     NumberLong(0),
                     // Predicate to run on each element.
                     {"i": {"$regex": "b"}},
-                ]
-            }
-        }
-    ]
+                ],
+            },
+        },
+    ],
 };
 const explain = coll.find(query).explain();
 assert(planHasStage(db, explain, "COLLSCAN"), explain);

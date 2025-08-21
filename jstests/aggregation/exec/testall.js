@@ -14,16 +14,16 @@ const testDB = db.getSiblingDB("aggdb");
 let p1 = testDB.runCommand({
     aggregate: "article",
     pipeline: [{$project: {tags: 1, pageViews: 1}}, {$sort: {_id: 1}}],
-    cursor: {}
+    cursor: {},
 });
 
 let p1result = [
     {"_id": 1, "pageViews": 5, "tags": ["fun", "good", "fun"]},
     {"_id": 2, "pageViews": 7, "tags": ["fun", "nasty"]},
-    {"_id": 3, "pageViews": 6, "tags": ["nasty", "filthy"]}
+    {"_id": 3, "pageViews": 6, "tags": ["nasty", "filthy"]},
 ];
 
-assert.docEq(p1result, p1.cursor.firstBatch, 'p1 failed');
+assert.docEq(p1result, p1.cursor.firstBatch, "p1 failed");
 
 // a simple array unwinding
 let u1 = testDB.runCommand({aggregate: "article", pipeline: [{$unwind: "$tags"}], cursor: {}});
@@ -36,9 +36,11 @@ let u1result = [
         "posted": ISODate("2004-03-21T18:59:54Z"),
         "pageViews": 5,
         "tags": "fun",
-        "comments":
-            [{"author": "joe", "text": "this is cool"}, {"author": "sam", "text": "this is bad"}],
-        "other": {"foo": 5}
+        "comments": [
+            {"author": "joe", "text": "this is cool"},
+            {"author": "sam", "text": "this is bad"},
+        ],
+        "other": {"foo": 5},
     },
     {
         "_id": 1,
@@ -47,9 +49,11 @@ let u1result = [
         "posted": ISODate("2004-03-21T18:59:54Z"),
         "pageViews": 5,
         "tags": "good",
-        "comments":
-            [{"author": "joe", "text": "this is cool"}, {"author": "sam", "text": "this is bad"}],
-        "other": {"foo": 5}
+        "comments": [
+            {"author": "joe", "text": "this is cool"},
+            {"author": "sam", "text": "this is bad"},
+        ],
+        "other": {"foo": 5},
     },
     {
         "_id": 1,
@@ -58,9 +62,11 @@ let u1result = [
         "posted": ISODate("2004-03-21T18:59:54Z"),
         "pageViews": 5,
         "tags": "fun",
-        "comments":
-            [{"author": "joe", "text": "this is cool"}, {"author": "sam", "text": "this is bad"}],
-        "other": {"foo": 5}
+        "comments": [
+            {"author": "joe", "text": "this is cool"},
+            {"author": "sam", "text": "this is bad"},
+        ],
+        "other": {"foo": 5},
     },
     {
         "_id": 2,
@@ -71,9 +77,9 @@ let u1result = [
         "tags": "fun",
         "comments": [
             {"author": "barbara", "text": "this is interesting"},
-            {"author": "jenny", "text": "i like to play pinball", "votes": 10}
+            {"author": "jenny", "text": "i like to play pinball", "votes": 10},
         ],
-        "other": {"bar": 14}
+        "other": {"bar": 14},
     },
     {
         "_id": 2,
@@ -84,9 +90,9 @@ let u1result = [
         "tags": "nasty",
         "comments": [
             {"author": "barbara", "text": "this is interesting"},
-            {"author": "jenny", "text": "i like to play pinball", "votes": 10}
+            {"author": "jenny", "text": "i like to play pinball", "votes": 10},
         ],
-        "other": {"bar": 14}
+        "other": {"bar": 14},
     },
     {
         "_id": 3,
@@ -97,9 +103,9 @@ let u1result = [
         "tags": "nasty",
         "comments": [
             {"author": "will", "text": "i don't like the color"},
-            {"author": "jenny", "text": "can i get that in green?"}
+            {"author": "jenny", "text": "can i get that in green?"},
         ],
-        "other": {"bar": 14}
+        "other": {"bar": 14},
     },
     {
         "_id": 3,
@@ -110,10 +116,10 @@ let u1result = [
         "tags": "filthy",
         "comments": [
             {"author": "will", "text": "i don't like the color"},
-            {"author": "jenny", "text": "can i get that in green?"}
+            {"author": "jenny", "text": "can i get that in green?"},
         ],
-        "other": {"bar": 14}
-    }
+        "other": {"bar": 14},
+    },
 ];
 
 let firstBatch = u1.cursor.firstBatch;
@@ -122,23 +128,22 @@ assert(arrayEq(firstBatch, u1result), tojson({got: firstBatch, expected: u1resul
 // unwind an array at the end of a dotted path
 testDB.ut.drop();
 assert.commandWorked(testDB.ut.insert({_id: 4, a: 1, b: {e: 7, f: [4, 3, 2, 1]}, c: 12, d: 17}));
-let u2 = testDB.runCommand(
-    {aggregate: "ut", pipeline: [{$unwind: "$b.f"}, {$sort: {"b.f": -1}}], cursor: {}});
+let u2 = testDB.runCommand({aggregate: "ut", pipeline: [{$unwind: "$b.f"}, {$sort: {"b.f": -1}}], cursor: {}});
 
 let u2result = [
     {"_id": 4, "a": 1, "b": {"e": 7, "f": 4}, "c": 12, "d": 17},
     {"_id": 4, "a": 1, "b": {"e": 7, "f": 3}, "c": 12, "d": 17},
     {"_id": 4, "a": 1, "b": {"e": 7, "f": 2}, "c": 12, "d": 17},
-    {"_id": 4, "a": 1, "b": {"e": 7, "f": 1}, "c": 12, "d": 17}
+    {"_id": 4, "a": 1, "b": {"e": 7, "f": 1}, "c": 12, "d": 17},
 ];
 
-assert.docEq(u2result, u2.cursor.firstBatch, 'u2 failed');
+assert.docEq(u2result, u2.cursor.firstBatch, "u2 failed");
 
 // combining a projection with unwinding an array
 let p2 = testDB.runCommand({
     aggregate: "article",
     pipeline: [{$project: {author: 1, tags: 1, pageViews: 1}}, {$unwind: "$tags"}],
-    cursor: {}
+    cursor: {},
 });
 
 let p2result = [
@@ -148,7 +153,7 @@ let p2result = [
     {"_id": 2, "author": "dave", "pageViews": 7, "tags": "fun"},
     {"_id": 2, "author": "dave", "pageViews": 7, "tags": "nasty"},
     {"_id": 3, "author": "jane", "pageViews": 6, "tags": "nasty"},
-    {"_id": 3, "author": "jane", "pageViews": 6, "tags": "filthy"}
+    {"_id": 3, "author": "jane", "pageViews": 6, "tags": "filthy"},
 ];
 
 firstBatch = p2.cursor.firstBatch;
@@ -158,27 +163,31 @@ assert(arrayEq(firstBatch, p2result), tojson({got: firstBatch, expected: p2resul
 let p3 = testDB.runCommand({
     aggregate: "article",
     pipeline: [{$project: {otherfoo: "$other.foo", otherbar: "$other.bar"}}, {$sort: {_id: 1}}],
-    cursor: {}
+    cursor: {},
 });
 
-let p3result = [{"_id": 1, "otherfoo": 5}, {"_id": 2, "otherbar": 14}, {"_id": 3, "otherbar": 14}];
+let p3result = [
+    {"_id": 1, "otherfoo": 5},
+    {"_id": 2, "otherbar": 14},
+    {"_id": 3, "otherbar": 14},
+];
 
-assert.docEq(p3result, p3.cursor.firstBatch, 'p3 failed');
+assert.docEq(p3result, p3.cursor.firstBatch, "p3 failed");
 
 // projection includes a computed value
 let p4 = testDB.runCommand({
     aggregate: "article",
     pipeline: [{$project: {author: 1, daveWroteIt: {$eq: ["$author", "dave"]}}}, {$sort: {_id: 1}}],
-    cursor: {}
+    cursor: {},
 });
 
 let p4result = [
     {"_id": 1, "author": "bob", "daveWroteIt": false},
     {"_id": 2, "author": "dave", "daveWroteIt": true},
-    {"_id": 3, "author": "jane", "daveWroteIt": false}
+    {"_id": 3, "author": "jane", "daveWroteIt": false},
 ];
 
-assert.docEq(p4result, p4.cursor.firstBatch, 'p4 failed');
+assert.docEq(p4result, p4.cursor.firstBatch, "p4 failed");
 
 // projection includes a virtual (fabricated) document
 let p5 = testDB.runCommand({
@@ -186,9 +195,9 @@ let p5 = testDB.runCommand({
     pipeline: [
         {$project: {author: 1, pageViews: 1, tags: 1}},
         {$unwind: "$tags"},
-        {$project: {author: 1, subDocument: {foo: "$pageViews", bar: "$tags"}}}
+        {$project: {author: 1, subDocument: {foo: "$pageViews", bar: "$tags"}}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let p5result = [
@@ -198,7 +207,7 @@ let p5result = [
     {"_id": 2, "author": "dave", "subDocument": {"foo": 7, "bar": "fun"}},
     {"_id": 2, "author": "dave", "subDocument": {"foo": 7, "bar": "nasty"}},
     {"_id": 3, "author": "jane", "subDocument": {"foo": 6, "bar": "nasty"}},
-    {"_id": 3, "author": "jane", "subDocument": {"foo": 6, "bar": "filthy"}}
+    {"_id": 3, "author": "jane", "subDocument": {"foo": 6, "bar": "filthy"}},
 ];
 
 firstBatch = p5.cursor.firstBatch;
@@ -217,11 +226,11 @@ let p6 = testDB.runCommand({
                 tag: "$tags",
                 pageViews: 1,
                 daveWroteIt: {$eq: ["$author", "dave"]},
-                weLikeIt: {$or: [{$eq: ["$author", "dave"]}, {$eq: ["$tags", "good"]}]}
-            }
-        }
+                weLikeIt: {$or: [{$eq: ["$author", "dave"]}, {$eq: ["$tags", "good"]}]},
+            },
+        },
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let p6result = [
@@ -231,7 +240,7 @@ let p6result = [
         "pageViews": 5,
         "tag": "fun",
         "daveWroteIt": false,
-        "weLikeIt": false
+        "weLikeIt": false,
     },
     {
         "_id": 1,
@@ -239,7 +248,7 @@ let p6result = [
         "pageViews": 5,
         "tag": "good",
         "daveWroteIt": false,
-        "weLikeIt": true
+        "weLikeIt": true,
     },
     {
         "_id": 1,
@@ -247,7 +256,7 @@ let p6result = [
         "pageViews": 5,
         "tag": "fun",
         "daveWroteIt": false,
-        "weLikeIt": false
+        "weLikeIt": false,
     },
     {
         "_id": 2,
@@ -255,7 +264,7 @@ let p6result = [
         "pageViews": 7,
         "tag": "fun",
         "daveWroteIt": true,
-        "weLikeIt": true
+        "weLikeIt": true,
     },
     {
         "_id": 2,
@@ -263,7 +272,7 @@ let p6result = [
         "pageViews": 7,
         "tag": "nasty",
         "daveWroteIt": true,
-        "weLikeIt": true
+        "weLikeIt": true,
     },
     {
         "_id": 3,
@@ -271,7 +280,7 @@ let p6result = [
         "pageViews": 6,
         "tag": "nasty",
         "daveWroteIt": false,
-        "weLikeIt": false
+        "weLikeIt": false,
     },
     {
         "_id": 3,
@@ -279,8 +288,8 @@ let p6result = [
         "pageViews": 6,
         "tag": "filthy",
         "daveWroteIt": false,
-        "weLikeIt": false
-    }
+        "weLikeIt": false,
+    },
 ];
 
 firstBatch = p6.cursor.firstBatch;
@@ -291,20 +300,24 @@ let p7 = testDB.runCommand({
     aggregate: "article",
     pipeline: [
         {$project: {theSum: {$add: ["$pageViews", {$ifNull: ["$other.foo", "$other.bar"]}]}}},
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
-let p7result = [{"_id": 1, "theSum": 10}, {"_id": 2, "theSum": 21}, {"_id": 3, "theSum": 20}];
+let p7result = [
+    {"_id": 1, "theSum": 10},
+    {"_id": 2, "theSum": 21},
+    {"_id": 3, "theSum": 20},
+];
 
-assert.docEq(p7result, p7.cursor.firstBatch, 'p7 failed');
+assert.docEq(p7result, p7.cursor.firstBatch, "p7 failed");
 
 // dotted path inclusion; _id exclusion
 let p8 = testDB.runCommand({
     aggregate: "article",
     pipeline: [{$project: {_id: 0, author: 1, tags: 1, "comments.author": 1}}, {$unwind: "$tags"}],
-    cursor: {}
+    cursor: {},
 });
 
 let p8result = [
@@ -314,7 +327,7 @@ let p8result = [
     {"author": "dave", "tags": "fun", "comments": [{"author": "barbara"}, {"author": "jenny"}]},
     {"author": "dave", "tags": "nasty", "comments": [{"author": "barbara"}, {"author": "jenny"}]},
     {"author": "jane", "tags": "nasty", "comments": [{"author": "will"}, {"author": "jenny"}]},
-    {"author": "jane", "tags": "filthy", "comments": [{"author": "will"}, {"author": "jenny"}]}
+    {"author": "jane", "tags": "filthy", "comments": [{"author": "will"}, {"author": "jenny"}]},
 ];
 
 firstBatch = p8.cursor.firstBatch;
@@ -323,18 +336,17 @@ assert(arrayEq(firstBatch, p8result), tojson({got: firstBatch, expected: p8resul
 // collapse a dotted path with an intervening array
 let p9 = testDB.runCommand({
     aggregate: "article",
-    pipeline:
-        [{$project: {_id: 0, author: 1, commentsAuthor: "$comments.author"}}, {$sort: {author: 1}}],
-    cursor: {}
+    pipeline: [{$project: {_id: 0, author: 1, commentsAuthor: "$comments.author"}}, {$sort: {author: 1}}],
+    cursor: {},
 });
 
 let p9result = [
     {"author": "bob", "commentsAuthor": ["joe", "sam"]},
     {"author": "dave", "commentsAuthor": ["barbara", "jenny"]},
-    {"author": "jane", "commentsAuthor": ["will", "jenny"]}
+    {"author": "jane", "commentsAuthor": ["will", "jenny"]},
 ];
 
-assert.docEq(p9result, p9.cursor.firstBatch, 'p9 failed');
+assert.docEq(p9result, p9.cursor.firstBatch, "p9 failed");
 
 // simple sort
 let p10 = testDB.runCommand({aggregate: "article", pipeline: [{$sort: {title: 1}}], cursor: {}});
@@ -347,9 +359,11 @@ let p10result = [
         "posted": ISODate("2004-03-21T18:59:54Z"),
         "pageViews": 5,
         "tags": ["fun", "good", "fun"],
-        "comments":
-            [{"author": "joe", "text": "this is cool"}, {"author": "sam", "text": "this is bad"}],
-        "other": {"foo": 5}
+        "comments": [
+            {"author": "joe", "text": "this is cool"},
+            {"author": "sam", "text": "this is bad"},
+        ],
+        "other": {"foo": 5},
     },
     {
         "_id": 3,
@@ -360,9 +374,9 @@ let p10result = [
         "tags": ["nasty", "filthy"],
         "comments": [
             {"author": "will", "text": "i don't like the color"},
-            {"author": "jenny", "text": "can i get that in green?"}
+            {"author": "jenny", "text": "can i get that in green?"},
         ],
-        "other": {"bar": 14}
+        "other": {"bar": 14},
     },
     {
         "_id": 2,
@@ -373,32 +387,27 @@ let p10result = [
         "tags": ["fun", "nasty"],
         "comments": [
             {"author": "barbara", "text": "this is interesting"},
-            {"author": "jenny", "text": "i like to play pinball", "votes": 10}
+            {"author": "jenny", "text": "i like to play pinball", "votes": 10},
         ],
-        "other": {"bar": 14}
-    }
+        "other": {"bar": 14},
+    },
 ];
 
-assert.docEq(p10result, p10.cursor.firstBatch, 'p10 failed');
+assert.docEq(p10result, p10.cursor.firstBatch, "p10 failed");
 
 // unwind on nested array
 testDB.p11.drop();
 testDB.p11.save({
     _id: 5,
-    name: 'MongoDB',
-    items: {authors: ['jay', 'vivek', 'bjornar'], dbg: [17, 42]},
-    favorites: ['pickles', 'ice cream', 'kettle chips']
+    name: "MongoDB",
+    items: {authors: ["jay", "vivek", "bjornar"], dbg: [17, 42]},
+    favorites: ["pickles", "ice cream", "kettle chips"],
 });
 
 const p11a = testDB.runCommand({
     aggregate: "p11",
-    pipeline: [
-        {$unwind: "$items.authors"},
-        {$project: {name: 1, author: "$items.authors"}},
-        {$sort: {author: 1}}
-
-    ],
-    cursor: {}
+    pipeline: [{$unwind: "$items.authors"}, {$project: {name: 1, author: "$items.authors"}}, {$sort: {author: 1}}],
+    cursor: {},
 });
 
 const p11a_result = [
@@ -407,7 +416,7 @@ const p11a_result = [
     {"_id": 5, "name": "MongoDB", "author": "vivek"},
 ];
 
-assert.docEq(p11a_result, p11a.cursor.firstBatch, 'p11a failed');
+assert.docEq(p11a_result, p11a.cursor.firstBatch, "p11a failed");
 
 // Same as prior test but also return the array index in new field "idx".
 const p11b = testDB.runCommand({
@@ -415,10 +424,9 @@ const p11b = testDB.runCommand({
     pipeline: [
         {$unwind: {path: "$items.authors", includeArrayIndex: "idx"}},
         {$project: {name: 1, idx: 1, author: "$items.authors"}},
-        {$sort: {author: 1}}
-
+        {$sort: {author: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 const p11b_result = [
@@ -427,7 +435,7 @@ const p11b_result = [
     {"_id": 5, "name": "MongoDB", "idx": NumberLong(1), "author": "vivek"},
 ];
 
-assert.docEq(p11b_result, p11b.cursor.firstBatch, 'p11b failed');
+assert.docEq(p11b_result, p11b.cursor.firstBatch, "p11b failed");
 
 // Same as prior test but return the array index in a field that overwrites existing "dbg" field.
 const p11c = testDB.runCommand({
@@ -435,10 +443,9 @@ const p11c = testDB.runCommand({
     pipeline: [
         {$unwind: {path: "$items.authors", includeArrayIndex: "dbg"}},
         {$project: {name: 1, dbg: 1, author: "$items.authors"}},
-        {$sort: {author: 1}}
-
+        {$sort: {author: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 const p11c_result = [
@@ -447,7 +454,7 @@ const p11c_result = [
     {"_id": 5, "name": "MongoDB", "dbg": NumberLong(1), "author": "vivek"},
 ];
 
-assert.docEq(p11c_result, p11c.cursor.firstBatch, 'p11c failed');
+assert.docEq(p11c_result, p11c.cursor.firstBatch, "p11c failed");
 
 // Same as prior test but $project also depends on "dbg" field to compute "dbgInc".
 const p11d = testDB.runCommand({
@@ -455,10 +462,9 @@ const p11d = testDB.runCommand({
     pipeline: [
         {$unwind: {path: "$items.authors", includeArrayIndex: "dbg"}},
         {$project: {name: 1, dbg: 1, dbgInc: {$add: ["$dbg", 1]}, author: "$items.authors"}},
-        {$sort: {author: 1}}
-
+        {$sort: {author: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 const p11d_result = [
@@ -467,60 +473,65 @@ const p11d_result = [
     {"_id": 5, "name": "MongoDB", "dbg": NumberLong(1), "dbgInc": 2, "author": "vivek"},
 ];
 
-assert.docEq(p11d_result, p11d.cursor.firstBatch, 'p11d failed');
+assert.docEq(p11d_result, p11d.cursor.firstBatch, "p11d failed");
 
 // Verify unwinding a nonexistent field "x.y.z" does not create the dotted path "x.y" above that
 // field in the output object when "preserveNullAndEmptyArrays" is true.
 const p11e = testDB.runCommand({
     aggregate: "p11",
     pipeline: [{$unwind: {path: "$x.y.z", preserveNullAndEmptyArrays: true}}],
-    cursor: {}
+    cursor: {},
 });
 
-const p11e_result = [{
-    "_id": 5,
-    "name": 'MongoDB',
-    "items": {"authors": ['jay', 'vivek', 'bjornar'], "dbg": [17, 42]},
-    "favorites": ['pickles', 'ice cream', 'kettle chips']
-}];
+const p11e_result = [
+    {
+        "_id": 5,
+        "name": "MongoDB",
+        "items": {"authors": ["jay", "vivek", "bjornar"], "dbg": [17, 42]},
+        "favorites": ["pickles", "ice cream", "kettle chips"],
+    },
+];
 
-assert.docEq(p11e_result, p11e.cursor.firstBatch, 'p11e failed');
+assert.docEq(p11e_result, p11e.cursor.firstBatch, "p11e failed");
 
 // Same as prior test but also set "includeArrayIndex" to true.
 const p11f = testDB.runCommand({
     aggregate: "p11",
-    pipeline:
-        [{$unwind: {path: "$x.y.z", preserveNullAndEmptyArrays: true, includeArrayIndex: "idx"}}],
-    cursor: {}
+    pipeline: [{$unwind: {path: "$x.y.z", preserveNullAndEmptyArrays: true, includeArrayIndex: "idx"}}],
+    cursor: {},
 });
 
-const p11f_result = [{
-    "_id": 5,
-    "name": 'MongoDB',
-    "items": {"authors": ['jay', 'vivek', 'bjornar'], "dbg": [17, 42]},
-    "favorites": ['pickles', 'ice cream', 'kettle chips'],
-    "idx": null
-}];
+const p11f_result = [
+    {
+        "_id": 5,
+        "name": "MongoDB",
+        "items": {"authors": ["jay", "vivek", "bjornar"], "dbg": [17, 42]},
+        "favorites": ["pickles", "ice cream", "kettle chips"],
+        "idx": null,
+    },
+];
 
-assert.docEq(p11f_result, p11f.cursor.firstBatch, 'p11f failed');
+assert.docEq(p11f_result, p11f.cursor.firstBatch, "p11f failed");
 
 // multiply test
 let p12 = testDB.runCommand({
     aggregate: "article",
     pipeline: [
         {
-            $project:
-                {theProduct: {$multiply: ["$pageViews", {$ifNull: ["$other.foo", "$other.bar"]}]}},
+            $project: {theProduct: {$multiply: ["$pageViews", {$ifNull: ["$other.foo", "$other.bar"]}]}},
         },
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
-let p12result =
-    [{"_id": 1, "theProduct": 25}, {"_id": 2, "theProduct": 98}, {"_id": 3, "theProduct": 84}];
+let p12result = [
+    {"_id": 1, "theProduct": 25},
+    {"_id": 2, "theProduct": 98},
+    {"_id": 3, "theProduct": 84},
+];
 
-assert.docEq(p12result, p12.cursor.firstBatch, 'p12 failed');
+assert.docEq(p12result, p12.cursor.firstBatch, "p12 failed");
 
 // subtraction test
 let p13 = testDB.runCommand({
@@ -528,22 +539,21 @@ let p13 = testDB.runCommand({
     pipeline: [
         {
             $project: {
-                theDifference:
-                    {$subtract: ["$pageViews", {$ifNull: ["$other.foo", "$other.bar"]}]}
-            }
+                theDifference: {$subtract: ["$pageViews", {$ifNull: ["$other.foo", "$other.bar"]}]},
+            },
         },
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let p13result = [
     {"_id": 1, "theDifference": 0},
     {"_id": 2, "theDifference": -7},
-    {"_id": 3, "theDifference": -8}
+    {"_id": 3, "theDifference": -8},
 ];
 
-assert.docEq(p13result, p13.cursor.firstBatch, 'p13 failed');
+assert.docEq(p13result, p13.cursor.firstBatch, "p13 failed");
 
 // mod test
 let p14 = testDB.runCommand({
@@ -552,37 +562,37 @@ let p14 = testDB.runCommand({
         {
             $project: {
                 theRemainder: {
-                    $mod: [
-                        {$ifNull: ["$other.foo", "$other.bar"]},
-                        "$pageViews",
-                    ]
-                }
-            }
+                    $mod: [{$ifNull: ["$other.foo", "$other.bar"]}, "$pageViews"],
+                },
+            },
         },
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
-let p14result =
-    [{"_id": 1, "theRemainder": 0}, {"_id": 2, "theRemainder": 0}, {"_id": 3, "theRemainder": 2}];
+let p14result = [
+    {"_id": 1, "theRemainder": 0},
+    {"_id": 2, "theRemainder": 0},
+    {"_id": 3, "theRemainder": 2},
+];
 
-assert.docEq(p14result, p14.cursor.firstBatch, 'p14 failed');
+assert.docEq(p14result, p14.cursor.firstBatch, "p14 failed");
 
 // toUpper test
 let p15 = testDB.runCommand({
     aggregate: "article",
     pipeline: [{$project: {author: {$toUpper: "$author"}, pageViews: 1}}, {$sort: {_id: 1}}],
-    cursor: {}
+    cursor: {},
 });
 
 let p15result = [
     {"_id": 1, "author": "BOB", "pageViews": 5},
     {"_id": 2, "author": "DAVE", "pageViews": 7},
-    {"_id": 3, "author": "JANE", "pageViews": 6}
+    {"_id": 3, "author": "JANE", "pageViews": 6},
 ];
 
-assert.docEq(p15result, p15.cursor.firstBatch, 'p15 failed');
+assert.docEq(p15result, p15.cursor.firstBatch, "p15 failed");
 
 // toLower test
 let p16 = testDB.runCommand({
@@ -590,9 +600,9 @@ let p16 = testDB.runCommand({
     pipeline: [
         {$project: {author: {$toUpper: "$author"}, pageViews: 1}},
         {$project: {author: {$toLower: "$author"}, pageViews: 1}},
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let p16result = [
@@ -610,10 +620,10 @@ let p16result = [
         "_id": 3,
         "author": "jane",
         "pageViews": 6,
-    }
+    },
 ];
 
-assert.docEq(p16result, p16.cursor.firstBatch, 'p16 failed');
+assert.docEq(p16result, p16.cursor.firstBatch, "p16 failed");
 
 // substr test
 let p17 = testDB.runCommand({
@@ -622,17 +632,20 @@ let p17 = testDB.runCommand({
         {
             $project: {
                 author: {$substrBytes: ["$author", 1, 2]},
-            }
+            },
         },
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
-let p17result =
-    [{"_id": 1, "author": "ob"}, {"_id": 2, "author": "av"}, {"_id": 3, "author": "an"}];
+let p17result = [
+    {"_id": 1, "author": "ob"},
+    {"_id": 2, "author": "av"},
+    {"_id": 3, "author": "an"},
+];
 
-assert.docEq(p17result, p17.cursor.firstBatch, 'p17 failed');
+assert.docEq(p17result, p17.cursor.firstBatch, "p17 failed");
 
 // strcasecmp test
 let p18 = testDB.runCommand({
@@ -642,21 +655,21 @@ let p18 = testDB.runCommand({
             $project: {
                 tags: 1,
                 thisisalametest: {$strcasecmp: ["foo", "bar"]},
-                thisisalamepass: {$strcasecmp: ["foo", "foo"]}
-            }
+                thisisalamepass: {$strcasecmp: ["foo", "foo"]},
+            },
         },
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let p18result = [
     {"_id": 1, "tags": ["fun", "good", "fun"], "thisisalametest": 1, "thisisalamepass": 0},
     {"_id": 2, "tags": ["fun", "nasty"], "thisisalametest": 1, "thisisalamepass": 0},
-    {"_id": 3, "tags": ["nasty", "filthy"], "thisisalametest": 1, "thisisalamepass": 0}
+    {"_id": 3, "tags": ["nasty", "filthy"], "thisisalametest": 1, "thisisalamepass": 0},
 ];
 
-assert.docEq(p18result, p18.cursor.firstBatch, 'p18 failed');
+assert.docEq(p18result, p18.cursor.firstBatch, "p18 failed");
 
 // date tests
 let p19 = testDB.runCommand({
@@ -674,12 +687,12 @@ let p19 = testDB.runCommand({
                 dayOfWeek: {$dayOfWeek: "$posted"},
                 month: {$month: "$posted"},
                 week: {$week: "$posted"},
-                year: {$year: "$posted"}
-            }
+                year: {$year: "$posted"},
+            },
         },
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let p19result = [
@@ -721,10 +734,10 @@ let p19result = [
         "month": 12,
         "week": 53,
         "year": 2000,
-    }
+    },
 ];
 
-assert.docEq(p19result, p19.cursor.firstBatch, 'p19 failed');
+assert.docEq(p19result, p19.cursor.firstBatch, "p19 failed");
 
 testDB.lettype.drop();
 testDB.lettype.save({x: 17, y: "foo"});
@@ -738,43 +751,43 @@ let p21 = testDB.runCommand({
                 _id: 0,
                 author: 1,
                 pageViews: {
-                    $cond:
-                        [{$eq: ["$author", "dave"]}, {$add: ["$pageViews", 1000]}, "$pageViews"]
-                }
-            }
+                    $cond: [{$eq: ["$author", "dave"]}, {$add: ["$pageViews", 1000]}, "$pageViews"],
+                },
+            },
         },
-        {$sort: {author: 1}}
+        {$sort: {author: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let p21result = [
     {"author": "bob", "pageViews": 5},
     {"author": "dave", "pageViews": 1007},
-    {"author": "jane", "pageViews": 6}
+    {"author": "jane", "pageViews": 6},
 ];
 
-assert.docEq(p21result, p21.cursor.firstBatch, 'p21 failed');
+assert.docEq(p21result, p21.cursor.firstBatch, "p21 failed");
 
 // simple matching
-let m1 =
-    testDB.runCommand({aggregate: "article", pipeline: [{$match: {author: "dave"}}], cursor: {}});
+let m1 = testDB.runCommand({aggregate: "article", pipeline: [{$match: {author: "dave"}}], cursor: {}});
 
-let m1result = [{
-    "_id": 2,
-    "title": "this is your title",
-    "author": "dave",
-    "posted": ISODate("2030-08-08T04:11:10Z"),
-    "pageViews": 7,
-    "tags": ["fun", "nasty"],
-    "comments": [
-        {"author": "barbara", "text": "this is interesting"},
-        {"author": "jenny", "text": "i like to play pinball", "votes": 10}
-    ],
-    "other": {"bar": 14}
-}];
+let m1result = [
+    {
+        "_id": 2,
+        "title": "this is your title",
+        "author": "dave",
+        "posted": ISODate("2030-08-08T04:11:10Z"),
+        "pageViews": 7,
+        "tags": ["fun", "nasty"],
+        "comments": [
+            {"author": "barbara", "text": "this is interesting"},
+            {"author": "jenny", "text": "i like to play pinball", "votes": 10},
+        ],
+        "other": {"bar": 14},
+    },
+];
 
-assert.docEq(m1result, m1.cursor.firstBatch, 'm1 failed');
+assert.docEq(m1result, m1.cursor.firstBatch, "m1 failed");
 
 // combining matching with a projection
 let m2 = testDB.runCommand({
@@ -783,9 +796,9 @@ let m2 = testDB.runCommand({
         {$project: {title: 1, author: 1, pageViews: 1, tags: 1, comments: 1}},
         {$unwind: "$tags"},
         {$match: {tags: "nasty"}},
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let m2result = [
@@ -797,8 +810,8 @@ let m2result = [
         "tags": "nasty",
         "comments": [
             {"author": "barbara", "text": "this is interesting"},
-            {"author": "jenny", "text": "i like to play pinball", "votes": 10}
-        ]
+            {"author": "jenny", "text": "i like to play pinball", "votes": 10},
+        ],
     },
     {
         "_id": 3,
@@ -808,12 +821,12 @@ let m2result = [
         "tags": "nasty",
         "comments": [
             {"author": "will", "text": "i don't like the color"},
-            {"author": "jenny", "text": "can i get that in green?"}
-        ]
-    }
+            {"author": "jenny", "text": "can i get that in green?"},
+        ],
+    },
 ];
 
-assert.docEq(m2result, m2.cursor.firstBatch, 'm2 failed');
+assert.docEq(m2result, m2.cursor.firstBatch, "m2 failed");
 
 // group by tag, _id is a field reference
 let g1 = testDB.runCommand({
@@ -822,9 +835,9 @@ let g1 = testDB.runCommand({
         {$project: {author: 1, tags: 1, pageViews: 1}},
         {$unwind: "$tags"},
         {$group: {_id: "$tags", docsByTag: {$sum: 1}, viewsByTag: {$sum: "$pageViews"}}},
-        {$sort: {'_id': 1}}
+        {$sort: {"_id": 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let g1result = [
@@ -834,7 +847,7 @@ let g1result = [
     {"_id": "nasty", "docsByTag": 2, "viewsByTag": 13},
 ];
 
-assert.docEq(g1result, g1.cursor.firstBatch, 'g1 failed');
+assert.docEq(g1result, g1.cursor.firstBatch, "g1 failed");
 
 // $max, and averaging in a final projection; _id is structured
 let g2 = testDB.runCommand({
@@ -848,7 +861,7 @@ let g2 = testDB.runCommand({
                 docsByTag: {$sum: 1},
                 viewsByTag: {$sum: "$pageViews"},
                 mostViewsByTag: {$max: "$pageViews"},
-            }
+            },
         },
         {
             $project: {
@@ -857,12 +870,12 @@ let g2 = testDB.runCommand({
                 mostViewsByTag: 1,
                 docsByTag: 1,
                 viewsByTag: 1,
-                avgByTag: {$divide: ["$viewsByTag", "$docsByTag"]}
-            }
+                avgByTag: {$divide: ["$viewsByTag", "$docsByTag"]},
+            },
         },
-        {$sort: {'docsByTag': 1, 'viewsByTag': 1}}
+        {$sort: {"docsByTag": 1, "viewsByTag": 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let g2result = [
@@ -874,11 +887,11 @@ let g2result = [
         "viewsByTag": 17,
         "mostViewsByTag": 7,
         "tag": "fun",
-        "avgByTag": 5.666666666666667
-    }
+        "avgByTag": 5.666666666666667,
+    },
 ];
 
-assert.docEq(g2result, g2.cursor.firstBatch, 'g2 failed');
+assert.docEq(g2result, g2.cursor.firstBatch, "g2 failed");
 
 // $push as an accumulator; can pivot data
 let g3 = testDB.runCommand({
@@ -888,24 +901,24 @@ let g3 = testDB.runCommand({
             $project: {
                 author: 1,
                 tags: 1,
-            }
+            },
         },
         {$unwind: "$tags"},
         {$sort: {author: 1}},
         {$group: {_id: {tags: "$tags"}, authors: {$push: "$author"}}},
-        {$sort: {'_id': 1}}
+        {$sort: {"_id": 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let g3result = [
     {"_id": {"tags": "filthy"}, "authors": ["jane"]},
     {"_id": {"tags": "fun"}, "authors": ["bob", "bob", "dave"]},
     {"_id": {"tags": "good"}, "authors": ["bob"]},
-    {"_id": {"tags": "nasty"}, "authors": ["dave", "jane"]}
+    {"_id": {"tags": "nasty"}, "authors": ["dave", "jane"]},
 ];
 
-assert.docEq(g3result, g3.cursor.firstBatch, 'g3 failed');
+assert.docEq(g3result, g3.cursor.firstBatch, "g3 failed");
 
 // $avg, and averaging in a final projection
 let g4 = testDB.runCommand({
@@ -919,21 +932,21 @@ let g4 = testDB.runCommand({
                 docsByTag: {$sum: 1},
                 viewsByTag: {$sum: "$pageViews"},
                 avgByTag: {$avg: "$pageViews"},
-            }
+            },
         },
-        {$sort: {'_id': 1}}
+        {$sort: {"_id": 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let g4result = [
     {"_id": {"tags": "filthy"}, "docsByTag": 1, "viewsByTag": 6, "avgByTag": 6},
     {"_id": {"tags": "fun"}, "docsByTag": 3, "viewsByTag": 17, "avgByTag": 5.666666666666667},
     {"_id": {"tags": "good"}, "docsByTag": 1, "viewsByTag": 5, "avgByTag": 5},
-    {"_id": {"tags": "nasty"}, "docsByTag": 2, "viewsByTag": 13, "avgByTag": 6.5}
+    {"_id": {"tags": "nasty"}, "docsByTag": 2, "viewsByTag": 13, "avgByTag": 6.5},
 ];
 
-assert.docEq(g4result, g4.cursor.firstBatch, 'g4 failed');
+assert.docEq(g4result, g4.cursor.firstBatch, "g4 failed");
 
 // $addToSet as an accumulator; can pivot data
 let g5 = testDB.runCommand({
@@ -943,17 +956,17 @@ let g5 = testDB.runCommand({
             $project: {
                 author: 1,
                 tags: 1,
-            }
+            },
         },
         {$unwind: "$tags"},
         {$group: {_id: {tags: "$tags"}, authors: {$addToSet: "$author"}}},
-        {$sort: {'_id': 1}}
+        {$sort: {"_id": 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 // $addToSet doesn't guarantee order so we shouldn't test for it.
-g5.cursor.firstBatch.forEach(function(obj) {
+g5.cursor.firstBatch.forEach(function (obj) {
     obj.authors.sort();
 });
 
@@ -961,22 +974,16 @@ let g5result = [
     {"_id": {"tags": "filthy"}, "authors": ["jane"]},
     {
         "_id": {"tags": "fun"},
-        "authors": [
-            "bob",
-            "dave",
-        ]
+        "authors": ["bob", "dave"],
     },
     {"_id": {"tags": "good"}, "authors": ["bob"]},
     {
         "_id": {"tags": "nasty"},
-        "authors": [
-            "dave",
-            "jane",
-        ]
-    }
+        "authors": ["dave", "jane"],
+    },
 ];
 
-assert.docEq(g5result, g5.cursor.firstBatch, 'g5 failed');
+assert.docEq(g5result, g5.cursor.firstBatch, "g5 failed");
 
 // $first and $last accumulators, constant _id
 let g6 = testDB.runCommand({
@@ -985,14 +992,14 @@ let g6 = testDB.runCommand({
         {$sort: {author: -1}},
         {
             $group: {
-                _id: "authors",                  /* constant string, *not* a field reference */
-                firstAuthor: {$last: "$author"}, /* note reverse sort above */
-                lastAuthor: {$first: "$author"}, /* note reverse sort above */
-                count: {$sum: 1}
-            }
-        }
+                _id: "authors" /* constant string, *not* a field reference */,
+                firstAuthor: {$last: "$author"} /* note reverse sort above */,
+                lastAuthor: {$first: "$author"} /* note reverse sort above */,
+                count: {$sum: 1},
+            },
+        },
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let g6result = [{"_id": "authors", firstAuthor: "bob", lastAuthor: "jane", count: 3}];
@@ -1001,15 +1008,15 @@ let g6result = [{"_id": "authors", firstAuthor: "bob", lastAuthor: "jane", count
 let g7 = testDB.runCommand({
     aggregate: "article",
     pipeline: [
-        {$unwind: '$tags'},
+        {$unwind: "$tags"},
         {
             $group: {
-                _id: "tag_count", /* constant string, *not* a field reference */
-                count: {$sum: 1}
-            }
-        }
+                _id: "tag_count" /* constant string, *not* a field reference */,
+                count: {$sum: 1},
+            },
+        },
     ],
-    cursor: {}
+    cursor: {},
 });
 assert.eq(g7.cursor.firstBatch[0].count, 7);
 
@@ -1019,9 +1026,9 @@ let g8 = testDB.runCommand({
     pipeline: [
         {$unwind: "$tags"},
         {$group: {_id: "$tags", docCount1: {$sum: 1}, docCount2: {$count: {}}}},
-        {$sort: {'_id': 1}}
+        {$sort: {"_id": 1}},
     ],
-    cursor: {}
+    cursor: {},
 });
 
 let g8result = [
@@ -1031,4 +1038,4 @@ let g8result = [
     {"_id": "nasty", "docCount1": 2, "docCount2": 2},
 ];
 
-assert.docEq(g8result, g8.cursor.firstBatch, 'g8 failed');
+assert.docEq(g8result, g8.cursor.firstBatch, "g8 failed");

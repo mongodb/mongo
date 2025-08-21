@@ -1,11 +1,11 @@
 function testInvalidDBNameThrowsExceptionWithConstructor() {
-    assert.throws(function() {
+    assert.throws(function () {
         return new DB(null, "/\\");
     });
 }
 
 function testInvalidDBNameThrowsExceptionWithSibling() {
-    assert.throws(function() {
+    assert.throws(function () {
         return db.getSiblingDB("/\\");
     });
 }

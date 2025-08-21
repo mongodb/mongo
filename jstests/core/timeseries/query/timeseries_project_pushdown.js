@@ -18,13 +18,13 @@ const coll = db[jsTestName()];
 
 function runTest({docs, pipeline, expectedResults}) {
     coll.drop();
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+    );
     assert.commandWorked(coll.insertMany(docs));
     const results = coll.aggregate(pipeline).toArray();
     assert.sameMembers(expectedResults, results, () => {
-        return `Pipeline: ${tojson(pipeline)}. Explain: ${
-            tojson(coll.explain().aggregate(pipeline))}`;
+        return `Pipeline: ${tojson(pipeline)}. Explain: ${tojson(coll.explain().aggregate(pipeline))}`;
     });
 }
 
@@ -35,7 +35,7 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [{_id: 1, [timeField]: new Date(), [metaField]: 2}],
         pipeline: [{$project: {new: {$getField: metaField}, _id: 0}}],
-        expectedResults: [{new: 2}]
+        expectedResults: [{new: 2}],
     });
 })();
 
@@ -45,10 +45,13 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: 2, "a.b": 3, a: {b: 2}},
-            {_id: 2, [timeField]: new Date(), [metaField]: 2, a: {b: 2}}  // missing field.
+            {_id: 2, [timeField]: new Date(), [metaField]: 2, a: {b: 2}}, // missing field.
         ],
         pipeline: [{$project: {new: {$add: [`$${metaField}`, {$getField: "a.b"}]}}}],
-        expectedResults: [{_id: 1, new: 5}, {_id: 2, new: null}]
+        expectedResults: [
+            {_id: 1, new: 5},
+            {_id: 2, new: null},
+        ],
     });
 })();
 
@@ -60,12 +63,15 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: 2, "a.$b": 3, a: {b: 4}},
-            {_id: 2, [timeField]: new Date(), [metaField]: 2, a: {b: 2}}  // missing field.
+            {_id: 2, [timeField]: new Date(), [metaField]: 2, a: {b: 2}}, // missing field.
         ],
         pipeline: [{$project: {new: {$add: [`$${metaField}`, {$getField: {$literal: "a.$b"}}]}}}],
-        expectedResults: [{_id: 1, new: 5}, {_id: 2, new: null}]
+        expectedResults: [
+            {_id: 1, new: 5},
+            {_id: 2, new: null},
+        ],
     });
-}());
+})();
 
 // There is a difference between the metaField "meta1", and "$meta1". Field paths are allowed to
 // have a '$' and are accessed by $getField. We need to validate we return the correct results when
@@ -74,10 +80,13 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: 2},
-            {_id: 2, [timeField]: new Date(), [metaField]: 2, "$meta1": 3}  // missing field.
+            {_id: 2, [timeField]: new Date(), [metaField]: 2, "$meta1": 3}, // missing field.
         ],
         pipeline: [{$project: {new: {$add: [`$${metaField}`, {$getField: {$literal: "$meta1"}}]}}}],
-        expectedResults: [{_id: 1, new: null}, {_id: 2, new: 5}]
+        expectedResults: [
+            {_id: 1, new: null},
+            {_id: 2, new: 5},
+        ],
     });
 })();
 
@@ -88,14 +97,19 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: 2},
-            {_id: 2, [timeField]: new Date(), [metaField]: 4, "$meta1": 3}
+            {_id: 2, [timeField]: new Date(), [metaField]: 4, "$meta1": 3},
         ],
-        pipeline: [{
-            $project: {
-                new: {$add: [`$${metaField}`, {$getField: {$concat: ["m", "e", "t", "a", "1"]}}]}
-            }
-        }],
-        expectedResults: [{_id: 1, new: 4}, {_id: 2, new: 8}]
+        pipeline: [
+            {
+                $project: {
+                    new: {$add: [`$${metaField}`, {$getField: {$concat: ["m", "e", "t", "a", "1"]}}]},
+                },
+            },
+        ],
+        expectedResults: [
+            {_id: 1, new: 4},
+            {_id: 2, new: 8},
+        ],
     });
 })();
 
@@ -105,13 +119,17 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: 2},
-            {_id: 2, [timeField]: new Date(), [metaField]: 2, "a.b.c": 3}
+            {_id: 2, [timeField]: new Date(), [metaField]: 2, "a.b.c": 3},
         ],
-        pipeline: [{
-            $project:
-                {new: {$add: [`$${metaField}`, {$getField: {$cond: [false, null, "a.b.c"]}}]}}
-        }],
-        expectedResults: [{_id: 1, new: null}, {_id: 2, new: 5}]
+        pipeline: [
+            {
+                $project: {new: {$add: [`$${metaField}`, {$getField: {$cond: [false, null, "a.b.c"]}}]}},
+            },
+        ],
+        expectedResults: [
+            {_id: 1, new: null},
+            {_id: 2, new: 5},
+        ],
     });
 })();
 
@@ -123,10 +141,10 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: {b: 4}},
-            {_id: 2, [timeField]: new Date(), [metaField]: {c: 5}}  // missing subfield.
+            {_id: 2, [timeField]: new Date(), [metaField]: {c: 5}}, // missing subfield.
         ],
         pipeline: [{$project: {new: {$getField: {input: `$${metaField}`, field: "b"}}}}],
-        expectedResults: [{_id: 1, new: 4}, {_id: 2}]
+        expectedResults: [{_id: 1, new: 4}, {_id: 2}],
     });
 })();
 
@@ -136,10 +154,10 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: {"a.$b": 4}},
-            {_id: 2, [timeField]: new Date(), [metaField]: {c: 5}}  // missing subfield.
+            {_id: 2, [timeField]: new Date(), [metaField]: {c: 5}}, // missing subfield.
         ],
         pipeline: [{$project: {new: {$getField: {input: `$${metaField}`, field: "a.$b"}}}}],
-        expectedResults: [{_id: 1, new: 4}, {_id: 2}]
+        expectedResults: [{_id: 1, new: 4}, {_id: 2}],
     });
 })();
 
@@ -149,17 +167,22 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: 2, a: {"$meta1": 4}},
-            {_id: 2, [timeField]: new Date(), [metaField]: 2, a: {c: 5}}  // missing subfield.
+            {_id: 2, [timeField]: new Date(), [metaField]: 2, a: {c: 5}}, // missing subfield.
         ],
 
-        pipeline: [{
-            $project: {
-                new: {
-                    $add: [`$${metaField}`, {$getField: {input: "$a", field: {$literal: "$meta1"}}}]
-                }
-            }
-        }],
-        expectedResults: [{_id: 1, new: 6}, {_id: 2, new: null}]
+        pipeline: [
+            {
+                $project: {
+                    new: {
+                        $add: [`$${metaField}`, {$getField: {input: "$a", field: {$literal: "$meta1"}}}],
+                    },
+                },
+            },
+        ],
+        expectedResults: [
+            {_id: 1, new: 6},
+            {_id: 2, new: null},
+        ],
     });
 })();
 
@@ -169,19 +192,21 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: time, [metaField]: 2, a: {"$meta1": 4}},
-            {_id: 2, [timeField]: time, [metaField]: 2, a: {c: 5}}  // missing subfield.
+            {_id: 2, [timeField]: time, [metaField]: 2, a: {c: 5}}, // missing subfield.
         ],
-        pipeline: [{
-            $addFields: {
-                new: {
-                    $add: [`$${metaField}`, {$getField: {input: "$a", field: {$literal: "$meta1"}}}]
-                }
-            }
-        }],
+        pipeline: [
+            {
+                $addFields: {
+                    new: {
+                        $add: [`$${metaField}`, {$getField: {input: "$a", field: {$literal: "$meta1"}}}],
+                    },
+                },
+            },
+        ],
         expectedResults: [
             {[timeField]: time, [metaField]: 2, a: {"$meta1": 4}, _id: 1, new: 6},
-            {[timeField]: time, [metaField]: 2, a: {c: 5}, _id: 2, new: null}
-        ]
+            {[timeField]: time, [metaField]: 2, a: {c: 5}, _id: 2, new: null},
+        ],
     });
 })();
 
@@ -193,19 +218,21 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: {field: 3}},
-            {_id: 2, [timeField]: new Date(), [metaField]: {notField: 4}}  // missing subfield.
+            {_id: 2, [timeField]: new Date(), [metaField]: {notField: 4}}, // missing subfield.
         ],
-        pipeline: [{
-            $project: {
-                new: {
-                    $getField: {
-                        input: {$cond: [true, "$meta1", null]},
-                        field: {$concat: ["f", "i", "e", "l", "d"]}
-                    }
-                }
-            }
-        }],
-        expectedResults: [{_id: 1, new: 3}, {_id: 2}]
+        pipeline: [
+            {
+                $project: {
+                    new: {
+                        $getField: {
+                            input: {$cond: [true, "$meta1", null]},
+                            field: {$concat: ["f", "i", "e", "l", "d"]},
+                        },
+                    },
+                },
+            },
+        ],
+        expectedResults: [{_id: 1, new: 3}, {_id: 2}],
     });
 })();
 
@@ -215,24 +242,29 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: new Date(), [metaField]: 2, a: {"b.c": 3}},
-            {_id: 2, [timeField]: new Date(), [metaField]: 2, a: {b: {c: 4}}}  // missing field.
+            {_id: 2, [timeField]: new Date(), [metaField]: 2, a: {b: {c: 4}}}, // missing field.
         ],
-        pipeline: [{
-            $project: {
-                new: {
-                    $add: [
-                        `$${metaField}`,
-                        {
-                            $getField: {
-                                input: {$cond: [true, "$a", null]},
-                                field: {$concat: ["b", ".", "c"]}
-                            }
-                        }
-                    ]
-                }
-            }
-        }],
-        expectedResults: [{_id: 1, new: 5}, {_id: 2, new: null}]
+        pipeline: [
+            {
+                $project: {
+                    new: {
+                        $add: [
+                            `$${metaField}`,
+                            {
+                                $getField: {
+                                    input: {$cond: [true, "$a", null]},
+                                    field: {$concat: ["b", ".", "c"]},
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+        ],
+        expectedResults: [
+            {_id: 1, new: 5},
+            {_id: 2, new: null},
+        ],
     });
 })();
 
@@ -243,13 +275,13 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: time, [metaField]: 2, a: 2},
-            {_id: 2, [timeField]: time, [metaField]: 2, b: 3}
+            {_id: 2, [timeField]: time, [metaField]: 2, b: 3},
         ],
         pipeline: [{$project: {new: "$$ROOT", _id: 1}}],
         expectedResults: [
             {_id: 1, new: {_id: 1, [timeField]: time, [metaField]: 2, a: 2}},
-            {_id: 2, new: {_id: 2, [timeField]: time, [metaField]: 2, b: 3}}
-        ]
+            {_id: 2, new: {_id: 2, [timeField]: time, [metaField]: 2, b: 3}},
+        ],
     });
 })();
 
@@ -258,7 +290,7 @@ function runTest({docs, pipeline, expectedResults}) {
     runTest({
         docs: [
             {_id: 1, [timeField]: time, [metaField]: 2, a: 2},
-            {_id: 2, [timeField]: time, [metaField]: 2, b: 3}
+            {_id: 2, [timeField]: time, [metaField]: 2, b: 3},
         ],
         pipeline: [{$addFields: {new: "$$ROOT"}}],
         expectedResults: [
@@ -267,15 +299,15 @@ function runTest({docs, pipeline, expectedResults}) {
                 [timeField]: time,
                 [metaField]: 2,
                 a: 2,
-                new: {_id: 1, [timeField]: time, [metaField]: 2, a: 2}
+                new: {_id: 1, [timeField]: time, [metaField]: 2, a: 2},
             },
             {
                 _id: 2,
                 [timeField]: time,
                 [metaField]: 2,
                 b: 3,
-                new: {_id: 2, [timeField]: time, [metaField]: 2, b: 3}
-            }
-        ]
+                new: {_id: 2, [timeField]: time, [metaField]: 2, b: 3},
+            },
+        ],
     });
 })();

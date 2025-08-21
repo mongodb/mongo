@@ -29,9 +29,10 @@ const primaryColl = primaryDB[collName];
 
 assert.commandWorked(primaryDB.createCollection(collName, {writeConcern: {w: "majority"}}));
 
-const failPoint = configureFailPoint(primaryDB,
-                                     "hangAfterCollectionInserts",
-                                     {collectionNS: primaryColl.getFullName(), first_id: "b"});
+const failPoint = configureFailPoint(primaryDB, "hangAfterCollectionInserts", {
+    collectionNS: primaryColl.getFullName(),
+    first_id: "b",
+});
 let ps = undefined;
 try {
     // Hold back the durable timestamp by leaving an uncommitted transaction hanging.
@@ -55,8 +56,7 @@ try {
     //
     // The primary's durable timestamp should be pinned by the prior hanging uncommitted write. So
     // this second write will have an oplog hole behind it and will be truncated after a crash.
-    assert.commandWorked(
-        primaryColl.insert({_id: "writeAfterHole"}, {writeConcern: {w: 1, j: true}}));
+    assert.commandWorked(primaryColl.insert({_id: "writeAfterHole"}, {writeConcern: {w: 1, j: true}}));
 
     const findResult = primaryColl.findOne({_id: "writeAfterHole"});
     assert.eq(findResult, {"_id": "writeAfterHole"});
@@ -82,7 +82,7 @@ rst.start(primary);
 
 // Wait for the restarted node to complete startup recovery and start accepting user requests.
 // Note: no new primary will be elected because of the high election timeout set on the replica set.
-assert.soonNoExcept(function() {
+assert.soonNoExcept(function () {
     const nodeState = assert.commandWorked(primary.adminCommand("replSetGetStatus")).myState;
     return nodeState == ReplSetTest.State.SECONDARY;
 });

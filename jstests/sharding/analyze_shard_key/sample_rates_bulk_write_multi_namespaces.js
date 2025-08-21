@@ -13,12 +13,10 @@
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {
     fieldName,
-    runBulkWriteDeleteCmdsOnRepeat
+    runBulkWriteDeleteCmdsOnRepeat,
 } from "jstests/sharding/analyze_shard_key/libs/sample_rates_common.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
@@ -44,7 +42,7 @@ function getSampleSize(conn) {
     const docs = conn.getCollection("config.sampledQueries").find().toArray();
     sampleSize.total += docs.length;
 
-    docs.forEach(doc => {
+    docs.forEach((doc) => {
         if (!sampleSize.hasOwnProperty(doc.cmdName)) {
             sampleSize[[doc.cmdName]] = 0;
         }
@@ -63,18 +61,19 @@ function testQuerySampling(conn, sampleConn, dbName, collNameNotSampled, collNam
     const samplesPerSecond = 3;
     const durationSecs = 30;
 
-    assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
+    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
     sleep(queryAnalysisSamplerConfigurationRefreshSecs * 1000);
 
     const targetNumBulkWriteDeletePerSec = 15;
-    const bulkWriteThread = new Thread(runBulkWriteDeleteCmdsOnRepeat,
-                                       conn.host,
-                                       dbName,
-                                       collNameSampled,
-                                       collNameNotSampled,
-                                       targetNumBulkWriteDeletePerSec,
-                                       durationSecs);
+    const bulkWriteThread = new Thread(
+        runBulkWriteDeleteCmdsOnRepeat,
+        conn.host,
+        dbName,
+        collNameSampled,
+        collNameNotSampled,
+        targetNumBulkWriteDeletePerSec,
+        durationSecs,
+    );
 
     bulkWriteThread.start();
     const actualNumBulkWritePerSec = bulkWriteThread.returnData();
@@ -95,25 +94,23 @@ function testQuerySampling(conn, sampleConn, dbName, collNameNotSampled, collNam
         return true;
     });
 
-    jsTest.log("Finished waiting for sampled queries: " +
-               tojsononeline({actualSampleSize: sampleSize}));
+    jsTest.log("Finished waiting for sampled queries: " + tojsononeline({actualSampleSize: sampleSize}));
 
     assert.eq(sampleSize.total, sampleSize.bulkWrite);
 
     // Verify that the difference between the actual and expected number of samples is within the
     // expected threshold.
     const expectedTotalCount = durationSecs * samplesPerSecond;
-    AnalyzeShardKeyUtil.assertDiffPercentage(
-        sampleSize.total, expectedTotalCount, 10 /* maxDiffPercentage */);
+    AnalyzeShardKeyUtil.assertDiffPercentage(sampleSize.total, expectedTotalCount, 10 /* maxDiffPercentage */);
 
     // Verify that no operation against the notSampledNs was sampled.
-    const queriesNotSampledColl =
-        conn.getCollection("config.sampledQueries").find({ns: notSampledNs}).toArray();
+    const queriesNotSampledColl = conn.getCollection("config.sampledQueries").find({ns: notSampledNs}).toArray();
     assert.eq(queriesNotSampledColl.length, 0, () => tojson(queriesNotSampledColl));
 }
 
 (function testReplSet() {
-    if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test
+    if (jsTestOptions().useAutoBootstrapProcedure) {
+        // TODO: SERVER-80318 Delete test
         return;
     }
 
@@ -124,9 +121,9 @@ function testQuerySampling(conn, sampleConn, dbName, collNameNotSampled, collNam
             setParameter: {
                 queryAnalysisSamplerConfigurationRefreshSecs,
                 queryAnalysisWriterIntervalSecs,
-                logComponentVerbosity: tojson({sharding: 3})
+                logComponentVerbosity: tojson({sharding: 3}),
             },
-        }
+        },
     });
     rst.startSet();
     rst.initiate();
@@ -155,8 +152,8 @@ function testQuerySampling(conn, sampleConn, dbName, collNameNotSampled, collNam
             setParameter: {
                 queryAnalysisSamplerConfigurationRefreshSecs,
                 queryAnalysisWriterIntervalSecs,
-                logComponentVerbosity: tojson({sharding: 3})
-            }
+                logComponentVerbosity: tojson({sharding: 3}),
+            },
         },
         config: {nodes: 1},
     });

@@ -12,7 +12,7 @@ const kNumWriteTickets = 5;
 const kReshardingOplogBatchTaskCount = 20;
 const reshardingTest = new ReshardingTest({
     wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
-    reshardingOplogBatchTaskCount: kReshardingOplogBatchTaskCount
+    reshardingOplogBatchTaskCount: kReshardingOplogBatchTaskCount,
 });
 
 reshardingTest.setup();
@@ -38,5 +38,6 @@ reshardingTest.withReshardingInBackground(
         // be applied by the ReshardingOplogApplier.
         reshardingTest.awaitCloneTimestampChosen();
         assert.commandWorked(sourceCollection.remove({x: 1}, {justOne: false}));
-    });
+    },
+);
 reshardingTest.teardown();

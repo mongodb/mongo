@@ -25,7 +25,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForAllMembers} from "jstests/replsets/rslib.js";
 
-var replTest = new ReplSetTest({name: 'testSet', nodes: 2, oplogSize: 5});
+var replTest = new ReplSetTest({name: "testSet", nodes: 2, oplogSize: 5});
 // Start each mongod in the replica set. Returns a list of nodes
 var nodes = replTest.startSet();
 // This will wait for initiation
@@ -33,8 +33,9 @@ replTest.initiate();
 var primary = replTest.getPrimary();
 
 // The default WC is majority and fsyncLock will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 var ret = primary.getDB("admin").fsyncLock();
 if (!ret.ok) {
@@ -64,13 +65,11 @@ for (var i = 0; i < docNum; i++) {
 // This is what we are testing. Previously this would block. After the fix
 // this should work just fine.
 var secondary0count = secondaries[0].getDB("foo").bar.find().itcount();
-assert.eq(secondary0count,
-          100,
-          "Doc count in fsync lock wrong. Expected (=100), found " + secondary0count);
+assert.eq(secondary0count, 100, "Doc count in fsync lock wrong. Expected (=100), found " + secondary0count);
 assert(secondaries[0].getDB("admin").fsyncUnlock().ok);
 
 // The secondary should have equal or more documents than what it had before.
-assert.soon(function() {
+assert.soon(function () {
     return secondaries[0].getDB("foo").bar.find().itcount() > 100;
 }, "count of documents stored on the secondary did not increase");
 replTest.stopSet();

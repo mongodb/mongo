@@ -159,7 +159,7 @@ const testCases = [
             {a: {b: 3}},
             {a: {b: null}},
             {a: {b: {x: 4}}},
-            {a: {b: []}}
+            {a: {b: []}},
         ],
         field: "a.b.c",
         result: [0],
@@ -177,12 +177,18 @@ const testCases = [
      * Distinct on "_id" field (it might use special optimization).
      */
     {
-        docs: [{_id: 1, a: 42}, {_id: 2, a: 42}],
+        docs: [
+            {_id: 1, a: 42},
+            {_id: 2, a: 42},
+        ],
         field: "_id",
         result: [1, 2],
     },
     {
-        docs: [{_id: 1, a: 42}, {_id: 2, a: 42}],
+        docs: [
+            {_id: 1, a: 42},
+            {_id: 2, a: 42},
+        ],
         field: "_id",
         filter: {_id: {$gt: 1}},
         result: [2],
@@ -223,16 +229,16 @@ const coll = db.distinct_semantics;
 
         // Test with no secondary indexes.
         {
-            const testDescription = `distinct("${testCase.field}", ${
-                tojson(testCase.filter)}) over ${tojson(testCase.docs)}`;
+            const testDescription = `distinct("${testCase.field}", ${tojson(
+                testCase.filter,
+            )}) over ${tojson(testCase.docs)}`;
 
-            result = assert.commandWorked(coll.runCommand("distinct", distinctSpec),
-                                          `Attempted ${testDescription}`);
+            result = assert.commandWorked(coll.runCommand("distinct", distinctSpec), `Attempted ${testDescription}`);
 
             assertArrayEq({
                 expected: testCase.result,
                 actual: result.values,
-                extraErrorMsg: `Unexpected result for ${testDescription}`
+                extraErrorMsg: `Unexpected result for ${testDescription}`,
             });
         }
 
@@ -240,15 +246,16 @@ const coll = db.distinct_semantics;
         {
             const indexSpec = testCase.index ? testCase.index : {[testCase.field]: 1};
 
-            const testDescription =
-                `distinct("${testCase.field}", ${tojson(testCase.filter)}) over ${
-                    tojson(testCase.docs)} with index ${tojson(indexSpec)}`;
+            const testDescription = `distinct("${testCase.field}", ${tojson(testCase.filter)}) over ${tojson(
+                testCase.docs,
+            )} with index ${tojson(indexSpec)}`;
 
             assert.commandWorked(coll.createIndex(indexSpec), `createIndex for ${testDescription}`);
 
             result = assert.commandWorked(
                 coll.runCommand("distinct", {"key": testCase.field, "query": testCase.filter}),
-                `Attempted ${testDescription}`);
+                `Attempted ${testDescription}`,
+            );
 
             // Shard filtering might require fetching, so we may get the correct result even with
             // the index.
@@ -256,7 +263,7 @@ const coll = db.distinct_semantics;
                 expected1: testCase.resultWithIndex ? testCase.resultWithIndex : testCase.result,
                 expected2: testCase.result,
                 actual: result.values,
-                extraErrorMsg: `Unexpected result for ${testDescription}`
+                extraErrorMsg: `Unexpected result for ${testDescription}`,
             });
         }
     }

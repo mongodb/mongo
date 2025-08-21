@@ -15,26 +15,29 @@
 const col = db.function_string_representations;
 const out = db.map_reduce_example;
 col.drop();
-assert.commandWorked(col.insert({
-    _id: "abc123",
-    ord_date: new Date("Oct 04, 2012"),
-    status: 'A',
-    price: 25,
-    items: [{sku: "mmm", qty: 5, price: 2.5}, {sku: "nnn", qty: 5, price: 2.5}]
-}));
+assert.commandWorked(
+    col.insert({
+        _id: "abc123",
+        ord_date: new Date("Oct 04, 2012"),
+        status: "A",
+        price: 25,
+        items: [
+            {sku: "mmm", qty: 5, price: 2.5},
+            {sku: "nnn", qty: 5, price: 2.5},
+        ],
+    }),
+);
 
 var mapFunction = "function() {emit(this._id, this.price);}";
 var reduceFunction = "function(keyCustId, valuesPrices) {return Array.sum(valuesPrices);}";
 out.drop();
-assert.commandWorked(
-    col.mapReduce(mapFunction, reduceFunction, {out: {merge: "map_reduce_example"}}));
+assert.commandWorked(col.mapReduce(mapFunction, reduceFunction, {out: {merge: "map_reduce_example"}}));
 
 // Provided strings may end with semicolons and/or whitespace
 mapFunction += " ; ";
 reduceFunction += " ; ";
 out.drop();
-assert.commandWorked(
-    col.mapReduce(mapFunction, reduceFunction, {out: {merge: "map_reduce_example"}}));
+assert.commandWorked(col.mapReduce(mapFunction, reduceFunction, {out: {merge: "map_reduce_example"}}));
 
 // $where exhibits the same behavior
 var whereFunction = "function() {return this.price === 25;}";

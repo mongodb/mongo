@@ -46,8 +46,11 @@ if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
 }
 
 // Test aggregation command output format.
-var commandResult = testDB.runCommand(
-    {aggregate: testColl.getName(), pipeline: [{$collStats: {latencyStats: {}}}], cursor: {}});
+var commandResult = testDB.runCommand({
+    aggregate: testColl.getName(),
+    pipeline: [{$collStats: {latencyStats: {}}}],
+    cursor: {},
+});
 assert.commandWorked(commandResult);
 assert(commandResult.cursor.firstBatch.length == 1);
 
@@ -57,7 +60,7 @@ var histogramTypes = ["reads", "writes", "commands"];
 assert(stats.hasOwnProperty("localTime"));
 assert(stats.hasOwnProperty("latencyStats"));
 
-histogramTypes.forEach(function(key) {
+histogramTypes.forEach(function (key) {
     assert(stats.latencyStats.hasOwnProperty(key));
     assert(stats.latencyStats[key].hasOwnProperty("ops"));
     assert(stats.latencyStats[key].hasOwnProperty("latency"));
@@ -136,17 +139,21 @@ assert.commandWorked(testColl.createIndex({pt: "2dsphere"}));
 lastHistogram = assertHistogramDiffEq(testDB, testColl, lastHistogram, 0, 0, 1);
 
 // $geoNear aggregation stage
-assert.commandWorked(testDB.runCommand({
-    aggregate: testColl.getName(),
-    pipeline: [{
-        $geoNear: {
-            near: {type: "Point", coordinates: [0, 0]},
-            spherical: true,
-            distanceField: "dist",
-        }
-    }],
-    cursor: {},
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        aggregate: testColl.getName(),
+        pipeline: [
+            {
+                $geoNear: {
+                    near: {type: "Point", coordinates: [0, 0]},
+                    spherical: true,
+                    distanceField: "dist",
+                },
+            },
+        ],
+        cursor: {},
+    }),
+);
 lastHistogram = assertHistogramDiffEq(testDB, testColl, lastHistogram, 1, 0, 0);
 
 // GetIndexes
@@ -181,9 +188,11 @@ var commandResult = testDB.runCommand({compact: testColl.getName(), force: true}
 // The storage engine may not support compact or if it does, it can be interrupted because of cache
 // pressure or concurrent calls to compact.
 if (!commandResult.ok) {
-    assert.commandFailedWithCode(commandResult,
-                                 [ErrorCodes.CommandNotSupported, ErrorCodes.Interrupted],
-                                 tojson(commandResult));
+    assert.commandFailedWithCode(
+        commandResult,
+        [ErrorCodes.CommandNotSupported, ErrorCodes.Interrupted],
+        tojson(commandResult),
+    );
 }
 lastHistogram = assertHistogramDiffEq(testDB, testColl, lastHistogram, 0, 0, 1);
 

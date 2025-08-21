@@ -6,8 +6,6 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {dropAllIndexes} from "jstests/concurrency/fsm_workload_modifiers/drop_all_indexes.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/update/update_simple.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/update/update_simple.js";
 
 export const $config = extendWorkload($baseConfig, dropAllIndexes);

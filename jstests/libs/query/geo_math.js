@@ -4,14 +4,14 @@
  * Converts distance in degrees to radians.
  */
 export function deg2rad(arg) {
-    return arg * Math.PI / 180.0;
+    return (arg * Math.PI) / 180.0;
 }
 
 /**
  * Converts distance in radians to degrees.
  */
 export function rad2deg(arg) {
-    return arg * 180.0 / Math.PI;
+    return (arg * 180.0) / Math.PI;
 }
 
 /**

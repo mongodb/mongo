@@ -13,7 +13,7 @@ const config = rst.getReplSetConfig();
 // Prevent elections and set heartbeat timeout >> electionHangsBeforeUpdateMemberState.
 config.settings = {
     electionTimeoutMillis: 12 * 60 * 60 * 1000,
-    heartbeatTimeoutSecs: 60 * 1000
+    heartbeatTimeoutSecs: 60 * 1000,
 };
 rst.initiate(config);
 
@@ -22,14 +22,15 @@ const candidate = rst.getSecondary();
 
 jsTestLog("Step down");
 
-const failPoint = configureFailPoint(
-    candidate, "electionHangsBeforeUpdateMemberState", {waitForMillis: 10 * 1000});
+const failPoint = configureFailPoint(candidate, "electionHangsBeforeUpdateMemberState", {waitForMillis: 10 * 1000});
 
 // The incumbent sends replSetStepUp to the candidate for election handoff.
-assert.commandWorked(incumbent.adminCommand({
-    replSetStepDown: ElectionHandoffTest.stepDownPeriodSecs,
-    secondaryCatchUpPeriodSecs: ElectionHandoffTest.stepDownPeriodSecs / 2
-}));
+assert.commandWorked(
+    incumbent.adminCommand({
+        replSetStepDown: ElectionHandoffTest.stepDownPeriodSecs,
+        secondaryCatchUpPeriodSecs: ElectionHandoffTest.stepDownPeriodSecs / 2,
+    }),
+);
 
 jsTestLog("Wait for candidate to win the election");
 
@@ -43,9 +44,10 @@ config.version++;
 // command before it succeeds. Failing due to interruption on stepup or the automatic reconfig on
 // stepup is acceptable here because we are testing that the reconfig command does not cause the
 // server to invariant.
-assert.commandWorkedOrFailedWithCode(
-    candidate.adminCommand({replSetReconfig: config, force: true}),
-    [ErrorCodes.InterruptedDueToReplStateChange, ErrorCodes.ConfigurationInProgress]);
+assert.commandWorkedOrFailedWithCode(candidate.adminCommand({replSetReconfig: config, force: true}), [
+    ErrorCodes.InterruptedDueToReplStateChange,
+    ErrorCodes.ConfigurationInProgress,
+]);
 
 failPoint.off();
 

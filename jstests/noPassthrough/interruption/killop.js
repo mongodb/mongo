@@ -14,14 +14,17 @@ const collName = "test";
 function runTest(conn, shardConn) {
     const db = conn.getDB(dbName);
 
-    assert.commandWorked(
-        shardConn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-    assert.commandWorked(
-        shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}));
+    assert.commandWorked(shardConn.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
+    assert.commandWorked(shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "alwaysOn"}));
 
     const findComment = "unique_find_comment";
-    const queryToKill = "assert.commandWorked(db.getSiblingDB('" + dbName +
-        "').runCommand({find: '" + collName + "', filter: {x: 1}, comment: '" + findComment +
+    const queryToKill =
+        "assert.commandWorked(db.getSiblingDB('" +
+        dbName +
+        "').runCommand({find: '" +
+        collName +
+        "', filter: {x: 1}, comment: '" +
+        findComment +
         "'}));";
     const awaitShell = startParallelShell(queryToKill, conn.port);
     let opId;
@@ -31,7 +34,7 @@ function runTest(conn, shardConn) {
         "command.comment": findComment,
     };
     assert.soon(
-        function() {
+        function () {
             const result = db.currentOp(curOpFilter);
             assert.commandWorked(result);
             if (result.inprog.length === 1 && result.inprog[0].numYields > 0) {
@@ -41,10 +44,13 @@ function runTest(conn, shardConn) {
 
             return false;
         },
-        function() {
-            return "Failed to find operation in currentOp() output: " +
-                tojson(db.currentOp({"ns": dbName + "." + collName}));
-        });
+        function () {
+            return (
+                "Failed to find operation in currentOp() output: " +
+                tojson(db.currentOp({"ns": dbName + "." + collName}))
+            );
+        },
+    );
 
     assert.commandWorked(db.killOp(opId));
 
@@ -54,8 +60,7 @@ function runTest(conn, shardConn) {
     assert(result.inprog[0].hasOwnProperty("killPending"));
     assert.eq(true, result.inprog[0].killPending);
 
-    assert.commandWorked(
-        shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}));
+    assert.commandWorked(shardConn.adminCommand({"configureFailPoint": "setYieldAllLocksHang", "mode": "off"}));
 
     const exitCode = awaitShell({checkExitSuccess: false});
     assert.neq(0, exitCode, "Expected shell to exit with failure due to operation kill");

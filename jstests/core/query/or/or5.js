@@ -29,15 +29,39 @@ assert.eq(6, t.find({$or: [{a: 2}, {b: 6}, {c: 4}]}).toArray().length);
 assert.eq(6, t.find({$or: [{a: 2}, {b: 3}, {c: 6}]}).toArray().length);
 
 for (var i = 2; i <= 7; ++i) {
-    assert.eq(7, t.find({$or: [{a: 2}, {b: 3}, {c: 4}]}).batchSize(i).toArray().length);
-    assert.eq(6, t.find({$or: [{a: 6}, {b: 3}, {c: 4}]}).batchSize(i).toArray().length);
-    assert.eq(6, t.find({$or: [{a: 2}, {b: 6}, {c: 4}]}).batchSize(i).toArray().length);
-    assert.eq(6, t.find({$or: [{a: 2}, {b: 3}, {c: 6}]}).batchSize(i).toArray().length);
+    assert.eq(
+        7,
+        t
+            .find({$or: [{a: 2}, {b: 3}, {c: 4}]})
+            .batchSize(i)
+            .toArray().length,
+    );
+    assert.eq(
+        6,
+        t
+            .find({$or: [{a: 6}, {b: 3}, {c: 4}]})
+            .batchSize(i)
+            .toArray().length,
+    );
+    assert.eq(
+        6,
+        t
+            .find({$or: [{a: 2}, {b: 6}, {c: 4}]})
+            .batchSize(i)
+            .toArray().length,
+    );
+    assert.eq(
+        6,
+        t
+            .find({$or: [{a: 2}, {b: 3}, {c: 6}]})
+            .batchSize(i)
+            .toArray().length,
+    );
 }
 
 t.createIndex({z: "2d"});
 
-assert.throws(function() {
+assert.throws(function () {
     return t.find({$or: [{z: {$near: [50, 50]}}, {a: 2}]}).toArray();
 });
 
@@ -58,8 +82,20 @@ function reset() {
 
 reset();
 
-assert.eq(6, t.find({$or: [{a: 2}, {b: 3}, {c: 4}]}).batchSize(1).itcount());
-assert.eq(6, t.find({$or: [{a: 2}, {b: 3}, {c: 4}]}).batchSize(2).itcount());
+assert.eq(
+    6,
+    t
+        .find({$or: [{a: 2}, {b: 3}, {c: 4}]})
+        .batchSize(1)
+        .itcount(),
+);
+assert.eq(
+    6,
+    t
+        .find({$or: [{a: 2}, {b: 3}, {c: 4}]})
+        .batchSize(2)
+        .itcount(),
+);
 
 t.drop();
 

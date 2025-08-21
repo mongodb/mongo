@@ -7,14 +7,13 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 let viewsDB = db.getSiblingDB("views_basic");
 assert.commandWorked(viewsDB.dropDatabase());
 
-let assertCmdResultEq = function(cmd, expected) {
+let assertCmdResultEq = function (cmd, expected) {
     let res = viewsDB.runCommand(cmd);
     assert.commandWorked(res);
 
     let cursor = new DBCommandCursor(viewsDB, res, 5);
     let actual = cursor.toArray();
-    assert(arrayEq(actual, expected),
-           "actual: " + tojson(cursor.toArray()) + ", expected:" + tojson(expected));
+    assert(arrayEq(actual, expected), "actual: " + tojson(cursor.toArray()) + ", expected:" + tojson(expected));
 };
 
 // Insert some control documents.
@@ -29,22 +28,29 @@ assert.commandWorked(bulk.execute());
 
 // Test creating views on both collections and other views, using the database command and the
 // shell helper.
-assert.commandWorked(viewsDB.runCommand(
-    {create: "californiaCities", viewOn: "collection", pipeline: [{$match: {state: "CA"}}]}));
-assert.commandWorked(viewsDB.createView(
-    "largeCaliforniaCities", "californiaCities", [{$match: {pop: {$gte: 10}}}, {$sort: {pop: 1}}]));
+assert.commandWorked(
+    viewsDB.runCommand({create: "californiaCities", viewOn: "collection", pipeline: [{$match: {state: "CA"}}]}),
+);
+assert.commandWorked(
+    viewsDB.createView("largeCaliforniaCities", "californiaCities", [{$match: {pop: {$gte: 10}}}, {$sort: {pop: 1}}]),
+);
 
 // Use the find command on a view with various options.
-assertCmdResultEq(
-    {find: "californiaCities", filter: {}, projection: {_id: 1, pop: 1}},
-    [{_id: "Oakland", pop: 3}, {_id: "Palo Alto", pop: 10}, {_id: "San Francisco", pop: 4}]);
-assertCmdResultEq({find: "largeCaliforniaCities", filter: {pop: {$lt: 50}}, limit: 1},
-                  [{_id: "Palo Alto", state: "CA", pop: 10}]);
+assertCmdResultEq({find: "californiaCities", filter: {}, projection: {_id: 1, pop: 1}}, [
+    {_id: "Oakland", pop: 3},
+    {_id: "Palo Alto", pop: 10},
+    {_id: "San Francisco", pop: 4},
+]);
+assertCmdResultEq({find: "largeCaliforniaCities", filter: {pop: {$lt: 50}}, limit: 1}, [
+    {_id: "Palo Alto", state: "CA", pop: 10},
+]);
 
 // Use aggregation on a view.
-assertCmdResultEq({
-    aggregate: "californiaCities",
-    pipeline: [{$group: {_id: "$state", totalPop: {$sum: "$pop"}}}],
-    cursor: {}
-},
-                  [{_id: "CA", totalPop: 17}]);
+assertCmdResultEq(
+    {
+        aggregate: "californiaCities",
+        pipeline: [{$group: {_id: "$state", totalPop: {$sum: "$pop"}}}],
+        cursor: {},
+    },
+    [{_id: "CA", totalPop: 17}],
+);

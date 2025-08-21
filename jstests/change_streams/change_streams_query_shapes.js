@@ -20,11 +20,15 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
 function checkQueryShapeAndHash(db, query, queryShapeHash) {
     qsutils.withQuerySettings(query, {reject: true}, () => {
         const hashFromSettings = qsutils.getQueryShapeHashFromQuerySettings(query);
-        assert.eq(queryShapeHash,
-                  hashFromSettings,
-                  `Expected query shape (hash) for input query ${tojsononeline(query)}: (${
-                      queryShapeHash}), got ${hashFromSettings}. Full configuration: ${
-                      tojson(qsutils.getQuerySettings({showDebugQueryShape: true}))}`);
+        assert.eq(
+            queryShapeHash,
+            hashFromSettings,
+            `Expected query shape (hash) for input query ${tojsononeline(query)}: (${
+                queryShapeHash
+            }), got ${hashFromSettings}. Full configuration: ${tojson(
+                qsutils.getQuerySettings({showDebugQueryShape: true}),
+            )}`,
+        );
     });
 }
 
@@ -46,9 +50,11 @@ function checkQueryShapeAndHash(db, query, queryShapeHash) {
 //
 
 // Check shape and hash for a basic change stream pipeline.
-checkQueryShapeAndHash(db,
-                       {aggregate: 1, pipeline: [{$changeStream: {}}], $db: db.getName()},
-                       "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D");
+checkQueryShapeAndHash(
+    db,
+    {aggregate: 1, pipeline: [{$changeStream: {}}], $db: db.getName()},
+    "ABD13DBF8CFAE39BF22941780FFCF8BB111582FB30C6CDC832933EA0E29F1C3D",
+);
 
 // Check shape and hash for pipelines with 'showSystemEvents' flag.
 // Using this flag changes the query shape and hash, regardless of whether the flag is set to the
@@ -56,12 +62,14 @@ checkQueryShapeAndHash(db,
 checkQueryShapeAndHash(
     db,
     {aggregate: 1, pipeline: [{$changeStream: {showSystemEvents: true}}], $db: db.getName()},
-    "989509505CA0513EF576E1DA3C3D1319D8BCB6EF3A91E436C9A08FEA39AE428A");
+    "989509505CA0513EF576E1DA3C3D1319D8BCB6EF3A91E436C9A08FEA39AE428A",
+);
 
 checkQueryShapeAndHash(
     db,
     {aggregate: 1, pipeline: [{$changeStream: {showSystemEvents: false}}], $db: db.getName()},
-    "06F4F2FAD655A12343302BCCFD2702EEEA00A6D797D5EA0B1D89FC9396D20ADB");
+    "06F4F2FAD655A12343302BCCFD2702EEEA00A6D797D5EA0B1D89FC9396D20ADB",
+);
 
 // Check shape and hash for pipelines with 'showExpandedEvents' flag.
 // Using this flag changes the query shape and hash, regardless of whether the flag is set to the
@@ -69,12 +77,14 @@ checkQueryShapeAndHash(
 checkQueryShapeAndHash(
     db,
     {aggregate: 1, pipeline: [{$changeStream: {showExpandedEvents: true}}], $db: db.getName()},
-    "8F93080A29997E20EE5C90B1DDF681DB8D0F3419531C00C9DE4843D80C7FEC3E");
+    "8F93080A29997E20EE5C90B1DDF681DB8D0F3419531C00C9DE4843D80C7FEC3E",
+);
 
 checkQueryShapeAndHash(
     db,
     {aggregate: 1, pipeline: [{$changeStream: {showExpandedEvents: false}}], $db: db.getName()},
-    "29524DD77A583945DFBDAC1909346D6565B2BEF5A607F6D9AD040982C12DEFCA");
+    "29524DD77A583945DFBDAC1909346D6565B2BEF5A607F6D9AD040982C12DEFCA",
+);
 
 //
 // Collection-level change streams.
@@ -84,45 +94,54 @@ checkQueryShapeAndHash(
 checkQueryShapeAndHash(
     db,
     {aggregate: coll.getName(), pipeline: [{$changeStream: {}}], $db: db.getName()},
-    "FF65C1F81BEB9C930D7C2A94661E1106F77C59809E0B1D7FB2AC3C6232D03A4C");
+    "FF65C1F81BEB9C930D7C2A94661E1106F77C59809E0B1D7FB2AC3C6232D03A4C",
+);
 
 // Check shape and hash for pipelines with 'showSystemEvents' flag.
 // Using this flag changes the query shape and hash, regardless of whether the flag is set to the
 // implicit default value (false) or not.
-checkQueryShapeAndHash(db,
-                       {
-                           aggregate: coll.getName(),
-                           pipeline: [{$changeStream: {showSystemEvents: true}}],
-                           $db: db.getName()
-                       },
-                       "DBE479E988FF18FA2DD5B2188A97A797BF1A6BD9571DD3CF3CEFAE4BDEF4E1D3");
+checkQueryShapeAndHash(
+    db,
+    {
+        aggregate: coll.getName(),
+        pipeline: [{$changeStream: {showSystemEvents: true}}],
+        $db: db.getName(),
+    },
+    "DBE479E988FF18FA2DD5B2188A97A797BF1A6BD9571DD3CF3CEFAE4BDEF4E1D3",
+);
 
-checkQueryShapeAndHash(db,
-                       {
-                           aggregate: coll.getName(),
-                           pipeline: [{$changeStream: {showSystemEvents: false}}],
-                           $db: db.getName()
-                       },
-                       "AFD4BD81AC43C813818444EA835F951E1112E18D513F0BA255A867764A9ED48E");
+checkQueryShapeAndHash(
+    db,
+    {
+        aggregate: coll.getName(),
+        pipeline: [{$changeStream: {showSystemEvents: false}}],
+        $db: db.getName(),
+    },
+    "AFD4BD81AC43C813818444EA835F951E1112E18D513F0BA255A867764A9ED48E",
+);
 
 // Check shape and hash for pipelines with 'showExpandedEvents' flag.
 // Using this flag changes the query shape and hash, regardless of whether the flag is set to
 // the implicit default value (false) or not.
-checkQueryShapeAndHash(db,
-                       {
-                           aggregate: coll.getName(),
-                           pipeline: [{$changeStream: {showExpandedEvents: true}}],
-                           $db: db.getName()
-                       },
-                       "97744EC94700017030246635FDFD4481C177EF25D2CFE7335ABD7E570BDE273E");
+checkQueryShapeAndHash(
+    db,
+    {
+        aggregate: coll.getName(),
+        pipeline: [{$changeStream: {showExpandedEvents: true}}],
+        $db: db.getName(),
+    },
+    "97744EC94700017030246635FDFD4481C177EF25D2CFE7335ABD7E570BDE273E",
+);
 
-checkQueryShapeAndHash(db,
-                       {
-                           aggregate: coll.getName(),
-                           pipeline: [{$changeStream: {showExpandedEvents: false}}],
-                           $db: db.getName()
-                       },
-                       "8BFCDD5DA40E82A947514CD30503795B72B3B61DD2F5455133F1D7120F9394B2");
+checkQueryShapeAndHash(
+    db,
+    {
+        aggregate: coll.getName(),
+        pipeline: [{$changeStream: {showExpandedEvents: false}}],
+        $db: db.getName(),
+    },
+    "8BFCDD5DA40E82A947514CD30503795B72B3B61DD2F5455133F1D7120F9394B2",
+);
 
 // The following tests rely on fields that were added to the $changeStreams stage in v8.2, so we
 // only execute them if the FCV version is high enough.
@@ -132,22 +151,26 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {version: "v1"}}], $db: db.getName()},
-        "EC5DB9EA352364BD4061C6CBC605C887347ED0B30B9CE8D5B3BFFB6BE5F81AF5");
+        "EC5DB9EA352364BD4061C6CBC605C887347ED0B30B9CE8D5B3BFFB6BE5F81AF5",
+    );
 
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {version: "v2"}}], $db: db.getName()},
-        "CA169C644BFED846C3782FF04DB2AA18CA0EBC141AF71654D77B245AD9C5B1F0");
+        "CA169C644BFED846C3782FF04DB2AA18CA0EBC141AF71654D77B245AD9C5B1F0",
+    );
 
     // Check shape and hash when setting the 'supportedEvents' field.
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {supportedEvents: ["foo"]}}], $db: db.getName()},
-        "B953C7FD7733C29EEEFB27EC963A2C9D123AB94311959A9B2749DD745BCBC838");
+        "B953C7FD7733C29EEEFB27EC963A2C9D123AB94311959A9B2749DD745BCBC838",
+    );
 
     // Check shape and hash for a change stream pipeline using the 'ignoreRemovedShards' flag.
     checkQueryShapeAndHash(
         db,
         {aggregate: 1, pipeline: [{$changeStream: {ignoreRemovedShards: true}}], $db: db.getName()},
-        "796AFF268E3D2A16D9FFCD9F5929CB6C78D704560AC6F19A2BE40DC2B688200D");
+        "796AFF268E3D2A16D9FFCD9F5929CB6C78D704560AC6F19A2BE40DC2B688200D",
+    );
 }

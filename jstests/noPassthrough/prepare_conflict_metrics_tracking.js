@@ -50,9 +50,10 @@ const causePrepareConflictAndVerify = function assertPrepareReadConflict(filter,
             find: collName,
             filter: filter,
             readConcern: {afterClusterTime: clusterTime},
-            maxTimeMS: 1000
+            maxTimeMS: 1000,
         }),
-        ErrorCodes.MaxTimeMSExpired);
+        ErrorCodes.MaxTimeMSExpired,
+    );
 
     let opMetrics = testDB.serverStatus().metrics.operation;
     assert.gt(opMetrics.prepareConflictWaitMicros, basePrepareConflictWaitTime);
@@ -65,30 +66,34 @@ testColl.drop({writeConcern: {w: "majority"}});
 // Insert a document modified by the transaction.
 const txnDoc = {
     _id: 1,
-    x: 1
+    x: 1,
 };
 assert.commandWorked(testColl.insert(txnDoc));
 // Insert a document unmodified by the transaction.
 const otherDoc = {
     _id: 2,
-    y: 2
+    y: 2,
 };
 assert.commandWorked(testColl.insert(otherDoc, {writeConcern: {w: "majority"}}));
 
 // Create an index on 'y' to avoid conflicts on the field.
-assert.commandWorked(testColl.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {"y": 1}, name: "y_1"}],
-    writeConcern: {w: "majority"}
-}));
+assert.commandWorked(
+    testColl.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {"y": 1}, name: "y_1"}],
+        writeConcern: {w: "majority"},
+    }),
+);
 
 const session = testDB.getMongo().startSession();
 const sessionDB = session.getDatabase(dbName);
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandWorked(sessionDB.runCommand({
-    update: collName,
-    updates: [{q: txnDoc, u: {$inc: {x: 1}}}],
-}));
+assert.commandWorked(
+    sessionDB.runCommand({
+        update: collName,
+        updates: [{q: txnDoc, u: {$inc: {x: 1}}}],
+    }),
+);
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 // Setup and ensure tracking of 2 prepare conflicts.

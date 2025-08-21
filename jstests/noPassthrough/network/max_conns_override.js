@@ -24,35 +24,35 @@ function verifyStats(conn, {exemptCount, normalCount}) {
     const totalCount = exemptCount + normalCount;
 
     // Verify that we have updated serverStatus.
-    assert.soon(() => {
-        const serverStatus = getStats(conn);
-        const executors = serverStatus.network.serviceExecutors;
+    assert.soon(
+        () => {
+            const serverStatus = getStats(conn);
+            const executors = serverStatus.network.serviceExecutors;
 
-        const currentCount = serverStatus.connections.current;
-        if (currentCount != totalCount) {
-            print(`Not yet at the expected count of connections: ${currentCount} != ${totalCount}`);
-            return false;
-        }
+            const currentCount = serverStatus.connections.current;
+            if (currentCount != totalCount) {
+                print(`Not yet at the expected count of connections: ${currentCount} != ${totalCount}`);
+                return false;
+            }
 
-        const readyAdminThreads =
-            executors.reserved.threadsRunning - executors.reserved.clientsRunning;
-        if (readyAdminThreads < kConfiguredReadyAdminThreads) {
-            print("Not enough admin threads yet: " +
-                  `${readyAdminThreads} < ${kConfiguredReadyAdminThreads}`);
-            return false;
-        }
+            const readyAdminThreads = executors.reserved.threadsRunning - executors.reserved.clientsRunning;
+            if (readyAdminThreads < kConfiguredReadyAdminThreads) {
+                print("Not enough admin threads yet: " + `${readyAdminThreads} < ${kConfiguredReadyAdminThreads}`);
+                return false;
+            }
 
-        const threadedCount = serverStatus.connections.threaded;
-        const threadedExecutorCount =
-            executors.passthrough.clientsInTotal + executors.reserved.clientsInTotal;
-        if (threadedCount != threadedExecutorCount) {
-            print("Not enough running threaded clients yet: " +
-                  `${threadedCount} != ${threadedExecutorCount}`);
-            return false;
-        }
+            const threadedCount = serverStatus.connections.threaded;
+            const threadedExecutorCount = executors.passthrough.clientsInTotal + executors.reserved.clientsInTotal;
+            if (threadedCount != threadedExecutorCount) {
+                print("Not enough running threaded clients yet: " + `${threadedCount} != ${threadedExecutorCount}`);
+                return false;
+            }
 
-        return true;
-    }, "Failed to verify initial conditions", 10000);
+            return true;
+        },
+        "Failed to verify initial conditions",
+        10000,
+    );
 
     const serverStatus = getStats(conn);
     const connectionsStatus = serverStatus.connections;
@@ -62,7 +62,7 @@ function verifyStats(conn, {exemptCount, normalCount}) {
     // Log these serverStatus sections so we can debug this easily.
     const filteredSections = {
         connections: connectionsStatus,
-        network: {serviceExecutors: {passthrough: executorStatus, reserved: reservedExecutorStatus}}
+        network: {serviceExecutors: {passthrough: executorStatus, reserved: reservedExecutorStatus}},
     };
     print(`serverStatus: ${tojson(filteredSections)}`);
 
@@ -117,13 +117,12 @@ function runTest(useProxy, useMongos) {
 
         // Start up two proxy servers, one on localhost, the other on the public address.
         const servers = {
-            admin: '127.0.0.1',
+            admin: "127.0.0.1",
             normal: ip,
         };
 
-        Object.keys(servers).forEach(function(mode) {
-            const svr =
-                new ProxyProtocolServer(allocatePort(), opts.proxyPort, kProxyProtocolVersion);
+        Object.keys(servers).forEach(function (mode) {
+            const svr = new ProxyProtocolServer(allocatePort(), opts.proxyPort, kProxyProtocolVersion);
             svr.ingress_address = servers[mode];
             svr.egress_address = servers[mode];
             svr.start();
@@ -132,15 +131,14 @@ function runTest(useProxy, useMongos) {
         });
 
         jsTest.log(`ProxyPort: ${opts.proxyPort}`);
-        Object.keys(proxyServer).forEach(function(mode) {
+        Object.keys(proxyServer).forEach(function (mode) {
             const svr = proxyServer[mode];
-            jsTest.log(
-                `ProxyServer ${mode}: ${svr.getIngressString()} -> ${svr.getEgressString()}`);
+            jsTest.log(`ProxyServer ${mode}: ${svr.getIngressString()} -> ${svr.getEgressString()}`);
         });
     }
     jsTest.log(`Listening: ${opts.port}`);
 
-    const {conn, shutdown} = function() {
+    const {conn, shutdown} = (function () {
         if (useMongos) {
             if (useProxy) {
                 // mongos accepts proxied connections on loadBalancerPort, not proxyPort. Rename.
@@ -149,7 +147,7 @@ function runTest(useProxy, useMongos) {
                 delete opts.proxyPort;
 
                 // Client must connect with "?loadBalanced=true" in URI when proxying to mongos.
-                Object.keys(host).forEach(function(key) {
+                Object.keys(host).forEach(function (key) {
                     host[key] = `mongodb://${host[key]}/admin?loadBalanced=true`;
                 });
             }
@@ -159,14 +157,16 @@ function runTest(useProxy, useMongos) {
             const m = MongoRunner.runMongod(opts);
             return {conn: m, shutdown: () => MongoRunner.stopMongod(m)};
         }
-    }();
+    })();
 
     try {
         if (featureFlagMongodProxyProtocolSupportEnabled === undefined) {
             // Test for featureFlag while in normal mode,
             // so that we know if we can run with proxy mode later.
-            featureFlagMongodProxyProtocolSupportEnabled =
-                FeatureFlagUtil.isEnabled(conn, 'MongodProxyProtocolSupport');
+            featureFlagMongodProxyProtocolSupportEnabled = FeatureFlagUtil.isEnabled(
+                conn,
+                "MongodProxyProtocolSupport",
+            );
         }
 
         let adminConns = [];
@@ -181,7 +181,7 @@ function runTest(useProxy, useMongos) {
 
         for (let i = 0; i < 2 * kConfiguredMaxConns; i++) {
             // Make some connections using the exempt CIDR and some using the normal CIDR.
-            let isExempt = (i % 2 == 0);
+            let isExempt = i % 2 == 0;
             try {
                 if (isExempt) {
                     adminConns.push(new Mongo(host.admin));
@@ -191,7 +191,7 @@ function runTest(useProxy, useMongos) {
                     ++normalCount;
                 }
             } catch (e) {
-                jsTest.log('Threw exception: ' + tojson(e));
+                jsTest.log("Threw exception: " + tojson(e));
 
                 // If we couldn't connect, that means we've exceeded maxConns
                 // and we're using the normal CIDR.

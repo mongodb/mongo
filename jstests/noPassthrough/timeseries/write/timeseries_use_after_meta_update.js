@@ -12,8 +12,7 @@ const db = conn.getDB("test");
 const coll = db[jsTestName()];
 coll.drop();
 
-assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 
 // Create a new bucket.
 assert.commandWorked(coll.insert({m: 1, t: ISODate("2024-06-06T00:00:00.000Z")}));

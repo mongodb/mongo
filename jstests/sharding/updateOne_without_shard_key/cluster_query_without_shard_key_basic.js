@@ -21,19 +21,19 @@ let shardedCollNsMultiShard = dbName + "." + shardedCollNameMultiShard;
 let mongosConn = st.s.getDB(dbName);
 let shardConn = st.shard0.getDB(dbName);
 let splitPoint = 50;
-let xFieldValShard0 = 0;           // monotonically increasing x field value targeting shard0.
-let xFieldValShard1 = splitPoint;  // monotonically increasing x field value targeting shard1.
-let yFieldVal = 0;                 // monotonically increasing y field value.
+let xFieldValShard0 = 0; // monotonically increasing x field value targeting shard0.
+let xFieldValShard1 = splitPoint; // monotonically increasing x field value targeting shard1.
+let yFieldVal = 0; // monotonically increasing y field value.
 
 // Shard collection
-assert.commandWorked(
-    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
 
 // Create a sharded collection sharded on the "x" field and move one of the chunks to another shard.
 assert.commandWorked(st.s.adminCommand({shardCollection: shardedCollNsMultiShard, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: shardedCollNsMultiShard, middle: {x: splitPoint}}));
-assert.commandWorked(st.s.adminCommand(
-    {moveChunk: shardedCollNsMultiShard, find: {x: splitPoint}, to: st.shard1.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: shardedCollNsMultiShard, find: {x: splitPoint}, to: st.shard1.shardName}),
+);
 
 // Create a sharded collection sharded on the "x" field and keep both chunks on the same shard.
 assert.commandWorked(st.s.adminCommand({shardCollection: shardedCollNsSingleShard, key: {x: 1}}));
@@ -42,7 +42,9 @@ assert.commandWorked(st.s.adminCommand({split: shardedCollNsSingleShard, middle:
 function testCommandFailsOnMongod(testCase) {
     jsTest.log(
         "Test that _clusterQueryWithoutShardKey is not a registered command on a mongod with" +
-        " write command: " + tojson(testCase.writeCommand));
+            " write command: " +
+            tojson(testCase.writeCommand),
+    );
 
     // The command is not sent to the shard in this case, so the transaction is never officially
     // started.
@@ -55,14 +57,17 @@ function testCommandFailsOnMongod(testCase) {
         txnNumber: txnNumber,
         lsid: lsid,
         startTransaction: true,
-        autocommit: false
+        autocommit: false,
     };
     assert.commandFailedWithCode(shardConn.runCommand(cmdObj), ErrorCodes.CommandNotFound);
 }
 
 function testCommandNoMatchingDocument(testCase) {
-    jsTest.log("Test that running the command against a collection with no match yields an empty" +
-               " document and shard id for write command : " + tojson(testCase.writeCommand));
+    jsTest.log(
+        "Test that running the command against a collection with no match yields an empty" +
+            " document and shard id for write command : " +
+            tojson(testCase.writeCommand),
+    );
 
     let session = st.s.startSession();
     withTxnAndAutoRetryOnMongos(session, () => {
@@ -84,7 +89,8 @@ function testCommandNoMatchingDocument(testCase) {
 function testCommandUnshardedCollection(testCase) {
     jsTest.log(
         "Test that running the command against an unsharded collection fails with write command: " +
-        tojson(testCase.writeCommand));
+            tojson(testCase.writeCommand),
+    );
 
     // The command is not sent to the shard in this case, so the transaction is never officially
     // started.
@@ -97,24 +103,27 @@ function testCommandUnshardedCollection(testCase) {
         txnNumber: txnNumber,
         lsid: lsid,
         startTransaction: true,
-        autocommit: false
+        autocommit: false,
     };
     assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.NamespaceNotSharded);
 }
 
 function testCommandShardedCollectionOnSingleShard(testCase) {
-    jsTest.log("Test that running the command against an sharded collection on a single shard" +
-               " forwards the request to the primary shard for write command: " + tojson(testCase));
+    jsTest.log(
+        "Test that running the command against an sharded collection on a single shard" +
+            " forwards the request to the primary shard for write command: " +
+            tojson(testCase),
+    );
     mongosConn.getCollection(shardedCollNameSingleShard).insert([
         {_id: testCase.shardKeyValShard0, x: testCase.shardKeyValShard0, y: testCase.yFieldVal},
-        {_id: testCase.shardKeyValShard1, x: testCase.shardKeyValShard1, y: testCase.yFieldVal}
+        {_id: testCase.shardKeyValShard1, x: testCase.shardKeyValShard1, y: testCase.yFieldVal},
     ]);
 
     let doc1Before = mongosConn.getCollection(shardedCollNameSingleShard).findOne({
-        _id: testCase.shardKeyValShard0
+        _id: testCase.shardKeyValShard0,
     });
     let doc2Before = mongosConn.getCollection(shardedCollNameSingleShard).findOne({
-        _id: testCase.shardKeyValShard1
+        _id: testCase.shardKeyValShard1,
     });
 
     let session = st.s.startSession();
@@ -132,10 +141,10 @@ function testCommandShardedCollectionOnSingleShard(testCase) {
     });
     // Check that no modifications were made to the documents.
     let doc1After = mongosConn.getCollection(shardedCollNameSingleShard).findOne({
-        _id: testCase.shardKeyValShard0
+        _id: testCase.shardKeyValShard0,
     });
     let doc2After = mongosConn.getCollection(shardedCollNameSingleShard).findOne({
-        _id: testCase.shardKeyValShard1
+        _id: testCase.shardKeyValShard1,
     });
     assert.eq(doc1Before, doc1After);
     assert.eq(doc2Before, doc2After);
@@ -144,19 +153,20 @@ function testCommandShardedCollectionOnSingleShard(testCase) {
 function testCommandShardedCollectionOnMultipleShards(testCase) {
     jsTest.log(
         "Test that running the command against an sharded collection forwards the request to" +
-        " all shards and selects a shard that contains a match for write command: " +
-        tojson(testCase.writeCommand));
+            " all shards and selects a shard that contains a match for write command: " +
+            tojson(testCase.writeCommand),
+    );
 
     mongosConn.getCollection(shardedCollNameMultiShard).insert([
         {_id: testCase.shardKeyValShard0, x: testCase.shardKeyValShard0, y: testCase.yFieldVal},
-        {_id: testCase.shardKeyValShard1, x: testCase.shardKeyValShard1, y: testCase.yFieldVal}
+        {_id: testCase.shardKeyValShard1, x: testCase.shardKeyValShard1, y: testCase.yFieldVal},
     ]);
 
     let doc1Before = mongosConn.getCollection(shardedCollNameMultiShard).findOne({
-        _id: testCase.shardKeyValShard0
+        _id: testCase.shardKeyValShard0,
     });
     let doc2Before = mongosConn.getCollection(shardedCollNameMultiShard).findOne({
-        _id: testCase.shardKeyValShard1
+        _id: testCase.shardKeyValShard1,
     });
 
     let session = st.s.startSession();
@@ -182,10 +192,10 @@ function testCommandShardedCollectionOnMultipleShards(testCase) {
 
     // Check that no modifications were made to the documents.
     let doc1After = mongosConn.getCollection(shardedCollNameMultiShard).findOne({
-        _id: testCase.shardKeyValShard0
+        _id: testCase.shardKeyValShard0,
     });
     let doc2After = mongosConn.getCollection(shardedCollNameMultiShard).findOne({
-        _id: testCase.shardKeyValShard1
+        _id: testCase.shardKeyValShard1,
     });
     assert.eq(doc1Before, doc1After);
     assert.eq(doc2Before, doc2After);
@@ -196,29 +206,25 @@ function testCommandShardedCollectionOnMultipleShards(testCase) {
         {
             writeCommand: {
                 update: unshardedCollName,
-                updates: [
-                    {q: {x: xFieldValShard0}, u: {$set: {a: 90}}, upsert: false},
-                ]
-            }
+                updates: [{q: {x: xFieldValShard0}, u: {$set: {a: 90}}, upsert: false}],
+            },
         },
         {
             writeCommand: {
                 findAndModify: unshardedCollName,
                 query: {x: xFieldValShard0},
-                update: {$set: {a: 90}}
-            }
+                update: {$set: {a: 90}},
+            },
         },
         {
             writeCommand: {
                 delete: unshardedCollName,
-                deletes: [
-                    {q: {x: xFieldValShard0}, limit: 1},
-                ]
-            }
-        }
+                deletes: [{q: {x: xFieldValShard0}, limit: 1}],
+            },
+        },
     ];
 
-    testCases.forEach(testCase => {
+    testCases.forEach((testCase) => {
         testCommandFailsOnMongod(testCase);
     });
 })();
@@ -228,29 +234,25 @@ function testCommandShardedCollectionOnMultipleShards(testCase) {
         {
             writeCommand: {
                 update: shardedCollNameMultiShard,
-                updates: [
-                    {q: {x: xFieldValShard0}, u: {$set: {a: 90}}, upsert: false},
-                ]
-            }
+                updates: [{q: {x: xFieldValShard0}, u: {$set: {a: 90}}, upsert: false}],
+            },
         },
         {
             writeCommand: {
                 findAndModify: shardedCollNameMultiShard,
                 query: {x: xFieldValShard0},
-                update: {$set: {a: 90}}
-            }
+                update: {$set: {a: 90}},
+            },
         },
         {
             writeCommand: {
                 delete: shardedCollNameMultiShard,
-                deletes: [
-                    {q: {x: xFieldValShard0}, limit: 1},
-                ]
-            }
-        }
+                deletes: [{q: {x: xFieldValShard0}, limit: 1}],
+            },
+        },
     ];
 
-    testCases.forEach(testCase => {
+    testCases.forEach((testCase) => {
         testCommandNoMatchingDocument(testCase);
     });
 })();
@@ -260,29 +262,25 @@ function testCommandShardedCollectionOnMultipleShards(testCase) {
         {
             writeCommand: {
                 update: unshardedCollName,
-                updates: [
-                    {q: {x: xFieldValShard0}, u: {$set: {a: 90}}, upsert: false},
-                ]
-            }
+                updates: [{q: {x: xFieldValShard0}, u: {$set: {a: 90}}, upsert: false}],
+            },
         },
         {
             writeCommand: {
                 findandmodify: unshardedCollName,
                 query: {x: xFieldValShard0},
-                update: {$set: {a: 90}}
-            }
+                update: {$set: {a: 90}},
+            },
         },
         {
             writeCommand: {
                 delete: unshardedCollName,
-                deletes: [
-                    {q: {x: xFieldValShard0}, limit: 1},
-                ]
-            }
+                deletes: [{q: {x: xFieldValShard0}, limit: 1}],
+            },
         },
     ];
 
-    testCases.forEach(testCase => {
+    testCases.forEach((testCase) => {
         testCommandUnshardedCollection(testCase);
     });
 })();
@@ -292,38 +290,34 @@ function testCommandShardedCollectionOnMultipleShards(testCase) {
         {
             writeCommand: {
                 update: shardedCollNameSingleShard,
-                updates: [
-                    {q: {y: yFieldVal}, u: {$set: {a: 90}}, upsert: false},
-                ]
+                updates: [{q: {y: yFieldVal}, u: {$set: {a: 90}}, upsert: false}],
             },
             shardKeyValShard0: xFieldValShard0++,
             shardKeyValShard1: xFieldValShard1++,
-            yFieldVal: yFieldVal++
+            yFieldVal: yFieldVal++,
         },
         {
             writeCommand: {
                 findandmodify: shardedCollNameSingleShard,
                 query: {y: yFieldVal},
-                update: {$set: {a: 90}}
+                update: {$set: {a: 90}},
             },
             shardKeyValShard0: xFieldValShard0++,
             shardKeyValShard1: xFieldValShard1++,
-            yFieldVal: yFieldVal++
+            yFieldVal: yFieldVal++,
         },
         {
             writeCommand: {
                 delete: shardedCollNameSingleShard,
-                deletes: [
-                    {q: {y: yFieldVal}, limit: 1},
-                ]
+                deletes: [{q: {y: yFieldVal}, limit: 1}],
             },
             shardKeyValShard0: xFieldValShard0++,
             shardKeyValShard1: xFieldValShard1++,
-            yFieldVal: yFieldVal++
+            yFieldVal: yFieldVal++,
         },
     ];
 
-    testCases.forEach(testCase => {
+    testCases.forEach((testCase) => {
         testCommandShardedCollectionOnSingleShard(testCase);
     });
 })();
@@ -333,38 +327,34 @@ function testCommandShardedCollectionOnMultipleShards(testCase) {
         {
             writeCommand: {
                 update: shardedCollNameMultiShard,
-                updates: [
-                    {q: {y: yFieldVal}, u: {$set: {a: 90}, upsert: false}},
-                ]
+                updates: [{q: {y: yFieldVal}, u: {$set: {a: 90}, upsert: false}}],
             },
             shardKeyValShard0: xFieldValShard0++,
             shardKeyValShard1: xFieldValShard1++,
-            yFieldVal: yFieldVal++
+            yFieldVal: yFieldVal++,
         },
         {
             writeCommand: {
                 findAndModify: shardedCollNameMultiShard,
                 query: {y: yFieldVal},
-                update: {$set: {a: 90}}
+                update: {$set: {a: 90}},
             },
             shardKeyValShard0: xFieldValShard0++,
             shardKeyValShard1: xFieldValShard1++,
-            yFieldVal: yFieldVal++
+            yFieldVal: yFieldVal++,
         },
         {
             writeCommand: {
                 delete: shardedCollNameMultiShard,
-                deletes: [
-                    {q: {y: yFieldVal}, limit: 1},
-                ]
+                deletes: [{q: {y: yFieldVal}, limit: 1}],
             },
             shardKeyValShard0: xFieldValShard0++,
             shardKeyValShard1: xFieldValShard1++,
-            yFieldVal: yFieldVal++
+            yFieldVal: yFieldVal++,
         },
     ];
 
-    testCases.forEach(testCase => {
+    testCases.forEach((testCase) => {
         testCommandShardedCollectionOnMultipleShards(testCase);
     });
 })();

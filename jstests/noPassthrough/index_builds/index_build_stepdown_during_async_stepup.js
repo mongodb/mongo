@@ -14,8 +14,8 @@ const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
-const dbName = 'test';
-const collName = 'coll';
+const dbName = "test";
+const collName = "coll";
 const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB.getCollection(collName);
@@ -26,13 +26,15 @@ rst.awaitReplication();
 
 const secondary = rst.getSecondary();
 
-const hangAfterIndexBuildDumpsInsertsFromBulk =
-    configureFailPoint(primary, 'hangAfterIndexBuildDumpsInsertsFromBulk');
-const hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum =
-    configureFailPoint(secondary, 'hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum');
+const hangAfterIndexBuildDumpsInsertsFromBulk = configureFailPoint(primary, "hangAfterIndexBuildDumpsInsertsFromBulk");
+const hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum = configureFailPoint(
+    secondary,
+    "hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum",
+);
 
-const waitForIndexBuildToComplete = IndexBuildTest.startIndexBuild(
-    primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.InterruptedDueToReplStateChange]);
+const waitForIndexBuildToComplete = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1}, null, [
+    ErrorCodes.InterruptedDueToReplStateChange,
+]);
 
 // Wait for the primary to start the index build.
 hangAfterIndexBuildDumpsInsertsFromBulk.wait();
@@ -53,16 +55,18 @@ const waitForStepDown = startParallelShell(() => {
 // in this test case), and it's running now when it's stepping down again.
 assert.soon(() => {
     // Check both the RSTL kill op thread and the Intent Registry kill op thread.
-    return checkLog.checkContainsWithCountJson(secondary, 21343, {}, 2) ||
-        checkLog.checkContainsWithCountJson(secondary, 9945003, {}, 2);
+    return (
+        checkLog.checkContainsWithCountJson(secondary, 21343, {}, 2) ||
+        checkLog.checkContainsWithCountJson(secondary, 9945003, {}, 2)
+    );
 });
 
 // Wait for the step-up task to be marked as killPending by the RstlKillOpThread.
 assert.soon(() => {
-    return 1 ===
-        secondary.getDB('test')
-            .currentOp({desc: 'IndexBuildsCoordinator-StepUp', killPending: true})['inprog']
-            .length;
+    return (
+        1 ===
+        secondary.getDB("test").currentOp({desc: "IndexBuildsCoordinator-StepUp", killPending: true})["inprog"].length
+    );
 });
 
 // Turn off the failpoints. Allow the createIndexes command to return
@@ -73,9 +77,7 @@ hangAfterIndexBuildDumpsInsertsFromBulk.off();
 waitForIndexBuildToComplete();
 waitForStepDown();
 
-IndexBuildTest.assertIndexesSoon(
-    rst.getPrimary().getDB(dbName).getCollection(collName), 2, ['_id_', 'a_1']);
-IndexBuildTest.assertIndexesSoon(
-    rst.getSecondary().getDB(dbName).getCollection(collName), 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexesSoon(rst.getPrimary().getDB(dbName).getCollection(collName), 2, ["_id_", "a_1"]);
+IndexBuildTest.assertIndexesSoon(rst.getSecondary().getDB(dbName).getCollection(collName), 2, ["_id_", "a_1"]);
 
 rst.stopSet();

@@ -54,8 +54,7 @@ assert.commandWorked(coll.insertMany(allDocs));
 
 function testRankFusion({pipeline, expectedResults}) {
     let results = coll.aggregate(pipeline).toArray();
-    assert(orderedArrayEq(results, expectedResults),
-           `$rankFusion returned unexpected output: ${tojson(results)}`);
+    assert(orderedArrayEq(results, expectedResults), `$rankFusion returned unexpected output: ${tojson(results)}`);
 }
 
 function withAndWithoutIndex({index, assertFn}) {
@@ -73,17 +72,14 @@ function withAndWithoutIndex({index, assertFn}) {
                 $rankFusion: {
                     input: {
                         pipelines: {
-                            tasty: [
-                                {$match: {tasty: true}},
-                                {$sort: {n_per_serving: -1, _id: 1}},
-                            ],
+                            tasty: [{$match: {tasty: true}}, {$sort: {n_per_serving: -1, _id: 1}}],
                         },
                     },
                 },
             },
             // Just to trim the test down a bit.
             {$unset: ["dish_name", "flavor"]},
-            {$limit: 2}
+            {$limit: 2},
         ],
         expectedResults: [
             {
@@ -95,8 +91,8 @@ function withAndWithoutIndex({index, assertFn}) {
                 _id: 3,
                 n_per_serving: 3,
                 tasty: true,
-            }
-        ]
+            },
+        ],
     });
 }
 
@@ -108,10 +104,7 @@ function withAndWithoutIndex({index, assertFn}) {
                 $rankFusion: {
                     input: {
                         pipelines: {
-                            tasty: [
-                                {$match: {tasty: true}},
-                                {$sort: {n_per_serving: -1, _id: 1}},
-                            ],
+                            tasty: [{$match: {tasty: true}}, {$sort: {n_per_serving: -1, _id: 1}}],
                         },
                     },
                     scoreDetails: true,
@@ -119,7 +112,7 @@ function withAndWithoutIndex({index, assertFn}) {
             },
             {$set: {details: {$meta: "scoreDetails"}}},
             {$unset: ["dish_name", "flavor"]},
-            {$limit: 2}
+            {$limit: 2},
         ],
         expectedResults: [
             {
@@ -129,8 +122,8 @@ function withAndWithoutIndex({index, assertFn}) {
                 details: {
                     value: 0.01639344262295082,
                     description: scoreDetailsDescription,
-                    details: [{inputPipelineName: "tasty", rank: 1, weight: 1, details: []}]
-                }
+                    details: [{inputPipelineName: "tasty", rank: 1, weight: 1, details: []}],
+                },
             },
             {
                 _id: 3,
@@ -139,10 +132,10 @@ function withAndWithoutIndex({index, assertFn}) {
                 details: {
                     value: 0.016129032258064516,
                     description: scoreDetailsDescription,
-                    details: [{inputPipelineName: "tasty", rank: 2, weight: 1, details: []}]
-                }
-            }
-        ]
+                    details: [{inputPipelineName: "tasty", rank: 2, weight: 1, details: []}],
+                },
+            },
+        ],
     });
 }
 
@@ -166,19 +159,18 @@ function withAndWithoutIndex({index, assertFn}) {
             {$set: {details: {$meta: "scoreDetails"}}},
             // Just to trim the test down a bit.
             {$unset: ["dish_name", "flavor"]},
-            {$limit: 2}
+            {$limit: 2},
         ];
         const expectedResults = [
             {
-
                 _id: 3,
                 n_per_serving: 3,
                 tasty: true,
                 details: {
                     value: 0.01639344262295082,
                     description: scoreDetailsDescription,
-                    details: [{inputPipelineName: "tasty", rank: 1, weight: 1, details: []}]
-                }
+                    details: [{inputPipelineName: "tasty", rank: 1, weight: 1, details: []}],
+                },
             },
             {
                 _id: 4,
@@ -187,9 +179,9 @@ function withAndWithoutIndex({index, assertFn}) {
                 details: {
                     value: 0.016129032258064516,
                     description: scoreDetailsDescription,
-                    details: [{inputPipelineName: "tasty", rank: 2, weight: 1, details: []}]
-                }
-            }
+                    details: [{inputPipelineName: "tasty", rank: 2, weight: 1, details: []}],
+                },
+            },
         ];
         testRankFusion({pipeline, expectedResults});
     }
@@ -199,14 +191,11 @@ function withAndWithoutIndex({index, assertFn}) {
         index: actualExpectedSortSpec,
         assertFn: () => {
             const irrelevantSort = {$sort: {n_per_serving: -1, _id: 1}};
-            testWithSortVariation([
-                actualExpectedSort,
-            ]);
+            testWithSortVariation([actualExpectedSort]);
             testWithSortVariation([irrelevantSort, actualExpectedSort]);
-            testWithSortVariation(
-                [irrelevantSort, {$_internalInhibitOptimization: {}}, actualExpectedSort]);
+            testWithSortVariation([irrelevantSort, {$_internalInhibitOptimization: {}}, actualExpectedSort]);
             testWithSortVariation([{$_internalInhibitOptimization: {}}, actualExpectedSort]);
-        }
+        },
     });
 }
 
@@ -215,29 +204,28 @@ function withAndWithoutIndex({index, assertFn}) {
     const tripleCompoundSort = {tasty: -1, n_per_serving: -1, _id: 1};
     withAndWithoutIndex({
         index: tripleCompoundSort,
-        assertFn: () => testRankFusion({
-            pipeline: [
-                {
-                    $rankFusion: {
-                        input: {
-                            pipelines: {
-                                everything_sorted: [
-                                    {$sort: tripleCompoundSort},
-                                ]
-                            }
-                        }
-                    }
-                },
-                {$project: {tasty: 1, n_per_serving: 1}}
-            ],
-            expectedResults: [
-                {_id: 1, n_per_serving: 4, tasty: true},
-                {_id: 3, n_per_serving: 3, tasty: true},
-                {_id: 4, n_per_serving: 3, tasty: true},
-                {_id: 5, n_per_serving: 4, tasty: false},
-                {_id: 2, n_per_serving: 2, tasty: false},
-            ],
-        })
+        assertFn: () =>
+            testRankFusion({
+                pipeline: [
+                    {
+                        $rankFusion: {
+                            input: {
+                                pipelines: {
+                                    everything_sorted: [{$sort: tripleCompoundSort}],
+                                },
+                            },
+                        },
+                    },
+                    {$project: {tasty: 1, n_per_serving: 1}},
+                ],
+                expectedResults: [
+                    {_id: 1, n_per_serving: 4, tasty: true},
+                    {_id: 3, n_per_serving: 3, tasty: true},
+                    {_id: 4, n_per_serving: 3, tasty: true},
+                    {_id: 5, n_per_serving: 4, tasty: false},
+                    {_id: 2, n_per_serving: 2, tasty: false},
+                ],
+            }),
     });
 }
 
@@ -246,14 +234,8 @@ function withAndWithoutIndex({index, assertFn}) {
     const rankFusionSpec = {
         input: {
             pipelines: {
-                tasty: [
-                    {$match: {tasty: true}},
-                    {$sort: {n_per_serving: -1, _id: 1}},
-                ],
-                has_a_but: [
-                    {$match: {flavor: /but/}},
-                    {$sort: {n_per_serving: 1, _id: -1}},
-                ],
+                tasty: [{$match: {tasty: true}}, {$sort: {n_per_serving: -1, _id: 1}}],
+                has_a_but: [{$match: {flavor: /but/}}, {$sort: {n_per_serving: 1, _id: -1}}],
             },
         },
     };
@@ -272,28 +254,27 @@ function withAndWithoutIndex({index, assertFn}) {
         },
         {
             _id: 3,
-            flavor:
-                "Like a lemony thing going on. Quite intriguing. I think it'd be good on potatoes",
+            flavor: "Like a lemony thing going on. Quite intriguing. I think it'd be good on potatoes",
             n_per_serving: 3,
             tasty: true,
-        }
+        },
     ];
     testRankFusion({
         pipeline: [{$rankFusion: rankFusionSpec}, {$unset: ["dish_name"]}, {$limit: 3}],
-        expectedResults
+        expectedResults,
     });
     // Add one more pipeline which shouldn't influence the results at all.
     rankFusionSpec.input.pipelines.everything = [{$sort: {no_such_field: 1 /* all ties */}}];
     testRankFusion({
         pipeline: [{$rankFusion: rankFusionSpec}, {$unset: ["dish_name"]}, {$limit: 3}],
-        expectedResults
+        expectedResults,
     });
     rankFusionSpec.scoreDetails = true;
     testRankFusion({
         pipeline: [
             {$rankFusion: rankFusionSpec},
             {$project: {n_per_serving: 1, flavor: 1, tasty: 1, details: {$meta: "scoreDetails"}}},
-            {$limit: 3}
+            {$limit: 3},
         ],
         expectedResults: [
             {
@@ -307,9 +288,9 @@ function withAndWithoutIndex({index, assertFn}) {
                     details: [
                         {inputPipelineName: "everything", rank: 1, weight: 1, details: []},
                         {inputPipelineName: "has_a_but", rank: 2, weight: 1, details: []},
-                        {inputPipelineName: "tasty", rank: 1, weight: 1, details: []}
-                    ]
-                }
+                        {inputPipelineName: "tasty", rank: 1, weight: 1, details: []},
+                    ],
+                },
             },
             {
                 _id: 4,
@@ -322,15 +303,14 @@ function withAndWithoutIndex({index, assertFn}) {
                     details: [
                         {inputPipelineName: "everything", rank: 1, weight: 1, details: []},
                         {inputPipelineName: "has_a_but", rank: 1, weight: 1, details: []},
-                        {inputPipelineName: "tasty", rank: 3, weight: 1, details: []}
-                    ]
-                }
+                        {inputPipelineName: "tasty", rank: 3, weight: 1, details: []},
+                    ],
+                },
             },
             {
                 _id: 3,
                 n_per_serving: 3,
-                flavor:
-                    "Like a lemony thing going on. Quite intriguing. I think it'd be good on potatoes",
+                flavor: "Like a lemony thing going on. Quite intriguing. I think it'd be good on potatoes",
                 tasty: true,
                 details: {
                     value: 0.03252247488101534,
@@ -338,10 +318,10 @@ function withAndWithoutIndex({index, assertFn}) {
                     details: [
                         {inputPipelineName: "everything", rank: 1, weight: 1, details: []},
                         {inputPipelineName: "has_a_but", rank: "NA"},
-                        {inputPipelineName: "tasty", rank: 2, weight: 1, details: []}
-                    ]
-                }
-            }
-        ]
+                        {inputPipelineName: "tasty", rank: 2, weight: 1, details: []},
+                    ],
+                },
+            },
+        ],
     });
 }

@@ -16,7 +16,7 @@ let rst = new ReplSetTest({
     name: replSetName,
     nodeOptions: {
         shardsvr: "",
-    }
+    },
 });
 
 rst.startSet();
@@ -27,7 +27,7 @@ const config = {
         {_id: 0, host: nodes[0]},
         {_id: 1, host: nodes[1], priority: 0},
         {_id: 2, host: nodes[2], arbiterOnly: true},
-    ]
+    ],
 };
 
 rst.initiate(config);
@@ -42,8 +42,9 @@ if (TestData.configShard) {
     assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
 }
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(st.s.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Even though implicitDefaultWC is set to w:1, addShard will work as CWWC is set.
 assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
@@ -53,15 +54,16 @@ testReadCommittedLookup(st.s.getDB("test"), shardSecondary, rst);
 // Confirm read committed works on a cluster with:
 // - A sharding enabled database
 // - An unsharded local collection
-assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
+assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
 testReadCommittedLookup(st.s.getDB("test"), shardSecondary, rst);
 
 // Confirm read committed works on a cluster with:
 // - A sharding enabled database
 // - A sharded local collection.
-assert.commandWorked(st.s.getDB("test").runCommand(
-    {createIndexes: 'local', indexes: [{name: "foreignKey_1", key: {foreignKey: 1}}]}));
-assert.commandWorked(st.s.adminCommand({shardCollection: 'test.local', key: {foreignKey: 1}}));
+assert.commandWorked(
+    st.s.getDB("test").runCommand({createIndexes: "local", indexes: [{name: "foreignKey_1", key: {foreignKey: 1}}]}),
+);
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.local", key: {foreignKey: 1}}));
 testReadCommittedLookup(st.s.getDB("test"), shardSecondary, rst);
 
 st.stop();

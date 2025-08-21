@@ -9,7 +9,10 @@ assert.commandWorked(coll.insert({b: 5}));
 assert.eq(2, coll.find({}, {b: 1}).count(), "A");
 
 function getIds(projection) {
-    return coll.find({}, projection).map(doc => doc._id).sort();
+    return coll
+        .find({}, projection)
+        .map((doc) => doc._id)
+        .sort();
 }
 
 assert.eq(Array.tojson(getIds(null)), Array.tojson(getIds({})), "B1 ");

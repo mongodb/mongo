@@ -69,8 +69,8 @@ export class NumberDataset {
             {a: {$in: [-1, 1]}},
 
             // Values that do not exist in the histogram
-            {a: ''},
-            {a: 'no_such_value'},
+            {a: ""},
+            {a: "no_such_value"},
             {a: -1},
 
             // Null
@@ -161,7 +161,7 @@ export class NumberDataset {
 
             // Nested $and and $or
             {$and: [{$or: [{a: 0}, {a: 1}]}, {$or: [{a: {$lt: 90}}]}]},
-            {$and: [{a: {$gte: MinKey()}}, {$or: [{a: 1}, {a: {$gt: 90}}]}]}
+            {$and: [{a: {$gte: MinKey()}}, {$or: [{a: 1}, {a: {$gt: 90}}]}]},
 
             /* TODO(SERVER-99710) Not estimated via histograms
                 {$or: [

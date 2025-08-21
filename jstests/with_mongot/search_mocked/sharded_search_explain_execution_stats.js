@@ -12,9 +12,7 @@ import {
     getDefaultProtocolVersionForPlanShardedSearch,
     mongotCommandForQuery,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock,
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     getDefaultLastExplainContents,
     getShardedMongotStagesAndValidateExplainExecutionStats,
@@ -39,15 +37,13 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-if (checkSbeRestrictedOrFullyEnabled(testDB) &&
-    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchInSbe')) {
+if (checkSbeRestrictedOrFullyEnabled(testDB) && FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), "SearchInSbe")) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     stWithMock.stop();
     quit();
 }
 
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const coll = testDB.getCollection(collName);
 
@@ -68,7 +64,7 @@ const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 
 const searchQuery = {
     query: "fire",
-    path: "element"
+    path: "element",
 };
 
 let cursorId = NumberLong(123);
@@ -105,39 +101,42 @@ function runExplainTest(verbosity) {
             protocolVersion,
         });
 
-        const metaPipeline = [{
-            "$group": {
-                "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
-                "value": {
-                    "$sum": "$metaVal",
-                }
-            }
-        }];
+        const metaPipeline = [
+            {
+                "$group": {
+                    "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
+                    "value": {
+                        "$sum": "$metaVal",
+                    },
+                },
+            },
+        ];
         if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ShardFilteringDistinctScan")) {
             metaPipeline[0].$group.$willBeMerged = false;
         }
         const sortSpec = {"$searchSortValues.a": 1};
 
-        const mergingPipelineHistory = [{
-            expectedCommand: {
-                planShardedSearch: collName,
-                query: searchQuery,
-                $db: dbName,
-                searchFeatures: {shardedSort: 1},
-                explain: {verbosity},
+        const mergingPipelineHistory = [
+            {
+                expectedCommand: {
+                    planShardedSearch: collName,
+                    query: searchQuery,
+                    $db: dbName,
+                    searchFeatures: {shardedSort: 1},
+                    explain: {verbosity},
+                },
+                response: {
+                    ok: 1,
+                    protocolVersion,
+                    metaPipeline,
+                    sortSpec,
+                },
             },
-            response: {
-                ok: 1,
-                protocolVersion,
-                metaPipeline,
-                sortSpec,
-            }
-        }];
+        ];
         // TODO SERVER-91594: setUpMongotReturnExplain() can be removed when mongot always
         // returns a cursor alongside explain for execution stats.
         {
-            stWithMock.getMockConnectedToHost(stWithMock.st.s)
-                .setMockResponses(mergingPipelineHistory, cursorId);
+            stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
             setUpMongotReturnExplain({
                 searchCmd,
                 mongotMock: s0Mongot,
@@ -177,14 +176,12 @@ function runExplainTest(verbosity) {
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
                 verbosity,
-                nReturnedList: [NumberLong(0), NumberLong(0)]
+                nReturnedList: [NumberLong(0), NumberLong(0)],
             });
-            verifyShardsPartExplainOutput(
-                {result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
+            verifyShardsPartExplainOutput({result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
         }
         {
-            stWithMock.getMockConnectedToHost(stWithMock.st.s)
-                .setMockResponses(mergingPipelineHistory, cursorId);
+            stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
 
             setUpMongotReturnExplainAndMultiCursor({
                 searchCmd,
@@ -196,7 +193,7 @@ function runExplainTest(verbosity) {
                     {_id: 4, $searchScore: 1},
                     {_id: 21, $searchScore: 0.99},
                 ],
-                metaBatch: [{val: 1}]
+                metaBatch: [{val: 1}],
             });
             setUpMongotReturnExplainAndMultiCursor({
                 searchCmd,
@@ -207,7 +204,7 @@ function runExplainTest(verbosity) {
                     {_id: 12, $searchScore: 10},
                     {_id: 13, $searchScore: 1},
                 ],
-                metaBatch: [{val: 2}]
+                metaBatch: [{val: 2}],
             });
 
             const result = coll.explain(verbosity).aggregate([{$search: searchQuery}]);
@@ -227,12 +224,10 @@ function runExplainTest(verbosity) {
                 nReturnedList: [NumberLong(3), NumberLong(3)],
                 numFilteredList: [NumberLong(1), NumberLong(0)],
             });
-            verifyShardsPartExplainOutput(
-                {result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
+            verifyShardsPartExplainOutput({result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
         }
         {
-            stWithMock.getMockConnectedToHost(stWithMock.st.s)
-                .setMockResponses(mergingPipelineHistory, cursorId);
+            stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
 
             setUpMongotReturnExplainAndMultiCursorGetMore({
                 searchCmd,
@@ -243,23 +238,28 @@ function runExplainTest(verbosity) {
                         {_id: 3, $searchScore: 100},
                         {_id: 2, $searchScore: 10},
                     ],
-                    [{_id: 4, $searchScore: 1}, {_id: 21, $searchScore: 0.99}],
+                    [
+                        {_id: 4, $searchScore: 1},
+                        {_id: 21, $searchScore: 0.99},
+                    ],
                 ],
-                metaBatchList: [[{val: 1}]]
+                metaBatchList: [[{val: 1}]],
             });
             setUpMongotReturnExplainAndMultiCursorGetMore({
                 searchCmd,
                 mongotMock: s1Mongot,
                 coll: coll,
                 batchList: [
-                    [{_id: 11, $searchScore: 100}, {_id: 12, $searchScore: 1}],
+                    [
+                        {_id: 11, $searchScore: 100},
+                        {_id: 12, $searchScore: 1},
+                    ],
                     [{_id: 13, $searchScore: 0.99}],
                 ],
-                metaBatchList: [[{val: 2}]]
+                metaBatchList: [[{val: 2}]],
             });
 
-            const result = coll.explain(verbosity).aggregate([{$search: searchQuery}],
-                                                             {cursor: {batchSize: 2}});
+            const result = coll.explain(verbosity).aggregate([{$search: searchQuery}], {cursor: {batchSize: 2}});
             getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchMongotRemote",
@@ -276,15 +276,13 @@ function runExplainTest(verbosity) {
                 nReturnedList: [NumberLong(3), NumberLong(3)],
                 numFilteredList: [NumberLong(1), NumberLong(0)],
             });
-            verifyShardsPartExplainOutput(
-                {result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
+            verifyShardsPartExplainOutput({result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
         }
 
         // Test demonstrating that $$SEARCH_META after search will not use the metadata
         // pipeline, due to explain not running the merging shard. See SERVER-82206.
         {
-            stWithMock.getMockConnectedToHost(stWithMock.st.s)
-                .setMockResponses(mergingPipelineHistory, cursorId);
+            stWithMock.getMockConnectedToHost(stWithMock.st.s).setMockResponses(mergingPipelineHistory, cursorId);
 
             // Add two extra batches to metaBatchList to confirm that getMore's are not being
             // sent until the cursor is exhuasted. One getMore is for prefetching and one
@@ -298,7 +296,10 @@ function runExplainTest(verbosity) {
                         {_id: 3, $searchScore: 100},
                         {_id: 21, $searchScore: 10},
                     ],
-                    [{_id: 4, $searchScore: 1}, {_id: 1, $searchScore: 0.99}],
+                    [
+                        {_id: 4, $searchScore: 1},
+                        {_id: 1, $searchScore: 0.99},
+                    ],
                 ],
                 metaBatchList: [[{val: 1}, {val: 2}], [{val: 3}, {val: 4}], [{val: 6}]],
                 metaCursorId: NumberLong(11111),
@@ -308,16 +309,21 @@ function runExplainTest(verbosity) {
                 mongotMock: s1Mongot,
                 coll: coll,
                 batchList: [
-                    [{_id: 11, $searchScore: 100}, {_id: 12, $searchScore: 1}],
+                    [
+                        {_id: 11, $searchScore: 100},
+                        {_id: 12, $searchScore: 1},
+                    ],
                     [{_id: 13, $searchScore: 0.99}],
                 ],
                 metaBatchList: [[{val: 5}, {val: 6}], [{val: 7}], [{val: 15}]],
                 metaCursorId: NumberLong(12345),
             });
 
-            const result = coll.explain(verbosity).aggregate(
-                [{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}],
-                {cursor: {batchSize: 2}});
+            const result = coll
+                .explain(verbosity)
+                .aggregate([{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}], {
+                    cursor: {batchSize: 2},
+                });
 
             getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
@@ -335,27 +341,34 @@ function runExplainTest(verbosity) {
                 nReturnedList: [NumberLong(3), NumberLong(3)],
                 numFilteredList: [NumberLong(1), NumberLong(0)],
             });
-            verifyShardsPartExplainOutput(
-                {result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
+            verifyShardsPartExplainOutput({result, searchType: "$search", metaPipeline, protocolVersion, sortSpec});
 
             // There should be getMore's on mongot that have not been exhausted as the metadata
             // pipeline is not run.
             let errMsg = assert.throws(() => s0Mongot.assertEmpty());
-            assert.neq(
-                -1, errMsg.message.indexOf("found unused response for cursorID 11111"), errMsg);
+            assert.neq(-1, errMsg.message.indexOf("found unused response for cursorID 11111"), errMsg);
             errMsg = assert.throws(() => s1Mongot.assertEmpty());
-            assert.neq(
-                -1, errMsg.message.indexOf("found unused response for cursorID 12345"), errMsg);
+            assert.neq(-1, errMsg.message.indexOf("found unused response for cursorID 12345"), errMsg);
 
             // Run a getMore on each mock to exhaust the history and reset for the next test.
-            assert.commandWorked(s0Mongot.getConnection().getDB("mongotmock").runCommand({
-                getMore: NumberLong(11111),
-                collection: collName
-            }));
-            assert.commandWorked(s1Mongot.getConnection().getDB("mongotmock").runCommand({
-                getMore: NumberLong(12345),
-                collection: collName
-            }));
+            assert.commandWorked(
+                s0Mongot
+                    .getConnection()
+                    .getDB("mongotmock")
+                    .runCommand({
+                        getMore: NumberLong(11111),
+                        collection: collName,
+                    }),
+            );
+            assert.commandWorked(
+                s1Mongot
+                    .getConnection()
+                    .getDB("mongotmock")
+                    .runCommand({
+                        getMore: NumberLong(12345),
+                        collection: collName,
+                    }),
+            );
 
             stWithMock.assertEmptyMocks();
         }

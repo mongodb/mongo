@@ -20,9 +20,9 @@ const session = st.shard0.getDB("test").getMongo().startSession();
 const shardDB = session.getDatabase("test");
 const coll = shardDB.exchange_in_session;
 
-let bigString = '';
+let bigString = "";
 for (let i = 0; i < 20; i++) {
-    bigString += 's';
+    bigString += "s";
 }
 
 // Insert some documents.
@@ -34,19 +34,21 @@ for (let i = 0; i < nDocs; i++) {
 session.startTransaction();
 
 // Set up an Exchange with two cursors.
-let res = assert.commandWorked(shardDB.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [],
-    exchange: {
-        policy: 'keyRange',
-        consumers: NumberInt(2),
-        key: {_id: 1},
-        boundaries: [{a: MinKey}, {a: nDocs / 2}, {a: MaxKey}],
-        consumerIds: [NumberInt(0), NumberInt(1)],
-        bufferSize: NumberInt(128)
-    },
-    cursor: {batchSize: 0},
-}));
+let res = assert.commandWorked(
+    shardDB.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [],
+        exchange: {
+            policy: "keyRange",
+            consumers: NumberInt(2),
+            key: {_id: 1},
+            boundaries: [{a: MinKey}, {a: nDocs / 2}, {a: MaxKey}],
+            consumerIds: [NumberInt(0), NumberInt(1)],
+            bufferSize: NumberInt(128),
+        },
+        cursor: {batchSize: 0},
+    }),
+);
 
 function spawnShellToIterateCursor(cursorId) {
     let code = `const cursor = ${tojson(cursorId)};`;
@@ -60,7 +62,7 @@ function spawnShellToIterateCursor(cursorId) {
             batchSize: 4,
             lsid: sessionId,
             txnNumber: NumberLong(0),
-            autocommit: false
+            autocommit: false,
         };
 
         let resp = null;
@@ -78,7 +80,7 @@ for (let curs of res.cursors) {
     parallelShells.push(spawnShellToIterateCursor(curs.cursor));
 }
 
-assert.soon(function() {
+assert.soon(function () {
     for (let waitFn of parallelShells) {
         waitFn();
     }

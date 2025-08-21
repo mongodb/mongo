@@ -12,7 +12,7 @@ function checkDedup(query, idArray) {
     assert.eq(resultsArr.length, idArray.length, "same number of results");
 
     for (let i = 0; i < idArray.length; i++) {
-        assert(("_id" in resultsArr[i]), "result doc missing _id");
+        assert("_id" in resultsArr[i], "result doc missing _id");
         assert.eq(idArray[i], resultsArr[i]._id, "_id mismatch for doc " + i);
     }
 }
@@ -25,14 +25,16 @@ assert.commandWorked(coll.insert({_id: 2, a: 1, b: 1}));
 assert.commandWorked(coll.insert({_id: 3, a: 2, b: 2}));
 assert.commandWorked(coll.insert({_id: 4, a: 3, b: 3}));
 assert.commandWorked(coll.insert({_id: 5, a: 3, b: 3}));
-checkDedup({
-    $or: [
-        {a: {$gte: 0, $lte: 2}, b: {$gte: 0, $lte: 2}},
-        {a: {$gte: 1, $lte: 3}, b: {$gte: 1, $lte: 3}},
-        {a: {$gte: 1, $lte: 4}, b: {$gte: 1, $lte: 4}}
-    ]
-},
-           [1, 2, 3, 4, 5]);
+checkDedup(
+    {
+        $or: [
+            {a: {$gte: 0, $lte: 2}, b: {$gte: 0, $lte: 2}},
+            {a: {$gte: 1, $lte: 3}, b: {$gte: 1, $lte: 3}},
+            {a: {$gte: 1, $lte: 4}, b: {$gte: 1, $lte: 4}},
+        ],
+    },
+    [1, 2, 3, 4, 5],
+);
 
 // Deduping multikey
 assert(coll.drop());

@@ -5,12 +5,12 @@
  * This test was designed to reproduce SERVER-24386.
  */
 const options = {
-    setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'
+    setParameter: "internalDocumentSourceCursorBatchSizeBytes=1",
 };
 const conn = MongoRunner.runMongod(options);
-assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
 
-const testDB = conn.getDB('test');
+const testDB = conn.getDB("test");
 
 function runTest(pipeline) {
     // We use a batch size of 2 to ensure that the mongo shell does not exhaust the cursor on
@@ -25,66 +25,68 @@ function runTest(pipeline) {
         assert.commandWorked(testDB.dest.insert({x: 1}));
     }
 
-    const res = assert.commandWorked(testDB.runCommand({
-        aggregate: 'source',
-        pipeline: pipeline,
-        cursor: {
-            batchSize: batchSize,
-        },
-    }));
+    const res = assert.commandWorked(
+        testDB.runCommand({
+            aggregate: "source",
+            pipeline: pipeline,
+            cursor: {
+                batchSize: batchSize,
+            },
+        }),
+    );
 
     const cursor = new DBCommandCursor(testDB, res, batchSize);
-    cursor.close();  // Closing the cursor will issue the "killCursors" command.
+    cursor.close(); // Closing the cursor will issue the "killCursors" command.
 
     const serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     assert.eq(0, serverStatus.metrics.cursor.open.total, tojson(serverStatus.metrics.cursor));
 }
 
 runTest([
-        {
-          $lookup: {
-              from: 'dest',
-              localField: 'x',
-              foreignField: 'x',
-              as: 'matches',
-          }
+    {
+        $lookup: {
+            from: "dest",
+            localField: "x",
+            foreignField: "x",
+            as: "matches",
         },
-        {
-          $unwind: {
-              path: '$matches',
-          },
+    },
+    {
+        $unwind: {
+            path: "$matches",
         },
-    ]);
+    },
+]);
 
 runTest([
-        {
-          $lookup: {
-              from: 'dest',
-              let : {x1: "$x"},
-              pipeline: [
-                  {$match: {$expr: {$eq: ["$$x1", "$x"]}}},
-                  {
+    {
+        $lookup: {
+            from: "dest",
+            let: {x1: "$x"},
+            pipeline: [
+                {$match: {$expr: {$eq: ["$$x1", "$x"]}}},
+                {
                     $lookup: {
                         from: "dest",
                         as: "matches2",
-                        let : {x2: "$x"},
-                        pipeline: [{$match: {$expr: {$eq: ["$$x2", "$x"]}}}]
-                    }
-                  },
-                  {
-                    $unwind: {
-                        path: '$matches2',
+                        let: {x2: "$x"},
+                        pipeline: [{$match: {$expr: {$eq: ["$$x2", "$x"]}}}],
                     },
-                  },
-              ],
-              as: 'matches1',
-          }
+                },
+                {
+                    $unwind: {
+                        path: "$matches2",
+                    },
+                },
+            ],
+            as: "matches1",
         },
-        {
-          $unwind: {
-              path: '$matches1',
-          },
+    },
+    {
+        $unwind: {
+            path: "$matches1",
         },
-    ]);
+    },
+]);
 
 MongoRunner.stopMongod(conn);

@@ -4,12 +4,10 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     searchShardedExampleCursors1,
-    searchShardedExampleCursors2
+    searchShardedExampleCursors2,
 } from "jstests/with_mongot/search_mocked/lib/search_sharded_example_cursors.js";
 
 let nodeOptions = {setParameter: {enableTestCommands: 1}};
@@ -24,7 +22,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     other: {
         rsOptions: nodeOptions,
         mongosOptions: nodeOptions,
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
@@ -34,8 +32,7 @@ const mongotConn = stWithMock.getMockConnectedToHost(conn);
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
-assert.commandWorked(
-    conn.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(conn.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const collName = "meta";
 const coll = testDB.getCollection(collName);
@@ -52,52 +49,60 @@ const currentVerbosity = "queryPlanner";
 
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 const protocolVersion = NumberInt(42);
 
-const mergingPipelineHistory = [{
-    expectedCommand: {
-        planShardedSearch: coll.getName(),
-        query: searchQuery,
-        $db: dbName,
-        searchFeatures: {shardedSort: 1},
+const mergingPipelineHistory = [
+    {
+        expectedCommand: {
+            planShardedSearch: coll.getName(),
+            query: searchQuery,
+            $db: dbName,
+            searchFeatures: {shardedSort: 1},
+        },
+        response: {
+            ok: 1,
+            protocolVersion: protocolVersion,
+            metaPipeline: [
+                {
+                    "$group": {
+                        "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
+                        "value": {
+                            "$sum": "$metaVal",
+                        },
+                    },
+                },
+            ],
+        },
     },
-    response: {
-        ok: 1,
-        protocolVersion: protocolVersion,
-        metaPipeline: [{
-            "$group": {
-                "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
-                "value": {
-                    "$sum": "$metaVal",
-                }
-            }
-        }]
-    }
-}];
+];
 
-const explainMergingPipelineHistory = [{
-    expectedCommand: {
-        planShardedSearch: coll.getName(),
-        query: searchQuery,
-        $db: dbName,
-        searchFeatures: {shardedSort: 1},
-        explain: {verbosity: currentVerbosity}
+const explainMergingPipelineHistory = [
+    {
+        expectedCommand: {
+            planShardedSearch: coll.getName(),
+            query: searchQuery,
+            $db: dbName,
+            searchFeatures: {shardedSort: 1},
+            explain: {verbosity: currentVerbosity},
+        },
+        response: {
+            ok: 1,
+            protocolVersion: protocolVersion,
+            metaPipeline: [
+                {
+                    "$group": {
+                        "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
+                        "value": {
+                            "$sum": "$metaVal",
+                        },
+                    },
+                },
+            ],
+        },
     },
-    response: {
-        ok: 1,
-        protocolVersion: protocolVersion,
-        metaPipeline: [{
-            "$group": {
-                "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
-                "value": {
-                    "$sum": "$metaVal",
-                }
-            }
-        }]
-    }
-}];
+];
 
 if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ShardFilteringDistinctScan")) {
     mergingPipelineHistory[0].response.metaPipeline[0].$group.$willBeMerged = false;
@@ -105,7 +110,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ShardFilteringDistinctScan")) {
 }
 
 const setPipelineOptimizationMode = (mode) => {
-    testDB.adminCommand({configureFailPoint: 'disablePipelineOptimization', mode});
+    testDB.adminCommand({configureFailPoint: "disablePipelineOptimization", mode});
 };
 
 // Test that explain includes a $setVariableFromSubPipeline stage with the appropriate merging
@@ -114,7 +119,7 @@ const setPipelineOptimizationMode = (mode) => {
 function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
     try {
         if (disablePipelineOptimization) {
-            setPipelineOptimizationMode('alwaysOn');
+            setPipelineOptimizationMode("alwaysOn");
         }
         mongotConn.setMockResponses(explainMergingPipelineHistory, 1);
 
@@ -123,18 +128,19 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
         const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), collName);
         // History for shard 1.
         {
-            const exampleCursor =
-                searchShardedExampleCursors1(dbName,
-                                             collNS,
-                                             collName,
-                                             // Explain doesn't take protocol version.
-                                             mongotCommandForQuery({
-                                                 query: mongotQuery,
-                                                 collName: collName,
-                                                 db: dbName,
-                                                 collectionUUID: collUUID0,
-                                                 explainVerbosity: {verbosity: currentVerbosity}
-                                             }));
+            const exampleCursor = searchShardedExampleCursors1(
+                dbName,
+                collNS,
+                collName,
+                // Explain doesn't take protocol version.
+                mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID0,
+                    explainVerbosity: {verbosity: currentVerbosity},
+                }),
+            );
             exampleCursor.historyResults[0].response.explain = {destiny: "avatar"};
             const mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
             mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
@@ -143,18 +149,19 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
 
         // History for shard 2
         {
-            const exampleCursor =
-                searchShardedExampleCursors2(dbName,
-                                             collNS,
-                                             collName,
-                                             // Explain doesn't take protocol version.
-                                             mongotCommandForQuery({
-                                                 query: mongotQuery,
-                                                 collName: collName,
-                                                 db: dbName,
-                                                 collectionUUID: collUUID1,
-                                                 explainVerbosity: {verbosity: currentVerbosity}
-                                             }));
+            const exampleCursor = searchShardedExampleCursors2(
+                dbName,
+                collNS,
+                collName,
+                // Explain doesn't take protocol version.
+                mongotCommandForQuery({
+                    query: mongotQuery,
+                    collName: collName,
+                    db: dbName,
+                    collectionUUID: collUUID1,
+                    explainVerbosity: {verbosity: currentVerbosity},
+                }),
+            );
             exampleCursor.historyResults[0].response.explain = {destiny: "avatar"};
             const mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
             mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
@@ -173,13 +180,15 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
             const acc = {
                 "$setVariableFromSubPipeline": {
                     "setVariable": "$$SEARCH_META",
-                    "pipeline": [{
-                        "$group": {
-                            "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
-                            "value": {"$sum": "$metaVal"}
-                        }
-                    }]
-                }
+                    "pipeline": [
+                        {
+                            "$group": {
+                                "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
+                                "value": {"$sum": "$metaVal"},
+                            },
+                        },
+                    ],
+                },
             };
             if (FeatureFlagUtil.isPresentAndEnabled(testDB, "ShardFilteringDistinctScan")) {
                 acc.$setVariableFromSubPipeline.pipeline[0].$group.$willBeMerged = false;
@@ -193,7 +202,7 @@ function testExplain({shouldReferenceSearchMeta, disablePipelineOptimization}) {
     } finally {
         if (disablePipelineOptimization) {
             // Reset the pipeline optimization failpoint if we set it at the start.
-            setPipelineOptimizationMode('off');
+            setPipelineOptimizationMode("off");
         }
     }
 }
@@ -208,14 +217,18 @@ function setQueryMockResponses(removeGetMore, hasSearchStage = false) {
     // History for shard 1.
     {
         const exampleCursor = searchShardedExampleCursors1(
-            dbName, collNS, collName, mongotCommandForQuery({
+            dbName,
+            collNS,
+            collName,
+            mongotCommandForQuery({
                 query: mongotQuery,
                 collName: collName,
                 db: dbName,
                 collectionUUID: collUUID0,
                 protocolVersion: protocolVersion,
-                optimizationFlags: hasSearchStage ? {omitSearchDocumentResults: true} : null
-            }));
+                optimizationFlags: hasSearchStage ? {omitSearchDocumentResults: true} : null,
+            }),
+        );
         // If the query we are setting responses for has a
         // limit, the getMore is not needed.
         if (removeGetMore) {
@@ -230,14 +243,18 @@ function setQueryMockResponses(removeGetMore, hasSearchStage = false) {
     // History for shard 2
     {
         const exampleCursor = searchShardedExampleCursors2(
-            dbName, collNS, collName, mongotCommandForQuery({
+            dbName,
+            collNS,
+            collName,
+            mongotCommandForQuery({
                 query: mongotQuery,
                 collName: collName,
                 db: dbName,
                 collectionUUID: collUUID1,
                 protocolVersion: protocolVersion,
-                optimizationFlags: hasSearchStage ? {omitSearchDocumentResults: true} : null
-            }));
+                optimizationFlags: hasSearchStage ? {omitSearchDocumentResults: true} : null,
+            }),
+        );
         if (removeGetMore) {
             exampleCursor.historyResults.pop();
             exampleCursor.historyResults[0].response.cursors[0].cursor.id = NumberLong(0);
@@ -252,9 +269,8 @@ function setQueryMockResponses(removeGetMore, hasSearchStage = false) {
 // returned by mongot(mock).
 function testSearchQuery() {
     setQueryMockResponses(false);
-    let queryResult =
-        coll.aggregate([{$search: searchQuery}, {$project: {"var": "$$SEARCH_META"}}]);
-    assert.eq([{_id: 1, var : {_id: {}, value: 56}}], queryResult.toArray());
+    let queryResult = coll.aggregate([{$search: searchQuery}, {$project: {"var": "$$SEARCH_META"}}]);
+    assert.eq([{_id: 1, var: {_id: {}, value: 56}}], queryResult.toArray());
 }
 
 // Test that a $searchMeta query properly computes the metadata value according to the pipeline

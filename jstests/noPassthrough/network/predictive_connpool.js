@@ -12,15 +12,15 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 2, protocolVersion: 1}});
-const kDbName = 'test';
+const kDbName = "test";
 const mongosClient = st.s;
 const mongos = mongosClient.getDB(kDbName);
 const rst = st.rs0;
 const primary = rst.getPrimary();
 const secondary = rst.getSecondaries()[0];
 
-const cfg = primary.getDB('local').system.replset.findOne();
-const allHosts = cfg.members.map(x => x.host);
+const cfg = primary.getDB("local").system.replset.findOne();
+const allHosts = cfg.members.map((x) => x.host);
 const primaryOnly = [primary.name];
 const secondaryOnly = [secondary.name];
 
@@ -29,17 +29,24 @@ var threads = [];
 function launchFinds({times, readPref, shouldFail}) {
     jsTestLog("Starting " + times + " connections");
     for (var i = 0; i < times; i++) {
-        var thread = new Thread(function(connStr, readPref, dbName, shouldFail) {
-            var client = new Mongo(connStr);
-            const ret = client.getDB(dbName).runCommand(
-                {find: "test", limit: 1, "$readPreference": {mode: readPref}});
+        var thread = new Thread(
+            function (connStr, readPref, dbName, shouldFail) {
+                var client = new Mongo(connStr);
+                const ret = client
+                    .getDB(dbName)
+                    .runCommand({find: "test", limit: 1, "$readPreference": {mode: readPref}});
 
-            if (shouldFail) {
-                assert.commandFailed(ret);
-            } else {
-                assert.commandWorked(ret);
-            }
-        }, st.s.host, readPref, kDbName, shouldFail);
+                if (shouldFail) {
+                    assert.commandFailed(ret);
+                } else {
+                    assert.commandWorked(ret);
+                }
+            },
+            st.s.host,
+            readPref,
+            kDbName,
+            shouldFail,
+        );
         thread.start();
         threads.push(thread);
     }
@@ -83,7 +90,7 @@ function assertSoonMongosHasConnPoolStats({hosts, ready = 0, pending = 0, active
 
     function checkStatsAndThreads() {
         // If any of the "find" threads failed, then let that failure bubble up as an exception.
-        threads.forEach(thread => {
+        threads.forEach((thread) => {
             const status = thread.currentStatus();
             assert.eq(status.code, 0, "error occurred in 'find' thread: " + tojson(status));
         });
@@ -93,16 +100,17 @@ function assertSoonMongosHasConnPoolStats({hosts, ready = 0, pending = 0, active
         // mismatches :: {[host]: "Connection stats are absent", ...}
         mismatches = {};
         connPoolStatsResponse = mongos.adminCommand({connPoolStats: 1});
-        hosts.forEach(host => checkStatsForHost({connPoolStatsResponse, host, mismatches}));
+        hosts.forEach((host) => checkStatsForHost({connPoolStatsResponse, host, mismatches}));
         return Object.keys(mismatches).length === 0;
     }
 
     function makeErrorMessage() {
-        const briefResponse =
-            Object.fromEntries(Object.entries(connPoolStatsResponse.hosts).map(([host, stats]) => {
+        const briefResponse = Object.fromEntries(
+            Object.entries(connPoolStatsResponse.hosts).map(([host, stats]) => {
                 delete stats.acquisitionWaitTimes;
                 return [host, stats];
-            }));
+            }),
+        );
         return `connPoolStats response had mismatches:
 ${tojson(mismatches)}
 
@@ -118,9 +126,10 @@ function walkThroughBehavior({primaryFollows, secondaryFollows}) {
     mongos.adminCommand({multicast: {ping: 0}});
 
     // Block connections from finishing
-    const fpRs = configureFailPointForRS(st.rs0.nodes,
-                                         "waitInFindBeforeMakingBatch",
-                                         {shouldCheckForInterrupt: true, nss: kDbName + ".test"});
+    const fpRs = configureFailPointForRS(st.rs0.nodes, "waitInFindBeforeMakingBatch", {
+        shouldCheckForInterrupt: true,
+        nss: kDbName + ".test",
+    });
 
     // Launch a bunch of primary finds
     launchFinds({times: 10, readPref: "primary"});
@@ -161,7 +170,7 @@ jsTestLog("Reseting to disabled");
 updateSetParameters({ShardingTaskExecutorPoolReplicaSetMatching: "disabled"});
 walkThroughBehavior({primaryFollows: false, secondaryFollows: false});
 
-threads.forEach(function(thread) {
+threads.forEach(function (thread) {
     thread.join();
 });
 

@@ -19,7 +19,7 @@
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 // Use aggdb
-const testDb = db.getSiblingDB('aggdb');
+const testDb = db.getSiblingDB("aggdb");
 
 // Empty and fill aggdb
 testDb.agg.drop();

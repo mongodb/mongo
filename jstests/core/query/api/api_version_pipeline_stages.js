@@ -33,9 +33,7 @@ const unstablePipelines = [
 ];
 
 function is81orAbove(db) {
-    const res = db.getSiblingDB("admin")
-                    .system.version.find({_id: "featureCompatibilityVersion"})
-                    .toArray();
+    const res = db.getSiblingDB("admin").system.version.find({_id: "featureCompatibilityVersion"}).toArray();
     return res.length == 0 || MongoRunner.compareBinVersions(res[0].version, "8.1") >= 0;
 }
 
@@ -51,50 +49,55 @@ let hybridSearchPipelines = [
     // $score is not included in the strict api.
     [{$score: {score: 10}}],
     // $minMaxScaler is not included in the strict api.
-    [{
-        $setWindowFields: {
-            sortBy: {_id: 1},
-            output: {
-                "relativeXValue": {
-                    $minMaxScaler: {
-                        input: "$x",
-                    },
-                    window: {range: ["unbounded", "unbounded"]}
-                },
-            }
-        }
-    }],
-    // $scoreFusion is not included in the strict api.
-    [{
-        $scoreFusion: {
-            input: {
-                pipelines: {
-                    score2: [
-                        {
-                            $search:
-                                {index: "search_index", text: {query: "mystery", path: "genres"}}
+    [
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {
+                    "relativeXValue": {
+                        $minMaxScaler: {
+                            input: "$x",
                         },
-                        {$match: {author: "dave"}}
-                    ]
+                        window: {range: ["unbounded", "unbounded"]},
+                    },
                 },
-                normalization: "none"
             },
-            combination: {weights: {score2: 5}}
-        }
-    }]
+        },
+    ],
+    // $scoreFusion is not included in the strict api.
+    [
+        {
+            $scoreFusion: {
+                input: {
+                    pipelines: {
+                        score2: [
+                            {
+                                $search: {index: "search_index", text: {query: "mystery", path: "genres"}},
+                            },
+                            {$match: {author: "dave"}},
+                        ],
+                    },
+                    normalization: "none",
+                },
+                combination: {weights: {score2: 5}},
+            },
+        },
+    ],
 ];
 
 unstablePipelines.concat(hybridSearchPipelines);
 
 function assertAggregateFailsWithAPIStrict(pipeline) {
-    assert.commandFailedWithCode(testDb.runCommand({
-        aggregate: collName,
-        pipeline: pipeline,
-        cursor: {},
-        apiStrict: true,
-        apiVersion: "1"
-    }),
-                                 [ErrorCodes.APIStrictError, kUnrecognizedPipelineStageErrorCode]);
+    assert.commandFailedWithCode(
+        testDb.runCommand({
+            aggregate: collName,
+            pipeline: pipeline,
+            cursor: {},
+            apiStrict: true,
+            apiVersion: "1",
+        }),
+        [ErrorCodes.APIStrictError, kUnrecognizedPipelineStageErrorCode],
+    );
 }
 
 for (let pipeline of unstablePipelines) {
@@ -104,14 +107,16 @@ for (let pipeline of unstablePipelines) {
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
     // The error code may also be an unrecognized pipeline stage, if the test is running in a
     // multiversioned scenario.
-    assert.commandFailedWithCode(testDb.runCommand({
-        create: 'api_version_pipeline_stages_should_fail',
-        viewOn: collName,
-        pipeline: pipeline,
-        apiStrict: true,
-        apiVersion: "1"
-    }),
-                                 [ErrorCodes.APIStrictError, kUnrecognizedPipelineStageErrorCode]);
+    assert.commandFailedWithCode(
+        testDb.runCommand({
+            create: "api_version_pipeline_stages_should_fail",
+            viewOn: collName,
+            pipeline: pipeline,
+            apiStrict: true,
+            apiVersion: "1",
+        }),
+        [ErrorCodes.APIStrictError, kUnrecognizedPipelineStageErrorCode],
+    );
 }
 
 // Test that $collStats is allowed in APIVersion 1, even with 'apiStrict: true', so long as the only
@@ -121,35 +126,40 @@ assertAggregateFailsWithAPIStrict([{$collStats: {latencyStats: {histograms: true
 assertAggregateFailsWithAPIStrict([{$collStats: {storageStats: {}}}]);
 assertAggregateFailsWithAPIStrict([{$collStats: {queryExecStats: {}}}]);
 assertAggregateFailsWithAPIStrict([{$collStats: {latencyStats: {}, queryExecStats: {}}}]);
-assertAggregateFailsWithAPIStrict(
-    [{$collStats: {latencyStats: {}, storageStats: {scale: 1024}, queryExecStats: {}}}]);
+assertAggregateFailsWithAPIStrict([{$collStats: {latencyStats: {}, storageStats: {scale: 1024}, queryExecStats: {}}}]);
 
-assert.commandWorked(testDb.runCommand({
-    aggregate: collName,
-    pipeline: [{$collStats: {}}],
-    cursor: {},
-    apiVersion: "1",
-    apiStrict: true
-}));
-assert.commandWorked(testDb.runCommand({
-    aggregate: collName,
-    pipeline: [{$collStats: {count: {}}}],
-    cursor: {},
-    apiVersion: "1",
-    apiStrict: true
-}));
+assert.commandWorked(
+    testDb.runCommand({
+        aggregate: collName,
+        pipeline: [{$collStats: {}}],
+        cursor: {},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
+);
+assert.commandWorked(
+    testDb.runCommand({
+        aggregate: collName,
+        pipeline: [{$collStats: {count: {}}}],
+        cursor: {},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
+);
 
 // Test that by running the aggregate command with $collStats + $group like our drivers do to
 // compute the count, we get back a single result in the first batch - no getMore is required.
 // This test is meant to mimic a drivers test and serve as a warning if we may be making a breaking
 // change for the drivers.
-const cmdResult = assert.commandWorked(testDb.runCommand({
-    aggregate: collName,
-    pipeline: [{$collStats: {count: {}}}, {$group: {_id: 1, count: {$sum: "$count"}}}],
-    cursor: {},
-    apiVersion: "1",
-    apiStrict: true
-}));
+const cmdResult = assert.commandWorked(
+    testDb.runCommand({
+        aggregate: collName,
+        pipeline: [{$collStats: {count: {}}}, {$group: {_id: 1, count: {$sum: "$count"}}}],
+        cursor: {},
+        apiVersion: "1",
+        apiStrict: true,
+    }),
+);
 
 assert.eq(cmdResult.cursor.id, 0, cmdResult);
 assert.eq(cmdResult.cursor.firstBatch.length, 1, cmdResult);

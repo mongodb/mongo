@@ -21,20 +21,28 @@ for (let i = 0; i < 4; ++i) {
 }
 
 jsTest.log("Test that cursors created in transactions may be kill outside of the transaction.");
-withTxnAndAutoRetryOnMongos(session, () => {
-    let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
-    assert(res.hasOwnProperty("cursor"), tojson(res));
-    assert(res.cursor.hasOwnProperty("id"), tojson(res));
-    assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
-}, /* txnOpts = */ {});
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+        assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+    },
+    /* txnOpts = */ {},
+);
 
 jsTest.log("Test that cursors created in transactions may be kill outside of the session.");
-withTxnAndAutoRetryOnMongos(session, () => {
-    let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
-    assert(res.hasOwnProperty("cursor"), tojson(res));
-    assert(res.cursor.hasOwnProperty("id"), tojson(res));
-    assert.commandWorked(session.commitTransaction_forTesting());
-    assert.commandWorked(testDB.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
-}, /* txnOpts = */ {});
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+        assert.commandWorked(session.commitTransaction_forTesting());
+        assert.commandWorked(testDB.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+    },
+    /* txnOpts = */ {},
+);
 
 session.endSession();

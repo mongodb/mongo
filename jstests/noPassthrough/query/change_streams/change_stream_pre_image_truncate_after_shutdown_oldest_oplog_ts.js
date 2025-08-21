@@ -11,9 +11,7 @@
 //  requires_replication,
 // ]
 
-import {
-    PreImageTruncateAfterShutdownTest
-} from "jstests/noPassthrough/libs/change_stream_pre_image_truncate_after_shutdown.js";
+import {PreImageTruncateAfterShutdownTest} from "jstests/noPassthrough/libs/change_stream_pre_image_truncate_after_shutdown.js";
 
 const testName = "pre_image_truncate_after_shutdown_oldest_oplog_ts";
 const preImageTruncateAfterShutdownTest = new PreImageTruncateAfterShutdownTest(testName);

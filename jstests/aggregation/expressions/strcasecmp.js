@@ -14,8 +14,7 @@ function strcasecmp(a, b) {
 }
 
 function assertException(args) {
-    assert.commandFailed(
-        t.runCommand('aggregate', {pipeline: [{$project: {a: {$strcasecmp: args}}}]}));
+    assert.commandFailed(t.runCommand("aggregate", {pipeline: [{$project: {a: {$strcasecmp: args}}}]}));
 }
 
 function assertStrcasecmp(expected, a, b) {
@@ -31,41 +30,41 @@ function assertBoth(expectedStrcasecmp, expectedCmp, a, b) {
 
 // Wrong number of arguments.
 assertException([]);
-assertException(['a']);
-assertException(['a', 'b', 'c']);
+assertException(["a"]);
+assertException(["a", "b", "c"]);
 
 // Basic tests.
-assertBoth(0, 0, '', '');
+assertBoth(0, 0, "", "");
 assertBoth(0, 0, null, null);
-assertBoth(-1, -1, '', 'a');
-assertBoth(0, -1, 'A', 'a');
-assertBoth(1, -1, 'Ab', 'a');
-assertBoth(0, -1, 'Ab', 'aB');
-assertBoth(1, -1, 'Bb', 'aB');
-assertBoth(-1, -1, 'Bb', 'cB');
-assertBoth(1, -1, 'aB', 'aa');
-assertBoth(-1, -1, 'aB', 'ac');
+assertBoth(-1, -1, "", "a");
+assertBoth(0, -1, "A", "a");
+assertBoth(1, -1, "Ab", "a");
+assertBoth(0, -1, "Ab", "aB");
+assertBoth(1, -1, "Bb", "aB");
+assertBoth(-1, -1, "Bb", "cB");
+assertBoth(1, -1, "aB", "aa");
+assertBoth(-1, -1, "aB", "ac");
 
 // With non alphabet characters.
-assertBoth(0, -1, 'A$_b1C?', 'a$_b1C?');
-assertBoth(1, -1, 'ABC01234', 'abc0123');
+assertBoth(0, -1, "A$_b1C?", "a$_b1C?");
+assertBoth(1, -1, "ABC01234", "abc0123");
 
 // String coercion.
-assertStrcasecmp(0, '1', 1);
-assertStrcasecmp(0, '1.23', 1.23);
-assertStrcasecmp(0, '1970-01-01T00:00:00.000Z', new Date(0));
-assertStrcasecmp(0, '1970-01-01t00:00:00.000Z', new Date(0));
-assertException(['abc', /abc/]);
+assertStrcasecmp(0, "1", 1);
+assertStrcasecmp(0, "1.23", 1.23);
+assertStrcasecmp(0, "1970-01-01T00:00:00.000Z", new Date(0));
+assertStrcasecmp(0, "1970-01-01t00:00:00.000Z", new Date(0));
+assertException(["abc", /abc/]);
 
 // Extended characters.
-assertBoth(0, -1, '\u0080D\u20ac', '\u0080d\u20ac');
-assertBoth(1, 1, 'ó', 'Ó');  // Not treated as equal currently.
+assertBoth(0, -1, "\u0080D\u20ac", "\u0080d\u20ac");
+assertBoth(1, 1, "ó", "Ó"); // Not treated as equal currently.
 
 // String coersion fails
-assertException(['a', ['a']]);
-assertException(['a', new Map()]);
+assertException(["a", ["a"]]);
+assertException(["a", new Map()]);
 
 // String from field path.
 t.drop();
-t.save({x: 'abc'});
-assertBoth(0, 1, '$x', 'ABC');
+t.save({x: "abc"});
+assertBoth(0, 1, "$x", "ABC");

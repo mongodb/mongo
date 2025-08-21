@@ -4,18 +4,22 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const compatibleOptions = [{repair: false, fixMultikey: true}, {repair: true, fixMultikey: true}];
+const compatibleOptions = [
+    {repair: false, fixMultikey: true},
+    {repair: true, fixMultikey: true},
+];
 
-const incompatibleOptions =
-    [{repair: true, fixMultikey: false}, {fixMultikey: true, background: true}];
+const incompatibleOptions = [
+    {repair: true, fixMultikey: false},
+    {fixMultikey: true, background: true},
+];
 
 const incompatibleReplOptions = [{repair: true}, {fixMultikey: true, background: true}];
 
 const runTest = (coll, options, expectFailure) => {
     const res = coll.validate(options);
     if (expectFailure) {
-        assert.commandFailedWithCode(res,
-                                     [ErrorCodes.InvalidOptions, ErrorCodes.CommandNotSupported]);
+        assert.commandFailedWithCode(res, [ErrorCodes.InvalidOptions, ErrorCodes.CommandNotSupported]);
         return;
     }
 
@@ -27,7 +31,7 @@ const runTest = (coll, options, expectFailure) => {
 (() => {
     const conn = MongoRunner.runMongod();
     const dbName = jsTestName();
-    const collName = 'test';
+    const collName = "test";
     const db = conn.getDB(dbName);
 
     assert.commandWorked(db.createCollection(collName));
@@ -50,7 +54,7 @@ const runTest = (coll, options, expectFailure) => {
     replSet.startSet();
     replSet.initiate();
     const dbName = jsTestName();
-    const collName = 'test';
+    const collName = "test";
     const primary = replSet.getPrimary();
     const db = primary.getDB(dbName);
 

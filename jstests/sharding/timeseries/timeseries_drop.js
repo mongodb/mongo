@@ -10,16 +10,16 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
     areViewlessTimeseriesEnabled,
     getTimeseriesBucketsColl,
-    getTimeseriesCollForDDLOps
+    getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
 
-const dbName = 'testDB';
-const collName = 'testColl';
-const timeField = 'time';
-const metaField = 'hostid';
+const dbName = "testDB";
+const collName = "testColl";
+const timeField = "time";
+const metaField = "hostid";
 
 // Connections.
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -27,7 +27,7 @@ const mongos = st.s0;
 
 // Databases.
 const mainDB = mongos.getDB(dbName);
-const configDB = mongos.getDB('config');
+const configDB = mongos.getDB("config");
 
 // Helpers.
 let currentId = 0;
@@ -36,11 +36,13 @@ function generateId() {
 }
 
 function generateBatch(size) {
-    return TimeseriesTest.generateHosts(size).map((host, index) => Object.assign(host, {
-        _id: generateId(),
-        [metaField]: index,
-        [timeField]: ISODate(`20${index}0-01-01`),
-    }));
+    return TimeseriesTest.generateHosts(size).map((host, index) =>
+        Object.assign(host, {
+            _id: generateId(),
+            [metaField]: index,
+            [timeField]: ISODate(`20${index}0-01-01`),
+        }),
+    );
 }
 
 function ensureCollectionExists(collName, db) {
@@ -62,17 +64,18 @@ function runTest(getShardKey, performChunkSplit) {
     assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 
     // Create timeseries collection.
-    assert.commandWorked(mainDB.createCollection(
-        collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(mainDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
     const coll = mainDB.getCollection(collName);
 
     // Shard timeseries collection.
     const shardKey = getShardKey(1, 1);
     assert.commandWorked(coll.createIndex(shardKey));
-    assert.commandWorked(mongos.adminCommand({
-        shardCollection: coll.getFullName(),
-        key: shardKey,
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: shardKey,
+        }),
+    );
 
     // Insert initial set of documents.
     const numDocs = 8;
@@ -90,8 +93,9 @@ function runTest(getShardKey, performChunkSplit) {
             splitPoint[`control.min.${timeField}`] = firstBatch[splitIndex][timeField];
         }
 
-        assert.commandWorked(mongos.adminCommand(
-            {split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(), middle: splitPoint}));
+        assert.commandWorked(
+            mongos.adminCommand({split: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(), middle: splitPoint}),
+        );
 
         // Ensure that currently both chunks reside on the primary shard.
         let counts = st.chunkCounts(collName, dbName);
@@ -100,12 +104,14 @@ function runTest(getShardKey, performChunkSplit) {
 
         // Move one of the chunks into the second shard.
         const otherShard = st.getOther(primaryShard);
-        assert.commandWorked(mongos.adminCommand({
-            movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
-            find: splitPoint,
-            to: otherShard.name,
-            _waitForDelete: true
-        }));
+        assert.commandWorked(
+            mongos.adminCommand({
+                movechunk: getTimeseriesCollForDDLOps(mainDB, coll).getFullName(),
+                find: splitPoint,
+                to: otherShard.name,
+                _waitForDelete: true,
+            }),
+        );
 
         // Ensure that each shard owns one chunk.
         counts = st.chunkCounts(collName, dbName);
@@ -117,8 +123,10 @@ function runTest(getShardKey, performChunkSplit) {
     // TODO SERVER-107138 update once drop on the buckets namespace fails on FCV 9.0.
     if (!areViewlessTimeseriesEnabled(mainDB)) {
         // Confirm it's illegal to directly drop the time-series buckets collection.
-        assert.commandFailedWithCode(mainDB.runCommand({drop: getTimeseriesBucketsColl(collName)}),
-                                     ErrorCodes.IllegalOperation);
+        assert.commandFailedWithCode(
+            mainDB.runCommand({drop: getTimeseriesBucketsColl(collName)}),
+            ErrorCodes.IllegalOperation,
+        );
         ensureCollectionExists(collName, mainDB);
         ensureCollectionExists(getTimeseriesBucketsColl(collName), mainDB);
     }
@@ -134,10 +142,7 @@ function runTest(getShardKey, performChunkSplit) {
     ensureCollectionDoesNotExist(getTimeseriesBucketsColl(collName));
 
     // Ensure that the time-series collection gets deleted from the config database.
-    assert.eq(
-        [],
-        configDB.collections.find({_id: getTimeseriesCollForDDLOps(mainDB, coll).getFullName()})
-            .toArray());
+    assert.eq([], configDB.collections.find({_id: getTimeseriesCollForDDLOps(mainDB, coll).getFullName()}).toArray());
 }
 
 try {

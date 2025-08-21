@@ -11,10 +11,9 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const rsNodeOptions = {
-    setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
+    setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
 };
-const st =
-    new ShardingTest({shards: 1, mongos: 1, rs: {nodes: 1}, other: {rsOptions: rsNodeOptions}});
+const st = new ShardingTest({shards: 1, mongos: 1, rs: {nodes: 1}, other: {rsOptions: rsNodeOptions}});
 
 // We require one 'test' database and a second 'other' database.
 const oldShardDB = st.s.getDB(jsTestName() + "_other");
@@ -78,8 +77,7 @@ for (let csCursor of [wholeDBCS, singleCollCS]) {
 const newShard1 = addShardToCluster("newShard1");
 
 // .. make sure the primary shard of 'newShardDB' database is the new shard ..
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: newShardDB.getName(), primaryShard: "newShard1"}));
+assert.commandWorked(st.s.adminCommand({enableSharding: newShardDB.getName(), primaryShard: "newShard1"}));
 assert.neq(configDB.databases.findOne({_id: newShardDB.getName(), primary: "newShard1"}), null);
 
 //... create a new collection, and verify that it was placed on the new shard....

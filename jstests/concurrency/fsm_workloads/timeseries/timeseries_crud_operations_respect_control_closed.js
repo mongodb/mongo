@@ -16,16 +16,14 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js';
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getRawOperationSpec, getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const data = {
-        timeFieldName: 'time',
-        metaFieldName: 'tag',
+        timeFieldName: "time",
+        metaFieldName: "tag",
         numDocs: 1,
         numBucketMetaFieldsPerThread: 100,
         bucketMetaFieldName: "meta",
@@ -36,7 +34,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         bucketValidationCollName: "timeseries_crud_operations_respect_control_closed_log",
     };
 
-    $config.states.init = function(db, collNameSuffix) {
+    $config.states.init = function (db, collNameSuffix) {
         // Reading at which this thread should start inserting. The starting point begins after
         // the seed data and is based on the thread id to ensure uniqueness across inserted
         // values.
@@ -56,7 +54,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * TODO (SERVER-88275): Revisit this, see whether we still want to accept the QueryPlanKilled
      * error.
      */
-    const handleQueryPlanKilled = function(fn) {
+    const handleQueryPlanKilled = function (fn) {
         let ret;
         assert.soon(() => {
             try {
@@ -73,20 +71,22 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         return ret;
     };
 
-    const insert = function(db,
-                            collName,
-                            tid,
-                            ordered,
-                            newReadingNo,
-                            numBucketsToInsertInto,
-                            numDocumentsToInsertPerBucket) {
+    const insert = function (
+        db,
+        collName,
+        tid,
+        ordered,
+        newReadingNo,
+        numBucketsToInsertInto,
+        numDocumentsToInsertPerBucket,
+    ) {
         let docs = [];
         // Insert numBucketsDocumentsToInsertPerBucket into numBucketsToInsertInto distinct buckets.
         for (let i = 0; i < numBucketsToInsertInto; ++i) {
             for (let j = 0; j < numDocumentsToInsertPerBucket; ++j) {
                 docs.push({
                     [data.timeFieldName]: ISODate(),
-                    [data.metaFieldName]: (tid * data.numDocs) + i,
+                    [data.metaFieldName]: tid * data.numDocs + i,
                     readingNo: newReadingNo + j,
                 });
             }
@@ -96,32 +96,39 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         docs = Array.shuffle(docs);
         const additionalCodesToRetry = [ErrorCodes.NoProgressMade];
 
-        retryOnRetryableError(() => {
-            db.runCommand({insert: collName, documents: docs, ordered: ordered});
-        }, 100, undefined, additionalCodesToRetry);
+        retryOnRetryableError(
+            () => {
+                db.runCommand({insert: collName, documents: docs, ordered: ordered});
+            },
+            100,
+            undefined,
+            additionalCodesToRetry,
+        );
     };
 
     $config.states.setControlClosedTrue = function setControlClosedTrue(db, collNameSuffix) {
         for (let i = 0; i < data.numBucketsToCloseAtATime; i++) {
-            const bucketMeta =
-                Random.randInt($baseConfig.threadCount * data.numBucketMetaFieldsPerThread);
+            const bucketMeta = Random.randInt($baseConfig.threadCount * data.numBucketMetaFieldsPerThread);
             // Get a random bucket metadata, and then find a bucket with that metadata that does not
             // have its control.closed field set to true, and that is still being inserted into (its
             // count is less than the max amount of documents per bucket).
-            const res = assert.commandWorked(db.runCommand({
-                findAndModify: this.collNameForRawOps,
-                query: {
-                    [data.bucketMetaFieldName]: bucketMeta,
-                    "control.closed": {$exists: false},
-                },
-                sort: {"meta": 1, "control.max.timeField": -1},
-                new: true,
-                update: {$set: {"control.closed": true}},
-                ...this.rawOperationSpec,
-            }));
+            const res = assert.commandWorked(
+                db.runCommand({
+                    findAndModify: this.collNameForRawOps,
+                    query: {
+                        [data.bucketMetaFieldName]: bucketMeta,
+                        "control.closed": {$exists: false},
+                    },
+                    sort: {"meta": 1, "control.max.timeField": -1},
+                    new: true,
+                    update: {$set: {"control.closed": true}},
+                    ...this.rawOperationSpec,
+                }),
+            );
             if (res.value) {
                 let insertRes = assert.commandWorkedIgnoringWriteErrors(
-                    db.runCommand({insert: data.bucketValidationCollName, documents: [res.value]}));
+                    db.runCommand({insert: data.bucketValidationCollName, documents: [res.value]}),
+                );
                 if (insertRes.writeErrors) {
                     assert.eq(insertRes.writeErrors[0].code, ErrorCodes.DuplicateKey);
                 }
@@ -129,27 +136,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
     };
 
-    $config.states.insertOrdered = function(db, collNameSuffix) {
+    $config.states.insertOrdered = function (db, collNameSuffix) {
         const collName = getCollectionName(collNameSuffix);
-        insert(db,
-               collName,
-               this.tid,
-               true,
-               this.readingNo,
-               data.numBucketMetaFieldsPerThread,
-               data.numDocs);
+        insert(db, collName, this.tid, true, this.readingNo, data.numBucketMetaFieldsPerThread, data.numDocs);
         this.readingNo += data.numDocs;
     };
 
-    $config.states.insertUnordered = function(db, collNameSuffix) {
+    $config.states.insertUnordered = function (db, collNameSuffix) {
         const collName = getCollectionName(collNameSuffix);
-        insert(db,
-               collName,
-               this.tid,
-               false,
-               this.readingNo,
-               data.numBucketMetaFieldsPerThread,
-               data.numDocs);
+        insert(db, collName, this.tid, false, this.readingNo, data.numBucketMetaFieldsPerThread, data.numDocs);
         this.readingNo += data.numDocs;
     };
 
@@ -171,7 +166,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     // TODO SERVER-93150: Add states with concurrent arbitrary user updates.
 
-    $config.setup = function(db, collNameSuffix, cluster) {
+    $config.setup = function (db, collNameSuffix, cluster) {
         $super.setup.apply(this, [db, collNameSuffix, cluster]);
         // Create a bucket for each metadata and insert some measurements into it. This prevents
         // setControlClosedTrue from trying to modify buckets that haven't been created yet.
@@ -190,30 +185,28 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         jsTestLog(db.runCommand({collStats: collName}).timeseries);
     };
 
-    $config.teardown = function(db, collNameSuffix, cluster) {
+    $config.teardown = function (db, collNameSuffix, cluster) {
         $super.teardown.apply(this, [db, collNameSuffix, cluster]);
 
         const collNameForRawOps = getTimeseriesCollForRawOps(db, getCollectionName(collNameSuffix));
         const rawOperationSpec = getRawOperationSpec(db);
 
-        const bucketsToValidate =
-            handleQueryPlanKilled(() => db[data.bucketValidationCollName].find().toArray());
-        const numTotalBuckets =
-            handleQueryPlanKilled(() => db[collNameForRawOps].countDocuments({}, rawOperationSpec));
+        const bucketsToValidate = handleQueryPlanKilled(() => db[data.bucketValidationCollName].find().toArray());
+        const numTotalBuckets = handleQueryPlanKilled(() => db[collNameForRawOps].countDocuments({}, rawOperationSpec));
         // Let's go through all of the buckets that we had set the control.closed field to true for,
         // and validate that they have not been written to since.
-        jsTestLog(`Validating ${
-            bucketsToValidate
-                .length} buckets that had their control.closed field set to true out of ${
-            numTotalBuckets} total buckets`);
+        jsTestLog(
+            `Validating ${bucketsToValidate.length} buckets that had their control.closed field set to true out of ${
+                numTotalBuckets
+            } total buckets`,
+        );
         let numDocsInBucketWhenClosed = 0;
         for (let i = 0; i < bucketsToValidate.length; i++) {
             const bucket = bucketsToValidate[i];
             numDocsInBucketWhenClosed += bucket.control.count;
-            const bucketsInCollection = handleQueryPlanKilled(
-                () => db[collNameForRawOps]
-                          .aggregate([{$match: {_id: bucket._id}}], rawOperationSpec)
-                          .toArray());
+            const bucketsInCollection = handleQueryPlanKilled(() =>
+                db[collNameForRawOps].aggregate([{$match: {_id: bucket._id}}], rawOperationSpec).toArray(),
+            );
             assert.eq(bucketsInCollection.length, 1);
             const bucketInCollection = bucketsInCollection[0];
             const errMsg = `Expected bucket ${tojson(bucket)} and actual bucket ${tojson(bucketInCollection)} did not match; bucket may have had writes to it after the control.closed field was set.`;

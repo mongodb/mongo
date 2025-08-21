@@ -9,8 +9,7 @@
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const getExtendedRangeCount = (db) => {
-    return assert.commandWorked(db.adminCommand({serverStatus: 1}))
-        .catalogStats.timeseriesExtendedRange;
+    return assert.commandWorked(db.adminCommand({serverStatus: 1})).catalogStats.timeseriesExtendedRange;
 };
 
 const collName = "test.standard";
@@ -43,14 +42,10 @@ assert.eq(undefined, getExtendedRangeCount(secondary));
 CommonOps(primary);
 
 // Make sure the collections got flagged properly during the initial write.
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6679402, {"namespace": "test.standard", "timeField": "time"}, 0));
-assert(checkLog.checkContainsWithCountJson(
-    secondary, 6679402, {"namespace": "test.standard", "timeField": "time"}, 0));
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6679402, {"namespace": "test.extended", "timeField": "time"}, 1));
-assert(checkLog.checkContainsWithCountJson(
-    secondary, 6679402, {"namespace": "test.extended", "timeField": "time"}, 1));
+assert(checkLog.checkContainsWithCountJson(primary, 6679402, {"namespace": "test.standard", "timeField": "time"}, 0));
+assert(checkLog.checkContainsWithCountJson(secondary, 6679402, {"namespace": "test.standard", "timeField": "time"}, 0));
+assert(checkLog.checkContainsWithCountJson(primary, 6679402, {"namespace": "test.extended", "timeField": "time"}, 1));
+assert(checkLog.checkContainsWithCountJson(secondary, 6679402, {"namespace": "test.extended", "timeField": "time"}, 1));
 
 assert.eq(1, getExtendedRangeCount(primary));
 assert.eq(1, getExtendedRangeCount(secondary));

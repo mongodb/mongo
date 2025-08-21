@@ -33,5 +33,6 @@ reshardingTest.withReshardingInBackground(
         reshardingTest.awaitCloneTimestampChosen();
 
         assert.commandWorked(sourceCollection.remove({x: 1}, {justOne: false}));
-    });
+    },
+);
 reshardingTest.teardown();

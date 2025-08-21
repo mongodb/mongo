@@ -3,12 +3,11 @@ let __magicNoPrint = {__magicNoPrint: 1111};
 let _verboseShell = false;
 
 function chatty(s) {
-    if (!globalThis.__quiet)
-        print(s);
-};
+    if (!globalThis.__quiet) print(s);
+}
 
 function reconnect(db) {
-    assert.soon(function() {
+    assert.soon(function () {
         try {
             db.runCommand({ping: 1});
             return true;
@@ -31,8 +30,10 @@ function _getErrorWithCode(codeOrObj, message) {
 
         if (codeOrObj.hasOwnProperty("writeErrors")) {
             e.writeErrors = codeOrObj.writeErrors;
-        } else if ((codeOrObj instanceof BulkWriteResult || codeOrObj instanceof BulkWriteError) &&
-                   codeOrObj.hasWriteErrors()) {
+        } else if (
+            (codeOrObj instanceof BulkWriteResult || codeOrObj instanceof BulkWriteError) &&
+            codeOrObj.hasWriteErrors()
+        ) {
             e.writeErrors = codeOrObj.getWriteErrors();
         }
 
@@ -46,12 +47,9 @@ function _getErrorWithCode(codeOrObj, message) {
 
         if (codeOrObj.hasOwnProperty("writeConcernError")) {
             e.writeConcernError = codeOrObj.writeConcernError;
-        } else if (codeOrObj.hasOwnProperty("writeConcernErrors") &&
-                   codeOrObj.writeConcernErrors.length > 0) {
-            e.writeConcernError =
-                codeOrObj.writeConcernErrors[codeOrObj.writeConcernErrors.length - 1];
-        } else if (codeOrObj.hasOwnProperty("hasWriteConcernError") &&
-                   codeOrObj.hasWriteConcernError()) {
+        } else if (codeOrObj.hasOwnProperty("writeConcernErrors") && codeOrObj.writeConcernErrors.length > 0) {
+            e.writeConcernError = codeOrObj.writeConcernErrors[codeOrObj.writeConcernErrors.length - 1];
+        } else if (codeOrObj.hasOwnProperty("hasWriteConcernError") && codeOrObj.hasWriteConcernError()) {
             e.writeConcernError = codeOrObj.getWriteConcernError();
         }
     } else if (typeof codeOrObj === "number") {
@@ -81,10 +79,10 @@ function retryOnRetryableError(func, numRetries, sleepMs, additionalCodesToRetry
         try {
             return func();
         } catch (e) {
-            if ((isRetryableError(e) || hasErrorCode(e, additionalCodesToRetry)) &&
-                numRetries > 0) {
-                print("An error occurred and the call will be retried: " +
-                      tojson({error: e.toString(), stack: e.stack}));
+            if ((isRetryableError(e) || hasErrorCode(e, additionalCodesToRetry)) && numRetries > 0) {
+                print(
+                    "An error occurred and the call will be retried: " + tojson({error: e.toString(), stack: e.stack}),
+                );
                 numRetries--;
                 sleep(sleepMs);
             } else {
@@ -109,8 +107,10 @@ function retryOnNetworkError(func, numRetries, sleepMs) {
             return func();
         } catch (e) {
             if (isNetworkError(e) && numRetries > 0) {
-                print("Network error occurred and the call will be retried: " +
-                      tojson({error: e.toString(), stack: e.stack}));
+                print(
+                    "Network error occurred and the call will be retried: " +
+                        tojson({error: e.toString(), stack: e.stack}),
+                );
                 numRetries--;
                 sleep(sleepMs);
             } else {
@@ -147,8 +147,7 @@ function isNetworkError(errorOrResponse) {
     // Then check if it's an Error, if so see if any of the known network error strings appear
     // in the given message.
     if (errorOrResponse.message) {
-        if (networkErrsPlusShellGeneratedNetworkErrs.some(
-                err => errorOrResponse.message.includes(err))) {
+        if (networkErrsPlusShellGeneratedNetworkErrs.some((err) => errorOrResponse.message.includes(err))) {
             return true;
         }
     }
@@ -198,8 +197,7 @@ function isRetryableError(errorOrResponse) {
     // Then check if it's an Error, if so determine retryability by checking the error message
     if (errorOrResponse.message) {
         // See if any of the known network error strings appear in the given message.
-        if (retryableErrsPlusShellGeneratedNetworkErrs.some(
-                err => errorOrResponse.message.includes(err))) {
+        if (retryableErrsPlusShellGeneratedNetworkErrs.some((err) => errorOrResponse.message.includes(err))) {
             return true;
         }
     }
@@ -216,13 +214,13 @@ function isRetryableError(errorOrResponse) {
 function hasErrorCode(response, errorCodes) {
     // Check if this is a command response, if so determine a match by checking the error code
     // in the response.
-    if (errorCodes.some(code => response.code == code)) {
+    if (errorCodes.some((code) => response.code == code)) {
         return true;
     }
 
     if (response.writeErrors) {
         for (let writeError of response.writeErrors) {
-            if (errorCodes.some(code => writeError.code == code)) {
+            if (errorCodes.some((code) => writeError.code == code)) {
                 return true;
             }
         }
@@ -233,16 +231,14 @@ function hasErrorCode(response, errorCodes) {
 
 // Please consider using bsonWoCompare instead of this as much as possible.
 function friendlyEqual(a, b) {
-    if (a == b)
-        return true;
+    if (a == b) return true;
 
     a = tojson(a, false, true);
     b = tojson(b, false, true);
 
-    if (a == b)
-        return true;
+    if (a == b) return true;
 
-    let clean = function(s) {
+    let clean = function (s) {
         s = s.replace(/NumberInt\((\-?\d+)\)/g, "$1");
         return s;
     };
@@ -250,11 +246,10 @@ function friendlyEqual(a, b) {
     a = clean(a);
     b = clean(b);
 
-    if (a == b)
-        return true;
+    if (a == b) return true;
 
     return false;
-};
+}
 
 function printStackTrace() {
     try {
@@ -262,7 +257,7 @@ function printStackTrace() {
     } catch (e) {
         print(e.stack);
     }
-};
+}
 
 /**
  * <p> Set the shell verbosity. If verbose the shell will display more information about command
@@ -271,30 +266,28 @@ function printStackTrace() {
  * @param {Bool} verbosity on / off
  */
 function setVerboseShell(value) {
-    if (value == undefined)
-        value = true;
+    if (value == undefined) value = true;
     _verboseShell = value;
-};
+}
 
 // these two are helpers for Array.sort(func)
 function compare(l, r) {
-    return (l == r ? 0 : (l < r ? -1 : 1));
-};
+    return l == r ? 0 : l < r ? -1 : 1;
+}
 
 // arr.sort(compareOn('name'))
 function compareOn(field) {
-    return function(l, r) {
+    return function (l, r) {
         return compare(l[field], r[field]);
     };
-};
+}
 
-print.captureAllOutput = function(fn, args) {
+print.captureAllOutput = function (fn, args) {
     let res = {};
     res.output = [];
     let __orig_print = print;
-    print = function() {
-        Array.prototype.push.apply(res.output,
-                                   Array.prototype.slice.call(arguments).join(" ").split("\n"));
+    print = function () {
+        Array.prototype.push.apply(res.output, Array.prototype.slice.call(arguments).join(" ").split("\n"));
     };
     try {
         res.result = fn.apply(undefined, args);
@@ -305,13 +298,13 @@ print.captureAllOutput = function(fn, args) {
     return res;
 };
 
-let indentStr = function(indent, s) {
-    if (typeof (s) === "undefined") {
+let indentStr = function (indent, s) {
+    if (typeof s === "undefined") {
         s = indent;
         indent = 0;
     }
     if (indent > 0) {
-        indent = (new Array(indent + 1)).join(" ");
+        indent = new Array(indent + 1).join(" ");
         s = indent + s.replace(/\n/g, "\n" + indent);
     }
     return s;
@@ -354,7 +347,7 @@ function jsTestName() {
     }
 
     return "__unknown_name__";
-};
+}
 
 let _jsTestOptions = {};
 
@@ -363,11 +356,10 @@ function jsTestOptions() {
         return Object.merge(_jsTestOptions, {
             // Test commands should be enabled by default if no enableTestCommands were present in
             // TestData
-            enableTestCommands:
-                TestData.hasOwnProperty('enableTestCommands') ? TestData.enableTestCommands : true,
+            enableTestCommands: TestData.hasOwnProperty("enableTestCommands") ? TestData.enableTestCommands : true,
             // Testing diagnostics should be enabled by default if no testingDiagnosticsEnabled was
             // present in TestData
-            testingDiagnosticsEnabled: TestData.hasOwnProperty('testingDiagnosticsEnabled')
+            testingDiagnosticsEnabled: TestData.hasOwnProperty("testingDiagnosticsEnabled")
                 ? TestData.testingDiagnosticsEnabled
                 : true,
             setParameters: TestData.setParameters,
@@ -412,21 +404,17 @@ function jsTestOptions() {
             networkMessageCompressors: TestData.networkMessageCompressors,
             skipRetryOnNetworkError: TestData.skipRetryOnNetworkError,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
-            forceValidationWithFeatureCompatibilityVersion:
-                TestData.forceValidationWithFeatureCompatibilityVersion,
+            forceValidationWithFeatureCompatibilityVersion: TestData.forceValidationWithFeatureCompatibilityVersion,
             skipCollectionAndIndexValidation: TestData.skipCollectionAndIndexValidation,
             // We default skipValidationOnNamespaceNotFound to true because mongod can end up
             // dropping a collection after calling listCollections (e.g. if a secondary applies an
             // oplog entry).
-            skipValidationOnNamespaceNotFound:
-                TestData.hasOwnProperty("skipValidationOnNamespaceNotFound")
+            skipValidationOnNamespaceNotFound: TestData.hasOwnProperty("skipValidationOnNamespaceNotFound")
                 ? TestData.skipValidationOnNamespaceNotFound
                 : true,
             skipValidationNamespaces: TestData.skipValidationNamespaces || [],
-            skipCheckingUUIDsConsistentAcrossCluster:
-                TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
-            skipCheckingIndexesConsistentAcrossCluster:
-                TestData.skipCheckingIndexesConsistentAcrossCluster || false,
+            skipCheckingUUIDsConsistentAcrossCluster: TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
+            skipCheckingIndexesConsistentAcrossCluster: TestData.skipCheckingIndexesConsistentAcrossCluster || false,
             skipCheckingCatalogCacheConsistencyWithShardingCatalog:
                 TestData.skipCheckingCatalogCacheConsistencyWithShardingCatalog || false,
             skipAwaitingReplicationOnShardsBeforeCheckingUUIDs:
@@ -440,8 +428,7 @@ function jsTestOptions() {
             logRetryAttempts: TestData.logRetryAttempts || false,
             connectionString: TestData.connectionString || "",
             skipCheckDBHashes: TestData.skipCheckDBHashes || false,
-            traceExceptions: TestData.hasOwnProperty("traceExceptions") ? TestData.traceExceptions
-                                                                        : true,
+            traceExceptions: TestData.hasOwnProperty("traceExceptions") ? TestData.traceExceptions : true,
             transactionLifetimeLimitSeconds: TestData.transactionLifetimeLimitSeconds,
             mqlTestFile: TestData.mqlTestFile,
             mqlRootPath: TestData.mqlRootPath,
@@ -454,8 +441,7 @@ function jsTestOptions() {
             // versions of each node in the replica set to 'latest' or 'last-lts'.
             // This flag is currently a placeholder and only sets the replica set to last-lts
             // FCV.
-            useRandomBinVersionsWithinReplicaSet:
-                TestData.useRandomBinVersionsWithinReplicaSet || false,
+            useRandomBinVersionsWithinReplicaSet: TestData.useRandomBinVersionsWithinReplicaSet || false,
             // Set a specific random seed to be used when useRandomBinVersionsWithinReplicaSet is
             // true.
             seed: TestData.seed || undefined,
@@ -484,7 +470,7 @@ function jsTestOptions() {
         });
     }
     return _jsTestOptions;
-};
+}
 
 /**
  * @deprecated: This function should not be used for new tests. The new severity API's should be
@@ -501,9 +487,8 @@ function jsTestOptions() {
 function jsTestLog(msg, attr, {severity = "I"} = {}) {
     const severityMap = {E: 1, W: 2, I: 3, D: 4};
     const severityLevel = severityMap[severity];
-    const logLevel = TestData?.logLevel ?? severityMap["I"];  // The default log level is 'INFO'.
-    if (!logLevel || typeof logLevel !== "number" || ![1, 2, 3, 4].includes(logLevel) ||
-        !severityLevel) {
+    const logLevel = TestData?.logLevel ?? severityMap["I"]; // The default log level is 'INFO'.
+    if (!logLevel || typeof logLevel !== "number" || ![1, 2, 3, 4].includes(logLevel) || !severityLevel) {
         throw new Error(`invalid log severity (${severity}) and/or log level (${logLevel})`);
     }
 
@@ -525,8 +510,8 @@ function jsTestLog(msg, attr, {severity = "I"} = {}) {
             t: new Date(),
             "s": severity,
             "c": "js_test",
-            "ctx": TestData?.testName || "-",  // context (e.g., TestData.testName)
-            "msg": msg,                        // message body
+            "ctx": TestData?.testName || "-", // context (e.g., TestData.testName)
+            "msg": msg, // message body
         };
         if (attr && typeof attr === "object" && Object.keys(attr).length > 0) {
             new_msg["attr"] = attr;
@@ -544,10 +529,10 @@ function jsTestLog(msg, attr, {severity = "I"} = {}) {
         msg += " " + tojson(attr);
     }
 
-    assert.eq(typeof (msg), "string", "Received: " + msg);
-    const msgs = ["----", ...msg.split("\n"), "----"].map(s => `[jsTest] ${s}`);
+    assert.eq(typeof msg, "string", "Received: " + msg);
+    const msgs = ["----", ...msg.split("\n"), "----"].map((s) => `[jsTest] ${s}`);
     print(`\n\n${msgs.join("\n")}\n\n`);
-};
+}
 
 let jsTest = {};
 
@@ -563,26 +548,25 @@ jsTest.adminUserRoles = ["root"];
  */
 jsTest.log = jsTestLog;
 
-jsTest.log.info = function(msg, attr) {
+jsTest.log.info = function (msg, attr) {
     jsTestLog(msg, attr, {severity: "I"});
 };
 
-jsTest.log.debug = function(msg, attr) {
+jsTest.log.debug = function (msg, attr) {
     jsTestLog(msg, attr, {severity: "D"});
 };
 
-jsTest.log.warning = function(msg, attr) {
+jsTest.log.warning = function (msg, attr) {
     jsTestLog(msg, attr, {severity: "W"});
 };
 
-jsTest.log.error = function(msg, attr) {
+jsTest.log.error = function (msg, attr) {
     jsTestLog(msg, attr, {severity: "E"});
 };
 
-jsTest.authenticate = function(conn) {
+jsTest.authenticate = function (conn) {
     const connOptions = conn.fullOptions || {};
-    const authMode =
-        connOptions.clusterAuthMode || conn.clusterAuthMode || jsTest.options().clusterAuthMode;
+    const authMode = connOptions.clusterAuthMode || conn.clusterAuthMode || jsTest.options().clusterAuthMode;
 
     if (!jsTest.options().auth && !jsTest.options().keyFile && authMode !== "x509") {
         conn.authenticated = true;
@@ -590,33 +574,45 @@ jsTest.authenticate = function(conn) {
     }
 
     try {
-        assert.soon(function() {
-            // Set authenticated to stop an infinite recursion from getDB calling
-            // back into authenticate.
-            conn.authenticated = true;
-            let mech = DB.prototype._getDefaultAuthenticationMechanism();
-            if (authMode === 'x509') {
-                mech = 'MONGODB-X509';
-            }
+        assert.soon(
+            function () {
+                // Set authenticated to stop an infinite recursion from getDB calling
+                // back into authenticate.
+                conn.authenticated = true;
+                let mech = DB.prototype._getDefaultAuthenticationMechanism();
+                if (authMode === "x509") {
+                    mech = "MONGODB-X509";
+                }
 
-            print("Authenticating as user " + jsTestOptions().authUser + " with mechanism " + mech +
-                  " on connection: " + conn);
+                print(
+                    "Authenticating as user " +
+                        jsTestOptions().authUser +
+                        " with mechanism " +
+                        mech +
+                        " on connection: " +
+                        conn,
+                );
 
-            if (authMode !== 'x509') {
-                conn.authenticated = conn.getDB(jsTestOptions().authenticationDatabase).auth({
-                    user: jsTestOptions().authUser,
-                    pwd: jsTestOptions().authPassword,
-                });
-            } else {
-                authutil.assertAuthenticate(conn, '$external', {
-                    mechanism: 'MONGODB-X509',
-                });
-            }
+                if (authMode !== "x509") {
+                    conn.authenticated = conn.getDB(jsTestOptions().authenticationDatabase).auth({
+                        user: jsTestOptions().authUser,
+                        pwd: jsTestOptions().authPassword,
+                    });
+                } else {
+                    authutil.assertAuthenticate(conn, "$external", {
+                        mechanism: "MONGODB-X509",
+                    });
+                }
 
-            return conn.authenticated;
-            // Dont' run the hang analyzer because we expect that this might fail in the normal
-            // course of events.
-        }, "Authenticating connection: " + conn, 5000, 1000, {runHangAnalyzer: false});
+                return conn.authenticated;
+                // Dont' run the hang analyzer because we expect that this might fail in the normal
+                // course of events.
+            },
+            "Authenticating connection: " + conn,
+            5000,
+            1000,
+            {runHangAnalyzer: false},
+        );
     } catch (e) {
         print("Caught exception while authenticating connection: " + tojson(e));
         conn.authenticated = false;
@@ -624,33 +620,37 @@ jsTest.authenticate = function(conn) {
     return conn.authenticated;
 };
 
-jsTest.authenticateNodes = function(nodes) {
-    assert.soonNoExcept(function() {
-        for (let i = 0; i < nodes.length; i++) {
-            // Don't try to authenticate to arbiters
-            let res = {};
-            try {
-                res = nodes[i].getDB("admin")._runCommandWithoutApiStrict({replSetGetStatus: 1});
-            } catch (e) {
-                // ReplicaSet tests which don't use auth are allowed to have nodes crash during
-                // startup. To allow tests which use to behavior to work with auth,
-                // attempting authentication against a dead node should be non-fatal.
-                print("Caught exception getting replSetStatus while authenticating: " + e);
-                continue;
+jsTest.authenticateNodes = function (nodes) {
+    assert.soonNoExcept(
+        function () {
+            for (let i = 0; i < nodes.length; i++) {
+                // Don't try to authenticate to arbiters
+                let res = {};
+                try {
+                    res = nodes[i].getDB("admin")._runCommandWithoutApiStrict({replSetGetStatus: 1});
+                } catch (e) {
+                    // ReplicaSet tests which don't use auth are allowed to have nodes crash during
+                    // startup. To allow tests which use to behavior to work with auth,
+                    // attempting authentication against a dead node should be non-fatal.
+                    print("Caught exception getting replSetStatus while authenticating: " + e);
+                    continue;
+                }
+                if (res.myState == 7) {
+                    continue;
+                }
+                if (jsTest.authenticate(nodes[i]) != 1) {
+                    return false;
+                }
             }
-            if (res.myState == 7) {
-                continue;
-            }
-            if (jsTest.authenticate(nodes[i]) != 1) {
-                return false;
-            }
-        }
-        return true;
-    }, "Authenticate to nodes: " + nodes, 30000);
+            return true;
+        },
+        "Authenticate to nodes: " + nodes,
+        30000,
+    );
 };
 
-jsTest.isMongos = function(conn) {
-    return conn.getDB('admin')._helloOrLegacyHello().msg == 'isdbgrid';
+jsTest.isMongos = function (conn) {
+    return conn.getDB("admin")._helloOrLegacyHello().msg == "isdbgrid";
 };
 
 function defaultPrompt() {
@@ -658,7 +658,7 @@ function defaultPrompt() {
     let prefix = globalThis.db.getMongo().promptPrefix;
     let hello;
 
-    if (typeof prefix == 'undefined') {
+    if (typeof prefix == "undefined") {
         prefix = "";
         let buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
         try {
@@ -731,15 +731,14 @@ function defaultPrompt() {
 
     globalThis.db.getMongo().authStatus = status;
     return prefix + "> ";
-};
+}
 
 function replSetMemberStatePrompt() {
-    let state = '';
-    let stateInfo = globalThis.db.getSiblingDB('admin')._runCommandWithoutApiStrict(
-        {replSetGetStatus: 1, forShell: 1});
+    let state = "";
+    let stateInfo = globalThis.db.getSiblingDB("admin")._runCommandWithoutApiStrict({replSetGetStatus: 1, forShell: 1});
     if (stateInfo.ok) {
         // Report the self member's stateStr if it's present.
-        stateInfo.members.forEach(function(member) {
+        stateInfo.members.forEach(function (member) {
             if (member.self) {
                 state = member.stateStr;
             }
@@ -748,20 +747,20 @@ function replSetMemberStatePrompt() {
         if (!state) {
             state = stateInfo.myState;
         }
-        state = '' + stateInfo.set + ':' + state;
+        state = "" + stateInfo.set + ":" + state;
     } else {
         let info = stateInfo.info;
         if (info && info.length < 20) {
-            state = info;  // "mongos", "configsvr"
+            state = info; // "mongos", "configsvr"
         } else {
             throw _getErrorWithCode(stateInfo, "Failed:" + info);
         }
     }
-    return state + '> ';
-};
+    return state + "> ";
+}
 
 function helloStatePrompt(helloReply) {
-    let state = '';
+    let state = "";
     let hello = helloReply || globalThis.db._helloOrLegacyHello({forShell: 1});
     if (hello.ok) {
         let role = "";
@@ -771,124 +770,119 @@ function helloStatePrompt(helloReply) {
         }
 
         if (hello.setName) {
-            if (hello.isWritablePrimary || hello.ismaster)
-                role = "PRIMARY";
-            else if (hello.secondary)
-                role = "SECONDARY";
-            else if (hello.arbiterOnly)
-                role = "ARBITER";
+            if (hello.isWritablePrimary || hello.ismaster) role = "PRIMARY";
+            else if (hello.secondary) role = "SECONDARY";
+            else if (hello.arbiterOnly) role = "ARBITER";
             else {
                 role = "OTHER";
             }
-            state = hello.setName + ':';
+            state = hello.setName + ":";
         }
         state = state + role;
     } else {
         throw _getErrorWithCode(hello, "Failed: " + tojson(hello));
     }
-    return state + '> ';
-};
+    return state + "> ";
+}
 
 // We ensure the _shouldRetryWrites() function is always defined, in case the JavaScript engine
 // is being used from someplace other than the mongo shell (e.g. map-reduce).
-let _shouldRetryWrites = globalThis._shouldRetryWrites ?? function() {
-    return false;
-};
+let _shouldRetryWrites =
+    globalThis._shouldRetryWrites ??
+    function () {
+        return false;
+    };
 
 // We ensure the _shouldUseImplicitSessions() function is always defined, in case the JavaScript
 // engine is being used from someplace other than the mongo shell (e.g. map-reduce). If the
 // function was not defined, implicit sessions are disabled to prevent unnecessary sessions from
 // being created.
-let _shouldUseImplicitSessions = globalThis._shouldUseImplicitSessions ?? function() {
-    return false;
-};
+let _shouldUseImplicitSessions =
+    globalThis._shouldUseImplicitSessions ??
+    function () {
+        return false;
+    };
 
 function shellPrintHelper(x) {
-    if (typeof (x) == "undefined") {
+    if (typeof x == "undefined") {
         return;
     }
 
-    if (x == __magicNoPrint)
-        return;
+    if (x == __magicNoPrint) return;
 
     if (x == null) {
         print("null");
         return;
     }
 
-    if (x === MinKey || x === MaxKey)
-        return x.tojson();
+    if (x === MinKey || x === MaxKey) return x.tojson();
 
-    if (typeof x != "object")
-        return print(x);
+    if (typeof x != "object") return print(x);
 
     let p = x.shellPrint;
-    if (typeof p == "function")
-        return x.shellPrint();
+    if (typeof p == "function") return x.shellPrint();
 
     p = x.tojson;
-    if (typeof p == "function")
-        print(x.tojson());
-    else
-        print(tojson(x));
-};
+    if (typeof p == "function") print(x.tojson());
+    else print(tojson(x));
+}
 
-let shellAutocomplete = function(
-    /*prefix*/) {  // outer scope function called on init. Actual function at end
+let shellAutocomplete = (function () /*prefix*/ {
+    // outer scope function called on init. Actual function at end
     let universalMethods =
-        "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable"
-            .split(' ');
+        "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable".split(" ");
 
-    let builtinMethods = {};  // uses constructor objects as keys
+    let builtinMethods = {}; // uses constructor objects as keys
     builtinMethods[Array] =
-        "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some isArray reduce reduceRight"
-            .split(' ');
-    builtinMethods[Boolean] = "".split(' ');  // nothing more than universal methods
+        "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some isArray reduce reduceRight".split(
+            " ",
+        );
+    builtinMethods[Boolean] = "".split(" "); // nothing more than universal methods
     builtinMethods[Date] =
-        "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toISOString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC now"
-            .split(' ');
-    if (typeof JSON != "undefined") {  // JSON is new in V8
-        builtinMethods["[object JSON]"] = "parse stringify".split(' ');
+        "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toISOString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC now".split(
+            " ",
+        );
+    if (typeof JSON != "undefined") {
+        // JSON is new in V8
+        builtinMethods["[object JSON]"] = "parse stringify".split(" ");
     }
     builtinMethods[Math] =
-        "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan"
-            .split(' ');
+        "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split(
+            " ",
+        );
     builtinMethods[Number] =
-        "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision"
-            .split(' ');
-    builtinMethods[RegExp] =
-        "global ignoreCase lastIndex multiline source compile exec test".split(' ');
+        "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision".split(" ");
+    builtinMethods[RegExp] = "global ignoreCase lastIndex multiline source compile exec test".split(" ");
     builtinMethods[String] =
-        "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase trim trimLeft trimRight"
-            .split(' ');
-    builtinMethods[Function] = "call apply bind".split(' ');
+        "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase trim trimLeft trimRight".split(
+            " ",
+        );
+    builtinMethods[Function] = "call apply bind".split(" ");
     builtinMethods[Object] =
-        "bsonsize create defineProperty defineProperties getPrototypeOf keys seal freeze preventExtensions isSealed isFrozen isExtensible getOwnPropertyDescriptor getOwnPropertyNames"
-            .split(' ');
+        "bsonsize create defineProperty defineProperties getPrototypeOf keys seal freeze preventExtensions isSealed isFrozen isExtensible getOwnPropertyDescriptor getOwnPropertyNames".split(
+            " ",
+        );
 
-    builtinMethods[Mongo] = "find update insert remove".split(' ');
-    builtinMethods[BinData] = "hex base64 length subtype".split(' ');
+    builtinMethods[Mongo] = "find update insert remove".split(" ");
+    builtinMethods[BinData] = "hex base64 length subtype".split(" ");
 
     let extraGlobals =
-        "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map Timestamp JSON"
-            .split(' ');
-    if (typeof NumberDecimal !== 'undefined') {
+        "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map Timestamp JSON".split(
+            " ",
+        );
+    if (typeof NumberDecimal !== "undefined") {
         extraGlobals[extraGlobals.length] = "NumberDecimal";
     }
 
-    let isPrivate = function(name) {
-        if (shellAutocomplete.showPrivate)
-            return false;
-        if (name == '_id')
-            return false;
-        if (name[0] == '_')
-            return true;
-        if (name[name.length - 1] == '_')
-            return true;  // some native functions have an extra name_ method
+    let isPrivate = function (name) {
+        if (shellAutocomplete.showPrivate) return false;
+        if (name == "_id") return false;
+        if (name[0] == "_") return true;
+        if (name[name.length - 1] == "_") return true; // some native functions have an extra name_ method
         return false;
     };
 
-    let customComplete = function(obj) {
+    let customComplete = function (obj) {
         try {
             if (obj.__proto__.constructor.autocomplete) {
                 let ret = obj.constructor.autocomplete(obj);
@@ -906,64 +900,55 @@ let shellAutocomplete = function(
         }
     };
 
-    let worker = function(prefix) {
+    let worker = function (prefix) {
         let global = globalThis;
 
         let curObj = global;
-        let parts = prefix.split('.');
-        for (let p = 0; p < parts.length - 1; p++) {  // doesn't include last part
+        let parts = prefix.split(".");
+        for (let p = 0; p < parts.length - 1; p++) {
+            // doesn't include last part
             curObj = curObj[parts[p]];
-            if (curObj == null)
-                return [];
+            if (curObj == null) return [];
         }
 
-        let lastPrefix = parts[parts.length - 1] || '';
+        let lastPrefix = parts[parts.length - 1] || "";
         let lastPrefixLowercase = lastPrefix.toLowerCase();
-        let beginning = parts.slice(0, parts.length - 1).join('.');
-        if (beginning.length)
-            beginning += '.';
+        let beginning = parts.slice(0, parts.length - 1).join(".");
+        if (beginning.length) beginning += ".";
 
-        let possibilities =
-            new Array().concat(universalMethods,
-                               Object.keySet(curObj),
-                               Object.keySet(curObj.__proto__),
-                               builtinMethods[curObj] || [],  // curObj is a builtin constructor
-                               builtinMethods[curObj.__proto__.constructor] ||
-                                   [],  // curObj is made from a builtin constructor
-                               curObj == global ? extraGlobals : [],
-                               customComplete(curObj));
+        let possibilities = new Array().concat(
+            universalMethods,
+            Object.keySet(curObj),
+            Object.keySet(curObj.__proto__),
+            builtinMethods[curObj] || [], // curObj is a builtin constructor
+            builtinMethods[curObj.__proto__.constructor] || [], // curObj is made from a builtin constructor
+            curObj == global ? extraGlobals : [],
+            customComplete(curObj),
+        );
 
-        let noDuplicates =
-            {};  // see http://dreaminginjavascript.wordpress.com/2008/08/22/eliminating-duplicates/
+        let noDuplicates = {}; // see http://dreaminginjavascript.wordpress.com/2008/08/22/eliminating-duplicates/
         for (let i = 0; i < possibilities.length; i++) {
             let p = possibilities[i];
-            if (typeof (curObj[p]) == "undefined" && curObj != global)
-                continue;  // extraGlobals aren't in the global object
-            if (p.length == 0 || p.length < lastPrefix.length)
-                continue;
-            if (lastPrefix[0] != '_' && isPrivate(p))
-                continue;
-            if (p.match(/^[0-9]+$/))
-                continue;  // don't array number indexes
-            if (p.substr(0, lastPrefix.length).toLowerCase() != lastPrefixLowercase)
-                continue;
+            if (typeof curObj[p] == "undefined" && curObj != global) continue; // extraGlobals aren't in the global object
+            if (p.length == 0 || p.length < lastPrefix.length) continue;
+            if (lastPrefix[0] != "_" && isPrivate(p)) continue;
+            if (p.match(/^[0-9]+$/)) continue; // don't array number indexes
+            if (p.substr(0, lastPrefix.length).toLowerCase() != lastPrefixLowercase) continue;
 
             let completion = beginning + p;
-            if (curObj[p] && curObj[p].constructor == Function && p != 'constructor')
-                completion += '(';
+            if (curObj[p] && curObj[p].constructor == Function && p != "constructor") completion += "(";
 
             noDuplicates[completion] = 0;
         }
 
         let ret = [];
-        for (let i in noDuplicates)
-            ret.push(i);
+        for (let i in noDuplicates) ret.push(i);
 
         return ret;
     };
 
     // this is the actual function that gets assigned to shellAutocomplete
-    return function(prefix) {
+    return function (prefix) {
         try {
             globalThis.__autocomplete__ = worker(prefix).sort();
         } catch (e) {
@@ -971,25 +956,24 @@ let shellAutocomplete = function(
             globalThis.__autocomplete__ = [];
         }
     };
-}();
+})();
 
-shellAutocomplete.showPrivate = false;  // toggle to show (useful when working on internals)
+shellAutocomplete.showPrivate = false; // toggle to show (useful when working on internals)
 
 function shellHelper(command, rest, shouldPrint) {
     command = command.trim();
     let args = rest.trim().replace(/\s*;$/, "").split("\s+");
 
-    if (!shellHelper[command])
-        throw Error("no command [" + command + "]");
+    if (!shellHelper[command]) throw Error("no command [" + command + "]");
 
     let res = shellHelper[command].apply(null, args);
     if (shouldPrint) {
         shellPrintHelper(res);
     }
     return res;
-};
+}
 
-shellHelper.use = function(dbname) {
+shellHelper.use = function (dbname) {
     let s = "" + dbname;
     if (s == "") {
         print("bad use parameter");
@@ -999,7 +983,7 @@ shellHelper.use = function(dbname) {
     print("switched to db " + globalThis.db.getName());
 };
 
-shellHelper.set = function(str) {
+shellHelper.set = function (str) {
     if (str == "") {
         print("bad use parameter");
         return;
@@ -1008,13 +992,10 @@ shellHelper.set = function(str) {
     const param = tokens[0];
     let value = tokens[1];
 
-    if (value == undefined)
-        value = true;
+    if (value == undefined) value = true;
     // value comes in as a string..
-    if (value == "true")
-        value = true;
-    if (value == "false")
-        value = false;
+    if (value == "true") value = true;
+    if (value == "false") value = false;
 
     if (param == "verbose") {
         _verboseShell = value;
@@ -1022,15 +1003,15 @@ shellHelper.set = function(str) {
     print("set " + param + " to " + value);
 };
 
-shellHelper.it = function() {
-    if (typeof (___it___) == "undefined" || ___it___ == null) {
+shellHelper.it = function () {
+    if (typeof ___it___ == "undefined" || ___it___ == null) {
         print("no cursor");
         return;
     }
     shellPrintHelper(___it___);
 };
 
-shellHelper.show = function(what) {
+shellHelper.show = function (what) {
     assert(typeof what == "string");
 
     let args = what.split(/\s+/);
@@ -1046,28 +1027,23 @@ shellHelper.show = function(what) {
             print("Use db.system.profile.find() to show raw profile entries");
         } else {
             print();
-            globalThis.db.system.profile.find({millis: {$gt: 0}})
+            globalThis.db.system.profile
+                .find({millis: {$gt: 0}})
                 .sort({$natural: -1})
                 .limit(5)
-                .forEach(function(x) {
-                    print("" + x.op + "\t" + x.ns + " " + x.millis + "ms " +
-                          String(x.ts).substring(0, 24));
+                .forEach(function (x) {
+                    print("" + x.op + "\t" + x.ns + " " + x.millis + "ms " + String(x.ts).substring(0, 24));
                     let l = "";
                     for (let z in x) {
-                        if (z == "op" || z == "ns" || z == "millis" || z == "ts")
-                            continue;
+                        if (z == "op" || z == "ns" || z == "millis" || z == "ts") continue;
 
                         let val = x[z];
-                        let mytype = typeof (val);
+                        let mytype = typeof val;
 
-                        if (mytype == "string" || mytype == "number")
-                            l += z + ":" + val + " ";
-                        else if (mytype == "object")
-                            l += z + ":" + tojson(val) + " ";
-                        else if (mytype == "boolean")
-                            l += z + " ";
-                        else
-                            l += z + ":" + val + " ";
+                        if (mytype == "string" || mytype == "number") l += z + ":" + val + " ";
+                        else if (mytype == "object") l += z + ":" + tojson(val) + " ";
+                        else if (mytype == "boolean") l += z + " ";
+                        else l += z + ":" + val + " ";
                     }
                     print(l);
                     print("\n");
@@ -1087,7 +1063,7 @@ shellHelper.show = function(what) {
     }
 
     if (what == "collections" || what == "tables") {
-        globalThis.db.getCollectionInfos({}, true, true).forEach(function(infoObj) {
+        globalThis.db.getCollectionInfos({}, true, true).forEach(function (infoObj) {
             print(infoObj.name);
         });
         return "";
@@ -1100,7 +1076,7 @@ shellHelper.show = function(what) {
             dbs = mongo.getDBs(globalThis.db.getSession(), undefined, false);
         } catch (ex) {
             // Unable to get detailed information, retry name-only.
-            mongo.getDBs(globalThis.db.getSession(), undefined, true).forEach(function(x) {
+            mongo.getDBs(globalThis.db.getSession(), undefined, true).forEach(function (x) {
                 print(x);
             });
             return "";
@@ -1110,15 +1086,13 @@ shellHelper.show = function(what) {
         let maxNameLength = 0;
         let maxGbDigits = 0;
 
-        dbs.databases.forEach(function(x) {
+        dbs.databases.forEach(function (x) {
             let sizeStr = (x.sizeOnDisk / 1024 / 1024 / 1024).toFixed(3);
             let nameLength = x.name.length;
             let gbDigits = sizeStr.indexOf(".");
 
-            if (nameLength > maxNameLength)
-                maxNameLength = nameLength;
-            if (gbDigits > maxGbDigits)
-                maxGbDigits = gbDigits;
+            if (nameLength > maxNameLength) maxNameLength = nameLength;
+            if (gbDigits > maxGbDigits) maxGbDigits = gbDigits;
 
             dbinfo.push({
                 name: x.name,
@@ -1126,12 +1100,12 @@ shellHelper.show = function(what) {
                 empty: x.empty,
                 size_str: sizeStr,
                 name_size: nameLength,
-                gb_digits: gbDigits
+                gb_digits: gbDigits,
             });
         });
 
-        dbinfo.sort(compareOn('name'));
-        dbinfo.forEach(function(db) {
+        dbinfo.sort(compareOn("name"));
+        dbinfo.forEach(function (db) {
             let namePadding = maxNameLength - db.name_size;
             let sizePadding = maxGbDigits - db.gb_digits;
             let padding = Array(namePadding + sizePadding + 3).join(" ");
@@ -1149,8 +1123,7 @@ shellHelper.show = function(what) {
 
     if (what == "log") {
         let n = "global";
-        if (args.length > 0)
-            n = args[0];
+        if (args.length > 0) n = args[0];
 
         let res = globalThis.db.adminCommand({getLog: n});
         if (!res.ok) {
@@ -1185,8 +1158,7 @@ shellHelper.show = function(what) {
             dbDeclared = false;
         }
         if (dbDeclared) {
-            let res = globalThis.db.getSiblingDB("admin")._runCommandWithoutApiStrict(
-                {getLog: "startupWarnings"});
+            let res = globalThis.db.getSiblingDB("admin")._runCommandWithoutApiStrict({getLog: "startupWarnings"});
             if (res.ok) {
                 if (res.log.length == 0) {
                     return "";
@@ -1201,8 +1173,7 @@ shellHelper.show = function(what) {
                         logOut = linePrefix + parsedLog.msg + "\n";
                         if (parsedLog.attr) {
                             for (let attr in parsedLog.attr) {
-                                logOut += linePrefix + messageIndent + attr + ": " +
-                                    parsedLog.attr[attr] + "\n";
+                                logOut += linePrefix + messageIndent + attr + ": " + parsedLog.attr[attr] + "\n";
                             }
                         }
                     } catch (err) {
@@ -1216,8 +1187,11 @@ shellHelper.show = function(what) {
             } else if (res.errmsg == "no such cmd: getLog") {
                 // Don't print if the command is not available
                 return "";
-            } else if (res.code == 13 /*unauthorized*/ || res.errmsg == "unauthorized" ||
-                       res.errmsg == "need to login") {
+            } else if (
+                res.code == 13 /*unauthorized*/ ||
+                res.errmsg == "unauthorized" ||
+                res.errmsg == "need to login"
+            ) {
                 // Don't print if startupWarnings command failed due to auth
                 return "";
             } else {
@@ -1225,7 +1199,7 @@ shellHelper.show = function(what) {
                 return "";
             }
         } else {
-            print("Cannot show startupWarnings, \"db\" is not set");
+            print('Cannot show startupWarnings, "db" is not set');
             return "";
         }
     }
@@ -1248,17 +1222,14 @@ shellHelper.show = function(what) {
             }
 
             if (res.hasOwnProperty("automationServiceDescriptor")) {
-                print("Note: This server is managed by automation service '" +
-                      res.automationServiceDescriptor + "'.");
-                print(
-                    "Note: Many administrative actions are inappropriate, and may be automatically reverted.");
+                print("Note: This server is managed by automation service '" + res.automationServiceDescriptor + "'.");
+                print("Note: Many administrative actions are inappropriate, and may be automatically reverted.");
                 return "";
             }
 
             return "";
-
         } else {
-            print("Cannot show automationNotices, \"db\" is not set");
+            print('Cannot show automationNotices, "db" is not set');
             return "";
         }
     }
@@ -1270,7 +1241,7 @@ shellHelper.show = function(what) {
         // responsible for a certain disk operating system.
         try {
             const buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
-            if (buildInfo.hasOwnProperty('_t')) {
+            if (buildInfo.hasOwnProperty("_t")) {
                 matchesKnownImposterSignature = true;
             }
         } catch (e) {
@@ -1282,8 +1253,7 @@ shellHelper.show = function(what) {
         if (!matchesKnownImposterSignature) {
             try {
                 const cmdLineOpts = globalThis.db.adminCommand({getCmdLineOpts: 1});
-                if (cmdLineOpts.hasOwnProperty('errmsg') &&
-                    cmdLineOpts.errmsg.indexOf('not supported') !== -1) {
+                if (cmdLineOpts.hasOwnProperty("errmsg") && cmdLineOpts.errmsg.indexOf("not supported") !== -1) {
                     matchesKnownImposterSignature = true;
                 }
             } catch (e) {
@@ -1292,18 +1262,17 @@ shellHelper.show = function(what) {
         }
 
         if (matchesKnownImposterSignature) {
-            print("\n" +
-                  "Warning: Non-Genuine MongoDB Detected\n\n" +
-
-                  "This server or service appears to be an emulation of MongoDB " +
-                  "rather than an official MongoDB product.\n\n" +
-
-                  "Some documented MongoDB features may work differently, " +
-                  "be entirely missing or incomplete, " +
-                  "or have unexpected performance characteristics.\n\n" +
-
-                  "To learn more please visit: " +
-                  "https://dochub.mongodb.org/core/non-genuine-mongodb-server-warning.\n");
+            print(
+                "\n" +
+                    "Warning: Non-Genuine MongoDB Detected\n\n" +
+                    "This server or service appears to be an emulation of MongoDB " +
+                    "rather than an official MongoDB product.\n\n" +
+                    "Some documented MongoDB features may work differently, " +
+                    "be entirely missing or incomplete, " +
+                    "or have unexpected performance characteristics.\n\n" +
+                    "To learn more please visit: " +
+                    "https://dochub.mongodb.org/core/non-genuine-mongodb-server-warning.\n",
+            );
         }
 
         return "";
@@ -1314,7 +1283,7 @@ shellHelper.show = function(what) {
 
 function __promptWrapper__(promptFunction) {
     // Call promptFunction directly if the global "db" is not defined, e.g. --nodb.
-    if (typeof globalThis.db === 'undefined' || !(globalThis.db instanceof DB)) {
+    if (typeof globalThis.db === "undefined" || !(globalThis.db instanceof DB)) {
         globalThis.__prompt__ = promptFunction();
         return;
     }
@@ -1333,9 +1302,9 @@ function __promptWrapper__(promptFunction) {
     } finally {
         globalThis.db = originalDB;
     }
-};
+}
 
-Math.sigFig = function(x, N) {
+Math.sigFig = function (x, N) {
     if (!N) {
         N = 3;
     }
@@ -1343,10 +1312,9 @@ Math.sigFig = function(x, N) {
     return Math.round(x * p) / p;
 };
 
-let Random = (function() {
+let Random = (function () {
     let initialized = false;
-    let errorMsg = "The random number generator hasn't been seeded yet; " +
-        "call Random.setRandomSeed()";
+    let errorMsg = "The random number generator hasn't been seeded yet; " + "call Random.setRandomSeed()";
 
     function isInitialized() {
         return initialized;
@@ -1370,10 +1338,12 @@ let Random = (function() {
         let seed = setRandomSeed(TestData.seed).valueOf();
         print(
             `Reproduce this randomized jstest fixture topology by adding the --shellSeed
-            ${seed} option to your resmoke invocation.`);
+            ${seed} option to your resmoke invocation.`,
+        );
         print(
             `ie: buildscripts/resmoke.py run --suites [suite_name] ... --shellSeed
-            ${seed} [my_jstest.js]`);
+            ${seed} [my_jstest.js]`,
+        );
     }
 
     // Generate a random number 0 <= r < 1.
@@ -1417,13 +1387,13 @@ let Random = (function() {
         }
         // See http://en.wikipedia.org/wiki/Marsaglia_polar_method
         while (true) {
-            let x = (2 * rand()) - 1;
-            let y = (2 * rand()) - 1;
-            let s = (x * x) + (y * y);
+            let x = 2 * rand() - 1;
+            let y = 2 * rand() - 1;
+            let s = x * x + y * y;
 
             if (s > 0 && s < 1) {
-                let standardNormal = x * Math.sqrt(-2 * Math.log(s) / s);
-                return mean + (standardDeviation * standardNormal);
+                let standardNormal = x * Math.sqrt((-2 * Math.log(s)) / s);
+                return mean + standardDeviation * standardNormal;
             }
         }
     }
@@ -1461,30 +1431,26 @@ function timestampCmp(ts1, ts2) {
 }
 
 let Geo = {};
-Geo.distance = function(a, b) {
+Geo.distance = function (a, b) {
     let ax = null;
     let ay = null;
     let bx = null;
     let by = null;
 
     for (let key in a) {
-        if (ax == null)
-            ax = a[key];
-        else if (ay == null)
-            ay = a[key];
+        if (ax == null) ax = a[key];
+        else if (ay == null) ay = a[key];
     }
 
     for (let key in b) {
-        if (bx == null)
-            bx = b[key];
-        else if (by == null)
-            by = b[key];
+        if (bx == null) bx = b[key];
+        else if (by == null) by = b[key];
     }
 
     return Math.sqrt(Math.pow(by - ay, 2) + Math.pow(bx - ax, 2));
 };
 
-Geo.sphereDistance = function(a, b) {
+Geo.sphereDistance = function (a, b) {
     let ax = null;
     let ay = null;
     let bx = null;
@@ -1492,26 +1458,25 @@ Geo.sphereDistance = function(a, b) {
 
     // TODO swap order of x and y when done on server
     for (let key in a) {
-        if (ax == null)
-            ax = a[key] * (Math.PI / 180);
-        else if (ay == null)
-            ay = a[key] * (Math.PI / 180);
+        if (ax == null) ax = a[key] * (Math.PI / 180);
+        else if (ay == null) ay = a[key] * (Math.PI / 180);
     }
 
     for (let key in b) {
-        if (bx == null)
-            bx = b[key] * (Math.PI / 180);
-        else if (by == null)
-            by = b[key] * (Math.PI / 180);
+        if (bx == null) bx = b[key] * (Math.PI / 180);
+        else if (by == null) by = b[key] * (Math.PI / 180);
     }
 
-    let sin_x1 = Math.sin(ax), cos_x1 = Math.cos(ax);
-    let sin_y1 = Math.sin(ay), cos_y1 = Math.cos(ay);
-    let sin_x2 = Math.sin(bx), cos_x2 = Math.cos(bx);
-    let sin_y2 = Math.sin(by), cos_y2 = Math.cos(by);
+    let sin_x1 = Math.sin(ax),
+        cos_x1 = Math.cos(ax);
+    let sin_y1 = Math.sin(ay),
+        cos_y1 = Math.cos(ay);
+    let sin_x2 = Math.sin(bx),
+        cos_x2 = Math.cos(bx);
+    let sin_y2 = Math.sin(by),
+        cos_y2 = Math.cos(by);
 
-    let cross_prod = (cos_y1 * cos_x1 * cos_y2 * cos_x2) + (cos_y1 * sin_x1 * cos_y2 * sin_x2) +
-        (sin_y1 * sin_y2);
+    let cross_prod = cos_y1 * cos_x1 * cos_y2 * cos_x2 + cos_y1 * sin_x1 * cos_y2 * sin_x2 + sin_y1 * sin_y2;
 
     if (cross_prod >= 1 || cross_prod <= -1) {
         // fun with floats
@@ -1524,7 +1489,7 @@ Geo.sphereDistance = function(a, b) {
 
 function rs() {
     return "try rs.help()";
-};
+}
 
 /**
  * This method is intended to aid in the writing of tests. It takes a host's address, desired state,
@@ -1540,12 +1505,11 @@ function _awaitRSHostViaRSMonitor(hostAddr, desiredState, rsName, timeout) {
         desiredState = {ok: true};
     }
 
-    print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " +
-          " rs " + rsName);
+    print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " + " rs " + rsName);
 
     let tests = 0;
     assert.soon(
-        function() {
+        function () {
             let stats = _replMonitorStats(rsName);
             if (tests++ % 10 == 0) {
                 printjson(stats);
@@ -1554,8 +1518,7 @@ function _awaitRSHostViaRSMonitor(hostAddr, desiredState, rsName, timeout) {
             for (let i = 0; i < stats.length; i++) {
                 let node = stats[i];
                 printjson(node);
-                if (node["addr"] !== hostAddr)
-                    continue;
+                if (node["addr"] !== hostAddr) continue;
 
                 // Check that *all* hostAddr properties match desiredState properties
                 let stateReached = true;
@@ -1577,88 +1540,94 @@ function _awaitRSHostViaRSMonitor(hostAddr, desiredState, rsName, timeout) {
             }
             return false;
         },
-        "timed out waiting for replica set member: " + hostAddr +
-            " to reach state: " + tojson(desiredState),
-        timeout);
-};
+        "timed out waiting for replica set member: " + hostAddr + " to reach state: " + tojson(desiredState),
+        timeout,
+    );
+}
 
-rs.help = function() {
+rs.help = function () {
+    print("\trs.status()                                     { replSetGetStatus : 1 } checks repl set status");
     print(
-        "\trs.status()                                     { replSetGetStatus : 1 } checks repl set status");
+        "\trs.initiate()                                   { replSetInitiate : null } initiates set with default settings",
+    );
     print(
-        "\trs.initiate()                                   { replSetInitiate : null } initiates set with default settings");
+        "\trs.initiate(cfg)                                { replSetInitiate : cfg } initiates set with configuration cfg",
+    );
     print(
-        "\trs.initiate(cfg)                                { replSetInitiate : cfg } initiates set with configuration cfg");
+        "\trs.conf()                                       get the current configuration object from local.system.replset",
+    );
     print(
-        "\trs.conf()                                       get the current configuration object from local.system.replset");
+        "\trs.reconfig(cfg, opts)                          updates the configuration of a running replica set with cfg, using the given opts (disconnects)",
+    );
     print(
-        "\trs.reconfig(cfg, opts)                          updates the configuration of a running replica set with cfg, using the given opts (disconnects)");
+        "\trs.reconfigForPSASet(memberIndex, cfg, opts)    updates the configuration of a Primary-Secondary-Arbiter (PSA) replica set while preserving majority writes",
+    );
     print(
-        "\trs.reconfigForPSASet(memberIndex, cfg, opts)    updates the configuration of a Primary-Secondary-Arbiter (PSA) replica set while preserving majority writes");
+        "\t                                                    memberIndex: index of the node being updated; cfg: the desired new config; opts: options passed in with the reconfig",
+    );
+    print("\t                                                    Not to be used with every configuration");
     print(
-        "\t                                                    memberIndex: index of the node being updated; cfg: the desired new config; opts: options passed in with the reconfig");
+        "\t                                                    For more information, visit: https://docs.mongodb.com/manual/reference/method/rs.reconfigForPSASet/",
+    );
     print(
-        "\t                                                    Not to be used with every configuration");
+        "\trs.add(hostportstr)                             add a new member to the set with default attributes (disconnects)",
+    );
     print(
-        "\t                                                    For more information, visit: https://docs.mongodb.com/manual/reference/method/rs.reconfigForPSASet/");
-    print(
-        "\trs.add(hostportstr)                             add a new member to the set with default attributes (disconnects)");
-    print(
-        "\trs.add(membercfgobj)                            add a new member to the set with extra attributes (disconnects)");
-    print(
-        "\trs.addArb(hostportstr)                          add a new member which is arbiterOnly:true (disconnects)");
+        "\trs.add(membercfgobj)                            add a new member to the set with extra attributes (disconnects)",
+    );
+    print("\trs.addArb(hostportstr)                          add a new member which is arbiterOnly:true (disconnects)");
     print("\trs.stepDown([stepdownSecs, catchUpSecs])        step down as primary (disconnects)");
+    print("\trs.syncFrom(hostportstr)                        make a secondary sync from the given member");
     print(
-        "\trs.syncFrom(hostportstr)                        make a secondary sync from the given member");
-    print(
-        "\trs.freeze(secs)                                 make a node ineligible to become primary for the time specified");
-    print(
-        "\trs.remove(hostportstr)                          remove a host from the replica set (disconnects)");
+        "\trs.freeze(secs)                                 make a node ineligible to become primary for the time specified",
+    );
+    print("\trs.remove(hostportstr)                          remove a host from the replica set (disconnects)");
     print("\trs.secondaryOk()                                allow queries on secondary nodes");
     print();
     print("\trs.printReplicationInfo()                       check oplog size and time range");
-    print(
-        "\trs.printSecondaryReplicationInfo()              check replica set members and replication lag");
+    print("\trs.printSecondaryReplicationInfo()              check replica set members and replication lag");
     print("\tdb.isMaster()                                   check who is primary");
     print("\tdb.hello()                                      check who is primary");
     print();
     print("\treconfiguration helpers disconnect from the database so the shell will display");
     print("\tan error, even if the command succeeds.");
 };
-rs.slaveOk = function(value) {
+rs.slaveOk = function (value) {
     print(
-        "WARNING: slaveOk() is deprecated and may be removed in the next major release. Please use secondaryOk() instead.");
+        "WARNING: slaveOk() is deprecated and may be removed in the next major release. Please use secondaryOk() instead.",
+    );
     return globalThis.db.getMongo().setSecondaryOk(value);
 };
 
-rs.secondaryOk = function(value) {
+rs.secondaryOk = function (value) {
     return globalThis.db.getMongo().setSecondaryOk(value);
 };
 
-rs.status = function() {
+rs.status = function () {
     return globalThis.db._adminCommand("replSetGetStatus");
 };
-rs.isMaster = function() {
+rs.isMaster = function () {
     return globalThis.db.isMaster();
 };
-rs.hello = function() {
+rs.hello = function () {
     return globalThis.db.hello();
 };
-rs.initiate = function(c) {
+rs.initiate = function (c) {
     return globalThis.db._adminCommand({replSetInitiate: c});
 };
-rs.printSlaveReplicationInfo = function() {
+rs.printSlaveReplicationInfo = function () {
     print(
-        "WARNING: printSlaveReplicationInfo is deprecated and may be removed in the next major release. Please use printSecondaryReplicationInfo instead.");
+        "WARNING: printSlaveReplicationInfo is deprecated and may be removed in the next major release. Please use printSecondaryReplicationInfo instead.",
+    );
     return globalThis.db.printSecondaryReplicationInfo();
 };
-rs.printSecondaryReplicationInfo = function() {
+rs.printSecondaryReplicationInfo = function () {
     return globalThis.db.printSecondaryReplicationInfo();
 };
-rs.printReplicationInfo = function() {
+rs.printReplicationInfo = function () {
     return globalThis.db.printReplicationInfo();
 };
-rs._runCmd = function(c) {
+rs._runCmd = function (c) {
     // after the command, catch the disconnect and reconnect if necessary
     let res = null;
     try {
@@ -1672,14 +1641,13 @@ rs._runCmd = function(c) {
             }
         } else {
             print("shell got exception during repl set operation: " + e);
-            print(
-                "in some circumstances, the primary steps down and closes connections on a reconfig");
+            print("in some circumstances, the primary steps down and closes connections on a reconfig");
         }
         return "";
     }
     return res;
 };
-rs.reconfig = function(cfg, options) {
+rs.reconfig = function (cfg, options) {
     cfg.version = rs.conf().version + 1;
     const cmd = {replSetReconfig: cfg};
     for (let i in options) {
@@ -1691,14 +1659,12 @@ rs.reconfig = function(cfg, options) {
 function _validateMemberIndex(memberIndex, newConfig) {
     const newMemberConfig = newConfig.members[memberIndex];
     assert(newMemberConfig, `Node at index ${memberIndex} does not exist in the new config`);
-    assert.eq(1,
-              newMemberConfig.votes,
-              `Node at index ${memberIndex} must have {votes: 1} in the new config`);
+    assert.eq(1, newMemberConfig.votes, `Node at index ${memberIndex} must have {votes: 1} in the new config`);
 
     // Use memberId to compare nodes across configs.
     const memberId = newMemberConfig._id;
     const oldConfig = rs.conf();
-    const oldMemberConfig = oldConfig.members.find(member => member._id === memberId);
+    const oldMemberConfig = oldConfig.members.find((member) => member._id === memberId);
 
     // If the node doesn't exist in the old config, we are adding it as a new node. Skip validating
     // the node in the old config.
@@ -1706,16 +1672,14 @@ function _validateMemberIndex(memberIndex, newConfig) {
         return;
     }
 
-    assert(!oldMemberConfig.votes,
-           `Node at index ${memberIndex} must have {votes: 0} in the old config`);
-};
+    assert(!oldMemberConfig.votes, `Node at index ${memberIndex} must have {votes: 0} in the old config`);
+}
 
-rs.reconfigForPSASet = function(memberIndex, cfg, options) {
+rs.reconfigForPSASet = function (memberIndex, cfg, options) {
     _validateMemberIndex(memberIndex, cfg);
 
     const memberPriority = cfg.members[memberIndex].priority;
-    print(
-        `Running first reconfig to give member at index ${memberIndex} { votes: 1, priority: 0 }`);
+    print(`Running first reconfig to give member at index ${memberIndex} { votes: 1, priority: 0 }`);
     cfg.members[memberIndex].votes = 1;
     cfg.members[memberIndex].priority = 0;
     let res = rs.reconfig(cfg, options);
@@ -1723,8 +1687,7 @@ rs.reconfigForPSASet = function(memberIndex, cfg, options) {
         return res;
     }
 
-    print(`Running second reconfig to give member at index ${memberIndex} { priority: ${
-        memberPriority} }`);
+    print(`Running second reconfig to give member at index ${memberIndex} { priority: ${memberPriority} }`);
     cfg.members[memberIndex].priority = memberPriority;
 
     // If the first reconfig added a new node, the second config will not succeed until the
@@ -1736,99 +1699,101 @@ rs.reconfigForPSASet = function(memberIndex, cfg, options) {
     });
     return res;
 };
-rs.add = function(hostport, arb) {
+rs.add = function (hostport, arb) {
     let res;
     let self = this;
 
-    assert.soon(function() {
-        let cfg = hostport;
+    assert.soon(
+        function () {
+            let cfg = hostport;
 
-        let local = globalThis.db.getSiblingDB("local");
-        assert(local.system.replset.count() <= 1,
-               "error: local.system.replset has unexpected contents");
-        let c = local.system.replset.findOne();
-        assert(c, "no config object retrievable from local.system.replset");
+            let local = globalThis.db.getSiblingDB("local");
+            assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
+            let c = local.system.replset.findOne();
+            assert(c, "no config object retrievable from local.system.replset");
 
-        const attemptedVersion = c.version++;
+            const attemptedVersion = c.version++;
 
-        let max = 0;
-        for (let i in c.members) {
-            // Omit 'newlyAdded' field if it exists in the config.
-            delete c.members[i].newlyAdded;
-            if (c.members[i]._id > max)
-                max = c.members[i]._id;
-        }
-        if (isString(hostport)) {
-            cfg = {_id: max + 1, host: hostport};
-            if (arb)
-                cfg.arbiterOnly = true;
-        } else if (arb == true) {
-            throw Error(
-                "Expected first parameter to be a host-and-port string of arbiter, but got " +
-                tojson(hostport));
-        }
-
-        if (cfg._id == null) {
-            cfg._id = max + 1;
-        }
-        c.members.push(cfg);
-
-        res = self._runCmd({replSetReconfig: c});
-        if (res === "") {
-            // _runCmd caught an exception.
-            return true;
-        }
-        if (res.ok) {
-            return true;
-        }
-        if (res.code === ErrorCodes.ConfigurationInProgress ||
-            res.code === ErrorCodes.CurrentConfigNotCommittedYet) {
-            return false;  // keep retrying
-        }
-        if (res.code === ErrorCodes.NewReplicaSetConfigurationIncompatible) {
-            // We will retry only if this error was due to our config version being too low.
-            const cfgState = local.system.replset.findOne();
-            if (cfgState.version >= attemptedVersion) {
-                return false;  // keep retrying
+            let max = 0;
+            for (let i in c.members) {
+                // Omit 'newlyAdded' field if it exists in the config.
+                delete c.members[i].newlyAdded;
+                if (c.members[i]._id > max) max = c.members[i]._id;
             }
-        }
-        // Take no action on other errors.
-        return true;
-    }, () => tojson(res), 10 * 60 * 1000 /* timeout */, 200 /* interval */);
+            if (isString(hostport)) {
+                cfg = {_id: max + 1, host: hostport};
+                if (arb) cfg.arbiterOnly = true;
+            } else if (arb == true) {
+                throw Error(
+                    "Expected first parameter to be a host-and-port string of arbiter, but got " + tojson(hostport),
+                );
+            }
+
+            if (cfg._id == null) {
+                cfg._id = max + 1;
+            }
+            c.members.push(cfg);
+
+            res = self._runCmd({replSetReconfig: c});
+            if (res === "") {
+                // _runCmd caught an exception.
+                return true;
+            }
+            if (res.ok) {
+                return true;
+            }
+            if (
+                res.code === ErrorCodes.ConfigurationInProgress ||
+                res.code === ErrorCodes.CurrentConfigNotCommittedYet
+            ) {
+                return false; // keep retrying
+            }
+            if (res.code === ErrorCodes.NewReplicaSetConfigurationIncompatible) {
+                // We will retry only if this error was due to our config version being too low.
+                const cfgState = local.system.replset.findOne();
+                if (cfgState.version >= attemptedVersion) {
+                    return false; // keep retrying
+                }
+            }
+            // Take no action on other errors.
+            return true;
+        },
+        () => tojson(res),
+        10 * 60 * 1000 /* timeout */,
+        200 /* interval */,
+    );
 
     return res;
 };
-rs.syncFrom = function(host) {
+rs.syncFrom = function (host) {
     return globalThis.db._adminCommand({replSetSyncFrom: host});
 };
-rs.stepDown = function(stepdownSecs, catchUpSecs) {
+rs.stepDown = function (stepdownSecs, catchUpSecs) {
     let cmdObj = {replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs};
     if (catchUpSecs !== undefined) {
-        cmdObj['secondaryCatchUpPeriodSecs'] = catchUpSecs;
+        cmdObj["secondaryCatchUpPeriodSecs"] = catchUpSecs;
     }
     return globalThis.db._adminCommand(cmdObj);
 };
-rs.freeze = function(secs) {
+rs.freeze = function (secs) {
     return globalThis.db._adminCommand({replSetFreeze: secs});
 };
-rs.addArb = function(hn) {
+rs.addArb = function (hn) {
     return this.add(hn, true);
 };
 
-rs.conf = function() {
+rs.conf = function () {
     let resp = globalThis.db._adminCommand({replSetGetConfig: 1});
-    if (resp.ok && !(resp.errmsg) && resp.config)
-        return resp.config;
+    if (resp.ok && !resp.errmsg && resp.config) return resp.config;
     else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
         return globalThis.db.getSiblingDB("local").system.replset.findOne();
     throw new Error("Could not retrieve replica set config: " + tojson(resp));
 };
 rs.config = rs.conf;
 
-rs.remove = function(hn) {
+rs.remove = function (hn) {
     let local = globalThis.db.getSiblingDB("local");
-    assert(local.system.replset.count() <= 1,
-           "error: local.system.replset has unexpected contents");
+    assert(local.system.replset.count() <= 1, "error: local.system.replset has unexpected contents");
     let c = local.system.replset.findOne();
     assert(c, "no config object retrievable from local.system.replset");
     c.version++;
@@ -1845,7 +1810,7 @@ rs.remove = function(hn) {
 
 rs.debug = {};
 
-rs.debug.nullLastOpWritten = function(primary, secondary) {
+rs.debug.nullLastOpWritten = function (primary, secondary) {
     let p = connect(primary + "/local");
     let s = connect(secondary + "/local");
     s.getMongo().setSecondaryOk();
@@ -1855,7 +1820,7 @@ rs.debug.nullLastOpWritten = function(primary, secondary) {
         findAndModify: "oplog.rs",
         query: {ts: {$gt: secondToLast.ts}},
         sort: {$natural: 1},
-        update: {$set: {op: "n"}}
+        update: {$set: {op: "n"}},
     });
 
     if (!last.value.o || !last.value.o._id) {
@@ -1868,7 +1833,7 @@ rs.debug.nullLastOpWritten = function(primary, secondary) {
     printjson(last);
 };
 
-rs.debug.getLastOpWritten = function(server) {
+rs.debug.getLastOpWritten = function (server) {
     let s = globalThis.db.getSiblingDB("local");
     if (server) {
         s = connect(server + "/local");
@@ -1878,9 +1843,9 @@ rs.debug.getLastOpWritten = function(server) {
     return s.oplog.rs.find().sort({$natural: -1}).limit(1).next();
 };
 
-rs.isValidOpTime = function(opTime) {
-    let timestampIsValid = (opTime.hasOwnProperty("ts") && (opTime.ts !== Timestamp(0, 0)));
-    let termIsValid = (opTime.hasOwnProperty("t") && (opTime.t != -1));
+rs.isValidOpTime = function (opTime) {
+    let timestampIsValid = opTime.hasOwnProperty("ts") && opTime.ts !== Timestamp(0, 0);
+    let termIsValid = opTime.hasOwnProperty("t") && opTime.t != -1;
 
     return timestampIsValid && termIsValid;
 };
@@ -1889,7 +1854,7 @@ rs.isValidOpTime = function(opTime) {
  * Compares OpTimes in the format {ts:Timestamp, t:NumberLong}.
  * Returns -1 if ot1 is 'earlier' than ot2, 1 if 'later' and 0 if equal.
  */
-rs.compareOpTimes = function(ot1, ot2) {
+rs.compareOpTimes = function (ot1, ot2) {
     if (!globalThis.rs.isValidOpTime(ot1) || !globalThis.rs.isValidOpTime(ot2)) {
         throw Error("invalid optimes, received: " + tojson(ot1) + " and " + tojson(ot2));
     }
@@ -1926,7 +1891,8 @@ function help(x) {
         return;
     } else if (x == "connect") {
         print(
-            "\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.");
+            "\nNormally one specifies the server on the mongo shell command line.  Run mongo --help to see those options.",
+        );
         print("Additional connections may be opened:\n");
         print("    var x = new Mongo('host[:port]');");
         print("    var mydb = x.getDB('mydb');");
@@ -1941,9 +1907,11 @@ function help(x) {
         print("  Ctrl-K del to end of line");
         print("\nMulti-line commands");
         print(
-            "You can enter a multi line javascript expression.  If parens, braces, etc. are not closed, you will see a new line ");
+            "You can enter a multi line javascript expression.  If parens, braces, etc. are not closed, you will see a new line ",
+        );
         print(
-            "beginning with '...' characters.  Type the rest of your expression.  Press Ctrl-C to abort the data entry if you");
+            "beginning with '...' characters.  Type the rest of your expression.  Press Ctrl-C to abort the data entry if you",
+        );
         print("get stuck.\n");
     } else if (x == "misc") {
         print("\tb = new BinData(subtype,base64str)  create a BSON BinData value");
@@ -1953,24 +1921,19 @@ function help(x) {
         print("\tb.base64()                          the data as a base 64 encoded string");
         print("\tb.toString()");
         print();
-        print(
-            "\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
+        print("\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
         print("\tb = UUID(hexstr)                    create a BSON BinData value of UUID subtype");
         print("\tb = MD5(hexstr)                     create a BSON BinData value of MD5 subtype");
-        print(
-            "\t\"hexstr\"                            string, sequence of hex characters (no 0x prefix)");
+        print('\t"hexstr"                            string, sequence of hex characters (no 0x prefix)');
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
-        print(
-            "\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");
+        print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");
         print("\to.isObjectId");
         print("\to.toString()");
         print("\to.equals(otherid)");
         print();
-        print(
-            "\td = ISODate()                       like Date() but behaves more intuitively when used");
-        print(
-            "\td = ISODate('YYYY-MM-DD hh:mm:ss')    without an explicit \"new \" prefix on construction");
+        print("\td = ISODate()                       like Date() but behaves more intuitively when used");
+        print("\td = ISODate('YYYY-MM-DD hh:mm:ss')    without an explicit \"new \" prefix on construction");
         return;
     } else if (x == "admin") {
         print("\tls([path])                      list files");
@@ -1990,55 +1953,30 @@ function help(x) {
         print("\t                              returns a connection to the new server");
         return;
     } else if (x == "") {
-        print("\t" +
-              "db.help()                    help on db methods");
-        print("\t" +
-              "db.mycoll.help()             help on collection methods");
-        print("\t" +
-              "sh.help()                    sharding helpers");
-        print("\t" +
-              "rs.help()                    replica set helpers");
-        print("\t" +
-              "help admin                   administrative help");
-        print("\t" +
-              "help connect                 connecting to a db help");
-        print("\t" +
-              "help keys                    key shortcuts");
-        print("\t" +
-              "help misc                    misc things to know");
-        print("\t" +
-              "help mr                      mapreduce");
+        print("\t" + "db.help()                    help on db methods");
+        print("\t" + "db.mycoll.help()             help on collection methods");
+        print("\t" + "sh.help()                    sharding helpers");
+        print("\t" + "rs.help()                    replica set helpers");
+        print("\t" + "help admin                   administrative help");
+        print("\t" + "help connect                 connecting to a db help");
+        print("\t" + "help keys                    key shortcuts");
+        print("\t" + "help misc                    misc things to know");
+        print("\t" + "help mr                      mapreduce");
         print();
-        print("\t" +
-              "show dbs                     show database names");
-        print("\t" +
-              "show collections             show collections in current database");
-        print("\t" +
-              "show users                   show users in current database");
-        print(
-            "\t" +
-            "show profile                 show most recent system.profile entries with time >= 1ms");
-        print("\t" +
-              "show logs                    show the accessible logger names");
-        print(
-            "\t" +
-            "show log [name]              prints out the last segment of log in memory, 'global' is default");
-        print("\t" +
-              "use <db_name>                set current database");
-        print("\t" +
-              "db.mycoll.find()             list objects in collection mycoll");
-        print("\t" +
-              "db.mycoll.find( { a : 1 } )  list objects in mycoll where a == 1");
-        print(
-            "\t" +
-            "it                           result of the last line evaluated; use to further iterate");
-        print("\t" +
-              "DBQuery.shellBatchSize = x   set default number of items to display on shell");
-        print("\t" +
-              "exit                         quit the mongo shell");
-    } else
-        print("unknown help option");
-};
+        print("\t" + "show dbs                     show database names");
+        print("\t" + "show collections             show collections in current database");
+        print("\t" + "show users                   show users in current database");
+        print("\t" + "show profile                 show most recent system.profile entries with time >= 1ms");
+        print("\t" + "show logs                    show the accessible logger names");
+        print("\t" + "show log [name]              prints out the last segment of log in memory, 'global' is default");
+        print("\t" + "use <db_name>                set current database");
+        print("\t" + "db.mycoll.find()             list objects in collection mycoll");
+        print("\t" + "db.mycoll.find( { a : 1 } )  list objects in mycoll where a == 1");
+        print("\t" + "it                           result of the last line evaluated; use to further iterate");
+        print("\t" + "DBQuery.shellBatchSize = x   set default number of items to display on shell");
+        print("\t" + "exit                         quit the mongo shell");
+    } else print("unknown help option");
+}
 shellHelper.help = help;
 
 export {

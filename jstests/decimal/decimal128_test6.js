@@ -33,10 +33,10 @@ var parseErrors = [
     {"description": "Invalid", "string": "-Na"},
     {"description": "Invalid", "string": "1.23abc"},
     {"description": "Invalid", "string": "1.23abcE+02"},
-    {"description": "Invalid", "string": "1.23E+0aabs2"}
+    {"description": "Invalid", "string": "1.23E+0aabs2"},
 ];
 
-parseErrors.forEach(function(testCase) {
+parseErrors.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
     function test() {
         NumberDecimal(testCase.string);

@@ -48,7 +48,7 @@ assert.commandWorked(out.createIndex({a: 1}));
 function pipeline(outColl) {
     return [
         {$match: {a: {$gt: 0}}},
-        {$merge: {into: outColl, whenMatched: [{$addFields: {a: {$multiply: ["$a", 2]}}}]}}
+        {$merge: {into: outColl, whenMatched: [{$addFields: {a: {$multiply: ["$a", 2]}}}]}},
     ];
 }
 
@@ -57,8 +57,7 @@ const sameCollPipeline = pipeline(coll.getName());
 
 // Targeting a collection that is not the collection being aggregated over will result in each
 // document's value of 'a' being updated exactly once.
-assert.commandWorked(
-    db.runCommand({aggregate: coll.getName(), pipeline: differentCollPipeline, cursor: {}}));
+assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: differentCollPipeline, cursor: {}}));
 
 // Filter out 'largeArray' as we are only interested in verifying the value of "a" in each
 // document.
@@ -72,8 +71,7 @@ for (const doc of diffCollResult) {
 
 // Targeting the same collection that is being aggregated over will result in some documents' value
 // of 'a' being updated multiple times.
-assert.commandWorked(
-    db.runCommand({aggregate: coll.getName(), pipeline: sameCollPipeline, cursor: {}}));
+assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: sameCollPipeline, cursor: {}}));
 
 const sameCollResult = coll.find({}, {largeArray: 0}).toArray();
 
@@ -93,8 +91,11 @@ for (const doc of sameCollResult) {
     }
 }
 
-assert(foundDocumentUpdatedMultipleTimes,
-       "All documents were updated exactly once, which is unexpected. Contents of the collection" +
-           " being aggregated over and merged into: " + tojson(sameCollResult));
+assert(
+    foundDocumentUpdatedMultipleTimes,
+    "All documents were updated exactly once, which is unexpected. Contents of the collection" +
+        " being aggregated over and merged into: " +
+        tojson(sameCollResult),
+);
 
 MongoRunner.stopMongod(conn);

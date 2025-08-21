@@ -10,14 +10,13 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
 const collName = "foo";
-const ns = dbName + '.' + collName;
+const ns = dbName + "." + collName;
 
 const st = new ShardingTest({shards: 2, config: 1});
 const testDB = st.s.getDB(dbName);
 
 // Shard a collection with the only chunk on shard0.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 const recipientPrimary = st.rs1.getPrimary();
@@ -41,9 +40,11 @@ const kCommands = [
 kCommands.forEach((cmd) => {
     // The recipient shard should return StaleConfig until mongos exhausts its retries and
     // returns the final StaleConfig to the client.
-    assert.commandFailedWithCode(testDB.runCommand(cmd),
-                                 ErrorCodes.StaleConfig,
-                                 "expected to fail with StaleConfig, cmd: " + tojson(cmd));
+    assert.commandFailedWithCode(
+        testDB.runCommand(cmd),
+        ErrorCodes.StaleConfig,
+        "expected to fail with StaleConfig, cmd: " + tojson(cmd),
+    );
 });
 
 fp.off();
@@ -55,7 +56,7 @@ if (jsTest.options().storageEngine === "inMemory") {
 }
 
 // Restart nodes to clear filtering metadata to trigger a refresh with following operations.
-st.rs0.nodes.forEach(node => {
+st.rs0.nodes.forEach((node) => {
     st.rs0.restart(node, undefined, undefined, false /* wait */);
 });
 

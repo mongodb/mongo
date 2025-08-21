@@ -3,7 +3,7 @@
 // The aliases are 'splithorizon1' and 'splithorizon2'
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const hostsFile = MongoRunner.dataPath + 'split-horizon-hosts';
+const hostsFile = MongoRunner.dataPath + "split-horizon-hosts";
 writeFile(hostsFile, "splithorizon1 localhost\nsplithorizon2 localhost\n");
 
 // Check if HOSTALIASES works on this system (Will not work on Windows or OSX and may not work
@@ -12,7 +12,8 @@ try {
     var rc = runMongoProgram("env", "HOSTALIASES=" + hostsFile, "getent", "hosts", "splithorizon1");
 } catch (e) {
     jsTestLog(
-        `Failed the check for HOSTALIASES support using env, we are probably on a non-GNU platform. Skipping this test.`);
+        `Failed the check for HOSTALIASES support using env, we are probably on a non-GNU platform. Skipping this test.`,
+    );
     removeFile(hostsFile);
     quit();
 }
@@ -24,8 +25,7 @@ if (rc != 0) {
     clearRawMongoProgramOutput();
     rc = runProgram("getconf", "GNU_LIBC_VERSION");
     if (rc != 0) {
-        jsTestLog(
-            `Failed the check for GLIBC version, we are probably on a non-GNU platform. Skipping this test.`);
+        jsTestLog(`Failed the check for GLIBC version, we are probably on a non-GNU platform. Skipping this test.`);
         quit();
     }
 
@@ -40,8 +40,7 @@ if (rc != 0) {
 
     rc = runProgram("cat", "/etc/os-release");
     if (rc != 0) {
-        jsTestLog(
-            `Failed the check for /etc/os-release, we are probably not on a *nix. Skipping this test.`);
+        jsTestLog(`Failed the check for /etc/os-release, we are probably not on a *nix. Skipping this test.`);
         quit();
     }
 
@@ -56,18 +55,22 @@ if (rc != 0) {
     if (glibc_version < 2.2) {
         jsTestLog(
             `HOSTALIASES does not seem to work as expected on this system. GLIBC
-                version is ${glibc_version}, skipping this test.`);
+                version is ${glibc_version}, skipping this test.`,
+        );
         quit();
     } else if (suzeMatch) {
         jsTestLog(
             `HOSTALIASES does not seem to work as expected but we detected SLES. GLIBC
-                version is ${glibc_version}, skipping this test.`);
+                version is ${glibc_version}, skipping this test.`,
+        );
         quit();
     }
 
-    assert(false,
-           `HOSTALIASES does not seem to work as expected on this system. GLIBC
-            version is ${glibc_version}`);
+    assert(
+        false,
+        `HOSTALIASES does not seem to work as expected on this system. GLIBC
+            version is ${glibc_version}`,
+    );
 }
 
 var replTest = new ReplSetTest({
@@ -84,7 +87,7 @@ var replTest = new ReplSetTest({
 
 replTest.startSet({
     env: {
-        SSL_CERT_FILE: 'jstests/libs/ca.pem',
+        SSL_CERT_FILE: "jstests/libs/ca.pem",
     },
 });
 
@@ -107,26 +110,26 @@ config.members[1].horizons.horizon_name = node1horizonHostname;
 
 replTest.initiate(config);
 
-var checkExpectedHorizon = function(url, memberIndex, expectedHostname) {
+var checkExpectedHorizon = function (url, memberIndex, expectedHostname) {
     // Run isMaster in the shell and check that we get the expected hostname back. We must use the
     // isMaster command instead of its alias hello, as the initial handshake between the shell and
     // server use isMaster.
-    const assertion = (memberIndex === "me")
-        ? ("assert(db.runCommand({isMaster: 1})['me'] == '" + expectedHostname + "')")
-        : ("assert(db.runCommand({isMaster: 1})['hosts'][" + memberIndex + "] == '" +
-           expectedHostname + "')");
+    const assertion =
+        memberIndex === "me"
+            ? "assert(db.runCommand({isMaster: 1})['me'] == '" + expectedHostname + "')"
+            : "assert(db.runCommand({isMaster: 1})['hosts'][" + memberIndex + "] == '" + expectedHostname + "')";
 
     var argv = [
-        'env',
+        "env",
         "HOSTALIASES=" + hostsFile,
         "SSL_CERT_FILE=jstests/libs/ca.pem",
-        'mongo',
-        '--tls',
-        '--tlsCertificateKeyFile',
-        'jstests/libs/splithorizon-server.pem',
+        "mongo",
+        "--tls",
+        "--tlsCertificateKeyFile",
+        "jstests/libs/splithorizon-server.pem",
         url,
-        '--eval',
-        assertion
+        "--eval",
+        assertion,
     ];
     return runMongoProgram(...argv);
 };
@@ -134,42 +137,27 @@ var checkExpectedHorizon = function(url, memberIndex, expectedHostname) {
 // Using localhost should use the default horizon
 var defaultURL = `mongodb://${node0localHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
 jsTestLog(`URL without horizon: ${defaultURL}`);
-assert.eq(checkExpectedHorizon(defaultURL, 0, node0localHostname),
-          0,
-          "localhost does not return horizon");
-assert.eq(checkExpectedHorizon(defaultURL, "me", node0localHostname),
-          0,
-          "localhost does not return horizon");
-assert.eq(checkExpectedHorizon(defaultURL, 1, node1localHostname),
-          0,
-          "localhost does not return horizon");
+assert.eq(checkExpectedHorizon(defaultURL, 0, node0localHostname), 0, "localhost does not return horizon");
+assert.eq(checkExpectedHorizon(defaultURL, "me", node0localHostname), 0, "localhost does not return horizon");
+assert.eq(checkExpectedHorizon(defaultURL, 1, node1localHostname), 0, "localhost does not return horizon");
 
 // Using 'splithorizon1' should use that horizon
 var horizonURL = `mongodb://${node0horizonHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
 jsTestLog(`URL with horizon: ${horizonURL}`);
-assert.eq(checkExpectedHorizon(horizonURL, 0, node0horizonHostname),
-          0,
-          "does not return horizon as expected");
-assert.eq(checkExpectedHorizon(horizonURL, "me", node0horizonHostname),
-          0,
-          "does not return horizon as expected");
-assert.eq(checkExpectedHorizon(horizonURL, 1, node1horizonHostname),
-          0,
-          "does not return horizon as expected");
+assert.eq(checkExpectedHorizon(horizonURL, 0, node0horizonHostname), 0, "does not return horizon as expected");
+assert.eq(checkExpectedHorizon(horizonURL, "me", node0horizonHostname), 0, "does not return horizon as expected");
+assert.eq(checkExpectedHorizon(horizonURL, 1, node1horizonHostname), 0, "does not return horizon as expected");
 
 // Using 'splithorizon2' does not have a horizon so it should return default
-var horizonMissingURL =
-    `mongodb://${node0horizonMissingHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
+var horizonMissingURL = `mongodb://${node0horizonMissingHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
 jsTestLog(`URL with horizon: ${horizonMissingURL}`);
-assert.eq(checkExpectedHorizon(horizonMissingURL, 0, node0localHostname),
-          0,
-          "does not return localhost as expected");
-assert.eq(checkExpectedHorizon(horizonMissingURL, "me", node0localHostname),
-          0,
-          "does not return localhost as expected");
-assert.eq(checkExpectedHorizon(horizonMissingURL, 1, node1localHostname),
-          0,
-          "does not return localhost as expected");
+assert.eq(checkExpectedHorizon(horizonMissingURL, 0, node0localHostname), 0, "does not return localhost as expected");
+assert.eq(
+    checkExpectedHorizon(horizonMissingURL, "me", node0localHostname),
+    0,
+    "does not return localhost as expected",
+);
+assert.eq(checkExpectedHorizon(horizonMissingURL, 1, node1localHostname), 0, "does not return localhost as expected");
 
 // Check so we can replSetReconfig to add another horizon.
 // Add 2 to the config version to account for the 'newlyAdded' removal reconfig.
@@ -180,18 +168,23 @@ config.members[1].horizons.other_horizon_name = node1horizonMissingHostname;
 assert.adminCommandWorkedAllowingNetworkError(replTest.getPrimary(), {replSetReconfig: config});
 
 // Using 'splithorizon2' should now return the new horizon
-horizonMissingURL =
-    `mongodb://${node0horizonMissingHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
+horizonMissingURL = `mongodb://${node0horizonMissingHostname}/admin?replicaSet=${replTest.name}&ssl=true`;
 jsTestLog(`URL with horizon: ${horizonMissingURL}`);
-assert.eq(checkExpectedHorizon(horizonMissingURL, 0, node0horizonMissingHostname),
-          0,
-          "does not return horizon as expected");
-assert.eq(checkExpectedHorizon(horizonMissingURL, "me", node0horizonMissingHostname),
-          0,
-          "does not return horizon as expected");
-assert.eq(checkExpectedHorizon(horizonMissingURL, 1, node1horizonMissingHostname),
-          0,
-          "does not return horizon as expected");
+assert.eq(
+    checkExpectedHorizon(horizonMissingURL, 0, node0horizonMissingHostname),
+    0,
+    "does not return horizon as expected",
+);
+assert.eq(
+    checkExpectedHorizon(horizonMissingURL, "me", node0horizonMissingHostname),
+    0,
+    "does not return horizon as expected",
+);
+assert.eq(
+    checkExpectedHorizon(horizonMissingURL, 1, node1horizonMissingHostname),
+    0,
+    "does not return horizon as expected",
+);
 
 // Change horizon to return a different port to connect to, so the feature can be used in a
 // port-forwarding environment
@@ -207,15 +200,21 @@ assert.adminCommandWorkedAllowingNetworkError(replTest.getPrimary(), {replSetRec
 // which will fail as we can't actually connect now (port is wrong)
 var horizonDifferentPortURL = `mongodb://${node0horizonHostname}/admin?ssl=true`;
 jsTestLog(`URL with horizon using different port: ${horizonDifferentPortURL}`);
-assert.eq(checkExpectedHorizon(horizonDifferentPortURL, 0, node0horizonHostnameDifferentPort),
-          0,
-          "does not return horizon as expected");
-assert.eq(checkExpectedHorizon(horizonDifferentPortURL, "me", node0horizonHostnameDifferentPort),
-          0,
-          "does not return horizon as expected");
-assert.eq(checkExpectedHorizon(horizonDifferentPortURL, 1, node1horizonHostnameDifferentPort),
-          0,
-          "does not return horizon as expected");
+assert.eq(
+    checkExpectedHorizon(horizonDifferentPortURL, 0, node0horizonHostnameDifferentPort),
+    0,
+    "does not return horizon as expected",
+);
+assert.eq(
+    checkExpectedHorizon(horizonDifferentPortURL, "me", node0horizonHostnameDifferentPort),
+    0,
+    "does not return horizon as expected",
+);
+assert.eq(
+    checkExpectedHorizon(horizonDifferentPortURL, 1, node1horizonHostnameDifferentPort),
+    0,
+    "does not return horizon as expected",
+);
 
 // Providing a config where horizons does not exist in all members is expected to fail
 config.version += 1;

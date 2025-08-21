@@ -10,7 +10,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 if (determineSSLProvider() !== "openssl") {
-    print('Skipping test, tlsClusterAuthX509 options are only available with OpenSSL');
+    print("Skipping test, tlsClusterAuthX509 options are only available with OpenSSL");
     quit();
 }
 
@@ -19,8 +19,8 @@ if (determineSSLProvider() !== "openssl") {
  */
 // Subject: C=US, ST=New York, L=New York, O=MongoDB, OU=Kernel, CN=server
 const originalDNAttributes = "O=MongoDB, OU=Kernel";
-const originalCert = 'jstests/libs/server.pem';
-const originalCACert = 'jstests/libs/ca.pem';
+const originalCert = "jstests/libs/server.pem";
+const originalCACert = "jstests/libs/ca.pem";
 const defaultPolicyClusterAuthX509Override = {
     attributes: originalDNAttributes,
 };
@@ -30,7 +30,7 @@ const defaultPolicyClusterAuthX509Override = {
  */
 // Subject: C=US, ST=New York, L=New York City, CN=server, title=foo
 const fooTitleDNAttributes = "C=US, ST=New York, L=New York City, title=foo";
-const fooTitleDNCert = 'jstests/libs/server_title_foo_no_o_ou_dc.pem';
+const fooTitleDNCert = "jstests/libs/server_title_foo_no_o_ou_dc.pem";
 const fooTitleClusterAuthX509Override = {
     attributes: fooTitleDNAttributes,
 };
@@ -40,23 +40,23 @@ const fooTitleClusterAuthX509Override = {
  */
 // Subject: C=US, ST=New York, L=New York City, O=MongoDB, OU=Kernel, CN=server, title=bar
 const barTitleDNAttributes = "C=US, ST=New York, L=New York City, title=bar";
-const barTitleDNCert = 'jstests/libs/server_title_bar.pem';
+const barTitleDNCert = "jstests/libs/server_title_bar.pem";
 const barTitleClusterAuthX509Override = {
     attributes: barTitleDNAttributes,
 };
 /**
  * This is the path of the certificate containing the cluster membership extension set to 'foo'.
  */
-const fooExtensionCert = 'jstests/ssl/libs/cluster-member-foo.pem';
+const fooExtensionCert = "jstests/ssl/libs/cluster-member-foo.pem";
 const fooExtensionClusterAuthX509Override = {
-    extensionValue: 'foo',
+    extensionValue: "foo",
 };
 /**
  * This is the path of the certificate containing the cluster membership extension set to 'bar'.
  */
-const barExtensionCert = 'jstests/ssl/libs/cluster-member-bar.pem';
+const barExtensionCert = "jstests/ssl/libs/cluster-member-bar.pem";
 const barExtensionClusterAuthX509Override = {
-    extensionValue: 'bar',
+    extensionValue: "bar",
 };
 
 const rst = new ReplSetTest({
@@ -68,26 +68,30 @@ const rst = new ReplSetTest({
         tlsCertificateKeyFile: originalCert,
         tlsCAFile: originalCACert,
         tlsAllowInvalidHostnames: "",
-    }
+    },
 });
 rst.startSet();
-rst.initiate(Object.extend(rst.getReplSetConfig(), {
-    writeConcernMajorityJournalDefault: true,
-}),
-             null,
-             {initiateWithDefaultElectionTimeout: true, allNodesAuthorizedToRunRSGetStatus: false});
+rst.initiate(
+    Object.extend(rst.getReplSetConfig(), {
+        writeConcernMajorityJournalDefault: true,
+    }),
+    null,
+    {initiateWithDefaultElectionTimeout: true, allNodesAuthorizedToRunRSGetStatus: false},
+);
 
 // Create a user to login as when auth is enabled later
-rst.getPrimary().getDB('admin').createUser({user: 'root', pwd: 'root', roles: ['root']}, {w: 3});
+rst.getPrimary()
+    .getDB("admin")
+    .createUser({user: "root", pwd: "root", roles: ["root"]}, {w: 3});
 rst.nodes.forEach((node) => {
     assert(node.getDB("admin").auth("root", "root"));
 });
 
 // Future connections should authenticate immediately on connecting so that replSet actions succeed.
 const originalAwaitConnection = MongoRunner.awaitConnection;
-MongoRunner.awaitConnection = function(args) {
+MongoRunner.awaitConnection = function (args) {
     const conn = originalAwaitConnection(args);
-    assert(conn.getDB('admin').auth('root', 'root'));
+    assert(conn.getDB("admin").auth("root", "root"));
     return conn;
 };
 
@@ -103,14 +107,14 @@ function rolloverConfig(newConfig) {
         rst.awaitSecondaryNodes();
     }
 
-    rst.nodes.forEach(function(node) {
+    rst.nodes.forEach(function (node) {
         restart(node);
     });
 
     assert.soon(() => {
         let primary = rst.getPrimary();
         assert.commandWorked(primary.getDB("admin").runCommand({hello: 1}));
-        assert.commandWorked(primary.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'}));
+        assert.commandWorked(primary.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"}));
 
         return true;
     });
@@ -153,13 +157,13 @@ rolloverConfig({
     tlsClusterAuthX509Attributes: fooTitleDNAttributes,
 });
 
-jsTestLog(
-    "SUCCESS - certificate rotation from DC/O/OU certs to custom subject DN attribute-based certs");
+jsTestLog("SUCCESS - certificate rotation from DC/O/OU certs to custom subject DN attribute-based certs");
 
 // Scenario 2: From tlsClusterAuthX509Attributes: 'title=foo' to tlsClusterAuthX509Attributes:
 // 'title=bar'
 jsTestLog(
-    "Transitioning from custom subject DN attributes with 'title=foo' to custom subject DN attributes with 'title=bar'");
+    "Transitioning from custom subject DN attributes with 'title=foo' to custom subject DN attributes with 'title=bar'",
+);
 rolloverConfig({
     tlsMode: "preferTLS",
     clusterAuthMode: "x509",
@@ -205,7 +209,7 @@ rolloverConfig({
     tlsCertificateKeyFile: barTitleDNCert,
     tlsCAFile: originalCACert,
     tlsAllowInvalidHostnames: "",
-    tlsClusterAuthX509ExtensionValue: 'foo',
+    tlsClusterAuthX509ExtensionValue: "foo",
     setParameter: {
         tlsClusterAuthX509Override: tojson(barTitleClusterAuthX509Override),
     },
@@ -218,7 +222,7 @@ rolloverConfig({
     tlsCertificateKeyFile: fooExtensionCert,
     tlsCAFile: originalCACert,
     tlsAllowInvalidHostnames: "",
-    tlsClusterAuthX509ExtensionValue: 'foo',
+    tlsClusterAuthX509ExtensionValue: "foo",
     setParameter: {
         tlsClusterAuthX509Override: tojson(barTitleClusterAuthX509Override),
     },
@@ -231,11 +235,10 @@ rolloverConfig({
     tlsCertificateKeyFile: fooExtensionCert,
     tlsCAFile: originalCACert,
     tlsAllowInvalidHostnames: "",
-    tlsClusterAuthX509ExtensionValue: 'foo',
+    tlsClusterAuthX509ExtensionValue: "foo",
 });
 
-jsTestLog(
-    "SUCCESS - certificate rotation from custom subject DN attributes to custom extension value");
+jsTestLog("SUCCESS - certificate rotation from custom subject DN attributes to custom extension value");
 
 // Scenario 4: From tlsClusterAuthX509ExtensionValue: 'foo' to tlsClusterAuthX509ExtensionValue:
 // 'bar'
@@ -246,7 +249,7 @@ rolloverConfig({
     tlsCertificateKeyFile: fooExtensionCert,
     tlsCAFile: originalCACert,
     tlsAllowInvalidHostnames: "",
-    tlsClusterAuthX509ExtensionValue: 'bar',
+    tlsClusterAuthX509ExtensionValue: "bar",
     setParameter: {
         tlsClusterAuthX509Override: tojson(fooExtensionClusterAuthX509Override),
     },
@@ -259,7 +262,7 @@ rolloverConfig({
     tlsCertificateKeyFile: barExtensionCert,
     tlsCAFile: originalCACert,
     tlsAllowInvalidHostnames: "",
-    tlsClusterAuthX509ExtensionValue: 'bar',
+    tlsClusterAuthX509ExtensionValue: "bar",
     setParameter: {
         tlsClusterAuthX509Override: tojson(fooExtensionClusterAuthX509Override),
     },
@@ -272,7 +275,7 @@ rolloverConfig({
     tlsCertificateKeyFile: barExtensionCert,
     tlsCAFile: originalCACert,
     tlsAllowInvalidHostnames: "",
-    tlsClusterAuthX509ExtensionValue: 'bar',
+    tlsClusterAuthX509ExtensionValue: "bar",
 });
 
 jsTestLog("SUCCESS - certificate rotation from one custom extension value to another");

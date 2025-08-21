@@ -20,16 +20,16 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const kDbName = "test";
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 const testDB = st.s.getDB(kDbName);
 assert.commandWorked(testDB.foo.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: "test.foo", key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: "test.foo", middle: {_id: 0}}));
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(st.s.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // The document is in the majority committed snapshot.
 assert.eq(1, testDB.foo.find().readConcern("majority").itcount());
@@ -40,13 +40,15 @@ pauseMigrateAtStep(st.rs1.getPrimary(), migrateStepNames.rangeDeletionTaskSchedu
 // For startParallelOps to write its state
 let staticMongod = MongoRunner.runMongod({});
 
-let awaitMigration = moveChunkParallel(staticMongod,
-                                       st.s.host,
-                                       {_id: 1},
-                                       null,
-                                       "test.foo",
-                                       st.shard1.shardName,
-                                       false /* expectSuccess */);
+let awaitMigration = moveChunkParallel(
+    staticMongod,
+    st.s.host,
+    {_id: 1},
+    null,
+    "test.foo",
+    st.shard1.shardName,
+    false /* expectSuccess */,
+);
 
 // Wait for the migration to reach the failpoint and allow any writes to become majority committed
 // before pausing replication.
@@ -65,12 +67,14 @@ unpauseMigrateAtStep(st.rs1.getPrimary(), migrateStepNames.rangeDeletionTaskSche
 // will hang on trying to remove the recipient's range deletion entry with majority writeConcern
 // until replication is re-enabled on the recipient.
 assert.soon(() => {
-    return st.rs0.getPrimary().getDB("config").getCollection("migrationCoordinators").findOne({
-        nss: "test.foo",
-        "range.min._id": 0,
-        "range.max._id": MaxKey,
-        decision: "aborted",
-    }) != null;
+    return (
+        st.rs0.getPrimary().getDB("config").getCollection("migrationCoordinators").findOne({
+            nss: "test.foo",
+            "range.min._id": 0,
+            "range.max._id": MaxKey,
+            decision: "aborted",
+        }) != null
+    );
 });
 
 restartServerReplication(destinationSec);

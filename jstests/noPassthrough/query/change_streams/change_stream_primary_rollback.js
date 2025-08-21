@@ -12,9 +12,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    restartReplSetReplication,
-} from "jstests/libs/write_concern_util.js";
+import {restartReplSetReplication} from "jstests/libs/write_concern_util.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 // Verifies that "getMore" command on a change stream cursor returns an error classified as
@@ -23,7 +21,7 @@ import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 function verifyChangeStreamReturnsResumableChangeStreamErrorOnNodeRollback(rollbackTest) {
     assert(rollbackTest instanceof RollbackTest);
     const primaryNodeConnection = rollbackTest.getPrimary();
-    const testDB = primaryNodeConnection.getDB('test');
+    const testDB = primaryNodeConnection.getDB("test");
     const collectionName = "coll";
     assert.commandWorked(testDB.createCollection(collectionName));
     const collection = testDB[collectionName];
@@ -42,13 +40,17 @@ function verifyChangeStreamReturnsResumableChangeStreamErrorOnNodeRollback(rollb
 
     // Verify that when "getMore" command is issued, the server returns an error response with error
     // code 'ErrorCodes.QueryPlanKilled' and "ResumableChangeStreamError" label.
-    const response = assert.throwsWithCode(() => {
-        changeStreamCursor.hasNext();
-    }, ErrorCodes.QueryPlanKilled, []);
-    assert(response.hasOwnProperty("errorLabels") &&
-               response.errorLabels.includes("ResumableChangeStreamError"),
-           `Expected "ResumableChangeStreamError" label in the "getMore" command response: ${
-               tojson(response)}`);
+    const response = assert.throwsWithCode(
+        () => {
+            changeStreamCursor.hasNext();
+        },
+        ErrorCodes.QueryPlanKilled,
+        [],
+    );
+    assert(
+        response.hasOwnProperty("errorLabels") && response.errorLabels.includes("ResumableChangeStreamError"),
+        `Expected "ResumableChangeStreamError" label in the "getMore" command response: ${tojson(response)}`,
+    );
 }
 
 // Perform a test on a replica set.
@@ -61,8 +63,7 @@ replicaSetRollbackTest.stop();
 const shardingTest = new ShardingTest({
     shards: 1,
     mongos: 1,
-    configReplSetTestOptions:
-        {settings: {chainingAllowed: false, electionTimeoutMillis: ReplSetTest.kForeverMillis}},
+    configReplSetTestOptions: {settings: {chainingAllowed: false, electionTimeoutMillis: ReplSetTest.kForeverMillis}},
     config: [{}, {}, {rsConfig: {priority: 0}}],
     other: {useBridge: true},
 });

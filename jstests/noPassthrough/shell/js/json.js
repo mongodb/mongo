@@ -1,10 +1,9 @@
-
 import {describe, it} from "jstests/libs/mochalite.js";
 
 globalThis.TestData ??= {};
 
-describe("tojson", function() {
-    it("should indent and lint properly", function() {
+describe("tojson", function () {
+    it("should indent and lint properly", function () {
         const obj = ["foo", "bar"];
         let json;
 
@@ -32,7 +31,7 @@ describe("tojson", function() {
         assert.eq(json, '[ "foo", "bar" ]');
     });
 
-    it("should parse each type properly", function() {
+    it("should parse each type properly", function () {
         const obj = {"x": null, "y": true, "z": 123, "w": "foo", "a": undefined};
         let json;
 
@@ -40,33 +39,35 @@ describe("tojson", function() {
         assert.eq(json, '{ "x" : null, "y" : true, "z" : 123, "w" : "foo", "a" : undefined }');
 
         json = tojson(obj, "", false);
-        assert.eq(json,
-                  `{
+        assert.eq(
+            json,
+            `{
 	"x" : null,
 	"y" : true,
 	"z" : 123,
 	"w" : "foo",
 	"a" : undefined
-}`);
+}`,
+        );
 
         json = toJsonForLog(obj);
         assert.eq(json, '{"x":null,"y":true,"z":123,"w":"foo","a":{"$undefined":true}}');
     });
 
-    it("parses nulls", function() {
+    it("parses nulls", function () {
         const obj = {"x": null};
         assert.eq(tojson(obj), '{ "x" : null }');
     });
 
-    it("accepts 'false' indent", function() {
+    it("accepts 'false' indent", function () {
         // treats it like an empty string
         let a = {"foo": 1};
         let json = tojson(a, false, true);
         assert.eq(json, '{ "foo" : 1 }');
     });
 
-    describe("nested", function() {
-        it("shallow", function() {
+    describe("nested", function () {
+        it("shallow", function () {
             const obj = {"x": [], "y": {}};
             let json;
 
@@ -84,21 +85,23 @@ describe("tojson", function() {
             assert.eq(json, '{\n\t"x" : [ ],\n\t"y" : {\n\t\t\n\t}\n}');
         });
 
-        it("deep", function() {
+        it("deep", function () {
             const obj = {"x": [{"x": [1, 2, []], "z": "ok", "y": [[]]}, {"foo": "bar"}], "y": null};
             let json;
 
             json = tojson(obj, "", true);
             assert.eq(
                 json,
-                '{ "x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ], "y" : null }');
+                '{ "x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ], "y" : null }',
+            );
 
             json = toJsonForLog(obj);
             assert.eq(json, '{"x":[{"x":[1,2,[]],"z":"ok","y":[[]]},{"foo":"bar"}],"y":null}');
 
             json = tojson(obj, "", false);
-            assert.eq(json,
-                      `{
+            assert.eq(
+                json,
+                `{
 	"x" : [
 		{
 			"x" : [
@@ -116,12 +119,13 @@ describe("tojson", function() {
 		}
 	],
 	"y" : null
-}`);
+}`,
+            );
         });
     });
 
-    describe("timestamp", function() {
-        it("should parse timestamp properly", function() {
+    describe("timestamp", function () {
+        it("should parse timestamp properly", function () {
             const obj = Timestamp(10, 2);
             let json;
 
@@ -133,9 +137,12 @@ describe("tojson", function() {
         });
     });
 
-    describe("map", function() {
-        it("should parse map properly", function() {
-            const obj = new Map([["one", 1], [2, "two"]]);
+    describe("map", function () {
+        it("should parse map properly", function () {
+            const obj = new Map([
+                ["one", 1],
+                [2, "two"],
+            ]);
             let json;
 
             json = tojson(obj);
@@ -146,8 +153,8 @@ describe("tojson", function() {
         });
     });
 
-    describe("special types", function() {
-        it("ObjectId", function() {
+    describe("special types", function () {
+        it("ObjectId", function () {
             const obj = {
                 "x": ObjectId("4ad35a73d2e34eb4fc43579a"),
             };
@@ -157,49 +164,45 @@ describe("tojson", function() {
             assert.eq(json, '{ "x" : ObjectId("4ad35a73d2e34eb4fc43579a") }');
         });
 
-        it("RegEx", function() {
-            const obj = {"y": /xd?/ig};
+        it("RegEx", function () {
+            const obj = {"y": /xd?/gi};
             let json;
 
             json = tojson(obj);
             assert.eq(json, '{ "y" : /xd?/gi }');
         });
 
-        it("NumberLong", function() {
+        it("NumberLong", function () {
             const obj = {x: NumberLong(64)};
 
             let json = tostrictjson(obj);
             assert.eq(json, '{ "x" : { "$numberLong" : "64" } }');
         });
 
-        it("undefined", function() {
+        it("undefined", function () {
             const obj = undefined;
 
             let json = tojson(obj);
-            assert.eq(json, 'undefined');
+            assert.eq(json, "undefined");
 
             json = toJsonForLog(obj);
             assert.eq(json, '{"$undefined":true}');
         });
     });
 
-    describe("JSON.stringify", function() {
-        it("binary", function() {
+    describe("JSON.stringify", function () {
+        it("binary", function () {
             const x = BinData(0, "VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==");
             let json;
 
             json = JSON.stringify(x);
-            assert.eq(
-                json,
-                '{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"}');
+            assert.eq(json, '{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"}');
 
             json = toJsonForLog(x);
-            assert.eq(
-                json,
-                '{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"}');
+            assert.eq(json, '{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"}');
         });
 
-        it("timestamp", function() {
+        it("timestamp", function () {
             const x = Timestamp(987654321, 0);
             let json;
 
@@ -210,7 +213,7 @@ describe("tojson", function() {
             assert.eq(json, '{"$timestamp":{"t":987654321,"i":0}}');
         });
 
-        it("regex", function() {
+        it("regex", function () {
             const x = /^acme/i;
             let json;
 
@@ -221,7 +224,7 @@ describe("tojson", function() {
             assert.eq(json, '{"$regex":"^acme","$options":"i"}');
         });
 
-        it("oid", function() {
+        it("oid", function () {
             const x = ObjectId("579a70d9e249393f153b5bc1");
             let json;
 
@@ -232,7 +235,7 @@ describe("tojson", function() {
             assert.eq(json, '{"$oid":"579a70d9e249393f153b5bc1"}');
         });
 
-        it("ref", function() {
+        it("ref", function () {
             const x = DBRef("test", "579a70d9e249393f153b5bc1");
             let json;
 
@@ -243,7 +246,7 @@ describe("tojson", function() {
             assert.eq(json, '{"$ref":"test","$id":"579a70d9e249393f153b5bc1"}');
         });
 
-        it("pointer", function() {
+        it("pointer", function () {
             const x = DBPointer("test", ObjectId("579a70d9e249393f153b5bc1"));
             let json;
 
@@ -254,7 +257,7 @@ describe("tojson", function() {
             assert.eq(json, '{"ns":"test","id":{"$oid":"579a70d9e249393f153b5bc1"}}');
         });
 
-        it("undefined", function() {
+        it("undefined", function () {
             const x = undefined;
             let json;
 
@@ -265,7 +268,7 @@ describe("tojson", function() {
             assert.eq(json, '{"$undefined":true}');
         });
 
-        it("minkey", function() {
+        it("minkey", function () {
             const x = MinKey;
             let json;
 
@@ -276,7 +279,7 @@ describe("tojson", function() {
             assert.eq(json, '{"$minKey":1}');
         });
 
-        it("maxkey", function() {
+        it("maxkey", function () {
             const x = MaxKey;
             let json;
 
@@ -287,7 +290,7 @@ describe("tojson", function() {
             assert.eq(json, '{"$maxKey":1}');
         });
 
-        it("numberlong", function() {
+        it("numberlong", function () {
             const x = NumberLong("12345");
             let json;
 
@@ -298,18 +301,18 @@ describe("tojson", function() {
             assert.eq(json, '{"$numberLong":"12345"}');
         });
 
-        it("numberint", function() {
+        it("numberint", function () {
             const x = NumberInt(5);
             let json;
 
             json = JSON.stringify(x);
-            assert.eq(json, '5');
+            assert.eq(json, "5");
 
             json = toJsonForLog(x);
-            assert.eq(json, '5');
+            assert.eq(json, "5");
         });
 
-        it("numberdecimal", function() {
+        it("numberdecimal", function () {
             const x = NumberDecimal(3.14);
             let json;
 
@@ -320,7 +323,7 @@ describe("tojson", function() {
             assert.eq(json, '{"$numberDecimal":"3.14000000000000"}');
         });
 
-        it("date", function() {
+        it("date", function () {
             const x = new Date(Date.UTC(1970, 0, 1, 23, 59, 59, 999));
             let json;
 
@@ -332,8 +335,8 @@ describe("tojson", function() {
         });
     });
 
-    describe("recursive objects", function() {
-        it("should stringify objects", function() {
+    describe("recursive objects", function () {
+        it("should stringify objects", function () {
             const x = {};
             x.self = x;
             let json;
@@ -343,24 +346,28 @@ describe("tojson", function() {
         });
     });
 
-    describe("containers", function() {
-        it("should serialize containers", function() {
+    describe("containers", function () {
+        it("should serialize containers", function () {
             const x = {};
             x.array = new Array(1, "two", [3, false]);
             x.set = new Set([1, "two", true]);
-            x.map = new Map([["one", 1], [2, {y: [3, 4]}]]);
+            x.map = new Map([
+                ["one", 1],
+                [2, {y: [3, 4]}],
+            ]);
 
-            assert.docEq(x, eval('(' + tojson(x) + ')'));
+            assert.docEq(x, eval("(" + tojson(x) + ")"));
 
             let json = toJsonForLog(x);
             assert.eq(
                 json,
-                '{"array":[1,"two",[3,false]],"set":{"$set":[1,"two",true]},"map":{"$map":[["one",1],[2,{"y":[3,4]}]]}}');
+                '{"array":[1,"two",[3,false]],"set":{"$set":[1,"two",true]},"map":{"$map":[["one",1],[2,{"y":[3,4]}]]}}',
+            );
         });
     });
 
-    describe("Strings to escape", function() {
-        it("serializes strings that needs escaping", function() {
+    describe("Strings to escape", function () {
+        it("serializes strings that needs escaping", function () {
             const stringThatNeedsEscaping = 'ho\"la';
 
             assert.eq('\"ho\\\"la\"', JSON.stringify(stringThatNeedsEscaping));
@@ -371,23 +378,21 @@ describe("tojson", function() {
             assert.eq(tojson(obj), '{ "quotes" : "ho\\\"la" }');
         });
 
-        it("serializes strings in errors", function() {
+        it("serializes strings in errors", function () {
             const stringThatNeedsEscaping = 'ho\"la';
 
-            assert.eq('{}', JSON.stringify(new Error(stringThatNeedsEscaping)));
+            assert.eq("{}", JSON.stringify(new Error(stringThatNeedsEscaping)));
             assert.eq(tojson(new Error(stringThatNeedsEscaping)), 'new Error(\"ho\\\"la\")');
             assert.eq(toJsonForLog(new Error(stringThatNeedsEscaping)), '{"$error":"ho\\\"la"}');
 
-            assert.eq('{}', JSON.stringify(new SyntaxError(stringThatNeedsEscaping)));
-            assert.eq(tojson(new SyntaxError(stringThatNeedsEscaping)),
-                      'new SyntaxError(\"ho\\\"la\")');
-            assert.eq(toJsonForLog(new SyntaxError(stringThatNeedsEscaping)),
-                      '{"$error":"ho\\\"la"}');
+            assert.eq("{}", JSON.stringify(new SyntaxError(stringThatNeedsEscaping)));
+            assert.eq(tojson(new SyntaxError(stringThatNeedsEscaping)), 'new SyntaxError(\"ho\\\"la\")');
+            assert.eq(toJsonForLog(new SyntaxError(stringThatNeedsEscaping)), '{"$error":"ho\\\"la"}');
         });
     });
 
-    describe("logformat json", function() {
-        it("should override indent", function() {
+    describe("logformat json", function () {
+        it("should override indent", function () {
             const oldLogFormat = TestData.logFormat;
             TestData.logFormat = "json";
 
@@ -398,7 +403,7 @@ describe("tojson", function() {
             assert.eq(json, '{ "a" : 1, "b" : [ 2, 3 ] }');
         });
 
-        it("should not override if nolint is specified", function() {
+        it("should not override if nolint is specified", function () {
             const oldLogFormat = TestData.logFormat;
             TestData.logFormat = "json";
 
@@ -406,14 +411,16 @@ describe("tojson", function() {
             let json = tojson(x, "\t", false);
             TestData.logFormat = oldLogFormat;
 
-            assert.eq(json,
-                      `{
+            assert.eq(
+                json,
+                `{
 		"a" : 1,
 		"b" : [
 			2,
 			3
 		]
-	}`);
+	}`,
+            );
         });
     });
 });

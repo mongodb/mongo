@@ -3,21 +3,19 @@
  * _id values can be successfully inserted into all nodes in a replica set. This implicitly tests
  * the message size limits that are applied on messages received by the secondaries' oplog fetcher.
  */
-import {
-    assertDropAndRecreateCollection,
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDbName = jsTestName();
-const kCollName = 'coll';
+const kCollName = "coll";
 
 function runTest(coll) {
     // Generate _id values with different characters so we avoid duplicate key errors.
-    let nextChar = 'a'.charCodeAt(0);
+    let nextChar = "a".charCodeAt(0);
     const nextIdChar = () => String.fromCharCode(nextChar++);
 
     const generateDoc = (idLength, payloadLength) => {
-        return {_id: nextIdChar().repeat(idLength), payload: 'a'.repeat(payloadLength)};
+        return {_id: nextIdChar().repeat(idLength), payload: "a".repeat(payloadLength)};
     };
 
     // The insert needs to be acknowledged by all nodes in the replica set, not just the primary.
@@ -42,7 +40,7 @@ function runReplicaSetTest() {
     const replTest = new ReplSetTest({
         name: jsTestName(),
         nodes: 3,
-        setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
+        setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1},
     });
 
     replTest.startSet();

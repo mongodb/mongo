@@ -12,20 +12,22 @@ var db = s.getDB("test");
 
 var test = new GeoNearRandomTest(testName, db);
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: 'test', primaryShard: s.shard1.shardName}));
-assert.commandWorked(s.s0.adminCommand({shardcollection: ('test.' + testName), key: {_id: 1}}));
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
+assert.commandWorked(s.s0.adminCommand({shardcollection: "test." + testName, key: {_id: 1}}));
 
 test.insertPts(5000);
 var shardList = [s.shard0.shardName, s.shard1.shardName, s.shard2.shardName];
-for (var i = (test.nPts / 10); i < test.nPts; i += (test.nPts / 10)) {
-    assert.commandWorked(s.s0.adminCommand({split: ('test.' + testName), middle: {_id: i}}));
+for (var i = test.nPts / 10; i < test.nPts; i += test.nPts / 10) {
+    assert.commandWorked(s.s0.adminCommand({split: "test." + testName, middle: {_id: i}}));
     try {
-        assert.commandWorked(s.s0.adminCommand({
-            moveChunk: ('test.' + testName),
-            find: {_id: i - 1},
-            to: shardList[i % 3],
-            _waitForDelete: true
-        }));
+        assert.commandWorked(
+            s.s0.adminCommand({
+                moveChunk: "test." + testName,
+                find: {_id: i - 1},
+                to: shardList[i % 3],
+                _waitForDelete: true,
+            }),
+        );
     } catch (e) {
         // ignore this error
         if (!e.message.match(/that chunk is already on that shard/)) {

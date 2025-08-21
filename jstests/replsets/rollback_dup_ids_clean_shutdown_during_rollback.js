@@ -30,7 +30,7 @@ CommonOps(rollbackTest.getPrimary());
 
 let rollbackNode = rollbackTest.transitionToRollbackOperations();
 // Have rollback hang after it has taken an unstable checkpoint but before it completes.
-rollbackNode.adminCommand({configureFailPoint: 'bgSyncHangAfterRunRollback', mode: 'alwaysOn'});
+rollbackNode.adminCommand({configureFailPoint: "bgSyncHangAfterRunRollback", mode: "alwaysOn"});
 RollbackOps(rollbackNode);
 
 // Wait for rollback to finish.

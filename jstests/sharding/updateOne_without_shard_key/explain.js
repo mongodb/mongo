@@ -9,9 +9,7 @@
 
 import {getExecutionStages, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
+import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // 2 shards single node, 1 mongos, 1 config server 3-node.
 const st = new ShardingTest({});
@@ -24,13 +22,18 @@ const docsToInsert = [
     {_id: 0, x: -2, y: 1, a: [1, 2, 3]},
     {_id: 1, x: -1, y: 1, a: [1, 2, 3]},
     {_id: 2, x: 1, y: 1, a: [1, 2, 3]},
-    {_id: 3, x: 2, y: 1, a: [1, 2, 3]}
+    {_id: 3, x: 2, y: 1, a: [1, 2, 3]},
 ];
 
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 0.
 WriteWithoutShardKeyTestUtil.setupShardedCollection(
-    st, nss, {x: 1}, [{x: splitPoint}], [{query: {x: splitPoint}, shard: st.shard1.shardName}]);
+    st,
+    nss,
+    {x: 1},
+    [{x: splitPoint}],
+    [{query: {x: splitPoint}, shard: st.shard1.shardName}],
+);
 
 assert.commandWorked(dbConn[collName].insert(docsToInsert));
 
@@ -49,7 +52,7 @@ let testCases = [
                 query: {y: 1},
                 sort: {x: 1},
                 update: {$inc: {z: 1}},
-            }
+            },
         },
     },
     {
@@ -60,11 +63,11 @@ let testCases = [
         cmdObj: {
             explain: {
                 findAndModify: collName,
-                query: {y: 5},  // Query matches no documents.
+                query: {y: 5}, // Query matches no documents.
                 sort: {x: 1},
                 update: {$inc: {z: 1}},
-                upsert: true
-            }
+                upsert: true,
+            },
         },
     },
     {
@@ -75,7 +78,7 @@ let testCases = [
                 findAndModify: collName,
                 query: {y: 1},
                 update: {$inc: {z: 1}},
-            }
+            },
         },
     },
     {
@@ -85,10 +88,10 @@ let testCases = [
         cmdObj: {
             explain: {
                 findAndModify: collName,
-                query: {y: 5},  // Query matches no documents.
+                query: {y: 5}, // Query matches no documents.
                 update: {$inc: {z: 1}},
                 upsert: true,
-            }
+            },
         },
     },
     {
@@ -101,7 +104,7 @@ let testCases = [
                 query: {y: 1},
                 sort: {x: 1},
                 remove: true,
-            }
+            },
         },
     },
     {
@@ -112,12 +115,11 @@ let testCases = [
                 findAndModify: collName,
                 query: {y: 1},
                 remove: true,
-            }
+            },
         },
     },
     {
-        logMessage:
-            "Running explain for findAndModify remove with positional projection with sort.",
+        logMessage: "Running explain for findAndModify remove with positional projection with sort.",
         opType: "DELETE",
         hasSort: true,
         isPositionalProjection: true,
@@ -125,29 +127,27 @@ let testCases = [
             explain: {
                 findAndModify: collName,
                 query: {y: 1, a: 1},
-                fields: {'a.$': 1},
+                fields: {"a.$": 1},
                 sort: {x: 1},
                 remove: true,
-            }
-        }
+            },
+        },
     },
     {
-        logMessage:
-            "Running explain for findAndModify remove with positional projection without sort.",
+        logMessage: "Running explain for findAndModify remove with positional projection without sort.",
         opType: "DELETE",
         isPositionalProjection: true,
         cmdObj: {
             explain: {
                 findAndModify: collName,
                 query: {y: 1, a: 1},
-                fields: {'a.$': 1},
+                fields: {"a.$": 1},
                 remove: true,
-            }
-        }
+            },
+        },
     },
     {
-        logMessage:
-            "Running explain for findAndModify update with positional projection with sort.",
+        logMessage: "Running explain for findAndModify update with positional projection with sort.",
         opType: "UPDATE",
         hasSort: true,
         isPositionalProjection: true,
@@ -156,24 +156,23 @@ let testCases = [
                 findAndModify: collName,
                 query: {y: 1, a: 1},
                 sort: {x: 1},
-                fields: {'a.$': 1},
+                fields: {"a.$": 1},
                 update: {$inc: {z: 1}},
-            }
-        }
+            },
+        },
     },
     {
-        logMessage:
-            "Running explain for findAndModify update with positional projection without sort.",
+        logMessage: "Running explain for findAndModify update with positional projection without sort.",
         opType: "UPDATE",
         isPositionalProjection: true,
         cmdObj: {
             explain: {
                 findAndModify: collName,
                 query: {y: 1, a: 1},
-                fields: {'a.$': 1},
+                fields: {"a.$": 1},
                 update: {$inc: {z: 1}},
-            }
-        }
+            },
+        },
     },
     {
         logMessage: "Running explain for findAndModify update with positional update with sort.",
@@ -186,8 +185,8 @@ let testCases = [
                 query: {y: 1, a: 1},
                 sort: {x: 1},
                 update: {$set: {"a.$": 3}},
-            }
-        }
+            },
+        },
     },
     {
         logMessage: "Running explain for findAndModify update with positional update without sort.",
@@ -198,8 +197,8 @@ let testCases = [
                 findAndModify: collName,
                 query: {y: 1, a: 1},
                 update: {$set: {"a.$": 3}},
-            }
-        }
+            },
+        },
     },
     {
         logMessage: "Running explain for updateOne.",
@@ -207,12 +206,14 @@ let testCases = [
         cmdObj: {
             explain: {
                 update: collName,
-                updates: [{
-                    q: {y: 1},
-                    u: {$set: {z: 1}},
-                    multi: false,
-                    upsert: false,
-                }],
+                updates: [
+                    {
+                        q: {y: 1},
+                        u: {$set: {z: 1}},
+                        multi: false,
+                        upsert: false,
+                    },
+                ],
             },
         },
     },
@@ -223,12 +224,14 @@ let testCases = [
         cmdObj: {
             explain: {
                 update: collName,
-                updates: [{
-                    q: {y: 5},
-                    u: {$set: {z: 1}},
-                    multi: false,
-                    upsert: true,
-                }],  // Query matches no documents.
+                updates: [
+                    {
+                        q: {y: 5},
+                        u: {$set: {z: 1}},
+                        multi: false,
+                        upsert: true,
+                    },
+                ], // Query matches no documents.
             },
         },
     },
@@ -239,12 +242,14 @@ let testCases = [
         cmdObj: {
             explain: {
                 update: collName,
-                updates: [{
-                    q: {y: 1, a: 1},
-                    u: {$set: {"a.$": 3}},
-                    multi: false,
-                    upsert: false,
-                }],
+                updates: [
+                    {
+                        q: {y: 1, a: 1},
+                        u: {$set: {"a.$": 3}},
+                        multi: false,
+                        upsert: false,
+                    },
+                ],
             },
         },
     },
@@ -264,7 +269,7 @@ function runTestCase(testCase) {
     jsTestLog(testCase.logMessage + "\n" + tojson(testCase));
 
     let verbosityLevels = ["queryPlanner", "executionStats", "allPlansExecution"];
-    verbosityLevels.forEach(verbosityLevel => {
+    verbosityLevels.forEach((verbosityLevel) => {
         jsTestLog("Running with verbosity level: " + verbosityLevel);
         let explainCmdObj = Object.assign(testCase.cmdObj, {verbosity: verbosityLevel});
         let res = assert.commandWorked(dbConn.runCommand(explainCmdObj));
@@ -273,7 +278,7 @@ function runTestCase(testCase) {
 }
 
 function constainsExecutionStage(executionStages, stageName) {
-    return executionStages.findIndex(stage => stage.name === stageName) != -1;
+    return executionStages.findIndex((stage) => stage.name === stageName) != -1;
 }
 
 /**
@@ -293,29 +298,22 @@ function validateResponse(res, testCase, verbosity) {
     const clusteredIndexScanStages = getPlanStages(res, "CLUSTERED_IXSCAN");
 
     if (clusteredIndexScanStages.length != 0) {
-        assert.eq(true,
-                  usingClusteredIndex,
-                  "CLUSTERED_IXSCAN is expected only for queries using clustered index");
+        assert.eq(true, usingClusteredIndex, "CLUSTERED_IXSCAN is expected only for queries using clustered index");
     }
 
     if (testCase.isPositionalProjection) {
         assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, "PROJECTION_DEFAULT");
-        assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage,
-                  testCase.opType);
+        assert.eq(res.queryPlanner.winningPlan.shards[0].winningPlan.inputStage.stage, testCase.opType);
     } else if (testCase.opType == "UPDATE") {
         // For 8.0 and beyond, EXPRESS will be used for update-by-id
-        assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage,
-                        ["EXPRESS_UPDATE", testCase.opType]);
+        assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, ["EXPRESS_UPDATE", testCase.opType]);
     } else if (testCase.opType == "DELETE") {
         // For 8.0 and beyond, EXPRESS will be used for delete-by-id
-        assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage,
-                        ["EXPRESS_DELETE", testCase.opType]);
+        assert.contains(res.queryPlanner.winningPlan.shards[0].winningPlan.stage, ["EXPRESS_DELETE", testCase.opType]);
     }
 
-    assert.eq(res.queryPlanner.winningPlan.shards.length,
-              1);  // Only 1 shard targeted by the write.
-    assert.eq(res.queryPlanner.winningPlan.inputStage.winningPlan.shards.length,
-              2);  // 2 shards had matching documents.
+    assert.eq(res.queryPlanner.winningPlan.shards.length, 1); // Only 1 shard targeted by the write.
+    assert.eq(res.queryPlanner.winningPlan.inputStage.winningPlan.shards.length, 2); // 2 shards had matching documents.
 
     if (verbosity === "queryPlanner") {
         assert.eq(res.executionStats, null);
@@ -323,34 +321,31 @@ function validateResponse(res, testCase, verbosity) {
         assert.eq(res.executionStats.executionStages.stage, "SHARD_WRITE");
 
         const executionStages = getExecutionStages(res);
-        const containsClusteredIndexScanStages =
-            constainsExecutionStage(executionStages, "CLUSTERED_IXSCAN");
+        const containsClusteredIndexScanStages = constainsExecutionStage(executionStages, "CLUSTERED_IXSCAN");
 
         if (containsClusteredIndexScanStages) {
-            assert.eq(true,
-                      usingClusteredIndex,
-                      "CLUSTERED_IXSCAN is expected only for queries using clustered index");
+            assert.eq(true, usingClusteredIndex, "CLUSTERED_IXSCAN is expected only for queries using clustered index");
         }
 
         if (testCase.isPositionalProjection) {
-            assert.eq(res.executionStats.executionStages.shards[0].executionStages.stage,
-                      "PROJECTION_DEFAULT");
-            assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.stage,
-                      testCase.opType);
+            assert.eq(res.executionStats.executionStages.shards[0].executionStages.stage, "PROJECTION_DEFAULT");
+            assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.stage, testCase.opType);
         } else if (testCase.opType == "UPDATE") {
             // For 8.0 and beyond, EXPRESS will be used for update-by-id
-            assert.contains(res.executionStats.executionStages.shards[0].executionStages.stage,
-                            ["EXPRESS_UPDATE", testCase.opType]);
+            assert.contains(res.executionStats.executionStages.shards[0].executionStages.stage, [
+                "EXPRESS_UPDATE",
+                testCase.opType,
+            ]);
         } else if (testCase.opType == "DELETE") {
             // For 8.0 and beyond, EXPRESS will be used for update-by-id
-            assert.contains(res.executionStats.executionStages.shards[0].executionStages.stage,
-                            ["EXPRESS_DELETE", testCase.opType]);
+            assert.contains(res.executionStats.executionStages.shards[0].executionStages.stage, [
+                "EXPRESS_DELETE",
+                testCase.opType,
+            ]);
         }
 
-        assert.eq(res.executionStats.executionStages.shards.length,
-                  1);  // Only 1 shard targeted by the write.
-        assert.eq(res.executionStats.inputStage.executionStages.shards.length,
-                  2);  // 2 shards had matching documents.
+        assert.eq(res.executionStats.executionStages.shards.length, 1); // Only 1 shard targeted by the write.
+        assert.eq(res.executionStats.inputStage.executionStages.shards.length, 2); // 2 shards had matching documents.
 
         // We use a dummy _id target document for the Write Phase which should not match any
         // existing documents in the collection. This will at least preserve the query plan,
@@ -368,32 +363,20 @@ function validateResponse(res, testCase, verbosity) {
                 // existing documents in the collection. This will at least preserve the query plan,
                 // but may lead to incorrect executionStats.
                 if (testCase.isPositionalProjection) {
-                    assert.eq(res.executionStats.executionStages.shards[0]
-                                  .executionStages.inputStage.nWouldDelete,
-                              0);
+                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.nWouldDelete, 0);
                 } else {
-                    assert.eq(
-                        res.executionStats.executionStages.shards[0].executionStages.nWouldDelete,
-                        0);
+                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.nWouldDelete, 0);
                 }
             } else {
                 // We use a dummy _id target document for the Write Phase which should not match any
                 // existing documents in the collection. This will at least preserve the query plan,
                 // but may lead to incorrect executionStats.
                 if (testCase.isPositionalProjection) {
-                    assert.eq(res.executionStats.executionStages.shards[0]
-                                  .executionStages.inputStage.nWouldModify,
-                              0);
-                    assert.eq(res.executionStats.executionStages.shards[0]
-                                  .executionStages.inputStage.nWouldUpsert,
-                              0);
+                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.nWouldModify, 0);
+                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.inputStage.nWouldUpsert, 0);
                 } else {
-                    assert.eq(
-                        res.executionStats.executionStages.shards[0].executionStages.nWouldModify,
-                        0);
-                    assert.eq(
-                        res.executionStats.executionStages.shards[0].executionStages.nWouldUpsert,
-                        0);
+                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.nWouldModify, 0);
+                    assert.eq(res.executionStats.executionStages.shards[0].executionStages.nWouldUpsert, 0);
                 }
             }
             assert.eq(res.executionStats.inputStage.nReturned, 2);
@@ -417,7 +400,7 @@ function validateResponse(res, testCase, verbosity) {
     }
 }
 
-testCases.forEach(testCase => {
+testCases.forEach((testCase) => {
     runTestCase(testCase);
 });
 

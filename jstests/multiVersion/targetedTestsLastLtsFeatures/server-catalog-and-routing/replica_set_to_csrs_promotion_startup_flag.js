@@ -6,12 +6,14 @@
 import {describe, it} from "jstests/libs/mochalite.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-describe("replicaSetConfigShardMaintenanceMode startup flag incompatibility tests", function() {
+describe("replicaSetConfigShardMaintenanceMode startup flag incompatibility tests", function () {
     it("incompatible with disabled featureFlagEnableReplicasetTransitionToCSRS", () => {
         const rs = new ReplSetTest({
-            nodes: [{
-                setParameter: {defaultStartupFCV: lastLTSFCV},
-            }]
+            nodes: [
+                {
+                    setParameter: {defaultStartupFCV: lastLTSFCV},
+                },
+            ],
         });
         rs.startSet({
             configsvr: "",
@@ -19,7 +21,7 @@ describe("replicaSetConfigShardMaintenanceMode startup flag incompatibility test
         });
 
         TestData.cleanUpCoreDumpsFromExpectedCrash = true;
-        assert.throws(function() {
+        assert.throws(function () {
             rs.initiate();
         });
         const SIGTERM = 15;

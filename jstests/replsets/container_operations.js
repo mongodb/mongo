@@ -19,8 +19,7 @@ const primaryDB = primary.getDB(dbName);
 
 // TODO(SERVER-109349): Remove this check when the feature flag is removed.
 if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
-    jsTestLog(
-        "Skipping container_operations.js because featureFlagPrimaryDrivenIndexBuilds is disabled");
+    jsTestLog("Skipping container_operations.js because featureFlagPrimaryDrivenIndexBuilds is disabled");
     rst.stopSet();
     quit();
 }
@@ -30,8 +29,8 @@ const ciInnerOp = {
     ns: `${dbName}.${collName}`,
     container: "testContainer",
     o: {
-        k: BinData(0, "QQ=="),  // 'A'
-        v: BinData(0, "Qg=="),  // 'B'
+        k: BinData(0, "QQ=="), // 'A'
+        v: BinData(0, "Qg=="), // 'B'
     },
 };
 
@@ -40,7 +39,7 @@ const cdInnerOp = {
     ns: `${dbName}.${collName}`,
     container: "testContainer",
     o: {
-        k: BinData(0, "QQ=="),  // 'A'
+        k: BinData(0, "QQ=="), // 'A'
     },
 };
 

@@ -23,7 +23,6 @@ assert.commandWorked(secondary.adminCommand({replSetFreeze: 15}));
 assert.commandFailedWithCode(secondary.adminCommand({replSetStepUp: 1}), ErrorCodes.CommandFailed);
 
 // Test that the election handoff works eventually when the secondary node becomes electable.
-ElectionHandoffTest.testElectionHandoff(
-    rst, 0, 1, {stepDownPeriodSecs: 30, secondaryCatchUpPeriodSecs: 30});
+ElectionHandoffTest.testElectionHandoff(rst, 0, 1, {stepDownPeriodSecs: 30, secondaryCatchUpPeriodSecs: 30});
 
 rst.stopSet();

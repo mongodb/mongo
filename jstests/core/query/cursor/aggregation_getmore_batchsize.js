@@ -22,8 +22,7 @@ for (var i = 0; i < 6; i++) {
     print(tojson(cursor.next()));
     jsTestLog("Expecting " + (curCount - 1));
     assert.eq(cursor.objsLeftInBatch(), --curCount);
-    if (curCount == 0)
-        curCount = 2;
+    if (curCount == 0) curCount = 2;
 }
 
 // Create a cursor with a batch size of 0 (should only return one full batch of documents).

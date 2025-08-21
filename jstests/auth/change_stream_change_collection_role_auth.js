@@ -14,7 +14,7 @@ import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kPassword = "password";
-const kVTSKey = 'secret';
+const kVTSKey = "secret";
 const kKeyFile = "jstests/libs/key1";
 const kTenantId = ObjectId();
 const kToken = _createTenantToken({tenant: kTenantId});
@@ -33,12 +33,12 @@ replSetTest.startSet({
     setParameter: {
         multitenancySupport: true,
         testOnlyValidatedTenancyScopeKey: kVTSKey,
-    }
+    },
 });
 replSetTest.initiate();
 const primary = replSetTest.getPrimary();
 const tokenConn = new Mongo(primary.host);
-const adminDb = primary.getDB('admin');
+const adminDb = primary.getDB("admin");
 
 // A dictionary of users against which authorization of change collection will be verified.
 // The format of dictionary is:
@@ -59,58 +59,60 @@ const users = {
             find: true,
             update: true,
             remove: true,
-        }
+        },
     },
     tenantRoot: {
         isTenantUser: true,
         db: "admin",
         roles: [],
-        privileges:
-            [{resource: {anyResource: true}, actions: ['insert', 'find', 'update', 'remove']}],
+        privileges: [{resource: {anyResource: true}, actions: ["insert", "find", "update", "remove"]}],
         testPrivileges: {
             insert: true,
             find: true,
             update: true,
             remove: true,
-        }
+        },
     },
     tenantDbAdmin: {
         isTenantUser: true,
         db: "admin",
-        roles: [{role: 'dbAdminAnyDatabase', db: 'admin'}],
+        roles: [{role: "dbAdminAnyDatabase", db: "admin"}],
         testPrivileges: {
             insert: false,
             find: false,
             update: false,
             remove: false,
-        }
+        },
     },
     tenantReadOnly: {
         isTenantUser: true,
         db: "admin",
-        roles: [{role: 'readAnyDatabase', db: 'admin'}],
+        roles: [{role: "readAnyDatabase", db: "admin"}],
         testPrivileges: {
             insert: false,
             find: false,
             update: false,
             remove: false,
-        }
+        },
     },
     tenantReadWrite: {
         isTenantUser: true,
         db: "admin",
-        roles: [{role: 'readWriteAnyDatabase', db: 'admin'}],
+        roles: [{role: "readWriteAnyDatabase", db: "admin"}],
         testPrivileges: {
             insert: false,
             find: false,
             update: false,
             remove: false,
-        }
+        },
     },
     test: {
         isTenantUser: true,
         db: "test",
-        roles: [{"role": "readWrite", "db": "test"}, {"role": "readWrite", "db": "config"}],
+        roles: [
+            {"role": "readWrite", "db": "test"},
+            {"role": "readWrite", "db": "config"},
+        ],
         testPrivileges: {
             insert: false,
             find: false,
@@ -137,8 +139,7 @@ function login(userName) {
     } else {
         // Otherwise, authenticate using a Security Token (on db: '$external').
         jsTestLog(`Trying to log on ${userDbName} for tenant: ${kTenantId} as ${userName}`);
-        const securityToken =
-            _createSecurityToken({user: userName, db: "$external", tenant: kTenantId}, kVTSKey);
+        const securityToken = _createSecurityToken({user: userName, db: "$external", tenant: kTenantId}, kVTSKey);
         tokenConn._setSecurityToken(securityToken);
         const tokenDB = tokenConn.getDB(userDbName);
         assert.commandWorked(tokenDB.runCommand({connectionStatus: 1}));
@@ -155,8 +156,9 @@ function createUsers() {
         jsTestLog(`Creating user ${userName} on tenant:${kTenantId} for db:${user.db}`);
 
         if (isRootUser(userName)) {
-            assert.commandWorked(primary.getDB(user.db).runCommand(
-                {createUser: userName, pwd: kPassword, roles: user.roles}));
+            assert.commandWorked(
+                primary.getDB(user.db).runCommand({createUser: userName, pwd: kPassword, roles: user.roles}),
+            );
         } else {
             // Must be authenticated as a user with ActionType::useTenant in order to use unsigned
             // security token.
@@ -165,18 +167,18 @@ function createUsers() {
             if (user.privileges !== undefined) {
                 // If we have to set privileges for the user, then create first a role with those
                 // privileges, and add it to the user roles.
-                const userRoleName = 'roleFor_' + userName;
+                const userRoleName = "roleFor_" + userName;
                 const createRoleForUserCommand = {
                     createRole: userRoleName,
                     privileges: user.privileges,
-                    roles: []
+                    roles: [],
                 };
-                assert.commandWorked(
-                    runCommandWithSecurityToken(kToken, adminDb, createRoleForUserCommand));
-                createUserCommand.roles.push({role: userRoleName, db: 'admin'});
+                assert.commandWorked(runCommandWithSecurityToken(kToken, adminDb, createRoleForUserCommand));
+                createUserCommand.roles.push({role: userRoleName, db: "admin"});
             }
-            assert.commandWorked(runCommandWithSecurityToken(
-                kToken, adminDb.getSiblingDB("$external"), createUserCommand));
+            assert.commandWorked(
+                runCommandWithSecurityToken(kToken, adminDb.getSiblingDB("$external"), createUserCommand),
+            );
             adminDb.logout();
         }
 
@@ -209,10 +211,16 @@ function assertActionAuthorized(actionFunc, isAuthorized) {
         assert.eq(isAuthorized, false, "authorization failed unexpectedly, details: " + ex);
 
         // Verify that the authorization failed with the expected error code.
-        assert.eq(ex.code,
-                  ErrorCodes.Unauthorized,
-                  "expected operation should fail with code: " + ErrorCodes.Unauthorized +
-                      ", found: " + ex.code + ", details: " + ex);
+        assert.eq(
+            ex.code,
+            ErrorCodes.Unauthorized,
+            "expected operation should fail with code: " +
+                ErrorCodes.Unauthorized +
+                ", found: " +
+                ex.code +
+                ", details: " +
+                ex,
+        );
     }
 }
 
@@ -262,8 +270,7 @@ createUsers();
     let testPrimary = login("root");
 
     // Enable change streams to ensure the creation of change collections.
-    assert.commandWorked(
-        runCommandWithSecurityToken(kToken, adminDb, {setChangeStreamState: 1, enabled: true}));
+    assert.commandWorked(runCommandWithSecurityToken(kToken, adminDb, {setChangeStreamState: 1, enabled: true}));
 
     // And logout.
     testPrimary.logout();
@@ -286,13 +293,13 @@ createUsers();
 
     // Check that Change Collection was NOT created outside the tenant.
     const configDB = rootDB.getSiblingDB("config");
-    let result = assert.commandWorked(
-        configDB.runCommand({listCollections: 1, filter: {name: changeCollectionName}}));
+    let result = assert.commandWorked(configDB.runCommand({listCollections: 1, filter: {name: changeCollectionName}}));
     assert.eq(result.cursor.firstBatch.length, 0, result);
 
     // Check that Change Collection was created in the tenant.
-    result = assert.commandWorked(runCommandWithSecurityToken(
-        kToken, configDB, {listCollections: 1, filter: {name: changeCollectionName}}));
+    result = assert.commandWorked(
+        runCommandWithSecurityToken(kToken, configDB, {listCollections: 1, filter: {name: changeCollectionName}}),
+    );
     assert.eq(result.cursor.firstBatch.length, 1, result);
 
     rootDB.logout();
@@ -305,19 +312,19 @@ for (const userName of Object.keys(users)) {
     // which tenant we are acting; otherwise the tenant of the user will be used.
     const token = !users[userName].isTenantUser ? kToken : tokenConn._securityToken;
 
-    for (const [op, isAuthorized] of Object.entries(users[userName]['testPrivileges'])) {
+    for (const [op, isAuthorized] of Object.entries(users[userName]["testPrivileges"])) {
         let opFunc;
         switch (op) {
-            case 'insert':
+            case "insert":
                 opFunc = insertChangeCollectionDoc.bind(null, userDB, token);
                 break;
-            case 'find':
+            case "find":
                 opFunc = findChangeCollectionDoc.bind(null, userDB, token);
                 break;
-            case 'update':
+            case "update":
                 opFunc = updateChangeCollectionDoc.bind(null, userDB, token);
                 break;
-            case 'remove':
+            case "remove":
                 opFunc = removeChangeCollectionDoc.bind(null, userDB, token);
                 break;
             default:

@@ -13,8 +13,7 @@ const collName = "testColl";
 const ns = dbName + "." + collName;
 
 // Make shard0 the primary shard.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 const mongos0Coll = st.s.getCollection(ns);
 assert.commandWorked(mongos0Coll.createIndex({x: 1}));
@@ -23,7 +22,7 @@ assert.commandWorked(mongos0Coll.insert([{x: -1}, {x: 1}]));
 const configureCmdObj = {
     configureQueryAnalyzer: ns,
     mode: "full",
-    samplesPerSecond: 1
+    samplesPerSecond: 1,
 };
 
 // Run the configureQueryAnalyzer command.

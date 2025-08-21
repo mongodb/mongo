@@ -14,7 +14,7 @@ const VERSION_4_9_COMPATIBILITY = {
     maxWireVersion: WIRE_VERSION_49,
 };
 
-let testWireVersion = function(isSystem, compatibilityBounds) {
+let testWireVersion = function (isSystem, compatibilityBounds) {
     const rst = new ReplSetTest({nodes: 3, auth: ""});
     rst.startSet();
     rst.initiate();
@@ -26,13 +26,15 @@ let testWireVersion = function(isSystem, compatibilityBounds) {
         admin.auth("__system", "");
     }
 
-    {  // Test deprecated isMaster command
+    {
+        // Test deprecated isMaster command
         let res = admin.runCommand({isMaster: 1, apiVersion: "1"});
         assert.lte(res.minWireVersion, compatibilityBounds.minWireVersion);
         assert.gte(res.maxWireVersion, compatibilityBounds.maxWireVersion);
     }
 
-    {  // Test new hello command
+    {
+        // Test new hello command
         let res = admin.runCommand({hello: 1, apiVersion: "1", apiStrict: true});
         assert.lte(res.minWireVersion, compatibilityBounds.minWireVersion);
         assert.gte(res.maxWireVersion, compatibilityBounds.maxWireVersion);

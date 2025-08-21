@@ -23,61 +23,71 @@ function assertCorrectResult(res, shouldWork, user) {
     }
 }
 
-const createInactiveCursor = function(db, collName) {
+const createInactiveCursor = function (db, collName) {
     const cmdRes = db.runCommand({find: collName, filter: {}, batchSize: 1});
     assert.commandWorked(cmdRes);
     return cmdRes.cursor.id;
 };
 
-function testReleaseMemory(
-    conn, user, shouldWorkCollection, shouldWorkDatabase, shouldWorkCluster) {
-    const admin = conn.getDB('admin');
+function testReleaseMemory(conn, user, shouldWorkCollection, shouldWorkDatabase, shouldWorkCluster) {
+    const admin = conn.getDB("admin");
     admin.auth(user, "pass");
 
     const db1 = conn.getDB(db1Name);
     const db2 = conn.getDB(db2Name);
 
-    assertCorrectResult(db1.runCommand({releaseMemory: [createInactiveCursor(db1, coll1Name)]}),
-                        shouldWorkCollection,
-                        user);
-    assertCorrectResult(db1.runCommand({releaseMemory: [createInactiveCursor(db1, coll2Name)]}),
-                        shouldWorkDatabase,
-                        user);
-    assertCorrectResult(db2.runCommand({releaseMemory: [createInactiveCursor(db2, coll1Name)]}),
-                        shouldWorkCluster,
-                        user);
+    assertCorrectResult(
+        db1.runCommand({releaseMemory: [createInactiveCursor(db1, coll1Name)]}),
+        shouldWorkCollection,
+        user,
+    );
+    assertCorrectResult(
+        db1.runCommand({releaseMemory: [createInactiveCursor(db1, coll2Name)]}),
+        shouldWorkDatabase,
+        user,
+    );
+    assertCorrectResult(
+        db2.runCommand({releaseMemory: [createInactiveCursor(db2, coll1Name)]}),
+        shouldWorkCluster,
+        user,
+    );
 
     admin.logout();
 }
 
 export function runTest(conn) {
-    const admin = conn.getDB('admin');
-    admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
+    const admin = conn.getDB("admin");
+    admin.createUser({user: "admin", pwd: "pass", roles: jsTest.adminUserRoles});
 
-    assert(admin.auth('admin', 'pass'));
+    assert(admin.auth("admin", "pass"));
     setupCollections(conn);
 
     const db1 = conn.getDB(db1Name);
     assert.commandFailedWithCode(
         db1.runCommand({releaseMemory: [createInactiveCursor(db1, coll1Name)]}),
         [ErrorCodes.Unauthorized],
-        "releaseMemory should not work without releaseMemoryAnyCursor permission");
+        "releaseMemory should not work without releaseMemoryAnyCursor permission",
+    );
 
     admin.createRole({
         createRole: "releaseCollection",
         roles: ["readAnyDatabase"],
-        privileges: [{
-            resource: {db: "release_memory_base_1", collection: "coll1"},
-            actions: ["releaseMemoryAnyCursor"],
-        }],
+        privileges: [
+            {
+                resource: {db: "release_memory_base_1", collection: "coll1"},
+                actions: ["releaseMemoryAnyCursor"],
+            },
+        ],
     });
     admin.createRole({
         createRole: "releaseDatabase",
         roles: ["readAnyDatabase"],
-        privileges: [{
-            resource: {db: "release_memory_base_1", collection: ""},
-            actions: ["releaseMemoryAnyCursor"],
-        }],
+        privileges: [
+            {
+                resource: {db: "release_memory_base_1", collection: ""},
+                actions: ["releaseMemoryAnyCursor"],
+            },
+        ],
     });
     admin.createRole({
         createRole: "releaseCluster",

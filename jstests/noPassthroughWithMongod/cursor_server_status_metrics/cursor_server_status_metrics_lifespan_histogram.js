@@ -36,10 +36,13 @@ const initialNumCursorsLt30s = getNumCursorsLessThan30Seconds();
 // Calculates the number of cursors that have lived less than 30s (< 1s, < 5s, etc.) since this test
 // was started.
 function cursorsDeadSinceStartLt30Seconds() {
-    return (getNumCursorsLessThan1Second() + getNumCursorsLessThan5Seconds() +
-            getNumCursorsLessThan15Seconds() + getNumCursorsLessThan30Seconds()) -
-        (initialNumCursorsLt1s + initialNumCursorsLt5s + initialNumCursorsLt15s +
-         initialNumCursorsLt30s);
+    return (
+        getNumCursorsLessThan1Second() +
+        getNumCursorsLessThan5Seconds() +
+        getNumCursorsLessThan15Seconds() +
+        getNumCursorsLessThan30Seconds() -
+        (initialNumCursorsLt1s + initialNumCursorsLt5s + initialNumCursorsLt15s + initialNumCursorsLt30s)
+    );
 }
 
 let cursorId = assert.commandWorked(db.runCommand({find: coll.getName(), batchSize: 2})).cursor.id;

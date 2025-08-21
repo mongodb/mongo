@@ -10,6 +10,6 @@ removeFile(sentinelPath);
 
 // Loop infinitely to simulate timeout.
 while (true) {
-    print('looping...');
+    print("looping...");
     sleep(100);
 }

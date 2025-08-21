@@ -17,13 +17,22 @@ const innerColl = db["inner"];
 
 (function createOuterColl() {
     outerColl.drop();
-    assert.commandWorked(outerColl.insert([{_id: 1, x: "foo"}, {_id: 3, x: "foo"}]));
-}());
+    assert.commandWorked(
+        outerColl.insert([
+            {_id: 1, x: "foo"},
+            {_id: 3, x: "foo"},
+        ]),
+    );
+})();
 
 function createInnerColl() {
     innerColl.drop();
     assert.commandWorked(
-        innerColl.insert([{_id: 1, x: "foo", y: "a"}, {_id: 2, x: "foo", y: "z"}]));
+        innerColl.insert([
+            {_id: 1, x: "foo", y: "a"},
+            {_id: 2, x: "foo", y: "z"},
+        ]),
+    );
 }
 createInnerColl();
 
@@ -36,19 +45,16 @@ function explainStage(stage, stageName) {
 }
 
 // Explain of $lookup when neither collection is sharded.
-const lookupStage =
-        {
-            $lookup: {
-                from: innerColl.getName(),
-                let: {
-                    myX: "$x",
-                },
-                pipeline: [
-                    {$match: {$expr: {$eq: ["$x", "$$myX"]}}},
-                ],
-                as: "as"
-            }
-        };
+const lookupStage = {
+    $lookup: {
+        from: innerColl.getName(),
+        let: {
+            myX: "$x",
+        },
+        pipeline: [{$match: {$expr: {$eq: ["$x", "$$myX"]}}}],
+        as: "as",
+    },
+};
 let stageExplain = explainStage(lookupStage, "$lookup");
 assert.eq(stageExplain.nReturned, 2, stageExplain);
 // The two documents in the inner collection are scanned twice, leading to four docs examined in
@@ -61,14 +67,12 @@ assert.eq(stageExplain.indexesUsed, [], stageExplain);
 const unionWithStage = {
     $unionWith: {
         coll: innerColl.getName(),
-        pipeline: [
-            {$match: {$expr: {$eq: ["$x", "foo"]}}},
-        ]
-    }
+        pipeline: [{$match: {$expr: {$eq: ["$x", "foo"]}}}],
+    },
 };
 
 const nestedUnionWithStage = {
-    $unionWith: {coll: innerColl.getName(), pipeline: [unionWithStage]}
+    $unionWith: {coll: innerColl.getName(), pipeline: [unionWithStage]},
 };
 
 // Explain of $unionWith when neither collection is sharded.
@@ -81,12 +85,14 @@ assert.eq(stageExplain.nReturned, 6, stageExplain);
 
 // Shard the inner collection.
 assert.commandWorked(innerColl.createIndex({y: 1, x: 1}));
-st.shardColl(innerColl.getName(),
-             {y: 1, x: 1} /* shard key */,
-             {y: "b", x: "b"} /* split at */,
-             {y: "c", x: "c"} /* move */,
-             dbName,
-             true);
+st.shardColl(
+    innerColl.getName(),
+    {y: 1, x: 1} /* shard key */,
+    {y: "b", x: "b"} /* split at */,
+    {y: "c", x: "c"} /* move */,
+    dbName,
+    true,
+);
 
 // Explain of $lookup when outer collection is unsharded and inner collection is sharded.
 stageExplain = explainStage(lookupStage, "$lookup");
@@ -120,12 +126,7 @@ stageExplain = explainStage(nestedUnionWithStage, "$unionWith");
 assert.eq(stageExplain.nReturned, 6, stageExplain);
 
 // Shard the outer collection.
-st.shardColl(outerColl.getName(),
-             {_id: 1} /* shard key */,
-             {_id: 2} /* split at */,
-             {_id: 3} /* move */,
-             dbName,
-             true);
+st.shardColl(outerColl.getName(), {_id: 1} /* shard key */, {_id: 2} /* split at */, {_id: 3} /* move */, dbName, true);
 
 // A variant of 'explainStage()' when the stage is expected to appear twice because it runs on
 // two shards.

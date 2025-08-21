@@ -16,8 +16,7 @@ const primaryShardConn = st.rs1.getPrimary();
 
 // Create a sharded collection. This will add an entry on both the sharding and the local
 // catalog of the primary shard.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: "hashed"}}));
 
 // Drop and re-create the collection on the primary shard. This will generate a uuid mismatch.
@@ -25,13 +24,12 @@ primaryShardConn.getDB(dbName).getCollection(collName).drop();
 assert.commandWorked(primaryShardConn.getDB(dbName).createCollection(collName));
 // Re-create the shard key index for consistency. The shard key must always have an associated
 // index. This issue would fail before the uuid mismach inconsistency is detected.
-assert.commandWorked(
-    primaryShardConn.getDB(dbName).getCollection(collName).createIndex({_id: "hashed"}));
+assert.commandWorked(primaryShardConn.getDB(dbName).getCollection(collName).createIndex({_id: "hashed"}));
 
 // Run an insertion to force the shard to access the local catalog and detect the mismatch. The log
 // should be eventually detected.
 const logid = 9087200;
-const timeoutMs = 5 * 60 * 1000;  // 5 min
+const timeoutMs = 5 * 60 * 1000; // 5 min
 const retryIntervalMS = 300;
 assert.soon(
     () => {
@@ -42,8 +40,9 @@ assert.soon(
         }
         return false;
     },
-    'Could not find log entries containing the following message: ' + logid,
+    "Could not find log entries containing the following message: " + logid,
     timeoutMs,
     retryIntervalMS,
-    {runHangAnalyzer: false});
+    {runHangAnalyzer: false},
+);
 st.stop();

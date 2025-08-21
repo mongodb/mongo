@@ -12,12 +12,13 @@
 
 function countEventually(collection, n) {
     assert.soon(
-        function() {
+        function () {
             return collection.count() === n;
         },
-        function() {
+        function () {
             return "unacknowledged write timed out";
-        });
+        },
+    );
 }
 
 let coll = db[jsTestName()];
@@ -42,7 +43,7 @@ request = {
     update: coll.getName(),
     updates: [{q: {a: 1}, u: {$set: {a: 1}}, upsert: true}],
     writeConcern: {w: 0},
-    ordered: true
+    ordered: true,
 };
 result = coll.runCommand(request);
 assert.eq({ok: 1}, result);
@@ -56,10 +57,10 @@ request = {
     update: coll.getName(),
     updates: [
         {q: {a: 2}, u: {$set: {a: 1}}, upsert: true},
-        {q: {a: 2}, u: {$set: {a: 2}}, upsert: true}
+        {q: {a: 2}, u: {$set: {a: 2}}, upsert: true},
     ],
     writeConcern: {w: 0},
-    ordered: true
+    ordered: true,
 };
 result = coll.runCommand(request);
 assert.eq({ok: 1}, result);
@@ -68,16 +69,17 @@ countEventually(coll, 2);
 //
 // Upsert fail due to duplicate key index, w:0, ordered:true
 assert(coll.drop());
-assert.commandWorked(db.runCommand(
-    {createIndexes: coll.getName(), indexes: [{key: {a: 1}, name: "a_1", unique: true}]}));
+assert.commandWorked(
+    db.runCommand({createIndexes: coll.getName(), indexes: [{key: {a: 1}, name: "a_1", unique: true}]}),
+);
 request = {
     update: coll.getName(),
     updates: [
         {q: {b: 1}, u: {$set: {b: 1, a: 1}}, upsert: true},
-        {q: {b: 2}, u: {$set: {b: 2, a: 1}}, upsert: true}
+        {q: {b: 2}, u: {$set: {b: 2, a: 1}}, upsert: true},
     ],
     writeConcern: {w: 0},
-    ordered: true
+    ordered: true,
 };
 result = coll.runCommand(request);
 assert.eq({ok: 1}, result);
@@ -91,7 +93,7 @@ assert.commandWorked(coll.insert({a: 1}));
 request = {
     delete: coll.getName(),
     deletes: [{q: {a: 1}, limit: 1}],
-    writeConcern: {w: 0}
+    writeConcern: {w: 0},
 };
 result = coll.runCommand(request);
 assert.eq({ok: 1}, result);
@@ -104,9 +106,13 @@ assert.commandWorked(db.runCommand({create: coll.getName()}));
 assert.commandWorked(coll.insert({a: 1}));
 request = {
     delete: coll.getName(),
-    deletes: [{q: {$set: {a: 1}}, limit: 0}, {q: {$set: {a: 1}}, limit: 0}, {q: {a: 1}, limit: 0}],
+    deletes: [
+        {q: {$set: {a: 1}}, limit: 0},
+        {q: {$set: {a: 1}}, limit: 0},
+        {q: {a: 1}, limit: 0},
+    ],
     writeConcern: {w: 0},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert.eq({ok: 1}, result);
@@ -119,9 +125,13 @@ assert.commandWorked(db.runCommand({create: coll.getName()}));
 assert.commandWorked(coll.insert({a: 1}));
 request = {
     delete: coll.getName(),
-    deletes: [{q: {$set: {a: 1}}, limit: 0}, {q: {$set: {a: 1}}, limit: 0}, {q: {a: 1}, limit: 1}],
+    deletes: [
+        {q: {$set: {a: 1}}, limit: 0},
+        {q: {$set: {a: 1}}, limit: 0},
+        {q: {a: 1}, limit: 1},
+    ],
     writeConcern: {w: 0},
-    ordered: true
+    ordered: true,
 };
 result = coll.runCommand(request);
 assert.eq({ok: 1}, result);
@@ -136,7 +146,7 @@ request = {
     delete: coll.getName(),
     deletes: [{q: {a: 1}, limit: 2}],
     writeConcern: {w: 0},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 // Unacknowledged writes are always OK

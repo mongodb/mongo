@@ -18,7 +18,7 @@ export function runWithFailpoint(db, failpointName, failpointOpts, func) {
 
         func();
     } finally {
-        failPoints.forEach(failPoint => failPoint.off());
+        failPoints.forEach((failPoint) => failPoint.off());
     }
 }
 
@@ -36,8 +36,7 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
 
     assert.commandWorked(collection.createIndex({a: 1}));
     assert.commandWorked(collection.createIndex({b: 1}));
-    assert.commandWorked(
-        collection.insertMany(Array.from({length: 100}, (_, i) => ({a: "abc", b: "def", c: i}))));
+    assert.commandWorked(collection.insertMany(Array.from({length: 100}, (_, i) => ({a: "abc", b: "def", c: i}))));
 
     assert.commandWorked(db.createView("view", collName, [{$match: filter}]));
 
@@ -48,7 +47,7 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
         {testName: "distinct", command: {explain: {distinct: collName, key: "c", query: filter}}},
         {
             testName: "findAndModify",
-            command: {explain: {findAndModify: collName, query: filter, update: {$inc: {c: 1}}}}
+            command: {explain: {findAndModify: collName, query: filter, update: {$inc: {c: 1}}}},
         },
         {
             testName: "findAndModify upsert",
@@ -57,17 +56,17 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
                     findAndModify: collName,
                     query: filter,
                     update: {$inc: {c: 1}},
-                    upsert: true
-                }
-            }
+                    upsert: true,
+                },
+            },
         },
         {
             testName: "delete",
-            command: {explain: {delete: collName, deletes: [{q: filter, limit: 0}]}}
+            command: {explain: {delete: collName, deletes: [{q: filter, limit: 0}]}},
         },
         {
             testName: "update",
-            command: {explain: {update: collName, updates: [{q: filter, u: {$inc: {c: 1}}}]}}
+            command: {explain: {update: collName, updates: [{q: filter, u: {$inc: {c: 1}}}]}},
         },
         {
             testName: "bulkWrite",
@@ -76,16 +75,16 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
                     bulkWrite: 1,
                     ops: [{update: 0, filter: filter, updateMods: {$inc: {c: 1}}}],
                     nsInfo: [{ns: collection.getFullName()}],
-                }
+                },
             },
         },
         {
             testName: "aggregate with explain command",
-            command: {explain: {aggregate: collName, pipeline: [{$match: filter}], cursor: {}}}
+            command: {explain: {aggregate: collName, pipeline: [{$match: filter}], cursor: {}}},
         },
         {
             testName: "aggregate with explain flag",
-            command: {aggregate: collName, pipeline: [{$match: filter}], cursor: {}, explain: true}
+            command: {aggregate: collName, pipeline: [{$match: filter}], cursor: {}, explain: true},
         },
         {
             testName: "aggregate with subpipeline",
@@ -99,22 +98,21 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
                                 from: collName,
                                 as: "arr",
                                 let: {local_c: "$c"},
-                                pipeline: [{$match: {$expr: {$gte: ["$c", "$$local_c"]}}}]
-                            }
-                        }
+                                pipeline: [{$match: {$expr: {$gte: ["$c", "$$local_c"]}}}],
+                            },
+                        },
                     ],
-                    cursor: {}
-                }
-            }
+                    cursor: {},
+                },
+            },
         },
         {
             testName: "aggregate on view",
-            command: {explain: {aggregate: "view", pipeline: [], cursor: {}}}
+            command: {explain: {aggregate: "view", pipeline: [], cursor: {}}},
         },
         {
             testName: "aggregate with getMore",
-            command: {explain: {aggregate: collName, pipeline: [{$match: filter}],
-            cursor: {batchSize: 2}}}
+            command: {explain: {aggregate: collName, pipeline: [{$match: filter}], cursor: {batchSize: 2}}},
         },
         {
             testName: "mapReduce",
@@ -122,15 +120,15 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
                 explain: {
                     mapReduce: collName,
                     query: filter,
-                    map: function() {
+                    map: function () {
                         emit("val", 1);
                     },
-                    reduce: function(k, v) {
+                    reduce: function (k, v) {
                         return 1;
                     },
-                    out: "example"
-                }
-            }
+                    out: "example",
+                },
+            },
         },
     ];
 
@@ -138,30 +136,29 @@ export function setupCollectionAndGetExplainTestCases(db, collName, waitTimeMill
     const nonMultiplanningCommands = [
         {
             testName: "express-eligible find-by-id",
-            command: {explain: {find: collName, filter: {_id: 0}}}
+            command: {explain: {find: collName, filter: {_id: 0}}},
         },
         {
             testName: "express-eligible single-field find",
-            command: {explain: {find: collName, filter: {a: "abc"}, limit: 1}}
+            command: {explain: {find: collName, filter: {a: "abc"}, limit: 1}},
         },
         {
             testName: "single-field find that doesn't multiplan",
-            command: {explain: {find: collName, filter: {a: "abc"}}}
+            command: {explain: {find: collName, filter: {a: "abc"}}},
         },
     ];
 
     let failpointBase = {
         failpointName: "sleepWhileMultiplanning",
-        failpointOpts: {ms: waitTimeMillis}
+        failpointOpts: {ms: waitTimeMillis},
     };
-    const testCases = commands.map(cmd => Object.assign({}, failpointBase, cmd));
+    const testCases = commands.map((cmd) => Object.assign({}, failpointBase, cmd));
 
     failpointBase = {
         failpointName: "setAutoGetCollectionWait",
-        failpointOpts: {waitForMillis: waitTimeMillis}
+        failpointOpts: {waitForMillis: waitTimeMillis},
     };
-    const nonMultiPlanningTestCases =
-        nonMultiplanningCommands.map(cmd => Object.assign({}, failpointBase, cmd));
+    const nonMultiPlanningTestCases = nonMultiplanningCommands.map((cmd) => Object.assign({}, failpointBase, cmd));
 
     return testCases.concat(nonMultiPlanningTestCases);
 }

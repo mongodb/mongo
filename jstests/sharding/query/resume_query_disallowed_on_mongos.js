@@ -14,25 +14,30 @@ const db = st.getDB("test");
 // $_requestResumeToken is disallowed.
 assert.commandFailedWithCode(
     db.runCommand({find: "test", hint: {$natural: 1}, batchSize: 1, $_requestResumeToken: true}),
-    ErrorCodes.BadValue);
+    ErrorCodes.BadValue,
+);
 
 // Passing a $_resumeAfter token is disallowed.
-assert.commandFailedWithCode(db.runCommand({
-    find: "test",
-    hint: {$natural: 1},
-    batchSize: 1,
-    $_resumeAfter: {$recordId: NumberLong(1)}
-}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({
+        find: "test",
+        hint: {$natural: 1},
+        batchSize: 1,
+        $_resumeAfter: {$recordId: NumberLong(1)},
+    }),
+    ErrorCodes.BadValue,
+);
 
 // Passing both is disallowed.
-assert.commandFailedWithCode(db.runCommand({
-    find: "test",
-    hint: {$natural: 1},
-    batchSize: 1,
-    $_requestResumeToken: true,
-    $_resumeAfter: {$recordId: NumberLong(1)}
-}),
-                             ErrorCodes.BadValue);
+assert.commandFailedWithCode(
+    db.runCommand({
+        find: "test",
+        hint: {$natural: 1},
+        batchSize: 1,
+        $_requestResumeToken: true,
+        $_resumeAfter: {$recordId: NumberLong(1)},
+    }),
+    ErrorCodes.BadValue,
+);
 
 st.stop();

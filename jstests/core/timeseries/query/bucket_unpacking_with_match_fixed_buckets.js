@@ -30,7 +30,7 @@ function checkResults({
     eventFilter = null,
     wholeBucketFilter = null,
     fixedBuckets = true,
-    expectUnpackStage = true
+    expectUnpackStage = true,
 }) {
     checkExplain(pipeline, eventFilter, wholeBucketFilter, fixedBuckets, expectUnpackStage);
     let results = coll.aggregate(pipeline).toArray();
@@ -62,14 +62,16 @@ function checkExplain(pipeline, eventFilter, wholeBucketFilter, fixedBuckets, ex
 
 function testDeterministicInput(roundingParam, startingTime) {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {
-            timeField: timeField,
-            metaField: metaField,
-            bucketMaxSpanSeconds: roundingParam,
-            bucketRoundingSeconds: roundingParam
-        }
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {
+                timeField: timeField,
+                metaField: metaField,
+                bucketMaxSpanSeconds: roundingParam,
+                bucketRoundingSeconds: roundingParam,
+            },
+        }),
+    );
     let docs = [];
     // Need to convert the 'bucketRoundingSeconds' and 'bucketMaxSpanSeconds' to milliseconds.
     const offset = roundingParam * 1000;
@@ -81,7 +83,7 @@ function testDeterministicInput(roundingParam, startingTime) {
         startingTime,
         new Date(startingTime.getTime() + offset / 3),
         new Date(startingTime.getTime() + offset / 2),
-        new Date(startingTime.getTime() + offset)
+        new Date(startingTime.getTime() + offset),
     ];
     times.forEach((time, index) => {
         docs.push({
@@ -89,7 +91,7 @@ function testDeterministicInput(roundingParam, startingTime) {
             [timeField]: time,
             [metaField]: {"id": 1234, "location": "nyc"},
             otherTime: time,
-            accValue: index * 2
+            accValue: index * 2,
         });
     });
     assert.commandWorked(coll.insertMany(docs));
@@ -104,14 +106,14 @@ function testDeterministicInput(roundingParam, startingTime) {
         pipeline: [{$match: {[timeField]: {$lt: times[2]}}}],
         expectedDocs: [docs[0], docs[1]],
         eventFilter: {[timeField]: {$lt: times[2]}},
-        wholeBucketFilter: {[`control.max.${timeField}`]: {$lt: times[2]}}
+        wholeBucketFilter: {[`control.max.${timeField}`]: {$lt: times[2]}},
     });
 
     // $lt when the predicate does align with the bucket boundary, and we don't expect an
     // _eventFilter.
     checkResults({
         pipeline: [{$match: {[timeField]: {$lt: startingTime}}}],
-        expectedDocs: [docs[0], docs[1], docs[2]]
+        expectedDocs: [docs[0], docs[1], docs[2]],
     });
 
     // $lte always has an eventFilter to catch edge cases.
@@ -119,7 +121,7 @@ function testDeterministicInput(roundingParam, startingTime) {
         pipeline: [{$match: {[timeField]: {$lte: startingTime}}}],
         expectedDocs: [docs[0], docs[1], docs[2], docs[3]],
         eventFilter: {[timeField]: {$lte: startingTime}},
-        wholeBucketFilter: {[`control.max.${timeField}`]: {$lte: startingTime}}
+        wholeBucketFilter: {[`control.max.${timeField}`]: {$lte: startingTime}},
     });
 
     // $gt always has an eventFilter to capture all of the correct results.
@@ -127,21 +129,20 @@ function testDeterministicInput(roundingParam, startingTime) {
         pipeline: [{$match: {[timeField]: {$gt: startingTime}}}],
         expectedDocs: [docs[4], docs[5], docs[6]],
         eventFilter: {[timeField]: {$gt: startingTime}},
-        wholeBucketFilter: {[`control.min.${timeField}`]: {$gt: startingTime}}
+        wholeBucketFilter: {[`control.min.${timeField}`]: {$gt: startingTime}},
     });
     checkResults({
         pipeline: [{$match: {[timeField]: {$gt: times[4]}}}],
         expectedDocs: [docs[5], docs[6]],
         eventFilter: {[timeField]: {$gt: times[4]}},
-        wholeBucketFilter: {[`control.min.${timeField}`]: {$gt: times[4]}}
-
+        wholeBucketFilter: {[`control.min.${timeField}`]: {$gt: times[4]}},
     });
 
     // $gte when the predicate does align with the bucket boundary, and we don't expect an
     // _eventFilter.
     checkResults({
         pipeline: [{$match: {[timeField]: {$gte: startingTime}}}],
-        expectedDocs: [docs[3], docs[4], docs[5], docs[6]]
+        expectedDocs: [docs[3], docs[4], docs[5], docs[6]],
     });
 
     // $gte when the predicate doesn't align with the bucket boundary, and we expect an
@@ -150,7 +151,7 @@ function testDeterministicInput(roundingParam, startingTime) {
         pipeline: [{$match: {[timeField]: {$gte: times[4]}}}],
         expectedDocs: [docs[4], docs[5], docs[6]],
         eventFilter: {[timeField]: {$gte: times[4]}},
-        wholeBucketFilter: {[`control.min.${timeField}`]: {$gte: times[4]}}
+        wholeBucketFilter: {[`control.min.${timeField}`]: {$gte: times[4]}},
     });
 
     // $eq always has an eventFilter to capture all of the correct results.
@@ -161,56 +162,49 @@ function testDeterministicInput(roundingParam, startingTime) {
         wholeBucketFilter: {
             $and: [
                 {[`control.min.${timeField}`]: {$eq: startingTime}},
-                {[`control.max.${timeField}`]: {$eq: startingTime}}
-            ]
-        }
+                {[`control.max.${timeField}`]: {$eq: startingTime}},
+            ],
+        },
     });
     checkResults({
         pipeline: [{$match: {[timeField]: times[0]}}],
         expectedDocs: [docs[0]],
         eventFilter: {[timeField]: {$eq: times[0]}},
         wholeBucketFilter: {
-            $and: [
-                {[`control.min.${timeField}`]: {$eq: times[0]}},
-                {[`control.max.${timeField}`]: {$eq: times[0]}}
-            ]
-        }
+            $and: [{[`control.min.${timeField}`]: {$eq: times[0]}}, {[`control.max.${timeField}`]: {$eq: times[0]}}],
+        },
     });
 
     // $in always has an eventFilter to capture all of the correct results.
     checkResults({
         pipeline: [{$match: {[timeField]: {$in: [startingTime, times[4]]}}}],
         expectedDocs: [docs[3], docs[4]],
-        eventFilter: {[timeField]: {$in: [startingTime, times[4]]}}
+        eventFilter: {[timeField]: {$in: [startingTime, times[4]]}},
     });
     checkResults({
         pipeline: [{$match: {[timeField]: {$in: [startingTime, times[6]]}}}],
         expectedDocs: [docs[3], docs[6]],
-        eventFilter: {[timeField]: {$in: [startingTime, times[6]]}}
+        eventFilter: {[timeField]: {$in: [startingTime, times[6]]}},
     });
 
     // Test a $match expression that is a conjunction, with all the predicates on the 'timeField'
     // that do align with bucket boundaries.
     checkResults({
-        pipeline: [{
-            $match: {
-                $or: [
-                    {[timeField]: {$gte: times[6]}},
-                    {[timeField]: {$lt: startingTime}},
-                ]
-            }
-        }],
+        pipeline: [
+            {
+                $match: {
+                    $or: [{[timeField]: {$gte: times[6]}}, {[timeField]: {$lt: startingTime}}],
+                },
+            },
+        ],
         expectedDocs: [docs[0], docs[1], docs[2], docs[6]],
     });
 
     // Test multiple $match expressions, with all the predicates on the 'timeField' that align with
     // the bucket boundaries.
     checkResults({
-        pipeline: [
-            {$match: {[timeField]: {$lt: startingTime}}},
-            {$match: {[timeField]: {$gte: times[0]}}}
-        ],
-        expectedDocs: [docs[0], docs[1], docs[2]]
+        pipeline: [{$match: {[timeField]: {$lt: startingTime}}}, {$match: {[timeField]: {$gte: times[0]}}}],
+        expectedDocs: [docs[0], docs[1], docs[2]],
     });
 
     // Test that a $group stage can replace the unpack stage after the $match stage is rewritten.
@@ -221,15 +215,14 @@ function testDeterministicInput(roundingParam, startingTime) {
         pipeline: [
             {$match: {[timeField]: {$lt: startingTime}}},
             {
-                $group:
-                    {_id: `$${metaField}`, accmin: {$min: "$accValue"}, accmax: {$max: "$accValue"}}
-            }
+                $group: {_id: `$${metaField}`, accmin: {$min: "$accValue"}, accmax: {$max: "$accValue"}},
+            },
         ],
         expectedDocs: [{"_id": {"id": 1234, "location": "nyc"}, "accmin": 0, "accmax": 4}],
         eventFilter: null,
         wholeBucketFilter: null,
         fixedBuckets: true,
-        expectUnpackStage: false
+        expectUnpackStage: false,
     });
 
     //
@@ -239,30 +232,28 @@ function testDeterministicInput(roundingParam, startingTime) {
     // Test a $match expression that is a conjunction, with all the predicates on the 'timeField'
     // that don't align with bucket boundaries.
     checkResults({
-        pipeline: [{
-            $match: {
-                $or: [
-                    {[timeField]: {$gte: times[5]}},
-                    {[timeField]: {$lt: times[2]}},
-                    {[timeField]: {$lte: times[0]}}
-                ]
-            }
-        }],
+        pipeline: [
+            {
+                $match: {
+                    $or: [
+                        {[timeField]: {$gte: times[5]}},
+                        {[timeField]: {$lt: times[2]}},
+                        {[timeField]: {$lte: times[0]}},
+                    ],
+                },
+            },
+        ],
         expectedDocs: [docs[5], docs[6], docs[1], docs[0]],
         eventFilter: {
-            $or: [
-                {[timeField]: {$gte: times[5]}},
-                {[timeField]: {$lt: times[2]}},
-                {[timeField]: {$lte: times[0]}}
-            ]
+            $or: [{[timeField]: {$gte: times[5]}}, {[timeField]: {$lt: times[2]}}, {[timeField]: {$lte: times[0]}}],
         },
         wholeBucketFilter: {
             $or: [
                 {[`control.min.${timeField}`]: {$gte: times[5]}},
                 {[`control.max.${timeField}`]: {$lt: times[2]}},
-                {[`control.max.${timeField}`]: {$lte: times[0]}}
-            ]
-        }
+                {[`control.max.${timeField}`]: {$lte: times[0]}},
+            ],
+        },
     });
 
     // Test multiple $match expressions, with all the predicates on the 'timeField' that don't align
@@ -271,25 +262,24 @@ function testDeterministicInput(roundingParam, startingTime) {
         pipeline: [
             {$match: {[timeField]: {$in: [startingTime, times[4]]}}},
             {$match: {[timeField]: {$lt: times[5]}}},
-            {$match: {[timeField]: {$gte: times[4]}}}
+            {$match: {[timeField]: {$gte: times[4]}}},
         ],
         expectedDocs: [docs[4]],
         eventFilter: {
             $and: [
                 {[timeField]: {$in: [startingTime, times[4]]}},
                 {[timeField]: {$lt: times[5]}},
-                {[timeField]: {$gte: times[4]}}
-            ]
-        }
+                {[timeField]: {$gte: times[4]}},
+            ],
+        },
     });
 
     // Test multiple $match expressions, where one predicate is on the 'timeField' and aligns with
     // the bucket boundaries, and the other predicate is on a different field.
     checkResults({
-        pipeline:
-            [{$match: {[timeField]: {$lt: startingTime}}}, {$match: {otherTime: {$gte: times[0]}}}],
+        pipeline: [{$match: {[timeField]: {$lt: startingTime}}}, {$match: {otherTime: {$gte: times[0]}}}],
         expectedDocs: [docs[0], docs[1], docs[2]],
-        eventFilter: {$and: [{[timeField]: {$lt: startingTime}}, {otherTime: {$gte: times[0]}}]}
+        eventFilter: {$and: [{[timeField]: {$lt: startingTime}}, {otherTime: {$gte: times[0]}}]},
     });
 
     // Test that comparisons to extended range dates will return either none or all documents, with
@@ -307,10 +297,12 @@ function testDeterministicInput(roundingParam, startingTime) {
     // Test the fixed bucketing specific rewrites are not done if the bucketing parameters have
     // been changed. We still do the generic rewrites on the 'control' fields. This test needs to
     // run last, since collMod will permanently change the flag to false.
-    assert.commandWorked(db.runCommand({
-        "collMod": coll.getName(),
-        "timeseries": {bucketMaxSpanSeconds: 100000, bucketRoundingSeconds: 100000}
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            "collMod": coll.getName(),
+            "timeseries": {bucketMaxSpanSeconds: 100000, bucketRoundingSeconds: 100000},
+        }),
+    );
     // This query was rewritten without 'eventFilter' earlier, but now that collection's bucketing
     // parameters have changed, the query will need an 'eventFilter'.
     checkResults({
@@ -318,50 +310,49 @@ function testDeterministicInput(roundingParam, startingTime) {
         expectedDocs: [docs[3], docs[4], docs[5], docs[6]],
         eventFilter: {[timeField]: {$gte: startingTime}},
         wholeBucketFilter: {[`control.min.${timeField}`]: {$gte: startingTime}},
-        fixedBuckets: false
+        fixedBuckets: false,
     });
 }
 
 // Run the test with different rounding parameters.
-testDeterministicInput(3600 /* roundingParam */,
-                       ISODate("2022-09-30T15:00:00.000Z") /* startingTime */);  // 1 hour
-testDeterministicInput(86400 /* roundingParam */,
-                       ISODate("2022-09-30T00:00:00.000Z") /* startingTime */);  // 1 day
-testDeterministicInput(60 /* roundingParam */,
-                       ISODate("2022-09-30T15:10:00.000Z") /* startingTime */);  // 1 minute
+testDeterministicInput(3600 /* roundingParam */, ISODate("2022-09-30T15:00:00.000Z") /* startingTime */); // 1 hour
+testDeterministicInput(86400 /* roundingParam */, ISODate("2022-09-30T00:00:00.000Z") /* startingTime */); // 1 day
+testDeterministicInput(60 /* roundingParam */, ISODate("2022-09-30T15:10:00.000Z") /* startingTime */); // 1 minute
 
 function checkRandomTestResult(pipeline, shouldCheckExplain = true) {
     if (shouldCheckExplain) {
-        checkExplain(pipeline,
-                     null /* eventFilter */,
-                     null /* wholeBucketFilter */,
-                     true /* fixedBuckets */,
-                     true /*expectUnpackStage */);
+        checkExplain(
+            pipeline,
+            null /* eventFilter */,
+            null /* wholeBucketFilter */,
+            true /* fixedBuckets */,
+            true /*expectUnpackStage */,
+        );
     }
     const results = coll.aggregate(pipeline).toArray();
-    const noOptResults =
-        coll.aggregate([{$_internalInhibitOptimization: {}}, pipeline[0]]).toArray();
+    const noOptResults = coll.aggregate([{$_internalInhibitOptimization: {}}, pipeline[0]]).toArray();
     assert.sameMembers(results, noOptResults, "Results differ with and without the optimization.");
 }
 
 function generateRandomTimestamp() {
     const startTime = ISODate("2012-01-01T00:01:00.000Z");
     const maxTime = ISODate("2015-12-31T23:59:59.000Z");
-    return new Date(Math.floor(Random.rand() * (maxTime.getTime() - startTime.getTime()) +
-                               startTime.getTime()));
+    return new Date(Math.floor(Random.rand() * (maxTime.getTime() - startTime.getTime()) + startTime.getTime()));
 }
 
 (function testRandomizedInput() {
     Random.setRandomSeed();
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {
-            timeField: timeField,
-            metaField: metaField,
-            bucketMaxSpanSeconds: 900,
-            bucketRoundingSeconds: 900
-        }
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {
+                timeField: timeField,
+                metaField: metaField,
+                bucketMaxSpanSeconds: 900,
+                bucketRoundingSeconds: 900,
+            },
+        }),
+    );
 
     let docs = [];
     // Insert 1000 documents at random times spanning 3 years (between 2012 and 2015). These dates
@@ -378,8 +369,6 @@ function generateRandomTimestamp() {
 
     // Validate the same results are returned with a completely random timestamp. We will not check
     // the explain output, since we cannot guarantee the time will align with the bucket boundaries.
-    checkRandomTestResult([{$match: {[timeField]: {$lt: generateRandomTimestamp()}}}],
-                          false /* shouldCheckExplain */);
-    checkRandomTestResult([{$match: {[timeField]: {$gte: generateRandomTimestamp()}}}],
-                          false /* shouldCheckExplain */);
+    checkRandomTestResult([{$match: {[timeField]: {$lt: generateRandomTimestamp()}}}], false /* shouldCheckExplain */);
+    checkRandomTestResult([{$match: {[timeField]: {$gte: generateRandomTimestamp()}}}], false /* shouldCheckExplain */);
 })();

@@ -32,32 +32,32 @@ coll.insert({name: "Code", expected: "Code", x: Code("function() { return 1; }")
 // NumberInt values to native numbers so they are safe to use in comparisons. See SERVER-5424.
 coll.insert({name: "NumberInt", expected: "Number", x: NumberInt("1")});
 
-const pipeline = [{
-    $addFields: {
-        nested: {
-            $function: {
-                body: function(x) {
-                    return {x: x};
+const pipeline = [
+    {
+        $addFields: {
+            nested: {
+                $function: {
+                    body: function (x) {
+                        return {x: x};
+                    },
+                    args: ["$x"],
+                    lang: "js",
                 },
-                args: ["$x"],
-                lang: "js",
-
-            }
-        },
-        toplevel: {
-            $function: {
-                body: function(x) {
-                    return x;
+            },
+            toplevel: {
+                $function: {
+                    body: function (x) {
+                        return x;
+                    },
+                    args: ["$x"],
+                    lang: "js",
                 },
-                args: ["$x"],
-                lang: "js",
-
-            }
+            },
         },
-    }
-}];
+    },
+];
 
-coll.aggregate(pipeline).forEach(doc => {
+coll.aggregate(pipeline).forEach((doc) => {
     assert.eq(doc.expected, doc.nested.x.constructor.name, doc);
     assert.eq(doc.expected, doc.toplevel.constructor.name, doc);
 });

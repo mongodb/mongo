@@ -26,7 +26,7 @@ const rst = new ReplSetTest({
                 priority: 0,
                 votes: 0,
             },
-        }
+        },
     ],
     nodeOptions: {
         // Ensure the storage engine cache can accommodate large transactions.
@@ -41,11 +41,13 @@ const localDB = rst.getPrimary().getDB("local");
 
 // We prevent the replica set from advancing oldest_timestamp. This ensures that the snapshot
 // associated with 'clusterTime' is retained for the duration of this test.
-rst.nodes.forEach(conn => {
-    assert.commandWorked(conn.adminCommand({
-        configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
-        mode: "alwaysOn",
-    }));
+rst.nodes.forEach((conn) => {
+    assert.commandWorked(
+        conn.adminCommand({
+            configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+            mode: "alwaysOn",
+        }),
+    );
 });
 
 // Verifies that the expected pre-images are written during function 'ops' invocation.
@@ -54,8 +56,10 @@ function assertPreImagesWrittenForOps(db, ops, expectedPreImages) {
     assert.eq(
         expectedPreImages.length,
         writtenPreImages.length,
-        `Expected pre-image documents: ${tojson(expectedPreImages)}. Found pre-image documents: ${
-            tojson(writtenPreImages)}.`);
+        `Expected pre-image documents: ${tojson(expectedPreImages)}. Found pre-image documents: ${tojson(
+            writtenPreImages,
+        )}.`,
+    );
 
     for (let idx = 0; idx < writtenPreImages.length; idx++) {
         assert.eq(writtenPreImages[idx].preImage, expectedPreImages[idx]);
@@ -81,18 +85,18 @@ function assertValidChangeStreamPreImageDocument(preImage) {
         const applyOpsOplogEntry = oplogEntry;
         assert(preImage._id.applyOpsIndex < applyOpsOplogEntry.o.applyOps.length);
         const applyOpsEntry = applyOpsOplogEntry.o.applyOps[preImage._id.applyOpsIndex.toNumber()];
-        assertChangeStreamPreImageDocumentMatchesOplogEntry(
-            applyOpsEntry, preImage, applyOpsOplogEntry.wall);
+        assertChangeStreamPreImageDocumentMatchesOplogEntry(applyOpsEntry, preImage, applyOpsOplogEntry.wall);
     } else {
-        assert.eq(preImage._id.applyOpsIndex,
-                  0,
-                  "applyOpsIndex value greater than 0 not expected for non-applyOps oplog entries");
+        assert.eq(
+            preImage._id.applyOpsIndex,
+            0,
+            "applyOpsIndex value greater than 0 not expected for non-applyOps oplog entries",
+        );
         assertChangeStreamPreImageDocumentMatchesOplogEntry(oplogEntry, preImage, oplogEntry.wall);
     }
 }
 
-const coll = assertDropAndRecreateCollection(
-    testDB, "coll", {changeStreamPreAndPostImages: {enabled: true}});
+const coll = assertDropAndRecreateCollection(testDB, "coll", {changeStreamPreAndPostImages: {enabled: true}});
 const otherColl = assertDropAndRecreateCollection(testDB, "coll_regular");
 
 // Returns 'timestamp' - 1 increment for Timestamp type value.
@@ -109,12 +113,8 @@ function getPreviousTimestampValue(timestamp) {
 // collection 'coll'.
 function assertDocumentInsertedAtTimestamp(commitTimestamp, insertedDocumentId) {
     const beforeCommitTimestamp = getPreviousTimestampValue(commitTimestamp);
-    assert.eq(0,
-              coll.find({_id: insertedDocumentId})
-                  .readConcern("snapshot", beforeCommitTimestamp)
-                  .itcount());
-    assert.eq(
-        1, coll.find({_id: insertedDocumentId}).readConcern("snapshot", commitTimestamp).itcount());
+    assert.eq(0, coll.find({_id: insertedDocumentId}).readConcern("snapshot", beforeCommitTimestamp).itcount());
+    assert.eq(1, coll.find({_id: insertedDocumentId}).readConcern("snapshot", commitTimestamp).itcount());
 }
 
 // Verifies that the change stream pre-image corresponding to a write operation on the document with
@@ -122,10 +122,7 @@ function assertDocumentInsertedAtTimestamp(commitTimestamp, insertedDocumentId) 
 // 'commitTimestamp'.
 function assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, modifiedDocumentId) {
     const preImagesCollection = getPreImagesCollection(testDB.getMongo());
-    assert.eq(
-        1,
-        preImagesCollection.find({"preImage._id": modifiedDocumentId, "_id.ts": commitTimestamp})
-            .itcount());
+    assert.eq(1, preImagesCollection.find({"preImage._id": modifiedDocumentId, "_id.ts": commitTimestamp}).itcount());
 }
 
 // Gets collections used in the test for database 'db'. In some passthroughs the collections get
@@ -138,20 +135,33 @@ function getCollections(db) {
 (function testPreImageWritingInTransaction() {
     // Verify that the pre-images are written correctly for a transaction with update and delete
     // operations consisting of a single "applyOps" entry.
-    assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 2, a: 1}, {_id: 3, a: 1}]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 1},
+            {_id: 3, a: 1},
+        ]),
+    );
     assert.commandWorked(otherColl.insert([{_id: 1, a: 1}]));
     let commitTimestamp;
-    assertPreImagesWrittenForOps(testDB, function() {
-        const result =
-            TxnUtil.runInTransaction(testDB, getCollections, function(db, {coll, otherColl}) {
+    assertPreImagesWrittenForOps(
+        testDB,
+        function () {
+            const result = TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
                 assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
                 assert.commandWorked(otherColl.updateOne({_id: 1}, {$inc: {a: 1}}));
                 assert.commandWorked(coll.updateOne({_id: 2}, {$inc: {a: 1}}));
                 assert.commandWorked(coll.deleteOne({_id: 3}));
                 assert.commandWorked(coll.insert({_id: 4}));
             });
-        commitTimestamp = result.operationTime;
-    }, [{_id: 1, a: 1}, {_id: 2, a: 1}, {_id: 3, a: 1}]);
+            commitTimestamp = result.operationTime;
+        },
+        [
+            {_id: 1, a: 1},
+            {_id: 2, a: 1},
+            {_id: 3, a: 1},
+        ],
+    );
     // Verify that the insert of a new document and the pre-images saved during the
     // updates/deletes of existing documents were recorded with the same timestamp as the
     // transaction operations.
@@ -165,9 +175,10 @@ function getCollections(db) {
     const stringSizeInBytes = 15 * 1024 * 1024;
     const largeString = "b".repeat(stringSizeInBytes);
     assert.commandWorked(coll.insert([{_id: 3, a: 1}, {_id: 10}]));
-    assertPreImagesWrittenForOps(testDB, function() {
-        const result =
-            TxnUtil.runInTransaction(testDB, getCollections, function(db, {coll, otherColl}) {
+    assertPreImagesWrittenForOps(
+        testDB,
+        function () {
+            const result = TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
                 assert.commandWorked(otherColl.insert({b: largeString}));
                 assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
                 // We're expecting a split transaction here.
@@ -177,8 +188,10 @@ function getCollections(db) {
                 assert.commandWorked(coll.insert({_id: 5}));
                 assert.commandWorked(coll.deleteOne({_id: 10}));
             });
-        commitTimestamp = result.operationTime;
-    }, [{_id: 1, a: 2}, {_id: 2, a: 2}, {_id: 3, a: 1}, {_id: 10}]);
+            commitTimestamp = result.operationTime;
+        },
+        [{_id: 1, a: 2}, {_id: 2, a: 2}, {_id: 3, a: 1}, {_id: 10}],
+    );
 
     // Verify that when the transaction doesn't fit in 16MB, it is split.
     const beforeCommitTimestamp = getPreviousTimestampValue(commitTimestamp);
@@ -193,29 +206,51 @@ function getCollections(db) {
 
     // Verify that large pre-images are written correctly for a transaction.
     assert.commandWorked(coll.insert([{_id: 3, a: largeString}]));
-    assertPreImagesWrittenForOps(testDB, function() {
-        TxnUtil.runInTransaction(testDB, getCollections, function(db, {coll, _}) {
-            assert.commandWorked(coll.updateOne({_id: 1}, {$set: {b: largeString}}));
-            assert.commandWorked(coll.deleteOne({_id: 3}));
-            assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
-        });
-    }, [{_id: 1, a: 3}, {_id: 3, a: largeString}, {_id: 1, a: 3, b: largeString}]);
+    assertPreImagesWrittenForOps(
+        testDB,
+        function () {
+            TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, _}) {
+                assert.commandWorked(coll.updateOne({_id: 1}, {$set: {b: largeString}}));
+                assert.commandWorked(coll.deleteOne({_id: 3}));
+                assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
+            });
+        },
+        [
+            {_id: 1, a: 3},
+            {_id: 3, a: largeString},
+            {_id: 1, a: 3, b: largeString},
+        ],
+    );
 })();
 
 (function testPreImageWritingForApplyOpsCommand() {
     assert.commandWorked(coll.deleteMany({}));
-    assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 2, a: 1}]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 1},
+        ]),
+    );
 
     // Verify that pre-images are written correctly for the "applyOps" command.
-    assertPreImagesWrittenForOps(testDB, function() {
-        assert.commandWorked(testDB.runCommand({
-            applyOps: [
-                {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$v: 2, diff: {u: {a: 2}}}},
-                {op: "d", ns: coll.getFullName(), o: {_id: 2}}
-            ],
-            allowAtomic: false,
-        }));
-    }, [{_id: 1, a: 1}, {_id: 2, a: 1}]);
+    assertPreImagesWrittenForOps(
+        testDB,
+        function () {
+            assert.commandWorked(
+                testDB.runCommand({
+                    applyOps: [
+                        {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$v: 2, diff: {u: {a: 2}}}},
+                        {op: "d", ns: coll.getFullName(), o: {_id: 2}},
+                    ],
+                    allowAtomic: false,
+                }),
+            );
+        },
+        [
+            {_id: 1, a: 1},
+            {_id: 2, a: 1},
+        ],
+    );
 })();
 
 (function testPreImageWritingForPreparedTransaction() {
@@ -225,18 +260,22 @@ function getCollections(db) {
     // Verify that pre-images are written correctly for a transaction that is prepared and then
     // committed.
     let prepareTimestamp;
-    assertPreImagesWrittenForOps(testDB, function() {
-        const session = testDB.getMongo().startSession();
-        const sessionDb = session.getDatabase(jsTestName());
-        session.startTransaction({readConcern: {level: "majority"}});
-        const collInner = sessionDb[coll.getName()];
-        assert.commandWorked(collInner.updateOne({_id: 1}, {$inc: {a: 1}}));
-        assert.commandWorked(collInner.deleteOne({_id: 3}));
-        assert.commandWorked(collInner.deleteOne({_id: 11}));
-        assert.commandWorked(collInner.insert({_id: 12}));
-        prepareTimestamp = PrepareHelpers.prepareTransaction(session);
-        assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
-    }, [{_id: 1, a: 1}, {_id: 3, a: 1}, {_id: 11}]);
+    assertPreImagesWrittenForOps(
+        testDB,
+        function () {
+            const session = testDB.getMongo().startSession();
+            const sessionDb = session.getDatabase(jsTestName());
+            session.startTransaction({readConcern: {level: "majority"}});
+            const collInner = sessionDb[coll.getName()];
+            assert.commandWorked(collInner.updateOne({_id: 1}, {$inc: {a: 1}}));
+            assert.commandWorked(collInner.deleteOne({_id: 3}));
+            assert.commandWorked(collInner.deleteOne({_id: 11}));
+            assert.commandWorked(collInner.insert({_id: 12}));
+            prepareTimestamp = PrepareHelpers.prepareTransaction(session);
+            assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
+        },
+        [{_id: 1, a: 1}, {_id: 3, a: 1}, {_id: 11}],
+    );
     // Verify that the insert of a new document and the pre-images saved during the
     // updates/deletes of existing documents were recorded with the same timestamp as the
     // transaction operations.
@@ -248,19 +287,28 @@ function getCollections(db) {
 
 (function testPreImageWritingForAbortedPreparedTransaction() {
     assert.commandWorked(coll.deleteMany({}));
-    assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 3, a: 1}]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: 1, a: 1},
+            {_id: 3, a: 1},
+        ]),
+    );
 
     // Verify that pre-images are not written for a transaction that is prepared and then aborted.
-    assertPreImagesWrittenForOps(testDB, function() {
-        const session = testDB.getMongo().startSession();
-        const sessionDb = session.getDatabase(jsTestName());
-        session.startTransaction({readConcern: {level: "majority"}});
-        const collInner = sessionDb[coll.getName()];
-        assert.commandWorked(collInner.updateOne({_id: 1}, {$inc: {a: 1}}));
-        assert.commandWorked(collInner.deleteOne({_id: 3}));
-        PrepareHelpers.prepareTransaction(session);
-        assert.commandWorked(session.abortTransaction_forTesting());
-    }, []);
+    assertPreImagesWrittenForOps(
+        testDB,
+        function () {
+            const session = testDB.getMongo().startSession();
+            const sessionDb = session.getDatabase(jsTestName());
+            session.startTransaction({readConcern: {level: "majority"}});
+            const collInner = sessionDb[coll.getName()];
+            assert.commandWorked(collInner.updateOne({_id: 1}, {$inc: {a: 1}}));
+            assert.commandWorked(collInner.deleteOne({_id: 3}));
+            PrepareHelpers.prepareTransaction(session);
+            assert.commandWorked(session.abortTransaction_forTesting());
+        },
+        [],
+    );
 })();
 
 rst.stopSet();

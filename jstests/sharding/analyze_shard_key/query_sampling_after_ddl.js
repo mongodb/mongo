@@ -12,8 +12,7 @@ import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_s
 function setUpCollection(conn, {isShardedColl, st}) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
     if (st) {
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     }
     const collName = isShardedColl ? "testCollSharded" : "testCollUnsharded";
     const ns = dbName + "." + collName;
@@ -24,8 +23,7 @@ function setUpCollection(conn, {isShardedColl, st}) {
         assert(st);
         assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
         assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 0}}));
-        assert.commandWorked(
-            st.s0.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
+        assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
     }
 
     return {dbName, collName};
@@ -34,8 +32,7 @@ function setUpCollection(conn, {isShardedColl, st}) {
 function enableQuerySampling(conn, dbName, collName, {rst, st}) {
     const ns = dbName + "." + collName;
     const collUuid = QuerySamplingUtil.getCollectionUuid(conn.getDB(dbName), collName);
-    assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
     QuerySamplingUtil.waitForActiveSampling(ns, collUuid, {rst, st});
 }
 
@@ -46,8 +43,9 @@ function assertNumSampledQueries(conn, ns, expectedNum) {
 
     let sampledQueryDocs;
     assert.soon(() => {
-        const aggRes = assert.commandWorked(conn.adminCommand(
-            {aggregate: 1, pipeline: [{$listSampledQueries: {namespace: ns}}], cursor: {}}));
+        const aggRes = assert.commandWorked(
+            conn.adminCommand({aggregate: 1, pipeline: [{$listSampledQueries: {namespace: ns}}], cursor: {}}),
+        );
         sampledQueryDocs = aggRes.cursor.firstBatch;
         if (sampledQueryDocs.length >= expectedNum) {
             return true;
@@ -64,8 +62,7 @@ function testDropCollection(conn, {recreateCollection, isShardedColl, rst, st}) 
     const {dbName, collName} = setUpCollection(conn, {isShardedColl, st});
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
-    jsTest.log(
-        `Testing dropCollection ${tojson({dbName, collName, isShardedColl, recreateCollection})}`);
+    jsTest.log(`Testing dropCollection ${tojson({dbName, collName, isShardedColl, recreateCollection})}`);
 
     enableQuerySampling(conn, dbName, collName, {rst, st});
 
@@ -92,8 +89,7 @@ function testDropDatabase(conn, {recreateCollection, isShardedColl, rst, st}) {
     const {dbName, collName} = setUpCollection(conn, {isShardedColl, st});
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
-    jsTest.log(`Testing testDropDatabase ${
-        tojson({dbName, collName, isShardedColl, recreateCollection})}`);
+    jsTest.log(`Testing testDropDatabase ${tojson({dbName, collName, isShardedColl, recreateCollection})}`);
 
     enableQuerySampling(conn, dbName, collName, {rst, st});
 
@@ -124,19 +120,28 @@ function testRenameCollection(conn, {sameDatabase, isShardedColl, rst, st}) {
     const srcNs = srcDbName + "." + srcCollName;
     const srcDb = conn.getDB(srcDbName);
 
-    const dstDbName = sameDatabase ? srcDbName : (srcDbName + "New");
-    const dstCollName = sameDatabase ? (srcCollName + "New") : srcCollName;
+    const dstDbName = sameDatabase ? srcDbName : srcDbName + "New";
+    const dstCollName = sameDatabase ? srcCollName + "New" : srcCollName;
     const dstNs = dstDbName + "." + dstCollName;
     const dstDb = conn.getDB(dstDbName);
     assert.commandWorked(dstDb.createCollection(dstCollName));
     if (!sameDatabase && st) {
         // On a sharded cluster, the src and dst collections must be on same shard.
-        assert.commandWorked(st.s.adminCommand(
-            {movePrimary: dstDbName, to: st.getPrimaryShardIdForDatabase(srcDbName)}));
+        assert.commandWorked(
+            st.s.adminCommand({movePrimary: dstDbName, to: st.getPrimaryShardIdForDatabase(srcDbName)}),
+        );
     }
 
-    jsTest.log(`Testing configuration deletion upon renameCollection ${
-        tojson({sameDatabase, srcDbName, srcCollName, dstDbName, dstCollName, isShardedColl})}`);
+    jsTest.log(
+        `Testing configuration deletion upon renameCollection ${tojson({
+            sameDatabase,
+            srcDbName,
+            srcCollName,
+            dstDbName,
+            dstCollName,
+            isShardedColl,
+        })}`,
+    );
 
     enableQuerySampling(conn, srcDbName, srcCollName, {rst, st});
     enableQuerySampling(conn, dstDbName, dstCollName, {rst, st});
@@ -164,14 +169,14 @@ const mongodSetParameterOpts = {
 };
 const mongosSetParametersOpts = {
     queryAnalysisSamplerConfigurationRefreshSecs,
-    logComponentVerbosity: tojson({sharding: 3})
+    logComponentVerbosity: tojson({sharding: 3}),
 };
 
 {
     const st = new ShardingTest({
         shards: 2,
         rs: {nodes: 1, setParameter: mongodSetParameterOpts},
-        mongosOptions: {setParameter: mongosSetParametersOpts}
+        mongosOptions: {setParameter: mongosSetParametersOpts},
     });
 
     for (let isShardedColl of [true, false]) {
@@ -188,7 +193,8 @@ const mongosSetParametersOpts = {
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: mongodSetParameterOpts}});
     rst.startSet();
     rst.initiate();

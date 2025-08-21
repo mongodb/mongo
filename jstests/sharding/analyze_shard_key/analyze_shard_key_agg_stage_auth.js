@@ -16,8 +16,7 @@ function runTest(primary) {
     const ns1 = dbName + "." + collName1;
 
     const adminDb = primary.getDB("admin");
-    assert.commandWorked(
-        adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
+    assert.commandWorked(adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
     assert(adminDb.auth("super", "super"));
     const testDb = adminDb.getSiblingDB(dbName);
     const docs = [];
@@ -36,17 +35,17 @@ function runTest(primary) {
         splitPointsAfterClusterTime: new Timestamp(100, 1),
         // The use of "dummyShard" for splitPointsShardId will cause the aggregation to fail on
         // a sharded cluster with error code ShardNotFound.
-        splitPointsShardId: "dummyShard"
+        splitPointsShardId: "dummyShard",
     };
     const aggregateCmd0 = {
         aggregate: collName0,
         pipeline: [{$_analyzeShardKeyReadWriteDistribution: stageSpec}],
-        cursor: {}
+        cursor: {},
     };
     const aggregateCmd1 = {
         aggregate: collName1,
         pipeline: [{$_analyzeShardKeyReadWriteDistribution: stageSpec}],
-        cursor: {}
+        cursor: {},
     };
 
     // Set up a user without any role or privilege.
@@ -61,54 +60,57 @@ function runTest(primary) {
 
     // Set up a user with the 'analyzeShardKey' privilege against ns0.
     assert(adminDb.auth("super", "super"));
-    assert.commandWorked(testDb.runCommand({
-        createRole: "role_ns0_priv",
-        roles: [],
-        privileges: [{resource: {db: dbName, collection: collName0}, actions: ["analyzeShardKey"]}]
-    }));
-    assert.commandWorked(testDb.runCommand({
-        createUser: "user_with_explicit_ns0_priv",
-        pwd: "pwd",
-        roles: [{role: "role_ns0_priv", db: dbName}]
-    }));
+    assert.commandWorked(
+        testDb.runCommand({
+            createRole: "role_ns0_priv",
+            roles: [],
+            privileges: [{resource: {db: dbName, collection: collName0}, actions: ["analyzeShardKey"]}],
+        }),
+    );
+    assert.commandWorked(
+        testDb.runCommand({
+            createUser: "user_with_explicit_ns0_priv",
+            pwd: "pwd",
+            roles: [{role: "role_ns0_priv", db: dbName}],
+        }),
+    );
     assert(adminDb.logout());
     // Verify that the user is authorized to run the aggregation stage against ns0 but not ns1.
     assert(testDb.auth("user_with_explicit_ns0_priv", "pwd"));
-    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd0),
-                                         ErrorCodes.ShardNotFound);
+    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd0), ErrorCodes.ShardNotFound);
     assert.commandFailedWithCode(testDb.runCommand(aggregateCmd1), ErrorCodes.Unauthorized);
     assert(testDb.logout());
 
     // Set up a user with the 'clusterManager' role.
     assert(adminDb.auth("super", "super"));
-    assert.commandWorked(adminDb.runCommand({
-        createUser: "user_cluster_mgr",
-        pwd: "pwd",
-        roles: [{role: "clusterManager", db: "admin"}]
-    }));
+    assert.commandWorked(
+        adminDb.runCommand({
+            createUser: "user_cluster_mgr",
+            pwd: "pwd",
+            roles: [{role: "clusterManager", db: "admin"}],
+        }),
+    );
     assert(adminDb.logout());
     // Verify that the user is authorized to run the aggregation stage against both ns0 and ns1.
     assert(adminDb.auth("user_cluster_mgr", "pwd"));
-    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd0),
-                                         ErrorCodes.ShardNotFound);
-    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd1),
-                                         ErrorCodes.ShardNotFound);
+    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd0), ErrorCodes.ShardNotFound);
+    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd1), ErrorCodes.ShardNotFound);
     assert(adminDb.logout());
 
     // Set up a user with the 'enableSharding' role.
     assert(adminDb.auth("super", "super"));
-    assert.commandWorked(adminDb.runCommand({
-        createUser: "user_enable_sharding",
-        pwd: "pwd",
-        roles: [{role: "enableSharding", db: "testDb"}]
-    }));
+    assert.commandWorked(
+        adminDb.runCommand({
+            createUser: "user_enable_sharding",
+            pwd: "pwd",
+            roles: [{role: "enableSharding", db: "testDb"}],
+        }),
+    );
     assert(adminDb.logout());
     // Verify that the user is authorized to run the aggregation command against both ns0 and ns1.
     assert(adminDb.auth("user_enable_sharding", "pwd"));
-    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd0),
-                                         ErrorCodes.ShardNotFound);
-    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd1),
-                                         ErrorCodes.ShardNotFound);
+    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd0), ErrorCodes.ShardNotFound);
+    assert.commandWorkedOrFailedWithCode(testDb.runCommand(aggregateCmd1), ErrorCodes.ShardNotFound);
     assert(adminDb.logout());
 }
 

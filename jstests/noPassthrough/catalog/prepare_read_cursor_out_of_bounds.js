@@ -22,21 +22,21 @@ replTest.startSet();
 replTest.initiate();
 
 const primary = replTest.getPrimary();
-const dbName = 'test';
-const collName = 'coll';
+const dbName = "test";
+const collName = "coll";
 
 const db = primary.getDB(dbName);
 assert.commandWorked(db[collName].createIndex({x: 1}));
-assert.commandWorked(db[collName].insert({x: 'a'}));
+assert.commandWorked(db[collName].insert({x: "a"}));
 
 const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
 session.startTransaction();
-sessionColl.insert({x: 'b'});
+sessionColl.insert({x: "b"});
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-assert.eq(null, db.coll.findOne({x: 'c'}));
+assert.eq(null, db.coll.findOne({x: "c"}));
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
 replTest.stopSet();

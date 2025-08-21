@@ -19,7 +19,7 @@ config.members[1].priority = 0;
 // Make sure there are no election timeouts firing for the duration of the test. This helps
 // ensure that the test will only pass if the election handoff succeeds.
 config.settings = {
-    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000,
 };
 rst.initiate(config);
 

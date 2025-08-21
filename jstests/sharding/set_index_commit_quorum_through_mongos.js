@@ -15,16 +15,23 @@ const mongosDB = st.s0.getDB(dbName);
 const shard0 = st.shard0.rs.getPrimary();
 
 const generateCreateIndexThread = (host, dbName, collName) => {
-    return new Thread(function(host, dbName, collName) {
-        const mongos = new Mongo(host);
-        const db = mongos.getDB(dbName);
-        // Use the index builds coordinator for a two-phase index build.
-        assert.commandWorked(db.runCommand({
-            createIndexes: collName,
-            indexes: [{key: {idxKey: 1}, name: 'idxKey_1'}],
-            commitQuorum: "majority"
-        }));
-    }, host, dbName, collName);
+    return new Thread(
+        function (host, dbName, collName) {
+            const mongos = new Mongo(host);
+            const db = mongos.getDB(dbName);
+            // Use the index builds coordinator for a two-phase index build.
+            assert.commandWorked(
+                db.runCommand({
+                    createIndexes: collName,
+                    indexes: [{key: {idxKey: 1}, name: "idxKey_1"}],
+                    commitQuorum: "majority",
+                }),
+            );
+        },
+        host,
+        dbName,
+        collName,
+    );
 };
 
 // When setIndexCommitQuorum is sent by the mongos, the response follows the format:
@@ -46,8 +53,7 @@ const extractShardReplyFromResponse = (shard, mongosResponse) => {
     return mongosResponse.raw[shardURL];
 };
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 jsTest.log("Testing setIndexCommitQuorum from a mongos can succeed");
 // Create a sharded collection where only shard0 owns chunks.
@@ -62,8 +68,7 @@ createIndexThread.start();
 createIndexFailpoint.wait();
 
 // Confirm mongos succeeds when only one shard owns chunks (and data for the collection).
-assert.commandWorked(mongosDB.runCommand(
-    {setIndexCommitQuorum: collName, indexNames: ["idxKey_1"], commitQuorum: 2}));
+assert.commandWorked(mongosDB.runCommand({setIndexCommitQuorum: collName, indexNames: ["idxKey_1"], commitQuorum: 2}));
 createIndexFailpoint.off();
 createIndexThread.join();
 assert(mongosDB[collName].drop());
@@ -86,9 +91,9 @@ createIndexThread.start();
 createIndexFailpoint.wait();
 
 const res = assert.commandFailedWithCode(
-    mongosDB.runCommand(
-        {setIndexCommitQuorum: collName, indexNames: ["idxKey_1"], commitQuorum: 2}),
-    ErrorCodes.IndexNotFound);
+    mongosDB.runCommand({setIndexCommitQuorum: collName, indexNames: ["idxKey_1"], commitQuorum: 2}),
+    ErrorCodes.IndexNotFound,
+);
 
 // Confirm the mongos reports shard0 successfully set its index commit quorum despite the mongos
 // command failing.

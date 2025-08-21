@@ -94,7 +94,7 @@ lastTop = assertTopDiffEq(testDB, testColl, lastTop, "update", numRecords);
 var res;
 
 // "count" command
-lastTop = getTop(testColl);  // ignore any commands before this
+lastTop = getTop(testColl); // ignore any commands before this
 if (lastTop === undefined) {
     quit();
 }
@@ -112,11 +112,13 @@ if (lastTop === undefined) {
 }
 
 for (i = 0; i < numRecords; i++) {
-    res = assert.commandWorked(testDB.runCommand({
-        findAndModify: testColl.getName(),
-        query: {_id: i},
-        update: {$inc: {x: 1}},
-    }));
+    res = assert.commandWorked(
+        testDB.runCommand({
+            findAndModify: testColl.getName(),
+            query: {_id: i},
+            update: {$inc: {x: 1}},
+        }),
+    );
     assert.eq(res.value.x, i, tojson(res));
 }
 lastTop = assertTopDiffEq(testDB, testColl, lastTop, "commands", numRecords);
@@ -127,17 +129,19 @@ if (lastTop === undefined) {
 }
 
 for (i = 0; i < numRecords; i++) {
-    res = assert.commandWorked(testDB.runCommand({
-        findAndModify: testColl.getName(),
-        query: {_id: i},
-        remove: true,
-    }));
+    res = assert.commandWorked(
+        testDB.runCommand({
+            findAndModify: testColl.getName(),
+            query: {_id: i},
+            remove: true,
+        }),
+    );
     assert.eq(res.value.x, i + 1, tojson(res));
 }
 lastTop = assertTopDiffEq(testDB, testColl, lastTop, "commands", numRecords);
 
 // aggregate
-assert.eq(0, testColl.aggregate([]).itcount());  // All records were just deleted.
+assert.eq(0, testColl.aggregate([]).itcount()); // All records were just deleted.
 assertTopDiffEq(testDB, testColl, lastTop, "commands", 1);
 lastTop = assertTopDiffEq(testDB, testColl, lastTop, "readLock", 1);
 

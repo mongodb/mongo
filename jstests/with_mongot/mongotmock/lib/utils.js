@@ -2,13 +2,11 @@
  * Utility functions for mongotmock tests.
  */
 
-import {
-    getAggPlanStage,
-} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {validateMongotStageExplainExecutionStats} from "jstests/with_mongot/common_utils.js";
 import {
     mongotMultiCursorResponseForBatch,
-    mongotResponseForBatch
+    mongotResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 /**
@@ -19,11 +17,13 @@ import {
  * @param {String} searchScoreKey The key could be either '$searchScore' or '$vectorSearchScore'.
  * @returns {Array{Object}} Returns expected results.
  */
-export function prepMongotResponse(expectedCommand,
-                                   coll,
-                                   mongotConn,
-                                   cursorId = NumberLong(123),
-                                   searchScoreKey = '$vectorSearchScore') {
+export function prepMongotResponse(
+    expectedCommand,
+    coll,
+    mongotConn,
+    cursorId = NumberLong(123),
+    searchScoreKey = "$vectorSearchScore",
+) {
     const history = [
         {
             expectedCommand,
@@ -35,10 +35,10 @@ export function prepMongotResponse(expectedCommand,
                         {_id: 1, ...Object.fromEntries([[searchScoreKey, 0.789]])},
                         {_id: 2, ...Object.fromEntries([[searchScoreKey, 0.654]])},
                         {_id: 4, ...Object.fromEntries([[searchScoreKey, 0.345]])},
-                    ]
+                    ],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -46,10 +46,10 @@ export function prepMongotResponse(expectedCommand,
                 cursor: {
                     id: cursorId,
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 11, ...Object.fromEntries([[searchScoreKey, 0.321]])}]
+                    nextBatch: [{_id: 11, ...Object.fromEntries([[searchScoreKey, 0.321]])}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -58,14 +58,13 @@ export function prepMongotResponse(expectedCommand,
                 cursor: {
                     id: NumberLong(0),
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 14, ...Object.fromEntries([[searchScoreKey, 0.123]])}]
+                    nextBatch: [{_id: 14, ...Object.fromEntries([[searchScoreKey, 0.123]])}],
                 },
-            }
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 
     return [
         {_id: 1, shardKey: 0, x: "ow"},
@@ -91,27 +90,28 @@ export function prepCollection(conn, dbName, collName, shouldShard = false) {
         // Create and shard the collection so the commands can succeed.
         assert.commandWorked(db.createCollection(collName));
         assert.commandWorked(conn.adminCommand({enableSharding: dbName}));
-        assert.commandWorked(
-            conn.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}));
+        assert.commandWorked(conn.adminCommand({shardCollection: coll.getFullName(), key: {shardKey: 1}}));
     }
 
-    assert.commandWorked(coll.insert([
-        // Documents that end up on shard0.
-        {_id: 1, shardKey: 0, x: "ow"},
-        {_id: 2, shardKey: 0, x: "now", y: "lorem"},
-        {_id: 3, shardKey: 0, x: "brown", y: "ipsum"},
-        {_id: 4, shardKey: 0, x: "cow", y: "lorem ipsum"},
-        // Documents that end up on shard1.
-        {_id: 11, shardKey: 100, x: "brown", y: "ipsum"},
-        {_id: 12, shardKey: 100, x: "cow", y: "lorem ipsum"},
-        {_id: 13, shardKey: 100, x: "brown", y: "ipsum"},
-        {_id: 14, shardKey: 100, x: "cow", y: "lorem ipsum"},
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            // Documents that end up on shard0.
+            {_id: 1, shardKey: 0, x: "ow"},
+            {_id: 2, shardKey: 0, x: "now", y: "lorem"},
+            {_id: 3, shardKey: 0, x: "brown", y: "ipsum"},
+            {_id: 4, shardKey: 0, x: "cow", y: "lorem ipsum"},
+            // Documents that end up on shard1.
+            {_id: 11, shardKey: 100, x: "brown", y: "ipsum"},
+            {_id: 12, shardKey: 100, x: "cow", y: "lorem ipsum"},
+            {_id: 13, shardKey: 100, x: "brown", y: "ipsum"},
+            {_id: 14, shardKey: 100, x: "cow", y: "lorem ipsum"},
+        ]),
+    );
 }
 
 // Explain object used for all explains except the last explain object.
 const defaultExplainContents = {
-    profession: "writer"
+    profession: "writer",
 };
 
 export function getDefaultExplainContents() {
@@ -120,7 +120,7 @@ export function getDefaultExplainContents() {
 
 // Explain object used for the last explain returned.
 const defaultLastExplainContents = {
-    profession: "teacher"
+    profession: "teacher",
 };
 
 export function getDefaultLastExplainContents() {
@@ -140,7 +140,7 @@ export function setUpMongotReturnExplain({
     mongotMock,
     searchCmd,
     cursorId = NumberLong(123),
-    explainContents = defaultLastExplainContents
+    explainContents = defaultLastExplainContents,
 }) {
     {
         const history = [{expectedCommand: searchCmd, response: {explain: explainContents, ok: 1}}];
@@ -170,11 +170,19 @@ export function setUpMongotReturnExplainAndCursor({
     explainContents = defaultLastExplainContents,
 }) {
     {
-        const history = [{
-            expectedCommand: searchCmd,
-            response: mongotResponseForBatch(
-                nextBatch, NumberLong(0), coll.getFullName(), 1, explainContents, vars)
-        }];
+        const history = [
+            {
+                expectedCommand: searchCmd,
+                response: mongotResponseForBatch(
+                    nextBatch,
+                    NumberLong(0),
+                    coll.getFullName(),
+                    1,
+                    explainContents,
+                    vars,
+                ),
+            },
+        ];
         mongotMock.setMockResponses(history, cursorId);
     }
 }
@@ -203,17 +211,21 @@ export function setUpMongotReturnExplainAndMultiCursor({
     metaCursorId = NumberLong(1230),
     explainContents = defaultLastExplainContents,
 }) {
-    let history = [{
-        expectedCommand: searchCmd,
-        response: mongotMultiCursorResponseForBatch(nextBatch,
-                                                    NumberLong(0),
-                                                    metaBatch,
-                                                    NumberLong(0),
-                                                    coll.getFullName(),
-                                                    1,
-                                                    explainContents /*results explain*/,
-                                                    explainContents /*meta explain*/)
-    }];
+    let history = [
+        {
+            expectedCommand: searchCmd,
+            response: mongotMultiCursorResponseForBatch(
+                nextBatch,
+                NumberLong(0),
+                metaBatch,
+                NumberLong(0),
+                coll.getFullName(),
+                1,
+                explainContents /*results explain*/,
+                explainContents /*meta explain*/,
+            ),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId, metaCursorId);
 }
 
@@ -221,8 +233,7 @@ export function setUpMongotReturnExplainAndMultiCursor({
  * Helper to set up getMores for history. Adds a getMore to history starting from the 2nd entry
  * in batchList.
  */
-function setUpGetMoreHistory(
-    history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents) {
+function setUpGetMoreHistory(history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents) {
     assert(batchList.length > 1, "To set up getMore's, batchList must have at least 2 responses.");
     for (let i = 1; i < batchList.length - 1; i++) {
         let getMoreResponse = {
@@ -236,7 +247,12 @@ function setUpGetMoreHistory(
     const lastGetMore = {
         expectedCommand: {getMore: cursorId, collection: collName},
         response: mongotResponseForBatch(
-            batchList[batchList.length - 1], NumberLong(0), collNS, 1, lastExplainContents),
+            batchList[batchList.length - 1],
+            NumberLong(0),
+            collNS,
+            1,
+            lastExplainContents,
+        ),
     };
     history.push(lastGetMore);
     return history;
@@ -268,7 +284,8 @@ export function setUpMongotReturnExplainAndCursorGetMore({
 }) {
     assert(
         batchList.length > 1,
-        "Must have at least two responses in batchList: one for the initial reply, and one for the getMore.");
+        "Must have at least two responses in batchList: one for the initial reply, and one for the getMore.",
+    );
 
     const collName = coll.getName();
     const collNS = coll.getFullName();
@@ -277,11 +294,10 @@ export function setUpMongotReturnExplainAndCursorGetMore({
     // First response should have vars and the command.
     history.push({
         expectedCommand: searchCmd,
-        response: mongotResponseForBatch(batchList[0], cursorId, collNS, 1, explainContents, vars)
+        response: mongotResponseForBatch(batchList[0], cursorId, collNS, 1, explainContents, vars),
     });
 
-    history = setUpGetMoreHistory(
-        history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents);
+    history = setUpGetMoreHistory(history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents);
     mongotMock.setMockResponses(history, cursorId);
 }
 
@@ -329,25 +345,35 @@ export function setUpMongotReturnExplainAndMultiCursorGetMore({
         coll.getFullName(),
         1,
         batchList.length == 1 ? lastExplainContents : explainContents,
-        metaBatchList.length == 1 ? lastExplainContents : explainContents);
+        metaBatchList.length == 1 ? lastExplainContents : explainContents,
+    );
 
     history.push({expectedCommand: searchCmd, response});
 
     if (batchList.length > 1) {
         history = setUpGetMoreHistory(
-            history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents);
+            history,
+            batchList,
+            collName,
+            collNS,
+            cursorId,
+            explainContents,
+            lastExplainContents,
+        );
     }
     mongotMock.setMockResponses(history, cursorId, metaCursorId);
 
     // Set up metaHistory for "meta" cursor.
     if (metaBatchList.length > 1) {
-        metaHistory = setUpGetMoreHistory(metaHistory,
-                                          metaBatchList,
-                                          collName,
-                                          collNS,
-                                          metaCursorId,
-                                          explainContents,
-                                          lastExplainContents);
+        metaHistory = setUpGetMoreHistory(
+            metaHistory,
+            metaBatchList,
+            collName,
+            collNS,
+            metaCursorId,
+            explainContents,
+            lastExplainContents,
+        );
         mongotMock.setMockResponses(metaHistory, metaCursorId);
     }
 }
@@ -365,8 +391,14 @@ export function setUpMongotReturnExplainAndMultiCursorGetMore({
  *     mongot stage.
  * @param {Object} explainContents The explain object that the stage should contain.
  */
-export function getMongotStagesAndValidateExplainExecutionStats(
-    {result, stageType, verbosity, nReturned, explainObject = null, numFiltered = null}) {
+export function getMongotStagesAndValidateExplainExecutionStats({
+    result,
+    stageType,
+    verbosity,
+    nReturned,
+    explainObject = null,
+    numFiltered = null,
+}) {
     const searchStage = getAggPlanStage(result, stageType);
     assert.neq(searchStage, null, result);
     validateMongotStageExplainExecutionStats({
@@ -405,11 +437,10 @@ export function getShardedMongotStagesAndValidateExplainExecutionStats({
     verbosity,
     nReturnedList,
     expectedExplainContents,
-    numFilteredList = null
+    numFilteredList = null,
 }) {
     assert.eq(nReturnedList.length, expectedNumStages);
-    assert(result.hasOwnProperty("shards"),
-           tojson(result) + "has no shards property, but it should.");
+    assert(result.hasOwnProperty("shards"), tojson(result) + "has no shards property, but it should.");
 
     let counter = 0;
     // Since the explain object shard results are unordered, we manually check which shard
@@ -428,9 +459,10 @@ export function getShardedMongotStagesAndValidateExplainExecutionStats({
                 stage = stages[i];
             }
         }
-        assert(stage,
-               "Unable to find stageType: " + stageType + " for shard " + index +
-                   " in result: " + tojson(result));
+        assert(
+            stage,
+            "Unable to find stageType: " + stageType + " for shard " + index + " in result: " + tojson(result),
+        );
 
         validateMongotStageExplainExecutionStats({
             stage: stage,
@@ -443,8 +475,14 @@ export function getShardedMongotStagesAndValidateExplainExecutionStats({
         counter++;
     }
 
-    assert.eq(counter,
-              expectedNumStages,
-              "Number of shards checked: " + counter + " did not match the expectedNumber: " +
-                  expectedNumStages + " in the result: " + tojson(result));
+    assert.eq(
+        counter,
+        expectedNumStages,
+        "Number of shards checked: " +
+            counter +
+            " did not match the expectedNumber: " +
+            expectedNumStages +
+            " in the result: " +
+            tojson(result),
+    );
 }

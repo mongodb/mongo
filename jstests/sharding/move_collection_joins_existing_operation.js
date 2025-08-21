@@ -15,10 +15,15 @@ import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Generates a new thread to run moveCollection.
 const makeMoveCollectionThread = (mongoSConnectionString, ns, toShard) => {
-    return new Thread((mongoSConnectionString, ns, toShard) => {
-        const mongoS = new Mongo(mongoSConnectionString);
-        assert.commandWorked(mongoS.adminCommand({moveCollection: ns, toShard: toShard}));
-    }, mongoSConnectionString, ns, toShard);
+    return new Thread(
+        (mongoSConnectionString, ns, toShard) => {
+            const mongoS = new Mongo(mongoSConnectionString);
+            assert.commandWorked(mongoS.adminCommand({moveCollection: ns, toShard: toShard}));
+        },
+        mongoSConnectionString,
+        ns,
+        toShard,
+    );
 };
 
 const getTempUUID = (tempNs) => {
@@ -30,19 +35,23 @@ const reshardingTest = new ReshardingTest();
 reshardingTest.setup();
 const donorShardNames = reshardingTest.donorShardNames;
 const recipientShardNames = reshardingTest.recipientShardNames;
-const sourceCollection = reshardingTest.createUnshardedCollection(
-    {ns: "reshardingDb.coll", primaryShardName: donorShardNames[0]});
+const sourceCollection = reshardingTest.createUnshardedCollection({
+    ns: "reshardingDb.coll",
+    primaryShardName: donorShardNames[0],
+});
 
 const mongos = sourceCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donorShard = new Mongo(topology.shards[donorShardNames[0]].nodes[0]);
 
 const pauseDuringCloning = configureFailPoint(donorShard, "reshardingPauseRecipientDuringCloning");
-const shorterLockTimeout =
-    configureFailPoint(donorShard, "overrideDDLLockTimeout", {'timeoutMillisecs': 500});
+const shorterLockTimeout = configureFailPoint(donorShard, "overrideDDLLockTimeout", {"timeoutMillisecs": 500});
 
-const moveCollectionThread =
-    makeMoveCollectionThread(mongos.host, sourceCollection.getFullName(), recipientShardNames[0]);
+const moveCollectionThread = makeMoveCollectionThread(
+    mongos.host,
+    sourceCollection.getFullName(),
+    recipientShardNames[0],
+);
 
 // Fulfilled once the first reshardCollection command creates the temporary collection.
 let expectedUUIDAfterReshardingCompletes = undefined;
@@ -54,8 +63,7 @@ reshardingTest.withMoveCollectionInBackground({toShard: recipientShardNames[0]},
     // collection once resharding has completed.
     expectedUUIDAfterReshardingCompletes = getTempUUID(tempNs);
 
-    const moveCollectionJoinedFP =
-        configureFailPoint(donorShard, "shardsvrReshardCollectionJoinedExistingOperation");
+    const moveCollectionJoinedFP = configureFailPoint(donorShard, "shardsvrReshardCollectionJoinedExistingOperation");
 
     moveCollectionThread.start();
 
@@ -74,8 +82,7 @@ shorterLockTimeout.off();
 // Confirm the UUID for the namespace that was resharded is the same as the temporary collection's
 // UUID before the second reshardCollection command was issued.
 assert.neq(expectedUUIDAfterReshardingCompletes, undefined);
-const finalSourceCollectionUUID =
-    getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
+const finalSourceCollectionUUID = getUUIDFromListCollections(sourceCollection.getDB(), sourceCollection.getName());
 assert.eq(expectedUUIDAfterReshardingCompletes, finalSourceCollectionUUID);
 
 reshardingTest.teardown();

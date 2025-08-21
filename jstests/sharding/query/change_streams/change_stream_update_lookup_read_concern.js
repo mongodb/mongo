@@ -46,7 +46,7 @@ const rst = new ReplSetTest({
     nodes: [
         {rsConfig: {priority: 1, tags: {tag: "primary"}}},
         {rsConfig: {priority: 0, tags: {tag: "closestSecondary"}}},
-        {rsConfig: {priority: 0, tags: {tag: "fartherSecondary"}}}
+        {rsConfig: {priority: 0, tags: {tag: "fartherSecondary"}}},
     ],
     nodeOptions: rsNodeOptions,
     settings: {chainingAllowed: false},
@@ -61,15 +61,15 @@ const st = new ShardingTest({manualAddShard: true});
 assert.commandWorked(st.s.adminCommand({addShard: rst.name + "/" + rst.getPrimary().host}));
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(st.s.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-assert.commandWorked(
-    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
 
 assert.commandWorked(mongosColl.insert({_id: 1}));
 rst.awaitReplication();
@@ -84,20 +84,23 @@ mongosColl.find().readPref("secondary", [{tag: "closestSecondary"}]);
 
 // We expect the tag to ensure there is only one node to choose from, so the actual read
 // preference doesn't really matter - we use 'nearest' throughout.
-assert.eq(mongosColl.find()
-              .readPref("nearest", [{tag: "closestSecondary"}])
-              .comment("testing targeting")
-              .itcount(),
-          1);
+assert.eq(
+    mongosColl
+        .find()
+        .readPref("nearest", [{tag: "closestSecondary"}])
+        .comment("testing targeting")
+        .itcount(),
+    1,
+);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: closestSecondaryDB,
-    filter: {ns: mongosColl.getFullName(), "command.comment": "testing targeting"}
+    filter: {ns: mongosColl.getFullName(), "command.comment": "testing targeting"},
 });
 
 const changeStreamComment = "change stream against closestSecondary";
 const changeStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}], {
     comment: changeStreamComment,
-    $readPreference: {mode: "nearest", tags: [{tag: "closestSecondary"}]}
+    $readPreference: {mode: "nearest", tags: [{tag: "closestSecondary"}]},
 });
 assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 1}}));
 assert.soon(() => changeStream.hasNext());
@@ -109,8 +112,10 @@ assert.docEq({_id: 1, updatedCount: 1}, latestChange.fullDocument);
 // needed multiple getMores to retrieve the changes.
 // TODO SERVER-31650 We have to use 'originatingCommand' here and look for the getMore because
 // the initial aggregate will not show up.
-profilerHasAtLeastOneMatchingEntryOrThrow(
-    {profileDB: closestSecondaryDB, filter: {"originatingCommand.comment": changeStreamComment}});
+profilerHasAtLeastOneMatchingEntryOrThrow({
+    profileDB: closestSecondaryDB,
+    filter: {"originatingCommand.comment": changeStreamComment},
+});
 
 // Test that the update lookup goes to the secondary as well.
 let filter = {
@@ -122,7 +127,7 @@ let filter = {
     // will enforce shard version.
     errCode: {$ne: ErrorCodes.StaleConfig},
     "command.aggregate": mongosColl.getName(),
-    "command.pipeline.0.$match._id": 1
+    "command.pipeline.0.$match._id": 1,
 };
 
 profilerHasSingleMatchingEntryOrThrow({
@@ -136,10 +141,10 @@ profilerHasSingleMatchingEntryOrThrow({
 // node than the change stream itself.
 let rsConfig = rst.getReplSetConfig();
 rsConfig.members[1].tags = {
-    tag: "fartherSecondary"
+    tag: "fartherSecondary",
 };
 rsConfig.members[2].tags = {
-    tag: "closestSecondary"
+    tag: "closestSecondary",
 };
 rsConfig.version = rst.getReplSetConfigFromNode().version + 1;
 reconfig(rst, rsConfig);
@@ -149,24 +154,28 @@ const newClosestSecondaryDB = newClosestSecondary.getDB(mongosDB.getName());
 const originalClosestSecondaryDB = closestSecondaryDB;
 
 // Wait for the mongos to acknowledge the new tags from our reconfig.
+awaitRSClientHosts(st.s, newClosestSecondary, {ok: true, secondary: true, tags: {tag: "closestSecondary"}}, rst);
 awaitRSClientHosts(
-    st.s, newClosestSecondary, {ok: true, secondary: true, tags: {tag: "closestSecondary"}}, rst);
-awaitRSClientHosts(st.s,
-                   originalClosestSecondaryDB.getMongo(),
-                   {ok: true, secondary: true, tags: {tag: "fartherSecondary"}},
-                   rst);
+    st.s,
+    originalClosestSecondaryDB.getMongo(),
+    {ok: true, secondary: true, tags: {tag: "fartherSecondary"}},
+    rst,
+);
 assert.commandWorked(newClosestSecondaryDB.setProfilingLevel(2));
 
 // Make sure new queries with read preference tag "closestSecondary" go to the new secondary.
 profilerHasZeroMatchingEntriesOrThrow({profileDB: newClosestSecondaryDB, filter: {}});
-assert.eq(mongosColl.find()
-              .readPref("nearest", [{tag: "closestSecondary"}])
-              .comment("testing targeting")
-              .itcount(),
-          1);
+assert.eq(
+    mongosColl
+        .find()
+        .readPref("nearest", [{tag: "closestSecondary"}])
+        .comment("testing targeting")
+        .itcount(),
+    1,
+);
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: newClosestSecondaryDB,
-    filter: {ns: mongosColl.getFullName(), "command.comment": "testing targeting"}
+    filter: {ns: mongosColl.getFullName(), "command.comment": "testing targeting"},
 });
 
 // Test that the change stream continues on the original host, but the update lookup now targets
@@ -178,9 +187,9 @@ assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 2}}));
 // Since we stopped replication, we expect the update lookup to block indefinitely until we
 // resume replication, so we resume replication in a parallel shell while this thread is blocked
 // getting the next change from the stream.
-const noConnect = true;  // This shell creates its own connection to the host.
-const joinResumeReplicationShell =
-        startParallelShell(`
+const noConnect = true; // This shell creates its own connection to the host.
+const joinResumeReplicationShell = startParallelShell(
+    `
             import {restartServerReplication} from "jstests/libs/write_concern_util.js";
 
             const pausedSecondary = new Mongo("${newClosestSecondary.host}");
@@ -206,8 +215,9 @@ const joinResumeReplicationShell =
 
             // Then restart replication - this should eventually unblock the lookup.
             restartServerReplication(pausedSecondary);`,
-                           undefined,
-                           noConnect);
+    undefined,
+    noConnect,
+);
 assert.soon(() => changeStream.hasNext());
 latestChange = changeStream.next();
 assert.eq(latestChange.operationType, "update");
@@ -223,7 +233,7 @@ filter = {
     // this secondary with a readConcern specified, so it is the first read on this secondary that
     // will enforce shard version.
     errCode: {$ne: ErrorCodes.StaleConfig},
-    "command.aggregate": mongosColl.getName()
+    "command.aggregate": mongosColl.getName(),
 };
 
 profilerHasSingleMatchingEntryOrThrow({profileDB: newClosestSecondaryDB, filter: filter});

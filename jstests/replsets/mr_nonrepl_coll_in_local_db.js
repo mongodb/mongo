@@ -25,7 +25,7 @@ const coll = primaryDB[collName];
 // Insert 1000 documents in the "test" collection.
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < 1000; i++) {
-    const array = Array.from({lengthToInsert: 10000}, _ => Math.floor(Math.random() * 100));
+    const array = Array.from({lengthToInsert: 10000}, (_) => Math.floor(Math.random() * 100));
     bulk.insert({arr: array});
 }
 assert.commandWorked(bulk.execute());
@@ -33,25 +33,26 @@ assert.commandWorked(bulk.execute());
 // Run a simple map-reduce.
 const result = coll.mapReduce(
     function map() {
-        return this.arr.forEach(element => emit(element, 1));
+        return this.arr.forEach((element) => emit(element, 1));
     },
     function reduce(key, values) {
         return Array.sum(values);
     },
-    {query: {arr: {$exists: true}}, out: "mr_result"});
+    {query: {arr: {$exists: true}}, out: "mr_result"},
+);
 assert.commandWorked(result);
 
 // Examine the logs to find a list of created collections.
 const logLines = checkLog.getGlobalLog(primaryDB);
 let createdCollections = [];
-logLines.forEach(function(line) {
+logLines.forEach(function (line) {
     const matchResult = line.match(/createCollection: (.+) with/);
     if (matchResult) {
         createdCollections.push(matchResult[1]);
     }
 });
 
-createdCollections.forEach(function(createdCollectionName) {
+createdCollections.forEach(function (createdCollectionName) {
     if (createdCollectionName.startsWith("admin.")) {
         // Although the "admin.system.version" collection is replicated, no "c" entry gets
         // created for it in the oplog, so this test would see it as unreplicated. In general,
@@ -65,21 +66,26 @@ createdCollections.forEach(function(createdCollectionName) {
     const collName = createdCollectionName.substring(periodIndex + 1);
 
     // Search for a log entry for the creation of this collection.
-    const oplogEntries =
-        primaryDB.getSiblingDB("local")["oplog.rs"]
-            .find({op: "c", ns: dbName + ".$cmd", "o.create": collName, "o.idIndex.name": "_id_"})
-            .toArray();
+    const oplogEntries = primaryDB
+        .getSiblingDB("local")
+        ["oplog.rs"].find({op: "c", ns: dbName + ".$cmd", "o.create": collName, "o.idIndex.name": "_id_"})
+        .toArray();
     if (createdCollectionName.startsWith("local.")) {
         // We do not want to see any replication of "local" collections.
-        assert.eq(oplogEntries.length,
-                  0,
-                  "Found unexpected oplog entry for creation of " + createdCollectionName + ": " +
-                      tojson(oplogEntries));
+        assert.eq(
+            oplogEntries.length,
+            0,
+            "Found unexpected oplog entry for creation of " + createdCollectionName + ": " + tojson(oplogEntries),
+        );
     } else {
-        assert.eq(oplogEntries.length,
-                  1,
-                  "Found no oplog entry or too many entries for creation of " +
-                      createdCollectionName + ": " + tojson(oplogEntries));
+        assert.eq(
+            oplogEntries.length,
+            1,
+            "Found no oplog entry or too many entries for creation of " +
+                createdCollectionName +
+                ": " +
+                tojson(oplogEntries),
+        );
     }
 });
 

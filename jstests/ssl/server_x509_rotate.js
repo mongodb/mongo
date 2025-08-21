@@ -19,7 +19,7 @@ copyCertificateFile(OLD_SERVER, dbPath + "/server-test.pem");
 const mongod = MongoRunner.runMongod({
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: dbPath + "/server-test.pem",
-    tlsCAFile: dbPath + "/ca-test.pem"
+    tlsCAFile: dbPath + "/ca-test.pem",
 });
 const host = "localhost:" + mongod.port;
 

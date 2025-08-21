@@ -8,14 +8,12 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    moveDatabaseAndUnshardedColls
-} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
+import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 var numDocs = 10000;
 var baseName = "moveprimary-replset";
 var testDBName = baseName;
-var testCollName = 'coll';
+var testCollName = "coll";
 
 var shardingTestConfig = {
     name: baseName,
@@ -23,14 +21,13 @@ var shardingTestConfig = {
     shards: 2,
     config: 3,
     rs: {nodes: 3},
-    other: {manualAddShard: true}
+    other: {manualAddShard: true},
 };
 
 var shardingTest = new ShardingTest(shardingTestConfig);
 
 // TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(shardingTest.configRS.getPrimary(),
-                                        "ShardAuthoritativeDbMetadataDDL")) {
+if (FeatureFlagUtil.isPresentAndEnabled(shardingTest.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
     shardingTest.stop();
     quit();
 }
@@ -49,23 +46,21 @@ var testDB = mongosConn.getDB(testDBName);
 
 mongosConn.adminCommand({addshard: replSet1.getURL()});
 
-testDB[testCollName].update({}, {$set: {y: 'hello'}}, false /*upsert*/, true /*multi*/);
-assert.eq(testDB[testCollName].count({y: 'hello'}),
-          numDocs,
-          'updating and counting docs via mongos failed');
+testDB[testCollName].update({}, {$set: {y: "hello"}}, false /*upsert*/, true /*multi*/);
+assert.eq(testDB[testCollName].count({y: "hello"}), numDocs, "updating and counting docs via mongos failed");
 
 mongosConn.adminCommand({addshard: replSet2.getURL()});
 
 moveDatabaseAndUnshardedColls(mongosConn.getDB(testDBName), replSet2.name);
 
-mongosConn.getDB('admin').printShardingStatus();
-assert.eq(testDB.getSiblingDB("config").databases.findOne({"_id": testDBName}).primary,
-          replSet2.name,
-          "Failed to change primary shard for unsharded database.");
+mongosConn.getDB("admin").printShardingStatus();
+assert.eq(
+    testDB.getSiblingDB("config").databases.findOne({"_id": testDBName}).primary,
+    replSet2.name,
+    "Failed to change primary shard for unsharded database.",
+);
 
-testDB[testCollName].update({}, {$set: {z: 'world'}}, false /*upsert*/, true /*multi*/);
-assert.eq(testDB[testCollName].count({z: 'world'}),
-          numDocs,
-          'updating and counting docs via mongos failed');
+testDB[testCollName].update({}, {$set: {z: "world"}}, false /*upsert*/, true /*multi*/);
+assert.eq(testDB[testCollName].count({z: "world"}), numDocs, "updating and counting docs via mongos failed");
 
 shardingTest.stop();

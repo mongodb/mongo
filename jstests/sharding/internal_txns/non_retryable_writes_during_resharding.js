@@ -4,20 +4,22 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence, exclude_from_large_txns]
  */
-import {
-    InternalTransactionReshardingTest
-} from "jstests/sharding/internal_txns/libs/resharding_test.js";
+import {InternalTransactionReshardingTest} from "jstests/sharding/internal_txns/libs/resharding_test.js";
 
 {
     const transactionTest = new InternalTransactionReshardingTest({reshardInPlace: false});
     transactionTest.runTestForInsertUpdateDeleteDuringResharding(
-        transactionTest.InternalTxnType.kNonRetryable, false /* abortOnInitialTry */);
+        transactionTest.InternalTxnType.kNonRetryable,
+        false /* abortOnInitialTry */,
+    );
     transactionTest.stop();
 }
 
 {
     const transactionTest = new InternalTransactionReshardingTest({reshardInPlace: false});
     transactionTest.runTestForInsertUpdateDeleteDuringResharding(
-        transactionTest.InternalTxnType.kNonRetryable, true /* abortOnInitialTry */);
+        transactionTest.InternalTxnType.kNonRetryable,
+        true /* abortOnInitialTry */,
+    );
     transactionTest.stop();
 }

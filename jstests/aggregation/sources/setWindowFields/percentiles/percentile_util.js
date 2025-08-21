@@ -9,11 +9,12 @@ export function runSetWindowStage(coll, percentileSpec, medianSpec, letSpec) {
                         output: {
                             runningPercentile: percentileSpec,
                             runningMedian: medianSpec,
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             ],
-            {let : letSpec})
+            {let: letSpec},
+        )
         .toArray();
 }
 
@@ -37,13 +38,20 @@ export function assertResultCloseToVal({resultArray: results, percentile: pVal, 
 }
 
 export function testError(coll, percentileSpec, expectedCode, letSpec) {
-    assert.throwsWithCode(() => coll.aggregate([{
-                                                   $setWindowFields: {
-                                                       partitionBy: "$ticket",
-                                                       sortBy: {ts: 1},
-                                                       output: {outputField: percentileSpec},
-                                                   }
-                                               }],
-                                               {let : letSpec}),
-                          expectedCode);
+    assert.throwsWithCode(
+        () =>
+            coll.aggregate(
+                [
+                    {
+                        $setWindowFields: {
+                            partitionBy: "$ticket",
+                            sortBy: {ts: 1},
+                            output: {outputField: percentileSpec},
+                        },
+                    },
+                ],
+                {let: letSpec},
+            ),
+        expectedCode,
+    );
 }

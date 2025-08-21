@@ -19,14 +19,16 @@ function initCollection(coll) {
 }
 
 function initCursorFind(coll) {
-    const cursor =
-        coll.find({a: {$gte: 0}, b: {$gte: 0}}, {_id: 0, b: 0}).sort({a: 1}).batchSize(1);
+    const cursor = coll
+        .find({a: {$gte: 0}, b: {$gte: 0}}, {_id: 0, b: 0})
+        .sort({a: 1})
+        .batchSize(1);
     assert(cursor.hasNext());
     return cursor;
 }
 
 function getInitCursorCallback(pipeline) {
-    return function(coll) {
+    return function (coll) {
         const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
         assert(cursor.hasNext());
         return cursor;
@@ -34,12 +36,14 @@ function getInitCursorCallback(pipeline) {
 }
 
 // Set it to a low value so release memory will yield.
-assert.commandWorked(db.adminCommand({
-    setParameter: 1,
-    internalQueryExecYieldIterations: 1,
-    internalDocumentSourceCursorBatchSizeBytes: 1,
-    internalDocumentSourceCursorInitialBatchSize: 1,
-}));
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        internalQueryExecYieldIterations: 1,
+        internalDocumentSourceCursorBatchSizeBytes: 1,
+        internalDocumentSourceCursorInitialBatchSize: 1,
+    }),
+);
 
 function runTest(initCursor) {
     initCollection(db.coll1);
@@ -54,11 +58,12 @@ function runTest(initCursor) {
         const cursor1 = initCursor(db.coll1);
         const cursor2 = initCursor(db.coll2);
 
-        const fp = configureFailPoint(conn,
-                                      "setInterruptOnlyPlansCheckForInterruptHang",
-                                      {namespace: db.coll1.getFullName()});
+        const fp = configureFailPoint(conn, "setInterruptOnlyPlansCheckForInterruptHang", {
+            namespace: db.coll1.getFullName(),
+        });
 
-        const awaitShell = startParallelShell(`
+        const awaitShell = startParallelShell(
+            `
     import {assertReleaseMemoryFailedWithCode, assertReleaseMemoryWorked} from "jstests/libs/release_memory_util.js";
 
     const res = db.runCommand({releaseMemory: [${cursor1.getId()}, ${cursor2.getId()}]});
@@ -66,15 +71,16 @@ function runTest(initCursor) {
 
     assertReleaseMemoryWorked(res, ${cursor1.getId()});
     assertReleaseMemoryWorked(res, ${cursor2.getId()});
-    `, conn.port);
+    `,
+            conn.port,
+        );
 
         fp.wait();
         assert(db.coll1.drop());
         fp.off();
         awaitShell();
 
-        assert.throwsWithCode(() => cursor1.toArray(),
-                              [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled]);
+        assert.throwsWithCode(() => cursor1.toArray(), [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled]);
         assertArrayEq({actual: cursor2.toArray(), expected: expectedResult});
     }
 
@@ -89,34 +95,38 @@ function runTest(initCursor) {
         const cursor1 = initCursor(db.coll1);
         const cursor2 = initCursor(db.coll2);
 
-        const fp = configureFailPoint(conn,
-                                      "setInterruptOnlyPlansCheckForInterruptHang",
-                                      {namespace: db.coll1.getFullName()});
+        const fp = configureFailPoint(conn, "setInterruptOnlyPlansCheckForInterruptHang", {
+            namespace: db.coll1.getFullName(),
+        });
 
-        const awaitShell = startParallelShell(`
+        const awaitShell = startParallelShell(
+            `
     import {assertReleaseMemoryFailedWithCode} from "jstests/libs/release_memory_util.js";
 
     const res = db.runCommand({releaseMemory: [${cursor1.getId()}, ${cursor2.getId()}]});
     jsTest.log("Release memory result: " + tojson(res));
 
     assertReleaseMemoryFailedWithCode(res, ${cursor1.getId()}, [ErrorCodes.Interrupted]);
-    `, conn.port);
+    `,
+            conn.port,
+        );
 
         fp.wait();
 
         let opId = null;
-        assert.soon(function() {
-            const ops = db.getSiblingDB("admin")
-                            .aggregate([
-                                {$currentOp: {allUsers: true, localOps: true}},
-                                {
-                                    $match: {
-                                        op: "command",
-                                        "command.releaseMemory": {$exists: true},
-                                    }
-                                }
-                            ])
-                            .toArray();
+        assert.soon(function () {
+            const ops = db
+                .getSiblingDB("admin")
+                .aggregate([
+                    {$currentOp: {allUsers: true, localOps: true}},
+                    {
+                        $match: {
+                            op: "command",
+                            "command.releaseMemory": {$exists: true},
+                        },
+                    },
+                ])
+                .toArray();
 
             if (ops.length > 0) {
                 assert.eq(ops.length, 1);
@@ -140,11 +150,7 @@ function runTest(initCursor) {
 
 runTest(initCursorFind);
 
-const sortPipeline = [
-    {$match: {a: {$gte: 0}, b: {$gte: 0}}},
-    {$sort: {a: 1}},
-    {$_internalInhibitOptimization: {}},
-];
+const sortPipeline = [{$match: {a: {$gte: 0}, b: {$gte: 0}}}, {$sort: {a: 1}}, {$_internalInhibitOptimization: {}}];
 runTest(getInitCursorCallback(sortPipeline));
 
 if (checkSbeRestrictedOrFullyEnabled(db)) {

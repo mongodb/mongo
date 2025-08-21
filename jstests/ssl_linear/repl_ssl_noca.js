@@ -15,7 +15,7 @@ if (HOST_TYPE == "macOS") {
     // Ensure trusted-ca.pem is properly installed on MacOS hosts.
     // (MacOS is the only OS where it is installed outside of this test)
     let exitCode = runProgram("security", "verify-cert", "-c", "./jstests/libs/trusted-client.pem");
-    assert.eq(0, exitCode, 'Check for proper installation of Trusted CA on MacOS host');
+    assert.eq(0, exitCode, "Check for proper installation of Trusted CA on MacOS host");
 }
 if (HOST_TYPE == "windows") {
     assert.eq(0, runProgram(getPython3Binary(), "jstests/ssl_linear/windows_castore_cleanup.py"));
@@ -43,7 +43,7 @@ try {
 
     replTest.startSet({
         env: {
-            SSL_CERT_FILE: 'jstests/libs/trusted-ca.pem',
+            SSL_CERT_FILE: "jstests/libs/trusted-ca.pem",
         },
     });
 
@@ -51,13 +51,13 @@ try {
 
     var nodeList = replTest.nodeList().join();
 
-    var checkShell = function(url) {
+    var checkShell = function (url) {
         // Should not be able to authenticate with x509.
         // Authenticate call will return 1 on success, 0 on error.
-        var argv = ['mongo', url, '--eval', ('db.runCommand({replSetGetStatus: 1})')];
+        var argv = ["mongo", url, "--eval", "db.runCommand({replSetGetStatus: 1})"];
 
-        if (url.endsWith('&ssl=true')) {
-            argv.push('--tls', '--tlsCertificateKeyFile', 'jstests/libs/trusted-client.pem');
+        if (url.endsWith("&ssl=true")) {
+            argv.push("--tls", "--tlsCertificateKeyFile", "jstests/libs/trusted-client.pem");
         }
 
         if (!_isWindows()) {
@@ -84,7 +84,7 @@ try {
     replTest.stopSet();
 } finally {
     if (_isWindows()) {
-        const ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
+        const ca_thumbprint = cat("jstests/libs/trusted-ca.pem.digest.sha1");
         runProgram("certutil.exe", "-delstore", "-f", "Root", ca_thumbprint);
         runProgram("certutil.exe", "-delstore", "-user", "-f", "CA", ca_thumbprint);
     }

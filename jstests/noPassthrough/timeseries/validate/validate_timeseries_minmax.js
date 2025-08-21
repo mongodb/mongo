@@ -19,17 +19,17 @@ const weatherData = [
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T12:00:00.000Z"),
-        "temp": 12
+        "temp": 12,
     },
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T16:00:00.000Z"),
-        "temp": 16
+        "temp": 16,
     },
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T20:00:00.000Z"),
-        "temp": 15
+        "temp": 15,
     },
 ];
 
@@ -37,7 +37,7 @@ const weatherDataWithGap = [
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T12:00:00.000Z"),
-        "temp": 12
+        "temp": 12,
     },
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
@@ -46,7 +46,7 @@ const weatherDataWithGap = [
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T20:00:00.000Z"),
-        "temp": 15
+        "temp": 15,
     },
 ];
 
@@ -55,19 +55,19 @@ const stringData = [
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T12:00:00.000Z"),
         "temp": 12,
-        "str": "a"
+        "str": "a",
     },
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T16:00:00.000Z"),
         "temp": 16,
-        "str": "11"
+        "str": "11",
     },
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T20:00:00.000Z"),
         "temp": 16,
-        "str": "18"
+        "str": "18",
     },
 ];
 
@@ -75,17 +75,17 @@ const arrayData = [
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T12:00:00.000Z"),
-        "arr": ["a", {"field": 1}, 1]
+        "arr": ["a", {"field": 1}, 1],
     },
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T16:00:00.000Z"),
-        "arr": ["1", {"field": 2}, 100]
+        "arr": ["1", {"field": 2}, 100],
     },
     {
         "metadata": {"sensorId": 5578, "type": "temperature"},
         "timestamp": ISODate("2021-05-18T20:00:00.000Z"),
-        "arr": ["z", {"field": -2}, 30]
+        "arr": ["z", {"field": -2}, 30],
     },
 ];
 
@@ -107,10 +107,13 @@ const objectData = [
     },
 ];
 
-const lotsOfData = [...Array(1010).keys()].map(
-    i => ({"metadata": {"sensorId": 2, "type": "temperature"}, "timestamp": ISODate(), "temp": i}));
+const lotsOfData = [...Array(1010).keys()].map((i) => ({
+    "metadata": {"sensorId": 2, "type": "temperature"},
+    "timestamp": ISODate(),
+    "temp": i,
+}));
 
-const skipFieldData = [...Array(1010).keys()].map(function(i) {
+const skipFieldData = [...Array(1010).keys()].map(function (i) {
     if (i % 2) {
         return {"timestamp": ISODate(), "temp": i};
     } else {
@@ -124,9 +127,11 @@ function setUpCollection(data) {
     testCount += 1;
     collName = collPrefix + testCount;
     db.getCollection(collName).drop();
-    assert.commandWorked(db.createCollection(
-        collName,
-        {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
+    assert.commandWorked(
+        db.createCollection(collName, {
+            timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"},
+        }),
+    );
     let collection = db.getCollection(collName);
     assert.commandWorked(collection.insertMany(data, {ordered: false}));
 
@@ -134,8 +139,7 @@ function setUpCollection(data) {
     // compressed bucket with the decompressed bucket.
     const bucketDoc = getTimeseriesCollForRawOps(db, collection).find().rawData()[0];
     TimeseriesTest.decompressBucket(bucketDoc);
-    getTimeseriesCollForRawOps(db, collection)
-        .replaceOne({_id: bucketDoc._id}, bucketDoc, getRawOperationSpec(db));
+    getTimeseriesCollForRawOps(db, collection).replaceOne({_id: bucketDoc._id}, bucketDoc, getRawOperationSpec(db));
 
     let result = assert.commandWorked(collection.validate());
     assert(result.valid, tojson(result));
@@ -146,13 +150,14 @@ function setUpCollection(data) {
 // Updates 'control' min temperature with corresponding update in recorded temperature, testing
 // that valid updates do not return warnings.
 setUpCollection(weatherData);
-jsTestLog("Running validate on bucket with correct 'max' temperature, using collection " +
-          collName + ".");
+jsTestLog("Running validate on bucket with correct 'max' temperature, using collection " + collName + ".");
 let coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.max.temp": 17}}, getRawOperationSpec(db)));
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"data.temp.1": 17}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$set": {"control.max.temp": 17}}, getRawOperationSpec(db)),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$set": {"data.temp.1": 17}}, getRawOperationSpec(db)),
+);
 let res = assert.commandWorked(coll.validate());
 assert(res.valid, tojson(res));
 assert(res.warnings.length == 0, tojson(res));
@@ -160,14 +165,14 @@ assert(res.nNonCompliantDocuments == 0, tojson(res));
 
 // Updates the 'control' min and max temperature without an update in recorded temperature.
 setUpCollection(weatherData);
-jsTestLog(
-    "Running validate on bucket with incorrect 'min' and 'max' temperature, using collection " +
-    collName + ".");
+jsTestLog("Running validate on bucket with incorrect 'min' and 'max' temperature, using collection " + collName + ".");
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.min.temp": -200}}, getRawOperationSpec(db)));
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.max.temp": 500}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$set": {"control.min.temp": -200}}, getRawOperationSpec(db)),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$set": {"control.max.temp": 500}}, getRawOperationSpec(db)),
+);
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -179,12 +184,16 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 setUpCollection(weatherDataWithGap);
 jsTestLog(
     "Running validate on bucket with incorrect 'min' and 'max' temperature with gaps in temperature data, using collection " +
-    collName + ".");
+        collName +
+        ".",
+);
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.min.temp": -200}}, getRawOperationSpec(db)));
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.max.temp": 500}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$set": {"control.min.temp": -200}}, getRawOperationSpec(db)),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$set": {"control.max.temp": 500}}, getRawOperationSpec(db)),
+);
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -192,13 +201,15 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Updates the 'control' max _id without an update in recorded temperature.
 setUpCollection(weatherData);
-jsTestLog("Running validate on bucket with incorrect 'max' '_id', using collection " + collName +
-          ".");
+jsTestLog("Running validate on bucket with incorrect 'max' '_id', using collection " + collName + ".");
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {},
-    {"$set": {"control.max._id": ObjectId("62bcc728f3c51f43297eea43")}},
-    getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$set": {"control.max._id": ObjectId("62bcc728f3c51f43297eea43")}},
+        getRawOperationSpec(db),
+    ),
+);
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -206,13 +217,15 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Updates the 'control' min timestamp without an update in recorded temperature.
 setUpCollection(weatherData);
-jsTestLog("Running validate on bucket with incorrect 'min' timestamp, using collection " +
-          collName + ".");
+jsTestLog("Running validate on bucket with incorrect 'min' timestamp, using collection " + collName + ".");
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {},
-    {"$set": {"control.min.timestamp": ISODate("2021-05-19T13:00:00.000Z")}},
-    getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$set": {"control.min.timestamp": ISODate("2021-05-19T13:00:00.000Z")}},
+        getRawOperationSpec(db),
+    ),
+);
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -220,11 +233,11 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Adds an extra field to the 'control' min object.
 setUpCollection(weatherData);
-jsTestLog("Running validate on bucket with extra control field, using collection " + collName +
-          ".");
+jsTestLog("Running validate on bucket with extra control field, using collection " + collName + ".");
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.min.extra": 10}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$set": {"control.min.extra": 10}}, getRawOperationSpec(db)),
+);
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 2, tojson(res));
@@ -232,14 +245,14 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests whether discrepancies with string min/max values are caught.
 setUpCollection(stringData);
-jsTestLog(
-    "Running validate on bucket with incorrect 'min' and 'max' string field, using collection " +
-    collName + ".");
+jsTestLog("Running validate on bucket with incorrect 'min' and 'max' string field, using collection " + collName + ".");
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.min.str": "-200"}}, getRawOperationSpec(db)));
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.max.str": "zzz"}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$set": {"control.min.str": "-200"}}, getRawOperationSpec(db)),
+);
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update({}, {"$set": {"control.max.str": "zzz"}}, getRawOperationSpec(db)),
+);
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -247,11 +260,15 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests whether discrepancies with array values are caught.
 setUpCollection(arrayData);
-jsTestLog("Running validate on bucket with incorrect 'max' array field, using collection " +
-          collName + ".");
+jsTestLog("Running validate on bucket with incorrect 'max' array field, using collection " + collName + ".");
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.max.arr": ["zzzzz", {"field": -2}, 30]}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$set": {"control.max.arr": ["zzzzz", {"field": -2}, 30]}},
+        getRawOperationSpec(db),
+    ),
+);
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -259,11 +276,15 @@ assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests whether discrepancies with nested objects are caught.
 setUpCollection(objectData);
-jsTestLog("Running validate on bucket with incorrect 'max' object field, using collection " +
-          collName + ".");
+jsTestLog("Running validate on bucket with incorrect 'max' object field, using collection " + collName + ".");
 coll = db.getCollection(collName);
-assert.commandWorked(getTimeseriesCollForRawOps(db, coll).update(
-    {}, {"$set": {"control.max.obj": {"nestedObj": {"field": 2}}}}, getRawOperationSpec(db)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(db, coll).update(
+        {},
+        {"$set": {"control.max.obj": {"nestedObj": {"field": 2}}}},
+        getRawOperationSpec(db),
+    ),
+);
 res = assert.commandWorked(coll.validate());
 assert(!res.valid, tojson(res));
 assert(res.errors.length == 1, tojson(res));
@@ -276,15 +297,15 @@ coll = db.getCollection(collName);
 getTimeseriesCollForRawOps(db, coll).updateOne(
     {"meta.sensorId": 2, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.max.temp": 800}},
-    getRawOperationSpec(db));
+    getRawOperationSpec(db),
+);
 res = coll.validate({checkBSONConformance: true});
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.errors.length, 1);
 
 // "Checks no errors are thrown with a valid closed bucket."
-jsTestLog(
-    "Running validate on a version 2 bucket with everything correct, checking that no warnings are found.");
+jsTestLog("Running validate on a version 2 bucket with everything correct, checking that no warnings are found.");
 setUpCollection(lotsOfData);
 coll = db.getCollection(collName);
 res = coll.validate({checkBSONConformance: true});
@@ -294,7 +315,8 @@ assert.eq(res.warnings.length, 0);
 
 // "Checks no errors are thrown with a valid closed bucket with skipped data fields."
 jsTestLog(
-    "Running validate on a correct version 2 bucket with skipped data fields, checking that no warnings are found.");
+    "Running validate on a correct version 2 bucket with skipped data fields, checking that no warnings are found.",
+);
 setUpCollection(skipFieldData);
 coll = db.getCollection(collName);
 res = coll.validate({checkBSONConformance: true});

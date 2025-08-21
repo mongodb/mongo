@@ -80,48 +80,47 @@ function good(start, mod, expected) {
     assert.docEq(expected, got);
 }
 
-good({a: 1}, {$rename: {a: 'b'}}, {b: 1});
-good({a: 1}, {$rename: {a: 'bb'}}, {bb: 1});
-good({b: 1}, {$rename: {b: 'a'}}, {a: 1});
-good({bb: 1}, {$rename: {bb: 'a'}}, {a: 1});
-good({a: {y: 1}}, {$rename: {'a.y': 'a.z'}}, {a: {z: 1}});
-good({a: {yy: 1}}, {$rename: {'a.yy': 'a.z'}}, {a: {z: 1}});
-good({a: {z: 1}}, {$rename: {'a.z': 'a.y'}}, {a: {y: 1}});
-good({a: {zz: 1}}, {$rename: {'a.zz': 'a.y'}}, {a: {y: 1}});
-good({a: {c: 1}}, {$rename: {a: 'b'}}, {b: {c: 1}});
-good({aa: {c: 1}}, {$rename: {aa: 'b'}}, {b: {c: 1}});
-good({a: 1, b: 2}, {$rename: {a: 'b'}}, {b: 1});
-good({aa: 1, b: 2}, {$rename: {aa: 'b'}}, {b: 1});
-good({a: 1, bb: 2}, {$rename: {a: 'bb'}}, {bb: 1});
-good({a: 1}, {$rename: {a: 'b.c'}}, {b: {c: 1}});
-good({aa: 1}, {$rename: {aa: 'b.c'}}, {b: {c: 1}});
-good({a: 1, b: {}}, {$rename: {a: 'b.c'}}, {b: {c: 1}});
-good({aa: 1, b: {}}, {$rename: {aa: 'b.c'}}, {b: {c: 1}});
-good({a: 1}, {$rename: {b: 'c'}}, {a: 1});
-good({aa: 1}, {$rename: {b: 'c'}}, {aa: 1});
-good({}, {$rename: {b: 'c'}}, {});
-good({a: {b: 1, c: 2}}, {$rename: {'a.b': 'd'}}, {a: {c: 2}, d: 1});
-good({a: {bb: 1, c: 2}}, {$rename: {'a.bb': 'd'}}, {a: {c: 2}, d: 1});
-good({a: {b: 1}}, {$rename: {'a.b': 'd'}}, {a: {}, d: 1});
-good({a: [5]}, {$rename: {a: 'b'}}, {b: [5]});
-good({aa: [5]}, {$rename: {aa: 'b'}}, {b: [5]});
-good({'0': 1}, {$rename: {'0': '5'}}, {'5': 1});
-good({a: 1, b: 2}, {$rename: {a: 'c'}, $set: {b: 5}}, {b: 5, c: 1});
-good({aa: 1, b: 2}, {$rename: {aa: 'c'}, $set: {b: 5}}, {b: 5, c: 1});
-good({a: 1, b: 2}, {$rename: {z: 'c'}, $set: {b: 5}}, {a: 1, b: 5});
-good({aa: 1, b: 2}, {$rename: {z: 'c'}, $set: {b: 5}}, {aa: 1, b: 5});
+good({a: 1}, {$rename: {a: "b"}}, {b: 1});
+good({a: 1}, {$rename: {a: "bb"}}, {bb: 1});
+good({b: 1}, {$rename: {b: "a"}}, {a: 1});
+good({bb: 1}, {$rename: {bb: "a"}}, {a: 1});
+good({a: {y: 1}}, {$rename: {"a.y": "a.z"}}, {a: {z: 1}});
+good({a: {yy: 1}}, {$rename: {"a.yy": "a.z"}}, {a: {z: 1}});
+good({a: {z: 1}}, {$rename: {"a.z": "a.y"}}, {a: {y: 1}});
+good({a: {zz: 1}}, {$rename: {"a.zz": "a.y"}}, {a: {y: 1}});
+good({a: {c: 1}}, {$rename: {a: "b"}}, {b: {c: 1}});
+good({aa: {c: 1}}, {$rename: {aa: "b"}}, {b: {c: 1}});
+good({a: 1, b: 2}, {$rename: {a: "b"}}, {b: 1});
+good({aa: 1, b: 2}, {$rename: {aa: "b"}}, {b: 1});
+good({a: 1, bb: 2}, {$rename: {a: "bb"}}, {bb: 1});
+good({a: 1}, {$rename: {a: "b.c"}}, {b: {c: 1}});
+good({aa: 1}, {$rename: {aa: "b.c"}}, {b: {c: 1}});
+good({a: 1, b: {}}, {$rename: {a: "b.c"}}, {b: {c: 1}});
+good({aa: 1, b: {}}, {$rename: {aa: "b.c"}}, {b: {c: 1}});
+good({a: 1}, {$rename: {b: "c"}}, {a: 1});
+good({aa: 1}, {$rename: {b: "c"}}, {aa: 1});
+good({}, {$rename: {b: "c"}}, {});
+good({a: {b: 1, c: 2}}, {$rename: {"a.b": "d"}}, {a: {c: 2}, d: 1});
+good({a: {bb: 1, c: 2}}, {$rename: {"a.bb": "d"}}, {a: {c: 2}, d: 1});
+good({a: {b: 1}}, {$rename: {"a.b": "d"}}, {a: {}, d: 1});
+good({a: [5]}, {$rename: {a: "b"}}, {b: [5]});
+good({aa: [5]}, {$rename: {aa: "b"}}, {b: [5]});
+good({"0": 1}, {$rename: {"0": "5"}}, {"5": 1});
+good({a: 1, b: 2}, {$rename: {a: "c"}, $set: {b: 5}}, {b: 5, c: 1});
+good({aa: 1, b: 2}, {$rename: {aa: "c"}, $set: {b: 5}}, {b: 5, c: 1});
+good({a: 1, b: 2}, {$rename: {z: "c"}, $set: {b: 5}}, {a: 1, b: 5});
+good({aa: 1, b: 2}, {$rename: {z: "c"}, $set: {b: 5}}, {aa: 1, b: 5});
 
 // (formerly) rewriting single field
-good({a: {z: 1, b: 1}}, {$rename: {'a.b': 'a.c'}}, {a: {c: 1, z: 1}});
-good({a: {z: 1, tomato: 1}}, {$rename: {'a.tomato': 'a.potato'}}, {a: {potato: 1, z: 1}});
-good({a: {z: 1, b: 1, c: 1}}, {$rename: {'a.b': 'a.c'}}, {a: {c: 1, z: 1}});
-good(
-    {a: {z: 1, tomato: 1, potato: 1}}, {$rename: {'a.tomato': 'a.potato'}}, {a: {potato: 1, z: 1}});
-good({a: {z: 1, b: 1}}, {$rename: {'a.b': 'a.cc'}}, {a: {cc: 1, z: 1}});
-good({a: {z: 1, b: 1, c: 1}}, {$rename: {'a.b': 'aa.c'}}, {a: {c: 1, z: 1}, aa: {c: 1}});
+good({a: {z: 1, b: 1}}, {$rename: {"a.b": "a.c"}}, {a: {c: 1, z: 1}});
+good({a: {z: 1, tomato: 1}}, {$rename: {"a.tomato": "a.potato"}}, {a: {potato: 1, z: 1}});
+good({a: {z: 1, b: 1, c: 1}}, {$rename: {"a.b": "a.c"}}, {a: {c: 1, z: 1}});
+good({a: {z: 1, tomato: 1, potato: 1}}, {$rename: {"a.tomato": "a.potato"}}, {a: {potato: 1, z: 1}});
+good({a: {z: 1, b: 1}}, {$rename: {"a.b": "a.cc"}}, {a: {cc: 1, z: 1}});
+good({a: {z: 1, b: 1, c: 1}}, {$rename: {"a.b": "aa.c"}}, {a: {c: 1, z: 1}, aa: {c: 1}});
 
 // invalid target, but missing source
-good({a: 1, c: 4}, {$rename: {b: 'c.d'}}, {a: 1, c: 4});
+good({a: 1, c: 4}, {$rename: {b: "c.d"}}, {a: 1, c: 4});
 
 // TODO: This should be supported, and it is with the new update framework, but not with the
 // old, and we currently don't have a good way to check which mode we are in. When we do have
@@ -145,7 +144,7 @@ function l(start, mod, query, expected) {
     assert.docEq(expected, got);
 }
 
-l({a: 1}, {$rename: {a: 'b'}}, {a: null}, {b: 1});
-l({a: 1}, {$rename: {a: 'bb'}}, {a: null}, {bb: 1});
-l({b: 1}, {$rename: {b: 'a'}}, {a: 1}, {a: 1});
-l({bb: 1}, {$rename: {bb: 'a'}}, {a: 1}, {a: 1});
+l({a: 1}, {$rename: {a: "b"}}, {a: null}, {b: 1});
+l({a: 1}, {$rename: {a: "bb"}}, {a: null}, {bb: 1});
+l({b: 1}, {$rename: {b: "a"}}, {a: 1}, {a: 1});
+l({bb: 1}, {$rename: {bb: "a"}}, {a: 1}, {a: 1});

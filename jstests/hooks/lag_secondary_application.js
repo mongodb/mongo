@@ -9,7 +9,8 @@ const MIN_MS = 400;
 const MAX_MS = 1000;
 
 /* Pick a random millisecond value between 400 and 1000 for the lag value */
-function randomMSFromInterval(minMS, maxMS) {  // min and max included
+function randomMSFromInterval(minMS, maxMS) {
+    // min and max included
     return Math.floor(Math.random() * (maxMS - minMS + 1) + minMS);
 }
 
@@ -17,20 +18,24 @@ function randomMSFromInterval(minMS, maxMS) {  // min and max included
 function isShutdownError(error) {
     // TODO (SERVER-54026): Remove check for error messages once the shell correctly
     // propagates the error code.
-    return error.code === ErrorCodes.ShutdownInProgress ||
+    return (
+        error.code === ErrorCodes.ShutdownInProgress ||
         error.code === ErrorCodes.InterruptedAtShutdown ||
         error.message.includes("The server is in quiesce mode and will shut down") ||
-        error.message.includes("interrupted at shutdown");
+        error.message.includes("interrupted at shutdown")
+    );
 }
 
 function turnOffFailPointWithRetry(conn) {
     let retryRemaining = 5;
     while (retryRemaining > 0) {
         try {
-            assert.commandWorked(conn.adminCommand({
-                configureFailPoint: 'pauseBatchApplicationAfterWritingOplogEntries',
-                mode: "off"
-            }));
+            assert.commandWorked(
+                conn.adminCommand({
+                    configureFailPoint: "pauseBatchApplicationAfterWritingOplogEntries",
+                    mode: "off",
+                }),
+            );
             jsTestLog("Resuming oplog application on secondary: " + conn);
             return;
         } catch (e) {
@@ -42,8 +47,10 @@ function turnOffFailPointWithRetry(conn) {
             }
         }
     }
-    jsTestLog("LagOplogApplication hook turn off failPoint with network retry failed. " +
-              "The node is expected to be shutdown.");
+    jsTestLog(
+        "LagOplogApplication hook turn off failPoint with network retry failed. " +
+            "The node is expected to be shutdown.",
+    );
 }
 /**
  * Enables the 'pauseBatchApplicationAfterWritingOplogEntries' failpoint on a secondary
@@ -55,8 +62,12 @@ function lagLastApplied(secondaryConn) {
     const randMS = randomMSFromInterval(MIN_MS, MAX_MS);
     jsTestLog("Pausing oplog application for " + randMS + " ms on secondary: " + secondaryConn);
 
-    assert.commandWorked(secondaryConn.adminCommand(
-        {configureFailPoint: 'pauseBatchApplicationAfterWritingOplogEntries', mode: "alwaysOn"}));
+    assert.commandWorked(
+        secondaryConn.adminCommand({
+            configureFailPoint: "pauseBatchApplicationAfterWritingOplogEntries",
+            mode: "alwaysOn",
+        }),
+    );
     // Induce a random millisecond lag and turn off the failpoint.
     sleep(randMS);
 
@@ -76,17 +87,16 @@ try {
 
     // Limit this hook to replica sets.
     if (topology.type !== Topology.kReplicaSet) {
-        throw new Error('Unsupported topology configuration: ' + tojson(topology));
+        throw new Error("Unsupported topology configuration: " + tojson(topology));
     }
 
     // Ensure there is at least one secondary.
     if (topology.nodes.length < 2) {
-        throw new Error('Must have at least 2 nodes in the replica set: ' + tojson(topology));
+        throw new Error("Must have at least 2 nodes in the replica set: " + tojson(topology));
     }
 
     const primary = topology.primary;
-    const secondaries =
-        (primary === undefined) ? topology.nodes : topology.nodes.filter(node => node !== primary);
+    const secondaries = primary === undefined ? topology.nodes : topology.nodes.filter((node) => node !== primary);
     const randomSecondary = secondaries[Math.floor(Math.random() * secondaries.length)];
     const randomSecondaryConn = newMongoWithRetry(randomSecondary);
     res = lagLastApplied(randomSecondaryConn);
@@ -96,14 +106,16 @@ try {
     // Ignore this error until we find a new primary.
     const kReplicaSetMonitorErrors = [
         /^Could not find host matching read preference.*mode: "primary"/,
-        /^can't connect to new replica set primary/
+        /^can't connect to new replica set primary/,
     ];
 
     if (isNetworkError(e)) {
         jsTestLog("Ignoring network error" + tojson(e));
-    } else if (kReplicaSetMonitorErrors.some((regex) => {
-                   return regex.test(e.message);
-               })) {
+    } else if (
+        kReplicaSetMonitorErrors.some((regex) => {
+            return regex.test(e.message);
+        })
+    ) {
         jsTestLog("Ignoring replica set monitor error" + tojson(e));
     } else if (isShutdownError(e)) {
         // It's possible that the secondary we passed in gets killed by the kill secondary hook.

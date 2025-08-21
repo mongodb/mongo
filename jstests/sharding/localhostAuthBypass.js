@@ -23,12 +23,12 @@ var username = "foo";
 var password = "bar";
 var adhocShard = 0;
 
-var createUser = function(mongo) {
+var createUser = function (mongo) {
     print("============ adding a user.");
     mongo.getDB("admin").createUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
 };
 
-var addUsersToEachShard = function(st) {
+var addUsersToEachShard = function (st) {
     // In config shard mode skip the first shard because it is also the config server and will
     // already have a user made on it through mongos.
     for (var i = TestData.configShard ? 1 : 0; i < numShards; i++) {
@@ -38,10 +38,9 @@ var addUsersToEachShard = function(st) {
     }
 };
 
-var addShard = function(st, shouldPass) {
+var addShard = function (st, shouldPass) {
     adhocShard++;
-    const rs =
-        new ReplSetTest({nodes: 1, host: 'localhost', name: 'localhostAuthShard-' + adhocShard});
+    const rs = new ReplSetTest({nodes: 1, host: "localhost", name: "localhostAuthShard-" + adhocShard});
     rs.startSet({shardsvr: "", keyFile: keyfile, auth: ""});
     rs.initiate();
 
@@ -54,7 +53,7 @@ var addShard = function(st, shouldPass) {
     return rs;
 };
 
-var findEmptyShard = function(st, ns) {
+var findEmptyShard = function (st, ns) {
     var counts = st.chunkCounts("foo");
 
     for (var shard in counts) {
@@ -66,35 +65,36 @@ var findEmptyShard = function(st, ns) {
     return null;
 };
 
-var assertCannotRunCommands = function(mongo, st) {
+var assertCannotRunCommands = function (mongo, st) {
     print("============ ensuring that commands cannot be run.");
 
     // CRUD
     var test = mongo.getDB("test");
-    assert.throws(function() {
+    assert.throws(function () {
         test.system.users.findOne();
     });
     assert.writeError(test.foo.save({_id: 0}));
-    assert.throws(function() {
+    assert.throws(function () {
         test.foo.findOne({_id: 0});
     });
     assert.writeError(test.foo.update({_id: 0}, {$set: {x: 20}}));
     assert.writeError(test.foo.remove({_id: 0}));
 
     // Multi-shard
-    assert.throws(function() {
+    assert.throws(function () {
         test.foo.mapReduce(
-            function() {
+            function () {
                 emit(1, 1);
             },
-            function(id, count) {
+            function (id, count) {
                 return Array.sum(count);
             },
-            {out: "other"});
+            {out: "other"},
+        );
     });
 
     // Config
-    assert.throws(function() {
+    assert.throws(function () {
         mongo.getDB("config").shards.findOne();
     });
 
@@ -102,14 +102,15 @@ var assertCannotRunCommands = function(mongo, st) {
     var res = mongo.getDB("admin").runCommand({
         moveChunk: "test.foo",
         find: {_id: 1},
-        to: st.shard0.shardName  // Arbitrary shard.
+        to: st.shard0.shardName, // Arbitrary shard.
     });
     assert.commandFailedWithCode(res, authorizeErrorCode, "moveChunk");
     // Create collection
     assert.commandFailedWithCode(
         mongo.getDB("test").createCollection("log", {capped: true, size: 5242880, max: 5000}),
         authorizeErrorCode,
-        "createCollection");
+        "createCollection",
+    );
     // Set/Get system parameters
     var params = [
         {param: "journalCommitInterval", val: 200},
@@ -123,23 +124,29 @@ var assertCannotRunCommands = function(mongo, st) {
         {param: "traceExceptions", val: true},
         {param: "sslMode", val: "preferSSL"},
         {param: "clusterAuthMode", val: "sendX509"},
-        {param: "userCacheInvalidationIntervalSecs", val: 300}
+        {param: "userCacheInvalidationIntervalSecs", val: 300},
     ];
-    params.forEach(function(p) {
+    params.forEach(function (p) {
         var cmd = {setParameter: 1};
         cmd[p.param] = p.val;
         assert.commandFailedWithCode(
-            mongo.getDB("admin").runCommand(cmd), authorizeErrorCode, "setParameter: " + p.param);
+            mongo.getDB("admin").runCommand(cmd),
+            authorizeErrorCode,
+            "setParameter: " + p.param,
+        );
     });
-    params.forEach(function(p) {
+    params.forEach(function (p) {
         var cmd = {getParameter: 1};
         cmd[p.param] = 1;
         assert.commandFailedWithCode(
-            mongo.getDB("admin").runCommand(cmd), authorizeErrorCode, "getParameter: " + p.param);
+            mongo.getDB("admin").runCommand(cmd),
+            authorizeErrorCode,
+            "getParameter: " + p.param,
+        );
     });
 };
 
-var assertCanRunCommands = function(mongo, st) {
+var assertCanRunCommands = function (mongo, st) {
     print("============ ensuring that commands can be run.");
 
     // CRUD
@@ -154,13 +161,14 @@ var assertCanRunCommands = function(mongo, st) {
 
     // Multi-shard
     test.foo.mapReduce(
-        function() {
+        function () {
             emit(1, 1);
         },
-        function(id, count) {
+        function (id, count) {
             return Array.sum(count);
         },
-        {out: "other"});
+        {out: "other"},
+    );
 
     // Config
     // this will throw if it fails
@@ -171,12 +179,12 @@ var assertCanRunCommands = function(mongo, st) {
     assert.commandWorked(res);
 };
 
-var authenticate = function(mongo) {
+var authenticate = function (mongo) {
     print("============ authenticating user.");
     mongo.getDB("admin").auth(username, password);
 };
 
-var setupSharding = function(shardingTest) {
+var setupSharding = function (shardingTest) {
     var mongo = shardingTest.s;
 
     print("============ enabling sharding on test.foo.");
@@ -189,16 +197,15 @@ var setupSharding = function(shardingTest) {
     }
 };
 
-var start = function() {
+var start = function () {
     return new ShardingTest({
         auth: "",
         shards: numShards,
         other: {
             keyFile: keyfile,
             chunkSize: 1,
-            useHostname:
-                false,  // Must use localhost to take advantage of the localhost auth bypass
-        }
+            useHostname: false, // Must use localhost to take advantage of the localhost auth bypass
+        },
     });
 };
 
@@ -240,7 +247,7 @@ assertCanRunCommands(mongo, st);
 extraShards.push(addShard(mongo, 1));
 st.printShardingStatus();
 
-extraShards.forEach(function(rs) {
+extraShards.forEach(function (rs) {
     rs.stopSet();
 });
 st.stop();

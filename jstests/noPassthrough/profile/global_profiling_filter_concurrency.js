@@ -11,14 +11,17 @@ let handles = [];
 
 const numThreads = 5;
 for (let i = 0; i < numThreads; ++i) {
-    handles.push(startParallelShell(() => {
-        const numIterations = 500;
-        for (let j = 0; j < numIterations; ++j) {
-            const res = assert.commandWorked(db.runCommand(
-                {setProfilingFilterGlobally: 1, filter: j % 2 == 0 ? {nreturned: 0} : "unset"}));
-            assert(res.hasOwnProperty("was"), tojson(res));
-        }
-    }, conn.port));
+    handles.push(
+        startParallelShell(() => {
+            const numIterations = 500;
+            for (let j = 0; j < numIterations; ++j) {
+                const res = assert.commandWorked(
+                    db.runCommand({setProfilingFilterGlobally: 1, filter: j % 2 == 0 ? {nreturned: 0} : "unset"}),
+                );
+                assert(res.hasOwnProperty("was"), tojson(res));
+            }
+        }, conn.port),
+    );
 }
 
 for (const handle of handles) {

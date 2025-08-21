@@ -13,7 +13,7 @@ import {
     logEveryBatch,
     logQueries,
     resetAndInsert,
-    runDbCheck
+    runDbCheck,
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
 // Skipping data consistency checks because secondary will be missing _id index.
@@ -34,8 +34,8 @@ const dbName = "test";
 const db = primary.getDB(dbName);
 const collName = "testColl";
 
-const primaryHealthLog = primary.getDB('local').system.healthlog;
-const secondaryHealthLog = secondary.getDB('local').system.healthlog;
+const primaryHealthLog = primary.getDB("local").system.healthlog;
+const secondaryHealthLog = secondary.getDB("local").system.healthlog;
 
 logEveryBatch(rst);
 

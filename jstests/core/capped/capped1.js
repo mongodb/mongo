@@ -11,7 +11,7 @@ assert(t.drop());
 
 assert.commandWorked(db.createCollection(jsTestName(), {capped: true, size: 1024}));
 let v = assert.commandWorked(t.validate());
-assert(v.valid, "A : " + tojson(v));  // SERVER-485
+assert(v.valid, "A : " + tojson(v)); // SERVER-485
 
 assert.commandWorked(t.save({x: 1}));
 assert(assert.commandWorked(t.validate()).valid, "B");

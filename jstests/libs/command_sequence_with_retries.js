@@ -40,7 +40,7 @@ export class CommandSequenceWithRetries {
                 if (result !== undefined && result.shouldStop) {
                     return {
                         ok: 0,
-                        msg: "giving up after " + this.steps[i].phase + ": " + result.reason
+                        msg: "giving up after " + this.steps[i].phase + ": " + result.reason,
                     };
                 }
             } catch (e) {
@@ -55,16 +55,17 @@ export class CommandSequenceWithRetries {
                 if (stepHadNetworkErrorAlready) {
                     return {
                         ok: 0,
-                        msg: "giving up after " + this.steps[i].phase +
-                            " because we encountered multiple network errors"
+                        msg:
+                            "giving up after " +
+                            this.steps[i].phase +
+                            " because we encountered multiple network errors",
                     };
                 }
 
                 if (!attemptReconnect(this.conn)) {
                     return {
                         ok: 0,
-                        msg: "giving up after " + this.steps[i].phase +
-                            " because attempting to reconnect failed"
+                        msg: "giving up after " + this.steps[i].phase + " because attempting to reconnect failed",
                     };
                 }
 

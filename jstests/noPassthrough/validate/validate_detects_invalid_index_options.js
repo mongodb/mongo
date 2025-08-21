@@ -26,7 +26,7 @@ assert.commandWorked(coll.createIndex({x: 1}, {safe: true, sparse: true, force: 
 
 fp.off();
 
-const checkValidateWarns = function(options = {}) {
+const checkValidateWarns = function (options = {}) {
     const res = assert.commandWorked(db.runCommand(Object.assign({validate: collName}, options)));
     assert(res.valid, res);
     assert.eq(res.errors.length, 0, res);
@@ -48,15 +48,22 @@ checkValidateWarns({metadata: true});
 checkLog.containsJson(primary, 5980500);
 
 // Cannot use { metadata: true } with any other options.
-assert.commandFailedWithCode(db.runCommand({validate: collName, metadata: true, background: true}),
-                             ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(db.runCommand({validate: collName, metadata: true, repair: true}),
-                             ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(db.runCommand({validate: collName, metadata: true, full: true}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    db.runCommand({validate: collName, metadata: true, background: true}),
+    ErrorCodes.InvalidOptions,
+);
+assert.commandFailedWithCode(
+    db.runCommand({validate: collName, metadata: true, repair: true}),
+    ErrorCodes.InvalidOptions,
+);
+assert.commandFailedWithCode(
+    db.runCommand({validate: collName, metadata: true, full: true}),
+    ErrorCodes.InvalidOptions,
+);
 assert.commandFailedWithCode(
     db.runCommand({validate: collName, metadata: true, enforceFastCount: true}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 
 // Drop the index with the invalid index options and validate only the metadata.
 assert.commandWorked(coll.dropIndex({x: 1}));

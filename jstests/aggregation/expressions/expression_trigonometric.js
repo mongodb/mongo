@@ -41,8 +41,8 @@ function testOpApprox(op, val, expResult) {
     const {result} = res[0];
     const pipeline2 = {
         $project: {
-            difference: {$abs: {$convert: {input: {$subtract: [result, expResult]}, to: "double"}}}
-        }
+            difference: {$abs: {$convert: {input: {$subtract: [result, expResult]}, to: "double"}}},
+        },
     };
     const res2 = coll.aggregate(pipeline2).toArray();
     const {difference} = res2[0];
@@ -131,77 +131,74 @@ testOpApprox("$radiansToDegrees", NumberDecimal(0), NumberDecimal(0));
 
 // Infinity input produces out of bounds error.
 testErrorCode("$acos", -Infinity, 50989);
-testErrorCode("$acos", NumberDecimal('-Infinity'), 50989);
+testErrorCode("$acos", NumberDecimal("-Infinity"), 50989);
 testErrorCode("$acos", Infinity, 50989);
-testErrorCode("$acos", NumberDecimal('Infinity'), 50989);
+testErrorCode("$acos", NumberDecimal("Infinity"), 50989);
 
 testErrorCode("$acosh", -Infinity, 50989);
-testErrorCode("$acosh", NumberDecimal('-Infinity'), 50989);
+testErrorCode("$acosh", NumberDecimal("-Infinity"), 50989);
 
 testErrorCode("$asin", -Infinity, 50989);
-testErrorCode("$asin", NumberDecimal('-Infinity'), 50989);
+testErrorCode("$asin", NumberDecimal("-Infinity"), 50989);
 testErrorCode("$asin", Infinity, 50989);
-testErrorCode("$asin", NumberDecimal('Infinity'), 50989);
+testErrorCode("$asin", NumberDecimal("Infinity"), 50989);
 
 testErrorCode("$atanh", -Infinity, 50989);
-testErrorCode("$atanh", NumberDecimal('-Infinity'), 50989);
+testErrorCode("$atanh", NumberDecimal("-Infinity"), 50989);
 testErrorCode("$atanh", Infinity, 50989);
-testErrorCode("$atanh", NumberDecimal('Infinity'), 50989);
+testErrorCode("$atanh", NumberDecimal("Infinity"), 50989);
 
 testErrorCode("$cos", -Infinity, 50989);
-testErrorCode("$cos", NumberDecimal('-Infinity'), 50989);
+testErrorCode("$cos", NumberDecimal("-Infinity"), 50989);
 testErrorCode("$cos", Infinity, 50989);
-testErrorCode("$cos", NumberDecimal('Infinity'), 50989);
+testErrorCode("$cos", NumberDecimal("Infinity"), 50989);
 
 testErrorCode("$sin", -Infinity, 50989);
-testErrorCode("$sin", NumberDecimal('-Infinity'), 50989);
+testErrorCode("$sin", NumberDecimal("-Infinity"), 50989);
 testErrorCode("$sin", Infinity, 50989);
-testErrorCode("$sin", NumberDecimal('Infinity'), 50989);
+testErrorCode("$sin", NumberDecimal("Infinity"), 50989);
 
 testErrorCode("$tan", -Infinity, 50989);
-testErrorCode("$tan", NumberDecimal('-Infinity'), 50989);
+testErrorCode("$tan", NumberDecimal("-Infinity"), 50989);
 testErrorCode("$tan", Infinity, 50989);
-testErrorCode("$tan", NumberDecimal('Infinity'), 50989);
+testErrorCode("$tan", NumberDecimal("Infinity"), 50989);
 
 // Infinity input produces Infinity as output.
-testOp("$acosh", NumberDecimal('Infinity'), NumberDecimal('Infinity'));
+testOp("$acosh", NumberDecimal("Infinity"), NumberDecimal("Infinity"));
 testOp("$acosh", Infinity, Infinity);
 
-testOp("$asinh", NumberDecimal('Infinity'), NumberDecimal('Infinity'));
-testOp("$asinh", NumberDecimal('-Infinity'), NumberDecimal('-Infinity'));
+testOp("$asinh", NumberDecimal("Infinity"), NumberDecimal("Infinity"));
+testOp("$asinh", NumberDecimal("-Infinity"), NumberDecimal("-Infinity"));
 testOp("$asinh", Infinity, Infinity);
 testOp("$asinh", -Infinity, -Infinity);
-testOp("$cosh", NumberDecimal('Infinity'), NumberDecimal('Infinity'));
-testOp("$cosh", NumberDecimal('-Infinity'), NumberDecimal('Infinity'));
+testOp("$cosh", NumberDecimal("Infinity"), NumberDecimal("Infinity"));
+testOp("$cosh", NumberDecimal("-Infinity"), NumberDecimal("Infinity"));
 testOp("$cosh", Infinity, Infinity);
 testOp("$cosh", -Infinity, Infinity);
-testOp("$sinh", NumberDecimal('Infinity'), NumberDecimal('Infinity'));
-testOp("$sinh", NumberDecimal('-Infinity'), NumberDecimal('-Infinity'));
+testOp("$sinh", NumberDecimal("Infinity"), NumberDecimal("Infinity"));
+testOp("$sinh", NumberDecimal("-Infinity"), NumberDecimal("-Infinity"));
 testOp("$sinh", Infinity, Infinity);
 testOp("$sinh", -Infinity, -Infinity);
 
 // Infinity produces finite output (due to asymptotic bounds).
-testOpApprox("$atan", NumberDecimal('Infinity'), NumberDecimal(Math.PI / 2));
-testOpApprox("$atan", NumberDecimal('-Infinity'), NumberDecimal(-Math.PI / 2));
+testOpApprox("$atan", NumberDecimal("Infinity"), NumberDecimal(Math.PI / 2));
+testOpApprox("$atan", NumberDecimal("-Infinity"), NumberDecimal(-Math.PI / 2));
 testOpApprox("$atan", Infinity, Math.PI / 2);
 testOpApprox("$atan", -Infinity, -Math.PI / 2);
 
-testOpApprox("$atan2", [NumberDecimal('Infinity'), 0], NumberDecimal(Math.PI / 2));
-testOpApprox("$atan2", [NumberDecimal('-Infinity'), 0], NumberDecimal(-Math.PI / 2));
-testOpApprox(
-    "$atan2", [NumberDecimal('-Infinity'), NumberDecimal("Infinity")], NumberDecimal(-Math.PI / 4));
-testOpApprox("$atan2",
-             [NumberDecimal('-Infinity'), NumberDecimal("-Infinity")],
-             NumberDecimal(-3 * Math.PI / 4));
-testOpApprox("$atan2", [NumberDecimal('0'), NumberDecimal("-Infinity")], NumberDecimal(Math.PI));
-testOpApprox("$atan2", [NumberDecimal('0'), NumberDecimal("Infinity")], NumberDecimal(0));
+testOpApprox("$atan2", [NumberDecimal("Infinity"), 0], NumberDecimal(Math.PI / 2));
+testOpApprox("$atan2", [NumberDecimal("-Infinity"), 0], NumberDecimal(-Math.PI / 2));
+testOpApprox("$atan2", [NumberDecimal("-Infinity"), NumberDecimal("Infinity")], NumberDecimal(-Math.PI / 4));
+testOpApprox("$atan2", [NumberDecimal("-Infinity"), NumberDecimal("-Infinity")], NumberDecimal((-3 * Math.PI) / 4));
+testOpApprox("$atan2", [NumberDecimal("0"), NumberDecimal("-Infinity")], NumberDecimal(Math.PI));
+testOpApprox("$atan2", [NumberDecimal("0"), NumberDecimal("Infinity")], NumberDecimal(0));
 
-testOp("$tanh", NumberDecimal('Infinity'), NumberDecimal('1'));
-testOp("$tanh", NumberDecimal('-Infinity'), NumberDecimal('-1'));
+testOp("$tanh", NumberDecimal("Infinity"), NumberDecimal("1"));
+testOp("$tanh", NumberDecimal("-Infinity"), NumberDecimal("-1"));
 
 // Finite input produces infinite outputs.
-testOp("$atanh", NumberDecimal(1), NumberDecimal('Infinity'));
-testOp("$atanh", NumberDecimal(-1), NumberDecimal('-Infinity'));
+testOp("$atanh", NumberDecimal(1), NumberDecimal("Infinity"));
+testOp("$atanh", NumberDecimal(-1), NumberDecimal("-Infinity"));
 testOp("$atanh", 1, Infinity);
 testOp("$atanh", -1, -Infinity);
 
@@ -245,15 +242,15 @@ testErrorCode("$atanh", NumberDecimal(-1.00001), 50989);
 testErrorCode("$atanh", NumberDecimal(1.000001), 50989);
 
 // Check NaN is preserved.
-["$acos", "$asin", "$atan", "$cos", "$sin", "$tan"].forEach(op => {
+["$acos", "$asin", "$atan", "$cos", "$sin", "$tan"].forEach((op) => {
     testOp([op], NaN, NaN);
     testOp([op], NumberDecimal(NaN), NumberDecimal(NaN));
     // Check the hyperbolic version of each function.
-    testOp([op + 'h'], NaN, NaN);
-    testOp([op + 'h'], NumberDecimal(NaN), NumberDecimal(NaN));
+    testOp([op + "h"], NaN, NaN);
+    testOp([op + "h"], NumberDecimal(NaN), NumberDecimal(NaN));
 });
 
-["$radiansToDegrees", "$degreesToRadians"].forEach(op => {
+["$radiansToDegrees", "$degreesToRadians"].forEach((op) => {
     testOp([op], NaN, NaN);
     testOp([op], NumberDecimal(NaN), NumberDecimal(NaN));
     testOp([op], -Infinity, -Infinity);
@@ -262,9 +259,9 @@ testErrorCode("$atanh", NumberDecimal(1.000001), 50989);
     testOp([op], NumberDecimal(Infinity), NumberDecimal(Infinity));
 });
 
-testOp("$atan2", [NumberDecimal('NaN'), NumberDecimal('NaN')], NumberDecimal('NaN'));
-testOp("$atan2", [NumberDecimal('NaN'), NumberDecimal('0')], NumberDecimal('NaN'));
-testOp("$atan2", [NumberDecimal('0'), NumberDecimal('NaN')], NumberDecimal('NaN'));
+testOp("$atan2", [NumberDecimal("NaN"), NumberDecimal("NaN")], NumberDecimal("NaN"));
+testOp("$atan2", [NumberDecimal("NaN"), NumberDecimal("0")], NumberDecimal("NaN"));
+testOp("$atan2", [NumberDecimal("0"), NumberDecimal("NaN")], NumberDecimal("NaN"));
 
 // atan2 additional testing with unknown constants
 testOpApprox("$atan2", [NumberInt(3), NumberInt(2)], NumberDecimal(0.9827937232));

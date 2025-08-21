@@ -1,4 +1,3 @@
-
 /**
  * Iterates log lines that match the given filter.
  * Yields every logline that contains the specified fields. The regex escape function used here is
@@ -14,23 +13,21 @@
 export function* iterateMatchingLogLines(logLines, fields, ignoreFields) {
     ignoreFields = ignoreFields || [];
     function escapeRegex(input) {
-        return (typeof input === "string" ? input.replace(/[\^\$\\\.\*\+\?\(\)\[\]\{\}]/g, '\\$&')
-                                          : input);
+        return typeof input === "string" ? input.replace(/[\^\$\\\.\*\+\?\(\)\[\]\{\}]/g, "\\$&") : input;
     }
 
     function lineMatches(line, fields, ignoreFields) {
-        const fieldNames =
-            Object.keys(fields).filter((fieldName) => !ignoreFields.includes(fieldName));
+        const fieldNames = Object.keys(fields).filter((fieldName) => !ignoreFields.includes(fieldName));
         return fieldNames.every((fieldName) => {
             const fieldValue = fields[fieldName];
             let regex;
             const booleanFields = [
-                'cursorExhausted',
-                'upsert',
-                'hasSortStage',
-                'usedDisk',
-                'cursorExhausted',
-                'cursorExhausted'
+                "cursorExhausted",
+                "upsert",
+                "hasSortStage",
+                "usedDisk",
+                "cursorExhausted",
+                "cursorExhausted",
             ];
 
             // Command is a special case since it is the first arg of the message, not a
@@ -48,12 +45,17 @@ export function* iterateMatchingLogLines(logLines, fields, ignoreFields) {
             } else if (fieldName === "insert" && fieldValue.indexOf("|") != -1) {
                 // Match new and legacy insert
                 regex = `("insert","ns":"(${fieldValue})"|("insert":"(${fieldValue})"))`;
-            } else if (booleanFields.find(f => f === fieldName) && fieldValue == 1) {
+            } else if (booleanFields.find((f) => f === fieldName) && fieldValue == 1) {
                 regex = `"${fieldName}":true`;
             } else {
-                regex = "\"" + escapeRegex(fieldName) + "\":(" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue)) + "|" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true)) + ")";
+                regex =
+                    '"' +
+                    escapeRegex(fieldName) +
+                    '":(' +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue)) +
+                    "|" +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true)) +
+                    ")";
             }
             const match = line.match(regex);
             return match && match[0];

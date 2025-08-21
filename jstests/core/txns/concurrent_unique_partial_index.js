@@ -14,8 +14,7 @@ const collName = "concurrent_unique_partial_index";
 
 const testDB = db.getSiblingDB(dbName);
 const coll = testDB[collName];
-assert.commandWorked(
-    coll.createIndex({a: 1}, {unique: true, partialFilterExpression: {active: true}}));
+assert.commandWorked(coll.createIndex({a: 1}, {unique: true, partialFilterExpression: {active: true}}));
 
 const sessionA = db.getMongo().startSession({causalConsistency: false});
 const dbSessionA = sessionA.getDatabase(dbName);

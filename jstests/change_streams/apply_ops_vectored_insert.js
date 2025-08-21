@@ -24,7 +24,7 @@ const numShards = FixtureHelpers.numberOfShardsForCollection(coll);
 const insertsPerBatch = 4;
 FixtureHelpers.runCommandOnAllShards({
     db: db.getSiblingDB("admin"),
-    cmdObj: {setParameter: 1, internalInsertMaxBatchSize: insertsPerBatch}
+    cmdObj: {setParameter: 1, internalInsertMaxBatchSize: insertsPerBatch},
 });
 // Try and get every shard to have at least two batches.
 const numInserts = numShards * insertsPerBatch * 2;
@@ -36,13 +36,12 @@ let cst = new ChangeStreamTest(db);
 let changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {}}, {$project: {"lsid.uid": 0}}],
     collection: coll,
-    doNotModifyInPassthroughs:
-        true  // A collection drop only invalidates single-collection change streams.
+    doNotModifyInPassthroughs: true, // A collection drop only invalidates single-collection change streams.
 });
 
 const sessionOptions = {
     causalConsistency: false,
-    retryWrites: true
+    retryWrites: true,
 };
 
 const session = db.getMongo().startSession(sessionOptions);
@@ -73,20 +72,18 @@ assert.commandWorked(db.runCommand({drop: coll.getName()}));
 
 // Define the set of changes expected for the single-collection case per the operations above.
 let expectedChanges = Array.from(documents, (doc, _) => ({
-                                                documentKey: {_id: doc._id},
-                                                fullDocument: doc,
-                                                ns: {db: db.getName(), coll: coll.getName()},
-                                                operationType: "insert",
-                                            }));
+    documentKey: {_id: doc._id},
+    fullDocument: doc,
+    ns: {db: db.getName(), coll: coll.getName()},
+    operationType: "insert",
+}));
 
-expectedChanges.push(
-    {
-        documentKey: {_id: 1},
-        ns: {db: db.getName(), coll: coll.getName()},
-        operationType: "update",
-        updateDescription: {removedFields: [], updatedFields: {a: 1}, truncatedArrays: []},
-    },
-);
+expectedChanges.push({
+    documentKey: {_id: 1},
+    ns: {db: db.getName(), coll: coll.getName()},
+    operationType: "update",
+    updateDescription: {removedFields: [], updatedFields: {a: 1}, truncatedArrays: []},
+});
 
 expectedChanges.push({
     operationType: "drop",
@@ -98,14 +95,13 @@ expectedChanges.push({
 //
 
 // Verify that the stream returns the expected sequence of changes.
-cst.assertNextChangesEqualWithDeploymentAwareness(
-    {cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness({cursor: changeStream, expectedChanges: expectedChanges});
 
 // Single collection change stream should also be invalidated by the drop.
 cst.assertNextChangesEqualWithDeploymentAwareness({
     cursor: changeStream,
     expectedChanges: [{operationType: "invalidate"}],
-    expectInvalidate: true
+    expectInvalidate: true,
 });
 
 //
@@ -129,10 +125,9 @@ expectedChanges.splice(numInserts, 0, {
 // on the other collection but NOT the changes on the other DB.
 changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {startAtOperationTime: testStartTime}}, {$project: {"lsid.uid": 0}}],
-    collection: 1
+    collection: 1,
 });
-cst.assertNextChangesEqualWithDeploymentAwareness(
-    {cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness({cursor: changeStream, expectedChanges: expectedChanges});
 
 //
 // Test behavior of whole-cluster change streams with apply ops.
@@ -152,11 +147,10 @@ cst = new ChangeStreamTest(db.getSiblingDB("admin"));
 changeStream = cst.startWatchingChanges({
     pipeline: [
         {$changeStream: {startAtOperationTime: testStartTime, allChangesForCluster: true}},
-        {$project: {"lsid.uid": 0}}
+        {$project: {"lsid.uid": 0}},
     ],
-    collection: 1
+    collection: 1,
 });
-cst.assertNextChangesEqualWithDeploymentAwareness(
-    {cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness({cursor: changeStream, expectedChanges: expectedChanges});
 
 cst.cleanUp();

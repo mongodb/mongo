@@ -24,11 +24,11 @@ q.insert({"a": [1]});
 q.insert({"a": [9, 1]});
 
 function f() {
-    assert.eq(2, q.find({'a.0': 1}).count(), "da1");
-    assert.eq(2, q.find({'a.0': 1}).count(), "da2");
+    assert.eq(2, q.find({"a.0": 1}).count(), "da1");
+    assert.eq(2, q.find({"a.0": 1}).count(), "da2");
 
-    assert.eq(1, q.find({'a.0': {$gt: 8}}).count(), "da3");
-    assert.eq(0, q.find({'a.0': {$lt: 0}}).count(), "da4");
+    assert.eq(1, q.find({"a.0": {$gt: 8}}).count(), "da3");
+    assert.eq(0, q.find({"a.0": {$lt: 0}}).count(), "da4");
 }
 
 for (var pass = 0; pass <= 1; pass++) {

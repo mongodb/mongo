@@ -9,8 +9,11 @@ import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uu
 // Set up replica set. Disallow chaining so nodes always sync from primary.
 const testName = "initial_sync_rename_collection";
 const dbName = testName;
-const replTest = new ReplSetTest(
-    {name: testName, nodes: [{}, {rsConfig: {priority: 0}}], settings: {chainingAllowed: false}});
+const replTest = new ReplSetTest({
+    name: testName,
+    nodes: [{}, {rsConfig: {priority: 0}}],
+    settings: {chainingAllowed: false},
+});
 replTest.startSet();
 replTest.initiate();
 
@@ -21,8 +24,9 @@ const primaryColl = primaryDB[collName];
 const pRenameColl = primaryDB["r_" + collName];
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Used for cross-DB renames.
 const secondDbName = testName + "_cross";
@@ -47,22 +51,23 @@ function setupTest({failPoint, extraFailPointData, secondaryStartupParams}) {
 
     jsTestLog("Restarting secondary with failPoint " + failPoint + " set for " + nss);
     secondaryStartupParams = secondaryStartupParams || {};
-    secondaryStartupParams['failpoint.' + failPoint] = tojson({mode: 'alwaysOn', data: data});
+    secondaryStartupParams["failpoint." + failPoint] = tojson({mode: "alwaysOn", data: data});
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
-    secondaryStartupParams['failpoint.skipClearInitialSyncState'] = tojson({mode: 'alwaysOn'});
-    secondaryStartupParams['numInitialSyncAttempts'] = 1;
-    secondary =
-        replTest.restart(secondary, {startClean: true, setParameter: secondaryStartupParams});
+    secondaryStartupParams["failpoint.skipClearInitialSyncState"] = tojson({mode: "alwaysOn"});
+    secondaryStartupParams["numInitialSyncAttempts"] = 1;
+    secondary = replTest.restart(secondary, {startClean: true, setParameter: secondaryStartupParams});
     secondaryDB = secondary.getDB(dbName);
     secondaryColl = secondaryDB[collName];
 
     jsTestLog("Waiting for secondary to reach failPoint " + failPoint);
-    assert.commandWorked(secondary.adminCommand({
-        waitForFailPoint: failPoint,
-        timesEntered: 1,
-        maxTimeMS: kDefaultWaitForFailPointTimeout
-    }));
+    assert.commandWorked(
+        secondary.adminCommand({
+            waitForFailPoint: failPoint,
+            timesEntered: 1,
+            maxTimeMS: kDefaultWaitForFailPointTimeout,
+        }),
+    );
 
     // Restarting the secondary may have resulted in an election.  Wait until the system
     // stabilizes and reaches RS_STARTUP2 state.
@@ -74,14 +79,16 @@ function finishTest({failPoint, expectedLog, createNew, renameAcrossDBs}) {
     // Get the uuid for use in checking the log line.
     const uuid_obj = getUUIDFromListCollections(primaryDB, collName);
     const uuid = extractUUIDFromObject(uuid_obj);
-    const target = (renameAcrossDBs ? pCrossDBRenameColl : pRenameColl);
+    const target = renameAcrossDBs ? pCrossDBRenameColl : pRenameColl;
 
     jsTestLog("Renaming collection on primary: " + target.getFullName());
-    assert.commandWorked(primary.adminCommand({
-        renameCollection: primaryColl.getFullName(),
-        to: target.getFullName(),
-        dropTarget: false
-    }));
+    assert.commandWorked(
+        primary.adminCommand({
+            renameCollection: primaryColl.getFullName(),
+            to: target.getFullName(),
+            dropTarget: false,
+        }),
+    );
 
     if (createNew) {
         jsTestLog("Creating a new collection with the same name: " + primaryColl.getFullName());
@@ -89,7 +96,7 @@ function finishTest({failPoint, expectedLog, createNew, renameAcrossDBs}) {
     }
 
     jsTestLog("Allowing secondary to continue.");
-    assert.commandWorked(secondary.adminCommand({configureFailPoint: failPoint, mode: 'off'}));
+    assert.commandWorked(secondary.adminCommand({configureFailPoint: failPoint, mode: "off"}));
 
     if (expectedLog) {
         expectedLog = eval(expectedLog);
@@ -123,31 +130,29 @@ function runRenameTest(params) {
 jsTestLog("[1] Testing rename between listIndexes and find.");
 runRenameTest({
     failPoint: "hangBeforeClonerStage",
-    extraFailPointData: {cloner: "CollectionCloner", stage: "query"}
+    extraFailPointData: {cloner: "CollectionCloner", stage: "query"},
 });
 
 jsTestLog("[2] Testing cross-DB rename between listIndexes and find.");
 runRenameTest({
     failPoint: "hangBeforeClonerStage",
     extraFailPointData: {cloner: "CollectionCloner", stage: "query"},
-    renameAcrossDBs: true
+    renameAcrossDBs: true,
 });
 
-jsTestLog(
-    "[3] Testing rename between listIndexes and find, with new same-name collection created.");
-runRenameTest({
-    failPoint: "hangBeforeClonerStage",
-    extraFailPointData: {cloner: "CollectionCloner", stage: "query"},
-    createNew: true
-});
-
-jsTestLog(
-    "[4] Testing cross-DB rename between listIndexes and find, with new same-name collection created.");
+jsTestLog("[3] Testing rename between listIndexes and find, with new same-name collection created.");
 runRenameTest({
     failPoint: "hangBeforeClonerStage",
     extraFailPointData: {cloner: "CollectionCloner", stage: "query"},
     createNew: true,
-    renameAcrossDBs: true
+});
+
+jsTestLog("[4] Testing cross-DB rename between listIndexes and find, with new same-name collection created.");
+runRenameTest({
+    failPoint: "hangBeforeClonerStage",
+    extraFailPointData: {cloner: "CollectionCloner", stage: "query"},
+    createNew: true,
+    renameAcrossDBs: true,
 });
 
 const expectedLogFor5and7 =
@@ -157,7 +162,7 @@ jsTestLog("[5] Testing rename between getMores.");
 runRenameTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
-    expectedLog: expectedLogFor5and7
+    expectedLog: expectedLogFor5and7,
 });
 
 // A cross-DB rename will appear as a drop in the context of the source DB.
@@ -170,14 +175,14 @@ runRenameTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
     renameAcrossDBs: true,
-    expectedLog: expectedLogFor6and8
+    expectedLog: expectedLogFor6and8,
 });
 
 jsTestLog("[7] Testing rename with new same-name collection created, between getMores.");
 runRenameTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
-    expectedLog: expectedLogFor5and7
+    expectedLog: expectedLogFor5and7,
 });
 
 jsTestLog("[8] Testing cross-DB rename with new same-name collection created, between getMores.");
@@ -185,7 +190,7 @@ runRenameTest({
     failPoint: "initialSyncHangCollectionClonerAfterHandlingBatchResponse",
     secondaryStartupParams: {collectionClonerBatchSize: 1},
     renameAcrossDBs: true,
-    expectedLog: expectedLogFor6and8
+    expectedLog: expectedLogFor6and8,
 });
 
 replTest.stopSet();

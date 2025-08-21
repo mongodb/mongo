@@ -20,26 +20,31 @@ var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
 var nodes = replTest.nodeList();
 
 var conns = replTest.startSet();
-replTest.initiate({
-    _id: name,
-    members:
-        [{_id: 0, host: nodes[0]}, {_id: 1, host: nodes[1]}, {_id: 2, host: nodes[2], priority: 0}]
-},
-                  null,
-                  {initiateWithDefaultElectionTimeout: true});
+replTest.initiate(
+    {
+        _id: name,
+        members: [
+            {_id: 0, host: nodes[0]},
+            {_id: 1, host: nodes[1]},
+            {_id: 2, host: nodes[2], priority: 0},
+        ],
+    },
+    null,
+    {initiateWithDefaultElectionTimeout: true},
+);
 
 // The test starts with node 0 as the primary.
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 var primary = replTest.nodes[0];
 var collName = primary.getDB("db")[name].getFullName();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 replTest.awaitReplication();
 
 const batchSize = 500;
-const setParameterResult =
-    primary.getDB("admin").runCommand({setParameter: 1, internalInsertMaxBatchSize: batchSize});
+const setParameterResult = primary.getDB("admin").runCommand({setParameter: 1, internalInsertMaxBatchSize: batchSize});
 assert.commandWorked(setParameterResult);
 
 // Prevent any writes to node 0 (the primary) from replicating to nodes 1 and 2.
@@ -49,20 +54,30 @@ stopServerReplication(conns[2]);
 // Allow the primary to insert the first 5 batches of documents. After that, the fail point
 // activates, and the client thread hangs until the fail point gets turned off.
 let failPoint = configureFailPoint(
-    primary.getDB("db"), "hangDuringBatchInsert", {shouldCheckForInterrupt: true}, {skip: 5});
+    primary.getDB("db"),
+    "hangDuringBatchInsert",
+    {shouldCheckForInterrupt: true},
+    {skip: 5},
+);
 
 // In a background thread, issue an insert command to the primary that will insert 10 batches of
 // documents.
-var worker = new Thread((host, collName, numToInsert) => {
-    // Insert elements [{idx: 0}, {idx: 1}, ..., {idx: numToInsert - 1}].
-    const docsToInsert = Array.from({length: numToInsert}, (_, i) => {
-        return {idx: i};
-    });
-    var coll = new Mongo(host).getCollection(collName);
-    assert.commandFailedWithCode(
-        coll.insert(docsToInsert, {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),
-        ErrorCodes.InterruptedDueToReplStateChange);
-}, primary.host, collName, 10 * batchSize);
+var worker = new Thread(
+    (host, collName, numToInsert) => {
+        // Insert elements [{idx: 0}, {idx: 1}, ..., {idx: numToInsert - 1}].
+        const docsToInsert = Array.from({length: numToInsert}, (_, i) => {
+            return {idx: i};
+        });
+        var coll = new Mongo(host).getCollection(collName);
+        assert.commandFailedWithCode(
+            coll.insert(docsToInsert, {writeConcern: {w: "majority", wtimeout: 5000}, ordered: true}),
+            ErrorCodes.InterruptedDueToReplStateChange,
+        );
+    },
+    primary.host,
+    collName,
+    10 * batchSize,
+);
 worker.start();
 
 // Wait long enough to guarantee that all 5 batches of inserts have executed and the primary is
@@ -99,13 +114,15 @@ assert.eq(replTest.nodes[0], replTest.getPrimary());
 failPoint.off();
 
 // Wait until the insert command is done.
-assert.soon(
-    () =>
-        primary.getDB("db").currentOp({"command.insert": name, active: true}).inprog.length === 0);
+assert.soon(() => primary.getDB("db").currentOp({"command.insert": name, active: true}).inprog.length === 0);
 
 worker.join();
 
-var docs = primary.getDB("db")[name].find({idx: {$exists: 1}}).sort({idx: 1}).toArray();
+var docs = primary
+    .getDB("db")
+    [name].find({idx: {$exists: 1}})
+    .sort({idx: 1})
+    .toArray();
 
 // Any discontinuity in the "idx" values is an error. If an "idx" document failed to insert, all
 // the of "idx" documents after it should also have failed to insert, because the insert

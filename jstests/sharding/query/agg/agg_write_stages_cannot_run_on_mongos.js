@@ -13,30 +13,35 @@ assert.commandWorked(db.runCommand({create: "coll"}));
 // requires shard execution.
 assert.commandFailedWithCode(
     db.runCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}, {$out: "test"}], cursor: {}}),
-    ErrorCodes.IllegalOperation);
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: "coll",
-    pipeline: [{$_internalSplitPipeline: {mergeType: st.getMergeType(db)}}, {$out: "test"}],
-    cursor: {}
-}),
-                             ErrorCodes.IllegalOperation);
+    ErrorCodes.IllegalOperation,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: "coll",
+        pipeline: [{$_internalSplitPipeline: {mergeType: st.getMergeType(db)}}, {$out: "test"}],
+        cursor: {},
+    }),
+    ErrorCodes.IllegalOperation,
+);
 assert.commandFailedWithCode(
     db.runCommand({aggregate: 1, pipeline: [{$changeStream: {}}, {$out: "test"}], cursor: {}}),
-    ErrorCodes.IllegalOperation);
+    ErrorCodes.IllegalOperation,
+);
 assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: 1, pipeline: [{$listLocalSessions: {}}, {$merge: {into: "test"}}], cursor: {}}),
-    ErrorCodes.IllegalOperation);
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: "coll",
-    pipeline:
-        [{$_internalSplitPipeline: {mergeType: st.getMergeType(db)}}, {$merge: {into: "test"}}],
-    cursor: {}
-}),
-                             ErrorCodes.IllegalOperation);
+    db.runCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}, {$merge: {into: "test"}}], cursor: {}}),
+    ErrorCodes.IllegalOperation,
+);
 assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: 1, pipeline: [{$changeStream: {}}, {$merge: {into: "test"}}], cursor: {}}),
-    ErrorCodes.IllegalOperation);
+    db.runCommand({
+        aggregate: "coll",
+        pipeline: [{$_internalSplitPipeline: {mergeType: st.getMergeType(db)}}, {$merge: {into: "test"}}],
+        cursor: {},
+    }),
+    ErrorCodes.IllegalOperation,
+);
+assert.commandFailedWithCode(
+    db.runCommand({aggregate: 1, pipeline: [{$changeStream: {}}, {$merge: {into: "test"}}], cursor: {}}),
+    ErrorCodes.IllegalOperation,
+);
 
 st.stop();

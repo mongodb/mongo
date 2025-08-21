@@ -40,14 +40,18 @@ assert.neq(null, coll.findOne({_id: 1}));
  * succeed.
  */
 // Ensure all connections dropped so unused connections aren't immediately reused.
-configureFailPoint(st.s,
-                   "connectionPoolDropConnectionsBeforeGetConnection",
-                   {"instance": "NetworkInterfaceTL-TaskExecutor"},
-                   "alwaysOn");
-configureFailPoint(st.s,
-                   "triggerConnectionSetupHandshakeTimeout",
-                   {"instance": "NetworkInterfaceTL-TaskExecutor"},
-                   {times: 1});
+configureFailPoint(
+    st.s,
+    "connectionPoolDropConnectionsBeforeGetConnection",
+    {"instance": "NetworkInterfaceTL-TaskExecutor"},
+    "alwaysOn",
+);
+configureFailPoint(
+    st.s,
+    "triggerConnectionSetupHandshakeTimeout",
+    {"instance": "NetworkInterfaceTL-TaskExecutor"},
+    {times: 1},
+);
 assert.neq(null, coll.findOne({_id: 1}));
 configureFailPoint(st.s, "connectionPoolDropConnectionsBeforeGetConnection", {}, "off");
 
@@ -55,18 +59,16 @@ configureFailPoint(st.s, "connectionPoolDropConnectionsBeforeGetConnection", {},
  * Mimic timeout from timer in the NetworkInterface. This general timeout should not return a
  * retryable error.
  */
-configureFailPoint(
-    st.s, "triggerSendRequestNetworkTimeout", {"collectionNS": testColl}, {times: 1});
+configureFailPoint(st.s, "triggerSendRequestNetworkTimeout", {"collectionNS": testColl}, {times: 1});
 // Run a long query to make sure the network fail points fail the command.
-assert.throwsWithCode(function() {
+assert.throwsWithCode(function () {
     coll.findOne({
         _id: 1,
-        $where: function() {
+        $where: function () {
             const start = new Date().getTime();
-            while (new Date().getTime() - start < 100000)
-                ;
+            while (new Date().getTime() - start < 100000);
             return true;
-        }
+        },
     });
 }, ErrorCodes.NetworkInterfaceExceededTimeLimit);
 

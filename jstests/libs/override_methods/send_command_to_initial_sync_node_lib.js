@@ -5,7 +5,7 @@ export function getConn(connStr) {
     try {
         return new Mongo(connStr);
     } catch (exp) {
-        jsTest.log('Unable to connect to ' + connStr + ": " + tojson(exp));
+        jsTest.log("Unable to connect to " + connStr + ": " + tojson(exp));
         return null;
     }
 }
@@ -45,8 +45,7 @@ export function shouldSkipCommand(_commandName, commandObj) {
     return false;
 }
 
-export function sendCommandToInitialSyncNodeInReplSet(
-    conn, _commandName, commandObj, func, makeFuncArgs, rsType) {
+export function sendCommandToInitialSyncNodeInReplSet(conn, _commandName, commandObj, func, makeFuncArgs, rsType) {
     const replSetStatus = conn.adminCommand({replSetGetStatus: 1});
     assert.commandWorked(replSetStatus);
 
@@ -60,14 +59,25 @@ export function sendCommandToInitialSyncNodeInReplSet(
         // Best effort attempt to send command to initial sync node. If it fails, move
         // on.
         try {
-            jsTestLog("Attempting to forward command to " + rsType +
-                      " initial sync node: " + _commandName + " (this may end up being a no-op)");
+            jsTestLog(
+                "Attempting to forward command to " +
+                    rsType +
+                    " initial sync node: " +
+                    _commandName +
+                    " (this may end up being a no-op)",
+            );
             func.apply(initialSyncConn, makeFuncArgs(commandObj));
         } catch (exp) {
-            jsTest.log("Unable to apply command " + _commandName + ": " + tojson(commandObj) +
-                       " on initial sync node: " + tojson(exp));
+            jsTest.log(
+                "Unable to apply command " +
+                    _commandName +
+                    ": " +
+                    tojson(commandObj) +
+                    " on initial sync node: " +
+                    tojson(exp),
+            );
         } finally {
             initialSyncConn.close();
         }
-    }  // Move on if we can't get a connection to the node.
+    } // Move on if we can't get a connection to the node.
 }

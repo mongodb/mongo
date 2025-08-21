@@ -18,44 +18,54 @@ function runTest(conn) {
     // Implicit default write concern is returned.
     checkDefaultWC({"w": "majority", "wtimeout": 0});
     jsTestLog("Setting only the default read concern works.");
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultReadConcern: {level: 'local'},
-    }));
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultReadConcern: {level: "local"},
+        }),
+    );
     // CWWC shouldn't change.
     checkDefaultWC({"w": "majority", "wtimeout": 0});
 
     jsTestLog("Sending empty wc to unset the default write concern initially works.");
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultWriteConcern: {},
-    }));
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {},
+        }),
+    );
     // CWWC shouldn't change.
     checkDefaultWC({"w": "majority", "wtimeout": 0});
 
     jsTestLog("Setting only 'wtimeout', command should fail with 'BadValue'.");
-    assert.commandFailedWithCode(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultWriteConcern: {wtimeout: 60},
-    }),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {wtimeout: 60},
+        }),
+        ErrorCodes.BadValue,
+    );
     // CWWC shouldn't change.
     checkDefaultWC({"w": "majority", "wtimeout": 0});
 
     jsTestLog("Setting only 'j' field, command should fail with 'BadValue'.");
-    assert.commandFailedWithCode(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultWriteConcern: {j: true},
-    }),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {j: true},
+        }),
+        ErrorCodes.BadValue,
+    );
     // CWWC shouldn't change.
     checkDefaultWC({"w": "majority", "wtimeout": 0});
 
     jsTestLog("Setting only 'w' field succeeds.");
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultWriteConcern: {w: 1},
-    }));
+    assert.commandWorked(
+        conn.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: 1},
+        }),
+    );
     checkDefaultWC({"w": 1, "wtimeout": 0});
 }
 

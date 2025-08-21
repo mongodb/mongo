@@ -10,10 +10,7 @@ t.drop();
 t.save({});
 
 function week(date) {
-    return t
-        .aggregate({$project: {a: {$week: date}}},
-                   {$match: {a: {$type: 16 /* Int type expected */}}})
-        .toArray()[0]
+    return t.aggregate({$project: {a: {$week: date}}}, {$match: {a: {$type: 16 /* Int type expected */}}}).toArray()[0]
         .a;
 }
 
@@ -139,19 +136,16 @@ assertWeek(1, new Timestamp(new Date(Date.UTC(1984, 0, 1)).getTime() / 1000, 100
 assertErrorCode(t, {$project: {a: {$week: 5}}}, 16006);
 
 // String argument not allowed.
-assertErrorCode(t, {$project: {a: {$week: 'foo'}}}, 16006);
+assertErrorCode(t, {$project: {a: {$week: "foo"}}}, 16006);
 
 // Array argument format.
 assertWeek(8, [new Date(Date.UTC(2016, 1, 27))]);
 
 // Wrong number of arguments.
 assertErrorCode(t, {$project: {a: {$week: []}}}, 40536);
-assertErrorCode(
-    t,
-    {$project: {a: {$week: [new Date(Date.UTC(2020, 1, 28)), new Date(Date.UTC(2020, 1, 29))]}}},
-    40536);
+assertErrorCode(t, {$project: {a: {$week: [new Date(Date.UTC(2020, 1, 28)), new Date(Date.UTC(2020, 1, 29))]}}}, 40536);
 
 // From a field path expression.
 t.remove({});
 t.save({a: new Date(Date.UTC(2020, 2, 1))});
-assertWeek(9, '$a');
+assertWeek(9, "$a");

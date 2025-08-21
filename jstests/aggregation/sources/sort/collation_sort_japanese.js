@@ -26,14 +26,14 @@ const data = [
 ];
 
 const simpleCollation = {
-    locale: "simple"
+    locale: "simple",
 };
 const jaCollationStr3 = {
-    locale: "ja"
+    locale: "ja",
 };
 const jaCollationStr4 = {
     locale: "ja",
-    strength: 4
+    strength: 4,
 };
 
 /**
@@ -49,29 +49,33 @@ function runTests(docs) {
     let sortOrder;
 
     function assertAggregationSortOrder(collation, expectedVals) {
-        let expectedDocs = expectedVals.map(val => ({val: val}));
-        let result = coll.aggregate([{$sort: sortOrder}, {$project: {_id: 0, val: 1}}],
-                                    {collation: collation})
-                         .toArray();
-        assert.eq(result,
-                  expectedDocs,
-                  "sort returned wrong order with sort pattern " + tojson(sortOrder) +
-                      " and collation " + tojson(collation));
+        let expectedDocs = expectedVals.map((val) => ({val: val}));
+        let result = coll
+            .aggregate([{$sort: sortOrder}, {$project: {_id: 0, val: 1}}], {collation: collation})
+            .toArray();
+        assert.eq(
+            result,
+            expectedDocs,
+            "sort returned wrong order with sort pattern " + tojson(sortOrder) + " and collation " + tojson(collation),
+        );
 
         // Run the same aggregation, but in a sharded cluster, force the merging to be performed
         // on a shard instead of on mongos.
-        result = coll.aggregate(
-                         [
-                             {$_internalSplitPipeline: {mergeType: "anyShard"}},
-                             {$sort: sortOrder},
-                             {$project: {_id: 0, val: 1}}
-                         ],
-                         {collation: collation})
-                     .toArray();
-        assert.eq(result,
-                  expectedDocs,
-                  "sort returned wrong order with sort pattern " + tojson(sortOrder) +
-                      " and collation " + tojson(collation) + " when merging on a shard");
+        result = coll
+            .aggregate(
+                [{$_internalSplitPipeline: {mergeType: "anyShard"}}, {$sort: sortOrder}, {$project: {_id: 0, val: 1}}],
+                {collation: collation},
+            )
+            .toArray();
+        assert.eq(
+            result,
+            expectedDocs,
+            "sort returned wrong order with sort pattern " +
+                tojson(sortOrder) +
+                " and collation " +
+                tojson(collation) +
+                " when merging on a shard",
+        );
     }
 
     // Start with a sort on a single key.
@@ -106,42 +110,48 @@ runTests(data);
 
 // Test sorting documents containing singleton arrays.
 assert(coll.drop());
-runTests(data.map(doc => {
-    let copy = Object.extend({}, doc);
-    copy.kana = [copy.kana];
-    return copy;
-}));
+runTests(
+    data.map((doc) => {
+        let copy = Object.extend({}, doc);
+        copy.kana = [copy.kana];
+        return copy;
+    }),
+);
 
 // Test sorting documents containing arrays with multiple elements.
 assert(coll.drop());
-runTests(data.map(doc => {
-    let copy = Object.extend({}, doc);
-    copy.kana = [copy.kana, copy.kana, copy.kana];
-    return copy;
-}));
+runTests(
+    data.map((doc) => {
+        let copy = Object.extend({}, doc);
+        copy.kana = [copy.kana, copy.kana, copy.kana];
+        return copy;
+    }),
+);
 
 // Test sorting documents where some values are scalars and others are arrays.
 assert(coll.drop());
-runTests(data.map(doc => {
-    let copy = Object.extend({}, doc);
-    if (Math.random() < 0.5) {
-        copy.kana = [copy.kana];
-    }
-    return copy;
-}));
+runTests(
+    data.map((doc) => {
+        let copy = Object.extend({}, doc);
+        if (Math.random() < 0.5) {
+            copy.kana = [copy.kana];
+        }
+        return copy;
+    }),
+);
 
 // Create indexes that provide sorts and assert that the results are equivalent.
 assert(coll.drop());
 assert.commandWorked(coll.createIndex({kana: 1}, {name: "k1_jaStr3", collation: jaCollationStr3}));
 assert.commandWorked(coll.createIndex({kana: 1}, {name: "k1_jaStr4", collation: jaCollationStr4}));
-assert.commandWorked(
-    coll.createIndex({kana: 1, val: 1}, {name: "k1v1_jaStr3", collation: jaCollationStr3}));
-assert.commandWorked(
-    coll.createIndex({kana: 1, val: 1}, {name: "k1v1_jaStr4", collation: jaCollationStr4}));
-runTests(data.map(doc => {
-    let copy = Object.extend({}, doc);
-    if (Math.random() < 0.5) {
-        copy.kana = [copy.kana];
-    }
-    return copy;
-}));
+assert.commandWorked(coll.createIndex({kana: 1, val: 1}, {name: "k1v1_jaStr3", collation: jaCollationStr3}));
+assert.commandWorked(coll.createIndex({kana: 1, val: 1}, {name: "k1v1_jaStr4", collation: jaCollationStr4}));
+runTests(
+    data.map((doc) => {
+        let copy = Object.extend({}, doc);
+        if (Math.random() < 0.5) {
+            copy.kana = [copy.kana];
+        }
+        return copy;
+    }),
+);

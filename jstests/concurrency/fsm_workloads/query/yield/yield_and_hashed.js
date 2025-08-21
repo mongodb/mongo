@@ -19,12 +19,10 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/yield/yield_rooted_or.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/yield/yield_rooted_or.js";
 import {planHasStage} from "jstests/libs/query/analyze_plan.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     /*
      * Issue a query that will use the AND_HASH stage.
      */
@@ -34,7 +32,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const query = {c: {$lte: nMatches}, d: {$gte: this.nDocs - nMatches}};
 
         const explain = db[collName].explain().find(query).finish();
-        assert(planHasStage(db, explain.queryPlanner.winningPlan, 'AND_HASH'));
+        assert(planHasStage(db, explain.queryPlanner.winningPlan, "AND_HASH"));
 
         const res = db[collName].find(query).toArray();
         for (const result of res) {
@@ -51,20 +49,26 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         $super.setup.apply(this, arguments);
 
         cluster.executeOnMongodNodes((db) => {
-            const res1 = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryPlannerEnableHashIntersection: true,
-            }));
+            const res1 = assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryPlannerEnableHashIntersection: true,
+                }),
+            );
             this.originalQueryPlannerEnableHashIntersection[db.getMongo().host] = res1.was;
-            const res2 = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryPlannerEnableIndexIntersection: true,
-            }));
+            const res2 = assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryPlannerEnableIndexIntersection: true,
+                }),
+            );
             this.originalQueryPlannerEnableIndexIntersection[db.getMongo().host] = res2.was;
-            const res3 = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryForceIntersectionPlans: true,
-            }));
+            const res3 = assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryForceIntersectionPlans: true,
+                }),
+            );
             this.originalQueryForceIntersectionPlans[db.getMongo().host] = res3.was;
         });
     };
@@ -73,21 +77,26 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         $super.teardown.apply(this, arguments);
 
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryPlannerEnableHashIntersection:
-                    this.originalQueryPlannerEnableHashIntersection[db.getMongo().host],
-            }));
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryPlannerEnableIndexIntersection:
-                    this.originalQueryPlannerEnableIndexIntersection[db.getMongo().host],
-            }));
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryForceIntersectionPlans:
-                    this.originalQueryForceIntersectionPlans[db.getMongo().host],
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryPlannerEnableHashIntersection:
+                        this.originalQueryPlannerEnableHashIntersection[db.getMongo().host],
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryPlannerEnableIndexIntersection:
+                        this.originalQueryPlannerEnableIndexIntersection[db.getMongo().host],
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryForceIntersectionPlans: this.originalQueryForceIntersectionPlans[db.getMongo().host],
+                }),
+            );
         });
     };
 

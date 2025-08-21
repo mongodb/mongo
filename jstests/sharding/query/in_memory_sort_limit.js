@@ -6,15 +6,14 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 var st = new ShardingTest({
     shards: 2,
     other: {
-        rsOptions: {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}}
-    }
+        rsOptions: {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}},
+    },
 });
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
-assert.commandWorked(st.s.adminCommand({shardCollection: 'test.skip', key: {_id: 'hashed'}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.skip", key: {_id: "hashed"}}));
 
-var mongosCol = st.s.getDB('test').getCollection('skip');
-var shardCol = st.shard0.getDB('test').getCollection('skip');
+var mongosCol = st.s.getDB("test").getCollection("skip");
+var shardCol = st.shard0.getDB("test").getCollection("skip");
 
 // Create enough data to exceed the 32MB in-memory sort limit (per shard)
 var filler = new Array(10240).toString();
@@ -34,7 +33,8 @@ assert.eq(passLimit, shardCol.find().sort({x: 1}).allowDiskUse(false).limit(pass
 jsTestLog("Test error with limit of " + failLimit + " on mongod");
 assert.throwsWithCode(
     () => shardCol.find().sort({x: 1}).allowDiskUse(false).limit(failLimit).itcount(),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
 
 // Test on MongoS
 jsTestLog("Test no error with limit of " + passLimit + " on mongos");
@@ -43,6 +43,7 @@ assert.eq(passLimit, mongosCol.find().sort({x: 1}).allowDiskUse(false).limit(pas
 jsTestLog("Test error with limit of " + failLimit + " on mongos");
 assert.throwsWithCode(
     () => mongosCol.find().sort({x: 1}).allowDiskUse(false).limit(failLimit).itcount(),
-    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+    ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+);
 
 st.stop();

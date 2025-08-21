@@ -17,23 +17,19 @@ function runTest(conn, downgradeVersion, configSvrPrimary = null) {
     checkFCV(checkFCVConn, latestFCV);
 
     // Fail when downgrading the node if 'confirm: true' is not specified.
-    assert.commandFailedWithCode(conn.runCommand({setFeatureCompatibilityVersion: downgradeFCV}),
-                                 7369100);
+    assert.commandFailedWithCode(conn.runCommand({setFeatureCompatibilityVersion: downgradeFCV}), 7369100);
     checkFCV(checkFCVConn, latestFCV);
 
     // Successfully downgrade if 'confirm: true' is specified.
-    assert.commandWorked(
-        conn.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(conn.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
     checkFCV(checkFCVConn, downgradeFCV);
 
     // Fail when upgrading the node if 'confirm: true' is not specified.
-    assert.commandFailedWithCode(conn.runCommand({setFeatureCompatibilityVersion: latestFCV}),
-                                 7369100);
+    assert.commandFailedWithCode(conn.runCommand({setFeatureCompatibilityVersion: latestFCV}), 7369100);
     checkFCV(checkFCVConn, downgradeFCV);
 
     // Successfully upgrade if 'confirm: true' is specified.
-    assert.commandWorked(
-        conn.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(conn.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkFCV(checkFCVConn, latestFCV);
 }
 
@@ -78,12 +74,12 @@ function runShardingTest(downgradeVersion) {
     st.stop();
 }
 
-runStandaloneTest('last-lts');
-runReplicaSetTest('last-lts');
-runShardingTest('last-lts');
+runStandaloneTest("last-lts");
+runReplicaSetTest("last-lts");
+runShardingTest("last-lts");
 
 if (lastLTSFCV != lastContinuousFCV) {
-    runStandaloneTest('last-continuous');
-    runReplicaSetTest('last-continuous');
-    runShardingTest('last-continuous');
+    runStandaloneTest("last-continuous");
+    runReplicaSetTest("last-continuous");
+    runShardingTest("last-continuous");
 }

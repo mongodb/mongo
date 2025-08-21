@@ -21,7 +21,7 @@ const replTest = new ReplSetTest({
         {},
         {rsConfig: {priority: 0, buildIndexes: false}},
         {rsConfig: {priority: 0, votes: 0, buildIndexes: false}},
-    ]
+    ],
 });
 replTest.startSet();
 replTest.initiate();
@@ -38,29 +38,35 @@ for (let i = 0; i < 100; i++) {
 
 // The default commit quorum is 'votingMembers', and this index build should fail early because the
 // voting buildIndexes:false node will never build the index.
-assert.commandFailedWithCode(primaryDb.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {y: 1}, name: 'y_1_default_commitQuorum'}],
-}),
-                             ErrorCodes.UnsatisfiableCommitQuorum);
+assert.commandFailedWithCode(
+    primaryDb.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {y: 1}, name: "y_1_default_commitQuorum"}],
+    }),
+    ErrorCodes.UnsatisfiableCommitQuorum,
+);
 
 // With a commit quorum that includes 4 nodes, the quorum is unsatisfiable because it includes a
 // buildIndexes: false node.
-assert.commandFailedWithCode(primaryDb.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {y: 1}, name: 'y_1_commitQuorum_3'}],
-    commitQuorum: 4,
-}),
-                             ErrorCodes.UnsatisfiableCommitQuorum);
+assert.commandFailedWithCode(
+    primaryDb.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {y: 1}, name: "y_1_commitQuorum_3"}],
+        commitQuorum: 4,
+    }),
+    ErrorCodes.UnsatisfiableCommitQuorum,
+);
 
 // This commit quorum does not need to include the buildIndexes:false node so it should be
 // satisfiable.
-const indexName = 'y_1_commitQuorum_majority';
-assert.commandWorked(primaryDb.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {y: 1}, name: indexName}],
-    commitQuorum: 'majority',
-}));
+const indexName = "y_1_commitQuorum_majority";
+assert.commandWorked(
+    primaryDb.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {y: 1}, name: indexName}],
+        commitQuorum: "majority",
+    }),
+);
 
 replTest.awaitReplication();
 
@@ -70,9 +76,9 @@ replTest.getSecondaries().forEach((conn) => {
     secondaryDbs.push(conn.getDB(dbName));
 });
 
-IndexBuildTest.assertIndexes(secondaryDbs[0][collName], 2, ['_id_', indexName]);
-IndexBuildTest.assertIndexes(secondaryDbs[1][collName], 2, ['_id_', indexName]);
-IndexBuildTest.assertIndexes(secondaryDbs[2][collName], 1, ['_id_']);
-IndexBuildTest.assertIndexes(secondaryDbs[3][collName], 1, ['_id_']);
+IndexBuildTest.assertIndexes(secondaryDbs[0][collName], 2, ["_id_", indexName]);
+IndexBuildTest.assertIndexes(secondaryDbs[1][collName], 2, ["_id_", indexName]);
+IndexBuildTest.assertIndexes(secondaryDbs[2][collName], 1, ["_id_"]);
+IndexBuildTest.assertIndexes(secondaryDbs[3][collName], 1, ["_id_"]);
 
 replTest.stopSet();

@@ -1,4 +1,3 @@
-
 let t = db.indexf;
 t.drop();
 

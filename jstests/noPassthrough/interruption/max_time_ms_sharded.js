@@ -28,31 +28,25 @@ const defaultMaxTimeMS = 60 * 1000;
 // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which forces mongod
 // to throw if it receives an operation with a max time. See fail point declaration for complete
 // description.
-var configureMaxTimeAlwaysTimeOut = function(mode) {
-    assert.commandWorked(shards[0].getDB("admin").runCommand(
-        {configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
-    assert.commandWorked(shards[1].getDB("admin").runCommand(
-        {configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
+var configureMaxTimeAlwaysTimeOut = function (mode) {
+    assert.commandWorked(shards[0].getDB("admin").runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
+    assert.commandWorked(shards[1].getDB("admin").runCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: mode}));
 };
 
 // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which prohibits
 // mongod from enforcing time limits. See fail point declaration for complete description.
-var configureMaxTimeNeverTimeOut = function(mode) {
-    assert.commandWorked(shards[0].getDB("admin").runCommand(
-        {configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
-    assert.commandWorked(shards[1].getDB("admin").runCommand(
-        {configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
+var configureMaxTimeNeverTimeOut = function (mode) {
+    assert.commandWorked(shards[0].getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
+    assert.commandWorked(shards[1].getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
 };
 
 //
 // Pre-split collection: shard 0 takes {_id: {$lt: 0}}, shard 1 takes {_id: {$gte: 0}}.
 //
-assert.commandWorked(
-    admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {_id: 0}}));
-assert.commandWorked(
-    admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
 
 //
 // Insert 1000 documents into sharded collection, such that each shard owns 500.
@@ -75,17 +69,25 @@ assert.eq(nDocsPerShard, shards[1].getCollection(coll.getFullName()).count());
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 cursor = coll.find();
 cursor.maxTimeMS(defaultMaxTimeMS);
-assert.throws(function() {
-    cursor.next();
-}, [], "expected query to fail in mongod due to maxTimeAlwaysTimeOut fail point");
+assert.throws(
+    function () {
+        cursor.next();
+    },
+    [],
+    "expected query to fail in mongod due to maxTimeAlwaysTimeOut fail point",
+);
 
 // Negative test.
 configureMaxTimeAlwaysTimeOut("off");
 cursor = coll.find();
 cursor.maxTimeMS(defaultMaxTimeMS);
-assert.doesNotThrow(function() {
-    cursor.next();
-}, [], "expected query to not hit time limit in mongod");
+assert.doesNotThrow(
+    function () {
+        cursor.next();
+    },
+    [],
+    "expected query to not hit time limit in mongod",
+);
 
 //
 // Test that mongos correctly times out max time sharded getmore operations.  Uses
@@ -98,32 +100,39 @@ configureMaxTimeNeverTimeOut("alwaysOn");
 // = 120ms. We do not expect the first operation (one batch) to time out, but iterating the cursor
 // should exhaust the 10s limit.
 cursor = coll.find({
-    $where: function() {
+    $where: function () {
         sleep(60);
         return true;
-    }
+    },
 });
 cursor.batchSize(2);
 cursor.maxTimeMS(10 * 1000);
-assert.doesNotThrow(
-    () => cursor.next(), [], "did not expect mongos to time out first batch of query");
+assert.doesNotThrow(() => cursor.next(), [], "did not expect mongos to time out first batch of query");
 assert.throws(() => cursor.itcount(), [], "expected mongos to abort getmore due to time limit");
 
 // Negative test. ~5s operation, with a high (1-day) limit.
 cursor = coll.find({
-    $where: function() {
+    $where: function () {
         sleep(10);
         return true;
-    }
+    },
 });
 cursor.batchSize(2);
 cursor.maxTimeMS(1000 * 60 * 60 * 24);
-assert.doesNotThrow(function() {
-    cursor.next();
-}, [], "did not expect mongos to time out first batch of query");
-assert.doesNotThrow(function() {
-    cursor.itcount();
-}, [], "did not expect getmore ops to hit the time limit");
+assert.doesNotThrow(
+    function () {
+        cursor.next();
+    },
+    [],
+    "did not expect mongos to time out first batch of query",
+);
+assert.doesNotThrow(
+    function () {
+        cursor.itcount();
+    },
+    [],
+    "did not expect getmore ops to hit the time limit",
+);
 
 configureMaxTimeNeverTimeOut("off");
 
@@ -134,9 +143,11 @@ configureMaxTimeNeverTimeOut("off");
 
 let assertCommandFailedWithMaxTimeMSExpired = (commandName, failMessage) => {
     const maxTimeMSCounter = admin.serverStatus().metrics.operation.killedDueToMaxTimeMSExpired;
-    assert.commandFailedWithCode(coll.runCommand(commandName, {maxTimeMS: defaultMaxTimeMS}),
-                                 ErrorCodes.MaxTimeMSExpired,
-                                 failMessage);
+    assert.commandFailedWithCode(
+        coll.runCommand(commandName, {maxTimeMS: defaultMaxTimeMS}),
+        ErrorCodes.MaxTimeMSExpired,
+        failMessage,
+    );
 
     assert.gt(admin.serverStatus().metrics.operation.killedDueToMaxTimeMSExpired, maxTimeMSCounter);
 };
@@ -145,83 +156,107 @@ let assertCommandFailedWithMaxTimeMSExpired = (commandName, failMessage) => {
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 assertCommandFailedWithMaxTimeMSExpired(
     "validate",
-    "expected vailidate to fail with code " + ErrorCodes.MaxTimeMSExpired +
-        " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
+    "expected vailidate to fail with code " +
+        ErrorCodes.MaxTimeMSExpired +
+        " due to maxTimeAlwaysTimeOut fail point, but instead got: " +
+        tojson(res),
+);
 
 // Negative test for "validate".
 configureMaxTimeAlwaysTimeOut("off");
-assert.commandWorked(coll.runCommand("validate", {maxTimeMS: 60 * 1000}),
-                     "expected validate to not hit time limit in mongod");
+assert.commandWorked(
+    coll.runCommand("validate", {maxTimeMS: 60 * 1000}),
+    "expected validate to not hit time limit in mongod",
+);
 
 // Positive test for "count".
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 assertCommandFailedWithMaxTimeMSExpired(
     "count",
-    "expected count to fail with code " + ErrorCodes.MaxTimeMSExpired +
-        " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
+    "expected count to fail with code " +
+        ErrorCodes.MaxTimeMSExpired +
+        " due to maxTimeAlwaysTimeOut fail point, but instead got: " +
+        tojson(res),
+);
 
 // Negative test for "count".
 configureMaxTimeAlwaysTimeOut("off");
-assert.commandWorked(coll.runCommand("count", {maxTimeMS: 60 * 1000}),
-                     "expected count to not hit time limit in mongod");
+assert.commandWorked(
+    coll.runCommand("count", {maxTimeMS: 60 * 1000}),
+    "expected count to not hit time limit in mongod",
+);
 
 // Positive test for "collStats".
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 assertCommandFailedWithMaxTimeMSExpired(
     "collStats",
-    "expected collStats to fail with code " + ErrorCodes.MaxTimeMSExpired +
-        " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
+    "expected collStats to fail with code " +
+        ErrorCodes.MaxTimeMSExpired +
+        " due to maxTimeAlwaysTimeOut fail point, but instead got: " +
+        tojson(res),
+);
 
 // Negative test for "collStats".
 configureMaxTimeAlwaysTimeOut("off");
-assert.commandWorked(coll.runCommand("collStats", {maxTimeMS: 60 * 1000}),
-                     "expected collStats to not hit time limit in mongod");
+assert.commandWorked(
+    coll.runCommand("collStats", {maxTimeMS: 60 * 1000}),
+    "expected collStats to not hit time limit in mongod",
+);
 
 // Positive test for "mapReduce".
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 res = coll.runCommand("mapReduce", {
-    map: function() {
+    map: function () {
         emit(0, 0);
     },
-    reduce: function(key, values) {
+    reduce: function (key, values) {
         return 0;
     },
     out: {inline: 1},
-    maxTimeMS: defaultMaxTimeMS
+    maxTimeMS: defaultMaxTimeMS,
 });
 assert.commandFailedWithCode(
     res,
     ErrorCodes.MaxTimeMSExpired,
-    "expected mapReduce to fail with code " + ErrorCodes.MaxTimeMSExpired +
-        " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
+    "expected mapReduce to fail with code " +
+        ErrorCodes.MaxTimeMSExpired +
+        " due to maxTimeAlwaysTimeOut fail point, but instead got: " +
+        tojson(res),
+);
 
 // Negative test for "mapReduce".
 configureMaxTimeAlwaysTimeOut("off");
-assert.commandWorked(coll.runCommand("mapReduce", {
-    map: function() {
-        emit(0, 0);
-    },
-    reduce: function(key, values) {
-        return 0;
-    },
-    out: {inline: 1},
-    maxTimeMS: defaultMaxTimeMS
-}),
-                     "expected mapReduce to not hit time limit in mongod");
+assert.commandWorked(
+    coll.runCommand("mapReduce", {
+        map: function () {
+            emit(0, 0);
+        },
+        reduce: function (key, values) {
+            return 0;
+        },
+        out: {inline: 1},
+        maxTimeMS: defaultMaxTimeMS,
+    }),
+    "expected mapReduce to not hit time limit in mongod",
+);
 
 // Positive test for "aggregate".
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 assert.commandFailedWithCode(
     coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: defaultMaxTimeMS}),
     ErrorCodes.MaxTimeMSExpired,
-    "expected aggregate to fail with code " + ErrorCodes.MaxTimeMSExpired +
-        " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
+    "expected aggregate to fail with code " +
+        ErrorCodes.MaxTimeMSExpired +
+        " due to maxTimeAlwaysTimeOut fail point, but instead got: " +
+        tojson(res),
+);
 
 // Negative test for "aggregate".
 configureMaxTimeAlwaysTimeOut("off");
 assert.commandWorked(
     coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: defaultMaxTimeMS}),
-    "expected aggregate to not hit time limit in mongod");
+    "expected aggregate to not hit time limit in mongod",
+);
 
 // Positive test for "setFeatureCompatibilityVersion"
 configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -229,54 +264,58 @@ assert.commandFailedWithCode(
     admin.runCommand({
         setFeatureCompatibilityVersion: lastLTSFCV,
         confirm: true,
-        maxTimeMS: 1000 * 60 * 60 * 24
+        maxTimeMS: 1000 * 60 * 60 * 24,
     }),
     ErrorCodes.MaxTimeMSExpired,
-    "expected setFeatureCompatibilityVersion to fail due to maxTimeAlwaysTimeOut fail point");
+    "expected setFeatureCompatibilityVersion to fail due to maxTimeAlwaysTimeOut fail point",
+);
 
 // Negative test for "setFeatureCompatibilityVersion"
 configureMaxTimeAlwaysTimeOut("off");
-assert.commandWorked(admin.runCommand({
-    setFeatureCompatibilityVersion: lastLTSFCV,
-    confirm: true,
-    maxTimeMS: 1000 * 60 * 60 * 24
-}),
-                     "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
+assert.commandWorked(
+    admin.runCommand({
+        setFeatureCompatibilityVersion: lastLTSFCV,
+        confirm: true,
+        maxTimeMS: 1000 * 60 * 60 * 24,
+    }),
+    "expected setFeatureCompatibilityVersion to not hit time limit in mongod",
+);
 
 // Negative test for "setFeatureCompatibilityVersion" to upgrade
 assert.commandWorked(
-    admin.runCommand(
-        {setFeatureCompatibilityVersion: latestFCV, confirm: true, maxTimeMS: 1000 * 60 * 60 * 24}),
-    "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
+    admin.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true, maxTimeMS: 1000 * 60 * 60 * 24}),
+    "expected setFeatureCompatibilityVersion to not hit time limit in mongod",
+);
 
 // Test that the maxTimeMS is still enforced on the shards even if we do not spend much time in
 // mongos blocking.
 
 // Manually run a find here so we can be sure cursor establishment happens with batch size 0.
 const kTimeoutMS = 10 * 1000;
-res = assert.commandWorked(coll.runCommand({
-    find: coll.getName(),
-    filter: {
-        $where: function() {
-            if (this._id < 0) {
-                // Slow down the query only on one of the shards. Each shard has 500 documents
-                // so we expect the slow shard to take ~30 seconds to return a batch of 500.
-                sleep(60);
-            }
-            return true;
-        }
-    },
-    maxTimeMS: kTimeoutMS,
-    batchSize: 0
-}));
+res = assert.commandWorked(
+    coll.runCommand({
+        find: coll.getName(),
+        filter: {
+            $where: function () {
+                if (this._id < 0) {
+                    // Slow down the query only on one of the shards. Each shard has 500 documents
+                    // so we expect the slow shard to take ~30 seconds to return a batch of 500.
+                    sleep(60);
+                }
+                return true;
+            },
+        },
+        maxTimeMS: kTimeoutMS,
+        batchSize: 0,
+    }),
+);
 // Use a batch size of 500 to allow returning results from the fast shard as soon as they're
 // ready, as opposed to waiting to return one 16MB batch at a time.
 const kBatchSize = nDocsPerShard;
 cursor = new DBCommandCursor(coll.getDB(), res, kBatchSize);
 // The fast shard should return relatively quickly.
 for (let i = 0; i < nDocsPerShard; ++i) {
-    let next = assert.doesNotThrow(
-        () => cursor.next(), [], "did not expect mongos to time out first batch of query");
+    let next = assert.doesNotThrow(() => cursor.next(), [], "did not expect mongos to time out first batch of query");
     assert.gte(next._id, 0);
 }
 // Sleep on the client-side so mongos's time budget is not being used.

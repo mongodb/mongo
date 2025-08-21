@@ -24,7 +24,7 @@ export function areViewlessTimeseriesEnabled(db) {
 export function getTimeseriesBucketsColl(coll) {
     const kBucketsPrefix = "system.buckets.";
 
-    if (typeof coll === 'string') {
+    if (typeof coll === "string") {
         // It's a collection name string
         if (coll.trim() === "") {
             throw new Error("Input collection name string cannot be empty.");
@@ -41,8 +41,10 @@ export function getTimeseriesBucketsColl(coll) {
 
     // Handle invalid input types
     throw new Error(
-        `Invalid parameter. 'coll' must be a collection (DBCollection) or the collection name (string). Receinved parameter '${
-            tojson(coll)}' (${typeof coll})`);
+        `Invalid parameter. 'coll' must be a collection (DBCollection) or the collection name (string). Receinved parameter '${tojson(
+            coll,
+        )}' (${typeof coll})`,
+    );
 }
 
 export function getTimeseriesCollForDDLOps(db, coll) {
@@ -57,6 +59,5 @@ export function getTimeseriesCollForDDLOps(db, coll) {
  * FixtureHelpers::isSharded on the given collection.
  */
 export function isShardedTimeseries(coll) {
-    return FixtureHelpers.isSharded(coll) ||
-        FixtureHelpers.isSharded(getTimeseriesBucketsColl(coll));
+    return FixtureHelpers.isSharded(coll) || FixtureHelpers.isSharded(getTimeseriesBucketsColl(coll));
 }

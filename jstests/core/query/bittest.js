@@ -10,10 +10,8 @@ var coll = db.jstests_bitwise;
 
 function assertQueryCorrect(query, count) {
     var explain = coll.find(query).explain("executionStats");
-    assert(isCollscan(db, getWinningPlanFromExplain(explain)),
-           "expected bit test query plan to be COLLSCAN");
-    assert.eq(
-        count, explain.executionStats.nReturned, "bit test query not returning correct documents");
+    assert(isCollscan(db, getWinningPlanFromExplain(explain)), "expected bit test query plan to be COLLSCAN");
+    assert.eq(count, explain.executionStats.nReturned, "bit test query not returning correct documents");
 }
 
 // Tests on numbers.
@@ -76,32 +74,32 @@ coll.drop();
 
 assert.commandWorked(coll.insert({a: 0}));
 assert.commandWorked(coll.insert({a: 1}));
-assert.commandWorked(coll.insert({a: NumberLong('+9223372036854775807')}));
-assert.commandWorked(coll.insert({a: NumberLong('+6917529027641081856')}));
-assert.commandWorked(coll.insert({a: NumberLong('+2305843009213693952')}));
+assert.commandWorked(coll.insert({a: NumberLong("+9223372036854775807")}));
+assert.commandWorked(coll.insert({a: NumberLong("+6917529027641081856")}));
+assert.commandWorked(coll.insert({a: NumberLong("+2305843009213693952")}));
 assert.commandWorked(coll.createIndex({a: 1}));
 
 // Tests with `NumberLongs` as arguments to bitwise expressions
 assertQueryCorrect({a: {$bitsAllSet: 0}}, 5);
 assertQueryCorrect({a: {$bitsAllSet: 1}}, 2);
-assertQueryCorrect({a: {$bitsAllSet: NumberLong('+9223372036854775807')}}, 1);
-assertQueryCorrect({a: {$bitsAllSet: NumberLong('+6917529027641081856')}}, 2);
-assertQueryCorrect({a: {$bitsAllSet: NumberLong('+2305843009213693952')}}, 3);
+assertQueryCorrect({a: {$bitsAllSet: NumberLong("+9223372036854775807")}}, 1);
+assertQueryCorrect({a: {$bitsAllSet: NumberLong("+6917529027641081856")}}, 2);
+assertQueryCorrect({a: {$bitsAllSet: NumberLong("+2305843009213693952")}}, 3);
 assertQueryCorrect({a: {$bitsAllClear: 0}}, 5);
 assertQueryCorrect({a: {$bitsAllClear: 1}}, 3);
-assertQueryCorrect({a: {$bitsAllClear: NumberLong('+9223372036854775807')}}, 1);
-assertQueryCorrect({a: {$bitsAllClear: NumberLong('+6917529027641081856')}}, 2);
-assertQueryCorrect({a: {$bitsAllClear: NumberLong('+2305843009213693952')}}, 2);
+assertQueryCorrect({a: {$bitsAllClear: NumberLong("+9223372036854775807")}}, 1);
+assertQueryCorrect({a: {$bitsAllClear: NumberLong("+6917529027641081856")}}, 2);
+assertQueryCorrect({a: {$bitsAllClear: NumberLong("+2305843009213693952")}}, 2);
 assertQueryCorrect({a: {$bitsAnySet: 0}}, 0);
 assertQueryCorrect({a: {$bitsAnySet: 1}}, 2);
-assertQueryCorrect({a: {$bitsAnySet: NumberLong('+9223372036854775807')}}, 4);
-assertQueryCorrect({a: {$bitsAnySet: NumberLong('+6917529027641081856')}}, 3);
-assertQueryCorrect({a: {$bitsAnySet: NumberLong('+2305843009213693952')}}, 3);
+assertQueryCorrect({a: {$bitsAnySet: NumberLong("+9223372036854775807")}}, 4);
+assertQueryCorrect({a: {$bitsAnySet: NumberLong("+6917529027641081856")}}, 3);
+assertQueryCorrect({a: {$bitsAnySet: NumberLong("+2305843009213693952")}}, 3);
 assertQueryCorrect({a: {$bitsAnyClear: 0}}, 0);
 assertQueryCorrect({a: {$bitsAnyClear: 1}}, 3);
-assertQueryCorrect({a: {$bitsAnyClear: NumberLong('+9223372036854775807')}}, 4);
-assertQueryCorrect({a: {$bitsAnyClear: NumberLong('+6917529027641081856')}}, 3);
-assertQueryCorrect({a: {$bitsAnyClear: NumberLong('+2305843009213693952')}}, 2);
+assertQueryCorrect({a: {$bitsAnyClear: NumberLong("+9223372036854775807")}}, 4);
+assertQueryCorrect({a: {$bitsAnyClear: NumberLong("+6917529027641081856")}}, 3);
+assertQueryCorrect({a: {$bitsAnyClear: NumberLong("+2305843009213693952")}}, 2);
 
 // Tests on negative numbers.
 coll.drop();
@@ -175,13 +173,15 @@ assertQueryCorrect({a: {$bitsAnyClear: BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq"
 assertQueryCorrect({a: {$bitsAnyClear: BinData(0, "////////////////////////////")}}, 3);
 
 // Tests with multiple predicates.
-assertQueryCorrect({
-    a: {
-        $bitsAllSet: BinData(0, "AANgAAAAAAAAAAAAAAAAAAAAAAAA"),
-        $bitsAllClear: BinData(0, "//yf////////////////////////")
-    }
-},
-                   1);
+assertQueryCorrect(
+    {
+        a: {
+            $bitsAllSet: BinData(0, "AANgAAAAAAAAAAAAAAAAAAAAAAAA"),
+            $bitsAllClear: BinData(0, "//yf////////////////////////"),
+        },
+    },
+    1,
+);
 
 coll.drop();
 
@@ -230,25 +230,24 @@ assert(coll.drop());
 assert.commandWorked(coll.insert({a: BinData(0, "ZG9n")}));
 assert.commandWorked(coll.insert({a: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}));
 assert.commandWorked(coll.insert({a: BinData(1, "JA4A8gAxqTwciCuF5GGzAA==")}));
-assert.commandWorked(
-    coll.insert({a: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}));
+assert.commandWorked(coll.insert({a: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}));
 assert.commandWorked(coll.insert({a: BinData(2, "BAAAADEyMzQ=")}));
 
 assertQueryCorrect({a: {$bitsAllSet: BinData(0, "ZG9n")}}, 1);
 assertQueryCorrect({a: {$bitsAllSet: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: BinData(2, "BAAAADEyMzQ=")}}, 1);
-assertQueryCorrect(
-    {a: {$bitsAllSet: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}},
-    1);
+assertQueryCorrect({a: {$bitsAllSet: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}}, 1);
 assertQueryCorrect({a: {$bitsAllSet: BinData(2, "BAAAADEyMzQ=")}}, 1);
 assertQueryCorrect({a: {$bitsAllClear: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 5);
 assertQueryCorrect({a: {$bitsAllClear: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 0);
 assertQueryCorrect({a: {$bitsAnySet: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 0);
 assertQueryCorrect({a: {$bitsAnySet: BinData(0, "JA4A8gAxqTwciCuF5GGzAA==")}}, 5);
 assertQueryCorrect({a: {$bitsAnyClear: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, 0);
-assertQueryCorrect({
-    a: {$bitsAnyClear: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")}
-},
-                   4);
+assertQueryCorrect(
+    {
+        a: {$bitsAnyClear: BinData(0, "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw==")},
+    },
+    4,
+);
 
 assert(coll.drop());

@@ -14,8 +14,7 @@ const simpleGeoNearIndexName = "simpleGeoNearIndex";
 const compoundGeoNearIndexName = "compoundGeoNearIndex";
 
 assert.commandWorked(coll.insert({_id: "1", state: "ACTIVE", location: [106, 10], name: "TEST"}));
-assert.commandWorked(
-    coll.createIndex({_id: 1, location: "2dsphere", state: 1}, {name: compoundGeoNearIndexName}));
+assert.commandWorked(coll.createIndex({_id: 1, location: "2dsphere", state: 1}, {name: compoundGeoNearIndexName}));
 assert.commandWorked(coll.createIndex({location: "2dsphere"}, {name: simpleGeoNearIndexName}));
 
 const pipeline = [
@@ -25,10 +24,10 @@ const pipeline = [
             spherical: true,
             near: {coordinates: [106.65589, 10.787627], type: "Point"},
             distanceField: "distance",
-            key: "location"
-        }
+            key: "location",
+        },
     },
-    {$project: {id: 1, name: 1, distance: 1}}
+    {$project: {id: 1, name: 1, distance: 1}},
 ];
 
 // Run the aggregate with two different hinted indexes and confirm that the hinted index gets

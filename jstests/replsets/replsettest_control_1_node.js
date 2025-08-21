@@ -7,7 +7,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const replTest = new ReplSetTest({name: 'replsettest_control_1_node', nodes: 1});
+const replTest = new ReplSetTest({name: "replsettest_control_1_node", nodes: 1});
 replTest.startSet();
 replTest.initiate();
 replTest.stopSet();

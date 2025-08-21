@@ -17,15 +17,14 @@ const st = new ShardingTest({
     config: 1,
     other: {
         configOptions: {
-            setParameter:
-                {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */}
-        }
-    }
+            setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */},
+        },
+    },
 });
 
-const kDbName = 'db';
-const collName = 'foo';
-const ns = kDbName + '.' + collName;
+const kDbName = "db";
+const collName = "foo";
+const ns = kDbName + "." + collName;
 const mongos = st.s;
 const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
@@ -47,8 +46,7 @@ for (let i = 0; i < nChunks; i++) {
 newChunks.push({min: {newKey: nChunks}, max: {newKey: MaxKey}, recipientShardId: shard1});
 
 jsTestLog("Resharding Collection");
-assert.commandWorked(mongos.adminCommand(
-    {reshardCollection: ns, key: {newKey: 1}, _presetReshardedChunks: newChunks}));
+assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1}, _presetReshardedChunks: newChunks}));
 
 // Assert that the correct number of chunks documents exist after resharding 'db.foo'.
 // There should be two more chunks docs to cover the ranges

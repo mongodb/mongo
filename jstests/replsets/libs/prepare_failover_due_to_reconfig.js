@@ -5,7 +5,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
  * Library used to test that prepared transactions survive failovers due to reconfig.
  */
 
-export var testPrepareFailoverDueToReconfig = function(name, reconfigOnPrimary) {
+export var testPrepareFailoverDueToReconfig = function (name, reconfigOnPrimary) {
     const dbName = "test";
     const collName = name;
 
@@ -13,15 +13,17 @@ export var testPrepareFailoverDueToReconfig = function(name, reconfigOnPrimary) 
     const nodes = rst.nodeList();
 
     rst.startSet();
-    rst.initiate({
-        "_id": name,
-        "members": [
-            {/* primary   */ "_id": 0, "host": nodes[0]},
-            {/* secondary */ "_id": 1, "host": nodes[1], "priority": 0}
-        ]
-    },
-                 null,
-                 {initiateWithDefaultElectionTimeout: true});
+    rst.initiate(
+        {
+            "_id": name,
+            "members": [
+                {/* primary   */ "_id": 0, "host": nodes[0]},
+                {/* secondary */ "_id": 1, "host": nodes[1], "priority": 0},
+            ],
+        },
+        null,
+        {initiateWithDefaultElectionTimeout: true},
+    );
 
     const primary = rst.getPrimary();
     const secondary = rst.getSecondary();

@@ -16,10 +16,7 @@
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {
-    accumulateServerStatusMetric,
-    assertReleaseMemoryFailedWithCode
-} from "jstests/libs/release_memory_util.js";
+import {accumulateServerStatusMetric, assertReleaseMemoryFailedWithCode} from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getServerParameter(knob) {
@@ -31,23 +28,21 @@ function setServerParameter(knob, value) {
 }
 
 function getSortSpillCounter() {
-    return accumulateServerStatusMetric(db, metrics => metrics.query.sort.spillToDisk);
+    return accumulateServerStatusMetric(db, (metrics) => metrics.query.sort.spillToDisk);
 }
 
 const sortMemoryLimitKnob = "internalQueryMaxBlockingSortMemoryUsageBytes";
 
 db.dropDatabase();
 const coll = db[jsTestName()];
-assert.commandWorked(
-    db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
-const bucketMaxSpanSeconds =
-    db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
+assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
 
 const start = new Date();
 const kMetaCount = 10;
 const kDocCount = 100;
 
-const string1KB = 'X'.repeat(1024);
+const string1KB = "X".repeat(1024);
 for (let i = 0; i < kMetaCount; ++i) {
     const batch = [];
     let batchTime = +start + i;
@@ -73,8 +68,7 @@ function assertCursorSortedByTime(cursor) {
 // Some background queries can use $group and classic $group uses sorter to spill, so this
 // background spills can affect server status metrics.
 const classicGroupIncreasedSpillingKnob = "internalQueryEnableAggressiveSpillsInGroup";
-const classicGroupIncreasedSpillingInitialValue =
-    getServerParameter(classicGroupIncreasedSpillingKnob);
+const classicGroupIncreasedSpillingInitialValue = getServerParameter(classicGroupIncreasedSpillingKnob);
 setServerParameter(classicGroupIncreasedSpillingKnob, false);
 
 const pipeline = [{$sort: {time: 1}}];
@@ -90,7 +84,8 @@ let previousSpillCount = getSortSpillCounter();
 assertCursorSortedByTime(coll.aggregate(pipeline));
 assert.eq(previousSpillCount, getSortSpillCounter());
 
-{  // Release memory should spill, which will increment spill serverStatus counters.
+{
+    // Release memory should spill, which will increment spill serverStatus counters.
     const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}});
     const cursorId = cursor.getId();
     assert.eq(previousSpillCount, getSortSpillCounter());
@@ -104,21 +99,23 @@ assert.eq(previousSpillCount, getSortSpillCounter());
     assertCursorSortedByTime(cursor);
 }
 
-{  // Cursor with allowDiskUse: false should be reported as failed.
+{
+    // Cursor with allowDiskUse: false should be reported as failed.
     const cursor = coll.aggregate(pipeline, {cursor: {batchSize: 1}, allowDiskUse: false});
     const cursorId = cursor.getId();
 
     const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
     assert.commandWorked(releaseMemoryRes);
-    assertReleaseMemoryFailedWithCode(
-        releaseMemoryRes,
-        cursorId,
-        [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ReleaseMemoryShardError]);
+    assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, [
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        ErrorCodes.ReleaseMemoryShardError,
+    ]);
 
     assertCursorSortedByTime(cursor);
 }
 
-{  // Release memory should work when the cursor already have spilled by itself.
+{
+    // Release memory should work when the cursor already have spilled by itself.
     const originalKnobValue = getServerParameter(sortMemoryLimitKnob);
     setServerParameter(sortMemoryLimitKnob, 10 * 1024);
 

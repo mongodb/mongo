@@ -1,4 +1,3 @@
-
 /**
  * Tests that $rankFusion and $scoreFusion on a nested view namespace is allowed and works
  * correctly.
@@ -7,12 +6,8 @@
  */
 
 import {verifyExplainStagesAreEqual} from "jstests/with_mongot/e2e_lib/explain_utils.js";
-import {
-    createHybridSearchPipeline,
-} from "jstests/with_mongot/e2e_lib/hybrid_search_on_view.js";
-import {
-    assertDocArrExpectedFuzzy,
-} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
+import {createHybridSearchPipeline} from "jstests/with_mongot/e2e_lib/hybrid_search_on_view.js";
+import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -53,12 +48,10 @@ export function createRankFusionPipeline(inputPipelines, viewPipeline = null) {
  */
 export function createScoreFusionPipeline(inputPipelines, viewPipeline = null) {
     const scoreFusionStage = {
-        $scoreFusion:
-            {input: {pipelines: {}, normalization: "sigmoid"}, combination: {method: "avg"}}
+        $scoreFusion: {input: {pipelines: {}, normalization: "sigmoid"}, combination: {method: "avg"}},
     };
 
-    return createHybridSearchPipeline(
-        inputPipelines, viewPipeline, scoreFusionStage, /**isRankFusion*/ false);
+    return createHybridSearchPipeline(inputPipelines, viewPipeline, scoreFusionStage, /**isRankFusion*/ false);
 }
 
 // Define and create nested views.
@@ -96,8 +89,7 @@ const rankFusionInputPipelines = {
     b: [{$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
 };
 
-const rankFusionPipelineWithViewPrepended =
-    createRankFusionPipeline(rankFusionInputPipelines, [...viewA, ...viewB]);
+const rankFusionPipelineWithViewPrepended = createRankFusionPipeline(rankFusionInputPipelines, [...viewA, ...viewB]);
 
 const rankFusionPipelineWithoutView = createRankFusionPipeline(rankFusionInputPipelines);
 
@@ -112,8 +104,7 @@ const scoreFusionInputPipelines = {
     b: [{$match: {x: {$lte: 15}}}, {$score: {score: "$y", normalization: "minMaxScaler"}}],
 };
 
-const scoreFusionPipelineWithViewPrepended =
-    createScoreFusionPipeline(scoreFusionInputPipelines, [...viewA, ...viewB]);
+const scoreFusionPipelineWithViewPrepended = createScoreFusionPipeline(scoreFusionInputPipelines, [...viewA, ...viewB]);
 
 const scoreFusionPipelineWithoutView = createScoreFusionPipeline(scoreFusionInputPipelines);
 

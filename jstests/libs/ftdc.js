@@ -53,7 +53,7 @@ export function verifyGetDiagnosticData(adminDb, logData = true) {
     // We need to retry a few times in case we're running this test immediately
     // after mongod is started. FTDC may not have run yet, or some collectors
     // might have timed out initially and so be missing from the response.
-    for (let attempt = 1;; ++attempt) {
+    for (let attempt = 1; ; ++attempt) {
         const result = adminDb.runCommand("getDiagnosticData");
         assert.commandWorked(result);
         const data = result.data;
@@ -66,21 +66,22 @@ export function verifyGetDiagnosticData(adminDb, logData = true) {
         if (Object.values(results).indexOf(false) === -1) {
             // all predicates are satisfied
             if (logData) {
-                jsTestLog("getDiagnosticData response met all criteria: " +
-                          tojson({criteria: results}));
+                jsTestLog("getDiagnosticData response met all criteria: " + tojson({criteria: results}));
             }
             return data;
         }
 
-        assert(attempt < maxAttempts,
-               `getDiagnosticData response failed to satisfy criteria after ${
-                   maxAttempts} attempts: ` +
-                   tojson({criteria: results, data}));
+        assert(
+            attempt < maxAttempts,
+            `getDiagnosticData response failed to satisfy criteria after ${maxAttempts} attempts: ` +
+                tojson({criteria: results, data}),
+        );
 
         jsTestLog(
             `getDiagnosticData response did not satisfy one or more criteria. Trying again in ${
-                retryMillis} milliseconds (attempt ${attempt}/${maxAttempts}). Criteria: ` +
-            tojson(results));
+                retryMillis
+            } milliseconds (attempt ${attempt}/${maxAttempts}). Criteria: ` + tojson(results),
+        );
         sleep(retryMillis);
     }
 }
@@ -90,7 +91,7 @@ export function verifyGetDiagnosticData(adminDb, logData = true) {
  */
 export function verifyCommonFTDCParameters(adminDb, isEnabled) {
     // Are we running against MongoS?
-    var isMongos = ("isdbgrid" == adminDb.runCommand("ismaster").msg);
+    var isMongos = "isdbgrid" == adminDb.runCommand("ismaster").msg;
 
     // Check the defaults are correct
     //
@@ -145,11 +146,13 @@ export function verifyCommonFTDCParameters(adminDb, isEnabled) {
 }
 
 export function waitFailedToStart(pid, exitCode) {
-    assert.soon(function() {
-        return !checkProgram(pid).alive;
-    }, `Failed to wait for ${pid} to die`, 30 * 1000);
+    assert.soon(
+        function () {
+            return !checkProgram(pid).alive;
+        },
+        `Failed to wait for ${pid} to die`,
+        30 * 1000,
+    );
 
-    assert.eq(exitCode,
-              checkProgram(pid).exitCode,
-              `Failed to wait for ${pid} to die with exit code ${exitCode}`);
+    assert.eq(exitCode, checkProgram(pid).exitCode, `Failed to wait for ${pid} to die with exit code ${exitCode}`);
 }

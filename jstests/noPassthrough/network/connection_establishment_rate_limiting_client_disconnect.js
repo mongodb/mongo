@@ -10,21 +10,19 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {
-    isLinux,
-} from "jstests/libs/os_helpers.js";
+import {isLinux} from "jstests/libs/os_helpers.js";
 import {
     getConnectionStats,
     runTestReplSet,
     runTestShardedCluster,
     runTestStandaloneParamsSetAtRuntime,
-    runTestStandaloneParamsSetAtStartup
+    runTestStandaloneParamsSetAtStartup,
 } from "jstests/noPassthrough/network/libs/conn_establishment_rate_limiter_helpers.js";
 
 const maxQueueSize = 3;
 
 const testKillOnClientDisconnect = (conn) => {
-    let connDelayFailPoint = configureFailPoint(conn, 'hangInRateLimiter');
+    let connDelayFailPoint = configureFailPoint(conn, "hangInRateLimiter");
 
     let queuedConn;
     try {
@@ -41,12 +39,8 @@ const testKillOnClientDisconnect = (conn) => {
     // that rather than polling the socket state. Because of this, we don't assert on the log or
     // metric on non-Linux platforms.
     if (isLinux()) {
-        assert.soon(() => checkLog.checkContainsOnceJson(
-                        conn, 20883));  // Interrupted operation as its client disconnected
-        assert.soon(() =>
-                        (1 ==
-                         getConnectionStats(
-                             conn)["establishmentRateLimit"]["interruptedDueToClientDisconnect"]));
+        assert.soon(() => checkLog.checkContainsOnceJson(conn, 20883)); // Interrupted operation as its client disconnected
+        assert.soon(() => 1 == getConnectionStats(conn)["establishmentRateLimit"]["interruptedDueToClientDisconnect"]);
     }
 };
 

@@ -26,7 +26,7 @@ assert.commandWorked(coll.insert([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 
 // negative.
 const inputPipe = [
     {$addFields: {trap: {$sqrt: {$subtract: ["$_id", 4]}}}},
-    {$match: {$or: [{_id: 4, trap: {$ne: 0}}]}}
+    {$match: {$or: [{_id: 4, trap: {$ne: 0}}]}},
 ];
 const result = coll.aggregate(inputPipe).toArray();
 assert.sameMembers([], result);

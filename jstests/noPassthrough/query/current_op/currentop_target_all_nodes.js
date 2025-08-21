@@ -15,16 +15,16 @@ function runCurrentOpAgg(shouldTargetAllNodes) {
     return clusterAdminDB.aggregate(
         [
             {$currentOp: {targetAllNodes: shouldTargetAllNodes}},
-            {$match: {"command.comment": "issuing a currentOp with targetAllNodes"}}
+            {$match: {"command.comment": "issuing a currentOp with targetAllNodes"}},
         ],
-        {comment: "issuing a currentOp with targetAllNodes"});
+        {comment: "issuing a currentOp with targetAllNodes"},
+    );
 }
 
 const targetAllNodesFalse = runCurrentOpAgg(false);
 assert.eq(shardCount, targetAllNodesFalse.itcount(), tojson(targetAllNodesFalse));
 
 const targetAllNodesTrue = runCurrentOpAgg(true);
-assert.eq(
-    shardCount * rsNodesPerShardCount, targetAllNodesTrue.itcount(), tojson(targetAllNodesTrue));
+assert.eq(shardCount * rsNodesPerShardCount, targetAllNodesTrue.itcount(), tojson(targetAllNodesTrue));
 
 st.stop();

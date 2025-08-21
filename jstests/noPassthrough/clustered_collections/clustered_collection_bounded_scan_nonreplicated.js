@@ -10,9 +10,7 @@
  *   requires_profiling,
  * ]
  */
-import {
-    testClusteredCollectionBoundedScan
-} from "jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js";
+import {testClusteredCollectionBoundedScan} from "jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js";
 
 const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
 

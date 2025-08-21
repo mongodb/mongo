@@ -10,23 +10,27 @@
  * ]
  */
 
-import {configureFailPoint} from 'jstests/libs/fail_point_util.js';
-import {Thread} from 'jstests/libs/parallelTester.js';
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const dbName = 'test';
-const collNS = dbName + '.foo';
+const dbName = "test";
+const collNS = dbName + ".foo";
 
 const st = new ShardingTest({mongos: 1, shards: 1, config: 1});
 
 // Pause the write operation after creating the database but before the operation is actually
 // targeted by the router.
-let failPoint = configureFailPoint(st.s, 'waitForDatabaseToBeDropped');
+let failPoint = configureFailPoint(st.s, "waitForDatabaseToBeDropped");
 
-let insertThread = new Thread((mongosConnString, collNS) => {
-    let mongos = new Mongo(mongosConnString);
-    assert.commandWorked(mongos.getCollection(collNS).insert({}));
-}, st.s0.host, collNS);
+let insertThread = new Thread(
+    (mongosConnString, collNS) => {
+        let mongos = new Mongo(mongosConnString);
+        assert.commandWorked(mongos.getCollection(collNS).insert({}));
+    },
+    st.s0.host,
+    collNS,
+);
 
 // Perform a write operation, the database is implicitly created then the operation is paused.
 insertThread.start();

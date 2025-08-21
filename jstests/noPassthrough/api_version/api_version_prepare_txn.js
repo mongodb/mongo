@@ -6,7 +6,7 @@ import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Override all commands to explicitly set 'apiVersion'.
-import('jstests/libs/override_methods/set_api_version.js');
+import("jstests/libs/override_methods/set_api_version.js");
 
 const dbName = "prepare_txn_with_api";
 const collName = "test";
@@ -25,9 +25,8 @@ let inc = 1;
 // First create the collection.
 assert.commandWorked(testColl.insert(oldDoc));
 
-const runTest = function(failover, commit) {
-    jsTestLog(`Testing ${(commit) ? "Commiting" : "Aborting"} with ${
-        (failover) ? "Failover" : "Restarting Primary"}.`);
+const runTest = function (failover, commit) {
+    jsTestLog(`Testing ${commit ? "Commiting" : "Aborting"} with ${failover ? "Failover" : "Restarting Primary"}.`);
     const newDoc = {_id: 42, x: inc++};
     let session = primary.startSession();
     const sessionColl = session.getDatabase(dbName).getCollection(collName);
@@ -55,7 +54,7 @@ const runTest = function(failover, commit) {
     }
 
     const newPrimary = rst.getPrimary();
-    assert.eq((failover) ? secondary : primary, newPrimary, "Wrong primary");
+    assert.eq(failover ? secondary : primary, newPrimary, "Wrong primary");
 
     if (commit) {
         // Commit the prepared transaction on the new primary.
@@ -78,6 +77,6 @@ const runTest = function(failover, commit) {
     secondary = rst.getSecondary();
 };
 
-[false, true].forEach(failover => [true, false].forEach(commit => runTest(failover, commit)));
+[false, true].forEach((failover) => [true, false].forEach((commit) => runTest(failover, commit)));
 
 rst.stopSet();

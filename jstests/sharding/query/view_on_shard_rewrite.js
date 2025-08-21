@@ -27,8 +27,7 @@ const viewNs = dbName + "." + viewName;
 const mongosDB = st.s.getDB(dbName);
 const mongosView = mongosDB[viewName];
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 const shard0Primary = st.rs0.getPrimary();
 assert.commandWorked(shard0Primary.getDB(dbName).setProfilingLevel(2, -1));
@@ -43,24 +42,28 @@ function assertReadOnView(view, expectKickBackToMongos) {
     jsTest.log("Using comment: " + tojson(comment));
 
     const result = view.find({}).sort({_id: 1}).comment(comment).toArray();
-    assert.eq(result, [{_id: 1, foo: 1}, {_id: 2, foo: 2}, {_id: 3, foo: 3}]);
+    assert.eq(result, [
+        {_id: 1, foo: 1},
+        {_id: 2, foo: 2},
+        {_id: 3, foo: 3},
+    ]);
 
     // Check if kickback happened using the profile collection.
     if (expectKickBackToMongos) {
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: shard0Primary.getDB(dbName),
             filter: {
-                'command.comment': comment,
+                "command.comment": comment,
                 ok: 0,
                 errCode: ErrorCodes.CommandOnShardedViewNotSupportedOnMongod,
             },
-            errorMsgFilter: {ns: viewNs, 'command.comment': comment}
+            errorMsgFilter: {ns: viewNs, "command.comment": comment},
         });
     } else {
         profilerHasSingleMatchingEntryOrThrow({
             profileDB: shard0Primary.getDB(dbName),
-            filter: {'command.comment': comment, errCode: {$exists: false}},
-            errorMsgFilter: {ns: viewNs, 'command.comment': comment}
+            filter: {"command.comment": comment, errCode: {$exists: false}},
+            errorMsgFilter: {ns: viewNs, "command.comment": comment},
         });
     }
 }
@@ -86,7 +89,7 @@ assertReadOnView(mongosView, false /* expectKickBackToMongos */);
 
 // Move the collection to the other shard.
 assert.commandWorked(st.s.adminCommand({moveCollection: collNS, toShard: st.shard1.shardName}));
-mongosView.find().itcount();  // Make sure the mongos updates its routing info.
+mongosView.find().itcount(); // Make sure the mongos updates its routing info.
 
 // Read view on unsharded collection on a shard other than the db-primary.
 assertReadOnView(mongosView, true /* expectKickBackToMongos */);
@@ -94,38 +97,40 @@ assertReadOnView(mongosView, true /* expectKickBackToMongos */);
 // Test that when reading from views within a multi-document transaction, the shard considers
 // the transaction timestamp to decide whether it can read locally.
 {
-    mongosDB.getSiblingDB('otherDb').runCommand({createUnsplittableCollection: 'otherColl'});
+    mongosDB.getSiblingDB("otherDb").runCommand({createUnsplittableCollection: "otherColl"});
 
     let session1 = st.s.startSession();
-    session1.startTransaction({readConcern: {level: 'snapshot'}});
-    session1.getDatabase('otherDb')['otherColl'].find().itcount();
+    session1.startTransaction({readConcern: {level: "snapshot"}});
+    session1.getDatabase("otherDb")["otherColl"].find().itcount();
 
     let session2 = st.s.startSession();
-    session2.startTransaction({readConcern: {level: 'majority'}});
-    session2.getDatabase('otherDb')['otherColl'].find().itcount();
+    session2.startTransaction({readConcern: {level: "majority"}});
+    session2.getDatabase("otherDb")["otherColl"].find().itcount();
 
     // Move back to db-primary shard.
     assert.commandWorked(st.s.adminCommand({moveCollection: collNS, toShard: st.shard0.shardName}));
-    mongosView.find().itcount();  // Make sure the mongos updates its routing info.
+    mongosView.find().itcount(); // Make sure the mongos updates its routing info.
 
     // MoveCollection results in a new instance of the collection (different uuid), so the
     // transaction fails with a TransientTransactionError. We'd otherwise expect to have
     // kicked-back to mongos, since shard1 owned the underlying collection at the transaction
     // snapshot.
-    assert.throwsWithCode(() => assertReadOnView(session1.getDatabase(dbName)[viewName],
-                                                 true /* expectKickBackToMongos */),
-                          ErrorCodes.StaleChunkHistory);
-    assert.throwsWithCode(() => assertReadOnView(session2.getDatabase(dbName)[viewName],
-                                                 true /* expectKickBackToMongos */),
-                          ErrorCodes.MigrationConflict);
+    assert.throwsWithCode(
+        () => assertReadOnView(session1.getDatabase(dbName)[viewName], true /* expectKickBackToMongos */),
+        ErrorCodes.StaleChunkHistory,
+    );
+    assert.throwsWithCode(
+        () => assertReadOnView(session2.getDatabase(dbName)[viewName], true /* expectKickBackToMongos */),
+        ErrorCodes.MigrationConflict,
+    );
 
     session1.abortTransaction();
     session2.abortTransaction();
 
     // Try the transactions again, with the underlying collection now living on the db-primary
     // shard.
-    session1.startTransaction({readConcern: {level: 'snapshot'}});
-    session2.startTransaction({readConcern: {level: 'majority'}});
+    session1.startTransaction({readConcern: {level: "snapshot"}});
+    session2.startTransaction({readConcern: {level: "majority"}});
     assertReadOnView(session1.getDatabase(dbName)[viewName], false /* expectKickBackToMongos */);
     assertReadOnView(session1.getDatabase(dbName)[viewName], false /* expectKickBackToMongos */);
     session1.commitTransaction();

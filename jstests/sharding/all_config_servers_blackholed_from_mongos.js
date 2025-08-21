@@ -19,21 +19,20 @@ var st = new ShardingTest({
     shards: 2,
     mongos: 1,
     useBridge: true,
-    bridgeOptions: {verbose: 'vvv'},
+    bridgeOptions: {verbose: "vvv"},
     // ShardingTest use a high config command timeout to avoid spurious failures but this test
     // intentionally triggers a timeout, so we restore the default value.
-    other: {mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}}}
+    other: {mongosOptions: {setParameter: {defaultConfigCommandTimeoutMS: 30000}}},
 });
 
-var testDB = st.s.getDB('BlackHoleDB');
+var testDB = st.s.getDB("BlackHoleDB");
 
-assert.commandWorked(testDB.adminCommand({enableSharding: 'BlackHoleDB'}));
-assert.commandWorked(
-    testDB.adminCommand({shardCollection: testDB.ShardedColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(testDB.adminCommand({enableSharding: "BlackHoleDB"}));
+assert.commandWorked(testDB.adminCommand({shardCollection: testDB.ShardedColl.getFullName(), key: {_id: 1}}));
 
 assert.commandWorked(testDB.ShardedColl.insert({a: 1}));
 
-jsTest.log('Making all the config servers appear as a blackhole to mongos');
+jsTest.log("Making all the config servers appear as a blackhole to mongos");
 st.forEachConfigServer((configSvr) => {
     configSvr.discardMessagesFrom(st.s, 1.0);
 });
@@ -41,15 +40,17 @@ st.forEachConfigServer((configSvr) => {
 assert.commandWorked(testDB.adminCommand({flushRouterConfig: 1}));
 
 // This shouldn't stall
-jsTest.log('Doing read operation on the sharded collection');
-assert.throws(function() {
+jsTest.log("Doing read operation on the sharded collection");
+assert.throws(function () {
     testDB.ShardedColl.find({}).maxTimeMS(15000).itcount();
 });
 
 // This should fail, because the primary is not available
-jsTest.log('Doing write operation on a new database and collection');
+jsTest.log("Doing write operation on a new database and collection");
 assert.writeError(
-    st.s.getDB('NonExistentDB')
-        .TestColl.insert({_id: 0, value: 'This value will never be inserted'}, {maxTimeMS: 15000}));
+    st.s
+        .getDB("NonExistentDB")
+        .TestColl.insert({_id: 0, value: "This value will never be inserted"}, {maxTimeMS: 15000}),
+);
 
 st.stop();

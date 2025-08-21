@@ -1,7 +1,7 @@
 // Tests behavior with invalid 2d bounds.
 import {GeoNearRandomTest} from "jstests/libs/query/geo_near_random.js";
 
-const test = new GeoNearRandomTest('geo_near_bounds_overflow');
+const test = new GeoNearRandomTest("geo_near_bounds_overflow");
 
 function testBounds(min, max) {
     const indexBounds = {min: min, max: max};
@@ -9,10 +9,10 @@ function testBounds(min, max) {
 
     // Handle case where either 1. indexLambda will fail but not throw. We are asserting it
     // works, so the outer lambda generates an exception. 2. indexLambda itself will throw.
-    const indexLambda = function(t) {
-        return t.createIndex({loc: '2d'}, indexBounds);
+    const indexLambda = function (t) {
+        return t.createIndex({loc: "2d"}, indexBounds);
     };
-    const assertLambda = function(t, lambda) {
+    const assertLambda = function (t, lambda) {
         assert.commandWorked(lambda(t));
     };
     assert.throws(assertLambda, [test.t, indexLambda]);

@@ -16,9 +16,8 @@
  */
 
 const numDocs = 100;
-const dbNames = ['db0', 'db1'];
-const collNames =
-    ['rename_sharded_collectionA', 'rename_sharded_collectionB', 'rename_sharded_collectionC'];
+const dbNames = ["db0", "db1"];
+const collNames = ["rename_sharded_collectionA", "rename_sharded_collectionB", "rename_sharded_collectionC"];
 
 /*
  * Initialize a collection with expected number of chunks/documents and randomly distribute chunks
@@ -51,10 +50,9 @@ function getRandomCollName(tid) {
 /*
  * Keep track of raised exceptions in a collection to be checked during teardown.
  */
-const expectedExceptions =
-    [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress];
-const logExceptionsDBName = 'exceptions';
-const logExceptionsCollName = 'log';
+const expectedExceptions = [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress];
+const logExceptionsDBName = "exceptions";
+const logExceptionsCollName = "log";
 
 function logException(db, exceptionCode) {
     db = db.getSiblingDB(logExceptionsDBName);
@@ -66,12 +64,12 @@ function checkExceptionHasBeenThrown(db, exceptionCode) {
     db = db.getSiblingDB(logExceptionsDBName);
     const coll = db[logExceptionsCollName];
     const count = coll.countDocuments({code: exceptionCode});
-    assert.gte(count, 1, 'No exception with error code ' + exceptionCode + ' has been thrown');
+    assert.gte(count, 1, "No exception with error code " + exceptionCode + " has been thrown");
 }
 
-export const $config = (function() {
+export const $config = (function () {
     let states = {
-        rename: function(db, collName, connCache) {
+        rename: function (db, collName, connCache) {
             const dbName = getRandomDbName(this.threadCount);
             db = db.getSiblingDB(dbName);
             collName = getRandomCollName(this.threadCount);
@@ -85,7 +83,8 @@ export const $config = (function() {
                     assert.eq(
                         collName,
                         destCollName,
-                        "The FSM thread can fail with IllegalOperation just if a rename collection is happening on the same collection.");
+                        "The FSM thread can fail with IllegalOperation just if a rename collection is happening on the same collection.",
+                    );
                     return;
                 }
                 if (exceptionCode) {
@@ -96,10 +95,10 @@ export const $config = (function() {
                 }
                 throw e;
             }
-        }
+        },
     };
 
-    let setup = function(db, collName, cluster) {
+    let setup = function (db, collName, cluster) {
         // Initialize databases
         for (var i = 0; i < dbNames.length; i++) {
             const dbName = dbNames[i];
@@ -110,11 +109,11 @@ export const $config = (function() {
         }
     };
 
-    let teardown = function(db, collName, cluster) {
+    let teardown = function (db, collName, cluster) {
         // Ensure that NamespaceNotFound and ConflictingOperationInProgress have been raised at
         // least once: with a high level of concurrency, it's too improbable for such exceptions to
         // never be thrown (in that case, it's very likely that a bug has been introduced).
-        expectedExceptions.forEach(errCode => checkExceptionHasBeenThrown(db, errCode));
+        expectedExceptions.forEach((errCode) => checkExceptionHasBeenThrown(db, errCode));
 
         // Check that at most one collection per test DB is present and that no data has been lost
         // upon multiple renames.
@@ -125,7 +124,7 @@ export const $config = (function() {
             assert.eq(1, listColl.length);
             collName = listColl[0];
             const docCount = db[collName].countDocuments({});
-            assert.eq(numDocs, docCount, 'Unexpected number of chunks');
+            assert.eq(numDocs, docCount, "Unexpected number of chunks");
         }
     };
 
@@ -134,12 +133,12 @@ export const $config = (function() {
     return {
         threadCount: 12,
         iterations: 64,
-        startState: 'rename',
+        startState: "rename",
         states: states,
         transitions: transitions,
         data: {},
         setup: setup,
         teardown: teardown,
-        passConnectionCache: true
+        passConnectionCache: true,
     };
 })();

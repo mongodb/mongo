@@ -22,7 +22,7 @@ assert.commandWorked(testColl.insert({a: 1}, {b: 2}, {c: 3}));
 jsTestLog("Adding the initial-syncing node to the replica set.");
 const secondary = rst.add({
     rsConfig: {priority: 0, votes: 0},
-    setParameter: {logComponentVerbosity: tojson({'sharding': 2})}
+    setParameter: {logComponentVerbosity: tojson({"sharding": 2})},
 });
 
 rst.reInitiate();

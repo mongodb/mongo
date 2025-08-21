@@ -13,7 +13,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/multi_plan_storm.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states = {
         query: function query(db, collName) {
             try {
@@ -32,7 +32,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         },
         dropPlanCache: function dropPlanCache(db, collName) {
             db[collName].getPlanCache().clear();
-        }
+        },
     };
 
     $config.transitions = {

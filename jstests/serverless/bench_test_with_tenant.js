@@ -8,7 +8,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Create a replica set with multi-tenancy enabled.
-const kVTSKey = 'secret';
+const kVTSKey = "secret";
 const replSetTest = new ReplSetTest({nodes: 1});
 replSetTest.startSet({
     setParameter: {
@@ -16,7 +16,7 @@ replSetTest.startSet({
         featureFlagSecurityToken: true,
         featureFlagRequireTenantID: true,
         testOnlyValidatedTenancyScopeKey: kVTSKey,
-    }
+    },
 });
 replSetTest.initiate();
 
@@ -30,20 +30,20 @@ const tenantDB = (() => {
     const user = ObjectId().str;
 
     // Create and login to the root user.
-    assert.commandWorked(
-        tokenConn.getDB("admin").runCommand({createUser: "root", pwd: "pwd", roles: ["root"]}));
+    assert.commandWorked(tokenConn.getDB("admin").runCommand({createUser: "root", pwd: "pwd", roles: ["root"]}));
     assert(tokenConn.getDB("admin").auth("root", "pwd"));
 
     tokenConn._setSecurityToken(_createTenantToken({tenant: tenantId}));
     // Create the user with the required privileges.
-    assert.commandWorked(tokenConn.getDB("$external").runCommand({
-        createUser: user,
-        roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
-    }));
+    assert.commandWorked(
+        tokenConn.getDB("$external").runCommand({
+            createUser: user,
+            roles: [{role: "readWriteAnyDatabase", db: "admin"}],
+        }),
+    );
 
     // Set the provided tenant id into the security token for the user.
-    tokenConn._setSecurityToken(
-        _createSecurityToken({user: user, db: '$external', tenant: tenantId}, kVTSKey));
+    tokenConn._setSecurityToken(_createSecurityToken({user: user, db: "$external", tenant: tenantId}, kVTSKey));
 
     // Logout the root user to avoid multiple authentication.
     tokenConn.getDB("admin").logout();
@@ -56,18 +56,20 @@ const tenantDB = (() => {
 // Test the 'insert' operation for the tenant 'tenantId'.
 //
 benchRunSync({
-    ops: [{
-        op: "insert",
-        writeCmd: true,
-        ns: idColl.getFullName(),
-        tenantId: tenantId,
-        doc: {
-            _id: {"#RAND_INT": [0, 10]},
-        }
-    }],
+    ops: [
+        {
+            op: "insert",
+            writeCmd: true,
+            ns: idColl.getFullName(),
+            tenantId: tenantId,
+            doc: {
+                _id: {"#RAND_INT": [0, 10]},
+            },
+        },
+    ],
     parallel: 1,
-    seconds: 1,  // Sleep for 1 second before calling 'BenchFinish'.
-    host: primary.host
+    seconds: 1, // Sleep for 1 second before calling 'BenchFinish'.
+    host: primary.host,
 });
 
 // Verify that the 'BenchRun' inserted the required documents for the tenant 'tenantId'.
@@ -81,17 +83,19 @@ for (let id = 0; id < 10; id++) {
 // Test the 'update' operation for the tenant 'tenantId'.
 //
 benchRunSync({
-    ops: [{
-        op: "update",
-        writeCmd: true,
-        ns: idColl.getFullName(),
-        tenantId: tenantId,
-        query: {_id: {"#RAND_INT": [0, 10]}},
-        update: {$set: {state: "updated"}}
-    }],
+    ops: [
+        {
+            op: "update",
+            writeCmd: true,
+            ns: idColl.getFullName(),
+            tenantId: tenantId,
+            query: {_id: {"#RAND_INT": [0, 10]}},
+            update: {$set: {state: "updated"}},
+        },
+    ],
     parallel: 1,
-    seconds: 1,  // Sleep for 1 second before calling 'BenchFinish'.
-    host: primary.host
+    seconds: 1, // Sleep for 1 second before calling 'BenchFinish'.
+    host: primary.host,
 });
 
 // Verify that the 'BenchRun' updated the required documents for the tenant 'tenantId'.
@@ -105,17 +109,19 @@ for (let id = 0; id < 10; id++) {
 // Test the 'find' operation for the tenant 'tenantId'.
 //
 let benchStats = benchRunSync({
-    ops: [{
-        op: "find",
-        readCmd: true,
-        ns: idColl.getFullName(),
-        tenantId: tenantId,
-        expected: 10,      // There should be 10 documents in the collection.
-        handleError: true  // Get 'errCount' if 'find' documents count is not equals to 'expected'.
-    }],
+    ops: [
+        {
+            op: "find",
+            readCmd: true,
+            ns: idColl.getFullName(),
+            tenantId: tenantId,
+            expected: 10, // There should be 10 documents in the collection.
+            handleError: true, // Get 'errCount' if 'find' documents count is not equals to 'expected'.
+        },
+    ],
     parallel: 1,
-    seconds: 2,  // Sleep for 2 second before calling 'BenchFinish'.
-    host: primary.host
+    seconds: 2, // Sleep for 2 second before calling 'BenchFinish'.
+    host: primary.host,
 });
 assert.eq(benchStats.errCount, 0);
 
@@ -123,18 +129,20 @@ assert.eq(benchStats.errCount, 0);
 // Test the 'findOne' operation for the tenant 'tenantId'.
 //
 benchStats = benchRunSync({
-    ops: [{
-        op: "findOne",
-        query: {_id: 5},
-        readCmd: true,
-        ns: idColl.getFullName(),
-        tenantId: tenantId,
-        expectedDoc: {_id: 5, state: "updated"},  // This is the expected returned document.
-        handleError: true  // Get 'errCount' if returned document is not the same as 'expectedDoc'.
-    }],
+    ops: [
+        {
+            op: "findOne",
+            query: {_id: 5},
+            readCmd: true,
+            ns: idColl.getFullName(),
+            tenantId: tenantId,
+            expectedDoc: {_id: 5, state: "updated"}, // This is the expected returned document.
+            handleError: true, // Get 'errCount' if returned document is not the same as 'expectedDoc'.
+        },
+    ],
     parallel: 1,
-    seconds: 1,  // Sleep for 2 second before calling 'BenchFinish'.
-    host: primary.host
+    seconds: 1, // Sleep for 2 second before calling 'BenchFinish'.
+    host: primary.host,
 });
 assert.eq(benchStats.errCount, 0);
 
@@ -142,16 +150,18 @@ assert.eq(benchStats.errCount, 0);
 // Test the 'remove' operation for the tenant 'tenantId'.
 //
 benchRunSync({
-    ops: [{
-        op: "remove",
-        writeCmd: true,
-        ns: idColl.getFullName(),
-        tenantId: tenantId,
-        query: {_id: {"#RAND_INT": [0, 10]}},
-    }],
+    ops: [
+        {
+            op: "remove",
+            writeCmd: true,
+            ns: idColl.getFullName(),
+            tenantId: tenantId,
+            query: {_id: {"#RAND_INT": [0, 10]}},
+        },
+    ],
     parallel: 1,
     seconds: 1,
-    host: primary.host
+    host: primary.host,
 });
 
 // Verify that all documents from the collection have been removed.
@@ -162,40 +172,50 @@ assert.eq(response.length, 0);
 // Test the 'createIndex' operation for the tenant 'tenantId'.
 //
 benchRunSync({
-    ops: [{
-        op: "createIndex",
-        writeCmd: true,
-        ns: idColl.getFullName(),
-        tenantId: tenantId,
-        key: {newId: 1},
-    }],
+    ops: [
+        {
+            op: "createIndex",
+            writeCmd: true,
+            ns: idColl.getFullName(),
+            tenantId: tenantId,
+            key: {newId: 1},
+        },
+    ],
     parallel: 1,
     seconds: 1,
-    host: primary.host
+    host: primary.host,
 });
 
 // Verify that the required index for the collection has been created.
 response = tenantDB.id.getIndexes();
-assert.eq(response.some(index => index.name === "newId_1"), true);
+assert.eq(
+    response.some((index) => index.name === "newId_1"),
+    true,
+);
 
 //
 // Test the 'dropIndex' operation for the tenant 'tenantId'.
 //
 benchRunSync({
-    ops: [{
-        op: "dropIndex",
-        writeCmd: true,
-        ns: idColl.getFullName(),
-        tenantId: tenantId,
-        key: {newId: 1},
-    }],
+    ops: [
+        {
+            op: "dropIndex",
+            writeCmd: true,
+            ns: idColl.getFullName(),
+            tenantId: tenantId,
+            key: {newId: 1},
+        },
+    ],
     parallel: 1,
     seconds: 1,
-    host: primary.host
+    host: primary.host,
 });
 
 // Verify that the required index from the collection has been dropped.
 response = tenantDB.id.getIndexes();
-assert.eq(response.some(index => index.name === "newId_1"), false);
+assert.eq(
+    response.some((index) => index.name === "newId_1"),
+    false,
+);
 
 replSetTest.stopSet();

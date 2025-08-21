@@ -41,9 +41,11 @@ function testCommandWithUnstableFields(command, containsUnstableFields) {
         const cmd = JSON.parse(JSON.stringify(command));
         const cmdWithUnstableField = Object.assign(cmd, {[field]: containsUnstableFields[field]});
 
-        assert.commandFailedWithCode(testDb.runCommand(cmdWithUnstableField),
-                                     ErrorCodes.APIStrictError,
-                                     cmdWithUnstableField);
+        assert.commandFailedWithCode(
+            testDb.runCommand(cmdWithUnstableField),
+            ErrorCodes.APIStrictError,
+            cmdWithUnstableField,
+        );
     }
 }
 
@@ -52,12 +54,12 @@ const aggCmd = {
     pipeline: [],
     cursor: {},
     apiVersion: "1",
-    apiStrict: true
+    apiStrict: true,
 };
 const findCmd = {
     find: collName,
     apiVersion: "1",
-    apiStrict: true
+    apiStrict: true,
 };
 
 testCommandWithUnstableFields(aggCmd, unstableFieldsForAggregate);
@@ -70,16 +72,13 @@ let createIndexesCmd = {
     apiVersion: "1",
     apiStrict: true,
 };
-assert.commandFailedWithCode(
-    testDb.runCommand(createIndexesCmd), ErrorCodes.APIStrictError, createIndexesCmd);
+assert.commandFailedWithCode(testDb.runCommand(createIndexesCmd), ErrorCodes.APIStrictError, createIndexesCmd);
 
 createIndexesCmd["indexes"] = [{key: {a: "geoHaystack"}, name: "a_1"}];
-assert.commandFailedWithCode(
-    testDb.runCommand(createIndexesCmd), ErrorCodes.CannotCreateIndex, createIndexesCmd);
+assert.commandFailedWithCode(testDb.runCommand(createIndexesCmd), ErrorCodes.CannotCreateIndex, createIndexesCmd);
 
 // Test that collMod command with an unstable field ('prepareUnique') in an inner struct throws when
 // 'apiStrict' is set to true.
-assert.commandWorked(
-    testDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
+assert.commandWorked(testDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
 let collModCommand = {collMod: "col", apiVersion: "1", apiStrict: true};
 testCommandWithUnstableFields(collModCommand, {index: {name: "a_1", prepareUnique: true}});

@@ -27,7 +27,7 @@ import {
     getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
     getPlanStages,
-    getWinningPlanFromExplain
+    getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -43,14 +43,15 @@ assert.commandWorked(coll.createIndex({a: -1, b: 1, c: 1, d: 1}));
 // A helper function to look up a cache entry in the plan cache based on the given filter
 // and sort specs.
 function getPlanForCacheEntry(query, sortSpec) {
-    const keyHash =
-        getPlanCacheKeyFromShape({query: query, sort: sortSpec, collection: coll, db: db});
-    const res =
-        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
-    assert.eq(1,
-              res.length,
-              `Expected exactly one cache entry matching ${keyHash} but got ${
-                  tojson(coll.aggregate([{$planCacheStats: {}}]).toArray())}`);
+    const keyHash = getPlanCacheKeyFromShape({query: query, sort: sortSpec, collection: coll, db: db});
+    const res = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    assert.eq(
+        1,
+        res.length,
+        `Expected exactly one cache entry matching ${keyHash} but got ${tojson(
+            coll.aggregate([{$planCacheStats: {}}]).toArray(),
+        )}`,
+    );
     return res[0];
 }
 
@@ -58,46 +59,47 @@ function getPlanForCacheEntry(query, sortSpec) {
 // and sort specs.
 function getPlanForCacheEntryAgg(pipeline) {
     const keyHash = getPlanCacheKeyFromPipeline(pipeline, coll);
-    const res =
-        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
-    assert.eq(1,
-              res.length,
-              `Expected exactly one cache entry matching ${keyHash} but got ${
-                  tojson(coll.aggregate([{$planCacheStats: {}}]).toArray())}`);
+    const res = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    assert.eq(
+        1,
+        res.length,
+        `Expected exactly one cache entry matching ${keyHash} but got ${tojson(
+            coll.aggregate([{$planCacheStats: {}}]).toArray(),
+        )}`,
+    );
     return res[0];
 }
 
 function assertIsExplodeForSort(query, sortSpec) {
     const explain = coll.find(query).sort(sortSpec).explain();
     const winningPlan = getWinningPlanFromExplain(explain);
-    const sortMerges = getPlanStages(winningPlan, 'SORT_MERGE');
+    const sortMerges = getPlanStages(winningPlan, "SORT_MERGE");
     assert.eq(sortMerges.length, 1, explain);
 }
 
 function assertIsNotExplodeForSort(query, sortSpec) {
     const explain = coll.find(query).sort(sortSpec).explain();
     const winningPlan = getWinningPlanFromExplain(explain);
-    const sortMerges = getPlanStages(winningPlan, 'SORT_MERGE');
+    const sortMerges = getPlanStages(winningPlan, "SORT_MERGE");
     assert.eq(sortMerges.length, 0, explain);
 }
 
-function assertActiveAndSameCacheEntry(
-    expectedActive, isCacheEntrySame, [lhs, lhsTag], [rhs, rhsTag]) {
+function assertActiveAndSameCacheEntry(expectedActive, isCacheEntrySame, [lhs, lhsTag], [rhs, rhsTag]) {
     assert.eq(lhs.isActive, expectedActive, lhs);
     if (isCacheEntrySame) {
-        assert.eq(getPlanCacheShapeHashFromObject(lhs),
-                  getPlanCacheShapeHashFromObject(rhs),
-                  `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
-        assert.eq(lhs.planCacheKey,
-                  rhs.planCacheKey,
-                  `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+        assert.eq(
+            getPlanCacheShapeHashFromObject(lhs),
+            getPlanCacheShapeHashFromObject(rhs),
+            `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`,
+        );
+        assert.eq(lhs.planCacheKey, rhs.planCacheKey, `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
     } else {
-        assert.neq(getPlanCacheShapeHashFromObject(lhs),
-                   getPlanCacheShapeHashFromObject(rhs),
-                   `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
-        assert.neq(lhs.planCacheKey,
-                   rhs.planCacheKey,
-                   `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+        assert.neq(
+            getPlanCacheShapeHashFromObject(lhs),
+            getPlanCacheShapeHashFromObject(rhs),
+            `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`,
+        );
+        assert.neq(lhs.planCacheKey, rhs.planCacheKey, `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
     }
 }
 
@@ -128,45 +130,55 @@ function assertQueryParameterizedCorrectly({
     // Run the same query again to activate the cache entry.
     assert.eq(queryCount, coll.find(query).sort(sortSpec).itcount());
     const activeEntry = getPlanForCacheEntry(query, sortSpec);
-    assertActiveAndSameCacheEntry(true /*expectedActive*/,
-                                  true /*isCacheEntrySame*/,
-                                  [activeEntry, "active"],
-                                  [inactiveEntry, "inactive"]);
+    assertActiveAndSameCacheEntry(
+        true /*expectedActive*/,
+        true /*isCacheEntrySame*/,
+        [activeEntry, "active"],
+        [inactiveEntry, "inactive"],
+    );
 
     // Run an equivalent aggregation and check that 'planCacheShapeHash' and 'planCacheKey' match
     // with the active entry.
     let pipeline = isEmptySort ? [{$match: query}] : [{$match: query}, {$sort: sortSpec}];
     assert.eq(queryCount, coll.aggregate(pipeline).itcount());
     const activeEntryAgg = getPlanForCacheEntryAgg(pipeline);
-    assertActiveAndSameCacheEntry(true /*expectedActive*/,
-                                  true /*isCacheEntrySame*/,
-                                  [activeEntryAgg, "activeEntryAgg"],
-                                  [activeEntry, "activeEntry"]);
+    assertActiveAndSameCacheEntry(
+        true /*expectedActive*/,
+        true /*isCacheEntrySame*/,
+        [activeEntryAgg, "activeEntryAgg"],
+        [activeEntry, "activeEntry"],
+    );
 
     // Run the new query and check for cache entry.
     assert.eq(newQueryCount, coll.find(newQuery).sort(sortSpec).itcount());
 
     if (reuseEntry) {
         const reusedEntry = getPlanForCacheEntry(newQuery, sortSpec);
-        assertActiveAndSameCacheEntry(true /*expectedActive*/,
-                                      true /*isCacheEntrySame*/,
-                                      [reusedEntry, "reusedEntry"],
-                                      [activeEntry, "activeEntry"]);
+        assertActiveAndSameCacheEntry(
+            true /*expectedActive*/,
+            true /*isCacheEntrySame*/,
+            [reusedEntry, "reusedEntry"],
+            [activeEntry, "activeEntry"],
+        );
 
         // Run an equivalent aggregation for the newQuery and check the cache.
         pipeline = isEmptySort ? [{$match: newQuery}] : [{$match: newQuery}, {$sort: sortSpec}];
         assert.eq(newQueryCount, coll.aggregate(pipeline).itcount());
         const reusedEntryAgg = getPlanForCacheEntryAgg(pipeline);
-        assertActiveAndSameCacheEntry(true /*expectedActive*/,
-                                      true /*isCacheEntrySame*/,
-                                      [reusedEntryAgg, "reusedEntryAgg"],
-                                      [activeEntry, "activeEntry"]);
+        assertActiveAndSameCacheEntry(
+            true /*expectedActive*/,
+            true /*isCacheEntrySame*/,
+            [reusedEntryAgg, "reusedEntryAgg"],
+            [activeEntry, "activeEntry"],
+        );
     } else {
         inactiveEntry = getPlanForCacheEntry(newQuery, sortSpec);
-        assertActiveAndSameCacheEntry(false /*expectedActive*/,
-                                      false /*isCacheEntrySame*/,
-                                      [inactiveEntry, "inactiveEntry"],
-                                      [activeEntry, "activeEntry"]);
+        assertActiveAndSameCacheEntry(
+            false /*expectedActive*/,
+            false /*isCacheEntrySame*/,
+            [inactiveEntry, "inactiveEntry"],
+            [activeEntry, "activeEntry"],
+        );
     }
 }
 
@@ -286,8 +298,9 @@ assertQueryParameterizedCorrectly({
     reuseEntry: false,
 });
 
-const maxScansToExplode = assert.commandWorked(db.adminCommand(
-    {getParameter: 1, internalQueryMaxScansToExplode: 1}))["internalQueryMaxScansToExplode"];
+const maxScansToExplode = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryMaxScansToExplode: 1}))[
+    "internalQueryMaxScansToExplode"
+];
 
 const maxExplodeIn = [];
 for (let i = 0; i < maxScansToExplode; ++i) {

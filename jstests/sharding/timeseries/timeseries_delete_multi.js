@@ -13,9 +13,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 Random.setRandomSeed();
 
 const dbName = jsTestName();
-const collName = 'sharded_timeseries_delete_multi';
-const timeField = 'time';
-const metaField = 'hostid';
+const collName = "sharded_timeseries_delete_multi";
+const timeField = "time";
+const metaField = "hostid";
 
 // Connections.
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -50,21 +50,21 @@ const collectionConfigurations = {
     // Shard key only on meta field/subfields.
     metaShardKey: {
         nDocs: 4,
-        metaGenerator: (id => id),
+        metaGenerator: (id) => id,
         shardKey: {[metaField]: 1},
         splitPoint: {meta: 2},
     },
     metaObjectShardKey: {
         nDocs: 4,
-        metaGenerator: (index => ({a: index})),
+        metaGenerator: (index) => ({a: index}),
         shardKey: {[metaField]: 1},
         splitPoint: {meta: {a: 2}},
     },
     metaSubFieldShardKey: {
         nDocs: 4,
-        metaGenerator: (index => ({a: index})),
-        shardKey: {[metaField + '.a']: 1},
-        splitPoint: {'meta.a': 2},
+        metaGenerator: (index) => ({a: index}),
+        shardKey: {[metaField + ".a"]: 1},
+        splitPoint: {"meta.a": 2},
     },
 
     // Shard key on time field.
@@ -77,21 +77,21 @@ const collectionConfigurations = {
     // Shard key on both meta and time field.
     metaTimeShardKey: {
         nDocs: 4,
-        metaGenerator: (id => id),
+        metaGenerator: (id) => id,
         shardKey: {[metaField]: 1, [timeField]: 1},
         splitPoint: {meta: 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
     },
     metaObjectTimeShardKey: {
         nDocs: 4,
-        metaGenerator: (index => ({a: index})),
+        metaGenerator: (index) => ({a: index}),
         shardKey: {[metaField]: 1, [timeField]: 1},
         splitPoint: {meta: {a: 2}, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
     },
     metaSubFieldTimeShardKey: {
         nDocs: 4,
-        metaGenerator: (index => ({a: index})),
-        shardKey: {[metaField + '.a']: 1, [timeField]: 1},
-        splitPoint: {'meta.a': 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
+        metaGenerator: (index) => ({a: index}),
+        shardKey: {[metaField + ".a"]: 1, [timeField]: 1},
+        splitPoint: {"meta.a": 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
     },
 };
 
@@ -112,16 +112,20 @@ const requestConfigurations = {
     },
     // This time field filter has the request targeted to the shard0.
     timeFilterOneShard: {
-        deletePredicates:
-            [{[timeField]: generateTimeValue(0), f: 0}, {[timeField]: generateTimeValue(1), f: 1}],
+        deletePredicates: [
+            {[timeField]: generateTimeValue(0), f: 0},
+            {[timeField]: generateTimeValue(1), f: 1},
+        ],
         remainingDocumentsIds: [2, 3],
         reachesPrimary: true,
         reachesOther: false,
     },
     // This time field filter has the request targeted to both shards.
     timeFilterTwoShards: {
-        deletePredicates:
-            [{[timeField]: generateTimeValue(1), f: 1}, {[timeField]: generateTimeValue(3), f: 3}],
+        deletePredicates: [
+            {[timeField]: generateTimeValue(1), f: 1},
+            {[timeField]: generateTimeValue(3), f: 3},
+        ],
         remainingDocumentsIds: [0, 2],
         reachesPrimary: true,
         reachesOther: true,
@@ -140,7 +144,10 @@ const requestConfigurations = {
         reachesOther: true,
     },
     metaFilterTwoShards: {
-        deletePredicates: [{[metaField]: 1, f: 1}, {[metaField]: 2, f: 2}],
+        deletePredicates: [
+            {[metaField]: 1, f: 1},
+            {[metaField]: 2, f: 2},
+        ],
         remainingDocumentsIds: [0, 3],
         reachesPrimary: true,
         reachesOther: true,
@@ -159,26 +166,32 @@ const requestConfigurations = {
         reachesOther: true,
     },
     metaObjectFilterTwoShards: {
-        deletePredicates: [{[metaField]: {a: 1}, f: 1}, {[metaField]: {a: 2}, f: 2}],
+        deletePredicates: [
+            {[metaField]: {a: 1}, f: 1},
+            {[metaField]: {a: 2}, f: 2},
+        ],
         remainingDocumentsIds: [0, 3],
         reachesPrimary: true,
         reachesOther: true,
     },
     metaSubFieldFilterOneShard: {
-        deletePredicates: [{[metaField + '.a']: 2, f: 2}],
+        deletePredicates: [{[metaField + ".a"]: 2, f: 2}],
         remainingDocumentsIds: [0, 1, 3],
         reachesPrimary: false,
         reachesOther: true,
     },
     // Meta sub field + time filter has the request targeted to shard1.
     metaSubFieldTimeFilterOneShard: {
-        deletePredicates: [{[metaField + '.a']: 2, [timeField]: generateTimeValue(2), f: 2}],
+        deletePredicates: [{[metaField + ".a"]: 2, [timeField]: generateTimeValue(2), f: 2}],
         remainingDocumentsIds: [0, 1, 3],
         reachesPrimary: false,
         reachesOther: true,
     },
     metaSubFieldFilterTwoShards: {
-        deletePredicates: [{[metaField + '.a']: 1, f: 1}, {[metaField + '.a']: 2, f: 2}],
+        deletePredicates: [
+            {[metaField + ".a"]: 1, f: 1},
+            {[metaField + ".a"]: 2, f: 2},
+        ],
         remainingDocumentsIds: [0, 3],
         reachesPrimary: true,
         reachesOther: true,
@@ -187,11 +200,8 @@ const requestConfigurations = {
 
 function getProfilerEntriesForSuccessfulMultiDelete(db) {
     const profilerFilter = {
-        $or: [
-            {op: 'remove'},
-            {op: 'bulkWrite', "command.delete": {$exists: true}},
-        ],
-        op: {$in: ['remove', 'bulkWrite']},
+        $or: [{op: "remove"}, {op: "bulkWrite", "command.delete": {$exists: true}}],
+        op: {$in: ["remove", "bulkWrite"]},
         ns: `${dbName}.${collName}`,
         // Filters out events recorded because of StaleConfig error.
         ok: {$ne: 0},
@@ -233,20 +243,24 @@ function prepareShardedTimeseriesCollection(collConfig, insertFn) {
 
     // Shards timeseries collection.
     assert.commandWorked(coll.createIndex(collConfig.shardKey));
-    assert.commandWorked(mongos.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
-        key: collConfig.shardKey,
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            shardCollection: `${dbName}.${collName}`,
+            key: collConfig.shardKey,
+        }),
+    );
 
     // Inserts initial set of documents.
     const documents = generateDocsForTestCase(collConfig);
     assert.commandWorked(insertFn(coll, documents));
 
     // Manually splits the data into two chunks.
-    assert.commandWorked(mongos.adminCommand({
-        split: getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
-        middle: collConfig.splitPoint
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            split: getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
+            middle: collConfig.splitPoint,
+        }),
+    );
 
     // Ensures that currently both chunks reside on the primary shard.
     let counts = st.chunkCounts(collName, dbName);
@@ -255,12 +269,14 @@ function prepareShardedTimeseriesCollection(collConfig, insertFn) {
 
     // Moves one of the chunks into the second shard.
     const otherShard = st.getOther(primaryShard);
-    assert.commandWorked(mongos.adminCommand({
-        movechunk: getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
-        find: collConfig.splitPoint,
-        to: otherShard.name,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            movechunk: getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
+            find: collConfig.splitPoint,
+            to: otherShard.name,
+            _waitForDelete: true,
+        }),
+    );
 
     // Ensures that each shard owns one chunk.
     counts = st.chunkCounts(collName, dbName);
@@ -308,27 +324,38 @@ function runTest(collConfig, reqConfig, insertFn) {
     }
 
     // Checks that the query was routed to the correct shards and gets profile entries if so.
-    const [primaryEntries, otherEntries] =
-        assertAndGetProfileEntriesIfRequestIsRoutedToCorrectShards(reqConfig, primaryDB, otherDB);
+    const [primaryEntries, otherEntries] = assertAndGetProfileEntriesIfRequestIsRoutedToCorrectShards(
+        reqConfig,
+        primaryDB,
+        otherDB,
+    );
 
     // Ensures that the collection contains only expected documents.
-    const remainingIds = coll.find({}, {_id: 1}).sort({_id: 1}).toArray().map(x => x._id);
+    const remainingIds = coll
+        .find({}, {_id: 1})
+        .sort({_id: 1})
+        .toArray()
+        .map((x) => x._id);
     const remainingDocs = coll.find({}, {time: 1, hostid: 1, f: 1}).sort({_id: 1}).toArray();
 
     reqConfig.remainingDocumentsIds.sort();
 
-    assert.eq(remainingIds, reqConfig.remainingDocumentsIds, `
+    assert.eq(
+        remainingIds,
+        reqConfig.remainingDocumentsIds,
+        `
 Delete query: ${tojsononeline(reqConfig.deleteQuery)}
 Delete predicates: ${tojsononeline(reqConfig.deletePredicates)}
 Input documents:
-    Ids: ${tojsononeline(documents.map(x => x._id))}
-    Meta: ${tojsononeline(documents.map(x => x[metaField]))}
-    Time: ${tojsononeline(documents.map(x => x[timeField]))}
+    Ids: ${tojsononeline(documents.map((x) => x._id))}
+    Meta: ${tojsononeline(documents.map((x) => x[metaField]))}
+    Time: ${tojsononeline(documents.map((x) => x[timeField]))}
 Remaining ids: ${tojsononeline(remainingIds)}
 Remaining docs: ${tojsononeline(remainingDocs)}
 Expected remaining ids: ${tojsononeline(reqConfig.remainingDocumentsIds)}
 Primary shard profiler entries: ${tojson(primaryEntries)}
-Other shard profiler entries: ${tojson(otherEntries)}`);
+Other shard profiler entries: ${tojson(otherEntries)}`,
+    );
 }
 
 function runOneTestCase(collConfigName, reqConfigName) {

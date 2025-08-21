@@ -10,7 +10,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({
     shards: 2,
     mongos: 2,
-    rs: {nodes: 3, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
+    rs: {nodes: 3, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}},
 });
 
 for (let key of Object.keys(ChangeStreamWatchMode)) {
@@ -26,11 +26,11 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
     // Split so ids < nDocs / 2 are for one shard, ids >= nDocs / 2 + 1 for another.
     st.shardColl(
         coll,
-        {_id: 1},              // key
-        {_id: nDocs / 2},      // split
-        {_id: nDocs / 2 + 1},  // move
-        "test",                // dbName
-        false                  // waitForDelete
+        {_id: 1}, // key
+        {_id: nDocs / 2}, // split
+        {_id: nDocs / 2 + 1}, // move
+        "test", // dbName
+        false, // waitForDelete
     );
 
     // Open a change stream.
@@ -65,14 +65,13 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
     }
 
     // Assert that we found the documents we inserted (in any order).
-    assert.setEq(new Set(kIds), new Set(docsFoundInOrder.map(doc => doc.fullDocument._id)));
+    assert.setEq(new Set(kIds), new Set(docsFoundInOrder.map((doc) => doc.fullDocument._id)));
     cst.cleanUp();
 
     // Now resume using the resume token from the first change on a different mongos.
     const otherCst = new ChangeStreamTest(ChangeStreamTest.getDBForChangeStream(watchMode, s1DB));
 
-    const resumeCursor =
-        otherCst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: firstChange._id});
+    const resumeCursor = otherCst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: firstChange._id});
 
     // Get the resume tokens for each change that occurred.
     const resumeTokens = [firstChange._id];
@@ -82,10 +81,8 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
 
     // Check that resuming from each possible resume token works.
     for (let i = 0; i < resumeTokens.length; i++) {
-        const cursor = otherCst.getChangeStream(
-            {watchMode: watchMode, coll: coll, resumeAfter: resumeTokens[i]});
-        otherCst.assertNextChangesEqual(
-            {cursor: cursor, expectedChanges: docsFoundInOrder.splice(i + 1)});
+        const cursor = otherCst.getChangeStream({watchMode: watchMode, coll: coll, resumeAfter: resumeTokens[i]});
+        otherCst.assertNextChangesEqual({cursor: cursor, expectedChanges: docsFoundInOrder.splice(i + 1)});
     }
     otherCst.cleanUp();
 }

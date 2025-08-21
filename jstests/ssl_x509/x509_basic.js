@@ -12,7 +12,7 @@ const x509_options = {
     tlsCAFile: "jstests/libs/ca.pem",
     tlsClusterFile: "jstests/libs/cluster_cert.pem",
     tlsAllowInvalidHostnames: "",
-    clusterAuthMode: "x509"
+    clusterAuthMode: "x509",
 };
 const CLIENT_USER = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
 
@@ -22,19 +22,22 @@ function runTest() {
     const ext = mongo.getDB("$external");
     ext.createUser({user: CLIENT_USER, roles: []});
 
-    assert.commandWorked(ext.runCommand({
-        hello: 1,
-        saslSupportedMechs: "local.__system",
-        speculativeAuthenticate: {authenticate: "1", mechanism: "MONGODB-X509", db: "$external"}
-    }));
+    assert.commandWorked(
+        ext.runCommand({
+            hello: 1,
+            saslSupportedMechs: "local.__system",
+            speculativeAuthenticate: {authenticate: "1", mechanism: "MONGODB-X509", db: "$external"},
+        }),
+    );
 
     const profileLevelDB = mongo.getDB("x509_basic");
-    const globalLog = assert.commandWorked(profileLevelDB.adminCommand({getLog: 'global'}));
+    const globalLog = assert.commandWorked(profileLevelDB.adminCommand({getLog: "global"}));
     const fieldMatcher = {msg: "Different user name was supplied to saslSupportedMechs"};
     assert.eq(
         null,
         findMatchingLogLine(globalLog.log, fieldMatcher),
-        "Found log line concerning \"Different user name was supplied to saslSupportedMechs\" when we did not expect to.");
+        'Found log line concerning "Different user name was supplied to saslSupportedMechs" when we did not expect to.',
+    );
     MongoRunner.stopMongod(mongo);
 }
 

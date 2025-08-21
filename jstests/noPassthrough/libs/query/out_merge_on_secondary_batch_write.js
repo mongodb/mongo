@@ -15,7 +15,7 @@ export function testOutAndMergeOnSecondaryBatchWrite(db, awaitReplication) {
     // serialized as a single BSONObj.
     const hello = db.hello();
     const maxBatchSize = hello.maxWriteBatchSize;
-    const totalDataSize = hello.maxBsonObjectSize + (4 * 1024 * 1024);
+    const totalDataSize = hello.maxBsonObjectSize + 4 * 1024 * 1024;
     const sizePerDoc = totalDataSize / maxBatchSize;
     const bigString = "a".repeat(sizePerDoc);
     const bulk = coll.initializeUnorderedBulkOp();
@@ -42,10 +42,7 @@ export function testOutAndMergeOnSecondaryBatchWrite(db, awaitReplication) {
 
             // If the caller provided some error codes, assert that the command failed with one
             // of these codes.
-            const fn = () =>
-                db[collName]
-                    .aggregate([aggWriteStageSpec], {$readPreference: {mode: readPref}})
-                    .itcount();
+            const fn = () => db[collName].aggregate([aggWriteStageSpec], {$readPreference: {mode: readPref}}).itcount();
             const errMsg = "Failed to run aggregate with read preference " + readPref;
             if (errorCodes.length > 0) {
                 assert.throwsWithCode(fn, errorCodes, [] /* params */, errMsg);
@@ -70,28 +67,32 @@ export function testOutAndMergeOnSecondaryBatchWrite(db, awaitReplication) {
     testWriteAggSpec({$out: targetCollName}, defaultSetUpFn);
     testWriteAggSpec(
         {$merge: {into: targetCollName, whenMatched: "replace", whenNotMatched: "insert"}},
-        defaultSetUpFn);
-    testWriteAggSpec(
-        {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "insert"}},
-        defaultSetUpFn);
+        defaultSetUpFn,
+    );
+    testWriteAggSpec({$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "insert"}}, defaultSetUpFn);
     testWriteAggSpec(
         {$merge: {into: targetCollName, whenMatched: "keepExisting", whenNotMatched: "insert"}},
-        defaultSetUpFn);
+        defaultSetUpFn,
+    );
     testWriteAggSpec(
         {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "insert", on: "_id"}},
-        mergeUpdateSetupFn);
+        mergeUpdateSetupFn,
+    );
 
     // Failure cases.
     testWriteAggSpec(
         {$merge: {into: targetCollName, whenMatched: "replace", whenNotMatched: "fail", on: "_id"}},
         defaultSetUpFn,
-        [ErrorCodes.MergeStageNoMatchingDocument]);
+        [ErrorCodes.MergeStageNoMatchingDocument],
+    );
     testWriteAggSpec(
         {$merge: {into: targetCollName, whenMatched: "merge", whenNotMatched: "fail", on: "_id"}},
         defaultSetUpFn,
-        [ErrorCodes.MergeStageNoMatchingDocument]);
+        [ErrorCodes.MergeStageNoMatchingDocument],
+    );
     testWriteAggSpec(
         {$merge: {into: targetCollName, whenMatched: "fail", whenNotMatched: "insert", on: "_id"}},
         mergeUpdateSetupFn,
-        [ErrorCodes.DuplicateKey]);
+        [ErrorCodes.DuplicateKey],
+    );
 }

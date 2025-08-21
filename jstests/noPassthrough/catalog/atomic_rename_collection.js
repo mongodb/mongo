@@ -24,7 +24,7 @@ const tests = [
         source: first.x,
         target: second.x,
         expectedOplogEntries: 4,
-    }
+    },
 ];
 tests.forEach((test) => {
     test.source.drop();
@@ -32,21 +32,26 @@ tests.forEach((test) => {
     assert.commandWorked(test.target.insert({}));
     // Other things may be going on in the system; look only at oplog entries affecting the
     // particular databases under test.
-    const dbregex =
-        "^(" + test.source.getDB().getName() + ")|(" + test.target.getDB().getName() + ")\\.";
+    const dbregex = "^(" + test.source.getDB().getName() + ")|(" + test.target.getDB().getName() + ")\\.";
 
     let ts = local.oplog.rs.find().sort({$natural: -1}).limit(1).next().ts;
     let cmd = {
         renameCollection: test.source.toString(),
         to: test.target.toString(),
-        dropTarget: true
+        dropTarget: true,
     };
     assert.commandWorked(local.adminCommand(cmd), tojson(cmd));
-    let ops =
-        local.oplog.rs.find({ts: {$gt: ts}, ns: {'$regex': dbregex}}).sort({$natural: 1}).toArray();
-    assert.eq(ops.length,
-              test.expectedOplogEntries,
-              "renameCollection was supposed to only generate " + test.expectedOplogEntries +
-                  " oplog entries: " + tojson(ops));
+    let ops = local.oplog.rs
+        .find({ts: {$gt: ts}, ns: {"$regex": dbregex}})
+        .sort({$natural: 1})
+        .toArray();
+    assert.eq(
+        ops.length,
+        test.expectedOplogEntries,
+        "renameCollection was supposed to only generate " +
+            test.expectedOplogEntries +
+            " oplog entries: " +
+            tojson(ops),
+    );
 });
 rs.stopSet();

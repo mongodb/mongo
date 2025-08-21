@@ -49,9 +49,7 @@ function extractTmp(stages) {
 }
 
 // No partitionBy and no sortBy means we don't need to sort the input.
-assert.eq(desugar({$setWindowFields: {output: {}}}), [
-    {$_internalSetWindowFields: {output: {}}},
-]);
+assert.eq(desugar({$setWindowFields: {output: {}}}), [{$_internalSetWindowFields: {output: {}}}]);
 
 // 'sortBy' becomes an explicit $sort stage.
 assert.eq(desugar({$setWindowFields: {sortBy: {ts: 1}, output: {}}}), [
@@ -72,24 +70,23 @@ let tmp = extractTmp(stages);
 assert.eq(stages, [
     {$addFields: {[tmp]: {$toLower: ["$country"]}}},
     {$sort: {sortKey: {[tmp]: 1}, outputSortKeyMetadata: true}},
-    {$_internalSetWindowFields: {partitionBy: '$' + tmp, output: {}}},
+    {$_internalSetWindowFields: {partitionBy: "$" + tmp, output: {}}},
     {$project: {[tmp]: false, _id: true}},
 ]);
 
 // $sort first by partitionBy, then sortBy, because we sort within each partition.
-assert.eq(
-    desugar({$setWindowFields: {partitionBy: "$zip", sortBy: {ts: -1, _id: 1}, output: {}}}), [
-        {$sort: {sortKey: {zip: 1, ts: -1, _id: 1}, outputSortKeyMetadata: true}},
-        {$_internalSetWindowFields: {partitionBy: "$zip", sortBy: {ts: -1, _id: 1}, output: {}}},
-    ]);
+assert.eq(desugar({$setWindowFields: {partitionBy: "$zip", sortBy: {ts: -1, _id: 1}, output: {}}}), [
+    {$sort: {sortKey: {zip: 1, ts: -1, _id: 1}, outputSortKeyMetadata: true}},
+    {$_internalSetWindowFields: {partitionBy: "$zip", sortBy: {ts: -1, _id: 1}, output: {}}},
+]);
 
 stages = desugar({
-    $setWindowFields: {partitionBy: {$toLower: "$country"}, sortBy: {ts: -1, _id: 1}, output: {}}
+    $setWindowFields: {partitionBy: {$toLower: "$country"}, sortBy: {ts: -1, _id: 1}, output: {}},
 });
 tmp = extractTmp(stages);
 assert.eq(stages, [
     {$addFields: {[tmp]: {$toLower: ["$country"]}}},
     {$sort: {sortKey: {[tmp]: 1, ts: -1, _id: 1}, outputSortKeyMetadata: true}},
-    {$_internalSetWindowFields: {partitionBy: '$' + tmp, sortBy: {ts: -1, _id: 1}, output: {}}},
+    {$_internalSetWindowFields: {partitionBy: "$" + tmp, sortBy: {ts: -1, _id: 1}, output: {}}},
     {$project: {[tmp]: false, _id: true}},
 ]);

@@ -13,16 +13,16 @@ import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js"
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         // Use the workload name as a prefix for the role name,
         // since the workload name is assumed to be unique.
-        prefix: 'auth_create_role'
+        prefix: "auth_create_role",
     };
 
-    var states = (function() {
+    var states = (function () {
         function uniqueRoleName(prefix, tid, num) {
-            return prefix + tid + '_' + num;
+            return prefix + tid + "_" + num;
         }
 
         function init(db, collName) {
@@ -34,15 +34,17 @@ export const $config = (function() {
             const kCreateRoleRetries = 5;
             const kCreateRoleRetryInterval = 5 * 1000;
             assert.retry(
-                function() {
+                function () {
                     try {
                         db.createRole({
                             role: roleName,
-                            privileges: [{
-                                resource: {db: db.getName(), collection: collName},
-                                actions: ['update']
-                            }],
-                            roles: [{role: 'read', db: db.getName()}]
+                            privileges: [
+                                {
+                                    resource: {db: db.getName(), collection: collName},
+                                    actions: ["update"],
+                                },
+                            ],
+                            roles: [{role: "read", db: db.getName()}],
                         });
                         return true;
                     } catch (e) {
@@ -52,7 +54,8 @@ export const $config = (function() {
                 },
                 "Failed creating role '" + roleName + "'",
                 kCreateRoleRetries,
-                kCreateRoleRetryInterval);
+                kCreateRoleRetryInterval,
+            );
 
             // Verify the newly created role exists, as well as all previously created roles
             for (var i = 0; i < this.num; ++i) {
@@ -60,7 +63,7 @@ export const $config = (function() {
                 var res = db.getRole(name);
                 assert(res !== null, "role '" + name + "' should exist");
                 assert.eq(name, res.role);
-                assert(!res.isBuiltin, 'role should be user-defined');
+                assert(!res.isBuiltin, "role should be user-defined");
             }
         }
 
@@ -70,7 +73,7 @@ export const $config = (function() {
     var transitions = {init: {createRole: 1}, createRole: {createRole: 1}};
 
     function teardown(db, collName, cluster) {
-        var pattern = new RegExp('^' + this.prefix + '\\d+_\\d+$');
+        var pattern = new RegExp("^" + this.prefix + "\\d+_\\d+$");
         dropRoles(db, pattern);
     }
 
@@ -80,6 +83,6 @@ export const $config = (function() {
         data: data,
         states: states,
         transitions: transitions,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

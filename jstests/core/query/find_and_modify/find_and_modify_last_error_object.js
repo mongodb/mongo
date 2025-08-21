@@ -1,8 +1,7 @@
 const t = db[jsTestName()];
 
 t.drop();
-let x =
-    t.runCommand("findAndModify", {query: {f: 1}, update: {$set: {f: 2}}, upsert: true, new: true});
+let x = t.runCommand("findAndModify", {query: {f: 1}, update: {$set: {f: 2}}, upsert: true, new: true});
 let le = x.lastErrorObject;
 assert.eq(le.updatedExisting, false);
 assert.eq(le.n, 1);

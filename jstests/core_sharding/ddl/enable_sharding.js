@@ -7,49 +7,48 @@
  * ]
  */
 
-import {setupDbName} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {setupDbName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 function checkDbNameExistenceOnConfigCatalog(dbName, shouldExist) {
-    assert.eq(shouldExist ? 1 : 0,
-              db.getSiblingDB('config').databases.countDocuments({_id: dbName}));
+    assert.eq(shouldExist ? 1 : 0, db.getSiblingDB("config").databases.countDocuments({_id: dbName}));
 }
 
 function listDatabasesFilteredByDbName(dbName) {
     return assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: dbName}}));
 }
 
-jsTest.log('enableSharding can run only against the admin database');
+jsTest.log("enableSharding can run only against the admin database");
 {
     assert.commandFailedWithCode(
-        db.getSiblingDB('aRegularNamespace').runCommand({enableSharding: 'newDbName'}),
-        ErrorCodes.Unauthorized);
+        db.getSiblingDB("aRegularNamespace").runCommand({enableSharding: "newDbName"}),
+        ErrorCodes.Unauthorized,
+    );
 }
 
-jsTest.log('Cannot shard db with the name that just differ on case');
+jsTest.log("Cannot shard db with the name that just differ on case");
 {
-    const testDbName = setupDbName(db, 'casing');
+    const testDbName = setupDbName(db, "casing");
     const testDbNameAllCaps = testDbName.toUpperCase();
     db.getSiblingDB(testDbNameAllCaps).dropDatabase();
 
     assert.commandWorked(db.adminCommand({enableSharding: testDbName}));
     checkDbNameExistenceOnConfigCatalog(testDbName, 1);
-    assert.commandFailedWithCode(db.adminCommand({enableSharding: testDbNameAllCaps}),
-                                 ErrorCodes.DatabaseDifferCase);
+    assert.commandFailedWithCode(db.adminCommand({enableSharding: testDbNameAllCaps}), ErrorCodes.DatabaseDifferCase);
     checkDbNameExistenceOnConfigCatalog(testDbNameAllCaps, 0);
 }
 
-jsTest.log('Cannot shard invalid db name');
+jsTest.log("Cannot shard invalid db name");
 {
-    const invalidDbNames = ['', 'dbName.withDot'];
+    const invalidDbNames = ["", "dbName.withDot"];
     for (let dbName of invalidDbNames) {
         assert.commandFailed(db.adminCommand({enableSharding: dbName}));
         checkDbNameExistenceOnConfigCatalog(dbName, 0);
     }
 }
 
-jsTest.log('enableSharding is idempotent');
+jsTest.log("enableSharding is idempotent");
 {
-    const testDbName = setupDbName(db, 'idempotency');
+    const testDbName = setupDbName(db, "idempotency");
 
     assert.commandWorked(db.adminCommand({enableSharding: testDbName}));
     checkDbNameExistenceOnConfigCatalog(testDbName, 1);
@@ -58,24 +57,24 @@ jsTest.log('enableSharding is idempotent');
     checkDbNameExistenceOnConfigCatalog(testDbName, 1);
 }
 
-jsTest.log('enableSharding is implicitly invoked when writing the first collection document');
+jsTest.log("enableSharding is implicitly invoked when writing the first collection document");
 {
-    const testDbName = setupDbName(db, 'implicitCollCreation');
+    const testDbName = setupDbName(db, "implicitCollCreation");
     assert.commandWorked(db.getSiblingDB(testDbName).foo.insert({aKey: "aValue"}));
     checkDbNameExistenceOnConfigCatalog(testDbName, 1);
 }
 
-jsTest.log('enableSharding is implicitly invoked when sharding a collection');
+jsTest.log("enableSharding is implicitly invoked when sharding a collection");
 {
-    const testDbName = setupDbName(db, 'uponShardCollection');
-    const nss = testDbName + '.testColl';
+    const testDbName = setupDbName(db, "uponShardCollection");
+    const nss = testDbName + ".testColl";
     assert.commandWorked(db.adminCommand({shardCollection: nss, key: {_id: 1}}));
     checkDbNameExistenceOnConfigCatalog(testDbName, 1);
 }
 
-jsTest.log('Testing enableSharding VS listDatabases');
+jsTest.log("Testing enableSharding VS listDatabases");
 {
-    const testDbName = setupDbName(db, '_vs_list_databases');
+    const testDbName = setupDbName(db, "_vs_list_databases");
 
     checkDbNameExistenceOnConfigCatalog(testDbName, false);
     assert.eq(0, listDatabasesFilteredByDbName(testDbName).databases.length);
@@ -98,20 +97,20 @@ jsTest.log('Testing enableSharding VS listDatabases');
     assert.neq(undefined, listDatabasesResponse.databases[0].shards[dbPrimaryShardId]);
 }
 
-jsTest.log('enableSharding on config DB is allowed');
+jsTest.log("enableSharding on config DB is allowed");
 {
     // At first, there should not be an entry for config
-    assert.eq(0, db.getSiblingDB('config')['databases'].countDocuments({'_id': 'config'}));
+    assert.eq(0, db.getSiblingDB("config")["databases"].countDocuments({"_id": "config"}));
 
     // Test that we can enable sharding on the config db (without causing any alteration to the
     // sharding catalog).
-    assert.commandWorked(db.adminCommand({enableSharding: 'config'}));
+    assert.commandWorked(db.adminCommand({enableSharding: "config"}));
 
-    assert.eq(0, db.getSiblingDB('config')['databases'].countDocuments({'_id': 'config'}));
+    assert.eq(0, db.getSiblingDB("config")["databases"].countDocuments({"_id": "config"}));
 }
 
-jsTest.log('enableSharding on reserved namespaces is forbidden');
+jsTest.log("enableSharding on reserved namespaces is forbidden");
 {
-    assert.commandFailed(db.adminCommand({enableSharding: 'local'}));
-    assert.commandFailed(db.adminCommand({enableSharding: 'admin'}));
+    assert.commandFailed(db.adminCommand({enableSharding: "local"}));
+    assert.commandFailed(db.adminCommand({enableSharding: "admin"}));
 }

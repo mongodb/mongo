@@ -11,18 +11,15 @@
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor, assumes_balancer_off]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/invalidated_cursors.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/invalidated_cursors.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     /**
      * Runs the specified aggregation pipeline and stores the resulting cursor (if the command
      * is successful) in 'this.cursor'.
      */
     $config.data.runAggregation = function runAggregation(db, collName, pipeline) {
-        var res = db.runCommand(
-            {aggregate: collName, pipeline: pipeline, cursor: {batchSize: this.batchSize}});
+        var res = db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {batchSize: this.batchSize}});
 
         if (res.ok) {
             this.cursor = new DBCommandCursor(db, res, this.batchSize);
@@ -32,19 +29,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.makeLookupPipeline = function makeLookupPipeline(foreignColl) {
         var pipeline = [
             {
-              $lookup: {
-                  from: foreignColl,
-                  // We perform the $lookup on a field that doesn't exist in either the document
-                  // on the source collection or the document on the foreign collection. This
-                  // ensures that every document in the source collection will match every
-                  // document in the foreign collection and cause the cursor underlying the
-                  // $lookup stage to need to request another batch.
-                  localField: 'fieldThatDoesNotExistInDoc',
-                  foreignField: 'fieldThatDoesNotExistInDoc',
-                  as: 'results'
-              }
+                $lookup: {
+                    from: foreignColl,
+                    // We perform the $lookup on a field that doesn't exist in either the document
+                    // on the source collection or the document on the foreign collection. This
+                    // ensures that every document in the source collection will match every
+                    // document in the foreign collection and cause the cursor underlying the
+                    // $lookup stage to need to request another batch.
+                    localField: "fieldThatDoesNotExistInDoc",
+                    foreignField: "fieldThatDoesNotExistInDoc",
+                    as: "results",
+                },
             },
-            {$unwind: '$results'}
+            {$unwind: "$results"},
         ];
 
         return pipeline;
@@ -53,16 +50,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.makeGraphLookupPipeline = function makeGraphLookupPipeline(foreignName) {
         var pipeline = [
             {
-              $graphLookup: {
-                  from: foreignName,
-                  startWith: '$fieldThatDoesNotExistInDoc',
-                  connectToField: 'fieldThatDoesNotExistInDoc',
-                  connectFromField: 'fieldThatDoesNotExistInDoc',
-                  maxDepth: Random.randInt(5),
-                  as: 'results'
-              }
+                $graphLookup: {
+                    from: foreignName,
+                    startWith: "$fieldThatDoesNotExistInDoc",
+                    connectToField: "fieldThatDoesNotExistInDoc",
+                    connectFromField: "fieldThatDoesNotExistInDoc",
+                    maxDepth: Random.randInt(5),
+                    as: "results",
+                },
             },
-            {$unwind: '$results'}
+            {$unwind: "$results"},
         ];
 
         return pipeline;
@@ -116,15 +113,17 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var lookupForeignCollName = this.chooseRandomlyFrom(this.involvedCollections);
         var graphLookupForeignCollName = this.chooseRandomlyFrom(this.involvedCollections);
 
-        var pipeline = [{
-            $facet: {
-                // The lookup pipeline computes a Cartesian product of the input collection, which
-                // can occasionally create $facet documents large enough to OOM crash the test. The
-                // $limit keeps it in check.
-                lookup: this.makeLookupPipeline(lookupForeignCollName).concat({$limit: 50}),
-                graphLookup: this.makeGraphLookupPipeline(graphLookupForeignCollName)
-            }
-        }];
+        var pipeline = [
+            {
+                $facet: {
+                    // The lookup pipeline computes a Cartesian product of the input collection, which
+                    // can occasionally create $facet documents large enough to OOM crash the test. The
+                    // $limit keeps it in check.
+                    lookup: this.makeLookupPipeline(lookupForeignCollName).concat({$limit: 50}),
+                    graphLookup: this.makeGraphLookupPipeline(graphLookupForeignCollName),
+                },
+            },
+        ];
         this.runAggregation(myDB, targetCollName, pipeline);
     };
 
@@ -147,7 +146,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         getMore: {killCursor: 0.2, getMore: 0.6, init: 0.2},
         dropDatabase: {init: 1},
         dropCollection: {init: 1},
-        dropIndex: {init: 1}
+        dropIndex: {init: 1},
     };
 
     $config.setup = function setup(db, collName, cluster) {
@@ -156,8 +155,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // likely for the "killCursors" command to need to handle destroying the underlying
         // PlanExecutor.
         cluster.executeOnMongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
         });
 
         // Use the workload name as part of the database name, since the workload name is assumed to
@@ -165,7 +163,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.uniqueDBName = db.getName() + jsTestName();
 
         var myDB = db.getSiblingDB(this.uniqueDBName);
-        this.involvedCollections.forEach(collName => {
+        this.involvedCollections.forEach((collName) => {
             this.populateDataAndIndexes(myDB, collName);
             assert.eq(this.numDocs, myDB[collName].find({}).itcount());
         });
@@ -174,8 +172,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.teardown = function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
             // Restore DocumentSourceCursor batch size to the default.
-            assert.commandWorked(db.adminCommand(
-                {setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024}));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024}),
+            );
         });
     };
 

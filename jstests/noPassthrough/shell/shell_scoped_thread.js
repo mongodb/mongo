@@ -20,11 +20,16 @@ tests.push(function checkTestDataWithOtherArgs() {
     let testData = TestData;
     let arg1 = 1;
     let arg2 = {a: 1};
-    let worker = new Thread((testData, arg1, arg2) => {
-        assert.eq(TestData, testData);
-        assert.eq(arg1, 1);
-        assert.eq(arg2, {a: 1});
-    }, testData, arg1, arg2);
+    let worker = new Thread(
+        (testData, arg1, arg2) => {
+            assert.eq(TestData, testData);
+            assert.eq(arg1, 1);
+            assert.eq(arg2, {a: 1});
+        },
+        testData,
+        arg1,
+        arg2,
+    );
     worker.start();
     worker.join();
     assert(!worker.hasFailed());
@@ -97,40 +102,35 @@ function testUncaughtException(joinFn) {
     thread.start();
 
     let error = assert.throws(joinFn, [thread]);
-    assert(/Intentionally thrown inside Thread/.test(error.message),
-           () => "Exception didn't include the message from the exception thrown in Thread: " +
-               tojson(error.message));
-    assert(/myFunction@/.test(error.stack),
-           () => "Exception doesn't contain stack frames from within the Thread: " +
-               tojson(error.stack));
-    assert(/testUncaughtException@/.test(error.stack),
-           () => "Exception doesn't contain stack frames from caller of the Thread: " +
-               tojson(error.stack));
+    assert(
+        /Intentionally thrown inside Thread/.test(error.message),
+        () => "Exception didn't include the message from the exception thrown in Thread: " + tojson(error.message),
+    );
+    assert(
+        /myFunction@/.test(error.stack),
+        () => "Exception doesn't contain stack frames from within the Thread: " + tojson(error.stack),
+    );
+    assert(
+        /testUncaughtException@/.test(error.stack),
+        () => "Exception doesn't contain stack frames from caller of the Thread: " + tojson(error.stack),
+    );
 
     error = assert.throws(() => thread.join());
-    assert.eq("Thread not running",
-              error.message,
-              "join() is expected to be called only once for the thread");
+    assert.eq("Thread not running", error.message, "join() is expected to be called only once for the thread");
 
-    assert.eq(true,
-              thread.hasFailed(),
-              "Uncaught exception didn't cause thread to be marked as having failed");
-    assert.doesNotThrow(() => thread.returnData(),
-                        [],
-                        "returnData() threw an exception after join() had been called");
-    assert.eq(undefined,
-              thread.returnData(),
-              "returnData() shouldn't have anything to return if the thread failed");
+    assert.eq(true, thread.hasFailed(), "Uncaught exception didn't cause thread to be marked as having failed");
+    assert.doesNotThrow(() => thread.returnData(), [], "returnData() threw an exception after join() had been called");
+    assert.eq(undefined, thread.returnData(), "returnData() shouldn't have anything to return if the thread failed");
 }
 
 tests.push(function testUncaughtExceptionAndWaitUsingJoin() {
-    testUncaughtException(thread => thread.join());
+    testUncaughtException((thread) => thread.join());
 });
 
 // The returnData() method internally calls the join() method and should also throw an exception
 // if the Thread had an uncaught exception.
 tests.push(function testUncaughtExceptionAndWaitUsingReturnData() {
-    testUncaughtException(thread => thread.returnData());
+    testUncaughtException((thread) => thread.returnData());
 });
 
 tests.push(function testUncaughtExceptionInNativeCode() {
@@ -140,12 +140,14 @@ tests.push(function testUncaughtExceptionInNativeCode() {
     thread.start();
 
     const error = assert.throws(() => thread.join());
-    assert(/Timestamp/.test(error.message),
-           () => "Exception didn't include the message from the exception thrown in Thread: " +
-               tojson(error.message));
-    assert(/myFunction@/.test(error.stack),
-           () => "Exception doesn't contain stack frames from within the Thread: " +
-               tojson(error.stack));
+    assert(
+        /Timestamp/.test(error.message),
+        () => "Exception didn't include the message from the exception thrown in Thread: " + tojson(error.message),
+    );
+    assert(
+        /myFunction@/.test(error.stack),
+        () => "Exception doesn't contain stack frames from within the Thread: " + tojson(error.stack),
+    );
 });
 
 /* main */

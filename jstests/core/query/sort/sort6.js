@@ -1,9 +1,12 @@
 let t = db.sort6;
 
 function get(x) {
-    return t.find().sort({c: x}).map(function(z) {
-        return z._id;
-    });
+    return t
+        .find()
+        .sort({c: x})
+        .map(function (z) {
+            return z._id;
+        });
 }
 
 // part 1
@@ -13,7 +16,7 @@ t.insert({_id: 1, c: null});
 t.insert({_id: 2, c: 1});
 t.insert({_id: 3, c: 2});
 
-assert.eq([3, 2, 1], get(-1), "A1");  // SERVER-635
+assert.eq([3, 2, 1], get(-1), "A1"); // SERVER-635
 assert.eq([1, 2, 3], get(1), "A2");
 
 t.createIndex({c: 1});
@@ -28,7 +31,7 @@ t.insert({_id: 1});
 t.insert({_id: 2, c: 1});
 t.insert({_id: 3, c: 2});
 
-assert.eq([3, 2, 1], get(-1), "C1");  // SERVER-635
+assert.eq([3, 2, 1], get(-1), "C1"); // SERVER-635
 assert.eq([1, 2, 3], get(1), "C2");
 
 t.createIndex({c: 1});

@@ -33,7 +33,7 @@ const pipelineShardedStages = [
     {$skip: 100},
     {$project: {arr: 0}},
     {$group: {_id: "$b", count: {$sum: 1}}},
-    {$limit: 10}
+    {$limit: 10},
 ];
 
 // Test explain output where the shards part of the pipeline can be optimized away.
@@ -48,7 +48,7 @@ const pipelineNoShardedStages = [
     {$sort: {a: -1}},
     {$project: {arr: 0}},
     {$group: {_id: "$b", count: {$sum: 1}}},
-    {$limit: 10}
+    {$limit: 10},
 ];
 
 // Verify behavior of a nested pipeline.
@@ -115,18 +115,14 @@ function checkResults(result, assertExecutionStatsCallback) {
 }
 
 for (let pipeline of [pipelineShardedStages, pipelineNoShardedStages, facet]) {
-    checkResults(coll.explain("executionStats").aggregate(pipeline),
-                 assertStageExecutionStatsPresent);
-    checkResults(coll.explain("allPlansExecution").aggregate(pipeline),
-                 assertStageExecutionStatsPresent);
+    checkResults(coll.explain("executionStats").aggregate(pipeline), assertStageExecutionStatsPresent);
+    checkResults(coll.explain("allPlansExecution").aggregate(pipeline), assertStageExecutionStatsPresent);
 }
 
 // Only test $changeStream if we are on a replica set or on a sharded cluster.
 if (FixtureHelpers.isReplSet(db) || FixtureHelpers.isSharded(coll)) {
-    checkResults(coll.explain("executionStats").aggregate(changeStream),
-                 assertStageExecutionStatsPresent);
-    checkResults(coll.explain("allPlansExecution").aggregate(changeStream),
-                 assertStageExecutionStatsPresent);
+    checkResults(coll.explain("executionStats").aggregate(changeStream), assertStageExecutionStatsPresent);
+    checkResults(coll.explain("allPlansExecution").aggregate(changeStream), assertStageExecutionStatsPresent);
 }
 
 // Returns the number of documents
@@ -142,15 +138,14 @@ function numberOfDocsReturnedByMatchStage(explain) {
 }
 
 const matchPipeline = [{$_internalInhibitOptimization: {}}, {$match: {a: {$gte: 500}}}];
-assert.eq(numberOfDocsReturnedByMatchStage(coll.explain("executionStats").aggregate(matchPipeline)),
-          500);
+assert.eq(numberOfDocsReturnedByMatchStage(coll.explain("executionStats").aggregate(matchPipeline)), 500);
 
 // Checks $group totalOutputDataSizeBytes execution statistic.
 (function testGroupStatTotalDataSizeBytes() {
     const pipeline = [{$group: {_id: null, count: {$sum: 1}}}];
     const result = coll.explain("executionStats").aggregate(pipeline);
 
-    let assertOutputBytesSize = function(stage) {
+    let assertOutputBytesSize = function (stage) {
         if (stage.hasOwnProperty("$group")) {
             assert(stage.hasOwnProperty("totalOutputDataSizeBytes"), stage);
 

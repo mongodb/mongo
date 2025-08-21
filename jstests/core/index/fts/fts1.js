@@ -20,6 +20,6 @@ assert.commandWorked(coll.insert({_id: 4, x: "b c d"}));
 assert.eq([1, 2, 3, 4], queryIDS(coll, "c az").sort(), "A1");
 assert.eq([4], queryIDS(coll, "d"), "A2");
 
-const index = coll.getIndexes().find(index => index.name === "x_text");
+const index = coll.getIndexes().find((index) => index.name === "x_text");
 assert.neq(index, undefined);
 assert.gte(index.textIndexVersion, 1, tojson(index));

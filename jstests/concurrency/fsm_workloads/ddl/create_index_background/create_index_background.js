@@ -18,7 +18,7 @@
  */
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         nDocumentsToSeed: 500,
         nDocumentsToCreate: 100,
@@ -45,10 +45,10 @@ export const $config = (function() {
         extendUpdateExpr: function extendUpdateExpr(update) {
             // Only relevant for extended workloads.
             return update;
-        }
+        },
     };
 
-    var states = (function() {
+    var states = (function () {
         function init(db, collName) {
             // Add thread-specific documents
             var bulk = db[collName].initializeUnorderedBulkOp();
@@ -65,14 +65,18 @@ export const $config = (function() {
                 var coll = db[collName];
                 // Before creating the background index make sure insert or update
                 // CRUD operations are active.
-                assert.soon(function() {
-                    return coll.find({crud: {$exists: true}}).itcount() > 0;
-                }, 'No documents with "crud" field have been inserted or updated', 60 * 1000);
+                assert.soon(
+                    function () {
+                        return coll.find({crud: {$exists: true}}).itcount() > 0;
+                    },
+                    'No documents with "crud" field have been inserted or updated',
+                    60 * 1000,
+                );
 
                 let createOptions = {};
                 let filter = this.getPartialFilterExpression();
                 if (filter !== undefined) {
-                    createOptions['partialFilterExpression'] = filter;
+                    createOptions["partialFilterExpression"] = filter;
                 }
 
                 res = coll.createIndex(this.getIndexSpec(), createOptions);
@@ -93,9 +97,11 @@ export const $config = (function() {
                 assert.commandWorked(res);
                 assert.eq(res.nInserted, 1, tojson(res));
             }
-            assert.eq(coll.find({tid: this.tid}).itcount(),
-                      this.nDocumentsToCreate + count,
-                      'createDocs itcount mismatch');
+            assert.eq(
+                coll.find({tid: this.tid}).itcount(),
+                this.nDocumentsToCreate + count,
+                "createDocs itcount mismatch",
+            );
         }
 
         function readDocs(db, collName) {
@@ -103,8 +109,7 @@ export const $config = (function() {
             var coll = db[collName];
             var res;
             var count = coll.find({tid: this.tid}).itcount();
-            assert.gte(
-                count, this.nDocumentsToRead, 'readDocs not enough documents for tid ' + this.tid);
+            assert.gte(count, this.nDocumentsToRead, "readDocs not enough documents for tid " + this.tid);
 
             var highest = this.getHighestX(coll, this.tid);
             for (var i = 0; i < this.nDocumentsToRead; ++i) {
@@ -113,7 +118,7 @@ export const $config = (function() {
                 res = coll.find({x: Random.randInt(highest), tid: this.tid}).itcount();
                 assert.contains(res, [0, 1], tojson(res));
             }
-            assert.eq(coll.find({tid: this.tid}).itcount(), count, 'readDocs itcount mismatch');
+            assert.eq(coll.find({tid: this.tid}).itcount(), count, "readDocs itcount mismatch");
         }
 
         function updateDocs(db, collName) {
@@ -123,9 +128,7 @@ export const $config = (function() {
                 var coll = db[collName];
                 var res;
                 var count = coll.find({tid: this.tid}).itcount();
-                assert.gte(count,
-                           this.nDocumentsToUpdate,
-                           'updateDocs not enough documents for tid ' + this.tid);
+                assert.gte(count, this.nDocumentsToUpdate, "updateDocs not enough documents for tid " + this.tid);
 
                 var highest = this.getHighestX(coll, this.tid);
                 for (var i = 0; i < this.nDocumentsToUpdate; ++i) {
@@ -141,8 +144,7 @@ export const $config = (function() {
                     assert.contains(res.nMatched, [0, 1], tojson(res));
                     assert.eq(res.nUpserted, 0, tojson(res));
                 }
-                assert.eq(
-                    coll.find({tid: this.tid}).itcount(), count, 'updateDocs itcount mismatch');
+                assert.eq(coll.find({tid: this.tid}).itcount(), count, "updateDocs itcount mismatch");
             }
         }
 
@@ -174,9 +176,7 @@ export const $config = (function() {
                 assert.contains(res.nRemoved, [0, 1], tojson(res));
                 nActualDeletes += res.nRemoved;
             }
-            assert.eq(coll.find({tid: this.tid}).itcount(),
-                      count - nActualDeletes,
-                      'deleteDocs itcount mismatch');
+            assert.eq(coll.find({tid: this.tid}).itcount(), count - nActualDeletes, "deleteDocs itcount mismatch");
         }
 
         return {
@@ -184,7 +184,7 @@ export const $config = (function() {
             createDocs: createDocs,
             readDocs: readDocs,
             updateDocs: updateDocs,
-            deleteDocs: deleteDocs
+            deleteDocs: deleteDocs,
         };
     })();
 
@@ -215,7 +215,7 @@ export const $config = (function() {
         assert.eq(nSetupDocs, res.nInserted, tojson(res));
 
         // Increase the following parameters to reduce the number of yields.
-        cluster.executeOnMongodNodes(function(db) {
+        cluster.executeOnMongodNodes(function (db) {
             var res;
             res = db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 100000});
             assert.commandWorked(res);
@@ -228,13 +228,16 @@ export const $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
-        cluster.executeOnMongodNodes(function(db) {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                internalQueryExecYieldIterations: internalQueryExecYieldIterations
-            }));
-            assert.commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryExecYieldPeriodMS: internalQueryExecYieldPeriodMS}));
+        cluster.executeOnMongodNodes(function (db) {
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    internalQueryExecYieldIterations: internalQueryExecYieldIterations,
+                }),
+            );
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: internalQueryExecYieldPeriodMS}),
+            );
         });
     }
 

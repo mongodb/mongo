@@ -24,15 +24,15 @@ const docs = [
     {_id: 14, a: []},
     {_id: 15, a: [1, 2, 3]},
     {_id: 16, a: [{c: "1"}, {d: "2"}]},
-    {_id: 17, a: new BinData(0, '1234')},
-    {_id: 18, a: new BinData(0, 'aaaa')},
-    {_id: 19, a: new BinData(0, '')},
+    {_id: 17, a: new BinData(0, "1234")},
+    {_id: 18, a: new BinData(0, "aaaa")},
+    {_id: 19, a: new BinData(0, "")},
     {_id: 20, a: {$regularExpression: {pattern: "a", options: ""}}},
     {_id: 21, a: /a+/},
     {_id: 22, a: new DBRef("type_bracket", 15)},
-    {_id: 23, a: new ObjectId('000000000000000000000000')},
-    {_id: 24, a: new Code('x = 1+1;', {})},
-    {_id: 25, a: new Code('', {})},
+    {_id: 23, a: new ObjectId("000000000000000000000000")},
+    {_id: 24, a: new Code("x = 1+1;", {})},
+    {_id: 25, a: new Code("", {})},
     {_id: 26, a: true},
     {_id: 27, a: false},
     {_id: 28, a: new Code("noScope")},
@@ -89,8 +89,8 @@ let tests = [
     {filter: {a: {$lte: new ObjectId()}}, expected: [docs[23]]},
 
     // Date
-    {filter: {a: {$lt: new Date('2019-09-18')}}, expected: [docs[8], docs[9]]},
-    {filter: {a: {$gte: new Date('2019-01-01')}}, expected: []},
+    {filter: {a: {$lt: new Date("2019-09-18")}}, expected: [docs[8], docs[9]]},
+    {filter: {a: {$gte: new Date("2019-01-01")}}, expected: []},
 
     // Timestamp
     {filter: {a: {$lte: new Timestamp(3, 1)}}, expected: [docs[10], docs[11]]},
@@ -111,17 +111,17 @@ let tests = [
     // DBRef
     {
         filter: {a: {$gte: new DBRef("type_bracket", 15)}},
-        expected: [docs[12], docs[16], docs[20], docs[22]]
+        expected: [docs[12], docs[16], docs[20], docs[22]],
     },
     {filter: {a: {$lt: new DBRef("type_bracket", 15)}}, expected: [docs[13]]},
     {
         filter: {a: {$gte: new DBRef("type_bracket", 14)}},
-        expected: [docs[12], docs[16], docs[20], docs[22]]
+        expected: [docs[12], docs[16], docs[20], docs[22]],
     },
 
     // CODEWSCOPE
-    {filter: {a: {$gte: new Code('function() {x++;}', {})}}, expected: [docs[24]]},
-    {filter: {a: {$lt: new Code('x', {})}}, expected: [docs[25]]},
+    {filter: {a: {$gte: new Code("function() {x++;}", {})}}, expected: [docs[24]]},
+    {filter: {a: {$lt: new Code("x", {})}}, expected: [docs[25]]},
 
     // CODE
     {filter: {a: {$gte: new Code("")}}, expected: [docs[28]]},

@@ -20,13 +20,10 @@ function runTest(conn) {
     const unshardedCollName = `${jsTestName()}_unsharded`;
 
     assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-    assert.commandWorked(
-        db.adminCommand({shardCollection: `${db.getName()}.${shardedCollName}`, key: {_id: 1}}));
-    assert.commandWorked(
-        db.adminCommand({split: `${db.getName()}.${shardedCollName}`, middle: {_id: 1}}));
+    assert.commandWorked(db.adminCommand({shardCollection: `${db.getName()}.${shardedCollName}`, key: {_id: 1}}));
+    assert.commandWorked(db.adminCommand({split: `${db.getName()}.${shardedCollName}`, middle: {_id: 1}}));
 
-    const docs = Array.from(
-        {length: 10}, (_, i) => ({_id: 0.2 * i, key: i % 5, arr: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}));
+    const docs = Array.from({length: 10}, (_, i) => ({_id: 0.2 * i, key: i % 5, arr: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}));
     assert.commandWorked(db[shardedCollName].insert(docs));
     assert.commandWorked(db[unshardedCollName].insert(docs));
 
@@ -38,32 +35,35 @@ function runTest(conn) {
                 {
                     $unionWith: {
                         coll: shardedCollName,
-                        pipeline: [{
-                            $lookup: {
-                                from: unshardedCollName,
-                                "let": {localKey: "$key"},
-                                pipeline: [
-                                    {$match: {$expr: {$eq: ["$key", "$$localKey"]}}},
-                                    {
-                                        $lookup: {
-                                            from: unshardedCollName,
-                                            "let": {localKey: "$key"},
-                                            pipeline: [
-                                                {$match: {$expr: {$eq: ["$key", "$$localKey"]}}},
-                                                {$addFields: {computed: {$add: ["$$localKey", 1]}}},
-                                            ],
-                                            as: "nestedMatches",
-                                        }
-                                    },
-                                ],
-                                as: "matches",
+                        pipeline: [
+                            {
+                                $lookup: {
+                                    from: unshardedCollName,
+                                    "let": {localKey: "$key"},
+                                    pipeline: [
+                                        {$match: {$expr: {$eq: ["$key", "$$localKey"]}}},
+                                        {
+                                            $lookup: {
+                                                from: unshardedCollName,
+                                                "let": {localKey: "$key"},
+                                                pipeline: [
+                                                    {$match: {$expr: {$eq: ["$key", "$$localKey"]}}},
+                                                    {$addFields: {computed: {$add: ["$$localKey", 1]}}},
+                                                ],
+                                                as: "nestedMatches",
+                                            },
+                                        },
+                                    ],
+                                    as: "matches",
+                                },
                             },
-                        }]
-                    }
-                }
+                        ],
+                    },
+                },
             ],
             // Note: a small batchSize is required here so that we have multiple getMore calls.
-            {batchSize: 2})
+            {batchSize: 2},
+        )
         .toArray();
 
     assert.eq(20, result.length);

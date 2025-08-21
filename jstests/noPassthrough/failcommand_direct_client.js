@@ -17,8 +17,10 @@ db.dropDatabase();
 const coll = db.coll;
 
 {
-    const failpoint = configureFailPoint(
-        rs.getPrimary(), "failCommand", {errorCode: ErrorCodes.BadValue, failCommands: ["find"]});
+    const failpoint = configureFailPoint(rs.getPrimary(), "failCommand", {
+        errorCode: ErrorCodes.BadValue,
+        failCommands: ["find"],
+    });
 
     assert.commandWorked(coll.insertOne({index: 1}));
 
@@ -34,10 +36,11 @@ const coll = db.coll;
     failpoint.off();
 }
 {
-    const failpoint = configureFailPoint(
-        rs.getPrimary(),
-        "failCommand",
-        {errorCode: ErrorCodes.BadValue, failCommands: ["find"], failDirectClientCommands: false});
+    const failpoint = configureFailPoint(rs.getPrimary(), "failCommand", {
+        errorCode: ErrorCodes.BadValue,
+        failCommands: ["find"],
+        failDirectClientCommands: false,
+    });
 
     assert.commandWorked(coll.insertOne({index: 1}));
 

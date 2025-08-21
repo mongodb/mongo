@@ -13,7 +13,7 @@ function ok(q) {
 
 t.save({a: 1});
 
-let test = function() {
+let test = function () {
     ok({a: 1});
 
     ok({$and: [{a: 1}]});
@@ -55,7 +55,7 @@ test();
 
 // Test an inequality base match.
 
-test = function() {
+test = function () {
     ok({a: {$ne: 2}});
 
     ok({$and: [{a: {$ne: 2}}]});

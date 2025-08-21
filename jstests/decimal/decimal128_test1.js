@@ -16,18 +16,18 @@ var testData = [
     {
         "description": "Special - Invalid representation treated as 0E3",
         "input": "0E+3",
-        "lossy": true
+        "lossy": true,
     },
     {
         "description": "Regular - Adjusted Exponent Limit",
-        "input": "0.000001234567890123456789012345678901234"
+        "input": "0.000001234567890123456789012345678901234",
     },
     {"description": "Regular - Smallest", "input": "0.001234"},
     {"description": "Regular - Smallest with Trailing Zeros", "input": "0.00123400000"},
     {"description": "Regular - 0.1", "input": "0.1"},
     {
         "description": "Regular - 0.1234567890123456789012345678901234",
-        "input": "0.1234567890123456789012345678901234"
+        "input": "0.1234567890123456789012345678901234",
     },
     {"description": "Regular - 0", "input": "0"},
     {"description": "Regular - -0", "input": "-0"},
@@ -40,7 +40,7 @@ var testData = [
     {"description": "Scientific - Negative Tiny", "input": "-1E-6176"},
     {
         "description": "Scientific - Adjusted Exponent Limit",
-        "input": "1.234567890123456789012345678901234E-7"
+        "input": "1.234567890123456789012345678901234E-7",
     },
     {"description": "Scientific - Fractional", "input": "-1.00E-8"},
     {"description": "Scientific - 0 with Exponent", "input": "0E+6000"},
@@ -54,27 +54,27 @@ var testData = [
     {
         "description": "Non-Canonical Parsing - Exponent Normalization",
         "input": "-100E-10",
-        "expected": "-1.00E-8"
+        "expected": "-1.00E-8",
     },
     {
         "description": "Non-Canonical Parsing - Unsigned Positive Exponent",
         "input": "1E3",
-        "expected": "1E+3"
+        "expected": "1E+3",
     },
     {
         "description": "Non-Canonical Parsing - Lowercase Exponent Identifier",
         "input": "1e+3",
-        "expected": "1E+3"
+        "expected": "1E+3",
     },
     {
         "description": "Non-Canonical Parsing - Long Significand with Exponent",
         "input": "12345689012345789012345E+12",
-        "expected": "1.2345689012345789012345E+34"
+        "expected": "1.2345689012345789012345E+34",
     },
     {
         "description": "Non-Canonical Parsing - Positive Sign",
         "input": "+1234567890123456789012345678901234",
-        "expected": "1234567890123456789012345678901234"
+        "expected": "1234567890123456789012345678901234",
     },
     {
         "description": "Non-Canonical Parsing - Long Decimal String",
@@ -92,36 +92,36 @@ var testData = [
             "00000000000000000000000000000000000000000000000000000000000000000000000000000000" +
             "00000000000000000000000000000000000000000000000000000000000000000000000000000000" +
             "0000000000000000000000000000000000000001",
-        "expected": "1E-999"
+        "expected": "1E-999",
     },
     {"description": "Non-Canonical Parsing - nan", "input": "nan", "expected": "NaN"},
     {"description": "Non-Canonical Parsing - nAn", "input": "nAn", "expected": "NaN"},
     {
         "description": "Non-Canonical Parsing - +infinity",
         "input": "+infinity",
-        "expected": "Infinity"
+        "expected": "Infinity",
     },
     {
         "description": "Non-Canonical Parsing - infinity",
         "input": "infinity",
-        "expected": "Infinity"
+        "expected": "Infinity",
     },
     {
         "description": "Non-Canonical Parsing - infiniTY",
         "input": "infiniTY",
-        "expected": "Infinity"
+        "expected": "Infinity",
     },
     {"description": "Non-Canonical Parsing - inf", "input": "inf", "expected": "Infinity"},
     {"description": "Non-Canonical Parsing - inF", "input": "inF", "expected": "Infinity"},
     {
         "description": "Non-Canonical Parsing - -infinity",
         "input": "-infinity",
-        "expected": "-Infinity"
+        "expected": "-Infinity",
     },
     {
         "description": "Non-Canonical Parsing - -infiniTy",
         "input": "-infiniTy",
-        "expected": "-Infinity"
+        "expected": "-Infinity",
     },
     {"description": "Non-Canonical Parsing - -Inf", "input": "-Infinity", "expected": "-Infinity"},
     {"description": "Non-Canonical Parsing - -inf", "input": "-inf", "expected": "-Infinity"},
@@ -144,11 +144,11 @@ var testData = [
             "000000000000000000000000000000000000000000000000000000000000000000000000000000000" +
             "000000000000000000000000000000000000000000000000000000000000000000000000000000000" +
             "0000000000000000000000000000",
-        "expected": "1.000000000000000000000000000000000E+999"
-    }
+        "expected": "1.000000000000000000000000000000000E+999",
+    },
 ];
 
-testData.forEach(function(testCase) {
+testData.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
     var output = NumberDecimal(testCase.input).toString();
     if (testCase.expected) {

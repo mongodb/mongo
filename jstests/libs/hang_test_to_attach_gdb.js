@@ -1,4 +1,3 @@
-
 function logClusterPorts(st) {
     st.printNodes();
 }
@@ -7,8 +6,7 @@ function isTimeToWake(waitFor) {
         if (waitFor.anyDataIn.findOne() != null) {
             return true;
         } else {
-            jsTestLog(`Put data in ${
-                waitFor.anyDataIn.getFullName()} collection to break this infinite loop.`);
+            jsTestLog(`Put data in ${waitFor.anyDataIn.getFullName()} collection to break this infinite loop.`);
             return false;
         }
     } else {

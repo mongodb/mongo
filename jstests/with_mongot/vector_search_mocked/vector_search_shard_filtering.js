@@ -8,14 +8,10 @@
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mongotCommandForVectorSearchQuery,
-    mongotResponseForBatch
+    mongotResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
-import {
-    prepCollection,
-} from "jstests/with_mongot/mongotmock/lib/utils.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {prepCollection} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 const dbName = "test";
 const collName = "vector_search_shard_filtering";
@@ -46,8 +42,7 @@ prepCollection(mongos, dbName, collName);
 assert.commandWorked(testColl.createIndex({shardKey: 1}));
 
 // 'waitForDelete' is set to 'true' so that range deletion completes before we insert our orphan.
-st.shardColl(
-    testColl, {shardKey: 1}, {shardKey: 10}, {shardKey: 10 + 1}, dbName, true /* waitForDelete */);
+st.shardColl(testColl, {shardKey: 1}, {shardKey: 10}, {shardKey: 10 + 1}, dbName, true /* waitForDelete */);
 
 const shard0Conn = st.rs0.getPrimary();
 const shard1Conn = st.rs1.getPrimary();
@@ -57,8 +52,7 @@ assert.eq(shard0Conn.getDB(dbName)[collName].find().itcount(), 4);
 assert.eq(testColl.find().itcount(), 8);
 
 // Insert a document into shard 0 which is not owned by that shard.
-assert.commandWorked(shard0Conn.getDB(dbName)[collName].insert(
-    {_id: 15, shardKey: 100, x: "_should be filtered out"}));
+assert.commandWorked(shard0Conn.getDB(dbName)[collName].insert({_id: 15, shardKey: 100, x: "_should be filtered out"}));
 
 // Verify that the orphaned document exists on shard0, but that it gets filtered out when
 // querying 'testColl'.
@@ -93,30 +87,38 @@ const mongot0ResponseBatch = [
 
     // The remaining documents rightfully belong to shard 0.
     {_id: 3, $vectorSearchScore: 0.97},
-    {_id: 2, $vectorSearchScore: 0.10},
+    {_id: 2, $vectorSearchScore: 0.1},
     {_id: 4, $vectorSearchScore: 0.02},
     {_id: 1, $vectorSearchScore: 0.01},
 ];
-const expectedMongotCommand = mongotCommandForVectorSearchQuery(
-    {...vectorSearchQuery, collName, dbName, collectionUUID: collUUID0});
+const expectedMongotCommand = mongotCommandForVectorSearchQuery({
+    ...vectorSearchQuery,
+    collName,
+    dbName,
+    collectionUUID: collUUID0,
+});
 
-const history0 = [{
-    expectedCommand: expectedMongotCommand,
-    response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk)
-}];
+const history0 = [
+    {
+        expectedCommand: expectedMongotCommand,
+        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+    },
+];
 const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
 s0Mongot.setMockResponses(history0, NumberLong(123));
 
 const mongot1ResponseBatch = [
     {_id: 11, $vectorSearchScore: 1.0},
-    {_id: 13, $vectorSearchScore: 0.30},
+    {_id: 13, $vectorSearchScore: 0.3},
     {_id: 12, $vectorSearchScore: 0.29},
     {_id: 14, $vectorSearchScore: 0.28},
 ];
-const history1 = [{
-    expectedCommand: expectedMongotCommand,
-    response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk)
-}];
+const history1 = [
+    {
+        expectedCommand: expectedMongotCommand,
+        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+    },
+];
 const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
 s1Mongot.setMockResponses(history1, NumberLong(456));
 

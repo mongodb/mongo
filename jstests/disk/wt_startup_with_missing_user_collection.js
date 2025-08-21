@@ -4,11 +4,7 @@
  *
  * @tags: [requires_wiredtiger]
  */
-import {
-    getUriForColl,
-    getUriForIndex,
-    startMongodOnExistingPath
-} from "jstests/disk/libs/wt_file_helper.js";
+import {getUriForColl, getUriForIndex, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
@@ -29,13 +25,10 @@ assert.commandWorked(testDB.createCollection("b"));
 assert.commandWorked(testDB.getCollection("a").insert({x: 1}));
 
 IndexBuildTest.pauseIndexBuilds(mongod);
-const awaitIndexBuild = IndexBuildTest.startIndexBuild(mongod,
-                                                       testDB.getCollection("a").getFullName(),
-                                                       {x: 1},
-                                                       {},
-                                                       [ErrorCodes.InterruptedAtShutdown]);
-IndexBuildTest.waitForIndexBuildToScanCollection(
-    testDB, testDB.getCollection("a").getName(), "x_1");
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(mongod, testDB.getCollection("a").getFullName(), {x: 1}, {}, [
+    ErrorCodes.InterruptedAtShutdown,
+]);
+IndexBuildTest.waitForIndexBuildToScanCollection(testDB, testDB.getCollection("a").getName(), "x_1");
 
 assert.commandWorked(testDB.adminCommand({fsync: 1}));
 

@@ -2,9 +2,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
-import {
-    verifyServerStatusElectionReasonCounterChange
-} from "jstests/replsets/libs/election_metrics.js";
+import {verifyServerStatusElectionReasonCounterChange} from "jstests/replsets/libs/election_metrics.js";
 
 var name = "stepup";
 var rst = new ReplSetTest({name: name, nodes: 2});
@@ -15,8 +13,9 @@ rst.initiate();
 var primary = rst.getPrimary();
 var secondary = rst.getSecondary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const initialSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
 
@@ -41,7 +40,7 @@ assert.commandWorked(primary.getDB("test").bar.insert({x: 3}, {writeConcern: {w:
 // vote.
 let numStepUpCmds = 0;
 rst.awaitReplication();
-assert.soonNoExcept(function() {
+assert.soonNoExcept(function () {
     numStepUpCmds++;
     return secondary.adminCommand({replSetStepUp: 1}).ok;
 });
@@ -54,24 +53,36 @@ const newSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverSt
 // Check that both the 'called' and 'successful' fields of stepUpCmd have been incremented in
 // serverStatus, and that they have not been incremented in any of the other election reason
 // counters.
-verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
-                                              newSecondaryStatus.electionMetrics,
-                                              "stepUpCmd",
-                                              numStepUpCmds, /* expectedNumCalled */
-                                              1 /* expectedNumSuccessful */);
-verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
-                                              newSecondaryStatus.electionMetrics,
-                                              "priorityTakeover",
-                                              0);
-verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
-                                              newSecondaryStatus.electionMetrics,
-                                              "catchUpTakeover",
-                                              0);
-verifyServerStatusElectionReasonCounterChange(initialSecondaryStatus.electionMetrics,
-                                              newSecondaryStatus.electionMetrics,
-                                              "electionTimeout",
-                                              0);
 verifyServerStatusElectionReasonCounterChange(
-    initialSecondaryStatus.electionMetrics, newSecondaryStatus.electionMetrics, "freezeTimeout", 0);
+    initialSecondaryStatus.electionMetrics,
+    newSecondaryStatus.electionMetrics,
+    "stepUpCmd",
+    numStepUpCmds /* expectedNumCalled */,
+    1 /* expectedNumSuccessful */,
+);
+verifyServerStatusElectionReasonCounterChange(
+    initialSecondaryStatus.electionMetrics,
+    newSecondaryStatus.electionMetrics,
+    "priorityTakeover",
+    0,
+);
+verifyServerStatusElectionReasonCounterChange(
+    initialSecondaryStatus.electionMetrics,
+    newSecondaryStatus.electionMetrics,
+    "catchUpTakeover",
+    0,
+);
+verifyServerStatusElectionReasonCounterChange(
+    initialSecondaryStatus.electionMetrics,
+    newSecondaryStatus.electionMetrics,
+    "electionTimeout",
+    0,
+);
+verifyServerStatusElectionReasonCounterChange(
+    initialSecondaryStatus.electionMetrics,
+    newSecondaryStatus.electionMetrics,
+    "freezeTimeout",
+    0,
+);
 
 rst.stopSet();

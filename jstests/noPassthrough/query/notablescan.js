@@ -36,13 +36,13 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
     if (0) {
         // TODO: SERVER-2222 This should actually throw an error as it performs a collection
         // scan.
-        assert.throws(function() {
+        assert.throws(function () {
             coll.find({a: 1}).toArray();
         });
     }
 
     coll.insert({a: 1});
-    let err = assert.throws(function() {
+    let err = assert.throws(function () {
         coll.count({a: 1});
     });
     checkError(err);
@@ -50,12 +50,12 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
     // TODO: SERVER-2222 This should actually throw an error as it performs a collection scan.
     assert.eq(1, coll.find({}).itcount());
 
-    err = assert.throws(function() {
+    err = assert.throws(function () {
         coll.find({a: 1}).toArray();
     });
     checkError(err);
 
-    err = assert.throws(function() {
+    err = assert.throws(function () {
         coll.find({a: 1}).hint({$natural: 1}).toArray();
     });
     assert.includes(err.toString(), "$natural");
@@ -66,7 +66,8 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
     assert.eq(1, coll.find({a: 1, b: null}).itcount());
 }
 
-{  // Run the testcase with a clustered index.
+{
+    // Run the testcase with a clustered index.
     assertDropAndRecreateCollection(db, colName, {clusteredIndex: {key: {_id: 1}, unique: true}});
     coll = db.getCollection(colName);
     assert.commandWorked(coll.insert({_id: 22}));
@@ -80,11 +81,11 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
     plan = coll.explain().aggregate([{$match: {_id: 22}}]);
     // Make sure the plan uses Express
     assert(isIdhackOrExpress(db, plan));
-    assert.commandWorked(
-        db.runCommand({aggregate: colName, pipeline: [{$match: {_id: 22}}], cursor: {}}));
+    assert.commandWorked(db.runCommand({aggregate: colName, pipeline: [{$match: {_id: 22}}], cursor: {}}));
 }
 
-{  // Make sure that Query Settings override the notablescan parameter.
+{
+    // Make sure that Query Settings override the notablescan parameter.
     const qsutils = new QuerySettingsUtils(db, colName);
     const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
@@ -96,10 +97,10 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
 
     const querySettingsFindQuery = qsutils.makeFindQueryInstance({
         filter: {a: 1, b: 1},
-        let : {
+        let: {
             c: 1,
             d: 2,
-        }
+        },
     });
 
     qstests.assertQuerySettingsNaturalApplication(querySettingsFindQuery, ns);

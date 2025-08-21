@@ -20,8 +20,7 @@ const adminDB = conn.getDB("admin");
 // And we need to use a side connection to do so in order to prevent the test connection from
 // being closed on FCV changes.
 function cmdAsInternalClient(cmd) {
-    const command =
-        {[cmd]: 1, internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}};
+    const command = {[cmd]: 1, internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}};
     const connInternal = new Mongo(adminDB.getMongo().host);
     const res = assert.commandWorked(connInternal.adminCommand(command));
     connInternal.close();
@@ -41,17 +40,23 @@ function runTest(downgradeFCV, downgradeWireVersion, maxWireVersion, cmd) {
     // When the featureCompatibilityVersion is upgrading, running hello/isMaster with internalClient
     // returns a response with minWireVersion == maxWireVersion.
     assert.commandWorked(
-        adminDB.system.version.update({_id: "featureCompatibilityVersion"},
-                                      {$set: {version: downgradeFCV, targetVersion: latestFCV}}));
+        adminDB.system.version.update(
+            {_id: "featureCompatibilityVersion"},
+            {$set: {version: downgradeFCV, targetVersion: latestFCV}},
+        ),
+    );
     let res = cmdAsInternalClient(cmd);
     assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
     assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
 
     // When the featureCompatibilityVersion is downgrading, running hello/isMaster with
     // internalClient returns a response with minWireVersion == maxWireVersion.
-    assert.commandWorked(adminDB.system.version.update(
-        {_id: "featureCompatibilityVersion"},
-        {$set: {version: downgradeFCV, targetVersion: downgradeFCV, previousVersion: latestFCV}}));
+    assert.commandWorked(
+        adminDB.system.version.update(
+            {_id: "featureCompatibilityVersion"},
+            {$set: {version: downgradeFCV, targetVersion: downgradeFCV, previousVersion: latestFCV}},
+        ),
+    );
     res = cmdAsInternalClient(cmd);
     assert.eq(res.minWireVersion, res.maxWireVersion, tojson(res));
     assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
@@ -59,8 +64,7 @@ function runTest(downgradeFCV, downgradeWireVersion, maxWireVersion, cmd) {
     // When the featureCompatibilityVersion is equal to the downgrade version, running
     // hello/isMaster with internalClient returns a response with minWireVersion + 1 ==
     // maxWireVersion.
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
     res = cmdAsInternalClient(cmd);
     assert.eq(downgradeWireVersion, res.minWireVersion, tojson(res));
     assert.eq(maxWireVersion, res.maxWireVersion, tojson(res));
@@ -68,8 +72,7 @@ function runTest(downgradeFCV, downgradeWireVersion, maxWireVersion, cmd) {
     // When the internalClient field is missing from the hello/isMaster command, the response
     // returns the full wire version range from minWireVersion == 0 to maxWireVersion == latest
     // version, even if the featureCompatibilityVersion is equal to the upgrade version.
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     res = adminDB.runCommand({[cmd]: 1});
     assert.commandWorked(res);
     assert.eq(res.minWireVersion, 0, tojson(res));

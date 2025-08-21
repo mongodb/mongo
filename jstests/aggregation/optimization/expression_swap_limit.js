@@ -23,13 +23,13 @@ const predicate = {
         // The other branch doesn't matter: it's only here to prevent the $or being
         // optimized out.
         {this_predicate_matches_nothing: true},
-    ]
+    ],
 };
 const sortSpec = {
-    _id: -1
+    _id: -1,
 };
 const oppositeSortSpec = {
-    _id: +1
+    _id: +1,
 };
 const projection = {
     _id: 1,
@@ -54,26 +54,19 @@ const pipeline1 = [
     assert.docEq([{_id: 99, b: 123}], aggResult);
 
     // The pipeline should succeed without pushing down to find.
-    const noOptResult =
-        coll.aggregate([{$_internalInhibitOptimization: {}}].concat(pipeline1)).toArray();
+    const noOptResult = coll.aggregate([{$_internalInhibitOptimization: {}}].concat(pipeline1)).toArray();
     assert.docEq([{_id: 99, b: 123}], noOptResult);
 }
 
 // Similarly, we can select the 1 valid document by flipping the sort and skipping
 // all but one document.
-const pipeline2 = [
-    {$match: predicate},
-    {$sort: oppositeSortSpec},
-    {$skip: NUM_INVALID_DOCS},
-    {$project: projection},
-];
+const pipeline2 = [{$match: predicate}, {$sort: oppositeSortSpec}, {$skip: NUM_INVALID_DOCS}, {$project: projection}];
 {
     // The pipeline should succeed.
     const aggResult = coll.aggregate(pipeline2).toArray();
     assert.docEq([{_id: 99, b: 123}], aggResult);
 
     // The pipeline should succeed without pushing down to find.
-    const noOptResult =
-        coll.aggregate([{$_internalInhibitOptimization: {}}].concat(pipeline2)).toArray();
+    const noOptResult = coll.aggregate([{$_internalInhibitOptimization: {}}].concat(pipeline2)).toArray();
     assert.docEq([{_id: 99, b: 123}], noOptResult);
 }

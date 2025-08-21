@@ -72,12 +72,8 @@
  *      If true, do not run this command on a standalone mongod.
  */
 
-import {
-    commandsRemovedFromMongodSinceLastLTS
-} from "jstests/sharding/libs/last_lts_mongod_commands.js";
-import {
-    commandsRemovedFromMongosSinceLastLTS
-} from "jstests/sharding/libs/last_lts_mongos_commands.js";
+import {commandsRemovedFromMongodSinceLastLTS} from "jstests/sharding/libs/last_lts_mongod_commands.js";
+import {commandsRemovedFromMongosSinceLastLTS} from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
@@ -106,8 +102,7 @@ let viewsCommandTests = {
     _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
     _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
     _configsvrCommitMergeAllChunksOnShard: {skip: isAnInternalCommand},
-    _configsvrCommitMovePrimary:
-        {skip: isAnInternalCommand},  // Can be removed once 6.0 is last LTS
+    _configsvrCommitMovePrimary: {skip: isAnInternalCommand}, // Can be removed once 6.0 is last LTS
     _configsvrCommitRefineCollectionShardKey: {skip: isAnInternalCommand},
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
     _configsvrCommitShardRemoval: {skip: isAnInternalCommand},
@@ -278,7 +273,7 @@ let viewsCommandTests = {
     balancerStop: {skip: isUnrelated},
     buildInfo: {skip: isUnrelated},
     bulkWrite: {skip: isUnrelated},
-    captrunc: {skip: "removed"},  // TODO: (SERVER-94847): Remove this case.
+    captrunc: {skip: "removed"}, // TODO: (SERVER-94847): Remove this case.
     changePrimary: {skip: "Tested in sharding/change_primary.js"},
     checkMetadataConsistency: {
         command: {checkMetadataConsistency: "view"},
@@ -341,23 +336,23 @@ let viewsCommandTests = {
     },
     createRole: {
         command: {createRole: "testrole", privileges: [], roles: []},
-        setup: function(conn) {
+        setup: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
         },
-        teardown: function(conn) {
+        teardown: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
-        }
+        },
     },
     createSearchIndexes: {skip: isUnrelated},
     createUnsplittableCollection: {skip: isUnrelated},
     createUser: {
         command: {createUser: "testuser", pwd: "testpass", roles: []},
-        setup: function(conn) {
+        setup: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllUsersFromDatabase: 1}));
         },
-        teardown: function(conn) {
+        teardown: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllUsersFromDatabase: 1}));
-        }
+        },
     },
     currentOp: {skip: isUnrelated},
     dataSize: {
@@ -366,8 +361,8 @@ let viewsCommandTests = {
     },
     dbCheck: {command: {dbCheck: "view"}, expectFailure: true},
     dbHash: {
-        command: function(conn) {
-            let getHash = function() {
+        command: function (conn) {
+            let getHash = function () {
                 let cmd = {dbHash: 1};
                 let res = conn.runCommand(cmd);
                 assert.commandWorked(res, tojson(cmd));
@@ -375,14 +370,16 @@ let viewsCommandTests = {
             };
             // The checksum below should change if we change the views, but not otherwise.
             let hash1 = getHash();
-            assert.commandWorked(conn.runCommand({create: "view2", viewOn: "view"}),
-                                 "could not create view 'view2' on 'view'");
+            assert.commandWorked(
+                conn.runCommand({create: "view2", viewOn: "view"}),
+                "could not create view 'view2' on 'view'",
+            );
             let hash2 = getHash();
             assert.neq(hash1, hash2, "expected hash to change after creating new view");
             assert.commandWorked(conn.runCommand({drop: "view2"}), "problem dropping view2");
             let hash3 = getHash();
             assert.eq(hash1, hash3, "hash should be the same again after removing 'view2'");
-        }
+        },
     },
     dbStats: {command: {dbStats: 1}},
     delete: {command: {delete: "view", deletes: [{q: {x: 1}, limit: 1}]}, expectFailure: true},
@@ -402,18 +399,17 @@ let viewsCommandTests = {
     dropIndexes: {command: {dropIndexes: "view", index: "a_1"}, expectFailure: true},
     dropRole: {
         command: {dropRole: "testrole"},
-        setup: function(conn) {
-            assert.commandWorked(
-                conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
+        setup: function (conn) {
+            assert.commandWorked(conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
         },
-        teardown: function(conn) {
+        teardown: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
-        }
+        },
     },
     dropSearchIndex: {skip: isUnrelated},
     dropUser: {skip: isUnrelated},
     echo: {skip: isUnrelated},
-    emptycapped: {skip: "removed"},  // TODO (SERVER-92950): Remove this case.
+    emptycapped: {skip: "removed"}, // TODO (SERVER-92950): Remove this case.
     enableSharding: {skip: "Tested as part of shardCollection"},
     endSessions: {skip: isUnrelated},
     explain: {command: {explain: {count: "view"}}},
@@ -422,7 +418,7 @@ let viewsCommandTests = {
     find: {skip: "tested in views/views_find.js & views/views_sharded.js"},
     findAndModify: {
         command: {findAndModify: "view", query: {a: 1}, update: {$set: {a: 2}}},
-        expectFailure: true
+        expectFailure: true,
     },
     flushRouterConfig: {skip: isUnrelated},
     fsync: {skip: isUnrelated},
@@ -436,26 +432,23 @@ let viewsCommandTests = {
     getDiagnosticData: {skip: isUnrelated},
     getLog: {skip: isUnrelated},
     getMore: {
-        setup: function(conn) {
+        setup: function (conn) {
             assert.commandWorked(conn.collection.remove({}));
             assert.commandWorked(conn.collection.insert([{_id: 1}, {_id: 2}, {_id: 3}]));
         },
-        command: function(conn) {
+        command: function (conn) {
             function testGetMoreForCommand(cmd) {
                 let res = conn.runCommand(cmd);
                 assert.commandWorked(res, tojson(cmd));
                 let cursor = res.cursor;
-                assert.eq(
-                    cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
+                assert.eq(cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
                 let expectedFirstBatch = [{_id: 1}, {_id: 2}];
                 assert.eq(cursor.firstBatch, expectedFirstBatch, "returned wrong firstBatch");
                 let getmoreCmd = {getMore: cursor.id, collection: "view"};
                 res = conn.runCommand(getmoreCmd);
 
                 assert.commandWorked(res, tojson(getmoreCmd));
-                assert.eq("test.view",
-                          res.cursor.ns,
-                          "expected view namespace in cursor: " + tojson(res));
+                assert.eq("test.view", res.cursor.ns, "expected view namespace in cursor: " + tojson(res));
             }
             // find command.
             let findCmd = {find: "view", filter: {_id: {$gt: 0}}, batchSize: 2};
@@ -465,10 +458,10 @@ let viewsCommandTests = {
             let aggCmd = {
                 aggregate: "view",
                 pipeline: [{$match: {_id: {$gt: 0}}}],
-                cursor: {batchSize: 2}
+                cursor: {batchSize: 2},
             };
             testGetMoreForCommand(aggCmd);
-        }
+        },
     },
     getParameter: {skip: isUnrelated},
     getQueryableEncryptionCountInfo: {skip: isAnInternalCommand},
@@ -480,7 +473,7 @@ let viewsCommandTests = {
         expectFailure: !TestData.testingReplicaSetEndpoint,
         expectedErrorCode: ErrorCodes.ShardingStateNotInitialized,
         isAdminCommand: true,
-        skipSharded: true,  // mongos is tested in views/views_sharded.js
+        skipSharded: true, // mongos is tested in views/views_sharded.js
     },
     getTrafficRecordingStatus: {skip: isUnrelated},
     godinsert: {skip: isAnInternalCommand},
@@ -499,18 +492,17 @@ let viewsCommandTests = {
     isdbgrid: {skip: isUnrelated},
     isMaster: {skip: isUnrelated},
     killCursors: {
-        setup: function(conn) {
+        setup: function (conn) {
             assert.commandWorked(conn.collection.remove({}));
             assert.commandWorked(conn.collection.insert([{_id: 1}, {_id: 2}, {_id: 3}]));
         },
-        command: function(conn) {
+        command: function (conn) {
             // First get and check a partial result for an aggregate command.
             let aggCmd = {aggregate: "view", pipeline: [{$sort: {_id: 1}}], cursor: {batchSize: 2}};
             let res = conn.runCommand(aggCmd);
             assert.commandWorked(res, tojson(aggCmd));
             let cursor = res.cursor;
-            assert.eq(
-                cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
+            assert.eq(cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
             let expectedFirstBatch = [{_id: 1}, {_id: 2}];
             assert.eq(cursor.firstBatch, expectedFirstBatch, "aggregate returned wrong firstBatch");
 
@@ -523,12 +515,12 @@ let viewsCommandTests = {
                 cursorsNotFound: [],
                 cursorsAlive: [],
                 cursorsUnknown: [],
-                ok: 1
+                ok: 1,
             };
             delete res.operationTime;
             delete res.$clusterTime;
             assert.eq(expectedRes, res, "unexpected result for: " + tojson(killCursorsCmd));
-        }
+        },
     },
     killOp: {skip: isUnrelated},
     killSessions: {skip: isUnrelated},
@@ -548,9 +540,8 @@ let viewsCommandTests = {
     logout: {skip: isUnrelated},
     makeSnapshot: {skip: isAnInternalCommand},
     mapReduce: {
-        command:
-            {mapReduce: "view", map: function() {}, reduce: function(key, vals) {}, out: "out"},
-        expectFailure: true
+        command: {mapReduce: "view", map: function () {}, reduce: function (key, vals) {}, out: "out"},
+        expectFailure: true,
     },
     mergeAllChunksOnShard: {skip: isUnrelated},
     mergeChunks: {
@@ -602,18 +593,17 @@ let viewsCommandTests = {
         expectedErrorCode: [ErrorCodes.IllegalOperation, ErrorCodes.CommandNotSupportedOnView],
     },
     releaseMemory: {
-        setup: function(conn) {
+        setup: function (conn) {
             assert.commandWorked(conn.collection.remove({}));
             assert.commandWorked(conn.collection.insert([{_id: 1}, {_id: 2}, {_id: 3}]));
         },
-        command: function(conn) {
+        command: function (conn) {
             // First get and check a partial result for an aggregate command.
             let aggCmd = {aggregate: "view", pipeline: [{$sort: {_id: 1}}], cursor: {batchSize: 2}};
             let res = conn.runCommand(aggCmd);
             assert.commandWorked(res, tojson(aggCmd));
             let cursor = res.cursor;
-            assert.eq(
-                cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
+            assert.eq(cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
             let expectedFirstBatch = [{_id: 1}, {_id: 2}];
             assert.eq(cursor.firstBatch, expectedFirstBatch, "aggregate returned wrong firstBatch");
 
@@ -626,12 +616,12 @@ let viewsCommandTests = {
                 cursorsNotFound: [],
                 cursorsCurrentlyPinned: [],
                 cursorsWithErrors: [],
-                ok: 1
+                ok: 1,
             };
             delete res.operationTime;
             delete res.$clusterTime;
             assert.eq(expectedRes, res, "unexpected result for: " + tojson(releaseMemoryCmd));
-        }
+        },
     },
     removeShard: {skip: isUnrelated},
     removeShardFromZone: {skip: isUnrelated},
@@ -648,7 +638,7 @@ let viewsCommandTests = {
             expectFailure: true,
             expectedErrorCode: ErrorCodes.NamespaceExists,
             skipSharded: true,
-        }
+        },
     ],
     repairShardedCollectionChunksHistory: {
         command: {repairShardedCollectionChunksHistory: "test.view"},
@@ -686,15 +676,14 @@ let viewsCommandTests = {
     revokePrivilegesFromRole: {
         command: {
             revokePrivilegesFromRole: "testrole",
-            privileges: [{resource: {db: "test", collection: "view"}, actions: ["find"]}]
+            privileges: [{resource: {db: "test", collection: "view"}, actions: ["find"]}],
         },
-        setup: function(conn) {
-            assert.commandWorked(
-                conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
+        setup: function (conn) {
+            assert.commandWorked(conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
         },
-        teardown: function(conn) {
+        teardown: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
-        }
+        },
     },
     revokeRolesFromRole: {skip: isUnrelated},
     revokeRolesFromUser: {skip: isUnrelated},
@@ -703,7 +692,7 @@ let viewsCommandTests = {
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
         skipStandalone: true,
         expectFailure: true,
-        isAdminCommand: true
+        isAdminCommand: true,
     },
     rolesInfo: {skip: isUnrelated},
     rotateCertificates: {skip: isUnrelated},
@@ -750,7 +739,7 @@ let viewsCommandTests = {
             max: {x: 0},
             keyPattern: {x: 1},
             splitKeys: [{x: -2}, {x: -1}],
-            shardVersion: {t: Timestamp(1, 2), e: ObjectId(), v: Timestamp(1, 1)}
+            shardVersion: {t: Timestamp(1, 2), e: ObjectId(), v: Timestamp(1, 1)},
         },
         skipSharded: true,
         expectFailure: true,
@@ -803,23 +792,21 @@ let viewsCommandTests = {
     updateRole: {
         command: {
             updateRole: "testrole",
-            privileges: [{resource: {db: "test", collection: "view"}, actions: ["find"]}]
+            privileges: [{resource: {db: "test", collection: "view"}, actions: ["find"]}],
         },
-        setup: function(conn) {
-            assert.commandWorked(
-                conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
+        setup: function (conn) {
+            assert.commandWorked(conn.runCommand({createRole: "testrole", privileges: [], roles: []}));
         },
-        teardown: function(conn) {
+        teardown: function (conn) {
             assert.commandWorked(conn.runCommand({dropAllRolesFromDatabase: 1}));
-        }
+        },
     },
     updateSearchIndex: {skip: isUnrelated},
     updateUser: {skip: isUnrelated},
     updateZoneKeyRange: {skip: isUnrelated},
     usersInfo: {skip: isUnrelated},
     validate: {command: {validate: "view"}, expectFailure: true},
-    validateDBMetadata:
-        {command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}}},
+    validateDBMetadata: {command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}}},
     voteAbortIndexBuild: {skip: isUnrelated},
     voteCommitImportCollection: {skip: isUnrelated},
     voteCommitIndexBuild: {skip: isUnrelated},
@@ -828,14 +815,14 @@ let viewsCommandTests = {
     waitForFailPoint: {skip: isUnrelated},
     getShardingReady: {skip: isAnInternalCommand},
     whatsmyuri: {skip: isUnrelated},
-    whatsmysni: {skip: isUnrelated}
+    whatsmysni: {skip: isUnrelated},
 };
 
-commandsRemovedFromMongodSinceLastLTS.forEach(function(cmd) {
+commandsRemovedFromMongodSinceLastLTS.forEach(function (cmd) {
     viewsCommandTests[cmd] = {skip: "must define test coverage for backwards compatibility"};
 });
 
-commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
+commandsRemovedFromMongosSinceLastLTS.forEach(function (cmd) {
     viewsCommandTests[cmd] = {skip: "must define test coverage for backwards compatibility"};
 });
 
@@ -844,19 +831,16 @@ commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
  * If 'code' is null we only check for failure, otherwise we confirm error code matches as
  * well. On assert 'msg' is printed.
  */
-let assertCommandOrWriteFailed = function(res, code, msg) {
-    if (res.writeErrors !== undefined)
-        assert.neq(0, res.writeErrors.length, msg);
-    else if (res.code !== null)
-        assert.commandFailedWithCode(res, code, msg);
-    else
-        assert.commandFailed(res, msg);
+let assertCommandOrWriteFailed = function (res, code, msg) {
+    if (res.writeErrors !== undefined) assert.neq(0, res.writeErrors.length, msg);
+    else if (res.code !== null) assert.commandFailedWithCode(res, code, msg);
+    else assert.commandFailed(res, msg);
 };
 
 // Are we on a mongos?
 var hello = db.runCommand("hello");
 assert.commandWorked(hello);
-var isMongos = (hello.msg === "isdbgrid");
+var isMongos = hello.msg === "isdbgrid";
 
 // Obtain a list of all commands.
 let res = db.runCommand({listCommands: 1});
@@ -865,11 +849,9 @@ assert.commandWorked(res);
 let commands = Object.keys(res.commands);
 for (let command of commands) {
     let test = viewsCommandTests[command];
-    assert(test !== undefined,
-           "Coverage failure: must explicitly define a views test for " + command);
+    assert(test !== undefined, "Coverage failure: must explicitly define a views test for " + command);
 
-    if (!(test instanceof Array))
-        test = [test];
+    if (!(test instanceof Array)) test = [test];
     let subtest_nr = 0;
     for (let subtest of test) {
         // Tests can be explicitly skipped. Print the name of the skipped test, as well as
@@ -899,32 +881,26 @@ for (let command of commands) {
         assert.commandWorked(dbHandle.dropDatabase());
         assert.commandWorked(dbHandle.runCommand({create: "view", viewOn: "collection"}));
         assert.commandWorked(dbHandle.collection.insert({x: 1}));
-        if (subtest.setup !== undefined)
-            subtest.setup(dbHandle);
+        if (subtest.setup !== undefined) subtest.setup(dbHandle);
 
         // Execute the command. Print the command name for the first subtest, as otherwise
         // it may be hard to figure out what command caused a failure.
-        if (!subtest_nr++)
-            print("Testing " + command);
+        if (!subtest_nr++) print("Testing " + command);
 
-        if (subtest.isAdminCommand)
-            commandHandle = db.getSiblingDB("admin");
+        if (subtest.isAdminCommand) commandHandle = db.getSiblingDB("admin");
 
         if (subtest.expectFailure) {
             let expectedErrorCode = subtest.expectedErrorCode;
-            if (expectedErrorCode === undefined)
-                expectedErrorCode = ErrorCodes.CommandNotSupportedOnView;
+            if (expectedErrorCode === undefined) expectedErrorCode = ErrorCodes.CommandNotSupportedOnView;
 
-            assertCommandOrWriteFailed(commandHandle.runCommand(subtest.command),
-                                       expectedErrorCode,
-                                       tojson(subtest.command));
-        } else if (subtest.command instanceof Function)
-            subtest.command(commandHandle);
-        else
-            assert.commandWorked(commandHandle.runCommand(subtest.command),
-                                 tojson(subtest.command));
+            assertCommandOrWriteFailed(
+                commandHandle.runCommand(subtest.command),
+                expectedErrorCode,
+                tojson(subtest.command),
+            );
+        } else if (subtest.command instanceof Function) subtest.command(commandHandle);
+        else assert.commandWorked(commandHandle.runCommand(subtest.command), tojson(subtest.command));
 
-        if (subtest.teardown !== undefined)
-            subtest.teardown(dbHandle);
+        if (subtest.teardown !== undefined) subtest.teardown(dbHandle);
     }
 }

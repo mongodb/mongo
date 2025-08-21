@@ -39,6 +39,8 @@ assert(s.getIndexKeys()[0]._id, "no _id index");
 
 // Renaming from system.js to another system namespace is an existing
 // check handled by both the access control system and command namespace checking.
-assert.commandFailedWithCode(s.renameCollection('system.js_old'),
-                             [ErrorCodes.IllegalOperation, ErrorCodes.Unauthorized]);
-assert.commandFailedWithCode(s.renameCollection('old_system_js'), ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(s.renameCollection("system.js_old"), [
+    ErrorCodes.IllegalOperation,
+    ErrorCodes.Unauthorized,
+]);
+assert.commandFailedWithCode(s.renameCollection("old_system_js"), ErrorCodes.IllegalOperation);

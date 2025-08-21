@@ -11,10 +11,10 @@
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {numDocs: 1000};
 
-    const states = (function() {
+    const states = (function () {
         function query(db, collName) {
             if (this.shouldSkipTest) {
                 return;
@@ -25,21 +25,23 @@ export const $config = (function() {
             function getQueryResults() {
                 let arr = null;
                 try {
-                    const cursor = db[collName]
-                          .aggregate([
-                              {$match: {_id: {$gt: startingId}}},
-                              {
-                                  $graphLookup: {
-                                      from: collName,
-                                      startWith: "$to",
-                                      connectToField: "_id",
-                                      connectFromField: "to",
-                                      maxDepth: 10,
-                                      as: "out",
-                                  }
-                              },
-                              {$limit: limitAmount}
-                          ], {cursor: {batchSize: limitAmount + 1}});
+                    const cursor = db[collName].aggregate(
+                        [
+                            {$match: {_id: {$gt: startingId}}},
+                            {
+                                $graphLookup: {
+                                    from: collName,
+                                    startWith: "$to",
+                                    connectToField: "_id",
+                                    connectFromField: "to",
+                                    maxDepth: 10,
+                                    as: "out",
+                                },
+                            },
+                            {$limit: limitAmount},
+                        ],
+                        {cursor: {batchSize: limitAmount + 1}},
+                    );
 
                     arr = cursor.toArray();
                 } catch (e) {
@@ -80,8 +82,10 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         // TODO SERVER-88936: Remove this field and associated checks once the flag is active on
         // last-lts.
-        this.shouldSkipTest = TestData.runInsideTransaction && cluster.isSharded() &&
-            !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'AllowAdditionalParticipants');
+        this.shouldSkipTest =
+            TestData.runInsideTransaction &&
+            cluster.isSharded() &&
+            !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "AllowAdditionalParticipants");
         if (this.shouldSkipTest) {
             return;
         }
@@ -93,8 +97,7 @@ export const $config = (function() {
         // otherwise it will be 24 hours during testing.
         this.originalTransactionLifetimeLimitSeconds = {};
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(
-                db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
+            const res = assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
             this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
         });
 
@@ -113,11 +116,12 @@ export const $config = (function() {
         // TODO SERVER-89663: We restore the original transaction lifetime limit since there may be
         // concurrent executions that relied on the old value.
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                transactionLifetimeLimitSeconds:
-                    this.originalTransactionLifetimeLimitSeconds[db.getMongo().host]
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    transactionLifetimeLimitSeconds: this.originalTransactionLifetimeLimitSeconds[db.getMongo().host],
+                }),
+            );
         });
     }
 
@@ -125,7 +129,7 @@ export const $config = (function() {
         threadCount: 5,
         iterations: 50,
         states: states,
-        startState: 'query',
+        startState: "query",
         transitions: transitions,
         data: data,
         setup: setup,

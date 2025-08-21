@@ -4,7 +4,7 @@
  * @tags: [uses_transactions, requires_db_locking, assumes_unsharded_collection]
  */
 
-let dbName = 'drop_collection_not_blocked_by_txn';
+let dbName = "drop_collection_not_blocked_by_txn";
 let mydb = db.getSiblingDB(dbName);
 
 assert.commandWorked(mydb.runCommand({insert: "a", documents: [{x: 1}]}));

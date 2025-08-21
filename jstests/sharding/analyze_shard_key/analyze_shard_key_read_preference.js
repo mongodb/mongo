@@ -6,9 +6,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const numShards = 2;
 const analyzeShardKeyNumMostCommonValues = 5;
@@ -20,10 +18,10 @@ const st = new ShardingTest({
         nodes: [
             {rsConfig: {priority: 1}},
             {rsConfig: {priority: 0}},
-            {rsConfig: {priority: 0, tags: {tag: "analytics"}}}
+            {rsConfig: {priority: 0, tags: {tag: "analytics"}}},
         ],
-        setParameter: {analyzeShardKeyNumMostCommonValues, analyzeShardKeyNumRanges}
-    }
+        setParameter: {analyzeShardKeyNumMostCommonValues, analyzeShardKeyNumRanges},
+    },
 });
 
 /**
@@ -68,47 +66,55 @@ function setUpCollection() {
  * numbers of entries in 'numProfilerEntries' with the numbers of entries found.
  */
 function assertReadPreferenceBasedOnProfiling(
-    node, dbName, collName, comment, startTime, expectedReadPref, numProfilerEntries) {
+    node,
+    dbName,
+    collName,
+    comment,
+    startTime,
+    expectedReadPref,
+    numProfilerEntries,
+) {
     const ns = dbName + "." + collName;
 
-    const analyzeShardKeyProfilerDocs =
-        node.getDB(dbName)
-            .system.profile.find({"command.analyzeShardKey": ns, "command.comment": comment})
-            .toArray();
+    const analyzeShardKeyProfilerDocs = node
+        .getDB(dbName)
+        .system.profile.find({"command.analyzeShardKey": ns, "command.comment": comment})
+        .toArray();
     for (let doc of analyzeShardKeyProfilerDocs) {
-        assert.eq(0,
-                  bsonWoCompare(doc.command.$readPreference, expectedReadPref),
-                  {actual: doc.command.$readPreference, expected: expectedReadPref});
+        assert.eq(0, bsonWoCompare(doc.command.$readPreference, expectedReadPref), {
+            actual: doc.command.$readPreference,
+            expected: expectedReadPref,
+        });
     }
     numProfilerEntries.numAnalyzeShardKey += analyzeShardKeyProfilerDocs.length;
 
-    const aggregateProfilerDocs =
-        node.getDB(dbName)
-            .system.profile.find({"command.aggregate": collName, "command.comment": comment})
-            .toArray();
+    const aggregateProfilerDocs = node
+        .getDB(dbName)
+        .system.profile.find({"command.aggregate": collName, "command.comment": comment})
+        .toArray();
     for (let doc of aggregateProfilerDocs) {
-        assert.eq(0,
-                  bsonWoCompare(doc.command.$readPreference, expectedReadPref),
-                  {actual: doc.command.$readPreference, expected: expectedReadPref});
+        assert.eq(0, bsonWoCompare(doc.command.$readPreference, expectedReadPref), {
+            actual: doc.command.$readPreference,
+            expected: expectedReadPref,
+        });
     }
     numProfilerEntries.numAggregate += aggregateProfilerDocs.length;
 
-    const configAggregateProfilerDocs =
-        node.getDB("config")
-            .system.profile
-            .find({"command.aggregate": "analyzeShardKeySplitPoints", "ts": {$gte: startTime}})
-            .toArray();
+    const configAggregateProfilerDocs = node
+        .getDB("config")
+        .system.profile.find({"command.aggregate": "analyzeShardKeySplitPoints", "ts": {$gte: startTime}})
+        .toArray();
     for (let doc of configAggregateProfilerDocs) {
-        assert.eq(0,
-                  bsonWoCompare(doc.command.$readPreference, expectedReadPref),
-                  {actual: doc.command.$readPreference, expected: expectedReadPref});
+        assert.eq(0, bsonWoCompare(doc.command.$readPreference, expectedReadPref), {
+            actual: doc.command.$readPreference,
+            expected: expectedReadPref,
+        });
     }
     numProfilerEntries.numConfigAggregate += configAggregateProfilerDocs.length;
 }
 
 {
-    jsTest.log(
-        `Test the analyzeShardKey command respects the readPreference specified by the client`);
+    jsTest.log(`Test the analyzeShardKey command respects the readPreference specified by the client`);
     const {dbName, collName} = setUpCollection();
     const ns = dbName + "." + collName;
     // Used to identify the commands performed by the analyzeShardKey command in this test case.
@@ -118,7 +124,7 @@ function assertReadPreferenceBasedOnProfiling(
         analyzeShardKey: ns,
         key: {x: 1},
         $readPreference: {mode: "secondary", tags: [{tag: "analytics"}]},
-        comment
+        comment,
     };
     const expectedReadPref = analyzeShardKeyCmdObj.$readPreference;
 
@@ -130,13 +136,13 @@ function assertReadPreferenceBasedOnProfiling(
         failLocalClients: true,
         failCommands: ["analyzeShardKey"],
         errorCode: ErrorCodes.InternalError,
-        namespace: ns
+        namespace: ns,
     };
     let fps = [
         configureFailPoint(st.rs0.nodes[0], fpName, fpData),
         configureFailPoint(st.rs0.nodes[1], fpName, fpData),
         configureFailPoint(st.rs1.nodes[0], fpName, fpData),
-        configureFailPoint(st.rs1.nodes[1], fpName, fpData)
+        configureFailPoint(st.rs1.nodes[1], fpName, fpData),
     ];
 
     // Turn on profiling on the "analytics" nodes to verify the readPreference used below.
@@ -151,20 +157,24 @@ function assertReadPreferenceBasedOnProfiling(
 
     // Verify that the readPreference is as expected.
     let numProfilerEntries = {numAnalyzeShardKey: 0, numAggregate: 0, numConfigAggregate: 0};
-    assertReadPreferenceBasedOnProfiling(st.rs0.nodes[2],
-                                         dbName,
-                                         collName,
-                                         comment,
-                                         startTime,
-                                         expectedReadPref,
-                                         numProfilerEntries);
-    assertReadPreferenceBasedOnProfiling(st.rs1.nodes[2],
-                                         dbName,
-                                         collName,
-                                         comment,
-                                         startTime,
-                                         expectedReadPref,
-                                         numProfilerEntries);
+    assertReadPreferenceBasedOnProfiling(
+        st.rs0.nodes[2],
+        dbName,
+        collName,
+        comment,
+        startTime,
+        expectedReadPref,
+        numProfilerEntries,
+    );
+    assertReadPreferenceBasedOnProfiling(
+        st.rs1.nodes[2],
+        dbName,
+        collName,
+        comment,
+        startTime,
+        expectedReadPref,
+        numProfilerEntries,
+    );
     assert.gt(numProfilerEntries.numAnalyzeShardKey, 0, numProfilerEntries);
     assert.gt(numProfilerEntries.numAggregate, 0, numProfilerEntries);
     assert.gte(numProfilerEntries.numConfigAggregate, numShards, numProfilerEntries);
@@ -175,12 +185,11 @@ function assertReadPreferenceBasedOnProfiling(
     AnalyzeShardKeyUtil.disableProfiler([st.rs1.nodes[2]], dbName);
     AnalyzeShardKeyUtil.disableProfiler([st.rs1.nodes[2]], "config");
 
-    fps.forEach(fp => fp.off());
+    fps.forEach((fp) => fp.off());
 }
 
 {
-    jsTest.log(
-        `Test the analyzeShardKey command uses readPreference "secondaryPreferred" by default`);
+    jsTest.log(`Test the analyzeShardKey command uses readPreference "secondaryPreferred" by default`);
     const {dbName, collName} = setUpCollection();
     const ns = dbName + "." + collName;
     // Used to identify the commands performed by the analyzeShardKey command in this test case.
@@ -200,13 +209,27 @@ function assertReadPreferenceBasedOnProfiling(
 
     // Verify that the readPreference is as expected.
     let numProfilerEntries = {numAnalyzeShardKey: 0, numAggregate: 0, numConfigAggregate: 0};
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         assertReadPreferenceBasedOnProfiling(
-            node, dbName, collName, comment, startTime, expectedReadPref, numProfilerEntries);
+            node,
+            dbName,
+            collName,
+            comment,
+            startTime,
+            expectedReadPref,
+            numProfilerEntries,
+        );
     });
-    st.rs1.nodes.forEach(node => {
+    st.rs1.nodes.forEach((node) => {
         assertReadPreferenceBasedOnProfiling(
-            node, dbName, collName, comment, startTime, expectedReadPref, numProfilerEntries);
+            node,
+            dbName,
+            collName,
+            comment,
+            startTime,
+            expectedReadPref,
+            numProfilerEntries,
+        );
     });
     assert.gt(numProfilerEntries.numAnalyzeShardKey, 0, numProfilerEntries);
     assert.gt(numProfilerEntries.numAggregate, 0, numProfilerEntries);

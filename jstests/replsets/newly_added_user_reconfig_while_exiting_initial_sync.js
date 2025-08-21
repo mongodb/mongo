@@ -37,16 +37,18 @@ jsTestLog("Adding a new node to the replica set");
 const secondary = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Checking that the 'newlyAdded' field is set on the new node");
 assert(isMemberNewlyAdded(primary, 1));
@@ -57,15 +59,15 @@ assertVoteCount(primary, {
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
     writeMajorityCount: 1,
-    totalMembersCount: 2
+    totalMembersCount: 2,
 });
 
 const baseConfig = rst.getReplSetConfigFromNode();
 
 jsTestLog("Doing a reconfig while exiting initial sync");
 
-const userReconfigFn = function() {
-    const sleepAmount = Math.floor(Math.random() * 3000);  // 0-3000 ms
+const userReconfigFn = function () {
+    const sleepAmount = Math.floor(Math.random() * 3000); // 0-3000 ms
     print("Sleeping for " + sleepAmount + " milliseconds");
     sleep(sleepAmount);
     const res = rs.add({priority: 0, votes: 0, host: "abcde:12345"});
@@ -74,8 +76,7 @@ const userReconfigFn = function() {
 };
 const waitForUserReconfig = startParallelShell(userReconfigFn, primary.port);
 
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 waitForUserReconfig();
 
 jsTestLog("Waiting for 'newlyAdded' field to be removed");
@@ -92,9 +93,7 @@ assertVoteCount(primary, {
 jsTestLog("Making sure we can see the results of the user reconfig");
 const modifiedConfig = rst.getReplSetConfigFromNode();
 assert.eq(3, modifiedConfig.members.length, () => [tojson(baseConfig), tojson(modifiedConfig)]);
-assert.eq("abcde:12345",
-          modifiedConfig.members[2].host,
-          () => [tojson(baseConfig), tojson(modifiedConfig)]);
+assert.eq("abcde:12345", modifiedConfig.members[2].host, () => [tojson(baseConfig), tojson(modifiedConfig)]);
 
 jsTestLog("Making sure set can accept w:2 writes");
 assert.commandWorked(primaryColl.insert({"steady": "state"}, {writeConcern: {w: 2}}));

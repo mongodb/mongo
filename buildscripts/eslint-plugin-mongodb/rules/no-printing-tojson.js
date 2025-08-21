@@ -1,11 +1,11 @@
 const print_fns = [
-    'jsTestLog',
-    'jsTest.log',
-    'jsTest.log.info',
-    'jsTest.log.debug',
-    'jsTest.log.warning',
-    'jsTest.log.error',
-    'print',
+    "jsTestLog",
+    "jsTest.log",
+    "jsTest.log.info",
+    "jsTest.log.debug",
+    "jsTest.log.warning",
+    "jsTest.log.error",
+    "print",
 ];
 
 function flattenMemberExpressionName(expr) {
@@ -19,7 +19,6 @@ function flattenMemberExpressionName(expr) {
 }
 
 export default {
-
     meta: {
         type: "problem",
         docs: {
@@ -30,43 +29,31 @@ export default {
 
     create(context) {
         return {
-            CallExpression: function(node) {
+            CallExpression: function (node) {
                 if (node.callee.type == "MemberExpression") {
                     node.callee.name = flattenMemberExpressionName(node.callee);
+                } else if (node.callee.type != "Identifier") return;
 
-                } else if (node.callee.type != "Identifier")
-                    return;
+                if (print_fns.every((name) => name != node.callee.name)) return;
 
-                if (print_fns.every((name) => name != node.callee.name))
-                    return;
+                node.arguments.forEach((arg) => {
+                    if (arg.type != "CallExpression") return;
 
-                node.arguments.forEach(arg => {
-                    if (arg.type != "CallExpression")
-                        return;
+                    if (arg.callee.type != "Identifier") return;
 
-                    if (arg.callee.type != "Identifier")
-                        return;
+                    if (arg.callee.name != "tojson" && arg.callee.name != "tojsononeline") return;
 
-                    if (arg.callee.name != "tojson" && arg.callee.name != "tojsononeline")
-                        return;
-
-                    context.report(
-                        {
-                            node,
-                            message: `Calling ${arg.callee.name}() as a parameter of ${
-                                node.callee
-                                    .name}(). Consider using toJsonForLog() instead or disable this rule by adding '// eslint-disable-next-line mongodb/no-printing-tojson'`,
-                            fix(fixer) {
-                                return fixer.replaceTextRange(
-                                    [
-                                        arg.callee.start,
-                                        arg.callee.end,
-                                    ],
-                                    "toJsonForLog");
-                            }
-                        });
+                    context.report({
+                        node,
+                        message: `Calling ${arg.callee.name}() as a parameter of ${
+                            node.callee.name
+                        }(). Consider using toJsonForLog() instead or disable this rule by adding '// eslint-disable-next-line mongodb/no-printing-tojson'`,
+                        fix(fixer) {
+                            return fixer.replaceTextRange([arg.callee.start, arg.callee.end], "toJsonForLog");
+                        },
+                    });
                 });
-            }
+            },
         };
-    }
+    },
 };

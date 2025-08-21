@@ -16,12 +16,10 @@
  */
 function waitUntilOpCountIs(opFilter, num) {
     assert.soon(() => {
-        let ops = db.getSiblingDB('admin')
-                      .aggregate([
-                          {$currentOp: {allUsers: true, idleConnections: true}},
-                          {$match: opFilter},
-                      ])
-                      .toArray();
+        let ops = db
+            .getSiblingDB("admin")
+            .aggregate([{$currentOp: {allUsers: true, idleConnections: true}}, {$match: opFilter}])
+            .toArray();
         if (ops.length != num) {
             jsTest.log("Num opeartions: " + ops.length + ", expected: " + num);
             jsTest.log(ops);
@@ -32,7 +30,7 @@ function waitUntilOpCountIs(opFilter, num) {
 }
 
 // Start with a clean DB.
-var fsyncLockDB = db.getSiblingDB('fsyncLockTestDB');
+var fsyncLockDB = db.getSiblingDB("fsyncLockTestDB");
 fsyncLockDB.dropDatabase();
 
 // Tests the db.fsyncLock/fsyncUnlock features.
@@ -52,7 +50,7 @@ db.fsyncUnlock();
 var resFail = fsyncLockDB.runCommand({fsync: 1, lock: 1});
 
 // Start with a clean DB
-var fsyncLockDB = db.getSiblingDB('fsyncLockTestDB');
+var fsyncLockDB = db.getSiblingDB("fsyncLockTestDB");
 fsyncLockDB.dropDatabase();
 
 // Test that a single, regular write works as expected.
@@ -70,14 +68,16 @@ assert.commandFailed(db.adminCommand({fsync: 1, lock: "not_valid_boolean"}));
 // Uses admin automatically and locks the server for writes.
 var fsyncLockRes = db.fsyncLock();
 assert(fsyncLockRes.ok, "fsyncLock command failed against admin DB");
-assert(db.getSiblingDB('admin').runCommand({currentOp: 1}).fsyncLock,
-       "Value in currentOp result incorrect for fsyncLocked server");
+assert(
+    db.getSiblingDB("admin").runCommand({currentOp: 1}).fsyncLock,
+    "Value in currentOp result incorrect for fsyncLocked server",
+);
 
 // Make sure writes are blocked. Spawn a write operation in a separate shell and make sure it
 // is blocked. There is really no way to do that currently, so just check that the write didn't
 // go through.
 var writeOpHandle = startParallelShell("db.getSiblingDB('fsyncLockTestDB').coll.insert({x:1});");
-waitUntilOpCountIs({op: 'insert', ns: 'fsyncLockTestDB.coll', waitingForLock: true}, 1);
+waitUntilOpCountIs({op: "insert", ns: "fsyncLockTestDB.coll", waitingForLock: true}, 1);
 
 // Make sure reads can still run even though there is a pending write and also that the write
 // didn't get through.
@@ -86,8 +86,10 @@ assert.eq(1, fsyncLockDB.coll.find({}).itcount());
 // Unlock and make sure the insert succeeded.
 var fsyncUnlockRes = db.fsyncUnlock();
 assert(fsyncUnlockRes.ok, "fsyncUnlock command failed");
-assert(db.getSiblingDB('admin').runCommand({currentOp: 1}).fsyncLock == null,
-       "fsyncUnlock is not null in currentOp result");
+assert(
+    db.getSiblingDB("admin").runCommand({currentOp: 1}).fsyncLock == null,
+    "fsyncUnlock is not null in currentOp result",
+);
 
 // Make sure the db is unlocked and the initial write made it through.
 writeOpHandle();
@@ -108,23 +110,21 @@ assert(fsyncUnlockRes.ok, "Second execution of fsyncUnlock command failed");
 fsyncLockRes = db.fsyncLock();
 assert.commandWorked(fsyncLockRes);
 assert(fsyncLockRes.lockCount == 1, tojson(fsyncLockRes));
-let currentOp = db.getSiblingDB('admin').runCommand({currentOp: 1});
+let currentOp = db.getSiblingDB("admin").runCommand({currentOp: 1});
 assert.commandWorked(currentOp);
 assert(currentOp.fsyncLock, "Value in currentOp result incorrect for fsyncLocked server");
 
-let shellHandle1 =
-    startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
+let shellHandle1 = startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
 
 fsyncLockRes = db.fsyncLock();
 assert.commandWorked(fsyncLockRes);
 assert(fsyncLockRes.lockCount == 2, tojson(fsyncLockRes));
-currentOp = db.getSiblingDB('admin').runCommand({currentOp: 1});
+currentOp = db.getSiblingDB("admin").runCommand({currentOp: 1});
 assert.commandWorked(currentOp);
 assert(currentOp.fsyncLock, "Value in currentOp result incorrect for fsyncLocked server");
 
-let shellHandle2 =
-    startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
-waitUntilOpCountIs({op: 'insert', ns: 'fsyncLockTestDB.multipleLock', waitingForLock: true}, 2);
+let shellHandle2 = startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
+waitUntilOpCountIs({op: "insert", ns: "fsyncLockTestDB.multipleLock", waitingForLock: true}, 2);
 
 assert.eq(0, fsyncLockDB.multipleLock.find({}).itcount());
 

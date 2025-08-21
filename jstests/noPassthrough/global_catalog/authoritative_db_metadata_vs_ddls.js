@@ -9,18 +9,17 @@
  * ]
  */
 
-import {ShardingTest} from 'jstests/libs/shardingtest.js';
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 3}});
-const db = st.s.getDB('test');
+const db = st.s.getDB("test");
 
 function getDbMetadataFromGlobalCatalog(db) {
-    return db.getSiblingDB('config').databases.findOne({_id: db.getName()});
+    return db.getSiblingDB("config").databases.findOne({_id: db.getName()});
 }
 
 function validateShardCatalog(dbName, shard, expectedDbMetadata) {
-    const dbMetadataFromShard =
-        shard.getDB('config').getCollection('shard.catalog.databases').findOne({_id: dbName});
+    const dbMetadataFromShard = shard.getDB("config").getCollection("shard.catalog.databases").findOne({_id: dbName});
     assert.eq(expectedDbMetadata, dbMetadataFromShard);
 }
 
@@ -36,10 +35,9 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
 }
 
 {
-    jsTest.log('Validating shard database metadata consistency for createDatabase DDL');
+    jsTest.log("Validating shard database metadata consistency for createDatabase DDL");
 
-    assert.commandWorked(
-        db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 
     st.awaitReplicationOnShards();
 
@@ -48,13 +46,13 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
     validateShardCatalog(db.getName(), st.shard0, dbMetadataFromConfig);
 
     // Validate that the db metadata in the shard catalog cache mathes the global catalog.
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         validateShardCatalogCache(db.getName(), node, dbMetadataFromConfig);
     });
 }
 
 {
-    jsTest.log('Validating shard database metadata consistency for movePrimary DDL');
+    jsTest.log("Validating shard database metadata consistency for movePrimary DDL");
 
     assert.commandWorked(db.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}));
 
@@ -67,16 +65,16 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
     validateShardCatalog(db.getName(), st.shard0, null /* expectedDbMetadata */);
 
     // Validate the same for the shard catalog cache.
-    st.rs1.nodes.forEach(node => {
+    st.rs1.nodes.forEach((node) => {
         validateShardCatalogCache(db.getName(), node, dbMetadataFromConfig);
     });
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         validateShardCatalogCache(db.getName(), node, null /* expectedDbMetadata */);
     });
 }
 
 {
-    jsTest.log('Validating shard database metadata consistency for dropDatabase DDL');
+    jsTest.log("Validating shard database metadata consistency for dropDatabase DDL");
 
     assert.commandWorked(db.dropDatabase());
 
@@ -86,10 +84,10 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
     // and shard1.
     validateShardCatalog(db.getName(), st.shard0, null /* expectedDbMetadata */);
     validateShardCatalog(db.getName(), st.shard1, null /* expectedDbMetadata */);
-    st.rs0.nodes.forEach(node => {
+    st.rs0.nodes.forEach((node) => {
         validateShardCatalogCache(db.getName(), node, null /* expectedDbMetadata */);
     });
-    st.rs1.nodes.forEach(node => {
+    st.rs1.nodes.forEach((node) => {
         validateShardCatalogCache(db.getName(), node, null /* expectedDbMetadata */);
     });
 }

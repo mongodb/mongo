@@ -23,7 +23,7 @@ const primary = replTest.getPrimary();
 
 // Initiate a session.
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = primary.getDB(dbName).getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);

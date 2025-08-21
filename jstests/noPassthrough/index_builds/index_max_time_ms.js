@@ -18,14 +18,14 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
 });
 const nodes = rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const testDB = primary.getDB("test");
+const coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({a: 1}));
 
@@ -35,7 +35,7 @@ const createIndexesCmd = {
     createIndexes: coll.getName(),
     indexes: [
         {
-            name: 'a_1',
+            name: "a_1",
             key: {a: 1},
         },
     ],
@@ -44,15 +44,19 @@ const createIndexesCmd = {
     maxTimeMS: 20000,
 };
 
-const createIdx =
-    startParallelShell('assert.commandFailedWithCode(db.getSiblingDB("' + testDB.getName() +
-                           '").runCommand(' + tojson(createIndexesCmd) + '), ' +
-                           'ErrorCodes.MaxTimeMSExpired' +
-                           ');',
-                       primary.port);
+const createIdx = startParallelShell(
+    'assert.commandFailedWithCode(db.getSiblingDB("' +
+        testDB.getName() +
+        '").runCommand(' +
+        tojson(createIndexesCmd) +
+        "), " +
+        "ErrorCodes.MaxTimeMSExpired" +
+        ");",
+    primary.port,
+);
 
 try {
-    IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
+    IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1");
 
     // Index build will be interrupted when the createIndexes command times out.
     IndexBuildTest.waitForIndexBuildToStop(testDB);
@@ -64,6 +68,6 @@ createIdx();
 
 // Check that no new index has been created.  This verifies that the index build was aborted
 // rather than successfully completed.
-IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+IndexBuildTest.assertIndexes(coll, 1, ["_id_"]);
 
 rst.stopSet();

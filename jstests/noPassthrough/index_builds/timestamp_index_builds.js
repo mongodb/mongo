@@ -27,7 +27,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_buil
 const rst = new ReplSetTest({
     name: "timestampingIndexBuilds",
     nodes: 2,
-    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}}
+    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}},
 });
 const nodes = rst.startSet();
 rst.initiate();
@@ -40,8 +40,9 @@ if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapsho
 
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
-assert.commandWorked(rst.getPrimary().adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 function getColl(conn) {
     return conn.getDB(jsTestName())["coll"];
@@ -57,8 +58,9 @@ rst.awaitLastOpCommitted();
 
 // Disable snapshotting on all members of the replica set so that further operations do not
 // enter the majority snapshot.
-nodes.forEach(node => assert.commandWorked(node.adminCommand(
-                  {configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})));
+nodes.forEach((node) =>
+    assert.commandWorked(node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})),
+);
 
 // This test create indexes with majority of nodes not available for replication. So, disabling
 // index build commit quorum.
@@ -75,11 +77,10 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
 
     // Bringing up the node as a standalone should only find the `_id` index.
     {
-        jsTestLog("Starting as a standalone. Ensure only the `_id` index exists. Node: " +
-                  nodeIdentity);
+        jsTestLog("Starting as a standalone. Ensure only the `_id` index exists. Node: " + nodeIdentity);
         let conn = rst.start(nodeIdx, {noReplSet: true, noCleanData: true});
         assert.neq(null, conn, "failed to restart node");
-        IndexBuildTest.assertIndexes(getColl(conn), 1, ['_id_']);
+        IndexBuildTest.assertIndexes(getColl(conn), 1, ["_id_"]);
         rst.stop(nodeIdx);
     }
 
@@ -90,7 +91,7 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
         let conn = rst.start(nodeIdx, {startClean: false}, true);
         rst.awaitSecondaryNodes(null, [conn]);
         conn.setSecondaryOk();
-        IndexBuildTest.assertIndexes(getColl(conn), 2, ['_id_', 'foo_1']);
+        IndexBuildTest.assertIndexes(getColl(conn), 2, ["_id_", "foo_1"]);
         rst.stop(nodeIdx);
     }
 
@@ -98,10 +99,11 @@ for (let nodeIdx = 0; nodeIdx < 2; ++nodeIdx) {
     {
         jsTestLog(
             "Starting as a standalone after replication startup recovery. Ensure only the `_id` index exists. Node: " +
-            nodeIdentity);
+                nodeIdentity,
+        );
         let conn = rst.start(nodeIdx, {noReplSet: true, noCleanData: true});
         assert.neq(null, conn, "failed to restart node");
-        IndexBuildTest.assertIndexes(getColl(conn), 1, ['_id_']);
+        IndexBuildTest.assertIndexes(getColl(conn), 1, ["_id_"]);
         rst.stop(nodeIdx);
     }
 }

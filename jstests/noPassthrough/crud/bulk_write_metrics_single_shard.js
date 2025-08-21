@@ -13,8 +13,11 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     // We are ok with the randomness here since we clearly log the state.
     // TODO SERVER-105762: Remove the 'uweEnabled' check once errorsOnly is enabled.
     const errorsOnly = uweEnabled ? false : Math.random() < 0.5;
-    print(`Running on a ${isMongos ? "ShardingTest" : "ReplSetTest"} with bulkWrite = ${
-        bulkWrite}, errorsOnly = ${errorsOnly} and timeseries = ${timeseries}.`);
+    print(
+        `Running on a ${isMongos ? "ShardingTest" : "ReplSetTest"} with bulkWrite = ${
+            bulkWrite
+        }, errorsOnly = ${errorsOnly} and timeseries = ${timeseries}.`,
+    );
 
     const dbName = "testDB";
     const collName = "testColl";
@@ -23,30 +26,32 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     const testDB = session.getDatabase(dbName);
 
     if (timeseries) {
-        assert.commandWorked(testDB.createCollection(collName, {
-            timeseries: {timeField: "timestamp", bucketMaxSpanSeconds: 1, bucketRoundingSeconds: 1}
-        }));
+        assert.commandWorked(
+            testDB.createCollection(collName, {
+                timeseries: {timeField: "timestamp", bucketMaxSpanSeconds: 1, bucketRoundingSeconds: 1},
+            }),
+        );
     }
 
     if (isMongos) {
-        assert.commandWorked(testDB.adminCommand({'enableSharding': dbName}));
+        assert.commandWorked(testDB.adminCommand({"enableSharding": dbName}));
 
-        assert.commandWorked(
-            testDB.adminCommand({shardCollection: namespace, key: {timestamp: 1}}));
+        assert.commandWorked(testDB.adminCommand({shardCollection: namespace, key: {timestamp: 1}}));
     }
 
     const coll = testDB[collName];
 
-    const metricChecker =
-        new BulkWriteMetricChecker(testDB,
-                                   [namespace],
-                                   bulkWrite,
-                                   isMongos,
-                                   false /*fle*/,
-                                   errorsOnly,
-                                   retryCount,
-                                   timeseries,
-                                   ISODate("2021-05-18T00:00:00.000Z") /* defaultTimestamp */);
+    const metricChecker = new BulkWriteMetricChecker(
+        testDB,
+        [namespace],
+        bulkWrite,
+        isMongos,
+        false /*fle*/,
+        errorsOnly,
+        retryCount,
+        timeseries,
+        ISODate("2021-05-18T00:00:00.000Z") /* defaultTimestamp */,
+    );
 
     const key = ISODate("2024-01-30T00:00:00.00Z");
     metricChecker.executeCommand({insert: collName, documents: [{_id: 1, timestamp: key}]});
@@ -59,11 +64,11 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
             updated: 1,
             updateCount: 1,
             updateShardField: "oneShard",
-            opcounterFactor:
-                !isMongos || !timeseries ? 1 : 2  // TODO SERVER-85757 remove opcounterFactor.
+            opcounterFactor: !isMongos || !timeseries ? 1 : 2, // TODO SERVER-85757 remove opcounterFactor.
         },
         session.getSessionId(),
-        NumberLong(13));
+        NumberLong(13),
+    );
     coll.drop();
 }
 
@@ -75,9 +80,9 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         nodeOptions: {
             setParameter: {
                 // Required for serverStatus() to have opWriteConcernCounters.
-                reportOpWriteConcernCountersInServerStatus: true
-            }
-        }
+                reportOpWriteConcernCountersInServerStatus: true,
+            },
+        },
     });
 
     replTest.startSet();

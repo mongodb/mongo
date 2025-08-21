@@ -36,8 +36,7 @@ function login(userObj, thingToUse) {
 }
 
 function logout(userObj, thingToUse) {
-    if (!thingToUse)
-        thingToUse = s;
+    if (!thingToUse) thingToUse = s;
 
     s.getDB(userObj.db).runCommand({logout: 1});
 }
@@ -45,7 +44,7 @@ function logout(userObj, thingToUse) {
 function getShardName(rsTest) {
     var primary = rsTest.getPrimary();
     var config = primary.getDB("local").system.replset.findOne();
-    var members = config.members.map(function(elem) {
+    var members = config.members.map(function (elem) {
         return elem.host;
     });
     return config._id + "/" + members.join(",");
@@ -58,21 +57,25 @@ var s = new ShardingTest({
     other: {keyFile: "jstests/libs/key1", chunkSize: 1},
 });
 
-if (s.getDB('admin').runCommand('buildInfo').bits < 64) {
-    print('Skipping test on 32-bit platforms');
+if (s.getDB("admin").runCommand("buildInfo").bits < 64) {
+    print("Skipping test on 32-bit platforms");
     quit();
 }
 
 print("Configuration: Add user " + tojson(adminUser));
-s.getDB(adminUser.db)
-    .createUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
+s.getDB(adminUser.db).createUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
 login(adminUser);
 
 // Set the chunk size, disable the secondary throttle (so the test doesn't run so slow)
 assert.commandWorked(
-    s.getDB("config").settings.update({_id: "balancer"},
-                                      {$set: {"_secondaryThrottle": false, "_waitForDelete": true}},
-                                      {upsert: true}));
+    s
+        .getDB("config")
+        .settings.update(
+            {_id: "balancer"},
+            {$set: {"_secondaryThrottle": false, "_waitForDelete": true}},
+            {upsert: true},
+        ),
+);
 
 printjson(s.getDB("config").settings.find().toArray());
 
@@ -85,7 +88,7 @@ d1.startSet({keyFile: "jstests/libs/key2", shardsvr: ""});
 d1.initiate();
 
 print("d1 initiated");
-var shardName = authutil.asCluster(d1.nodes, "jstests/libs/key2", function() {
+var shardName = authutil.asCluster(d1.nodes, "jstests/libs/key2", function () {
     return getShardName(d1);
 });
 
@@ -133,18 +136,17 @@ s.getDB("admin").runCommand({shardCollection: "test.foo", key: {x: 1}});
 
 d1.awaitSecondaryNodes(5 * 60 * 1000);
 
-s.getDB(testUser.db)
-    .createUser({user: testUser.username, pwd: testUser.password, roles: jsTest.basicUserRoles});
+s.getDB(testUser.db).createUser({user: testUser.username, pwd: testUser.password, roles: jsTest.basicUserRoles});
 s.getDB(testUserReadOnly.db).createUser({
     user: testUserReadOnly.username,
     pwd: testUserReadOnly.password,
-    roles: jsTest.readOnlyUserRoles
+    roles: jsTest.readOnlyUserRoles,
 });
 
 logout(adminUser);
 
 print("query try");
-var e = assert.throws(function() {
+var e = assert.throws(function () {
     s.s.getDB("foo").bar.findOne();
 });
 printjson(e);
@@ -169,7 +171,7 @@ d2.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
 d2.initiate();
 d2.awaitSecondaryNodes();
 
-shardName = authutil.asCluster(d2.nodes, "jstests/libs/key1", function() {
+shardName = authutil.asCluster(d2.nodes, "jstests/libs/key1", function () {
     return getShardName(d2);
 });
 
@@ -186,7 +188,7 @@ s.getDB("test").foo.remove({});
 
 var num = 10;
 assert.commandWorked(s.s.adminCommand({split: "test.foo", middle: {x: num / 2}}));
-const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+const bigString = "X".repeat(1024 * 1024); // 1MB
 var bulk = s.getDB("test").foo.initializeUnorderedBulkOp();
 for (i = 0; i < num; i++) {
     bulk.insert({_id: i, x: i, abc: "defg", date: new Date(), str: bigString});
@@ -224,9 +226,7 @@ if (numDocs != num) {
         traceMissingDoc(s.getDB("test").foo, {_id: missingDocNumbers[i], x: missingDocNumbers[i]});
     }
 
-    assert(false,
-           "Number of docs found does not equal the number inserted. Missing docs: " +
-               missingDocNumbers);
+    assert(false, "Number of docs found does not equal the number inserted. Missing docs: " + missingDocNumbers);
 }
 
 // We're only sure we aren't duplicating documents iff there's no balancing going on here
@@ -248,22 +248,26 @@ logout(adminUser);
 d1.awaitSecondaryNodes(5 * 60 * 1000);
 d2.awaitSecondaryNodes(5 * 60 * 1000);
 
-authutil.asCluster(d1.nodes, "jstests/libs/key1", function() {
+authutil.asCluster(d1.nodes, "jstests/libs/key1", function () {
     d1.awaitReplication();
 });
-authutil.asCluster(d2.nodes, "jstests/libs/key1", function() {
+authutil.asCluster(d2.nodes, "jstests/libs/key1", function () {
     d2.awaitReplication();
 });
 
 // add admin on shard itself, hack to prevent localhost auth bypass
 d1.getPrimary()
     .getDB(adminUser.db)
-    .createUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles},
-                {w: 3, wtimeout: 60000});
+    .createUser(
+        {user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles},
+        {w: 3, wtimeout: 60000},
+    );
 d2.getPrimary()
     .getDB(adminUser.db)
-    .createUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles},
-                {w: 3, wtimeout: 60000});
+    .createUser(
+        {user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles},
+        {w: 3, wtimeout: 60000},
+    );
 
 login(testUser);
 print("testing map reduce");
@@ -273,13 +277,13 @@ print("testing map reduce");
 // properly tested here since addresses are localhost, which is more permissive.
 var res = s.getDB("test").runCommand({
     mapreduce: "foo",
-    map: function() {
+    map: function () {
         emit(this.x, 1);
     },
-    reduce: function(key, values) {
+    reduce: function (key, values) {
         return values.length;
     },
-    out: "mrout"
+    out: "mrout",
 });
 printjson(res);
 assert.commandWorked(res);
@@ -291,7 +295,7 @@ var readOnlyS = new Mongo(s.getDB("test").getMongo().host);
 var readOnlyDB = readOnlyS.getDB("test");
 
 print("   testing find that should fail");
-assert.throws(function() {
+assert.throws(function () {
     readOnlyDB.foo.findOne();
 });
 

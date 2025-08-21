@@ -10,9 +10,11 @@ const sourceColl = mongosDB["source_coll"];
 const outputCollSameDb = mongosDB[jsTestName() + "_merge"];
 
 function testMerge(sourceColl, targetColl, shardedSource, shardedTarget) {
-    jsTestLog(`Testing $merge from ${sourceColl.getFullName()} ` +
-              `(${shardedSource ? "sharded" : "unsharded"}) to ${targetColl.getFullName()} ` +
-              `(${shardedTarget ? "sharded" : "unsharded"})`);
+    jsTestLog(
+        `Testing $merge from ${sourceColl.getFullName()} ` +
+            `(${shardedSource ? "sharded" : "unsharded"}) to ${targetColl.getFullName()} ` +
+            `(${shardedTarget ? "sharded" : "unsharded"})`,
+    );
     sourceColl.drop();
     targetColl.drop();
     assert.commandWorked(targetColl.runCommand("create"));
@@ -33,29 +35,37 @@ function testMerge(sourceColl, targetColl, shardedSource, shardedTarget) {
         assert.commandWorked(targetColl.remove({}));
         if (whenNotMatchedMode == "fail") {
             // Test whenNotMatchedMode: "fail" to an existing collection.
-            assertErrorCode(sourceColl,
-                            [{
-                                $merge: {
-                                    into: {
-                                        db: targetColl.getDB().getName(),
-                                        coll: targetColl.getName(),
-                                    },
-                                    whenMatched: whenMatchedMode,
-                                    whenNotMatched: whenNotMatchedMode
-                                }
-                            }],
-                            13113);
-        } else {
-            assert.doesNotThrow(() => sourceColl.aggregate([{
-                $merge: {
-                    into: {
-                        db: targetColl.getDB().getName(),
-                        coll: targetColl.getName(),
+            assertErrorCode(
+                sourceColl,
+                [
+                    {
+                        $merge: {
+                            into: {
+                                db: targetColl.getDB().getName(),
+                                coll: targetColl.getName(),
+                            },
+                            whenMatched: whenMatchedMode,
+                            whenNotMatched: whenNotMatchedMode,
+                        },
                     },
-                    whenMatched: whenMatchedMode,
-                    whenNotMatched: whenNotMatchedMode
-                }
-            }]));
+                ],
+                13113,
+            );
+        } else {
+            assert.doesNotThrow(() =>
+                sourceColl.aggregate([
+                    {
+                        $merge: {
+                            into: {
+                                db: targetColl.getDB().getName(),
+                                coll: targetColl.getName(),
+                            },
+                            whenMatched: whenMatchedMode,
+                            whenNotMatched: whenNotMatchedMode,
+                        },
+                    },
+                ]),
+            );
             assert.eq(whenNotMatchedMode == "discard" ? 0 : 10, targetColl.find().itcount());
         }
 
@@ -68,29 +78,37 @@ function testMerge(sourceColl, targetColl, shardedSource, shardedTarget) {
 
         if (whenMatchedMode == "fail") {
             // Test whenMatched: "fail" to an existing collection with unique key conflicts.
-            assertErrorCode(sourceColl,
-                            [{
-                                $merge: {
-                                    into: {
-                                        db: targetColl.getDB().getName(),
-                                        coll: targetColl.getName(),
-                                    },
-                                    whenMatched: whenMatchedMode,
-                                    whenNotMatched: whenNotMatchedMode
-                                }
-                            }],
-                            ErrorCodes.DuplicateKey);
-        } else {
-            assert.doesNotThrow(() => sourceColl.aggregate([{
-                $merge: {
-                    into: {
-                        db: targetColl.getDB().getName(),
-                        coll: targetColl.getName(),
+            assertErrorCode(
+                sourceColl,
+                [
+                    {
+                        $merge: {
+                            into: {
+                                db: targetColl.getDB().getName(),
+                                coll: targetColl.getName(),
+                            },
+                            whenMatched: whenMatchedMode,
+                            whenNotMatched: whenNotMatchedMode,
+                        },
                     },
-                    whenMatched: whenMatchedMode,
-                    whenNotMatched: whenNotMatchedMode
-                }
-            }]));
+                ],
+                ErrorCodes.DuplicateKey,
+            );
+        } else {
+            assert.doesNotThrow(() =>
+                sourceColl.aggregate([
+                    {
+                        $merge: {
+                            into: {
+                                db: targetColl.getDB().getName(),
+                                coll: targetColl.getName(),
+                            },
+                            whenMatched: whenMatchedMode,
+                            whenNotMatched: whenNotMatchedMode,
+                        },
+                    },
+                ]),
+            );
         }
         assert.eq(15, targetColl.find().itcount());
     });

@@ -18,8 +18,8 @@ export function randomLongLat() {
         // onto a sphere.
         const longRadians = Math.atan2(y, x);
         const latRadians = Math.atan2(z, Math.sqrt(x * x + y * y));
-        const long = longRadians * 180 / Math.PI;
-        const lat = latRadians * 180 / Math.PI;
+        const long = (longRadians * 180) / Math.PI;
+        const lat = (latRadians * 180) / Math.PI;
         return [long, lat];
     }
 }

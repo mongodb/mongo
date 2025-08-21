@@ -19,8 +19,7 @@ function getTxnTableEntry(db) {
 const replTest = new ReplSetTest({
     nodes: 3,
     nodeOptions: {
-        setParameter:
-            {maxNumberOfTransactionOperationsInSingleOplogEntry: 1, bgSyncOplogFetcherBatchSize: 1}
+        setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 1, bgSyncOplogFetcherBatchSize: 1},
     },
 });
 
@@ -30,7 +29,7 @@ config.members[2].priority = 0;
 // Disable primary catchup and chaining.
 config.settings = {
     catchUpTimeoutMillis: 0,
-    chainingAllowed: false
+    chainingAllowed: false,
 };
 replTest.initiate(config);
 
@@ -48,14 +47,15 @@ testDB.dropDatabase();
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 // Prevent the priority: 0 node from fetching new ops so that it can vote for the new primary.
-const stopReplProducerFailPoint = configureFailPoint(replTest.nodes[2], 'stopReplProducer');
+const stopReplProducerFailPoint = configureFailPoint(replTest.nodes[2], "stopReplProducer");
 
 jsTest.log("Stop secondary oplog replication before the last operation in the transaction.");
 // The stopReplProducerOnDocument failpoint ensures that secondary stops replicating before
 // applying the last operation in the transaction. This depends on the oplog fetcher batch size
 // being 1.
-const stopReplProducerOnDocumentFailPoint = configureFailPoint(
-    newPrimary, "stopReplProducerOnDocument", {document: {"applyOps.o._id": "last in txn"}});
+const stopReplProducerOnDocumentFailPoint = configureFailPoint(newPrimary, "stopReplProducerOnDocument", {
+    document: {"applyOps.o._id": "last in txn"},
+});
 
 jsTestLog("Starting transaction");
 const session = primary.startSession({causalConsistency: false});
@@ -63,7 +63,7 @@ const sessionDB = session.getDatabase(dbName);
 session.startTransaction({writeConcern: {w: "majority", wtimeout: 500}});
 
 const doc = {
-    _id: "first in txn on primary " + primary
+    _id: "first in txn on primary " + primary,
 };
 assert.commandWorked(sessionDB.getCollection(collName).insert(doc));
 assert.commandWorked(sessionDB.getCollection(collName).insert({_id: "last in txn"}));
@@ -81,8 +81,7 @@ const startOpTime = testDB.getSiblingDB("local").oplog.rs.findOne({ts: commitOpT
 jsTestLog("Wait for the new primary to block on fail point.");
 stopReplProducerOnDocumentFailPoint.wait();
 
-jsTestLog("Wait for the new primary to apply the first op of transaction at timestamp: " +
-          tojson(startOpTime));
+jsTestLog("Wait for the new primary to apply the first op of transaction at timestamp: " + tojson(startOpTime));
 assert.soon(() => {
     const lastOpTime = getLastOpTime(newPrimary);
     jsTestLog("Current lastOpTime on the new primary: " + tojson(lastOpTime));
@@ -116,13 +115,15 @@ jsTestLog("The transaction has been aborted on the new primary.");
 const newSession = new _DelegatingDriverSession(newPrimary, session);
 const newSessionDB = newSession.getDatabase(dbName);
 // The transaction has been aborted.
-assert.commandFailedWithCode(newSessionDB.adminCommand({
-    commitTransaction: 1,
-    txnNumber: NumberLong(newSession.getTxnNumber_forTesting()),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-}),
-                             ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(
+    newSessionDB.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(newSession.getTxnNumber_forTesting()),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    }),
+    ErrorCodes.NoSuchTransaction,
+);
 
 // The old primary rolls back the local committed transaction.
 assert.eq(testDB.getCollection(collName).find().itcount(), 0);
@@ -139,7 +140,7 @@ assert(!txnTableEntry.hasOwnProperty("startOpTime"));
 jsTestLog("Running another transaction on the new primary");
 newSession.startTransaction({writeConcern: {w: 3}});
 const secondDoc = {
-    _id: "second-doc"
+    _id: "second-doc",
 };
 assert.commandWorked(newSession.getDatabase(dbName).getCollection(collName).insert(secondDoc));
 assert.commandWorked(newSession.commitTransaction_forTesting());

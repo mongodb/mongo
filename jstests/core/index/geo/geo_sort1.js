@@ -14,7 +14,7 @@ for (let x = 0; x < 10; x++) {
 t.createIndex({loc: "2d", foo: 1});
 
 let q = t.find({loc: {$near: [5, 5]}, foo: {$gt: 20}});
-let m = function(z) {
+let m = function (z) {
     return z.foo;
 };
 

@@ -5,10 +5,10 @@
  *
  * @tags: [requires_sharding]
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {};
 
-    var states = (function() {
+    var states = (function () {
         function init(db, collName) {
             this.docNum = 0;
             assert.commandWorked(db[collName].insertOne({_id: this.docNum}));
@@ -23,8 +23,7 @@ export const $config = (function() {
 
         function createShardedCollection(db, collName) {
             assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assert.commandWorked(
-                db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}));
+            assert.commandWorked(db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}));
             assert.commandWorked(db[collName].insertOne({_id: this.docNum}));
             checkForDocument(db[collName], this.docNum);
         }
@@ -49,7 +48,7 @@ export const $config = (function() {
             createShardedCollection: createShardedCollection,
             createUnshardedCollection: createUnshardedCollection,
             dropCollection: dropCollection,
-            dropDatabase: dropDatabase
+            dropDatabase: dropDatabase,
         };
     })();
 
@@ -58,7 +57,7 @@ export const $config = (function() {
         createShardedCollection: {dropCollection: 0.5, dropDatabase: 0.5},
         createUnshardedCollection: {dropCollection: 0.5, dropDatabase: 0.5},
         dropCollection: {createShardedCollection: 0.5, createUnshardedCollection: 0.5},
-        dropDatabase: {createShardedCollection: 0.5, createUnshardedCollection: 0.5}
+        dropDatabase: {createShardedCollection: 0.5, createUnshardedCollection: 0.5},
     };
 
     // This test in in the concurrency suite because it requires shard stepdowns to properly test

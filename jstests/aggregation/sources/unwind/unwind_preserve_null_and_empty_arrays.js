@@ -16,13 +16,15 @@ function testPreserveNullAndEmptyArraysParam(inputDoc, unwindPath, outputDoc) {
     assert.commandWorked(coll.insert(inputDoc));
 
     // If preserveNullAndEmptyArrays is passed, we should get an output document.
-    const preservedResults =
-        coll.aggregate([{$unwind: {path: unwindPath, preserveNullAndEmptyArrays: true}}]).toArray();
+    const preservedResults = coll
+        .aggregate([{$unwind: {path: unwindPath, preserveNullAndEmptyArrays: true}}])
+        .toArray();
     assert.eq(1, preservedResults.length, "$unwind returned the wrong number of results");
-    assert.eq(preservedResults[0],
-              outputDoc,
-              "Unexpected result for an $unwind with preserveNullAndEmptyArrays " +
-                  "(input was " + tojson(inputDoc) + ")");
+    assert.eq(
+        preservedResults[0],
+        outputDoc,
+        "Unexpected result for an $unwind with preserveNullAndEmptyArrays " + "(input was " + tojson(inputDoc) + ")",
+    );
 
     // If not, we should get no outputs.
     const defaultResults = coll.aggregate([{$unwind: {path: unwindPath}}]).toArray();

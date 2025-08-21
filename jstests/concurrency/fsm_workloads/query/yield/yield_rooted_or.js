@@ -13,7 +13,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/yield/yield.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     /*
      * Issue a query with an or stage as the root.
      */
@@ -21,11 +21,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var nMatches = 100;
 
         var cursor = db[collName]
-                         .find({$or: [{c: {$lte: nMatches / 2}}, {d: {$lte: nMatches / 2}}]})
-                         .batchSize(this.batchSize);
+            .find({$or: [{c: {$lte: nMatches / 2}}, {d: {$lte: nMatches / 2}}]})
+            .batchSize(this.batchSize);
 
         var verifier = function rootedOrVerifier(doc, prevDoc) {
-            return (doc.c <= nMatches / 2 || doc.d <= nMatches / 2);
+            return doc.c <= nMatches / 2 || doc.d <= nMatches / 2;
         };
 
         this.advanceCursor(cursor, verifier);

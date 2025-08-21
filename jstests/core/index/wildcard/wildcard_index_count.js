@@ -14,32 +14,23 @@ import {getAggPlanStage, getPlanStage, isCollscan} from "jstests/libs/query/anal
 const coll = db.wildcard_index_count;
 coll.drop();
 
-assert.commandWorked(coll.insert([
-    {a: 3},
-    {a: null},
-    {a: [-1, 0]},
-    {a: [4, -3, 5]},
-    {},
-    {a: {b: 4}},
-    {a: []},
-    {a: [[], {}]},
-    {a: {}},
-]));
+assert.commandWorked(
+    coll.insert([{a: 3}, {a: null}, {a: [-1, 0]}, {a: [4, -3, 5]}, {}, {a: {b: 4}}, {a: []}, {a: [[], {}]}, {a: {}}]),
+);
 
-const wildcardIndexes =
-    [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": -1, b: -1}, wildcardProjection: {b: 0}}];
+const wildcardIndexes = [{keyPattern: {"$**": 1}}, {keyPattern: {"$**": -1, b: -1}, wildcardProjection: {b: 0}}];
 
 for (const indexSpec of wildcardIndexes) {
     const option = {};
     if (indexSpec.wildcardProjection) {
-        option['wildcardProjection'] = indexSpec.wildcardProjection;
+        option["wildcardProjection"] = indexSpec.wildcardProjection;
     }
     assert.commandWorked(coll.createIndex(indexSpec.keyPattern, option));
 
     const expectedPattern = {$_path: 1};
-    expectedPattern['a'] = indexSpec.keyPattern['$**'];
+    expectedPattern["a"] = indexSpec.keyPattern["$**"];
     if (indexSpec.keyPattern.b) {
-        expectedPattern['b'] = indexSpec.keyPattern['b'];
+        expectedPattern["b"] = indexSpec.keyPattern["b"];
     }
 
     assert.eq(2, coll.count({a: {$gt: 0}}));

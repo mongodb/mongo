@@ -42,105 +42,141 @@ assert.commandWorked(sourceSharded.insert(shardedData));
 // Test that we can query the backing collection normally.
 assert.eq(sourceSharded.aggregate().itcount(), shardedData.length);
 assert.eq(sourceUnsharded.aggregate().itcount(), unshardedData.length);
-assert.eq(sourceSharded.aggregate([{$unionWith: sourceUnsharded.getName()}]).itcount(),
-          shardedData.length + unshardedData.length);
-assert.eq(sourceUnsharded.aggregate([{$unionWith: sourceSharded.getName()}]).itcount(),
-          shardedData.length + unshardedData.length);
+assert.eq(
+    sourceSharded.aggregate([{$unionWith: sourceUnsharded.getName()}]).itcount(),
+    shardedData.length + unshardedData.length,
+);
+assert.eq(
+    sourceUnsharded.aggregate([{$unionWith: sourceSharded.getName()}]).itcount(),
+    shardedData.length + unshardedData.length,
+);
 
 // Now create an identity view on top of each collection and expect to get the same results.
 const identityUnsharded = db.identity_unsharded;
-assert.commandWorked(db.runCommand(
-    {create: identityUnsharded.getName(), viewOn: sourceUnsharded.getName(), pipeline: []}));
+assert.commandWorked(
+    db.runCommand({create: identityUnsharded.getName(), viewOn: sourceUnsharded.getName(), pipeline: []}),
+);
 
 const identitySharded = db.identity_sharded;
-assert.commandWorked(db.runCommand(
-    {create: identitySharded.getName(), viewOn: sourceSharded.getName(), pipeline: []}));
+assert.commandWorked(db.runCommand({create: identitySharded.getName(), viewOn: sourceSharded.getName(), pipeline: []}));
 
 assert.eq(identitySharded.aggregate().itcount(), shardedData.length);
 assert.eq(identityUnsharded.aggregate().itcount(), unshardedData.length);
-assert.eq(identitySharded.aggregate([{$unionWith: identityUnsharded.getName()}]).itcount(),
-          shardedData.length + unshardedData.length);
-assert.eq(identityUnsharded.aggregate([{$unionWith: identitySharded.getName()}]).itcount(),
-          shardedData.length + unshardedData.length);
+assert.eq(
+    identitySharded.aggregate([{$unionWith: identityUnsharded.getName()}]).itcount(),
+    shardedData.length + unshardedData.length,
+);
+assert.eq(
+    identityUnsharded.aggregate([{$unionWith: identitySharded.getName()}]).itcount(),
+    shardedData.length + unshardedData.length,
+);
 
 // Now create some views with some actual definitions.
 const groupedByShardKey = db.grouped_by_sk;
-assert.commandWorked(db.runCommand({
-    create: groupedByShardKey.getName(),
-    viewOn: sourceSharded.getName(),
-    pipeline: [{$group: {_id: "$shardKey", count: {$sum: 1}}}]
-}));
-assert(resultsEq(sourceUnsharded.aggregate([{$unionWith: groupedByShardKey.getName()}]).toArray(),
-                 unshardedData.concat([
-                     {_id: -100, count: 2},
-                     {_id: -10, count: 2},
-                     {_id: -1, count: 1},
-                     {_id: 0, count: 1},
-                     {_id: 1, count: 1},
-                     {_id: 10, count: 2},
-                     {_id: 100, count: 2},
-                 ])));
-assert(resultsEq(sourceUnsharded
-                     .aggregate([
-                         {$group: {_id: null, count: {$sum: 1}}},
-                         {$unionWith: groupedByShardKey.getName()},
-                         {$match: {count: {$gt: 1}}}
-                     ])
-                     .toArray(),
-                 [
-                     {_id: null, count: unshardedData.length},
-                     {_id: -100, count: 2},
-                     {_id: -10, count: 2},
-                     {_id: 10, count: 2},
-                     {_id: 100, count: 2},
-                 ]));
+assert.commandWorked(
+    db.runCommand({
+        create: groupedByShardKey.getName(),
+        viewOn: sourceSharded.getName(),
+        pipeline: [{$group: {_id: "$shardKey", count: {$sum: 1}}}],
+    }),
+);
+assert(
+    resultsEq(
+        sourceUnsharded.aggregate([{$unionWith: groupedByShardKey.getName()}]).toArray(),
+        unshardedData.concat([
+            {_id: -100, count: 2},
+            {_id: -10, count: 2},
+            {_id: -1, count: 1},
+            {_id: 0, count: 1},
+            {_id: 1, count: 1},
+            {_id: 10, count: 2},
+            {_id: 100, count: 2},
+        ]),
+    ),
+);
+assert(
+    resultsEq(
+        sourceUnsharded
+            .aggregate([
+                {$group: {_id: null, count: {$sum: 1}}},
+                {$unionWith: groupedByShardKey.getName()},
+                {$match: {count: {$gt: 1}}},
+            ])
+            .toArray(),
+        [
+            {_id: null, count: unshardedData.length},
+            {_id: -100, count: 2},
+            {_id: -10, count: 2},
+            {_id: 10, count: 2},
+            {_id: 100, count: 2},
+        ],
+    ),
+);
 
 const onlySmallIdsFromSharded = db.only_small_ids_sharded;
-assert.commandWorked(db.runCommand({
-    create: onlySmallIdsFromSharded.getName(),
-    viewOn: sourceSharded.getName(),
-    pipeline: [{$match: {_id: {$lte: 4}}}]
-}));
-assert.eq(sourceUnsharded.aggregate([{$unionWith: onlySmallIdsFromSharded.getName()}]).itcount(),
-          unshardedData.length + 5);
-assert(resultsEq(sourceUnsharded
-                     .aggregate([{
-                         $unionWith: {
-                             coll: onlySmallIdsFromSharded.getName(),
-                             pipeline: [{$group: {_id: "$shardKey", count: {$sum: 1}}}]
-                         }
-                     }])
-                     .toArray(),
-                 unshardedData.concat([
-                     {_id: -100, count: 2},
-                     {_id: -10, count: 2},
-                     {_id: -1, count: 1},
-                 ])));
+assert.commandWorked(
+    db.runCommand({
+        create: onlySmallIdsFromSharded.getName(),
+        viewOn: sourceSharded.getName(),
+        pipeline: [{$match: {_id: {$lte: 4}}}],
+    }),
+);
+assert.eq(
+    sourceUnsharded.aggregate([{$unionWith: onlySmallIdsFromSharded.getName()}]).itcount(),
+    unshardedData.length + 5,
+);
+assert(
+    resultsEq(
+        sourceUnsharded
+            .aggregate([
+                {
+                    $unionWith: {
+                        coll: onlySmallIdsFromSharded.getName(),
+                        pipeline: [{$group: {_id: "$shardKey", count: {$sum: 1}}}],
+                    },
+                },
+            ])
+            .toArray(),
+        unshardedData.concat([
+            {_id: -100, count: 2},
+            {_id: -10, count: 2},
+            {_id: -1, count: 1},
+        ]),
+    ),
+);
 
 const onlySmallIdsFromUnsharded = db.only_small_ids_unsharded;
-assert.commandWorked(db.runCommand({
-    create: onlySmallIdsFromUnsharded.getName(),
-    viewOn: sourceUnsharded.getName(),
-    pipeline: [{$match: {_id: {$lte: 4}}}]
-}));
-assert(resultsEq(onlySmallIdsFromUnsharded
-                     .aggregate([{
-                         $unionWith: {
-                             coll: onlySmallIdsFromSharded.getName(),
-                             pipeline: [{$group: {_id: "$shardKey", count: {$sum: 1}}}]
-                         }
-                     }])
-                     .toArray(),
-                 [
-                     {_id: 0},
-                     {_id: 1},
-                     {_id: 2},
-                     {_id: 3},
-                     {_id: 4},
-                     {_id: -100, count: 2},
-                     {_id: -10, count: 2},
-                     {_id: -1, count: 1},
-                 ]));
+assert.commandWorked(
+    db.runCommand({
+        create: onlySmallIdsFromUnsharded.getName(),
+        viewOn: sourceUnsharded.getName(),
+        pipeline: [{$match: {_id: {$lte: 4}}}],
+    }),
+);
+assert(
+    resultsEq(
+        onlySmallIdsFromUnsharded
+            .aggregate([
+                {
+                    $unionWith: {
+                        coll: onlySmallIdsFromSharded.getName(),
+                        pipeline: [{$group: {_id: "$shardKey", count: {$sum: 1}}}],
+                    },
+                },
+            ])
+            .toArray(),
+        [
+            {_id: 0},
+            {_id: 1},
+            {_id: 2},
+            {_id: 3},
+            {_id: 4},
+            {_id: -100, count: 2},
+            {_id: -10, count: 2},
+            {_id: -1, count: 1},
+        ],
+    ),
+);
 
 // Now test that $unionWith can be stored in a view that is backed by a sharded collection.
 
@@ -150,8 +186,8 @@ assert(resultsEq(onlySmallIdsFromUnsharded
  */
 function testQueryOverUnionedData(unionedView) {
     assert(resultsEq(unionedView.find().toArray(), shardedData.concat(unshardedData)));
-    assert(resultsEq(
-        unionedView.aggregate([{$group: {_id: "$shardKey", count: {$sum: 1}}}]).toArray(), [
+    assert(
+        resultsEq(unionedView.aggregate([{$group: {_id: "$shardKey", count: {$sum: 1}}}]).toArray(), [
             {_id: null, count: unshardedData.length},
             {_id: -100, count: 2},
             {_id: -10, count: 2},
@@ -160,21 +196,26 @@ function testQueryOverUnionedData(unionedView) {
             {_id: 1, count: 1},
             {_id: 10, count: 2},
             {_id: 100, count: 2},
-        ]));
+        ]),
+    );
 }
-assert.commandWorked(db.runCommand({
-    create: "union_view",
-    viewOn: sourceSharded.getName(),
-    pipeline: [{$unionWith: sourceUnsharded.getName()}]
-}));
+assert.commandWorked(
+    db.runCommand({
+        create: "union_view",
+        viewOn: sourceSharded.getName(),
+        pipeline: [{$unionWith: sourceUnsharded.getName()}],
+    }),
+);
 testQueryOverUnionedData(db["union_view"]);
 // Now test that $unionWith can be stored in a view that is backed by an unsharded collection, but
 // the $unionWith is targeting a sharded collection.
-assert.commandWorked(db.runCommand({
-    collMod: "union_view",
-    viewOn: sourceUnsharded.getName(),
-    pipeline: [{$unionWith: sourceSharded.getName()}]
-}));
+assert.commandWorked(
+    db.runCommand({
+        collMod: "union_view",
+        viewOn: sourceUnsharded.getName(),
+        pipeline: [{$unionWith: sourceSharded.getName()}],
+    }),
+);
 testQueryOverUnionedData(db["union_view"]);
 
 st.stop();

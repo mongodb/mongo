@@ -13,11 +13,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
 
-const dbName = 'test_txn_with_chunk_migration';
-const collName1 = 'coll1';
-const collName2 = 'coll2';
-const ns1 = dbName + '.' + collName1;
-const ns2 = dbName + '.' + collName2;
+const dbName = "test_txn_with_chunk_migration";
+const collName1 = "coll1";
+const collName2 = "coll2";
+const ns1 = dbName + "." + collName1;
+const ns2 = dbName + "." + collName2;
 
 st.s.getDB(dbName).dropDatabase();
 
@@ -57,19 +57,19 @@ assert.commandWorked(coll2.insert({x: 1}));
     assert.commandWorked(st.moveChunk(ns2, {x: 1}, st.shard0.shardName));
 
     // A non-transactional agg should find: a:1 matches x:1
-    const lookupPipeline =
-        [{$lookup: {from: collName2, localField: "a", foreignField: "x", as: "result"}}];
-    let firstResult =
-        st.s.getDB(dbName).getCollection(collName1).aggregate(lookupPipeline).toArray();
+    const lookupPipeline = [{$lookup: {from: collName2, localField: "a", foreignField: "x", as: "result"}}];
+    let firstResult = st.s.getDB(dbName).getCollection(collName1).aggregate(lookupPipeline).toArray();
     jsTest.log("First aggregation result: " + tojson(firstResult));
     assert.eq(1, firstResult[0].result.length, "First lookup should find match for a:1 with x:1");
 
     // Run the same agg in the open transaction, and assert it fails with MigrationConflict.
-    assert.commandFailedWithCode(assert.throws(() => sessionColl1.aggregate(lookupPipeline)),
-                                              ErrorCodes.MigrationConflict);
+    assert.commandFailedWithCode(
+        assert.throws(() => sessionColl1.aggregate(lookupPipeline)),
+        ErrorCodes.MigrationConflict,
+    );
 
     // Cleanup
-    for (let db of [st.shard0.getDB('config'), st.shard1.getDB('config')]) {
+    for (let db of [st.shard0.getDB("config"), st.shard1.getDB("config")]) {
         assert.commandWorked(db.runCommand({killSessions: [session.id]}));
     }
 }

@@ -8,12 +8,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    checkHealthLog,
-    clearHealthLog,
-    logQueries,
-    runDbCheck
-} from "jstests/replsets/libs/dbcheck_utils.js";
+import {checkHealthLog, clearHealthLog, logQueries, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 // Skipping data consistency checks because data is inserted into primary and secondary separately.
 TestData.skipCheckDBHashes = true;
@@ -32,18 +27,18 @@ const primaryHealthLog = primary.getDB("local").system.healthlog;
 const secondaryHealthLog = secondary.getDB("local").system.healthlog;
 
 const doc = {
-    a: 1
+    a: 1,
 };
 const maxDocsPerBatch = 10000;
 
 function testClusteredCollection() {
     jsTestLog(
-        "Run dbcheck ExtraIndexKeys on _id index of clustered collection should raise error with appropriate information.");
+        "Run dbcheck ExtraIndexKeys on _id index of clustered collection should raise error with appropriate information.",
+    );
     clearHealthLog(replSet);
     primaryDb[collName].drop();
 
-    assert.commandWorked(
-        primaryDb.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+    assert.commandWorked(primaryDb.createCollection(collName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
     assert.commandWorked(primaryDb[collName].insert(doc));
 
     runDbCheck(replSet, primary.getDB(dbName), collName, {
@@ -53,16 +48,14 @@ function testClusteredCollection() {
     });
 
     const nWarnings = 1;
-    checkHealthLog(
-        primaryHealthLog, logQueries.checkIdIndexOnClusteredCollectionWarningQuery, nWarnings);
+    checkHealthLog(primaryHealthLog, logQueries.checkIdIndexOnClusteredCollectionWarningQuery, nWarnings);
 
     checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, nWarnings);
     checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
 }
 
 function testNonClusteredCollection() {
-    jsTestLog(
-        "Run dbcheck ExtraIndexKeys on _id index of non-clustered collection should succeed.");
+    jsTestLog("Run dbcheck ExtraIndexKeys on _id index of non-clustered collection should succeed.");
     clearHealthLog(replSet);
     primaryDb[collName].drop();
 

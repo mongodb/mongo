@@ -27,42 +27,52 @@ function runTestWithoutSubset(client) {
     print(tojson(expectedCounts));
 
     const conn = MongoRunner.runMongod({
-        tlsMode: 'allowTLS',
+        tlsMode: "allowTLS",
         tlsCertificateKeyFile: SERVER_CERT,
-        tlsDisabledProtocols: 'none',
+        tlsDisabledProtocols: "none",
         useLogFiles: true,
         tlsLogVersions: "TLS1_0,TLS1_1,TLS1_2,TLS1_3",
-        tlsCAFile: CA_CERT
+        tlsCAFile: CA_CERT,
     });
 
-    const exitStatus = runMongoProgram('mongo',
-                                       '--tls',
-                                       '--tlsAllowInvalidHostnames',
-                                       '--tlsCertificateKeyFile',
-                                       CLIENT_CERT,
-                                       '--tlsCAFile',
-                                       CA_CERT,
-                                       '--port',
-                                       conn.port,
-                                       '--tlsDisabledProtocols',
-                                       disabledProtocols.join(","),
-                                       '--eval',
-                                       // The Javascript string "1.0" is implicitly converted to the
-                                       // Number(1) Workaround this with parseFloat
-                                       'one = Number.parseFloat(1).toPrecision(2); a = {};' +
-                                           'a[one] = NumberLong(' + expectedCounts[0] + ');' +
-                                           'a["1.1"] = NumberLong(' + expectedCounts[1] + ');' +
-                                           'a["1.2"] = NumberLong(' + expectedCounts[2] + ');' +
-                                           'a["1.3"] = NumberLong(' + expectedCounts[3] + ');' +
-                                           'a["unknown"] = NumberLong(' + expectedCounts[4] + ');' +
-                                           'assert.eq(db.serverStatus().transportSecurity, a);');
+    const exitStatus = runMongoProgram(
+        "mongo",
+        "--tls",
+        "--tlsAllowInvalidHostnames",
+        "--tlsCertificateKeyFile",
+        CLIENT_CERT,
+        "--tlsCAFile",
+        CA_CERT,
+        "--port",
+        conn.port,
+        "--tlsDisabledProtocols",
+        disabledProtocols.join(","),
+        "--eval",
+        // The Javascript string "1.0" is implicitly converted to the
+        // Number(1) Workaround this with parseFloat
+        "one = Number.parseFloat(1).toPrecision(2); a = {};" +
+            "a[one] = NumberLong(" +
+            expectedCounts[0] +
+            ");" +
+            'a["1.1"] = NumberLong(' +
+            expectedCounts[1] +
+            ");" +
+            'a["1.2"] = NumberLong(' +
+            expectedCounts[2] +
+            ");" +
+            'a["1.3"] = NumberLong(' +
+            expectedCounts[3] +
+            ");" +
+            'a["unknown"] = NumberLong(' +
+            expectedCounts[4] +
+            ");" +
+            "assert.eq(db.serverStatus().transportSecurity, a);",
+    );
 
     if (expectedDefaultProtocol === "TLS1_2" && client === "TLS1_3") {
         // If the runtime environment does not support TLS 1.3, a client cannot connect to a
         // server if TLS 1.3 is its only usable protocol version.
-        assert.neq(0,
-                   exitStatus,
-                   "A client which does not support TLS 1.3 should not be able to connect with it");
+        assert.neq(0, exitStatus, "A client which does not support TLS 1.3 should not be able to connect with it");
         MongoRunner.stopMongod(conn);
         return;
     }
@@ -72,24 +82,31 @@ function runTestWithoutSubset(client) {
     print(`Checking ${conn.fullOptions.logFile} for TLS version message`);
     const log = cat(conn.fullOptions.logFile);
 
-    const lines = log.split('\n');
+    const lines = log.split("\n");
     let found = false;
     for (let logMsg of lines) {
         if (!logMsg) {
             continue;
         }
         const logJson = JSON.parse(logMsg);
-        if (logJson.id === 23218 && /1\.\d/.test(logJson.attr.tlsVersion) &&
-            /127.0.0.1:\d+/.test(logJson.attr.remoteHost)) {
+        if (
+            logJson.id === 23218 &&
+            /1\.\d/.test(logJson.attr.tlsVersion) &&
+            /127.0.0.1:\d+/.test(logJson.attr.remoteHost)
+        ) {
             found = true;
             break;
         }
     }
-    assert(found,
-           "'Accepted connection with TLS Version' log line missing in log file!\n" +
-               "Log file contents: " + conn.fullOptions.logFile +
-               "\n************************************************************\n" + log +
-               "\n************************************************************");
+    assert(
+        found,
+        "'Accepted connection with TLS Version' log line missing in log file!\n" +
+            "Log file contents: " +
+            conn.fullOptions.logFile +
+            "\n************************************************************\n" +
+            log +
+            "\n************************************************************",
+    );
 
     MongoRunner.stopMongod(conn);
 }

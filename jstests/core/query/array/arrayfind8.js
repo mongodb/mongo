@@ -5,7 +5,7 @@
  *    requires_getmore
  *  ]
  */
-const collNamePrefix = 'jstests_arrayfind8_';
+const collNamePrefix = "jstests_arrayfind8_";
 let collCount = 0;
 let coll;
 
@@ -16,7 +16,7 @@ let currentIndexSpec = {a: 1};
  * Check that the query results match the documents in the 'expected' array.
  */
 function assertResults(expected, query, context) {
-    assert.eq(expected.length, coll.count(query), 'unexpected count in ' + context);
+    assert.eq(expected.length, coll.count(query), "unexpected count in " + context);
     const results = coll.find(query).toArray();
     const resultsAOnly = results.map((r) => r.a);
     assert.sameMembers(resultsAOnly, expected);
@@ -38,12 +38,12 @@ function checkMatch(bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatch
     let expectedStandardQueryResults = [];
     mayPush(expectedStandardQueryResults, bothMatch);
     mayPush(expectedStandardQueryResults, nonElemMatch);
-    assertResults(expectedStandardQueryResults, standardQuery, context + ' standard query');
+    assertResults(expectedStandardQueryResults, standardQuery, context + " standard query");
 
     let expectedElemMatchQueryResults = [];
     mayPush(expectedElemMatchQueryResults, bothMatch);
     mayPush(expectedElemMatchQueryResults, elemMatch);
-    assertResults(expectedElemMatchQueryResults, elemMatchQuery, context + ' elemMatch query');
+    assertResults(expectedElemMatchQueryResults, elemMatchQuery, context + " elemMatch query");
 }
 
 /**
@@ -57,19 +57,19 @@ function checkMatch(bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatch
  */
 function checkQuery(subQuery, bothMatch, elemMatch, nonElemMatch, additionalConstraints) {
     const collNameSuffix = collCount++;
-    coll = db.getCollection(collNamePrefix + 'noindex_' + collNameSuffix);
+    coll = db.getCollection(collNamePrefix + "noindex_" + collNameSuffix);
     coll.drop();
     additionalConstraints = additionalConstraints || {};
 
     // Construct standard and elemMatch queries from subQuery.
     const firstSubQueryKey = Object.keySet(subQuery)[0];
     let standardQuery = null;
-    if (firstSubQueryKey[0] == '$') {
+    if (firstSubQueryKey[0] == "$") {
         standardQuery = {$and: [{a: subQuery}, additionalConstraints]};
     } else {
         // If the subQuery contains a field rather than operators, append to the 'a' field.
         let modifiedSubQuery = {};
-        modifiedSubQuery['a.' + firstSubQueryKey] = subQuery[firstSubQueryKey];
+        modifiedSubQuery["a." + firstSubQueryKey] = subQuery[firstSubQueryKey];
         standardQuery = {$and: [modifiedSubQuery, additionalConstraints]};
     }
     const elemMatchQuery = {$and: [{a: {$elemMatch: subQuery}}, additionalConstraints]};
@@ -84,17 +84,17 @@ function checkQuery(subQuery, bothMatch, elemMatch, nonElemMatch, additionalCons
     insertValueIfNotNull(bothMatch);
     insertValueIfNotNull(elemMatch);
     insertValueIfNotNull(nonElemMatch);
-    checkMatch(bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatchQuery, 'unindexed');
+    checkMatch(bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatchQuery, "unindexed");
 
     // Check matching and index bounds for a single key index.
 
-    coll = db.getCollection(collNamePrefix + 'index_' + collNameSuffix);
+    coll = db.getCollection(collNamePrefix + "index_" + collNameSuffix);
     coll.drop();
     insertValueIfNotNull(bothMatch);
     insertValueIfNotNull(elemMatch);
     // The nonElemMatch document is not tested here, as it will often make the index multikey.
     assert.commandWorked(coll.createIndex(currentIndexSpec));
-    checkMatch(bothMatch, elemMatch, null, standardQuery, elemMatchQuery, 'single key index');
+    checkMatch(bothMatch, elemMatch, null, standardQuery, elemMatchQuery, "single key index");
 
     // Check matching and index bounds for a multikey index.
 
@@ -103,7 +103,7 @@ function checkQuery(subQuery, bothMatch, elemMatch, nonElemMatch, additionalCons
     // Force the index to be multikey.
     assert.commandWorked(coll.insert({a: [-1, -2]}));
     assert.commandWorked(coll.insert({a: {b: [-1, -2]}}));
-    checkMatch(bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatchQuery, 'multikey index');
+    checkMatch(bothMatch, elemMatch, nonElemMatch, standardQuery, elemMatchQuery, "multikey index");
 }
 
 // Basic test.
@@ -115,7 +115,7 @@ checkQuery({$gt: 4, $not: {$gte: 6}}, [5]);
 checkQuery({$gt: 4, $not: {$ne: 6}}, [6]);
 checkQuery({$gte: 5, $lte: 5}, [5], null, [4, 6]);
 checkQuery({$in: [4, 6], $gt: 5}, [6], null, [4, 7]);
-checkQuery({$regex: '^a'}, ['a']);
+checkQuery({$regex: "^a"}, ["a"]);
 
 // Some constraints within a $elemMatch clause and other constraints outside of it.
 checkQuery({$gt: 4}, [5], null, null, {a: {$lt: 6}});
@@ -131,7 +131,7 @@ checkQuery({$in: [4, 6]}, [6], null, null, {a: {$elemMatch: {$gt: 5}}});
 checkQuery({$elemMatch: {$in: [5]}}, null, [[5]], [5], null);
 
 currentIndexSpec = {
-    "a.b": 1
+    "a.b": 1,
 };
 checkQuery({$elemMatch: {b: {$gte: 1, $lte: 1}}}, null, [[{b: 1}]], [{b: 1}], null);
 checkQuery({$elemMatch: {b: {$gte: 1, $lte: 1}}}, null, [[{b: [0, 2]}]], [{b: [0, 2]}], null);
@@ -141,6 +141,5 @@ checkQuery({$elemMatch: {b: {$gte: 1, $lte: 1}}}, null, [[{b: [0, 2]}]], [{b: [0
 checkQuery({b: {$elemMatch: {$gte: 1, $lte: 1}}}, [{b: [1]}]);
 checkQuery({b: {$elemMatch: {$gte: 1, $lte: 4}}}, [{b: [1]}]);
 
-checkQuery({b: {$elemMatch: {$gte: 1, $lte: 4}}}, [{b: [2]}], null, null, {'a.b': {$in: [2, 5]}});
-checkQuery(
-    {b: {$elemMatch: {$in: [1, 2]}, $in: [2, 3]}}, [{b: [2]}], null, [{b: [1]}, {b: [3]}], null);
+checkQuery({b: {$elemMatch: {$gte: 1, $lte: 4}}}, [{b: [2]}], null, null, {"a.b": {$in: [2, 5]}});
+checkQuery({b: {$elemMatch: {$in: [1, 2]}, $in: [2, 3]}}, [{b: [2]}], null, [{b: [1]}, {b: [3]}], null);

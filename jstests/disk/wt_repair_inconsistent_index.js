@@ -20,7 +20,7 @@ const dbpath = MongoRunner.dataPath + baseName + "/";
 /**
  * Run the test by supplying additional parameters to MongoRunner.runMongod with 'mongodOptions'.
  */
-let runTest = function(mongodOptions) {
+let runTest = function (mongodOptions) {
     jsTestLog("Running test with args: " + tojson(mongodOptions));
 
     /**
@@ -45,8 +45,7 @@ let runTest = function(mongodOptions) {
         const indexUri = getUriForIndex(testColl, indexName);
 
         const db = mongod.getDB(baseName);
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: 'skipIndexNewRecords', mode: 'alwaysOn'}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: "skipIndexNewRecords", mode: "alwaysOn"}));
         assert.commandWorked(testColl.insert({a: 2}));
 
         // Disable validation because it is expected to not pass due to index inconsistencies.
@@ -79,7 +78,7 @@ let runTest = function(mongodOptions) {
 
         // Insert a document that is the size of the validate memory limit so that validate is
         // unable to report and fix all inconsistencies during startup repair.
-        const bigDoc = {a: 'x'.repeat(1024 * 1024)};
+        const bigDoc = {a: "x".repeat(1024 * 1024)};
         assert.commandWorked(testColl.insert(bigDoc));
 
         const smallDoc = {a: 1};

@@ -5,8 +5,7 @@
  * https://github.com/mongodb/specifications/blob/master/source/sessions/driver-sessions.rst#abstract
  */
 
-const kShellDefaultShouldRetryWrites =
-    typeof _shouldRetryWrites === "function" ? _shouldRetryWrites() : false;
+const kShellDefaultShouldRetryWrites = typeof _shouldRetryWrites === "function" ? _shouldRetryWrites() : false;
 
 function isNonNullObject(obj) {
     return typeof obj === "object" && obj !== null;
@@ -34,13 +33,13 @@ function SessionOptions(rawOptions = {}) {
     let _writeConcern = rawOptions.writeConcern;
 
     // Causal consistency is implicitly enabled when a session is explicitly started.
-    const _causalConsistency =
-        rawOptions.hasOwnProperty("causalConsistency") ? rawOptions.causalConsistency : true;
+    const _causalConsistency = rawOptions.hasOwnProperty("causalConsistency") ? rawOptions.causalConsistency : true;
 
     // If the user specified --retryWrites to the mongo shell, then we enable retryable
     // writes automatically.
-    const _retryWrites = rawOptions.hasOwnProperty("retryWrites") ? rawOptions.retryWrites
-                                                                  : kShellDefaultShouldRetryWrites;
+    const _retryWrites = rawOptions.hasOwnProperty("retryWrites")
+        ? rawOptions.retryWrites
+        : kShellDefaultShouldRetryWrites;
 
     this.getReadPreference = function getReadPreference() {
         return _readPreference;
@@ -95,7 +94,7 @@ function SessionOptions(rawOptions = {}) {
             readConcern: _readConcern,
             writeConcern: _writeConcern,
             causalConsistency: _causalConsistency,
-            retryWrites: _retryWrites
+            retryWrites: _retryWrites,
         };
     };
 }
@@ -145,8 +144,7 @@ function SessionAwareClient(client) {
     };
 
     function serverSupports(wireVersion) {
-        return client.getMinWireVersion() <= wireVersion &&
-            wireVersion <= client.getMaxWireVersion();
+        return client.getMinWireVersion() <= wireVersion && wireVersion <= client.getMaxWireVersion();
     }
 
     // TODO: Update this allowlist, or convert it to a denylist depending on the outcome of
@@ -161,11 +159,9 @@ function SessionAwareClient(client) {
         "group",
     ]);
 
-    const kAggStagesThatNotSupportReadConcern = new Set([
-        "$listClusterCatalog",
-    ]);
+    const kAggStagesThatNotSupportReadConcern = new Set(["$listClusterCatalog"]);
 
-    this.canUseReadConcern = function(driverSession, cmdObj) {
+    this.canUseReadConcern = function (driverSession, cmdObj) {
         // Always attach the readConcern to the first statement of the transaction, whether it
         // is a read or a write.
         if (driverSession._serverSession.isTxnActive()) {
@@ -178,10 +174,13 @@ function SessionAwareClient(client) {
             return false;
         }
 
-        if (cmdName === "aggregate" && cmdObj.pipeline && Array.isArray(cmdObj.pipeline) &&
-            cmdObj.pipeline.length !== 0) {
-            const stages =
-                cmdObj.pipeline.map(obj => obj instanceof Object ? Object.keys(obj)[0] : "");
+        if (
+            cmdName === "aggregate" &&
+            cmdObj.pipeline &&
+            Array.isArray(cmdObj.pipeline) &&
+            cmdObj.pipeline.length !== 0
+        ) {
+            const stages = cmdObj.pipeline.map((obj) => (obj instanceof Object ? Object.keys(obj)[0] : ""));
             if (stages.some((stage) => kAggStagesThatNotSupportReadConcern.has(stage))) {
                 return false;
             }
@@ -226,8 +225,7 @@ function SessionAwareClient(client) {
 
         // Transaction read concerns are handled later in assignTxnInfo().
         const sessionReadConcern = driverSession.getOptions().getReadConcern();
-        cmdObjUnwrapped.readConcern =
-            Object.assign({}, sessionReadConcern, cmdObjUnwrapped.readConcern);
+        cmdObjUnwrapped.readConcern = Object.assign({}, sessionReadConcern, cmdObjUnwrapped.readConcern);
         const readConcern = cmdObjUnwrapped.readConcern;
 
         if (!readConcern.hasOwnProperty("afterClusterTime")) {
@@ -237,22 +235,26 @@ function SessionAwareClient(client) {
         return cmdObj;
     }
 
-    this.prepareCommandRequest = function(driverSession, cmdObj) {
+    this.prepareCommandRequest = function (driverSession, cmdObj) {
         if (driverSession._isExplicit && !isAcknowledged(cmdObj)) {
             throw new Error("Unacknowledged writes are prohibited with sessions");
         }
 
-        if (serverSupports(kWireVersionSupportingLogicalSession) &&
+        if (
+            serverSupports(kWireVersionSupportingLogicalSession) &&
             // Always attach sessionId from explicit sessions.
             (driverSession._isExplicit ||
-             // Check that implicit sessions are not disabled.
-             !jsTest.options().disableImplicitSessions)) {
+                // Check that implicit sessions are not disabled.
+                !jsTest.options().disableImplicitSessions)
+        ) {
             cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
         }
 
-        if (serverSupports(kWireVersionSupportingCausalConsistency) &&
+        if (
+            serverSupports(kWireVersionSupportingCausalConsistency) &&
             (client.isReplicaSetMember() || client.isMongos()) &&
-            !jsTest.options().skipGossipingClusterTime) {
+            !jsTest.options().skipGossipingClusterTime
+        ) {
             // The `clientClusterTime` is the highest clusterTime observed by any connection
             // within this mongo shell.
             const clientClusterTime = client.getClusterTime();
@@ -275,20 +277,22 @@ function SessionAwareClient(client) {
                 } else if (!isNonNullObject(clientClusterTime)) {
                     clusterTimeToGossip = sessionClusterTime;
                 } else {
-                    clusterTimeToGossip = (bsonWoCompare({_: clientClusterTime.clusterTime},
-                                                         {_: sessionClusterTime.clusterTime}) >= 0)
-                        ? clientClusterTime
-                        : sessionClusterTime;
+                    clusterTimeToGossip =
+                        bsonWoCompare({_: clientClusterTime.clusterTime}, {_: sessionClusterTime.clusterTime}) >= 0
+                            ? clientClusterTime
+                            : sessionClusterTime;
                 }
 
                 cmdObj = gossipClusterTime(cmdObj, clusterTimeToGossip);
             }
         }
 
-        if (serverSupports(kWireVersionSupportingCausalConsistency) &&
+        if (
+            serverSupports(kWireVersionSupportingCausalConsistency) &&
             (client.isReplicaSetMember() || client.isMongos()) &&
             (driverSession.getOptions().isCausalConsistency() || client.isCausalConsistency()) &&
-            this.canUseReadConcern(driverSession, cmdObj)) {
+            this.canUseReadConcern(driverSession, cmdObj)
+        ) {
             cmdObj = establishSessionReadConcern(cmdObj, driverSession);
         }
 
@@ -297,11 +301,12 @@ function SessionAwareClient(client) {
         cmdObj = driverSession._serverSession.assignTxnInfo(cmdObj);
 
         // Retryable writes code should execute only we are not in an active transaction.
-        if ((jsTest.options().alwaysInjectTransactionNumber ||
-             (Object.keys(cmdObj)[0] == "testInternalTransactions")) &&
+        if (
+            (jsTest.options().alwaysInjectTransactionNumber || Object.keys(cmdObj)[0] == "testInternalTransactions") &&
             serverSupports(kWireVersionSupportingRetryableWrites) &&
             driverSession.getOptions().shouldRetryWrites() &&
-            _ServerSession.canRetryWrites(cmdObj)) {
+            _ServerSession.canRetryWrites(cmdObj)
+        ) {
             cmdObj = driverSession._serverSession.assignTransactionNumber(cmdObj);
         }
 
@@ -319,23 +324,27 @@ function SessionAwareClient(client) {
      * source/retryable-writes/retryable-writes.rst#terms
      */
     function isRetryableCode(code) {
-        return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotPrimaryError(code) ||
-            ErrorCodes.isShutdownError(code) || ErrorCodes.WriteConcernTimeout === code;
+        return (
+            ErrorCodes.isNetworkError(code) ||
+            ErrorCodes.isNotPrimaryError(code) ||
+            ErrorCodes.isShutdownError(code) ||
+            ErrorCodes.WriteConcernTimeout === code
+        );
     }
 
-    function runClientFunctionWithRetries(
-        driverSession, cmdObj, clientFunction, clientFunctionArguments) {
+    function runClientFunctionWithRetries(driverSession, cmdObj, clientFunction, clientFunctionArguments) {
         let cmdName = Object.keys(cmdObj)[0];
 
         // TODO SERVER-33921: Revisit how the mongo shell decides whether it should
         // retry a command or not.
         const sessionOptions = driverSession.getOptions();
         let numRetries =
-            (sessionOptions.shouldRetryWrites() && cmdObj.hasOwnProperty("txnNumber") &&
-             !jsTest.options().skipRetryOnNetworkError &&
-             !driverSession._serverSession.isTxnActive())
-            ? 1
-            : 0;
+            sessionOptions.shouldRetryWrites() &&
+            cmdObj.hasOwnProperty("txnNumber") &&
+            !jsTest.options().skipRetryOnNetworkError &&
+            !driverSession._serverSession.isTxnActive()
+                ? 1
+                : 0;
 
         if (numRetries > 0 && jsTest.options().overrideRetryAttempts) {
             numRetries = jsTest.options().overrideRetryAttempts;
@@ -353,7 +362,7 @@ function SessionAwareClient(client) {
 
                 // We run a "hello" command explicitly to force the underlying
                 // DBClient to reconnect to the server.
-                const res = client.getDB('admin')._helloOrLegacyHello();
+                const res = client.getDB("admin")._helloOrLegacyHello();
                 if (res.ok !== 1) {
                     throw e;
                 }
@@ -362,7 +371,8 @@ function SessionAwareClient(client) {
                 // re-establishing our connection doesn't support retryable writes. If
                 // that happens, then we just return the original network error back to
                 // the user.
-                const serverSupportsRetryableWrites = res.hasOwnProperty("minWireVersion") &&
+                const serverSupportsRetryableWrites =
+                    res.hasOwnProperty("minWireVersion") &&
                     res.hasOwnProperty("maxWireVersion") &&
                     res.minWireVersion <= kWireVersionSupportingRetryableWrites &&
                     kWireVersionSupportingRetryableWrites <= res.maxWireVersion;
@@ -376,13 +386,12 @@ function SessionAwareClient(client) {
             if (res !== undefined && res.code === ErrorCodes.ReauthenticationRequired) {
                 try {
                     const accessToken = client._refreshAccessToken();
-                    assert(client.getDB('$external')
-                               .auth({oidcAccessToken: accessToken, mechanism: 'MONGODB-OIDC'}));
+                    assert(client.getDB("$external").auth({oidcAccessToken: accessToken, mechanism: "MONGODB-OIDC"}));
                     continue;
                 } catch (e) {
                     // Could not automatically reauthenticate, return the error response
                     // as-is.
-                    jsTest.log('Assertion thrown when performing refresh flow: ' + e);
+                    jsTest.log("Assertion thrown when performing refresh flow: " + e);
                     return res;
                 }
             }
@@ -393,18 +402,29 @@ function SessionAwareClient(client) {
                 if (res === undefined) {
                     if (jsTest.options().logRetryAttempts) {
                         jsTest.log(
-                            "Retrying " + cmdName +
-                            " with original command request: " + tojson(cmdObj) +
-                            " due to network error, subsequent retries remaining: " + numRetries);
+                            "Retrying " +
+                                cmdName +
+                                " with original command request: " +
+                                tojson(cmdObj) +
+                                " due to network error, subsequent retries remaining: " +
+                                numRetries,
+                        );
                     }
                     continue;
                 }
 
                 if (isRetryableCode(res.code)) {
                     if (jsTest.options().logRetryAttempts) {
-                        jsTest.log("Retrying " + cmdName + " with original command request: " +
-                                   tojson(cmdObj) + " due to retryable error (code=" + res.code +
-                                   "), subsequent retries remaining: " + numRetries);
+                        jsTest.log(
+                            "Retrying " +
+                                cmdName +
+                                " with original command request: " +
+                                tojson(cmdObj) +
+                                " due to retryable error (code=" +
+                                res.code +
+                                "), subsequent retries remaining: " +
+                                numRetries,
+                        );
                     }
                     if (client.isReplicaSetConnection()) {
                         client._markNodeAsFailed(res._mongo.host, res.code, res.errmsg);
@@ -415,48 +435,61 @@ function SessionAwareClient(client) {
                 if (Array.isArray(res.writeErrors)) {
                     // If any of the write operations in the batch fails with a
                     // retryable error, then we retry the entire batch.
-                    const writeError =
-                        res.writeErrors.find((writeError) => isRetryableCode(writeError.code));
+                    const writeError = res.writeErrors.find((writeError) => isRetryableCode(writeError.code));
 
                     if (writeError !== undefined) {
                         if (jsTest.options().logRetryAttempts) {
-                            jsTest.log("Retrying " + cmdName +
-                                       " with original command request: " + tojson(cmdObj) +
-                                       " due to retryable write error (code=" + writeError.code +
-                                       "), subsequent retries remaining: " + numRetries);
+                            jsTest.log(
+                                "Retrying " +
+                                    cmdName +
+                                    " with original command request: " +
+                                    tojson(cmdObj) +
+                                    " due to retryable write error (code=" +
+                                    writeError.code +
+                                    "), subsequent retries remaining: " +
+                                    numRetries,
+                            );
                         }
                         if (client.isReplicaSetConnection()) {
-                            client._markNodeAsFailed(
-                                res._mongo.host, writeError.code, writeError.errmsg);
+                            client._markNodeAsFailed(res._mongo.host, writeError.code, writeError.errmsg);
                         }
                         continue;
                     }
                 }
 
-                if (res.hasOwnProperty("writeConcernError") &&
-                    isRetryableCode(res.writeConcernError.code)) {
+                if (res.hasOwnProperty("writeConcernError") && isRetryableCode(res.writeConcernError.code)) {
                     if (jsTest.options().logRetryAttempts) {
-                        jsTest.log("Retrying " + cmdName + " with original command request: " +
-                                   tojson(cmdObj) + " due to retryable write concern error (code=" +
-                                   res.writeConcernError.code +
-                                   "), subsequent retries remaining: " + numRetries);
+                        jsTest.log(
+                            "Retrying " +
+                                cmdName +
+                                " with original command request: " +
+                                tojson(cmdObj) +
+                                " due to retryable write concern error (code=" +
+                                res.writeConcernError.code +
+                                "), subsequent retries remaining: " +
+                                numRetries,
+                        );
                     }
                     if (client.isReplicaSetConnection()) {
-                        client._markNodeAsFailed(res._mongo.host,
-                                                 res.writeConcernError.code,
-                                                 res.writeConcernError.errmsg);
+                        client._markNodeAsFailed(
+                            res._mongo.host,
+                            res.writeConcernError.code,
+                            res.writeConcernError.errmsg,
+                        );
                     }
                     continue;
                 }
 
-                if (res.hasOwnProperty("errorLabels") &&
-                    res.errorLabels.includes("RetryableWriteError")) {
+                if (res.hasOwnProperty("errorLabels") && res.errorLabels.includes("RetryableWriteError")) {
                     if (jsTest.options().logRetryAttempts) {
                         jsTest.log(
-                            "Retrying " + cmdName +
-                            " with original command request: " + tojson(cmdObj) +
-                            " due to RetryableWriteError label, subsequent retries remaining: " +
-                            numRetries);
+                            "Retrying " +
+                                cmdName +
+                                " with original command request: " +
+                                tojson(cmdObj) +
+                                " due to RetryableWriteError label, subsequent retries remaining: " +
+                                numRetries,
+                        );
                     }
                     continue;
                 }
@@ -469,8 +502,7 @@ function SessionAwareClient(client) {
     this.runCommand = function runCommand(driverSession, dbName, cmdObj, options) {
         cmdObj = this.prepareCommandRequest(driverSession, cmdObj);
 
-        const res = runClientFunctionWithRetries(
-            driverSession, cmdObj, client.runCommand, [dbName, cmdObj, options]);
+        const res = runClientFunctionWithRetries(driverSession, cmdObj, client.runCommand, [dbName, cmdObj, options]);
 
         processCommandResponse(driverSession, client, res);
         return res;
@@ -513,17 +545,17 @@ function ServerSession(client) {
 
     if (!serverSupports(kWireVersionSupportingLogicalSession)) {
         throw new DriverSession.UnsupportedError(
-            "Logical Sessions are only supported on server versions 3.6 and greater.");
+            "Logical Sessions are only supported on server versions 3.6 and greater.",
+        );
     }
     this.handle = client._startSession();
 
     function serverSupports(wireVersion) {
-        return client.getMinWireVersion() <= wireVersion &&
-            wireVersion <= client.getMaxWireVersion();
+        return client.getMinWireVersion() <= wireVersion && wireVersion <= client.getMaxWireVersion();
     }
 
-    const hasTxnState = ((name) => this.handle.getTxnState() === name);
-    const setTxnState = ((name) => this.handle.setTxnState(name));
+    const hasTxnState = (name) => this.handle.getTxnState() === name;
+    const setTxnState = (name) => this.handle.setTxnState(name);
 
     this.isTxnActive = function isTxnActive() {
         return hasTxnState("active");
@@ -583,8 +615,7 @@ function ServerSession(client) {
     this.assignTxnInfo = function assignTxnInfo(cmdObj) {
         // We will want to reset the transaction state to 'inactive' if a normal operation
         // follows a committed or aborted transaction.
-        if ((hasTxnState("aborted")) ||
-            (hasTxnState("committed") && Object.keys(cmdObj)[0] !== "commitTransaction")) {
+        if (hasTxnState("aborted") || (hasTxnState("committed") && Object.keys(cmdObj)[0] !== "commitTransaction")) {
             setTxnState("inactive");
         }
 
@@ -620,8 +651,7 @@ function ServerSession(client) {
             cmdObj.startTransaction = true;
             if (_txnOptions.getTxnReadConcern() !== undefined) {
                 // Override the readConcern with the one specified during startTransaction.
-                cmdObj.readConcern =
-                    Object.assign({}, cmdObj.readConcern, _txnOptions.getTxnReadConcern());
+                cmdObj.readConcern = Object.assign({}, cmdObj.readConcern, _txnOptions.getTxnReadConcern());
             }
         }
 
@@ -772,7 +802,7 @@ ServerSession.canRetryWrites = function canRetryWrites(cmdObj) {
             return false;
         }
 
-        const hasMultiUpdate = cmdObj.updates.some(updateOp => updateOp.multi);
+        const hasMultiUpdate = cmdObj.updates.some((updateOp) => updateOp.multi);
         if (hasMultiUpdate) {
             // Operations that modify multiple documents (e.g. updateMany()) cannot be retried.
             return false;
@@ -791,8 +821,7 @@ ServerSession.canRetryWrites = function canRetryWrites(cmdObj) {
 
         // We use bsonWoCompare() in order to handle cases where the limit is specified as a
         // NumberInt() or NumberLong() instance.
-        const hasMultiDelete =
-            cmdObj.deletes.some(deleteOp => bsonWoCompare({_: deleteOp.limit}, {_: 0}) === 0);
+        const hasMultiDelete = cmdObj.deletes.some((deleteOp) => bsonWoCompare({_: deleteOp.limit}, {_: 0}) === 0);
         if (hasMultiDelete) {
             // Operations that modify multiple documents (e.g. deleteMany()) cannot be retried.
             return false;
@@ -813,7 +842,7 @@ ServerSession.canRetryWrites = function canRetryWrites(cmdObj) {
 };
 
 function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
-    let driverSessionConstructor = function(client, options = defaultOptions) {
+    let driverSessionConstructor = function (client, options = defaultOptions) {
         const sessionAwareClient = new SessionAwareClient(client);
 
         let _options = options;
@@ -866,8 +895,7 @@ function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
         };
 
         this.advanceOperationTime = function advanceOperationTime(operationTime) {
-            if (!isNonNullObject(_operationTime) ||
-                bsonWoCompare({_: operationTime}, {_: _operationTime}) > 0) {
+            if (!isNonNullObject(_operationTime) || bsonWoCompare({_: operationTime}, {_: _operationTime}) > 0) {
                 _operationTime = operationTime;
             }
         };
@@ -881,8 +909,10 @@ function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
         };
 
         this.advanceClusterTime = function advanceClusterTime(clusterTime) {
-            if (!isNonNullObject(_clusterTime) ||
-                bsonWoCompare({_: clusterTime.clusterTime}, {_: _clusterTime.clusterTime}) > 0) {
+            if (
+                !isNonNullObject(_clusterTime) ||
+                bsonWoCompare({_: clusterTime.clusterTime}, {_: _clusterTime.clusterTime}) > 0
+            ) {
                 _clusterTime = clusterTime;
             }
         };
@@ -910,7 +940,7 @@ function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
             implMethods.endSession(this._serverSession);
         };
 
-        this.shellPrint = function() {
+        this.shellPrint = function () {
             return this.toString();
         };
 
@@ -931,7 +961,9 @@ function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
         };
 
         this.startTransaction_forTesting = function startTransaction_forTesting(
-            txnOptsObj = {}, {ignoreActiveTxn: ignoreActiveTxn = false} = {}) {
+            txnOptsObj = {},
+            {ignoreActiveTxn: ignoreActiveTxn = false} = {},
+        ) {
             this._serverSession.startTransaction(txnOptsObj, ignoreActiveTxn);
         };
 
@@ -958,14 +990,13 @@ function makeDriverSessionConstructor(implMethods, defaultOptions = {}) {
 
     // Having a specific Error for when logical sessions aren't supported by the server, allows
     // the correct fallback behavior in this case (while propagating other errors).
-    driverSessionConstructor.UnsupportedError = function(message) {
+    driverSessionConstructor.UnsupportedError = function (message) {
         this.name = "DriverSession.UnsupportedError";
         this.message = message;
-        this.stack = this.toString() + "\n" + (new Error()).stack;
+        this.stack = this.toString() + "\n" + new Error().stack;
     };
     driverSessionConstructor.UnsupportedError.prototype = Object.create(Error.prototype);
-    driverSessionConstructor.UnsupportedError.prototype.constructor =
-        driverSessionConstructor.UnsupportedError;
+    driverSessionConstructor.UnsupportedError.prototype.constructor = driverSessionConstructor.UnsupportedError;
 
     return driverSessionConstructor;
 }
@@ -983,15 +1014,15 @@ const DriverSession = makeDriverSessionConstructor({
 function DelegatingDriverSession(client, originalSession) {
     const sessionAwareClient = new SessionAwareClient(client);
 
-    this.getClient = function() {
+    this.getClient = function () {
         return client;
     };
 
-    this._getSessionAwareClient = function() {
+    this._getSessionAwareClient = function () {
         return sessionAwareClient;
     };
 
-    this.getDatabase = function(dbName) {
+    this.getDatabase = function (dbName) {
         const db = client.getDB(dbName);
         db._session = this;
         return db;
@@ -1017,7 +1048,8 @@ function DelegatingDriverSession(client, originalSession) {
 // The default session on the Mongo connection object should also report that retryable
 // writes isn't enabled when interrogating the SessionOptions since `DummyDriverSession` won't
 // ever assign a transaction number.
-const DummyDriverSession = makeDriverSessionConstructor(  // Force clang-format to break this line.
+const DummyDriverSession = makeDriverSessionConstructor(
+    // Force clang-format to break this line.
     {
         createServerSession: function createServerSession(client) {
             return {
@@ -1050,25 +1082,29 @@ const DummyDriverSession = makeDriverSessionConstructor(  // Force clang-format 
                 },
 
                 startTransaction: function startTransaction() {
-                    throw new Error("Must call startSession() on the Mongo connection " +
-                                    "object before starting a transaction.");
+                    throw new Error(
+                        "Must call startSession() on the Mongo connection " + "object before starting a transaction.",
+                    );
                 },
 
                 commitTransaction: function commitTransaction() {
-                    throw new Error("Must call startSession() on the Mongo connection " +
-                                    "object before committing a transaction.");
+                    throw new Error(
+                        "Must call startSession() on the Mongo connection " + "object before committing a transaction.",
+                    );
                 },
 
                 abortTransaction: function abortTransaction() {
-                    throw new Error("Must call startSession() on the Mongo connection " +
-                                    "object before aborting a transaction.");
+                    throw new Error(
+                        "Must call startSession() on the Mongo connection " + "object before aborting a transaction.",
+                    );
                 },
             };
         },
 
         endSession: function endSession(serverSession) {},
     },
-    {causalConsistency: false, retryWrites: false});
+    {causalConsistency: false, retryWrites: false},
+);
 
 // We don't actually put anything on DriverSession.prototype, but this way
 // `session instanceof DriverSession` will work for DummyDriverSession instances.
@@ -1079,10 +1115,4 @@ const _DummyDriverSession = DummyDriverSession;
 const _DelegatingDriverSession = DelegatingDriverSession;
 const _ServerSession = ServerSession;
 
-export {
-    DriverSession,
-    SessionOptions,
-    _DummyDriverSession,
-    _DelegatingDriverSession,
-    _ServerSession
-};
+export {DriverSession, SessionOptions, _DummyDriverSession, _DelegatingDriverSession, _ServerSession};

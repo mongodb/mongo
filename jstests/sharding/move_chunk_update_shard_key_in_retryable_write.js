@@ -33,8 +33,7 @@ let st = new ShardingTest({
     mongos: 2,
     shards: 3,
     rs: {nodes: 2},
-    rsOptions:
-        {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}}
+    rsOptions: {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}},
 });
 
 const dbName = "test";
@@ -46,8 +45,7 @@ let mongos1TestDB = st.s1.getDB(dbName);
 
 // Create a sharded collection with three chunks:
 //     [-inf, -10), [-10, 10), [10, inf)
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: -10}}));
 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 10}}));
@@ -60,12 +58,9 @@ assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 10}}));
  *     shard2: [10, inf)
  */
 function setUp() {
-    assert.commandWorked(
-        st.s0.adminCommand({moveChunk: ns, find: {x: -100}, to: st.shard0.shardName}));
-    assert.commandWorked(
-        st.s0.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
-    assert.commandWorked(
-        st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
+    assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: -100}, to: st.shard0.shardName}));
+    assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
 
     flushRoutersAndRefreshShardMetadata(st, {ns});
 }
@@ -99,9 +94,7 @@ const shardKeyValueOnShard1 = 0;
 // because the document can't move shards if it is being deleted.
 const updateCmdObjBase = {
     update: collName,
-    updates: [
-        {q: {x: shardKeyValueOnShard0}, u: {$set: {x: shardKeyValueOnShard1}}},
-    ],
+    updates: [{q: {x: shardKeyValueOnShard0}, u: {$set: {x: shardKeyValueOnShard1}}}],
     ordered: false,
 };
 
@@ -145,13 +138,14 @@ function attachTxnFields(cmdObj) {
                 assert.eq(result.lastErrorObject.updatedExisting, false, tojson(result));
                 assert(result.lastErrorObject.upserted, tojson(result));
             }
-        } else {  // update
+        } else {
+            // update
             assert.eq(result.n, 1, tojson(result));
             assert.eq(result.nModified, 1, tojson(result));
         }
         assert.eq(mongos0TestColl.find({x: shardKeyValueOnShard1}).itcount(), 1);
 
-        assert.commandWorked(mongos0TestColl.deleteMany({}));  // Clean up for the next test case.
+        assert.commandWorked(mongos0TestColl.deleteMany({})); // Clean up for the next test case.
     }
 
     test("Updating shard key in retryable write receives error on retry", () => {
@@ -165,154 +159,188 @@ function attachTxnFields(cmdObj) {
 
         // Retry the commands. They should run against shard0, which should throw
         // IncompleteTransactionHistory.
-        assert.commandFailedWithCode(mongos0TestDB.runCommand(updateCmdObj),
-                                     ErrorCodes.IncompleteTransactionHistory);
-        assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
-                                     ErrorCodes.IncompleteTransactionHistory);
-        assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
-                                     ErrorCodes.IncompleteTransactionHistory);
+        assert.commandFailedWithCode(mongos0TestDB.runCommand(updateCmdObj), ErrorCodes.IncompleteTransactionHistory);
+        assert.commandFailedWithCode(
+            mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
+            ErrorCodes.IncompleteTransactionHistory,
+        );
+        assert.commandFailedWithCode(
+            mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
+            ErrorCodes.IncompleteTransactionHistory,
+        );
     });
 
-    test("Updating shard key in retryable write receives error on retry when the original chunk " +
-             "has been migrated to a new shard",
-         () => {
-             const updateCmdObj = attachTxnFields(updateCmdObjBase);
-             const findAndModifyUpdateCmdObj = attachTxnFields(findAndModifyUpdateCmdObjBase);
-             const findAndModifyUpsertCmdObj = attachTxnFields(findAndModifyUpsertCmdObjBase);
+    test(
+        "Updating shard key in retryable write receives error on retry when the original chunk " +
+            "has been migrated to a new shard",
+        () => {
+            const updateCmdObj = attachTxnFields(updateCmdObjBase);
+            const findAndModifyUpdateCmdObj = attachTxnFields(findAndModifyUpdateCmdObjBase);
+            const findAndModifyUpsertCmdObj = attachTxnFields(findAndModifyUpsertCmdObjBase);
 
-             runCommandOnInitialTry(updateCmdObj);
-             runCommandOnInitialTry(findAndModifyUpdateCmdObj);
-             runCommandOnInitialTry(findAndModifyUpsertCmdObj);
+            runCommandOnInitialTry(updateCmdObj);
+            runCommandOnInitialTry(findAndModifyUpdateCmdObj);
+            runCommandOnInitialTry(findAndModifyUpsertCmdObj);
 
-             // Move the chunk that contained the original document to shard1.
-             assert.commandWorked(st.s0.adminCommand(
-                 {moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard1.shardName}));
+            // Move the chunk that contained the original document to shard1.
+            assert.commandWorked(
+                st.s0.adminCommand({moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard1.shardName}),
+            );
 
-             // Retry the command. This should retry against shard1, which should throw
-             // IncompleteTransactionHistory.
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(updateCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-         });
+            // Retry the command. This should retry against shard1, which should throw
+            // IncompleteTransactionHistory.
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(updateCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+        },
+    );
 
-    test("Updating shard key in retryable write receives error on retry when the original chunk " +
-             "has been migrated to a new shard and then to a third shard",
-         () => {
-             const updateCmdObj = attachTxnFields(updateCmdObjBase);
-             const findAndModifyUpdateCmdObj = attachTxnFields(findAndModifyUpdateCmdObjBase);
-             const findAndModifyUpsertCmdObj = attachTxnFields(findAndModifyUpsertCmdObjBase);
+    test(
+        "Updating shard key in retryable write receives error on retry when the original chunk " +
+            "has been migrated to a new shard and then to a third shard",
+        () => {
+            const updateCmdObj = attachTxnFields(updateCmdObjBase);
+            const findAndModifyUpdateCmdObj = attachTxnFields(findAndModifyUpdateCmdObjBase);
+            const findAndModifyUpsertCmdObj = attachTxnFields(findAndModifyUpsertCmdObjBase);
 
-             runCommandOnInitialTry(updateCmdObj);
-             runCommandOnInitialTry(findAndModifyUpdateCmdObj);
-             runCommandOnInitialTry(findAndModifyUpsertCmdObj);
+            runCommandOnInitialTry(updateCmdObj);
+            runCommandOnInitialTry(findAndModifyUpdateCmdObj);
+            runCommandOnInitialTry(findAndModifyUpsertCmdObj);
 
-             // Move the chunk that contained the original document to shard1.
-             assert.commandWorked(st.s0.adminCommand(
-                 {moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard1.shardName}));
+            // Move the chunk that contained the original document to shard1.
+            assert.commandWorked(
+                st.s0.adminCommand({moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard1.shardName}),
+            );
 
-             // Then move the same chunk that contained the original document to shard2.
-             assert.commandWorked(st.s0.adminCommand(
-                 {moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard2.shardName}));
+            // Then move the same chunk that contained the original document to shard2.
+            assert.commandWorked(
+                st.s0.adminCommand({moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard2.shardName}),
+            );
 
-             // Retry the command. This should retry against shard1, which should throw
-             // IncompleteTransactionHistory.
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(updateCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-         });
+            // Retry the command. This should retry against shard1, which should throw
+            // IncompleteTransactionHistory.
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(updateCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+        },
+    );
 
-    test("Updating shard key in retryable write receives error on retry when the original chunk " +
-             "has been migrated to a shard without knowledge of the transaction",
-         () => {
-             const updateCmdObj = attachTxnFields(updateCmdObjBase);
-             const findAndModifyUpdateCmdObj = attachTxnFields(findAndModifyUpdateCmdObjBase);
-             const findAndModifyUpsertCmdObj = attachTxnFields(findAndModifyUpsertCmdObjBase);
+    test(
+        "Updating shard key in retryable write receives error on retry when the original chunk " +
+            "has been migrated to a shard without knowledge of the transaction",
+        () => {
+            const updateCmdObj = attachTxnFields(updateCmdObjBase);
+            const findAndModifyUpdateCmdObj = attachTxnFields(findAndModifyUpdateCmdObjBase);
+            const findAndModifyUpsertCmdObj = attachTxnFields(findAndModifyUpsertCmdObjBase);
 
-             runCommandOnInitialTry(updateCmdObj);
-             runCommandOnInitialTry(findAndModifyUpdateCmdObj);
-             runCommandOnInitialTry(findAndModifyUpsertCmdObj);
+            runCommandOnInitialTry(updateCmdObj);
+            runCommandOnInitialTry(findAndModifyUpdateCmdObj);
+            runCommandOnInitialTry(findAndModifyUpsertCmdObj);
 
-             // Move the chunk that contained the original document to shard2, which does not know
-             // about the transaction.
-             assert.commandWorked(st.s0.adminCommand(
-                 {moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard2.shardName}));
+            // Move the chunk that contained the original document to shard2, which does not know
+            // about the transaction.
+            assert.commandWorked(
+                st.s0.adminCommand({moveChunk: ns, find: {x: shardKeyValueOnShard0}, to: st.shard2.shardName}),
+            );
 
-             // Retry the command. This should retry against shard2, which should throw
-             // IncompleteTransactionHistory.
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(updateCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-         });
+            // Retry the command. This should retry against shard2, which should throw
+            // IncompleteTransactionHistory.
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(updateCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+        },
+    );
 }
 
-test(
-    "config.transactions entries for single-shard transactions which commit during transferMods phase are successfully migrated as dead-end sentinels",
-    () => {
-        const shardKeyValueOnShard0 = -100;
+test("config.transactions entries for single-shard transactions which commit during transferMods phase are successfully migrated as dead-end sentinels", () => {
+    const shardKeyValueOnShard0 = -100;
 
-        // Insert a single document on shard0.
-        assert.commandWorked(mongos0TestColl.insert({x: shardKeyValueOnShard0}));
+    // Insert a single document on shard0.
+    assert.commandWorked(mongos0TestColl.insert({x: shardKeyValueOnShard0}));
 
-        pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
+    pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
-        let joinMoveChunk = moveChunkParallel(
-            staticMongod, st.s0.host, {x: shardKeyValueOnShard0}, null, ns, st.shard1.shardName);
+    let joinMoveChunk = moveChunkParallel(
+        staticMongod,
+        st.s0.host,
+        {x: shardKeyValueOnShard0},
+        null,
+        ns,
+        st.shard1.shardName,
+    );
 
-        waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
+    waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
-        // Update a document being migrated.
-        let session = st.s.startSession();
-        withTxnAndAutoRetryOnMongos(session, () => {
-            let sessionDB = session.getDatabase(dbName);
-            const cmdToRunInTransaction = {
-                update: collName,
-                updates: [
-                    // Add a new field.
-                    {q: {x: shardKeyValueOnShard0}, u: {$set: {a: 4}}},
-                ],
-                ordered: false,
-            };
-
-            const result = assert.commandWorked(sessionDB.runCommand(cmdToRunInTransaction));
-            assert.eq(result.n, 1);
-            assert.eq(result.nModified, 1);
-        });
-
-        // Check that the update from the transaction succeeded.
-        const resultingDoc = mongos0TestColl.findOne({x: shardKeyValueOnShard0});
-        assert.neq(resultingDoc, null);
-        assert.eq(resultingDoc["a"], 4);
-
-        unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
-
-        // Wait for moveChunk to complete
-        joinMoveChunk();
-
-        st.printShardingStatus();
-        // Retry the command. This should retry against shard1, which should throw
-        // IncompleteTransactionHistory.
-        const fakeRetryCmd = {
+    // Update a document being migrated.
+    let session = st.s.startSession();
+    withTxnAndAutoRetryOnMongos(session, () => {
+        let sessionDB = session.getDatabase(dbName);
+        const cmdToRunInTransaction = {
             update: collName,
             updates: [
                 // Add a new field.
                 {q: {x: shardKeyValueOnShard0}, u: {$set: {a: 4}}},
             ],
             ordered: false,
-            lsid: session.getSessionId(),
-            txnNumber: NumberLong(session.getTxnNumber_forTesting())
         };
-        assert.commandFailedWithCode(mongos0TestDB.runCommand(fakeRetryCmd),
-                                     ErrorCodes.IncompleteTransactionHistory);
+
+        const result = assert.commandWorked(sessionDB.runCommand(cmdToRunInTransaction));
+        assert.eq(result.n, 1);
+        assert.eq(result.nModified, 1);
     });
+
+    // Check that the update from the transaction succeeded.
+    const resultingDoc = mongos0TestColl.findOne({x: shardKeyValueOnShard0});
+    assert.neq(resultingDoc, null);
+    assert.eq(resultingDoc["a"], 4);
+
+    unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
+
+    // Wait for moveChunk to complete
+    joinMoveChunk();
+
+    st.printShardingStatus();
+    // Retry the command. This should retry against shard1, which should throw
+    // IncompleteTransactionHistory.
+    const fakeRetryCmd = {
+        update: collName,
+        updates: [
+            // Add a new field.
+            {q: {x: shardKeyValueOnShard0}, u: {$set: {a: 4}}},
+        ],
+        ordered: false,
+        lsid: session.getSessionId(),
+        txnNumber: NumberLong(session.getTxnNumber_forTesting()),
+    };
+    assert.commandFailedWithCode(mongos0TestDB.runCommand(fakeRetryCmd), ErrorCodes.IncompleteTransactionHistory);
+});
 
 {
     // Run the given command as during the transferMods phase of chunk migration is migrated
@@ -332,7 +360,13 @@ test(
         // here we move the chunk from shard0 to shard2, which won't be involved in the
         // transaction created by the shard key update.
         let joinMoveChunk = moveChunkParallel(
-            staticMongod, st.s0.host, {x: shardKeyValueOnShard0}, null, ns, st.shard2.shardName);
+            staticMongod,
+            st.s0.host,
+            {x: shardKeyValueOnShard0},
+            null,
+            ns,
+            st.shard2.shardName,
+        );
 
         waitForMoveChunkStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
@@ -347,7 +381,8 @@ test(
                 assert.eq(result.lastErrorObject.updatedExisting, false, tojson(result));
                 assert(result.lastErrorObject.upserted, tojson(result));
             }
-        } else {  // update
+        } else {
+            // update
             assert.eq(result.n, 1, tojson(result));
             assert.eq(result.nModified, 1, tojson(result));
         }
@@ -360,59 +395,72 @@ test(
         st.printShardingStatus();
     }
 
-    test("Update shard key in retryable write during transferMods phase of chunk migration " +
-             "is migrated successfully to a node not involved in the shard key update",
-         () => {
-             const updateCmdObj = attachTxnFields(updateCmdObjBase);
-             runCommandDuringChunkMigration(updateCmdObj);
-             // Retry the command. This should retry against shard2, which should throw
-             // IncompleteTransactionHistory.
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(updateCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-         });
+    test(
+        "Update shard key in retryable write during transferMods phase of chunk migration " +
+            "is migrated successfully to a node not involved in the shard key update",
+        () => {
+            const updateCmdObj = attachTxnFields(updateCmdObjBase);
+            runCommandDuringChunkMigration(updateCmdObj);
+            // Retry the command. This should retry against shard2, which should throw
+            // IncompleteTransactionHistory.
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(updateCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+        },
+    );
 
-    test("findAndModify update shard key in retryable write during transferMods phase of chunk " +
-             "migration is migrated successfully to a node not involved in the shard key update",
-         () => {
-             const findAndModifyUpdateCmdObj = attachTxnFields(findAndModifyUpdateCmdObjBase);
-             runCommandDuringChunkMigration(findAndModifyUpdateCmdObj);
-             // Retry the command. This should retry against shard2, which should throw
-             // IncompleteTransactionHistory.
-             assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
-                                          ErrorCodes.IncompleteTransactionHistory);
-         });
+    test(
+        "findAndModify update shard key in retryable write during transferMods phase of chunk " +
+            "migration is migrated successfully to a node not involved in the shard key update",
+        () => {
+            const findAndModifyUpdateCmdObj = attachTxnFields(findAndModifyUpdateCmdObjBase);
+            runCommandDuringChunkMigration(findAndModifyUpdateCmdObj);
+            // Retry the command. This should retry against shard2, which should throw
+            // IncompleteTransactionHistory.
+            assert.commandFailedWithCode(
+                mongos0TestDB.runCommand(findAndModifyUpdateCmdObj),
+                ErrorCodes.IncompleteTransactionHistory,
+            );
+        },
+    );
 
-    test("findAndModify update shard key with upsert=true in retryable write during " +
-             "transferMods phase of chunk migration is migrated successfully to a node not " +
-             "involved in the shard key update",
-         () => {
-             const findAndModifyUpsertCmdObj = attachTxnFields(findAndModifyUpsertCmdObjBase);
-             runCommandDuringChunkMigration(findAndModifyUpsertCmdObj);
-             // Retry the command. This should retry against shard2.
-             if (isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s0)) {
-                 // If internal transactions are enabled, shard2 is expected to throw
-                 // IncompleteTransactionHistory since it should have the WouldChangeOwningShard
-                 // noop oplog entry copied from shard0 during the migration.
-                 assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
-                                              ErrorCodes.IncompleteTransactionHistory);
-             } else {
-                 // If internal transactions are not enabled, shard2 is expected not to throw an
-                 // error since this is an upsert so on shard0 the applyOps oplog entry would not
-                 // have any operations in it and therefore shard2 would not receive a dead-end
-                 // sentinel oplog entry for this transaction.
+    test(
+        "findAndModify update shard key with upsert=true in retryable write during " +
+            "transferMods phase of chunk migration is migrated successfully to a node not " +
+            "involved in the shard key update",
+        () => {
+            const findAndModifyUpsertCmdObj = attachTxnFields(findAndModifyUpsertCmdObjBase);
+            runCommandDuringChunkMigration(findAndModifyUpsertCmdObj);
+            // Retry the command. This should retry against shard2.
+            if (isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s0)) {
+                // If internal transactions are enabled, shard2 is expected to throw
+                // IncompleteTransactionHistory since it should have the WouldChangeOwningShard
+                // noop oplog entry copied from shard0 during the migration.
+                assert.commandFailedWithCode(
+                    mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
+                    ErrorCodes.IncompleteTransactionHistory,
+                );
+            } else {
+                // If internal transactions are not enabled, shard2 is expected not to throw an
+                // error since this is an upsert so on shard0 the applyOps oplog entry would not
+                // have any operations in it and therefore shard2 would not receive a dead-end
+                // sentinel oplog entry for this transaction.
 
-                 // If the retry is done against the original mongos, it should fail with
-                 // ConflictingOperationInProgress on the mongos itself when the mongos tries to
-                 // convert the retryable write into a transaction again.
-                 assert.commandFailedWithCode(mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
-                                              ErrorCodes.ConflictingOperationInProgress);
-                 // If the retry is done against a different mongos, it should fail on shard1
-                 // when the shard receives a transaction statement with a txnNumber that is already
-                 // committed.
-                 assert.commandFailedWithCode(mongos1TestDB.runCommand(findAndModifyUpsertCmdObj),
-                                              50911);
-             }
-         });
+                // If the retry is done against the original mongos, it should fail with
+                // ConflictingOperationInProgress on the mongos itself when the mongos tries to
+                // convert the retryable write into a transaction again.
+                assert.commandFailedWithCode(
+                    mongos0TestDB.runCommand(findAndModifyUpsertCmdObj),
+                    ErrorCodes.ConflictingOperationInProgress,
+                );
+                // If the retry is done against a different mongos, it should fail on shard1
+                // when the shard receives a transaction statement with a txnNumber that is already
+                // committed.
+                assert.commandFailedWithCode(mongos1TestDB.runCommand(findAndModifyUpsertCmdObj), 50911);
+            }
+        },
+    );
 }
 
 // TODO (SERVER-40815) This test currently fails with DuplicateKeyError on _id.

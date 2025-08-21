@@ -26,15 +26,17 @@ function getNewCollection(conn) {
 function makeUnshardedCollection(conn) {
     const coll = getNewCollection(conn);
     coll.drop();
-    assert.commandWorked(coll.insert([
-        {v: 1, y: -3},
-        {v: 2, y: -2},
-        {v: 3, y: -1},
-        {v: 4, y: 1},
-        {v: 5, y: 2},
-        {v: 6, y: 3},
-        {v: 7, y: 4}
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {v: 1, y: -3},
+            {v: 2, y: -2},
+            {v: 3, y: -1},
+            {v: 4, y: 1},
+            {v: 5, y: 2},
+            {v: 6, y: 3},
+            {v: 7, y: 4},
+        ]),
+    );
     assert.commandWorked(coll.createIndex({y: 1}));
     return coll;
 }
@@ -42,12 +44,14 @@ function makeUnshardedCollection(conn) {
 function makeShardedCollection(st) {
     const conn = st.s;
     const coll = makeUnshardedCollection(conn);
-    st.shardColl(coll,
-                 /* key */ {y: 1},
-                 /* split at */ {y: 0},
-                 /* move chunk containing */ {y: 1},
-                 /* db */ coll.getDB().getName(),
-                 /* waitForDelete */ true);
+    st.shardColl(
+        coll,
+        /* key */ {y: 1},
+        /* split at */ {y: 0},
+        /* move chunk containing */ {y: 1},
+        /* db */ coll.getDB().getName(),
+        /* waitForDelete */ true,
+    );
     return coll;
 }
 
@@ -58,12 +62,14 @@ function runLookupForeignShardedPipelineTest(st) {
     const foreignColl = makeShardedCollection(st);
     const localColl = makeUnshardedCollection(st);
 
-    const lookup = {$lookup: {
-        from: foreignColl.getName(),
-        as: "lookedUp",
-        localField: "v",
-        foreignField: "y",
-    }};
+    const lookup = {
+        $lookup: {
+            from: foreignColl.getName(),
+            as: "lookedUp",
+            localField: "v",
+            foreignField: "y",
+        },
+    };
     const shape = {pipeline: [lookup]};
 
     const queryStatsKey = getAggregateQueryStatsKey({
@@ -82,11 +88,15 @@ function runLookupForeignShardedPipelineTest(st) {
         const cmd = {
             aggregate: localColl.getName(),
             pipeline: [lookup],
-            cursor: {batchSize: batchSize}
+            cursor: {batchSize: batchSize},
         };
 
-        const queryStats = exhaustCursorAndGetQueryStats(
-            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
+        const queryStats = exhaustCursorAndGetQueryStats({
+            conn: conn,
+            cmd: cmd,
+            key: queryStatsKey,
+            expectedDocs: expectedDocs,
+        });
 
         // Due to the index, we look at all local documents plus only the matching foreign
         // documents.
@@ -97,7 +107,7 @@ function runLookupForeignShardedPipelineTest(st) {
             hasSortStage: false,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 }
@@ -116,12 +126,8 @@ function runUnionWithShardedPipelineTest(st) {
         {
             $unionWith: {
                 coll: coll2.getName(),
-                pipeline: [
-                    {$match: {v: {$gt: 2}}},
-                    {$sort: {v: 1}},
-                    {$limit: 10},
-                ],
-            }
+                pipeline: [{$match: {v: {$gt: 2}}}, {$sort: {v: 1}}, {$limit: 10}],
+            },
         },
     ];
     const shape = {
@@ -130,14 +136,10 @@ function runUnionWithShardedPipelineTest(st) {
             {
                 $unionWith: {
                     coll: coll2.getName(),
-                    pipeline: [
-                        {$match: {v: {$gt: "?number"}}},
-                        {$sort: {v: 1}},
-                        {$limit: "?number"},
-                    ],
-                }
+                    pipeline: [{$match: {v: {$gt: "?number"}}}, {$sort: {v: 1}}, {$limit: "?number"}],
+                },
             },
-        ]
+        ],
     };
 
     const queryStatsKey = getAggregateQueryStatsKey({
@@ -154,11 +156,15 @@ function runUnionWithShardedPipelineTest(st) {
         const cmd = {
             aggregate: coll1.getName(),
             pipeline: pipeline,
-            cursor: {batchSize: batchSize}
+            cursor: {batchSize: batchSize},
         };
 
-        const queryStats = exhaustCursorAndGetQueryStats(
-            {conn: conn, cmd: cmd, key: queryStatsKey, expectedDocs: expectedDocs});
+        const queryStats = exhaustCursorAndGetQueryStats({
+            conn: conn,
+            cmd: cmd,
+            key: queryStatsKey,
+            expectedDocs: expectedDocs,
+        });
 
         // Index scan against coll1 for 5 docs examined and collection scan against coll2 for 7,
         // giving a total of 12 docs and 5 keys examined.
@@ -168,13 +174,13 @@ function runUnionWithShardedPipelineTest(st) {
             hasSortStage: true,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 }
 
 const options = {
-    setParameter: {internalQueryStatsRateLimit: -1}
+    setParameter: {internalQueryStatsRateLimit: -1},
 };
 
 const st = new ShardingTest(Object.assign({shards: 2, other: {mongosOptions: options}}));

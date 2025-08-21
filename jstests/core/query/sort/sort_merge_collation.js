@@ -11,7 +11,7 @@
 import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const numericOrdering = {
-    collation: {locale: "en_US", numericOrdering: true}
+    collation: {locale: "en_US", numericOrdering: true},
 };
 
 const coll = db.sort_merge_collation;
@@ -19,34 +19,34 @@ coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), numericOrdering));
 
-assert.commandWorked(
-    coll.createIndex({filterFieldA: 1, sortFieldA: 1, sortFieldB: 1}, numericOrdering));
-assert.commandWorked(
-    coll.createIndex({filterFieldA: 1, sortFieldA: -1, sortFieldB: -1}, numericOrdering));
+assert.commandWorked(coll.createIndex({filterFieldA: 1, sortFieldA: 1, sortFieldB: 1}, numericOrdering));
+assert.commandWorked(coll.createIndex({filterFieldA: 1, sortFieldA: -1, sortFieldB: -1}, numericOrdering));
 assert.commandWorked(coll.createIndex({sortFieldA: 1, sortFieldB: 1}, numericOrdering));
 
-assert.commandWorked(coll.insert([
-    {filterFieldA: "1", filterFieldB: "1", sortFieldA: "18", sortFieldB: "11"},
-    {filterFieldA: "2", filterFieldB: "2", sortFieldA: "2", sortFieldB: "13"},
-    {filterFieldA: "3", filterFieldB: "3", sortFieldA: "13", sortFieldB: "7"},
-    {filterFieldA: "4", filterFieldB: "4", sortFieldA: "7", sortFieldB: "4"},
-    {filterFieldA: "5", filterFieldB: "5", sortFieldA: "14", sortFieldB: "10"},
-    {filterFieldA: "1", filterFieldB: "1", sortFieldA: "4", sortFieldB: "12"},
-    {filterFieldA: "2", filterFieldB: "2", sortFieldA: "11", sortFieldB: "8"},
-    {filterFieldA: "3", filterFieldB: "3", sortFieldA: "9", sortFieldB: "5"},
-    {filterFieldA: "4", filterFieldB: "4", sortFieldA: "10", sortFieldB: "14"},
-    {filterFieldA: "5", filterFieldB: "5", sortFieldA: "1", sortFieldB: "18"},
-    {filterFieldA: "1", filterFieldB: "1", sortFieldA: "18", sortFieldB: "6"},
-    {filterFieldA: "2", filterFieldB: "2", sortFieldA: "2", sortFieldB: "3"},
-    {filterFieldA: "3", filterFieldB: "3", sortFieldA: "13", sortFieldB: "19"},
-    {filterFieldA: "4", filterFieldB: "4", sortFieldA: "7", sortFieldB: "15"},
-    {filterFieldA: "5", filterFieldB: "5", sortFieldA: "14", sortFieldB: "1"},
-    {filterFieldA: "1", filterFieldB: "1", sortFieldA: "4", sortFieldB: "0"},
-    {filterFieldA: "2", filterFieldB: "2", sortFieldA: "11", sortFieldB: "17"},
-    {filterFieldA: "3", filterFieldB: "3", sortFieldA: "9", sortFieldB: "16"},
-    {filterFieldA: "4", filterFieldB: "4", sortFieldA: "10", sortFieldB: "9"},
-    {filterFieldA: "5", filterFieldB: "5", sortFieldA: "1", sortFieldB: "2"},
-]));
+assert.commandWorked(
+    coll.insert([
+        {filterFieldA: "1", filterFieldB: "1", sortFieldA: "18", sortFieldB: "11"},
+        {filterFieldA: "2", filterFieldB: "2", sortFieldA: "2", sortFieldB: "13"},
+        {filterFieldA: "3", filterFieldB: "3", sortFieldA: "13", sortFieldB: "7"},
+        {filterFieldA: "4", filterFieldB: "4", sortFieldA: "7", sortFieldB: "4"},
+        {filterFieldA: "5", filterFieldB: "5", sortFieldA: "14", sortFieldB: "10"},
+        {filterFieldA: "1", filterFieldB: "1", sortFieldA: "4", sortFieldB: "12"},
+        {filterFieldA: "2", filterFieldB: "2", sortFieldA: "11", sortFieldB: "8"},
+        {filterFieldA: "3", filterFieldB: "3", sortFieldA: "9", sortFieldB: "5"},
+        {filterFieldA: "4", filterFieldB: "4", sortFieldA: "10", sortFieldB: "14"},
+        {filterFieldA: "5", filterFieldB: "5", sortFieldA: "1", sortFieldB: "18"},
+        {filterFieldA: "1", filterFieldB: "1", sortFieldA: "18", sortFieldB: "6"},
+        {filterFieldA: "2", filterFieldB: "2", sortFieldA: "2", sortFieldB: "3"},
+        {filterFieldA: "3", filterFieldB: "3", sortFieldA: "13", sortFieldB: "19"},
+        {filterFieldA: "4", filterFieldB: "4", sortFieldA: "7", sortFieldB: "15"},
+        {filterFieldA: "5", filterFieldB: "5", sortFieldA: "14", sortFieldB: "1"},
+        {filterFieldA: "1", filterFieldB: "1", sortFieldA: "4", sortFieldB: "0"},
+        {filterFieldA: "2", filterFieldB: "2", sortFieldA: "11", sortFieldB: "17"},
+        {filterFieldA: "3", filterFieldB: "3", sortFieldA: "9", sortFieldB: "16"},
+        {filterFieldA: "4", filterFieldB: "4", sortFieldA: "10", sortFieldB: "9"},
+        {filterFieldA: "5", filterFieldB: "5", sortFieldA: "1", sortFieldB: "2"},
+    ]),
+);
 
 function isSorted(array, lessThanFunction) {
     for (let i = 1; i < array.length; ++i) {
@@ -67,9 +67,10 @@ function runTest(sorts, filters) {
 
             // Check that the results are in order.
             let res = coll.find(filter).sort(sortInfo.sortPattern).toArray();
-            assert(isSorted(res, sortInfo.cmpFunction),
-                   () => "Assertion failed for filter: " + filter + "\n" +
-                       "sort pattern " + sortInfo.sortPattern);
+            assert(
+                isSorted(res, sortInfo.cmpFunction),
+                () => "Assertion failed for filter: " + filter + "\n" + "sort pattern " + sortInfo.sortPattern,
+            );
 
             // Check that there are no duplicates.
             let ids = new Set();
@@ -84,23 +85,25 @@ function runTest(sorts, filters) {
 const kSorts = [
     {
         sortPattern: {sortFieldA: 1},
-        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) < parseInt(docB.sortFieldA)
+        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) < parseInt(docB.sortFieldA),
     },
     {
         sortPattern: {sortFieldA: -1},
-        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) > parseInt(docB.sortFieldA)
+        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) > parseInt(docB.sortFieldA),
     },
     {
         sortPattern: {sortFieldA: 1, sortFieldB: 1},
-        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) < parseInt(docB.sortFieldA) ||
+        cmpFunction: (docA, docB) =>
+            parseInt(docA.sortFieldA) < parseInt(docB.sortFieldA) ||
             (parseInt(docA.sortFieldA) == parseInt(docB.sortFieldA) &&
-             parseInt(docA.sortFieldB) < parseInt(docB.sortFieldB))
+                parseInt(docA.sortFieldB) < parseInt(docB.sortFieldB)),
     },
     {
         sortPattern: {sortFieldA: -1, sortFieldB: -1},
-        cmpFunction: (docA, docB) => parseInt(docA.sortFieldA) > parseInt(docB.sortFieldA) ||
+        cmpFunction: (docA, docB) =>
+            parseInt(docA.sortFieldA) > parseInt(docB.sortFieldA) ||
             (parseInt(docA.sortFieldA) == parseInt(docB.sortFieldA) &&
-             parseInt(docA.sortFieldB) > parseInt(docB.sortFieldB))
+                parseInt(docA.sortFieldB) > parseInt(docB.sortFieldB)),
     },
 ];
 
@@ -108,15 +111,20 @@ const kSorts = [
 (function testFetchedChildren() {
     const kFilterPredicates = [
         // $or with two children.
-        {$or: [{filterFieldA: "4", filterFieldB: "4"}, {filterFieldA: "3", filterFieldB: "3"}]},
+        {
+            $or: [
+                {filterFieldA: "4", filterFieldB: "4"},
+                {filterFieldA: "3", filterFieldB: "3"},
+            ],
+        },
 
         // $or with three children.
         {
             $or: [
                 {filterFieldA: "4", filterFieldB: "4"},
                 {filterFieldA: "3", filterFieldB: "3"},
-                {filterFieldA: "1", filterFieldB: "1"}
-            ]
+                {filterFieldA: "1", filterFieldB: "1"},
+            ],
         },
 
         // $or with four children.
@@ -125,8 +133,8 @@ const kSorts = [
                 {filterFieldA: "4", filterFieldB: "4"},
                 {filterFieldA: "3", filterFieldB: "3"},
                 {filterFieldA: "2", filterFieldB: "2"},
-                {filterFieldA: "1", filterFieldB: "1"}
-            ]
+                {filterFieldA: "1", filterFieldB: "1"},
+            ],
         },
     ];
 
@@ -137,15 +145,20 @@ const kSorts = [
 (function testUnfetchedChildren() {
     const kFilterPredicates = [
         // $or with two children.
-        {$or: [{sortFieldA: "4", sortFieldB: "4"}, {sortFieldA: "3", sortFieldB: "3"}]},
+        {
+            $or: [
+                {sortFieldA: "4", sortFieldB: "4"},
+                {sortFieldA: "3", sortFieldB: "3"},
+            ],
+        },
 
         // $or with three children.
         {
             $or: [
                 {sortFieldA: "4", sortFieldB: "4"},
                 {sortFieldA: "3", sortFieldB: "3"},
-                {sortFieldA: "7", sortFieldB: "4"}
-            ]
+                {sortFieldA: "7", sortFieldB: "4"},
+            ],
         },
 
         // $or with four children.
@@ -154,8 +167,8 @@ const kSorts = [
                 {sortFieldA: "4", sortFieldB: "4"},
                 {sortFieldA: "3", sortFieldB: "3"},
                 {sortFieldA: "7", sortFieldB: "4"},
-                {sortFieldA: "10", sortFieldB: "9"}
-            ]
+                {sortFieldA: "10", sortFieldB: "9"},
+            ],
         },
     ];
 

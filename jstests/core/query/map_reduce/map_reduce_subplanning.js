@@ -28,18 +28,23 @@ assert.commandWorked(coll.insert({b: 3}));
 assert.commandWorked(coll.insert({b: 3}));
 assert.commandWorked(coll.insert({a: 2, b: 3}));
 
-assert.commandWorked(coll.mapReduce(
-    function() {
-        if (!this.hasOwnProperty('a')) {
-            emit('a', 0);
-        } else {
-            emit('a', this.a);
-        }
-    },
-    function(key, vals) {
-        return vals.reduce((a, b) => a + b, 0);
-    },
-    {out: {merge: "mrOutput"}, query: {$or: [{a: 2}, {b: 3}]}}));
+assert.commandWorked(
+    coll.mapReduce(
+        function () {
+            if (!this.hasOwnProperty("a")) {
+                emit("a", 0);
+            } else {
+                emit("a", this.a);
+            }
+        },
+        function (key, vals) {
+            return vals.reduce((a, b) => a + b, 0);
+        },
+        {out: {merge: "mrOutput"}, query: {$or: [{a: 2}, {b: 3}]}},
+    ),
+);
 
-assert(resultsEq([{"_id": "a", "value": 4}], db.getCollection("mrOutput").find().toArray()),
-       db.getCollection("mrOutput").find().toArray());
+assert(
+    resultsEq([{"_id": "a", "value": 4}], db.getCollection("mrOutput").find().toArray()),
+    db.getCollection("mrOutput").find().toArray(),
+);

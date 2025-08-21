@@ -7,7 +7,7 @@ admin.auth("admin", "pwd");
 db.createUser({user: "lily", pwd: "pwd", roles: jsTest.basicUserRoles});
 admin.logout();
 
-var testCommand = function(cmd) {
+var testCommand = function (cmd) {
     // Test that we can run a pre-auth command without authenticating.
     var command = {[cmd]: 1};
 
@@ -22,18 +22,20 @@ var testCommand = function(cmd) {
 
     // Test that we can run a pre-auth command with a session while
     // the session owner is logged in (and the session gets ignored)
-    assert.commandWorked(db.runCommand(command),
-                         "failed to run command " + cmd + " while logged in");
-    assert.commandWorked(db.runCommand(commandWithSession),
-                         "failed to run command " + cmd + " with session while logged in");
+    assert.commandWorked(db.runCommand(command), "failed to run command " + cmd + " while logged in");
+    assert.commandWorked(
+        db.runCommand(commandWithSession),
+        "failed to run command " + cmd + " with session while logged in",
+    );
 
     // Test that we can run a pre-auth command with a session while
     // nobody is logged in (and the session gets ignored)
     db.logout();
-    assert.commandWorked(db.runCommand(command),
-                         "failed to run command " + cmd + " without being logged in");
-    assert.commandWorked(db.runCommand(commandWithSession),
-                         "failed to run command " + cmd + " with session without being logged in");
+    assert.commandWorked(db.runCommand(command), "failed to run command " + cmd + " without being logged in");
+    assert.commandWorked(
+        db.runCommand(commandWithSession),
+        "failed to run command " + cmd + " with session without being logged in",
+    );
 
     db.logout();
     admin.logout();

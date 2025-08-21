@@ -17,8 +17,11 @@ import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Create a resharding test instance and enable higher frequency no-ops to avoid test case from
 // failing because of timeout while waiting for next change stream event.
-const reshardingTest = new ReshardingTest(
-    {reshardInPlace: false, periodicNoopIntervalSecs: 1, writePeriodicNoops: true});
+const reshardingTest = new ReshardingTest({
+    reshardInPlace: false,
+    periodicNoopIntervalSecs: 1,
+    writePeriodicNoops: true,
+});
 reshardingTest.setup();
 
 const donorShardNames = reshardingTest.donorShardNames;
@@ -29,9 +32,7 @@ const collectionName = "test.whileResharding";
 const coll = reshardingTest.createShardedCollection({
     ns: collectionName,
     shardKeyPattern: {oldShardKey: 1},
-    chunks: [
-        {min: {oldShardKey: MinKey}, max: {oldShardKey: MaxKey}, shard: donorShardNames[0]},
-    ],
+    chunks: [{min: {oldShardKey: MinKey}, max: {oldShardKey: MaxKey}, shard: donorShardNames[0]}],
 });
 
 const mongos = coll.getMongo();
@@ -41,21 +42,18 @@ const recipientConn = new Mongo(topology.shards[recipientShardNames[0]].primary)
 
 // Verifies that expected documents are present in the pre-image collection at the specified shard.
 function verifyPreImages(conn, expectedPreImageDocuments) {
-    const preImageDocuments =
-        conn.getDB("config").getCollection("system.preimages").find().toArray();
+    const preImageDocuments = conn.getDB("config").getCollection("system.preimages").find().toArray();
 
     assert.eq(preImageDocuments.length, expectedPreImageDocuments.length, preImageDocuments);
 
     for (let idx = 0; idx < preImageDocuments.length; idx++) {
-        assert.eq(preImageDocuments[idx].preImage,
-                  expectedPreImageDocuments[idx],
-                  preImageDocuments[idx].preImage);
+        assert.eq(preImageDocuments[idx].preImage, expectedPreImageDocuments[idx], preImageDocuments[idx].preImage);
     }
 }
 
 // Verifies that the change streams cursor 'csCursor' observes the expected events.
 function verifyChangeStreamEvents(csCursor, events) {
-    events.forEach(expectedEvent => {
+    events.forEach((expectedEvent) => {
         assert.soon(() => csCursor.hasNext());
         const event = csCursor.next();
 
@@ -70,16 +68,19 @@ function verifyChangeStreamEvents(csCursor, events) {
 }
 
 // Enable recording of pre-images in the collection.
-assert.commandWorked(coll.getDB().runCommand(
-    {collMod: "whileResharding", changeStreamPreAndPostImages: {enabled: true}}));
+assert.commandWorked(
+    coll.getDB().runCommand({collMod: "whileResharding", changeStreamPreAndPostImages: {enabled: true}}),
+);
 
 // Insert some documents before resharding the collection so that there is data to clone.
-assert.commandWorked(coll.insert([
-    {_id: 0, annotation: "pre-resharding-insert", oldShardKey: 0, newShardKey: 2},
-    {_id: 1, annotation: "pre-resharding-insert", oldShardKey: 1, newShardKey: 3},
-    {_id: 2, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
-    {_id: 3, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
-]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, annotation: "pre-resharding-insert", oldShardKey: 0, newShardKey: 2},
+        {_id: 1, annotation: "pre-resharding-insert", oldShardKey: 1, newShardKey: 3},
+        {_id: 2, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
+        {_id: 3, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
+    ]),
+);
 
 // Verify that 'insert' operations does not record any pre-images.
 verifyPreImages(donorConn, []);
@@ -95,7 +96,7 @@ assert.commandWorked(coll.update({_id: 1}, {$set: {annotation: "pre-resharding-u
 // Verify that pre-images are recorded for 'update' operations on the donor shard.
 verifyPreImages(donorConn, [
     {_id: 0, annotation: "pre-resharding-insert", oldShardKey: 0, newShardKey: 2},
-    {_id: 1, annotation: "pre-resharding-insert", oldShardKey: 1, newShardKey: 3}
+    {_id: 1, annotation: "pre-resharding-insert", oldShardKey: 1, newShardKey: 3},
 ]);
 verifyPreImages(recipientConn, []);
 
@@ -103,19 +104,15 @@ verifyPreImages(recipientConn, []);
 reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {newShardKey: 1},
-        newChunks: [
-            {min: {newShardKey: MinKey}, max: {newShardKey: MaxKey}, shard: recipientShardNames[0]}
-        ],
+        newChunks: [{min: {newShardKey: MinKey}, max: {newShardKey: MaxKey}, shard: recipientShardNames[0]}],
     },
     () => {
         // We wait until cloneTimestamp has been chosen to guarantee that any subsequent writes will
         // be applied by the ReshardingOplogApplier.
         reshardingTest.awaitCloneTimestampChosen();
 
-        assert.commandWorked(
-            coll.update({_id: 0}, {$set: {annotation: "during-resharding-update"}}));
-        assert.commandWorked(
-            coll.update({_id: 1}, {$set: {annotation: "during-resharding-update"}}));
+        assert.commandWorked(coll.update({_id: 0}, {$set: {annotation: "during-resharding-update"}}));
+        assert.commandWorked(coll.update({_id: 1}, {$set: {annotation: "during-resharding-update"}}));
         assert.commandWorked(coll.remove({_id: 1}, {justOne: true}));
 
         // Perform some operations in a transaction.
@@ -125,21 +122,23 @@ reshardingTest.withReshardingInBackground(
                 const sessionDB = session.getDatabase(coll.getDB().getName());
                 const sessionColl = sessionDB.getCollection(coll.getName());
                 withTxnAndAutoRetryOnMongos(session, () => {
-                    assert.commandWorked(sessionColl.update(
-                        {_id: 2}, {$set: {annotation: "during-resharding-txn-update"}}));
+                    assert.commandWorked(
+                        sessionColl.update({_id: 2}, {$set: {annotation: "during-resharding-txn-update"}}),
+                    );
                     assert.commandWorked(sessionColl.remove({_id: 3}, {justOne: true}));
                 });
                 return true;
             },
             "Failed to execute a transaction while resharding was in progress",
             10 /*num_attempts*/,
-            100 /*intervalMS*/);
-    });
+            100 /*intervalMS*/,
+        );
+    },
+);
 
 // Verify that after the resharding is complete, the pre-image collection exists on the recipient
 // shard with clustered-index enabled.
-const preImageCollInfo =
-    recipientConn.getDB("config").getCollectionInfos({name: "system.preimages"});
+const preImageCollInfo = recipientConn.getDB("config").getCollectionInfos({name: "system.preimages"});
 assert.eq(preImageCollInfo.length, 1, preImageCollInfo);
 assert(preImageCollInfo[0].options.hasOwnProperty("clusteredIndex"), preImageCollInfo[0]);
 
@@ -159,8 +158,7 @@ verifyPreImages(donorConn, [
     {_id: 2, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
     {_id: 3, annotation: "pre-resharding-txn", oldShardKey: 1, newShardKey: 3},
 ]);
-verifyPreImages(recipientConn,
-                [{_id: 0, annotation: "during-resharding-update", oldShardKey: 0, newShardKey: 2}]);
+verifyPreImages(recipientConn, [{_id: 0, annotation: "during-resharding-update", oldShardKey: 0, newShardKey: 2}]);
 
 // Verify that the change stream observes the change events with required pre-images.
 verifyChangeStreamEvents(csCursor, [
@@ -168,39 +166,39 @@ verifyChangeStreamEvents(csCursor, [
         opType: "update",
         id: 0,
         prevAnnotation: "pre-resharding-insert",
-        curAnnotation: "pre-resharding-update"
+        curAnnotation: "pre-resharding-update",
     },
     {
         opType: "update",
         id: 1,
         prevAnnotation: "pre-resharding-insert",
-        curAnnotation: "pre-resharding-update"
+        curAnnotation: "pre-resharding-update",
     },
     {
         opType: "update",
         id: 0,
         prevAnnotation: "pre-resharding-update",
-        curAnnotation: "during-resharding-update"
+        curAnnotation: "during-resharding-update",
     },
     {
         opType: "update",
         id: 1,
         prevAnnotation: "pre-resharding-update",
-        curAnnotation: "during-resharding-update"
+        curAnnotation: "during-resharding-update",
     },
     {opType: "delete", id: 1, prevAnnotation: "during-resharding-update"},
     {
         opType: "update",
         id: 2,
         prevAnnotation: "pre-resharding-txn",
-        curAnnotation: "during-resharding-txn-update"
+        curAnnotation: "during-resharding-txn-update",
     },
     {opType: "delete", id: 3, prevAnnotation: "pre-resharding-txn"},
     {
         opType: "update",
         id: 0,
         prevAnnotation: "during-resharding-update",
-        curAnnotation: "post-resharding-update"
+        curAnnotation: "post-resharding-update",
     },
 ]);
 

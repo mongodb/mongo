@@ -16,8 +16,7 @@ var reduceNumLoops = codeCoverageVariant || inMemoryStorageEngine;
 var loopNum = reduceNumLoops ? 100 : 10000;
 for (var i = 0; i < loopNum; ++i) {
     const name = "memoryTest" + i;
-    if ((i % 1000) == 0)
-        print("Processing " + name);
+    if (i % 1000 == 0) print("Processing " + name);
     for (var j = 0; j < 100; ++j) {
         db[name + "_" + j].find();
     }
@@ -25,7 +24,7 @@ for (var i = 0; i < loopNum; ++i) {
 
 // do mix of calls to make sure OOM is handled with no permanent damage
 function doWhereTest(count) {
-    print('doWhereTest(' + count + ')');
+    print("doWhereTest(" + count + ")");
     const coll = db.whereCol;
     coll.drop();
     coll.insert({a: 1});
@@ -36,8 +35,7 @@ function assertMemoryError(func) {
     try {
         func();
     } catch (e) {
-        if (e.message.includes("Out of memory") ||
-            e.message.includes("JavaScript execution interrupted")) {
+        if (e.message.includes("Out of memory") || e.message.includes("JavaScript execution interrupted")) {
             return;
         }
         throw e;
@@ -46,11 +44,11 @@ function assertMemoryError(func) {
 }
 
 doWhereTest(10);
-assertMemoryError(function() {
+assertMemoryError(function () {
     doWhereTest(1000000000);
 });
 doWhereTest(10);
-assertMemoryError(function() {
+assertMemoryError(function () {
     doWhereTest(1000000000);
 });
 
@@ -58,7 +56,7 @@ loopNum = reduceNumLoops ? 10000 : 1000000;
 doWhereTest(loopNum);
 doWhereTest(loopNum);
 doWhereTest(loopNum);
-assertMemoryError(function() {
+assertMemoryError(function () {
     doWhereTest(1000000000);
 });
 

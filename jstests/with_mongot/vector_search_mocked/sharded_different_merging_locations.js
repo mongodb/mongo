@@ -7,11 +7,9 @@
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mongotCommandForVectorSearchQuery,
-    mongotResponseForBatch
+    mongotResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {prepCollection} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 const dbName = "test";
@@ -28,15 +26,14 @@ const stWithMock = new ShardingTestWithMongotMock({
     other: {
         rsOptions: nodeOptions,
         mongosOptions: nodeOptions,
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 function setupCollection() {
     const testColl = testDB.getCollection(collName);
@@ -52,7 +49,7 @@ const vectorSearchQuery = {
     queryVector: [1.0, 2.0, 3.0],
     path: "x",
     numCandidates: 10,
-    limit: 5
+    limit: 5,
 };
 const cursorId = NumberLong(123);
 let testColl = setupCollection(collName);
@@ -77,53 +74,53 @@ function testMergeAtLocation(mergeType, localColl, isView, limit = Infinity) {
 
     const mongot0ResponseBatch = [
         {_id: 3, $vectorSearchScore: 0.99},
-        {_id: 2, $vectorSearchScore: 0.10},
+        {_id: 2, $vectorSearchScore: 0.1},
         {_id: 4, $vectorSearchScore: 0.02},
         {_id: 1, $vectorSearchScore: 0.01},
     ];
-    const mongot0Response =
-        mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk);
-    const history0 = [{
-        expectedCommand: mongotCommandForVectorSearchQuery(
-            {...vectorSearchQuery, collName: testColl.getName(), dbName, collectionUUID: collUUID}),
-        response: mongot0Response
-    }];
+    const mongot0Response = mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk);
+    const history0 = [
+        {
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                ...vectorSearchQuery,
+                collName: testColl.getName(),
+                dbName,
+                collectionUUID: collUUID,
+            }),
+            response: mongot0Response,
+        },
+    ];
 
     const mongot1ResponseBatch = [
         {_id: 11, $vectorSearchScore: 1.0},
-        {_id: 13, $vectorSearchScore: 0.30},
+        {_id: 13, $vectorSearchScore: 0.3},
         {_id: 12, $vectorSearchScore: 0.29},
         {_id: 14, $vectorSearchScore: 0.28},
     ];
-    const mongot1Response =
-        mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk);
-    const history1 = [{
-        expectedCommand: mongotCommandForVectorSearchQuery(
-            {...vectorSearchQuery, collName: testColl.getName(), dbName, collectionUUID: collUUID}),
-        response: mongot1Response
-    }];
+    const mongot1Response = mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk);
+    const history1 = [
+        {
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                ...vectorSearchQuery,
+                collName: testColl.getName(),
+                dbName,
+                collectionUUID: collUUID,
+            }),
+            response: mongot1Response,
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
     const s1Mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
     s0Mongot.setMockResponses(history0, cursorId);
     s1Mongot.setMockResponses(history1, cursorId);
 
-    const expectedDocs = [
-        {_id: 11},
-        {_id: 3},
-        {_id: 13},
-        {_id: 12},
-        {_id: 14},
-        {_id: 2},
-        {_id: 4},
-        {_id: 1},
-    ];
+    const expectedDocs = [{_id: 11}, {_id: 3}, {_id: 13}, {_id: 12}, {_id: 14}, {_id: 2}, {_id: 4}, {_id: 1}];
 
-    assert.eq(localColl.aggregate(pipeline).toArray(),
-              expectedDocs.slice(0, Math.min(vectorSearchQuery.limit, limit)));
+    assert.eq(localColl.aggregate(pipeline).toArray(), expectedDocs.slice(0, Math.min(vectorSearchQuery.limit, limit)));
 }
 
 const owningShardMerge = {
-    "specificShard": st.shard0.shardName
+    "specificShard": st.shard0.shardName,
 };
 const routerMergeType = st.getMergeType(testDB);
 testMergeAtLocation(routerMergeType, testColl, false);

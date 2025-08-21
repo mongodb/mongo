@@ -16,9 +16,9 @@ let conn = MongoRunner.runMongod({
         diagnosticDataCollectionSampleTimeoutMillis: kDefaultTimeout,
         diagnosticDataCollectionMinThreads: kDefaultMinThreads,
         diagnosticDataCollectionMaxThreads: kDefaultMaxThreads,
-    }
+    },
 });
-let adminDb = conn.getDB('admin');
+let adminDb = conn.getDB("admin");
 
 function setParameter(parameter, value) {
     let command = {setParameter: 1};
@@ -36,17 +36,20 @@ function resetParameters() {
 function getNextSample() {
     let originalSample = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
     let currData;
-    assert.soon(() => {
-        currData = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
-        return currData.start > originalSample.start;
-    }, "Timeout waiting for next FTDC sample", 30 * 1000);
+    assert.soon(
+        () => {
+            currData = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
+            return currData.start > originalSample.start;
+        },
+        "Timeout waiting for next FTDC sample",
+        30 * 1000,
+    );
 
     return currData;
 }
 
 function configureFailPointAndWaitUntilHit(delay) {
-    let fp =
-        configureFailPoint(conn, "injectFTDCServerStatusCollectionDelay", {sleepTimeMillis: delay});
+    let fp = configureFailPoint(conn, "injectFTDCServerStatusCollectionDelay", {sleepTimeMillis: delay});
     fp.waitWithTimeout(2000);
 
     return fp;
@@ -56,10 +59,14 @@ function waitUntilNormalOperation() {
     // Since we are injecting delays into server status using the
     // injectFTDCServerStatusCollectionDelay failpoint, we define "normal" ftdc operation as having
     // data for serverStatus.
-    assert.soon(() => {
-        let data = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
-        return data.hasOwnProperty("serverStatus");
-    }, "Timeout waiting for FTDC to operate normally.", 90 * 1000);
+    assert.soon(
+        () => {
+            let data = assert.commandWorked(adminDb.runCommand("getDiagnosticData")).data;
+            return data.hasOwnProperty("serverStatus");
+        },
+        "Timeout waiting for FTDC to operate normally.",
+        90 * 1000,
+    );
 }
 
 function testSampleTimeout() {
@@ -67,7 +74,7 @@ function testSampleTimeout() {
 
     let invalidTimeoutCmd = {
         setParameter: 1,
-        diagnosticDataCollectionSampleTimeoutMillis: kDefaultPeriod
+        diagnosticDataCollectionSampleTimeoutMillis: kDefaultPeriod,
     };
     assert.commandFailedWithCode(adminDb.runCommand(invalidTimeoutCmd), ErrorCodes.InvalidOptions);
 
@@ -94,7 +101,8 @@ function testMinThreads() {
 
     assert.commandFailedWithCode(
         adminDb.runCommand({setParameter: 1, diagnosticDataCollectionMinThreads: 2}),
-        ErrorCodes.BadValue);
+        ErrorCodes.BadValue,
+    );
 
     setParameter("diagnosticDataCollectionMaxThreads", 4);
     setParameter("diagnosticDataCollectionMinThreads", 2);
@@ -112,7 +120,8 @@ function testMaxThreads() {
 
     assert.commandFailedWithCode(
         adminDb.runCommand({setParameter: 1, diagnosticDataCollectionMaxThreads: 0}),
-        ErrorCodes.BadValue);
+        ErrorCodes.BadValue,
+    );
 
     const newPeriod = 500;
     setParameter("diagnosticDataCollectionPeriodMillis", newPeriod);

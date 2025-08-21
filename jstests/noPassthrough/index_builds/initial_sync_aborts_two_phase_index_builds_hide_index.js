@@ -26,8 +26,8 @@ const rst = new ReplSetTest({
             rsConfig: {
                 priority: 0,
             },
-        }
-    ]
+        },
+    ],
 });
 
 rst.startSet();
@@ -46,9 +46,11 @@ rst.awaitReplication();
 let secondary = rst.restart(1, {
     startClean: true,
     setParameter: {
-        'failpoint.initialSyncHangDuringCollectionClone': tojson(
-            {mode: 'alwaysOn', data: {namespace: "admin.system.version", numDocsToClone: 0}}),
-    }
+        "failpoint.initialSyncHangDuringCollectionClone": tojson({
+            mode: "alwaysOn",
+            data: {namespace: "admin.system.version", numDocsToClone: 0},
+        }),
+    },
 });
 
 // Wait until we block on cloning 'admin.system.version'.
@@ -72,8 +74,7 @@ const awaitIndexBuild = startParallelShell(() => {
 
 IndexBuildTest.waitForIndexBuildToStart(db, collName, "a_1");
 
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
 rst.awaitReplication();
 rst.awaitSecondaryNodes();

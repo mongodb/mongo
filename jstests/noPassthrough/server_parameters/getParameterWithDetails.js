@@ -32,20 +32,18 @@ function checkSpecificParameters(dbConn, parameters) {
     parameters.forEach((parameter) => {
         const expectedDetailedResultObj = parameter["result"];
         const expectedValue = expectedDetailedResultObj["value"];
-        const plainErrMsg = "Expecting plain result to contain: " + tojson(parameter) +
-            "but found: " + tojson(resultsPlain);
-        const detailErrMsg = "Expecting detail result to contain: " + tojson(parameter) +
-            "but found: " + tojson(resultsWithDetail);
-        const startupErrMsg = "Expecting startup-only result to contain: " + tojson(parameter) +
-            "but found: " + tojson(startupResults);
-        const runtimeErrMsg = "Expecting runtime-only result to contain: " + tojson(parameter) +
-            "but found: " + tojson(runtimeResults);
+        const plainErrMsg =
+            "Expecting plain result to contain: " + tojson(parameter) + "but found: " + tojson(resultsPlain);
+        const detailErrMsg =
+            "Expecting detail result to contain: " + tojson(parameter) + "but found: " + tojson(resultsWithDetail);
+        const startupErrMsg =
+            "Expecting startup-only result to contain: " + tojson(parameter) + "but found: " + tojson(startupResults);
+        const runtimeErrMsg =
+            "Expecting runtime-only result to contain: " + tojson(parameter) + "but found: " + tojson(runtimeResults);
         const unexpectedStartupErrMsg =
-            "Expecting startup-only result to omit: " + tojson(parameter) +
-            "but found: " + tojson(startupResults);
+            "Expecting startup-only result to omit: " + tojson(parameter) + "but found: " + tojson(startupResults);
         const unexpectedRuntimeErrMsg =
-            "Expecting runtime-only result to omit: " + tojson(parameter) +
-            "but found: " + tojson(runtimeResults);
+            "Expecting runtime-only result to omit: " + tojson(parameter) + "but found: " + tojson(runtimeResults);
 
         assert.eq(resultsPlain[parameter["name"]], expectedValue, plainErrMsg);
         assert.docEq(expectedDetailedResultObj, resultsWithDetail[parameter["name"]], detailErrMsg);
@@ -75,13 +73,13 @@ function checkSpecificParameters(dbConn, parameters) {
 }
 
 function checkAllParameters(dbConn) {
-    const plainCommand = {getParameter: '*'};
+    const plainCommand = {getParameter: "*"};
     const detailCommand = {getParameter: {showDetails: true, allParameters: true}};
     const setAtStartupCommand = {
-        getParameter: {setAt: "startup", allParameters: true, showDetails: true}
+        getParameter: {setAt: "startup", allParameters: true, showDetails: true},
     };
     const setAtRuntimeCommand = {
-        getParameter: {setAt: "runtime", allParameters: true, showDetails: true}
+        getParameter: {setAt: "runtime", allParameters: true, showDetails: true},
     };
 
     // Fetch results
@@ -95,10 +93,16 @@ function checkAllParameters(dbConn) {
     // every time one is added or changes in value.
     Object.keys(resultsWithDetail).forEach((k) => {
         if (resultsWithDetail[k].hasOwnProperty("value")) {
-            assert.eq(resultsWithDetail[k]["value"],
-                      resultsPlain[k],
-                      "In all parameters, mismatch for parameter " + k + ":" +
-                          tojson(resultsWithDetail[k]) + " vs " + tojson(resultsPlain[k]));
+            assert.eq(
+                resultsWithDetail[k]["value"],
+                resultsPlain[k],
+                "In all parameters, mismatch for parameter " +
+                    k +
+                    ":" +
+                    tojson(resultsWithDetail[k]) +
+                    " vs " +
+                    tojson(resultsPlain[k]),
+            );
         }
     });
     Object.keys(resultsPlain).forEach((k) => {
@@ -112,11 +116,14 @@ function checkAllParameters(dbConn) {
     Object.keys(startupResults).forEach((parameterName) => {
         // Ignore fields like "ok", "$clusterTime", etc. in the reply.
         if (startupResults[parameterName].hasOwnProperty("settableAtStartup")) {
-            assert.eq(startupResults[parameterName]["settableAtStartup"],
-                      true,
-                      "In all startup parameters, unexpectedly received parameter " +
-                          parameterName + " that has 'settableAtStartup' set to false: " +
-                          tojson(startupResults[parameterName]));
+            assert.eq(
+                startupResults[parameterName]["settableAtStartup"],
+                true,
+                "In all startup parameters, unexpectedly received parameter " +
+                    parameterName +
+                    " that has 'settableAtStartup' set to false: " +
+                    tojson(startupResults[parameterName]),
+            );
         }
     });
 
@@ -124,11 +131,14 @@ function checkAllParameters(dbConn) {
     Object.keys(runtimeResults).forEach((parameterName) => {
         // Ignore fields like "ok", "$clusterTime", etc. in the reply.
         if (runtimeResults[parameterName].hasOwnProperty("settableAtRuntime")) {
-            assert.eq(runtimeResults[parameterName]["settableAtRuntime"],
-                      true,
-                      "In all runtime parameters, unexpectedly received parameter " +
-                          parameterName + " that has 'settableAtRuntime' set to false: " +
-                          tojson(runtimeResults[parameterName]));
+            assert.eq(
+                runtimeResults[parameterName]["settableAtRuntime"],
+                true,
+                "In all runtime parameters, unexpectedly received parameter " +
+                    parameterName +
+                    " that has 'settableAtRuntime' set to false: " +
+                    tojson(runtimeResults[parameterName]),
+            );
         }
     });
 }
@@ -139,57 +149,57 @@ function checkAllParameters(dbConn) {
 const specificParametersBothProcesses = [
     {
         name: "ShardingTaskExecutorPoolMinSize",
-        result: {value: 1, settableAtRuntime: true, settableAtStartup: true}
+        result: {value: 1, settableAtRuntime: true, settableAtStartup: true},
     },
     {name: "maxLogSizeKB", result: {value: 10, settableAtRuntime: true, settableAtStartup: true}},
     {
         name: "cursorTimeoutMillis",
-        result: {value: NumberLong(600000), settableAtRuntime: true, settableAtStartup: true}
+        result: {value: NumberLong(600000), settableAtRuntime: true, settableAtStartup: true},
     },
     {
         name: "loadRoutingTableOnStartup",
-        result: {value: true, settableAtRuntime: false, settableAtStartup: true}
+        result: {value: true, settableAtRuntime: false, settableAtStartup: true},
     },
     {
         name: "clusterAuthMode",
-        result: {value: "undefined", settableAtRuntime: true, settableAtStartup: false}
-    }
+        result: {value: "undefined", settableAtRuntime: true, settableAtStartup: false},
+    },
 ];
 const specificParametersMongodOnly = [
     {
         name: "ttlMonitorEnabled",
-        result: {value: true, settableAtRuntime: true, settableAtStartup: true}
+        result: {value: true, settableAtRuntime: true, settableAtStartup: true},
     },
     {
         name: "skipShardingConfigurationChecks",
-        result: {value: false, settableAtRuntime: false, settableAtStartup: true}
+        result: {value: false, settableAtRuntime: false, settableAtStartup: true},
     },
     {
         name: "shardedIndexConsistencyCheckIntervalMS",
-        result: {value: 600000, settableAtRuntime: false, settableAtStartup: true}
+        result: {value: 600000, settableAtRuntime: false, settableAtStartup: true},
     },
     {
         name: "clusterIpSourceAllowlist",
-        result: {value: null, settableAtRuntime: true, settableAtStartup: false}
-    }
+        result: {value: null, settableAtRuntime: true, settableAtStartup: false},
+    },
 ];
 const specificParametersMongosOnly = [
     {
         name: "activeFaultDurationSecs",
-        result: {value: 120, settableAtRuntime: true, settableAtStartup: true}
+        result: {value: 120, settableAtRuntime: true, settableAtStartup: true},
     },
     {
         name: "userCacheInvalidationIntervalSecs",
-        result: {value: 30, settableAtRuntime: true, settableAtStartup: true}
+        result: {value: 30, settableAtRuntime: true, settableAtStartup: true},
     },
     {
         name: "loadBalancerPort",
-        result: {value: 0, settableAtRuntime: false, settableAtStartup: true}
+        result: {value: 0, settableAtRuntime: false, settableAtStartup: true},
     },
     {
         name: "testMongosOnlyRuntimeParameter",
-        result: {value: false, settableAtRuntime: true, settableAtStartup: false}
-    }
+        result: {value: false, settableAtRuntime: true, settableAtStartup: false},
+    },
 ];
 
 checkSpecificParameters(mongosDB, specificParametersBothProcesses);

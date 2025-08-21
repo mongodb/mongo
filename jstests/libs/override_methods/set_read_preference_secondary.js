@@ -5,19 +5,12 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 const kReadPreferenceSecondary = {
-    mode: "secondary"
+    mode: "secondary",
 };
 
 const {defaultReadPreference: kReadPreferenceToUse = kReadPreferenceSecondary} = TestData;
 
-const kCommandsSupportingReadPreference = new Set([
-    "aggregate",
-    "collStats",
-    "count",
-    "dbStats",
-    "distinct",
-    "find",
-]);
+const kCommandsSupportingReadPreference = new Set(["aggregate", "collStats", "count", "dbStats", "distinct", "find"]);
 const kDatabasesOnConfigServers = new Set(["config", "admin"]);
 
 // This list of cursor-generating commands is incomplete. For example, both "listCollections" and
@@ -26,14 +19,14 @@ const kDatabasesOnConfigServers = new Set(["config", "admin"]);
 // this list and also handle any differences in the server's response format.
 const kCursorGeneratingCommands = new Set(["aggregate", "find"]);
 
-const CursorTracker = (function() {
+const CursorTracker = (function () {
     const kNoCursor = new NumberLong(0);
 
     const connectionsByCursorId = {};
 
     return {
         getConnectionUsedForCursor: function getConnectionUsedForCursor(cursorId) {
-            return (cursorId instanceof NumberLong) ? connectionsByCursorId[cursorId] : undefined;
+            return cursorId instanceof NumberLong ? connectionsByCursorId[cursorId] : undefined;
         },
 
         setConnectionUsedForCursor: function setConnectionUsedForCursor(cursorId, cursorConn) {
@@ -61,7 +54,7 @@ function getRandomElement(arr) {
 const kSecondariesToConnectDirectlyTo = [];
 if (TestData.connectDirectlyToRandomSubsetOfSecondaries) {
     const hostColl = db.getSiblingDB("config").connectDirectlyToSecondaries.hosts;
-    hostColl.find().forEach(doc => {
+    hostColl.find().forEach((doc) => {
         if (doc.isSecondary && !doc.isExcluded) {
             kSecondariesToConnectDirectlyTo.push({host: doc.host, comment: doc.comment});
         }
@@ -74,27 +67,29 @@ if (TestData.connectDirectlyToRandomSubsetOfSecondaries) {
         if (!helloRes.hasOwnProperty("setName")) {
             throw new Error(
                 "Cannot connect directly to a secondary since this is not a replica set. " +
-                "Unrecognized topology format:" + tojson(helloRes));
+                    "Unrecognized topology format:" +
+                    tojson(helloRes),
+            );
         }
         assert.gt(helloRes.passives.length, 0, {
-            msg: "Cannot definitively determine which nodes are secondaries since all nodes " +
-                "are electable",
-            helloRes
+            msg: "Cannot definitively determine which nodes are secondaries since all nodes " + "are electable",
+            helloRes,
         });
         assert.gt(helloRes.passives.length, 1, {
             msg: "Cannot connect to only a subset of secondaries since there is only one secondary",
-            helloRes
+            helloRes,
         });
 
         jsTest.log("Choosing secondaries to reads directly from");
-        assert.commandWorked(hostColl.insert({
-            host: helloRes.primary,
-            isPrimary: true,
-        }));
+        assert.commandWorked(
+            hostColl.insert({
+                host: helloRes.primary,
+                isPrimary: true,
+            }),
+        );
 
-        const secondaryToExclude =
-            helloRes.passives[getRandInteger(0, helloRes.passives.length - 1)];
-        helloRes.passives.forEach(host => {
+        const secondaryToExclude = helloRes.passives[getRandInteger(0, helloRes.passives.length - 1)];
+        helloRes.passives.forEach((host) => {
             if (host == secondaryToExclude) {
                 assert.commandWorked(hostColl.insert({host, isSecondary: true, isExcluded: true}));
             } else {
@@ -105,19 +100,21 @@ if (TestData.connectDirectlyToRandomSubsetOfSecondaries) {
         });
     }
 }
-jsTest.log("Forcing reads to go directly to the following secondaries: " +
-           tojsononeline(kSecondariesToConnectDirectlyTo));
+jsTest.log(
+    "Forcing reads to go directly to the following secondaries: " + tojsononeline(kSecondariesToConnectDirectlyTo),
+);
 
-function runCommandWithReadPreferenceSecondary(
-    conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandWithReadPreferenceSecondary(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 
-    if (commandObj[commandName] === "system.profile" || commandName === 'profile') {
+    if (commandObj[commandName] === "system.profile" || commandName === "profile") {
         throw new Error(
             "Cowardly refusing to run test that interacts with the system profiler as the " +
-            "'system.profile' collection is not replicated" + tojson(commandObj));
+                "'system.profile' collection is not replicated" +
+                tojson(commandObj),
+        );
     }
 
     if (conn.isReplicaSetConnection() || TestData.connectDirectlyToRandomSubsetOfSecondaries) {
@@ -164,8 +161,10 @@ function runCommandWithReadPreferenceSecondary(
 
     let shouldForceReadPreference = kCommandsSupportingReadPreference.has(commandName);
 
-    if ((commandName === "mapReduce" || commandName === "mapreduce") &&
-        !OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObj)) {
+    if (
+        (commandName === "mapReduce" || commandName === "mapreduce") &&
+        !OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObj)
+    ) {
         // A map-reduce operation with non-inline output must be sent to the primary.
         shouldForceReadPreference = false;
     } else if ((conn.isMongos() && kDatabasesOnConfigServers.has(dbName)) || conn._isConfigServer) {
@@ -196,18 +195,23 @@ function runCommandWithReadPreferenceSecondary(
     }
 
     if (shouldForceReadPreference) {
-        if (commandObj.hasOwnProperty("$readPreference") &&
-            !bsonBinaryEqual({_: commandObj.$readPreference}, {_: kReadPreferenceToUse})) {
-            throw new Error("Cowardly refusing to override read preference to " +
-                            tojson(kReadPreferenceToUse) + " for command: " + tojson(commandObj));
+        if (
+            commandObj.hasOwnProperty("$readPreference") &&
+            !bsonBinaryEqual({_: commandObj.$readPreference}, {_: kReadPreferenceToUse})
+        ) {
+            throw new Error(
+                "Cowardly refusing to override read preference to " +
+                    tojson(kReadPreferenceToUse) +
+                    " for command: " +
+                    tojson(commandObj),
+            );
         } else if (!commandObj.hasOwnProperty("$readPreference")) {
             commandObj.$readPreference = kReadPreferenceToUse;
         }
         if (TestData.connectDirectlyToRandomSubsetOfSecondaries) {
             const randomSecondary = getRandomElement(kSecondariesToConnectDirectlyTo);
 
-            const newConn =
-                new Mongo("mongodb://" + randomSecondary.host + "/?directConnection=true");
+            const newConn = new Mongo("mongodb://" + randomSecondary.host + "/?directConnection=true");
             if (conn.isAutoEncryptionEnabled()) {
                 const clientSideFLEOptions = conn.getAutoEncryptionOptions();
                 assert(newConn.setAutoEncryption(clientSideFLEOptions));
@@ -233,9 +237,12 @@ function runCommandWithReadPreferenceSecondary(
 
     const serverResponse = func.apply(conn, makeFuncArgs(commandObj));
 
-    if ((conn.isReplicaSetConnection() || TestData.connectDirectlyToRandomSubsetOfSecondaries) &&
-        kCursorGeneratingCommands.has(commandName) && serverResponse.ok === 1 &&
-        serverResponse.hasOwnProperty("cursor")) {
+    if (
+        (conn.isReplicaSetConnection() || TestData.connectDirectlyToRandomSubsetOfSecondaries) &&
+        kCursorGeneratingCommands.has(commandName) &&
+        serverResponse.ok === 1 &&
+        serverResponse.hasOwnProperty("cursor")
+    ) {
         // We associate the cursor id returned by the server with the connection that was used
         // to establish it so that we can attempt to automatically route subsequent "getMore"
         // and "killCursors" commands.
@@ -245,7 +252,6 @@ function runCommandWithReadPreferenceSecondary(
     return serverResponse;
 }
 
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/set_read_preference_secondary.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/set_read_preference_secondary.js");
 
 OverrideHelpers.overrideRunCommand(runCommandWithReadPreferenceSecondary);

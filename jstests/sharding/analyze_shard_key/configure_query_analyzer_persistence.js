@@ -12,7 +12,7 @@ import {
     testConfigurationDeletionDropCollection,
     testConfigurationDeletionDropDatabase,
     testConfigurationDeletionRenameCollection,
-    testPersistingConfiguration
+    testPersistingConfiguration,
 } from "jstests/sharding/analyze_shard_key/libs/configure_query_analyzer_common.js";
 
 {
@@ -22,21 +22,29 @@ import {
 
     testPersistingConfiguration(st.s);
     for (let isShardedColl of [true, false]) {
-        testConfigurationDeletionDropCollection(st.s,
-                                                {isShardedColl, isShardedCluster, shardNames});
+        testConfigurationDeletionDropCollection(st.s, {isShardedColl, isShardedCluster, shardNames});
         testConfigurationDeletionDropDatabase(st.s, {isShardedColl, isShardedCluster, shardNames});
-        testConfigurationDeletionRenameCollection(
-            st.s, {sameDatabase: true, isShardedColl, isShardedCluster, shardNames});
+        testConfigurationDeletionRenameCollection(st.s, {
+            sameDatabase: true,
+            isShardedColl,
+            isShardedCluster,
+            shardNames,
+        });
     }
     // During renameCollection, the source database is only allowed to be different from the
     // destination database when the collection being renamed is unsharded.
-    testConfigurationDeletionRenameCollection(
-        st.s, {sameDatabase: false, isShardedColl: false, isShardedCluster, shardNames});
+    testConfigurationDeletionRenameCollection(st.s, {
+        sameDatabase: false,
+        isShardedColl: false,
+        isShardedCluster,
+        shardNames,
+    });
 
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();

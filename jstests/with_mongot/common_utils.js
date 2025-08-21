@@ -22,13 +22,10 @@ export function verifyShardsPartExplainOutput({
     sortSpec = null,
 }) {
     // Checks index 0 of 'shardsPart' since $search, $searchMeta need to come first in the pipeline
-    assert(result.splitPipeline.shardsPart[0][searchType].hasOwnProperty(
-        "metadataMergeProtocolVersion"));
+    assert(result.splitPipeline.shardsPart[0][searchType].hasOwnProperty("metadataMergeProtocolVersion"));
     assert(result.splitPipeline.shardsPart[0][searchType].hasOwnProperty("mergingPipeline"));
 
-    assert.eq(
-        NumberInt(result.splitPipeline.shardsPart[0][searchType].metadataMergeProtocolVersion),
-        protocolVersion);
+    assert.eq(NumberInt(result.splitPipeline.shardsPart[0][searchType].metadataMergeProtocolVersion), protocolVersion);
 
     if (metaPipeline) {
         assert.eq(result.splitPipeline.shardsPart[0][searchType].mergingPipeline, metaPipeline);
@@ -49,8 +46,11 @@ export function verifyShardsPartExplainOutput({
  */
 
 export function prepareUnionWithExplain(unionSubExplain) {
-    if (unionSubExplain.hasOwnProperty("stages") || unionSubExplain.hasOwnProperty("shards") ||
-        unionSubExplain.hasOwnProperty("queryPlanner")) {
+    if (
+        unionSubExplain.hasOwnProperty("stages") ||
+        unionSubExplain.hasOwnProperty("shards") ||
+        unionSubExplain.hasOwnProperty("queryPlanner")
+    ) {
         return unionSubExplain;
     }
     // In the case that the pipeline doesn't have "stages", "shards", or "queryPlanner", the explain
@@ -59,19 +59,21 @@ export function prepareUnionWithExplain(unionSubExplain) {
         Array.isArray(unionSubExplain),
         "We expect the input is an array here. If this is not an array, this function needs to be " +
             "updated in order to replicate a non-unionWith explain object. " +
-            tojson(unionSubExplain));
+            tojson(unionSubExplain),
+    );
 
     // The first stage of the explain array should be a initial mongot stage.
-    assert(Object.keys(unionSubExplain[0]).includes("$_internalSearchMongotRemote") ||
-               Object.keys(unionSubExplain[0]).includes("$searchMeta") ||
-               Object.keys(unionSubExplain[0]).includes("$vectorSearch"),
-           "The first stage of the array should be a mongot stage.");
+    assert(
+        Object.keys(unionSubExplain[0]).includes("$_internalSearchMongotRemote") ||
+            Object.keys(unionSubExplain[0]).includes("$searchMeta") ||
+            Object.keys(unionSubExplain[0]).includes("$vectorSearch"),
+        "The first stage of the array should be a mongot stage.",
+    );
 
     return {stages: unionSubExplain};
 }
 
-const mongotStages =
-    ["$_internalSearchMongotRemote", "$searchMeta", "$_internalSearchIdLookup", "$vectorSearch"];
+const mongotStages = ["$_internalSearchMongotRemote", "$searchMeta", "$_internalSearchIdLookup", "$vectorSearch"];
 
 /**
  * Validates that the mongot stage from the explain output includes the required execution metrics.
@@ -97,12 +99,10 @@ export function validateMongotStageExplainExecutionStats({
     nReturned = null,
     explain = null,
     isE2E = false,
-    numFiltered = null
+    numFiltered = null,
 }) {
-    assert(mongotStages.includes(stageType),
-           "stageType must be a mongot stage found in mongotStages.");
-    assert(stage[stageType],
-           "Given stage isn't the expected stage. " + stageType + " is not found.");
+    assert(mongotStages.includes(stageType), "stageType must be a mongot stage found in mongotStages.");
+    assert(stage[stageType], "Given stage isn't the expected stage. " + stageType + " is not found.");
 
     const isIdLookup = stageType === "$_internalSearchIdLookup";
 

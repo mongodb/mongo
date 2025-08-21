@@ -50,8 +50,7 @@ export class WorkloadManyCollectionsInLookupBushy extends LongPipelineWorkload {
         let unsetList = ["_id"];
         for (let i = 1; i < this.scale(); i++) {
             pipeline.push({
-                $lookup:
-                    {from: `coll${i}`, localField: "f0", foreignField: "f0", as: `asField_${i}`}
+                $lookup: {from: `coll${i}`, localField: "f0", foreignField: "f0", as: `asField_${i}`},
             });
             // Remove all _id fields
             unsetList.push(`asField_${i}._id`);

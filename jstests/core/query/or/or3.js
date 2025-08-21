@@ -13,10 +13,10 @@ function checkArrs(a, b) {
     assert.eq(a.length, b.length);
     const aStr = [];
     const bStr = [];
-    a.forEach(function(x) {
+    a.forEach(function (x) {
         aStr.push(tojson(x));
     });
-    b.forEach(function(x) {
+    b.forEach(function (x) {
         bStr.push(tojson(x));
     });
     for (let i = 0; i < aStr.length; ++i) {
@@ -38,13 +38,13 @@ function doTest(index) {
     assert.commandWorked(t.insert({_id: 6, x: 1, a: 2, b: 1}));
     assert.commandWorked(t.insert({_id: 7, x: 1, a: 2, b: 2}));
 
-    assert.throws(function() {
+    assert.throws(function () {
         t.find({x: 0, $nor: "a"}).toArray();
     });
-    assert.throws(function() {
+    assert.throws(function () {
         t.find({x: 0, $nor: []}).toArray();
     });
-    assert.throws(function() {
+    assert.throws(function () {
         t.find({x: 0, $nor: ["a"]}).toArray();
     });
 

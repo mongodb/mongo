@@ -25,10 +25,8 @@ function runTest(conn) {
     //
 
     // Create two users, "Alice" and "Mallory".
-    assert.commandWorked(
-        testDB.runCommand({createUser: "Alice", pwd: "pwd", roles: ["readWrite"]}));
-    assert.commandWorked(
-        testDB.runCommand({createUser: "Mallory", pwd: "pwd", roles: ["readWrite"]}));
+    assert.commandWorked(testDB.runCommand({createUser: "Alice", pwd: "pwd", roles: ["readWrite"]}));
+    assert.commandWorked(testDB.runCommand({createUser: "Mallory", pwd: "pwd", roles: ["readWrite"]}));
     adminDB.logout();
 
     // Test that "Mallory" cannot use a find cursor created by "Alice".
@@ -38,22 +36,25 @@ function runTest(conn) {
     assert.neq(0, cursorId);
     testDB.logout();
     assert.eq(1, testDB.auth("Mallory", "pwd"));
-    assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "foo"}),
-                                 ErrorCodes.Unauthorized,
-                                 "read from another user's find cursor");
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: cursorId, collection: "foo"}),
+        ErrorCodes.Unauthorized,
+        "read from another user's find cursor",
+    );
     testDB.logout();
 
     // Test that "Mallory" cannot use an aggregation cursor created by "Alice".
     assert.eq(1, testDB.auth("Alice", "pwd"));
-    res = assert.commandWorked(
-        testDB.runCommand({aggregate: "foo", pipeline: [], cursor: {batchSize: 0}}));
+    res = assert.commandWorked(testDB.runCommand({aggregate: "foo", pipeline: [], cursor: {batchSize: 0}}));
     cursorId = res.cursor.id;
     assert.neq(0, cursorId);
     testDB.logout();
     assert.eq(1, testDB.auth("Mallory", "pwd"));
-    assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "foo"}),
-                                 ErrorCodes.Unauthorized,
-                                 "read from another user's aggregate cursor");
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: cursorId, collection: "foo"}),
+        ErrorCodes.Unauthorized,
+        "read from another user's aggregate cursor",
+    );
     testDB.logout();
 
     // Test that "Mallory" cannot use a listCollections cursor created by "Alice".
@@ -66,7 +67,8 @@ function runTest(conn) {
     assert.commandFailedWithCode(
         testDB.runCommand({getMore: cursorId, collection: "$cmd.listCollections"}),
         ErrorCodes.Unauthorized,
-        "read from another user's listCollections cursor");
+        "read from another user's listCollections cursor",
+    );
     testDB.logout();
 
     // Test that "Mallory" cannot use a listIndexes cursor created by "Alice".
@@ -76,9 +78,11 @@ function runTest(conn) {
     assert.neq(0, cursorId);
     testDB.logout();
     assert.eq(1, testDB.auth("Mallory", "pwd"));
-    assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "foo"}),
-                                 ErrorCodes.Unauthorized,
-                                 "read from another user's listIndexes cursor");
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: cursorId, collection: "foo"}),
+        ErrorCodes.Unauthorized,
+        "read from another user's listIndexes cursor",
+    );
     testDB.logout();
 
     //
@@ -87,37 +91,41 @@ function runTest(conn) {
     //
 
     assert.eq(1, adminDB.auth("admin", "admin"));
-    assert.commandWorked(testDB.runCommand({
-        createRole: "indexStatsOnly",
-        privileges: [{resource: {db: testDBName, collection: "foo"}, actions: ["indexStats"]}],
-        roles: []
-    }));
     assert.commandWorked(
-        testDB.runCommand({createUser: "Bob", pwd: "pwd", roles: ["indexStatsOnly"]}));
+        testDB.runCommand({
+            createRole: "indexStatsOnly",
+            privileges: [{resource: {db: testDBName, collection: "foo"}, actions: ["indexStats"]}],
+            roles: [],
+        }),
+    );
+    assert.commandWorked(testDB.runCommand({createUser: "Bob", pwd: "pwd", roles: ["indexStatsOnly"]}));
     adminDB.logout();
 
     assert.eq(1, testDB.auth("Bob", "pwd"));
-    res = assert.commandWorked(testDB.runCommand(
-        {aggregate: "foo", pipeline: [{$indexStats: {}}], cursor: {batchSize: 0}}));
+    res = assert.commandWorked(
+        testDB.runCommand({aggregate: "foo", pipeline: [{$indexStats: {}}], cursor: {batchSize: 0}}),
+    );
     cursorId = res.cursor.id;
     assert.neq(0, cursorId);
     assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "foo"}));
 
-    res = assert.commandWorked(testDB.runCommand(
-        {aggregate: "foo", pipeline: [{$indexStats: {}}], cursor: {batchSize: 0}}));
+    res = assert.commandWorked(
+        testDB.runCommand({aggregate: "foo", pipeline: [{$indexStats: {}}], cursor: {batchSize: 0}}),
+    );
     cursorId = res.cursor.id;
     assert.neq(0, cursorId);
     testDB.logout();
 
     assert.eq(1, adminDB.auth("admin", "admin"));
-    assert.commandWorked(
-        testDB.runCommand({revokeRolesFromUser: "Bob", roles: ["indexStatsOnly"]}));
+    assert.commandWorked(testDB.runCommand({revokeRolesFromUser: "Bob", roles: ["indexStatsOnly"]}));
     adminDB.logout();
 
     assert.eq(1, testDB.auth("Bob", "pwd"));
-    assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "foo"}),
-                                 ErrorCodes.Unauthorized,
-                                 "read from a cursor without required privileges");
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: cursorId, collection: "foo"}),
+        ErrorCodes.Unauthorized,
+        "read from a cursor without required privileges",
+    );
     testDB.logout();
 
     //
@@ -134,8 +142,7 @@ function runTest(conn) {
     res = assert.commandWorked(testDB.runCommand({listCollections: 1, cursor: {batchSize: 0}}));
     cursorId = res.cursor.id;
     assert.neq(0, cursorId);
-    assert.commandWorked(
-        testDB.runCommand({getMore: cursorId, collection: "$cmd.listCollections"}));
+    assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "$cmd.listCollections"}));
 
     res = assert.commandWorked(testDB.runCommand({listCollections: 1, cursor: {batchSize: 0}}));
     cursorId = res.cursor.id;
@@ -150,7 +157,8 @@ function runTest(conn) {
     assert.commandFailedWithCode(
         testDB.runCommand({getMore: cursorId, collection: "$cmd.listCollections"}),
         ErrorCodes.Unauthorized,
-        "read from a cursor without required privileges");
+        "read from a cursor without required privileges",
+    );
     testDB.logout();
     //
     // Test that a user can call getMore on a listIndexes cursor they created, unless the
@@ -178,9 +186,11 @@ function runTest(conn) {
     adminDB.logout();
 
     assert.eq(1, testDB.auth("Bill", "pwd"));
-    assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "foo"}),
-                                 ErrorCodes.Unauthorized,
-                                 "read from a cursor without required privileges");
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: cursorId, collection: "foo"}),
+        ErrorCodes.Unauthorized,
+        "read from a cursor without required privileges",
+    );
     testDB.logout();
 
     //
@@ -189,14 +199,16 @@ function runTest(conn) {
     //
 
     assert.eq(1, testDB.auth("Alice", "pwd"));
-    res = assert.commandWorked(testDB.runCommand(
-        {aggregate: "foo", pipeline: [{$match: {_id: 0}}, {$out: "out"}], cursor: {batchSize: 0}}));
+    res = assert.commandWorked(
+        testDB.runCommand({aggregate: "foo", pipeline: [{$match: {_id: 0}}, {$out: "out"}], cursor: {batchSize: 0}}),
+    );
     cursorId = res.cursor.id;
     assert.neq(0, cursorId);
     assert.commandWorked(testDB.runCommand({getMore: cursorId, collection: "foo"}));
 
-    res = assert.commandWorked(testDB.runCommand(
-        {aggregate: "foo", pipeline: [{$match: {_id: 0}}, {$out: "out"}], cursor: {batchSize: 0}}));
+    res = assert.commandWorked(
+        testDB.runCommand({aggregate: "foo", pipeline: [{$match: {_id: 0}}, {$out: "out"}], cursor: {batchSize: 0}}),
+    );
     cursorId = res.cursor.id;
     assert.neq(0, cursorId);
     testDB.logout();
@@ -208,13 +220,15 @@ function runTest(conn) {
 
     assert.eq(1, testDB.auth("Alice", "pwd"));
     assert.commandFailedWithCode(
-        testDB.runCommand(
-            {aggregate: "foo", pipeline: [{$match: {_id: 0}}, {$out: "out"}], cursor: {}}),
+        testDB.runCommand({aggregate: "foo", pipeline: [{$match: {_id: 0}}, {$out: "out"}], cursor: {}}),
         ErrorCodes.Unauthorized,
-        "user should no longer have write privileges");
-    assert.commandFailedWithCode(testDB.runCommand({getMore: cursorId, collection: "foo"}),
-                                 ErrorCodes.Unauthorized,
-                                 "wrote from a cursor without required privileges");
+        "user should no longer have write privileges",
+    );
+    assert.commandFailedWithCode(
+        testDB.runCommand({getMore: cursorId, collection: "foo"}),
+        ErrorCodes.Unauthorized,
+        "wrote from a cursor without required privileges",
+    );
     testDB.logout();
 
     //
@@ -226,26 +240,28 @@ function runTest(conn) {
     assert.commandWorked(testDB.bar.insert({_id: 0}));
 
     // Create a user "fooUser" on the test database that can read the "foo" collection.
-    assert.commandWorked(testDB.runCommand({
-        createRole: "readFoo",
-        privileges: [{resource: {db: testDBName, collection: "foo"}, actions: ["find"]}],
-        roles: []
-    }));
     assert.commandWorked(
-        testDB.runCommand({createUser: "fooUser", pwd: "pwd", roles: ["readFoo"]}));
+        testDB.runCommand({
+            createRole: "readFoo",
+            privileges: [{resource: {db: testDBName, collection: "foo"}, actions: ["find"]}],
+            roles: [],
+        }),
+    );
+    assert.commandWorked(testDB.runCommand({createUser: "fooUser", pwd: "pwd", roles: ["readFoo"]}));
 
     // Create a user "fooBarUser" on the admin database that can read the "foo" and "bar"
     // collections.
-    assert.commandWorked(adminDB.runCommand({
-        createRole: "readFooBar",
-        privileges: [
-            {resource: {db: testDBName, collection: "foo"}, actions: ["find"]},
-            {resource: {db: testDBName, collection: "bar"}, actions: ["find"]}
-        ],
-        roles: []
-    }));
     assert.commandWorked(
-        adminDB.runCommand({createUser: "fooBarUser", pwd: "pwd", roles: ["readFooBar"]}));
+        adminDB.runCommand({
+            createRole: "readFooBar",
+            privileges: [
+                {resource: {db: testDBName, collection: "foo"}, actions: ["find"]},
+                {resource: {db: testDBName, collection: "bar"}, actions: ["find"]},
+            ],
+            roles: [],
+        }),
+    );
+    assert.commandWorked(adminDB.runCommand({createUser: "fooBarUser", pwd: "pwd", roles: ["readFooBar"]}));
 
     adminDB.logout();
 }
@@ -256,7 +272,6 @@ runTest(conn);
 MongoRunner.stopMongod(conn);
 
 // Run the test on a sharded cluster.
-const cluster = new ShardingTest(
-    {shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {rsOptions: {auth: ""}}});
+const cluster = new ShardingTest({shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {rsOptions: {auth: ""}}});
 runTest(cluster);
 cluster.stop();

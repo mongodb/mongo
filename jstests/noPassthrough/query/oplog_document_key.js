@@ -16,7 +16,7 @@ const mongos = st.s;
 const dbName = jsTestName();
 const db = mongos.getDB(dbName);
 
-Array.prototype.flatMap = function(lambda) {
+Array.prototype.flatMap = function (lambda) {
     return Array.prototype.concat.apply([], this.map(lambda));
 };
 
@@ -59,31 +59,31 @@ const testWriteOplogDocumentKey = ({sharded, inTransaction}) => {
     });
 
     const primary = st.getPrimaryShard(dbName);
-    const query = inTransaction ? {'o.applyOps.0.ns': ns} : {ns, op: {$in: ['i', 'u', 'd']}};
+    const query = inTransaction ? {"o.applyOps.0.ns": ns} : {ns, op: {$in: ["i", "u", "d"]}};
     let oplogs = primary.getDB("local").oplog.rs.find(query).sort({$natural: 1}).toArray();
     if (inTransaction) {
-        oplogs = oplogs.flatMap(oplog => oplog.o.applyOps);
+        oplogs = oplogs.flatMap((oplog) => oplog.o.applyOps);
     }
 
     assert.eq(oplogs.length, 4, tojson(oplogs));
     const [insertOplog, replaceOplog, updateOplog, deleteOplog] = oplogs;
     const docKey = sharded ? docKeys.sharded : docKeys.unsharded;
-    assert.eq(insertOplog.op, 'i', insertOplog);
+    assert.eq(insertOplog.op, "i", insertOplog);
     assert.docEq(doc0, insertOplog.o, insertOplog);
     assert.docEq(docKey, insertOplog.o2, insertOplog);
 
-    assert.eq(replaceOplog.op, 'u', replaceOplog);
+    assert.eq(replaceOplog.op, "u", replaceOplog);
     assert.docEq(doc1, replaceOplog.o, replaceOplog);
     assert.docEq(docKey, replaceOplog.o2, replaceOplog);
 
-    assert.eq(updateOplog.op, 'u', updateOplog);
+    assert.eq(updateOplog.op, "u", updateOplog);
     assert.docEq(docKey, updateOplog.o2, updateOplog);
 
-    assert.eq(deleteOplog.op, 'd', deleteOplog);
+    assert.eq(deleteOplog.op, "d", deleteOplog);
     assert.docEq(docKey, deleteOplog.o, deleteOplog);
 
     performWrites(function largeInsert(coll) {
-        const largeDoc = {_id: 'x'.repeat(16 * 1024 * 1024), a: 0};
+        const largeDoc = {_id: "x".repeat(16 * 1024 * 1024), a: 0};
         assert.commandFailedWithCode(coll.insert(largeDoc), ErrorCodes.BadValue);
     });
 };

@@ -9,26 +9,28 @@
  */
 import {getUriForIndex, truncateUriAndRestartMongod} from "jstests/disk/libs/wt_file_helper.js";
 
-const dbpath = MongoRunner.dataPath + 'skip_geo_hash_checks';
+const dbpath = MongoRunner.dataPath + "skip_geo_hash_checks";
 resetDbpath(dbpath);
 let conn = MongoRunner.runMongod();
-let db = conn.getCollection('test.skip_geo_hash');
+let db = conn.getCollection("test.skip_geo_hash");
 
 assert.commandWorked(db.getDB().createCollection(db.getName()));
-assert.commandWorked(db.createIndex({loc: '2dsphere'}));
-assert.commandWorked(db.createIndex({loc: '2d'}));
+assert.commandWorked(db.createIndex({loc: "2dsphere"}));
+assert.commandWorked(db.createIndex({loc: "2d"}));
 
-assert.commandWorked(db.insertMany([
-    {
-        loc: [Math.random(), Math.random()],
-    },
-    {
-        loc: [Math.random(), Math.random()],
-    },
-    {
-        loc: [Math.random(), Math.random()],
-    }
-]));
+assert.commandWorked(
+    db.insertMany([
+        {
+            loc: [Math.random(), Math.random()],
+        },
+        {
+            loc: [Math.random(), Math.random()],
+        },
+        {
+            loc: [Math.random(), Math.random()],
+        },
+    ]),
+);
 
 let result = assert.commandWorked(db.validate());
 jsTestLog(result);
@@ -44,8 +46,7 @@ jsTestLog(result);
 assert(result.valid);
 
 // Ensure that other index errors will fail for geo indexes
-assert.commandWorked(
-    conn.adminCommand({configureFailPoint: "failIndexKeyOrdering", mode: "alwaysOn"}));
+assert.commandWorked(conn.adminCommand({configureFailPoint: "failIndexKeyOrdering", mode: "alwaysOn"}));
 result = assert.commandWorked(db.validate());
 jsTestLog(result);
 // Check this index specifically because loc2d_sphere has no keys to compare ordering, and _id will

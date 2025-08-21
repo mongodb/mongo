@@ -7,9 +7,9 @@
  *   requires_sharding,
  * ]
  */
-const dbPrefix = jsTestName() + '_DB_';
+const dbPrefix = jsTestName() + "_DB_";
 const dbCount = 2;
-const collPrefix = 'sharded_coll_';
+const collPrefix = "sharded_coll_";
 const collCount = 2;
 
 function getRandomDb(db) {
@@ -20,8 +20,8 @@ function getRandomCollection(db) {
     return getRandomDb(db)[collPrefix + Random.randInt(collCount)];
 }
 
-export const $config = (function() {
-    var setup = function(db, collName, cluster) {
+export const $config = (function () {
+    var setup = function (db, collName, cluster) {
         // Initialize databases
         for (var i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
@@ -29,15 +29,13 @@ export const $config = (function() {
         }
     };
 
-    var states = (function() {
-        function init(db, collName) {
-        }
+    var states = (function () {
+        function init(db, collName) {}
 
         function create(db, collName) {
             const coll = getRandomCollection(db);
             jsTestLog("Executing create state on: " + coll.getFullName());
-            assert.commandWorked(
-                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
         }
 
         function drop(db, collName) {
@@ -52,16 +50,16 @@ export const $config = (function() {
     var transitions = {
         init: {create: 0.5, drop: 0.5},
         create: {create: 0.5, drop: 0.5},
-        drop: {create: 0.5, drop: 0.5}
+        drop: {create: 0.5, drop: 0.5},
     };
 
     return {
         threadCount: 12,
         iterations: 64,
-        startState: 'init',
+        startState: "init",
         data: {},
         states: states,
         setup: setup,
-        transitions: transitions
+        transitions: transitions,
     };
 })();

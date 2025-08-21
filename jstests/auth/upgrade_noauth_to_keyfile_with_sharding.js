@@ -11,21 +11,21 @@ TestData.skipCheckShardFilteringMetadata = true;
 TestData.skipCheckRoutingTableConsistency = true;
 
 // Disable auth explicitly
-var noAuthOptions = {noauth: ''};
-var transitionToAuthOptions = {clusterAuthMode: 'keyFile', keyFile: KEYFILE, transitionToAuth: ''};
-var keyFileOptions = {clusterAuthMode: 'keyFile', keyFile: KEYFILE};
+var noAuthOptions = {noauth: ""};
+var transitionToAuthOptions = {clusterAuthMode: "keyFile", keyFile: KEYFILE, transitionToAuth: ""};
+var keyFileOptions = {clusterAuthMode: "keyFile", keyFile: KEYFILE};
 
-print('=== Testing no-auth/transitionToAuth cluster ===');
+print("=== Testing no-auth/transitionToAuth cluster ===");
 mixedShardTest(noAuthOptions, transitionToAuthOptions, true);
 mixedShardTest(transitionToAuthOptions, noAuthOptions, true);
 
-print('=== Testing transitionToAuth/transitionToAuth cluster ===');
+print("=== Testing transitionToAuth/transitionToAuth cluster ===");
 mixedShardTest(transitionToAuthOptions, transitionToAuthOptions, true);
 
-print('=== Testing transitionToAuth/keyFile cluster ===');
+print("=== Testing transitionToAuth/keyFile cluster ===");
 mixedShardTest(keyFileOptions, transitionToAuthOptions, true);
 mixedShardTest(transitionToAuthOptions, keyFileOptions, true);
 
-print('=== Testing no-auth/keyFile cluster fails ===');
+print("=== Testing no-auth/keyFile cluster fails ===");
 mixedShardTest(noAuthOptions, keyFileOptions, false);
 mixedShardTest(keyFileOptions, noAuthOptions, false);

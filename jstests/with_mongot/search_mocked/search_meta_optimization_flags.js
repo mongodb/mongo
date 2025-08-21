@@ -23,7 +23,7 @@ assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
 const collUUID = getUUIDFromListCollections(testDB, coll.getName());
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 // Verify that omitSearchDocumentResults is set for $searchMeta queries.
@@ -37,16 +37,19 @@ const searchMetaCmd = {
 const searchMetaCursorId = NumberLong(17);
 
 {
-    const history = [{
-        expectedCommand: searchMetaCmd,
-        response: {
-            ok: 1,
-            cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: []},
-            vars: {SEARCH_META: {value: 42}}
-        }
-    }];
-    assert.commandWorked(mongotConn.adminCommand(
-        {setMockResponses: 1, cursorId: searchMetaCursorId, history: history}));
+    const history = [
+        {
+            expectedCommand: searchMetaCmd,
+            response: {
+                ok: 1,
+                cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: []},
+                vars: {SEARCH_META: {value: 42}},
+            },
+        },
+    ];
+    assert.commandWorked(
+        mongotConn.adminCommand({setMockResponses: 1, cursorId: searchMetaCursorId, history: history}),
+    );
 
     let cursorMeta = coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
     const expectedMeta = [{value: 42}];
@@ -63,16 +66,17 @@ const searchCmd = {
 const searchCursorId = NumberLong(18);
 
 {
-    const history = [{
-        expectedCommand: searchCmd,
-        response: {
-            ok: 1,
-            cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: []},
-            vars: {SEARCH_META: {value: 42}}
-        }
-    }];
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: searchCursorId, history: history}));
+    const history = [
+        {
+            expectedCommand: searchCmd,
+            response: {
+                ok: 1,
+                cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: []},
+                vars: {SEARCH_META: {value: 42}},
+            },
+        },
+    ];
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: searchCursorId, history: history}));
 
     coll.aggregate([{$search: searchQuery}], {cursor: {}});
 }

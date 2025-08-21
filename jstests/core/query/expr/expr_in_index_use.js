@@ -16,7 +16,7 @@ import {
     getAggPlanStages,
     getEngine,
     getPlanStage,
-    hasRejectedPlans
+    hasRejectedPlans,
 } from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.expr_in_index_use;
@@ -52,7 +52,7 @@ const docs = [
     {_id: 26, "category.a": "clothing"},
     {_id: 27, category: {a: "clothing"}},
     {_id: 28, category: {b: "clothing"}},
-    {_id: 29, category: [{a: "clothing"}, {a: "electronics"}, {}]}
+    {_id: 29, category: [{a: "clothing"}, {a: "electronics"}, {}]},
 ];
 assert.commandWorked(coll.insertMany(docs));
 
@@ -67,8 +67,7 @@ assert.commandWorked(coll.createIndexes([{category: 1}, {"category.a": 1}]));
  *                      'null' if a collection scan is expected.
  */
 function confirmExpectedExprExecution(expr, metricsToCheck) {
-    assert(metricsToCheck.hasOwnProperty("expectedRes"),
-           "metricsToCheck must contain an expectedRes field");
+    assert(metricsToCheck.hasOwnProperty("expectedRes"), "metricsToCheck must contain an expectedRes field");
 
     // Verify that $expr returns the expected results when run inside the $match stage of an
     // aggregate. Note that assert.sameMembers is used instead of eq because there is no guarantee
@@ -85,29 +84,33 @@ function confirmExpectedExprExecution(expr, metricsToCheck) {
         {$_internalInhibitOptimization: {}},
         {$project: {result: {$cond: [expr, true, false]}}},
         {$_internalInhibitOptimization: {}},
-        {$match: {result: true}}
+        {$match: {result: true}},
     ];
 
-    const expectedResultIds = metricsToCheck.expectedRes.map(doc => doc._id).sort();
-    const actualResultIds =
-        coll.aggregate(pipelineWithProject).toArray().map(doc => doc._id).sort();
+    const expectedResultIds = metricsToCheck.expectedRes.map((doc) => doc._id).sort();
+    const actualResultIds = coll
+        .aggregate(pipelineWithProject)
+        .toArray()
+        .map((doc) => doc._id)
+        .sort();
     assert.eq(expectedResultIds, actualResultIds);
 
     let explain = coll.explain("executionStats").aggregate(pipelineWithProject);
     const isSharded = explain.hasOwnProperty("shards");
 
     if (isSharded) {
-        const stages = getAggPlanStages(
-            explain, "COLLSCAN", getEngine(explain) === "sbe" /* useQueryPlannerSection */);
+        const stages = getAggPlanStages(explain, "COLLSCAN", getEngine(explain) === "sbe" /* useQueryPlannerSection */);
         const numShards = Object.keys(explain.shards).length;
         assert.eq(
             stages.length,
             numShards,
-            `Expected ${numShards} COLLSCAN stages (one per shard), but found ${stages.length}`);
+            `Expected ${numShards} COLLSCAN stages (one per shard), but found ${stages.length}`,
+        );
     } else {
-        assert(getAggPlanStage(
-                   explain, "COLLSCAN", getEngine(explain) === "sbe" /* useQueryPlannerSection */),
-               explain);
+        assert(
+            getAggPlanStage(explain, "COLLSCAN", getEngine(explain) === "sbe" /* useQueryPlannerSection */),
+            explain,
+        );
     }
 
     explain = assert.commandWorked(coll.explain("executionStats").aggregate(pipeline));
@@ -151,52 +154,55 @@ function verifyExplainOutput(explain, metricsToCheck, isSharded) {
 const indexableTestCases = [
     // $in with all scalar values
     {
-        expr: {$in: ["$category", ["clothing", "materials"]]},  // Strings
-        expectedRes: [{_id: 0, category: "clothing"}, {_id: 2, category: "materials"}],
-        expectedIndex: {category: 1}
+        expr: {$in: ["$category", ["clothing", "materials"]]}, // Strings
+        expectedRes: [
+            {_id: 0, category: "clothing"},
+            {_id: 2, category: "materials"},
+        ],
+        expectedIndex: {category: 1},
     },
     {
-        expr: {$in: ["$category", [1]]},  // Numerics
+        expr: {$in: ["$category", [1]]}, // Numerics
         expectedRes: [
             {_id: 21, category: 1},
             {_id: 22, category: 1.0},
             {_id: 23, category: NumberDecimal("1.00000000000000")},
-            {_id: 24, category: NumberLong(1)}
+            {_id: 24, category: NumberLong(1)},
         ],
-        expectedIndex: {category: 1}
+        expectedIndex: {category: 1},
     },
     // $in with dotted paths
     {
         expr: {$in: ["$category.a", ["clothing", "electronics"]]},
         expectedRes: [{_id: 27, category: {a: "clothing"}}],
-        expectedIndex: {"category.a": 1}
+        expectedIndex: {"category.a": 1},
     },
     // $in with objects
     {
-        expr: {$in: ["$category", [{}]]},  // Empty object
+        expr: {$in: ["$category", [{}]]}, // Empty object
         expectedRes: [{_id: 5, category: {}}],
-        expectedIndex: {"category": 1}
+        expectedIndex: {"category": 1},
     },
     {
-        expr: {$in: ["$category", [{a: 'clothing'}]]},  // Non-empty object
+        expr: {$in: ["$category", [{a: "clothing"}]]}, // Non-empty object
         expectedRes: [{_id: 27, category: {a: "clothing"}}],
-        expectedIndex: {"category": 1}
+        expectedIndex: {"category": 1},
     },
     {
-        expr: {$in: ["$category", [{$toDouble: 1}]]},  // $toDouble
+        expr: {$in: ["$category", [{$toDouble: 1}]]}, // $toDouble
         expectedRes: [
             {_id: 21, category: 1},
             {_id: 22, category: 1.0},
             {_id: 23, category: NumberDecimal("1.00000000000000")},
-            {_id: 24, category: NumberLong(1)}
+            {_id: 24, category: NumberLong(1)},
         ],
-        expectedIndex: {category: 1}
+        expectedIndex: {category: 1},
     },
     {
-        expr: {$in: ["$category", [{$literal: {$toDouble: 1}}]]},  // $literal
+        expr: {$in: ["$category", [{$literal: {$toDouble: 1}}]]}, // $literal
         expectedRes: [{_id: 25, category: {$toDouble: 1}}],
-        expectedIndex: {category: 1}
-    }
+        expectedIndex: {category: 1},
+    },
 ];
 
 /*
@@ -209,15 +215,15 @@ const nonIndexableTestCases = [
         expectedRes: [
             {_id: 0, category: "clothing"},
             {_id: 2, category: "materials"},
-            {_id: 10, category: ["clothing", "electronics"]}
-        ]
+            {_id: 10, category: ["clothing", "electronics"]},
+        ],
     },
     {
-        expr: {$in: ["$category", [[]]]},  // Nested empty array
-        expectedRes: [{_id: 6, category: []}]
+        expr: {$in: ["$category", [[]]]}, // Nested empty array
+        expectedRes: [{_id: 6, category: []}],
     },
     {
-        expr: {$in: ["$category.a", [[]]]},  // Dotted path, empty array
+        expr: {$in: ["$category.a", [[]]]}, // Dotted path, empty array
         expectedRes: [
             {_id: 6, category: []},
             {_id: 7, category: [[]]},
@@ -230,8 +236,8 @@ const nonIndexableTestCases = [
             {_id: 16, category: [["clothing", "electronics"]]},
             {_id: 17, category: [[["clothing", "materials", "electronics"]]]},
             {_id: 18, category: [[["clothing", "electronics"]]]},
-            {_id: 19, category: [[[null]]]}
-        ]
+            {_id: 19, category: [[[null]]]},
+        ],
     },
     // $in with regex
     {expr: {$in: ["$category", [/clothing/]]}, expectedRes: [{_id: 13, category: /clothing/}]},
@@ -239,9 +245,9 @@ const nonIndexableTestCases = [
     {expr: {$in: ["$category", [null]]}, expectedRes: [{_id: 4, category: null}]},
     // $in with $getField in lhs
     {
-        expr: {$in: [{$getField: "category.a"}, ["clothing", "electronics"]]},  // $getField
-        expectedRes: [{_id: 26, "category.a": "clothing"}]
-    }
+        expr: {$in: [{$getField: "category.a"}, ["clothing", "electronics"]]}, // $getField
+        expectedRes: [{_id: 26, "category.a": "clothing"}],
+    },
 ];
 
 indexableTestCases.forEach(({expr, expectedRes, expectedIndex}) => {

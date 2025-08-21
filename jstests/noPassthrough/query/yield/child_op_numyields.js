@@ -19,15 +19,17 @@ const testColl = testDB.test;
 function runYieldTest(docsToRemove) {
     // Sets parameters such that all operations will yield & the operation hangs on the server
     // when we need to test.
+    assert.commandWorked(testDB.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
     assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: "hangBeforeChildRemoveOpFinishes", mode: "alwaysOn"}));
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: "hangAfterAllChildRemoveOpsArePopped", mode: "alwaysOn"}));
+        testDB.adminCommand({configureFailPoint: "hangBeforeChildRemoveOpFinishes", mode: "alwaysOn"}),
+    );
+    assert.commandWorked(
+        testDB.adminCommand({configureFailPoint: "hangAfterAllChildRemoveOpsArePopped", mode: "alwaysOn"}),
+    );
 
     // Starts parallel shell to run the command that will hang.
-    const awaitShell = startParallelShell(`{
+    const awaitShell = startParallelShell(
+        `{
             const testDB = db.getSiblingDB("currentop_yield");
             const bulkRemove = testDB.test.initializeOrderedBulkOp();
             for(let doc of ${tojsononeline(docsToRemove)}) {
@@ -35,7 +37,8 @@ function runYieldTest(docsToRemove) {
             }
             bulkRemove.execute();
         }`,
-                                              testDB.getMongo().port);
+        testDB.getMongo().port,
+    );
 
     let childOpId = null;
     let childYields = 0;
@@ -47,8 +50,7 @@ function runYieldTest(docsToRemove) {
     // op is caught and their individual 'numYields' recorded.
     for (let childCount = 0; childCount < docsToRemove.length; childCount++) {
         // Wait for the child op to hit the first of two failpoints.
-        let childCurOp = waitForCurOpByFailPoint(
-            testDB, testColl.getFullName(), "hangBeforeChildRemoveOpFinishes")[0];
+        let childCurOp = waitForCurOpByFailPoint(testDB, testColl.getFullName(), "hangBeforeChildRemoveOpFinishes")[0];
 
         // Add the child's yield count to the running total, and record the opid.
         assert(childOpId === null || childOpId === childCurOp.opid);
@@ -58,38 +60,38 @@ function runYieldTest(docsToRemove) {
 
         // Enable the subsequent 'hangBeforeChildRemoveOpIsPopped' failpoint, just after the
         // child op finishes but before it is popped from the stack.
-        assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: "hangBeforeChildRemoveOpIsPopped", mode: "alwaysOn"}));
+        assert.commandWorked(
+            testDB.adminCommand({configureFailPoint: "hangBeforeChildRemoveOpIsPopped", mode: "alwaysOn"}),
+        );
 
         // Let the operation proceed to the 'hangBeforeChildRemoveOpIsPopped' failpoint.
-        assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: "hangBeforeChildRemoveOpFinishes", mode: "off"}));
+        assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeChildRemoveOpFinishes", mode: "off"}));
         waitForCurOpByFailPoint(testDB, testColl.getFullName(), "hangBeforeChildRemoveOpIsPopped");
 
         // If this is not the final child op, re-enable the 'hangBeforeChildRemoveOpFinishes'
         // failpoint from earlier so that we don't miss the next child.
         if (childCount + 1 < docsToRemove.length) {
-            assert.commandWorked(testDB.adminCommand(
-                {configureFailPoint: "hangBeforeChildRemoveOpFinishes", mode: "alwaysOn"}));
+            assert.commandWorked(
+                testDB.adminCommand({configureFailPoint: "hangBeforeChildRemoveOpFinishes", mode: "alwaysOn"}),
+            );
         }
 
         // Finally, allow the operation to continue.
-        assert.commandWorked(testDB.adminCommand(
-            {configureFailPoint: "hangBeforeChildRemoveOpIsPopped", mode: "off"}));
+        assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangBeforeChildRemoveOpIsPopped", mode: "off"}));
     }
 
     // Wait for the operation to hit the 'hangAfterAllChildRemoveOpsArePopped' failpoint, then
     // take the total number of yields recorded by the parent op.
-    const parentCurOp = waitForCurOpByFailPointNoNS(
-        testDB, "hangAfterAllChildRemoveOpsArePopped", {opid: childOpId})[0];
+    const parentCurOp = waitForCurOpByFailPointNoNS(testDB, "hangAfterAllChildRemoveOpsArePopped", {
+        opid: childOpId,
+    })[0];
 
     // Verify that the parent's yield count equals the sum of the child ops' yields.
     assert.eq(parentCurOp.numYields, childYields);
     assert.eq(parentCurOp.opid, childOpId);
 
     // Allow the parent operation to complete.
-    assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: "hangAfterAllChildRemoveOpsArePopped", mode: "off"}));
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterAllChildRemoveOpsArePopped", mode: "off"}));
 
     // Wait for the parallel shell to complete.
     awaitShell();

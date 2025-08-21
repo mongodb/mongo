@@ -20,12 +20,12 @@ function runTest(db) {
     coll.aggregate([
         {$match: {_id: {$in: [0, 1, 2]}}},
         {$sort: {_id: 1}},
-        {$group: {_id: null, allBooks: {$concatArrays: '$books'}}}
+        {$group: {_id: null, allBooks: {$concatArrays: "$books"}}},
     ]);
 
     // Window Function Case: The $concatArray accumulator is only allowed on FCV 8.1 and above.
     // Given that the current FCV is greater than 8.1, the operation should succeed.
-    coll.aggregate([{$setWindowFields: {output: {field: {$concatArrays: '$a'}}}}]);
+    coll.aggregate([{$setWindowFields: {output: {field: {$concatArrays: "$a"}}}}]);
 
     // Set the feature compatibility version to 8.0 (feature_flags::gFeatureFlagArrayAccumulators is
     // gated under FCV 8.1).
@@ -33,16 +33,20 @@ function runTest(db) {
 
     // The following aggregate commands for the accumulator and window function cases should fail
     // with QueryFeatureNotAllowed.
-    assert.throwsWithCode(() => coll.aggregate([
-        {$match: {_id: {$in: [0, 1, 2]}}},
-        {$sort: {_id: 1}},
-        {$group: {_id: null, allBooks: {$concatArrays: '$books'}}}
-    ]),
-                          ErrorCodes.QueryFeatureNotAllowed);
+    assert.throwsWithCode(
+        () =>
+            coll.aggregate([
+                {$match: {_id: {$in: [0, 1, 2]}}},
+                {$sort: {_id: 1}},
+                {$group: {_id: null, allBooks: {$concatArrays: "$books"}}},
+            ]),
+        ErrorCodes.QueryFeatureNotAllowed,
+    );
 
     assert.throwsWithCode(
-        () => coll.aggregate([{$setWindowFields: {output: {field: {$concatArrays: '$a'}}}}]),
-        ErrorCodes.QueryFeatureNotAllowed);
+        () => coll.aggregate([{$setWindowFields: {output: {field: {$concatArrays: "$a"}}}}]),
+        ErrorCodes.QueryFeatureNotAllowed,
+    );
 }
 
 (function testReplicaSet() {

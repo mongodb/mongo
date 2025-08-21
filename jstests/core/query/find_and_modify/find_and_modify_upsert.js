@@ -9,7 +9,7 @@ function getNextVal(counterName) {
         query: {_id: counterName},
         update: {$inc: {val: 1}},
         upsert: true,
-        'new': true,
+        "new": true,
     });
     return ret;
 }
@@ -28,7 +28,7 @@ function helper(upsert) {
         query: {_id: "asdf"},
         update: {$inc: {val: 1}},
         upsert: upsert,
-        'new': false  // the default
+        "new": false, // the default
     });
 }
 
@@ -39,12 +39,12 @@ assert.eq(t.count(), 0);
 // upsert:true so nothing there before; something there after
 assert.eq(helper(true), null);
 assert.eq(t.count(), 1);
-assert.eq(helper(true), {_id: 'asdf', val: 1});
-assert.eq(helper(false), {_id: 'asdf', val: 2});  // upsert only matters when obj doesn't exist
-assert.eq(helper(true), {_id: 'asdf', val: 3});
+assert.eq(helper(true), {_id: "asdf", val: 1});
+assert.eq(helper(false), {_id: "asdf", val: 2}); // upsert only matters when obj doesn't exist
+assert.eq(helper(true), {_id: "asdf", val: 3});
 
 // _id created if not specified
-const out = t.findAndModify({query: {a: 1}, update: {$set: {b: 2}}, upsert: true, 'new': true});
+const out = t.findAndModify({query: {a: 1}, update: {$set: {b: 2}}, upsert: true, "new": true});
 assert.neq(out._id, undefined);
 assert.eq(out.a, 1);
 assert.eq(out.b, 2);

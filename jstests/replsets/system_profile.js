@@ -15,15 +15,16 @@ rst.initiate();
 rst.awaitReplication();
 
 // filter out noop writes
-var getLatestOp = function() {
-    return primaryDB.getSiblingDB('local')
-        .oplog.rs.find({op: {$ne: 'n'}})
+var getLatestOp = function () {
+    return primaryDB
+        .getSiblingDB("local")
+        .oplog.rs.find({op: {$ne: "n"}})
         .sort({$natural: -1})
         .limit(1)
         .next();
 };
 
-var primaryDB = rst.getPrimary().getDB('test');
+var primaryDB = rst.getPrimary().getDB("test");
 assert.commandWorked(primaryDB.foo.insert({}));
 var op = getLatestOp();
 

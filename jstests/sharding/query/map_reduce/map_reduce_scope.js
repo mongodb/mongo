@@ -14,19 +14,20 @@ st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName});
 
 function runTest(coll) {
     /* eslint-disable */
-    const map = function() {
+    const map = function () {
         emit(xx.val, this.a);
     };
-    const reduce = function(key, values) {
+    const reduce = function (key, values) {
         return {reduce: xx.val + 1};
     };
-    const finalize = function(key, values) {
+    const finalize = function (key, values) {
         values.finalize = xx.val + 2;
         return values;
     };
     /* eslint-enable */
     const res = assert.commandWorked(
-        coll.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}, scope: {xx: {val: 9}}}));
+        coll.mapReduce(map, reduce, {finalize: finalize, out: {inline: 1}, scope: {xx: {val: 9}}}),
+    );
     assert.eq(res.results.length, 1, res);
     assert.eq(res.results[0], {_id: 9, value: {reduce: 10, finalize: 11}}, res);
 }

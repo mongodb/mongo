@@ -20,7 +20,7 @@ const rt = new ReplSetTest({
                 priority: 0,
             },
         },
-    ]
+    ],
 });
 const nodes = rt.startSet();
 rt.initiate();
@@ -29,10 +29,10 @@ rt.awaitSecondaryNodes();
 let secondary1 = rt.getSecondary();
 
 // shortcuts
-let primarydb = primary.getDB('d');
-let secondary1db = secondary1.getDB('d');
-let primarycol = primarydb['c'];
-let secondary1col = secondary1db['c'];
+let primarydb = primary.getDB("d");
+let secondary1db = secondary1.getDB("d");
+let primarycol = primarydb["c"];
+let secondary1col = secondary1db["c"];
 
 // create TTL index, wait for TTL monitor to kick in, then check things
 primarycol.createIndex({x: 1}, {expireAfterSeconds: 10});
@@ -44,12 +44,15 @@ assert.commandWorked(secondary1col.getDB().adminCommand({setParameter: 1, logLev
 
 // insert old doc (10 minutes old) directly on secondary using godinsert
 // The default WC is majority and godinsert command on a secondary is incompatible with wc:majority.
-assert.commandWorked(secondary1col.runCommand(
-    "godinsert",
-    {obj: {_id: new Date(), x: new Date((new Date()).getTime() - 600000)}, writeConcern: {w: 1}}));
+assert.commandWorked(
+    secondary1col.runCommand("godinsert", {
+        obj: {_id: new Date(), x: new Date(new Date().getTime() - 600000)},
+        writeConcern: {w: 1},
+    }),
+);
 assert.eq(1, secondary1col.count(), "missing inserted doc");
 
-sleep(70 * 1000);  // wait for 70seconds
+sleep(70 * 1000); // wait for 70seconds
 assert.eq(1, secondary1col.count(), "ttl deleted my doc!");
 
 // finish up

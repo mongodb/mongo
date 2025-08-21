@@ -20,18 +20,17 @@ const st = new ShardingTest({
     rs: {nodes: 2},
 });
 
-const dbName = 'test';
-const collName = 'coll';
+const dbName = "test";
+const collName = "coll";
 const nss = dbName + "." + collName;
 const db = st.getDB(dbName);
 const coll = db.getCollection(collName);
 const shardKey = {
-    key: 1
+    key: 1,
 };
 
 // shard collection such that shard0 is the primary and shard0 and shard1 both own some documents
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 CreateShardedCollectionUtil.shardCollectionWithChunks(coll, shardKey, [
     {min: {key: MinKey}, max: {key: 5}, shard: st.shard0.shardName},
     {min: {key: 5}, max: {key: MaxKey}, shard: st.shard1.shardName},
@@ -88,15 +87,19 @@ checkShardUUIDsAgainstConfig(false);
 // assert that running reshard command without relaxed mode fails due to a CollectionUUIDMismatch or
 // SnapshotUnavailable (the later can happen when the shard detects the mismatch between the local
 // and sharding catalogs).
-assert.commandFailedWithCode(reshardingCommandWithRelaxed(undefined),
-                             [ErrorCodes.CollectionUUIDMismatch, ErrorCodes.SnapshotUnavailable]);
+assert.commandFailedWithCode(reshardingCommandWithRelaxed(undefined), [
+    ErrorCodes.CollectionUUIDMismatch,
+    ErrorCodes.SnapshotUnavailable,
+]);
 
 // assert that the collection UUID is still mistmached
 checkShardUUIDsAgainstConfig(false);
 
 // assert that running reshard command with relaxed mode = false fails as well
-assert.commandFailedWithCode(reshardingCommandWithRelaxed(false),
-                             [ErrorCodes.CollectionUUIDMismatch, ErrorCodes.SnapshotUnavailable]);
+assert.commandFailedWithCode(reshardingCommandWithRelaxed(false), [
+    ErrorCodes.CollectionUUIDMismatch,
+    ErrorCodes.SnapshotUnavailable,
+]);
 
 // assert that the collection UUID is still mistmached
 checkShardUUIDsAgainstConfig(false);

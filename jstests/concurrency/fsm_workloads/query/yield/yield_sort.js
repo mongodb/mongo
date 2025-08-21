@@ -10,24 +10,24 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/yield/yield_sort_merge.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/yield/yield_sort_merge.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     /*
      * Execute a query that will use the SORT stage.
      */
     $config.states.query = function sort(db, collName) {
         var nMatches = 100;
         // Sort on c, since it's not an indexed field.
-        var cursor =
-            db[collName].find({a: {$lt: nMatches}}).sort({c: -1}).batchSize(this.batchSize);
+        var cursor = db[collName]
+            .find({a: {$lt: nMatches}})
+            .sort({c: -1})
+            .batchSize(this.batchSize);
 
         var verifier = function sortVerifier(doc, prevDoc) {
             var correctOrder = true;
             if (prevDoc !== null) {
-                correctOrder = (doc.c <= prevDoc.c);
+                correctOrder = doc.c <= prevDoc.c;
             }
             return doc.a < nMatches && correctOrder;
         };

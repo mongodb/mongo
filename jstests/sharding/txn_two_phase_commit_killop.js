@@ -8,13 +8,10 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    getCoordinatorFailpoints,
-    waitForFailpoint
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {getCoordinatorFailpoints, waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 import {
     checkDecisionIs,
-    runCommitThroughMongosInParallelThread
+    runCommitThroughMongosInParallelThread,
 } from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
@@ -31,20 +28,17 @@ let participant2 = st.shard2;
 let lsid = {id: UUID()};
 let txnNumber = 0;
 
-const setUp = function() {
+const setUp = function () {
     // Create a sharded collection with a chunk on each shard:
     // shard0: [-inf, 0)
     // shard1: [0, 10)
     // shard2: [10, +inf)
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
 
     // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
     // from the shards starting, aborting, and restarting the transaction due to needing to
@@ -55,20 +49,26 @@ const setUp = function() {
     st.refreshCatalogCacheForNs(st.s, ns);
 
     // Start a new transaction by inserting a document onto each shard.
-    assert.commandWorked(st.s.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: -5}, {_id: 5}, {_id: 15}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-    }));
+    assert.commandWorked(
+        st.s.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: -5}, {_id: 5}, {_id: 15}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 };
 
-const testCommitProtocol = function(shouldCommit, failpointData) {
-    jsTest.log("Testing two-phase " + (shouldCommit ? "commit" : "abort") +
-               " protocol with failpointData: " + tojson(failpointData));
+const testCommitProtocol = function (shouldCommit, failpointData) {
+    jsTest.log(
+        "Testing two-phase " +
+            (shouldCommit ? "commit" : "abort") +
+            " protocol with failpointData: " +
+            tojson(failpointData),
+    );
 
     txnNumber++;
     setUp();
@@ -76,81 +76,89 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
     if (!shouldCommit) {
         // Manually abort the transaction on one of the participants, so that the participant
         // fails to prepare.
-        assert.commandWorked(participant2.adminCommand({
-            abortTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            autocommit: false,
-        }));
+        assert.commandWorked(
+            participant2.adminCommand({
+                abortTransaction: 1,
+                lsid: lsid,
+                txnNumber: NumberLong(txnNumber),
+                stmtId: NumberInt(0),
+                autocommit: false,
+            }),
+        );
     }
 
     // Turn on failpoint to make the coordinator hang at a specified point.
-    assert.commandWorked(coordinator.adminCommand({
-        configureFailPoint: failpointData.failpoint,
-        mode: "alwaysOn",
-        data: failpointData.data ? failpointData.data : {}
-    }));
+    assert.commandWorked(
+        coordinator.adminCommand({
+            configureFailPoint: failpointData.failpoint,
+            mode: "alwaysOn",
+            data: failpointData.data ? failpointData.data : {},
+        }),
+    );
 
     // Run commitTransaction through a parallel shell.
     let commitThread;
     if (shouldCommit) {
         commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
     } else {
-        commitThread = runCommitThroughMongosInParallelThread(
-            lsid, txnNumber, st.s.host, ErrorCodes.NoSuchTransaction);
+        commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host, ErrorCodes.NoSuchTransaction);
     }
     commitThread.start();
 
     // Deliver killOp once the failpoint has been hit.
 
-    waitForFailpoint("Hit " + failpointData.failpoint + " failpoint",
-                     failpointData.numTimesShouldBeHit);
+    waitForFailpoint("Hit " + failpointData.failpoint + " failpoint", failpointData.numTimesShouldBeHit);
 
     jsTest.log("Going to find coordinator opCtx ids");
     let coordinatorOpsToKill = [];
-    assert.soon(() => {
-        coordinatorOpsToKill = coordinator.getDB("admin")
-                                   .aggregate([
-                                       {$currentOp: {'allUsers': true, 'idleConnections': true}},
-                                       {
-                                           $match: {
-                                               $and: [
-                                                   {desc: "TransactionCoordinator"},
-                                                   // Filter out the prepareTransaction op on the
-                                                   // coordinator itself since killing it would
-                                                   // cause the transaction to abort.
-                                                   {"command.prepareTransaction": {$exists: false}}
-                                               ]
-                                           }
-                                       }
-                                   ])
-                                   .toArray();
+    assert.soon(
+        () => {
+            coordinatorOpsToKill = coordinator
+                .getDB("admin")
+                .aggregate([
+                    {$currentOp: {"allUsers": true, "idleConnections": true}},
+                    {
+                        $match: {
+                            $and: [
+                                {desc: "TransactionCoordinator"},
+                                // Filter out the prepareTransaction op on the
+                                // coordinator itself since killing it would
+                                // cause the transaction to abort.
+                                {"command.prepareTransaction": {$exists: false}},
+                            ],
+                        },
+                    },
+                ])
+                .toArray();
 
-        for (let x = 0; x < coordinatorOpsToKill.length; x++) {
-            if (!coordinatorOpsToKill[x].opid) {
-                print("Retrying currentOp because op doesn't have opId: " +
-                      tojson(coordinatorOpsToKill[x]));
-                return false;
+            for (let x = 0; x < coordinatorOpsToKill.length; x++) {
+                if (!coordinatorOpsToKill[x].opid) {
+                    print("Retrying currentOp because op doesn't have opId: " + tojson(coordinatorOpsToKill[x]));
+                    return false;
+                }
             }
-        }
 
-        return true;
-    }, 'timed out trying to fetch coordinator ops', undefined /* timeout */, 1000 /* interval */);
+            return true;
+        },
+        "timed out trying to fetch coordinator ops",
+        undefined /* timeout */,
+        1000 /* interval */,
+    );
 
     // Use "greater than or equal to" since, for failpoints that pause the coordinator while
     // it's sending prepare or sending the decision, there might be one additional thread that's
     // doing the "send" to the local participant (or that thread might have already completed).
     assert.gte(coordinatorOpsToKill.length, failpointData.numTimesShouldBeHit);
 
-    coordinatorOpsToKill.forEach(function(coordinatorOp) {
+    coordinatorOpsToKill.forEach(function (coordinatorOp) {
         coordinator.getDB("admin").killOp(coordinatorOp.opid);
     });
 
     // If we're hanging after the decision is written and before it is removed, then we can read the
     // decision.
     let commitTimestamp;
-    const canReadDecision = (failpointData.data || {}).twoPhaseCommitStage === "decision" ||
+    const canReadDecision =
+        (failpointData.data || {}).twoPhaseCommitStage === "decision" ||
         failpointData.failpoint === hangBeforeDeletingCoordinatorDocFpName;
     let hangBeforeDeletingCoordinatorDocFp;
     if (canReadDecision && shouldCommit) {
@@ -160,13 +168,19 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
         // but before it's deleted.
         const coordinatorPrimary = coordinator.rs.getPrimary();
         hangBeforeDeletingCoordinatorDocFp = configureFailPoint(
-            coordinatorPrimary, hangBeforeDeletingCoordinatorDocFpName, {}, "alwaysOn");
+            coordinatorPrimary,
+            hangBeforeDeletingCoordinatorDocFpName,
+            {},
+            "alwaysOn",
+        );
     }
 
-    assert.commandWorked(coordinator.adminCommand({
-        configureFailPoint: failpointData.failpoint,
-        mode: "off",
-    }));
+    assert.commandWorked(
+        coordinator.adminCommand({
+            configureFailPoint: failpointData.failpoint,
+            mode: "off",
+        }),
+    );
 
     if (!canReadDecision && shouldCommit) {
         // Wait to delete the coordinator doc, then read the commitTimestamp.
@@ -182,8 +196,7 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
 
     // If deleting the coordinator doc was not robust to killOp, the document would still exist.
     // Deletion is done asynchronously, so we might have to wait.
-    assert.soon(
-        () => coordinator.getDB("config").getCollection("transaction_coordinators").count() == 0);
+    assert.soon(() => coordinator.getDB("config").getCollection("transaction_coordinators").count() == 0);
 
     // Check that the transaction committed or aborted as expected.
     if (!shouldCommit) {
@@ -191,11 +204,13 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
         assert.eq(0, st.s.getDB(dbName).getCollection(collName).find().itcount());
     } else {
         jsTest.log("Verify that the transaction was committed on all shards.");
-        const res = assert.commandWorked(st.s.getDB(dbName).runCommand({
-            find: collName,
-            readConcern: {level: "majority", afterClusterTime: commitTimestamp},
-            maxTimeMS: 10000
-        }));
+        const res = assert.commandWorked(
+            st.s.getDB(dbName).runCommand({
+                find: collName,
+                readConcern: {level: "majority", afterClusterTime: commitTimestamp},
+                maxTimeMS: 10000,
+            }),
+        );
         assert.eq(3, res.cursor.firstBatch.length);
     }
 
@@ -205,7 +220,7 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
 const failpointDataArr = getCoordinatorFailpoints();
 
 // Test commit path.
-failpointDataArr.forEach(function(failpointData) {
+failpointDataArr.forEach(function (failpointData) {
     testCommitProtocol(true /* shouldCommit */, failpointData);
     clearRawMongoProgramOutput();
 });

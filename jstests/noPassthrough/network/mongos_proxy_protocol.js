@@ -11,7 +11,7 @@ if (_isWindows()) {
 import {
     emptyMessageTest,
     fuzzingTest,
-    testProxyProtocolShardedCluster
+    testProxyProtocolShardedCluster,
 } from "jstests/noPassthrough/libs/proxy_protocol_helpers.js";
 
 const ingressPort = allocatePort();

@@ -12,7 +12,7 @@ import {
     checkHealthLog,
     insertDocsWithMissingIndexKeys,
     logQueries,
-    runDbCheck
+    runDbCheck,
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
 // Skipping data consistency checks because data is inserted into primary and secondary separately.
@@ -23,7 +23,7 @@ const dbName = "ignore_dbcheck_in_intial_sync";
 const collName = "ignore_dbcheck_in_intial_sync-collection";
 
 const doc1 = {
-    a: 1
+    a: 1,
 };
 
 const replSet = new ReplSetTest({
@@ -33,10 +33,10 @@ const replSet = new ReplSetTest({
         {
             rsConfig:
                 // disallow elections on secondary
-                {priority: 0}
-        }
+                {priority: 0},
+        },
     ],
-    nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}}
+    nodeOptions: {setParameter: {dbCheckHealthLogEveryNBatches: 1}},
 });
 replSet.startSet();
 replSet.initiate();
@@ -56,21 +56,23 @@ replSet.awaitReplication();
 
 const initialSyncNode = replSet.add({rsConfig: {priority: 0}});
 
-const initialSyncHangBeforeSplittingControlFlowFailPoint =
-    configureFailPoint(initialSyncNode, "initialSyncHangBeforeSplittingControlFlow");
+const initialSyncHangBeforeSplittingControlFlowFailPoint = configureFailPoint(
+    initialSyncNode,
+    "initialSyncHangBeforeSplittingControlFlow",
+);
 
 replSet.reInitiate();
 
 initialSyncHangBeforeSplittingControlFlowFailPoint.wait();
 
-runDbCheck(
-    replSet,
-    primaryDb,
-    collName,
-    {maxDocsPerBatch: maxDocsPerBatch, validateMode: "dataConsistencyAndMissingIndexKeysCheck"});
+runDbCheck(replSet, primaryDb, collName, {
+    maxDocsPerBatch: maxDocsPerBatch,
+    validateMode: "dataConsistencyAndMissingIndexKeysCheck",
+});
 
-assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: 'initialSyncHangBeforeSplittingControlFlow', mode: 'off'}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeSplittingControlFlow", mode: "off"}),
+);
 
 replSet.awaitSecondaryNodes(null, [initialSyncNode]);
 

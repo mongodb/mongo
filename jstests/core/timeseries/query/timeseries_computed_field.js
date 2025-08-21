@@ -22,17 +22,19 @@ TimeseriesTest.run((insert) => {
 
     let coll = db[jsTestName()];
 
-    const timeFieldName = 'time';
-    const metaFieldName = 'measurement';
+    const timeFieldName = "time";
+    const metaFieldName = "measurement";
 
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
+    );
 
     insert(coll, {
         _id: 0,
-        [timeFieldName]: new Date(datePrefix + 100),  // ISODate("1970-01-20T10:55:12.540Z")
+        [timeFieldName]: new Date(datePrefix + 100), // ISODate("1970-01-20T10:55:12.540Z")
         [metaFieldName]: "cpu",
         topLevelScalar: 123,
         topLevelScalarDouble: 123.8778645,
@@ -44,7 +46,7 @@ TimeseriesTest.run((insert) => {
     });
     insert(coll, {
         _id: 1,
-        [timeFieldName]: new Date(datePrefix + 200),  // ISODate("1970-01-20T10:55:12.640Z")
+        [timeFieldName]: new Date(datePrefix + 200), // ISODate("1970-01-20T10:55:12.640Z")
         [metaFieldName]: "cpu",
         topLevelScalar: 456,
         topLevelScalarDouble: 546.76858699,
@@ -65,49 +67,53 @@ TimeseriesTest.run((insert) => {
     // semantics for setting a computed field on a dotted array path are particularly strange, but
     // should be preserved for backwards compatibility.
     {
-        const res = coll.aggregate([
-                            {$addFields: {"arrOfObj.x": {$trim: {input: "test string"}}}},
-                            {$match: {topLevelScalar: {$gte: 0}}},
-                            {$group: {_id: null, max: {$max: "$arrOfObj.x"}}}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"arrOfObj.x": {$trim: {input: "test string"}}}},
+                {$match: {topLevelScalar: {$gte: 0}}},
+                {$group: {_id: null, max: {$max: "$arrOfObj.x"}}},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].max, ["test string", "test string", "test string", "test string"], res);
     }
 
     {
-        const res = coll.aggregate([
-                            {$addFields: {"arrOfObj.x": {$add: ["$topLevelScalar", 1]}}},
-                            {$match: {topLevelScalar: {$gte: 0}}},
-                            {$group: {_id: null, max: {$max: "$arrOfObj.x"}}}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"arrOfObj.x": {$add: ["$topLevelScalar", 1]}}},
+                {$match: {topLevelScalar: {$gte: 0}}},
+                {$group: {_id: null, max: {$max: "$arrOfObj.x"}}},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].max, [457, 457, 457, 457], res);
     }
 
     // Computing a field and then filtering by it.
     {
-        const res = coll.aggregate([
-                            {$addFields: {"arrOfObj.x": {$trim: {input: "test string"}}}},
-                            {$match: {"arrOfObj.x": "test string"}},
-                            {$group: {_id: null, max: {$max: "$arrOfObj.x"}}}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"arrOfObj.x": {$trim: {input: "test string"}}}},
+                {$match: {"arrOfObj.x": "test string"}},
+                {$group: {_id: null, max: {$max: "$arrOfObj.x"}}},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].max, ["test string", "test string", "test string", "test string"], res);
     }
 
     {
         // Computing a field based on a dotted path which does not traverse arrays.
-        const res = coll.aggregate([
-                            {$addFields: {"computedA": {$add: ["$obj.a", 1]}}},
-                            // Only one document should have a value where obj.a was 457
-                            // (456 + 1).
-                            {$match: {"computedA": 457}},
-                            {$count: "count"}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"computedA": {$add: ["$obj.a", 1]}}},
+                // Only one document should have a value where obj.a was 457
+                // (456 + 1).
+                {$match: {"computedA": 457}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
@@ -124,7 +130,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$add: ["$topLevelScalar", 1]}}},
             {$match: {"computedA": 457}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -135,7 +141,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$subtract: ["$topLevelScalar", 1]}}},
             {$match: {"computedA": 455}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -146,7 +152,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$multiply: ["$topLevelScalar", 10]}}},
             {$match: {"computedA": 4560}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -157,7 +163,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$divide: ["$topLevelScalar", 2]}}},
             {$match: {"computedA": 228}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -168,7 +174,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$add: [1, "$topLevelScalar"]}}},
             {$match: {"computedA": 457}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -179,7 +185,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$subtract: [200, "$topLevelScalar"]}}},
             {$match: {"computedA": 77}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -190,7 +196,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$multiply: [10, "$topLevelScalar"]}}},
             {$match: {"computedA": 4560}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -201,7 +207,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$divide: [4560, "$topLevelScalar"]}}},
             {$match: {"computedA": 10}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -213,7 +219,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$add: ["$topLevelScalar", "$topLevelScalar"]}}},
             {$match: {"computedA": 912}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -224,7 +230,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$subtract: ["$topLevelScalar", "$topLevelScalar"]}}},
             {$match: {"computedA": 0}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -235,7 +241,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$multiply: ["$topLevelScalar", "$topLevelScalar"]}}},
             {$match: {"computedA": 15129}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -246,7 +252,7 @@ TimeseriesTest.run((insert) => {
         let pipeline = [
             {$addFields: {"computedA": {$divide: ["$topLevelScalar", "$topLevelScalar"]}}},
             {$match: {"computedA": 1}},
-            {$count: "count"}
+            {$count: "count"},
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -262,22 +268,24 @@ TimeseriesTest.run((insert) => {
                         $dateDiff: {
                             "startDate": "$time",
                             "endDate": new Date("1970-01-21"),
-                            "unit": "hour"
-                        }
-                    }
-                }
+                            "unit": "hour",
+                        },
+                    },
+                },
             },
             {$match: {"hourDiff": {$gte: 12}}},
             {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "open": {"$first": "$topLevelScalar"},
-                }
-            }
+                },
+            },
         ];
 
-        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "open": 123}],
-                     coll.aggregate(pipeline).toArray());
+        assert.docEq(
+            [{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "open": 123}],
+            coll.aggregate(pipeline).toArray(),
+        );
     }
 
     {
@@ -288,12 +296,14 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "open": {"$first": "$topLevelScalar"},
-                }
-            }
+                },
+            },
         ];
 
-        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "open": 456}],
-                     coll.aggregate(pipeline).toArray());
+        assert.docEq(
+            [{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "open": 456}],
+            coll.aggregate(pipeline).toArray(),
+        );
     }
 
     {
@@ -304,31 +314,31 @@ TimeseriesTest.run((insert) => {
                         $dateDiff: {
                             "startDate": "$time",
                             "endDate": new Date("1970-01-21"),
-                            "unit": "hour"
-                        }
-                    }
-                }
+                            "unit": "hour",
+                        },
+                    },
+                },
             },
             {$match: {$or: [{topLevelScalar: {$gt: 200, $lt: 800}}, {hourDiff: {$gte: 12}}]}},
             {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "open": {"$first": "$topLevelScalar"},
-                }
-            }
+                },
+            },
         ];
 
-        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "open": 123}],
-                     coll.aggregate(pipeline).toArray());
+        assert.docEq(
+            [{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "open": 123}],
+            coll.aggregate(pipeline).toArray(),
+        );
     }
 
     {
         // Try a project stage which adds and remove subfields.
-        const res = coll.aggregate([
-                            {$project: {"obj.newField": "$topLevelScalar"}},
-                            {$project: {"_id": 0, "obj.a": 0}}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([{$project: {"obj.newField": "$topLevelScalar"}}, {$project: {"_id": 0, "obj.a": 0}}])
+            .toArray();
         assert.eq(res.length, 3, res);
         assert.eq(res[0], {"obj": {"newField": 123}}, res);
         assert.eq(res[1], {"obj": {"newField": 456}}, res);
@@ -337,13 +347,14 @@ TimeseriesTest.run((insert) => {
 
     {
         // Try a replaceRoot stage which remove all fields.
-        const res = coll.aggregate([
-                            {$match: {"time": {$gte: new Date(datePrefix + 200)}}},
-                            {$addFields: {}},
-                            {$project: {"measurement0": {$floor: "$topLevelScalar"}}},
-                            {$replaceRoot: {newRoot: {}}}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$match: {"time": {$gte: new Date(datePrefix + 200)}}},
+                {$addFields: {}},
+                {$project: {"measurement0": {$floor: "$topLevelScalar"}}},
+                {$replaceRoot: {newRoot: {}}},
+            ])
+            .toArray();
         assert.eq(res.length, 2, res);
         assert.eq(res[0], {}, res);
         assert.eq(res[1], {}, res);
@@ -351,31 +362,34 @@ TimeseriesTest.run((insert) => {
 
     {
         // Try a $match that works on fields that are not projected.
-        const res =
-            coll.aggregate([
-                    {$project: {"obj.a": 1}},
-                    {$match: {$or: [{"topLevelScalar": {$gt: 10}}, {$expr: {$literal: true}}]}},
-                    {$sort: {_id: 1}},
-                    {$count: "count"}
-                ])
-                .toArray();
+        const res = coll
+            .aggregate([
+                {$project: {"obj.a": 1}},
+                {$match: {$or: [{"topLevelScalar": {$gt: 10}}, {$expr: {$literal: true}}]}},
+                {$sort: {_id: 1}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 3, res);
     }
 
     {
-        const res = coll.aggregate([{
-                            "$project": {
-                                "t": {
-                                    "$dateDiff": {
-                                        "startDate": "$time",
-                                        "endDate": new Date(datePrefix + 150),
-                                        "unit": "millisecond"
-                                    }
-                                }
-                            }
-                        }])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {
+                    "$project": {
+                        "t": {
+                            "$dateDiff": {
+                                "startDate": "$time",
+                                "endDate": new Date(datePrefix + 150),
+                                "unit": "millisecond",
+                            },
+                        },
+                    },
+                },
+            ])
+            .toArray();
         assert.eq(res.length, 3, res);
         assert.docEq(res[0], {_id: 0, "t": 50}, res);
         assert.docEq(res[1], {_id: 1, "t": -50}, res);
@@ -383,18 +397,21 @@ TimeseriesTest.run((insert) => {
     }
 
     {
-        const res = coll.aggregate([{
-                            "$project": {
-                                "t": {
-                                    "$dateDiff": {
-                                        "startDate": new Date(datePrefix - 10),
-                                        "endDate": "$time",
-                                        "unit": "millisecond"
-                                    }
-                                }
-                            }
-                        }])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {
+                    "$project": {
+                        "t": {
+                            "$dateDiff": {
+                                "startDate": new Date(datePrefix - 10),
+                                "endDate": "$time",
+                                "unit": "millisecond",
+                            },
+                        },
+                    },
+                },
+            ])
+            .toArray();
         assert.eq(res.length, 3, res);
         assert.docEq(res[0], {_id: 0, "t": 110}, res);
         assert.docEq(res[1], {_id: 1, "t": 210}, res);
@@ -402,167 +419,164 @@ TimeseriesTest.run((insert) => {
     }
 
     {
-        const res = coll.aggregate([
-                            {
-                                $addFields: {
-                                    "computedField": {
-                                        $dateTrunc: {
-                                            date: "$time",
-                                            unit: "second",
-                                        }
-                                    }
-                                }
+        const res = coll
+            .aggregate([
+                {
+                    $addFields: {
+                        "computedField": {
+                            $dateTrunc: {
+                                date: "$time",
+                                unit: "second",
                             },
-                            {$match: {computedField: new Date(datePrefix - 440)}},
-                            {$count: "count"}
-                        ])
-                        .toArray();
+                        },
+                    },
+                },
+                {$match: {computedField: new Date(datePrefix - 440)}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 3, res);
     }
 
     {
-        const res = coll.aggregate([{$match: {topLevelScalar: {$exists: true}}}, {$count: "count"}])
-                        .toArray();
+        const res = coll.aggregate([{$match: {topLevelScalar: {$exists: true}}}, {$count: "count"}]).toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res =
-            coll.aggregate([{$match: {topLevelScalar: {$lt: 456}}}, {$count: "count"}]).toArray();
+        const res = coll.aggregate([{$match: {topLevelScalar: {$lt: 456}}}, {$count: "count"}]).toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
 
     {
-        const res =
-            coll.aggregate([{$match: {topLevelScalar: {$lte: 456}}}, {$count: "count"}]).toArray();
+        const res = coll.aggregate([{$match: {topLevelScalar: {$lte: 456}}}, {$count: "count"}]).toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res =
-            coll.aggregate([{$match: {topLevelScalar: {$gt: 123}}}, {$count: "count"}]).toArray();
+        const res = coll.aggregate([{$match: {topLevelScalar: {$gt: 123}}}, {$count: "count"}]).toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
 
     {
-        const res =
-            coll.aggregate([{$match: {topLevelScalar: {$gte: 123}}}, {$count: "count"}]).toArray();
+        const res = coll.aggregate([{$match: {topLevelScalar: {$gte: 123}}}, {$count: "count"}]).toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res =
-            coll.aggregate([{$match: {topLevelScalar: {$eq: 123}}}, {$count: "count"}]).toArray();
+        const res = coll.aggregate([{$match: {topLevelScalar: {$eq: 123}}}, {$count: "count"}]).toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
 
     {
-        const res =
-            coll.aggregate([{$match: {topLevelScalar: {$ne: 123}}}, {$count: "count"}]).toArray();
+        const res = coll.aggregate([{$match: {topLevelScalar: {$ne: 123}}}, {$count: "count"}]).toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res = coll.aggregate([
-                            {
-                                $match: {
-                                    $or: [
-                                        {"topLevelScalar": 123},
-                                        {"topLevelScalar": 456},
-                                    ]
-                                }
-                            },
-                            {$count: "count"}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {
+                    $match: {
+                        $or: [{"topLevelScalar": 123}, {"topLevelScalar": 456}],
+                    },
+                },
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res = coll.aggregate([
-                            {$addFields: {"computedField": {$and: ["$topLevelScalar", true]}}},
-                            {$match: {computedField: true}},
-                            {$count: "count"}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"computedField": {$and: ["$topLevelScalar", true]}}},
+                {$match: {computedField: true}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res = coll.aggregate([
-                            {$addFields: {"computedField": {$and: ["$topLevelScalar", "$obj.a"]}}},
-                            {$match: {computedField: true}},
-                            {$count: "count"}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"computedField": {$and: ["$topLevelScalar", "$obj.a"]}}},
+                {$match: {computedField: true}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res = coll.aggregate([
-                            {$addFields: {"computedField": {$or: ["$topLevelScalar", false]}}},
-                            {$match: {computedField: true}},
-                            {$count: "count"}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"computedField": {$or: ["$topLevelScalar", false]}}},
+                {$match: {computedField: true}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res = coll.aggregate([
-                            {$addFields: {"computedField": {$or: ["$topLevelScalar", "$obj.a"]}}},
-                            {$match: {computedField: true}},
-                            {$count: "count"}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"computedField": {$or: ["$topLevelScalar", "$obj.a"]}}},
+                {$match: {computedField: true}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res = coll.aggregate([
-                            {$addFields: {"computedField": {$not: ["$topLevelScalar"]}}},
-                            {$match: {computedField: true}},
-                            {$count: "count"}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"computedField": {$not: ["$topLevelScalar"]}}},
+                {$match: {computedField: true}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
 
     {
-        const res =
-            coll.aggregate([
-                    {$addFields: {"computedField": {$anyElementTrue: [["$topLevelScalar"]]}}},
-                    {$match: {computedField: true}},
-                    {$count: "count"}
-                ])
-                .toArray();
+        const res = coll
+            .aggregate([
+                {$addFields: {"computedField": {$anyElementTrue: [["$topLevelScalar"]]}}},
+                {$match: {computedField: true}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
     }
 
     {
-        const res =
-            coll.aggregate([
-                    {$match: {length: {$ne: 0}}},
-                    {$set: {"computedA": {$multiply: ["$topLevelScalar", "$topLevelScalar"]}}},
-                    {$addFields: {"ratio": {$divide: ["$computedA", "$length"]}}},
-                    {$match: {ratio: {$gt: 0}}},
-                ])
-                .toArray();
+        const res = coll
+            .aggregate([
+                {$match: {length: {$ne: 0}}},
+                {$set: {"computedA": {$multiply: ["$topLevelScalar", "$topLevelScalar"]}}},
+                {$addFields: {"ratio": {$divide: ["$computedA", "$length"]}}},
+                {$match: {ratio: {$gt: 0}}},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0]._id, 1, res);
     }
@@ -575,8 +589,8 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "value": {$sum: "$computedA"},
-                }
-            }
+                },
+            },
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -590,8 +604,8 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "value": {$sum: "$computedA"},
-                }
-            }
+                },
+            },
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -605,8 +619,8 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "value": {$sum: "$computedA"},
-                }
-            }
+                },
+            },
         ];
 
         assert.throws(() => coll.aggregate(pipeline));
@@ -619,8 +633,8 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "value": {$sum: "$computedA"},
-                }
-            }
+                },
+            },
         ];
 
         assert.throws(() => coll.aggregate(pipeline));
@@ -634,8 +648,8 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "value": {$sum: "$computedA"},
-                }
-            }
+                },
+            },
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -649,8 +663,8 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "value": {$sum: "$computedA"},
-                }
-            }
+                },
+            },
         ];
 
         const res = coll.aggregate(pipeline).toArray();
@@ -664,8 +678,8 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "value": {$sum: "$computedA"},
-                }
-            }
+                },
+            },
         ];
 
         assert.throws(() => coll.aggregate(pipeline));
@@ -678,8 +692,8 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
                     "value": {$sum: "$computedA"},
-                }
-            }
+                },
+            },
         ];
 
         assert.throws(() => coll.aggregate(pipeline));
@@ -692,13 +706,15 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {$dateTrunc: {"date": "$time", "unit": "minute"}},
                     "total1": {$sum: "$md"},
-                    "total2": {$sum: "$topLevelScalar"}
-                }
-            }
+                    "total2": {$sum: "$topLevelScalar"},
+                },
+            },
         ];
 
-        assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 4, "total2": 579}],
-                     coll.aggregate(pipeline).toArray());
+        assert.docEq(
+            [{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 4, "total2": 579}],
+            coll.aggregate(pipeline).toArray(),
+        );
     }
 
     {
@@ -708,13 +724,15 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {$dateTrunc: {"date": "$time", "unit": "minute"}},
                     "total1": {$sum: "$md"},
-                    "total2": {$sum: "$topLevelScalar"}
-                }
-            }
+                    "total2": {$sum: "$topLevelScalar"},
+                },
+            },
         ];
 
-        assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 52, "total2": 579}],
-                     coll.aggregate(pipeline).toArray());
+        assert.docEq(
+            [{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 52, "total2": 579}],
+            coll.aggregate(pipeline).toArray(),
+        );
     }
 
     {
@@ -724,13 +742,15 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {$dateTrunc: {"date": "$time", "unit": "minute"}},
                     "total1": {$sum: "$md"},
-                    "total2": {$sum: "$topLevelScalar"}
-                }
-            }
+                    "total2": {$sum: "$topLevelScalar"},
+                },
+            },
         ];
 
-        assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 0, "total2": 579}],
-                     coll.aggregate(pipeline).toArray());
+        assert.docEq(
+            [{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 0, "total2": 579}],
+            coll.aggregate(pipeline).toArray(),
+        );
     }
 
     {
@@ -741,13 +761,15 @@ TimeseriesTest.run((insert) => {
                 $group: {
                     "_id": {$dateTrunc: {"date": "$time", "unit": "minute"}},
                     "total1": {$sum: "$md"},
-                    "total2": {$sum: "$topLevelScalar"}
-                }
-            }
+                    "total2": {$sum: "$topLevelScalar"},
+                },
+            },
         ];
 
-        assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 1, "total2": 456}],
-                     coll.aggregate(pipeline).toArray());
+        assert.docEq(
+            [{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 1, "total2": 456}],
+            coll.aggregate(pipeline).toArray(),
+        );
     }
     {
         let pipeline = [{$match: {topLevelLargeNumber: {$mod: [1, 0]}}}, {$count: "count"}];
@@ -758,44 +780,42 @@ TimeseriesTest.run((insert) => {
         assert.eq(res[0].count, 1, res);
     }
     {
-        const res =
-            coll.aggregate([
-                    {
-                        $addFields: {
-                            "computedField":
-                                {$dateAdd: {startDate: "$time", unit: "millisecond", amount: 100}}
-                        }
+        const res = coll
+            .aggregate([
+                {
+                    $addFields: {
+                        "computedField": {$dateAdd: {startDate: "$time", unit: "millisecond", amount: 100}},
                     },
-                    {$match: {computedField: new Date(datePrefix + 400)}},
-                    {$count: "count"}
-                ])
-                .toArray();
+                },
+                {$match: {computedField: new Date(datePrefix + 400)}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
 
     {
-        const res = coll.aggregate([
-                            {
-                                $addFields: {
-                                    "computedField": {
-                                        $dateSubtract:
-                                            {startDate: "$time", unit: "millisecond", amount: 100}
-                                    }
-                                }
-                            },
-                            {$match: {computedField: new Date(datePrefix)}},
-                            {$count: "count"}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {
+                    $addFields: {
+                        "computedField": {
+                            $dateSubtract: {startDate: "$time", unit: "millisecond", amount: 100},
+                        },
+                    },
+                },
+                {$match: {computedField: new Date(datePrefix)}},
+                {$count: "count"},
+            ])
+            .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
     }
 
     {
         // Test the case where a computed meta field is computed to missing.
-        const res =
-            coll.aggregate([{"$project": {"_id": 0, [metaFieldName]: "$$REMOVE"}}]).toArray();
+        const res = coll.aggregate([{"$project": {"_id": 0, [metaFieldName]: "$$REMOVE"}}]).toArray();
         assert.eq(res.length, coll.count(), res);
         for (let doc of res) {
             assert.eq(doc, {}, res);
@@ -805,23 +825,25 @@ TimeseriesTest.run((insert) => {
     {
         // Test the case where a computed meta field is computed to missing because of a project
         // out.
-        const res = coll.aggregate([
-                            {"$project": {[metaFieldName]: 0}},
-                            {"$project": {[metaFieldName]: "$" + metaFieldName}},
-                            {$match: {a: 1}}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {"$project": {[metaFieldName]: 0}},
+                {"$project": {[metaFieldName]: "$" + metaFieldName}},
+                {$match: {a: 1}},
+            ])
+            .toArray();
         assert.eq(res.length, 0, res);
     }
 
     {
         // Test the case where a field is projected out and then projected back in.
-        const res = coll.aggregate([
-                            {"$project": {"_id": 0, [metaFieldName]: 1}},
-                            {"$project": {"_id": 0, [timeFieldName]: "$" + timeFieldName}},
-                            {"$project": {"_id": 1, [timeFieldName]: 1}}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {"$project": {"_id": 0, [metaFieldName]: 1}},
+                {"$project": {"_id": 0, [timeFieldName]: "$" + timeFieldName}},
+                {"$project": {"_id": 1, [timeFieldName]: 1}},
+            ])
+            .toArray();
         assert.eq(res.length, coll.count(), res);
         for (let doc of res) {
             assert.eq(doc, {}, res);
@@ -830,11 +852,9 @@ TimeseriesTest.run((insert) => {
 
     {
         // Test the case where a field is projected out and then projected back in.
-        const res = coll.aggregate([
-                            {"$project": {"_id": 0, [metaFieldName]: 1}},
-                            {"$project": {"_id": 0, [timeFieldName]: 1}}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([{"$project": {"_id": 0, [metaFieldName]: 1}}, {"$project": {"_id": 0, [timeFieldName]: 1}}])
+            .toArray();
         assert.eq(res.length, coll.count(), res);
         for (let doc of res) {
             assert.eq(doc, {}, res);
@@ -843,12 +863,13 @@ TimeseriesTest.run((insert) => {
 
     {
         // Test the case where a field is projected out and then projected back in.
-        const res = coll.aggregate([
-                            {"$project": {"_id": 0, [metaFieldName]: 0}},
-                            {"$project": {"_id": 0, [metaFieldName]: 1}},
-                            {"$project": {"_id": 0, [timeFieldName]: 1}}
-                        ])
-                        .toArray();
+        const res = coll
+            .aggregate([
+                {"$project": {"_id": 0, [metaFieldName]: 0}},
+                {"$project": {"_id": 0, [metaFieldName]: 1}},
+                {"$project": {"_id": 0, [timeFieldName]: 1}},
+            ])
+            .toArray();
         assert.eq(res.length, coll.count(), res);
         for (let doc of res) {
             assert.eq(doc, {}, res);

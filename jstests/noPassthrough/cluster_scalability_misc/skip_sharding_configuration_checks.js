@@ -11,7 +11,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function expectState(rst, state) {
-    assert.soon(function() {
+    assert.soon(function () {
         var status = rst.status();
         if (status.myState != state) {
             print("Waiting for state " + state + " in replSetGetStatus output: " + tojson(status));
@@ -20,11 +20,9 @@ function expectState(rst, state) {
     });
 }
 
-assert.throws(() => MongoRunner.runMongod(
-                  {configsvr: "", setParameter: 'skipShardingConfigurationChecks=true'}));
+assert.throws(() => MongoRunner.runMongod({configsvr: "", setParameter: "skipShardingConfigurationChecks=true"}));
 
-assert.throws(() => MongoRunner.runMongod(
-                  {shardsvr: "", setParameter: 'skipShardingConfigurationChecks=true'}));
+assert.throws(() => MongoRunner.runMongod({shardsvr: "", setParameter: "skipShardingConfigurationChecks=true"}));
 
 var st = new ShardingTest({name: "skipConfig", shards: {rs0: {nodes: 1}}});
 var configRS = st.configRS;
@@ -37,7 +35,7 @@ jsTestLog("Restarting configRS as a standalone ReplicaSet");
 
 for (let i = 0; i < configRS.nodes.length; i++) {
     delete configRS.nodes[i].fullOptions.configsvr;
-    configRS.nodes[i].fullOptions.setParameter = 'skipShardingConfigurationChecks=true';
+    configRS.nodes[i].fullOptions.setParameter = "skipShardingConfigurationChecks=true";
 }
 configRS.startSet({}, true);
 expectState(configRS, ReplSetTest.State.PRIMARY);
@@ -46,7 +44,7 @@ configRS.stopSet();
 jsTestLog("Restarting shardRS as a standalone ReplicaSet");
 for (let i = 0; i < shardRS.nodes.length; i++) {
     delete shardRS.nodes[i].fullOptions.shardsvr;
-    shardRS.nodes[i].fullOptions.setParameter = 'skipShardingConfigurationChecks=true';
+    shardRS.nodes[i].fullOptions.setParameter = "skipShardingConfigurationChecks=true";
 }
 shardRS.startSet({}, true);
 expectState(shardRS, ReplSetTest.State.PRIMARY);

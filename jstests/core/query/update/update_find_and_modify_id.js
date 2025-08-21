@@ -6,7 +6,7 @@
 const t = db[jsTestName()];
 const startingDoc = {
     _id: 1,
-    a: 1
+    a: 1,
 };
 
 function prepare() {
@@ -37,7 +37,7 @@ function update_fails(updateDoc, qid) {
     assert.eq(t.findOne(), startingDoc);
 
     prepare();
-    assert.throws(function() {
+    assert.throws(function () {
         t.findAndModify({query: {_id: qid}, update: updateDoc, upsert: true});
     });
     assert.eq(t.count(), 1);

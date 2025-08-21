@@ -3,8 +3,7 @@
  */
 const coll = db.all_elements_true;
 coll.drop();
-assert.commandWorked(
-    coll.insert({_id: 0, allTrue: [true, true], someTrue: [true, false], noneTrue: [0, false]}));
+assert.commandWorked(coll.insert({_id: 0, allTrue: [true, true], someTrue: [true, false], noneTrue: [0, false]}));
 
 function testOp(expression, expected) {
     const results = coll.aggregate([{$project: {_id: 0, result: expression}}]).toArray();

@@ -3,8 +3,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var rst = new ReplSetTest(
-    {name: "configRS", nodes: 3, nodeOptions: {configsvr: "", storageEngine: "wiredTiger"}});
+var rst = new ReplSetTest({name: "configRS", nodes: 3, nodeOptions: {configsvr: "", storageEngine: "wiredTiger"}});
 rst.startSet();
 var conf = rst.getReplSetConfig();
 conf.members[1].priority = 0;
@@ -12,12 +11,12 @@ conf.members[2].priority = 0;
 conf.writeConcernMajorityJournalDefault = true;
 rst.initiate(conf);
 
-var seedList = rst.name + "/" + rst.nodes[1].host;  // node 1 is guaranteed to not be primary
+var seedList = rst.name + "/" + rst.nodes[1].host; // node 1 is guaranteed to not be primary
 {
     // Ensure that mongos can start up when given the CSRS secondary, discover the primary, and
     // perform writes to the config servers.
     var mongos = MongoRunner.runMongos({configdb: seedList});
-    var admin = mongos.getDB('admin');
+    var admin = mongos.getDB("admin");
     assert.commandWorked(admin.foo.insert({a: 1}));
     assert.eq(1, admin.foo.findOne().a);
     MongoRunner.stopMongos(mongos);
@@ -38,7 +37,7 @@ var mongos = MongoRunner.runMongos({configdb: seedList});
 // config server
 rst.stop(1);
 
-var admin = mongos.getDB('admin');
+var admin = mongos.getDB("admin");
 mongos.setSecondaryOk();
 assert.eq(1, admin.foo.findOne().a);
 MongoRunner.stopMongos(mongos);

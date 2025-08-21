@@ -10,52 +10,59 @@ const cachedParamValue = assert.commandWorked(db.adminCommand({getParameter: 1, 
 
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(coll.insertMany([
-    {m: []},
-    {m: [[]]},
-    {m: [[[]]]},
-    {a: 1, m: [1]},
-    {a: 2, m: [1, 2, 3]},
-    {m: [1, 2]},
-    {m: [2]},
-    {m: [5, 2, 3, 6]},
-    {m: [5, 2, 1, 3, 6]},
-    {m: [4, 5, 6, 10]},
-    {m: [4, 5, 6, null, 10]},
-    {m: [null, null, null]},
-    // Nested array cases.
-    {m: [[1]]},
-    {m: [[[1]]]},
-    {m: [[2]]},
-    {m: [[1, 2]]},
-    {m: [[[1, 2]]]},
-    {m: [[1, 2, 3, 4]]},
-    {m: [[1, 2, 3, 4], [1, 2]]},
-    {m: [[2, 1]]},
-    {m: [[1], [2]]},
-    {m: [[[1]], [[2]]]},
-    {m: [[[1], [2]]]},
-    {m: [[null], null]},
-    {m: [[[null]]]},
-    // Object cases
-    {m: [{}]},
-    {m: [[{}]]},
-    {m: [{a: 1}]},
-    {m: [[{a: 1}]]},
-    {m: [{a: [1]}]},
-    {m: [{a: []}]},
-    {m: [{a: null}]},
-    {m: [{a: {}}]},
-    {m: [{a: 1, b: 1}]},
-    // String & regex
-    {m: ["a", "b", "c"]},
-    {m: ["abc"]},
-    {m: ["ghi", "abc", "def"]},
-    {m: ["aBC"]},
-    {m: ["ABC"]},
-    {m: [/abc/]},
-    {m: [/a/]}
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {m: []},
+        {m: [[]]},
+        {m: [[[]]]},
+        {a: 1, m: [1]},
+        {a: 2, m: [1, 2, 3]},
+        {m: [1, 2]},
+        {m: [2]},
+        {m: [5, 2, 3, 6]},
+        {m: [5, 2, 1, 3, 6]},
+        {m: [4, 5, 6, 10]},
+        {m: [4, 5, 6, null, 10]},
+        {m: [null, null, null]},
+        // Nested array cases.
+        {m: [[1]]},
+        {m: [[[1]]]},
+        {m: [[2]]},
+        {m: [[1, 2]]},
+        {m: [[[1, 2]]]},
+        {m: [[1, 2, 3, 4]]},
+        {
+            m: [
+                [1, 2, 3, 4],
+                [1, 2],
+            ],
+        },
+        {m: [[2, 1]]},
+        {m: [[1], [2]]},
+        {m: [[[1]], [[2]]]},
+        {m: [[[1], [2]]]},
+        {m: [[null], null]},
+        {m: [[[null]]]},
+        // Object cases
+        {m: [{}]},
+        {m: [[{}]]},
+        {m: [{a: 1}]},
+        {m: [[{a: 1}]]},
+        {m: [{a: [1]}]},
+        {m: [{a: []}]},
+        {m: [{a: null}]},
+        {m: [{a: {}}]},
+        {m: [{a: 1, b: 1}]},
+        // String & regex
+        {m: ["a", "b", "c"]},
+        {m: ["abc"]},
+        {m: ["ghi", "abc", "def"]},
+        {m: ["aBC"]},
+        {m: ["ABC"]},
+        {m: [/abc/]},
+        {m: [/a/]},
+    ]),
+);
 
 assert.commandWorked(coll.createIndex({m: 1}));
 assert.commandWorked(coll.createIndex({"m.a": 1}));
@@ -138,12 +145,9 @@ try {
     validateResultsSame({$expr: {$in: [[/abc/], "$m"]}});
     validateResultsSame({$expr: {$or: [{$in: [1, "$m"]}]}});
     validateResultsSame({$expr: {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}});
-    validateResultsSame(
-        {$expr: {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}, {$in: ["$a", [1, 2, 10]]}]}});
-    validateResultsSame(
-        {$expr: {$and: [{$in: ["$a", [1, 2]]}, {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}]}});
-    validateResultsSame(
-        {$expr: {$and: [{$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}, {$in: ["$a", [null]]}]}});
+    validateResultsSame({$expr: {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}, {$in: ["$a", [1, 2, 10]]}]}});
+    validateResultsSame({$expr: {$and: [{$in: ["$a", [1, 2]]}, {$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}]}});
+    validateResultsSame({$expr: {$and: [{$or: [{$in: [1, "$m"]}, {$in: [2, "$m"]}]}, {$in: ["$a", [null]]}]}});
 
     // Tests for "$m.a".
     validateResultsSame({$expr: {$in: [1, "$m.a"]}});
@@ -164,8 +168,6 @@ try {
     // Note: this won't fail with an IXSCAN, but will with a COLLSCAN.
     // We accept this because we have precedent.
     // validateError({$expr: {$in: [1, "$m"]}});
-
 } finally {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, [paramName]: cachedParamValue[paramName]}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, [paramName]: cachedParamValue[paramName]}));
 }

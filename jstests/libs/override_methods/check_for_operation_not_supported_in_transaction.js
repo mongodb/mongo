@@ -9,13 +9,22 @@ import {includesErrorCode} from "jstests/libs/error_code_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 function runCommandCheckForOperationNotSupportedInTransaction(
-    conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+    conn,
+    dbName,
+    commandName,
+    commandObj,
+    func,
+    makeFuncArgs,
+) {
     let res = func.apply(conn, makeFuncArgs(commandObj));
-    const isTransient = (res.errorLabels && res.errorLabels.includes('TransientTransactionError') &&
-                         !includesErrorCode(res, ErrorCodes.NoSuchTransaction));
+    const isTransient =
+        res.errorLabels &&
+        res.errorLabels.includes("TransientTransactionError") &&
+        !includesErrorCode(res, ErrorCodes.NoSuchTransaction);
 
-    const isNotSupported = (includesErrorCode(res, ErrorCodes.OperationNotSupportedInTransaction) ||
-                            includesErrorCode(res, ErrorCodes.InvalidOptions));
+    const isNotSupported =
+        includesErrorCode(res, ErrorCodes.OperationNotSupportedInTransaction) ||
+        includesErrorCode(res, ErrorCodes.InvalidOptions);
 
     if (isTransient || isNotSupported) {
         // Generate an exception, store some info for fsm.js to inspect, and rethrow.
@@ -32,6 +41,7 @@ function runCommandCheckForOperationNotSupportedInTransaction(
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/check_for_operation_not_supported_in_transaction.js");
+    "jstests/libs/override_methods/check_for_operation_not_supported_in_transaction.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandCheckForOperationNotSupportedInTransaction);

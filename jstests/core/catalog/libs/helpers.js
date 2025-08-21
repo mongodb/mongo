@@ -11,8 +11,7 @@ export function getListCollectionsCursor(connToDb, options = {}, subsequentBatch
         options.filter = {name: {$ne: "system.profile"}};
     }
 
-    return new DBCommandCursor(
-        connToDb, connToDb.runCommand("listCollections", options), subsequentBatchSize);
+    return new DBCommandCursor(connToDb, connToDb.runCommand("listCollections", options), subsequentBatchSize);
 }
 
 // Exhausts the passed in cursor and counts the number of items matching the specified predicate.

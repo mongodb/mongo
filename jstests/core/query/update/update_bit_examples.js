@@ -30,7 +30,6 @@ assert.writeError(coll.update({}, {$bit: {a: {}}}));
 
 // Make sure $bit on index arrays 9 and 10 when padding is needed works.
 assert.commandWorked(coll.insert({_id: 2, a: [0]}));
-assert.commandWorked(
-    coll.update({_id: 2}, {$bit: {"a.9": {or: NumberInt(0)}, "a.10": {or: NumberInt(0)}}}));
+assert.commandWorked(coll.update({_id: 2}, {$bit: {"a.9": {or: NumberInt(0)}, "a.10": {or: NumberInt(0)}}}));
 res = coll.find({_id: 2}).toArray();
 assert.eq(res[0]["a"], [0, null, null, null, null, null, null, null, null, 0, 0]);

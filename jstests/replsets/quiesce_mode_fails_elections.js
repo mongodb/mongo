@@ -8,7 +8,7 @@ const rst = new ReplSetTest({
     name: jsTestName(),
     nodes: 3,
     // Override the quiesce period.
-    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"}
+    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"},
 });
 
 rst.startSet();
@@ -19,13 +19,11 @@ const primary = rst.getPrimary();
 const secondary = rst.getSecondaries()[0];
 const primaryDB = primary.getDB(dbName);
 
-assert.commandWorked(
-    primaryDB.coll.insert([{_id: 0, data: "initial data"}], {writeConcern: {w: "majority"}}));
+assert.commandWorked(primaryDB.coll.insert([{_id: 0, data: "initial data"}], {writeConcern: {w: "majority"}}));
 rst.awaitReplication();
 
 jsTestLog("Make the secondary hang before processing real election vote result.");
-let voteRequestCompleteFailPoint =
-    configureFailPoint(secondary, "hangBeforeOnVoteRequestCompleteCallback");
+let voteRequestCompleteFailPoint = configureFailPoint(secondary, "hangBeforeOnVoteRequestCompleteCallback");
 
 jsTestLog("Stepping up the secondary.");
 const awaitStepUp = startParallelShell(() => {

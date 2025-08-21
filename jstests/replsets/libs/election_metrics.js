@@ -9,11 +9,8 @@
  */
 export function verifyServerStatusElectionReasonCounterValue(electionMetrics, fieldName, value) {
     const field = electionMetrics[fieldName];
-    assert.eq(
-        field["called"], value, `expected the 'called' field of '${fieldName}' to be ${value}`);
-    assert.eq(field["successful"],
-              value,
-              `expected the 'successful' field of '${fieldName}' to be ${value}`);
+    assert.eq(field["called"], value, `expected the 'called' field of '${fieldName}' to be ${value}`);
+    assert.eq(field["successful"], value, `expected the 'successful' field of '${fieldName}' to be ${value}`);
 }
 
 /**
@@ -23,12 +20,14 @@ export function verifyServerStatusElectionReasonCounterValue(electionMetrics, fi
  * The 'expectedNumSuccessful' field should be passed in when we need to distinguish between how
  * many times an election was called and how many times an election was successful.
  */
-export function verifyServerStatusElectionReasonCounterChange(initialElectionMetrics,
-                                                              newElectionMetrics,
-                                                              fieldName,
-                                                              expectedNumCalled,
-                                                              expectedNumSuccessful = undefined,
-                                                              allowGreater = false) {
+export function verifyServerStatusElectionReasonCounterChange(
+    initialElectionMetrics,
+    newElectionMetrics,
+    fieldName,
+    expectedNumCalled,
+    expectedNumSuccessful = undefined,
+    allowGreater = false,
+) {
     // If 'expectedNumSuccessful' is not passed in, we assume that the 'successful' field is equal
     // to the 'called' field.
     if (!expectedNumSuccessful) {
@@ -38,7 +37,7 @@ export function verifyServerStatusElectionReasonCounterChange(initialElectionMet
     const initialField = initialElectionMetrics[fieldName];
     const newField = newElectionMetrics[fieldName];
 
-    const assertFunc = function(expected, actual, msg) {
+    const assertFunc = function (expected, actual, msg) {
         if (allowGreater) {
             assert.lte(expected, actual, msg);
         } else {
@@ -46,22 +45,27 @@ export function verifyServerStatusElectionReasonCounterChange(initialElectionMet
         }
     };
 
-    assertFunc(initialField["called"] + expectedNumCalled,
-               newField["called"],
-               `expected the 'called' field of '${fieldName}' to increase by ${expectedNumCalled}`);
-    assertFunc(initialField["successful"] + expectedNumSuccessful,
-               newField["successful"],
-               `expected the 'successful' field of '${fieldName}' to increase by ${
-                   expectedNumSuccessful}`);
+    assertFunc(
+        initialField["called"] + expectedNumCalled,
+        newField["called"],
+        `expected the 'called' field of '${fieldName}' to increase by ${expectedNumCalled}`,
+    );
+    assertFunc(
+        initialField["successful"] + expectedNumSuccessful,
+        newField["successful"],
+        `expected the 'successful' field of '${fieldName}' to increase by ${expectedNumSuccessful}`,
+    );
 }
 
 /**
  * Verifies that the given field in serverStatus is incremented in the way we expect.
  */
 export function verifyServerStatusChange(initialStatus, newStatus, fieldName, expectedIncrement) {
-    assert.eq(initialStatus[fieldName] + expectedIncrement,
-              newStatus[fieldName],
-              `expected '${fieldName}' to increase by ${expectedIncrement}`);
+    assert.eq(
+        initialStatus[fieldName] + expectedIncrement,
+        newStatus[fieldName],
+        `expected '${fieldName}' to increase by ${expectedIncrement}`,
+    );
 }
 
 /**
@@ -76,17 +80,14 @@ export function verifyCatchUpConclusionReason(initialStatus, newStatus, fieldNam
         "numCatchUpsTimedOut",
         "numCatchUpsFailedWithError",
         "numCatchUpsFailedWithNewTerm",
-        "numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd"
+        "numCatchUpsFailedWithReplSetAbortPrimaryCatchUpCmd",
     ];
 
-    catchUpConclusionMetrics.forEach(function(metric) {
+    catchUpConclusionMetrics.forEach(function (metric) {
         if (metric === fieldName) {
-            assert.eq(initialStatus[metric] + 1,
-                      newStatus[metric],
-                      `expected '${metric}' to increase by 1`);
+            assert.eq(initialStatus[metric] + 1, newStatus[metric], `expected '${metric}' to increase by 1`);
         } else {
-            assert.eq(
-                initialStatus[metric], newStatus[metric], `did not expect '${metric}' to increase`);
+            assert.eq(initialStatus[metric], newStatus[metric], `did not expect '${metric}' to increase`);
         }
     });
 }

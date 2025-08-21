@@ -11,29 +11,31 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
  * 7. Migrate only chunk back to original shard.
  * 8. Retry writes.
  */
-export var testMoveChunkWithSession = function(st,
-                                               collName,
-                                               cmdObj,
-                                               setupFunc,
-                                               checkRetryResultFunc,
-                                               checkDocumentsFunc,
-                                               useAdminCommand = false) {
-    var ns = 'test.' + collName;
-    var testDB = st.s.getDB('test');
+export var testMoveChunkWithSession = function (
+    st,
+    collName,
+    cmdObj,
+    setupFunc,
+    checkRetryResultFunc,
+    checkDocumentsFunc,
+    useAdminCommand = false,
+) {
+    var ns = "test." + collName;
+    var testDB = st.s.getDB("test");
     var coll = testDB.getCollection(collName);
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
     setupFunc(coll);
-    var result = assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj)
-                                                      : testDB.runCommand(cmdObj));
+    var result = assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj));
 
     jsTestLog("MOVECHUNK");
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
 
-    checkRetryResultFunc(result,
-                         assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj)
-                                                              : testDB.runCommand(cmdObj)));
+    checkRetryResultFunc(
+        result,
+        assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj)),
+    );
     checkDocumentsFunc(coll);
 
     const secondary = st.rs1.getSecondary();
@@ -44,18 +46,19 @@ export var testMoveChunkWithSession = function(st,
         awaitRSClientHosts(conn, {host: st.rs1.getPrimary().host}, {ok: true, ismaster: true});
     });
 
-    checkRetryResultFunc(result,
-                         assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj)
-                                                              : testDB.runCommand(cmdObj)));
+    checkRetryResultFunc(
+        result,
+        assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj)),
+    );
     checkDocumentsFunc(coll);
 
     // Make sure that the other shard knows about the latest primary.
-    awaitRSClientHosts(
-        st.rs0.getPrimary(), {host: st.rs1.getPrimary().host}, {ok: true, ismaster: true});
+    awaitRSClientHosts(st.rs0.getPrimary(), {host: st.rs1.getPrimary().host}, {ok: true, ismaster: true});
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard0.shardName}));
 
-    checkRetryResultFunc(result,
-                         assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj)
-                                                              : testDB.runCommand(cmdObj)));
+    checkRetryResultFunc(
+        result,
+        assert.commandWorked(useAdminCommand ? st.s.adminCommand(cmdObj) : testDB.runCommand(cmdObj)),
+    );
     checkDocumentsFunc(coll);
 };

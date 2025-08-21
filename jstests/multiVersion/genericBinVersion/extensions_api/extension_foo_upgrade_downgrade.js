@@ -38,12 +38,8 @@ import "jstests/multiVersion/libs/multi_cluster.js";
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
-import {
-    testPerformReplSetRollingRestart
-} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
-import {
-    testPerformShardedClusterRollingRestart
-} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
+import {testPerformReplSetRollingRestart} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
+import {testPerformShardedClusterRollingRestart} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 if (!isLinux()) {
     jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");
@@ -56,17 +52,21 @@ const pathToExtensionFooV2 = MongoRunner.getExtensionPath("libfoo_extension_v2.s
 const collName = jsTestName();
 const viewName = "foo_view";
 const getDB = (primaryConnection) => primaryConnection.getDB(jsTestName());
-const data = [{_id: 0, test: "a"}, {_id: 1, test: "b"}, {_id: 2, test: "c"}];
+const data = [
+    {_id: 0, test: "a"},
+    {_id: 1, test: "b"},
+    {_id: 2, test: "c"},
+];
 
 const fooParseErrorCodes = [10624200, 10624201];
 
 export const fooV1Options = {
     loadExtensions: [pathToExtensionFoo],
-    setParameter: {featureFlagExtensionsAPI: true}
+    setParameter: {featureFlagExtensionsAPI: true},
 };
 export const fooV2Options = {
     loadExtensions: [pathToExtensionFooV2],
-    setParameter: {featureFlagExtensionsAPI: true}
+    setParameter: {featureFlagExtensionsAPI: true},
 };
 
 export function setupCollection(primaryConn, shardingTest = null) {
@@ -86,7 +86,8 @@ export function assertFooStageAcceptedV1Only(primaryConn) {
     // $testFoo in v1 should reject a non-empty stage definition.
     assert.commandFailedWithCode(
         db.runCommand({aggregate: collName, pipeline: [{$testFoo: {nonEmpty: true}}], cursor: {}}),
-        fooParseErrorCodes);
+        fooParseErrorCodes,
+    );
 
     // $testFoo with empty stage definition is accepted in a plain aggregation command.
     const result = db.runCommand({aggregate: collName, pipeline: [{$testFoo: {}}], cursor: {}});
@@ -96,7 +97,8 @@ export function assertFooStageAcceptedV1Only(primaryConn) {
     // $testFoo with empty stage definition is accepted in a view pipeline.
     assert.commandWorked(db.createView(viewName, collName, [{$testFoo: {}}]));
     const viewResult = assert.commandWorked(
-        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}));
+        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}),
+    );
     assertArrayEq({actual: viewResult.cursor.firstBatch, expected: [data[0]]});
 }
 
@@ -110,23 +112,22 @@ export function assertFooStageAcceptedV1AndV2(primaryConn) {
     assertArrayEq({actual: result.cursor.firstBatch, expected: data});
 
     // $testFoo V2 now accepts a non-empty stage definition.
-    result =
-        db.runCommand({aggregate: collName, pipeline: [{$testFoo: {nonEmpty: true}}], cursor: {}});
+    result = db.runCommand({aggregate: collName, pipeline: [{$testFoo: {nonEmpty: true}}], cursor: {}});
     assert.commandWorked(result);
     assertArrayEq({actual: result.cursor.firstBatch, expected: data});
 
     // $testFoo with empty stage definition is accepted in a view pipeline.
     assert.commandWorked(db.createView(viewName, collName, [{$testFoo: {}}]));
     let viewResult = assert.commandWorked(
-        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}));
+        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}),
+    );
     assertArrayEq({actual: viewResult.cursor.firstBatch, expected: [data[0]]});
 
     db[viewName].drop();
 
     // $testFoo with a non-empty stage definition is now accepted in a view pipeline.
     assert.commandWorked(db.createView(viewName, collName, [{$testFoo: {nonEmpty: true}}]));
-    viewResult = assert.commandWorked(
-        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}));
+    viewResult = assert.commandWorked(db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}));
     assertArrayEq({actual: viewResult.cursor.firstBatch, expected: [data[0]]});
 }
 
@@ -137,7 +138,8 @@ function assertFooStageAcceptedV1OnlyPlusV2ViewCreation(primaryConn) {
     // $testFoo should reject a non-empty stage definition in an aggregation command.
     assert.commandFailedWithCode(
         db.runCommand({aggregate: collName, pipeline: [{$testFoo: {nonEmpty: true}}], cursor: {}}),
-        fooParseErrorCodes);
+        fooParseErrorCodes,
+    );
 
     // $testFoo with empty stage definition is accepted in a plain aggregation command.
     const result = db.runCommand({aggregate: collName, pipeline: [{$testFoo: {}}], cursor: {}});
@@ -147,7 +149,8 @@ function assertFooStageAcceptedV1OnlyPlusV2ViewCreation(primaryConn) {
     // $testFoo with empty stage definition is accepted in a view pipeline.
     assert.commandWorked(db.createView(viewName, collName, [{$testFoo: {}}]));
     const viewResult = assert.commandWorked(
-        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}));
+        db.runCommand({aggregate: viewName, pipeline: [{$match: {_id: 0}}], cursor: {}}),
+    );
     assertArrayEq({actual: viewResult.cursor.firstBatch, expected: [data[0]]});
 
     // This behavior is flaky. Most of the time here, $testFoo with a non-empty stage definition is
@@ -156,8 +159,10 @@ function assertFooStageAcceptedV1OnlyPlusV2ViewCreation(primaryConn) {
     db[viewName].drop();
     const createViewResult = db.createView(viewName, collName, [{$testFoo: {nonEmpty: true}}]);
     if (createViewResult["ok"]) {
-        assert.commandFailedWithCode(db.runCommand({aggregate: viewName, pipeline: [], cursor: {}}),
-                                     fooParseErrorCodes);
+        assert.commandFailedWithCode(
+            db.runCommand({aggregate: viewName, pipeline: [], cursor: {}}),
+            fooParseErrorCodes,
+        );
     } else {
         assert.commandFailedWithCode(createViewResult, fooParseErrorCodes);
     }

@@ -38,26 +38,28 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     }
 
     const commentStr = "whenMatched_" + whenMatchedMode + "_whenNotMatched_" + whenNotMatchedMode;
-    assert.eq(0,
-              inputColl
-                  .aggregate([{
-                                 $merge: {
-                                     into: outColl.getName(),
-                                     whenMatched: whenMatchedMode,
-                                     whenNotMatched: whenNotMatchedMode
-                                 }
-                             }],
-                             {comment: commentStr})
-                  .itcount());
+    assert.eq(
+        0,
+        inputColl
+            .aggregate(
+                [
+                    {
+                        $merge: {
+                            into: outColl.getName(),
+                            whenMatched: whenMatchedMode,
+                            whenNotMatched: whenNotMatchedMode,
+                        },
+                    },
+                ],
+                {comment: commentStr},
+            )
+            .itcount(),
+    );
     assert.eq(whenNotMatchedMode === "discard" ? 0 : 2, outColl.find().itcount());
     if (whenMatchedMode === "fail") {
-        assert.eq(
-            1,
-            primary.system.profile.find({"op": "insert", "command.comment": commentStr}).itcount());
+        assert.eq(1, primary.system.profile.find({"op": "insert", "command.comment": commentStr}).itcount());
     } else {
-        assert.eq(
-            2,
-            primary.system.profile.find({"op": "update", "command.comment": commentStr}).itcount());
+        assert.eq(2, primary.system.profile.find({"op": "update", "command.comment": commentStr}).itcount());
     }
     outColl.drop();
 });

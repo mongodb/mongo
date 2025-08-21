@@ -62,13 +62,14 @@ findAndModifyResult = coll.findAndModify({query: {_id: 109}, update: [{$addField
 assert.eq(findAndModifyResult, {_id: 109, a: 6});
 
 // Do a pipeline-style update with $internalApplyOplogUpdate to update _id=110.
-assert.commandWorked(coll.update(
-    {_id: 110}, [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}]));
+assert.commandWorked(
+    coll.update({_id: 110}, [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}]),
+);
 
 // Do a pipeline-style findAndModify with $internalApplyOplogUpdate to update _id=111.
 findAndModifyResult = coll.findAndModify({
     query: {_id: 111},
-    update: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}]
+    update: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
 });
 assert.eq(findAndModifyResult, {_id: 111, a: 8});
 
@@ -76,29 +77,28 @@ assert.eq(findAndModifyResult, {_id: 111, a: 8});
 assert.commandWorked(coll.update({_id: 112}, {$set: {a: emptyTs}}, {upsert: true}));
 
 // Do an update-operator-style findAndModify to add a new document with _id=113.
-findAndModifyResult =
-    coll.findAndModify({query: {_id: 113}, update: {$set: {a: emptyTs}}, upsert: true});
+findAndModifyResult = coll.findAndModify({query: {_id: 113}, update: {$set: {a: emptyTs}}, upsert: true});
 assert.eq(findAndModifyResult, null);
 
 // Do a pipeline-style update to add a new document with _id=114.
 assert.commandWorked(coll.update({_id: 114}, [{$addFields: {a: emptyTs}}], {upsert: true}));
 
 // Do a pipeline-style findAndModify to add a new document with _id=115.
-findAndModifyResult =
-    coll.findAndModify({query: {_id: 115}, update: [{$addFields: {a: emptyTs}}], upsert: true});
+findAndModifyResult = coll.findAndModify({query: {_id: 115}, update: [{$addFields: {a: emptyTs}}], upsert: true});
 assert.eq(findAndModifyResult, null);
 
 // Do a pipline-style update with $internalApplyOplogUpdate to add a new document _id=116.
 assert.commandWorked(
-    coll.update({_id: 116},
-                [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
-                {upsert: true}));
+    coll.update({_id: 116}, [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}], {
+        upsert: true,
+    }),
+);
 
 // Do pipeline-style findAndModify with $internalApplyOplogUpdate to add a new document _id=117.
 findAndModifyResult = coll.findAndModify({
     query: {_id: 117},
     update: [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
-    upsert: true
+    upsert: true,
 });
 assert.eq(findAndModifyResult, null);
 

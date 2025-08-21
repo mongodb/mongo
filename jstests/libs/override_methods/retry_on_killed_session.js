@@ -39,23 +39,19 @@ function runWithKilledSessionRetries(mongo, cmdObj, clientFunction, clientFuncti
             const res = clientFunction.apply(mongo, clientFunctionArguments);
 
             if (KilledSessionUtil.hasKilledSessionError(res)) {
-                jsTest.log.info("-=-=-=- Retrying after killed session error response",
-                                {cmdObj, res});
+                jsTest.log.info("-=-=-=- Retrying after killed session error response", {cmdObj, res});
                 continue;
             }
 
             if (KilledSessionUtil.hasKilledSessionWCError(res)) {
-                jsTest.log.info(
-                    "-=-=-=- Retrying after killed session write concern error response",
-                    {cmdObj, res});
+                jsTest.log.info("-=-=-=- Retrying after killed session write concern error response", {cmdObj, res});
                 continue;
             }
 
             return res;
         } catch (e) {
             if (KilledSessionUtil.hasKilledSessionError(e)) {
-                jsTest.log.info("-=-=-=- Retrying after thrown killed session error",
-                                {cmdObj, error: e});
+                jsTest.log.info("-=-=-=- Retrying after thrown killed session error", {cmdObj, error: e});
                 continue;
             }
             throw e;
@@ -63,5 +59,4 @@ function runWithKilledSessionRetries(mongo, cmdObj, clientFunction, clientFuncti
     }
 }
 
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/retry_on_killed_session.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/retry_on_killed_session.js");

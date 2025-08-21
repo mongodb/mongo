@@ -1,4 +1,4 @@
-const collNamePrefix = 'update_addToSet_';
+const collNamePrefix = "update_addToSet_";
 let collCount = 0;
 let coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
@@ -25,7 +25,7 @@ coll = db.getCollection(collNamePrefix + collCount++);
 assert(coll.drop());
 doc = {
     _id: 1,
-    a: [3, 5, 6]
+    a: [3, 5, 6],
 };
 assert.commandWorked(coll.insert(doc));
 assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [3, 5, 6]}}}));
@@ -48,7 +48,7 @@ assert.eq({_id: 2, a: [3]}, coll.findOne());
 // SERVER-3245
 doc = {
     _id: 1,
-    a: [1, 2]
+    a: [1, 2],
 };
 coll = db.getCollection(collNamePrefix + collCount++);
 assert(coll.drop());
@@ -75,30 +75,30 @@ coll = db.getCollection(collNamePrefix + collCount++);
 assert(coll.drop());
 doc = {
     _id: 1,
-    a: [1, 2]
+    a: [1, 2],
 };
 assert.commandWorked(coll.insert(doc));
 
-assert.commandWorked(coll.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
-assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {"x.$.y": "bad"}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {"x.$.y": "bad"}}}}));
 
 assert.commandWorked(coll.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
 assert.commandWorked(coll.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
 
 assert.commandWorked(coll.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
 
-assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
-assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{"x.$.y": "bad"}]}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {"x.$.y": "bad"}}]}}}));
 
-assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
-assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{"$bad": "bad"}]}}}));
+assert.commandWorked(coll.update({}, {$addToSet: {a: {$each: [{b: {"$bad": "bad"}}]}}}));
 
 // Test that nested _id fields are allowed.
 coll = db.getCollection(collNamePrefix + collCount++);
 assert(coll.drop());
 doc = {
     _id: 1,
-    a: [1, 2]
+    a: [1, 2],
 };
 assert.commandWorked(coll.insert(doc));
 
@@ -110,19 +110,19 @@ coll = db.getCollection(collNamePrefix + collCount++);
 assert(coll.drop());
 doc = {
     _id: 1,
-    a: [1, 2]
+    a: [1, 2],
 };
 assert.commandWorked(coll.insert(doc));
 
 const foo = {
-    "foo": "bar"
+    "foo": "bar",
 };
 assert.commandWorked(coll.insert(foo));
 const fooDoc = coll.findOne(foo);
 assert.eq(fooDoc.foo, foo.foo);
 
 const fooDocRef = {
-    reference: new DBRef(coll.getName(), fooDoc._id, coll.getDB().getName())
+    reference: new DBRef(coll.getName(), fooDoc._id, coll.getDB().getName()),
 };
 
 assert.commandWorked(coll.update({_id: doc._id}, {$addToSet: {a: fooDocRef}}));

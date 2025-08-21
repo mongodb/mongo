@@ -12,7 +12,7 @@ const dbName = "db";
 
 function checkCommand(cmd, collName, withinTransaction) {
     let session;
-    const withRetryIfWithinTransaction = function(func) {
+    const withRetryIfWithinTransaction = function (func) {
         if (withinTransaction) {
             withRetryOnTransientTxnError(func, () => {
                 if (session) {
@@ -31,15 +31,15 @@ function checkCommand(cmd, collName, withinTransaction) {
         coll.drop();
 
         // Create a sharded collection and move it to the secondary shard.
-        assert.commandWorked(
-            st.s0.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
+        assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
         const nonPrimaryShard = st.getOther(st.getPrimaryShard(dbName)).name;
-        assert.commandWorked(st.s0.adminCommand(
-            {moveChunk: `${dbName}.${collName}`, find: {a: 0}, to: nonPrimaryShard}));
+        assert.commandWorked(
+            st.s0.adminCommand({moveChunk: `${dbName}.${collName}`, find: {a: 0}, to: nonPrimaryShard}),
+        );
         // We now proceed to insert one document on each mongos connection. This will register cache
         // information about where to route the requests to that particular shard key.
         let i = 0;
-        st.forEachMongos(mongos => {
+        st.forEachMongos((mongos) => {
             mongos.getDB(dbName)[collName].insert({a: 0, x: i++});
         });
 
@@ -61,12 +61,12 @@ function checkCommand(cmd, collName, withinTransaction) {
         // in this case.
         if (withinTransaction) {
             const sessionColl = session.getDatabase(dbName).getCollection(collName);
-            assert.commandWorked(
-                sessionColl.runCommand(Object.extend(cmd, {collectionUUID: newUuid})));
+            assert.commandWorked(sessionColl.runCommand(Object.extend(cmd, {collectionUUID: newUuid})));
             session.commitTransaction();
         } else {
-            assert.commandWorked(st.s1.getDB(dbName)[collName].runCommand(
-                Object.extend(cmd, {collectionUUID: newUuid})));
+            assert.commandWorked(
+                st.s1.getDB(dbName)[collName].runCommand(Object.extend(cmd, {collectionUUID: newUuid})),
+            );
         }
     });
 }
@@ -78,9 +78,7 @@ collName = jsTestName() + "_insert";
 checkCommand({insert: collName, documents: [{x: 1}]}, collName, false);
 checkCommand({insert: collName, documents: [{x: 1}]}, collName, true);
 collName = jsTestName() + "_agg";
-checkCommand(
-    {aggregate: collName, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}}, collName, false);
-checkCommand(
-    {aggregate: collName, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}}, collName, true);
+checkCommand({aggregate: collName, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}}, collName, false);
+checkCommand({aggregate: collName, pipeline: [{$match: {x: 1}}], cursor: {batchSize: 10}}, collName, true);
 
 st.stop();

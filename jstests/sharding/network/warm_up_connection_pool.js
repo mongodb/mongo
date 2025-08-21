@@ -56,20 +56,22 @@ function runTest(setParams, connPoolStatsCheck, extraOptions) {
 
 jsTest.log("Tests basic warm up of connection pool");
 var testWarmUpParams = {};
-var testWarmUpConnPoolStatsCheck = function(connPoolStats, currentShard) {
-    return connPoolStats["hosts"][currentShard]["inUse"] +
-        connPoolStats["hosts"][currentShard]["available"] +
-        connPoolStats["hosts"][currentShard]["refreshing"] >=
-        1;
+var testWarmUpConnPoolStatsCheck = function (connPoolStats, currentShard) {
+    return (
+        connPoolStats["hosts"][currentShard]["inUse"] +
+            connPoolStats["hosts"][currentShard]["available"] +
+            connPoolStats["hosts"][currentShard]["refreshing"] >=
+        1
+    );
 };
 
 runTest(testWarmUpParams, testWarmUpConnPoolStatsCheck);
 
 jsTest.log("Tests does not warm up connection pool when parameter is disabled");
 var warmUpDisabledParams = {
-    setParameter: {warmMinConnectionsInShardingTaskExecutorPoolOnStartup: false}
+    setParameter: {warmMinConnectionsInShardingTaskExecutorPoolOnStartup: false},
 };
-var warmUpDisabledConnPoolStatsCheck = function(connPoolStats, currentShard) {
+var warmUpDisabledConnPoolStatsCheck = function (connPoolStats, currentShard) {
     return undefined === connPoolStats["hosts"][currentShard];
 };
 
@@ -85,33 +87,39 @@ jsTest.log("Tests establishes more connections when parameter is set.");
 var biggerPoolSizeParams = {
     setParameter: {
         ShardingTaskExecutorPoolMinSize: 3,
-        warmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS: 60000
-    }
+        warmMinConnectionsInShardingTaskExecutorPoolOnStartupWaitMS: 60000,
+    },
 };
-var biggerPoolSizeConnPoolStatsCheck = function(connPoolStats, currentShard) {
-    return connPoolStats["hosts"][currentShard]["inUse"] +
-        connPoolStats["hosts"][currentShard]["available"] +
-        connPoolStats["hosts"][currentShard]["refreshing"] >=
-        3;
+var biggerPoolSizeConnPoolStatsCheck = function (connPoolStats, currentShard) {
+    return (
+        connPoolStats["hosts"][currentShard]["inUse"] +
+            connPoolStats["hosts"][currentShard]["available"] +
+            connPoolStats["hosts"][currentShard]["refreshing"] >=
+        3
+    );
 };
 
 runTest(biggerPoolSizeParams, biggerPoolSizeConnPoolStatsCheck);
 
 jsTest.log("Tests establishes connections it can and ignores the ones it can't");
 var shutdownNodeParams = {};
-var shutdownNodeConnPoolStatsCheck = function(connPoolStats, currentShard, primary) {
+var shutdownNodeConnPoolStatsCheck = function (connPoolStats, currentShard, primary) {
     if (currentShard == primary) {
-        return connPoolStats["hosts"][currentShard]["inUse"] +
+        return (
+            connPoolStats["hosts"][currentShard]["inUse"] +
+                connPoolStats["hosts"][currentShard]["available"] +
+                connPoolStats["hosts"][currentShard]["refreshing"] ===
+            0
+        );
+    }
+    return (
+        connPoolStats["hosts"][currentShard]["inUse"] +
             connPoolStats["hosts"][currentShard]["available"] +
             connPoolStats["hosts"][currentShard]["refreshing"] ===
-            0;
-    }
-    return connPoolStats["hosts"][currentShard]["inUse"] +
-        connPoolStats["hosts"][currentShard]["available"] +
-        connPoolStats["hosts"][currentShard]["refreshing"] ===
-        1;
+        1
+    );
 };
-var shutdownNodeExtraOptions = function(test) {
+var shutdownNodeExtraOptions = function (test) {
     const nodeList = test.rs0.nodeList();
     const primary = test.rs0.getPrimary();
     var pId = test.rs0.getNodeId(primary);

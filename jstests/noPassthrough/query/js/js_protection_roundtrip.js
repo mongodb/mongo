@@ -29,10 +29,8 @@ function withJavaScriptProtection() {
 
 function testFunctionUnmarshall(jsProtection, evalFunc) {
     var evalString = "(" + tojson(evalFunc) + ")();";
-    var protectionFlag =
-        jsProtection ? "--enableJavaScriptProtection" : "--disableJavaScriptProtection";
-    var exitCode =
-        runMongoProgram("mongo", "--port", testServer.port, protectionFlag, "--eval", evalString);
+    var protectionFlag = jsProtection ? "--enableJavaScriptProtection" : "--disableJavaScriptProtection";
+    var exitCode = runMongoProgram("mongo", "--port", testServer.port, protectionFlag, "--eval", evalString);
     assert.eq(exitCode, 0);
 }
 
@@ -41,9 +39,9 @@ function testFunctionUnmarshall(jsProtection, evalFunc) {
  */
 var result = t.insert({
     _id: 0,
-    myFunc: function() {
+    myFunc: function () {
         return "yes";
-    }
+    },
 });
 assert.commandWorked(result);
 

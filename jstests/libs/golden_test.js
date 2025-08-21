@@ -3,8 +3,7 @@ export function tojsonOnelineSortKeys(x) {
 }
 
 export function tojsonMultiLineSortKeys(x) {
-    return tojson(
-        x, undefined /*indent*/, false /*nolint*/, undefined /*depth*/, true /*sortKeys*/);
+    return tojson(x, undefined /*indent*/, false /*nolint*/, undefined /*depth*/, true /*sortKeys*/);
 }
 
 // Takes an array of documents ('result').
@@ -17,9 +16,10 @@ export function normalizeArray(result, shouldSort = true) {
         throw Error("The result is not an array: " + tojson(result));
     }
 
-    const normalizedResults = shouldSort ? result.map(d => tojsonOnelineSortKeys(d)).sort()
-                                         : result.map(d => tojsononeline(d));
-    return normalizedResults.join('\n') + '\n';
+    const normalizedResults = shouldSort
+        ? result.map((d) => tojsonOnelineSortKeys(d)).sort()
+        : result.map((d) => tojsononeline(d));
+    return normalizedResults.join("\n") + "\n";
 }
 
 // Takes an array or cursor, and prints a normalized version of it.

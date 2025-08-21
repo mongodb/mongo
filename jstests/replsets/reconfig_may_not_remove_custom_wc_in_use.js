@@ -10,12 +10,8 @@ import {reconfig} from "jstests/replsets/rslib.js";
 const name = jsTestName();
 const rst = new ReplSetTest({
     name: name,
-    nodes: [
-        {rsConfig: {tags: {region: "us"}}},
-        {rsConfig: {tags: {region: "us"}}},
-        {rsConfig: {tags: {region: "eu"}}}
-    ],
-    settings: {getLastErrorModes: {multiRegion: {region: 2}}}
+    nodes: [{rsConfig: {tags: {region: "us"}}}, {rsConfig: {tags: {region: "us"}}}, {rsConfig: {tags: {region: "eu"}}}],
+    settings: {getLastErrorModes: {multiRegion: {region: 2}}},
 });
 
 rst.startSet();
@@ -24,8 +20,7 @@ rst.initiate();
 const primary = rst.getPrimary();
 
 jsTestLog("Setting the write concern to match the custom definition.");
-assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}));
+assert.commandWorked(primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}));
 
 let cfg = rst.getReplSetConfigFromNode();
 cfg.settings.getLastErrorModes = {};
@@ -38,8 +33,7 @@ assert.throwsWithCode(() => {
 jsTestLog("Resetting the write concern to majority.");
 assert.commandWorked(primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 2}}));
 
-jsTestLog(
-    "Removing custom write concern definition now that it is no longer in use (should succceed).");
+jsTestLog("Removing custom write concern definition now that it is no longer in use (should succceed).");
 cfg = rst.getReplSetConfigFromNode();
 cfg.settings.getLastErrorModes = {};
 reconfig(rst, cfg);

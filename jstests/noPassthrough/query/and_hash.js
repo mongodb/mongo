@@ -7,8 +7,7 @@ const db = conn.getDB("test");
 
 // Enable and force AND_HASH query solution to be used to evaluate index intersections.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceIntersectionPlans: true}));
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: true}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlannerEnableHashIntersection: true}));
 
 const coll = db.and_hash;
 coll.drop();
@@ -19,24 +18,26 @@ assert.commandWorked(coll.createIndex({c: -1}));
 assert.commandWorked(coll.createIndex({e: 1}));
 assert.commandWorked(coll.createIndex({f: 1}));
 
-assert.commandWorked(coll.insertMany([
-    {_id: 0, a: 1, b: "A", c: 22, d: "field"},
-    {_id: 1, a: 1, b: "B", c: 22, d: "field"},
-    {_id: 2, a: 1, b: "C", c: 22, d: "field"},
-    {_id: 3, a: 2, b: 2, c: null},
-    {_id: 4, a: 2, b: "D", c: 22},
-    {_id: 5, a: 2, b: "E", c: 22, d: 99},
-    {_id: 6, a: 3, b: "b", c: 23, d: "field"},
-    {_id: 7, a: 3, b: "abc", c: 22, d: 23},
-    {_id: 8, a: 3, b: "A", c: 22, d: "field"},
-    {_id: 9, a: 4, b: "a", c: {x: 1, y: 2}, d: "field"},
-    {_id: 10, a: 5, b: "ABC", d: 22, c: "field"},
-    {_id: 11, a: 6, b: "ABC", d: 22, c: "field"},
-    {_id: 12, a: 4, b: "a", c: {x: 1, y: 2}, d: "field", e: [1, 2, 3]},
-    {_id: 13, a: 5, b: "ABC", d: 22, c: "field", e: [4, 5, 6]},
-    {_id: 14, a: 6, b: "ABC", d: 22, c: "field", e: [7, 8, 9]},
-    {_id: 15, a: 1, e: [7, 8, 9], f: [-1, -2, -3]},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {_id: 0, a: 1, b: "A", c: 22, d: "field"},
+        {_id: 1, a: 1, b: "B", c: 22, d: "field"},
+        {_id: 2, a: 1, b: "C", c: 22, d: "field"},
+        {_id: 3, a: 2, b: 2, c: null},
+        {_id: 4, a: 2, b: "D", c: 22},
+        {_id: 5, a: 2, b: "E", c: 22, d: 99},
+        {_id: 6, a: 3, b: "b", c: 23, d: "field"},
+        {_id: 7, a: 3, b: "abc", c: 22, d: 23},
+        {_id: 8, a: 3, b: "A", c: 22, d: "field"},
+        {_id: 9, a: 4, b: "a", c: {x: 1, y: 2}, d: "field"},
+        {_id: 10, a: 5, b: "ABC", d: 22, c: "field"},
+        {_id: 11, a: 6, b: "ABC", d: 22, c: "field"},
+        {_id: 12, a: 4, b: "a", c: {x: 1, y: 2}, d: "field", e: [1, 2, 3]},
+        {_id: 13, a: 5, b: "ABC", d: 22, c: "field", e: [4, 5, 6]},
+        {_id: 14, a: 6, b: "ABC", d: 22, c: "field", e: [7, 8, 9]},
+        {_id: 15, a: 1, e: [7, 8, 9], f: [-1, -2, -3]},
+    ]),
+);
 
 // Helper to check the result returned by the query and to check whether the
 // query solution correctly did or did not use an AND_HASH for index
@@ -54,15 +55,15 @@ function assertAndHashUsed({query, expectedResult, shouldUseAndHash} = {}) {
 assertAndHashUsed({
     query: {a: {$gt: 1}, c: null},
     expectedResult: [{_id: 3, a: 2, b: 2, c: null}],
-    shouldUseAndHash: true
+    shouldUseAndHash: true,
 });
 assertAndHashUsed({
     query: {a: {$gt: 3}, c: {x: 1, y: 2}},
     expectedResult: [
         {_id: 9, a: 4, b: "a", c: {x: 1, y: 2}, d: "field"},
-        {_id: 12, a: 4, b: "a", c: {x: 1, y: 2}, d: "field", e: [1, 2, 3]}
+        {_id: 12, a: 4, b: "a", c: {x: 1, y: 2}, d: "field", e: [1, 2, 3]},
     ],
-    shouldUseAndHash: true
+    shouldUseAndHash: true,
 });
 assertAndHashUsed({
     query: {a: {$lt: 5}, b: {$in: ["A", "abc"]}},
@@ -71,7 +72,7 @@ assertAndHashUsed({
         {_id: 7, a: 3, b: "abc", c: 22, d: 23},
         {_id: 8, a: 3, b: "A", c: 22, d: "field"},
     ],
-    shouldUseAndHash: true
+    shouldUseAndHash: true,
 });
 assertAndHashUsed({
     query: {a: {$gt: 1}, e: {$elemMatch: {$lt: 7}}},
@@ -79,7 +80,7 @@ assertAndHashUsed({
         {_id: 12, a: 4, b: "a", c: {x: 1, y: 2}, d: "field", e: [1, 2, 3]},
         {_id: 13, a: 5, b: "ABC", d: 22, c: "field", e: [4, 5, 6]},
     ],
-    shouldUseAndHash: true
+    shouldUseAndHash: true,
 });
 assertAndHashUsed({query: {a: {$gt: 5}, c: {$lt: 3}}, expectedResult: [], shouldUseAndHash: true});
 assertAndHashUsed({query: {a: {$gt: 5}, c: null}, expectedResult: [], shouldUseAndHash: true});
@@ -90,18 +91,18 @@ assertAndHashUsed({
     query: {a: 6},
     expectedResult: [
         {_id: 11, a: 6, b: "ABC", d: 22, c: "field"},
-        {_id: 14, a: 6, b: "ABC", d: 22, c: "field", e: [7, 8, 9]}
+        {_id: 14, a: 6, b: "ABC", d: 22, c: "field", e: [7, 8, 9]},
     ],
-    shouldUseAndHash: false
+    shouldUseAndHash: false,
 });
 assertAndHashUsed({query: {fieldDoesNotExist: 1}, expectedResult: [], shouldUseAndHash: false});
 assertAndHashUsed({
     query: {$or: [{a: 6}, {fieldDoesNotExist: 1}]},
     expectedResult: [
         {_id: 11, a: 6, b: "ABC", d: 22, c: "field"},
-        {_id: 14, a: 6, b: "ABC", d: 22, c: "field", e: [7, 8, 9]}
+        {_id: 14, a: 6, b: "ABC", d: 22, c: "field", e: [7, 8, 9]},
     ],
-    shouldUseAndHash: false
+    shouldUseAndHash: false,
 });
 assertAndHashUsed({query: {$or: [{a: 7}, {a: 8}]}, expectedResult: [], shouldUseAndHash: false});
 
@@ -110,14 +111,14 @@ assert.commandWorked(coll.createIndex({c: 1, d: -1}));
 assertAndHashUsed({
     query: {a: {$gt: 1}, c: {$gt: 0}, d: {$gt: 90}},
     expectedResult: [{_id: 5, a: 2, b: "E", c: 22, d: 99}],
-    shouldUseAndHash: true
+    shouldUseAndHash: true,
 });
 // The query on only 'd' field should not be able to use the index and thus the intersection
 // since it is not using a prefix of the compound index {c:1, d:-1}.
 assertAndHashUsed({
     query: {a: {$gt: 1}, d: {$gt: 90}},
     expectedResult: [{_id: 5, a: 2, b: "E", c: 22, d: 99}],
-    shouldUseAndHash: false
+    shouldUseAndHash: false,
 });
 
 // Test that deduplication is correctly performed on top of the index scans that comprise the
@@ -126,12 +127,12 @@ assertAndHashUsed({
 assertAndHashUsed({
     query: {e: {$gt: 0}, a: 6},
     expectedResult: [{_id: 14, a: 6, b: "ABC", d: 22, c: "field", e: [7, 8, 9]}],
-    shouldUseAndHash: true
+    shouldUseAndHash: true,
 });
 assertAndHashUsed({
     query: {e: {$gt: 0}, f: {$lt: 0}},
     expectedResult: [{_id: 15, a: 1, e: [7, 8, 9], f: [-1, -2, -3]}],
-    shouldUseAndHash: true
+    shouldUseAndHash: true,
 });
 
 MongoRunner.stopMongod(conn);

@@ -6,7 +6,7 @@ t.insert(o);
 
 assert.eq(o, t.findOne(), "A1");
 
-o.a = o.a.filter(function(z) {
+o.a = o.a.filter(function (z) {
     return z >= 6;
 });
 t.update({}, {$pull: {a: {$lt: 6}}});

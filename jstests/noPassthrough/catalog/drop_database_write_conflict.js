@@ -15,7 +15,7 @@ assert.commandWorked(db.createCollection(jsTestName()));
 
 const fp = configureFailPoint(primary, "throwWriteConflictExceptionDuringDropDatabase");
 
-const awaitDropDB = startParallelShell(function() {
+const awaitDropDB = startParallelShell(function () {
     assert.commandWorked(db.getSiblingDB("test").dropDatabase());
 }, primary.port);
 

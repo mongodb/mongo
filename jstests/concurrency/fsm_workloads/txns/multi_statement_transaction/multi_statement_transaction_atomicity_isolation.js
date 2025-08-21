@@ -44,11 +44,11 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     isKilledSessionCode,
-    withTxnAndAutoRetry
+    withTxnAndAutoRetry,
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {Graph} from "jstests/libs/cycle_detection.js";
 
-export const $config = (function() {
+export const $config = (function () {
     function checkTransactionCommitOrder(documents) {
         const graph = new Graph();
 
@@ -65,10 +65,9 @@ export const $config = (function() {
         const result = graph.findCycle();
 
         if (result.length > 0) {
-            const isOpPartOfCycle = (op) =>
-                result.some(cyclicOp => bsonBinaryEqual({_: op}, {_: cyclicOp}));
+            const isOpPartOfCycle = (op) => result.some((cyclicOp) => bsonBinaryEqual({_: op}, {_: cyclicOp}));
 
-            const filteredDocuments = documents.map(doc => {
+            const filteredDocuments = documents.map((doc) => {
                 const filteredCommitOrder = doc.order.filter(isOpPartOfCycle);
                 return Object.assign({}, doc, {order: filteredCommitOrder});
             });
@@ -92,8 +91,16 @@ export const $config = (function() {
 
         for (let {op, actual} of updateCounts.values()) {
             assert.eq(op.numUpdated, actual, () => {
-                return 'transaction ' + tojson(op) + ' should have updated ' + op.numUpdated +
-                    ' documents, but ' + actual + ' were updated: ' + tojson(updateCounts.values());
+                return (
+                    "transaction " +
+                    tojson(op) +
+                    " should have updated " +
+                    op.numUpdated +
+                    " documents, but " +
+                    actual +
+                    " were updated: " +
+                    tojson(updateCounts.values())
+                );
             });
         }
     }
@@ -113,7 +120,7 @@ export const $config = (function() {
                     updatedDocsServerHistory[txnNum].push({
                         _id: doc._id,
                         dbName: doc.metadata[i].dbName,
-                        collName: doc.metadata[i].collName
+                        collName: doc.metadata[i].collName,
                     });
                 }
             }
@@ -122,14 +129,18 @@ export const $config = (function() {
         // Assert that any transaction written down in $config.data also exists in the database
         // and that the docIds associated with this txnNum in $config.data match those docIds
         // associated with this txnNum in the database.
-        const highestTxnNum =
-            Math.max(updatedDocsServerHistory.length, data.updatedDocsClientHistory.length);
+        const highestTxnNum = Math.max(updatedDocsServerHistory.length, data.updatedDocsClientHistory.length);
         for (let txnNum = 0; txnNum < highestTxnNum; ++txnNum) {
-            assert((arrayEq(updatedDocsServerHistory[txnNum] || [],
-                            data.updatedDocsClientHistory[txnNum] || [])),
-                   () => 'expected ' + tojson(data.updatedDocsClientHistory[txnNum]) +
-                       ' but instead have ' + tojson(updatedDocsServerHistory[txnNum]) +
-                       ' for txnNumber ' + txnNum);
+            assert(
+                arrayEq(updatedDocsServerHistory[txnNum] || [], data.updatedDocsClientHistory[txnNum] || []),
+                () =>
+                    "expected " +
+                    tojson(data.updatedDocsClientHistory[txnNum]) +
+                    " but instead have " +
+                    tojson(updatedDocsServerHistory[txnNum]) +
+                    " for txnNumber " +
+                    txnNum,
+            );
         }
     }
 
@@ -140,24 +151,27 @@ export const $config = (function() {
         let allDocuments = [];
 
         if (useTxn) {
-            withTxnAndAutoRetry(this.session, () => {
-                allDocuments = [];
-                for (let collection of this.collections) {
-                    const txnDbName = collection.getDB().getName();
-                    const txnCollName = collection.getName();
-                    const txnCollection =
-                        this.session.getDatabase(txnDbName).getCollection(txnCollName);
+            withTxnAndAutoRetry(
+                this.session,
+                () => {
+                    allDocuments = [];
+                    for (let collection of this.collections) {
+                        const txnDbName = collection.getDB().getName();
+                        const txnCollName = collection.getName();
+                        const txnCollection = this.session.getDatabase(txnDbName).getCollection(txnCollName);
 
-                    // We intentionally use a smaller batch size when fetching all of the
-                    // documents in the collection in order to stress the behavior of reading
-                    // from the same snapshot over the course of multiple network roundtrips.
-                    const batchSize = Math.max(2, Math.floor(numDocs / 5));
-                    allDocuments.push(...txnCollection.find().batchSize(batchSize).toArray());
-                }
-            }, {
-                retryOnKilledSession: this.retryOnKilledSession,
-                prepareProbability: this.prepareProbability
-            });
+                        // We intentionally use a smaller batch size when fetching all of the
+                        // documents in the collection in order to stress the behavior of reading
+                        // from the same snapshot over the course of multiple network roundtrips.
+                        const batchSize = Math.max(2, Math.floor(numDocs / 5));
+                        allDocuments.push(...txnCollection.find().batchSize(batchSize).toArray());
+                    }
+                },
+                {
+                    retryOnKilledSession: this.retryOnKilledSession,
+                    prepareProbability: this.prepareProbability,
+                },
+            );
         } else {
             for (let collection of this.collections) {
                 allDocuments.push(...collection.find().toArray());
@@ -166,9 +180,14 @@ export const $config = (function() {
 
         assert.eq(allDocuments.length, numDocs * this.collections.length, () => {
             if (this.session) {
-                return "txnNumber: " + tojson(this.session.getTxnNumber_forTesting()) +
-                    ", session id: " + tojson(this.session.getSessionId()) +
-                    ", all documents: " + tojson(allDocuments);
+                return (
+                    "txnNumber: " +
+                    tojson(this.session.getTxnNumber_forTesting()) +
+                    ", session id: " +
+                    tojson(this.session.getSessionId()) +
+                    ", all documents: " +
+                    tojson(allDocuments)
+                );
             }
             return "all documents: " + tojson(allDocuments);
         });
@@ -184,7 +203,7 @@ export const $config = (function() {
         return Array.shuffle(docIds).slice(0, numOps);
     }
 
-    const states = (function() {
+    const states = (function () {
         return {
             init: function init(db, collName) {
                 this.iteration = 0;
@@ -201,54 +220,56 @@ export const $config = (function() {
                 let committedTxnInfo;
                 let txnNumber;
 
-                withTxnAndAutoRetry(this.session, () => {
-                    committedTxnInfo = [];
-                    for (let [_, docId] of docIds.entries()) {
-                        const collection =
-                            this.collections[Random.randInt(this.collections.length)];
-                        const txnDbName = collection.getDB().getName();
-                        const txnCollName = collection.getName();
-                        txnNumber = this.session.getTxnNumber_forTesting();
+                withTxnAndAutoRetry(
+                    this.session,
+                    () => {
+                        committedTxnInfo = [];
+                        for (let [_, docId] of docIds.entries()) {
+                            const collection = this.collections[Random.randInt(this.collections.length)];
+                            const txnDbName = collection.getDB().getName();
+                            const txnCollName = collection.getName();
+                            txnNumber = this.session.getTxnNumber_forTesting();
 
-                        // We apply the following update to each of the 'docIds' documents
-                        // to record the number of times we expect to see the transaction
-                        // being run in this execution of the update() state function by this
-                        // worker thread present across all documents. Using the $push
-                        // operator causes a transaction which commits after another
-                        // transaction to appear later in the array.
-                        const updateMods = {
-                            $push: {
-                                order: {
-                                    tid: this.tid,
-                                    iteration: this.iteration,
-                                    numUpdated: docIds.length,
+                            // We apply the following update to each of the 'docIds' documents
+                            // to record the number of times we expect to see the transaction
+                            // being run in this execution of the update() state function by this
+                            // worker thread present across all documents. Using the $push
+                            // operator causes a transaction which commits after another
+                            // transaction to appear later in the array.
+                            const updateMods = {
+                                $push: {
+                                    order: {
+                                        tid: this.tid,
+                                        iteration: this.iteration,
+                                        numUpdated: docIds.length,
+                                    },
+                                    metadata: {
+                                        dbName: txnDbName,
+                                        collName: txnCollName,
+                                        txnNum: txnNumber,
+                                    },
                                 },
-                                metadata: {
-                                    dbName: txnDbName,
-                                    collName: txnCollName,
-                                    txnNum: txnNumber,
-                                }
-                            }
-                        };
+                            };
 
-                        const txnCollection =
-                            this.session.getDatabase(txnDbName).getCollection(txnCollName);
-                        const coll = txnCollection.find().toArray();
-                        const res = txnCollection.runCommand('update', {
-                            updates: [{q: {_id: docId}, u: updateMods}],
-                        });
-                        assert.commandWorked(res,
-                                             () => "Failed to update. result: " + tojson(res) +
-                                                 ", collection: " + tojson(coll));
-                        assert.eq(res.n, 1, () => tojson(res));
-                        assert.eq(res.nModified, 1, () => tojson(res));
-                        committedTxnInfo.push(
-                            {_id: docId, dbName: txnDbName, collName: txnCollName});
-                    }
-                }, {
-                    retryOnKilledSession: this.retryOnKilledSession,
-                    prepareProbability: this.prepareProbability
-                });
+                            const txnCollection = this.session.getDatabase(txnDbName).getCollection(txnCollName);
+                            const coll = txnCollection.find().toArray();
+                            const res = txnCollection.runCommand("update", {
+                                updates: [{q: {_id: docId}, u: updateMods}],
+                            });
+                            assert.commandWorked(
+                                res,
+                                () => "Failed to update. result: " + tojson(res) + ", collection: " + tojson(coll),
+                            );
+                            assert.eq(res.n, 1, () => tojson(res));
+                            assert.eq(res.nModified, 1, () => tojson(res));
+                            committedTxnInfo.push({_id: docId, dbName: txnDbName, collName: txnCollName});
+                        }
+                    },
+                    {
+                        retryOnKilledSession: this.retryOnKilledSession,
+                        prepareProbability: this.prepareProbability,
+                    },
+                );
 
                 this.updatedDocsClientHistory[txnNumber.valueOf()] = committedTxnInfo;
                 ++this.iteration;
@@ -270,8 +291,7 @@ export const $config = (function() {
                 // 'afterClusterTime' internally and is subject to prepare conflicts (in a sharded
                 // cluster). This is meant to expose deadlocks involving prepare conflicts outside
                 // of transactions.
-                const sessionCollection =
-                    this.session.getDatabase(randomDbName).getCollection(randomCollName);
+                const sessionCollection = this.session.getDatabase(randomDbName).getCollection(randomCollName);
 
                 try {
                     const cursor = sessionCollection.find();
@@ -283,7 +303,7 @@ export const $config = (function() {
                     }
                     throw e;
                 }
-            }
+            },
         };
     })();
 
@@ -302,11 +322,13 @@ export const $config = (function() {
     // Wrap each state in a checkConsistencyOnLastIteration() invocation.
     for (let stateName of Object.keys(states)) {
         const stateFn = states[stateName];
-        const checkConsistencyFn = states['checkConsistency'];
-        states[stateName] = function(db, collName) {
-            checkConsistencyOnLastIteration(this,
-                                            () => stateFn.apply(this, arguments),
-                                            () => checkConsistencyFn.apply(this, arguments));
+        const checkConsistencyFn = states["checkConsistency"];
+        states[stateName] = function (db, collName) {
+            checkConsistencyOnLastIteration(
+                this,
+                () => stateFn.apply(this, arguments),
+                () => checkConsistencyFn.apply(this, arguments),
+            );
         };
     }
 
@@ -320,19 +342,23 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         // The default WC is majority and this workload may not be able to satisfy majority writes.
         if (cluster.isSharded()) {
-            cluster.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.adminCommand({
-                    setDefaultRWConcern: 1,
-                    defaultWriteConcern: {w: 1},
-                    writeConcern: {w: "majority"}
-                }));
+            cluster.executeOnMongosNodes(function (db) {
+                assert.commandWorked(
+                    db.adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {w: 1},
+                        writeConcern: {w: "majority"},
+                    }),
+                );
             });
         } else if (cluster.isReplication()) {
-            assert.commandWorked(db.adminCommand({
-                setDefaultRWConcern: 1,
-                defaultWriteConcern: {w: 1},
-                writeConcern: {w: "majority"}
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: 1},
+                    writeConcern: {w: "majority"},
+                }),
+            );
         }
 
         this.collections = this.getAllCollections(db, collName);
@@ -344,7 +370,7 @@ export const $config = (function() {
                 bulk.insert({_id: i, order: []});
             }
 
-            const res = bulk.execute({w: 'majority'});
+            const res = bulk.execute({w: "majority"});
             assert.commandWorked(res);
             assert.eq(this.numDocs, res.nInserted);
         }
@@ -358,19 +384,23 @@ export const $config = (function() {
         // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
         // majority by setting CWWC to {w: majority}.
         if (cluster.isSharded()) {
-            cluster.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.adminCommand({
-                    setDefaultRWConcern: 1,
-                    defaultWriteConcern: {w: "majority"},
-                    writeConcern: {w: "majority"}
-                }));
+            cluster.executeOnMongosNodes(function (db) {
+                assert.commandWorked(
+                    db.adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {w: "majority"},
+                        writeConcern: {w: "majority"},
+                    }),
+                );
             });
         } else if (cluster.isReplication()) {
-            assert.commandWorked(db.adminCommand({
-                setDefaultRWConcern: 1,
-                defaultWriteConcern: {w: "majority"},
-                writeConcern: {w: "majority"}
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: "majority"},
+                    writeConcern: {w: "majority"},
+                }),
+            );
         }
     }
 

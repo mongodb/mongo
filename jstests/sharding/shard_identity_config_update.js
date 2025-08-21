@@ -16,13 +16,12 @@ var st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 // Note: Adding new replica set member by hand because of SERVER-24011.
 
-var newNode =
-    MongoRunner.runMongod({configsvr: '', replSet: st.configRS.name, storageEngine: 'wiredTiger'});
+var newNode = MongoRunner.runMongod({configsvr: "", replSet: st.configRS.name, storageEngine: "wiredTiger"});
 
 var replConfig = st.configRS.getReplSetConfigFromNode();
 replConfig.version += 1;
@@ -34,17 +33,17 @@ reconfig(st.configRS, replConfig);
  * Returns true if the shardIdentity document has all the replica set member nodes in the
  * expectedConfigStr.
  */
-var checkConfigStrUpdated = function(conn, expectedConfigStr) {
-    var shardIdentity = conn.getDB('admin').system.version.findOne({_id: 'shardIdentity'});
+var checkConfigStrUpdated = function (conn, expectedConfigStr) {
+    var shardIdentity = conn.getDB("admin").system.version.findOne({_id: "shardIdentity"});
 
     var shardConfigsvrStr = shardIdentity.configsvrConnectionString;
-    var shardConfigReplName = shardConfigsvrStr.split('/')[0];
-    var expectedReplName = expectedConfigStr.split('/')[0];
+    var shardConfigReplName = shardConfigsvrStr.split("/")[0];
+    var expectedReplName = expectedConfigStr.split("/")[0];
 
     assert.eq(expectedReplName, shardConfigReplName);
 
-    var expectedHostList = expectedConfigStr.split('/')[1].split(',');
-    var shardConfigHostList = shardConfigsvrStr.split('/')[1].split(',');
+    var expectedHostList = expectedConfigStr.split("/")[1].split(",");
+    var shardConfigHostList = shardConfigsvrStr.split("/")[1].split(",");
 
     if (expectedHostList.length != shardConfigHostList.length) {
         return false;
@@ -60,31 +59,31 @@ var checkConfigStrUpdated = function(conn, expectedConfigStr) {
 };
 
 var origConfigConnStr = st.configRS.getURL();
-var expectedConfigStr = origConfigConnStr + ',' + newNode.host;
-assert.soon(function() {
+var expectedConfigStr = origConfigConnStr + "," + newNode.host;
+assert.soon(function () {
     return checkConfigStrUpdated(st.rs0.getPrimary(), expectedConfigStr);
 });
 
-st.rs0.getSecondaries().forEach(secConn => {
+st.rs0.getSecondaries().forEach((secConn) => {
     secConn.setSecondaryOk();
-    assert.soon(function() {
+    assert.soon(function () {
         return checkConfigStrUpdated(secConn, expectedConfigStr);
     });
 });
 
-assert.soon(function() {
+assert.soon(function () {
     return checkConfigStrUpdated(st.configRS.getPrimary(), expectedConfigStr);
 });
 
-st.configRS.getSecondaries().forEach(secConn => {
+st.configRS.getSecondaries().forEach((secConn) => {
     secConn.setSecondaryOk();
-    assert.soon(function() {
+    assert.soon(function () {
         return checkConfigStrUpdated(secConn, expectedConfigStr);
     });
 });
 
 newNode.setSecondaryOk();
-assert.soon(function() {
+assert.soon(function () {
     return checkConfigStrUpdated(newNode, expectedConfigStr);
 });
 
@@ -110,32 +109,32 @@ replConfig.members.pop();
 reconfig(st.configRS, replConfig);
 
 if (!TestData.configShard) {
-    st.rs0.restart(0, {shardsvr: ''});
-    st.rs0.restart(1, {shardsvr: ''});
+    st.rs0.restart(0, {shardsvr: ""});
+    st.rs0.restart(1, {shardsvr: ""});
 }
 
 st.rs0.waitForPrimary();
 st.rs0.awaitSecondaryNodes();
 
-assert.soon(function() {
+assert.soon(function () {
     return checkConfigStrUpdated(st.rs0.getPrimary(), origConfigConnStr);
 });
 
-st.rs0.getSecondaries().forEach(secConn => {
+st.rs0.getSecondaries().forEach((secConn) => {
     secConn.setSecondaryOk();
-    assert.soon(function() {
+    assert.soon(function () {
         return checkConfigStrUpdated(secConn, origConfigConnStr);
     });
 });
 
 // Config servers in 7.0 also maintain the connection string in their shard identity document.
-assert.soon(function() {
+assert.soon(function () {
     return checkConfigStrUpdated(st.configRS.getPrimary(), origConfigConnStr);
 });
 
-st.configRS.getSecondaries().forEach(secConn => {
+st.configRS.getSecondaries().forEach((secConn) => {
     secConn.setSecondaryOk();
-    assert.soon(function() {
+    assert.soon(function () {
         return checkConfigStrUpdated(secConn, origConfigConnStr);
     });
 });

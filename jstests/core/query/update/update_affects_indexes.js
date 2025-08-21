@@ -3,7 +3,7 @@
 const coll = db[jsTestName()];
 coll.drop();
 const indexKeyPattern = {
-    "a.b": 1
+    "a.b": 1,
 };
 assert.commandWorked(coll.createIndex(indexKeyPattern));
 

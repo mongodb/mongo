@@ -1,4 +1,3 @@
-
 import {describe, it} from "jstests/libs/mochalite.js";
 
 /**
@@ -9,9 +8,9 @@ import {describe, it} from "jstests/libs/mochalite.js";
  */
 
 const log = [];
-const logfn = msg => (() => log.push(msg));
+const logfn = (msg) => () => log.push(msg);
 
-describe("first", function() {
+describe("first", function () {
     it("test1", logfn(1));
     it("test2", logfn(2));
 });

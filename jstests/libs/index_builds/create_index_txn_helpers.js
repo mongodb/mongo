@@ -4,21 +4,20 @@
 
 export const indexSpecs = {
     key: {a: 1},
-    name: "a_1"
+    name: "a_1",
 };
 
 export const conflictingIndexSpecs = {
     key: {a: -1},
-    name: "a_1"
+    name: "a_1",
 };
 
-export const createIndexAndCRUDInTxn = function(
-    sessionDB, collName, explicitCollCreate, multikeyIndex) {
+export const createIndexAndCRUDInTxn = function (sessionDB, collName, explicitCollCreate, multikeyIndex) {
     if (undefined === explicitCollCreate) {
-        doassert('createIndexAndCRUDInTxn called with undefined explicitCollCreate');
+        doassert("createIndexAndCRUDInTxn called with undefined explicitCollCreate");
     }
     if (undefined === multikeyIndex) {
-        doassert('createIndexAndCRUDInTxn called with undefined multikeyIndex');
+        doassert("createIndexAndCRUDInTxn called with undefined multikeyIndex");
     }
     if (explicitCollCreate) {
         assert.commandWorked(sessionDB.runCommand({create: collName}));

@@ -17,7 +17,7 @@ TimeseriesTest.run((insert) => {
     const hostIdFieldName = "hostid";
     const nonTimeseriesCollOption = null;
     const timeseriesCollOption = {
-        timeseries: {timeField: timeFieldName, metaField: hostIdFieldName}
+        timeseries: {timeField: timeFieldName, metaField: hostIdFieldName},
     };
     const numHosts = 10;
     const numDocs = 200;
@@ -25,7 +25,7 @@ TimeseriesTest.run((insert) => {
     Random.setRandomSeed();
     const hosts = TimeseriesTest.generateHosts(numHosts);
 
-    let testFunc = function(collAOption, collBOption) {
+    let testFunc = function (collAOption, collBOption) {
         // Prepares two collections. Each collection can be either a time-series or a non
         // time-series collection, depending on collAOption/collBOption.
         const collA = testDB.getCollection("a");
@@ -49,12 +49,11 @@ TimeseriesTest.run((insert) => {
             let host = TimeseriesTest.getRandomElem(hosts);
             let usage = TimeseriesTest.getRandomUsage();
             if (usage % 2) {
-                assert.commandWorked(insert(
-                    collB,
-                    {time: ISODate(), hostid: host.tags.hostid, cpu: usage, idle: 100 - usage}));
-            } else {
                 assert.commandWorked(
-                    insert(collB, {time: ISODate(), hostid: host.tags.hostid, cpu: usage}));
+                    insert(collB, {time: ISODate(), hostid: host.tags.hostid, cpu: usage, idle: 100 - usage}),
+                );
+            } else {
+                assert.commandWorked(insert(collB, {time: ISODate(), hostid: host.tags.hostid, cpu: usage}));
             }
 
             // These counts are to test metaField match.
@@ -68,7 +67,8 @@ TimeseriesTest.run((insert) => {
         }
 
         // Verifies that a meta field "hostid" works with $graphLookup.
-        let results = collA.aggregate([
+        let results = collA
+            .aggregate([
                 {
                     $graphLookup: {
                         from: collB.getName(),
@@ -76,19 +76,21 @@ TimeseriesTest.run((insert) => {
                         connectFromField: "hostid",
                         connectToField: "hostid",
                         as: "matchedB",
-                        maxDepth: 0
-                    }
-                }, {
+                        maxDepth: 0,
+                    },
+                },
+                {
                     $project: {
                         _id: 0,
                         hostid: 1,
                         matchedB: {
-                            $size: "$matchedB"
-                        }
-                    }
+                            $size: "$matchedB",
+                        },
+                    },
                 },
-                {$sort: {hostid: 1}}
-            ]).toArray();
+                {$sort: {hostid: 1}},
+            ])
+            .toArray();
 
         assert.eq(numHosts, results.length, results);
 
@@ -97,39 +99,40 @@ TimeseriesTest.run((insert) => {
         }
 
         // Verifies that measurement fields "cpu" and "idle" work with $graphLookup as expected.
-        results = collA.aggregate([
-            {
-                $graphLookup: {
-                    from: collB.getName(),
-                    startWith: "$hostid",
-                    connectFromField: "hostid",
-                    connectToField: "hostid",
-                    as: "matchedB",
-                    maxDepth: 0,
-                    restrictSearchWithMatch: {
-                        cpu: {$gt: 80},             // Tests measurement "cpu".
-                        idle: {$exists: true}       // Tests the existence of measurement "idle".
-                    }
-                }
-            }, {
-                $project: {
-                    _id: 0,
-                    hostid: 1,
-                    matchedB: {
-                        $size: "$matchedB"
-                    }
-                }
-            },
-            {$sort: {hostid: 1}}
-        ]).toArray();
+        results = collA
+            .aggregate([
+                {
+                    $graphLookup: {
+                        from: collB.getName(),
+                        startWith: "$hostid",
+                        connectFromField: "hostid",
+                        connectToField: "hostid",
+                        as: "matchedB",
+                        maxDepth: 0,
+                        restrictSearchWithMatch: {
+                            cpu: {$gt: 80}, // Tests measurement "cpu".
+                            idle: {$exists: true}, // Tests the existence of measurement "idle".
+                        },
+                    },
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        hostid: 1,
+                        matchedB: {
+                            $size: "$matchedB",
+                        },
+                    },
+                },
+                {$sort: {hostid: 1}},
+            ])
+            .toArray();
 
         assert.eq(numHosts, results.length, results);
 
         for (let i = 0; i < numHosts; i++) {
             let expectedCount = entryCountOver80AndExistsIdlePerHost[i];
-            assert.eq({hostid: i, matchedB: expectedCount},
-                      results[i],
-                      entryCountOver80AndExistsIdlePerHost);
+            assert.eq({hostid: i, matchedB: expectedCount}, results[i], entryCountOver80AndExistsIdlePerHost);
         }
     };
 

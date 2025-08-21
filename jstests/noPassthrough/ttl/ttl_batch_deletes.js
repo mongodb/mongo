@@ -15,7 +15,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const docCount = 50;
 
-const runTestCase = function(fn, isSharded = false) {
+const runTestCase = function (fn, isSharded = false) {
     if (!isSharded) {
         const replTest = new ReplSetTest({
             nodes: 1,
@@ -34,7 +34,7 @@ const runTestCase = function(fn, isSharded = false) {
             config: 1,
             other: {
                 rsOptions: {setParameter: {ttlMonitorSleepSecs: 1}},
-            }
+            },
         });
         const conn = st.s0;
 
@@ -44,27 +44,25 @@ const runTestCase = function(fn, isSharded = false) {
     }
 };
 
-const disableTTLBatchDeletes = function(conn) {
+const disableTTLBatchDeletes = function (conn) {
     // Disable TTL batch deletion.
-    assert.commandWorked(
-        conn.getDB('admin').runCommand({setParameter: 1, ttlMonitorBatchDeletes: false}));
+    assert.commandWorked(conn.getDB("admin").runCommand({setParameter: 1, ttlMonitorBatchDeletes: false}));
 };
 
-const triggerIndexScanTTL = function(db, doShardCollection = false) {
+const triggerIndexScanTTL = function (db, doShardCollection = false) {
     const coll = db.ttl_coll;
     coll.drop();
 
     if (doShardCollection) {
         assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-        assert.commandWorked(
-            db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 'hashed'}}));
+        assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
     }
 
     // Insert 50 docs with timestamp 'now - 24h'.
-    const now = (new Date()).getTime();
-    const past = new Date(now - (3600 * 1000 * 24));
+    const now = new Date().getTime();
+    const past = new Date(now - 3600 * 1000 * 24);
     for (let i = 0; i < docCount; i++) {
-        assert.commandWorked(db.runCommand({insert: 'ttl_coll', documents: [{x: past}]}));
+        assert.commandWorked(db.runCommand({insert: "ttl_coll", documents: [{x: past}]}));
     }
 
     assert.eq(coll.find().itcount(), docCount);
@@ -72,21 +70,21 @@ const triggerIndexScanTTL = function(db, doShardCollection = false) {
     // Create TTL index: expire docs older than 20000 seconds (~5.5h).
     coll.createIndex({x: 1}, {expireAfterSeconds: 20000});
 
-    assert.soon(function() {
+    assert.soon(function () {
         return coll.find().itcount() == 0;
-    }, 'TTL index on x didn\'t delete');
+    }, "TTL index on x didn't delete");
 };
 
-const testTTLDeleteWithIndexScanBatched = function(conn) {
-    const db = conn.getDB('test');
+const testTTLDeleteWithIndexScanBatched = function (conn) {
+    const db = conn.getDB("test");
     triggerIndexScanTTL(db);
 
     // Verify batchedDeletes status to verify ttl deletions have been batched.
     assert.eq(db.serverStatus()["batchedDeletes"]["docs"], docCount);
 };
 
-const testTTLDeleteWithIndexScanDocByDoc = function(conn) {
-    const db = conn.getDB('test');
+const testTTLDeleteWithIndexScanDocByDoc = function (conn) {
+    const db = conn.getDB("test");
 
     disableTTLBatchDeletes(conn);
 
@@ -96,44 +94,45 @@ const testTTLDeleteWithIndexScanDocByDoc = function(conn) {
     assert.eq(db.serverStatus()["batchedDeletes"]["docs"], 0);
 };
 
-const triggerCollectionScanTTL = function(testDB, doShardCollection = false) {
-    const timeFieldName = 'time';
-    const metaFieldName = 'host';
+const triggerCollectionScanTTL = function (testDB, doShardCollection = false) {
+    const timeFieldName = "time";
+    const metaFieldName = "host";
     const expireAfterSeconds = 5;
     // Default maximum range of time for a bucket.
     const defaultBucketMaxRange = 3600;
 
-    const coll = testDB.getCollection('ts');
-    assert.commandWorked(testDB.createCollection(coll.getName(), {
-        timeseries: {
-            timeField: timeFieldName,
-            metaField: metaFieldName,
-        },
-        expireAfterSeconds: expireAfterSeconds,
-    }));
+    const coll = testDB.getCollection("ts");
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {
+            timeseries: {
+                timeField: timeFieldName,
+                metaField: metaFieldName,
+            },
+            expireAfterSeconds: expireAfterSeconds,
+        }),
+    );
 
     if (doShardCollection) {
-        assert.commandWorked(
-            testDB.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}));
+        assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), key: {[metaFieldName]: 1}}));
     }
 
-    const maxTime = new Date((new Date()).getTime() - (1000 * defaultBucketMaxRange));
-    const minTime = new Date(maxTime.getTime() - (1000 * 5 * 60));
+    const maxTime = new Date(new Date().getTime() - 1000 * defaultBucketMaxRange);
+    const minTime = new Date(maxTime.getTime() - 1000 * 5 * 60);
     for (let i = 0; i < docCount; i++) {
         const time = new Date(minTime.getTime() + i);
         assert.commandWorked(coll.insert({[timeFieldName]: time, [metaFieldName]: "localhost"}));
     }
 
-    assert.soon(function() {
+    assert.soon(function () {
         return coll.find().itcount() == 0;
-    }, 'TTL index on the cluster key didn\'t delete');
+    }, "TTL index on the cluster key didn't delete");
 
     assert.eq(0, coll.find().itcount());
     assert.eq(0, getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount());
 };
 
-const testTTLDeleteWithCollectionScanBatched = function(conn) {
-    const testDB = conn.getDB('test');
+const testTTLDeleteWithCollectionScanBatched = function (conn) {
+    const testDB = conn.getDB("test");
 
     triggerCollectionScanTTL(testDB);
 
@@ -142,8 +141,8 @@ const testTTLDeleteWithCollectionScanBatched = function(conn) {
     assert.gt(testDB.serverStatus()["batchedDeletes"]["batches"], 0);
 };
 
-const testTTLDeleteWithCollectionScanDocByDoc = function(conn) {
-    const testDB = conn.getDB('test');
+const testTTLDeleteWithCollectionScanDocByDoc = function (conn) {
+    const testDB = conn.getDB("test");
 
     disableTTLBatchDeletes(conn);
 
@@ -152,8 +151,8 @@ const testTTLDeleteWithCollectionScanDocByDoc = function(conn) {
     assert.eq(testDB.serverStatus()["batchedDeletes"]["batches"], 0);
 };
 
-const verifyTTLOnShardedCluster = function(conn, clustered = false) {
-    const db = conn.getDB('test');
+const verifyTTLOnShardedCluster = function (conn, clustered = false) {
+    const db = conn.getDB("test");
     if (clustered) {
         triggerCollectionScanTTL(db, true /* doShardCollection */);
     } else {
@@ -166,7 +165,7 @@ const verifyTTLOnShardedCluster = function(conn, clustered = false) {
         db: db,
         func: (db) => {
             sum += db.serverStatus()["batchedDeletes"]["docs"];
-        }
+        },
     });
 
     if (clustered) {
@@ -178,11 +177,11 @@ const verifyTTLOnShardedCluster = function(conn, clustered = false) {
     }
 };
 
-const testTTLDeleteWithIndexScanBatchedOnShardedCollection = function(conn) {
+const testTTLDeleteWithIndexScanBatchedOnShardedCollection = function (conn) {
     verifyTTLOnShardedCluster(conn, false);
 };
 
-const testTTLDeleteWithCollectionScanBatchedOnShardedCollection = function(conn) {
+const testTTLDeleteWithCollectionScanBatchedOnShardedCollection = function (conn) {
     verifyTTLOnShardedCluster(conn, true);
 };
 

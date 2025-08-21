@@ -14,13 +14,13 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const defaultBucketMaxSize = 128000;                                           //  125 KB
-const minWiredTigerCacheSizeGB = 0.256;                                        //  256 MB
-const minWiredTigerCacheSize = minWiredTigerCacheSizeGB * 1024 * 1024 * 1024;  //  256 MB
-const measurementValueLength = 1 * 1024 * 1024;                                //    1 MB
+const defaultBucketMaxSize = 128000; //  125 KB
+const minWiredTigerCacheSizeGB = 0.256; //  256 MB
+const minWiredTigerCacheSize = minWiredTigerCacheSizeGB * 1024 * 1024 * 1024; //  256 MB
+const measurementValueLength = 1 * 1024 * 1024; //    1 MB
 const defaultBucketMinCount = 10;
-const timeFieldName = 'time';
-const metaFieldName = 'meta';
+const timeFieldName = "time";
+const metaFieldName = "meta";
 
 const replSet = new ReplSetTest({
     nodes: 1,
@@ -31,22 +31,23 @@ replSet.initiate();
 
 const db = replSet.getPrimary().getDB(jsTestName());
 
-let coll = db.getCollection('t');
+let coll = db.getCollection("t");
 coll.drop();
 
 // Helper to log timeseries stats.
-const formatStatsLog = ((stats) => {
+const formatStatsLog = (stats) => {
     return "Timeseries stats: " + tojson(stats);
-});
+};
 
-const resetCollection = (() => {
+const resetCollection = () => {
     coll.drop();
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-});
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
+};
 
 // Inserts small documents into the collection with increasing meta fields to generate N buckets.
-const initializeBuckets = function(numOfBuckets = 1) {
+const initializeBuckets = function (numOfBuckets = 1) {
     jsTestLog("Inserting and generating buckets.");
     let bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < numOfBuckets; i++) {
@@ -58,7 +59,7 @@ const initializeBuckets = function(numOfBuckets = 1) {
 
 (function largeMeasurementsNoCachePressure() {
     jsTestLog("Entering largeMeasurementsNoCachePressure...");
-    coll = db.getCollection('largeMeasurementsNoCachePressure');
+    coll = db.getCollection("largeMeasurementsNoCachePressure");
     resetCollection();
 
     let expectedBucketCount = 0;
@@ -73,12 +74,12 @@ const initializeBuckets = function(numOfBuckets = 1) {
     // ~11.5 MB (right under the largest size of buckets we allow which is 12 MB).
     for (let i = 0; i < defaultBucketMinCount - 1; i++) {
         // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
-        const value = (i % 2 == 0 ? "a" : "b");
+        const value = i % 2 == 0 ? "a" : "b";
         const doc = {
             _id: i,
             [timeFieldName]: ISODate(),
             [metaFieldName]: meta1,
-            value: value.repeat(measurementValueLength)
+            value: value.repeat(measurementValueLength),
         };
         assert.commandWorked(coll.insert(doc));
     }
@@ -86,12 +87,12 @@ const initializeBuckets = function(numOfBuckets = 1) {
 
     let timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
     assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numBucketsClosedDueToSize,
-              numBucketsClosedDueToSize,
-              formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure,
-              numBucketsClosedDueToCachePressure,
-              formatStatsLog(timeseriesStats));
+    assert.eq(timeseriesStats.numBucketsClosedDueToSize, numBucketsClosedDueToSize, formatStatsLog(timeseriesStats));
+    assert.eq(
+        timeseriesStats.numBucketsClosedDueToCachePressure,
+        numBucketsClosedDueToCachePressure,
+        formatStatsLog(timeseriesStats),
+    );
 
     // If we exceed the min bucket count of 10, we should close the bucket since it exceeds our
     // default bucket size of 125 KB. (This requires two additional insertions).
@@ -105,24 +106,24 @@ const initializeBuckets = function(numOfBuckets = 1) {
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
     assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numBucketsClosedDueToSize,
-              numBucketsClosedDueToSize,
-              formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure,
-              numBucketsClosedDueToCachePressure,
-              formatStatsLog(timeseriesStats));
+    assert.eq(timeseriesStats.numBucketsClosedDueToSize, numBucketsClosedDueToSize, formatStatsLog(timeseriesStats));
+    assert.eq(
+        timeseriesStats.numBucketsClosedDueToCachePressure,
+        numBucketsClosedDueToCachePressure,
+        formatStatsLog(timeseriesStats),
+    );
 
     // Since the maximum size for buckets is capped at 12 MB, we should hit the size limit before
     // closing the bucket due to the minimum count, so we expect to close the oversized bucket and
     // create another bucket.
     for (let i = 0; i < defaultBucketMinCount; i++) {
         // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
-        const value = (i % 2 == 0 ? "a" : "b");
+        const value = i % 2 == 0 ? "a" : "b";
         const doc = {
             _id: i,
             [timeFieldName]: ISODate(),
             [metaFieldName]: meta2,
-            value: value.repeat(measurementValueLength)
+            value: value.repeat(measurementValueLength),
         };
         assert.commandWorked(coll.insert(doc));
     }
@@ -134,23 +135,22 @@ const initializeBuckets = function(numOfBuckets = 1) {
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
     assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numBucketsClosedDueToSize,
-              numBucketsClosedDueToSize,
-              formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure,
-              numBucketsClosedDueToCachePressure,
-              formatStatsLog(timeseriesStats));
+    assert.eq(timeseriesStats.numBucketsClosedDueToSize, numBucketsClosedDueToSize, formatStatsLog(timeseriesStats));
+    assert.eq(
+        timeseriesStats.numBucketsClosedDueToCachePressure,
+        numBucketsClosedDueToCachePressure,
+        formatStatsLog(timeseriesStats),
+    );
 })();
 
 (function largeMeasurementsWithCachePressure() {
     jsTestLog("Entering largeMeasurementsWithCachePressure...");
-    coll = db.getCollection('largeMeasurementsWithCachePressure');
+    coll = db.getCollection("largeMeasurementsWithCachePressure");
     resetCollection();
 
     // We want the 'cacheDerivedMaxSize' to equal 5.5 MB.
     const cacheDerivedMaxSize = 5.5 * 1024 * 1024;
-    const bucketCount =
-        Math.ceil(minWiredTigerCacheSize / (2 * cacheDerivedMaxSize));  // Evaluates to 24.
+    const bucketCount = Math.ceil(minWiredTigerCacheSize / (2 * cacheDerivedMaxSize)); // Evaluates to 24.
     const meta = bucketCount;
 
     // We expect the bucket mapping to 'meta' to be around ~5 MB in size so no buckets should be
@@ -158,12 +158,12 @@ const initializeBuckets = function(numOfBuckets = 1) {
     initializeBuckets(bucketCount - 1);
     for (let i = 0; i < 3; i++) {
         // Strings greater than 16 bytes are not compressed unless they are equal to the previous.
-        const value = (i % 2 == 0 ? "a" : "b");
+        const value = i % 2 == 0 ? "a" : "b";
         const doc = {
             _id: i,
             [timeFieldName]: ISODate(),
             [metaFieldName]: meta,
-            value: value.repeat(measurementValueLength)
+            value: value.repeat(measurementValueLength),
         };
         assert.commandWorked(coll.insert(doc));
     }
@@ -171,23 +171,21 @@ const initializeBuckets = function(numOfBuckets = 1) {
     let timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
     assert.eq(timeseriesStats.bucketCount, bucketCount, formatStatsLog(timeseriesStats));
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
-    assert.eq(
-        timeseriesStats.numBucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
+    assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
     // We expect this insert to cause the bucket to close due to cache pressure since it will exceed
     // the rough cacheDerivedMaxSize of 5.5 MB and create a new bucket for this measurement.
     const doc = {
         _id: bucketCount,
         [timeFieldName]: ISODate(),
         [metaFieldName]: meta,
-        value: "a".repeat(measurementValueLength)
+        value: "a".repeat(measurementValueLength),
     };
     assert.commandWorked(coll.insert(doc));
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
     assert.eq(timeseriesStats.bucketCount, bucketCount + 1, formatStatsLog(timeseriesStats));
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
-    assert.eq(
-        timeseriesStats.numBucketsClosedDueToCachePressure, 1, formatStatsLog(timeseriesStats));
+    assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure, 1, formatStatsLog(timeseriesStats));
 })();
 
 replSet.stopSet();

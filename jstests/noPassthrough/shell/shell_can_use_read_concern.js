@@ -28,10 +28,13 @@ function runTests({withSession}) {
     const coll = db.shell_can_use_read_concern;
     coll.drop();
 
-    function testCommandCanBeCausallyConsistent(func, {
-        expectedSession: expectedSession = withSession,
-        expectedAfterClusterTime: expectedAfterClusterTime = true
-    } = {}) {
+    function testCommandCanBeCausallyConsistent(
+        func,
+        {
+            expectedSession: expectedSession = withSession,
+            expectedAfterClusterTime: expectedAfterClusterTime = true,
+        } = {},
+    ) {
         const mongoRunCommandOriginal = Mongo.prototype.runCommand;
 
         const sentinel = {};
@@ -55,13 +58,15 @@ function runTests({withSession}) {
         let cmdName = Object.keys(cmdObjSeen)[0];
 
         if (expectedSession) {
-            assert(cmdObjSeen.hasOwnProperty("lsid"),
-                   "Expected operation " + tojson(cmdObjSeen) +
-                       " to have a logical session id: " + func.toString());
+            assert(
+                cmdObjSeen.hasOwnProperty("lsid"),
+                "Expected operation " + tojson(cmdObjSeen) + " to have a logical session id: " + func.toString(),
+            );
         } else {
-            assert(!cmdObjSeen.hasOwnProperty("lsid"),
-                   "Expected operation " + tojson(cmdObjSeen) +
-                       " to not have a logical session id: " + func.toString());
+            assert(
+                !cmdObjSeen.hasOwnProperty("lsid"),
+                "Expected operation " + tojson(cmdObjSeen) + " to not have a logical session id: " + func.toString(),
+            );
         }
 
         // Explain read concerns are on the inner command.
@@ -70,20 +75,31 @@ function runTests({withSession}) {
         }
 
         if (expectedAfterClusterTime) {
-            assert(cmdObjSeen.hasOwnProperty("readConcern"),
-                   "Expected operation " + tojson(cmdObjSeen) +
-                       " to have a readConcern object since it can be causally consistent: " +
-                       func.toString());
+            assert(
+                cmdObjSeen.hasOwnProperty("readConcern"),
+                "Expected operation " +
+                    tojson(cmdObjSeen) +
+                    " to have a readConcern object since it can be causally consistent: " +
+                    func.toString(),
+            );
 
             const readConcern = cmdObjSeen.readConcern;
-            assert(readConcern.hasOwnProperty("afterClusterTime"),
-                   "Expected operation " + tojson(cmdObjSeen) +
-                       " to specify afterClusterTime since it can be causally consistent: " +
-                       func.toString());
+            assert(
+                readConcern.hasOwnProperty("afterClusterTime"),
+                "Expected operation " +
+                    tojson(cmdObjSeen) +
+                    " to specify afterClusterTime since it can be causally consistent: " +
+                    func.toString(),
+            );
         } else {
-            assert(!cmdObjSeen.hasOwnProperty("readConcern"),
-                   "Expected operation " + tojson(cmdObjSeen) + " to not have a readConcern" +
-                       " object since it cannot be causally consistent: " + func.toString());
+            assert(
+                !cmdObjSeen.hasOwnProperty("readConcern"),
+                "Expected operation " +
+                    tojson(cmdObjSeen) +
+                    " to not have a readConcern" +
+                    " object since it cannot be causally consistent: " +
+                    func.toString(),
+            );
         }
     }
 
@@ -92,42 +108,47 @@ function runTests({withSession}) {
     //
 
     {
-        testCommandCanBeCausallyConsistent(function() {
-            assert.commandWorked(coll.insert([{}, {}, {}, {}, {}]));
-        }, {expectedSession: withSession, expectedAfterClusterTime: false});
+        testCommandCanBeCausallyConsistent(
+            function () {
+                assert.commandWorked(coll.insert([{}, {}, {}, {}, {}]));
+            },
+            {expectedSession: withSession, expectedAfterClusterTime: false},
+        );
 
-        testCommandCanBeCausallyConsistent(function() {
-            assert.commandWorked(
-                db.runCommand({find: coll.getName(), batchSize: 5, singleBatch: true}));
+        testCommandCanBeCausallyConsistent(function () {
+            assert.commandWorked(db.runCommand({find: coll.getName(), batchSize: 5, singleBatch: true}));
         });
 
         const cursor = coll.find().batchSize(2);
 
-        testCommandCanBeCausallyConsistent(function() {
+        testCommandCanBeCausallyConsistent(function () {
             cursor.next();
             cursor.next();
         });
 
-        testCommandCanBeCausallyConsistent(function() {
-            cursor.next();
-            cursor.next();
-            cursor.next();
-            assert(!cursor.hasNext());
-        }, {
-            expectedSession: withSession,
-            expectedAfterClusterTime: false,
-        });
+        testCommandCanBeCausallyConsistent(
+            function () {
+                cursor.next();
+                cursor.next();
+                cursor.next();
+                assert(!cursor.hasNext());
+            },
+            {
+                expectedSession: withSession,
+                expectedAfterClusterTime: false,
+            },
+        );
     }
 
     //
     // Tests for the "count" command.
     //
 
-    testCommandCanBeCausallyConsistent(function() {
+    testCommandCanBeCausallyConsistent(function () {
         assert.commandWorked(db.runCommand({count: coll.getName()}));
     });
 
-    testCommandCanBeCausallyConsistent(function() {
+    testCommandCanBeCausallyConsistent(function () {
         assert.eq(5, coll.count());
     });
 
@@ -135,11 +156,11 @@ function runTests({withSession}) {
     // Tests for the "distinct" command.
     //
 
-    testCommandCanBeCausallyConsistent(function() {
+    testCommandCanBeCausallyConsistent(function () {
         assert.commandWorked(db.runCommand({distinct: coll.getName(), key: "_id"}));
     });
 
-    testCommandCanBeCausallyConsistent(function() {
+    testCommandCanBeCausallyConsistent(function () {
         const values = coll.distinct("_id");
         assert.eq(5, values.length, tojson(values));
     });
@@ -149,48 +170,51 @@ function runTests({withSession}) {
     //
 
     {
-        testCommandCanBeCausallyConsistent(function() {
-            assert.commandWorked(
-                db.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 5}}));
+        testCommandCanBeCausallyConsistent(function () {
+            assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 5}}));
         });
 
-        testCommandCanBeCausallyConsistent(function() {
-            assert.commandWorked(db.runCommand(
-                {aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 5}, explain: true}));
+        testCommandCanBeCausallyConsistent(function () {
+            assert.commandWorked(
+                db.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 5}, explain: true}),
+            );
         });
 
         let cursor;
 
-        testCommandCanBeCausallyConsistent(function() {
+        testCommandCanBeCausallyConsistent(function () {
             cursor = coll.aggregate([], {cursor: {batchSize: 2}});
             cursor.next();
             cursor.next();
         });
 
-        testCommandCanBeCausallyConsistent(function() {
-            cursor.next();
-            cursor.next();
-            cursor.next();
-            assert(!cursor.hasNext());
-        }, {
-            expectedSession: withSession,
-            expectedAfterClusterTime: false,
-        });
+        testCommandCanBeCausallyConsistent(
+            function () {
+                cursor.next();
+                cursor.next();
+                cursor.next();
+                assert(!cursor.hasNext());
+            },
+            {
+                expectedSession: withSession,
+                expectedAfterClusterTime: false,
+            },
+        );
     }
 
     //
     // Tests for the "explain" command.
     //
 
-    testCommandCanBeCausallyConsistent(function() {
+    testCommandCanBeCausallyConsistent(function () {
         assert.commandWorked(db.runCommand({explain: {find: coll.getName()}}));
     });
 
-    testCommandCanBeCausallyConsistent(function() {
+    testCommandCanBeCausallyConsistent(function () {
         coll.find().explain();
     });
 
-    testCommandCanBeCausallyConsistent(function() {
+    testCommandCanBeCausallyConsistent(function () {
         coll.explain().find().finish();
     });
 

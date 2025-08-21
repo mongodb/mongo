@@ -46,13 +46,11 @@ function testExplainAuth(authSpec) {
     assertCmdResult(cmdResult, authSpec.count);
 
     // .remove()
-    cmdResult =
-        db.runCommand({explain: {delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}]}});
+    cmdResult = db.runCommand({explain: {delete: coll.getName(), deletes: [{q: {a: 1}, limit: 1}]}});
     assertCmdResult(cmdResult, authSpec.remove);
 
     // .update()
-    cmdResult = db.runCommand(
-        {explain: {update: coll.getName(), updates: [{q: {a: 1}, u: {$set: {b: 1}}}]}});
+    cmdResult = db.runCommand({explain: {update: coll.getName(), updates: [{q: {a: 1}, u: {$set: {b: 1}}}]}});
     assertCmdResult(cmdResult, authSpec.update);
 }
 
@@ -60,17 +58,17 @@ function testExplainAuth(authSpec) {
 db.createRole({
     role: "findOnly",
     privileges: [{resource: {db: db.getName(), collection: coll.getName()}, actions: ["find"]}],
-    roles: []
+    roles: [],
 });
 db.createRole({
     role: "updateOnly",
     privileges: [{resource: {db: db.getName(), collection: coll.getName()}, actions: ["update"]}],
-    roles: []
+    roles: [],
 });
 db.createRole({
     role: "removeOnly",
     privileges: [{resource: {db: db.getName(), collection: coll.getName()}, actions: ["remove"]}],
-    roles: []
+    roles: [],
 });
 
 // Create three users:

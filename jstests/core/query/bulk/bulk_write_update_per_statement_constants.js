@@ -12,11 +12,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {
-    cursorEntryValidator,
-    cursorSizeValidator,
-    summaryFieldsValidator
-} from "jstests/libs/bulk_write_utils.js";
+import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
 
 const coll = db[jsTestName()];
 const collName = coll.getFullName();
@@ -33,7 +29,7 @@ let res = db.adminCommand({
             update: 0,
             filter: {$expr: {$eq: ["$skey", "$$targetKey"]}},
             updateMods: [{$set: {skey: "$$replacedKey"}}],
-            constants: {targetKey: "MongoDB", replacedKey: "MongoDB2"}
+            constants: {targetKey: "MongoDB", replacedKey: "MongoDB2"},
         },
     ],
     nsInfo: [{ns: collName}],
@@ -41,17 +37,18 @@ let res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 4);
-summaryFieldsValidator(
-    res, {nErrors: 0, nInserted: 3, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
+summaryFieldsValidator(res, {nErrors: 0, nInserted: 3, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, n: 1, nModified: 1});
 
-assert.sameMembers(
-    coll.find().toArray(),
-    [{_id: 0, skey: "MongoDB2"}, {_id: 1, skey: "MongoDB2"}, {_id: 2, skey: "MongoDB3"}]);
+assert.sameMembers(coll.find().toArray(), [
+    {_id: 0, skey: "MongoDB2"},
+    {_id: 1, skey: "MongoDB2"},
+    {_id: 2, skey: "MongoDB3"},
+]);
 
 assert(coll.drop());
 
@@ -66,18 +63,17 @@ res = db.adminCommand({
             update: 0,
             filter: {$expr: {$eq: ["$skey", "$$targetKey"]}},
             updateMods: [{$set: {skey: "$$replacedKey"}}],
-            constants: {replacedKey: "MongoDB4"}
+            constants: {replacedKey: "MongoDB4"},
         },
     ],
     nsInfo: [{ns: collName}],
-    let : {targetKey: "MongoDB3", replacedKey: "MongoDB2"}
+    let: {targetKey: "MongoDB3", replacedKey: "MongoDB2"},
 });
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 4);
 assert.eq(res.nErrors, 0, "bulkWrite command response: " + tojson(res));
-summaryFieldsValidator(
-    res, {nErrors: 0, nInserted: 3, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
+summaryFieldsValidator(res, {nErrors: 0, nInserted: 3, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});

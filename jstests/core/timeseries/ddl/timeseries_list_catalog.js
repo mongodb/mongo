@@ -17,29 +17,28 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {
     areViewlessTimeseriesEnabled,
-    getTimeseriesCollForDDLOps
+    getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 assert.commandWorked(db.dropDatabase());
 
-const collName = 'coll';
-const timeFieldName = 'timestamp';
-const metaFieldName = 'metadata';
+const collName = "coll";
+const timeFieldName = "timestamp";
+const metaFieldName = "metadata";
 
 function validateCollectionMetadata(coll, metadata, onAdminDB) {
-    jsTest.log(`Context | nss: ${coll.getFullName()}, tracked: ${coll._isSharded()}, onAdminDB: ${
-        onAdminDB}`);
+    jsTest.log(`Context | nss: ${coll.getFullName()}, tracked: ${coll._isSharded()}, onAdminDB: ${onAdminDB}`);
     jsTest.log(`Collection metadata: ${tojson(metadata)}`);
     const viewlessTimeseriesEnabled = areViewlessTimeseriesEnabled(db);
     if (viewlessTimeseriesEnabled) {
-        assert.eq('timeseries', metadata.type);
+        assert.eq("timeseries", metadata.type);
     } else {
-        assert.eq('collection', metadata.type);
+        assert.eq("collection", metadata.type);
     }
-    assert.hasFields(metadata.md.options, ['timeseries']);
+    assert.hasFields(metadata.md.options, ["timeseries"]);
     const tsOptions = metadata.md.options.timeseries;
 
-    assert.hasFields(tsOptions, ['timeField', 'metaField']);
+    assert.hasFields(tsOptions, ["timeField", "metaField"]);
 
     assert.eq(timeFieldName, tsOptions.timeField);
     assert.eq(metaFieldName, tsOptions.metaField);
@@ -47,9 +46,11 @@ function validateCollectionMetadata(coll, metadata, onAdminDB) {
 
 function validateListCatalog(coll, listCatalogRes, onAdminDB, collExists) {
     if (!collExists) {
-        assert.eq(0,
-                  listCatalogRes.length,
-                  `Expected listCatalog output to be empty but found: ${tojson(listCatalogRes)}`);
+        assert.eq(
+            0,
+            listCatalogRes.length,
+            `Expected listCatalog output to be empty but found: ${tojson(listCatalogRes)}`,
+        );
         return;
     }
 
@@ -58,47 +59,52 @@ function validateListCatalog(coll, listCatalogRes, onAdminDB, collExists) {
             1,
             listCatalogRes.length,
             `Expected listCatalog to have exactly one entry for unsharded timeseries collection '${
-                collName}' but found: ${tojson(listCatalogRes)}`);
+                collName
+            }' but found: ${tojson(listCatalogRes)}`,
+        );
         validateCollectionMetadata(coll, listCatalogRes[0], onAdminDB);
     } else {
-        listCatalogRes.forEach(listCatalogEntry =>
-                                   validateCollectionMetadata(coll, listCatalogEntry, onAdminDB));
+        listCatalogRes.forEach((listCatalogEntry) => validateCollectionMetadata(coll, listCatalogEntry, onAdminDB));
     }
 }
 function testListCatalog(coll, collExists) {
     // Check output of listCatalog on admin namespace
-    let listCatalogRes =
-        coll.getDB()
-            .getSiblingDB('admin')
-            .aggregate([
-                {$listCatalog: {}},
-                {
-                    $match: {
-                        'db': coll.getDB().getName(),
-                        'name': getTimeseriesCollForDDLOps(coll.getDB(), coll).getName()
-                    }
-                }
-            ])
-            .toArray();
-    validateListCatalog(getTimeseriesCollForDDLOps(coll.getDB(), coll),
-                        listCatalogRes,
-                        true /* onAdminDB */,
-                        collExists);
+    let listCatalogRes = coll
+        .getDB()
+        .getSiblingDB("admin")
+        .aggregate([
+            {$listCatalog: {}},
+            {
+                $match: {
+                    "db": coll.getDB().getName(),
+                    "name": getTimeseriesCollForDDLOps(coll.getDB(), coll).getName(),
+                },
+            },
+        ])
+        .toArray();
+    validateListCatalog(
+        getTimeseriesCollForDDLOps(coll.getDB(), coll),
+        listCatalogRes,
+        true /* onAdminDB */,
+        collExists,
+    );
 
     // Check output of listCatalog on collection namespace
-    listCatalogRes =
-        getTimeseriesCollForDDLOps(coll.getDB(), coll).aggregate([{$listCatalog: {}}]).toArray();
-    validateListCatalog(getTimeseriesCollForDDLOps(coll.getDB(), coll),
-                        listCatalogRes,
-                        false /* onAdminDB */,
-                        collExists);
+    listCatalogRes = getTimeseriesCollForDDLOps(coll.getDB(), coll)
+        .aggregate([{$listCatalog: {}}])
+        .toArray();
+    validateListCatalog(
+        getTimeseriesCollForDDLOps(coll.getDB(), coll),
+        listCatalogRes,
+        false /* onAdminDB */,
+        collExists,
+    );
 }
 
 const coll = db[collName];
 testListCatalog(coll, false /* collExists */);
 
-assert.commandWorked(db.createCollection(
-    collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 testListCatalog(coll, true /* collExists */);
 
 TimeseriesTest.insertManyDocs(coll);

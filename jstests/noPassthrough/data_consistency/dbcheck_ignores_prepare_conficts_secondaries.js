@@ -14,9 +14,9 @@ replSet.initiate();
 const primary = replSet.getPrimary();
 const secondary = replSet.getSecondary();
 
-const dbName = 'test';
+const dbName = "test";
 const db = primary.getDB(dbName);
-const collName = 'coll';
+const collName = "coll";
 const coll = db[collName];
 
 assert.commandWorked(coll.insert({_id: 0, a: "first"}));
@@ -25,7 +25,7 @@ assert.commandWorked(coll.insert({_id: 0, a: "first"}));
 const failPoint = configureFailPoint(primary, "hangBeforeDbCheckLogOp");
 
 const awaitDbCheck = startParallelShell(() => {
-    assert.commandWorked(db.runCommand({dbCheck: 'coll'}));
+    assert.commandWorked(db.runCommand({dbCheck: "coll"}));
 }, primary.port);
 failPoint.wait();
 
@@ -46,7 +46,7 @@ awaitDbCheckCompletion(replSet, db);
 
 // We should not find inconsistencies on any node.
 [primary, secondary].forEach((node) => {
-    checkHealthLog(node.getDB('local').system.healthlog, {severity: "error"}, 0);
+    checkHealthLog(node.getDB("local").system.healthlog, {severity: "error"}, 0);
 });
 
 session.abortTransaction();

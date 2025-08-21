@@ -1,9 +1,7 @@
 /**
  * Verify CBR can estimate value $elemMatch MatchExpression using histograms.
  */
-import {
-    getWinningPlanFromExplain,
-} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {planEstimatedWithHistogram} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -20,11 +18,7 @@ coll.drop();
 let docs = [];
 for (let i = 0; i < 100; i++) {
     docs.push({
-        a: [
-            i,
-            i * 2,
-            i * 3,
-        ]
+        a: [i, i * 2, i * 3],
     });
 }
 assert.commandWorked(coll.insert(docs));
@@ -35,10 +29,8 @@ function testElemMatchWithDifferentSelectivities() {
     assert.commandWorked(coll.runCommand({analyze: collName, key: "a"}));
     // No index on 'a' forces a collection scan plan.
 
-    const moreDocsPlan =
-        getWinningPlanFromExplain(coll.find({a: {$elemMatch: {$gt: 5, $lt: 20}}}).explain());
-    const fewerDocsPlan =
-        getWinningPlanFromExplain(coll.find({a: {$elemMatch: {$gt: 5, $lt: 15}}}).explain());
+    const moreDocsPlan = getWinningPlanFromExplain(coll.find({a: {$elemMatch: {$gt: 5, $lt: 20}}}).explain());
+    const fewerDocsPlan = getWinningPlanFromExplain(coll.find({a: {$elemMatch: {$gt: 5, $lt: 15}}}).explain());
 
     assert(planEstimatedWithHistogram(moreDocsPlan), moreDocsPlan);
     assert(planEstimatedWithHistogram(fewerDocsPlan), fewerDocsPlan);

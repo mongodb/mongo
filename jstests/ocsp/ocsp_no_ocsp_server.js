@@ -10,7 +10,7 @@ import {
     clearOCSPCache,
     OCSP_CA_PEM,
     OCSP_NO_OCSP_SERVER_CERT,
-    OCSP_SERVER_CERT
+    OCSP_SERVER_CERT,
 } from "jstests/ocsp/lib/ocsp_helpers.js";
 import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 

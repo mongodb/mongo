@@ -7,7 +7,7 @@ const name = "read_concern_majority_getmore_secondaries";
 const replSet = new ReplSetTest({
     name: name,
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
-    settings: {chainingAllowed: false}
+    settings: {chainingAllowed: false},
 });
 replSet.startSet();
 replSet.initiate();
@@ -23,8 +23,9 @@ const primaryDB = primary.getDB(dbName);
 const secondaryDB = secondary.getDB(dbName);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Insert data on primary and allow it to become committed.
 for (let i = 0; i < 4; i++) {
@@ -45,8 +46,10 @@ for (let i = 4; i < 8; i++) {
 }
 
 // Check that it reached the secondary.
-assert.docEq([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 7}],
-             secondaryDB[collName].find().sort({_id: 1}).toArray());
+assert.docEq(
+    [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 7}],
+    secondaryDB[collName].find().sort({_id: 1}).toArray(),
+);
 
 // It is important that this query does not do an in-memory sort. Otherwise the initial find
 // will consume all of the results from the storage engine in order to sort them, so we will not

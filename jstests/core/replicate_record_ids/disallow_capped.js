@@ -15,9 +15,9 @@
  * ]
  */
 
-const collName = jsTestName() + '_coll';
-const cappedCollName = collName + '_capped';
-const badCappedCollName = collName + '_bad_coll';
+const collName = jsTestName() + "_coll";
+const cappedCollName = collName + "_capped";
+const badCappedCollName = collName + "_bad_coll";
 db[collName].drop();
 db[cappedCollName].drop();
 db[badCappedCollName].drop();
@@ -27,8 +27,7 @@ assert.commandWorked(db.runCommand({create: collName, recordIdsReplicated: true}
 assert.commandWorked(db[collName].createIndex({a: 1}));
 
 jsTestLog("Cloning as capped should work but disables recordIdsReplicated on clone.");
-assert.commandWorked(
-    db.runCommand({cloneCollectionAsCapped: collName, toCollection: cappedCollName, size: 2000}));
+assert.commandWorked(db.runCommand({cloneCollectionAsCapped: collName, toCollection: cappedCollName, size: 2000}));
 let collectionOptions = db[cappedCollName].exists();
 assert(collectionOptions.options.capped, collectionOptions);
 assert(!collectionOptions.options.recordIdsReplicated, collectionOptions);
@@ -40,18 +39,18 @@ jsTestLog("The original collection should still have secondary indexes.");
 indexes = db[collName].getIndexes();
 assert.eq(indexes.length, 2, indexes);
 
-jsTestLog('Converting to capped should work but disables recordIdsReplicated after conversion.');
+jsTestLog("Converting to capped should work but disables recordIdsReplicated after conversion.");
 assert.commandWorked(db.runCommand({convertToCapped: collName, size: 2000}));
 collectionOptions = db[collName].exists();
 assert(collectionOptions.options.capped, collectionOptions);
 assert(!collectionOptions.options.recordIdsReplicated, collectionOptions);
 
-jsTestLog('Converting to capped should remove secondary indexes.');
+jsTestLog("Converting to capped should remove secondary indexes.");
 indexes = db[collName].getIndexes();
 assert.eq(indexes.length, 1, indexes);
 
-jsTestLog(
-    "Creating collection with capped:true and recordIdsReplicated:true should not be allowed.");
+jsTestLog("Creating collection with capped:true and recordIdsReplicated:true should not be allowed.");
 assert.commandFailedWithCode(
     db.runCommand({create: badCappedCollName, capped: true, size: 2000, recordIdsReplicated: true}),
-    ErrorCodes.CommandNotSupported);
+    ErrorCodes.CommandNotSupported,
+);

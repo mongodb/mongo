@@ -17,13 +17,13 @@ if (jsTest.options().storageEngine == "inMemory" && _isWindows()) {
     quit();
 }
 
-export const $config = (function() {
+export const $config = (function () {
     const initData = {
-        getCollectionName: function(collName) {
+        getCollectionName: function (collName) {
             return "insert_duplicates_unique_index_" + collName;
         },
 
-        getCollection: function(db, collName) {
+        getCollection: function (db, collName) {
             return db.getCollection(this.getCollectionName(collName));
         },
     };
@@ -48,7 +48,7 @@ export const $config = (function() {
                 assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
                 assert.eq(0, res.nInserted, tojson(res));
             }
-        }
+        },
     };
 
     function setup(db, collName) {
@@ -65,10 +65,10 @@ export const $config = (function() {
     return {
         threadCount: 10,
         iterations: 100,
-        startState: 'init',
+        startState: "init",
         states: states,
         data: initData,
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

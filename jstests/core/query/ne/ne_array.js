@@ -29,11 +29,21 @@ assert.commandWorked(coll.insert({_id: 2, a: [7, 8]}));
 
 // sort by _id in case we run on a sharded cluster which puts the documents on different
 // shards (and thus, might return them in any order).
-assert.eq(coll.find({a: {$elemMatch: {$not: {$eq: [123]}}}}, {_id: 1}).sort({_id: 1}).toArray(),
-          [{_id: 1}, {_id: 2}]);
+assert.eq(
+    coll
+        .find({a: {$elemMatch: {$not: {$eq: [123]}}}}, {_id: 1})
+        .sort({_id: 1})
+        .toArray(),
+    [{_id: 1}, {_id: 2}],
+);
 
-assert.eq(coll.find({a: {$elemMatch: {$not: {$in: [[123]]}}}}, {_id: 1}).sort({_id: 1}).toArray(),
-          [{_id: 1}, {_id: 2}]);
+assert.eq(
+    coll
+        .find({a: {$elemMatch: {$not: {$in: [[123]]}}}}, {_id: 1})
+        .sort({_id: 1})
+        .toArray(),
+    [{_id: 1}, {_id: 2}],
+);
 
 assert.eq(coll.find({a: {$not: {$elemMatch: {$eq: [123]}}}}, {_id: 1}).toArray(), [{_id: 2}]);
 assert.eq(coll.find({a: {$not: {$elemMatch: {$in: [[123]]}}}}, {_id: 1}).toArray(), [{_id: 2}]);
@@ -48,14 +58,32 @@ assert.commandWorked(coll.insert({_id: 2, a: [{b: [4, [123]]}]}));
 assert.commandWorked(coll.insert({_id: 3, a: [{b: [[123]]}]}));
 
 // Remember that $ne with an array will match arrays where _none_ of the elements match.
-assert.eq(coll.find({a: {$elemMatch: {b: {$ne: [123]}}}}, {_id: 1}).sort({_id: 1}).toArray(),
-          [{_id: 0}, {_id: 1}]);
 assert.eq(
-    coll.find({a: {$elemMatch: {b: {$not: {$in: [[123]]}}}}}, {_id: 1}).sort({_id: 1}).toArray(),
-    [{_id: 0}, {_id: 1}]);
+    coll
+        .find({a: {$elemMatch: {b: {$ne: [123]}}}}, {_id: 1})
+        .sort({_id: 1})
+        .toArray(),
+    [{_id: 0}, {_id: 1}],
+);
+assert.eq(
+    coll
+        .find({a: {$elemMatch: {b: {$not: {$in: [[123]]}}}}}, {_id: 1})
+        .sort({_id: 1})
+        .toArray(),
+    [{_id: 0}, {_id: 1}],
+);
 
-assert.eq(coll.find({a: {$not: {$elemMatch: {b: [123]}}}}, {_id: 1}).sort({_id: 1}).toArray(),
-          [{_id: 0}, {_id: 1}]);
 assert.eq(
-    coll.find({a: {$not: {$elemMatch: {b: {$in: [[123]]}}}}}, {_id: 1}).sort({_id: 1}).toArray(),
-    [{_id: 0}, {_id: 1}]);
+    coll
+        .find({a: {$not: {$elemMatch: {b: [123]}}}}, {_id: 1})
+        .sort({_id: 1})
+        .toArray(),
+    [{_id: 0}, {_id: 1}],
+);
+assert.eq(
+    coll
+        .find({a: {$not: {$elemMatch: {b: {$in: [[123]]}}}}}, {_id: 1})
+        .sort({_id: 1})
+        .toArray(),
+    [{_id: 0}, {_id: 1}],
+);

@@ -5,10 +5,7 @@
  * @tags: [requires_fcv_81]
  */
 
-import {
-    runCommandAndValidateQueryStats,
-    withQueryStatsEnabled
-} from "jstests/libs/query/query_stats_utils.js";
+import {runCommandAndValidateQueryStats, withQueryStatsEnabled} from "jstests/libs/query/query_stats_utils.js";
 
 const collName = jsTestName();
 const countCommand = {

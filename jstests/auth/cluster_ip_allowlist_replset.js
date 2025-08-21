@@ -8,24 +8,25 @@
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const kKeyFile = 'jstests/libs/key1';
+const kKeyFile = "jstests/libs/key1";
 const replTest = new ReplSetTest({nodes: 1, nodeOptions: {auth: ""}, keyFile: kKeyFile});
 replTest.startSet();
 replTest.initiate();
 
 const primary = replTest.getPrimary();
-const admin = primary.getDB('admin');
-assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'admin', roles: ['root']}));
-admin.auth('admin', 'admin');
+const admin = primary.getDB("admin");
+assert.commandWorked(admin.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
+admin.auth("admin", "admin");
 
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}, writeConcern: {w: "majority"}}),
+);
 
 function resetClusterIpSourceAllowlist(host) {
     jsTest.log("resetClusterIpSourceAllowlist: started");
     const mongo = new Mongo(host);
     const admin = mongo.getDB("admin");
-    admin.auth('admin', 'admin');
+    admin.auth("admin", "admin");
 
     jsTest.log("Check log for denied connections");
     checkLog.containsJson(admin, 20240, {});
@@ -46,8 +47,7 @@ conf.version++;
 // Following function will succeed after resetClusterIpSourceAllowlist()
 // successfully resets IP for connection
 jsTest.log("ReplSet started, will block __system connections and expect error");
-assert.commandWorked(
-    primary.adminCommand({setParameter: 1, "clusterIpSourceAllowlist": ["192.0.2.1"]}));
+assert.commandWorked(primary.adminCommand({setParameter: 1, "clusterIpSourceAllowlist": ["192.0.2.1"]}));
 assert.commandWorked(admin.runCommand({replSetReconfig: conf}));
 thread.join();
 

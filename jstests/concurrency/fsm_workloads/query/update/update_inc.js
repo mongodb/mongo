@@ -9,12 +9,12 @@
 
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         // uses the workload name as _id on the document.
         // assumes this name will be unique.
-        id: 'update_inc',
-        getUpdateArgument: function(fieldName) {
+        id: "update_inc",
+        getUpdateArgument: function (fieldName) {
             var updateDoc = {$inc: {}};
             updateDoc.$inc[fieldName] = 1;
             return updateDoc;
@@ -23,7 +23,7 @@ export const $config = (function() {
 
     var states = {
         init: function init(db, collName) {
-            this.fieldName = 't' + this.tid;
+            this.fieldName = "t" + this.tid;
             this.count = 0;
         },
 
@@ -50,7 +50,7 @@ export const $config = (function() {
 
             // The $inc operator always modifies the matched document, so if we matched something,
             // then we must have updated it.
-            this.count += (res.nMatched >= 1);
+            this.count += res.nMatched >= 1;
         },
 
         find: function find(db, collName) {
@@ -65,7 +65,7 @@ export const $config = (function() {
                     assert.eq(this.count, 0);
                 }
             }
-        }
+        },
     };
 
     var transitions = {init: {update: 1}, update: {find: 1}, find: {update: 1}};
@@ -75,7 +75,7 @@ export const $config = (function() {
 
         // Pre-populate the fields we need to avoid size change for capped collections.
         for (var i = 0; i < this.threadCount; ++i) {
-            doc['t' + i] = 0;
+            doc["t" + i] = 0;
         }
         db[collName].insert(doc);
     }
@@ -86,6 +86,6 @@ export const $config = (function() {
         data: data,
         states: states,
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

@@ -13,7 +13,12 @@ const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB.coll;
 
 coll.drop();
-assert.commandWorked(coll.insert([{_id: 0, a: 0, b: 0}, {_id: 1, a: 1, b: 0}]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, a: 0, b: 0},
+        {_id: 1, a: 1, b: 0},
+    ]),
+);
 
 const pipeline = [{$changeStream: {showExpandedEvents: true, showSystemEvents: true}}];
 const cst = new ChangeStreamTest(testDB);
@@ -26,10 +31,12 @@ const indexes = [
 
 // Try to create unique indexes on "a" and "b", which should fail since the inserted documents
 // contain duplicate values for "b".
-assert.commandFailedWithCode(coll.runCommand({createIndexes: coll.getName(), indexes: indexes}),
-                             ErrorCodes.DuplicateKey);
+assert.commandFailedWithCode(
+    coll.runCommand({createIndexes: coll.getName(), indexes: indexes}),
+    ErrorCodes.DuplicateKey,
+);
 
-const assertNextIndexBuildEvent = function(operationType) {
+const assertNextIndexBuildEvent = function (operationType) {
     cst.assertNextChangesEqual({
         cursor: cursor,
         expectedChanges: {

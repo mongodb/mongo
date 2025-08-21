@@ -62,22 +62,53 @@ explain = coll.find({}, {a: 0}).hint({a: 1}).sort({a: -1}).returnKey().explain()
 assert(isIndexOnly(db, explain.queryPlanner.winningPlan));
 
 // Unlike other projections, sortKey meta-projection can co-exist with returnKey.
-results = coll.find({}, {c: {$meta: 'sortKey'}}).hint({a: 1}).sort({a: -1}).returnKey().toArray();
-assert.eq(results, [{a: 3, c: [3]}, {a: 2, c: [2]}, {a: 1, c: [1]}]);
+results = coll
+    .find({}, {c: {$meta: "sortKey"}})
+    .hint({a: 1})
+    .sort({a: -1})
+    .returnKey()
+    .toArray();
+assert.eq(results, [
+    {a: 3, c: [3]},
+    {a: 2, c: [2]},
+    {a: 1, c: [1]},
+]);
 
 // returnKey with sortKey $meta where there is an in-memory sort.
-results = coll.find({}, {c: {$meta: 'sortKey'}}).hint({a: 1}).sort({b: 1}).returnKey().toArray();
-assert.eq(results, [{a: 3, c: [1]}, {a: 2, c: [2]}, {a: 1, c: [3]}]);
+results = coll
+    .find({}, {c: {$meta: "sortKey"}})
+    .hint({a: 1})
+    .sort({b: 1})
+    .returnKey()
+    .toArray();
+assert.eq(results, [
+    {a: 3, c: [1]},
+    {a: 2, c: [2]},
+    {a: 1, c: [3]},
+]);
 
 // returnKey with multiple sortKey $meta projections.
-results = coll.find({}, {c: {$meta: 'sortKey'}, d: {$meta: 'sortKey'}})
-              .hint({a: 1})
-              .sort({b: 1})
-              .returnKey()
-              .toArray();
-assert.eq(results, [{a: 3, c: [1], d: [1]}, {a: 2, c: [2], d: [2]}, {a: 1, c: [3], d: [3]}]);
+results = coll
+    .find({}, {c: {$meta: "sortKey"}, d: {$meta: "sortKey"}})
+    .hint({a: 1})
+    .sort({b: 1})
+    .returnKey()
+    .toArray();
+assert.eq(results, [
+    {a: 3, c: [1], d: [1]},
+    {a: 2, c: [2], d: [2]},
+    {a: 1, c: [3], d: [3]},
+]);
 
 // returnKey with a sortKey $meta projection on a nested field.
-results =
-    coll.find({}, {"c.d": {$meta: "sortKey"}}).hint({a: 1}).sort({b: 1}).returnKey().toArray();
-assert.eq(results, [{a: 3, c: {d: [1]}}, {a: 2, c: {d: [2]}}, {a: 1, c: {d: [3]}}]);
+results = coll
+    .find({}, {"c.d": {$meta: "sortKey"}})
+    .hint({a: 1})
+    .sort({b: 1})
+    .returnKey()
+    .toArray();
+assert.eq(results, [
+    {a: 3, c: {d: [1]}},
+    {a: 2, c: {d: [2]}},
+    {a: 1, c: {d: [3]}},
+]);

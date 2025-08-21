@@ -26,7 +26,7 @@ export function generateComparisons(field, boundaries, fieldType) {
     // Index over comparison operators.
     let j = 0;
     let docs = [];
-    boundaries.forEach(function(boundary) {
+    boundaries.forEach(function (boundary) {
         if (i % 4 == 1) {
             for (const op of compOps) {
                 const pred = makeMatchPredicate(field, boundary, op);
@@ -35,7 +35,7 @@ export function generateComparisons(field, boundaries, fieldType) {
                     "qtype": op,
                     "dtype": fieldType,
                     "fieldName": field,
-                    "elemMatch": false
+                    "elemMatch": false,
                 };
                 docs.push(doc);
             }
@@ -46,7 +46,7 @@ export function generateComparisons(field, boundaries, fieldType) {
                 "qtype": compOps[j],
                 "dtype": fieldType,
                 "fieldName": field,
-                "elemMatch": false
+                "elemMatch": false,
             };
             docs.push(doc);
             j = (j + 1) % 5;
@@ -56,15 +56,14 @@ export function generateComparisons(field, boundaries, fieldType) {
     return docs;
 }
 
-export const min_char_code = '0'.codePointAt(0);
-export const max_char_code = '~'.codePointAt(0);
+export const min_char_code = "0".codePointAt(0);
+export const max_char_code = "~".codePointAt(0);
 
 export function nextChar(thisChar, distance) {
     const number_of_chars = max_char_code - min_char_code + 1;
     const char_code = thisChar.codePointAt(0);
     assert(min_char_code <= char_code <= max_char_code, "char is out of range");
-    const new_char_code =
-        ((char_code - min_char_code + distance) % number_of_chars) + min_char_code;
+    const new_char_code = ((char_code - min_char_code + distance) % number_of_chars) + min_char_code;
     assert(min_char_code <= new_char_code <= max_char_code, "new char is out of range");
     return String.fromCodePoint(new_char_code);
 }
@@ -74,14 +73,15 @@ export function nextChar(thisChar, distance) {
  * distance: "small", "middle", "large".
  */
 export function nextStr(str, distance) {
-    var res = 'nextStrUndefined';
+    var res = "nextStrUndefined";
     const spec = {"small": 3, "medium": 2, "large": 1};
     if (str.length == 0) {
         const nextCharCode = min_char_code + 4 - spec[distance];
         res = String.fromCodePoint(nextCharCode);
-        assert(res.indexOf("NaN") == -1,
-               `Found NaN with inputs: str=${str}, res=${res}, distance=${
-                   distance}; min_char_code=${min_char_code}`);
+        assert(
+            res.indexOf("NaN") == -1,
+            `Found NaN with inputs: str=${str}, res=${res}, distance=${distance}; min_char_code=${min_char_code}`,
+        );
     } else {
         let pos = spec[distance] - 1;
         if (pos >= str.length) {
@@ -92,13 +92,15 @@ export function nextStr(str, distance) {
         let nextCh = nextChar(str[pos], 4 - spec[distance] /*char distance*/);
         const newStr1 = newStr0 + nextCh;
         const newStr = newStr1 + str.slice(pos + 1, str.length);
-        assert(newStr.indexOf("NaN") == -1,
-               `Found NaN with inputs: newStr=${newStr}, str=${str}, distance=${distance}; pos=${
-                   pos}, nextCh=${nextCh}, newStr0=${newStr0}, newStr1=${newStr1}`);
+        assert(
+            newStr.indexOf("NaN") == -1,
+            `Found NaN with inputs: newStr=${newStr}, str=${str}, distance=${distance}; pos=${
+                pos
+            }, nextCh=${nextCh}, newStr0=${newStr0}, newStr1=${newStr1}`,
+        );
         res = newStr;
     }
-    assert(res !== undefined,
-           `Found undefined with inputs: str=${str}, res=${res}, distance=${distance}`);
+    assert(res !== undefined, `Found undefined with inputs: str=${str}, res=${res}, distance=${distance}`);
     return res;
 }
 
@@ -112,24 +114,26 @@ export function nextStr(str, distance) {
  */
 export function generateRanges(values, fieldType, rangeSize) {
     let ranges = [];
-    if (fieldType == 'integer' || fieldType == 'double') {
+    if (fieldType == "integer" || fieldType == "double") {
         for (const val of values) {
             ranges.push([val, val + rangeSize]);
         }
-    } else if (fieldType == 'string') {
+    } else if (fieldType == "string") {
         for (const val of values) {
             const nanPos = val.indexOf("NaN");
             assert(nanPos == -1, `Found NaN in values: ${values}, ${val}, ${nanPos}`);
             var nextVar = nextStr(val, rangeSize);
-            assert(nextVar != 'nextStrUndefined',
-                   `Found nextStrUndefined in values: ${values}, nextVar: ${nextVar}, val=${
-                       val}, rangeSize=${rangeSize}`);
-            assert(nextVar !== undefined,
-                   `Found undefined in values: ${values}, nextVar: ${nextVar}, val=${
-                       val}, rangeSize=${rangeSize}`);
+            assert(
+                nextVar != "nextStrUndefined",
+                `Found nextStrUndefined in values: ${values}, nextVar: ${nextVar}, val=${val}, rangeSize=${rangeSize}`,
+            );
+            assert(
+                nextVar !== undefined,
+                `Found undefined in values: ${values}, nextVar: ${nextVar}, val=${val}, rangeSize=${rangeSize}`,
+            );
             ranges.push([val, nextVar]);
         }
-    } else if (fieldType == 'date') {
+    } else if (fieldType == "date") {
         for (const val of values) {
             const minDate = new Date(val);
             ranges.push([minDate, new Date(minDate.getTime() + rangeSize)]);
@@ -140,9 +144,10 @@ export function generateRanges(values, fieldType, rangeSize) {
         const step = rangeSize;
         while (i + step < values.length) {
             let highBound = values[i + step];
-            assert(highBound !== undefined,
-                   `Undefined value, inputs: (values=${values}, fieldType=${fieldType}, rangeSize=${
-                       rangeSize})`);
+            assert(
+                highBound !== undefined,
+                `Undefined value, inputs: (values=${values}, fieldType=${fieldType}, rangeSize=${rangeSize})`,
+            );
             ranges.push([values[i], highBound]);
             i++;
         }
@@ -205,38 +210,42 @@ export function getTypeFromFieldName(fieldName) {
 export function generateRangePredicates(field, queryValues, fieldType) {
     const querySpecs = {"small": 0.001, "medium": 0.01, "large": 0.1};
 
-    const opOptions = [["$gt", "$lt"], ["$gt", "$lte"], ["$gte", "$lt"], ["$gte", "$lte"]];
+    const opOptions = [
+        ["$gt", "$lt"],
+        ["$gt", "$lte"],
+        ["$gte", "$lt"],
+        ["$gte", "$lte"],
+    ];
     // Index over comparison operators to choose them in a round robin fashion.
     let j = 0;
 
     let elemType = fieldType;
-    if (fieldType == 'array') {
+    if (fieldType == "array") {
         elemType = getTypeFromFieldName(field);
     }
     let docs = [];
     for (const qSize in querySpecs) {
         let ranges = [];
-        if (elemType == 'integer' || elemType == 'double') {
-            var valueDiff = (queryValues["max"] - queryValues["min"]);
+        if (elemType == "integer" || elemType == "double") {
+            var valueDiff = queryValues["max"] - queryValues["min"];
             const rangeSize = Math.round(valueDiff * querySpecs[qSize]);
-            if (rangeSize < 2 && elemType == 'integer') {
+            if (rangeSize < 2 && elemType == "integer") {
                 continue;
             }
             ranges = generateRanges(queryValues["values"], elemType, rangeSize);
-        } else if (elemType == 'string') {
+        } else if (elemType == "string") {
             ranges = generateRanges(queryValues["values"], elemType, qSize);
-        } else if (elemType == 'date') {
+        } else if (elemType == "date") {
             const minDate = new Date(queryValues["min"]);
             const maxDate = new Date(queryValues["max"]);
-            const rangeSize =
-                Math.round((maxDate.getTime() - minDate.getTime()) * querySpecs[qSize]);
+            const rangeSize = Math.round((maxDate.getTime() - minDate.getTime()) * querySpecs[qSize]);
             ranges = generateRanges(queryValues["values"], elemType, rangeSize);
         } else {
-            const step = (qSize == "small") ? 1 : (qSize == "medium") ? 2 : 3;
+            const step = qSize == "small" ? 1 : qSize == "medium" ? 2 : 3;
             ranges = generateRanges(queryValues["values"], elemType, step);
         }
 
-        ranges.forEach(function(range) {
+        ranges.forEach(function (range) {
             assert(range.length == 2);
             let [op1, op2] = opOptions[j];
             let pred = makeRangePredicate(field, op1, range[0], op2, range[1]);
@@ -245,17 +254,17 @@ export function generateRangePredicates(field, queryValues, fieldType) {
                 "qtype": qSize + " range",
                 "dtype": fieldType,
                 "fieldName": field,
-                "elemMatch": false
+                "elemMatch": false,
             };
             docs.push(doc);
-            if (fieldType == 'array' && range[0] <= range[1]) {
+            if (fieldType == "array" && range[0] <= range[1]) {
                 let pred = makeRangePredicate(field, op1, range[0], op2, range[1], true);
                 const doc = {
                     "pipeline": [pred],
                     "qtype": qSize + " range",
                     "dtype": fieldType,
                     "fieldName": field,
-                    "elemMatch": true
+                    "elemMatch": true,
                 };
                 docs.push(doc);
             }
@@ -274,8 +283,7 @@ export function selectSamplePos(collSize, n) {
     let step = Math.round(collSize / n);
     let offset = n * step - collSize;
 
-    let pos = (offset >= 0) ? Math.min(Math.trunc(step / 2), step - offset)
-                            : Math.trunc(step / 2 + Math.abs(offset) / 2);
+    let pos = offset >= 0 ? Math.min(Math.trunc(step / 2), step - offset) : Math.trunc(step / 2 + Math.abs(offset) / 2);
     while (pos < collSize) {
         samplePos.push(pos);
         pos += step;
@@ -305,7 +313,7 @@ export function selectHistogramBounds(statsColl, field, fieldType) {
     // Specify which bucket bound to choose from each histogram type. The number is ratio of the
     // histogram size.
     let histSpec = {"minHistogram": 0.1, "maxHistogram": 0.9, "uniqueHistogram": 0.5};
-    if (fieldType === 'array') {
+    if (fieldType === "array") {
         for (const key in histSpec) {
             const bounds = stats.statistics.arrayStatistics[key].bounds;
             const len = bounds.length;
@@ -333,12 +341,13 @@ export function selectHistogramBounds(statsColl, field, fieldType) {
  * field contains arrays.
  */
 export function getMinMax(coll, field) {
-    const res = coll.aggregate([
-                        {$unwind: field},
-                        {$group: {_id: null, min: {$min: field}, max: {$max: field}}},
-                        {$project: {_id: 0}}
-                    ])
-                    .toArray();
+    const res = coll
+        .aggregate([
+            {$unwind: field},
+            {$group: {_id: null, min: {$min: field}, max: {$max: field}}},
+            {$project: {_id: 0}},
+        ])
+        .toArray();
     return res[0];
 }
 
@@ -348,7 +357,7 @@ export function getMinMax(coll, field) {
  */
 export function selectArrayValues(nestedArray) {
     let values = [];
-    nestedArray.forEach(function(array) {
+    nestedArray.forEach(function (array) {
         if (typeof array != "object") {
             values.push(array);
         } else {
@@ -375,22 +384,22 @@ export function selectOutOfRangeValues(minMaxDoc, fieldType) {
 
     const oneHour = 60 * 60 * 1000;
     const min = minMaxDoc["min"];
-    if (fieldType == 'integer' || fieldType == 'double') {
+    if (fieldType == "integer" || fieldType == "double") {
         values.push(min - 1);
-    } else if (fieldType == 'string') {
-        const prevMin = (min.length > 1) ? min.at(0) : "";
+    } else if (fieldType == "string") {
+        const prevMin = min.length > 1 ? min.at(0) : "";
         values.push(prevMin);
-    } else if (fieldType == 'date') {
+    } else if (fieldType == "date") {
         const minDate = new Date(min);
         values.push(new Date(minDate.getTime() - oneHour));
     }
 
     const max = minMaxDoc["max"];
-    if (fieldType == 'integer' || fieldType == 'double') {
+    if (fieldType == "integer" || fieldType == "double") {
         values.push(max + 1);
-    } else if (fieldType == 'string') {
+    } else if (fieldType == "string") {
         values.push(nextStr(max, "small"));
-    } else if (fieldType == 'date') {
+    } else if (fieldType == "date") {
         const maxDate = new Date(max);
         values.push(new Date(maxDate.getTime() + oneHour));
     }
@@ -445,7 +454,7 @@ export function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl
         const fieldType = fieldTypes[i];
 
         let v = selectFieldValues(sample, field);
-        if (fieldType === 'array') {
+        if (fieldType === "array") {
             v = selectArrayValues(v);
         }
 
@@ -465,7 +474,7 @@ export function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl
         queryValues[[field]] = {
             values: deduplicate(values),
             min: minMaxDoc["min"],
-            max: minMaxDoc["max"]
+            max: minMaxDoc["max"],
         };
         i++;
     }
@@ -484,8 +493,7 @@ export function generateQueries(fields, fieldTypes, queryValues) {
     while (i < fields.length) {
         const field = fields[i];
         const fieldType = fieldTypes[i];
-        testCases =
-            testCases.concat(generateComparisons(field, queryValues[field].values, fieldType));
+        testCases = testCases.concat(generateComparisons(field, queryValues[field].values, fieldType));
 
         testCases = testCases.concat(generateRangePredicates(field, queryValues[field], fieldType));
         i++;
@@ -510,7 +518,7 @@ export function generateQueries(fields, fieldTypes, queryValues) {
  */
 export function pickNextTerm(testCases, cnt, curPos, chosenIds, chosenFields, step, predicates) {
     assert.eq(curPos, chosenIds.length);
-    let i = (curPos == 0) ? 0 : chosenIds.at(-1) + 1;
+    let i = curPos == 0 ? 0 : chosenIds.at(-1) + 1;
 
     while (i < testCases.length) {
         if (testCases[i].nReturned == 0 || chosenFields.has(testCases[i].fieldName)) {
@@ -530,7 +538,7 @@ export function pickNextTerm(testCases, cnt, curPos, chosenIds, chosenFields, st
                 "pipeline": [{$match: {$and: terms}}],
                 "qtype": "conjunction",
                 "numberOfTerms": cnt,
-                "fieldNames": fields
+                "fieldNames": fields,
             };
             predicates.push(doc);
         } else {
@@ -548,13 +556,12 @@ export function pickNextTerm(testCases, cnt, curPos, chosenIds, chosenFields, st
  * op: $and or $or
  * comp: array of comparisons for predicate terms
  */
-export function makeSingleFieldComplexPredicate(
-    field, values, op, comp, predicates, isArray = false) {
+export function makeSingleFieldComplexPredicate(field, values, op, comp, predicates, isArray = false) {
     let terms = [];
     for (let i = 0; i < comp.length; i++) {
         terms.push({[field]: {[comp[i]]: values[i]}});
     }
-    let qtype = (op == "$or") ? "disj1field" : "conj1field";
+    let qtype = op == "$or" ? "disj1field" : "conj1field";
     if (isArray) {
         qtype = qtype + "array";
     }
@@ -563,7 +570,7 @@ export function makeSingleFieldComplexPredicate(
         "pipeline": [{$match: {[op]: terms}}],
         "qtype": qtype,
         "numberOfTerms": comp.length,
-        "fieldNames": [field]
+        "fieldNames": [field],
     };
     predicates.push(doc);
 }
@@ -579,7 +586,7 @@ export function makeSingleFieldDNF(field, values, predicates) {
         "pipeline": [{$match: {"$or": [term1, term2]}}],
         "qtype": "DNF1field",
         "numberOfTerms": 4,
-        "fieldNames": [field]
+        "fieldNames": [field],
     };
     predicates.push(doc);
 }
@@ -600,21 +607,23 @@ export function generateSingleFieldPredicates(fields, fieldTypes, queryValues, p
 
         while (values.length > 4) {
             makeSingleFieldComplexPredicate(field, values, "$and", ["$gte", "$lte"], predicates);
-            makeSingleFieldComplexPredicate(
-                field, values, "$and", ["$gt", "$gte", "$lt", "$lte"], predicates);
-            if (fieldType == 'array') {
+            makeSingleFieldComplexPredicate(field, values, "$and", ["$gt", "$gte", "$lt", "$lte"], predicates);
+            if (fieldType == "array") {
                 // Make non-overlapping conjunctions for multi-key fields.
+                makeSingleFieldComplexPredicate(field, values, "$and", ["$lte", "$gte"], predicates, true);
+                makeSingleFieldComplexPredicate(field, values, "$and", ["$lte", "$eq"], predicates, true);
                 makeSingleFieldComplexPredicate(
-                    field, values, "$and", ["$lte", "$gte"], predicates, true);
-                makeSingleFieldComplexPredicate(
-                    field, values, "$and", ["$lte", "$eq"], predicates, true);
-                makeSingleFieldComplexPredicate(
-                    field, values, "$and", ["$gt", "$lte", "$gte", "$lt"], predicates, true);
+                    field,
+                    values,
+                    "$and",
+                    ["$gt", "$lte", "$gte", "$lt"],
+                    predicates,
+                    true,
+                );
             }
             makeSingleFieldComplexPredicate(field, values, "$or", ["$lte", "$gte"], predicates);
             makeSingleFieldComplexPredicate(field, values, "$or", ["$eq", "$gte"], predicates);
-            makeSingleFieldComplexPredicate(
-                field, values, "$or", ["$lt", "$eq", "$eq", "$gte"], predicates);
+            makeSingleFieldComplexPredicate(field, values, "$or", ["$lt", "$eq", "$eq", "$gte"], predicates);
             makeSingleFieldDNF(field, values, predicates);
             values = values.slice(4, values.length);
         }

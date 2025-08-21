@@ -37,17 +37,17 @@ assert.eq(0, coll.find({i: 1}).hint("x_1").count());
 assert.eq(0, coll.find({i: 1}).hint({x: 1}).count());
 
 // SERVER-14792: bad hints should cause the count to fail, even if there is no query predicate.
-assert.throws(function() {
+assert.throws(function () {
     coll.find().hint({bad: 1, hint: 1}).count();
 });
-assert.throws(function() {
+assert.throws(function () {
     coll.find({i: 1}).hint({bad: 1, hint: 1}).count();
 });
 
-assert.throws(function() {
+assert.throws(function () {
     coll.find().hint("BAD HINT").count();
 });
-assert.throws(function() {
+assert.throws(function () {
     coll.find({i: 1}).hint("BAD HINT").count();
 });
 

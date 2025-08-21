@@ -48,7 +48,7 @@ const cwiList = [
     },
 ];
 
-const collectionName = 'compound_wildcard_index_hint';
+const collectionName = "compound_wildcard_index_hint";
 db[collectionName].drop();
 assert.commandWorked(db.createCollection(collectionName));
 const coll = db[collectionName];
@@ -61,14 +61,12 @@ for (const indexSpec of cwiList) {
 
 // Test that CWIs obey hinting using index name.
 for (const testCase of cwiList) {
-    const explain = assert.commandWorked(
-        coll.find(testCase.query).hint(testCase.indexName).explain('executionStats'));
+    const explain = assert.commandWorked(coll.find(testCase.query).hint(testCase.indexName).explain("executionStats"));
     WildcardIndexHelpers.assertExpectedIndexIsUsed(explain, testCase.indexName);
 }
 
 // Test that CWIs obey hinting using index key pattern.
 for (const testCase of cwiList) {
-    const explain = assert.commandWorked(
-        coll.find(testCase.query).hint(testCase.keyPattern).explain('executionStats'));
+    const explain = assert.commandWorked(coll.find(testCase.query).hint(testCase.keyPattern).explain("executionStats"));
     WildcardIndexHelpers.assertExpectedIndexIsUsed(explain, testCase.indexName);
 }

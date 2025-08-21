@@ -11,18 +11,15 @@ coll.drop();
 assert.commandWorked(coll.insertOne({"a": "abc"}));
 
 function assertArgsException(errorCode, args) {
-    assertErrorCode(
-        coll, [{$project: {a: {$substrCP: args}}}], errorCode, "error thrown, check parameters");
+    assertErrorCode(coll, [{$project: {a: {$substrCP: args}}}], errorCode, "error thrown, check parameters");
 }
 
 function assertSubstring(expected, str, offset, len) {
-    assert.eq(expected,
-              coll.aggregate({$project: {a: {$substrCP: [str, offset, len]}}}).toArray()[0].a);
+    assert.eq(expected, coll.aggregate({$project: {a: {$substrCP: [str, offset, len]}}}).toArray()[0].a);
 }
 
 function assertSubstringBytes(expected, str, offset, len) {
-    assert.eq(expected,
-              coll.aggregate({$project: {a: {$substrBytes: [str, offset, len]}}}).toArray()[0].a);
+    assert.eq(expected, coll.aggregate({$project: {a: {$substrBytes: [str, offset, len]}}}).toArray()[0].a);
 }
 
 assertArgsException(34452, ["$a", 0, "a"]);
@@ -38,9 +35,9 @@ coll.insertOne({
     u: "éclair",
     v: "Å",
     w: "◢◢◢",
-    x: 'a',
-    y: 'abc',
-    z: 'abcde',
+    x: "a",
+    y: "abc",
+    z: "abcde",
     a: 0,
     b: 1,
     c: 2,
@@ -50,13 +47,13 @@ coll.insertOne({
     neg: -4,
     invalidStr: new Map(),
     /* Max unsigned int plus one */
-    bigNum: NumberLong(4294967297)
+    bigNum: NumberLong(4294967297),
 });
 
 // Wrong number of args.
 assertArgsException(16020, []);
-assertArgsException(16020, ['$x']);
-assertArgsException(16020, ['$x', 1, 2, 3]);
+assertArgsException(16020, ["$x"]);
+assertArgsException(16020, ["$x", 1, 2, 3]);
 
 // Tests that $substrCP performs as expected.
 assertSubstring("", "$x", 999, 0);
@@ -67,38 +64,38 @@ assertSubstring("◢◢", "$w", "$b", "$c");
 assertSubstring("cde", "$z", "$c", "$d");
 
 // Covers additional errors and ensures errors are thrown following document retrival.
-assertArgsException(5155700, ['a', '$invalidStr', 7]);
-assertArgsException(5155700, ['a', '$bigNum', 7]);
-assertArgsException(5155702, ['a', 0, "$t"]);
-assertArgsException(5155701, ['a', "$neg", 2]);
-assertArgsException(5155703, ['a', 0, "$neg"]);
+assertArgsException(5155700, ["a", "$invalidStr", 7]);
+assertArgsException(5155700, ["a", "$bigNum", 7]);
+assertArgsException(5155702, ["a", 0, "$t"]);
+assertArgsException(5155701, ["a", "$neg", 2]);
+assertArgsException(5155703, ["a", 0, "$neg"]);
 
 // String coercion fails as expected.
-assertArgsException(16007, ['$invalidStr', '$a', '$b']);
+assertArgsException(16007, ["$invalidStr", "$a", "$b"]);
 
 // Computed operands.
-assertSubstring('cde', '$z', {$add: ['$b', '$b']}, {$add: ['$c', '$d']});
-assertSubstring('cde', '$z', {$add: ['$b', 1]}, {$add: [2, '$d']});
+assertSubstring("cde", "$z", {$add: ["$b", "$b"]}, {$add: ["$c", "$d"]});
+assertSubstring("cde", "$z", {$add: ["$b", 1]}, {$add: [2, "$d"]});
 
 // Nested.
 assert.eq(
-    'e',
-    coll.aggregate({
+    "e",
+    coll
+        .aggregate({
             $project: {
                 a: {
                     $substrCP: [
                         {
-                            $substrCP:
-                                [{$substrCP: [{$substrCP: ['abcdefghij', '$b', 6]}, '$c', 5]}, 0, 3]
+                            $substrCP: [{$substrCP: [{$substrCP: ["abcdefghij", "$b", 6]}, "$c", 5]}, 0, 3],
                         },
                         1,
-                        1
-                    ]
-                }
-            }
+                        1,
+                    ],
+                },
+            },
         })
-        .toArray()[0]
-        .a);
+        .toArray()[0].a,
+);
 
 // $substrBytes and $substrCP returns different results when encountering multi-byte
 // utf-chars.

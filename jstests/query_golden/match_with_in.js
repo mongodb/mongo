@@ -13,7 +13,7 @@ const docs = [
     {_id: 3, a: 2, b: {c: 2}},
     {_id: 4, a: [], b: {c: 3}},
     {_id: 5, a: [1]},
-    {_id: 6, a: ['1']},
+    {_id: 6, a: ["1"]},
     {_id: 7, a: [[1]]},
     {_id: 8, a: {}},
     {_id: 9, a: {c: 1}},
@@ -23,7 +23,7 @@ const docs = [
     {_id: 13, a: [null]},
 ];
 
-jsTestLog('Inserting docs:');
+jsTestLog("Inserting docs:");
 show(docs);
 assert.commandWorked(coll.insert(docs));
 print(`Collection count: ${coll.find().itcount()}`);
@@ -43,8 +43,8 @@ const testFilters = [
 
     // Test traversal and type bracketing behavior.
     {a: {$in: [1]}},
-    {a: {$in: ['1']}},
-    {a: {$in: [1, '1']}},
+    {a: {$in: ["1"]}},
+    {a: {$in: [1, "1"]}},
     {a: {$in: [1, 2]}},
     {a: {$in: [1, 2, {}]}},
 
@@ -62,9 +62,9 @@ const testFilters = [
     {a: {$in: [{}, {c: 1}]}},
 
     // Test compound predicates.
-    {a: {$in: [1, 2]}, 'b.c': {$in: [2, 3]}},
-    {a: {$in: [1, 2]}, 'b.c': {$in: []}},
-    {a: {$in: [1, 2]}, 'b.c': {$in: [null]}},
+    {a: {$in: [1, 2]}, "b.c": {$in: [2, 3]}},
+    {a: {$in: [1, 2]}, "b.c": {$in: []}},
+    {a: {$in: [1, 2]}, "b.c": {$in: [null]}},
 
     // Test $type.
     {a: {$type: "array"}},

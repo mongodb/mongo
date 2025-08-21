@@ -20,10 +20,12 @@ const collName = jsTestName();
 const testInternalClient = (function createInternalClient() {
     const connInternal = new Mongo(testDB.getMongo().host);
     const curDB = connInternal.getDB(dbName);
-    assert.commandWorked(curDB.runCommand({
-        ["hello"]: 1,
-        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}
-    }));
+    assert.commandWorked(
+        curDB.runCommand({
+            ["hello"]: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
     return connInternal;
 })();
 

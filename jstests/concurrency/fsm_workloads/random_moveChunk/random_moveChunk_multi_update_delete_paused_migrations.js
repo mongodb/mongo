@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * This test performs random updates and deletes (see random_update_delete.js) on a sharded
@@ -14,23 +14,17 @@
  * ];
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 import {migrationsAreAllowed} from "jstests/libs/chunk_manipulation_util.js";
-import {
-    randomUpdateDelete
-} from "jstests/concurrency/fsm_workload_modifiers/random_update_delete.js";
+import {randomUpdateDelete} from "jstests/concurrency/fsm_workload_modifiers/random_update_delete.js";
 
 function getPauseMigrationsClusterParameter(db) {
-    const response = assert.commandWorked(
-        db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
+    const response = assert.commandWorked(db.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
     return response.clusterParameters[0].enabled;
 }
 
 function setPauseMigrationsClusterParameter(db, cluster, enabled) {
-    assert.commandWorked(
-        db.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled}}}));
+    assert.commandWorked(db.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled}}}));
 
     cluster.executeOnMongosNodes((db) => {
         // Ensure all mongoses have refreshed cluster parameter after being set.
@@ -42,7 +36,7 @@ function setPauseMigrationsClusterParameter(db, cluster, enabled) {
 
 const $partialConfig = extendWorkload($baseConfig, randomUpdateDelete);
 
-export const $config = extendWorkload($partialConfig, function($config, $super) {
+export const $config = extendWorkload($partialConfig, function ($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
     $config.data.partitionSize = 100;

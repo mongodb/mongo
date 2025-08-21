@@ -8,8 +8,8 @@
  *  ]
  */
 
-export const $config = (function() {
-    const kCollNamePrefix = 'unsharded_coll_';
+export const $config = (function () {
+    const kCollNamePrefix = "unsharded_coll_";
     const kInitialCollSize = 100;
     const kBatchSizeForDocsLookup = kInitialCollSize * 2;
 
@@ -18,7 +18,7 @@ export const $config = (function() {
      * no errors occur, or that any error is in `ignorableErrorCodes`. However, if the error is in
      * `retryableErrorCodes`, then the command is retried.
      */
-    const assertCommandWorked = function(cmd, retryableErrorCodes, ignorableErrorCodes = []) {
+    const assertCommandWorked = function (cmd, retryableErrorCodes, ignorableErrorCodes = []) {
         if (!Array.isArray(retryableErrorCodes)) {
             retryableErrorCodes = [retryableErrorCodes];
         }
@@ -64,14 +64,14 @@ export const $config = (function() {
         // IDs for new documents to insert.
         lastId: undefined,
 
-        getRandomDoc: function() {
+        getRandomDoc: function () {
             const keys = Object.keys(this.collMirror);
             return this.collMirror[keys[Random.randInt(keys.length)]];
-        }
+        },
     };
 
     const states = {
-        init: function(db, collName, connCache) {
+        init: function (db, collName, connCache) {
             // Insert an initial amount of documents into the collection, with a progressive _id and
             // the update counter set to zero.
 
@@ -93,24 +93,23 @@ export const $config = (function() {
                 () => {
                     let bulkOp = sessionColl.initializeUnorderedBulkOp();
                     for (let i = 0; i < kInitialCollSize; ++i) {
-                        bulkOp.insert(
-                            {_id: i, updateCount: 0},
-                        );
+                        bulkOp.insert({_id: i, updateCount: 0});
                     }
                     bulkOp.execute();
                 },
                 ErrorCodes.MovePrimaryInProgress,
                 // TODO (SERVER-32113): Retryable writes may cause double inserts if performed on a
                 // shard involved as the originator of a movePrimary operation.
-                ErrorCodes.DuplicateKey);
+                ErrorCodes.DuplicateKey,
+            );
         },
-        insert: function(db, collName, connCache) {
+        insert: function (db, collName, connCache) {
             // Insert a document into the collection, with an _id greater than all those already
             // present (last + 1) and the update counter set to zero.
 
             let coll = db[this.collName];
 
-            const newId = this.lastId += 1;
+            const newId = (this.lastId += 1);
             jsTestLog(`Inserting document: coll=${coll} _id=${newId}`);
 
             this.collMirror[newId] = {_id: newId, updateCount: 0};
@@ -119,7 +118,7 @@ export const $config = (function() {
                 coll.insertOne({_id: newId, updateCount: 0});
             }, ErrorCodes.MovePrimaryInProgress);
         },
-        update: function(db, collName, connCache) {
+        update: function (db, collName, connCache) {
             // Increment the update counter of a random document of the collection.
 
             let coll = db[this.collName];
@@ -127,13 +126,13 @@ export const $config = (function() {
             const randomId = this.getRandomDoc()._id;
             jsTestLog(`Updating document: coll=${coll} _id=${randomId}`);
 
-            const newUpdateCount = this.collMirror[randomId].updateCount += 1;
+            const newUpdateCount = (this.collMirror[randomId].updateCount += 1);
 
             assertCommandWorked(() => {
                 coll.updateOne({_id: randomId}, {$set: {updateCount: newUpdateCount}});
             }, ErrorCodes.MovePrimaryInProgress);
         },
-        delete: function(db, collName, connCache) {
+        delete: function (db, collName, connCache) {
             // Remove a random document from the collection.
 
             let coll = db[this.collName];
@@ -147,7 +146,7 @@ export const $config = (function() {
                 coll.deleteOne({_id: randomId});
             }, ErrorCodes.MovePrimaryInProgress);
         },
-        movePrimary: function(db, collName, connCache) {
+        movePrimary: function (db, collName, connCache) {
             // Move the primary shard of the database to a random shard (which could coincide with
             // the starting one).
 
@@ -172,20 +171,22 @@ export const $config = (function() {
                 expectedErrorCodes.push(ErrorCodes.ShardNotFound);
             }
             assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({movePrimary: db.getName(), to: toShard}), expectedErrorCodes);
+                db.adminCommand({movePrimary: db.getName(), to: toShard}),
+                expectedErrorCodes,
+            );
         },
-        checkDatabaseMetadataConsistency: function(db, collName, connCache) {
-            jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
+        checkDatabaseMetadataConsistency: function (db, collName, connCache) {
+            jsTestLog("Executing checkMetadataConsistency state for database: " + db.getName());
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
-        checkCollectionMetadataConsistency: function(db, collName, connCache) {
+        checkCollectionMetadataConsistency: function (db, collName, connCache) {
             let coll = db[this.collName];
             jsTestLog(`Executing checkMetadataConsistency state for collection: ${coll}`);
             const inconsistencies = coll.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
-        verifyDocuments: function(db, collName, connCache) {
+        verifyDocuments: function (db, collName, connCache) {
             // Verify the correctness of the collection data by checking that each document matches
             // its copy in memory.
 
@@ -197,34 +198,37 @@ export const $config = (function() {
                     return coll.find().batchSize(kBatchSizeForDocsLookup).toArray();
                 },
                 // Caused by a concurrent movePrimary operation.
-                ErrorCodes.QueryPlanKilled);
+                ErrorCodes.QueryPlanKilled,
+            );
 
-            assert.eq(Object.keys(this.collMirror).length,
-                      docs.length,
-                      `expectedData=${JSON.stringify(this.collMirror)}} actualData=${
-                          JSON.stringify(docs)}`);
+            assert.eq(
+                Object.keys(this.collMirror).length,
+                docs.length,
+                `expectedData=${JSON.stringify(this.collMirror)}} actualData=${JSON.stringify(docs)}`,
+            );
 
-            docs.forEach(doc => {
-                assert.eq(this.collMirror[doc._id],
-                          doc,
-                          `expectedData=${JSON.stringify(this.collMirror)}} actualData=${
-                              JSON.stringify(docs)}`);
+            docs.forEach((doc) => {
+                assert.eq(
+                    this.collMirror[doc._id],
+                    doc,
+                    `expectedData=${JSON.stringify(this.collMirror)}} actualData=${JSON.stringify(docs)}`,
+                );
             });
-        }
+        },
     };
 
-    let setup = function(db, collName, cluster) {
+    let setup = function (db, collName, cluster) {
         return;
     };
 
     const standardTransition = {
-        insert: 0.20,
-        update: 0.20,
-        delete: 0.20,
+        insert: 0.2,
+        update: 0.2,
+        delete: 0.2,
         movePrimary: 0.12,
         checkDatabaseMetadataConsistency: 0.04,
         checkCollectionMetadataConsistency: 0.04,
-        verifyDocuments: 0.20,
+        verifyDocuments: 0.2,
     };
 
     const transitions = {
@@ -235,7 +239,7 @@ export const $config = (function() {
         movePrimary: standardTransition,
         checkDatabaseMetadataConsistency: standardTransition,
         checkCollectionMetadataConsistency: standardTransition,
-        verifyDocuments: standardTransition
+        verifyDocuments: standardTransition,
     };
 
     return {
@@ -245,6 +249,6 @@ export const $config = (function() {
         transitions: transitions,
         data: data,
         setup: setup,
-        passConnectionCache: true
+        passConnectionCache: true,
     };
 })();

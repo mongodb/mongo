@@ -23,7 +23,7 @@ import {
     forwardIxscan,
     runDoesntRewriteTest,
     runRewritesTest,
-    setupColl
+    setupColl,
 } from "jstests/core/timeseries/libs/timeseries_sort_util.js";
 
 const metaCollSubFields = db[jsTestName()];
@@ -37,30 +37,31 @@ for (const ixA of [-1, +1]) {
     for (const ixB of [-1, +1]) {
         for (const ixT of [-1, +1]) {
             for (const ixTrailing of [{}, {x: 1, y: -1}]) {
-                const ix = Object.merge({'m.a': ixA, 'm.b': ixB, t: ixT}, ixTrailing);
+                const ix = Object.merge({"m.a": ixA, "m.b": ixB, t: ixT}, ixTrailing);
 
                 // Test a point predicate on 'm.a' with a sort on {m.b, t}.
                 // The point predicate lets us zoom in on a contiguous range of the index,
                 // as if we were using an index on {constant, m.b, t}.
                 for (const sortB of [-1, +1]) {
                     for (const sortT of [-1, +1]) {
-                        const predicate = [{$match: {'m.a': 7}}];
-                        const sort = {'m.b': sortB, t: sortT};
+                        const predicate = [{$match: {"m.a": 7}}];
+                        const sort = {"m.b": sortB, t: sortT};
 
                         // 'sortB * sortT' is +1 if the sort has those fields in the same
                         // direction, -1 for opposite direction. 'b * t' says the same thing about
                         // the index key. The index and sort are compatible iff they agree on
                         // whether or not these two fields are in the same direction.
                         if (ixB * ixT === sortB * sortT) {
+                            runRewritesTest(sort, ix, ix, null, metaCollSubFields, ixT === sortT, predicate);
                             runRewritesTest(
-                                sort, ix, ix, null, metaCollSubFields, ixT === sortT, predicate);
-                            runRewritesTest(sort,
-                                            ix,
-                                            null,
-                                            ixT === sortT ? forwardIxscan : backwardIxscan,
-                                            metaCollSubFields,
-                                            ixT === sortT,
-                                            predicate);
+                                sort,
+                                ix,
+                                null,
+                                ixT === sortT ? forwardIxscan : backwardIxscan,
+                                metaCollSubFields,
+                                ixT === sortT,
+                                predicate,
+                            );
                         } else {
                             runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
                         }
@@ -73,14 +74,14 @@ for (const ixA of [-1, +1]) {
                 // satisfy a sort on {m.a, t}.
                 for (const sortA of [-1, +1]) {
                     for (const sortT of [-1, +1]) {
-                        const sort = {'m.a': sortA, t: sortT};
+                        const sort = {"m.a": sortA, t: sortT};
 
                         // However, when there is no point predicate on 'm.a', the planner gives us
                         // a full index scan with no bounds on 'm.b'. Since our implementation
                         // looks at index bounds to decide whether to rewrite, we don't get the
                         // optimization in this case.
                         {
-                            const predicate = [{$match: {'m.b': 7}}];
+                            const predicate = [{$match: {"m.b": 7}}];
                             runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
                         }
 
@@ -90,17 +91,18 @@ for (const ixA of [-1, +1]) {
                         //
                         // As usual the index and sort must agree on whether m.a, t are
                         // in the same direction.
-                        const predicate = [{$match: {'m.a': {$gte: -999, $lte: 999}, 'm.b': 7}}];
+                        const predicate = [{$match: {"m.a": {$gte: -999, $lte: 999}, "m.b": 7}}];
                         if (ixA * ixT === sortA * sortT) {
+                            runRewritesTest(sort, ix, ix, null, metaCollSubFields, ixT === sortT, predicate);
                             runRewritesTest(
-                                sort, ix, ix, null, metaCollSubFields, ixT === sortT, predicate);
-                            runRewritesTest(sort,
-                                            ix,
-                                            null,
-                                            ixT === sortT ? forwardIxscan : backwardIxscan,
-                                            metaCollSubFields,
-                                            ixT === sortT,
-                                            predicate);
+                                sort,
+                                ix,
+                                null,
+                                ixT === sortT ? forwardIxscan : backwardIxscan,
+                                metaCollSubFields,
+                                ixT === sortT,
+                                predicate,
+                            );
                         } else {
                             runDoesntRewriteTest(sort, ix, ix, metaCollSubFields, predicate);
                         }

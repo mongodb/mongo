@@ -4,9 +4,12 @@ const t = db[jsTestName()];
 t.drop();
 
 function s() {
-    return t.find().sort({_id: 1}).map(function(z) {
-        return z.x;
-    });
+    return t
+        .find()
+        .sort({_id: 1})
+        .map(function (z) {
+            return z.x;
+        });
 }
 
 assert.commandWorked(t.save({_id: 1, x: 1}));
@@ -117,8 +120,7 @@ assert.commandWorked(t.update({}, {$inc: {x: 1}}, false, true));
 assert.eq("5,8,1", s(), "E2");
 
 let i;
-for (i = 4; i < 8; i++)
-    assert.commandWorked(t.save({_id: i}));
+for (i = 4; i < 8; i++) assert.commandWorked(t.save({_id: i}));
 assert.commandWorked(t.save({_id: i, x: 1}));
 assert.eq("5,8,1,,,,,1", s(), "E4");
 assert.commandWorked(t.update({}, {$inc: {x: 1}}, false, true));

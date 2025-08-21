@@ -47,17 +47,19 @@ jsTestLog("Restarting the secondary");
 secondary = replTest.restart(secondary, {
     startClean: true,
     setParameter: {
-        'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1
-    }
+        "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 
 // Wait for fail point message to be logged so that we know that initial sync is paused.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Initial sync paused");
 
@@ -88,8 +90,9 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes(null, [secondary]);

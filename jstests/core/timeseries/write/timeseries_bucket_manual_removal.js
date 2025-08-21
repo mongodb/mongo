@@ -10,20 +10,16 @@
  *   requires_timeseries,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
 
-    const timeFieldName = 'time';
+    const timeFieldName = "time";
 
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
     const docs1 = [
         {
@@ -49,24 +45,22 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(insert(coll, docs1));
     assert.docEq(docs1, coll.find().toArray());
     let buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
-    assert.eq(buckets.length, 1, 'Expected one bucket but found ' + tojson(buckets));
+    assert.eq(buckets.length, 1, "Expected one bucket but found " + tojson(buckets));
     const bucketId = buckets[0]._id;
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).remove({_id: bucketId}, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).remove({_id: bucketId}, kRawOperationSpec));
     assert.docEq([], coll.find().toArray());
     buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
-    assert.eq(buckets.length, 0, 'Expected no buckets but found ' + tojson(buckets));
+    assert.eq(buckets.length, 0, "Expected no buckets but found " + tojson(buckets));
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).remove({_id: bucketId}, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).remove({_id: bucketId}, kRawOperationSpec));
     assert.docEq([], coll.find().toArray());
     buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
-    assert.eq(buckets.length, 0, 'Expected no buckets but found ' + tojson(buckets));
+    assert.eq(buckets.length, 0, "Expected no buckets but found " + tojson(buckets));
 
     assert.commandWorked(coll.insert(docs2, {ordered: false}));
     assert.docEq(docs2, coll.find().toArray());
     buckets = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
-    assert.eq(buckets.length, 1, 'Expected one bucket but found ' + tojson(buckets));
+    assert.eq(buckets.length, 1, "Expected one bucket but found " + tojson(buckets));
     assert.neq(buckets[0]._id, bucketId);
 });

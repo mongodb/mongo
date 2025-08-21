@@ -25,8 +25,7 @@ function compareId(a, b) {
 
 // Helper for testing that pipeline returns correct set of results.
 function testPipeline(pipeline, expectedResult, collection) {
-    arrayEq(collection.aggregate(pipeline).toArray().sort(compareId),
-            expectedResult.sort(compareId));
+    arrayEq(collection.aggregate(pipeline).toArray().sort(compareId), expectedResult.sort(compareId));
 }
 
 function runTest(coll, from, thirdColl, fourthColl) {
@@ -52,69 +51,74 @@ function runTest(coll, from, thirdColl, fourthColl) {
     let expectedResults = [
         {_id: 0, a: 1, "same": [{_id: 0, b: 1}]},
         {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
-        {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
+        {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]},
     ];
-    testPipeline([{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}],
-                 expectedResults,
-                 coll);
+    testPipeline([{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}], expectedResults, coll);
 
     // If localField is nonexistent, it is treated as if it is null.
     expectedResults = [
         {_id: 0, a: 1, "same": [{_id: 1, b: null}, {_id: 2}]},
         {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
-        {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
+        {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]},
     ];
     testPipeline(
         [{$lookup: {localField: "nonexistent", foreignField: "b", from: "from", as: "same"}}],
         expectedResults,
-        coll);
+        coll,
+    );
 
     // If foreignField is nonexistent, it is treated as if it is null.
     expectedResults = [
         {_id: 0, a: 1, "same": []},
         {_id: 1, a: null, "same": [{_id: 0, b: 1}, {_id: 1, b: null}, {_id: 2}]},
-        {_id: 2, "same": [{_id: 0, b: 1}, {_id: 1, b: null}, {_id: 2}]}
+        {_id: 2, "same": [{_id: 0, b: 1}, {_id: 1, b: null}, {_id: 2}]},
     ];
     testPipeline(
         [{$lookup: {localField: "a", foreignField: "nonexistent", from: "from", as: "same"}}],
         expectedResults,
-        coll);
+        coll,
+    );
 
     // If there are no matches or the from coll doesn't exist, the result is an empty array.
-    expectedResults =
-        [{_id: 0, a: 1, "same": []}, {_id: 1, a: null, "same": []}, {_id: 2, "same": []}];
+    expectedResults = [
+        {_id: 0, a: 1, "same": []},
+        {_id: 1, a: null, "same": []},
+        {_id: 2, "same": []},
+    ];
     testPipeline(
         [{$lookup: {localField: "_id", foreignField: "nonexistent", from: "from", as: "same"}}],
         expectedResults,
-        coll);
-    testPipeline([{$lookup: {localField: "a", foreignField: "b", from: "nonexistent", as: "same"}}],
-                 expectedResults,
-                 coll);
+        coll,
+    );
+    testPipeline(
+        [{$lookup: {localField: "a", foreignField: "b", from: "nonexistent", as: "same"}}],
+        expectedResults,
+        coll,
+    );
 
     // If field name specified by "as" already exists, it is overwritten.
     expectedResults = [
         {_id: 0, "a": [{_id: 0, b: 1}]},
         {_id: 1, "a": [{_id: 1, b: null}, {_id: 2}]},
-        {_id: 2, "a": [{_id: 1, b: null}, {_id: 2}]}
+        {_id: 2, "a": [{_id: 1, b: null}, {_id: 2}]},
     ];
-    testPipeline([{$lookup: {localField: "a", foreignField: "b", from: "from", as: "a"}}],
-                 expectedResults,
-                 coll);
+    testPipeline([{$lookup: {localField: "a", foreignField: "b", from: "from", as: "a"}}], expectedResults, coll);
 
     // Running multiple $lookups in the same pipeline is allowed.
     expectedResults = [
         {_id: 0, a: 1, "c": [{_id: 0, b: 1}], "d": [{_id: 0, b: 1}]},
         {_id: 1, a: null, "c": [{_id: 1, b: null}, {_id: 2}], "d": [{_id: 1, b: null}, {_id: 2}]},
-        {_id: 2, "c": [{_id: 1, b: null}, {_id: 2}], "d": [{_id: 1, b: null}, {_id: 2}]}
+        {_id: 2, "c": [{_id: 1, b: null}, {_id: 2}], "d": [{_id: 1, b: null}, {_id: 2}]},
     ];
     testPipeline(
         [
             {$lookup: {localField: "a", foreignField: "b", from: "from", as: "c"}},
             {$project: {"a": 1, "c": 1}},
-            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "d"}}
+            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "d"}},
         ],
         expectedResults,
-        coll);
+        coll,
+    );
 
     //
     // Coalescing with $unwind.
@@ -126,15 +130,13 @@ function runTest(coll, from, thirdColl, fourthColl) {
         {_id: 1, a: null, same: {_id: 1, b: null}},
         {_id: 1, a: null, same: {_id: 2}},
         {_id: 2, same: {_id: 1, b: null}},
-        {_id: 2, same: {_id: 2}}
+        {_id: 2, same: {_id: 2}},
     ];
     testPipeline(
-        [
-            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}},
-            {$unwind: {path: "$same"}}
-        ],
+        [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}, {$unwind: {path: "$same"}}],
         expectedResults,
-        coll);
+        coll,
+    );
 
     // An $unwind on the "as" field, with includeArrayIndex.
     expectedResults = [
@@ -147,48 +149,44 @@ function runTest(coll, from, thirdColl, fourthColl) {
     testPipeline(
         [
             {$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}},
-            {$unwind: {path: "$same", includeArrayIndex: "index"}}
+            {$unwind: {path: "$same", includeArrayIndex: "index"}},
         ],
         expectedResults,
-        coll);
+        coll,
+    );
 
     // Normal $unwind with no matching documents.
     expectedResults = [];
     testPipeline(
         [
             {$lookup: {localField: "_id", foreignField: "nonexistent", from: "from", as: "same"}},
-            {$unwind: {path: "$same"}}
+            {$unwind: {path: "$same"}},
         ],
         expectedResults,
-        coll);
+        coll,
+    );
 
     // $unwind with preserveNullAndEmptyArray with no matching documents.
-    expectedResults = [
-        {_id: 0, a: 1},
-        {_id: 1, a: null},
-        {_id: 2},
-    ];
+    expectedResults = [{_id: 0, a: 1}, {_id: 1, a: null}, {_id: 2}];
     testPipeline(
         [
             {$lookup: {localField: "_id", foreignField: "nonexistent", from: "from", as: "same"}},
-            {$unwind: {path: "$same", preserveNullAndEmptyArrays: true}}
+            {$unwind: {path: "$same", preserveNullAndEmptyArrays: true}},
         ],
         expectedResults,
-        coll);
+        coll,
+    );
 
     // $unwind with preserveNullAndEmptyArray, some with matching documents, some without.
-    expectedResults = [
-        {_id: 0, a: 1},
-        {_id: 1, a: null, same: {_id: 0, b: 1}},
-        {_id: 2},
-    ];
+    expectedResults = [{_id: 0, a: 1}, {_id: 1, a: null, same: {_id: 0, b: 1}}, {_id: 2}];
     testPipeline(
         [
             {$lookup: {localField: "_id", foreignField: "b", from: "from", as: "same"}},
-            {$unwind: {path: "$same", preserveNullAndEmptyArrays: true}}
+            {$unwind: {path: "$same", preserveNullAndEmptyArrays: true}},
         ],
         expectedResults,
-        coll);
+        coll,
+    );
 
     // $unwind with preserveNullAndEmptyArray and includeArrayIndex, some with matching
     // documents, some without.
@@ -200,10 +198,11 @@ function runTest(coll, from, thirdColl, fourthColl) {
     testPipeline(
         [
             {$lookup: {localField: "_id", foreignField: "b", from: "from", as: "same"}},
-            {$unwind: {path: "$same", preserveNullAndEmptyArrays: true, includeArrayIndex: "index"}}
+            {$unwind: {path: "$same", preserveNullAndEmptyArrays: true, includeArrayIndex: "index"}},
         ],
         expectedResults,
-        coll);
+        coll,
+    );
 
     //
     // Dependencies.
@@ -214,37 +213,50 @@ function runTest(coll, from, thirdColl, fourthColl) {
     expectedResults = [
         {_id: 0, "same": [{_id: 0, b: 1}]},
         {_id: 1, "same": [{_id: 1, b: null}, {_id: 2}]},
-        {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]}
+        {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]},
     ];
     testPipeline(
-        [
-            {$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}},
-            {$project: {"same": 1}}
-        ],
+        [{$lookup: {localField: "a", foreignField: "b", from: "from", as: "same"}}, {$project: {"same": 1}}],
         expectedResults,
-        coll);
+        coll,
+    );
 
     // If $lookup didn't add fields referenced by "let" variables to its dependencies, this test
     // would fail as the value of the "a" field would be lost and treated as null.
     expectedResults = [
-        {"_id": 0, "same": [{"_id": 0, "x": 1}, {"_id": 1, "x": 1}, {"_id": 2, "x": 1}]},
-        {"_id": 1, "same": [{"_id": 0, "x": null}, {"_id": 1, "x": null}, {"_id": 2, "x": null}]},
-        {"_id": 2, "same": [{"_id": 0}, {"_id": 1}, {"_id": 2}]}
+        {
+            "_id": 0,
+            "same": [
+                {"_id": 0, "x": 1},
+                {"_id": 1, "x": 1},
+                {"_id": 2, "x": 1},
+            ],
+        },
+        {
+            "_id": 1,
+            "same": [
+                {"_id": 0, "x": null},
+                {"_id": 1, "x": null},
+                {"_id": 2, "x": null},
+            ],
+        },
+        {"_id": 2, "same": [{"_id": 0}, {"_id": 1}, {"_id": 2}]},
     ];
     testPipeline(
-            [
-              {
+        [
+            {
                 $lookup: {
-                    let : {var1: "$a"},
+                    let: {var1: "$a"},
                     pipeline: [{$project: {x: "$$var1"}}],
                     from: "from",
-                    as: "same"
-                }
-              },
-              {$project: {"same": 1}}
-            ],
-            expectedResults,
-            coll);
+                    as: "same",
+                },
+            },
+            {$project: {"same": 1}},
+        ],
+        expectedResults,
+        coll,
+    );
 
     //
     // Dotted field paths.
@@ -269,7 +281,7 @@ function runTest(coll, from, thirdColl, fourthColl) {
         {_id: 0, a: 1, "same": [{_id: 0, b: 1}]},
         {_id: 1, a: null, "same": [{_id: 1, b: null}, {_id: 2}]},
         {_id: 2, "same": [{_id: 1, b: null}, {_id: 2}]},
-        {_id: 3, a: {c: 1}, "same": [{_id: 3, b: {c: 1}}]}
+        {_id: 3, a: {c: 1}, "same": [{_id: 3, b: {c: 1}}]},
     ];
     testPipeline(pipeline, expectedResults, coll);
 
@@ -280,7 +292,7 @@ function runTest(coll, from, thirdColl, fourthColl) {
         {_id: 0, a: 1, same: [{_id: 0, b: 1}, {_id: 1, b: null}, {_id: 2}]},
         {_id: 1, a: null, same: [{_id: 0, b: 1}, {_id: 1, b: null}, {_id: 2}]},
         {_id: 2, same: [{_id: 0, b: 1}, {_id: 1, b: null}, {_id: 2}]},
-        {_id: 3, a: {c: 1}, same: [{_id: 3, b: {c: 1}}]}
+        {_id: 3, a: {c: 1}, same: [{_id: 3, b: {c: 1}}]},
     ];
     testPipeline(pipeline, expectedResults, coll);
 
@@ -293,25 +305,25 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assert.commandWorked(from.insert({_id: 0, target: 1}));
 
     pipeline = [
-            {
-              $lookup: {
-                  localField: "a.b",
-                  foreignField: "target",
-                  from: "from",
-                  as: "same.documents",
-              }
+        {
+            $lookup: {
+                localField: "a.b",
+                foreignField: "target",
+                from: "from",
+                as: "same.documents",
             },
-            {
-              // Expected input to $unwind:
-              // {_id: 0, a: {b: 1}, same: {documents: [{_id: 0, target: 1}]}}
-              // {_id: 1, same: {documents: []}}
-              $unwind: {
-                  path: "$same.documents",
-                  preserveNullAndEmptyArrays: true,
-                  includeArrayIndex: "c.d.e",
-              }
-            }
-        ];
+        },
+        {
+            // Expected input to $unwind:
+            // {_id: 0, a: {b: 1}, same: {documents: [{_id: 0, target: 1}]}}
+            // {_id: 1, same: {documents: []}}
+            $unwind: {
+                path: "$same.documents",
+                preserveNullAndEmptyArrays: true,
+                includeArrayIndex: "c.d.e",
+            },
+        },
+    ];
     expectedResults = [
         {_id: 0, a: {b: 1}, same: {documents: {_id: 0, target: 1}}, c: {d: {e: NumberLong(0)}}},
         {_id: 1, same: {}, c: {d: {e: null}}},
@@ -331,15 +343,15 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assert.commandWorked(from.insert({_id: 1, b: "string that matches /a regex/"}));
 
     pipeline = [
-            {
-              $lookup: {
-                  localField: "a",
-                  foreignField: "b",
-                  from: "from",
-                  as: "b",
-              }
+        {
+            $lookup: {
+                localField: "a",
+                foreignField: "b",
+                from: "from",
+                as: "b",
             },
-        ];
+        },
+    ];
     expectedResults = [{_id: 0, a: /a regex/, b: [{_id: 0, b: /a regex/}]}];
     testPipeline(pipeline, expectedResults, coll);
 
@@ -356,15 +368,15 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assert.commandWorked(from.insert({_id: 1}));
 
     pipeline = [
-            {
-              $lookup: {
-                  localField: "a",
-                  foreignField: "_id",
-                  from: "from",
-                  as: "b",
-              }
+        {
+            $lookup: {
+                localField: "a",
+                foreignField: "_id",
+                from: "from",
+                as: "b",
             },
-        ];
+        },
+    ];
     expectedResults = [{_id: 0, a: [0, 1, 2], b: [{_id: 0}, {_id: 1}]}];
     testPipeline(pipeline, expectedResults, coll);
 
@@ -377,15 +389,15 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assert.commandWorked(from.insert({_id: 1}));
 
     pipeline = [
-            {
-              $lookup: {
-                  localField: "a",
-                  foreignField: "_id",
-                  from: "from",
-                  as: "b",
-              }
+        {
+            $lookup: {
+                localField: "a",
+                foreignField: "_id",
+                from: "from",
+                as: "b",
             },
-        ];
+        },
+    ];
     expectedResults = [{_id: 0, a: [1], b: [{_id: 1}]}];
     testPipeline(pipeline, expectedResults, coll);
 
@@ -401,18 +413,25 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assert.commandWorked(from.insert({_id: 3, b: /^x/}));
 
     pipeline = [
-            {
-              $lookup: {
-                  localField: "a",
-                  foreignField: "b",
-                  from: "from",
-                  as: "b",
-              }
+        {
+            $lookup: {
+                localField: "a",
+                foreignField: "b",
+                from: "from",
+                as: "b",
             },
-        ];
+        },
+    ];
     expectedResults = [
-        {_id: 0, a: [/a regex/, /^x/], b: [{_id: 2, b: /a regex/}, {_id: 3, b: /^x/}]},
-        {_id: 1, a: [/^x/], b: [{_id: 3, b: /^x/}]}
+        {
+            _id: 0,
+            a: [/a regex/, /^x/],
+            b: [
+                {_id: 2, b: /a regex/},
+                {_id: 3, b: /^x/},
+            ],
+        },
+        {_id: 1, a: [/^x/], b: [{_id: 3, b: /^x/}]},
     ];
     testPipeline(pipeline, expectedResults, coll);
 
@@ -427,15 +446,15 @@ function runTest(coll, from, thirdColl, fourthColl) {
     assert.commandWorked(from.insert({_id: 3}));
 
     pipeline = [
-            {
-              $lookup: {
-                  localField: "a.b",
-                  foreignField: "_id",
-                  from: "from",
-                  as: "c",
-              }
+        {
+            $lookup: {
+                localField: "a.b",
+                foreignField: "_id",
+                from: "from",
+                as: "c",
             },
-        ];
+        },
+    ];
 
     expectedResults = [{"_id": 0, "a": [{"b": 1}, {"b": 2}], "c": [{"_id": 1}, {"_id": 2}]}];
     testPipeline(pipeline, expectedResults, coll);
@@ -443,18 +462,17 @@ function runTest(coll, from, thirdColl, fourthColl) {
     //
     // Test $lookup when the foreign collection is a view.
     //
-    assert.commandWorked(
-        coll.getDB().runCommand({create: "fromView", viewOn: "from", pipeline: []}));
+    assert.commandWorked(coll.getDB().runCommand({create: "fromView", viewOn: "from", pipeline: []}));
     pipeline = [
-            {
-                $lookup: {
-                    localField: "a.b",
-                    foreignField: "_id",
-                    from: "fromView",
-                    as: "c",
-                }
+        {
+            $lookup: {
+                localField: "a.b",
+                foreignField: "_id",
+                from: "fromView",
+                as: "c",
             },
-        ];
+        },
+    ];
 
     expectedResults = [{"_id": 0, "a": [{"b": 1}, {"b": 2}], "c": [{"_id": 1}, {"_id": 2}]}];
     testPipeline(pipeline, expectedResults, coll);
@@ -469,56 +487,73 @@ function runTest(coll, from, thirdColl, fourthColl) {
 
     // 'from', 'as', 'localField' and 'foreignField' must all be specified when run with
     // localField/foreignField syntax.
-    assertErrorCode(
-        coll, [{$lookup: {foreignField: "b", from: "from", as: "same"}}], ErrorCodes.FailedToParse);
-    assertErrorCode(
-        coll, [{$lookup: {localField: "a", from: "from", as: "same"}}], ErrorCodes.FailedToParse);
-    assertErrorCode(coll,
-                    [{$lookup: {localField: "a", foreignField: "b", as: "same"}}],
-                    ErrorCodes.FailedToParse);
+    assertErrorCode(coll, [{$lookup: {foreignField: "b", from: "from", as: "same"}}], ErrorCodes.FailedToParse);
+    assertErrorCode(coll, [{$lookup: {localField: "a", from: "from", as: "same"}}], ErrorCodes.FailedToParse);
+    assertErrorCode(coll, [{$lookup: {localField: "a", foreignField: "b", as: "same"}}], ErrorCodes.FailedToParse);
     // TODO SERVER-106081: Remove ErrorCodes.FailedToParse from the following test case.
-    assertErrorCode(coll,
-                    [{$lookup: {localField: "a", foreignField: "b", from: "from"}}],
-                    [ErrorCodes.IDLFailedToParse, ErrorCodes.FailedToParse]);
-    assertErrorCode(coll,
-                    [{$lookup: {pipeline: [], foreignField: "b", from: "from", as: "as"}}],
-                    ErrorCodes.FailedToParse);
-    assertErrorCode(coll,
-                    [{$lookup: {pipeline: [], localField: "b", from: "from", as: "as"}}],
-                    ErrorCodes.FailedToParse);
-    assertErrorCode(coll,
-                    [{$lookup: {let : {a: "$b"}, foreignField: "b", from: "from", as: "as"}}],
-                    ErrorCodes.FailedToParse);
-    assertErrorCode(coll,
-                    [{$lookup: {let : {a: "$b"}, localField: "b", from: "from", as: "as"}}],
-                    ErrorCodes.FailedToParse);
     assertErrorCode(
         coll,
-        [{$lookup: {let : {a: "$b"}, localField: "b", foreignField: "b", from: "from", as: "as"}}],
-        ErrorCodes.FailedToParse);
+        [{$lookup: {localField: "a", foreignField: "b", from: "from"}}],
+        [ErrorCodes.IDLFailedToParse, ErrorCodes.FailedToParse],
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {pipeline: [], foreignField: "b", from: "from", as: "as"}}],
+        ErrorCodes.FailedToParse,
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {pipeline: [], localField: "b", from: "from", as: "as"}}],
+        ErrorCodes.FailedToParse,
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {let: {a: "$b"}, foreignField: "b", from: "from", as: "as"}}],
+        ErrorCodes.FailedToParse,
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {let: {a: "$b"}, localField: "b", from: "from", as: "as"}}],
+        ErrorCodes.FailedToParse,
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {let: {a: "$b"}, localField: "b", foreignField: "b", from: "from", as: "as"}}],
+        ErrorCodes.FailedToParse,
+    );
 
     // 'from', 'as', 'localField' and 'foreignField' must all be of type string.
     // TODO SERVER-106081: Remove ErrorCodes.FailedToParse from the following test cases.
     // ----------------------------------------------------------------------------------
-    assertErrorCode(coll,
-                    [{$lookup: {localField: 1, foreignField: "b", from: "from", as: "as"}}],
-                    [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);
-    assertErrorCode(coll,
-                    [{$lookup: {localField: "a", foreignField: 1, from: "from", as: "as"}}],
-                    [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);
+    assertErrorCode(
+        coll,
+        [{$lookup: {localField: 1, foreignField: "b", from: "from", as: "as"}}],
+        [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse],
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {localField: "a", foreignField: 1, from: "from", as: "as"}}],
+        [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse],
+    );
     // ----------------------------------------------------------------------------------
-    assertErrorCode(coll,
-                    [{$lookup: {localField: "a", foreignField: "b", from: 1, as: "as"}}],
-                    ErrorCodes.FailedToParse);
+    assertErrorCode(
+        coll,
+        [{$lookup: {localField: "a", foreignField: "b", from: 1, as: "as"}}],
+        ErrorCodes.FailedToParse,
+    );
     // TODO SERVER-106081: Remove ErrorCodes.FailedToParse from the following test case.
-    assertErrorCode(coll,
-                    [{$lookup: {localField: "a", foreignField: "b", from: "from", as: 1}}],
-                    [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse]);
+    assertErrorCode(
+        coll,
+        [{$lookup: {localField: "a", foreignField: "b", from: "from", as: 1}}],
+        [ErrorCodes.TypeMismatch, ErrorCodes.FailedToParse],
+    );
 
     // The foreign collection must be a valid namespace.
-    assertErrorCode(coll,
-                    [{$lookup: {localField: "a", foreignField: "b", from: "", as: "as"}}],
-                    ErrorCodes.InvalidNamespace);
+    assertErrorCode(
+        coll,
+        [{$lookup: {localField: "a", foreignField: "b", from: "", as: "as"}}],
+        ErrorCodes.InvalidNamespace,
+    );
     // $lookup's field must be an object.
     assertErrorCode(coll, [{$lookup: "string"}], ErrorCodes.FailedToParse);
 }
@@ -535,9 +570,11 @@ runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl)
 
 // Verify that the command targets exactly one shard when both the local and foreign collections are
 // unsharded.
-const explain = assert.commandWorked(mongosDB.lookup.explain().aggregate([
-    {$lookup: {from: mongosDB.from.getName(), localField: "a", foreignField: "b", as: "results"}}
-]));
+const explain = assert.commandWorked(
+    mongosDB.lookup
+        .explain()
+        .aggregate([{$lookup: {from: mongosDB.from.getName(), localField: "a", foreignField: "b", as: "results"}}]),
+);
 
 // Note that in a mixed version cluster, the presence of the 'shards' field will depend on the
 // binary version of the shard that the 'lookup' collection belongs to.
@@ -587,7 +624,7 @@ assert.commandWorked(fromColl.insert({_id: 0, b: 0}));
 
 sourceColl.aggregate([
     {$lookup: {localField: "a", foreignField: "b", from: fromColl.getName(), as: "same"}},
-    {$merge: {into: outColl.getName()}}
+    {$merge: {into: outColl.getName()}},
 ]);
 
 assert.eq([{a: 0, same: [{_id: 0, b: 0}]}], outColl.find({}, {_id: 0}).toArray());

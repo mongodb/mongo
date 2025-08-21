@@ -36,9 +36,13 @@ function runTest(m) {
     db.createUser({user: "guest", pwd: "guest", roles: jsTest.readOnlyUserRoles});
     db.getSiblingDB("admin").logout();
 
-    assert.throws(function() {
-        t.findOne();
-    }, [], "read without login");
+    assert.throws(
+        function () {
+            t.findOne();
+        },
+        [],
+        "read without login",
+    );
 
     print("make sure we can't run certain commands w/out auth");
     var codeUnauthorized = 13;
@@ -66,13 +70,13 @@ function runTest(m) {
     assert(dbRO.auth("guest", "guest"), "auth failed 2");
 
     assert.eq(1000, tRO.count(), "B1");
-    assert.eq(1000, tRO.find().toArray().length, "B2");  // make sure we have a getMore in play
+    assert.eq(1000, tRO.find().toArray().length, "B2"); // make sure we have a getMore in play
     assert.commandWorked(dbRO.runCommand({hello: 1}), "B3");
 
     assert.writeError(tRO.save({}));
 
     assert.eq(1000, tRO.count(), "B6");
-    db.getSiblingDB('admin').auth('super', 'super');
+    db.getSiblingDB("admin").auth("super", "super");
 
     assert.eq(1000, t.count(), "D1");
     t.insert({i: 1000});

@@ -11,15 +11,21 @@ coll.drop();
 
 // Insert some documents so our query will perform some work.
 assert.commandWorked(coll.insert([{a: 1}, {a: 2}]));
-const longField = 'a.'.repeat(99) + 'a';
+const longField = "a.".repeat(99) + "a";
 const projectionSpec = {
-    [longField]: 1
+    [longField]: 1,
 };
 
 // Setup the profiler to only pick up the query below.
-assert.commandWorked(db.setProfilingLevel(2, {slowms: 0, sampleRate: 1}, {
-    filter: {'op': 'query', 'command.projection': projectionSpec}
-}));
+assert.commandWorked(
+    db.setProfilingLevel(
+        2,
+        {slowms: 0, sampleRate: 1},
+        {
+            filter: {"op": "query", "command.projection": projectionSpec},
+        },
+    ),
+);
 
 // Verify that our query was picked up by the profiler.
 coll.find({}, projectionSpec).toArray();

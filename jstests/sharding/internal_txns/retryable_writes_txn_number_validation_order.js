@@ -29,13 +29,12 @@ const mongosTestColl = mongosTestDB.getCollection(kCollName);
 let shard0TestDB = shard0Primary.getDB(kDbName);
 
 assert.commandWorked(mongosTestDB.createCollection(kCollName));
-assert.commandWorked(
-    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}));
+assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: mongosTestColl.getFullName()}));
 
 const kTestMode = {
     kNonRecovery: 1,
     kRestart: 2,
-    kFailover: 3
+    kFailover: 3,
 };
 
 function setUpTestMode(mode) {
@@ -45,8 +44,7 @@ function setUpTestMode(mode) {
         shard0TestDB = st.rs0.getPrimary().getDB(kDbName);
     } else if (mode == kTestMode.kFailover) {
         const oldPrimary = st.rs0.getPrimary();
-        assert.commandWorked(
-            oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
         assert.commandWorked(oldPrimary.adminCommand({replSetFreeze: 0}));
         shard0TestDB = st.rs0.getPrimary().getDB(kDbName);
     }
@@ -75,25 +73,32 @@ function testTxnNumberValidationOnRetryingOldTxnNumber(makeOrderedSessionOptsFun
     const {sessionOpts0, sessionOpts1} = makeOrderedSessionOptsFunc();
     const testMode = kTestMode[testModeName];
 
-    jsTest.log(`Testing txnNumber validation upon retrying ${tojson(sessionOpts0)} after running ${
-        tojson(sessionOpts1)} with test mode ${testModeName}`);
+    jsTest.log(
+        `Testing txnNumber validation upon retrying ${tojson(sessionOpts0)} after running ${tojson(
+            sessionOpts1,
+        )} with test mode ${testModeName}`,
+    );
 
     assert.commandWorked(shard0TestDB.runCommand(makeInsertCmdObj([{x: 0}], sessionOpts0)));
     if (sessionOpts0.isTransaction) {
-        assert.commandWorked(shard0TestDB.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)));
+        assert.commandWorked(
+            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+        );
     }
     assert.commandWorked(shard0TestDB.runCommand(makeInsertCmdObj([{x: 1}], sessionOpts1)));
     if (sessionOpts1.isTransaction) {
-        assert.commandWorked(shard0TestDB.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts1.lsid, sessionOpts1.txnNumber)));
+        assert.commandWorked(
+            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts1.lsid, sessionOpts1.txnNumber)),
+        );
     }
     assert.eq(mongosTestColl.count(), 2);
 
     setUpTestMode(testMode);
 
-    assert.commandFailedWithCode(shard0TestDB.runCommand(makeInsertCmdObj([{x: 0}], sessionOpts0)),
-                                 ErrorCodes.TransactionTooOld);
+    assert.commandFailedWithCode(
+        shard0TestDB.runCommand(makeInsertCmdObj([{x: 0}], sessionOpts0)),
+        ErrorCodes.TransactionTooOld,
+    );
     assert.eq(mongosTestColl.count(), 2);
 
     assert.commandWorked(mongosTestColl.remove({}));
@@ -105,25 +110,32 @@ function testTxnNumberValidationOnStartingOldTxnNumber(makeOrderedSessionOptsFun
     const sessionOpts1 = orderedSessionsOpts.sessionOpts0;
     const testMode = kTestMode[testModeName];
 
-    jsTest.log(`Testing txnNumber validation upon starting ${tojson(sessionOpts1)} after running ${
-        tojson(sessionOpts0)} with test mode ${testModeName}`);
+    jsTest.log(
+        `Testing txnNumber validation upon starting ${tojson(sessionOpts1)} after running ${tojson(
+            sessionOpts0,
+        )} with test mode ${testModeName}`,
+    );
 
     assert.commandWorked(shard0TestDB.runCommand(makeInsertCmdObj([{x: 0}], sessionOpts0)));
-    if (sessionOpts0.isTransaction && (testModeName != "kNonRecovery")) {
+    if (sessionOpts0.isTransaction && testModeName != "kNonRecovery") {
         // Only transactions that have been prepared or committed are expected to survive failover
         // and restart.
-        assert.commandWorked(shard0TestDB.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)));
+        assert.commandWorked(
+            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+        );
     }
 
     setUpTestMode(testMode);
 
-    assert.commandFailedWithCode(shard0TestDB.runCommand(makeInsertCmdObj([{x: 1}], sessionOpts1)),
-                                 ErrorCodes.TransactionTooOld);
+    assert.commandFailedWithCode(
+        shard0TestDB.runCommand(makeInsertCmdObj([{x: 1}], sessionOpts1)),
+        ErrorCodes.TransactionTooOld,
+    );
 
     if (sessionOpts0.isTransaction) {
-        assert.commandWorked(shard0TestDB.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)));
+        assert.commandWorked(
+            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+        );
     }
 
     assert.eq(mongosTestColl.count(), 1);
@@ -145,13 +157,13 @@ function runTestsForInternalSessionForRetryableWrite(makeOrderedSessionOptsFunc)
         const sessionOpts0 = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(5), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         // Internal transaction for retryable writes in a child session.
         const sessionOpts1 = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(6), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         return {sessionOpts0, sessionOpts1};
     };
@@ -166,13 +178,13 @@ function runTestsForInternalSessionForRetryableWrite(makeOrderedSessionOptsFunc)
         const sessionOpts0 = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(5), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         // Retryable writes in the parent session.
         const sessionOpts1 = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(6),
-            isTransaction: false
+            isTransaction: false,
         };
         return {sessionOpts0, sessionOpts1};
     };
@@ -187,13 +199,13 @@ function runTestsForInternalSessionForRetryableWrite(makeOrderedSessionOptsFunc)
         const sessionOpts0 = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(5), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         // Transaction in the parent session.
         const sessionOpts1 = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(6),
-            isTransaction: true
+            isTransaction: true,
         };
         return {sessionOpts0, sessionOpts1};
     };
@@ -208,13 +220,13 @@ function runTestsForInternalSessionForRetryableWrite(makeOrderedSessionOptsFunc)
         const sessionOpts0 = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(5),
-            isTransaction: false
+            isTransaction: false,
         };
         // Internal transaction for retryable writes in a child session.
         const sessionOpts1 = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(6), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         return {sessionOpts0, sessionOpts1};
     };
@@ -229,13 +241,13 @@ function runTestsForInternalSessionForRetryableWrite(makeOrderedSessionOptsFunc)
         const sessionOpts0 = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(5),
-            isTransaction: true
+            isTransaction: true,
         };
         // Internal transaction for retryable writes in a child session.
         const sessionOpts1 = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(6), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         return {sessionOpts0, sessionOpts1};
     };
@@ -249,19 +261,24 @@ function runTestsForInternalSessionForRetryableWrite(makeOrderedSessionOptsFunc)
 function runTestForInternalSessionForNonRetryableWrite(makeSessionOptsFunc) {
     const {sessionOpts0, sessionOpts1} = makeSessionOptsFunc();
 
-    jsTest.log(`Testing that there is no txnNumber validation upon starting ${
-        tojson(sessionOpts1)} after running ${tojson(sessionOpts0)}`);
+    jsTest.log(
+        `Testing that there is no txnNumber validation upon starting ${tojson(
+            sessionOpts1,
+        )} after running ${tojson(sessionOpts0)}`,
+    );
 
     assert.commandWorked(shard0TestDB.runCommand(makeInsertCmdObj([{x: 0}], sessionOpts0)));
     assert.commandWorked(shard0TestDB.runCommand(makeInsertCmdObj([{x: 1}], sessionOpts1)));
 
     if (sessionOpts0.isTransaction) {
-        assert.commandWorked(shard0TestDB.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)));
+        assert.commandWorked(
+            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts0.lsid, sessionOpts0.txnNumber)),
+        );
     }
     if (sessionOpts1.isTransaction) {
-        assert.commandWorked(shard0TestDB.adminCommand(
-            makeCommitTransactionCmdObj(sessionOpts1.lsid, sessionOpts1.txnNumber)));
+        assert.commandWorked(
+            shard0TestDB.adminCommand(makeCommitTransactionCmdObj(sessionOpts1.lsid, sessionOpts1.txnNumber)),
+        );
     }
 
     assert.eq(mongosTestColl.count(), 2);
@@ -277,13 +294,13 @@ function runTestForInternalSessionForNonRetryableWrite(makeSessionOptsFunc) {
         const sessionOpts0 = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(6),
-            isTransaction: false
+            isTransaction: false,
         };
         // Internal transaction for non-retryable writes in another child session.
         const sessionOpts1 = {
             lsid: {id: sessionUUID, txnUUID: UUID()},
             txnNumber: NumberLong(5),
-            isTransaction: true
+            isTransaction: true,
         };
         return {sessionOpts0, sessionOpts1};
     };
@@ -298,13 +315,13 @@ function runTestForInternalSessionForNonRetryableWrite(makeSessionOptsFunc) {
         const sessionOpts0 = {
             lsid: {id: sessionUUID, txnUUID: UUID()},
             txnNumber: NumberLong(6),
-            isTransaction: true
+            isTransaction: true,
         };
         // Retryable writes in the parent session.
         const sessionOpts1 = {
             lsid: {id: sessionUUID},
             txnNumber: NumberLong(5),
-            isTransaction: false
+            isTransaction: false,
         };
         return {sessionOpts0, sessionOpts1};
     };
@@ -319,13 +336,13 @@ function runTestForInternalSessionForNonRetryableWrite(makeSessionOptsFunc) {
         const sessionOpts0 = {
             lsid: {id: sessionUUID, txnUUID: UUID()},
             txnNumber: NumberLong(6),
-            isTransaction: true
+            isTransaction: true,
         };
         // Internal transaction for retryable writes in a child session.
         const sessionOpts1 = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(5), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         return {sessionOpts0, sessionOpts1};
     };
@@ -340,13 +357,13 @@ function runTestForInternalSessionForNonRetryableWrite(makeSessionOptsFunc) {
         const sessionOpts0 = {
             lsid: {id: sessionUUID, txnNumber: NumberLong(6), txnUUID: UUID()},
             txnNumber: NumberLong(0),
-            isTransaction: true
+            isTransaction: true,
         };
         // Internal transaction for non-retryable writes in another child session.
         const sessionOpts1 = {
             lsid: {id: sessionUUID, txnUUID: UUID()},
             txnNumber: NumberLong(5),
-            isTransaction: true
+            isTransaction: true,
         };
         return {sessionOpts0, sessionOpts1};
     };

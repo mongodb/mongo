@@ -3,11 +3,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const sharded = new ShardingTest({mongos: 1, shards: 2});
 
-assert.commandWorked(
-    sharded.s.adminCommand({enableSharding: "test", primaryShard: sharded.shard0.shardName}));
+assert.commandWorked(sharded.s.adminCommand({enableSharding: "test", primaryShard: sharded.shard0.shardName}));
 
-const coll = sharded.s.getDB('test').mainColl;
-const foreignColl = sharded.s.getDB('test').foreignColl;
+const coll = sharded.s.getDB("test").mainColl;
+const foreignColl = sharded.s.getDB("test").foreignColl;
 const smallColl = sharded.s.getDB("test").smallColl;
 
 const nDocsMainColl = 10;
@@ -16,28 +15,26 @@ const nDocsForeignColl = 2 * nDocsMainColl;
 for (let i = 0; i < nDocsMainColl; i++) {
     assert.commandWorked(coll.insert({_id: i, collName: "mainColl", foreignId: i}));
 
-    assert.commandWorked(
-        foreignColl.insert({_id: 2 * i, key: i, collName: "foreignColl", data: "hello-0"}));
-    assert.commandWorked(
-        foreignColl.insert({_id: 2 * i + 1, key: i, collName: "foreignColl", data: "hello-1"}));
+    assert.commandWorked(foreignColl.insert({_id: 2 * i, key: i, collName: "foreignColl", data: "hello-0"}));
+    assert.commandWorked(foreignColl.insert({_id: 2 * i + 1, key: i, collName: "foreignColl", data: "hello-1"}));
 }
 assert.commandWorked(smallColl.insert({_id: 0, collName: "smallColl"}));
 
-const runTest = function() {
+const runTest = function () {
     (function testSingleLookupFromShard() {
         // Run a pipeline which must be merged on a shard. This should force the $lookup (on
         // the sharded collection) to be run on a mongod.
         let pipeline = [
-                {$_internalSplitPipeline: {mergeType: "anyShard"}},
-                {
-                  $lookup: {
-                      localField: "foreignId",
-                      foreignField: "key",
-                      from: "foreignColl",
-                      as: "foreignDoc"
-                  }
-                }
-            ];
+            {$_internalSplitPipeline: {mergeType: "anyShard"}},
+            {
+                $lookup: {
+                    localField: "foreignId",
+                    foreignField: "key",
+                    from: "foreignColl",
+                    as: "foreignDoc",
+                },
+            },
+        ];
 
         const results = coll.aggregate(pipeline).toArray();
         assert.eq(results.length, nDocsMainColl);
@@ -49,23 +46,23 @@ const runTest = function() {
     (function testMultipleLookupsFromShard() {
         // Run two lookups in a row (both on mongod).
         let pipeline = [
-                {$_internalSplitPipeline: {mergeType: "anyShard"}},
-                {
-                  $lookup: {
-                      localField: "foreignId",
-                      foreignField: "key",
-                      from: "foreignColl",
-                      as: "foreignDoc"
-                  }
+            {$_internalSplitPipeline: {mergeType: "anyShard"}},
+            {
+                $lookup: {
+                    localField: "foreignId",
+                    foreignField: "key",
+                    from: "foreignColl",
+                    as: "foreignDoc",
                 },
-                {
-                  $lookup: {
-                      from: "smallColl",
-                      as: "smallCollDocs",
-                      pipeline: [],
-                  }
-                }
-            ];
+            },
+            {
+                $lookup: {
+                    from: "smallColl",
+                    as: "smallCollDocs",
+                    pipeline: [],
+                },
+            },
+        ];
 
         const results = coll.aggregate(pipeline).toArray();
         assert.eq(results.length, nDocsMainColl);
@@ -78,17 +75,15 @@ const runTest = function() {
     (function testUnshardedLookupWithinShardedLookup() {
         // Pipeline with unsharded $lookup inside a sharded $lookup.
         let pipeline = [
-                {$_internalSplitPipeline: {mergeType: "anyShard"}},
-                {
-                  $lookup: {
-                      from: "foreignColl",
-                      as: "foreignDoc",
-                      pipeline: [
-                          {$lookup: {from: "smallColl", as: "doc", pipeline: []}},
-                      ],
-                  }
-                }
-            ];
+            {$_internalSplitPipeline: {mergeType: "anyShard"}},
+            {
+                $lookup: {
+                    from: "foreignColl",
+                    as: "foreignDoc",
+                    pipeline: [{$lookup: {from: "smallColl", as: "doc", pipeline: []}}],
+                },
+            },
+        ];
 
         const results = coll.aggregate(pipeline).toArray();
 
@@ -112,22 +107,22 @@ runTest();
 jsTestLog("Running test with foreign collection sharded");
 sharded.shardColl(
     "foreignColl",
-    {_id: 1},  // shard key
-    {_id: 5},  // split
-    {_id: 5},  // move
-    "test",    // dbName
-    true       // waitForDelete
+    {_id: 1}, // shard key
+    {_id: 5}, // split
+    {_id: 5}, // move
+    "test", // dbName
+    true, // waitForDelete
 );
 runTest();
 
 jsTestLog("Running test with main and foreign collection sharded");
 sharded.shardColl(
     "mainColl",
-    {_id: 1},  // shard key
-    {_id: 5},  // split
-    {_id: 5},  // move
-    "test",    // dbName
-    true       // waitForDelete
+    {_id: 1}, // shard key
+    {_id: 5}, // split
+    {_id: 5}, // move
+    "test", // dbName
+    true, // waitForDelete
 );
 runTest();
 

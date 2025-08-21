@@ -3,7 +3,7 @@
  *
  * Runs multiple aggregations with $_externalDataSources option concurrently.
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = (() => {
         Random.setRandomSeed();
 
@@ -11,7 +11,7 @@ export const $config = (function() {
         for (let i = 0; i < 100000; ++i) {
             localCollObjs.push({
                 _id: i,
-                g: Random.randInt(100),  // 100 groups
+                g: Random.randInt(100), // 100 groups
                 str1: "strdata_" + Random.randInt(100000000),
             });
         }
@@ -37,7 +37,7 @@ export const $config = (function() {
         };
     })();
 
-    var states = (function() {
+    var states = (function () {
         const kUrlProtocolFile = "file://";
 
         function init(db, collName) {
@@ -58,36 +58,35 @@ export const $config = (function() {
             const pipeName1 = this.pipeName1 + "_scan";
             const pipeName2 = this.pipeName2 + "_scan";
 
-            _writeTestPipeObjects(
-                pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
-            _writeTestPipeObjects(
-                pipeName2, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(pipeName2, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
 
             const expectedRes = this.localCollObjs.concat(this.localCollObjs);
 
             const resArr = db[this.vcollName1]
-                               .aggregate([], {
-                                   $_externalDataSources: [{
-                                       collName: this.vcollName1,
-                                       dataSources: [
-                                           {
-                                               url: kUrlProtocolFile + pipeName1,
-                                               storageType: "pipe",
-                                               fileType: "bson"
-                                           },
-                                           {
-                                               url: kUrlProtocolFile + pipeName2,
-                                               storageType: "pipe",
-                                               fileType: "bson"
-                                           }
-                                       ]
-                                   }]
-                               })
-                               .toArray();
+                .aggregate([], {
+                    $_externalDataSources: [
+                        {
+                            collName: this.vcollName1,
+                            dataSources: [
+                                {
+                                    url: kUrlProtocolFile + pipeName1,
+                                    storageType: "pipe",
+                                    fileType: "bson",
+                                },
+                                {
+                                    url: kUrlProtocolFile + pipeName2,
+                                    storageType: "pipe",
+                                    fileType: "bson",
+                                },
+                            ],
+                        },
+                    ],
+                })
+                .toArray();
             assert.eq(resArr.length, expectedRes.length);
             for (let i = 0; i < expectedRes.length; ++i) {
-                assert.eq(
-                    resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
+                assert.eq(resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
             }
 
             jsTestLog(`thread_num ${this.tid} scan_case_end`);
@@ -98,27 +97,29 @@ export const $config = (function() {
 
             const pipeName1 = this.pipeName1 + "_match";
 
-            _writeTestPipeObjects(
-                pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
 
-            const expectedRes = this.localCollObjs.filter(obj => obj.g < 50);
+            const expectedRes = this.localCollObjs.filter((obj) => obj.g < 50);
 
             const resArr = db[this.vcollName1]
-                               .aggregate([{$match: {g: {$lt: 50}}}], {
-                                   $_externalDataSources: [{
-                                       collName: this.vcollName1,
-                                       dataSources: [{
-                                           url: kUrlProtocolFile + pipeName1,
-                                           storageType: "pipe",
-                                           fileType: "bson"
-                                       }]
-                                   }]
-                               })
-                               .toArray();
+                .aggregate([{$match: {g: {$lt: 50}}}], {
+                    $_externalDataSources: [
+                        {
+                            collName: this.vcollName1,
+                            dataSources: [
+                                {
+                                    url: kUrlProtocolFile + pipeName1,
+                                    storageType: "pipe",
+                                    fileType: "bson",
+                                },
+                            ],
+                        },
+                    ],
+                })
+                .toArray();
             assert.eq(resArr.length, expectedRes.length);
             for (let i = 0; i < expectedRes.length; ++i) {
-                assert.eq(
-                    resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
+                assert.eq(resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
             }
 
             jsTestLog(`thread_num ${this.tid} match_case_end`);
@@ -130,39 +131,40 @@ export const $config = (function() {
             const pipeName1 = this.pipeName1 + "_unionWith";
             const pipeName2 = this.pipeName2 + "_unionWith";
 
-            _writeTestPipeObjects(
-                pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
-            _writeTestPipeObjects(
-                pipeName2, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(pipeName2, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
 
             const expectedRes = this.localCollObjs.concat(this.localCollObjs);
 
             const resArr = db[this.vcollName1]
-                               .aggregate([{$unionWith: this.vcollName2}], {
-                                   $_externalDataSources: [
-                                       {
-                                           collName: this.vcollName1,
-                                           dataSources: [{
-                                               url: kUrlProtocolFile + pipeName1,
-                                               storageType: "pipe",
-                                               fileType: "bson"
-                                           }]
-                                       },
-                                       {
-                                           collName: this.vcollName2,
-                                           dataSources: [{
-                                               url: kUrlProtocolFile + pipeName2,
-                                               storageType: "pipe",
-                                               fileType: "bson"
-                                           }]
-                                       }
-                                   ]
-                               })
-                               .toArray();
+                .aggregate([{$unionWith: this.vcollName2}], {
+                    $_externalDataSources: [
+                        {
+                            collName: this.vcollName1,
+                            dataSources: [
+                                {
+                                    url: kUrlProtocolFile + pipeName1,
+                                    storageType: "pipe",
+                                    fileType: "bson",
+                                },
+                            ],
+                        },
+                        {
+                            collName: this.vcollName2,
+                            dataSources: [
+                                {
+                                    url: kUrlProtocolFile + pipeName2,
+                                    storageType: "pipe",
+                                    fileType: "bson",
+                                },
+                            ],
+                        },
+                    ],
+                })
+                .toArray();
             assert.eq(resArr.length, expectedRes.length);
             for (let i = 0; i < expectedRes.length; ++i) {
-                assert.eq(
-                    resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
+                assert.eq(resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
             }
 
             jsTestLog(`thread_num ${this.tid} unionWith_case_end`);
@@ -173,14 +175,13 @@ export const $config = (function() {
 
             const pipeName1 = this.pipeName1 + "_group";
 
-            _writeTestPipeObjects(
-                pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
 
             const countPerGroup = [];
             for (let i = 0; i < 100; ++i) {
                 countPerGroup[i] = 0;
             }
-            this.localCollObjs.forEach(obj => {
+            this.localCollObjs.forEach((obj) => {
                 countPerGroup[obj.g]++;
             });
             const expectedRes = [];
@@ -191,17 +192,21 @@ export const $config = (function() {
             });
 
             const resArr = db[this.vcollName1]
-                               .aggregate([{$group: {_id: "$g", c: {$count: {}}}}], {
-                                   $_externalDataSources: [{
-                                       collName: this.vcollName1,
-                                       dataSources: [{
-                                           url: kUrlProtocolFile + pipeName1,
-                                           storageType: "pipe",
-                                           fileType: "bson"
-                                       }]
-                                   }]
-                               })
-                               .toArray();
+                .aggregate([{$group: {_id: "$g", c: {$count: {}}}}], {
+                    $_externalDataSources: [
+                        {
+                            collName: this.vcollName1,
+                            dataSources: [
+                                {
+                                    url: kUrlProtocolFile + pipeName1,
+                                    storageType: "pipe",
+                                    fileType: "bson",
+                                },
+                            ],
+                        },
+                    ],
+                })
+                .toArray();
             assert.sameMembers(resArr, expectedRes);
 
             jsTestLog(`thread_num ${this.tid} group_case_end`);
@@ -224,17 +229,15 @@ export const $config = (function() {
         group: {scan: 0.25, match: 0.25, unionWith: 0.25, group: 0.25},
     };
 
-    function setup(db, collName, cluster) {
-    }
+    function setup(db, collName, cluster) {}
 
-    function teardown(db, collName) {
-    }
+    function teardown(db, collName) {}
 
     return {
         threadCount: 5,
         iterations: 20,
         states: states,
-        startState: 'init',
+        startState: "init",
         transitions: transitions,
         setup: setup,
         teardown: teardown,

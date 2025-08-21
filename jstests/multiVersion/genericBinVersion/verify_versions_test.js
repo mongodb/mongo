@@ -10,31 +10,23 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 function assertBinVersionsEqual(v1, v2) {
-    assert(MongoRunner.areBinVersionsTheSame(v1, v2),
-           "Expected \"" + v1 + "\" to equal \"" + v2 + "\"");
+    assert(MongoRunner.areBinVersionsTheSame(v1, v2), 'Expected "' + v1 + '" to equal "' + v2 + '"');
 }
 
 function assertBinVersionsNotEqual(v1, v2) {
-    assert(!MongoRunner.areBinVersionsTheSame(v1, v2),
-           "Expected \"" + v1 + "\" not to equal \"" + v2 + "\"");
+    assert(!MongoRunner.areBinVersionsTheSame(v1, v2), 'Expected "' + v1 + '" not to equal "' + v2 + '"');
 }
 
 function assertBinVersionComparesHigher(v1, v2) {
-    assert.eq(1,
-              MongoRunner.compareBinVersions(v1, v2),
-              "Expected \"" + v1 + "\" to compare higher than \"" + v2 + "\"");
+    assert.eq(1, MongoRunner.compareBinVersions(v1, v2), 'Expected "' + v1 + '" to compare higher than "' + v2 + '"');
 }
 
 function assertBinVersionComparesLower(v1, v2) {
-    assert.eq(-1,
-              MongoRunner.compareBinVersions(v1, v2),
-              "Expected \"" + v1 + "\" to compare lower than \"" + v2 + "\"");
+    assert.eq(-1, MongoRunner.compareBinVersions(v1, v2), 'Expected "' + v1 + '" to compare lower than "' + v2 + '"');
 }
 
 function assertBinVersionComparesEqual(v1, v2) {
-    assert.eq(0,
-              MongoRunner.compareBinVersions(v1, v2),
-              "Expected \"" + v1 + "\" to compare equal to \"" + v2 + "\"");
+    assert.eq(0, MongoRunner.compareBinVersions(v1, v2), 'Expected "' + v1 + '" to compare equal to "' + v2 + '"');
 }
 
 // "latest" is the same version as the shell, "last-lts" is not.

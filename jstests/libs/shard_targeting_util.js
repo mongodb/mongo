@@ -41,8 +41,7 @@ export class ShardTargetingTest {
         let stageIdx = 0;
         for (const stage of expectedStages) {
             const spec = actualStages[stageIdx];
-            assert(spec.hasOwnProperty(stage),
-                   "Expected stage " + tojson(stage) + " in explain " + tojson(explain));
+            assert(spec.hasOwnProperty(stage), "Expected stage " + tojson(stage) + " in explain " + tojson(explain));
             stageIdx++;
         }
     }
@@ -78,7 +77,8 @@ export class ShardTargetingTest {
                 assert(
                     expectedMergingStages,
                     "Should have specified merging stages for test case if split pipeline has 'mergerPart'" +
-                        tojson(splitPipeline));
+                        tojson(splitPipeline),
+                );
                 this._assertExpectedStages(expectedMergingStages, mergerPart, splitPipeline);
             }
         }
@@ -89,7 +89,8 @@ export class ShardTargetingTest {
                 assert(
                     expectedShardStages,
                     "Should have specified shard stages for test case if split pipeline has 'shardsPart'" +
-                        tojson(splitPipeline));
+                        tojson(splitPipeline),
+                );
                 this._assertExpectedStages(expectedShardStages, shardsPart, splitPipeline);
             }
         }
@@ -104,14 +105,17 @@ export class ShardTargetingTest {
      * shard for execution.
      * - 'assertSBELookupPushdown' asserts that $lookup was pushed down into SBE when present.
      */
-    _assertExplainTargeting(explain, {
-        expectedMergingShard,
-        expectedMergingStages,
-        expectedShard,
-        expectedShardStages,
-        assertSBELookupPushdown,
-        expectRouter,
-    }) {
+    _assertExplainTargeting(
+        explain,
+        {
+            expectedMergingShard,
+            expectedMergingStages,
+            expectedShard,
+            expectedShardStages,
+            assertSBELookupPushdown,
+            expectRouter,
+        },
+    ) {
         if (expectedMergingShard) {
             assert.eq(explain.mergeType, "specificShard", explain);
             assert.eq(explain.mergeShardId, expectedMergingShard, explain);
@@ -119,14 +123,15 @@ export class ShardTargetingTest {
             this._examineSplitPipeline({
                 splitPipeline: explain.splitPipeline,
                 expectedMergingStages: expectedMergingStages,
-                expectedShardStages: expectedShardStages
+                expectedShardStages: expectedShardStages,
             });
         } else {
-            assert.neq(explain.mergeType,
-                       "specificShard",
-                       "Expected not to merge on a specific shard; explain " + tojson(explain));
             assert.neq(
-                explain.mergeType, "anyShard", "Expected not to merge on any shard", explain);
+                explain.mergeType,
+                "specificShard",
+                "Expected not to merge on a specific shard; explain " + tojson(explain),
+            );
+            assert.neq(explain.mergeType, "anyShard", "Expected not to merge on any shard", explain);
         }
 
         if (expectedShard) {
@@ -164,7 +169,7 @@ export class ShardTargetingTest {
             this._examineSplitPipeline({
                 splitPipeline: explain.splitPipeline,
                 expectedMergingStages: expectedMergingStages,
-                expectedShardStages: expectedShardStages
+                expectedShardStages: expectedShardStages,
             });
         }
     }
@@ -183,14 +188,11 @@ export class ShardTargetingTest {
     setupColl({collName, indexList, docs, collType, shardKey, chunkList, owningShard}) {
         const coll = this.db[collName];
         if (collType === "sharded") {
-            assert(shardKey && chunkList,
-                   "Must specify shard key and chunk list when setting up a sharded collection");
+            assert(shardKey && chunkList, "Must specify shard key and chunk list when setting up a sharded collection");
             CreateShardedCollectionUtil.shardCollectionWithChunks(coll, shardKey, chunkList);
         } else if (collType == "unsplittable") {
-            assert(owningShard,
-                   "Must specify an owning shard when setting up an unsplittable collection");
-            assert.commandWorked(this.db.runCommand(
-                {createUnsplittableCollection: collName, dataShard: owningShard}));
+            assert(owningShard, "Must specify an owning shard when setting up an unsplittable collection");
+            assert.commandWorked(this.db.runCommand({createUnsplittableCollection: collName, dataShard: owningShard}));
         } else {
             assert(false, "Unknown collection type " + tojson(collType));
         }
@@ -216,17 +218,10 @@ export class ShardTargetingTest {
      * - 'profileFilters' is a map from shard name to objects containing arguments to create a
      * filter to query the profiler output.
      */
-    assertShardTargeting({
-        pipeline,
-        targetCollName,
-        explainAssertionObj,
-        expectedResults,
-        comment,
-        profileFilters,
-    }) {
+    assertShardTargeting({pipeline, targetCollName, explainAssertionObj, expectedResults, comment, profileFilters}) {
         const coll = this.db[targetCollName];
 
-        const options = comment ? {'comment': comment} : {};
+        const options = comment ? {"comment": comment} : {};
 
         // Test explain if 'explainAssertionObj' is specified.
         if (explainAssertionObj) {
@@ -239,9 +234,13 @@ export class ShardTargetingTest {
 
         // Verify that 'pipeline' returns the expected results.
         const res = coll.aggregate(pipeline, options).toArray();
-        assert(arrayEq(res, expectedResults),
-               "sharded aggregation results did not match: " + tojson(res) +
-                   " does not have the same members as " + tojson(expectedResults));
+        assert(
+            arrayEq(res, expectedResults),
+            "sharded aggregation results did not match: " +
+                tojson(res) +
+                " does not have the same members as " +
+                tojson(expectedResults),
+        );
 
         // Verify that execution targeted the expected nodes if 'profileFilters' was specified.
         if (profileFilters) {
@@ -253,13 +252,18 @@ export class ShardTargetingTest {
                     const profileFilter = this._createProfileFilter(filter);
                     const profileColl = profileDB.system.profile;
                     const debugFilter = comment ? {"command.comment": comment} : {};
-                    assert.gt(profileColl.find(profileFilter).itcount(),
-                              0,
-                              "Expected to find an entry matching " + tojson(profileFilter) +
-                                  " on shard " + shard +
-                                  ". Dumping profiler contents limited to filter " +
-                                  tojson(debugFilter) + ": " +
-                                  tojson(profileColl.find(debugFilter).toArray()));
+                    assert.gt(
+                        profileColl.find(profileFilter).itcount(),
+                        0,
+                        "Expected to find an entry matching " +
+                            tojson(profileFilter) +
+                            " on shard " +
+                            shard +
+                            ". Dumping profiler contents limited to filter " +
+                            tojson(debugFilter) +
+                            ": " +
+                            tojson(profileColl.find(debugFilter).toArray()),
+                    );
                 }
             }
         }

@@ -13,9 +13,9 @@ const rst = new ReplSetTest({
     nodes: [
         {rsConfig: {tags: {region: "us", category: "A"}}},
         {rsConfig: {tags: {region: "us", category: "B"}}},
-        {rsConfig: {tags: {region: "eu", category: "A"}}}
+        {rsConfig: {tags: {region: "eu", category: "A"}}},
     ],
-    settings: {getLastErrorModes: {multiRegion: {region: 2}}}
+    settings: {getLastErrorModes: {multiRegion: {region: 2}}},
 });
 
 rst.startSet();
@@ -29,14 +29,13 @@ let cfg = rst.getReplSetConfigFromNode();
 cfg.version += 1;
 cfg.settings.getLastErrorModes = {
     multiRegion: {region: 2},
-    multiCategory: {category: 2}
+    multiCategory: {category: 2},
 };
 
 async function runReconfigFn(cfg) {
     const {ReplSetTest} = await import("jstests/libs/replsettest.js");
     jsTestLog("Running reconfig");
-    assert.commandWorked(
-        db.adminCommand({replSetReconfig: cfg, maxTimeMS: ReplSetTest.kDefaultTimeoutMS}));
+    assert.commandWorked(db.adminCommand({replSetReconfig: cfg, maxTimeMS: ReplSetTest.kDefaultTimeoutMS}));
     jsTestLog("Finished running reconfig");
 }
 
@@ -47,15 +46,15 @@ hangDuringReconfigFP.wait();
 jsTestLog("Attempting setDefaultRWC (should fail).");
 assert.commandFailedWithCode(
     primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}),
-    ErrorCodes.ConfigurationInProgress);
+    ErrorCodes.ConfigurationInProgress,
+);
 
 jsTestLog("Allowing reconfig to finish.");
 hangDuringReconfigFP.off();
 waitForReconfig();
 
 jsTestLog("Attempting setDefaultRWC again (should succeed).");
-assert.commandWorked(
-    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}));
+assert.commandWorked(primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "multiRegion"}}));
 
 jsTestLog("Checking writeability.");
 const coll = primary.getDB("db").getCollection("coll");

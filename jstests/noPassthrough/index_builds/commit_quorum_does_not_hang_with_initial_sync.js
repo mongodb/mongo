@@ -40,7 +40,7 @@ const rst = new ReplSetTest({
                 priority: 0,
             },
         },
-    ]
+    ],
 });
 
 rst.startSet();
@@ -88,7 +88,7 @@ IndexBuildTest.waitForIndexBuildToStart(db, collName, "g_1");
 // Restart the secondary with a clean data directory to start the initial sync process.
 secondary = rst.restart(1, {
     startClean: true,
-    setParameter: 'failpoint.initialSyncHangAfterDataCloning=' + tojson({mode: 'alwaysOn'}),
+    setParameter: "failpoint.initialSyncHangAfterDataCloning=" + tojson({mode: "alwaysOn"}),
 });
 
 // The secondary node will start any in-progress two-phase index builds from the primary before
@@ -102,16 +102,15 @@ checkLog.containsJson(secondary, 21184);
 function checkForIndexes(indexes) {
     for (let i = 0; i < indexes.length; i++) {
         checkLog.containsJson(secondary, 20384, {
-            "properties": function(obj) {
+            "properties": function (obj) {
                 return obj.name === indexes[i];
-            }
+            },
         });
     }
 }
 checkForIndexes(["b_1", "c_1", "d_1", "e_1", "f_1", "g_1"]);
 
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
 
 rst.awaitReplication();
 rst.awaitSecondaryNodes();

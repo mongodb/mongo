@@ -6,10 +6,7 @@
 //   # During fcv upgrade/downgrade the engine might not be what we expect.
 //   cannot_run_during_upgrade_downgrade,
 // ]
-import {
-    documentEq,
-    orderedArrayEq,
-} from "jstests/aggregation/extras/utils.js";
+import {documentEq, orderedArrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     getPlanStages,
     getWinningPlanFromExplain,
@@ -19,15 +16,15 @@ import {
 import {
     checkSbeCompletelyDisabled,
     checkSbeFullyEnabled,
-    checkSbeRestrictedOrFullyEnabled
+    checkSbeRestrictedOrFullyEnabled,
 } from "jstests/libs/query/sbe_util.js";
 
 let coll = db.remove_redundant_projects;
 coll.drop();
 
-assert.commandWorked(coll.insert({_id: {a: 1, b: 1}, a: 1, c: {d: 1}, e: ['elem1']}));
+assert.commandWorked(coll.insert({_id: {a: 1, b: 1}, a: 1, c: {d: 1}, e: ["elem1"]}));
 
-let indexSpec = {a: 1, 'c.d': 1, 'e.0': 1};
+let indexSpec = {a: 1, "c.d": 1, "e.0": 1};
 
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
@@ -45,7 +42,7 @@ function assertResultsMatch({
     expectedCoalescedProjects = [],
     removedProjectStage = null,
     index = indexSpec,
-    pipelineOptimizedAway = false
+    pipelineOptimizedAway = false,
 } = {}) {
     // Add a match stage to ensure index scans are considered for planning (workaround for
     // SERVER-20066).
@@ -75,33 +72,36 @@ function assertResultsMatch({
                 expectedCoalescedProjects.length,
                 1,
                 "If we expect project to coalesce, there should be at least one such projection in expectedCoalescedProjects " +
-                    tojson(expectedCoalescedProjects));
+                    tojson(expectedCoalescedProjects),
+            );
 
             const projects = [
                 ...getPlanStages(result, "PROJECTION_DEFAULT"),
                 ...getPlanStages(result, "PROJECTION_COVERED"),
-                ...getPlanStages(result, "PROJECTION_SIMPLE")
+                ...getPlanStages(result, "PROJECTION_SIMPLE"),
             ];
 
             assert.gte(projects.length, 1, explain);
 
-            const areAllexpectedCoalescedProjectsPresent =
-                expectedCoalescedProjects.every(coalescedProject => {
-                    return projects.some(project => {
-                        return documentEq(project.transformBy, coalescedProject);
-                    });
+            const areAllexpectedCoalescedProjectsPresent = expectedCoalescedProjects.every((coalescedProject) => {
+                return projects.some((project) => {
+                    return documentEq(project.transformBy, coalescedProject);
                 });
+            });
 
-            assert(areAllexpectedCoalescedProjectsPresent,
-                   "There were missing or extra coalesced projects in " +
-                       tojson(expectedCoalescedProjects) + " with explain " + tojson(explain));
+            assert(
+                areAllexpectedCoalescedProjectsPresent,
+                "There were missing or extra coalesced projects in " +
+                    tojson(expectedCoalescedProjects) +
+                    " with explain " +
+                    tojson(explain),
+            );
         }
 
         if (!pipelineOptimizedAway) {
             // Check that $project was removed from pipeline and pushed to the query system.
-            explain.stages.forEach(function(stage) {
-                if (stage.hasOwnProperty("$project"))
-                    assert.neq(removedProjectStage, stage["$project"], explain);
+            explain.stages.forEach(function (stage) {
+                if (stage.hasOwnProperty("$project")) assert.neq(removedProjectStage, stage["$project"], explain);
             });
         }
     }
@@ -119,37 +119,33 @@ assertResultsMatch({
     pipeline: [{$project: {_id: 0, a: 1}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"a": true, "_id": false}],
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 assertResultsMatch({
     pipeline: [{$project: {_id: 0, a: 1}}, {$group: {_id: null, a: {$sum: "$a"}}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"a": true, "_id": false}],
     removedProjectStage: {_id: 0, a: 1},
-    pipelineOptimizedAway: sbeRestricted
+    pipelineOptimizedAway: sbeRestricted,
 });
 assertResultsMatch({
     pipeline: [{$sort: {a: -1}}, {$project: {_id: 0, a: 1}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"a": true, "_id": false}],
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 assertResultsMatch({
-    pipeline: [
-        {$sort: {a: 1, 'c.d': 1}},
-        {$project: {_id: 0, a: 1}},
-        {$group: {_id: "$a", a: {$sum: "$a"}}}
-    ],
+    pipeline: [{$sort: {a: 1, "c.d": 1}}, {$project: {_id: 0, a: 1}}, {$group: {_id: "$a", a: {$sum: "$a"}}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"a": true, "_id": false}],
     removedProjectStage: {_id: 0, a: 1},
-    pipelineOptimizedAway: sbeRestricted
+    pipelineOptimizedAway: sbeRestricted,
 });
 assertResultsMatch({
     pipeline: [{$project: {_id: 0, c: {d: 1}}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"c": {"d": true}, "_id": false}],
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 
 // Test that projections with renamed fields are removed from the pipeline.
@@ -157,13 +153,13 @@ assertResultsMatch({
     pipeline: [{$project: {_id: 0, f: "$a"}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"f": "$a", "_id": false}],
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 assertResultsMatch({
     pipeline: [{$project: {_id: 0, a: 1, f: "$a"}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"a": true, "f": "$a", "_id": false}],
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 
 // Test that uncovered projections are removed from the pipeline.
@@ -171,7 +167,7 @@ assertResultsMatch({
     pipeline: [{$sort: {a: 1}}, {$project: {_id: 1, b: 1}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"_id": true, "b": true}],
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 
 // When SBE is not enabled, we end up pushing down a projection which is internally generated by the
@@ -179,9 +175,8 @@ assertResultsMatch({
 assertResultsMatch({
     pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
     expectProjectToCoalesce: checkSbeCompletelyDisabled(db) || sbeFullyEnabled,
-    expectedCoalescedProjects: sbeFullyEnabled ? [{"_id": true, "arr": true}]
-                                               : [{"_id": 1, "a": 1}],
-    pipelineOptimizedAway: sbeFullyEnabled
+    expectedCoalescedProjects: sbeFullyEnabled ? [{"_id": true, "arr": true}] : [{"_id": 1, "a": 1}],
+    pipelineOptimizedAway: sbeFullyEnabled,
 });
 
 // Test that projections with computed fields are removed from the pipeline.
@@ -189,50 +184,51 @@ assertResultsMatch({
     pipeline: [{$project: {computedField: {$sum: "$a"}}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"_id": true, "computedField": {"$sum": ["$a"]}}],
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 assertResultsMatch({
     pipeline: [{$project: {a: ["$a", "$b"]}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"_id": true, "a": ["$a", "$b"]}],
-    pipelineOptimizedAway: true
+    pipelineOptimizedAway: true,
 });
 assertResultsMatch({
-    pipeline:
-        [{$project: {e: {$filter: {input: "$e", as: "item", cond: {"$eq": ["$$item", "elem0"]}}}}}],
+    pipeline: [{$project: {e: {$filter: {input: "$e", as: "item", cond: {"$eq": ["$$item", "elem0"]}}}}}],
     expectProjectToCoalesce: true,
-    expectedCoalescedProjects: [{
-        "_id": true,
-        "e": {
-            "$filter":
-                {"input": "$e", "as": "item", "cond": {"$eq": ["$$item", {"$const": "elem0"}]}}
-        }
-    }],
-    pipelineOptimizedAway: true
+    expectedCoalescedProjects: [
+        {
+            "_id": true,
+            "e": {
+                "$filter": {"input": "$e", "as": "item", "cond": {"$eq": ["$$item", {"$const": "elem0"}]}},
+            },
+        },
+    ],
+    pipelineOptimizedAway: true,
 });
 
 assertResultsMatch({
     pipeline: [
         {$project: {_id: 0, a: 1}},
         {$group: {_id: "$a", c: {$sum: "$c"}, a: {$sum: "$a"}}},
-        {$project: {_id: 0}}
+        {$project: {_id: 0}},
     ],
     expectProjectToCoalesce: true,
-    expectedCoalescedProjects: sbeFullyEnabled ? [{"a": true, "_id": false}, {"_id": false}]
-                                               : [{"a": true, "_id": false}],
-    pipelineOptimizedAway: sbeFullyEnabled
+    expectedCoalescedProjects: sbeFullyEnabled
+        ? [{"a": true, "_id": false}, {"_id": false}]
+        : [{"a": true, "_id": false}],
+    pipelineOptimizedAway: sbeFullyEnabled,
 });
 
 // Test that projections on _id with nested fields are removed from pipeline.
 indexSpec = {
-    '_id.a': 1,
-    a: 1
+    "_id.a": 1,
+    a: 1,
 };
 assertResultsMatch({
-    pipeline: [{$match: {"_id.a": 1}}, {$project: {'_id.a': 1}}],
+    pipeline: [{$match: {"_id.a": 1}}, {$project: {"_id.a": 1}}],
     expectProjectToCoalesce: true,
     expectedCoalescedProjects: [{"_id": {"a": true}}],
     index: indexSpec,
     pipelineOptimizedAway: true,
-    removedProjectStage: {'_id.a': 1},
+    removedProjectStage: {"_id.a": 1},
 });

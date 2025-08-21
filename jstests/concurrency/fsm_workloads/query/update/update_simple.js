@@ -9,7 +9,7 @@
 
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var states = {
         set: function set(db, collName) {
             this.setOrUnset(db, collName, true, this.numDocs);
@@ -17,7 +17,7 @@ export const $config = (function() {
 
         unset: function unset(db, collName) {
             this.setOrUnset(db, collName, false, this.numDocs);
-        }
+        },
     };
 
     var transitions = {set: {set: 0.5, unset: 0.5}, unset: {set: 0.5, unset: 0.5}};
@@ -28,7 +28,7 @@ export const $config = (function() {
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 5);
-        assert.gt(this.numDocs, 0, 'numDocs should be a positive number');
+        assert.gt(this.numDocs, 0, "numDocs should be a positive number");
 
         for (var i = 0; i < this.numDocs; ++i) {
             // make sure the inserted docs have a 'value' field, so they won't need
@@ -42,7 +42,7 @@ export const $config = (function() {
     return {
         threadCount: 20,
         iterations: 20,
-        startState: 'set',
+        startState: "set",
         states: states,
         transitions: transitions,
         data: {
@@ -73,7 +73,7 @@ export const $config = (function() {
                 var value = Random.randInt(5);
 
                 var updater = {};
-                updater[set ? '$set' : '$unset'] = {value: value};
+                updater[set ? "$set" : "$unset"] = {value: value};
 
                 var query = {_id: docIndex};
                 var res = this.doUpdate(db, collName, query, updater);
@@ -84,6 +84,6 @@ export const $config = (function() {
                 return db[collName].update(query, updater);
             },
         },
-        setup: setup
+        setup: setup,
     };
 })();

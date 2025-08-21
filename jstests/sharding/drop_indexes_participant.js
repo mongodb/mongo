@@ -13,7 +13,11 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function assertShardHasIndexes(st, dbName, collName, expectedIndexNames) {
     let indexes = st.rs0.getPrimary().getDB(dbName)[collName].getIndexes();
-    assert.sameMembers(indexes.map(ix => ix.name), expectedIndexNames, tojson(indexes));
+    assert.sameMembers(
+        indexes.map((ix) => ix.name),
+        expectedIndexNames,
+        tojson(indexes),
+    );
 }
 
 const st = new ShardingTest({shards: 1});
@@ -27,18 +31,17 @@ assert.commandWorked(db.TestColl.createIndex({x: 1}));
 assertShardHasIndexes(st, dbName, collName, ["_id_", "x_1"]);
 
 const lsid = {
-    id: UUID()
+    id: UUID(),
 };
 const txnNumber = NumberLong(1);
 const txnParams = {
     lsid: lsid,
     txnNumber: txnNumber,
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 
 // --- Test 1: Command successfully drops specified indexes ---
-let dropCmd =
-    {_shardsvrDropIndexesParticipant: collName, index: "x_1", dbName: dbName, ...txnParams};
+let dropCmd = {_shardsvrDropIndexesParticipant: collName, index: "x_1", dbName: dbName, ...txnParams};
 
 assert.commandWorked(st.shard0.getDB(dbName).runCommand(dropCmd));
 assertShardHasIndexes(st, dbName, collName, ["_id_"]);
@@ -63,7 +66,10 @@ let staleCmd = Object.assign({}, dropCmd, {txnNumber: NumberLong(9)});
 let res = st.shard0.getDB(dbName).runCommand(staleCmd);
 
 assert.commandFailedWithCode(
-    res, ErrorCodes.TransactionTooOld, "Should fail with TransactionTooOld for stale txnNumber");
+    res,
+    ErrorCodes.TransactionTooOld,
+    "Should fail with TransactionTooOld for stale txnNumber",
+);
 assertShardHasIndexes(st, dbName, collName, ["_id_", "x_1"]);
 
 st.stop();

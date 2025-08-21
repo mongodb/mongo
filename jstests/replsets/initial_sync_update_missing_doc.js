@@ -23,7 +23,7 @@ const replSet = new ReplSetTest({nodes: 1});
 replSet.startSet();
 replSet.initiate();
 const primary = replSet.getPrimary();
-const dbName = 'test';
+const dbName = "test";
 const collectionName = jsTestName();
 const coll = primary.getDB(dbName).getCollection(collectionName);
 assert.commandWorked(coll.insert({_id: 0, x: 1}));
@@ -31,7 +31,7 @@ assert.commandWorked(coll.insert({_id: 0, x: 1}));
 // Add a secondary node with priority: 0 and votes: 0 so that we prevent elections while
 // it is syncing from the primary.
 const secondaryConfig = {
-    rsConfig: {votes: 0, priority: 0}
+    rsConfig: {votes: 0, priority: 0},
 };
 const secondary = reInitiateSetWithSecondary(replSet, secondaryConfig);
 

@@ -35,7 +35,7 @@ const knobToPossibleValues = {
     internalQueryExecYieldIterations: fc.nat({max: 10}),
     internalQueryExecYieldPeriodMS: fc.nat({max: 100}),
     internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: fc.integer({min: 1, max: 2000}),
-    internalQueryFrameworkControl: fc.constantFrom('forceClassicEngine', 'trySbeRestricted'),
+    internalQueryFrameworkControl: fc.constantFrom("forceClassicEngine", "trySbeRestricted"),
     internalQueryDisableSingleFieldExpressExecutor: fc.boolean(),
     internalQueryAutoParameterizationMaxParameterCount: fc.nat({max: 1024}),
     internalQueryEnableBooleanExpressionsSimplifier: fc.boolean(),
@@ -52,8 +52,9 @@ const knobToPossibleValues = {
         // 'automaticCE',
         // 'samplingCE',
         // 'heuristicCE',
-        'multiPlanning'),
-    internalQuerySamplingCEMethod: fc.constantFrom('random', 'chunk')
+        "multiPlanning",
+    ),
+    internalQuerySamplingCEMethod: fc.constantFrom("random", "chunk"),
 };
 
 /*
@@ -67,7 +68,7 @@ for (const [knobName, valuesArb] of Object.entries(knobToPossibleValues)) {
     optionalKnobObject[knobName] = fc.option(valuesArb);
 }
 
-export const queryKnobsModel = fc.record(optionalKnobObject).map(knobs => {
+export const queryKnobsModel = fc.record(optionalKnobObject).map((knobs) => {
     // Remove the null values.
     const knobsWithoutNull = {};
     for (const [knobName, value] of Object.entries(knobs)) {

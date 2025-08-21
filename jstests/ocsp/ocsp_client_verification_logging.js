@@ -21,8 +21,8 @@ const mongodOptions = (connectionHealthLoggingOn) => {
         setParameter: {
             "failpoint.disableStapling": "{'mode':'alwaysOn'}",
             "ocspEnabled": "true",
-            "enableDetailedConnectionHealthMetricLogLines": connectionHealthLoggingOn
-        }
+            "enableDetailedConnectionHealthMetricLogLines": connectionHealthLoggingOn,
+        },
     };
 };
 
@@ -34,16 +34,14 @@ let runTest = (options) => {
 
     let conn = MongoRunner.runMongod(mongodOptions(connectionHealthLoggingOn));
 
-    let loggingShellArg =
-        `enableDetailedConnectionHealthMetricLogLines=${connectionHealthLoggingOn}`;
+    let loggingShellArg = `enableDetailedConnectionHealthMetricLogLines=${connectionHealthLoggingOn}`;
 
     clearRawMongoProgramOutput();
     // The desired log line will be printed by the shell. We run a parallel shell because
     // 'rawMongoProgramOutput' will only return logs for subprocesses spawned by the shell.
     let runParallelShellSuccess = startParallelShell(
         () => {
-            jsTestLog(
-                "Established connection with server to test successful certification verification.");
+            jsTestLog("Established connection with server to test successful certification verification.");
         },
         conn.port,
         null /*noConnect */,
@@ -56,7 +54,8 @@ let runTest = (options) => {
         OCSP_CLIENT_CERT,
         "--tlsAllowInvalidHostnames",
         "--verbose",
-        1);
+        1,
+    );
     runParallelShellSuccess();
 
     const successOutput = rawMongoProgramOutput(".*");
@@ -71,22 +70,25 @@ let runTest = (options) => {
 
         clearRawMongoProgramOutput();
 
-        assert.throws(startParallelShell(
-            (ocspFaultType) => {
-                jsTestLog("Something went wrong if we print this! Fault type: " + ocspFaultType);
-            },
-            conn.port,
-            null /*noConnect */,
-            "--setShellParameter",
-            loggingShellArg,
-            "--tls",
-            "--tlsCAFile",
-            OCSP_CA_PEM,
-            "--tlsCertificateKeyFile",
-            OCSP_CLIENT_CERT,
-            "--tlsAllowInvalidHostnames",
-            "--verbose",
-            1));
+        assert.throws(
+            startParallelShell(
+                (ocspFaultType) => {
+                    jsTestLog("Something went wrong if we print this! Fault type: " + ocspFaultType);
+                },
+                conn.port,
+                null /*noConnect */,
+                "--setShellParameter",
+                loggingShellArg,
+                "--tls",
+                "--tlsCAFile",
+                OCSP_CA_PEM,
+                "--tlsCertificateKeyFile",
+                OCSP_CLIENT_CERT,
+                "--tlsAllowInvalidHostnames",
+                "--verbose",
+                1,
+            ),
+        );
 
         failOutput = rawMongoProgramOutput(".*");
     }

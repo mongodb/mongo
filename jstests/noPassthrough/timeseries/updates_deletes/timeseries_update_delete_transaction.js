@@ -18,24 +18,27 @@ const collectionName = "t";
 
 assert.commandWorked(testDB.dropDatabase());
 assert.commandWorked(
-    testDB.createCollection(testDB.getCollection(collectionName).getName(),
-                            {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    testDB.createCollection(testDB.getCollection(collectionName).getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }),
+);
 
 const session = testDB.getMongo().startSession();
 const sessionColl = session.getDatabase(jsTestName()).getCollection(collectionName);
 session.startTransaction();
 // Time-series delete in a multi-document transaction should fail.
-assert.commandFailedWithCode(sessionColl.remove({[metaFieldName]: "a"}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(sessionColl.remove({[metaFieldName]: "a"}), ErrorCodes.OperationNotSupportedInTransaction);
 assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction();
 // Time-series update in a multi-document transaction should fail.
-assert.commandFailedWithCode(session.getDatabase(jsTestName()).runCommand({
-    update: collectionName,
-    updates: [{q: {[metaFieldName]: "a"}, u: {"$set": {"b": "a"}}, multi: true}],
-}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(
+    session.getDatabase(jsTestName()).runCommand({
+        update: collectionName,
+        updates: [{q: {[metaFieldName]: "a"}, u: {"$set": {"b": "a"}}, multi: true}],
+    }),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 session.endSession();
 rst.stopSet();

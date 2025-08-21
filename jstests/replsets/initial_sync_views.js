@@ -18,8 +18,7 @@ for (let i = 0; i < 10; ++i) {
 }
 
 // Setup view.
-assert.commandWorked(
-    primaryDB.runCommand({create: "view", viewOn: "coll", pipeline: [{$match: {a: 5}}]}));
+assert.commandWorked(primaryDB.runCommand({create: "view", viewOn: "coll", pipeline: [{$match: {a: 5}}]}));
 
 assert.eq(10, primaryDB.coll.find().itcount());
 assert.eq(1, primaryDB.view.find().itcount());

@@ -25,14 +25,12 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_inline.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_inline.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Use the workload name as the database name,
     // since the workload name is assumed to be unique.
-    var uniqueDBName = 'map_reduce_merge';
+    var uniqueDBName = "map_reduce_merge";
 
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
@@ -43,8 +41,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.mapReduce = function mapReduce(db, collName) {
         var outDB = db.getSiblingDB(this.outDBName);
         var fullName = outDB[collName].getFullName();
-        assert(outDB[collName].exists() !== null,
-               "output collection '" + fullName + "' should exist");
+        assert(outDB[collName].exists() !== null, "output collection '" + fullName + "' should exist");
 
         // Have all threads combine their results into the same collection
         var options = {finalize: this.finalizer, out: {merge: collName, db: this.outDBName}};

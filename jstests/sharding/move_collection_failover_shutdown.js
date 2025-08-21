@@ -22,8 +22,10 @@ const recipientShardNames = reshardingTest.recipientShardNames;
 
 const sourceCollectionNs = "reshardingDb.coll";
 
-const sourceCollection = reshardingTest.createUnshardedCollection(
-    {ns: sourceCollectionNs, primaryShardName: donorShardNames[0]});
+const sourceCollection = reshardingTest.createUnshardedCollection({
+    ns: sourceCollectionNs,
+    primaryShardName: donorShardNames[0],
+});
 
 reshardingTest.withMoveCollectionInBackground({toShard: recipientShardNames[0]}, () => {
     reshardingTest.stepUpNewPrimaryOnShard(donorShardNames[0]);
@@ -34,7 +36,7 @@ reshardingTest.withMoveCollectionInBackground({toShard: recipientShardNames[0]},
 });
 
 // Should have unsplittable set to true
-let configDb = sourceCollection.getMongo().getDB('config');
+let configDb = sourceCollection.getMongo().getDB("config");
 let unshardedColl = configDb.collections.findOne({_id: sourceCollectionNs});
 assert.eq(unshardedColl.unsplittable, true);
 let unshardedChunk = configDb.chunks.find({uuid: unshardedColl.uuid}).toArray();

@@ -11,7 +11,7 @@ const st = new ShardingTest({
     mongosOptions: {
         setParameter: {
             internalQueryStatsRateLimit: -1,
-        }
+        },
     },
 });
 const coll = st.s.getDB("test").geometry_without_coordinates;

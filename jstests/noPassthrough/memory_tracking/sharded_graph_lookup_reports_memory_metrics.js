@@ -14,8 +14,7 @@ const collName = jsTestName();
 const coll = testDB[collName];
 testDB[collName].drop();
 
-assert.commandWorked(
-    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 st.shardColl(coll, {_id: 1}, {_id: "hashed"});
 
@@ -27,20 +26,20 @@ for (let i = 0; i < docCount; ++i) {
 
 // Run the $graphLookup stage in a sub-pipeline to force it to run on the router.
 let pipeline = [
-    {   
+    {
         $facet: {
             f: [
-                { 
+                {
                     $graphLookup: {
                         from: collName,
                         startWith: "$_id",
                         connectFromField: "to",
                         connectToField: "_id",
                         as: "output",
-                    }
+                    },
                 },
-                {$unwind: "$output"}
-            ]
+                {$unwind: "$output"},
+            ],
         },
     },
     {$unwind: "$f"},
@@ -60,10 +59,10 @@ runShardedMemoryStatsTest({
     stageName: "$graphLookup",
     expectedNumGetMores: 3,
     numShards: 2,
-    skipExplain: true,  // graphLookup will execute on the merging part of the pipeline and will not
-                        // appear in the shards' explain output.
-    skipInUseTrackedMemBytesCheck: true,  // Because we run $graphLookup in a sub-pipeline, we
-                                          // compute the result in one shot, and don't have in-use
-                                          // memory hanging around between requests.
+    skipExplain: true, // graphLookup will execute on the merging part of the pipeline and will not
+    // appear in the shards' explain output.
+    skipInUseTrackedMemBytesCheck: true, // Because we run $graphLookup in a sub-pipeline, we
+    // compute the result in one shot, and don't have in-use
+    // memory hanging around between requests.
 });
 st.stop();

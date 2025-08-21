@@ -28,7 +28,7 @@ function basicTest() {
     const pipeline = [
         {$addFields: {uuidField: {$createUUID: {}}}},
         {$project: {uuidStrField: {$toString: "$uuidField"}, uuidField: 1}},
-        {$project: {_id: 0}}
+        {$project: {_id: 0}},
     ];
 
     const resultArray = coll.aggregate(pipeline).toArray();
@@ -56,21 +56,21 @@ function lookupTest() {
     setupCollection();
 
     const pipeline = [
-        {$lookup: {
-            from: collName,
-            let: {
-                docId: "$_id"
+        {
+            $lookup: {
+                from: collName,
+                let: {
+                    docId: "$_id",
+                },
+                pipeline: [{$addFields: {uuid: {$createUUID: {}}}}],
+                as: "result",
             },
-            pipeline: [
-                {$addFields: {uuid: {$createUUID: {}}}}
-            ],
-            as: "result"
-        }},
+        },
     ];
 
     const resultArray = coll.aggregate(pipeline).toArray();
     assert.eq(resultArray.length, docCount);
-    const s = resultArray.flatMap(doc => doc.result).map(doc => doc.uuid);
+    const s = resultArray.flatMap((doc) => doc.result).map((doc) => doc.uuid);
     const set = new Set(s);
     assert.eq(set.size, docCount * docCount);
 }

@@ -7,9 +7,7 @@
  *   uses_transactions,
  * ]
  */
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
@@ -30,17 +28,14 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 // Set up a sharded collection with 3 chunks, [min, 0), [0, 10), [10, max), one on each shard,
 // with one document in each.
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 function setupCollection() {
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {skey: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 10}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {skey: 5}, to: st.shard1.shardName}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {skey: 15}, to: st.shard2.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 5}, to: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 15}, to: st.shard2.shardName}));
 
     assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 1, counter: 0, skey: -5}));
     assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 2, counter: 0, skey: 5}));
@@ -63,8 +58,9 @@ function runTest(st, session, writeCmd, staleRouter) {
         // that would not be targeted by a stale router. Put the orphan on the shard that
         // previously owned the chunk to verify the multi-write obeys the shard versioning
         // protocol.
-        assert.commandWorked(st.s1.adminCommand(
-            {moveChunk: ns, find: {skey: 5}, to: st.shard2.shardName, _waitForDelete: true}));
+        assert.commandWorked(
+            st.s1.adminCommand({moveChunk: ns, find: {skey: 5}, to: st.shard2.shardName, _waitForDelete: true}),
+        );
         orphanShardName = "rs1";
     } else {
         // Otherwise put the orphan on a shard that should not be targeted by a fresh router to
@@ -73,8 +69,7 @@ function runTest(st, session, writeCmd, staleRouter) {
     }
 
     const orphanShardDB = st[orphanShardName].getPrimary().getDB(dbName);
-    assert.commandWorked(
-        orphanShardDB[collName].insert(orphanDoc, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(orphanShardDB[collName].insert(orphanDoc, {writeConcern: {w: "majority"}}));
 
     // Start a transaction with majority read concern to ensure the orphan will be visible if
     // its shard is targeted and send the multi-write.
@@ -86,7 +81,7 @@ function runTest(st, session, writeCmd, staleRouter) {
         assert.sameMembers(st.getDB(dbName)[collName].find().toArray(), [
             {_id: 1, counter: 0, skey: -5},
             {_id: 2, counter: 0, skey: 5},
-            {_id: 3, counter: 0, skey: 15}
+            {_id: 3, counter: 0, skey: 15},
         ]);
 
         // Commit the transaction and verify the write was successful.
@@ -99,21 +94,25 @@ function runTest(st, session, writeCmd, staleRouter) {
             [
                 {_id: 1, counter: 1, skey: -5},
                 {_id: 2, counter: 1, skey: 5},
-                {_id: 3, counter: 0, skey: 15}
+                {_id: 3, counter: 0, skey: 15},
             ],
-            "document mismatch for update, stale: " + staleRouter + ", cmd: " + tojson(writeCmd));
-    } else {  // isDelete
+            "document mismatch for update, stale: " + staleRouter + ", cmd: " + tojson(writeCmd),
+        );
+    } else {
+        // isDelete
         assert.sameMembers(
             sessionDB[collName].find().toArray(),
             [{_id: 3, counter: 0, skey: 15}],
-            "document mismatch for delete, stale: " + staleRouter + ", cmd: " + tojson(writeCmd));
+            "document mismatch for delete, stale: " + staleRouter + ", cmd: " + tojson(writeCmd),
+        );
     }
 
     // The orphaned document should not have been affected.
     assert.docEq(
         orphanDoc,
         orphanShardDB[collName].findOne({skey: orphanDoc.skey}),
-        "document mismatch for orphaned doc, stale: " + staleRouter + ", cmd: " + tojson(writeCmd));
+        "document mismatch for orphaned doc, stale: " + staleRouter + ", cmd: " + tojson(writeCmd),
+    );
 
     assertDropCollection(st.getDB(dbName), collName);
 }
@@ -122,7 +121,7 @@ const session = st.s.startSession();
 
 let multiUpdate = {
     update: collName,
-    updates: [{q: {skey: {$lte: 5}}, u: {$inc: {counter: 1}}, multi: true}]
+    updates: [{q: {skey: {$lte: 5}}, u: {$inc: {counter: 1}}, multi: true}],
 };
 
 multiUpdate.ordered = false;

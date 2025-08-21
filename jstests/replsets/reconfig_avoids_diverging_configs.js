@@ -34,7 +34,7 @@ configureFailPoint(rst.getPrimary(), "omitConfigQuorumCheck");
 
 // Reconfig to remove the node3. The new config, C1, is now {node0, node1, node2}.
 const C1 = Object.assign({}, rst.getReplSetConfigFromNode());
-C1.members = C1.members.slice(0, 3);  // Remove the last node.
+C1.members = C1.members.slice(0, 3); // Remove the last node.
 // Increase the C1 version by a high number to ensure the following config
 // C2 will win the propagation by having a higher term.
 C1.version = C1.version + 1000;
@@ -48,7 +48,7 @@ jsTestLog("Current replica set topology: [node0 (Primary)] [node1, node2, node3]
 // Create parallel shell to execute reconfig on partitioned primary.
 // This reconfig will not get propagated.
 const parallelShell = startParallelShell(
-    funWithArgs(function(config) {
+    funWithArgs(function (config) {
         assert.soon(() => {
             try {
                 const res = db.getMongo().adminCommand({replSetReconfig: config});
@@ -60,12 +60,14 @@ const parallelShell = startParallelShell(
                 throw e;
             }
         }, "Reconfig C1 should fail");
-    }, C1), node0.port);
+    }, C1),
+    node0.port,
+);
 
 assert.commandWorked(node1.adminCommand({replSetStepUp: 1}));
 rst.awaitNodesAgreeOnPrimary(rst.timeoutMS, [node1, node2, node3], node1);
 jsTestLog("Current replica set topology: [node0 (Primary)] [node1 (Primary), node2, node3]");
-assert.soon(() => node1.getDB('admin').runCommand({hello: 1}).isWritablePrimary);
+assert.soon(() => node1.getDB("admin").runCommand({hello: 1}).isWritablePrimary);
 assert.soon(() => isConfigCommitted(node1));
 
 // Reconfig to remove a secondary. We need to specify the node to get the original
@@ -100,7 +102,8 @@ parallelShell();
 // Node0 could have gone through a rollback after reconnecting with the Node1, the
 // new primary. Make sure all secondaries are out of a recovering state before
 // attempting to shutdown the replica set.
-assert.commandWorked(rst.getPrimary().adminCommand(
-    {appendOplogNote: 1, data: {msg: "dummy write to the new primary"}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({appendOplogNote: 1, data: {msg: "dummy write to the new primary"}}),
+);
 rst.awaitReplication();
 rst.stopSet();

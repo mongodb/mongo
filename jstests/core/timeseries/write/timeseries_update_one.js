@@ -17,44 +17,44 @@ import {
     metaFieldName,
     prepareCollection,
     testUpdateOne,
-    timeFieldName
+    timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
 // The test, which works under the featureFlagTimeseriesUpdatesSupport requires the collection to be
 // tracked when retryable writes are enabled.
-if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOptions &&
-    TestData.sessionOptions.retryWrites) {
+if (
+    !TestData.implicitlyTrackUnshardedCollectionOnCreation &&
+    TestData.sessionOptions &&
+    TestData.sessionOptions.retryWrites
+) {
     jsTest.log(
-        "When featureFlagTimeseriesUpdatesSupport is enabled, we expect the collections to be tracked in order to enable retryable writes. Skipping test.");
+        "When featureFlagTimeseriesUpdatesSupport is enabled, we expect the collections to be tracked in order to enable retryable writes. Skipping test.",
+    );
     quit();
 }
 /**
  * Tests op-style updates.
  */
 {
-    const doc_m1_a_b =
-        {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, a: 1, b: 1};
+    const doc_m1_a_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, a: 1, b: 1};
     const doc_a_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), _id: 1, a: 1, b: 1};
-    const doc_m1_b =
-        {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, b: 1};
-    const doc_m2_b =
-        {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 2, _id: 1, b: 1};
+    const doc_m1_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 1, _id: 1, b: 1};
+    const doc_m2_b = {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), [metaFieldName]: 2, _id: 1, b: 1};
     const doc_m1_arrayA_b = {
         [timeFieldName]: ISODate("2023-02-06T19:19:01Z"),
         [metaFieldName]: 1,
         _id: 1,
         a: ["arr", "ay"],
-        b: 1
+        b: 1,
     };
     const doc_stringM1_a_b = {
         [timeFieldName]: ISODate("2023-02-06T19:19:01Z"),
         [metaFieldName]: "string",
         _id: 1,
         a: 1,
-        b: 1
+        b: 1,
     };
-    const doc_m1_c_d =
-        {[timeFieldName]: ISODate("2023-02-06T19:19:02Z"), [metaFieldName]: 1, _id: 2, c: 1, d: 1};
+    const doc_m1_c_d = {[timeFieldName]: ISODate("2023-02-06T19:19:02Z"), [metaFieldName]: 1, _id: 2, c: 1, d: 1};
     const query_m1_a1 = {a: {$eq: 1}, [metaFieldName]: {$eq: 1}};
     const query_m1_b1 = {b: {$eq: 1}, [metaFieldName]: {$eq: 1}};
 
@@ -65,7 +65,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateQuery: query_m1_a1,
             updateObj: {$unset: {a: ""}},
             resultDocList: [doc_m1_b, doc_m1_c_d],
-            nMatched: 1
+            nMatched: 1,
         });
     })();
 
@@ -76,7 +76,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateQuery: query_m1_b1,
             updateObj: {$set: {a: 1}},
             resultDocList: [doc_m1_a_b, doc_m1_c_d],
-            nMatched: 1
+            nMatched: 1,
         });
     })();
 
@@ -87,7 +87,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateQuery: query_m1_a1,
             updateObj: {$set: {a: ["arr", "ay"]}},
             resultDocList: [doc_m1_arrayA_b, doc_m1_c_d],
-            nMatched: 1
+            nMatched: 1,
         });
     })();
 
@@ -99,7 +99,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateObj: {$unset: {z: ""}},
             resultDocList: [doc_m1_a_b, doc_m1_c_d],
             nMatched: 1,
-            nModified: 0
+            nModified: 0,
         });
     })();
 
@@ -111,7 +111,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateObj: {$unset: {z: ""}},
             resultDocList: [doc_m1_a_b, doc_m1_c_d],
             nMatched: 1,
-            nModified: 0
+            nModified: 0,
         });
     })();
 
@@ -179,7 +179,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateQuery: query_m1_a1,
             updateObj: {$unset: {[metaFieldName]: ""}},
             resultDocList: [doc_a_b, doc_m1_c_d],
-            nMatched: 1
+            nMatched: 1,
         });
     })();
 
@@ -190,7 +190,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateQuery: {},
             updateObj: {$set: {[metaFieldName]: 1}},
             resultDocList: [doc_m1_a_b],
-            nMatched: 1
+            nMatched: 1,
         });
     })();
 
@@ -201,7 +201,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateQuery: {},
             updateObj: {$set: {[metaFieldName]: 2}},
             resultDocList: [doc_m2_b],
-            nMatched: 1
+            nMatched: 1,
         });
     })();
 
@@ -212,7 +212,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateQuery: query_m1_a1,
             updateObj: {$set: {[metaFieldName]: "string"}},
             resultDocList: [doc_stringM1_a_b, doc_m1_c_d],
-            nMatched: 1
+            nMatched: 1,
         });
     })();
 }
@@ -224,8 +224,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
     const timestamp2023 = ISODate("2023-02-06T19:19:00Z");
     const timestamp2022 = ISODate("2022-02-06T19:19:00Z");
     const doc_2023_m1_a1 = {[timeFieldName]: timestamp2023, [metaFieldName]: 1, _id: 1, a: 1};
-    const doc_2022_m2_a1_newField =
-        {[timeFieldName]: timestamp2022, [metaFieldName]: 2, _id: 1, a: 1, "newField": 42};
+    const doc_2022_m2_a1_newField = {[timeFieldName]: timestamp2022, [metaFieldName]: 2, _id: 1, a: 1, "newField": 42};
 
     // Update timeField, metaField and add a new field.
     // Skip tests changing the shard key value in sharding.
@@ -240,7 +239,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
                     {$set: {"newField": 42}},
                 ],
                 resultDocList: [doc_2022_m2_a1_newField],
-                nMatched: 1
+                nMatched: 1,
             });
         })();
     }
@@ -287,7 +286,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
                 updateQuery: {},
                 updateObj: doc_t2022_m2_id2_a2,
                 resultDocList: [doc_t2022_m2_id2_a2],
-                nMatched: 1
+                nMatched: 1,
             });
         })();
 
@@ -301,7 +300,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
                     doc_t2022_m2_id2_a2,
                     {[timeFieldName]: timestamp2022, [metaFieldName]: 2, a: 2, _id: 1},
                 ],
-                nMatched: 1
+                nMatched: 1,
             });
         })();
 
@@ -372,7 +371,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             resultDocList: [doc_t2023_m1_id1_a1],
             nMatched: 1,
             nModified: 0,
-            upsert: true
+            upsert: true,
         });
     })();
 
@@ -409,9 +408,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateObj: {$set: {[timeFieldName]: dateTime}},
             upsert: true,
             upsertedDoc: {[metaFieldName]: {z: "Z"}, [timeFieldName]: dateTime},
-            resultDocList: [
-                doc_id_1_a_b_no_metrics,
-            ],
+            resultDocList: [doc_id_1_a_b_no_metrics],
         });
     })();
 
@@ -423,9 +420,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateObj: {$set: {[timeFieldName]: dateTime}},
             upsert: true,
             upsertedDoc: {_id: 100, [timeFieldName]: dateTime},
-            resultDocList: [
-                doc_id_1_a_b_no_metrics,
-            ],
+            resultDocList: [doc_id_1_a_b_no_metrics],
         });
     })();
 
@@ -457,9 +452,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateObj: {$set: {[timeFieldName]: dateTime}},
             upsert: true,
             upsertedDoc: {[metaFieldName]: {a: "A", b: "B"}, [timeFieldName]: dateTime, f: 111},
-            resultDocList: [
-                doc_id_1_a_b_no_metrics,
-            ],
+            resultDocList: [doc_id_1_a_b_no_metrics],
         });
     })();
 
@@ -470,9 +463,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateQuery: {[metaFieldName]: {z: "Z"}},
             updateObj: {$set: {f: 10}},
             upsert: true,
-            resultDocList: [
-                doc_id_1_a_b_no_metrics,
-            ],
+            resultDocList: [doc_id_1_a_b_no_metrics],
             failCode: ErrorCodes.BadValue,
         });
     })();
@@ -485,9 +476,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateObj: {$set: {f: 10}},
             upsert: true,
             upsertedDoc: {[timeFieldName]: dateTimeUpdated, f: 10},
-            resultDocList: [
-                doc_id_1_a_b_no_metrics,
-            ],
+            resultDocList: [doc_id_1_a_b_no_metrics],
         });
     })();
 
@@ -500,9 +489,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             upsert: true,
             upsertedDoc: {[timeFieldName]: dateTime, f: 100},
             c: {new: {[timeFieldName]: dateTime, f: 100}},
-            resultDocList: [
-                doc_id_1_a_b_no_metrics,
-            ],
+            resultDocList: [doc_id_1_a_b_no_metrics],
         });
     })();
 
@@ -515,9 +502,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
             updateObj: [{$set: {f: 10}}],
             upsert: true,
             c: {new: {[metaFieldName]: {a: "A"}, f: 100}},
-            resultDocList: [
-                doc_id_1_a_b_no_metrics,
-            ],
+            resultDocList: [doc_id_1_a_b_no_metrics],
             failCode: ErrorCodes.BadValue,
         });
     })();
@@ -539,8 +524,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
     while (batchNum < 4) {
         let batch = [];
         for (let i = 0; i < 30; i++) {
-            const doc =
-                {_id: i, [timeFieldName]: ISODate("2023-07-13T17:00:00Z"), value: "a".repeat(1000)};
+            const doc = {_id: i, [timeFieldName]: ISODate("2023-07-13T17:00:00Z"), value: "a".repeat(1000)};
             batch.push(doc);
         }
 
@@ -549,8 +533,7 @@ if (!TestData.implicitlyTrackUnshardedCollectionOnCreation && TestData.sessionOp
     }
 
     // Update any of the measurements with a document which will exceed the 128000 byte threshold.
-    const chunkyDoc =
-        {_id: 128000, [timeFieldName]: ISODate("2023-07-13T17:00:00Z"), value: "a".repeat(10000)};
+    const chunkyDoc = {_id: 128000, [timeFieldName]: ISODate("2023-07-13T17:00:00Z"), value: "a".repeat(10000)};
 
     const updateCommand = {update: collName, updates: [{q: {}, u: chunkyDoc, multi: false}]};
     const res = assert.commandWorked(testDB.runCommand(updateCommand));

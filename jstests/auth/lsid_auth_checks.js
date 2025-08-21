@@ -26,8 +26,8 @@ adminDB.createRole({
     roles: [],
     privileges: [
         {resource: {db: "test", collection: "test"}, actions: ["find", "update"]},
-        {resource: {cluster: true}, actions: ["impersonate"]}
-    ]
+        {resource: {cluster: true}, actions: ["impersonate"]},
+    ],
 });
 adminDB.createUser({user: "impersonateUser", pwd: "user", roles: ["impersonateRole"]});
 adminDB.logout();
@@ -35,7 +35,7 @@ adminDB.logout();
 // LSID helper functions.
 const cmdLsid = UUID();
 const invalidUid = computeSHA256Block("abc");
-const getUserUid = function() {
+const getUserUid = function () {
     const user = adminDB.runCommand({connectionStatus: 1}).authInfo.authenticatedUsers[0];
     return user ? computeSHA256Block(user.user + "@" + user.db) : computeSHA256Block("");
 };
@@ -50,8 +50,9 @@ const assertExplain = (cmd, uid, shouldFail = false, isOuter = false) => {
     const lsidObj = createLsidObj(uid);
     const command = commandWithLsid(cmd, lsidObj, isOuter);
 
-    shouldFail ? assert.commandFailedWithCode(testDB.runCommand(command), ErrorCodes.Unauthorized)
-               : assert.commandWorked(testDB.runCommand(command));
+    shouldFail
+        ? assert.commandFailedWithCode(testDB.runCommand(command), ErrorCodes.Unauthorized)
+        : assert.commandWorked(testDB.runCommand(command));
 };
 
 const assertInnerLsidExplainIsUnauthorized = (cmd, uid) => assertExplain(cmd, uid, true);
@@ -59,27 +60,27 @@ const assertInnerLsidExplainWorked = (cmd, uid) => assertExplain(cmd, uid, false
 const assertTopLevelLsidExplainIsUnauthorized = (cmd, uid) => assertExplain(cmd, uid, true, true);
 const assertTopLevelLsidExplainWorked = (cmd, uid) => assertExplain(cmd, uid, false, true);
 
-const runCommandWithLsidTest =
-    (isAuthZforInnerCmd, canSetTopLevelLsid, cmd, invalidUid, userUid) => {
-        // A user can put any arbitrary lsid/generic argument in the inner command invocation, as
-        // this will be pruned when the command is wrapped into an explain command. The explain will
-        // succeed so long as the user is authorized to run the command being explained. A user can
-        // only specify an lsid in the top-level explain command if they are authorized to do so, or
-        // if the uid in the lsid is the same as the user digest in the opCtx. The explain command
-        // will succeed if the user is authorized to run the command being explained.
-        if (isAuthZforInnerCmd) {
-            assertInnerLsidExplainWorked(cmd, invalidUid);
-            assertInnerLsidExplainWorked(cmd, userUid);
-            assertTopLevelLsidExplainWorked(cmd, userUid);
-        } else {
-            assertInnerLsidExplainIsUnauthorized(cmd, invalidUid);
-            assertInnerLsidExplainIsUnauthorized(cmd, userUid);
-            assertTopLevelLsidExplainIsUnauthorized(cmd, userUid);
-        }
+const runCommandWithLsidTest = (isAuthZforInnerCmd, canSetTopLevelLsid, cmd, invalidUid, userUid) => {
+    // A user can put any arbitrary lsid/generic argument in the inner command invocation, as
+    // this will be pruned when the command is wrapped into an explain command. The explain will
+    // succeed so long as the user is authorized to run the command being explained. A user can
+    // only specify an lsid in the top-level explain command if they are authorized to do so, or
+    // if the uid in the lsid is the same as the user digest in the opCtx. The explain command
+    // will succeed if the user is authorized to run the command being explained.
+    if (isAuthZforInnerCmd) {
+        assertInnerLsidExplainWorked(cmd, invalidUid);
+        assertInnerLsidExplainWorked(cmd, userUid);
+        assertTopLevelLsidExplainWorked(cmd, userUid);
+    } else {
+        assertInnerLsidExplainIsUnauthorized(cmd, invalidUid);
+        assertInnerLsidExplainIsUnauthorized(cmd, userUid);
+        assertTopLevelLsidExplainIsUnauthorized(cmd, userUid);
+    }
 
-        canSetTopLevelLsid ? assertTopLevelLsidExplainWorked(cmd, invalidUid)
-                           : assertTopLevelLsidExplainIsUnauthorized(cmd, invalidUid);
-    };
+    canSetTopLevelLsid
+        ? assertTopLevelLsidExplainWorked(cmd, invalidUid)
+        : assertTopLevelLsidExplainIsUnauthorized(cmd, invalidUid);
+};
 
 // Commands to run explain on.
 const commands = [
@@ -88,9 +89,9 @@ const commands = [
     {cmd: {find: "test", filter: {a: 1}}, isWrite: false},
     {
         cmd: {findAndModify: "test", query: {a: 1}, update: {$set: {b: 2}}, "new": true},
-        isWrite: true
+        isWrite: true,
     },
-    {cmd: {update: "test", updates: [{q: {a: 1}, u: {c: "foo"}}]}, isWrite: true}
+    {cmd: {update: "test", updates: [{q: {a: 1}, u: {c: "foo"}}]}, isWrite: true},
 ];
 
 // A user is only authorized to run an explain on a command if they:
@@ -107,7 +108,7 @@ const users = [
         pwd: "user",
         authDB: adminDB,
         canWrite: true,
-        canSetTopLevelLsid: true
+        canSetTopLevelLsid: true,
     },
     {user: "admin", pwd: "admin", authDB: adminDB, canWrite: true, canSetTopLevelLsid: false},
 ];

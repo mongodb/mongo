@@ -1,6 +1,6 @@
 // Log bound addresses at startup.
 
-const mongo = MongoRunner.runMongod({ipv6: '', bind_ip: 'localhost', useLogFiles: true});
+const mongo = MongoRunner.runMongod({ipv6: "", bind_ip: "localhost", useLogFiles: true});
 assert.neq(mongo, null, "Database is not running");
 const log = cat(mongo.fullOptions.logFile);
 print(log);

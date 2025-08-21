@@ -31,8 +31,9 @@ for (let ch1 = 97; ch1 < 123; ch1++) {
         }
     }
 }
-assert.commandWorked(db.runCommand(
-    {insert: t.getName(), documents: [{_id: 1, comments: commentsWithALotOfUniqueWords}]}));
+assert.commandWorked(
+    db.runCommand({insert: t.getName(), documents: [{_id: 1, comments: commentsWithALotOfUniqueWords}]}),
+);
 
 // 2. Test total size of index keys for unique terms exceeds 4MB
 
@@ -48,7 +49,8 @@ for (let ch1 = 97; ch1 < 123; ch1++) {
     }
 }
 
-assert.commandWorked(db.runCommand(
-    {insert: t.getName(), documents: [{_id: 2, comments: commentsWithWordsOfLargeSize}]}));
+assert.commandWorked(
+    db.runCommand({insert: t.getName(), documents: [{_id: 2, comments: commentsWithWordsOfLargeSize}]}),
+);
 
 replTest.stopSet();

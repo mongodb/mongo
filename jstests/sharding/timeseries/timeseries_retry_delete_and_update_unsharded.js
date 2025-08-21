@@ -9,9 +9,7 @@
  * ]
  */
 
-import {
-    runTimeseriesRetryDeleteAndUpdateTest
-} from "jstests/libs/collection_write_path/timeseries_retry_delete_and_update.js";
+import {runTimeseriesRetryDeleteAndUpdateTest} from "jstests/libs/collection_write_path/timeseries_retry_delete_and_update.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -20,29 +18,32 @@ const st = new ShardingTest({
 
 runTimeseriesRetryDeleteAndUpdateTest(
     st.s,
-    function(db, coll, metaFieldName) {},
-    function(db, retriedCommandsCount, statementsRetried) {
+    function (db, coll, metaFieldName) {},
+    function (db, retriedCommandsCount, statementsRetried) {
         const transactionsServerStatus = st.shard0.getDB(db.getName()).serverStatus().transactions;
 
         // On sharded clusters, retriedCommandsCount is the same as retriedStatementsCount because
         // each statement is executed on the shard individually as its own command.
-        assert.eq(retriedCommandsCount + statementsRetried,
-                  transactionsServerStatus.retriedCommandsCount,
-                  'Incorrect value for retriedCommandsCount in serverStatus: ' +
-                      tojson(transactionsServerStatus));
+        assert.eq(
+            retriedCommandsCount + statementsRetried,
+            transactionsServerStatus.retriedCommandsCount,
+            "Incorrect value for retriedCommandsCount in serverStatus: " + tojson(transactionsServerStatus),
+        );
 
         return statementsRetried;
     },
-    function(db, retriedStatementsCount, statementsRetried) {
+    function (db, retriedStatementsCount, statementsRetried) {
         const transactionsServerStatus = st.shard0.getDB(db.getName()).serverStatus().transactions;
 
-        assert.eq(retriedStatementsCount + statementsRetried,
-                  transactionsServerStatus.retriedStatementsCount,
-                  'Incorrect value for retriedStatementsCount in serverStatus:' +
-                      tojson(transactionsServerStatus));
+        assert.eq(
+            retriedStatementsCount + statementsRetried,
+            transactionsServerStatus.retriedStatementsCount,
+            "Incorrect value for retriedStatementsCount in serverStatus:" + tojson(transactionsServerStatus),
+        );
 
         return statementsRetried;
     },
-    st.shard0);
+    st.shard0,
+);
 
 st.stop();

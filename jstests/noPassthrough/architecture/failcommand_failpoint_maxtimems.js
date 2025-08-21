@@ -1,12 +1,12 @@
 var conn = MongoRunner.runMongod();
-var admin = conn.getDB('admin');
-var db = conn.getDB('test');
+var admin = conn.getDB("admin");
+var db = conn.getDB("test");
 
 var fpCmd = {
-    configureFailPoint: 'failCommand',
+    configureFailPoint: "failCommand",
     mode: {times: 1},
     data: {
-        failCommands: ['insert'],
+        failCommands: ["insert"],
         blockConnection: true,
         blockTimeMS: 1000,
     },
@@ -15,7 +15,7 @@ var fpCmd = {
 assert.commandWorked(admin.runCommand(fpCmd));
 
 var insertCmd = {
-    insert: 'coll',
+    insert: "coll",
     documents: [{x: 1}],
     maxTimeMS: 100,
 };

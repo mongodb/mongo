@@ -62,8 +62,7 @@ export function runTests(getHistogramStats, testDB, testColl, isMongos) {
     for (var i = 0; i < numRecords - 1; i++) {
         cursors[i].close();
     }
-    lastHistogram =
-        checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 0, 0, numRecords - 1);
+    lastHistogram = checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 0, 0, numRecords - 1);
 
     // Remove
     for (var i = 0; i < numRecords; i++) {
@@ -98,17 +97,21 @@ export function runTests(getHistogramStats, testDB, testColl, isMongos) {
     lastHistogram = checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 0, 0, 1);
 
     // $geoNear aggregation stage
-    assert.commandWorked(testDB.runCommand({
-        aggregate: testColl.getName(),
-        pipeline: [{
-            $geoNear: {
-                near: {type: "Point", coordinates: [0, 0]},
-                spherical: true,
-                distanceField: "dist",
-            }
-        }],
-        cursor: {},
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            aggregate: testColl.getName(),
+            pipeline: [
+                {
+                    $geoNear: {
+                        near: {type: "Point", coordinates: [0, 0]},
+                        spherical: true,
+                        distanceField: "dist",
+                    },
+                },
+            ],
+            cursor: {},
+        }),
+    );
     lastHistogram = checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 1, 0, 0);
 
     // GetIndexes
@@ -134,8 +137,7 @@ export function runTests(getHistogramStats, testDB, testColl, isMongos) {
     lastHistogram = checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 0, 0, 1);
 
     // CollMod
-    assert.commandWorked(
-        testDB.runCommand({collStats: testColl.getName(), validationLevel: "off"}));
+    assert.commandWorked(testDB.runCommand({collStats: testColl.getName(), validationLevel: "off"}));
     lastHistogram = checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 0, 0, 1);
 
     // Compact
@@ -143,9 +145,11 @@ export function runTests(getHistogramStats, testDB, testColl, isMongos) {
     // The storage engine may not support compact or if it does, it can be interrupted because of
     // cache pressure or concurrent calls to compact.
     if (!commandResult.ok) {
-        assert.commandFailedWithCode(commandResult,
-                                     [ErrorCodes.CommandNotSupported, ErrorCodes.Interrupted],
-                                     tojson(commandResult));
+        assert.commandFailedWithCode(
+            commandResult,
+            [ErrorCodes.CommandNotSupported, ErrorCodes.Interrupted],
+            tojson(commandResult),
+        );
     }
     lastHistogram = checkHistogramDiff(getHistogramStats, lastHistogram, testDB, 0, 0, 1);
 
@@ -194,14 +198,16 @@ export function runLatencyComparisonTest(getOpTimes, st, testDB, testColl) {
     let opTimesMongoDNew = getOpTimes(shard);
     let opsMongoD = opTimesMongoDNew.writes.ops - opTimesMongoDOld.writes.ops;
     if (opsMongoD == 1) {
-        assert.gte((opTimesMongoSNew.writes.latency - opTimesMongoSOld.writes.latency),
-                   (opTimesMongoDNew.writes.latency - opTimesMongoDOld.writes.latency),
-                   {
-                       "mongoSOld": opTimesMongoSOld,
-                       "mongoSNew": opTimesMongoSNew,
-                       "mongoDOld": opTimesMongoDOld,
-                       "mongoDNew": opTimesMongoDNew
-                   });
+        assert.gte(
+            opTimesMongoSNew.writes.latency - opTimesMongoSOld.writes.latency,
+            opTimesMongoDNew.writes.latency - opTimesMongoDOld.writes.latency,
+            {
+                "mongoSOld": opTimesMongoSOld,
+                "mongoSNew": opTimesMongoSNew,
+                "mongoDOld": opTimesMongoDOld,
+                "mongoDNew": opTimesMongoDNew,
+            },
+        );
     }
 
     // Read test
@@ -212,13 +218,15 @@ export function runLatencyComparisonTest(getOpTimes, st, testDB, testColl) {
     opTimesMongoDNew = getOpTimes(shard);
     opsMongoD = opTimesMongoDNew.reads.ops - opTimesMongoDOld.reads.ops;
     if (opsMongoD == 1) {
-        assert.gte((opTimesMongoSNew.reads.latency - opTimesMongoSOld.reads.latency),
-                   (opTimesMongoDNew.reads.latency - opTimesMongoDOld.reads.latency),
-                   {
-                       "mongoSOld": opTimesMongoSOld,
-                       "mongoSNew": opTimesMongoSNew,
-                       "mongoDOld": opTimesMongoDOld,
-                       "mongoDNew": opTimesMongoDNew
-                   });
+        assert.gte(
+            opTimesMongoSNew.reads.latency - opTimesMongoSOld.reads.latency,
+            opTimesMongoDNew.reads.latency - opTimesMongoDOld.reads.latency,
+            {
+                "mongoSOld": opTimesMongoSOld,
+                "mongoSNew": opTimesMongoSNew,
+                "mongoDOld": opTimesMongoDOld,
+                "mongoDNew": opTimesMongoDNew,
+            },
+        );
     }
 }

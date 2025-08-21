@@ -28,14 +28,18 @@ jsTestLog("Do a document write");
 assert.commandWorked(primaryColl.insert({_id: 1, x: 1}, {"writeConcern": {"w": 1}}));
 
 // Clear the log.
-assert.commandWorked(primary.adminCommand({clearLog: 'global'}));
+assert.commandWorked(primary.adminCommand({clearLog: "global"}));
 
 // Enable fail point which makes the index build to hang before unregistering after a commit.
-const hangBeforeUnregisteringAfterCommit =
-    configureFailPoint(primary, 'hangBeforeUnregisteringAfterCommit');
+const hangBeforeUnregisteringAfterCommit = configureFailPoint(primary, "hangBeforeUnregisteringAfterCommit");
 
 const indexThread = IndexBuildTest.startIndexBuild(
-    primary, primaryColl.getFullName(), {x: 1}, {}, ErrorCodes.InterruptedDueToReplStateChange);
+    primary,
+    primaryColl.getFullName(),
+    {x: 1},
+    {},
+    ErrorCodes.InterruptedDueToReplStateChange,
+);
 
 jsTestLog("Waiting for index build to hit failpoint");
 hangBeforeUnregisteringAfterCommit.wait();

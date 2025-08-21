@@ -8,24 +8,25 @@
 //   requires_getmore,
 // ]
 
-import {
-    getPlanStage,
-    getWinningPlanFromExplain,
-    isIndexOnly
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain, isIndexOnly} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.covered_query_with_sort;
 coll.drop();
 
-assert.commandWorked(coll.insert([
-    {y: 0, x: 0},
-    {y: 0, x: 1},
-    {y: 1, x: -1},
-]));
+assert.commandWorked(
+    coll.insert([
+        {y: 0, x: 0},
+        {y: 0, x: 1},
+        {y: 1, x: -1},
+    ]),
+);
 assert.commandWorked(coll.createIndex({y: 1, x: 1}));
 
 function buildQuery() {
-    return coll.find({y: {$gte: 0}, x: {$gte: 0}}, {_id: 0, y: 1, x: 1}).sort({x: -1}).limit(2);
+    return coll
+        .find({y: {$gte: 0}, x: {$gte: 0}}, {_id: 0, y: 1, x: 1})
+        .sort({x: -1})
+        .limit(2);
 }
 
 // Ensure that query is covered.
@@ -41,4 +42,11 @@ const ixScanStage = getPlanStage(projectionCoveredStage, "IXSCAN");
 assert.neq(ixScanStage, null, plan);
 
 const results = buildQuery().toArray();
-assert.eq(results, [{y: 0, x: 1}, {y: 0, x: 0}], results);
+assert.eq(
+    results,
+    [
+        {y: 0, x: 1},
+        {y: 0, x: 0},
+    ],
+    results,
+);

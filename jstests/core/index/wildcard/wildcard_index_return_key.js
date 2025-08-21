@@ -21,8 +21,10 @@ assert.commandWorked(coll.insert({a: 2, b: 1, c: {d: 2, e: 2}}));
 assert.commandWorked(coll.insert({a: 1, b: 1, c: {e: 2}}));
 
 // $** index return key with one field argument.
-assertArrayEq(coll.find({a: 1}).returnKey().toArray(),
-              [{"$_path": "a", a: 1}, {"$_path": "a", a: 1}]);
+assertArrayEq(coll.find({a: 1}).returnKey().toArray(), [
+    {"$_path": "a", a: 1},
+    {"$_path": "a", a: 1},
+]);
 
 // $** index return key with dot path argument.
 assertArrayEq(coll.find({"c.e": 1}).returnKey().toArray(), [{"$_path": "c.e", "c.e": 1}]);
@@ -30,8 +32,10 @@ assertArrayEq(coll.find({"c.e": 1}).returnKey().toArray(), [{"$_path": "c.e", "c
 assert.commandWorked(coll.createIndex({"a": 1}));
 
 // $** index return key with competing regular index.
-assertArrayEq(coll.find({a: 1}).hint({"$**": 1}).returnKey().toArray(),
-              [{"$_path": "a", a: 1}, {"$_path": "a", a: 1}]);
+assertArrayEq(coll.find({a: 1}).hint({"$**": 1}).returnKey().toArray(), [
+    {"$_path": "a", a: 1},
+    {"$_path": "a", a: 1},
+]);
 
 assert.commandWorked(coll.createIndex({"a": 1, "b": 1}));
 

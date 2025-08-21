@@ -25,13 +25,13 @@ const st = new ShardingTest({
             queryAnalysisWriterIntervalSecs,
             queryAnalysisSampleExpirationSecs,
             ttlMonitorSleepSecs,
-            logComponentVerbosity: tojson({sharding: 2})
-        }
+            logComponentVerbosity: tojson({sharding: 2}),
+        },
     },
     mongosOptions: {
         setParameter: {
             queryAnalysisSamplerConfigurationRefreshSecs,
-        }
+        },
     },
 });
 const shard0Primary = st.rs0.getPrimary();
@@ -53,8 +53,7 @@ assert.commandWorked(bulk.execute());
 const collUuid = QuerySamplingUtil.getCollectionUuid(testDB, collName);
 
 // Enable query sampling
-assert.commandWorked(
-    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collUuid);
 
 // Find each document
@@ -64,10 +63,12 @@ for (let i = 0; i < kNumDocs; i++) {
 
 // Update each document
 for (let i = 0; i < kNumDocs; i++) {
-    assert.commandWorked(testDB.runCommand({
-        update: collName,
-        updates: [{q: {x: i}, u: [{$set: {y: i + 1}}], multi: false, upsert: false}]
-    }));
+    assert.commandWorked(
+        testDB.runCommand({
+            update: collName,
+            updates: [{q: {x: i}, u: [{$set: {y: i + 1}}], multi: false, upsert: false}],
+        }),
+    );
 }
 
 // Assert that query sample documents exist
@@ -85,8 +86,10 @@ assert.commandWorked(shard0Primary.adminCommand({setParameter: 1, ttlMonitorSlee
 
 // Assert that query sample documents are eventually deleted.
 assert.soon(() => {
-    return (QuerySamplingUtil.getNumSampledQueryDocuments(st) == 0 &&
-            QuerySamplingUtil.getNumSampledQueryDiffDocuments(st) == 0);
+    return (
+        QuerySamplingUtil.getNumSampledQueryDocuments(st) == 0 &&
+        QuerySamplingUtil.getNumSampledQueryDiffDocuments(st) == 0
+    );
 });
 
 st.stop();

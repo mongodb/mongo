@@ -38,18 +38,18 @@ let failPoint = "pauseBatchApplicationBeforeCompletion";
 const fp = configureFailPoint(secDB, failPoint);
 
 // Start oplog batch application.
-const awaitOplog = startParallelShell(function() {
-    const primaryDB = db.getSiblingDB('test_validation');
-    const coll = primaryDB.getCollection('test_coll_validation');
+const awaitOplog = startParallelShell(function () {
+    const primaryDB = db.getSiblingDB("test_validation");
+    const coll = primaryDB.getCollection("test_coll_validation");
     assert.commandWorked(coll.insert({a: 1, b: 1, c: 1}, {writeConcern: {w: 2}}));
 }, primary.port);
 
 fp.wait();
 
 // Start validation on the secondary on a parallel shell.
-const awaitValidate = startParallelShell(function() {
-    const secDB = db.getSiblingDB('test_validation');
-    const coll = secDB.getCollection('test_coll_validation');
+const awaitValidate = startParallelShell(function () {
+    const secDB = db.getSiblingDB("test_validation");
+    const coll = secDB.getCollection("test_coll_validation");
     secDB.setSecondaryOk();
     const res = coll.validate();
     assert.commandWorked(res);
@@ -58,8 +58,8 @@ const awaitValidate = startParallelShell(function() {
 
 // Ensure that the validation call is blocked on waiting for the lock.
 assert.soon(() => {
-    return secDB.currentOp().inprog.some(op => {
-        return op.active && (op.command.validate === "test_coll_validation") && (op.waitingForLock);
+    return secDB.currentOp().inprog.some((op) => {
+        return op.active && op.command.validate === "test_coll_validation" && op.waitingForLock;
     });
 });
 

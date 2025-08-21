@@ -16,8 +16,7 @@ let st = new ShardingTest({shards: 2, enableBalancer: true});
 
 const dbName = "test";
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 let db = st.s.getDB(dbName);
 let coll1 = db["coll1"];
@@ -37,22 +36,26 @@ let coll1 = db["coll1"];
     });
 
     let awaitDropCollection = startParallelShell(() => {
-        assert(db.getSiblingDB('test')['coll1'].drop());
+        assert(db.getSiblingDB("test")["coll1"].drop());
     }, st.s.port);
     fpBlockDropCollectionParticipant.wait();
 
     // Start remove shard. It should block behind the running DDL.
     let shardToRemove = st.shard1.shardName;
     let awaitRemoveShard = startParallelShell(
-        funWithArgs(async function(shardToRemove) {
+        funWithArgs(async function (shardToRemove) {
             const {removeShard} = await import("jstests/sharding/libs/remove_shard_util.js");
             removeShard(db, shardToRemove);
-        }, shardToRemove), st.s.port);
+        }, shardToRemove),
+        st.s.port,
+    );
 
     // Wait for removeShard to reach the point where it waits for DDLs to drain.
-    waitForCommand("_shardsvrJoinDDLCoordinators",
-                   op => (op["command"] && op["command"]["_shardsvrJoinDDLCoordinators"] == 1),
-                   st.rs0.getPrimary().getDB("admin"));
+    waitForCommand(
+        "_shardsvrJoinDDLCoordinators",
+        (op) => op["command"] && op["command"]["_shardsvrJoinDDLCoordinators"] == 1,
+        st.rs0.getPrimary().getDB("admin"),
+    );
 
     // Check new DDL operations can still start and complete.
     assert.commandWorked(db.coll2.insert({}));
@@ -85,22 +88,30 @@ let coll1 = db["coll1"];
     });
 
     let awaitDropCollection = startParallelShell(() => {
-        assert(db.getSiblingDB('test')['coll1'].drop());
+        assert(db.getSiblingDB("test")["coll1"].drop());
     }, st.s.port);
     fpBlockDropCollectionParticipant.wait();
 
     // Start add shard. It should block behind the running DDL.
     let shardToAdd = st.shard1.shardName;
     let shardToAddUrl = st.rs1.getURL();
-    let awaitAddShard =
-        startParallelShell(funWithArgs(async function(shardToAdd, shardToAddUrl) {
-                               db.adminCommand({addShard: shardToAddUrl, name: shardToAdd});
-                           }, shardToAdd, shardToAddUrl), st.s.port);
+    let awaitAddShard = startParallelShell(
+        funWithArgs(
+            async function (shardToAdd, shardToAddUrl) {
+                db.adminCommand({addShard: shardToAddUrl, name: shardToAdd});
+            },
+            shardToAdd,
+            shardToAddUrl,
+        ),
+        st.s.port,
+    );
 
     // Wait for removeShard to reach the point where it waits for DDLs to drain.
-    waitForCommand("_shardsvrJoinDDLCoordinators",
-                   op => (op["command"] && op["command"]["_shardsvrJoinDDLCoordinators"] == 1),
-                   st.rs0.getPrimary().getDB("admin"));
+    waitForCommand(
+        "_shardsvrJoinDDLCoordinators",
+        (op) => op["command"] && op["command"]["_shardsvrJoinDDLCoordinators"] == 1,
+        st.rs0.getPrimary().getDB("admin"),
+    );
 
     // Check new DDL operations can still start and complete.
     assert.commandWorked(db.coll2.insert({}));
@@ -121,15 +132,12 @@ let coll1 = db["coll1"];
 // Test that if addShard/removeShard fails after having blocked new DDL coordinators, it will
 // unblock them.
 {
-    jsTest.log(
-        "Testing that the addOrRemoveShardInProgress is reset after a crash during add/removeShard");
+    jsTest.log("Testing that the addOrRemoveShardInProgress is reset after a crash during add/removeShard");
 
     function getAddOrRemoveShardInProgressParamValue() {
-        return assert
-            .commandWorked(st.configRS.getPrimary().adminCommand(
-                {getClusterParameter: "addOrRemoveShardInProgress"}))
-            .clusterParameters[0]
-            .inProgress;
+        return assert.commandWorked(
+            st.configRS.getPrimary().adminCommand({getClusterParameter: "addOrRemoveShardInProgress"}),
+        ).clusterParameters[0].inProgress;
     }
 
     function test(testCase) {
@@ -139,41 +147,49 @@ let coll1 = db["coll1"];
         let shardToRemove = st.shard1.shardName;
         let shardURL = st.rs1.getURL();
         let awaitRemoveShard = startParallelShell(
-            funWithArgs(async function(shardToRemove) {
+            funWithArgs(async function (shardToRemove) {
                 const {removeShard} = await import("jstests/sharding/libs/remove_shard_util.js");
                 try {
                     removeShard(db, shardToRemove);
-                } catch (e) {
-                }
-            }, shardToRemove), st.s.port);
+                } catch (e) {}
+            }, shardToRemove),
+            st.s.port,
+        );
 
         fp.wait();
 
         assert.eq(true, getAddOrRemoveShardInProgressParamValue());
-        if (!FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary().getDB("admin"),
-                                                 "UseTopologyChangeCoordinators")) {
-            assert.eq(1,
-                      st.configRS.getPrimary().getDB("admin")["system.version"].count(
-                          {_id: "addOrRemoveShardInProgressRecovery"}));
+        if (
+            !FeatureFlagUtil.isPresentAndEnabled(
+                st.configRS.getPrimary().getDB("admin"),
+                "UseTopologyChangeCoordinators",
+            )
+        ) {
+            assert.eq(
+                1,
+                st.configRS
+                    .getPrimary()
+                    .getDB("admin")
+                    ["system.version"].count({_id: "addOrRemoveShardInProgressRecovery"}),
+            );
         }
 
         if (testCase === "killOp") {
             let configPrimary = st.configRS.getPrimary();
-            let removeShardOpId =
-                configPrimary.getDB("admin")
-                    .aggregate([
-                        {$currentOp: {allUsers: true}},
-                        {
-                            $match: {
-                                $or: [
-                                    {"command._configsvrRemoveShard": shardToRemove},
-                                    {"command._configsvrCommitShardRemoval": shardToRemove}
-                                ]
-                            }
-                        }
-                    ])
-                    .toArray()[0]
-                    .opid;
+            let removeShardOpId = configPrimary
+                .getDB("admin")
+                .aggregate([
+                    {$currentOp: {allUsers: true}},
+                    {
+                        $match: {
+                            $or: [
+                                {"command._configsvrRemoveShard": shardToRemove},
+                                {"command._configsvrCommitShardRemoval": shardToRemove},
+                            ],
+                        },
+                    },
+                ])
+                .toArray()[0].opid;
             assert.commandWorked(configPrimary.getDB("admin").killOp(removeShardOpId));
         } else if (testCase === "stopServer") {
             // Restart the configsvr.
@@ -185,13 +201,9 @@ let coll1 = db["coll1"];
 
         // Turn off the failpoint for the coordinator case where the command is still stuck
         st.configRS.nodes.forEach((conn) => {
-            sh.assertRetryableCommandWorkedOrFailedWithCodes(
-                () => {
-                    return conn.adminCommand(
-                        {configureFailPoint: "hangRemoveShardAfterDrainingDDL", mode: "off"});
-                },
-                "Timed out disabling fail point " +
-                    "hangRemoveShardAfterDrainingDDL");
+            sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
+                return conn.adminCommand({configureFailPoint: "hangRemoveShardAfterDrainingDDL", mode: "off"});
+            }, "Timed out disabling fail point " + "hangRemoveShardAfterDrainingDDL");
         });
 
         awaitRemoveShard();
@@ -199,11 +211,17 @@ let coll1 = db["coll1"];
         // Soon the cluster parameter will be reset and new DDL operations will be able to start.
         assert.soon(() => {
             let recoveryDocRemoved = true;
-            if (!FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary().getDB("admin"),
-                                                     "UseTopologyChangeCoordinators")) {
+            if (
+                !FeatureFlagUtil.isPresentAndEnabled(
+                    st.configRS.getPrimary().getDB("admin"),
+                    "UseTopologyChangeCoordinators",
+                )
+            ) {
                 recoveryDocRemoved =
-                    st.configRS.getPrimary().getDB("admin")["system.version"].count(
-                        {_id: "addOrRemoveShardInProgressRecovery"}) === 0;
+                    st.configRS
+                        .getPrimary()
+                        .getDB("admin")
+                        ["system.version"].count({_id: "addOrRemoveShardInProgressRecovery"}) === 0;
             }
             return getAddOrRemoveShardInProgressParamValue() === false && recoveryDocRemoved;
         });
@@ -216,8 +234,7 @@ let coll1 = db["coll1"];
     }
 
     test("killOp");
-    if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB("admin"),
-                                            "UseTopologyChangeCoordinators")) {
+    if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB("admin"), "UseTopologyChangeCoordinators")) {
         // Test step up rather than stop because stopping the primary will hang due to the
         // coordinator waiting for the failpoint. Only run this test if we have some secondary to
         // step up (auto bootstrap runs with a single CSRS node).

@@ -12,7 +12,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkDecisionIs,
     checkDocumentDeleted,
-    runCommitThroughMongosInParallelThread
+    runCommitThroughMongosInParallelThread,
 } from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
@@ -28,34 +28,33 @@ let participant2 = st.shard2;
 let lsid = {id: UUID()};
 let txnNumber = 0;
 
-const setUp = function() {
+const setUp = function () {
     // Create a sharded collection with a chunk on each shard:
     // shard0: [-inf, 0)
     // shard1: [0, 10)
     // shard2: [10, +inf)
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
 
     // Start a new transaction by inserting a document onto each shard.
-    assert.commandWorked(st.s.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: -5}, {_id: 5}, {_id: 15}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-    }));
+    assert.commandWorked(
+        st.s.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: -5}, {_id: 5}, {_id: 15}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 };
 
-const testCommitProtocol = function() {
+const testCommitProtocol = function () {
     jsTest.log("Testing two-phase commit");
 
     txnNumber++;
@@ -64,7 +63,11 @@ const testCommitProtocol = function() {
     const coordinatorPrimary = coordinator.rs.getPrimary();
 
     const hangBeforeWaitingForDecisionWriteConcernFp = configureFailPoint(
-        coordinatorPrimary, "hangBeforeWaitingForDecisionWriteConcern", {}, "alwaysOn");
+        coordinatorPrimary,
+        "hangBeforeWaitingForDecisionWriteConcern",
+        {},
+        "alwaysOn",
+    );
 
     const commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
     commitThread.start();
@@ -73,8 +76,7 @@ const testCommitProtocol = function() {
     hangBeforeWaitingForDecisionWriteConcernFp.wait();
     const commitTimestamp = checkDecisionIs(coordinator, lsid, txnNumber, "commit");
 
-    assert.commandWorked(
-        coordinatorPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(coordinatorPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
     // The replSetFreeze command will cause the node to run for primary on its own.
     assert.commandWorked(coordinatorPrimary.adminCommand({replSetFreeze: 0}));
 
@@ -90,18 +92,20 @@ const testCommitProtocol = function() {
     commitThread.join();
 
     // Check that the coordinator deleted its persisted state.
-    assert.soon(function() {
+    assert.soon(function () {
         return checkDocumentDeleted(coordinator, lsid, txnNumber);
     });
 
     // Check that the transaction committed as expected.
 
     jsTest.log("Verify that the transaction was committed on all shards.");
-    const res = assert.commandWorked(st.s.getDB(dbName).runCommand({
-        find: collName,
-        readConcern: {level: "majority", afterClusterTime: commitTimestamp},
-        maxTimeMS: 10000
-    }));
+    const res = assert.commandWorked(
+        st.s.getDB(dbName).runCommand({
+            find: collName,
+            readConcern: {level: "majority", afterClusterTime: commitTimestamp},
+            maxTimeMS: 10000,
+        }),
+    );
     assert.eq(3, res.cursor.firstBatch.length);
 };
 

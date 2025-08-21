@@ -21,11 +21,16 @@ const primaryDb = primary.getDB(dbName);
 const primaryColl = primaryDb.getCollection(collName);
 
 jsTestLog("Insert a small document to ensure the set is running normally.");
-assert.commandWorked(primaryColl.insert([{x: 1, y: 2}, {x: 2, y: 2}]));
+assert.commandWorked(
+    primaryColl.insert([
+        {x: 1, y: 2},
+        {x: 2, y: 2},
+    ]),
+);
 
 jsTestLog("Insert a 16MB document with an _id that is the maximum size.");
 // Subtract 16 bytes to accommodate the space taken up by the field name.
-const idSize = (16 * 1024 * 1024) - 16;
+const idSize = 16 * 1024 * 1024 - 16;
 assert.commandWorked(primaryColl.insert({_id: "Z".repeat(idSize)}));
 
 jsTestLog("Await replication of the large document to the secondary.");

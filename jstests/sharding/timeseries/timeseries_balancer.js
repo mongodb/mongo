@@ -14,10 +14,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
 
-const dbName = 'testDB';
-const collName = 'testColl';
-const timeField = 'time';
-const metaField = 'hostid';
+const dbName = "testDB";
+const collName = "testColl";
+const timeField = "time";
+const metaField = "hostid";
 
 // Connections.
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}, other: {chunkSize: 1}});
@@ -36,20 +36,21 @@ function generateId() {
 const largeStr = "a".repeat(10000);
 
 function generateBatch(size) {
-    return TimeseriesTest.generateHosts(size).map((host, index) => Object.assign(host, {
-        _id: generateId(),
-        [metaField]: index,
-        // Use a random timestamp across a year so that we can get a larger data distribution and
-        // avoid jumbo chunks.
-        [timeField]: new Date(Math.floor(Random.rand() * (365 * 24 * 60 * 60 * 1000))),
-        largeField: largeStr,
-    }));
+    return TimeseriesTest.generateHosts(size).map((host, index) =>
+        Object.assign(host, {
+            _id: generateId(),
+            [metaField]: index,
+            // Use a random timestamp across a year so that we can get a larger data distribution and
+            // avoid jumbo chunks.
+            [timeField]: new Date(Math.floor(Random.rand() * (365 * 24 * 60 * 60 * 1000))),
+            largeField: largeStr,
+        }),
+    );
 }
 
 st.startBalancer();
 function runTest(shardKey) {
-    assert.commandWorked(mainDB.createCollection(
-        collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(mainDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
     const coll = mainDB.getCollection(collName);
 
     // Shard timeseries collection.
@@ -64,10 +65,12 @@ function runTest(shardKey) {
     }
     assert.commandWorked(bulk.execute());
 
-    assert.commandWorked(mongos.adminCommand({
-        shardCollection: coll.getFullName(),
-        key: shardKey,
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            shardCollection: coll.getFullName(),
+            key: shardKey,
+        }),
+    );
     st.awaitBalancerRound();
 
     // Ensure that each shard has at least one chunk after the split.
@@ -80,7 +83,8 @@ function runTest(shardKey) {
         },
         () => {
             return tojson(mongos.getDB("config").getCollection("chunks").find().toArray());
-        });
+        },
+    );
 
     // Verify that all the documents still exist in the collection.
     assert.eq(coll.find().itcount(), numDocs);

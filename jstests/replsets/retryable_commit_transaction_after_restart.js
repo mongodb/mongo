@@ -19,7 +19,7 @@ let txnNumber = 0;
 let stmtId = 0;
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = testDB.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -27,31 +27,37 @@ const sessionDb = session.getDatabase(dbName);
 jsTest.log("commitTransaction command is retryable before restart");
 txnNumber++;
 stmtId = 0;
-assert.commandWorked(sessionDb.runCommand({
-    insert: collName,
-    documents: [{_id: "commit-txn-1"}],
-    readConcern: {level: "snapshot"},
-    txnNumber: NumberLong(txnNumber),
-    stmtId: NumberInt(stmtId++),
-    startTransaction: true,
-    autocommit: false
-}));
-assert.commandWorked(sessionDb.adminCommand({
-    commitTransaction: 1,
-    txnNumber: NumberLong(txnNumber),
-    stmtId: NumberInt(stmtId++),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-}));
+assert.commandWorked(
+    sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "commit-txn-1"}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
+        startTransaction: true,
+        autocommit: false,
+    }),
+);
+assert.commandWorked(
+    sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    }),
+);
 
 // Retry commitTransaction.
-assert.commandWorked(sessionDb.adminCommand({
-    commitTransaction: 1,
-    txnNumber: NumberLong(txnNumber),
-    stmtId: NumberInt(stmtId),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-}));
+assert.commandWorked(
+    sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    }),
+);
 
 jsTest.log("restart the single node replset");
 rst.restart(0);
@@ -61,34 +67,40 @@ reconnect(sessionDb);
 
 jsTest.log("commitTransaction command is retryable after restart");
 // Retry commitTransaction.
-assert.commandWorked(sessionDb.adminCommand({
-    commitTransaction: 1,
-    txnNumber: NumberLong(txnNumber),
-    stmtId: NumberInt(stmtId),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-}));
+assert.commandWorked(
+    sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    }),
+);
 
 jsTest.log("Attempt to abort a committed transaction after restart");
 // Cannot abort the committed transaction.
-assert.commandFailedWithCode(sessionDb.adminCommand({
-    abortTransaction: 1,
-    txnNumber: NumberLong(txnNumber),
-    stmtId: NumberInt(stmtId++),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-}),
-                             ErrorCodes.TransactionCommitted);
+assert.commandFailedWithCode(
+    sessionDb.adminCommand({
+        abortTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    }),
+    ErrorCodes.TransactionCommitted,
+);
 
 jsTest.log("Attempt to continue a committed transaction after restart");
-assert.commandFailedWithCode(sessionDb.runCommand({
-    insert: collName,
-    documents: [{_id: "commit-txn-2"}],
-    txnNumber: NumberLong(txnNumber),
-    stmtId: NumberInt(stmtId++),
-    autocommit: false
-}),
-                             ErrorCodes.TransactionCommitted);
+assert.commandFailedWithCode(
+    sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "commit-txn-2"}],
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
+        autocommit: false,
+    }),
+    ErrorCodes.TransactionCommitted,
+);
 
 session.endSession();
 rst.stopSet();

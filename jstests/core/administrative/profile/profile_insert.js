@@ -13,9 +13,7 @@
 //   run_getLatestProfilerEntry,
 // ]
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
@@ -26,8 +24,9 @@ var coll = testDB.getCollection(collName);
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDB.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
 //
 // Test single insert.
@@ -82,7 +81,7 @@ assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 //
 coll.drop();
 doc = {
-    _id: 1
+    _id: 1,
 };
 var wtimeout = 60000;
 assert.commandWorked(coll.insert(doc, {writeConcern: {w: 1, wtimeout: wtimeout}, ordered: false}));

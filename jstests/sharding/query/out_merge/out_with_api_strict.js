@@ -28,7 +28,7 @@ let result = sourceDB.runCommand({
     pipeline: [{$out: targetColl.getName()}],
     cursor: {},
     apiVersion: "1",
-    apiStrict: true
+    apiStrict: true,
 });
 assert.commandWorked(result);
 

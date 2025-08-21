@@ -14,11 +14,8 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from
-    'jstests/concurrency/fsm_workloads/convert_to_capped_collection/convert_to_capped_collection.js';
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/convert_to_capped_collection/convert_to_capped_collection.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     return $config;
 });

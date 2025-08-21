@@ -35,8 +35,10 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
 const recipientShardNames = reshardingTest.recipientShardNames;
 const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
 
-const reshardingPauseRecipientBeforeBuildingIndexFailpoint =
-    configureFailPoint(recipient, "reshardingPauseRecipientBeforeBuildingIndex");
+const reshardingPauseRecipientBeforeBuildingIndexFailpoint = configureFailPoint(
+    recipient,
+    "reshardingPauseRecipientBeforeBuildingIndex",
+);
 
 reshardingTest.withReshardingInBackground(
     {
@@ -54,13 +56,14 @@ reshardingTest.withReshardingInBackground(
         afterReshardingFn: () => {
             const indexes = mongos.getDB("reshardingDb").getCollection("coll").getIndexes();
             let haveNewShardKeyIndex = false;
-            indexes.forEach(index => {
+            indexes.forEach((index) => {
                 if ("newKey" in index["key"]) {
                     haveNewShardKeyIndex = true;
                 }
             });
             assert.eq(haveNewShardKeyIndex, true);
-        }
-    });
+        },
+    },
+);
 
 reshardingTest.teardown();

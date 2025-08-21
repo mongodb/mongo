@@ -61,9 +61,9 @@ try {
     throw new Error(`Failed to create regex from '${GREP}': ${e.message}`);
 }
 
-const redText = msg => `\x1b[31m${msg}\x1b[0m`;
-const stdout = msg => jsTest.log.info(msg);
-const stderr = msg => jsTest.log.error(redText(msg));
+const redText = (msg) => `\x1b[31m${msg}\x1b[0m`;
+const stdout = (msg) => jsTest.log.info(msg);
+const stderr = (msg) => jsTest.log.error(redText(msg));
 
 /**
  * Reporter class for logging test results.
@@ -111,12 +111,12 @@ class Reporter {
      * @throws {Error} if there are any failing tests
      */
     report() {
-        let msg = ['Test Report Summary:', `  ${this.#passed.length} passing`];
+        let msg = ["Test Report Summary:", `  ${this.#passed.length} passing`];
         if (this.#failed.length > 0) {
             msg.push(redText(`  ${this.#failed.length} failing`));
-            msg.push('Failures and stacks are reprinted below.');
+            msg.push("Failures and stacks are reprinted below.");
         }
-        stdout(msg.join('\n'));
+        stdout(msg.join("\n"));
 
         if (this.#failed.length > 0) {
             this.#failed.forEach(({headline, error}) => {
@@ -166,11 +166,11 @@ class Scope {
         let children = this.children;
 
         // look for "only" marked scopes
-        children = children.filter(child => child.containsOnly());
+        children = children.filter((child) => child.containsOnly());
 
         if (children.length > 0) {
             // prioritize direct it.only scopes
-            let directTestOnly = children.filter(child => child instanceof TestScope);
+            let directTestOnly = children.filter((child) => child instanceof TestScope);
             if (directTestOnly.length > 0) {
                 // this breaks any ties with sibling describe.only scopes
                 children = directTestOnly;
@@ -212,13 +212,13 @@ class DescribeScope extends Scope {
     discover(scope) {
         this.ctx = scope.ctx;
 
-        this.beforeEach = [...scope.beforeEach];  // queue
+        this.beforeEach = [...scope.beforeEach]; // queue
 
         // change shared context and invoke the content
         currScope = this;
         this.fn.call(scope.ctx);
 
-        this.afterEach = [...this.afterEach, ...scope.afterEach];  // stack of queues
+        this.afterEach = [...this.afterEach, ...scope.afterEach]; // stack of queues
     }
 
     /**
@@ -236,11 +236,11 @@ class DescribeScope extends Scope {
      * @returns {boolean}
      */
     containsTests() {
-        return this.children.some(child => child.containsTests());
+        return this.children.some((child) => child.containsTests());
     }
 
     containsOnly() {
-        return this.only || this.children.some(child => child.containsOnly());
+        return this.only || this.children.some((child) => child.containsOnly());
     }
 
     /**
@@ -396,7 +396,7 @@ function it(title, fn) {
  * @param {string} title Test title
  * @param {function} fn Test content
  */
-it.only = function(title, fn) {
+it.only = function (title, fn) {
     addTest(title, fn, {only: true});
 };
 
@@ -405,13 +405,17 @@ it.only = function(title, fn) {
  * @param {string} title Test title
  * @param {function} fn Test content
  */
-it.skip = function(title, fn) {
+it.skip = function (title, fn) {
     // no-op
 };
 
-function addTest(title, fn, options = {
-    only: false
-}) {
+function addTest(
+    title,
+    fn,
+    options = {
+        only: false,
+    },
+) {
     assertNoFunctionArgs(fn);
     markUsage();
     const scope = new TestScope(title, fn, options);
@@ -440,7 +444,7 @@ function describe(title, fn) {
  * @param {*} title
  * @param {*} fn
  */
-describe.only = function(title, fn) {
+describe.only = function (title, fn) {
     addDescribe(title, fn, {only: true});
 };
 
@@ -450,13 +454,17 @@ describe.only = function(title, fn) {
  * @param {*} title
  * @param {*} fn
  */
-describe.skip = function(title, fn) {
+describe.skip = function (title, fn) {
     // no-op
 };
 
-function addDescribe(title, fn, options = {
-    only: false
-}) {
+function addDescribe(
+    title,
+    fn,
+    options = {
+        only: false,
+    },
+) {
     markUsage();
     const scope = new DescribeScope(title, fn, options);
     const oldScope = currScope;
@@ -560,7 +568,8 @@ function markUsage() {
 function assertNoFunctionArgs(fn) {
     if (fn.length > 0) {
         throw new Error(
-            "Test content should not take parameters. If you intended to write callback-based content, use async functions instead.");
+            "Test content should not take parameters. If you intended to write callback-based content, use async functions instead.",
+        );
     }
 }
 

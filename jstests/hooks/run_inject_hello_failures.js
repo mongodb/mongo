@@ -1,4 +1,3 @@
-
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
 // Interval between test loops.
@@ -16,12 +15,11 @@ const kRefreshTimeoutSec = 1;
 // Connection could be to 'mongos' or 'mongod'.
 function getAdminDB(connection) {
     let adminDB;
-    if (typeof connection.getDB === 'function') {
-        adminDB = connection.getDB('admin');
+    if (typeof connection.getDB === "function") {
+        adminDB = connection.getDB("admin");
     } else {
-        assert(typeof connection.getSiblingDB === 'function',
-               `Cannot get Admin DB from ${tojson(connection)}`);
-        adminDB = connection.getSiblingDB('admin');
+        assert(typeof connection.getSiblingDB === "function", `Cannot get Admin DB from ${tojson(connection)}`);
+        adminDB = connection.getSiblingDB("admin");
     }
     return adminDB;
 }
@@ -63,13 +61,14 @@ function stepUp(connection) {
 function injectReduceRefreshPeriod(connection) {
     jsTestLog(`Reduce refresh interval for ${connection}`);
     const adminDB = getAdminDB(connection);
-    assert.commandWorked(adminDB.runCommand({
-        configureFailPoint: "modifyReplicaSetMonitorDefaultRefreshPeriod",
-        mode: "alwaysOn",
-        data: {period: kRefreshTimeoutSec},
-    }));
-    const res = adminDB.runCommand(
-        {getParameter: 1, "failpoint.modifyReplicaSetMonitorDefaultRefreshPeriod": 1});
+    assert.commandWorked(
+        adminDB.runCommand({
+            configureFailPoint: "modifyReplicaSetMonitorDefaultRefreshPeriod",
+            mode: "alwaysOn",
+            data: {period: kRefreshTimeoutSec},
+        }),
+    );
+    const res = adminDB.runCommand({getParameter: 1, "failpoint.modifyReplicaSetMonitorDefaultRefreshPeriod": 1});
     assert.commandWorked(res);
     assert.eq(res["failpoint.modifyReplicaSetMonitorDefaultRefreshPeriod"].mode, 1);
 }
@@ -77,11 +76,13 @@ function injectReduceRefreshPeriod(connection) {
 function injectHelloFail(connection) {
     jsTestLog(`Inject Hello fail to connection ${connection}`);
     const adminDB = getAdminDB(connection);
-    assert.commandWorked(adminDB.runCommand({
-        configureFailPoint: "shardWaitInHello",
-        mode: "alwaysOn",
-        data: {internalClient: 1}  // No effect if client is mongo shell.
-    }));
+    assert.commandWorked(
+        adminDB.runCommand({
+            configureFailPoint: "shardWaitInHello",
+            mode: "alwaysOn",
+            data: {internalClient: 1}, // No effect if client is mongo shell.
+        }),
+    );
     const res = adminDB.runCommand({getParameter: 1, "failpoint.shardWaitInHello": 1});
     assert.commandWorked(res);
     assert.eq(res["failpoint.shardWaitInHello"].mode, 1);
@@ -94,8 +95,7 @@ function freeze(connection) {
 
 function getConfigServer(connection) {
     const adminDB = getAdminDB(connection);
-    const res = assert.commandWorked(adminDB.runCommand({serverStatus: 1}))
-                    .sharding.configsvrConnectionString;
+    const res = assert.commandWorked(adminDB.runCommand({serverStatus: 1})).sharding.configsvrConnectionString;
     var rx = /.*\/(.*)/g;
     var arr = rx.exec(res);
     jsTestLog(`Config server: ${arr[1]} extracted from ${tojson(res)}`);
@@ -141,7 +141,7 @@ function doFailInjectionLoop(db) {
         for (let arrayOfSecondaries of connectionsToSecondaries) {
             for (let connection of arrayOfSecondaries) {
                 stepUp(connection);
-                break;  // For each replica set pick one secondary.
+                break; // For each replica set pick one secondary.
             }
         }
         sleep(kTestLoopPeriodMs);
@@ -151,8 +151,8 @@ function doFailInjectionLoop(db) {
 import {Topology, DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
-var cmdLineOpts = db.adminCommand('getCmdLineOpts');
+assert.eq(typeof db, "object", "Invalid `db` object, is the shell connected to a mongod?");
+var cmdLineOpts = db.adminCommand("getCmdLineOpts");
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 jsTestLog(`Run Hello fail injection in ${JSON.stringify(topology)},
                Invoked with ${JSON.stringify(cmdLineOpts)},

@@ -14,7 +14,7 @@ const originalRunCommand = Mongo.prototype.runCommand;
 
 const viewNameSuffix = "_identity_view";
 
-DB.prototype.getCollection = function() {
+DB.prototype.getCollection = function () {
     const collection = originalGetCollection.apply(this, arguments);
 
     if (isSystemCollectionName(collection.getName())) {
@@ -25,13 +25,13 @@ DB.prototype.getCollection = function() {
     this.runCommand({
         create: collection.getName() + viewNameSuffix,
         viewOn: collection.getName(),
-        pipeline: []
+        pipeline: [],
     });
     return collection;
 };
 
-Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
-    if (typeof cmdObj !== 'object' || cmdObj === null) {
+Mongo.prototype.runCommand = function (dbName, cmdObj, options) {
+    if (typeof cmdObj !== "object" || cmdObj === null) {
         return originalRunCommand.apply(this, arguments);
     }
 
@@ -53,8 +53,12 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     }
 
     const collectionName = cmdObj[command];
-    if (!collectionName || !(typeof collectionName === "string") ||
-        isSystemCollectionName(collectionName) || collectionName.startsWith("oplog")) {
+    if (
+        !collectionName ||
+        !(typeof collectionName === "string") ||
+        isSystemCollectionName(collectionName) ||
+        collectionName.startsWith("oplog")
+    ) {
         return originalRunCommand.apply(this, arguments);
     }
 
@@ -92,7 +96,7 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
             "$queryStats",
         ];
         for (const stageSpec of cmdObj.pipeline) {
-            if (typeof stageSpec !== 'object' || stageSpec === null) {
+            if (typeof stageSpec !== "object" || stageSpec === null) {
                 continue;
             }
 
@@ -110,5 +114,4 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
 };
 
 // Always apply the override if a test spawns a parallel shell.
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicit_identity_views.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicit_identity_views.js");

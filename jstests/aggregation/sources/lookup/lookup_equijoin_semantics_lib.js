@@ -23,7 +23,7 @@ export const JoinAlgorithm = {
     NLJ: {name: "NLJ", strategy: "NestedLoopJoin"},
     INLJ_Asc: {name: "INLJ_Asc", indexType: 1, strategy: "IndexedLoopJoin"},
     INLJ_Dec: {name: "INLJ_Dec", indexType: -1, strategy: "IndexedLoopJoin"},
-    INLJ_Hashed: {name: "INLJ_Hashed", indexType: "hashed", strategy: "IndexedLoopJoin"}
+    INLJ_Hashed: {name: "INLJ_Hashed", indexType: "hashed", strategy: "IndexedLoopJoin"},
 };
 
 export function setupCollections(testConfig, localRecords, foreignRecords, foreignField) {
@@ -68,22 +68,27 @@ export function checkJoinConfiguration(testConfig, explain) {
  */
 export function runTest_SingleForeignRecord(
     testConfig,
-    {testDescription, localRecords, localField, foreignRecord, foreignField, idsExpectedToMatch}) {
+    {testDescription, localRecords, localField, foreignRecord, foreignField, idsExpectedToMatch},
+) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
-    assert('object' === typeof (foreignRecord) && !Array.isArray(foreignRecord),
-           "foreignRecord should be a single document");
+    assert(
+        "object" === typeof foreignRecord && !Array.isArray(foreignRecord),
+        "foreignRecord should be a single document",
+    );
     testDescription += ` (currentJoinAlgorithm: ${currentJoinAlgorithm.name})`;
 
     setupCollections(testConfig, localRecords, [foreignRecord], foreignField);
 
-    const pipeline = [{
-        $lookup: {
-            from: foreignColl.getName(),
-            localField: localField,
-            foreignField: foreignField,
-            as: "matched"
-        }
-    }];
+    const pipeline = [
+        {
+            $lookup: {
+                from: foreignColl.getName(),
+                localField: localField,
+                foreignField: foreignField,
+                as: "matched",
+            },
+        },
+    ];
     const aggOptions = {allowDiskUse: currentJoinAlgorithm == JoinAlgorithm.HJ};
 
     const results = localColl.aggregate(pipeline, aggOptions).toArray();
@@ -92,22 +97,21 @@ export function runTest_SingleForeignRecord(
     // The foreign record should never duplicate in the results (e.g. see SERVER-66119). That is,
     // the "matched" field should either be an empty array or contain a single element.
     for (let i = 0; i < results.length; i++) {
-        assert(results[i].matched.length < 2,
-               testDescription + " Found duplicated match in " + tojson(results[i]));
+        assert(results[i].matched.length < 2, testDescription + " Found duplicated match in " + tojson(results[i]));
     }
 
     // Build the array of ids for the results that have non-empty array in the "matched" field.
     const matchedIds = results
-                           .filter(function(x) {
-                               return tojson(x.matched) != tojson([]);
-                           })
-                           .map(x => (x._id));
+        .filter(function (x) {
+            return tojson(x.matched) != tojson([]);
+        })
+        .map((x) => x._id);
 
     // Order of the elements within the arrays is not significant for 'assertArrayEq'.
     assertArrayEq({
         actual: matchedIds,
         expected: idsExpectedToMatch,
-        extraErrorMsg: " **TEST** " + testDescription + " " + tojson(explain)
+        extraErrorMsg: " **TEST** " + testDescription + " " + tojson(explain),
     });
 }
 
@@ -117,22 +121,24 @@ export function runTest_SingleForeignRecord(
  */
 export function runTest_SingleLocalRecord(
     testConfig,
-    {testDescription, localRecord, localField, foreignRecords, foreignField, idsExpectedToMatch}) {
+    {testDescription, localRecord, localField, foreignRecords, foreignField, idsExpectedToMatch},
+) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
-    assert('object' === typeof (localRecord) && !Array.isArray(localRecord),
-           "localRecord should be a single document");
+    assert("object" === typeof localRecord && !Array.isArray(localRecord), "localRecord should be a single document");
     testDescription += ` (currentJoinAlgorithm: ${currentJoinAlgorithm.name})`;
 
     setupCollections(testConfig, [localRecord], foreignRecords, foreignField);
 
-    const pipeline = [{
-        $lookup: {
-            from: foreignColl.getName(),
-            localField: localField,
-            foreignField: foreignField,
-            as: "matched"
-        }
-    }];
+    const pipeline = [
+        {
+            $lookup: {
+                from: foreignColl.getName(),
+                localField: localField,
+                foreignField: foreignField,
+                as: "matched",
+            },
+        },
+    ];
     const aggOptions = {allowDiskUse: currentJoinAlgorithm == JoinAlgorithm.HJ};
 
     const results = localColl.aggregate(pipeline, aggOptions).toArray();
@@ -141,13 +147,13 @@ export function runTest_SingleLocalRecord(
     assert.eq(1, results.length);
 
     // Extract matched foreign ids from the "matched" field.
-    const matchedIds = results[0].matched.map(x => (x._id));
+    const matchedIds = results[0].matched.map((x) => x._id);
 
     // Order of the elements within the arrays is not significant for 'assertArrayEq'.
     assertArrayEq({
         actual: matchedIds,
         expected: idsExpectedToMatch,
-        extraErrorMsg: " **TEST** " + testDescription + " " + tojson(explain)
+        extraErrorMsg: " **TEST** " + testDescription + " " + tojson(explain),
     });
 }
 
@@ -156,7 +162,8 @@ export function runTest_SingleLocalRecord(
  */
 export function runTest_ExpectFailure(
     testConfig,
-    {testDescription, localRecords, localField, foreignRecords, foreignField, expectedErrorCode}) {
+    {testDescription, localRecords, localField, foreignRecords, foreignField, expectedErrorCode},
+) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
     testDescription += ` (currentJoinAlgorithm: ${currentJoinAlgorithm.name})`;
 
@@ -164,19 +171,22 @@ export function runTest_ExpectFailure(
 
     assert.commandFailedWithCode(
         localColl.runCommand("aggregate", {
-            pipeline: [{
-                $lookup: {
-                    from: foreignColl.getName(),
-                    localField: localField,
-                    foreignField: foreignField,
-                    as: "matched"
-                }
-            }],
+            pipeline: [
+                {
+                    $lookup: {
+                        from: foreignColl.getName(),
+                        localField: localField,
+                        foreignField: foreignField,
+                        as: "matched",
+                    },
+                },
+            ],
             allowDiskUse: currentJoinAlgorithm == JoinAlgorithm.HJ,
-            cursor: {}
+            cursor: {},
         }),
         expectedErrorCode,
-        "**TEST** " + testDescription);
+        "**TEST** " + testDescription,
+    );
 }
 
 /**
@@ -187,9 +197,7 @@ export function runTests(testConfig) {
 
     // Sanity-test that the join is configured correctly.
     setupCollections(testConfig, [{a: 1}], [{a: 1}], "a");
-    const pipeline = [
-        {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "a", as: "matched"}}
-    ];
+    const pipeline = [{$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "a", as: "matched"}}];
     const aggOptions = {allowDiskUse: currentJoinAlgorithm == JoinAlgorithm.HJ};
     const explain = localColl.explain().aggregate(pipeline, aggOptions);
     if (!checkJoinConfiguration(testConfig, explain)) {
@@ -215,7 +223,7 @@ export function runTests(testConfig) {
             {_id: 23, a: false},
             {_id: 24, a: 0},
             {_id: 25, a: {}},
-            {_id: 26, a: ""}
+            {_id: 26, a: ""},
         ];
 
         runTest_SingleForeignRecord(testConfig, {
@@ -224,7 +232,7 @@ export function runTests(testConfig) {
             localField: "a",
             foreignRecord: {_id: 0, b: null},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 10]
+            idsExpectedToMatch: [0, 1, 2, 10],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Null in local, top-level field in foreign",
@@ -232,7 +240,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: [0, 1, 2]
+            idsExpectedToMatch: [0, 1, 2],
         });
 
         runTest_SingleForeignRecord(testConfig, {
@@ -241,7 +249,7 @@ export function runTests(testConfig) {
             localField: "a",
             foreignRecord: {_id: 0, no_b: 1},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 10]
+            idsExpectedToMatch: [0, 1, 2, 10],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Missing in local, top-level field in foreign",
@@ -249,7 +257,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: [0, 1, 2]
+            idsExpectedToMatch: [0, 1, 2],
         });
     })();
 
@@ -271,7 +279,7 @@ export function runTests(testConfig) {
             localField: "a",
             foreignRecord: {_id: 0, b: undefined},
             foreignField: "b",
-            idsExpectedToMatch: []
+            idsExpectedToMatch: [],
         });
 
         // $lookup is allowed to run with sbe when internalQueryFrameworkControl is set to
@@ -280,19 +288,25 @@ export function runTests(testConfig) {
             // When lowered to SBE, "undefined" should only match "undefined".
             runTest_SingleForeignRecord(testConfig, {
                 testDescription: "Undefined in foreign, undefined in array in local",
-                localRecords: [{_id: 0, a: undefined}, {_id: 1, a: [undefined, 1]}],
+                localRecords: [
+                    {_id: 0, a: undefined},
+                    {_id: 1, a: [undefined, 1]},
+                ],
                 localField: "a",
                 foreignRecord: {_id: 0, b: undefined},
                 foreignField: "b",
-                idsExpectedToMatch: [0, 1]
+                idsExpectedToMatch: [0, 1],
             });
             runTest_SingleLocalRecord(testConfig, {
                 testDescription: "Undefined in local, undefined in array in foreign",
                 localRecord: {_id: 0, b: undefined},
                 localField: "a",
-                foreignRecords: [{_id: 0, a: undefined}, {_id: 1, a: [undefined, 1]}],
+                foreignRecords: [
+                    {_id: 0, a: undefined},
+                    {_id: 1, a: [undefined, 1]},
+                ],
                 foreignField: "b",
-                idsExpectedToMatch: [0, 1]
+                idsExpectedToMatch: [0, 1],
             });
 
             runTest_SingleLocalRecord(testConfig, {
@@ -301,7 +315,7 @@ export function runTests(testConfig) {
                 localField: "b",
                 foreignRecords: docs,
                 foreignField: "a",
-                idsExpectedToMatch: []
+                idsExpectedToMatch: [],
             });
         } else {
             // Due to legacy reasons, in the classic engine if the left-hand side collection has a
@@ -316,7 +330,7 @@ export function runTests(testConfig) {
                 localField: "b",
                 foreignRecords: docs,
                 foreignField: "a",
-                expectedErrorCode: ErrorCodes.BadValue
+                expectedErrorCode: ErrorCodes.BadValue,
             });
         }
     })();
@@ -338,7 +352,7 @@ export function runTests(testConfig) {
             localField: "a",
             foreignRecord: {_id: 0, b: NaN},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 3]
+            idsExpectedToMatch: [0, 1, 2, 3],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "NaN in local, top-level field in foreign",
@@ -346,7 +360,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: [0, 1, 2, 3]
+            idsExpectedToMatch: [0, 1, 2, 3],
         });
     })();
 
@@ -372,14 +386,14 @@ export function runTests(testConfig) {
             {_id: 13, a: new DBRef("collection", "id", "database")},
         ];
 
-        docs.forEach(doc => {
+        docs.forEach((doc) => {
             runTest_SingleForeignRecord(testConfig, {
                 testDescription: "Various data types in local matching to: " + tojson(doc),
                 localRecords: docs,
                 localField: "a",
                 foreignRecord: {b: doc.a},
                 foreignField: "b",
-                idsExpectedToMatch: [doc._id]
+                idsExpectedToMatch: [doc._id],
             });
             runTest_SingleLocalRecord(testConfig, {
                 testDescription: "Various data types in foreign matching to: " + tojson(doc),
@@ -387,7 +401,7 @@ export function runTests(testConfig) {
                 localField: "b",
                 foreignRecords: docs,
                 foreignField: "a",
-                idsExpectedToMatch: [doc._id]
+                idsExpectedToMatch: [doc._id],
             });
         });
 
@@ -395,17 +409,17 @@ export function runTests(testConfig) {
             testDescription: "Various data types in local, expecting no match",
             localRecords: docs,
             localField: "a",
-            foreignRecord: {b: 'xxx'},
+            foreignRecord: {b: "xxx"},
             foreignField: "b",
-            idsExpectedToMatch: []
+            idsExpectedToMatch: [],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Various data types in foreign, expecting no match",
-            localRecord: {b: 'xxx'},
+            localRecord: {b: "xxx"},
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: []
+            idsExpectedToMatch: [],
         });
     })();
 
@@ -436,7 +450,7 @@ export function runTests(testConfig) {
             localField: "a",
             foreignRecord: {_id: 0, b: 1},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level scalar in local and top-level field in foreign",
@@ -444,7 +458,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7],
         });
     })();
 
@@ -477,7 +491,7 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, b: 1},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level scalar in local and path in foreign",
@@ -485,7 +499,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.x",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7],
         });
     })();
 
@@ -535,9 +549,7 @@ export function runTests(testConfig) {
             localField: "a.b.c",
             foreignRecord: {_id: 0, key: 1},
             foreignField: "key",
-            idsExpectedToMatch:
-                [0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
-                 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level scalar in local and deep path in foreign",
@@ -545,9 +557,7 @@ export function runTests(testConfig) {
             localField: "key",
             foreignRecords: docs,
             foreignField: "a.b.c",
-            idsExpectedToMatch:
-                [0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
-                 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
         });
     })();
 
@@ -577,7 +587,7 @@ export function runTests(testConfig) {
             localField: "a",
             foreignRecord: {_id: 0, b: [1, 2]},
             foreignField: "b",
-            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, /*match on 1: */ 2, 11]
+            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, /*match on 1: */ 2, 11],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level array in local and top-level field in foreign",
@@ -585,7 +595,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: [/*match on 1: */ 2, 11]
+            idsExpectedToMatch: [/*match on 1: */ 2, 11],
         });
 
         runTest_SingleForeignRecord(testConfig, {
@@ -594,7 +604,7 @@ export function runTests(testConfig) {
             localField: "a",
             foreignRecord: {_id: 0, b: [[1, 2], 42]},
             foreignField: "b",
-            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1]
+            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Nested array in local and top-level field in foreign",
@@ -602,7 +612,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, 2]
+            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, 2],
         });
     })();
 
@@ -638,8 +648,7 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, b: [1, 2]},
             foreignField: "b",
-            idsExpectedToMatch:
-                [/*match on [1, 2]: */ 0, 1, 2, 3, /*match on 1: */ 4, 5, 6, 7, 10, 12]
+            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, 2, 3, /*match on 1: */ 4, 5, 6, 7, 10, 12],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level array in local and path in foreign",
@@ -647,7 +656,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.x",
-            idsExpectedToMatch: [/*match on 1: */ 4, 5, 6, 7, 10, 12]
+            idsExpectedToMatch: [/*match on 1: */ 4, 5, 6, 7, 10, 12],
         });
 
         runTest_SingleForeignRecord(testConfig, {
@@ -656,7 +665,7 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, b: [[1, 2], 42]},
             foreignField: "b",
-            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, 2, 3]
+            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, 2, 3],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Nested array in local and path in foreign",
@@ -664,7 +673,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.x",
-            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, 2, 3, 4, 5, 6, 7]
+            idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, 2, 3, 4, 5, 6, 7],
         });
     })();
 
@@ -696,7 +705,7 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, b: null},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12]
+            idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level null in local and missing in foreign path",
@@ -704,7 +713,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.x",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8],
         });
 
         runTest_SingleForeignRecord(testConfig, {
@@ -713,7 +722,7 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, no_b: 1},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12]
+            idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level missing in local and missing in foreign path",
@@ -721,7 +730,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.x",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8],
         });
     })();
 
@@ -745,7 +754,7 @@ export function runTests(testConfig) {
             localField: "a.b.c",
             foreignRecord: {_id: 0, b: null},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level null in local and scalars on path in foreign",
@@ -753,7 +762,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.b.c",
-            idsExpectedToMatch: [0, 1, 3, 4, 6, 7]
+            idsExpectedToMatch: [0, 1, 3, 4, 6, 7],
         });
     })();
 
@@ -787,7 +796,7 @@ export function runTests(testConfig) {
             localField: "a",
             foreignRecord: {_id: 0, b: []},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2]
+            idsExpectedToMatch: [0, 1, 2],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Empty top-level array in local, top field in foreign",
@@ -795,7 +804,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: [2, 10, 11, 12, 13]
+            idsExpectedToMatch: [2, 10, 11, 12, 13],
         });
 
         runTest_SingleForeignRecord(testConfig, {
@@ -804,7 +813,7 @@ export function runTests(testConfig) {
             localField: "a",
             foreignRecord: {_id: 0, b: [[], 42]},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2]
+            idsExpectedToMatch: [0, 1, 2],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Empty nested array in local, top field in foreign",
@@ -812,7 +821,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: [0, 1, 2, 3]
+            idsExpectedToMatch: [0, 1, 2, 3],
         });
     })();
 
@@ -837,7 +846,7 @@ export function runTests(testConfig) {
             localField: "a.b.c",
             foreignRecord: {_id: 0, b: null},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 3, 4]
+            idsExpectedToMatch: [0, 1, 2, 3, 4],
         });
 
         runTest_SingleForeignRecord(testConfig, {
@@ -846,7 +855,7 @@ export function runTests(testConfig) {
             localField: "a.b.c",
             foreignRecord: {_id: 0, b: []},
             foreignField: "b",
-            idsExpectedToMatch: [5, 6, 7, 8, 9]
+            idsExpectedToMatch: [5, 6, 7, 8, 9],
         });
     })();
 
@@ -897,7 +906,7 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, b: []},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Empty top-level array in local, path in foreign",
@@ -905,7 +914,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.x",
-            idsExpectedToMatch: [3, 4, 12, 13, 20, 21, 22, 23]
+            idsExpectedToMatch: [3, 4, 12, 13, 20, 21, 22, 23],
         });
 
         runTest_SingleForeignRecord(testConfig, {
@@ -914,7 +923,7 @@ export function runTests(testConfig) {
             localField: "a.x",
             foreignRecord: {_id: 0, b: [[], 42]},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Empty nested array in local, path in foreign",
@@ -922,7 +931,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.x",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 10, 11, 12, 13]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 10, 11, 12, 13],
         });
     })();
 
@@ -947,7 +956,7 @@ export function runTests(testConfig) {
             localField: "a.0.x",
             foreignRecord: {_id: 0, b: 1},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2]
+            idsExpectedToMatch: [0, 1, 2],
         });
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Scalar in local, path with numeral in foreign",
@@ -955,7 +964,7 @@ export function runTests(testConfig) {
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.0.x",
-            idsExpectedToMatch: [0, 1, 2]
+            idsExpectedToMatch: [0, 1, 2],
         });
     })();
 
@@ -981,20 +990,18 @@ export function runTests(testConfig) {
             localField: "a.0.x",
             foreignRecord: {_id: 0, b: null},
             foreignField: "b",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5],
         });
         // SERVER-64221/SERVER-27442: matching to null isn't consistent.
         const S64221 =
-            (currentJoinAlgorithm == JoinAlgorithm.NLJ || currentJoinAlgorithm == JoinAlgorithm.HJ)
-            ? [10, 11]
-            : [];
+            currentJoinAlgorithm == JoinAlgorithm.NLJ || currentJoinAlgorithm == JoinAlgorithm.HJ ? [10, 11] : [];
         runTest_SingleLocalRecord(testConfig, {
             testDescription: "Null in local, path with numeral in foreign",
             localRecord: {_id: 0, b: null},
             localField: "b",
             foreignRecords: docs,
             foreignField: "a.0.x",
-            idsExpectedToMatch: [0, 1, 2, 3, 4].concat(S64221)
+            idsExpectedToMatch: [0, 1, 2, 3, 4].concat(S64221),
         });
     })();
 
@@ -1009,14 +1016,18 @@ export function runTests(testConfig) {
 
         foreignColl.drop();
 
-        const results = localColl.aggregate([{
-            $lookup: {
-                from: foreignColl.getName(),
-                localField: "a",
-                foreignField: "b",
-                as: "matched"
-            }
-        }]).toArray();
+        const results = localColl
+            .aggregate([
+                {
+                    $lookup: {
+                        from: foreignColl.getName(),
+                        localField: "a",
+                        foreignField: "b",
+                        as: "matched",
+                    },
+                },
+            ])
+            .toArray();
 
         assert.eq(localDocs.length, results.length);
 

@@ -3,7 +3,7 @@
 // Role dbAdminAnyDatabase has this privilege.
 const applyOps_priv = {
     resource: {cluster: true},
-    actions: ["applyOps"]
+    actions: ["applyOps"],
 };
 
 const testUser = "testUser";
@@ -14,33 +14,40 @@ const adminDbName = "admin";
 const authErrCode = 13;
 
 const command = {
-    applyOps: [{
-        "op": "c",
-        "ns": testDBName + ".$cmd",
-        "o": {
-            "create": "x",
-        }
-    }]
+    applyOps: [
+        {
+            "op": "c",
+            "ns": testDBName + ".$cmd",
+            "o": {
+                "create": "x",
+            },
+        },
+    ],
 };
 
 function createUsers(conn) {
     let adminDb = conn.getDB(adminDbName);
     // Create the admin user.
-    assert.commandWorked(
-        adminDb.runCommand({createUser: "admin", pwd: "password", roles: ["__system"]}));
+    assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "password", roles: ["__system"]}));
 
     assert(adminDb.auth("admin", "password"));
     assert.commandWorked(adminDb.runCommand({createRole: testRole, privileges: [], roles: []}));
 
     let testDb = adminDb.getSiblingDB(testDBName);
-    assert.commandWorked(testDb.runCommand(
-        {createUser: testUser, pwd: "password", roles: [{role: testRole, db: adminDbName}]}));
+    assert.commandWorked(
+        testDb.runCommand({createUser: testUser, pwd: "password", roles: [{role: testRole, db: adminDbName}]}),
+    );
 
-    assert.commandWorked(testDb.runCommand({
-        createUser: testUserWithDbAdminAnyDatabaseRole,
-        pwd: "password",
-        roles: [{role: "dbAdminAnyDatabase", db: adminDbName}, {role: testRole, db: adminDbName}]
-    }));
+    assert.commandWorked(
+        testDb.runCommand({
+            createUser: testUserWithDbAdminAnyDatabaseRole,
+            pwd: "password",
+            roles: [
+                {role: "dbAdminAnyDatabase", db: adminDbName},
+                {role: testRole, db: adminDbName},
+            ],
+        }),
+    );
 
     adminDb.logout();
 }
@@ -59,8 +66,12 @@ function testAuthorization(conn, privileges, user, shouldSucceed) {
     } else {
         var res = testDb.runCommand(command);
         if (res.ok == 1 || res.code != authErrCode) {
-            let msg = "expected authorization failure " +
-                " but received " + tojson(res) + " with privileges " + tojson(privileges);
+            let msg =
+                "expected authorization failure " +
+                " but received " +
+                tojson(res) +
+                " with privileges " +
+                tojson(privileges);
             assert(false, msg);
         }
     }

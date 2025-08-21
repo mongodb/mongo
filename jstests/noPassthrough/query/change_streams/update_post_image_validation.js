@@ -9,8 +9,7 @@ const testDB = conn.getDB("test");
 // Test validation of elements added to an array that is represented in a "deserialized" format
 // in mutablebson. The added element is valid.
 assert.commandWorked(testDB.coll.insert({_id: 0, a: []}));
-assert.commandWorked(
-    testDB.coll.update({_id: 0}, {$set: {"a.1": 0, "a.0": {$ref: "coll", $db: "test"}}}));
+assert.commandWorked(testDB.coll.update({_id: 0}, {$set: {"a.1": 0, "a.0": {$ref: "coll", $db: "test"}}}));
 assert.docEq({_id: 0, a: [{$ref: "coll", $db: "test"}, 0]}, testDB.coll.findOne({_id: 0}));
 
 // Test validation of modified array elements that are accessed using a string that is

@@ -27,9 +27,7 @@ assert.eq(docs[0], {a1: 1});
 assert.eq(docs[1], {a1: 2});
 
 // $documents evaluates to an array of objects.
-const docs1 =
-    currDB.aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in : {x: "$$this"}}}}])
-        .toArray();
+const docs1 = currDB.aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in: {x: "$$this"}}}}]).toArray();
 
 assert.eq(100, docs1.length);
 for (let i = 0; i < 100; i++) {
@@ -37,91 +35,97 @@ for (let i = 0; i < 100; i++) {
 }
 
 // $documents evaluates to an array of objects.
-const docsUnionWith =
-    coll.aggregate([
-            {
-                $unionWith: {
-                    pipeline: [{$documents: {$map: {input: {$range: [0, 5]}, in : {x: "$$this"}}}}]
-                }
+const docsUnionWith = coll
+    .aggregate([
+        {
+            $unionWith: {
+                pipeline: [{$documents: {$map: {input: {$range: [0, 5]}, in: {x: "$$this"}}}}],
             },
-            {$group: {_id: "$x", x: {$first: "$x"}}},
-            {$project: {_id: 0}},
-        ])
-        .toArray();
+        },
+        {$group: {_id: "$x", x: {$first: "$x"}}},
+        {$project: {_id: 0}},
+    ])
+    .toArray();
 
 assert(resultsEq([{x: null}, {x: 0}, {x: 1}, {x: 2}, {x: 3}, {x: 4}], docsUnionWith));
 
-{  // $documents with const objects inside $unionWith (no "coll").
-    const res = coll.aggregate([
-                        {$unionWith: {pipeline: [{$documents: [{xx: 1}, {xx: 2}]}]}},
-                        {$group: {_id: "$xx", xx: {$first: "$xx"}}},
-                        {$project: {_id: 0}}
-                    ])
-                    .toArray();
+{
+    // $documents with const objects inside $unionWith (no "coll").
+    const res = coll
+        .aggregate([
+            {$unionWith: {pipeline: [{$documents: [{xx: 1}, {xx: 2}]}]}},
+            {$group: {_id: "$xx", xx: {$first: "$xx"}}},
+            {$project: {_id: 0}},
+        ])
+        .toArray();
     assert(resultsEq([{xx: null}, {xx: 1}, {xx: 2}], res));
 }
 
-{  // $documents with const objects inside $lookup (no "coll", explicit $match).
-    const res = lookup_coll.aggregate([
-                {
-                    $lookup: {
-                        let: {"id_lookup": "$id_name"},
-                        pipeline: [
-                            {$documents: [{xx: 1}, {xx: 2}]},
-                            {
-                                $match:
-                                    {
-                                        $expr:
-                                            {
-                                                $eq:
-                                                    ["$$id_lookup", "$xx"]
-                                            }
-                                    }
-                            }
-                            ],
-                        as: "names"
-                    }
+{
+    // $documents with const objects inside $lookup (no "coll", explicit $match).
+    const res = lookup_coll
+        .aggregate([
+            {
+                $lookup: {
+                    let: {"id_lookup": "$id_name"},
+                    pipeline: [
+                        {$documents: [{xx: 1}, {xx: 2}]},
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$$id_lookup", "$xx"],
+                                },
+                            },
+                        },
+                    ],
+                    as: "names",
                 },
-                {$match: {"names": {"$ne": []}}},
-                {$project: {_id: 0}}
-            ]
-           )
-            .toArray();
-    assert(resultsEq(
-        [
-            {id_name: 1, name: "name_1", names: [{"xx": 1}]},
-            {id_name: 2, name: "name_2", names: [{"xx": 2}]}
-        ],
-        res));
+            },
+            {$match: {"names": {"$ne": []}}},
+            {$project: {_id: 0}},
+        ])
+        .toArray();
+    assert(
+        resultsEq(
+            [
+                {id_name: 1, name: "name_1", names: [{"xx": 1}]},
+                {id_name: 2, name: "name_2", names: [{"xx": 2}]},
+            ],
+            res,
+        ),
+    );
 }
 
-{  // $documents with const objects inside $lookup (no "coll", + localField/foreignField).
-    const res = lookup_coll.aggregate([
-                {
-                    $lookup: {
-                        localField: "id_name",
-                        foreignField: "xx",
-                        pipeline: [
-                            {$documents: [{xx: 1}, {xx: 2}]}
-                        ],
-                        as: "names"
-                    }
+{
+    // $documents with const objects inside $lookup (no "coll", + localField/foreignField).
+    const res = lookup_coll
+        .aggregate([
+            {
+                $lookup: {
+                    localField: "id_name",
+                    foreignField: "xx",
+                    pipeline: [{$documents: [{xx: 1}, {xx: 2}]}],
+                    as: "names",
                 },
-                {$match: {"names": {"$ne": []}}},
-                {$project: {_id: 0}}
-            ])
-            .toArray();
-    assert(resultsEq(
-        [
-            {id_name: 1, name: "name_1", names: [{"xx": 1}]},
-            {id_name: 2, name: "name_2", names: [{"xx": 2}]}
-        ],
-        res));
+            },
+            {$match: {"names": {"$ne": []}}},
+            {$project: {_id: 0}},
+        ])
+        .toArray();
+    assert(
+        resultsEq(
+            [
+                {id_name: 1, name: "name_1", names: [{"xx": 1}]},
+                {id_name: 2, name: "name_2", names: [{"xx": 2}]},
+            ],
+            res,
+        ),
+    );
 }
 
 // Must fail when $document appears in the top level collection pipeline.
 assert.throwsWithCode(() => {
-    coll.aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in : {x: "$$this"}}}}]);
+    coll.aggregate([{$documents: {$map: {input: {$range: [0, 100]}, in: {x: "$$this"}}}}]);
 }, ErrorCodes.InvalidNamespace);
 
 // Must fail due to misplaced $document.
@@ -142,10 +146,11 @@ assert.throwsWithCode(() => {
 
 // $unionWith must fail because it requires a collection even when database does not exist
 assert.throwsWithCode(() => {
-    nonExistingDB.aggregate([{
-        $unionWith:
-            {pipeline: [{$documents: {$map: {input: {$range: [0, 5]}, in : {x: "$$this"}}}}]}
-    }]);
+    nonExistingDB.aggregate([
+        {
+            $unionWith: {pipeline: [{$documents: {$map: {input: {$range: [0, 5]}, in: {x: "$$this"}}}}]},
+        },
+    ]);
 }, ErrorCodes.InvalidNamespace);
 
 // $unionWith must fail due to no $document
@@ -160,14 +165,14 @@ assert.throwsWithCode(() => {
             $lookup: {
                 let: {"id_lookup": "$id_name"},
                 as: "aa",
-                pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]
-            }
-        }
-        ]);
+                pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}],
+            },
+        },
+    ]);
 }, ErrorCodes.FailedToParse);
 // Test that $lookup fails due to no 'from' argument and no pipeline field.
 assert.throwsWithCode(() => {
-    coll.aggregate([{$lookup: {let : {"id_lookup": "$id_name"}, as: "aa"}}]);
+    coll.aggregate([{$lookup: {let: {"id_lookup": "$id_name"}, as: "aa"}}]);
 }, ErrorCodes.FailedToParse);
 
 // Test that $documents fails due to producing array of non-objects.

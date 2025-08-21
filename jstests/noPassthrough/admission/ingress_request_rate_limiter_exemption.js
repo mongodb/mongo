@@ -39,15 +39,10 @@ const testExemptIPsFromRateLimit = (rateExemptConn, exemptClient, nonExemptClien
 
     const finalRateLimiterStats = getRateLimiterStats(rateExemptConn);
 
-    assert.eq(
-        finalRateLimiterStats.successfulAdmissions - initialRateLimiterStats.successfulAdmissions,
-        1);
-    assert.eq(finalRateLimiterStats.rejectedAdmissions - initialRateLimiterStats.rejectedAdmissions,
-              2);
-    assert.eq(
-        finalRateLimiterStats.attemptedAdmissions - initialRateLimiterStats.attemptedAdmissions, 3);
-    assert.eq(finalRateLimiterStats.exemptedAdmissions - initialRateLimiterStats.exemptedAdmissions,
-              2);
+    assert.eq(finalRateLimiterStats.successfulAdmissions - initialRateLimiterStats.successfulAdmissions, 1);
+    assert.eq(finalRateLimiterStats.rejectedAdmissions - initialRateLimiterStats.rejectedAdmissions, 2);
+    assert.eq(finalRateLimiterStats.attemptedAdmissions - initialRateLimiterStats.attemptedAdmissions, 3);
+    assert.eq(finalRateLimiterStats.exemptedAdmissions - initialRateLimiterStats.exemptedAdmissions, 2);
 };
 
 const nonExemptIP = get_ipaddr();
@@ -84,8 +79,9 @@ runTestStandalone({startupParams: kParams, auth: true}, (conn, exemptConn) => {
     const nonExemptClient = new Mongo(`mongodb://${nonExemptIP}:${conn.port}`);
     const exemptAdmin = exemptConn.getDB("admin");
     const unixPort = `/tmp/mongodb-${conn.port}.sock`;
-    assert.commandWorked(exemptAdmin.adminCommand(
-        {setParameter: 1, ingressRequestRateLimiterExemptions: {ranges: [unixPort]}}));
+    assert.commandWorked(
+        exemptAdmin.adminCommand({setParameter: 1, ingressRequestRateLimiterExemptions: {ranges: [unixPort]}}),
+    );
     const exemptSocketClient = new Mongo(`mongodb://${encodeURIComponent(unixPort)}`);
     testExemptIPsFromRateLimit(exemptConn, exemptSocketClient, nonExemptClient);
 });

@@ -21,15 +21,17 @@ assert.commandWorked(coll.createIndex({x: 1, y: 1}));
 assert.commandWorked(coll.createIndex({x: -1, y: 1}));
 assert.commandWorked(coll.createIndex({y: 1, x: 1}));
 assert.commandWorked(coll.createIndex({x: 1, z: 1, y: 1}));
-assert.commandWorked(coll.insertMany([
-    {x: 3, y: 5, z: 7},
-    {x: 5, y: 6, z: 5},
-    {x: 5, y: 5, z: 4},
-    {x: 6, y: 5, z: 3},
-    {x: 7, y: 5, z: 8},
-    {x: 8, y: 7, z: 3},
-    {x: 8, y: 8, z: 3},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {x: 3, y: 5, z: 7},
+        {x: 5, y: 6, z: 5},
+        {x: 5, y: 5, z: 4},
+        {x: 6, y: 5, z: 3},
+        {x: 7, y: 5, z: 8},
+        {x: 8, y: 7, z: 3},
+        {x: 8, y: 8, z: 3},
+    ]),
+);
 
 function confirmSingleDistinctScan(filter, expected) {
     assertArrayEq({actual: coll.distinct("x", filter), expected: expected});

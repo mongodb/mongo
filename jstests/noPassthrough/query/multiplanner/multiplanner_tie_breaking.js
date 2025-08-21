@@ -9,16 +9,16 @@ import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 function testTieBreaking(breakTies, expectedPlanCount, checkAgainstOriginal) {
     const expectedDocsExamined = 1;
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryPlanTieBreakingWithIndexHeuristics: breakTies}));
-    const stats = assert.commandWorked(
-        coll.find({a: "mouse", b: /not rat/, c: /capybara/, d: /degu/}).explain(true));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlanTieBreakingWithIndexHeuristics: breakTies}),
+    );
+    const stats = assert.commandWorked(coll.find({a: "mouse", b: /not rat/, c: /capybara/, d: /degu/}).explain(true));
 
     // Check we're generating the expected number of plans.
     assert.eq(stats.executionStats.allPlansExecution.length, expectedPlanCount);
 
     // Check that all plans tie on their score.
-    const scores = stats.executionStats.allPlansExecution.map(a => a.score);
+    const scores = stats.executionStats.allPlansExecution.map((a) => a.score);
     assert.eq(new Set(scores).size, 1);
 
     if (checkAgainstOriginal) {
@@ -46,11 +46,11 @@ function testTieBreakingScenarios(expectedPlanCount, checkAgainstOriginal) {
 
 // Make sure we are testing on the classic engine.
 const options = {
-    setParameter: {internalQueryFrameworkControl: "forceClassicEngine"}
+    setParameter: {internalQueryFrameworkControl: "forceClassicEngine"},
 };
 const conn = MongoRunner.runMongod(options);
-assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
-const db = conn.getDB('test');
+assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
+const db = conn.getDB("test");
 
 const coll = db.multiplanner_tie_breaking;
 coll.drop();

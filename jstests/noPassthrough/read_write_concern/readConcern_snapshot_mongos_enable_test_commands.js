@@ -16,23 +16,27 @@ function expectSnapshotReadConcernIsSupported() {
     const session = st.s.startSession({causalConsistency: false});
     let txnNumber = 0;
 
-    assert.commandWorked(session.getDatabase(dbName).runCommand({
-        find: collName,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        session.getDatabase(dbName).runCommand({
+            find: collName,
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(txnNumber++),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
-    assert.commandWorked(session.getDatabase(dbName).runCommand({
-        aggregate: collName,
-        pipeline: [],
-        cursor: {},
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        session.getDatabase(dbName).runCommand({
+            aggregate: collName,
+            pipeline: [],
+            cursor: {},
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(txnNumber++),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 
     session.endSession();
     st.stop();

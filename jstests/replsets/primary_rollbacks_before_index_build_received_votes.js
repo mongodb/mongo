@@ -18,8 +18,7 @@ const secondary = rollbackTest.getSecondary();
 const secondaryDB = secondary.getDB(dbName);
 
 jsTestLog("Do a document write.");
-assert.commandWorked(
-        primaryColl.insert({_id: 0, x: 0}, {"writeConcern": {"w": "majority"}}));
+assert.commandWorked(primaryColl.insert({_id: 0, x: 0}, {"writeConcern": {"w": "majority"}}));
 
 // This makes sure the index build on primary hangs before receiving any votes from itself and
 // secondary.
@@ -27,14 +26,15 @@ IndexBuildTest.pauseIndexBuilds(secondary);
 IndexBuildTest.pauseIndexBuilds(primary);
 
 jsTestLog("Start index build.");
-const awaitBuild = IndexBuildTest.startIndexBuild(
-    primary, collNss, {i: 1}, {}, [ErrorCodes.InterruptedDueToReplStateChange]);
+const awaitBuild = IndexBuildTest.startIndexBuild(primary, collNss, {i: 1}, {}, [
+    ErrorCodes.InterruptedDueToReplStateChange,
+]);
 
 jsTestLog("Wait for secondary to reach collection scan phase.");
-IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, collName, 'i_1');
+IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, collName, "i_1");
 
 jsTestLog("Wait for primary to reach collection scan phase.");
-IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, collName, 'i_1');
+IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, collName, "i_1");
 
 rollbackTest.transitionToRollbackOperations();
 
@@ -53,6 +53,6 @@ IndexBuildTest.waitForIndexBuildToStop(newPrimaryDB, collName, "i_1");
 awaitBuild();
 
 // check to see if the index was successfully created.
-IndexBuildTest.assertIndexes(newPrimaryDB[collName], 2, ['_id_', 'i_1']);
+IndexBuildTest.assertIndexes(newPrimaryDB[collName], 2, ["_id_", "i_1"]);
 
 rollbackTest.stop();

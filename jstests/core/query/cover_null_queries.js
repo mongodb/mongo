@@ -11,9 +11,7 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {getAggPlanStages, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.cover_null_queries;
@@ -21,15 +19,17 @@ coll.drop();
 
 const clustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 
-assert.commandWorked(coll.insertMany([
-    {_id: 1, a: 1, b: 1},
-    {_id: 2, a: 1, b: null},
-    {_id: 3, a: null, b: 1},
-    {_id: 4, a: null, b: null},
-    {_id: 5, a: 2},
-    {_id: 6, b: 2},
-    {_id: 7},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {_id: 1, a: 1, b: 1},
+        {_id: 2, a: 1, b: null},
+        {_id: 3, a: null, b: 1},
+        {_id: 4, a: null, b: null},
+        {_id: 5, a: 2},
+        {_id: 6, b: 2},
+        {_id: 7},
+    ]),
+);
 
 /**
  * Validates that the explain() of command 'cmdObj' has the stages in 'expectedStages'.
@@ -138,7 +138,7 @@ function validateGroupCountAggCmdOutputAndPlan({filter, expectedStages, expected
     validateCountAggCmdOutputAndPlan({
         expectedStages,
         expectedCount,
-        pipeline: [{$match: filter}, {$group: {_id: 0, count: {$count: {}}}}]
+        pipeline: [{$match: filter}, {$group: {_id: 0, count: {$count: {}}}}],
     });
 }
 
@@ -233,8 +233,12 @@ validateSimpleCountCmdOutputAndPlan({
 validateFindCmdOutputAndPlan({
     filter: {a: null},
     projection: {_id: 1, incr_id: {$add: [1, "$_id"]}},
-    expectedOutput:
-        [{_id: 3, incr_id: 4}, {_id: 4, incr_id: 5}, {_id: 6, incr_id: 7}, {_id: 7, incr_id: 8}],
+    expectedOutput: [
+        {_id: 3, incr_id: 4},
+        {_id: 4, incr_id: 5},
+        {_id: 6, incr_id: 7},
+        {_id: 7, incr_id: 8},
+    ],
     expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_DEFAULT": 1},
 });
 
@@ -255,7 +259,7 @@ validateFindCmdOutputAndPlan({
         {_id: 3, incr_id: null},
         {_id: 4, incr_id: null},
         {_id: 6, incr_id: null},
-        {_id: 7, incr_id: null}
+        {_id: 7, incr_id: null},
     ],
     expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_DEFAULT": 1},
 });
@@ -313,7 +317,7 @@ assert.commandWorked(coll.insertOne({_id: 10, a: [null, []]}));
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: null},
     expectedCount: 5,
-    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1}
+    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: null},
@@ -444,8 +448,7 @@ validateCountAggCmdOutputAndPlan({
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, [], 1]}},
     projection: {_id: 1},
-    expectedOutput:
-        [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}, {_id: 10}],
+    expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}, {_id: 10}],
     expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateCountAggCmdOutputAndPlan({
@@ -471,22 +474,14 @@ validateFindCmdOutputAndPlan({
         {_id: 7},
         {_id: 8, a: []},
         {_id: 9, a: [[]]},
-        {_id: 10, a: [[], null]}
+        {_id: 10, a: [[], null]},
     ],
     expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     projection: {_id: 1, b: 1},
-    expectedOutput: [
-        {_id: 3, b: 1},
-        {_id: 4, b: null},
-        {_id: 6, b: 2},
-        {_id: 7},
-        {_id: 8},
-        {_id: 9},
-        {_id: 10}
-    ],
+    expectedOutput: [{_id: 3, b: 1}, {_id: 4, b: null}, {_id: 6, b: 2}, {_id: 7}, {_id: 8}, {_id: 9}, {_id: 10}],
     expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 
@@ -653,12 +648,7 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1, _id: 1}));
 validateFindCmdOutputAndPlan({
     filter: {a: null},
     projection: {_id: 1, b: 1},
-    expectedOutput: [
-        {_id: 3, b: 1},
-        {_id: 4, b: null},
-        {_id: 6, b: 2},
-        {_id: 7},
-    ],
+    expectedOutput: [{_id: 3, b: 1}, {_id: 4, b: null}, {_id: 6, b: 2}, {_id: 7}],
     expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 
@@ -723,8 +713,8 @@ assert.commandWorked(coll.createIndex({a: -1, b: -1}));
 validateCountAggCmdOutputAndPlan({
     expectedCount: 2,
     expectedStages: {"COUNT_SCAN": 1, "FETCH": 0},
-    pipeline: /* Sort by field a in the opposite direction of the index. */
-        [{$match: {a: null, b: {$gt: 0}}}, {$sort: {a: 1}}, {$count: "count"}],
+    /* Sort by field a in the opposite direction of the index. */
+    pipeline: [{$match: {a: null, b: {$gt: 0}}}, {$sort: {a: 1}}, {$count: "count"}],
 });
 
 // Test case when query is fully covered, predicate is not a single interval, and the index does not
@@ -774,13 +764,15 @@ validateFindCmdOutputAndPlan({
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.deleteMany({}));
 assert.commandWorked(coll.createIndex({a: 1, "_id.x": 1}));
-assert.commandWorked(coll.insertMany([
-    {a: null, _id: {x: 1}},
-    {a: null, _id: {x: 1, y: 1}},
-    {a: null, _id: {y: 1}},
-    {_id: {x: 1, y: 2}},
-    {a: "not null", _id: {x: 3}},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {a: null, _id: {x: 1}},
+        {a: null, _id: {x: 1, y: 1}},
+        {a: null, _id: {y: 1}},
+        {_id: {x: 1, y: 2}},
+        {a: "not null", _id: {x: 3}},
+    ]),
+);
 validateFindCmdOutputAndPlan({
     filter: {a: null},
     projection: {"_id.x": 1},
@@ -802,15 +794,17 @@ validateCountAggCmdOutputAndPlan({
 // $or. See SERVER-70436 for more details.
 coll.drop();
 
-assert.commandWorked(coll.insertMany([
-    {_id: 1, a: '123456'},
-    {_id: 2, a: '1234567'},
-    {_id: 3, a: ' 12345678'},
-    {_id: 4, a: '444456'},
-    {_id: 5, a: ''},
-    {_id: 6, a: null},
-    {_id: 7},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {_id: 1, a: "123456"},
+        {_id: 2, a: "1234567"},
+        {_id: 3, a: " 12345678"},
+        {_id: 4, a: "444456"},
+        {_id: 5, a: ""},
+        {_id: 6, a: null},
+        {_id: 7},
+    ]),
+);
 
 assert.commandWorked(coll.createIndex({a: 1, _id: 1}));
 
@@ -893,14 +887,16 @@ validateGroupCountAggCmdOutputAndPlan({
 
 // Validate that when we have a dotted path, we return the correct results for null queries.
 coll.drop();
-assert.commandWorked(coll.insertMany([
-    {_id: 1, a: 1},
-    {_id: 2, a: null},
-    {_id: 3},
-    {_id: 4, a: {b: 1}},
-    {_id: 5, a: {b: null}},
-    {_id: 6, a: {c: 1}},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {_id: 1, a: 1},
+        {_id: 2, a: null},
+        {_id: 3},
+        {_id: 4, a: {b: 1}},
+        {_id: 5, a: {b: null}},
+        {_id: 6, a: {c: 1}},
+    ]),
+);
 assert.commandWorked(coll.createIndex({"a.b": 1, _id: 1}));
 
 validateFindCmdOutputAndPlan({
@@ -941,44 +937,30 @@ validateGroupCountAggCmdOutputAndPlan({
 validateFindCmdOutputAndPlan({
     filter: {"a.b": null},
     projection: {_id: 1, a: 1},
-    expectedOutput: [
-        {_id: 1, a: 1},
-        {_id: 2, a: null},
-        {_id: 3},
-        {_id: 5, a: {b: null}},
-        {_id: 6, a: {c: 1}},
-    ],
+    expectedOutput: [{_id: 1, a: 1}, {_id: 2, a: null}, {_id: 3}, {_id: 5, a: {b: null}}, {_id: 6, a: {c: 1}}],
     expectedStages: {"IXSCAN": 1, "FETCH": 1},
 });
 
 // Make index multikey, and test case where field b is nested in an array.
-assert.commandWorked(coll.insertMany([
-    {_id: 7, a: [{b: null}]},
-    {_id: 8, a: [{b: []}]},
-    {_id: 9, a: [{b: [1, 2, 3]}]},
-    {_id: 10, a: [{b: 123}]},
-    {_id: 11, a: [{c: 123}]},
-    {_id: 12, a: []},
-    {_id: 13, a: [{}]},
-    {_id: 14, a: [1, 2, 3]},
-    {_id: 15, a: [{b: 1}, {c: 2}, {b: 3}]},
-    {_id: 16, a: [null]},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {_id: 7, a: [{b: null}]},
+        {_id: 8, a: [{b: []}]},
+        {_id: 9, a: [{b: [1, 2, 3]}]},
+        {_id: 10, a: [{b: 123}]},
+        {_id: 11, a: [{c: 123}]},
+        {_id: 12, a: []},
+        {_id: 13, a: [{}]},
+        {_id: 14, a: [1, 2, 3]},
+        {_id: 15, a: [{b: 1}, {c: 2}, {b: 3}]},
+        {_id: 16, a: [null]},
+    ]),
+);
 
 validateFindCmdOutputAndPlan({
     filter: {"a.b": null},
     projection: {_id: 1},
-    expectedOutput: [
-        {_id: 1},
-        {_id: 2},
-        {_id: 3},
-        {_id: 5},
-        {_id: 6},
-        {_id: 7},
-        {_id: 11},
-        {_id: 13},
-        {_id: 15}
-    ],
+    expectedOutput: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 5}, {_id: 6}, {_id: 7}, {_id: 11}, {_id: 13}, {_id: 15}],
     expectedStages: {"IXSCAN": 1, "PROJECTION_SIMPLE": 1, "FETCH": 1},
 });
 validateSimpleCountCmdOutputAndPlan({
@@ -1044,7 +1026,7 @@ validateFindCmdOutputAndPlan({
         {_id: 8},
         {_id: 11},
         {_id: 13},
-        {_id: 15}
+        {_id: 15},
     ],
     expectedStages: {"IXSCAN": 1, "PROJECTION_SIMPLE": 1, "FETCH": 1},
 });

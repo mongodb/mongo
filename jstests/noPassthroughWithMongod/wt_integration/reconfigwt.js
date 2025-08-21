@@ -25,15 +25,11 @@ if (ss.storageEngine.name !== "wiredTiger") {
         // See the WT_CONNECTION:reconfigure documentation for a list of valid options
         // http://source.wiredtiger.com/develop/struct_w_t___c_o_n_n_e_c_t_i_o_n.html#a579141678af06217b22869cbc604c6d4
         assert.commandWorked(reconfigure("eviction_target=81"));
-        assert.eq("eviction_target=81",
-                  admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
+        assert.eq("eviction_target=81", admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
         assert.commandWorked(reconfigure("cache_size=81M"));
-        assert.eq("cache_size=81M",
-                  admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
-        assert.commandWorked(reconfigure(
-            "eviction_dirty_target=19"));  // must be lower than eviction_dirty_trigger (default 20)
-        assert.commandWorked(
-            reconfigure("shared_cache=(chunk=11MB, name=bar, reserve=12MB, size=1G)"));
+        assert.eq("cache_size=81M", admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
+        assert.commandWorked(reconfigure("eviction_dirty_target=19")); // must be lower than eviction_dirty_trigger (default 20)
+        assert.commandWorked(reconfigure("shared_cache=(chunk=11MB, name=bar, reserve=12MB, size=1G)"));
 
         // Negative tests - bad input to mongod
         assert.commandFailed(reconfigure("abc\0as"));
@@ -41,8 +37,10 @@ if (ss.storageEngine.name !== "wiredTiger") {
         // Negative tests - bad input to wt
         assert.commandFailed(reconfigure("eviction_target=a"));
         assert.commandFailed(reconfigure("fake_config_key=1"));
-        assert.eq("shared_cache=(chunk=11MB, name=bar, reserve=12MB, size=1G)",
-                  admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName]);
+        assert.eq(
+            "shared_cache=(chunk=11MB, name=bar, reserve=12MB, size=1G)",
+            admin.adminCommand({getParameter: 1, [paramName]: 1})[paramName],
+        );
     }
 
     runTestForParam("wiredTigerEngineRuntimeConfig");

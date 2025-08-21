@@ -34,85 +34,102 @@ let noOp = () => {};
  *
  */
 let rollbackOps = {
-    "insert": [{
-        init: (db, collName) => {
-            assert.commandWorked(db.createCollection(collName));
+    "insert": [
+        {
+            init: (db, collName) => {
+                assert.commandWorked(db.createCollection(collName));
+            },
+            op: (db, collName) => {
+                assert.commandWorked(db[collName].insert({_id: 0}));
+            },
         },
-        op: (db, collName) => {
-            assert.commandWorked(db[collName].insert({_id: 0}));
-        }
-    }],
-    "update": [{
-        init: (db, collName) => {
-            assert.commandWorked(db[collName].insert({_id: 0, val: 0}));
+    ],
+    "update": [
+        {
+            init: (db, collName) => {
+                assert.commandWorked(db[collName].insert({_id: 0, val: 0}));
+            },
+            op: (db, collName) => {
+                assert.commandWorked(db[collName].update({_id: 0}, {val: 1}));
+            },
         },
-        op: (db, collName) => {
-            assert.commandWorked(db[collName].update({_id: 0}, {val: 1}));
+    ],
+    "delete": [
+        {
+            init: (db, collName) => {
+                assert.commandWorked(db[collName].insert({_id: 0}));
+            },
+            op: (db, collName) => {
+                assert.commandWorked(db[collName].remove({_id: 0}));
+            },
         },
-    }],
-    "delete": [{
-        init: (db, collName) => {
-            assert.commandWorked(db[collName].insert({_id: 0}));
+    ],
+    "create": [
+        {
+            init: noOp,
+            op: (db, collName) => {
+                assert.commandWorked(db.createCollection(collName));
+            },
         },
-        op: (db, collName) => {
-            assert.commandWorked(db[collName].remove({_id: 0}));
+    ],
+    "drop": [
+        {
+            init: (db, collName) => {
+                assert.commandWorked(db.createCollection(collName));
+            },
+            op: (db, collName) => {
+                assert.commandWorked(db.runCommand({drop: collName}));
+            },
         },
-    }],
-    "create": [{
-        init: noOp,
-        op: (db, collName) => {
-            assert.commandWorked(db.createCollection(collName));
+    ],
+    "createIndexes": [
+        {
+            init: (db, collName) => {
+                assert.commandWorked(db.createCollection(collName));
+            },
+            op: (db, collName) => {
+                assert.commandWorked(
+                    db.runCommand({
+                        createIndexes: collName,
+                        indexes: [{name: collName + "_index", key: {index_key: 1}}],
+                    }),
+                );
+            },
         },
-    }],
-    "drop": [{
-        init: (db, collName) => {
-            assert.commandWorked(db.createCollection(collName));
-        },
-        op: (db, collName) => {
-            assert.commandWorked(db.runCommand({drop: collName}));
-        },
-    }],
-    "createIndexes": [{
-        init: (db, collName) => {
-            assert.commandWorked(db.createCollection(collName));
-        },
-        op: (db, collName) => {
-            assert.commandWorked(db.runCommand({
-                createIndexes: collName,
-                indexes: [{name: collName + "_index", key: {index_key: 1}}]
-            }));
-        }
-    }],
+    ],
     "dropIndexes": [
         {
             description: "singleIndex",
             init: (db, collName) => {
-                assert.commandWorked(db.runCommand({
-                    createIndexes: collName,
-                    indexes: [{name: collName + "_index", key: {index_key: 1}}]
-                }));
+                assert.commandWorked(
+                    db.runCommand({
+                        createIndexes: collName,
+                        indexes: [{name: collName + "_index", key: {index_key: 1}}],
+                    }),
+                );
             },
             op: (db, collName) => {
-                assert.commandWorked(
-                    db.runCommand({dropIndexes: collName, index: collName + "_index"}));
-            }
+                assert.commandWorked(db.runCommand({dropIndexes: collName, index: collName + "_index"}));
+            },
         },
         {
             description: "allIndexes",
             init: (db, collName) => {
-                assert.commandWorked(db.runCommand({
-                    createIndexes: collName,
-                    indexes: [
-                        {name: collName + "_index_0", key: {index_key_0: 1}},
-                        {name: collName + "_index_1", key: {index_key_1: 1}},
-                        {name: collName + "_index_2", key: {index_key_2: 1}}
-                    ]
-                }));
+                assert.commandWorked(
+                    db.runCommand({
+                        createIndexes: collName,
+                        indexes: [
+                            {name: collName + "_index_0", key: {index_key_0: 1}},
+                            {name: collName + "_index_1", key: {index_key_1: 1}},
+                            {name: collName + "_index_2", key: {index_key_2: 1}},
+                        ],
+                    }),
+                );
             },
             op: (db, collName) => {
                 assert.commandWorked(db.runCommand({dropIndexes: collName, index: "*"}));
-            }
-        }
+            },
+        },
     ],
     "renameCollection": [
         {
@@ -122,8 +139,7 @@ let rollbackOps = {
             },
             op: (db, collName) => {
                 let nss = db[collName].getFullName();
-                assert.commandWorked(
-                    db.adminCommand({renameCollection: nss + "_source", to: nss + "_dest"}));
+                assert.commandWorked(db.adminCommand({renameCollection: nss + "_source", to: nss + "_dest"}));
             },
         },
         {
@@ -148,8 +164,7 @@ let rollbackOps = {
             op: (db, collName) => {
                 let sourceNss = db[collName].getFullName();
                 let destNss = db.getName() + "_dest." + collName;
-                assert.commandWorked(
-                    db.adminCommand({renameCollection: sourceNss, to: destNss, dropTarget: true}));
+                assert.commandWorked(db.adminCommand({renameCollection: sourceNss, to: destNss, dropTarget: true}));
             },
         },
         {
@@ -160,11 +175,11 @@ let rollbackOps = {
             },
             op: (db, collName) => {
                 let nss = db[collName].getFullName();
-                assert.commandWorked(db.adminCommand(
-                    {renameCollection: nss + "_source", to: nss + "_dest", dropTarget: true}));
+                assert.commandWorked(
+                    db.adminCommand({renameCollection: nss + "_source", to: nss + "_dest", dropTarget: true}),
+                );
             },
-        }
-
+        },
     ],
     "collMod": [
         {
@@ -173,13 +188,15 @@ let rollbackOps = {
                 assert.commandWorked(db.createCollection(collName));
             },
             op: (db, collName) => {
-                assert.commandWorked(db.runCommand({
-                    collMod: collName,
-                    validator: {a: 1},
-                    validationLevel: "moderate",
-                    validationAction: "warn"
-                }));
-            }
+                assert.commandWorked(
+                    db.runCommand({
+                        collMod: collName,
+                        validator: {a: 1},
+                        validationLevel: "moderate",
+                        validationAction: "warn",
+                    }),
+                );
+            },
         },
         {
             description: "validationOptionsWithoutValidator",
@@ -187,35 +204,41 @@ let rollbackOps = {
                 assert.commandWorked(db.createCollection(collName));
             },
             op: (db, collName) => {
-                assert.commandWorked(db.runCommand(
-                    {collMod: collName, validationLevel: "moderate", validationAction: "warn"}));
-            }
+                assert.commandWorked(
+                    db.runCommand({collMod: collName, validationLevel: "moderate", validationAction: "warn"}),
+                );
+            },
         },
         {
             description: "existingValidationOptions",
             init: (db, collName) => {
                 assert.commandWorked(db.createCollection(collName));
-                assert.commandWorked(db.runCommand(
-                    {collMod: collName, validationLevel: "moderate", validationAction: "warn"}));
+                assert.commandWorked(
+                    db.runCommand({collMod: collName, validationLevel: "moderate", validationAction: "warn"}),
+                );
             },
             op: (db, collName) => {
-                assert.commandWorked(db.runCommand({
-                    collMod: collName,
-                    validator: {a: 1},
-                    validationLevel: "moderate",
-                    validationAction: "warn"
-                }));
-            }
-        }
+                assert.commandWorked(
+                    db.runCommand({
+                        collMod: collName,
+                        validator: {a: 1},
+                        validationLevel: "moderate",
+                        validationAction: "warn",
+                    }),
+                );
+            },
+        },
     ],
-    "convertToCapped": [{
-        init: (db, collName) => {
-            assert.commandWorked(db.createCollection(collName));
+    "convertToCapped": [
+        {
+            init: (db, collName) => {
+                assert.commandWorked(db.createCollection(collName));
+            },
+            op: (db, collName) => {
+                assert.commandWorked(db.runCommand({convertToCapped: collName, size: 1024}));
+            },
         },
-        op: (db, collName) => {
-            assert.commandWorked(db.runCommand({convertToCapped: collName, size: 1024}));
-        },
-    }],
+    ],
     "applyOps": [
         {
             description: "multipleCRUDOps",
@@ -237,10 +260,10 @@ let rollbackOps = {
                         o: {_id: 0, val: 1},
                         o2: {_id: 0},
                     },
-                    {op: "d", ns: coll.getFullName(), ui: uuid, o: {_id: 0}}
+                    {op: "d", ns: coll.getFullName(), ui: uuid, o: {_id: 0}},
                 ];
                 assert.commandWorked(db.adminCommand({applyOps: opsToApply}));
-            }
+            },
         },
         {
             description: "opWithoutUUID",
@@ -251,13 +274,11 @@ let rollbackOps = {
             // entry.
             op: (db, collName) => {
                 let coll = db.getCollection(collName);
-                let opsToApply = [
-                    {op: "i", ns: coll.getFullName(), o: {_id: 0}},
-                ];
+                let opsToApply = [{op: "i", ns: coll.getFullName(), o: {_id: 0}}];
                 assert.commandWorked(db.adminCommand({applyOps: opsToApply}));
-            }
-        }
-    ]
+            },
+        },
+    ],
 };
 
 let testCollName = "test";
@@ -286,7 +307,7 @@ let CommonOps = (node) => {
     // Run init functions for each op type. Each is given its own database to run in and a
     // standard collection name to use.
     jsTestLog("Performing init operations for every operation type.");
-    opNames.forEach(opName => {
+    opNames.forEach((opName) => {
         let opObj = rollbackOps[opName];
         opObj.forEach((opVariantObj, ind) => {
             let opVariantName = opTestNameStr(opName, opVariantObj.description, ind);
@@ -316,9 +337,8 @@ let RollbackOps = (node) => {
         // Override 'runCommand' so we can capture the raw command object for each operation
         // and log it, to improve diagnostics.
         const runCommandOriginal = Mongo.prototype.runCommand;
-        Mongo.prototype.runCommand = function(dbName, commandObj, options) {
-            jsTestLog("Executing command for '" + opName + "' test: \n" +
-                      tojson(basicCommandObj(commandObj)));
+        Mongo.prototype.runCommand = function (dbName, commandObj, options) {
+            jsTestLog("Executing command for '" + opName + "' test: \n" + tojson(basicCommandObj(commandObj)));
             return runCommandOriginal.apply(this, arguments);
         };
 
@@ -329,7 +349,7 @@ let RollbackOps = (node) => {
     }
 
     jsTestLog("Performing rollback operations for every operation type.");
-    opNames.forEach(opName => {
+    opNames.forEach((opName) => {
         let opObj = rollbackOps[opName];
         // Execute all test cases for this operation type.
         jsTestLog("Performing '" + opName + "' operations.");

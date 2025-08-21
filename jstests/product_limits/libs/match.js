@@ -11,7 +11,7 @@ export class WorkloadAndOverSingleField extends PipelineWorkload {
         let match = [];
 
         for (let i = 0; i < this.scale(); i++) {
-            match.push({'f0': {$lt: this.scale() + i}});
+            match.push({"f0": {$lt: this.scale() + i}});
         }
 
         return [{$match: {$and: match}}, {$unset: "_id"}];
@@ -33,11 +33,11 @@ export class WorkloadOrOverSingleField extends PipelineWorkload {
 
         for (let i = 0; i < this.scale(); i++) {
             // Those conditions all evaluate to False
-            match.push({'f0': {$gt: this.scale() + i}});
+            match.push({"f0": {$gt: this.scale() + i}});
         }
 
         // This condition evaluates to True
-        match.push({'f0': {$lt: dataset.scale()}});
+        match.push({"f0": {$lt: dataset.scale()}});
 
         return [{$match: {$or: match}}, {$unset: "_id"}];
     }
@@ -122,10 +122,7 @@ export class WorkloadOrPlusAndOverManyFields extends PipelineWorkload {
 
         // This condition evaluates to True
         match.push({
-            $and: [
-                {[`f${this.scale() - 1}`]: {$lt: this.scale()}},
-                {[`f${this.scale() - 1}`]: {$gte: 0}}
-            ]
+            $and: [{[`f${this.scale() - 1}`]: {$lt: this.scale()}}, {[`f${this.scale() - 1}`]: {$gte: 0}}],
         });
 
         return [{$match: {$or: match}}, {$unset: "_id"}];
@@ -155,7 +152,7 @@ export class WorkloadMatchLongPath extends PipelineWorkload {
             path.push(`f${i}`);
         }
 
-        return path.join('.');
+        return path.join(".");
     }
 
     pipeline() {
@@ -241,6 +238,6 @@ export class WorkloadExists extends PipelineWorkload {
 
 export class WorkloadLongValue extends PipelineWorkload {
     pipeline(dataset) {
-        return [{$match: {f0: 'x'.repeat(dataset.scale()) + ' x'}}, {$unset: "_id"}];
+        return [{$match: {f0: "x".repeat(dataset.scale()) + " x"}}, {$unset: "_id"}];
     }
 }

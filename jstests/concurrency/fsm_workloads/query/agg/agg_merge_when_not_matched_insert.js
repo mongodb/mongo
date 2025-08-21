@@ -12,11 +12,9 @@
  *]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/agg/agg_with_chunk_migrations.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_with_chunk_migrations.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Set the collection to run concurrent moveChunk operations as the output collection.
     $config.data.collWithMigrations = "agg_merge_when_not_matched_insert";
     $config.data.threadRunCount = 0;
@@ -38,17 +36,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                             100,
                             {$multiply: [this.tid, 100_000_000]},
                             {$multiply: [this.threadRunCount, 1_000_000]},
-                            {$mod: ["$_id", 1_000_000]}
-                        ]
+                            {$mod: ["$_id", 1_000_000]},
+                        ],
                     },
                     "meta.tid": {$literal: this.tid},
                     "meta.count": {$literal: this.threadRunCount},
-                    "meta.doc": "$_id"
-                }
+                    "meta.doc": "$_id",
+                },
             },
             {
-                $merge:
-                    {into: this.collWithMigrations, whenMatched: "fail", whenNotMatched: "insert"}
+                $merge: {into: this.collWithMigrations, whenMatched: "fail", whenNotMatched: "insert"},
             },
         ]);
 
@@ -60,8 +57,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             let count;
             try {
                 count = db[this.collWithMigrations]
-                            .find({"meta.tid": this.tid, "meta.count": this.threadRunCount})
-                            .itcount();
+                    .find({"meta.tid": this.tid, "meta.count": this.threadRunCount})
+                    .itcount();
             } catch (e) {
                 if (e.code != ErrorCodes.QueryPlanKilled) {
                     // When this query is run on a secondary, it might be killed with
@@ -84,18 +81,22 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         cluster.executeOnMongodNodes((db) => {
             const param = assert.commandWorked(
-                db.adminCommand({getParameter: 1, maxCatchUpPercentageBeforeBlockingWrites: 1}));
+                db.adminCommand({getParameter: 1, maxCatchUpPercentageBeforeBlockingWrites: 1}),
+            );
             if (param.hasOwnProperty("maxCatchUpPercentageBeforeBlockingWrites")) {
                 const defaultValue = 10;
                 if (param.maxCatchUpPercentageBeforeBlockingWrites < defaultValue) {
                     jsTest.log(
                         "Parameter `maxCatchUpPercentageBeforeBlockingWrites` value too low: " +
-                        param.maxCatchUpPercentageBeforeBlockingWrites +
-                        ". Setting value to default: " + defaultValue + ".");
-                    initialMaxCatchUpPercentageBeforeBlockingWrites =
-                        param.maxCatchUpPercentageBeforeBlockingWrites;
-                    assert.commandWorked(db.adminCommand(
-                        {setParameter: 1, maxCatchUpPercentageBeforeBlockingWrites: defaultValue}));
+                            param.maxCatchUpPercentageBeforeBlockingWrites +
+                            ". Setting value to default: " +
+                            defaultValue +
+                            ".",
+                    );
+                    initialMaxCatchUpPercentageBeforeBlockingWrites = param.maxCatchUpPercentageBeforeBlockingWrites;
+                    assert.commandWorked(
+                        db.adminCommand({setParameter: 1, maxCatchUpPercentageBeforeBlockingWrites: defaultValue}),
+                    );
                 }
             }
         });
@@ -105,13 +106,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         if (initialMaxCatchUpPercentageBeforeBlockingWrites) {
             jsTest.log(
                 "Resetting parameter `maxCatchUpPercentageBeforeBlockingWrites` to original value: " +
-                initialMaxCatchUpPercentageBeforeBlockingWrites);
+                    initialMaxCatchUpPercentageBeforeBlockingWrites,
+            );
             cluster.executeOnMongodNodes((db) => {
-                assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    maxCatchUpPercentageBeforeBlockingWrites:
-                        initialMaxCatchUpPercentageBeforeBlockingWrites
-                }));
+                assert.commandWorked(
+                    db.adminCommand({
+                        setParameter: 1,
+                        maxCatchUpPercentageBeforeBlockingWrites: initialMaxCatchUpPercentageBeforeBlockingWrites,
+                    }),
+                );
             });
         }
 

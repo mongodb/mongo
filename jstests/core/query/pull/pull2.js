@@ -27,8 +27,10 @@ assert.eq(1, t.find().count(), "C2");
 
 t.update({}, {$pull: {a: {x: {$lt: 3}}}});
 assert.eq(2, t.findOne().a.length, "F");
-assert.eq([3, 4],
-          t.findOne().a.map(function(z) {
-              return z.x;
-          }),
-          "G");
+assert.eq(
+    [3, 4],
+    t.findOne().a.map(function (z) {
+        return z.x;
+    }),
+    "G",
+);

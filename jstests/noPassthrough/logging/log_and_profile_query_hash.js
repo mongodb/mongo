@@ -20,7 +20,7 @@ const testDB = conn.getDB("jstests_plan_cache_shape_hash");
 const coll = testDB.test;
 
 const profileEntryFilter = {
-    op: "query"
+    op: "query",
 };
 
 assert.commandWorked(testDB.setProfilingLevel(2, {"slowms": 0}));
@@ -30,8 +30,7 @@ assert.commandWorked(testDB.setLogLevel(0, "query"));
 // Returns true if the logLine command components correspond to the profile entry. This is
 // sufficient for the purpose of testing 'planCacheShapeHash'.
 function logMatchesEntry(logLine, profileEntry) {
-    return logLine.indexOf('command":{"find":"test"') >= 0 &&
-        logLine.indexOf(profileEntry["command"]["comment"]) >= 0;
+    return logLine.indexOf('command":{"find":"test"') >= 0 && logLine.indexOf(profileEntry["command"]["comment"]) >= 0;
 }
 
 // Fetch the log line that corresponds to the profile entry. If there is no such line, return
@@ -62,13 +61,17 @@ function runTestsAndGetHashes(db, {comment, test}) {
 
     assert(profileEntry.hasOwnProperty("planCacheShapeHash"), profileEntry);
     assert(profileEntry.hasOwnProperty("planCacheKey"), profileEntry);
-    assert(logLine.indexOf(profileEntry["planCacheShapeHash"]) >= 0,
-           `entry=${tojson(profileEntry)}, logLine=${tojson(logLine)}`);
-    assert(logLine.indexOf(profileEntry["planCacheKey"]) >= 0,
-           `entry=${tojson(profileEntry)}, logLine=${tojson(logLine)}`);
+    assert(
+        logLine.indexOf(profileEntry["planCacheShapeHash"]) >= 0,
+        `entry=${tojson(profileEntry)}, logLine=${tojson(logLine)}`,
+    );
+    assert(
+        logLine.indexOf(profileEntry["planCacheKey"]) >= 0,
+        `entry=${tojson(profileEntry)}, logLine=${tojson(logLine)}`,
+    );
     return {
         planCacheShapeHash: profileEntry["planCacheShapeHash"],
-        planCacheKey: profileEntry["planCacheKey"]
+        planCacheKey: profileEntry["planCacheKey"],
     };
 }
 
@@ -82,43 +85,47 @@ assert.commandWorked(coll.createIndex({b: 1}));
 
 const queryA = {
     a: {$gte: 3},
-    b: 32
+    b: 32,
 };
 const queryB = {
     a: {$gte: 199},
-    b: -1
+    b: -1,
 };
 const projectionB = {
     _id: 0,
-    b: 1
+    b: 1,
 };
 const sortC = {
-    c: -1
+    c: -1,
 };
 
 const testList = [
     {
         comment: "Test0 find query",
-        test: function(db, comment) {
+        test: function (db, comment) {
             assert.eq(200, db.test.find().comment(comment).itcount());
         },
     },
     {
         comment: "Test1 find query",
-        test: function(db, comment) {
-            assert.eq(1,
-                      db.test.find(queryB, projectionB).sort(sortC).comment(comment).itcount(),
-                      'unexpected document count');
+        test: function (db, comment) {
+            assert.eq(
+                1,
+                db.test.find(queryB, projectionB).sort(sortC).comment(comment).itcount(),
+                "unexpected document count",
+            );
         },
     },
     {
         comment: "Test2 find query",
-        test: function(db, comment) {
-            assert.eq(0,
-                      db.test.find(queryA, projectionB).sort(sortC).comment(comment).itcount(),
-                      'unexpected document count');
+        test: function (db, comment) {
+            assert.eq(
+                0,
+                db.test.find(queryA, projectionB).sort(sortC).comment(comment).itcount(),
+                "unexpected document count",
+            );
         },
-    }
+    },
 ];
 
 const hashValues = testList.map((testCase) => runTestsAndGetHashes(testDB, testCase));
@@ -132,11 +139,16 @@ assert.eq(hashValues[1], hashValues[2]);
 assert.commandWorked(testDB.setLogLevel(1, "query"));
 const testInactiveCreationLog = {
     comment: "Test Creating inactive entry.",
-    test: function(db, comment) {
+    test: function (db, comment) {
         assert.eq(
             0,
-            db.test.find({b: {$lt: 12}, a: {$eq: 500}}).sort({a: -1}).comment(comment).itcount(),
-            'unexpected document count');
+            db.test
+                .find({b: {$lt: 12}, a: {$eq: 500}})
+                .sort({a: -1})
+                .comment(comment)
+                .itcount(),
+            "unexpected document count",
+        );
     },
 };
 const onCreationHashes = runTestsAndGetHashes(testDB, testInactiveCreationLog);
@@ -145,10 +157,11 @@ const log = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
 // Fetch the line that logs when an inactive cache entry is created for the query with
 // 'planCacheShapeHash'. Confirm only one line does this.
 const creationLogList = log.filter(
-    logLine => (logLine.indexOf("Creating inactive cache entry for query") != -1 &&
-                logLine.indexOf('"planCacheKey":"' + String(onCreationHashes.planCacheKey)) != -1 &&
-                logLine.indexOf('"planCacheShapeHash":"' +
-                                String(onCreationHashes.planCacheShapeHash)) != -1));
+    (logLine) =>
+        logLine.indexOf("Creating inactive cache entry for query") != -1 &&
+        logLine.indexOf('"planCacheKey":"' + String(onCreationHashes.planCacheKey)) != -1 &&
+        logLine.indexOf('"planCacheShapeHash":"' + String(onCreationHashes.planCacheShapeHash)) != -1,
+);
 assert.eq(1, creationLogList.length);
 
 MongoRunner.stopMongod(conn);

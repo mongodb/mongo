@@ -24,12 +24,12 @@ import {hasMergeCursors} from "jstests/libs/query/analyze_plan.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
-    setAvailableDiskSpaceMode
+    setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 function getSpillCounter() {
-    return accumulateServerStatusMetric(db, metrics => metrics.query.setWindowFields.spills);
+    return accumulateServerStatusMetric(db, (metrics) => metrics.query.setWindowFields.spills);
 }
 
 const memoryKnob = "internalDocumentSourceSetWindowFieldsMaxMemoryBytes";
@@ -53,13 +53,15 @@ const docs = [
 ];
 assert.commandWorked(coll.insertMany(docs));
 
-const pipeline = [{
-    $setWindowFields: {
-        partitionBy: "$category",
-        sortBy: {date: 1},
-        output: {runningTotal: {$sum: "$amount", window: {documents: ["unbounded", "current"]}}}
-    }
-}];
+const pipeline = [
+    {
+        $setWindowFields: {
+            partitionBy: "$category",
+            sortBy: {date: 1},
+            output: {runningTotal: {$sum: "$amount", window: {documents: ["unbounded", "current"]}}},
+        },
+    },
+];
 
 // Get all the results to use as a reference.
 const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArray();
@@ -130,13 +132,13 @@ const expectedResults = coll.aggregate(pipeline, {"allowDiskUse": false}).toArra
     const cursorId = cursor.getId();
 
     // Release memory (i.e., spill)
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "alwaysOn");
     const releaseMemoryCmd = {releaseMemory: [cursorId]};
     jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
     assert.commandWorked(releaseMemoryRes);
     assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
 
     jsTest.log.info("Running getMore");
     assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);
@@ -167,7 +169,7 @@ if (hasMergeCursors(explain)) {
     assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, [
         ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
         5643008,
-        ErrorCodes.ReleaseMemoryShardError
+        ErrorCodes.ReleaseMemoryShardError,
     ]);
 
     jsTest.log.info("Running getMore");

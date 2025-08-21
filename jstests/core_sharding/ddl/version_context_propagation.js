@@ -26,63 +26,67 @@ const ns = db.getName() + "." + collName;
 assert.commandWorked(db.adminCommand({shardCollection: ns, key: {_id: 1}}));
 const primaryShardName = getPrimaryShardNameForDB(db);
 const topology = DiscoverTopology.findConnectedNodes(db);
-const dataShardName = Object.keys(topology.shards).find(sn => sn != primaryShardName);
+const dataShardName = Object.keys(topology.shards).find((sn) => sn != primaryShardName);
 assert.commandWorked(db.adminCommand({moveChunk: ns, find: {_id: 0}, to: dataShardName}));
 
 // Hang the drop command on the data shard, so we can take a look at the running ops
 const dataShard = new Mongo(topology.shards[dataShardName].primary);
 const fpDrop = configureFailPoint(dataShard, "waitAfterCommandFinishesExecution", {
-    commands: ['_shardsvrDropCollectionParticipant'],
+    commands: ["_shardsvrDropCollectionParticipant"],
     ns: ns,
     comment: jsTestName(),
 });
-const dropThread = new Thread(function(host, dbName, collName) {
-    new Mongo(host).getDB(dbName).runCommand({drop: collName, comment: jsTestName()});
-}, db.getMongo().host, db.getName(), collName);
+const dropThread = new Thread(
+    function (host, dbName, collName) {
+        new Mongo(host).getDB(dbName).runCommand({drop: collName, comment: jsTestName()});
+    },
+    db.getMongo().host,
+    db.getName(),
+    collName,
+);
 dropThread.start();
 try {
     fpDrop.wait();
 
     // Expect version context to be present (or not) according to the feature flag state
-    const currentFCV = db.getSiblingDB("admin")
-                           .system.version.findOne({_id: 'featureCompatibilityVersion'})
-                           .version;
+    const currentFCV = db.getSiblingDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"}).version;
     const expectedVersionContext = FeatureFlagUtil.isEnabled(db, "SnapshotFCVInDDLCoordinators")
         ? {OFCV: currentFCV}
         : undefined;
 
     // Check that the DDL coordinator has the version context set on its op
-    const coordinatorOp = db.getSiblingDB("admin")
-                              .aggregate([
-                                  {$currentOp: {allUsers: true}},
-                                  {
-                                      $match: {
-                                          shard: primaryShardName,
-                                          desc: {$regex: "^ShardingDDLCoordinator"},
-                                          'command.comment': jsTestName()
-                                      }
-                                  }
-                              ])
-                              .toArray();
+    const coordinatorOp = db
+        .getSiblingDB("admin")
+        .aggregate([
+            {$currentOp: {allUsers: true}},
+            {
+                $match: {
+                    shard: primaryShardName,
+                    desc: {$regex: "^ShardingDDLCoordinator"},
+                    "command.comment": jsTestName(),
+                },
+            },
+        ])
+        .toArray();
     assert.eq(1, coordinatorOp.length, tojson(coordinatorOp));
     assert.docEq(expectedVersionContext, coordinatorOp[0].versionContext, tojson(coordinatorOp[0]));
 
     // Check that the participant command has received the version context as a command argument
-    const participantOp = db.getSiblingDB("admin")
-                              .aggregate([
-                                  {$currentOp: {allUsers: true}},
-                                  {
-                                      $match: {
-                                          shard: dataShardName,
-                                          "command._shardsvrDropCollectionParticipant": collName,
-                                          'command.comment': jsTestName()
-                                      }
-                                  }
-                              ])
-                              .toArray();
+    const participantOp = db
+        .getSiblingDB("admin")
+        .aggregate([
+            {$currentOp: {allUsers: true}},
+            {
+                $match: {
+                    shard: dataShardName,
+                    "command._shardsvrDropCollectionParticipant": collName,
+                    "command.comment": jsTestName(),
+                },
+            },
+        ])
+        .toArray();
     assert.eq(1, participantOp.length, tojson(participantOp));
-    assert.docEq(
-        expectedVersionContext, participantOp[0].command.versionContext, tojson(participantOp[0]));
+    assert.docEq(expectedVersionContext, participantOp[0].command.versionContext, tojson(participantOp[0]));
     assert.docEq(expectedVersionContext, participantOp[0].versionContext, tojson(coordinatorOp[0]));
 } finally {
     fpDrop.off();

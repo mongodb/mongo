@@ -9,24 +9,30 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 // To be eligible, a command must be a changeStream request sent to a mongos.
-const isEligibleForPerShardCursor = function(conn, cmdObj) {
-    if (!(cmdObj && cmdObj.aggregate && Array.isArray(cmdObj.pipeline) &&
-          cmdObj.pipeline.length > 0 && typeof cmdObj.pipeline[0].$changeStream == "object" &&
-          cmdObj.pipeline[0].$changeStream.constructor === Object)) {
+const isEligibleForPerShardCursor = function (conn, cmdObj) {
+    if (
+        !(
+            cmdObj &&
+            cmdObj.aggregate &&
+            Array.isArray(cmdObj.pipeline) &&
+            cmdObj.pipeline.length > 0 &&
+            typeof cmdObj.pipeline[0].$changeStream == "object" &&
+            cmdObj.pipeline[0].$changeStream.constructor === Object
+        )
+    ) {
         return false;
     }
     return conn.isMongos();
 };
 
-const discoverShardId = function(conn) {
+const discoverShardId = function (conn) {
     const topology = DiscoverTopology.findConnectedNodes(conn);
     const shards = topology.shards;
     let shardName = Object.keys(shards)[0];
     return {shard: shardName};
 };
 
-function runCommandWithPassthroughToShard(
-    conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
+function runCommandWithPassthroughToShard(conn, _dbName, _commandName, commandObj, func, makeFuncArgs) {
     if (typeof commandObj !== "object" || commandObj === null) {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
@@ -38,6 +44,7 @@ function runCommandWithPassthroughToShard(
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicit_passthrough_to_shard_changestreams.js");
+    "jstests/libs/override_methods/implicit_passthrough_to_shard_changestreams.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandWithPassthroughToShard);

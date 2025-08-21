@@ -22,27 +22,31 @@ for (let i = 0; i < numCollections; ++i) {
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDB.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
 const profileEntryFilter = {
     op: "command",
-    command: "listCollections"
+    command: "listCollections",
 };
 
 let cmdRes = assert.commandWorked(testDB.runCommand({listCollections: 1, cursor: {batchSize: 1}}));
 
 // We don't profile listCollections commands.
-assert.eq(testDB.system.profile.find(profileEntryFilter).itcount(),
-          0,
-          "Did not expect any profile entry for a listCollections command");
+assert.eq(
+    testDB.system.profile.find(profileEntryFilter).itcount(),
+    0,
+    "Did not expect any profile entry for a listCollections command",
+);
 
 const getMoreCollName = cmdRes.cursor.ns.substr(cmdRes.cursor.ns.indexOf(".") + 1);
-cmdRes = assert.commandWorked(
-    testDB.runCommand({getMore: cmdRes.cursor.id, collection: getMoreCollName}));
+cmdRes = assert.commandWorked(testDB.runCommand({getMore: cmdRes.cursor.id, collection: getMoreCollName}));
 
 // We disabled profiling getMore commands that originate from a listCollection command, given that
 // the original command was not profiled either.
-assert.throws(() => getLatestProfilerEntry(testDB, {op: "getmore"}),
-              [],
-              "Did not expect to find entry for getMore on a listCollections cursor");
+assert.throws(
+    () => getLatestProfilerEntry(testDB, {op: "getmore"}),
+    [],
+    "Did not expect to find entry for getMore on a listCollections cursor",
+);

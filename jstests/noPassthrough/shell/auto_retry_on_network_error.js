@@ -6,29 +6,31 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 TestData.networkErrorAndTxnOverrideConfig = {
-    retryOnNetworkErrors: true
+    retryOnNetworkErrors: true,
 };
 
 function getThreadName(db) {
     let myUri = db.adminCommand({whatsmyuri: 1}).you;
-    return db.getSiblingDB("admin")
+    return db
+        .getSiblingDB("admin")
         .aggregate([{$currentOp: {localOps: true}}, {$match: {client: myUri}}])
-        .toArray()[0]
-        .desc;
+        .toArray()[0].desc;
 }
 
 function failNextCommand(db, command) {
     let threadName = getThreadName(db);
 
-    assert.commandWorked(db.adminCommand({
-        configureFailPoint: "failCommand",
-        mode: {times: 1},
-        data: {
-            closeConnection: true,
-            failCommands: [command],
-            threadName: threadName,
-        }
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            configureFailPoint: "failCommand",
+            mode: {times: 1},
+            data: {
+                closeConnection: true,
+                failCommands: [command],
+                threadName: threadName,
+            },
+        }),
+    );
 }
 
 const rst = new ReplSetTest({nodes: 1});
@@ -63,17 +65,19 @@ failNextCommand(db, "insert");
 assert.commandWorked(db[collName].insert({x: 1}));
 
 failNextCommand(db, "insert");
-assert.commandWorked(db.runCommand({
-    insert: collName,
-    documents: [{x: 2}, {x: 3}],
-    txnNumber: NumberLong(10),
-    lsid: {id: UUID()}
-}));
+assert.commandWorked(
+    db.runCommand({
+        insert: collName,
+        documents: [{x: 2}, {x: 3}],
+        txnNumber: NumberLong(10),
+        lsid: {id: UUID()},
+    }),
+);
 
 // Retryable write commands that cannot be retried (i.e. no transaction number, no session id,
 // or are unordered) throw.
 failNextCommand(db, "insert");
-assert.throws(function() {
+assert.throws(function () {
     db.runCommand({insert: collName, documents: [{x: 1}, {x: 2}], ordered: false});
 });
 
@@ -82,7 +86,7 @@ assert.throws(function() {
 assert.commandWorked(db.runCommand({ping: 1}));
 
 failNextCommand(db, "insert");
-assert.throws(function() {
+assert.throws(function () {
     db.runCommand({insert: collName, documents: [{x: 1}, {x: 2}], ordered: false});
 });
 
@@ -90,13 +94,13 @@ assert.throws(function() {
 // not.
 let cursorId = assert.commandWorked(db.runCommand({find: collName, batchSize: 0})).cursor.id;
 failNextCommand(db, "getMore");
-assert.throws(function() {
+assert.throws(function () {
     db.runCommand({getMore: cursorId, collection: collName});
 });
 
 cursorId = assert.commandWorked(db.runCommand({find: collName, batchSize: 0})).cursor.id;
 failNextCommand(db, "getMore");
-assert.throws(function() {
+assert.throws(function () {
     db.runCommand({getMore: cursorId, collection: collName});
 });
 

@@ -21,8 +21,7 @@ const testNode = rst.getSecondaries()[1];
 // Set up a failpoint that forces the original primary to vote no in this election. This guarantees
 // that 'testNode' will be a participant in this election, since its vote will be needed for the new
 // primary to win.
-assert.commandWorked(
-    originalPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}));
+assert.commandWorked(originalPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}));
 
 // Step up the new primary.
 rst.stepUp(newPrimary);
@@ -39,35 +38,44 @@ const originalNewTermAppliedDate = testNodeElectionParticipantMetrics.newTermApp
 
 // These fields should be set, since testNode has received and applied the new term oplog entry
 // after the election.
-assert(originalNewTermStartDate,
-       () => "Response should have an 'electionParticipantMetrics.newTermStartDate' field: " +
-           tojson(testNodeElectionParticipantMetrics));
-assert(originalNewTermAppliedDate,
-       () => "Response should have an 'electionParticipantMetrics.newTermAppliedDate' field: " +
-           tojson(testNodeElectionParticipantMetrics));
+assert(
+    originalNewTermStartDate,
+    () =>
+        "Response should have an 'electionParticipantMetrics.newTermStartDate' field: " +
+        tojson(testNodeElectionParticipantMetrics),
+);
+assert(
+    originalNewTermAppliedDate,
+    () =>
+        "Response should have an 'electionParticipantMetrics.newTermAppliedDate' field: " +
+        tojson(testNodeElectionParticipantMetrics),
+);
 
 // Set up a failpoint that forces newPrimary and testNode to vote no in the election, in addition to
 // the new primary above. This will cause the dry run to fail for the original primary.
-assert.commandWorked(
-    newPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}));
-assert.commandWorked(
-    testNode.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}));
+assert.commandWorked(newPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}));
+assert.commandWorked(testNode.adminCommand({configureFailPoint: "voteNoInElection", mode: "alwaysOn"}));
 
 // Attempt to step up the original primary.
-assert.commandFailedWithCode(originalPrimary.adminCommand({replSetStepUp: 1}),
-                             ErrorCodes.CommandFailed);
+assert.commandFailedWithCode(originalPrimary.adminCommand({replSetStepUp: 1}), ErrorCodes.CommandFailed);
 
 testNodeReplSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
 testNodeElectionParticipantMetrics = testNodeReplSetGetStatus.electionParticipantMetrics;
 
 // The 'newTermStartDate' and 'newTermAppliedDate' fields should not be cleared, since the term is
 // not incremented when a dry run election is initiated.
-assert(testNodeElectionParticipantMetrics.newTermStartDate,
-       () => "Response should have an 'electionParticipantMetrics.newTermStartDate' field: " +
-           tojson(testNodeElectionParticipantMetrics));
-assert(testNodeElectionParticipantMetrics.newTermAppliedDate,
-       () => "Response should have an 'electionParticipantMetrics.newTermAppliedDate' field: " +
-           tojson(testNodeElectionParticipantMetrics));
+assert(
+    testNodeElectionParticipantMetrics.newTermStartDate,
+    () =>
+        "Response should have an 'electionParticipantMetrics.newTermStartDate' field: " +
+        tojson(testNodeElectionParticipantMetrics),
+);
+assert(
+    testNodeElectionParticipantMetrics.newTermAppliedDate,
+    () =>
+        "Response should have an 'electionParticipantMetrics.newTermAppliedDate' field: " +
+        tojson(testNodeElectionParticipantMetrics),
+);
 
 // The fields should store the same dates, since a new term oplog entry was not received.
 assert.eq(originalNewTermStartDate, testNodeElectionParticipantMetrics.newTermStartDate);
@@ -76,17 +84,17 @@ assert.eq(originalNewTermAppliedDate, testNodeElectionParticipantMetrics.newTerm
 // Clear the previous failpoint and set up a new one that forces the two current secondaries to vote
 // yes for the candidate in the dry run election and no in the real election. This will cause the
 // real election to fail.
+assert.commandWorked(newPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "off"}));
 assert.commandWorked(
-    newPrimary.adminCommand({configureFailPoint: "voteNoInElection", mode: "off"}));
-assert.commandWorked(newPrimary.adminCommand(
-    {configureFailPoint: "voteYesInDryRunButNoInRealElection", mode: "alwaysOn"}));
+    newPrimary.adminCommand({configureFailPoint: "voteYesInDryRunButNoInRealElection", mode: "alwaysOn"}),
+);
 assert.commandWorked(testNode.adminCommand({configureFailPoint: "voteNoInElection", mode: "off"}));
-assert.commandWorked(testNode.adminCommand(
-    {configureFailPoint: "voteYesInDryRunButNoInRealElection", mode: "alwaysOn"}));
+assert.commandWorked(
+    testNode.adminCommand({configureFailPoint: "voteYesInDryRunButNoInRealElection", mode: "alwaysOn"}),
+);
 
 // Attempt to step up the original primary.
-assert.commandFailedWithCode(originalPrimary.adminCommand({replSetStepUp: 1}),
-                             ErrorCodes.CommandFailed);
+assert.commandFailedWithCode(originalPrimary.adminCommand({replSetStepUp: 1}), ErrorCodes.CommandFailed);
 
 testNodeReplSetGetStatus = assert.commandWorked(testNode.adminCommand({replSetGetStatus: 1}));
 testNodeElectionParticipantMetrics = testNodeReplSetGetStatus.electionParticipantMetrics;
@@ -94,11 +102,17 @@ testNodeElectionParticipantMetrics = testNodeReplSetGetStatus.electionParticipan
 // Since the election succeeded in the dry run, a new term was encountered by the secondary.
 // However, because the real election failed, there was no new term oplog entry, so these fields
 // should not be set.
-assert(!testNodeElectionParticipantMetrics.newTermStartDate,
-       () => "Response should not have an 'electionParticipantMetrics.newTermStartDate' field: " +
-           tojson(testNodeElectionParticipantMetrics));
-assert(!testNodeElectionParticipantMetrics.newTermAppliedDate,
-       () => "Response should not have an 'electionParticipantMetrics.newTermAppliedDate' field: " +
-           tojson(testNodeElectionParticipantMetrics));
+assert(
+    !testNodeElectionParticipantMetrics.newTermStartDate,
+    () =>
+        "Response should not have an 'electionParticipantMetrics.newTermStartDate' field: " +
+        tojson(testNodeElectionParticipantMetrics),
+);
+assert(
+    !testNodeElectionParticipantMetrics.newTermAppliedDate,
+    () =>
+        "Response should not have an 'electionParticipantMetrics.newTermAppliedDate' field: " +
+        tojson(testNodeElectionParticipantMetrics),
+);
 
 rst.stopSet();

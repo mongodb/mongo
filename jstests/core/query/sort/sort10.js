@@ -31,12 +31,11 @@ function checkSorting2(dates, sortOrder) {
 }
 
 t.drop();
-let dates =
-    [new Date(-5000000000000), new Date(5000000000000), new Date(0), new Date(5), new Date(-5)];
+let dates = [new Date(-5000000000000), new Date(5000000000000), new Date(0), new Date(5), new Date(-5)];
 for (var i = 0; i < dates.length; i++) {
     t.insert({x: dates[i]});
 }
-dates.sort(function(a, b) {
+dates.sort(function (a, b) {
     return a - b;
 });
 let reverseDates = dates.slice(0).reverse();

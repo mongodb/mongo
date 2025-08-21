@@ -11,8 +11,7 @@ const dbName = "test";
 const collName = jsTestName();
 
 const db = conn.getDB(dbName);
-assert.commandWorked(
-    db.createCollection(collName, {capped: true, size: 1024 * 1024 * 1024, max: 5}));
+assert.commandWorked(db.createCollection(collName, {capped: true, size: 1024 * 1024 * 1024, max: 5}));
 
 const coll = db.getCollection(collName);
 
@@ -21,8 +20,7 @@ for (let i = 0; i < 5; i++) {
 }
 
 // Hang the collection scan phase of the index build when it's halfway finished.
-let fp = configureFailPoint(
-    conn, "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", {fieldsToMatch: {a: 3}});
+let fp = configureFailPoint(conn, "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", {fieldsToMatch: {a: 3}});
 
 const awaitCreateIndex = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {a: 1});
 fp.wait();
@@ -34,11 +32,11 @@ for (let i = 5; i < 10; i++) {
 
 fp.off();
 checkLog.containsJson(conn, 5470300, {
-    error: function(error) {
+    error: function (error) {
         return error.code === ErrorCodes.CappedPositionLost;
-    }
-});                                                     // Collection scan restarted.
-checkLog.containsJson(conn, 20391, {totalRecords: 5});  // Collection scan complete.
+    },
+}); // Collection scan restarted.
+checkLog.containsJson(conn, 20391, {totalRecords: 5}); // Collection scan complete.
 
 awaitCreateIndex();
 

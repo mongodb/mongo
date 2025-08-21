@@ -10,21 +10,23 @@ import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 const coll = db.projection_expr_mod;
 coll.drop();
 
-assert.commandWorked(coll.insertMany([
-    {n: "double % double", v: 138.5, m: 3.0},
-    {n: "double % long", v: 138.5, m: NumberLong(3)},
-    {n: "double % int", v: 138.5, m: NumberInt(3)},
-    {n: "int % double", v: NumberInt(8), m: 3.25},
-    {n: "int % double int", v: NumberInt(8), m: 3.0},
-    {n: "int % int", v: NumberInt(8), m: NumberInt(3)},
-    {n: "int % long", v: NumberInt(8), m: NumberLong(3)},
-    {n: "long % double", v: NumberLong(8), m: 3.25},
-    {n: "long % double int", v: NumberLong(8), m: 3.0},
-    {n: "long % double long", v: NumberLong(500000000000), m: 450000000000.0},
-    {n: "long % int", v: NumberLong(8), m: NumberInt(3)},
-    {n: "long % long", v: NumberLong(8), m: NumberLong(3)},
-    {n: "very long % very long", v: NumberLong(800000000000), m: NumberLong(300000000000)}
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {n: "double % double", v: 138.5, m: 3.0},
+        {n: "double % long", v: 138.5, m: NumberLong(3)},
+        {n: "double % int", v: 138.5, m: NumberInt(3)},
+        {n: "int % double", v: NumberInt(8), m: 3.25},
+        {n: "int % double int", v: NumberInt(8), m: 3.0},
+        {n: "int % int", v: NumberInt(8), m: NumberInt(3)},
+        {n: "int % long", v: NumberInt(8), m: NumberLong(3)},
+        {n: "long % double", v: NumberLong(8), m: 3.25},
+        {n: "long % double int", v: NumberLong(8), m: 3.0},
+        {n: "long % double long", v: NumberLong(500000000000), m: 450000000000.0},
+        {n: "long % int", v: NumberLong(8), m: NumberInt(3)},
+        {n: "long % long", v: NumberLong(8), m: NumberLong(3)},
+        {n: "very long % very long", v: NumberLong(800000000000), m: NumberLong(300000000000)},
+    ]),
+);
 
 const result = coll.find({}, {f: {$mod: ["$v", "$m"]}, _id: 0, n: 1}).toArray();
 const expectedResult = [
@@ -40,7 +42,7 @@ const expectedResult = [
     {n: "long % double long", f: 50000000000},
     {n: "long % int", f: NumberLong(2)},
     {n: "long % long", f: NumberLong(2)},
-    {n: "very long % very long", f: NumberLong(200000000000)}
+    {n: "very long % very long", f: NumberLong(200000000000)},
 ];
 assertArrayEq({actual: result, expected: expectedResult});
 
@@ -56,14 +58,12 @@ assert.commandFailedWithCode(error, 16610);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({a: NumberInt(10)}));
-error =
-    assert.throws(() => coll.find({}, {f: {$mod: ["$a", NumberInt(0)]}, _id: 0, n: 1}).toArray());
+error = assert.throws(() => coll.find({}, {f: {$mod: ["$a", NumberInt(0)]}, _id: 0, n: 1}).toArray());
 assert.commandFailedWithCode(error, 16610);
 
 assert(coll.drop());
 assert.commandWorked(coll.insert({a: NumberLong(10)}));
-error =
-    assert.throws(() => coll.find({}, {f: {$mod: ["$a", NumberLong(0)]}, _id: 0, n: 1}).toArray());
+error = assert.throws(() => coll.find({}, {f: {$mod: ["$a", NumberLong(0)]}, _id: 0, n: 1}).toArray());
 assert.commandFailedWithCode(error, 16610);
 
 // Clear collection again and reset.

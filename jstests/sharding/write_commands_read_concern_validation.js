@@ -5,9 +5,7 @@
  * - Throw InvalidOptions if a client specifies readConcern in all other cases.
  * @tags: [requires_fcv_51, uses_transactions, uses_multi_shard_transaction]
  */
-import {
-    withRetryOnTransientTxnErrorIncrementTxnNum
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnErrorIncrementTxnNum} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -19,8 +17,7 @@ const shard0Primary = st.rs0.getPrimary();
 const kDbName = "testDb";
 assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
 
-function testWriteCommandOutsideSessionAndTransaction(
-    conn, cmdObj, readConcern, shouldBypassCheck) {
+function testWriteCommandOutsideSessionAndTransaction(conn, cmdObj, readConcern, shouldBypassCheck) {
     const cmdObjWithReadConcern = Object.assign({}, cmdObj, {
         readConcern: readConcern,
     });
@@ -53,17 +50,19 @@ function testWriteCommandInsideTransactionFirstCommand(conn, cmdObj, readConcern
             lsid: lsid,
             txnNumber: NumberLong(txnNum),
             startTransaction: true,
-            autocommit: false
+            autocommit: false,
         });
 
         assert.commandWorked(conn.getDB(kDbName).runCommand(cmdObjWithReadConcern));
-        assert.commandWorked(conn.getDB(kDbName).adminCommand({
-            commitTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNum),
-            autocommit: false,
-            writeConcern: {w: "majority"}
-        }));
+        assert.commandWorked(
+            conn.getDB(kDbName).adminCommand({
+                commitTransaction: 1,
+                lsid: lsid,
+                txnNumber: NumberLong(txnNum),
+                autocommit: false,
+                writeConcern: {w: "majority"},
+            }),
+        );
     });
 }
 
@@ -72,47 +71,48 @@ function testWriteCommandInsideTransactionNotFirstCommand(conn, cmdObj, readConc
     const txnNumber = NumberLong(1);
 
     withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
-        assert.commandWorked(conn.getDB(kDbName).runCommand({
-            findAndModify: kCollName,
-            query: {x: -10},
-            update: {$set: {z: -10}},
-            lsid: lsid,
-            txnNumber: NumberLong(txnNum),
-            startTransaction: true,
-            autocommit: false
-        }));
+        assert.commandWorked(
+            conn.getDB(kDbName).runCommand({
+                findAndModify: kCollName,
+                query: {x: -10},
+                update: {$set: {z: -10}},
+                lsid: lsid,
+                txnNumber: NumberLong(txnNum),
+                startTransaction: true,
+                autocommit: false,
+            }),
+        );
         const cmdObjWithReadConcern = Object.assign({}, cmdObj, {
             readConcern: readConcern,
             lsid: lsid,
             txnNumber: NumberLong(txnNum),
-            autocommit: false
+            autocommit: false,
         });
         const res = conn.getDB(kDbName).runCommand(cmdObjWithReadConcern);
         assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
-        assert.commandWorked(conn.getDB(kDbName).adminCommand({
-            abortTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNum),
-            autocommit: false,
-            writeConcern: {w: "majority"}
-        }));
+        assert.commandWorked(
+            conn.getDB(kDbName).adminCommand({
+                abortTransaction: 1,
+                lsid: lsid,
+                txnNumber: NumberLong(txnNum),
+                autocommit: false,
+                writeConcern: {w: "majority"},
+            }),
+        );
     });
 }
 
 function runTest(conn, cmdObj, mongosConn, kCollName) {
-    const defaultReadConcerns = [
-        {},
-        {"level": "local"},
-        {"level": "majority"},
-        {"level": "available"},
-    ];
+    const defaultReadConcerns = [{}, {"level": "local"}, {"level": "majority"}, {"level": "available"}];
 
-    defaultReadConcerns.forEach(defaultReadConcern => {
+    defaultReadConcerns.forEach((defaultReadConcern) => {
         if ("level" in defaultReadConcern) {
-            assert.commandWorked(mongosConn.adminCommand({
-                setDefaultRWConcern: 1,
-                defaultReadConcern: defaultReadConcern,
-            }));
+            assert.commandWorked(
+                mongosConn.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultReadConcern: defaultReadConcern,
+                }),
+            );
             jsTest.log("Testing defaultReadConcern " + tojson(defaultReadConcern));
         } else {
             jsTest.log("Testing without specifying defaultReadConcern");
@@ -124,18 +124,20 @@ function runTest(conn, cmdObj, mongosConn, kCollName) {
             {supportedInTransaction: false, readConcern: {level: "linearizable"}},
             {supportedInTransaction: false, readConcern: {level: "available"}},
             // "local" is the default readConcern so it is exempt from the check.
-            {supportedInTransaction: true, readConcern: {level: "local"}, shouldBypassCheck: true}
+            {supportedInTransaction: true, readConcern: {level: "local"}, shouldBypassCheck: true},
         ];
-        testCases.forEach(testCase => {
+        testCases.forEach((testCase) => {
             jsTest.log("Testing readConcern " + tojson(testCase.readConcern));
             testWriteCommandOutsideSessionAndTransaction(
-                conn, cmdObj, testCase.readConcern, testCase.shouldBypassCheck);
-            testWriteCommandOutsideTransaction(
-                conn, cmdObj, testCase.readConcern, testCase.shouldBypassCheck);
+                conn,
+                cmdObj,
+                testCase.readConcern,
+                testCase.shouldBypassCheck,
+            );
+            testWriteCommandOutsideTransaction(conn, cmdObj, testCase.readConcern, testCase.shouldBypassCheck);
             if (testCase.supportedInTransaction) {
                 testWriteCommandInsideTransactionFirstCommand(conn, cmdObj, testCase.readConcern);
-                testWriteCommandInsideTransactionNotFirstCommand(
-                    conn, cmdObj, testCase.readConcern, kCollName);
+                testWriteCommandInsideTransactionNotFirstCommand(conn, cmdObj, testCase.readConcern, kCollName);
             }
         });
     });

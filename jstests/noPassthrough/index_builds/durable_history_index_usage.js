@@ -15,38 +15,37 @@ const replTest = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             // To control durable history more predictably, disable the checkpoint thread.
-            syncdelay: 0
-        }
-    }
+            syncdelay: 0,
+        },
+    },
 });
 replTest.startSet();
 replTest.initiate();
 
 const indexSpec = {
-    a: 1
+    a: 1,
 };
 
-const primary = function() {
+const primary = function () {
     return replTest.getPrimary();
 };
 
-const testDB = function() {
+const testDB = function () {
     return primary().getDB("test");
 };
 
-const coll = function() {
+const coll = function () {
     return testDB()[jsTestName()];
 };
 
-const insert = function(document) {
+const insert = function (document) {
     // The write concern guarantees the stable and oldest timestamp are bumped.
-    return assert
-        .commandWorked(testDB().runCommand(
-            {insert: coll().getName(), documents: [document], writeConcern: {w: "majority"}}))
-        .operationTime;
+    return assert.commandWorked(
+        testDB().runCommand({insert: coll().getName(), documents: [document], writeConcern: {w: "majority"}}),
+    ).operationTime;
 };
 
-const findWithIndex = function(atClusterTime, expectedErrCode) {
+const findWithIndex = function (atClusterTime, expectedErrCode) {
     let res = {};
     if (atClusterTime == undefined) {
         res = testDB().runCommand({find: jsTestName(), hint: indexSpec});
@@ -54,7 +53,7 @@ const findWithIndex = function(atClusterTime, expectedErrCode) {
         res = testDB().runCommand({
             find: jsTestName(),
             hint: indexSpec,
-            readConcern: {level: "snapshot", atClusterTime: atClusterTime}
+            readConcern: {level: "snapshot", atClusterTime: atClusterTime},
         });
     }
 
@@ -101,12 +100,13 @@ replTest.start(
         setParameter: {
             "failpoint.hangAfterSettingUpIndexBuildUnlocked": tojson({mode: "alwaysOn"}),
             // To control durable history more predictably, disable the checkpoint thread.
-            syncdelay: 0
-        }
+            syncdelay: 0,
+        },
     },
-    true /* restart */);
+    true /* restart */,
+);
 
-const checkLogs = function() {
+const checkLogs = function () {
     // Found index from unfinished build.
     checkLog.containsJson(primary(), 22253, {
         index: "a_1",
@@ -157,10 +157,11 @@ replTest.start(
     {
         setParameter: {
             // To control durable history more predictably, disable the checkpoint thread.
-            syncdelay: 0
-        }
+            syncdelay: 0,
+        },
     },
-    true /* restart */);
+    true /* restart */,
+);
 
 checkLogs();
 
@@ -213,10 +214,11 @@ replTest.start(
     {
         setParameter: {
             // To control durable history more predictably, disable the checkpoint thread.
-            syncdelay: 0
-        }
+            syncdelay: 0,
+        },
     },
-    true /* restart */);
+    true /* restart */,
+);
 
 // Test that we can read using the dropped index on timestamps before the drop
 assert.eq(4, findWithIndex(insertAfterIndexBuildTS)["cursor"]["firstBatch"].length);

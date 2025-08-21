@@ -4,10 +4,7 @@
  *
  * @tags: [requires_fcv_81]
  */
-import {
-    runCommandAndValidateQueryStats,
-    withQueryStatsEnabled
-} from "jstests/libs/query/query_stats_utils.js";
+import {runCommandAndValidateQueryStats, withQueryStatsEnabled} from "jstests/libs/query/query_stats_utils.js";
 
 const collName = jsTestName();
 
@@ -33,7 +30,7 @@ const distinctCommandObjComplex = {
     apiDeprecationErrors: false,
     apiVersion: "1",
     apiStrict: false,
-    $readPreference: {"mode": "primary"}
+    $readPreference: {"mode": "primary"},
 };
 
 const queryShapeDistinctFieldsComplex = ["cmdNs", "collation", "command", "key", "query"];
@@ -50,7 +47,7 @@ const distinctKeyFieldsComplex = [
     "apiVersion",
     "apiStrict",
     "maxTimeMS",
-    "$readPreference"
+    "$readPreference",
 ];
 
 withQueryStatsEnabled(collName, (coll) => {
@@ -62,7 +59,7 @@ withQueryStatsEnabled(collName, (coll) => {
         commandName: "distinct",
         commandObj: distinctCommandObjRequired,
         shapeFields: queryShapeDistinctFieldsRequired,
-        keyFields: distinctKeyFieldsRequired
+        keyFields: distinctKeyFieldsRequired,
     });
 
     runCommandAndValidateQueryStats({
@@ -70,6 +67,6 @@ withQueryStatsEnabled(collName, (coll) => {
         commandName: "distinct",
         commandObj: distinctCommandObjComplex,
         shapeFields: queryShapeDistinctFieldsComplex,
-        keyFields: distinctKeyFieldsComplex
+        keyFields: distinctKeyFieldsComplex,
     });
 });

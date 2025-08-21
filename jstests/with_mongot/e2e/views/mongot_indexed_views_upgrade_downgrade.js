@@ -13,13 +13,10 @@ const testDb = db.getSiblingDB(jsTestName());
 const coll = testDb.underlyingSourceCollection;
 coll.drop();
 
-assert.commandWorked(coll.insertMany([
-    {_id: 1, state: "NY", text: "hello new york"},
-]));
+assert.commandWorked(coll.insertMany([{_id: 1, state: "NY", text: "hello new york"}]));
 
 const addFieldsViewName = "addFieldsView";
-assert.commandWorked(
-    testDb.createView(addFieldsViewName, coll.getName(), [{$addFields: {country: "USA"}}]));
+assert.commandWorked(testDb.createView(addFieldsViewName, coll.getName(), [{$addFields: {country: "USA"}}]));
 const addFieldsView = testDb[addFieldsViewName];
 
 const identityViewName = "identityView";
@@ -27,47 +24,43 @@ assert.commandWorked(testDb.createView(identityViewName, coll.getName(), []));
 
 const searchIndexDef = {
     name: "index",
-    definition: {mappings: {dynamic: true}}
+    definition: {mappings: {dynamic: true}},
 };
 
 const vectorSearchIndexDef = {
     name: "index",
     type: "vectorSearch",
-    definition:
-        {fields: [{type: "vector", numDimensions: 10, path: "path", similarity: "euclidean"}]}
+    definition: {fields: [{type: "vector", numDimensions: 10, path: "path", similarity: "euclidean"}]},
 };
 
 const adminDB = testDb.getMongo().getDB("admin");
 
 function upgradeDowngradeFCV(commands) {
     // Downgrade to lastLTSFCV (8.0).
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     // On 8.0 single node, search index commands on views should be blocked.
     if (!FixtureHelpers.isMongos(testDb)) {
         assert.commandFailedWithCode(
             testDb.runCommand({createSearchIndexes: addFieldsViewName, indexes: [searchIndexDef]}),
-            ErrorCodes.QueryFeatureNotAllowed);
+            ErrorCodes.QueryFeatureNotAllowed,
+        );
         assert.commandFailedWithCode(
-            testDb.runCommand(
-                {createSearchIndexes: addFieldsViewName, indexes: [vectorSearchIndexDef]}),
-            ErrorCodes.QueryFeatureNotAllowed);
+            testDb.runCommand({createSearchIndexes: addFieldsViewName, indexes: [vectorSearchIndexDef]}),
+            ErrorCodes.QueryFeatureNotAllowed,
+        );
     }
 
     // All commands should be blocked on 8.0.
     for (const command of commands) {
-        assert.commandFailedWithCode(testDb.runCommand(command),
-                                     ErrorCodes.OptionNotSupportedOnView);
+        assert.commandFailedWithCode(testDb.runCommand(command), ErrorCodes.OptionNotSupportedOnView);
     }
 
     // An identity view search aggregation *should work* on 8.0.
-    assert.commandWorked(
-        testDb.runCommand({aggregate: identityViewName, pipeline: searchPipeline, cursor: {}}));
+    assert.commandWorked(testDb.runCommand({aggregate: identityViewName, pipeline: searchPipeline, cursor: {}}));
 
     // Upgrade to latestFCV.
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
     // All commands should work on latestFCV.
     for (const command of commands) {
@@ -84,7 +77,7 @@ function upgradeDowngradeFCV(commands) {
 
 const searchPipeline = [{$search: {index: "index", text: {query: "query", path: "path"}}}];
 const vectorSearchPipeline = [
-    {$vectorSearch: {index: "index", queryVector: [1, 2, 3], path: "path", limit: 1, exact: true}}
+    {$vectorSearch: {index: "index", queryVector: [1, 2, 3], path: "path", limit: 1, exact: true}},
 ];
 
 // Each of the commands passed through should work on latestFCV (FF enabled) but block on 8.0 (FF
@@ -96,53 +89,59 @@ upgradeDowngradeFCV([
         // Basic $search $unionWith.
         aggregate: coll.getName(),
         pipeline: [{$unionWith: {coll: addFieldsViewName, pipeline: searchPipeline}}],
-        cursor: {}
+        cursor: {},
     },
     {
         // Basic $search $lookup.
         aggregate: coll.getName(),
         pipeline: [{$lookup: {from: addFieldsViewName, as: "lookup", pipeline: searchPipeline}}],
-        cursor: {}
+        cursor: {},
     },
     {
         // Basic $vectorSearch $unionWith.
         aggregate: coll.getName(),
         pipeline: [{$unionWith: {coll: addFieldsViewName, pipeline: vectorSearchPipeline}}],
-        cursor: {}
-    }, 
+        cursor: {},
+    },
     {
         // Nested $search $lookup.
         aggregate: coll.getName(),
-        pipeline: [{
-            $lookup: {
-                from: coll.getName(),
-                as: "lookup",
-                pipeline: [{$lookup: {from: addFieldsViewName, as: "lookup", pipeline: searchPipeline}}]
-            }
-        }],
-        cursor: {}
+        pipeline: [
+            {
+                $lookup: {
+                    from: coll.getName(),
+                    as: "lookup",
+                    pipeline: [{$lookup: {from: addFieldsViewName, as: "lookup", pipeline: searchPipeline}}],
+                },
+            },
+        ],
+        cursor: {},
     },
     {
         // Nested $search $unionWith.
         aggregate: coll.getName(),
-        pipeline: [{
-            $unionWith: {
-                coll: coll.getName(),
-                pipeline: [{$unionWith: {coll: addFieldsViewName, pipeline: searchPipeline}}]
-            }
-        }],
-        cursor: {}
+        pipeline: [
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$unionWith: {coll: addFieldsViewName, pipeline: searchPipeline}}],
+                },
+            },
+        ],
+        cursor: {},
     },
     {
         // Nested $vectorSearch $unionWith.
         aggregate: coll.getName(),
-        pipeline: [{
-            $unionWith: {
-                coll: coll.getName(),
-                pipeline: [{$unionWith: {coll: addFieldsViewName, pipeline: vectorSearchPipeline}}]
-            }
-        }],
-        cursor: {}
+        pipeline: [
+            {
+                $unionWith: {
+                    coll: coll.getName(),
+                    pipeline: [{$unionWith: {coll: addFieldsViewName, pipeline: vectorSearchPipeline}}],
+                },
+            },
+        ],
+        cursor: {},
     },
     // TODO SERVER-106849: Uncomment when $vectorSearch is supported in $lookup.
     // {

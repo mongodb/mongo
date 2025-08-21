@@ -14,12 +14,13 @@ assert.commandWorked(coll.insert({"_id": 4, "title": "some cakes"}));
 assert.commandWorked(coll.createIndex({title: "text"}));
 
 // Add a metadata only field in the aggregation pipeline and use that field in the $group _id.
-const res = coll.aggregate([
-                    {$match: {$text: {$search: "cake"}}},
-                    {$addFields: {fooScore: {$meta: "textScore"}}},
-                    {$group: {_id: "$fooScore", count: {$sum: 1}}}
-                ])
-                .itcount();
+const res = coll
+    .aggregate([
+        {$match: {$text: {$search: "cake"}}},
+        {$addFields: {fooScore: {$meta: "textScore"}}},
+        {$group: {_id: "$fooScore", count: {$sum: 1}}},
+    ])
+    .itcount();
 
 // Assert that the command worked.
 assert.eq(2, res);

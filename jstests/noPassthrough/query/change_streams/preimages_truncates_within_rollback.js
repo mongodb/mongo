@@ -14,7 +14,7 @@ const nodeOptions = {
     setParameter: {
         preImagesCollectionTruncateMarkersMinBytes: 1,
         expiredChangeStreamPreImageRemovalJobSleepSecs: 1,
-    }
+    },
 };
 const dbName = jsTestName();
 
@@ -32,16 +32,14 @@ const getPreImagesForAllNodes = (nodes) => {
 };
 
 const setExpireAfterSeconds = (node, expireAfterSeconds) => {
-    assert.commandWorked(node.getDB("admin").runCommand({
-        setClusterParameter:
-            {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: expireAfterSeconds}}}
-    }));
+    assert.commandWorked(
+        node.getDB("admin").runCommand({
+            setClusterParameter: {changeStreamOptions: {preAndPostImages: {expireAfterSeconds: expireAfterSeconds}}},
+        }),
+    );
 };
 
-const baseDocs = [
-    {baseDoc: 0},
-    {baseDoc: 1},
-];
+const baseDocs = [{baseDoc: 0}, {baseDoc: 1}];
 
 // Operations that will be present on both nodes, before the common point.
 //
@@ -51,22 +49,18 @@ const baseDocs = [
 const CommonOps = (node, commonCollName, collWithoutCommonPreImagesName, expireAfterSeconds) => {
     jsTestLog(`Running common ops`);
     const testDB = node.getDB(dbName);
-    const commonColl = assertDropAndRecreateCollection(
-        testDB,
-        commonCollName,
-        {changeStreamPreAndPostImages: {enabled: true}},
-    );
+    const commonColl = assertDropAndRecreateCollection(testDB, commonCollName, {
+        changeStreamPreAndPostImages: {enabled: true},
+    });
     assert.commandWorked(commonColl.insert(baseDocs));
     assert.commandWorked(commonColl.update({}, {$set: {collName: commonCollName}}, {multi: true}));
     assert.soon(() => getPreImages(node).length == baseDocs.length);
 
     // Create 'collWithoutCommonPreImages' but don't generate pre-images for it until node histories
     // diverge.
-    const collWithoutCommonPreImages = assertDropAndRecreateCollection(
-        testDB,
-        collWithoutCommonPreImagesName,
-        {changeStreamPreAndPostImages: {enabled: true}},
-    );
+    const collWithoutCommonPreImages = assertDropAndRecreateCollection(testDB, collWithoutCommonPreImagesName, {
+        changeStreamPreAndPostImages: {enabled: true},
+    });
 
     setExpireAfterSeconds(node, expireAfterSeconds);
 };
@@ -98,19 +92,18 @@ const SyncSourceOps = (node, commonCollName, collWithoutCommonPreImagesName) => 
 
     const collWithoutCommonPreImages = testDB[collWithoutCommonPreImagesName];
     assert.commandWorked(collWithoutCommonPreImages.insert(baseDocs));
-    assert.commandWorked(collWithoutCommonPreImages.update(
-        {}, {$set: {collName: collWithoutCommonPreImagesName}}, {multi: true}));
+    assert.commandWorked(
+        collWithoutCommonPreImages.update({}, {$set: {collName: collWithoutCommonPreImagesName}}, {multi: true}),
+    );
 };
 
 const runTestCase = (expireAfterSeconds) => {
-    jsTest.log(
-        `Running rollback test case with 'expireAfterSeconds' ${tojson(expireAfterSeconds)}`);
+    jsTest.log(`Running rollback test case with 'expireAfterSeconds' ${tojson(expireAfterSeconds)}`);
 
     const rollbackTest = new RollbackTest(jsTestName(), undefined, nodeOptions);
     let primary = rollbackTest.getPrimary();
     const commonCollName = `commonCollExpirySecs-${expireAfterSeconds}`;
-    const collWithoutCommonPreImagesName =
-        `collWithoutCommonPreImagesExpirySecs-${expireAfterSeconds}`;
+    const collWithoutCommonPreImagesName = `collWithoutCommonPreImagesExpirySecs-${expireAfterSeconds}`;
     CommonOps(primary, commonCollName, collWithoutCommonPreImagesName, expireAfterSeconds);
 
     const rollbackNode = rollbackTest.transitionToRollbackOperations();

@@ -6,9 +6,7 @@
  * @tags: [requires_persistence, requires_replication,
  * requires_majority_read_concern, uses_transactions, uses_prepare_transaction]
  */
-import {
-    testPrepareRecoverFromOplogAsStandalone
-} from "jstests/replsets/libs/prepare_standalone_replication_recovery.js";
+import {testPrepareRecoverFromOplogAsStandalone} from "jstests/replsets/libs/prepare_standalone_replication_recovery.js";
 
 const testName = "standalone_replication_recovery_prepare_only";
 

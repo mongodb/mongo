@@ -17,26 +17,27 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const collNamePrefix = jsTestName() + '_';
+    const collNamePrefix = jsTestName() + "_";
 
-    const timeFieldName = 'time';
-    const metaFieldName = 'meta';
+    const timeFieldName = "time";
+    const metaFieldName = "meta";
 
     let collCount = 0;
     let coll;
 
-    const clearColl = function() {
+    const clearColl = function () {
         coll = db.getCollection(collNamePrefix + collCount++);
 
         coll.drop();
 
-        const timeFieldName = 'time';
-        assert.commandWorked(db.createCollection(
-            coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        const timeFieldName = "time";
+        assert.commandWorked(
+            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        );
     };
     clearColl();
 
-    const runTest = function(doc, expectedMin, expectedMax) {
+    const runTest = function (doc, expectedMin, expectedMax) {
         doc[timeFieldName] = ISODate();
         assert.commandWorked(insert(coll, doc));
 
@@ -47,23 +48,24 @@ TimeseriesTest.run((insert) => {
 
         // Find the bucket the measurement belongs to.
         const bucketDocs = getTimeseriesCollForRawOps(coll)
-                               .find({}, {
-                                   'control.min._id': 0,
-                                   'control.max._id': 0,
-                                   ['control.min.' + timeFieldName]: 0,
-                                   ['control.max.' + timeFieldName]: 0
-                               })
-                               .rawData()
-                               .toArray();
+            .find(
+                {},
+                {
+                    "control.min._id": 0,
+                    "control.max._id": 0,
+                    ["control.min." + timeFieldName]: 0,
+                    ["control.max." + timeFieldName]: 0,
+                },
+            )
+            .rawData()
+            .toArray();
         assert.eq(bucketDocs.length, 1);
 
         const bucketDoc = bucketDocs[0];
-        jsTestLog('Bucket document: ' + tojson(bucketDoc));
+        jsTestLog("Bucket document: " + tojson(bucketDoc));
 
-        assert.docEq(
-            expectedMin, bucketDoc.control.min, 'invalid min in bucket: ' + tojson(bucketDoc));
-        assert.docEq(
-            expectedMax, bucketDoc.control.max, 'invalid max in bucket: ' + tojson(bucketDoc));
+        assert.docEq(expectedMin, bucketDoc.control.min, "invalid min in bucket: " + tojson(bucketDoc));
+        assert.docEq(expectedMax, bucketDoc.control.max, "invalid max in bucket: " + tojson(bucketDoc));
     };
 
     // Empty objects are considered.
@@ -78,20 +80,22 @@ TimeseriesTest.run((insert) => {
     clearColl();
 
     // Objects and arrays are updated element-wise.
-    runTest(
-        {a: {x: 1, y: 2}, b: [1, 2]}, {a: {x: 1, y: 2}, b: [1, 2]}, {a: {x: 1, y: 2}, b: [1, 2]});
-    runTest(
-        {a: {x: 2, y: 1}, b: [2, 1]}, {a: {x: 1, y: 1}, b: [1, 1]}, {a: {x: 2, y: 2}, b: [2, 2]});
+    runTest({a: {x: 1, y: 2}, b: [1, 2]}, {a: {x: 1, y: 2}, b: [1, 2]}, {a: {x: 1, y: 2}, b: [1, 2]});
+    runTest({a: {x: 2, y: 1}, b: [2, 1]}, {a: {x: 1, y: 1}, b: [1, 1]}, {a: {x: 2, y: 2}, b: [2, 2]});
 
     clearColl();
     // Multiple levels of nesting are also updated element-wise.
-    runTest({a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]},
-            {a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]},
-            {a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]});
+    runTest(
+        {a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]},
+        {a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]},
+        {a: {x: {z: [3, 4]}}, b: [{x: 3, y: 4}]},
+    );
     // Sub-objects and arrays also updated element-wise
-    runTest({a: {x: {z: [4, 3]}}, b: [{x: 4, y: 3}, 3, 1]},
-            {a: {x: {z: [3, 3]}}, b: [{x: 3, y: 3}, 3, 1]},
-            {a: {x: {z: [4, 4]}}, b: [{x: 4, y: 4}, 3, 1]});
+    runTest(
+        {a: {x: {z: [4, 3]}}, b: [{x: 4, y: 3}, 3, 1]},
+        {a: {x: {z: [3, 3]}}, b: [{x: 3, y: 3}, 3, 1]},
+        {a: {x: {z: [4, 4]}}, b: [{x: 4, y: 4}, 3, 1]},
+    );
     clearColl();
 
     // Sparse measurements only affect the min/max for the fields present.

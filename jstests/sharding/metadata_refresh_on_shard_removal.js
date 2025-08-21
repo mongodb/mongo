@@ -3,9 +3,7 @@
  * to target shards that have been removed.
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    moveDatabaseAndUnshardedColls
-} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
+import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // Checking UUID consistency involves talking to shards, but this test shuts down shards.
@@ -18,7 +16,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 // therefore preventing orphans from being cleaned up.
 TestData.skipCheckOrphans = true;
 
-const dbName = 'TestDB';
+const dbName = "TestDB";
 
 /**
  * Test that sharded collections with data on a shard that gets removed are correctly invalidated in
@@ -35,27 +33,29 @@ const dbName = 'TestDB';
  */
 (() => {
     jsTestLog(
-        "Test that metadata of a sharded collection with data on a shard that gets removed is correctly invalidated in a router's catalog cache.");
+        "Test that metadata of a sharded collection with data on a shard that gets removed is correctly invalidated in a router's catalog cache.",
+    );
 
-    const shardedCollName = 'Coll';
-    const shardedCollNs = dbName + '.' + shardedCollName;
+    const shardedCollName = "Coll";
+    const shardedCollNs = dbName + "." + shardedCollName;
 
     var st = new ShardingTest({shards: 2, mongos: 2});
 
     let router0ShardedColl = st.s0.getDB(dbName)[shardedCollName];
     let router1ShardedColl = st.s1.getDB(dbName)[shardedCollName];
 
-    assert.commandWorked(
-        st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
     assert.commandWorked(st.s0.adminCommand({shardCollection: shardedCollNs, key: {_id: 1}}));
 
     // Make sure data is inserted into shard0.
-    assert.commandWorked(st.s0.adminCommand({
-        moveChunk: shardedCollNs,
-        find: {_id: -1},
-        to: st.shard0.shardName,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        st.s0.adminCommand({
+            moveChunk: shardedCollNs,
+            find: {_id: -1},
+            to: st.shard0.shardName,
+            _waitForDelete: true,
+        }),
+    );
 
     // Insert some documents into the sharded collection on shard0.
     router0ShardedColl.insert({_id: -1});
@@ -80,8 +80,7 @@ const dbName = 'TestDB';
         st.rs0.stopSet();
     }
 
-    const initCatalogCacheStats =
-        st.s1.getDB(dbName).serverStatus({}).shardingStatistics.catalogCache;
+    const initCatalogCacheStats = st.s1.getDB(dbName).serverStatus({}).shardingStatistics.catalogCache;
 
     // Ensure that s1, the router which did not run removeShard, eventually stops targeting chunks
     // for the sharded collection which previously resided on a shard that no longer exists.
@@ -98,14 +97,13 @@ const dbName = 'TestDB';
     // Removing shard0 updates the metadata version in the catalog cache of all nodes. The
     // subsequent CRUD operation on router1 triggered a incremental refresh (instead of a full
     // refresh) of its catalog cache.
-    const updatedCatalogCacheStats =
-        st.s1.getDB(dbName).serverStatus({}).shardingStatistics.catalogCache;
-    assert.eq(0,
-              updatedCatalogCacheStats.countFullRefreshesStarted -
-                  initCatalogCacheStats.countFullRefreshesStarted);
-    assert.eq(1,
-              updatedCatalogCacheStats.countIncrementalRefreshesStarted -
-                  initCatalogCacheStats.countIncrementalRefreshesStarted);
+    const updatedCatalogCacheStats = st.s1.getDB(dbName).serverStatus({}).shardingStatistics.catalogCache;
+    assert.eq(0, updatedCatalogCacheStats.countFullRefreshesStarted - initCatalogCacheStats.countFullRefreshesStarted);
+    assert.eq(
+        1,
+        updatedCatalogCacheStats.countIncrementalRefreshesStarted -
+            initCatalogCacheStats.countIncrementalRefreshesStarted,
+    );
 
     st.stop();
 })();
@@ -126,17 +124,17 @@ const dbName = 'TestDB';
  */
 (() => {
     jsTestLog(
-        "Test that entries for a database whose original primary shard gets removed are correctly invalidated in a router's catalog cache.");
+        "Test that entries for a database whose original primary shard gets removed are correctly invalidated in a router's catalog cache.",
+    );
 
-    const unshardedCollName = 'UnshardedColl';
+    const unshardedCollName = "UnshardedColl";
 
     var st = new ShardingTest({shards: 2, mongos: 2, other: {enableBalancer: true}});
 
     let router0UnshardedColl = st.s0.getDB(dbName)[unshardedCollName];
     let router1UnshardedColl = st.s1.getDB(dbName)[unshardedCollName];
 
-    assert.commandWorked(
-        st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
     // Insert some documents into the unsharded collection whose primary is the to-be-removed
     // shard0.

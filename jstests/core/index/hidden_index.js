@@ -22,18 +22,13 @@ function numOfUsedIndexes(explain) {
     return getNumberOfIndexScans(explain);
 }
 
-function validateHiddenIndexBehaviour(
-    {query = {}, projection = {}, index_type = 1, wildcard = false}) {
+function validateHiddenIndexBehaviour({query = {}, projection = {}, index_type = 1, wildcard = false}) {
     let index_name;
-    if (wildcard)
-        index_name = "a.$**_" + index_type;
-    else
-        index_name = "a_" + index_type;
+    if (wildcard) index_name = "a.$**_" + index_type;
+    else index_name = "a_" + index_type;
 
-    if (wildcard)
-        assert.commandWorked(coll.createIndex({"a.$**": index_type}));
-    else
-        assert.commandWorked(coll.createIndex({"a": index_type}));
+    if (wildcard) assert.commandWorked(coll.createIndex({"a.$**": index_type}));
+    else assert.commandWorked(coll.createIndex({"a": index_type}));
 
     let idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), index_name);
     assert.eq(idxSpec.hidden, undefined);
@@ -65,10 +60,8 @@ function validateHiddenIndexBehaviour(
 
     assert.commandWorked(coll.dropIndex(index_name));
 
-    if (wildcard)
-        assert.commandWorked(coll.createIndex({"a.$**": index_type}, {hidden: true}));
-    else
-        assert.commandWorked(coll.createIndex({"a": index_type}, {hidden: true}));
+    if (wildcard) assert.commandWorked(coll.createIndex({"a.$**": index_type}, {hidden: true}));
+    else assert.commandWorked(coll.createIndex({"a": index_type}, {hidden: true}));
 
     idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), index_name);
     assert(idxSpec.hidden);
@@ -76,11 +69,15 @@ function validateHiddenIndexBehaviour(
     assert.eq(numOfUsedIndexes(explain), 0);
 
     if (wildcard)
-        assert.commandFailedWithCode(coll.createIndex({"a.$**": index_type}, {hidden: false}),
-                                     ErrorCodes.IndexOptionsConflict);
+        assert.commandFailedWithCode(
+            coll.createIndex({"a.$**": index_type}, {hidden: false}),
+            ErrorCodes.IndexOptionsConflict,
+        );
     else
-        assert.commandFailedWithCode(coll.createIndex({"a": index_type}, {hidden: false}),
-                                     ErrorCodes.IndexOptionsConflict);
+        assert.commandFailedWithCode(
+            coll.createIndex({"a": index_type}, {hidden: false}),
+            ErrorCodes.IndexOptionsConflict,
+        );
 
     idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), index_name);
     assert(idxSpec.hidden);
@@ -95,11 +92,22 @@ validateHiddenIndexBehaviour({query: {a: 1}, index_type: 1});
 validateHiddenIndexBehaviour({
     query: {
         a: {
-            $geoWithin:
-                {$geometry: {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}}
-        }
+            $geoWithin: {
+                $geometry: {
+                    type: "Polygon",
+                    coordinates: [
+                        [
+                            [0, 0],
+                            [3, 6],
+                            [6, 1],
+                            [0, 0],
+                        ],
+                    ],
+                },
+            },
+        },
     },
-    index_type: "2dsphere"
+    index_type: "2dsphere",
 });
 
 // Fts index.
@@ -147,7 +155,7 @@ assert.eq(idxSpec.expireAfterSeconds, 10);
 
 db.runCommand({
     "collMod": coll.getName(),
-    "index": {"name": "tm_1", "expireAfterSeconds": 1, "hidden": true}
+    "index": {"name": "tm_1", "expireAfterSeconds": 1, "hidden": true},
 });
 idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), "tm_1");
 assert(idxSpec.hidden);
@@ -156,8 +164,7 @@ assert.eq(idxSpec.expireAfterSeconds, 1);
 //
 // Ensure that "hidden: false" won't be added to index specification.
 //
-assert.commandWorked(
-    db.runCommand({createIndexes: collName, indexes: [{key: {y: 1}, name: "y", hidden: false}]}));
+assert.commandWorked(db.runCommand({createIndexes: collName, indexes: [{key: {y: 1}, name: "y", hidden: false}]}));
 idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), "y");
 assert.eq(idxSpec.hidden, undefined);
 

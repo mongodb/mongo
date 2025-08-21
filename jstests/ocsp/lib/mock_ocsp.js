@@ -35,14 +35,15 @@ export class ResponderCertSet {
     }
 }
 
-export const OCSP_DELEGATE_RESPONDER =
-    new ResponderCertSet(OCSP_CA_PEM, OCSP_RESPONDER_CERT, OCSP_RESPONDER_KEY);
+export const OCSP_DELEGATE_RESPONDER = new ResponderCertSet(OCSP_CA_PEM, OCSP_RESPONDER_CERT, OCSP_RESPONDER_KEY);
 
 export const OCSP_CA_RESPONDER = new ResponderCertSet(OCSP_CA_PEM, OCSP_CA_CERT, OCSP_CA_KEY);
 
-export const OCSP_INTERMEDIATE_RESPONDER = new ResponderCertSet(OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
-                                                                OCSP_INTERMEDIATE_CA_ONLY_CERT,
-                                                                OCSP_INTERMEDIATE_CA_ONLY_KEY);
+export const OCSP_INTERMEDIATE_RESPONDER = new ResponderCertSet(
+    OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
+    OCSP_INTERMEDIATE_CA_ONLY_CERT,
+    OCSP_INTERMEDIATE_CA_ONLY_KEY,
+);
 
 export class MockOCSPServer {
     /**
@@ -52,12 +53,14 @@ export class MockOCSPServer {
      * @param {number} next_update_secs
      * @param {object} responder_certificate_set
      */
-    constructor(fault_type,
-                next_update_secs,
-                responder_certificate_set = OCSP_DELEGATE_RESPONDER,
-                response_delay_secs = 0,
-                include_extraneous_status = false,
-                issuer_hash_algorithm = "") {
+    constructor(
+        fault_type,
+        next_update_secs,
+        responder_certificate_set = OCSP_DELEGATE_RESPONDER,
+        response_delay_secs = 0,
+        include_extraneous_status = false,
+        issuer_hash_algorithm = "",
+    ) {
         this.python = getPython3Binary();
         this.fault_type = fault_type;
 
@@ -113,7 +116,7 @@ export class MockOCSPServer {
         this.pid = _startMongoProgram({args: args});
         assert(checkProgram(this.pid).alive);
 
-        assert.soon(function() {
+        assert.soon(function () {
             // Change this line if the OCSP endpoint changes
             return rawMongoProgramOutput(".*").search("Launching debugserver on port 8100") !== -1;
         });

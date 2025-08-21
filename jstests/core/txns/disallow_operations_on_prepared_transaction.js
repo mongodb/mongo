@@ -51,53 +51,59 @@ assert.commandWorked(sessionColl.insert({_id: 4}));
 PrepareHelpers.prepareTransaction(session);
 
 jsTestLog("Test that you can't run an aggregation on a prepared transaction.");
-assert.commandFailedWithCode(assert.throws(function() {
-                                              sessionColl.aggregate({$match: {}});
-                                          }),
-                                          ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    assert.throws(function () {
+        sessionColl.aggregate({$match: {}});
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Test that you can't run delete on a prepared transaction.");
-var res = assert.commandFailedWithCode(sessionColl.remove({_id: 4}),
-                                       ErrorCodes.PreparedTransactionInProgress);
+var res = assert.commandFailedWithCode(sessionColl.remove({_id: 4}), ErrorCodes.PreparedTransactionInProgress);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 jsTestLog("Test that you can't run distinct on a prepared transaction.");
-assert.commandFailedWithCode(assert.throws(function() {
-                                              sessionColl.distinct("_id");
-                                          }),
-                                          ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    assert.throws(function () {
+        sessionColl.distinct("_id");
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Test that you can't run find on a prepared transaction.");
-assert.commandFailedWithCode(assert.throws(function() {
-                                              sessionColl.find({}).toArray();
-                                          }),
-                                          ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    assert.throws(function () {
+        sessionColl.find({}).toArray();
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Test that you can't run findandmodify on a prepared transaction.");
-assert.commandFailedWithCode(sessionDB.runCommand({
-    findandmodify: collName,
-    remove: true,
-    txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-    stmtId: NumberInt(1),
-    autocommit: false
-}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB.runCommand({
+        findandmodify: collName,
+        remove: true,
+        txnNumber: NumberLong(session.getTxnNumber_forTesting()),
+        stmtId: NumberInt(1),
+        autocommit: false,
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Test that you can't run findAndModify on a prepared transaction.");
 assert.commandFailedWithCode(
-    assert.throws(function() {
-                     sessionColl.findAndModify({query: {_id: 4}, remove: true});
-                 }),
-                 ErrorCodes.PreparedTransactionInProgress);
+    assert.throws(function () {
+        sessionColl.findAndModify({query: {_id: 4}, remove: true});
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Test that you can't insert on a prepared transaction.");
-res = assert.commandFailedWithCode(sessionColl.insert({_id: 5}),
-                                   ErrorCodes.PreparedTransactionInProgress);
+res = assert.commandFailedWithCode(sessionColl.insert({_id: 5}), ErrorCodes.PreparedTransactionInProgress);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 jsTestLog("Test that you can't run update on a prepared transaction.");
-res = assert.commandFailedWithCode(sessionColl.update({_id: 4}, {a: 1}),
-                                   ErrorCodes.PreparedTransactionInProgress);
+res = assert.commandFailedWithCode(sessionColl.update({_id: 4}, {a: 1}), ErrorCodes.PreparedTransactionInProgress);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 assert.commandWorked(session.abortTransaction_forTesting());
 
@@ -107,13 +113,16 @@ res = assert.commandWorked(sessionDB.runCommand({find: collName, batchSize: 1}))
 assert(res.hasOwnProperty("cursor"), tojson(res));
 assert(res.cursor.hasOwnProperty("id"), tojson(res));
 PrepareHelpers.prepareTransaction(session);
-assert.commandFailedWithCode(sessionDB.runCommand({getMore: res.cursor.id, collection: collName}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB.runCommand({getMore: res.cursor.id, collection: collName}),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Test that you can't run killCursors on a prepared transaction.");
 assert.commandFailedWithCode(
     sessionDB.runCommand({killCursors: collName, cursors: [res.cursor.id]}),
-    ErrorCodes.PreparedTransactionInProgress);
+    ErrorCodes.PreparedTransactionInProgress,
+);
 assert.commandWorked(session.abortTransaction_forTesting());
 
 session.endSession();

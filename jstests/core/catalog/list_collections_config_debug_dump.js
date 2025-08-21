@@ -16,7 +16,7 @@ assert.commandWorked(db[databasesCollectionName].insertOne({x: 1}));
 
 const resultUserDB = db.runCommand({listCollections: 1});
 assert.commandWorked(resultUserDB);
-const userDBlist = (new DBCommandCursor(db, resultUserDB)).toArray();
+const userDBlist = new DBCommandCursor(db, resultUserDB).toArray();
 assert.gte(userDBlist.length, 2);
 
 let dummyFound = false;
@@ -47,7 +47,7 @@ if (!config[databasesCollectionName].exists()) {
 
 const result = config.runCommand({listCollections: 1});
 assert.commandWorked(result);
-const configList = (new DBCommandCursor(config, result)).toArray();
+const configList = new DBCommandCursor(config, result).toArray();
 
 dummyFound = false;
 databasesFound = false;
@@ -57,7 +57,7 @@ databasesFound = false;
 for (let c of configList) {
     assert(c.hasOwnProperty("info"));
     assert(c.info.hasOwnProperty("configDebugDump"));
-    assert.eq("boolean", typeof (c.info.configDebugDump));
+    assert.eq("boolean", typeof c.info.configDebugDump);
 
     if (c.name == dummyCollectionName) {
         assert.eq(false, c.info.configDebugDump);

@@ -7,7 +7,7 @@ t.drop();
 let q = {"name": "first", "pic": {"$ref": "foo", "$id": ObjectId("4c48d04cd33a5a92628c9af6")}};
 t.update(q, {$set: {x: 1}}, true, true);
 let ref = t.findOne().pic;
-assert.eq("object", typeof (ref));
+assert.eq("object", typeof ref);
 assert.eq(q.pic["$ref"], ref["$ref"]);
 assert.eq(q.pic["$id"], ref["$id"]);
 

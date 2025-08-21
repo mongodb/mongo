@@ -11,7 +11,7 @@
  *     requires_getmore,
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     const states = {
         /**
          * This is a no-op, used only as a transition state.
@@ -27,25 +27,27 @@ export const $config = (function() {
                 // Set a low maxTimeMs and small batch size so that it's likely the cursor will
                 // time out over its lifetime.
                 let curs = db[collName]
-                               .find({
-                                   $where: function() {
-                                       sleep(1);
-                                       return true;
-                                   }
-                               })
-                               .batchSize(2)
-                               .maxTimeMS(10);
+                    .find({
+                        $where: function () {
+                            sleep(1);
+                            return true;
+                        },
+                    })
+                    .batchSize(2)
+                    .maxTimeMS(10);
 
                 const c = curs.itcount();
             } catch (e) {
-                assert.commandFailedWithCode(
-                    e, [ErrorCodes.MaxTimeMSExpired, ErrorCodes.NetworkInterfaceExceededTimeLimit]);
+                assert.commandFailedWithCode(e, [
+                    ErrorCodes.MaxTimeMSExpired,
+                    ErrorCodes.NetworkInterfaceExceededTimeLimit,
+                ]);
             }
         },
 
         serverStatus: function serverStatus(db, collName) {
             assert.commandWorked(db.adminCommand({serverStatus: 1}));
-        }
+        },
     };
 
     const transitions = {
@@ -60,14 +62,14 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         // Write some data.
-        assert.commandWorked(db[collName].insert(Array.from({length: 100}, _ => ({a: 1}))));
+        assert.commandWorked(db[collName].insert(Array.from({length: 100}, (_) => ({a: 1}))));
     }
 
     return {
         threadCount: 10,
         iterations: 100,
         states: states,
-        startState: 'init',
+        startState: "init",
         transitions: transitions,
         setup: setup,
     };

@@ -6,8 +6,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-var shardingTest =
-    new ShardingTest({name: "shell_commands", shards: 1, mongos: 1, other: {enableBalancer: true}});
+var shardingTest = new ShardingTest({name: "shell_commands", shards: 1, mongos: 1, other: {enableBalancer: true}});
 
 // `sh` test runner commands assume the presence of a global `db` object
 globalThis.db = shardingTest.getDB("test");

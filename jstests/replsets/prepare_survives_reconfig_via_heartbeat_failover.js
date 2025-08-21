@@ -5,9 +5,7 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
-import {
-    testPrepareFailoverDueToReconfig
-} from "jstests/replsets/libs/prepare_failover_due_to_reconfig.js";
+import {testPrepareFailoverDueToReconfig} from "jstests/replsets/libs/prepare_failover_due_to_reconfig.js";
 
 let testName = "prepare_survives_reconfig_via_heartbeat_failover";
 

@@ -14,10 +14,12 @@ assert.commandWorked(st.s.adminCommand({shardCollection: "test.foo", key: {_id: 
 // local values.
 // The write concern is unsatisfiable, so any operations run in the shutdown hooks will fail if
 // they inherit it.
-assert.commandWorked(st.s.adminCommand({
-    setDefaultRWConcern: 1,
-    defaultWriteConcern: {w: 42},
-    defaultReadConcern: {level: "majority"}
-}));
+assert.commandWorked(
+    st.s.adminCommand({
+        setDefaultRWConcern: 1,
+        defaultWriteConcern: {w: 42},
+        defaultReadConcern: {level: "majority"},
+    }),
+);
 
 st.stop();

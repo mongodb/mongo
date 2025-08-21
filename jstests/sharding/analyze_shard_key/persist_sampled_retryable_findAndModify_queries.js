@@ -31,19 +31,20 @@ function testRetryExecutedWrite(rst) {
         update: {$inc: {a: 1}},
         sampleId: UUID(),
         lsid,
-        txnNumber
+        txnNumber,
     };
-    const expectedSampledQueryDocs = [{
-        sampleId: originalCmdObj.sampleId,
-        cmdName: "findAndModify",
-        cmdObj: QuerySamplingUtil.makeCmdObjIgnoreSessionInfo(originalCmdObj)
-    }];
+    const expectedSampledQueryDocs = [
+        {
+            sampleId: originalCmdObj.sampleId,
+            cmdName: "findAndModify",
+            cmdObj: QuerySamplingUtil.makeCmdObjIgnoreSessionInfo(originalCmdObj),
+        },
+    ];
 
     const originalRes = assert.commandWorked(db.runCommand(originalCmdObj));
     assert.eq(originalRes.lastErrorObject.n, 1, originalRes);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(
-        primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
 
     // Retry with the same sampleId.
     const retryCmdObj0 = originalCmdObj;
@@ -53,8 +54,7 @@ function testRetryExecutedWrite(rst) {
     // Wait for one interval to verify that no writes occurred as a result of the retry.
     sleep(queryAnalysisWriterIntervalSecs * 1000);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(
-        primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
 
     // Retry with a different sampleId.
     const retryCmdObj1 = Object.assign({}, originalCmdObj);
@@ -65,8 +65,7 @@ function testRetryExecutedWrite(rst) {
     // Wait for one interval to verify that no writes occurred as a result of the retry.
     sleep(queryAnalysisWriterIntervalSecs * 1000);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(
-        primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
 }
 
 function testRetryUnExecutedWrite(rst) {
@@ -89,21 +88,22 @@ function testRetryUnExecutedWrite(rst) {
         update: {$inc: {a: 1}},
         sampleId: UUID(),
         lsid,
-        txnNumber
+        txnNumber,
     };
-    const expectedSampledQueryDocs = [{
-        sampleId: originalCmdObj.sampleId,
-        cmdName: "findAndModify",
-        cmdObj: QuerySamplingUtil.makeCmdObjIgnoreSessionInfo(originalCmdObj)
-    }];
+    const expectedSampledQueryDocs = [
+        {
+            sampleId: originalCmdObj.sampleId,
+            cmdName: "findAndModify",
+            cmdObj: QuerySamplingUtil.makeCmdObjIgnoreSessionInfo(originalCmdObj),
+        },
+    ];
 
     const fp = configureFailPoint(primary, "failAllFindAndModify");
 
     // The findAndModify fails after it has been added to the sample buffer.
     assert.commandFailedWithCode(db.runCommand(originalCmdObj), ErrorCodes.InternalError);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(
-        primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
 
     fp.off();
 
@@ -115,8 +115,7 @@ function testRetryUnExecutedWrite(rst) {
     // Wait for one interval to verify that no writes occurred as a result of the retry.
     sleep(queryAnalysisWriterIntervalSecs * 1000);
 
-    QuerySamplingUtil.assertSoonSampledQueryDocuments(
-        primary, ns, collectionUuid, expectedSampledQueryDocs);
+    QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
 }
 
 const st = new ShardingTest({
@@ -125,8 +124,8 @@ const st = new ShardingTest({
         nodes: 2,
         // Make the periodic job for writing sampled queries have a period of 1 second to speed up
         // the test.
-        setParameter: {queryAnalysisWriterIntervalSecs}
-    }
+        setParameter: {queryAnalysisWriterIntervalSecs},
+    },
 });
 
 // Force samples to get persisted even though query sampling is not enabled.

@@ -14,18 +14,19 @@ replSetTest.startSet();
 replSetTest.initiate();
 
 let conn = replSetTest.getPrimary();
-let testDB = conn.getDB('test');
+let testDB = conn.getDB("test");
 
 // Enables a failpoint, runs 'hitFailpointFunc' to hit the failpoint, then runs
 // 'duringFailpointFunc' while the failpoint is active.
-let doDuringFailpoint = function(
-    failPointName, structuredLogRegEx, hitFailpointFunc, duringFailpointFunc, stopKey) {
+let doDuringFailpoint = function (failPointName, structuredLogRegEx, hitFailpointFunc, duringFailpointFunc, stopKey) {
     clearRawMongoProgramOutput();
-    assert.commandWorked(testDB.adminCommand({
-        configureFailPoint: failPointName,
-        mode: "alwaysOn",
-        data: {fieldsToMatch: {i: stopKey}}
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            configureFailPoint: failPointName,
+            mode: "alwaysOn",
+            data: {fieldsToMatch: {i: stopKey}},
+        }),
+    );
 
     hitFailpointFunc();
 
@@ -37,7 +38,7 @@ let doDuringFailpoint = function(
 };
 
 const docsToInsert = 1000;
-let setUp = function(coll) {
+let setUp = function (coll) {
     coll.drop();
 
     let bulk = coll.initializeUnorderedBulkOp();
@@ -47,20 +48,30 @@ let setUp = function(coll) {
     assert.commandWorked(bulk.execute());
 };
 
-let buildIndexInBackground = function(coll, expectDuplicateKeyError) {
-    const createIndexFunction = function(collFullName) {
+let buildIndexInBackground = function (coll, expectDuplicateKeyError) {
+    const createIndexFunction = function (collFullName) {
         const coll = db.getMongo().getCollection(collFullName);
         return coll.createIndex({i: 1}, {unique: true});
     };
-    const assertFunction = expectDuplicateKeyError ? function(collFullName) {
-        assert.commandFailedWithCode(createIndexFunction(collFullName), ErrorCodes.DuplicateKey);
-    } : function(collFullName) {
-        assert.commandWorked(createIndexFunction(collFullName));
-    };
-    return startParallelShell('const createIndexFunction = ' + createIndexFunction + ';\n' +
-                                  'const assertFunction = ' + assertFunction + ';\n' +
-                                  'assertFunction("' + coll.getFullName() + '")',
-                              conn.port);
+    const assertFunction = expectDuplicateKeyError
+        ? function (collFullName) {
+              assert.commandFailedWithCode(createIndexFunction(collFullName), ErrorCodes.DuplicateKey);
+          }
+        : function (collFullName) {
+              assert.commandWorked(createIndexFunction(collFullName));
+          };
+    return startParallelShell(
+        "const createIndexFunction = " +
+            createIndexFunction +
+            ";\n" +
+            "const assertFunction = " +
+            assertFunction +
+            ";\n" +
+            'assertFunction("' +
+            coll.getFullName() +
+            '")',
+        conn.port,
+    );
 };
 
 /**
@@ -78,12 +89,12 @@ let buildIndexInBackground = function(coll, expectDuplicateKeyError) {
  *   phase {number}: 0-4
  * }
  */
-let runTest = function(config) {
+let runTest = function (config) {
     jsTestLog("running test with config: " + tojson(config));
 
     const collName = Object.keys(config).length
-        ? 'hybrid_' + config.operation[0] + '_r' + Number(config.resolve) + '_p' + config.phase
-        : 'hybrid';
+        ? "hybrid_" + config.operation[0] + "_r" + Number(config.resolve) + "_p" + config.phase
+        : "hybrid";
     const coll = testDB.getCollection(collName);
     setUp(coll);
 
@@ -92,14 +103,14 @@ let runTest = function(config) {
     let expectDuplicate = config.resolve === false;
 
     let awaitBuild;
-    let buildIndex = function() {
+    let buildIndex = function () {
         awaitBuild = buildIndexInBackground(coll, expectDuplicate);
     };
 
     // Introduce a duplicate key, either from an insert or update. Optionally, follow-up with an
     // operation that will resolve the duplicate by removing it or updating it.
     const dup = {i: 0};
-    let doOperation = function() {
+    let doOperation = function () {
         if ("insert" == config.operation) {
             assert.commandWorked(coll.insert(dup));
             if (config.resolve) {
@@ -123,41 +134,44 @@ let runTest = function(config) {
         case 0:
             doDuringFailpoint(
                 "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
-                new RegExp("\"id\":20386.*\"where\":\"before\",\"doc\":.*\"i\":" + stopKey),
+                new RegExp('"id":20386.*"where":"before","doc":.*"i":' + stopKey),
                 buildIndex,
                 doOperation,
-                stopKey);
+                stopKey,
+            );
             break;
         // Hang after scanning the first document.
         case 1:
             doDuringFailpoint(
                 "hangIndexBuildDuringCollectionScanPhaseAfterInsertion",
-                new RegExp("\"id\":20386.*\"where\":\"after\",\"doc\":.*\"i\":" + stopKey),
+                new RegExp('"id":20386.*"where":"after","doc":.*"i":' + stopKey),
                 buildIndex,
                 doOperation,
-                stopKey);
+                stopKey,
+            );
             break;
         // Hang before the first drain and after dumping the keys from the external sorter into
         // the index.
         case 2:
-            doDuringFailpoint("hangAfterIndexBuildDumpsInsertsFromBulk",
-                              new RegExp("\"id\":20665"),
-                              buildIndex,
-                              doOperation);
+            doDuringFailpoint(
+                "hangAfterIndexBuildDumpsInsertsFromBulk",
+                new RegExp('"id":20665'),
+                buildIndex,
+                doOperation,
+            );
             break;
         // Hang before the second drain.
         case 3:
-            doDuringFailpoint("hangAfterIndexBuildFirstDrain",
-                              new RegExp("\"id\":20666"),
-                              buildIndex,
-                              doOperation);
+            doDuringFailpoint("hangAfterIndexBuildFirstDrain", new RegExp('"id":20666'), buildIndex, doOperation);
             break;
         // Hang before the final drain and commit.
         case 4:
-            doDuringFailpoint("hangIndexBuildAfterSignalPrimaryForCommitReadiness",
-                              new RegExp("\"id\":4841707"),
-                              buildIndex,
-                              doOperation);
+            doDuringFailpoint(
+                "hangIndexBuildAfterSignalPrimaryForCommitReadiness",
+                new RegExp('"id":4841707'),
+                buildIndex,
+                doOperation,
+            );
             break;
         default:
             assert(false, "Invalid phase: " + config.phase);
@@ -166,7 +180,7 @@ let runTest = function(config) {
     awaitBuild();
 
     let expectedDocs = docsToInsert;
-    expectedDocs += (config.operation == "insert" && config.resolve === false) ? 1 : 0;
+    expectedDocs += config.operation == "insert" && config.resolve === false ? 1 : 0;
 
     assert.eq(expectedDocs, coll.count());
     assert.eq(expectedDocs, coll.find().itcount());

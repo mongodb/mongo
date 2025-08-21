@@ -13,8 +13,7 @@ const emptyTs = Timestamp(0, 0);
 coll.drop();
 
 function doInsert(docs, bypassEmptyTsReplacement) {
-    let cmdRes = db.runCommand(
-        {insert: collName, documents: docs, bypassEmptyTsReplacement: bypassEmptyTsReplacement});
+    let cmdRes = db.runCommand({insert: collName, documents: docs, bypassEmptyTsReplacement: bypassEmptyTsReplacement});
     assert.commandWorked(cmdRes);
 }
 
@@ -22,7 +21,7 @@ function doUpdate(filter, update, bypassEmptyTsReplacement) {
     let cmdRes = db.runCommand({
         update: collName,
         updates: [{q: filter, u: update}],
-        bypassEmptyTsReplacement: bypassEmptyTsReplacement
+        bypassEmptyTsReplacement: bypassEmptyTsReplacement,
     });
     assert.commandWorked(cmdRes);
 }
@@ -31,7 +30,7 @@ function doUpdateWithUpsert(filter, update, bypassEmptyTsReplacement) {
     let cmdRes = db.runCommand({
         update: collName,
         updates: [{q: filter, u: update, upsert: true}],
-        bypassEmptyTsReplacement: bypassEmptyTsReplacement
+        bypassEmptyTsReplacement: bypassEmptyTsReplacement,
     });
     assert.commandWorked(cmdRes);
 }
@@ -41,7 +40,7 @@ function doFindAndModify(filter, update, bypassEmptyTsReplacement) {
         findAndModify: collName,
         query: filter,
         update: update,
-        bypassEmptyTsReplacement: bypassEmptyTsReplacement
+        bypassEmptyTsReplacement: bypassEmptyTsReplacement,
     });
     assert.commandWorked(cmdRes);
 }
@@ -52,7 +51,7 @@ function doFindAndModifyWithUpsert(filter, update, bypassEmptyTsReplacement) {
         query: filter,
         update: update,
         upsert: true,
-        bypassEmptyTsReplacement: bypassEmptyTsReplacement
+        bypassEmptyTsReplacement: bypassEmptyTsReplacement,
     });
     assert.commandWorked(cmdRes);
 }
@@ -62,7 +61,7 @@ let numCallsToRunTests = 0;
 function runTests(bypassEmptyTsReplacement) {
     ++numCallsToRunTests;
 
-    let first = (numCallsToRunTests == 1);
+    let first = numCallsToRunTests == 1;
     let startId = numCallsToRunTests * 100;
 
     function getId(i) {
@@ -113,15 +112,19 @@ function runTests(bypassEmptyTsReplacement) {
 
     // Do a pipeline-style update with $internalApplyOplogUpdate to update the doc with
     // _id=getId(10).
-    doUpdate({_id: getId(10)},
-             [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
-             bypassEmptyTsReplacement);
+    doUpdate(
+        {_id: getId(10)},
+        [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
+        bypassEmptyTsReplacement,
+    );
 
     // Do a pipeline-style findAndModify with $internalApplyOplogUpdate to update the doc with
     // _id=getId(11).
-    doFindAndModify({_id: getId(11)},
-                    [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
-                    bypassEmptyTsReplacement);
+    doFindAndModify(
+        {_id: getId(11)},
+        [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
+        bypassEmptyTsReplacement,
+    );
 
     // Do an update-operator-style update to add a new document with _id=getId(12).
     doUpdateWithUpsert({_id: getId(12)}, {$set: {a: emptyTs}}, bypassEmptyTsReplacement);
@@ -133,22 +136,23 @@ function runTests(bypassEmptyTsReplacement) {
     doUpdateWithUpsert({_id: getId(14)}, [{$addFields: {a: emptyTs}}], bypassEmptyTsReplacement);
 
     // Do a pipeline-style findAndModify to add a new document with _id=getId(15).
-    doFindAndModifyWithUpsert(
-        {_id: getId(15)}, [{$addFields: {a: emptyTs}}], bypassEmptyTsReplacement);
+    doFindAndModifyWithUpsert({_id: getId(15)}, [{$addFields: {a: emptyTs}}], bypassEmptyTsReplacement);
 
     // Do a pipline-style update with $internalApplyOplogUpdate to add a new document with
     // _id=getId(16).
     doUpdateWithUpsert(
         {_id: getId(16)},
         [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
-        bypassEmptyTsReplacement);
+        bypassEmptyTsReplacement,
+    );
 
     // Do pipeline-style findAndModify with $internalApplyOplogUpdate to add a new document
     // with _id=getId(17).
     doFindAndModifyWithUpsert(
         {_id: getId(17)},
         [{$_internalApplyOplogUpdate: {oplogUpdate: {$v: 2, diff: {i: {a: emptyTs}}}}}],
-        bypassEmptyTsReplacement);
+        bypassEmptyTsReplacement,
+    );
 
     // Verify that all the insert, update, and findAndModify commands behaved the way we expected.
     // If 'bypassEmptyTsReplacement' is true, then we expect field "a" will be equal to the empty

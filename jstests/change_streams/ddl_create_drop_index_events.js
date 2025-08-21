@@ -15,7 +15,7 @@ const dbName = testDB.getName();
 const collName = jsTestName();
 const ns = {
     db: dbName,
-    coll: collName
+    coll: collName,
 };
 
 const cst = new ChangeStreamTest(testDB);
@@ -57,15 +57,12 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
 
         assert.commandWorked(testDB[collName].createIndex(key, options));
         if (insertDataBeforeCreateIndex && pipeline[0].$changeStream.showSystemEvents) {
-            assertNextChangeEvent(
-                cursor, {operationType: "startIndexBuild", ns: ns, operationDescription: opDesc});
+            assertNextChangeEvent(cursor, {operationType: "startIndexBuild", ns: ns, operationDescription: opDesc});
         }
-        assertNextChangeEvent(
-            cursor, {operationType: "createIndexes", ns: ns, operationDescription: opDesc});
+        assertNextChangeEvent(cursor, {operationType: "createIndexes", ns: ns, operationDescription: opDesc});
 
         assert.commandWorked(testDB[collName].dropIndexes([dropKey]));
-        assertNextChangeEvent(cursor,
-                              {operationType: "dropIndexes", ns: ns, operationDescription: opDesc});
+        assertNextChangeEvent(cursor, {operationType: "dropIndexes", ns: ns, operationDescription: opDesc});
     }
 
     // Test createIndex() with various option followed by dropIndexes("*").
@@ -73,7 +70,7 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
         hidden: true,
         partialFilterExpression: {a: {$gte: 0}},
         expireAfterSeconds: 86400,
-        storageEngine: {wiredTiger: {}}
+        storageEngine: {wiredTiger: {}},
     };
     testCreateIndexAndDropIndex({a: 1}, options);
 
@@ -90,8 +87,8 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
             maxVariable: "punct",
             normalization: false,
             backwards: false,
-            version: "57.1"
-        }
+            version: "57.1",
+        },
     };
     testCreateIndexAndDropIndex({e: 1}, options, {e: 1}, "*");
 
@@ -106,7 +103,7 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
         weights: {e: 1},
         default_language: "english",
         language_override: "language",
-        textIndexVersion: 3
+        textIndexVersion: 3,
     };
     testCreateIndexAndDropIndex({e: "text"}, options, {_fts: "text", _ftsx: 1});
 
@@ -126,20 +123,18 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
     if (!insertDataBeforeCreateIndex) {
         // If the collection was empty before calling createIndexes(), then there will be a separate
         // change stream event for each index.
-        assert.commandWorked(
-            testDB[collName].createIndexes([{b: 1, c: -1}, {d: "hashed"}], {sparse: true}));
+        assert.commandWorked(testDB[collName].createIndexes([{b: 1, c: -1}, {d: "hashed"}], {sparse: true}));
         cst.assertNextChangesEqualUnordered({
             cursor: cursor,
             expectedChanges: [
                 {operationType: "createIndexes", ns: ns, operationDescription: opDesc1},
-                {operationType: "createIndexes", ns: ns, operationDescription: opDesc2}
-            ]
+                {operationType: "createIndexes", ns: ns, operationDescription: opDesc2},
+            ],
         });
     } else {
         // If the collection was not empty before calling createIndexes(), then there will be a
         // single change stream event that covers both indexes.
-        assert.commandWorked(
-            testDB[collName].createIndexes([{b: 1, c: -1}, {d: "hashed"}], {sparse: true}));
+        assert.commandWorked(testDB[collName].createIndexes([{b: 1, c: -1}, {d: "hashed"}], {sparse: true}));
         if (pipeline[0].$changeStream.showSystemEvents) {
             assertNextChangeEvent(cursor, {
                 operationType: "startIndexBuild",
@@ -150,7 +145,7 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
         assertNextChangeEvent(cursor, {
             operationType: "createIndexes",
             ns: ns,
-            operationDescription: {indexes: [opDesc1.indexes[0], opDesc2.indexes[0]]}
+            operationDescription: {indexes: [opDesc1.indexes[0], opDesc2.indexes[0]]},
         });
     }
     assert.commandWorked(testDB[collName].dropIndexes(["b_1_c_-1", "d_hashed"]));
@@ -158,25 +153,25 @@ function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
         cursor: cursor,
         expectedChanges: [
             {operationType: "dropIndexes", ns: ns, operationDescription: opDesc1},
-            {operationType: "dropIndexes", ns: ns, operationDescription: opDesc2}
-        ]
+            {operationType: "dropIndexes", ns: ns, operationDescription: opDesc2},
+        ],
     });
 
     testDB[collName].drop();
 }
 
-const runTests = function(pipeline) {
+const runTests = function (pipeline) {
     // Run the test using a whole-db change stream on an empty collection.
-    runTest((() => cst.startWatchingChanges({pipeline, collection: 1})), pipeline, false);
+    runTest(() => cst.startWatchingChanges({pipeline, collection: 1}), pipeline, false);
 
     // Run the test using a single change stream on an empty collection.
-    runTest((() => cst.startWatchingChanges({pipeline, collection: collName})), pipeline, false);
+    runTest(() => cst.startWatchingChanges({pipeline, collection: collName}), pipeline, false);
 
     // Run the test using a whole-db collection change stream on a non-empty collection.
-    runTest((() => cst.startWatchingChanges({pipeline, collection: 1})), pipeline, true);
+    runTest(() => cst.startWatchingChanges({pipeline, collection: 1}), pipeline, true);
 
     // Run the test using a single collection change stream on a non-empty collection.
-    runTest((() => cst.startWatchingChanges({pipeline, collection: collName})), pipeline, true);
+    runTest(() => cst.startWatchingChanges({pipeline, collection: collName}), pipeline, true);
 };
 runTests([{$changeStream: {showExpandedEvents: true}}]);
 runTests([{$changeStream: {showExpandedEvents: true, showSystemEvents: true}}]);

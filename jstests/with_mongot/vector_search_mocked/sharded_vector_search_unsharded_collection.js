@@ -7,9 +7,7 @@
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForVectorSearchQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {prepCollection} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 const dbName = jsTestName();
@@ -39,7 +37,7 @@ const vectorSearchQuery = {
     queryVector: [1.0, 2.0, 3.0],
     path: "x",
     numCandidates: 10,
-    limit: 5
+    limit: 5,
 };
 const vectorSearchCmd = mongotCommandForVectorSearchQuery({
     ...vectorSearchQuery,
@@ -59,11 +57,11 @@ const vectorSearchCmd = mongotCommandForVectorSearchQuery({
                     nextBatch: [
                         {_id: 2, $vectorSearchScore: 0.654},
                         {_id: 1, $vectorSearchScore: 0.321},
-                        {_id: 11, $vectorSearchScore: .2},
-                        {_id: 12, $vectorSearchScore: .5}
-                    ]
+                        {_id: 11, $vectorSearchScore: 0.2},
+                        {_id: 12, $vectorSearchScore: 0.5},
+                    ],
                 },
-            }
+            },
         },
     ];
 
@@ -72,17 +70,15 @@ const vectorSearchCmd = mongotCommandForVectorSearchQuery({
 }
 
 let cursor = testColl.aggregate(
-    [
-        {$vectorSearch: vectorSearchQuery},
-        {$project: {_id: 1, x: 1, score: {$meta: "vectorSearchScore"}}}
-    ],
-    {cursor: {}});
+    [{$vectorSearch: vectorSearchQuery}, {$project: {_id: 1, x: 1, score: {$meta: "vectorSearchScore"}}}],
+    {cursor: {}},
+);
 
 const expected = [
     {"_id": 2, x: "now", score: 0.654},
     {"_id": 1, x: "ow", score: 0.321},
-    {"_id": 11, x: "brown", score: .2},
-    {"_id": 12, x: "cow", score: .5}
+    {"_id": 11, x: "brown", score: 0.2},
+    {"_id": 12, x: "cow", score: 0.5},
 ];
 assert.eq(expected, cursor.toArray());
 stWithMock.stop();

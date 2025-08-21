@@ -12,7 +12,7 @@
 import {
     createRawTimeseriesIndex,
     getTimeseriesCollForRawOps,
-    kRawOperationSpec
+    kRawOperationSpec,
 } from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
@@ -25,18 +25,17 @@ const metaFieldName = "mm";
 const coll = db.getCollection(collName);
 coll.drop();
 
-assert.commandWorked(db.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 {
     // If the collection is sharded, we expect an implicitly-created index on time. This index will
     // be the same index as the result of createIndex({timeField: 1}). Therefore we cannot create
     // nor drop an identical index with a different name.
     if (!isShardedTimeseries(coll)) {
-        assert.commandWorked(
-            coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
-        TimeseriesTest.verifyAndDropIndex(
-            coll, /*shouldHaveOriginalSpec=*/ false, "timefield_downgradable");
+        assert.commandWorked(coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
+        TimeseriesTest.verifyAndDropIndex(coll, /*shouldHaveOriginalSpec=*/ false, "timefield_downgradable");
     }
 }
 
@@ -50,13 +49,13 @@ function testIndexSpec(indexSpec) {
     // The generated entry has all the options specified at creation
     for (const [key, value] of Object.entries(indexSpec.options)) {
         assert.hasFields(indexEntry, [key]);
-        assert.docEq(indexEntry[key],
-                     value,
-                     `unexpected value for '${key}' index property. Full index entry: ${
-                         tojson(indexEntry)}`);
+        assert.docEq(
+            indexEntry[key],
+            value,
+            `unexpected value for '${key}' index property. Full index entry: ${tojson(indexEntry)}`,
+        );
     }
-    TimeseriesTest.verifyAndDropIndex(
-        coll, indexSpec.shouldHaveOriginalSpec, indexSpec.options.name);
+    TimeseriesTest.verifyAndDropIndex(coll, indexSpec.shouldHaveOriginalSpec, indexSpec.options.name);
 }
 
 const indexSpecs = [
@@ -105,8 +104,7 @@ for (const indexSpec of indexSpecs) {
     // Creating a raw index directly over the bucket documents is permitted. However, these types
     // of index creations will not have an "originalSpec" field and rely on the reverse mapping
     // mechanism.
-    assert.commandWorked(
-        createRawTimeseriesIndex(coll, {"control.min.y": 1, "control.max.y": 1}, {name: "y"}));
+    assert.commandWorked(createRawTimeseriesIndex(coll, {"control.min.y": 1, "control.max.y": 1}, {name: "y"}));
 
     let foundIndex = false;
     let bucketIndexes = getTimeseriesCollForRawOps(coll).getIndexes(kRawOperationSpec);

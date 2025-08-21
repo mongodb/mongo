@@ -139,20 +139,20 @@ const optionalGlobalVars = [
 expectedGlobalVars.sort();
 
 function getGlobalProps() {
-    const global = function() {
+    const global = (function () {
         return this;
-    }();
+    })();
     return Object.getOwnPropertyNames(global);
 }
 
-const props =
-    coll.aggregate([
-            {$replaceWith: {varName: {$function: {lang: "js", args: [], body: getGlobalProps}}}},
-            {$unwind: "$varName"},
-            {$match: {varName: {$nin: optionalGlobalVars}}},
-            {$sort: {varName: 1}},
-        ])
-        .toArray();
+const props = coll
+    .aggregate([
+        {$replaceWith: {varName: {$function: {lang: "js", args: [], body: getGlobalProps}}}},
+        {$unwind: "$varName"},
+        {$match: {varName: {$nin: optionalGlobalVars}}},
+        {$sort: {varName: 1}},
+    ])
+    .toArray();
 
 // Because both are sorted, we can pinpoint any that are missing by going in order.
 for (let i = 0; i < Math.min(expectedGlobalVars.length, props.length); ++i) {
@@ -161,32 +161,38 @@ for (let i = 0; i < Math.min(expectedGlobalVars.length, props.length); ++i) {
     assert.eq(foundProp, expectedProp, () => {
         if (foundProp < expectedProp) {
             return `Found an unexpected extra global property during JS execution: "${
-                foundProp}".\n Expected only ${tojson(expectedGlobalVars)}.\n Found ${
-                tojson(props)}.`;
+                foundProp
+            }".\n Expected only ${tojson(expectedGlobalVars)}.\n Found ${tojson(props)}.`;
         } else {
             return `Did not find an expected global property during JS execution: "${
-                expectedProp}".\n Expected only ${tojson(expectedGlobalVars)}.\n Found ${
-                tojson(props)}.`;
+                expectedProp
+            }".\n Expected only ${tojson(expectedGlobalVars)}.\n Found ${tojson(props)}.`;
         }
     });
 }
-assert.lte(expectedGlobalVars.length,
-           props.length,
-           () => `Did not find expected global properties during JS execution: ${
-               tojson(expectedGlobalVars.slice(props.length))}.\n Full list expected: ${
-               tojson(expectedGlobalVars)}.\n Full list found: ${tojson(props)}.`);
-assert.lte(props.length,
-           expectedGlobalVars.length,
-           () => `Found extra global properties during JS execution: ${
-               tojson(props.slice(expectedGlobalVars.length))}`);
+assert.lte(
+    expectedGlobalVars.length,
+    props.length,
+    () =>
+        `Did not find expected global properties during JS execution: ${tojson(
+            expectedGlobalVars.slice(props.length),
+        )}.\n Full list expected: ${tojson(expectedGlobalVars)}.\n Full list found: ${tojson(props)}.`,
+);
+assert.lte(
+    props.length,
+    expectedGlobalVars.length,
+    () => `Found extra global properties during JS execution: ${tojson(props.slice(expectedGlobalVars.length))}`,
+);
 
 // Now test the same properties appear in a $where. We have two additional expected properties which
 // are defined by $where itself before executing the filter function.
 const expectedVarsInWhere = expectedGlobalVars.concat(["obj", "fullObject"]);
 assert.eq(
     coll.find().itcount(),
-    coll.find({
-            $where: "const global = function() { return this; }();\n" +
+    coll
+        .find({
+            $where:
+                "const global = function() { return this; }();\n" +
                 "printjsononeline(Object.getOwnPropertyNames(global));\n" +
                 `printjsononeline(${tojsononeline(expectedVarsInWhere)});\n` +
                 `const optional = ${tojsononeline(optionalGlobalVars)};\n` +
@@ -207,6 +213,7 @@ assert.eq(
                 "        print('did not find expected item: ' + expectedItem); return false;\n" +
                 "    }\n" +
                 "}\n" +
-                "return true;"
+                "return true;",
         })
-        .itcount());
+        .itcount(),
+);

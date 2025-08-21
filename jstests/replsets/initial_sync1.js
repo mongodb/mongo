@@ -24,8 +24,7 @@ print("1. Bring up set");
 // SERVER-7455, this test is called from ssl/auth_x509.js
 var x509_options1;
 var x509_options2;
-var replTest =
-    new ReplSetTest({name: basename, nodes: {node0: x509_options1, node1: x509_options2}});
+var replTest = new ReplSetTest({name: basename, nodes: {node0: x509_options1, node1: x509_options2}});
 
 var conns = replTest.startSet();
 replTest.initiate();
@@ -55,13 +54,17 @@ admin_s1.runCommand({replSetFreeze: 999999});
 print("6. Bring up #3");
 var hostname = getHostName();
 
-var secondary2 = MongoRunner.runMongod(Object.merge({
-    replSet: basename,
-    oplogSize: 2,
-    // Preserve the initial sync state to validate an assertion.
-    setParameter: {"failpoint.skipClearInitialSyncState": tojson({mode: 'alwaysOn'})}
-},
-                                                    x509_options2));
+var secondary2 = MongoRunner.runMongod(
+    Object.merge(
+        {
+            replSet: basename,
+            oplogSize: 2,
+            // Preserve the initial sync state to validate an assertion.
+            setParameter: {"failpoint.skipClearInitialSyncState": tojson({mode: "alwaysOn"})},
+        },
+        x509_options2,
+    ),
+);
 
 var local_s2 = secondary2.getDB("local");
 var admin_s2 = secondary2.getDB("admin");
@@ -83,12 +86,12 @@ var config2 = local_s1.system.replset.findOne();
 print("Config 2: " + tojsononeline(config2));
 assert(config2);
 // Add one to config.version to account for the 'newlyAdded' removal.
-assert.eq(config2.version, (config.version + 1));
+assert.eq(config2.version, config.version + 1);
 
 var config3 = local_s2.system.replset.findOne();
 print("Config 3: " + tojsononeline(config3));
 assert(config3);
-assert.eq(config3.version, (config.version + 1));
+assert.eq(config3.version, config.version + 1);
 
 replTest.waitForState(secondary2, [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING]);
 

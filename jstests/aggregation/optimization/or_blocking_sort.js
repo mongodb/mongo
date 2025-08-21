@@ -5,7 +5,11 @@ const t = db[jsTestName()];
 t.drop();
 
 assert.commandWorked(
-    t.insertMany([{_id: 0, name: "red", value: 2}, {_id: 1, name: "blue", value: 1}]));
+    t.insertMany([
+        {_id: 0, name: "red", value: 2},
+        {_id: 1, name: "blue", value: 1},
+    ]),
+);
 
 let cursor = t.aggregate([{$match: {$or: [{name: "red"}, {name: "blue"}]}}, {$sort: {value: 1}}]);
 assert.eq(1, cursor.next()["_id"]);

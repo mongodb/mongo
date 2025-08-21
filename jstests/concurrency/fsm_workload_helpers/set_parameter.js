@@ -11,8 +11,7 @@
  *     sync across all nodes before this change is applied. All settings will be in sync after
  *     changes are applied.
  */
-export function setParameterOnAllNodes(
-    {cluster, paramName, newValue, assertAllSettingsWereIdentical}) {
+export function setParameterOnAllNodes({cluster, paramName, newValue, assertAllSettingsWereIdentical}) {
     let returnValue = null;
     let lastSeenHost = null;
     const setQueryStatsParams = (db) => {
@@ -23,8 +22,10 @@ export function setParameterOnAllNodes(
             assert.eq(
                 returnValue,
                 res.was,
-                `Expected all hosts to start with the same value for the parameter. Latest is: ${
-                    db.getMongo().toString()}, last seen is: ${lastSeenHost}`);
+                `Expected all hosts to start with the same value for the parameter. Latest is: ${db
+                    .getMongo()
+                    .toString()}, last seen is: ${lastSeenHost}`,
+            );
         }
         returnValue = res.was;
     };

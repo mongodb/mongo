@@ -23,37 +23,45 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
  * Refresh logical session cache on mongos and shard and check that each one of the session IDs in
  * the 'expectedSessionIDs' array exist. If 'expectToExist' is false, checks that they don't exist.
  */
-const refreshSessionsAndVerifyExistence =
-    (mongosConfig, shardConfig, expectedSessionIDs, expectToExist = true) => {
-        const refresh = {refreshLogicalSessionCacheNow: 1};
+const refreshSessionsAndVerifyExistence = (mongosConfig, shardConfig, expectedSessionIDs, expectToExist = true) => {
+    const refresh = {refreshLogicalSessionCacheNow: 1};
 
-        mongosConfig.runCommand(refresh);
-        shardConfig.runCommand(refresh);
+    mongosConfig.runCommand(refresh);
+    shardConfig.runCommand(refresh);
 
-        const sessionIDs = mongosConfig.system.sessions.find().toArray().map(s => s._id.id);
+    const sessionIDs = mongosConfig.system.sessions
+        .find()
+        .toArray()
+        .map((s) => s._id.id);
 
-        // Assert that 'expectedSessionIDs' is a subset of 'sessionIDs'
-        assert(expectedSessionIDs.every(expectedId => {
-            return sessionIDs.some(s => {
-                return bsonBinaryEqual(s, expectedId);
-            }) == expectToExist;
-        }));
-    };
+    // Assert that 'expectedSessionIDs' is a subset of 'sessionIDs'
+    assert(
+        expectedSessionIDs.every((expectedId) => {
+            return (
+                sessionIDs.some((s) => {
+                    return bsonBinaryEqual(s, expectedId);
+                }) == expectToExist
+            );
+        }),
+    );
+};
 
 const verifyOpenCursorCount = (db, expectedCount) => {
     assert.eq(db.serverStatus().metrics.cursor.open.total, expectedCount);
 };
 
-const getSessions = config => {
-    return config.system.sessions.aggregate([{'$listSessions': {allUsers: true}}]).toArray();
+const getSessions = (config) => {
+    return config.system.sessions.aggregate([{"$listSessions": {allUsers: true}}]).toArray();
 };
 
-const createSessions = (mongos, count) => Array(count).fill(null).map(() => {
-    const session = mongos.startSession({});
-    assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}),
-                         "initialize the session");
-    return session;
-});
+const createSessions = (mongos, count) =>
+    Array(count)
+        .fill(null)
+        .map(() => {
+            const session = mongos.startSession({});
+            assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}), "initialize the session");
+            return session;
+        });
 
 const setup = (shardingTest, dbName, collName) => {
     const mongos = shardingTest.s;
@@ -82,8 +90,7 @@ const testSessionExpiry = (shardingTest) => {
 
     // Manually delete entries in config.system.sessions to simulate TTL expiration.
     assert.commandWorked(test.mongosConfig.system.sessions.remove({}));
-    refreshSessionsAndVerifyExistence(
-        test.mongosConfig, test.shardConfig, sessionIDs, false /* expectToExist */);
+    refreshSessionsAndVerifyExistence(test.mongosConfig, test.shardConfig, sessionIDs, false /* expectToExist */);
 };
 
 // 2. Verify that getMores after finds will update the 'lastUse' field on documents in the
@@ -95,40 +102,41 @@ const testSessionUpdates = (shardingTest) => {
 
     // Make sure we have no opened sessions before starting the test. Creating a collection will
     // generate a new session during the commit phase of the create coordinator
-    refreshSessionsAndVerifyExistence(
-        test.mongosConfig, test.shardConfig, [], false /* expectToExist */);
-    const openedSessionIDs = test.mongosConfig.system.sessions.find().toArray().map(s => s._id);
+    refreshSessionsAndVerifyExistence(test.mongosConfig, test.shardConfig, [], false /* expectToExist */);
+    const openedSessionIDs = test.mongosConfig.system.sessions
+        .find()
+        .toArray()
+        .map((s) => s._id);
     assert.commandWorked(test.db.runCommand({endSessions: openedSessionIDs}));
 
     const sessions = createSessions(test.mongos, 5);
-    const cursors = sessions.map(session => {
+    const cursors = sessions.map((session) => {
         const cursor = session.getDatabase(dbName)[testCollName].find({b: 1}).batchSize(1);
         assert(cursor.hasNext());
         return cursor;
     });
-    const sessionIDs = sessions.map(session => session.getSessionId().id);
+    const sessionIDs = sessions.map((session) => session.getSessionId().id);
 
     refreshSessionsAndVerifyExistence(test.mongosConfig, test.shardConfig, sessionIDs);
     verifyOpenCursorCount(test.mongosConfig, 5);
 
     let lastUseValues = Array(sessionIDs.length).fill(new Date(0));
     for (let i = 0; i < 3; i++) {
-        cursors.forEach(cursor => cursor.next());
+        cursors.forEach((cursor) => cursor.next());
 
         refreshSessionsAndVerifyExistence(test.mongosConfig, test.shardConfig, sessionIDs);
         verifyOpenCursorCount(test.mongosConfig, 5);
 
         // Get the sessions that are opened for the cursors
-        const sessionsCollectionArray = getSessions(test.mongosConfig).filter(session => {
-            return sessionIDs.some(s => {
+        const sessionsCollectionArray = getSessions(test.mongosConfig).filter((session) => {
+            return sessionIDs.some((s) => {
                 return bsonBinaryEqual(s, session._id.id);
             });
         });
         assert.eq(sessionsCollectionArray.length, cursors.length);
 
-        sessionsCollectionArray.forEach((session, idx) =>
-                                            assert.gt(session.lastUse, lastUseValues[idx]));
-        lastUseValues = sessionsCollectionArray.map(session => session.lastUse);
+        sessionsCollectionArray.forEach((session, idx) => assert.gt(session.lastUse, lastUseValues[idx]));
+        lastUseValues = sessionsCollectionArray.map((session) => session.lastUse);
 
         // Date_t has the granularity of milliseconds, so we have to make sure we don't run this
         // loop faster than that.
@@ -151,14 +159,14 @@ const testCursorInvalidation = (shardingTest) => {
 
     assert.commandWorked(test.mongosConfig.system.sessions.remove({}));
 
-    refreshSessionsAndVerifyExistence(
-        test.mongosConfig, test.shardConfig, sessionIDs, false /* expectToExist */);
+    refreshSessionsAndVerifyExistence(test.mongosConfig, test.shardConfig, sessionIDs, false /* expectToExist */);
     verifyOpenCursorCount(test.mongosConfig, 0);
 
     assert.commandFailedWithCode(
         test.db.runCommand({getMore: cursor._cursor._cursorid, collection: testCollName}),
         ErrorCodes.CursorNotFound,
-        'expected getMore to fail because the cursor was killed');
+        "expected getMore to fail because the cursor was killed",
+    );
 };
 
 // 4. Verify that an expired session (simulated by manual deletion) that has a currently
@@ -179,8 +187,7 @@ const testVivification = (shardingTest) => {
             assert.commandWorked(test.mongosConfig.system.sessions.remove({}));
             verifyOpenCursorCount(test.mongosConfig, 1);
 
-            refreshSessionsAndVerifyExistence(
-                test.mongosConfig, test.shardConfig, [pinnedCursorSessionID]);
+            refreshSessionsAndVerifyExistence(test.mongosConfig, test.shardConfig, [pinnedCursorSessionID]);
 
             let db = coll.getDB();
             assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursorId]}));

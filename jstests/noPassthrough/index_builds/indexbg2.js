@@ -7,51 +7,58 @@ assert.neq(null, conn, "mongod failed to start.");
 let db = conn.getDB("test");
 let baseName = jsTestName();
 
-let parallel = function() {
+let parallel = function () {
     return db[baseName + "_parallelStatus"];
 };
 
-let resetParallel = function() {
+let resetParallel = function () {
     parallel().drop();
 };
 
 // Return the PID to call `waitpid` on for clean shutdown.
-let doParallel = function(work) {
+let doParallel = function (work) {
     resetParallel();
     return startMongoProgramNoConnect(
         "mongo",
         "--eval",
         work + "; db." + baseName + "_parallelStatus.save( {done:1} );",
-        db.getMongo().host);
+        db.getMongo().host,
+    );
 };
 
-let indexBuild = function() {
+let indexBuild = function () {
     let fullName = "db." + baseName;
     return doParallel(fullName + ".createIndex( {i:1}, {unique:true} )");
 };
 
-let doneParallel = function() {
+let doneParallel = function () {
     return !!parallel().findOne();
 };
 
-let waitParallel = function() {
-    assert.soon(function() {
-        return doneParallel();
-    }, "parallel did not finish in time", 300000, 1000);
+let waitParallel = function () {
+    assert.soon(
+        function () {
+            return doneParallel();
+        },
+        "parallel did not finish in time",
+        300000,
+        1000,
+    );
 };
 
-let turnFailPointOn = function(failPointName, i) {
-    assert.commandWorked(conn.adminCommand(
-        {configureFailPoint: failPointName, mode: "alwaysOn", data: {fieldsToMatch: {i: i}}}));
+let turnFailPointOn = function (failPointName, i) {
+    assert.commandWorked(
+        conn.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn", data: {fieldsToMatch: {i: i}}}),
+    );
 };
 
-let turnFailPointOff = function(failPointName) {
+let turnFailPointOff = function (failPointName) {
     assert.commandWorked(conn.adminCommand({configureFailPoint: failPointName, mode: "off"}));
 };
 
 // Unique background index build fails when there exists duplicate indexed values
 // for the duration of the build.
-let failOnExistingDuplicateValue = function(coll) {
+let failOnExistingDuplicateValue = function (coll) {
     let duplicateKey = 0;
     assert.commandWorked(coll.save({i: duplicateKey}));
 
@@ -65,7 +72,7 @@ let failOnExistingDuplicateValue = function(coll) {
 
 // Unique background index build fails when started with a unique key set,
 // but a document with a duplicate key is inserted prior to that key being indexed.
-let failOnInsertedDuplicateValue = function(coll) {
+let failOnInsertedDuplicateValue = function (coll) {
     let duplicateKey = 7;
 
     turnFailPointOn("hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", duplicateKey);
@@ -74,13 +81,12 @@ let failOnInsertedDuplicateValue = function(coll) {
     try {
         bgIndexBuildPid = indexBuild();
 
-        jsTestLog("Waiting to hang index build during collection scan before insertion of {i: " +
-                  duplicateKey + "}");
+        jsTestLog("Waiting to hang index build during collection scan before insertion of {i: " + duplicateKey + "}");
         checkLog.containsJson(conn, 20386, {
             where: "before",
-            doc: function(doc) {
+            doc: function (doc) {
                 return doc.i === duplicateKey;
-            }
+            },
         });
 
         assert.commandWorked(coll.save({i: duplicateKey}));
@@ -89,9 +95,11 @@ let failOnInsertedDuplicateValue = function(coll) {
     }
 
     waitProgram(bgIndexBuildPid);
-    assert.eq(1,
-              coll.getIndexes().length,
-              "Index should fail. Duplicate key is inserted prior to that key being indexed.");
+    assert.eq(
+        1,
+        coll.getIndexes().length,
+        "Index should fail. Duplicate key is inserted prior to that key being indexed.",
+    );
 
     // Revert to unique key set
     coll.deleteOne({i: duplicateKey});
@@ -100,7 +108,7 @@ let failOnInsertedDuplicateValue = function(coll) {
 // Unique background index build succeeds:
 // 1) when a document is inserted and removed with a key that has already been indexed
 // 2) when a document with a key not present in the initial set is inserted and removed
-let succeedWithoutWriteErrors = function(coll, newKey) {
+let succeedWithoutWriteErrors = function (coll, newKey) {
     let duplicateKey = 3;
 
     turnFailPointOn("hangIndexBuildDuringCollectionScanPhaseAfterInsertion", duplicateKey);
@@ -109,13 +117,12 @@ let succeedWithoutWriteErrors = function(coll, newKey) {
     try {
         bgIndexBuildPid = indexBuild();
 
-        jsTestLog("Waiting to hang index build during collection scan after insertion of {i: " +
-                  duplicateKey + "}");
+        jsTestLog("Waiting to hang index build during collection scan after insertion of {i: " + duplicateKey + "}");
         checkLog.containsJson(conn, 20386, {
             where: "after",
-            doc: function(doc) {
+            doc: function (doc) {
                 return doc.i === duplicateKey;
-            }
+            },
         });
 
         assert.commandWorked(coll.insert({i: duplicateKey, n: true}));
@@ -126,7 +133,6 @@ let succeedWithoutWriteErrors = function(coll, newKey) {
         // Remove duplicates before completing the index build.
         assert.commandWorked(coll.deleteOne({i: duplicateKey, n: true}));
         assert.commandWorked(coll.deleteOne({i: newKey, n: true}));
-
     } finally {
         turnFailPointOff("hangIndexBuildDuringCollectionScanPhaseAfterInsertion");
     }
@@ -135,7 +141,7 @@ let succeedWithoutWriteErrors = function(coll, newKey) {
     assert.eq(2, coll.getIndexes().length, "Index build should succeed");
 };
 
-let doTest = function() {
+let doTest = function () {
     const size = 10;
 
     let coll = db[baseName];

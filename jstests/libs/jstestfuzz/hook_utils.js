@@ -7,8 +7,8 @@ export function defineFuzzerHooks({
     beforeServerInfo: beforeServerInfo = Function.prototype,
     afterServerInfo: afterServerInfo = Function.prototype,
 } = {}) {
-    if (typeof TestData === 'undefined') {
-        throw new Error('jstestfuzz tests must be run through resmoke.py');
+    if (typeof TestData === "undefined") {
+        throw new Error("jstestfuzz tests must be run through resmoke.py");
     }
 
     TestData.beforeFuzzerServerInfoHooks = TestData.beforeFuzzerServerInfoHooks || [];

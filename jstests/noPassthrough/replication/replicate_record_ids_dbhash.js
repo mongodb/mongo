@@ -24,28 +24,23 @@ const secondary = rst.getSecondary();
 const dbName = jsTestName();
 const collName = "testColl";
 
-const findRecordId = function(testDB, collName, doc) {
+const findRecordId = function (testDB, collName, doc) {
     const res = testDB[collName].find(doc).showRecordId().toArray()[0];
     assert(res);
     return res["$recordId"];
 };
 
-const insertDocWithInconsistentRids = function(primaryDB, secondaryDB, docToInsertWithDifRid) {
-    const explicitlySetRecordIdOnInsert = configureFailPoint(
-        secondaryDB,
-        "explicitlySetRecordIdOnInsert",
-        {
-            doc: docToInsertWithDifRid,
-            "rid": 400,
-        },
-    );
-    assert.commandWorked(
-        primaryDB.runCommand({insert: collName, documents: [docToInsertWithDifRid]}));
+const insertDocWithInconsistentRids = function (primaryDB, secondaryDB, docToInsertWithDifRid) {
+    const explicitlySetRecordIdOnInsert = configureFailPoint(secondaryDB, "explicitlySetRecordIdOnInsert", {
+        doc: docToInsertWithDifRid,
+        "rid": 400,
+    });
+    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [docToInsertWithDifRid]}));
     rst.awaitReplication();
     explicitlySetRecordIdOnInsert.off();
 };
 
-const runTest = function(replicatedRecordIds) {
+const runTest = function (replicatedRecordIds) {
     const primaryDB = primary.getDB(dbName);
     const secondaryDB = secondary.getDB(dbName);
     const createOpts = replicatedRecordIds ? {recordIdsReplicated: true} : {};
@@ -65,8 +60,10 @@ const runTest = function(replicatedRecordIds) {
     // Confirm consistent data aside from the recordIds.
     const primaryCursor = primaryDB[collName].find().sort({_id: 1});
     const secondaryCursor = secondaryDB[collName].find().sort({_id: 1});
-    assert.eq({docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},
-              DataConsistencyChecker.getDiff(primaryCursor, secondaryCursor));
+    assert.eq(
+        {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},
+        DataConsistencyChecker.getDiff(primaryCursor, secondaryCursor),
+    );
 
     if (replicatedRecordIds) {
         assert.throws(() => rst.checkReplicatedDataHashes());

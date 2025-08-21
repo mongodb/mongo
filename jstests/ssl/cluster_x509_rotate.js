@@ -52,8 +52,8 @@ assert.soon(() => {
             tls: {
                 certificateKeyFile: "jstests/libs/trusted-client.pem",
                 CAFile: "jstests/libs/trusted-ca.pem",
-                allowInvalidHostnames: true
-            }
+                allowInvalidHostnames: true,
+            },
         });
     } catch (error) {
         return false;
@@ -71,21 +71,21 @@ assert.soon(() => {
             tls: {
                 certificateKeyFile: "jstests/libs/trusted-client.pem",
                 CAFile: "jstests/libs/trusted-ca.pem",
-                allowInvalidHostnames: true
-            }
+                allowInvalidHostnames: true,
+            },
         });
         const PRIMARY = 1;
         const SECONDARY = 2;
         const s = conn.adminCommand({replSetGetStatus: 1});
         if (!s.ok) {
-            print('replSetGetStatus is not ok');
+            print("replSetGetStatus is not ok");
             return false;
         }
         if (s.myState != PRIMARY && s.myState != SECONDARY) {
-            print('node is not primary or secondary');
+            print("node is not primary or secondary");
             return false;
         }
-        print('node is online and in cluster');
+        print("node is online and in cluster");
     } catch (error) {
         return false;
     }
@@ -101,11 +101,10 @@ for (let node of rst.nodeList()) {
                 tls: {
                     certificateKeyFile: "jstests/libs/trusted-client.pem",
                     CAFile: "jstests/libs/trusted-ca.pem",
-                    allowInvalidHostnames: true
-                }
+                    allowInvalidHostnames: true,
+                },
             });
-            assert.commandWorked(
-                conn.adminCommand({replSetTestEgress: 1, target, timeoutSecs: NumberInt(15)}));
+            assert.commandWorked(conn.adminCommand({replSetTestEgress: 1, target, timeoutSecs: NumberInt(15)}));
         }
     }
 }

@@ -23,8 +23,18 @@ jsTest.log("Inserting a document with id : 12345 into both shards with diff shar
 assert.commandWorked(coll.insert({_id: id, skey: -1}));
 assert.commandWorked(coll.insert({_id: id, skey: 1}));
 
-printjson(st.shard0.getCollection(coll + "").find({_id: id}).toArray());
-printjson(st.shard1.getCollection(coll + "").find({_id: id}).toArray());
+printjson(
+    st.shard0
+        .getCollection(coll + "")
+        .find({_id: id})
+        .toArray(),
+);
+printjson(
+    st.shard1
+        .getCollection(coll + "")
+        .find({_id: id})
+        .toArray(),
+);
 assert.eq(2, coll.find({_id: id}).itcount());
 
 jsTest.log("Moving both chunks to same shard...");
@@ -32,8 +42,18 @@ jsTest.log("Moving both chunks to same shard...");
 var result = admin.runCommand({moveChunk: coll + "", find: {skey: -1}, to: st.shard1.shardName});
 printjson(result);
 
-printjson(st.shard0.getCollection(coll + "").find({_id: id}).toArray());
-printjson(st.shard1.getCollection(coll + "").find({_id: id}).toArray());
+printjson(
+    st.shard0
+        .getCollection(coll + "")
+        .find({_id: id})
+        .toArray(),
+);
+printjson(
+    st.shard1
+        .getCollection(coll + "")
+        .find({_id: id})
+        .toArray(),
+);
 assert.eq(2, coll.find({_id: id}).itcount());
 
 st.stop();

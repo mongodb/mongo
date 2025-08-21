@@ -9,26 +9,26 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const lastLTSVersion = {
-    binVersion: "last-lts"
+    binVersion: "last-lts",
 };
 const latestVersion = {
-    binVersion: "latest"
+    binVersion: "latest",
 };
 
 const dbName = jsTestName();
 // The set of documents expected for each collection in 'dbName'.
-const docs = [{_id: 0, x: 0}, {_id: 1, x: 1}];
+const docs = [
+    {_id: 0, x: 0},
+    {_id: 1, x: 1},
+];
 const getDB = (primaryConnection) => primaryConnection.getDB(dbName);
 
 // Prints collection idents for collections in the 'dbName' database.
 function printIdents(node) {
-    const identsResult = node.getDB('admin')
-                             .aggregate([
-                                 {$listCatalog: {}},
-                                 {$match: {db: dbName}},
-                                 {$project: {ns: 1, ident: 1, idxIdent: 1}}
-                             ])
-                             .toArray();
+    const identsResult = node
+        .getDB("admin")
+        .aggregate([{$listCatalog: {}}, {$match: {db: dbName}}, {$project: {ns: 1, ident: 1, idxIdent: 1}}])
+        .toArray();
     jsTestLog(`Collection idents on ${node.port}: ${tojson(identsResult)}`);
 }
 
@@ -44,8 +44,10 @@ function validateCollectionContents(rst, collNames) {
             assert.sameMembers(
                 docs,
                 foundDocs,
-                `Expected collection ${collName} on ${node.host} to contain all docs: ${
-                    tojson(docs)}. Found docs: ${tojson(foundDocs)}`);
+                `Expected collection ${collName} on ${node.host} to contain all docs: ${tojson(
+                    docs,
+                )}. Found docs: ${tojson(foundDocs)}`,
+            );
         }
     });
     rst.checkReplicatedDataHashes();
@@ -60,8 +62,7 @@ function setupCollection(rst, collName) {
 function downgradeSecondariesToLastLTS(rst) {
     // First downgrade FCV to simulate replica set downgrade.
     const primaryConnection = rst.getPrimary();
-    assert.commandWorked(primaryConnection.adminCommand(
-        {setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(primaryConnection.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     // Finally, downgrade the secondaries to result in a mixed bin version replica set.
     rst.upgradeSecondaries({...lastLTSVersion});
@@ -72,10 +73,7 @@ function downgradeSecondariesToLastLTS(rst) {
 function testIdentsCompatibleAcrossVersions() {
     const rst = new ReplSetTest({
         name: jsTestName(),
-        nodes: [
-            {...latestVersion},
-            {...latestVersion},
-        ],
+        nodes: [{...latestVersion}, {...latestVersion}],
     });
     rst.startSet();
     rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});

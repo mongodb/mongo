@@ -26,7 +26,7 @@ for (i = 0; i < numDocs; i++) {
     var criteria = {"_id": 1000};
     var mod = {};
 
-    if (Random.rand() < .8) {
+    if (Random.rand() < 0.8) {
         mod["$set"] = {};
         mod["$set"]["field0"] = Random.rand();
     } else {
@@ -39,12 +39,12 @@ for (i = 0; i < numDocs; i++) {
 
 // Build an index in the background on field0
 var backgroundIndexBuildShell = startParallelShell(
-    function() {
+    function () {
         var coll = db.getSiblingDB("indexbg_updates").coll;
         assert.commandWorked(coll.createIndex({"field0": 1}, {"background": true}));
     },
-    null,  // port -- use default
-    false  // noconnect
+    null, // port -- use default
+    false, // noconnect
 );
 
 print("Do some sets and unsets");

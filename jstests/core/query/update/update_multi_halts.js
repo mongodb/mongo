@@ -30,8 +30,7 @@ function testUpsert(withIndex) {
     }
 
     // The upserted record matches the filter but shouldn't be re-updated.
-    assert.commandWorked(
-        coll.updateMany({key: {$gt: 0}}, {$set: {key: 1}, $inc: {cUpdates: 1}}, options));
+    assert.commandWorked(coll.updateMany({key: {$gt: 0}}, {$set: {key: 1}, $inc: {cUpdates: 1}}, options));
 
     assert.eq(2, coll.count(), "Count of documents in the collection after upsert");
     assert.eq(1, coll.count({key: 1}), "Count of documents with the new key");
@@ -61,9 +60,13 @@ testUpsert(true /* use ixscan for the filter */);
 
     // The update of 'key' pushes the updated record "down" the index so it will reappear in the
     // index scan.
-    assert.commandWorked(coll.updateMany({key: {$gte: 0}},                // filter
-                                         {$inc: {key: 10, cUpdates: 1}},  // update
-                                         {hint: {key: 1}}));              // options
+    assert.commandWorked(
+        coll.updateMany(
+            {key: {$gte: 0}}, // filter
+            {$inc: {key: 10, cUpdates: 1}}, // update
+            {hint: {key: 1}},
+        ),
+    ); // options
 
     assert.eq(1, coll.count(), "Count of documents in the collection after update");
     assert.eq(1, coll.find().toArray()[0].cUpdates, "Number of updates on the target doc");

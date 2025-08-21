@@ -12,9 +12,10 @@ assert.commandWorked(t.insert([point1, point2]));
 
 assert.commandWorked(t.createIndex({loc: "2dsphere"}));
 
-var explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
-                  .limit(1)
-                  .explain("executionStats");
+var explain = t
+    .find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
+    .limit(1)
+    .explain("executionStats");
 var inputStage = getExecutionStages(explain)[0].inputStage;
 
 assert.eq(1, inputStage.searchIntervals.length);
@@ -27,23 +28,26 @@ for (var i = 10; i < 70; i += 0.1) {
 
 assert.commandWorked(t.insert(points));
 
-explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
-              .limit(10)
-              .explain("executionStats");
+explain = t
+    .find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
+    .limit(10)
+    .explain("executionStats");
 inputStage = getExecutionStages(explain)[0].inputStage;
 
 assert.eq(inputStage.inputStages.length, inputStage.searchIntervals.length);
 
-explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
-              .limit(50)
-              .explain("executionStats");
+explain = t
+    .find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
+    .limit(50)
+    .explain("executionStats");
 inputStage = getExecutionStages(explain)[0].inputStage;
 
 assert.eq(inputStage.inputStages.length, inputStage.searchIntervals.length);
 
-explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
-              .limit(200)
-              .explain("executionStats");
+explain = t
+    .find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
+    .limit(200)
+    .explain("executionStats");
 inputStage = getExecutionStages(explain)[0].inputStage;
 
 assert.eq(inputStage.inputStages.length, inputStage.searchIntervals.length);

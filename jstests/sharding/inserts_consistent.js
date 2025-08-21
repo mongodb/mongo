@@ -6,11 +6,10 @@ var st = new ShardingTest({shards: 2, mongos: 2});
 var mongos = st.s;
 var admin = mongos.getDB("admin");
 var config = mongos.getDB("config");
-var coll = st.s.getCollection('TestDB.coll');
+var coll = st.s.getCollection("TestDB.coll");
 
-assert.commandWorked(
-    mongos.adminCommand({enableSharding: 'TestDB', primaryShard: st.shard0.shardName}));
-assert.commandWorked(mongos.adminCommand({shardCollection: 'TestDB.coll', key: {_id: 1}}));
+assert.commandWorked(mongos.adminCommand({enableSharding: "TestDB", primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongos.adminCommand({shardCollection: "TestDB.coll", key: {_id: 1}}));
 
 jsTest.log("Refreshing second mongos...");
 
@@ -22,8 +21,7 @@ var collB = mongosB.getCollection(coll + "");
 assert.eq(0, collB.find().itcount());
 
 jsTest.log("Moving chunk to create stale mongos...");
-assert.commandWorked(
-    admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
 
 jsTest.log("Inserting docs that needs to be retried...");
 

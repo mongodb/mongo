@@ -9,26 +9,27 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_buil
 const conn = MongoRunner.runMongod();
 
 const dbName = jsTestName();
-const collName = 'ts';
+const collName = "ts";
 const testDB = conn.getDB(dbName);
 const tsColl = testDB[collName];
 
-const timeField = 'time';
-const metaField = 'meta';
+const timeField = "time";
+const metaField = "meta";
 
 const runTest = (config) => {
     // Populate the collection.
     tsColl.drop();
 
-    assert.commandWorked(testDB.createCollection(
-        collName, {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: timeField, metaField: metaField}}));
 
     let nDocs = 10;
     for (let i = 0; i < nDocs; i++) {
-        assert.commandWorked(tsColl.insert({
-            _id: i,
-            [timeField]: new Date(),
-        }));
+        assert.commandWorked(
+            tsColl.insert({
+                _id: i,
+                [timeField]: new Date(),
+            }),
+        );
     }
 
     jsTestLog("Testing: " + tojson(config));
@@ -43,15 +44,17 @@ const runTest = (config) => {
     const awaitIndex = assertCommandWorkedInParallelShell(conn, testDB, {
         createIndexes: getTimeseriesCollForRawOps(testDB, tsColl).getName(),
         indexes: [{key: config.indexSpec, ...indexOptions}],
-        ...getRawOperationSpec(testDB)
+        ...getRawOperationSpec(testDB),
     });
     IndexBuildTest.waitForIndexBuildToStart(testDB, tsColl.getName(), indexName);
 
     // Perform writes while the index build is in progress.
-    assert.commandWorked(tsColl.insert({
-        _id: nDocs++,
-        [timeField]: new Date(),
-    }));
+    assert.commandWorked(
+        tsColl.insert({
+            _id: nDocs++,
+            [timeField]: new Date(),
+        }),
+    );
 
     let extraDocs = config.extraDocs || [];
     extraDocs.forEach((doc) => {
@@ -71,15 +74,15 @@ const runTest = (config) => {
 };
 
 const basicOps = [
-    {[metaField]: -Math.pow(-2147483648, 34)},  // -Inf
+    {[metaField]: -Math.pow(-2147483648, 34)}, // -Inf
     {[metaField]: 0},
     {[metaField]: 0},
-    {[metaField]: {foo: 'bar'}},
+    {[metaField]: {foo: "bar"}},
     {[metaField]: {foo: 1}},
-    {[metaField]: 'hello world'},
+    {[metaField]: "hello world"},
     {[metaField]: 1},
     {},
-    {[metaField]: Math.pow(-2147483648, 34)},  // Inf
+    {[metaField]: Math.pow(-2147483648, 34)}, // Inf
 ];
 
 runTest({
@@ -93,45 +96,70 @@ runTest({
 });
 
 runTest({
-    indexSpec: {[metaField]: 'hashed'},
-    extraDocs: basicOps,
-
-});
-
-runTest({
-    indexSpec: {[metaField + '.$**']: 1},
-    extraDocs: basicOps,
-});
-runTest({
-    indexSpec: {[metaField + '$**']: 1},
+    indexSpec: {[metaField]: "hashed"},
     extraDocs: basicOps,
 });
 
 runTest({
-    indexSpec: {[metaField]: '2dsphere'},
+    indexSpec: {[metaField + ".$**"]: 1},
+    extraDocs: basicOps,
+});
+runTest({
+    indexSpec: {[metaField + "$**"]: 1},
+    extraDocs: basicOps,
+});
+
+runTest({
+    indexSpec: {[metaField]: "2dsphere"},
     extraDocs: [
-        {[metaField]: {type: 'Polygon', coordinates: [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]}},
-        {[metaField]: {type: 'Point', coordinates: [0, 1]}},
-    ]
+        {
+            [metaField]: {
+                type: "Polygon",
+                coordinates: [
+                    [
+                        [0, 0],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                        [0, 0],
+                    ],
+                ],
+            },
+        },
+        {[metaField]: {type: "Point", coordinates: [0, 1]}},
+    ],
 });
 
 runTest({
-    indexSpec: {[metaField]: '2dsphere'},
+    indexSpec: {[metaField]: "2dsphere"},
     indexOptions: {sparse: true},
     extraDocs: [
-        {[metaField]: {type: 'Polygon', coordinates: [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]}},
-        {[metaField]: {type: 'Point', coordinates: [0, 1]}},
+        {
+            [metaField]: {
+                type: "Polygon",
+                coordinates: [
+                    [
+                        [0, 0],
+                        [0, 1],
+                        [1, 1],
+                        [1, 0],
+                        [0, 0],
+                    ],
+                ],
+            },
+        },
+        {[metaField]: {type: "Point", coordinates: [0, 1]}},
         {},
-    ]
+    ],
 });
 
 runTest({
-    indexSpec: {'control.min.time': 1},
+    indexSpec: {"control.min.time": 1},
     extraDocs: basicOps,
 });
 
 runTest({
-    indexSpec: {'control.max.time': -1},
+    indexSpec: {"control.max.time": -1},
     extraDocs: basicOps,
 });
 

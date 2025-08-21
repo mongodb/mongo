@@ -1,16 +1,13 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 /**
  * Utilities for testing query sampling.
  */
-export var QuerySamplingUtil = (function() {
+export var QuerySamplingUtil = (function () {
     function getCollectionUuid(db, collName) {
-        const listCollectionRes =
-            assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+        const listCollectionRes = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
         return listCollectionRes.cursor.firstBatch[0].info.uuid;
     }
 
@@ -29,7 +26,8 @@ export var QuerySamplingUtil = (function() {
      * Returns the query sampling current op documents that match the given filter.
      */
     function getQuerySamplingCurrentOp(conn, filter) {
-        return conn.getDB("admin")
+        return conn
+            .getDB("admin")
             .aggregate([
                 {$currentOp: {allUsers: true, localOps: true}},
                 {$match: Object.assign({desc: "query analyzer"}, filter)},
@@ -54,8 +52,7 @@ export var QuerySamplingUtil = (function() {
             assert.eq(docs.length, 0, docs);
 
             if (numTries % 100 == 0) {
-                jsTest.log("Still waiting for active sampling " +
-                           tojson({node, ns, collUuid, docs}));
+                jsTest.log("Still waiting for active sampling " + tojson({node, ns, collUuid, docs}));
             }
             return false;
         });
@@ -79,8 +76,7 @@ export var QuerySamplingUtil = (function() {
             assert.eq(docs.length, 1, docs);
 
             if (numTries % 100 == 0) {
-                jsTest.log("Still waiting for inactive sampling " +
-                           tojson({node, ns, collUuid, docs}));
+                jsTest.log("Still waiting for inactive sampling " + tojson({node, ns, collUuid, docs}));
             }
             return false;
         });
@@ -93,7 +89,7 @@ export var QuerySamplingUtil = (function() {
      * waits for the sampling bucket to contain at least one second of tokens.
      */
     function waitForActiveSamplingReplicaSet(rst, ns, collUuid, waitForTokens = true) {
-        rst.nodes.forEach(node => {
+        rst.nodes.forEach((node) => {
             // Skip waiting for tokens now and just wait once at the end if needed.
             waitForActiveSamplingOnNode(node, ns, collUuid, false /* waitForTokens */);
         });
@@ -108,7 +104,7 @@ export var QuerySamplingUtil = (function() {
      * to be inactive on all nodes in the given replica set.
      */
     function waitForInactiveSamplingReplicaSet(rst, ns, collUuid) {
-        rst.nodes.forEach(node => {
+        rst.nodes.forEach((node) => {
             waitForInactiveSamplingOnNode(node, ns, collUuid);
         });
     }
@@ -119,11 +115,11 @@ export var QuerySamplingUtil = (function() {
      */
     function waitForActiveSamplingShardedCluster(st, ns, collUuid, {skipMongoses} = {}) {
         if (!skipMongoses) {
-            st.forEachMongos(mongos => {
+            st.forEachMongos((mongos) => {
                 waitForActiveSamplingOnNode(mongos, ns, collUuid);
             });
         }
-        st._rs.forEach(rst => {
+        st._rs.forEach((rst) => {
             // Skip waiting for tokens now and just wait once at the end if needed.
             waitForActiveSamplingReplicaSet(rst, ns, collUuid, false /* waitForTokens */);
         });
@@ -136,10 +132,10 @@ export var QuerySamplingUtil = (function() {
      * to be inactive on all mongos and shardsvr mongod nodes in the given sharded cluster.
      */
     function waitForInactiveSamplingShardedCluster(st, ns, collUuid) {
-        st.forEachMongos(mongos => {
+        st.forEachMongos((mongos) => {
             waitForInactiveSamplingOnNode(mongos, ns, collUuid);
         });
-        st._rs.forEach(rst => {
+        st._rs.forEach((rst) => {
             waitForInactiveSamplingReplicaSet(rst, ns, collUuid);
         });
     }
@@ -176,12 +172,12 @@ export var QuerySamplingUtil = (function() {
      * Forces samples to get persisted whether or not query sampling is active.
      */
     function skipActiveSamplingCheckWhenPersistingSamples(st) {
-        st._rs.forEach(rst => {
-            rst.nodes.forEach(node => {
+        st._rs.forEach((rst) => {
+            rst.nodes.forEach((node) => {
                 configureFailPoint(node, "queryAnalysisWriterSkipActiveSamplingCheck");
             });
         });
-        st.configRS.nodes.forEach(node => {
+        st.configRS.nodes.forEach((node) => {
             configureFailPoint(node, "queryAnalysisWriterSkipActiveSamplingCheck");
         });
     }
@@ -194,12 +190,10 @@ export var QuerySamplingUtil = (function() {
     function assertSubObject(supersetObj, subsetObj) {
         for (let key in subsetObj) {
             const value = subsetObj[key];
-            if (typeof value === 'object') {
+            if (typeof value === "object") {
                 assertSubObject(supersetObj[key], subsetObj[key]);
             } else {
-                assert.eq(supersetObj[key],
-                          subsetObj[key],
-                          {key, actual: supersetObj, expected: subsetObj});
+                assert.eq(supersetObj[key], subsetObj[key], {key, actual: supersetObj, expected: subsetObj});
             }
         }
     }
@@ -218,20 +212,26 @@ export var QuerySamplingUtil = (function() {
 
         let actualSampledQueryDocs;
         let tries = 0;
-        assert.soon(() => {
-            tries++;
-            actualSampledQueryDocs = coll.find({ns}).toArray();
+        assert.soon(
+            () => {
+                tries++;
+                actualSampledQueryDocs = coll.find({ns}).toArray();
 
-            if (tries % 100 == 0) {
-                jsTest.log("Waiting for sampled query documents " +
-                           tojson({actualSampledQueryDocs, expectedSampledQueryDocs}));
-            }
+                if (tries % 100 == 0) {
+                    jsTest.log(
+                        "Waiting for sampled query documents " +
+                            tojson({actualSampledQueryDocs, expectedSampledQueryDocs}),
+                    );
+                }
 
-            return actualSampledQueryDocs.length >= expectedSampledQueryDocs.length;
-        }, "timed out waiting for sampled query documents " + tojson(expectedSampledQueryDocs));
-        assert.eq(actualSampledQueryDocs.length,
-                  expectedSampledQueryDocs.length,
-                  {actualSampledQueryDocs, expectedSampledQueryDocs});
+                return actualSampledQueryDocs.length >= expectedSampledQueryDocs.length;
+            },
+            "timed out waiting for sampled query documents " + tojson(expectedSampledQueryDocs),
+        );
+        assert.eq(actualSampledQueryDocs.length, expectedSampledQueryDocs.length, {
+            actualSampledQueryDocs,
+            expectedSampledQueryDocs,
+        });
 
         for (let {sampleId, cmdName, cmdObj} of expectedSampledQueryDocs) {
             const doc = coll.findOne({_id: sampleId});
@@ -254,33 +254,36 @@ export var QuerySamplingUtil = (function() {
      * - The document has the expected fields. If 'diff' is not null, the query has a corresponding
      *   config.sampledQueriesDiff document with the expected diff on that same shard.
      */
-    function assertSoonSampledQueryDocumentsAcrossShards(
-        st, ns, collectionUuid, cmdNames, expectedSampledQueryDocs) {
+    function assertSoonSampledQueryDocumentsAcrossShards(st, ns, collectionUuid, cmdNames, expectedSampledQueryDocs) {
         let actualSampledQueryDocs, actualCount;
         let tries = 0;
-        assert.soon(() => {
-            actualSampledQueryDocs = {};
-            actualCount = 0;
-            tries++;
-            st._rs.forEach((rs) => {
-                const docs = rs.test.getPrimary()
-                                 .getCollection(kSampledQueriesNs)
-                                 .find({cmdName: {$in: cmdNames}})
-                                 .toArray();
-                actualSampledQueryDocs[[rs.test.name]] = docs;
-                actualCount += docs.length;
-            });
+        assert.soon(
+            () => {
+                actualSampledQueryDocs = {};
+                actualCount = 0;
+                tries++;
+                st._rs.forEach((rs) => {
+                    const docs = rs.test
+                        .getPrimary()
+                        .getCollection(kSampledQueriesNs)
+                        .find({cmdName: {$in: cmdNames}})
+                        .toArray();
+                    actualSampledQueryDocs[[rs.test.name]] = docs;
+                    actualCount += docs.length;
+                });
 
-            if (tries % 100 == 0) {
-                jsTest.log("Waiting for sampled query documents " +
-                           tojson({actualSampledQueryDocs, expectedSampledQueryDocs}));
-            }
+                if (tries % 100 == 0) {
+                    jsTest.log(
+                        "Waiting for sampled query documents " +
+                            tojson({actualSampledQueryDocs, expectedSampledQueryDocs}),
+                    );
+                }
 
-            return actualCount >= expectedSampledQueryDocs.length;
-        }, "timed out waiting for sampled query documents " + tojson(expectedSampledQueryDocs));
-        assert.eq(actualCount,
-                  expectedSampledQueryDocs.length,
-                  {actualSampledQueryDocs, expectedSampledQueryDocs});
+                return actualCount >= expectedSampledQueryDocs.length;
+            },
+            "timed out waiting for sampled query documents " + tojson(expectedSampledQueryDocs),
+        );
+        assert.eq(actualCount, expectedSampledQueryDocs.length, {actualSampledQueryDocs, expectedSampledQueryDocs});
 
         for (let {filter, shardNames, cmdName, cmdObj, diff} of expectedSampledQueryDocs) {
             if (!filter) {
@@ -293,19 +296,23 @@ export var QuerySamplingUtil = (function() {
                 const queryDocs = primary.getCollection(kSampledQueriesNs).find(filter).toArray();
 
                 if (shardName) {
-                    assert.eq(queryDocs.length,
-                              0,
-                              "Found a sampled query on more than one shard " +
-                                  tojson({shardNames: [shardName, rs.test.name], cmdName, cmdObj}));
+                    assert.eq(
+                        queryDocs.length,
+                        0,
+                        "Found a sampled query on more than one shard " +
+                            tojson({shardNames: [shardName, rs.test.name], cmdName, cmdObj}),
+                    );
                     continue;
                 } else if (queryDocs.length > 0) {
                     assert.eq(queryDocs.length, 1, queryDocs);
                     const queryDoc = queryDocs[0];
 
                     shardName = rs.test.name;
-                    assert(shardNames.includes(shardName),
-                           "Found a sampled query on an unexpected shard " +
-                               tojson({actual: shardName, expected: shardNames, cmdName, cmdObj}));
+                    assert(
+                        shardNames.includes(shardName),
+                        "Found a sampled query on an unexpected shard " +
+                            tojson({actual: shardName, expected: shardNames, cmdName, cmdObj}),
+                    );
 
                     assert.eq(queryDoc.ns, ns, queryDoc);
                     assert.eq(queryDoc.collectionUuid, collectionUuid, queryDoc);
@@ -313,8 +320,7 @@ export var QuerySamplingUtil = (function() {
                     assertSubObject(queryDoc.cmd, cmdObj);
 
                     if (diff) {
-                        assertSoonSingleSampledDiffDocument(
-                            primary, queryDoc._id, ns, collectionUuid, [diff]);
+                        assertSoonSingleSampledDiffDocument(primary, queryDoc._id, ns, collectionUuid, [diff]);
                     }
                 }
             }
@@ -344,8 +350,7 @@ export var QuerySamplingUtil = (function() {
      * 'sampleId' for the collection 'ns', and then asserts that the diff in that document matches
      * one of the diffs in 'expectedSampledDiffs'.
      */
-    function assertSoonSingleSampledDiffDocument(
-        conn, sampleId, ns, collectionUuid, expectedSampledDiffs) {
+    function assertSoonSingleSampledDiffDocument(conn, sampleId, ns, collectionUuid, expectedSampledDiffs) {
         const coll = conn.getCollection(kSampledQueriesDiffNs);
 
         assert.soon(() => {
@@ -355,10 +360,12 @@ export var QuerySamplingUtil = (function() {
             }
             assert.eq(doc.ns, ns, doc);
             assert.eq(doc.collectionUuid, collectionUuid, doc);
-            assert(expectedSampledDiffs.some(diff => {
-                return bsonUnorderedFieldsCompare(doc.diff, diff) === 0;
-            }),
-                   doc);
+            assert(
+                expectedSampledDiffs.some((diff) => {
+                    return bsonUnorderedFieldsCompare(doc.diff, diff) === 0;
+                }),
+                doc,
+            );
             return true;
         });
     }
@@ -391,10 +398,12 @@ export var QuerySamplingUtil = (function() {
             const cmdEndTimeMs = Date.now();
             sleep(Math.max(0, periodMs - (cmdEndTimeMs - cmdStartTimeMs)));
         }
-        const actualNumPerSec = actualNum * 1000 / durationMs;
+        const actualNumPerSec = (actualNum * 1000) / durationMs;
 
-        jsTest.log("Finished running commands on repeat: " +
-                   tojsononeline({durationMs, periodMs, actualNumPerSec, targetNumPerSec}));
+        jsTest.log(
+            "Finished running commands on repeat: " +
+                tojsononeline({durationMs, periodMs, actualNumPerSec, targetNumPerSec}),
+        );
         return actualNumPerSec;
     }
 
@@ -452,6 +461,6 @@ export var QuerySamplingUtil = (function() {
         clearSampledDiffCollection,
         runCmdsOnRepeat,
         getNumSampledQueryDocuments,
-        getNumSampledQueryDiffDocuments
+        getNumSampledQueryDiffDocuments,
     };
 })();

@@ -39,10 +39,10 @@ const outFailpoint = "hangDuringBatchInsert";
  */
 function findAndKillOp(conn, comment) {
     assert.soon(() => {
-        const curOps =
-            conn.getDB("admin")
-                .aggregate([{$currentOp: {allUsers: true}}, {$match: {"command.comment": comment}}])
-                .toArray();
+        const curOps = conn
+            .getDB("admin")
+            .aggregate([{$currentOp: {allUsers: true}}, {$match: {"command.comment": comment}}])
+            .toArray();
         if (curOps.length === 0) {
             return false;
         }

@@ -15,24 +15,24 @@ function checkResults(pipeline, expectedNumberOfStatesInPipeline) {
     FixtureHelpers.runCommandOnEachPrimary({
         db: admin,
         cmdObj: {
-            configureFailPoint: 'disablePipelineOptimization',
+            configureFailPoint: "disablePipelineOptimization",
             mode: "off",
-        }
+        },
     });
-    assert.commandWorked(
-        testDB.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
+    assert.commandWorked(testDB.adminCommand({"configureFailPoint": "disablePipelineOptimization", "mode": "off"}));
     let optimizedExplain = getExplainedPipelineFromAggregation(testDB, coll, pipeline);
     let optimizedResult = coll.aggregate(pipeline).toArray();
 
     FixtureHelpers.runCommandOnEachPrimary({
         db: admin,
         cmdObj: {
-            configureFailPoint: 'disablePipelineOptimization',
+            configureFailPoint: "disablePipelineOptimization",
             mode: "alwaysOn",
-        }
+        },
     });
-    assert.commandWorked(testDB.adminCommand(
-        {'configureFailPoint': 'disablePipelineOptimization', 'mode': 'alwaysOn'}));
+    assert.commandWorked(
+        testDB.adminCommand({"configureFailPoint": "disablePipelineOptimization", "mode": "alwaysOn"}),
+    );
     let nonOptimizedResults = coll.aggregate(pipeline).toArray();
     let nonOptimizedExplain = getExplainedPipelineFromAggregation(testDB, coll, pipeline);
     // This assert makes sure that $densify produces the same results, with and without the sort
@@ -49,9 +49,27 @@ const coll = testDB[jsTestName()];
 const admin = testDB.getSiblingDB("admin");
 
 let collection = [
-    {val: 0},   {val: 5},    {val: -10},  {val: 100},  {val: 20},   {val: -50},   {val: 30},
-    {val: 300}, {val: 150},  {val: -300}, {val: 75},   {val: 500},  {val: -220},  {val: 430},
-    {val: -90}, {val: -500}, {val: 1000}, {val: 1400}, {val: -750}, {val: -1000}, {val: 2000},
+    {val: 0},
+    {val: 5},
+    {val: -10},
+    {val: 100},
+    {val: 20},
+    {val: -50},
+    {val: 30},
+    {val: 300},
+    {val: 150},
+    {val: -300},
+    {val: 75},
+    {val: 500},
+    {val: -220},
+    {val: 430},
+    {val: -90},
+    {val: -500},
+    {val: 1000},
+    {val: 1400},
+    {val: -750},
+    {val: -1000},
+    {val: 2000},
 ];
 assert.commandWorked(coll.insert(collection));
 
@@ -69,11 +87,26 @@ checkResults(pipeline, 2);
 
 coll.drop();
 collection = [
-    {val: 0, part: 1},     {val: 20, part: 2},   {val: -5, part: 1},   {val: 50, part: 2},
-    {val: 106, part: 1},   {val: -50, part: 2},  {val: 100, part: 1},  {val: -75, part: 2},
-    {val: 45, part: 1},    {val: -28, part: 2},  {val: 67, part: 1},   {val: -19, part: 2},
-    {val: -125, part: 1},  {val: -500, part: 2}, {val: 600, part: 1},  {val: 1000, part: 2},
-    {val: -1000, part: 1}, {val: 1400, part: 2}, {val: 3000, part: 1}, {val: -1900, part: 2},
+    {val: 0, part: 1},
+    {val: 20, part: 2},
+    {val: -5, part: 1},
+    {val: 50, part: 2},
+    {val: 106, part: 1},
+    {val: -50, part: 2},
+    {val: 100, part: 1},
+    {val: -75, part: 2},
+    {val: 45, part: 1},
+    {val: -28, part: 2},
+    {val: 67, part: 1},
+    {val: -19, part: 2},
+    {val: -125, part: 1},
+    {val: -500, part: 2},
+    {val: 600, part: 1},
+    {val: 1000, part: 2},
+    {val: -1000, part: 1},
+    {val: 1400, part: 2},
+    {val: 3000, part: 1},
+    {val: -1900, part: 2},
     {val: -2995, part: 1},
 ];
 assert.commandWorked(coll.insert(collection));
@@ -81,17 +114,17 @@ assert.commandWorked(coll.insert(collection));
 // Sort order is preserved for partitions with non-full bounds.
 pipeline = [
     {$densify: {field: "val", range: {step: 10, bounds: "partition"}, partitionByFields: ["part"]}},
-    {$sort: {part: 1, val: 1}}
+    {$sort: {part: 1, val: 1}},
 ];
 checkResults(pipeline, 2);
 pipeline = [
     {$densify: {field: "val", range: {step: 7, bounds: "partition"}, partitionByFields: ["part"]}},
-    {$sort: {part: 1, val: 1}}
+    {$sort: {part: 1, val: 1}},
 ];
 checkResults(pipeline, 2);
 pipeline = [
     {$densify: {field: "val", range: {step: 17, bounds: [-399, -19]}, partitionByFields: ["part"]}},
-    {$sort: {part: 1, val: 1}}
+    {$sort: {part: 1, val: 1}},
 ];
 checkResults(pipeline, 2);
 
@@ -100,23 +133,22 @@ checkResults(pipeline, 2);
 pipeline = [
     {$densify: {field: "val", range: {step: 11, bounds: "partition"}, partitionByFields: ["part"]}},
     {$setWindowFields: {partitionBy: "$part", sortBy: {"val": 1}, output: {val: {$sum: "$val"}}}},
-    {$sort: {part: 1, val: 1}}
+    {$sort: {part: 1, val: 1}},
 ];
 checkResults(pipeline, 4);
 
 // Sort order is not preserved with partitions with full bounds.
 pipeline = [
     {$densify: {field: "val", range: {step: 18, bounds: "full"}, partitionByFields: ["part"]}},
-    {$sort: {val: 1}}
+    {$sort: {val: 1}},
 ];
 checkResults(pipeline, 3);
 
 FixtureHelpers.runCommandOnEachPrimary({
     db: admin,
     cmdObj: {
-        configureFailPoint: 'disablePipelineOptimization',
+        configureFailPoint: "disablePipelineOptimization",
         mode: "off",
-    }
+    },
 });
-assert.commandWorked(
-    db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
+assert.commandWorked(db.adminCommand({"configureFailPoint": "disablePipelineOptimization", "mode": "off"}));

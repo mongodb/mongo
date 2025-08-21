@@ -7,7 +7,7 @@
  *   requires_getmore,
  * ]
  */
-const collNamePrefix = 'merge_sort_collation_';
+const collNamePrefix = "merge_sort_collation_";
 let collCount = 0;
 
 // Executes a test case that creates a collection and indexes, inserts documents, issues a find
@@ -50,8 +50,11 @@ function executeQueryTestCase(testCase) {
     assert.eq(actualResults, testCase.expectedResults);
 }
 
-const standardInputDocuments =
-    [{_id: 0, a: 0, b: "CC"}, {_id: 1, a: 0, b: "AA"}, {_id: 2, a: 0, b: "bb"}];
+const standardInputDocuments = [
+    {_id: 0, a: 0, b: "CC"},
+    {_id: 1, a: 0, b: "AA"},
+    {_id: 2, a: 0, b: "bb"},
+];
 
 const testCases = [
     {
@@ -63,7 +66,11 @@ const testCases = [
         filter: {a: 0},
         sort: {b: 1},
         inputDocuments: standardInputDocuments,
-        expectedResults: [{_id: 1, a: 0, b: "AA"}, {_id: 0, a: 0, b: "CC"}, {_id: 2, a: 0, b: "bb"}]
+        expectedResults: [
+            {_id: 1, a: 0, b: "AA"},
+            {_id: 0, a: 0, b: "CC"},
+            {_id: 2, a: 0, b: "bb"},
+        ],
     },
     {
         // Verifies that a non-collatable point-query on the prefix of the index key together with a
@@ -76,7 +83,11 @@ const testCases = [
         sort: {b: 1},
         findCollation: {locale: "simple"},
         inputDocuments: standardInputDocuments,
-        expectedResults: [{_id: 1, a: 0, b: "AA"}, {_id: 0, a: 0, b: "CC"}, {_id: 2, a: 0, b: "bb"}]
+        expectedResults: [
+            {_id: 1, a: 0, b: "AA"},
+            {_id: 0, a: 0, b: "CC"},
+            {_id: 2, a: 0, b: "bb"},
+        ],
     },
     {
         // Verifies that a non-collatable point-query on the prefix of the index key together with a
@@ -87,7 +98,11 @@ const testCases = [
         sort: {b: 1},
         findCollation: {locale: "en_US", strength: 1},
         inputDocuments: standardInputDocuments,
-        expectedResults: [{_id: 1, a: 0, b: "AA"}, {_id: 2, a: 0, b: "bb"}, {_id: 0, a: 0, b: "CC"}]
+        expectedResults: [
+            {_id: 1, a: 0, b: "AA"},
+            {_id: 2, a: 0, b: "bb"},
+            {_id: 0, a: 0, b: "CC"},
+        ],
     },
     {
         // Verifies that a non-collatable point-query on the prefix of the index key together with a
@@ -99,7 +114,11 @@ const testCases = [
         sort: {b: 1},
         findCollation: {locale: "en_US", strength: 1},
         inputDocuments: standardInputDocuments,
-        expectedResults: [{_id: 1, a: 0, b: "AA"}, {_id: 2, a: 0, b: "bb"}, {_id: 0, a: 0, b: "CC"}]
+        expectedResults: [
+            {_id: 1, a: 0, b: "AA"},
+            {_id: 2, a: 0, b: "bb"},
+            {_id: 0, a: 0, b: "CC"},
+        ],
     },
     {
         // Verifies that a non-collatable point-query on the prefix of the index key together with a
@@ -111,7 +130,11 @@ const testCases = [
         sort: {b: 1},
         findCollation: {locale: "en_US", strength: 1},
         inputDocuments: standardInputDocuments,
-        expectedResults: [{_id: 1, a: 0, b: "AA"}, {_id: 2, a: 0, b: "bb"}, {_id: 0, a: 0, b: "CC"}]
+        expectedResults: [
+            {_id: 1, a: 0, b: "AA"},
+            {_id: 2, a: 0, b: "bb"},
+            {_id: 0, a: 0, b: "CC"},
+        ],
     },
     {
         // Verifies that a non-collatable point-query on the prefix of the index key, a collatable
@@ -120,10 +143,13 @@ const testCases = [
         // not have an explicit collation.
         indexes: [{a: 1, b: 1}],
         indexOptions: {collation: {locale: "en_US", strength: 1}},
-        filter: {a: 0, b: {$gte: 'A', $lt: 'D'}},
+        filter: {a: 0, b: {$gte: "A", $lt: "D"}},
         sort: {b: 1},
         inputDocuments: standardInputDocuments,
-        expectedResults: [{_id: 1, a: 0, b: "AA"}, {_id: 0, a: 0, b: "CC"}]
+        expectedResults: [
+            {_id: 1, a: 0, b: "AA"},
+            {_id: 0, a: 0, b: "CC"},
+        ],
     },
     {
         // Verifies that a non-collatable point-query on the prefix of the index key, a collatable
@@ -132,10 +158,13 @@ const testCases = [
         // have an explicit collation.
         indexes: [{a: 1, b: 1, c: 1}],
         indexOptions: {collation: {locale: "en_US", strength: 1}},
-        filter: {a: 0, b: {$gte: 'A', $lt: 'D'}},
+        filter: {a: 0, b: {$gte: "A", $lt: "D"}},
         sort: {b: 1},
         inputDocuments: standardInputDocuments,
-        expectedResults: [{_id: 1, a: 0, b: "AA"}, {_id: 0, a: 0, b: "CC"}]
+        expectedResults: [
+            {_id: 1, a: 0, b: "AA"},
+            {_id: 0, a: 0, b: "CC"},
+        ],
     },
     {
         // Verifies that a non-collatable multi-point query on the prefix of the index key, a
@@ -144,15 +173,19 @@ const testCases = [
         // query does not have an explicit collation.
         indexes: [{a: 1, b: 1}],
         indexOptions: {collation: {locale: "en_US", strength: 1}},
-        filter: {a: {$in: [0, 2]}, b: {$gte: 'A', $lt: 'D'}},
+        filter: {a: {$in: [0, 2]}, b: {$gte: "A", $lt: "D"}},
         sort: {b: 1},
         inputDocuments: [
             {_id: 0, a: 0, b: "CC"},
             {_id: 1, a: 0, b: "AA"},
             {_id: 2, a: 0, b: "bb"},
-            {_id: 3, a: 2, b: "BB"}
+            {_id: 3, a: 2, b: "BB"},
         ],
-        expectedResults: [{_id: 1, a: 0, b: "AA"}, {_id: 3, a: 2, b: "BB"}, {_id: 0, a: 0, b: "CC"}]
+        expectedResults: [
+            {_id: 1, a: 0, b: "AA"},
+            {_id: 3, a: 2, b: "BB"},
+            {_id: 0, a: 0, b: "CC"},
+        ],
     },
     {
         // Verifies that a non-collatable multi-point query on the prefix of the index key, a
@@ -168,9 +201,13 @@ const testCases = [
             {_id: 1, a: 0, b: 10},
             {_id: 2, a: 0, b: "bb"},
             {_id: 3, a: 2, b: 5},
-            {_id: 4, a: 2, b: 4}
+            {_id: 4, a: 2, b: 4},
         ],
-        expectedResults: [{_id: 4, a: 2, b: 4}, {_id: 3, a: 2, b: 5}, {_id: 0, a: 0, b: 6}]
+        expectedResults: [
+            {_id: 4, a: 2, b: 4},
+            {_id: 3, a: 2, b: 5},
+            {_id: 0, a: 0, b: 6},
+        ],
     },
     {
         // Verifies that a non-collatable multi-point query on the prefix of the index key, a
@@ -187,9 +224,13 @@ const testCases = [
             {_id: 1, a: 0, b: 10},
             {_id: 2, a: 0, b: "bb"},
             {_id: 3, a: 2, b: 5},
-            {_id: 4, a: 2, b: 4}
+            {_id: 4, a: 2, b: 4},
         ],
-        expectedResults: [{_id: 4, a: 2, b: 4}, {_id: 3, a: 2, b: 5}, {_id: 0, a: 0, b: 6}]
+        expectedResults: [
+            {_id: 4, a: 2, b: 4},
+            {_id: 3, a: 2, b: 5},
+            {_id: 0, a: 0, b: 6},
+        ],
     },
     {
         // Verifies that a non-collatable point-query on the prefix of the index key, a
@@ -204,9 +245,13 @@ const testCases = [
             {_id: 0, a: 0, b: 6},
             {_id: 1, a: 0, b: 5},
             {_id: 2, a: 0, b: "bb"},
-            {_id: 3, a: 0, b: 4}
+            {_id: 3, a: 0, b: 4},
         ],
-        expectedResults: [{_id: 3, a: 0, b: 4}, {_id: 1, a: 0, b: 5}, {_id: 0, a: 0, b: 6}]
+        expectedResults: [
+            {_id: 3, a: 0, b: 4},
+            {_id: 1, a: 0, b: 5},
+            {_id: 0, a: 0, b: 6},
+        ],
     },
     {
         // Verifies that a collatable multi-point query on the prefix of the index key, and a sort
@@ -222,14 +267,14 @@ const testCases = [
             {_id: 0, a: "1", b: "a"},
             {_id: 1, a: "1", b: "c"},
             {_id: 2, a: "2", b: "b"},
-            {_id: 3, a: "2", b: "d"}
+            {_id: 3, a: "2", b: "d"},
         ],
         expectedResults: [
             {_id: 0, a: "1", b: "a"},
             {_id: 2, a: "2", b: "b"},
             {_id: 1, a: "1", b: "c"},
-            {_id: 3, a: "2", b: "d"}
-        ]
+            {_id: 3, a: "2", b: "d"},
+        ],
     },
     {
         // Verifies that a collatable multi-point query on the prefix of the index key, and a sort
@@ -245,14 +290,14 @@ const testCases = [
             {_id: 0, a: "1", b: "1", c: "a"},
             {_id: 1, a: "1", b: "1", c: "c"},
             {_id: 2, a: "2", b: "1", c: "b"},
-            {_id: 3, a: "2", b: "1", c: "u", d: "a"}
+            {_id: 3, a: "2", b: "1", c: "u", d: "a"},
         ],
         expectedResults: [
             {_id: 0, a: "1", b: "1", c: "a"},
             {_id: 2, a: "2", b: "1", c: "b"},
             {_id: 1, a: "1", b: "1", c: "c"},
-            {_id: 3, a: "2", b: "1", c: "u", d: "a"}
-        ]
+            {_id: 3, a: "2", b: "1", c: "u", d: "a"},
+        ],
     },
     {
         // Verifies that a collatable $or query on the prefixes of the keys of 3 indexes, and a sort
@@ -263,9 +308,19 @@ const testCases = [
         // between MERGE_SORT and IXSCAN. This tests comparison of index versus fetched document
         // provided sort keys. In addition to that, some documents have missing values and objects
         // as sort attribute values.
-        indexes: [{a: 1, b: 1, c: 1}, {d: 1, c: 1}, {f: 1, c: 1}],
+        indexes: [
+            {a: 1, b: 1, c: 1},
+            {d: 1, c: 1},
+            {f: 1, c: 1},
+        ],
         indexOptions: {collation: {locale: "en", strength: 2}},
-        filter: {$or: [{a: {$in: ["1", "2"]}, b: "1"}, {d: "3", e: "3"}, {f: "4", g: "3"}]},
+        filter: {
+            $or: [
+                {a: {$in: ["1", "2"]}, b: "1"},
+                {d: "3", e: "3"},
+                {f: "4", g: "3"},
+            ],
+        },
         sort: {c: 1},
         findCollation: {locale: "en", strength: 2},
         inputDocuments: [
@@ -291,7 +346,7 @@ const testCases = [
             {_id: 7, d: "3", e: "3", c: {a: "A"}},
             {_id: 6, a: "2", b: "1", c: {a: "B"}},
             {_id: 8, d: "3", e: "3", c: {a: "C"}},
-        ]
+        ],
     },
     {
         // Verifies that a multi-point query on the prefix of the index key, and a sort on the
@@ -305,14 +360,14 @@ const testCases = [
             {_id: 0, a: "1", b: "1", c: "a"},
             {_id: 1, a: "1", b: "1", c: "c"},
             {_id: 2, a: "2", b: "1", c: "b"},
-            {_id: 3, a: "2", b: "1", c: "d"}
+            {_id: 3, a: "2", b: "1", c: "d"},
         ],
         expectedResults: [
             {_id: 0, a: "1", b: "1", c: "a"},
             {_id: 2, a: "2", b: "1", c: "b"},
             {_id: 1, a: "1", b: "1", c: "c"},
-            {_id: 3, a: "2", b: "1", c: "d"}
-        ]
+            {_id: 3, a: "2", b: "1", c: "d"},
+        ],
     },
     {
         // Verifies that a multi-point query on the prefix of the index key, and a sort on the
@@ -325,20 +380,23 @@ const testCases = [
             {_id: 0, a: "1", b: "1", c: "a"},
             {_id: 1, a: "1", b: "1", c: "c"},
             {_id: 2, a: "2", b: "1", c: "b"},
-            {_id: 3, a: "2", b: "1", c: "d"}
+            {_id: 3, a: "2", b: "1", c: "d"},
         ],
         expectedResults: [
             {_id: 0, a: "1", b: "1", c: "a"},
             {_id: 2, a: "2", b: "1", c: "b"},
             {_id: 1, a: "1", b: "1", c: "c"},
-            {_id: 3, a: "2", b: "1", c: "d"}
-        ]
+            {_id: 3, a: "2", b: "1", c: "d"},
+        ],
     },
     {
         // Verifies that an $or query on the prefixes of index keys, and a sort on the suffix of the
         // index keys returns correct results when the collection and the query have the same
         // non-simple collation specified.
-        indexes: [{a: 1, c: 1}, {b: 1, c: 1}],
+        indexes: [
+            {a: 1, c: 1},
+            {b: 1, c: 1},
+        ],
         indexOptions: {collation: {locale: "en", strength: 2}},
         filter: {$or: [{a: "1"}, {b: "2"}]},
         sort: {c: 1},
@@ -347,20 +405,23 @@ const testCases = [
             {_id: 0, a: "1", c: "a"},
             {_id: 1, a: "1", c: "c"},
             {_id: 2, b: "2", c: "b"},
-            {_id: 3, b: "2", c: "d"}
+            {_id: 3, b: "2", c: "d"},
         ],
         expectedResults: [
             {_id: 0, a: "1", c: "a"},
             {_id: 2, b: "2", c: "b"},
             {_id: 1, a: "1", c: "c"},
-            {_id: 3, b: "2", c: "d"}
-        ]
+            {_id: 3, b: "2", c: "d"},
+        ],
     },
     {
         // Verifies that an $or query on the prefixes of index keys, and a sort on the suffix of the
         // index keys returns correct results when the collection and the query have the same
         // non-simple collation specified and one $or operand requires a FETCH.
-        indexes: [{a: 1, c: 1}, {b: 1, c: 1}],
+        indexes: [
+            {a: 1, c: 1},
+            {b: 1, c: 1},
+        ],
         indexOptions: {collation: {locale: "en", strength: 2}},
         filter: {$or: [{a: "1"}, {b: "2", d: "3"}]},
         sort: {c: 1},
@@ -369,14 +430,14 @@ const testCases = [
             {_id: 0, a: "1", c: "a"},
             {_id: 1, a: "1", c: "c"},
             {_id: 2, b: "2", c: "b", d: "3"},
-            {_id: 3, b: "2", c: "d", d: "3"}
+            {_id: 3, b: "2", c: "d", d: "3"},
         ],
         expectedResults: [
             {_id: 0, a: "1", c: "a"},
             {_id: 2, b: "2", c: "b", d: "3"},
             {_id: 1, a: "1", c: "c"},
-            {_id: 3, b: "2", c: "d", d: "3"}
-        ]
+            {_id: 3, b: "2", c: "d", d: "3"},
+        ],
     },
     {
         // Verifies that a non-collatable multi-point query on the prefix of the index key, and a
@@ -392,22 +453,32 @@ const testCases = [
             {_id: 0, a: 1, b: "a"},
             {_id: 1, a: 1, b: "c"},
             {_id: 2, a: 2, b: "b"},
-            {_id: 3, a: 2, b: "d"}
+            {_id: 3, a: 2, b: "d"},
         ],
         expectedResults: [
             {_id: 0, a: 1, b: "a"},
             {_id: 2, a: 2, b: "b"},
             {_id: 1, a: 1, b: "c"},
-            {_id: 3, a: 2, b: "d"}
-        ]
+            {_id: 3, a: 2, b: "d"},
+        ],
     },
     {
         // Verifies that a non-collatable $or query on the prefixes of the index keys, and a sort on
         // suffixes of the index keys returns correct results when the index is a compound index
         // with a non-simple collation that is different from the collation of the query.
-        indexes: [{a: 1, c: 1}, {b: 1, c: 1}],
+        indexes: [
+            {a: 1, c: 1},
+            {b: 1, c: 1},
+        ],
         indexOptions: {collation: {locale: "fr"}},
-        filter: {$or: [{a: 1, c: 1}, {b: 2, c: 2}, {b: 2, c: 3}, {b: 2, c: 4}]},
+        filter: {
+            $or: [
+                {a: 1, c: 1},
+                {b: 2, c: 2},
+                {b: 2, c: 3},
+                {b: 2, c: 4},
+            ],
+        },
         sort: {c: 1},
         findCollation: {locale: "en", strength: 2},
         inputDocuments: [
@@ -421,7 +492,7 @@ const testCases = [
             {_id: 2, b: 2, c: 2},
             {_id: 3, b: 2, c: 3},
             {_id: 4, b: 2, c: 4},
-        ]
+        ],
     },
     {
         // Verifies that a fully-index-covered non-collatable multi-point query on a prefix of an
@@ -442,7 +513,7 @@ const testCases = [
             {a: 1, c: 3},
             {a: 2, c: 4},
             {a: 1, c: 5},
-        ]
+        ],
     },
     {
         // Verifies that a non-collatable multi-point query on a prefix of an index key, and a
@@ -467,7 +538,7 @@ const testCases = [
             {a: 2, c: "b"},
             {a: 1, c: "c"},
             {a: 2, c: "d"},
-        ]
+        ],
     },
 ];
 

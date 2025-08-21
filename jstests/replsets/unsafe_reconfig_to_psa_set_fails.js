@@ -13,10 +13,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    assertVoteCount,
-    waitForNewlyAddedRemovalForNodeToBeCommitted
-} from "jstests/replsets/rslib.js";
+import {assertVoteCount, waitForNewlyAddedRemovalForNodeToBeCommitted} from "jstests/replsets/rslib.js";
 
 {
     jsTestLog("Testing reconfig from PA set to PSA set fails");
@@ -47,8 +44,10 @@ import {
     config.version += 1;
     jsTestLog(`New config with secondary added: ${tojson(config)}`);
 
-    assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
-                                 ErrorCodes.NewReplicaSetConfigurationIncompatible);
+    assert.commandFailedWithCode(
+        primary.adminCommand({replSetReconfig: config}),
+        ErrorCodes.NewReplicaSetConfigurationIncompatible,
+    );
 
     // Verify that the vote counts have not changed, since the reconfig did not successfully
     // complete.
@@ -91,10 +90,13 @@ import {
     config.members[1].priority = 1;
     jsTestLog(
         `New config with secondary reconfigured to have {votes: 1, priority: 1}: 
-              ${tojson(config)}`);
+              ${tojson(config)}`,
+    );
 
-    assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config}),
-                                 ErrorCodes.NewReplicaSetConfigurationIncompatible);
+    assert.commandFailedWithCode(
+        primary.adminCommand({replSetReconfig: config}),
+        ErrorCodes.NewReplicaSetConfigurationIncompatible,
+    );
 
     // Verify that the vote counts have not changed, since the reconfig did not successfully
     // complete.
@@ -111,7 +113,8 @@ import {
 
 {
     jsTestLog(
-        "Testing that the correct workflow for converting a replica set with only one writable voting node to a PSA architecture succeeds");
+        "Testing that the correct workflow for converting a replica set with only one writable voting node to a PSA architecture succeeds",
+    );
     const rst = new ReplSetTest({
         nodes: [{}, {rsConfig: {arbiterOnly: true}}],
     });
@@ -135,8 +138,7 @@ import {
     const newConfig = rst.getReplSetConfig();
     config.members = newConfig.members;
     config.version += 1;
-    jsTestLog(`Reconfiguring set to add a secondary with {votes: 1: priority: 0. New config: ${
-        tojson(config)}`);
+    jsTestLog(`Reconfiguring set to add a secondary with {votes: 1: priority: 0. New config: ${tojson(config)}`);
     assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
     waitForNewlyAddedRemovalForNodeToBeCommitted(primary, 2 /* memberIndex */);
 
@@ -145,15 +147,14 @@ import {
         majorityVoteCount: 2,
         writableVotingMembersCount: 2,
         writeMajorityCount: 2,
-        totalMembersCount: 3
+        totalMembersCount: 3,
     });
 
     // Second, give the secondary a non-zero priority level.
     config = rst.getReplSetConfigFromNode();
     config.members[1].priority = 1;
     config.version += 1;
-    jsTestLog(`Reconfiguring set to give the secondary a positive priority. New config: ${
-        tojson(config)}`);
+    jsTestLog(`Reconfiguring set to give the secondary a positive priority. New config: ${tojson(config)}`);
     assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
     assertVoteCount(primary, {
@@ -161,7 +162,7 @@ import {
         majorityVoteCount: 2,
         writableVotingMembersCount: 2,
         writeMajorityCount: 2,
-        totalMembersCount: 3
+        totalMembersCount: 3,
     });
 
     rst.stopSet();

@@ -36,16 +36,17 @@ function testWriteCmd(rst, cmdOpts, testCase) {
         collectionUuid = QuerySamplingUtil.getCollectionUuid(primaryDB, collName);
     }
 
-    const {originalCmdObj, expectedSampledQueryDocs} =
-        cmdOpts.makeCmdObjFunc(collName, testCase.markForSampling, testCase.expectSampling);
+    const {originalCmdObj, expectedSampledQueryDocs} = cmdOpts.makeCmdObjFunc(
+        collName,
+        testCase.markForSampling,
+        testCase.expectSampling,
+    );
 
-    jsTest.log(
-        `Testing test case ${tojson(testCase)} with ${tojson({dbName, collName, originalCmdObj})}`);
+    jsTest.log(`Testing test case ${tojson(testCase)} with ${tojson({dbName, collName, originalCmdObj})}`);
     assert.commandWorked(primaryDB.runCommand(originalCmdObj));
 
     if (testCase.expectSampling) {
-        QuerySamplingUtil.assertSoonSampledQueryDocuments(
-            primary, ns, collectionUuid, expectedSampledQueryDocs);
+        QuerySamplingUtil.assertSoonSampledQueryDocuments(primary, ns, collectionUuid, expectedSampledQueryDocs);
     } else {
         // To verify that no writes occurred, wait for one interval before asserting.
         sleep(queryAnalysisWriterIntervalSecs * 1000);
@@ -62,7 +63,7 @@ function testUpdateCmd(rst, testCases) {
             arrayFilters: [{"element": {$gt: 10}}],
             multi: false,
             upsert: false,
-            collation: QuerySamplingUtil.generateRandomCollation()
+            collation: QuerySamplingUtil.generateRandomCollation(),
         };
         const updateOp1 = {
             q: {a: {$lt: 1}},
@@ -76,12 +77,12 @@ function testUpdateCmd(rst, testCases) {
             u: {$set: {b: 1}},
             multi: true,
             upsert: false,
-            collation: QuerySamplingUtil.generateRandomCollation()
+            collation: QuerySamplingUtil.generateRandomCollation(),
         };
         const originalCmdObj = {
             update: collName,
             updates: [updateOp0, updateOp1, updateOp2],
-            let : {y: 1},
+            let: {y: 1},
         };
 
         const expectedSampledQueryDocs = [];
@@ -93,12 +94,12 @@ function testUpdateCmd(rst, testCases) {
                 expectedSampledQueryDocs.push({
                     sampleId: updateOp0.sampleId,
                     cmdName: cmdName,
-                    cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp0]})
+                    cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp0]}),
                 });
                 expectedSampledQueryDocs.push({
                     sampleId: updateOp1.sampleId,
                     cmdName: cmdName,
-                    cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp1]})
+                    cmdObj: Object.assign({}, originalCmdObj, {updates: [updateOp1]}),
                 });
             }
         }
@@ -117,18 +118,17 @@ function testDeleteCmd(rst, testCases) {
         const deleteOp0 = {
             q: {a: 0},
             limit: 0,
-            collation: QuerySamplingUtil.generateRandomCollation()
+            collation: QuerySamplingUtil.generateRandomCollation(),
         };
         const deleteOp1 = {q: {a: {$lt: 1}}, limit: 0};
         const deleteOp2 = {
             q: {a: {$gte: 2}},
             limit: 1,
-            collation: QuerySamplingUtil.generateRandomCollation()
+            collation: QuerySamplingUtil.generateRandomCollation(),
         };
         const originalCmdObj = {
             delete: collName,
             deletes: [deleteOp0, deleteOp1, deleteOp2],
-
         };
 
         const expectedSampledQueryDocs = [];
@@ -140,12 +140,12 @@ function testDeleteCmd(rst, testCases) {
                 expectedSampledQueryDocs.push({
                     sampleId: deleteOp0.sampleId,
                     cmdName: cmdName,
-                    cmdObj: Object.assign({}, originalCmdObj, {deletes: [deleteOp0]})
+                    cmdObj: Object.assign({}, originalCmdObj, {deletes: [deleteOp0]}),
                 });
                 expectedSampledQueryDocs.push({
                     sampleId: deleteOp2.sampleId,
                     cmdName: cmdName,
-                    cmdObj: Object.assign({}, originalCmdObj, {deletes: [deleteOp2]})
+                    cmdObj: Object.assign({}, originalCmdObj, {deletes: [deleteOp2]}),
                 });
             }
         }
@@ -170,7 +170,7 @@ function testFindAndModifyCmd(rst, testCases) {
             collation: QuerySamplingUtil.generateRandomCollation(),
             new: true,
             upsert: false,
-            let : {x: 1},
+            let: {x: 1},
         };
 
         const expectedSampledQueryDocs = [];
@@ -181,7 +181,7 @@ function testFindAndModifyCmd(rst, testCases) {
                 expectedSampledQueryDocs.push({
                     sampleId: originalCmdObj.sampleId,
                     cmdName: cmdName,
-                    cmdObj: Object.assign({}, originalCmdObj)
+                    cmdObj: Object.assign({}, originalCmdObj),
                 });
             }
         }
@@ -203,7 +203,8 @@ function testInsertCmd(rst) {
     // is an unknown field for insert commands.
     assert.commandFailedWithCode(
         db.runCommand({insert: collName, documents: [{a: 0}], sampleId: UUID()}),
-        ErrorCodes.IDLUnknownField);
+        ErrorCodes.IDLUnknownField,
+    );
 }
 
 {

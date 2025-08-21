@@ -13,12 +13,24 @@ t.createIndex({geo: "2dsphere"});
  */
 
 let meridianCrossingLine = {
-    geo: {type: "LineString", coordinates: [[-178.0, 10.0], [178.0, 10.0]]}
+    geo: {
+        type: "LineString",
+        coordinates: [
+            [-178.0, 10.0],
+            [178.0, 10.0],
+        ],
+    },
 };
 
 assert.commandWorked(t.insert(meridianCrossingLine));
 
-let lineAlongMeridian = {type: "LineString", coordinates: [[180.0, 11.0], [180.0, 9.0]]};
+let lineAlongMeridian = {
+    type: "LineString",
+    coordinates: [
+        [180.0, 11.0],
+        [180.0, 9.0],
+    ],
+};
 
 let result = t.find({geo: {$geoIntersects: {$geometry: lineAlongMeridian}}});
 assert.eq(result.itcount(), 1);
@@ -40,7 +52,15 @@ t.insert(pointOnPositiveSideOfMeridian);
 
 let meridianCrossingPoly = {
     type: "Polygon",
-    coordinates: [[[-178.0, 10.0], [178.0, 10.0], [178.0, -10.0], [-178.0, -10.0], [-178.0, 10.0]]]
+    coordinates: [
+        [
+            [-178.0, 10.0],
+            [178.0, 10.0],
+            [178.0, -10.0],
+            [-178.0, -10.0],
+            [-178.0, 10.0],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoWithin: {$geometry: meridianCrossingPoly}}});
@@ -62,7 +82,7 @@ t.insert(pointOnPositiveSideOfMerid);
 
 pointOnPositiveSideOfMeridian = {
     type: "Point",
-    coordinates: [179.0, 0.0]
+    coordinates: [179.0, 0.0],
 };
 
 result = t.find({geo: {$geoNear: pointOnPositiveSideOfMeridian}});

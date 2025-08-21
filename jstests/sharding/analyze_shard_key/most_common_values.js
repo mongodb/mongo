@@ -6,9 +6,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const kSize10MB = 10 * 1024 * 1024;
 
@@ -19,26 +17,26 @@ const numMostCommonValues = 5;
 // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
 // command with readPreference "secondaryPreferred".
 const writeConcern = {
-    w: numNodesPerRS
+    w: numNodesPerRS,
 };
 
 const simpleCollation = {
-    locale: "simple"
+    locale: "simple",
 };
 const caseInsensitiveCollation = {
     locale: "en_US",
     strength: 1,
-    caseLevel: false
+    caseLevel: false,
 };
 
 function setMongodServerParametersReplicaSet(rst, params) {
-    rst.nodes.forEach(node => {
+    rst.nodes.forEach((node) => {
         assert.commandWorked(node.adminCommand(Object.assign({setParameter: 1}, params)));
     });
 }
 
 function setMongodServerParametersShardedCluster(st, params) {
-    st._rs.forEach(rst => {
+    st._rs.forEach((rst) => {
         setMongodServerParametersReplicaSet(rst, params);
     });
 }
@@ -57,8 +55,7 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
 
     const dbName = "testDb";
     if (st) {
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     }
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -70,39 +67,39 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
     // in casing.
     assert.commandWorked(db.createCollection(collName, {collation: caseInsensitiveCollation}));
 
-    const indexOptions =
-        Object.assign({collation: simpleCollation}, isUnique ? {unique: true} : {});
+    const indexOptions = Object.assign({collation: simpleCollation}, isUnique ? {unique: true} : {});
     assert.commandWorked(coll.createIndex({a: isHashed ? "hashed" : 1}, indexOptions));
     assert.commandWorked(coll.createIndex({"a.y": isHashed ? "hashed" : 1}, indexOptions));
     assert.commandWorked(coll.createIndex({"a.y.ii": isHashed ? "hashed" : 1}, indexOptions));
 
     if (isShardedColl) {
-        assert(!isUnique,
-               "Cannot test with a sharded collection when the candidate shard keys " +
-                   "are unique since uniqueness can't be maintained unless the shard key is " +
-                   "prefix of the candidate shard keys");
+        assert(
+            !isUnique,
+            "Cannot test with a sharded collection when the candidate shard keys " +
+                "are unique since uniqueness can't be maintained unless the shard key is " +
+                "prefix of the candidate shard keys",
+        );
         assert(st);
 
         // Make the collection have two chunks:
         // shard0: [MinKey, 1]
         // shard1: [1, MaxKey]
-        assert.commandWorked(
-            st.s.adminCommand({shardCollection: ns, key: {b: 1}, collation: simpleCollation}));
+        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {b: 1}, collation: simpleCollation}));
         assert.commandWorked(st.s.adminCommand({split: ns, middle: {b: 1}}));
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: ns, find: {b: 1}, to: st.shard1.shardName}));
+        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {b: 1}, to: st.shard1.shardName}));
     }
 
+    assert.commandWorked(coll.insert({a: {x: -2, y: {i: -2, ii: "a", iii: -2}, z: -2}, b: -2}, {writeConcern}));
+    assert.commandWorked(coll.insert({a: {x: -1, y: {i: -1, ii: "A", iii: -1}, z: -1}, b: -1}, {writeConcern}));
     assert.commandWorked(
-        coll.insert({a: {x: -2, y: {i: -2, ii: "a", iii: -2}, z: -2}, b: -2}, {writeConcern}));
+        coll.insert({a: {x: 0, y: {i: 0, ii: "B".repeat(kSize10MB - 1), iii: 0}, z: 0}, b: 0}, {writeConcern}),
+    );
     assert.commandWorked(
-        coll.insert({a: {x: -1, y: {i: -1, ii: "A", iii: -1}, z: -1}, b: -1}, {writeConcern}));
-    assert.commandWorked(coll.insert(
-        {a: {x: 0, y: {i: 0, ii: "B".repeat(kSize10MB - 1), iii: 0}, z: 0}, b: 0}, {writeConcern}));
-    assert.commandWorked(coll.insert(
-        {a: {x: 1, y: {i: 1, ii: "C".repeat(kSize10MB - 1), iii: 1}, z: 1}, b: 1}, {writeConcern}));
-    assert.commandWorked(coll.insert(
-        {a: {x: 2, y: {i: 2, ii: "D".repeat(kSize10MB - 1), iii: 2}, z: 2}, b: 2}, {writeConcern}));
+        coll.insert({a: {x: 1, y: {i: 1, ii: "C".repeat(kSize10MB - 1), iii: 1}, z: 1}, b: 1}, {writeConcern}),
+    );
+    assert.commandWorked(
+        coll.insert({a: {x: 2, y: {i: 2, ii: "D".repeat(kSize10MB - 1), iii: 2}, z: 2}, b: 2}, {writeConcern}),
+    );
 
     const testCases = [];
 
@@ -112,7 +109,7 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
         key: {"a.y.ii": 1},
         // Skip calculating the read and write distribution metrics since they are not needed by
         // this test.
-        readWriteDistribution: false
+        readWriteDistribution: false,
     };
     const expectedMetrics0 = {
         numDocs: 5,
@@ -123,18 +120,18 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
             {value: {"a.y.ii": "A"}, frequency: 1},
             {
                 value: {"a.y.ii": {type: "string", value: "truncated", sizeBytes: 10485764}},
-                frequency: 1
+                frequency: 1,
             },
             {
                 value: {"a.y.ii": {type: "string", value: "truncated", sizeBytes: 10485764}},
-                frequency: 1
+                frequency: 1,
             },
             {
                 value: {"a.y.ii": {type: "string", value: "truncated", sizeBytes: 10485764}},
-                frequency: 1
+                frequency: 1,
             },
         ],
-        numMostCommonValues
+        numMostCommonValues,
     };
     testCases.push({cmdObj: cmdObj0, expectedMetrics: expectedMetrics0});
 
@@ -144,7 +141,7 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
         key: {"a.y": 1},
         // Skip calculating the read and write distribution metrics since they are not needed by
         // this test.
-        readWriteDistribution: false
+        readWriteDistribution: false,
     };
     const expectedMetrics1 = {
         numDocs: 5,
@@ -158,33 +155,33 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
                     "a.y": {
                         i: 0,
                         ii: {type: "string", value: "truncated", sizeBytes: 10485764},
-                        iii: 0
-                    }
+                        iii: 0,
+                    },
                 },
-                frequency: 1
+                frequency: 1,
             },
             {
                 value: {
                     "a.y": {
                         i: 1,
                         ii: {type: "string", value: "truncated", sizeBytes: 10485764},
-                        iii: 1
-                    }
+                        iii: 1,
+                    },
                 },
-                frequency: 1
+                frequency: 1,
             },
             {
                 value: {
                     "a.y": {
                         i: 2,
                         ii: {type: "string", value: "truncated", sizeBytes: 10485764},
-                        iii: 2
-                    }
+                        iii: 2,
+                    },
                 },
-                frequency: 1
+                frequency: 1,
             },
         ],
-        numMostCommonValues
+        numMostCommonValues,
     };
     testCases.push({cmdObj: cmdObj1, expectedMetrics: expectedMetrics1});
 
@@ -194,7 +191,7 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
         key: {a: 1},
         // Skip calculating the read and write distribution metrics since they are not needed by
         // this test.
-        readWriteDistribution: false
+        readWriteDistribution: false,
     };
     const expectedMetrics2 = {
         numDocs: 5,
@@ -204,22 +201,19 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
             {value: {a: {x: -2, y: {i: -2, ii: "a", iii: -2}, z: -2}}, frequency: 1},
             {value: {a: {x: -1, y: {i: -1, ii: "A", iii: -1}, z: -1}}, frequency: 1},
             {
-                value:
-                    {a: {x: 0, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 0}},
-                frequency: 1
+                value: {a: {x: 0, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 0}},
+                frequency: 1,
             },
             {
-                value:
-                    {a: {x: 1, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 1}},
-                frequency: 1
+                value: {a: {x: 1, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 1}},
+                frequency: 1,
             },
             {
-                value:
-                    {a: {x: 2, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 2}},
-                frequency: 1
+                value: {a: {x: 2, y: {type: "object", value: "truncated", sizeBytes: 10485797}, z: 2}},
+                frequency: 1,
             },
         ],
-        numMostCommonValues
+        numMostCommonValues,
     };
     testCases.push({cmdObj: cmdObj2, expectedMetrics: expectedMetrics2});
 
@@ -236,15 +230,13 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
         setMongodServerParameters({st, rst, params: sufficientAccumulatorBytesLimitParams});
         let res = conn.adminCommand(cmdObj);
         assert.commandWorked(res);
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics,
-                                                            expectedMetrics);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, expectedMetrics);
 
         setMongodServerParameters({st, rst, params: insufficientAccumulatorBytesLimitParams});
         res = conn.adminCommand(cmdObj);
         if (isUnique || isHashed) {
             assert.commandWorked(res);
-            AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics,
-                                                                expectedMetrics);
+            AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, expectedMetrics);
         } else {
             // The aggregation pipeline that the analyzeShardKey command uses to calculate the
             // cardinality and frequency metrics when the supporting index is not unique contains
@@ -263,8 +255,7 @@ const setParameterOpts = {
 };
 
 {
-    const st =
-        new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
+    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
 
     runTest(st.s, {isHashed: false, isUnique: true, isShardedColl: false, st});
     runTest(st.s, {isHashed: false, isUnique: false, isShardedColl: false, st});
@@ -280,9 +271,9 @@ const setParameterOpts = {
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
-    const rst =
-        new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
+    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

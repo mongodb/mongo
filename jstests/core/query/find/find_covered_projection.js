@@ -14,14 +14,16 @@ import {arrayEq} from "jstests/aggregation/extras/utils.js";
 const coll = db.jstests_find_covered_projection;
 coll.drop();
 
-assert.commandWorked(coll.insert([
-    {order: 0, fn: "john", ln: "doe"},
-    {order: 1, fn: "jack", ln: "doe"},
-    {order: 2, fn: "john", ln: "smith"},
-    {order: 3, fn: "jack", ln: "black"},
-    {order: 4, fn: "bob", ln: "murray"},
-    {order: 5, fn: "aaa", ln: "bbb", obj: {a: 1, b: "blah"}}
-]));
+assert.commandWorked(
+    coll.insert([
+        {order: 0, fn: "john", ln: "doe"},
+        {order: 1, fn: "jack", ln: "doe"},
+        {order: 2, fn: "john", ln: "smith"},
+        {order: 3, fn: "jack", ln: "black"},
+        {order: 4, fn: "bob", ln: "murray"},
+        {order: 5, fn: "aaa", ln: "bbb", obj: {a: 1, b: "blah"}},
+    ]),
+);
 
 function assertResultsMatch(query, projection, expectedResult) {
     assert(arrayEq(coll.find(query, projection).toArray(), expectedResult));
@@ -37,8 +39,10 @@ assert.commandWorked(coll.dropIndex({ln: 1}));
 assert.commandWorked(coll.createIndex({ln: 1, fn: 1}));
 
 assertResultsMatch({ln: "doe"}, {ln: 1, _id: 0}, [{ln: "doe"}, {ln: "doe"}]);
-assertResultsMatch(
-    {ln: "doe"}, {ln: 1, fn: 1, _id: 0}, [{ln: "doe", fn: "jack"}, {ln: "doe", fn: "john"}]);
+assertResultsMatch({ln: "doe"}, {ln: 1, fn: 1, _id: 0}, [
+    {ln: "doe", fn: "jack"},
+    {ln: "doe", fn: "john"},
+]);
 assertResultsMatch({ln: "doe", fn: "john"}, {ln: 1, fn: 1, _id: 0}, [{ln: "doe", fn: "john"}]);
 assertResultsMatch({fn: "john", ln: "doe"}, {fn: 1, ln: 1, _id: 0}, [{ln: "doe", fn: "john"}]);
 

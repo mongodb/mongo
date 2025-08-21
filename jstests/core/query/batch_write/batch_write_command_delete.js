@@ -19,22 +19,28 @@ let batch;
 const maxWriteBatchSize = db.hello().maxWriteBatchSize;
 
 function resultOK(result) {
-    return result.ok && !('code' in result) && !('errmsg' in result) && !('errInfo' in result) &&
-        !('writeErrors' in result);
+    return (
+        result.ok &&
+        !("code" in result) &&
+        !("errmsg" in result) &&
+        !("errInfo" in result) &&
+        !("writeErrors" in result)
+    );
 }
 
 function resultNOK(result) {
-    return !result.ok && typeof (result.code) == 'number' && typeof (result.errmsg) == 'string';
+    return !result.ok && typeof result.code == "number" && typeof result.errmsg == "string";
 }
 
 function countEventually(collection, n) {
     assert.soon(
-        function() {
+        function () {
             return collection.count() === n;
         },
-        function() {
+        function () {
             return "unacknowledged write timed out";
-        });
+        },
+    );
 }
 
 // EACH TEST BELOW SHOULD BE SELF-CONTAINED, FOR EASIER DEBUGGING
@@ -44,7 +50,7 @@ function countEventually(collection, n) {
 coll.drop();
 assert.commandWorked(coll.insert({a: 1}));
 request = {
-    delete: coll.getName()
+    delete: coll.getName(),
 };
 result = coll.runCommand(request);
 assert(resultNOK(result), tojson(result));
@@ -56,7 +62,7 @@ assert(coll.drop());
 assert.commandWorked(coll.insert({a: 1}));
 request = {
     delete: coll.getName(),
-    deletes: [{q: {a: 1}, limit: 1}]
+    deletes: [{q: {a: 1}, limit: 1}],
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -71,7 +77,7 @@ request = {
     delete: coll.getName(),
     deletes: [{q: {a: 1}, limit: 1}],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -86,7 +92,7 @@ request = {
     delete: coll.getName(),
     deletes: [{q: {a: 1}, limit: 0}],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -101,7 +107,7 @@ request = {
     delete: coll.getName(),
     deletes: [{q: {a: 1}, limit: 0}],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -122,7 +128,7 @@ request = {
     delete: coll.getName(),
     deletes: batch,
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
@@ -143,7 +149,7 @@ request = {
     delete: coll.getName(),
     deletes: batch,
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert(resultNOK(result), tojson(result));
@@ -155,9 +161,13 @@ assert(coll.drop());
 assert.commandWorked(coll.insert({a: 1}));
 request = {
     delete: coll.getName(),
-    deletes: [{q: {a: 1}, limit: 0}, {q: {$set: {a: 1}}, limit: 0}, {q: {$set: {a: 1}}, limit: 0}],
+    deletes: [
+        {q: {a: 1}, limit: 0},
+        {q: {$set: {a: 1}}, limit: 0},
+        {q: {$set: {a: 1}}, limit: 0},
+    ],
     writeConcern: {w: 1},
-    ordered: true
+    ordered: true,
 };
 result = coll.runCommand(request);
 assert.commandWorkedIgnoringWriteErrors(result);
@@ -166,8 +176,8 @@ assert(result.writeErrors != null);
 assert.eq(1, result.writeErrors.length);
 
 assert.eq(1, result.writeErrors[0].index);
-assert.eq('number', typeof result.writeErrors[0].code);
-assert.eq('string', typeof result.writeErrors[0].errmsg);
+assert.eq("number", typeof result.writeErrors[0].code);
+assert.eq("string", typeof result.writeErrors[0].errmsg);
 assert.eq(0, coll.count());
 
 //
@@ -176,9 +186,13 @@ assert(coll.drop());
 assert.commandWorked(coll.insert({a: 1}));
 request = {
     delete: coll.getName(),
-    deletes: [{q: {$set: {a: 1}}, limit: 0}, {q: {$set: {a: 1}}, limit: 0}, {q: {a: 1}, limit: 0}],
+    deletes: [
+        {q: {$set: {a: 1}}, limit: 0},
+        {q: {$set: {a: 1}}, limit: 0},
+        {q: {a: 1}, limit: 0},
+    ],
     writeConcern: {w: 1},
-    ordered: false
+    ordered: false,
 };
 result = coll.runCommand(request);
 assert.commandWorkedIgnoringWriteErrors(result);
@@ -186,10 +200,10 @@ assert.eq(1, result.n);
 assert.eq(2, result.writeErrors.length);
 
 assert.eq(0, result.writeErrors[0].index);
-assert.eq('number', typeof result.writeErrors[0].code);
-assert.eq('string', typeof result.writeErrors[0].errmsg);
+assert.eq("number", typeof result.writeErrors[0].code);
+assert.eq("string", typeof result.writeErrors[0].errmsg);
 
 assert.eq(1, result.writeErrors[1].index);
-assert.eq('number', typeof result.writeErrors[1].code);
-assert.eq('string', typeof result.writeErrors[1].errmsg);
+assert.eq("number", typeof result.writeErrors[1].code);
+assert.eq("string", typeof result.writeErrors[1].errmsg);
 assert.eq(0, coll.count());

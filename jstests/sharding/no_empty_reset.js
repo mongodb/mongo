@@ -6,8 +6,7 @@ var st = new ShardingTest({shards: 2, mongos: 2});
 
 var coll = st.s.getCollection(jsTestName() + ".coll");
 
-for (var i = -10; i < 10; i++)
-    coll.insert({_id: i});
+for (var i = -10; i < 10; i++) coll.insert({_id: i});
 
 st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0}, null, /* waitForDelete */ true);
 
@@ -27,8 +26,9 @@ jsTestLog("Migrating via first mongos...");
 var fullShard = st.getShard(coll, {_id: 1});
 var emptyShard = st.getShard(coll, {_id: -1});
 
-assert.commandWorked(st.s0.adminCommand(
-    {moveChunk: "" + coll, find: {_id: -1}, to: fullShard.shardName, _waitForDelete: true}));
+assert.commandWorked(
+    st.s0.adminCommand({moveChunk: "" + coll, find: {_id: -1}, to: fullShard.shardName, _waitForDelete: true}),
+);
 
 jsTestLog("Resetting shard version via first mongos...");
 

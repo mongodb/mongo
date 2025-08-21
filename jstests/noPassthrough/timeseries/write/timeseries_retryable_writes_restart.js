@@ -19,19 +19,21 @@ function testRetryableRestart(ordered) {
     const testDB = primary.startSession({retryWrites: true}).getDatabase("test");
     const coll = testDB[jsTestName()];
 
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
 
     function setupRetryableWritesForCollection(collName) {
         jsTestLog("Setting up the test collection");
-        assert.commandWorked(coll.insert(
-            [
-                {time: ISODate(), x: 0, meta: 0},
-                {time: ISODate(), x: 1, meta: 0},
-                {time: ISODate(), x: 0, meta: 1},
-                {time: ISODate(), x: 1, meta: 1},
-            ],
-            {writeConcern: {w: "majority"}}));
+        assert.commandWorked(
+            coll.insert(
+                [
+                    {time: ISODate(), x: 0, meta: 0},
+                    {time: ISODate(), x: 1, meta: 0},
+                    {time: ISODate(), x: 0, meta: 1},
+                    {time: ISODate(), x: 1, meta: 1},
+                ],
+                {writeConcern: {w: "majority"}},
+            ),
+        );
 
         const insertTag = "retryable insert " + collName;
         const updateTag = "retryable update " + collName;

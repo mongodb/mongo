@@ -25,11 +25,9 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // The base setup will insert 'partitionSize' number of documents per thread, evenly
     // distributing across the chunks. Documents will only have the "_id" field.
     $config.data.partitionSize = 50;
@@ -61,10 +59,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Executes a mapReduce with output mode "replace".
      */
     $config.states.mapReduce = function mapReduce(db, collName, connCache) {
-        const map = function() {
+        const map = function () {
             emit(this._id, 1);
         };
-        const reduce = function(k, values) {
+        const reduce = function (k, values) {
             return Array.sum(values);
         };
 

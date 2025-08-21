@@ -3,10 +3,7 @@
  * tlsUseSystemCA is set.
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {
-    CA_CERT,
-    SERVER_CERT,
-} from "jstests/ssl/libs/ssl_helpers.js";
+import {CA_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 // Set up mongotmock and point the mongod to it, with tlsUseSystemCA enabled.
@@ -38,7 +35,7 @@ assert.commandWorked(db[collName].insert({"_id": 1, "title": "cakes"}));
 const collUUID = getUUIDFromListCollections(db, collName);
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 // Give mongotmock some stuff to return.
@@ -52,23 +49,20 @@ const searchQuery = {
                 cursor: {
                     id: NumberLong(0),
                     ns: "test." + collName,
-                    nextBatch: [{_id: 1, $searchScore: 0.321}]
+                    nextBatch: [{_id: 1, $searchScore: 0.321}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 // Perform a $search query.
 let cursor = db[collName].aggregate([{$search: searchQuery}]);
 
-const expected = [
-    {"_id": 1, "title": "cakes"},
-];
+const expected = [{"_id": 1, "title": "cakes"}];
 assert.eq(expected, cursor.toArray());
 
 MongoRunner.stopMongod(conn);

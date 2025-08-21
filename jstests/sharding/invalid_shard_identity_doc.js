@@ -22,7 +22,7 @@ var shardIdentityDoc = {
     _id: "shardIdentity",
     configsvrConnectionString: configConnStr,
     shardName: "config",
-    clusterId: ObjectId()
+    clusterId: ObjectId(),
 };
 
 const updateErrorMsgPrefix = "Plan executor error during update :: caused by :: ";
@@ -31,34 +31,42 @@ const updateErrorMsgPrefix = "Plan executor error during update :: caused by :: 
 // default.
 //
 // Insert with shard name "config" on shard server should fail
-var res =
-    assert.commandFailedWithCode(rs.getPrimary().getDB('admin').runCommand(
-                                     {insert: "system.version", documents: [shardIdentityDoc]}),
-                                 ErrorCodes.UnsupportedFormat);
+var res = assert.commandFailedWithCode(
+    rs
+        .getPrimary()
+        .getDB("admin")
+        .runCommand({insert: "system.version", documents: [shardIdentityDoc]}),
+    ErrorCodes.UnsupportedFormat,
+);
 assert.eq(
     res.writeErrors[0].errmsg,
-    "Invalid shard identity document: the shard name for a shard server cannot be \"config\"");
+    'Invalid shard identity document: the shard name for a shard server cannot be "config"',
+);
 
 // Update with shard name "config" on shard server should fail
 res = assert.commandFailedWithCode(
-    st.shard1.getDB('admin').runCommand(
-        {update: "system.version", updates: [{q: {"_id": "shardIdentity"}, u: shardIdentityDoc}]}),
-    ErrorCodes.UnsupportedFormat);
+    st.shard1
+        .getDB("admin")
+        .runCommand({update: "system.version", updates: [{q: {"_id": "shardIdentity"}, u: shardIdentityDoc}]}),
+    ErrorCodes.UnsupportedFormat,
+);
 assert.eq(
     res.writeErrors[0].errmsg,
-    updateErrorMsgPrefix +
-        "Invalid shard identity document: the shard name for a shard server cannot be \"config\"");
+    updateErrorMsgPrefix + 'Invalid shard identity document: the shard name for a shard server cannot be "config"',
+);
 
 // Update with shard name "pizza" on config server should fail
 shardIdentityDoc.shardName = "pizza";
 res = assert.commandFailedWithCode(
-    st.shard0.getDB('admin').runCommand(
-        {update: "system.version", updates: [{q: {"_id": "shardIdentity"}, u: shardIdentityDoc}]}),
-    ErrorCodes.UnsupportedFormat);
+    st.shard0
+        .getDB("admin")
+        .runCommand({update: "system.version", updates: [{q: {"_id": "shardIdentity"}, u: shardIdentityDoc}]}),
+    ErrorCodes.UnsupportedFormat,
+);
 assert.eq(
     res.writeErrors[0].errmsg,
-    updateErrorMsgPrefix +
-        "Invalid shard identity document: the shard name for a config server cannot be \"pizza\"");
+    updateErrorMsgPrefix + 'Invalid shard identity document: the shard name for a config server cannot be "pizza"',
+);
 
 // TODO SERVER-74570: Enable parallel shutdown
 st.stop({parallelSupported: false});

@@ -30,7 +30,7 @@ s1.adminCommand({
     movechunk: "test.foo",
     find: {name: "aaa"},
     to: s1.getOther(s1.getPrimaryShard("test")).name,
-    _waitForDelete: true
+    _waitForDelete: true,
 });
 
 assert.eq(3, db1.count({name: {$gte: "aaa", $lt: "ddd"}}), "post count mongos1");

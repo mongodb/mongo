@@ -10,9 +10,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 const calculatePercentage = AnalyzeShardKeyUtil.calculatePercentage;
@@ -39,27 +37,36 @@ function assertReadMetricsNonEmptySampleSize(actual, expected, isHashed) {
     assert.eq(actual.sampleSize.count, expected.sampleSize.count, {actual, expected});
     assert.eq(actual.sampleSize.distinct, expected.sampleSize.distinct, {actual, expected});
 
-    assertApprox(actual.percentageOfSingleShardReads,
-                 calculatePercentage(expected.numSingleShard, expected.sampleSize.total),
-                 {actual, expected});
-    assertApprox(actual.percentageOfMultiShardReads,
-                 calculatePercentage(expected.numMultiShard, expected.sampleSize.total),
-                 {actual, expected});
-    assertApprox(actual.percentageOfScatterGatherReads,
-                 calculatePercentage(expected.numScatterGather, expected.sampleSize.total),
-                 {actual, expected});
+    assertApprox(
+        actual.percentageOfSingleShardReads,
+        calculatePercentage(expected.numSingleShard, expected.sampleSize.total),
+        {actual, expected},
+    );
+    assertApprox(
+        actual.percentageOfMultiShardReads,
+        calculatePercentage(expected.numMultiShard, expected.sampleSize.total),
+        {actual, expected},
+    );
+    assertApprox(
+        actual.percentageOfScatterGatherReads,
+        calculatePercentage(expected.numScatterGather, expected.sampleSize.total),
+        {actual, expected},
+    );
 
     assert.eq(actual.numReadsByRange.length, analyzeShardKeyNumRanges, {actual, expected});
     if (isHashed) {
         assert.eq(actual.percentageOfMultiShardReads, 0, {actual, expected});
-        assert.eq(sum(actual.numReadsByRange),
-                  expected.numSingleShard + expected.numScatterGather * analyzeShardKeyNumRanges,
-                  {actual, expected});
+        assert.eq(
+            sum(actual.numReadsByRange),
+            expected.numSingleShard + expected.numScatterGather * analyzeShardKeyNumRanges,
+            {actual, expected},
+        );
     } else {
-        assert.gte(sum(actual.numReadsByRange),
-                   expected.numSingleShard + expected.numMultiShard +
-                       expected.numScatterGather * analyzeShardKeyNumRanges,
-                   {actual, expected});
+        assert.gte(
+            sum(actual.numReadsByRange),
+            expected.numSingleShard + expected.numMultiShard + expected.numScatterGather * analyzeShardKeyNumRanges,
+            {actual, expected},
+        );
     }
 }
 
@@ -67,43 +74,55 @@ function assertWriteMetricsNonEmptySampleSize(actual, expected, isHashed) {
     assert.eq(actual.sampleSize.total, expected.sampleSize.total, {actual, expected});
     assert.eq(actual.sampleSize.update, expected.sampleSize.update, {actual, expected});
     assert.eq(actual.sampleSize.delete, expected.sampleSize.delete, {actual, expected});
-    assert.eq(
-        actual.sampleSize.findAndModify, expected.sampleSize.findAndModify, {actual, expected});
+    assert.eq(actual.sampleSize.findAndModify, expected.sampleSize.findAndModify, {actual, expected});
 
-    assertApprox(actual.percentageOfSingleShardWrites,
-                 calculatePercentage(expected.numSingleShard, expected.sampleSize.total),
-                 {actual, expected});
-    assertApprox(actual.percentageOfMultiShardWrites,
-                 calculatePercentage(expected.numMultiShard, expected.sampleSize.total),
-                 {actual, expected});
-    assertApprox(actual.percentageOfScatterGatherWrites,
-                 calculatePercentage(expected.numScatterGather, expected.sampleSize.total),
-                 {actual, expected});
+    assertApprox(
+        actual.percentageOfSingleShardWrites,
+        calculatePercentage(expected.numSingleShard, expected.sampleSize.total),
+        {actual, expected},
+    );
+    assertApprox(
+        actual.percentageOfMultiShardWrites,
+        calculatePercentage(expected.numMultiShard, expected.sampleSize.total),
+        {actual, expected},
+    );
+    assertApprox(
+        actual.percentageOfScatterGatherWrites,
+        calculatePercentage(expected.numScatterGather, expected.sampleSize.total),
+        {actual, expected},
+    );
 
     assert.eq(actual.numWritesByRange.length, analyzeShardKeyNumRanges, {actual, expected});
     if (isHashed) {
         assert.eq(actual.percentageOfMultiShardWrites, 0, {actual, expected});
-        assert.eq(sum(actual.numWritesByRange),
-                  expected.numSingleShard + expected.numScatterGather * analyzeShardKeyNumRanges,
-                  {actual, expected});
+        assert.eq(
+            sum(actual.numWritesByRange),
+            expected.numSingleShard + expected.numScatterGather * analyzeShardKeyNumRanges,
+            {actual, expected},
+        );
     } else {
-        assert.gte(sum(actual.numWritesByRange),
-                   expected.numSingleShard + expected.numMultiShard +
-                       expected.numScatterGather * analyzeShardKeyNumRanges,
-                   {actual, expected});
+        assert.gte(
+            sum(actual.numWritesByRange),
+            expected.numSingleShard + expected.numMultiShard + expected.numScatterGather * analyzeShardKeyNumRanges,
+            {actual, expected},
+        );
     }
 
-    assertApprox(actual.percentageOfShardKeyUpdates,
-                 calculatePercentage(expected.numShardKeyUpdates, expected.sampleSize.total),
-                 {actual, expected});
+    assertApprox(
+        actual.percentageOfShardKeyUpdates,
+        calculatePercentage(expected.numShardKeyUpdates, expected.sampleSize.total),
+        {actual, expected},
+    );
     assertApprox(
         actual.percentageOfSingleWritesWithoutShardKey,
         calculatePercentage(expected.numSingleWritesWithoutShardKey, expected.sampleSize.total),
-        {actual, expected});
+        {actual, expected},
+    );
     assertApprox(
         actual.percentageOfMultiWritesWithoutShardKey,
         calculatePercentage(expected.numMultiWritesWithoutShardKey, expected.sampleSize.total),
-        {actual, expected});
+        {actual, expected},
+    );
 }
 
 function assertMetricsEmptySampleSize(actual) {
@@ -114,10 +133,8 @@ function assertMetricsEmptySampleSize(actual) {
 
 function assertMetricsNonEmptySampleSize(actual, expected, isHashed) {
     AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(actual);
-    assertReadMetricsNonEmptySampleSize(
-        actual.readDistribution, expected.readDistribution, isHashed);
-    assertWriteMetricsNonEmptySampleSize(
-        actual.writeDistribution, expected.writeDistribution, isHashed);
+    assertReadMetricsNonEmptySampleSize(actual.readDistribution, expected.readDistribution, isHashed);
+    assertWriteMetricsNonEmptySampleSize(actual.writeDistribution, expected.writeDistribution, isHashed);
 }
 
 function assertSoonNoConfigSplitPointDocuments(conn) {
@@ -128,8 +145,7 @@ function assertSoonNoConfigSplitPointDocuments(conn) {
         numTries++;
         if (numTries % 100 == 0) {
             const docs = coll.find().toArray();
-            jsTest.log("Waiting for the spit point documents to get deleted " +
-                       tojson({numTries, docs}));
+            jsTest.log("Waiting for the spit point documents to get deleted " + tojson({numTries, docs}));
         }
         return coll.find().itcount() === 0;
     });
@@ -145,14 +161,13 @@ function getRandomCount() {
     return AnalyzeShardKeyUtil.getRandInteger(1, 100);
 }
 
-function makeTestCase(
-    sampledCollName, notSampledCollName, {shardKeyField, isHashed, minVal, maxVal}) {
+function makeTestCase(sampledCollName, notSampledCollName, {shardKeyField, isHashed, minVal, maxVal}) {
     // Generate commands and populate the expected metrics.
     const cmdObjs = [];
 
     const usedVals = new Set();
     const getNextVal = () => {
-        while (usedVals.size < (maxVal + 1 - minVal)) {
+        while (usedVals.size < maxVal + 1 - minVal) {
             const val = AnalyzeShardKeyUtil.getRandInteger(minVal, maxVal);
             if (!usedVals.has(val)) {
                 usedVals.add(val);
@@ -166,7 +181,7 @@ function makeTestCase(
         sampleSize: {total: 0, find: 0, aggregate: 0, count: 0, distinct: 0},
         numSingleShard: 0,
         numMultiShard: 0,
-        numScatterGather: 0
+        numScatterGather: 0,
     };
     const writeDistribution = {
         sampleSize: {total: 0, update: 0, delete: 0, findAndModify: 0},
@@ -175,7 +190,7 @@ function makeTestCase(
         numScatterGather: 0,
         numShardKeyUpdates: 0,
         numSingleWritesWithoutShardKey: 0,
-        numMultiWritesWithoutShardKey: 0
+        numMultiWritesWithoutShardKey: 0,
     };
 
     // Below are reads targeting a single shard.
@@ -191,7 +206,7 @@ function makeTestCase(
         cmdObjs.push({
             aggregate: sampledCollName,
             pipeline: [{$match: {[shardKeyField]: getNextVal()}}],
-            cursor: {}
+            cursor: {},
         });
         readDistribution.sampleSize.aggregate++;
         readDistribution.sampleSize.total++;
@@ -203,7 +218,7 @@ function makeTestCase(
             aggregate: sampledCollName,
             pipeline: [{$match: {$expr: {$eq: ["$" + shardKeyField, "$$value"]}}}],
             cursor: {},
-            let : {value: getNextVal()}
+            let: {value: getNextVal()},
         });
         readDistribution.sampleSize.aggregate++;
         readDistribution.sampleSize.total++;
@@ -213,15 +228,17 @@ function makeTestCase(
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
             aggregate: notSampledCollName,
-            pipeline: [{
-                $lookup: {
-                    from: sampledCollName,
-                    let : {value: getNextVal()},
-                    pipeline: [{$match: {$expr: {$eq: ["$" + shardKeyField, "$$value"]}}}],
-                    as: "joined"
-                }
-            }],
-            cursor: {}
+            pipeline: [
+                {
+                    $lookup: {
+                        from: sampledCollName,
+                        let: {value: getNextVal()},
+                        pipeline: [{$match: {$expr: {$eq: ["$" + shardKeyField, "$$value"]}}}],
+                        as: "joined",
+                    },
+                },
+            ],
+            cursor: {},
         });
         readDistribution.sampleSize.aggregate++;
         readDistribution.sampleSize.total++;
@@ -260,7 +277,7 @@ function makeTestCase(
         cmdObjs.push({
             aggregate: sampledCollName,
             pipeline: [{$match: {[shardKeyField]: {$lt: getNextVal()}}}],
-            cursor: {}
+            cursor: {},
         });
         readDistribution.sampleSize.aggregate++;
         readDistribution.sampleSize.total++;
@@ -297,7 +314,7 @@ function makeTestCase(
         cmdObjs.push({
             aggregate: sampledCollName,
             pipeline: [{$match: {$expr: {$eq: ["$ts", "$$NOW"]}}}],
-            cursor: {}
+            cursor: {},
         });
         readDistribution.sampleSize.aggregate++;
         readDistribution.sampleSize.total++;
@@ -311,8 +328,8 @@ function makeTestCase(
             update: sampledCollName,
             updates: [
                 {q: {[shardKeyField]: getNextVal()}, u: {$set: {z: 0}}},
-                {q: {$expr: {$eq: ["$" + shardKeyField, getNextVal()]}}, u: [{$set: {z: 0}}]}
-            ]
+                {q: {$expr: {$eq: ["$" + shardKeyField, getNextVal()]}}, u: [{$set: {z: 0}}]},
+            ],
         });
         writeDistribution.sampleSize.update += 2;
         writeDistribution.sampleSize.total += 2;
@@ -324,8 +341,8 @@ function makeTestCase(
             delete: sampledCollName,
             deletes: [
                 {q: {[shardKeyField]: minVal++}, limit: 1},
-                {q: {[shardKeyField]: maxVal--}, limit: 0}
-            ]
+                {q: {[shardKeyField]: maxVal--}, limit: 0},
+            ],
         });
         writeDistribution.sampleSize.delete += 2;
         writeDistribution.sampleSize.total += 2;
@@ -339,7 +356,7 @@ function makeTestCase(
             query: {[shardKeyField]: minVal++},
             update: {$inc: {[shardKeyField]: 1}},
             lsid: {id: UUID()},
-            txnNumber: NumberLong(1)
+            txnNumber: NumberLong(1),
         });
         writeDistribution.sampleSize.findAndModify++;
         writeDistribution.sampleSize.total++;
@@ -352,7 +369,7 @@ function makeTestCase(
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
             update: sampledCollName,
-            updates: [{q: {[shardKeyField]: {$gte: getNextVal()}}, u: {$set: {z: 0}}}]
+            updates: [{q: {[shardKeyField]: {$gte: getNextVal()}}, u: {$set: {z: 0}}}],
         });
         writeDistribution.sampleSize.update++;
         writeDistribution.sampleSize.total++;
@@ -368,9 +385,9 @@ function makeTestCase(
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
             delete: sampledCollName,
-            deletes: [{q: {[shardKeyField]: {$lte: minVal++}}, limit: 0}]
+            deletes: [{q: {[shardKeyField]: {$lte: minVal++}}, limit: 0}],
         });
-        writeDistribution.sampleSize.delete ++;
+        writeDistribution.sampleSize.delete++;
         writeDistribution.sampleSize.total++;
         if (isHashed) {
             // For hashed sharding, range queries on the shard key target all shards.
@@ -385,7 +402,7 @@ function makeTestCase(
         cmdObjs.push({
             findAndModify: sampledCollName,
             query: {[shardKeyField]: {$lte: getNextVal()}},
-            update: {$set: {z: 0}}
+            update: {$set: {z: 0}},
         });
         writeDistribution.sampleSize.findAndModify++;
         writeDistribution.sampleSize.total++;
@@ -422,29 +439,32 @@ function waitForSampledQueries(conn, ns, shardKey, testCase) {
         numTries++;
 
         res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: shardKey}));
-        const numShardKeyUpdates = res.writeDistribution.percentageOfShardKeyUpdates *
-            res.writeDistribution.sampleSize.total / 100;
+        const numShardKeyUpdates =
+            (res.writeDistribution.percentageOfShardKeyUpdates * res.writeDistribution.sampleSize.total) / 100;
 
         if (numTries % 100 == 0) {
-            jsTest.log("Waiting for sampled queries and diffs " + tojsononeline({
-                           actual: {
-                               readSampleSize: res.readDistribution.sampleSize,
-                               writeSampleSize: res.writeDistribution.sampleSize,
-                               diffSampleSize: numShardKeyUpdates,
-                           },
-                           expected: {
-                               readSampleSize: testCase.metrics.readDistribution.sampleSize,
-                               writeSampleSize: testCase.metrics.writeDistribution.sampleSize,
-                               diffSampleSize: testCase.metrics.writeDistribution.numShardKeyUpdates
-                           }
-                       }));
+            jsTest.log(
+                "Waiting for sampled queries and diffs " +
+                    tojsononeline({
+                        actual: {
+                            readSampleSize: res.readDistribution.sampleSize,
+                            writeSampleSize: res.writeDistribution.sampleSize,
+                            diffSampleSize: numShardKeyUpdates,
+                        },
+                        expected: {
+                            readSampleSize: testCase.metrics.readDistribution.sampleSize,
+                            writeSampleSize: testCase.metrics.writeDistribution.sampleSize,
+                            diffSampleSize: testCase.metrics.writeDistribution.numShardKeyUpdates,
+                        },
+                    }),
+            );
         }
 
-        return (res.readDistribution.sampleSize.total >=
-                testCase.metrics.readDistribution.sampleSize.total) &&
-            (res.writeDistribution.sampleSize.total >=
-             testCase.metrics.writeDistribution.sampleSize.total) &&
-            (numShardKeyUpdates >= testCase.metrics.writeDistribution.numShardKeyUpdates);
+        return (
+            res.readDistribution.sampleSize.total >= testCase.metrics.readDistribution.sampleSize.total &&
+            res.writeDistribution.sampleSize.total >= testCase.metrics.writeDistribution.sampleSize.total &&
+            numShardKeyUpdates >= testCase.metrics.writeDistribution.numShardKeyUpdates
+        );
     });
 
     return res;
@@ -460,8 +480,7 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     const notSampledCollName = "notSampledColl";
     const sampledNs = dbName + "." + sampledCollName;
     const shardKey = {[shardKeyField]: isHashed ? "hashed" : 1};
-    jsTest.log(`Test analyzing the shard key ${tojsononeline(shardKey)} for the collection ${
-        tojson({ns: sampledNs})}`);
+    jsTest.log(`Test analyzing the shard key ${tojsononeline(shardKey)} for the collection ${tojson({ns: sampledNs})}`);
 
     const sampledColl = fixture.conn.getDB(dbName).getCollection(sampledCollName);
     const notSampledColl = fixture.conn.getDB(dbName).getCollection(notSampledCollName);
@@ -495,27 +514,26 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     fixture.waitForReplicationFn();
 
     // Make sure that the shard executing $lookup operations has up-to-date routing information.
-    fixture.conn.getDB(dbName).getCollection(notSampledCollName).aggregate([
-        {$lookup: {from: sampledCollName, pipeline: [], as: "out"}}
-    ]);
+    fixture.conn
+        .getDB(dbName)
+        .getCollection(notSampledCollName)
+        .aggregate([{$lookup: {from: sampledCollName, pipeline: [], as: "out"}}]);
 
-    const sampledCollUuid =
-        QuerySamplingUtil.getCollectionUuid(fixture.conn.getDB(dbName), sampledCollName);
+    const sampledCollUuid = QuerySamplingUtil.getCollectionUuid(fixture.conn.getDB(dbName), sampledCollName);
 
     // Verify that the analyzeShardKey command returns zeros for the read and write sample size
     // when there are no sampled queries.
-    res = assert.commandWorked(
-        fixture.conn.adminCommand({analyzeShardKey: sampledNs, key: shardKey}));
+    res = assert.commandWorked(fixture.conn.adminCommand({analyzeShardKey: sampledNs, key: shardKey}));
     assertMetricsEmptySampleSize(res);
 
     // Turn on query sampling and wait for sampling to become active.
-    assert.commandWorked(fixture.conn.adminCommand(
-        {configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
+    assert.commandWorked(
+        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}),
+    );
     fixture.waitForActiveSamplingFn(sampledNs, sampledCollUuid);
 
     // Create and run test queries.
-    const testCase = makeTestCase(
-        sampledCollName, notSampledCollName, {shardKeyField, isHashed, minVal, maxVal});
+    const testCase = makeTestCase(sampledCollName, notSampledCollName, {shardKeyField, isHashed, minVal, maxVal});
 
     fixture.runCmdsFn(dbName, testCase.cmdObjs);
 
@@ -524,8 +542,7 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     assertMetricsNonEmptySampleSize(res, testCase.metrics, isHashed);
 
     // Turn off query sampling and wait for sampling to become inactive.
-    assert.commandWorked(
-        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}));
+    assert.commandWorked(fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}));
     fixture.waitForInactiveSamplingFn(sampledNs, sampledCollUuid);
 
     assert(notSampledColl.drop());
@@ -562,38 +579,40 @@ const mongodSetParameterOpts = {
 };
 const mongosSetParametersOpts = {
     queryAnalysisSamplerConfigurationRefreshSecs,
-    logComponentVerbosity: tojson({sharding: 3})
+    logComponentVerbosity: tojson({sharding: 3}),
 };
 
 const eligibleForSamplingCommentBase = jsTestName() + " sampling ";
 
 {
-    jsTest.log("Verify that on a sharded cluster the analyzeShardKey command returns correct read" +
-               " and write distribution metrics");
+    jsTest.log(
+        "Verify that on a sharded cluster the analyzeShardKey command returns correct read" +
+            " and write distribution metrics",
+    );
     const eligibleForSamplingCommentSharded = eligibleForSamplingCommentBase + "sharded";
 
-    const numMongoses = 2;  // Test sampling on multiple mongoses.
+    const numMongoses = 2; // Test sampling on multiple mongoses.
     const numShards = 3;
 
     const st = new ShardingTest({
         mongos: numMongoses,
         shards: numShards,
         rs: {nodes: 2, setParameter: mongodSetParameterOpts},
-        mongosOptions: {setParameter: mongosSetParametersOpts}
+        mongosOptions: {setParameter: mongosSetParametersOpts},
     });
 
     // This test expects every query to get sampled regardless of which mongos or mongod routes it.
-    st.configRS.nodes.forEach(node => {
+    st.configRS.nodes.forEach((node) => {
         configureFailPoint(node, "queryAnalysisCoordinatorDistributeSamplesPerSecondEqually");
     });
 
     // We use a sampling filter to prevent internal aggregates run by AnalyzeShardKey from being
     // sampled.
-    st.forEachConnection(conn => {
-        conn.rs.nodes.forEach(node => {
-            configureFailPoint(node,
-                               "queryAnalysisSamplerFilterByComment",
-                               {comment: eligibleForSamplingCommentSharded});
+    st.forEachConnection((conn) => {
+        conn.rs.nodes.forEach((node) => {
+            configureFailPoint(node, "queryAnalysisSamplerFilterByComment", {
+                comment: eligibleForSamplingCommentSharded,
+            });
         });
     });
 
@@ -602,8 +621,7 @@ const eligibleForSamplingCommentBase = jsTestName() + " sampling ";
         setUpCollectionFn: (dbName, collName, isShardedColl) => {
             const ns = dbName + "." + collName;
 
-            assert.commandWorked(
-                st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+            assert.commandWorked(st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
             if (isShardedColl) {
                 // Set up the sharded collection. Make it have three chunks:
@@ -613,10 +631,8 @@ const eligibleForSamplingCommentBase = jsTestName() + " sampling ";
                 assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
                 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: -1000}}));
                 assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 1000}}));
-                assert.commandWorked(
-                    st.s0.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.shard1.shardName}));
-                assert.commandWorked(
-                    st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
+                assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.shard1.shardName}));
+                assert.commandWorked(st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
             }
         },
         waitForActiveSamplingFn: (ns, collUuid) => {
@@ -647,7 +663,7 @@ const eligibleForSamplingCommentBase = jsTestName() + " sampling ";
     runTest(fixture, {isShardedColl: true, shardKeyField: "y", isHashed: true});
 
     // Verify the split point documents are eventually deleted by the TTL monitor.
-    st._rs.forEach(rs => {
+    st._rs.forEach((rs) => {
         const primary = rs.test.getPrimary();
         assert.commandWorked(primary.adminCommand({setParameter: 1, ttlMonitorSleepSecs: 1}));
         assertSoonNoConfigSplitPointDocuments(primary);
@@ -656,9 +672,12 @@ const eligibleForSamplingCommentBase = jsTestName() + " sampling ";
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
-    jsTest.log("Verify that on a replica set the analyzeShardKey command returns correct read " +
-               "and write distribution metrics");
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
+    jsTest.log(
+        "Verify that on a replica set the analyzeShardKey command returns correct read " +
+            "and write distribution metrics",
+    );
 
     const eligibleForSamplingCommentReplset = eligibleForSamplingCommentBase + "replset";
 
@@ -667,14 +686,12 @@ if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove 
     rst.initiate();
     const primary = rst.getPrimary();
 
-    rst.nodes.forEach(node => {
+    rst.nodes.forEach((node) => {
         // This test expects every query to get sampled regardless of which mongod it runs against.
         configureFailPoint(node, "queryAnalysisCoordinatorDistributeSamplesPerSecondEqually");
         // We use a sampling filter to prevent internal aggregates run by AnalyzeShardKey from being
         // sampled.
-        configureFailPoint(node,
-                           "queryAnalysisSamplerFilterByComment",
-                           {comment: eligibleForSamplingCommentReplset});
+        configureFailPoint(node, "queryAnalysisSamplerFilterByComment", {comment: eligibleForSamplingCommentReplset});
     });
 
     const fixture = {

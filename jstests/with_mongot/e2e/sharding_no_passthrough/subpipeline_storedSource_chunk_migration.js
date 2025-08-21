@@ -19,72 +19,76 @@ assert.gte(shardNames.length, 2, "Test requires at least 2 shards");
 const primaryShardName = shardNames[0];
 const otherShardName = shardNames[1];
 
-assert.commandWorked(
-    db.adminCommand({enableSharding: testDb.getName(), primaryShard: primaryShardName}));
+assert.commandWorked(db.adminCommand({enableSharding: testDb.getName(), primaryShard: primaryShardName}));
 
 const innerCollName = "innerColl";
 const searchIndexName = "excludeStateBirdIndex";
 const searchStageDefinition = {
     index: searchIndexName,
     wildcard: {
-        query: "*",  // This matches all documents
+        query: "*", // This matches all documents
         path: "state",
         allowAnalyzedField: true,
     },
-    returnStoredSource: true
+    returnStoredSource: true,
 };
 
 function testSearchStoredSourceInSubpipeline(pipeline, expectedResults) {
     // Outer collection is unsharded.
     const outerColl = testDb.outerColl;
     outerColl.drop();
-    assert.commandWorked(outerColl.insertMany([
-        {
-            _id: 1,
-            state: "NY",
-        },
-        {
-            _id: 3,
-            state: "Hawaii",
-        },
-        {
-            _id: 5,
-            state: "NJ",
-        },
-    ]));
+    assert.commandWorked(
+        outerColl.insertMany([
+            {
+                _id: 1,
+                state: "NY",
+            },
+            {
+                _id: 3,
+                state: "Hawaii",
+            },
+            {
+                _id: 5,
+                state: "NJ",
+            },
+        ]),
+    );
 
     // Inner collection is unsharded to start.
     const innerColl = testDb.getCollection(innerCollName);
     innerColl.drop();
-    assert.commandWorked(innerColl.insertMany([
-        {
-            _id: 10000,
-            state: "NY",
-            governor: "Kathy Hochul",
-            facts: {state_bird: "Eastern Bluebird", most_popular_sandwich: "Pastrami on Rye"}
-        },
-        {
-            _id: 1,
-            state: "Hawaii",
-            governor: "Josh Green",
-            facts: {state_bird: "Nene", most_popular_sandwich: "Kalua Pork"}
-        }
-    ]));
+    assert.commandWorked(
+        innerColl.insertMany([
+            {
+                _id: 10000,
+                state: "NY",
+                governor: "Kathy Hochul",
+                facts: {state_bird: "Eastern Bluebird", most_popular_sandwich: "Pastrami on Rye"},
+            },
+            {
+                _id: 1,
+                state: "Hawaii",
+                governor: "Josh Green",
+                facts: {state_bird: "Nene", most_popular_sandwich: "Kalua Pork"},
+            },
+        ]),
+    );
 
     // Shard the inner collection and move a chunk (with _id: 10000) to the other shard.
-    assert.commandWorked(
-        testDb.adminCommand({shardCollection: innerColl.getFullName(), key: {_id: 1}}));
+    assert.commandWorked(testDb.adminCommand({shardCollection: innerColl.getFullName(), key: {_id: 1}}));
     assert.commandWorked(testDb.adminCommand({split: innerColl.getFullName(), middle: {_id: 3}}));
-    assert.commandWorked(testDb.adminCommand({
-        moveChunk: innerColl.getFullName(),
-        find: {_id: 3},
-        to: otherShardName,
-        _waitForDelete: true  // We need to wait for delete, or we are going to read orphans
-    }));
+    assert.commandWorked(
+        testDb.adminCommand({
+            moveChunk: innerColl.getFullName(),
+            find: {_id: 3},
+            to: otherShardName,
+            _waitForDelete: true, // We need to wait for delete, or we are going to read orphans
+        }),
+    );
 
     const searchIndexDefinition = {
         mappings: {dynamic: true},
-        storedSource: {exclude: ["facts.state_bird"]}
+        storedSource: {exclude: ["facts.state_bird"]},
     };
     createSearchIndex(innerColl, {name: searchIndexName, definition: searchIndexDefinition});
 
@@ -94,15 +98,14 @@ function testSearchStoredSourceInSubpipeline(pipeline, expectedResults) {
 }
 
 // Test $search under a $unionWith.
-let pipeline = [{
-    $unionWith: {
-        coll: innerCollName,
-        pipeline: [
-            {$search: searchStageDefinition},
-            {$project: {_id: 0}},
-        ]
-    }
-}];
+let pipeline = [
+    {
+        $unionWith: {
+            coll: innerCollName,
+            pipeline: [{$search: searchStageDefinition}, {$project: {_id: 0}}],
+        },
+    },
+];
 let expectedResults = [
     {
         _id: 1,
@@ -130,40 +133,46 @@ let expectedResults = [
 testSearchStoredSourceInSubpipeline(pipeline, expectedResults);
 
 // Test $search under a $lookup.
-pipeline = [{
-    $lookup: {
-        from: innerCollName,
-        localField: "state",
-        foreignField: "state",
-        pipeline: [
-            {
-                $search: searchStageDefinition
-            },
-            {$project: {_id: 0}},
-        ],
-        as: "matchedDocs"
-    }
-}];
+pipeline = [
+    {
+        $lookup: {
+            from: innerCollName,
+            localField: "state",
+            foreignField: "state",
+            pipeline: [
+                {
+                    $search: searchStageDefinition,
+                },
+                {$project: {_id: 0}},
+            ],
+            as: "matchedDocs",
+        },
+    },
+];
 expectedResults = [
     {
         _id: 1,
         state: "NY",
-        matchedDocs: [{
-            state: "NY",
-            governor: "Kathy Hochul",
-            facts: {most_popular_sandwich: "Pastrami on Rye"},
-        }]
+        matchedDocs: [
+            {
+                state: "NY",
+                governor: "Kathy Hochul",
+                facts: {most_popular_sandwich: "Pastrami on Rye"},
+            },
+        ],
     },
     {
         _id: 3,
         state: "Hawaii",
-        matchedDocs: [{
-            state: "Hawaii",
-            governor: "Josh Green",
-            facts: {most_popular_sandwich: "Kalua Pork"},
-        }]
+        matchedDocs: [
+            {
+                state: "Hawaii",
+                governor: "Josh Green",
+                facts: {most_popular_sandwich: "Kalua Pork"},
+            },
+        ],
     },
-    {_id: 5, state: "NJ", matchedDocs: []}
+    {_id: 5, state: "NJ", matchedDocs: []},
 ];
 
 testSearchStoredSourceInSubpipeline(pipeline, expectedResults);

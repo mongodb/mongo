@@ -25,7 +25,7 @@ for (let j = 1; j <= 10; j++) {
 }
 assert.commandWorked(t.insert(docs));
 
-assert.commandWorked(t.update({_id: 3}, {s: "Hello, Mongo!"}));  // Mongo is same length as World
+assert.commandWorked(t.update({_id: 3}, {s: "Hello, Mongo!"})); // Mongo is same length as World
 assert.commandWorked(t.update({_id: 3}, {$set: {s: "Hello!"}}));
 assert.commandWorked(t.update({_id: 10}, {}));
 assert.commandWorked(t.update({_id: 10}, {s: "Hello, World!!!"}));

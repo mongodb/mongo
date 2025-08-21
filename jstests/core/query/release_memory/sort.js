@@ -17,7 +17,7 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
-    setAvailableDiskSpaceMode
+    setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -35,12 +35,12 @@ db.dropDatabase();
 const coll = db[jsTestName()];
 
 function getSortSpillCounter() {
-    return accumulateServerStatusMetric(db, metrics => metrics.query.sort.spillToDisk);
+    return accumulateServerStatusMetric(db, (metrics) => metrics.query.sort.spillToDisk);
 }
 
 const kDocCount = 40;
 for (let i = 0; i < kDocCount; ++i) {
-    assert.commandWorked(coll.insertOne({index: i, padding: 'X'.repeat(1024 * 1024)}));
+    assert.commandWorked(coll.insertOne({index: i, padding: "X".repeat(1024 * 1024)}));
 }
 
 function assertCursorSortedByIndex(cursor) {
@@ -54,26 +54,25 @@ function assertCursorSortedByIndex(cursor) {
 // Some background queries can use $group and classic $group uses sorter to spill, so this
 // background spills can affect server status metrics.
 const classicGroupIncreasedSpillingKnob = "internalQueryEnableAggressiveSpillsInGroup";
-const classicGroupIncreasedSpillingInitialValue =
-    getServerParameter(classicGroupIncreasedSpillingKnob);
+const classicGroupIncreasedSpillingInitialValue = getServerParameter(classicGroupIncreasedSpillingKnob);
 setServerParameter(classicGroupIncreasedSpillingKnob, false);
 
 const pipelines = [
     [
-        {$sort: {index: 1, padding: 1}},  // Will be pushed down to find.
-        {$project: {padding: 0}},         // Secondary sort on padding prevents projection pushdown.
+        {$sort: {index: 1, padding: 1}}, // Will be pushed down to find.
+        {$project: {padding: 0}}, // Secondary sort on padding prevents projection pushdown.
     ],
     [
         {
-            $_internalInhibitOptimization: {}
-        },  // Prevents $sort pushdown to find, allowing to test DocumentSourceSort.
+            $_internalInhibitOptimization: {},
+        }, // Prevents $sort pushdown to find, allowing to test DocumentSourceSort.
         {$sort: {index: 1, padding: 1}},
-        {$project: {padding: 0}},  // Secondary sort on padding prevents projection pushdown.
+        {$project: {padding: 0}}, // Secondary sort on padding prevents projection pushdown.
     ],
     [
-        {$sort: {index: 1, padding: 1}},  // Will be pushed down to find.
-        {$project: {padding: 0}},         // Secondary sort on padding prevents projection pushdown.
-        {$_internalInhibitOptimization: {}},  // Prevents the pipeline from being eliminated.
+        {$sort: {index: 1, padding: 1}}, // Will be pushed down to find.
+        {$project: {padding: 0}}, // Secondary sort on padding prevents projection pushdown.
+        {$_internalInhibitOptimization: {}}, // Prevents the pipeline from being eliminated.
     ],
 ];
 
@@ -106,7 +105,7 @@ for (let pipeline of pipelines) {
         assert.commandWorked(releaseMemoryRes);
         assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, [
             ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-            ErrorCodes.ReleaseMemoryShardError
+            ErrorCodes.ReleaseMemoryShardError,
         ]);
 
         assertCursorSortedByIndex(cursor);
@@ -137,13 +136,13 @@ for (let pipeline of pipelines) {
         const cursorId = cursor.getId();
 
         // Release memory (i.e., spill)
-        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "alwaysOn");
         const releaseMemoryCmd = {releaseMemory: [cursorId]};
         jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
         const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
         assert.commandWorked(releaseMemoryRes);
         assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
-        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+        setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
 
         jsTest.log.info("Running getMore");
         assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);

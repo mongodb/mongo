@@ -16,7 +16,7 @@ const st = new ShardingTest({
     mongos: 1,
     shards: 2,
     rs: {nodes: 2},
-    other: {rsOptions: {setParameter: {orphanCleanupDelaySecs: 0}}}
+    other: {rsOptions: {setParameter: {orphanCleanupDelaySecs: 0}}},
 });
 
 const db = st.s.getDB("query_gets_killed_test");
@@ -51,13 +51,16 @@ function getNewColl(db) {
 
     // Start a query
     const cursor = new DBCommandCursor(
-        db, assert.commandWorked(db.runCommand({find: coll.getName(), filter: {}, batchSize: 5})));
+        db,
+        assert.commandWorked(db.runCommand({find: coll.getName(), filter: {}, batchSize: 5})),
+    );
 
     // Shard the collection and move a chunk out of the primary shard to force a
     // range deletion.
     assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveRange: coll.getFullName(), min: {x: MinKey()}, max: {x: MaxKey()}, toShard: shard1}));
+    assert.commandWorked(
+        st.s.adminCommand({moveRange: coll.getFullName(), min: {x: MinKey()}, max: {x: MaxKey()}, toShard: shard1}),
+    );
 
     // The ongoing query should hold the range deletion task.
     sleep(500);
@@ -73,8 +76,7 @@ function getNewColl(db) {
 }
 
 {
-    jsTestLog(
-        "Running a query on a secondary node. The query must get killed the query on a range deletion");
+    jsTestLog("Running a query on a secondary node. The query must get killed the query on a range deletion");
 
     const coll = getNewColl(db);
 
@@ -92,21 +94,22 @@ function getNewColl(db) {
     coll.insertMany(insertions);
 
     // Start a query
-    const cursor = assert
-                       .commandWorked(db.runCommand({
-                           find: coll.getName(),
-                           $readPreference: {mode: "secondary"},
-                           readConcern: {level: 'local'},
-                           filter: {},
-                           batchSize: 5
-                       }))
-                       .cursor;
+    const cursor = assert.commandWorked(
+        db.runCommand({
+            find: coll.getName(),
+            $readPreference: {mode: "secondary"},
+            readConcern: {level: "local"},
+            filter: {},
+            batchSize: 5,
+        }),
+    ).cursor;
 
     // Shard the collection and move a chunk out of the primary shard to force a
     // range deletion.
     assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveRange: coll.getFullName(), min: {x: MinKey()}, max: {x: MaxKey()}, toShard: shard1}));
+    assert.commandWorked(
+        st.s.adminCommand({moveRange: coll.getFullName(), min: {x: MinKey()}, max: {x: MaxKey()}, toShard: shard1}),
+    );
 
     // Wait for the range deletion to be executed.
     assert.soon(() => {

@@ -27,7 +27,7 @@ assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: C2, for
 secondary.reconnect(primary);
 
 // Wait until the config has propagated to the secondary.
-assert.soon(function() {
+assert.soon(function () {
     const res = primary.adminCommand({replSetGetStatus: 1});
     return res.members[1].configVersion === replTest.getReplSetConfigFromNode().version;
 });

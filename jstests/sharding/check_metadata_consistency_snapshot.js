@@ -26,8 +26,9 @@ jsTest.log("Checking logs for snapshot read concern");
 // Make sure we've used snapshot read concern for the query on config.chunks
 // `"readConcern":{"level":"snapshot"` should appear twice, once from the passed in command and once
 // from the actual readConcern used.
-assert(checkLog.checkContainsOnce(st.configRS.getPrimary(),
-                                  /"config.chunks"(.*"readConcern":{"level":"snapshot"){2}/),
-       "The query on config.chunks should use snapshot read concern");
+assert(
+    checkLog.checkContainsOnce(st.configRS.getPrimary(), /"config.chunks"(.*"readConcern":{"level":"snapshot"){2}/),
+    "The query on config.chunks should use snapshot read concern",
+);
 
 st.stop();

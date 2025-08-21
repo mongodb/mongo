@@ -75,7 +75,7 @@ const kLitFieldNames = [
     "lit12",
     "lit13",
     "lit14",
-    "lit15"
+    "lit15",
 ];
 const kObjFieldNames = ["obj16", "obj17"];
 const kArrFieldNames = ["arr18", "arr19"];
@@ -95,8 +95,7 @@ const kSortLiterals = [-1, 1];
 // have a good chance of matching some documents. Does not include the JS pseudovalue <undefined> as
 // it causes havoc. This must also not include any array literals as they could trigger unsupported
 // $sort stages with multiple array key parts.
-const kValueLiterals =
-    [-7, -6, 0, 6, 7, -9.99, -8.88, 8.88, 9.99, "Quoth", "the", "raven", "nevermore", null, NaN];
+const kValueLiterals = [-7, -6, 0, 6, 7, -9.99, -8.88, 8.88, 9.99, "Quoth", "the", "raven", "nevermore", null, NaN];
 
 // Maximum depth for objects (including documents) and arrays.
 const kValueMaxDepth = 4;
@@ -109,7 +108,7 @@ const kValueMaxDepth = 4;
 // 'rngDocs' random number generator by assigning that to 'rngCurr', then reassigning it back to the
 // 'rngMain' generator before returning so everything else will use 'rngMain'.
 function createDoc(id) {
-    rngCurr = rngDocs;  // switch to the docs random number generator
+    rngCurr = rngDocs; // switch to the docs random number generator
 
     let result = {"_id": id};
     // All docs must have the "key" fields, else $lookup produces matches between all docs that are
@@ -128,9 +127,9 @@ function createDoc(id) {
         result[fieldName] = getValueRaw(0, fieldName);
     }
 
-    rngCurr = rngMain;  // switch back to the main random number generator
+    rngCurr = rngMain; // switch back to the main random number generator
     return result;
-}  // function createDoc
+} // function createDoc
 
 // Returns an array of random documents with sequential "_id" values starting from 0.
 function createDocs(numDocs) {
@@ -139,17 +138,19 @@ function createDocs(numDocs) {
         result.push(createDoc(id));
     }
     return result;
-}  // function createDocs
+} // function createDocs
 
 // Creates non-unique indexes on the field names in the 'fieldNames' array.
 function createIndexes(fieldNames) {
     for (let keyName of fieldNames) {
         let keyObj = {};
         keyObj[keyName] = 1;
-        assert.commandWorked(db.runCommand({
-            createIndexes: coll.getName(),
-            indexes: [{key: keyObj, name: `index_${keyName}`, unique: false}]
-        }));
+        assert.commandWorked(
+            db.runCommand({
+                createIndexes: coll.getName(),
+                indexes: [{key: keyObj, name: `index_${keyName}`, unique: false}],
+            }),
+        );
     }
 }
 
@@ -180,7 +181,7 @@ function getArrayRaw(depth) {
         result.push(getValueRaw(depth + 1, kFieldNameAny));
     }
     return result;
-}  // function getArrayRaw
+} // function getArrayRaw
 
 // Returns a random raw JavaScript object. 'depth' is the current depth in the doc being created,
 // used to limit the total depth to 'kValueMaxDepth'.
@@ -196,7 +197,7 @@ function getObjectRaw(depth) {
         result[fieldName] = getValueRaw(depth + 1, fieldName);
     }
     return result;
-}  // function getObjectRaw
+} // function getObjectRaw
 
 // Returns a value of any supported type, which may be an object or array and contain more nested
 // object and arrays. Non-recursive calls should pass 'depth' 0, and recursive calls increment this
@@ -215,7 +216,7 @@ function getValueManaged(depth, fieldName, valueLiteralManager) {
     if (fieldName.startsWith("lit")) {
         return valueLiteralManager.getLiteralManaged();
     } else if (fieldName.startsWith("key")) {
-        return getKeyFieldValue();  // NOT managed
+        return getKeyFieldValue(); // NOT managed
     }
 
     // Prevents objects and arrays from growing to arbitrary depths.
@@ -228,7 +229,7 @@ function getValueManaged(depth, fieldName, valueLiteralManager) {
         return new ValueArray(depth, valueLiteralManager);
     }
     assert(false, `Unknown field type ${fieldName.substring(0, 3)}`);
-}  // function getValueManaged
+} // function getValueManaged
 
 // Returns a value of any supported type, which may be an object or array and contain more nested
 // object and arrays. Non-recursive calls should pass 'depth' 0, and recursive calls increment this
@@ -251,8 +252,8 @@ function getValueRaw(depth, fieldName) {
     } else if (fieldName.startsWith("obj")) {
         return getObjectRaw(depth);
     }
-    return getArrayRaw(depth);  // fieldName.startsWith("arr")
-}  // function getValueRaw
+    return getArrayRaw(depth); // fieldName.startsWith("arr")
+} // function getValueRaw
 
 // Returns a raw (unmanaged) value literal (not wrapped in a ValueLiteral).
 function getValueLiteralRaw() {
@@ -262,11 +263,13 @@ function getValueLiteralRaw() {
 // Logs a detailed message for a manual repro success, i.e. when the repro attempt did get a
 // mismatch, strongly implying (but not guaranteeing) that the original failure was reproduced.
 function logRepro(pipeline, results1, results2, msg) {
-    const fullMsg = msg + `\nPipeline:\n${tojson(pipeline)}` +
+    const fullMsg =
+        msg +
+        `\nPipeline:\n${tojson(pipeline)}` +
         `\nFirst run results (${results1.length} docs):\n${tojson(results1)}` +
         `\nSecond run results (${results2.length} docs):\n${tojson(results2)}`;
     assert(false, fullMsg);
-}  // function logFailedRepro
+} // function logFailedRepro
 
 // Logs a detailed failure message for a mismatch between the results of two runs of the same
 // pipeline and information about how to reproduce it.
@@ -274,7 +277,9 @@ function logRepro(pipeline, results1, results2, msg) {
 //   results1, results2 (JS Array) - results from the first and second runs of 'pipeline'
 //   msg (string) - caller-provided specific message for this failure
 function logFailedTest(pipeline, results1, results2, msg) {
-    const fullMsg = msg + `\nTo reproduce, in this test script replace` +
+    const fullMsg =
+        msg +
+        `\nTo reproduce, in this test script replace` +
         `\n  "let rngSeed = undefined;" with "let rngSeed = ${rngSeed};"` +
         `\n  "const pipelineOrig = undefined;" with "const pipelineOrig =` +
         `\n${tojson(pipeline.unmutate().toMql())};"` +
@@ -283,21 +288,21 @@ function logFailedTest(pipeline, results1, results2, msg) {
         `\nFirst run results (${results1.length} docs):\n${tojson(results1)}` +
         `\nSecond run results (${results2.length} docs):\n${tojson(results2)}`;
     assert(false, fullMsg);
-}  // function logFailedTest
+} // function logFailedTest
 
 // Recursively converts an array to MQL.
 function toMqlArray(arr) {
     let result = [];
     for (let entry of arr) {
         // Only managed values have a toMql() function and must call it to convert to plain JSON.
-        if (typeof entry.toMql === 'function') {
+        if (typeof entry.toMql === "function") {
             result.push(entry.toMql());
         } else {
             result.push(entry);
         }
     }
     return result;
-}  // function toMqlArray
+} // function toMqlArray
 
 // Recursively converts an object to MQL.
 function toMqlObject(obj) {
@@ -307,7 +312,7 @@ function toMqlObject(obj) {
         if (obj.hasOwnProperty(fieldName)) {
             // Only managed values have a toMql() function and must call it to convert to plain
             // JSON.
-            if (typeof obj[fieldName].toMql === 'function') {
+            if (typeof obj[fieldName].toMql === "function") {
                 result[fieldName] = obj[fieldName].toMql();
             } else {
                 result[fieldName] = obj[fieldName];
@@ -315,7 +320,7 @@ function toMqlObject(obj) {
         }
     }
     return result;
-}  // function toMqlObject
+} // function toMqlObject
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS Accumulator
@@ -331,15 +336,14 @@ class Accumulator {
         // The accumulator object.
         this._self = {};
 
-        this._self[kAccumulators[rngCurr.getRandomInt(0, kAccumulators.length)]] =
-            fieldNameRefMgr.getLiteralManaged();
-    }  // constructor
+        this._self[kAccumulators[rngCurr.getRandomInt(0, kAccumulators.length)]] = fieldNameRefMgr.getLiteralManaged();
+    } // constructor
 
     // Recursively converts the subtree rooted at this stage into an MQL query.
     toMql() {
         return toMqlObject(this._self);
     }
-}  // class Accumulator
+} // class Accumulator
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS AggStageLookup
@@ -353,18 +357,18 @@ class AggStageLookup {
     constructor(aggPipeline) {
         // The $lookup: value object.
         this._self = {
-        from: coll.getName(),  // not mutatable
-        localField: aggPipeline.getKeyFieldNameManaged(),
-        foreignField: aggPipeline.getKeyFieldNameManaged(),
-        as: aggPipeline.getArrFieldNameManaged(),
-    };
-    }  // constructor
+            from: coll.getName(), // not mutatable
+            localField: aggPipeline.getKeyFieldNameManaged(),
+            foreignField: aggPipeline.getKeyFieldNameManaged(),
+            as: aggPipeline.getArrFieldNameManaged(),
+        };
+    } // constructor
 
     // Recursively converts the subtree rooted at this stage into an MQL query.
     toMql() {
         return {"$lookup": toMqlObject(this._self)};
     }
-}  // class AggStageLookup
+} // class AggStageLookup
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS AggStageMatch
@@ -387,13 +391,13 @@ class AggStageMatch {
             }
             this._self[fieldName] = aggPipeline.getValueManaged(fieldName);
         }
-    }  // constructor
+    } // constructor
 
     // Recursively converts the subtree rooted at this stage into an MQL query.
     toMql() {
         return {"$match": toMqlObject(this._self)};
     }
-}  // class AggStageMatch
+} // class AggStageMatch
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS AggStageGroup
@@ -416,13 +420,13 @@ class AggStageGroup {
             }
             this._self[fieldName] = aggPipeline.getAccumulator();
         }
-    }  // constructor
+    } // constructor
 
     // Recursively converts the subtree rooted at this stage into an MQL query.
     toMql() {
         return {"$group": toMqlObject(this._self)};
     }
-}  // class AggStageGroup
+} // class AggStageGroup
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS AggStageProject
@@ -462,13 +466,13 @@ class AggStageProject {
         if (rngCurr.getRandomInt(0, 2) === 0) {
             this._self["_id"] = false;
         }
-    }  // constructor
+    } // constructor
 
     // Recursively converts the subtree rooted at this stage into an MQL query.
     toMql() {
         return {"$project": toMqlObject(this._self)};
     }
-}  // class AggStageProject
+} // class AggStageProject
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS AggStageSort
@@ -482,7 +486,7 @@ class AggStageSort {
         // The $sort: value object.
         this._self = {};
 
-        let arrayInKey = false;  // does the $sort key already have an array field in it?
+        let arrayInKey = false; // does the $sort key already have an array field in it?
         const numFields = rngCurr.getRandomInt(1, 3);
         for (let field = 0; field < numFields; ++field) {
             let fieldName = getFieldName();
@@ -499,13 +503,13 @@ class AggStageSort {
                 arrayInKey = true;
             }
         }
-    }  // constructor
+    } // constructor
 
     // Recursively converts the subtree rooted at this stage into an MQL query.
     toMql() {
         return {"$sort": toMqlObject(this._self)};
     }
-}  // class AggStageSort
+} // class AggStageSort
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS AggStageUnwind
@@ -519,23 +523,22 @@ class AggStageUnwind {
         this._self = {
             path: aggPipeline.getFieldNameRefManaged(),
             includeArrayIndex: aggPipeline.getFieldNameManaged(),
-            preserveNullAndEmptyArrays: aggPipeline.getBoolLiteralManaged()
+            preserveNullAndEmptyArrays: aggPipeline.getBoolLiteralManaged(),
         };
-    }  // constructor
+    } // constructor
 
     // Recursively converts the subtree rooted at this stage into an MQL query.
     toMql() {
         return {"$unwind": toMqlObject(this._self)};
     }
-}  // class AggStageUnwind
+} // class AggStageUnwind
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS AggPipeline
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Array of the classes representing supported aggregation stage types.
-const kStageTypes =
-    [AggStageGroup, AggStageLookup, AggStageMatch, AggStageProject, AggStageSort, AggStageUnwind];
+const kStageTypes = [AggStageGroup, AggStageLookup, AggStageMatch, AggStageProject, AggStageSort, AggStageUnwind];
 
 /**
  * Represents a complete aggregation pipeline.
@@ -544,14 +547,14 @@ class AggPipeline {
     constructor() {
         // Managers for the different types of mutatable literals in this AggPipeline.
         this._literalMgrs = [];
-        this._literalMgrs.push(this._arrFieldNameMgr = new LiteralMgr(kArrFieldNames));
-        this._literalMgrs.push(this._boolLiteralMgr = new LiteralMgr(kBoolLiterals));
-        this._literalMgrs.push(this._fieldNameMgr = new LiteralMgr(kFieldNames));
-        this._literalMgrs.push(this._fieldNameRefMgr = new LiteralMgr(kFieldNameRefs));
-        this._literalMgrs.push(this._keyFieldNameMgr = new LiteralMgr(kKeyFieldNames));
-        this._literalMgrs.push(this._nonKeyFieldNameMgr = new LiteralMgr(kNonKeyFieldNames));
-        this._literalMgrs.push(this._sortLiteralMgr = new LiteralMgr(kSortLiterals));
-        this._literalMgrs.push(this._valueLiteralMgr = new LiteralMgr(kValueLiterals));
+        this._literalMgrs.push((this._arrFieldNameMgr = new LiteralMgr(kArrFieldNames)));
+        this._literalMgrs.push((this._boolLiteralMgr = new LiteralMgr(kBoolLiterals)));
+        this._literalMgrs.push((this._fieldNameMgr = new LiteralMgr(kFieldNames)));
+        this._literalMgrs.push((this._fieldNameRefMgr = new LiteralMgr(kFieldNameRefs)));
+        this._literalMgrs.push((this._keyFieldNameMgr = new LiteralMgr(kKeyFieldNames)));
+        this._literalMgrs.push((this._nonKeyFieldNameMgr = new LiteralMgr(kNonKeyFieldNames)));
+        this._literalMgrs.push((this._sortLiteralMgr = new LiteralMgr(kSortLiterals)));
+        this._literalMgrs.push((this._valueLiteralMgr = new LiteralMgr(kValueLiterals)));
 
         // The stages of the pipeline.
         this._self = [];
@@ -570,7 +573,7 @@ class AggPipeline {
             this._runningSums[i] = this._runningSums[i - 1] + this._literalMgrs[i].getNum();
         }
         this._runningSumsTotal = this._runningSums[len - 1];
-    }  // constructor
+    } // constructor
 
     // Gets a random accumulator object whose RHS is a managed 'kFieldNameRefs' entry'.
     getAccumulator() {
@@ -662,7 +665,7 @@ class AggPipeline {
         }
         return this;
     }
-}  // class AggPipeline
+} // class AggPipeline
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS Literal
@@ -717,7 +720,7 @@ class Literal {
             this._literalIdx = this._origLiteralIdx;
         }
     }
-}  // class Literal
+} // class Literal
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS LiteralMgr
@@ -730,7 +733,7 @@ class LiteralMgr {
     // 'kLitSource' is an array of the possible JavaScript native literals to be managed.
     constructor(kLitSource) {
         this._kLitSource = kLitSource;
-        this._literals = [];  // all managed literals
+        this._literals = []; // all managed literals
     }
 
     // Returns the number of Literals currently under management.
@@ -767,7 +770,7 @@ class LiteralMgr {
             lit.unmutate();
         }
     }
-}  // class LiteralMgr
+} // class LiteralMgr
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS ValueArray
@@ -798,7 +801,7 @@ class ValueArray {
     toMql() {
         return toMqlArray(this._self);
     }
-}  // class ValueArray
+} // class ValueArray
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // CLASS ValueObject
@@ -834,7 +837,7 @@ class ValueObject {
     toMql() {
         return toMqlObject(this._self);
     }
-}  // class ValueObject
+} // class ValueObject
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // MAIN HELPER FUNCTIONS
@@ -852,11 +855,13 @@ function deepSortObjAndArr(ent) {
     if (Array.isArray(ent)) {
         let result = ent.map(deepSortObjAndArr);
         return result.sort(bsonWoCompare);
-    } else if (typeof ent === 'object' && ent !== null && !ent.tojson) {
+    } else if (typeof ent === "object" && ent !== null && !ent.tojson) {
         const sortedObj = {};
-        Object.keys(ent).sort().forEach(key => {
-            sortedObj[key] = deepSortObjAndArr(ent[key]);
-        });
+        Object.keys(ent)
+            .sort()
+            .forEach((key) => {
+                sortedObj[key] = deepSortObjAndArr(ent[key]);
+            });
         return sortedObj;
     } else if (Number(ent) === ent && ent % 1 !== 0) {
         // Rounds floating point to one decimal place to avoid mismatches from precision loss in
@@ -924,19 +929,22 @@ function runManualRepro(pipelineOrig, pipelineMutant) {
             pipelineMutant,
             resultsMutant1,
             resultsMutant2,
-            "Repro got mismatch between mutant pipeline runs. Plan cache should not be involved.");
+            "Repro got mismatch between mutant pipeline runs. Plan cache should not be involved.",
+        );
     }
 
     // Rerun the original, which may reuse the mutant's cached plan. It should still return the
     // original's ground-truth results.
     const resultsOrig2 = doAggregate(coll, pipelineOrig);
     if (!resultsIdentical(resultsOrig1, resultsOrig2)) {
-        logRepro(pipelineOrig,
-                 resultsOrig1,
-                 resultsOrig2,
-                 "Repro got mismatch between original pipeline runs. Plan cache may have a bug.");
+        logRepro(
+            pipelineOrig,
+            resultsOrig1,
+            resultsOrig2,
+            "Repro got mismatch between original pipeline runs. Plan cache may have a bug.",
+        );
     }
-}  // function runManualRepro
+} // function runManualRepro
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // MAIN
@@ -993,7 +1001,7 @@ const rngMain = new LcgRandom(rngSeed + 1);
 // Current random number generator.
 let rngCurr = rngMain;
 
-let tested = 0;  // num pipelines with different ground-truth results for original and mutant
+let tested = 0; // num pipelines with different ground-truth results for original and mutant
 
 print(`main: Dropping collection ${coll.getName()}`);
 assert(coll.drop());
@@ -1006,8 +1014,10 @@ print(`main: Creating indexes on ${kKeyFieldNames.length} key fields`);
 createIndexes(kKeyFieldNames);
 
 if (pipelineOrig) {
-    assert(rngSeed && pipelineMutant,
-           "main: To rerun a failing query pair, 'rngSeed' and 'pipelineMutant' must be defined.");
+    assert(
+        rngSeed && pipelineMutant,
+        "main: To rerun a failing query pair, 'rngSeed' and 'pipelineMutant' must be defined.",
+    );
     print("main: Running 'pipelineOrig' versus 'pipelineMutant' for repro attempt.");
     runManualRepro(pipelineOrig, pipelineMutant);
 } else {
@@ -1022,7 +1032,7 @@ if (pipelineOrig) {
         // Saves ground-truth results for the mutated pipeline. Try several times to get a mutation
         // that produces different results from the original.
         let mutations = 0;
-        let found = false;  // did we find a mutation that gave different results from original?
+        let found = false; // did we find a mutation that gave different results from original?
         let resultsMutant1;
         while (!found && mutations < kMaxMutations) {
             aggPipeline.mutate();
@@ -1064,7 +1074,8 @@ if (pipelineOrig) {
                     resultsMutant1,
                     resultsMutant2,
                     "Results from two runs of mutant pipeline differ from each other." +
-                        " Unexpected - plan cache should not be involved in these two runs.");
+                        " Unexpected - plan cache should not be involved in these two runs.",
+                );
             }
 
             // Rerun the original, which may reuse the mutant's cached plan. It should still return
@@ -1078,13 +1089,12 @@ if (pipelineOrig) {
                     resultsOrig2,
                     "Results from two runs of original pipeline differ from each other." +
                         " Possible plan cache bug where improperly parameterized cached mutant plan" +
-                        " was reused for second run of original pipeline.");
+                        " was reused for second run of original pipeline.",
+                );
             }
         }
-    }  // for kNumPipelines
+    } // for kNumPipelines
     print(`main: ${kNumPipelines} original pipelines were run.`);
-    print(`main: ${tested} pipelines (${
-        (100.0 * tested / kNumPipelines).toFixed(1)}%) tested the plan cache.`);
-    print(`main: ${
-        kNumPipelines - tested} pipelines had the same original and mutant ground-truth results.`);
-}  // else run full test
+    print(`main: ${tested} pipelines (${((100.0 * tested) / kNumPipelines).toFixed(1)}%) tested the plan cache.`);
+    print(`main: ${kNumPipelines - tested} pipelines had the same original and mutant ground-truth results.`);
+} // else run full test

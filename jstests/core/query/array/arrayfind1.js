@@ -18,7 +18,7 @@ function test(exptected, q, name) {
 test(3, {}, "A1");
 test(1, {"a.y": 2}, "A2");
 test(1, {"a": {x: 1}}, "A3");
-test(3, {"a": {$elemMatch: {x: 1}}}, "A4");  // SERVER-377
+test(3, {"a": {$elemMatch: {x: 1}}}, "A4"); // SERVER-377
 
 t.save({a: [{x: 2}]});
 t.save({a: [{x: 3}]});

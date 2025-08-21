@@ -27,14 +27,14 @@ const findWithConstLet5 = {
     filter: {},
     projection: {_id: "$$a"},
     limit: 1,
-    let : {a: {$add: [2, 3]}},
+    let: {a: {$add: [2, 3]}},
 };
 const findWithConstLet500 = {
     find: coll.getName(),
     filter: {},
     projection: {_id: "$$a"},
     limit: 1,
-    let : {a: {$add: [200, 300]}},
+    let: {a: {$add: [200, 300]}},
 };
 
 result = assert.commandWorked(db.runCommand(findWithConstLet5)).cursor.firstBatch;

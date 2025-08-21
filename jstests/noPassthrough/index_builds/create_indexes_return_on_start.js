@@ -11,24 +11,27 @@ const indexNameA = "a_1";
 const indexNameB = "b_1";
 const indexNameC = "c_1";
 
-const runTest = function(db, replSets, timeseries, setUp) {
+const runTest = function (db, replSets, timeseries, setUp) {
     const coll = timeseries ? db.coll_ts : db.coll;
     if (timeseries) {
-        assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+        assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
     }
     if (setUp) {
         setUp(coll);
     }
 
-    const awaitReplication = function() {
+    const awaitReplication = function () {
         for (const replSet of replSets) {
             replSet.awaitReplication();
         }
     };
 
     assert.commandWorked(
-        coll.insert([{_id: 0, m: 0, t: ISODate()}, {_id: 10, m: 10, t: ISODate()}]));
+        coll.insert([
+            {_id: 0, m: 0, t: ISODate()},
+            {_id: 10, m: 10, t: ISODate()},
+        ]),
+    );
     awaitReplication();
 
     const cmdA = {
@@ -48,17 +51,26 @@ const runTest = function(db, replSets, timeseries, setUp) {
     };
     const cmdAB = {
         createIndexes: coll.getName(),
-        indexes: [{key: {a: 1}, name: indexNameA}, {key: {b: 1}, name: indexNameB}],
+        indexes: [
+            {key: {a: 1}, name: indexNameA},
+            {key: {b: 1}, name: indexNameB},
+        ],
         returnOnStart: true,
     };
     const cmdAC = {
         createIndexes: coll.getName(),
-        indexes: [{key: {a: 1}, name: indexNameA}, {key: {c: 1}, name: indexNameC}],
+        indexes: [
+            {key: {a: 1}, name: indexNameA},
+            {key: {c: 1}, name: indexNameC},
+        ],
         returnOnStart: true,
     };
     const cmdBC = {
         createIndexes: coll.getName(),
-        indexes: [{key: {b: 1}, name: indexNameB}, {key: {c: 1}, name: indexNameC}],
+        indexes: [
+            {key: {b: 1}, name: indexNameB},
+            {key: {c: 1}, name: indexNameC},
+        ],
         returnOnStart: true,
     };
 
@@ -74,44 +86,50 @@ const runTest = function(db, replSets, timeseries, setUp) {
     };
     const joinCmdAB = {
         createIndexes: coll.getName(),
-        indexes: [{key: {a: 1}, name: indexNameA}, {key: {b: 1}, name: indexNameB}],
+        indexes: [
+            {key: {a: 1}, name: indexNameA},
+            {key: {b: 1}, name: indexNameB},
+        ],
         returnOnStart: false,
     };
 
-    const stopReplication = function() {
+    const stopReplication = function () {
         for (const replSet of replSets) {
             stopServerReplication(replSet.getSecondary());
         }
     };
 
-    const restartReplication = function() {
+    const restartReplication = function () {
         for (const replSet of replSets) {
             restartServerReplication(replSet.getSecondaries());
         }
     };
 
-    const _assertReady = function(indexName, expected) {
+    const _assertReady = function (indexName, expected) {
         for (const replSet of replSets) {
             const replSetDb = replSet.getPrimary().getDB(db.getName());
-            assert.eq((timeseries ? getTimeseriesCollForDDLOps(replSetDb, replSetDb[coll.getName()])
-                                  : replSetDb[coll.getName()])
-                          .aggregate([{$listCatalog: {}}])
-                          .toArray()[0]
-                          .md.indexes.find(index => index.spec.name === indexName)
-                          .ready,
-                      expected);
+            assert.eq(
+                (timeseries
+                    ? getTimeseriesCollForDDLOps(replSetDb, replSetDb[coll.getName()])
+                    : replSetDb[coll.getName()]
+                )
+                    .aggregate([{$listCatalog: {}}])
+                    .toArray()[0]
+                    .md.indexes.find((index) => index.spec.name === indexName).ready,
+                expected,
+            );
         }
     };
 
-    const assertReady = function(indexName) {
+    const assertReady = function (indexName) {
         _assertReady(indexName, true);
     };
 
-    const assertNotReady = function(indexName) {
+    const assertNotReady = function (indexName) {
         _assertReady(indexName, false);
     };
 
-    const assertCreateIndexesWorked = function(res) {
+    const assertCreateIndexesWorked = function (res) {
         assert.commandWorked(res);
         if (res.hasOwnProperty("raw")) {
             for (const [key, value] of Object.entries(res.raw)) {
@@ -188,7 +206,7 @@ const runTest = function(db, replSets, timeseries, setUp) {
 };
 
 const reduceOplogMaxTimeParam = {
-    setParameter: {'failpoint.setSmallOplogGetMoreMaxTimeMS': {mode: "alwaysOn"}}
+    setParameter: {"failpoint.setSmallOplogGetMoreMaxTimeMS": {mode: "alwaysOn"}},
 };
 
 const replSetConfig = {
@@ -204,32 +222,36 @@ runTest(replDb, [replTest], false);
 runTest(replDb, [replTest], true);
 replTest.stopSet();
 
-const shardingTest =
-    new ShardingTest({shards: 2, rs: {...replSetConfig, ...reduceOplogMaxTimeParam}});
+const shardingTest = new ShardingTest({shards: 2, rs: {...replSetConfig, ...reduceOplogMaxTimeParam}});
 const shardingDb = shardingTest.s.getDB(jsTestName());
 runTest(shardingDb, [shardingTest.rs0, shardingTest.rs1], false, (coll) => {
-    assert.commandWorked(
-        shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}));
+    assert.commandWorked(shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}));
     assert.commandWorked(shardingDb.adminCommand({split: coll.getFullName(), middle: {m: 5}}));
-    assert.commandWorked(shardingDb.adminCommand(
-        {moveChunk: coll.getFullName(), find: {m: 0}, to: shardingTest.shard0.shardName}));
-    assert.commandWorked(shardingDb.adminCommand(
-        {moveChunk: coll.getFullName(), find: {m: 10}, to: shardingTest.shard1.shardName}));
+    assert.commandWorked(
+        shardingDb.adminCommand({moveChunk: coll.getFullName(), find: {m: 0}, to: shardingTest.shard0.shardName}),
+    );
+    assert.commandWorked(
+        shardingDb.adminCommand({moveChunk: coll.getFullName(), find: {m: 10}, to: shardingTest.shard1.shardName}),
+    );
 });
 runTest(shardingDb, [shardingTest.rs0, shardingTest.rs1], true, (coll) => {
+    assert.commandWorked(shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}));
     assert.commandWorked(
-        shardingDb.adminCommand({shardCollection: coll.getFullName(), key: {m: 1}}));
-    assert.commandWorked(shardingDb.adminCommand(
-        {split: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(), middle: {meta: 5}}));
-    assert.commandWorked(shardingDb.adminCommand({
-        moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
-        find: {meta: 0},
-        to: shardingTest.shard0.shardName
-    }));
-    assert.commandWorked(shardingDb.adminCommand({
-        moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
-        find: {meta: 10},
-        to: shardingTest.shard1.shardName
-    }));
+        shardingDb.adminCommand({split: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(), middle: {meta: 5}}),
+    );
+    assert.commandWorked(
+        shardingDb.adminCommand({
+            moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
+            find: {meta: 0},
+            to: shardingTest.shard0.shardName,
+        }),
+    );
+    assert.commandWorked(
+        shardingDb.adminCommand({
+            moveChunk: getTimeseriesCollForDDLOps(shardingDb, coll).getFullName(),
+            find: {meta: 10},
+            to: shardingTest.shard1.shardName,
+        }),
+    );
 });
 shardingTest.stop();

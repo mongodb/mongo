@@ -42,13 +42,15 @@ coll.drop();
 
 // Run a simple query that does not need a particular FCV to run,
 // so that there is at least one query shape stored in the query stats store.
-assert.commandWorked(conn.adminCommand(
-    {aggregate: coll.getName(), pipeline: [{$project: {_id: 1, x: "x"}}], cursor: {}}));
+assert.commandWorked(
+    conn.adminCommand({aggregate: coll.getName(), pipeline: [{$project: {_id: 1, x: "x"}}], cursor: {}}),
+);
 
 // Now enable the fail point that simulates that the query feature is not allowed for
 // the query shape saved in the query stats store.
-assert.commandWorked(testDB.adminCommand(
-    {'configureFailPoint': "queryStatsGenerateQueryFeatureNotAllowedError", 'mode': 'alwaysOn'}));
+assert.commandWorked(
+    testDB.adminCommand({"configureFailPoint": "queryStatsGenerateQueryFeatureNotAllowedError", "mode": "alwaysOn"}),
+);
 
 // Now when requesting the $queryStats, we should receive a QueryFeatureNotEnabled error,
 // but despite 'internalQueryStatsErrorsAreCommandFatal' and (potentially) being in debug mode,
@@ -58,22 +60,24 @@ assert.commandWorked(conn.adminCommand({aggregate: 1, pipeline: [{$queryStats: {
 // Now assert that no results were returned by $queryStats.
 // We know there should be only one key in the store,
 // and it should be skipped over without failing the query.
-let results = testDB.getSiblingDB("admin")
-                  .aggregate([
-                      {$queryStats: {}},
-                  ])
-                  .toArray();
+let results = testDB
+    .getSiblingDB("admin")
+    .aggregate([{$queryStats: {}}])
+    .toArray();
 assert.eq(results.length, 0);
 
 // Now turn on the fail point that will also generate an error in $queryStats,
 // but not the one that should be skipped over, so we can ensure that $queryStats
 // still fails when we expect it to.
-assert.commandWorked(testDB.adminCommand(
-    {'configureFailPoint': "queryStatsGenerateQueryFeatureNotAllowedError", 'mode': 'off'}));
-assert.commandWorked(testDB.adminCommand(
-    {'configureFailPoint': "queryStatsFailToReparseQueryShape", 'mode': 'alwaysOn'}));
+assert.commandWorked(
+    testDB.adminCommand({"configureFailPoint": "queryStatsGenerateQueryFeatureNotAllowedError", "mode": "off"}),
+);
+assert.commandWorked(
+    testDB.adminCommand({"configureFailPoint": "queryStatsFailToReparseQueryShape", "mode": "alwaysOn"}),
+);
 assert.commandFailedWithCode(
     conn.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}),
-    ErrorCodes.QueryStatsFailedToRecord);
+    ErrorCodes.QueryStatsFailedToRecord,
+);
 
 MongoRunner.stopMongod(conn);

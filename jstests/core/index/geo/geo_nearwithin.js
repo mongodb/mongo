@@ -18,8 +18,7 @@ for (var x = -points; x < points; x += 1) {
 }
 assert.commandWorked(t.insert(docs));
 
-const runQuery = (center) =>
-    t.find({$and: [{geo: {$near: [0, 0]}}, {geo: {$within: {$center: center}}}]}).toArray();
+const runQuery = (center) => t.find({$and: [{geo: {$near: [0, 0]}}, {geo: {$within: {$center: center}}}]}).toArray();
 
 let resNear = runQuery([[0, 0], 1]);
 assert.eq(resNear.length, 5, tojson(resNear));
@@ -35,11 +34,13 @@ assert.eq(resNear.length, 9, tojson(resNear));
 
 // We want everything distance >1 from us but <1.5
 // These points are (-+1, -+1)
-resNear = t.find({
-               $and: [
-                   {geo: {$near: [0, 0]}},
-                   {geo: {$within: {$center: [[0, 0], 1.5]}}},
-                   {geo: {$not: {$within: {$center: [[0, 0], 1]}}}}
-               ]
-           }).toArray();
+resNear = t
+    .find({
+        $and: [
+            {geo: {$near: [0, 0]}},
+            {geo: {$within: {$center: [[0, 0], 1.5]}}},
+            {geo: {$not: {$within: {$center: [[0, 0], 1]}}}},
+        ],
+    })
+    .toArray();
 assert.eq(resNear.length, 4, tojson(resNear));

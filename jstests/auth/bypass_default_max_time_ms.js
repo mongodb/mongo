@@ -20,8 +20,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function setDefaultReadMaxTimeMS(db, newValue) {
-    assert.commandWorked(
-        db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
+    assert.commandWorked(db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
 
     // Currently, the mongos cluster parameter cache is not updated on setClusterParameter. An
     // explicit call to getClusterParameter will refresh the cache.
@@ -32,29 +31,27 @@ function setup(conn, getConn, multiTenancy = false) {
     // Create a global admin user.
     {
         const adminDB = conn.getDB("admin");
-        adminDB.createUser({user: 'admin', pwd: 'admin', roles: ['root']});
+        adminDB.createUser({user: "admin", pwd: "admin", roles: ["root"]});
     }
 
     // Fetch a new connection, this might seem redundant, but is intended to make this work for the
     // multi-tenancy case.
-    const adminDB = getConn('admin', 'admin', 'admin');
+    const adminDB = getConn("admin", "admin", "admin");
 
     // Prepare a regular user without the 'bypassDefaultMaxtimeMS' privilege.
-    adminDB.createUser({user: 'regularUser', pwd: 'password', roles: ["readAnyDatabase"]});
+    adminDB.createUser({user: "regularUser", pwd: "password", roles: ["readAnyDatabase"]});
 
     // Prepare a user with the 'bypassDefaultMaxtimeMS' privilege.
     adminDB.createRole({
         role: "bypassDefaultMaxtimeMSRole",
-        privileges: [
-            {resource: {cluster: true}, actions: ["bypassDefaultMaxTimeMS"]},
-        ],
-        roles: []
+        privileges: [{resource: {cluster: true}, actions: ["bypassDefaultMaxTimeMS"]}],
+        roles: [],
     });
 
     adminDB.createUser({
-        user: 'bypassUser',
-        pwd: 'password',
-        roles: ["readAnyDatabase", "bypassDefaultMaxtimeMSRole"]
+        user: "bypassUser",
+        pwd: "password",
+        roles: ["readAnyDatabase", "bypassDefaultMaxtimeMSRole"],
     });
 
     if (multiTenancy) {
@@ -74,15 +71,15 @@ function setup(conn, getConn, multiTenancy = false) {
             $match: {
                 $expr: {
                     $function: {
-                        body: function() {
+                        body: function () {
                             sleep(1000);
                             return true;
                         },
                         args: [],
-                        lang: "js"
-                    }
-                }
-            }
+                        lang: "js",
+                    },
+                },
+            },
         };
 
         return {
@@ -94,25 +91,29 @@ function setup(conn, getConn, multiTenancy = false) {
 }
 
 function runBypassTests(getConn, commandToRun, dbName = jsTestName()) {
-    const adminDB = getConn('admin', 'admin', 'admin');
+    const adminDB = getConn("admin", "admin", "admin");
     // Sets the default maxTimeMS for read operations with a small value.
     setDefaultReadMaxTimeMS(adminDB, 1);
 
     // Expect failure for the regular user.
-    const regularUserDB = getConn(dbName, 'regularUser', 'password');
+    const regularUserDB = getConn(dbName, "regularUser", "password");
     // Note the error could manifest as an Interrupted error sometimes due to the JavaScript
     // execution being interrupted.
-    assert.commandFailedWithCode(regularUserDB.runCommand(commandToRun),
-                                 [ErrorCodes.Interrupted, ErrorCodes.MaxTimeMSExpired]);
+    assert.commandFailedWithCode(regularUserDB.runCommand(commandToRun), [
+        ErrorCodes.Interrupted,
+        ErrorCodes.MaxTimeMSExpired,
+    ]);
 
     // Expect a user with 'bypassDefaultMaxTimeMS' to succeed.
-    const bypassUserDB = getConn(dbName, 'bypassUser', 'password');
+    const bypassUserDB = getConn(dbName, "bypassUser", "password");
     assert.commandWorked(bypassUserDB.runCommand(commandToRun));
 
     // Expect a user with 'bypassDefaultMaxTimeMS', but that specified a maxTimeMS on the query, to
     // fail due to timeout.
-    assert.commandFailedWithCode(bypassUserDB.runCommand({...commandToRun, maxTimeMS: 1}),
-                                 [ErrorCodes.Interrupted, ErrorCodes.MaxTimeMSExpired]);
+    assert.commandFailedWithCode(bypassUserDB.runCommand({...commandToRun, maxTimeMS: 1}), [
+        ErrorCodes.Interrupted,
+        ErrorCodes.MaxTimeMSExpired,
+    ]);
 
     // Expect root user to bypass the default.
     const rootUserDB = adminDB.getSiblingDB(dbName);
@@ -151,8 +152,7 @@ const keyFile = "jstests/libs/key1";
         shards: {nodes: 1},
         config: {nodes: 1},
         keyFile: keyFile,
-        mongosOptions:
-            {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
+        mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
     });
 
     const conn = st.s;
@@ -178,9 +178,9 @@ const keyFile = "jstests/libs/key1";
             setParameter: {
                 multitenancySupport: true,
                 testOnlyValidatedTenancyScopeKey: vtsKey,
-            }
+            },
         },
-        keyFile: keyFile
+        keyFile: keyFile,
     });
     rstWithTenants.startSet();
     rstWithTenants.initiate();
@@ -198,13 +198,12 @@ const keyFile = "jstests/libs/key1";
     };
     const getConn = (dbName, user, password) => {
         // setClusterParameter is only possible with a global user with useTenant.
-        if (user == 'admin') {
+        if (user == "admin") {
             return getConnWithGlobalUser(dbName, user, password);
         }
 
         const newConn = new Mongo(conn.host);
-        const securityToken =
-            _createSecurityToken({user: user, db: 'admin', tenant: tenantId1}, vtsKey);
+        const securityToken = _createSecurityToken({user: user, db: "admin", tenant: tenantId1}, vtsKey);
         newConn._setSecurityToken(securityToken);
         return newConn.getDB(dbName);
     };

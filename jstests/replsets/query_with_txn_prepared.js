@@ -29,7 +29,7 @@ const collName = "coll";
 
 assert.commandWorked(primary.getDB(dbName)[collName].createIndexes([{x: 1}]));
 
-const transactionShell = startParallelShell(async function() {
+const transactionShell = startParallelShell(async function () {
     const {PrepareHelpers} = await import("jstests/core/txns/libs/prepare_helpers.js");
     while (db.getSiblingDB("query_with_txn_prepared")["stopQueries"].find().count() == 0) {
         for (let i = 0; i < 100; ++i) {

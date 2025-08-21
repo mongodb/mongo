@@ -86,8 +86,7 @@ export function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
     try {
         mongod.getDB("admin").createUser({user: "root", pwd: "pass", roles: ["root"]});
         mongod.getDB("admin").auth("root", "pass");
-    } catch (ex) {
-    }
+    } catch (ex) {}
 
     // Get base command line opts.  Needed because the framework adds its own options
     var getCmdLineOptsExpected = getCmdLineOptsBaseMongod;
@@ -148,22 +147,23 @@ export function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
     // options of its own, and we only want to compare against the options we care about.
     function getCmdLineOptsFromMongos(mongosOptions) {
         // Start mongod with no options
-        var baseMongod =
-            MongoRunner.runMongod({configsvr: "", replSet: "csrs", storageEngine: "wiredTiger"});
-        assert.commandWorked(baseMongod.adminCommand({
-            replSetInitiate:
-                {_id: "csrs", configsvr: true, members: [{_id: 0, host: baseMongod.host}]}
-        }));
+        var baseMongod = MongoRunner.runMongod({configsvr: "", replSet: "csrs", storageEngine: "wiredTiger"});
+        assert.commandWorked(
+            baseMongod.adminCommand({
+                replSetInitiate: {_id: "csrs", configsvr: true, members: [{_id: 0, host: baseMongod.host}]},
+            }),
+        );
         var configdbStr = "csrs/" + baseMongod.host;
         var ismasterResult;
         assert.soon(
-            function() {
+            function () {
                 ismasterResult = baseMongod.adminCommand("ismaster");
                 return ismasterResult.ismaster;
             },
-            function() {
+            function () {
                 return tojson(ismasterResult);
-            });
+            },
+        );
 
         var options = Object.merge(mongosOptions, {configdb: configdbStr});
         var baseMongos = MongoRunner.runMongos(options);

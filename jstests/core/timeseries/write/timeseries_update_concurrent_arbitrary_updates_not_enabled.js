@@ -33,48 +33,51 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
-const collName = 't';
+const collName = "t";
 const dbName = jsTestName();
 
 const testCases = {
     DROP_COLLECTION: 0,
     REPLACE_COLLECTION: 1,
-    REPLACE_METAFIELD: 2
+    REPLACE_METAFIELD: 2,
 };
 
-const validateUpdateIndex = (initialDocList,
-                             updateList,
-                             testType,
-                             failCode,
-                             newMetaField = null) => {
+const validateUpdateIndex = (initialDocList, updateList, testType, failCode, newMetaField = null) => {
     const testDB = db.getSiblingDB(dbName);
-    const awaitTestUpdate = startParallelShell(funWithArgs(
-        function(
-            dbName, collName, timeFieldName, metaFieldName, initialDocList, updateList, failCode) {
-            const testDB = db.getSiblingDB(dbName);
-            const coll = testDB.getCollection(collName);
+    const awaitTestUpdate = startParallelShell(
+        funWithArgs(
+            function (dbName, collName, timeFieldName, metaFieldName, initialDocList, updateList, failCode) {
+                const testDB = db.getSiblingDB(dbName);
+                const coll = testDB.getCollection(collName);
 
-            assert.commandWorked(testDB.createCollection(
-                coll.getName(),
-                {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+                assert.commandWorked(
+                    testDB.createCollection(coll.getName(), {
+                        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                    }),
+                );
 
-            assert.commandWorked(coll.insert(initialDocList));
+                assert.commandWorked(coll.insert(initialDocList));
 
-            assert.commandWorked(testDB.adminCommand(
-                {configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}));
+                assert.commandWorked(
+                    testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}),
+                );
 
-            assert.commandFailedWithCode(
-                testDB.runCommand({update: coll.getName(), updates: updateList}), failCode);
+                assert.commandFailedWithCode(
+                    testDB.runCommand({update: coll.getName(), updates: updateList}),
+                    failCode,
+                );
 
-            coll.drop();
-        },
-        dbName,
-        collName,
-        timeFieldName,
-        metaFieldName,
-        initialDocList,
-        updateList,
-        failCode));
+                coll.drop();
+            },
+            dbName,
+            collName,
+            timeFieldName,
+            metaFieldName,
+            initialDocList,
+            updateList,
+            failCode,
+        ),
+    );
 
     const coll = testDB.getCollection(collName);
     const childOp = waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangDuringBatchUpdate")[0];
@@ -86,13 +89,15 @@ const validateUpdateIndex = (initialDocList,
             assert.commandWorked(testDB.createCollection(coll.getName()));
             break;
         case testCases.REPLACE_METAFIELD:
-            assert.commandWorked(testDB.createCollection(
-                coll.getName(), {timeseries: {timeField: timeFieldName, metaField: newMetaField}}));
+            assert.commandWorked(
+                testDB.createCollection(coll.getName(), {
+                    timeseries: {timeField: timeFieldName, metaField: newMetaField},
+                }),
+            );
             break;
     }
 
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
 
     // Wait for testUpdate to finish.
     awaitTestUpdate();
@@ -112,5 +117,6 @@ if (!TimeseriesTest.arbitraryUpdatesEnabled(db)) {
         [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
         testCases.REPLACE_METAFIELD,
         ErrorCodes.InvalidOptions,
-        "meta");
+        "meta",
+    );
 }

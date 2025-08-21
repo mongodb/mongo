@@ -15,20 +15,19 @@ function hasNullAttr(entry, attrName) {
     return entry.attr.hasOwnProperty(attrName) && entry.attr[attrName] == null;
 }
 function hasOptionalMillisAttr(entry, attrName) {
-    return hasNullAttr(entry, attrName) || hasNonNegativeAttr(entry, attrName + 'Millis');
+    return hasNullAttr(entry, attrName) || hasNonNegativeAttr(entry, attrName + "Millis");
 }
 function validateSlowConnectionLogEntry(entry) {
-    assert(entry.hasOwnProperty('attr'));
-    assert(entry.attr.hasOwnProperty('hostAndPort'));
-    assert(hasNonNegativeAttr(entry, 'dnsResolutionTimeMillis'));
-    assert(hasNonNegativeAttr(entry, 'tcpConnectionTimeMillis'));
-    assert(hasOptionalMillisAttr(entry, 'tlsHandshakeTime'));
-    assert(hasNonNegativeAttr(entry, 'authTimeMillis'));
-    assert(hasOptionalMillisAttr(entry, 'hookTime'));
-    assert(hasNonNegativeAttr(entry, 'totalTimeMillis'));
+    assert(entry.hasOwnProperty("attr"));
+    assert(entry.attr.hasOwnProperty("hostAndPort"));
+    assert(hasNonNegativeAttr(entry, "dnsResolutionTimeMillis"));
+    assert(hasNonNegativeAttr(entry, "tcpConnectionTimeMillis"));
+    assert(hasOptionalMillisAttr(entry, "tlsHandshakeTime"));
+    assert(hasNonNegativeAttr(entry, "authTimeMillis"));
+    assert(hasOptionalMillisAttr(entry, "hookTime"));
+    assert(hasNonNegativeAttr(entry, "totalTimeMillis"));
 
-    let total = entry.attr.dnsResolutionTimeMillis + entry.attr.tcpConnectionTimeMillis +
-        entry.attr.authTimeMillis;
+    let total = entry.attr.dnsResolutionTimeMillis + entry.attr.tcpConnectionTimeMillis + entry.attr.authTimeMillis;
     if (entry.attr.tlsHandshakeTimeMillis >= 0) {
         total += entry.attr.tlsHandshakeTimeMillis;
     }
@@ -55,16 +54,15 @@ function validateLogAndExtractCountAndEntry(st) {
 }
 
 const kConnectionEstablishmentDelayMillis = 250;
-const kDBName = 'TestDB';
-const kCollectionName = 'sharded_coll';
-const kKeyName = 'foo';
+const kDBName = "TestDB";
+const kCollectionName = "sharded_coll";
+const kKeyName = "foo";
 
 let runTest = (connectionHealthLoggingOn) => {
     let st = new ShardingTest({shards: 1});
 
     if (!connectionHealthLoggingOn) {
-        assert.commandWorked(st.s.adminCommand(
-            {setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}));
+        assert.commandWorked(st.s.adminCommand({setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}));
     }
 
     const initialLogEntryCount = validateLogAndExtractCountAndEntry(st).count;
@@ -72,40 +70,54 @@ let runTest = (connectionHealthLoggingOn) => {
     jsTestLog("Setting up the test collection.");
 
     assert.commandWorked(st.s.adminCommand({enableSharding: kDBName}));
-    assert.commandWorked(st.s.adminCommand(
-        {shardcollection: `${kDBName}.${kCollectionName}`, key: {[kKeyName]: 1}}));
+    assert.commandWorked(st.s.adminCommand({shardcollection: `${kDBName}.${kCollectionName}`, key: {[kKeyName]: 1}}));
 
     let db = st.getDB(kDBName);
     assert.commandWorked(db[kCollectionName].insertOne({primaryOnly: true, [kKeyName]: 42}));
 
     jsTestLog("Activating the delay in connection establishment.");
-    let connDelayFailPoint = configureFailPoint(
-        st.s, 'asioTransportLayerDelayConnection', {millis: kConnectionEstablishmentDelayMillis});
-    assert.commandWorked(st.s.adminCommand(
-        {setParameter: 1, slowConnectionThresholdMillis: kConnectionEstablishmentDelayMillis}));
+    let connDelayFailPoint = configureFailPoint(st.s, "asioTransportLayerDelayConnection", {
+        millis: kConnectionEstablishmentDelayMillis,
+    });
     assert.commandWorked(
-        st.s.adminCommand({dropConnections: 1, hostAndPort: [st.rs0.getPrimary().name]}));
+        st.s.adminCommand({setParameter: 1, slowConnectionThresholdMillis: kConnectionEstablishmentDelayMillis}),
+    );
+    assert.commandWorked(st.s.adminCommand({dropConnections: 1, hostAndPort: [st.rs0.getPrimary().name]}));
 
     jsTestLog("Running the query.");
 
     function runTestQuery(db) {
         return startParallelShell(
-            funWithArgs((host, dbName, collName, keyName) => {
-                let conn = new Mongo(host);
-                assert.eq(1,
-                          conn.getDB(dbName)
-                              .getCollection(collName)
-                              .find({primaryOnly: true, [keyName]: 42})
-                              .itcount());
-            }, db.getMongo().name, db.getName(), kCollectionName, kKeyName), null, true);
+            funWithArgs(
+                (host, dbName, collName, keyName) => {
+                    let conn = new Mongo(host);
+                    assert.eq(
+                        1,
+                        conn
+                            .getDB(dbName)
+                            .getCollection(collName)
+                            .find({primaryOnly: true, [keyName]: 42})
+                            .itcount(),
+                    );
+                },
+                db.getMongo().name,
+                db.getName(),
+                kCollectionName,
+                kKeyName,
+            ),
+            null,
+            true,
+        );
     }
     let queryShell = runTestQuery(db);
 
     if (connectionHealthLoggingOn) {
         jsTestLog("Checking the mongos log.");
 
-        assert.soon(() => validateLogAndExtractCountAndEntry(st).entry != null,
-                    "Slow connection establishment log entry not found.");
+        assert.soon(
+            () => validateLogAndExtractCountAndEntry(st).entry != null,
+            "Slow connection establishment log entry not found.",
+        );
 
         queryShell();
         connDelayFailPoint.off();
@@ -114,8 +126,10 @@ let runTest = (connectionHealthLoggingOn) => {
         let queryLogEntry = validateLogAndExtractCountAndEntry(st).entry;
         let status = assert.commandWorked(st.s.adminCommand({serverStatus: 1}));
         printjson(status);
-        assert.gte(status.metrics.network.totalEgressConnectionEstablishmentTimeMillis,
-                   queryLogEntry.attr.totalTimeMillis);
+        assert.gte(
+            status.metrics.network.totalEgressConnectionEstablishmentTimeMillis,
+            queryLogEntry.attr.totalTimeMillis,
+        );
     } else {
         assert.eq(validateLogAndExtractCountAndEntry(st).count, initialLogEntryCount);
 

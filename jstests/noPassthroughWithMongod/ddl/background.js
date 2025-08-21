@@ -9,7 +9,7 @@ var a = new Mongo(db.getMongo().host).getDB(db.getName());
 
 var bulk = t.initializeUnorderedBulkOp();
 for (var i = 0; i < 100000; i++) {
-    bulk.insert({y: 'aaaaaaaaaaaa', i: i});
+    bulk.insert({y: "aaaaaaaaaaaa", i: i});
     if (i % 10000 == 0) {
         assert.commandWorked(bulk.execute());
         bulk = t.initializeUnorderedBulkOp();
@@ -37,8 +37,7 @@ assert.commandWorked(bulk.execute());
 printjson(db.currentOp());
 
 for (var i = 0; i < 40; i++) {
-    if (db.currentOp().inprog.length == 0)
-        break;
+    if (db.currentOp().inprog.length == 0) break;
     print("waiting");
     sleep(1000);
 }

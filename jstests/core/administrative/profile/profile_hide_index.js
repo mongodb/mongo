@@ -23,8 +23,9 @@ const collName = "profile_hide_index";
 const coll = assertDropAndRecreateCollection(testDb, collName);
 
 function setPostCommandFailpoint({mode, options}) {
-    assert.commandWorked(testDb.adminCommand(
-        {configureFailPoint: "waitAfterCommandFinishesExecution", mode: mode, data: options}));
+    assert.commandWorked(
+        testDb.adminCommand({configureFailPoint: "waitAfterCommandFinishesExecution", mode: mode, data: options}),
+    );
 }
 
 // This helper function is used to test 'hidden' flag can be found in 'currentOp' by given a command
@@ -36,25 +37,22 @@ function testHiddenFlagInCurrentOp({runCmd, isCommandExpected, cmdName}) {
 
     let awaitHideIndex;
     try {
-        setPostCommandFailpoint(
-            {mode: "alwaysOn", options: {ns: coll.getFullName(), commands: [cmdName]}});
+        setPostCommandFailpoint({mode: "alwaysOn", options: {ns: coll.getFullName(), commands: [cmdName]}});
 
         awaitHideIndex = startParallelShell(runCmd);
 
         assert.soon(
-            function() {
-                const inprogs = testDb.getSiblingDB("admin")
-                                    .aggregate([
-                                        {$currentOp: {}},
-                                        {$match: {"ns": "profile_hide_index.profile_hide_index"}}
-                                    ])
-                                    .toArray();
+            function () {
+                const inprogs = testDb
+                    .getSiblingDB("admin")
+                    .aggregate([{$currentOp: {}}, {$match: {"ns": "profile_hide_index.profile_hide_index"}}])
+                    .toArray();
                 return inprogs.length > 0 && isCommandExpected(inprogs);
             },
-            function() {
+            function () {
                 return "Failed to find expected hidden_index command in currentOp()";
-            });
-
+            },
+        );
     } finally {
         // Ensure that we unset the failpoint, regardless of the outcome of the test.
         setPostCommandFailpoint({mode: "off", options: {}});
@@ -69,13 +67,19 @@ testHiddenFlagInCurrentOp({
     runCmd: `assert.commandWorked(db.getSiblingDB("profile_hide_index").runCommand({
                 "collMod": "profile_hide_index",
                 "index": {"name": "b_1", "hidden": true}}));`,
-    isCommandExpected: function(inprogs) {
-        return inprogs.find(function(inprog) {
-            return inprog.command.collMod === "profile_hide_index" && inprog.command.index &&
-                inprog.command.index.hidden === true && inprog.command.index.name === "b_1";
-        }) !== undefined;
+    isCommandExpected: function (inprogs) {
+        return (
+            inprogs.find(function (inprog) {
+                return (
+                    inprog.command.collMod === "profile_hide_index" &&
+                    inprog.command.index &&
+                    inprog.command.index.hidden === true &&
+                    inprog.command.index.name === "b_1"
+                );
+            }) !== undefined
+        );
     },
-    cmdName: "collMod"
+    cmdName: "collMod",
 });
 
 // Tests that createIndex command with 'hidden' set to true showed up in currentOp.
@@ -83,14 +87,18 @@ testHiddenFlagInCurrentOp({
     runCmd: `assert.commandWorked(db.getSiblingDB("profile_hide_index").runCommand({
                 "createIndexes": "profile_hide_index",
                 "indexes": [{"key" : {c: 1}, "name": "c_1", "hidden": true}]}))`,
-    isCommandExpected: function(inprogs) {
-        return inprogs.find(function(inprog) {
-            return inprog.command.createIndexes === "profile_hide_index" &&
-                inprog.command.indexes[0].hidden === true &&
-                inprog.command.indexes[0].name == "c_1";
-        }) !== undefined;
+    isCommandExpected: function (inprogs) {
+        return (
+            inprogs.find(function (inprog) {
+                return (
+                    inprog.command.createIndexes === "profile_hide_index" &&
+                    inprog.command.indexes[0].hidden === true &&
+                    inprog.command.indexes[0].name == "c_1"
+                );
+            }) !== undefined
+        );
     },
-    cmdName: "createIndexes"
+    cmdName: "createIndexes",
 });
 
 //
@@ -101,8 +109,9 @@ testDb.setProfilingLevel(0);
 testDb.system.profile.drop();
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDb.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDb.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
 assert.commandWorked(coll.createIndex({b: 1}, {hidden: true}));
 profilerHasSingleMatchingEntryOrThrow({
@@ -110,17 +119,16 @@ profilerHasSingleMatchingEntryOrThrow({
     filter: {
         "ns": "profile_hide_index.profile_hide_index",
         "command.createIndexes": "profile_hide_index",
-        "command.indexes.hidden": true
-    }
+        "command.indexes.hidden": true,
+    },
 });
 
-assert.commandWorked(
-    testDb.runCommand({"collMod": coll.getName(), "index": {"name": "b_1", "hidden": false}}));
+assert.commandWorked(testDb.runCommand({"collMod": coll.getName(), "index": {"name": "b_1", "hidden": false}}));
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: testDb,
     filter: {
         "ns": "profile_hide_index.profile_hide_index",
         "command.collMod": "profile_hide_index",
         "command.index.hidden": false,
-    }
+    },
 });

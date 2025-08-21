@@ -20,13 +20,15 @@ const node0SessionDB = node0Session.getDatabase(dbName);
 assert.commandWorked(node0SessionDB.coll.insert({a: 1}, {writeConcern: {"w": "majority"}}));
 
 jsTestLog("Run a transaction with txnNumber 0 on the primary.");
-assert.commandWorked(node0SessionDB.runCommand({
-    insert: collName,
-    documents: [{b: 1}],
-    txnNumber: NumberLong(0),
-    startTransaction: true,
-    autocommit: false
-}));
+assert.commandWorked(
+    node0SessionDB.runCommand({
+        insert: collName,
+        documents: [{b: 1}],
+        txnNumber: NumberLong(0),
+        startTransaction: true,
+        autocommit: false,
+    }),
+);
 
 jsTestLog("Step up the secondary. The primary will abort the transaction when it steps down.");
 rst.stepUp(node1);
@@ -34,29 +36,35 @@ rst.stepUp(node1);
 const node1DB = node1.getDB(dbName);
 
 jsTestLog("Run a transaction with txnNumber 0 and the same session ID on the new primary.");
-assert.commandWorked(node1DB.runCommand({
-    insert: collName,
-    documents: [{c: 1}],
-    lsid: sessionId,
-    txnNumber: NumberLong(0),
-    startTransaction: true,
-    autocommit: false
-}));
-let res = assert.commandWorked(node1DB.adminCommand({
-    prepareTransaction: 1,
-    lsid: sessionId,
-    txnNumber: NumberLong(0),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-}));
-assert.commandWorked(node1DB.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: res.prepareTimestamp,
-    lsid: sessionId,
-    txnNumber: NumberLong(0),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-}));
+assert.commandWorked(
+    node1DB.runCommand({
+        insert: collName,
+        documents: [{c: 1}],
+        lsid: sessionId,
+        txnNumber: NumberLong(0),
+        startTransaction: true,
+        autocommit: false,
+    }),
+);
+let res = assert.commandWorked(
+    node1DB.adminCommand({
+        prepareTransaction: 1,
+        lsid: sessionId,
+        txnNumber: NumberLong(0),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    }),
+);
+assert.commandWorked(
+    node1DB.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: res.prepareTimestamp,
+        lsid: sessionId,
+        txnNumber: NumberLong(0),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    }),
+);
 rst.awaitReplication();
 assert.eq(2, node0SessionDB.coll.find().itcount());
 assert.eq(0, node0SessionDB.coll.find({b: 1}).itcount());

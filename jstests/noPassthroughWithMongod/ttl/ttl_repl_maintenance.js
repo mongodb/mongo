@@ -9,7 +9,7 @@
 var runner;
 var conn;
 
-var primeSystemReplset = function() {
+var primeSystemReplset = function () {
     conn = MongoRunner.runMongod();
     var localDB = conn.getDB("local");
     localDB.system.replset.insert({x: 1});
@@ -19,7 +19,7 @@ var primeSystemReplset = function() {
     assert.commandWorked(testDB.foo.createIndex({x: 1}, {expireAfterSeconds: 2}));
 };
 
-var restartWithConfig = function() {
+var restartWithConfig = function () {
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: conn.dbpath});
     let testDB = conn.getDB("test");
@@ -34,7 +34,7 @@ var restartWithConfig = function() {
     assert.eq(testDB.foo.count(), n);
 };
 
-var restartWithoutConfig = function() {
+var restartWithoutConfig = function () {
     var localDB = conn.getDB("local");
     assert.commandWorked(localDB.system.replset.remove({}));
 
@@ -42,9 +42,13 @@ var restartWithoutConfig = function() {
 
     conn = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: conn.dbpath});
 
-    assert.soon(function() {
-        return conn.getDB("test").foo.count() < 100;
-    }, "never deleted", 75000);
+    assert.soon(
+        function () {
+            return conn.getDB("test").foo.count() < 100;
+        },
+        "never deleted",
+        75000,
+    );
 
     MongoRunner.stopMongod(conn);
 };

@@ -21,8 +21,9 @@ replTest.initiate(config);
 var primary = replTest.getPrimary().getDB(jsTestName());
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 replTest.awaitReplication();
 
@@ -43,7 +44,7 @@ primary.foo.insert({x: 1});
 syncFrom(nodes[1], nodes[0], replTest);
 
 // make sure the record still appears in the remote secondary
-assert.soon(function() {
+assert.soon(function () {
     return secondaries[1].foo.findOne() != null;
 });
 

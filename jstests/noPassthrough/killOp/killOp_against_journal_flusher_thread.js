@@ -27,15 +27,17 @@ try {
 
     // Find the JournalFlusher thread's opID.
     const currentOpResults = adminDB.currentOp();
-    const journalFlusherOp = currentOpResults.inprog.filter(function(op) {
+    const journalFlusherOp = currentOpResults.inprog.filter(function (op) {
         if (op.desc && op.desc == "JournalFlusher") {
             jsTestLog("Found JournalFlusher operation: " + tojson(op));
             return true;
         }
     });
-    assert.eq(1,
-              journalFlusherOp.length,
-              "Unexpectedly found multiple JournalFlusher operations: " + tojson(journalFlusherOp));
+    assert.eq(
+        1,
+        journalFlusherOp.length,
+        "Unexpectedly found multiple JournalFlusher operations: " + tojson(journalFlusherOp),
+    );
 
     // Try to kill the JournalFlusher thread.
     assert.commandWorked(adminDB.killOp(journalFlusherOp[0].opid));

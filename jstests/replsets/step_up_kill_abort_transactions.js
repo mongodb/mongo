@@ -24,7 +24,7 @@ const rst = new ReplSetTest({
     nodeOptions: {
         setParameter:
             // Make it easier to hold a transaction before it completes.
-            {maxNumberOfTransactionOperationsInSingleOplogEntry: 1, bgSyncOplogFetcherBatchSize: 1}
+            {maxNumberOfTransactionOperationsInSingleOplogEntry: 1, bgSyncOplogFetcherBatchSize: 1},
     },
 });
 
@@ -34,7 +34,7 @@ config.members[2].priority = 0;
 // Disable primary catchup and chaining.
 config.settings = {
     catchUpTimeoutMillis: 0,
-    chainingAllowed: false
+    chainingAllowed: false,
 };
 rst.initiate(config);
 
@@ -51,14 +51,15 @@ const newPrimaryDB = newPrimary.getDB(dbName);
 assert.commandWorked(primaryDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 // Prevent the priority: 0 node from fetching new ops so that it can vote for the new primary.
-const stopReplProducerFailPoint = configureFailPoint(rst.nodes[2], 'stopReplProducer');
+const stopReplProducerFailPoint = configureFailPoint(rst.nodes[2], "stopReplProducer");
 
 jsTest.log("Stop secondary oplog replication before the last operation in the transaction.");
 // The stopReplProducerOnDocument failpoint ensures that secondary stops replicating before
 // applying the last operation in the transaction. This depends on the oplog fetcher batch size
 // being 1.
-const stopReplProducerOnDocumentFailPoint = configureFailPoint(
-    newPrimary, "stopReplProducerOnDocument", {document: {"applyOps.o._id": "last in txn"}});
+const stopReplProducerOnDocumentFailPoint = configureFailPoint(newPrimary, "stopReplProducerOnDocument", {
+    document: {"applyOps.o._id": "last in txn"},
+});
 
 jsTestLog("Start a transaction.");
 const session = primary.startSession({causalConsistency: false});
@@ -81,14 +82,12 @@ jsTestLog("Find the start and commit optimes on the primary.");
 let txnTableEntry = getTxnTableEntry(primaryDB);
 assert.eq(txnTableEntry.state, "committed");
 const commitOpTime = txnTableEntry.lastWriteOpTime;
-const startOpTime =
-    primaryDB.getSiblingDB("local").oplog.rs.findOne({ts: commitOpTime.ts}).prevOpTime;
+const startOpTime = primaryDB.getSiblingDB("local").oplog.rs.findOne({ts: commitOpTime.ts}).prevOpTime;
 
 jsTestLog("Wait for the new primary to block on fail point.");
 stopReplProducerOnDocumentFailPoint.wait();
 
-jsTestLog("Wait for the new primary to apply the first op of transaction at timestamp: " +
-          tojson(startOpTime));
+jsTestLog("Wait for the new primary to apply the first op of transaction at timestamp: " + tojson(startOpTime));
 assert.soon(() => {
     const lastOpTime = getLastOpTime(newPrimary);
     jsTestLog("Current lastOpTime on the new primary: " + tojson(lastOpTime));
@@ -132,13 +131,15 @@ jsTestLog("Verifying that the transaction has been aborted on the new primary.")
 const newSession = new _DelegatingDriverSession(newPrimary, session);
 const newSessionDB = newSession.getDatabase(dbName);
 // The transaction should have been aborted.
-assert.commandFailedWithCode(newSessionDB.adminCommand({
-    commitTransaction: 1,
-    txnNumber: NumberLong(newSession.getTxnNumber_forTesting()),
-    autocommit: false,
-    writeConcern: {w: "majority"}
-}),
-                             ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(
+    newSessionDB.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(newSession.getTxnNumber_forTesting()),
+        autocommit: false,
+        writeConcern: {w: "majority"},
+    }),
+    ErrorCodes.NoSuchTransaction,
+);
 
 jsTestLog("Verifying that the collection was not changed by the transaction.");
 assert.eq(primaryDB.getCollection(collName).find().itcount(), 0);

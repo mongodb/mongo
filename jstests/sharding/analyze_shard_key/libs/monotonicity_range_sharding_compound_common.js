@@ -1,9 +1,5 @@
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
-import {
-    kOrderTypes,
-} from "jstests/sharding/analyze_shard_key/libs/monotonicity_common.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {kOrderTypes} from "jstests/sharding/analyze_shard_key/libs/monotonicity_common.js";
 
 // Construct test cases for testing the monotonicity of compound shard keys that use range sharding.
 // For each test case:
@@ -31,16 +27,14 @@ export const rangeShardingCompoundTestCases = (() => {
                 indexKey: {[fieldName0]: 1, [fieldName1]: 1},
                 fieldOpts: [
                     {name: fieldName0, type: fieldType0, order: orderType0.name},
-                    {name: fieldName1, type: fieldType1, order: orderType1.name}
+                    {name: fieldName1, type: fieldType1, order: orderType1.name},
                 ],
-                expected: orderType0.name == "constant" ? orderType1.monotonicity
-                                                        : orderType0.monotonicity
+                expected: orderType0.name == "constant" ? orderType1.monotonicity : orderType0.monotonicity,
             });
 
             for (let orderType2 of kOrderTypes) {
                 const fieldName2 = AnalyzeShardKeyUtil.getRandomFieldName("c");
-                const fieldType2 =
-                    AnalyzeShardKeyUtil.getRandomElement(orderType2.supportedFieldTypes);
+                const fieldType2 = AnalyzeShardKeyUtil.getRandomElement(orderType2.supportedFieldTypes);
 
                 // Test compound shard key with a compound shard key prefixed index.
                 testCases.push({
@@ -49,10 +43,9 @@ export const rangeShardingCompoundTestCases = (() => {
                     fieldOpts: [
                         {name: fieldName0, type: fieldType0, order: orderType0.name},
                         {name: fieldName1, type: fieldType1, order: orderType1.name},
-                        {name: fieldName2, type: fieldType2, order: orderType2.name}
+                        {name: fieldName2, type: fieldType2, order: orderType2.name},
                     ],
-                    expected: orderType0.name == "constant" ? orderType1.monotonicity
-                                                            : orderType0.monotonicity
+                    expected: orderType0.name == "constant" ? orderType1.monotonicity : orderType0.monotonicity,
                 });
             }
         }
@@ -67,5 +60,5 @@ export const testProbability = 0.15;
 // out the insertion order noise caused by parallel oplog application on secondaries.
 export const numDocsRange = {
     min: 45000,
-    max: 50000
+    max: 50000,
 };

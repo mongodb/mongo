@@ -23,13 +23,14 @@ assert.throwsWithCode(() => sourceColl.explain().aggregate([{$out: targetColl.ge
 // Then test that the $out fails if the collection becomes sharded between establishing the
 // cursor and performing the $out.
 targetColl.drop();
-const cursorResponse = assert.commandWorked(mongosDB.runCommand({
-    aggregate: sourceColl.getName(),
-    pipeline: [{$out: targetColl.getName()}],
-    cursor: {batchSize: 0}
-}));
+const cursorResponse = assert.commandWorked(
+    mongosDB.runCommand({
+        aggregate: sourceColl.getName(),
+        pipeline: [{$out: targetColl.getName()}],
+        cursor: {batchSize: 0},
+    }),
+);
 st.shardColl(targetColl, {_id: 1}, false);
-assert.throwsWithCode(() => new DBCommandCursor(mongosDB, cursorResponse).itcount(),
-                      ErrorCodes.IllegalOperation);
+assert.throwsWithCode(() => new DBCommandCursor(mongosDB, cursorResponse).itcount(), ErrorCodes.IllegalOperation);
 
 st.stop();

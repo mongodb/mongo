@@ -17,11 +17,7 @@
  *   requires_fcv_80
  * ]
  */
-import {
-    cursorEntryValidator,
-    cursorSizeValidator,
-    summaryFieldsValidator
-} from "jstests/libs/bulk_write_utils.js";
+import {cursorEntryValidator, cursorSizeValidator, summaryFieldsValidator} from "jstests/libs/bulk_write_utils.js";
 
 // The retryable write override does not append txnNumber to getMore since it is not a retryable
 // command so we need to test it manually.
@@ -36,7 +32,10 @@ function runTest(retryableWrite) {
     // Should end up with 1 insert return per batch.
     var cmdObj = {
         bulkWrite: 1,
-        ops: [{insert: 1, document: {skey: "MongoDB"}}, {insert: 0, document: {skey: "MongoDB"}}],
+        ops: [
+            {insert: 1, document: {skey: "MongoDB"}},
+            {insert: 0, document: {skey: "MongoDB"}},
+        ],
         nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}],
         cursor: {batchSize: 1},
     };
@@ -49,29 +48,32 @@ function runTest(retryableWrite) {
 
     assert.commandWorked(res);
     cursorSizeValidator(res, 1);
-    summaryFieldsValidator(
-        res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
+    summaryFieldsValidator(res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
-    assert(res.cursor.id != 0,
-           "Unexpectedly found cursor ID 0 in bulkWrite command response: " + tojson(res));
+    assert(res.cursor.id != 0, "Unexpectedly found cursor ID 0 in bulkWrite command response: " + tojson(res));
     cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
-    assert.eq(res.cursor.ns,
-              "admin.$cmd.bulkWrite",
-              "Found unexpected ns in bulkWrite command response: " + tojson(res));
+    assert.eq(
+        res.cursor.ns,
+        "admin.$cmd.bulkWrite",
+        "Found unexpected ns in bulkWrite command response: " + tojson(res),
+    );
 
     // First batch only had 1 of 2 responses so run a getMore to get the next batch.
-    var getMoreRes = assert.commandWorked(
-        db.adminCommand({getMore: res.cursor.id, collection: "$cmd.bulkWrite"}));
-    assert(!getMoreRes.cursor.nextBatch[1],
-           "Unexpectedly found cursor entry at index 1 in getMore command response: " +
-               tojson(getMoreRes));
+    var getMoreRes = assert.commandWorked(db.adminCommand({getMore: res.cursor.id, collection: "$cmd.bulkWrite"}));
+    assert(
+        !getMoreRes.cursor.nextBatch[1],
+        "Unexpectedly found cursor entry at index 1 in getMore command response: " + tojson(getMoreRes),
+    );
     assert(
         getMoreRes.cursor.id == 0,
-        "Unexpectedly found non-zero cursor ID in getMore command response: " + tojson(getMoreRes));
+        "Unexpectedly found non-zero cursor ID in getMore command response: " + tojson(getMoreRes),
+    );
     cursorEntryValidator(getMoreRes.cursor.nextBatch[0], {ok: 1, n: 1, idx: 1});
-    assert.eq(getMoreRes.cursor.ns,
-              "admin.$cmd.bulkWrite",
-              "Found unexpected ns in getMore command response: " + tojson(res));
+    assert.eq(
+        getMoreRes.cursor.ns,
+        "admin.$cmd.bulkWrite",
+        "Found unexpected ns in getMore command response: " + tojson(res),
+    );
 
     assert.eq(coll.find().itcount(), 1);
     assert.eq(coll1.find().itcount(), 1);
@@ -80,16 +82,20 @@ function runTest(retryableWrite) {
 
     // Want to test ns is properly applied to a cursor that does not need a getMore. This test
     // is in this file so it does not run in suites since that would change the ns name.
-    res = assert.commandWorked(db.adminCommand({
-        bulkWrite: 1,
-        ops: [{insert: 0, document: {skey: "MongoDB"}}],
-        nsInfo: [{ns: "test.coll"}]
-    }));
+    res = assert.commandWorked(
+        db.adminCommand({
+            bulkWrite: 1,
+            ops: [{insert: 0, document: {skey: "MongoDB"}}],
+            nsInfo: [{ns: "test.coll"}],
+        }),
+    );
 
     assert.commandWorked(res);
-    assert.eq(res.cursor.ns,
-              "admin.$cmd.bulkWrite",
-              "Found unexpected ns in bulkWrite command response: " + tojson(res));
+    assert.eq(
+        res.cursor.ns,
+        "admin.$cmd.bulkWrite",
+        "Found unexpected ns in bulkWrite command response: " + tojson(res),
+    );
 
     coll.drop();
 
@@ -118,4 +124,4 @@ function runTest(retryableWrite) {
 }
 
 runTest(false /* retryableWrite */);
-runTest(true, /* retryableWrite */);
+runTest(true /* retryableWrite */);

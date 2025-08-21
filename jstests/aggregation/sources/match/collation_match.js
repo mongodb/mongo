@@ -19,19 +19,13 @@ assert.eq(1, coll.aggregate([{$match: {a: "A"}}], caseInsensitive).itcount());
 assert.eq(1, coll.aggregate([{$project: {b: "B"}}, {$match: {b: "b"}}], caseInsensitive).itcount());
 
 // Test that $match inside a $facet respects the collation.
-assert.eq(1,
-          coll.aggregate([{$facet: {fct: [{$match: {a: "A"}}]}}], caseInsensitive)
-              .toArray()[0]
-              .fct.length);
+assert.eq(1, coll.aggregate([{$facet: {fct: [{$match: {a: "A"}}]}}], caseInsensitive).toArray()[0].fct.length);
 
 // Test that when a $match can be split to be part before the $unwind and part after, both
 // pieces of the split respect the collation.
 coll.drop();
 assert.commandWorked(coll.insert({a: "foo", b: ["bar"]}));
-assert.eq(
-    1,
-    coll.aggregate([{$limit: 1}, {$unwind: "$b"}, {$match: {a: "FOO", b: "BAR"}}], caseInsensitive)
-        .itcount());
+assert.eq(1, coll.aggregate([{$limit: 1}, {$unwind: "$b"}, {$match: {a: "FOO", b: "BAR"}}], caseInsensitive).itcount());
 
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));

@@ -21,7 +21,7 @@
 import {
     getPlanCacheKeyFromExplain,
     getPlanCacheShapeHashFromExplain,
-    getPlanCacheShapeHashFromObject
+    getPlanCacheShapeHashFromObject,
 } from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -29,15 +29,21 @@ coll.drop();
 
 // Set up the collection with an index and a set of documents.
 assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.insertMany([{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}]));
+assert.commandWorked(
+    coll.insertMany([
+        {_id: 1, a: 1},
+        {_id: 2, a: 2},
+        {_id: 3, a: 3},
+    ]),
+);
 const filter1 = {
-    a: {$gte: 2, $lte: 2}
+    a: {$gte: 2, $lte: 2},
 };
 const filter2 = {
-    a: {$gte: 1, $lte: 2}
+    a: {$gte: 1, $lte: 2},
 };
 const sortPattern = {
-    a: -1
+    a: -1,
 };
 
 // Create a cache entry using 'filter1'.
@@ -55,7 +61,10 @@ assert(cacheEntry.isActive, cacheEntry);
 
 // Capture the results for 'filter2' and verify that it used the same plan cache entry as 'filter1'.
 const cacheResults = coll.find(filter2).sort(sortPattern).toArray();
-const expectedFilter2Result = [{_id: 2, a: 2}, {_id: 1, a: 1}];
+const expectedFilter2Result = [
+    {_id: 2, a: 2},
+    {_id: 1, a: 1},
+];
 assert.eq(cacheResults, expectedFilter2Result);
 
 // There should still be exactly one plan cache entry.
@@ -89,33 +98,39 @@ assert.eq(results, cacheResults);
 // These two queries have the same query shape but should not have a same plan cache key because
 // the filter with a infinity value should not be eligible for auto-parameterization.
 const filterWithInf = {
-    "a": {$not: {$gt: NumberDecimal("Infinity")}}
+    "a": {$not: {$gt: NumberDecimal("Infinity")}},
 };
 const filterWithVeryLargeValue = {
-    "a": {$not: {$gt: NumberDecimal("9.999999999999999999999999999999999E+6144")}}
+    "a": {$not: {$gt: NumberDecimal("9.999999999999999999999999999999999E+6144")}},
 };
 
 assert.neq(
     getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithInf}])),
-    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}])));
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}])),
+);
 
 // Auto-parameterization should still apply if no infinity value is involved.
 assert.eq(
     getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: {"a": {$not: {$gt: 1}}}}])),
-    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}])));
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: filterWithVeryLargeValue}])),
+);
 
 const singleElemIn = {
-    "a": {$in: [1]}
+    "a": {$in: [1]},
 };
 const multipleElemsIn = {
-    "a": {$in: [1, 2]}
+    "a": {$in: [1, 2]},
 };
 const multipleElemsIn2 = {
-    "a": {$in: [3, 4]}
+    "a": {$in: [3, 4]},
 };
-assert.neq(getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: singleElemIn}])),
-           getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}])));
+assert.neq(
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: singleElemIn}])),
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}])),
+);
 
 // Auto-parameterization should still apply if there's no single-element $in query.
-assert.eq(getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}])),
-          getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn2}])));
+assert.eq(
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn}])),
+    getPlanCacheKeyFromExplain(coll.explain().aggregate([{$match: multipleElemsIn2}])),
+);

@@ -58,7 +58,7 @@ class TestCollection {
     assert(test.coll.drop());
     assert.eq(getPlanCacheSize(db), initialPlanCacheSize);
     assert.eq(getPlanCacheNumEntries(db), 0);
-}());
+})();
 
 (function cacheEntriesNotRemovedIfAnotherCollectedDropped() {
     const test = new TestCollection("coll1");
@@ -75,7 +75,7 @@ class TestCollection {
     // Entries associated with anotherTest.coll are booted from the plan cache.
     assert.eq(getPlanCacheNumEntries(db), 2);
     test.assertCollectionCacheEntriesNotRemoved();
-}());
+})();
 
 (function cacheEntriesRemovedIfANewIndexCreated() {
     const test = new TestCollection();
@@ -85,7 +85,7 @@ class TestCollection {
 
     assert.lt(getPlanCacheSize(db), planCacheSize);
     test.assertAllCollectionCacheEntriesRemoved();
-}());
+})();
 
 (function cacheEntriesRemovedIfAnyIndexDropped() {
     const test = new TestCollection();
@@ -95,34 +95,35 @@ class TestCollection {
 
     assert.lt(getPlanCacheSize(db), initialPlanCacheSize);
     test.assertAllCollectionCacheEntriesRemoved();
-}());
+})();
 
 (function cacheEntriesNotRemovedIfCollModCalled() {
     const collectionName = "coll";
     const test = new TestCollection(collectionName);
     const initialPlanCacheSize = getPlanCacheSize(db);
 
-    assert.commandWorked(
-        db.runCommand({collMod: collectionName, validator: {text: {$type: "string"}}}));
+    assert.commandWorked(db.runCommand({collMod: collectionName, validator: {text: {$type: "string"}}}));
 
     assert.eq(getPlanCacheSize(db), initialPlanCacheSize);
     test.assertCollectionCacheEntriesNotRemoved();
-}());
+})();
 
 (function cacheEntriesRemovedIfIndexChanged() {
     const collectionName = "coll";
     const test = new TestCollection(collectionName);
     const initialPlanCacheSize = getPlanCacheSize(db);
-    assert.commandWorked(db.runCommand({
-        collMod: collectionName,
-        index: {
-            name: test.indexNames[0],
-            hidden: true,
-        }
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            collMod: collectionName,
+            index: {
+                name: test.indexNames[0],
+                hidden: true,
+            },
+        }),
+    );
     assert.lt(getPlanCacheSize(db), initialPlanCacheSize);
     test.assertAllCollectionCacheEntriesRemoved();
-}());
+})();
 
 (function cacheEntriesRemovedOnClearPlanCacheCommand() {
     const collectionName = "cacheEntriesRemovedOnClearPlanCacheCommand";
@@ -139,7 +140,7 @@ class TestCollection {
 
     assert.eq(getPlanCacheSize(db), initialPlanCacheSize);
     test.assertAllCollectionCacheEntriesRemoved();
-}());
+})();
 
 (function oneCacheEntryRemovedOnClearPlanCacheWithQueryCommand() {
     const collectionName = "coll";
@@ -150,10 +151,9 @@ class TestCollection {
     assert.eq(numberOfCacheEntries + 1, getPlanCacheNumEntries(db));
     const planCacheSize = getPlanCacheSize(db);
 
-    assert.commandWorked(
-        db.runCommand({planCacheClear: collectionName, query: {a: 1, b: 2, c: 3, d: 4}}));
+    assert.commandWorked(db.runCommand({planCacheClear: collectionName, query: {a: 1, b: 2, c: 3, d: 4}}));
     assert.lt(getPlanCacheSize(db), planCacheSize);
     assert.eq(numberOfCacheEntries, getPlanCacheNumEntries(db));
-}());
+})();
 
 MongoRunner.stopMongod(conn);

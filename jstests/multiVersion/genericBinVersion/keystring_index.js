@@ -31,7 +31,7 @@ const indexTypes = [
         // This is the name of the index.
         indexName: "BTreeIndex",
         // This function is called to create documents, which are then inserted into the collection.
-        createDoc: i => ({
+        createDoc: (i) => ({
             a: i,
             b: {x: i, y: i + 1},
             c: [i, i + 1],
@@ -44,33 +44,41 @@ const indexTypes = [
     },
     {
         indexName: "2d",
-        createDoc: i => ({loc: [i, i]}),
+        createDoc: (i) => ({loc: [i, i]}),
         spec: {loc: "2d"},
     },
     {
         indexName: "2dSphere",
-        createDoc: i => {
+        createDoc: (i) => {
             if (i == 0)
                 return {
                     "loc": {
                         "type": "Polygon",
-                        "coordinates": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]
+                        "coordinates": [
+                            [
+                                [0, 0],
+                                [0, 1],
+                                [1, 1],
+                                [1, 0],
+                                [0, 0],
+                            ],
+                        ],
                     },
                     b: {x: i, y: i + 1},
                     c: [i, i + 1],
                 };
             else
-                return ({
-                    loc: {type: "Point", coordinates: [(i / 10.0) * (i / 10.0), (i / 10.0)]},
+                return {
+                    loc: {type: "Point", coordinates: [(i / 10.0) * (i / 10.0), i / 10.0]},
                     b: {x: i, y: i + 1},
                     c: [i, i + 1],
-                });
+                };
         },
         spec: {loc: "2dsphere", b: 1, c: -1},
     },
     {
         indexName: "text",
-        createDoc: i => ({
+        createDoc: (i) => ({
             a: "a".repeat(i + 1),
             b: {x: i, y: i + 1, z: [i, i + 1]},
         }),
@@ -78,20 +86,17 @@ const indexTypes = [
     },
     {
         indexName: "hashed",
-        createDoc: i => ({
+        createDoc: (i) => ({
             a: {x: i, y: i + 1, z: [i, i + 1]},
         }),
         spec: {a: "hashed"},
     },
     {
         indexName: "wildCard",
-        createDoc: i => {
-            if (i == 0)
-                return {};
-            else if (i == 1)
-                return {a: null};
-            else if (i == 2)
-                return {a: {}};
+        createDoc: (i) => {
+            if (i == 0) return {};
+            else if (i == 1) return {a: null};
+            else if (i == 2) return {a: {}};
             else
                 return {
                     a: i,
@@ -100,22 +105,22 @@ const indexTypes = [
                 };
         },
         spec: {"$**": 1},
-    }
+    },
 ];
 // -----
 
-const dbpath = MongoRunner.dataPath + 'keystring_index';
+const dbpath = MongoRunner.dataPath + "keystring_index";
 resetDbpath(dbpath);
 
 const defaultOptions = {
     dbpath: dbpath,
-    noCleanData: true
+    noCleanData: true,
 };
 
-const kCollectionPrefix = 'testColl';
+const kCollectionPrefix = "testColl";
 
-let mongodOptionsLastLTS = Object.extend({binVersion: 'last-lts'}, defaultOptions);
-let mongodOptionsCurrent = Object.extend({binVersion: 'latest'}, defaultOptions);
+let mongodOptionsLastLTS = Object.extend({binVersion: "last-lts"}, defaultOptions);
+let mongodOptionsCurrent = Object.extend({binVersion: "latest"}, defaultOptions);
 
 // We will first start up a last-lts version mongod, populate the database, upgrade, then
 // validate.
@@ -123,10 +128,9 @@ let mongodOptionsCurrent = Object.extend({binVersion: 'latest'}, defaultOptions)
 jsTestLog("Starting version: last-lts");
 let conn = MongoRunner.runMongod(mongodOptionsLastLTS);
 
-assert.neq(
-    null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptionsLastLTS));
+assert.neq(null, conn, "mongod was unable able to start with version " + tojson(mongodOptionsLastLTS));
 
-let testDb = conn.getDB('test');
+let testDb = conn.getDB("test");
 
 populateDb(testDb);
 MongoRunner.stopMongod(conn);
@@ -135,12 +139,11 @@ jsTestLog("Starting version: latest");
 
 // Restart the mongod with the latest binary version on the old version's data files.
 conn = MongoRunner.runMongod(mongodOptionsCurrent);
-assert.neq(null, conn, 'mongod was unable to start with the latest version');
-testDb = conn.getDB('test');
+assert.neq(null, conn, "mongod was unable to start with the latest version");
+testDb = conn.getDB("test");
 assert.gt(testDb.getCollectionInfos().length, 0);
 
-jsTestLog("Validating indexes created with a 'last-lts' version binary using a 'latest' version " +
-          "binary");
+jsTestLog("Validating indexes created with a 'last-lts' version binary using a 'latest' version " + "binary");
 
 // Validate all the indexes.
 assert.commandWorked(validateCollections(testDb, {full: true}));
@@ -151,14 +154,12 @@ populateDb(testDb);
 MongoRunner.stopMongod(conn);
 
 conn = MongoRunner.runMongod(mongodOptionsLastLTS);
-assert.neq(
-    null, conn, 'mongod was unable able to start with version ' + tojson(mongodOptionsLastLTS));
+assert.neq(null, conn, "mongod was unable able to start with version " + tojson(mongodOptionsLastLTS));
 
-testDb = conn.getDB('test');
+testDb = conn.getDB("test");
 assert.gt(testDb.getCollectionInfos().length, 0);
 
-jsTestLog(
-    "Validating indexes created with 'latest' version binary using a 'last-lts' version binary");
+jsTestLog("Validating indexes created with 'latest' version binary using a 'last-lts' version binary");
 
 assert.commandWorked(validateCollections(testDb, {full: true}));
 MongoRunner.stopMongod(conn);
@@ -166,45 +167,39 @@ MongoRunner.stopMongod(conn);
 // Populate the database using the config specified by the indexTypes array.
 function populateDb(testDb) {
     // Create a new collection and index for each indexType in the array.
-    indexTypes.forEach(indexOptions => {
+    indexTypes.forEach((indexOptions) => {
         // Try unique and non-unique.
-        [true, false].forEach(unique => {
+        [true, false].forEach((unique) => {
             // Try index-version 1 and 2.
-            [1, 2].forEach(indexVersion => {
+            [1, 2].forEach((indexVersion) => {
                 let indexName = indexOptions.indexName;
 
                 // We only run V2 non-unique for hashed and wildCard because they don't exist in
                 // v1.
-                if ((indexName == "hashed" || indexName == "wildCard") &&
-                    (unique === true || indexVersion === 1))
+                if ((indexName == "hashed" || indexName == "wildCard") && (unique === true || indexVersion === 1))
                     return;
 
                 indexName += unique === true ? "Unique" : "NotUnique";
                 indexName += `Version${indexVersion}`;
-                let collectionName = kCollectionPrefix + '_' + indexName;
+                let collectionName = kCollectionPrefix + "_" + indexName;
                 print(`${indexName}: Creating Collection`);
                 assert.commandWorked(testDb.createCollection(collectionName));
 
                 print(`${indexName}: Inserting Documents`);
-                if (unique)
-                    insertDocumentsUnique(testDb[collectionName], kNumDocs, indexOptions.createDoc);
-                else
-                    insertDocumentsNotUnique(
-                        testDb[collectionName], kNumDocs, indexOptions.createDoc);
+                if (unique) insertDocumentsUnique(testDb[collectionName], kNumDocs, indexOptions.createDoc);
+                else insertDocumentsNotUnique(testDb[collectionName], kNumDocs, indexOptions.createDoc);
 
                 let extraCreateIndexOptions = {
                     name: indexName,
                     v: NumberLong(indexVersion),
-                    unique: unique === true
+                    unique: unique === true,
                 };
 
                 if ("createIndexOptions" in indexOptions)
-                    extraCreateIndexOptions =
-                        Object.extend(extraCreateIndexOptions, indexOptions.createIndexOptions);
+                    extraCreateIndexOptions = Object.extend(extraCreateIndexOptions, indexOptions.createIndexOptions);
                 print(JSON.stringify(extraCreateIndexOptions));
                 print(`${indexName}: Creating Index`);
-                assert.commandWorked(
-                    testDb[collectionName].createIndex(indexOptions.spec, extraCreateIndexOptions));
+                assert.commandWorked(testDb[collectionName].createIndex(indexOptions.spec, extraCreateIndexOptions));
 
                 // Assert that the correct index type was created.
                 let indexSpec = getIndexSpecByName(testDb[collectionName], indexName);
@@ -225,19 +220,16 @@ function dropAllUserCollections(testDb) {
 
 function getIndexSpecByName(coll, indexName) {
     const indexes = coll.getIndexes();
-    const indexesFilteredByName = indexes.filter(spec => spec.name === indexName);
-    assert.eq(
-        1, indexesFilteredByName.length, "index '" + indexName + "' not found: " + tojson(indexes));
+    const indexesFilteredByName = indexes.filter((spec) => spec.name === indexName);
+    assert.eq(1, indexesFilteredByName.length, "index '" + indexName + "' not found: " + tojson(indexes));
     return indexesFilteredByName[0];
 }
 
 function fibonacci(num, memo) {
     memo = memo || {};
 
-    if (memo[num])
-        return memo[num];
-    if (num <= 1)
-        return 1;
+    if (memo[num]) return memo[num];
+    if (num <= 1) return 1;
 
     memo[num] = fibonacci(num - 1, memo) + fibonacci(num - 2, memo);
     return memo[num];

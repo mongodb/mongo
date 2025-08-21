@@ -40,8 +40,7 @@ function assertGeoNearFails(nearParams, code) {
 function assertGeoNearSucceedsAndReturnsIds(nearParams, expectedIds) {
     let aggResult = assert.commandWorked(runNearAgg(nearParams));
     let res = aggResult.cursor.firstBatch;
-    let errfn = () => `expected ids ${tojson(expectedIds)}, but these documents were ` +
-        `returned: ${tojson(res)}`;
+    let errfn = () => `expected ids ${tojson(expectedIds)}, but these documents were ` + `returned: ${tojson(res)}`;
 
     assert.eq(expectedIds.length, res.length, errfn);
     for (let i = 0; i < expectedIds.length; i++) {
@@ -74,15 +73,13 @@ assertGeoNearFails({near: [0, 0]}, ErrorCodes.IndexNotFound);
 // Verify that the key field can correctly identify the index to use, when there is only a
 // single geo index on the relevant path.
 assertGeoNearSucceedsAndReturnsIds({near: [0, 0], key: "b.c"}, [2, 3]);
-assertGeoNearSucceedsAndReturnsIds({near: {type: "Point", coordinates: [0, 0]}, key: "b.d"},
-                                   [4, 5]);
+assertGeoNearSucceedsAndReturnsIds({near: {type: "Point", coordinates: [0, 0]}, key: "b.d"}, [4, 5]);
 
 // Verify that when the key path has both a 2d or 2dsphere index, the command still succeeds.
 assertGeoNearSucceedsAndReturnsIds({near: [0, 0], key: "a"}, [0, 1]);
 assertGeoNearSucceedsAndReturnsIds({near: [0, 0], spherical: true, key: "a"}, [0, 1]);
 assertGeoNearSucceedsAndReturnsIds({near: {type: "Point", coordinates: [0, 0]}, key: "a"}, [0, 1]);
-assertGeoNearSucceedsAndReturnsIds(
-    {near: {type: "Point", coordinates: [0, 0]}, spherical: true, key: "a"}, [0, 1]);
+assertGeoNearSucceedsAndReturnsIds({near: {type: "Point", coordinates: [0, 0]}, spherical: true, key: "a"}, [0, 1]);
 
 // Hide all the indexes.
 assert.commandWorked(coll.hideIndex({a: "2d"}));
@@ -112,8 +109,7 @@ assert.commandWorked(coll.unhideIndex({a: "2d"}));
 
 // Verify that $geoNear fails when a GeoJSON point is used with a 'key' path that only has a 2d
 // index. GeoJSON points can only be used for spherical geometry.
-assertGeoNearFails({near: {type: "Point", coordinates: [0, 0]}, key: "b.c"},
-                   ErrorCodes.NoQueryExecutionPlans);
+assertGeoNearFails({near: {type: "Point", coordinates: [0, 0]}, key: "b.c"}, ErrorCodes.NoQueryExecutionPlans);
 
 // Verify that $geoNear fails when:
 //  -- The only index available over the 'key' path is 2dsphere.

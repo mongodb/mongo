@@ -11,7 +11,7 @@ let options = {
 };
 
 const conn = MongoRunner.runMongod(options);
-const testDB = conn.getDB('test');
+const testDB = conn.getDB("test");
 var coll = testDB[jsTestName()];
 coll.drop();
 
@@ -39,34 +39,42 @@ coll.createIndex({foo: 1});
     resetQueryStatsStore(conn, "1MB");
     coll.find({$expr: {result: {$regexMatch: {input: "$word", regex: "^a"}}}}).itcount();
     let queryStats = getQueryStats(testDB);
-    assert.eq({"$expr": {"result": {"$regexMatch": {"input": "$word", "regex": "?string"}}}},
-              queryStats[0].key.queryShape.filter);
+    assert.eq(
+        {"$expr": {"result": {"$regexMatch": {"input": "$word", "regex": "?string"}}}},
+        queryStats[0].key.queryShape.filter,
+    );
 }
 
 // Tests that $let is re-parsed correctly, by ensuring the variables are not serialized as string
 // literals.
 {
     resetQueryStatsStore(conn, "1MB");
-    coll.find({$expr: {$let: {
-       vars: {
-          total: { $add: [ '$foo', '$bar' ] },
-          discounted: { $cond: { if: '$applyDiscount', then: 0.9, else: 1 } }
-       },
-       in: { $multiply: [ "$$total", "$$discounted" ] }
-    }}}).itcount();
-    let queryStats = getQueryStats(testDB);
-    assert.eq({
-        "$expr": {
-            "$let": {
-                "vars": {
-                    "total": {"$add": ["$foo", "$bar"]},
-                    "discounted": {"$cond": ["$applyDiscount", "?number", "?number"]}
+    coll.find({
+        $expr: {
+            $let: {
+                vars: {
+                    total: {$add: ["$foo", "$bar"]},
+                    discounted: {$cond: {if: "$applyDiscount", then: 0.9, else: 1}},
                 },
-                "in": {"$multiply": ["$$total", "$$discounted"]}
-            }
-        }
-    },
-              queryStats[0].key.queryShape.filter);
+                in: {$multiply: ["$$total", "$$discounted"]},
+            },
+        },
+    }).itcount();
+    let queryStats = getQueryStats(testDB);
+    assert.eq(
+        {
+            "$expr": {
+                "$let": {
+                    "vars": {
+                        "total": {"$add": ["$foo", "$bar"]},
+                        "discounted": {"$cond": ["$applyDiscount", "?number", "?number"]},
+                    },
+                    "in": {"$multiply": ["$$total", "$$discounted"]},
+                },
+            },
+        },
+        queryStats[0].key.queryShape.filter,
+    );
 }
 
 function makeAggCmd(pipeline, collName = coll.getName()) {
@@ -79,23 +87,23 @@ function makeAggCmd(pipeline, collName = coll.getName()) {
 {
     resetQueryStatsStore(conn, "1MB");
     assert.commandFailedWithCode(
-        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {$add: [1, 2]}}}}])), 3041704);
+        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {$add: [1, 2]}}}}])),
+        3041704,
+    );
+    assert.commandFailedWithCode(testDB.runCommand(makeAggCmd([{$project: {a: {$getField: ["a", "b"]}}}])), 3041704);
+    assert.commandFailedWithCode(testDB.runCommand(makeAggCmd([{$project: {a: {$getField: null}}}])), 3041704);
     assert.commandFailedWithCode(
-        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: ["a", "b"]}}}])), 3041704);
+        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {field: {$add: [1, 2]}, input: "$$CURRENT"}}}}])),
+        3041704,
+    );
     assert.commandFailedWithCode(
-        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: null}}}])), 3041704);
+        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {field: ["a", "b"], input: "$$CURRENT"}}}}])),
+        3041704,
+    );
     assert.commandFailedWithCode(
-        testDB.runCommand(makeAggCmd(
-            [{$project: {a: {$getField: {field: {$add: [1, 2]}, input: "$$CURRENT"}}}}])),
-        3041704);
-    assert.commandFailedWithCode(
-        testDB.runCommand(
-            makeAggCmd([{$project: {a: {$getField: {field: ["a", "b"], input: "$$CURRENT"}}}}])),
-        3041704);
-    assert.commandFailedWithCode(
-        testDB.runCommand(
-            makeAggCmd([{$project: {a: {$getField: {field: null, input: "$$CURRENT"}}}}])),
-        3041704);
+        testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {field: null, input: "$$CURRENT"}}}}])),
+        3041704,
+    );
     let queryStats = getQueryStats(conn);
     assert.eq(queryStats.length, 0, `Expected no entries but got ${tojson(queryStats)}`);
 }
@@ -109,18 +117,17 @@ function makeAggCmd(pipeline, collName = coll.getName()) {
 
     // query shape #1
     testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {$add: [1, 2]}}}}], "nocoll"));
-    testDB.runCommand(makeAggCmd(
-        [{$project: {a: {$getField: {field: {$add: [1, 2]}, input: "$$CURRENT"}}}}], "nocoll"));
+    testDB.runCommand(
+        makeAggCmd([{$project: {a: {$getField: {field: {$add: [1, 2]}, input: "$$CURRENT"}}}}], "nocoll"),
+    );
 
     // query shape #2
     testDB.runCommand(makeAggCmd([{$project: {a: {$getField: ["a", "b"]}}}], "nocoll"));
-    testDB.runCommand(makeAggCmd(
-        [{$project: {a: {$getField: {field: ["a", "b"], input: "$$CURRENT"}}}}], "nocoll"));
+    testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {field: ["a", "b"], input: "$$CURRENT"}}}}], "nocoll"));
 
     // query shape #3
     testDB.runCommand(makeAggCmd([{$project: {a: {$getField: null}}}], "nocoll"));
-    testDB.runCommand(
-        makeAggCmd([{$project: {a: {$getField: {field: null, input: "$$CURRENT"}}}}], "nocoll"));
+    testDB.runCommand(makeAggCmd([{$project: {a: {$getField: {field: null, input: "$$CURRENT"}}}}], "nocoll"));
 
     let queryStats = getQueryStats(conn);
     assert.eq(queryStats.length, 3, `Expected 3 entries but got ${tojson(queryStats)}`);
@@ -132,32 +139,40 @@ function makeAggCmd(pipeline, collName = coll.getName()) {
     resetQueryStatsStore(conn, "1MB");
 
     // Query shape with $maxN.
-    testDB.runCommand(makeAggCmd([{
-        $setWindowFields: {
-            output: {
-                max: {
-                    $maxN: {
-                        n: {$abs: {$ceil: {$strcasecmp: ["Grocery Small", "withdrawal"]}}},
-                        input: "$x"
-                    }
-                }
-            }
-        }
-    }]));
+    testDB.runCommand(
+        makeAggCmd([
+            {
+                $setWindowFields: {
+                    output: {
+                        max: {
+                            $maxN: {
+                                n: {$abs: {$ceil: {$strcasecmp: ["Grocery Small", "withdrawal"]}}},
+                                input: "$x",
+                            },
+                        },
+                    },
+                },
+            },
+        ]),
+    );
 
     // Query shape with $minN.
-    testDB.runCommand(makeAggCmd([{
-        $setWindowFields: {
-            output: {
-                max: {
-                    $minN: {
-                        n: {$abs: {$ceil: {$strcasecmp: ["Grocery Small", "withdrawal"]}}},
-                        input: "$x"
-                    }
-                }
-            }
-        }
-    }]));
+    testDB.runCommand(
+        makeAggCmd([
+            {
+                $setWindowFields: {
+                    output: {
+                        max: {
+                            $minN: {
+                                n: {$abs: {$ceil: {$strcasecmp: ["Grocery Small", "withdrawal"]}}},
+                                input: "$x",
+                            },
+                        },
+                    },
+                },
+            },
+        ]),
+    );
 
     const queryStats = getQueryStats(conn);
     assert.eq(queryStats.length, 2, `Expected 2 entries but got ${tojson(queryStats)}`);

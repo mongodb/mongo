@@ -5,7 +5,13 @@
 let t = db.geo_s2nearcorrect;
 t.drop();
 
-let longline = {"type": "LineString", "coordinates": [[0, 0], [179, 89]]};
+let longline = {
+    "type": "LineString",
+    "coordinates": [
+        [0, 0],
+        [179, 89],
+    ],
+};
 t.insert({geo: longline});
 t.createIndex({geo: "2dsphere"});
 let origin = {"type": "Point", "coordinates": [45, 45]};

@@ -22,13 +22,13 @@ var coll = "collModTest";
 var t = db.getCollection(coll);
 t.drop();
 
-var isMongos = ("isdbgrid" == db.runCommand("hello").msg);
+var isMongos = "isdbgrid" == db.runCommand("hello").msg;
 
 db.createCollection(coll);
 
 function findTTL(key, expireAfterSeconds) {
     var all = t.getIndexes();
-    all = all.filter(function(z) {
+    all = all.filter(function (z) {
         return z.expireAfterSeconds == expireAfterSeconds && friendlyEqual(z.key, key);
     });
     return all.length == 1;
@@ -36,7 +36,7 @@ function findTTL(key, expireAfterSeconds) {
 
 function findTTLByName(name, expireAfterSeconds) {
     var all = t.getIndexes();
-    all = all.filter(function(z) {
+    all = all.filter(function (z) {
         return z.expireAfterSeconds == expireAfterSeconds && z.name == name;
     });
     return all.length == 1;
@@ -44,7 +44,7 @@ function findTTLByName(name, expireAfterSeconds) {
 
 function findCollectionInfo() {
     var all = db.getCollectionInfos();
-    all = all.filter(function(z) {
+    all = all.filter(function (z) {
         return z.name == t.getName();
     });
     assert.eq(all.length, 1);
@@ -52,15 +52,14 @@ function findCollectionInfo() {
 }
 
 // ensure we fail with gibberish options
-assert.commandFailed(t.runCommand('collMod', {NotARealOption: 1}));
+assert.commandFailed(t.runCommand("collMod", {NotARealOption: 1}));
 
 // add a TTL index
 t.createIndex({a: 1}, {"name": "index1", "expireAfterSeconds": 50});
 assert(findTTL({a: 1}, 50), "TTL index not added");
 
 // try to modify it with a bad key pattern
-var res =
-    db.runCommand({"collMod": coll, "index": {"keyPattern": "bad", "expireAfterSeconds": 100}});
+var res = db.runCommand({"collMod": coll, "index": {"keyPattern": "bad", "expireAfterSeconds": 100}});
 debug(res);
 assert.eq(0, res.ok, "mod shouldn't work with bad keypattern");
 
@@ -74,14 +73,12 @@ debug(res);
 assert.eq(0, res.ok, "TTL mod shouldn't work without expireAfterSeconds");
 
 // try to modify it with a non-numeric expireAfterSeconds field
-var res =
-    db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": "100"}});
+var res = db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": "100"}});
 debug(res);
 assert.eq(0, res.ok, "TTL mod shouldn't work with non-numeric expireAfterSeconds");
 
 // this time modifying should finally  work
-var res =
-    db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}});
+var res = db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}});
 debug(res);
 assert(findTTL({a: 1}, 100), "TTL index not modified");
 
@@ -93,16 +90,17 @@ assert(findTTL({a: 1}, 500), "TTL index not modified");
 assert.commandFailed(db.runCommand({"collMod": coll, "index": {}}));
 
 // Not allowed to specify key pattern and name.
-assert.commandFailed(db.runCommand({
-    "collMod": coll,
-    "index": {"keyPattern": {a: 1}, "name": "index1", "expireAfterSeconds": 1000}
-}));
+assert.commandFailed(
+    db.runCommand({
+        "collMod": coll,
+        "index": {"keyPattern": {a: 1}, "name": "index1", "expireAfterSeconds": 1000},
+    }),
+);
 
 // try with new index, this time set expireAfterSeconds
 t.dropIndex({a: 1});
 t.createIndex({a: 1}, {"expireAfterSeconds": 50});
-var res =
-    db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}});
+var res = db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}});
 debug(res);
 assert(findTTL({a: 1}, 100), "TTL index should be 100 now");
 
@@ -113,12 +111,10 @@ t = db.getCollection(coll);
 
 // It's odd to create multiple TTL indexes... but you can.
 assert.commandWorked(t.createIndex({a: 1}, {name: "TTL", expireAfterSeconds: 60}));
-assert.commandWorked(
-    t.createIndex({a: 1}, {name: "TTLfr", collation: {locale: "fr"}, expireAfterSeconds: 120}));
+assert.commandWorked(t.createIndex({a: 1}, {name: "TTLfr", collation: {locale: "fr"}, expireAfterSeconds: 120}));
 
 // Ensure that coll mod will not accept an ambiguous key pattern.
-assert.commandFailed(
-    db.runCommand({collMod: coll, index: {keyPattern: {a: 1}, expireAfterSeconds: 240}}));
+assert.commandFailed(db.runCommand({collMod: coll, index: {keyPattern: {a: 1}, expireAfterSeconds: 240}}));
 assert(!findTTL({a: 1}, 240), "TTL index modified.");
 
 // Ensure that a single TTL index is modified by name.
@@ -127,18 +123,18 @@ assert(findTTLByName("TTL", 100), "TTL index not modified.");
 assert(findTTLByName("TTLfr", 120), "TTL index modified.");
 
 // Fails with an unknown index name.
-assert.commandFailed(
-    db.runCommand({collMod: coll, index: {name: "notaname", expireAfterSeconds: 100}}));
+assert.commandFailed(db.runCommand({collMod: coll, index: {name: "notaname", expireAfterSeconds: 100}}));
 
 // Fails with an unknown key pattern.
-assert.commandFailed(db.runCommand(
-    {collMod: coll, index: {keyPattern: {doesnotexist: 1}, expireAfterSeconds: 100}}));
+assert.commandFailed(db.runCommand({collMod: coll, index: {keyPattern: {doesnotexist: 1}, expireAfterSeconds: 100}}));
 
 // The timeseriesBucketsMayHaveMixedSchemaData option can only be used on time-series
 // collections.
 assert.commandFailedWithCode(
     db.runCommand({collMod: coll, timeseriesBucketsMayHaveMixedSchemaData: true}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);
 assert.commandFailedWithCode(
     db.runCommand({collMod: coll, timeseriesBucketsMayHaveMixedSchemaData: false}),
-    ErrorCodes.InvalidOptions);
+    ErrorCodes.InvalidOptions,
+);

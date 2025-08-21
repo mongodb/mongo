@@ -30,10 +30,11 @@ const topology = DiscoverTopology.findConnectedNodes(mongos);
 const donor = new Mongo(topology.shards[donorShardNames[0]].primary);
 const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
 
-const reshardingDonorFailsBeforeObtainingTimestampFp =
-    configureFailPoint(donor, "reshardingDonorFailsBeforeObtainingTimestamp");
-const hangBeforeRemovingRecipientDocFp =
-    configureFailPoint(recipient, "removeRecipientDocFailpoint");
+const reshardingDonorFailsBeforeObtainingTimestampFp = configureFailPoint(
+    donor,
+    "reshardingDonorFailsBeforeObtainingTimestamp",
+);
+const hangBeforeRemovingRecipientDocFp = configureFailPoint(recipient, "removeRecipientDocFailpoint");
 
 reshardingTest.withReshardingInBackground(
     {
@@ -46,10 +47,9 @@ reshardingTest.withReshardingInBackground(
     () => {
         hangBeforeRemovingRecipientDocFp.wait();
 
-        const recipientDoc =
-            recipient.getCollection('config.localReshardingOperations.recipient').findOne({
-                ns: "reshardingDb.coll"
-            });
+        const recipientDoc = recipient.getCollection("config.localReshardingOperations.recipient").findOne({
+            ns: "reshardingDb.coll",
+        });
         assert(recipientDoc != null);
         assert(recipientDoc.mutableState.state === "done");
         assert(recipientDoc.mutableState.abortReason != null);
@@ -61,6 +61,7 @@ reshardingTest.withReshardingInBackground(
         recipientRS.awaitReplication();
         reshardingTest.retryOnceOnNetworkError(hangBeforeRemovingRecipientDocFp.off);
     },
-    {expectedErrorCode: ErrorCodes.InternalError});
+    {expectedErrorCode: ErrorCodes.InternalError},
+);
 
 reshardingTest.teardown();

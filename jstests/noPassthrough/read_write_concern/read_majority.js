@@ -27,21 +27,19 @@ function testReadConcernLevel(level) {
     var replTest = new ReplSetTest({
         nodes: 1,
         oplogSize: 2,
-        nodeOptions: {setParameter: 'testingSnapshotBehaviorInIsolation=true'}
+        nodeOptions: {setParameter: "testingSnapshotBehaviorInIsolation=true"},
     });
     replTest.startSet();
     // Cannot wait for a stable recovery timestamp with 'testingSnapshotBehaviorInIsolation'
     // set.
     replTest.initiate(null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
 
-    const session =
-        replTest.getPrimary().getDB("test").getMongo().startSession({causalConsistency: false});
+    const session = replTest.getPrimary().getDB("test").getMongo().startSession({causalConsistency: false});
     const db = session.getDatabase("test");
     const t = db.coll;
 
     function assertNoSnapshotAvailableForReadConcernLevel() {
-        var res =
-            t.runCommand('find', {batchSize: 2, readConcern: {level: level}, maxTimeMS: 1000});
+        var res = t.runCommand("find", {batchSize: 2, readConcern: {level: level}, maxTimeMS: 1000});
         assert.commandWorkedOrFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
         if (!res.ok) {
             return;
@@ -54,13 +52,11 @@ function testReadConcernLevel(level) {
     }
 
     function assertSnapshotAvailableForReadConcernLevel() {
-        return assert.commandWorked(
-            t.runCommand('find', {batchSize: 2, readConcern: {level: level}}));
+        return assert.commandWorked(t.runCommand("find", {batchSize: 2, readConcern: {level: level}}));
     }
 
     function assertNoSnapshotAvailableForReadConcernLevelByUUID(uuid) {
-        var res =
-            db.runCommand({find: uuid, batchSize: 2, readConcern: {level: level}, maxTimeMS: 1000});
+        var res = db.runCommand({find: uuid, batchSize: 2, readConcern: {level: level}, maxTimeMS: 1000});
         assert.commandWorkedOrFailedWithCode(res, ErrorCodes.MaxTimeMSExpired);
         if (!res.ok) {
             return;
@@ -73,19 +69,17 @@ function testReadConcernLevel(level) {
     }
 
     function assertSnapshotAvailableForReadConcernLevelByUUID(uuid) {
-        return assert.commandWorked(
-            t.runCommand({find: uuid, batchSize: 2, readConcern: {level: level}}));
+        return assert.commandWorked(t.runCommand({find: uuid, batchSize: 2, readConcern: {level: level}}));
     }
 
     function getCursorForReadConcernLevel() {
-        var res = t.runCommand('find', {batchSize: 2, readConcern: {level: level}});
+        var res = t.runCommand("find", {batchSize: 2, readConcern: {level: level}});
         assert.commandWorked(res);
         return new DBCommandCursor(db, res, 2, undefined);
     }
 
     function getAggCursorForReadConcernLevel() {
-        var res = t.runCommand('aggregate',
-                               {pipeline: [], cursor: {batchSize: 2}, readConcern: {level: level}});
+        var res = t.runCommand("aggregate", {pipeline: [], cursor: {batchSize: 2}, readConcern: {level: level}});
         assert.commandWorked(res);
         return new DBCommandCursor(db, res, 2, undefined);
     }
@@ -102,22 +96,28 @@ function testReadConcernLevel(level) {
     var blockedReader = startParallelShell(
         "const session = db.getMongo().startSession({causalConsistency: false}); " +
             "const sessionDB = session.getDatabase(db.getName()); " +
-            "sessionDB.coll.runCommand('find', {batchSize: 2, readConcern: {level: \"" + level +
-            "\"}});",
-        replTest.ports[0]);
+            "sessionDB.coll.runCommand('find', {batchSize: 2, readConcern: {level: \"" +
+            level +
+            '"}});',
+        replTest.ports[0],
+    );
 
-    assert.soon(function() {
-        var curOps = db.currentOp(true);
-        jsTestLog("curOp output: " + tojson(curOps));
-        for (var i in curOps.inprog) {
-            var op = curOps.inprog[i];
-            if (op.op === 'query' && op.ns === "test.$cmd" && op.command.find === 'coll') {
-                db.killOp(op.opid);
-                return true;
+    assert.soon(
+        function () {
+            var curOps = db.currentOp(true);
+            jsTestLog("curOp output: " + tojson(curOps));
+            for (var i in curOps.inprog) {
+                var op = curOps.inprog[i];
+                if (op.op === "query" && op.ns === "test.$cmd" && op.command.find === "coll") {
+                    db.killOp(op.opid);
+                    return true;
+                }
             }
-        }
-        return false;
-    }, "could not kill an op that was waiting for a snapshot", 60 * 1000);
+            return false;
+        },
+        "could not kill an op that was waiting for a snapshot",
+        60 * 1000,
+    );
     blockedReader();
 
     var snapshot1 = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
@@ -149,14 +149,14 @@ function testReadConcernLevel(level) {
     // In snapshot 3 the collection was filled with {version: 3} documents.
     assert.commandWorked(db.adminCommand({"setCommittedSnapshot": snapshot3}));
     assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
-    getAggCursorForReadConcernLevel().forEach(function(doc) {
+    getAggCursorForReadConcernLevel().forEach(function (doc) {
         // Note: agg uses internal batching so can't reliably test flipping snapshot. However,
         // it uses the same mechanism as find, so if one works, both should.
         assert.eq(doc.version, 3);
     });
 
     assert.eq(getCursorForReadConcernLevel().itcount(), 10);
-    var cursor = getCursorForReadConcernLevel();  // Note: uses batchsize=2.
+    var cursor = getCursorForReadConcernLevel(); // Note: uses batchsize=2.
     assert.eq(cursor.next().version, 3);
     assert.eq(cursor.next().version, 3);
     assert(!cursor.objsLeftInBatch());
@@ -199,8 +199,7 @@ function testReadConcernLevel(level) {
 
     // Get the UUID before renaming.
     const collUuid = (() => {
-        const collectionInfos =
-            assert.commandWorked(db.runCommand({listCollections: 1})).cursor.firstBatch;
+        const collectionInfos = assert.commandWorked(db.runCommand({listCollections: 1})).cursor.firstBatch;
         assert.eq(1, collectionInfos.length);
         const info = collectionInfos[0];
         assert.eq(t.getName(), info.name);
@@ -209,14 +208,14 @@ function testReadConcernLevel(level) {
     assert(collUuid);
 
     // Get a cursor before renaming.
-    cursor = getCursorForReadConcernLevel();  // Note: uses batchsize=2.
+    cursor = getCursorForReadConcernLevel(); // Note: uses batchsize=2.
     assert.eq(cursor.next().version, 4);
     assert.eq(cursor.next().version, 4);
     assert(!cursor.objsLeftInBatch());
 
     // Even though the collection is renamed, point-in-time reads reconstruct the prior collection
     // internally.
-    const tempNs = db.getName() + '.temp';
+    const tempNs = db.getName() + ".temp";
     assert.commandWorked(db.adminCommand({renameCollection: t.getFullName(), to: tempNs}));
     assert.eq(getCursorForReadConcernLevel().itcount(), 10);
 
@@ -248,15 +247,17 @@ function testReadConcernLevel(level) {
 
     // Commands that only support read concern 'local', (such as ping) must work when it is
     // explicitly specified and fail for majority-committed read concern levels.
-    assert.commandWorked(db.adminCommand({ping: 1, readConcern: {level: 'local'}}));
+    assert.commandWorked(db.adminCommand({ping: 1, readConcern: {level: "local"}}));
     var res = assert.commandFailed(db.adminCommand({ping: 1, readConcern: {level: level}}));
     assert.eq(res.code, ErrorCodes.InvalidOptions);
 
     // Agg $out supports majority committed reads.
-    assert.commandWorked(t.runCommand(
-        'aggregate', {pipeline: [{$out: 'out'}], cursor: {}, readConcern: {level: 'local'}}));
-    assert.commandWorked(t.runCommand(
-        'aggregate', {pipeline: [{$out: 'out'}], cursor: {}, readConcern: {level: level}}));
+    assert.commandWorked(
+        t.runCommand("aggregate", {pipeline: [{$out: "out"}], cursor: {}, readConcern: {level: "local"}}),
+    );
+    assert.commandWorked(
+        t.runCommand("aggregate", {pipeline: [{$out: "out"}], cursor: {}, readConcern: {level: level}}),
+    );
 
     replTest.stopSet();
 }
@@ -264,8 +265,7 @@ function testReadConcernLevel(level) {
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const db = conn.getDB("test");
-const supportsCommittedReads =
-    assert.commandWorked(db.serverStatus()).storageEngine.supportsCommittedReads;
+const supportsCommittedReads = assert.commandWorked(db.serverStatus()).storageEngine.supportsCommittedReads;
 MongoRunner.stopMongod(conn);
 
 if (supportsCommittedReads) {

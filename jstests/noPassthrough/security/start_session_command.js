@@ -3,7 +3,7 @@
 TestData.disableImplicitSessions = true;
 
 const request = {
-    startSession: 1
+    startSession: 1,
 };
 
 let conn = MongoRunner.runMongod({setParameter: {maxSessions: 2}});
@@ -18,7 +18,8 @@ assert.eq(0, serverStatus.logicalSessionRecordCache.activeSessionsCount);
 let result = admin.runCommand(request);
 assert.commandWorked(
     result,
-    "failed test that we can run startSession unauthenticated when the server is running without --auth");
+    "failed test that we can run startSession unauthenticated when the server is running without --auth",
+);
 assert(result.id, "failed test that our session response has an id");
 assert.eq(result.timeoutMinutes, 30, "failed test that our session record has the correct timeout");
 
@@ -28,18 +29,18 @@ assert.eq(1, serverStatus.logicalSessionRecordCache.activeSessionsCount);
 
 // test that we can run startSession authenticated when the server is running without --auth
 
-admin.createUser({user: 'user0', pwd: 'password', roles: []});
+admin.createUser({user: "user0", pwd: "password", roles: []});
 admin.auth("user0", "password");
 
 result = admin.runCommand(request);
 assert.commandWorked(
     result,
-    "failed test that we can run startSession authenticated when the server is running without --auth");
+    "failed test that we can run startSession authenticated when the server is running without --auth",
+);
 assert(result.id, "failed test that our session response has an id");
 assert.eq(result.timeoutMinutes, 30, "failed test that our session record has the correct timeout");
 
-assert.commandFailed(admin.runCommand(request),
-                     "failed test that we can't run startSession when the cache is full");
+assert.commandFailed(admin.runCommand(request), "failed test that we can't run startSession when the cache is full");
 MongoRunner.stopMongod(conn);
 
 //
@@ -51,13 +52,14 @@ admin = conn.getDB("admin");
 
 assert.commandFailed(
     admin.runCommand(request),
-    "failed test that we can't run startSession unauthenticated when the server is running with --auth");
+    "failed test that we can't run startSession unauthenticated when the server is running with --auth",
+);
 
 //
 
-admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
+admin.createUser({user: "admin", pwd: "admin", roles: jsTest.adminUserRoles});
 admin.auth("admin", "admin");
-admin.createUser({user: 'user0', pwd: 'password', roles: jsTest.basicUserRoles});
+admin.createUser({user: "user0", pwd: "password", roles: jsTest.basicUserRoles});
 admin.logout();
 
 // test that we can run startSession authenticated as one user with proper permissions
@@ -66,7 +68,8 @@ admin.auth("user0", "password");
 result = admin.runCommand(request);
 assert.commandWorked(
     result,
-    "failed test that we can run startSession authenticated as one user with proper permissions");
+    "failed test that we can run startSession authenticated as one user with proper permissions",
+);
 assert(result.id, "failed test that our session response has an id");
 assert.eq(result.timeoutMinutes, 30, "failed test that our session record has the correct timeout");
 admin.logout();

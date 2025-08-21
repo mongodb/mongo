@@ -34,7 +34,7 @@ function checkCollection(coll) {
     assert.eq(coll.find().itcount(), nDocuments);
 
     var i = 0;
-    coll.find().forEach(function(doc) {
+    coll.find().forEach(function (doc) {
         assert.eq(doc._id, i);
         i++;
     });

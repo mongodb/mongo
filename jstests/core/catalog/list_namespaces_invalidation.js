@@ -1,5 +1,5 @@
 // @tags: [requires_non_retryable_commands, requires_fastcount, requires_getmore]
-let dbInvalidName = 'system_namespaces_invalidations';
+let dbInvalidName = "system_namespaces_invalidations";
 let dbInvalid = db.getSiblingDB(dbInvalidName);
 let num_collections = 3;
 let DROP = 1;
@@ -10,32 +10,33 @@ function testNamespaceInvalidation(namespaceAction, batchSize) {
 
     // Create enough collections to necessitate multiple cursor batches.
     for (let i = 0; i < num_collections; i++) {
-        assert.commandWorked(dbInvalid.createCollection('coll' + i.toString()));
+        assert.commandWorked(dbInvalid.createCollection("coll" + i.toString()));
     }
 
     // Get the first two namespaces using listCollections.
     let cmd = {listCollections: dbInvalidName};
     Object.extend(cmd, {cursor: {batchSize: batchSize}});
     let res = dbInvalid.runCommand(cmd);
-    assert.commandWorked(res, 'could not run ' + tojson(cmd));
+    assert.commandWorked(res, "could not run " + tojson(cmd));
     printjson(res);
 
     // Ensure the cursor has data, invalidate the namespace, and exhaust the cursor.
     let cursor = new DBCommandCursor(dbInvalid, res);
-    let errMsg = 'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
+    let errMsg = "expected more data from command " + tojson(cmd) + ", with result " + tojson(res);
     assert(cursor.hasNext(), errMsg);
     if (namespaceAction == RENAME) {
         // Rename the collection to something that does not fit in the previously allocated
         // memory for the record.
         assert.commandWorked(
-            dbInvalid['coll1'].renameCollection('coll1' +
-                                                'lkdsahflaksjdhfsdkljhfskladhfkahfsakfla' +
-                                                'skfjhaslfaslfkhasklfjhsakljhdsjksahkldjslh'));
+            dbInvalid["coll1"].renameCollection(
+                "coll1" + "lkdsahflaksjdhfsdkljhfskladhfkahfsakfla" + "skfjhaslfaslfkhasklfjhsakljhdsjksahkldjslh",
+            ),
+        );
     } else if (namespaceAction == DROP) {
-        assert(dbInvalid['coll1'].drop());
+        assert(dbInvalid["coll1"].drop());
     } else if (namespaceAction == MOVE) {
         let modCmd = {
-            collMod: 'coll1',
+            collMod: "coll1",
             validator: {
                 $or: [
                     {phone: {$type: "string"}},
@@ -50,9 +51,9 @@ function testNamespaceInvalidation(namespaceAction, batchSize) {
                     {favoriteFood: {$type: "string"}},
                     {favoriteSport: {$type: "string"}},
                     {favoriteMovie: {$type: "string"}},
-                    {favoriteShow: {$type: "string"}}
-                ]
-            }
+                    {favoriteShow: {$type: "string"}},
+                ],
+            },
         };
         assert.commandWorked(dbInvalid.runCommand(modCmd));
     }

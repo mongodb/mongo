@@ -33,7 +33,7 @@ function setMemoryParamHelper(paramName, memoryLimit) {
         cmdObj: {
             setParameter: 1,
             [paramName]: memoryLimit,
-        }
+        },
     });
     assert.gt(commandResArr.length, 0, "Setting memory limit on primaries failed");
     const oldMemoryLimit = assert.commandWorked(commandResArr[0]).was;
@@ -57,7 +57,7 @@ const memoryLimitMB = sharded ? 200 : 100;
 
 const isSbeGroupLookupPushdownEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
-const bigStr = Array(1024 * 1024 + 1).toString();  // 1MB of ','
+const bigStr = Array(1024 * 1024 + 1).toString(); // 1MB of ','
 for (let i = 0; i < memoryLimitMB + 1; i++)
     assert.commandWorked(coll.insert({_id: i, bigStr: i + bigStr, random: Math.random()}));
 
@@ -66,24 +66,21 @@ assert.gt(coll.stats().size, memoryLimitMB * 1024 * 1024);
 function test({pipeline, expectedCodes, canSpillToDisk}) {
     // Test that 'allowDiskUse: false' does indeed prevent spilling to disk.
     assert.commandFailedWithCode(
-        db.runCommand(
-            {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: false}),
-        expectedCodes);
+        db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: false}),
+        expectedCodes,
+    );
 
     // If this command supports spilling to disk, ensure that it will succeed when disk use is
     // allowed.
-    const res = db.runCommand(
-        {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: true});
+    const res = db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: true});
     if (canSpillToDisk) {
-        assert.eq(new DBCommandCursor(coll.getDB(), res).itcount(),
-                  coll.count());  // all tests output one doc per input doc
+        assert.eq(new DBCommandCursor(coll.getDB(), res).itcount(), coll.count()); // all tests output one doc per input doc
 
         if (isSbeGroupLookupPushdownEnabled) {
             const explain = db.runCommand({
-                explain:
-                    {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: true}
+                explain: {aggregate: coll.getName(), pipeline: pipeline, cursor: {}, allowDiskUse: true},
             });
-            const hashAggGroups = getSbePlanStages(explain, 'group');
+            const hashAggGroups = getSbePlanStages(explain, "group");
             if (hashAggGroups.length > 0) {
                 assert.eq(hashAggGroups.length, 1, explain);
                 const hashAggGroup = hashAggGroups[0];
@@ -101,7 +98,7 @@ function setHashAggParameters(memoryLimit, atLeast) {
         cmdObj: {
             setParameter: 1,
             internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: memoryLimit,
-        }
+        },
     });
     assert.gt(memLimitCommandResArr.length, 0, "Setting memory limit on primaries failed.");
     const oldMemoryLimit = assert.commandWorked(memLimitCommandResArr[0]).was;
@@ -111,7 +108,7 @@ function setHashAggParameters(memoryLimit, atLeast) {
         cmdObj: {
             setParameter: 1,
             internalQuerySlotBasedExecutionHashAggMemoryCheckPerAdvanceAtLeast: atLeast,
-        }
+        },
     });
     assert.gt(atLeastCommandResArr.length, 0, "Setting atLeast limit on primaries failed.");
     const oldAtLeast = assert.commandWorked(atLeastCommandResArr[0]).was;
@@ -129,10 +126,10 @@ function testWithHashAggMemoryLimit({pipeline, expectedCodes, canSpillToDisk, me
 }
 
 testWithHashAggMemoryLimit({
-    pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}],
+    pipeline: [{$group: {_id: "$_id", bigStr: {$min: "$bigStr"}}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
     canSpillToDisk: true,
-    memoryLimit: 1024
+    memoryLimit: 1024,
 });
 
 // Sorting with _id would use index which doesn't require external sort, so sort by 'random'
@@ -140,73 +137,70 @@ testWithHashAggMemoryLimit({
 test({
     pipeline: [{$sort: {random: 1}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-    canSpillToDisk: true
+    canSpillToDisk: true,
 });
 
 test({
-    pipeline: [{$sort: {bigStr: 1}}],  // big key and value
+    pipeline: [{$sort: {bigStr: 1}}], // big key and value
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-    canSpillToDisk: true
+    canSpillToDisk: true,
 });
 
 // Test that sort + large limit won't crash the server (SERVER-10136)
 test({
     pipeline: [{$sort: {bigStr: 1}}, {$limit: 1000 * 1000 * 1000}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-    canSpillToDisk: true
+    canSpillToDisk: true,
 });
 
 // Test combining two external sorts in both same and different orders.
 test({
-    pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {_id: 1}}],
+    pipeline: [{$group: {_id: "$_id", bigStr: {$min: "$bigStr"}}}, {$sort: {_id: 1}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-    canSpillToDisk: true
+    canSpillToDisk: true,
 });
 
 test({
-    pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {_id: -1}}],
+    pipeline: [{$group: {_id: "$_id", bigStr: {$min: "$bigStr"}}}, {$sort: {_id: -1}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-    canSpillToDisk: true
+    canSpillToDisk: true,
 });
 
 test({
-    pipeline: [{$group: {_id: '$_id', bigStr: {$min: '$bigStr'}}}, {$sort: {random: 1}}],
+    pipeline: [{$group: {_id: "$_id", bigStr: {$min: "$bigStr"}}}, {$sort: {random: 1}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-    canSpillToDisk: true
+    canSpillToDisk: true,
 });
 
 test({
-    pipeline: [{$sort: {random: 1}}, {$group: {_id: '$_id', bigStr: {$first: '$bigStr'}}}],
+    pipeline: [{$sort: {random: 1}}, {$group: {_id: "$_id", bigStr: {$first: "$bigStr"}}}],
     expectedCodes: ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
-    canSpillToDisk: true
+    canSpillToDisk: true,
 });
 
 // Test accumulating all values into one array. On debug builds we will spill to disk for $group and
 // so may hit the group error code before we hit ExceededMemoryLimit.
 test({
-    pipeline: [{$group: {_id: null, bigArray: {$push: '$bigStr'}}}],
-    expectedCodes:
-        [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
-    canSpillToDisk: false
+    pipeline: [{$group: {_id: null, bigArray: {$push: "$bigStr"}}}],
+    expectedCodes: [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
+    canSpillToDisk: false,
 });
 
 test({
-    pipeline:
-        [{$group: {_id: null, bigArray: {$addToSet: {$concat: ['$bigStr', {$toString: "$_id"}]}}}}],
-    expectedCodes:
-        [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
-    canSpillToDisk: false
+    pipeline: [{$group: {_id: null, bigArray: {$addToSet: {$concat: ["$bigStr", {$toString: "$_id"}]}}}}],
+    expectedCodes: [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
+    canSpillToDisk: false,
 });
 
-for (const op of ['$firstN', '$lastN', '$minN', '$maxN', '$topN', '$bottomN']) {
+for (const op of ["$firstN", "$lastN", "$minN", "$maxN", "$topN", "$bottomN"]) {
     jsTestLog("Testing op " + op);
     let spec = {n: 100000000};
-    if (op === '$topN' || op === '$bottomN') {
-        spec['sortBy'] = {random: 1};
-        spec['output'] = '$bigStr';
+    if (op === "$topN" || op === "$bottomN") {
+        spec["sortBy"] = {random: 1};
+        spec["output"] = "$bigStr";
     } else {
         // $firstN/$lastN/$minN/$maxN accept 'input'.
-        spec['input'] = '$bigStr';
+        spec["input"] = "$bigStr";
     }
 
     // By grouping all of the entries in the same group, it is the case that we will either
@@ -216,18 +210,17 @@ for (const op of ['$firstN', '$lastN', '$minN', '$maxN', '$topN', '$bottomN']) {
     // reduce the memory consumption of our group in this case.
     test({
         pipeline: [{$group: {_id: null, bigArray: {[op]: spec}}}],
-        expectedCodes:
-            [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
-        canSpillToDisk: false
+        expectedCodes: [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ExceededMemoryLimit],
+        canSpillToDisk: false,
     });
 
     // Because each group uses less than the configured limit, but cumulatively they exceed
     // the limit for $group, we only check for 'QueryExceededMemoryLimitNoDiskUseAllowed'
     // when disk use is disabled.
     test({
-        pipeline: [{$group: {_id: '$_id', bigArray: {[op]: spec}}}],
+        pipeline: [{$group: {_id: "$_id", bigArray: {[op]: spec}}}],
         expectedCodes: [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed],
-        canSpillToDisk: true
+        canSpillToDisk: true,
     });
 }
 // don't leave large collection laying around
@@ -245,25 +238,23 @@ for (let i = 0; i < numGroups; ++i) {
             _id: counter++,
             a: i,
             b: 100 * i + j,
-            c: 100 * i + j % 5,
+            c: 100 * i + (j % 5),
             obj: {a: i, b: j},
-            random: Math.random()
+            random: Math.random(),
         };
         assert.commandWorked(coll.insert(doc));
     }
 }
 
 function setHashGroupMemoryParameters(memoryLimit) {
-    return setMemoryParamHelper(
-        "internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", memoryLimit);
+    return setMemoryParamHelper("internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill", memoryLimit);
 }
 
 // Runs a group query containing the given 'accumulator' after sorting the data by the given
 // 'sortInputBy' field. Then verifies that the query results are equal to 'expectedOutput'. If SBE
 // is enabled, also runs explain and checks that the execution stats show that spilling occurred.
 function testAccumulator({accumulator, sortInputBy, expectedOutput, ignoreArrayOrder = false}) {
-    const pipeline =
-        [{$sort: {[sortInputBy]: 1}}, {$group: {_id: "$a", acc: accumulator}}, {$sort: {_id: 1}}];
+    const pipeline = [{$sort: {[sortInputBy]: 1}}, {$group: {_id: "$a", acc: accumulator}}, {$sort: {_id: 1}}];
     const results = coll.aggregate(pipeline).toArray();
 
     if (ignoreArrayOrder) {
@@ -289,9 +280,8 @@ function testSpillingForVariousAccumulators() {
             {_id: 1, acc: 100},
             {_id: 2, acc: 200},
             {_id: 3, acc: 300},
-            {_id: 4, acc: 400}
-        ]
-
+            {_id: 4, acc: 400},
+        ],
     });
 
     testAccumulator({
@@ -302,8 +292,8 @@ function testSpillingForVariousAccumulators() {
             {_id: 1, acc: 109},
             {_id: 2, acc: 209},
             {_id: 3, acc: 309},
-            {_id: 4, acc: 409}
-        ]
+            {_id: 4, acc: 409},
+        ],
     });
 
     testAccumulator({
@@ -314,8 +304,8 @@ function testSpillingForVariousAccumulators() {
             {_id: 1, acc: 100},
             {_id: 2, acc: 200},
             {_id: 3, acc: 300},
-            {_id: 4, acc: 400}
-        ]
+            {_id: 4, acc: 400},
+        ],
     });
 
     testAccumulator({
@@ -326,8 +316,8 @@ function testSpillingForVariousAccumulators() {
             {_id: 1, acc: 109},
             {_id: 2, acc: 209},
             {_id: 3, acc: 309},
-            {_id: 4, acc: 409}
-        ]
+            {_id: 4, acc: 409},
+        ],
     });
 
     testAccumulator({
@@ -338,8 +328,8 @@ function testSpillingForVariousAccumulators() {
             {_id: 1, acc: 1045},
             {_id: 2, acc: 2045},
             {_id: 3, acc: 3045},
-            {_id: 4, acc: 4045}
-        ]
+            {_id: 4, acc: 4045},
+        ],
     });
 
     testAccumulator({
@@ -350,8 +340,8 @@ function testSpillingForVariousAccumulators() {
             {_id: 1, acc: 104.5},
             {_id: 2, acc: 204.5},
             {_id: 3, acc: 304.5},
-            {_id: 4, acc: 404.5}
-        ]
+            {_id: 4, acc: 404.5},
+        ],
     });
 
     testAccumulator({
@@ -388,19 +378,19 @@ function testSpillingForVariousAccumulators() {
             {_id: 1, acc: {a: 1, b: 9}},
             {_id: 2, acc: {a: 2, b: 9}},
             {_id: 3, acc: {a: 3, b: 9}},
-            {_id: 4, acc: {a: 4, b: 9}}
+            {_id: 4, acc: {a: 4, b: 9}},
         ],
     });
 }
 
-(function() {
-const kMemLimit = 100;
-let oldMemSettings = setHashGroupMemoryParameters(kMemLimit);
-try {
-    testSpillingForVariousAccumulators();
-} finally {
-    setHashGroupMemoryParameters(oldMemSettings);
-}
+(function () {
+    const kMemLimit = 100;
+    let oldMemSettings = setHashGroupMemoryParameters(kMemLimit);
+    try {
+        testSpillingForVariousAccumulators();
+    } finally {
+        setHashGroupMemoryParameters(oldMemSettings);
+    }
 })();
 
 assert(coll.drop());
@@ -418,7 +408,9 @@ function setupCollections(localRecords, foreignRecords, foreignField) {
 
 function setHashLookupParameters(memoryLimit) {
     return setMemoryParamHelper(
-        "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill", memoryLimit);
+        "internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill",
+        memoryLimit,
+    );
 }
 
 /**
@@ -433,23 +425,26 @@ function runTest_MultipleLocalForeignRecords({
     foreignRecords,
     foreignField,
     idsExpectedToMatch,
-    spillsToDisk
+    spillsToDisk,
 }) {
     setupCollections(localRecords, foreignRecords, foreignField);
-    const pipeline = [{
-                  $lookup: {
-                                from: foreignColl.getName(),
-                                localField: localField,
-                                foreignField: foreignField,
-                                as: "matched"
-                            }}];
+    const pipeline = [
+        {
+            $lookup: {
+                from: foreignColl.getName(),
+                localField: localField,
+                foreignField: foreignField,
+                as: "matched",
+            },
+        },
+    ];
     const results = localColl.aggregate(pipeline, {allowDiskUse: true}).toArray();
-    const explain = localColl.explain('executionStats').aggregate(pipeline, {allowDiskUse: true});
+    const explain = localColl.explain("executionStats").aggregate(pipeline, {allowDiskUse: true});
     const pipelineWasSplit = !!explain.splitPipeline;
 
     // If sharding is enabled, or the pipeline was split, then '$lookup' is not pushed down to SBE.
     if (isSbeGroupLookupPushdownEnabled && !sharded && !pipelineWasSplit) {
-        const hLookups = getSbePlanStages(explain, 'hash_lookup');
+        const hLookups = getSbePlanStages(explain, "hash_lookup");
         assert.eq(hLookups.length, 1, explain);
         const hLookup = hLookups[0];
         assert(hLookup, explain);
@@ -465,12 +460,12 @@ function runTest_MultipleLocalForeignRecords({
 
     // Extract matched foreign ids from the "matched" field.
     for (let i = 0; i < results.length; i++) {
-        const matchedIds = results[i].matched.map(x => (x._id));
+        const matchedIds = results[i].matched.map((x) => x._id);
         // Order of the elements within the arrays is not significant for 'assertArrayEq'.
         assertArrayEq({
             actual: matchedIds,
             expected: idsExpectedToMatch[i],
-            extraErrorMsg: " **TEST** " + testDescription + " " + tojson(explain)
+            extraErrorMsg: " **TEST** " + testDescription + " " + tojson(explain),
         });
     }
 }
@@ -494,7 +489,7 @@ function runHashLookupSpill({memoryLimit, spillsToDisk}) {
             foreignRecords: docs,
             foreignField: "a",
             idsExpectedToMatch: [[1, 2, 4]],
-            spillsToDisk: spillsToDisk
+            spillsToDisk: spillsToDisk,
         });
     })();
 
@@ -526,20 +521,19 @@ function runHashLookupSpill({memoryLimit, spillsToDisk}) {
             foreignRecords: foreignDocs,
             foreignField: "b",
             idsExpectedToMatch: [[], [8], [9, 10], [11, 12, 13], [11, 12, 13], []],
-            spillsToDisk: spillsToDisk
+            spillsToDisk: spillsToDisk,
         });
     })();
 
     return oldSettings;
 }
 
-const oldMemSettings =
-    assert
-        .commandWorked(db.adminCommand({
-            getParameter: 1,
-            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
-        }))
-        .internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill;
+const oldMemSettings = assert.commandWorked(
+    db.adminCommand({
+        getParameter: 1,
+        internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1,
+    }),
+).internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill;
 
 (function runAllDiskTest() {
     try {

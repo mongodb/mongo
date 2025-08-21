@@ -9,9 +9,8 @@ const storageEnginesUsingKeyString = new Set(["wiredTiger", "inMemory"]);
 
 function getIndexSpecByName(coll, indexName) {
     const indexes = coll.getIndexes();
-    const indexesFilteredByName = indexes.filter(spec => spec.name === indexName);
-    assert.eq(
-        1, indexesFilteredByName.length, "index '" + indexName + "' not found: " + tojson(indexes));
+    const indexesFilteredByName = indexes.filter((spec) => spec.name === indexName);
+    assert.eq(1, indexesFilteredByName.length, "index '" + indexName + "' not found: " + tojson(indexes));
     return indexesFilteredByName[0];
 }
 
@@ -48,8 +47,7 @@ indexSpec = getIndexSpecByName(testDB.collation, "_id_");
 assert.eq(2, indexSpec.v, tojson(indexSpec));
 
 // Test that creating an index with a non-simple collation succeeds.
-assert.commandWorked(
-    testDB.collation.createIndex({str: 1}, {name: "withCollation", collation: {locale: "fr"}}));
+assert.commandWorked(testDB.collation.createIndex({str: 1}, {name: "withCollation", collation: {locale: "fr"}}));
 indexSpec = getIndexSpecByName(testDB.collation, "withCollation");
 assert.eq(2, indexSpec.v, tojson(indexSpec));
 
@@ -71,8 +69,7 @@ assert.eq(1, indexSpec.v, tojson(indexSpec));
 assert.commandFailed(testDB.collation.createIndex({str: 1}, {v: 1, collation: {locale: "simple"}}));
 
 // Test that creating an index with v=1 and a non-simple collation returns an error.
-assert.commandFailed(
-    testDB.collation.createIndex({str: 1}, {v: 1, collation: {locale: "en", strength: 2}}));
+assert.commandFailed(testDB.collation.createIndex({str: 1}, {v: 1, collation: {locale: "en", strength: 2}}));
 
 // Test that creating an index with v=1 and a simple collation on a collection with a non-simple
 // default collation returns an error.
@@ -84,15 +81,13 @@ assert.commandFailed(testDB.collation.createIndex({str: 1}, {v: 1, collation: {l
 // non-simple default collation returns an error.
 testDB.collation.drop();
 assert.commandWorked(testDB.runCommand({create: "collation", collation: {locale: "en"}}));
-assert.commandFailed(
-    testDB.collation.createIndex({str: 1}, {v: 1, collation: {locale: "en", strength: 2}}));
+assert.commandFailed(testDB.collation.createIndex({str: 1}, {v: 1, collation: {locale: "en", strength: 2}}));
 
 // Test that indexing decimal data with a v=1 index returns an error on storage engines using
 // the KeyString format.
 assert.commandWorked(testDB.decimal.createIndex({num: 1}, {v: 1}));
 if (storageEnginesUsingKeyString.has(storageEngine)) {
-    assert.writeErrorWithCode(testDB.decimal.insert({num: new NumberDecimal("42")}),
-                              ErrorCodes.UnsupportedFormat);
+    assert.writeErrorWithCode(testDB.decimal.insert({num: new NumberDecimal("42")}), ErrorCodes.UnsupportedFormat);
 } else {
     assert.commandWorked(testDB.decimal.insert({num: new NumberDecimal("42")}));
 }

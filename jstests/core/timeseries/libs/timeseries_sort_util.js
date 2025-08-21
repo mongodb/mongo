@@ -8,19 +8,19 @@ import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 export const forwardCollscan = {
     stage: "COLLSCAN",
-    direction: "forward"
+    direction: "forward",
 };
 export const backwardCollscan = {
     stage: "COLLSCAN",
-    direction: "backward"
+    direction: "backward",
 };
 export const forwardIxscan = {
     stage: "IXSCAN",
-    direction: "forward"
+    direction: "forward",
 };
 export const backwardIxscan = {
     stage: "IXSCAN",
-    direction: "backward"
+    direction: "backward",
 };
 
 export const setupColl = (coll, collName, usesMeta, subFields = null) => {
@@ -33,13 +33,15 @@ export const setupColl = (coll, collName, usesMeta, subFields = null) => {
     // Create a few buckets.
     let meta = usesMeta ? 10 : 1;
     let docs = [];
-    let numberOfItemsPerBucket =
-        db.adminCommand({getParameter: 1, timeseriesBucketMaxCount: 1}).timeseriesBucketMaxCount;
+    let numberOfItemsPerBucket = db.adminCommand({
+        getParameter: 1,
+        timeseriesBucketMaxCount: 1,
+    }).timeseriesBucketMaxCount;
     assert(Number.isInteger(numberOfItemsPerBucket));
     for (let j = 0; j < meta; ++j) {
         let metaVal = j;
         if (subFields) {
-            metaVal = Object.assign({}, ...subFields.map(field => ({[field]: j})));
+            metaVal = Object.assign({}, ...subFields.map((field) => ({[field]: j})));
             metaVal.array = [1, 2];
         }
         for (let i = 0; i < numberOfItemsPerBucket; ++i) {
@@ -55,14 +57,12 @@ export const setupColl = (coll, collName, usesMeta, subFields = null) => {
     }
     assert.commandWorked(coll.insert(docs));
 
-    TimeseriesTest.ensureDataIsDistributedIfSharded(coll,
-                                                    new Date((numberOfItemsPerBucket / 2) * 6000));
+    TimeseriesTest.ensureDataIsDistributedIfSharded(coll, new Date((numberOfItemsPerBucket / 2) * 6000));
 };
 
-const hasInternalBoundedSort = (pipeline) =>
-    pipeline.some((stage) => stage.hasOwnProperty("$_internalBoundedSort"));
+const hasInternalBoundedSort = (pipeline) => pipeline.some((stage) => stage.hasOwnProperty("$_internalBoundedSort"));
 
-const findFirstMatch = (pipeline) => pipeline.find(stage => stage.hasOwnProperty("$match"));
+const findFirstMatch = (pipeline) => pipeline.find((stage) => stage.hasOwnProperty("$match"));
 
 const setup = (coll, createIndex = null) => {
     if (createIndex) {
@@ -82,28 +82,32 @@ const setup = (coll, createIndex = null) => {
  * traversing a min (resp. max) field index on a descending (resp. ascending) sort.
  * `testColl` is the collection to use.
  */
-export const runRewritesTest = (sortSpec,
-                                createIndex,
-                                hint,
-                                expectedAccessPath,
-                                testColl,
-                                precise,
-                                intermediaryStages = [],
-                                posteriorStages = []) => {
-    jsTestLog(`runRewritesTest ${tojson({
-        sortSpec,
-        createIndex,
-        hint,
-        expectedAccessPath,
-        testColl,
-        precise,
-        intermediaryStages,
-        posteriorStages
-    })}`);
+export const runRewritesTest = (
+    sortSpec,
+    createIndex,
+    hint,
+    expectedAccessPath,
+    testColl,
+    precise,
+    intermediaryStages = [],
+    posteriorStages = [],
+) => {
+    jsTestLog(
+        `runRewritesTest ${tojson({
+            sortSpec,
+            createIndex,
+            hint,
+            expectedAccessPath,
+            testColl,
+            precise,
+            intermediaryStages,
+            posteriorStages,
+        })}`,
+    );
     setup(testColl, createIndex);
     assert.neq(typeof precise, "object", `'precise' arg must be a boolean: ${tojson(precise)}`);
 
-    const options = (hint) ? {hint: hint} : {};
+    const options = hint ? {hint: hint} : {};
 
     // Get results
     const optPipeline = [...intermediaryStages, {$sort: sortSpec}, ...posteriorStages];
@@ -115,7 +119,7 @@ export const runRewritesTest = (sortSpec,
         ...intermediaryStages,
         {$_internalInhibitOptimization: {}},
         {$sort: sortSpec},
-        ...posteriorStages
+        ...posteriorStages,
     ];
     const ogResults = testColl.aggregate(ogPipeline, options).toArray();
     const ogExplainFull = testColl.explain().aggregate(ogPipeline, options);
@@ -123,22 +127,22 @@ export const runRewritesTest = (sortSpec,
     // Assert correct
     assert.docEq(ogResults, optResults);
     // Make sure we're not testing trivial / empty queries.
-    assert.gt(ogResults.length, 0, 'Expected the queries in this test to have nonempty results');
+    assert.gt(ogResults.length, 0, "Expected the queries in this test to have nonempty results");
 
     // Check contains stage
-    const optExplain = getExplainedPipelineFromAggregation(
-        db,
-        testColl,
-        optPipeline,
-        {inhibitOptimization: false, hint: hint, postPlanningResults: true});
+    const optExplain = getExplainedPipelineFromAggregation(db, testColl, optPipeline, {
+        inhibitOptimization: false,
+        hint: hint,
+        postPlanningResults: true,
+    });
     assert(hasInternalBoundedSort(optExplain), optExplainFull);
 
     // Check doesn't contain stage
-    const ogExplain = getExplainedPipelineFromAggregation(
-        db,
-        testColl,
-        ogPipeline,
-        {inhibitOptimization: false, hint: hint, postPlanningResults: true});
+    const ogExplain = getExplainedPipelineFromAggregation(db, testColl, ogPipeline, {
+        inhibitOptimization: false,
+        hint: hint,
+        postPlanningResults: true,
+    });
     assert(!hasInternalBoundedSort(ogExplain), ogExplainFull);
 
     // For some queries we expect to see an extra predicate, to defend against bucketMaxSpanSeconds
@@ -146,22 +150,20 @@ export const runRewritesTest = (sortSpec,
     const bucketSpanMatch = {
         $match: {
             $expr: {
-                $lte: [
-                    {$subtract: ["$control.max.t", "$control.min.t"]},
-                    {$const: NumberLong(3600000)}
-                ]
+                $lte: [{$subtract: ["$control.max.t", "$control.min.t"]}, {$const: NumberLong(3600000)}],
             },
-        }
+        },
     };
     let foundMatch = findFirstMatch(optExplain);
     if (!precise) {
-        assert.docEq(
-            bucketSpanMatch, foundMatch, 'Expected an extra $match to check the bucket span');
+        assert.docEq(bucketSpanMatch, foundMatch, "Expected an extra $match to check the bucket span");
     } else {
         // (We don't have a 'assert.notDocEq' helper, but docEq is 'eq' + 'sortDoc'.)
-        assert.neq(sortDoc(foundMatch),
-                   sortDoc(bucketSpanMatch),
-                   'Did not expect an extra $match to check the bucket span');
+        assert.neq(
+            sortDoc(foundMatch),
+            sortDoc(bucketSpanMatch),
+            "Did not expect an extra $match to check the bucket span",
+        );
     }
 
     if (expectedAccessPath) {
@@ -174,24 +176,19 @@ export const runRewritesTest = (sortSpec,
     }
 };
 
-export const runDoesntRewriteTest =
-    (sortSpec, createIndex, hint, testColl, intermediaryStages = []) => {
-        jsTestLog(`runDoesntRewriteTest ${
-            tojson({sortSpec, createIndex, hint, testColl, intermediaryStages})}`);
-        setup(testColl, createIndex);
+export const runDoesntRewriteTest = (sortSpec, createIndex, hint, testColl, intermediaryStages = []) => {
+    jsTestLog(`runDoesntRewriteTest ${tojson({sortSpec, createIndex, hint, testColl, intermediaryStages})}`);
+    setup(testColl, createIndex);
 
-        const optPipeline = [
-            ...intermediaryStages,
-            {$sort: sortSpec},
-        ];
+    const optPipeline = [...intermediaryStages, {$sort: sortSpec}];
 
-        // Check doesn't contain stage
-        const optExplain = getExplainedPipelineFromAggregation(
-            db,
-            testColl,
-            optPipeline,
-            {inhibitOptimization: false, hint: hint, postPlanningResults: true});
-        const optExplainFull = testColl.explain().aggregate(optPipeline, {hint});
-        const containsOptimization = hasInternalBoundedSort(optExplain);
-        assert(!containsOptimization, optExplainFull);
-    };
+    // Check doesn't contain stage
+    const optExplain = getExplainedPipelineFromAggregation(db, testColl, optPipeline, {
+        inhibitOptimization: false,
+        hint: hint,
+        postPlanningResults: true,
+    });
+    const optExplainFull = testColl.explain().aggregate(optPipeline, {hint});
+    const containsOptimization = hasInternalBoundedSort(optExplain);
+    assert(!containsOptimization, optExplainFull);
+};

@@ -17,7 +17,7 @@ import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const ns = {
     db: db.getName(),
-    coll: coll.getName()
+    coll: coll.getName(),
 };
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 qsutils.removeAllQuerySettings();
@@ -44,21 +44,20 @@ function testQuerySettingsUsing(params) {
     // invoking setQuerySettings command.
     {
         qsutils.assertExplainQuerySettings(params.queryA, undefined);
-        assert.commandWorked(
-            db.adminCommand({setQuerySettings: params.queryA, settings: params.querySettingsA}));
-        qsutils.assertQueryShapeConfiguration(
-            [qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryA)]);
+        assert.commandWorked(db.adminCommand({setQuerySettings: params.queryA, settings: params.querySettingsA}));
+        qsutils.assertQueryShapeConfiguration([
+            qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryA),
+        ]);
     }
 
     // Ensure that 'querySettings' cluster parameter contains both QueryShapeConfigurations
     // after invoking setQuerySettings command.
     {
         qsutils.assertExplainQuerySettings(params.queryB, undefined);
-        assert.commandWorked(
-            db.adminCommand({setQuerySettings: params.queryB, settings: params.querySettingsB}));
+        assert.commandWorked(db.adminCommand({setQuerySettings: params.queryB, settings: params.querySettingsB}));
         qsutils.assertQueryShapeConfiguration([
             qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryA),
-            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryB)
+            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryB),
         ]);
     }
 
@@ -66,22 +65,20 @@ function testQuerySettingsUsing(params) {
     // setQuerySettings by passing a QueryShapeHash.
     {
         assert.neq(queryShapeHashA, undefined);
-        assert.commandWorked(
-            db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsB}));
+        assert.commandWorked(db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsB}));
         qsutils.assertQueryShapeConfiguration([
             qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
-            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryB)
+            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryB),
         ]);
     }
 
     // Ensure that 'querySettings' cluster parameter gets updated on subsequent call of
     // setQuerySettings by passing a different QueryInstance with the same QueryShape.
     {
-        assert.commandWorked(db.adminCommand(
-            {setQuerySettings: params.queryBPrime, settings: params.querySettingsA}));
+        assert.commandWorked(db.adminCommand({setQuerySettings: params.queryBPrime, settings: params.querySettingsA}));
         qsutils.assertQueryShapeConfiguration([
             qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
-            qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryBPrime)
+            qsutils.makeQueryShapeConfiguration(params.querySettingsA, params.queryBPrime),
         ]);
     }
 
@@ -89,8 +86,9 @@ function testQuerySettingsUsing(params) {
     // 'settingsArray' of the 'querySettings' cluster parameter by providing a query instance.
     {
         assert.commandWorked(db.adminCommand({removeQuerySettings: params.queryBPrime}));
-        qsutils.assertQueryShapeConfiguration(
-            [qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA)]);
+        qsutils.assertQueryShapeConfiguration([
+            qsutils.makeQueryShapeConfiguration(params.querySettingsB, params.queryA),
+        ]);
         qsutils.assertExplainQuerySettings(params.queryB, undefined);
     }
 
@@ -105,22 +103,22 @@ function testQuerySettingsUsing(params) {
     // Ensure that query settings can also be added for a query shape hash without providing a
     // representative query.
     {
-        assert.commandWorked(
-            db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsA}));
+        assert.commandWorked(db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsA}));
 
         // Call 'assertQueryShapeConfiguration()' with shouldRunExplain = false, because we
         // don't have a representative query.
-        qsutils.assertQueryShapeConfiguration([{settings: params.querySettingsA}],
-                                              false /* shouldRunExplain */);
+        qsutils.assertQueryShapeConfiguration([{settings: params.querySettingsA}], false /* shouldRunExplain */);
         // Run 'assertExplainQuerySettings()' separately with a query.
         qsutils.assertExplainQuerySettings(params.queryA, params.querySettingsA);
 
         // Assert there is no 'debugQueryShape'.
-        assert(!qsutils
-                    .getQuerySettings({
-                        showDebugQueryShape: true,
-                    })[0]
-                    .hasOwnProperty("debugQueryShape"));
+        assert(
+            !qsutils
+                .getQuerySettings({
+                    showDebugQueryShape: true,
+                })[0]
+                .hasOwnProperty("debugQueryShape"),
+        );
         assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHashA}));
         qsutils.assertQueryShapeConfiguration([]);
     }
@@ -132,26 +130,26 @@ function testQuerySettingsParameterized({find, distinct, aggregate}) {
     testQuerySettingsUsing({
         queryA: qsutils.makeFindQueryInstance({
             filter,
-            let : {
+            let: {
                 variableA: 10,
                 variableB: 15,
             },
         }),
         queryB: qsutils.makeFindQueryInstance({
             filter,
-            let : {
+            let: {
                 variableA: "string",
                 variableB: "super-string",
             },
         }),
         queryBPrime: qsutils.makeFindQueryInstance({
             filter,
-            let : {
+            let: {
                 variableA: "another-string",
                 variableB: "still-super-string",
             },
         }),
-        ...find
+        ...find,
     });
 
     // Same for aggregate query settings.
@@ -171,33 +169,34 @@ function testQuerySettingsParameterized({find, distinct, aggregate}) {
     testQuerySettingsUsing({
         queryA: qsutils.makeAggregateQueryInstance({
             pipeline,
-            let : {
+            let: {
                 variable: 10,
             },
         }),
         queryB: qsutils.makeAggregateQueryInstance({
             pipeline,
-            let : {
+            let: {
                 variable: "string",
             },
         }),
         queryBPrime: qsutils.makeAggregateQueryInstance({
             pipeline,
-            let : {
+            let: {
                 variable: "another-string",
             },
         }),
-        ...aggregate
+        ...aggregate,
     });
 
     // Same for distinct query settings.
     testQuerySettingsUsing({
         queryA: qsutils.makeDistinctQueryInstance({key: "k", query: {a: 1, b: 2}}),
-        queryB: qsutils.makeDistinctQueryInstance(
-            {key: "k", query: {b: "string", a: "still-super-string"}}),
-        queryBPrime: qsutils.makeDistinctQueryInstance(
-            {key: "k", query: {b: "another string", a: "no-more-super-string"}}),
-        ...distinct
+        queryB: qsutils.makeDistinctQueryInstance({key: "k", query: {b: "string", a: "still-super-string"}}),
+        queryBPrime: qsutils.makeDistinctQueryInstance({
+            key: "k",
+            query: {b: "another string", a: "no-more-super-string"},
+        }),
+        ...distinct,
     });
 }
 
@@ -205,17 +204,16 @@ function testQuerySettingsParameterized({find, distinct, aggregate}) {
 testQuerySettingsParameterized({
     find: {
         querySettingsA: {indexHints: {ns, allowedIndexes: [{a: 1, b: 1}, {$natural: 1}]}},
-        querySettingsB: {indexHints: {ns, allowedIndexes: [{b: 1, a: 1}]}}
+        querySettingsB: {indexHints: {ns, allowedIndexes: [{b: 1, a: 1}]}},
     },
     distinct: {
         querySettingsA: {indexHints: {ns, allowedIndexes: [{a: 1, b: 1}, {$natural: 1}]}},
-        querySettingsB: {indexHints: {ns, allowedIndexes: [{b: 1, a: 1}]}}
+        querySettingsB: {indexHints: {ns, allowedIndexes: [{b: 1, a: 1}]}},
     },
     aggregate: {
-        querySettingsA:
-            {indexHints: {ns, allowedIndexes: [{groupID: 1, matchKey: 1}, {$natural: 1}]}},
-        querySettingsB: {indexHints: {ns, allowedIndexes: [{matchKey: 1, groupID: 1}]}}
-    }
+        querySettingsA: {indexHints: {ns, allowedIndexes: [{groupID: 1, matchKey: 1}, {$natural: 1}]}},
+        querySettingsB: {indexHints: {ns, allowedIndexes: [{matchKey: 1, groupID: 1}]}},
+    },
 });
 
 // Test changing reject. With no other settings present, there's only one valid value for
@@ -226,7 +224,7 @@ testQuerySettingsParameterized({
 testQuerySettingsParameterized({
     find: {querySettingsA: {reject: true}, querySettingsB: {reject: true}},
     distinct: {querySettingsA: {reject: true}, querySettingsB: {reject: true}},
-    aggregate: {querySettingsA: {reject: true}, querySettingsB: {reject: true}}
+    aggregate: {querySettingsA: {reject: true}, querySettingsB: {reject: true}},
 });
 
 // Test setting and changing comment.
@@ -242,7 +240,6 @@ testQuerySettingsParameterized({
     find: {
         querySettingsA: {...commonSettingsA, comment: "Reject this query, because..."},
         querySettingsB: {...commonSettingsB, comment: "Please set reject to false, because..."},
-
     },
     distinct: {
         querySettingsA: {...commonSettingsA, comment: "Reject this query, because..."},
@@ -251,7 +248,7 @@ testQuerySettingsParameterized({
     aggregate: {
         querySettingsA: {...commonSettingsA, comment: "Reject this query, because..."},
         querySettingsB: {...commonSettingsB, comment: "Please set reject to false, because..."},
-    }
+    },
 });
 
 // Test changing reject with an unrelated setting present. Additionally test that 'setQuerySettings'
@@ -268,11 +265,12 @@ testQuerySettingsParameterized({
         // settings with the same value.
         for (const op in [`insert with reject: ${reject}`, `update with reject: ${reject}`]) {
             assert.commandWorked(
-                db.adminCommand(
-                    {setQuerySettings: query, settings: {...unrelatedSettings, reject}}),
-                `the 'setQuerySettings' ${op} operation failed`);
-            qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(
-                {...unrelatedSettings, ...(reject && {reject})}, query)]);
+                db.adminCommand({setQuerySettings: query, settings: {...unrelatedSettings, reject}}),
+                `the 'setQuerySettings' ${op} operation failed`,
+            );
+            qsutils.assertQueryShapeConfiguration([
+                qsutils.makeQueryShapeConfiguration({...unrelatedSettings, ...(reject && {reject})}, query),
+            ]);
         }
 
         // Repeat the following 'setQuerySettings' command twice to test the retryability. The first
@@ -280,11 +278,12 @@ testQuerySettingsParameterized({
         // query settings with the same value.
         for (const op in [`update with reject: ${!reject}`, `update with reject: ${!reject}`]) {
             assert.commandWorked(
-                db.adminCommand(
-                    {setQuerySettings: query, settings: {...unrelatedSettings, reject: !reject}}),
-                `the 'setQuerySettings' ${op} operation failed`);
-            qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(
-                {...unrelatedSettings, ...(!reject && {reject: !reject})}, query)]);
+                db.adminCommand({setQuerySettings: query, settings: {...unrelatedSettings, reject: !reject}}),
+                `the 'setQuerySettings' ${op} operation failed`,
+            );
+            qsutils.assertQueryShapeConfiguration([
+                qsutils.makeQueryShapeConfiguration({...unrelatedSettings, ...(!reject && {reject: !reject})}, query),
+            ]);
         }
 
         db.adminCommand({removeQuerySettings: query});
@@ -297,17 +296,14 @@ testQuerySettingsParameterized({
     // Test that setting reject=false as the _only_ setting fails as the newly constructed
     // QuerySettings would be empty.
     const query = qsutils.makeFindQueryInstance({filter: {a: 15}});
-    assert.commandFailedWithCode(
-        db.adminCommand({setQuerySettings: query, settings: {reject: false}}), 7746604);
+    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {reject: false}}), 7746604);
 
     // Set reject=true, which should be permitted as it is non-default behaviour.
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: {reject: true}}));
 
     // Setting reject=false would make the existing QuerySettings empty; verify that this fails.
-    qsutils.assertQueryShapeConfiguration(
-        [qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
-    assert.commandFailedWithCode(
-        db.adminCommand({setQuerySettings: query, settings: {reject: false}}), 7746604);
+    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
+    assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {reject: false}}), 7746604);
 
     // Confirm that the settings can indeed be removed (also cleans up after above test).
     assert.commandWorked(db.adminCommand({removeQuerySettings: query}));
@@ -329,15 +325,12 @@ testQuerySettingsParameterized({
     const finalSettings = {...initialSettings, reject: true};
 
     // Set the query settings via hash. Representative query will be missing.
-    assert.commandWorked(
-        db.adminCommand({setQuerySettings: queryShapeHash, settings: initialSettings}));
-    qsutils.assertQueryShapeConfiguration([{settings: initialSettings}],
-                                          false /* shouldRunExplain */);
+    assert.commandWorked(db.adminCommand({setQuerySettings: queryShapeHash, settings: initialSettings}));
+    qsutils.assertQueryShapeConfiguration([{settings: initialSettings}], false /* shouldRunExplain */);
 
     // Update the query settings via query. Representative query will be populated.
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: {reject: true}}));
-    qsutils.assertQueryShapeConfiguration(
-        [qsutils.makeQueryShapeConfiguration(finalSettings, query)]);
+    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(finalSettings, query)]);
 
     // Remove the query settings.
     assert.commandWorked(db.adminCommand({removeQuerySettings: queryShapeHash}));
@@ -358,11 +351,13 @@ testQuerySettingsParameterized({
     assert.soonNoExcept(() => {
         assert.sameMembers(
             [queryA, queryB, queryC],
-            db.getSiblingDB("admin")
-                .aggregate(
-                    [{$querySettings: {}}, {$replaceRoot: {newRoot: "$representativeQuery"}}],
-                    {cursor: {batchSize: 1}})
-                .toArray());
+            db
+                .getSiblingDB("admin")
+                .aggregate([{$querySettings: {}}, {$replaceRoot: {newRoot: "$representativeQuery"}}], {
+                    cursor: {batchSize: 1},
+                })
+                .toArray(),
+        );
         return true;
     });
 }

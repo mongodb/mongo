@@ -26,14 +26,14 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.iterations = 100;
 
-    $config.data.outputCollName = 'agg_out';  // Use the workload name as the collection name
-                                              // because it is assumed to be unique.
+    $config.data.outputCollName = "agg_out"; // Use the workload name as the collection name
+    // because it is assumed to be unique.
 
-    $config.data.indexSpecs = [{rand: -1, randInt: 1}, {randInt: -1}, {flag: 1}, {padding: 'text'}];
-    $config.data.shardKey = {_id: 'hashed'};
+    $config.data.indexSpecs = [{rand: -1, randInt: 1}, {randInt: -1}, {flag: 1}, {padding: "text"}];
+    $config.data.shardKey = {_id: "hashed"};
 
     // We'll use document validation so that we can change the collection options in the middle of
     // an $out, to test that the $out stage will notice this and error. This validator is not very
@@ -71,7 +71,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const res = db[collName].runCommand({
             aggregate: collName,
             pipeline: [{$match: {flag: true}}, {$out: this.outputCollName}],
-            cursor: {}
+            cursor: {},
         });
 
         const allowedErrorCodes = [
@@ -117,8 +117,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         for (var i = 0; i < this.indexSpecs; ++i) {
             const indexSpecs = this.indexSpecs[i];
             jsTestLog(`Running createIndex: coll=${this.outputCollName} indexSpec=${indexSpecs}`);
-            assert.commandWorkedOrFailedWithCode(db[this.outputCollName].createIndex(indexSpecs),
-                                                 ErrorCodes.MovePrimaryInProgress);
+            assert.commandWorkedOrFailedWithCode(
+                db[this.outputCollName].createIndex(indexSpecs),
+                ErrorCodes.MovePrimaryInProgress,
+            );
         }
     };
 
@@ -137,23 +139,23 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.collMod = function collMod(db, unusedCollName) {
         if (Random.rand() < 0.5) {
             // Change the validation level.
-            const validationLevels = ['off', 'strict', 'moderate'];
+            const validationLevels = ["off", "strict", "moderate"];
             const newValidationLevel = validationLevels[Random.randInt(validationLevels.length)];
-            jsTestLog(`Running collMod: coll=${this.outputCollName} validationLevel=${
-                newValidationLevel}`);
+            jsTestLog(`Running collMod: coll=${this.outputCollName} validationLevel=${newValidationLevel}`);
 
             assert.commandWorkedOrFailedWithCode(
                 db.runCommand({collMod: this.outputCollName, validationLevel: newValidationLevel}),
-                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.MovePrimaryInProgress]);
+                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.MovePrimaryInProgress],
+            );
         } else {
             // Change the validation action.
-            const validationAction = Random.rand() > 0.5 ? 'warn' : 'error';
-            jsTestLog(`Running collMod: coll=${this.outputCollName} validationAction=${
-                validationAction}`);
+            const validationAction = Random.rand() > 0.5 ? "warn" : "error";
+            jsTestLog(`Running collMod: coll=${this.outputCollName} validationAction=${validationAction}`);
 
             assert.commandWorkedOrFailedWithCode(
                 db.runCommand({collMod: this.outputCollName, validationAction: validationAction}),
-                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.MovePrimaryInProgress]);
+                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.MovePrimaryInProgress],
+            );
         }
     };
 
@@ -181,7 +183,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             expectedErrorCodes.push(ErrorCodes.ShardNotFound);
         }
         assert.commandWorkedOrFailedWithCode(
-            db.adminCommand({movePrimary: db.getName(), to: toShard}), expectedErrorCodes);
+            db.adminCommand({movePrimary: db.getName(), to: toShard}),
+            expectedErrorCodes,
+        );
     };
 
     /*
@@ -192,15 +196,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const namespace = `${db}.${collName}`;
         jsTestLog(`Running untrackUnshardedCollection: ns=${namespace}`);
         if (isMongos(db)) {
-            assert.commandWorkedOrFailedWithCode(
-                db.adminCommand({untrackUnshardedCollection: namespace}), [
-                    // Handles the case where the collection is not located on its primary
-                    ErrorCodes.OperationFailed,
-                    // Handles the case where the collection is sharded
-                    ErrorCodes.InvalidNamespace,
-                    // Handles the case where the collection/db does not exist
-                    ErrorCodes.NamespaceNotFound,
-                ]);
+            assert.commandWorkedOrFailedWithCode(db.adminCommand({untrackUnshardedCollection: namespace}), [
+                // Handles the case where the collection is not located on its primary
+                ErrorCodes.OperationFailed,
+                // Handles the case where the collection is sharded
+                ErrorCodes.InvalidNamespace,
+                // Handles the case where the collection/db does not exist
+                ErrorCodes.NamespaceNotFound,
+            ]);
         }
     };
 
@@ -210,12 +213,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
-        assert.commandWorkedOrFailedWithCode(
-            db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
-                ErrorCodes.MovePrimaryInProgress,
-                ErrorCodes.NamespaceNotFound,
-                ErrorCodes.NamespaceCannotBeSharded,
-            ]);
+        assert.commandWorkedOrFailedWithCode(db.runCommand({convertToCapped: this.outputCollName, size: 100000}), [
+            ErrorCodes.MovePrimaryInProgress,
+            ErrorCodes.NamespaceNotFound,
+            ErrorCodes.NamespaceCannotBeSharded,
+        ]);
     };
 
     /**
@@ -230,8 +232,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
 
             try {
-                assert.commandWorked(db.adminCommand(
-                    {shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}));
+                assert.commandWorked(
+                    db.adminCommand({shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}),
+                );
             } catch (e) {
                 const exceptionCode = e.code;
                 if (exceptionCode) {
@@ -258,7 +261,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // `shardCollection()` requires a shard key index to be in place on the output collection,
         // as we may be sharding a non-empty collection.
-        assert.commandWorked(db[this.outputCollName].createIndex({_id: 'hashed'}));
+        assert.commandWorked(db[this.outputCollName].createIndex({_id: "hashed"}));
 
         if (isMongos(db)) {
             this.shards = Object.keys(cluster.getSerializedCluster().shards);

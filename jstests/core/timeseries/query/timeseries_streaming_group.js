@@ -15,11 +15,10 @@ import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 const ts = db[jsTestName()];
 ts.drop();
 
-const coll = db[jsTestName() + '_regular_collection'];
+const coll = db[jsTestName() + "_regular_collection"];
 coll.drop();
 
-assert.commandWorked(
-    db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
+assert.commandWorked(db.createCollection(ts.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
 
 const numTimes = 100;
 const numSymbols = 10;
@@ -30,7 +29,7 @@ const maxAmount = 20;
 
 Random.setRandomSeed(1);
 
-const randRange = function(min, max) {
+const randRange = function (min, max) {
     return min + Random.randInt(max - min);
 };
 
@@ -52,7 +51,7 @@ for (let i = 0; i < numTimes; i++) {
             time: new Date(startTime + i * 1000),
             price: randRange(minPrice, maxPrice),
             amount: randRange(minAmount, maxAmount),
-            meta: {"symbol": symbol}
+            meta: {"symbol": symbol},
         });
     }
 }
@@ -61,38 +60,44 @@ assert.commandWorked(ts.insert(documents));
 assert.commandWorked(coll.insert(documents));
 
 // Incorrect use of $_internalStreamingGroup should return error
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: jsTestName() + '_regular_collection',
-    pipeline: [{
-        $_internalStreamingGroup: {
-            _id: {symbol: "$symbol", time: "$time"},
-            count: {$sum: 1},
-            $monotonicIdFields: ["price"]
-        }
-    }],
-    cursor: {},
-}),
-                             7026705);
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: jsTestName() + '_regular_collection',
-    pipeline: [{$_internalStreamingGroup: {_id: null, count: {$sum: 1}}}],
-    cursor: {},
-}),
-                             7026702);
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: jsTestName() + '_regular_collection',
-    pipeline:
-        [{$_internalStreamingGroup: {_id: null, count: {$sum: 1}, $monotonicIdFields: ["_id"]}}],
-    cursor: {},
-}),
-                             7026708);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: jsTestName() + "_regular_collection",
+        pipeline: [
+            {
+                $_internalStreamingGroup: {
+                    _id: {symbol: "$symbol", time: "$time"},
+                    count: {$sum: 1},
+                    $monotonicIdFields: ["price"],
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    7026705,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: jsTestName() + "_regular_collection",
+        pipeline: [{$_internalStreamingGroup: {_id: null, count: {$sum: 1}}}],
+        cursor: {},
+    }),
+    7026702,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: jsTestName() + "_regular_collection",
+        pipeline: [{$_internalStreamingGroup: {_id: null, count: {$sum: 1}, $monotonicIdFields: ["_id"]}}],
+        cursor: {},
+    }),
+    7026708,
+);
 
-const runTest = function(pipeline, expectedMonotonicIdFields) {
+const runTest = function (pipeline, expectedMonotonicIdFields) {
     const explain = assert.commandWorked(ts.explain().aggregate(pipeline));
     const streamingGroupStage = getAggPlanStage(explain, "$_internalStreamingGroup");
     assert.neq(streamingGroupStage, null);
-    assert.eq(streamingGroupStage.$_internalStreamingGroup.$monotonicIdFields,
-              expectedMonotonicIdFields);
+    assert.eq(streamingGroupStage.$_internalStreamingGroup.$monotonicIdFields, expectedMonotonicIdFields);
 
     const found = ts.aggregate(pipeline).toArray();
     const expected = coll.aggregate(pipeline).toArray();
@@ -110,17 +115,18 @@ runTest(
                         $subtract: [
                             {$dateTrunc: {date: "$time", unit: "minute"}},
                             {$dateTrunc: {date: new Date(startTime), unit: "minute"}},
-                        ]
-                    }
+                        ],
+                    },
                 },
                 "average_price": {$avg: {$multiply: ["$price", "$amount"]}},
-                "average_amount": {$avg: "$amount"}
-            }
+                "average_amount": {$avg: "$amount"},
+            },
         },
         {$addFields: {"average_price": {$divide: ["$average_price", "$average_amount"]}}},
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    ["minute"]);
+    ["minute"],
+);
 
 runTest(
     [
@@ -129,13 +135,14 @@ runTest(
             $group: {
                 _id: {$dateTrunc: {date: "$time", unit: "minute"}},
                 "average_price": {$avg: {$multiply: ["$price", "$amount"]}},
-                "average_amount": {$avg: "$amount"}
-            }
+                "average_amount": {$avg: "$amount"},
+            },
         },
         {$addFields: {"average_price": {$divide: ["$average_price", "$average_amount"]}}},
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    ["_id"]);
+    ["_id"],
+);
 
 runTest(
     [
@@ -144,10 +151,11 @@ runTest(
             $group: {
                 _id: "$time",
                 "average_price": {$avg: {$multiply: ["$price", "$amount"]}},
-                "average_amount": {$avg: "$amount"}
-            }
+                "average_amount": {$avg: "$amount"},
+            },
         },
         {$addFields: {"average_price": {$divide: ["$average_price", "$average_amount"]}}},
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ],
-    ["_id"]);
+    ["_id"],
+);

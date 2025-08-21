@@ -7,16 +7,15 @@
  * @tags: [requires_persistence]
  */
 
-import {
-    runTests
-} from
-    "jstests/replsets/libs/rollback_with_coalesced_txn_table_updates_during_oplog_application_helper.js";
+import {runTests} from "jstests/replsets/libs/rollback_with_coalesced_txn_table_updates_during_oplog_application_helper.js";
 
 const initFunc = (primary, ns, counterTotal) => {
-    assert.commandWorked(primary.getCollection(ns).runCommand("insert", {
-        documents: Array.from({length: counterTotal}, (_, i) => ({_id: i})),
-        writeConcern: {w: 5}
-    }));
+    assert.commandWorked(
+        primary.getCollection(ns).runCommand("insert", {
+            documents: Array.from({length: counterTotal}, (_, i) => ({_id: i})),
+            writeConcern: {w: 5},
+        }),
+    );
 };
 
 const stopReplProducerOnDocumentFunc = (counterMajorityCommitted) => {
@@ -24,11 +23,13 @@ const stopReplProducerOnDocumentFunc = (counterMajorityCommitted) => {
 };
 
 const opsFunc = (primary, ns, counterTotal, lsid) => {
-    assert.commandWorked(primary.getCollection(ns).runCommand("delete", {
-        deletes: Array.from({length: counterTotal}, (_, i) => ({q: {_id: i}, limit: 1})),
-        lsid,
-        txnNumber: NumberLong(2),
-    }));
+    assert.commandWorked(
+        primary.getCollection(ns).runCommand("delete", {
+            deletes: Array.from({length: counterTotal}, (_, i) => ({q: {_id: i}, limit: 1})),
+            lsid,
+            txnNumber: NumberLong(2),
+        }),
+    );
 };
 
 const stmtMajorityCommittedFunc = (primary, ns, counterMajorityCommitted) => {
@@ -37,10 +38,12 @@ const stmtMajorityCommittedFunc = (primary, ns, counterMajorityCommitted) => {
 
 const validateFunc = (secondary1, ns, counterMajorityCommitted, counterTotal, lsid) => {
     // Insert doc in the range [0, counterMajorityCommitted] which should have been deleted.
-    assert.commandWorked(secondary1.getCollection(ns).runCommand("insert", {
-        documents: Array.from({length: counterMajorityCommitted + 1}, (_, i) => ({_id: i})),
-        writeConcern: {w: 5}
-    }));
+    assert.commandWorked(
+        secondary1.getCollection(ns).runCommand("insert", {
+            documents: Array.from({length: counterMajorityCommitted + 1}, (_, i) => ({_id: i})),
+            writeConcern: {w: 5},
+        }),
+    );
 
     // Docs in the range [counterMajorityCommitted + 1, counterTotal - 1] should exist because the
     // delete statements were rolled back.
@@ -51,12 +54,14 @@ const validateFunc = (secondary1, ns, counterMajorityCommitted, counterTotal, ls
 
     // Retry the operation which should only delete the range
     // [counterMajorityCommitted + 1, counterTotal - 1].
-    assert.commandWorked(secondary1.getCollection(ns).runCommand("delete", {
-        deletes: Array.from({length: counterTotal}, (_, i) => ({q: {_id: i}, limit: 1})),
-        lsid,
-        txnNumber: NumberLong(2),
-        writeConcern: {w: 5},
-    }));
+    assert.commandWorked(
+        secondary1.getCollection(ns).runCommand("delete", {
+            deletes: Array.from({length: counterTotal}, (_, i) => ({q: {_id: i}, limit: 1})),
+            lsid,
+            txnNumber: NumberLong(2),
+            writeConcern: {w: 5},
+        }),
+    );
 
     // We should still find the documents in the range [0, counterMajorityCommitted].
     for (var i = 0; i <= counterMajorityCommitted; i++) {
@@ -72,5 +77,4 @@ const validateFunc = (secondary1, ns, counterMajorityCommitted, counterTotal, ls
     }
 };
 
-runTests(
-    initFunc, stopReplProducerOnDocumentFunc, opsFunc, stmtMajorityCommittedFunc, validateFunc);
+runTests(initFunc, stopReplProducerOnDocumentFunc, opsFunc, stmtMajorityCommittedFunc, validateFunc);

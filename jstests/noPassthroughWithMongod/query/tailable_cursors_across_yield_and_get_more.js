@@ -19,9 +19,9 @@ for (let i = 0; i < numDocs; ++i) {
 
 // Set query to yield after every document read, so yielding is exercised at much as possible in the
 // subsequent find and getMore commands.
-const setParamResWas =
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}))
-        .was;
+const setParamResWas = assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}),
+).was;
 
 try {
     assert.eq(numDocs % 2, 0);
@@ -67,6 +67,5 @@ try {
 } finally {
     // We must ensure that the mongod's original settings are returned because this test shares a
     // common mongod instance with other tests.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: setParamResWas}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: setParamResWas}));
 }

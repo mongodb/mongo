@@ -15,13 +15,12 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1, c: 1, d: 1, e: 1}));
 
 // Save the old limit so it can be restored once the tests completes.
 const staticLimit = db.adminCommand({
-                          getParameter: 1,
-                          internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: 1
-                      }).internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals;
+    getParameter: 1,
+    internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: 1,
+}).internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals;
 
-const setStaticLimit = function(limit) {
-    return db.adminCommand(
-        {setParameter: 1, internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: limit});
+const setStaticLimit = function (limit) {
+    return db.adminCommand({setParameter: 1, internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: limit});
 };
 
 /**
@@ -48,17 +47,17 @@ function assertIndexScanPlan(explain, isGeneric) {
 try {
     // Verify that when the number of statically generated single interval bounds is less than the
     // static limit, the optimized plan is used.
-    const optimized =
-        coll.find({a: {$in: [1, 2, 3]}, b: {$in: [10, 11, 12]}, c: {$in: [42]}, d: {$lt: 3}})
-            .explain("executionStats");
+    const optimized = coll
+        .find({a: {$in: [1, 2, 3]}, b: {$in: [10, 11, 12]}, c: {$in: [42]}, d: {$lt: 3}})
+        .explain("executionStats");
     assertIndexScanPlan(optimized, /*isGeneric*/ false);
 
     // Verify that when the number of statically generated single interval bounds is greater than
     // the static limit, the generic plan is used.
     setStaticLimit(2);
-    const generic =
-        coll.find({a: {$in: [1, 2, 3]}, b: {$in: [10, 11, 12]}, c: {$in: [42]}, d: {$lt: 3}})
-            .explain("executionStats");
+    const generic = coll
+        .find({a: {$in: [1, 2, 3]}, b: {$in: [10, 11, 12]}, c: {$in: [42]}, d: {$lt: 3}})
+        .explain("executionStats");
     assertIndexScanPlan(generic, /*isGeneric*/ true);
 } finally {
     setStaticLimit(staticLimit);

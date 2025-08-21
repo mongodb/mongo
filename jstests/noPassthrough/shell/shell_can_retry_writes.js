@@ -34,52 +34,65 @@ function testCommandCanBeRetried(func, expected = true) {
         throw new Error("Mongo.prototype.runCommand() was never called: " + func.toString());
     }
 
-    assert(cmdObjSeen.hasOwnProperty("lsid"),
-           "Expected operation " + tojson(cmdObjSeen) +
-               " to have a logical session id: " + func.toString());
+    assert(
+        cmdObjSeen.hasOwnProperty("lsid"),
+        "Expected operation " + tojson(cmdObjSeen) + " to have a logical session id: " + func.toString(),
+    );
 
     if (expected) {
         assert(
             cmdObjSeen.hasOwnProperty("txnNumber"),
-            "Expected operation " + tojson(cmdObjSeen) +
-                " to be assigned a transaction number since it can be retried: " + func.toString());
+            "Expected operation " +
+                tojson(cmdObjSeen) +
+                " to be assigned a transaction number since it can be retried: " +
+                func.toString(),
+        );
     } else {
-        assert(!cmdObjSeen.hasOwnProperty("txnNumber"),
-               "Expected operation " + tojson(cmdObjSeen) +
-                   " to not be assigned a transaction number since it cannot be retried: " +
-                   func.toString());
+        assert(
+            !cmdObjSeen.hasOwnProperty("txnNumber"),
+            "Expected operation " +
+                tojson(cmdObjSeen) +
+                " to not be assigned a transaction number since it cannot be retried: " +
+                func.toString(),
+        );
     }
 }
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.insertOne({_id: 0});
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.updateOne({_id: 0}, {$set: {a: 1}});
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.updateOne({_id: 1}, {$set: {a: 2}}, {upsert: true});
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.deleteOne({_id: 1});
 });
 
-testCommandCanBeRetried(function() {
-    coll.insertMany([{_id: 2, b: 3}, {_id: 3, b: 4}], {ordered: true});
+testCommandCanBeRetried(function () {
+    coll.insertMany(
+        [
+            {_id: 2, b: 3},
+            {_id: 3, b: 4},
+        ],
+        {ordered: true},
+    );
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.insertMany([{_id: 4}, {_id: 5}], {ordered: false});
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.updateMany({a: {$gt: 0}}, {$set: {c: 7}});
 }, false);
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.deleteMany({b: {$lt: 5}});
 }, false);
 
@@ -87,11 +100,11 @@ testCommandCanBeRetried(function() {
 // Tests for writeConcern.
 //
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.insertOne({_id: 1}, {w: 1});
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.insertOne({_id: "majority"}, {w: "majority"});
 });
 
@@ -99,38 +112,37 @@ testCommandCanBeRetried(function() {
 // Tests for bulkWrite().
 //
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.bulkWrite([{insertOne: {document: {_id: 10}}}]);
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.bulkWrite([{updateOne: {filter: {_id: 10}, update: {$set: {a: 1}}}}]);
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.bulkWrite([{updateOne: {filter: {_id: 10}, update: {$set: {a: 2}}, upsert: true}}]);
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.bulkWrite([{deleteOne: {filter: {_id: 10}}}]);
 });
 
-testCommandCanBeRetried(function() {
-    coll.bulkWrite(
-        [{insertOne: {document: {_id: 20, b: 3}}}, {insertOne: {document: {_id: 30, b: 4}}}],
-        {ordered: true});
+testCommandCanBeRetried(function () {
+    coll.bulkWrite([{insertOne: {document: {_id: 20, b: 3}}}, {insertOne: {document: {_id: 30, b: 4}}}], {
+        ordered: true,
+    });
 });
 
-testCommandCanBeRetried(function() {
-    coll.bulkWrite([{insertOne: {document: {_id: 40}}}, {insertOne: {document: {_id: 50}}}],
-                   {ordered: false});
+testCommandCanBeRetried(function () {
+    coll.bulkWrite([{insertOne: {document: {_id: 40}}}, {insertOne: {document: {_id: 50}}}], {ordered: false});
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.bulkWrite([{updateMany: {filter: {a: {$gt: 0}}, update: {$set: {c: 7}}}}]);
 }, false);
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.bulkWrite([{deleteMany: {filter: {b: {$lt: 5}}}}]);
 }, false);
 
@@ -138,15 +150,15 @@ testCommandCanBeRetried(function() {
 // Tests for wrappers around "findAndModify" command.
 //
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.findOneAndUpdate({_id: 100}, {$set: {d: 9}}, {upsert: true});
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.findOneAndReplace({_id: 100}, {e: 11});
 });
 
-testCommandCanBeRetried(function() {
+testCommandCanBeRetried(function () {
     coll.findOneAndDelete({e: {$exists: true}});
 });
 

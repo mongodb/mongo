@@ -8,24 +8,13 @@ const db = shardingTest.getDB("test");
 const coll = db.sharded_agg_sort;
 coll.drop();
 
-assert.commandWorked(shardingTest.s0.adminCommand(
-    {enableSharding: db.getName(), primaryShard: shardingTest.shard1.shardName}));
 assert.commandWorked(
-    shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+    shardingTest.s0.adminCommand({enableSharding: db.getName(), primaryShard: shardingTest.shard1.shardName}),
+);
+assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
 const nDocs = 10;
-const yValues = [
-    "abc",
-    "ABC",
-    null,
-    1,
-    NumberLong(2),
-    NumberDecimal(-20),
-    MinKey,
-    MaxKey,
-    BinData(0, ""),
-    [3, 4],
-];
+const yValues = ["abc", "ABC", null, 1, NumberLong(2), NumberDecimal(-20), MinKey, MaxKey, BinData(0, ""), [3, 4]];
 const bulkOp = coll.initializeOrderedBulkOp();
 for (var i = 0; i < nDocs; ++i) {
     bulkOp.insert({_id: i, x: Math.floor(i / 2), y: yValues[i]});
@@ -37,11 +26,13 @@ assert.commandWorked(shardingTest.s0.adminCommand({split: coll.getFullName(), mi
 assert.commandWorked(shardingTest.s0.adminCommand({split: coll.getFullName(), middle: {_id: 6}}));
 
 // Migrate the middle chunk to another shard
-assert.commandWorked(shardingTest.s0.adminCommand({
-    movechunk: coll.getFullName(),
-    find: {_id: 5},
-    to: shardingTest.getOther(shardingTest.getPrimaryShard(db.getName())).name
-}));
+assert.commandWorked(
+    shardingTest.s0.adminCommand({
+        movechunk: coll.getFullName(),
+        find: {_id: 5},
+        to: shardingTest.getOther(shardingTest.getPrimaryShard(db.getName())).name,
+    }),
+);
 
 function assertResultsEqual({actual, expected}) {
     const resultsAsString = "  actual: " + tojson(actual) + "\n  expected: " + tojson(expected);
@@ -70,7 +61,7 @@ function testSorts() {
     });
     assertResultsEqual({
         actual: coll.aggregate([{$sort: {_id: 1}}, {$project: {_id: 1}}]).toArray(),
-        expected: new Array(nDocs).fill().map(function(_, index) {
+        expected: new Array(nDocs).fill().map(function (_, index) {
             return {_id: index};
         }),
     });
@@ -121,7 +112,7 @@ function testSorts() {
             {_id: 6, x: 3, y: MinKey},
             {_id: 9, x: 4, y: [3, 4]},
             {_id: 8, x: 4, y: BinData(0, "")},
-        ]
+        ],
     });
 }
 testSorts();
@@ -137,39 +128,37 @@ testSorts();
 // Test that a sort including the text score is merged properly in a sharded cluster.
 const textColl = db.sharded_agg_sort_text;
 
-assert.commandWorked(
-    shardingTest.s0.adminCommand({shardCollection: textColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: textColl.getFullName(), key: {_id: 1}}));
 
-assert.commandWorked(textColl.insert([
-    {_id: 0, text: "apple"},
-    {_id: 1, text: "apple orange banana apple"},
-    {_id: 2, text: "apple orange"},
-    {_id: 3, text: "apple orange banana apple apple banana"},
-    {_id: 4, text: "apple orange banana"},
-    {_id: 5, text: "apple orange banana apple apple"},
-]));
+assert.commandWorked(
+    textColl.insert([
+        {_id: 0, text: "apple"},
+        {_id: 1, text: "apple orange banana apple"},
+        {_id: 2, text: "apple orange"},
+        {_id: 3, text: "apple orange banana apple apple banana"},
+        {_id: 4, text: "apple orange banana"},
+        {_id: 5, text: "apple orange banana apple apple"},
+    ]),
+);
 
 // Split the data into 3 chunks
-assert.commandWorked(
-    shardingTest.s0.adminCommand({split: textColl.getFullName(), middle: {_id: 2}}));
-assert.commandWorked(
-    shardingTest.s0.adminCommand({split: textColl.getFullName(), middle: {_id: 4}}));
+assert.commandWorked(shardingTest.s0.adminCommand({split: textColl.getFullName(), middle: {_id: 2}}));
+assert.commandWorked(shardingTest.s0.adminCommand({split: textColl.getFullName(), middle: {_id: 4}}));
 
 // Migrate the middle chunk to another shard
-assert.commandWorked(shardingTest.s0.adminCommand({
-    movechunk: textColl.getFullName(),
-    find: {_id: 3},
-    to: shardingTest.getOther(shardingTest.getPrimaryShard(db.getName())).name
-}));
+assert.commandWorked(
+    shardingTest.s0.adminCommand({
+        movechunk: textColl.getFullName(),
+        find: {_id: 3},
+        to: shardingTest.getOther(shardingTest.getPrimaryShard(db.getName())).name,
+    }),
+);
 
 assert.commandWorked(textColl.createIndex({text: "text"}));
 assertResultsEqual({
     actual: textColl
-                .aggregate([
-                    {$match: {$text: {$search: "apple banana orange"}}},
-                    {$sort: {x: {$meta: "textScore"}}}
-                ])
-                .toArray(),
+        .aggregate([{$match: {$text: {$search: "apple banana orange"}}}, {$sort: {x: {$meta: "textScore"}}}])
+        .toArray(),
     expected: [
         {_id: 3, text: "apple orange banana apple apple banana"},
         {_id: 5, text: "apple orange banana apple apple"},
@@ -182,36 +171,41 @@ assertResultsEqual({
 
 function assertSortedByMetaField(results) {
     for (let i = 0; i < results.length - 1; ++i) {
-        assert(results[i].hasOwnProperty("meta"),
-               `Expected all results to have "meta" field, found one without it at index ${i}`);
-        assert.gte(results[i].meta,
-                   results[i + 1].meta,
-                   `Expected results to be sorted by "meta" field, descending. Detected unsorted` +
-                       ` results at index ${i}, entire result set: ${tojson(results)}`);
+        assert(
+            results[i].hasOwnProperty("meta"),
+            `Expected all results to have "meta" field, found one without it at index ${i}`,
+        );
+        assert.gte(
+            results[i].meta,
+            results[i + 1].meta,
+            `Expected results to be sorted by "meta" field, descending. Detected unsorted` +
+                ` results at index ${i}, entire result set: ${tojson(results)}`,
+        );
     }
 }
 
-assertSortedByMetaField(textColl
-                            .aggregate([
-                                {$match: {$text: {$search: "apple banana orange"}}},
-                                {$sort: {x: {$meta: "textScore"}}},
-                                {$project: {_id: 0, meta: {$meta: "textScore"}}},
-                            ])
-                            .toArray());
+assertSortedByMetaField(
+    textColl
+        .aggregate([
+            {$match: {$text: {$search: "apple banana orange"}}},
+            {$sort: {x: {$meta: "textScore"}}},
+            {$project: {_id: 0, meta: {$meta: "textScore"}}},
+        ])
+        .toArray(),
+);
 
-assertSortedByMetaField(textColl
-                            .aggregate([
-                                {$match: {$text: {$search: "apple banana orange"}}},
-                                {$project: {_id: 0, meta: {$meta: "textScore"}}},
-                                {$sort: {meta: -1}},
-                            ])
-                            .toArray());
+assertSortedByMetaField(
+    textColl
+        .aggregate([
+            {$match: {$text: {$search: "apple banana orange"}}},
+            {$project: {_id: 0, meta: {$meta: "textScore"}}},
+            {$sort: {meta: -1}},
+        ])
+        .toArray(),
+);
 
-assertSortedByMetaField(textColl
-                            .aggregate([
-                                {$sample: {size: 10}},
-                                {$project: {_id: 0, meta: {$meta: "randVal"}}},
-                            ])
-                            .toArray());
+assertSortedByMetaField(
+    textColl.aggregate([{$sample: {size: 10}}, {$project: {_id: 0, meta: {$meta: "randVal"}}}]).toArray(),
+);
 
 shardingTest.stop();

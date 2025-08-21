@@ -9,13 +9,13 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 
 const localColl = db.lookup_large_documents_local;
-const foreignCollName = 'lookup_large_documents_foreign';
+const foreignCollName = "lookup_large_documents_foreign";
 const foreignColl = db[foreignCollName];
 
 localColl.drop();
 foreignColl.drop();
 
-const largeString = 'x'.repeat(10 * 1024 * 1024);
+const largeString = "x".repeat(10 * 1024 * 1024);
 for (let i = 0; i < 8; ++i) {
     assert.commandWorked(foreignColl.insert({foreign: 1, largeField: largeString}));
 }
@@ -23,9 +23,11 @@ for (let i = 0; i < 8; ++i) {
 assert.commandWorked(localColl.insert({local: 1}));
 
 for (let preventProjectPushdown of [false, true]) {
-    const pipeline = [{
-        $lookup: {from: foreignCollName, localField: 'local', foreignField: 'foreign', as: 'result'}
-    }];
+    const pipeline = [
+        {
+            $lookup: {from: foreignCollName, localField: "local", foreignField: "foreign", as: "result"},
+        },
+    ];
     if (preventProjectPushdown) {
         pipeline.push({$_internalInhibitOptimization: {}});
     }
@@ -33,6 +35,5 @@ for (let preventProjectPushdown of [false, true]) {
 
     const results = localColl.aggregate(pipeline).toArray();
 
-    assert(arrayEq(results, [{foo: 3}]),
-           "Pipeline:\n" + tojson(pipeline) + "Actual results:\n" + tojson(results));
+    assert(arrayEq(results, [{foo: 3}]), "Pipeline:\n" + tojson(pipeline) + "Actual results:\n" + tojson(results));
 }

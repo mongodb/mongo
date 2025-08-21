@@ -15,7 +15,7 @@ import {
     isCollscan,
     isIxscan,
     isIxscanMultikey,
-    planHasStage
+    planHasStage,
 } from "jstests/libs/query/analyze_plan.js";
 
 let coll = db.covered_multikey;
@@ -40,10 +40,7 @@ let cursor = coll.find({a: 1, b: 1}, {_id: 0, c: 1, d: 1}).sort({c: -1, d: -1});
 assert.eq(cursor.next(), {c: 4, d: 6});
 assert.eq(cursor.next(), {c: 3, d: 5});
 assert(!cursor.hasNext());
-explainRes = coll.explain("queryPlanner")
-                 .find({a: 1, b: 1}, {_id: 0, c: 1, d: 1})
-                 .sort({c: -1, d: -1})
-                 .finish();
+explainRes = coll.explain("queryPlanner").find({a: 1, b: 1}, {_id: 0, c: 1, d: 1}).sort({c: -1, d: -1}).finish();
 winningPlan = getWinningPlanFromExplain(explainRes);
 assert(!planHasStage(db, winningPlan, "FETCH"));
 

@@ -19,7 +19,7 @@ import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {
     accumulateServerStatusMetric,
     assertReleaseMemoryFailedWithCode,
-    setAvailableDiskSpaceMode
+    setAvailableDiskSpaceMode,
 } from "jstests/libs/release_memory_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
@@ -35,31 +35,12 @@ db.dropDatabase();
 const coll = db[jsTestName()];
 
 function getTextOrSpillCounter() {
-    return accumulateServerStatusMetric(db, metrics => metrics.query.textOr.spills);
+    return accumulateServerStatusMetric(db, (metrics) => metrics.query.textOr.spills);
 }
 
-const words1 = [
-    "red",
-    "orange",
-    "yellow",
-    "green",
-    "blue",
-    "purple",
-];
-const words2 = [
-    "tea",
-    "coffee",
-    "soda",
-    "water",
-    "juice",
-    "fresh",
-];
-const words3 = [
-    "drink",
-    "beverage",
-    "refreshment",
-    "hydration",
-];
+const words1 = ["red", "orange", "yellow", "green", "blue", "purple"];
+const words2 = ["tea", "coffee", "soda", "water", "juice", "fresh"];
+const words3 = ["drink", "beverage", "refreshment", "hydration"];
 
 function insertData(coll, padding = "") {
     assert.commandWorked(coll.deleteMany({}));
@@ -68,8 +49,7 @@ function insertData(coll, padding = "") {
     for (let word1 of words1) {
         for (let word2 of words2) {
             for (let word3 of words3) {
-                docs.push(
-                    {desc: word1 + " " + word2 + " " + word3, price: price, padding: padding});
+                docs.push({desc: word1 + " " + word2 + " " + word3, price: price, padding: padding});
                 price = (price + 2) % 7;
             }
         }
@@ -90,8 +70,10 @@ function idCompare(lhs, rhs) {
 }
 
 let previousSpillCount = getTextOrSpillCounter();
-const expectedResults =
-    coll.find(predicate, {score: {$meta: "textScore"}}).toArray().sort(idCompare);
+const expectedResults = coll
+    .find(predicate, {score: {$meta: "textScore"}})
+    .toArray()
+    .sort(idCompare);
 assert.eq(previousSpillCount, getTextOrSpillCounter());
 
 {
@@ -109,16 +91,18 @@ assert.eq(previousSpillCount, getTextOrSpillCounter());
 }
 
 {
-    const cursor =
-        coll.find(predicate, {score: {$meta: "textScore"}}).batchSize(1).allowDiskUse(false);
+    const cursor = coll
+        .find(predicate, {score: {$meta: "textScore"}})
+        .batchSize(1)
+        .allowDiskUse(false);
     const cursorId = cursor.getId();
 
     const releaseMemoryRes = db.runCommand({releaseMemory: [cursorId]});
     assert.commandWorked(releaseMemoryRes);
-    assertReleaseMemoryFailedWithCode(
-        releaseMemoryRes,
-        cursorId,
-        [ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed, ErrorCodes.ReleaseMemoryShardError]);
+    assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, [
+        ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        ErrorCodes.ReleaseMemoryShardError,
+    ]);
 
     assert.eq(previousSpillCount, getTextOrSpillCounter());
 
@@ -128,18 +112,20 @@ assert.eq(previousSpillCount, getTextOrSpillCounter());
 // No disk space available for spilling.
 {
     jsTest.log(`Running releaseMemory with no disk space available`);
-    const cursor =
-        coll.find(predicate, {score: {$meta: "textScore"}}).batchSize(1).allowDiskUse(true);
+    const cursor = coll
+        .find(predicate, {score: {$meta: "textScore"}})
+        .batchSize(1)
+        .allowDiskUse(true);
     const cursorId = cursor.getId();
 
     // Release memory (i.e., spill)
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'alwaysOn');
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "alwaysOn");
     const releaseMemoryCmd = {releaseMemory: [cursorId]};
     jsTest.log.info("Running releaseMemory: ", releaseMemoryCmd);
     const releaseMemoryRes = db.runCommand(releaseMemoryCmd);
     assert.commandWorked(releaseMemoryRes);
     assertReleaseMemoryFailedWithCode(releaseMemoryRes, cursorId, ErrorCodes.OutOfDiskSpace);
-    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), 'off');
+    setAvailableDiskSpaceMode(db.getSiblingDB("admin"), "off");
 
     jsTest.log.info("Running getMore");
     assert.throwsWithCode(() => cursor.toArray(), ErrorCodes.CursorNotFound);
@@ -148,8 +134,10 @@ assert.eq(previousSpillCount, getTextOrSpillCounter());
 {
     // Add a string of 2KB to each document
     insertData(coll, "x".repeat(2 * 1024));
-    const expectedResults =
-        coll.find(predicate, {padding: 0, score: {$meta: "textScore"}}).toArray().sort(idCompare);
+    const expectedResults = coll
+        .find(predicate, {padding: 0, score: {$meta: "textScore"}})
+        .toArray()
+        .sort(idCompare);
 
     const originalKnobValue = getServerParameter("internalTextOrStageMaxMemoryBytes");
     setServerParameter("internalTextOrStageMaxMemoryBytes", 1 * 1024);

@@ -29,8 +29,8 @@ assertBoolValue(true, 1.0);
 assertBoolValue(false, null);
 
 // Always true types.
-assertBoolValue(true, '');
-assertBoolValue(true, 'a');
+assertBoolValue(true, "");
+assertBoolValue(true, "a");
 assertBoolValue(true, "$object");
 assertBoolValue(true, []);
 assertBoolValue(true, [1]);
@@ -40,4 +40,4 @@ assertBoolValue(true, /a/);
 assertBoolValue(true, new Timestamp());
 
 // Missing field.
-assertBoolValue(false, '$missingField');
+assertBoolValue(false, "$missingField");

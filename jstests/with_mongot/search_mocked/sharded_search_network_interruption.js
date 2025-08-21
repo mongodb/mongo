@@ -9,9 +9,7 @@ import {
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const collName = jsTestName();
@@ -25,7 +23,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     mongos: 1,
     other: {
         rsOptions: {setParameter: {enableTestCommands: 1}},
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
@@ -33,14 +31,14 @@ const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 
-assert.commandWorked(mongos.getDB("admin").runCommand(
-    {configureFailPoint: 'shardedSearchOpCtxDisconnect', mode: 'alwaysOn'}));
+assert.commandWorked(
+    mongos.getDB("admin").runCommand({configureFailPoint: "shardedSearchOpCtxDisconnect", mode: "alwaysOn"}),
+);
 const mongotQuery = {
-    $search: {}
+    $search: {},
 };
 
 const error = assert.throws(() => testColl.aggregate(mongotQuery));

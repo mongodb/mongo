@@ -16,20 +16,20 @@ const metricsColl = mongosDB["metrics"];
 const rollupColl = mongosDB["rollup"];
 
 function incDateByMinutes(date, mins) {
-    return new Date(date.getTime() + (60 * 1000 * mins));
+    return new Date(date.getTime() + 60 * 1000 * mins);
 }
 
 // Inserts 'nSamples' worth of random data starting at 'date'.
 function insertRandomData(coll, date, nSamples) {
-    let ticksSum = 0, tempSum = 0;
+    let ticksSum = 0,
+        tempSum = 0;
     let bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < nSamples; i++) {
         const randTick = Random.randInt(100);
         const randTemp = Random.randInt(100);
         ticksSum += randTick;
         tempSum += randTemp;
-        bulk.insert(
-            {_id: incDateByMinutes(date, i * (60 / nSamples)), ticks: randTick, temp: randTemp});
+        bulk.insert({_id: incDateByMinutes(date, i * (60 / nSamples)), ticks: randTick, temp: randTemp});
     }
     assert.commandWorked(bulk.execute());
 
@@ -46,15 +46,15 @@ function runAggregate({startDate, whenMatchedMode, whenNotMatchedMode}) {
                 _id: {$dateToString: {format: "%Y-%m-%dT%H", date: "$_id"}},
                 ticks: {$sum: "$ticks"},
                 avgTemp: {$avg: "$temp"},
-            }
+            },
         },
         {
             $merge: {
                 into: {db: rollupColl.getDB().getName(), coll: rollupColl.getName()},
                 whenMatched: whenMatchedMode,
-                whenNotMatched: whenNotMatchedMode
-            }
-        }
+                whenNotMatched: whenNotMatchedMode,
+            },
+        },
     ]);
 }
 
@@ -71,8 +71,7 @@ runAggregate({startDate: hourZero, whenMatchedMode: "fail", whenNotMatchedMode: 
 
 // Verify the results of the $merge in the rollup collection.
 let res = rollupColl.find().sort({_id: 1});
-assert.eq([{_id: "2018-08-15T00", ticks: ticksSum, avgTemp: tempSum / samplesPerHour}],
-          res.toArray());
+assert.eq([{_id: "2018-08-15T00", ticks: ticksSum, avgTemp: tempSum / samplesPerHour}], res.toArray());
 
 // Insert another hour's worth of data, and verify that the $merge will append the result to the
 // output collection.

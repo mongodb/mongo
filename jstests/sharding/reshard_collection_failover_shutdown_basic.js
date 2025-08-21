@@ -25,12 +25,14 @@ const sourceCollection = reshardingTest.createShardedCollection({
     ],
 });
 
-assert.commandWorked(sourceCollection.insert([
-    {_id: "stays on shard0", oldKey: -10, newKey: -10},
-    {_id: "moves to shard0", oldKey: 10, newKey: -10},
-    {_id: "moves to shard1", oldKey: -10, newKey: 10},
-    {_id: "stays on shard1", oldKey: 10, newKey: 10},
-]));
+assert.commandWorked(
+    sourceCollection.insert([
+        {_id: "stays on shard0", oldKey: -10, newKey: -10},
+        {_id: "moves to shard0", oldKey: 10, newKey: -10},
+        {_id: "moves to shard1", oldKey: -10, newKey: 10},
+        {_id: "stays on shard1", oldKey: 10, newKey: 10},
+    ]),
+);
 
 reshardingTest.withReshardingInBackground(
     {
@@ -46,6 +48,7 @@ reshardingTest.withReshardingInBackground(
         reshardingTest.killAndRestartPrimaryOnShard(recipientShardNames[0]);
 
         reshardingTest.shutdownAndRestartPrimaryOnShard(recipientShardNames[1]);
-    });
+    },
+);
 
 reshardingTest.teardown();

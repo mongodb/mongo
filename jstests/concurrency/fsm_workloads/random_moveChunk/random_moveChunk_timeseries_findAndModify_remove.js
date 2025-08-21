@@ -15,11 +15,9 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_deletes.js';
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_deletes.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.doFindAndRemove = function doFindAndRemove(db, collName, connCache) {
         const fieldNameF = "f";
         const fieldNameTid = `tid${this.tid}`;
@@ -31,19 +29,25 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             },
         };
         // May delete different measurements from the two collections.
-        const res1 = assert.commandWorked(
-            db.runCommand({findAndModify: collName, query: filter, remove: true}));
+        const res1 = assert.commandWorked(db.runCommand({findAndModify: collName, query: filter, remove: true}));
         const res2 = assert.commandWorked(
-            db.runCommand({findAndModify: this.nonShardCollName, query: filter, remove: true}));
+            db.runCommand({findAndModify: this.nonShardCollName, query: filter, remove: true}),
+        );
         if (res1 && res1.lastErrorObject.n) {
-            assert(res1.value[fieldNameF][fieldNameTid] >= filterFieldVal,
-                   `Deleted measurement ${tojson(res1.value)} should match the query predicate ${
-                       tojson(filter)}} for the sharded collection`);
+            assert(
+                res1.value[fieldNameF][fieldNameTid] >= filterFieldVal,
+                `Deleted measurement ${tojson(res1.value)} should match the query predicate ${tojson(
+                    filter,
+                )}} for the sharded collection`,
+            );
         }
         if (res2 && res2.lastErrorObject.n) {
-            assert(res2.value[fieldNameF][fieldNameTid] >= filterFieldVal,
-                   `Deleted measurement ${tojson(res2.value)} should match the query predicate ${
-                       tojson(filter)}} for the non-sharded collection`);
+            assert(
+                res2.value[fieldNameF][fieldNameTid] >= filterFieldVal,
+                `Deleted measurement ${tojson(res2.value)} should match the query predicate ${tojson(
+                    filter,
+                )}} for the non-sharded collection`,
+            );
         }
     };
 

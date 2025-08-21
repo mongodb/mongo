@@ -15,7 +15,7 @@ import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-TestData.skipCheckDBHashes = true;  // the set is not consistent when we shutdown the test
+TestData.skipCheckDBHashes = true; // the set is not consistent when we shutdown the test
 // Because this test intentionally causes the server to crash, we need to instruct the
 // shell to clean up the core dump that is left behind.
 TestData.cleanUpCoreDumpsFromExpectedCrash = true;
@@ -37,8 +37,9 @@ const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);
 const primaryColl = primaryDb.getCollection(collName);
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 rst.awaitReplication();
 assert.commandWorked(primaryColl.insert({"starting": "doc", writeConcern: {w: 3}}));
 
@@ -56,7 +57,7 @@ let resyncNode = rst.getSecondaries()[1];
 stopServerReplication(syncSource);
 
 const disappearingDoc = {
-    "harry": "houdini"
+    "harry": "houdini",
 };
 assert.commandWorked(primaryColl.insert(disappearingDoc, {writeConcern: {w: "majority"}}));
 
@@ -69,22 +70,21 @@ resyncNode = rst.restart(resyncNode, {
     startClean: true,
     setParameter: {
         "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
-        "failpoint.forceSyncSourceCandidate":
-            tojson({mode: "alwaysOn", data: {"hostAndPort": syncSource.host}}),
-        "numInitialSyncAttempts": 1
-    }
+        "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {"hostAndPort": syncSource.host}}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 
-assert.commandWorked(resyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
 assert.commandWorked(
-    resyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+    resyncNode.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
+assert.commandWorked(resyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 
-assert.commandWorked(
-    rollbackNode.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+assert.commandWorked(rollbackNode.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
 rst.awaitSecondaryNodes(null, [rollbackNode]);
 
 restartServerReplication(syncSource);
@@ -92,15 +92,21 @@ restartServerReplication(syncSource);
 // Now elect node 2, the minority member.
 assert.commandWorked(syncSource.adminCommand({replSetStepUp: 1}));
 assert.eq(syncSource, rst.getPrimary());
-assert.commandWorked(syncSource.getDB(dbName).getCollection(collName).insert(
-    {"new": "data"}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    syncSource
+        .getDB(dbName)
+        .getCollection(collName)
+        .insert({"new": "data"}, {writeConcern: {w: "majority"}}),
+);
 
 // This failpoint will only be hit if the node's rollback common point is before the replication
 // commit point, which triggers an invariant. This failpoint is used to verify the invariant
 // will be hit without having to search the logs.
 let rollbackCommittedWritesFailPoint;
-rollbackCommittedWritesFailPoint =
-    configureFailPoint(rollbackNode, "rollbackToTimestampHangCommonPointBeforeReplCommitPoint");
+rollbackCommittedWritesFailPoint = configureFailPoint(
+    rollbackNode,
+    "rollbackToTimestampHangCommonPointBeforeReplCommitPoint",
+);
 
 // Node 1 will have to roll back to rejoin the set. It will crash as it will refuse to roll back
 // majority committed data.

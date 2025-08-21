@@ -13,16 +13,15 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000;  // 1 day
+const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000; // 1 day
 const st = new ShardingTest({
     mongos: 1,
     config: 1,
     shards: 1,
     other: {
         // Avoid spurious failures with small 'ReshardingCriticalSectionTimeout' values being set.
-        configOptions:
-            {setParameter: {reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}}
-    }
+        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}},
+    },
 });
 
 const mongos = st.s;
@@ -34,14 +33,22 @@ const collB = db["collB"];
 function assertPlanCacheSizeForColl(nss, expectedEntriesCount) {
     // Using assert.soon since the sharded metadata cleanup function is executed asynchronously.
     assert.soon(() => {
-        const entries = mongos.getCollection(nss).aggregate([{$planCacheStats: {}}]).toArray();
+        const entries = mongos
+            .getCollection(nss)
+            .aggregate([{$planCacheStats: {}}])
+            .toArray();
         var numSBEEntries = 0;
-        entries.forEach(entry => {
-            if (entry.version == "2")
-                numSBEEntries++;
+        entries.forEach((entry) => {
+            if (entry.version == "2") numSBEEntries++;
         });
-        jsTestLog('99999 actual SBE entries: ' + numSBEEntries + ', expected SBE entries: ' +
-                  expectedEntriesCount + ', total entries: ' + entries.length);
+        jsTestLog(
+            "99999 actual SBE entries: " +
+                numSBEEntries +
+                ", expected SBE entries: " +
+                expectedEntriesCount +
+                ", total entries: " +
+                entries.length,
+        );
 
         return numSBEEntries === expectedEntriesCount;
     });
@@ -83,12 +90,10 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 
     // Ensure that after refining the shard key there are no plan cache entries associated with the
     // 'collA'. However, plan cache entries for 'collB' must remain unchanged.
-    assert.commandWorked(
-        mongos.adminCommand({refineCollectionShardKey: collA.getFullName(), key: {a: 1, b: 1}}));
+    assert.commandWorked(mongos.adminCommand({refineCollectionShardKey: collA.getFullName(), key: {a: 1, b: 1}}));
 
     // The refine shard key command may complete but shards might not be aware of it.
-    st.shard0.adminCommand(
-        {_flushRoutingTableCacheUpdates: collA.getFullName(), syncFromConfig: true});
+    st.shard0.adminCommand({_flushRoutingTableCacheUpdates: collA.getFullName(), syncFromConfig: true});
 
     assertPlanCacheSizeForColl(collA.getFullName(), 0);
     assertPlanCacheSizeForColl(collB.getFullName(), 1);
@@ -105,8 +110,9 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 
     // Ensure that after resharding there are no plan cache entries associated with the 'collA'.
     // However, plan cache entries for 'collB' must remain unchanged.
-    assert.commandWorked(mongos.adminCommand(
-        {reshardCollection: collA.getFullName(), key: {b: 1}, numInitialChunks: 1}));
+    assert.commandWorked(
+        mongos.adminCommand({reshardCollection: collA.getFullName(), key: {b: 1}, numInitialChunks: 1}),
+    );
     assertPlanCacheSizeForColl(collA.getFullName(), 0);
     assertPlanCacheSizeForColl(collB.getFullName(), 1);
 })();
@@ -122,8 +128,9 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 
     // Ensure that after renaming there are no plan cache entries associated with either 'collA' or
     // 'collB'.
-    assert.commandWorked(mongos.adminCommand(
-        {renameCollection: collA.getFullName(), to: collB.getFullName(), dropTarget: true}));
+    assert.commandWorked(
+        mongos.adminCommand({renameCollection: collA.getFullName(), to: collB.getFullName(), dropTarget: true}),
+    );
 
     assertPlanCacheSizeForColl(collB.getFullName(), 0);
 
@@ -131,7 +138,8 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
     // exected error (i.e. collection doesn't exist)
     assert.commandFailedWithCode(
         db.runCommand({aggregate: collA.getName(), pipeline: [{$planCacheStats: {}}], cursor: {}}),
-        50933);
+        50933,
+    );
 })();
 
 st.stop();

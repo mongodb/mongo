@@ -14,13 +14,13 @@
 import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const initData = {
-        getCollectionName: function(collName) {
-            return jsTestName() + '_' + collName;
+        getCollectionName: function (collName) {
+            return jsTestName() + "_" + collName;
         },
 
-        getCollection: function(db, collName) {
+        getCollection: function (db, collName) {
             return db.getCollection(this.getCollectionName(collName));
         },
     };
@@ -34,7 +34,7 @@ export const $config = (function() {
     // Generates a time in the past that will be expired soon. TTL for time-series collections only
     // expires buckets once the bucket minimum is past the maximum range of the bucket size, in this
     // case one hour.
-    const getTime = function() {
+    const getTime = function () {
         const now = new Date();
         return new Date(now.getTime() - defaultBucketMaxRangeMs);
     };
@@ -132,7 +132,7 @@ export const $config = (function() {
             const docs = [];
             const start = getTime();
             for (let i = 0; i < batchSize; i++) {
-                let time = new Date(start.getTime() - ((batchSize - i) * defaultBucketMaxRangeMs));
+                let time = new Date(start.getTime() - (batchSize - i) * defaultBucketMaxRangeMs);
                 docs.push({
                     [metaFieldName]: this.tid,
                     [timeFieldName]: time,
@@ -142,18 +142,20 @@ export const $config = (function() {
             const res = coll.insertMany(docs, {ordered: false});
             TimeseriesTest.assertInsertWorked(res);
             assert.eq(res.insertedIds.length, batchSize);
-        }
+        },
     };
 
     function setup(db, collName, cluster) {
         collName = this.getCollectionName(collName);
-        assert.commandWorked(db.createCollection(collName, {
-            timeseries: {
-                timeField: timeFieldName,
-                metaField: metaFieldName,
-            },
-            expireAfterSeconds: ttlSeconds,
-        }));
+        assert.commandWorked(
+            db.createCollection(collName, {
+                timeseries: {
+                    timeField: timeFieldName,
+                    metaField: metaFieldName,
+                },
+                expireAfterSeconds: ttlSeconds,
+            }),
+        );
     }
 
     function teardown(db, collName, cluster) {
@@ -172,14 +174,17 @@ export const $config = (function() {
         // run right after the TTL thread has started to sleep, which requires us to wait another
         // period for it to wake up and delete the expired documents. We wait at least another
         // period just to avoid race-prone tests on overloaded test hosts.
-        const timeoutMS =
-            (TestData.inEvergreen ? 10 : 2) * Math.max(ttlMonitorSleepSecs, ttlSeconds) * 1000;
+        const timeoutMS = (TestData.inEvergreen ? 10 : 2) * Math.max(ttlMonitorSleepSecs, ttlSeconds) * 1000;
 
         print("Waiting for data to be deleted by TTL monitor");
         collName = this.getCollectionName(collName);
-        assert.soon(() => {
-            return db[collName].find({first: true}).itcount() == 0;
-        }, 'Expected oldest documents to be removed', timeoutMS);
+        assert.soon(
+            () => {
+                return db[collName].find({first: true}).itcount() == 0;
+            },
+            "Expected oldest documents to be removed",
+            timeoutMS,
+        );
 
         if (TestData.runningWithBalancer) {
             assert.commandWorked(db.adminCommand({balancerStart: 1, maxTimeMS: 600000}));
@@ -192,7 +197,7 @@ export const $config = (function() {
         insertManyOrdered: 0.1,
         insertManyUnordered: 0.1,
         insertManyRandTid: 0.1,
-        insertManyOld: 0.1
+        insertManyOld: 0.1,
     };
 
     const transitions = {
@@ -207,11 +212,11 @@ export const $config = (function() {
     return {
         threadCount: 20,
         iterations: 1000,
-        startState: 'init',
+        startState: "init",
         states: states,
         data: initData,
         transitions: transitions,
         setup: setup,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

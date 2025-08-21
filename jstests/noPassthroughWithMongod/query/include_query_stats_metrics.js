@@ -9,7 +9,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 
 function assertMetricEqual(metrics, name, expectedValue) {
-    if (typeof expectedValue === 'undefined') {
+    if (typeof expectedValue === "undefined") {
         // If there is no exact expected value given, just assert that the metric is present.
         assert(name in metrics, name + " is missing");
     } else {
@@ -23,23 +23,16 @@ function assertCpuNanosMetricEqual(metrics) {
     const name = "cpuNanos";
     assert(name in metrics, ` ${name} is missing. Returned metrics: ${tojson(metrics)}`);
     if (isLinux()) {
-        assert.gte(
-            metrics[name], 0, `${name} should be positive. Returned metrics: ${tojson(metrics)}`);
+        assert.gte(metrics[name], 0, `${name} should be positive. Returned metrics: ${tojson(metrics)}`);
         return;
     }
-    assert.lte(
-        metrics[name], 0, `${name} should be negative. Returned metrics: ${tojson(metrics)}`);
+    assert.lte(metrics[name], 0, `${name} should be negative. Returned metrics: ${tojson(metrics)}`);
 }
 
-function assertMetricsEqual(cursor, {
-    keysExamined,
-    docsExamined,
-    workingTimeMillis,
-    hasSortStage,
-    usedDisk,
-    fromMultiPlanner,
-    fromPlanCache,
-} = {}) {
+function assertMetricsEqual(
+    cursor,
+    {keysExamined, docsExamined, workingTimeMillis, hasSortStage, usedDisk, fromMultiPlanner, fromPlanCache} = {},
+) {
     assert(cursor.hasOwnProperty("metrics"), "cursor is missing metrics field");
     const metrics = cursor.metrics;
 
@@ -58,7 +51,7 @@ function assertMetricsEqual(cursor, {
 }
 
 {
-    const testDB = db.getSiblingDB('test');
+    const testDB = db.getSiblingDB("test");
     var coll = testDB[jsTestName()];
     coll.drop();
 
@@ -68,8 +61,7 @@ function assertMetricsEqual(cursor, {
 
     {
         // includeQueryStatsMetrics is false, no metrics should be included.
-        const result = testDB.runCommand(
-            {find: coll.getName(), filter: {a: 1}, includeQueryStatsMetrics: false});
+        const result = testDB.runCommand({find: coll.getName(), filter: {a: 1}, includeQueryStatsMetrics: false});
         assert.commandWorked(result);
         const cursor = result.cursor;
         assert(!cursor.hasOwnProperty("metrics"));
@@ -77,8 +69,7 @@ function assertMetricsEqual(cursor, {
 
     {
         // Basic find command with includeQueryStatsMetrics, metrics should appear.
-        const result = testDB.runCommand(
-            {find: coll.getName(), filter: {a: 1}, includeQueryStatsMetrics: true});
+        const result = testDB.runCommand({find: coll.getName(), filter: {a: 1}, includeQueryStatsMetrics: true});
         assert.commandWorked(result);
         const cursor = result.cursor;
         assertMetricsEqual(cursor, {
@@ -86,7 +77,7 @@ function assertMetricsEqual(cursor, {
             docsExamined: 5,
             hasSortStage: false,
             usedDisk: false,
-            fromMultiPlanner: false
+            fromMultiPlanner: false,
         });
     }
 
@@ -97,7 +88,7 @@ function assertMetricsEqual(cursor, {
         const result = testDB.runCommand({
             find: nonExistentCollection.getName(),
             filter: {a: 1},
-            includeQueryStatsMetrics: true
+            includeQueryStatsMetrics: true,
         });
         assert.commandWorked(result);
         const cursor = result.cursor;
@@ -108,7 +99,7 @@ function assertMetricsEqual(cursor, {
             hasSortStage: false,
             usedDisk: false,
             fromMultiPlanner: false,
-            fromPlanCache: false
+            fromPlanCache: false,
         });
     }
 
@@ -124,7 +115,7 @@ function assertMetricsEqual(cursor, {
             docsExamined: 5,
             hasSortStage: false,
             usedDisk: false,
-            fromMultiPlanner: false
+            fromMultiPlanner: false,
         });
     }
 
@@ -134,7 +125,7 @@ function assertMetricsEqual(cursor, {
             aggregate: coll.getName(),
             pipeline: [{$sort: {a: 1}}],
             cursor: {},
-            includeQueryStatsMetrics: false
+            includeQueryStatsMetrics: false,
         });
         assert.commandWorked(result);
         const cursor = result.cursor;
@@ -147,7 +138,7 @@ function assertMetricsEqual(cursor, {
             aggregate: coll.getName(),
             pipeline: [{$sort: {a: 1}}],
             cursor: {},
-            includeQueryStatsMetrics: true
+            includeQueryStatsMetrics: true,
         });
         assert.commandWorked(result);
         const cursor = result.cursor;
@@ -156,15 +147,14 @@ function assertMetricsEqual(cursor, {
             docsExamined: 5,
             hasSortStage: true,
             usedDisk: false,
-            fromMultiPlanner: false
+            fromMultiPlanner: false,
         });
     }
 
     {
         // GetMore command without metrics requested.
         const cursor = coll.find({}).batchSize(1);
-        const result = testDB.runCommand(
-            {getMore: cursor.getId(), collection: coll.getName(), batchSize: 100});
+        const result = testDB.runCommand({getMore: cursor.getId(), collection: coll.getName(), batchSize: 100});
         assert.commandWorked(result);
         assert(!result.cursor.hasOwnProperty("metrics"));
     }
@@ -176,7 +166,7 @@ function assertMetricsEqual(cursor, {
             getMore: findCursor.getId(),
             collection: coll.getName(),
             batchSize: 100,
-            includeQueryStatsMetrics: true
+            includeQueryStatsMetrics: true,
         });
         assert.commandWorked(result);
         const cursor = result.cursor;
@@ -185,30 +175,28 @@ function assertMetricsEqual(cursor, {
             docsExamined: 4,
             hasSortStage: false,
             usedDisk: false,
-            fromMultiPlanner: false
+            fromMultiPlanner: false,
         });
     }
 
     if (FeatureFlagUtil.isEnabled(testDB.getMongo(), "QueryStatsCountDistinct")) {
         {
             // Distinct command without metrics requested.
-            const result = testDB.runCommand(
-                {distinct: coll.getName(), key: "b", includeQueryStatsMetrics: false});
+            const result = testDB.runCommand({distinct: coll.getName(), key: "b", includeQueryStatsMetrics: false});
             assert.commandWorked(result);
             assert(!result.hasOwnProperty("metrics"));
         }
 
         {
             // Distinct command with metrics requested.
-            const result = testDB.runCommand(
-                {distinct: coll.getName(), key: "b", includeQueryStatsMetrics: true});
+            const result = testDB.runCommand({distinct: coll.getName(), key: "b", includeQueryStatsMetrics: true});
             assert.commandWorked(result);
             assertMetricsEqual(result, {
                 keysExamined: 0,
                 docsExamined: 5,
                 hasSortStage: false,
                 usedDisk: false,
-                fromMultiPlanner: false
+                fromMultiPlanner: false,
             });
         }
 
@@ -216,43 +204,39 @@ function assertMetricsEqual(cursor, {
             // Distinct command against a view - internally rewritten to an aggregate.
             var viewName = jsTestName() + "_distinct_view";
             assert.commandWorked(testDB.createView(viewName, coll.getName(), []));
-            const result =
-                testDB.runCommand({distinct: viewName, key: "b", includeQueryStatsMetrics: true});
+            const result = testDB.runCommand({distinct: viewName, key: "b", includeQueryStatsMetrics: true});
             assert.commandWorked(result);
             const spillParameter = testDB.adminCommand({
                 getParameter: 1,
                 internalQueryEnableAggressiveSpillsInGroup: 1,
             });
-            const aggressiveSpillsInGroup =
-                spillParameter["internalQueryEnableAggressiveSpillsInGroup"];
+            const aggressiveSpillsInGroup = spillParameter["internalQueryEnableAggressiveSpillsInGroup"];
             assertMetricsEqual(result, {
                 keysExamined: 0,
                 docsExamined: 5,
                 hasSortStage: false,
                 usedDisk: aggressiveSpillsInGroup,
-                fromMultiPlanner: false
+                fromMultiPlanner: false,
             });
         }
 
         {
             // includeQueryStatsMetrics is false, no metrics should be included.
-            const result = testDB.runCommand(
-                {count: coll.getName(), query: {a: 1}, includeQueryStatsMetrics: false});
+            const result = testDB.runCommand({count: coll.getName(), query: {a: 1}, includeQueryStatsMetrics: false});
             assert.commandWorked(result);
             assert(!result.hasOwnProperty("metrics"));
         }
 
         {
             // Basic count command with includeQueryStatsMetrics, metrics should appear.
-            const result = testDB.runCommand(
-                {count: coll.getName(), query: {a: 1}, includeQueryStatsMetrics: true});
+            const result = testDB.runCommand({count: coll.getName(), query: {a: 1}, includeQueryStatsMetrics: true});
             assert.commandWorked(result);
             assertMetricsEqual(result, {
                 keysExamined: 0,
                 docsExamined: 5,
                 hasSortStage: false,
                 usedDisk: false,
-                fromMultiPlanner: false
+                fromMultiPlanner: false,
             });
         }
 
@@ -264,7 +248,7 @@ function assertMetricsEqual(cursor, {
             const result = testDB.runCommand({
                 count: nonExistentCollection.getName(),
                 query: {a: 1},
-                includeQueryStatsMetrics: true
+                includeQueryStatsMetrics: true,
             });
             assert.commandWorked(result);
             assertMetricsEqual(result, {
@@ -273,7 +257,7 @@ function assertMetricsEqual(cursor, {
                 hasSortStage: false,
                 usedDisk: false,
                 fromMultiPlanner: false,
-                fromPlanCache: false
+                fromPlanCache: false,
             });
         }
     }

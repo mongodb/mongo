@@ -8,7 +8,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 
 const collName = "rank_fusion";
@@ -31,7 +31,7 @@ let matchStage = {
         number_of_reviews: {
             $gte: 25,
         },
-    }
+    },
 };
 
 let rankFusionWithoutSearchStage = {
@@ -39,8 +39,8 @@ let rankFusionWithoutSearchStage = {
         input: {
             pipelines: {
                 a: [{$sort: {_id: 1}}],
-            }
-        }
+            },
+        },
     },
 };
 
@@ -48,33 +48,37 @@ let rankFusionWithSearchStage = {
     $rankFusion: {
         input: {
             pipelines: {
-                vector: [{
-                    $vectorSearch: {
-                        // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
-                        queryVector: getMoviePlotEmbeddingById(6),
-                        path: "plot_embedding",
-                        numCandidates: limit * vectorSearchOverrequestFactor,
-                        index: getMovieVectorSearchIndexSpec().name,
-                        limit: limit,
-                    }
-                }],
+                vector: [
+                    {
+                        $vectorSearch: {
+                            // Get the embedding for 'Tarzan the Ape Man', which has _id = 6.
+                            queryVector: getMoviePlotEmbeddingById(6),
+                            path: "plot_embedding",
+                            numCandidates: limit * vectorSearchOverrequestFactor,
+                            index: getMovieVectorSearchIndexSpec().name,
+                            limit: limit,
+                        },
+                    },
+                ],
                 search: [
                     {
                         $search: {
                             index: getMovieSearchIndexSpec().name,
                             text: {query: "ape", path: ["fullplot", "title"]},
-                        }
+                        },
                     },
-                    {$limit: limit}
-                ]
-            }
-        }
+                    {$limit: limit},
+                ],
+            },
+        },
     },
 };
 
 function assertRankFusionMustBeFirstStageInPipeline(pipeline) {
-    assert.commandFailedWithCode(coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
-                                 RankFusionMustBeFirstStageOfPipelineErrCode);
+    assert.commandFailedWithCode(
+        coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}}),
+        RankFusionMustBeFirstStageOfPipelineErrCode,
+    );
 }
 
 // Simple case where a typical search-based $rankFusion is preceded by a filter (match stage).
@@ -91,7 +95,11 @@ assertRankFusionMustBeFirstStageInPipeline([matchStage, rankFusionWithoutSearchS
 // it must also not be any stage other than the first.
 // (i.e. if we have 2 different $rankFusion in a pipeline, even if one is the first,
 // the query still fails).
-assertRankFusionMustBeFirstStageInPipeline(
-    [rankFusionWithoutSearchStage, matchStage, rankFusionWithSearchStage, limitStage]);
+assertRankFusionMustBeFirstStageInPipeline([
+    rankFusionWithoutSearchStage,
+    matchStage,
+    rankFusionWithSearchStage,
+    limitStage,
+]);
 
 dropSearchIndex(coll, {name: getMovieSearchIndexSpec().name});

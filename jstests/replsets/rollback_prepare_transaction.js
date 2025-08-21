@@ -59,8 +59,7 @@ PrepareHelpers.commitTransaction(session1, prepareTs);
 assert.eq(6, testColl.count());
 
 // Check the visible documents.
-assert.sameMembers([{_id: "a"}, {_id: "b"}, {_id: "t2_a"}, {_id: "t2_b"}, {_id: "t2_c"}],
-                   testColl.find().toArray());
+assert.sameMembers([{_id: "a"}, {_id: "b"}, {_id: "t2_a"}, {_id: "t2_b"}, {_id: "t2_c"}], testColl.find().toArray());
 
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
@@ -81,21 +80,25 @@ let adminDB = rollbackTest.getPrimary().getDB("admin");
 
 // Since we rolled back the prepared transaction on session2, retrying the prepareTransaction
 // command on this session should fail with a NoSuchTransaction error.
-assert.commandFailedWithCode(adminDB.adminCommand({
-    prepareTransaction: 1,
-    lsid: session2.getSessionId(),
-    txnNumber: session2.getTxnNumber_forTesting(),
-    autocommit: false
-}),
-                             ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(
+    adminDB.adminCommand({
+        prepareTransaction: 1,
+        lsid: session2.getSessionId(),
+        txnNumber: session2.getTxnNumber_forTesting(),
+        autocommit: false,
+    }),
+    ErrorCodes.NoSuchTransaction,
+);
 
 // Allow the test to complete by aborting the left over prepared transaction.
 jsTestLog("Aborting the prepared transaction on session " + tojson(session1.getSessionId()));
-assert.commandWorked(adminDB.adminCommand({
-    abortTransaction: 1,
-    lsid: session1.getSessionId(),
-    txnNumber: session1.getTxnNumber_forTesting(),
-    autocommit: false
-}));
+assert.commandWorked(
+    adminDB.adminCommand({
+        abortTransaction: 1,
+        lsid: session1.getSessionId(),
+        txnNumber: session1.getTxnNumber_forTesting(),
+        autocommit: false,
+    }),
+);
 
 rollbackTest.stop();

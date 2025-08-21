@@ -44,23 +44,23 @@ if (storageEngine !== "wiredTiger") {
     rst.initiate(conf, "replSetInitiate", {
         doNotWaitForStableRecoveryTimestamp: true,
         doNotWaitForReplication: true,
-        doNotWaitForNewlyAddedRemovals: true
+        doNotWaitForNewlyAddedRemovals: true,
     });
-    var primary = rst.getPrimary();  // Waits for PRIMARY state.
+    var primary = rst.getPrimary(); // Waits for PRIMARY state.
 
     // The default WC is majority and we want the delayed secondary to fall behind in replication.
     // Retry to make sure the primary is done executing (but not necessarily replicating) the
     // reconfig.
-    assert.soonNoExcept(function() {
-        assert.commandWorked(primary.adminCommand(
-            {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: 1}}));
+    assert.soonNoExcept(function () {
+        assert.commandWorked(
+            primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: 1}}),
+        );
         return true;
     });
 
     // Reconfigure primary with a small cache size so less data needs to be
     // inserted to make the cache full while trying to trigger a stall.
-    assert.commandWorked(primary.adminCommand(
-        {setParameter: 1, "wiredTigerEngineRuntimeConfig": "cache_size=100MB"}));
+    assert.commandWorked(primary.adminCommand({setParameter: 1, "wiredTigerEngineRuntimeConfig": "cache_size=100MB"}));
 
     var coll = primary.getCollection("test.coll");
     var bigstr = "a".repeat(4000);

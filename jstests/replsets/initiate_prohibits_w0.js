@@ -8,14 +8,14 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var InvalidReplicaSetConfig = 93;
 
-var replTest = new ReplSetTest({name: 'prohibit_w0', nodes: 1});
+var replTest = new ReplSetTest({name: "prohibit_w0", nodes: 1});
 var nodes = replTest.nodeList();
 var conns = replTest.startSet();
 var admin = conns[0].getDB("admin");
 
 function testInitiate(gleDefaults) {
     var conf = replTest.getReplSetConfig();
-    jsTestLog('conf');
+    jsTestLog("conf");
     printjson(conf);
     conf.settings = gleDefaults;
 

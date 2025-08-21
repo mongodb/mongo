@@ -34,12 +34,12 @@ assert.eq(5, t.find().sort({x: 1}).itcount());
 const catalog = t.aggregate([{$listCatalog: {}}]).toArray();
 assert.eq(catalog[0].db, db.getName());
 assert.eq(catalog[0].name, t.getName());
-const sparseIndexInCatalog = catalog[0].md.indexes.find(i => i.spec.name === "x_1");
+const sparseIndexInCatalog = catalog[0].md.indexes.find((i) => i.spec.name === "x_1");
 assert(sparseIndexInCatalog, "Could not find x_1 index in: " + tojson(catalog[0].md.indexes));
 assert.eq(sparseIndexInCatalog.spec.sparse, nonBooleanValue);
 
 // Verify that getIndexes() converts the value to a boolean.
 const indexes = t.getIndexes();
-const sparseIndexInIndexes = indexes.find(i => i.name === "x_1");
+const sparseIndexInIndexes = indexes.find((i) => i.name === "x_1");
 assert(sparseIndexInIndexes, "Could not find x_1 index in: " + tojson(indexes));
 assert.eq(sparseIndexInIndexes.sparse, true);

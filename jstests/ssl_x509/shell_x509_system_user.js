@@ -4,11 +4,11 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const x509Options = {
-    clusterAuthMode: 'x509',
-    tlsMode: 'requireTLS',
-    tlsCertificateKeyFile: 'jstests/libs/server.pem',
-    tlsCAFile: 'jstests/libs/ca.pem',
-    tlsAllowInvalidCertificates: '',
+    clusterAuthMode: "x509",
+    tlsMode: "requireTLS",
+    tlsCertificateKeyFile: "jstests/libs/server.pem",
+    tlsCAFile: "jstests/libs/ca.pem",
+    tlsAllowInvalidCertificates: "",
 };
 
 const rst = new ReplSetTest({nodes: 1, nodeOptions: x509Options, waitForKeys: false});
@@ -19,16 +19,15 @@ rst.initiate();
 
 const primaryConnString = rst.getPrimary().host;
 
-const subShellCommands = async function() {
+const subShellCommands = async function () {
     TestData = {
-        authUser: 'C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=server',
-        authenticationDatabase: '$external',
-        keyFile: 'dummyKeyFile',
-        clusterAuthMode: 'x509',
-
+        authUser: "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel,CN=server",
+        authenticationDatabase: "$external",
+        keyFile: "dummyKeyFile",
+        clusterAuthMode: "x509",
     };
     // Explicitly check asCluster can succeed.
-    authutil.asCluster(db.getMongo(), 'dummyKeyFile', function() {
+    authutil.asCluster(db.getMongo(), "dummyKeyFile", function () {
         // No need to do anything here. We just need to check we don't error out in the
         // previous auth step.
     });
@@ -41,19 +40,19 @@ const subShellCommands = async function() {
 };
 
 const subShellArgs = [
-    'mongo',
-    '--ssl',
-    '--tlsCAFile=jstests/libs/ca.pem',
-    '--tlsCertificateKeyFile=jstests/libs/server.pem',
-    '--tlsAllowInvalidHostnames',
-    '--authenticationDatabase=$external',
-    '--authenticationMechanism=MONGODB-X509',
+    "mongo",
+    "--ssl",
+    "--tlsCAFile=jstests/libs/ca.pem",
+    "--tlsCertificateKeyFile=jstests/libs/server.pem",
+    "--tlsAllowInvalidHostnames",
+    "--authenticationDatabase=$external",
+    "--authenticationMechanism=MONGODB-X509",
     primaryConnString,
-    '--eval',
-    `(${subShellCommands.toString()})();`
+    "--eval",
+    `(${subShellCommands.toString()})();`,
 ];
 
 const retVal = _runMongoProgram(...subShellArgs);
-assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
+assert.eq(retVal, 0, "mongo shell did not succeed with exit code 0");
 
 rst.stopSet();

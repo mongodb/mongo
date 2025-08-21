@@ -15,8 +15,9 @@ replTest.initiate();
 let primary = replTest.getPrimary();
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "recover_multiple_prepared_transactions_startup";
@@ -40,8 +41,7 @@ assert.commandWorked(sessionColl2.insert({_id: 2}));
 jsTestLog("Disable snapshotting on all nodes");
 
 // Disable snapshotting so that future operations do not enter the majority snapshot.
-assert.commandWorked(
-    primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"}));
 
 session.startTransaction();
 assert.commandWorked(sessionColl.update({_id: 1}, {_id: 1, a: 1}));
@@ -89,19 +89,21 @@ assert.eq(testDB[collName].find({_id: 1}).toArray(), [{_id: 1}]);
 // Make sure that another write on the same document from the first transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand(
-        {update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    testDB.runCommand({update: collName, updates: [{q: {_id: 1}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Make sure that we cannot add other operations to the first transaction since it is prepared.
-assert.commandFailedWithCode(sessionDB.runCommand({
-    insert: collName,
-    documents: [{_id: 3}],
-    txnNumber: NumberLong(txnNumber),
-    stmtId: NumberInt(2),
-    autocommit: false
-}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB.runCommand({
+        insert: collName,
+        documents: [{_id: 3}],
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(2),
+        autocommit: false,
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Committing the first transaction");
 // Wait for the prepared transaction oplog entry to be majority committed before committing the
@@ -112,12 +114,14 @@ jsTestLog("Committing the first transaction");
 PrepareHelpers.awaitMajorityCommitted(replTest, prepareTimestamp);
 // Make sure we can successfully commit the first transaction after recovery.
 let commitTimestamp = Timestamp(prepareTimestamp.getTime(), prepareTimestamp.getInc() + 1);
-assert.commandWorked(sessionDB.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: commitTimestamp,
-    txnNumber: NumberLong(txnNumber),
-    autocommit: false
-}));
+assert.commandWorked(
+    sessionDB.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: commitTimestamp,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+    }),
+);
 
 // Force the second session to use the same lsid and txnNumber as from before the restart.
 // This ensures that we're working with the same session and transaction.
@@ -133,25 +137,28 @@ assert.eq(testDB[collName].find({_id: 2}).toArray(), [{_id: 2}]);
 // Make sure that another write on the same document from the second transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand(
-        {update: collName, updates: [{q: {_id: 2}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    testDB.runCommand({update: collName, updates: [{q: {_id: 2}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Make sure that we cannot add other operations to the second transaction since it is prepared.
-assert.commandFailedWithCode(sessionDB2.runCommand({
-    insert: collName,
-    documents: [{_id: 3}],
-    txnNumber: NumberLong(txnNumber2),
-    stmtId: NumberInt(2),
-    autocommit: false
-}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB2.runCommand({
+        insert: collName,
+        documents: [{_id: 3}],
+        txnNumber: NumberLong(txnNumber2),
+        stmtId: NumberInt(2),
+        autocommit: false,
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Aborting the second transaction");
 
 // Make sure we can successfully abort the second transaction after recovery.
-assert.commandWorked(sessionDB2.adminCommand(
-    {abortTransaction: 1, txnNumber: NumberLong(txnNumber2), autocommit: false}));
+assert.commandWorked(
+    sessionDB2.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber2), autocommit: false}),
+);
 
 jsTestLog("Attempting to run another transaction");
 

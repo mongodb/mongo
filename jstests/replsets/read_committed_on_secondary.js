@@ -14,7 +14,8 @@ function printStatus() {
         var self = status.members.filter((m) => m.self)[0];
         var msg = self.name + "\n";
         msg += tojson(status.optimes) + "\n";
-        if (self.state == 1) {  // Primary status.
+        if (self.state == 1) {
+            // Primary status.
             // List other members status from the primaries perspective
             msg += tojson(status.members.filter((m) => !m.self)) + "\n";
             msg += tojson(status.slaveInfo) + "\n";
@@ -36,8 +37,8 @@ var config = {
     "members": [
         {"_id": 0, "host": nodes[0]},
         {"_id": 1, "host": nodes[1], priority: 0},
-        {"_id": 2, "host": nodes[2], arbiterOnly: true}
-    ]
+        {"_id": 2, "host": nodes[2], arbiterOnly: true},
+    ],
 };
 
 replTest.initiate(config);
@@ -55,13 +56,15 @@ var collSecondary = dbSecondary[name];
 
 function saveDoc(state) {
     log("saving doc.");
-    var res = dbPrimary.runCommand(  //
+    var res = dbPrimary.runCommand(
+        //
         {
             update: name,
             writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS},
             updates: [{q: {_id: 1}, u: {_id: 1, state: state}, upsert: true}],
-            $replData: 1
-        });
+            $replData: 1,
+        },
+    );
     assert.commandWorked(res);
     assert.eq(res.writeErrors, undefined);
     log("done saving doc: optime " + tojson(res.$replData.lastOpVisible));
@@ -70,9 +73,9 @@ function saveDoc(state) {
 
 function doDirtyRead(lastOp) {
     log("doing dirty read for lastOp:" + tojson(lastOp));
-    var res = collSecondary.runCommand('find', {
+    var res = collSecondary.runCommand("find", {
         "readConcern": {"level": "local", "afterOpTime": lastOp},
-        "maxTimeMS": replTest.timeoutMS
+        "maxTimeMS": replTest.timeoutMS,
     });
     assert.commandWorked(res);
     log("done doing dirty read.");
@@ -81,9 +84,9 @@ function doDirtyRead(lastOp) {
 
 function doCommittedRead(lastOp) {
     log("doing committed read for optime: " + tojson(lastOp));
-    var res = collSecondary.runCommand('find', {
+    var res = collSecondary.runCommand("find", {
         "readConcern": {"level": "majority", "afterOpTime": lastOp},
-        "maxTimeMS": replTest.timeoutMS
+        "maxTimeMS": replTest.timeoutMS,
     });
     assert.commandWorked(res);
     log("done doing committed read.");
@@ -92,8 +95,9 @@ function doCommittedRead(lastOp) {
 
 // The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 replTest.awaitReplication();
 // Do a write, wait for it to replicate, and ensure it is visible.
 var op0 = saveDoc(0);
@@ -103,7 +107,7 @@ printStatus();
 assert.eq(doCommittedRead(op0), 0);
 
 // Disable snapshotting on the secondary.
-secondary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'});
+secondary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"});
 
 // Do a write and ensure it is only visible to dirty reads
 var op1 = saveDoc(1);
@@ -120,7 +124,7 @@ assert.eq(doCommittedRead(op0), 0);
 // new
 // state.
 log("turning off failpoint");
-secondary.adminCommand({configureFailPoint: 'disableSnapshotting', mode: 'off'});
+secondary.adminCommand({configureFailPoint: "disableSnapshotting", mode: "off"});
 // Do another write in order to update the committedSnapshot value.
 var op2 = saveDoc(2);
 assert.eq(doDirtyRead(op2), 2);

@@ -7,32 +7,32 @@ try {
     var commandsRan = [];
     var insertsRan = [];
     var mockMongo = {
-        getSecondaryOk: function() {
+        getSecondaryOk: function () {
             return true;
         },
-        runCommand: function(db, cmd, opts) {
+        runCommand: function (db, cmd, opts) {
             commandsRan.push({db: db, cmd: cmd, opts: opts});
             return {ok: 1.0};
         },
-        getWriteConcern: function() {
+        getWriteConcern: function () {
             return null;
         },
-        getMinWireVersion: function() {
+        getMinWireVersion: function () {
             return mongo.getMinWireVersion();
         },
-        getMaxWireVersion: function() {
+        getMaxWireVersion: function () {
             return mongo.getMaxWireVersion();
         },
-        isReplicaSetMember: function() {
+        isReplicaSetMember: function () {
             return mongo.isReplicaSetMember();
         },
-        isMongos: function() {
+        isMongos: function () {
             return mongo.isMongos();
         },
-        isCausalConsistency: function() {
+        isCausalConsistency: function () {
             return false;
         },
-        getClusterTime: function() {
+        getClusterTime: function () {
             return null;
         },
     };

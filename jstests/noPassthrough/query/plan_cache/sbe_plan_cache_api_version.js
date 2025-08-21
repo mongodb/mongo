@@ -14,7 +14,12 @@ coll.drop();
 const shouldGenerateSbePlan = checkSbeFullyEnabled(db);
 const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
 
-assert.commandWorked(coll.insert([{a: 1, b: 1}, {a: 2, b: 2}]));
+assert.commandWorked(
+    coll.insert([
+        {a: 1, b: 1},
+        {a: 2, b: 2},
+    ]),
+);
 
 // Runs the given pipeline with the specified options and returns its plan cache key.
 function runPipeline(pipeline, options, explainOptions = {}) {
@@ -33,22 +38,21 @@ function runPipeline(pipeline, options, explainOptions = {}) {
 
 // Runs the given 'pipeline' with the API version and returns its plan cache key.
 function runPipelineWithApiVersion(pipeline) {
-    const options = {apiVersion: '1'};
+    const options = {apiVersion: "1"};
     return runPipeline(pipeline, options, options);
 }
 
 // Runs the given 'pipeline' with the API version and 'apiStrict: true' and returns its plan cache
 // key.
 function runPipelineWithApiStrict(pipeline) {
-    const options = {apiVersion: '1', apiStrict: true};
+    const options = {apiVersion: "1", apiStrict: true};
     return runPipeline(pipeline, options, options);
 }
 
 // Asserts that a plan cache entry for the given 'cacheKey' exists in the plan cache and has
 // certain properties set as per provided 'properties' argument.
 function assertPlanCacheEntryExists(cacheKey, properties = {}) {
-    const entries =
-        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: cacheKey}}]).toArray();
+    const entries = coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: cacheKey}}]).toArray();
     assert.eq(entries.length, 1, entries);
     const entry = entries[0];
 
@@ -75,21 +79,21 @@ const sbeEngineTestcases = [
     {
         withApiVersion: {isActive: true, isPinned: true},
         withApiStrict: {isActive: true, isPinned: true},
-        indexSpecs: []
+        indexSpecs: [],
     },
     {
         withApiVersion: {isActive: true, isPinned: true},
         withApiStrict: {isActive: true, isPinned: true},
-        indexSpecs: [{keyPattern: {a: 1}, options: {name: "a_1"}}]
+        indexSpecs: [{keyPattern: {a: 1}, options: {name: "a_1"}}],
     },
     {
         withApiVersion: {isActive: false, isPinned: false},
         withApiStrict: {isActive: true, isPinned: true},
         indexSpecs: [
             {keyPattern: {a: 1}, options: {name: "a_1"}},
-            {keyPattern: {a: 1}, options: {name: "a_1_sparse", sparse: true}}
-        ]
-    }
+            {keyPattern: {a: 1}, options: {name: "a_1_sparse", sparse: true}},
+        ],
+    },
 ];
 
 const classicEngineTestcases = [
@@ -98,8 +102,8 @@ const classicEngineTestcases = [
         withApiStrict: {isActive: false},
         indexSpecs: [
             {keyPattern: {a: 1}, options: {name: "a_1"}},
-            {keyPattern: {b: 1}, options: {name: "b_1"}}
-        ]
+            {keyPattern: {b: 1}, options: {name: "b_1"}},
+        ],
     },
     {
         withApiVersion: {isActive: false},
@@ -107,9 +111,9 @@ const classicEngineTestcases = [
         indexSpecs: [
             {keyPattern: {a: 1}, options: {name: "a_1"}},
             {keyPattern: {a: 1}, options: {name: "a_1_sparse", sparse: true}},
-            {keyPattern: {b: 1}, options: {name: "b_1"}}
-        ]
-    }
+            {keyPattern: {b: 1}, options: {name: "b_1"}},
+        ],
+    },
 ];
 
 const testcases = isUsingSbePlanCache ? sbeEngineTestcases : classicEngineTestcases;

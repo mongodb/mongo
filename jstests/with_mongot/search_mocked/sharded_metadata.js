@@ -4,11 +4,9 @@
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mongotCommandForQuery,
-    mongotMultiCursorResponseForBatch
+    mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const collName = "internal_search_mongot_remote";
@@ -24,15 +22,14 @@ const stWithMock = new ShardingTestWithMongotMock({
     other: {
         rsOptions: nodeOptions,
         mongosOptions: nodeOptions,
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 function setupCollection(localName) {
     const testColl = testDB.getCollection(localName);
@@ -77,23 +74,29 @@ function setUpMerge(mergeType, localColl, isView) {
         {_id: 4, $searchScore: 1},
         {_id: 1, $searchScore: 0.99},
     ];
-    const mongot0Response =
-        mongotMultiCursorResponseForBatch(mongot0ResponseBatch,
-                                          NumberLong(0),
-                                          [{type: "a", val: 7}, {type: "b", val: 4}],
-                                          NumberLong(0),
-                                          collNS,
-                                          responseOk);
-    const history0 = [{
-        expectedCommand: mongotCommandForQuery({
-            query: mongotQuery,
-            collName: testColl.getName(),
-            db: dbName,
-            collectionUUID: collUUID,
-            protocolVersion: protocolVersion
-        }),
-        response: mongot0Response
-    }];
+    const mongot0Response = mongotMultiCursorResponseForBatch(
+        mongot0ResponseBatch,
+        NumberLong(0),
+        [
+            {type: "a", val: 7},
+            {type: "b", val: 4},
+        ],
+        NumberLong(0),
+        collNS,
+        responseOk,
+    );
+    const history0 = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: testColl.getName(),
+                db: dbName,
+                collectionUUID: collUUID,
+                protocolVersion: protocolVersion,
+            }),
+            response: mongot0Response,
+        },
+    ];
 
     const mongot1ResponseBatch = [
         {_id: 11, $searchScore: 111},
@@ -101,69 +104,80 @@ function setUpMerge(mergeType, localColl, isView) {
         {_id: 12, $searchScore: 29},
         {_id: 14, $searchScore: 28},
     ];
-    const mongot1Response =
-        mongotMultiCursorResponseForBatch(mongot1ResponseBatch,
-                                          NumberLong(0),
-                                          [{type: "a", val: 12}, {type: "b", val: 10}],
-                                          NumberLong(0),
-                                          collNS,
-                                          responseOk);
-    const history1 = [{
-        expectedCommand: mongotCommandForQuery({
-            query: mongotQuery,
-            collName: testColl.getName(),
-            db: dbName,
-            collectionUUID: collUUID,
-            protocolVersion: protocolVersion
-        }),
-        response: mongot1Response
-    }];
+    const mongot1Response = mongotMultiCursorResponseForBatch(
+        mongot1ResponseBatch,
+        NumberLong(0),
+        [
+            {type: "a", val: 12},
+            {type: "b", val: 10},
+        ],
+        NumberLong(0),
+        collNS,
+        responseOk,
+    );
+    const history1 = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: testColl.getName(),
+                db: dbName,
+                collectionUUID: collUUID,
+                protocolVersion: protocolVersion,
+            }),
+            response: mongot1Response,
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
     const s1Mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
     s0Mongot.setMockResponses(history0, cursorId, NumberLong(20));
     s1Mongot.setMockResponses(history1, cursorId, NumberLong(20));
 
-    const mergingPipelineHistory = [{
-        expectedCommand: {
-            planShardedSearch: testColl.getName(),
-            query: mongotQuery,
-            $db: dbName,
-            searchFeatures: {shardedSort: 1}
-        },
-        response: {
-            ok: 1,
-            protocolVersion: NumberInt(42),
-            metaPipeline: [
-                {
-                    "$group": {
-                        "_id": {
-                            "type": "$type",
+    const mergingPipelineHistory = [
+        {
+            expectedCommand: {
+                planShardedSearch: testColl.getName(),
+                query: mongotQuery,
+                $db: dbName,
+                searchFeatures: {shardedSort: 1},
+            },
+            response: {
+                ok: 1,
+                protocolVersion: NumberInt(42),
+                metaPipeline: [
+                    {
+                        "$group": {
+                            "_id": {
+                                "type": "$type",
+                            },
+                            "val": {
+                                "$sum": "$val",
+                            },
                         },
-                        "val": {
-                            "$sum": "$val",
-                        }
-                    }
-                },
-                {$project: {_id: 0, type: "$_id.type", count: "$val"}},
-                {$sort: {"type": 1}},
-                {
-                    "$group": {
-                        "_id": null,
-                        "arr": {
-                            $push: "$$ROOT",
-                        }
-                    }
-                }
-            ]
-        }
-    }];
+                    },
+                    {$project: {_id: 0, type: "$_id.type", count: "$val"}},
+                    {$sort: {"type": 1}},
+                    {
+                        "$group": {
+                            "_id": null,
+                            "arr": {
+                                $push: "$$ROOT",
+                            },
+                        },
+                    },
+                ],
+            },
+        },
+    ];
     const mongot = stWithMock.getMockConnectedToHost(stWithMock.st.s);
     mongot.setMockResponses(mergingPipelineHistory, 1);
     return pipeline;
 }
 
 function testMergeAtLocation(mergeType, localColl, isView) {
-    const metaDoc = [{type: "a", count: 19}, {type: "b", count: 14}];
+    const metaDoc = [
+        {type: "a", count: 19},
+        {type: "b", count: 14},
+    ];
     const expectedDocs = [
         {_id: 11, meta: metaDoc},
         {_id: 3, meta: metaDoc},
@@ -185,7 +199,8 @@ function testSearchMetaFailure(mergeType, localColl, isView) {
 
     assert.commandFailedWithCode(
         localColl.runCommand({aggregate: localColl.getName(), pipeline: pipeline, cursor: {}}),
-        6347902);
+        6347902,
+    );
 }
 
 function testMergeAtLocationSearchMeta(mergeType, localColl, isView) {
@@ -206,24 +221,30 @@ function testMergeAtLocationSearchMeta(mergeType, localColl, isView) {
         {_id: 4, $searchScore: 1},
         {_id: 1, $searchScore: 0.99},
     ];
-    const mongot0Response =
-        mongotMultiCursorResponseForBatch(mongot0ResponseBatch,
-                                          NumberLong(0),
-                                          [{type: "a", val: 7}, {type: "b", val: 4}],
-                                          NumberLong(0),
-                                          collNS,
-                                          responseOk);
-    const history0 = [{
-        expectedCommand: mongotCommandForQuery({
-            query: mongotQuery,
-            collName: testColl.getName(),
-            db: dbName,
-            collectionUUID: collUUID,
-            protocolVersion: protocolVersion,
-            optimizationFlags: {omitSearchDocumentResults: true}
-        }),
-        response: mongot0Response
-    }];
+    const mongot0Response = mongotMultiCursorResponseForBatch(
+        mongot0ResponseBatch,
+        NumberLong(0),
+        [
+            {type: "a", val: 7},
+            {type: "b", val: 4},
+        ],
+        NumberLong(0),
+        collNS,
+        responseOk,
+    );
+    const history0 = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: testColl.getName(),
+                db: dbName,
+                collectionUUID: collUUID,
+                protocolVersion: protocolVersion,
+                optimizationFlags: {omitSearchDocumentResults: true},
+            }),
+            response: mongot0Response,
+        },
+    ];
 
     const mongot1ResponseBatch = [
         {_id: 11, $searchScore: 111},
@@ -231,73 +252,84 @@ function testMergeAtLocationSearchMeta(mergeType, localColl, isView) {
         {_id: 12, $searchScore: 29},
         {_id: 14, $searchScore: 28},
     ];
-    const mongot1Response =
-        mongotMultiCursorResponseForBatch(mongot1ResponseBatch,
-                                          NumberLong(0),
-                                          [{type: "a", val: 12}, {type: "b", val: 10}],
-                                          NumberLong(0),
-                                          collNS,
-                                          responseOk);
-    const history1 = [{
-        expectedCommand: mongotCommandForQuery({
-            query: mongotQuery,
-            collName: testColl.getName(),
-            db: dbName,
-            collectionUUID: collUUID,
-            protocolVersion: protocolVersion,
-            optimizationFlags: {omitSearchDocumentResults: true}
-        }),
-        response: mongot1Response
-    }];
+    const mongot1Response = mongotMultiCursorResponseForBatch(
+        mongot1ResponseBatch,
+        NumberLong(0),
+        [
+            {type: "a", val: 12},
+            {type: "b", val: 10},
+        ],
+        NumberLong(0),
+        collNS,
+        responseOk,
+    );
+    const history1 = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: testColl.getName(),
+                db: dbName,
+                collectionUUID: collUUID,
+                protocolVersion: protocolVersion,
+                optimizationFlags: {omitSearchDocumentResults: true},
+            }),
+            response: mongot1Response,
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
     const s1Mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
     s0Mongot.setMockResponses(history0, cursorId, NumberLong(20));
     s1Mongot.setMockResponses(history1, cursorId, NumberLong(20));
 
-    const metaDoc = [{type: "a", count: 19}, {type: "b", count: 14}];
+    const metaDoc = [
+        {type: "a", count: 19},
+        {type: "b", count: 14},
+    ];
     const expectedDocs = [{arr: metaDoc}];
 
-    const mergingPipelineHistory = [{
-        expectedCommand: {
-            planShardedSearch: testColl.getName(),
-            query: mongotQuery,
-            $db: dbName,
-            searchFeatures: {shardedSort: 1}
-        },
-        response: {
-            ok: 1,
-            protocolVersion: NumberInt(42),
-            metaPipeline: [
-                {
-                    "$group": {
-                        "_id": {
-                            "type": "$type",
+    const mergingPipelineHistory = [
+        {
+            expectedCommand: {
+                planShardedSearch: testColl.getName(),
+                query: mongotQuery,
+                $db: dbName,
+                searchFeatures: {shardedSort: 1},
+            },
+            response: {
+                ok: 1,
+                protocolVersion: NumberInt(42),
+                metaPipeline: [
+                    {
+                        "$group": {
+                            "_id": {
+                                "type": "$type",
+                            },
+                            "val": {
+                                "$sum": "$val",
+                            },
                         },
-                        "val": {
-                            "$sum": "$val",
-                        }
-                    }
-                },
-                {$project: {_id: 0, type: "$_id.type", count: "$val"}},
-                {$sort: {"type": 1}},
-                {
-                    "$group": {
-                        "_id": null,
-                        "arr": {
-                            $push: "$$ROOT",
-                        }
-                    }
-                }
-            ]
-        }
-    }];
+                    },
+                    {$project: {_id: 0, type: "$_id.type", count: "$val"}},
+                    {$sort: {"type": 1}},
+                    {
+                        "$group": {
+                            "_id": null,
+                            "arr": {
+                                $push: "$$ROOT",
+                            },
+                        },
+                    },
+                ],
+            },
+        },
+    ];
     const mongot = stWithMock.getMockConnectedToHost(stWithMock.st.s);
     mongot.setMockResponses(mergingPipelineHistory, 1);
     assert.eq(localColl.aggregate(pipeline).toArray(), expectedDocs);
 }
 
 const owningShardMerge = {
-    "specificShard": st.shard0.shardName
+    "specificShard": st.shard0.shardName,
 };
 const routerMergeType = st.getMergeType(testDB);
 testMergeAtLocation(routerMergeType, testColl, false);
@@ -311,8 +343,7 @@ testMergeAtLocationSearchMeta(owningShardMerge, testColl, false);
 
 // Create a view that does not use $search. Verify that we can detect an invalid use of
 // $$SEARCH_META.
-assert.commandWorked(testDB.createView(
-    collName + "viewColl", testColl.getName(), [{$match: {_id: {$gt: -1000}}}], {}));
+assert.commandWorked(testDB.createView(collName + "viewColl", testColl.getName(), [{$match: {_id: {$gt: -1000}}}], {}));
 let viewColl = testDB.getCollection(collName + "viewColl");
 testSearchMetaFailure(routerMergeType, viewColl, true);
 testSearchMetaFailure("anyShard", viewColl, true);
@@ -321,8 +352,7 @@ testSearchMetaFailure("localOnly", viewColl, true);
 
 assert(viewColl.drop());
 
-assert.commandWorked(
-    testDB.createView(collName + "viewColl", testColl.getName(), [{$searchMeta: mongotQuery}], {}));
+assert.commandWorked(testDB.createView(collName + "viewColl", testColl.getName(), [{$searchMeta: mongotQuery}], {}));
 viewColl = testDB.getCollection(collName + "viewColl");
 testMergeAtLocationSearchMeta(routerMergeType, testColl, false);
 testMergeAtLocationSearchMeta("anyShard", viewColl, true);

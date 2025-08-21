@@ -5,7 +5,7 @@
 import {includesErrorCode} from "jstests/libs/error_code_utils.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {numIds: 10, docValue: "mydoc"};
 
     const states = {
@@ -37,8 +37,7 @@ export const $config = (function() {
                 let indexToUpdate = Math.floor(Math.random() * this.numIds);
                 let res;
                 try {
-                    res =
-                        db[collName].update({_id: indexToUpdate}, {$inc: {num: 1}}, {upsert: true});
+                    res = db[collName].update({_id: indexToUpdate}, {$inc: {num: 1}}, {upsert: true});
                     assert.commandWorked(res);
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
@@ -51,8 +50,7 @@ export const $config = (function() {
                             e["errorLabels"] = ["TransientTransactionError"];
                             throw e;
                         }
-                    } else if (e.code == ErrorCodes.QueryPlanKilled ||
-                               e.code == ErrorCodes.OperationFailed) {
+                    } else if (e.code == ErrorCodes.QueryPlanKilled || e.code == ErrorCodes.OperationFailed) {
                         // dropIndex can cause queries to throw if these queries
                         // yield.
                     } else {
@@ -73,7 +71,7 @@ export const $config = (function() {
                         findAndModify: collName,
                         query: {_id: indexToUpdate},
                         update: {$inc: {num: 1}},
-                        upsert: true
+                        upsert: true,
                     });
                     assert.commandWorked(res);
                 } catch (e) {
@@ -87,8 +85,10 @@ export const $config = (function() {
                             e["errorLabels"] = ["TransientTransactionError"];
                             throw e;
                         }
-                    } else if (TestData.runInsideTransaction &&
-                               includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
+                    } else if (
+                        TestData.runInsideTransaction &&
+                        includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)
+                    ) {
                         // Rethrow so the auto transaction retry logic will retry.
                         //
                         // With background config shard transitions, movePrimary may be called while
@@ -102,9 +102,10 @@ export const $config = (function() {
                             e.code,
                             [
                                 // dropIndex can cause queries to throw if these queries yield.
-                                ErrorCodes.QueryPlanKilled
+                                ErrorCodes.QueryPlanKilled,
                             ],
-                            'unexpected error code: ' + e.code + ': ' + e.message);
+                            "unexpected error code: " + e.code + ": " + e.message,
+                        );
                     }
                 }
             }
@@ -131,13 +132,11 @@ export const $config = (function() {
                     } else {
                         // dropIndex or collection drops can cause queries to throw if these queries
                         // yield.
-                        assert.contains(e.code,
-                                        [
-                                            ErrorCodes.NamespaceNotFound,
-                                            ErrorCodes.OperationFailed,
-                                            ErrorCodes.QueryPlanKilled,
-                                        ],
-                                        'unexpected error code: ' + e.code + ': ' + e.message);
+                        assert.contains(
+                            e.code,
+                            [ErrorCodes.NamespaceNotFound, ErrorCodes.OperationFailed, ErrorCodes.QueryPlanKilled],
+                            "unexpected error code: " + e.code + ": " + e.message,
+                        );
                     }
                 }
             }
@@ -157,8 +156,7 @@ export const $config = (function() {
                         e["errorLabels"] = ["TransientTransactionError"];
                         throw e;
                     }
-                } else if (TestData.runInsideTransaction &&
-                           includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
+                } else if (TestData.runInsideTransaction && includesErrorCode(e, ErrorCodes.MovePrimaryInProgress)) {
                     // Rethrow so the auto transaction retry logic will retry.
                     //
                     // With background config shard transitions, movePrimary may be called while
@@ -168,75 +166,77 @@ export const $config = (function() {
                     throw e;
                 } else {
                     // dropIndex can cause queries to throw if these queries yield.
-                    assert.contains(e.code,
-                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                    'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(
+                        e.code,
+                        [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                        "unexpected error code: " + e.code + ": " + e.message,
+                    );
                 }
             }
         },
 
         dropCollection: function dropCollection(db, collName) {
             db[collName].drop();
-        }
+        },
     };
 
     const transitions = {
         init: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            findAndModifyDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            dropCollection: 0.10,
+            insertDocs: 0.1,
+            updateDocs: 0.1,
+            findAndModifyDocs: 0.1,
+            readDocs: 0.1,
+            deleteDocs: 0.1,
+            dropCollection: 0.1,
         },
         insertDocs: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            findAndModifyDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            dropCollection: 0.30,
+            insertDocs: 0.1,
+            updateDocs: 0.1,
+            findAndModifyDocs: 0.1,
+            readDocs: 0.1,
+            deleteDocs: 0.1,
+            dropCollection: 0.3,
         },
         updateDocs: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            findAndModifyDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            dropCollection: 0.30,
+            insertDocs: 0.1,
+            updateDocs: 0.1,
+            findAndModifyDocs: 0.1,
+            readDocs: 0.1,
+            deleteDocs: 0.1,
+            dropCollection: 0.3,
         },
         findAndModifyDocs: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            findAndModifyDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            dropCollection: 0.30,
+            insertDocs: 0.1,
+            updateDocs: 0.1,
+            findAndModifyDocs: 0.1,
+            readDocs: 0.1,
+            deleteDocs: 0.1,
+            dropCollection: 0.3,
         },
         readDocs: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            findAndModifyDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            dropCollection: 0.30,
+            insertDocs: 0.1,
+            updateDocs: 0.1,
+            findAndModifyDocs: 0.1,
+            readDocs: 0.1,
+            deleteDocs: 0.1,
+            dropCollection: 0.3,
         },
         deleteDocs: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            findAndModifyDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            dropCollection: 0.30,
+            insertDocs: 0.1,
+            updateDocs: 0.1,
+            findAndModifyDocs: 0.1,
+            readDocs: 0.1,
+            deleteDocs: 0.1,
+            dropCollection: 0.3,
         },
         dropCollection: {
-            insertDocs: 0.10,
-            updateDocs: 0.10,
-            findAndModifyDocs: 0.10,
-            readDocs: 0.10,
-            deleteDocs: 0.10,
-            dropCollection: 0.10,
-        }
+            insertDocs: 0.1,
+            updateDocs: 0.1,
+            findAndModifyDocs: 0.1,
+            readDocs: 0.1,
+            deleteDocs: 0.1,
+            dropCollection: 0.1,
+        },
     };
 
     function setup(db, collName, cluster) {
@@ -251,7 +251,7 @@ export const $config = (function() {
     return {
         threadCount: 5,
         iterations: 20,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         setup: setup,

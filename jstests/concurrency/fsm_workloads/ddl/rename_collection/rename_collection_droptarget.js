@@ -9,16 +9,16 @@
  *   assumes_unsharded_collection,
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
-        prefix: 'rename_collection_droptarget'
+        prefix: "rename_collection_droptarget",
     };
 
-    var states = (function() {
+    var states = (function () {
         function uniqueCollectionName(prefix, tid, num) {
-            return prefix + tid + '_' + num;
+            return prefix + tid + "_" + num;
         }
 
         function insert(db, collName, numDocs) {
@@ -50,8 +50,7 @@ export const $config = (function() {
 
             // Verify that 'fromCollCount' documents exist in the "to" collection
             // after the rename occurs
-            var res =
-                db[this.fromCollName].renameCollection(this.toCollName, true /* dropTarget */);
+            var res = db[this.fromCollName].renameCollection(this.toCollName, true /* dropTarget */);
 
             // SERVER-57128: NamespaceNotFound is an acceptable error if the mongos retries
             // the rename after the coordinator has already fulfilled the original request

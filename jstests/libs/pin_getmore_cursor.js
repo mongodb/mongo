@@ -22,8 +22,15 @@
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
-export function withPinnedCursor(
-    {conn, sessionId, db, assertFunction, runGetMoreFunc, failPointName, assertEndCounts}) {
+export function withPinnedCursor({
+    conn,
+    sessionId,
+    db,
+    assertFunction,
+    runGetMoreFunc,
+    failPointName,
+    assertEndCounts,
+}) {
     // This test runs manual getMores using different connections, which will not inherit the
     // implicit session of the cursor establishing command.
     TestData.disableImplicitSessions = true;
@@ -43,16 +50,23 @@ export function withPinnedCursor(
         assert.neq(cursorId, NumberLong(0));
 
         // Enable the specified failpoint.
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
 
         // In a different shell pin the cursor by calling 'getMore' on it that would be blocked by
         // the failpoint.
-        cleanup =
-            startParallelShell(funWithArgs(function(runGetMoreFunc, collName, cursorId, sessionId) {
-                                   runGetMoreFunc(collName, cursorId, sessionId);
-                                   db.active_cursor_sentinel.insert({});
-                               }, runGetMoreFunc, coll.getName(), cursorId, sessionId), conn.port);
+        cleanup = startParallelShell(
+            funWithArgs(
+                function (runGetMoreFunc, collName, cursorId, sessionId) {
+                    runGetMoreFunc(collName, cursorId, sessionId);
+                    db.active_cursor_sentinel.insert({});
+                },
+                runGetMoreFunc,
+                coll.getName(),
+                cursorId,
+                sessionId,
+            ),
+            conn.port,
+        );
 
         // Wait until we know the failpoint has been reached.
         waitForCurOpByFailPointNoNS(db, failPointName, {}, {localOps: true, allUsers: true});
@@ -79,7 +93,8 @@ export function withPinnedCursor(
                 },
                 "Expected 0 pinned cursors, but have " + tojson(db.serverStatus().metrics.cursor),
                 10 /* num_attempts */,
-                500 /* intervalMS */);
+                500 /* intervalMS */,
+            );
         }
 
         // By now either getMore in the parallel shell has exhausted the cursor, or the cursor has

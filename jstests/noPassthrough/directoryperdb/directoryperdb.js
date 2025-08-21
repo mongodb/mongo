@@ -11,38 +11,38 @@ const baseDir = jsTestName();
 const dbpath = MongoRunner.dataPath + baseDir;
 const dbname = "foo";
 
-const isDirectoryPerDBSupported =
-    jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
+const isDirectoryPerDBSupported = jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
 
-const m = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', syncdelay: 1});
+const m = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: "", syncdelay: 1});
 
 if (!isDirectoryPerDBSupported) {
-    assert.isnull(m, 'storage engine without directoryperdb support should fail to start up');
+    assert.isnull(m, "storage engine without directoryperdb support should fail to start up");
     quit();
 } else {
-    assert(m, 'storage engine with directoryperdb support failed to start up');
+    assert(m, "storage engine with directoryperdb support failed to start up");
 }
 
-const getDir = function(dbName, dbDirPath) {
-    return listFiles(dbDirPath).filter(function(path) {
+const getDir = function (dbName, dbDirPath) {
+    return listFiles(dbDirPath).filter(function (path) {
         return path.name.endsWith(dbName);
     });
 };
 
-const checkDirExists = function(dbName, dbDirPath) {
+const checkDirExists = function (dbName, dbDirPath) {
     const files = getDir(dbName, dbDirPath);
-    assert.eq(1,
-              files.length,
-              "dbpath did not contain '" + dbName +
-                  "' directory when it should have: " + tojson(listFiles(dbDirPath)));
+    assert.eq(
+        1,
+        files.length,
+        "dbpath did not contain '" + dbName + "' directory when it should have: " + tojson(listFiles(dbDirPath)),
+    );
     assert.gt(listFiles(files[0].name).length, 0);
 };
 
-const checkDirRemoved = function(dbName, dbDirPath) {
+const checkDirRemoved = function (dbName, dbDirPath) {
     const pathsep = _isWindows() ? "\\" : "/";
     checkLog.containsJson(db.getMongo(), 4888200, {path: dbDirPath + pathsep + dbname});
     assert.soon(
-        function() {
+        function () {
             const files = getDir(dbName, dbDirPath);
             if (files.length == 0) {
                 return true;
@@ -50,9 +50,9 @@ const checkDirRemoved = function(dbName, dbDirPath) {
                 return false;
             }
         },
-        "dbpath contained '" + dbName +
-            "' directory when it should have been removed:" + tojson(listFiles(dbDirPath)),
-        20 * 1000);  // The periodic task to run data table cleanup runs once a second.
+        "dbpath contained '" + dbName + "' directory when it should have been removed:" + tojson(listFiles(dbDirPath)),
+        20 * 1000,
+    ); // The periodic task to run data table cleanup runs once a second.
 };
 
 const db = m.getDB(dbname);

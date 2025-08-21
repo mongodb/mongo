@@ -47,8 +47,9 @@ const resumeToken = change._id;
 
 // For whole-db streams, it is possible to resume at a point before a collection is dropped.
 assertDropCollection(testDB, collAgg.getName());
-assert.commandWorked(testDB.runCommand(
-    {aggregate: 1, pipeline: [{$changeStream: {resumeAfter: resumeToken}}], cursor: {}}));
+assert.commandWorked(
+    testDB.runCommand({aggregate: 1, pipeline: [{$changeStream: {resumeAfter: resumeToken}}], cursor: {}}),
+);
 
 // Test that invalidation entries for other databases are filtered out.
 const otherDB = testDB.getSiblingDB(jsTestName() + "other");
@@ -62,8 +63,7 @@ coll = assertDropAndRecreateCollection(testDB, collName);
 // Create the $changeStream. We set 'doNotModifyInPassthroughs' so that this test will not be
 // upconverted to a cluster-wide stream, which would return an entry for the dropped collection
 // in the other database.
-aggCursor = cst.startWatchingChanges(
-    {pipeline: [{$changeStream: {}}], collection: 1, doNotModifyInPassthroughs: true});
+aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1, doNotModifyInPassthroughs: true});
 
 // Drop the collection on the other database, this should *not* invalidate the change stream.
 assertDropCollection(otherDB, otherDBColl.getName());
@@ -85,11 +85,13 @@ if (!FixtureHelpers.isSharded(coll)) {
     assert.commandWorked(coll.renameCollection("renamed_coll"));
     cst.assertNextChangesEqual({
         cursor: aggCursor,
-        expectedChanges: [{
-            operationType: "rename",
-            ns: {db: testDB.getName(), coll: coll.getName()},
-            to: {db: testDB.getName(), coll: "renamed_coll"}
-        }]
+        expectedChanges: [
+            {
+                operationType: "rename",
+                ns: {db: testDB.getName(), coll: coll.getName()},
+                to: {db: testDB.getName(), coll: "renamed_coll"},
+            },
+        ],
     });
 
     // Repeat the test, this time using the 'dropTarget' option with an existing target
@@ -105,14 +107,14 @@ if (!FixtureHelpers.isSharded(coll)) {
                 operationType: "insert",
                 ns: {db: testDB.getName(), coll: collName},
                 documentKey: {_id: 0},
-                fullDocument: {_id: 0}
+                fullDocument: {_id: 0},
             },
             {
                 operationType: "rename",
                 ns: {db: testDB.getName(), coll: "renamed_coll"},
-                to: {db: testDB.getName(), coll: collName}
-            }
-        ]
+                to: {db: testDB.getName(), coll: collName},
+            },
+        ],
     });
 
     coll = testDB[collName];
@@ -125,19 +127,20 @@ if (!FixtureHelpers.isSharded(coll)) {
         // Create target collection to ensure the database exists.
         const collOtherDB = assertCreateCollection(otherDB, "test");
         assertDropCollection(otherDB, "test");
-        assert.commandWorked(testDB.adminCommand(
-            {renameCollection: coll.getFullName(), to: collOtherDB.getFullName()}));
+        assert.commandWorked(
+            testDB.adminCommand({renameCollection: coll.getFullName(), to: collOtherDB.getFullName()}),
+        );
         // Rename across databases drops the source collection after the collection is copied
         // over.
         cst.assertNextChangesEqual({
             cursor: aggCursor,
-            expectedChanges:
-                [{operationType: "drop", ns: {db: testDB.getName(), coll: coll.getName()}}]
+            expectedChanges: [{operationType: "drop", ns: {db: testDB.getName(), coll: coll.getName()}}],
         });
 
         // Test renaming a collection from a different database to the database being watched.
-        assert.commandWorked(testDB.adminCommand(
-            {renameCollection: collOtherDB.getFullName(), to: coll.getFullName()}));
+        assert.commandWorked(
+            testDB.adminCommand({renameCollection: collOtherDB.getFullName(), to: coll.getFullName()}),
+        );
         // Do not check the 'ns' field since it will contain the namespace of the temp
         // collection created when renaming a collection across databases.
         change = cst.getOneChange(aggCursor);
@@ -164,8 +167,7 @@ if (!FixtureHelpers.isSharded(coll)) {
     assertDropCollection(testDB, "renamed_coll");
     cst.assertNextChangesEqual({
         cursor: aggCursor,
-        expectedChanges:
-            [{operationType: "drop", ns: {db: testDB.getName(), coll: "renamed_coll"}}],
+        expectedChanges: [{operationType: "drop", ns: {db: testDB.getName(), coll: "renamed_coll"}}],
     });
 }
 
@@ -195,13 +197,14 @@ assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});
 // 'invalidate'.
 assert.commandWorked(testDB.dropDatabase());
 cst.assertDatabaseDrop({cursor: aggCursor, db: testDB});
-const invalidateEvent = cst.assertNextChangesEqual(
-    {cursor: aggCursor, expectedChanges: [{operationType: "invalidate"}]});
+const invalidateEvent = cst.assertNextChangesEqual({
+    cursor: aggCursor,
+    expectedChanges: [{operationType: "invalidate"}],
+});
 
 // Even after the 'invalidate' event has been filtered out, the cursor should hold the resume token
 // of the 'invalidate' event.
-const resumeStream =
-    testDB.watch([{$match: {operationType: "DummyOperationType"}}], {resumeAfter: change._id});
+const resumeStream = testDB.watch([{$match: {operationType: "DummyOperationType"}}], {resumeAfter: change._id});
 assert.soon(() => {
     assert(!resumeStream.hasNext());
     return resumeStream.isExhausted();

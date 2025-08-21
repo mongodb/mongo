@@ -35,9 +35,9 @@ assert.eq(typeof myfunc2, "undefined", "Checking that myfunc2() is undefined");
 // Insert a function in the context of this process: make sure it's in the collection
 systemJsColl.insert({
     _id: "myfunc",
-    "value": function() {
+    "value": function () {
         return "myfunc";
-    }
+    },
 });
 systemJsColl.insert({_id: "mystring", "value": "var root = this;"});
 systemJsColl.insert({_id: "changeme", "value": false});
@@ -60,9 +60,10 @@ x = myfunc();
 assert.eq(x, "myfunc", "Checking that myfunc() returns the correct value");
 
 // Insert value into collection from another process
-var coproc =
-    startParallelShell('db.getSiblingDB("loadserverscripts").getCollection("system.js").insert' +
-                       '    ( {_id: "myfunc2", "value": function(){ return "myfunc2"; } } );');
+var coproc = startParallelShell(
+    'db.getSiblingDB("loadserverscripts").getCollection("system.js").insert' +
+        '    ( {_id: "myfunc2", "value": function(){ return "myfunc2"; } } );',
+);
 // wait for results
 coproc();
 

@@ -26,10 +26,10 @@ function getMillis() {
 function runtimeMillis(f) {
     var start = getMillis();
     f();
-    return (getMillis() - start);
+    return getMillis() - start;
 }
 function isError(res) {
-    return !res.hasOwnProperty('ok') || !res['ok'];
+    return !res.hasOwnProperty("ok") || !res["ok"];
 }
 
 class MultiController {
@@ -78,9 +78,9 @@ function initDb(numSamples, splitPoint) {
     // Use ranged sharding with a specified fraction of the data on the second shard.
     st.shardColl(
         coll,
-        {_id: 1},              // shard key
-        {_id: splitPoint},     // split point
-        {_id: splitPoint + 1}  // move the chunk to the other shard
+        {_id: 1}, // shard key
+        {_id: splitPoint}, // split point
+        {_id: splitPoint + 1}, // move the chunk to the other shard
     );
 
     let bulk = coll.initializeUnorderedBulkOp();
@@ -108,14 +108,14 @@ function runQueryWithTimeout(doAllowPartialResults, timeout) {
         filter: {$where: whereCode()},
         allowPartialResults: doAllowPartialResults,
         batchSize: nDocs,
-        maxTimeMS: timeout
+        maxTimeMS: timeout,
     });
 }
 
 const neverTimeout = new MultiController([
     new NeverTimeoutController(st.shard0),
     new NeverTimeoutController(st.shard1),
-    new NeverTimeoutController(st.s)
+    new NeverTimeoutController(st.s),
 ]);
 
 // Set ampleTimeMS to at least 2000ms, plus ten times the basic query runtime.
@@ -144,13 +144,15 @@ function runQuery(doAllowPartialResults) {
 function getMoreMongosTimeout(allowPartialResults, batchSize) {
     // Get the first batch.  Disable MaxTimeMSExpired during the intial find.
     neverTimeout.enable();
-    const res = assert.commandWorked(coll.runCommand({
-        find: collName,
-        filter: {$where: whereCode()},
-        allowPartialResults: allowPartialResults,
-        batchSize: batchSize,
-        maxTimeMS: ampleTimeMS
-    }));
+    const res = assert.commandWorked(
+        coll.runCommand({
+            find: collName,
+            filter: {$where: whereCode()},
+            allowPartialResults: allowPartialResults,
+            batchSize: batchSize,
+            maxTimeMS: ampleTimeMS,
+        }),
+    );
     neverTimeout.disable();
     assert(!res.cursor.hasOwnProperty("partialResultsReturned"));
     assert.gt(res.cursor.id, 0);
@@ -159,21 +161,22 @@ function getMoreMongosTimeout(allowPartialResults, batchSize) {
 
     // Run getmores repeatedly until we exhaust the cache on mongos.
     // Eventually we should get either a MaxTimeMS error or partial results because a shard is down.
-    let numReturned = batchSize;  // One batch was returned so far.
+    let numReturned = batchSize; // One batch was returned so far.
     while (true) {
-        const res2 =
-            coll.runCommand({getMore: res.cursor.id, collection: collName, batchSize: batchSize});
+        const res2 = coll.runCommand({getMore: res.cursor.id, collection: collName, batchSize: batchSize});
         if (isError(res2)) {
             assert.commandFailedWithCode(
-                res2, ErrorCodes.MaxTimeMSExpired, "failure should be due to MaxTimeMSExpired");
+                res2,
+                ErrorCodes.MaxTimeMSExpired,
+                "failure should be due to MaxTimeMSExpired",
+            );
             break;
         }
         // Results were cached from the first request. As long as GetMore is not called, these
         // are returned even if MaxTimeMS expired on mongos.
         numReturned += res2.cursor.nextBatch.length;
         print(numReturned + " docs returned so far");
-        assert.neq(
-            numReturned, nDocs, "Got full results even through mongos had MaxTimeMSExpired.");
+        assert.neq(numReturned, nDocs, "Got full results even through mongos had MaxTimeMSExpired.");
         if (res2.cursor.partialResultsReturned) {
             assert(allowPartialResults);
             assert.lt(numReturned, nDocs);
@@ -205,9 +208,9 @@ function withEachValueOfAllowPartialResults(callback) {
     callback(false);
 }
 
-withEachValueOfAllowPartialResults(
-    allowPartialResults =>
-        withEachBatchSize(batchSize => getMoreMongosTimeout(allowPartialResults, batchSize)));
+withEachValueOfAllowPartialResults((allowPartialResults) =>
+    withEachBatchSize((batchSize) => getMoreMongosTimeout(allowPartialResults, batchSize)),
+);
 
 // Test shard timeouts.  These are the scenario that we expect to be likely in practice.
 // Test using 3 different types of simulated timeouts, giving slightly different execution paths.
@@ -257,7 +260,7 @@ class FindWhereSleepController {
     enable() {
         // Add a $where expression to find command that sleeps when processing a document on the
         // shard of interest.
-        let slowDocId = (this.shard == st.shard0) ? 0 : splitPoint;
+        let slowDocId = this.shard == st.shard0 ? 0 : splitPoint;
         // Offset the slowDocId by at least the getMore batch size so that when testing getMore,
         // we quickly return enough documents to serve the first batch without timing out.
         slowDocId += Math.max(...batchSizesForGetMore);
@@ -311,36 +314,40 @@ function getMoreShardTimeout(allowPartialResults, failureController, batchSize) 
     // on the initial find.  However, to be safe, set failpoints to ensure that MaxTimeMS is
     // ignored for the initial find, to avoid failing in cases of resource contention (BF-26792).
     neverTimeout.enable();
-    const res = assert.commandWorked(coll.runCommand({
-        find: collName,
-        filter: {$where: whereCode()},
-        // FindWhereSleepController only works with getMore if docs are _id-ordered.  We use a hint
-        // instead of sort here because we want to avoid blocking on missing docs -- we want the
-        // AsyncResultsMerger to return results from the live shard while the other is failing.
-        hint: {_id: 1},
-        allowPartialResults: allowPartialResults,
-        batchSize: batchSize,
-        maxTimeMS: ampleTimeMS
-    }));
+    const res = assert.commandWorked(
+        coll.runCommand({
+            find: collName,
+            filter: {$where: whereCode()},
+            // FindWhereSleepController only works with getMore if docs are _id-ordered.  We use a hint
+            // instead of sort here because we want to avoid blocking on missing docs -- we want the
+            // AsyncResultsMerger to return results from the live shard while the other is failing.
+            hint: {_id: 1},
+            allowPartialResults: allowPartialResults,
+            batchSize: batchSize,
+            maxTimeMS: ampleTimeMS,
+        }),
+    );
     neverTimeout.disable();
     assert.eq(undefined, res.cursor.partialResultsReturned);
     assert.gt(res.cursor.id, 0);
 
     // Stop a shard and run getMore.
     failureController.enable();
-    let numReturned = batchSize;  // One batch was returned so far.
+    let numReturned = batchSize; // One batch was returned so far.
     print(numReturned + " docs returned in the first batch");
     while (true) {
         // Run getmores repeatedly until we exhaust the cache on mongos.
         // Eventually we should get partial results or an error because a shard is down.
-        const res2 =
-            coll.runCommand({getMore: res.cursor.id, collection: collName, batchSize: batchSize});
+        const res2 = coll.runCommand({getMore: res.cursor.id, collection: collName, batchSize: batchSize});
         if (allowPartialResults) {
             assert.commandWorked(res2);
         } else {
             if (isError(res2)) {
                 assert.commandFailedWithCode(
-                    res2, ErrorCodes.MaxTimeMSExpired, "failure should be due to MaxTimeMSExpired");
+                    res2,
+                    ErrorCodes.MaxTimeMSExpired,
+                    "failure should be due to MaxTimeMSExpired",
+                );
                 break;
             }
         }
@@ -359,10 +366,11 @@ function getMoreShardTimeout(allowPartialResults, failureController, batchSize) 
     failureController.disable();
 }
 shard0SleepFailure.enable();
-withEachValueOfAllowPartialResults(
-    allowPartialResults => withEachBatchSize(
-        batchSize => withEachSingleShardFailure(
-            failure => getMoreShardTimeout(allowPartialResults, failure, batchSize))));
+withEachValueOfAllowPartialResults((allowPartialResults) =>
+    withEachBatchSize((batchSize) =>
+        withEachSingleShardFailure((failure) => getMoreShardTimeout(allowPartialResults, failure, batchSize)),
+    ),
+);
 
 // With 'allowPartialResults: true', if a shard times out on the first batch then return
 // partial results.

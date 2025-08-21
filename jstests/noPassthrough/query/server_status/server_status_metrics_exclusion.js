@@ -20,17 +20,15 @@ assert(!serverStatusMetrics.document.hasOwnProperty("deleted"));
 assert(serverStatusMetrics.document.hasOwnProperty("inserted"));
 
 // Exclude the "document.deleted" and "document.inserted" fields.
-serverStatusMetrics =
-    db.serverStatus({metrics: {document: {deleted: false, inserted: false}}}).metrics;
+serverStatusMetrics = db.serverStatus({metrics: {document: {deleted: false, inserted: false}}}).metrics;
 
 assert(!serverStatusMetrics.document.hasOwnProperty("deleted"));
 assert(!serverStatusMetrics.document.hasOwnProperty("inserted"));
 
 // Exclude the "document.deleted" and "dotsAndDollarsFields.inserts" fields.
-serverStatusMetrics =
-    db.serverStatus({
-          metrics: {document: {deleted: false}, dotsAndDollarsFields: {inserts: false}}
-      }).metrics;
+serverStatusMetrics = db.serverStatus({
+    metrics: {document: {deleted: false}, dotsAndDollarsFields: {inserts: false}},
+}).metrics;
 
 assert(!serverStatusMetrics.document.hasOwnProperty("deleted"));
 assert(!serverStatusMetrics.dotsAndDollarsFields.hasOwnProperty("inserts"));
@@ -42,18 +40,19 @@ assert(serverStatusMetrics.document.hasOwnProperty("deleted"));
 assert(serverStatusMetrics.document.hasOwnProperty("inserted"));
 
 // Attempt a non-boolean values which should be rejected (uassert).
-assert.commandFailedWithCode(db.serverStatus({metrics: {document: "Non-boolean"}}),
-                             [ErrorCodes.InvalidBSONType]);
+assert.commandFailedWithCode(db.serverStatus({metrics: {document: "Non-boolean"}}), [ErrorCodes.InvalidBSONType]);
 
-assert.commandFailedWithCode(db.serverStatus({metrics: {document: {deleted: "Non-boolean"}}}),
-                             [ErrorCodes.InvalidBSONType]);
+assert.commandFailedWithCode(db.serverStatus({metrics: {document: {deleted: "Non-boolean"}}}), [
+    ErrorCodes.InvalidBSONType,
+]);
 
-assert.commandFailedWithCode(db.serverStatus({metrics: {document: {deleted: ["Non-boolean"]}}}),
-                             [ErrorCodes.InvalidBSONType]);
+assert.commandFailedWithCode(db.serverStatus({metrics: {document: {deleted: ["Non-boolean"]}}}), [
+    ErrorCodes.InvalidBSONType,
+]);
 
-assert.commandFailedWithCode(
-    db.serverStatus({metrics: {document: {deleted: {invalidObjectAtLeftLevel: 1}}}}),
-    [ErrorCodes.InvalidBSONType]);
+assert.commandFailedWithCode(db.serverStatus({metrics: {document: {deleted: {invalidObjectAtLeftLevel: 1}}}}), [
+    ErrorCodes.InvalidBSONType,
+]);
 
 // Exclude the "document" subtree.
 serverStatusMetrics = db.serverStatus({metrics: {document: false}}).metrics;

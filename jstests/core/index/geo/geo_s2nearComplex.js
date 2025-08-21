@@ -26,8 +26,8 @@ let origin = {name: "origin", geo: originGeo};
  */
 function coordinateEqual(first, second, threshold) {
     threshold = threshold || 0.001;
-    first = first['geo']['coordinates'];
-    second = second['geo']['coordinates'];
+    first = first["geo"]["coordinates"];
+    second = second["geo"]["coordinates"];
     if (Math.abs(first[0] - second[0]) <= threshold) {
         if (Math.abs(first[1] - second[1]) <= threshold) {
             return true;
@@ -45,42 +45,37 @@ function coordinateEqual(first, second, threshold) {
  */
 function uniformPoints(origin, count, minDist, maxDist) {
     var i;
-    var lng = origin['geo']['coordinates'][0];
-    var lat = origin['geo']['coordinates'][1];
+    var lng = origin["geo"]["coordinates"][0];
+    var lat = origin["geo"]["coordinates"][1];
     var distances = [];
     var points = [];
     for (i = 0; i < count; i++) {
-        distances.push((random() * (maxDist - minDist)) + minDist);
+        distances.push(random() * (maxDist - minDist) + minDist);
     }
     distances.sort();
     while (points.length < count) {
         var angle = random() * 2 * PI;
         var distance = distances[points.length];
-        var pointLat = asin((sin(lat) * cos(distance)) + (cos(lat) * sin(distance) * cos(angle)));
-        var pointDLng =
-            atan2(sin(angle) * sin(distance) * cos(lat), cos(distance) - sin(lat) * sin(pointLat));
-        var pointLng = ((lng - pointDLng + PI) % 2 * PI) - PI;
+        var pointLat = asin(sin(lat) * cos(distance) + cos(lat) * sin(distance) * cos(angle));
+        var pointDLng = atan2(sin(angle) * sin(distance) * cos(lat), cos(distance) - sin(lat) * sin(pointLat));
+        var pointLng = ((lng - pointDLng + PI) % 2) * PI - PI;
 
         // Latitude must be [-90, 90]
         var newLat = lat + pointLat;
-        if (newLat > 90)
-            newLat -= 180;
-        if (newLat < -90)
-            newLat += 180;
+        if (newLat > 90) newLat -= 180;
+        if (newLat < -90) newLat += 180;
 
         // Longitude must be [-180, 180]
         var newLng = lng + pointLng;
-        if (newLng > 180)
-            newLng -= 360;
-        if (newLng < -180)
-            newLng += 360;
+        if (newLng > 180) newLng -= 360;
+        if (newLng < -180) newLng += 360;
 
         var newPoint = {
             geo: {
                 type: "Point",
                 // coordinates: [lng + pointLng, lat + pointLat]
-                coordinates: [newLng, newLat]
-            }
+                coordinates: [newLng, newLat],
+            },
         };
 
         points.push(newPoint);
@@ -111,12 +106,20 @@ function uniformPointsWithGaps(origin, count, minDist, maxDist, numberOfHoles, s
  * covers as a fraction of the full area that points are created on.  Defaults to 10.
  */
 function uniformPointsWithClusters(
-    origin, count, minDist, maxDist, numberOfClusters, minClusterSize, maxClusterSize, distRatio) {
+    origin,
+    count,
+    minDist,
+    maxDist,
+    numberOfClusters,
+    minClusterSize,
+    maxClusterSize,
+    distRatio,
+) {
     distRatio = distRatio || 10;
     var points = uniformPoints(origin, count, minDist, maxDist);
     for (let j = 0; j < numberOfClusters; j++) {
         var randomPoint = points[Math.floor(random() * points.length)];
-        var clusterSize = (random() * (maxClusterSize - minClusterSize)) + minClusterSize;
+        var clusterSize = random() * (maxClusterSize - minClusterSize) + minClusterSize;
         uniformPoints(randomPoint, clusterSize, minDist / distRatio, maxDist / distRatio);
     }
 }
@@ -125,11 +128,11 @@ function uniformPointsWithClusters(
  * geo objects to the specified `point`.
  */
 function removeNearest(point, number) {
-    var pointsToRemove = t.find({geo: {$geoNear: {$geometry: point['geo']}}}).limit(number);
+    var pointsToRemove = t.find({geo: {$geoNear: {$geometry: point["geo"]}}}).limit(number);
     var idsToRemove = [];
     while (pointsToRemove.hasNext()) {
         point = pointsToRemove.next();
-        idsToRemove.push(point['_id']);
+        idsToRemove.push(point["_id"]);
     }
 
     t.remove({_id: {$in: idsToRemove}});
@@ -207,20 +210,18 @@ t.createIndex({geo: "2dsphere"});
 // Center point near pole.
 originGeo = {
     type: "Point",
-    coordinates: [0.0, 89.0]
+    coordinates: [0.0, 89.0],
 };
 origin = {
     name: "origin",
-    geo: originGeo
+    geo: originGeo,
 };
 uniformPoints(origin, 50, 0.5, 1.5);
 
 validateOrdering({geo: {$geoNear: {$geometry: originGeo}}});
 
 print("Millis for uniform near pole:");
-print(t.find({geo: {$geoNear: {$geometry: originGeo}}})
-          .explain("executionStats")
-          .executionStats.executionTimeMillis);
+print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats.executionTimeMillis);
 assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).itcount(), 50);
 
 t.drop();
@@ -229,20 +230,18 @@ t.createIndex({geo: "2dsphere"});
 // Center point near the meridian
 originGeo = {
     type: "Point",
-    coordinates: [179.0, 0.0]
+    coordinates: [179.0, 0.0],
 };
 origin = {
     name: "origin",
-    geo: originGeo
+    geo: originGeo,
 };
 uniformPoints(origin, 50, 0.5, 1.5);
 
 validateOrdering({geo: {$geoNear: {$geometry: originGeo}}});
 
 print("Millis for uniform on meridian:");
-print(t.find({geo: {$geoNear: {$geometry: originGeo}}})
-          .explain("executionStats")
-          .executionStats.executionTimeMillis);
+print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats.executionTimeMillis);
 assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).itcount(), 50);
 
 t.drop();
@@ -251,20 +250,18 @@ t.createIndex({geo: "2dsphere"});
 // Center point near the negative meridian
 originGeo = {
     type: "Point",
-    coordinates: [-179.0, 0.0]
+    coordinates: [-179.0, 0.0],
 };
 origin = {
     name: "origin",
-    geo: originGeo
+    geo: originGeo,
 };
 uniformPoints(origin, 50, 0.5, 1.5);
 
 validateOrdering({geo: {$near: {$geometry: originGeo}}});
 
 print("Millis for uniform on negative meridian:");
-print(t.find({geo: {$geoNear: {$geometry: originGeo}}})
-          .explain("executionStats")
-          .executionStats.executionTimeMillis);
+print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats.executionTimeMillis);
 assert.eq(t.find({geo: {$near: {$geometry: originGeo}}}).itcount(), 50);
 
 // Near search with points that are really far away.
@@ -272,11 +269,11 @@ t.drop();
 t.createIndex({geo: "2dsphere"});
 originGeo = {
     type: "Point",
-    coordinates: [0.0, 0.0]
+    coordinates: [0.0, 0.0],
 };
 origin = {
     name: "origin",
-    geo: originGeo
+    geo: originGeo,
 };
 
 uniformPoints(origin, 10, 89, 90);
@@ -287,8 +284,6 @@ assert.eq(cur.itcount(), 10);
 cur = t.find({geo: {$near: {$geometry: originGeo}}});
 
 print("Near search on very distant points:");
-print(t.find({geo: {$geoNear: {$geometry: originGeo}}})
-          .explain("executionStats")
-          .executionStats.executionTimeMillis);
+print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain("executionStats").executionStats.executionTimeMillis);
 let pt = cur.next();
 assert(pt);

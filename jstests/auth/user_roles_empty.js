@@ -31,8 +31,7 @@ db.logout();
 
 // Create and authenticate a user that does have roles. Here, we want to test that $$USER_ROLES
 // provides the correct value in the case where mongod was started with auth disbaled.
-assert.commandWorked(
-    db.runCommand({createUser: "user2", pwd: "pwd", roles: [{role: "read", db: dbName}]}));
+assert.commandWorked(db.runCommand({createUser: "user2", pwd: "pwd", roles: [{role: "read", db: dbName}]}));
 db.auth("user2", "pwd");
 
 result = db.coll.findOne({}, {myRoles: "$$USER_ROLES"});

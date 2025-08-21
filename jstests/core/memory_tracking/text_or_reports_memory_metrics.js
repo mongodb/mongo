@@ -22,28 +22,9 @@ db.dropDatabase();
 const coll = db[jsTestName()];
 
 // Set up.
-const words1 = [
-    "red",
-    "orange",
-    "yellow",
-    "green",
-    "blue",
-    "purple",
-];
-const words2 = [
-    "tea",
-    "coffee",
-    "soda",
-    "water",
-    "juice",
-    "fresh",
-];
-const words3 = [
-    "drink",
-    "beverage",
-    "refreshment",
-    "hydration",
-];
+const words1 = ["red", "orange", "yellow", "green", "blue", "purple"];
+const words2 = ["tea", "coffee", "soda", "water", "juice", "fresh"];
+const words3 = ["drink", "beverage", "refreshment", "hydration"];
 
 function insertData(coll, padding = "") {
     const docs = [];
@@ -51,8 +32,7 @@ function insertData(coll, padding = "") {
     for (let word1 of words1) {
         for (let word2 of words2) {
             for (let word3 of words3) {
-                docs.push(
-                    {desc: word1 + " " + word2 + " " + word3, price: price, padding: padding});
+                docs.push({desc: word1 + " " + word2 + " " + word3, price: price, padding: padding});
                 price = (price + 2) % 7;
             }
         }
@@ -90,8 +70,7 @@ const predicate = {
 }
 
 {
-    const pipelineWithLimit =
-        [{$match: predicate}, {$project: {score: {$meta: "textScore"}}}, {$limit: 2}];
+    const pipelineWithLimit = [{$match: predicate}, {$project: {score: {$meta: "textScore"}}}, {$limit: 2}];
     jsTest.log.info("Running pipeline " + tojson(pipelineWithLimit));
 
     runMemoryStatsTest({
@@ -116,12 +95,10 @@ const predicate = {
     jsTest.log.info("Running pipeline where we spill: " + tojson(pipeline));
 
     // Set a low memory limit to force spilling to disk.
-    const originalMemoryLimit =
-        assert
-            .commandWorked(db.adminCommand({getParameter: 1, internalTextOrStageMaxMemoryBytes: 1}))
-            .internalTextOrStageMaxMemoryBytes;
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalTextOrStageMaxMemoryBytes: 100}));
+    const originalMemoryLimit = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalTextOrStageMaxMemoryBytes: 1}),
+    ).internalTextOrStageMaxMemoryBytes;
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalTextOrStageMaxMemoryBytes: 100}));
 
     runMemoryStatsTest({
         db: db,
@@ -131,15 +108,14 @@ const predicate = {
             pipeline: pipeline,
             cursor: {batchSize: 20},
             comment: "memory stats textOr with spilling test",
-            allowDiskUse: true
+            allowDiskUse: true,
         },
         stageName: "TEXT_OR",
         expectedNumGetMores: 2,
         skipInUseTrackedMemBytesCheck: true,
     });
 
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalTextOrStageMaxMemoryBytes: originalMemoryLimit}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalTextOrStageMaxMemoryBytes: originalMemoryLimit}));
 }
 
 // Clean up.

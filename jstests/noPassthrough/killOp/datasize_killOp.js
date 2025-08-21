@@ -22,7 +22,7 @@ const dataSizeCommand = {
     "dataSize": dbName + ".foo",
     "keyPattern": {"_id": 1},
     "min": {"_id": 0},
-    "max": {"_id": 1}
+    "max": {"_id": 1},
 };
 
 // Set the yield iterations to 1 such that on every getNext() call we check for yield or interrupt.
@@ -32,20 +32,23 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIte
 const failpoint = configureFailPoint(db, "hangBeforeDatasizeCount");
 
 // Launch a parallel shell that runs the dataSize command, that should fail due to interrupt.
-const awaitShell =
-    startParallelShell(funWithArgs(function(cmd) {
-                           assert.commandFailedWithCode(db.runCommand(cmd), ErrorCodes.Interrupted);
-                       }, dataSizeCommand), db.getMongo().port);
+const awaitShell = startParallelShell(
+    funWithArgs(function (cmd) {
+        assert.commandFailedWithCode(db.runCommand(cmd), ErrorCodes.Interrupted);
+    }, dataSizeCommand),
+    db.getMongo().port,
+);
 failpoint.wait();
 
 // Find the command opid and kill it.
-const opId =
-    waitForCommand("dataSizeCmd", op => (op["command"]["dataSize"] == dbName + ".foo"), db);
+const opId = waitForCommand("dataSizeCmd", (op) => op["command"]["dataSize"] == dbName + ".foo", db);
 assert.commandWorked(db.killOp(opId));
 
 // The command is not killed just yet. It will be killed, after releasing the failpoint.
-assert.neq(waitForCommand("dataSizeCmd", op => (op["command"]["dataSize"] == dbName + ".foo"), db),
-           -1);
+assert.neq(
+    waitForCommand("dataSizeCmd", (op) => op["command"]["dataSize"] == dbName + ".foo", db),
+    -1,
+);
 
 failpoint.off();
 awaitShell();

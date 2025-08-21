@@ -19,13 +19,7 @@ docs.push({_id: {a: [2, 3]}});
 docs.push({_id: 5});
 coll.insert(docs);
 
-const locales = [
-    "bn@collation=traditional",
-    "de@collation=phonebook",
-    "ca",
-    "fr_CA",
-    "simple",
-];
+const locales = ["bn@collation=traditional", "de@collation=phonebook", "ca", "fr_CA", "simple"];
 
 locales.forEach((locale) => {
     jsTest.log(`Testing locale ${locale}...`);
@@ -58,7 +52,7 @@ locales.forEach((locale) => {
             aggregate: coll.getName(),
             pipeline: [{$match: {_id: {$in: [{a: [2, 3]}, 5]}}}],
             collation: {locale},
-            cursor: {}
+            cursor: {},
         });
         assert.commandWorked(res);
         assert.eq([{_id: {a: [2, 3]}}], res.cursor.firstBatch);

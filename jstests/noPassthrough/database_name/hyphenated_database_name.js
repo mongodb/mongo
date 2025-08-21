@@ -3,13 +3,11 @@
  *
  * @tags: [requires_persistence]
  */
-var isDirectoryPerDBSupported =
-    jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
-if (!isDirectoryPerDBSupported)
-    quit();
+var isDirectoryPerDBSupported = jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
+if (!isDirectoryPerDBSupported) quit();
 
 const dbName = "test-hyphen";
-let conn = MongoRunner.runMongod({directoryperdb: ''});
+let conn = MongoRunner.runMongod({directoryperdb: ""});
 
 conn.getDB(dbName).a.insert({x: 1});
 let res = conn.getDB(dbName).runCommand({dbStats: 1, scale: 1});

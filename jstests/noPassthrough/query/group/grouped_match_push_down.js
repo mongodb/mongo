@@ -4,7 +4,7 @@
 import {getEngine, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
-const db = conn.getDB('test');
+const db = conn.getDB("test");
 
 const MultiStageSBE = 0;
 const MultiStageClassic = 1;
@@ -73,8 +73,7 @@ function assertPipelineOptimization(pipeline, expectedStageSequence) {
 
     if (explain.hasOwnProperty("shards")) {
         for (const shardName in explain.shards) {
-            let stageSequenceTuple =
-                getStageSequenceToCompare(explain.shards[shardName], queryEngine);
+            let stageSequenceTuple = getStageSequenceToCompare(explain.shards[shardName], queryEngine);
             assert.eq(stageSequenceTuple[0], expectedStageSequence[stageSequenceTuple[1]], explain);
         }
     } else {
@@ -101,80 +100,68 @@ assert.commandWorked(coll.insert({_id: 20, d: 2}));
 // Asserts that a sequence of stages group, project, match over a rename on a dotted path (depth
 // 3) will push the predicate before the group stage.
 assertPipelineOptimizationAndResult({
-    pipeline: [
-        {$group: {_id: {c: '$d'}, c: {$sum: {$const: 1}}}},
-        {$project: {m: '$_id.c'}},
-        {$match: {m: {$eq: 2}}}
-    ],
+    pipeline: [{$group: {_id: {c: "$d"}, c: {$sum: {$const: 1}}}}, {$project: {m: "$_id.c"}}, {$match: {m: {$eq: 2}}}],
     expectedStageSequence: {
         [MultiStageSBE]: ["$cursor", "$project"],
         [MultiStageClassic]: ["$cursor", "$group", "$project"],
-        [SingleStage]: ["PROJECTION_DEFAULT", "GROUP", "COLLSCAN"]
+        [SingleStage]: ["PROJECTION_DEFAULT", "GROUP", "COLLSCAN"],
     },
-    expectedResult: [{"_id": {"c": 2}, "m": 2}]
+    expectedResult: [{"_id": {"c": 2}, "m": 2}],
 });
 
 // Asserts that the optimization over group, project, match over a renamed dotted path will push
 // down the predicate while the dotted notation is kept to 2 levels.
 assertPipelineOptimizationAndResult({
     pipeline: [
-        {$group: {_id: {c: '$d'}, c: {$sum: {$const: 1}}}},
-        {$project: {m: '$_id.c'}},
-        {$project: {m2: '$m'}},
-        {$match: {m2: {$eq: 2}}}
+        {$group: {_id: {c: "$d"}, c: {$sum: {$const: 1}}}},
+        {$project: {m: "$_id.c"}},
+        {$project: {m2: "$m"}},
+        {$match: {m2: {$eq: 2}}},
     ],
     expectedStageSequence: {
         [MultiStageSBE]: ["$cursor", "$project", "$project"],
         [MultiStageClassic]: ["$cursor", "$group", "$project", "$project"],
-        [SingleStage]: ["PROJECTION_DEFAULT", "PROJECTION_DEFAULT", "GROUP", "COLLSCAN"]
+        [SingleStage]: ["PROJECTION_DEFAULT", "PROJECTION_DEFAULT", "GROUP", "COLLSCAN"],
     },
-    expectedResult: [{"_id": {"c": 2}, "m2": 2}]
+    expectedResult: [{"_id": {"c": 2}, "m2": 2}],
 });
 
 // Asserts that the optimization over group, project, match over a renamed dotted path will not
 // push down the predicate when the rename stage renames a dotted path with depth more than 3.
 assertPipelineOptimizationAndResult({
     pipeline: [
-        {$group: {_id: {c: {d: '$d'}}, c: {$sum: {$const: 1}}}},
-        {$project: {m: '$_id.c.d'}},
-        {$match: {m: {$eq: 2}}}
+        {$group: {_id: {c: {d: "$d"}}, c: {$sum: {$const: 1}}}},
+        {$project: {m: "$_id.c.d"}},
+        {$match: {m: {$eq: 2}}},
     ],
     expectedStageSequence: {
         [MultiStageSBE]: ["$cursor", "$project", "$match"],
         [MultiStageClassic]: ["$cursor", "$group", "$project", "$match"],
-        [SingleStage]: ["MATCH", "PROJECTION_DEFAULT", "GROUP", "COLLSCAN"]
+        [SingleStage]: ["MATCH", "PROJECTION_DEFAULT", "GROUP", "COLLSCAN"],
     },
-    expectedResult: [{"_id": {"c": {"d": 2}}, "m": 2}]
+    expectedResult: [{"_id": {"c": {"d": 2}}, "m": 2}],
 });
 
 // Asserts that the optimization over group, addFields, match over a renamed dotted path will not
 // lose other dependencies between stages.
 assertPipelineOptimizationAndResult({
-    pipeline: [
-        {$group: {_id: "$d", c: {$sum: {$const: 1}}}},
-        {$addFields: {c: '$_id'}},
-        {$match: {c: {$eq: 2}}}
-    ],
+    pipeline: [{$group: {_id: "$d", c: {$sum: {$const: 1}}}}, {$addFields: {c: "$_id"}}, {$match: {c: {$eq: 2}}}],
     expectedStageSequence: {
         [MultiStageSBE]: ["$cursor", "$addFields"],
         [MultiStageClassic]: ["$cursor", "$group", "$addFields"],
-        [SingleStage]: ["PROJECTION_DEFAULT", "GROUP", "COLLSCAN"]
+        [SingleStage]: ["PROJECTION_DEFAULT", "GROUP", "COLLSCAN"],
     },
-    expectedResult: [{_id: 2, c: 2}]
+    expectedResult: [{_id: 2, c: 2}],
 });
 
 assertPipelineOptimizationAndResult({
-    pipeline: [
-        {$group: {_id: "$d", c: {$sum: {$const: 1}}}},
-        {$addFields: {d: '$c'}},
-        {$match: {d: {$eq: 1}}}
-    ],
+    pipeline: [{$group: {_id: "$d", c: {$sum: {$const: 1}}}}, {$addFields: {d: "$c"}}, {$match: {d: {$eq: 1}}}],
     expectedStageSequence: {
         [MultiStageSBE]: ["$cursor", "$match", "$addFields"],
         [MultiStageClassic]: ["$cursor", "$group", "$match", "$addFields"],
-        [SingleStage]: ["PROJECTION_DEFAULT", "MATCH", "GROUP", "COLLSCAN"]
+        [SingleStage]: ["PROJECTION_DEFAULT", "MATCH", "GROUP", "COLLSCAN"],
     },
-    expectedResult: [{_id: 2, c: 1, d: 1}]
+    expectedResult: [{_id: 2, c: 1, d: 1}],
 });
 
 //
@@ -190,45 +177,66 @@ assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$exists: false}}}], []
 assertQueryResult([{$match: {a: {$exists: false}}}, {$group: {_id: "$a"}}], [{_id: null}]);
 
 coll.drop();
-assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 2, a: NumberLong(1)}]));
-assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$type: 'long'}}}], []);
-assertQueryResult([{$match: {a: {$type: 'long'}}}, {$group: {_id: "$a"}}], [{_id: NumberLong(1)}]);
+assert.commandWorked(
+    coll.insert([
+        {_id: 1, a: 1},
+        {_id: 2, a: NumberLong(1)},
+    ]),
+);
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$type: "long"}}}], []);
+assertQueryResult([{$match: {a: {$type: "long"}}}, {$group: {_id: "$a"}}], [{_id: NumberLong(1)}]);
 
 coll.drop();
 assert.commandWorked(coll.insert([{_id: 1, a: [{}]}]));
 assertQueryResult([{$group: {_id: "$a.b"}}, {$match: {_id: {$exists: false}}}], []);
-assertQueryResult([{$match: {'a.b': {$exists: false}}}, {$group: {_id: "$a.b"}}], [{_id: []}]);
+assertQueryResult([{$match: {"a.b": {$exists: false}}}, {$group: {_id: "$a.b"}}], [{_id: []}]);
 
 coll.drop();
 assert.commandWorked(coll.insert([{_id: 1, a: [{b: [{c: null}]}]}]));
-assertQueryResult([{$group: {_id: "$a.b"}}, {$match: {'_id.c': {$exists: true}}}], []);
-assertQueryResult([{$match: {'a.b.c': {$exists: true}}}, {$group: {_id: "$a.b"}}],
-                  [{_id: [[{c: null}]]}]);
-
-coll.drop();
-assert.commandWorked(coll.insert([{_id: 1, a: {b: 1}}, {_id: 2, a: {b: NumberLong(1)}}]));
-assertQueryResult([{$group: {_id: "$a"}}, {$match: {'_id.b': {$type: 'long'}}}], []);
-assertQueryResult([{$match: {'a.b': {$type: 'long'}}}, {$group: {_id: "$a"}}],
-                  [{_id: {b: NumberLong(1)}}]);
+assertQueryResult([{$group: {_id: "$a.b"}}, {$match: {"_id.c": {$exists: true}}}], []);
+assertQueryResult([{$match: {"a.b.c": {$exists: true}}}, {$group: {_id: "$a.b"}}], [{_id: [[{c: null}]]}]);
 
 coll.drop();
 assert.commandWorked(
-    coll.insert([{_id: 1, a: [{b: 5, c: 1}]}, {_id: 2, a: [{b: 5, c: NumberLong(1)}]}]));
+    coll.insert([
+        {_id: 1, a: {b: 1}},
+        {_id: 2, a: {b: NumberLong(1)}},
+    ]),
+);
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {"_id.b": {$type: "long"}}}], []);
+assertQueryResult([{$match: {"a.b": {$type: "long"}}}, {$group: {_id: "$a"}}], [{_id: {b: NumberLong(1)}}]);
+
+coll.drop();
+assert.commandWorked(
+    coll.insert([
+        {_id: 1, a: [{b: 5, c: 1}]},
+        {_id: 2, a: [{b: 5, c: NumberLong(1)}]},
+    ]),
+);
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$elemMatch: {b: 5, c: {$type: "long"}}}}}], []);
 assertQueryResult(
-    [{$group: {_id: "$a"}}, {$match: {_id: {$elemMatch: {b: 5, c: {$type: 'long'}}}}}], []);
-assertQueryResult([{$match: {a: {$elemMatch: {b: 5, c: {$type: 'long'}}}}}, {$group: {_id: "$a"}}],
-                  [{_id: [{b: 5, c: NumberLong(1)}]}]);
+    [{$match: {a: {$elemMatch: {b: 5, c: {$type: "long"}}}}}, {$group: {_id: "$a"}}],
+    [{_id: [{b: 5, c: NumberLong(1)}]}],
+);
 
 coll.drop();
-assert.commandWorked(coll.insert([{_id: 1, a: [1]}, {_id: 2, a: [NumberLong(1)]}]));
-assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$elemMatch: {$type: 'long'}}}}], []);
-assertQueryResult([{$match: {a: {$elemMatch: {$type: 'long'}}}}, {$group: {_id: "$a"}}],
-                  [{_id: [NumberLong(1)]}]);
+assert.commandWorked(
+    coll.insert([
+        {_id: 1, a: [1]},
+        {_id: 2, a: [NumberLong(1)]},
+    ]),
+);
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {_id: {$elemMatch: {$type: "long"}}}}], []);
+assertQueryResult([{$match: {a: {$elemMatch: {$type: "long"}}}}, {$group: {_id: "$a"}}], [{_id: [NumberLong(1)]}]);
 
 coll.drop();
-assert.commandWorked(coll.insert([{_id: 1, a: {"": 1}}, {_id: 2, a: {"": NumberLong(1)}}]));
-assertQueryResult([{$group: {_id: "$a"}}, {$match: {"_id.": {$type: 'long'}}}], []);
-assertQueryResult([{$match: {'a.': {$type: 'long'}}}, {$group: {_id: "$a"}}],
-                  [{_id: {"": NumberLong(1)}}]);
+assert.commandWorked(
+    coll.insert([
+        {_id: 1, a: {"": 1}},
+        {_id: 2, a: {"": NumberLong(1)}},
+    ]),
+);
+assertQueryResult([{$group: {_id: "$a"}}, {$match: {"_id.": {$type: "long"}}}], []);
+assertQueryResult([{$match: {"a.": {$type: "long"}}}, {$group: {_id: "$a"}}], [{_id: {"": NumberLong(1)}}]);
 
 MongoRunner.stopMongod(conn);

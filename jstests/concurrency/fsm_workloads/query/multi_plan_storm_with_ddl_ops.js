@@ -17,7 +17,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/multi_plan_storm.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states = {
         query: function query(db, collName) {
             try {
@@ -34,27 +34,26 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     // DDL operations complicate creating snapshots which leads to this type of
                     // error, but the rate limiter itself does not modify data and therefore doesn't
                     // cause this error.
-                    ErrorCodes.MigrationConflict
+                    ErrorCodes.MigrationConflict,
                 ];
                 assert.contains(e.code, allowedCodes);
             }
         },
         recreateIndex: function recreateIndex(db, collName) {
             // Both commands may fail due to a concurrent dropIndex.
-            assert.commandWorkedOrFailedWithCode(db[collName].dropIndex({a: 1}),
-                                                 [ErrorCodes.IndexNotFound]);
-            assert.commandWorkedOrFailedWithCode(db[collName].createIndex({a: 1}),
-                                                 [ErrorCodes.IndexBuildAborted]);
+            assert.commandWorkedOrFailedWithCode(db[collName].dropIndex({a: 1}), [ErrorCodes.IndexNotFound]);
+            assert.commandWorkedOrFailedWithCode(db[collName].createIndex({a: 1}), [ErrorCodes.IndexBuildAborted]);
         },
         collMod: function collMod(db, collName) {
             // Change the validation level.
-            const validationLevels = ['off', 'strict', 'moderate'];
+            const validationLevels = ["off", "strict", "moderate"];
             const newValidationLevel = validationLevels[Random.randInt(validationLevels.length)];
             jsTestLog(`Running collMod: coll=${collName} validationLevel=${newValidationLevel}`);
             assert.commandWorkedOrFailedWithCode(
                 db.runCommand({collMod: collName, validationLevel: newValidationLevel}),
-                [ErrorCodes.ConflictingOperationInProgress]);
-        }
+                [ErrorCodes.ConflictingOperationInProgress],
+            );
+        },
     };
 
     $config.transitions = {

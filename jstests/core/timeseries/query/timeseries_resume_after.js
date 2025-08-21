@@ -18,10 +18,7 @@
  *   does_not_support_viewless_timeseries_yet,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -30,8 +27,7 @@ TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
     coll.drop();
 
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
     Random.setRandomSeed();
 
@@ -43,26 +39,32 @@ TimeseriesTest.run((insert) => {
         const host = TimeseriesTest.getRandomElem(hosts);
         TimeseriesTest.updateUsages(host.fields);
 
-        assert.commandWorked(insert(coll, {
-            measurement: "cpu",
-            time: ISODate(),
-            fields: host.fields,
-            tags: host.tags,
-        }));
+        assert.commandWorked(
+            insert(coll, {
+                measurement: "cpu",
+                time: ISODate(),
+                fields: host.fields,
+                tags: host.tags,
+            }),
+        );
     }
-    assert.eq(1,
-              getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec),
-              "The following tests rely on having a single bucket");
+    assert.eq(
+        1,
+        getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec),
+        "The following tests rely on having a single bucket",
+    );
 
     function testResumeToken(tokenType) {
         // Run the initial query and request to return a resume token.
-        let res = assert.commandWorked(db.runCommand({
-            find: getTimeseriesCollForRawOps(coll).getName(),
-            hint: {$natural: 1},
-            batchSize: 1,
-            $_requestResumeToken: true,
-            ...kRawOperationSpec,
-        }));
+        let res = assert.commandWorked(
+            db.runCommand({
+                find: getTimeseriesCollForRawOps(coll).getName(),
+                hint: {$natural: 1},
+                batchSize: 1,
+                $_requestResumeToken: true,
+                ...kRawOperationSpec,
+            }),
+        );
         assert.neq([], res.cursor.firstBatch, "Expect some data to be returned");
 
         // Make sure the query returned a resume token.
@@ -71,8 +73,9 @@ TimeseriesTest.run((insert) => {
         assert.neq(null, resumeToken.$recordId, "Got resume token " + tojson(resumeToken));
 
         // Kill the cursor before attempting to resume.
-        assert.commandWorked(db.runCommand(
-            {killCursors: getTimeseriesCollForRawOps(coll).getName(), cursors: [res.cursor.id]}));
+        assert.commandWorked(
+            db.runCommand({killCursors: getTimeseriesCollForRawOps(coll).getName(), cursors: [res.cursor.id]}),
+        );
 
         // Try to resume the query from the saved resume token.
         let resumeCmd = {
@@ -97,16 +100,15 @@ TimeseriesTest.run((insert) => {
         assert.commandFailedWithCode(db.runCommand(resumeCmd), ErrorCodes.KeyNotFound);
 
         // Test that resuming fails if the recordId is Long.
-        resumeCmd[tokenType] = {'$recordId': NumberLong(10)};
+        resumeCmd[tokenType] = {"$recordId": NumberLong(10)};
         assert.commandFailedWithCode(db.runCommand(resumeCmd), 7738600);
 
         // Test that resuming fails if querying the time-series collection without rawData.
-        let viewCmd =
-            {find: coll.getName(), filter: {}, $_requestResumeToken: true, hint: {$natural: 1}};
-        viewCmd[tokenType] = {'$recordId': BinData(5, '1234')};
+        let viewCmd = {find: coll.getName(), filter: {}, $_requestResumeToken: true, hint: {$natural: 1}};
+        viewCmd[tokenType] = {"$recordId": BinData(5, "1234")};
         assert.commandFailedWithCode(db.runCommand(viewCmd), ErrorCodes.InvalidPipelineOperator);
     }
 
-    testResumeToken('$_resumeAfter');
-    testResumeToken('$_startAt');
+    testResumeToken("$_resumeAfter");
+    testResumeToken("$_startAt");
 });

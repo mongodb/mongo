@@ -15,8 +15,20 @@ assert.eq(1, t.count({a: {$gt: 5, $lt: 2}}));
 t.save({a: [-1, 12]});
 
 // Check that we can do a query with 'invalid' range and sort.
-assert.eq(2, t.find({a: {$gt: 5, $lt: 2}}).sort({a: 1}).itcount());
-assert.eq(2, t.find({a: {$gt: 5, $lt: 2}}).sort({$natural: -1}).itcount());
+assert.eq(
+    2,
+    t
+        .find({a: {$gt: 5, $lt: 2}})
+        .sort({a: 1})
+        .itcount(),
+);
+assert.eq(
+    2,
+    t
+        .find({a: {$gt: 5, $lt: 2}})
+        .sort({$natural: -1})
+        .itcount(),
+);
 
 // SERVER-2864
 if (0) {

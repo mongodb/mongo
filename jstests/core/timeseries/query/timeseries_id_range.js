@@ -17,16 +17,9 @@
  *   requires_fcv_80,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {
-    getAggPlanStage,
-    getPlanStage,
-    getSingleNodeExplain
-} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStage, getPlanStage, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     // These dates will all be inserted into individual buckets.
@@ -36,9 +29,9 @@ TimeseriesTest.run((insert) => {
         ISODate("2021-04-03T00:00:00.005Z"),
         ISODate("2021-04-04T00:00:00.003Z"),
         ISODate("2021-04-05T00:00:00.009Z"),
-        ISODate("2021-04-06T00:00:00.008Z"),  // Starting document for $gt & $gte predicates.
+        ISODate("2021-04-06T00:00:00.008Z"), // Starting document for $gt & $gte predicates.
         ISODate("2021-04-06T00:00:00.010Z"),
-        ISODate("2021-04-06T00:00:00.010Z"),  // Starting document for $lt & $gte predicates.
+        ISODate("2021-04-06T00:00:00.010Z"), // Starting document for $lt & $gte predicates.
         ISODate("2021-04-07T00:00:00.006Z"),
         ISODate("2021-04-08T00:00:00.003Z"),
         ISODate("2021-04-09T00:00:00.007Z"),
@@ -51,8 +44,7 @@ TimeseriesTest.run((insert) => {
     function init() {
         coll.drop();
 
-        assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+        assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
         if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
             assert.commandWorked(coll.createIndex({[timeFieldName]: 1}));
@@ -62,13 +54,15 @@ TimeseriesTest.run((insert) => {
     (function testEQ() {
         init();
 
-        let expl = assert.commandWorked(db.runCommand({
-            explain: {
-                update: getTimeseriesCollForRawOps(coll).getName(),
-                updates: [{q: {"_id": dates[5]}, u: {$set: {a: 1}}}],
-                ...kRawOperationSpec,
-            }
-        }));
+        let expl = assert.commandWorked(
+            db.runCommand({
+                explain: {
+                    update: getTimeseriesCollForRawOps(coll).getName(),
+                    updates: [{q: {"_id": dates[5]}, u: {$set: {a: 1}}}],
+                    ...kRawOperationSpec,
+                },
+            }),
+        );
 
         if (getPlanStage(expl, "CLUSTERED_IXSCAN") == undefined) {
             // post 8.0, EXPRESS will handle update-by-id
@@ -82,7 +76,7 @@ TimeseriesTest.run((insert) => {
     (function testLTE() {
         init();
         // Just for this test, use a more complex pipeline with unwind.
-        const pipeline = [{$match: {time: {$lte: dates[7]}}}, {$unwind: '$x'}];
+        const pipeline = [{$match: {time: {$lte: dates[7]}}}, {$unwind: "$x"}];
         let res = coll.aggregate(pipeline).toArray();
         assert.eq(0, res.length);
 
@@ -96,7 +90,7 @@ TimeseriesTest.run((insert) => {
         }
 
         res = coll.aggregate(pipeline).toArray();
-        assert.eq(16, res.length);  // 8 documents x 2 unwound array entries per document.
+        assert.eq(16, res.length); // 8 documents x 2 unwound array entries per document.
 
         expl = getSingleNodeExplain(coll.explain("executionStats").aggregate(pipeline));
         assert.eq(7, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);

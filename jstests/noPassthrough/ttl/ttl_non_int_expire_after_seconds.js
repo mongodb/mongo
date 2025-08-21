@@ -26,34 +26,39 @@ rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 let primary = rst.getPrimary();
-const dbName = 'test';
-const collName = 'coll';
+const dbName = "test";
+const collName = "coll";
 const db = primary.getDB(dbName);
 const coll = db[collName];
 
 function assertExpireAfterSeconds(coll, indexName, expectedExpireAfterSeconds) {
     const indexes = coll.aggregate({$listCatalog: {}}).toArray()[0].md.indexes;
-    const index = indexes.find(index => index.spec.name === indexName);
-    assert(index,
-           `Expected to find index with ${indexName} in the catalog. Found catalog indexes: ${
-               tojson(index)}`);
+    const index = indexes.find((index) => index.spec.name === indexName);
+    assert(index, `Expected to find index with ${indexName} in the catalog. Found catalog indexes: ${tojson(index)}`);
     const actualExpireAfterSeconds = index.spec.expireAfterSeconds;
-    assert.eq(expectedExpireAfterSeconds,
-              actualExpireAfterSeconds,
-              `Unexpected expireAfterSeconds field for index: ${tojson(index)}`);
+    assert.eq(
+        expectedExpireAfterSeconds,
+        actualExpireAfterSeconds,
+        `Unexpected expireAfterSeconds field for index: ${tojson(index)}`,
+    );
 }
 
 function assertExpireAfterSecondsAcrossNodes(indexName, expectedExpireAfterSeconds) {
     rst.awaitReplication();
-    rst.nodes.forEach(node => {
+    rst.nodes.forEach((node) => {
         assert.soonNoExcept(
             () => {
                 const nodeColl = node.getDB(dbName)[collName];
                 assertExpireAfterSeconds(nodeColl, indexName, expectedExpireAfterSeconds);
                 return true;
             },
-            `Node ${node.host} has unexpected index catalog results. ${
-                tojson(node.getDB(dbName)[collName].aggregate([{$indexStats: {}}]).toArray())}`);
+            `Node ${node.host} has unexpected index catalog results. ${tojson(
+                node
+                    .getDB(dbName)
+                    [collName].aggregate([{$indexStats: {}}])
+                    .toArray(),
+            )}`,
+        );
     });
 }
 
@@ -61,7 +66,7 @@ function assertExpireAfterSecondsAcrossNodes(indexName, expectedExpireAfterSecon
 // its integer value during validation. Thus, we use a failpoint to disable current behavior and
 // simulate a non-int value leftover from older MongoDB versions.
 function createIndexWithoutExpireAfterSecondsValidation(coll, indexName, expireAfterSeconds) {
-    const fpCreate = configureFailPoint(primary, 'skipTTLIndexExpireAfterSecondsValidation');
+    const fpCreate = configureFailPoint(primary, "skipTTLIndexExpireAfterSecondsValidation");
     try {
         assert.commandWorked(coll.createIndex({t: 1}, {expireAfterSeconds: nonIntVal}));
     } finally {
@@ -73,25 +78,24 @@ function createIndexWithoutExpireAfterSecondsValidation(coll, indexName, expireA
 // integer value.
 (function testNonIntToIntByDefault() {
     assert.commandWorked(coll.createIndex({t: 1}, {expireAfterSeconds: nonIntVal}));
-    assertExpireAfterSecondsAcrossNodes('t_1', intVal);
-    assert.commandWorked(coll.dropIndex('t_1'));
-}());
+    assertExpireAfterSecondsAcrossNodes("t_1", intVal);
+    assert.commandWorked(coll.dropIndex("t_1"));
+})();
 
 // Tests that a non-int 'expireAfterSeconds' value stored in the catalog can be converted to its
 // truncated integer equivalent via collMod.
 (function testNonIntToIntByCollMod() {
     // Force the catalog to store a non-int 'expireAfterSeconds' to simulate behavior from older
     // versions of the server.
-    createIndexWithoutExpireAfterSecondsValidation(coll, 't_1', nonIntVal);
+    createIndexWithoutExpireAfterSecondsValidation(coll, "t_1", nonIntVal);
     // Ensure the non-int value is stored in the catalog for both the primary and the secondaries.
-    assertExpireAfterSecondsAcrossNodes('t_1', nonIntVal);
+    assertExpireAfterSecondsAcrossNodes("t_1", nonIntVal);
 
-    assert.commandWorked(db.runCommand(
-        {collMod: collName, index: {keyPattern: {t: 1}, expireAfterSeconds: intVal}}));
-    assertExpireAfterSecondsAcrossNodes('t_1', intVal);
+    assert.commandWorked(db.runCommand({collMod: collName, index: {keyPattern: {t: 1}, expireAfterSeconds: intVal}}));
+    assertExpireAfterSecondsAcrossNodes("t_1", intVal);
 
-    assert.commandWorked(coll.dropIndex('t_1'));
-}());
+    assert.commandWorked(coll.dropIndex("t_1"));
+})();
 
 // Tests that a node that undergoes initial sync will sync the int version of a non-int
 // 'expireAfterSeconds' from the primary.
@@ -99,8 +103,8 @@ function createIndexWithoutExpireAfterSecondsValidation(coll, indexName, expireA
 // Note: This contrasts the standard replication behavior where the non-int value is replicated
 // to secondaries.
 (function testNonIntWithInitialSyncResultsInInt() {
-    createIndexWithoutExpireAfterSecondsValidation(coll, 't_1', nonIntVal);
-    assertExpireAfterSeconds(coll, 't_1', nonIntVal);
+    createIndexWithoutExpireAfterSecondsValidation(coll, "t_1", nonIntVal);
+    assertExpireAfterSeconds(coll, "t_1", nonIntVal);
 
     const newNode = rst.add({rsConfig: {votes: 0, priority: 0}});
     rst.reInitiate();
@@ -108,8 +112,8 @@ function createIndexWithoutExpireAfterSecondsValidation(coll, indexName, expireA
     rst.awaitReplication();
     let newNodeTestDB = newNode.getDB(dbName);
     let newNodeColl = newNodeTestDB.getCollection(collName);
-    assertExpireAfterSeconds(newNodeColl, 't_1', intVal);
-    assert.commandWorked(coll.dropIndex('t_1'));
-}());
+    assertExpireAfterSeconds(newNodeColl, "t_1", intVal);
+    assert.commandWorked(coll.dropIndex("t_1"));
+})();
 
 rst.stopSet();

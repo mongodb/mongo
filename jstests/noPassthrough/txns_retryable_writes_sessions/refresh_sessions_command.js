@@ -20,7 +20,7 @@ result = admin.runCommand({refreshSessions: [lsid]});
 assert.commandWorked(result, "could not run refreshSessions unauthenticated without --auth");
 
 // Test that we can run refreshSessions authenticated if --auth is off.
-admin.createUser({user: 'admin', pwd: 'admin', roles: ['readAnyDatabase', 'userAdminAnyDatabase']});
+admin.createUser({user: "admin", pwd: "admin", roles: ["readAnyDatabase", "userAdminAnyDatabase"]});
 admin.auth("admin", "admin");
 result = admin.runCommand(startSession);
 var lsid2 = result.id;
@@ -32,17 +32,17 @@ MongoRunner.stopMongod(conn);
 conn = MongoRunner.runMongod({auth: "", setParameter: {maxSessions: 3}});
 admin = conn.getDB("admin");
 
-admin.createUser({user: 'admin', pwd: 'admin', roles: ['readAnyDatabase', 'userAdminAnyDatabase']});
+admin.createUser({user: "admin", pwd: "admin", roles: ["readAnyDatabase", "userAdminAnyDatabase"]});
 admin.auth("admin", "admin");
 
 result = admin.runCommand({
-    createRole: 'readSessionsCollection',
-    privileges: [{resource: {db: 'config', collection: 'system.sessions'}, actions: ['find']}],
-    roles: []
+    createRole: "readSessionsCollection",
+    privileges: [{resource: {db: "config", collection: "system.sessions"}, actions: ["find"]}],
+    roles: [],
 });
 assert.commandWorked(result, "couldn't make readSessionsCollection role");
 
-admin.createUser({user: 'readSessionsCollection', pwd: 'pwd', roles: ['readSessionsCollection']});
+admin.createUser({user: "readSessionsCollection", pwd: "pwd", roles: ["readSessionsCollection"]});
 admin.logout();
 
 // Test that we cannot run refreshSessions unauthenticated if --auth is on.

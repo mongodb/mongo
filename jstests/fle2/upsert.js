@@ -18,18 +18,18 @@ if (!isEnterpriseShell()) {
     quit();
 }
 
-let dbName = 'test';
-let collName = 'test';
+let dbName = "test";
+let collName = "test";
 let dbTest = db.getSiblingDB(dbName);
 dbTest.dropDatabase();
 let client = new EncryptedClient(db.getMongo(), dbName);
-assert.commandWorked(client.createEncryptionCollection(collName, {
-    encryptedFields: {
-        "fields": [
-            {"path": "a", "bsonType": "string", "queries": {"queryType": "equality"}},
-        ]
-    }
-}));
+assert.commandWorked(
+    client.createEncryptionCollection(collName, {
+        encryptedFields: {
+            "fields": [{"path": "a", "bsonType": "string", "queries": {"queryType": "equality"}}],
+        },
+    }),
+);
 
 const ecoll = client.getDB().getCollection(collName);
 assert.commandWorked(ecoll.einsert({_id: 1, "a": "a"}));

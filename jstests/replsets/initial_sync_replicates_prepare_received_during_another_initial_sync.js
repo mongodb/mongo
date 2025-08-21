@@ -30,21 +30,24 @@ import {waitForState} from "jstests/replsets/rslib.js";
  */
 function restartSecondaryAndForceSyncSource(replSet, secondary, syncSource, dbName, clusterTime) {
     // Restart secondary with startClean: true so that it goes through initial sync.
-    replSet.stop(secondary,
-                 // signal
-                 undefined,
-                 // Validation would encounter a prepare conflict on the open transaction.
-                 {skipValidation: true});
-    replSet.start(secondary,
-                  {
-                      startClean: true,
-                      // Force this secondary to sync from the primary.
-                      setParameter: {
-                          'failpoint.forceSyncSourceCandidate':
-                              tojson({mode: 'alwaysOn', data: {hostAndPort: syncSource.host}}),
-                      }
-                  },
-                  true /* wait */);
+    replSet.stop(
+        secondary,
+        // signal
+        undefined,
+        // Validation would encounter a prepare conflict on the open transaction.
+        {skipValidation: true},
+    );
+    replSet.start(
+        secondary,
+        {
+            startClean: true,
+            // Force this secondary to sync from the primary.
+            setParameter: {
+                "failpoint.forceSyncSourceCandidate": tojson({mode: "alwaysOn", data: {hostAndPort: syncSource.host}}),
+            },
+        },
+        true /* wait */,
+    );
 
     // Wait for the secondary to complete initial sync.
     waitForState(secondary, ReplSetTest.State.SECONDARY);
@@ -61,9 +64,10 @@ function restartSecondaryAndForceSyncSource(replSet, secondary, syncSource, dbNa
             find: name,
             filter: {_id: 0},
             readConcern: {afterClusterTime: clusterTime},
-            maxTimeMS: 5000
+            maxTimeMS: 5000,
         }),
-        ErrorCodes.MaxTimeMSExpired);
+        ErrorCodes.MaxTimeMSExpired,
+    );
 }
 
 // Add secondary nodes with priority: 0 and votes: 0 so that we prevent elections while
@@ -80,7 +84,7 @@ const primary = replSet.getPrimary();
 const secondaries = replSet.getSecondaries();
 const secondary1 = secondaries[0];
 const secondary2 = secondaries[1];
-const dbName = 'test';
+const dbName = "test";
 
 const coll = primary.getDB(dbName).getCollection(name);
 // Insert document that will be updated by a prepared transaction.
@@ -96,17 +100,16 @@ assert.commandWorked(sessionColl.update({_id: 0}, {x: 2}));
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
 // Advance the clusterTime with another insert.
-const clusterTimeAfterPrepare =
-    assert.commandWorked(coll.runCommand("insert", {documents: [{advanceClusterTime: 1}]}))
-        .operationTime;
+const clusterTimeAfterPrepare = assert.commandWorked(
+    coll.runCommand("insert", {documents: [{advanceClusterTime: 1}]}),
+).operationTime;
 
 jsTestLog("Restarting secondary1");
 restartSecondaryAndForceSyncSource(replSet, secondary1, primary, dbName, clusterTimeAfterPrepare);
 jsTestLog("secondary1 successfully replicated prepared transaction after initial sync");
 
 jsTestLog("Restarting secondary2");
-restartSecondaryAndForceSyncSource(
-    replSet, secondary2, secondary1, dbName, clusterTimeAfterPrepare);
+restartSecondaryAndForceSyncSource(replSet, secondary2, secondary1, dbName, clusterTimeAfterPrepare);
 jsTestLog("secondary2 successfully replicated prepared transaction after initial sync");
 
 // Commit the transaction.

@@ -33,9 +33,15 @@ var staticMongod = MongoRunner.runMongod({});
 var st = new ShardingTest({shards: 2, mongos: 1});
 st.stopBalancer();
 
-var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns = dbName + ".foo",
-    coll = mongos.getCollection(ns), donor = st.shard0, recipient = st.shard1,
-    donorColl = donor.getCollection(ns), recipientColl = recipient.getCollection(ns);
+var mongos = st.s0,
+    admin = mongos.getDB("admin"),
+    dbName = "testDB",
+    ns = dbName + ".foo",
+    coll = mongos.getCollection(ns),
+    donor = st.shard0,
+    recipient = st.shard1,
+    donorColl = donor.getCollection(ns),
+    recipientColl = recipient.getCollection(ns);
 
 /**
  * Exable sharding, and split collection into two chunks.
@@ -44,7 +50,7 @@ var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns = dbNam
 // Two chunks
 // Donor:     [0, 20) [20, 40)
 // Recipient:
-jsTest.log('Enabling sharding of the collection and pre-splitting into two chunks....');
+jsTest.log("Enabling sharding of the collection and pre-splitting into two chunks....");
 assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: ns, key: {a: 1}}));
 assert.commandWorked(admin.runCommand({split: ns, middle: {a: 20}}));
@@ -54,11 +60,9 @@ assert.commandWorked(admin.runCommand({split: ns, middle: {a: 20}}));
  */
 
 // 10 documents in each chunk on the donor
-jsTest.log('Inserting 20 docs into donor shard, 10 in each chunk....');
-for (var i = 0; i < 10; ++i)
-    assert.commandWorked(coll.insert({a: i}));
-for (var i = 20; i < 30; ++i)
-    assert.commandWorked(coll.insert({a: i}));
+jsTest.log("Inserting 20 docs into donor shard, 10 in each chunk....");
+for (var i = 0; i < 10; ++i) assert.commandWorked(coll.insert({a: i}));
+for (var i = 20; i < 30; ++i) assert.commandWorked(coll.insert({a: i}));
 assert.eq(20, coll.count());
 
 /**
@@ -67,11 +71,14 @@ assert.eq(20, coll.count());
  * before checking transfer mods log on donor.
  */
 
-jsTest.log('Setting failpoint failMigrationReceivedOutOfRangeOperation');
-assert.commandWorked(recipient.getDB('admin').runCommand(
-    {configureFailPoint: 'failMigrationReceivedOutOfRangeOperation', mode: 'alwaysOn'}));
+jsTest.log("Setting failpoint failMigrationReceivedOutOfRangeOperation");
+assert.commandWorked(
+    recipient
+        .getDB("admin")
+        .runCommand({configureFailPoint: "failMigrationReceivedOutOfRangeOperation", mode: "alwaysOn"}),
+);
 
-jsTest.log('Setting chunk migration recipient failpoint so that it pauses after bulk clone step');
+jsTest.log("Setting chunk migration recipient failpoint so that it pauses after bulk clone step");
 pauseMigrateAtStep(recipient, migrateStepNames.cloned);
 
 /**
@@ -82,9 +89,8 @@ pauseMigrateAtStep(recipient, migrateStepNames.cloned);
 
 // Donor:     [0, 20)
 // Recipient:    [20, 40)
-jsTest.log('Starting migration, pause after cloning...');
-var joinMoveChunk = moveChunkParallel(
-    staticMongod, st.s0.host, {a: 20}, null, coll.getFullName(), st.shard1.shardName);
+jsTest.log("Starting migration, pause after cloning...");
+var joinMoveChunk = moveChunkParallel(staticMongod, st.s0.host, {a: 20}, null, coll.getFullName(), st.shard1.shardName);
 
 /**
  * Wait for recipient to finish cloning step.
@@ -101,14 +107,14 @@ var joinMoveChunk = moveChunkParallel(
 
 waitForMigrateStep(recipient, migrateStepNames.cloned);
 
-jsTest.log('Deleting 5 docs from each chunk, migrating chunk and remaining chunk...');
+jsTest.log("Deleting 5 docs from each chunk, migrating chunk and remaining chunk...");
 assert.commandWorked(coll.remove({$and: [{a: {$gte: 5}}, {a: {$lt: 25}}]}));
 
-jsTest.log('Inserting 1 in the migrating chunk range and 1 in the remaining chunk range...');
+jsTest.log("Inserting 1 in the migrating chunk range and 1 in the remaining chunk range...");
 assert.commandWorked(coll.insert({a: 10}));
 assert.commandWorked(coll.insert({a: 30}));
 
-jsTest.log('Updating 1 in the migrating chunk range and 1 in the remaining chunk range...');
+jsTest.log("Updating 1 in the migrating chunk range and 1 in the remaining chunk range...");
 assert.commandWorked(coll.update({a: 0}, {a: 0, updatedData: "updated"}));
 assert.commandWorked(coll.update({a: 25}, {a: 25, updatedData: "updated"}));
 
@@ -117,7 +123,7 @@ assert.commandWorked(coll.update({a: 25}, {a: 25, updatedData: "updated"}));
  * the new ops from the donor shard's migration transfer mods log, and finish.
  */
 
-jsTest.log('Continuing and finishing migration...');
+jsTest.log("Continuing and finishing migration...");
 unpauseMigrateAtStep(recipient, migrateStepNames.cloned);
 joinMoveChunk();
 
@@ -125,7 +131,7 @@ joinMoveChunk();
  * Check documents are where they should be: 6 docs in each shard's respective chunk.
  */
 
-jsTest.log('Checking that documents are on the shards they should be...');
+jsTest.log("Checking that documents are on the shards they should be...");
 assert.eq(6, donorColl.count());
 assert.eq(6, recipientColl.count());
 assert.eq(12, coll.count());
@@ -134,12 +140,12 @@ assert.eq(12, coll.count());
  * Check that the updated documents are where they should be, one on each shard.
  */
 
-jsTest.log('Checking that documents were updated correctly...');
+jsTest.log("Checking that documents were updated correctly...");
 var donorCollUpdatedNum = donorColl.find({updatedData: "updated"}).count();
 assert.eq(1, donorCollUpdatedNum, "Update failed on donor shard during migration!");
 var recipientCollUpdatedNum = recipientColl.find({updatedData: "updated"}).count();
 assert.eq(1, recipientCollUpdatedNum, "Update failed on recipient shard during migration!");
 
-jsTest.log('DONE!');
+jsTest.log("DONE!");
 MongoRunner.stopMongod(staticMongod);
 st.stop();

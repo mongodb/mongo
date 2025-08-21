@@ -17,23 +17,21 @@
 // ]
 //
 
-import {
-    assertDropAndRecreateCollection,
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsIndexHintsTests} from "jstests/libs/query/query_settings_index_hints_tests.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const ns = {
     db: db.getName(),
-    coll: coll.getName()
+    coll: coll.getName(),
 };
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 const qstests = new QuerySettingsIndexHintsTests(qsutils);
 
 const apiStrictOpts = {
     apiVersion: "1",
-    apiStrict: true
+    apiStrict: true,
 };
 
 // Create indexes on field a and b.
@@ -41,13 +39,15 @@ assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndexes(qstests.allIndexes));
 
 // Insert data into the collection.
-assert.commandWorked(coll.insertMany([
-    {a: 1, b: 5},
-    {a: 2, b: 4},
-    {a: 3, b: 3},
-    {a: 4, b: 2},
-    {a: 5, b: 1},
-]));
+assert.commandWorked(
+    coll.insertMany([
+        {a: 1, b: 5},
+        {a: 2, b: 4},
+        {a: 3, b: 3},
+        {a: 4, b: 2},
+        {a: 5, b: 1},
+    ]),
+);
 
 // Ensure query settings can be set and applied on a strict API find command.
 {
@@ -60,7 +60,7 @@ assert.commandWorked(coll.insertMany([
     const aggCmd = {
         aggregate: coll.getName(),
         pipeline: [{$match: {a: 1, b: 1}}],
-        ...apiStrictOpts
+        ...apiStrictOpts,
     };
     qstests.assertQuerySettingsIndexApplication(qsutils.makeQueryInstance(aggCmd), ns);
 }

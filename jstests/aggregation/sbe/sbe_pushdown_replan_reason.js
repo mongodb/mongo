@@ -41,16 +41,21 @@ function testPushedDownSBEPlanReplanning(match1, match2, pushedDownStage) {
 
     // Don't profile the setFCV command, which could be run during this test in the
     // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-    assert.commandWorked(testDB.setProfilingLevel(
-        1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+    assert.commandWorked(
+        testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+    );
     // The cached plan is not efficient for the 'match2' stage and replanning will happen.
     const pipelineTriggeringReplanning = [match2, pushedDownStage];
     lcoll.aggregate(pipelineTriggeringReplanning).itcount();
     assert.commandWorked(testDB.setProfilingLevel(0));
 
     const replanReasonRegex = /cached plan was less efficient than expected:/;
-    const profileEntryFilter =
-        {op: "command", ns: lcoll.getFullName(), replanned: true, replanReason: replanReasonRegex};
+    const profileEntryFilter = {
+        op: "command",
+        ns: lcoll.getFullName(),
+        replanned: true,
+        replanReason: replanReasonRegex,
+    };
 
     const profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
     assert(profileObj);
@@ -61,12 +66,15 @@ function testPushedDownSBEPlanReplanning(match1, match2, pushedDownStage) {
 }
 
 (function testPushedDownLookupReplanning() {
-    testPushedDownSBEPlanReplanning({$match: {a: 5, b: 15}}, {$match: {a: 15, b: 10}}, {
-        $lookup: {from: fcoll.getName(), as: "as", localField: "a", foreignField: "c"}
-    });
+    testPushedDownSBEPlanReplanning(
+        {$match: {a: 5, b: 15}},
+        {$match: {a: 15, b: 10}},
+        {
+            $lookup: {from: fcoll.getName(), as: "as", localField: "a", foreignField: "c"},
+        },
+    );
 })();
 
 (function testPushedDownGroupReplanning() {
-    testPushedDownSBEPlanReplanning(
-        {$match: {a: 5, b: 15}}, {$match: {a: 15, b: 10}}, {$group: {_id: "$a"}});
+    testPushedDownSBEPlanReplanning({$match: {a: 5, b: 15}}, {$match: {a: 15, b: 10}}, {$group: {_id: "$a"}});
 })();

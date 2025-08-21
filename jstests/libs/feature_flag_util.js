@@ -3,12 +3,12 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 /**
  * Utilities for feature flags.
  */
-export var FeatureFlagUtil = (function() {
+export var FeatureFlagUtil = (function () {
     // A JS attempt at an enum.
     const FlagStatus = {
-        kEnabled: 'kEnabled',
-        kDisabled: 'kDisabled',
-        kNotFound: 'kNotFound',
+        kEnabled: "kEnabled",
+        kDisabled: "kDisabled",
+        kNotFound: "kNotFound",
     };
 
     function _getConnectionToMongod(db) {
@@ -25,9 +25,11 @@ export var FeatureFlagUtil = (function() {
             // should guarantee that subsequent operations on the connection are retried in the
             // event of network errors in suites where that possibility exists.
             return retryOnRetryableError(() => {
-                return new Mongo(FixtureHelpers.getConfigServerConnString(db),
-                                 undefined /*encryptedDBClientCallback */,
-                                 {gRPC: false});
+                return new Mongo(
+                    FixtureHelpers.getConfigServerConnString(db),
+                    undefined /*encryptedDBClientCallback */,
+                    {gRPC: false},
+                );
             });
         };
         try {
@@ -71,14 +73,12 @@ export var FeatureFlagUtil = (function() {
     }
 
     function _getStatusLegacy(conn, ignoreFCV, flagDoc) {
-        const fcvDoc = assert.commandWorked(
-            conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+        const fcvDoc = assert.commandWorked(conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
         assert(fcvDoc.hasOwnProperty("featureCompatibilityVersion"), fcvDoc);
 
         const flagIsEnabled = flagDoc.value;
         const flagVersionIsValid =
-            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                           flagDoc.version) >= 0;
+            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, flagDoc.version) >= 0;
 
         const flagShouldBeFCVGated = flagDoc.fcv_gated;
 
@@ -154,7 +154,8 @@ export var FeatureFlagUtil = (function() {
             status != FlagStatus.kNotFound,
             `You asked about a feature flag ${featureFlag} which wasn't present. If this is a ` +
                 "multiversion test and you want the coverage despite the flag not existing on an " +
-                "older version, consider using 'isPresentAndEnabled()' instead of 'isEnabled()'");
+                "older version, consider using 'isPresentAndEnabled()' instead of 'isEnabled()'",
+        );
         return status == FlagStatus.kEnabled;
     }
 

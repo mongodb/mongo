@@ -12,10 +12,10 @@
  *   assumes_unsharded_collection
  * ]
  */
-var dbName = 'indexing_not_blocked_by_txn';
+var dbName = "indexing_not_blocked_by_txn";
 var mydb = db.getSiblingDB(dbName);
 const wcMajority = {
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 
 mydb.foo.drop(wcMajority);

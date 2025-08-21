@@ -10,16 +10,15 @@ var o = {
         "key2": "val2",
         "001": "val3",
         "002": "val4",
-        "0020000000000000000000": "val5"
+        "0020000000000000000000": "val5",
     },
-    "profile-id": "test"
+    "profile-id": "test",
 };
 
 assert.commandWorked(t.insert(o));
 assert.eq(o, t.findOne(), "A1");
 
-assert.commandWorked(
-    t.update({"profile-id": "test"}, {$set: {"actual.0030000000000000000000": "val6"}}));
+assert.commandWorked(t.update({"profile-id": "test"}, {$set: {"actual.0030000000000000000000": "val6"}}));
 
 var q = t.findOne();
 
@@ -66,13 +65,8 @@ assert.eq(q.actual["000"], "val000", "A11");
 assert.eq(q.actual["01"], "val01", "A12");
 
 // shouldn't work, but shouldn't do anything too heinous, either
-assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {"0..": "val01"}}),
-                             ErrorCodes.EmptyFieldName);
-assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {"0..0": "val01"}}),
-                             ErrorCodes.EmptyFieldName);
-assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {".0": "val01"}}),
-                             ErrorCodes.EmptyFieldName);
-assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {"..0": "val01"}}),
-                             ErrorCodes.EmptyFieldName);
-assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {"0.0..0": "val01"}}),
-                             ErrorCodes.EmptyFieldName);
+assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {"0..": "val01"}}), ErrorCodes.EmptyFieldName);
+assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {"0..0": "val01"}}), ErrorCodes.EmptyFieldName);
+assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {".0": "val01"}}), ErrorCodes.EmptyFieldName);
+assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {"..0": "val01"}}), ErrorCodes.EmptyFieldName);
+assert.commandFailedWithCode(t.update({"_id": 1}, {$set: {"0.0..0": "val01"}}), ErrorCodes.EmptyFieldName);

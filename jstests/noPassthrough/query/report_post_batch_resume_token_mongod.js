@@ -19,14 +19,12 @@ const testCollection = assertDropAndRecreateCollection(db, collName);
 const otherCollection = assertDropAndRecreateCollection(db, "unrelated_" + collName);
 const oplogColl = db.getSiblingDB("local").oplog.rs;
 
-let docId = 0;  // Tracks _id of documents inserted to ensure that we do not duplicate.
+let docId = 0; // Tracks _id of documents inserted to ensure that we do not duplicate.
 const batchSize = 2;
 
 // Helper function to perform generic comparisons and dump the oplog on failure.
 function assertCompare(cmpFn, left, right, cmpOp, cmpVal) {
-    assert[cmpOp](cmpFn(left, right),
-                  cmpVal,
-                  {left: left, right: right, oplogEntries: oplogColl.find().toArray()});
+    assert[cmpOp](cmpFn(left, right), cmpVal, {left: left, right: right, oplogEntries: oplogColl.find().toArray()});
 }
 
 // Start watching the test collection in order to capture a resume token.
@@ -45,7 +43,7 @@ csCursor.close();
 assert.soon(() => {
     csCursor = testCollection.watch([], {resumeAfter: resumeTokenFromDoc});
     assert.soon(() => csCursor.hasNext());
-    csCursor.close();  // We don't need any results after the initial batch.
+    csCursor.close(); // We don't need any results after the initial batch.
     return csCursor.objsLeftInBatch();
 });
 while (csCursor.objsLeftInBatch()) {
@@ -76,11 +74,12 @@ assert.commandWorked(session.commitTransaction_forTesting());
 session.endSession();
 
 // Grab the next 2 events, which should be the first 2 events in the transaction.
-assert(csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert(csCursor.hasNext()); // Causes a getMore to be dispatched.
 assert.eq(csCursor.objsLeftInBatch(), 2);
 
 // The clusterTime should be the same on each, but the resume token keeps advancing.
-const txnEvent1 = csCursor.next(), txnEvent2 = csCursor.next();
+const txnEvent1 = csCursor.next(),
+    txnEvent2 = csCursor.next();
 const txnClusterTime = txnEvent1.clusterTime;
 assertCompare(timestampCmp, txnEvent2.clusterTime, txnClusterTime, "eq", 0);
 assertCompare(bsonWoCompare, txnEvent1._id, initialAggPBRT, "gt", 0);
@@ -95,7 +94,7 @@ const resumePBRT = getMorePBRT;
 
 // Now get the next batch. This contains the third of the four transaction operations.
 let previousGetMorePBRT = getMorePBRT;
-assert(csCursor.hasNext());  // Causes a getMore to be dispatched.
+assert(csCursor.hasNext()); // Causes a getMore to be dispatched.
 assert.eq(csCursor.objsLeftInBatch(), 1);
 
 // The clusterTime of this event is the same as the two events from the previous batch, but its

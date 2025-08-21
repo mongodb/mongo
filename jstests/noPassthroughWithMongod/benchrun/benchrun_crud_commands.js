@@ -20,9 +20,9 @@ function makeDocument(docSize) {
 function executeBenchRun(benchOps) {
     var benchArgs = {ops: benchOps, parallel: 2, seconds: 5, host: db.getMongo().host};
     if (jsTest.options().auth) {
-        benchArgs['db'] = 'admin';
-        benchArgs['username'] = jsTest.options().authUser;
-        benchArgs['password'] = jsTest.options().authPassword;
+        benchArgs["db"] = "admin";
+        benchArgs["username"] = jsTest.options().authUser;
+        benchArgs["password"] = jsTest.options().authPassword;
     }
     return benchRun(benchArgs);
 }
@@ -30,8 +30,7 @@ function executeBenchRun(benchOps) {
 function testInsert(docs, wc) {
     coll.drop();
 
-    var res = executeBenchRun(
-        [{ns: coll.getFullName(), op: "insert", doc: docs, writeCmd: true, writeConcern: wc}]);
+    var res = executeBenchRun([{ns: coll.getFullName(), op: "insert", doc: docs, writeCmd: true, writeConcern: wc}]);
 
     assert.gt(coll.count(), 0);
     assert.eq(coll.findOne({}, {_id: 0}), docs[0]);
@@ -43,8 +42,9 @@ function testFind() {
         assert.commandWorked(coll.insert({}));
     }
 
-    var res = executeBenchRun(
-        [{ns: coll.getFullName(), op: "find", query: {}, batchSize: NumberInt(10), readCmd: true}]);
+    var res = executeBenchRun([
+        {ns: coll.getFullName(), op: "find", query: {}, batchSize: NumberInt(10), readCmd: true},
+    ]);
     assert.gt(res.query, 0, tojson(res));
 }
 

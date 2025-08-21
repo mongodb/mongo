@@ -5,15 +5,10 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    withTxnAndAutoRetry
-} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_simple.js";
+import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_simple.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.numReads = 5;
 
     $config.states.repeatedRead = function repeatedRead(db, collName) {
@@ -24,12 +19,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 const collectionDocs = collection.find().toArray();
                 assert.eq(this.numAccounts, collectionDocs.length, () => tojson(collectionDocs));
                 if (prevDocuments) {
-                    assert.sameMembers(prevDocuments,
-                                       collectionDocs,
-                                       () => "Document mismatch - previous documents: " +
-                                           tojsononeline(prevDocuments) +
-                                           ", current documents: " + tojsononeline(collectionDocs),
-                                       bsonBinaryEqual);  // Exact document matches.
+                    assert.sameMembers(
+                        prevDocuments,
+                        collectionDocs,
+                        () =>
+                            "Document mismatch - previous documents: " +
+                            tojsononeline(prevDocuments) +
+                            ", current documents: " +
+                            tojsononeline(collectionDocs),
+                        bsonBinaryEqual,
+                    ); // Exact document matches.
                 }
                 prevDocuments = collectionDocs;
             }

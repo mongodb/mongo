@@ -19,7 +19,7 @@ export function executeReshardCollection($config, db, collName, connCache, sameK
     const ns = collection.getFullName();
     jsTestLog("Running reshardCollection state on: " + tojson(ns));
 
-    if ($config.tid === 0 && ($config.reshardingCount <= maxReshardingExecutions)) {
+    if ($config.tid === 0 && $config.reshardingCount <= maxReshardingExecutions) {
         const newShardKeyIndex = sameKeyResharding
             ? $config.currentShardKeyIndex
             : ($config.currentShardKeyIndex + 1) % $config.shardKeys.length;
@@ -27,7 +27,7 @@ export function executeReshardCollection($config, db, collName, connCache, sameK
         let reshardCollectionCmdObj = {
             reshardCollection: ns,
             key: newShardKey,
-            numInitialChunks: 1
+            numInitialChunks: 1,
         };
         if (sameKeyResharding) {
             reshardCollectionCmdObj.forceRedistribution = true;
@@ -35,20 +35,24 @@ export function executeReshardCollection($config, db, collName, connCache, sameK
 
         print(`Started resharding collection ${ns}: ${tojson({newShardKey})}`);
         if (TestData.runningWithShardStepdowns) {
-            assert.soon(function() {
-                var res = db.adminCommand(reshardCollectionCmdObj);
-                if (res.ok) {
-                    return true;
-                }
-                assert(res.hasOwnProperty("code"));
+            assert.soon(
+                function () {
+                    var res = db.adminCommand(reshardCollectionCmdObj);
+                    if (res.ok) {
+                        return true;
+                    }
+                    assert(res.hasOwnProperty("code"));
 
-                // Race to retry.
-                if (res.code === ErrorCodes.ReshardCollectionInProgress) {
-                    return false;
-                }
-                // Unexpected error.
-                doassert(`Failed with unexpected ${tojson(res)}`);
-            }, "Reshard command failed", 10 * 1000);
+                    // Race to retry.
+                    if (res.code === ErrorCodes.ReshardCollectionInProgress) {
+                        return false;
+                    }
+                    // Unexpected error.
+                    doassert(`Failed with unexpected ${tojson(res)}`);
+                },
+                "Reshard command failed",
+                10 * 1000,
+            );
         } else {
             assert.commandWorked(db.adminCommand(reshardCollectionCmdObj));
         }
@@ -62,7 +66,7 @@ export function executeReshardCollection($config, db, collName, connCache, sameK
 
         db.printShardingStatus();
 
-        connCache.mongos.forEach(mongos => {
+        connCache.mongos.forEach((mongos) => {
             if ($config.generateRandomBool()) {
                 // Without explicitly refreshing mongoses, retries of retryable write statements
                 // would always be routed to the donor shards. Non-deterministically refreshing

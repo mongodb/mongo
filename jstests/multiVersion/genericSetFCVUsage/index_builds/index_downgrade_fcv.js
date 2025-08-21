@@ -18,26 +18,25 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
 });
 const nodes = rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const testDB = primary.getDB("test");
+const coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(primary);
 
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
-IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
+IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), "a_1");
 
 // Downgrade the primary using the setFeatureCompatibilityVersion command.
 try {
-    assert.commandWorked(
-        primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 } finally {
     IndexBuildTest.resumeIndexBuilds(primary);
 }
@@ -46,11 +45,10 @@ IndexBuildTest.waitForIndexBuildToStop(testDB);
 
 createIdx();
 
-IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 
 // This confirms that the downgrade command will complete successfully after the index build has
 // completed.
-assert.commandWorked(
-    primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
 rst.stopSet();

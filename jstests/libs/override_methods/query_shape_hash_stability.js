@@ -32,10 +32,9 @@ const topologyCache = {};
 function getTopologyConnections(conn) {
     if (!topologyCache.allConnections) {
         jsTest.log.debug(`Discovering topology...`);
-        topologyCache.allConnections =
-            getAllMongosConnections(conn)
-                .flatMap(connection => DiscoverTopology.findNonConfigNodes(connection, {connectFn}))
-                .map(host => connectFn(host));
+        topologyCache.allConnections = getAllMongosConnections(conn)
+            .flatMap((connection) => DiscoverTopology.findNonConfigNodes(connection, {connectFn}))
+            .map((host) => connectFn(host));
     }
     return topologyCache.allConnections;
 }
@@ -44,12 +43,10 @@ function getAllMongosConnections(conn) {
     if (!topologyCache.mongosConnectionsArr) {
         jsTest.log.debug(`Settings the mongos connections array...`);
         if (isMultiShardedClusterFixture) {
-            const connections =
-                conn.getDB("config").multiShardedClusterFixture.find().sort({_id: 1}).toArray();
+            const connections = conn.getDB("config").multiShardedClusterFixture.find().sort({_id: 1}).toArray();
             assert.eq(connections.length, 2);
             // Set the connections array to include both when using a multi-cluster fixture.
-            topologyCache.mongosConnectionsArr =
-                connections.map(doc => connectFn(doc.connectionString));
+            topologyCache.mongosConnectionsArr = connections.map((doc) => connectFn(doc.connectionString));
         } else {
             topologyCache.mongosConnectionsArr = [conn];
         }
@@ -66,12 +63,13 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
     try {
         // We run explain on all connections in the topology and assert that the query shape hash is
         // the same on all nodes.
-        explainResults = getTopologyConnections(conn).map(conn => conn.getDB(dbName)).map(db => {
-            jsTest.log.info('About to run the explain', {host: db.getMongo().host});
-            const explainResult =
-                retryOnRetryableError(() => assert.commandWorked(db.runCommand(explainCmd)), 50);
-            return explainResult;
-        });
+        explainResults = getTopologyConnections(conn)
+            .map((conn) => conn.getDB(dbName))
+            .map((db) => {
+                jsTest.log.info("About to run the explain", {host: db.getMongo().host});
+                const explainResult = retryOnRetryableError(() => assert.commandWorked(db.runCommand(explainCmd)), 50);
+                return explainResult;
+            });
     } catch (ex) {
         // Fuzzer may generate invalid commands, which will fail on assert.commandWorked().
         // If explain command failed, ignore the exception.
@@ -79,8 +77,7 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
             return;
         }
 
-        const expectedErrorCodes =
-            [ErrorCodes.CommandOnShardedViewNotSupportedOnMongod, ErrorCodes.NamespaceNotFound];
+        const expectedErrorCodes = [ErrorCodes.CommandOnShardedViewNotSupportedOnMongod, ErrorCodes.NamespaceNotFound];
         if (expectedErrorCodes.includes(ex.code)) {
             return;
         }
@@ -94,11 +91,11 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
             return false;
         }
         const isSystemBucketsNamespace = (nss) => {
-            return getCollectionNameFromFullNamespace(nss).startsWith('system.buckets.');
+            return getCollectionNameFromFullNamespace(nss).startsWith("system.buckets.");
         };
-        return explainResults.some(explainRes => getQueryPlanners(explainRes)
-                                                     .some(queryPlanner => isSystemBucketsNamespace(
-                                                               queryPlanner.namespace)));
+        return explainResults.some((explainRes) =>
+            getQueryPlanners(explainRes).some((queryPlanner) => isSystemBucketsNamespace(queryPlanner.namespace)),
+        );
     })();
 
     // TODO SERVER-103551 remove this once query shape hash calculation for legacy timeseries
@@ -113,9 +110,11 @@ export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
     assert.gt(explainResults.length, 0, `Found explain results array to be empty`);
     const firstQueryShapeHash = explainResults[0].queryShapeHash;
     assert(
-        explainResults.every(explainRes => explainRes.queryShapeHash === firstQueryShapeHash),
-        `Not all nodes returned same QueryShapeHash in explain command results. Explain command: ${
-            tojson(explainCmd)}. Explain results from all nodes: ${tojson(explainResults)}`);
+        explainResults.every((explainRes) => explainRes.queryShapeHash === firstQueryShapeHash),
+        `Not all nodes returned same QueryShapeHash in explain command results. Explain command: ${tojson(
+            explainCmd,
+        )}. Explain results from all nodes: ${tojson(explainResults)}`,
+    );
 }
 
 function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeFuncArgs) {
@@ -136,8 +135,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
                 // TODO SERVER-100658 Explain on non-existent collection returns empty results for
                 // sharded cluster aggregations - Assess if this is still needed.
                 const secondClusterMongos = mongosConnArr[1];
-                retryOnRetryableError(
-                    () => clientFunction.apply(secondClusterMongos, makeFuncArgs(cmdObj)), 50);
+                retryOnRetryableError(() => clientFunction.apply(secondClusterMongos, makeFuncArgs(cmdObj)), 50);
                 FixtureHelpers.awaitReplication(secondClusterMongos.getDB("admin"));
             }
             const innerCmd = getInnerCommand(cmdObj);
@@ -156,5 +154,4 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
 OverrideHelpers.overrideRunCommand(runCommandOverride);
 
 // Always apply the override if a test spawns a parallel shell.
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/query_shape_hash_stability.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/query_shape_hash_stability.js");

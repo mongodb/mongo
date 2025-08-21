@@ -8,7 +8,7 @@
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-const collNamePrefix = 'query_bound_inclusion_';
+const collNamePrefix = "query_bound_inclusion_";
 let collCount = 0;
 let coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
@@ -38,7 +38,12 @@ if (FixtureHelpers.numberOfShardsForCollection(coll) === 1) {
 } else {
     // With more than one shard, we cannot assume the results will come back in order, since we
     // did not request a sort.
-    assert(resultsEq(res.map((result) => result.a), [1, 2]));
+    assert(
+        resultsEq(
+            res.map((result) => result.a),
+            [1, 2],
+        ),
+    );
 }
 
 res = coll.find().min({a: 1}).max({a: 3}).sort({a: -1}).hint({a: 1}).toArray();
@@ -68,7 +73,12 @@ if (FixtureHelpers.numberOfShardsForCollection(coll) === 1) {
 } else {
     // With more than one shard, we cannot assume the results will come back in order, since we
     // did not request a sort.
-    assert(resultsEq(res.map((result) => result.b), [3, 2]));
+    assert(
+        resultsEq(
+            res.map((result) => result.b),
+            [3, 2],
+        ),
+    );
 }
 
 res = coll.find().min({b: 3}).max({b: 1}).sort({b: 1}).hint({b: -1}).toArray();
@@ -81,24 +91,25 @@ const testBoundsInclusivity = (indexDirection) => {
     coll = db.getCollection(collNamePrefix + collCount++);
     coll.drop();
     assert.commandWorked(coll.createIndex({i: indexDirection}));
-    assert.commandWorked(coll.insert([{i: 'a'}, {i: 'b'}, {i: 'c'}, {i: 'd'}, {i: 'd'}, {i: 'e'}]));
+    assert.commandWorked(coll.insert([{i: "a"}, {i: "b"}, {i: "c"}, {i: "d"}, {i: "d"}, {i: "e"}]));
 
     // Test for all the posible ranges.
-    [['$gte', '$lte', 4], ['$gt', '$lte', 3], ['$gte', '$lt', 2], ['$gt', '$lt', 1]].forEach(
-        ([gt, lt, count]) => {
-            let query = {i: {}};
-            query['i'][gt] = 'b';
-            query['i'][lt] = 'd';
+    [
+        ["$gte", "$lte", 4],
+        ["$gt", "$lte", 3],
+        ["$gte", "$lt", 2],
+        ["$gt", "$lt", 1],
+    ].forEach(([gt, lt, count]) => {
+        let query = {i: {}};
+        query["i"][gt] = "b";
+        query["i"][lt] = "d";
 
-            assert.eq(count, coll.find(query).count(), {query, indexDirection});
+        assert.eq(count, coll.find(query).count(), {query, indexDirection});
 
-            // Test with forward and backward sorts.
-            assert.eq(count,
-                      coll.find(query).sort({i: indexDirection}).count(),
-                      {query, sort: 1, indexDirection});
-            assert.eq(
-                count, coll.find(query).sort({i: -1}).count(), {query, sort: -1, indexDirection});
-        });
+        // Test with forward and backward sorts.
+        assert.eq(count, coll.find(query).sort({i: indexDirection}).count(), {query, sort: 1, indexDirection});
+        assert.eq(count, coll.find(query).sort({i: -1}).count(), {query, sort: -1, indexDirection});
+    });
 };
 testBoundsInclusivity(1);
 testBoundsInclusivity(-1);
@@ -110,39 +121,47 @@ const testBoundsInclusivityCompound = (lIndexDirection, nIndexDirection) => {
     coll.drop();
     assert.commandWorked(coll.createIndex({l: lIndexDirection, n: nIndexDirection}));
     let docs = [];
-    ['a', 'b', 'c', 'd', 'e'].forEach((l) => [1, 2, 3, 4, 5].forEach((n) => docs.push({l, n})));
+    ["a", "b", "c", "d", "e"].forEach((l) => [1, 2, 3, 4, 5].forEach((n) => docs.push({l, n})));
     assert.commandWorked(coll.insert(docs));
 
     // The eq variants of the operators add one more document to the result.
-    const opExtra = {'$lt': 0, '$lte': 1, '$gt': 0, '$gte': 1};
-    const lts = ['$lt', '$lte'];
-    const gts = ['$gt', '$gte'];
+    const opExtra = {"$lt": 0, "$lte": 1, "$gt": 0, "$gte": 1};
+    const lts = ["$lt", "$lte"];
+    const gts = ["$gt", "$gte"];
 
     // Iterate through all posible combinations of operators.
-    lts.forEach((llt) => gts.forEach((lgt) => {
-        lts.forEach((nlt) => gts.forEach((ngt) => {
-            let query = {l: {}, n: {}};
-            query['l'][llt] = 'd';
-            query['l'][lgt] = 'b';
-            query['n'][nlt] = 4;
-            query['n'][ngt] = 2;
+    lts.forEach((llt) =>
+        gts.forEach((lgt) => {
+            lts.forEach((nlt) =>
+                gts.forEach((ngt) => {
+                    let query = {l: {}, n: {}};
+                    query["l"][llt] = "d";
+                    query["l"][lgt] = "b";
+                    query["n"][nlt] = 4;
+                    query["n"][ngt] = 2;
 
-            // Calculate the count of documents based on operators used.
-            const count = (1 + opExtra[llt] + opExtra[lgt]) * (1 + opExtra[nlt] + opExtra[ngt]);
-            assert.eq(count, coll.find(query).count(), {query, lIndexDirection, nIndexDirection});
+                    // Calculate the count of documents based on operators used.
+                    const count = (1 + opExtra[llt] + opExtra[lgt]) * (1 + opExtra[nlt] + opExtra[ngt]);
+                    assert.eq(count, coll.find(query).count(), {query, lIndexDirection, nIndexDirection});
 
-            // Also check with all posible sort combinations.
-            const withSort = (lSort, nSort) => {
-                assert.eq(count,
-                          coll.find(query).sort({l: lSort, n: nSort}).count(),
-                          {query, lSort, nSort, lIndexDirection, nIndexDirection});
-            };
-            withSort(1, 1);
-            withSort(-1, 1);
-            withSort(1, -1);
-            withSort(-1, -1);
-        }));
-    }));
+                    // Also check with all posible sort combinations.
+                    const withSort = (lSort, nSort) => {
+                        assert.eq(count, coll.find(query).sort({l: lSort, n: nSort}).count(), {
+                            query,
+                            lSort,
+                            nSort,
+                            lIndexDirection,
+                            nIndexDirection,
+                        });
+                    };
+                    withSort(1, 1);
+                    withSort(-1, 1);
+                    withSort(1, -1);
+                    withSort(-1, -1);
+                }),
+            );
+        }),
+    );
 };
 testBoundsInclusivityCompound(1, 1);
 testBoundsInclusivityCompound(-1, 1);

@@ -30,7 +30,7 @@ const primary = rst.getPrimary();
 let upperDB = primary.getDB(dbNameUpper);
 assert.commandWorked(upperDB.createCollection(collName));
 
-let failPoint = configureFailPoint(upperDB, 'dropDatabaseHangBeforeInMemoryDrop');
+let failPoint = configureFailPoint(upperDB, "dropDatabaseHangBeforeInMemoryDrop");
 let awaitDropUpper = startParallelShell(() => {
     db.getSiblingDB("A").dropDatabase();
 }, primary.port);

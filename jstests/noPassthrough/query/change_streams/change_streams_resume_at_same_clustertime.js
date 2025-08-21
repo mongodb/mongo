@@ -14,8 +14,7 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 1, setParameter: {writePerio
 const mongosDB = st.s.startSession({causalConsistency: true}).getDatabase(jsTestName());
 const mongosColl = mongosDB.test;
 
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard on {_id:1}, split at {_id:0}, and move the upper chunk to shard1.
 st.shardColl(mongosColl, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName(), true);
@@ -38,11 +37,12 @@ assert.commandWorked(mongosColl.update({}, {$set: {updatedAgain: 1}}, {multi: tr
 // is based on each shard's local value and there are operations beyond noop write that can
 // bump the oplog timestamp. We expect however that they will be identical for most test runs,
 // so there is value in testing.
-let clusterTime = null, updateEvent = null;
+let clusterTime = null,
+    updateEvent = null;
 for (let x = 0; x < 2; ++x) {
     assert.soon(() => csCursor.hasNext());
     updateEvent = csCursor.next();
-    clusterTime = (clusterTime || updateEvent.clusterTime);
+    clusterTime = clusterTime || updateEvent.clusterTime;
     assert.gte(updateEvent.clusterTime, clusterTime);
     assert.eq(updateEvent.updateDescription.updatedFields.updated, 1);
 }
@@ -59,7 +59,7 @@ clusterTime = updateEvent = null;
 for (let x = 0; x < 2; ++x) {
     assert.soon(() => csCursor.hasNext());
     updateEvent = csCursor.next();
-    clusterTime = (clusterTime || updateEvent.clusterTime);
+    clusterTime = clusterTime || updateEvent.clusterTime;
     assert.gte(updateEvent.clusterTime, clusterTime);
     assert.eq(updateEvent.updateDescription.updatedFields.updatedAgain, 1);
 }

@@ -9,9 +9,9 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const timeFieldName = 'time';
-const metaFieldName = 'metafield';
-const valueFieldName = 'value';
+const timeFieldName = "time";
+const metaFieldName = "metafield";
+const valueFieldName = "value";
 
 const runSideBucketTest = (setAtRuntime) => {
     const rst = new ReplSetTest({nodes: 1});
@@ -23,7 +23,7 @@ const runSideBucketTest = (setAtRuntime) => {
         rst.startSet({
             setParameter: {
                 timeseriesIdleBucketExpiryMemoryUsageThreshold: 104857600,
-            }
+            },
         });
         rst.initiate();
         rst.getPrimary().getDB(jsTestName()).adminCommand({
@@ -35,7 +35,7 @@ const runSideBucketTest = (setAtRuntime) => {
             setParameter: {
                 timeseriesIdleBucketExpiryMemoryUsageThreshold: 104857600,
                 timeseriesSideBucketCatalogMemoryUsageThreshold: 1048576,
-            }
+            },
         });
         rst.initiate();
     }
@@ -44,47 +44,59 @@ const runSideBucketTest = (setAtRuntime) => {
     assert.commandWorked(db.dropDatabase());
     const coll = db.timeseries_idle_buckets;
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
     let stats = assert.commandWorked(coll.stats());
-    assert.eq(TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToMemoryThreshold"),
-              0);
+    assert.eq(TimeseriesTest.getStat(stats.timeseries, "numBucketsArchivedDueToMemoryThreshold"), 0);
 
     const numDocs = 100;
-    const metaValue = 'a';
+    const metaValue = "a";
     for (let i = 0; i < numDocs; i++) {
-        assert.commandWorked(coll.insert([{
-            [timeFieldName]: ISODate(),
-            [metaFieldName]: {[i.toString()]: metaValue},
-            [valueFieldName]: 'a',
-        }]));
-        assert.commandWorked(coll.insert([{
-            [timeFieldName]: ISODate(),
-            [metaFieldName]: {[i.toString()]: metaValue},
-            [valueFieldName]: 'a',
-        }]));
-        assert.commandWorked(coll.insert([{
-            [timeFieldName]: ISODate(),
-            [metaFieldName]: {[i.toString()]: metaValue},
-            [valueFieldName]: 'a',
-        }]));
+        assert.commandWorked(
+            coll.insert([
+                {
+                    [timeFieldName]: ISODate(),
+                    [metaFieldName]: {[i.toString()]: metaValue},
+                    [valueFieldName]: "a",
+                },
+            ]),
+        );
+        assert.commandWorked(
+            coll.insert([
+                {
+                    [timeFieldName]: ISODate(),
+                    [metaFieldName]: {[i.toString()]: metaValue},
+                    [valueFieldName]: "a",
+                },
+            ]),
+        );
+        assert.commandWorked(
+            coll.insert([
+                {
+                    [timeFieldName]: ISODate(),
+                    [metaFieldName]: {[i.toString()]: metaValue},
+                    [valueFieldName]: "a",
+                },
+            ]),
+        );
     }
 
     // Go through the existing documents and perform updates large enough to trigger the
     // sidebucketcatalog memoryusage threshold.
-    assert.commandWorked(coll.updateMany({}, {$set: {[valueFieldName]: 'a'.repeat(1024 * 1024)}}));
+    assert.commandWorked(coll.updateMany({}, {$set: {[valueFieldName]: "a".repeat(1024 * 1024)}}));
 
     // Check that some buckets were archived due to memory pressure.
     stats = assert.commandWorked(coll.stats());
-    assert.gt(stats.timeseries.numBucketsArchivedDueToMemoryThreshold,
-              0,
-              "Did not find an archived bucket");
+    assert.gt(stats.timeseries.numBucketsArchivedDueToMemoryThreshold, 0, "Did not find an archived bucket");
 
     // It is possible that archiving buckets alone was not enough to get the side bucket catalog
     // below the memory usage threshold. In this case, archived buckets will then also be closed.
     // We should guarantee that no bucket was closed that wasn't archived.
-    assert.lte(stats.timeseries.numBucketsClosedDueToMemoryThreshold,
-               stats.timeseries.numBucketsArchivedDueToMemoryThreshold);
+    assert.lte(
+        stats.timeseries.numBucketsClosedDueToMemoryThreshold,
+        stats.timeseries.numBucketsArchivedDueToMemoryThreshold,
+    );
 
     rst.stopSet();
 };

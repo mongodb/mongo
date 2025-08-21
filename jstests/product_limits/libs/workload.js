@@ -40,8 +40,7 @@ export class PipelineWorkload extends Workload {
         }
 
         const startTime = Date.now();
-        const cursor = pipeline[0].hasOwnProperty("$documents") ? db.aggregate(pipeline)
-                                                                : coll.aggregate(pipeline);
+        const cursor = pipeline[0].hasOwnProperty("$documents") ? db.aggregate(pipeline) : coll.aggregate(pipeline);
         const actualResult = cursor.toArray();
         const duration = Date.now() - startTime;
         print(`${dataset.constructor.name}.${this.constructor.name} took ${duration} ms.`);

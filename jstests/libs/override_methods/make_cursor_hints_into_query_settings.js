@@ -1,13 +1,13 @@
 import {
     sysCollNamePrefix,
-    transformIndexHintsFromTimeseriesToView
+    transformIndexHintsFromTimeseriesToView,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {
     getCollectionName,
     getCommandName,
     getExplainCommand,
     getInnerCommand,
-    isSystemBucketNss
+    isSystemBucketNss,
 } from "jstests/libs/cmd_object_utils.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {everyWinningPlan, isIdhackOrExpress} from "jstests/libs/query/analyze_plan.js";
@@ -15,7 +15,7 @@ import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
 function isMinMaxQuery(cmdObj) {
     // When using min()/max() a hint of which index to use must be provided.
-    return 'min' in cmdObj || 'max' in cmdObj;
+    return "min" in cmdObj || "max" in cmdObj;
 }
 
 function isValidIndexHint(innerCmd) {
@@ -33,7 +33,7 @@ function isValidIndexHint(innerCmd) {
         return false;
     }
     // Only numeric values are accepted for key-pattern values.
-    return objValues.every(val => typeof val === 'number');
+    return objValues.every((val) => typeof val === "number");
 }
 
 function requestsResumeToken(cmdObj) {
@@ -54,10 +54,12 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     // exit early with the original command response.
     const db = conn.getDB(dbName);
     const innerCmd = getInnerCommand(cmdObj);
-    const shouldApplyQuerySettings = isValidIndexHint(innerCmd) &&
+    const shouldApplyQuerySettings =
+        isValidIndexHint(innerCmd) &&
         // Only intercept command types supported by query settings.
         QuerySettingsUtils.isSupportedCommand(getCommandName(innerCmd)) &&
-        !isMinMaxQuery(innerCmd) && !requestsResumeToken(innerCmd);
+        !isMinMaxQuery(innerCmd) &&
+        !requestsResumeToken(innerCmd);
     if (!shouldApplyQuerySettings) {
         return originalResponse;
     }
@@ -74,10 +76,11 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     const explainCmd = getExplainCommand(innerCmd);
     const explain = assert.commandWorked(
         db.runCommand(explainCmd),
-        `Failed running explain command ${
-            toJsonForLog(explainCmd)} while transforming cursor hints into query settings`);
-    const isIdHackQuery =
-        explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+        `Failed running explain command ${toJsonForLog(
+            explainCmd,
+        )} while transforming cursor hints into query settings`,
+    );
+    const isIdHackQuery = explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
     if (isIdHackQuery) {
         // Query settings cannot be set over IDHACK or express queries.
         return originalResponse;
@@ -85,8 +88,7 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
 
     // If the collection used is a view, determine the underlying collection.
     const resolvedCollName = getCollectionName(db, innerCmd);
-    const collectionName = isSystemBucketColl ? resolvedCollName.substring(sysCollNamePrefix.length)
-                                              : resolvedCollName;
+    const collectionName = isSystemBucketColl ? resolvedCollName.substring(sysCollNamePrefix.length) : resolvedCollName;
     if (!collectionName) {
         return originalResponse;
     }
@@ -103,9 +105,11 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
     const settings = {indexHints: {ns: {db: dbName, coll: collectionName}, allowedIndexes}};
     const qsutils = new QuerySettingsUtils(db, collectionName);
     const representativeQuery = qsutils.makeQueryInstance(
-        isSystemBucketColl ? {...innerCmd, [getCommandName(innerCmd)]: collectionName} : innerCmd);
-    return qsutils.withQuerySettings(
-        representativeQuery, settings, () => clientFunction.apply(conn, makeFuncArgs(cmdObj)));
+        isSystemBucketColl ? {...innerCmd, [getCommandName(innerCmd)]: collectionName} : innerCmd,
+    );
+    return qsutils.withQuerySettings(representativeQuery, settings, () =>
+        clientFunction.apply(conn, makeFuncArgs(cmdObj)),
+    );
 }
 
 // Override the default runCommand with our custom version.
@@ -113,4 +117,5 @@ OverrideHelpers.overrideRunCommand(runCommandOverride);
 
 // Always apply the override if a test spawns a parallel shell.
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/make_cursor_hints_into_query_settings.js");
+    "jstests/libs/override_methods/make_cursor_hints_into_query_settings.js",
+);

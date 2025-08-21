@@ -21,8 +21,10 @@ export function executeAggregationTestCase(collection, testCase) {
     try {
         const actualResults = collection.aggregate(testCase.pipeline).toArray();
         if (testCase.expectedResults === undefined) {
-            assert(testCase.expectedErrorCode === undefined,
-                   `Expected an exception with code ${testCase.expectedErrorCode}`);
+            assert(
+                testCase.expectedErrorCode === undefined,
+                `Expected an exception with code ${testCase.expectedErrorCode}`,
+            );
         }
         assert.docEq(testCase.expectedResults, actualResults);
     } catch (error) {
@@ -39,19 +41,23 @@ export function executeAggregationTestCase(collection, testCase) {
 export function getExpectedPipelineLimit(database) {
     const buildInfo = assert.commandWorked(database.adminCommand("buildInfo"));
     const isDebug = buildInfo.debug;
-    const isS390X =
-        "buildEnvironment" in buildInfo ? buildInfo.buildEnvironment.distarch == "s390x" : false;
-    return isDebug ? 200 : (isS390X ? 700 : 1000);
+    const isS390X = "buildEnvironment" in buildInfo ? buildInfo.buildEnvironment.distarch == "s390x" : false;
+    return isDebug ? 200 : isS390X ? 700 : 1000;
 }
 
 /**
  * Helper for `isSlowBuild`.
  */
 function isSlowBuildInfo(buildInfo) {
-    return buildInfo.isDebug() || !buildInfo.isOptimizationsEnabled() ||
-        buildInfo.isAddressSanitizerActive() || buildInfo.isLeakSanitizerActive() ||
-        buildInfo.isThreadSanitizerActive() || buildInfo.isUndefinedBehaviorSanitizerActive() ||
-        _isSpiderMonkeyDebugEnabled();
+    return (
+        buildInfo.isDebug() ||
+        !buildInfo.isOptimizationsEnabled() ||
+        buildInfo.isAddressSanitizerActive() ||
+        buildInfo.isLeakSanitizerActive() ||
+        buildInfo.isThreadSanitizerActive() ||
+        buildInfo.isUndefinedBehaviorSanitizerActive() ||
+        _isSpiderMonkeyDebugEnabled()
+    );
 }
 
 /**
@@ -63,7 +69,7 @@ export function isSlowBuild(db) {
     if (FixtureHelpers.isMongos(db)) {
         const shardBuildInfos = FixtureHelpers.mapOnEachShardNode({
             db,
-            func: primaryDb => primaryDb.getServerBuildInfo(),
+            func: (primaryDb) => primaryDb.getServerBuildInfo(),
         });
         return shardBuildInfos.some(isSlowBuildInfo);
     }

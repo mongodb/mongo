@@ -12,18 +12,18 @@
  * additional functions exposed to shape network traffic from other processes.
  */
 function MongoBridge(options) {
-    'use strict';
+    "use strict";
 
     if (!(this instanceof MongoBridge)) {
         return new MongoBridge(options);
     }
 
     options = options || {};
-    if (!options.hasOwnProperty('dest')) {
+    if (!options.hasOwnProperty("dest")) {
         throw new Error('Missing required field "dest"');
     }
 
-    let hostName = options.hostName || 'localhost';
+    let hostName = options.hostName || "localhost";
 
     this.dest = options.dest;
     this.port = options.port || allocatePort();
@@ -42,27 +42,29 @@ function MongoBridge(options) {
     let controlConn;
 
     // Start the mongobridge on port 'this.port' routing network traffic to 'this.dest'.
-    let args = ['mongobridge', '--port', this.port, '--dest', this.dest];
-    let keysToSkip = [
-        'dest',
-        'hostName',
-        'port',
-    ];
+    let args = ["mongobridge", "--port", this.port, "--dest", this.dest];
+    let keysToSkip = ["dest", "hostName", "port"];
 
     // Append any command line arguments that are optional for mongobridge.
-    Object.keys(options).forEach(function(key) {
+    Object.keys(options).forEach(function (key) {
         if (Array.contains(keysToSkip, key)) {
             return;
         }
 
         let value = options[key];
         if (value === null || value === undefined) {
-            throw new Error("Value '" + value + "' for '" + key + "' option is ambiguous; specify" +
-                            " {flag: ''} to add --flag command line options'");
+            throw new Error(
+                "Value '" +
+                    value +
+                    "' for '" +
+                    key +
+                    "' option is ambiguous; specify" +
+                    " {flag: ''} to add --flag command line options'",
+            );
         }
 
-        args.push('--' + key);
-        if (value !== '') {
+        args.push("--" + key);
+        if (value !== "") {
             args.push(value.toString());
         }
     });
@@ -94,29 +96,29 @@ function MongoBridge(options) {
             }
 
             try {
-                userConn = new Mongo(hostName + ':' + this.port);
+                userConn = new Mongo(hostName + ":" + this.port);
             } catch (e) {
                 return false;
             }
             return true;
-        }, 'failed to connect to the mongobridge on port ' + this.port);
-        assert(!failedToStart, 'mongobridge failed to start on port ' + this.port);
+        }, "failed to connect to the mongobridge on port " + this.port);
+        assert(!failedToStart, "mongobridge failed to start on port " + this.port);
 
         // The MongoRunner.runMongoXX() functions define a 'name' property on the returned
         // connection object that is equivalent to its 'host' property. Certain functions in
         // ReplSetTest and ShardingTest use the 'name' property instead of the 'host' property, so
         // we define it here for consistency.
-        Object.defineProperty(userConn, 'name', {
+        Object.defineProperty(userConn, "name", {
             enumerable: true,
-            get: function() {
+            get: function () {
                 return this.host;
             },
         });
 
         assert.soonNoExcept(() => {
-            controlConn = new Mongo(hostName + ':' + this.port);
+            controlConn = new Mongo(hostName + ":" + this.port);
             return true;
-        }, 'failed to make control connection to the mongobridge on port ' + this.port);
+        }, "failed to make control connection to the mongobridge on port " + this.port);
     };
 
     /**
@@ -141,7 +143,7 @@ function MongoBridge(options) {
         bridges.forEach(throwErrorIfNotMongoBridgeInstance);
 
         this.acceptConnectionsFrom(bridges);
-        bridges.forEach(bridge => bridge.acceptConnectionsFrom(this));
+        bridges.forEach((bridge) => bridge.acceptConnectionsFrom(this));
     };
 
     /**
@@ -160,7 +162,7 @@ function MongoBridge(options) {
         bridges.forEach(throwErrorIfNotMongoBridgeInstance);
 
         this.rejectConnectionsFrom(bridges);
-        bridges.forEach(bridge => bridge.rejectConnectionsFrom(this));
+        bridges.forEach((bridge) => bridge.rejectConnectionsFrom(this));
     };
 
     /**
@@ -175,11 +177,15 @@ function MongoBridge(options) {
         bridges.forEach(throwErrorIfNotMongoBridgeInstance);
         bridges.forEach(checkTestCommandsEnabled("acceptConnectionsFrom"));
 
-        bridges.forEach(bridge => {
-            let res = runBridgeCommand(controlConn, 'acceptConnectionsFrom', {host: bridge.dest});
-            assert.commandWorked(res,
-                                 'failed to configure the mongobridge listening on port ' +
-                                     this.port + ' to accept new connections from ' + bridge.dest);
+        bridges.forEach((bridge) => {
+            let res = runBridgeCommand(controlConn, "acceptConnectionsFrom", {host: bridge.dest});
+            assert.commandWorked(
+                res,
+                "failed to configure the mongobridge listening on port " +
+                    this.port +
+                    " to accept new connections from " +
+                    bridge.dest,
+            );
         });
     };
 
@@ -196,11 +202,15 @@ function MongoBridge(options) {
         bridges.forEach(throwErrorIfNotMongoBridgeInstance);
         bridges.forEach(checkTestCommandsEnabled("rejectConnectionsFrom"));
 
-        bridges.forEach(bridge => {
-            let res = runBridgeCommand(controlConn, 'rejectConnectionsFrom', {host: bridge.dest});
-            assert.commandWorked(res,
-                                 'failed to configure the mongobridge listening on port ' +
-                                     this.port + ' to hang up connections from ' + bridge.dest);
+        bridges.forEach((bridge) => {
+            let res = runBridgeCommand(controlConn, "rejectConnectionsFrom", {host: bridge.dest});
+            assert.commandWorked(
+                res,
+                "failed to configure the mongobridge listening on port " +
+                    this.port +
+                    " to hang up connections from " +
+                    bridge.dest,
+            );
         });
     };
 
@@ -218,15 +228,21 @@ function MongoBridge(options) {
         bridges.forEach(throwErrorIfNotMongoBridgeInstance);
         bridges.forEach(checkTestCommandsEnabled("delayMessagesFrom"));
 
-        bridges.forEach(bridge => {
-            let res = runBridgeCommand(controlConn, 'delayMessagesFrom', {
+        bridges.forEach((bridge) => {
+            let res = runBridgeCommand(controlConn, "delayMessagesFrom", {
                 host: bridge.dest,
                 delay: delay,
             });
-            assert.commandWorked(res,
-                                 'failed to configure the mongobridge listening on port ' +
-                                     this.port + ' to delay messages from ' + bridge.dest + ' by ' +
-                                     delay + ' milliseconds');
+            assert.commandWorked(
+                res,
+                "failed to configure the mongobridge listening on port " +
+                    this.port +
+                    " to delay messages from " +
+                    bridge.dest +
+                    " by " +
+                    delay +
+                    " milliseconds",
+            );
         });
     };
 
@@ -244,15 +260,20 @@ function MongoBridge(options) {
         bridges.forEach(throwErrorIfNotMongoBridgeInstance);
         bridges.forEach(checkTestCommandsEnabled("discardMessagesFrom"));
 
-        bridges.forEach(bridge => {
-            let res = runBridgeCommand(controlConn, 'discardMessagesFrom', {
+        bridges.forEach((bridge) => {
+            let res = runBridgeCommand(controlConn, "discardMessagesFrom", {
                 host: bridge.dest,
                 loss: lossProbability,
             });
-            assert.commandWorked(res,
-                                 'failed to configure the mongobridge listening on port ' +
-                                     this.port + ' to discard messages from ' + bridge.dest +
-                                     ' with probability ' + lossProbability);
+            assert.commandWorked(
+                res,
+                "failed to configure the mongobridge listening on port " +
+                    this.port +
+                    " to discard messages from " +
+                    bridge.dest +
+                    " with probability " +
+                    lossProbability,
+            );
         });
     };
 
@@ -268,7 +289,7 @@ function MongoBridge(options) {
                 return target[property];
             }
             let value = userConn[property];
-            if (typeof value === 'function') {
+            if (typeof value === "function") {
                 return value.bind(userConn);
             }
             return value;
@@ -291,7 +312,7 @@ function MongoBridge(options) {
 // Throws an error if 'obj' is not a MongoBridge instance.
 function throwErrorIfNotMongoBridgeInstance(obj) {
     if (!(obj instanceof MongoBridge)) {
-        throw new Error('Expected MongoBridge instance, but got ' + tojson(obj));
+        throw new Error("Expected MongoBridge instance, but got " + tojson(obj));
     }
 }
 
@@ -305,7 +326,7 @@ function runBridgeCommand(conn, cmdName, cmdArgs) {
     cmdObj.$forBridge = true;
     Object.extend(cmdObj, cmdArgs);
 
-    let dbName = 'test';
+    let dbName = "test";
     let noQueryOptions = 0;
     return conn.runCommand(dbName, cmdObj, noQueryOptions);
 }
@@ -313,9 +334,11 @@ function runBridgeCommand(conn, cmdName, cmdArgs) {
 // All *From functions require that test commands be enabled on the mongod
 // instance (which populates the hostInfo field).
 function checkTestCommandsEnabled(fn_name) {
-    return function(bridge) {
-        assert(bridge._testCommandsEnabledAtInit,
-               "testing commands have not been enabled. " + fn_name + " will not work as expected");
+    return function (bridge) {
+        assert(
+            bridge._testCommandsEnabledAtInit,
+            "testing commands have not been enabled. " + fn_name + " will not work as expected",
+        );
     };
 }
 

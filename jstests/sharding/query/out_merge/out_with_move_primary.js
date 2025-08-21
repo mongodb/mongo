@@ -16,16 +16,14 @@ function testFn(shardSourceColl) {
     targetColl.drop();
 
     if (shardSourceColl) {
-        assert.commandWorked(
-            st.s.adminCommand({shardCollection: sourceColl.getFullName(), key: {_id: "hashed"}}));
+        assert.commandWorked(st.s.adminCommand({shardCollection: sourceColl.getFullName(), key: {_id: "hashed"}}));
     }
 
     assert.commandWorked(sourceColl.insert({_id: 0}));
 
     let outFp = configureFailPoint(st.shard0, "outWaitAfterTempCollectionCreation");
 
-    assert.commandWorked(
-        st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard0.shardName}));
 
     let comment = jsTestName() + "_comment";
     let outFn = `
@@ -61,8 +59,7 @@ function testFn(shardSourceColl) {
 
     outFp.wait();
 
-    assert.commandWorked(
-        st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard1.shardName}));
 
     outFp.off();
 

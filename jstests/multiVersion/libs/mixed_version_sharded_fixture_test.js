@@ -4,10 +4,10 @@ import {copyJSON} from "jstests/libs/json_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const latestVersion = {
-    binVersion: "latest"
+    binVersion: "latest",
 };
 const lastLTSVersion = {
-    binVersion: "last-lts"
+    binVersion: "last-lts",
 };
 
 /**
@@ -50,7 +50,7 @@ export function testPerformShardedClusterRollingRestart({
         other: {
             mongosOptions: {...startingVersion, ...copyJSON(startingNodeOptions)},
             configOptions: {...startingVersion, ...copyJSON(startingNodeOptions)},
-            rsOptions: {...startingVersion, ...copyJSON(startingNodeOptions)}
+            rsOptions: {...startingVersion, ...copyJSON(startingNodeOptions)},
         },
     });
     st.configRS.awaitReplication();
@@ -59,47 +59,63 @@ export function testPerformShardedClusterRollingRestart({
 
     beforeRestart(st.s);
 
-    const justWaitForStable =
-        {upgradeShards: false, upgradeMongos: false, upgradeConfigs: false, waitUntilStable: true};
+    const justWaitForStable = {
+        upgradeShards: false,
+        upgradeMongos: false,
+        upgradeConfigs: false,
+        waitUntilStable: true,
+    };
 
     // Upgrade the configs.
-    st.upgradeCluster(restartVersion.binVersion,
-                      {...justWaitForStable, upgradeConfigs: true},
-                      copyJSON(restartNodeOptions));
+    st.upgradeCluster(
+        restartVersion.binVersion,
+        {...justWaitForStable, upgradeConfigs: true},
+        copyJSON(restartNodeOptions),
+    );
     afterConfigHasRestarted(st.s);
 
     // Upgrade the secondary shard.
-    st.upgradeCluster(restartVersion.binVersion,
-                      {...justWaitForStable, upgradeOneShard: st.rs1},
-                      copyJSON(restartNodeOptions));
+    st.upgradeCluster(
+        restartVersion.binVersion,
+        {...justWaitForStable, upgradeOneShard: st.rs1},
+        copyJSON(restartNodeOptions),
+    );
     afterSecondaryShardHasRestarted(st.s);
 
     // Upgrade the rest of the cluster.
-    st.upgradeCluster(restartVersion.binVersion,
-                      {...justWaitForStable, upgradeShards: true},
-                      copyJSON(restartNodeOptions));
+    st.upgradeCluster(
+        restartVersion.binVersion,
+        {...justWaitForStable, upgradeShards: true},
+        copyJSON(restartNodeOptions),
+    );
     afterPrimaryShardHasRestarted(st.s);
 
     // Upgrade mongos.
-    st.upgradeCluster(restartVersion.binVersion,
-                      {...justWaitForStable, upgradeMongos: true},
-                      copyJSON(restartNodeOptions));
+    st.upgradeCluster(
+        restartVersion.binVersion,
+        {...justWaitForStable, upgradeMongos: true},
+        copyJSON(restartNodeOptions),
+    );
     afterMongosHasRestarted(st.s);
 
     if (afterFCVBump) {
         // Upgrade the FCV.
-        assert.commandWorked(st.s.getDB(jsTestName()).adminCommand({
-            setFeatureCompatibilityVersion: latestFCV,
-            confirm: true
-        }));
+        assert.commandWorked(
+            st.s.getDB(jsTestName()).adminCommand({
+                setFeatureCompatibilityVersion: latestFCV,
+                confirm: true,
+            }),
+        );
 
         afterFCVBump(st.s);
 
         // Downgrade FCV without restarting.
-        assert.commandWorked(st.s.getDB(jsTestName()).adminCommand({
-            setFeatureCompatibilityVersion: lastLTSFCV,
-            confirm: true
-        }));
+        assert.commandWorked(
+            st.s.getDB(jsTestName()).adminCommand({
+                setFeatureCompatibilityVersion: lastLTSFCV,
+                confirm: true,
+            }),
+        );
 
         afterMongosHasRestarted(st.s);
     }
@@ -116,7 +132,7 @@ export function testPerformUpgradeSharded({
     whenSecondariesAndConfigAreLatestBinary,
     whenMongosBinaryIsLastLTS,
     whenBinariesAreLatestAndFCVIsLastLTS,
-    whenFullyUpgraded
+    whenFullyUpgraded,
 }) {
     testPerformShardedClusterRollingRestart({
         startingVersion: lastLTSVersion,

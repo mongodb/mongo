@@ -28,10 +28,8 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 
 function assertClassicMultiPlannerMetrics(multiPlannerMetrics, expectedCount) {
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros),
-              expectedCount);
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans),
-              expectedCount);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros), expectedCount);
+    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans), expectedCount);
     assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicWorks), expectedCount);
     assert.eq(multiPlannerMetrics.classicCount, expectedCount);
     assert.eq(multiPlannerMetrics.stoppingCondition.hitEof, expectedCount * 2);
@@ -54,8 +52,7 @@ assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
 
 // Run with classic engine and verify metrics.
 {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
@@ -64,8 +61,7 @@ assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
 
 // Run with SBE and verify metrics.
 {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
@@ -74,8 +70,8 @@ assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
 
 assert.soon(() => {
     // Verify FTDC includes aggregate metrics.
-    const multiPlannerMetricsFtdc =
-        verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query.multiPlanner;
+    const multiPlannerMetricsFtdc = verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query
+        .multiPlanner;
 
     const expectedClassicCount = 2;
     if (multiPlannerMetricsFtdc.classicCount != expectedClassicCount) {
@@ -92,8 +88,7 @@ assert.soon(() => {
     // Run the query with a low works limit.
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 1}));
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 10000}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationWorks: 10000}));
 
     assert.docEq(db.serverStatus().metrics.query.multiPlanner.stoppingCondition, {
         hitEof: 4,
@@ -109,11 +104,9 @@ assert.soon(() => {
     assert.commandWorked(coll.insert({_id: 7, a: 1, b: 1, c: 1}));
 
     // Run the query with a low results limit.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlanEvaluationMaxResults: 1}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationMaxResults: 1}));
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryPlanEvaluationMaxResults: 101}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryPlanEvaluationMaxResults: 101}));
 
     assert.docEq(db.serverStatus().metrics.query.multiPlanner.stoppingCondition, {
         hitEof: 4,

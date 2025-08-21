@@ -28,13 +28,15 @@ const docs = [
 assert.commandWorked(coll.insertMany(docs));
 
 function assertNoError(aggFunction, aggFunctionArgument) {
-    const pipeline = [{
-        $group: {
-            _id: "$groupKey",
-            agg: {[aggFunction]: aggFunctionArgument},
-            $doingMerge: true,
-        }
-    }];
+    const pipeline = [
+        {
+            $group: {
+                _id: "$groupKey",
+                agg: {[aggFunction]: aggFunctionArgument},
+                $doingMerge: true,
+            },
+        },
+    ];
     assert.eq(coll.aggregate(pipeline).toArray().length, 2);
 }
 

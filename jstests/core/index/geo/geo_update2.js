@@ -19,8 +19,7 @@ function p() {
     for (var y = 0; y < 10; y++) {
         var c = t.find({y: y}).sort({x: 1});
         var s = "";
-        while (c.hasNext())
-            s += c.next().z + " ";
+        while (c.hasNext()) s += c.next().z + " ";
         print(s);
     }
     print("--------------");
@@ -28,13 +27,11 @@ function p() {
 
 p();
 
-assert.commandWorked(
-    t.update({"loc": {"$within": {"$center": [[5, 5], 2]}}}, {'$inc': {'z': 1}}, false, true));
+assert.commandWorked(t.update({"loc": {"$within": {"$center": [[5, 5], 2]}}}, {"$inc": {"z": 1}}, false, true));
 p();
 
-assert.commandWorked(t.update({}, {'$inc': {'z': 1}}, false, true));
+assert.commandWorked(t.update({}, {"$inc": {"z": 1}}, false, true));
 p();
 
-assert.commandWorked(
-    t.update({"loc": {"$within": {"$center": [[5, 5], 2]}}}, {'$inc': {'z': 1}}, false, true));
+assert.commandWorked(t.update({"loc": {"$within": {"$center": [[5, 5], 2]}}}, {"$inc": {"z": 1}}, false, true));
 p();

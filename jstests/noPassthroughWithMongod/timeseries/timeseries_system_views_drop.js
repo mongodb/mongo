@@ -14,11 +14,10 @@ const testDB = db.getSiblingDB("timeseries_system_views_drop");
 
 TimeseriesTest.run((insert) => {
     const tsColl = testDB.timeseries_system_views_drop;
-    const timeFieldName = 'time';
+    const timeFieldName = "time";
 
     tsColl.drop();
-    assert.commandWorked(
-        testDB.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(testDB.createCollection(tsColl.getName(), {timeseries: {timeField: timeFieldName}}));
 
     assert.eq(testDB.system.views.find().toArray().length, 1);
     assert.throws(() => {

@@ -43,8 +43,7 @@ const insertCmd = {
 const firstRes = assert.commandWorked(sessionCollection.runCommand("update", updateCmd));
 assert.eq({n: firstRes.n, nModified: firstRes.nModified}, {n: 1, nModified: 1});
 
-assert.commandWorked(db.adminCommand(
-    {moveChunk: collection.getFullName(), find: {"x.y": 5}, to: st.shard1.shardName}));
+assert.commandWorked(db.adminCommand({moveChunk: collection.getFullName(), find: {"x.y": 5}, to: st.shard1.shardName}));
 
 const secondRes = assert.commandWorked(sessionCollection.runCommand("update", updateCmd));
 print(`secondRes: ${tojsononeline(secondRes)}`);
@@ -56,8 +55,9 @@ const firstResDelete = assert.commandWorked(sessionCollection.runCommand("delete
 assert.eq({n: firstResDelete.n}, {n: 1});
 assert.eq(collection.findOne({_id: 1}), null);
 
-assert.commandWorked(db.adminCommand(
-    {moveChunk: collection.getFullName(), find: {"x.y": 15}, to: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({moveChunk: collection.getFullName(), find: {"x.y": 15}, to: st.shard0.shardName}),
+);
 
 const secondResDelete = assert.commandWorked(sessionCollection.runCommand("delete", deleteCmd));
 print(`secondResDelete: ${tojsononeline(secondResDelete)}`);
@@ -69,8 +69,9 @@ assert.eq(secondResDelete.n, firstResDelete.n);
 const firstResInsert = assert.commandWorked(sessionCollection.runCommand("insert", insertCmd));
 assert.eq({n: firstResInsert.n}, {n: 1});
 
-assert.commandWorked(db.adminCommand(
-    {moveChunk: collection.getFullName(), find: {"x.y": 25}, to: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({moveChunk: collection.getFullName(), find: {"x.y": 25}, to: st.shard0.shardName}),
+);
 
 const secondResInsert = assert.commandWorked(sessionCollection.runCommand("insert", insertCmd));
 print(`secondResInsert: ${tojsononeline(secondResInsert)}`);

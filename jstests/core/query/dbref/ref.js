@@ -5,7 +5,7 @@ var other = {s: "other thing", n: 1};
 db.otherthings.save(other);
 
 // Verify that the DBPointer prototype is not serializable
-assert.throws(function() {
+assert.throws(function () {
     db.things.save({a: DBPointer.prototype});
 });
 

@@ -10,22 +10,20 @@ function runTest(cursorId, coll) {
     const db = coll.getDB();
     const adminDB = db.getSiblingDB("admin");
     // Test that active cursors do not show up as idle cursors.
-    const idleCursors =
-        adminDB
-            .aggregate([
-                {"$currentOp": {"localOps": true, "idleCursors": true, "allUsers": false}},
-                {"$match": {"type": "idleCursor"}}
-            ])
-            .toArray();
+    const idleCursors = adminDB
+        .aggregate([
+            {"$currentOp": {"localOps": true, "idleCursors": true, "allUsers": false}},
+            {"$match": {"type": "idleCursor"}},
+        ])
+        .toArray();
     assert.eq(idleCursors.length, 0, tojson(idleCursors));
     // Test that an active cursor shows up in currentOp.
-    const activeCursors =
-        adminDB
-            .aggregate([
-                {"$currentOp": {"localOps": true, "idleCursors": false, "allUsers": false}},
-                {"$match": {"cursor": {"$exists": true}}}
-            ])
-            .toArray();
+    const activeCursors = adminDB
+        .aggregate([
+            {"$currentOp": {"localOps": true, "idleCursors": false, "allUsers": false}},
+            {"$match": {"cursor": {"$exists": true}}},
+        ])
+        .toArray();
     assert.eq(activeCursors.length, 1, tojson(activeCursors));
     const cursorObject = activeCursors[0].cursor;
     assert.eq(cursorObject.originatingCommand.find, coll.getName(), tojson(activeCursors));
@@ -40,11 +38,11 @@ withPinnedCursor({
     sessionId: null,
     db: conn.getDB("test"),
     assertFunction: runTest,
-    runGetMoreFunc: function(collName, cursorId) {
+    runGetMoreFunc: function (collName, cursorId) {
         assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName}));
     },
     failPointName: failPointName,
-    assertEndCounts: true
+    assertEndCounts: true,
 });
 MongoRunner.stopMongod(conn);
 
@@ -56,10 +54,10 @@ withPinnedCursor({
     sessionId: null,
     db: st.s.getDB("test"),
     assertFunction: runTest,
-    runGetMoreFunc: function(collName, cursorId) {
+    runGetMoreFunc: function (collName, cursorId) {
         assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName}));
     },
     failPointName: failPointName,
-    assertEndCounts: true
+    assertEndCounts: true,
 });
 st.stop();

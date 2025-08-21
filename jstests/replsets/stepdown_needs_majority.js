@@ -26,7 +26,8 @@ function assertStepDownFailsWithExceededTimeLimit(node) {
     assert.commandFailedWithCode(
         node.adminCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 5}),
         ErrorCodes.ExceededTimeLimit,
-        "step down did not fail with 'ExceededTimeLimit'");
+        "step down did not fail with 'ExceededTimeLimit'",
+    );
 }
 
 function assertStepDownSucceeds(node) {
@@ -40,14 +41,14 @@ function nodeIdStr(repltest, node) {
 //
 // Test setup
 //
-var name = 'stepdown_needs_majority';
+var name = "stepdown_needs_majority";
 var replTest = new ReplSetTest({name: name, nodes: 5, settings: {chainingAllowed: false}});
 
 replTest.startSet();
 replTest.initiate();
 
 var primary = replTest.getPrimary();
-var testDB = primary.getDB('testdb');
+var testDB = primary.getDB("testdb");
 var coll = testDB[name];
 var dummy_doc = {"dummy_key": "dummy_val"};
 var timeout = ReplSetTest.kDefaultTimeoutMS;

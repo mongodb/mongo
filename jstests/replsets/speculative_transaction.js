@@ -20,8 +20,9 @@ const secondary = rst.getSecondary();
 var testDB = primary.getDB(dbName);
 const coll = testDB[collName];
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 function runTest(sessionOptions) {
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
@@ -91,11 +92,9 @@ function runTest(sessionOptions) {
     assert.eq(sessionColl.findOne({_id: 1}), {_id: 1, y: 1});
 
     // But update fails
-    assert.commandFailedWithCode(sessionColl.update({_id: 1}, {$inc: {x: 1}}),
-                                 ErrorCodes.WriteConflict);
+    assert.commandFailedWithCode(sessionColl.update({_id: 1}, {$inc: {x: 1}}), ErrorCodes.WriteConflict);
 
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
     // Restart server replication to allow majority commit point to advance.
     restartServerReplication(secondary);

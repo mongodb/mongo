@@ -14,7 +14,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkWriteConcernBehaviorAdditionalCRUDOps,
-    checkWriteConcernBehaviorForAllCommands
+    checkWriteConcernBehaviorForAllCommands,
 } from "jstests/libs/write_concern_all_commands.js";
 
 const name = jsTestName();

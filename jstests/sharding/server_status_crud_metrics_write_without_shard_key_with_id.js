@@ -14,8 +14,7 @@ const testColl = testDB.coll;
 
 Random.setRandomSeed();
 
-assert.commandWorked(
-    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.rs0.getURL()}));
 
 CreateShardedCollectionUtil.shardCollectionWithChunks(testColl, {x: 1}, [
     {min: {x: MinKey}, max: {x: -100}, shard: st.shard0.shardName},
@@ -24,8 +23,7 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(testColl, {x: 1}, [
 ]);
 
 // Move chunk from shard0 to shard1.
-assert.commandWorked(testDB.adminCommand(
-    {moveChunk: testColl.getFullName(), find: {x: 1}, to: st.shard1.shardName}));
+assert.commandWorked(testDB.adminCommand({moveChunk: testColl.getFullName(), find: {x: 1}, to: st.shard1.shardName}));
 
 const session = st.s.startSession({retryWrites: true});
 const sessionColl = session.getDatabase(testDB.getName()).getCollection(testDB.coll.getName());

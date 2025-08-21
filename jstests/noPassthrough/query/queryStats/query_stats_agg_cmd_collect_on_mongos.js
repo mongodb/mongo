@@ -7,7 +7,7 @@ import {
     assertExpectedResults,
     getLatestQueryStatsEntry,
     getQueryStats,
-    getQueryStatsAggCmd
+    getQueryStatsAggCmd,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -19,8 +19,8 @@ const st = new ShardingTest({
     mongosOptions: {
         setParameter: {
             internalQueryStatsRateLimit: -1,
-            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-        }
+            "failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}",
+        },
     },
 });
 const mongos = st.s;
@@ -38,20 +38,16 @@ const db = mongos.getDB("test");
             command: "aggregate",
             pipeline: [
                 {$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}},
-                {$project: {_id: true, hello: true}}
-            ]
-
+                {$project: {_id: true, hello: true}},
+            ],
         },
         cursor: {batchSize: "?number"},
         applicationName: "MongoDB Shell",
     };
 
-    const cursor = coll.aggregate(
-        [
-            {$match: {v: {$gt: 0, $lt: 5}}},
-            {$project: {hello: true}},
-        ],
-        {cursor: {batchSize: 1}});  // returns 1 doc
+    const cursor = coll.aggregate([{$match: {v: {$gt: 0, $lt: 5}}}, {$project: {hello: true}}], {
+        cursor: {batchSize: 1},
+    }); // returns 1 doc
 
     // Since the cursor hasn't been exhausted yet, ensure no query stats results have been written
     // yet.
@@ -60,11 +56,13 @@ const db = mongos.getDB("test");
 
     // Run a getMore to exhaust the cursor, then ensure query stats results have been written
     // accurately. batchSize must be 2 so the cursor recognizes exhaustion.
-    assert.commandWorked(db.runCommand({
-        getMore: cursor.getId(),
-        collection: coll.getName(),
-        batchSize: 2
-    }));  // returns 1 doc, exhausts the cursor
+    assert.commandWorked(
+        db.runCommand({
+            getMore: cursor.getId(),
+            collection: coll.getName(),
+            batchSize: 2,
+        }),
+    ); // returns 1 doc, exhausts the cursor
     queryStats = getQueryStatsAggCmd(db);
     assert.eq(1, queryStats.length, queryStats);
     assertExpectedResults({
@@ -75,23 +73,14 @@ const db = mongos.getDB("test");
         expectedDocsReturnedMax: 2,
         expectedDocsReturnedMin: 2,
         expectedDocsReturnedSumOfSq: 4,
-        getMores: true
+        getMores: true,
     });
 
     // Run more queries (to exhaustion) with the same query shape, and ensure query stats results
     // are accurate.
-    coll.aggregate([
-        {$match: {v: {$gt: 0, $lt: 5}}},
-        {$project: {hello: true}},
-    ]);  // returns 2 docs
-    coll.aggregate([
-        {$match: {v: {$gt: 2, $lt: 3}}},
-        {$project: {hello: true}},
-    ]);  // returns 0 docs
-    coll.aggregate([
-        {$match: {v: {$gt: 0, $lt: 2}}},
-        {$project: {hello: true}},
-    ]);  // returns 1 doc
+    coll.aggregate([{$match: {v: {$gt: 0, $lt: 5}}}, {$project: {hello: true}}]); // returns 2 docs
+    coll.aggregate([{$match: {v: {$gt: 2, $lt: 3}}}, {$project: {hello: true}}]); // returns 0 docs
+    coll.aggregate([{$match: {v: {$gt: 0, $lt: 2}}}, {$project: {hello: true}}]); // returns 1 doc
     queryStats = getQueryStatsAggCmd(db);
     assert.eq(1, queryStats.length, queryStats);
     assertExpectedResults({
@@ -102,7 +91,7 @@ const db = mongos.getDB("test");
         expectedDocsReturnedMax: 2,
         expectedDocsReturnedMin: 0,
         expectedDocsReturnedSumOfSq: 9,
-        getMores: true
+        getMores: true,
     });
 }
 
@@ -117,25 +106,16 @@ const db = mongos.getDB("test");
         queryShape: {
             cmdNs: {db: "test", coll: "coll2"},
             command: "aggregate",
-            pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}]
+            pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}],
         },
         cursor: {batchSize: "?number"},
         applicationName: "MongoDB Shell",
     };
 
-    const cursor1 = coll.aggregate(
-        [
-            {$match: {v: {$gt: 0, $lt: 5}}},
-        ],
-        {cursor: {batchSize: 1}});  // returns 1 doc
-    const cursor2 = coll.aggregate(
-        [
-            {$match: {v: {$gt: 0, $lt: 2}}},
-        ],
-        {cursor: {batchSize: 1}});  // returns 1 doc
+    const cursor1 = coll.aggregate([{$match: {v: {$gt: 0, $lt: 5}}}], {cursor: {batchSize: 1}}); // returns 1 doc
+    const cursor2 = coll.aggregate([{$match: {v: {$gt: 0, $lt: 2}}}], {cursor: {batchSize: 1}}); // returns 1 doc
 
-    assert.commandWorked(
-        db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
+    assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
     const queryStats = getLatestQueryStatsEntry(db, {collName: coll.getName()});
     assertExpectedResults({
         results: queryStats,
@@ -145,7 +125,7 @@ const db = mongos.getDB("test");
         expectedDocsReturnedMax: 1,
         expectedDocsReturnedMin: 1,
         expectedDocsReturnedSumOfSq: 2,
-        getMores: false
+        getMores: false,
     });
 }
 

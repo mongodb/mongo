@@ -32,8 +32,7 @@ const db = primary.getDB(dbName);
 const secondarydb = secondary.getDB(dbName);
 
 // Only run this test for debug=off, because we log all batches in debug builds.
-const debugBuild =
-    db.adminCommand("buildInfo").debug || secondarydb.adminCommand("buildInfo").debug;
+const debugBuild = db.adminCommand("buildInfo").debug || secondarydb.adminCommand("buildInfo").debug;
 if (debugBuild) {
     jsTestLog("Skipping the test because debug is on.");
     replSet.stopSet();
@@ -43,17 +42,21 @@ if (debugBuild) {
 function healthLogConsistent(params) {
     jsTestLog("Clear healthLog and run dbcheck and waits for it to finish.");
     resetAndInsert(replSet, db, collName, nDocs);
-    assert.commandWorked(db.runCommand({
-        createIndexes: collName,
-        indexes: [{key: {a: 1}, name: 'a_1'}],
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            createIndexes: collName,
+            indexes: [{key: {a: 1}, name: "a_1"}],
+        }),
+    );
     replSet.awaitReplication();
 
-    runDbCheck(replSet,
-               db,
-               collName,
-               {...params, maxDocsPerBatch: 1, maxBatchTimeMillis: maxBatchTimeMillis},
-               true /* awaitCompletion */);
+    runDbCheck(
+        replSet,
+        db,
+        collName,
+        {...params, maxDocsPerBatch: 1, maxBatchTimeMillis: maxBatchTimeMillis},
+        true /* awaitCompletion */,
+    );
 
     const collUUID = db.getCollectionInfos({name: collName})[0].info.uuid;
     let query = {operation: "dbCheckBatch", collectionUUID: collUUID};
@@ -66,24 +69,28 @@ function healthLogConsistent(params) {
     checkHealthLog(primaryHealthlog, query, 0);
     checkHealthLog(secondaryHealthlog, query, 0);
 
-    let primaryHealthLogs =
-        primaryHealthlog.find({operation: "dbCheckBatch"}).toArray().reduce((map, log) => {
+    let primaryHealthLogs = primaryHealthlog
+        .find({operation: "dbCheckBatch"})
+        .toArray()
+        .reduce((map, log) => {
             map[log.data.batchId] = log.data;
             return map;
         }, {});
-    let secondaryHealthLogs =
-        secondaryHealthlog.find({operation: "dbCheckBatch"}).toArray().reduce((map, log) => {
+    let secondaryHealthLogs = secondaryHealthlog
+        .find({operation: "dbCheckBatch"})
+        .toArray()
+        .reduce((map, log) => {
             map[log.data.batchId] = log.data;
             return map;
         }, {});
 
-    jsTestLog(`Verifying that batch healthlog entries should be the same across nodes. Params: ${
-        tojson(params)}`);
+    jsTestLog(`Verifying that batch healthlog entries should be the same across nodes. Params: ${tojson(params)}`);
     jsTestLog(`Primary health log: ${tojson(primaryHealthLogs)}`);
-    assert.eq(tojson(primaryHealthLogs),
-              tojson(secondaryHealthLogs),
-              `primary health logs: ${tojson(primaryHealthLogs)}, secondary health logs: ${
-                  tojson(secondaryHealthLogs)}`);
+    assert.eq(
+        tojson(primaryHealthLogs),
+        tojson(secondaryHealthLogs),
+        `primary health logs: ${tojson(primaryHealthLogs)}, secondary health logs: ${tojson(secondaryHealthLogs)}`,
+    );
 }
 
 // Running the dbcheck multiple times should invalidate all the in-memory states between primary
@@ -94,7 +101,7 @@ const validateModes = [
     {},
     {validateMode: "dataConsistency"},
     {validateMode: "dataConsistencyAndMissingIndexKeysCheck"},
-    {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1"}
+    {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1"},
 ];
 for (let i = 0; i < 3; i++) {
     for (let params of validateModes) {

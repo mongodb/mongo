@@ -3,10 +3,7 @@
  * and none are missing.
  * @tags: [requires_fcv_72]
  */
-import {
-    runCommandAndValidateQueryStats,
-    withQueryStatsEnabled
-} from "jstests/libs/query/query_stats_utils.js";
+import {runCommandAndValidateQueryStats, withQueryStatsEnabled} from "jstests/libs/query/query_stats_utils.js";
 
 const collName = jsTestName();
 const aggregateCommandObj = {
@@ -21,14 +18,13 @@ const aggregateCommandObj = {
     collation: {locale: "en_US", strength: 2},
     hint: {"v": 1},
     comment: "",
-    let : {},
+    let: {},
     apiDeprecationErrors: false,
     apiVersion: "1",
     apiStrict: false,
 };
 
-const queryShapeAggregateFields =
-    ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
+const queryShapeAggregateFields = ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
 
 // The outer fields not nested inside queryShape.
 const queryStatsAggregateKeyFields = [
@@ -58,6 +54,6 @@ withQueryStatsEnabled(collName, (coll) => {
         commandName: "aggregate",
         commandObj: aggregateCommandObj,
         shapeFields: queryShapeAggregateFields,
-        keyFields: queryStatsAggregateKeyFields
+        keyFields: queryStatsAggregateKeyFields,
     });
 });

@@ -7,8 +7,7 @@ coll.drop();
 
 assert.commandWorked(coll.insert({_id: 1}));
 
-const pipeline =
-    [{$setWindowFields: {output: {obj: {$first: null}}}}, {$group: {_id: "$obj.nonexistent"}}];
+const pipeline = [{$setWindowFields: {output: {obj: {$first: null}}}}, {$group: {_id: "$obj.nonexistent"}}];
 
 const expected = [{_id: null}];
 

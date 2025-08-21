@@ -22,8 +22,7 @@ f.drop();
 f.createIndex({x: 1, y: 1});
 assert.eq(0, f.count(), "1. initial count should be zero");
 
-let res =
-    db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
+let res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
 assert.commandWorked(res, "1a");
 
 f.save({x: 1, y: 1});
@@ -108,8 +107,7 @@ res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPatter
 assert.commandFailed(res, "4c " + tojson(res));
 res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
 assert.commandFailed(res, "4d " + tojson(res));
-res = db.runCommand(
-    {checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
 assert.commandFailed(res, "4e " + tojson(res));
 
 f.remove({y: 2});
@@ -117,8 +115,7 @@ f.dropIndex({x: 1, y: 1, z: 1});
 f.createIndex({x: 1, y: 1, z: 1});
 
 assert.eq(1, f.count(), "4. count after removing array value should be 1");
-res = db.runCommand(
-    {checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
 assert.commandWorked(res, "4f " + tojson(res));
 
 f.save({x: 3, y: [1, 2], z: 3});
@@ -128,8 +125,7 @@ res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPatter
 assert.commandFailed(res, "4g " + tojson(res));
 res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
 assert.commandFailed(res, "4h " + tojson(res));
-res = db.runCommand(
-    {checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
 assert.commandFailed(res, "4i " + tojson(res));
 
 f.remove({x: 3});
@@ -138,8 +134,7 @@ f.dropIndex({x: 1, y: 1, z: 1});
 f.createIndex({x: 1, y: 1, z: 1});
 
 assert.eq(1, f.count(), "4. count after removing array value should be 1 again");
-res = db.runCommand(
-    {checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
 assert.commandWorked(res, "4e " + tojson(res));
 
 f.save({x: 4, y: 4, z: [1, 2]});
@@ -149,8 +144,7 @@ res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPatter
 assert.commandFailed(res, "4c " + tojson(res));
 res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
 assert.commandFailed(res, "4d " + tojson(res));
-res = db.runCommand(
-    {checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
+res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1, z: 1}});
 assert.commandFailed(res, "4e " + tojson(res));
 
 // -------------------------
@@ -197,8 +191,7 @@ f.drop();
 f.createIndex({x: 1, y: 1}, {sparse: true, collation: {locale: "en"}});
 res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
 assert.commandFailed(res);
-assert(res.errmsg.includes("Index key is sparse.") &&
-       res.errmsg.includes("Index has a non-simple collation."));
+assert(res.errmsg.includes("Index key is sparse.") && res.errmsg.includes("Index has a non-simple collation."));
 
 // Multiple incompatible indexes: Index key is multikey and is partial:
 f.drop();
@@ -207,8 +200,7 @@ f.createIndex({x: 1, y: 1}, {name: "index_2"});
 f.save({y: [1, 2, 3, 4, 5]});
 res = db.runCommand({checkShardingIndex: "test.jstests_shardingindex", keyPattern: {x: 1, y: 1}});
 assert.commandFailed(res);
-assert(res.errmsg.includes("Index key is multikey.") &&
-       res.errmsg.includes("Index key is partial."));
+assert(res.errmsg.includes("Index key is multikey.") && res.errmsg.includes("Index key is partial."));
 
 // Multiple incompatible indexes: Index key is partial and sparse:
 f.drop();

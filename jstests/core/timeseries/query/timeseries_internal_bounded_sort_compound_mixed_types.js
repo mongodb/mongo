@@ -12,20 +12,18 @@
  *   requires_getmore,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
-assert.commandWorked(db.createCollection(coll.getName(), {
-    timeseries: {timeField: 't', metaField: 'm'},
-    collation: {locale: 'en_US', strength: 2},
-}));
-const bucketMaxSpanSeconds =
-    db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
+assert.commandWorked(
+    db.createCollection(coll.getName(), {
+        timeseries: {timeField: "t", metaField: "m"},
+        collation: {locale: "en_US", strength: 2},
+    }),
+);
+const bucketMaxSpanSeconds = db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.bucketMaxSpanSeconds;
 
 // For each interesting value, insert two events:
 //   {m: <interesting>, t: <low>}
@@ -35,15 +33,15 @@ const bucketMaxSpanSeconds =
 // We insert two events per 'm' value so we can tell whether two 'm' values tied or not:
 // the events will be interleaved if (and only if) the 'm' values tied.
 {
-    const epoch = ISODate('1970-01-01');
+    const epoch = ISODate("1970-01-01");
 
     // Pick values with interesting equality behavior.
     let interestingValues = [
         // Strings that differ only by case.
-        'a',
-        'A',
-        'b',
-        'B',
+        "a",
+        "A",
+        "b",
+        "B",
         // Arrays whose highest or lowest element is equal.
         [5],
         [5, 99],
@@ -69,8 +67,8 @@ const bucketMaxSpanSeconds =
     ];
     // Also wrap each interesting value in an object or array.
     // Some values that are "equal" at the top level may be distinguished when wrapped this way.
-    const arrayWrapped = interestingValues.map(v => [v]);
-    const objectWrapped = interestingValues.map(v => ({w: v}));
+    const arrayWrapped = interestingValues.map((v) => [v]);
+    const objectWrapped = interestingValues.map((v) => ({w: v}));
     interestingValues = interestingValues.concat(arrayWrapped).concat(objectWrapped);
 
     let docs = [];
@@ -86,41 +84,37 @@ const bucketMaxSpanSeconds =
     }
 
     assert.commandWorked(coll.insert(docs));
-    printjson(getTimeseriesCollForRawOps(coll)
-                  .find({}, {_id: 0, meta: 1}, kRawOperationSpec)
-                  .sort({meta: 1})
-                  .toArray());
-    const numInterestingValues = 1 + interestingValues.length;  // +1 for missing.
+    printjson(
+        getTimeseriesCollForRawOps(coll).find({}, {_id: 0, meta: 1}, kRawOperationSpec).sort({meta: 1}).toArray(),
+    );
+    const numInterestingValues = 1 + interestingValues.length; // +1 for missing.
     // Some of these interestingValues may be considered equal for bucketing purposes, so
     // we can get fewer than numInterestingValues buckets. But if we get more buckets than expected,
     // that probably means our timestamps are too far apart, which could lead to this test passing
     // for the wrong reason.
-    assert.lte(getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec),
-               numInterestingValues,
-               `Expected no more than numInterestingValues (${numInterestingValues}) buckets`);
+    assert.lte(
+        getTimeseriesCollForRawOps(coll).count({}, kRawOperationSpec),
+        numInterestingValues,
+        `Expected no more than numInterestingValues (${numInterestingValues}) buckets`,
+    );
 }
 
-const unpackStage = getAggPlanStage(coll.explain().aggregate(), '$_internalUnpackBucket');
+const unpackStage = getAggPlanStage(coll.explain().aggregate(), "$_internalUnpackBucket");
 
 function runTest(sortSpec) {
-    assert.eq(['m', 't'], Object.keys(sortSpec), 'Expected a compound sort on {m: _, t: _}');
+    assert.eq(["m", "t"], Object.keys(sortSpec), "Expected a compound sort on {m: _, t: _}");
     assert.contains(sortSpec.m, [-1, +1]);
     assert.contains(sortSpec.t, [-1, +1]);
 
-    const naiveQuery = [
-        unpackStage,
-        {$_internalInhibitOptimization: {}},
-        {$sort: sortSpec},
-    ];
-    const naive =
-        getTimeseriesCollForRawOps(coll).aggregate(naiveQuery, kRawOperationSpec).toArray();
+    const naiveQuery = [unpackStage, {$_internalInhibitOptimization: {}}, {$sort: sortSpec}];
+    const naive = getTimeseriesCollForRawOps(coll).aggregate(naiveQuery, kRawOperationSpec).toArray();
 
     const optFromMinQuery = [
         {
             $sort: {
-                'meta': sortSpec.m,
-                'control.min.t': sortSpec.t,
-            }
+                "meta": sortSpec.m,
+                "control.min.t": sortSpec.t,
+            },
         },
         unpackStage,
         {
@@ -130,19 +124,18 @@ function runTest(sortSpec) {
                 // With such a loose bound, events are only released due to a partition boundary,
                 // never a bucket boundary.
                 bound: {base: "min", offsetSeconds: -sortSpec.t * 10 * bucketMaxSpanSeconds},
-            }
+            },
         },
     ];
-    const optFromMin =
-        getTimeseriesCollForRawOps(coll).aggregate(optFromMinQuery, kRawOperationSpec).toArray();
+    const optFromMin = getTimeseriesCollForRawOps(coll).aggregate(optFromMinQuery, kRawOperationSpec).toArray();
     assert.eq(naive, optFromMin);
 
     const optFromMaxQuery = [
         {
             $sort: {
-                'meta': sortSpec.m,
-                'control.max.t': sortSpec.t,
-            }
+                "meta": sortSpec.m,
+                "control.max.t": sortSpec.t,
+            },
         },
         unpackStage,
         {
@@ -152,11 +145,10 @@ function runTest(sortSpec) {
                 // With such a loose bound, events are only released due to a partition boundary,
                 // never a bucket boundary.
                 bound: {base: "max", offsetSeconds: -sortSpec.t * 10 * bucketMaxSpanSeconds},
-            }
+            },
         },
     ];
-    const optFromMax =
-        getTimeseriesCollForRawOps(coll).aggregate(optFromMaxQuery, kRawOperationSpec).toArray();
+    const optFromMax = getTimeseriesCollForRawOps(coll).aggregate(optFromMaxQuery, kRawOperationSpec).toArray();
     assert.eq(naive, optFromMax);
 }
 

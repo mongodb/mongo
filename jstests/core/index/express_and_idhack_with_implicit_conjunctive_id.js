@@ -9,13 +9,11 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {isExpress, isIdhack} from "jstests/libs/query/analyze_plan.js";
 
-const collName = 'express_and_idhack_with_implicit_conjunctive_id';
+const collName = "express_and_idhack_with_implicit_conjunctive_id";
 const coll = db.getCollection(collName);
 const docs = [
     {_id: 0, a: 0},
@@ -35,28 +33,29 @@ function runExpressReadTest({command, expectedDocs, usesExpress, usesIdHack}) {
         assertArrayEq({
             actual: res.values,
             expected: expectedDocs,
-            extraErrorMsg: "Result set comparison failed for command: " + tojson(command)
+            extraErrorMsg: "Result set comparison failed for command: " + tojson(command),
         });
     } else {
         assertArrayEq({
             actual: res.cursor.firstBatch,
             expected: expectedDocs,
-            extraErrorMsg: "Result set comparison failed for command: " + tojson(command)
+            extraErrorMsg: "Result set comparison failed for command: " + tojson(command),
         });
     }
 
-    const explain =
-        assert.commandWorked(db.runCommand({explain: command, verbosity: "executionStats"}));
+    const explain = assert.commandWorked(db.runCommand({explain: command, verbosity: "executionStats"}));
 
     assert.eq(
         usesExpress,
         isExpress(db, explain),
-        "Expected the query to " + (usesExpress ? "" : "not ") + "use express: " + tojson(explain));
+        "Expected the query to " + (usesExpress ? "" : "not ") + "use express: " + tojson(explain),
+    );
 
     assert.eq(
         usesIdHack,
         isIdhack(db, explain),
-        "Expected the query to " + (usesIdHack ? "" : "not ") + "use idhack: " + tojson(explain));
+        "Expected the query to " + (usesIdHack ? "" : "not ") + "use idhack: " + tojson(explain),
+    );
 }
 
 function runExpressWriteTest({command, expectedDocs, usesExpress, usesIdHack}) {
@@ -69,24 +68,25 @@ function runExpressWriteTest({command, expectedDocs, usesExpress, usesIdHack}) {
     assertArrayEq({
         actual: coll.find().toArray(),
         expected: expectedDocs,
-        extraErrorMsg: "Result set comparison failed for command: " + tojson(command)
+        extraErrorMsg: "Result set comparison failed for command: " + tojson(command),
     });
 
     // Reset the collection docs then run explain.
     assert.commandWorked(coll.remove({}));
     assert.commandWorked(coll.insert(docs));
-    const explain =
-        assert.commandWorked(db.runCommand({explain: command, verbosity: "executionStats"}));
+    const explain = assert.commandWorked(db.runCommand({explain: command, verbosity: "executionStats"}));
 
     assert.eq(
         usesExpress,
         isExpress(db, explain),
-        "Expected the query to " + (usesExpress ? "" : "not ") + "use express: " + tojson(explain));
+        "Expected the query to " + (usesExpress ? "" : "not ") + "use express: " + tojson(explain),
+    );
 
     assert.eq(
         usesIdHack,
         isIdhack(db, explain),
-        "Expected the query to " + (usesIdHack ? "" : "not ") + "use idhack: " + tojson(explain));
+        "Expected the query to " + (usesIdHack ? "" : "not ") + "use idhack: " + tojson(explain),
+    );
 }
 
 coll.drop();
@@ -100,59 +100,57 @@ runExpressReadTest({
     command: {find: collName, filter: _buildBsonObj("_id", 0, "_id", 0)},
     usesExpress: true,
     usesIdHack: false,
-    expectedDocs: [docs[0]]
+    expectedDocs: [docs[0]],
 });
 
 runExpressReadTest({
     command: {find: collName, filter: _buildBsonObj("_id", 0, "_id", 1)},
     usesExpress: false,
     usesIdHack: false,
-    expectedDocs: []
+    expectedDocs: [],
 });
 
 runExpressReadTest({
     command: {find: collName, filter: _buildBsonObj("a", 0, "a", 0)},
     usesExpress: !isShardedColl && !collectionIsClustered,
     usesIdHack: false,
-    expectedDocs: [docs[0]]
+    expectedDocs: [docs[0]],
 });
 
 runExpressReadTest({
     command: {find: collName, filter: _buildBsonObj("a", 0, "a", 1)},
     usesExpress: false,
     usesIdHack: false,
-    expectedDocs: []
+    expectedDocs: [],
 });
 
 // Aggregation
 runExpressReadTest({
-    command:
-        {aggregate: collName, pipeline: [{$match: _buildBsonObj("_id", 0, "_id", 0)}], cursor: {}},
+    command: {aggregate: collName, pipeline: [{$match: _buildBsonObj("_id", 0, "_id", 0)}], cursor: {}},
     usesExpress: true,
     usesIdHack: false,
-    expectedDocs: [docs[0]]
+    expectedDocs: [docs[0]],
 });
 
 runExpressReadTest({
-    command:
-        {aggregate: collName, pipeline: [{$match: _buildBsonObj("_id", 0, "_id", 1)}], cursor: {}},
+    command: {aggregate: collName, pipeline: [{$match: _buildBsonObj("_id", 0, "_id", 1)}], cursor: {}},
     usesExpress: false,
     usesIdHack: false,
-    expectedDocs: []
+    expectedDocs: [],
 });
 
 runExpressReadTest({
     command: {aggregate: collName, pipeline: [{$match: _buildBsonObj("a", 0, "a", 0)}], cursor: {}},
     usesExpress: !isShardedColl && !collectionIsClustered,
     usesIdHack: false,
-    expectedDocs: [docs[0]]
+    expectedDocs: [docs[0]],
 });
 
 runExpressReadTest({
     command: {aggregate: collName, pipeline: [{$match: _buildBsonObj("a", 0, "a", 1)}], cursor: {}},
     usesExpress: false,
     usesIdHack: false,
-    expectedDocs: []
+    expectedDocs: [],
 });
 
 // Count
@@ -160,14 +158,14 @@ runExpressReadTest({
     command: {count: collName, query: _buildBsonObj("_id", 0, "_id", 0)},
     usesExpress: false,
     usesIdHack: true,
-    expectedDocs: 1
+    expectedDocs: 1,
 });
 
 runExpressReadTest({
     command: {count: collName, query: _buildBsonObj("_id", 0, "_id", 1)},
     usesExpress: false,
     usesIdHack: false,
-    expectedDocs: 0
+    expectedDocs: 0,
 });
 
 // Distinct
@@ -175,14 +173,14 @@ runExpressReadTest({
     command: {distinct: collName, key: "a", query: _buildBsonObj("_id", 0, "_id", 0)},
     usesExpress: true,
     usesIdHack: false,
-    expectedDocs: [docs[0].a]
+    expectedDocs: [docs[0].a],
 });
 
 runExpressReadTest({
     command: {distinct: collName, key: "a", query: _buildBsonObj("_id", 0, "_id", 1)},
     usesExpress: false,
     usesIdHack: false,
-    expectedDocs: []
+    expectedDocs: [],
 });
 
 // Delete
@@ -190,14 +188,14 @@ runExpressWriteTest({
     command: {delete: collName, deletes: [{q: _buildBsonObj("_id", 0, "_id", 0), limit: 0}]},
     usesExpress: false,
     usesIdHack: true,
-    expectedDocs: [docs[1]]
+    expectedDocs: [docs[1]],
 });
 
 runExpressWriteTest({
     command: {delete: collName, deletes: [{q: _buildBsonObj("_id", 0, "_id", 1), limit: 0}]},
     usesExpress: false,
     usesIdHack: false,
-    expectedDocs: [docs[0], docs[1]]
+    expectedDocs: [docs[0], docs[1]],
 });
 
 // FindAndModify
@@ -205,39 +203,38 @@ runExpressWriteTest({
     command: {
         findAndModify: collName,
         query: _buildBsonObj("_id", 0, "_id", 0),
-        update: [{$set: {c: 1}}]
+        update: [{$set: {c: 1}}],
     },
     usesExpress: false,
     usesIdHack: true,
-    expectedDocs: [{_id: 0, a: 0, c: 1}, docs[1]]
+    expectedDocs: [{_id: 0, a: 0, c: 1}, docs[1]],
 });
 
 runExpressWriteTest({
     command: {
         findAndModify: collName,
         query: _buildBsonObj("_id", 0, "_id", 1),
-        update: [{$set: {c: 1}}]
+        update: [{$set: {c: 1}}],
     },
     usesExpress: false,
     usesIdHack: false,
-    expectedDocs: [docs[0], docs[1]]
+    expectedDocs: [docs[0], docs[1]],
 });
 
 // Update
 runExpressWriteTest({
-    command:
-        {update: collName, updates: [{q: _buildBsonObj("_id", 0, "_id", 0), u: {$set: {c: 1}}}]},
+    command: {update: collName, updates: [{q: _buildBsonObj("_id", 0, "_id", 0), u: {$set: {c: 1}}}]},
     usesExpress: false,
     usesIdHack: true,
-    expectedDocs: [{_id: 0, a: 0, c: 1}, docs[1]]
+    expectedDocs: [{_id: 0, a: 0, c: 1}, docs[1]],
 });
 
 runExpressWriteTest({
     command: {
         update: collName,
-        updates: [{q: _buildBsonObj("_id", 0, "_id", 1), u: {$set: {c: 1}}, multi: true}]
+        updates: [{q: _buildBsonObj("_id", 0, "_id", 1), u: {$set: {c: 1}}, multi: true}],
     },
     usesExpress: false,
     usesIdHack: false,
-    expectedDocs: [docs[0], docs[1]]
+    expectedDocs: [docs[0], docs[1]],
 });

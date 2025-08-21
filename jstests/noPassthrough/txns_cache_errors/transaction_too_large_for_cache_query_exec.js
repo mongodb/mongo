@@ -15,7 +15,7 @@ replSet.startSet();
 replSet.initiate();
 
 const doc = {
-    x: []
+    x: [],
 };
 // Approximate the max BSON object size (16MB)
 for (var j = 0; j < 334000; j++) {
@@ -56,9 +56,10 @@ assert.soon(
         assert(false, "unexpected error: " + e);
     },
     "Expected operation to eventually fail with TransactionTooLargeForCache error, did not occur after " +
-        attempts + " attempts.");
+        attempts +
+        " attempts.",
+);
 
-jsTestLog("Operation correctly failed with TransactionTooLargeForCache error after " + attempts +
-          " attempts");
+jsTestLog("Operation correctly failed with TransactionTooLargeForCache error after " + attempts + " attempts");
 
 replSet.stopSet();

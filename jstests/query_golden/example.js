@@ -10,8 +10,8 @@ for (let i = 0; i < 10; ++i) {
     coll.insert({_id: i, a: i});
 }
 
-jsTestLog('Collection contents');
+jsTestLog("Collection contents");
 show(coll.find());
 
-jsTestLog('ID lookup');
+jsTestLog("ID lookup");
 show(coll.find({_id: 5}));

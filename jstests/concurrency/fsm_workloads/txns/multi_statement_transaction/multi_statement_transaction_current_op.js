@@ -13,31 +13,25 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_all_commands.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_all_commands.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.verifyMongosSessionsWithTxns = function verifyMongosSessionsWithTxns(sessions) {
-        const acceptableReadConcernLevels = ['snapshot', 'local'];
+        const acceptableReadConcernLevels = ["snapshot", "local"];
         sessions.forEach((session) => {
             const transactionDocument = session.transaction;
 
             assert.gte(transactionDocument.parameters.txnNumber, 0);
             assert.eq(transactionDocument.parameters.autocommit, false);
             if (transactionDocument.parameters.readConcern !== undefined) {
-                assert(acceptableReadConcernLevels.includes(
-                    transactionDocument.parameters.readConcern.level));
+                assert(acceptableReadConcernLevels.includes(transactionDocument.parameters.readConcern.level));
             }
             if (transactionDocument.globalReadTimestamp !== undefined) {
                 assert.gt(transactionDocument.globalReadTimestamp, Timestamp(0, 0));
             }
-            assert.gt(ISODate(transactionDocument.startWallClockTime),
-                      ISODate("1970-01-01T00:00:00.000Z"));
+            assert.gt(ISODate(transactionDocument.startWallClockTime), ISODate("1970-01-01T00:00:00.000Z"));
 
-            assert.hasFields(transactionDocument,
-                             ["timeOpenMicros", "timeActiveMicros", "timeInactiveMicros"]);
+            assert.hasFields(transactionDocument, ["timeOpenMicros", "timeActiveMicros", "timeInactiveMicros"]);
             const timeOpen = Number(transactionDocument["timeOpenMicros"]);
             const timeActive = Number(transactionDocument["timeActiveMicros"]);
             const timeInactive = Number(transactionDocument["timeInactiveMicros"]);
@@ -60,7 +54,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                         hasCoordinator = true;
                     }
 
-                    if (participant.hasOwnProperty('readOnly')) {
+                    if (participant.hasOwnProperty("readOnly")) {
                         if (participant.readOnly) {
                             ++numReadOnly;
                         } else {
@@ -79,77 +73,77 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.runCurrentOp = function runCurrentOp(db, collName) {
         const admin = db.getSiblingDB("admin");
         const mongosSessionsWithTransactions = admin
-                                                   .aggregate([
-                                                       {
-                                                           $currentOp: {
-                                                               allUsers: true,
-                                                               idleSessions: true,
-                                                               idleConnections: true,
-                                                               localOps: true
-                                                           }
-                                                       },
-                                                       {$match: {transaction: {$exists: true}}}
-                                                   ])
-                                                   .toArray();
+            .aggregate([
+                {
+                    $currentOp: {
+                        allUsers: true,
+                        idleSessions: true,
+                        idleConnections: true,
+                        localOps: true,
+                    },
+                },
+                {$match: {transaction: {$exists: true}}},
+            ])
+            .toArray();
 
         this.verifyMongosSessionsWithTxns(mongosSessionsWithTransactions);
     };
 
     $config.transitions = {
         init: {
-            runCurrentOp: .2,
-            runFindAndModify: .16,
-            runUpdate: .16,
-            runDelete: .16,
-            runFindAndGetMore: .16,
-            commitTxn: .16
+            runCurrentOp: 0.2,
+            runFindAndModify: 0.16,
+            runUpdate: 0.16,
+            runDelete: 0.16,
+            runFindAndGetMore: 0.16,
+            commitTxn: 0.16,
         },
         runCurrentOp: {
-            runCurrentOp: .2,
-            runFindAndModify: .16,
-            runUpdate: .16,
-            runDelete: .16,
-            runFindAndGetMore: .16,
-            commitTxn: .16
+            runCurrentOp: 0.2,
+            runFindAndModify: 0.16,
+            runUpdate: 0.16,
+            runDelete: 0.16,
+            runFindAndGetMore: 0.16,
+            commitTxn: 0.16,
         },
         runFindAndModify: {
-            runCurrentOp: .2,
-            runFindAndModify: .16,
-            runUpdate: .16,
-            runDelete: .16,
-            runFindAndGetMore: .16,
-            commitTxn: .16
+            runCurrentOp: 0.2,
+            runFindAndModify: 0.16,
+            runUpdate: 0.16,
+            runDelete: 0.16,
+            runFindAndGetMore: 0.16,
+            commitTxn: 0.16,
         },
         runUpdate: {
-            runCurrentOp: .2,
-            runFindAndModify: .16,
-            runUpdate: .16,
-            runDelete: .16,
-            runFindAndGetMore: .16,
-            commitTxn: .16
+            runCurrentOp: 0.2,
+            runFindAndModify: 0.16,
+            runUpdate: 0.16,
+            runDelete: 0.16,
+            runFindAndGetMore: 0.16,
+            commitTxn: 0.16,
         },
         runDelete: {
-            runCurrentOp: .2,
-            runFindAndModify: .16,
-            runUpdate: .16,
-            runDelete: .16,
-            runFindAndGetMore: .16,
-            commitTxn: .16
+            runCurrentOp: 0.2,
+            runFindAndModify: 0.16,
+            runUpdate: 0.16,
+            runDelete: 0.16,
+            runFindAndGetMore: 0.16,
+            commitTxn: 0.16,
         },
         runFindAndGetMore: {
-            runCurrentOp: .2,
-            runFindAndModify: .16,
-            runUpdate: .16,
-            runDelete: .16,
-            runFindAndGetMore: .16,
-            commitTxn: .16
+            runCurrentOp: 0.2,
+            runFindAndModify: 0.16,
+            runUpdate: 0.16,
+            runDelete: 0.16,
+            runFindAndGetMore: 0.16,
+            commitTxn: 0.16,
         },
         commitTxn: {
-            runCurrentOp: .1,
-            runFindAndModify: .225,
-            runUpdate: .225,
-            runDelete: .225,
-            runFindAndGetMore: .225
+            runCurrentOp: 0.1,
+            runFindAndModify: 0.225,
+            runUpdate: 0.225,
+            runDelete: 0.225,
+            runFindAndGetMore: 0.225,
         },
     };
 

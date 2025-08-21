@@ -10,7 +10,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const replTest = new ReplSetTest({name: 'testSet', nodes: 2});
+const replTest = new ReplSetTest({name: "testSet", nodes: 2});
 let nodes = replTest.startSet();
 replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
@@ -26,10 +26,10 @@ const newReplSetName = "newTestSet";
 assert.commandWorked(coll.insert({a: 1}, {"writeConcern": {"w": 2, "j": true}}));
 
 // Restart all nodes in the set as standalones.
-nodes.forEach(node => replTest.restart(node, {noReplSet: true}));
+nodes.forEach((node) => replTest.restart(node, {noReplSet: true}));
 
 // Change each node's config to have the new replica set name.
-replTest.nodes.forEach(function(node) {
+replTest.nodes.forEach(function (node) {
     let replsetColl = node.getDB("local").system.replset;
     let doc = replsetColl.findOne();
 

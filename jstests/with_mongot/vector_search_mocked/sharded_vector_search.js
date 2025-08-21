@@ -7,11 +7,9 @@
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mongotCommandForVectorSearchQuery,
-    mongotResponseForBatch
+    mongotResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {prepCollection} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 const dbName = "test";
@@ -26,15 +24,14 @@ const stWithMock = new ShardingTestWithMongotMock({
     mongos: 1,
     other: {
         rsOptions: {setParameter: {enableTestCommands: 1}},
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const testColl = testDB.getCollection(collName);
 const collNS = testColl.getFullName();
@@ -52,10 +49,9 @@ let vectorSearchQuery = {
     "numCandidates": 10,
     "limit": 100,
     "filter": {"$or": [{"color": {"$gt": "C"}}, {"color": {"$lt": "C"}}]},
-    "queryVector": [2.0, 2.0]
+    "queryVector": [2.0, 2.0],
 };
-let expectedMongotCommand =
-    mongotCommandForVectorSearchQuery({...vectorSearchQuery, collName, dbName, collectionUUID});
+let expectedMongotCommand = mongotCommandForVectorSearchQuery({...vectorSearchQuery, collName, dbName, collectionUUID});
 
 const cursorId = NumberLong(123);
 let pipeline = [{$vectorSearch: vectorSearchQuery}, {$project: {x: 1, y: 1}}];
@@ -76,28 +72,32 @@ function testBasicSortCase(shard0Conn, shard1Conn) {
 
     const mongot0ResponseBatch = [
         {_id: 3, $vectorSearchScore: 0.99},
-        {_id: 2, $vectorSearchScore: 0.10},
+        {_id: 2, $vectorSearchScore: 0.1},
         {_id: 4, $vectorSearchScore: 0.01},
         {_id: 1, $vectorSearchScore: 0.0099},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
 
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
 
     const mongot1ResponseBatch = [
         {_id: 11, $vectorSearchScore: 1.0},
-        {_id: 13, $vectorSearchScore: 0.30},
+        {_id: 13, $vectorSearchScore: 0.3},
         {_id: 12, $vectorSearchScore: 0.29},
         {_id: 14, $vectorSearchScore: 0.28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
 
@@ -123,30 +123,34 @@ function testVectorSearchPassesAllFields(shard0Conn, shard1Conn) {
 
     const mongot0ResponseBatch = [
         {_id: 3, $vectorSearchScore: 0.99},
-        {_id: 2, $vectorSearchScore: 0.10},
+        {_id: 2, $vectorSearchScore: 0.1},
         {_id: 4, $vectorSearchScore: 0.01},
         {_id: 1, $vectorSearchScore: 0.0099},
     ];
     let localExpectedCommand = expectedMongotCommand;
     localExpectedCommand["extraField"] = true;
-    const history0 = [{
-        expectedCommand: localExpectedCommand,
-        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: localExpectedCommand,
+            response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
 
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
 
     const mongot1ResponseBatch = [
         {_id: 11, $vectorSearchScore: 1.0},
-        {_id: 13, $vectorSearchScore: 0.30},
+        {_id: 13, $vectorSearchScore: 0.3},
         {_id: 12, $vectorSearchScore: 0.29},
         {_id: 14, $vectorSearchScore: 0.28},
     ];
-    const history1 = [{
-        expectedCommand: localExpectedCommand,
-        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: localExpectedCommand,
+            response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
 
@@ -173,9 +177,7 @@ runTestOnSecondaries(testVectorSearchPassesAllFields);
 function testErrorCase(shard0Conn, shard1Conn) {
     const responseOk = 1;
 
-    const mongot0ResponseBatch = [
-        {_id: 3, $vectorSearchScore: 1.00},
-    ];
+    const mongot0ResponseBatch = [{_id: 3, $vectorSearchScore: 1.0}];
     const history0 = [
         {
             expectedCommand: expectedMongotCommand,
@@ -187,23 +189,25 @@ function testErrorCase(shard0Conn, shard1Conn) {
                 ok: 0,
                 errmsg: "mongot error",
                 code: ErrorCodes.InternalError,
-                codeName: "InternalError"
-            }
-        }
+                codeName: "InternalError",
+            },
+        },
     ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
 
     const mongot1ResponseBatch = [
         {_id: 11, $vectorSearchScore: 1.0},
-        {_id: 13, $vectorSearchScore: 0.30},
+        {_id: 13, $vectorSearchScore: 0.3},
         {_id: 12, $vectorSearchScore: 0.29},
         {_id: 14, $vectorSearchScore: 0.28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
 
@@ -218,13 +222,13 @@ runTestOnSecondaries(testErrorCase);
 function testUnevenResultDistributionCase(shard0Conn, shard1Conn) {
     const responseOk = 1;
 
-    const mongot0ResponseBatch = [
-        {_id: 3, $vectorSearchScore: 0.99},
+    const mongot0ResponseBatch = [{_id: 3, $vectorSearchScore: 0.99}];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
 
@@ -232,20 +236,28 @@ function testUnevenResultDistributionCase(shard0Conn, shard1Conn) {
         {
             expectedCommand: expectedMongotCommand,
             response: mongotResponseForBatch(
-                [{_id: 11, $vectorSearchScore: 1.0}, {_id: 13, $vectorSearchScore: 0.30}],
+                [
+                    {_id: 11, $vectorSearchScore: 1.0},
+                    {_id: 13, $vectorSearchScore: 0.3},
+                ],
                 cursorId,
                 collNS,
-                responseOk),
+                responseOk,
+            ),
         },
 
         {
             expectedCommand: {getMore: cursorId, collection: collName},
             response: mongotResponseForBatch(
-                [{_id: 12, $vectorSearchScore: 0.29}, {_id: 14, $vectorSearchScore: 0.28}],
+                [
+                    {_id: 12, $vectorSearchScore: 0.29},
+                    {_id: 14, $vectorSearchScore: 0.28},
+                ],
                 NumberLong(0),
                 collNS,
-                responseOk)
-        }
+                responseOk,
+            ),
+        },
     ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
@@ -269,15 +281,17 @@ function testMisbehavingMongot(shard0Conn, shard1Conn) {
 
     // mongot 0 returns results in the wrong order!
     const mongot0ResponseBatch = [
-        {_id: 2, $vectorSearchScore: 0.10},
+        {_id: 2, $vectorSearchScore: 0.1},
         {_id: 1, $vectorSearchScore: 0.0099},
         {_id: 3, $vectorSearchScore: 0.99},
         {_id: 4, $vectorSearchScore: 0.01},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
 
@@ -285,12 +299,14 @@ function testMisbehavingMongot(shard0Conn, shard1Conn) {
         {_id: 12, $vectorSearchScore: 0.29},
         {_id: 14, $vectorSearchScore: 0.28},
         {_id: 11, $vectorSearchScore: 1.0},
-        {_id: 13, $vectorSearchScore: 0.30},
+        {_id: 13, $vectorSearchScore: 0.3},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
 
@@ -321,27 +337,31 @@ function testSearchFollowedBySortOnDifferentKey(shard0Conn, shard1Conn) {
 
     const mongot0ResponseBatch = [
         {_id: 3, $vectorSearchScore: 0.99},
-        {_id: 2, $vectorSearchScore: 0.10},
+        {_id: 2, $vectorSearchScore: 0.1},
         {_id: 4, $vectorSearchScore: 0.01},
         {_id: 1, $vectorSearchScore: 0.0099},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
 
     const mongot1ResponseBatch = [
         {_id: 11, $vectorSearchScore: 1.0},
-        {_id: 13, $vectorSearchScore: 0.30},
+        {_id: 13, $vectorSearchScore: 0.3},
         {_id: 12, $vectorSearchScore: 0.29},
         {_id: 14, $vectorSearchScore: 0.28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
 
@@ -374,8 +394,7 @@ function testGetMoreOnShard(shard0Conn, shard1Conn) {
     const history0 = [
         {
             expectedCommand: expectedMongotCommand,
-            response: mongotResponseForBatch(
-                mongot0ResponseBatch.slice(0, 2), NumberLong(10), collNS, responseOk),
+            response: mongotResponseForBatch(mongot0ResponseBatch.slice(0, 2), NumberLong(10), collNS, responseOk),
         },
         {
             expectedCommand: {getMore: NumberLong(10), collection: collName},
@@ -386,7 +405,7 @@ function testGetMoreOnShard(shard0Conn, shard1Conn) {
                     nextBatch: mongot0ResponseBatch.slice(2),
                 },
                 ok: 1,
-            }
+            },
         },
     ];
 
@@ -396,15 +415,14 @@ function testGetMoreOnShard(shard0Conn, shard1Conn) {
     // Mock response from shard 1's mongot.
     const mongot1ResponseBatch = [
         {_id: 14, $vectorSearchScore: 0.28},
-        {_id: 11, $vectorSearchScore: 0.10},
+        {_id: 11, $vectorSearchScore: 0.1},
         {_id: 13, $vectorSearchScore: 0.02},
         {_id: 12, $vectorSearchScore: 0.0099},
     ];
     const history1 = [
         {
             expectedCommand: expectedMongotCommand,
-            response: mongotResponseForBatch(
-                mongot1ResponseBatch.slice(0, 1), NumberLong(30), collNS, responseOk),
+            response: mongotResponseForBatch(mongot1ResponseBatch.slice(0, 1), NumberLong(30), collNS, responseOk),
         },
         {
             expectedCommand: {getMore: NumberLong(30), collection: collName},
@@ -415,7 +433,7 @@ function testGetMoreOnShard(shard0Conn, shard1Conn) {
                     nextBatch: mongot1ResponseBatch.slice(1),
                 },
                 ok: 1,
-            }
+            },
         },
     ];
 
@@ -433,29 +451,29 @@ function testGetMoreOnShard(shard0Conn, shard1Conn) {
         {_id: 12, x: "cow"},
     ];
 
-    assert.eq(expectedDocs,
-              testColl
-                  .aggregate([
-                      {$vectorSearch: vectorSearchQuery},
-                      {$project: {_id: 1, x: 1}},
-                  ])
-                  .toArray());
+    assert.eq(
+        expectedDocs,
+        testColl.aggregate([{$vectorSearch: vectorSearchQuery}, {$project: {_id: 1, x: 1}}]).toArray(),
+    );
 }
 runTestOnPrimaries(testGetMoreOnShard);
 runTestOnSecondaries(testGetMoreOnShard);
 
 function testVectorSearchMultipleBatches(shard0Conn, shard1Conn) {
     const responseOk = {ok: 1};
-    const vectorSearchQueryLimit =
-        {queryVector: [1.0, 2.0, 3.0], path: "x", numCandidates: 10, limit: 5};
+    const vectorSearchQueryLimit = {queryVector: [1.0, 2.0, 3.0], path: "x", numCandidates: 10, limit: 5};
 
     const pipeline = [
         {$vectorSearch: vectorSearchQueryLimit},
-        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}, x: 1, y: 1}}
+        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}, x: 1, y: 1}},
     ];
 
-    const expectedMongotCommandLimit = mongotCommandForVectorSearchQuery(
-        {...vectorSearchQueryLimit, collName, dbName, collectionUUID});
+    const expectedMongotCommandLimit = mongotCommandForVectorSearchQuery({
+        ...vectorSearchQueryLimit,
+        collName,
+        dbName,
+        collectionUUID,
+    });
 
     const mongot0ResponseBatch = [
         {_id: 4, $vectorSearchScore: 1.0},
@@ -463,10 +481,12 @@ function testVectorSearchMultipleBatches(shard0Conn, shard1Conn) {
         {_id: 2, $vectorSearchScore: 0.8},
     ];
 
-    const history0 = [{
-        expectedCommand: expectedMongotCommandLimit,
-        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommandLimit,
+            response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
 
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
@@ -477,10 +497,12 @@ function testVectorSearchMultipleBatches(shard0Conn, shard1Conn) {
         {_id: 13, $vectorSearchScore: 0.1},
     ];
 
-    const history1 = [{
-        expectedCommand: expectedMongotCommandLimit,
-        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommandLimit,
+            response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
 
@@ -499,38 +521,45 @@ runTestOnSecondaries(testVectorSearchMultipleBatches);
 
 // Tests that $vectorSearch returns the correct number of documents.
 function testBasicLimitCase(shard0Conn, shard1Conn) {
-    const vectorSearchQueryLimit =
-        {queryVector: [1.0, 2.0, 3.0], path: "x", numCandidates: 10, limit: 5};
+    const vectorSearchQueryLimit = {queryVector: [1.0, 2.0, 3.0], path: "x", numCandidates: 10, limit: 5};
 
-    const expectedMongotCommandLimit = mongotCommandForVectorSearchQuery(
-        {...vectorSearchQueryLimit, collName, dbName, collectionUUID});
+    const expectedMongotCommandLimit = mongotCommandForVectorSearchQuery({
+        ...vectorSearchQueryLimit,
+        collName,
+        dbName,
+        collectionUUID,
+    });
 
     const responseOk = 1;
 
     const mongot0ResponseBatch = [
         {_id: 3, $vectorSearchScore: 0.99},
-        {_id: 2, $vectorSearchScore: 0.10},
+        {_id: 2, $vectorSearchScore: 0.1},
         {_id: 4, $vectorSearchScore: 0.01},
         {_id: 1, $vectorSearchScore: 0.0099},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommandLimit,
-        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommandLimit,
+            response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
 
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
 
     const mongot1ResponseBatch = [
         {_id: 11, $vectorSearchScore: 1.0},
-        {_id: 13, $vectorSearchScore: 0.30},
+        {_id: 13, $vectorSearchScore: 0.3},
         {_id: 12, $vectorSearchScore: 0.29},
         {_id: 14, $vectorSearchScore: 0.28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommandLimit,
-        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommandLimit,
+            response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
 
@@ -549,34 +578,41 @@ runTestOnSecondaries(testBasicLimitCase);
 
 // Tests that $vectorSearch returns the correct number of documents on unbalanced shards.
 function testLimitOnUnbalancedShards(shard0Conn, shard1Conn) {
-    const vectorSearchQueryUnbalanced =
-        {queryVector: [1.0, 2.0, 3.0], path: "x", numCandidates: 10, limit: 3};
+    const vectorSearchQueryUnbalanced = {queryVector: [1.0, 2.0, 3.0], path: "x", numCandidates: 10, limit: 3};
 
-    const expectedMongotCommandLimit = mongotCommandForVectorSearchQuery(
-        {...vectorSearchQueryUnbalanced, collName, dbName, collectionUUID});
+    const expectedMongotCommandLimit = mongotCommandForVectorSearchQuery({
+        ...vectorSearchQueryUnbalanced,
+        collName,
+        dbName,
+        collectionUUID,
+    });
 
     const responseOk = 1;
 
     const mongot0ResponseBatch = [
         {_id: 3, $vectorSearchScore: 0.99},
-        {_id: 2, $vectorSearchScore: 0.10},
+        {_id: 2, $vectorSearchScore: 0.1},
         {_id: 4, $vectorSearchScore: 0.01},
         {_id: 1, $vectorSearchScore: 0.0099},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommandLimit,
-        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommandLimit,
+            response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
 
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
 
     // Set second shard to return nothing.
     const mongot1ResponseBatch = [];
-    const history1 = [{
-        expectedCommand: expectedMongotCommandLimit,
-        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommandLimit,
+            response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
 
@@ -586,22 +622,22 @@ function testLimitOnUnbalancedShards(shard0Conn, shard1Conn) {
         {_id: 4, shardKey: 0, x: "cow", y: "lorem ipsum"},
     ];
 
-    assert.eq(testColl.aggregate({$vectorSearch: vectorSearchQueryUnbalanced}).toArray(),
-              expectedDocs);
+    assert.eq(testColl.aggregate({$vectorSearch: vectorSearchQueryUnbalanced}).toArray(), expectedDocs);
 }
 runTestOnPrimaries(testLimitOnUnbalancedShards);
 runTestOnSecondaries(testLimitOnUnbalancedShards);
 
 // Tests that $vectorSearch returns an error with a limit of 0 on a sharded cluster.
 (function testLimitLessThanOneOnSharded() {
-    const vectorSearchQueryLimitOne =
-        {queryVector: [1.0, 2.0, 3.0], path: "x", numCandidates: 10, limit: 0};
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: collName,
-        pipeline: [{$vectorSearch: vectorSearchQueryLimitOne}],
-        cursor: {}
-    }),
-                                 7912700);
+    const vectorSearchQueryLimitOne = {queryVector: [1.0, 2.0, 3.0], path: "x", numCandidates: 10, limit: 0};
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            aggregate: collName,
+            pipeline: [{$vectorSearch: vectorSearchQueryLimitOne}],
+            cursor: {},
+        }),
+        7912700,
+    );
 })();
 
 // Test with a vector search filter that gets desugared during serialization.
@@ -611,38 +647,41 @@ vectorSearchQuery = {
     "numCandidates": 10,
     "limit": 100,
     "filter": {"version": {"$gt": 1, "$lte": 4, "$ne": 3}},
-    "queryVector": [2.0, 2.0]
+    "queryVector": [2.0, 2.0],
 };
 pipeline = [{$vectorSearch: vectorSearchQuery}, {$project: {x: 1, y: 1}}];
-expectedMongotCommand =
-    mongotCommandForVectorSearchQuery({...vectorSearchQuery, collName, dbName, collectionUUID});
+expectedMongotCommand = mongotCommandForVectorSearchQuery({...vectorSearchQuery, collName, dbName, collectionUUID});
 function testFilterNotCase(shard0Conn, shard1Conn) {
     const responseOk = 1;
 
     const mongot0ResponseBatch = [
         {_id: 3, $vectorSearchScore: 0.99},
-        {_id: 2, $vectorSearchScore: 0.10},
+        {_id: 2, $vectorSearchScore: 0.1},
         {_id: 4, $vectorSearchScore: 0.01},
         {_id: 1, $vectorSearchScore: 0.0099},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot0ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
 
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId);
 
     const mongot1ResponseBatch = [
         {_id: 11, $vectorSearchScore: 1.0},
-        {_id: 13, $vectorSearchScore: 0.30},
+        {_id: 13, $vectorSearchScore: 0.3},
         {_id: 12, $vectorSearchScore: 0.29},
         {_id: 14, $vectorSearchScore: 0.28},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotResponseForBatch(mongot1ResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId);
 

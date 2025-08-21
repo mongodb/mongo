@@ -218,8 +218,7 @@ const invalidArgumentValueDocs = [
     },
 ];
 
-runConvertTests(
-    {coll, requiresFCV81, conversionTestDocs, illegalConversionTestDocs, invalidArgumentValueDocs});
+runConvertTests({coll, requiresFCV81, conversionTestDocs, illegalConversionTestDocs, invalidArgumentValueDocs});
 
 // Additional tests covering shortcuts and string byteOrder.
 function testConvertNumeric({pipeline: convertPipeline, docs: documents}) {
@@ -227,61 +226,66 @@ function testConvertNumeric({pipeline: convertPipeline, docs: documents}) {
     assert.commandWorked(coll.insertMany(documents));
 
     let aggResult = coll.aggregate(convertPipeline).toArray();
-    aggResult.forEach(doc => {
+    aggResult.forEach((doc) => {
         assert.eq(doc.output, doc.expected);
     });
 }
 
 (function testConvertBindataToLong() {
-    let pipeline = [{
-        $project: {
-            _id: 0,
-            expected: 1,
-            output: {$convert: {to: "binData", input: "$longInput", byteOrder: "big"}}
-        }
-    }];
+    let pipeline = [
+        {
+            $project: {
+                _id: 0,
+                expected: 1,
+                output: {$convert: {to: "binData", input: "$longInput", byteOrder: "big"}},
+            },
+        },
+    ];
     testConvertNumeric({
         pipeline: pipeline,
         // Hex: "0x00000000000000c8", 8 byte long
-        docs: [{longInput: NumberLong(200), expected: BinData(0, "AAAAAAAAAMg=")}]
+        docs: [{longInput: NumberLong(200), expected: BinData(0, "AAAAAAAAAMg=")}],
     });
 })();
 
 (function testConvertBindataToInt() {
-    let pipeline = [{
-        $project: {
-            _id: 0,
-            expected: 1,
-            output: {$convert: {to: "binData", input: "$IntInput", byteOrder: "big"}}
-        }
-    }];
+    let pipeline = [
+        {
+            $project: {
+                _id: 0,
+                expected: 1,
+                output: {$convert: {to: "binData", input: "$IntInput", byteOrder: "big"}},
+            },
+        },
+    ];
     testConvertNumeric({
         pipeline: pipeline,
         // Hex: "0xfffffe89", 4 byte int
-        docs: [{IntInput: NumberInt(-375), expected: BinData(0, "///+iQ==")}]
+        docs: [{IntInput: NumberInt(-375), expected: BinData(0, "///+iQ==")}],
     });
 })();
 
 (function testConvertBindataToDouble() {
-    let pipeline = [{
-        $project: {
-            _id: 0,
-            expected: 1,
-            output: {$convert: {to: "binData", input: "$DoubleInput", byteOrder: "big"}}
-        }
-    }];
+    let pipeline = [
+        {
+            $project: {
+                _id: 0,
+                expected: 1,
+                output: {$convert: {to: "binData", input: "$DoubleInput", byteOrder: "big"}},
+            },
+        },
+    ];
     testConvertNumeric({
         pipeline: pipeline,
         // Hex: "0xC004CCCCCCCCCCCD", 8 byte double precision double
-        docs: [{DoubleInput: -2.6, expected: BinData(0, "wATMzMzMzM0=")}]
+        docs: [{DoubleInput: -2.6, expected: BinData(0, "wATMzMzMzM0=")}],
     });
 })();
 
 (function testConvertBindataToIntShortCut() {
     let pipeline = [{$project: {_id: 0, expected: 1, output: {$toInt: "$binDataInput"}}}];
     // Hex: "0x=02", 1 byte integer
-    testConvertNumeric(
-        {pipeline: pipeline, docs: [{binDataInput: BinData(0, "Ag=="), expected: NumberInt(2)}]});
+    testConvertNumeric({pipeline: pipeline, docs: [{binDataInput: BinData(0, "Ag=="), expected: NumberInt(2)}]});
 })();
 
 (function testConvertBindataToLongShortCut() {
@@ -289,7 +293,7 @@ function testConvertNumeric({pipeline: convertPipeline, docs: documents}) {
     testConvertNumeric({
         pipeline: pipeline,
         // Hex: "0xA2020000", 4 byte long
-        docs: [{binDataInput: BinData(6, "ogIAAA=="), expected: NumberLong(674)}]
+        docs: [{binDataInput: BinData(6, "ogIAAA=="), expected: NumberLong(674)}],
     });
 })();
 
@@ -298,6 +302,6 @@ function testConvertNumeric({pipeline: convertPipeline, docs: documents}) {
     testConvertNumeric({
         pipeline: pipeline,
         // Hex: "0xCDCCCCCCCCCC04C0", 4 byte long
-        docs: [{binDataInput: BinData(0, "zczMzMzMBMA="), expected: -2.6}]
+        docs: [{binDataInput: BinData(0, "zczMzMzMBMA="), expected: -2.6}],
     });
 })();

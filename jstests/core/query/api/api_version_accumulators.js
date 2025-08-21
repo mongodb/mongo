@@ -14,12 +14,12 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 1, a: [1]}));
 
 const stableAccumulatorPipelines = [
-    [{$group: {_id: null, field: {$concatArrays: '$a'}}}],
-    [{$setWindowFields: {output: {field: {$concatArrays: '$a'}}}}],
+    [{$group: {_id: null, field: {$concatArrays: "$a"}}}],
+    [{$setWindowFields: {output: {field: {$concatArrays: "$a"}}}}],
     [{$bucket: {groupBy: "$_id", boundaries: [0, 5], output: {nums: {$concatArrays: "$a"}}}}],
     [{$bucketAuto: {groupBy: "$_id", buckets: 2, output: {nums: {$concatArrays: "$a"}}}}],
-    [{$group: {_id: null, field: {$setUnion: '$a'}}}],
-    [{$setWindowFields: {output: {field: {$setUnion: '$a'}}}}],
+    [{$group: {_id: null, field: {$setUnion: "$a"}}}],
+    [{$setWindowFields: {output: {field: {$setUnion: "$a"}}}}],
     [{$bucket: {groupBy: "$_id", boundaries: [0, 5], output: {nums: {$setUnion: "$a"}}}}],
     [{$bucketAuto: {groupBy: "$_id", buckets: 2, output: {nums: {$setUnion: "$a"}}}}],
 ];

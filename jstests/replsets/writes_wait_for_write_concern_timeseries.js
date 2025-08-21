@@ -12,7 +12,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkWriteConcernBehaviorAdditionalCRUDOps,
-    checkWriteConcernBehaviorForAllCommands
+    checkWriteConcernBehaviorForAllCommands,
 } from "jstests/libs/write_concern_all_commands.js";
 
 const name = jsTestName();
@@ -23,24 +23,27 @@ const replTest = new ReplSetTest({
 replTest.startSet();
 replTest.initiate();
 
-const preSetupTimeseries = function(conn, cluster, dbName, collName) {
+const preSetupTimeseries = function (conn, cluster, dbName, collName) {
     let db = conn.getDB(dbName);
-    assert.commandWorked(
-        db.createCollection(collName, {timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "time", metaField: "meta"}}));
 };
 
-checkWriteConcernBehaviorForAllCommands(replTest.getPrimary(),
-                                        replTest,
-                                        "rs" /* clusterType */,
-                                        preSetupTimeseries,
-                                        false /* shardedCollection */,
-                                        true /*limitToTimeseriesViews*/);
-checkWriteConcernBehaviorAdditionalCRUDOps(replTest.getPrimary(),
-                                           replTest,
-                                           "rs" /* clusterType */,
-                                           preSetupTimeseries,
-                                           false /* shardedCollection */,
-                                           false /* writeWithoutShardKey */,
-                                           true /*limitToTimeseriesViews*/);
+checkWriteConcernBehaviorForAllCommands(
+    replTest.getPrimary(),
+    replTest,
+    "rs" /* clusterType */,
+    preSetupTimeseries,
+    false /* shardedCollection */,
+    true /*limitToTimeseriesViews*/,
+);
+checkWriteConcernBehaviorAdditionalCRUDOps(
+    replTest.getPrimary(),
+    replTest,
+    "rs" /* clusterType */,
+    preSetupTimeseries,
+    false /* shardedCollection */,
+    false /* writeWithoutShardKey */,
+    true /*limitToTimeseriesViews*/,
+);
 
 replTest.stopSet();

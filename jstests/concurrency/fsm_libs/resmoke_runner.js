@@ -18,7 +18,7 @@ function cleanupWorkload(workload, context, cluster, errors, header) {
     try {
         teardownWorkload(workload, context, cluster);
     } catch (e) {
-        errors.push(new WorkloadFailure(e.toString(), e.stack, 'main', header + ' Teardown'));
+        errors.push(new WorkloadFailure(e.toString(), e.stack, "main", header + " Teardown"));
         return false;
     }
 
@@ -29,8 +29,8 @@ function cleanupWorkload(workload, context, cluster, errors, header) {
 // hook name for each hook.
 function writeFiles(file) {
     for (const hook of TestData.useActionPermittedFile) {
-        const path = file + '_' + hook;
-        writeFile(path, '');
+        const path = file + "_" + hook;
+        writeFile(path, "");
     }
 }
 
@@ -38,19 +38,18 @@ function writeFiles(file) {
 // following the FSM synchronization protocol.
 function readAcks(file) {
     for (const hook of TestData.useActionPermittedFile) {
-        const path = file + '_' + hook;
+        const path = file + "_" + hook;
         // The cat() function throws if the file isn't found.
         cat(path);
     }
 }
 
-async function runWorkloads(workloads,
-                            {cluster: clusterOptions = {}, execution: executionOptions = {}} = {}) {
-    assert.gt(workloads.length, 0, 'need at least one workload to run');
+async function runWorkloads(workloads, {cluster: clusterOptions = {}, execution: executionOptions = {}} = {}) {
+    assert.gt(workloads.length, 0, "need at least one workload to run");
 
     const executionMode = {serial: true};
     validateExecutionOptions(executionMode, executionOptions);
-    Object.freeze(executionOptions);  // immutable after validation (and normalization)
+    Object.freeze(executionOptions); // immutable after validation (and normalization)
 
     const context = {};
     const applyMultipliers = true;
@@ -68,18 +67,18 @@ async function runWorkloads(workloads,
     const errors = [];
     const cleanup = [];
     let teardownFailed = false;
-    let startTime = Date.now();  // Initialize in case setupWorkload fails below.
+    let startTime = Date.now(); // Initialize in case setupWorkload fails below.
     let totalTime;
 
     await cluster.setup();
 
-    if (typeof executionOptions.tenantId !== 'undefined') {
+    if (typeof executionOptions.tenantId !== "undefined") {
         // Import simulate_atlas_proxy.js to override requests for tenant during preparing
         // collections, setup and teardown of workloads.
         await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
     }
 
-    jsTest.log('Workload(s) started: ' + workloads.join(' '));
+    jsTest.log("Workload(s) started: " + workloads.join(" "));
 
     prepareCollections(workloads, context, cluster, clusterOptions, executionOptions);
 
@@ -93,7 +92,7 @@ async function runWorkloads(workloads,
         }
 
         // Call each workload's setup function.
-        workloads.forEach(function(workload) {
+        workloads.forEach(function (workload) {
             // Define "iterations" and "threadCount" properties on the workload's $config.data
             // object so that they can be used within its setup(), teardown(), and state
             // functions. This must happen after calling threadMgr.init() in case the thread
@@ -133,13 +132,12 @@ async function runWorkloads(workloads,
         // initial clusterTime and initial operationTime for the sessions they'll create so that
         // they are guaranteed to observe the effects of the workload's $config.setup() function
         // being called.
-        if (typeof executionOptions.sessionOptions === 'object' &&
-            executionOptions.sessionOptions !== null) {
+        if (typeof executionOptions.sessionOptions === "object" && executionOptions.sessionOptions !== null) {
             // We only start a session for the worker threads and never start one for the main
             // thread. We can therefore get the clusterTime and operationTime tracked by the
             // underlying DummyDriverSession through any DB instance (i.e. the "test" database
             // here was chosen arbitrarily).
-            const session = cluster.getDB('test').getSession();
+            const session = cluster.getDB("test").getSession();
 
             // JavaScript objects backed by C++ objects (e.g. BSON values from a command
             // response) do not serialize correctly when passed through the Thread
@@ -147,8 +145,7 @@ async function runWorkloads(workloads,
             // the JavaScript object through the Thread constructor and use eval() to
             // rehydrate it.
             executionOptions.sessionOptions.initialClusterTime = tojson(session.getClusterTime());
-            executionOptions.sessionOptions.initialOperationTime =
-                tojson(session.getOperationTime());
+            executionOptions.sessionOptions.initialOperationTime = tojson(session.getOperationTime());
         }
 
         try {
@@ -161,9 +158,11 @@ async function runWorkloads(workloads,
             } finally {
                 // Threads must be joined before destruction, so do this even in the presence of
                 // exceptions.
-                errors.push(...threadMgr.joinAll().map(
-                    e => new WorkloadFailure(
-                        e.err, e.stack, e.tid, 'Foreground ' + e.workloads.join(' '))));
+                errors.push(
+                    ...threadMgr
+                        .joinAll()
+                        .map((e) => new WorkloadFailure(e.err, e.stack, e.tid, "Foreground " + e.workloads.join(" "))),
+                );
             }
         } finally {
             // Until we are guaranteed that the hook thread isn't running, it isn't safe for
@@ -176,7 +175,7 @@ async function runWorkloads(workloads,
                 writeFiles(executionOptions.actionFiles.idleRequest);
 
                 // Wait for the acknowledgement file to be created by the hook thread.
-                assert.soonNoExcept(function() {
+                assert.soonNoExcept(function () {
                     try {
                         // The readAcks() function will throw an exception if any hook hasn't
                         // provided an acknowledgement.
@@ -199,12 +198,13 @@ async function runWorkloads(workloads,
         }
         // Call each workload's teardown function. After all teardowns have completed check if
         // any of them failed.
-        const cleanupResults = cleanup.map(
-            workload => cleanupWorkload(workload, context, cluster, errors, 'Foreground'));
-        teardownFailed = cleanupResults.some(success => (success === false));
+        const cleanupResults = cleanup.map((workload) =>
+            cleanupWorkload(workload, context, cluster, errors, "Foreground"),
+        );
+        teardownFailed = cleanupResults.some((success) => success === false);
 
         totalTime = Date.now() - startTime;
-        jsTest.log('Workload(s) completed in ' + totalTime + ' ms: ' + workloads.join(' '));
+        jsTest.log("Workload(s) completed in " + totalTime + " ms: " + workloads.join(" "));
     }
 
     // Throw any existing errors so that resmoke.py can abort its execution of the test suite.
@@ -213,9 +213,8 @@ async function runWorkloads(workloads,
     cluster.teardown();
 }
 
-if (typeof db === 'undefined') {
-    throw new Error(
-        'resmoke_runner.js must be run with the mongo shell already connected to the database');
+if (typeof db === "undefined") {
+    throw new Error("resmoke_runner.js must be run with the mongo shell already connected to the database");
 }
 
 const clusterOptions = {
@@ -234,17 +233,16 @@ if (TestData.discoverTopology !== false) {
     } else if (topology.type === Topology.kShardedCluster) {
         clusterOptions.replication.enabled = true;
         clusterOptions.sharded.enabled = true;
-        clusterOptions.sharded.enableBalancer =
-            TestData.hasOwnProperty('runningWithBalancer') ? TestData.runningWithBalancer : true;
+        clusterOptions.sharded.enableBalancer = TestData.hasOwnProperty("runningWithBalancer")
+            ? TestData.runningWithBalancer
+            : true;
         clusterOptions.sharded.numMongos = topology.mongos.nodes.length;
         clusterOptions.sharded.numShards = Object.keys(topology.shards).length;
         clusterOptions.sharded.stepdownOptions = {};
-        clusterOptions.sharded.stepdownOptions.configStepdown =
-            TestData.runningWithConfigStepdowns || false;
-        clusterOptions.sharded.stepdownOptions.shardStepdown =
-            TestData.runningWithShardStepdowns || false;
+        clusterOptions.sharded.stepdownOptions.configStepdown = TestData.runningWithConfigStepdowns || false;
+        clusterOptions.sharded.stepdownOptions.shardStepdown = TestData.runningWithShardStepdowns || false;
     } else if (topology.type !== Topology.kStandalone) {
-        throw new Error('Unrecognized topology format: ' + tojson(topology));
+        throw new Error("Unrecognized topology format: " + tojson(topology));
     }
 }
 
@@ -260,7 +258,7 @@ if (TestData.runningWithCausalConsistency !== undefined) {
     sessionOptions.causalConsistency = TestData.runningWithCausalConsistency;
 
     if (TestData.runningWithCausalConsistency) {
-        sessionOptions.readPreference = {mode: 'secondary'};
+        sessionOptions.readPreference = {mode: "secondary"};
     }
 }
 
@@ -270,7 +268,7 @@ if (TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns) {
 
 const executionOptions = {
     dbNamePrefix: TestData.dbNamePrefix || "",
-    tenantId: TestData.tenantId
+    tenantId: TestData.tenantId,
 };
 const resmokeDbPathPrefix = TestData.resmokeDbPathPrefix || ".";
 
@@ -279,12 +277,12 @@ const resmokeDbPathPrefix = TestData.resmokeDbPathPrefix || ".";
 if (TestData.useActionPermittedFile) {
     assert(
         Array.isArray(TestData.useActionPermittedFile),
-        `TestData.useActionPermittedFile needs to be a list of hooks use action files. Current value: '${
-            tojson()}'`);
+        `TestData.useActionPermittedFile needs to be a list of hooks use action files. Current value: '${tojson()}'`,
+    );
     executionOptions.actionFiles = {
-        permitted: resmokeDbPathPrefix + '/permitted',
-        idleRequest: resmokeDbPathPrefix + '/idle_request',
-        idleAck: resmokeDbPathPrefix + '/idle_ack',
+        permitted: resmokeDbPathPrefix + "/permitted",
+        idleRequest: resmokeDbPathPrefix + "/idle_request",
+        idleAck: resmokeDbPathPrefix + "/idle_ack",
     };
 }
 

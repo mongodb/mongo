@@ -7,9 +7,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 
 const numNodesPerRS = 2;
 const numMostCommonValues = 5;
@@ -18,7 +16,7 @@ const numMostCommonValues = 5;
 // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
 // command with readPreference "secondaryPreferred".
 const writeConcern = {
-    w: numNodesPerRS
+    w: numNodesPerRS,
 };
 
 function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics}) {
@@ -34,13 +32,15 @@ function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics}) {
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     for (let shardKey of shardKeys) {
-        const res = assert.commandWorked(conn.adminCommand({
-            analyzeShardKey: ns,
-            key: shardKey,
-            // Skip calculating the read and write distribution metrics since they are not needed by
-            // this test.
-            readWriteDistribution: false
-        }));
+        const res = assert.commandWorked(
+            conn.adminCommand({
+                analyzeShardKey: ns,
+                key: shardKey,
+                // Skip calculating the read and write distribution metrics since they are not needed by
+                // this test.
+                readWriteDistribution: false,
+            }),
+        );
         AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, metrics);
     }
 }
@@ -57,16 +57,19 @@ function runTest(conn) {
                 name: "x_1",
                 key: {x: 1},
                 unique: true,
-            }
+            },
         ],
         shardKeys: [{x: 1}, {x: "hashed"}],
         metrics: {
             numDocs: 2,
             isUnique: true,
             numDistinctValues: 2,
-            mostCommonValues: [{value: {x: -1}, frequency: 1}, {value: {x: 1}, frequency: 1}],
-            numMostCommonValues
-        }
+            mostCommonValues: [
+                {value: {x: -1}, frequency: 1},
+                {value: {x: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
     });
 
     testAnalyzeShardKey(conn, {
@@ -80,20 +83,26 @@ function runTest(conn) {
                 name: "x_1_unique",
                 key: {x: 1},
                 unique: true,
-            }
+            },
         ],
         shardKeys: [{x: 1}, {x: "hashed"}],
         metrics: {
             numDocs: 2,
             isUnique: true,
             numDistinctValues: 2,
-            mostCommonValues: [{value: {x: -1}, frequency: 1}, {value: {x: 1}, frequency: 1}],
-            numMostCommonValues
-        }
+            mostCommonValues: [
+                {value: {x: -1}, frequency: 1},
+                {value: {x: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
     });
 
     testAnalyzeShardKey(conn, {
-        docs: [{x: -1, y: -1}, {x: 1, y: 1}],
+        docs: [
+            {x: -1, y: -1},
+            {x: 1, y: 1},
+        ],
         indexSpecs: [
             {
                 name: "x_1_y_1",
@@ -103,20 +112,26 @@ function runTest(conn) {
             {
                 name: "x_1",
                 key: {x: 1},
-            }
+            },
         ],
         shardKeys: [{x: 1}, {x: "hashed"}],
         metrics: {
             numDocs: 2,
             isUnique: false,
             numDistinctValues: 2,
-            mostCommonValues: [{value: {x: -1}, frequency: 1}, {value: {x: 1}, frequency: 1}],
-            numMostCommonValues
-        }
+            mostCommonValues: [
+                {value: {x: -1}, frequency: 1},
+                {value: {x: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
     });
 
     testAnalyzeShardKey(conn, {
-        docs: [{x: -1, y: -1, z: -1}, {x: 1, y: 1, z: 1}],
+        docs: [
+            {x: -1, y: -1, z: -1},
+            {x: 1, y: 1, z: 1},
+        ],
         indexSpecs: [
             {
                 name: "x_1_y_1_z_1",
@@ -127,36 +142,40 @@ function runTest(conn) {
                 name: "x_1_y_1",
                 key: {x: 1, y: 1},
                 unique: true,
-            }
+            },
         ],
-        shardKeys: [{x: 1, y: 1}, {x: "hashed", y: 1}],
+        shardKeys: [
+            {x: 1, y: 1},
+            {x: "hashed", y: 1},
+        ],
         metrics: {
             numDocs: 2,
             isUnique: true,
             numDistinctValues: 2,
-            mostCommonValues:
-                [{value: {x: -1, y: -1}, frequency: 1}, {value: {x: 1, y: 1}, frequency: 1}],
-            numMostCommonValues
-        }
+            mostCommonValues: [
+                {value: {x: -1, y: -1}, frequency: 1},
+                {value: {x: 1, y: 1}, frequency: 1},
+            ],
+            numMostCommonValues,
+        },
     });
 }
 
 const setParameterOpts = {
-    analyzeShardKeyNumMostCommonValues: numMostCommonValues
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
 };
 
 {
-    const st =
-        new ShardingTest({shards: 1, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
+    const st = new ShardingTest({shards: 1, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
 
     runTest(st.s);
 
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
-    const rst =
-        new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
+    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

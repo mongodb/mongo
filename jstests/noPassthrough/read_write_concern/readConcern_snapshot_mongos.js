@@ -8,9 +8,7 @@
 //   uses_transactions,
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    flushRoutersAndRefreshShardMetadata
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {flushRoutersAndRefreshShardMetadata} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // Runs the command as the first in a multi statement txn that is aborted right after, expecting
 // success.
@@ -80,8 +78,7 @@ expectSuccessInTxnThenAbort(session, sessionDb, {
 
 // readConcern 'snapshot' is supported by find and getMore on mongos in a transaction.
 session.startTransaction();
-let res = assert.commandWorked(
-    sessionDb.runCommand({find: collName, batchSize: 0, readConcern: {level: "snapshot"}}));
+let res = assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 0, readConcern: {level: "snapshot"}}));
 assert(!res.cursor.hasOwnProperty("atClusterTime"));
 res = assert.commandWorked(sessionDb.runCommand({getMore: res.cursor.id, collection: collName}));
 assert(!res.cursor.hasOwnProperty("atClusterTime"));
@@ -114,11 +111,10 @@ expectSuccessInTxnThenAbort(session, sessionDb, {
 
 // Test snapshot outside of transactions on mongos.
 const snapshotReadConcern = {
-    level: "snapshot"
+    level: "snapshot",
 };
 // readConcern 'snapshot' is supported by find outside of transactions on mongos.
-res = assert.commandWorked(
-    testDB.runCommand({find: collName, batchSize: 0, readConcern: snapshotReadConcern}));
+res = assert.commandWorked(testDB.runCommand({find: collName, batchSize: 0, readConcern: snapshotReadConcern}));
 assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by getMore outside of transactions on mongos.
@@ -126,26 +122,30 @@ res = assert.commandWorked(testDB.runCommand({getMore: res.cursor.id, collection
 assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by aggregate outside of transactions on mongos.
-res = assert.commandWorked(testDB.runCommand(
-    {aggregate: collName, pipeline: [], cursor: {}, readConcern: snapshotReadConcern}));
+res = assert.commandWorked(
+    testDB.runCommand({aggregate: collName, pipeline: [], cursor: {}, readConcern: snapshotReadConcern}),
+);
 assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by distinct outside of transactions on mongos.
-res = assert.commandWorked(
-    testDB.runCommand({distinct: collName, key: "x", readConcern: snapshotReadConcern}));
+res = assert.commandWorked(testDB.runCommand({distinct: collName, key: "x", readConcern: snapshotReadConcern}));
 assert(res.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is not supported by count on mongos.
-assert.commandFailedWithCode(testDB.runCommand({count: collName, readConcern: snapshotReadConcern}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    testDB.runCommand({count: collName, readConcern: snapshotReadConcern}),
+    ErrorCodes.InvalidOptions,
+);
 
 // readConcern 'snapshot' is not supported by findAndModify outside of transactions on mongos.
-assert.commandFailedWithCode(testDB.runCommand({
-    findAndModify: collName,
-    query: {},
-    update: {$set: {a: 1}},
-    readConcern: snapshotReadConcern,
-}),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    testDB.runCommand({
+        findAndModify: collName,
+        query: {},
+        update: {$set: {a: 1}},
+        readConcern: snapshotReadConcern,
+    }),
+    ErrorCodes.InvalidOptions,
+);
 
 st.stop();

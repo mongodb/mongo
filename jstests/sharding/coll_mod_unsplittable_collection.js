@@ -14,7 +14,7 @@ function assertIndexExists(coll, indexKey, options, connections) {
         assert.commandWorked(res);
         const indexes = new DBCommandCursor(db, res).toArray();
 
-        const expectedIndex = indexes.filter(function(idx) {
+        const expectedIndex = indexes.filter(function (idx) {
             // Checkk that index key match
             if (!friendlyEqual(idx.key, indexKey)) {
                 return false;
@@ -61,7 +61,7 @@ const shard0_ps = st.shard0;
 const shard1 = st.shard1;
 const shard2 = st.shard2;
 const kIndexKey = {
-    key: 1
+    key: 1,
 };
 
 // Ensure the db primary is shard0.
@@ -78,8 +78,9 @@ jsTest.log("Test collmod over an unsplittable collection living on the DBPrimary
     assertIndexDoesntExist(coll, kIndexKey, {expireAfterSeconds: 3333}, [shard1, shard2]);
 
     // Update index options calling collmod
-    const res = assert.commandWorked(db.runCommand(
-        {collMod: coll.getName(), index: {keyPattern: kIndexKey, expireAfterSeconds: 1111}}));
+    const res = assert.commandWorked(
+        db.runCommand({collMod: coll.getName(), index: {keyPattern: kIndexKey, expireAfterSeconds: 1111}}),
+    );
     assert(res.ok === 1);
     assertIndexExists(coll, kIndexKey, {expireAfterSeconds: 1111}, [mongos, shard0_ps]);
     assertIndexDoesntExist(coll, kIndexKey, {expireAfterSeconds: 1111}, [shard1, shard2]);
@@ -95,8 +96,9 @@ jsTest.log("Test collmod over an unsplittable collection living outside the DBPr
     assertIndexDoesntExist(coll, kIndexKey, {expireAfterSeconds: 3333}, [shard0_ps, shard2]);
 
     // Update index options calling collmod
-    const res = assert.commandWorked(db.runCommand(
-        {collMod: coll.getName(), index: {keyPattern: kIndexKey, expireAfterSeconds: 1111}}));
+    const res = assert.commandWorked(
+        db.runCommand({collMod: coll.getName(), index: {keyPattern: kIndexKey, expireAfterSeconds: 1111}}),
+    );
 
     assert(res.ok === 1);
     assertIndexExists(coll, kIndexKey, {expireAfterSeconds: 1111}, [mongos, shard1]);

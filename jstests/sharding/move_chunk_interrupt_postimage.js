@@ -8,8 +8,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 2}});
-const interruptBeforeProcessingPrePostImageOriginatingOpFP =
-    configureFailPoint(st.rs1.getPrimary(), "interruptBeforeProcessingPrePostImageOriginatingOp");
+const interruptBeforeProcessingPrePostImageOriginatingOpFP = configureFailPoint(
+    st.rs1.getPrimary(),
+    "interruptBeforeProcessingPrePostImageOriginatingOp",
+);
 
 const collection = st.s.getCollection("test.mycoll");
 CreateShardedCollectionUtil.shardCollectionWithChunks(collection, {x: 1}, [
@@ -19,12 +21,14 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(collection, {x: 1}, [
 ]);
 
 assert.commandWorked(collection.insert({_id: 0, x: 10}));
-assert.commandWorked(collection.runCommand("findAndModify", {
-    query: {x: 10},
-    update: {$set: {y: 2}},
-    new: true,
-    txnNumber: NumberLong(1),
-}));
+assert.commandWorked(
+    collection.runCommand("findAndModify", {
+        query: {x: 10},
+        update: {$set: {y: 2}},
+        new: true,
+        txnNumber: NumberLong(1),
+    }),
+);
 
 const res = st.s.adminCommand({
     moveChunk: collection.getFullName(),

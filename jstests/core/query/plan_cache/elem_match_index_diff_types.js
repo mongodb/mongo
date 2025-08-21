@@ -13,7 +13,7 @@ import {getPlanCacheKeyFromShape} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.elem_match_index_diff_types;
 const indexCollation = {
-    collation: {locale: 'en'},
+    collation: {locale: "en"},
 };
 
 /**
@@ -39,10 +39,8 @@ function runTest(documentList, arrayFieldName, cachedQuery, notCachedQuery, quer
     assert.commandWorked(coll.createIndex({[arrayFieldName]: 1}, indexCollation));
     assert.commandWorked(coll.createIndex({[arrayFieldName]: -1}, indexCollation));
 
-    const key1 =
-        getPlanCacheKeyFromShape({query: cachedQuery, collection: coll, db: db, ...queryCollation});
-    const key2 = getPlanCacheKeyFromShape(
-        {query: notCachedQuery, collection: coll, db: db, ...queryCollation});
+    const key1 = getPlanCacheKeyFromShape({query: cachedQuery, collection: coll, db: db, ...queryCollation});
+    const key2 = getPlanCacheKeyFromShape({query: notCachedQuery, collection: coll, db: db, ...queryCollation});
     assert.neq(key1, key2, "Plan cache keys should differ.");
 
     // Sanity check that the test query returns the correct results.
@@ -127,7 +125,7 @@ function runTest(documentList, arrayFieldName, cachedQuery, notCachedQuery, quer
     ];
     const cachedQuery = {arr: {$elemMatch: {$in: [123, 456, 789]}}};
     const notCachedQuery = {arr: {$elemMatch: {$in: ["2", "3", "10"]}}};
-    const numericOrderCollation = {collation: {locale: 'en', strength: 1, numericOrdering: true}};
+    const numericOrderCollation = {collation: {locale: "en", strength: 1, numericOrdering: true}};
 
     // Because the query and index collation differ, we should not re-use the cache entry for the
     // string comparison.

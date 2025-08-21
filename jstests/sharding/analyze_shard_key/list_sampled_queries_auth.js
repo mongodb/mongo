@@ -13,8 +13,7 @@ function runTest(conn) {
     const collName1 = "testColl1";
 
     const adminDb = conn.getDB("admin");
-    assert.commandWorked(
-        adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
+    assert.commandWorked(adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
     assert(adminDb.auth("super", "super"));
     const testDb = adminDb.getSiblingDB(dbName);
     const docs = [];
@@ -34,43 +33,46 @@ function runTest(conn) {
     assert(adminDb.auth("user_no_priv", "pwd"));
     assert.commandFailedWithCode(
         adminDb.runCommand({aggregate: 1, pipeline: [{$listSampledQueries: {}}], cursor: {}}),
-        ErrorCodes.Unauthorized);
+        ErrorCodes.Unauthorized,
+    );
     assert(adminDb.logout());
 
     // Set up a role with 'listSampledQueries' privilege.
     assert(adminDb.auth("super", "super"));
-    assert.commandWorked(adminDb.runCommand({
-        createRole: "role_priv",
-        roles: [],
-        privileges: [{resource: {cluster: true}, actions: ["listSampledQueries"]}]
-    }));
+    assert.commandWorked(
+        adminDb.runCommand({
+            createRole: "role_priv",
+            roles: [],
+            privileges: [{resource: {cluster: true}, actions: ["listSampledQueries"]}],
+        }),
+    );
     // Set up a user with the privileged role.
-    assert.commandWorked(adminDb.runCommand({
-        createUser: "user_with_explicit_priv",
-        pwd: "pwd",
-        roles: [{role: "role_priv", db: "admin"}]
-    }));
+    assert.commandWorked(
+        adminDb.runCommand({
+            createUser: "user_with_explicit_priv",
+            pwd: "pwd",
+            roles: [{role: "role_priv", db: "admin"}],
+        }),
+    );
     assert(adminDb.logout());
     // Verify that the user is authorized to run the listSampledQueries aggregation stage.
     assert(adminDb.auth("user_with_explicit_priv", "pwd"));
-    assert.commandWorked(
-        adminDb.runCommand({aggregate: 1, pipeline: [{$listSampledQueries: {}}], cursor: {}}),
-    );
+    assert.commandWorked(adminDb.runCommand({aggregate: 1, pipeline: [{$listSampledQueries: {}}], cursor: {}}));
     assert(adminDb.logout());
 
     // Set up a user as a clusterMonitor with the 'listSampledQueries' privilege.
     assert(adminDb.auth("super", "super"));
-    assert.commandWorked(adminDb.runCommand({
-        createUser: "user_with_clusterMonitor",
-        pwd: "pwd",
-        roles: [{role: "clusterMonitor", db: "admin"}]
-    }));
+    assert.commandWorked(
+        adminDb.runCommand({
+            createUser: "user_with_clusterMonitor",
+            pwd: "pwd",
+            roles: [{role: "clusterMonitor", db: "admin"}],
+        }),
+    );
     assert(adminDb.logout());
     // Verify that the user is authorized to run the listSampledQueries aggregation stage.
     assert(adminDb.auth("user_with_clusterMonitor", "pwd"));
-    assert.commandWorked(
-        adminDb.runCommand({aggregate: 1, pipeline: [{$listSampledQueries: {}}], cursor: {}}),
-    );
+    assert.commandWorked(adminDb.runCommand({aggregate: 1, pipeline: [{$listSampledQueries: {}}], cursor: {}}));
     assert(adminDb.logout());
 }
 

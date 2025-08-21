@@ -12,9 +12,7 @@ import {
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const unshardedCollName = jsTestName() + "_unsharded";
@@ -29,7 +27,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     mongos: 1,
     other: {
         rsOptions: {setParameter: {enableTestCommands: 1}},
-    }
+    },
 });
 
 const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
@@ -40,21 +38,22 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const shardedColl = testDB.getCollection(shardedCollName);
 
-assert.commandWorked(shardedColl.insert([
-    {_id: 1, a: 10},
-    {_id: 2, a: 20},
-    {_id: 3, a: 15},
-    {_id: 4, a: 5},
-    {_id: 11, a: 50},
-    {_id: 12, a: 0},
-    {_id: 13, a: 22},
-    {_id: 14, a: 3},
-]));
+assert.commandWorked(
+    shardedColl.insert([
+        {_id: 1, a: 10},
+        {_id: 2, a: 20},
+        {_id: 3, a: 15},
+        {_id: 4, a: 5},
+        {_id: 11, a: 50},
+        {_id: 12, a: 0},
+        {_id: 13, a: 22},
+        {_id: 14, a: 3},
+    ]),
+);
 
 // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
 st.shardColl(shardedColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
@@ -81,11 +80,7 @@ let shard1Conn = st.rs1.getPrimary();
 const unshardedColl = testDB.getCollection(unshardedCollName);
 unshardedColl.drop();
 
-assert.commandWorked(unshardedColl.insert([
-    {b: 1},
-    {b: 2},
-    {b: 3},
-]));
+assert.commandWorked(unshardedColl.insert([{b: 1}, {b: 2}, {b: 3}]));
 
 var uid = NumberLong(1432);
 function uniqueCursorId() {
@@ -94,39 +89,47 @@ function uniqueCursorId() {
 
 function mockMongotShardResponses(mongotQuery) {
     const responseOk = 1;
-    const history0 = [{
-        expectedCommand: mongotCommandForQuery({
-            query: mongotQuery,
-            collName: shardedCollName,
-            db: dbName,
-            collectionUUID: collUUID0,
-            protocolVersion: protocolVersion
-        }),
-        response: mongotMultiCursorResponseForBatch(shard0MockResponse,
-                                                    NumberLong(0),
-                                                    [{val: 1}],
-                                                    NumberLong(0),
-                                                    shardedColl.getFullName(),
-                                                    responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: shardedCollName,
+                db: dbName,
+                collectionUUID: collUUID0,
+                protocolVersion: protocolVersion,
+            }),
+            response: mongotMultiCursorResponseForBatch(
+                shard0MockResponse,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                shardedColl.getFullName(),
+                responseOk,
+            ),
+        },
+    ];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, uniqueCursorId(), uniqueCursorId());
 
-    const history1 = [{
-        expectedCommand: mongotCommandForQuery({
-            query: mongotQuery,
-            collName: shardedCollName,
-            db: dbName,
-            collectionUUID: collUUID1,
-            protocolVersion: protocolVersion
-        }),
-        response: mongotMultiCursorResponseForBatch(shard1MockResponse,
-                                                    NumberLong(0),
-                                                    [{val: 1}],
-                                                    NumberLong(0),
-                                                    shardedColl.getFullName(),
-                                                    responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: mongotCommandForQuery({
+                query: mongotQuery,
+                collName: shardedCollName,
+                db: dbName,
+                collectionUUID: collUUID1,
+                protocolVersion: protocolVersion,
+            }),
+            response: mongotMultiCursorResponseForBatch(
+                shard1MockResponse,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                shardedColl.getFullName(),
+                responseOk,
+            ),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, uniqueCursorId(), uniqueCursorId());
 }
@@ -137,40 +140,23 @@ function mockMongotShardResponses(mongotQuery) {
 
     const mongotQuery = {sort: {a: 1}};
     const sortSpec = {"$searchSortValues.a": 1};
-    mockPlanShardedSearchResponseOnConn(
-        shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard0Conn);
+    mockPlanShardedSearchResponseOnConn(shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard0Conn);
     mockMongotShardResponses(mongotQuery);
 
     const result = unshardedColl
-                       .aggregate([
-                           {$match: {b: {$lt: 3}}},
-                           {$project: {_id: 0}},
-                           {
-                               $unionWith: {
-                                   coll: shardedCollName,
-                                   pipeline: [
-                                       {$search: {sort: {a: 1}}},
-                                       {$project: {_id: 0}},
-                                   ],
-                               }
-                           },
-                       ])
-                       .toArray();
+        .aggregate([
+            {$match: {b: {$lt: 3}}},
+            {$project: {_id: 0}},
+            {
+                $unionWith: {
+                    coll: shardedCollName,
+                    pipeline: [{$search: {sort: {a: 1}}}, {$project: {_id: 0}}],
+                },
+            },
+        ])
+        .toArray();
 
-    assert.sameMembers(
-        [
-            {b: 1},
-            {b: 2},
-            {a: 0},
-            {a: 3},
-            {a: 5},
-            {a: 10},
-            {a: 15},
-            {a: 20},
-            {a: 22},
-            {a: 50},
-        ],
-        result);
+    assert.sameMembers([{b: 1}, {b: 2}, {a: 0}, {a: 3}, {a: 5}, {a: 10}, {a: 15}, {a: 20}, {a: 22}, {a: 50}], result);
 })();
 
 (function testLookupUnshardedLocalShardedForeign() {
@@ -179,21 +165,21 @@ function mockMongotShardResponses(mongotQuery) {
     // Mock PSS on primary shard's mongotmock.
     // The primary shard ends up sending planShardedSearch to its mongotmock during $lookup's
     // getNext() implementation which parses the subpipeline on each invocation.
-    mockPlanShardedSearchResponseOnConn(
-        shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard0Conn);
+    mockPlanShardedSearchResponseOnConn(shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard0Conn);
     mockMongotShardResponses(mongotQuery);
-    const result =
-        unshardedColl
-            .aggregate([
-                {$match: {b: 1}}, // Ensure only one element from the local collection.
-                {$project: {_id: 0}},
-                {$lookup: {from: shardedCollName, pipeline: [
-                    {$search: {sort: {a: 1}}},
-                    {$match: {a: {$lt: 4}}},
-                    {$project: {_id: 0}},
-                ], as: "out"}},
-            ])
-            .toArray();
+    const result = unshardedColl
+        .aggregate([
+            {$match: {b: 1}}, // Ensure only one element from the local collection.
+            {$project: {_id: 0}},
+            {
+                $lookup: {
+                    from: shardedCollName,
+                    pipeline: [{$search: {sort: {a: 1}}}, {$match: {a: {$lt: 4}}}, {$project: {_id: 0}}],
+                    as: "out",
+                },
+            },
+        ])
+        .toArray();
     assert.eq([{b: 1, out: [{a: 0}, {a: 3}]}], result);
 })();
 
@@ -201,10 +187,8 @@ function mockMongotShardResponses(mongotQuery) {
     const mongotQuery = {sort: {a: 1}};
     const sortSpec = {"$searchSortValues.a": 1};
     // Mock PSS for both shards. It is invoked during the execution of $lookup.
-    mockPlanShardedSearchResponseOnConn(
-        shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard0Conn);
-    mockPlanShardedSearchResponseOnConn(
-        shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard1Conn);
+    mockPlanShardedSearchResponseOnConn(shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard0Conn);
+    mockPlanShardedSearchResponseOnConn(shardedCollName, mongotQuery, dbName, sortSpec, stWithMock, shard1Conn);
     // Mock search result for both shards twice. Each shard will execute the subpipeline which
     // requires it to get search results for itself and the other shard.
     for (let i = 0; i < 2; i++) {
@@ -218,20 +202,27 @@ function mockMongotShardResponses(mongotQuery) {
     // run PSS or 'search' first, and as a result must disable the order checks.
     stWithMock.getMockConnectedToHost(shard0Conn).disableOrderCheck();
     stWithMock.getMockConnectedToHost(shard1Conn).disableOrderCheck();
-    const result =
-        shardedColl
-            .aggregate([
-                {$match: {a: {$in: [0, 5]}}}, // Ensure the pipeline needs to run on both shards.
-                {$sort: {a: 1}},
-                {$project: {_id: 0}},
-                {$lookup: {from: shardedCollName, pipeline: [
-                    {$search: {sort: {a: 1}}},
-                    {$match: {a: {$lt: 4}}},
-                    {$project: {_id: 0}},
-                ], as: "out"}},
-            ])
-            .toArray();
-    assert.eq([{a: 0, out: [{a: 0}, {a: 3}]}, {a: 5, out: [{a: 0}, {a: 3}]}], result);
+    const result = shardedColl
+        .aggregate([
+            {$match: {a: {$in: [0, 5]}}}, // Ensure the pipeline needs to run on both shards.
+            {$sort: {a: 1}},
+            {$project: {_id: 0}},
+            {
+                $lookup: {
+                    from: shardedCollName,
+                    pipeline: [{$search: {sort: {a: 1}}}, {$match: {a: {$lt: 4}}}, {$project: {_id: 0}}],
+                    as: "out",
+                },
+            },
+        ])
+        .toArray();
+    assert.eq(
+        [
+            {a: 0, out: [{a: 0}, {a: 3}]},
+            {a: 5, out: [{a: 0}, {a: 3}]},
+        ],
+        result,
+    );
 })();
 
 stWithMock.stop();

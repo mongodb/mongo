@@ -17,10 +17,10 @@ test.t.insert({loc: [-180, 0]});
 test.t.insert({loc: [179.999, 0]});
 test.t.insert({loc: [-179.999, 0]});
 
-let assertXIsNegative = function(obj) {
+let assertXIsNegative = function (obj) {
     assert.lt(obj.loc[0], 0);
 };
-let assertXIsPositive = function(obj) {
+let assertXIsPositive = function (obj) {
     assert.gt(obj.loc[0], 0);
 };
 
@@ -29,39 +29,161 @@ assert.eq(test.t.count({loc: {$within: {$center: [[-180, 0], 1]}}}), 2);
 test.t.find({loc: {$within: {$center: [[180, 0], 1]}}}).forEach(assertXIsPositive);
 test.t.find({loc: {$within: {$center: [[-180, 0], 1]}}}).forEach(assertXIsNegative);
 
-var oneDegree = Math.PI / 180;  // in radians
+var oneDegree = Math.PI / 180; // in radians
 
 // errors out due to SERVER-1760
 if (0) {
     assert.eq(test.t.count({loc: {$within: {$centerSphere: [[180, 0], oneDegree]}}}), 2);
     assert.eq(test.t.count({loc: {$within: {$centerSphere: [[-180, 0], oneDegree]}}}), 2);
-    test.t.find({loc: {$within: {$centerSphere: [[180, 0], oneDegree]}}})
-        .forEach(assertXIsPositive);
-    test.t.find({loc: {$within: {$centerSphere: [[-180, 0], oneDegree]}}})
-        .forEach(assertXIsNegative);
+    test.t.find({loc: {$within: {$centerSphere: [[180, 0], oneDegree]}}}).forEach(assertXIsPositive);
+    test.t.find({loc: {$within: {$centerSphere: [[-180, 0], oneDegree]}}}).forEach(assertXIsNegative);
 }
 
-assert.eq(test.t.count({loc: {$within: {$box: [[180, 0.1], [179, -0.1]]}}}), 2);
-assert.eq(test.t.count({loc: {$within: {$box: [[-180, 0.1], [-179, -0.1]]}}}), 2);
-test.t.find({loc: {$within: {$box: [[180, 0.1], [179, -0.1]]}}}).forEach(assertXIsPositive);
-test.t.find({loc: {$within: {$box: [[-180, 0.1], [-179, -0.1]]}}}).forEach(assertXIsNegative);
-
-assert.eq(test.t.count({loc: {$within: {$polygon: [[180, 0], [179, 0], [179.5, 0.5]]}}}), 2);
-assert.eq(test.t.count({loc: {$within: {$polygon: [[-180, 0], [-179, 0], [179.5, 0.5]]}}}), 2);
-test.t.find({loc: {$within: {$polygon: [[180, 0], [179, 0], [179.5, 0.5]]}}})
+assert.eq(
+    test.t.count({
+        loc: {
+            $within: {
+                $box: [
+                    [180, 0.1],
+                    [179, -0.1],
+                ],
+            },
+        },
+    }),
+    2,
+);
+assert.eq(
+    test.t.count({
+        loc: {
+            $within: {
+                $box: [
+                    [-180, 0.1],
+                    [-179, -0.1],
+                ],
+            },
+        },
+    }),
+    2,
+);
+test.t
+    .find({
+        loc: {
+            $within: {
+                $box: [
+                    [180, 0.1],
+                    [179, -0.1],
+                ],
+            },
+        },
+    })
     .forEach(assertXIsPositive);
-test.t.find({loc: {$within: {$polygon: [[-180, 0], [-179, 0], [179.5, 0.5]]}}})
+test.t
+    .find({
+        loc: {
+            $within: {
+                $box: [
+                    [-180, 0.1],
+                    [-179, -0.1],
+                ],
+            },
+        },
+    })
     .forEach(assertXIsNegative);
 
-assert.eq(test.t.find({loc: {$near: [180, 0]}}, {_id: 0}).limit(2).toArray(),
-          [{loc: [180, 0]}, {loc: [179.999, 0]}]);
-assert.eq(test.t.find({loc: {$near: [-180, 0]}}, {_id: 0}).limit(2).toArray(),
-          [{loc: [-180, 0]}, {loc: [-179.999, 0]}]);
+assert.eq(
+    test.t.count({
+        loc: {
+            $within: {
+                $polygon: [
+                    [180, 0],
+                    [179, 0],
+                    [179.5, 0.5],
+                ],
+            },
+        },
+    }),
+    2,
+);
+assert.eq(
+    test.t.count({
+        loc: {
+            $within: {
+                $polygon: [
+                    [-180, 0],
+                    [-179, 0],
+                    [179.5, 0.5],
+                ],
+            },
+        },
+    }),
+    2,
+);
+test.t
+    .find({
+        loc: {
+            $within: {
+                $polygon: [
+                    [180, 0],
+                    [179, 0],
+                    [179.5, 0.5],
+                ],
+            },
+        },
+    })
+    .forEach(assertXIsPositive);
+test.t
+    .find({
+        loc: {
+            $within: {
+                $polygon: [
+                    [-180, 0],
+                    [-179, 0],
+                    [179.5, 0.5],
+                ],
+            },
+        },
+    })
+    .forEach(assertXIsNegative);
+
+assert.eq(
+    test.t
+        .find({loc: {$near: [180, 0]}}, {_id: 0})
+        .limit(2)
+        .toArray(),
+    [{loc: [180, 0]}, {loc: [179.999, 0]}],
+);
+assert.eq(
+    test.t
+        .find({loc: {$near: [-180, 0]}}, {_id: 0})
+        .limit(2)
+        .toArray(),
+    [{loc: [-180, 0]}, {loc: [-179.999, 0]}],
+);
 
 // These will need to change when SERVER-1760 is fixed
-printjson(test.t.find({loc: {$nearSphere: [180, 0]}}, {_id: 0}).limit(2).explain());
-assert.eq(test.t.find({loc: {$nearSphere: [180, 0]}}, {_id: 0}).limit(2).toArray(),
-          [{loc: [180, 0]}, {loc: [179.999, 0]}]);
-printjson(test.t.find({loc: {$nearSphere: [-180, 0]}}, {_id: 0}).limit(2).explain());
-assert.eq(test.t.find({loc: {$nearSphere: [-180, 0]}}, {_id: 0}).limit(2).toArray(),
-          [{loc: [-180, 0]}, {loc: [-179.999, 0]}]);
+printjson(
+    test.t
+        .find({loc: {$nearSphere: [180, 0]}}, {_id: 0})
+        .limit(2)
+        .explain(),
+);
+assert.eq(
+    test.t
+        .find({loc: {$nearSphere: [180, 0]}}, {_id: 0})
+        .limit(2)
+        .toArray(),
+    [{loc: [180, 0]}, {loc: [179.999, 0]}],
+);
+printjson(
+    test.t
+        .find({loc: {$nearSphere: [-180, 0]}}, {_id: 0})
+        .limit(2)
+        .explain(),
+);
+assert.eq(
+    test.t
+        .find({loc: {$nearSphere: [-180, 0]}}, {_id: 0})
+        .limit(2)
+        .toArray(),
+    [{loc: [-180, 0]}, {loc: [-179.999, 0]}],
+);

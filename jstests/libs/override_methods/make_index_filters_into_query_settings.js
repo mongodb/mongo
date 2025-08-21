@@ -26,9 +26,9 @@ function populateIndexFilterSetIfQuerySettingsArePresent(response) {
  * query settings are set.
  */
 function processAggregateResponse(cmdObj, response) {
-    if (cmdObj.pipeline.some(stage => stage.hasOwnProperty("$planCacheStats"))) {
+    if (cmdObj.pipeline.some((stage) => stage.hasOwnProperty("$planCacheStats"))) {
         for (let cacheEntry of response.cursor.firstBatch) {
-            cacheEntry.indexFilterSet = cacheEntry.hasOwnProperty('querySettings');
+            cacheEntry.indexFilterSet = cacheEntry.hasOwnProperty("querySettings");
         }
     }
 
@@ -51,8 +51,7 @@ function planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj) {
     // Setting index filters on idhack query is no-op for index filter command, but is a failure
     // for query settings command, therefore avoid specifying query settings and return success.
     const explain = assert.commandWorked(db.runCommand(getExplainCommand(queryInstance)));
-    const isIdHackQuery =
-        explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
+    const isIdHackQuery = explain && everyWinningPlan(explain, (winningPlan) => isIdhackOrExpress(db, winningPlan));
     if (isIdHackQuery) {
         return {ok: 1};
     }
@@ -67,8 +66,8 @@ function planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj) {
     const settings = {
         indexHints: {
             ns: {db: dbName, coll: collName},
-            allowedIndexes: [...cmdObj["indexes"], {$natural: 1}, {$natural: -1}]
-        }
+            allowedIndexes: [...cmdObj["indexes"], {$natural: 1}, {$natural: -1}],
+        },
     };
 
     // Run setQuerySettings command.
@@ -81,7 +80,7 @@ function planCacheClearFiltersToRemoveAllQuerySettings(conn, cmdObj) {
     let pipeline = [
         {$querySettings: {}},
         // Perform the $match on the collection name.
-        {$match: {"representativeQuery.find": cmdObj.planCacheClearFilters}}
+        {$match: {"representativeQuery.find": cmdObj.planCacheClearFilters}},
     ];
 
     // Add additional $match stage for the query filter.
@@ -95,23 +94,24 @@ function planCacheClearFiltersToRemoveAllQuerySettings(conn, cmdObj) {
     addMatchIfPresent("sort");
     addMatchIfPresent("collation");
 
-    adminDb.aggregate(pipeline).toArray().forEach((queryShapeConfig, _) => {
-        assert.commandWorked(
-            adminDb.runCommand({removeQuerySettings: queryShapeConfig.queryShapeHash}));
-    });
+    adminDb
+        .aggregate(pipeline)
+        .toArray()
+        .forEach((queryShapeConfig, _) => {
+            assert.commandWorked(adminDb.runCommand({removeQuerySettings: queryShapeConfig.queryShapeHash}));
+        });
     return {ok: 1};
 }
 
 function planCacheListFiltersToDollarQuerySettings(conn, cmdObj) {
     const adminDb = conn.getDB("admin");
-    const allQueryShapeConfigurations =
-        adminDb
-            .aggregate([
-                {$querySettings: {}},
-                // Perform the match on the collection name.
-                {$match: {"representativeQuery.find": cmdObj.planCacheListFilters}}
-            ])
-            .toArray();
+    const allQueryShapeConfigurations = adminDb
+        .aggregate([
+            {$querySettings: {}},
+            // Perform the match on the collection name.
+            {$match: {"representativeQuery.find": cmdObj.planCacheListFilters}},
+        ])
+        .toArray();
 
     function isNotNaturalHint(allowedIndex) {
         return typeof allowedIndex !== "object" || !allowedIndex.hasOwnProperty("$natural");
@@ -121,14 +121,14 @@ function planCacheListFiltersToDollarQuerySettings(conn, cmdObj) {
             query: queryShapeConfig.representativeQuery.filter,
             // Remove the previously added '$natural' hints to ensure that the results match the
             // expected output.
-            indexes: queryShapeConfig.settings.indexHints[0].allowedIndexes.filter(isNotNaturalHint)
+            indexes: queryShapeConfig.settings.indexHints[0].allowedIndexes.filter(isNotNaturalHint),
         };
         addOptionalQueryFields(queryShapeConfig.representativeQuery, indexFilter);
         return indexFilter;
     }
     return {
         ok: 1,
-        filters: allQueryShapeConfigurations.map(fromQueryShapeConfigurationToIndexFilter)
+        filters: allQueryShapeConfigurations.map(fromQueryShapeConfigurationToIndexFilter),
     };
 }
 
@@ -137,8 +137,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
         case "drop": {
             // Remove all query settings associated with that collection upon collection drop. This
             // is the semantics of index filters.
-            planCacheClearFiltersToRemoveAllQuerySettings(conn,
-                                                          {planCacheClearFilters: cmdObj.drop});
+            planCacheClearFiltersToRemoveAllQuerySettings(conn, {planCacheClearFilters: cmdObj.drop});
 
             // Drop the collection.
             return clientFunction.apply(conn, makeFuncArgs(cmdObj));
@@ -171,4 +170,5 @@ OverrideHelpers.overrideRunCommand(runCommandOverride);
 
 // Always apply the override if a test spawns a parallel shell.
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/make_index_filters_into_query_settings.js");
+    "jstests/libs/override_methods/make_index_filters_into_query_settings.js",
+);

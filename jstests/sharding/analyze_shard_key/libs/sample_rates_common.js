@@ -10,12 +10,9 @@ export const fieldName = "x";
  * 'dbName' at rate 'targetNumPerSec' for 'durationSecs'. Returns the actual rate.
  */
 export async function runFindCmdsOnRepeat(host, dbName, collName, targetNumPerSec, durationSecs) {
-    const {QuerySamplingUtil} =
-        await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-    const {AnalyzeShardKeyUtil} =
-        await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-    const {fieldName} =
-        await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+    const {QuerySamplingUtil} = await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+    const {AnalyzeShardKeyUtil} = await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+    const {fieldName} = await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
 
     const conn = new Mongo(host);
     const db = conn.getDB(dbName);
@@ -35,15 +32,12 @@ export async function runFindCmdsOnRepeat(host, dbName, collName, targetNumPerSe
  * 'dbName' at rate 'targetNumPerSec' for 'durationSecs'. Returns the actual rate.
  */
 export async function runDeleteCmdsOnRepeat(host, dbName, collName, targetNumPerSec, durationSecs) {
-    const {QuerySamplingUtil} =
-        await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-    const {AnalyzeShardKeyUtil} =
-        await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-    const {fieldName} =
-        await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+    const {QuerySamplingUtil} = await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+    const {AnalyzeShardKeyUtil} = await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+    const {fieldName} = await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
 
     if (TestData.runningWithBulkWriteOverride) {
-        await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
+        await import("jstests/libs/override_methods/single_crud_op_as_bulk_write.js");
     }
 
     const conn = new Mongo(host);
@@ -65,13 +59,16 @@ export async function runDeleteCmdsOnRepeat(host, dbName, collName, targetNumPer
  * rate 'targetNumPerSec' for 'durationSecs'. Returns the actual rate.
  */
 export async function runBulkWriteDeleteCmdsOnRepeat(
-    host, dbName, collName, collNameNotSampled, targetNumPerSec, durationSecs) {
-    const {QuerySamplingUtil} =
-        await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-    const {AnalyzeShardKeyUtil} =
-        await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-    const {fieldName} =
-        await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+    host,
+    dbName,
+    collName,
+    collNameNotSampled,
+    targetNumPerSec,
+    durationSecs,
+) {
+    const {QuerySamplingUtil} = await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+    const {AnalyzeShardKeyUtil} = await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+    const {fieldName} = await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
 
     const conn = new Mongo(host);
     const adminDB = conn.getDB("admin");
@@ -87,14 +84,10 @@ export async function runBulkWriteDeleteCmdsOnRepeat(
                 {delete: 0, filter: filter, collation, multi: false},
                 {delete: 1, filter: filter, collation, multi: false},
             ],
-            nsInfo: [
-                {ns: `${dbName}.${collNameNotSampled}`},
-                {ns: `${dbName}.${collName}`},
-            ],
+            nsInfo: [{ns: `${dbName}.${collNameNotSampled}`}, {ns: `${dbName}.${collName}`}],
         };
     };
-    return QuerySamplingUtil.runCmdsOnRepeat(
-        adminDB, makeCmdObjFunc, targetNumPerSec, durationSecs);
+    return QuerySamplingUtil.runCmdsOnRepeat(adminDB, makeCmdObjFunc, targetNumPerSec, durationSecs);
 }
 
 /**
@@ -103,13 +96,16 @@ export async function runBulkWriteDeleteCmdsOnRepeat(
  * 'durationSecs'. Returns the actual rate.
  */
 export async function runNestedAggregateCmdsOnRepeat(
-    host, dbName, localCollName, foreignCollName, targetNumPerSec, durationSecs) {
-    const {QuerySamplingUtil} =
-        await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-    const {AnalyzeShardKeyUtil} =
-        await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-    const {fieldName} =
-        await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
+    host,
+    dbName,
+    localCollName,
+    foreignCollName,
+    targetNumPerSec,
+    durationSecs,
+) {
+    const {QuerySamplingUtil} = await import("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+    const {AnalyzeShardKeyUtil} = await import("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
+    const {fieldName} = await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
 
     const conn = new Mongo(host);
     const db = conn.getDB(dbName);
@@ -121,11 +117,10 @@ export async function runNestedAggregateCmdsOnRepeat(
         const collation = QuerySamplingUtil.generateRandomCollation();
         return {
             aggregate: localCollName,
-            pipeline:
-                [{$lookup: {from: foreignCollName, as: "joined", pipeline: [{$match: filter}]}}],
+            pipeline: [{$lookup: {from: foreignCollName, as: "joined", pipeline: [{$match: filter}]}}],
             collation,
             cursor: {},
-            $readPreference: {mode: "secondaryPreferred"}
+            $readPreference: {mode: "secondaryPreferred"},
         };
     };
     return QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, targetNumPerSec, durationSecs);
@@ -140,8 +135,10 @@ export function isSlowBuild(conn) {
     const rawBuildInfo = buildInfo.rawData();
     jsTest.log("buildInfo: " + tojson({rawBuildInfo}));
 
-    return buildInfo.isAddressSanitizerActive() || buildInfo.isThreadSanitizerActive() ||
+    return (
+        buildInfo.isAddressSanitizerActive() ||
+        buildInfo.isThreadSanitizerActive() ||
         buildInfo.isDebug() ||
-        (rawBuildInfo.hasOwnProperty("buildEnvironment") &&
-         rawBuildInfo.buildEnvironment.target_os == "windows");
+        (rawBuildInfo.hasOwnProperty("buildEnvironment") && rawBuildInfo.buildEnvironment.target_os == "windows")
+    );
 }

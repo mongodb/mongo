@@ -10,7 +10,7 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 const rst = new ReplSetTest({
     name: "new_sync_source_in_quiesce_mode",
     nodes: 3,
-    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"}
+    nodeOptions: {setParameter: "shutdownTimeoutMillisForSignaledShutdown=5000"},
 });
 rst.startSet();
 const syncSource = rst.nodes[1];
@@ -18,17 +18,20 @@ const syncingNode = rst.nodes[2];
 
 // Make sure the syncSource syncs only from the new primary. This is so that we prevent
 // syncingNode from denylisting syncSource because it isn't syncing from anyone.
-assert.commandWorked(syncSource.adminCommand({
-    configureFailPoint: "forceSyncSourceCandidate",
-    mode: "alwaysOn",
-    data: {hostAndPort: rst.nodes[0].host}
-}));
+assert.commandWorked(
+    syncSource.adminCommand({
+        configureFailPoint: "forceSyncSourceCandidate",
+        mode: "alwaysOn",
+        data: {hostAndPort: rst.nodes[0].host},
+    }),
+);
 rst.initiate();
 
 const primary = rst.getPrimary();
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 rst.awaitReplication();
 
 // Stop replication on the syncingNode so that the primary and syncSource will both

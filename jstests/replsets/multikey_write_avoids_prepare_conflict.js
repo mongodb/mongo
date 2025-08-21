@@ -9,7 +9,7 @@
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-const replTest = new ReplSetTest({name: 'multikey_write_avoids_prepare_conflict', nodes: 2});
+const replTest = new ReplSetTest({name: "multikey_write_avoids_prepare_conflict", nodes: 2});
 replTest.startSet();
 replTest.initiate();
 
@@ -46,11 +46,13 @@ assert.commandWorked(newPrimaryColl.insert({x: [3, 4]}));
 replTest.awaitReplication();
 
 jsTestLog("Aborting the prepared transaction on session " + tojson(session.getSessionId()));
-assert.commandWorked(newPrimary.adminCommand({
-    abortTransaction: 1,
-    lsid: session.getSessionId(),
-    txnNumber: session.getTxnNumber_forTesting(),
-    autocommit: false
-}));
+assert.commandWorked(
+    newPrimary.adminCommand({
+        abortTransaction: 1,
+        lsid: session.getSessionId(),
+        txnNumber: session.getTxnNumber_forTesting(),
+        autocommit: false,
+    }),
+);
 
 replTest.stopSet();

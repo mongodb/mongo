@@ -9,7 +9,7 @@ import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mongotCommandForVectorSearchQuery,
     MongotMock,
-    mongotResponseForBatch
+    mongotResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 const dbName = jsTestName();
@@ -49,7 +49,7 @@ const responseOk = 1;
 })();
 
 const someScore = {
-    $vectorSearchScore: 0.99
+    $vectorSearchScore: 0.99,
 };
 // $vectorSearch can query mongot and correctly pass along results.
 (function testVectorSearchQueriesMongotAndReturnsResults() {
@@ -59,20 +59,22 @@ const someScore = {
     const mongotResponseBatch = [{_id: 0, ...someScore}];
     const expectedDocs = [{_id: 0}];
 
-    const history = [{
-        expectedCommand: mongotCommandForVectorSearchQuery({
-            queryVector,
-            path,
-            numCandidates,
-            index,
-            limit,
-            collName,
-            filter,
-            dbName,
-            collectionUUID
-        }),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                queryVector,
+                path,
+                numCandidates,
+                index,
+                limit,
+                collName,
+                filter,
+                dbName,
+                collectionUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
 })();
@@ -81,14 +83,25 @@ const someScore = {
 (function testVectorSearchRespectsLimit() {
     const pipeline = [{$vectorSearch: {queryVector, path, limit: 1}}];
 
-    const mongotResponseBatch = [{_id: 0, ...someScore}, {_id: 1, ...someScore}];
+    const mongotResponseBatch = [
+        {_id: 0, ...someScore},
+        {_id: 1, ...someScore},
+    ];
     const expectedDocs = [{_id: 0}];
 
-    const history = [{
-        expectedCommand: mongotCommandForVectorSearchQuery(
-            {queryVector, path, limit: 1, collName, dbName, collectionUUID}),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                queryVector,
+                path,
+                limit: 1,
+                collName,
+                dbName,
+                collectionUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
 })();
@@ -99,22 +112,27 @@ const someScore = {
     const filter = {"$or": [{"color": {"$gt": "C"}}, {"color": {"$lt": "C"}}]};
     const pipeline = [{$vectorSearch: {queryVector, path, limit: 1, filter: filter}}];
 
-    const mongotResponseBatch = [{_id: 0, ...someScore}, {_id: 1, ...someScore}];
+    const mongotResponseBatch = [
+        {_id: 0, ...someScore},
+        {_id: 1, ...someScore},
+    ];
     const expectedDocs = [{_id: 0}];
 
-    const history = [{
-        expectedCommand: mongotCommandForVectorSearchQuery({
-            queryVector,
-            path,
-            limit: 1,
-            index: null,
-            filter: filter,
-            collName,
-            dbName,
-            collectionUUID
-        }),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                queryVector,
+                path,
+                limit: 1,
+                index: null,
+                filter: filter,
+                collName,
+                dbName,
+                collectionUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
 })();
@@ -123,16 +141,25 @@ const someScore = {
 (function testVectorSearchPopulatesScoreMetaField() {
     const pipeline = [
         {$vectorSearch: {queryVector, path, numCandidates, limit}},
-        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}}
+        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}},
     ];
     const mongotResponseBatch = [{_id: 0, $vectorSearchScore: 1.234}];
     const expectedDocs = [{_id: 0, score: 1.234}];
 
-    const history = [{
-        expectedCommand: mongotCommandForVectorSearchQuery(
-            {queryVector, path, numCandidates, limit, collName, dbName, collectionUUID}),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                queryVector,
+                path,
+                numCandidates,
+                limit,
+                collName,
+                dbName,
+                collectionUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
 })();
@@ -141,18 +168,27 @@ const someScore = {
 (function testVectorSearchPassesAllFields() {
     const pipeline = [
         {$vectorSearch: {queryVector, path, numCandidates, limit, "extraField": true}},
-        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}}
+        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}},
     ];
     const mongotResponseBatch = [{_id: 0, $vectorSearchScore: 1.234}];
     const expectedDocs = [{_id: 0, score: 1.234}];
 
-    let localExpectedCommand = mongotCommandForVectorSearchQuery(
-        {queryVector, path, numCandidates, limit, collName, dbName, collectionUUID});
+    let localExpectedCommand = mongotCommandForVectorSearchQuery({
+        queryVector,
+        path,
+        numCandidates,
+        limit,
+        collName,
+        dbName,
+        collectionUUID,
+    });
     localExpectedCommand["extraField"] = true;
-    const history = [{
-        expectedCommand: localExpectedCommand,
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: localExpectedCommand,
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
 })();
@@ -161,19 +197,30 @@ const someScore = {
 (function testVectorSearchPropagatesMongotError() {
     const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit}}];
 
-    const history = [{
-        expectedCommand: mongotCommandForVectorSearchQuery(
-            {queryVector, path, numCandidates, limit, collName, dbName, collectionUUID}),
-        response: {
-            ok: 0,
-            errmsg: "mongot error",
-            code: ErrorCodes.InternalError,
-            codeName: "InternalError"
-        }
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                queryVector,
+                path,
+                numCandidates,
+                limit,
+                collName,
+                dbName,
+                collectionUUID,
+            }),
+            response: {
+                ok: 0,
+                errmsg: "mongot error",
+                code: ErrorCodes.InternalError,
+                codeName: "InternalError",
+            },
+        },
+    ];
     mongotMock.setMockResponses(history, cursorId);
-    assert.commandFailedWithCode(testDB.runCommand({aggregate: collName, pipeline, cursor: {}}),
-                                 ErrorCodes.InternalError);
+    assert.commandFailedWithCode(
+        testDB.runCommand({aggregate: collName, pipeline, cursor: {}}),
+        ErrorCodes.InternalError,
+    );
 })();
 
 coll.insert({_id: 1});
@@ -185,11 +232,17 @@ coll.insert({_id: 20});
 (function testVectorSearchMultipleBatches() {
     const pipeline = [
         {$vectorSearch: {queryVector, path, numCandidates, limit}},
-        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}}
+        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}},
     ];
 
-    const batchOne = [{_id: 0, $vectorSearchScore: 1.234}, {_id: 1, $vectorSearchScore: 1.21}];
-    const batchTwo = [{_id: 10, $vectorSearchScore: 1.1}, {_id: 11, $vectorSearchScore: 0.8}];
+    const batchOne = [
+        {_id: 0, $vectorSearchScore: 1.234},
+        {_id: 1, $vectorSearchScore: 1.21},
+    ];
+    const batchTwo = [
+        {_id: 10, $vectorSearchScore: 1.1},
+        {_id: 11, $vectorSearchScore: 0.8},
+    ];
     const batchThree = [{_id: 20, $vectorSearchScore: 0.2}];
 
     const expectedDocs = [
@@ -202,8 +255,15 @@ coll.insert({_id: 20});
 
     const history = [
         {
-            expectedCommand: mongotCommandForVectorSearchQuery(
-                {queryVector, path, numCandidates, limit, collName, dbName, collectionUUID}),
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                queryVector,
+                path,
+                numCandidates,
+                limit,
+                collName,
+                dbName,
+                collectionUUID,
+            }),
             response: mongotResponseForBatch(batchOne, cursorId, collNS, 1),
         },
         {
@@ -213,26 +273,35 @@ coll.insert({_id: 20});
         {
             expectedCommand: {getMore: cursorId, collection: collName},
             response: mongotResponseForBatch(batchThree, NumberLong(0), collNS, 1),
-        }
+        },
     ];
     mongotMock.setMockResponses(history, cursorId);
-    assert.eq(testDB[collName].aggregate(pipeline, {cursor: {batchSize: 2}}).toArray(),
-              expectedDocs);
+    assert.eq(testDB[collName].aggregate(pipeline, {cursor: {batchSize: 2}}).toArray(), expectedDocs);
 })();
 
 // $vectorSearch handles errors returned by mongot during a getMore.
 (function testVectorSearchPropagatesMongotGetMoreError() {
     const pipeline = [
         {$vectorSearch: {queryVector, path, numCandidates, limit}},
-        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}}
+        {$project: {_id: 1, score: {$meta: "vectorSearchScore"}}},
     ];
 
-    const batchOne = [{_id: 0, $vectorSearchScore: 1.234}, {_id: 1, $vectorSearchScore: 1.21}];
+    const batchOne = [
+        {_id: 0, $vectorSearchScore: 1.234},
+        {_id: 1, $vectorSearchScore: 1.21},
+    ];
 
     const history = [
         {
-            expectedCommand: mongotCommandForVectorSearchQuery(
-                {queryVector, path, numCandidates, limit, collName, dbName, collectionUUID}),
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                queryVector,
+                path,
+                numCandidates,
+                limit,
+                collName,
+                dbName,
+                collectionUUID,
+            }),
             response: mongotResponseForBatch(batchOne, cursorId, collNS, 1),
         },
         {
@@ -241,9 +310,9 @@ coll.insert({_id: 20});
                 ok: 0,
                 errmsg: "mongot error",
                 code: ErrorCodes.InternalError,
-                codeName: "InternalError"
-            }
-        }
+                codeName: "InternalError",
+            },
+        },
     ];
     mongotMock.setMockResponses(history, cursorId);
 
@@ -271,24 +340,34 @@ coll.insert({_id: 4, x: "cow", y: "lorem ipsum"});
 
 // $vectorSearch uses the idLookup stage as expected.
 (function testVectorSearchPerformsIdLookup() {
-    const pipeline = [
-        {$vectorSearch: {queryVector, path, numCandidates, limit}},
-    ];
+    const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit}}];
 
-    const mongotResponseBatch =
-        [{_id: 2, ...someScore}, {_id: 3, ...someScore}, {_id: 4, ...someScore}];
+    const mongotResponseBatch = [
+        {_id: 2, ...someScore},
+        {_id: 3, ...someScore},
+        {_id: 4, ...someScore},
+    ];
 
     const expectedDocs = [
         {_id: 2, x: "now", y: "lorem"},
         {_id: 3, x: "brown", y: "ipsum"},
-        {_id: 4, x: "cow", y: "lorem ipsum"}
+        {_id: 4, x: "cow", y: "lorem ipsum"},
     ];
 
-    const history = [{
-        expectedCommand: mongotCommandForVectorSearchQuery(
-            {queryVector, path, numCandidates, limit, collName, dbName, collectionUUID}),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                queryVector,
+                path,
+                numCandidates,
+                limit,
+                collName,
+                dbName,
+                collectionUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
 
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
@@ -297,25 +376,35 @@ coll.insert({_id: 4, x: "cow", y: "lorem ipsum"});
 // The idLookup stage following $vectorSearch filters orphans, which does not trigger getMores
 // (i.e., limit is applied before idLookup).
 (function testVectorSearchIdLookupFiltersOrphans() {
-    const pipeline = [
-        {$vectorSearch: {queryVector, path, numCandidates, limit: 5}},
-    ];
+    const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit: 5}}];
 
     const mongotResponseBatch = [
         {_id: 3, ...someScore},
         {_id: 4, ...someScore},
         {_id: 5, ...someScore},
         {_id: 6, ...someScore},
-        {_id: 7, ...someScore}
+        {_id: 7, ...someScore},
     ];
 
-    const expectedDocs = [{_id: 3, x: "brown", y: "ipsum"}, {_id: 4, x: "cow", y: "lorem ipsum"}];
+    const expectedDocs = [
+        {_id: 3, x: "brown", y: "ipsum"},
+        {_id: 4, x: "cow", y: "lorem ipsum"},
+    ];
 
-    const history = [{
-        expectedCommand: mongotCommandForVectorSearchQuery(
-            {queryVector, path, numCandidates, limit, collName, dbName, collectionUUID}),
-        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
-    }];
+    const history = [
+        {
+            expectedCommand: mongotCommandForVectorSearchQuery({
+                queryVector,
+                path,
+                numCandidates,
+                limit,
+                collName,
+                dbName,
+                collectionUUID,
+            }),
+            response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+        },
+    ];
 
     mongotMock.setMockResponses(history, cursorId);
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
@@ -323,13 +412,10 @@ coll.insert({_id: 4, x: "cow", y: "lorem ipsum"});
 
 // Fail on non-local read concern.
 (function testVectorSearchFailsOnNonLocalReadConcern() {
-    const pipeline = [
-        {$vectorSearch: {queryVector, path, numCandidates, limit: 5}},
-    ];
+    const pipeline = [{$vectorSearch: {queryVector, path, numCandidates, limit: 5}}];
 
     const err = assert.throws(() => coll.aggregate(pipeline, {readConcern: {level: "majority"}}));
-    assert.commandFailedWithCode(
-        err, [ErrorCodes.InvalidOptions, ErrorCodes.ReadConcernMajorityNotEnabled]);
+    assert.commandFailedWithCode(err, [ErrorCodes.InvalidOptions, ErrorCodes.ReadConcernMajorityNotEnabled]);
 })();
 
 mongotMock.stop();

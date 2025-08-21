@@ -19,7 +19,7 @@ const intervalMS = 10000;
 const st = new ShardingTest({
     shards: 2,
     config: 1,
-    configOptions: {setParameter: {"shardedIndexConsistencyCheckIntervalMS": intervalMS}}
+    configOptions: {setParameter: {"shardedIndexConsistencyCheckIntervalMS": intervalMS}},
 });
 
 const dbName = "testDb";
@@ -28,8 +28,7 @@ const ns1 = dbName + ".testColl1";
 const ns2 = dbName + ".testColl2";
 
 // Create 3 sharded collections, two hashed and another with 3 chunks, 1 on shard1 and 2 on shard0.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns0, key: {_id: "hashed"}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns1, key: {_id: "hashed"}}));
@@ -59,17 +58,15 @@ assert.soon(
         ShardVersioningUtil.moveChunkNotRefreshRecipient(st.s, ns2, st.shard1, st.shard0, {_id: 0});
         sleep(2000);
 
-        const latestCount =
-            getServerStatusNumCollsWithInconsistentIndexes(st.configRS.getPrimary());
-        jsTestLog(
-            "Waiting for periodic index check to discover inconsistent indexes. Latest count: " +
-            latestCount);
+        const latestCount = getServerStatusNumCollsWithInconsistentIndexes(st.configRS.getPrimary());
+        jsTestLog("Waiting for periodic index check to discover inconsistent indexes. Latest count: " + latestCount);
         return latestCount == 2;
     },
     "periodic index check couldn't discover inconsistent indexes with stale shards",
     undefined,
     undefined,
-    {runHangAnalyzer: false});
+    {runHangAnalyzer: false},
+);
 
 // As an extra sanity check, verify the index check didn't log a failure.
 checkLog.containsWithCount(st.configRS.getPrimary(), "Failed to check index consistency", 0);

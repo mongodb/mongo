@@ -10,11 +10,9 @@
  * @tags: [incompatible_with_concurrency_simultaneous]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_inc.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_inc.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.data.getUpdateArgument = function getUpdateArgument(fieldName) {
         return [{$addFields: {[fieldName]: {$add: ["$" + fieldName, 1]}}}];
     };

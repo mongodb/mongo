@@ -22,9 +22,10 @@ function checkForNonExistentRoles() {
                         break;
                     }
                 }
-                assert(roleExists,
-                       "Role " + role + " found in test: " + test.testname +
-                           ", but doesn't exist in roles array");
+                assert(
+                    roleExists,
+                    "Role " + role + " found in test: " + test.testname + ", but doesn't exist in roles array",
+                );
             }
         }
     }

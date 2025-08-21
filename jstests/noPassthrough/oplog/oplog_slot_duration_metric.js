@@ -26,12 +26,14 @@ assert.commandWorked(testColl.insert({_id: "doc"}));
 assert.commandWorked(testDB.runCommand({profile: 1, slowms: 0}));
 
 jsTest.log("Run an identifiable (when logged) write operation.");
-assert.commandWorked(testDB.runCommand({
-    update: collName,
-    updates: [{'q': {}, 'u': {'updateField': 1}}],
-    writeConcern: {w: "majority"},
-    comment: writeComment,
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        update: collName,
+        updates: [{"q": {}, "u": {"updateField": 1}}],
+        writeConcern: {w: "majority"},
+        comment: writeComment,
+    }),
+);
 
 function getOplogSlotDuration(logLine) {
     const pattern = /totalOplogSlotDurationMicros"?:([0-9]+)/;
@@ -43,11 +45,16 @@ function getOplogSlotDuration(logLine) {
 }
 
 const mongodLog = assert.commandWorked(testDB.adminCommand({getLog: "global"})).log;
-const slowQueryLogLine = findMatchingLogLine(
-    mongodLog, {msg: "Slow query", comment: writeComment, "u": {"updateField": 1}});
+const slowQueryLogLine = findMatchingLogLine(mongodLog, {
+    msg: "Slow query",
+    comment: writeComment,
+    "u": {"updateField": 1},
+});
 assert(slowQueryLogLine, "Expected to find a 'Slow query' log msg for an update operation.");
-assert(getOplogSlotDuration(slowQueryLogLine),
-       "Expected to find a 'totalOplogSlotDurationMicros' entry in a 'Slow query' log msg.");
+assert(
+    getOplogSlotDuration(slowQueryLogLine),
+    "Expected to find a 'totalOplogSlotDurationMicros' entry in a 'Slow query' log msg.",
+);
 
 profilerHasAtLeastOneMatchingEntryOrThrow({
     profileDB: testDB,
@@ -56,7 +63,7 @@ profilerHasAtLeastOneMatchingEntryOrThrow({
         "op": "update",
         "command.comment": writeComment,
         "totalOplogSlotDurationMicros": {"$exists": true},
-    }
+    },
 });
 
 rst.stopSet();

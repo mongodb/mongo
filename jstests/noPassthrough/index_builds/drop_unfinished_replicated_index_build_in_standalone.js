@@ -43,25 +43,23 @@ rst.stop(secondary);
 
 //  Waiting for parallel index build threads to finish
 let exitCode = createIdx1({checkExitSuccess: false});
-assert.neq(0, exitCode, 'expected shell to exit abnormally due to shutdown');
+assert.neq(0, exitCode, "expected shell to exit abnormally due to shutdown");
 exitCode = createIdx2({checkExitSuccess: false});
-assert.neq(0, exitCode, 'expected shell to exit abnormally due to shutdown');
+assert.neq(0, exitCode, "expected shell to exit abnormally due to shutdown");
 
 jsTestLog("Starting secondary as standalone");
 const mongod = MongoRunner.runMongod({dbpath: secondaryDbpath, noReplSet: true, noCleanData: true});
 secondaryDB = mongod.getDB(dbName);
 
 // Confirm that the secondary node leaves the index on coll1 as unfinished.
-IndexBuildTest.assertIndexes(
-    secondaryDB.getCollection(collName1), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexes(secondaryDB.getCollection(collName1), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
 
 jsTestLog("Dropping collection from secondary");
 assert.commandWorked(secondaryDB.runCommand({drop: collName1}));
 
 // Confirm that the secondary node leaves the index on coll2 as unfinished so we can check that
 // dropping database is also able to drop collections and indexes.
-IndexBuildTest.assertIndexes(
-    secondaryDB.getCollection(collName2), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexes(secondaryDB.getCollection(collName2), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
 
 jsTestLog("Dropping database from secondary");
 assert.commandWorked(secondaryDB.dropDatabase());

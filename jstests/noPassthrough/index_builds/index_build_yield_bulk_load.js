@@ -21,16 +21,15 @@ for (let i = 0; i < 3; i++) {
 }
 
 // Make the index build bulk load yield often.
-assert.commandWorked(
-    conn.adminCommand({setParameter: 1, internalIndexBuildBulkLoadYieldIterations: 1}));
+assert.commandWorked(conn.adminCommand({setParameter: 1, internalIndexBuildBulkLoadYieldIterations: 1}));
 
 jsTestLog("Enable hangDuringIndexBuildBulkLoadYield fail point");
-let failpoint = configureFailPoint(
-    testDB, "hangDuringIndexBuildBulkLoadYield", {namespace: coll.getFullName()});
+let failpoint = configureFailPoint(testDB, "hangDuringIndexBuildBulkLoadYield", {namespace: coll.getFullName()});
 
 jsTestLog("Create index");
-const awaitIndex = IndexBuildTest.startIndexBuild(
-    testDB.getMongo(), coll.getFullName(), {x: 1}, {}, [ErrorCodes.IndexBuildAborted]);
+const awaitIndex = IndexBuildTest.startIndexBuild(testDB.getMongo(), coll.getFullName(), {x: 1}, {}, [
+    ErrorCodes.IndexBuildAborted,
+]);
 
 // Wait until index build (bulk load phase) yields.
 jsTestLog("Wait for the index build to yield and hang");

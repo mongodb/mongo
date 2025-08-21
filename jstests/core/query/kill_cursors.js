@@ -25,14 +25,11 @@ for (var i = 0; i < 10; i++) {
 }
 
 // killCursors command should fail if the collection name is not a string.
-cmdRes = db.runCommand(
-    {killCursors: {foo: "bad collection param"}, cursors: [NumberLong(123), NumberLong(456)]});
-assert.commandFailedWithCode(
-    cmdRes, [ErrorCodes.TypeMismatch, ErrorCodes.BadValue, ErrorCodes.InvalidNamespace]);
+cmdRes = db.runCommand({killCursors: {foo: "bad collection param"}, cursors: [NumberLong(123), NumberLong(456)]});
+assert.commandFailedWithCode(cmdRes, [ErrorCodes.TypeMismatch, ErrorCodes.BadValue, ErrorCodes.InvalidNamespace]);
 
 // killCursors command should fail if the cursors parameter is not an array.
-cmdRes =
-    db.runCommand({killCursors: coll.getName(), cursors: {a: NumberLong(123), b: NumberLong(456)}});
+cmdRes = db.runCommand({killCursors: coll.getName(), cursors: {a: NumberLong(123), b: NumberLong(456)}});
 assert.commandFailedWithCode(cmdRes, ErrorCodes.TypeMismatch);
 
 // killCursors command should report that zero cursors were killed if the cursors parameter is an
@@ -45,8 +42,7 @@ assert.eq(cmdRes.cursorsAlive, []);
 assert.eq(cmdRes.cursorsUnknown, []);
 
 // killCursors command should report cursors as not found if the collection does not exist.
-cmdRes = db.runCommand(
-    {killCursors: "non-existent-collection", cursors: [NumberLong(123), NumberLong(456)]});
+cmdRes = db.runCommand({killCursors: "non-existent-collection", cursors: [NumberLong(123), NumberLong(456)]});
 assert.commandWorked(cmdRes);
 assert.eq(cmdRes.cursorsKilled, []);
 assert.eq(cmdRes.cursorsNotFound, [NumberLong(123), NumberLong(456)]);

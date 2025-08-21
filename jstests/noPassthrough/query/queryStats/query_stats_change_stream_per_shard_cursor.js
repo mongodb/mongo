@@ -31,7 +31,7 @@ function testCollectionChangeStream(sdb, shardId) {
         db: sdb,
         collectionName: "coll",
         numExecs: 1,
-        numDocsReturned: 0
+        numDocsReturned: 0,
     });
 
     assert(queryStatsEntry.key.hasOwnProperty("explain"));
@@ -55,7 +55,7 @@ function testCollectionChangeStream(sdb, shardId) {
         db: sdb,
         collectionName: "coll",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
     assert(queryStatsEntry.key.hasOwnProperty("$_passthroughToShard"));
     assert(queryStatsEntry.key.$_passthroughToShard.hasOwnProperty("shard"));
@@ -72,7 +72,7 @@ function testCollectionChangeStream(sdb, shardId) {
         db: sdb,
         collectionName: "coll",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
     assert(queryStatsEntry.key.hasOwnProperty("$_passthroughToShard"));
     assert(queryStatsEntry.key.$_passthroughToShard.hasOwnProperty("shard"));
@@ -86,7 +86,7 @@ function testCollectionChangeStream(sdb, shardId) {
         db: sdb,
         collectionName: "coll",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
     assert(queryStatsEntry.key.hasOwnProperty("$_passthroughToShard"));
     assert(queryStatsEntry.key.$_passthroughToShard.hasOwnProperty("shard"));
@@ -102,7 +102,7 @@ function testDatabaseChangeStream(sdb, shardId) {
         aggregate: 1,
         cursor: {},
         pipeline: [{$changeStream: {}}],
-        $_passthroughToShard: {shard: shardId}
+        $_passthroughToShard: {shard: shardId},
     };
 
     let resp = sdb.runCommand(aggregateCmd);
@@ -120,7 +120,7 @@ function testDatabaseChangeStream(sdb, shardId) {
         db: sdb,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     assert(queryStatsEntry.key.hasOwnProperty("$_passthroughToShard"));
@@ -138,7 +138,7 @@ function testDatabaseChangeStream(sdb, shardId) {
         db: sdb,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
 
     assert(queryStatsEntry.key.hasOwnProperty("$_passthroughToShard"));
@@ -156,7 +156,7 @@ function testDatabaseChangeStream(sdb, shardId) {
         db: sdb,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
     assert(queryStatsEntry.key.hasOwnProperty("$_passthroughToShard"));
     assert(queryStatsEntry.key.$_passthroughToShard.hasOwnProperty("shard"));
@@ -171,7 +171,7 @@ function testDatabaseChangeStream(sdb, shardId) {
         db: sdb,
         collectionName: "$cmd.aggregate",
         numExecs: numExecs,
-        numDocsReturned: numDocsReturned
+        numDocsReturned: numDocsReturned,
     });
     assert(queryStatsEntry.key.hasOwnProperty("$_passthroughToShard"));
     assert(queryStatsEntry.key.$_passthroughToShard.hasOwnProperty("shard"));
@@ -195,9 +195,9 @@ function setupShardedCluster() {
             mongosOptions: {
                 setParameter: {
                     internalQueryStatsRateLimit: -1,
-                }
-            }
-        }
+                },
+            },
+        },
     });
 
     const sdb = st.s0.getDB(dbName);

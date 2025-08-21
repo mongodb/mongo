@@ -1,7 +1,7 @@
 /**
  * Utilities for testing retryable writes.
  */
-export var RetryableWritesUtil = (function() {
+export var RetryableWritesUtil = (function () {
     /**
      * Returns true if the error code is retryable, assuming the command is idempotent.
      *
@@ -9,9 +9,13 @@ export var RetryableWritesUtil = (function() {
      * src/mongo/shell/session.js and use it here.
      */
     function isRetryableCode(code) {
-        return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotPrimaryError(code) ||
-            ErrorCodes.isWriteConcernError(code) || ErrorCodes.isShutdownError(code) ||
-            ErrorCodes.isInterruption(code);
+        return (
+            ErrorCodes.isNetworkError(code) ||
+            ErrorCodes.isNotPrimaryError(code) ||
+            ErrorCodes.isWriteConcernError(code) ||
+            ErrorCodes.isShutdownError(code) ||
+            ErrorCodes.isInterruption(code)
+        );
     }
 
     // The names of all codes that return true in isRetryableCode() above. Can be used where the
@@ -22,9 +26,12 @@ export var RetryableWritesUtil = (function() {
 
     // Returns true if the error message contains a retryable code name.
     function errmsgContainsRetryableCodeName(errmsg) {
-        return typeof errmsg !== "undefined" && kRetryableCodeNames.some(codeName => {
-            return errmsg.indexOf(codeName) > 0;
-        });
+        return (
+            typeof errmsg !== "undefined" &&
+            kRetryableCodeNames.some((codeName) => {
+                return errmsg.indexOf(codeName) > 0;
+            })
+        );
     }
 
     const kRetryableWriteCommands = new Set([
@@ -34,7 +41,7 @@ export var RetryableWritesUtil = (function() {
         "insert",
         "update",
         "testInternalTransactions",
-        "bulkWrite"
+        "bulkWrite",
     ]);
 
     /**
@@ -64,10 +71,16 @@ export var RetryableWritesUtil = (function() {
         let primaryRecord = primary.getDB("config").transactions.findOne({"_id.id": lsid.id});
         let secondaryRecord = secondary.getDB("config").transactions.findOne({"_id.id": lsid.id});
 
-        assert.eq(bsonWoCompare(primaryRecord, secondaryRecord),
-                  0,
-                  "expected transaction records: " + tojson(primaryRecord) + " and " +
-                      tojson(secondaryRecord) + " to be the same for lsid: " + tojson(lsid));
+        assert.eq(
+            bsonWoCompare(primaryRecord, secondaryRecord),
+            0,
+            "expected transaction records: " +
+                tojson(primaryRecord) +
+                " and " +
+                tojson(secondaryRecord) +
+                " to be the same for lsid: " +
+                tojson(lsid),
+        );
     }
 
     /**
@@ -77,8 +90,9 @@ export var RetryableWritesUtil = (function() {
     function runRetryableWrite(conn, command, expectedErrorCode = ErrorCodes.OK, nTimes = 2) {
         var res;
         for (var i = 0; i < nTimes; i++) {
-            jsTestLog("Executing command: " + tojson(command) + "\nIteration: " + i +
-                      "\nExpected Code: " + expectedErrorCode);
+            jsTestLog(
+                "Executing command: " + tojson(command) + "\nIteration: " + i + "\nExpected Code: " + expectedErrorCode,
+            );
             res = conn.runCommand(command);
         }
         if (expectedErrorCode === ErrorCodes.OK) {
@@ -90,8 +104,7 @@ export var RetryableWritesUtil = (function() {
     }
 
     function isFailedToSatisfyPrimaryReadPreferenceError(res) {
-        const kReplicaSetMonitorError =
-            /Could not find host matching read preference.*mode:.*primary/;
+        const kReplicaSetMonitorError = /Could not find host matching read preference.*mode:.*primary/;
         if (res.code === ErrorCodes.FailedToSatisfyReadPreference && res.hasOwnProperty("reason")) {
             return res.reason.match(kReplicaSetMonitorError);
         }
@@ -135,19 +148,23 @@ export var RetryableWritesUtil = (function() {
         //
         // TODO SERVER-32208: Remove this function once it is no longer needed.
         const isRetryableExecutorCodeAndMessage = (code, msg) => {
-            return code === ErrorCodes.OperationFailed && typeof msg !== "undefined" &&
-                msg.indexOf("InterruptedDueToReplStateChange") >= 0;
+            return (
+                code === ErrorCodes.OperationFailed &&
+                typeof msg !== "undefined" &&
+                msg.indexOf("InterruptedDueToReplStateChange") >= 0
+            );
         };
 
         // If an explain is interrupted by a stepdown, and it returns before its connection is
         // closed, it will return incomplete results. To prevent failing the test, force retries
         // of interrupted explains.
         if (res.hasOwnProperty("executionStats")) {
-            const shouldRetryExplain = function(executionStats) {
-                return !executionStats.executionSuccess &&
+            const shouldRetryExplain = function (executionStats) {
+                return (
+                    !executionStats.executionSuccess &&
                     (isRetryableCode(executionStats.errorCode) ||
-                     isRetryableExecutorCodeAndMessage(executionStats.errorCode,
-                                                       executionStats.errorMessage));
+                        isRetryableExecutorCodeAndMessage(executionStats.errorCode, executionStats.errorMessage))
+                );
             };
             const executionStats = res.executionStats.executionStages.hasOwnProperty("shards")
                 ? res.executionStats.executionStages.shards
@@ -170,8 +187,10 @@ export var RetryableWritesUtil = (function() {
     }
 
     function runCommandWithRetries(conn, cmd) {
-        return retryOnRetryableCode(() => assert.commandWorked(conn.runCommand(cmd)),
-                                    "Retry interrupt: runCommand(" + tojson(cmd) + ")");
+        return retryOnRetryableCode(
+            () => assert.commandWorked(conn.runCommand(cmd)),
+            "Retry interrupt: runCommand(" + tojson(cmd) + ")",
+        );
     }
 
     return {
@@ -184,6 +203,6 @@ export var RetryableWritesUtil = (function() {
         isFailedToSatisfyPrimaryReadPreferenceError,
         retryOnRetryableCode,
         shouldRetryExplainCommand,
-        runCommandWithRetries
+        runCommandWithRetries,
     };
 })();

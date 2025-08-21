@@ -14,9 +14,7 @@
  * requires_getmore,
  * ]
  */
-import {
-    createCacheCorrectnessProperty
-} from "jstests/libs/property_test_helpers/common_properties.js";
+import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getMatchPredicateSpec} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
@@ -26,7 +24,7 @@ import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 if (isSlowBuild(db)) {
-    jsTestLog('Exiting early because debug is on, opt is off, or a sanitizer is enabled.');
+    jsTestLog("Exiting early because debug is on, opt is off, or a sanitizer is enabled.");
     quit();
 }
 
@@ -42,25 +40,27 @@ const correctnessProperty = createCacheCorrectnessProperty(controlColl, experime
 
 // {$match: {$or: ...}}
 const matchWithTopLevelOrArb = getMatchPredicateSpec()
-                                   .singleCompoundPredicate
-                                   .filter(pred => {
-                                       // This filter will pass 1/3rd of the time. Since generating
-                                       // queries is quick, this isn't a concern.
-                                       return Object.keys(pred).includes('$or');
-                                   })
-                                   .map(pred => {
-                                       return {$match: pred};
-                                   });
-const aggModel = fc.record({orMatch: matchWithTopLevelOrArb, pipeline: getAggPipelineModel()})
-                     .map(({orMatch, pipeline}) => {
-                         return [orMatch, ...pipeline];
-                     });
+    .singleCompoundPredicate.filter((pred) => {
+        // This filter will pass 1/3rd of the time. Since generating
+        // queries is quick, this isn't a concern.
+        return Object.keys(pred).includes("$or");
+    })
+    .map((pred) => {
+        return {$match: pred};
+    });
+const aggModel = fc
+    .record({orMatch: matchWithTopLevelOrArb, pipeline: getAggPipelineModel()})
+    .map(({orMatch, pipeline}) => {
+        return [orMatch, ...pipeline];
+    });
 
 // Test with a regular collection.
-testProperty(correctnessProperty,
-             {controlColl, experimentColl},
-             makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
-             numRuns);
+testProperty(
+    correctnessProperty,
+    {controlColl, experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
+    numRuns,
+);
 
 // // TODO SERVER-103381 re-enable PBT testing for time-series
 // // Test with a TS collection.

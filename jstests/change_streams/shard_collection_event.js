@@ -11,20 +11,14 @@
  * ]
  */
 
-import {
-    assertDropAndRecreateCollection,
-    assertDropCollection
-} from "jstests/libs/collection_drop_recreate.js";
-import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 jsTestLog("creating sharding test");
 var st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const dbName = jsTestName();
@@ -34,7 +28,7 @@ const db = mongosConn.getDB(dbName);
 
 const ns = {
     db: dbName,
-    coll: collName
+    coll: collName,
 };
 
 const collNS = dbName + "." + collName;
@@ -76,8 +70,11 @@ function runTest(startChangeStream) {
     function validateExpectedEventAndConfirmResumability(command, expectedOutput) {
         assertDropAndRecreateCollection(db, collName);
         let pipeline = [{$changeStream: {showExpandedEvents: true}}];
-        let cursor = test.startWatchingChanges(
-            {pipeline, collection: collName, aggregateOptions: {cursor: {batchSize: 0}}});
+        let cursor = test.startWatchingChanges({
+            pipeline,
+            collection: collName,
+            aggregateOptions: {cursor: {batchSize: 0}},
+        });
 
         assert.commandWorked(db.adminCommand(command));
 
@@ -88,8 +85,7 @@ function runTest(startChangeStream) {
                 break;
             }
             // The only possible other events are create collection or index.
-            assert(events[0].operationType == "create" ||
-                   events[0].operationType == "createIndexes");
+            assert(events[0].operationType == "create" || events[0].operationType == "createIndexes");
             events = test.getNextChanges(cursor, 1);
         }
 
@@ -111,71 +107,13 @@ function runTest(startChangeStream) {
                 ns: ns,
                 fullDocument: {_id: 1},
                 documentKey: {_id: 1},
-            }
+            },
         });
     }
 
-    validateExpectedEventAndConfirmResumability({shardCollection: collNS, key: {_id: 1}}, {
-        operationType: "shardCollection",
-        ns: ns,
-        operationDescription:
-            {"shardKey": {"_id": 1}, "unique": false, "presplitHashedZones": false, "capped": false}
-    });
-
-    validateExpectedEventAndConfirmResumability({shardCollection: collNS, key: {_id: "hashed"}}, {
-        operationType: "shardCollection",
-        ns: ns,
-        operationDescription: {
-            "shardKey": {"_id": "hashed"},
-            "unique": false,
-            "presplitHashedZones": false,
-            "capped": false
-        }
-    });
-
-    /* This test verifies simple key parameter passing .*/
-    validateExpectedEventAndDropCollection({shardCollection: collNS, key: {_id: 1}}, {
-        operationType: "shardCollection",
-        ns: ns,
-        operationDescription:
-            {"shardKey": {"_id": 1}, "unique": false, "presplitHashedZones": false, "capped": false}
-    });
-
-    /* This test verifies simple hashed key parameter passing .*/
-    validateExpectedEventAndDropCollection({shardCollection: collNS, key: {_id: "hashed"}}, {
-        operationType: "shardCollection",
-        ns: ns,
-        operationDescription: {
-            "shardKey": {"_id": "hashed"},
-            "unique": false,
-            "presplitHashedZones": false,
-            "capped": false
-        }
-    });
-
-    /* This test verifies compound hashed key parameter passing .*/
-    validateExpectedEventAndDropCollection({shardCollection: collNS, key: {x: "hashed", y: 1}}, {
-        operationType: "shardCollection",
-        ns: ns,
-        operationDescription: {
-            "shardKey": {"x": "hashed", "y": 1},
-            "unique": false,
-            "presplitHashedZones": false,
-            "capped": false
-        }
-    });
-
-    /* This test verifies unique parameter passing .*/
-    validateExpectedEventAndDropCollection({shardCollection: collNS, key: {_id: 1}, unique: true}, {
-        operationType: "shardCollection",
-        ns: ns,
-        operationDescription:
-            {"shardKey": {"_id": 1}, "unique": true, "presplitHashedZones": false, "capped": false}
-    });
-
-    /* This test verifies collation parameter passing .*/
-    validateExpectedEventAndDropCollection(
-        {shardCollection: collNS, key: {_id: 1}, collation: {locale: 'simple'}}, {
+    validateExpectedEventAndConfirmResumability(
+        {shardCollection: collNS, key: {_id: 1}},
+        {
             operationType: "shardCollection",
             ns: ns,
             operationDescription: {
@@ -183,9 +121,99 @@ function runTest(startChangeStream) {
                 "unique": false,
                 "presplitHashedZones": false,
                 "capped": false,
-                "collation": {"locale": "simple"}
-            }
-        });
+            },
+        },
+    );
+
+    validateExpectedEventAndConfirmResumability(
+        {shardCollection: collNS, key: {_id: "hashed"}},
+        {
+            operationType: "shardCollection",
+            ns: ns,
+            operationDescription: {
+                "shardKey": {"_id": "hashed"},
+                "unique": false,
+                "presplitHashedZones": false,
+                "capped": false,
+            },
+        },
+    );
+
+    /* This test verifies simple key parameter passing .*/
+    validateExpectedEventAndDropCollection(
+        {shardCollection: collNS, key: {_id: 1}},
+        {
+            operationType: "shardCollection",
+            ns: ns,
+            operationDescription: {
+                "shardKey": {"_id": 1},
+                "unique": false,
+                "presplitHashedZones": false,
+                "capped": false,
+            },
+        },
+    );
+
+    /* This test verifies simple hashed key parameter passing .*/
+    validateExpectedEventAndDropCollection(
+        {shardCollection: collNS, key: {_id: "hashed"}},
+        {
+            operationType: "shardCollection",
+            ns: ns,
+            operationDescription: {
+                "shardKey": {"_id": "hashed"},
+                "unique": false,
+                "presplitHashedZones": false,
+                "capped": false,
+            },
+        },
+    );
+
+    /* This test verifies compound hashed key parameter passing .*/
+    validateExpectedEventAndDropCollection(
+        {shardCollection: collNS, key: {x: "hashed", y: 1}},
+        {
+            operationType: "shardCollection",
+            ns: ns,
+            operationDescription: {
+                "shardKey": {"x": "hashed", "y": 1},
+                "unique": false,
+                "presplitHashedZones": false,
+                "capped": false,
+            },
+        },
+    );
+
+    /* This test verifies unique parameter passing .*/
+    validateExpectedEventAndDropCollection(
+        {shardCollection: collNS, key: {_id: 1}, unique: true},
+        {
+            operationType: "shardCollection",
+            ns: ns,
+            operationDescription: {
+                "shardKey": {"_id": 1},
+                "unique": true,
+                "presplitHashedZones": false,
+                "capped": false,
+            },
+        },
+    );
+
+    /* This test verifies collation parameter passing .*/
+    validateExpectedEventAndDropCollection(
+        {shardCollection: collNS, key: {_id: 1}, collation: {locale: "simple"}},
+        {
+            operationType: "shardCollection",
+            ns: ns,
+            operationDescription: {
+                "shardKey": {"_id": 1},
+                "unique": false,
+                "presplitHashedZones": false,
+                "capped": false,
+                "collation": {"locale": "simple"},
+            },
+        },
+    );
 }
 
 assert.commandWorked(db.adminCommand({enableSharding: dbName}));

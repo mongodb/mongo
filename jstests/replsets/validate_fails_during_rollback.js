@@ -11,8 +11,9 @@ let rollbackTest = new RollbackTest();
 
 let rollbackNode = rollbackTest.transitionToRollbackOperations();
 
-assert.commandWorked(rollbackNode.adminCommand(
-    {configureFailPoint: "rollbackHangAfterTransitionToRollback", mode: "alwaysOn"}));
+assert.commandWorked(
+    rollbackNode.adminCommand({configureFailPoint: "rollbackHangAfterTransitionToRollback", mode: "alwaysOn"}),
+);
 
 // Start rollback.
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
@@ -23,13 +24,15 @@ checkLog.contains(rollbackNode, "rollbackHangAfterTransitionToRollback fail poin
 
 // Try to run the validate command on the rollback node. This should fail with a
 // NotPrimaryOrSecondary error.
-const result =
-    assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"validate": collName}),
-                                 ErrorCodes.NotPrimaryOrSecondary);
-jsTestLog('Validation failed on rollback node as expected: ' + tojson(result));
+const result = assert.commandFailedWithCode(
+    rollbackNode.getDB(dbName).runCommand({"validate": collName}),
+    ErrorCodes.NotPrimaryOrSecondary,
+);
+jsTestLog("Validation failed on rollback node as expected: " + tojson(result));
 
-assert.commandWorked(rollbackNode.adminCommand(
-    {configureFailPoint: "rollbackHangAfterTransitionToRollback", mode: "off"}));
+assert.commandWorked(
+    rollbackNode.adminCommand({configureFailPoint: "rollbackHangAfterTransitionToRollback", mode: "off"}),
+);
 
 rollbackTest.transitionToSteadyStateOperations();
 

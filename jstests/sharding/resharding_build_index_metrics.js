@@ -14,9 +14,9 @@ import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 const reshardingTest = new ReshardingTest({numDonors: 2, enableElections: true});
 reshardingTest.setup();
 
-const kDbName = 'reshardingDb';
-const kCollName = 'resharding_build_index_metrics';
-const ns = kDbName + '.' + kCollName;
+const kDbName = "reshardingDb";
+const kCollName = "resharding_build_index_metrics";
+const ns = kDbName + "." + kCollName;
 
 const donorShardNames = reshardingTest.donorShardNames;
 const sourceCollection = reshardingTest.createShardedCollection({
@@ -36,10 +36,13 @@ const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
 
 // Create an index on oldKey.
 assert.commandWorked(
-    mongos.getCollection(ns).insert([{oldKey: 1, newKey: -1}, {oldKey: 2, newKey: -2}]));
+    mongos.getCollection(ns).insert([
+        {oldKey: 1, newKey: -1},
+        {oldKey: 2, newKey: -2},
+    ]),
+);
 assert.commandWorked(mongos.getCollection(ns).createIndex({oldKey: 1}));
-const hangAfterInitializingIndexBuildFailPoint =
-    configureFailPoint(recipient, "hangAfterInitializingIndexBuild");
+const hangAfterInitializingIndexBuildFailPoint = configureFailPoint(recipient, "hangAfterInitializingIndexBuild");
 
 reshardingTest.withReshardingInBackground(
     {
@@ -50,14 +53,14 @@ reshardingTest.withReshardingInBackground(
         hangAfterInitializingIndexBuildFailPoint.wait();
 
         jsTestLog("Entered building index phase, check currentOp");
-        const report = recipient.getDB("admin").currentOp(
-            {ns, desc: {$regex: 'ReshardingMetricsRecipientService'}});
+        const report = recipient.getDB("admin").currentOp({ns, desc: {$regex: "ReshardingMetricsRecipientService"}});
         assert.eq(report.inprog.length, 1);
         const curOp = report.inprog[0];
         jsTestLog("Fetched currentOp: " + tojson(curOp));
         // There should be 2 indexes in progress: oldKey and newKey.
         assert.eq(curOp["indexesToBuild"] - curOp["indexesBuilt"], 2);
         hangAfterInitializingIndexBuildFailPoint.off();
-    });
+    },
+);
 
 reshardingTest.teardown();

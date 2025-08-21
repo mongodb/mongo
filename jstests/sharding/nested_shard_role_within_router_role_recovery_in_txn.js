@@ -15,7 +15,7 @@ const st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 const dbName = "test";
@@ -23,8 +23,7 @@ const collName1 = "my_coll_1";
 const collName2 = "my_coll_2";
 const viewName = "my_view";
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 
 const db = st.s.getDB(dbName);
 const coll1 = db[collName1];
@@ -52,7 +51,8 @@ withRetryOnTransientTxnError(
     },
     () => {
         session.abortTransaction_forTesting();
-    });
+    },
+);
 
 // Run an aggregation that includes $lookup to a second collection within a transaction.
 withRetryOnTransientTxnError(
@@ -62,14 +62,15 @@ withRetryOnTransientTxnError(
 
         assert.eq(
             sessionDB[collName1]
-                .aggregate(
-                    [{$lookup: {from: collName2, localField: 'x', foreignField: 'x', as: 'j'}}])
+                .aggregate([{$lookup: {from: collName2, localField: "x", foreignField: "x", as: "j"}}])
                 .itcount(),
-            1);
+            1,
+        );
         assert.commandWorked(session.commitTransaction_forTesting());
     },
     () => {
         session.abortTransaction_forTesting();
-    });
+    },
+);
 
 st.stop();

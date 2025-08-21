@@ -6,9 +6,7 @@
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {
-    ChangeStreamMultitenantReplicaSetTest
-} from "jstests/serverless/libs/change_collection_util.js";
+import {ChangeStreamMultitenantReplicaSetTest} from "jstests/serverless/libs/change_collection_util.js";
 
 const getTenantConnection = ChangeStreamMultitenantReplicaSetTest.getTenantConnection;
 
@@ -26,9 +24,8 @@ const kMinBytesPerMarker = 1;
 const replSet = new ChangeStreamMultitenantReplicaSetTest({
     nodes: 2,
     nodeOptions: {
-        setParameter:
-            {changeCollectionExpiredDocumentsRemoverJobSleepSeconds: kExpiredRemovalJobSleepSeconds}
-    }
+        setParameter: {changeCollectionExpiredDocumentsRemoverJobSleepSeconds: kExpiredRemovalJobSleepSeconds},
+    },
 });
 
 const primary = replSet.getPrimary();
@@ -40,17 +37,21 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, internalInsertMaxBat
 
 // Assert that the change collection contains all documents in 'expectedRetainedDocs' and no
 // document in 'expectedDeletedDocs' for the collection 'stocksColl'.
-function assertChangeCollectionDocuments(
-    changeColl, stocksColl, expectedDeletedDocs, expectedRetainedDocs) {
+function assertChangeCollectionDocuments(changeColl, stocksColl, expectedDeletedDocs, expectedRetainedDocs) {
     const collNss = `${stocksTestDb.getName()}.${stocksColl.getName()}`;
-    const pipeline =
-        (collectionEntries) => [{
-            $match:
-                {$or: [{op: "i", ns: collNss}, {"o.applyOps.op": "i", "o.applyOps.ns": collNss}]}
+    const pipeline = (collectionEntries) => [
+        {
+            $match: {
+                $or: [
+                    {op: "i", ns: collNss},
+                    {"o.applyOps.op": "i", "o.applyOps.ns": collNss},
+                ],
+            },
         },
-                                {$unwind: {path: "$o.applyOps", preserveNullAndEmptyArrays: true}},
-                                {$replaceRoot: {"newRoot": {$ifNull: ["$o.applyOps.o", "$o"]}}},
-                                {$match: {$or: collectionEntries}}];
+        {$unwind: {path: "$o.applyOps", preserveNullAndEmptyArrays: true}},
+        {$replaceRoot: {"newRoot": {$ifNull: ["$o.applyOps.o", "$o"]}}},
+        {$match: {$or: collectionEntries}},
+    ];
 
     // Assert that querying for 'expectedRetainedDocs' yields documents that are exactly the same as
     // 'expectedRetainedDocs'.
@@ -74,8 +75,7 @@ function assertChangeCollectionDocuments(
 
 // Returns the operation time for the provided document 'doc'.
 function getDocumentOperationTime(doc) {
-    const oplogEntry =
-        primary.getDB("local").oplog.rs.findOne({$or: [{o: doc}, {"o.applyOps.o": doc}]});
+    const oplogEntry = primary.getDB("local").oplog.rs.findOne({$or: [{o: doc}, {"o.applyOps.o": doc}]});
     assert(oplogEntry);
     return oplogEntry.wall.getTime();
 }
@@ -83,34 +83,29 @@ function getDocumentOperationTime(doc) {
 // Hard code a tenants information such that tenants can be identified deterministically.
 const stocksTenantInfo = {
     tenantId: ObjectId("6303b6bb84305d2266d0b779"),
-    user: "stock"
+    user: "stock",
 };
 const citiesTenantInfo = {
     tenantId: ObjectId("7303b6bb84305d2266d0b779"),
-    user: "cities"
+    user: "cities",
 };
 const notUsedTenantInfo = {
     tenantId: ObjectId("8303b6bb84305d2266d0b779"),
-    user: "notUser"
+    user: "notUser",
 };
 
 // Create connections to the primary such that they have respective tenant ids stamped.
-const stocksTenantConnPrimary =
-    getTenantConnection(primary.host, stocksTenantInfo.tenantId, stocksTenantInfo.user);
-const citiesTenantConnPrimary =
-    getTenantConnection(primary.host, citiesTenantInfo.tenantId, citiesTenantInfo.user);
+const stocksTenantConnPrimary = getTenantConnection(primary.host, stocksTenantInfo.tenantId, stocksTenantInfo.user);
+const citiesTenantConnPrimary = getTenantConnection(primary.host, citiesTenantInfo.tenantId, citiesTenantInfo.user);
 
 // Create a tenant connection associated with 'notUsedTenantId' such that only the tenant id exists
 // in the replica set but no corresponding change collection exists. The purging job should safely
 // ignore this tenant without any side-effects.
-const notUsedTenantConnPrimary =
-    getTenantConnection(primary.host, notUsedTenantInfo.tenantId, notUsedTenantInfo.user);
+const notUsedTenantConnPrimary = getTenantConnection(primary.host, notUsedTenantInfo.tenantId, notUsedTenantInfo.user);
 
 // Create connections to the secondary such that they have respective tenant ids stamped.
-const stocksTenantConnSecondary =
-    getTenantConnection(secondary.host, stocksTenantInfo.tenantId, stocksTenantInfo.user);
-const citiesTenantConnSecondary =
-    getTenantConnection(secondary.host, citiesTenantInfo.tenantId, citiesTenantInfo.user);
+const stocksTenantConnSecondary = getTenantConnection(secondary.host, stocksTenantInfo.tenantId, stocksTenantInfo.user);
+const citiesTenantConnSecondary = getTenantConnection(secondary.host, citiesTenantInfo.tenantId, citiesTenantInfo.user);
 
 // Enable change streams for both tenants.
 replSet.setChangeStreamState(stocksTenantConnPrimary, true);
@@ -122,22 +117,24 @@ assert.eq(replSet.getChangeStreamState(citiesTenantConnPrimary), true);
 assert.eq(replSet.getChangeStreamState(notUsedTenantConnPrimary), false);
 
 // Get tenants respective change collections on the primary.
-const stocksChangeCollectionPrimary =
-    stocksTenantConnPrimary.getDB("config").system.change_collection;
-const citiesChangeCollectionPrimary =
-    citiesTenantConnPrimary.getDB("config").system.change_collection;
+const stocksChangeCollectionPrimary = stocksTenantConnPrimary.getDB("config").system.change_collection;
+const citiesChangeCollectionPrimary = citiesTenantConnPrimary.getDB("config").system.change_collection;
 
 // Get tenants respective change collections on the secondary.
-const stocksChangeCollectionSecondary =
-    stocksTenantConnSecondary.getDB("config").system.change_collection;
-const citiesChangeCollectionSecondary =
-    citiesTenantConnSecondary.getDB("config").system.change_collection;
+const stocksChangeCollectionSecondary = stocksTenantConnSecondary.getDB("config").system.change_collection;
+const citiesChangeCollectionSecondary = citiesTenantConnSecondary.getDB("config").system.change_collection;
 
 // Set the 'expireAfterSeconds' to 'kExpireAfterSeconds'.
-assert.commandWorked(stocksTenantConnPrimary.getDB("admin").runCommand(
-    {setClusterParameter: {changeStreams: {expireAfterSeconds: kExpireAfterSeconds}}}));
-assert.commandWorked(citiesTenantConnPrimary.getDB("admin").runCommand(
-    {setClusterParameter: {changeStreams: {expireAfterSeconds: kExpireAfterSeconds}}}));
+assert.commandWorked(
+    stocksTenantConnPrimary
+        .getDB("admin")
+        .runCommand({setClusterParameter: {changeStreams: {expireAfterSeconds: kExpireAfterSeconds}}}),
+);
+assert.commandWorked(
+    citiesTenantConnPrimary
+        .getDB("admin")
+        .runCommand({setClusterParameter: {changeStreams: {expireAfterSeconds: kExpireAfterSeconds}}}),
+);
 
 // Get tenants respective collections for testing.
 const stocksTestDb = stocksTenantConnPrimary.getDB(jsTestName());
@@ -149,10 +146,8 @@ const citiesColl = assertDropAndRecreateCollection(citiesTestDb, "cities");
 const notUsedColl = assertDropAndRecreateCollection(notUsedTestDb, "notUsed");
 
 // Wait until the remover job hangs.
-let fpHangBeforeRemovingDocsPrimary =
-    configureFailPoint(primary, "hangBeforeRemovingExpiredChanges");
-let fpHangBeforeRemovingDocsSecondary =
-    configureFailPoint(secondary, "hangBeforeRemovingExpiredChanges");
+let fpHangBeforeRemovingDocsPrimary = configureFailPoint(primary, "hangBeforeRemovingExpiredChanges");
+let fpHangBeforeRemovingDocsSecondary = configureFailPoint(secondary, "hangBeforeRemovingExpiredChanges");
 fpHangBeforeRemovingDocsPrimary.wait();
 fpHangBeforeRemovingDocsSecondary.wait();
 
@@ -163,7 +158,7 @@ const stocksExpiredDocuments = [
     {_id: "dis", price: 100},
     {_id: "nflx", price: 185},
     {_id: "baba", price: 66},
-    {_id: "amc", price: 185}
+    {_id: "amc", price: 185},
 ];
 
 // Insert 4 documents to the 'cities' collection owned by the 'citiesTenantId' that should be
@@ -172,7 +167,7 @@ const citiesExpiredDocuments = [
     {_id: "toronto", area_km2: 630},
     {_id: "singapore ", area_km2: 728},
     {_id: "london", area_km2: 1572},
-    {_id: "tokyo", area_km2: 2194}
+    {_id: "tokyo", area_km2: 2194},
 ];
 
 // Insert documents to the 'stocks' collection and wait for the replication.
@@ -181,14 +176,18 @@ replSet.awaitReplication();
 
 // Verify that the change collection for the 'stocks' tenant is consistent on both the primary and
 // the secondary.
-assertChangeCollectionDocuments(stocksChangeCollectionPrimary,
-                                stocksColl,
-                                /* expectedDeletedDocs */[],
-                                /* expectedRetainedDocs */ stocksExpiredDocuments);
-assertChangeCollectionDocuments(stocksChangeCollectionSecondary,
-                                stocksColl,
-                                /* expectedDeletedDocs */[],
-                                /* expectedRetainedDocs */ stocksExpiredDocuments);
+assertChangeCollectionDocuments(
+    stocksChangeCollectionPrimary,
+    stocksColl,
+    /* expectedDeletedDocs */ [],
+    /* expectedRetainedDocs */ stocksExpiredDocuments,
+);
+assertChangeCollectionDocuments(
+    stocksChangeCollectionSecondary,
+    stocksColl,
+    /* expectedDeletedDocs */ [],
+    /* expectedRetainedDocs */ stocksExpiredDocuments,
+);
 
 // Insert documents to the 'cities' collection and wait for the replication.
 assert.commandWorked(citiesColl.insertMany(citiesExpiredDocuments));
@@ -196,19 +195,25 @@ replSet.awaitReplication();
 
 // Verify that the change collection for the 'cities' tenant is consistent on both the primary and
 // the secondary.
-assertChangeCollectionDocuments(citiesChangeCollectionPrimary,
-                                citiesColl,
-                                /* expectedDeletedDocs */[],
-                                /* expectedRetainedDocs */ citiesExpiredDocuments);
-assertChangeCollectionDocuments(citiesChangeCollectionSecondary,
-                                citiesColl,
-                                /* expectedDeletedDocs */[],
-                                /* expectedRetainedDocs */ citiesExpiredDocuments);
+assertChangeCollectionDocuments(
+    citiesChangeCollectionPrimary,
+    citiesColl,
+    /* expectedDeletedDocs */ [],
+    /* expectedRetainedDocs */ citiesExpiredDocuments,
+);
+assertChangeCollectionDocuments(
+    citiesChangeCollectionSecondary,
+    citiesColl,
+    /* expectedDeletedDocs */ [],
+    /* expectedRetainedDocs */ citiesExpiredDocuments,
+);
 
 // Insert 2 documents to the 'notUsed' collection such that the associated tenant becomes visible to
 // the mongoD. The documents in these collections will not be consumed by the change stream.
-const notUsedDocuments =
-    [{_id: "cricket_bat", since_years: 2}, {_id: "tennis_racket", since_years: 2}];
+const notUsedDocuments = [
+    {_id: "cricket_bat", since_years: 2},
+    {_id: "tennis_racket", since_years: 2},
+];
 assert.commandWorked(notUsedColl.insertMany(notUsedDocuments));
 
 // All document before and inclusive this wall time will be deleted by the purging job.
@@ -225,7 +230,7 @@ const stocksNonExpiredDocuments = [
     {_id: "coin", price: 23},
     {_id: "ddog", price: 15},
     {_id: "goog", price: 199},
-    {_id: "tsla", price: 12}
+    {_id: "tsla", price: 12},
 ];
 
 // The documents for the 'cities' collection owned by the 'citiesTenantId' that should not be
@@ -234,7 +239,7 @@ const citiesNonExpiredDocuments = [
     {_id: "dublin", area_km2: 117},
     {_id: "new york", area_km2: 783},
     {_id: "hong kong", area_km2: 1114},
-    {_id: "sydney", area_km2: 12386}
+    {_id: "sydney", area_km2: 12386},
 ];
 
 // Insert documents to the 'stocks' collection and wait for the replication.
@@ -242,34 +247,41 @@ assert.commandWorked(stocksColl.insertMany(stocksNonExpiredDocuments));
 replSet.awaitReplication();
 
 // Verify that state of change collection both at the primary and the secondary.
-assertChangeCollectionDocuments(stocksChangeCollectionPrimary,
-                                stocksColl,
-                                /* expectedDeletedDocs */[],
-                                /* expectedRetainedDocs */ stocksNonExpiredDocuments);
-assertChangeCollectionDocuments(stocksChangeCollectionSecondary,
-                                stocksColl,
-                                /* expectedDeletedDocs */[],
-                                /* expectedRetainedDocs */ stocksNonExpiredDocuments);
+assertChangeCollectionDocuments(
+    stocksChangeCollectionPrimary,
+    stocksColl,
+    /* expectedDeletedDocs */ [],
+    /* expectedRetainedDocs */ stocksNonExpiredDocuments,
+);
+assertChangeCollectionDocuments(
+    stocksChangeCollectionSecondary,
+    stocksColl,
+    /* expectedDeletedDocs */ [],
+    /* expectedRetainedDocs */ stocksNonExpiredDocuments,
+);
 
 // Insert documents to the 'cities' collection and wait for the replication.
 assert.commandWorked(citiesColl.insertMany(citiesNonExpiredDocuments));
 replSet.awaitReplication();
 
 // Verify that state of change collection both at the primary and the secondary.
-assertChangeCollectionDocuments(citiesChangeCollectionPrimary,
-                                citiesColl,
-                                /* expectedDeletedDocs */[],
-                                /* expectedRetainedDocs */ citiesNonExpiredDocuments);
-assertChangeCollectionDocuments(citiesChangeCollectionSecondary,
-                                citiesColl,
-                                /* expectedDeletedDocs */[],
-                                /* expectedRetainedDocs */ citiesNonExpiredDocuments);
+assertChangeCollectionDocuments(
+    citiesChangeCollectionPrimary,
+    citiesColl,
+    /* expectedDeletedDocs */ [],
+    /* expectedRetainedDocs */ citiesNonExpiredDocuments,
+);
+assertChangeCollectionDocuments(
+    citiesChangeCollectionSecondary,
+    citiesColl,
+    /* expectedDeletedDocs */ [],
+    /* expectedRetainedDocs */ citiesNonExpiredDocuments,
+);
 
 // Calculate the 'currentWallTime' such that only the first batch of inserted documents
 // should be expired, ie.: 'lastExpiredDocumentTime' + 'kExpireAfterSeconds' <
 // 'currentWallTime' < first-non-expired-document.
-const currentWallTime =
-    new Date(lastExpiredDocumentTime + kExpireAfterSeconds * 1000 + kSafetyMarginMillis);
+const currentWallTime = new Date(lastExpiredDocumentTime + kExpireAfterSeconds * 1000 + kSafetyMarginMillis);
 const failpointName = "injectCurrentWallTimeForChangeCollectionRemoval";
 const fpInjectWallTimePrimary = configureFailPoint(primary, failpointName, {currentWallTime});
 const fpInjectWallTimeSecondary = configureFailPoint(secondary, failpointName, {currentWallTime});
@@ -286,24 +298,39 @@ fpInjectWallTimeSecondary.wait();
 
 // Wait for a complete cycle of the TTL job.
 fpHangBeforeRemovingDocsPrimary = configureFailPoint(primary, "hangBeforeRemovingExpiredChanges");
-fpHangBeforeRemovingDocsSecondary =
-    configureFailPoint(secondary, "hangBeforeRemovingExpiredChanges");
+fpHangBeforeRemovingDocsSecondary = configureFailPoint(secondary, "hangBeforeRemovingExpiredChanges");
 fpHangBeforeRemovingDocsPrimary.wait();
 fpHangBeforeRemovingDocsSecondary.wait();
 
 // Assert that only required documents are retained in change collections on the primary.
 assertChangeCollectionDocuments(
-    stocksChangeCollectionPrimary, stocksColl, stocksExpiredDocuments, stocksNonExpiredDocuments);
+    stocksChangeCollectionPrimary,
+    stocksColl,
+    stocksExpiredDocuments,
+    stocksNonExpiredDocuments,
+);
 assertChangeCollectionDocuments(
-    citiesChangeCollectionPrimary, citiesColl, citiesExpiredDocuments, citiesNonExpiredDocuments);
+    citiesChangeCollectionPrimary,
+    citiesColl,
+    citiesExpiredDocuments,
+    citiesNonExpiredDocuments,
+);
 
 // Wait for the replication to complete and assert that the expired documents have also been deleted
 // from the secondary and the state is consistent with the primary.
 replSet.awaitReplication();
 assertChangeCollectionDocuments(
-    stocksChangeCollectionSecondary, stocksColl, stocksExpiredDocuments, stocksNonExpiredDocuments);
+    stocksChangeCollectionSecondary,
+    stocksColl,
+    stocksExpiredDocuments,
+    stocksNonExpiredDocuments,
+);
 assertChangeCollectionDocuments(
-    citiesChangeCollectionSecondary, citiesColl, citiesExpiredDocuments, citiesNonExpiredDocuments);
+    citiesChangeCollectionSecondary,
+    citiesColl,
+    citiesExpiredDocuments,
+    citiesNonExpiredDocuments,
+);
 
 fpHangBeforeRemovingDocsPrimary.off();
 fpHangBeforeRemovingDocsSecondary.off();

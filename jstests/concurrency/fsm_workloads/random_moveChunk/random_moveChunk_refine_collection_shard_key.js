@@ -12,11 +12,9 @@
 import "jstests/libs/parallelTester.js";
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 
@@ -24,7 +22,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // partition per thread.
     $config.data.partitionSize = 100;
 
-    $config.data.defaultShardKeyField = 'a';
+    $config.data.defaultShardKeyField = "a";
     $config.data.defaultShardKey = {a: 1};
 
     // The variables used by the random_moveChunk_base config in order to move chunks.
@@ -42,16 +40,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.latchCount = $config.iterations;
     $config.data.latch = new CountDownLatch($config.data.latchCount);
 
-    $config.data.getCurrentLatchCollName = function(collName) {
-        return collName + '_' + this.latch.getCount().toString();
+    $config.data.getCurrentLatchCollName = function (collName) {
+        return collName + "_" + this.latch.getCount().toString();
     };
 
-    $config.data.getCurrentOrPreviousLatchCollName = function(collName) {
-        const latchNumber = (Random.rand() < 0.5)
-            ? this.latch.getCount()
-            : Math.min(this.latch.getCount() + 1, this.latchCount);
+    $config.data.getCurrentOrPreviousLatchCollName = function (collName) {
+        const latchNumber =
+            Random.rand() < 0.5 ? this.latch.getCount() : Math.min(this.latch.getCount() + 1, this.latchCount);
 
-        return collName + '_' + latchNumber.toString();
+        return collName + "_" + latchNumber.toString();
     };
 
     // Because updates don't have a shard filter stage, a migration may fail if a
@@ -67,29 +64,32 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             ErrorCodes.Interrupted,
             ErrorCodes.OrphanedRangeCleanUpFailed,
         ];
-        return (err.code && codes.includes(err.code)) ||
+        return (
+            (err.code && codes.includes(err.code)) ||
             (err.message &&
-             (err.message.includes("CommandFailed") ||
-              err.message.includes("Documents in target range may still be in use") ||
-              // This error will occur as a result of trying to move a chunk with a pre-refine
-              // collection epoch.
-              err.message.includes("collection may have been dropped") ||
-              // This error will occur if a moveChunk command has been sent with chunk boundaries
-              // that represent the pre-refine chunks, but the collection has already been changed
-              // to possess the post-refine chunk boundaries.
-              (err.message.includes("shard key bounds") &&
-               err.message.includes("are not valid for shard key pattern"))));
+                (err.message.includes("CommandFailed") ||
+                    err.message.includes("Documents in target range may still be in use") ||
+                    // This error will occur as a result of trying to move a chunk with a pre-refine
+                    // collection epoch.
+                    err.message.includes("collection may have been dropped") ||
+                    // This error will occur if a moveChunk command has been sent with chunk boundaries
+                    // that represent the pre-refine chunks, but the collection has already been changed
+                    // to possess the post-refine chunk boundaries.
+                    (err.message.includes("shard key bounds") &&
+                        err.message.includes("are not valid for shard key pattern"))))
+        );
     };
 
-    $config.states.refineCollectionShardKey = function refineCollectionShardKey(
-        db, collName, connCache) {
+    $config.states.refineCollectionShardKey = function refineCollectionShardKey(db, collName, connCache) {
         const latchCollName = this.getCurrentLatchCollName(collName);
 
         try {
-            assert.commandWorked(db.adminCommand({
-                refineCollectionShardKey: db.getCollection(latchCollName).getFullName(),
-                key: this.newShardKey
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    refineCollectionShardKey: db.getCollection(latchCollName).getFullName(),
+                    key: this.newShardKey,
+                }),
+            );
         } catch (e) {
             // There is a race that could occur where two threads run refineCollectionShardKey
             // concurrently on the same collection. Since the epoch of the collection changes,
@@ -106,13 +106,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.states.moveChunk = function moveChunk(db, collName, connCache) {
-        $super.states.moveChunk.apply(
-            this, [db, this.getCurrentOrPreviousLatchCollName(collName), connCache]);
+        $super.states.moveChunk.apply(this, [db, this.getCurrentOrPreviousLatchCollName(collName), connCache]);
     };
 
     $config.states.init = function init(db, collName, connCache) {
         for (let i = this.latchCount; i >= 0; --i) {
-            const latchCollName = collName + '_' + i;
+            const latchCollName = collName + "_" + i;
             $super.states.init.apply(this, [db, latchCollName, connCache]);
         }
     };
@@ -126,8 +125,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.transitions = {
         init: {moveChunk: 0.4, refineCollectionShardKey: 0.4, flushRouterConfig: 0.2},
         moveChunk: {moveChunk: 0.4, refineCollectionShardKey: 0.4, flushRouterConfig: 0.2},
-        refineCollectionShardKey:
-            {moveChunk: 0.4, refineCollectionShardKey: 0.4, flushRouterConfig: 0.2},
+        refineCollectionShardKey: {moveChunk: 0.4, refineCollectionShardKey: 0.4, flushRouterConfig: 0.2},
         flushRouterConfig: {moveChunk: 0.5, refineCollectionShardKey: 0.5},
     };
 
@@ -137,10 +135,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // race that could occur between sharding a collection and creating an index on the new
         // shard key (if this step were done after every refineCollectionShardKey).
         for (let i = this.latchCount; i >= 0; --i) {
-            const latchCollName = collName + '_' + i;
+            const latchCollName = collName + "_" + i;
             let coll = db.getCollection(latchCollName);
-            assert.commandWorked(
-                db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}));
+            assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}));
             assert.commandWorked(coll.createIndex(this.newShardKey));
             $super.setup.apply(this, [db, latchCollName, cluster]);
         }

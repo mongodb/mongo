@@ -17,7 +17,7 @@ import {
     OCSP_SERVER_CERT,
     OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
     supportsStapling,
-    waitForServer
+    waitForServer,
 } from "jstests/ocsp/lib/ocsp_helpers.js";
 
 if (!supportsStapling()) {
@@ -40,7 +40,7 @@ function test(serverCert, caCert, responderCertPair, extraOpts) {
         setParameter: {
             "ocspStaplingRefreshPeriodSecs": 500,
             "ocspEnabled": "true",
-        }
+        },
     };
 
     if (extraOpts) {
@@ -116,7 +116,7 @@ function testSuperLongOCSPResponseNextUpdateTime() {
         tlsAllowInvalidHostnames: "",
         setParameter: {
             "ocspEnabled": "true",
-        }
+        },
     };
 
     let conn = null;
@@ -140,14 +140,9 @@ test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_CA_RESPONDER, CLUSTER_CA);
 
 // This test can not be repeated with CLUSTER_CA, because intermediate cert
 // is not part of cluster CA chain
-test(OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM,
-     OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
-     OCSP_INTERMEDIATE_RESPONDER);
+test(OCSP_SERVER_SIGNED_BY_INTERMEDIATE_CA_PEM, OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM, OCSP_INTERMEDIATE_RESPONDER);
 
 test(OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM, OCSP_CA_PEM, OCSP_INTERMEDIATE_RESPONDER);
-test(OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM,
-     OCSP_CA_PEM,
-     OCSP_INTERMEDIATE_RESPONDER,
-     CLUSTER_CA);
+test(OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM, OCSP_CA_PEM, OCSP_INTERMEDIATE_RESPONDER, CLUSTER_CA);
 
 testSuperLongOCSPResponseNextUpdateTime();

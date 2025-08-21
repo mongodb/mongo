@@ -9,12 +9,12 @@ let rst = new ReplSetTest({
     nodes: {
         n0: {},
         n1: {rsConfig: {priority: 0}},
-        n2: {rsConfig: {priority: 0}, setParameter: {enableOverrideClusterChainingSetting: true}}
+        n2: {rsConfig: {priority: 0}, setParameter: {enableOverrideClusterChainingSetting: true}},
     },
     // Enable the periodic noop writer to aid sync source selection.
     nodeOptions: {setParameter: {writePeriodicNoops: true}},
     settings: {chainingAllowed: false},
-    useBridge: true
+    useBridge: true,
 });
 rst.startSet();
 rst.initiate();

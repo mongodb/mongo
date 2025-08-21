@@ -10,9 +10,7 @@
 //   run_getLatestProfilerEntry,
 // ]
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
@@ -23,10 +21,11 @@ var coll = testDB.getCollection(collName);
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDB.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDB.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 const profileEntryFilter = {
-    op: "query"
+    op: "query",
 };
 
 //
@@ -100,7 +99,14 @@ assert.commandWorked(coll.createIndex({a: 1}));
 
 assert.neq(coll.findOne({a: 1}), null);
 
-assert.neq(coll.find({a: {$gte: 0}}).sort({b: 1}).batchSize(1).next(), null);
+assert.neq(
+    coll
+        .find({a: {$gte: 0}})
+        .sort({b: 1})
+        .batchSize(1)
+        .next(),
+    null,
+);
 profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 
 assert.eq(profileObj.hasSortStage, true, profileObj);
@@ -163,11 +169,13 @@ assert.neq(coll.findOne({a: 15, b: 10}), null);
 profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 
 assert.eq(profileObj.replanned, true, profileObj);
-assert(profileObj.hasOwnProperty('replanReason'), profileObj);
+assert(profileObj.hasOwnProperty("replanReason"), profileObj);
 assert(
     profileObj.replanReason.match(
-        /cached plan was less efficient than expected: expected trial execution to take [0-9]+ (works|reads) but it took at least [0-9]+ (works|reads)/),
-    profileObj);
+        /cached plan was less efficient than expected: expected trial execution to take [0-9]+ (works|reads) but it took at least [0-9]+ (works|reads)/,
+    ),
+    profileObj,
+);
 assert.eq(profileObj.appName, "MongoDB Shell", profileObj);
 
 //
@@ -213,7 +221,7 @@ for (let i = 0; i < 501; i++) {
 
 assert.eq(coll.find(queryPredicate).comment("profile_find").itcount(), 0);
 profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-assert.eq((typeof profileObj.command.$truncated), "string", profileObj);
+assert.eq(typeof profileObj.command.$truncated, "string", profileObj);
 assert.eq(profileObj.command.comment, "profile_find", profileObj);
 
 //

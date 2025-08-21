@@ -4,30 +4,31 @@
  * upsert generates an insert, which then fails due to another operation inserting first. This test
  * also involves collation.
  */
-export const $config = (function() {
+export const $config = (function () {
     const data = {
         uniqueKeys: ["aa", "ab", "ba", "bb", "Aa", "Ab", "Ba", "BB"],
-        getUniqueKey: function() {
+        getUniqueKey: function () {
             return this.uniqueKeys[Random.randInt(this.uniqueKeys.length)];
         },
         originalReshardingOplogBatchTaskCount: {},
     };
 
     const states = {
-        delete: function(db, collName) {
-            assert.commandWorked(
-                db[collName].remove({uniqueKey: this.getUniqueKey()}, {justOne: true}));
+        delete: function (db, collName) {
+            assert.commandWorked(db[collName].remove({uniqueKey: this.getUniqueKey()}, {justOne: true}));
         },
-        upsert: function(db, collName) {
+        upsert: function (db, collName) {
             const uniqueKey = this.getUniqueKey();
             const cmdRes = db.runCommand({
                 update: collName,
-                updates: [{
-                    q: {uniqueKey: uniqueKey},
-                    u: {$inc: {updates: 1}},
-                    upsert: true,
-                    collation: {locale: "en", strength: 2},
-                }]
+                updates: [
+                    {
+                        q: {uniqueKey: uniqueKey},
+                        u: {$inc: {updates: 1}},
+                        upsert: true,
+                        collation: {locale: "en", strength: 2},
+                    },
+                ],
             });
             assert.commandWorked(cmdRes);
         },
@@ -40,17 +41,20 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         db[collName].drop();
-        assert.commandWorked(db[collName].createIndex(
-            {uniqueKey: 1}, {unique: 1, collation: {locale: "en", strength: 2}}));
+        assert.commandWorked(
+            db[collName].createIndex({uniqueKey: 1}, {unique: 1, collation: {locale: "en", strength: 2}}),
+        );
 
         // Creating an unique index on a key other than _id can result in DuplicateKey errors for
         // background resharding operations. To avoid this, lower reshardingOplogBatchTaskCount
         // to 1.
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                reshardingOplogBatchTaskCount: 1,
-            }));
+            const res = assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    reshardingOplogBatchTaskCount: 1,
+                }),
+            );
             this.originalReshardingOplogBatchTaskCount[db.getMongo().host] = res.was;
         });
     }
@@ -58,11 +62,12 @@ export const $config = (function() {
     function teardown(db, collName, cluster) {
         db[collName].drop();
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                reshardingOplogBatchTaskCount:
-                    this.originalReshardingOplogBatchTaskCount[db.getMongo().host],
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    reshardingOplogBatchTaskCount: this.originalReshardingOplogBatchTaskCount[db.getMongo().host],
+                }),
+            );
         });
     }
 
@@ -70,7 +75,7 @@ export const $config = (function() {
         threadCount: 20,
         iterations: 100,
         states: states,
-        startState: 'upsert',
+        startState: "upsert",
         transitions: transitions,
         data: data,
         setup: setup,

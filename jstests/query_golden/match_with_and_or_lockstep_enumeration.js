@@ -1,4 +1,3 @@
-
 /**
  * Test a particular nested $and/$or query. This test was designed to reproduce SERVER-83091, a bug
  * in which this query could trigger an infinite loop during plan enumeration.
@@ -44,7 +43,7 @@ const predicate = {
         {b: 5},
         {
             b: {$in: [6, 7]},
-        }
+        },
     ],
 };
 
@@ -85,8 +84,7 @@ function runTest(boolSimplificationEnabled) {
 
 // Get the default parameter value so it can be correctly reset if the test fails. Then run the test
 // with boolean simplification enabled and with it disabled.
-const origParamValue =
-    assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}))[paramName];
+const origParamValue = assert.commandWorked(db.adminCommand({getParameter: 1, [paramName]: 1}))[paramName];
 try {
     runTest(true);
     runTest(false);

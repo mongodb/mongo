@@ -12,15 +12,14 @@ try {
 
     try {
         MongoRunner.runningChildPids();
-        throw new Error('Simulating assert.soon() failure');
+        throw new Error("Simulating assert.soon() failure");
     } finally {
         cleanup();
         cleanup2();
     }
-
 } catch (e) {
     assert.eq(e instanceof Error, true);
-    assert.eq(e.message, 'Simulating assert.soon() failure');
+    assert.eq(e.message, "Simulating assert.soon() failure");
 }
 
 print("shell_parallel_wait_for_pid.js SUCCESS");

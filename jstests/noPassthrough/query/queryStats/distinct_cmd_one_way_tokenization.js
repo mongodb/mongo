@@ -3,10 +3,7 @@
  *
  * @tags: [requires_fcv_81]
  */
-import {
-    getQueryStatsDistinctCmd,
-    withQueryStatsEnabled
-} from "jstests/libs/query/query_stats_utils.js";
+import {getQueryStatsDistinctCmd, withQueryStatsEnabled} from "jstests/libs/query/query_stats_utils.js";
 
 const collName = jsTestName();
 
@@ -32,8 +29,10 @@ withQueryStatsEnabled(collName, (coll) => {
     assert.eq(2, queryStats.length);
     assert.eq("distinct", queryStats[1].key.queryShape.command);
     assert.eq(kHashedFieldName, queryStats[1].key.queryShape.key);
-    assert.eq({
-        "$or": [{[kHashedFieldName]: {"$gt": "?number"}}, {[kHashedFieldName]: {"$eq": "?number"}}]
-    },
-              queryStats[1].key.queryShape.query);
+    assert.eq(
+        {
+            "$or": [{[kHashedFieldName]: {"$gt": "?number"}}, {[kHashedFieldName]: {"$eq": "?number"}}],
+        },
+        queryStats[1].key.queryShape.query,
+    );
 });

@@ -23,26 +23,27 @@ assert.commandWorked(primaryColl.insert([{a: 1}, {b: 2}, {c: 3}]));
 
 rst.awaitReplication();
 
-jsTestLog(
-    "Adding new node with unsupportedSyncSource to be the primary and readPreference to be secondary only.");
+jsTestLog("Adding new node with unsupportedSyncSource to be the primary and readPreference to be secondary only.");
 
 const initialSyncNode = rst.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
-        'unsupportedSyncSource': primary.host,
-        'initialSyncSourceReadPreference': 'secondary',
-        'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
-    }
+        "unsupportedSyncSource": primary.host,
+        "initialSyncSourceReadPreference": "secondary",
+        "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
+    },
 });
 rst.reInitiate();
 
 jsTestLog("Wait until after the sync source has been chosen to confirm it is the primary.");
 
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 const res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus: 1}));
 assert.eq(primary.host, res.syncSourceHost);
@@ -50,8 +51,9 @@ assert.eq(primary.host, res.syncSourceHost);
 jsTestLog("Sync source confirmed to be primary.");
 
 // Allow the node to continue copying databases.
-assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 rst.awaitSecondaryNodes();
 

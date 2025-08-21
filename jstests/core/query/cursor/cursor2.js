@@ -1,4 +1,3 @@
-
 /**
  * Test to see if the count returned from the cursor is the number of objects that would be
  * returned
@@ -19,8 +18,7 @@ function testCursorCountVsArrLen(dbConn) {
     var fromCount = coll.find({}, {b: 1}).count();
     var fromArrLen = coll.find({}, {b: 1}).toArray().length;
 
-    assert(fromCount == fromArrLen,
-           "count from cursor [" + fromCount + "] !=  count from arrlen [" + fromArrLen + "]");
+    assert(fromCount == fromArrLen, "count from cursor [" + fromCount + "] !=  count from arrlen [" + fromArrLen + "]");
 }
 
 testCursorCountVsArrLen(db);

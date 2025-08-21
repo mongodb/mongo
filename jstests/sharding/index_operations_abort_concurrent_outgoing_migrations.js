@@ -23,7 +23,7 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
  */
 function runMoveChunk(host, ns, fromShard, toShard, findOneChunkFunction) {
     const mongos = new Mongo(host);
-    const chunk = findOneChunkFunction(mongos.getDB('config'), ns, {shard: fromShard});
+    const chunk = findOneChunkFunction(mongos.getDB("config"), ns, {shard: fromShard});
     let res, hasRetriableError;
     do {
         hasRetriableError = false;
@@ -49,12 +49,14 @@ function assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, cmdFun
 
     // Turn on the fail point and wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, stepName);
-    let moveChunkThread = new Thread(runMoveChunk,
-                                     st.s.host,
-                                     ns,
-                                     fromShard.shardName,
-                                     toShard.shardName,
-                                     findChunksUtil.findOneChunkByNs);
+    let moveChunkThread = new Thread(
+        runMoveChunk,
+        st.s.host,
+        ns,
+        fromShard.shardName,
+        toShard.shardName,
+        findChunksUtil.findOneChunkByNs,
+    );
     moveChunkThread.start();
     waitForMoveChunkStep(fromShard, stepName);
 
@@ -70,20 +72,18 @@ const st = new ShardingTest({shards: 2});
 const dbName = "test";
 const testDB = st.s.getDB(dbName);
 const shardKey = {
-    _id: 1
+    _id: 1,
 };
 const index = {
-    x: 1
+    x: 1,
 };
 // The steps after cloning starts and before the donor enters the critical section.
 const stepNames = [moveChunkStepNames.startedMoveChunk, moveChunkStepNames.reachedSteadyState];
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 stepNames.forEach((stepName) => {
-    jsTest.log(`Testing that createIndexes aborts concurrent outgoing migrations that are in step ${
-        stepName}...`);
+    jsTest.log(`Testing that createIndexes aborts concurrent outgoing migrations that are in step ${stepName}...`);
     const collName = "testCreateIndexesMoveChunkStep" + stepName;
     const ns = dbName + "." + collName;
 
@@ -115,8 +115,8 @@ stepNames.forEach((stepName) => {
 
 stepNames.forEach((stepName) => {
     jsTest.log(
-        `Testing that single phase createIndexes aborts concurrent outgoing migrations that are in step ${
-            stepName}...`);
+        `Testing that single phase createIndexes aborts concurrent outgoing migrations that are in step ${stepName}...`,
+    );
     const collName = "testSinglePhaseCreateIndexesMoveChunkStep" + stepName;
     const ns = dbName + "." + collName;
 
@@ -143,8 +143,7 @@ stepNames.forEach((stepName) => {
 });
 
 stepNames.forEach((stepName) => {
-    jsTest.log(`Testing that dropIndexes aborts concurrent outgoing migrations that are in step ${
-        stepName}...`);
+    jsTest.log(`Testing that dropIndexes aborts concurrent outgoing migrations that are in step ${stepName}...`);
     const collName = "testDropIndexesMoveChunkStep" + stepName;
     const ns = dbName + "." + collName;
 
@@ -174,7 +173,9 @@ stepNames.forEach((stepName) => {
 stepNames.forEach((stepName) => {
     jsTest.log(
         `Testing that dropIndex of a hashed shard key index aborts concurrent outgoing migrations that are in step ${
-            stepName}...`);
+            stepName
+        }...`,
+    );
     const collName = "testDropHashedShardKeyIndexMoveChunkStep" + stepName;
     const ns = dbName + "." + collName;
     const hashedShardKey = {_id: "hashed"};

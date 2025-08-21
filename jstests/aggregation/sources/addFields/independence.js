@@ -48,8 +48,7 @@ function testIndependent({inputDoc, stage1, stage2}) {
     jsTestLog(`Test independent stages: ${tojson(stage1)}, ${tojson(stage2)}`);
     const {output, swappedOutput, message} = runBothOrders({input: [inputDoc], stage1, stage2});
     jsTestLog(message);
-    assert.eq(
-        output, swappedOutput, `Stages are not independent: ${tojson(stage1)}, ${tojson(stage2)}`);
+    assert.eq(output, swappedOutput, `Stages are not independent: ${tojson(stage1)}, ${tojson(stage2)}`);
 }
 
 /**
@@ -63,9 +62,11 @@ function testDependent({inputDoc, stage1, stage2}) {
     jsTestLog(`Test dependent stages: ${tojson(stage1)}, ${tojson(stage2)}`);
     const {output, swappedOutput, message} = runBothOrders({input: [inputDoc], stage1, stage2});
     jsTestLog(message);
-    assert.neq(output, swappedOutput, `Input ${tojson([
-                   inputDoc
-               ])} is not a counterexample for ${tojson(stage1)}, ${tojson(stage2)}`);
+    assert.neq(
+        output,
+        swappedOutput,
+        `Input ${tojson([inputDoc])} is not a counterexample for ${tojson(stage1)}, ${tojson(stage2)}`,
+    );
 
     const optimized = db.aggregate([{$documents: [inputDoc]}, stage1, stage2]).toArray();
     assert.eq(optimized, output, `Pipeline must have been optimized incorrectly`);
@@ -75,7 +76,7 @@ function testDependent({inputDoc, stage1, stage2}) {
  * Puts {$_internalInhibitOptimization: {}} before every stage to prevent optimizations.
  */
 function unoptimized(pipeline) {
-    return pipeline.flatMap(stage => [{$_internalInhibitOptimization: {}}, stage]);
+    return pipeline.flatMap((stage) => [{$_internalInhibitOptimization: {}}, stage]);
 }
 
 /**
@@ -97,9 +98,7 @@ function testEquivalent({inputDoc, pipeline1, pipeline2}) {
         ${tojson(pipeline2)}
             ${tojson(result2)}
 `);
-    assert.eq(result1,
-              result2,
-              `Pipelines ${tojson(pipeline1)} vs ${tojson(pipeline2)} are not equivalent`);
+    assert.eq(result1, result2, `Pipelines ${tojson(pipeline1)} vs ${tojson(pipeline2)} are not equivalent`);
 }
 
 /**
@@ -108,10 +107,8 @@ function testEquivalent({inputDoc, pipeline1, pipeline2}) {
  */
 function testNotEquivalent({inputDoc, correct, incorrect}) {
     jsTestLog(`Test non-equivalent pipelines: ${tojson(correct)} vs ${tojson(incorrect)}`);
-    const correctResult =
-        db.aggregate([{$documents: [inputDoc]}, ...unoptimized(correct)]).toArray();
-    const incorrectResult =
-        db.aggregate([{$documents: [inputDoc]}, ...unoptimized(incorrect)]).toArray();
+    const correctResult = db.aggregate([{$documents: [inputDoc]}, ...unoptimized(correct)]).toArray();
+    const incorrectResult = db.aggregate([{$documents: [inputDoc]}, ...unoptimized(incorrect)]).toArray();
 
     const optimizedResult = db.aggregate([{$documents: [inputDoc]}, ...correct]).toArray();
 
@@ -126,13 +123,16 @@ function testNotEquivalent({inputDoc, correct, incorrect}) {
 
         optimizedResult,
     });
-    assert.neq(correctResult,
-               incorrectResult,
-               `Input ${tojson(inputDoc)} is not a counterexample for ${tojson(correct)} vs ${
-                   tojson(incorrect)}`);
-    assert.eq(correctResult,
-              optimizedResult,
-              `Input ${tojson(inputDoc)} shows that ${tojson(correct)} was incorrectly optimized`);
+    assert.neq(
+        correctResult,
+        incorrectResult,
+        `Input ${tojson(inputDoc)} is not a counterexample for ${tojson(correct)} vs ${tojson(incorrect)}`,
+    );
+    assert.eq(
+        correctResult,
+        optimizedResult,
+        `Input ${tojson(inputDoc)} shows that ${tojson(correct)} was incorrectly optimized`,
+    );
 }
 
 // When the first component of the path is different, then they really are independent paths.
@@ -155,20 +155,20 @@ function testNotEquivalent({inputDoc, correct, incorrect}) {
 // which makes the $match path visit some missing fields instead of skipping them,
 // which means an {$eq: null} predicate changes from false to true.
 testDependent({
-    stage1: {$addFields: {'a.x': 5}},
-    stage2: {$match: {'a.y': null}},
+    stage1: {$addFields: {"a.x": 5}},
+    stage2: {$match: {"a.y": null}},
     inputDoc: {a: [0]},
 });
 // Similarly {$in: [... null ...]} is a null-accepting predicate.
 testDependent({
-    stage1: {$addFields: {'a.x': 5}},
-    stage2: {$match: {'a.y': {$in: [2, null]}}},
+    stage1: {$addFields: {"a.x": 5}},
+    stage2: {$match: {"a.y": {$in: [2, null]}}},
     inputDoc: {a: [0]},
 });
 // Many predicates do not match null, and those are not affected by this edge case.
 {
-    const stage1 = {$addFields: {'a.x': 5}};
-    const stage2 = {$match: {'a.y': 7}};
+    const stage1 = {$addFields: {"a.x": 5}};
+    const stage2 = {$match: {"a.y": 7}};
     testIndependent({stage1, stage2, inputDoc: {a: {y: 6}}});
     testIndependent({stage1, stage2, inputDoc: {a: {y: 7}}});
     testIndependent({stage1, stage2, inputDoc: {a: [{y: 6}]}});
@@ -181,8 +181,8 @@ testDependent({
 // 'a.0' and 'a.x' look like they diverge in their second component,
 // but because of implicit array traversal they can both touch $$ROOT["a"][0]["x"].
 testDependent({
-    stage1: {$addFields: {'a.x': 5}},
-    stage2: {$match: {'a.0': 3}},
+    stage1: {$addFields: {"a.x": 5}},
+    stage2: {$match: {"a.0": 3}},
     inputDoc: {a: [3]},
 });
 
@@ -195,7 +195,7 @@ testDependent({
 // specially: in "$a.0" the 0 is treated as an object field name.
 // See 'ExpressionFieldPath::evaluatePath'.
 {
-    const stage1 = {$addFields: {'a.x': 5}};
+    const stage1 = {$addFields: {"a.x": 5}};
     const stage2 = {$addFields: {result: "$a.y"}};
     // Non-array cases.
     testIndependent({stage1, stage2, inputDoc: {}});
@@ -218,9 +218,9 @@ testDependent({
                 {},
                 {x: 0},
                 {x: 0, y: 7},
-                [[{x: 0, y: 7}]],  // With different nesting.
-            ]
-        }
+                [[{x: 0, y: 7}]], // With different nesting.
+            ],
+        },
     });
 }
 
@@ -229,7 +229,7 @@ testDependent({
 testEquivalent({
     inputDoc: {a: 0, x: 5},
     pipeline1: [{$addFields: {a: "$x"}}, {$_internalInhibitOptimization: {}}, {$match: {a: 5}}],
-    pipeline2: [{$match: {x: 5}}, {$addFields: {a: "$x"}}]
+    pipeline2: [{$match: {x: 5}}, {$addFields: {a: "$x"}}],
 });
 
 // However when either side is dotted then it's not a simple rename.
@@ -238,11 +238,11 @@ testEquivalent({
 testNotEquivalent({
     inputDoc: {a: 0, x: [{y: [5]}]},
     correct: [{$addFields: {a: "$x.y"}}, {$match: {a: 5}}],
-    incorrect: [{$match: {'x.y': 5}}, {$addFields: {a: "$x.y"}}],
+    incorrect: [{$match: {"x.y": 5}}, {$addFields: {a: "$x.y"}}],
 });
 // 'a.b': "$x" is not a rename for several reasons.
 {
-    const correct = [{$addFields: {'a.b': "$x"}}, {$match: {'a.b': 5}}];
+    const correct = [{$addFields: {"a.b": "$x"}}, {$match: {"a.b": 5}}];
     const incorrect = [{$match: {x: 5}}, {$addFields: {a: "$x.y"}}];
     // 'a.b' can descend into doubly nested arrays.
     testNotEquivalent({correct, incorrect, inputDoc: {a: [[0]], x: 5}});

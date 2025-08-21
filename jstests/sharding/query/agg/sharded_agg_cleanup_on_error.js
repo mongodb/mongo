@@ -18,7 +18,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kFailPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
 const kFailpointOptions = {
-    shouldCheckForInterrupt: true
+    shouldCheckForInterrupt: true,
 };
 
 const st = new ShardingTest({shards: 2});
@@ -28,8 +28,7 @@ const mongosDB = st.s.getDB(kDBName);
 const shard0DB = st.shard0.getDB(kDBName);
 const shard1DB = st.shard1.getDB(kDBName);
 
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: kDBName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: kDBName, primaryShard: st.shard0.shardName}));
 let coll = mongosDB.sharded_agg_cleanup_on_error;
 
 for (let i = 0; i < 10; i++) {
@@ -39,15 +38,16 @@ for (let i = 0; i < 10; i++) {
 st.shardColl(coll, {_id: 1}, {_id: 5}, {_id: 6}, kDBName, false);
 
 function findMatchingCursors(db) {
-    return db.getSiblingDB("admin")
+    return db
+        .getSiblingDB("admin")
         .aggregate([
             {$currentOp: {idleCursors: true, localOps: true}},
             {
                 $match: {
                     "cursor.originatingCommand.pipeline.$mergeCursors": {$exists: false},
-                    "cursor.originatingCommand.comment": jsTestName()
-                }
-            }
+                    "cursor.originatingCommand.comment": jsTestName(),
+                },
+            },
         ])
         .toArray();
 }
@@ -57,7 +57,7 @@ function assertFailsAndCleansUpCursors({pipeline, errCode}) {
         aggregate: coll.getName(),
         pipeline: pipeline,
         cursor: {batchSize: 0},
-        comment: jsTestName()
+        comment: jsTestName(),
     });
     assert.commandWorked(cmdRes);
     assert.neq(0, cmdRes.cursor.id);
@@ -71,18 +71,23 @@ function assertFailsAndCleansUpCursors({pipeline, errCode}) {
     // cursor which was hanging on shard 1 will have been marked interrupted, but isn't
     // guaranteed to be deleted yet. Thus, we use an assert.soon().
     assert(findMatchingCursors(mongosDB).length === 0);
-    assert.soon(() => findMatchingCursors(shard0DB).length === 0,
-                () => findMatchingCursors(shard0DB),
-                2 * 60 * 1000);
-    assert.soon(() => findMatchingCursors(shard1DB).length === 0,
-                () => findMatchingCursors(shard1DB),
-                2 * 60 * 1000);
+    assert.soon(
+        () => findMatchingCursors(shard0DB).length === 0,
+        () => findMatchingCursors(shard0DB),
+        2 * 60 * 1000,
+    );
+    assert.soon(
+        () => findMatchingCursors(shard1DB).length === 0,
+        () => findMatchingCursors(shard1DB),
+        2 * 60 * 1000,
+    );
 }
 
 try {
     // Set up a fail point which causes getMore to hang on shard 1.
-    assert.commandWorked(shard1DB.adminCommand(
-        {configureFailPoint: kFailPointName, mode: "alwaysOn", data: kFailpointOptions}));
+    assert.commandWorked(
+        shard1DB.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn", data: kFailpointOptions}),
+    );
 
     // Issue an aggregation that will fail during a getMore on shard 0, and make sure that
     // this correctly kills the hanging cursor on shard 1. Use $_internalSplitPipeline to ensure
@@ -90,9 +95,9 @@ try {
     assertFailsAndCleansUpCursors({
         pipeline: [
             {$project: {out: {$divide: ["$_id", 0]}}},
-            {$_internalSplitPipeline: {mergeType: st.getMergeType(mongosDB)}}
+            {$_internalSplitPipeline: {mergeType: st.getMergeType(mongosDB)}},
         ],
-        errCode: kDivideByZeroErrCodes
+        errCode: kDivideByZeroErrCodes,
     });
 
     // Repeat the test above, but this time use $_internalSplitPipeline to force the merge to
@@ -100,9 +105,9 @@ try {
     assertFailsAndCleansUpCursors({
         pipeline: [
             {$project: {out: {$divide: ["$_id", 0]}}},
-            {$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}}
+            {$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}},
         ],
-        errCode: kDivideByZeroErrCodes
+        errCode: kDivideByZeroErrCodes,
     });
 } finally {
     assert.commandWorked(shard1DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
@@ -112,10 +117,12 @@ try {
 // shard cursors.
 try {
     // Enable the failpoint to fail on establishing a merging shard cursor.
-    assert.commandWorked(mongosDB.adminCommand({
-        configureFailPoint: "shardedAggregateFailToEstablishMergingShardCursor",
-        mode: "alwaysOn"
-    }));
+    assert.commandWorked(
+        mongosDB.adminCommand({
+            configureFailPoint: "shardedAggregateFailToEstablishMergingShardCursor",
+            mode: "alwaysOn",
+        }),
+    );
 
     // Run an aggregation which requires a merging shard pipeline. This should fail because of
     // the failpoint.
@@ -125,18 +132,20 @@ try {
     assert.eq(mongosDB.serverStatus().metrics.cursor.open.total, 0);
     assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.total == 0);
     assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.total == 0);
-
 } finally {
-    assert.commandWorked(mongosDB.adminCommand(
-        {configureFailPoint: "shardedAggregateFailToEstablishMergingShardCursor", mode: "off"}));
+    assert.commandWorked(
+        mongosDB.adminCommand({configureFailPoint: "shardedAggregateFailToEstablishMergingShardCursor", mode: "off"}),
+    );
 }
 
 // Test that aggregations involving $exchange correctly clean up the producer cursors.
 try {
-    assert.commandWorked(mongosDB.adminCommand({
-        configureFailPoint: "shardedAggregateFailToDispatchExchangeConsumerPipeline",
-        mode: "alwaysOn"
-    }));
+    assert.commandWorked(
+        mongosDB.adminCommand({
+            configureFailPoint: "shardedAggregateFailToDispatchExchangeConsumerPipeline",
+            mode: "alwaysOn",
+        }),
+    );
 
     // Run an aggregation which is eligible for $exchange. This should assert because of
     // the failpoint. Add a $group stage to force an exchange-eligible split of the pipeline
@@ -148,19 +157,20 @@ try {
         source: coll,
         target: mongosDB.target,
         prevStages: [{$group: {_id: "$fakeShardKey"}}],
-        errorCodes: ErrorCodes.FailPointEnabled
+        errorCodes: ErrorCodes.FailPointEnabled,
     });
 
     // Neither mongos or the shards should leave cursors open.
     assert.eq(mongosDB.serverStatus().metrics.cursor.open.total, 0);
     assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.total == 0);
     assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.total == 0);
-
 } finally {
-    assert.commandWorked(mongosDB.adminCommand({
-        configureFailPoint: "shardedAggregateFailToDispatchExchangeConsumerPipeline",
-        mode: "off"
-    }));
+    assert.commandWorked(
+        mongosDB.adminCommand({
+            configureFailPoint: "shardedAggregateFailToDispatchExchangeConsumerPipeline",
+            mode: "off",
+        }),
+    );
 }
 
 st.stop();

@@ -19,9 +19,7 @@
  */
 
 import {prepareCollection} from "jstests/libs/query/group_to_distinct_scan_utils.js";
-import {
-    runGroupWithTopBottomToDistinctScanTests
-} from "jstests/libs/query/group_with_top_bottom_to_distinct_scan.js";
+import {runGroupWithTopBottomToDistinctScanTests} from "jstests/libs/query/group_with_top_bottom_to_distinct_scan.js";
 
 prepareCollection(db);
 // Query hashes programmatically obtained for the subsequent tests.
@@ -75,6 +73,6 @@ const queryHashes = [
     "9C785DA8B37011F03DAEBFDE853007AA2B99E34DB6015BE093A9A330E41007D4",
     "437A4A75D8E3B5C7C17BD2540F7E5937BB09CA2B67851EE9EDC37610406C9705",
     "8C85570ACC71E3FB96C1BE6E1B4D2253F32C95947C8AEE942D76645CCB0CE6E1",
-    "9563AB7EB2A7849E4A83C5BE32B7FD77D57C0963ABF9D72C04646EDE571F3EF8"
+    "9563AB7EB2A7849E4A83C5BE32B7FD77D57C0963ABF9D72C04646EDE571F3EF8",
 ];
 runGroupWithTopBottomToDistinctScanTests(db, queryHashes);

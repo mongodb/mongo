@@ -6,7 +6,7 @@
  */
 import {
     withAbortAndRetryOnTransientTxnError,
-    withTxnAndAutoRetryOnMongos
+    withTxnAndAutoRetryOnMongos,
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -15,11 +15,11 @@ import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uu
 const st = new ShardingTest({
     mongos: 1,
     shards: 2,
-    rsOptions: {setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 2}}
+    rsOptions: {setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 2}},
 });
-const dbName = 'test';
-const collName = 'foo';
-const ns = dbName + '.' + collName;
+const dbName = "test";
+const collName = "foo";
+const ns = dbName + "." + collName;
 const mongos = st.s0;
 
 let testDB = mongos.getDB(dbName);
@@ -40,11 +40,9 @@ function simulateResharding() {
     assert.commandWorked(testDB.createCollection(tempReshardingColl));
     assert.commandWorked(mongos.adminCommand({shardCollection: tempReshardingNss, key: {y: 1}}));
     assert.commandWorked(mongos.adminCommand({split: tempReshardingNss, middle: {y: 5}}));
-    assert.commandWorked(
-        mongos.adminCommand({moveChunk: tempReshardingNss, find: {y: 5}, to: st.shard1.shardName}));
+    assert.commandWorked(mongos.adminCommand({moveChunk: tempReshardingNss, find: {y: 5}, to: st.shard1.shardName}));
 
-    assert.commandWorked(
-        mongos.adminCommand({moveChunk: ns, find: {x: 5}, to: st.shard1.shardName}));
+    assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {x: 5}, to: st.shard1.shardName}));
 
     jsTestLog("Updating resharding fields");
     let donorReshardingFields = {
@@ -57,8 +55,12 @@ function simulateResharding() {
             "recipientShardIds": [st.shard0.shardName, st.shard1.shardName],
         },
     };
-    assert.commandWorked(st.configRS.getPrimary().getDB("config").collections.update(
-        {_id: ns}, {"$set": {"reshardingFields": donorReshardingFields}}));
+    assert.commandWorked(
+        st.configRS
+            .getPrimary()
+            .getDB("config")
+            .collections.update({_id: ns}, {"$set": {"reshardingFields": donorReshardingFields}}),
+    );
 
     jsTestLog("Flushing routing table updates");
 
@@ -69,20 +71,19 @@ function simulateResharding() {
         assert.commandWorked(st.shard1.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     }
 
-    assert.commandWorked(
-        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
-    assert.commandWorked(
-        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
+    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
+    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
 
-    assert.commandWorked(st.shard0.adminCommand(
-        {_flushRoutingTableCacheUpdates: tempReshardingNss, syncFromConfig: true}));
-    assert.commandWorked(st.shard1.adminCommand(
-        {_flushRoutingTableCacheUpdates: tempReshardingNss, syncFromConfig: true}));
+    assert.commandWorked(
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: tempReshardingNss, syncFromConfig: true}),
+    );
+    assert.commandWorked(
+        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: tempReshardingNss, syncFromConfig: true}),
+    );
     st.refreshCatalogCacheForNs(mongos, ns);
 }
 
-assert.commandWorked(
-    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(mongos.adminCommand({split: ns, middle: {x: 5}}));
 
@@ -93,10 +94,14 @@ let primary = st.shard0;
 (() => {
     jsTestLog("Inserting docs in applyOps");
 
-    assert.commandWorked(primary.getDB(dbName).runCommand({
-        applyOps:
-            [{op: "i", ns: ns, o: {_id: 0, x: 2, y: 2}}, {op: "i", ns: ns, o: {_id: 1, x: 3, y: 5}}]
-    }));
+    assert.commandWorked(
+        primary.getDB(dbName).runCommand({
+            applyOps: [
+                {op: "i", ns: ns, o: {_id: 0, x: 2, y: 2}},
+                {op: "i", ns: ns, o: {_id: 1, x: 3, y: 5}},
+            ],
+        }),
+    );
 })();
 
 (() => {
@@ -255,7 +260,7 @@ let primary = st.shard0;
     session.endSession();
 })();
 
-let localDB = primary.getDB('local');
+let localDB = primary.getDB("local");
 
 let oplog = localDB.oplog.rs.find();
 let oplogEntries = oplog.toArray();

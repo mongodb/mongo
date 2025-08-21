@@ -12,15 +12,21 @@ const coll = db.coll;
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1}));
 
-const fp = configureFailPoint(conn, 'hangAfterAbortingIndexes');
+const fp = configureFailPoint(conn, "hangAfterAbortingIndexes");
 
 const awaitDropIndexes = startParallelShell(
-    funWithArgs(function(dbName, collName) {
-        assert.commandWorked(db.getSiblingDB(dbName)[collName].dropIndex({a: 1}));
-    }, db.getName(), coll.getName()), conn.port);
+    funWithArgs(
+        function (dbName, collName) {
+            assert.commandWorked(db.getSiblingDB(dbName)[collName].dropIndex({a: 1}));
+        },
+        db.getName(),
+        coll.getName(),
+    ),
+    conn.port,
+);
 
 fp.wait();
-assert.commandWorked(coll.renameCollection('coll_2'));
+assert.commandWorked(coll.renameCollection("coll_2"));
 fp.off();
 
 awaitDropIndexes();

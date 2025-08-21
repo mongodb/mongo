@@ -16,7 +16,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
-if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test
+if (jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Delete test
     quit();
 }
 
@@ -45,7 +46,7 @@ const _id = "randomId";
  * Checks that basic CRUD operations work as expected. Expects the collection to have a
  * { _id: _id } document.
  */
-const checkBasicCRUD = function(withCollection, _id, isReplSetConnection) {
+const checkBasicCRUD = function (withCollection, _id, isReplSetConnection) {
     const sleepMs = 1;
     const numRetries = 99999;
     const NUM_NODES = 3;
@@ -58,8 +59,7 @@ const checkBasicCRUD = function(withCollection, _id, isReplSetConnection) {
         additionalCodesToRetry.push(ErrorCodes.FailedToSatisfyReadPreference);
     }
 
-    const runWithRetries = (fn) =>
-        retryOnRetryableError(fn, numRetries, sleepMs, additionalCodesToRetry);
+    const runWithRetries = (fn) => retryOnRetryableError(fn, numRetries, sleepMs, additionalCodesToRetry);
     const runFindOneWithRetries = (coll, filter) => runWithRetries(() => coll.findOne(filter));
 
     withCollection((coll) => {
@@ -78,8 +78,7 @@ const checkBasicCRUD = function(withCollection, _id, isReplSetConnection) {
     });
 
     withCollection((coll) => {
-        assert.commandWorked(
-            runWithRetries(() => coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}})));
+        assert.commandWorked(runWithRetries(() => coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}})));
         assert.eq(_id, runFindOneWithRetries(coll, {_id: _id})._id);
     });
 };
@@ -87,7 +86,7 @@ const checkBasicCRUD = function(withCollection, _id, isReplSetConnection) {
 /**
  * Checks that common DDl operations work as expected.
  */
-const checkDDLOps = function(withDbs, isReplSetConnection) {
+const checkDDLOps = function (withDbs, isReplSetConnection) {
     const DDLDb = "DDL";
     const DDLCollection = "DDLCollection";
     const DDLNs = `${DDLDb}.${DDLCollection}`;
@@ -134,7 +133,11 @@ const checkDDLOps = function(withDbs, isReplSetConnection) {
             additionalCodesToRetry.push(ErrorCodes.FailedToSatisfyReadPreference);
         }
         return retryOnRetryableError(
-            () => assertCommand(db.runCommand(cmd)), numRetries, sleepMs, additionalCodesToRetry);
+            () => assertCommand(db.runCommand(cmd)),
+            numRetries,
+            sleepMs,
+            additionalCodesToRetry,
+        );
     };
 
     withDbs((db, _) => {
@@ -149,7 +152,10 @@ const checkDDLOps = function(withDbs, isReplSetConnection) {
         assert.eq(res["cursor"]["firstBatch"].length, 1, res);
         runDDLCommandWithRetries(db, {
             createIndexes: DDLCollection,
-            indexes: [{name: "x_1", key: {x: 1}}, {name: "y_1", key: {y: 1}}]
+            indexes: [
+                {name: "x_1", key: {x: 1}},
+                {name: "y_1", key: {y: 1}},
+            ],
         });
         res = runDDLCommandWithRetries(db, {listIndexes: DDLCollection});
         assert.eq(res["cursor"]["firstBatch"].length, 3, res);
@@ -158,8 +164,7 @@ const checkDDLOps = function(withDbs, isReplSetConnection) {
     withDbs((db, _) => {
         jsTestLog("Running collMod.");
         runDDLCommandWithRetries(db, {collMod: DDLCollection, validator: {x: {$lt: 10}}});
-        assert.commandFailedWithCode(db[DDLCollection].insert({x: 11}),
-                                     ErrorCodes.DocumentValidationFailure);
+        assert.commandFailedWithCode(db[DDLCollection].insert({x: 11}), ErrorCodes.DocumentValidationFailure);
     });
 
     withDbs((db, _) => {
@@ -175,15 +180,19 @@ const checkDDLOps = function(withDbs, isReplSetConnection) {
         // rename can fail with ShardNotfound when a shard is being removed, but it is safe to
         // retry.
         let additionalCodesToRetry = [ErrorCodes.ShardNotFound];
-        runDDLCommandWithRetries(adminDb,
-                                 {renameCollection: DDLNs, to: tempNs, dropTarget: false},
-                                 additionalCodesToRetry);
+        runDDLCommandWithRetries(
+            adminDb,
+            {renameCollection: DDLNs, to: tempNs, dropTarget: false},
+            additionalCodesToRetry,
+        );
         let res = runDDLCommandWithRetries(db, {listCollections: 1});
         assert.eq(res["cursor"]["firstBatch"][0]["name"], "tempName", res);
 
-        runDDLCommandWithRetries(adminDb,
-                                 {renameCollection: tempNs, to: DDLNs, dropTarget: false},
-                                 additionalCodesToRetry);
+        runDDLCommandWithRetries(
+            adminDb,
+            {renameCollection: tempNs, to: DDLNs, dropTarget: false},
+            additionalCodesToRetry,
+        );
         res = runDDLCommandWithRetries(db, {listCollections: 1});
         assert.eq(res["cursor"]["firstBatch"][0]["name"], DDLCollection, res);
     });
@@ -203,8 +212,7 @@ const checkDDLOps = function(withDbs, isReplSetConnection) {
     });
 };
 
-const checkCRUDThread = function(
-    mongosHost, replSetHost, ns, _id, countdownLatch, stage, checkBasicCRUD) {
+const checkCRUDThread = function (mongosHost, replSetHost, ns, _id, countdownLatch, stage, checkBasicCRUD) {
     const [dbName, collName] = ns.split(".");
 
     const mongos = new Mongo(mongosHost);
@@ -220,11 +228,11 @@ const checkCRUDThread = function(
     let isReplSetConnection = false;
     const withCollection = (op) => {
         switch (stage.getCount()) {
-            case 2:  // Before the replica set is added as a shard.
+            case 2: // Before the replica set is added as a shard.
                 op(replSetColl);
                 isReplSetConnection = true;
                 break;
-            case 1:  // After the replica set has been added as a shard.
+            case 1: // After the replica set has been added as a shard.
                 // Randomly select mongos or replica set connection to simulate a rolling connection
                 // string change.
                 if (Math.random() > 0.5) {
@@ -233,7 +241,7 @@ const checkCRUDThread = function(
                     op(replSetColl);
                 }
                 break;
-            case 0:  // Right before the second shard is added.
+            case 0: // Right before the second shard is added.
                 op(mongosColl);
                 break;
         }
@@ -241,11 +249,11 @@ const checkCRUDThread = function(
 
     while (countdownLatch.getCount() > 0) {
         checkBasicCRUD(withCollection, _id, isReplSetConnection);
-        sleep(1);  // milliseconds.
+        sleep(1); // milliseconds.
     }
 };
 
-const checkDDLThread = function(mongosHost, replSetHost, countdownLatch, stage, checkDDLOps) {
+const checkDDLThread = function (mongosHost, replSetHost, countdownLatch, stage, checkDDLOps) {
     const mongos = new Mongo(mongosHost);
     const mongosSession = mongos.startSession({retryWrites: true});
     const mongosDb = mongosSession.getDatabase("DDL");
@@ -261,12 +269,12 @@ const checkDDLThread = function(mongosHost, replSetHost, countdownLatch, stage, 
         let adminDb;
         let isReplSetConnection = false;
         switch (stage.getCount()) {
-            case 2:  // Before the replica set is added as a shard.
+            case 2: // Before the replica set is added as a shard.
                 db = replSetDb;
                 adminDb = replSetAdminDb;
                 isReplSetConnection = true;
                 break;
-            case 1:  // After the replica set has been added as a shard.
+            case 1: // After the replica set has been added as a shard.
                 // TODO SERVER-67835 When replica set endpoint is enabled, change it so that
                 // this stage randomly selects between mongos and replica set connection. Also put
                 // this code inside withDbs() so that the connection can possibly change for every
@@ -275,7 +283,7 @@ const checkDDLThread = function(mongosHost, replSetHost, countdownLatch, stage, 
                 db = mongosDb;
                 adminDb = mongosAdminDb;
                 break;
-            case 0:  // Right before the second shard is added.
+            case 0: // Right before the second shard is added.
                 db = mongosDb;
                 adminDb = mongosAdminDb;
                 break;
@@ -286,7 +294,7 @@ const checkDDLThread = function(mongosHost, replSetHost, countdownLatch, stage, 
         };
 
         checkDDLOps(withDbs, isReplSetConnection);
-        sleep(1);  // milliseconds.
+        sleep(1); // milliseconds.
     }
 };
 
@@ -297,8 +305,7 @@ const st = new ShardingTest({
 });
 
 // TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(),
-                                        "ShardAuthoritativeDbMetadataDDL")) {
+if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
     st.stop();
     quit();
 }
@@ -318,55 +325,57 @@ jsTestLog("Starting background CRUD operations.");
 const crudStage = new CountDownLatch(2);
 
 const crudStopLatchUnsharded = new CountDownLatch(1);
-let crudThreadUnsharded = new Thread(checkCRUDThread,
-                                     st.s.host,
-                                     replShard.getURL(),
-                                     unshardedNs,
-                                     _id,
-                                     crudStopLatchUnsharded,
-                                     crudStage,
-                                     checkBasicCRUD);
+let crudThreadUnsharded = new Thread(
+    checkCRUDThread,
+    st.s.host,
+    replShard.getURL(),
+    unshardedNs,
+    _id,
+    crudStopLatchUnsharded,
+    crudStage,
+    checkBasicCRUD,
+);
 crudThreadUnsharded.start();
 
 const crudStopLatchSharded = new CountDownLatch(1);
-let crudThreadSharded = new Thread(checkCRUDThread,
-                                   st.s.host,
-                                   replShard.getURL(),
-                                   shardedNs,
-                                   _id,
-                                   crudStopLatchSharded,
-                                   crudStage,
-                                   checkBasicCRUD);
+let crudThreadSharded = new Thread(
+    checkCRUDThread,
+    st.s.host,
+    replShard.getURL(),
+    shardedNs,
+    _id,
+    crudStopLatchSharded,
+    crudStage,
+    checkBasicCRUD,
+);
 crudThreadSharded.start();
 
 jsTestLog("Stating background DDL operations.");
 // Used to signal to the threads whether to run operations on the replica set, mongos, or both.
 const ddlStage = new CountDownLatch(2);
 const ddlStopLatch = new CountDownLatch(1);
-let ddlThread =
-    new Thread(checkDDLThread, st.s.host, replShard.getURL(), ddlStopLatch, ddlStage, checkDDLOps);
+let ddlThread = new Thread(checkDDLThread, st.s.host, replShard.getURL(), ddlStopLatch, ddlStage, checkDDLOps);
 ddlThread.start();
 
 jsTestLog("Restarting secondaries with --shardsvr.");
 const secondaries = replShard.getSecondaries();
-secondaries.forEach(secondary => {
-    replShard.restart(secondary, {shardsvr: ''});
+secondaries.forEach((secondary) => {
+    replShard.restart(secondary, {shardsvr: ""});
 });
 
 jsTestLog("Restarting primary with --shardsvr and waiting for new primary.");
 let primary = replShard.getPrimary();
 primary.adminCommand({replSetStepDown: 600});
-replShard.restart(primary, {shardsvr: ''});
+replShard.restart(primary, {shardsvr: ""});
 replShard.awaitNodesAgreeOnPrimary();
 
 jsTestLog("Adding replica set as shard.");
 assert.commandWorked(st.s.adminCommand({addShard: replShard.getURL()}));
 
-jsTestLog(
-    "Simulating rolling connection string change by starting background CRUD and DDL ops on mongos.");
+jsTestLog("Simulating rolling connection string change by starting background CRUD and DDL ops on mongos.");
 ddlStage.countDown();
 crudStage.countDown();
-sleep(3000);  // Let the background CRUD and DDL operations run for a while.
+sleep(3000); // Let the background CRUD and DDL operations run for a while.
 
 jsTestLog("Sharding a collection and creating chunks.");
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -381,22 +390,20 @@ ddlStage.countDown();
 crudStage.countDown();
 
 jsTestLog("Adding a second shard.");
-const newShard =
-    new ReplSetTest({name: "toRemoveLater", nodes: NUM_NODES, nodeOptions: {shardsvr: ""}});
+const newShard = new ReplSetTest({name: "toRemoveLater", nodes: NUM_NODES, nodeOptions: {shardsvr: ""}});
 newShard.startSet();
 newShard.initiate();
-assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: 'toRemoveLater'}));
+assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL(), name: "toRemoveLater"}));
 
 jsTestLog("Moving chunks to second shard.");
 for (let x = 0; x < 2; x++) {
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: shardedNs, find: {_id: x}, to: 'toRemoveLater'}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: shardedNs, find: {_id: x}, to: "toRemoveLater"}));
 }
 
 jsTestLog("Removing second shard.");
 // Start the balancer to start draining the chunks.
 st.startBalancer();
-removeShard(st, 'toRemoveLater');
+removeShard(st, "toRemoveLater");
 newShard.stopSet();
 
 jsTestLog("Joining background CRUD ops thread.");
@@ -412,13 +419,13 @@ ddlThread.join();
 
 st.stop();
 
-jsTest.log('Restarting repl w/o shardsvr');
+jsTest.log("Restarting repl w/o shardsvr");
 // Rolling restart is not needed because converting back to replica set can have downtime.
-replShard.nodes.forEach(function(node) {
+replShard.nodes.forEach(function (node) {
     delete node.fullOptions.shardsvr;
 });
 
-replShard.nodes.forEach(node => replShard.restart(node));
+replShard.nodes.forEach((node) => replShard.restart(node));
 replShard.awaitNodesAgreeOnPrimary();
 
 priConn = replShard.getPrimary();

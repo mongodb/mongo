@@ -9,7 +9,7 @@
 import {
     assertHasConnPoolStats,
     checkHostHasNoOpenConnections,
-    checkHostHasOpenConnections
+    checkHostHasOpenConnections,
 } from "jstests/libs/conn_pool_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -26,10 +26,14 @@ let currentCheckNumber = 0;
 
 mongos.adminCommand({multicast: {ping: 0}});
 
-const cfg = primary.getDB('local').system.replset.findOne();
+const cfg = primary.getDB("local").system.replset.findOne();
 const memberHost = cfg.members[2].host;
 currentCheckNumber = assertHasConnPoolStats(
-    mongos, [memberHost], {checkStatsFunc: checkHostHasOpenConnections}, currentCheckNumber);
+    mongos,
+    [memberHost],
+    {checkStatsFunc: checkHostHasOpenConnections},
+    currentCheckNumber,
+);
 
 const removedMember = cfg.members.splice(2, 1);
 assert.eq(removedMember[0].host, memberHost);
@@ -38,12 +42,20 @@ cfg.version++;
 jsTestLog("Reconfiguring to omit " + memberHost);
 assert.commandWorked(primary.adminCommand({replSetReconfig: cfg}));
 currentCheckNumber = assertHasConnPoolStats(
-    mongos, [memberHost], {checkStatsFunc: checkHostHasOpenConnections}, currentCheckNumber);
+    mongos,
+    [memberHost],
+    {checkStatsFunc: checkHostHasOpenConnections},
+    currentCheckNumber,
+);
 
 jsTestLog("Dropping connections to " + memberHost);
 assert.commandWorked(mongos.adminCommand({dropConnections: 1, hostAndPort: [memberHost]}));
 currentCheckNumber = assertHasConnPoolStats(
-    mongos, [memberHost], {checkStatsFunc: checkHostHasNoOpenConnections}, currentCheckNumber);
+    mongos,
+    [memberHost],
+    {checkStatsFunc: checkHostHasNoOpenConnections},
+    currentCheckNumber,
+);
 
 // need to re-add removed node or test complain about the replset config
 cfg.members.push(removedMember[0]);

@@ -3,18 +3,22 @@
 assert.throws(
     () => MongoRunner.runMongod({timeZoneInfo: "jstests/libs/config_files/bad_timezone_info"}),
     [],
-    "expected launching mongod with bad timezone rules to fail");
+    "expected launching mongod with bad timezone rules to fail",
+);
 assert.neq(-1, rawMongoProgramOutput(".*").search(/Fatal assertion.*40475/));
 
 // Test that a non-existent directory causes startup to fail.
 assert.throws(
     () => MongoRunner.runMongod({timeZoneInfo: "jstests/libs/config_files/missing_directory"}),
     [],
-    "expected launching mongod with bad timezone rules to fail");
+    "expected launching mongod with bad timezone rules to fail",
+);
 
 // Look for either old or new error message
-assert(rawMongoProgramOutput(".*").includes("Error creating service context") ||
-       rawMongoProgramOutput(".*").includes("Failed to create service context"));
+assert(
+    rawMongoProgramOutput(".*").includes("Error creating service context") ||
+        rawMongoProgramOutput(".*").includes("Failed to create service context"),
+);
 
 function testWithGoodTimeZoneDir(tz_good_path) {
     let conn = MongoRunner.runMongod({timeZoneInfo: tz_good_path});
@@ -24,16 +28,15 @@ function testWithGoodTimeZoneDir(tz_good_path) {
     const testDB = conn.getDB("test");
     const coll = testDB.parse_zone_info;
     assert.commandWorked(coll.insert({x: new Date()}));
-    assert.doesNotThrow(
-        () => coll.aggregate([{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "GMT"}}}}]));
-    assert.doesNotThrow(
-        () => coll.aggregate(
-            [{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "America/Sao_Paulo"}}}}]));
+    assert.doesNotThrow(() => coll.aggregate([{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "GMT"}}}}]));
+    assert.doesNotThrow(() =>
+        coll.aggregate([{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "America/Sao_Paulo"}}}}]),
+    );
 
     // Confirm that attempt to use a non-existent timezone in an expression fails.
-    const err =
-        assert.throws(() => coll.aggregate(
-                          [{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "Unknown"}}}}]));
+    const err = assert.throws(() =>
+        coll.aggregate([{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "Unknown"}}}}]),
+    );
     assert.eq(err.code, 40485);
 
     // Test some dates which specifically exercise slim-format timezone files. The test-case below
@@ -52,8 +55,8 @@ function testWithGoodTimeZoneDir(tz_good_path) {
                 "hour": 15,
                 "minute": 49,
                 "second": 47,
-                "millisecond": 634
-            }
+                "millisecond": 634,
+            },
         },
         {
             test_date: "2020-12-14T12:00:00Z",
@@ -64,9 +67,9 @@ function testWithGoodTimeZoneDir(tz_good_path) {
                 "hour": 7,
                 "minute": 0,
                 "second": 0,
-                "millisecond": 0
-            }
-        }
+                "millisecond": 0,
+            },
+        },
     ];
 
     for (let i = 0; i < test_dates.length; ++i) {
@@ -74,11 +77,8 @@ function testWithGoodTimeZoneDir(tz_good_path) {
     }
 
     let res = corner_coll
-                  .aggregate([
-                      {$set: {x_parts: {$dateToParts: {date: "$x", timezone: "America/New_York"}}}},
-                      {$sort: {_id: 1}}
-                  ])
-                  .toArray();
+        .aggregate([{$set: {x_parts: {$dateToParts: {date: "$x", timezone: "America/New_York"}}}}, {$sort: {_id: 1}}])
+        .toArray();
     for (let i = 0; i < test_dates.length; ++i) {
         assert.eq(res[i].x_parts, test_dates[i].test_date_parts);
     }

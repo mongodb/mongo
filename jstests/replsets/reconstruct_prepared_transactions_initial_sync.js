@@ -25,7 +25,7 @@ const config = replTest.getReplSetConfig();
 // Increase the election timeout so that we do not accidentally trigger an election while the
 // secondary is restarting.
 config.settings = {
-    "electionTimeoutMillis": 12 * 60 * 60 * 1000
+    "electionTimeoutMillis": 12 * 60 * 60 * 1000,
 };
 replTest.initiate(config);
 
@@ -33,8 +33,9 @@ const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 
 // The default WC is majority and this test can't satisfy majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 const dbName = "test";
 const collName = "reconstruct_prepared_transactions_initial_sync";
@@ -95,19 +96,24 @@ secondary = replTest.start(
     {
         startClean: true,
         setParameter: {
-            'failpoint.initialSyncHangDuringCollectionClone': tojson(
-                {mode: 'alwaysOn', data: {namespace: testColl.getFullName(), numDocsToClone: 3}}),
-            'numInitialSyncAttempts': 1
-        }
+            "failpoint.initialSyncHangDuringCollectionClone": tojson({
+                mode: "alwaysOn",
+                data: {namespace: testColl.getFullName(), numDocsToClone: 3},
+            }),
+            "numInitialSyncAttempts": 1,
+        },
     },
-    true /* wait */);
+    true /* wait */,
+);
 
 // Wait for failpoint to be reached so we know that collection cloning is paused.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangDuringCollectionClone",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangDuringCollectionClone",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Running operations while collection cloning is paused");
 
@@ -136,18 +142,19 @@ jsTestLog("Preparing the fifth transaction");
 // Prepare a transaction that would fail validation while collection cloning is paused so that its
 // oplog entry must be applied during the oplog application phase of initial sync.
 session5.startTransaction();
-assert.commandWorked(sessionDB5.runCommand({
-    update: collName,
-    updates: [{q: {_id: 5}, u: {_id: 5, a: 1, b: 2}}],
-    bypassDocumentValidation: true
-}));
+assert.commandWorked(
+    sessionDB5.runCommand({
+        update: collName,
+        updates: [{q: {_id: 5}, u: {_id: 5, a: 1, b: 2}}],
+        bypassDocumentValidation: true,
+    }),
+);
 const prepareTimestamp5 = PrepareHelpers.prepareTransaction(session5, {w: 1});
 
 jsTestLog("Resuming initial sync");
 
 // Resume initial sync.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "initialSyncHangDuringCollectionClone", mode: "off"}));
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes();
@@ -224,29 +231,33 @@ assert.eq(testColl.find({_id: 2}).toArray(), [{_id: 2}]);
 // Make sure that another write on the same document from the second transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand(
-        {update: collName, updates: [{q: {_id: 2}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    testDB.runCommand({update: collName, updates: [{q: {_id: 2}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Make sure that we cannot add other operations to the second transaction since it is prepared.
-assert.commandFailedWithCode(sessionDB2.runCommand({
-    insert: collName,
-    documents: [{_id: 6}],
-    txnNumber: NumberLong(txnNumber2),
-    stmtId: NumberInt(2),
-    autocommit: false
-}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB2.runCommand({
+        insert: collName,
+        documents: [{_id: 6}],
+        txnNumber: NumberLong(txnNumber2),
+        stmtId: NumberInt(2),
+        autocommit: false,
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Committing the second transaction");
 
 // Make sure we can successfully commit the second transaction after recovery.
-assert.commandWorked(sessionDB2.adminCommand({
-    commitTransaction: 1,
-    commitTimestamp: prepareTimestamp2,
-    txnNumber: NumberLong(txnNumber2),
-    autocommit: false
-}));
+assert.commandWorked(
+    sessionDB2.adminCommand({
+        commitTransaction: 1,
+        commitTimestamp: prepareTimestamp2,
+        txnNumber: NumberLong(txnNumber2),
+        autocommit: false,
+    }),
+);
 assert.eq(testColl.find({_id: 2}).toArray(), [{_id: 2, a: 1}]);
 
 jsTestLog("Attempting to run another transaction");
@@ -273,25 +284,28 @@ assert.eq(testColl.find({_id: 3}).toArray(), [{_id: 3}]);
 // Make sure that another write on the same document from the third transaction causes a write
 // conflict.
 assert.commandFailedWithCode(
-    testDB.runCommand(
-        {update: collName, updates: [{q: {_id: 3}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
-    ErrorCodes.MaxTimeMSExpired);
+    testDB.runCommand({update: collName, updates: [{q: {_id: 3}, u: {$set: {a: 2}}}], maxTimeMS: 5 * 1000}),
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 // Make sure that we cannot add other operations to the third transaction since it is prepared.
-assert.commandFailedWithCode(sessionDB3.runCommand({
-    insert: collName,
-    documents: [{_id: 6}],
-    txnNumber: NumberLong(txnNumber3),
-    stmtId: NumberInt(2),
-    autocommit: false
-}),
-                             ErrorCodes.PreparedTransactionInProgress);
+assert.commandFailedWithCode(
+    sessionDB3.runCommand({
+        insert: collName,
+        documents: [{_id: 6}],
+        txnNumber: NumberLong(txnNumber3),
+        stmtId: NumberInt(2),
+        autocommit: false,
+    }),
+    ErrorCodes.PreparedTransactionInProgress,
+);
 
 jsTestLog("Aborting the third transaction");
 
 // Make sure we can successfully abort the third transaction after recovery.
-assert.commandWorked(sessionDB3.adminCommand(
-    {abortTransaction: 1, txnNumber: NumberLong(txnNumber3), autocommit: false}));
+assert.commandWorked(
+    sessionDB3.adminCommand({abortTransaction: 1, txnNumber: NumberLong(txnNumber3), autocommit: false}),
+);
 assert.eq(testColl.find({_id: 3}).toArray(), [{_id: 3}]);
 
 replTest.stopSet();

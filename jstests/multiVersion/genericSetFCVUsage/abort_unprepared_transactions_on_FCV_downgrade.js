@@ -30,22 +30,21 @@ function runTest(downgradeFCV, succeedDowngrade) {
         assert.commandWorked(sessionDB[collName].insert({_id: "insert-1"}));
 
         jsTestLog("Attempt to drop the collection. This should fail due to the open transaction.");
-        assert.commandFailedWithCode(testDB.runCommand({drop: collName, maxTimeMS: 1000}),
-                                     ErrorCodes.MaxTimeMSExpired);
+        assert.commandFailedWithCode(testDB.runCommand({drop: collName, maxTimeMS: 1000}), ErrorCodes.MaxTimeMSExpired);
 
         if (succeedDowngrade) {
             jsTestLog("Downgrade the featureCompatibilityVersion.");
-            assert.commandWorked(
-                testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
+            assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}));
             checkFCV(adminDB, downgradeFCV);
         } else {
             jsTestLog(
-                "Downgrade the featureCompatibilityVersion but fail after transitioning to the intermediary downgrading state.");
-            assert.commandWorked(
-                primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
+                "Downgrade the featureCompatibilityVersion but fail after transitioning to the intermediary downgrading state.",
+            );
+            assert.commandWorked(primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
             assert.commandFailedWithCode(
                 testDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV, confirm: true}),
-                549181);
+                549181,
+            );
             checkFCV(adminDB, downgradeFCV, downgradeFCV);
         }
 
@@ -53,14 +52,12 @@ function runTest(downgradeFCV, succeedDowngrade) {
         assert.commandWorked(testDB.runCommand({drop: collName}));
 
         jsTestLog("Test that committing the transaction fails, since it was aborted.");
-        assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     } finally {
         // We can't upgrade from "downgrading to lastContinuous" -> latest.
         if (succeedDowngrade || downgradeFCV == lastLTSFCV) {
             jsTestLog("Restore the original featureCompatibilityVersion.");
-            assert.commandWorked(
-                testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+            assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
             checkFCV(adminDB, latestFCV);
         }
     }

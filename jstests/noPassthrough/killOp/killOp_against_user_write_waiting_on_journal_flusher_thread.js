@@ -17,11 +17,11 @@ rst.startSet({journalCommitInterval: 500});
 rst.initiate();
 
 const primary = rst.getPrimary();
-const testDB = primary.getDB('test');
-const testColl = testDB.getCollection('t');
+const testDB = primary.getDB("test");
+const testColl = testDB.getCollection("t");
 assert.commandWorked(testDB.createCollection(testColl.getName()));
 
-primary.setLogLevel(1, 'storage');
+primary.setLogLevel(1, "storage");
 
 // Pause the JournalFlusher thread right before it flushes. While the thread is blocked on the
 // fail point, we start a user write with an majority write concern that will block.
@@ -33,20 +33,28 @@ try {
     journalFlusherFP.wait();
 
     runInsert = startParallelShell(
-        funWithArgs((collName, doc) => {
-            jsTestLog('Inserting document ' + tojson(doc) + ' into ' + collName);
-            const coll = db.getMongo().getCollection(collName);
-            const result = assert.commandFailedWithCode(
-                coll.insert(doc, {writeConcern: {w: "majority", j: true}}), ErrorCodes.Interrupted);
-            jsTestLog('Insert operation failed (as expected) with result: ' + tojson(result));
-        }, testColl.getFullName(), doc), primary.port);
+        funWithArgs(
+            (collName, doc) => {
+                jsTestLog("Inserting document " + tojson(doc) + " into " + collName);
+                const coll = db.getMongo().getCollection(collName);
+                const result = assert.commandFailedWithCode(
+                    coll.insert(doc, {writeConcern: {w: "majority", j: true}}),
+                    ErrorCodes.Interrupted,
+                );
+                jsTestLog("Insert operation failed (as expected) with result: " + tojson(result));
+            },
+            testColl.getFullName(),
+            doc,
+        ),
+        primary.port,
+    );
 
     // Find the insert thread's opID.
-    jsTestLog('Looking for insert operation in currentOp results.');
+    jsTestLog("Looking for insert operation in currentOp results.");
     let op;
     assert.soon(() => {
         const currentOpResults = testDB.currentOp({
-            op: 'insert',
+            op: "insert",
             ns: testColl.getFullName(),
             connectionId: {$exists: true},
         });
@@ -57,25 +65,25 @@ try {
         }
         return false;
     });
-    jsTestLog('Found insert operation in currentOp results: ' + tojson(op));
+    jsTestLog("Found insert operation in currentOp results: " + tojson(op));
 
     // Try to kill the JournalFlusher thread.
-    jsTestLog('Interrupting insert operation with opId: ' + op.opid);
+    jsTestLog("Interrupting insert operation with opId: " + op.opid);
     assert.commandWorked(testDB.killOp(op.opid));
 
     // Wait for the insert operation to go away to confirm that the journal flusher wait
     // was interrupted successfully.
-    jsTestLog('Waiting for interrupted insert operation to complete.');
+    jsTestLog("Waiting for interrupted insert operation to complete.");
     assert.soon(() => {
         const currentOpResults = testDB.currentOp({
-            op: 'insert',
+            op: "insert",
             ns: testColl.getFullName(),
             connectionId: {$exists: true},
         });
         jsTestLog("currentOp results: " + tojson(currentOpResults));
         return currentOpResults.inprog.length == 0;
     });
-    jsTestLog('Interrupted insert operation is gone. Test successful.');
+    jsTestLog("Interrupted insert operation is gone. Test successful.");
 } finally {
     // Ensure the failpoint is turned off so the stepdown command waits for a data flush.
     journalFlusherFP.off();

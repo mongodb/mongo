@@ -6,11 +6,7 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 // ]
-import {
-    hasRejectedPlans,
-    isQueryPlan,
-    planHasStage,
-} from "jstests/libs/query/analyze_plan.js";
+import {hasRejectedPlans, isQueryPlan, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.use_query_sort;
 coll.drop();
@@ -72,8 +68,7 @@ assertHasNonBlockingQuerySort([{$match: {_id: {$gte: 0}}}, {$sort: {x: 1}}], tru
 
 // Verify that meta-sort on "textScore" can be pushed down into the query layer.
 assert.commandWorked(coll.createIndex({x: "text"}));
-assertHasBlockingQuerySort(
-    [{$match: {$text: {$search: "test"}}}, {$sort: {key: {$meta: "textScore"}}}], false);
+assertHasBlockingQuerySort([{$match: {$text: {$search: "test"}}}, {$sort: {key: {$meta: "textScore"}}}], false);
 
 // Verify that meta-sort on "randVal" can be pushed into the query layer. Although "randVal" $meta
 // sort is currently a supported way to randomize the order of the data, it shouldn't preclude

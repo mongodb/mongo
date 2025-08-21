@@ -14,25 +14,39 @@ const replSet = new ReplSetTest({name: "clustered_capped_collections", nodes: 1}
 replSet.startSet({setParameter: {ttlMonitorSleepSecs: 1, supportArbitraryClusterKeyIndex: true}});
 replSet.initiate();
 
-const replicatedDB = replSet.getPrimary().getDB('replicated');
-const nonReplicatedDB = replSet.getPrimary().getDB('local');
-const collName = 'clustered_collection';
+const replicatedDB = replSet.getPrimary().getDB("replicated");
+const nonReplicatedDB = replSet.getPrimary().getDB("local");
+const collName = "clustered_collection";
 const replicatedColl = replicatedDB[collName];
 const nonReplicatedColl = nonReplicatedDB[collName];
 
 replicatedColl.drop();
 nonReplicatedColl.drop();
 
-ClusteredCappedUtils.testClusteredCappedCollectionWithTTL(nonReplicatedDB, collName, 'ts');
-ClusteredCappedUtils.testClusteredTailableCursorCreation(
-    nonReplicatedDB, collName, 'ts', false /* isReplicated */);
+ClusteredCappedUtils.testClusteredCappedCollectionWithTTL(nonReplicatedDB, collName, "ts");
+ClusteredCappedUtils.testClusteredTailableCursorCreation(nonReplicatedDB, collName, "ts", false /* isReplicated */);
 for (let awaitData of [false, true]) {
     ClusteredCappedUtils.testClusteredTailableCursorWithTTL(
-        nonReplicatedDB, collName, 'ts', false /* isReplicated */, awaitData);
+        nonReplicatedDB,
+        collName,
+        "ts",
+        false /* isReplicated */,
+        awaitData,
+    );
     ClusteredCappedUtils.testClusteredTailableCursorCappedPositionLostWithTTL(
-        nonReplicatedDB, collName, 'ts', false /* isReplicated */, awaitData);
+        nonReplicatedDB,
+        collName,
+        "ts",
+        false /* isReplicated */,
+        awaitData,
+    );
     ClusteredCappedUtils.testClusteredTailableCursorOutOfOrderInsertion(
-        nonReplicatedDB, collName, 'ts', false /* isReplicated */, awaitData);
+        nonReplicatedDB,
+        collName,
+        "ts",
+        false /* isReplicated */,
+        awaitData,
+    );
 }
 
 replSet.stopSet();

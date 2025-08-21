@@ -15,7 +15,7 @@ function assertEqualObj(lhs, rhs, keysToIgnore) {
         }
 
         const value = rhs[key];
-        if (typeof value === 'object') {
+        if (typeof value === "object") {
             assertEqualObj(lhs[key], rhs[key], keysToIgnore);
         } else {
             assert.eq(lhs[key], rhs[key], {key, actual: lhs, expected: rhs});
@@ -29,10 +29,8 @@ const st = new ShardingTest({
     // phase to fail with a TransactionTooLargeForCache error. To make the test setup work reliably,
     // disable the cluster parameter refresher since it periodically runs internal transactions
     // against the the config server.
-    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
-    configOptions:
-        {setParameter:
-             {'reshardingCriticalSectionTimeoutMillis': 24 * 60 * 60 * 1000 /* 1 day */}}
+    mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
+    configOptions: {setParameter: {"reshardingCriticalSectionTimeoutMillis": 24 * 60 * 60 * 1000 /* 1 day */}},
 });
 const configRSPrimary = st.configRS.getPrimary();
 
@@ -45,8 +43,7 @@ const collectionsColl = configDB.getCollection("collections");
 const chunksColl = configDB.getCollection("chunks");
 const tagsColl = configDB.getCollection("tags");
 
-assert.commandWorked(
-    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {skey: "hashed"}}));
 
 const zoneName = "testZone";
@@ -55,10 +52,11 @@ assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zon
 const oldZone = {
     tag: zoneName,
     min: {skey: NumberLong("4470791281878691347")},
-    max: {skey: NumberLong("7766103514953448109")}
+    max: {skey: NumberLong("7766103514953448109")},
 };
-assert.commandWorked(st.s.adminCommand(
-    {updateZoneKeyRange: ns, min: oldZone.min, max: oldZone.max, zone: oldZone.tag}));
+assert.commandWorked(
+    st.s.adminCommand({updateZoneKeyRange: ns, min: oldZone.min, max: oldZone.max, zone: oldZone.tag}),
+);
 
 const collBefore = collectionsColl.findOne({_id: ns});
 assert.neq(collBefore, null);
@@ -72,14 +70,14 @@ const reshardingFunc = (mongosHost, ns, zoneName) => {
     const newZone = {
         tag: zoneName,
         min: {skey: NumberLong("4470791281878691346")},
-        max: {skey: NumberLong("7766103514953448108")}
+        max: {skey: NumberLong("7766103514953448108")},
     };
     jsTest.log("Start resharding");
     const reshardingRes = mongos.adminCommand({
         reshardCollection: ns,
         key: {skey: 1},
         unique: false,
-        collation: {locale: 'simple'},
+        collation: {locale: "simple"},
         zones: [{zone: newZone.tag, min: newZone.min, max: newZone.max}],
         numInitialChunks: 2,
     });
@@ -88,20 +86,21 @@ const reshardingFunc = (mongosHost, ns, zoneName) => {
 };
 let reshardingThread = new Thread(reshardingFunc, st.s.host, ns, zoneName);
 
-const persistFp =
-    configureFailPoint(configRSPrimary, "reshardingPauseCoordinatorBeforeDecisionPersisted");
+const persistFp = configureFailPoint(configRSPrimary, "reshardingPauseCoordinatorBeforeDecisionPersisted");
 reshardingThread.start();
 persistFp.wait();
 
-const commitFp = configureFailPoint(configRSPrimary,
-                                    "failCommand",
-                                    {
-                                        failCommands: ["commitTransaction"],
-                                        failInternalCommands: true,
-                                        failLocalClients: true,
-                                        errorCode: ErrorCodes.TransactionTooLargeForCache,
-                                    },
-                                    {times: 1});
+const commitFp = configureFailPoint(
+    configRSPrimary,
+    "failCommand",
+    {
+        failCommands: ["commitTransaction"],
+        failInternalCommands: true,
+        failLocalClients: true,
+        errorCode: ErrorCodes.TransactionTooLargeForCache,
+    },
+    {times: 1},
+);
 persistFp.off();
 commitFp.wait();
 commitFp.off();
@@ -114,8 +113,7 @@ assert.neq(collAfter, null);
 const chunksAfter = chunksColl.find({uuid: collAfter.uuid}).sort({lastmod: -1}).toArray();
 const tagsAfter = tagsColl.find({ns}).toArray();
 
-jsTest.log(
-    "Verify that the collection metadata remains the same since the resharding operation failed.");
+jsTest.log("Verify that the collection metadata remains the same since the resharding operation failed.");
 
 assertEqualObj(collBefore, collAfter);
 

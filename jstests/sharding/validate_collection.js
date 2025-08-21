@@ -15,8 +15,8 @@ assert(NUM_SHARDS >= 3);
 
 var st = new ShardingTest({shards: NUM_SHARDS});
 var s = st.s;
-var testDb = st.getDB('test');
-assert.commandWorked(s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
+var testDb = st.getDB("test");
+assert.commandWorked(s.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName}));
 
 function setup() {
     assert.commandWorked(testDb.test.insert({_id: 0}));
@@ -28,7 +28,7 @@ function setup() {
 }
 
 function validate(valid) {
-    var res = testDb.runCommand({validate: 'test'});
+    var res = testDb.runCommand({validate: "test"});
     assert.commandWorked(res);
     assert.eq(res.valid, valid, tojson(res));
 }
@@ -36,12 +36,12 @@ function validate(valid) {
 function setFailValidateFailPointOnShard(enabled, shard) {
     var mode;
     if (enabled) {
-        mode = 'alwaysOn';
+        mode = "alwaysOn";
     } else {
-        mode = 'off';
+        mode = "off";
     }
 
-    var res = shard.adminCommand({configureFailPoint: 'validateCmdCollectionNotValid', mode: mode});
+    var res = shard.adminCommand({configureFailPoint: "validateCmdCollectionNotValid", mode: mode});
     assert.commandWorked(res);
 }
 
@@ -51,29 +51,26 @@ setup();
 validate(true);
 
 // 2. Sharded collection in a DB.
-assert.commandWorked(s.adminCommand({shardCollection: 'test.test', key: {_id: 1}}));
-assert.commandWorked(s.adminCommand({shardCollection: 'test.dummy', key: {_id: 1}}));
+assert.commandWorked(s.adminCommand({shardCollection: "test.test", key: {_id: 1}}));
+assert.commandWorked(s.adminCommand({shardCollection: "test.dummy", key: {_id: 1}}));
 validate(true);
 
 // 3. Sharded collection with chunks on two shards.
-assert.commandWorked(s.adminCommand({split: 'test.test', middle: {_id: 1}}));
-assert.commandWorked(
-    testDb.adminCommand({moveChunk: 'test.test', find: {_id: 1}, to: st.shard1.shardName}));
+assert.commandWorked(s.adminCommand({split: "test.test", middle: {_id: 1}}));
+assert.commandWorked(testDb.adminCommand({moveChunk: "test.test", find: {_id: 1}, to: st.shard1.shardName}));
 // We move the dummy database to NUM_SHARDS shards so that testDb will exist on all NUM_SHARDS
 // shards but the testDb.test collection will only exist on the first two shards. Prior to
 // SERVER-22588, this scenario would cause validation to fail.
-assert.commandWorked(s.adminCommand({split: 'test.dummy', middle: {_id: 1}}));
-assert.commandWorked(s.adminCommand({split: 'test.dummy', middle: {_id: 2}}));
-assert.commandWorked(
-    testDb.adminCommand({moveChunk: 'test.dummy', find: {_id: 1}, to: st.shard1.shardName}));
-assert.commandWorked(
-    testDb.adminCommand({moveChunk: 'test.dummy', find: {_id: 2}, to: st.shard2.shardName}));
-assert.eq(st.onNumShards('test', 'test'), 2);
-assert.eq(st.onNumShards('test', 'dummy'), NUM_SHARDS);
+assert.commandWorked(s.adminCommand({split: "test.dummy", middle: {_id: 1}}));
+assert.commandWorked(s.adminCommand({split: "test.dummy", middle: {_id: 2}}));
+assert.commandWorked(testDb.adminCommand({moveChunk: "test.dummy", find: {_id: 1}, to: st.shard1.shardName}));
+assert.commandWorked(testDb.adminCommand({moveChunk: "test.dummy", find: {_id: 2}, to: st.shard2.shardName}));
+assert.eq(st.onNumShards("test", "test"), 2);
+assert.eq(st.onNumShards("test", "dummy"), NUM_SHARDS);
 validate(true);
 
 // 4. Fail validation on one of the shards.
-var primaryShard = st.getPrimaryShard('test');
+var primaryShard = st.getPrimaryShard("test");
 setFailValidateFailPointOnShard(true, primaryShard);
 validate(false);
 setFailValidateFailPointOnShard(false, primaryShard);

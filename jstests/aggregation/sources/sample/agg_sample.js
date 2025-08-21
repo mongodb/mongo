@@ -14,7 +14,7 @@ for (let i = 0; i < nItems; i++) {
     assert.commandWorked(coll.insert({_id: i}));
 }
 
-[1, nItems, nItems + 1].forEach(function(size) {
+[1, nItems, nItems + 1].forEach(function (size) {
     const results = coll.aggregate([{$sample: {size: size}}]).toArray();
     assert.eq(results.length, Math.min(size, nItems));
 });
@@ -24,11 +24,21 @@ const results = coll.aggregate([{$sample: {size: nItems}}, {$sample: {size: 1}}]
 assert.eq(results.length, 1);
 
 // Invalid options.
-assertErrorCode(coll, [{$sample: 'string'}], 28745);
-assertErrorCode(coll, [{$sample: {size: 'string'}}], 28746);
+assertErrorCode(coll, [{$sample: "string"}], 28745);
+assertErrorCode(coll, [{$sample: {size: "string"}}], 28746);
 assertErrorCode(coll, [{$sample: {size: -1}}], 28747);
 assertErrorCode(coll, [{$sample: {unknownOpt: true}}], 28748);
-assertErrorCode(coll, [{$sample: {/* no size */}}], 28749);
+assertErrorCode(
+    coll,
+    [
+        {
+            $sample: {
+                /* no size */
+            },
+        },
+    ],
+    28749,
+);
 
 // TODO(SERVER-94154): Remove version check here.
 const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});

@@ -7,16 +7,12 @@
  * ]
  */
 
-import {
-    getRandomShardName,
-    getShardNames,
-    setupDbName
-} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {getRandomShardName, getShardNames, setupDbName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 const allShardNames = getShardNames(db);
 
 function checkDbNameExistenceOnConfigCatalog(dbName, shouldExist, expectedShardId) {
-    const matches = db.getSiblingDB('config').databases.find({_id: dbName}).toArray();
+    const matches = db.getSiblingDB("config").databases.find({_id: dbName}).toArray();
     if (shouldExist) {
         assert.eq(1, matches.length);
         assert.eq(expectedShardId, matches[0].primary);
@@ -25,7 +21,7 @@ function checkDbNameExistenceOnConfigCatalog(dbName, shouldExist, expectedShardI
     }
 }
 
-jsTest.log('enableSharding on a database with a valid shard name must work');
+jsTest.log("enableSharding on a database with a valid shard name must work");
 {
     let i = 0;
     for (let shardName of allShardNames) {
@@ -35,15 +31,15 @@ jsTest.log('enableSharding on a database with a valid shard name must work');
     }
 }
 
-jsTest.log('enableSharding on a nonExisting shard name must fail');
+jsTest.log("enableSharding on a nonExisting shard name must fail");
 {
-    const dbName = setupDbName(db, 'invalidShardId');
-    const invalidShardName = allShardNames[0] + '_invalid';
+    const dbName = setupDbName(db, "invalidShardId");
+    const invalidShardName = allShardNames[0] + "_invalid";
     assert(!allShardNames.includes(invalidShardName));
     assert.commandFailed(db.adminCommand({enableSharding: dbName, primaryShard: invalidShardName}));
 }
 
-jsTest.log('enableSharding with shardId selection is idempotent');
+jsTest.log("enableSharding with shardId selection is idempotent");
 {
     let i = 0;
     for (let shardName of allShardNames) {
@@ -55,14 +51,15 @@ jsTest.log('enableSharding with shardId selection is idempotent');
     }
 }
 
-jsTest.log('enableSharding on an existing dbName fails if the chosen primary shard does not match');
+jsTest.log("enableSharding on an existing dbName fails if the chosen primary shard does not match");
 {
-    const dbName = setupDbName(db, 'primaryShardMismatch');
+    const dbName = setupDbName(db, "primaryShardMismatch");
     assert.commandWorked(db.adminCommand({enableSharding: dbName}));
     const existingPrimaryShard = db.getSiblingDB(dbName).getDatabasePrimaryShardId();
     const mismatchingShard = getRandomShardName(db, [existingPrimaryShard]);
 
     assert.commandFailedWithCode(
         db.adminCommand({enableSharding: dbName, primaryShard: mismatchingShard}),
-        ErrorCodes.NamespaceExists);
+        ErrorCodes.NamespaceExists,
+    );
 }

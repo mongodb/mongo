@@ -13,13 +13,12 @@
 import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
 
 (function testSeconds() {
-    let coll = db[jsTestName() + '_granularitySeconds'];
+    let coll = db[jsTestName() + "_granularitySeconds"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "seconds"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
     // Ensure min time is rounded down to nearest bucketRoundingSeconds (minute).
@@ -43,13 +42,12 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 })();
 
 (function testMinutes() {
-    let coll = db[jsTestName() + '_granularityMinutes'];
+    let coll = db[jsTestName() + "_granularityMinutes"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "minutes"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
     // Ensure min time is rounded down to nearest bucketRoundingSeconds (hour).
@@ -73,13 +71,12 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 })();
 
 (function testHours() {
-    let coll = db[jsTestName() + '_granularityHours'];
+    let coll = db[jsTestName() + "_granularityHours"];
     coll.drop();
 
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: 't', granularity: 'hours'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "hours"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
     // Ensure min time is rounded down to nearest bucketRoundingSeconds (day).
@@ -104,13 +101,12 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 })();
 
 (function testSecondsToMinutes() {
-    let coll = db[jsTestName() + '_granularitySecondsToMinutes'];
+    let coll = db[jsTestName() + "_granularitySecondsToMinutes"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "seconds"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
     // Ensure min time is rounded down to nearest bucketRoundingSeconds (minute).
@@ -128,8 +124,7 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
     assert.eq(buckets[0].control.min.t, buckets[0]._id.getTimestamp());
 
     // Now let's bump to minutes and make sure we get the expected behavior
-    assert.commandWorked(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
+    assert.commandWorked(db.runCommand({collMod: coll.getName(), timeseries: {granularity: "minutes"}}));
 
     // Open a new bucket and ensure min time is rounded down to nearest bucketRoundingSeconds
     // (hour).
@@ -153,13 +148,12 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 })();
 
 (function testMinutesToHours() {
-    let coll = db[jsTestName() + '_granularityMinutesToHours'];
+    let coll = db[jsTestName() + "_granularityMinutesToHours"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "minutes"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
     // Ensure min time is rounded down to nearest bucketRoundingSeconds (hour).
@@ -177,8 +171,7 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
     assert.eq(buckets[0].control.min.t, buckets[0]._id.getTimestamp());
 
     // Now let's bump to minutes and make sure we get the expected behavior
-    assert.commandWorked(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
+    assert.commandWorked(db.runCommand({collMod: coll.getName(), timeseries: {granularity: "hours"}}));
 
     // Open a new bucket and ensure min time is rounded down to nearest bucketRoundingSeconds (day).
     assert.commandWorked(coll.insert({t: ISODate("2021-06-24T20:10:14.134Z")}));

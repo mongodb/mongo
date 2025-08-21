@@ -17,8 +17,7 @@ const ns = dbName + "." + collName;
 const st = new ShardingTest({shards: 2});
 
 jsTest.log("Create a sharded collection with one chunk on each of the two shards.");
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
@@ -64,20 +63,18 @@ nRemainingDocs -= nDocs / 2 - batchSize;
 // Do getMore with the returned cursor.
 jsTest.log(
     "When no getMores are issued to the unreachable shard because mongos has loaded 'batchSize' " +
-    "docs from each shard in the initial find, getMore does not return partialResultsReturned.");
-let getMoreRes =
-    coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: batchSize});
+        "docs from each shard in the initial find, getMore does not return partialResultsReturned.",
+);
+let getMoreRes = coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: batchSize});
 assert.commandWorked(getMoreRes);
 assert.eq(batchSize, getMoreRes.cursor.nextBatch.length);
 assert.eq(undefined, getMoreRes.cursor.partialResultsReturned);
 nRemainingDocs -= batchSize;
 
-jsTest.log(
-    "When getMores are issued to the unreachable shard, getMore returns partialResultsReturned: 1");
+jsTest.log("When getMores are issued to the unreachable shard, getMore returns partialResultsReturned: 1");
 // Use batch size of nRemainingDocs + 1 so that the getMore will wait for the scheduled getMores to
 // all the shards.
-getMoreRes = coll.runCommand(
-    {getMore: findRes.cursor.id, collection: collName, batchSize: nRemainingDocs + 1});
+getMoreRes = coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: nRemainingDocs + 1});
 assert.commandWorked(getMoreRes);
 assert.eq(nRemainingDocs, getMoreRes.cursor.nextBatch.length);
 assert.eq(true, getMoreRes.cursor.partialResultsReturned);
@@ -90,37 +87,35 @@ assert.commandFailed(coll.runCommand({find: collName, allowPartialResults: false
 
 nRemainingDocs = nDocs / 2;
 
-jsTest.log(
-    "With 'allowPartialResults: true', if some shards are down, find returns partial results");
+jsTest.log("With 'allowPartialResults: true', if some shards are down, find returns partial results");
 findRes = coll.runCommand({find: collName, allowPartialResults: true, batchSize: batchSize});
 assert.commandWorked(findRes);
 assert.eq(batchSize, findRes.cursor.firstBatch.length);
 assert.eq(true, findRes.cursor.partialResultsReturned);
 nRemainingDocs -= batchSize;
 
-jsTest.log(
-    "getMore after a find that returns partial results returns partialResultsReturned: true");
-getMoreRes =
-    coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: batchSize});
+jsTest.log("getMore after a find that returns partial results returns partialResultsReturned: true");
+getMoreRes = coll.runCommand({getMore: findRes.cursor.id, collection: collName, batchSize: batchSize});
 assert.commandWorked(getMoreRes);
 assert.eq(batchSize, getMoreRes.cursor.nextBatch.length);
 assert.eq(true, getMoreRes.cursor.partialResultsReturned);
 nRemainingDocs -= batchSize;
 
-jsTest.log(
-    "Subsequent getMores should return partialResultsReturned: true regardless of the batch size.");
+jsTest.log("Subsequent getMores should return partialResultsReturned: true regardless of the batch size.");
 getMoreRes = coll.runCommand({getMore: findRes.cursor.id, collection: collName});
 assert.commandWorked(getMoreRes);
 assert.eq(nRemainingDocs, getMoreRes.cursor.nextBatch.length);
 assert.eq(true, getMoreRes.cursor.partialResultsReturned);
 
 jsTest.log("The allowPartialResults option does not currently apply to aggregation.");
-assert.commandFailedWithCode(coll.runCommand({
-    aggregate: collName,
-    pipeline: [{$project: {_id: 1}}],
-    cursor: {},
-    allowPartialResults: true
-}),
-                             [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownField]);
+assert.commandFailedWithCode(
+    coll.runCommand({
+        aggregate: collName,
+        pipeline: [{$project: {_id: 1}}],
+        cursor: {},
+        allowPartialResults: true,
+    }),
+    [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownField],
+);
 
 st.stop();

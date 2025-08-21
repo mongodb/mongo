@@ -23,10 +23,12 @@ assertDropAndRecreateCollection(db.getSiblingDB(otherDbName), otherDbCollName);
 
 // Insert a document that gets deleted as part of the transaction.
 const kDeletedDocumentId = 0;
-const insertRes = assert.commandWorked(coll.runCommand("insert", {
-    documents: [{_id: kDeletedDocumentId, a: "I was here before the transaction"}],
-    writeConcern: {w: "majority"}
-}));
+const insertRes = assert.commandWorked(
+    coll.runCommand("insert", {
+        documents: [{_id: kDeletedDocumentId, a: "I was here before the transaction"}],
+        writeConcern: {w: "majority"},
+    }),
+);
 
 // Record the clusterTime of the insert, and increment it to give the test start time.
 const testStartTime = insertRes.$clusterTime.clusterTime;
@@ -36,16 +38,15 @@ let cst = new ChangeStreamTest(db);
 let changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {}}, {$project: {"lsid.uid": 0}}],
     collection: coll,
-    doNotModifyInPassthroughs:
-        true  // A collection drop only invalidates single-collection change streams.
+    doNotModifyInPassthroughs: true, // A collection drop only invalidates single-collection change streams.
 });
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const txnOptions = {
     readConcern: {level: "snapshot"},
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 
 const session = db.getMongo().startSession(sessionOptions);
@@ -57,34 +58,38 @@ const sessionColl = sessionDb[coll.getName()];
 const sessionOtherColl = sessionDb[otherCollName];
 const sessionOtherDbColl = session.getDatabase(otherDbName)[otherDbCollName];
 
-withTxnAndAutoRetryOnMongos(session, () => {
-    // Two inserts on the main test collection.
-    assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
-    assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        // Two inserts on the main test collection.
+        assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
+        assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
 
-    // One insert on a collection that we're not watching. This should be skipped by the
-    // single-collection changestream.
-    assert.commandWorked(sessionOtherColl.insert({_id: 111, a: "Doc on other collection"}));
+        // One insert on a collection that we're not watching. This should be skipped by the
+        // single-collection changestream.
+        assert.commandWorked(sessionOtherColl.insert({_id: 111, a: "Doc on other collection"}));
 
-    // One insert on a collection in a different database. This should be skipped by the single
-    // collection and single-db changestreams.
-    assert.commandWorked(sessionOtherDbColl.insert({_id: 222, a: "Doc on other DB"}));
+        // One insert on a collection in a different database. This should be skipped by the single
+        // collection and single-db changestreams.
+        assert.commandWorked(sessionOtherDbColl.insert({_id: 222, a: "Doc on other DB"}));
 
-    assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
+        assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
 
-    assert.commandWorked(sessionColl.deleteOne({_id: kDeletedDocumentId}));
-}, txnOptions);
+        assert.commandWorked(sessionColl.deleteOne({_id: kDeletedDocumentId}));
+    },
+    txnOptions,
+);
 
 // Do applyOps on the collection that we care about. This is an "external" applyOps, though (not run
 // as part of a transaction). This checks that although this applyOps doesn't have an 'lsid' and
 // 'txnNumber', the field gets unwound and a change stream event is emitted. Skip if running in a
 // sharded passthrough, since the applyOps command does not exist on mongoS.
 if (!FixtureHelpers.isMongos(db)) {
-    assert.commandWorked(db.runCommand({
-        applyOps: [
-            {op: "i", ns: coll.getFullName(), o: {_id: 3, a: "insert from applyOps"}},
-        ]
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            applyOps: [{op: "i", ns: coll.getFullName(), o: {_id: 3, a: "insert from applyOps"}}],
+        }),
+    );
 }
 
 // Drop the collection. This will trigger an "invalidate" event at the end of the stream.
@@ -122,7 +127,7 @@ let expectedChanges = [
         operationType: "delete",
         lsid: session.getSessionId(),
         txnNumber: session.getTxnNumber_forTesting(),
-    }
+    },
 ];
 
 if (!FixtureHelpers.isMongos(db)) {
@@ -143,14 +148,13 @@ expectedChanges.push({
 //
 
 // Verify that the stream returns the expected sequence of changes.
-cst.assertNextChangesEqualWithDeploymentAwareness(
-    {cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness({cursor: changeStream, expectedChanges: expectedChanges});
 
 // Single collection change stream should also be invalidated by the drop.
 cst.assertNextChangesEqualWithDeploymentAwareness({
     cursor: changeStream,
     expectedChanges: [{operationType: "invalidate"}],
-    expectInvalidate: true
+    expectInvalidate: true,
 });
 
 //
@@ -176,10 +180,9 @@ expectedChanges.splice(2, 0, {
 // on the other collection but NOT the changes on the other DB or the manual applyOps.
 changeStream = cst.startWatchingChanges({
     pipeline: [{$changeStream: {startAtOperationTime: testStartTime}}, {$project: {"lsid.uid": 0}}],
-    collection: 1
+    collection: 1,
 });
-cst.assertNextChangesEqualWithDeploymentAwareness(
-    {cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness({cursor: changeStream, expectedChanges: expectedChanges});
 
 //
 // Test behavior of whole-cluster change streams with apply ops.
@@ -201,11 +204,10 @@ cst = new ChangeStreamTest(db.getSiblingDB("admin"));
 changeStream = cst.startWatchingChanges({
     pipeline: [
         {$changeStream: {startAtOperationTime: testStartTime, allChangesForCluster: true}},
-        {$project: {"lsid.uid": 0}}
+        {$project: {"lsid.uid": 0}},
     ],
-    collection: 1
+    collection: 1,
 });
-cst.assertNextChangesEqualWithDeploymentAwareness(
-    {cursor: changeStream, expectedChanges: expectedChanges});
+cst.assertNextChangesEqualWithDeploymentAwareness({cursor: changeStream, expectedChanges: expectedChanges});
 
 cst.cleanUp();

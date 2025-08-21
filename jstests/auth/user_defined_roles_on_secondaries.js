@@ -38,17 +38,15 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
-var name = 'user_defined_roles_on_secondaries';
+var name = "user_defined_roles_on_secondaries";
 var m0;
 
 function assertListContainsRole(list, role, msg) {
     var i;
     for (i = 0; i < list.length; ++i) {
-        if (list[i].role == role.role && list[i].db == role.db)
-            return;
+        if (list[i].role == role.role && list[i].db == role.db) return;
     }
-    doassert("Could not find value " + tojson(role) + " in " + tojson(list) +
-             (msg ? ": " + msg : ""));
+    doassert("Could not find value " + tojson(role) + " in " + tojson(list) + (msg ? ": " + msg : ""));
 }
 
 //
@@ -68,13 +66,13 @@ m0 = rstest.nodes[0];
 m0.getDB("db1").createRole({
     role: "r1",
     roles: ["read"],
-    privileges: [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}]
+    privileges: [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}],
 });
 
 m0.getDB("db1").createRole({
     role: "r2",
     roles: ["read"],
-    privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}]
+    privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}],
 });
 
 //
@@ -91,18 +89,27 @@ rstest.reInitiate();
 
 // Do a write after the node has completed initial sync.
 rstest.awaitSecondaryNodes();
-assert.commandWorked(rstest.getPrimary().getDB("db1")["aCollection"].insert(
-    {a: "afterSecondNodeAdded"}, {writeConcern: {w: 2}}));
+assert.commandWorked(
+    rstest
+        .getPrimary()
+        .getDB("db1")
+        ["aCollection"].insert({a: "afterSecondNodeAdded"}, {writeConcern: {w: 2}}),
+);
 
-rstest.getPrimary().getDB("db1").createRole({
-    role: "r3",
-    roles: ["r1", "r2"],
-    privileges: [{resource: {db: "db1", collection: "log"}, actions: ["update"]}]
-},
-                                            {w: 2});
+rstest
+    .getPrimary()
+    .getDB("db1")
+    .createRole(
+        {
+            role: "r3",
+            roles: ["r1", "r2"],
+            privileges: [{resource: {db: "db1", collection: "log"}, actions: ["update"]}],
+        },
+        {w: 2},
+    );
 
 // Verify that both members of the set see the same role graph.
-rstest.nodes.forEach(function(node) {
+rstest.nodes.forEach(function (node) {
     var role = node.getDB("db1").getRole("r3");
     assert.eq(2, role.roles.length, tojson(node));
     assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);
@@ -116,7 +123,7 @@ rstest.nodes.forEach(function(node) {
 // Verify that updating roles propagates.
 rstest.getPrimary().getDB("db1").revokeRolesFromRole("r1", ["read"], {w: 2});
 rstest.getPrimary().getDB("db1").grantRolesToRole("r1", ["dbAdmin"], {w: 2});
-rstest.nodes.forEach(function(node) {
+rstest.nodes.forEach(function (node) {
     var role = node.getDB("db1").getRole("r1");
     assert.eq(1, role.roles.length, tojson(node));
     assertListContainsRole(role.roles, {role: "dbAdmin", db: "db1"});
@@ -128,7 +135,7 @@ setLogVerbosity(rstest.nodes, {"command": {"verbosity": 2}});
 jsTestLog("Dropping role r2");
 assert.eq(true, rstest.getPrimary().getDB("db1").dropRole("r2", {w: 2}));
 assert.eq(null, rstest.getPrimary().getDB("db1").getRole("r2"));
-rstest.nodes.forEach(function(node) {
+rstest.nodes.forEach(function (node) {
     jsTestLog(`Testing node ${node}`);
     const roles = assert.commandWorked(node.getDB("db1").runCommand({rolesInfo: 1}));
     jsTestLog(`Roles: ${tojson(roles)}`);
@@ -144,78 +151,86 @@ rstest.nodes.forEach(function(node) {
 
 // Verify that applyOps commands propagate.
 // NOTE: This section of the test depends on the oplog and roles schemas.
-assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand({
-    applyOps: [
-        {op: "c", ns: "admin.$cmd", o: {create: "system.roles"}},
-        {
-            op: "i",
-            ns: "admin.system.roles",
-            o: {
-                _id: "db1.s1",
-                role: "s1",
-                db: "db1",
-                roles: [{role: "read", db: "db1"}],
-                privileges: [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}]
-            }
-        },
-        {
-            op: "i",
-            ns: "admin.system.roles",
-            o: {
-                _id: "db1.s2",
-                role: "s2",
-                db: "db1",
-                roles: [{role: "read", db: "db1"}],
-                privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}]
-            }
-        },
-        {op: "c", ns: "admin.$cmd", o: {drop: "system.roles"}},
-        {op: "c", ns: "admin.$cmd", o: {create: "system.roles"}},
-        {
-            op: "i",
-            ns: "admin.system.roles",
-            o: {
-                _id: "db1.t1",
-                role: "t1",
-                db: "db1",
-                roles: [{role: "read", db: "db1"}],
-                privileges: [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}]
-            }
-        },
-        {
-            op: "i",
-            ns: "admin.system.roles",
-            o: {
-                _id: "db1.t2",
-                role: "t2",
-                db: "db1",
-                roles: [],
-                privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}]
-            }
-        },
-        {
-            op: "i",
-            ns: "admin.system.roles",
-            o: {
-                _id: "db1.t3",
-                role: "t3",
-                db: "db1",
-                roles: [{role: "t1", db: "db1"}, {role: "t2", db: "db1"}],
-                privileges: []
-            }
-        },
-        {
-            op: "u",
-            ns: "admin.system.roles",
-            o: {$v: 2, diff: {u: {roles: [{role: "readWrite", db: "db1"}]}}},
-            o2: {_id: "db1.t2"}
-        }
-    ]
-}));
+assert.commandWorked(
+    rstest
+        .getPrimary()
+        .getDB("admin")
+        .runCommand({
+            applyOps: [
+                {op: "c", ns: "admin.$cmd", o: {create: "system.roles"}},
+                {
+                    op: "i",
+                    ns: "admin.system.roles",
+                    o: {
+                        _id: "db1.s1",
+                        role: "s1",
+                        db: "db1",
+                        roles: [{role: "read", db: "db1"}],
+                        privileges: [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}],
+                    },
+                },
+                {
+                    op: "i",
+                    ns: "admin.system.roles",
+                    o: {
+                        _id: "db1.s2",
+                        role: "s2",
+                        db: "db1",
+                        roles: [{role: "read", db: "db1"}],
+                        privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}],
+                    },
+                },
+                {op: "c", ns: "admin.$cmd", o: {drop: "system.roles"}},
+                {op: "c", ns: "admin.$cmd", o: {create: "system.roles"}},
+                {
+                    op: "i",
+                    ns: "admin.system.roles",
+                    o: {
+                        _id: "db1.t1",
+                        role: "t1",
+                        db: "db1",
+                        roles: [{role: "read", db: "db1"}],
+                        privileges: [{resource: {db: "db1", collection: "system.users"}, actions: ["find"]}],
+                    },
+                },
+                {
+                    op: "i",
+                    ns: "admin.system.roles",
+                    o: {
+                        _id: "db1.t2",
+                        role: "t2",
+                        db: "db1",
+                        roles: [],
+                        privileges: [{resource: {db: "db1", collection: "log"}, actions: ["insert"]}],
+                    },
+                },
+                {
+                    op: "i",
+                    ns: "admin.system.roles",
+                    o: {
+                        _id: "db1.t3",
+                        role: "t3",
+                        db: "db1",
+                        roles: [
+                            {role: "t1", db: "db1"},
+                            {role: "t2", db: "db1"},
+                        ],
+                        privileges: [],
+                    },
+                },
+                {
+                    op: "u",
+                    ns: "admin.system.roles",
+                    o: {$v: 2, diff: {u: {roles: [{role: "readWrite", db: "db1"}]}}},
+                    o2: {_id: "db1.t2"},
+                },
+            ],
+        }),
+);
 
 rstest.awaitReplication();
 
-rstest.nodes.forEach(function(node) {
+rstest.nodes.forEach(function (node) {
     var role = node.getDB("db1").getRole("t1");
     assert.eq(1, role.roles.length, tojson(node));
     assertListContainsRole(role.roles, {role: "read", db: "db1"}, node);
@@ -227,10 +242,14 @@ rstest.nodes.forEach(function(node) {
 
 // Verify that irrelevant index creation doesn't impair graph resolution
 assert.commandWorked(rstest.getPrimary().getDB("admin").col.save({data: 5}));
-assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand(
-    {createIndexes: "col", indexes: [{key: {data: 1}, name: "testIndex"}]}));
+assert.commandWorked(
+    rstest
+        .getPrimary()
+        .getDB("admin")
+        .runCommand({createIndexes: "col", indexes: [{key: {data: 1}, name: "testIndex"}]}),
+);
 rstest.awaitReplication();
-rstest.nodes.forEach(function(node) {
+rstest.nodes.forEach(function (node) {
     var role = node.getDB("db1").getRole("t3");
     assert.eq(4, role.inheritedRoles.length, tojson(node));
 });

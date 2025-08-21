@@ -12,10 +12,14 @@ function runRollbackOplogsTest(shouldCreateRollbackFiles) {
     const rollbackTest = new RollbackTest(jsTestName());
     const rollbackNode = rollbackTest.getPrimary();
     const secondTermPrimary = rollbackTest.getSecondary();
-    assert.commandWorked(rollbackNode.getDB("admin").adminCommand(
-        {setParameter: 1, createRollbackDataFiles: shouldCreateRollbackFiles}));
-    assert.commandWorked(secondTermPrimary.getDB("admin").adminCommand(
-        {setParameter: 1, createRollbackDataFiles: shouldCreateRollbackFiles}));
+    assert.commandWorked(
+        rollbackNode.getDB("admin").adminCommand({setParameter: 1, createRollbackDataFiles: shouldCreateRollbackFiles}),
+    );
+    assert.commandWorked(
+        secondTermPrimary
+            .getDB("admin")
+            .adminCommand({setParameter: 1, createRollbackDataFiles: shouldCreateRollbackFiles}),
+    );
 
     const dbName = "test";
     const collName = "rollbackColl";

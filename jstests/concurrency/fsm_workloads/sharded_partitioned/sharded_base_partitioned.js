@@ -25,37 +25,39 @@ import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {isMongodConfigsvr} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         partitionSize: 1,
         // We use a non-hashed shard key of { _id: 1 } so that documents reside on their expected
         // shard. The setup function creates documents with sequential numbering and gives
         // each shard its own numeric range to work with.
         shardKey: {_id: 1},
-        shardKeyField: '_id',
+        shardKeyField: "_id",
     };
 
     data.makePartition = function makePartition(ns, tid, partitionSize) {
         var partition = {ns: ns};
         partition.lower = tid * partitionSize;
-        partition.mid = (tid * partitionSize) + (partitionSize / 2);
-        partition.upper = (tid * partitionSize) + partitionSize;
+        partition.mid = tid * partitionSize + partitionSize / 2;
+        partition.upper = tid * partitionSize + partitionSize;
 
-        partition.isLowChunk = (tid === 0) ? true : false;
-        partition.isHighChunk = (tid === (this.threadCount - 1)) ? true : false;
+        partition.isLowChunk = tid === 0 ? true : false;
+        partition.isHighChunk = tid === this.threadCount - 1 ? true : false;
 
         partition.chunkLower = partition.isLowChunk ? MinKey : partition.lower;
         partition.chunkUpper = partition.isHighChunk ? MaxKey : partition.upper;
 
         // Unless only 1 thread, verify that we aren't both the high and low chunk.
         if (this.threadCount > 1) {
-            assert(!(partition.isLowChunk && partition.isHighChunk),
-                   'should not be both the high and low chunk when there is more than 1 ' +
-                       'thread:\n' + tojson(this));
+            assert(
+                !(partition.isLowChunk && partition.isHighChunk),
+                "should not be both the high and low chunk when there is more than 1 " + "thread:\n" + tojson(this),
+            );
         } else {
-            assert(partition.isLowChunk && partition.isHighChunk,
-                   'should be both the high and low chunk when there is only 1 thread:\n' +
-                       tojson(this));
+            assert(
+                partition.isLowChunk && partition.isHighChunk,
+                "should be both the high and low chunk when there is only 1 thread:\n" + tojson(this),
+            );
         }
 
         return partition;
@@ -64,16 +66,15 @@ export const $config = (function() {
     // Intended for use on config servers only.
     // Get a random chunk within this thread's partition.
     data.getRandomChunkInPartition = function getRandomChunkInPartition(collName, conn) {
-        assert(isMongodConfigsvr(conn.getDB('admin')), 'Not connected to a mongod configsvr');
-        assert(this.partition,
-               'This function must be called from workloads that partition data across threads.');
-        var coll = conn.getDB('config').chunks;
+        assert(isMongodConfigsvr(conn.getDB("admin")), "Not connected to a mongod configsvr");
+        assert(this.partition, "This function must be called from workloads that partition data across threads.");
+        var coll = conn.getDB("config").chunks;
         // We must split up these cases because MinKey and MaxKey are not fully comparable.
         // This may be due to SERVER-18341, where the Matcher returns false positives in
         // comparison predicates with MinKey/MaxKey.
         const shardKeyField = this.shardKeyField[collName] || this.shardKeyField;
-        let maxField = 'max.';
-        let minField = 'min.';
+        let maxField = "max.";
+        let minField = "min.";
 
         if (Array.isArray(shardKeyField)) {
             maxField += shardKeyField[0];
@@ -83,56 +84,49 @@ export const $config = (function() {
             minField += shardKeyField;
         }
 
-        const chunksJoinClause =
-            findChunksUtil.getChunksJoinClause(conn.getDB('config'), this.partition.ns);
+        const chunksJoinClause = findChunksUtil.getChunksJoinClause(conn.getDB("config"), this.partition.ns);
         if (this.partition.isLowChunk && this.partition.isHighChunk) {
-            return coll
-                .aggregate([
-                    {$match: chunksJoinClause},
-                    {$sample: {size: 1}},
-                ])
-                .toArray()[0];
+            return coll.aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}]).toArray()[0];
         } else if (this.partition.isLowChunk) {
             return coll
                 .aggregate([
                     {
-                        $match: Object.assign({[maxField]: {$lte: this.partition.chunkUpper}},
-                                              chunksJoinClause)
+                        $match: Object.assign({[maxField]: {$lte: this.partition.chunkUpper}}, chunksJoinClause),
                     },
-                    {$sample: {size: 1}}
+                    {$sample: {size: 1}},
                 ])
                 .toArray()[0];
         } else if (this.partition.isHighChunk) {
             return coll
                 .aggregate([
                     {
-                        $match: Object.assign({[minField]: {$gte: this.partition.chunkLower}},
-                                              chunksJoinClause)
+                        $match: Object.assign({[minField]: {$gte: this.partition.chunkLower}}, chunksJoinClause),
                     },
-                    {$sample: {size: 1}}
+                    {$sample: {size: 1}},
                 ])
                 .toArray()[0];
         } else {
             return coll
                 .aggregate([
                     {
-                        $match: Object.assign({
-                            [minField]: {$gte: this.partition.chunkLower},
-                            [maxField]: {$lte: this.partition.chunkUpper}
-                        },
-                                              chunksJoinClause)
+                        $match: Object.assign(
+                            {
+                                [minField]: {$gte: this.partition.chunkLower},
+                                [maxField]: {$lte: this.partition.chunkUpper},
+                            },
+                            chunksJoinClause,
+                        ),
                     },
-                    {$sample: {size: 1}}
+                    {$sample: {size: 1}},
                 ])
                 .toArray()[0];
         }
     };
 
     // This is used by the extended workloads to perform additional setup for more splitPoints.
-    data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(
-        db, collName, partition) {};
+    data.setupAdditionalSplitPoints = function setupAdditionalSplitPoints(db, collName, partition) {};
 
-    var states = (function() {
+    var states = (function () {
         // Inform this thread about its partition,
         // and verify that its partition is encapsulated in a single chunk.
         function init(db, collName, connCache) {
@@ -145,15 +139,13 @@ export const $config = (function() {
 
             // Verify that there is exactly 1 chunk in our partition.
             var config = connCache.rsConns.config;
-            var numChunks = ChunkHelper.getNumChunks(
-                config, ns, this.partition.chunkLower, this.partition.chunkUpper);
+            var numChunks = ChunkHelper.getNumChunks(config, ns, this.partition.chunkLower, this.partition.chunkUpper);
             var chunks = ChunkHelper.getChunks(config, ns, MinKey, MaxKey);
             var msg = tojson({tid: this.tid, data: this.data, chunks: chunks});
             assert.eq(numChunks, 1, msg);
         }
 
-        function dummy(db, collName, connCache) {
-        }
+        function dummy(db, collName, connCache) {}
 
         return {init: init, dummy: dummy};
     })();
@@ -163,10 +155,10 @@ export const $config = (function() {
     // Define each thread's data partition, populate it, and encapsulate it in a chunk.
     var setup = function setup(db, collName, cluster) {
         var ns = db[collName].getFullName();
-        var configDB = db.getSiblingDB('config');
+        var configDB = db.getSiblingDB("config");
 
         // Sharding must be enabled on db[collName].
-        var msg = 'collection ' + collName + ' must be sharded.';
+        var msg = "collection " + collName + " must be sharded.";
         assert.gte(findChunksUtil.findChunksByNs(configDB, ns).itcount(), 1, msg);
 
         for (var tid = 0; tid < this.threadCount; ++tid) {
@@ -199,12 +191,12 @@ export const $config = (function() {
     return {
         threadCount: 1,
         iterations: 1,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         data: data,
         setup: setup,
         teardown: teardown,
-        passConnectionCache: true
+        passConnectionCache: true,
     };
 })();

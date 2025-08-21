@@ -13,10 +13,10 @@
  * ]
  */
 
-import {getRandomShardName} from 'jstests/libs/sharded_cluster_fixture_helpers.js';
+import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
 
 // Create a normal collection
-const coll = db['coll'];
+const coll = db["coll"];
 
 const N = 250;
 
@@ -39,11 +39,12 @@ doInserts(N);
 assert.eq(N, coll.countDocuments({}));
 
 // Create view
-const viewDataColl = db['view_data_coll'];
+const viewDataColl = db["view_data_coll"];
 assert.commandWorked(viewDataColl.insertMany([{a: 1}, {a: 2}, {a: 3}]));
-const view = db['view'];
-assert.commandWorked(db.runCommand(
-    {create: view.getName(), viewOn: viewDataColl.getName(), pipeline: [{$match: {a: 3}}]}));
+const view = db["view"];
+assert.commandWorked(
+    db.runCommand({create: view.getName(), viewOn: viewDataColl.getName(), pipeline: [{$match: {a: 3}}]}),
+);
 assert.eq(1, view.countDocuments({}));
 
 let otherShard = getRandomShardName(db, /* exclude = */ initPrimaryShard);

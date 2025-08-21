@@ -10,17 +10,21 @@ const coll = db.linear_fill;
 coll.drop();
 
 // Test that $linearFill doesn't parse with a window.
-assert.commandFailedWithCode(coll.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [{
-        $setWindowFields: {
-            sortBy: {_id: 1},
-            output: {val: {$linearFill: {}, window: []}},
-        }
-    }],
-    cursor: {}
-}),
-                             ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(
+    coll.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {
+                $setWindowFields: {
+                    sortBy: {_id: 1},
+                    output: {val: {$linearFill: {}, window: []}},
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    ErrorCodes.FailedToParse,
+);
 
 let collection = [
     {_id: 0, val: 0},
@@ -31,13 +35,16 @@ let collection = [
 ];
 assert.commandWorked(coll.insert(collection));
 
-let result = coll.aggregate([{
-                     $setWindowFields: {
-                         sortBy: {_id: 1},
-                         output: {val: {$linearFill: "$val"}},
-                     }
-                 }])
-                 .toArray();
+let result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 
 let expected = [
     {_id: 0, val: 0},
@@ -49,22 +56,19 @@ let expected = [
 assert.eq(result, expected);
 
 coll.drop();
-collection = [
-    {_id: 0, val: 0},
-    {_id: 1},
-    {_id: 2},
-    {_id: 9},
-    {_id: 10, val: 10},
-];
+collection = [{_id: 0, val: 0}, {_id: 1}, {_id: 2}, {_id: 9}, {_id: 10, val: 10}];
 assert.commandWorked(coll.insert(collection));
 
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 
 expected = [
     {_id: 0, val: 0},
@@ -76,22 +80,19 @@ expected = [
 assert.eq(result, expected);
 
 coll.drop();
-collection = [
-    {_id: 0},
-    {_id: 1},
-    {_id: 2},
-    {_id: 9},
-    {_id: 10},
-];
+collection = [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 9}, {_id: 10}];
 assert.commandWorked(coll.insert(collection));
 
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 
 expected = [
     {_id: 0, val: null},
@@ -109,16 +110,19 @@ collection = [
     {_id: 3, val: 3},
     {_id: 9, val: 9},
     {_id: 10, val: null},
-    {_id: 11, val: 11}
+    {_id: 11, val: 11},
 ];
 assert.commandWorked(coll.insert(collection));
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 
 expected = [
     {_id: 0, val: 0},
@@ -126,7 +130,7 @@ expected = [
     {_id: 3, val: 3},
     {_id: 9, val: 9},
     {_id: 10, val: 10},
-    {_id: 11, val: 11}
+    {_id: 11, val: 11},
 ];
 assert.eq(result, expected);
 
@@ -137,16 +141,19 @@ collection = [
     {_id: 11, val: 11},
     {_id: 1, val: null},
     {_id: 9, val: 9},
-    {_id: 3, val: 3}
+    {_id: 3, val: 3},
 ];
 assert.commandWorked(coll.insert(collection));
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 assert.eq(result, expected);
 
 coll.drop();
@@ -158,13 +165,16 @@ collection = [
     {_id: 10.09283, val: 11.28374},
 ];
 assert.commandWorked(coll.insert(collection));
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 expected = [
     {_id: 0.5, val: 0},
     {_id: 1, val: 0.5881340542884634},
@@ -208,13 +218,16 @@ expected = [
     {_id: 13, val: -5},
 ];
 assert.commandWorked(coll.insert(collection));
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 assert.eq(result, expected);
 coll.drop();
 
@@ -248,17 +261,20 @@ expected = [
     {_id: 3, date: ISODate("2003-12-25T00:00:00Z"), val: 4},
     {_id: 2, date: ISODate("2003-12-26T00:00:00Z"), val: 3},
     {_id: 1, date: ISODate("2003-12-27T00:00:00Z"), val: 2},
-    {_id: 0, date: ISODate("2003-12-28T00:00:00Z"), val: 1}
+    {_id: 0, date: ISODate("2003-12-28T00:00:00Z"), val: 1},
 ];
 
 assert.commandWorked(coll.insert(collection));
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {date: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {date: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 assert.eq(result, expected);
 coll.drop();
 // Test $linearFill with partitions.
@@ -284,21 +300,22 @@ expected = [
     {borough: "Manhattan", x: 10, y: -10},
     {borough: "Queens", x: 2, y: -2},
     {borough: "Queens", x: 3, y: -3},
-    {borough: "Queens", x: 20, y: -20}
+    {borough: "Queens", x: 20, y: -20},
 ];
 assert.commandWorked(coll.insert(collection));
 
-result = coll.aggregate([
-                 {$project: {_id: 0}},
-                 {
-                     $setWindowFields: {
-                         partitionBy: "$borough",
-                         sortBy: {x: 1},
-                         output: {y: {$linearFill: "$y"}},
-                     }
-                 }
-             ])
-             .toArray();
+result = coll
+    .aggregate([
+        {$project: {_id: 0}},
+        {
+            $setWindowFields: {
+                partitionBy: "$borough",
+                sortBy: {x: 1},
+                output: {y: {$linearFill: "$y"}},
+            },
+        },
+    ])
+    .toArray();
 assert.eq(result, expected);
 
 // Test sets of nulls with partitions.
@@ -319,31 +336,43 @@ collection = [
 ];
 assert.commandWorked(coll.insert(collection));
 expected = [
-    {borough: "Bronx", x: 1000, y: -10},   {borough: "Bronx", x: 1100, y: 11},
-    {borough: "Bronx", x: 1200, y: 32},    {borough: "Bronx", x: 2000, y: 200},
-    {borough: "Manhattan", x: 1, y: -1},   {borough: "Manhattan", x: 5, y: -5},
-    {borough: "Manhattan", x: 10, y: -10}, {borough: "Queens", x: 2, y: -2},
-    {borough: "Queens", x: 3, y: -3},      {borough: "Queens", x: 20, y: -20},
-    {borough: "SI", x: 1, y: 1},           {borough: "SI", x: 2, y: 2},
-    {borough: "SI", x: 3, y: 3},           {borough: "SI", x: 4, y: 4},
-    {borough: "SI", x: 5, y: 5},           {borough: "SI", x: 6, y: 6.25},
-    {borough: "SI", x: 7, y: 7.5},         {borough: "SI", x: 8, y: 8.75},
-    {borough: "SI", x: 9, y: 10},          {borough: "SI", x: 10, y: 6.25},
-    {borough: "SI", x: 11, y: 2.5},        {borough: "SI", x: 12, y: -1.25},
-    {borough: "SI", x: 13, y: -5}
+    {borough: "Bronx", x: 1000, y: -10},
+    {borough: "Bronx", x: 1100, y: 11},
+    {borough: "Bronx", x: 1200, y: 32},
+    {borough: "Bronx", x: 2000, y: 200},
+    {borough: "Manhattan", x: 1, y: -1},
+    {borough: "Manhattan", x: 5, y: -5},
+    {borough: "Manhattan", x: 10, y: -10},
+    {borough: "Queens", x: 2, y: -2},
+    {borough: "Queens", x: 3, y: -3},
+    {borough: "Queens", x: 20, y: -20},
+    {borough: "SI", x: 1, y: 1},
+    {borough: "SI", x: 2, y: 2},
+    {borough: "SI", x: 3, y: 3},
+    {borough: "SI", x: 4, y: 4},
+    {borough: "SI", x: 5, y: 5},
+    {borough: "SI", x: 6, y: 6.25},
+    {borough: "SI", x: 7, y: 7.5},
+    {borough: "SI", x: 8, y: 8.75},
+    {borough: "SI", x: 9, y: 10},
+    {borough: "SI", x: 10, y: 6.25},
+    {borough: "SI", x: 11, y: 2.5},
+    {borough: "SI", x: 12, y: -1.25},
+    {borough: "SI", x: 13, y: -5},
 ];
 
-result = coll.aggregate([
-                 {$project: {_id: 0}},
-                 {
-                     $setWindowFields: {
-                         partitionBy: "$borough",
-                         sortBy: {x: 1},
-                         output: {y: {$linearFill: "$y"}},
-                     }
-                 }
-             ])
-             .toArray();
+result = coll
+    .aggregate([
+        {$project: {_id: 0}},
+        {
+            $setWindowFields: {
+                partitionBy: "$borough",
+                sortBy: {x: 1},
+                output: {y: {$linearFill: "$y"}},
+            },
+        },
+    ])
+    .toArray();
 assert.eq(result, expected);
 coll.drop();
 
@@ -371,20 +400,21 @@ expected = [
     {borough: "Manhattan", y: -10, date: ISODate("2006-12-28T00:00:00Z")},
     {borough: "Queens", y: -2, date: ISODate("2007-12-28T00:00:00Z")},
     {borough: "Queens", y: -20, date: ISODate("2008-12-28T00:00:00Z")},
-    {borough: "Queens", y: null, date: ISODate("2009-12-28T00:00:00Z")}
+    {borough: "Queens", y: null, date: ISODate("2009-12-28T00:00:00Z")},
 ];
 
-result = coll.aggregate([
-                 {$project: {_id: 0}},
-                 {
-                     $setWindowFields: {
-                         partitionBy: "$borough",
-                         sortBy: {date: 1},
-                         output: {y: {$linearFill: "$y"}},
-                     }
-                 }
-             ])
-             .toArray();
+result = coll
+    .aggregate([
+        {$project: {_id: 0}},
+        {
+            $setWindowFields: {
+                partitionBy: "$borough",
+                sortBy: {date: 1},
+                output: {y: {$linearFill: "$y"}},
+            },
+        },
+    ])
+    .toArray();
 assert.eq(result, expected);
 
 // If there are not enough values to perform interpolation, we output the original documents.
@@ -397,13 +427,16 @@ collection = [
     {_id: 10, val: null},
 ];
 assert.commandWorked(coll.insert(collection));
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 assert.eq(result, collection);
 
 coll.drop();
@@ -415,13 +448,16 @@ collection = [
     {_id: 10, val: null},
 ];
 assert.commandWorked(coll.insert(collection));
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 assert.eq(result, collection);
 
 coll.drop();
@@ -446,13 +482,16 @@ expected = [
     {_id: 13, val: 13},
 ];
 assert.commandWorked(coll.insert(collection));
-result = coll.aggregate([{
-                 $setWindowFields: {
-                     sortBy: {_id: 1},
-                     output: {val: {$linearFill: "$val"}},
-                 }
-             }])
-             .toArray();
+result = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {val: {$linearFill: "$val"}},
+            },
+        },
+    ])
+    .toArray();
 assert.eq(result, expected);
 
 // There can be no repeated values in the field we sort on.
@@ -463,24 +502,26 @@ collection = [
     {test: 9, val: 9},
     {test: 10, val: 10},
     {test: 10, val: null},
-    {test: 11, val: 11}
+    {test: 11, val: 11},
 ];
 assert.commandWorked(coll.insert(collection));
 
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$project: {_id: 0}},
-        {
-            $setWindowFields: {
-                sortBy: {test: 1},
-                output: {val: {$linearFill: "$val"}},
-            }
-        }
-    ],
-    cursor: {}
-}),
-                             6050106);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$project: {_id: 0}},
+            {
+                $setWindowFields: {
+                    sortBy: {test: 1},
+                    output: {val: {$linearFill: "$val"}},
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    6050106,
+);
 
 // The sort field values must be of type numeric.
 coll.drop();
@@ -492,20 +533,22 @@ collection = [
     {test: 10, val: 10},
 ];
 assert.commandWorked(coll.insert(collection));
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$project: {_id: 0}},
-        {
-            $setWindowFields: {
-                sortBy: {test: 1},
-                output: {val: {$linearFill: "$val"}},
-            }
-        }
-    ],
-    cursor: {}
-}),
-                             ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$project: {_id: 0}},
+            {
+                $setWindowFields: {
+                    sortBy: {test: 1},
+                    output: {val: {$linearFill: "$val"}},
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    ErrorCodes.TypeMismatch,
+);
 
 // The field we are filling can only have a numeric or null value.
 coll.drop();
@@ -515,54 +558,64 @@ collection = [
     {test: 9, val: 9, z: 4},
     {test: 10, val: "str", z: 50},
     {test: 10, val: null, z: 9},
-    {test: 11, val: 11, z: 2}
+    {test: 11, val: 11, z: 2},
 ];
 assert.commandWorked(coll.insert(collection));
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$project: {_id: 0}},
-        {
-            $setWindowFields: {
-                sortBy: {test: 1},
-                output: {val: {$linearFill: "$val"}},
-            }
-        }
-    ],
-    cursor: {}
-}),
-                             ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$project: {_id: 0}},
+            {
+                $setWindowFields: {
+                    sortBy: {test: 1},
+                    output: {val: {$linearFill: "$val"}},
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    ErrorCodes.TypeMismatch,
+);
 
 // There can only be a single sort key for $linearFill.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$project: {_id: 0}},
-        {
-            $setWindowFields: {
-                sortBy: {test: 1, z: 1},
-                output: {val: {$linearFill: "$val"}},
-            }
-        }
-    ],
-    cursor: {}
-}),
-                             605001);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$project: {_id: 0}},
+            {
+                $setWindowFields: {
+                    sortBy: {test: 1, z: 1},
+                    output: {val: {$linearFill: "$val"}},
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    605001,
+);
 // Mixing dates with numerics in sort field is not allowed.
 coll.drop();
-collection = [{x: 1, y: 10}, {x: 2, y: null}, {x: new Date(), y: 20}];
+collection = [
+    {x: 1, y: 10},
+    {x: 2, y: null},
+    {x: new Date(), y: 20},
+];
 assert.commandWorked(coll.insert(collection));
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$project: {_id: 0}},
-        {
-            $setWindowFields: {
-                sortBy: {x: 1},
-                output: {y: {$linearFill: "$y"}},
-            }
-        }
-    ],
-    cursor: {}
-}),
-                             ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [
+            {$project: {_id: 0}},
+            {
+                $setWindowFields: {
+                    sortBy: {x: 1},
+                    output: {y: {$linearFill: "$y"}},
+                },
+            },
+        ],
+        cursor: {},
+    }),
+    ErrorCodes.TypeMismatch,
+);

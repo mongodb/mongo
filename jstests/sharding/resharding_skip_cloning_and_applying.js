@@ -30,8 +30,7 @@ function getDottedField(doc, fieldName) {
 }
 
 function getCollectionUuid(db, collName) {
-    const listCollectionRes =
-        assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+    const listCollectionRes = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
     return listCollectionRes.cursor.firstBatch[0].info.uuid;
 }
 
@@ -45,43 +44,47 @@ function checkCollectionOptionsAndIndexes(conn, ns, expectedOptions, expectedInd
     }
 
     const actualIndexes = coll.getIndexes();
-    expectedIndexes.forEach(expectedIndex => {
+    expectedIndexes.forEach((expectedIndex) => {
         assert(
-            actualIndexes.some(actualIndex => bsonWoCompare(actualIndex.key, expectedIndex) != 0),
-            {actualIndexes, expectedIndex});
+            actualIndexes.some((actualIndex) => bsonWoCompare(actualIndex.key, expectedIndex) != 0),
+            {actualIndexes, expectedIndex},
+        );
     });
 }
 
-function checkMoveCollectionCloningMetrics(
-    st, ns, numDocs, numBytes, primaryShardName, toShardName) {
+function checkMoveCollectionCloningMetrics(st, ns, numDocs, numBytes, primaryShardName, toShardName) {
     assert.neq(primaryShardName, toShardName);
     let currentOps;
-    assert.soon(() => {
-        currentOps = st.s.getDB("admin")
-                         .aggregate([
-                             {$currentOp: {allUsers: true, localOps: false}},
-                             {
-                                 $match: {
-                                     type: "op",
-                                     "originatingCommand.reshardCollection": ns,
-                                     recipientState: {$exists: true}
-                                 }
-                             },
-                         ])
-                         .toArray();
-        if (currentOps.length < 2) {
-            return false;
-        }
-        for (let op of currentOps) {
-            if (op.recipientState != "cloning") {
+    assert.soon(
+        () => {
+            currentOps = st.s
+                .getDB("admin")
+                .aggregate([
+                    {$currentOp: {allUsers: true, localOps: false}},
+                    {
+                        $match: {
+                            type: "op",
+                            "originatingCommand.reshardCollection": ns,
+                            recipientState: {$exists: true},
+                        },
+                    },
+                ])
+                .toArray();
+            if (currentOps.length < 2) {
                 return false;
             }
-        }
-        return true;
-    }, () => tojson(currentOps));
+            for (let op of currentOps) {
+                if (op.recipientState != "cloning") {
+                    return false;
+                }
+            }
+            return true;
+        },
+        () => tojson(currentOps),
+    );
 
     assert.eq(currentOps.length, 2, currentOps);
-    currentOps.forEach(op => {
+    currentOps.forEach((op) => {
         if (op.shard == primaryShardName) {
             assert.eq(op.approxDocumentsToCopy, 0, {op});
             assert.eq(op.approxBytesToCopy, 0, {op});
@@ -106,8 +109,7 @@ function checkCollectionExistence(conn, ns, exists) {
 function checkOplogBufferAndConflictStashCollections(conn, collUuid, donorShardName, exists) {
     const oplogBufferNs = "config.localReshardingOplogBuffer." + collUuid + "." + donorShardName;
     checkCollectionExistence(conn, oplogBufferNs, exists);
-    const conflictStashNs =
-        "config.localReshardingConflictStash." + collUuid + "." + donorShardName;
+    const conflictStashNs = "config.localReshardingConflictStash." + collUuid + "." + donorShardName;
     checkCollectionExistence(conn, conflictStashNs, exists);
 }
 
@@ -119,15 +121,14 @@ function runTest(featureFlagReshardingSkipCloningAndApplying) {
         rs: {
             nodes: 2,
             setParameter: {
-                featureFlagReshardingSkipCloningAndApplyingIfApplicable:
-                    featureFlagReshardingSkipCloningAndApplying
-            }
+                featureFlagReshardingSkipCloningAndApplyingIfApplicable: featureFlagReshardingSkipCloningAndApplying,
+            },
         },
         // By default, our test infrastructure sets the election timeout to a very high value (24
         // hours). For this test, we need a shorter election timeout because it relies on nodes
         // running an election when they do not detect an active primary. Therefore, we are setting
         // the electionTimeoutMillis to its default value.
-        initiateWithDefaultElectionTimeout: true
+        initiateWithDefaultElectionTimeout: true,
     });
 
     // Create an unsharded collection on shard0 (primary shard) and move the collection from
@@ -139,12 +140,17 @@ function runTest(featureFlagReshardingSkipCloningAndApplying) {
     const coll = db.getCollection(collName);
     const options = {validator: {x: {$gte: 0}}};
 
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-    assert.commandWorked(db.runCommand(Object.assign({
-        create: collName,
-    },
-                                                     options)));
+        db.runCommand(
+            Object.assign(
+                {
+                    create: collName,
+                },
+                options,
+            ),
+        ),
+    );
 
     const numDocs = 100;
     const docs = [];
@@ -157,66 +163,79 @@ function runTest(featureFlagReshardingSkipCloningAndApplying) {
     const collUuid = extractUUIDFromObject(getCollectionUuid(db, collName));
 
     const indexes = [{x: 1}];
-    indexes.forEach(index => assert.commandWorked(coll.createIndex(index)));
+    indexes.forEach((index) => assert.commandWorked(coll.createIndex(index)));
 
     const oldShard0Primary = st.rs0.getPrimary();
     const oldShard1Primary = st.rs1.getPrimary();
     checkCollectionOptionsAndIndexes(oldShard0Primary, ns, options, indexes);
 
     const shard0Indexes = st.rs0.getPrimary().getCollection(ns).getIndexes();
-    assert(shard0Indexes.some(index => bsonWoCompare(index.key, {x: 1}) != 0), shard0Indexes);
+    assert(
+        shard0Indexes.some((index) => bsonWoCompare(index.key, {x: 1}) != 0),
+        shard0Indexes,
+    );
 
     // Pause resharding recipients (both shard0 and shard1) at the "cloning" state.
-    const shard0CloningFps =
-        st.rs0.nodes.map(node => configureFailPoint(node, "reshardingPauseRecipientBeforeCloning"));
-    const shard1CloningFps =
-        st.rs1.nodes.map(node => configureFailPoint(node, "reshardingPauseRecipientBeforeCloning"));
+    const shard0CloningFps = st.rs0.nodes.map((node) =>
+        configureFailPoint(node, "reshardingPauseRecipientBeforeCloning"),
+    );
+    const shard1CloningFps = st.rs1.nodes.map((node) =>
+        configureFailPoint(node, "reshardingPauseRecipientBeforeCloning"),
+    );
 
     // Also pause resharding coordinator before it starts committing.
-    const beforePersistingDecisionFps = st.configRS.nodes.map(
-        node => configureFailPoint(node, "reshardingPauseCoordinatorBeforeDecisionPersisted"));
+    const beforePersistingDecisionFps = st.configRS.nodes.map((node) =>
+        configureFailPoint(node, "reshardingPauseCoordinatorBeforeDecisionPersisted"),
+    );
 
-    const thread = new Thread((host, ns, toShard) => {
-        const mongos = new Mongo(host);
-        assert.soonRetryOnAcceptableErrors(() => {
-            assert.commandWorked(mongos.adminCommand({moveCollection: ns, toShard}));
-            return true;
-        }, ErrorCodes.FailedToSatisfyReadPreference);
-    }, st.s.host, ns, st.shard1.shardName);
+    const thread = new Thread(
+        (host, ns, toShard) => {
+            const mongos = new Mongo(host);
+            assert.soonRetryOnAcceptableErrors(() => {
+                assert.commandWorked(mongos.adminCommand({moveCollection: ns, toShard}));
+                return true;
+            }, ErrorCodes.FailedToSatisfyReadPreference);
+        },
+        st.s.host,
+        ns,
+        st.shard1.shardName,
+    );
     thread.start();
 
-    checkMoveCollectionCloningMetrics(st,
-                                      ns,
-                                      numDocs,
-                                      numBytes,
-                                      st.shard0.shardName /* primaryShard */,
-                                      st.shard1.shardName /* toShard */);
+    checkMoveCollectionCloningMetrics(
+        st,
+        ns,
+        numDocs,
+        numBytes,
+        st.shard0.shardName /* primaryShard */,
+        st.shard1.shardName /* toShard */,
+    );
 
     // Trigger a failover on shard0.
-    assert.commandWorked(
-        oldShard0Primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(oldShard0Primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
     assert.commandWorked(oldShard0Primary.adminCommand({replSetFreeze: 0}));
     const newShard0Primary = st.rs0.waitForPrimary();
 
     // Trigger a failover on shard1.
-    assert.commandWorked(
-        oldShard1Primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(oldShard1Primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
     assert.commandWorked(oldShard1Primary.adminCommand({replSetFreeze: 0}));
     const newShard1Primary = st.rs1.waitForPrimary();
 
-    checkMoveCollectionCloningMetrics(st,
-                                      ns,
-                                      numDocs,
-                                      numBytes,
-                                      st.shard0.shardName /* primaryShard */,
-                                      st.shard1.shardName /* toShard */);
+    checkMoveCollectionCloningMetrics(
+        st,
+        ns,
+        numDocs,
+        numBytes,
+        st.shard0.shardName /* primaryShard */,
+        st.shard1.shardName /* toShard */,
+    );
 
-    shard0CloningFps.forEach(fp => fp.off());
-    shard1CloningFps.forEach(fp => fp.off());
+    shard0CloningFps.forEach((fp) => fp.off());
+    shard1CloningFps.forEach((fp) => fp.off());
 
     // Verify that shard0 which is a recipient that is not going to own any chunk for the collection
     // after resharding skipped fetching/applying oplog entries.
-    beforePersistingDecisionFps.forEach(fp => {
+    beforePersistingDecisionFps.forEach((fp) => {
         if (fp.conn == st.configRS.getPrimary()) {
             fp.wait();
         }
@@ -225,11 +244,11 @@ function runTest(featureFlagReshardingSkipCloningAndApplying) {
         newShard0Primary,
         collUuid,
         st.shard0.shardName,
-        !featureFlagReshardingSkipCloningAndApplying /* exists */);
-    checkOplogBufferAndConflictStashCollections(
-        newShard1Primary, collUuid, st.shard0.shardName, true /* exists */);
+        !featureFlagReshardingSkipCloningAndApplying /* exists */,
+    );
+    checkOplogBufferAndConflictStashCollections(newShard1Primary, collUuid, st.shard0.shardName, true /* exists */);
 
-    beforePersistingDecisionFps.forEach(fp => fp.off());
+    beforePersistingDecisionFps.forEach((fp) => fp.off());
     thread.join();
 
     checkCollectionOptionsAndIndexes(newShard1Primary, ns, options, indexes);

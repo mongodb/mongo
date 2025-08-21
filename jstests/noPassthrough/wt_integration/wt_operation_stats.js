@@ -10,10 +10,10 @@ import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const readStatRegx = /"storage":{"data":{"bytesRead":([0-9]+)/;
 
-let checkLogStats = function() {
+let checkLogStats = function () {
     // Check if the log output contains the expected statistics.
     let mongodLogs = rawMongoProgramOutput(".*");
-    let lines = mongodLogs.split('\n');
+    let lines = mongodLogs.split("\n");
     let match;
     let logLineCount = 0;
     for (let line of lines) {
@@ -25,7 +25,7 @@ let checkLogStats = function() {
     assert.gte(logLineCount, 1);
 };
 
-let checkSystemProfileStats = function(profileObj, statName) {
+let checkSystemProfileStats = function (profileObj, statName) {
     // Check that the profiled operation contains the expected statistics.
     assert(profileObj.hasOwnProperty("storage"), tojson(profileObj));
     assert(profileObj.storage.hasOwnProperty("data"), tojson(profileObj));
@@ -33,7 +33,7 @@ let checkSystemProfileStats = function(profileObj, statName) {
 };
 
 // This test can only be run if the storageEngine is wiredTiger
-if (jsTest.options().storageEngine && (jsTest.options().storageEngine !== "wiredTiger")) {
+if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
     jsTestLog("Skipping test because storageEngine is not wiredTiger");
 } else {
     let name = "wt_op_stat";
@@ -44,7 +44,7 @@ if (jsTest.options().storageEngine && (jsTest.options().storageEngine !== "wired
     let testDB = conn.getDB(name);
 
     // Insert 200 documents of size 1K each, spanning multiple pages in the btree.
-    let value = 'a'.repeat(1024);
+    let value = "a".repeat(1024);
 
     jsTestLog("insert data");
     for (let i = 0; i < 200; i++) {

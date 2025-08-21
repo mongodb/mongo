@@ -17,28 +17,28 @@ assert.commandFailedWithCode(
     db.runCommand({
         aggregate: coll.getName(),
         cursor: {},
-        pipeline: [{$project: {_id: 1, meta: "$$SEARCH_META"}}]
+        pipeline: [{$project: {_id: 1, meta: "$$SEARCH_META"}}],
     }),
-    [6347902, 6347903]);  // Error code depends on presence of the enterprise module.
+    [6347902, 6347903],
+); // Error code depends on presence of the enterprise module.
 
 // Check that users cannot assign values to SEARCH_META.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: [
-        {$lookup: {from: coll.getName(), let : {SEARCH_META: "$title"}, as: "joined", pipeline: []}}
-    ],
-    cursor: {}
-}),
-                             ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$lookup: {from: coll.getName(), let: {SEARCH_META: "$title"}, as: "joined", pipeline: []}}],
+        cursor: {},
+    }),
+    ErrorCodes.FailedToParse,
+);
 
 const response = db.runCommand({
     aggregate: "non_existent_namespace",
     pipeline: [{$searchMeta: {query: {nonsense: true}}}],
-    cursor: {}
+    cursor: {},
 });
 if (!response.ok) {
-    assert.commandFailedWithCode(response,
-                                 [ErrorCodes.SearchNotEnabled, 6047401] /* mongos or community */);
+    assert.commandFailedWithCode(response, [ErrorCodes.SearchNotEnabled, 6047401] /* mongos or community */);
 } else {
     assert.eq(response.cursor.firstBatch, []);
 }

@@ -19,17 +19,17 @@ if (testingReplication && TestData && TestData.mixedBinVersions) {
         const admin = conn.getDB("admin");
         const serverStatus = admin.serverStatus();
         const actualVersion = serverStatus["version"];
-        const expectedVersion = TestData.mixedBinVersions[i] === "new"
-            ? latestBinVersion
-            : MongoRunner.getBinVersionFor(TestData.multiversionBinVersion);
-        print(actualVersion,
-              expectedVersion,
-              MongoRunner.getBinVersionFor(TestData.multiversionBinVersion));
+        const expectedVersion =
+            TestData.mixedBinVersions[i] === "new"
+                ? latestBinVersion
+                : MongoRunner.getBinVersionFor(TestData.multiversionBinVersion);
+        print(actualVersion, expectedVersion, MongoRunner.getBinVersionFor(TestData.multiversionBinVersion));
         print(TestData.multiversionBinVersion);
         assert(MongoRunner.areBinVersionsTheSame(actualVersion, expectedVersion));
     }
 } else {
     jsTestLog(
         "This tests initializing a mixed version replica set through resmoke. Skipping test run" +
-        " because testingReplication and TestData.mixedBinVersion are not set.");
+            " because testingReplication and TestData.mixedBinVersion are not set.",
+    );
 }

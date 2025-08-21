@@ -11,7 +11,7 @@ const currentDate = new Date();
 const comparisonFunctions = [_resultSetsEqualUnordered, _resultSetsEqualNormalized];
 
 // We should throw for invalid input. These functions expect both arguments to be a list of objects.
-comparisonFunctions.forEach(comparisonFn => {
+comparisonFunctions.forEach((comparisonFn) => {
     assert.throwsWithCode(() => comparisonFn({}, []), 9193201);
     assert.throwsWithCode(() => comparisonFn([], 5), 9193201);
     assert.throwsWithCode(() => comparisonFn([4, 1], []), 9193202);
@@ -23,7 +23,7 @@ comparisonFunctions.forEach(comparisonFn => {
 });
 
 // Some base cases.
-comparisonFunctions.forEach(comparisonFn => {
+comparisonFunctions.forEach((comparisonFn) => {
     assert(comparisonFn([], []));
     assert(comparisonFn([{a: 1}], [{a: 1}]));
     assert(comparisonFn([{a: 1}, {a: 1}], [{a: 1}, {a: 1}]));
@@ -34,8 +34,8 @@ comparisonFunctions.forEach(comparisonFn => {
 });
 
 // Different non-numeric types should fail both comparisons.
-comparisonFunctions.forEach(comparisonFn => {
-    assert(!comparisonFn([{a: 1}], [{a: '1'}]));
+comparisonFunctions.forEach((comparisonFn) => {
+    assert(!comparisonFn([{a: 1}], [{a: "1"}]));
     assert(!comparisonFn([{a: null}], [{}]));
     assert(!comparisonFn([{a: null}], [{b: null}]));
     assert(!comparisonFn([{a: null}], [{a: undefined}]));
@@ -60,8 +60,12 @@ assert(_resultSetsEqualNormalized([{a: 0.14285714285714285}], [{a: 0.14285714285
 // Normalized comparison is sensitive to differences before the 15th decimal place.
 assert(!_resultSetsEqualNormalized([{a: 0.142857142856}], [{a: 0.142857142855}]));
 // Normalized comparison doesn't currently round decimals.
-assert(!_resultSetsEqualNormalized([{a: NumberDecimal('0.14285714285714285')}],
-                                   [{a: NumberDecimal('0.14285714285714288')}]));
+assert(
+    !_resultSetsEqualNormalized(
+        [{a: NumberDecimal("0.14285714285714285")}],
+        [{a: NumberDecimal("0.14285714285714288")}],
+    ),
+);
 
 /*
  * Given two sets of results - `equalResults` and `differentResults`, we test that all pairs of
@@ -91,15 +95,15 @@ function testIndividualDocumentEquality() {
         a: 1,
         b: [
             {x: "a string", y: currentDate, z: NumberDecimal(1)},
-            {'a1.b1': 5, 'a1.c1': 2, 'a2': [3, 2, 1]}
-        ]
+            {"a1.b1": 5, "a1.c1": 2, "a2": [3, 2, 1]},
+        ],
     };
     const docOutOfOrder = {
         b: [
             {z: NumberDecimal(1), x: "a string", y: currentDate},
-            {'a1.b1': 5, 'a2': [3, 2, 1], 'a1.c1': 2}
+            {"a1.b1": 5, "a2": [3, 2, 1], "a1.c1": 2},
         ],
-        a: 1
+        a: 1,
     };
 
     // We change the order of arrays here - our comparator should return false, because arrays need
@@ -108,37 +112,37 @@ function testIndividualDocumentEquality() {
         a: 1,
         b: [
             {z: NumberDecimal(1), x: "a string", y: currentDate},
-            {'a1.b1': 5, 'a1.c1': 2, 'a2': [1, 2, 3]}
-        ]
+            {"a1.b1": 5, "a1.c1": 2, "a2": [1, 2, 3]},
+        ],
     };
     const docAltered2 = {
         a: 1,
         b: [
-            {'a1.b1': 5, 'a1.c1': 2, 'a2': [3, 2, 1]},
-            {z: NumberDecimal(1), x: "a string", y: currentDate}
-        ]
+            {"a1.b1": 5, "a1.c1": 2, "a2": [3, 2, 1]},
+            {z: NumberDecimal(1), x: "a string", y: currentDate},
+        ],
     };
     // Change a few values, which should also make our comparator return false.
     const docAltered3 = {
         a: 1,
         b: [
             {x: "a string", y: currentDate, z: NumberDecimal(2)},
-            {'a1.b1': 5, 'a1.c1': 2, 'a2': [3, 2, 1]}
-        ]
+            {"a1.b1": 5, "a1.c1": 2, "a2": [3, 2, 1]},
+        ],
     };
     const docAltered4 = {
         a: 1,
         b: [
             {x: "a string", y: currentDate, z: NumberDecimal(1)},
-            {'a1.b1': 5, 'a1.c1': 2, 'a2': [3, 3, 1]}
-        ]
+            {"a1.b1": 5, "a1.c1": 2, "a2": [3, 3, 1]},
+        ],
     };
     const docAltered5 = {
         a: 1,
         b: [
             {x: "a different string", y: currentDate, z: NumberDecimal(1)},
-            {'a1.b1': 5, 'a1.c1': 2, 'a2': [3, 2, 1]}
-        ]
+            {"a1.b1": 5, "a1.c1": 2, "a2": [3, 2, 1]},
+        ],
     };
 
     // Each result contains one document for this case.
@@ -155,18 +159,14 @@ function testResultOrderIndifference() {
     const resultAltered1 = [{a: 1, b: 1}, {d: 1}, {a: 1}, {b: 1}, {a: 1, b: 1}];
     const resultAltered2 = [{a: 1, b: 2}, {c: 1}, {a: 1}, {b: 1}, {a: 1, b: 1}];
     const resultAltered3 = [{a: 1, b: 2}, {c: 1}, {a: 1}, {b: 2}, {a: 1, b: 1}];
-    const resultAltered4 = [{a: 1, b: 1}, {c: 1}, {a: 1}, {b: 1}, {'a.a': 1, b: 1}];
-    const resultAltered5 = [{a: 1, b: 1}, {c: 1}, {a: 1}, {b: 1}, {a: '1', b: 1}];
+    const resultAltered4 = [{a: 1, b: 1}, {c: 1}, {a: 1}, {b: 1}, {"a.a": 1, b: 1}];
+    const resultAltered5 = [{a: 1, b: 1}, {c: 1}, {a: 1}, {b: 1}, {a: "1", b: 1}];
     const resultAltered6 = [{a: 1, b: 1}, {c: 1}, {a: 1, b: 1}, {b: 1}, {a: 1, b: 1}];
 
-    assertExpectedOutputs([result, resultOutOfOrder], [
-        resultAltered1,
-        resultAltered2,
-        resultAltered3,
-        resultAltered4,
-        resultAltered5,
-        resultAltered6
-    ]);
+    assertExpectedOutputs(
+        [result, resultOutOfOrder],
+        [resultAltered1, resultAltered2, resultAltered3, resultAltered4, resultAltered5, resultAltered6],
+    );
 }
 
 testIndividualDocumentEquality();

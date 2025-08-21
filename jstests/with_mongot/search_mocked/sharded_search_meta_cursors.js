@@ -11,25 +11,25 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     searchShardedExampleCursors1,
-    searchShardedExampleCursors2
+    searchShardedExampleCursors2,
 } from "jstests/with_mongot/search_mocked/lib/search_sharded_example_cursors.js";
 
 const dbName = "test";
 const collName = "internal_search_mongot_remote";
 
-const makeInternalConn = (function createInternalClient(conn) {
+const makeInternalConn = function createInternalClient(conn) {
     const curDB = conn.getDB(dbName);
-    assert.commandWorked(curDB.runCommand({
-        ["hello"]: 1,
-        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}
-    }));
+    assert.commandWorked(
+        curDB.runCommand({
+            ["hello"]: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
     return conn;
-});
+};
 
 let nodeOptions = {setParameter: {enableTestCommands: 1}};
 
@@ -43,7 +43,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     other: {
         rsOptions: nodeOptions,
         mongosOptions: nodeOptions,
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
@@ -52,8 +52,7 @@ const mongos = st.s;
 const testDb = mongos.getDB(dbName);
 
 // TODO SERVER-87335 Make this work for SBE
-if (checkSbeRestrictedOrFullyEnabled(testDb) &&
-    FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), 'SearchInSbe')) {
+if (checkSbeRestrictedOrFullyEnabled(testDb) && FeatureFlagUtil.isPresentAndEnabled(testDb.getMongo(), "SearchInSbe")) {
     jsTestLog("Skipping the test because it only applies to $search in classic engine.");
     stWithMock.stop();
     quit();
@@ -62,8 +61,7 @@ if (checkSbeRestrictedOrFullyEnabled(testDb) &&
 const coll = testDb.getCollection(collName);
 const collNS = coll.getFullName();
 
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 // Shard the test collection.
 const splitPoint = 5;
 const docList = [];
@@ -80,14 +78,18 @@ const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), 
 const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), collName);
 
 function mockShardZero(metaCursorWillBeKilled = false) {
-    const exampleCursor =
-        searchShardedExampleCursors1(dbName, collNS, collName, mongotCommandForQuery({
-                                         query: mongotQuery,
-                                         collName: collName,
-                                         db: dbName,
-                                         collectionUUID: collUUID0,
-                                         protocolVersion: protocolVersion
-                                     }));
+    const exampleCursor = searchShardedExampleCursors1(
+        dbName,
+        collNS,
+        collName,
+        mongotCommandForQuery({
+            query: mongotQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID0,
+            protocolVersion: protocolVersion,
+        }),
+    );
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
     // The getMore will be pre-fetched, but if the meta cursor is deemed unnecessary, we'll issue a
     // killCursors on the meta cursor. If the connection is pinned, we'll try to cancel the getMore
@@ -101,14 +103,18 @@ function mockShardZero(metaCursorWillBeKilled = false) {
 }
 
 function mockShardOne(metaCursorWillBeKilled = false) {
-    const exampleCursor =
-        searchShardedExampleCursors2(dbName, collNS, collName, mongotCommandForQuery({
-                                         query: mongotQuery,
-                                         collName: collName,
-                                         db: dbName,
-                                         collectionUUID: collUUID1,
-                                         protocolVersion: protocolVersion
-                                     }));
+    const exampleCursor = searchShardedExampleCursors2(
+        dbName,
+        collNS,
+        collName,
+        mongotCommandForQuery({
+            query: mongotQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID1,
+            protocolVersion: protocolVersion,
+        }),
+    );
     const s1Mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
     // See comment in mockShardZero().
     if (metaCursorWillBeKilled) {
@@ -159,21 +165,21 @@ let commandObj = {
     cursor: {batchSize: 0},
 };
 const shardPipelineRequiresMetaCursorImplicit = {
-    "$search": {"mongotQuery": mongotQuery, metadataMergeProtocolVersion: protocolVersion}
+    "$search": {"mongotQuery": mongotQuery, metadataMergeProtocolVersion: protocolVersion},
 };
 const shardPipelineRequiresMetaCursorExplicit = {
     "$search": {
         "mongotQuery": mongotQuery,
         metadataMergeProtocolVersion: protocolVersion,
-        requiresSearchMetaCursor: true
-    }
+        requiresSearchMetaCursor: true,
+    },
 };
 const shardPipelineDoesntRequireMetaCursor = {
     "$search": {
         "mongotQuery": mongotQuery,
         metadataMergeProtocolVersion: protocolVersion,
-        requiresSearchMetaCursor: false
-    }
+        requiresSearchMetaCursor: false,
+    },
 };
 
 /**
@@ -232,37 +238,43 @@ function runTestNoMetaCursorOnConn(shardDB, expectedDocs) {
 let expectedDocs = [
     // SortKey and searchScore are included because we're getting results directly from the
     // shard.
-    {_id: 1, val: 1, "$searchScore": .4, "$score": .4, "$sortKey": [.4]},
-    {_id: 2, val: 2, "$searchScore": .3, "$score": .3, "$sortKey": [.3]},
-    {_id: 3, val: 3, "$searchScore": .123, "$score": .123, "$sortKey": [.123]}
+    {_id: 1, val: 1, "$searchScore": 0.4, "$score": 0.4, "$sortKey": [0.4]},
+    {_id: 2, val: 2, "$searchScore": 0.3, "$score": 0.3, "$sortKey": [0.3]},
+    {_id: 3, val: 3, "$searchScore": 0.123, "$score": 0.123, "$sortKey": [0.123]},
 ];
 let expectedMetaResults = [{metaVal: 1}, {metaVal: 2}, {metaVal: 3}, {metaVal: 4}];
 const shardZeroConn = makeInternalConn(st.rs0.getPrimary());
 const shardZeroDB = shardZeroConn.getDB(dbName);
 mockShardZero();
 runTestRequiresMetaCursorOnConn(
-    shardZeroDB, shardPipelineRequiresMetaCursorImplicit, expectedDocs, expectedMetaResults);
+    shardZeroDB,
+    shardPipelineRequiresMetaCursorImplicit,
+    expectedDocs,
+    expectedMetaResults,
+);
 mockShardZero();
 runTestRequiresMetaCursorOnConn(
-    shardZeroDB, shardPipelineRequiresMetaCursorExplicit, expectedDocs, expectedMetaResults);
+    shardZeroDB,
+    shardPipelineRequiresMetaCursorExplicit,
+    expectedDocs,
+    expectedMetaResults,
+);
 mockShardZero(/*metaCursorWillBeKilled*/ true);
 runTestNoMetaCursorOnConn(shardZeroDB, expectedDocs);
 
 // Repeat for second shard.
 expectedDocs = [
-    {_id: 5, val: 5, "$searchScore": .4, "$score": .4, "$sortKey": [.4]},
-    {_id: 6, val: 6, "$searchScore": .3, "$score": .3, "$sortKey": [.3]},
-    {_id: 7, val: 7, "$searchScore": .123, "$score": .123, "$sortKey": [.123]}
+    {_id: 5, val: 5, "$searchScore": 0.4, "$score": 0.4, "$sortKey": [0.4]},
+    {_id: 6, val: 6, "$searchScore": 0.3, "$score": 0.3, "$sortKey": [0.3]},
+    {_id: 7, val: 7, "$searchScore": 0.123, "$score": 0.123, "$sortKey": [0.123]},
 ];
 expectedMetaResults = [{metaVal: 10}, {metaVal: 11}, {metaVal: 12}, {metaVal: 13}];
 const shardOneConn = makeInternalConn(st.rs1.getPrimary());
 const shardOneDB = shardOneConn.getDB(dbName);
 mockShardOne();
-runTestRequiresMetaCursorOnConn(
-    shardOneDB, shardPipelineRequiresMetaCursorImplicit, expectedDocs, expectedMetaResults);
+runTestRequiresMetaCursorOnConn(shardOneDB, shardPipelineRequiresMetaCursorImplicit, expectedDocs, expectedMetaResults);
 mockShardOne();
-runTestRequiresMetaCursorOnConn(
-    shardOneDB, shardPipelineRequiresMetaCursorExplicit, expectedDocs, expectedMetaResults);
+runTestRequiresMetaCursorOnConn(shardOneDB, shardPipelineRequiresMetaCursorExplicit, expectedDocs, expectedMetaResults);
 mockShardOne(/*metaCursorWillBeKilled*/ true);
 runTestNoMetaCursorOnConn(shardOneDB, expectedDocs);
 

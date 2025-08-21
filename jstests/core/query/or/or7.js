@@ -35,9 +35,9 @@ assert.eq(2, t.count({$or: [{a: /^ab/}, {a: /^a/}]}));
 assert.eq(2, t.count({$or: [{a: /^ab/}, {a: /^a/}]}));
 
 t.save({a: "ab"});
-assert.eq(3, t.count({$or: [{a: {$in: [/^ab/], $gte: 'abc'}}, {a: /^a/}]}));
+assert.eq(3, t.count({$or: [{a: {$in: [/^ab/], $gte: "abc"}}, {a: /^a/}]}));
 
 t.remove({});
 t.save({a: "a"});
 t.save({a: "b"});
-assert.eq(2, t.count({$or: [{a: {$gt: 'a', $lt: 'b'}}, {a: {$gte: 'a', $lte: 'b'}}]}));
+assert.eq(2, t.count({$or: [{a: {$gt: "a", $lt: "b"}}, {a: {$gte: "a", $lte: "b"}}]}));

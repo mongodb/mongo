@@ -9,8 +9,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertSameConfigContent, reconfig} from "jstests/replsets/rslib.js";
 
 // Make secondaries unelectable.
-const replTest =
-    new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}]});
+const replTest = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}]});
 replTest.startSet();
 let conf = replTest.getReplSetConfig();
 conf.settings = {

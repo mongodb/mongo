@@ -14,9 +14,9 @@ const st = new ShardingTest({
         rsOptions: {
             setParameter: {
                 internalQueryExecYieldIterations: 1,
-            }
-        }
-    }
+            },
+        },
+    },
 });
 
 const dbName = jsTestName();
@@ -31,15 +31,17 @@ function initCollection(coll) {
     // Total size of the collection should be ~100 MB so that the router can't buffer the whole
     // shard output.
     const padding = "X".repeat((128 * 1024 * 1024) / kDocCount);
-    assert.commandWorked(coll.insert(
-        Array.from({length: kDocCount}, (_, i) => ({_id: i, a: i, b: i, padding: padding}))));
-    st.shardColl(
-        coll.getName(), {_id: 1}, {_id: kDocCount / 2}, {_id: 0}, dbName, true /*waitForDelete*/);
+    assert.commandWorked(
+        coll.insert(Array.from({length: kDocCount}, (_, i) => ({_id: i, a: i, b: i, padding: padding}))),
+    );
+    st.shardColl(coll.getName(), {_id: 1}, {_id: kDocCount / 2}, {_id: 0}, dbName, true /*waitForDelete*/);
 }
 
 function initCursorFind(coll) {
-    const cursor =
-        coll.find({a: {$gte: 0}, b: {$gte: 0}}, {_id: 0, b: 0}).sort({a: 1}).batchSize(1);
+    const cursor = coll
+        .find({a: {$gte: 0}, b: {$gte: 0}}, {_id: 0, b: 0})
+        .sort({a: 1})
+        .batchSize(1);
     assert(cursor.hasNext());
     return cursor;
 }
@@ -54,14 +56,17 @@ function runInterruptTest(createFailpoint, interruptOperation) {
 
     const fp = createFailpoint();
 
-    const awaitShell = startParallelShell(`
+    const awaitShell = startParallelShell(
+        `
 import {assertReleaseMemoryFailedWithCode} from "jstests/libs/release_memory_util.js";
 
 const res = db.runCommand({releaseMemory: [${cursor1.getId()}, ${cursor2.getId()}]});
 jsTest.log("Release memory result: " + tojson(res));
 
 assertReleaseMemoryFailedWithCode(res, ${cursor1.getId()}, [ErrorCodes.Interrupted]);
-`, st.s.port);
+`,
+        st.s.port,
+    );
 
     fp.wait();
     interruptOperation();
@@ -75,18 +80,19 @@ assertReleaseMemoryFailedWithCode(res, ${cursor1.getId()}, [ErrorCodes.Interrupt
 
 function killReleaseMemoryCommandOnMongos() {
     let opId = null;
-    assert.soon(function() {
-        const ops = db.getSiblingDB("admin")
-                        .aggregate([
-                            {$currentOp: {allUsers: true, localOps: true}},
-                            {
-                                $match: {
-                                    op: "command",
-                                    "command.releaseMemory": {$exists: true},
-                                }
-                            }
-                        ])
-                        .toArray();
+    assert.soon(function () {
+        const ops = db
+            .getSiblingDB("admin")
+            .aggregate([
+                {$currentOp: {allUsers: true, localOps: true}},
+                {
+                    $match: {
+                        op: "command",
+                        "command.releaseMemory": {$exists: true},
+                    },
+                },
+            ])
+            .toArray();
 
         if (ops.length > 0) {
             assert.eq(ops.length, 1);
@@ -100,9 +106,9 @@ function killReleaseMemoryCommandOnMongos() {
 }
 
 function configureMongodFailPoint() {
-    return configureFailPoint(st.rs0.getPrimary().getDB(dbName),
-                              "releaseMemoryHangAfterPinCursor",
-                              {namespace: db.coll.getFullName()});
+    return configureFailPoint(st.rs0.getPrimary().getDB(dbName), "releaseMemoryHangAfterPinCursor", {
+        namespace: db.coll.getFullName(),
+    });
 }
 
 runInterruptTest(configureMongodFailPoint, killReleaseMemoryCommandOnMongos);

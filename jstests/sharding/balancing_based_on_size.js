@@ -16,14 +16,14 @@ const st = new ShardingTest({
         configOptions: {
             setParameter: {
                 logComponentVerbosity: tojson({sharding: {verbosity: 2}}),
-                balancerMigrationsThrottlingMs: 100
-            }
-        }
-    }
+                balancerMigrationsThrottlingMs: 100,
+            },
+        },
+    },
 });
 
-const dbName = 'test';
-const coll = st.getDB(dbName).getCollection('foo');
+const dbName = "test";
+const coll = st.getDB(dbName).getCollection("foo");
 const ns = coll.getFullName();
 const mongos = st.s;
 const shard0 = st.shard0.shardName;
@@ -35,7 +35,7 @@ assert.commandWorked(mongos.adminCommand({shardcollection: ns, key: {_id: 1}}));
 assert.commandWorked(mongos.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: shard1}));
 
-const bigString = 'X'.repeat(1024 * 1024);  // 1MB
+const bigString = "X".repeat(1024 * 1024); // 1MB
 
 // Insert 10MB of documents in range [MinKey, 0) on shard0
 var bulk = coll.initializeUnorderedBulkOp();

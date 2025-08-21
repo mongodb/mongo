@@ -18,24 +18,30 @@ var idxName = "a_1";
 let CommonOps = (node) => {
     let testDb = node.getDB(dbName);
     // This creates the collection implicitly and then creates the index.
-    assert.commandWorked(testDb.runCommand({
-        createIndexes: fromColl,
-        indexes: [{
-            key: {
-                "a": 1,
-            },
-            name: idxName
-        }]
-    }));
+    assert.commandWorked(
+        testDb.runCommand({
+            createIndexes: fromColl,
+            indexes: [
+                {
+                    key: {
+                        "a": 1,
+                    },
+                    name: idxName,
+                },
+            ],
+        }),
+    );
 };
 
 // Operations that will be performed on the rollback node past the common point.
 let RollbackOps = (node) => {
     let testDb = node.getDB(dbName);
-    assert.commandWorked(testDb.adminCommand({
-        renameCollection: dbName + "." + fromColl,
-        to: dbName + "." + toColl,
-    }));
+    assert.commandWorked(
+        testDb.adminCommand({
+            renameCollection: dbName + "." + fromColl,
+            to: dbName + "." + toColl,
+        }),
+    );
     assert.commandWorked(testDb.runCommand({dropIndexes: toColl, index: idxName}));
 };
 

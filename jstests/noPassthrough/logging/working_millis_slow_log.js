@@ -20,7 +20,6 @@ assert.commandWorked(coll.insert({a: 1}));
 
 // workingMillis should be present in the slow query log.
 const predicate = new RegExp(`Slow query.*"${coll}.*"workingMillis"`);
-assert(checkLog.checkContainsOnce(primary, predicate),
-       "Could not find log containing " + predicate);
+assert(checkLog.checkContainsOnce(primary, predicate), "Could not find log containing " + predicate);
 
 rst.stopSet();

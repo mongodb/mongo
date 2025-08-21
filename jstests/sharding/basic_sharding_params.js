@@ -16,10 +16,10 @@ function shardingTestUsingObjects() {
                     a1: {verbose: 1},
                     d2: {verbose: 2},
                     d3: {verbose: 2},
-                    d4: {verbose: 2}
-                }
-            }
-        }
+                    d4: {verbose: 2},
+                },
+            },
+        },
     });
 
     var s0 = st.s0;
@@ -61,7 +61,7 @@ function shardingTestUsingArrays() {
     var st = new ShardingTest({
         mongos: [{verbose: 5}, {verbose: 4}],
         config: [{verbose: 3}],
-        shards: [{verbose: 2}, {verbose: 1}]
+        shards: [{verbose: 2}, {verbose: 1}],
     });
 
     var s0 = st.s0;

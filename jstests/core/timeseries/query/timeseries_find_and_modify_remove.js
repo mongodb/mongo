@@ -23,7 +23,7 @@ import {
     makeBucketFilter,
     metaFieldName,
     testFindOneAndRemove,
-    timeFieldName
+    timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
 // findAndModify with a sort option is not supported.
@@ -44,10 +44,7 @@ import {
             expectedDocList: [doc1_a_nofields, doc4_b_f103, doc6_c_f105],
             nDeleted: 0,
             bucketFilter: makeBucketFilter({
-                $and: [
-                    {"control.min.f": {$_internalExprLte: 17}},
-                    {"control.max.f": {$_internalExprGte: 17}},
-                ]
+                $and: [{"control.min.f": {$_internalExprLte: 17}}, {"control.max.f": {$_internalExprGte: 17}}],
             }),
             residualFilter: {f: {$eq: 17}},
             nBucketsUnpacked: 0,
@@ -61,8 +58,7 @@ import {
     testFindOneAndRemove({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
         cmd: {filter: {f: 101}},
-        res:
-            {expectedDocList: [doc1_a_nofields, doc3_a_f102], nDeleted: 1, deletedDoc: doc2_a_f101},
+        res: {expectedDocList: [doc1_a_nofields, doc3_a_f102], nDeleted: 1, deletedDoc: doc2_a_f101},
     });
 })();
 
@@ -77,10 +73,7 @@ import {
             deletedDoc: {f: 102, [metaFieldName]: "A"},
             rootStage: "PROJECTION_DEFAULT",
             bucketFilter: makeBucketFilter({
-                $and: [
-                    {"control.min.f": {$_internalExprLte: 102}},
-                    {"control.max.f": {$_internalExprGte: 102}},
-                ]
+                $and: [{"control.min.f": {$_internalExprLte: 102}}, {"control.max.f": {$_internalExprGte: 102}}],
             }),
             residualFilter: {f: {$eq: 102}},
             nBucketsUnpacked: 1,
@@ -99,10 +92,7 @@ import {
             nDeleted: 1,
             deletedDoc: doc2_a_f101,
             bucketFilter: makeBucketFilter({
-                $and: [
-                    {"control.min.f": {$_internalExprLte: 101}},
-                    {"control.max.f": {$_internalExprGte: 101}},
-                ]
+                $and: [{"control.min.f": {$_internalExprLte: 101}}, {"control.max.f": {$_internalExprGte: 101}}],
             }),
             residualFilter: {f: {$eq: 101}},
             nBucketsUnpacked: 1,
@@ -135,27 +125,18 @@ import {
         res: {
             nDeleted: 1,
             deletedDoc: doc3_a_f102,
-            bucketFilter:
-                makeBucketFilter({meta: {$eq: "A"}}, {"control.max.f": {$_internalExprGt: 101}}),
+            bucketFilter: makeBucketFilter({meta: {$eq: "A"}}, {"control.max.f": {$_internalExprGt: 101}}),
             residualFilter: {f: {$gt: 101}},
             nBucketsUnpacked: 1,
             nReturned: 1,
-        }
+        },
     });
 })();
 
 // Query on the 'f' field matches docs in multiple buckets but only deletes from one.
 (function testMatchMultiBucketOnlyDeletesOne() {
     testFindOneAndRemove({
-        initialDocList: [
-            doc1_a_nofields,
-            doc2_a_f101,
-            doc3_a_f102,
-            doc4_b_f103,
-            doc5_b_f104,
-            doc6_c_f105,
-            doc7_c_f106
-        ],
+        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106],
         cmd: {filter: {f: {$gt: 101}}},
         // Don't validate exact results as we could delete one of a few docs.
         res: {
@@ -171,15 +152,7 @@ import {
 // Empty filter matches all docs but only deletes one.
 (function testEmptyFilterOnlyDeletesOne() {
     testFindOneAndRemove({
-        initialDocList: [
-            doc1_a_nofields,
-            doc2_a_f101,
-            doc3_a_f102,
-            doc4_b_f103,
-            doc5_b_f104,
-            doc6_c_f105,
-            doc7_c_f106
-        ],
+        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106],
         cmd: {filter: {}},
         // Don't validate exact results as we could delete any doc.
         res: {
@@ -187,7 +160,7 @@ import {
             bucketFilter: makeBucketFilter({}),
             residualFilter: {},
             nBucketsUnpacked: 1,
-            nReturned: 1
+            nReturned: 1,
         },
     });
 })();
@@ -196,25 +169,16 @@ import {
 // query-level collation overrides the collection default collation.
 (function testFindAndRemoveWithCollation() {
     testFindOneAndRemove({
-        initialDocList: [
-            doc1_a_nofields,
-            doc2_a_f101,
-            doc3_a_f102,
-            doc4_b_f103,
-            doc5_b_f104,
-            doc6_c_f105,
-            doc7_c_f106
-        ],
+        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106],
         cmd: {
             filter: {[metaFieldName]: "a", f: {$gt: 101}},
             /*caseInsensitive collation*/
-            collation: {locale: "en", strength: 2}
+            collation: {locale: "en", strength: 2},
         },
         res: {
             nDeleted: 1,
             deletedDoc: doc3_a_f102,
-            bucketFilter:
-                makeBucketFilter({meta: {$eq: "a"}}, {"control.max.f": {$_internalExprGt: 101}}),
+            bucketFilter: makeBucketFilter({meta: {$eq: "a"}}, {"control.max.f": {$_internalExprGt: 101}}),
             residualFilter: {f: {$gt: 101}},
             nBucketsUnpacked: 1,
             nReturned: 1,

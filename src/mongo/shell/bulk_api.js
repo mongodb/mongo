@@ -1,4 +1,3 @@
-
 // Batch types
 const INSERT = 1;
 const UPDATE = 2;
@@ -10,12 +9,12 @@ const WRITE_CONCERN_FAILED = 64;
 /**
  * Helper function to define properties
  */
-let defineReadOnlyProperty = function(self, name, value) {
+let defineReadOnlyProperty = function (self, name, value) {
     Object.defineProperty(self, name, {
         enumerable: true,
-        get: function() {
+        get: function () {
             return value;
-        }
+        },
     });
 };
 
@@ -36,58 +35,51 @@ function WriteConcern(wValue, wTimeout, jValue) {
     }
 
     let opts = {};
-    if (typeof wValue == 'object') {
-        if (arguments.length == 1)
-            opts = Object.merge(wValue);
-        else
-            throw Error("If the first arg is an Object then no additional args are allowed!");
+    if (typeof wValue == "object") {
+        if (arguments.length == 1) opts = Object.merge(wValue);
+        else throw Error("If the first arg is an Object then no additional args are allowed!");
     } else {
-        if (typeof wValue != 'undefined')
-            opts.w = wValue;
-        if (typeof wTimeout != 'undefined')
-            opts.wtimeout = wTimeout;
-        if (typeof jValue != 'undefined')
-            opts.j = jValue;
+        if (typeof wValue != "undefined") opts.w = wValue;
+        if (typeof wTimeout != "undefined") opts.wtimeout = wTimeout;
+        if (typeof jValue != "undefined") opts.j = jValue;
     }
 
     // Do basic validation.
-    if (typeof opts.w != 'undefined' && typeof opts.w != 'number' && typeof opts.w != 'string')
+    if (typeof opts.w != "undefined" && typeof opts.w != "number" && typeof opts.w != "string")
         throw Error("w value must be a number or string but was found to be a " + typeof opts.w);
-    if (typeof opts.w == 'number' && NumberInt(opts.w).toNumber() < 0)
+    if (typeof opts.w == "number" && NumberInt(opts.w).toNumber() < 0)
         throw Error("Numeric w value must be equal to or larger than 0, not " + opts.w);
 
-    if (typeof opts.wtimeout != 'undefined') {
-        if (typeof opts.wtimeout != 'number')
-            throw Error("wtimeout must be a number, not " + opts.wtimeout);
+    if (typeof opts.wtimeout != "undefined") {
+        if (typeof opts.wtimeout != "number") throw Error("wtimeout must be a number, not " + opts.wtimeout);
         if (NumberInt(opts.wtimeout).toNumber() < 0)
-            throw Error("wtimeout must be a number greater than or equal to 0, not " +
-                        opts.wtimeout);
+            throw Error("wtimeout must be a number greater than or equal to 0, not " + opts.wtimeout);
     }
 
-    if (typeof opts.j != 'undefined' && typeof opts.j != 'boolean')
+    if (typeof opts.j != "undefined" && typeof opts.j != "boolean")
         throw Error("j value must be true or false if defined, not " + opts.j);
 
     this._wc = opts;
 
-    this.toJSON = function() {
+    this.toJSON = function () {
         return Object.merge({}, this._wc);
     };
 
     /**
      * @return {string}
      */
-    this.tojson = function(indent, nolint) {
+    this.tojson = function (indent, nolint) {
         return tojson(this.toJSON(), indent, nolint);
     };
 
-    this.toString = function() {
+    this.toString = function () {
         return "WriteConcern(" + this.tojson() + ")";
     };
 
-    this.shellPrint = function() {
+    this.shellPrint = function () {
         return this.toString();
     };
-};
+}
 
 /**
  * Wraps the result for write commands and presents a convenient api for accessing
@@ -96,8 +88,7 @@ function WriteConcern(wValue, wTimeout, jValue) {
  * are used to filter the WriteResult to only include relevant result fields.
  */
 function WriteResult(bulkResult, singleBatchType, writeConcern) {
-    if (!(this instanceof WriteResult))
-        return new WriteResult(bulkResult, singleBatchType, writeConcern);
+    if (!(this instanceof WriteResult)) return new WriteResult(bulkResult, singleBatchType, writeConcern);
 
     // Define properties
     defineReadOnlyProperty(this, "ok", bulkResult.ok);
@@ -107,13 +98,12 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
     defineReadOnlyProperty(this, "nModified", bulkResult.nModified);
     defineReadOnlyProperty(this, "nRemoved", bulkResult.nRemoved);
     if (bulkResult.upserted.length > 0) {
-        defineReadOnlyProperty(
-            this, "_id", bulkResult.upserted[bulkResult.upserted.length - 1]._id);
+        defineReadOnlyProperty(this, "_id", bulkResult.upserted[bulkResult.upserted.length - 1]._id);
     }
 
     //
     // Define access methods
-    this.getUpsertedId = function() {
+    this.getUpsertedId = function () {
         if (bulkResult.upserted.length == 0) {
             return null;
         }
@@ -121,11 +111,11 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
         return bulkResult.upserted[bulkResult.upserted.length - 1];
     };
 
-    this.getRawResponse = function() {
+    this.getRawResponse = function () {
         return bulkResult;
     };
 
-    this.getWriteError = function() {
+    this.getWriteError = function () {
         if (!bulkResult.hasOwnProperty("writeErrors") || bulkResult.writeErrors.length == 0) {
             return null;
         } else {
@@ -133,27 +123,26 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
         }
     };
 
-    this.hasWriteError = function() {
+    this.hasWriteError = function () {
         return this.getWriteError() != null;
     };
 
-    this.getWriteConcernError = function() {
-        if (!bulkResult.hasOwnProperty("writeConcernErrors") ||
-            bulkResult.writeConcernErrors.length == 0) {
+    this.getWriteConcernError = function () {
+        if (!bulkResult.hasOwnProperty("writeConcernErrors") || bulkResult.writeConcernErrors.length == 0) {
             return null;
         } else {
             return bulkResult.writeConcernErrors[0];
         }
     };
 
-    this.hasWriteConcernError = function() {
+    this.hasWriteConcernError = function () {
         return this.getWriteConcernError() != null;
     };
 
     /**
      * @return {string}
      */
-    this.tojson = function(indent, nolint) {
+    this.tojson = function (indent, nolint) {
         let result = {};
 
         if (singleBatchType == INSERT) {
@@ -164,8 +153,7 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
             result.nMatched = this.nMatched;
             result.nUpserted = this.nUpserted;
 
-            if (this.nModified != undefined)
-                result.nModified = this.nModified;
+            if (this.nModified != undefined) result.nModified = this.nModified;
 
             if (Array.isArray(bulkResult.upserted) && bulkResult.upserted.length == 1) {
                 result._id = bulkResult.upserted[0]._id;
@@ -193,7 +181,7 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
         return tojson(result, indent, nolint);
     };
 
-    this.toString = function() {
+    this.toString = function () {
         // Suppress all output for the write concern w:0, since the client doesn't care.
         if (writeConcern && writeConcern.w == 0) {
             return "WriteResult(" + tojson({}) + ")";
@@ -201,10 +189,10 @@ function WriteResult(bulkResult, singleBatchType, writeConcern) {
         return "WriteResult(" + this.tojson() + ")";
     };
 
-    this.shellPrint = function() {
+    this.shellPrint = function () {
         return this.toString();
     };
-};
+}
 
 /**
  * Wraps the result for the commands
@@ -223,27 +211,27 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
 
     //
     // Define access methods
-    this.getUpsertedIds = function() {
+    this.getUpsertedIds = function () {
         return bulkResult.upserted;
     };
 
-    this.getUpsertedIdAt = function(index) {
+    this.getUpsertedIdAt = function (index) {
         return bulkResult.upserted[index];
     };
 
-    this.getRawResponse = function() {
+    this.getRawResponse = function () {
         return bulkResult;
     };
 
-    this.hasWriteErrors = function() {
+    this.hasWriteErrors = function () {
         return bulkResult.hasOwnProperty("writeErrors") && bulkResult.writeErrors.length > 0;
     };
 
-    this.getWriteErrorCount = function() {
+    this.getWriteErrorCount = function () {
         return bulkResult.writeErrors.length;
     };
 
-    this.getWriteErrorAt = function(index) {
+    this.getWriteErrorAt = function (index) {
         if (index < bulkResult.writeErrors.length) {
             return bulkResult.writeErrors[index];
         }
@@ -252,16 +240,15 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
 
     //
     // Get all errors
-    this.getWriteErrors = function() {
+    this.getWriteErrors = function () {
         return bulkResult.writeErrors;
     };
 
-    this.hasWriteConcernError = function() {
-        return bulkResult.hasOwnProperty("writeConcernErrors") &&
-            bulkResult.writeConcernErrors.length > 0;
+    this.hasWriteConcernError = function () {
+        return bulkResult.hasOwnProperty("writeConcernErrors") && bulkResult.writeConcernErrors.length > 0;
     };
 
-    this.getWriteConcernError = function() {
+    this.getWriteConcernError = function () {
         if (bulkResult.writeConcernErrors.length == 0) {
             return null;
         } else if (bulkResult.writeConcernErrors.length == 1) {
@@ -286,11 +273,11 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
     /**
      * @return {string}
      */
-    this.tojson = function(indent, nolint) {
+    this.tojson = function (indent, nolint) {
         return tojson(bulkResult, indent, nolint);
     };
 
-    this.toString = function() {
+    this.toString = function () {
         // Suppress all output for the write concern w:0, since the client doesn't care.
         if (writeConcern && writeConcern.w == 0) {
             return "BulkWriteResult(" + tojson({}) + ")";
@@ -298,15 +285,15 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
         return "BulkWriteResult(" + this.tojson() + ")";
     };
 
-    this.shellPrint = function() {
+    this.shellPrint = function () {
         return this.toString();
     };
 
-    this.hasErrors = function() {
+    this.hasErrors = function () {
         return this.hasWriteErrors() || this.hasWriteConcernError();
     };
 
-    this.toError = function() {
+    this.toError = function () {
         if (this.hasErrors()) {
             // Create a combined error message
             let message = "";
@@ -336,12 +323,11 @@ function BulkWriteResult(bulkResult, singleBatchType, writeConcern) {
     /**
      * @return {WriteResult} the simplified results condensed into one.
      */
-    this.toSingleResult = function() {
-        if (singleBatchType == null)
-            throw Error("Cannot output single WriteResult from multiple batch result");
+    this.toSingleResult = function () {
+        if (singleBatchType == null) throw Error("Cannot output single WriteResult from multiple batch result");
         return new WriteResult(bulkResult, singleBatchType, writeConcern);
     };
-};
+}
 
 /**
  * Represents a bulk write error, identical to a BulkWriteResult but thrown
@@ -350,8 +336,8 @@ function BulkWriteError(bulkResult, singleBatchType, writeConcern, message) {
     if (!(this instanceof BulkWriteError))
         return new BulkWriteError(bulkResult, singleBatchType, writeConcern, message);
 
-    this.name = 'BulkWriteError';
-    this.message = message || 'unknown bulk write error';
+    this.name = "BulkWriteError";
+    this.message = message || "unknown bulk write error";
 
     // Bulk errors are basically bulk results with additional error information
     BulkWriteResult.apply(this, arguments);
@@ -359,20 +345,20 @@ function BulkWriteError(bulkResult, singleBatchType, writeConcern, message) {
     // Override some particular methods
     delete this.toError;
 
-    this.toString = function() {
+    this.toString = function () {
         return "BulkWriteError(" + this.tojson() + ")";
     };
-    this.stack = this.toString() + "\n" + (new Error().stack);
+    this.stack = this.toString() + "\n" + new Error().stack;
 
-    this.toResult = function() {
+    this.toResult = function () {
         return new BulkWriteResult(bulkResult, singleBatchType, writeConcern);
     };
-};
+}
 
 BulkWriteError.prototype = Object.create(Error.prototype);
 BulkWriteError.prototype.constructor = BulkWriteError;
 
-let getEmptyBulkResult = function() {
+let getEmptyBulkResult = function () {
     return {
         writeErrors: [],
         writeConcernErrors: [],
@@ -381,7 +367,7 @@ let getEmptyBulkResult = function() {
         nMatched: 0,
         nModified: 0,
         nRemoved: 0,
-        upserted: []
+        upserted: [],
     };
 };
 
@@ -389,8 +375,7 @@ let getEmptyBulkResult = function() {
  * Wraps a command error
  */
 function WriteCommandError(commandError) {
-    if (!(this instanceof WriteCommandError))
-        return new WriteCommandError(commandError);
+    if (!(this instanceof WriteCommandError)) return new WriteCommandError(commandError);
 
     // Define properties
     defineReadOnlyProperty(this, "code", commandError.code);
@@ -399,25 +384,25 @@ function WriteCommandError(commandError) {
         defineReadOnlyProperty(this, "errorLabels", commandError.errorLabels);
     }
 
-    this.name = 'WriteCommandError';
+    this.name = "WriteCommandError";
     this.message = this.errmsg;
 
     /**
      * @return {string}
      */
-    this.tojson = function(indent, nolint) {
+    this.tojson = function (indent, nolint) {
         return tojson(commandError, indent, nolint);
     };
 
-    this.toString = function() {
+    this.toString = function () {
         return "WriteCommandError(" + this.tojson() + ")";
     };
-    this.stack = this.toString() + "\n" + (new Error().stack);
+    this.stack = this.toString() + "\n" + new Error().stack;
 
-    this.shellPrint = function() {
+    this.shellPrint = function () {
         return this.toString();
     };
-};
+}
 
 WriteCommandError.prototype = Object.create(Error.prototype);
 WriteCommandError.prototype.constructor = WriteCommandError;
@@ -426,42 +411,40 @@ WriteCommandError.prototype.constructor = WriteCommandError;
  * Wraps an error for a single write
  */
 function WriteError(err) {
-    if (!(this instanceof WriteError))
-        return new WriteError(err);
+    if (!(this instanceof WriteError)) return new WriteError(err);
 
-    this.name = 'WriteError';
-    this.message = err.errmsg || 'unknown write error';
+    this.name = "WriteError";
+    this.message = err.errmsg || "unknown write error";
 
     // Define properties
     defineReadOnlyProperty(this, "code", err.code);
     defineReadOnlyProperty(this, "index", err.index);
     defineReadOnlyProperty(this, "errmsg", err.errmsg);
     // errInfo field is optional.
-    if (err.hasOwnProperty("errInfo"))
-        defineReadOnlyProperty(this, "errInfo", err.errInfo);
+    if (err.hasOwnProperty("errInfo")) defineReadOnlyProperty(this, "errInfo", err.errInfo);
 
     //
     // Define access methods
-    this.getOperation = function() {
+    this.getOperation = function () {
         return err.op;
     };
 
     /**
      * @return {string}
      */
-    this.tojson = function(indent, nolint) {
+    this.tojson = function (indent, nolint) {
         return tojson(err, indent, nolint);
     };
 
-    this.toString = function() {
+    this.toString = function () {
         return "WriteError(" + tojson(err) + ")";
     };
-    this.stack = this.toString() + "\n" + (new Error().stack);
+    this.stack = this.toString() + "\n" + new Error().stack;
 
-    this.shellPrint = function() {
+    this.shellPrint = function () {
         return this.toString();
     };
-};
+}
 
 WriteError.prototype = Object.create(Error.prototype);
 WriteError.prototype.constructor = WriteError;
@@ -470,11 +453,10 @@ WriteError.prototype.constructor = WriteError;
  * Wraps a write concern error
  */
 function WriteConcernError(err) {
-    if (!(this instanceof WriteConcernError))
-        return new WriteConcernError(err);
+    if (!(this instanceof WriteConcernError)) return new WriteConcernError(err);
 
-    this.name = 'WriteConcernError';
-    this.message = err.errmsg || 'unknown write concern error';
+    this.name = "WriteConcernError";
+    this.message = err.errmsg || "unknown write concern error";
 
     // Define properties
     defineReadOnlyProperty(this, "code", err.code);
@@ -484,19 +466,19 @@ function WriteConcernError(err) {
     /**
      * @return {string}
      */
-    this.tojson = function(indent, nolint) {
+    this.tojson = function (indent, nolint) {
         return tojson(err, indent, nolint);
     };
 
-    this.toString = function() {
+    this.toString = function () {
         return "WriteConcernError(" + tojson(err) + ")";
     };
-    this.stack = this.toString() + "\n" + (new Error().stack);
+    this.stack = this.toString() + "\n" + new Error().stack;
 
-    this.shellPrint = function() {
+    this.shellPrint = function () {
         return this.toString();
     };
-};
+}
 
 WriteConcernError.prototype = Object.create(Error.prototype);
 WriteConcernError.prototype.constructor = WriteConcernError;
@@ -505,7 +487,7 @@ WriteConcernError.prototype.constructor = WriteConcernError;
  * Keeps the state of an unordered batch so we can rewrite the results
  * correctly after command execution
  */
-let Batch = function(batchType, originalZeroIndex) {
+let Batch = function (batchType, originalZeroIndex) {
     this.originalZeroIndex = originalZeroIndex;
     this.batchType = batchType;
     this.operations = [];
@@ -514,7 +496,7 @@ let Batch = function(batchType, originalZeroIndex) {
 /***********************************************************
  * Wraps the operations done for the batch
  ***********************************************************/
-let Bulk = function(collection, ordered) {
+let Bulk = function (collection, ordered) {
     let coll = collection;
     let executed = false;
 
@@ -537,10 +519,10 @@ let Bulk = function(collection, ordered) {
     let currentBatchSizeBytes = 0;
     let batches = [];
 
-    let defineBatchTypeCounter = function(self, name, type) {
+    let defineBatchTypeCounter = function (self, name, type) {
         Object.defineProperty(self, name, {
             enumerable: true,
-            get: function() {
+            get: function () {
                 let counter = 0;
 
                 for (let i = 0; i < batches.length; i++) {
@@ -554,7 +536,7 @@ let Bulk = function(collection, ordered) {
                 }
 
                 return counter;
-            }
+            },
         });
     };
 
@@ -563,24 +545,24 @@ let Bulk = function(collection, ordered) {
     defineBatchTypeCounter(this, "nRemoveOps", REMOVE);
 
     // Convert bulk into string
-    this.toString = function() {
+    this.toString = function () {
         return this.tojson();
     };
 
-    this.tojson = function() {
+    this.tojson = function () {
         return tojson({
             nInsertOps: this.nInsertOps,
             nUpdateOps: this.nUpdateOps,
             nRemoveOps: this.nRemoveOps,
-            nBatches: batches.length + (currentBatch == null ? 0 : 1)
+            nBatches: batches.length + (currentBatch == null ? 0 : 1),
         });
     };
 
-    this.getOperations = function() {
+    this.getOperations = function () {
         return batches;
     };
 
-    let finalizeBatch = function(newDocType) {
+    let finalizeBatch = function (newDocType) {
         // Save the batch to the execution stack
         batches.push(currentBatch);
 
@@ -593,9 +575,8 @@ let Bulk = function(collection, ordered) {
     };
 
     // Add to internal list of documents
-    let addToOperationsList = function(docType, document) {
-        if (Array.isArray(document))
-            throw Error("operation passed in cannot be an Array");
+    let addToOperationsList = function (docType, document) {
+        if (Array.isArray(document)) throw Error("operation passed in cannot be an Array");
 
         // Get the bsonSize
         let bsonSize = Object.bsonsize(document);
@@ -606,14 +587,15 @@ let Bulk = function(collection, ordered) {
         }
 
         // Create a new batch object if we don't have a current one
-        if (currentBatch == null)
-            currentBatch = new Batch(docType, currentIndex);
+        if (currentBatch == null) currentBatch = new Batch(docType, currentIndex);
 
         // Finalize and create a new batch if this op would take us over the
         // limits *or* if this op is of a different type
-        if (currentBatchSize + 1 > maxNumberOfDocsInBatch ||
+        if (
+            currentBatchSize + 1 > maxNumberOfDocsInBatch ||
             (currentBatchSize > 0 && currentBatchSizeBytes + bsonSize >= maxBatchSizeBytes) ||
-            currentBatch.batchType != docType) {
+            currentBatch.batchType != docType
+        ) {
             finalizeBatch(docType);
         }
 
@@ -630,16 +612,16 @@ let Bulk = function(collection, ordered) {
      * @returns true if the document needs an _id and false otherwise
      */
     function documentNeedsId(obj) {
-        return typeof (obj._id) == "undefined" && !Array.isArray(obj);
-    };
+        return typeof obj._id == "undefined" && !Array.isArray(obj);
+    }
 
     /**
      * @return {Object} a new document with an _id: ObjectId if _id is not present.
      *     Otherwise, returns the same object passed.
      */
-    let addIdIfNeeded = function(obj) {
+    let addIdIfNeeded = function (obj) {
         if (documentNeedsId(obj)) {
-            let tmp = obj;  // don't want to modify input
+            let tmp = obj; // don't want to modify input
             obj = {_id: new ObjectId()};
             for (let key in tmp) {
                 obj[key] = tmp[key];
@@ -654,31 +636,31 @@ let Bulk = function(collection, ordered) {
      *
      * @param document {Object} the document to insert.
      */
-    this.insert = function(document) {
+    this.insert = function (document) {
         return addToOperationsList(INSERT, document);
     };
 
     //
     // Find based operations
     const findOperations = {
-        update: function(updateDocument) {
+        update: function (updateDocument) {
             // Set the top value for the update 0 = multi true, 1 = multi false
-            let upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
+            let upsert = typeof currentOp.upsert == "boolean" ? currentOp.upsert : false;
             // Establish the update command
             let document = {q: currentOp.selector, u: updateDocument, multi: true, upsert: upsert};
 
             // Copy over the hint, if we have one.
-            if (currentOp.hasOwnProperty('hint')) {
+            if (currentOp.hasOwnProperty("hint")) {
                 document.hint = currentOp.hint;
             }
 
             // Copy over the collation, if we have one.
-            if (currentOp.hasOwnProperty('collation')) {
+            if (currentOp.hasOwnProperty("collation")) {
                 document.collation = currentOp.collation;
             }
 
             // Copy over the arrayFilters, if we have them.
-            if (currentOp.hasOwnProperty('arrayFilters')) {
+            if (currentOp.hasOwnProperty("arrayFilters")) {
                 document.arrayFilters = currentOp.arrayFilters;
             }
 
@@ -688,29 +670,29 @@ let Bulk = function(collection, ordered) {
             return addToOperationsList(UPDATE, document);
         },
 
-        updateOne: function(updateDocument) {
+        updateOne: function (updateDocument) {
             // Set the top value for the update 0 = multi true, 1 = multi false
-            let upsert = typeof currentOp.upsert == 'boolean' ? currentOp.upsert : false;
+            let upsert = typeof currentOp.upsert == "boolean" ? currentOp.upsert : false;
             // Establish the update command
             let document = {q: currentOp.selector, u: updateDocument, multi: false, upsert: upsert};
 
             // Copy over the sort, if we have one.
-            if (currentOp.hasOwnProperty('sort')) {
+            if (currentOp.hasOwnProperty("sort")) {
                 document.sort = currentOp.sort;
             }
 
             // Copy over the hint, if we have one.
-            if (currentOp.hasOwnProperty('hint')) {
+            if (currentOp.hasOwnProperty("hint")) {
                 document.hint = currentOp.hint;
             }
 
             // Copy over the collation, if we have one.
-            if (currentOp.hasOwnProperty('collation')) {
+            if (currentOp.hasOwnProperty("collation")) {
                 document.collation = currentOp.collation;
             }
 
             // Copy over the arrayFilters, if we have them.
-            if (currentOp.hasOwnProperty('arrayFilters')) {
+            if (currentOp.hasOwnProperty("arrayFilters")) {
                 document.arrayFilters = currentOp.arrayFilters;
             }
 
@@ -720,36 +702,36 @@ let Bulk = function(collection, ordered) {
             return addToOperationsList(UPDATE, document);
         },
 
-        replaceOne: function(updateDocument) {
+        replaceOne: function (updateDocument) {
             // Cannot use pipeline-style updates in a replacement operation.
             if (Array.isArray(updateDocument)) {
-                throw new Error('Cannot use pipeline-style updates in a replacement operation');
+                throw new Error("Cannot use pipeline-style updates in a replacement operation");
             }
             findOperations.updateOne(updateDocument);
         },
 
-        upsert: function() {
+        upsert: function () {
             currentOp.upsert = true;
             // Return the findOperations
             return findOperations;
         },
 
-        sort: function(sort) {
+        sort: function (sort) {
             currentOp.sort = sort;
             return findOperations;
         },
 
-        hint: function(hint) {
+        hint: function (hint) {
             currentOp.hint = hint;
             return findOperations;
         },
 
-        removeOne: function() {
+        removeOne: function () {
             // Establish the removeOne command
             let document = {q: currentOp.selector, limit: 1};
 
             // Copy over the collation, if we have one.
-            if (currentOp.hasOwnProperty('collation')) {
+            if (currentOp.hasOwnProperty("collation")) {
                 document.collation = currentOp.collation;
             }
 
@@ -759,12 +741,12 @@ let Bulk = function(collection, ordered) {
             return addToOperationsList(REMOVE, document);
         },
 
-        remove: function() {
+        remove: function () {
             // Establish the remove command
             let document = {q: currentOp.selector, limit: 0};
 
             // Copy over the collation, if we have one.
-            if (currentOp.hasOwnProperty('collation')) {
+            if (currentOp.hasOwnProperty("collation")) {
                 document.collation = currentOp.collation;
             }
 
@@ -774,12 +756,12 @@ let Bulk = function(collection, ordered) {
             return addToOperationsList(REMOVE, document);
         },
 
-        collation: function(collationSpec) {
+        collation: function (collationSpec) {
             currentOp.collation = collationSpec;
             return findOperations;
         },
 
-        arrayFilters: function(filters) {
+        arrayFilters: function (filters) {
             currentOp.arrayFilters = filters;
             return findOperations;
         },
@@ -787,9 +769,8 @@ let Bulk = function(collection, ordered) {
 
     //
     // Start of update and remove operations
-    this.find = function(selector) {
-        if (selector == undefined)
-            throw Error("find() requires query criteria");
+    this.find = function (selector) {
+        if (selector == undefined) throw Error("find() requires query criteria");
         // Save a current selector
         currentOp = {selector: selector};
 
@@ -797,17 +778,17 @@ let Bulk = function(collection, ordered) {
         return findOperations;
     };
 
-    this.setRawData = function(userRawData) {
+    this.setRawData = function (userRawData) {
         rawData = userRawData;
     };
 
-    this.setLetParams = function(userLet) {
+    this.setLetParams = function (userLet) {
         letParams = userLet;
     };
 
     //
     // Merge write command result into aggregated results object
-    let mergeBatchResults = function(batch, bulkResult, result) {
+    let mergeBatchResults = function (batch, bulkResult, result) {
         // If we have an insert Batch type
         if (batch.batchType == INSERT) {
             bulkResult.nInserted = bulkResult.nInserted + result.n;
@@ -827,7 +808,7 @@ let Bulk = function(collection, ordered) {
             for (let i = 0; i < result.upserted.length; i++) {
                 bulkResult.upserted.push({
                     index: result.upserted[i].index + batch.originalZeroIndex,
-                    _id: result.upserted[i]._id
+                    _id: result.upserted[i]._id,
                 });
             }
         } else if (result.upserted) {
@@ -853,11 +834,11 @@ let Bulk = function(collection, ordered) {
                     index: batch.originalZeroIndex + result.writeErrors[i].index,
                     code: result.writeErrors[i].code,
                     errmsg: result.writeErrors[i].errmsg,
-                    op: batch.operations[result.writeErrors[i].index]
+                    op: batch.operations[result.writeErrors[i].index],
                 };
                 let errInfo = result.writeErrors[i].errInfo;
                 if (errInfo) {
-                    writeError['errInfo'] = errInfo;
+                    writeError["errInfo"] = errInfo;
                 }
 
                 bulkResult.writeErrors.push(new WriteError(writeError));
@@ -871,7 +852,7 @@ let Bulk = function(collection, ordered) {
 
     //
     // Constructs the write batch command.
-    let buildBatchCmd = function(batch) {
+    let buildBatchCmd = function (batch) {
         let cmd = null;
 
         // Generate the right update
@@ -879,7 +860,7 @@ let Bulk = function(collection, ordered) {
             cmd = {update: coll.getName(), updates: batch.operations, ordered: ordered};
         } else if (batch.batchType == INSERT) {
             let transformedInserts = [];
-            batch.operations.forEach(function(insertDoc) {
+            batch.operations.forEach(function (insertDoc) {
                 transformedInserts.push(addIdIfNeeded(insertDoc));
             });
             batch.operations = transformedInserts;
@@ -910,8 +891,12 @@ let Bulk = function(collection, ordered) {
                 kWireVersionSupportingRetryableWrites <= coll.getMongo().getMaxWireVersion();
 
             const session = collection.getDB().getSession();
-            if (serverSupportsRetryableWrites && session.getOptions().shouldRetryWrites() &&
-                _ServerSession.canRetryWrites(cmd) && !session._serverSession.isTxnActive()) {
+            if (
+                serverSupportsRetryableWrites &&
+                session.getOptions().shouldRetryWrites() &&
+                _ServerSession.canRetryWrites(cmd) &&
+                !session._serverSession.isTxnActive()
+            ) {
                 cmd = session._serverSession.assignTransactionNumber(cmd);
             }
         }
@@ -921,7 +906,7 @@ let Bulk = function(collection, ordered) {
 
     //
     // Execute the batch
-    let executeBatch = function(batch) {
+    let executeBatch = function (batch) {
         let result = null;
         let cmd = buildBatchCmd(batch);
 
@@ -937,19 +922,16 @@ let Bulk = function(collection, ordered) {
     };
 
     // Execute the batch
-    this.execute = function(_writeConcern) {
-        if (executed)
-            throw Error("A bulk operation cannot be re-executed");
+    this.execute = function (_writeConcern) {
+        if (executed) throw Error("A bulk operation cannot be re-executed");
 
         // If writeConcern set, use it, else get from collection (which will inherit from
         // db/mongo)
         writeConcern = _writeConcern ? _writeConcern : coll.getWriteConcern();
-        if (writeConcern instanceof WriteConcern)
-            writeConcern = writeConcern.toJSON();
+        if (writeConcern instanceof WriteConcern) writeConcern = writeConcern.toJSON();
 
         // If we have current batch
-        if (currentBatch)
-            batches.push(currentBatch);
+        if (currentBatch) batches.push(currentBatch);
 
         // Execute all the batches
         for (let i = 0; i < batches.length; i++) {
@@ -971,7 +953,10 @@ let Bulk = function(collection, ordered) {
 
         // Create final result object
         let typedResult = new BulkWriteResult(
-            bulkResult, batches.length == 1 ? batches[0].batchType : null, writeConcern);
+            bulkResult,
+            batches.length == 1 ? batches[0].batchType : null,
+            writeConcern,
+        );
         // Throw on error
         if (typedResult.hasErrors()) {
             throw typedResult.toError();
@@ -983,7 +968,7 @@ let Bulk = function(collection, ordered) {
     // Generate an explain command for the bulk operation. Currently we only support single
     // batches
     // of size 1, which must be either delete or update.
-    this.convertToExplainCmd = function(verbosity) {
+    this.convertToExplainCmd = function (verbosity) {
         // If we have current batch
         if (currentBatch) {
             batches.push(currentBatch);
@@ -1003,11 +988,11 @@ let Bulk = function(collection, ordered) {
 function initializeUnorderedBulkOp() {
     // `this` will be the DBCollection instance
     return new Bulk(this, false);
-};
+}
 function initializeOrderedBulkOp() {
     // `this` will be the DBCollection instance
     return new Bulk(this, true);
-};
+}
 
 export {
     WriteConcern,
@@ -1018,5 +1003,5 @@ export {
     WriteError,
     WriteConcernError,
     initializeUnorderedBulkOp,
-    initializeOrderedBulkOp
+    initializeOrderedBulkOp,
 };

@@ -30,7 +30,7 @@ coll.insertOne({
     "array2": [1, 2, 3, "string"],
     "array3": [12.4, 5.6, 9.805],
     "arrayNested1": [[1, 2, 3], new Map()],
-    "arrayNested2": [[1, 2, 3], 4, null]
+    "arrayNested2": [[1, 2, 3], 4, null],
 });
 
 // Single non-array input.

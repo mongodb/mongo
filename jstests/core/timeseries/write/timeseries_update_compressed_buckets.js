@@ -33,17 +33,20 @@ let coll;
 
 function assertBucketsAreCompressed(db, coll) {
     const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().toArray();
-    bucketDocs.forEach(bucketDoc => {
-        assert(TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
-               `Expected bucket to be compressed: ${tojson(bucketDoc)}`);
+    bucketDocs.forEach((bucketDoc) => {
+        assert(
+            TimeseriesTest.isBucketCompressed(bucketDoc.control.version),
+            `Expected bucket to be compressed: ${tojson(bucketDoc)}`,
+        );
     });
 }
 
 function prepareCompressedBucket() {
     coll = db.getCollection(collNamePrefix + count++);
     coll.drop();
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     // Insert enough documents to trigger bucket compression.
     let docs = [];
@@ -53,29 +56,34 @@ function prepareCompressedBucket() {
             [timeFieldName]: dateTime,
             [metaFieldName]: "meta",
             f: i,
-            str: (i % 2 == 0 ? "even" : "odd")
+            str: i % 2 == 0 ? "even" : "odd",
         });
     }
     assert.commandWorked(coll.insert(docs));
 
     // Check the buckets to make sure it generated what we expect.
-    const bucketDocs =
-        getTimeseriesCollForRawOps(coll).find().rawData().sort({'control.min._id': 1}).toArray();
+    const bucketDocs = getTimeseriesCollForRawOps(coll).find().rawData().sort({"control.min._id": 1}).toArray();
     if (!TestData.runningWithBalancer && !TestData.isRunningFCVUpgradeDowngradeSuite) {
         assert.eq(2, bucketDocs.length, tojson(bucketDocs));
-        assert.eq(0,
-                  bucketDocs[0].control.min.f,
-                  "Expected first bucket to start at 0. " + tojson(bucketDocs));
-        assert.eq(bucketMaxCount - 1,
-                  bucketDocs[0].control.max.f,
-                  `Expected first bucket to end at ${bucketMaxCount - 1}. ${tojson(bucketDocs)}`);
-        assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
-               `Expected first bucket to be compressed. ${tojson(bucketDocs)}`);
-        assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
-               `Expected second bucket to be compressed. ${tojson(bucketDocs)}`);
-        assert.eq(bucketMaxCount,
-                  bucketDocs[1].control.min.f,
-                  `Expected second bucket to start at ${bucketMaxCount}. ${tojson(bucketDocs)}`);
+        assert.eq(0, bucketDocs[0].control.min.f, "Expected first bucket to start at 0. " + tojson(bucketDocs));
+        assert.eq(
+            bucketMaxCount - 1,
+            bucketDocs[0].control.max.f,
+            `Expected first bucket to end at ${bucketMaxCount - 1}. ${tojson(bucketDocs)}`,
+        );
+        assert(
+            TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
+            `Expected first bucket to be compressed. ${tojson(bucketDocs)}`,
+        );
+        assert(
+            TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
+            `Expected second bucket to be compressed. ${tojson(bucketDocs)}`,
+        );
+        assert.eq(
+            bucketMaxCount,
+            bucketDocs[1].control.min.f,
+            `Expected second bucket to start at ${bucketMaxCount}. ${tojson(bucketDocs)}`,
+        );
     } else {
         // If we are running with moveCollection or FCV upgrade in the background, we may run into
         // the issue described by SERVER-89349 which can result in more bucket documents than
@@ -84,9 +92,7 @@ function prepareCompressedBucket() {
         assert.lte(2, bucketDocs.length, tojson(bucketDocs));
         let currMin = 0;
         bucketDocs.forEach((doc) => {
-            assert.eq(currMin,
-                      doc.control.min.f,
-                      `Expected bucket to start at ${currMin}. ${tojson(bucketDocs)}`);
+            assert.eq(currMin, doc.control.min.f, `Expected bucket to start at ${currMin}. ${tojson(bucketDocs)}`);
             assert(TimeseriesTest.isBucketCompressed(doc.control.version));
             currMin = doc.control.max.f + 1;
         });
@@ -97,22 +103,26 @@ function prepareCompressedBucket() {
 prepareCompressedBucket();
 let result = assert.commandWorked(coll.updateMany({str: "even"}, {$inc: {updated: 1}}));
 assert.eq(numDocs / 2, result.modifiedCount);
-assert.eq(coll.countDocuments({updated: 1, str: "even"}),
-          numDocs / 2,
-          "Expected records matching the filter to be updated.");
-assert.eq(coll.countDocuments({updated: 1, str: "odd"}),
-          0,
-          "Expected records not matching the filter not to be updated.");
+assert.eq(
+    coll.countDocuments({updated: 1, str: "even"}),
+    numDocs / 2,
+    "Expected records matching the filter to be updated.",
+);
+assert.eq(
+    coll.countDocuments({updated: 1, str: "odd"}),
+    0,
+    "Expected records not matching the filter not to be updated.",
+);
 assertBucketsAreCompressed(db, coll);
 
 // Update one record from the compressed bucket.
 prepareCompressedBucket();
 result = assert.commandWorked(coll.updateOne({str: "even", f: {$lt: 100}}, {$inc: {updated: 1}}));
 assert.eq(1, result.modifiedCount);
-assert.eq(coll.countDocuments({updated: 1, str: "even", f: {$lt: 100}}),
-          1,
-          "Expected exactly one record matching the filter to be updated.");
-assert.eq(coll.countDocuments({updated: 1}),
-          1,
-          "Expected records not matching the filter not to be updated.");
+assert.eq(
+    coll.countDocuments({updated: 1, str: "even", f: {$lt: 100}}),
+    1,
+    "Expected exactly one record matching the filter to be updated.",
+);
+assert.eq(coll.countDocuments({updated: 1}), 1, "Expected records not matching the filter not to be updated.");
 assertBucketsAreCompressed(db, coll);

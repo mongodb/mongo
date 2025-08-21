@@ -20,15 +20,15 @@ export class SelinuxBaseTest {
                 "destination": "file",
                 "logAppend": true,
                 "path": "/var/log/mongodb/mongod.log",
-                "verbosity": 0
+                "verbosity": 0,
             },
             "processManagement": {
                 "pidFilePath": "/var/run/mongodb/mongod.pid",
-                "timeZoneInfo": "/usr/share/zoneinfo"
+                "timeZoneInfo": "/usr/share/zoneinfo",
             },
             "net": {"port": 27017, "bindIp": "127.0.0.1"},
             "storage": {"dbPath": "/var/lib/mongo"},
-            "setParameter": {"enableTestCommands": 1}
+            "setParameter": {"enableTestCommands": 1},
         };
     }
 
@@ -42,15 +42,13 @@ export class SelinuxBaseTest {
      * Called by test executors (e.g. evergreen/selinux_test_executor.sh)
      * to set up the test environment
      */
-    setup() {
-    }
+    setup() {}
 
     /**
      * Called by test executors (e.g. evergreen/selinux_test_executor.sh)
      * to tear down test configurations at the end of the test run
      */
-    teardown() {
-    }
+    teardown() {}
 
     /**
      * Called by test executors (e.g. evergreen/selinux_test_executor.sh)

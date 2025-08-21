@@ -7,13 +7,10 @@
 //   command_not_supported_in_serverless,
 // ]
 
-const localDB = db.getSiblingDB(`${jsTestName()}` +
-                                "_local_db");
-const outputDBName = `${jsTestName()}` +
-    "_output_db";
+const localDB = db.getSiblingDB(`${jsTestName()}` + "_local_db");
+const outputDBName = `${jsTestName()}` + "_output_db";
 const outputDB = db.getSiblingDB(outputDBName);
-const uninvolvedDB = db.getSiblingDB(`${jsTestName()}` +
-                                     "_uninvolved_db");
+const uninvolvedDB = db.getSiblingDB(`${jsTestName()}` + "_uninvolved_db");
 
 assert.commandWorked(localDB.dropDatabase());
 assert.commandWorked(outputDB.dropDatabase());
@@ -41,8 +38,7 @@ function runTest({
     let localTarget = localColl;
     if (localTargetIsView) {
         localColl = localDB[localTargetName + "_coll"];
-        assert.commandWorked(
-            localDB.createView(localTargetName, localColl.getName(), [] /* identity view */));
+        assert.commandWorked(localDB.createView(localTargetName, localColl.getName(), [] /* identity view */));
         localTarget = localDB[localTargetName];
     }
 
@@ -53,12 +49,12 @@ function runTest({
     let foreignColl_uninvolvedDB = uninvolvedDB[foreignTargetName];
     if (foreignTargetIsView) {
         foreignColl = localDB[foreignTargetName + "_coll"];
-        assert.commandWorked(
-            localDB.createView(foreignTargetName, foreignColl.getName(), [] /* identity view */));
+        assert.commandWorked(localDB.createView(foreignTargetName, foreignColl.getName(), [] /* identity view */));
 
         foreignColl_uninvolvedDB = uninvolvedDB[foreignTargetName + "_coll"];
-        assert.commandWorked(uninvolvedDB.createView(
-            foreignTargetName, foreignColl_uninvolvedDB.getName(), [] /* identity view */));
+        assert.commandWorked(
+            uninvolvedDB.createView(foreignTargetName, foreignColl_uninvolvedDB.getName(), [] /* identity view */),
+        );
     }
 
     // Populate the local collection.
@@ -73,8 +69,7 @@ function runTest({
     assert.commandWorked(outputDB.createCollection("uninvolvedColl"));
 
     // Run the pipeline against localColl which writes to outputColl.
-    assert.commandWorked(
-        localDB.runCommand({aggregate: localTarget.getName(), pipeline: pipeline, cursor: {}}));
+    assert.commandWorked(localDB.runCommand({aggregate: localTarget.getName(), pipeline: pipeline, cursor: {}}));
 
     assert.sameMembers(outputDB[foreignTargetName].find().toArray(), expectedOutput);
 
@@ -89,10 +84,10 @@ const foreignField = "num";
 const outputField = "_id";
 
 const outSpec = {
-    "$out": {"db": outputDB.getName(), "coll": foreignTargetName}
+    "$out": {"db": outputDB.getName(), "coll": foreignTargetName},
 };
 const mergeSpec = {
-    "$merge": {"into": {"db": outputDB.getName(), "coll": foreignTargetName}}
+    "$merge": {"into": {"db": outputDB.getName(), "coll": foreignTargetName}},
 };
 
 // $lookup/$graphLookup tests
@@ -106,7 +101,7 @@ const mergeSpec = {
         localInput: localInput,
         foreignInput: foreignInput,
         foreignInput_uninvolvedDB: foreignInput_uninvolvedDB,
-        expectedOutput: expectedOutput
+        expectedOutput: expectedOutput,
     };
 
     const unwindSpec = {"$unwind": "$" + outputField};
@@ -119,8 +114,8 @@ const mergeSpec = {
                 "from": foreignTargetName,
                 "as": outputField,
                 "localField": localField,
-                "foreignField": foreignField
-            }
+                "foreignField": foreignField,
+            },
         };
 
         // $out tests
@@ -154,8 +149,8 @@ const mergeSpec = {
                 "startWith": "$" + localField,
                 "connectFromField": "does_not_exist",
                 "connectToField": foreignField,
-                "as": outputField
-            }
+                "as": outputField,
+            },
         };
 
         // $out tests
@@ -193,13 +188,13 @@ const mergeSpec = {
         localInput: localInput,
         foreignInput: foreignInput,
         foreignInput_uninvolvedDB: foreignInput_uninvolvedDB,
-        expectedOutput: expectedOutput
+        expectedOutput: expectedOutput,
     };
 
     const unionWithSpec = {
         "$unionWith": {
             "coll": foreignTargetName,
-        }
+        },
     };
 
     // $out tests

@@ -9,7 +9,9 @@ assert.commandWorked(coll.insert({_id: 5, a: [5, {b: 5}]}));
 
 function getIds(query) {
     let ids = [];
-    coll.find(query).sort({_id: 1}).forEach(doc => ids.push(doc._id));
+    coll.find(query)
+        .sort({_id: 1})
+        .forEach((doc) => ids.push(doc._id));
     return ids;
 }
 

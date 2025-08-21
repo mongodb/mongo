@@ -17,8 +17,7 @@ assert.commandWorked(collB.insert({hello: "world"}));
 jsTest.log("Enabling sharding...");
 
 assert.commandWorked(mongosA.getDB("admin").adminCommand({enableSharding: "" + collA.getDB()}));
-assert.commandWorked(
-    mongosA.getDB("admin").adminCommand({shardCollection: "" + collA, key: {_id: 1}}));
+assert.commandWorked(mongosA.getDB("admin").adminCommand({shardCollection: "" + collA, key: {_id: 1}}));
 
 // MongoD doesn't know about the config shard version *until* MongoS tells it
 collA.findOne();

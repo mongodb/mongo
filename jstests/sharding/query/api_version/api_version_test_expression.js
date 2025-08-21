@@ -40,81 +40,96 @@ st.shardColl(collName, {a: 1}, {a: middle}, {a: middle + 1}, dbName);
 // Assert error thrown when the command specifies apiStrict:true and an inner pipeline contains an
 // unstable expression.
 const unstableInnerPipeline = [{$project: {v: {$_testApiVersion: {unstable: true}}}}];
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: collName,
-    pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
-    cursor: {},
-    apiStrict: true,
-    apiVersion: "1"
-}),
-                             ErrorCodes.APIStrictError);
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: collName,
-    pipeline: [{$unionWith: {coll: collForeignName, pipeline: unstableInnerPipeline}}],
-    cursor: {},
-    apiStrict: true,
-    apiVersion: "1"
-}),
-                             ErrorCodes.APIStrictError);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
+        cursor: {},
+        apiStrict: true,
+        apiVersion: "1",
+    }),
+    ErrorCodes.APIStrictError,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [{$unionWith: {coll: collForeignName, pipeline: unstableInnerPipeline}}],
+        cursor: {},
+        apiStrict: true,
+        apiVersion: "1",
+    }),
+    ErrorCodes.APIStrictError,
+);
 
 // Assert command worked when the command specifies apiStrict:false and an inner pipeline contains
 // an unstable expression.
-assert.commandWorked(db.runCommand({
-    aggregate: collName,
-    pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
-    cursor: {},
-    apiStrict: false,
-    apiVersion: "1"
-}));
-assert.commandWorked(db.runCommand({
-    aggregate: collName,
-    pipeline: [{$unionWith: {coll: collForeignName, pipeline: unstableInnerPipeline}}],
-    cursor: {},
-    apiStrict: false,
-    apiVersion: "1"
-}));
+assert.commandWorked(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: unstableInnerPipeline}}],
+        cursor: {},
+        apiStrict: false,
+        apiVersion: "1",
+    }),
+);
+assert.commandWorked(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [{$unionWith: {coll: collForeignName, pipeline: unstableInnerPipeline}}],
+        cursor: {},
+        apiStrict: false,
+        apiVersion: "1",
+    }),
+);
 
 // Assert error thrown when the command specifies apiDeprecationErrors:true and an inner pipeline
 // contains a deprecated expression.
 const deprecatedInnerPipeline = [{$project: {v: {$_testApiVersion: {deprecated: true}}}}];
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: collName,
-    pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
-    cursor: {},
-    apiDeprecationErrors: true,
-    apiVersion: "1"
-}),
-                             ErrorCodes.APIDeprecationError);
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: collName,
-    pipeline: [{$unionWith: {coll: collForeignName, pipeline: deprecatedInnerPipeline}}],
-    cursor: {},
-    apiDeprecationErrors: true,
-    apiVersion: "1"
-}),
-                             ErrorCodes.APIDeprecationError);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
+        cursor: {},
+        apiDeprecationErrors: true,
+        apiVersion: "1",
+    }),
+    ErrorCodes.APIDeprecationError,
+);
+assert.commandFailedWithCode(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [{$unionWith: {coll: collForeignName, pipeline: deprecatedInnerPipeline}}],
+        cursor: {},
+        apiDeprecationErrors: true,
+        apiVersion: "1",
+    }),
+    ErrorCodes.APIDeprecationError,
+);
 
 // Assert command worked when the command specifies apiDeprecationErrors:false and an inner pipeline
 // contains a deprecated expression.
-assert.commandWorked(db.runCommand({
-    aggregate: collName,
-    pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
-    cursor: {},
-    apiDeprecationErrors: false,
-    apiVersion: "1"
-}));
-assert.commandWorked(db.runCommand({
-    aggregate: collName,
-    pipeline: [{$unionWith: {coll: collForeignName, pipeline: deprecatedInnerPipeline}}],
-    cursor: {},
-    apiDeprecationErrors: false,
-    apiVersion: "1"
-}));
+assert.commandWorked(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [{$lookup: {from: collForeignName, as: "output", pipeline: deprecatedInnerPipeline}}],
+        cursor: {},
+        apiDeprecationErrors: false,
+        apiVersion: "1",
+    }),
+);
+assert.commandWorked(
+    db.runCommand({
+        aggregate: collName,
+        pipeline: [{$unionWith: {coll: collForeignName, pipeline: deprecatedInnerPipeline}}],
+        cursor: {},
+        apiDeprecationErrors: false,
+        apiVersion: "1",
+    }),
+);
 
 // Create a view with {apiStrict: true}.
 db.view.drop();
-assert.commandWorked(db.runCommand(
-    {create: "view", viewOn: collName, pipeline: [], apiStrict: true, apiVersion: "1"}));
+assert.commandWorked(db.runCommand({create: "view", viewOn: collName, pipeline: [], apiStrict: true, apiVersion: "1"}));
 // find() on views should work normally if 'apiStrict' is true.
 assert.commandWorked(db.runCommand({find: "view", apiStrict: true, apiVersion: "1"}));
 

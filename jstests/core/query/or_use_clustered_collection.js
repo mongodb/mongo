@@ -18,7 +18,7 @@ import {
     getAggPlanStages,
     getPlanStage,
     getPlanStages,
-    getWinningPlanFromExplain
+    getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -28,8 +28,7 @@ assertDropCollection(db, coll.getName());
 const isSbeGroupEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 // Create a clustered collection and create indexes.
-assert.commandWorked(
-    db.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(db.createCollection(coll.getName(), {clusteredIndex: {key: {_id: 1}, unique: true}}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({c: 1}));
 assert.commandWorked(coll.createIndex({b: "text"}));
@@ -57,16 +56,18 @@ function assertCorrectResults({query, expectedDocIds, projection, limit, skip}) 
         // Confirm we only skipped 1 document.
         assert.eq(results.length, expectedDocIds.length - 1);
         // Remove the document that was skipped.
-        expectedDocIds = expectedDocIds.filter(id => results.some(el => el["_id"] == id));
+        expectedDocIds = expectedDocIds.filter((id) => results.some((el) => el["_id"] == id));
     }
-    expectedDocIds.forEach(id => projection
-                               ? expectedResults.push({"_id": docs[id]["_id"], "a": docs[id]["a"]})
-                               : expectedResults.push(docs[id]));
+    expectedDocIds.forEach((id) =>
+        projection
+            ? expectedResults.push({"_id": docs[id]["_id"], "a": docs[id]["a"]})
+            : expectedResults.push(docs[id]),
+    );
     if (limit) {
         assert.eq(results.length, 2);
         assert.neq(results[0]["_id"], results[1]["_id"]);
         for (let i = 0; i < results.length; ++i) {
-            let doc = expectedResults.filter(r => r["_id"] == results[i]["_id"]);
+            let doc = expectedResults.filter((r) => r["_id"] == results[i]["_id"]);
             assert.eq(1, doc.length);
             assert.docEq(doc[0], results[i]);
         }
@@ -82,21 +83,17 @@ assertCorrectResults({query: coll.find({$or: [{_id: 123}, {a: 11}]}), expectedDo
 
 //$or query which uses a clustered collection scan plan and secondary index plan, and each predicate
 // matches some of the documents.
-assertCorrectResults(
-    {query: coll.find({$or: [{_id: 9}, {a: {$lte: 3}}]}), expectedDocIds: [0, 1, 2, 3, 9]});
+assertCorrectResults({query: coll.find({$or: [{_id: 9}, {a: {$lte: 3}}]}), expectedDocIds: [0, 1, 2, 3, 9]});
 
 // $or query which uses a clustered collection scan plan and secondary index plan, and some
 // documents match both predicates.
-assertCorrectResults(
-    {query: coll.find({$or: [{_id: {$lt: 2}}, {a: {$lte: 3}}]}), expectedDocIds: [0, 1, 2, 3]});
+assertCorrectResults({query: coll.find({$or: [{_id: {$lt: 2}}, {a: {$lte: 3}}]}), expectedDocIds: [0, 1, 2, 3]});
 
 //  $or query that uses two clustered collection scan plans.
-assertCorrectResults(
-    {query: coll.find({$or: [{_id: {$lt: 2}}, {_id: {$gt: 8}}]}), expectedDocIds: [0, 1, 9]});
+assertCorrectResults({query: coll.find({$or: [{_id: {$lt: 2}}, {_id: {$gt: 8}}]}), expectedDocIds: [0, 1, 9]});
 
 // $or query that uses two secondary index scan plans.
-assertCorrectResults(
-    {query: coll.find({$or: [{a: {$lt: 2}}, {a: {$gt: 8}}]}), expectedDocIds: [0, 1, 9]});
+assertCorrectResults({query: coll.find({$or: [{a: {$lt: 2}}, {a: {$gt: 8}}]}), expectedDocIds: [0, 1, 9]});
 
 function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWithCount}) {
     // TODO SERVER-77601 add coll.find(query).sort({_id: 1}) to 'queries'.
@@ -104,7 +101,7 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
         {
             explainQuery: coll.explain().find(query).finish(),
             additionalStages: {},
-            actualQuery: coll.find(query)
+            actualQuery: coll.find(query),
         },
         {
             explainQuery: coll.explain().find(query, {_id: 1, a: 1}).limit(2).finish(),
@@ -128,20 +125,19 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
             aggregate: true,
         },
         {
-            explainQuery: coll.explain().aggregate(
-                [{$match: query}, {$group: {_id: null, count: {$sum: 1}}}]),
+            explainQuery: coll.explain().aggregate([{$match: query}, {$group: {_id: null, count: {$sum: 1}}}]),
             additionalStages: {"GROUP": 1},
             actualQuery: coll.aggregate([{$match: query}, {$group: {_id: null, count: {$sum: 1}}}]),
-            aggregate: true
+            aggregate: true,
         },
         {
             explainQuery: coll.explain().find(query).count(),
             additionalStages: {"COUNT": 1},
             actualQuery: coll.find(query).count(),
-        }
+        },
     ];
 
-    testCases.forEach(test => {
+    testCases.forEach((test) => {
         const explain = test.explainQuery;
 
         // If there is a 'SHARD_MERGE' stage or 'shards', then we should expect more than our
@@ -151,10 +147,10 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
 
         // There won't be a 'FETCH' stage if we have a 'COUNT' or 'GROUP' stage with just index scan
         // plans.
-        const count = test.additionalStages.hasOwnProperty('COUNT');
-        const fetch = expectedStageCount.hasOwnProperty('FETCH');
-        const group = test.additionalStages.hasOwnProperty('GROUP');
-        const skip = test.additionalStages.hasOwnProperty('SKIP');
+        const count = test.additionalStages.hasOwnProperty("COUNT");
+        const fetch = expectedStageCount.hasOwnProperty("FETCH");
+        const group = test.additionalStages.hasOwnProperty("GROUP");
+        const skip = test.additionalStages.hasOwnProperty("SKIP");
         if (noFetchWithCount && (count || group) && fetch) {
             expectedStageCount["FETCH"] = 0;
         }
@@ -172,29 +168,33 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
         // Validate all the stages appear the correct number of times in the winning plan.
         const expectedStages = Object.assign({}, expectedStageCount, test.additionalStages);
         for (let stage in expectedStages) {
-            let planStages =
-                test.aggregate ? getAggPlanStages(explain, stage) : getPlanStages(explain, stage);
+            let planStages = test.aggregate ? getAggPlanStages(explain, stage) : getPlanStages(explain, stage);
             assert(planStages, tojson(explain));
             if (shardMergeStage || shards) {
-                assert.gte(planStages.length,
-                           expectedStages[stage],
-                           "Expected " + stage + " to appear, but got plan: " + tojson(explain));
+                assert.gte(
+                    planStages.length,
+                    expectedStages[stage],
+                    "Expected " + stage + " to appear, but got plan: " + tojson(explain),
+                );
             } else {
-                assert.eq(planStages.length,
-                          expectedStages[stage],
-                          "Expected " + stage + " to appear, but got plan: " + tojson(explain));
+                assert.eq(
+                    planStages.length,
+                    expectedStages[stage],
+                    "Expected " + stage + " to appear, but got plan: " + tojson(explain),
+                );
             }
         }
 
-        const projection = test.additionalStages.hasOwnProperty('PROJECTION_SIMPLE');
-        const limit = test.additionalStages.hasOwnProperty('LIMIT');
+        const projection = test.additionalStages.hasOwnProperty("PROJECTION_SIMPLE");
+        const limit = test.additionalStages.hasOwnProperty("LIMIT");
         if (count || group) {
             // If we have GROUP stage we are in an aggregation pipeline.
             let results = group ? test.actualQuery.toArray()[0]["count"] : test.actualQuery;
-            assert.eq(expectedDocIds.length,
-                      results,
-                      "Expected " + expectedDocIds.length.toString() + " number of docs, but got " +
-                          tojson(test.actualQuery));
+            assert.eq(
+                expectedDocIds.length,
+                results,
+                "Expected " + expectedDocIds.length.toString() + " number of docs, but got " + tojson(test.actualQuery),
+            );
         } else {
             assertCorrectResults({
                 query: test.actualQuery,
@@ -214,7 +214,7 @@ function validateQueryOR({query, expectedStageCount, expectedDocIds, noFetchWith
         query: query,
         expectedStageCount: expectedStageCount,
         expectedDocIds: expectedDocIds,
-        noFetchWithCount: noFetchWithCount
+        noFetchWithCount: noFetchWithCount,
     });
 }
 
@@ -238,20 +238,20 @@ validateQueryOR({
     expectedDocIds: [0, 5, 6, 7, 8, 9],
     // This is an optimization for IXSCAN for count queries that does not exist for plans with
     // clustered indexes.
-    noFetchWithCount: true
+    noFetchWithCount: true,
 });
 
 // $or with 2 CLUSTERED_IXSCAN stages.
 validateQueryOR({
     query: {$or: [{_id: {$lt: 1}}, {_id: {$gt: 8}}]},
     expectedStageCount: {"CLUSTERED_IXSCAN": 2},
-    expectedDocIds: [0, 9]
+    expectedDocIds: [0, 9],
 });
 
 validateQueryOR({
     query: {$or: [{_id: {$gt: 5}}, {_id: 8}]},
     expectedStageCount: {"CLUSTERED_IXSCAN": 2},
-    expectedDocIds: [6, 7, 8, 9]
+    expectedDocIds: [6, 7, 8, 9],
 });
 
 // $or with many children branches that are either IXSCAN or CLUSTERED_IXSCAN stages. Note that we
@@ -259,21 +259,21 @@ validateQueryOR({
 validateQueryOR({
     query: {$or: [{_id: {$gt: 5}}, {_id: 8}, {a: 1}, {a: 1}, {a: {$gte: 8}}]},
     expectedStageCount: {"CLUSTERED_IXSCAN": 2, "IXSCAN": 1},
-    expectedDocIds: [1, 6, 7, 8, 9]
+    expectedDocIds: [1, 6, 7, 8, 9],
 });
 
 // $or with many children branches that are either IXSCAN or CLUSTERED_IXSCAN stages.
 validateQueryOR({
     query: {$or: [{_id: {$gt: 7}}, {_id: 8}, {a: 1}, {a: {$gte: 8}}, {c: {$lt: 10}}]},
     expectedStageCount: {"CLUSTERED_IXSCAN": 2, "IXSCAN": 2},
-    expectedDocIds: [0, 1, 2, 3, 4, 8, 9]
+    expectedDocIds: [0, 1, 2, 3, 4, 8, 9],
 });
 
 // $or query where the branch of the clustered collection scan is not a leaf node.
 validateQueryOR({
     query: {$or: [{a: 1}, {$and: [{_id: {$gt: 7}}, {_id: {$lt: 10}}]}]},
     expectedStageCount: {"CLUSTERED_IXSCAN": 1, "IXSCAN": 1, "FETCH": 1},
-    expectedDocIds: [1, 8, 9]
+    expectedDocIds: [1, 8, 9],
 });
 
 // $or inside an $and should not change, and still use a FETCH with an IXSCAN.
@@ -300,7 +300,7 @@ validateQueryPlan({
 validateQueryPlan({
     query: {d: {$elemMatch: {$or: [{e: 6}, {g: 2}]}}},
     expectedStageCount: {"COLLSCAN": 1, "OR": 0},
-    expectedDocIds: [3, 4]
+    expectedDocIds: [3, 4],
 });
 
 // $or inside an $elemMatch that is indexed should use only IXSCAN.
@@ -316,8 +316,11 @@ validateQueryOR({
 // We prevented allowing MERGE_SORT plans with clustered collection scans, so the plan should
 // fallback to using a collection scan.
 function validateQuerySort() {
-    let explain =
-        coll.explain().find({$or: [{_id: {$lt: 1}}, {_id: {$gt: 8}}]}).sort({_id: 1}).finish();
+    let explain = coll
+        .explain()
+        .find({$or: [{_id: {$lt: 1}}, {_id: {$gt: 8}}]})
+        .sort({_id: 1})
+        .finish();
     const winningPlan = getWinningPlanFromExplain(explain);
     let expectedStageCount = {"MERGE_SORT": 0, "COLLSCAN": 1, "CLUSTERED_IXSCAN": 0, "OR": 0};
     const shardMergeStage = haveShardMergeStage(winningPlan, "SHARD_MERGE_SORT");
@@ -326,18 +329,22 @@ function validateQuerySort() {
         let planStages = getPlanStages(winningPlan, stage);
         assert(planStages, tojson(winningPlan));
         if (shardMergeStage || shards) {
-            assert.gte(planStages.length,
-                       expectedStageCount[stage],
-                       "Expected " + stage + " to appear, but got plan: " + tojson(winningPlan));
+            assert.gte(
+                planStages.length,
+                expectedStageCount[stage],
+                "Expected " + stage + " to appear, but got plan: " + tojson(winningPlan),
+            );
         } else {
-            assert.eq(planStages.length,
-                      expectedStageCount[stage],
-                      "Expected " + stage + " to appear, but got plan: " + tojson(winningPlan));
+            assert.eq(
+                planStages.length,
+                expectedStageCount[stage],
+                "Expected " + stage + " to appear, but got plan: " + tojson(winningPlan),
+            );
         }
     }
     assertCorrectResults({
         query: coll.find({$or: [{_id: {$lt: 1}}, {_id: {$gt: 8}}]}).sort({_id: 1}),
-        expectedDocIds: [0, 9]
+        expectedDocIds: [0, 9],
     });
 }
 validateQuerySort();
@@ -350,7 +357,7 @@ validateQuerySort();
 validateQueryOR({
     query: {$or: [{$text: {$search: "foo"}}, {_id: 1}]},
     expectedStageCount: {"CLUSTERED_IXSCAN": 1, "TEXT_MATCH": 1, "IXSCAN": 1},
-    expectedDocIds: [0, 1, 5, 6]
+    expectedDocIds: [0, 1, 5, 6],
 });
 
 // $or with a text index work with a clustered collection scan plan and a secondary index scan plan.
@@ -359,7 +366,7 @@ validateQueryOR({
 validateQueryOR({
     query: {$or: [{$text: {$search: "foo"}}, {_id: {$lt: 2}}, {a: 9}]},
     expectedStageCount: {"CLUSTERED_IXSCAN": 1, "TEXT_MATCH": 1, "IXSCAN": 2},
-    expectedDocIds: [0, 1, 5, 6, 9]
+    expectedDocIds: [0, 1, 5, 6, 9],
 });
 
 // $or inside an and with a text index works.
@@ -377,6 +384,5 @@ validateQueryOR({
 });
 
 // $or with a text index and an unindexed field should still fail.
-const err =
-    assert.throws(() => coll.find({$or: [{$text: {$search: "foo"}}, {noIndex: 1}]}).toArray());
+const err = assert.throws(() => coll.find({$or: [{$text: {$search: "foo"}}, {noIndex: 1}]}).toArray());
 assert.commandFailedWithCode(err, ErrorCodes.NoQueryExecutionPlans);

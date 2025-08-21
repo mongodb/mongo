@@ -5,7 +5,7 @@
 let coll = db.stress_test_unique_index_unique;
 coll.drop();
 
-const kNumDocs = 500000;  // ~15 MB
+const kNumDocs = 500000; // ~15 MB
 
 function loadCollectionWithDocs(collection, numDocs) {
     const kMaxChunkSize = 100000;

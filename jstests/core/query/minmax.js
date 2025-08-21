@@ -27,8 +27,7 @@ assert.eq(2, coll.find().hint({a: 1, b: 1}).min({a: 1, b: 2}).max({a: 2, b: 2}).
 assert.eq(3, coll.find().hint({a: 1, b: 1}).min({a: 1, b: 2}).toArray().length);
 assert.eq(3, coll.find().hint({a: 1, b: 1}).max({a: 2, b: 1.5}).toArray().length);
 assert.eq(3, coll.find().hint({a: 1, b: 1}).min({a: 1, b: 2}).hint({a: 1, b: 1}).toArray().length);
-assert.eq(3,
-          coll.find().hint({a: 1, b: 1}).max({a: 2, b: 1.5}).hint({a: 1, b: 1}).toArray().length);
+assert.eq(3, coll.find().hint({a: 1, b: 1}).max({a: 2, b: 1.5}).hint({a: 1, b: 1}).toArray().length);
 
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1, b: -1}));
@@ -37,42 +36,40 @@ assert.eq(4, coll.find().hint({a: 1, b: -1}).min({a: 1, b: 2}).toArray().length)
 assert.eq(4, coll.find().hint({a: 1, b: -1}).max({a: 2, b: 0.5}).toArray().length);
 assert.eq(1, coll.find().hint({a: 1, b: -1}).min({a: 2, b: 1}).toArray().length);
 assert.eq(1, coll.find().hint({a: 1, b: -1}).max({a: 1, b: 1.5}).toArray().length);
-assert.eq(4,
-          coll.find().hint({a: 1, b: -1}).min({a: 1, b: 2}).hint({a: 1, b: -1}).toArray().length);
-assert.eq(4,
-          coll.find().hint({a: 1, b: -1}).max({a: 2, b: 0.5}).hint({a: 1, b: -1}).toArray().length);
-assert.eq(1,
-          coll.find().hint({a: 1, b: -1}).min({a: 2, b: 1}).hint({a: 1, b: -1}).toArray().length);
-assert.eq(1,
-          coll.find().hint({a: 1, b: -1}).max({a: 1, b: 1.5}).hint({a: 1, b: -1}).toArray().length);
+assert.eq(4, coll.find().hint({a: 1, b: -1}).min({a: 1, b: 2}).hint({a: 1, b: -1}).toArray().length);
+assert.eq(4, coll.find().hint({a: 1, b: -1}).max({a: 2, b: 0.5}).hint({a: 1, b: -1}).toArray().length);
+assert.eq(1, coll.find().hint({a: 1, b: -1}).min({a: 2, b: 1}).hint({a: 1, b: -1}).toArray().length);
+assert.eq(1, coll.find().hint({a: 1, b: -1}).max({a: 1, b: 1.5}).hint({a: 1, b: -1}).toArray().length);
 
 // Check that min/max requires a hint.
-assert.throwsWithCode(() => coll.find().min({a: 1, b: 2}).max({a: 2, b: 1}).toArray(),
-                      [ErrorCodes.NoQueryExecutionPlans, 51173]);
+assert.throwsWithCode(
+    () => coll.find().min({a: 1, b: 2}).max({a: 2, b: 1}).toArray(),
+    [ErrorCodes.NoQueryExecutionPlans, 51173],
+);
 
 // Hint doesn't match.
-let error = assert.throws(function() {
+let error = assert.throws(function () {
     coll.find().min({a: 1}).hint({a: 1, b: -1}).toArray();
 });
 assert.eq(error.code, 51174, error);
 
-error = assert.throws(function() {
+error = assert.throws(function () {
     coll.find().min({a: 1, b: 1}).max({a: 1}).hint({a: 1, b: -1}).toArray();
 });
 assert.eq(error.code, 51176, error);
 
-error = assert.throws(function() {
+error = assert.throws(function () {
     coll.find().min({b: 1}).max({a: 1, b: 2}).hint({a: 1, b: -1}).toArray();
 });
 assert.eq(error.code, 51176, error);
 
 // No query solutions.
-error = assert.throws(function() {
+error = assert.throws(function () {
     coll.find().min({a: 1}).hint({$natural: 1}).toArray();
 });
 assert.eq(error.code, ErrorCodes.NoQueryExecutionPlans, error);
 
-assert.throwsWithCode(function() {
+assert.throwsWithCode(function () {
     coll.find().max({a: 1}).hint({$natural: 1}).toArray();
 }, ErrorCodes.NoQueryExecutionPlans);
 
@@ -84,16 +81,16 @@ for (let i = 0; i < 10; ++i) {
 
 // Reverse direction scan of the a:1 index between a:6 (inclusive) and a:3 (exclusive) is
 // expected to fail, as max must be > min.
-assert.throwsWithCode(function() {
+assert.throwsWithCode(function () {
     coll.find().hint({a: 1}).min({a: 6}).max({a: 3}).sort({a: -1}).toArray();
 }, 51175);
 
 // A find with identical min and max values is expected to fail, as max is exclusive.
-assert.throwsWithCode(function() {
+assert.throwsWithCode(function () {
     coll.find().hint({a: 1}).min({a: 2}).max({a: 2}).toArray();
 }, 51175);
 
-assert.throwsWithCode(function() {
+assert.throwsWithCode(function () {
     coll.find().hint({a: 1}).min({a: 2}).max({a: 2}).sort({a: -1}).toArray();
 }, 51175);
 
@@ -101,7 +98,7 @@ coll.drop();
 addData();
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
-assert.throwsWithCode(function() {
+assert.throwsWithCode(function () {
     coll.find().min({a: 1, b: 2}).max({a: 1, b: 2}).hint({a: 1, b: 1}).toArray();
 }, 51175);
 

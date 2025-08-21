@@ -5,11 +5,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-import {
-    getPlanStage,
-    getWinningPlanFromExplain,
-    planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.explain_multikey;
 const keyPattern = {
@@ -40,8 +36,7 @@ function createIndexAndRunExplain(testOptions) {
     assert.commandWorked(explain);
     const winningPlan = getWinningPlanFromExplain(explain);
 
-    assert(planHasStage(db, winningPlan, testOptions.stage),
-           "expected stage to be present: " + tojson(explain));
+    assert(planHasStage(db, winningPlan, testOptions.stage), "expected stage to be present: " + tojson(explain));
     return getPlanStage(winningPlan, testOptions.stage);
 }
 
@@ -51,7 +46,10 @@ function verifyMultikeyInfoInExplainOutput(testOptions) {
     // Insert a document that should cause the index to be multikey.
     testOptions.docToInsert = {
         a: 1,
-        b: [{c: ["w", "x"], d: 3}, {c: ["y", "z"], d: 4}],
+        b: [
+            {c: ["w", "x"], d: 3},
+            {c: ["y", "z"], d: 4},
+        ],
     };
     let stage = createIndexAndRunExplain(testOptions);
 

@@ -6,8 +6,13 @@ var replTest = new ReplSetTest({name: name, nodes: 2});
 var nodes = replTest.nodeList();
 
 replTest.startSet();
-replTest.initiate(
-    {"_id": name, "members": [{"_id": 0, "host": nodes[0]}, {"_id": 1, "host": nodes[1]}]});
+replTest.initiate({
+    "_id": name,
+    "members": [
+        {"_id": 0, "host": nodes[0]},
+        {"_id": 1, "host": nodes[1]},
+    ],
+});
 
 var primary = replTest.getPrimary().getDB(name);
 var secondary = replTest.getSecondary().getDB(name);

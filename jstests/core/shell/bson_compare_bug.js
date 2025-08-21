@@ -3,9 +3,16 @@ db.bson_compare_bug.drop();
 // We want some BSON objects for this test. One convenient way to get that is to insert them
 // into the database and then get them back through a query.
 const coll = db.bson_compare_bug;
-assert.commandWorked(coll.insert(
-    [{_id: 1, obj: {val: [], _id: 1}}, {_id: 2, obj: {val: []}}, {_id: 3, obj: {_id: 1, val: []}}],
-    {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    coll.insert(
+        [
+            {_id: 1, obj: {val: [], _id: 1}},
+            {_id: 2, obj: {val: []}},
+            {_id: 3, obj: {_id: 1, val: []}},
+        ],
+        {writeConcern: {w: "majority"}},
+    ),
+);
 
 // The $replaceRoot is so we can get back two results that have an "_id" field and one that
 // doesn't. The first two results from this query are the same, except for that.

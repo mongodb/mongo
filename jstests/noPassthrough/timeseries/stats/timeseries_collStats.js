@@ -14,8 +14,8 @@ const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
 const conn = MongoRunner.runMongod({
     setParameter: {
         timeseriesIdleBucketExpiryMemoryUsageThreshold: kIdleBucketExpiryMemoryUsageThreshold,
-        timeseriesBucketMinCount: 1
-    }
+        timeseriesBucketMinCount: 1,
+    },
 });
 
 const dbName = jsTestName();
@@ -23,20 +23,21 @@ const testDB = conn.getDB(dbName);
 
 assert.commandWorked(testDB.dropDatabase());
 
-const coll = testDB.getCollection('t');
+const coll = testDB.getCollection("t");
 
-const timeFieldName = 'time';
-const metaFieldName = 'meta';
+const timeFieldName = "time";
+const metaFieldName = "meta";
 
 const expectedStats = {
-    bucketsNs: getTimeseriesCollForDDLOps(testDB, coll).getFullName()
+    bucketsNs: getTimeseriesCollForDDLOps(testDB, coll).getFullName(),
 };
 let initialized = false;
 
-const clearCollection = function() {
+const clearCollection = function () {
     coll.drop();
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     expectedStats.bucketCount = 0;
     expectedStats.numBucketInserts = 0;
@@ -63,14 +64,13 @@ const clearCollection = function() {
 };
 clearCollection();
 
-const checkCollStats = function(empty = false, disableSizeClosureCheck = false) {
+const checkCollStats = function (empty = false, disableSizeClosureCheck = false) {
     const stats = assert.commandWorked(coll.stats());
 
     assert.eq(coll.getFullName(), stats.ns);
 
     for (let [stat, value] of Object.entries(expectedStats)) {
-        if (stat === 'numBucketsClosedDueToMemoryThreshold' ||
-            stat === 'numBucketsArchivedDueToMemoryThreshold') {
+        if (stat === "numBucketsClosedDueToMemoryThreshold" || stat === "numBucketsArchivedDueToMemoryThreshold") {
             // Idle bucket expiration behavior will be non-deterministic since buckets are hashed
             // into shards within the catalog based on metadata, and expiration is done on a
             // per-shard basis. We just want to make sure that if we are expecting the number to be
@@ -82,41 +82,44 @@ const checkCollStats = function(empty = false, disableSizeClosureCheck = false) 
             // least one of those inserted buckets that we expect to have triggered an expiration
             // did in fact land in a shard with an existing idle bucket that it could expire.
             if (value > 33) {
-                assert.gte(TimeseriesTest.getStat(stats.timeseries, stat),
-                           1,
-                           "Invalid 'timeseries." + stat +
-                               "' value in collStats: " + tojson(stats.timeseries));
+                assert.gte(
+                    TimeseriesTest.getStat(stats.timeseries, stat),
+                    1,
+                    "Invalid 'timeseries." + stat + "' value in collStats: " + tojson(stats.timeseries),
+                );
             }
         } else {
-            if (disableSizeClosureCheck && stat == 'numBucketsClosedDueToSize') {
+            if (disableSizeClosureCheck && stat == "numBucketsClosedDueToSize") {
                 // With SERVER-107584 it is not possible to deterministically know when an archived
                 // bucket will in fact be archived or closed. The current archival policy is set to
                 // random, and a test cannot check size on random buckets.
                 continue;
             } else {
-                assert.eq(TimeseriesTest.getStat(stats.timeseries, stat),
-                          value,
-                          "Invalid 'timeseries." + stat +
-                              "' value in collStats: " + tojson(stats.timeseries));
+                assert.eq(
+                    TimeseriesTest.getStat(stats.timeseries, stat),
+                    value,
+                    "Invalid 'timeseries." + stat + "' value in collStats: " + tojson(stats.timeseries),
+                );
             }
         }
     }
 
     if (empty) {
-        assert(!stats.timeseries.hasOwnProperty('avgBucketSize'));
-        assert(!stats.timeseries.hasOwnProperty('avgNumMeasurementsPerCommit'));
+        assert(!stats.timeseries.hasOwnProperty("avgBucketSize"));
+        assert(!stats.timeseries.hasOwnProperty("avgNumMeasurementsPerCommit"));
     } else {
         assert.gt(stats.timeseries.avgBucketSize, 0);
     }
 
-    assert(!stats.timeseries.hasOwnProperty('count'));
-    assert(!stats.timeseries.hasOwnProperty('avgObjSize'));
+    assert(!stats.timeseries.hasOwnProperty("count"));
+    assert(!stats.timeseries.hasOwnProperty("avgObjSize"));
 
     if (expectedStats.numCompressedBuckets > 0) {
-        assert.lt(stats.timeseries["numBytesCompressed"],
-                  stats.timeseries["numBytesUncompressed"],
-                  "Invalid 'timeseries.numBytesCompressed' value in collStats: " +
-                      tojson(stats.timeseries));
+        assert.lt(
+            stats.timeseries["numBytesCompressed"],
+            stats.timeseries["numBytesUncompressed"],
+            "Invalid 'timeseries.numBytesCompressed' value in collStats: " + tojson(stats.timeseries),
+        );
     }
 };
 checkCollStats(true);
@@ -132,8 +135,7 @@ expectedStats.avgNumMeasurementsPerCommit = 3;
 expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
-assert.commandWorked(
-    coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}}, {ordered: false}));
+assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}}, {ordered: false}));
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
 expectedStats.numBucketsOpenedDueToMetadata++;
@@ -143,8 +145,7 @@ expectedStats.avgNumMeasurementsPerCommit = 2;
 expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
-assert.commandWorked(
-    coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}}, {ordered: false}));
+assert.commandWorked(coll.insert({[timeFieldName]: ISODate(), [metaFieldName]: {a: 2}}, {ordered: false}));
 expectedStats.numBucketUpdates++;
 expectedStats.numCommits++;
 expectedStats.numMeasurementsCommitted++;
@@ -159,8 +160,9 @@ expectedStats.numMeasurementsCommitted += 5;
 expectedStats.avgNumMeasurementsPerCommit = 2;
 checkCollStats();
 
-assert.commandWorked(coll.insert(
-    {[timeFieldName]: ISODate("2021-01-01T01:00:00Z"), [metaFieldName]: {a: 1}}, {ordered: false}));
+assert.commandWorked(
+    coll.insert({[timeFieldName]: ISODate("2021-01-01T01:00:00Z"), [metaFieldName]: {a: 1}}, {ordered: false}),
+);
 expectedStats.bucketCount++;
 expectedStats.numBucketInserts++;
 expectedStats.numCommits++;
@@ -172,7 +174,7 @@ checkCollStats();
 // Assumes each bucket has a limit of 1000 measurements.
 const bucketMaxCount = 1000;
 let numDocs = bucketMaxCount + 100;
-docs = Array(numDocs).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 'limit_count'}});
+docs = Array(numDocs).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: "limit_count"}});
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += 2;
 expectedStats.numBucketInserts += 2;
@@ -180,19 +182,18 @@ expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numBucketsClosedDueToCount++;
 expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += numDocs;
-expectedStats.avgNumMeasurementsPerCommit =
-    Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+expectedStats.avgNumMeasurementsPerCommit = Math.floor(
+    expectedStats.numMeasurementsCommitted / expectedStats.numCommits,
+);
 expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
 // Assumes each bucket has a limit of 1000 measurements. We change the order twice of fields in the
 // subobj we are storing. Should be 2 'numSubObjCompressionRestart' if bucket compression is
 // enabled.
-docs = Array(500).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 37}, x: {'a': 1, 'b': 1}});
-docs = docs.concat(
-    Array(1).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 37}, x: {'b': 1, 'a': 1}}));
-docs = docs.concat(
-    Array(500).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 37}, x: {'a': 1, 'b': 1}}));
+docs = Array(500).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 37}, x: {"a": 1, "b": 1}});
+docs = docs.concat(Array(1).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 37}, x: {"b": 1, "a": 1}}));
+docs = docs.concat(Array(500).fill({[timeFieldName]: ISODate(), [metaFieldName]: {a: 37}, x: {"a": 1, "b": 1}}));
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += 2;
 expectedStats.numBucketInserts += 2;
@@ -200,8 +201,9 @@ expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numBucketsClosedDueToCount++;
 expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += 1001;
-expectedStats.avgNumMeasurementsPerCommit =
-    Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+expectedStats.avgNumMeasurementsPerCommit = Math.floor(
+    expectedStats.numMeasurementsCommitted / expectedStats.numCommits,
+);
 expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
@@ -212,9 +214,8 @@ numDocs = 2;
 // to leave a little room for the _id and the time fields.
 // This test leaves the bucket with a single measurement which will cause compression to be
 // by-passed. The stats tracking of compressed buckets will thus also be by-passed.
-let largeValue = 'x'.repeat((bucketMaxSizeKB - 1) * 1024);
-docs = Array(numDocs).fill(
-    {[timeFieldName]: ISODate(), x: largeValue, [metaFieldName]: {a: 'limit_size'}});
+let largeValue = "x".repeat((bucketMaxSizeKB - 1) * 1024);
+docs = Array(numDocs).fill({[timeFieldName]: ISODate(), x: largeValue, [metaFieldName]: {a: "limit_size"}});
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
 expectedStats.numBucketInserts += numDocs;
@@ -222,8 +223,9 @@ expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numBucketsClosedDueToSize++;
 expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
-expectedStats.avgNumMeasurementsPerCommit =
-    Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+expectedStats.avgNumMeasurementsPerCommit = Math.floor(
+    expectedStats.numMeasurementsCommitted / expectedStats.numCommits,
+);
 expectedStats.numBucketQueriesFailed++;
 checkCollStats();
 
@@ -234,7 +236,7 @@ const docTimes = [ISODate("2020-11-13T01:00:00Z"), ISODate("2020-11-13T03:00:00Z
 numDocs = 2;
 docs = [];
 for (let i = 0; i < numDocs; i++) {
-    docs.push({[timeFieldName]: docTimes[i], [metaFieldName]: {a: 'limit_time_range'}});
+    docs.push({[timeFieldName]: docTimes[i], [metaFieldName]: {a: "limit_time_range"}});
 }
 assert.commandWorked(coll.insert(docs, {ordered: false}));
 expectedStats.bucketCount += numDocs;
@@ -243,15 +245,16 @@ expectedStats.numBucketsOpenedDueToMetadata++;
 expectedStats.numBucketsClosedDueToTimeForward++;
 expectedStats.numCommits += numDocs;
 expectedStats.numMeasurementsCommitted += numDocs;
-expectedStats.avgNumMeasurementsPerCommit =
-    Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+expectedStats.avgNumMeasurementsPerCommit = Math.floor(
+    expectedStats.numMeasurementsCommitted / expectedStats.numCommits,
+);
 expectedStats.numBucketQueriesFailed += 1;
 checkCollStats();
 
 numDocs = 70;
-largeValue = 'a'.repeat(1024 * 1024);
+largeValue = "a".repeat(1024 * 1024);
 
-const testIdleBucketExpiry = function(docFn) {
+const testIdleBucketExpiry = function (docFn) {
     clearCollection();
 
     let memoryUsage = 0;
@@ -268,23 +271,27 @@ const testIdleBucketExpiry = function(docFn) {
         }
         expectedStats.numCommits++;
         expectedStats.numMeasurementsCommitted++;
-        expectedStats.avgNumMeasurementsPerCommit =
-            Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
+        expectedStats.avgNumMeasurementsPerCommit = Math.floor(
+            expectedStats.numMeasurementsCommitted / expectedStats.numCommits,
+        );
         expectedStats.numBucketQueriesFailed++;
         checkCollStats(/*empty=*/ false, /*disableSizeClosureCheck=*/ true);
 
         shouldExpire = memoryUsage > kIdleBucketExpiryMemoryUsageThreshold;
     }
 
-    assert(shouldExpire,
-           `Memory usage did not reach idle bucket expiry threshold: ${memoryUsage} < ${
-               kIdleBucketExpiryMemoryUsageThreshold}`);
+    assert(
+        shouldExpire,
+        `Memory usage did not reach idle bucket expiry threshold: ${memoryUsage} < ${
+            kIdleBucketExpiryMemoryUsageThreshold
+        }`,
+    );
 };
 
-testIdleBucketExpiry(i => {
+testIdleBucketExpiry((i) => {
     return {[timeFieldName]: ISODate(), [metaFieldName]: {[i.toString()]: largeValue}};
 });
-testIdleBucketExpiry(i => {
+testIdleBucketExpiry((i) => {
     return {[timeFieldName]: ISODate(), [metaFieldName]: i, a: largeValue};
 });
 

@@ -7,10 +7,7 @@ class CollInfos {
     constructor(conn, connName, dbName) {
         // Special listCollections filter to prevent reloading the view catalog.
         const listCollectionsFilter = {
-            $or: [
-                {type: 'collection'},
-                {type: {$exists: false}},
-            ]
+            $or: [{type: "collection"}, {type: {$exists: false}}],
         };
         this.conn = conn;
         this.connName = connName;
@@ -21,22 +18,22 @@ class CollInfos {
     }
 
     ns(collName) {
-        return this.dbName + '.' + collName;
+        return this.dbName + "." + collName;
     }
 
     /**
      * Do additional filtering to narrow down collections that have names in collNames.
      */
     filter(desiredCollNames) {
-        this.collInfosRes = this.collInfosRes.filter(info => desiredCollNames.includes(info.name));
+        this.collInfosRes = this.collInfosRes.filter((info) => desiredCollNames.includes(info.name));
     }
 
     /**
      * Get names for the clustered collections.
      */
     getClusteredCollNames() {
-        const infos = this.collInfosRes.filter(info => info.options.clusteredIndex);
-        return infos.map(info => info.name);
+        const infos = this.collInfosRes.filter((info) => info.options.clusteredIndex);
+        return infos.map((info) => info.name);
     }
 
     hostAndNS(collName) {
@@ -51,7 +48,7 @@ class CollInfos {
         const coll = this.conn.getDB(this.dbName).getCollection(collName);
         let collInfo = null;
 
-        const collInfoRaw = this.collInfosRes.find(elem => elem.name === collName);
+        const collInfoRaw = this.collInfosRes.find((elem) => elem.name === collName);
         if (collInfoRaw) {
             collInfo = {
                 ns: ns,
@@ -65,21 +62,19 @@ class CollInfos {
         const infoPrefix = `${this.connName}(${this.conn.host}) info for ${ns} : `;
         if (collInfo !== null) {
             if (alreadyPrinted) {
-                print(`${this.connName} info for ${ns} already printed. Search for ` +
-                      `'${infoPrefix}'`);
+                print(`${this.connName} info for ${ns} already printed. Search for ` + `'${infoPrefix}'`);
             } else {
                 print(infoPrefix + tojsononeline(collInfo));
             }
         } else {
-            print(infoPrefix + 'collection does not exist');
+            print(infoPrefix + "collection does not exist");
         }
 
         const collStats = this.conn.getDB(this.dbName).runCommand({collStats: collName});
         const statsPrefix = `${this.connName}(${this.conn.host}) collStats for ${ns}: `;
         if (collStats.ok === 1) {
             if (alreadyPrinted) {
-                print(`${this.connName} collStats for ${ns} already printed. Search for ` +
-                      `'${statsPrefix}'`);
+                print(`${this.connName} collStats for ${ns} already printed. Search for ` + `'${statsPrefix}'`);
             } else {
                 print(statsPrefix + tojsononeline(collStats));
             }
@@ -92,7 +87,7 @@ class CollInfos {
         // Return true if collInfo & collStats can be retrieved for conn.
         return collInfo !== null && collStats.ok === 1;
     }
-};
+}
 
 class PeekableCursor {
     constructor(cursor) {
@@ -112,7 +107,7 @@ class PeekableCursor {
     }
 
     next() {
-        const result = (this.stashedDoc === undefined) ? this.cursor.next() : this.stashedDoc;
+        const result = this.stashedDoc === undefined ? this.cursor.next() : this.stashedDoc;
         this.stashedDoc = undefined;
         return result;
     }
@@ -168,8 +163,7 @@ class DataConsistencyChecker {
                 continue;
             }
 
-            const ordering =
-                this.bsonCompareFunction({_: doc1._id}, {_: doc2._id}, false /* checkType */);
+            const ordering = this.bsonCompareFunction({_: doc1._id}, {_: doc2._id}, false /* checkType */);
             if (ordering === 0) {
                 // The documents have the same _id but have different contents.
                 docsWithDifferentContents.push({first: doc1, second: doc2});
@@ -222,8 +216,7 @@ class DataConsistencyChecker {
             if (!map1.hasOwnProperty(spec.name)) {
                 indexesMissingOnFirst.push(spec);
             } else {
-                const ordering =
-                    this.bsonCompareFunction(map1[spec.name], spec, false /* checkType */);
+                const ordering = this.bsonCompareFunction(map1[spec.name], spec, false /* checkType */);
                 if (ordering != 0) {
                     indexesWithDifferentSpecs.push({first: map1[spec.name], second: spec});
                 }
@@ -231,7 +224,7 @@ class DataConsistencyChecker {
             }
         }
         let map1keys = Object.keys(map1);
-        map1keys.forEach(function(key) {
+        map1keys.forEach(function (key) {
             if (!map2.hasOwnProperty(key)) {
                 indexesMissingOnSecond.push(map1[key]);
             }
@@ -251,15 +244,16 @@ class DataConsistencyChecker {
         const diff = this.getDiffIndexes(sourceCursor, syncingCursor);
 
         return {
-            indexesWithDifferentSpecs: diff.indexesWithDifferentSpecs.map(
-                ({first, second}) => ({sourceNode: first, syncingNode: second})),
+            indexesWithDifferentSpecs: diff.indexesWithDifferentSpecs.map(({first, second}) => ({
+                sourceNode: first,
+                syncingNode: second,
+            })),
             indexesMissingOnSource: diff.indexesMissingOnFirst,
-            indexesMissingOnSyncing: diff.indexesMissingOnSecond
+            indexesMissingOnSyncing: diff.indexesMissingOnSecond,
         };
     }
 
-    static getCollectionDiffUsingSessions(
-        sourceSession, syncingSession, dbName, collNameOrUUID, readAtClusterTime) {
+    static getCollectionDiffUsingSessions(sourceSession, syncingSession, dbName, collNameOrUUID, readAtClusterTime) {
         const sourceDB = sourceSession.getDatabase(dbName);
         const syncingDB = syncingSession.getDatabase(dbName);
 
@@ -273,24 +267,30 @@ class DataConsistencyChecker {
         const diff = this.getDiff(sourceCursor, syncingCursor);
 
         return {
-            docsWithDifferentContents: diff.docsWithDifferentContents.map(
-                ({first, second}) => ({sourceNode: first, syncingNode: second})),
+            docsWithDifferentContents: diff.docsWithDifferentContents.map(({first, second}) => ({
+                sourceNode: first,
+                syncingNode: second,
+            })),
             docsMissingOnSource: diff.docsMissingOnFirst,
-            docsMissingOnSyncing: diff.docsMissingOnSecond
+            docsMissingOnSyncing: diff.docsMissingOnSecond,
         };
     }
 
     static canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, collName) {
         if (collName === "system.preimages") {
-            print(`Ignoring hash inconsistencies for 'system.preimages' as those can be ` +
-                  `expected with independent truncates. Content is checked separately by ` +
-                  `ReplSetTest.checkPreImageCollection`);
+            print(
+                `Ignoring hash inconsistencies for 'system.preimages' as those can be ` +
+                    `expected with independent truncates. Content is checked separately by ` +
+                    `ReplSetTest.checkPreImageCollection`,
+            );
             return true;
         }
         if (collName === "system.change_collection") {
-            print(`Ignoring hash inconsistencies for 'system.change_collection' as those can be ` +
-                  `expected with independent truncates. Content is checked separately by ` +
-                  `ReplSetTest.checkChangeCollection`);
+            print(
+                `Ignoring hash inconsistencies for 'system.change_collection' as those can be ` +
+                    `expected with independent truncates. Content is checked separately by ` +
+                    `ReplSetTest.checkChangeCollection`,
+            );
             return true;
         }
         if (collName !== "image_collection") {
@@ -299,67 +299,77 @@ class DataConsistencyChecker {
         const sourceNode = sourceCollInfos.conn;
         const syncingNode = syncingCollInfos.conn;
 
-        const sourceSession = sourceNode.getDB('test').getSession();
-        const syncingSession = syncingNode.getDB('test').getSession();
+        const sourceSession = sourceNode.getDB("test").getSession();
+        const syncingSession = syncingNode.getDB("test").getSession();
         const diff = this.getCollectionDiffUsingSessions(
-            sourceSession, syncingSession, sourceCollInfos.dbName, collName);
+            sourceSession,
+            syncingSession,
+            sourceCollInfos.dbName,
+            collName,
+        );
         for (let doc of diff.docsWithDifferentContents) {
             const sourceDoc = doc["sourceNode"];
             const syncingDoc = doc["syncingNode"];
             if (!sourceDoc || !syncingDoc) {
                 return false;
             }
-            const hasInvalidated =
-                sourceDoc.hasOwnProperty("invalidated") && syncingDoc.hasOwnProperty("invalidated");
+            const hasInvalidated = sourceDoc.hasOwnProperty("invalidated") && syncingDoc.hasOwnProperty("invalidated");
             if (!hasInvalidated || sourceDoc["invalidated"] === syncingDoc["invalidated"]) {
                 // We only ever expect cases where the 'invalidated' fields are mismatched.
                 return false;
             }
         }
-        print(`Ignoring inconsistencies for 'image_collection' because this can be expected` +
-              ` when images are invalidated`);
+        print(
+            `Ignoring inconsistencies for 'image_collection' because this can be expected` +
+                ` when images are invalidated`,
+        );
         return true;
     }
 
-    static dumpCollectionDiff(
-        collectionPrinted, sourceCollInfos, syncingCollInfos, collName, indexDiffs) {
-        print('Dumping collection: ' + sourceCollInfos.ns(collName));
+    static dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, collName, indexDiffs) {
+        print("Dumping collection: " + sourceCollInfos.ns(collName));
 
         const sourceExists = sourceCollInfos.print(collectionPrinted, collName);
         const syncingExists = syncingCollInfos.print(collectionPrinted, collName);
 
         if (!sourceExists || !syncingExists) {
-            print(`Skipping checking collection differences for ${
-                sourceCollInfos.ns(collName)} since it does not exist on both nodes`);
+            print(
+                `Skipping checking collection differences for ${sourceCollInfos.ns(
+                    collName,
+                )} since it does not exist on both nodes`,
+            );
             return;
         }
 
         const sourceNode = sourceCollInfos.conn;
         const syncingNode = syncingCollInfos.conn;
 
-        const sourceSession = sourceNode.getDB('test').getSession();
-        const syncingSession = syncingNode.getDB('test').getSession();
+        const sourceSession = sourceNode.getDB("test").getSession();
+        const syncingSession = syncingNode.getDB("test").getSession();
         const diff = this.getCollectionDiffUsingSessions(
-            sourceSession, syncingSession, sourceCollInfos.dbName, collName);
+            sourceSession,
+            syncingSession,
+            sourceCollInfos.dbName,
+            collName,
+        );
 
-        for (let {
-                 sourceNode: sourceDoc,
-                 syncingNode: syncingDoc,
-             } of diff.docsWithDifferentContents) {
-            print(`Mismatching documents between the source node ${sourceNode.host}` +
-                  ` and the syncing node ${syncingNode.host}:`);
-            print('    sourceNode:   ' + tojsononeline(sourceDoc));
-            print('    syncingNode: ' + tojsononeline(syncingDoc));
+        for (let {sourceNode: sourceDoc, syncingNode: syncingDoc} of diff.docsWithDifferentContents) {
+            print(
+                `Mismatching documents between the source node ${sourceNode.host}` +
+                    ` and the syncing node ${syncingNode.host}:`,
+            );
+            print("    sourceNode:   " + tojsononeline(sourceDoc));
+            print("    syncingNode: " + tojsononeline(syncingDoc));
         }
 
         if (diff.docsMissingOnSource.length > 0) {
             print(`The following documents are missing on the source node ${sourceNode.host}:`);
-            print(diff.docsMissingOnSource.map(doc => tojsononeline(doc)).join('\n'));
+            print(diff.docsMissingOnSource.map((doc) => tojsononeline(doc)).join("\n"));
         }
 
         if (diff.docsMissingOnSyncing.length > 0) {
             print(`The following documents are missing on the syncing node ${syncingNode.host}:`);
-            print(diff.docsMissingOnSyncing.map(doc => tojsononeline(doc)).join('\n'));
+            print(diff.docsMissingOnSyncing.map((doc) => tojsononeline(doc)).join("\n"));
         }
 
         if (indexDiffs) {
@@ -368,79 +378,81 @@ class DataConsistencyChecker {
     }
 
     static dumpIndexDiffs(sourceNode, syncingNode, diff) {
-        for (let {
-                 sourceNode: sourceSpec,
-                 syncingNode: syncingSpec,
-             } of diff.indexesWithDifferentSpecs) {
-            print(`Mismatching indexes between the source node ${sourceNode.host}` +
-                  ` and the syncing node ${syncingNode.host}:`);
-            print('    sourceNode:   ' + tojsononeline(sourceSpec));
-            print('    syncingNode: ' + tojsononeline(syncingSpec));
+        for (let {sourceNode: sourceSpec, syncingNode: syncingSpec} of diff.indexesWithDifferentSpecs) {
+            print(
+                `Mismatching indexes between the source node ${sourceNode.host}` +
+                    ` and the syncing node ${syncingNode.host}:`,
+            );
+            print("    sourceNode:   " + tojsononeline(sourceSpec));
+            print("    syncingNode: " + tojsononeline(syncingSpec));
         }
 
         if (diff.indexesMissingOnSource.length > 0) {
             print(`The following indexes are missing on the source node ${sourceNode.host}:`);
-            print(diff.indexesMissingOnSource.map(spec => tojsononeline(spec)).join('\n'));
+            print(diff.indexesMissingOnSource.map((spec) => tojsononeline(spec)).join("\n"));
         }
 
         if (diff.indexesMissingOnSyncing.length > 0) {
             print(`The following indexes are missing on the syncing node ${syncingNode.host}:`);
-            print(diff.indexesMissingOnSyncing.map(spec => tojsononeline(spec)).join('\n'));
+            print(diff.indexesMissingOnSyncing.map((spec) => tojsononeline(spec)).join("\n"));
         }
     }
 
-    static checkDBHash(sourceDBHash,
-                       sourceCollInfos,
-                       syncingDBHash,
-                       syncingCollInfos,
-                       msgPrefix,
-                       ignoreUUIDs,
-                       syncingHasIndexes,
-                       collectionPrinted) {
+    static checkDBHash(
+        sourceDBHash,
+        sourceCollInfos,
+        syncingDBHash,
+        syncingCollInfos,
+        msgPrefix,
+        ignoreUUIDs,
+        syncingHasIndexes,
+        collectionPrinted,
+    ) {
         let success = true;
 
         const sourceDBName = sourceCollInfos.dbName;
         const syncingDBName = syncingCollInfos.dbName;
-        assert.eq(sourceDBName,
-                  syncingDBName,
-                  `dbName was not the same: source: ${sourceDBName}, syncing: ${syncingDBName}`);
+        assert.eq(
+            sourceDBName,
+            syncingDBName,
+            `dbName was not the same: source: ${sourceDBName}, syncing: ${syncingDBName}`,
+        );
         const dbName = syncingDBName;
 
         const sourceCollections = Object.keys(sourceDBHash.collections);
         const syncingCollections = Object.keys(syncingDBHash.collections);
 
         const dbHashesMsg = `source: ${tojson(sourceDBHash)}, syncing: ${tojson(syncingDBHash)}`;
-        const prettyPrint = (outputMsg => {
+        const prettyPrint = (outputMsg) => {
             print(`${msgPrefix}, ${outputMsg}`);
-        });
+        };
 
-        const arraySymmetricDifference = ((a, b) => {
-            const inAOnly = a.filter(function(elem) {
+        const arraySymmetricDifference = (a, b) => {
+            const inAOnly = a.filter(function (elem) {
                 return b.indexOf(elem) < 0;
             });
 
-            const inBOnly = b.filter(function(elem) {
+            const inBOnly = b.filter(function (elem) {
                 return a.indexOf(elem) < 0;
             });
 
             return inAOnly.concat(inBOnly);
-        });
+        };
 
         if (sourceCollections.length !== syncingCollections.length) {
             prettyPrint(`the two nodes have a different number of collections: ${dbHashesMsg}`);
-            for (const diffColl of arraySymmetricDifference(sourceCollections,
-                                                            syncingCollections)) {
-                this.dumpCollectionDiff(
-                    collectionPrinted, sourceCollInfos, syncingCollInfos, diffColl);
+            for (const diffColl of arraySymmetricDifference(sourceCollections, syncingCollections)) {
+                this.dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, diffColl);
             }
             success = false;
         }
 
         let didIgnoreFailure = false;
-        sourceCollInfos.collInfosRes.forEach(coll => {
+        sourceCollInfos.collInfosRes.forEach((coll) => {
             if (sourceDBHash.collections[coll.name] !== syncingDBHash.collections[coll.name]) {
-                prettyPrint(`the two nodes have a different hash for the collection ${dbName}.${
-                    coll.name}: ${dbHashesMsg}`);
+                prettyPrint(
+                    `the two nodes have a different hash for the collection ${dbName}.${coll.name}: ${dbHashesMsg}`,
+                );
                 // Although rare, the 'config.image_collection' table can be inconsistent after
                 // an initial sync or after a restart (see SERVER-60048). Dump the collection
                 // diff anyways for more visibility as a sanity check.
@@ -448,22 +460,22 @@ class DataConsistencyChecker {
                 // 'config.system.preimages' can potentially be inconsistent via hashes,
                 // there's a special process that verifies them with
                 // ReplSetTest.checkPreImageCollection so it is safe to ignore failures here.
-                this.dumpCollectionDiff(
-                    collectionPrinted, sourceCollInfos, syncingCollInfos, coll.name);
-                const shouldIgnoreFailure =
-                    this.canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, coll.name);
+                this.dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, coll.name);
+                const shouldIgnoreFailure = this.canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, coll.name);
                 if (shouldIgnoreFailure) {
-                    prettyPrint(`Collection diff in ${dbName}.${coll.name} can be ignored: ` +
-                                `${dbHashesMsg}. Inconsistencies in the collection can be ` +
-                                `expected in certain scenarios.`);
+                    prettyPrint(
+                        `Collection diff in ${dbName}.${coll.name} can be ignored: ` +
+                            `${dbHashesMsg}. Inconsistencies in the collection can be ` +
+                            `expected in certain scenarios.`,
+                    );
                 }
                 success = shouldIgnoreFailure && success;
                 didIgnoreFailure = shouldIgnoreFailure || didIgnoreFailure;
             }
         });
 
-        syncingCollInfos.collInfosRes.forEach(syncingInfo => {
-            sourceCollInfos.collInfosRes.forEach(sourceInfo => {
+        syncingCollInfos.collInfosRes.forEach((syncingInfo) => {
+            sourceCollInfos.collInfosRes.forEach((sourceInfo) => {
                 if (syncingInfo.name === sourceInfo.name && syncingInfo.type === sourceInfo.type) {
                     if (ignoreUUIDs) {
                         prettyPrint(`skipping UUID check for ${[sourceInfo.name]}`);
@@ -492,22 +504,21 @@ class DataConsistencyChecker {
 
                     if (sourceInfo.options?.storageEngine?.wiredTiger?.configString) {
                         sourceInfo.options.storageEngine.wiredTiger.configString =
-                            sourceInfo.options.storageEngine.wiredTiger.configString.replace(
-                                encryptionRegex, "");
+                            sourceInfo.options.storageEngine.wiredTiger.configString.replace(encryptionRegex, "");
                     }
 
                     if (syncingInfo.options?.storageEngine?.wiredTiger?.configString) {
                         syncingInfo.options.storageEngine.wiredTiger.configString =
-                            syncingInfo.options.storageEngine.wiredTiger.configString.replace(
-                                encryptionRegex, "");
+                            syncingInfo.options.storageEngine.wiredTiger.configString.replace(encryptionRegex, "");
                     }
 
                     if (!this.bsonCompareFunction(syncingInfo, sourceInfo)) {
                         prettyPrint(
                             `the two nodes have different attributes for the collection or view ${
-                                dbName}.${syncingInfo.name}`);
-                        this.dumpCollectionDiff(
-                            collectionPrinted, sourceCollInfos, syncingCollInfos, syncingInfo.name);
+                                dbName
+                            }.${syncingInfo.name}`,
+                        );
+                        this.dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, syncingInfo.name);
                         success = false;
                     }
                 }
@@ -516,7 +527,7 @@ class DataConsistencyChecker {
 
         // Treats each array as a set and returns true if the contents match. Assumes
         // the contents of each array are unique.
-        const compareSets = function(leftArr, rightArr) {
+        const compareSets = function (leftArr, rightArr) {
             if (leftArr === undefined) {
                 return rightArr === undefined;
             }
@@ -526,11 +537,11 @@ class DataConsistencyChecker {
             }
 
             const map = {};
-            leftArr.forEach(key => {
+            leftArr.forEach((key) => {
                 map[key] = 1;
             });
 
-            rightArr.forEach(key => {
+            rightArr.forEach((key) => {
                 if (map[key] === undefined) {
                     map[key] = -1;
                 } else {
@@ -551,15 +562,17 @@ class DataConsistencyChecker {
         // syncing node for a clustered collection. 6.1 added clustered indexes into collStat
         // output. There will be a difference in the nindex count between versions before and
         // after 6.1. So, skip comparing across 6.1 for clustered collections.
-        const skipIndexCountCheck = function(sourceCollInfos, syncingCollInfos, collName) {
+        const skipIndexCountCheck = function (sourceCollInfos, syncingCollInfos, collName) {
             const sourceVersion = sourceCollInfos.binVersion;
             const syncingVersion = syncingCollInfos.binVersion;
 
             // If both versions are before 6.1 or both are 6.1 onwards, we are good.
-            if ((MongoRunner.compareBinVersions(sourceVersion, "6.1") === -1 &&
-                 MongoRunner.compareBinVersions(syncingVersion, "6.1") === -1) ||
+            if (
+                (MongoRunner.compareBinVersions(sourceVersion, "6.1") === -1 &&
+                    MongoRunner.compareBinVersions(syncingVersion, "6.1") === -1) ||
                 (MongoRunner.compareBinVersions(sourceVersion, "6.1") >= 0 &&
-                 MongoRunner.compareBinVersions(syncingVersion, "6.1") >= 0)) {
+                    MongoRunner.compareBinVersions(syncingVersion, "6.1") >= 0)
+            ) {
                 return false;
             }
 
@@ -579,7 +592,7 @@ class DataConsistencyChecker {
         //  capped
         //  nindexes, except on nodes with buildIndexes: false
         //  ns
-        sourceCollections.forEach(collName => {
+        sourceCollections.forEach((collName) => {
             const sourceCollStats = sourceNode.getDB(dbName).runCommand({collStats: collName});
             const syncingCollStats = syncingNode.getDB(dbName).runCommand({collStats: collName});
 
@@ -593,11 +606,11 @@ class DataConsistencyChecker {
             // Provide hint on where to look within stats.
             let reasons = [];
             if (sourceCollStats.capped !== syncingCollStats.capped) {
-                reasons.push('capped');
+                reasons.push("capped");
             }
 
             if (sourceCollStats.ns !== syncingCollStats.ns) {
-                reasons.push('ns');
+                reasons.push("ns");
             }
 
             let indexSpecsDiffer = false;
@@ -606,52 +619,62 @@ class DataConsistencyChecker {
                 const sourceNode = sourceCollInfos.conn;
                 const syncingNode = syncingCollInfos.conn;
 
-                const sourceSession = sourceNode.getDB('test').getSession();
-                const syncingSession = syncingNode.getDB('test').getSession();
+                const sourceSession = sourceNode.getDB("test").getSession();
+                const syncingSession = syncingNode.getDB("test").getSession();
                 indexDiffs = this.getIndexDiffUsingSessions(
-                    sourceSession, syncingSession, sourceCollInfos.dbName, collName);
-                indexSpecsDiffer = indexDiffs.indexesMissingOnSource.length > 0 ||
+                    sourceSession,
+                    syncingSession,
+                    sourceCollInfos.dbName,
+                    collName,
+                );
+                indexSpecsDiffer =
+                    indexDiffs.indexesMissingOnSource.length > 0 ||
                     indexDiffs.indexesMissingOnSyncing.length > 0 ||
                     indexDiffs.indexesWithDifferentSpecs.length > 0;
             }
             if (skipIndexCountCheck(sourceCollInfos, syncingCollInfos, collName)) {
-                prettyPrint(`Skipping comparison of collStats.nindex for clustered collection ${
-                    dbName}.${collName}. Versions ${sourceCollInfos.binVersion} and ${
-                    syncingCollInfos.binVersion} are expected to differ in the nindex count.`);
-            } else if (syncingHasIndexes &&
-                       (sourceCollStats.nindexes !== syncingCollStats.nindexes ||
-                        indexSpecsDiffer)) {
-                reasons.push('indexes');
+                prettyPrint(
+                    `Skipping comparison of collStats.nindex for clustered collection ${
+                        dbName
+                    }.${collName}. Versions ${sourceCollInfos.binVersion} and ${
+                        syncingCollInfos.binVersion
+                    } are expected to differ in the nindex count.`,
+                );
+            } else if (
+                syncingHasIndexes &&
+                (sourceCollStats.nindexes !== syncingCollStats.nindexes || indexSpecsDiffer)
+            ) {
+                reasons.push("indexes");
             }
 
-            const indexBuildsMatch =
-                compareSets(sourceCollStats.indexBuilds, syncingCollStats.indexBuilds);
+            const indexBuildsMatch = compareSets(sourceCollStats.indexBuilds, syncingCollStats.indexBuilds);
             if (syncingHasIndexes && !indexBuildsMatch) {
-                reasons.push('indexBuilds');
+                reasons.push("indexBuilds");
             }
 
             if (reasons.length === 0) {
                 return;
             }
 
-            prettyPrint(`the two nodes have different states for the collection ${dbName}.${
-                collName}: ${reasons.join(', ')}`);
-            this.dumpCollectionDiff(
-                collectionPrinted, sourceCollInfos, syncingCollInfos, collName, indexDiffs);
+            prettyPrint(
+                `the two nodes have different states for the collection ${dbName}.${collName}: ${reasons.join(", ")}`,
+            );
+            this.dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, collName, indexDiffs);
             success = false;
         });
 
         // The hashes for the whole database should match.
         if (sourceDBHash.md5 !== syncingDBHash.md5) {
-            prettyPrint(
-                `the two nodes have a different hash for the ${dbName} database: ${dbHashesMsg}`);
+            prettyPrint(`the two nodes have a different hash for the ${dbName} database: ${dbHashesMsg}`);
             if (didIgnoreFailure) {
                 // We only expect database hash mismatches on the config db, where
                 // config.image_collection and config.system.preimages are expected to have
                 // inconsistencies in certain scenarios.
-                prettyPrint(`Ignoring hash mismatch for the ${dbName} database since ` +
-                            `inconsistencies in 'config.image_collection' or ` +
-                            `'config.system.preimages' can be expected`);
+                prettyPrint(
+                    `Ignoring hash mismatch for the ${dbName} database since ` +
+                        `inconsistencies in 'config.image_collection' or ` +
+                        `'config.system.preimages' can be expected`,
+                );
                 return success;
             }
             success = false;

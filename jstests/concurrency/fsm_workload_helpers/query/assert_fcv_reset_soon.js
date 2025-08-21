@@ -25,7 +25,7 @@ export function assertSetFCVSoon(db, FCV) {
         } else if (!kAcceptedSetFCVErrors.includes(res.code)) {
             assert.commandWorked(res);
         }
-        jsTestLog('retrying setFeatureCompatibilityVersion that failed with: ' + tojson(res));
+        jsTestLog("retrying setFeatureCompatibilityVersion that failed with: " + tojson(res));
         return false;
     });
 }

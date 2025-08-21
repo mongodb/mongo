@@ -16,8 +16,7 @@ const st = new ShardingTest({
     rs: {nodes: 1},
 });
 st.stopAllConfigServers({}, true);
-st.restartAllConfigServers(
-    {configsvr: "", setParameter: {featureFlagTransitionToCatalogShard: false}});
+st.restartAllConfigServers({configsvr: "", setParameter: {featureFlagTransitionToCatalogShard: false}});
 
 st.restartMongos(0, {setParameter: {featureFlagTransitionToCatalogShard: false}, restart: true});
 
@@ -26,9 +25,7 @@ assert.commandFailedWithCode(st.s.adminCommand({transitionFromDedicatedConfigSer
 assert.commandFailedWithCode(st.s.adminCommand({transitionToDedicatedConfigServer: 1}), 7368401);
 
 const configPrimary = st.configRS.getPrimary();
-assert.commandFailedWithCode(
-    configPrimary.adminCommand({_configsvrTransitionFromDedicatedConfigServer: 1}), 8454803);
-assert.commandFailedWithCode(
-    configPrimary.adminCommand({_configsvrTransitionToDedicatedConfigServer: 1}), 7368402);
+assert.commandFailedWithCode(configPrimary.adminCommand({_configsvrTransitionFromDedicatedConfigServer: 1}), 8454803);
+assert.commandFailedWithCode(configPrimary.adminCommand({_configsvrTransitionToDedicatedConfigServer: 1}), 7368402);
 
 st.stop();

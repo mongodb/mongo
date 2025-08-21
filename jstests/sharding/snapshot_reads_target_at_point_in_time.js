@@ -11,16 +11,17 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function expectChunks(st, ns, chunks) {
     for (let i = 0; i < chunks.length; i++) {
-        assert.eq(chunks[i],
-                  findChunksUtil.countChunksForNs(
-                      st.s.getDB("config"), ns, {shard: st["shard" + i].shardName}),
-                  "unexpected number of chunks on shard " + i);
+        assert.eq(
+            chunks[i],
+            findChunksUtil.countChunksForNs(st.s.getDB("config"), ns, {shard: st["shard" + i].shardName}),
+            "unexpected number of chunks on shard " + i,
+        );
     }
 }
 
 const dbName = "test";
 const collName = "foo";
-const ns = dbName + '.' + collName;
+const ns = dbName + "." + collName;
 
 const st = new ShardingTest({
     shards: 3,
@@ -35,20 +36,17 @@ const st = new ShardingTest({
         configOptions: {
             setParameter: {
                 "failpoint.skipExpiringOldChunkHistory": "{mode: 'alwaysOn'}",
-                minSnapshotHistoryWindowInSeconds: 600
-            }
+                minSnapshotHistoryWindowInSeconds: 600,
+            },
         },
-        rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: 600}}
-    }
+        rsOptions: {setParameter: {minSnapshotHistoryWindowInSeconds: 600}},
+    },
 });
 
 // Set up one sharded collection with 2 chunks, both on the primary shard.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(
-    st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(
-    st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
@@ -68,20 +66,23 @@ const kCommandTestCases = [
         name: "aggregate",
         commands: [
             {aggregate: collName, pipeline: [{$match: {_id: -5}}], cursor: {}},
-            {aggregate: collName, pipeline: [{$match: {_id: 5}}], cursor: {}}
-        ]
+            {aggregate: collName, pipeline: [{$match: {_id: 5}}], cursor: {}},
+        ],
     },
     {
         name: "find",
-        commands: [{find: collName, filter: {_id: -5}}, {find: collName, filter: {_id: 5}}]
-    }
+        commands: [
+            {find: collName, filter: {_id: -5}},
+            {find: collName, filter: {_id: 5}},
+        ],
+    },
 ];
 
 const TestMode = {
-    TRANSACTION: 'TRANSACTION',
-    CAUSAL_CONSISTENCY: 'CAUSAL_CONSISTENCY',
-    SNAPSHOT: 'SNAPSHOT',
-    SNAPSHOT_AT_CLUSTER_TIME: 'SNAPSHOT_AT_CLUSTER_TIME'
+    TRANSACTION: "TRANSACTION",
+    CAUSAL_CONSISTENCY: "CAUSAL_CONSISTENCY",
+    SNAPSHOT: "SNAPSHOT",
+    SNAPSHOT_AT_CLUSTER_TIME: "SNAPSHOT_AT_CLUSTER_TIME",
 };
 
 function runTest(testCase, testMode, readPreferenceMode) {
@@ -108,7 +109,7 @@ function runTest(testCase, testMode, readPreferenceMode) {
         case TestMode.CAUSAL_CONSISTENCY:
             session = st.s.startSession({causalConsistency: true});
             db = session.getDatabase(dbName);
-            db[collName].findOne();  // Establish a timestamp in the session.
+            db[collName].findOne(); // Establish a timestamp in the session.
             break;
         case TestMode.SNAPSHOT:
             db = st.s.getDB(dbName);
@@ -124,24 +125,26 @@ function runTest(testCase, testMode, readPreferenceMode) {
 
     // Establish a read timestamp.
     let res = assert.commandWorked(db.runCommand(targetChunk1Cmd));
-    assert.sameMembers([{_id: -5}],
-                       res.cursor.firstBatch,
-                       `expected to find document in first chunk, command` +
-                           ` ${tojson(targetChunk1Cmd)} returned ${tojson(res)}`);
+    assert.sameMembers(
+        [{_id: -5}],
+        res.cursor.firstBatch,
+        `expected to find document in first chunk, command` + ` ${tojson(targetChunk1Cmd)} returned ${tojson(res)}`,
+    );
 
     const targetChunk1CmdTimestamp = res.cursor.atClusterTime;
     jsTestLog(`Chunk 1 command replied with timestamp ${tojson(targetChunk1CmdTimestamp)}`);
 
     // Move a chunk from Shard1 to Shard2 outside of the transaction, and update it. This will
     // happen at a later logical time than the read timestamp.
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard2.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard2.shardName}));
 
-    res = assert.commandWorked(st.s.getDB(dbName).runCommand({
-        update: collName,
-        updates: [{q: {_id: 5}, u: {$set: {x: true}}}],
-        writeConcern: {w: "majority"}
-    }));
+    res = assert.commandWorked(
+        st.s.getDB(dbName).runCommand({
+            update: collName,
+            updates: [{q: {_id: 5}, u: {$set: {x: true}}}],
+            writeConcern: {w: "majority"},
+        }),
+    );
     jsTestLog(`Updated chunk 2 at timestamp ${tojson(res.operationTime)}`);
     st.refreshCatalogCacheForNs(st.s, ns);
 
@@ -155,22 +158,28 @@ function runTest(testCase, testMode, readPreferenceMode) {
         case TestMode.CAUSAL_CONSISTENCY:
         case TestMode.SNAPSHOT:
             // We may or may not see the result of the update above.
-            assert.eq(1,
-                      res.cursor.firstBatch.length,
-                      `expected to find document in second chunk, command` +
-                          ` ${tojson(targetChunk2Cmd)} returned ${tojson(res)}`);
-            assert.eq(5,
-                      res.cursor.firstBatch[0]._id,
-                      `expected to find {_id: 5} in second chunk, command` +
-                          ` ${tojson(targetChunk2Cmd)} returned ${tojson(res)}`);
+            assert.eq(
+                1,
+                res.cursor.firstBatch.length,
+                `expected to find document in second chunk, command` +
+                    ` ${tojson(targetChunk2Cmd)} returned ${tojson(res)}`,
+            );
+            assert.eq(
+                5,
+                res.cursor.firstBatch[0]._id,
+                `expected to find {_id: 5} in second chunk, command` +
+                    ` ${tojson(targetChunk2Cmd)} returned ${tojson(res)}`,
+            );
             break;
         case TestMode.TRANSACTION:
         case TestMode.SNAPSHOT_AT_CLUSTER_TIME:
             // Must not see the update's result.
-            assert.sameMembers([{_id: 5}],
-                               res.cursor.firstBatch,
-                               `expected to find document in second chunk, command` +
-                                   ` ${tojson(targetChunk2Cmd)} returned ${tojson(res)}`);
+            assert.sameMembers(
+                [{_id: 5}],
+                res.cursor.firstBatch,
+                `expected to find document in second chunk, command` +
+                    ` ${tojson(targetChunk2Cmd)} returned ${tojson(res)}`,
+            );
             break;
     }
 
@@ -179,13 +188,14 @@ function runTest(testCase, testMode, readPreferenceMode) {
     }
 
     // Move the chunk back to Shard1 and clear updated field for the next iteration.
-    assert.commandWorked(st.s.getDB(dbName).runCommand({
-        update: collName,
-        updates: [{q: {_id: 5}, u: {$unset: {x: true}}}],
-        writeConcern: {w: "majority"}
-    }));
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
+        st.s.getDB(dbName).runCommand({
+            update: collName,
+            updates: [{q: {_id: 5}, u: {$unset: {x: true}}}],
+            writeConcern: {w: "majority"},
+        }),
+    );
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 5}, to: st.shard1.shardName}));
 }
 
 for (let testCase of kCommandTestCases) {

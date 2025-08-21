@@ -19,12 +19,14 @@ function runTest(conn) {
     function validate({dbName, coll, apiStrict, error}) {
         dbName = dbName ? dbName : null;
         coll = coll ? coll : null;
-        const res = assert.commandWorked(testDB.runCommand({
-            validateDBMetadata: 1,
-            db: dbName,
-            collection: coll,
-            apiParameters: {version: "1", strict: apiStrict}
-        }));
+        const res = assert.commandWorked(
+            testDB.runCommand({
+                validateDBMetadata: 1,
+                db: dbName,
+                collection: coll,
+                apiParameters: {version: "1", strict: apiStrict},
+            }),
+        );
 
         assert(res.apiVersionErrors);
         const foundError = res.apiVersionErrors.length > 0;
@@ -65,8 +67,7 @@ function runTest(conn) {
     // Create a view which uses unstable expression and verify that validateDBMetadata commands
     // throws an assertion.
     const viewName = "view1";
-    const view = testDB.createView(
-        viewName, coll2.getName(), [{$project: {v: {$_testApiVersion: {unstable: true}}}}]);
+    const view = testDB.createView(viewName, coll2.getName(), [{$project: {v: {$_testApiVersion: {unstable: true}}}}]);
 
     validate({apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
     validate({apiStrict: false});
@@ -77,8 +78,9 @@ function runTest(conn) {
     assert.commandWorked(testDB.dropDatabase());
 
     const validatorCollName = "validator";
-    assert.commandWorked(testDB.createCollection(
-        validatorCollName, {validator: {$expr: {$_testApiVersion: {unstable: true}}}}));
+    assert.commandWorked(
+        testDB.createCollection(validatorCollName, {validator: {$expr: {$_testApiVersion: {unstable: true}}}}),
+    );
 
     validate({apiStrict: true, error: {code: ErrorCodes.APIStrictError}});
 

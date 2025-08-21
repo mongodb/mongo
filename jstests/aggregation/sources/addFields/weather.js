@@ -23,7 +23,7 @@ for (let i = 0; i < nDocs; i++) {
 function randomArray(length, minValue, maxValue) {
     let array = [];
     for (let i = 0; i < length; i++) {
-        array.push((Random.rand() * (maxValue - minValue)) + minValue);
+        array.push(Random.rand() * (maxValue - minValue) + minValue);
     }
     return array;
 }
@@ -41,8 +41,8 @@ function generateRandomDocument() {
     const maxTemp = 120;
 
     return {
-        month: Random.randInt(12) + 1,  // 1-12
-        day: Random.randInt(31) + 1,    // 1-31
+        month: Random.randInt(12) + 1, // 1-12
+        day: Random.randInt(31) + 1, // 1-31
         temperatures: randomArray(24, minTemp, maxTemp),
     };
 }
@@ -50,30 +50,36 @@ function generateRandomDocument() {
 // Add the minimum, maximum, and average temperatures, and make sure that doing the same
 // with addFields yields the correct answer.
 // First compute with $project, since we know all the fields in this document.
-let projectWeatherPipe = [{
-    $project: {
-        "month": 1,
-        "day": 1,
-        "temperatures": 1,
-        "minTemp": {"$min": "$temperatures"},
-        "maxTemp": {"$max": "$temperatures"},
-        "average": {"$avg": "$temperatures"},
-        // _id is implicitly included.
-    }
-}];
+let projectWeatherPipe = [
+    {
+        $project: {
+            "month": 1,
+            "day": 1,
+            "temperatures": 1,
+            "minTemp": {"$min": "$temperatures"},
+            "maxTemp": {"$max": "$temperatures"},
+            "average": {"$avg": "$temperatures"},
+            // _id is implicitly included.
+        },
+    },
+];
 let correctWeather = coll.aggregate(projectWeatherPipe).toArray();
 
 // Then compute the same results using $addFields.
-let addFieldsWeatherPipe = [{
-    $addFields: {
-        "minTemp": {"$min": "$temperatures"},
-        "maxTemp": {"$max": "$temperatures"},
-        "average": {"$avg": "$temperatures"},
-        // All other fields are implicitly included.
-    }
-}];
+let addFieldsWeatherPipe = [
+    {
+        $addFields: {
+            "minTemp": {"$min": "$temperatures"},
+            "maxTemp": {"$max": "$temperatures"},
+            "average": {"$avg": "$temperatures"},
+            // All other fields are implicitly included.
+        },
+    },
+];
 let addFieldsResult = coll.aggregate(addFieldsWeatherPipe).toArray();
 
 // Then assert they are the same.
-assert(arrayEq(addFieldsResult, correctWeather),
-       "$addFields does not work the same as a $project with computed and included fields");
+assert(
+    arrayEq(addFieldsResult, correctWeather),
+    "$addFields does not work the same as a $project with computed and included fields",
+);

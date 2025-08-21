@@ -27,7 +27,14 @@ assert.commandWorked(res);
 assert(res.valid);
 
 configureFailPoint(db, "enableCompoundTextIndexes", {}, "alwaysOn");
-assert.commandWorked(coll.insert({"a": [{"b": 1, "c": "foo"}, {"b": 2, "c": "bar"}]}));
+assert.commandWorked(
+    coll.insert({
+        "a": [
+            {"b": 1, "c": "foo"},
+            {"b": 2, "c": "bar"},
+        ],
+    }),
+);
 configureFailPoint(db, "enableCompoundTextIndexes", {}, "off");
 
 forceCheckpoint();

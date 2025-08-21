@@ -12,12 +12,9 @@ const db = rst.getPrimary().getDB("test");
 
 let unique_dbName = jsTestName();
 const sleepShell = startParallelShell(() => {
-    assert.commandFailedWithCode(db.adminCommand({sleep: 1, lock: "w", seconds: 600}),
-                                 ErrorCodes.Interrupted);
+    assert.commandFailedWithCode(db.adminCommand({sleep: 1, lock: "w", seconds: 600}), ErrorCodes.Interrupted);
 }, rst.getPrimary().port);
-assert.soon(
-    () =>
-        db.getSiblingDB("admin").currentOp({"command.sleep": 1, active: true}).inprog.length === 1);
+assert.soon(() => db.getSiblingDB("admin").currentOp({"command.sleep": 1, active: true}).inprog.length === 1);
 const sleepOps = db.getSiblingDB("admin").currentOp({"command.sleep": 1, active: true}).inprog;
 assert.eq(sleepOps.length, 1);
 const sleepOpId = sleepOps[0].opid;
@@ -30,8 +27,7 @@ const changeStreamShell2 = startParallelShell(openChangeStreamCode, rst.getPrima
 
 // Wait until we can see both change streams have started and are waiting to acquire the lock
 // held by the sleep command.
-assert.soon(
-    () => db.currentOp({"command.aggregate": "test", waitingForLock: true}).inprog.length === 2);
+assert.soon(() => db.currentOp({"command.aggregate": "test", waitingForLock: true}).inprog.length === 2);
 assert.commandWorked(db.adminCommand({killOp: 1, op: sleepOpId}));
 
 sleepShell();

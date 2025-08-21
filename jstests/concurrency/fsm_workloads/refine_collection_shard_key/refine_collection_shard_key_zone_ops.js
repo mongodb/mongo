@@ -17,10 +17,10 @@
  */
 import "jstests/libs/parallelTester.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
-        oldShardKeyField: 'a',
-        newShardKeyFields: ['a', 'b'],
+        oldShardKeyField: "a",
+        newShardKeyFields: ["a", "b"],
         oldShardKey: {a: 1},
         newShardKey: {a: 1, b: 1},
         docCount: 100,
@@ -30,43 +30,43 @@ export const $config = (function() {
     };
 
     function getCurrentLatchCollName(collName, latch) {
-        return collName + '_' + latch.getCount().toString();
+        return collName + "_" + latch.getCount().toString();
     }
 
     function getCurrentOrPreviousLatchCollName(collName, latch, latchCount) {
-        const latchNumber =
-            (Math.random() < 0.5) ? latch.getCount() : Math.min(latch.getCount() + 1, latchCount);
+        const latchNumber = Math.random() < 0.5 ? latch.getCount() : Math.min(latch.getCount() + 1, latchCount);
 
-        return collName + '_' + latchNumber.toString();
+        return collName + "_" + latchNumber.toString();
     }
 
     function getConfigTagsCollection(db) {
-        return db.getSiblingDB('config').tags;
+        return db.getSiblingDB("config").tags;
     }
 
     function getConfigShardsCollection(db) {
-        return db.getSiblingDB('config').shards;
+        return db.getSiblingDB("config").shards;
     }
 
-    function populateTagRangesForThreadFromConfig(
-        db, collName, threadId, currentZoneRangeMapForCollection) {
-        const threadZoneRegexMatch = '.*tid-' + threadId + '.*';
+    function populateTagRangesForThreadFromConfig(db, collName, threadId, currentZoneRangeMapForCollection) {
+        const threadZoneRegexMatch = ".*tid-" + threadId + ".*";
         const tags = getConfigTagsCollection(db)
-                         .find({ns: db + '.' + collName, tag: {$regex: threadZoneRegexMatch}})
-                         .toArray();
+            .find({ns: db + "." + collName, tag: {$regex: threadZoneRegexMatch}})
+            .toArray();
         assert.eq(2, tags.length);
         tags.forEach((tag) => {
-            currentZoneRangeMapForCollection[tag.tag] = {'min': tag.min, 'max': tag.max};
+            currentZoneRangeMapForCollection[tag.tag] = {"min": tag.min, "max": tag.max};
         });
     }
 
-    function initMapsForThread(db,
-                               collName,
-                               threadId,
-                               shardNames,
-                               zonesMappedToShardsForCollection,
-                               zonesMappedToRangesOwnedByThreadForCollection) {
-        const threadZoneStringMatch = 'tid-' + threadId;
+    function initMapsForThread(
+        db,
+        collName,
+        threadId,
+        shardNames,
+        zonesMappedToShardsForCollection,
+        zonesMappedToRangesOwnedByThreadForCollection,
+    ) {
+        const threadZoneStringMatch = "tid-" + threadId;
 
         if (!zonesMappedToShardsForCollection[collName]) {
             zonesMappedToShardsForCollection[collName] = {};
@@ -96,7 +96,7 @@ export const $config = (function() {
     }
 
     function attemptSwapZoneRange(db, collName, zonesMappedToRangesOwnedByThreadForCollection) {
-        const fullCollName = db + '.' + collName;
+        const fullCollName = db + "." + collName;
 
         // Assume that we only have two zones owned by the thread for a given collection.
         const zoneKeys = Object.keys(zonesMappedToRangesOwnedByThreadForCollection);
@@ -109,32 +109,40 @@ export const $config = (function() {
 
         // Swap the zone ranges by first setting both to null, then reversing the values such that
         // the first zone's range will now be associated with the second zone, and vice versa.
-        assert.commandWorked(db.adminCommand({
-            updateZoneKeyRange: fullCollName,
-            min: firstZoneRange.min,
-            max: firstZoneRange.max,
-            zone: null
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                updateZoneKeyRange: fullCollName,
+                min: firstZoneRange.min,
+                max: firstZoneRange.max,
+                zone: null,
+            }),
+        );
 
-        assert.commandWorked(db.adminCommand({
-            updateZoneKeyRange: fullCollName,
-            min: secondZoneRange.min,
-            max: secondZoneRange.max,
-            zone: null
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                updateZoneKeyRange: fullCollName,
+                min: secondZoneRange.min,
+                max: secondZoneRange.max,
+                zone: null,
+            }),
+        );
 
-        assert.commandWorked(db.adminCommand({
-            updateZoneKeyRange: fullCollName,
-            min: secondZoneRange.min,
-            max: secondZoneRange.max,
-            zone: firstZoneName
-        }));
-        assert.commandWorked(db.adminCommand({
-            updateZoneKeyRange: fullCollName,
-            min: firstZoneRange.min,
-            max: firstZoneRange.max,
-            zone: secondZoneName
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                updateZoneKeyRange: fullCollName,
+                min: secondZoneRange.min,
+                max: secondZoneRange.max,
+                zone: firstZoneName,
+            }),
+        );
+        assert.commandWorked(
+            db.adminCommand({
+                updateZoneKeyRange: fullCollName,
+                min: firstZoneRange.min,
+                max: firstZoneRange.max,
+                zone: secondZoneName,
+            }),
+        );
 
         // Verify that the commands set the correct data on the config server.
         const firstTagRangeOnConfig = getConfigTagsCollection(db).findOne({tag: firstZoneName});
@@ -152,20 +160,21 @@ export const $config = (function() {
     const states = {
         init: function init(db, collName, connCache) {
             for (let i = this.latchCount; i >= 0; --i) {
-                initMapsForThread(db,
-                                  collName + '_' + i,
-                                  this.tid,
-                                  this.shardNames,
-                                  this.zonesMappedToShardsForCollection,
-                                  this.zonesMappedToRangesOwnedByThreadForCollection);
+                initMapsForThread(
+                    db,
+                    collName + "_" + i,
+                    this.tid,
+                    this.shardNames,
+                    this.zonesMappedToShardsForCollection,
+                    this.zonesMappedToRangesOwnedByThreadForCollection,
+                );
             }
         },
 
         sendZoneToOtherShard: function sendZoneToOtherShard(db, collName, connCache) {
             const configShardsCollection = getConfigShardsCollection(db);
 
-            const latchCollName =
-                getCurrentOrPreviousLatchCollName(collName, this.latch, this.latchCount);
+            const latchCollName = getCurrentOrPreviousLatchCollName(collName, this.latch, this.latchCount);
             let currentZoneShardMap = this.zonesMappedToShardsForCollection[latchCollName];
 
             const zoneKeys = Object.keys(currentZoneShardMap);
@@ -180,14 +189,11 @@ export const $config = (function() {
             })[0];
 
             // Move the zone to the other shard.
-            assert.commandWorked(
-                db.adminCommand({addShardToZone: newShardForZone, zone: randomZone}));
-            assert.commandWorked(
-                db.adminCommand({removeShardFromZone: formerShardForZone, zone: randomZone}));
+            assert.commandWorked(db.adminCommand({addShardToZone: newShardForZone, zone: randomZone}));
+            assert.commandWorked(db.adminCommand({removeShardFromZone: formerShardForZone, zone: randomZone}));
 
             // Verify that the zone exists only on the new shard.
-            const tagsForFormerShard =
-                configShardsCollection.findOne({_id: formerShardForZone}).tags;
+            const tagsForFormerShard = configShardsCollection.findOne({_id: formerShardForZone}).tags;
             const tagsForNewShard = configShardsCollection.findOne({_id: newShardForZone}).tags;
 
             assert.eq(false, tagsForFormerShard.includes(randomZone));
@@ -197,11 +203,9 @@ export const $config = (function() {
         },
 
         swapZoneRange: function swapZoneRange(db, collName, connCache) {
-            const latchCollName =
-                getCurrentOrPreviousLatchCollName(collName, this.latch, this.latchCount);
+            const latchCollName = getCurrentOrPreviousLatchCollName(collName, this.latch, this.latchCount);
 
-            let currentZoneRangeMap =
-                this.zonesMappedToRangesOwnedByThreadForCollection[latchCollName];
+            let currentZoneRangeMap = this.zonesMappedToRangesOwnedByThreadForCollection[latchCollName];
 
             try {
                 attemptSwapZoneRange(db, latchCollName, currentZoneRangeMap);
@@ -211,11 +215,15 @@ export const $config = (function() {
                 // shard key in its refined state.
                 const newShardKeyField = this.newShardKeyFields[1];
                 const errorMsg = formatErrorMsg(e.message, e.extraAttr);
-                if ((errorMsg.includes(newShardKeyField) && errorMsg.includes('are not equal')) ||
-                    (errorMsg.includes(newShardKeyField) &&
-                     errorMsg.includes('assert.eq() failed'))) {
-                    jsTestLog("Retrying swapZoneRange on collection " + latchCollName +
-                              " due to refineCollectionShardKey conflict");
+                if (
+                    (errorMsg.includes(newShardKeyField) && errorMsg.includes("are not equal")) ||
+                    (errorMsg.includes(newShardKeyField) && errorMsg.includes("assert.eq() failed"))
+                ) {
+                    jsTestLog(
+                        "Retrying swapZoneRange on collection " +
+                            latchCollName +
+                            " due to refineCollectionShardKey conflict",
+                    );
                     for (let zoneRange of Object.values(currentZoneRangeMap)) {
                         zoneRange.min[newShardKeyField] = MinKey;
                         zoneRange.max[newShardKeyField] = MinKey;
@@ -233,8 +241,9 @@ export const $config = (function() {
             const latchColl = db.getCollection(latchCollName);
 
             try {
-                assert.commandWorked(db.adminCommand(
-                    {refineCollectionShardKey: latchColl.getFullName(), key: this.newShardKey}));
+                assert.commandWorked(
+                    db.adminCommand({refineCollectionShardKey: latchColl.getFullName(), key: this.newShardKey}),
+                );
             } catch (e) {
                 // There is a race that could occur where two threads run refineCollectionShardKey
                 // concurrently on the same collection. Since the epoch of the collection changes,
@@ -247,17 +256,14 @@ export const $config = (function() {
             }
 
             this.latch.countDown();
-        }
+        },
     };
 
     const transitions = {
         init: {sendZoneToOtherShard: 0.4, swapZoneRange: 0.4, refineCollectionShardKey: 0.2},
-        sendZoneToOtherShard:
-            {sendZoneToOtherShard: 0.4, swapZoneRange: 0.4, refineCollectionShardKey: 0.2},
-        swapZoneRange:
-            {sendZoneToOtherShard: 0.4, swapZoneRange: 0.4, refineCollectionShardKey: 0.2},
-        refineCollectionShardKey:
-            {sendZoneToOtherShard: 0.4, swapZoneRange: 0.4, refineCollectionShardKey: 0.2},
+        sendZoneToOtherShard: {sendZoneToOtherShard: 0.4, swapZoneRange: 0.4, refineCollectionShardKey: 0.2},
+        swapZoneRange: {sendZoneToOtherShard: 0.4, swapZoneRange: 0.4, refineCollectionShardKey: 0.2},
+        refineCollectionShardKey: {sendZoneToOtherShard: 0.4, swapZoneRange: 0.4, refineCollectionShardKey: 0.2},
     };
 
     function setup(db, collName, cluster) {
@@ -280,7 +286,7 @@ export const $config = (function() {
         // race that could occur between sharding a collection and creating an index on the new
         // shard key (if this step were done after every refineCollectionShardKey).
         for (let i = this.latchCount; i >= 0; --i) {
-            const latchCollName = collName + '_' + i;
+            const latchCollName = collName + "_" + i;
             const latchColl = db.getCollection(latchCollName);
 
             let currentRangeLowerBound = 0;
@@ -288,30 +294,29 @@ export const $config = (function() {
                 // Create a name for the zone that guarantees that the zone will never be touched
                 // by other threads for this test.
                 const currentThread = Math.floor(j / 2);
-                const zoneName = latchCollName + '-tid-' + currentThread + '-' + j % 2;
+                const zoneName = latchCollName + "-tid-" + currentThread + "-" + (j % 2);
 
                 // Add the zone to one random shard.
                 const randomShard = shardNames[Random.randInt(shardNames.length)];
-                assert.commandWorked(
-                    db.adminCommand({addShardToZone: randomShard, zone: zoneName}));
+                assert.commandWorked(db.adminCommand({addShardToZone: randomShard, zone: zoneName}));
 
                 // Assign a range to the zone.
                 const lowerZoneRange = {[this.oldShardKeyField]: currentRangeLowerBound};
-                const uppperZoneRange =
-                    {[this.oldShardKeyField]: currentRangeLowerBound + this.partitionSize};
-                assert.commandWorked(db.adminCommand({
-                    updateZoneKeyRange: latchColl.getFullName(),
-                    min: lowerZoneRange,
-                    max: uppperZoneRange,
-                    zone: zoneName
-                }));
+                const uppperZoneRange = {[this.oldShardKeyField]: currentRangeLowerBound + this.partitionSize};
+                assert.commandWorked(
+                    db.adminCommand({
+                        updateZoneKeyRange: latchColl.getFullName(),
+                        min: lowerZoneRange,
+                        max: uppperZoneRange,
+                        zone: zoneName,
+                    }),
+                );
 
                 currentRangeLowerBound += this.partitionSize;
             }
 
             // Shard the collection, implicitly creating chunks to match the created zones.
-            assert.commandWorked(
-                db.adminCommand({shardCollection: latchColl.getFullName(), key: this.oldShardKey}));
+            assert.commandWorked(db.adminCommand({shardCollection: latchColl.getFullName(), key: this.oldShardKey}));
             assert.commandWorked(latchColl.createIndex(this.newShardKey));
 
             db.printShardingStatus();
@@ -322,7 +327,7 @@ export const $config = (function() {
         threadCount: 5,
         iterations: 25,
         data: data,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         setup: setup,

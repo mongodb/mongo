@@ -1,32 +1,29 @@
 import {ContinuousStepdown} from "jstests/libs/override_methods/continuous_stepdown.js";
-import {
-    kOverrideConstructor as kOverrideConstructorForRST,
-    ReplSetTest
-} from "jstests/libs/replsettest.js";
-import {
-    kOverrideConstructor as kOverrideConstructorForST,
-    ShardingTest
-} from "jstests/libs/shardingtest.js";
+import {kOverrideConstructor as kOverrideConstructorForRST, ReplSetTest} from "jstests/libs/replsettest.js";
+import {kOverrideConstructor as kOverrideConstructorForST, ShardingTest} from "jstests/libs/shardingtest.js";
 
 const {ReplSetTestWithContinuousPrimaryStepdown, ShardingTestWithContinuousPrimaryStepdown} =
-    ContinuousStepdown.configure({
-        configStepdown: true,
-        electionTimeoutMS: 5 * 1000,
-        shardStepdown: false,
-        stepdownDurationSecs: 10,
-        stepdownIntervalMS: 8 * 1000,
-    },
-                                 {
-                                     verbositySetting: {
-                                         verbosity: 0,
-                                         command: {verbosity: 1},
-                                         network: {verbosity: 1, asio: {verbosity: 2}}
-                                     }
-                                 });
+    ContinuousStepdown.configure(
+        {
+            configStepdown: true,
+            electionTimeoutMS: 5 * 1000,
+            shardStepdown: false,
+            stepdownDurationSecs: 10,
+            stepdownIntervalMS: 8 * 1000,
+        },
+        {
+            verbositySetting: {
+                verbosity: 0,
+                command: {verbosity: 1},
+                network: {verbosity: 1, asio: {verbosity: 2}},
+            },
+        },
+    );
 
 ReplSetTest[kOverrideConstructorForRST] = ReplSetTestWithContinuousPrimaryStepdown;
-ShardingTest[kOverrideConstructorForST] = class ShardingTestWithContinuousFailover extends
-ShardingTestWithContinuousPrimaryStepdown{
+ShardingTest[kOverrideConstructorForST] = class ShardingTestWithContinuousFailover extends (
+    ShardingTestWithContinuousPrimaryStepdown
+) {
     constructor(params) {
         super(params);
         // Set the feature on the test configuration; this will allow js tests to selectively

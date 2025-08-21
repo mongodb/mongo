@@ -5,22 +5,25 @@
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 function assertLogLineContains(conn, parts) {
-    if (typeof (parts) == 'string') {
+    if (typeof parts == "string") {
         return assertLogLineContains(conn, [parts]);
     }
-    assert.soon(function() {
-        const logLines = checkLog.getGlobalLog(conn);
-        let foundAll = false;
-        for (let l = 0; l < logLines.length && !foundAll; l++) {
-            for (let p = 0; p < parts.length; p++) {
-                if (logLines[l].indexOf(parts[p]) == -1) {
-                    break;
+    assert.soon(
+        function () {
+            const logLines = checkLog.getGlobalLog(conn);
+            let foundAll = false;
+            for (let l = 0; l < logLines.length && !foundAll; l++) {
+                for (let p = 0; p < parts.length; p++) {
+                    if (logLines[l].indexOf(parts[p]) == -1) {
+                        break;
+                    }
+                    foundAll = p == parts.length - 1;
                 }
-                foundAll = (p == parts.length - 1);
             }
-        }
-        return foundAll;
-    }, "failed to find log line containing all of " + tojson(parts));
+            return foundAll;
+        },
+        "failed to find log line containing all of " + tojson(parts),
+    );
     print("FOUND: " + tojsononeline(parts));
 }
 
@@ -43,8 +46,14 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(testDB.setProfilingLevel(2, -1));
 
 // TEST: Verify the log format of the find command.
-let cursor = coll.find({a: {$gt: 0}}).sort({a: 1}).skip(1).limit(10).hint({a: 1}).batchSize(5);
-cursor.next();  // Perform initial query and retrieve first document in batch.
+let cursor = coll
+    .find({a: {$gt: 0}})
+    .sort({a: 1})
+    .skip(1)
+    .limit(10)
+    .hint({a: 1})
+    .batchSize(5);
+cursor.next(); // Perform initial query and retrieve first document in batch.
 
 let cursorid = getLatestProfilerEntry(testDB).cursorid;
 
@@ -52,7 +61,7 @@ let logLine = [
     '"msg":"Slow query","attr":{"type":"command",',
     '"isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
     '"command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-    '"planCacheShapeHash":'
+    '"planCacheShapeHash":',
 ];
 
 // Check the logs to verify that find appears as above.
@@ -60,7 +69,7 @@ assertLogLineContains(conn, logLine);
 
 // TEST: Verify the log format of a getMore command following a find command.
 
-assert.eq(cursor.itcount(), 8);  // Iterate the cursor established above to trigger getMore.
+assert.eq(cursor.itcount(), 8); // Iterate the cursor established above to trigger getMore.
 
 /**
  * Be sure to avoid rounding errors when converting a cursor ID to a string, since converting a
@@ -71,14 +80,15 @@ function cursorIdToString(cursorId) {
     if (cursorIdString.indexOf("NumberLong") === -1) {
         return cursorIdString;
     }
-    return cursorIdString.substring("NumberLong(\"".length, cursorIdString.length - "\")".length);
+    return cursorIdString.substring('NumberLong("'.length, cursorIdString.length - '")'.length);
 }
 
 logLine = [
-    `"msg":"Slow query","attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell","command":{"getMore":${
-        cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
+    `"msg":"Slow query","attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell","command":{"getMore":${cursorIdToString(
+        cursorid,
+    )},"collection":"test","batchSize":5,`,
     '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-    '"planCacheShapeHash":'
+    '"planCacheShapeHash":',
 ];
 
 assertLogLineContains(conn, logLine);
@@ -90,9 +100,10 @@ cursorid = getLatestProfilerEntry(testDB).cursorid;
 assert.eq(cursor.itcount(), 10);
 
 logLine = [
-    `"msg":"Slow query","attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell","command":{"getMore":${
-        cursorIdToString(cursorid)},"collection":"test"`,
-    '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}'
+    `"msg":"Slow query","attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell","command":{"getMore":${cursorIdToString(
+        cursorid,
+    )},"collection":"test"`,
+    '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}',
 ];
 
 assertLogLineContains(conn, logLine);

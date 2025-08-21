@@ -1,4 +1,3 @@
-
 /**
  *    Copyright (C) 2018-present MongoDB, Inc.
  *
@@ -34,7 +33,7 @@
 // this dictionary will be removed from the global scope.
 globalThis.exportToMongoHelpers = {
     // This function accepts an expression or function body and returns a function definition
-    'functionExpressionParser': function functionExpressionParser(fnSrc) {
+    "functionExpressionParser": function functionExpressionParser(fnSrc) {
         // Ensure that a provided expression or function body is not terminated with a ';'.
         // This ensures we interpret the input as a single expression, rather than a sequence
         // of expressions, and can wrap it in parentheses.
@@ -46,18 +45,18 @@ globalThis.exportToMongoHelpers = {
         try {
             parseTree = this.Reflect.parse(fnSrc);
         } catch (e) {
-            if (e == 'SyntaxError: function statement requires a name') {
+            if (e == "SyntaxError: function statement requires a name") {
                 return fnSrc;
-            } else if (e == 'SyntaxError: return not in function') {
-                return 'function() { ' + fnSrc + ' }';
+            } else if (e == "SyntaxError: return not in function") {
+                return "function() { " + fnSrc + " }";
             } else {
-                throw (e);
+                throw e;
             }
         }
         // Input source is a series of expressions. we should prepend the last one with return
         var lastStatement = parseTree.body.length - 1;
         var lastStatementType = parseTree.body[lastStatement].type;
-        if (lastStatementType == 'ExpressionStatement') {
+        if (lastStatementType == "ExpressionStatement") {
             var prevExprEnd = 0;
             var loc = parseTree.body[lastStatement].loc.start;
 
@@ -76,7 +75,7 @@ globalThis.exportToMongoHelpers = {
                 }
             }
 
-            var lines = fnSrc.split('\n');
+            var lines = fnSrc.split("\n");
             // Adjust for 1-indexed column number by substracting 1.
             var col = loc.column - 1;
             var fnSrc;
@@ -89,7 +88,7 @@ globalThis.exportToMongoHelpers = {
             while (col >= prevExprEnd) {
                 var modLine = origLine.substr(0, col) + "return " + origLine.substr(col);
                 lines[loc.line - 1] = modLine;
-                fnSrc = '{ ' + lines.join('\n') + ' }';
+                fnSrc = "{ " + lines.join("\n") + " }";
                 try {
                     tmpTree = this.Reflect.parse("function x() " + fnSrc);
                 } catch (e) {
@@ -100,12 +99,12 @@ globalThis.exportToMongoHelpers = {
             }
 
             return "function() " + fnSrc;
-        } else if (lastStatementType == 'FunctionDeclaration') {
+        } else if (lastStatementType == "FunctionDeclaration") {
             return fnSrc;
         } else {
-            return 'function() { ' + fnSrc + ' }';
+            return "function() { " + fnSrc + " }";
         }
-    }
+    },
 };
 
 // WARNING: Anything outside the exportToMongoHelpers dictionary will be available in the

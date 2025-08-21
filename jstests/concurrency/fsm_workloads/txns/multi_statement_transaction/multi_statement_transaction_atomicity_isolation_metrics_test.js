@@ -14,21 +14,16 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    checkServerStatusInvariants
-} from "jstests/concurrency/fsm_workload_helpers/check_transaction_server_status_invariants.js";
-import {
-    $config as $baseConfig
-} from
-    "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_atomicity_isolation.js";
+import {checkServerStatusInvariants} from "jstests/concurrency/fsm_workload_helpers/check_transaction_server_status_invariants.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_atomicity_isolation.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.setup = function(db, collName, cluster) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.setup = function (db, collName, cluster) {
         $super.setup.apply(this, arguments);
         this.prepareProbability = 0.5;
     };
 
-    $config.teardown = function(db, collName, cluster) {
+    $config.teardown = function (db, collName, cluster) {
         // Check the server-wide invariants one last time, with only a single sample, since all user
         // operations should have finished.
         checkServerStatusInvariants(db, 1, false /* isMongos */);
@@ -57,7 +52,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         init: {update: 0.9, checkInvariants: 0.1},
         update: {update: 0.8, checkInvariants: 0.1, causalRead: 0.1},
         checkInvariants: {update: 0.9, causalRead: 0.1},
-        causalRead: {update: 1.0}
+        causalRead: {update: 1.0},
     };
 
     return $config;

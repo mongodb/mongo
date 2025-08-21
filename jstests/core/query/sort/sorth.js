@@ -33,8 +33,7 @@ function resultsMatch(expectedMatches, actualMatches) {
     }
 
     for (var i = 0; i < expectedMatches.length; ++i) {
-        if ((expectedMatches[i].a !== actualMatches[i].a) ||
-            (expectedMatches[i].b !== actualMatches[i].b)) {
+        if (expectedMatches[i].a !== actualMatches[i].a || expectedMatches[i].b !== actualMatches[i].b) {
             return false;
         }
     }
@@ -58,18 +57,29 @@ function assertMatches(options) {
         const validResultSet = acceptableQueryResults[i];
 
         // All results should have the same number of results.
-        assert.eq(validResultSet.length,
-                  results.length,
-                  "Expected " + results.length + " results from query " + tojson(options.query) +
-                      " but found " + validResultSet.length);
+        assert.eq(
+            validResultSet.length,
+            results.length,
+            "Expected " +
+                results.length +
+                " results from query " +
+                tojson(options.query) +
+                " but found " +
+                validResultSet.length,
+        );
 
         if (resultsMatch(validResultSet, results)) {
             return;
         }
     }
-    throw new Error("Unexpected results for query " + tojson(options.query) + ": " +
-                    tojson(results) +
-                    ", acceptable results were: " + tojson(acceptableQueryResults));
+    throw new Error(
+        "Unexpected results for query " +
+            tojson(options.query) +
+            ": " +
+            tojson(results) +
+            ", acceptable results were: " +
+            tojson(acceptableQueryResults),
+    );
 }
 
 /**
@@ -114,11 +124,11 @@ function checkForwardDirection(options) {
     // the field "b".
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$gt: 2}}
+        query: {a: {$in: [1, 2]}, b: {$gt: 2}},
     });
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$gte: 3}}
+        query: {a: {$in: [1, 2]}, b: {$gte: 3}},
     });
     assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$gt: 3}}});
     assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$gte: 4}}});
@@ -132,42 +142,52 @@ function checkForwardDirection(options) {
     assertMatches({expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$lt: 3}}});
 
     // Lower and upper bounds checks.
-    assertMatches(
-        {expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$gte: 0, $lte: 0}}});
-    assertMatches(
-        {expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$gte: 0, $lt: 1}}});
-    assertMatches(
-        {expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$gte: 0, $lte: 1}}});
-    assertMatches(
-        {expectedQueryResults: [{a: 1, b: 1}], query: {a: {$in: [1, 2]}, b: {$gt: 0, $lte: 1}}});
-    assertMatches(
-        {expectedQueryResults: [{a: 1, b: 2}], query: {a: {$in: [1, 2]}, b: {$gte: 2, $lt: 3}}});
+    assertMatches({expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$gte: 0, $lte: 0}}});
+    assertMatches({expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$gte: 0, $lt: 1}}});
+    assertMatches({expectedQueryResults: [{a: 2, b: 0}], query: {a: {$in: [1, 2]}, b: {$gte: 0, $lte: 1}}});
+    assertMatches({expectedQueryResults: [{a: 1, b: 1}], query: {a: {$in: [1, 2]}, b: {$gt: 0, $lte: 1}}});
+    assertMatches({expectedQueryResults: [{a: 1, b: 2}], query: {a: {$in: [1, 2]}, b: {$gte: 2, $lt: 3}}});
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$gte: 2.5, $lte: 3}}
+        query: {a: {$in: [1, 2]}, b: {$gte: 2.5, $lte: 3}},
     });
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$gt: 2.5, $lte: 3}}
+        query: {a: {$in: [1, 2]}, b: {$gt: 2.5, $lte: 3}},
     });
 
     // Limit is -2.
     _limit = -2;
     assertMatches({
-        expectedQueryResults: [{a: 2, b: 0}, {a: 1, b: 1}],
-        query: {a: {$in: [1, 2]}, b: {$gte: 0}}
+        expectedQueryResults: [
+            {a: 2, b: 0},
+            {a: 1, b: 1},
+        ],
+        query: {a: {$in: [1, 2]}, b: {$gte: 0}},
     });
     assertMatches({
-        acceptableQueryResults: [[{a: 1, b: 2}, {a: 2, b: 3}], [{a: 1, b: 2}, {a: 1, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$gt: 1}}
+        acceptableQueryResults: [
+            [
+                {a: 1, b: 2},
+                {a: 2, b: 3},
+            ],
+            [
+                {a: 1, b: 2},
+                {a: 1, b: 3},
+            ],
+        ],
+        query: {a: {$in: [1, 2]}, b: {$gt: 1}},
     });
     assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$gt: 4}}});
 
     // With an additional document between the $in values.
     t.save({a: 1.5, b: 3});
     assertMatches({
-        expectedQueryResults: [{a: 2, b: 0}, {a: 1, b: 1}],
-        query: {a: {$in: [1, 2]}, b: {$gte: 0}}
+        expectedQueryResults: [
+            {a: 2, b: 0},
+            {a: 1, b: 1},
+        ],
+        query: {a: {$in: [1, 2]}, b: {$gte: 0}},
     });
 }
 
@@ -196,44 +216,41 @@ function checkReverseDirection(options) {
     assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$gte: 0}}});
     assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$gte: 5}}});
     assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$lte: 5}}});
-    assertMatches(
-        {expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$lte: 5, $gte: 5}}});
+    assertMatches({expectedQueryResults: [{a: 2, b: 5}], query: {a: {$in: [1, 2]}, b: {$lte: 5, $gte: 5}}});
 
     // For matching documents, highest value of 'b' is 2.
     assertMatches({expectedQueryResults: [{a: 1, b: 2}], query: {a: {$in: [1, 2]}, b: {$lt: 3}}});
-    assertMatches(
-        {expectedQueryResults: [{a: 1, b: 2}], query: {a: {$in: [1, 2]}, b: {$lt: 3, $gt: 1}}});
+    assertMatches({expectedQueryResults: [{a: 1, b: 2}], query: {a: {$in: [1, 2]}, b: {$lt: 3, $gt: 1}}});
 
     // For matching documents, highest value of 'b' is 1.
-    assertMatches(
-        {expectedQueryResults: [{a: 1, b: 1}], query: {a: {$in: [1, 2]}, b: {$lt: 2, $gte: 1}}});
+    assertMatches({expectedQueryResults: [{a: 1, b: 1}], query: {a: {$in: [1, 2]}, b: {$lt: 2, $gte: 1}}});
 
     // These queries expect 3 as the highest value of 'b' among matching documents, but there
     // are two documents with a value of 3 for the field 'b'. Either document is acceptable,
     // since there is no sort order on any other existing fields.
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$lt: 5}}
+        query: {a: {$in: [1, 2]}, b: {$lt: 5}},
     });
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$lt: 3.1}}
+        query: {a: {$in: [1, 2]}, b: {$lt: 3.1}},
     });
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$lt: 3.5}}
+        query: {a: {$in: [1, 2]}, b: {$lt: 3.5}},
     });
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$lte: 3}}
+        query: {a: {$in: [1, 2]}, b: {$lte: 3}},
     });
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$lt: 3.5, $gte: 3}}
+        query: {a: {$in: [1, 2]}, b: {$lt: 3.5, $gte: 3}},
     });
     assertMatches({
         acceptableQueryResults: [[{a: 1, b: 3}], [{a: 2, b: 3}]],
-        query: {a: {$in: [1, 2]}, b: {$lte: 3, $gt: 0}}
+        query: {a: {$in: [1, 2]}, b: {$lte: 3, $gt: 0}},
     });
 }
 

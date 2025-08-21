@@ -38,8 +38,8 @@ function checkResults({results, verbosity}) {
             const execStatsStages = getAggPlanStages(results, "limit");
             assert.gt(queryPlannerStages.length, 0, results);
             assert.gt(execStatsStages.length, 0, results);
-            const planNodeIds = new Set(queryPlannerStages.map(stage => stage.planNodeId));
-            return [execStatsStages.filter(stage => planNodeIds.has(stage.planNodeId)), "limit"];
+            const planNodeIds = new Set(queryPlannerStages.map((stage) => stage.planNodeId));
+            return [execStatsStages.filter((stage) => planNodeIds.has(stage.planNodeId)), "limit"];
         }
         return [getAggPlanStages(results, "LIMIT"), "limitAmount"];
     })();

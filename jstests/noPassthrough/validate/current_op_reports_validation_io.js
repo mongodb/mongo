@@ -43,25 +43,30 @@ TestData.collName = collName;
 const awaitValidation = startParallelShell(() => {
     assert.commandWorked(
         db.getSiblingDB(TestData.dbName).getCollection(TestData.collName).validate({
-            background: true
-        }));
+            background: true,
+        }),
+    );
 }, primary.port);
 
 pauseFailPoint.wait();
 
 const curOpFilter = {
-    'command.validate': collName
+    "command.validate": collName,
 };
 
 let curOp = assert.commandWorked(db.currentOp(curOpFilter));
 assert(curOp.inprog.length == 1);
-assert(curOp.inprog[0].hasOwnProperty("dataThroughputLastSecond") &&
-       curOp.inprog[0].hasOwnProperty("dataThroughputAverage"));
+assert(
+    curOp.inprog[0].hasOwnProperty("dataThroughputLastSecond") &&
+        curOp.inprog[0].hasOwnProperty("dataThroughputAverage"),
+);
 
-curOp = primary.getDB("admin").aggregate([{$currentOp: {}}, {$match: curOpFilter}]).toArray();
+curOp = primary
+    .getDB("admin")
+    .aggregate([{$currentOp: {}}, {$match: curOpFilter}])
+    .toArray();
 assert(curOp.length == 1);
-assert(curOp[0].hasOwnProperty("dataThroughputLastSecond") &&
-       curOp[0].hasOwnProperty("dataThroughputAverage"));
+assert(curOp[0].hasOwnProperty("dataThroughputLastSecond") && curOp[0].hasOwnProperty("dataThroughputAverage"));
 
 // Finish up validating the collection.
 cursorDataSizeFailPoint.off();

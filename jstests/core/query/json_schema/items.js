@@ -37,7 +37,7 @@ assertSchemaMatch(coll, schema, {a: ["cab", "caab", "b"]}, false);
 // Test that when "items" is an array, each element schema only apply to elements at that
 // position.
 schema = {
-    properties: {a: {items: [{multipleOf: 2}]}}
+    properties: {a: {items: [{multipleOf: 2}]}},
 };
 assertSchemaMatch(coll, schema, {a: []}, true);
 assertSchemaMatch(coll, schema, {a: [2]}, true);
@@ -45,7 +45,7 @@ assertSchemaMatch(coll, schema, {a: [2, 3]}, true);
 assertSchemaMatch(coll, schema, {a: [3]}, false);
 
 schema = {
-    properties: {a: {items: [{maxLength: 1}, {maxLength: 2}]}}
+    properties: {a: {items: [{maxLength: 1}, {maxLength: 2}]}},
 };
 assertSchemaMatch(coll, schema, {a: []}, true);
 assertSchemaMatch(coll, schema, {a: ["1"]}, true);
@@ -57,7 +57,7 @@ assertSchemaMatch(coll, schema, {a: ["1", "123"]}, false);
 
 // Test that "items" has no effect when it is an empty array (but is still accepted).
 schema = {
-    properties: {a: {items: []}}
+    properties: {a: {items: []}},
 };
 assertSchemaMatch(coll, schema, {}, true);
 assertSchemaMatch(coll, schema, {a: "blah"}, true);

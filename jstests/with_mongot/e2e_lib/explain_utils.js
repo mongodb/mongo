@@ -3,15 +3,11 @@
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {
-    getAggPlanStages,
-    getLookupStage,
-    getUnionWithStage
-} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getLookupStage, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {
     prepareUnionWithExplain,
     validateMongotStageExplainExecutionStats,
-    verifyShardsPartExplainOutput
+    verifyShardsPartExplainOutput,
 } from "jstests/with_mongot/common_utils.js";
 
 /**
@@ -27,7 +23,8 @@ function assertIdLookupContainsViewPipeline(explainOutput, viewPipeline) {
     assert(
         stages.length > 0,
         "There should be at least one stage corresponding to $_internalSearchIdLookup in the explain output. " +
-            tojson(explainOutput));
+            tojson(explainOutput),
+    );
 
     for (let stage of stages) {
         const idLookupFullSubPipe = stage["$_internalSearchIdLookup"]["subPipeline"];
@@ -35,8 +32,7 @@ function assertIdLookupContainsViewPipeline(explainOutput, viewPipeline) {
         const idLookupStage = {"$match": {"_id": {"$eq": "_id placeholder"}}};
         assert.eq(idLookupFullSubPipe[0], idLookupStage);
         // Make sure that idLookup subpipeline contains all of the view stages.
-        const idLookupViewStages =
-            idLookupFullSubPipe.length > 1 ? idLookupFullSubPipe.slice(1) : [];
+        const idLookupViewStages = idLookupFullSubPipe.length > 1 ? idLookupFullSubPipe.slice(1) : [];
         assert.eq(idLookupViewStages.length, viewPipeline.length);
         for (let i = 0; i < idLookupViewStages.length; i++) {
             const stageName = Object.keys(viewPipeline[i])[0];
@@ -55,9 +51,10 @@ function assertIdLookupContainsViewPipeline(explainOutput, viewPipeline) {
  * @param {Array} viewPipeline The pipeline used to define the view.
  */
 export function assertViewAppliedCorrectly(explainOutput, userPipeline, viewPipeline) {
-    if (userPipeline.length > 0 &&
-        (userPipeline[0].hasOwnProperty("$search") ||
-         userPipeline[0].hasOwnProperty("$vectorSearch"))) {
+    if (
+        userPipeline.length > 0 &&
+        (userPipeline[0].hasOwnProperty("$search") || userPipeline[0].hasOwnProperty("$vectorSearch"))
+    ) {
         // The view pipeline is pushed down to a desugared stage, $_internalSearchdLookup. Therefore
         // we inspect the stages (which represent the fully desugared pipeline from the user) to
         // ensure the view was successfully pushed down.
@@ -89,16 +86,18 @@ export function assertViewNotApplied(explainOutput, userPipeline, viewPipeline) 
     assert(
         stages.length == 0,
         "There should not be any stages corresponding to $_internalSearchIdLookup in the explain output. " +
-            tojson(explainOutput));
+            tojson(explainOutput),
+    );
 
     // If a view pipeline isn't pushed down to idLookup, there is a risk it was appended to the user
     // pipeline (as is the case for non-search queries on views). It's important to call out that
     // this check investigates the most basic case for non-search queries on views, where the view
     // pipeline isn't desugared and none of the view stages are pushed down or otherwise rearranged
     // during optimization.
-    if (userPipeline.length > 0 &&
-        (userPipeline[0].hasOwnProperty("$search") ||
-         userPipeline[0].hasOwnProperty("$vectorSearch"))) {
+    if (
+        userPipeline.length > 0 &&
+        (userPipeline[0].hasOwnProperty("$search") || userPipeline[0].hasOwnProperty("$vectorSearch"))
+    ) {
         assert.neq(explainOutput.command.pipeline.slice(0, viewPipeline.length), viewPipeline);
     }
 }
@@ -116,7 +115,12 @@ export function assertViewNotApplied(explainOutput, userPipeline, viewPipeline) 
  * @param {boolean} isStoredSource Whether the $search query is storedSource or not.
  */
 export function assertUnionWithSearchSubPipelineAppliedViews(
-    explainOutput, collNss, viewName, viewPipeline, isStoredSource = false) {
+    explainOutput,
+    collNss,
+    viewName,
+    viewPipeline,
+    isStoredSource = false,
+) {
     const unionWithStage = getUnionWithStage(explainOutput);
     const unionWithExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
     if (!isStoredSource) {
@@ -125,8 +129,7 @@ export function assertUnionWithSearchSubPipelineAppliedViews(
         // that will exist on the $unionWith explain output. We can still assert that the
         // $unionWith.coll is "resolved" to its collNss. Note that the view name is not resolved to
         // its collNss in full-sharded environments, and this is intended behavior.
-        if (unionWithExplain.hasOwnProperty("splitPipeline") &&
-            unionWithExplain["splitPipeline"] !== null) {
+        if (unionWithExplain.hasOwnProperty("splitPipeline") && unionWithExplain["splitPipeline"] !== null) {
             const firstStage = unionWithExplain.splitPipeline.shardsPart[0];
 
             print("explainOutput: " + tojson(explainOutput));
@@ -138,7 +141,8 @@ export function assertUnionWithSearchSubPipelineAppliedViews(
             } else {
                 assert.fail(
                     "Expected first stage to have either $search or $vectorSearch, but found neither: " +
-                    tojson(firstStage));
+                        tojson(firstStage),
+                );
             }
             assert.eq(unionWithStage.$unionWith.coll, viewName);
         } else {
@@ -164,24 +168,27 @@ export function assertLookupInExplain(explainOutput, lookupStage) {
     // Find the lookup stage in the explain output and assert that it matches the lookup passed
     // to the function.
     const stage = getLookupStage(explainOutput);
-    assert(stage,
-           "There should be one $lookup stage in the explain output. " + tojson(explainOutput));
+    assert(stage, "There should be one $lookup stage in the explain output. " + tojson(explainOutput));
 
     // The explain might add extra stages to the $lookup in its output which is why we can't
     // simply assert that the two BSON objects match each other.
     Object.keys(lookupStage["$lookup"]).forEach((lookupKey) => {
-        assert(stage["$lookup"].hasOwnProperty(lookupKey),
-               "There should be a key \"" + lookupKey +
-                   "\" in the lookup stage from the explain output." + tojson(stage));
+        assert(
+            stage["$lookup"].hasOwnProperty(lookupKey),
+            'There should be a key "' + lookupKey + '" in the lookup stage from the explain output.' + tojson(stage),
+        );
 
         // On the "pipeline" key, simply make sure that the two pipelines have the same length.
         // There are some optimizations in various environment configurations that will make the
         // actual content of the pipeline different, but the length should stay the same.
         if (lookupKey == "pipeline") {
-            assert.eq(stage["$lookup"][lookupKey].length,
-                      lookupStage["$lookup"][lookupKey].length,
-                      "The $lookup stage in the explain output should have the same number of " +
-                          "stages as the lookup stage passed to the function." + tojson(stage));
+            assert.eq(
+                stage["$lookup"][lookupKey].length,
+                lookupStage["$lookup"][lookupKey].length,
+                "The $lookup stage in the explain output should have the same number of " +
+                    "stages as the lookup stage passed to the function." +
+                    tojson(stage),
+            );
         }
     });
 }
@@ -198,17 +205,20 @@ export function assertLookupInExplain(explainOutput, lookupStage) {
  * @param {NumberLong} nReturned not needed if verbosity is 'queryPlanner'. For a sharded
  *     scenario, this should be the total returned across all shards.
  */
-export function verifyE2ESearchExplainOutput(
-    {explainOutput, stageType, verbosity, nReturned = null}) {
+export function verifyE2ESearchExplainOutput({explainOutput, stageType, verbosity, nReturned = null}) {
     if (explainOutput.hasOwnProperty("splitPipeline") && explainOutput["splitPipeline"] !== null) {
         // We check metadata and protocol version for sharded $search.
         verifyShardsPartExplainOutput({result: explainOutput, searchType: "$search"});
     }
     let totalNReturned = 0;
     let stages = getAggPlanStages(explainOutput, stageType);
-    assert(stages.length > 0,
-           "There should be at least one stage corresponding to " + stageType +
-               " in the explain output. " + tojson(explainOutput));
+    assert(
+        stages.length > 0,
+        "There should be at least one stage corresponding to " +
+            stageType +
+            " in the explain output. " +
+            tojson(explainOutput),
+    );
     // In a sharded scenario, there may be multiple stages. For an unsharded scenario, there is
     // only one stage.
     for (let stage of stages) {
@@ -239,8 +249,7 @@ export function verifyE2ESearchExplainOutput(
  * @param {string} verbosity The verbosity of explain. "nReturned" and
  *     "executionTimeMillisEstimate" will not be checked for 'queryPlanner' verbosity "
  */
-export function verifyE2ESearchMetaExplainOutput(
-    {explainOutput, numFacetBucketsAndCount, verbosity}) {
+export function verifyE2ESearchMetaExplainOutput({explainOutput, numFacetBucketsAndCount, verbosity}) {
     // In an unsharded scenario, $searchMeta returns one document with all of the facet values.
     let nReturned = 1;
     if (explainOutput.hasOwnProperty("splitPipeline") && explainOutput["splitPipeline"] !== null) {
@@ -257,7 +266,7 @@ export function verifyE2ESearchMetaExplainOutput(
             stageType: "$searchMeta",
             nReturned: nReturned,
             verbosity: verbosity,
-            isE2E: true
+            isE2E: true,
         });
     }
 }
@@ -287,7 +296,7 @@ export function verifyE2EVectorSearchExplainOutput({explainOutput, stageType, li
             stageType: stageType,
             nReturned: limit,
             verbosity: verbosity,
-            isE2E: true
+            isE2E: true,
         });
     }
 }
@@ -314,9 +323,11 @@ export function verifyExplainStagesAreEqual(realExplainOutput, expectedExplainOu
         if (realExplainOutput["splitPipeline"] != null) {
             // Case for sharded collection.
             realExplainOutputStages = realExplainOutput["splitPipeline"]["shardsPart"].concat(
-                realExplainOutput["splitPipeline"]["mergerPart"]);
+                realExplainOutput["splitPipeline"]["mergerPart"],
+            );
             expectedExplainStages = expectedExplainOutput["splitPipeline"]["shardsPart"].concat(
-                expectedExplainOutput["splitPipeline"]["mergerPart"]);
+                expectedExplainOutput["splitPipeline"]["mergerPart"],
+            );
             canCompareStagesExactly = false;
         } else {
             // Case for single shard.
@@ -330,28 +341,39 @@ export function verifyExplainStagesAreEqual(realExplainOutput, expectedExplainOu
     }
 
     if (canCompareStagesExactly) {
-        assert(arrayEq(realExplainOutputStages,
-                       expectedExplainStages,
-                       false /* verbose */,
-                       null /* valueComparator */,
-                       ['optimizationTimeMillis'] /* fieldsToSkip */),
-               "Explains did not match in 'stages'. Expected:\n" + tojson(expectedExplainOutput) +
-                   "\nView:\n" + tojson(realExplainOutput));
+        assert(
+            arrayEq(
+                realExplainOutputStages,
+                expectedExplainStages,
+                false /* verbose */,
+                null /* valueComparator */,
+                ["optimizationTimeMillis"] /* fieldsToSkip */,
+            ),
+            "Explains did not match in 'stages'. Expected:\n" +
+                tojson(expectedExplainOutput) +
+                "\nView:\n" +
+                tojson(realExplainOutput),
+        );
     } else {
         // This branch extracts the top-level stage names from the explain pipeline and ensures that
         // they are equal - it *does not* compare the stage specs themselves.
         function getStageNamesFromExplain(pipeline) {
             return pipeline.map((stage) => Object.keys(stage)[0]);
-        };
+        }
         const realExplainOutputStageNames = getStageNamesFromExplain(realExplainOutputStages);
         const expectedExplainOutputStageNames = getStageNamesFromExplain(expectedExplainStages);
-        assert(arrayEq(realExplainOutputStageNames,
-                       expectedExplainOutputStageNames,
-                       false /* verbose */,
-                       null /* valueComparator */,
-                       [] /* fieldsToSkip */),
-               "Explains did not match in stage names. Expected: \n" +
-                   tojson(expectedExplainOutputStageNames) + "\nView:\n" +
-                   tojson(realExplainOutputStageNames));
+        assert(
+            arrayEq(
+                realExplainOutputStageNames,
+                expectedExplainOutputStageNames,
+                false /* verbose */,
+                null /* valueComparator */,
+                [] /* fieldsToSkip */,
+            ),
+            "Explains did not match in stage names. Expected: \n" +
+                tojson(expectedExplainOutputStageNames) +
+                "\nView:\n" +
+                tojson(realExplainOutputStageNames),
+        );
     }
 }

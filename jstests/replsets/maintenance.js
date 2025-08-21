@@ -1,8 +1,6 @@
-
-
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var replTest = new ReplSetTest({name: 'unicomplex', nodes: 2});
+var replTest = new ReplSetTest({name: "unicomplex", nodes: 2});
 var conns = replTest.startSet({verbose: 1});
 var config = replTest.getReplSetConfig();
 config.members[0].priority = 2;
@@ -21,23 +19,21 @@ for (i = 0; i < 20; i++) {
 
 replTest.awaitReplication();
 
-assert.soon(function() {
+assert.soon(function () {
     return conns[1].getDB("admin").hello().secondary;
 });
 
-let join =
-    startParallelShell("db.getSiblingDB('bar').runCommand({compact : 'foo'});", replTest.ports[1]);
+let join = startParallelShell("db.getSiblingDB('bar').runCommand({compact : 'foo'});", replTest.ports[1]);
 
 print("joining");
 join();
 
 print("check secondary becomes a secondary again");
-var secondarySoon = function() {
+var secondarySoon = function () {
     var x = 0;
-    assert.soon(function() {
+    assert.soon(function () {
         var helloRes = conns[1].getDB("admin").hello();
-        if (x++ % 5 == 0)
-            printjson(helloRes);
+        if (x++ % 5 == 0) printjson(helloRes);
         return helloRes.secondary;
     });
 };
@@ -70,10 +66,9 @@ assert.eq(result.ok, 1, tojson(result));
 
 print("make sure secondary goes into recovering");
 var x = 0;
-assert.soon(function() {
+assert.soon(function () {
     var helloRes = conns[1].getDB("admin").hello();
-    if (x++ % 5 == 0)
-        printjson(helloRes);
+    if (x++ % 5 == 0) printjson(helloRes);
     return !helloRes.secondary && !helloRes.isWritablePrimary;
 });
 
@@ -82,12 +77,16 @@ assert.commandFailed(recv);
 assert.eq(recv.errmsg, "node is recovering");
 
 print("now getmore shouldn't work");
-var ex = assert.throws(function() {
-    let lastDoc = null;
-    while (cursor.hasNext()) {
-        lastDoc = cursor.next();
-    }
-}, [] /*no params*/, "getmore didn't fail");
+var ex = assert.throws(
+    function () {
+        let lastDoc = null;
+        while (cursor.hasNext()) {
+            lastDoc = cursor.next();
+        }
+    },
+    [] /*no params*/,
+    "getmore didn't fail",
+);
 
 assert(ex.message.match("13436"), "wrong error code -- " + ex);
 

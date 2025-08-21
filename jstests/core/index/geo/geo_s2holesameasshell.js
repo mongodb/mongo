@@ -16,15 +16,29 @@ t.insert({geo: cornerPoint});
 // This generates an empty covering.
 var polygonWithFullHole = {
     "type": "Polygon",
-    "coordinates":
-        [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]], [[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]
+    "coordinates": [
+        [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [1, 0],
+            [0, 0],
+        ],
+        [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [1, 0],
+            [0, 0],
+        ],
+    ],
 };
 
 // No keys for insert should error.
 assert.writeError(t.insert({geo: polygonWithFullHole}));
 
 // No covering to search over should give an empty result set.
-assert.throws(function() {
+assert.throws(function () {
     return t.find({geo: {$geoWithin: {$geometry: polygonWithFullHole}}}).count();
 });
 
@@ -33,16 +47,34 @@ assert.throws(function() {
 var polygonWithTwoHolesCoveringWholeArea = {
     "type": "Polygon",
     "coordinates": [
-        [[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]],
-        [[0, 0], [0, 0.5], [1, 0.5], [1, 0], [0, 0]],
-        [[0, 0.5], [0, 1], [1, 1], [1, 0.5], [0, 0.5]]
-    ]
+        [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [1, 0],
+            [0, 0],
+        ],
+        [
+            [0, 0],
+            [0, 0.5],
+            [1, 0.5],
+            [1, 0],
+            [0, 0],
+        ],
+        [
+            [0, 0.5],
+            [0, 1],
+            [1, 1],
+            [1, 0.5],
+            [0, 0.5],
+        ],
+    ],
 };
 
 // No keys for insert should error.
 assert.writeError(t.insert({geo: polygonWithTwoHolesCoveringWholeArea}));
 
 // No covering to search over should give an empty result set.
-assert.throws(function() {
+assert.throws(function () {
     return t.find({geo: {$geoWithin: {$geometry: polygonWithTwoHolesCoveringWholeArea}}}).count();
 });

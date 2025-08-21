@@ -40,7 +40,7 @@ if (FixtureHelpers.isReplSet(db)) {
 
 const storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
-if (storageEngine === "wiredTiger" && coll.stats().wiredTiger.type === 'lsm') {
+if (storageEngine === "wiredTiger" && coll.stats().wiredTiger.type === "lsm") {
     quit();
 }
 
@@ -51,7 +51,7 @@ assert.eq([], coll.aggregate([{$sample: {size: 10}}]).toArray());
 const paddingStr = "abcdefghijklmnopqrstuvwxyz";
 const firstDoc = {
     _id: 0,
-    paddingStr: paddingStr
+    paddingStr: paddingStr,
 };
 assert.commandWorked(coll.insert(firstDoc));
 assert.eq([firstDoc], coll.aggregate([{$sample: {size: 1}}]).toArray());
@@ -69,8 +69,10 @@ bulk.execute();
 let cumulativeSeenIds = {};
 const sampleSize = 10;
 
-jsTestLog("About to do repeated samples, explain output: " +
-          tojson(coll.explain().aggregate([{$sample: {size: sampleSize}}])));
+jsTestLog(
+    "About to do repeated samples, explain output: " +
+        tojson(coll.explain().aggregate([{$sample: {size: sampleSize}}])),
+);
 
 // Repeatedly ask for small samples of documents to get a cumulative sample of size 'nDocs'.
 for (let i = 0; i < nDocs / sampleSize; i++) {
@@ -82,8 +84,7 @@ for (let i = 0; i < nDocs / sampleSize; i++) {
     let idsThisSample = {};
     results.forEach(function recordId(result) {
         assert.lte(result._id, nDocs, "$sample returned an unknown document");
-        assert(!idsThisSample[result._id],
-               "A single $sample returned the same document twice: " + result._id);
+        assert(!idsThisSample[result._id], "A single $sample returned the same document twice: " + result._id);
 
         cumulativeSeenIds[result._id] = true;
         idsThisSample[result._id] = true;

@@ -21,7 +21,7 @@ qsutils.removeAllQuerySettings();
 // when query settings specify only query engine version.
 const indexKeyPattern = {
     a: 1,
-    b: 1
+    b: 1,
 };
 assert.commandWorked(coll.createIndexes([{a: 1}, indexKeyPattern, {a: 1, b: 1, c: 1}]));
 

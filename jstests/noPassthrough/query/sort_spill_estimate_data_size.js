@@ -40,19 +40,19 @@ for (let i = 0; i < numDocs; ++i) {
     totalSize += Object.bsonsize(doc);
 }
 
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 5000}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 5000}));
 assert.commandWorked(coll.insert(docs));
 
 function createPipeline(collection) {
     return collection.aggregate(
         [
             {$unwind: "$data"},
-            {$sort: {'_id': -1, 'data.uniqueValue': -1}},
+            {$sort: {"_id": -1, "data.uniqueValue": -1}},
             {$limit: 900},
-            {$group: {_id: 0, sumTop900UniqueValues: {$sum: '$data.uniqueValue'}}}
+            {$group: {_id: 0, sumTop900UniqueValues: {$sum: "$data.uniqueValue"}}},
         ],
-        {allowDiskUse: true});
+        {allowDiskUse: true},
+    );
 }
 
 const explain = createPipeline(coll.explain("executionStats"));
@@ -60,7 +60,7 @@ const explain = createPipeline(coll.explain("executionStats"));
 // Returns the (first) value of the field named 'key' in the object 'obj' if it exists nested at any
 // depth, else returns "undefined".
 function findKey(key, obj) {
-    if ((typeof obj === "undefined") || (obj === null)) {
+    if (typeof obj === "undefined" || obj === null) {
         return;
     }
     if (obj.hasOwnProperty(key)) {
@@ -74,7 +74,7 @@ function findKey(key, obj) {
             }
         }
     }
-}  // function findKey
+} // function findKey
 
 let dataBytesSorted;
 const sortStages = getAggPlanStages(explain, "$sort");

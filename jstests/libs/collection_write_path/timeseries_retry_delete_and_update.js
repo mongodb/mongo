@@ -13,16 +13,19 @@
  * has the expected value and returns the amount by which that statistic was expected to increment.
  */
 export function runTimeseriesRetryDeleteAndUpdateTest(
-    conn, setUpCollection, checkRetriedCommandsCount, checkRetriedStatementsCount, shard0 = conn) {
-    const timeFieldName = 'time';
-    const metaFieldName = 'tag';
+    conn,
+    setUpCollection,
+    checkRetriedCommandsCount,
+    checkRetriedStatementsCount,
+    shard0 = conn,
+) {
+    const timeFieldName = "time";
+    const metaFieldName = "tag";
     const dateTime = ISODate("2021-07-12T16:00:00Z");
     let collCount = 0;
 
-    let retriedCommandsCount =
-        shard0.getDB(jsTestName()).serverStatus().transactions.retriedCommandsCount;
-    let retriedStatementsCount =
-        shard0.getDB(jsTestName()).serverStatus().transactions.retriedStatementsCount;
+    let retriedCommandsCount = shard0.getDB(jsTestName()).serverStatus().transactions.retriedCommandsCount;
+    let retriedStatementsCount = shard0.getDB(jsTestName()).serverStatus().transactions.retriedStatementsCount;
 
     /**
      * Verifies that a timeseries delete or update command supports retryable writes. The arguments
@@ -30,33 +33,38 @@ export function runTimeseriesRetryDeleteAndUpdateTest(
      * that returns the command object given the collection to run it on, and a validate function
      * that validates the result after the command has been applied to the collection.
      */
-    const runTest = function(
-        initialDocs, cmdBuilderFn, validateFn, expectError = false, statementsRetried = 1) {
+    const runTest = function (initialDocs, cmdBuilderFn, validateFn, expectError = false, statementsRetried = 1) {
         const session = conn.startSession({retryWrites: true});
         const testDB = session.getDatabase(jsTestName());
 
-        const coll = testDB.getCollection('timeseries_retry_delete_and_update_' + collCount++);
+        const coll = testDB.getCollection("timeseries_retry_delete_and_update_" + collCount++);
         coll.drop();
         if (conn.isMongos()) {
             // TODO (SERVER-86443): Use create instead of createUnsplittableCollection
             // command once any collection becomes tracked upon creation
-            assert.commandWorked(testDB.runCommand({
-                createUnsplittableCollection: coll.getName(),
-                timeseries: {timeField: timeFieldName, metaField: metaFieldName}
-            }));
+            assert.commandWorked(
+                testDB.runCommand({
+                    createUnsplittableCollection: coll.getName(),
+                    timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                }),
+            );
         } else {
-            assert.commandWorked(testDB.createCollection(
-                coll.getName(),
-                {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+            assert.commandWorked(
+                testDB.createCollection(coll.getName(), {
+                    timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                }),
+            );
         }
         setUpCollection(testDB, coll, metaFieldName);
 
-        assert.commandWorked(testDB.runCommand({
-            insert: coll.getName(),
-            documents: initialDocs,
-            lsid: session.getSessionId(),
-            txnNumber: NumberLong(0),
-        }));
+        assert.commandWorked(
+            testDB.runCommand({
+                insert: coll.getName(),
+                documents: initialDocs,
+                lsid: session.getSessionId(),
+                txnNumber: NumberLong(0),
+            }),
+        );
 
         // For retryable writes, the server uses 'txnNumber' as the key to look up previously
         // executed operations in the session.
@@ -68,18 +76,14 @@ export function runTimeseriesRetryDeleteAndUpdateTest(
             assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.InvalidOptions);
             assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.InvalidOptions);
         } else {
-            assert.commandWorked(testDB.runCommand(cmdObj),
-                                 'Failed to write bucket on first write');
-            assert.commandWorked(testDB.runCommand(cmdObj),
-                                 'Failed to write bucket on retry write');
+            assert.commandWorked(testDB.runCommand(cmdObj), "Failed to write bucket on first write");
+            assert.commandWorked(testDB.runCommand(cmdObj), "Failed to write bucket on retry write");
         }
 
         validateFn(coll);
 
-        retriedCommandsCount +=
-            checkRetriedCommandsCount(testDB, retriedCommandsCount, statementsRetried);
-        retriedStatementsCount +=
-            checkRetriedStatementsCount(testDB, retriedStatementsCount, statementsRetried);
+        retriedCommandsCount += checkRetriedCommandsCount(testDB, retriedCommandsCount, statementsRetried);
+        retriedStatementsCount += checkRetriedStatementsCount(testDB, retriedStatementsCount, statementsRetried);
 
         session.endSession();
     };
@@ -125,64 +129,63 @@ export function runTimeseriesRetryDeleteAndUpdateTest(
         return updateCmd;
     }
     function updateValidateFn(coll) {
-        assert.eq(coll.countDocuments({updated: {$exists: true}}),
-                  1,
-                  "Expected exactly one document to be updated.");
-        assert.eq(
-            coll.countDocuments({updated: 1}), 1, "Expected document to be updated only once.");
+        assert.eq(coll.countDocuments({updated: {$exists: true}}), 1, "Expected exactly one document to be updated.");
+        assert.eq(coll.countDocuments({updated: 1}), 1, "Expected document to be updated only once.");
     }
     function updateUnorderedValidateFn(coll) {
         updateValidateFn(coll);
-        assert.eq(coll.countDocuments({anotherUpdated: {$exists: true}}),
-                  1,
-                  "Expected exactly one document to be updated.");
-        assert.eq(coll.countDocuments({anotherUpdated: 1}),
-                  1,
-                  "Expected document to be updated only once.");
+        assert.eq(
+            coll.countDocuments({anotherUpdated: {$exists: true}}),
+            1,
+            "Expected exactly one document to be updated.",
+        );
+        assert.eq(coll.countDocuments({anotherUpdated: 1}), 1, "Expected document to be updated only once.");
     }
 
     (function testPartialBucketUpdate() {
-        runTest(allDocumentsSameBucket,
-                updateCmdBuilderFn,
-                updateValidateFn,
-                /*expectError=*/ true);
+        runTest(allDocumentsSameBucket, updateCmdBuilderFn, updateValidateFn, /*expectError=*/ true);
     })();
     (function testFullBucketUpdate() {
-        runTest(allDocumentsDifferentBuckets,
-                updateCmdBuilderFn,
-                updateValidateFn,
-                /*expectError=*/ true);
+        runTest(allDocumentsDifferentBuckets, updateCmdBuilderFn, updateValidateFn, /*expectError=*/ true);
     })();
     (function testPartialBucketUpdateUnordered() {
-        runTest(allDocumentsSameBucket,
-                updateCmdUnorderedBuilderFn,
-                updateUnorderedValidateFn,
-                /*expectError=*/ true,
-                /*statementRetried=*/ 2);
+        runTest(
+            allDocumentsSameBucket,
+            updateCmdUnorderedBuilderFn,
+            updateUnorderedValidateFn,
+            /*expectError=*/ true,
+            /*statementRetried=*/ 2,
+        );
     })();
     (function testFullBucketUpdateUnordered() {
-        runTest(allDocumentsDifferentBuckets,
-                updateCmdUnorderedBuilderFn,
-                updateUnorderedValidateFn,
-                /*expectError=*/ true,
-                /*statementRetried=*/ 2);
+        runTest(
+            allDocumentsDifferentBuckets,
+            updateCmdUnorderedBuilderFn,
+            updateUnorderedValidateFn,
+            /*expectError=*/ true,
+            /*statementRetried=*/ 2,
+        );
     })();
 
     function upsertCmdBuilderFn(coll) {
         return {
             update: coll.getName(),
-            updates: [{
-                q: {[timeFieldName]: dateTime, [metaFieldName]: "B"},
-                u: {$inc: {updated: 1}},
-                multi: false,
-                upsert: true,
-            }],
+            updates: [
+                {
+                    q: {[timeFieldName]: dateTime, [metaFieldName]: "B"},
+                    u: {$inc: {updated: 1}},
+                    multi: false,
+                    upsert: true,
+                },
+            ],
         };
     }
     function upsertValidateFn(coll) {
-        assert.eq(coll.countDocuments({[metaFieldName]: "B", updated: 1}),
-                  1,
-                  "Expected exactly one document to be upserted once.");
+        assert.eq(
+            coll.countDocuments({[metaFieldName]: "B", updated: 1}),
+            1,
+            "Expected exactly one document to be upserted once.",
+        );
     }
     (function testUpsert() {
         runTest(allDocumentsSameBucket, upsertCmdBuilderFn, upsertValidateFn);

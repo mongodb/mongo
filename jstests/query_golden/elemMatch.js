@@ -3,7 +3,7 @@ import {show} from "jstests/libs/golden_test.js";
 const coll = db.cqf_elemMatch;
 coll.drop();
 
-jsTestLog('Inserting docs:');
+jsTestLog("Inserting docs:");
 
 const docs = [
     {a: [1, 2, 3, 4, 5, 6]},

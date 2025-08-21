@@ -18,10 +18,10 @@ TestData.disableImplicitSessions = true;
 // helper function for verifying contents at the end of the test
 function checkFinalResults(db) {
     assert.commandWorked(db.runCommand({dbStats: 1}));
-    assert.commandFailedWithCode(db.runCommand({collStats: 'foo'}), authzErrorCode);
-    assert.commandFailedWithCode(db.runCommand({collStats: 'bar'}), authzErrorCode);
-    assert.commandWorked(db.runCommand({collStats: 'baz'}));
-    assert.commandWorked(db.runCommand({collStats: 'foobar'}));
+    assert.commandFailedWithCode(db.runCommand({collStats: "foo"}), authzErrorCode);
+    assert.commandFailedWithCode(db.runCommand({collStats: "bar"}), authzErrorCode);
+    assert.commandWorked(db.runCommand({collStats: "baz"}));
+    assert.commandWorked(db.runCommand({collStats: "foobar"}));
 }
 
 const authzErrorCode = 13;
@@ -29,19 +29,21 @@ const authzErrorCode = 13;
 jsTestLog("Setting up replica set");
 
 const name = "rollbackAuth";
-const replTest = new ReplSetTest({name: name, nodes: 3, keyFile: 'jstests/libs/key1'});
+const replTest = new ReplSetTest({name: name, nodes: 3, keyFile: "jstests/libs/key1"});
 const nodes = replTest.nodeList();
 const conns = replTest.startSet();
-replTest.initiate({
-    "_id": "rollbackAuth",
-    "members": [
-        {"_id": 0, "host": nodes[0], "priority": 3},
-        {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2], arbiterOnly: true}
-    ]
-},
-                  null,
-                  {initiateWithDefaultElectionTimeout: true});
+replTest.initiate(
+    {
+        "_id": "rollbackAuth",
+        "members": [
+            {"_id": 0, "host": nodes[0], "priority": 3},
+            {"_id": 1, "host": nodes[1]},
+            {"_id": 2, "host": nodes[2], arbiterOnly: true},
+        ],
+    },
+    null,
+    {initiateWithDefaultElectionTimeout: true},
+);
 
 // Make sure we have a primary
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
@@ -58,7 +60,7 @@ assert.eq(primary, conns[0], "conns[0] assumed to be primary");
 assert.eq(a_conn, primary);
 
 // Make sure we have an arbiter
-assert.soon(function() {
+assert.soon(function () {
     const res = conns[2].getDB("admin").runCommand({replSetGetStatus: 1});
     return res.myState == 7;
 }, "Arbiter failed to initialize.");
@@ -66,11 +68,11 @@ assert.soon(function() {
 jsTestLog("Creating initial data");
 
 // Create collections that will be used in test
-A_admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
-A_admin.auth('admin', 'pwd');
+A_admin.createUser({user: "admin", pwd: "pwd", roles: ["root"]});
+A_admin.auth("admin", "pwd");
 
 // Set up user admin user
-A_admin.createUser({user: 'userAdmin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
+A_admin.createUser({user: "userAdmin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});
 
 A_test.foo.insert({a: 1});
 A_test.bar.insert({a: 1});
@@ -78,52 +80,51 @@ A_test.baz.insert({a: 1});
 A_test.foobar.insert({a: 1});
 A_admin.logout();
 
-assert(A_admin.auth('userAdmin', 'pwd'));
+assert(A_admin.auth("userAdmin", "pwd"));
 
 // Give replication time to catch up.
-assert.soon(function() {
-    return B_admin.auth('userAdmin', 'pwd');
+assert.soon(function () {
+    return B_admin.auth("userAdmin", "pwd");
 });
 
 // Create a basic user and role
 A_admin.createRole({
-    role: 'replStatusRole',  // To make awaitReplication() work
+    role: "replStatusRole", // To make awaitReplication() work
     roles: [],
     privileges: [
-        {resource: {cluster: true}, actions: ['replSetGetStatus']},
-        {resource: {db: 'local', collection: ''}, actions: ['find']},
-        {resource: {db: 'local', collection: 'system.replset'}, actions: ['find']}
-    ]
+        {resource: {cluster: true}, actions: ["replSetGetStatus"]},
+        {resource: {db: "local", collection: ""}, actions: ["find"]},
+        {resource: {db: "local", collection: "system.replset"}, actions: ["find"]},
+    ],
 });
 A_test.createRole({
-    role: 'myRole',
+    role: "myRole",
     roles: [],
-    privileges: [{resource: {db: 'test', collection: ''}, actions: ['dbStats']}]
+    privileges: [{resource: {db: "test", collection: ""}, actions: ["dbStats"]}],
 });
-A_test.createUser(
-    {user: 'spencer', pwd: 'pwd', roles: ['myRole', {role: 'replStatusRole', db: 'admin'}]});
+A_test.createUser({user: "spencer", pwd: "pwd", roles: ["myRole", {role: "replStatusRole", db: "admin"}]});
 
 A_admin.logout();
 B_admin.logout();
 
-assert(A_test.auth('spencer', 'pwd'));
+assert(A_test.auth("spencer", "pwd"));
 
 // wait for secondary to get this data
-assert.soon(function() {
-    return B_test.auth('spencer', 'pwd');
+assert.soon(function () {
+    return B_test.auth("spencer", "pwd");
 });
 
 assert.commandWorked(A_test.runCommand({dbStats: 1}));
-assert.commandFailedWithCode(A_test.runCommand({collStats: 'foo'}), authzErrorCode);
-assert.commandFailedWithCode(A_test.runCommand({collStats: 'bar'}), authzErrorCode);
-assert.commandFailedWithCode(A_test.runCommand({collStats: 'baz'}), authzErrorCode);
-assert.commandFailedWithCode(A_test.runCommand({collStats: 'foobar'}), authzErrorCode);
+assert.commandFailedWithCode(A_test.runCommand({collStats: "foo"}), authzErrorCode);
+assert.commandFailedWithCode(A_test.runCommand({collStats: "bar"}), authzErrorCode);
+assert.commandFailedWithCode(A_test.runCommand({collStats: "baz"}), authzErrorCode);
+assert.commandFailedWithCode(A_test.runCommand({collStats: "foobar"}), authzErrorCode);
 
 assert.commandWorked(B_test.runCommand({dbStats: 1}));
-assert.commandFailedWithCode(B_test.runCommand({collStats: 'foo'}), authzErrorCode);
-assert.commandFailedWithCode(B_test.runCommand({collStats: 'bar'}), authzErrorCode);
-assert.commandFailedWithCode(B_test.runCommand({collStats: 'baz'}), authzErrorCode);
-assert.commandFailedWithCode(B_test.runCommand({collStats: 'foobar'}), authzErrorCode);
+assert.commandFailedWithCode(B_test.runCommand({collStats: "foo"}), authzErrorCode);
+assert.commandFailedWithCode(B_test.runCommand({collStats: "bar"}), authzErrorCode);
+assert.commandFailedWithCode(B_test.runCommand({collStats: "baz"}), authzErrorCode);
+assert.commandFailedWithCode(B_test.runCommand({collStats: "foobar"}), authzErrorCode);
 
 replTest.awaitLastOpCommitted();
 
@@ -132,39 +133,36 @@ jsTestLog("Doing writes that will eventually be rolled back");
 // down A and wait for B to become primary
 A_test.logout();
 replTest.stop(0);
-assert.soon(function() {
+assert.soon(function () {
     try {
         return B_admin.hello().isWritablePrimary;
     } catch (e) {
         return false;
     }
 }, "B didn't become primary");
-printjson(assert.commandWorked(B_test.adminCommand('replSetGetStatus')));
+printjson(assert.commandWorked(B_test.adminCommand("replSetGetStatus")));
 B_test.logout();
 
 // Modify the the user and role in a way that will be rolled back.
-assert(B_admin.auth('admin', 'pwd'));
-B_test.grantPrivilegesToRole(
-    'myRole',
-    [{resource: {db: 'test', collection: 'foo'}, actions: ['collStats']}],
-    {});  // Default write concern will wait for majority, which will time out.
-B_test.createRole({
-    role: 'temporaryRole',
-    roles: [],
-    privileges: [{resource: {db: 'test', collection: 'bar'}, actions: ['collStats']}]
-},
-                  {});  // Default write concern will wait for majority, which will time out.
-B_test.grantRolesToUser('spencer',
-                        ['temporaryRole'],
-                        {});  // Default write concern will wait for majority, which will time out.
+assert(B_admin.auth("admin", "pwd"));
+B_test.grantPrivilegesToRole("myRole", [{resource: {db: "test", collection: "foo"}, actions: ["collStats"]}], {}); // Default write concern will wait for majority, which will time out.
+B_test.createRole(
+    {
+        role: "temporaryRole",
+        roles: [],
+        privileges: [{resource: {db: "test", collection: "bar"}, actions: ["collStats"]}],
+    },
+    {},
+); // Default write concern will wait for majority, which will time out.
+B_test.grantRolesToUser("spencer", ["temporaryRole"], {}); // Default write concern will wait for majority, which will time out.
 B_admin.logout();
 
-assert(B_test.auth('spencer', 'pwd'));
+assert(B_test.auth("spencer", "pwd"));
 assert.commandWorked(B_test.runCommand({dbStats: 1}));
-assert.commandWorked(B_test.runCommand({collStats: 'foo'}));
-assert.commandWorked(B_test.runCommand({collStats: 'bar'}));
-assert.commandFailedWithCode(B_test.runCommand({collStats: 'baz'}), authzErrorCode);
-assert.commandFailedWithCode(B_test.runCommand({collStats: 'foobar'}), authzErrorCode);
+assert.commandWorked(B_test.runCommand({collStats: "foo"}));
+assert.commandWorked(B_test.runCommand({collStats: "bar"}));
+assert.commandFailedWithCode(B_test.runCommand({collStats: "baz"}), authzErrorCode);
+assert.commandFailedWithCode(B_test.runCommand({collStats: "foobar"}), authzErrorCode);
 B_test.logout();
 
 // down B, bring A back up, then wait for A to become primary
@@ -172,7 +170,7 @@ B_test.logout();
 replTest.stop(1);
 
 replTest.restart(0);
-assert.soon(function() {
+assert.soon(function () {
     try {
         const helloResponse = A_admin.hello();
         jsTestLog("A hello response: " + tojson(helloResponse));
@@ -184,32 +182,33 @@ assert.soon(function() {
 }, "A didn't become primary");
 
 // A should not have the new data as it was down
-assert(A_test.auth('spencer', 'pwd'));
+assert(A_test.auth("spencer", "pwd"));
 assert.commandWorked(A_test.runCommand({dbStats: 1}));
-assert.commandFailedWithCode(A_test.runCommand({collStats: 'foo'}), authzErrorCode);
-assert.commandFailedWithCode(A_test.runCommand({collStats: 'bar'}), authzErrorCode);
-assert.commandFailedWithCode(A_test.runCommand({collStats: 'baz'}), authzErrorCode);
-assert.commandFailedWithCode(A_test.runCommand({collStats: 'foobar'}), authzErrorCode);
+assert.commandFailedWithCode(A_test.runCommand({collStats: "foo"}), authzErrorCode);
+assert.commandFailedWithCode(A_test.runCommand({collStats: "bar"}), authzErrorCode);
+assert.commandFailedWithCode(A_test.runCommand({collStats: "baz"}), authzErrorCode);
+assert.commandFailedWithCode(A_test.runCommand({collStats: "foobar"}), authzErrorCode);
 A_test.logout();
 
 jsTestLog("Doing writes that should persist after the rollback");
 // Modify the user and role in a way that will persist.
-A_admin.auth('userAdmin', 'pwd');
+A_admin.auth("userAdmin", "pwd");
 // Default write concern will wait for majority, which would time out
 // so we override it with an empty write concern
-A_test.grantPrivilegesToRole(
-    'myRole', [{resource: {db: 'test', collection: 'baz'}, actions: ['collStats']}], {});
+A_test.grantPrivilegesToRole("myRole", [{resource: {db: "test", collection: "baz"}, actions: ["collStats"]}], {});
 
-A_test.createRole({
-    role: 'persistentRole',
-    roles: [],
-    privileges: [{resource: {db: 'test', collection: 'foobar'}, actions: ['collStats']}]
-},
-                  {});
-A_test.grantRolesToUser('spencer', ['persistentRole'], {});
+A_test.createRole(
+    {
+        role: "persistentRole",
+        roles: [],
+        privileges: [{resource: {db: "test", collection: "foobar"}, actions: ["collStats"]}],
+    },
+    {},
+);
+A_test.grantRolesToUser("spencer", ["persistentRole"], {});
 A_admin.logout();
 
-A_test.auth('spencer', 'pwd');
+A_test.auth("spencer", "pwd");
 
 // A has the data we just wrote, but not what B wrote before
 checkFinalResults(A_test);
@@ -219,12 +218,12 @@ jsTestLog("Triggering rollback");
 // bring B back in contact with A
 // as A is primary, B will roll back and then catch up
 replTest.restart(1);
-assert.soonNoExcept(function() {
-    authutil.asCluster(replTest.nodes, 'jstests/libs/key1', function() {
+assert.soonNoExcept(function () {
+    authutil.asCluster(replTest.nodes, "jstests/libs/key1", function () {
         replTest.awaitReplication();
     });
 
-    return B_test.auth('spencer', 'pwd');
+    return B_test.auth("spencer", "pwd");
 });
 // Now both A and B should agree
 checkFinalResults(A_test);
@@ -233,7 +232,7 @@ checkFinalResults(B_test);
 A_test.logout();
 
 // Verify data consistency between nodes.
-authutil.asCluster(replTest.nodes, 'jstests/libs/key1', function() {
+authutil.asCluster(replTest.nodes, "jstests/libs/key1", function () {
     replTest.checkOplogs();
 });
 

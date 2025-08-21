@@ -17,8 +17,9 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
 function createUser(rst) {
-    rst.getPrimary().getDB("admin").createUser({user: "root", pwd: "root", roles: ["root"]},
-                                               {w: rst.nodes.length});
+    rst.getPrimary()
+        .getDB("admin")
+        .createUser({user: "root", pwd: "root", roles: ["root"]}, {w: rst.nodes.length});
 }
 
 function authUser(node) {
@@ -47,7 +48,7 @@ const numNodes = 3;
 const keyFile = "jstests/libs/key1";
 const rstOpts = {
     nodes: numNodes,
-    keyFile
+    keyFile,
 };
 
 if (TestData.configShard) {
@@ -70,7 +71,7 @@ createUser(rst);
 
 let sessions = [];
 let sessionOnPrimary;
-rst.nodes.forEach(node => {
+rst.nodes.forEach((node) => {
     const session = createSession(node);
     if (node == primary) {
         sessionOnPrimary = session;
@@ -97,10 +98,10 @@ const tmpTestData = {
     keyFile,
     authUser: "__system",
     keyFileData: "foopdedoop",
-    authenticationDatabase: "local"
+    authenticationDatabase: "local",
 };
 const upgradeOpts = {
-    appendOptions: true
+    appendOptions: true,
 };
 if (isShardSvrRst) {
     // Restart the replica set as a shardsvr.
@@ -113,12 +114,15 @@ if (isShardSvrRst) {
         const cfg = rst.getReplSetConfigFromNode();
         cfg["configsvr"] = true;
         reconfig(rst, cfg);
-        rst.upgradeSet(Object.assign({
-            configsvr: "",
-            setParameter:
-                {skipShardingConfigurationChecks: false, featureFlagTransitionToCatalogShard: true}
-        },
-                                     upgradeOpts));
+        rst.upgradeSet(
+            Object.assign(
+                {
+                    configsvr: "",
+                    setParameter: {skipShardingConfigurationChecks: false, featureFlagTransitionToCatalogShard: true},
+                },
+                upgradeOpts,
+            ),
+        );
     }, tmpTestData);
 }
 
@@ -164,9 +168,8 @@ if (isShardSvrRst) {
             // cluster time validation testing is completed, make the TTL monitor have a large
             // sleep interval at first and then lower it at the end of the test when verifying that
             // the documents do get deleted by the TTL monitor.
-            setParameter:
-                {newShardExistingClusterTimeKeysExpirationSecs: 1, ttlMonitorSleepSecs: 3600}
-        }
+            setParameter: {newShardExistingClusterTimeKeysExpirationSecs: 1, ttlMonitorSleepSecs: 3600},
+        },
     });
     assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
     createUser(st.configRS);
@@ -182,8 +185,11 @@ if (isShardSvrRst) {
         authutil.asCluster(rst.nodes, keyFile, () => {
             // Transitioning from last-lts to last-continuous is only allowed when
             // setFeatureCompatibilityVersion is called with fromConfigServer: true.
-            assert.commandWorked(rst.getPrimary().adminCommand(
-                {setFeatureCompatibilityVersion: fcv, confirm: true, fromConfigServer: true}));
+            assert.commandWorked(
+                rst
+                    .getPrimary()
+                    .adminCommand({setFeatureCompatibilityVersion: fcv, confirm: true, fromConfigServer: true}),
+            );
 
             // Wait for the new FCV to propagate to all configsvr nodes.
             rst.awaitReplication();
@@ -233,17 +239,16 @@ for (let session of sessions) {
         assert.neq(session.getClusterTime().signature.keyId, lastClusterTime.signature.keyId);
 
         // Verify that the old cluster time can also be used against the mongos and config server
+        assert.commandWorked(st.s.getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}));
         assert.commandWorked(
-            st.s.getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}));
-        assert.commandWorked(st.configRS.getPrimary().getDB("admin").runCommand(
-            {hello: 1, $clusterTime: lastClusterTime}));
+            st.configRS.getPrimary().getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}),
+        );
     } else {
         // Verify that the new cluster time was signed with the existing key.
         assert.eq(session.getClusterTime().signature.keyId, lastClusterTime.signature.keyId);
 
         // Verify that the old cluster time can also be used against the mongos.
-        assert.commandWorked(
-            mongos.getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}));
+        assert.commandWorked(mongos.getDB("admin").runCommand({hello: 1, $clusterTime: lastClusterTime}));
     }
 
     fp.off();

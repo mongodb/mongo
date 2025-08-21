@@ -37,16 +37,19 @@ withRetryOnTransientTxnError(
 
         // $out should now also only require an IX lock.
         // Test the scenario where we rename collection 'a' to collection 'b', which doesn't exist.
-        assert.commandWorked(mydb.runCommand(
-            {aggregate: "a", pipeline: [{$out: {db: dbName, coll: "b"}}], cursor: {}}));
+        assert.commandWorked(
+            mydb.runCommand({aggregate: "a", pipeline: [{$out: {db: dbName, coll: "b"}}], cursor: {}}),
+        );
         // Now test the scenario where we rename collection 'b' to collection 'c', which does exist.
         // This should drop collection 'c'.
-        assert.commandWorked(mydb.runCommand(
-            {aggregate: "b", pipeline: [{$out: {db: dbName, coll: "c"}}], cursor: {}}));
+        assert.commandWorked(
+            mydb.runCommand({aggregate: "b", pipeline: [{$out: {db: dbName, coll: "c"}}], cursor: {}}),
+        );
 
         // Now commit the transaction.
         assert.commandWorked(session.commitTransaction_forTesting());
     },
     () => {
         session.abortTransaction();
-    });
+    },
+);

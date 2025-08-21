@@ -31,23 +31,25 @@ function validateTargetDocsPerBatch() {
 
         coll.drop();
         assert.commandWorked(
-            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(10)})),
-                            {ordered: false}));
+            coll.insertMany(
+                [...Array(collCount).keys()].map((x) => ({_id: x, a: "a".repeat(10)})),
+                {ordered: false},
+            ),
+        );
 
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
 
         // batchedDeletesTargetBatchDocs := 0 means no limit.
         const expectedBatches = docsPerBatch ? Math.ceil(collCount / docsPerBatch) : 1;
-        const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
+        const serverStatusBatchesBefore = db.serverStatus()["batchedDeletes"]["batches"];
+        const serverStatusDocsBefore = db.serverStatus()["batchedDeletes"]["docs"];
 
         assert.eq(collCount, coll.find().itcount());
         assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));
         assert.eq(0, coll.find().itcount());
 
-        const serverStatusBatchesAfter = db.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocsAfter = db.serverStatus()['batchedDeletes']['docs'];
+        const serverStatusBatchesAfter = db.serverStatus()["batchedDeletes"]["batches"];
+        const serverStatusDocsAfter = db.serverStatus()["batchedDeletes"]["docs"];
         const serverStatusDocsExpected = serverStatusDocsBefore + collCount;
         const serverStatusBatchesExpected = serverStatusBatchesBefore + expectedBatches;
         assert.eq(serverStatusBatchesAfter, serverStatusBatchesExpected);
@@ -68,30 +70,34 @@ function validateTargetBatchTimeMS() {
 
         coll.drop();
         assert.commandWorked(
-            coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: "a".repeat(10)})),
-                            {ordered: false}));
+            coll.insertMany(
+                [...Array(collCount).keys()].map((x) => ({_id: x, a: "a".repeat(10)})),
+                {ordered: false},
+            ),
+        );
 
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: targetBatchTimeMS}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: targetBatchTimeMS}));
 
         // batchedDeletesTargetBatchTimeMS := 0 means no limit.
         const expectedBatches = targetBatchTimeMS ? collCount : 1;
-        const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
+        const serverStatusBatchesBefore = db.serverStatus()["batchedDeletes"]["batches"];
+        const serverStatusDocsBefore = db.serverStatus()["batchedDeletes"]["docs"];
 
         assert.eq(collCount, coll.find().itcount());
 
         // Make every delete take >> targetBatchTimeMS.
-        const fp = configureFailPoint(db,
-                                      "batchedDeleteStageSleepAfterNDocuments",
-                                      {nDocs: 1, ns: coll.getFullName(), sleepMs: 2000});
+        const fp = configureFailPoint(db, "batchedDeleteStageSleepAfterNDocuments", {
+            nDocs: 1,
+            ns: coll.getFullName(),
+            sleepMs: 2000,
+        });
 
         assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));
         assert.eq(0, coll.find().itcount());
 
         fp.off();
-        const serverStatusBatchesAfter = db.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocsAfter = db.serverStatus()['batchedDeletes']['docs'];
+        const serverStatusBatchesAfter = db.serverStatus()["batchedDeletes"]["batches"];
+        const serverStatusDocsAfter = db.serverStatus()["batchedDeletes"]["docs"];
         const serverStatusDocsExpected = serverStatusDocsBefore + collCount;
         const serverStatusBatchesExpected = serverStatusBatchesBefore + expectedBatches;
         assert.eq(serverStatusBatchesAfter, serverStatusBatchesExpected);
@@ -105,9 +111,11 @@ function validateTargetBatchTimeMS() {
 function validateTargetStagedDocsBytes() {
     const collCount = 10000;
     const docPaddingBytes = 1024;
-    const cumulativePaddingBytes = collCount *
-        (bsonsize({_id: ObjectId(), a: 'a'}) +
-         100 /* allow for getMemUsage() own metadata and overestimation */ + docPaddingBytes);
+    const cumulativePaddingBytes =
+        collCount *
+        (bsonsize({_id: ObjectId(), a: "a"}) +
+            100 /* allow for getMemUsage() own metadata and overestimation */ +
+            docPaddingBytes);
 
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: 0}));
@@ -115,26 +123,27 @@ function validateTargetStagedDocsBytes() {
     for (let stagedDocsBytes of [0, 1024 * 1024, 5 * 1024 * 1024]) {
         jsTestLog("Validating stagedDocsBytes=" + stagedDocsBytes);
 
-        assert.commandWorked(db.adminCommand(
-            {setParameter: 1, batchedDeletesTargetStagedDocBytes: stagedDocsBytes}));
+        assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: stagedDocsBytes}));
 
         coll.drop();
-        assert.commandWorked(coll.insertMany(
-            [...Array(collCount).keys()].map(x => ({a: "a".repeat(docPaddingBytes)})),
-            {ordered: false}));
+        assert.commandWorked(
+            coll.insertMany(
+                [...Array(collCount).keys()].map((x) => ({a: "a".repeat(docPaddingBytes)})),
+                {ordered: false},
+            ),
+        );
 
         // batchedDeletesTargetStagedDocsBytes := 0 means no limit.
-        const expectedBatches =
-            stagedDocsBytes ? Math.ceil(cumulativePaddingBytes / stagedDocsBytes) : 1;
-        const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
+        const expectedBatches = stagedDocsBytes ? Math.ceil(cumulativePaddingBytes / stagedDocsBytes) : 1;
+        const serverStatusBatchesBefore = db.serverStatus()["batchedDeletes"]["batches"];
+        const serverStatusDocsBefore = db.serverStatus()["batchedDeletes"]["docs"];
 
         assert.eq(collCount, coll.find().itcount());
         assert.commandWorked(coll.deleteMany({}));
         assert.eq(0, coll.find().itcount());
 
-        const serverStatusBatchesAfter = db.serverStatus()['batchedDeletes']['batches'];
-        const serverStatusDocsAfter = db.serverStatus()['batchedDeletes']['docs'];
+        const serverStatusBatchesAfter = db.serverStatus()["batchedDeletes"]["batches"];
+        const serverStatusDocsAfter = db.serverStatus()["batchedDeletes"]["docs"];
         const serverStatusDocsExpected = serverStatusDocsBefore + collCount;
         const serverStatusBatchesExpected = serverStatusBatchesBefore + expectedBatches;
         assert.eq(serverStatusBatchesAfter, serverStatusBatchesExpected);

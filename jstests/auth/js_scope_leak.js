@@ -18,17 +18,21 @@ const test = conn.getDB("test");
 // insert a single document and add two test users
 assert.writeOK(test.foo.insert({a: 1}));
 assert.eq(1, test.foo.findOne().a);
-test.createUser({user: 'a', pwd: 'a', roles: jsTest.basicUserRoles});
-test.createUser({user: 'b', pwd: 'b', roles: jsTest.basicUserRoles});
+test.createUser({user: "a", pwd: "a", roles: jsTest.basicUserRoles});
+test.createUser({user: "b", pwd: "b", roles: jsTest.basicUserRoles});
 
 function missingOrEquals(string) {
-    return 'function() { ' +
-        'var global = function(){return this;}.call();'
+    return (
+        "function() { " +
+        "var global = function(){return this;}.call();" +
         // Uncomment the next line when debugging.
         // + 'print(global.hasOwnProperty("someGlobal") ? someGlobal : "MISSING" );'
-        + 'return !global.hasOwnProperty("someGlobal")' +
-        '    || someGlobal == unescape("' + escape(string) + '");' +
-        '}()';
+        'return !global.hasOwnProperty("someGlobal")' +
+        '    || someGlobal == unescape("' +
+        escape(string) +
+        '");' +
+        "}()"
+    );
 }
 
 // test $where
@@ -37,21 +41,20 @@ function testWhere() {
     test.foo.findOne({$where: 'someGlobal = "noUsers";'});
 
     // test new user auth causes scope to be cleared
-    assert(test.auth('a', 'a'));
-    assert.eq(
-        1, test.foo.count({$where: 'return ' + missingOrEquals('a')}), "$where: Auth user 'a");
+    assert(test.auth("a", "a"));
+    assert.eq(1, test.foo.count({$where: "return " + missingOrEquals("a")}), "$where: Auth user 'a");
 
     // test auth as another user causes scope to be cleared
     test.foo.findOne({$where: 'someGlobal = "a";'});
     test.logout();
 
-    test.auth('b', 'b');
-    assert(test.foo.count({$where: 'return ' + missingOrEquals('a&b')}), "$where: Auth user 'b'");
+    test.auth("b", "b");
+    assert(test.foo.count({$where: "return " + missingOrEquals("a&b")}), "$where: Auth user 'b'");
     // test user logout causes scope to be cleared
     test.foo.findOne({$where: 'someGlobal = "a&b";'});
     test.logout();
 
-    assert(test.foo.count({$where: 'return ' + missingOrEquals('noUsers')}), "$where: log out");
+    assert(test.foo.count({$where: "return " + missingOrEquals("noUsers")}), "$where: log out");
 }
 testWhere();
 testWhere();
@@ -62,7 +65,7 @@ function testMapReduce() {
     }
 
     function mapGet(string) {
-        return Function('assert(' + missingOrEquals(string) + ')');
+        return Function("assert(" + missingOrEquals(string) + ")");
     }
 
     function reduce(k, v) {
@@ -78,28 +81,40 @@ function testMapReduce() {
     }
 
     // set the global variable 'someGlobal' before authenticating
-    setGlobalInMap('noUsers');
+    setGlobalInMap("noUsers");
 
     // test new user auth causes scope to be cleared
-    assert(test.auth('a', 'a'));
-    assert.doesNotThrow(function() {
-        getGlobalFromMap('a');
-    }, [], "M/R: Auth user 'a'");
+    assert(test.auth("a", "a"));
+    assert.doesNotThrow(
+        function () {
+            getGlobalFromMap("a");
+        },
+        [],
+        "M/R: Auth user 'a'",
+    );
 
     // test auth as another user causes scope to be cleared
-    setGlobalInMap('a');
+    setGlobalInMap("a");
     test.logout();
-    assert(test.auth('b', 'b'));
-    assert.doesNotThrow(function() {
-        getGlobalFromMap('a&b');
-    }, [], "M/R: Auth user 'b'");
+    assert(test.auth("b", "b"));
+    assert.doesNotThrow(
+        function () {
+            getGlobalFromMap("a&b");
+        },
+        [],
+        "M/R: Auth user 'b'",
+    );
 
     // test user logout causes scope to be cleared
-    setGlobalInMap('a&b');
+    setGlobalInMap("a&b");
     test.logout();
-    assert.doesNotThrow(function() {
-        getGlobalFromMap('noUsers');
-    }, [], "M/R: Log out");
+    assert.doesNotThrow(
+        function () {
+            getGlobalFromMap("noUsers");
+        },
+        [],
+        "M/R: Log out",
+    );
 }
 testMapReduce();
 testMapReduce();

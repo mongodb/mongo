@@ -22,18 +22,20 @@ function assertRejectsMismatchingLogicalTime(db) {
     assert.commandFailedWithCode(
         db.runCommand({hello: 1, $clusterTime: mismatchingTime}),
         ErrorCodes.TimeProofMismatch,
-        "expected command with mismatching cluster time and signature to be rejected");
+        "expected command with mismatching cluster time and signature to be rejected",
+    );
 }
 
 function assertAcceptsValidLogicalTime(db) {
     let validTime = db.runCommand({hello: 1}).$clusterTime;
-    assert.commandWorked(testDB.runCommand({hello: 1, $clusterTime: validTime}),
-                         "expected command with valid cluster time and signature to be accepted");
+    assert.commandWorked(
+        testDB.runCommand({hello: 1, $clusterTime: validTime}),
+        "expected command with valid cluster time and signature to be accepted",
+    );
 }
 
 // Start the sharding test with auth on.
-const st =
-    new ShardingTest({mongos: 1, manualAddShard: true, other: {keyFile: "jstests/libs/key1"}});
+const st = new ShardingTest({mongos: 1, manualAddShard: true, other: {keyFile: "jstests/libs/key1"}});
 
 // Create admin user and authenticate as them.
 st.s.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
@@ -54,8 +56,7 @@ assertAcceptsValidLogicalTime(testDB);
 
 // Initialize sharding.
 assert.commandWorked(testDB.adminCommand({enableSharding: "test"}));
-assert.commandWorked(
-    testDB.adminCommand({shardCollection: testDB.foo.getFullName(), key: {_id: 1}}));
+assert.commandWorked(testDB.adminCommand({shardCollection: testDB.foo.getFullName(), key: {_id: 1}}));
 
 // Sharded collections reject mismatching cluster times and accept valid ones.
 assertRejectsMismatchingLogicalTime(testDB);

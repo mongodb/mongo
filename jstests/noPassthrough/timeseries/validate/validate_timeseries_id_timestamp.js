@@ -18,23 +18,24 @@ let coll = null;
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
 
-jsTestLog(
-    "Running the validate command to check time-series bucket OID timestamp and min timestamp equivalence.");
+jsTestLog("Running the validate command to check time-series bucket OID timestamp and min timestamp equivalence.");
 testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
-assert.commandWorked(db.createCollection(
-    collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
+assert.commandWorked(
+    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+);
 coll = db.getCollection(collName);
 
 // Inserts documents into a bucket. Checks no issues are found.
 coll.insertMany(
-    [...Array(10).keys()].map(i => ({
-                                  "metadata": {"sensorId": testCount, "type": "temperature"},
-                                  "timestamp": ISODate(),
-                                  "temp": i
-                              })),
-    {ordered: false});
+    [...Array(10).keys()].map((i) => ({
+        "metadata": {"sensorId": testCount, "type": "temperature"},
+        "timestamp": ISODate(),
+        "temp": i,
+    })),
+    {ordered: false},
+);
 let res = coll.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
@@ -45,19 +46,23 @@ assert.eq(res.warnings.length, 0);
 testCount += 1;
 collName = collNamePrefix + testCount;
 db.getCollection(collName).drop();
-assert.commandWorked(db.createCollection(
-    collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}));
+assert.commandWorked(
+    db.createCollection(collName, {timeseries: {timeField: "timestamp", metaField: "metadata", granularity: "hours"}}),
+);
 coll = db.getCollection(collName);
 coll.insertMany(
-    [...Array(10).keys()].map(i => ({
-                                  "metadata": {"sensorId": testCount, "type": "temperature"},
-                                  "timestamp": ISODate(),
-                                  "temp": i
-                              })),
-    {ordered: false});
-getTimeseriesCollForRawOps(db, coll).updateOne({"meta.sensorId": testCount},
-                                               {"$set": {"control.min.timestamp": ISODate()}},
-                                               getRawOperationSpec(db));
+    [...Array(10).keys()].map((i) => ({
+        "metadata": {"sensorId": testCount, "type": "temperature"},
+        "timestamp": ISODate(),
+        "temp": i,
+    })),
+    {ordered: false},
+);
+getTimeseriesCollForRawOps(db, coll).updateOne(
+    {"meta.sensorId": testCount},
+    {"$set": {"control.min.timestamp": ISODate()}},
+    getRawOperationSpec(db),
+);
 
 res = coll.validate();
 assert(!res.valid, tojson(res));

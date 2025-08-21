@@ -57,8 +57,7 @@ const coll = db[jsTestName()];
 {
     section("Prefer cached IXSCAN over DISTINCT_SCAN for no duplicate values in the collection");
     coll.drop();
-    for (let i = 0; i < 100; ++i)
-        coll.insert({x: i, y: i + 100, z: i + 200});
+    for (let i = 0; i < 100; ++i) coll.insert({x: i, y: i + 100, z: i + 200});
     coll.createIndex({x: 1});
     coll.createIndex({x: 1, y: 1});
     coll.createIndex({y: 1, z: 1});
@@ -86,20 +85,16 @@ const coll = db[jsTestName()];
         {_id: 3, a: 5, b: 4, c: 7, d: 5},
         {a: 4, b: 2, c: 3},
         {a: 4, b: 3, c: 6},
-        {a: 5, b: 4, c: 7, d: [1, 2, 3]}
+        {a: 5, b: 4, c: 7, d: [1, 2, 3]},
     ]);
 
-    validateAggPlanCacheUse(coll,
-                            [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}]);
+    validateAggPlanCacheUse(coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}]);
 
-    validateAggPlanCacheUse(
-        coll, [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}]);
+    validateAggPlanCacheUse(coll, [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}]);
 
     section("DISTINCT_SCAN with embedded FETCH utilizes plan cache");
 
-    validateAggPlanCacheUse(
-        coll, [{$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$c"}}}}]);
+    validateAggPlanCacheUse(coll, [{$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$c"}}}}]);
 
-    validateAggPlanCacheUse(
-        coll, [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}]);
+    validateAggPlanCacheUse(coll, [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}]);
 }

@@ -24,17 +24,19 @@ import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 const testDb = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDb.dropDatabase());
 
-const coll = testDb.getCollection('test');
+const coll = testDb.getCollection("test");
 
 const queryPlanEvaluationMaxResults = (() => {
     const getParamRes = assert.commandWorked(
-        testDb.adminCommand({getParameter: 1, internalQueryPlanEvaluationMaxResults: 1}));
+        testDb.adminCommand({getParameter: 1, internalQueryPlanEvaluationMaxResults: 1}),
+    );
     return getParamRes["internalQueryPlanEvaluationMaxResults"];
 })();
 
 const queryCacheEvictionRatio = (() => {
     const getParamRes = assert.commandWorked(
-        testDb.adminCommand({getParameter: 1, internalQueryCacheEvictionRatio: 1}));
+        testDb.adminCommand({getParameter: 1, internalQueryCacheEvictionRatio: 1}),
+    );
     return getParamRes["internalQueryCacheEvictionRatio"];
 })();
 
@@ -58,7 +60,8 @@ assert.commandWorked(bulk.execute());
 // We enable profiling and run the test query three times. The first two times, it will go through
 // multiplanning.
 function runTestQuery(comment) {
-    return coll.find({a: 1, b: 1})
+    return coll
+        .find({a: 1, b: 1})
         .sort({c: 1})
         .batchSize(numMatchingDocs + 1)
         .comment(comment)
@@ -67,8 +70,9 @@ function runTestQuery(comment) {
 
 // Don't profile the setFCV command, which could be run during this test in the
 // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
-assert.commandWorked(testDb.setProfilingLevel(
-    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+assert.commandWorked(
+    testDb.setProfilingLevel(1, {filter: {"command.setFeatureCompatibilityVersion": {"$exists": false}}}),
+);
 
 let lastComment;
 for (let i = 0; i < 3; i++) {
@@ -79,10 +83,9 @@ for (let i = 0; i < 3; i++) {
 
 // Get the profile entry for the third execution, which should have bypassed the multiplanner and
 // used a cached plan.
-const profileEntry = getLatestProfilerEntry(
-    testDb, {'command.find': coll.getName(), 'command.comment': lastComment});
+const profileEntry = getLatestProfilerEntry(testDb, {"command.find": coll.getName(), "command.comment": lastComment});
 assert(!profileEntry.fromMultiPlanner, profileEntry);
-assert('planCacheKey' in profileEntry, profileEntry);
+assert("planCacheKey" in profileEntry, profileEntry);
 
 // We expect the cached plan to run through its "trial period," but the planner should determine
 // that the cached plan is still good and does _not_ need replanning. Previously, the planner would
@@ -92,8 +95,7 @@ assert('planCacheKey' in profileEntry, profileEntry);
 assert.eq(profileEntry.execStats.opens, 1, profileEntry);
 
 const planCacheEntry = (() => {
-    const planCache =
-        coll.getPlanCache().list([{$match: {planCacheKey: profileEntry.planCacheKey}}]);
+    const planCache = coll.getPlanCache().list([{$match: {planCacheKey: profileEntry.planCacheKey}}]);
     assert.eq(planCache.length, 1, planCache);
     return planCache[0];
 })();
@@ -122,6 +124,8 @@ lastComment = "test query expected to trigger replanning";
 const numResults = runTestQuery(lastComment);
 assert.eq(numResults, 0);
 
-const replanProfileEntry = getLatestProfilerEntry(
-    testDb, {'command.find': coll.getName(), 'command.comment': lastComment});
+const replanProfileEntry = getLatestProfilerEntry(testDb, {
+    "command.find": coll.getName(),
+    "command.comment": lastComment,
+});
 assert(replanProfileEntry.replanned, replanProfileEntry);

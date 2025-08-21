@@ -17,7 +17,8 @@ for (let i = 0; i < numShards; i++) {
 // Ensure pauseMigrationsDuringMultiUpdates defaults to false.
 for (const rs of allRs) {
     const response = assert.commandWorked(
-        rs.getPrimary().adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
+        rs.getPrimary().adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}),
+    );
     assert.eq(response.clusterParameters[0].enabled, false);
 }
 

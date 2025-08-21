@@ -18,10 +18,11 @@ let testColl = testDB[collectionNamePrefix + collectionCounter];
 assert.commandWorked(testDB.dropDatabase());
 
 const docsPerMetaField = 3;
-const initializeData = function() {
+const initializeData = function () {
     testColl = testDB[collectionNamePrefix + ++collectionCounter];
-    assert.commandWorked(testDB.createCollection(
-        testColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(testColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     let docs = [];
     for (let i = 0; i < docsPerMetaField; ++i) {
@@ -160,13 +161,20 @@ const initializeData = function() {
     // Note: there is a change the parallel shell runs after the transaction is committed and that
     // is fine as both interleavings should succeed.
     const awaitTestDelete = startParallelShell(
-        funWithArgs(function(dbName, collName, filter) {
-            const testDB = db.getSiblingDB(dbName);
-            const coll = testDB.getCollection(collName);
+        funWithArgs(
+            function (dbName, collName, filter) {
+                const testDB = db.getSiblingDB(dbName);
+                const coll = testDB.getCollection(collName);
 
-            // Outside of the session and transaction, perform deleteOne.
-            assert.commandWorked(coll.deleteOne(filter));
-        }, testDB.getName(), testColl.getName(), deleteFilter), testDB.getMongo().port);
+                // Outside of the session and transaction, perform deleteOne.
+                assert.commandWorked(coll.deleteOne(filter));
+            },
+            testDB.getName(),
+            testColl.getName(),
+            deleteFilter,
+        ),
+        testDB.getMongo().port,
+    );
 
     assert.commandWorked(session.commitTransaction_forTesting());
     assert.eq(testColl.find(deleteFilter).toArray().length, 0);
@@ -234,17 +242,18 @@ const initializeData = function() {
 
     const deleteCommand = {
         delete: collB.getName(),
-        deletes: [{
-            q: docToDelete,
-            limit: 1,
-        }]
+        deletes: [
+            {
+                q: docToDelete,
+                limit: 1,
+            },
+        ],
     };
 
     // We expect the deleteOne on transaction B to fail, causing the transaction to abort.
     // Sidenote: avoiding the deleteOne method from 'crud_api.js' because it throws.
     assert.commandFailedWithCode(collB.runCommand(deleteCommand), ErrorCodes.WriteConflict);
-    assert.commandFailedWithCode(sessionB.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(sessionB.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     sessionB.endSession();
 
     // Ensure the document does not exist in the snapshot of transaction A.

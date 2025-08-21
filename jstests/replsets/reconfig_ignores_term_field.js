@@ -17,7 +17,7 @@ jsTestLog("Reconfig command ignores user provided term, 50");
 var config = primary.getDB("local").system.replset.findOne();
 printjson(config);
 config.version++;
-config.members[nodes.indexOf(primary)].priority = 1;  // Legal reconfig.
+config.members[nodes.indexOf(primary)].priority = 1; // Legal reconfig.
 config.term = 50;
 assert.commandWorked(primary.getDB("admin").runCommand({replSetReconfig: config}));
 replTest.awaitReplication();

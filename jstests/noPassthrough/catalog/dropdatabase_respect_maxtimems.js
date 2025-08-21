@@ -13,13 +13,12 @@ rst.initiate();
 const dropDB = rst.getPrimary().getDB("drop");
 
 (function assertCollectionDropCanBeInterrupted() {
-    assert.commandWorked(dropDB.bar.insert({_id: 0}, {writeConcern: {w: 'majority'}}));
+    assert.commandWorked(dropDB.bar.insert({_id: 0}, {writeConcern: {w: "majority"}}));
     const session = dropDB.getMongo().startSession({causalConsistency: false});
     const sessionDB = session.getDatabase("drop");
     session.startTransaction();
     assert.commandWorked(sessionDB.bar.insert({_id: 1}));
-    assert.commandFailedWithCode(dropDB.runCommand({dropDatabase: 1, maxTimeMS: 100}),
-                                 ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(dropDB.runCommand({dropDatabase: 1, maxTimeMS: 100}), ErrorCodes.MaxTimeMSExpired);
 
     assert.commandWorked(session.commitTransaction_forTesting());
     session.endSession();
@@ -28,14 +27,14 @@ const dropDB = rst.getPrimary().getDB("drop");
 (function assertDatabaseDropCanBeInterrupted() {
     assert.commandWorked(dropDB.bar.insert({}));
 
-    const failPoint =
-        configureFailPoint(rst.getPrimary(), "dropDatabaseHangAfterAllCollectionsDrop");
+    const failPoint = configureFailPoint(rst.getPrimary(), "dropDatabaseHangAfterAllCollectionsDrop");
 
     // This will get blocked by the failpoint when collection drop phase finishes.
     let dropDatabaseShell = startParallelShell(() => {
         assert.commandFailedWithCode(
             db.getSiblingDB("drop").runCommand({dropDatabase: 1, maxTimeMS: 5000}),
-            ErrorCodes.MaxTimeMSExpired);
+            ErrorCodes.MaxTimeMSExpired,
+        );
     }, rst.getPrimary().port);
 
     failPoint.wait();
@@ -43,9 +42,11 @@ const dropDB = rst.getPrimary().getDB("drop");
     let sleepCommand = startParallelShell(() => {
         // Make dropDatabase timeout.
         assert.commandFailedWithCode(
-            db.getSiblingDB("drop").adminCommand(
-                {sleep: 1, secs: 500, lockTarget: "drop", lock: "ir", $comment: "Lock sleep"}),
-            ErrorCodes.Interrupted);
+            db
+                .getSiblingDB("drop")
+                .adminCommand({sleep: 1, secs: 500, lockTarget: "drop", lock: "ir", $comment: "Lock sleep"}),
+            ErrorCodes.Interrupted,
+        );
     }, rst.getPrimary().port);
 
     checkLog.contains(dropDB.getMongo(), "Test-only command 'sleep' invoked");
@@ -59,8 +60,9 @@ const dropDB = rst.getPrimary().getDB("drop");
     // Interrupt the sleep command.
     const sleepID = waitForCommand(
         "sleepCmd",
-        op => (op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Lock sleep"),
-        dropDB.getSiblingDB("admin"));
+        (op) => op["ns"] == "admin.$cmd" && op["command"]["$comment"] == "Lock sleep",
+        dropDB.getSiblingDB("admin"),
+    );
     assert.commandWorked(dropDB.getSiblingDB("admin").killOp(sleepID));
 
     sleepCommand();

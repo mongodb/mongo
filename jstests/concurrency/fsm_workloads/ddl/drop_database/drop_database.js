@@ -6,10 +6,10 @@
  * @tags: [
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     var states = {
         init: function init(db, collName) {
-            this.uniqueDBName = db.getName() + 'drop_database' + this.tid;
+            this.uniqueDBName = db.getName() + "drop_database" + this.tid;
         },
 
         createAndDrop: function createAndDrop(db, collName) {
@@ -19,7 +19,7 @@ export const $config = (function() {
             assert.commandWorked(myDB.createCollection(collName));
 
             assert.commandWorked(myDB.dropDatabase());
-        }
+        },
     };
 
     var transitions = {init: {createAndDrop: 1}, createAndDrop: {createAndDrop: 1}};

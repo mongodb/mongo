@@ -32,11 +32,11 @@ function prepareMongotResponse(searchCmd, coll) {
                     nextBatch: [
                         {_id: 1, $searchScore: 0.321},
                         {_id: 2, $searchScore: 0.654},
-                        {_id: 5, $searchScore: 0.789}
-                    ]
+                        {_id: 5, $searchScore: 0.789},
+                    ],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -44,10 +44,10 @@ function prepareMongotResponse(searchCmd, coll) {
                 cursor: {
                     id: cursorId,
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 6, $searchScore: 0.123}]
+                    nextBatch: [{_id: 6, $searchScore: 0.123}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -56,26 +56,24 @@ function prepareMongotResponse(searchCmd, coll) {
                 cursor: {
                     id: NumberLong(0),
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 8, $searchScore: 0.345}]
+                    nextBatch: [{_id: 8, $searchScore: 0.345}],
                 },
-            }
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 function makeSearchCmd(db, coll, searchQuery) {
     const collUUID = getUUIDFromListCollections(db, coll.getName());
-    const searchCmd =
-        {search: coll.getName(), collectionUUID: collUUID, query: searchQuery, $db: "test"};
+    const searchCmd = {search: coll.getName(), collectionUUID: collUUID, query: searchQuery, $db: "test"};
     return searchCmd;
 }
 
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 // Set up mongotmock and point the mongod to it. Configure the mongotmock to not have auth.
@@ -95,14 +93,13 @@ insertDataForSearch(coll);
 // Perform a $search query. We expect the command to fail because mongot will attempt
 // to authenticate with mongot, which will not support authentication.
 assert.commandFailedWithCode(
-    db.runCommand(
-        {aggregate: coll.getName(), pipeline: [{$search: searchQuery}], cursor: {batchSize: 2}}),
-    ErrorCodes.AuthenticationFailed);
+    db.runCommand({aggregate: coll.getName(), pipeline: [{$search: searchQuery}], cursor: {batchSize: 2}}),
+    ErrorCodes.AuthenticationFailed,
+);
 
 // Restart mongod with the option to not authenticate mongod <--> mongot connections.
 MongoRunner.stopMongod(conn);
-conn = MongoRunner.runMongod(
-    {setParameter: {mongotHost: mongotConn.host, skipAuthenticationToMongot: true}});
+conn = MongoRunner.runMongod({setParameter: {mongotHost: mongotConn.host, skipAuthenticationToMongot: true}});
 db = conn.getDB("test");
 coll = db.search;
 coll.drop();
@@ -121,7 +118,7 @@ const expected = [
     {"_id": 2, "title": "cookies and cakes"},
     {"_id": 5, "title": "cakes and oranges"},
     {"_id": 6, "title": "cakes and apples"},
-    {"_id": 8, "title": "cakes and kale"}
+    {"_id": 8, "title": "cakes and kale"},
 ];
 
 assert.eq(expected, cursor.toArray());

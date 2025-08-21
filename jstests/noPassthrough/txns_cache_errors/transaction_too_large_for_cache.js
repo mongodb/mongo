@@ -23,14 +23,14 @@ const replSet = new ReplSetTest({
             transactionTooLargeForCacheThreshold: 0.1,
             // Disable the periodic cache pressure rollback runner.
             cachePressureQueryPeriodMilliseconds: 0,
-        }
-    }
+        },
+    },
 });
 replSet.startSet();
 replSet.initiate();
 
 const doc1 = {
-    x: []
+    x: [],
 };
 for (var j = 0; j < 100000; j++) {
     doc1.x.push("" + Math.random() + Math.random());
@@ -44,7 +44,7 @@ coll.drop();
 
 // Scale the load in proportion to WT cache size, to reduce test run time.
 // A single collection can only have up to 64 indexes. Cap at _id + 1 text index + 62 indexes.
-const serverStatus = assert.commandWorked(replSet.getPrimary().getDB('admin').serverStatus());
+const serverStatus = assert.commandWorked(replSet.getPrimary().getDB("admin").serverStatus());
 const wtCacheSizeBytes = serverStatus.wiredTiger.cache["maximum bytes configured"];
 const nIndexes = 2;
 assert.commandWorked(coll.createIndex({x: "text"}));
@@ -89,6 +89,7 @@ assert.soon(
         return true;
     },
     "Expected a transaction to eventually fail with TransactionTooLargeForCache error.",
-    15 * 60 * 1000);
+    15 * 60 * 1000,
+);
 
 replSet.stopSet();

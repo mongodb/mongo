@@ -8,9 +8,7 @@
 import {getAggPlanStages, getUnionWithStage} from "jstests/libs/query/analyze_plan.js";
 import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
-import {
-    verifyE2ESearchExplainOutput,
-} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {verifyE2ESearchExplainOutput} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -26,7 +24,7 @@ const fireSearchQuery = {
     $search: {
         index: "search-index",
         text: {query: "fire", path: ["element"]},
-    }
+    },
 };
 
 // Another collection for $lookup and $unionWith queries.
@@ -52,11 +50,12 @@ function runExplainTest(verbosity) {
                             "_id": 0,
                             "ref_id": "$_id",
                             "searchMeta": "$$SEARCH_META",
-                        }
-                    }],
-                as: "fire_users"
-            }
-        }
+                        },
+                    },
+                ],
+                as: "fire_users",
+            },
+        },
     ]);
     if (verbosity != "queryPlanner") {
         let lookupStages = getAggPlanStages(result, "$lookup");
@@ -71,21 +70,23 @@ function runExplainTest(verbosity) {
     }
 
     // Test with $unionWith.
-    result = collBase.explain(verbosity).aggregate([{
-        $unionWith: {
-            coll: coll.getName(),
-            pipeline: [
-                fireSearchQuery,
-                {
-                    $project: {
-                        "_id": 0,
-                        "ref_id": "$_id",
-                        "searchMeta": "$$SEARCH_META",
-                    }
-                }
-            ]
-        }
-    }]);
+    result = collBase.explain(verbosity).aggregate([
+        {
+            $unionWith: {
+                coll: coll.getName(),
+                pipeline: [
+                    fireSearchQuery,
+                    {
+                        $project: {
+                            "_id": 0,
+                            "ref_id": "$_id",
+                            "searchMeta": "$$SEARCH_META",
+                        },
+                    },
+                ],
+            },
+        },
+    ]);
 
     let unionWithStage = getUnionWithStage(result);
     let unionSubExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
@@ -93,13 +94,13 @@ function runExplainTest(verbosity) {
         explainOutput: unionSubExplain,
         stageType: "$_internalSearchMongotRemote",
         verbosity,
-        nReturned: NumberLong(numFireDocs)
+        nReturned: NumberLong(numFireDocs),
     });
     verifyE2ESearchExplainOutput({
         explainOutput: unionSubExplain,
         stageType: "$_internalSearchIdLookup",
         verbosity,
-        nReturned: NumberLong(numFireDocs)
+        nReturned: NumberLong(numFireDocs),
     });
 }
 

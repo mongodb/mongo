@@ -26,11 +26,12 @@ conf.members[1].priority = 0;
 printjson(conf);
 rst.initiate(conf);
 
-var primary = rst.getPrimary();  // Waits for PRIMARY state.
+var primary = rst.getPrimary(); // Waits for PRIMARY state.
 var secondary = rst.nodes[1];
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Stop replication on the secondary.
 stopServerReplication(secondary);
@@ -39,10 +40,11 @@ stopServerReplication(secondary);
 primary.getCollection("test.coll").insert({_id: -1});
 
 // Start a w:2 write that will block until replication is resumed.
-var waitForReplStart = startParallelShell(function() {
-    printjson(assert.commandWorked(
-        db.getCollection('side').insert({}, {writeConcern: {w: 2, wtimeout: 30 * 60 * 1000}})));
-}, primary.host.split(':')[1]);
+var waitForReplStart = startParallelShell(function () {
+    printjson(
+        assert.commandWorked(db.getCollection("side").insert({}, {writeConcern: {w: 2, wtimeout: 30 * 60 * 1000}})),
+    );
+}, primary.host.split(":")[1]);
 
 // Insert a lot of data in increasing order to test.coll.
 var op = primary.getCollection("test.coll").initializeUnorderedBulkOp();
@@ -55,7 +57,7 @@ assert.commandWorked(op.execute());
 // secondary.
 restartServerReplication(secondary);
 waitForReplStart();
-sleep(100);  // wait a bit to increase the chances of killing mid-batch.
+sleep(100); // wait a bit to increase the chances of killing mid-batch.
 rst.stop(1);
 
 // Create a copy of the secondary nodes dbpath for diagnostic purposes.
@@ -83,24 +85,22 @@ assert.neq(null, conn, "secondary failed to start");
 // top of the oplog (SERVER-25353), and the oplogTruncateAfterPoint must be null (SERVER-7200
 // and SERVER-25071).
 const filter = {
-    $or: [{ns: 'test.coll'}, {"o.applyOps.ns": "test.coll"}]
+    $or: [{ns: "test.coll"}, {"o.applyOps.ns": "test.coll"}],
 };
-var oplogDoc = conn.getCollection('local.oplog.rs').find(filter).sort({$natural: -1}).limit(1)[0];
-var collDoc = conn.getCollection('test.coll').find().sort({_id: -1}).limit(1)[0];
-var minValidDoc =
-    conn.getCollection('local.replset.minvalid').find().sort({$natural: -1}).limit(1)[0];
-var oplogTruncateAfterPointDoc =
-    conn.getCollection('local.replset.oplogTruncateAfterPoint').find().limit(1)[0];
+var oplogDoc = conn.getCollection("local.oplog.rs").find(filter).sort({$natural: -1}).limit(1)[0];
+var collDoc = conn.getCollection("test.coll").find().sort({_id: -1}).limit(1)[0];
+var minValidDoc = conn.getCollection("local.replset.minvalid").find().sort({$natural: -1}).limit(1)[0];
+var oplogTruncateAfterPointDoc = conn.getCollection("local.replset.oplogTruncateAfterPoint").find().limit(1)[0];
 printjson({
     oplogDoc: oplogDoc,
     collDoc: collDoc,
     minValidDoc: minValidDoc,
-    oplogTruncateAfterPointDoc: oplogTruncateAfterPointDoc
+    oplogTruncateAfterPointDoc: oplogTruncateAfterPointDoc,
 });
 
 // The oplog doc could be an insert or an applyOps with an internal insert.
 let oplogDocId;
-if (oplogDoc.ns == 'test.coll') {
+if (oplogDoc.ns == "test.coll") {
     oplogDocId = oplogDoc.o._id;
 } else {
     const opArray = oplogDoc.o.applyOps;
@@ -108,7 +108,7 @@ if (oplogDoc.ns == 'test.coll') {
 }
 
 assert.eq(collDoc._id, oplogDocId);
-assert(!('begin' in minValidDoc), 'begin in minValidDoc');
+assert(!("begin" in minValidDoc), "begin in minValidDoc");
 if (storageEngine !== "wiredTiger") {
     assert.eq(minValidDoc.ts, oplogDoc.ts);
 }

@@ -17,8 +17,7 @@ export function runGroupRewriteTest(coll, docs, pipeline, expectedResults, exclu
     }
     coll.insertMany(docs);
     assert.sameMembers(expectedResults, coll.aggregate(pipeline).toArray(), () => {
-        return `Pipeline: ${tojson(pipeline)}. Explain: ${
-            tojson(coll.explain().aggregate(pipeline))}`;
+        return `Pipeline: ${tojson(pipeline)}. Explain: ${tojson(coll.explain().aggregate(pipeline))}`;
     });
 }
 
@@ -26,12 +25,11 @@ export function runGroupRewriteTest(coll, docs, pipeline, expectedResults, exclu
 // away. Check in explain that the rewrite has happened.
 export function assertUnpackOptimizedAway(coll, pipeline) {
     const explain = coll.explain().aggregate(pipeline);
-    const unpack = (getEngine(explain) === "classic")
-        ? getAggPlanStage(explain, "$_internalUnpackBucket")
-        : getPlanStage(explain, "UNPACK_TS_BUCKET");
+    const unpack =
+        getEngine(explain) === "classic"
+            ? getAggPlanStage(explain, "$_internalUnpackBucket")
+            : getPlanStage(explain, "UNPACK_TS_BUCKET");
     // The rewrite should remove the unpack stage and replace it with a $group over the buckets
     // collection.
-    assert(!unpack,
-           `Expected to find no unpack stage for pipeline ${tojson(pipeline)} but got ${
-               tojson(explain)}`);
+    assert(!unpack, `Expected to find no unpack stage for pipeline ${tojson(pipeline)} but got ${tojson(explain)}`);
 }

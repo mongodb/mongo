@@ -10,20 +10,28 @@ jsTestLog("Test connecting to a healthy node.");
 let numRetries = 5;
 let sleepMs = 50;
 let attempts = 0;
-retryOnNetworkError(function() {
-    attempts++;
-    new Mongo(hostname);
-}, numRetries, sleepMs);
+retryOnNetworkError(
+    function () {
+        attempts++;
+        new Mongo(hostname);
+    },
+    numRetries,
+    sleepMs,
+);
 assert.eq(attempts, 1);
 
 jsTestLog("Test connecting to a node that is down.");
 MongoRunner.stopMongod(node);
 attempts = 0;
 try {
-    retryOnNetworkError(function() {
-        attempts++;
-        new Mongo(hostname);
-    }, numRetries, sleepMs);
+    retryOnNetworkError(
+        function () {
+            attempts++;
+            new Mongo(hostname);
+        },
+        numRetries,
+        sleepMs,
+    );
 } catch (e) {
     jsTestLog("Caught exception after exhausting retries: " + e);
 }
@@ -33,10 +41,14 @@ jsTestLog("Test connecting to a node with an invalid hostname.");
 let invalidHostname = "very-invalid-host-name";
 attempts = 0;
 try {
-    retryOnNetworkError(function() {
-        attempts++;
-        new Mongo(invalidHostname);
-    }, numRetries, sleepMs);
+    retryOnNetworkError(
+        function () {
+            attempts++;
+            new Mongo(invalidHostname);
+        },
+        numRetries,
+        sleepMs,
+    );
 } catch (e) {
     jsTestLog("Caught exception after exhausting retries: " + e);
 }

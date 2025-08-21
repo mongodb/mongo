@@ -13,11 +13,10 @@ function runTest(admindb) {
     var sysCollections = ["system.js", "system.profile", "system.roles", "system.users"];
     var sysPrivs = new Array();
     for (let i in sysCollections) {
-        sysPrivs.push(
-            {resource: {db: admindb.getName(), collection: sysCollections[i]}, actions: ['find']});
+        sysPrivs.push({resource: {db: admindb.getName(), collection: sysCollections[i]}, actions: ["find"]});
     }
 
-    var findPriv = {resource: {db: admindb.getName(), collection: ""}, actions: ['find']};
+    var findPriv = {resource: {db: admindb.getName(), collection: ""}, actions: ["find"]};
 
     admindb.createRole({role: "FindInDB", roles: [], privileges: [findPriv]});
     admindb.createRole({role: "FindOnSysRes", roles: [], privileges: sysPrivs});
@@ -29,7 +28,7 @@ function runTest(admindb) {
     admindb.logout();
     assert.eq(1, admindb.auth("user", "pwd"));
 
-    assert.doesNotThrow(function() {
+    assert.doesNotThrow(function () {
         admindb.foo.findOne();
     });
     for (let i in sysCollections) {
@@ -40,7 +39,7 @@ function runTest(admindb) {
     admindb.logout();
     assert.eq(1, admindb.auth("sysUser", "pwd"));
 
-    assert.throws(function() {
+    assert.throws(function () {
         admindb.foo.findOne();
     });
     for (let i in sysCollections) {
@@ -50,12 +49,12 @@ function runTest(admindb) {
     admindb.logout();
 }
 
-jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: ''});
+jsTest.log("Test standalone");
+var conn = MongoRunner.runMongod({auth: ""});
 runTest(conn.getDB("admin"));
 MongoRunner.stopMongod(conn);
 
-jsTest.log('Test sharding');
-var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1'});
+jsTest.log("Test sharding");
+var st = new ShardingTest({shards: 2, config: 3, keyFile: "jstests/libs/key1"});
 runTest(st.s.getDB("admin"));
 st.stop();

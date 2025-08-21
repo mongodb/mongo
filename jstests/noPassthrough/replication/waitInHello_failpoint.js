@@ -11,7 +11,7 @@ function runTest(conn, fpName) {
 
     // Clear ramlog so checkLog can't find log messages from previous times this fail point was
     // enabled.
-    assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(conn.adminCommand({clearLog: "global"}));
 
     // Do a find to make sure that the shell has finished running hello while establishing its
     // initial connection.

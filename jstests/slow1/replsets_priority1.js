@@ -4,15 +4,15 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted, occasionally, reconnect} from "jstests/replsets/rslib.js";
 
-const rs = new ReplSetTest({name: 'testSet', nodes: 3, nodeOptions: {verbose: 2}});
+const rs = new ReplSetTest({name: "testSet", nodes: 3, nodeOptions: {verbose: 2}});
 rs.startSet();
 rs.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 var primary = rs.getPrimary();
 
-var everyoneOkSoon = function() {
+var everyoneOkSoon = function () {
     var status;
-    assert.soon(function() {
+    assert.soon(function () {
         var ok = true;
         status = primary.adminCommand({replSetGetStatus: 1});
 
@@ -30,48 +30,53 @@ var everyoneOkSoon = function() {
     }, tojson(status));
 };
 
-var checkPrimaryIs = function(node) {
+var checkPrimaryIs = function (node) {
     print("nreplsets_priority1.js checkPrimaryIs(" + node.host + ")");
 
     var status;
 
-    assert.soon(function() {
-        var ok = true;
+    assert.soon(
+        function () {
+            var ok = true;
 
-        try {
-            status = primary.adminCommand({replSetGetStatus: 1});
-        } catch (e) {
-            print(e);
-            print("nreplsets_priority1.js checkPrimaryIs reconnecting");
-            reconnect(primary);
-            status = primary.adminCommand({replSetGetStatus: 1});
-        }
-
-        var str = "goal: " + node.host + "==1 states: ";
-        if (!status || !status.members) {
-            return false;
-        }
-        status.members.forEach(function(m) {
-            str += m.name + ": " + m.state + " ";
-
-            if (m.name == node.host) {
-                ok &= m.state == 1;
-            } else {
-                ok &= m.state != 1 || (m.state == 1 && m.health == 0);
+            try {
+                status = primary.adminCommand({replSetGetStatus: 1});
+            } catch (e) {
+                print(e);
+                print("nreplsets_priority1.js checkPrimaryIs reconnecting");
+                reconnect(primary);
+                status = primary.adminCommand({replSetGetStatus: 1});
             }
-        });
-        print();
-        print(str);
-        print();
 
-        occasionally(function() {
-            print("\nstatus:");
-            printjson(status);
+            var str = "goal: " + node.host + "==1 states: ";
+            if (!status || !status.members) {
+                return false;
+            }
+            status.members.forEach(function (m) {
+                str += m.name + ": " + m.state + " ";
+
+                if (m.name == node.host) {
+                    ok &= m.state == 1;
+                } else {
+                    ok &= m.state != 1 || (m.state == 1 && m.health == 0);
+                }
+            });
             print();
-        }, 15);
+            print(str);
+            print();
 
-        return ok;
-    }, node.host + '==1', 240000, 1000);
+            occasionally(function () {
+                print("\nstatus:");
+                printjson(status);
+                print();
+            }, 15);
+
+            return ok;
+        },
+        node.host + "==1",
+        240000,
+        1000,
+    );
 
     everyoneOkSoon();
 };
@@ -115,22 +120,28 @@ for (var i = 0; i < n; i++) {
         }
     }
 
-    jsTestLog("replsets_priority1.js max is " + max.host + " with priority " + max.priority +
-              ", reconfiguring on " + primary.host);
+    jsTestLog(
+        "replsets_priority1.js max is " +
+            max.host +
+            " with priority " +
+            max.priority +
+            ", reconfiguring on " +
+            primary.host,
+    );
 
     assert.soon(() => isConfigCommitted(primary));
     assert.commandWorked(primary.adminCommand({replSetReconfig: config}));
 
     jsTestLog("replsets_priority1.js wait for 2 secondaries");
 
-    assert.soon(function() {
+    assert.soon(function () {
         rs.getPrimary();
         return rs.getSecondaries().length == 2;
     }, "2 secondaries");
 
     jsTestLog("replsets_priority1.js wait for new config version " + config.version);
 
-    assert.soon(function() {
+    assert.soon(function () {
         var versions = [0, 0];
         var secondaries = rs.getSecondaries();
         secondaries[0].setSecondaryOk();
@@ -165,7 +176,7 @@ for (var i = 0; i < n; i++) {
     checkPrimaryIs(second);
 
     // Wait for election oplog entry to be replicated, to avoid rollbacks later on.
-    let liveSecondaries = rs.nodes.filter(function(node) {
+    let liveSecondaries = rs.nodes.filter(function (node) {
         return node.host !== max.host && node.host !== second.host;
     });
     rs.awaitReplication(null, null, liveSecondaries);

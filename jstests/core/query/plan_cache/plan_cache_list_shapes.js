@@ -30,7 +30,7 @@ function dumpPlanCacheState() {
 
 // Utility function to list query shapes in cache.
 function getCachedQueryShapes() {
-    return coll.aggregate([{$planCacheStats: {}}, {$replaceWith: '$createdFromQuery'}]).toArray();
+    return coll.aggregate([{$planCacheStats: {}}, {$replaceWith: "$createdFromQuery"}]).toArray();
 }
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
@@ -64,15 +64,15 @@ assert.neq(getPlanCacheShapeHashFromObject(shapes[0]), getPlanCacheShapeHashFrom
 
 // Insert some documents with strings so we have something to search for.
 for (let i = 0; i < 5; i++) {
-    assert.commandWorked(coll.insert({a: 3, s: 'hello world'}));
+    assert.commandWorked(coll.insert({a: 3, s: "hello world"}));
 }
-assert.commandWorked(coll.insert({a: 3, s: 'hElLo wOrLd'}));
+assert.commandWorked(coll.insert({a: 3, s: "hElLo wOrLd"}));
 
 // Run a query with a regex. Also must include 'a' so that the query may use more than one
 // index, and thus, must use the MultiPlanner.
 const regexQuery = {
-    s: {$regex: 'hello world', $options: 'm'},
-    a: 3
+    s: {$regex: "hello world", $options: "m"},
+    a: 3,
 };
 assert.eq(5, coll.find(regexQuery).itcount());
 
@@ -81,7 +81,7 @@ assert.eq(3, shapes.length, shapes);
 
 // Run the same query, but with different regex options. We expect that this should cause a
 // shape to get added.
-regexQuery.s.$options = 'mi';
+regexQuery.s.$options = "mi";
 // There is one more result since the query is now case sensitive.
 assert.eq(6, coll.find(regexQuery).itcount());
 shapes = getCachedQueryShapes();

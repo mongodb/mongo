@@ -12,8 +12,8 @@
 import {ingressHandshakeMetricsTest} from "jstests/libs/ingress_handshake_metrics_helpers.js";
 
 let runTest = (connectionHealthLoggingOn) => {
-    let rootCreds = {user: 'root', pwd: 'root'};
-    let conn = MongoRunner.runMongod({auth: ''});
+    let rootCreds = {user: "root", pwd: "root"};
+    let conn = MongoRunner.runMongod({auth: ""});
 
     jsTestLog("Setting up users and test data.");
     let runMetricsTest = ingressHandshakeMetricsTest(conn, {

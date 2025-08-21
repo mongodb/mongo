@@ -1,5 +1,5 @@
 // Test that updates to fields in a text-indexed document are correctly reflected in the text index.
-const collNamePrefix = 'fts_index3_';
+const collNamePrefix = "fts_index3_";
 let collCount = 0;
 
 // 1) Create a text index on a single field, insert a document, update the value of the field, and

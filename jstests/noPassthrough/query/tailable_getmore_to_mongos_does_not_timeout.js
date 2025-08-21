@@ -13,15 +13,13 @@ const db = st.s.getDB("test");
 const coll = db.capped;
 assert.commandWorked(db.runCommand({create: "capped", capped: true, size: 1024}));
 assert.commandWorked(coll.insert({}));
-const findResult = assert.commandWorked(
-    db.runCommand({find: "capped", filter: {}, tailable: true, awaitData: true}));
+const findResult = assert.commandWorked(db.runCommand({find: "capped", filter: {}, tailable: true, awaitData: true}));
 
 const cursorId = findResult.cursor.id;
 assert.neq(cursorId, 0);
 
 // Test that the getMores on this tailable cursor are immune to interrupt.
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
+assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
 assert.commandWorked(db.runCommand({getMore: cursorId, collection: "capped", maxTimeMS: 30}));
 assert.commandWorked(db.runCommand({getMore: cursorId, collection: "capped"}));
 assert.commandWorked(db.adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}));

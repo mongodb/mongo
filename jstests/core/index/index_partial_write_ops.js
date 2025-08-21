@@ -7,11 +7,11 @@
 
 var coll = db.index_partial_write_ops;
 
-var getNumKeys = function(idxName) {
+var getNumKeys = function (idxName) {
     var res = assert.commandWorked(coll.validate({full: true}));
     var kpi;
 
-    var isShardedNS = res.hasOwnProperty('raw');
+    var isShardedNS = res.hasOwnProperty("raw");
     if (isShardedNS) {
         kpi = res.raw[Object.getOwnPropertyNames(res.raw)[0]].keysPerIndex;
     } else {
@@ -25,8 +25,8 @@ coll.drop();
 // Create partial index.
 assert.commandWorked(coll.createIndex({x: 1}, {unique: true, partialFilterExpression: {a: 1}}));
 
-assert.commandWorked(coll.insert({_id: 1, x: 5, a: 2, b: 1}));  // Not in index.
-assert.commandWorked(coll.insert({_id: 2, x: 6, a: 1, b: 1}));  // In index.
+assert.commandWorked(coll.insert({_id: 1, x: 5, a: 2, b: 1})); // Not in index.
+assert.commandWorked(coll.insert({_id: 2, x: 6, a: 1, b: 1})); // In index.
 
 assert.eq(1, getNumKeys("x_1"));
 
@@ -65,10 +65,9 @@ assert.commandWorked(coll.remove({x: 6}));
 assert.eq(0, getNumKeys("x_1"));
 
 // Documents with duplicate keys that straddle the index.
-assert.commandWorked(coll.insert({_id: 3, x: 1, a: 1}));  // In index.
-assert.commandWorked(coll.insert({_id: 4, x: 1, a: 0}));  // Not in index.
-assert.writeErrorWithCode(coll.insert({_id: 5, x: 1, a: 1}),
-                          ErrorCodes.DuplicateKey);  // Duplicate key constraint prevents insertion.
+assert.commandWorked(coll.insert({_id: 3, x: 1, a: 1})); // In index.
+assert.commandWorked(coll.insert({_id: 4, x: 1, a: 0})); // Not in index.
+assert.writeErrorWithCode(coll.insert({_id: 5, x: 1, a: 1}), ErrorCodes.DuplicateKey); // Duplicate key constraint prevents insertion.
 
 // Only _id 3 is in the index.
 assert.eq(1, getNumKeys("x_1"));

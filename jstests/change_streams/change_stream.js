@@ -2,15 +2,12 @@
 // Mark as assumes_read_preference_unchanged since reading from the non-replicated "system.profile"
 // collection results in a failure in the secondary reads suite.
 // @tags: [assumes_read_preference_unchanged]
-import {
-    assertDropAndRecreateCollection,
-    assertDropCollection
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertInvalidChangeStreamNss,
     assertValidChangeStreamNss,
-    ChangeStreamTest
+    ChangeStreamTest,
 } from "jstests/libs/query/change_stream_util.js";
 
 // Drop and recreate the collections to be used in this set of tests.
@@ -21,7 +18,8 @@ assertDropAndRecreateCollection(db, "t2");
 function checkArgFails(arg) {
     assert.commandFailedWithCode(
         db.runCommand({aggregate: "t1", pipeline: [{$changeStream: arg}], cursor: {}}),
-        [6188500, 50808]);
+        [6188500, 50808],
+    );
 }
 
 checkArgFails(1);
@@ -144,14 +142,14 @@ expected = [
         documentKey: {_id: 4},
         ns: {db: "test", coll: "t1"},
         operationType: "update",
-        updateDescription: {removedFields: [], updatedFields: {b: 2}, truncatedArrays: []}
+        updateDescription: {removedFields: [], updatedFields: {b: 2}, truncatedArrays: []},
     },
     {
         documentKey: {_id: 5},
         ns: {db: "test", coll: "t1"},
         operationType: "update",
-        updateDescription: {removedFields: [], updatedFields: {b: 2}, truncatedArrays: []}
-    }
+        updateDescription: {removedFields: [], updatedFields: {b: 2}, truncatedArrays: []},
+    },
 ];
 cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
@@ -180,7 +178,7 @@ expected = [
         documentKey: {_id: 7},
         ns: {db: "test", coll: "t1"},
         operationType: "delete",
-    }
+    },
 ];
 cst.assertNextChangesEqualUnordered({cursor: cursor, expectedChanges: expected});
 
@@ -215,8 +213,7 @@ jsTestLog("Testing resumability");
 assertDropAndRecreateCollection(db, "resume1");
 
 // Note we do not project away 'id.ts' as it is part of the resume token.
-let resumeCursor =
-    cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.resume1});
+let resumeCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.resume1});
 
 // Insert a document and save the resulting change stream.
 assert.commandWorked(db.resume1.insert({_id: 1}));
@@ -257,8 +254,10 @@ assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
 
 jsTestLog("Testing filtered updates");
 // With unmatched predicates
-cursor = cst.startWatchingChanges(
-    {pipeline: [{$changeStream: {}}, {$match: {"fullDocument.a": {$gt: 2}}}], collection: db.t1});
+cursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {}}, {$match: {"fullDocument.a": {$gt: 2}}}],
+    collection: db.t1,
+});
 let resumeToken = cursor.postBatchResumeToken._data;
 assert.soon(() => {
     assert.commandWorked(db.t1.insert({a: 2}));
@@ -267,8 +266,7 @@ assert.soon(() => {
 });
 
 // With trivially false predicates
-cursor = cst.startWatchingChanges(
-    {pipeline: [{$changeStream: {}}, {$match: {$alwaysFalse: 1}}], collection: db.t1});
+cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}, {$match: {$alwaysFalse: 1}}], collection: db.t1});
 resumeToken = cursor.postBatchResumeToken._data;
 assert.soon(() => {
     assert.commandWorked(db.t1.insert({a: 2}));

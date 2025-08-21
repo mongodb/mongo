@@ -1,10 +1,7 @@
 /**
  * Test that $min/max works as a window function.
  */
-import {
-    seedWithTickerData,
-    testAccumAgainstGroup
-} from "jstests/aggregation/extras/window_function_helpers.js";
+import {seedWithTickerData, testAccumAgainstGroup} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -44,16 +41,19 @@ for (let i = 0; i < documents.length; i++) {
     assert.commandWorked(coll.insert(documents[i]));
 }
 
-let results = coll.aggregate([{
-                      $setWindowFields: {
-                          sortBy: {_id: -1},
-                          output: {
-                              "maxStr": {$max: "$str", window: {documents: [-2, 0]}},
-                              "minStr": {$min: "$str", window: {documents: [-2, 0]}}
-                          }
-                      }
-                  }])
-                  .toArray();
+let results = coll
+    .aggregate([
+        {
+            $setWindowFields: {
+                sortBy: {_id: -1},
+                output: {
+                    "maxStr": {$max: "$str", window: {documents: [-2, 0]}},
+                    "minStr": {$min: "$str", window: {documents: [-2, 0]}},
+                },
+            },
+        },
+    ])
+    .toArray();
 
 assert.eq(expectedResults.length, results.length);
 for (let index = 0; index < results.length; index++) {
@@ -76,14 +76,16 @@ for (let i = 0; i < documents.length; i++) {
     assert.commandWorked(coll.insert(documents[i]));
 }
 
-results =
-    coll.aggregate([{
+results = coll
+    .aggregate([
+        {
             $setWindowFields: {
                 sortBy: {"num": -1},
-                output: {"minStr": {$min: "$str", window: {documents: ["unbounded", "current"]}}}
-            }
-        }])
-        .toArray();
+                output: {"minStr": {$min: "$str", window: {documents: ["unbounded", "current"]}}},
+            },
+        },
+    ])
+    .toArray();
 
 assert.eq(expectedResults.length, results.length);
 for (let index = 0; index < results.length; index++) {

@@ -13,7 +13,7 @@ rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
-let testColl = primary.getCollection('test.validate_multikey_compound_batch');
+let testColl = primary.getCollection("test.validate_multikey_compound_batch");
 
 assert.commandWorked(testColl.getDB().createCollection(testColl.getName()));
 
@@ -21,18 +21,22 @@ assert.commandWorked(testColl.createIndex({a: 1, b: 1}));
 
 // Insert 2 documents. Only the first and last documents are valid.
 assert.commandWorked(
-    testColl.insert([{_id: 0, a: [1, 2, 3], b: 'abc'}, {_id: 1, a: 456, b: ['d', 'e', 'f']}]));
+    testColl.insert([
+        {_id: 0, a: [1, 2, 3], b: "abc"},
+        {_id: 1, a: 456, b: ["d", "e", "f"]},
+    ]),
+);
 
-jsTestLog('Checking documents in collection');
+jsTestLog("Checking documents in collection");
 let docs = testColl.find().sort({_id: 1}).toArray();
-assert.eq(2, docs.length, 'too many docs in collection: ' + tojson(docs));
-assert.eq(0, docs[0]._id, 'unexpected document content in collection: ' + tojson(docs));
-assert.eq(1, docs[1]._id, 'unexpected document content in collection: ' + tojson(docs));
+assert.eq(2, docs.length, "too many docs in collection: " + tojson(docs));
+assert.eq(0, docs[0]._id, "unexpected document content in collection: " + tojson(docs));
+assert.eq(1, docs[1]._id, "unexpected document content in collection: " + tojson(docs));
 
-jsTestLog('Validating collection');
+jsTestLog("Validating collection");
 const result = assert.commandWorked(testColl.validate({full: true}));
 
-jsTestLog('Validation result: ' + tojson(result));
+jsTestLog("Validation result: " + tojson(result));
 assert.eq(testColl.getFullName(), result.ns, tojson(result));
 assert.eq(0, result.nInvalidDocuments, tojson(result));
 assert.eq(2, result.nrecords, tojson(result));

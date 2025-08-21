@@ -3,7 +3,7 @@
 import {setParameter, verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 
 let m = MongoRunner.runMongod();
-const adminDb = m.getDB('admin');
+const adminDb = m.getDB("admin");
 
 // Ensure that on a low verbosity, the formatted stats string is not included and the other expected
 // fields are present.
@@ -32,8 +32,10 @@ if (doc.serverStatus.hasOwnProperty("tcmalloc")) {
             if (doc.serverStatus.tcmalloc.hasOwnProperty("usingPerCPUCaches")) {
                 // Running New TCMalloc-- if cpu caches are on, we include the cpuCache verbose
                 // info.
-                return !doc.serverStatus.tcmalloc.usingPerCPUCaches ||
-                    doc.serverStatus.tcmalloc.tcmalloc.hasOwnProperty("cpuCache");
+                return (
+                    !doc.serverStatus.tcmalloc.usingPerCPUCaches ||
+                    doc.serverStatus.tcmalloc.tcmalloc.hasOwnProperty("cpuCache")
+                );
             } else {
                 // Running Old TCMalloc-- we include the size_classes verbose info.
                 return doc.serverStatus.tcmalloc.tcmalloc.hasOwnProperty("size_classes");

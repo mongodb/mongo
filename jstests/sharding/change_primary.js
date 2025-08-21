@@ -17,12 +17,12 @@ var shard0 = st.shard0;
 var shard1 = st.shard1;
 var config = st.config;
 
-const dbName = 'test_db';
-const shardedCollName = 'sharded_coll';
-const unshardedCollName = 'unsharded_coll';
-const untrackedCollName = 'untracked_coll';
-const shardedViewName = 'view_sharded';
-const unshardedViewName = 'view_unsharded';
+const dbName = "test_db";
+const shardedCollName = "sharded_coll";
+const unshardedCollName = "unsharded_coll";
+const untrackedCollName = "untracked_coll";
+const shardedViewName = "view_sharded";
+const unshardedViewName = "view_unsharded";
 
 function checkAccessViaMongoS() {
     assert.eq(mongos.getDB(dbName).getCollection(shardedCollName).find().itcount(), 1);
@@ -35,12 +35,10 @@ function checkAccessViaMongoS() {
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
 
 // Create sharded collection and insert 1 document.
-assert.commandWorked(
-    mongos.adminCommand({shardCollection: dbName + '.' + shardedCollName, key: {_id: 1}}));
+assert.commandWorked(mongos.adminCommand({shardCollection: dbName + "." + shardedCollName, key: {_id: 1}}));
 assert.commandWorked(mongos.getDB(dbName).getCollection(shardedCollName).insert({_id: 0}));
 // Create unsharded (tracked) collection and insert 1 document.
-assert.commandWorked(
-    mongos.getDB(dbName).runCommand({createUnsplittableCollection: unshardedCollName}));
+assert.commandWorked(mongos.getDB(dbName).runCommand({createUnsplittableCollection: unshardedCollName}));
 assert.commandWorked(mongos.getDB(dbName).getCollection(unshardedCollName).insert({_id: 0}));
 // Create unsharded (untracked) collection and insert 1 document.
 assert.commandWorked(shard0.getDB(dbName).getCollection(untrackedCollName).insert({_id: 0}));
@@ -49,25 +47,25 @@ assert.commandWorked(mongos.getDB(dbName).createView(shardedViewName, shardedCol
 // Create view on unsharded collection.
 assert.commandWorked(mongos.getDB(dbName).createView(unshardedViewName, unshardedCollName, []));
 
-jsTest.log('Checking that all commands are routed correctly before changing primary');
+jsTest.log("Checking that all commands are routed correctly before changing primary");
 checkAccessViaMongoS();
 
-jsTest.log('Checking that collections are on shard 0');
+jsTest.log("Checking that collections are on shard 0");
 assert.eq(shard0.getDB(dbName).getCollection(shardedCollName).find().itcount(), 1);
 assert.eq(shard0.getDB(dbName).getCollection(unshardedCollName).find().itcount(), 1);
 assert.eq(shard0.getDB(dbName).getCollection(untrackedCollName).find().itcount(), 1);
 
-jsTest.log('Running change primary');
+jsTest.log("Running change primary");
 assert.commandWorked(st.s.adminCommand({changePrimary: dbName, to: shard1.shardName}));
 
-jsTest.log('Checking that all commands are routed correctly after change primary');
+jsTest.log("Checking that all commands are routed correctly after change primary");
 checkAccessViaMongoS();
 
-jsTest.log('Checking that collections are still on shard 0');
+jsTest.log("Checking that collections are still on shard 0");
 assert.eq(shard0.getDB(dbName).getCollection(shardedCollName).find().itcount(), 1);
 assert.eq(shard0.getDB(dbName).getCollection(unshardedCollName).find().itcount(), 1);
 
-jsTest.log('Checking that untracked collection is now on shard 1');
+jsTest.log("Checking that untracked collection is now on shard 1");
 assert.eq(shard1.getDB(dbName).getCollection(untrackedCollName).find().itcount(), 1);
 
 st.stop();

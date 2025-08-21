@@ -21,7 +21,7 @@ export function getNetStatObj() {
     return cat("/proc/net/netstat")
         .split("\n")
         .filter((item) => item.length)
-        .map(line => line.split(" "))
+        .map((line) => line.split(" "))
         .reduce((acc, current) => {
             const sectionName = current[0].slice(0, -1);
             // If we're populating a subsection for the first time,

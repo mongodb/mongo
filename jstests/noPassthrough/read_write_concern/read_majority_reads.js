@@ -42,24 +42,31 @@ function makeCursor(db, result) {
 // These test cases are functions that return a cursor of the documents in collections without
 // fetching them yet.
 var cursorTestCases = {
-    find: function(coll) {
-        return makeCursor(coll.getDB(),
-                          assert.commandWorked(coll.runCommand(
-                              'find', {readConcern: {level: 'majority'}, batchSize: 0})));
-    },
-    aggregate: function(coll) {
+    find: function (coll) {
         return makeCursor(
             coll.getDB(),
-            assert.commandWorked(coll.runCommand(
-                'aggregate',
-                {readConcern: {level: 'majority'}, cursor: {batchSize: 0}, pipeline: []})));
+            assert.commandWorked(coll.runCommand("find", {readConcern: {level: "majority"}, batchSize: 0})),
+        );
     },
-    aggregateGeoNear: function(coll) {
-        return makeCursor(coll.getDB(), assert.commandWorked(coll.runCommand('aggregate', {
-            readConcern: {level: 'majority'},
-            cursor: {batchSize: 0},
-            pipeline: [{$geoNear: {near: [0, 0], distanceField: "d", spherical: true}}]
-        })));
+    aggregate: function (coll) {
+        return makeCursor(
+            coll.getDB(),
+            assert.commandWorked(
+                coll.runCommand("aggregate", {readConcern: {level: "majority"}, cursor: {batchSize: 0}, pipeline: []}),
+            ),
+        );
+    },
+    aggregateGeoNear: function (coll) {
+        return makeCursor(
+            coll.getDB(),
+            assert.commandWorked(
+                coll.runCommand("aggregate", {
+                    readConcern: {level: "majority"},
+                    cursor: {batchSize: 0},
+                    pipeline: [{$geoNear: {near: [0, 0], distanceField: "d", spherical: true}}],
+                }),
+            ),
+        );
     },
 };
 
@@ -70,9 +77,8 @@ var cursorTestCases = {
 // of the state field.
 var nonCursorTestCases = {
     count_before: {
-        run: function(coll) {
-            var res = coll.runCommand('count',
-                                      {readConcern: {level: 'majority'}, query: {state: 'before'}});
+        run: function (coll) {
+            var res = coll.runCommand("count", {readConcern: {level: "majority"}, query: {state: "before"}});
             assert.commandWorked(res);
             return res.n;
         },
@@ -80,9 +86,8 @@ var nonCursorTestCases = {
         expectedAfter: 0,
     },
     count_after: {
-        run: function(coll) {
-            var res = coll.runCommand('count',
-                                      {readConcern: {level: 'majority'}, query: {state: 'after'}});
+        run: function (coll) {
+            var res = coll.runCommand("count", {readConcern: {level: "majority"}, query: {state: "after"}});
             assert.commandWorked(res);
             return res.n;
         },
@@ -90,14 +95,14 @@ var nonCursorTestCases = {
         expectedAfter: 1,
     },
     distinct: {
-        run: function(coll) {
-            var res = coll.runCommand('distinct', {readConcern: {level: 'majority'}, key: 'state'});
+        run: function (coll) {
+            var res = coll.runCommand("distinct", {readConcern: {level: "majority"}, key: "state"});
             assert.commandWorked(res);
             assert.eq(res.values.length, 1, tojson(res));
             return res.values[0];
         },
-        expectedBefore: 'before',
-        expectedAfter: 'after',
+        expectedBefore: "before",
+        expectedAfter: "after",
     },
 };
 
@@ -109,54 +114,54 @@ function runTests(coll, mongodConnection) {
         assert.commandWorked(mongodConnection.adminCommand({"setCommittedSnapshot": snapshot}));
     }
 
-    assert.commandWorked(coll.createIndex({point: '2dsphere'}, {}, 0));
+    assert.commandWorked(coll.createIndex({point: "2dsphere"}, {}, 0));
     for (var testName in cursorTestCases) {
-        jsTestLog('Running ' + testName + ' against ' + coll.toString());
+        jsTestLog("Running " + testName + " against " + coll.toString());
         var getCursor = cursorTestCases[testName];
 
         // Setup initial state.
         assert.commandWorked(coll.remove({}));
-        assert.commandWorked(coll.save({_id: 1, state: 'before', point: [0, 0]}));
+        assert.commandWorked(coll.save({_id: 1, state: "before", point: [0, 0]}));
         setCommittedSnapshot(makeSnapshot());
 
         // Check initial conditions.
-        assert.eq(getCursor(coll).next().state, 'before');
+        assert.eq(getCursor(coll).next().state, "before");
 
         // Change state without making it committed.
-        assert.commandWorked(coll.save({_id: 1, state: 'after', point: [0, 0]}));
+        assert.commandWorked(coll.save({_id: 1, state: "after", point: [0, 0]}));
 
         // Cursor still sees old state.
-        assert.eq(getCursor(coll).next().state, 'before');
+        assert.eq(getCursor(coll).next().state, "before");
 
         // Create a cursor before the update is visible.
         var oldCursor = getCursor(coll);
 
         // Making a snapshot doesn't make the update visible yet.
         var snapshot = makeSnapshot();
-        assert.eq(getCursor(coll).next().state, 'before');
+        assert.eq(getCursor(coll).next().state, "before");
 
         // Setting it as committed does for both new and old cursors.
         setCommittedSnapshot(snapshot);
-        assert.eq(getCursor(coll).next().state, 'after');
-        assert.eq(oldCursor.next().state, 'after');
+        assert.eq(getCursor(coll).next().state, "after");
+        assert.eq(oldCursor.next().state, "after");
     }
 
     for (var testName in nonCursorTestCases) {
-        jsTestLog('Running ' + testName + ' against ' + coll.toString());
+        jsTestLog("Running " + testName + " against " + coll.toString());
         var getResult = nonCursorTestCases[testName].run;
         var expectedBefore = nonCursorTestCases[testName].expectedBefore;
         var expectedAfter = nonCursorTestCases[testName].expectedAfter;
 
         // Setup initial state.
         assert.commandWorked(coll.remove({}));
-        assert.commandWorked(coll.save({_id: 1, state: 'before', point: [0, 0]}));
+        assert.commandWorked(coll.save({_id: 1, state: "before", point: [0, 0]}));
         setCommittedSnapshot(makeSnapshot());
 
         // Check initial conditions.
         assert.eq(getResult(coll), expectedBefore);
 
         // Change state without making it committed.
-        assert.commandWorked(coll.save({_id: 1, state: 'after', point: [0, 0]}));
+        assert.commandWorked(coll.save({_id: 1, state: "after", point: [0, 0]}));
 
         // Cursor still sees old state.
         assert.eq(getResult(coll), expectedBefore);
@@ -174,7 +179,7 @@ function runTests(coll, mongodConnection) {
 var replTest = new ReplSetTest({
     nodes: 1,
     oplogSize: 2,
-    nodeOptions: {setParameter: 'testingSnapshotBehaviorInIsolation=true', shardsvr: ''}
+    nodeOptions: {setParameter: "testingSnapshotBehaviorInIsolation=true", shardsvr: ""},
 });
 replTest.startSet();
 // Cannot wait for a stable recovery timestamp with 'testingSnapshotBehaviorInIsolation' set.
@@ -205,7 +210,7 @@ assert(shardingTest.adminCommand({addShard: replTest.getURL()}));
     runTests(db.unshardedDB, mongod);
 })();
 
-shardingTest.adminCommand({enableSharding: 'throughMongos'});
+shardingTest.adminCommand({enableSharding: "throughMongos"});
 
 (function testUnshardedCollectionThroughMongos() {
     var db = shardingTest.getDB("throughMongos");

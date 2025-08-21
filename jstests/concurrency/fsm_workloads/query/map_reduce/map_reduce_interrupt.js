@@ -21,30 +21,25 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.prefix = 'map_reduce_interrupt';
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.prefix = "map_reduce_interrupt";
 
     $config.states.killOp = function killOp(db, collName) {
-        const mrOps = db.getSiblingDB('admin')
-                          .aggregate([
-                              {$currentOp: {}},
-                              {$match: {'command.mapreduce': collName}},
-                              {$project: {opid: '$opid'}}
-                          ])
-                          .toArray();
+        const mrOps = db
+            .getSiblingDB("admin")
+            .aggregate([{$currentOp: {}}, {$match: {"command.mapreduce": collName}}, {$project: {opid: "$opid"}}])
+            .toArray();
 
         if (mrOps.length > 0) {
             const randomOpIndex = Math.floor(mrOps.length * Math.random());
             const randomOpId = mrOps[randomOpIndex].opid;
-            jsTestLog('Randomly chose to kill Map-Reduce with opid: ' + tojson(randomOpId));
+            jsTestLog("Randomly chose to kill Map-Reduce with opid: " + tojson(randomOpId));
 
             // Note: Even if the killOp reaches the server after the map-reduce command is already
             // done, the server still returns an "ok" response, so this assertion is safe.
-            assert.commandWorked(db.getSiblingDB('admin').runCommand({killOp: 1, op: randomOpId}));
+            assert.commandWorked(db.getSiblingDB("admin").runCommand({killOp: 1, op: randomOpId}));
         } else {
             // No map-reduce operations to kill at the moment.
         }
@@ -60,8 +55,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // execution) and some non-specific errors (SERVER-39281, SERVER-39282). Checking for
             // "interrupted" in the error message is a reasonable way to spot all the miscellaneous
             // errors that can occur because of an interruption.
-            if (err.code != ErrorCodes.Interrupted && err.code != ErrorCodes.InternalError &&
-                !/interrupted/i.test(err.message)) {
+            if (
+                err.code != ErrorCodes.Interrupted &&
+                err.code != ErrorCodes.InternalError &&
+                !/interrupted/i.test(err.message)
+            ) {
                 throw err;
             }
         }
@@ -70,19 +68,23 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         // The default WC is majority and this workload may not be able to satisfy majority writes.
         if (cluster.isSharded()) {
-            cluster.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.adminCommand({
-                    setDefaultRWConcern: 1,
-                    defaultWriteConcern: {w: 1},
-                    writeConcern: {w: "majority"}
-                }));
+            cluster.executeOnMongosNodes(function (db) {
+                assert.commandWorked(
+                    db.adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {w: 1},
+                        writeConcern: {w: "majority"},
+                    }),
+                );
             });
         } else if (cluster.isReplication()) {
-            assert.commandWorked(db.adminCommand({
-                setDefaultRWConcern: 1,
-                defaultWriteConcern: {w: 1},
-                writeConcern: {w: "majority"}
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: 1},
+                    writeConcern: {w: "majority"},
+                }),
+            );
         }
 
         $super.setup.apply(this, arguments);
@@ -96,38 +98,41 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // Cleanup occurs as part of its own operations, which can also be interrupted, but the
         // 'killOp' state of this test only targets map-reduce operations.
 
-        const dbTempCollectionsResult =
-            db.runCommand({listCollections: 1, filter: {'options.temp': true}});
+        const dbTempCollectionsResult = db.runCommand({listCollections: 1, filter: {"options.temp": true}});
         assert.commandWorked(dbTempCollectionsResult);
         assert.eq(dbTempCollectionsResult.cursor.firstBatch.length, 0, dbTempCollectionsResult);
 
         if (!cluster.isSharded()) {
             // Note that we can't do this check on sharded clusters, which do not have a "local"
             // database.
-            const localTempCollectionsResult = db.getSiblingDB('local').runCommand(
-                {listCollections: 1, filter: {'options.temp': true}});
+            const localTempCollectionsResult = db
+                .getSiblingDB("local")
+                .runCommand({listCollections: 1, filter: {"options.temp": true}});
             assert.commandWorked(localTempCollectionsResult);
-            assert.eq(
-                localTempCollectionsResult.cursor.firstBatch.length, 0, localTempCollectionsResult);
+            assert.eq(localTempCollectionsResult.cursor.firstBatch.length, 0, localTempCollectionsResult);
 
             // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
             // majority by setting CWWC to {w: majority}.
             if (cluster.isReplication()) {
-                assert.commandWorked(db.adminCommand({
-                    setDefaultRWConcern: 1,
-                    defaultWriteConcern: {w: "majority"},
-                    writeConcern: {w: "majority"}
-                }));
+                assert.commandWorked(
+                    db.adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {w: "majority"},
+                        writeConcern: {w: "majority"},
+                    }),
+                );
             }
         } else {
             // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
             // majority by setting CWWC to {w: majority}.
-            cluster.executeOnMongosNodes(function(db) {
-                assert.commandWorked(db.adminCommand({
-                    setDefaultRWConcern: 1,
-                    defaultWriteConcern: {w: "majority"},
-                    writeConcern: {w: "majority"}
-                }));
+            cluster.executeOnMongosNodes(function (db) {
+                assert.commandWorked(
+                    db.adminCommand({
+                        setDefaultRWConcern: 1,
+                        defaultWriteConcern: {w: "majority"},
+                        writeConcern: {w: "majority"},
+                    }),
+                );
             });
         }
     };
@@ -135,7 +140,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.transitions = {
         init: {mapReduce: 0.8, killOp: 0.2},
         mapReduce: {mapReduce: 0.8, killOp: 0.2},
-        killOp: {mapReduce: 0.8, killOp: 0.2}
+        killOp: {mapReduce: 0.8, killOp: 0.2},
     };
 
     return $config;

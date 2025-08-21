@@ -16,9 +16,9 @@ const nBuckets = 40;
 const timeFieldName = "time";
 const metaFieldName = "m";
 
-let assertUniqueDocuments = function(docs) {
+let assertUniqueDocuments = function (docs) {
     let seen = new Set();
-    docs.forEach(doc => {
+    docs.forEach((doc) => {
         assert.eq(seen.has(doc._id), false);
         seen.add(doc._id);
     });
@@ -59,14 +59,14 @@ let assertPlanForSample = (explainRes, backupPlanSelected) => {
  * number of measurement documents inserted into the collection.
  */
 function fillBuckets(coll, measurementsPerBucket) {
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
 
     let numDocs = nBuckets * measurementsPerBucket;
     const bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < numDocs; i++) {
-        bulk.insert(
-            {_id: ObjectId(), [timeFieldName]: ISODate(), [metaFieldName]: i % nBuckets, x: i});
+        bulk.insert({_id: ObjectId(), [timeFieldName]: ISODate(), [metaFieldName]: i % nBuckets, x: i});
     }
     assert.commandWorked(bulk.execute());
 
@@ -93,8 +93,7 @@ let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
     assertUniqueDocuments(result);
 
     // Check that we have executed the correct branch of the TrialStage.
-    const optimizedSamplePlan =
-        coll.explain("executionStats").aggregate([{$sample: {size: sampleSize}}]);
+    const optimizedSamplePlan = coll.explain("executionStats").aggregate([{$sample: {size: sampleSize}}]);
     assertPlanForSample(optimizedSamplePlan, backupPlanSelected);
 
     // Run an agg pipeline with optimization disabled.
@@ -126,16 +125,13 @@ let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
 
     // Check that $lookup against a time-series collection doesn't cache inner pipeline results if
     // it contains a $sample stage.
-    result =
-        coll.aggregate(
-                {$lookup: {from: coll.getName(), as: "docs", pipeline: [{$sample: {size: 1}}]}})
-            .toArray();
+    result = coll.aggregate({$lookup: {from: coll.getName(), as: "docs", pipeline: [{$sample: {size: 1}}]}}).toArray();
 
     // Each subquery should be an independent sample by checking that we didn't sample the same
     // document repeatedly. It's sufficient for now to make sure that the seen set contains at least
     // two distinct samples.
     let seen = new Set();
-    result.forEach(r => {
+    result.forEach((r) => {
         assert.eq(r.docs.length, 1);
         seen.add(r.docs[0]._id);
     });

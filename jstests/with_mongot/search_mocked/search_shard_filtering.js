@@ -8,9 +8,7 @@ import {
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const collName = "internal_search_mongot_remote";
@@ -51,8 +49,7 @@ assert.commandWorked(testColl.insert({_id: 14, shardKey: 100, x: "cow", y: "lore
 assert.commandWorked(testColl.createIndex({shardKey: 1}));
 
 // 'waitForDelete' is set to 'true' so that range deletion completes before we insert our orphan.
-st.shardColl(
-    testColl, {shardKey: 1}, {shardKey: 10}, {shardKey: 10 + 1}, dbName, true /* waitForDelete */);
+st.shardColl(testColl, {shardKey: 1}, {shardKey: 10}, {shardKey: 10 + 1}, dbName, true /* waitForDelete */);
 
 const shard0Conn = st.rs0.getPrimary();
 const shard1Conn = st.rs1.getPrimary();
@@ -62,8 +59,7 @@ assert.eq(shard0Conn.getDB(dbName)[collName].find().itcount(), 4);
 assert.eq(testColl.find().itcount(), 8);
 
 // Insert a document into shard 0 which is not owned by that shard.
-assert.commandWorked(shard0Conn.getDB(dbName)[collName].insert(
-    {_id: 15, shardKey: 100, x: "_should be filtered out"}));
+assert.commandWorked(shard0Conn.getDB(dbName)[collName].insert({_id: 15, shardKey: 100, x: "_should be filtered out"}));
 
 // Verify that the orphaned document exists on shard0, but that it gets filtered out when
 // querying 'testColl'.
@@ -102,14 +98,22 @@ const expectedMongotCommand = mongotCommandForQuery({
     collName: collName,
     db: dbName,
     collectionUUID: collUUID0,
-    protocolVersion: NumberInt(1)
+    protocolVersion: NumberInt(1),
 });
 
-const history0 = [{
-    expectedCommand: expectedMongotCommand,
-    response: mongotMultiCursorResponseForBatch(
-        mongot0ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk)
-}];
+const history0 = [
+    {
+        expectedCommand: expectedMongotCommand,
+        response: mongotMultiCursorResponseForBatch(
+            mongot0ResponseBatch,
+            NumberLong(0),
+            [{val: 1}],
+            NumberLong(0),
+            collNS,
+            responseOk,
+        ),
+    },
+];
 const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
 s0Mongot.setMockResponses(history0, NumberLong(123), NumberLong(1124));
 
@@ -119,11 +123,19 @@ const mongot1ResponseBatch = [
     {_id: 12, $searchScore: 29},
     {_id: 14, $searchScore: 28},
 ];
-const history1 = [{
-    expectedCommand: expectedMongotCommand,
-    response: mongotMultiCursorResponseForBatch(
-        mongot1ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk)
-}];
+const history1 = [
+    {
+        expectedCommand: expectedMongotCommand,
+        response: mongotMultiCursorResponseForBatch(
+            mongot1ResponseBatch,
+            NumberLong(0),
+            [{val: 1}],
+            NumberLong(0),
+            collNS,
+            responseOk,
+        ),
+    },
+];
 const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
 s1Mongot.setMockResponses(history1, NumberLong(456), NumberLong(1457));
 

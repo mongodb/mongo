@@ -26,11 +26,11 @@ jsTest.log("Adding a new node to the replica set");
 const initialSyncNode = rst.add({
     rsConfig: {priority: 0, votes: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
+        "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
         // Wait for the cloners to finish.
-        'failpoint.initialSyncHangAfterDataCloning': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangAfterDataCloning": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 rst.reInitiate();
 
@@ -47,24 +47,24 @@ assert.commandWorked(syncSourceColl.insert({_id: 4}));
 const beforeFinishFailPoint = configureFailPoint(initialSyncNode, "initialSyncHangBeforeFinish");
 
 jsTestLog("Resuming database cloner on the initialSyncNode");
-assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 jsTestLog("Waiting for data cloning to complete on the initialSyncNode");
-assert.commandWorked(initialSyncNode.adminCommand({
-    waitForFailPoint: "initialSyncHangAfterDataCloning",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({
+        waitForFailPoint: "initialSyncHangAfterDataCloning",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 // Get the rollback id of the sync source before the unclean shutdown.
 const rollbackIdBefore = syncSourceNode.getDB("local").system.rollback.id.findOne();
 
 jsTestLog("Shutting down the syncSourceNode uncleanly");
-rst.stop(syncSourceNode,
-         9,
-         {allowedExitCode: MongoRunner.EXIT_SIGKILL},
-         {forRestart: true, waitPid: true});
+rst.stop(syncSourceNode, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true, waitPid: true});
 
 // Make sure some retries happen due to resumable initial sync and the initial sync does not
 // immediately fail while the sync source is completely down.
@@ -78,14 +78,16 @@ syncSourceNode = rst.getPrimary();
 
 // Test that the rollback id is incremented after the unclean shutdown.
 const rollbackIdAfter = syncSourceNode.getDB("local").system.rollback.id.findOne();
-assert.eq(rollbackIdAfter.rollbackId,
-          rollbackIdBefore.rollbackId + 1,
-          () => "rollbackIdBefore: " + tojson(rollbackIdBefore) +
-              " rollbackIdAfter: " + tojson(rollbackIdAfter));
+assert.eq(
+    rollbackIdAfter.rollbackId,
+    rollbackIdBefore.rollbackId + 1,
+    () => "rollbackIdBefore: " + tojson(rollbackIdBefore) + " rollbackIdAfter: " + tojson(rollbackIdAfter),
+);
 
 jsTestLog("Resuming initial sync after the data cloning phase on the initialSyncNode");
-assert.commandWorked(initialSyncNode.adminCommand(
-    {configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}));
+assert.commandWorked(
+    initialSyncNode.adminCommand({configureFailPoint: "initialSyncHangAfterDataCloning", mode: "off"}),
+);
 
 jsTestLog("Waiting for initial sync to fail on the initialSyncNode");
 beforeFinishFailPoint.wait();

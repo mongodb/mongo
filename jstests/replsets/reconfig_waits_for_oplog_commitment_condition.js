@@ -19,12 +19,12 @@ const secondary = rst.getSecondary();
 const coll = primary.getDB(dbName)[collName];
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // This makes the test run faster.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: 'setSmallOplogGetMoreMaxTimeMS', mode: 'alwaysOn'}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}));
 
 // Create collection.
 assert.commandWorked(coll.insert({}));
@@ -36,7 +36,7 @@ stopServerReplication(secondary);
 // Reconfig down to a 1 node replica set.
 let origConfig = rst.getReplSetConfigFromNode();
 let singleNodeConfig = Object.assign({}, origConfig);
-singleNodeConfig.members = singleNodeConfig.members.slice(0, 1);  // Remove the second node.
+singleNodeConfig.members = singleNodeConfig.members.slice(0, 1); // Remove the second node.
 singleNodeConfig.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: singleNodeConfig}));
 assert.soon(() => isConfigCommitted(primary));
@@ -60,7 +60,7 @@ C2.version = C1.version + 1;
 
 // {n0, n1}
 let C3 = Object.assign({}, origConfig);
-C3.version = C2.version + 2;  // Leave one for the 'newlyAdded' automatic reconfig
+C3.version = C2.version + 2; // Leave one for the 'newlyAdded' automatic reconfig
 
 jsTestLog("Do a write on primary and commit it in the current config.");
 assert.commandWorked(coll.insert({x: 1}, {writeConcern: {w: "majority"}}));
@@ -71,9 +71,12 @@ jsTestLog("Reconfig to add the secondary back in.");
 assert.commandWorked(primary.adminCommand({replSetReconfig: C2}));
 
 jsTestLog("Waiting for member 1 to no longer be 'newlyAdded'");
-assert.soonNoExcept(function() {
-    return !isMemberNewlyAdded(primary, 1, false /* force */);
-}, () => tojson(primary.getDB("local").system.replset.findOne()));
+assert.soonNoExcept(
+    function () {
+        return !isMemberNewlyAdded(primary, 1, false /* force */);
+    },
+    () => tojson(primary.getDB("local").system.replset.findOne()),
+);
 
 assert.eq(isConfigCommitted(primary), false);
 
@@ -82,8 +85,10 @@ assert.eq(isConfigCommitted(primary), false);
 rst.waitForConfigReplication(primary);
 
 // Reconfig should time out since we have not committed the last committed op from C1 in C2.
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: C3, maxTimeMS: 1000}),
-                             ErrorCodes.CurrentConfigNotCommittedYet);
+assert.commandFailedWithCode(
+    primary.adminCommand({replSetReconfig: C3, maxTimeMS: 1000}),
+    ErrorCodes.CurrentConfigNotCommittedYet,
+);
 assert.eq(isConfigCommitted(primary), false);
 
 // Make sure we can connect to the secondary after it was REMOVED.
@@ -119,7 +124,7 @@ jsTestLog("Stepping down the primary.");
 // Step down the primary and then step it back up so that it writes a log entry in a newer term.
 // This new op won't become committed yet, though, since we have paused replication.
 assert.commandWorked(primary.adminCommand({replSetStepDown: 5, force: 1}));
-assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));  // end the stepdown period.
+assert.commandWorked(primary.adminCommand({replSetFreeze: 0})); // end the stepdown period.
 
 jsTestLog("Stepping the primary back up.");
 rst.stepUp(primary, {awaitReplicationBeforeStepUp: false});
@@ -133,8 +138,10 @@ rst.waitForConfigReplication(primary);
 // Even though the current config has been replicated to all nodes, reconfig should still fail since
 // the primary has not yet committed an op in its term.
 config.version++;
-assert.commandFailedWithCode(primary.adminCommand({replSetReconfig: config, maxTimeMS: 1000}),
-                             ErrorCodes.CurrentConfigNotCommittedYet);
+assert.commandFailedWithCode(
+    primary.adminCommand({replSetReconfig: config, maxTimeMS: 1000}),
+    ErrorCodes.CurrentConfigNotCommittedYet,
+);
 
 // Restart server replication to let the primary commit an op.
 restartServerReplication(secondary);

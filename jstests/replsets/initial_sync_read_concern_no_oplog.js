@@ -10,15 +10,15 @@ replSet.initiate();
 const primary = replSet.getPrimary();
 const secondary = replSet.add({rsConfig: {votes: 0, priority: 0}});
 
-const failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCreatingOplog');
+const failPoint = configureFailPoint(secondary, "initialSyncHangBeforeCreatingOplog");
 replSet.reInitiate();
 
 failPoint.wait();
 
 assert.commandFailedWithCode(
-    secondary.getDB('local').runCommand(
-        {find: 'coll', limit: 1, readConcern: {afterClusterTime: Timestamp(1, 1)}}),
-    ErrorCodes.NotYetInitialized);
+    secondary.getDB("local").runCommand({find: "coll", limit: 1, readConcern: {afterClusterTime: Timestamp(1, 1)}}),
+    ErrorCodes.NotYetInitialized,
+);
 
 failPoint.off();
 

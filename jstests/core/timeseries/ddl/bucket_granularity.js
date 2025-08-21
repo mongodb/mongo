@@ -14,33 +14,26 @@
  */
 
 import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.js";
-import {
-    areViewlessTimeseriesEnabled
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 function assertBucketMaxSpanSecondsEquals(coll, expectedValue) {
     const cSeconds = coll.getMetadata().options.timeseries.bucketMaxSpanSeconds;
-    assert.eq(cSeconds,
-              expectedValue,
-              `expected collection 'bucketMaxSpanSeconds' to equal ${expectedValue}`);
+    assert.eq(cSeconds, expectedValue, `expected collection 'bucketMaxSpanSeconds' to equal ${expectedValue}`);
 
     if (!areViewlessTimeseriesEnabled(db)) {
-        const vProps =
-            db.system.views.find({_id: `${db.getName()}.${coll.getName()}`}).toArray()[0];
+        const vProps = db.system.views.find({_id: `${db.getName()}.${coll.getName()}`}).toArray()[0];
         const vSeconds = vProps.pipeline[0].$_internalUnpackBucket.bucketMaxSpanSeconds;
-        assert.eq(cSeconds,
-                  vSeconds,
-                  `expected view pipeline 'bucketMaxSpanSeconds' to match timeseries options`);
+        assert.eq(cSeconds, vSeconds, `expected view pipeline 'bucketMaxSpanSeconds' to match timeseries options`);
     }
 }
 
 function getDateOutsideBucketRange(coll, spanMS) {
     const newestBucketDoc = getTimeseriesCollForRawOps(coll)
-                                .find()
-                                .rawData()
-                                .sort({"control.min.t": -1})
-                                .limit(1)
-                                .toArray()[0];
+        .find()
+        .rawData()
+        .sort({"control.min.t": -1})
+        .limit(1)
+        .toArray()[0];
     let newDate = new Date(Date.parse(newestBucketDoc.control.min.t) + spanMS);
     return ISODate(newDate.toISOString());
 }
@@ -51,14 +44,13 @@ const dayInMS = 1000 * 60 * 60 * 24;
     let coll = db[jsTestName() + "_granularitySeconds"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "seconds"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
         // In suites running moveCollection or FCV upgrade in the background, it is possible to hit
         // the issue described by SERVER-89349 which will result in more bucket documents being
         // created. Creating an index on the time field allows the buckets to be reopened, allowing
         // the counts in this test to be accurate.
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
     // All measurements land in the same bucket.
@@ -79,10 +71,9 @@ const dayInMS = 1000 * 60 * 60 * 24;
     let coll = db[jsTestName() + "_granularityMinutes"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "minutes"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
     // All measurements land in the same bucket.
@@ -103,10 +94,9 @@ const dayInMS = 1000 * 60 * 60 * 24;
     let coll = db[jsTestName() + "_granularityHours"];
     coll.drop();
 
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: 't', granularity: 'hours'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "hours"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
     // All measurements land in the same bucket.
@@ -127,10 +117,9 @@ const dayInMS = 1000 * 60 * 60 * 24;
     let coll = db[jsTestName() + "_granularitySecondsToMinutes"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "seconds"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
     assertBucketMaxSpanSecondsEquals(coll, 60 * 60);
 
@@ -148,8 +137,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     assert.eq(2, getTimeseriesCollForRawOps(coll).find().rawData().itcount());
 
     // Now let's bump to minutes and make sure we get the expected behavior
-    assert.commandWorked(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
+    assert.commandWorked(db.runCommand({collMod: coll.getName(), timeseries: {granularity: "minutes"}}));
     assertBucketMaxSpanSecondsEquals(coll, 24 * 60 * 60);
 
     // If resharding is running in the background, it could be that neither of the buckets are in
@@ -181,10 +169,9 @@ const dayInMS = 1000 * 60 * 60 * 24;
     let coll = db[jsTestName() + "_granularitySecondsToHours"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'seconds'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "seconds"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
     assertBucketMaxSpanSecondsEquals(coll, 60 * 60);
 
@@ -201,8 +188,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     assert.commandWorked(coll.insert({t: ISODate("2021-04-22T21:00:00.000Z")}));
     assert.eq(2, getTimeseriesCollForRawOps(coll).find().rawData().itcount());
 
-    assert.commandWorked(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
+    assert.commandWorked(db.runCommand({collMod: coll.getName(), timeseries: {granularity: "hours"}}));
     assertBucketMaxSpanSecondsEquals(coll, 30 * 24 * 60 * 60);
 
     // All measurements land in the same bucket.
@@ -230,10 +216,9 @@ const dayInMS = 1000 * 60 * 60 * 24;
     let coll = db[jsTestName() + "_granularityMinutesToHours"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "minutes"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
     assertBucketMaxSpanSecondsEquals(coll, 24 * 60 * 60);
 
@@ -250,8 +235,7 @@ const dayInMS = 1000 * 60 * 60 * 24;
     assert.commandWorked(coll.insert({t: ISODate("2021-04-23T20:00:00.000Z")}));
     assert.eq(2, getTimeseriesCollForRawOps(coll).find().rawData().itcount());
 
-    assert.commandWorked(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
+    assert.commandWorked(db.runCommand({collMod: coll.getName(), timeseries: {granularity: "hours"}}));
     assertBucketMaxSpanSecondsEquals(coll, 30 * 24 * 60 * 60);
 
     // All measurements land in the same bucket.
@@ -279,24 +263,19 @@ const dayInMS = 1000 * 60 * 60 * 24;
     let coll = db[jsTestName() + "_reducingGranularityFails"];
     coll.drop();
 
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: 't', granularity: 'minutes'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", granularity: "minutes"}}));
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
-        assert.commandWorked(coll.createIndex({'t': 1}));
+        assert.commandWorked(coll.createIndex({"t": 1}));
     }
 
     // Decreasing minutes -> seconds shouldn't work.
-    assert.commandFailed(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'seconds'}}));
+    assert.commandFailed(db.runCommand({collMod: coll.getName(), timeseries: {granularity: "seconds"}}));
 
     // Increasing minutes -> hours should work fine.
-    assert.commandWorked(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'hours'}}));
+    assert.commandWorked(db.runCommand({collMod: coll.getName(), timeseries: {granularity: "hours"}}));
 
     // Decreasing hours -> minutes shouldn't work.
-    assert.commandFailed(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'minutes'}}));
+    assert.commandFailed(db.runCommand({collMod: coll.getName(), timeseries: {granularity: "minutes"}}));
     // Decreasing hours -> seconds shouldn't work either.
-    assert.commandFailed(
-        db.runCommand({collMod: coll.getName(), timeseries: {granularity: 'seconds'}}));
+    assert.commandFailed(db.runCommand({collMod: coll.getName(), timeseries: {granularity: "seconds"}}));
 })();

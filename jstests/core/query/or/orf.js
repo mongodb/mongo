@@ -6,9 +6,7 @@
 //   does_not_support_causal_consistency,
 // ]
 
-import {
-    ClusteredCollectionUtil
-} from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 
 const t = db.jstests_orf;
 t.drop();
@@ -24,9 +22,9 @@ assert.commandWorked(t.insert(a));
 const explain = t.find({$or: a}).hint({_id: 1}).explain(true);
 printjson(explain);
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
-assert.eq(200, explain.executionStats.nReturned, 'n');
+assert.eq(200, explain.executionStats.nReturned, "n");
 const expectedKeysExamined = collectionIsClustered ? 0 : 200;
-assert.eq(expectedKeysExamined, explain.executionStats.totalKeysExamined, 'keys examined');
-assert.eq(200, explain.executionStats.totalDocsExamined, 'docs examined');
+assert.eq(expectedKeysExamined, explain.executionStats.totalKeysExamined, "keys examined");
+assert.eq(200, explain.executionStats.totalDocsExamined, "docs examined");
 
 assert.eq(200, t.count({$or: a}));

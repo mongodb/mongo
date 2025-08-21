@@ -9,7 +9,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 var dbname = jsTestName();
-var collection = 'jstests_feh';
+var collection = "jstests_feh";
 var size = 100;
 
 const replTest = new ReplSetTest({
@@ -21,9 +21,9 @@ const replTest = new ReplSetTest({
                 priority: 0,
                 votes: 0,
             },
-            slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
+            slowms: 30000, // Don't log slow operations on secondary. See SERVER-44821.
         },
-    ]
+    ],
 });
 const nodes = replTest.startSet();
 replTest.initiate();
@@ -46,8 +46,7 @@ for (i = 0; i < size; ++i) {
 }
 assert.commandWorked(bulk.execute({w: 2, wtimeout: replTest.timeoutMS}));
 
-assert.commandWorked(
-    secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
+assert.commandWorked(secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"}));
 
 jsTest.log("Starting background indexing for test of: " + tojson(dc));
 
@@ -62,8 +61,7 @@ jsTest.log("Dropping indexes");
 primaryDB.runCommand({dropIndexes: collection, index: "*"});
 
 jsTest.log("Waiting on replication");
-assert.commandWorked(
-    secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
+assert.commandWorked(secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
 replTest.awaitReplication();
 
 print("Index list on primary:");
@@ -72,7 +70,7 @@ primaryDB.getCollection(collection).getIndexes().forEach(printjson);
 // Need to assert.soon because the drop only marks the index for removal
 // the removal itself is asynchronous and may take another moment before it happens.
 var i = 0;
-assert.soon(function() {
+assert.soon(function () {
     print("Index list on secondary (run " + i + "):");
     secondDB.getCollection(collection).getIndexes().forEach(printjson);
 

@@ -14,12 +14,12 @@
 
 import {isEphemeral} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
-    var getStringOfLength = (function() {
+export const $config = (function () {
+    var getStringOfLength = (function () {
         var cache = {};
         return function getStringOfLength(size) {
             if (!cache[size]) {
-                cache[size] = 'x'.repeat(size);
+                cache[size] = "x".repeat(size);
             }
             return cache[size];
         };
@@ -30,8 +30,7 @@ export const $config = (function() {
         // overhead
         doc.padding = "";
         var paddingLength = size - Object.bsonsize(doc);
-        assert.lte(
-            0, paddingLength, 'document is already bigger than ' + size + ' bytes: ' + tojson(doc));
+        assert.lte(0, paddingLength, "document is already bigger than " + size + " bytes: " + tojson(doc));
         doc.padding = getStringOfLength(paddingLength);
         assert.eq(size, Object.bsonsize(doc));
         return doc;
@@ -41,7 +40,7 @@ export const $config = (function() {
         query: function query(db, collName) {
             var count = db[collName].aggregate([]).itcount();
             assert.eq(count, this.numDocs);
-        }
+        },
     };
 
     var transitions = {query: {query: 1}};
@@ -73,12 +72,16 @@ export const $config = (function() {
         for (var i = 0; i < this.numDocs; ++i) {
             // note: padDoc caches the large string after allocating it once, so it's ok to call it
             // in this loop
-            bulk.insert(padDoc({
-                flag: i % 2 ? true : false,
-                rand: Random.rand(),
-                randInt: Random.randInt(this.numDocs)
-            },
-                               this.docSize));
+            bulk.insert(
+                padDoc(
+                    {
+                        flag: i % 2 ? true : false,
+                        rand: Random.rand(),
+                        randInt: Random.randInt(this.numDocs),
+                    },
+                    this.docSize,
+                ),
+            );
         }
         var res = bulk.execute();
         assert.commandWorked(res);
@@ -99,7 +102,7 @@ export const $config = (function() {
         threadCount: 5,
         iterations: 10,
         states: states,
-        startState: 'query',
+        startState: "query",
         transitions: transitions,
         data: {},
         setup: setup,

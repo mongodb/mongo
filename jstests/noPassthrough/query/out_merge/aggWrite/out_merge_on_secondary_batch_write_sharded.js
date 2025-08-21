@@ -6,9 +6,7 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    testOutAndMergeOnSecondaryBatchWrite
-} from "jstests/noPassthrough/libs/query/out_merge_on_secondary_batch_write.js";
+import {testOutAndMergeOnSecondaryBatchWrite} from "jstests/noPassthrough/libs/query/out_merge_on_secondary_batch_write.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 testOutAndMergeOnSecondaryBatchWrite(st.s.getDB("db"), () => st.awaitReplicationOnShards());

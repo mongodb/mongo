@@ -20,7 +20,7 @@ function runTests(func, testFunc) {
     testObjectsAreEqual(-5, -5, func, testFunc);
     testObjectsAreEqual(1.1, 1.1, func, testFunc);
     testObjectsAreEqual(1, 1, func, testFunc);
-    testObjectsAreEqual(1.1, 1.10, func, testFunc);
+    testObjectsAreEqual(1.1, 1.1, func, testFunc);
     var nl0 = new NumberLong("18014398509481984");
     var nl1 = new NumberLong("18014398509481985");
     testObjectsAreEqual(nl0, nl0, func, testFunc);
@@ -62,7 +62,7 @@ function runTests(func, testFunc) {
 
     // Tests on JavaScript.
     var js0 = Function.prototype;
-    var js1 = function() {};
+    var js1 = function () {};
     testObjectsAreEqual(js0, Function.prototype, func, testFunc);
     testObjectsAreNotEqual(js0, js1, func, testFunc);
 
@@ -72,10 +72,12 @@ function runTests(func, testFunc) {
     testObjectsAreNotEqual([1, 0], [0, 1], func, testFunc);
 
     // Tests on BinData & HexData.
-    testObjectsAreEqual(new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq"),
-                        new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq"),
-                        func,
-                        testFunc);
+    testObjectsAreEqual(
+        new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq"),
+        new BinData(0, "JANgqwetkqwklEWRbWERKKJREtbq"),
+        func,
+        testFunc,
+    );
     testObjectsAreEqual(new BinData(0, "AAaa"), new BinData(0, "AAaa"), func, testFunc);
     testObjectsAreNotEqual(new BinData(0, "AAaa"), new BinData(0, "aaAA"), func, testFunc);
 
@@ -84,14 +86,18 @@ function runTests(func, testFunc) {
     testObjectsAreNotEqual(new HexData(0, "AAaa"), new BinData(0, "AAaa"), func, testFunc);
 
     // Tests on ObjectId
-    testObjectsAreEqual(new ObjectId("57d1b31cd311a43091fe592f"),
-                        new ObjectId("57d1b31cd311a43091fe592f"),
-                        func,
-                        testFunc);
-    testObjectsAreNotEqual(new ObjectId("57d1b31cd311a43091fe592f"),
-                           new ObjectId("57d1b31ed311a43091fe5930"),
-                           func,
-                           testFunc);
+    testObjectsAreEqual(
+        new ObjectId("57d1b31cd311a43091fe592f"),
+        new ObjectId("57d1b31cd311a43091fe592f"),
+        func,
+        testFunc,
+    );
+    testObjectsAreNotEqual(
+        new ObjectId("57d1b31cd311a43091fe592f"),
+        new ObjectId("57d1b31ed311a43091fe5930"),
+        func,
+        testFunc,
+    );
 
     // Tests on miscellaneous types.
     testObjectsAreEqual(NaN, NaN, func, testFunc);
@@ -106,7 +112,7 @@ function runTests(func, testFunc) {
 }
 
 // Create wrapper function for bsonWoCompare, such that it returns boolean result.
-var bsonWoCompareWrapper = function(obj1, obj2) {
+var bsonWoCompareWrapper = function (obj1, obj2) {
     return bsonWoCompare(obj1, obj2) === 0;
 };
 
@@ -115,12 +121,26 @@ function runObjectEntriesTest() {
     t.drop();
     t.insertOne({_id: 1, a: "a", b: "b"});
     let res = t.findOne();
-    assert.eq([["_id", 1], ["a", "a"], ["b", "b"]], Object.entries(res));
+    assert.eq(
+        [
+            ["_id", 1],
+            ["a", "a"],
+            ["b", "b"],
+        ],
+        Object.entries(res),
+    );
     // Test that we don't re-define properties in Object.entries() after they've been already been
     // defined. We can test this by updating the object here and ensuring the overwrite is reflected
     // in Object.entries().
     res.a = "b";
-    assert.eq([["_id", 1], ["a", "b"], ["b", "b"]], Object.entries(res));
+    assert.eq(
+        [
+            ["_id", 1],
+            ["a", "b"],
+            ["b", "b"],
+        ],
+        Object.entries(res),
+    );
 }
 
 function runObjectEntriesArrayTypesTest() {
@@ -128,13 +148,35 @@ function runObjectEntriesArrayTypesTest() {
     // Test enumerating "dense" array.
     t.insertOne({_id: 1, a: [1, 2, 3, 4, 5], b: "b"});
     let res = t.findOne();
-    assert.eq([["_id", 1], ["a", [1, 2, 3, 4, 5]], ["b", "b"]], Object.entries(res));
-    assert.eq([["0", 1], ["1", 2], ["2", 3], ["3", 4], ["4", 5]], Object.entries(res.a));
+    assert.eq(
+        [
+            ["_id", 1],
+            ["a", [1, 2, 3, 4, 5]],
+            ["b", "b"],
+        ],
+        Object.entries(res),
+    );
+    assert.eq(
+        [
+            ["0", 1],
+            ["1", 2],
+            ["2", 3],
+            ["3", 4],
+            ["4", 5],
+        ],
+        Object.entries(res.a),
+    );
     t.update({_id: 1}, {$set: {"a.9": 10}});
     res = t.findOne();
     // Test enumerating "sparse" array.
-    assert.eq([["_id", 1], ["a", [1, 2, 3, 4, 5, null, null, null, null, 10]], ["b", "b"]],
-              Object.entries(res));
+    assert.eq(
+        [
+            ["_id", 1],
+            ["a", [1, 2, 3, 4, 5, null, null, null, null, 10]],
+            ["b", "b"],
+        ],
+        Object.entries(res),
+    );
     assert.eq(
         [
             ["0", 1],
@@ -146,14 +188,31 @@ function runObjectEntriesArrayTypesTest() {
             ["6", null],
             ["7", null],
             ["8", null],
-            ["9", 10]
+            ["9", 10],
         ],
-        Object.entries(res.a));
+        Object.entries(res.a),
+    );
 
     // Test overwriting the native object is not affected by the Object.entries() call.
     res.a = [5, 6, 7, 8, 9];
-    assert.eq([["_id", 1], ["a", [5, 6, 7, 8, 9]], ["b", "b"]], Object.entries(res));
-    assert.eq([["0", 5], ["1", 6], ["2", 7], ["3", 8], ["4", 9]], Object.entries(res.a));
+    assert.eq(
+        [
+            ["_id", 1],
+            ["a", [5, 6, 7, 8, 9]],
+            ["b", "b"],
+        ],
+        Object.entries(res),
+    );
+    assert.eq(
+        [
+            ["0", 5],
+            ["1", 6],
+            ["2", 7],
+            ["3", 8],
+            ["4", 9],
+        ],
+        Object.entries(res.a),
+    );
 
     // Test enumerating nested array.
     t.update({_id: 1}, {$set: {"a.10": [1, 2, 3, 4, 5]}});
@@ -162,27 +221,51 @@ function runObjectEntriesArrayTypesTest() {
         [
             ["_id", 1],
             ["a", [1, 2, 3, 4, 5, null, null, null, null, 10, [1, 2, 3, 4, 5]]],
-            ["b", "b"]
+            ["b", "b"],
         ],
-        Object.entries(res));
-    assert.eq([["0", 1], ["1", 2], ["2", 3], ["3", 4], ["4", 5]], Object.entries(res.a[10]));
+        Object.entries(res),
+    );
+    assert.eq(
+        [
+            ["0", 1],
+            ["1", 2],
+            ["2", 3],
+            ["3", 4],
+            ["4", 5],
+        ],
+        Object.entries(res.a[10]),
+    );
     // Test overwriting the native object is not affected by the Object.entries() call.
     res.a[10] = [5, 6, 7, 8, 9];
     assert.eq(
         [
             ["_id", 1],
             ["a", [1, 2, 3, 4, 5, null, null, null, null, 10, [5, 6, 7, 8, 9]]],
-            ["b", "b"]
+            ["b", "b"],
         ],
-        Object.entries(res));
-    assert.eq([["0", 5], ["1", 6], ["2", 7], ["3", 8], ["4", 9]], Object.entries(res.a[10]));
+        Object.entries(res),
+    );
+    assert.eq(
+        [
+            ["0", 5],
+            ["1", 6],
+            ["2", 7],
+            ["3", 8],
+            ["4", 9],
+        ],
+        Object.entries(res.a[10]),
+    );
 }
 
 function runBuildInvalidBsonTest() {
     // We want to ensure that fieldnames in BSONObj can't contain null terminators.
-    assert.throws(function() {
-        var invalidBson = _buildBsonObj('_id', 2, '\0\0', 3);
-    }, [], "BSON field name must not contain null terminators.");
+    assert.throws(
+        function () {
+            var invalidBson = _buildBsonObj("_id", 2, "\0\0", 3);
+        },
+        [],
+        "BSON field name must not contain null terminators.",
+    );
 }
 
 function runFindEmptyKeyTest() {

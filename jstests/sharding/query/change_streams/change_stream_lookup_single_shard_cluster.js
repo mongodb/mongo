@@ -12,7 +12,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     shards: 1,
-    rs: {nodes: 1, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
+    rs: {nodes: 1, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}},
 });
 
 const mongosDB = st.s0.getDB(jsTestName());
@@ -20,13 +20,13 @@ const mongosColl = mongosDB[jsTestName()];
 
 // Enable sharding, shard on _id, and insert a test document which will be updated later.
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-assert.commandWorked(
-    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
+assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
 assert.commandWorked(mongosColl.insert({_id: 1}));
 
 // Verify that the pipeline splits and merges on router despite only targeting a single shard.
 const explainPlan = assert.commandWorked(
-    mongosColl.explain().aggregate([{$changeStream: {fullDocument: "updateLookup"}}]));
+    mongosColl.explain().aggregate([{$changeStream: {fullDocument: "updateLookup"}}]),
+);
 assert.neq(explainPlan.splitPipeline, null);
 assert.eq(explainPlan.mergeType, st.getMergeType(mongosDB));
 

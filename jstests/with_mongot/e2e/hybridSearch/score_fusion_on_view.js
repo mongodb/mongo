@@ -13,7 +13,7 @@ import {
     testHybridSearchViewWithSubsequentUnionOnDifferentView,
     testHybridSearchViewWithSubsequentUnionOnSameView,
     vectorSearchPipelineV,
-    vectorSearchPipelineZ
+    vectorSearchPipelineZ,
 } from "jstests/with_mongot/e2e_lib/hybrid_search_on_view.js";
 
 /**
@@ -26,12 +26,10 @@ import {
  */
 export function createScoreFusionPipeline(inputPipelines, viewPipeline = null) {
     const scoreFusionStage = {
-        $scoreFusion:
-            {input: {pipelines: {}, normalization: "sigmoid"}, combination: {method: "avg"}}
+        $scoreFusion: {input: {pipelines: {}, normalization: "sigmoid"}, combination: {method: "avg"}},
     };
 
-    return createHybridSearchPipeline(
-        inputPipelines, viewPipeline, scoreFusionStage, /**isRankFusion*/ false);
+    return createHybridSearchPipeline(inputPipelines, viewPipeline, scoreFusionStage, /**isRankFusion*/ false);
 }
 
 /**
@@ -51,61 +49,51 @@ export function createScoreFusionPipeline(inputPipelines, viewPipeline = null) {
  *     search or vectorSearch stage). Use this to determine whether to compare explain results since
  *     they will otherwise differ if $scoreFusion has a hybrid search input pipeline.
  */
-const runScoreFusionViewTest =
-    (testName, inputPipelines, viewPipeline, checkCorrectness, isMongotPipeline = false) => {
-        runHybridSearchViewTest(testName,
-                                inputPipelines,
-                                viewPipeline,
-                                checkCorrectness,
-                                isMongotPipeline,
-                                createScoreFusionPipeline);
-    };
+const runScoreFusionViewTest = (testName, inputPipelines, viewPipeline, checkCorrectness, isMongotPipeline = false) => {
+    runHybridSearchViewTest(
+        testName,
+        inputPipelines,
+        viewPipeline,
+        checkCorrectness,
+        isMongotPipeline,
+        createScoreFusionPipeline,
+    );
+};
 
 (function testScoreFusionViewCasesWhereFirstViewStageMustBeFirstStageInPipeline() {
     runScoreFusionViewTest(
         "geo_near",
         {
-            a: [
-                {$score: {score: "$x", normalization: "minMaxScaler"}},
-                {$match: {x: {$gt: 3}}},
-                {$sort: {x: -1}}
-            ],
-            b: [
-                {$score: {score: "$y", normalization: "sigmoid"}},
-                {$match: {x: {$lte: 15}}},
-                {$sort: {x: 1}}
-            ],
+            a: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
+            b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
         },
         [{$geoNear: {spherical: true, near: {type: "Point", coordinates: [1, 1]}}}],
-        /*checkCorrectness=**/ true);
+        /*checkCorrectness=**/ true,
+    );
 
-    runScoreFusionViewTest("match_with_text",
-                           {
-                               a: [
-                                   {$score: {score: "$x", normalization: "minMaxScaler"}},
-                                   {$match: {x: {$gt: 3}}},
-                                   {$sort: {x: -1}}
-                               ],
-                               b: [
-                                   {$score: {score: "$y", normalization: "sigmoid"}},
-                                   {$match: {x: {$lte: 15}}},
-                                   {$sort: {x: 1}}
-                               ],
-                           },
-                           [{$match: {$text: {$search: "foo"}}}],
-                           /*CheckCorrectness=**/ true);
+    runScoreFusionViewTest(
+        "match_with_text",
+        {
+            a: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
+            b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
+        },
+        [{$match: {$text: {$search: "foo"}}}],
+        /*CheckCorrectness=**/ true,
+    );
 })();
 
 // Excluded tests:
 // - $geoNear can't run against views.
 (function testScoreFusionViewSimpleViews() {
-    runScoreFusionViewTest("only_score_match_view",
-                           {
-                               a: [{$score: {score: "$x", normalization: "minMaxScaler"}}],
-                               b: [{$score: {score: "$y", normalization: "sigmoid"}}],
-                           },
-                           [{$match: {a: "foo"}}],
-                           /*checkCorrectness=**/ true);
+    runScoreFusionViewTest(
+        "only_score_match_view",
+        {
+            a: [{$score: {score: "$x", normalization: "minMaxScaler"}}],
+            b: [{$score: {score: "$y", normalization: "sigmoid"}}],
+        },
+        [{$match: {a: "foo"}}],
+        /*checkCorrectness=**/ true,
+    );
     runScoreFusionViewTest(
         "simple_score",
         {
@@ -113,19 +101,21 @@ const runScoreFusionViewTest =
             b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$sort: {x: 1}}],
         },
         [{$match: {a: "foo"}}],
-        /*checkCorrectness=**/ true);
+        /*checkCorrectness=**/ true,
+    );
     runScoreFusionViewTest(
         "simple_score",
         {
             a: [
                 {$match: {$expr: {$eq: ["$m", "bar"]}}},
                 {$score: {score: "$x", normalization: "minMaxScaler"}},
-                {$sort: {x: -1}}
+                {$sort: {x: -1}},
             ],
             b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$sort: {x: 1}}],
         },
         [{$match: {a: "foo"}}],
-        /*checkCorrectness=**/ true);
+        /*checkCorrectness=**/ true,
+    );
     runScoreFusionViewTest(
         "view_produces_no_results",
         {
@@ -133,220 +123,225 @@ const runScoreFusionViewTest =
             b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$sort: {x: 1}}],
         },
         [{$match: {a: "adithi"}}],
-        /*checkCorrectness=**/ true);
+        /*checkCorrectness=**/ true,
+    );
     runScoreFusionViewTest(
         "score_and_limit",
         {
-            a: [
-                {$score: {score: "$y", normalization: "minMaxScaler"}},
-                {$sort: {x: 1}},
-                {$limit: 10}
-            ],
+            a: [{$score: {score: "$y", normalization: "minMaxScaler"}}, {$sort: {x: 1}}, {$limit: 10}],
             b: [{$score: {score: "$x", normalization: "sigmoid"}}, {$sort: {x: -1}}, {$limit: 8}],
         },
         [{$match: {a: "bar"}}],
-        /*checkCorrectness=**/ true);
-    runScoreFusionViewTest("limit_in_view",
-                           {
-                               a: [{$score: {score: {$add: ["$x", 4]}}}, {$sort: {x: 1}}],
-                               b: [{$score: {score: {$subtract: ["$x", 10]}}}, {$sort: {x: 1}}],
-                           },
-                           [{$sort: {x: -1}}, {$limit: 15}],
-                           /*checkCorrectness=**/ true);
-    runScoreFusionViewTest("only_score",
-                           {
-                               a: [{$score: {score: "$y", normalization: "minMaxScaler"}}],
-                               b: [{$score: {score: {$subtract: ["$x", 10]}}}],
-                           },
-                           [{$sort: {x: -1}}, {$limit: 15}],
-                           /*checkCorrectness=**/ true);
+        /*checkCorrectness=**/ true,
+    );
+    runScoreFusionViewTest(
+        "limit_in_view",
+        {
+            a: [{$score: {score: {$add: ["$x", 4]}}}, {$sort: {x: 1}}],
+            b: [{$score: {score: {$subtract: ["$x", 10]}}}, {$sort: {x: 1}}],
+        },
+        [{$sort: {x: -1}}, {$limit: 15}],
+        /*checkCorrectness=**/ true,
+    );
+    runScoreFusionViewTest(
+        "only_score",
+        {
+            a: [{$score: {score: "$y", normalization: "minMaxScaler"}}],
+            b: [{$score: {score: {$subtract: ["$x", 10]}}}],
+        },
+        [{$sort: {x: -1}}, {$limit: 15}],
+        /*checkCorrectness=**/ true,
+    );
     runScoreFusionViewTest(
         "three_pipelines",
         {
             a: [
                 {$match: {"$expr": {$gt: ["$y", 4]}}},
                 {$score: {score: {$subtract: [4.0, 2]}, normalization: "sigmoid"}},
-                {$sort: {x: 1}}
+                {$sort: {x: 1}},
             ],
-            b: [
-                {$score: {score: {$subtract: [4.0, 2]}, normalization: "minMaxScaler"}},
-                {$sort: {x: 1}}
-            ],
+            b: [{$score: {score: {$subtract: [4.0, 2]}, normalization: "minMaxScaler"}}, {$sort: {x: 1}}],
             c: [
                 {$match: {"$expr": {$lt: ["$x", 15]}}},
                 {$score: {score: {$subtract: [4.0, 2]}, normalization: "sigmoid"}},
-                {$sort: {x: -1}}
+                {$sort: {x: -1}},
             ],
         },
         [{$match: {"$expr": {$gt: ["$x", 2]}}}],
-        /*checkCorrectness=**/ true);
+        /*checkCorrectness=**/ true,
+    );
     runScoreFusionViewTest(
         "limit_in_input",
         {
             a: [
                 {$match: {x: {$gte: 4}}},
                 {$score: {score: {$subtract: [100, "$y"]}, normalization: "minMaxScaler"}},
-                {$sort: {x: 1}}
+                {$sort: {x: 1}},
             ],
             b: [{$score: {score: "$x", normalization: "sigmoid"}}, {$limit: 5}, {$sort: {x: 1}}],
         },
         [{$match: {"$expr": {$lt: ["$x", 10]}}}],
-        /*checkCorrectness=**/ false);
+        /*checkCorrectness=**/ false,
+    );
     runScoreFusionViewTest(
         "sample",
         {
             a: [
                 {$match: {x: {$gte: 4}}},
                 {$score: {score: {$add: [10, 2]}, normalization: "minMaxScaler", weight: 0.5}},
-                {$sort: {x: 1}}
+                {$sort: {x: 1}},
             ],
-            b: [
-                {$score: {score: '$x', normalization: "sigmoid"}},
-                {$sample: {size: 5}},
-                {$sort: {x: 1}}
-            ],
+            b: [{$score: {score: "$x", normalization: "sigmoid"}}, {$sample: {size: 5}}, {$sort: {x: 1}}],
         },
         [{$match: {"$expr": {$lt: ["$x", 10]}}}],
-        /*checkCorrectness=**/ false);
+        /*checkCorrectness=**/ false,
+    );
 })();
 
 (function testScoreFusionViewSearchViews() {
-    runScoreFusionViewTest("only_search",
-                           {a: [searchPipelineFoo]},
-                           [{$match: {"$expr": {$lt: ["$x", 0]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("search_first",
-                           {
-                               a: [searchPipelineFoo],
-                               b: [{$score: {score: '$x', normalization: "minMaxScaler"}}],
-                           },
-                           [{$match: {$expr: {$eq: ["$a", "bar"]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
     runScoreFusionViewTest(
-        "search_followed_by_score_first",
+        "only_search",
+        {a: [searchPipelineFoo]},
+        [{$match: {"$expr": {$lt: ["$x", 0]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "search_first",
         {
-            a: [searchPipelineFoo, {$score: {score: '$y', normalization: "sigmoid"}}],
-            b: [{$score: {score: '$x', normalization: "minMaxScaler"}}],
+            a: [searchPipelineFoo],
+            b: [{$score: {score: "$x", normalization: "minMaxScaler"}}],
         },
         [{$match: {$expr: {$eq: ["$a", "bar"]}}}],
         /*checkCorrectness=**/ true,
-        /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("search_second",
-                           {
-                               a: [{$score: {score: '$x', normalization: "sigmoid"}}],
-                               b: [searchPipelineFoo],
-                           },
-                           [{$match: {"$expr": {$lt: ["$x", 0]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("only_vector_search",
-                           {a: [vectorSearchPipelineV]},
-                           [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("vector_search_first",
-                           {
-                               a: [vectorSearchPipelineV],
-                               b: [{$score: {score: '$x', normalization: "minMaxScaler"}}],
-                           },
-                           [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
-                           /*checkCorrectness=**/ false,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("vector_search_second",
-                           {
-                               a: [{$score: {score: '$x', normalization: "sigmoid"}}],
-                               b: [vectorSearchPipelineV],
-                           },
-                           [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("double_search",
-                           {
-                               a: [searchPipelineFoo],
-                               b: [searchPipelineBar],
-                           },
-                           [{$match: {"$expr": {$lt: ["$x", 10]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("swapped_double_search",
-                           {
-                               a: [searchPipelineBar],
-                               b: [searchPipelineFoo],
-                           },
-                           [{$match: {"$expr": {$lt: ["$x", 10]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("double_vector_search",
-                           {
-                               a: [vectorSearchPipelineV],
-                               b: [vectorSearchPipelineZ],
-                           },
-                           [{$match: {"$expr": {$lt: ["$x", 10]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("swapped_double_vector_search",
-                           {
-                               a: [vectorSearchPipelineZ],
-                               b: [vectorSearchPipelineV],
-                           },
-                           [{$match: {"$expr": {$lt: ["$x", 10]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("multi_search",
-                           {
-                               a: [searchPipelineBar],
-                               b: [vectorSearchPipelineV],
-                           },
-                           [{$match: {"$expr": {$lt: ["$x", 10]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
-    runScoreFusionViewTest("swapped_multi_search",
-                           {
-                               a: [vectorSearchPipelineV],
-                               b: [searchPipelineBar],
-                           },
-                           [{$match: {"$expr": {$lt: ["$x", 10]}}}],
-                           /*checkCorrectness=**/ true,
-                           /*isMongotPipeline=**/ true);
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "search_followed_by_score_first",
+        {
+            a: [searchPipelineFoo, {$score: {score: "$y", normalization: "sigmoid"}}],
+            b: [{$score: {score: "$x", normalization: "minMaxScaler"}}],
+        },
+        [{$match: {$expr: {$eq: ["$a", "bar"]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "search_second",
+        {
+            a: [{$score: {score: "$x", normalization: "sigmoid"}}],
+            b: [searchPipelineFoo],
+        },
+        [{$match: {"$expr": {$lt: ["$x", 0]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "only_vector_search",
+        {a: [vectorSearchPipelineV]},
+        [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "vector_search_first",
+        {
+            a: [vectorSearchPipelineV],
+            b: [{$score: {score: "$x", normalization: "minMaxScaler"}}],
+        },
+        [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
+        /*checkCorrectness=**/ false,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "vector_search_second",
+        {
+            a: [{$score: {score: "$x", normalization: "sigmoid"}}],
+            b: [vectorSearchPipelineV],
+        },
+        [{$match: {$expr: {$eq: ["$a", "foo"]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "double_search",
+        {
+            a: [searchPipelineFoo],
+            b: [searchPipelineBar],
+        },
+        [{$match: {"$expr": {$lt: ["$x", 10]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "swapped_double_search",
+        {
+            a: [searchPipelineBar],
+            b: [searchPipelineFoo],
+        },
+        [{$match: {"$expr": {$lt: ["$x", 10]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "double_vector_search",
+        {
+            a: [vectorSearchPipelineV],
+            b: [vectorSearchPipelineZ],
+        },
+        [{$match: {"$expr": {$lt: ["$x", 10]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "swapped_double_vector_search",
+        {
+            a: [vectorSearchPipelineZ],
+            b: [vectorSearchPipelineV],
+        },
+        [{$match: {"$expr": {$lt: ["$x", 10]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "multi_search",
+        {
+            a: [searchPipelineBar],
+            b: [vectorSearchPipelineV],
+        },
+        [{$match: {"$expr": {$lt: ["$x", 10]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
+    runScoreFusionViewTest(
+        "swapped_multi_search",
+        {
+            a: [vectorSearchPipelineV],
+            b: [searchPipelineBar],
+        },
+        [{$match: {"$expr": {$lt: ["$x", 10]}}}],
+        /*checkCorrectness=**/ true,
+        /*isMongotPipeline=**/ true,
+    );
 })();
 
 // Test a $unionWith following a $scoreFusion to verify that the $scoreFusion desugaring doesn't
 // interfere with view resolution of the user provided $unionWith.
 (function testScoreFusionViewWithSubsequentUnionOnSameView() {
     const scoreFusionInputPipelines = {
-        a: [
-            {$score: {score: "$x", normalization: "minMaxScaler"}},
-            {$match: {x: {$gt: 3}}},
-            {$sort: {x: -1}}
-        ],
-        b: [
-            {$score: {score: "$y", normalization: "sigmoid"}},
-            {$match: {x: {$lte: 15}}},
-            {$sort: {x: 1}}
-        ],
+        a: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
+        b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
     };
 
-    testHybridSearchViewWithSubsequentUnionOnSameView(scoreFusionInputPipelines,
-                                                      createScoreFusionPipeline);
+    testHybridSearchViewWithSubsequentUnionOnSameView(scoreFusionInputPipelines, createScoreFusionPipeline);
 })();
 
 // Test a $unionWith following a $scoreFusion to verify that the $scoreFusion desugaring doesn't
 // interfere with view resolution of the user provided $unionWith.
 (function testScoreFusionViewWithSubsequentUnionOnDifferentView() {
     const scoreFusionInputPipelines = {
-        a: [
-            {$score: {score: "$x", normalization: "minMaxScaler"}},
-            {$match: {x: {$gt: 3}}},
-            {$sort: {x: -1}}
-        ],
-        b: [
-            {$score: {score: "$y", normalization: "sigmoid"}},
-            {$match: {x: {$lte: 15}}},
-            {$sort: {x: 1}}
-        ],
+        a: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$match: {x: {$gt: 3}}}, {$sort: {x: -1}}],
+        b: [{$score: {score: "$y", normalization: "sigmoid"}}, {$match: {x: {$lte: 15}}}, {$sort: {x: 1}}],
     };
-    testHybridSearchViewWithSubsequentUnionOnDifferentView(scoreFusionInputPipelines,
-                                                           createScoreFusionPipeline);
+    testHybridSearchViewWithSubsequentUnionOnDifferentView(scoreFusionInputPipelines, createScoreFusionPipeline);
 })();

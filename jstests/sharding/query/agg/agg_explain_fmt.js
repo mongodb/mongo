@@ -36,13 +36,11 @@ for (let shardId in explain.shards) {
     const shardExplain = explain.shards[shardId];
     assert(shardExplain.hasOwnProperty("explainVersion"));
     assert(shardExplain.hasOwnProperty("host"), shardExplain);
-    assert(shardExplain.hasOwnProperty("stages") || shardExplain.hasOwnProperty("queryPlanner"),
-           shardExplain);
+    assert(shardExplain.hasOwnProperty("stages") || shardExplain.hasOwnProperty("queryPlanner"), shardExplain);
 }
 
 // Test that the $mergeCursors stage is present in the mergerPart of the pipeline.
-explain = coll.explain().aggregate(
-    [{$match: {mykey: {'$in': [0, 1, 3, 7]}}}, {'$sort': {favColor: 1}}, {$limit: 5}]);
+explain = coll.explain().aggregate([{$match: {mykey: {"$in": [0, 1, 3, 7]}}}, {"$sort": {favColor: 1}}, {$limit: 5}]);
 
 assert(explain.hasOwnProperty("splitPipeline"), explain);
 assert(explain.splitPipeline.hasOwnProperty("shardsPart"), explain.splitPipeline);
@@ -55,9 +53,7 @@ assert.eq(mergeCursors.sort, {favColor: 1}, mergeCursors);
 assert.eq(mergeCursors.compareWholeSortKey, false, mergeCursors);
 assert(!mergeCursors.hasOwnProperty("remotes"), mergeCursors);
 assert.eq(mergeCursors.tailableMode, "normal", mergeCursors);
-assert.eq(mergeCursors.nss,
-          "test.agg_explain_fmt",
-          mergeCursors);  // This test manually sets collection and db at the top.
+assert.eq(mergeCursors.nss, "test.agg_explain_fmt", mergeCursors); // This test manually sets collection and db at the top.
 assert.eq(mergeCursors.allowPartialResults, false, mergeCursors);
 
 // Do a sharded explain from a mongod, not mongos, to ensure that it does not have a

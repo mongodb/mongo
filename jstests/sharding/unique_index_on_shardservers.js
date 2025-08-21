@@ -9,8 +9,7 @@ let rs = st.rs0;
 
 // Create `test.coll` and add some indexes on it:
 // with index versions as default, v=1 and v=2; both unique and standard types
-assert.commandWorked(
-    mongos.getDB("test").coll.insert({_id: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1}));
+assert.commandWorked(mongos.getDB("test").coll.insert({_id: 1, a: 1, b: 1, c: 1, d: 1, e: 1, f: 1}));
 assert.commandWorked(mongos.getDB("test").coll.createIndex({a: 1}, {"v": 1}));
 assert.commandWorked(mongos.getDB("test").coll.createIndex({b: 1}, {"v": 1, "unique": true}));
 assert.commandWorked(mongos.getDB("test").coll.createIndex({c: 1}, {"v": 2}));
@@ -21,9 +20,9 @@ assert.commandWorked(mongos.getDB("test").coll.createIndex({f: 1}, {"unique": tr
 // Add a node with --shardsvr to the replica set.
 let newNode;
 if (TestData.configShard) {
-    newNode = rs.add({'configsvr': '', rsConfig: {priority: 0, votes: 0}});
+    newNode = rs.add({"configsvr": "", rsConfig: {priority: 0, votes: 0}});
 } else {
-    newNode = rs.add({'shardsvr': '', rsConfig: {priority: 0, votes: 0}});
+    newNode = rs.add({"shardsvr": "", rsConfig: {priority: 0, votes: 0}});
 }
 rs.reInitiate();
 rs.awaitSecondaryNodes();

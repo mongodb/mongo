@@ -13,27 +13,29 @@ import {getTimeseriesCollForRawOps} from "jstests/core/libs/raw_operation_utils.
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
-    const timeFieldName = 'tm';
-    const metaFieldName = 'mm';
+    const timeFieldName = "tm";
+    const metaFieldName = "mm";
 
-    const metadata = ['8', '16', '64', '128'];
+    const metadata = ["8", "16", "64", "128"];
 
     const coll = db[jsTestName()];
 
     coll.drop();
 
     // Compares numeric strings as numbers rather than as strings.
-    const numericOrdering = {locale: 'en_US', numericOrdering: true};
+    const numericOrdering = {locale: "en_US", numericOrdering: true};
 
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
-        collation: numericOrdering
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+            collation: numericOrdering,
+        }),
+    );
 
     for (let i = 0; i < metadata.length; ++i) {
         const doc = {_id: i, [timeFieldName]: ISODate(), [metaFieldName]: metadata[i]};
-        jsTestLog('Inserting doc ' + i + ': ' + tojson(doc));
-        assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
+        jsTestLog("Inserting doc " + i + ": " + tojson(doc));
+        assert.commandWorked(insert(coll, doc), "failed to insert doc: " + tojson(doc));
     }
 
     // Check the bucket documents contained in the timeseries collection.
@@ -43,56 +45,69 @@ TimeseriesTest.run((insert) => {
 
     // Create an index that should use the default collation, which is {numericOrdering: true}.
     const indexKey = {[metaFieldName]: 1};
-    assert.commandWorked(coll.createIndex(indexKey, {name: 'index_numeric'}),
-                         'failed to create index: ' + tojson(indexKey));
+    assert.commandWorked(
+        coll.createIndex(indexKey, {name: "index_numeric"}),
+        "failed to create index: " + tojson(indexKey),
+    );
 
     const expectedNumericOrdering = metadata;
-    const docsNumericOrdering = coll.find().hint('index_numeric').toArray();
-    assert.eq(expectedNumericOrdering.length,
-              docsNumericOrdering.length,
-              'unexpected documents returned from index scan with numeric ordering: ' +
-                  tojson(docsNumericOrdering) +
-                  ' (expected metadata values: ' + tojson(expectedNumericOrdering) + ')');
+    const docsNumericOrdering = coll.find().hint("index_numeric").toArray();
+    assert.eq(
+        expectedNumericOrdering.length,
+        docsNumericOrdering.length,
+        "unexpected documents returned from index scan with numeric ordering: " +
+            tojson(docsNumericOrdering) +
+            " (expected metadata values: " +
+            tojson(expectedNumericOrdering) +
+            ")",
+    );
     for (let i = 0; i < docsNumericOrdering.length; ++i) {
-        assert.eq(expectedNumericOrdering[i],
-                  docsNumericOrdering[i][metaFieldName],
-                  'Unexpected metadata in doc ' + i +
-                      ' (numeric ordering): ' + tojson(docsNumericOrdering));
+        assert.eq(
+            expectedNumericOrdering[i],
+            docsNumericOrdering[i][metaFieldName],
+            "Unexpected metadata in doc " + i + " (numeric ordering): " + tojson(docsNumericOrdering),
+        );
     }
 
     // Create an index that does not use the default collation and compares numeric strings
     // lexicographically rather than as numbers.
     assert.commandWorked(
-        coll.createIndex(
-            indexKey, {name: 'index_string', collation: {locale: 'en_US', numericOrdering: false}}),
-        'failed to create index: ' + tojson(indexKey));
+        coll.createIndex(indexKey, {name: "index_string", collation: {locale: "en_US", numericOrdering: false}}),
+        "failed to create index: " + tojson(indexKey),
+    );
 
-    const expectedStringOrdering = ['128', '16', '64', '8'];
-    const docsStringOrdering = coll.find().hint('index_string').toArray();
-    assert.eq(expectedStringOrdering.length,
-              docsStringOrdering.length,
-              'unexpected documents returned from index scan with string ordering: ' +
-                  tojson(docsStringOrdering));
+    const expectedStringOrdering = ["128", "16", "64", "8"];
+    const docsStringOrdering = coll.find().hint("index_string").toArray();
+    assert.eq(
+        expectedStringOrdering.length,
+        docsStringOrdering.length,
+        "unexpected documents returned from index scan with string ordering: " + tojson(docsStringOrdering),
+    );
     for (let i = 0; i < docsNumericOrdering.length; ++i) {
-        assert.eq(expectedStringOrdering[i],
-                  docsStringOrdering[i][metaFieldName],
-                  'Unexpected metadata in doc ' + i +
-                      ' (string ordering): ' + tojson(docsStringOrdering));
+        assert.eq(
+            expectedStringOrdering[i],
+            docsStringOrdering[i][metaFieldName],
+            "Unexpected metadata in doc " + i + " (string ordering): " + tojson(docsStringOrdering),
+        );
     }
 
     // Check that listIndexes returns specs with collation information.
     // Don't assume that no other indexes exist--passthrough suites may create other indexes.
     const indexSpecs = coll.getIndexes();
 
-    const indexSpecsNumeric = indexSpecs.filter(ix => ix.name === 'index_numeric');
+    const indexSpecsNumeric = indexSpecs.filter((ix) => ix.name === "index_numeric");
     assert.eq(1, indexSpecsNumeric.length, {indexSpecs, indexSpecsNumeric});
-    assert.eq(true,
-              indexSpecsNumeric[0].collation.numericOrdering,
-              'Invalid index spec for index_numeric: ' + tojson(indexSpecsNumeric[0]));
+    assert.eq(
+        true,
+        indexSpecsNumeric[0].collation.numericOrdering,
+        "Invalid index spec for index_numeric: " + tojson(indexSpecsNumeric[0]),
+    );
 
-    const indexSpecsString = indexSpecs.filter(ix => ix.name === 'index_string');
+    const indexSpecsString = indexSpecs.filter((ix) => ix.name === "index_string");
     assert.eq(1, indexSpecsString.length, {indexSpecs, indexSpecsString});
-    assert.eq(false,
-              indexSpecsString[0].collation.numericOrdering,
-              'Invalid index spec for index_string: ' + tojson(indexSpecsString[0]));
+    assert.eq(
+        false,
+        indexSpecsString[0].collation.numericOrdering,
+        "Invalid index spec for index_string: " + tojson(indexSpecsString[0]),
+    );
 });

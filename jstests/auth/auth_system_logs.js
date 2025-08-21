@@ -1,9 +1,8 @@
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
-const mongod = MongoRunner.runMongod({auth: ''});
-mongod.getDB('admin').createUser(
-    {user: 'admin', pwd: 'pwd', roles: ['root'], mechanisms: ['SCRAM-SHA-1']});
-assert(mongod.getDB('admin').auth('admin', 'pwd'));
+const mongod = MongoRunner.runMongod({auth: ""});
+mongod.getDB("admin").createUser({user: "admin", pwd: "pwd", roles: ["root"], mechanisms: ["SCRAM-SHA-1"]});
+assert(mongod.getDB("admin").auth("admin", "pwd"));
 // `mongod` is authenticated as a super user and stays that way.
 
 const kFailedToAuthMsg = 5286307;
@@ -17,34 +16,41 @@ function runTest(speculations, performNormalAuth, expectedNumFailures) {
     // Running the operations in a parallel shell so that if performNormalAuth is false, we
     // encounter an "authentication session abandoned" error because the client will disconnect.
     let runAuths = startParallelShell(
-        funWithArgs(function(speculations, performNormalAuth = false) {
-            const admin = db.getSiblingDB('admin');
+        funWithArgs(
+            function (speculations, performNormalAuth = false) {
+                const admin = db.getSiblingDB("admin");
 
-            // base64 encoded: 'n,,n=admin,r=deadbeefcafeba11';
-            const kClientPayload = 'biwsbj1hZG1pbixyPWRlYWRiZWVmY2FmZWJhMTE=';
+                // base64 encoded: 'n,,n=admin,r=deadbeefcafeba11';
+                const kClientPayload = "biwsbj1hZG1pbixyPWRlYWRiZWVmY2FmZWJhMTE=";
 
-            // Run speculative auth(s).
-            for (let i = 0; i < speculations; ++i) {
-                assert.commandWorked(admin.runCommand({
-                    hello: 1,
-                    speculativeAuthenticate: {
-                        saslStart: 1,
-                        mechanism: "SCRAM-SHA-1",
-                        payload: kClientPayload,
-                        db: "admin"
-                    }
-                }));
-            }
+                // Run speculative auth(s).
+                for (let i = 0; i < speculations; ++i) {
+                    assert.commandWorked(
+                        admin.runCommand({
+                            hello: 1,
+                            speculativeAuthenticate: {
+                                saslStart: 1,
+                                mechanism: "SCRAM-SHA-1",
+                                payload: kClientPayload,
+                                db: "admin",
+                            },
+                        }),
+                    );
+                }
 
-            if (performNormalAuth) {
-                assert(admin.auth({user: 'admin', pwd: 'pwd', mechanism: 'SCRAM-SHA-1'}));
-            }
-        }, speculations, performNormalAuth), mongod.port);
+                if (performNormalAuth) {
+                    assert(admin.auth({user: "admin", pwd: "pwd", mechanism: "SCRAM-SHA-1"}));
+                }
+            },
+            speculations,
+            performNormalAuth,
+        ),
+        mongod.port,
+    );
 
     runAuths();
 
-    checkLog.containsWithCount(
-        mongod, kFailedToAuthMsg, failuresAlreadyObserved + expectedNumFailures);
+    checkLog.containsWithCount(mongod, kFailedToAuthMsg, failuresAlreadyObserved + expectedNumFailures);
     failuresAlreadyObserved += expectedNumFailures;
 }
 

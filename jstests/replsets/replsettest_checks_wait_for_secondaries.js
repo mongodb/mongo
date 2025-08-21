@@ -21,22 +21,25 @@ assert.commandWorked(primaryColl.insert({"starting": "doc"}));
 
 jsTestLog("Adding a new node to the replica set");
 const secondaryParams = {
-    'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
-    'numInitialSyncAttempts': 1,
+    "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
+    "numInitialSyncAttempts": 1,
 };
 const secondary = rst.add({rsConfig: {priority: 0}, setParameter: secondaryParams});
 rst.reInitiate();
 
 jsTestLog("Waiting for node to reach initial sync");
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeCopyingDatabases",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 // Turn off the failpoint and immediately proceeed with checking db hashes.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 // stopSet() will call checkReplicatedDBHashes
 rst.stopSet();

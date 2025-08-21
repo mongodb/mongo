@@ -6,16 +6,26 @@ coll.drop();
 // Locale's which start with "x" or "i" followed by a separator ("_" or "-") are considered
 // ID-prefixed.
 assert.commandFailedWithCode(
-    db.createCollection(coll.getName(), {collation: {locale: "x_invalid"}}), ErrorCodes.BadValue);
+    db.createCollection(coll.getName(), {collation: {locale: "x_invalid"}}),
+    ErrorCodes.BadValue,
+);
 
 assert.commandFailedWithCode(
-    db.createCollection(coll.getName(), {collation: {locale: "X_invalid"}}), ErrorCodes.BadValue);
+    db.createCollection(coll.getName(), {collation: {locale: "X_invalid"}}),
+    ErrorCodes.BadValue,
+);
 
 assert.commandFailedWithCode(
-    db.createCollection(coll.getName(), {collation: {locale: "i-invalid"}}), ErrorCodes.BadValue);
+    db.createCollection(coll.getName(), {collation: {locale: "i-invalid"}}),
+    ErrorCodes.BadValue,
+);
 
 assert.commandFailedWithCode(
-    db.createCollection(coll.getName(), {collation: {locale: "I-invalid"}}), ErrorCodes.BadValue);
+    db.createCollection(coll.getName(), {collation: {locale: "I-invalid"}}),
+    ErrorCodes.BadValue,
+);
 
 assert.commandFailedWithCode(
-    db.createCollection(coll.getName(), {collation: {locale: "xx_invalid"}}), ErrorCodes.BadValue);
+    db.createCollection(coll.getName(), {collation: {locale: "xx_invalid"}}),
+    ErrorCodes.BadValue,
+);

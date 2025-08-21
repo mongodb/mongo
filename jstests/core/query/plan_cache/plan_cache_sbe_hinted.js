@@ -21,11 +21,11 @@ coll.drop();
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 assert.commandWorked(coll.createIndexes([{a: 1}, {a: 1, b: 1}]));
 
-const verifyPlanCacheSize = function(len) {
+const verifyPlanCacheSize = function (len) {
     const caches = coll.getPlanCache().list();
     assert.eq(len, caches.length, caches);
 };
-const queryAndVerify = function(hint, expected) {
+const queryAndVerify = function (hint, expected) {
     assert.eq(1, coll.find({a: 1}).hint(hint).itcount());
     assert.eq(1, coll.find({a: 1}).hint(hint).itcount());
     verifyPlanCacheSize(expected);

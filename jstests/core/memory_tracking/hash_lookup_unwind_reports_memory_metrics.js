@@ -20,16 +20,15 @@ import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 
 // Get the current value of the query framework server parameter so we can restore it at the end of
 // the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl =
-    assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-        .internalQueryFrameworkControl;
-const kOriginalMemoryLimit =
-    assert
-        .commandWorked(db.adminCommand({
-            getParameter: 1,
-            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
-        }))
-        .internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill;
+const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+).internalQueryFrameworkControl;
+const kOriginalMemoryLimit = assert.commandWorked(
+    db.adminCommand({
+        getParameter: 1,
+        internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1,
+    }),
+).internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill;
 
 const stageName = "hash_lookup_unwind";
 
@@ -61,20 +60,19 @@ assert.commandWorked(recipes.insertMany(recipeDocs));
 assert.commandWorked(ingredients.insertMany(ingredientDocs));
 
 try {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 
     {
         const pipeline = [
             {
                 $lookup: {
-                    from: ingredients.getName(), 
-                    localField: "ingredientIds", 
-                    foreignField: "ingredientId", 
-                    as: "matched"
-                }
+                    from: ingredients.getName(),
+                    localField: "ingredientIds",
+                    foreignField: "ingredientId",
+                    as: "matched",
+                },
             },
-            {$unwind: "$matched"}
+            {$unwind: "$matched"},
         ];
         jsTest.log.info("Running basic pipeline test: " + tojson(pipeline));
 
@@ -94,17 +92,17 @@ try {
 
     {
         const pipelineWithLimit = [
-        {
-            $lookup: {
-                from: ingredients.getName(), 
-                localField: "ingredientIds", 
-                foreignField: "ingredientId", 
-                as: "matches"
-            }
-        },
-        {$unwind: "$matches"},
-        {$limit: 2}
-    ];
+            {
+                $lookup: {
+                    from: ingredients.getName(),
+                    localField: "ingredientIds",
+                    foreignField: "ingredientId",
+                    as: "matches",
+                },
+            },
+            {$unwind: "$matches"},
+            {$limit: 2},
+        ];
         jsTest.log.info("Running pipeline with $unwind and $limit: " + tojson(pipelineWithLimit));
 
         runMemoryStatsTest({
@@ -118,7 +116,7 @@ try {
             },
             stageName,
             expectedNumGetMores: 1,
-            skipInUseTrackedMemBytesCheck: true,  // $limit will force execution to stop early
+            skipInUseTrackedMemBytesCheck: true, // $limit will force execution to stop early
         });
     }
 
@@ -126,21 +124,23 @@ try {
         const pipeline = [
             {
                 $lookup: {
-                    from: ingredients.getName(), 
-                    localField: "ingredientIds", 
-                    foreignField: "ingredientId", 
-                    as: "matched"
-                }
+                    from: ingredients.getName(),
+                    localField: "ingredientIds",
+                    foreignField: "ingredientId",
+                    as: "matched",
+                },
             },
-            {$unwind: "$matched"}
+            {$unwind: "$matched"},
         ];
         jsTest.log.info("Running pipeline that will spill: " + tojson(pipeline));
 
         // Set a low memory limit to force spilling to disk.
-        assert.commandWorked(db.adminCommand({
-            setParameter: 1,
-            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 100
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 100,
+            }),
+        );
 
         runMemoryStatsTest({
             db: db,
@@ -153,8 +153,7 @@ try {
             },
             stageName,
             expectedNumGetMores: 8,
-            skipInUseTrackedMemBytesCheck:
-                true,  // Since we spill, we don't expect to see inUseTrackedMemBytes
+            skipInUseTrackedMemBytesCheck: true, // Since we spill, we don't expect to see inUseTrackedMemBytes
             // populated, as it should be 0 on each operation.
         });
     }
@@ -162,11 +161,13 @@ try {
     // Clean up.
     recipes.drop();
     ingredients.drop();
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}));
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
-            kOriginalMemoryLimit
-    }));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
+    );
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: kOriginalMemoryLimit,
+        }),
+    );
 }

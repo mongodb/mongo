@@ -19,7 +19,7 @@
 
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
-export const $config = (function() {
+export const $config = (function () {
     const data = {
         prefix: "index_build_abort_",
         nCollections: 3,
@@ -42,8 +42,7 @@ export const $config = (function() {
 
     function mutexTryLock(db, collName) {
         const collMutex = getCollMutexName(collName);
-        let doc = db[data.mutexColl].findAndModify(
-            {query: {mutex: collMutex, locked: 0}, update: {$set: {locked: 1}}});
+        let doc = db[data.mutexColl].findAndModify({query: {mutex: collMutex, locked: 0}, update: {$set: {locked: 1}}});
         if (doc === null) {
             return false;
         }
@@ -77,8 +76,7 @@ export const $config = (function() {
                     let bulkRes = bulk.execute();
                     assert.commandWorked(bulkRes);
                     assert.eq(this.nDocuments, bulkRes.nInserted, tojson(bulkRes));
-                    assert.commandFailedWithCode(coll.createIndexes([{a: "2d"}]),
-                                                 this.expectedErrorCodes);
+                    assert.commandFailedWithCode(coll.createIndexes([{a: "2d"}]), this.expectedErrorCodes);
                 } finally {
                     mutexUnlock(db, randomColl);
                 }
@@ -87,7 +85,8 @@ export const $config = (function() {
         dropIndexes: function dropIndexes(db, collName) {
             assert.commandWorkedOrFailedWithCode(
                 db.runCommand({dropIndexes: getRandCollectionName(), index: "*"}),
-                ErrorCodes.NamespaceNotFound);
+                ErrorCodes.NamespaceNotFound,
+            );
         },
         killOpIndexBuild: function killOpIndexBuild(db, collName) {
             let nTry = 0;
@@ -102,7 +101,7 @@ export const $config = (function() {
                     jsTestLog("Suppressed exception during killOp attempt: " + e);
                 }
             }
-        }
+        },
     };
 
     const transtitionToAllStates = {
@@ -113,17 +112,17 @@ export const $config = (function() {
     const transitions = {
         dropCollAndCreateIndexBuild: transtitionToAllStates,
         dropIndexes: transtitionToAllStates,
-        killOpIndexBuild: transtitionToAllStates
+        killOpIndexBuild: transtitionToAllStates,
     };
 
-    const setup = function(db, collName, cluster) {
+    const setup = function (db, collName, cluster) {
         for (let coll = 0; coll < this.nCollections; ++coll) {
             const mutexName = getCollMutexName(data.prefix + coll);
             db[data.mutexColl].insert({mutex: mutexName, locked: 0});
         }
     };
 
-    const teardown = function(db, collName, cluster) {
+    const teardown = function (db, collName, cluster) {
         for (let coll = 0; coll < this.nCollections; ++coll) {
             const collName = data.prefix + coll;
             db[collName].drop();
@@ -134,7 +133,7 @@ export const $config = (function() {
     return {
         threadCount: 12,
         iterations: 200,
-        startState: 'dropCollAndCreateIndexBuild',
+        startState: "dropCollAndCreateIndexBuild",
         states: states,
         transitions: transitions,
         setup: setup,

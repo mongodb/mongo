@@ -5,47 +5,49 @@
  * @tags: [ featureFlagMongotIndexedViews, requires_fcv_81 ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {
-    assertLookupInExplain,
-} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {assertLookupInExplain} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 import {
     createSearchIndexesAndExecuteTests,
-    validateSearchExplain
+    validateSearchExplain,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const localColl = testDb.localColl;
 localColl.drop();
-assert.commandWorked(localColl.insertMany([
-    {_id: "New York"},
-    {_id: "Kansas"},
-    {_id: "New Jersey"},
-    {_id: "California"},
-    {_id: "Missouri"}
-]));
+assert.commandWorked(
+    localColl.insertMany([
+        {_id: "New York"},
+        {_id: "Kansas"},
+        {_id: "New Jersey"},
+        {_id: "California"},
+        {_id: "Missouri"},
+    ]),
+);
 
 const foreignColl = testDb.underlyingSourceCollection;
 foreignColl.drop();
-assert.commandWorked(foreignColl.insertMany([
-    {city: "New York", state: "New York", sportsTeam: "NY Liberty", pop: 7},
-    {city: "Oakland", state: "California", sportsTeam: "Golden State Valkyries", pop: 6},
-    {
-        city: "Berkeley",
-        state: "California",
-    },
-    {
-        city: "Kansas City",
-        state: "Kansas",
-        sportsTeam: "KC Current",
-    },
-    {
-        city: "St Louis",
-        state: "Missouri",
-        sportsTeam: "St Louis Slam",
-    },
-    {city: "Richmond", state: "California", pop: 4},
-    {city: "Harrison", state: "New Jersey", sportsTeam: "NJ/NY Gotham FC", pop: 5}
-]));
+assert.commandWorked(
+    foreignColl.insertMany([
+        {city: "New York", state: "New York", sportsTeam: "NY Liberty", pop: 7},
+        {city: "Oakland", state: "California", sportsTeam: "Golden State Valkyries", pop: 6},
+        {
+            city: "Berkeley",
+            state: "California",
+        },
+        {
+            city: "Kansas City",
+            state: "Kansas",
+            sportsTeam: "KC Current",
+        },
+        {
+            city: "St Louis",
+            state: "Missouri",
+            sportsTeam: "St Louis Slam",
+        },
+        {city: "Richmond", state: "California", pop: 4},
+        {city: "Harrison", state: "New Jersey", sportsTeam: "NJ/NY Gotham FC", pop: 5},
+    ]),
+);
 
 const viewName = "identityView";
 assert.commandWorked(testDb.createView(viewName, foreignColl.getName(), []));
@@ -53,7 +55,7 @@ const identityView = testDb[viewName];
 
 const indexConfig = {
     coll: identityView,
-    definition: {name: "identityViewIx", definition: {"mappings": {"dynamic": true}}}
+    definition: {name: "identityViewIx", definition: {"mappings": {"dynamic": true}}},
 };
 
 const identityViewTestCases = (isStoredSource) => {
@@ -65,24 +67,22 @@ const identityViewTestCases = (isStoredSource) => {
         exists: {
             path: "state",
         },
-        returnStoredSource: isStoredSource
+        returnStoredSource: isStoredSource,
     };
 
-    const lookupPipeline = [{
+    const lookupPipeline = [
+        {
             $lookup: {
                 from: identityView.getName(),
                 localField: "_id",
                 foreignField: "state",
-                pipeline: [
-                    {$search: searchQuery},
-                    {$sort: {city: 1}},
-                    {$project: {_id: 0}}],
-                    as: "stateFacts"
-                }
+                pipeline: [{$search: searchQuery}, {$sort: {city: 1}}, {$project: {_id: 0}}],
+                as: "stateFacts",
             },
-            {$sort: {_id: 1}},
-            {$project: {"stateFacts.state": 0}}
-        ];
+        },
+        {$sort: {_id: 1}},
+        {$project: {"stateFacts.state": 0}},
+    ];
 
     let expectedResults = [
         {
@@ -90,16 +90,16 @@ const identityViewTestCases = (isStoredSource) => {
             stateFacts: [
                 {city: "Berkeley"},
                 {city: "Oakland", sportsTeam: "Golden State Valkyries", pop: 6},
-                {city: "Richmond", pop: 4}
-            ]
+                {city: "Richmond", pop: 4},
+            ],
         },
         {_id: "Kansas", stateFacts: [{city: "Kansas City", sportsTeam: "KC Current"}]},
         {_id: "Missouri", stateFacts: [{city: "St Louis", sportsTeam: "St Louis Slam"}]},
         {
             _id: "New Jersey",
-            stateFacts: [{city: "Harrison", sportsTeam: "NJ/NY Gotham FC", pop: 5}]
+            stateFacts: [{city: "Harrison", sportsTeam: "NJ/NY Gotham FC", pop: 5}],
         },
-        {_id: "New York", stateFacts: [{city: "New York", sportsTeam: "NY Liberty", pop: 7}]}
+        {_id: "New York", stateFacts: [{city: "New York", sportsTeam: "NY Liberty", pop: 7}]},
     ];
 
     validateSearchExplain(localColl, lookupPipeline, isStoredSource, null, (explain) => {
@@ -122,10 +122,10 @@ const identityViewTestCases = (isStoredSource) => {
                     {$search: searchQuery},
                     {$sort: {city: 1}},
                     {$project: {_id: 0, "stateFacts.state": 0}},
-                    {$limit: 1}
-                ]
-            }
-        }
+                    {$limit: 1},
+                ],
+            },
+        },
     ];
 
     expectedResults = [

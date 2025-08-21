@@ -9,27 +9,32 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const runTest = (db, coll) => {
     // Test that explain is legal with all readConcern levels.
     const readConcernLevels = ["local", "majority", "available", "linearizable", "snapshot"];
-    readConcernLevels.forEach(function(readConcernLevel) {
+    readConcernLevels.forEach(function (readConcernLevel) {
+        assert.commandWorked(coll.explain().aggregate([], {readConcern: {level: readConcernLevel}}));
+
         assert.commandWorked(
-            coll.explain().aggregate([], {readConcern: {level: readConcernLevel}}));
+            db.runCommand({
+                aggregate: coll.getName(),
+                pipeline: [],
+                explain: true,
+                readConcern: {level: readConcernLevel},
+            }),
+        );
 
-        assert.commandWorked(db.runCommand({
-            aggregate: coll.getName(),
-            pipeline: [],
-            explain: true,
-            readConcern: {level: readConcernLevel}
-        }));
+        assert.commandWorked(
+            db.runCommand({
+                explain: {aggregate: coll.getName(), pipeline: [], cursor: {}},
+                readConcern: {level: readConcernLevel},
+            }),
+        );
 
-        assert.commandWorked(db.runCommand({
-            explain: {aggregate: coll.getName(), pipeline: [], cursor: {}},
-            readConcern: {level: readConcernLevel}
-        }));
+        assert.commandWorked(
+            db.runCommand({explain: {find: coll.getName(), filter: {}}, readConcern: {level: readConcernLevel}}),
+        );
 
-        assert.commandWorked(db.runCommand(
-            {explain: {find: coll.getName(), filter: {}}, readConcern: {level: readConcernLevel}}));
-
-        assert.commandWorked(db.runCommand(
-            {explain: {count: coll.getName(), query: {}, readConcern: {level: readConcernLevel}}}));
+        assert.commandWorked(
+            db.runCommand({explain: {count: coll.getName(), query: {}, readConcern: {level: readConcernLevel}}}),
+        );
     });
 };
 
@@ -39,8 +44,7 @@ const runTest = (db, coll) => {
     rst.startSet();
     rst.initiate();
 
-    const session =
-        rst.getPrimary().getDB("test").getMongo().startSession({causalConsistency: false});
+    const session = rst.getPrimary().getDB("test").getMongo().startSession({causalConsistency: false});
     const db = session.getDatabase("test");
     const coll = db.agg_explain_read_concern;
 
@@ -58,20 +62,18 @@ const runTest = (db, coll) => {
     const db = st.s.getDB("test");
     const coll = db.agg_explain_read_concern;
 
-    assert.commandWorked(st.s.adminCommand(
-        {enableSharding: "test", primaryShard: config.shards.find().toArray()[0]._id}));
     assert.commandWorked(
-        st.s.adminCommand({shardCollection: "test.agg_explain_read_concern", key: {_id: 1}}));
+        st.s.adminCommand({enableSharding: "test", primaryShard: config.shards.find().toArray()[0]._id}),
+    );
+    assert.commandWorked(st.s.adminCommand({shardCollection: "test.agg_explain_read_concern", key: {_id: 1}}));
 
     runTest(db, coll);
 
     // Ensure read concern level is reflected in explain output.
-    let explain = db.runCommand(
-        {explain: {find: coll.getName(), filter: {}}, readConcern: {level: "available"}});
+    let explain = db.runCommand({explain: {find: coll.getName(), filter: {}}, readConcern: {level: "available"}});
     assert(!planHasStage(db, explain, "SHARDING_FILTER"));
 
-    explain = db.runCommand(
-        {explain: {find: coll.getName(), filter: {}}, readConcern: {level: "snapshot"}});
+    explain = db.runCommand({explain: {find: coll.getName(), filter: {}}, readConcern: {level: "snapshot"}});
     assert(planHasStage(db, explain, "SHARDING_FILTER"));
 
     st.stop();

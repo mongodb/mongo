@@ -16,9 +16,16 @@ var staticMongod = MongoRunner.runMongod({});
 
 var st = new ShardingTest({shards: 3});
 
-var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
-    coll1 = mongos.getCollection(ns1), shard0 = st.shard0, shard1 = st.shard1, shard2 = st.shard2,
-    shard0Coll1 = shard0.getCollection(ns1), shard1Coll1 = shard1.getCollection(ns1),
+var mongos = st.s0,
+    admin = mongos.getDB("admin"),
+    dbName = "testDB",
+    ns1 = dbName + ".foo",
+    coll1 = mongos.getCollection(ns1),
+    shard0 = st.shard0,
+    shard1 = st.shard1,
+    shard2 = st.shard2,
+    shard0Coll1 = shard0.getCollection(ns1),
+    shard1Coll1 = shard1.getCollection(ns1),
     shard2Coll1 = shard2.getCollection(ns1);
 
 assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
@@ -34,8 +41,7 @@ assert.eq(0, shard1Coll1.find().itcount());
 assert.eq(0, shard2Coll1.find().itcount());
 assert.eq(3, coll1.find().itcount());
 
-assert.commandWorked(admin.runCommand(
-    {moveChunk: ns1, find: {a: 10}, to: st.shard2.shardName, _waitForDelete: true}));
+assert.commandWorked(admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard2.shardName, _waitForDelete: true}));
 
 // Shard0:
 //      coll1:     [-inf, 0) [0, 10)
@@ -47,29 +53,34 @@ jsTest.log("Set up complete, now proceeding to test that migration interruptions
 
 // Start a migration between shard0 and shard1 on coll1 and then pause it
 pauseMigrateAtStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);
-var joinMoveChunk = moveChunkParallel(staticMongod,
-                                      st.s0.host,
-                                      {a: 0},
-                                      null,
-                                      coll1.getFullName(),
-                                      st.shard1.shardName,
-                                      true /**Parallel should expect success */);
+var joinMoveChunk = moveChunkParallel(
+    staticMongod,
+    st.s0.host,
+    {a: 0},
+    null,
+    coll1.getFullName(),
+    st.shard1.shardName,
+    true /**Parallel should expect success */,
+);
 waitForMigrateStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);
 
 assert.commandFailedWithCode(
     admin.runCommand({moveChunk: ns1, find: {a: -10}, to: st.shard2.shardName}),
     ErrorCodes.ConflictingOperationInProgress,
-    "(1) A shard should not be able to be the donor for two ongoing migrations.");
+    "(1) A shard should not be able to be the donor for two ongoing migrations.",
+);
 
 assert.commandFailedWithCode(
     admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard1.shardName}),
     ErrorCodes.ConflictingOperationInProgress,
-    "(2) A shard should not be able to be the recipient of two ongoing migrations.");
+    "(2) A shard should not be able to be the recipient of two ongoing migrations.",
+);
 
 assert.commandFailedWithCode(
     admin.runCommand({moveChunk: ns1, find: {a: 10}, to: st.shard0.shardName}),
     ErrorCodes.ConflictingOperationInProgress,
-    "(3) A shard should not be able to be both a donor and recipient of migrations.");
+    "(3) A shard should not be able to be both a donor and recipient of migrations.",
+);
 
 // Finish migration
 unpauseMigrateAtStep(shard1, migrateStepNames.rangeDeletionTaskScheduled);

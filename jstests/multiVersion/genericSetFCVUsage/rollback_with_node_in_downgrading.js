@@ -15,6 +15,5 @@ testMultiversionRollbackLatestFromDowngrading(testName, true /* upgradeImmediate
 testMultiversionRollbackLatestFromDowngrading(testName, false /* upgradeImmediately */);
 
 testName = "multiversion_rollback_downgrading_from_last_lts";
-jsTestLog(
-    "Testing multiversion rollback with a node in downgrading syncing from a node in lastLTS");
+jsTestLog("Testing multiversion rollback with a node in downgrading syncing from a node in lastLTS");
 testMultiversionRollbackDowngradingFromLastLTS(testName);

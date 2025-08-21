@@ -33,48 +33,51 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
-const collName = 't';
+const collName = "t";
 const dbName = jsTestName();
 
 const testCases = {
     DROP_COLLECTION: 0,
     REPLACE_COLLECTION: 1,
-    REPLACE_METAFIELD: 2
+    REPLACE_METAFIELD: 2,
 };
 
-const validateUpdateIndex = (initialDocList,
-                             updateList,
-                             testType,
-                             failCode,
-                             newMetaField = null) => {
+const validateUpdateIndex = (initialDocList, updateList, testType, failCode, newMetaField = null) => {
     const testDB = db.getSiblingDB(dbName);
-    const awaitTestUpdate = startParallelShell(funWithArgs(
-        function(
-            dbName, collName, timeFieldName, metaFieldName, initialDocList, updateList, failCode) {
-            const testDB = db.getSiblingDB(dbName);
-            const coll = testDB.getCollection(collName);
+    const awaitTestUpdate = startParallelShell(
+        funWithArgs(
+            function (dbName, collName, timeFieldName, metaFieldName, initialDocList, updateList, failCode) {
+                const testDB = db.getSiblingDB(dbName);
+                const coll = testDB.getCollection(collName);
 
-            assert.commandWorked(testDB.createCollection(
-                coll.getName(),
-                {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+                assert.commandWorked(
+                    testDB.createCollection(coll.getName(), {
+                        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                    }),
+                );
 
-            assert.commandWorked(coll.insert(initialDocList));
+                assert.commandWorked(coll.insert(initialDocList));
 
-            assert.commandWorked(testDB.adminCommand(
-                {configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}));
+                assert.commandWorked(
+                    testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "alwaysOn"}),
+                );
 
-            assert.commandFailedWithCode(
-                testDB.runCommand({update: coll.getName(), updates: updateList}), failCode);
+                assert.commandFailedWithCode(
+                    testDB.runCommand({update: coll.getName(), updates: updateList}),
+                    failCode,
+                );
 
-            coll.drop();
-        },
-        dbName,
-        collName,
-        timeFieldName,
-        metaFieldName,
-        initialDocList,
-        updateList,
-        failCode));
+                coll.drop();
+            },
+            dbName,
+            collName,
+            timeFieldName,
+            metaFieldName,
+            initialDocList,
+            updateList,
+            failCode,
+        ),
+    );
 
     const coll = testDB.getCollection(collName);
     const childOp = waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangDuringBatchUpdate")[0];
@@ -86,13 +89,15 @@ const validateUpdateIndex = (initialDocList,
             assert.commandWorked(testDB.createCollection(coll.getName()));
             break;
         case testCases.REPLACE_METAFIELD:
-            assert.commandWorked(testDB.createCollection(
-                coll.getName(), {timeseries: {timeField: timeFieldName, metaField: newMetaField}}));
+            assert.commandWorked(
+                testDB.createCollection(coll.getName(), {
+                    timeseries: {timeField: timeFieldName, metaField: newMetaField},
+                }),
+            );
             break;
     }
 
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangDuringBatchUpdate", mode: "off"}));
 
     // Wait for testUpdate to finish.
     awaitTestUpdate();
@@ -109,11 +114,8 @@ validateUpdateIndex(
     docs,
     [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
     testCases.DROP_COLLECTION,
-    [
-        ErrorCodes.NamespaceNotFound,
-        8555700,
-        8555701,
-    ]);  // TODO (SERVER-85548): revisit error codes
+    [ErrorCodes.NamespaceNotFound, 8555700, 8555701],
+); // TODO (SERVER-85548): revisit error codes
 
 // Attempt to update a document in a collection that has been replaced with a non-time-series
 // collection.
@@ -127,5 +129,6 @@ validateUpdateIndex(
         8555701,
         // Encountered when a time-series collection that we are operating on is dropped and
         // re-created as a non-timeseries collection.
-        10685101
-    ]);  // TODO (SERVER-85548): revisit error codes
+        10685101,
+    ],
+); // TODO (SERVER-85548): revisit error codes

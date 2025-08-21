@@ -17,16 +17,16 @@ assert.commandWorked(bulk.execute());
 assert.commandWorked(local.insert({starting: 0}));
 
 var res = local
-                .aggregate({
-                    $graphLookup: {
-                        from: "foreign",
-                        startWith: "$starting",
-                        connectFromField: "neighbors.id",
-                        connectToField: "_id",
-                        as: "integers"
-                    }
-                })
-                .toArray()[0];
+    .aggregate({
+        $graphLookup: {
+            from: "foreign",
+            startWith: "$starting",
+            connectFromField: "neighbors.id",
+            connectToField: "_id",
+            as: "integers",
+        },
+    })
+    .toArray()[0];
 assert.eq(res.integers.length, 100);
 
 foreign.drop();
@@ -39,16 +39,16 @@ for (let i = 0; i < 100; i++) {
 assert.commandWorked(bulk.execute());
 
 res = local
-                .aggregate({
-                    $graphLookup: {
-                        from: "foreign",
-                        startWith: "$starting",
-                        connectFromField: "value",
-                        connectToField: "previous.neighbor",
-                        as: "integers"
-                    }
-                })
-                .toArray()[0];
+    .aggregate({
+        $graphLookup: {
+            from: "foreign",
+            startWith: "$starting",
+            connectFromField: "value",
+            connectToField: "previous.neighbor",
+            as: "integers",
+        },
+    })
+    .toArray()[0];
 assert.eq(res.integers.length, 100);
 
 foreign.drop();
@@ -58,20 +58,20 @@ bulk = foreign.initializeUnorderedBulkOp();
 for (let i = 0; i < 100; i++) {
     bulk.insert({
         previous: [{neighbor: i}, {neighbor: i - 1}],
-        values: [{neighbor: i + 1}, {neighbor: i + 2}]
+        values: [{neighbor: i + 1}, {neighbor: i + 2}],
     });
 }
 assert.commandWorked(bulk.execute());
 
 res = local
-                .aggregate({
-                    $graphLookup: {
-                        from: "foreign",
-                        startWith: "$starting",
-                        connectFromField: "values.neighbor",
-                        connectToField: "previous.neighbor",
-                        as: "integers"
-                    }
-                })
-                .toArray()[0];
+    .aggregate({
+        $graphLookup: {
+            from: "foreign",
+            startWith: "$starting",
+            connectFromField: "values.neighbor",
+            connectToField: "previous.neighbor",
+            as: "integers",
+        },
+    })
+    .toArray()[0];
 assert.eq(res.integers.length, 100);

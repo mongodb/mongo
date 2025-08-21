@@ -11,10 +11,7 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {
-    awaitRSClientHosts,
-    createRstArgs,
-} from "jstests/replsets/rslib.js";
+import {awaitRSClientHosts, createRstArgs} from "jstests/replsets/rslib.js";
 import {
     makeAbortTransactionCmdObj,
     makeCommitTransactionCmdObj,
@@ -31,7 +28,7 @@ const st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 let shard0Primary = st.rs0.getPrimary();
 
@@ -48,8 +45,7 @@ function stepDownShard0Primary() {
     const oldPrimary = st.rs0.getPrimary();
     const oldSecondary = st.rs0.getSecondary();
     assert.commandWorked(oldSecondary.adminCommand({replSetFreeze: 0}));
-    assert.commandWorked(
-        oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(oldPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
     const newPrimary = st.rs0.getPrimary();
     assert.neq(oldPrimary, newPrimary);
     shard0Primary = newPrimary;
@@ -58,7 +54,7 @@ function stepDownShard0Primary() {
 }
 
 const parentLsid = {
-    id: UUID()
+    id: UUID(),
 };
 let currentParentTxnNumber = 35;
 
@@ -103,7 +99,8 @@ function testBlockingRetry(retryFunc, testOpts) {
         // behind the internal transaction above.
         fp = configureFailPoint(
             shard0Primary,
-            "waitAfterNewStatementBlocksBehindOpenInternalTransactionForRetryableWrite");
+            "waitAfterNewStatementBlocksBehindOpenInternalTransactionForRetryableWrite",
+        );
     }
     const retryThread = new Thread(retryFunc, {
         shard0RstArgs: createRstArgs(st.rs0),
@@ -113,7 +110,7 @@ function testBlockingRetry(retryFunc, testOpts) {
         stmtId,
         dbName: kDbName,
         collName: kCollName,
-        stepDownPrimaryAfterBlockingRetry: testOpts.stepDownPrimaryAfterBlockingRetry
+        stepDownPrimaryAfterBlockingRetry: testOpts.stepDownPrimaryAfterBlockingRetry,
     });
     retryThread.start();
     if (testOpts.prepareBeforeRetry) {
@@ -133,15 +130,14 @@ function testBlockingRetry(retryFunc, testOpts) {
     // exactly once despite the concurrent retry, whether or not the retry interrupted the original
     // attempt.
     if (testOpts.prepareBeforeRetry) {
-        assert.commandWorked(shard0TestDB.adminCommand(
-            testOpts.abortAfterBlockingRetry ? abortCmdObj : commitCmdObj));
+        assert.commandWorked(shard0TestDB.adminCommand(testOpts.abortAfterBlockingRetry ? abortCmdObj : commitCmdObj));
         retryThread.join();
     } else {
         // The retry should have interrupted the original attempt.
         assert.commandFailedWithCode(
-            shard0TestDB.adminCommand(testOpts.abortAfterBlockingRetry ? abortCmdObj
-                                                                       : commitCmdObj),
-            ErrorCodes.NoSuchTransaction);
+            shard0TestDB.adminCommand(testOpts.abortAfterBlockingRetry ? abortCmdObj : commitCmdObj),
+            ErrorCodes.NoSuchTransaction,
+        );
     }
     assert.eq(shard0TestColl.count(docToInsert), 1);
 
@@ -156,40 +152,41 @@ function runTests(retryFunc) {
     testBlockingRetry(retryFunc, {
         prepareBeforeRetry: false,
         abortAfterBlockingRetry: false,
-        stepDownPrimaryAfterBlockingRetry: false
+        stepDownPrimaryAfterBlockingRetry: false,
     });
     testBlockingRetry(retryFunc, {
         prepareBeforeRetry: false,
         abortAfterBlockingRetry: true,
-        stepDownPrimaryAfterBlockingRetry: false
+        stepDownPrimaryAfterBlockingRetry: false,
     });
     testBlockingRetry(retryFunc, {
         prepareBeforeRetry: true,
         abortAfterBlockingRetry: false,
-        stepDownPrimaryAfterBlockingRetry: false
+        stepDownPrimaryAfterBlockingRetry: false,
     });
     testBlockingRetry(retryFunc, {
         prepareBeforeRetry: true,
         abortAfterBlockingRetry: false,
-        stepDownPrimaryAfterBlockingRetry: true
+        stepDownPrimaryAfterBlockingRetry: true,
     });
     testBlockingRetry(retryFunc, {
         prepareBeforeRetry: true,
         abortAfterBlockingRetry: true,
-        stepDownPrimaryAfterBlockingRetry: false
+        stepDownPrimaryAfterBlockingRetry: false,
     });
     testBlockingRetry(retryFunc, {
         prepareBeforeRetry: true,
         abortAfterBlockingRetry: true,
-        stepDownPrimaryAfterBlockingRetry: true
+        stepDownPrimaryAfterBlockingRetry: true,
     });
 }
 
 {
     jsTest.log(
         "Test retrying write statement executed in a retryable internal transaction as a " +
-        "retryable write in the parent session while the transaction has not been committed " +
-        "or aborted");
+            "retryable write in the parent session while the transaction has not been committed " +
+            "or aborted",
+    );
 
     let retryFunc = async (testOpts) => {
         const {createRst} = await import("jstests/replsets/rslib.js");
@@ -201,7 +198,7 @@ function runTests(retryFunc) {
             documents: [testOpts.docToInsert],
             lsid: {id: UUID(testOpts.parentSessionUUIDString)},
             txnNumber: NumberLong(testOpts.parentTxnNumber),
-            stmtId: NumberInt(testOpts.stmtId)
+            stmtId: NumberInt(testOpts.stmtId),
         };
 
         let retryRes = shard0Primary.getDB(testOpts.dbName).runCommand(retryWriteCmdObj);
@@ -219,20 +216,20 @@ function runTests(retryFunc) {
 {
     jsTest.log(
         "Test retrying write statement executed in a retryable internal transaction in a " +
-        "different retryable internal transaction while the original transaction has not been " +
-        "committed or aborted");
+            "different retryable internal transaction while the original transaction has not been " +
+            "committed or aborted",
+    );
 
     let retryFunc = async (testOpts) => {
         const {createRst} = await import("jstests/replsets/rslib.js");
-        const {makeCommitTransactionCmdObj} =
-            await import("jstests/sharding/libs/sharded_transactions_helpers.js");
+        const {makeCommitTransactionCmdObj} = await import("jstests/sharding/libs/sharded_transactions_helpers.js");
         const shard0Rst = createRst(testOpts.shard0RstArgs);
         let shard0Primary = shard0Rst.getPrimary();
 
         const retryChildLsid = {
             id: UUID(testOpts.parentSessionUUIDString),
             txnNumber: NumberLong(testOpts.parentTxnNumber),
-            txnUUID: UUID()
+            txnUUID: UUID(),
         };
         const retryChildTxnNumber = NumberLong(0);
         const retryWriteCmdObj = {

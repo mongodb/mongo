@@ -8,12 +8,14 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, exclude_from_large_txns]
  */
-import {
-    RetryableInternalTransactionTest
-} from "jstests/sharding/internal_txns/libs/retryable_internal_transaction_test.js";
+import {RetryableInternalTransactionTest} from "jstests/sharding/internal_txns/libs/retryable_internal_transaction_test.js";
 
 const transactionTest = new RetryableInternalTransactionTest(
-    {} /*collectionOptions*/, true /*initiateWithDefaultElectionTimeout*/);
+    {} /*collectionOptions*/,
+    true /*initiateWithDefaultElectionTimeout*/,
+);
 transactionTest.runTestsForAllRetryableInternalTransactionTypes(
-    transactionTest.runInsertUpdateDeleteTests, transactionTest.TestMode.kFailover);
+    transactionTest.runInsertUpdateDeleteTests,
+    transactionTest.TestMode.kFailover,
+);
 transactionTest.stop();

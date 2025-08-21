@@ -14,28 +14,26 @@
  */
 
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
-import {
-    assertWorkedOrFailedHandleTxnErrors
-} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
+import {assertWorkedOrFailedHandleTxnErrors} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     let data = {
         chooseRandomlyFrom: function chooseRandomlyFrom(arr) {
             if (!Array.isArray(arr)) {
-                throw new Error('Expected array for first argument, but got: ' + tojson(arr));
+                throw new Error("Expected array for first argument, but got: " + tojson(arr));
             }
             return arr[Random.randInt(arr.length)];
         },
 
-        involvedCollections: ['coll0', 'coll1', 'coll2'],
+        involvedCollections: ["coll0", "coll1", "coll2"],
         indexSpecs: [{a: 1, b: 1}, {c: 1}],
 
         numDocs: 100,
         batchSize: 2,
         isCreateIndexRequested: false,
         isCreatedSucceedAtLeastOnce: false,
-        createIndexAndAssert: function(db, collName, indexSpecs) {
+        createIndexAndAssert: function (db, collName, indexSpecs) {
             const errorCodesTxn = [
                 ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
@@ -56,7 +54,7 @@ export const $config = (function() {
                 errorCodesTxn.push(ErrorCodes.CannotImplicitlyCreateCollection);
             }
             this.isCreateIndexRequested = true;
-            indexSpecs.forEach(indexSpec => {
+            indexSpecs.forEach((indexSpec) => {
                 const res = db[collName].createIndex(indexSpec);
                 assertWorkedOrFailedHandleTxnErrors(res, errorCodesTxn, errorCodesNonTxn);
                 if (res.ok) {
@@ -92,19 +90,19 @@ export const $config = (function() {
         killRandomGetMore: function killRandomGetMore(someDB, killFn) {
             const admin = someDB.getSiblingDB("admin");
             const getMores = admin
-                                 .aggregate([
-                                     // idleConnections true so we can also kill cursors which are
-                                     // not currently active.
-                                     // localOps true so that currentOp reports the mongos
-                                     // operations when run on a sharded cluster, instead of the
-                                     // shard's operations.
-                                     {$currentOp: {idleConnections: true, localOps: true}},
-                                     // We only about getMores.
-                                     {$match: {"command.getMore": {$exists: true}}},
-                                     // Only find getMores running on the database for this test.
-                                     {$match: {"ns": {$regex: this.uniqueDBName + "\."}}}
-                                 ])
-                                 .toArray();
+                .aggregate([
+                    // idleConnections true so we can also kill cursors which are
+                    // not currently active.
+                    // localOps true so that currentOp reports the mongos
+                    // operations when run on a sharded cluster, instead of the
+                    // shard's operations.
+                    {$currentOp: {idleConnections: true, localOps: true}},
+                    // We only about getMores.
+                    {$match: {"command.getMore": {$exists: true}}},
+                    // Only find getMores running on the database for this test.
+                    {$match: {"ns": {$regex: this.uniqueDBName + "\."}}},
+                ])
+                .toArray();
 
             if (getMores.length === 0) {
                 return;
@@ -112,7 +110,7 @@ export const $config = (function() {
 
             const toKill = this.chooseRandomlyFrom(getMores);
             return killFn(toKill);
-        }
+        },
     };
 
     let states = {
@@ -130,7 +128,7 @@ export const $config = (function() {
             let res = myDB.runCommand({
                 find: this.chooseRandomlyFrom(this.involvedCollections),
                 filter: {},
-                batchSize: this.batchSize
+                batchSize: this.batchSize,
             });
 
             if (res.ok) {
@@ -145,7 +143,7 @@ export const $config = (function() {
             let myDB = unusedDB.getSiblingDB(this.uniqueDBName);
             let res = myDB.runCommand({
                 explain: {find: this.chooseRandomlyFrom(this.involvedCollections), filter: {}},
-                verbosity: "executionStats"
+                verbosity: "executionStats",
             });
             assert.commandWorked(res);
         },
@@ -164,9 +162,11 @@ export const $config = (function() {
 
             // Not checking the return value, since the cursor may be closed on its own
             // before this has a chance to run.
-            this.killRandomGetMore(myDB, function(toKill) {
-                const res = myDB.runCommand(
-                    {killCursors: toKill.command.collection, cursors: [toKill.command.getMore]});
+            this.killRandomGetMore(myDB, function (toKill) {
+                const res = myDB.runCommand({
+                    killCursors: toKill.command.collection,
+                    cursors: [toKill.command.getMore],
+                });
                 assert.commandWorked(res);
             });
         },
@@ -175,7 +175,7 @@ export const $config = (function() {
             const myDB = unusedDB.getSiblingDB(this.uniqueDBName);
             // Not checking return value since the operation may end on its own before we have
             // a chance to kill it.
-            this.killRandomGetMore(myDB, function(toKill) {
+            this.killRandomGetMore(myDB, function (toKill) {
                 assert.commandWorked(myDB.killOp(toKill.opid));
             });
         },
@@ -185,7 +185,7 @@ export const $config = (function() {
          * thus ensures that a getMore request is sent for 'this.cursor'.
          */
         getMore: function getMore(unusedDB, unusedCollName) {
-            if (!this.hasOwnProperty('cursor')) {
+            if (!this.hasOwnProperty("cursor")) {
                 return;
             }
 
@@ -202,7 +202,7 @@ export const $config = (function() {
                     const expectedErrors = [
                         ErrorCodes.NamespaceNotFound,
                         ErrorCodes.OperationFailed,
-                        ...interruptedQueryErrors
+                        ...interruptedQueryErrors,
                     ];
                     if (!expectedErrors.includes(e.code)) {
                         throw e;
@@ -220,7 +220,7 @@ export const $config = (function() {
             myDB.dropDatabase();
 
             // Re-create all of the collections and indexes that were dropped.
-            this.involvedCollections.forEach(collName => {
+            this.involvedCollections.forEach((collName) => {
                 this.populateDataAndIndexes(myDB, collName);
             });
         },
@@ -254,7 +254,7 @@ export const $config = (function() {
             myDB[targetColl].dropIndex(indexSpec);
 
             this.createIndexAndAssert(myDB, targetColl, [indexSpec]);
-        }
+        },
     };
 
     let transitions = {
@@ -274,16 +274,16 @@ export const $config = (function() {
         getMore: {kill: 0.2, getMore: 0.6, init: 0.2},
         dropDatabase: {init: 1},
         dropCollection: {init: 1},
-        dropIndex: {init: 1}
+        dropIndex: {init: 1},
     };
 
     function setup(unusedDB, unusedCollName, cluster) {
         // Use the workload name as part of the database name, since the workload name is assumed to
         // be unique.
-        this.uniqueDBName = unusedDB.getName() + 'invalidated_cursors';
+        this.uniqueDBName = unusedDB.getName() + "invalidated_cursors";
 
         let myDB = unusedDB.getSiblingDB(this.uniqueDBName);
-        this.involvedCollections.forEach(collName => {
+        this.involvedCollections.forEach((collName) => {
             this.populateDataAndIndexes(myDB, collName);
             assert.eq(this.numDocs, myDB[collName].find({}).itcount());
         });
@@ -301,10 +301,10 @@ export const $config = (function() {
         threadCount: 10,
         iterations: 200,
         states: states,
-        startState: 'init',
+        startState: "init",
         transitions: transitions,
         data: data,
         setup: setup,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

@@ -21,16 +21,12 @@
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    getPlanStage,
-    getWinningPlanFromExplain,
-    isExpress,
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanStage, getWinningPlanFromExplain, isExpress} from "jstests/libs/query/analyze_plan.js";
 import {runExpressTest} from "jstests/libs/query/express_utils.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
-const coll = db.getCollection('express_coll');
+const coll = db.getCollection("express_coll");
 
 function runWithParamsAllNodes(db, keyValPairs, fn) {
     let prevVals = [];
@@ -39,7 +35,7 @@ function runWithParamsAllNodes(db, keyValPairs, fn) {
         for (let i = 0; i < keyValPairs.length; i++) {
             const flag = keyValPairs[i].key;
             const valIn = keyValPairs[i].value;
-            const val = (typeof valIn === 'object') ? JSON.stringify(valIn) : valIn;
+            const val = typeof valIn === "object" ? JSON.stringify(valIn) : valIn;
 
             let getParamObj = {};
             getParamObj["getParameter"] = 1;
@@ -55,8 +51,7 @@ function runWithParamsAllNodes(db, keyValPairs, fn) {
         for (let i = 0; i < keyValPairs.length; i++) {
             const flag = keyValPairs[i].key;
 
-            setParameterOnAllHosts(
-                DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, prevVals[i]);
+            setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()), flag, prevVals[i]);
         }
     }
 }
@@ -77,31 +72,26 @@ function recreateCollWith(documents) {
 recreateCollWith(docs);
 
 // Cannot use express path when no indexes exist.
-runExpressTest(
-    {coll, filter: {a: 1}, limit: 1, result: [{_id: 4, a: [1, 2, 3]}], usesExpress: false});
+runExpressTest({coll, filter: {a: 1}, limit: 1, result: [{_id: 4, a: [1, 2, 3]}], usesExpress: false});
 
 // Cannot use express path when predicate is not a single equality.
 assert.commandWorked(coll.createIndex({a: 1}));
 runExpressTest({coll, filter: {a: {$lte: -1}}, limit: 1, result: [], usesExpress: false});
-runExpressTest(
-    {coll, filter: {a: 0, b: 0}, limit: 1, result: [{_id: 0, a: 0, b: 0}], usesExpress: false});
+runExpressTest({coll, filter: {a: 0, b: 0}, limit: 1, result: [{_id: 0, a: 0, b: 0}], usesExpress: false});
 
 // Cannot use express path when the query field is contained in the index, but it is not a prefix.
 coll.dropIndexes();
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
-runExpressTest(
-    {coll, filter: {b: 0}, limit: 1, result: [{_id: 0, a: 0, b: 0}], usesExpress: false});
+runExpressTest({coll, filter: {b: 0}, limit: 1, result: [{_id: 0, a: 0, b: 0}], usesExpress: false});
 
 // Cannot use express path when the index is not a regular B-tree index. Here we drop the collection
 // since hashed indexes don't support array values.
 recreateCollWith([{_id: "hashed", a: 0}]);
-assert.commandWorked(coll.createIndex({a: 'hashed'}));
-runExpressTest(
-    {coll, filter: {a: 0}, limit: 1, result: [{_id: "hashed", a: 0}], usesExpress: false});
+assert.commandWorked(coll.createIndex({a: "hashed"}));
+runExpressTest({coll, filter: {a: 0}, limit: 1, result: [{_id: "hashed", a: 0}], usesExpress: false});
 coll.dropIndexes();
-assert.commandWorked(coll.createIndex({'$**': 1}));
-runExpressTest(
-    {coll, filter: {a: 0}, limit: 1, result: [{_id: "hashed", a: 0}], usesExpress: false});
+assert.commandWorked(coll.createIndex({"$**": 1}));
+runExpressTest({coll, filter: {a: 0}, limit: 1, result: [{_id: "hashed", a: 0}], usesExpress: false});
 
 // Cannot use express path when a hint is specified.
 recreateCollWith(docs);
@@ -121,7 +111,7 @@ for (let index of [{a: 1}, {a: -1}, {a: 1, b: 1}, {a: 1, b: -1}, {a: -1, b: 1}, 
         filter: {a: 1},
         limit: 1,
         result: [{_id: 4, a: [1, 2, 3]}],
-        usesExpress: !isShardedColl
+        usesExpress: !isShardedColl,
     });
 }
 
@@ -129,13 +119,13 @@ for (let index of [{a: 1}, {a: -1}, {a: 1, b: 1}, {a: 1, b: -1}, {a: -1, b: 1}, 
 // for an exact match.
 coll.dropIndexes();
 assert.commandWorked(coll.createIndex({a: 1}));
-runExpressTest({coll, filter: {'a.b': 0}, limit: 1, result: [], usesExpress: false});
+runExpressTest({coll, filter: {"a.b": 0}, limit: 1, result: [], usesExpress: false});
 runExpressTest({
     coll,
-    filter: {'a': {bar: 1}},
+    filter: {"a": {bar: 1}},
     limit: 1,
     result: [{_id: 2, a: {bar: 1}}],
-    usesExpress: !isShardedColl
+    usesExpress: !isShardedColl,
 });
 
 // When the index is dotted, queries against the dotted field can use the express path.
@@ -147,7 +137,7 @@ runExpressTest({
     filter: {"a.bar": 1},
     limit: 1,
     result: [{_id: 2, a: {bar: 1}}],
-    usesExpress: !isShardedColl
+    usesExpress: !isShardedColl,
 });
 runExpressTest({coll, filter: {"a.bar.c": 10}, limit: 1, result: [], usesExpress: false});
 runExpressTest({coll, filter: {"a": 10}, limit: 1, result: [], usesExpress: false});
@@ -180,7 +170,7 @@ runExpressTest({
     filter: {$or: [{a: 0}, {a: 0}]},
     limit: 1,
     result: [{_id: 0, a: 0, b: 0}],
-    usesExpress: !isShardedColl
+    usesExpress: !isShardedColl,
 });
 
 // Partial/sparse indexes are eligible to use the express path if the query matches the partial
@@ -188,24 +178,20 @@ runExpressTest({
 coll.dropIndexes();
 assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {a: {$lt: 1}}}));
 runExpressTest({coll, filter: {a: -1}, limit: 1, result: [], usesExpress: !isShardedColl});
-runExpressTest(
-    {coll, filter: {a: 0}, limit: 1, result: [{_id: 0, a: 0, b: 0}], usesExpress: !isShardedColl});
-runExpressTest(
-    {coll, filter: {a: 1}, limit: 1, result: [{_id: 4, a: [1, 2, 3]}], usesExpress: false});
+runExpressTest({coll, filter: {a: 0}, limit: 1, result: [{_id: 0, a: 0, b: 0}], usesExpress: !isShardedColl});
+runExpressTest({coll, filter: {a: 1}, limit: 1, result: [{_id: 4, a: [1, 2, 3]}], usesExpress: false});
 
 coll.dropIndexes();
 assert.commandWorked(coll.createIndex({a: 1}, {sparse: true}));
 runExpressTest({coll, filter: {a: -1}, limit: 1, result: [], usesExpress: !isShardedColl});
-runExpressTest(
-    {coll, filter: {a: 0}, limit: 1, result: [{_id: 0, a: 0, b: 0}], usesExpress: !isShardedColl});
-runExpressTest(
-    {coll, filter: {a: null}, limit: 1, result: [{_id: 3, a: null}], usesExpress: false});
+runExpressTest({coll, filter: {a: 0}, limit: 1, result: [{_id: 0, a: 0, b: 0}], usesExpress: !isShardedColl});
+runExpressTest({coll, filter: {a: null}, limit: 1, result: [{_id: 3, a: null}], usesExpress: false});
 
 // Indexes with collation that differs from the collection collation are elgible for use in the
 // express path if query collation matches the index collation.
 const caseInsensitive = {
     locale: "en_US",
-    strength: 2
+    strength: 2,
 };
 coll.dropIndexes();
 assert.commandWorked(coll.createIndex({a: 1}, {collation: caseInsensitive}));
@@ -215,7 +201,7 @@ runExpressTest({
     limit: 1,
     collation: caseInsensitive,
     result: [{_id: 1, a: "string"}],
-    usesExpress: !isShardedColl
+    usesExpress: !isShardedColl,
 });
 runExpressTest({
     coll,
@@ -223,7 +209,7 @@ runExpressTest({
     limit: 1,
     collation: caseInsensitive,
     result: [],
-    usesExpress: !isShardedColl
+    usesExpress: !isShardedColl,
 });
 runExpressTest({coll, filter: {a: "STRING"}, limit: 1, result: [], usesExpress: false});
 
@@ -236,7 +222,7 @@ runExpressTest({
     limit: 1,
     result: [],
     collation: caseInsensitive,
-    usesExpress: !isShardedColl
+    usesExpress: !isShardedColl,
 });
 
 // If there is more than one eligible index, we choose the shortest one.
@@ -263,11 +249,10 @@ if (!isShardedColl && !FixtureHelpers.isStandalone(db)) {
 
     // The express path will only choose an index allowed by the query settings for the query.
     const allowedIndex = {
-        indexHints: {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: ["a_1_b_1_c_1"]}
+        indexHints: {ns: {db: db.getName(), coll: coll.getName()}, allowedIndexes: ["a_1_b_1_c_1"]},
     };
     qsutils.withQuerySettings(query, allowedIndex, () => {
-        explain = assert.commandWorked(
-            db.runCommand({explain: {find: coll.getName(), filter: {a: 1}, limit: 1}}));
+        explain = assert.commandWorked(db.runCommand({explain: {find: coll.getName(), filter: {a: 1}, limit: 1}}));
         assert(isExpress(db, explain), tojson(explain));
         let express = getPlanStage(getWinningPlanFromExplain(explain), "EXPRESS_IXSCAN");
         assert(express && express.indexName == "a_1_b_1_c_1", tojson(explain));
@@ -277,19 +262,20 @@ if (!isShardedColl && !FixtureHelpers.isStandalone(db)) {
     qsutils.withQuerySettings(query, {reject: true}, () => {
         assert.commandFailedWithCode(
             db.runCommand({find: coll.getName(), filter: {a: 1}, limit: 1}),
-            ErrorCodes.QueryRejectedBySettings);
+            ErrorCodes.QueryRejectedBySettings,
+        );
     });
 
     // If a framework control is set in query settings, we will not use the express path.
     qsutils.withQuerySettings(query, {queryFramework: "classic"}, () => {
-        explain = assert.commandWorked(
-            db.runCommand({explain: {find: coll.getName(), filter: {a: 1}, limit: 1}}));
+        explain = assert.commandWorked(db.runCommand({explain: {find: coll.getName(), filter: {a: 1}, limit: 1}}));
         assert(!isExpress(db, explain), tojson(explain));
     });
 } else {
     jsTestLog(
         "Skipping query settings test because the collection is sharded, we are running against" +
-        " a standalone, or query settings is not enabled");
+            " a standalone, or query settings is not enabled",
+    );
 }
 
 // Aggregations that are pushed down to find are eligible for the express path.
@@ -307,28 +293,30 @@ if (isShardedColl) {
 // on the query plans chosen for the inner side. Here we just assert on the result set.
 coll.dropIndexes();
 assert.commandWorked(coll.createIndex({a: 1}));
-let res = coll.aggregate([
+let res = coll
+    .aggregate([
         {$match: {a: 0}},
-        {$lookup: {
-            from: coll.getName(),
-            as: "res",
-            localField: "a",
-            foreignField: "a",
-            pipeline: [{$limit: 1}]
-        }}
-    ]).toArray();
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "res",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$limit: 1}],
+            },
+        },
+    ])
+    .toArray();
 assert.eq(res, [{_id: 0, a: 0, b: 0, res: [{_id: 0, a: 0, b: 0}]}]);
 
 // Demonstrate use of internalQueryDisableSingleFieldExpressExecutor.
 recreateCollWith(docs);
 coll.createIndex({a: 1});
-runWithParamsAllNodes(
-    db, [{key: "internalQueryDisableSingleFieldExpressExecutor", value: false}], () => {
-        runExpressTest({coll, filter: {a: 10}, limit: 1, result: [], usesExpress: !isShardedColl});
-        runExpressTest({coll, filter: {_id: 10}, limit: 1, result: [], usesExpress: true});
-    });
-runWithParamsAllNodes(
-    db, [{key: "internalQueryDisableSingleFieldExpressExecutor", value: true}], () => {
-        runExpressTest({coll, filter: {a: 10}, limit: 1, result: [], usesExpress: false});
-        runExpressTest({coll, filter: {_id: 10}, limit: 1, result: [], usesExpress: true});
-    });
+runWithParamsAllNodes(db, [{key: "internalQueryDisableSingleFieldExpressExecutor", value: false}], () => {
+    runExpressTest({coll, filter: {a: 10}, limit: 1, result: [], usesExpress: !isShardedColl});
+    runExpressTest({coll, filter: {_id: 10}, limit: 1, result: [], usesExpress: true});
+});
+runWithParamsAllNodes(db, [{key: "internalQueryDisableSingleFieldExpressExecutor", value: true}], () => {
+    runExpressTest({coll, filter: {a: 10}, limit: 1, result: [], usesExpress: false});
+    runExpressTest({coll, filter: {_id: 10}, limit: 1, result: [], usesExpress: true});
+});

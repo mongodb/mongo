@@ -23,7 +23,7 @@ const mongodOptions = (connectionHealthLoggingOn) => {
         tlsCAFile: "jstests/libs/ca.pem",
         setParameter: {
             opensslCipherSuiteConfig: cipherSuite,
-            enableDetailedConnectionHealthMetricLogLines: connectionHealthLoggingOn
+            enableDetailedConnectionHealthMetricLogLines: connectionHealthLoggingOn,
         },
     };
 
@@ -31,18 +31,20 @@ const mongodOptions = (connectionHealthLoggingOn) => {
 };
 
 function testConn(mongod) {
-    const mongo = runMongoProgram('mongo',
-                                  '--host',
-                                  'localhost',
-                                  '--port',
-                                  mongod.port,
-                                  '--tls',
-                                  '--tlsCAFile',
-                                  'jstests/libs/ca.pem',
-                                  '--tlsCertificateKeyFile',
-                                  'jstests/libs/client.pem',
-                                  '--eval',
-                                  ';');
+    const mongo = runMongoProgram(
+        "mongo",
+        "--host",
+        "localhost",
+        "--port",
+        mongod.port,
+        "--tls",
+        "--tlsCAFile",
+        "jstests/libs/ca.pem",
+        "--tlsCertificateKeyFile",
+        "jstests/libs/client.pem",
+        "--eval",
+        ";",
+    );
     return mongo === 0;
 }
 
@@ -54,8 +56,7 @@ let runTest = (connectionHealthLoggingOn) => {
     jsTestLog(`totalTLSHandshakeTimeMillis: ${initialHandshakeTimeMillis}`);
 
     if (connectionHealthLoggingOn) {
-        checkLog.containsJson(
-            mongod, 6723804, {durationMillis: Number(initialHandshakeTimeMillis)});
+        checkLog.containsJson(mongod, 6723804, {durationMillis: Number(initialHandshakeTimeMillis)});
     } else {
         assert.eq(checkLog.checkContainsOnceJson(mongod, 6723804, {}), false);
     }
@@ -64,10 +65,10 @@ let runTest = (connectionHealthLoggingOn) => {
     // completion should have received a sample, which means it will be present
     // and have a non-negative numeric value.
     const avg = ssNetworkMetrics.averageTimeToCompletedTLSHandshakeMicros;
-    assert.eq('number', typeof avg, ssNetworkMetrics);
+    assert.eq("number", typeof avg, ssNetworkMetrics);
     assert.gte(avg, 0);
 
-    assert.commandWorked(mongod.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(mongod.adminCommand({clearLog: "global"}));
     assert.eq(1, ssNetworkMetrics.totalIngressTLSConnections, ssNetworkMetrics);
 
     // Get the logId that corresponds to the implementation of TLS being used.
@@ -104,8 +105,10 @@ let runTest = (connectionHealthLoggingOn) => {
 
     if (connectionHealthLoggingOn) {
         checkLog.containsJson(mongod, 6723804, {durationMillis: Number(secondHandshakeDuration)});
-        assert.soon(() => checkLog.checkContainsOnceJson(mongod, logId, {"cipher": cipherSuite}),
-                    "failed waiting for log line with negotiated cipher info");
+        assert.soon(
+            () => checkLog.checkContainsOnceJson(mongod, logId, {"cipher": cipherSuite}),
+            "failed waiting for log line with negotiated cipher info",
+        );
     } else {
         assert.eq(checkLog.checkContainsOnceJson(mongod, 6723804, {}), false);
         assert.eq(checkLog.checkContainsOnceJson(mongod, logId, {}), false);

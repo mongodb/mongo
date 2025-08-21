@@ -4,24 +4,26 @@
 
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
-requireSSLProvider(['openssl', 'windows'], function() {
+requireSSLProvider(["openssl", "windows"], function () {
     var md = MongoRunner.runMongod({
         tlsMode: "requireTLS",
         tlsCertificateKeyFile: "jstests/libs/server.pem",
         tlsCAFile: "jstests/libs/ca.pem",
-        tlsCRLFile: "jstests/libs/crl_client_revoked.pem"
+        tlsCRLFile: "jstests/libs/crl_client_revoked.pem",
     });
 
-    var mongo = runMongoProgram("mongo",
-                                "--port",
-                                md.port,
-                                "--tls",
-                                "--tlsCAFile",
-                                "jstests/libs/ca.pem",
-                                "--tlsCertificateKeyFile",
-                                "jstests/libs/client_revoked.pem",
-                                "--eval",
-                                ";");
+    var mongo = runMongoProgram(
+        "mongo",
+        "--port",
+        md.port,
+        "--tls",
+        "--tlsCAFile",
+        "jstests/libs/ca.pem",
+        "--tlsCertificateKeyFile",
+        "jstests/libs/client_revoked.pem",
+        "--eval",
+        ";",
+    );
 
     // 1 is the exit code for the shell failing to connect, which is what we want
     // for a successful test.

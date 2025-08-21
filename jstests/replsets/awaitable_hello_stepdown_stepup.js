@@ -25,11 +25,13 @@ assert(topologyVersionField.hasOwnProperty("processId"), tojson(topologyVersionF
 assert(topologyVersionField.hasOwnProperty("counter"), tojson(topologyVersionField));
 
 function runAwaitableHelloBeforeStepDown(topologyVersionField) {
-    const resAfterDisablingWrites = assert.commandWorked(db.runCommand({
-        hello: 1,
-        topologyVersion: topologyVersionField,
-        maxAwaitTimeMS: 99999999,
-    }));
+    const resAfterDisablingWrites = assert.commandWorked(
+        db.runCommand({
+            hello: 1,
+            topologyVersion: topologyVersionField,
+            maxAwaitTimeMS: 99999999,
+        }),
+    );
     assert.eq(topologyVersionField.counter + 1, resAfterDisablingWrites.topologyVersion.counter);
     // Validate that an hello response returns once writes have been disabled on the primary
     // even though the node has yet to transition to secondary.
@@ -39,25 +41,31 @@ function runAwaitableHelloBeforeStepDown(topologyVersionField) {
 
     // The TopologyVersion from resAfterDisablingWrites should now be stale since the old primary
     // has completed its transition to secondary. This hello request should respond immediately.
-    const resAfterStepdownComplete = assert.commandWorked(db.runCommand({
-        hello: 1,
-        topologyVersion: resAfterDisablingWrites.topologyVersion,
-        maxAwaitTimeMS: 99999999,
-    }));
-    assert.eq(resAfterDisablingWrites.topologyVersion.counter + 1,
-              resAfterStepdownComplete.topologyVersion.counter,
-              resAfterStepdownComplete);
+    const resAfterStepdownComplete = assert.commandWorked(
+        db.runCommand({
+            hello: 1,
+            topologyVersion: resAfterDisablingWrites.topologyVersion,
+            maxAwaitTimeMS: 99999999,
+        }),
+    );
+    assert.eq(
+        resAfterDisablingWrites.topologyVersion.counter + 1,
+        resAfterStepdownComplete.topologyVersion.counter,
+        resAfterStepdownComplete,
+    );
     assert.eq(false, resAfterStepdownComplete.isWritablePrimary, resAfterStepdownComplete);
     assert.eq(true, resAfterStepdownComplete.secondary, resAfterStepdownComplete);
     assert(!resAfterStepdownComplete.hasOwnProperty("primary"), resAfterStepdownComplete);
 }
 
 function runAwaitableHelloBeforeStepUp(topologyVersionField) {
-    const resAfterEnteringDrainMode = assert.commandWorked(db.runCommand({
-        hello: 1,
-        topologyVersion: topologyVersionField,
-        maxAwaitTimeMS: 99999999,
-    }));
+    const resAfterEnteringDrainMode = assert.commandWorked(
+        db.runCommand({
+            hello: 1,
+            topologyVersion: topologyVersionField,
+            maxAwaitTimeMS: 99999999,
+        }),
+    );
     assert.eq(topologyVersionField.counter + 1, resAfterEnteringDrainMode.topologyVersion.counter);
     // Validate that the hello response returns once the primary enters drain mode. At this
     // point, we expect the 'primary' field to exist but 'isWritablePrimary' will still be false.
@@ -67,14 +75,18 @@ function runAwaitableHelloBeforeStepUp(topologyVersionField) {
 
     // The TopologyVersion from resAfterEnteringDrainMode should now be stale since we expect
     // the primary to increase the config term and increment the counter once again.
-    const resAfterReconfigOnStepUp = assert.commandWorked(db.runCommand({
-        hello: 1,
-        topologyVersion: resAfterEnteringDrainMode.topologyVersion,
-        maxAwaitTimeMS: 99999999,
-    }));
-    assert.eq(resAfterEnteringDrainMode.topologyVersion.counter + 1,
-              resAfterReconfigOnStepUp.topologyVersion.counter,
-              resAfterReconfigOnStepUp);
+    const resAfterReconfigOnStepUp = assert.commandWorked(
+        db.runCommand({
+            hello: 1,
+            topologyVersion: resAfterEnteringDrainMode.topologyVersion,
+            maxAwaitTimeMS: 99999999,
+        }),
+    );
+    assert.eq(
+        resAfterEnteringDrainMode.topologyVersion.counter + 1,
+        resAfterReconfigOnStepUp.topologyVersion.counter,
+        resAfterReconfigOnStepUp,
+    );
     assert.eq(false, resAfterReconfigOnStepUp.isWritablePrimary, resAfterReconfigOnStepUp);
     assert.eq(true, resAfterReconfigOnStepUp.secondary, resAfterReconfigOnStepUp);
     assert.hasFields(resAfterReconfigOnStepUp, ["primary"]);
@@ -83,11 +95,13 @@ function runAwaitableHelloBeforeStepUp(topologyVersionField) {
 function runAwaitableHelloAfterStepUp(topologyVersionField) {
     // The TopologyVersion from resAfterReconfigOnStepUp should now be stale since we expect
     // the primary to exit drain mode and increment the counter once again.
-    const resAfterExitingDrainMode = assert.commandWorked(db.runCommand({
-        hello: 1,
-        topologyVersion: topologyVersionField,
-        maxAwaitTimeMS: 99999999,
-    }));
+    const resAfterExitingDrainMode = assert.commandWorked(
+        db.runCommand({
+            hello: 1,
+            topologyVersion: topologyVersionField,
+            maxAwaitTimeMS: 99999999,
+        }),
+    );
     assert.eq(topologyVersionField.counter + 1, resAfterExitingDrainMode.topologyVersion.counter);
     assert.eq(true, resAfterExitingDrainMode.isWritablePrimary, resAfterExitingDrainMode);
     assert.eq(false, resAfterExitingDrainMode.secondary, resAfterExitingDrainMode);
@@ -100,7 +114,9 @@ let failPoint = configureFailPoint(node, "waitForHelloResponse");
 // Send an awaitable hello request. This will block until maxAwaitTimeMS has elapsed or a
 // topology change happens.
 let awaitHelloBeforeStepDown = startParallelShell(
-    funWithArgs(runAwaitableHelloBeforeStepDown, topologyVersionField), node.port);
+    funWithArgs(runAwaitableHelloBeforeStepDown, topologyVersionField),
+    node.port,
+);
 failPoint.wait();
 
 // Call stepdown to increment the server TopologyVersion and respond to the waiting hello
@@ -119,7 +135,9 @@ const hangFailPoint = configureFailPoint(node, "hangAfterReconfigOnDrainComplete
 // Send an awaitable hello request. This will block until maxAwaitTimeMS has elapsed or a
 // topology change happens.
 let awaitHelloBeforeStepUp = startParallelShell(
-    funWithArgs(runAwaitableHelloBeforeStepUp, topologyVersionAfterStepDown), node.port);
+    funWithArgs(runAwaitableHelloBeforeStepUp, topologyVersionAfterStepDown),
+    node.port,
+);
 failPoint.wait();
 
 // Unfreezing the old primary will cause the node to step up in a single node replica set.
@@ -138,7 +156,9 @@ failPoint = configureFailPoint(node, "waitForHelloResponse");
 // Send an awaitable hello request. This will block until maxAwaitTimeMS has elapsed or a
 // topology change happens.
 let awaitHelloAfterStepUp = startParallelShell(
-    funWithArgs(runAwaitableHelloAfterStepUp, topologyVersionAfterStepUp), node.port);
+    funWithArgs(runAwaitableHelloAfterStepUp, topologyVersionAfterStepUp),
+    node.port,
+);
 failPoint.wait();
 // Let the stepup thread to continue.
 hangFailPoint.off();

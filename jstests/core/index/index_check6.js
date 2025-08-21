@@ -4,7 +4,7 @@
 //   assumes_unsharded_collection,
 // ]
 
-const collNamePrefix = 'jstests_index_check6_';
+const collNamePrefix = "jstests_index_check6_";
 let collCount = 0;
 let t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
@@ -24,26 +24,14 @@ for (let age = 10; age < 50; age++) {
 
 assertKeysExamined(10, {age: 30}, {}, "A");
 assertKeysExamined(20, {age: {$gte: 29, $lte: 30}}, {}, "B");
-assertKeysExamined(
-    19, {age: {$gte: 25, $lte: 30}, rating: {$in: [0, 9]}}, {age: 1, rating: 1}, "C1");
-assertKeysExamined(
-    24, {age: {$gte: 25, $lte: 30}, rating: {$in: [0, 8]}}, {age: 1, rating: 1}, "C2");
-assertKeysExamined(
-    29, {age: {$gte: 25, $lte: 30}, rating: {$in: [1, 8]}}, {age: 1, rating: 1}, "C3");
+assertKeysExamined(19, {age: {$gte: 25, $lte: 30}, rating: {$in: [0, 9]}}, {age: 1, rating: 1}, "C1");
+assertKeysExamined(24, {age: {$gte: 25, $lte: 30}, rating: {$in: [0, 8]}}, {age: 1, rating: 1}, "C2");
+assertKeysExamined(29, {age: {$gte: 25, $lte: 30}, rating: {$in: [1, 8]}}, {age: 1, rating: 1}, "C3");
 
-assertKeysExamined(5,
-                   {age: {$gte: 29, $lte: 30}, rating: 5},
-                   {age: 1, rating: 1},
-                   "C");  // SERVER-371
-assertKeysExamined(7,
-                   {age: {$gte: 29, $lte: 30}, rating: {$gte: 4, $lte: 5}},
-                   {age: 1, rating: 1},
-                   "D");  // SERVER-371
+assertKeysExamined(5, {age: {$gte: 29, $lte: 30}, rating: 5}, {age: 1, rating: 1}, "C"); // SERVER-371
+assertKeysExamined(7, {age: {$gte: 29, $lte: 30}, rating: {$gte: 4, $lte: 5}}, {age: 1, rating: 1}, "D"); // SERVER-371
 
-assert.eq(2,
-          t.find({age: 30, rating: {$gte: 4, $lte: 5}})
-              .explain('executionStats')
-              .executionStats.totalKeysExamined);
+assert.eq(2, t.find({age: 30, rating: {$gte: 4, $lte: 5}}).explain("executionStats").executionStats.totalKeysExamined);
 
 function doPopulateData() {
     for (let a = 1; a < 10; a++) {

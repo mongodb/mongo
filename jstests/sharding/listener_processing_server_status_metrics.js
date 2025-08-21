@@ -15,8 +15,7 @@ const admin = st.s.getDB("admin");
 let previous = 0;
 for (var i = 0; i < numConnections; i++) {
     const conn = new Mongo(admin.getMongo().host);
-    const t =
-        assert.commandWorked(admin.serverStatus()).network.listenerProcessingTime["durationMicros"];
+    const t = assert.commandWorked(admin.serverStatus()).network.listenerProcessingTime["durationMicros"];
     assert.gte(t, previous);
     previous = t;
 }

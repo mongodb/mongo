@@ -18,19 +18,18 @@ import {storageEngineIsWiredTiger} from "jstests/libs/storage_engine/storage_eng
 
 // Start a standalone node.
 let primary = MongoRunner.runMongod();
-let localDB = primary.getDB('local');
+let localDB = primary.getDB("local");
 
 // Standalone nodes don't start with an oplog; create one. The size of the oplog doesn't
 // matter. We are capping the oplog because some storage engines do not allow the creation
 // of uncapped oplog collections.
-assert.commandWorked(localDB.runCommand({create: 'oplog.rs', capped: true, size: 1000}));
+assert.commandWorked(localDB.runCommand({create: "oplog.rs", capped: true, size: 1000}));
 
 if (storageEngineIsWiredTiger()) {
-    const ret = assert.commandFailed(localDB.runCommand({drop: 'oplog.rs'}));
-    assert.eq("can't drop oplog on storage engines that support replSetResizeOplog command",
-              ret.errmsg);
+    const ret = assert.commandFailed(localDB.runCommand({drop: "oplog.rs"}));
+    assert.eq("can't drop oplog on storage engines that support replSetResizeOplog command", ret.errmsg);
 } else {
-    assert.commandWorked(localDB.runCommand({drop: 'oplog.rs'}));
+    assert.commandWorked(localDB.runCommand({drop: "oplog.rs"}));
 }
 
 MongoRunner.stopMongod(primary);

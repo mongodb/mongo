@@ -10,12 +10,10 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_inserts.js';
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_inserts.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     if (TestData.evergreenVariantName && TestData.evergreenVariantName.includes("tsan")) {
         // Reduce resource usage when running TSAN builds to avoid out-of-memory failures.
         $config.threadCount = Math.floor($config.threadCount * 0.6);
@@ -44,16 +42,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.call(this, db, collName, connCache);
 
-        this.arbitraryDeletesEnabled =
-            FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesDeletesSupport");
+        this.arbitraryDeletesEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesDeletesSupport");
     };
 
     $config.states.doDelete = function doDelete(db, collName, connCache) {
         // Alternate between filtering on the meta field and filtering on a data field. This will
         // cover both the timeseries batch delete and arbitrary delete paths.
-        const filterFieldName = !this.arbitraryDeletesEnabled || Random.randInt(2) == 0
-            ? "m.tid" + this.tid
-            : "f.tid" + this.tid;
+        const filterFieldName =
+            !this.arbitraryDeletesEnabled || Random.randInt(2) == 0 ? "m.tid" + this.tid : "f.tid" + this.tid;
         const filter = {
             [filterFieldName]: {
                 $gte: Random.randInt($config.data.numMetaCount),
@@ -69,9 +65,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // validation needs to be more lenient.
         const count = db[collName].find().itcount();
         const countNonSharded = db[this.nonShardCollName].find().itcount();
-        assert.gte(count,
-                   countNonSharded,
-                   "Expected sharded collection to have the same or more records than unsharded");
+        assert.gte(
+            count,
+            countNonSharded,
+            "Expected sharded collection to have the same or more records than unsharded",
+        );
     };
 
     $config.transitions = {

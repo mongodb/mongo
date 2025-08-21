@@ -1,10 +1,7 @@
 /**
  * Test that $ne: [] queries are cached correctly. See SERVER-39764.
  */
-import {
-    getPlanCacheKeyFromShape,
-    getPlanCacheShapeHashFromObject
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanCacheKeyFromShape, getPlanCacheShapeHashFromObject} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
 const isUsingSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
@@ -46,9 +43,9 @@ function runTest(queryToCache, queryToRunAfterCaching) {
     assert.neq(explain.queryPlanner.planCacheKey, cacheEntries[0].planCacheKey);
 }
 
-runTest({'obj': {$ne: 'def'}}, {'obj': {$ne: [[1]]}});
+runTest({"obj": {$ne: "def"}}, {"obj": {$ne: [[1]]}});
 
 // Clear the cache.
-assert.commandWorked(coll.runCommand('planCacheClear'));
+assert.commandWorked(coll.runCommand("planCacheClear"));
 
-runTest({'obj': {$nin: ['abc', 'def']}}, {'obj': {$nin: [[1], 'abc']}});
+runTest({"obj": {$nin: ["abc", "def"]}}, {"obj": {$nin: [[1], "abc"]}});

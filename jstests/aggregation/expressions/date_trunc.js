@@ -14,51 +14,57 @@ const coll = testDB.collection;
 assert.commandWorked(testDB.dropDatabase());
 
 const someDate = new Date("2020-11-01T18:23:36Z");
-const aggregationPipelineWithDateTrunc = [{
-    $project: {
-        _id: false,
-        date_trunc:
-            {$dateTrunc: {date: "$date", unit: "$unit", binSize: "$binSize", timezone: "$timeZone"}}
-    }
-}];
-const aggregationPipelineWithDateTruncAndStartOfWeek = [{
-    $project: {
-        _id: false,
-        date_trunc: {
-            $dateTrunc: {
-                date: "$date",
-                unit: "$unit",
-                binSize: "$binSize",
-                timezone: "$timeZone",
-                startOfWeek: "$startOfWeek"
-            }
-        }
-    }
-}];
+const aggregationPipelineWithDateTrunc = [
+    {
+        $project: {
+            _id: false,
+            date_trunc: {$dateTrunc: {date: "$date", unit: "$unit", binSize: "$binSize", timezone: "$timeZone"}},
+        },
+    },
+];
+const aggregationPipelineWithDateTruncAndStartOfWeek = [
+    {
+        $project: {
+            _id: false,
+            date_trunc: {
+                $dateTrunc: {
+                    date: "$date",
+                    unit: "$unit",
+                    binSize: "$binSize",
+                    timezone: "$timeZone",
+                    startOfWeek: "$startOfWeek",
+                },
+            },
+        },
+    },
+];
 const testCases = [
     {
         // Parameters are constants, timezone is not specified.
-        pipeline: [{
-            $project: {
-                _id: true,
-                date_trunc:
-                    {$dateTrunc: {date: new Date("2020-11-01T18:23:36Z"), unit: "hour", binSize: 2}}
-            }
-        }],
+        pipeline: [
+            {
+                $project: {
+                    _id: true,
+                    date_trunc: {$dateTrunc: {date: new Date("2020-11-01T18:23:36Z"), unit: "hour", binSize: 2}},
+                },
+            },
+        ],
         inputDocuments: [{_id: 1}],
-        expectedResults: [{_id: 1, date_trunc: new Date("2020-11-01T18:00:00Z")}]
+        expectedResults: [{_id: 1, date_trunc: new Date("2020-11-01T18:00:00Z")}],
     },
     {
         // Parameters are field paths.
         pipeline: aggregationPipelineWithDateTruncAndStartOfWeek,
-        inputDocuments: [{
-            date: new Date("2021-12-01T18:23:36Z"),
-            unit: "hour",
-            binSize: 4,
-            timeZone: "America/New_York",
-            startOfWeek: "IGNORED"  // Ignored when unit is not week.
-        }],
-        expectedResults: [{date_trunc: new Date("2021-12-01T17:00:00Z")}]
+        inputDocuments: [
+            {
+                date: new Date("2021-12-01T18:23:36Z"),
+                unit: "hour",
+                binSize: 4,
+                timeZone: "America/New_York",
+                startOfWeek: "IGNORED", // Ignored when unit is not week.
+            },
+        ],
+        expectedResults: [{date_trunc: new Date("2021-12-01T17:00:00Z")}],
     },
     // Expression parsing tests.
     {
@@ -89,44 +95,47 @@ const testCases = [
     {
         // Default values are used for optional parameters (startOfWeek: "Sunday", binSize: 1,
         // timezone: "UTC").
-        pipeline:
-            [{$project: {_id: false, date_trunc: {$dateTrunc: {date: "$date", unit: "week"}}}}],
-        inputDocuments: [{
-            date: new Date("2021-02-15T18:23:36Z"),
-        }],
-        expectedResults: [{date_trunc: new Date("2021-02-14T00:00:00Z")}]
+        pipeline: [{$project: {_id: false, date_trunc: {$dateTrunc: {date: "$date", unit: "week"}}}}],
+        inputDocuments: [
+            {
+                date: new Date("2021-02-15T18:23:36Z"),
+            },
+        ],
+        expectedResults: [{date_trunc: new Date("2021-02-14T00:00:00Z")}],
     },
     {
         // Optional parameters are accepted.
         pipeline: aggregationPipelineWithDateTruncAndStartOfWeek,
-        inputDocuments: [{
-            date: new Date("2000-01-30T18:00:00Z"),
-            unit: "week",
-            binSize: 2,
-            timeZone: "America/New_York",
-            startOfWeek: "mon"
-
-        }],
-        expectedResults: [{date_trunc: new Date("2000-01-17T05:00:00Z")}]
+        inputDocuments: [
+            {
+                date: new Date("2000-01-30T18:00:00Z"),
+                unit: "week",
+                binSize: 2,
+                timeZone: "America/New_York",
+                startOfWeek: "mon",
+            },
+        ],
+        expectedResults: [{date_trunc: new Date("2000-01-17T05:00:00Z")}],
     },
     {
         // 'date' is object id.
-        pipeline: [{
-            $project:
-                {_id: false, date_trunc: {$dateTrunc: {date: "$_id", unit: "minute", binSize: 10}}}
-        }],
-        inputDocuments:
-            [{_id: new ObjectId("507c7f79bcf86cd7994f6c0e") /* timestamp 2012-10-15T21:26:17Z*/}],
-        expectedResults: [{date_trunc: new Date("2012-10-15T21:20:00Z")}]
+        pipeline: [
+            {
+                $project: {_id: false, date_trunc: {$dateTrunc: {date: "$_id", unit: "minute", binSize: 10}}},
+            },
+        ],
+        inputDocuments: [{_id: new ObjectId("507c7f79bcf86cd7994f6c0e") /* timestamp 2012-10-15T21:26:17Z*/}],
+        expectedResults: [{date_trunc: new Date("2012-10-15T21:20:00Z")}],
     },
     {
         // 'date' is a timestamp.
-        pipeline: [{
-            $project:
-                {_id: false, date_trunc: {$dateTrunc: {date: "$ts", unit: "second", binSize: 10}}}
-        }],
+        pipeline: [
+            {
+                $project: {_id: false, date_trunc: {$dateTrunc: {date: "$ts", unit: "second", binSize: 10}}},
+            },
+        ],
         inputDocuments: [{ts: new Timestamp(1350336377 /*2012-10-15T21:26:17Z*/, 0)}],
-        expectedResults: [{date_trunc: new Date("2012-10-15T21:26:10Z")}]
+        expectedResults: [{date_trunc: new Date("2012-10-15T21:26:10Z")}],
     },
     {
         // Invalid 'date' type.
@@ -205,41 +214,53 @@ const testCases = [
     {
         // 'binSize' decimal value is accepted.
         pipeline: aggregationPipelineWithDateTrunc,
-        inputDocuments: [{
-            date: new Date("2020-01-30T18:59:00Z"),
-            unit: "minute",
-            binSize: NumberDecimal("15"),
-            timeZone: "UTC"
-        }],
-        expectedResults: [{
-            date_trunc: new Date("2020-01-30T18:45:00Z"),
-        }],
+        inputDocuments: [
+            {
+                date: new Date("2020-01-30T18:59:00Z"),
+                unit: "minute",
+                binSize: NumberDecimal("15"),
+                timeZone: "UTC",
+            },
+        ],
+        expectedResults: [
+            {
+                date_trunc: new Date("2020-01-30T18:45:00Z"),
+            },
+        ],
     },
     {
         // 'binSize' long value is accepted.
         pipeline: aggregationPipelineWithDateTrunc,
-        inputDocuments: [{
-            date: new Date("2020-01-30T18:59:00Z"),
-            unit: "day",
-            binSize: NumberLong("1"),
-            timeZone: "UTC"
-        }],
-        expectedResults: [{
-            date_trunc: new Date("2020-01-30T00:00:00Z"),
-        }],
+        inputDocuments: [
+            {
+                date: new Date("2020-01-30T18:59:00Z"),
+                unit: "day",
+                binSize: NumberLong("1"),
+                timeZone: "UTC",
+            },
+        ],
+        expectedResults: [
+            {
+                date_trunc: new Date("2020-01-30T00:00:00Z"),
+            },
+        ],
     },
     {
         // 'binSize' int value is accepted.
         pipeline: aggregationPipelineWithDateTrunc,
-        inputDocuments: [{
-            date: new Date("2020-01-30T18:59:00.003Z"),
-            unit: "millisecond",
-            binSize: NumberInt("1000"),
-            timeZone: "UTC"
-        }],
-        expectedResults: [{
-            date_trunc: new Date("2020-01-30T18:59:00.000Z"),
-        }],
+        inputDocuments: [
+            {
+                date: new Date("2020-01-30T18:59:00.003Z"),
+                unit: "millisecond",
+                binSize: NumberInt("1000"),
+                timeZone: "UTC",
+            },
+        ],
+        expectedResults: [
+            {
+                date_trunc: new Date("2020-01-30T18:59:00.000Z"),
+            },
+        ],
     },
     {
         // Null 'timezone'.
@@ -283,28 +304,28 @@ const testCases = [
     {
         // Invalid 'startOfWeek' type.
         pipeline: aggregationPipelineWithDateTruncAndStartOfWeek,
-        inputDocuments:
-            [{date: someDate, unit: "week", binSize: 1, timeZone: "GMT", startOfWeek: 1}],
+        inputDocuments: [{date: someDate, unit: "week", binSize: 1, timeZone: "GMT", startOfWeek: 1}],
         expectedErrorCode: 5439015,
     },
     {
         // Invalid 'startOfWeek' type, unit is not the week.
         pipeline: aggregationPipelineWithDateTruncAndStartOfWeek,
-        inputDocuments: [{
-            date: new Date("2020-01-30T18:59:00.000Z"),
-            binSize: 1,
-            unit: "year",
-            timeZone: "GMT",
-            startOfWeek: 1
-        }],
+        inputDocuments: [
+            {
+                date: new Date("2020-01-30T18:59:00.000Z"),
+                binSize: 1,
+                unit: "year",
+                timeZone: "GMT",
+                startOfWeek: 1,
+            },
+        ],
         expectedResults: [{date_trunc: new Date("2020-01-01T00:00:00.000Z")}],
     },
     {
         // Invalid 'startOfWeek' value.
         pipeline: aggregationPipelineWithDateTruncAndStartOfWeek,
-        inputDocuments:
-            [{date: someDate, unit: "week", binSize: 1, timeZone: "GMT", startOfWeek: "FRIDIE"}],
+        inputDocuments: [{date: someDate, unit: "week", binSize: 1, timeZone: "GMT", startOfWeek: "FRIDIE"}],
         expectedErrorCode: 5439016,
-    }
+    },
 ];
-testCases.forEach(testCase => executeAggregationTestCase(coll, testCase));
+testCases.forEach((testCase) => executeAggregationTestCase(coll, testCase));

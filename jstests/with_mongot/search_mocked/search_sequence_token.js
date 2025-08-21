@@ -26,14 +26,14 @@ assert.commandWorked(coll.insert({"_id": 8, "test": 100}));
 const collUUID = getUUIDFromListCollections(db, coll.getName());
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 const searchCmd = {
     search: coll.getName(),
     collectionUUID: collUUID,
     query: searchQuery,
     $db: "test",
-    cursorOptions: {requiresSearchSequenceToken: true}
+    cursorOptions: {requiresSearchSequenceToken: true},
 };
 
 const cursorId = NumberLong(123);
@@ -65,11 +65,11 @@ const history = [
                         $searchSequenceToken: "ddddddd==",
                         $searchScore: 2.5,
                     },
-                ]
+                ],
             },
             vars: {SEARCH_META: {value: 1}},
-            ok: 1
-        }
+            ok: 1,
+        },
     },
     {
         // pagination flag is not set on getMore cursor options
@@ -99,20 +99,19 @@ const history = [
                         $searchSequenceToken: "hhhhhhh==",
                         $searchScore: 2.5,
                     },
-                ]
+                ],
             },
-            ok: 1
-        }
+            ok: 1,
+        },
     },
 ];
 
-assert.commandWorked(
-    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 
 // Perform a $search query with pagination turned on.
 let cursor = coll.aggregate([
     {$search: searchQuery},
-    {$project: {"myToken": {$meta: "searchSequenceToken"}, "test": true}}
+    {$project: {"myToken": {$meta: "searchSequenceToken"}, "test": true}},
 ]);
 
 const expected = [
@@ -123,28 +122,27 @@ const expected = [
     {"_id": 5, "test": 100, "myToken": "eeeeeee=="},
     {"_id": 6, "test": 100, "myToken": "fffffff=="},
     {"_id": 7, "test": 10, "myToken": "ggggggg=="},
-    {"_id": 8, "test": 100, "myToken": "hhhhhhh=="}
+    {"_id": 8, "test": 100, "myToken": "hhhhhhh=="},
 ];
 assert.eq(expected, cursor.toArray());
 
-assert.commandWorked(
-    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 
 // $addFields is $project sugar.
-cursor = coll.aggregate(
-    [{$search: searchQuery}, {$addFields: {"myToken": {$meta: "searchSequenceToken"}}}]);
+cursor = coll.aggregate([{$search: searchQuery}, {$addFields: {"myToken": {$meta: "searchSequenceToken"}}}]);
 assert.eq(expected, cursor.toArray());
 
-const expected2 = [{
-    "meta": [{"value": 1}],
-    "docs": [
-        {"_id": 1, "paginationToken": "aaaaaaa==", "score": 1.234},
-        {"_id": 2, "paginationToken": "bbbbbbb==", "score": 1.345},
-        {"_id": 3, "paginationToken": "ccccccc==", "score": 2.234},
-    ]
-}];
-assert.commandWorked(
-    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+const expected2 = [
+    {
+        "meta": [{"value": 1}],
+        "docs": [
+            {"_id": 1, "paginationToken": "aaaaaaa==", "score": 1.234},
+            {"_id": 2, "paginationToken": "bbbbbbb==", "score": 1.345},
+            {"_id": 3, "paginationToken": "ccccccc==", "score": 2.234},
+        ],
+    },
+];
+assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 
 // Test $search + $facet with searchSequenceToken.
 cursor = coll.aggregate([

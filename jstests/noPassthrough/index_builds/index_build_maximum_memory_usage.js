@@ -13,7 +13,7 @@ replSet.initiate();
 const minIndexBuildMemoryLimitBytes = 50 * 1024 * 1024;
 
 const primary = replSet.getPrimary();
-const testDB = primary.getDB('test');
+const testDB = primary.getDB("test");
 const coll = testDB[jsTestName()];
 
 const availableMemoryMB = assert.commandWorked(testDB.hostInfo()).system.memSizeMB;
@@ -37,31 +37,32 @@ while (d < docs) {
 function roughlyEqual(expected, actual, digits) {
     let expectedNormalized = Math.trunc(expected / Math.pow(10, digits));
     let actualNormalized = Math.trunc(actual / Math.pow(10, digits));
-    jsTestLog("expected: [" + expectedNormalized.toString() + "] == [" +
-              actualNormalized.toString() + "]");
+    jsTestLog("expected: [" + expectedNormalized.toString() + "] == [" + actualNormalized.toString() + "]");
     return expectedNormalized == actualNormalized;
 }
 
 function assertLogIdExists(logId) {
-    assert.soon(() => rawMongoProgramOutput(':' + logId + ','),
-                "Expected index build log message not found.",
-                10 * 1000);
+    assert.soon(
+        () => rawMongoProgramOutput(":" + logId + ","),
+        "Expected index build log message not found.",
+        10 * 1000,
+    );
 }
 
-function runTest(
-    indexSpec, indexBuildMemoryLimit, expectedComputedLimit, expectedLogId, isSuccess) {
+function runTest(indexSpec, indexBuildMemoryLimit, expectedComputedLimit, expectedLogId, isSuccess) {
     clearRawMongoProgramOutput();
 
     if (indexBuildMemoryLimit != "default") {
         if (!isSuccess) {
             assert.commandFailedWithCode(
-                primary.adminCommand(
-                    {setParameter: 1, maxIndexBuildMemoryUsageMegabytes: indexBuildMemoryLimit}),
-                ErrorCodes.BadValue);
+                primary.adminCommand({setParameter: 1, maxIndexBuildMemoryUsageMegabytes: indexBuildMemoryLimit}),
+                ErrorCodes.BadValue,
+            );
             return;
         } else {
-            assert.commandWorked(primary.adminCommand(
-                {setParameter: 1, maxIndexBuildMemoryUsageMegabytes: indexBuildMemoryLimit}));
+            assert.commandWorked(
+                primary.adminCommand({setParameter: 1, maxIndexBuildMemoryUsageMegabytes: indexBuildMemoryLimit}),
+            );
         }
     }
 
@@ -70,7 +71,7 @@ function runTest(
     IndexBuildTest.waitForIndexBuildToStop(testDB);
 
     assertLogIdExists(expectedLogId);
-    let indexBuildMemoryLogLines = rawMongoProgramOutput('INDEX.*:' + expectedLogId + ',');
+    let indexBuildMemoryLogLines = rawMongoProgramOutput("INDEX.*:" + expectedLogId + ",");
     let matchedLine = indexBuildMemoryLogLines.match('limitBytes":[0-9]+');
     assert.neq(null, matchedLine);
     jsTestLog("matchedLimit: " + matchedLine);
@@ -81,32 +82,50 @@ function runTest(
     assert(roughlyEqual(expectedComputedLimit, computedLimit, 6));
 }
 
-function runPercentLimitTest(indexSpec,
-                             indexBuildMemoryPercentLimit,
-                             expectedComputedLimit,
-                             expectedLogId,
-                             isSuccess = true) {
-    jsTestLog("runPercentLimitTest(" + tojson(indexSpec) + ", " +
-              indexBuildMemoryPercentLimit.toString() + ", " + expectedComputedLimit.toString() +
-              ", " + expectedLogId.toString() + ", isSuccess=" + isSuccess + ")");
-    runTest(
-        indexSpec, indexBuildMemoryPercentLimit, expectedComputedLimit, expectedLogId, isSuccess);
+function runPercentLimitTest(
+    indexSpec,
+    indexBuildMemoryPercentLimit,
+    expectedComputedLimit,
+    expectedLogId,
+    isSuccess = true,
+) {
+    jsTestLog(
+        "runPercentLimitTest(" +
+            tojson(indexSpec) +
+            ", " +
+            indexBuildMemoryPercentLimit.toString() +
+            ", " +
+            expectedComputedLimit.toString() +
+            ", " +
+            expectedLogId.toString() +
+            ", isSuccess=" +
+            isSuccess +
+            ")",
+    );
+    runTest(indexSpec, indexBuildMemoryPercentLimit, expectedComputedLimit, expectedLogId, isSuccess);
 }
 
-function runByteLimitTest(indexSpec,
-                          indexBuildMemoryByteLimitMB,
-                          expectedComputedLimitBytes,
-                          expectedLogId,
-                          isSuccess = true) {
-    jsTestLog("runByteLimitTest(" + tojson(indexSpec) + ", " +
-              indexBuildMemoryByteLimitMB.toString() + ", " +
-              expectedComputedLimitBytes.toString() + ", " + expectedLogId.toString() +
-              ", isSuccess=" + isSuccess + ")");
-    runTest(indexSpec,
-            indexBuildMemoryByteLimitMB,
-            expectedComputedLimitBytes,
-            expectedLogId,
-            isSuccess);
+function runByteLimitTest(
+    indexSpec,
+    indexBuildMemoryByteLimitMB,
+    expectedComputedLimitBytes,
+    expectedLogId,
+    isSuccess = true,
+) {
+    jsTestLog(
+        "runByteLimitTest(" +
+            tojson(indexSpec) +
+            ", " +
+            indexBuildMemoryByteLimitMB.toString() +
+            ", " +
+            expectedComputedLimitBytes.toString() +
+            ", " +
+            expectedLogId.toString() +
+            ", isSuccess=" +
+            isSuccess +
+            ")",
+    );
+    runTest(indexSpec, indexBuildMemoryByteLimitMB, expectedComputedLimitBytes, expectedLogId, isSuccess);
 }
 
 //
@@ -128,7 +147,7 @@ if (availableMemoryMB <= 5000 * 1024) {
 
 // Within bounds
 if (availableMemoryMB >= 500) {
-    runPercentLimitTest({c: 1}, 0.1, (0.1 * availableMemoryBytes), "10448901");
+    runPercentLimitTest({c: 1}, 0.1, 0.1 * availableMemoryBytes, "10448901");
 } else {
     runPercentLimitTest({c: 1}, 0.1, minIndexBuildMemoryLimitBytes, "10448901");
     assertLogIdExists("10448902");

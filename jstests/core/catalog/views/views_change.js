@@ -13,17 +13,15 @@ let view = viewDB.view;
 let viewOnView = viewDB.viewOnView;
 
 // Convenience functions.
-let resetCollectionAndViews = function() {
+let resetCollectionAndViews = function () {
     viewDB.runCommand({drop: "collection"});
     viewDB.runCommand({drop: "view"});
     viewDB.runCommand({drop: "viewOnView"});
     assert.commandWorked(viewDB.runCommand({create: "collection"}));
-    assert.commandWorked(
-        viewDB.runCommand({create: "view", viewOn: "collection", pipeline: [{$match: {a: 1}}]}));
-    assert.commandWorked(
-        viewDB.runCommand({create: "viewOnView", viewOn: "view", pipeline: [{$match: {b: 1}}]}));
+    assert.commandWorked(viewDB.runCommand({create: "view", viewOn: "collection", pipeline: [{$match: {a: 1}}]}));
+    assert.commandWorked(viewDB.runCommand({create: "viewOnView", viewOn: "view", pipeline: [{$match: {b: 1}}]}));
 };
-let assertFindResultEq = function(collName, expected) {
+let assertFindResultEq = function (collName, expected) {
     let res = viewDB.runCommand({find: collName, filter: {}, projection: {_id: 0, a: 1, b: 1}});
     assert.commandWorked(res);
     let arr = new DBCommandCursor(viewDB, res).toArray();
@@ -75,8 +73,9 @@ resetCollectionAndViews();
 // A view is updated when a backing view is updated.
 assert.commandWorked(collection.insert(doc));
 assertFindResultEq("viewOnView", [doc]);
-assert.commandWorked(viewDB.runCommand(
-    {collMod: "view", viewOn: "collection", pipeline: [{$match: {nonexistent: 1}}]}));
+assert.commandWorked(
+    viewDB.runCommand({collMod: "view", viewOn: "collection", pipeline: [{$match: {nonexistent: 1}}]}),
+);
 assertFindResultEq("viewOnView", []);
 
 resetCollectionAndViews();

@@ -9,7 +9,7 @@ const conn = MongoRunner.runMongod({
         internalRoaringBitmapsMinimalDensity: 0.00001,
         // Set the batch small to keep the transition process for longer.
         internalRoaringBitmapsBatchSize: 1,
-    }
+    },
 });
 
 function assertNumberOfDocuments(coll, query, expectedNumberOfDocuments) {
@@ -35,14 +35,14 @@ docs.forEach((doc, index) => {
 
 // This query should return 249 documents from {i: 51} to {i: 299}
 const query = {
-    multiKey: {$gte: 150}
+    multiKey: {$gte: 150},
 };
 const expectedNumberOfDocuments = 249;
 
 //*********************************************************
 // Prepare test collections.
 
-const db = conn.getDB('roaring');
+const db = conn.getDB("roaring");
 
 // Ordinary collection.
 db.coll.drop();
@@ -50,9 +50,7 @@ assert.commandWorked(db.coll.insertMany(docs));
 
 // Collection with a clustered index.
 db.clusteredColl.drop();
-db.createCollection(
-    'clusteredColl',
-    {clusteredIndex: {key: {stringIndex: 1}, unique: true, name: 'clustered_index'}});
+db.createCollection("clusteredColl", {clusteredIndex: {key: {stringIndex: 1}, unique: true, name: "clustered_index"}});
 db.clusteredColl.insertMany(docs);
 
 //*********************************************************

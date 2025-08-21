@@ -7,7 +7,7 @@ var common_options = {
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: "jstests/libs/server.pem",
     tlsCAFile: "jstests/libs/ca.pem",
-    tlsAllowInvalidHostnames: ""
+    tlsAllowInvalidHostnames: "",
 };
 
 function runInitialSyncTest() {
@@ -15,7 +15,7 @@ function runInitialSyncTest() {
     var replTest = new ReplSetTest({
         name: "jstests_initsync1_x509",
         nodes: {node0: x509_options1, node1: x509_options2},
-        waitForKeys: false
+        waitForKeys: false,
     });
     replTest.startSet();
     replTest.initiate();
@@ -26,8 +26,8 @@ function runInitialSyncTest() {
 
     print("2. Create a root user.");
     admin.createUser({user: "root", pwd: "pass", roles: ["root"]});
-    authutil.assertAuthenticate(replTest.getPrimary(), '$external', {
-        mechanism: 'MONGODB-X509',
+    authutil.assertAuthenticate(replTest.getPrimary(), "$external", {
+        mechanism: "MONGODB-X509",
     });
 
     print("3. Insert some data");
@@ -57,15 +57,19 @@ function runInitialSyncTest() {
 }
 
 // Standard case, clusterAuthMode: x509
-var x509_options1 = Object.merge(
-    common_options, {tlsClusterFile: "jstests/libs/cluster_cert.pem", clusterAuthMode: "x509"});
+var x509_options1 = Object.merge(common_options, {
+    tlsClusterFile: "jstests/libs/cluster_cert.pem",
+    clusterAuthMode: "x509",
+});
 var x509_options2 = x509_options1;
 runInitialSyncTest();
 
 // Mixed clusterAuthMode: sendX509 and sendKeyFile and try adding --auth
-x509_options1 = Object.merge(
-    common_options,
-    {tlsClusterFile: "jstests/libs/cluster_cert.pem", clusterAuthMode: "sendX509", auth: ""});
+x509_options1 = Object.merge(common_options, {
+    tlsClusterFile: "jstests/libs/cluster_cert.pem",
+    clusterAuthMode: "sendX509",
+    auth: "",
+});
 x509_options2 = Object.merge(common_options, {clusterAuthMode: "sendKeyFile"});
 runInitialSyncTest();
 

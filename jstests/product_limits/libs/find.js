@@ -27,7 +27,7 @@ export class WorkloadFindOverSingleField extends FindWorkload {
     find() {
         let find = [];
         for (let i = 0; i < this.scale(); i++) {
-            find.push({'f0': {$lt: this.scale() + i}});
+            find.push({"f0": {$lt: this.scale() + i}});
         }
         return {$and: find};
     }

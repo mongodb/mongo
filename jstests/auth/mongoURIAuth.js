@@ -1,10 +1,10 @@
 // This tests that the shell successfully breaks down the URI and authenticates using
 // the specified auth mechanism.
 
-const runURIAuthTest = function(userMech, uriMech, authMechanism, regexMechanism) {
+const runURIAuthTest = function (userMech, uriMech, authMechanism, regexMechanism) {
     const conn = MongoRunner.runMongod({
         auth: "",
-        slowms: 30000,  // Don't log slow operations to improve test reliability
+        slowms: 30000, // Don't log slow operations to improve test reliability
     });
     const adminDB = conn.getDB("admin");
 
@@ -12,7 +12,6 @@ const runURIAuthTest = function(userMech, uriMech, authMechanism, regexMechanism
         user: "u",
         pwd: "p",
         roles: ["root"],
-
     });
     adminDB.auth("u", "p");
     adminDB.setLogLevel(2, "command");
@@ -35,13 +34,12 @@ const runURIAuthTest = function(userMech, uriMech, authMechanism, regexMechanism
     var uri;
 
     if (uriMech) {
-        uri = "mongodb://user:password@localhost:" + conn.port +
-            "/admin?authMechanism=" + authMechanism;
+        uri = "mongodb://user:password@localhost:" + conn.port + "/admin?authMechanism=" + authMechanism;
     } else {
         uri = "mongodb://user:password@localhost:" + conn.port;
     }
 
-    var shell = runMongoProgram('mongo', uri, "--eval", "db.getName()");
+    var shell = runMongoProgram("mongo", uri, "--eval", "db.getName()");
     assert.eq(shell, 0, "Should be able to connect with specified params.");
 
     const log = adminDB.runCommand({getLog: "global"});

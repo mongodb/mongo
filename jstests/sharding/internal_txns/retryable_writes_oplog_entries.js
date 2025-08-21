@@ -28,7 +28,7 @@ const mongosTestColl = mongosTestDB.getCollection(kCollName);
 const kStmtIdsOption = {
     isComplete: 1,
     isIncomplete: 2,
-    isRepeated: 3
+    isRepeated: 3,
 };
 
 /*
@@ -41,22 +41,26 @@ const kStmtIdsOption = {
 function makeCustomStmtIdsForTest(numStmtIds, option) {
     switch (option) {
         case kStmtIdsOption.isComplete:
-            return [...Array(numStmtIds).keys()].map(i => NumberInt(i * 10));
+            return [...Array(numStmtIds).keys()].map((i) => NumberInt(i * 10));
         case kStmtIdsOption.isIncomplete: {
             let stmtIds = [...Array(numStmtIds).keys()];
             stmtIds[0] = -1;
-            return stmtIds.map(i => NumberInt(i));
+            return stmtIds.map((i) => NumberInt(i));
         }
         case kStmtIdsOption.isRepeated:
-            return Array(numStmtIds).fill(1).map(i => NumberInt(i));
+            return Array(numStmtIds)
+                .fill(1)
+                .map((i) => NumberInt(i));
     }
 }
 
-function verifyOplogEntries(cmdObj,
-                            lsid,
-                            txnNumber,
-                            numWriteStatements,
-                            {shouldStoreStmtIds, customStmtIdsOption, isPreparedTransaction}) {
+function verifyOplogEntries(
+    cmdObj,
+    lsid,
+    txnNumber,
+    numWriteStatements,
+    {shouldStoreStmtIds, customStmtIdsOption, isPreparedTransaction},
+) {
     const writeCmdObj = Object.assign(cmdObj, {
         lsid: lsid,
         txnNumber: NumberLong(txnNumber),
@@ -80,8 +84,7 @@ function verifyOplogEntries(cmdObj,
     if (isPreparedTransaction) {
         const shard0Primary = st.rs0.getPrimary();
         const prepareCmdObj = makePrepareTransactionCmdObj(lsid, txnNumber);
-        const isPreparedTransactionRes =
-            assert.commandWorked(shard0Primary.adminCommand(prepareCmdObj));
+        const isPreparedTransactionRes = assert.commandWorked(shard0Primary.adminCommand(prepareCmdObj));
         commitCmdObj.commitTimestamp = isPreparedTransactionRes.prepareTimestamp;
         assert.commandWorked(shard0Primary.adminCommand(commitCmdObj));
     }
@@ -119,14 +122,22 @@ function testInserts(lsid, txnNumber, testOptions) {
     jsTest.log("Test batched inserts");
     const insertCmdObj = {
         insert: kCollName,
-        documents: [{_id: 0, x: 0}, {_id: 1, x: 1}],
+        documents: [
+            {_id: 0, x: 0},
+            {_id: 1, x: 1},
+        ],
     };
     verifyOplogEntries(insertCmdObj, lsid, txnNumber, insertCmdObj.documents.length, testOptions);
 }
 
 function testUpdates(lsid, txnNumber, testOptions) {
     jsTest.log("Test batched updates");
-    assert.commandWorked(mongosTestColl.insert([{_id: 0, x: 0}, {_id: 1, x: 1}]));
+    assert.commandWorked(
+        mongosTestColl.insert([
+            {_id: 0, x: 0},
+            {_id: 1, x: 1},
+        ]),
+    );
     const updateCmdObj = {
         update: kCollName,
         updates: [
@@ -139,7 +150,12 @@ function testUpdates(lsid, txnNumber, testOptions) {
 
 function testDeletes(lsid, txnNumber, testOptions) {
     jsTest.log("Test batched deletes");
-    assert.commandWorked(mongosTestColl.insert([{_id: 0, x: 0}, {_id: 1, x: 1}]));
+    assert.commandWorked(
+        mongosTestColl.insert([
+            {_id: 0, x: 0},
+            {_id: 1, x: 1},
+        ]),
+    );
     const deleteCmdObj = {
         delete: kCollName,
         deletes: [
@@ -161,8 +177,7 @@ function testDeletes(lsid, txnNumber, testOptions) {
 }
 
 {
-    jsTest.log(
-        "Test that oplog entries for non-retryable internal transactions do not have stmtIds");
+    jsTest.log("Test that oplog entries for non-retryable internal transactions do not have stmtIds");
     const lsid = {id: UUID(), txnUUID: UUID()};
     let txnNumber = 0;
     const testOptions = {shouldStoreStmtIds: false};
@@ -189,7 +204,7 @@ function testDeletes(lsid, txnNumber, testOptions) {
         const testOptions1 = {
             shouldStoreStmtIds: true,
             customStmtIdsOption: kStmtIdsOption.isComplete,
-            isPreparedTransaction
+            isPreparedTransaction,
         };
         testInserts(lsid, txnNumber++, testOptions1);
         testUpdates(lsid, txnNumber++, testOptions1);
@@ -197,11 +212,12 @@ function testDeletes(lsid, txnNumber, testOptions) {
 
         jsTest.log(
             "Test with custom stmtIds containing -1. Verify that operation entries for write " +
-            "statements with stmtId=-1 do not have a 'stmtId' field");
+                "statements with stmtId=-1 do not have a 'stmtId' field",
+        );
         const testOptions2 = {
             shouldStoreStmtIds: true,
             customStmtIdsOption: kStmtIdsOption.isIncomplete,
-            isPreparedTransaction
+            isPreparedTransaction,
         };
         testInserts(lsid, txnNumber++, testOptions2);
         testUpdates(lsid, txnNumber++, testOptions2);
@@ -209,11 +225,12 @@ function testDeletes(lsid, txnNumber, testOptions) {
 
         jsTest.log(
             "Test with custom stmtIds containing repeats. Verify that the command fails with " +
-            "a uassert instead causes the mongod that executes it to crash");
+                "a uassert instead causes the mongod that executes it to crash",
+        );
         const testOptions3 = {
             shouldStoreStmtIds: true,
             customStmtIdsOption: kStmtIdsOption.isRepeated,
-            isPreparedTransaction
+            isPreparedTransaction,
         };
         testInserts(lsid, txnNumber++, testOptions3);
         testUpdates(lsid, txnNumber++, testOptions3);

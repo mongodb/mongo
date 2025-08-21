@@ -1,21 +1,23 @@
 /**
  * Helper functions that help make assertions on API Version parameters.
  */
-export var APIVersionHelpers = (function() {
+export var APIVersionHelpers = (function () {
     /**
      * Asserts that the pipeline fails with the given code when apiStrict is set to true and
      * apiVersion is "1".
      */
     function assertAggregateFailsWithAPIStrict(pipeline, collName, errorCodes) {
-        assert.commandFailedWithCode(db.runCommand({
-            aggregate: collName,
-            pipeline: pipeline,
-            cursor: {},
-            apiStrict: true,
-            apiVersion: "1"
-        }),
-                                     errorCodes,
-                                     pipeline);
+        assert.commandFailedWithCode(
+            db.runCommand({
+                aggregate: collName,
+                pipeline: pipeline,
+                cursor: {},
+                apiStrict: true,
+                apiVersion: "1",
+            }),
+            errorCodes,
+            pipeline,
+        );
     }
 
     /**
@@ -23,24 +25,28 @@ export var APIVersionHelpers = (function() {
      */
     function assertAggregateSucceedsWithAPIStrict(pipeline, collName, errorCodes) {
         if (errorCodes) {
-            assert.commandWorkedOrFailedWithCode(db.runCommand({
-                aggregate: collName,
-                pipeline: pipeline,
-                cursor: {},
-                apiStrict: true,
-                apiVersion: "1"
-            }),
-                                                 errorCodes,
-                                                 pipeline);
+            assert.commandWorkedOrFailedWithCode(
+                db.runCommand({
+                    aggregate: collName,
+                    pipeline: pipeline,
+                    cursor: {},
+                    apiStrict: true,
+                    apiVersion: "1",
+                }),
+                errorCodes,
+                pipeline,
+            );
         } else {
-            assert.commandWorked(db.runCommand({
-                aggregate: collName,
-                pipeline: pipeline,
-                cursor: {},
-                apiStrict: true,
-                apiVersion: "1"
-            }),
-                                 pipeline);
+            assert.commandWorked(
+                db.runCommand({
+                    aggregate: collName,
+                    pipeline: pipeline,
+                    cursor: {},
+                    apiStrict: true,
+                    apiVersion: "1",
+                }),
+                pipeline,
+            );
         }
     }
 
@@ -49,14 +55,16 @@ export var APIVersionHelpers = (function() {
      * apiVersion is "1".
      */
     function assertAggregateSucceedsAPIVersionWithoutAPIStrict(pipeline, collName) {
-        assert.commandWorked(db.runCommand({
-            aggregate: collName,
-            pipeline: pipeline,
-            cursor: {},
-            apiStrict: false,
-            apiVersion: "1"
-        }),
-                             pipeline);
+        assert.commandWorked(
+            db.runCommand({
+                aggregate: collName,
+                pipeline: pipeline,
+                cursor: {},
+                apiStrict: false,
+                apiVersion: "1",
+            }),
+            pipeline,
+        );
     }
 
     /**
@@ -64,15 +72,17 @@ export var APIVersionHelpers = (function() {
      * and apiVersion is "1" on the create command.
      */
     function assertViewFailsWithAPIStrict(pipeline, viewName, collName) {
-        assert.commandFailedWithCode(db.runCommand({
-            create: viewName,
-            viewOn: collName,
-            pipeline: pipeline,
-            apiStrict: true,
-            apiVersion: "1"
-        }),
-                                     ErrorCodes.APIStrictError,
-                                     pipeline);
+        assert.commandFailedWithCode(
+            db.runCommand({
+                create: viewName,
+                viewOn: collName,
+                pipeline: pipeline,
+                apiStrict: true,
+                apiVersion: "1",
+            }),
+            ErrorCodes.APIStrictError,
+            pipeline,
+        );
     }
 
     /**
@@ -80,13 +90,15 @@ export var APIVersionHelpers = (function() {
      * and apiVersion is "1" on the create command.
      */
     function assertViewSucceedsWithAPIStrict(pipeline, viewName, collName) {
-        assert.commandWorked(db.runCommand({
-            create: viewName,
-            viewOn: collName,
-            pipeline: pipeline,
-            apiStrict: true,
-            apiVersion: "1"
-        }));
+        assert.commandWorked(
+            db.runCommand({
+                create: viewName,
+                viewOn: collName,
+                pipeline: pipeline,
+                apiStrict: true,
+                apiVersion: "1",
+            }),
+        );
 
         assert.commandWorked(db.runCommand({drop: viewName}));
     }
@@ -94,8 +106,7 @@ export var APIVersionHelpers = (function() {
     return {
         assertAggregateFailsWithAPIStrict: assertAggregateFailsWithAPIStrict,
         assertAggregateSucceedsWithAPIStrict: assertAggregateSucceedsWithAPIStrict,
-        assertAggregateSucceedsAPIVersionWithoutAPIStrict:
-            assertAggregateSucceedsAPIVersionWithoutAPIStrict,
+        assertAggregateSucceedsAPIVersionWithoutAPIStrict: assertAggregateSucceedsAPIVersionWithoutAPIStrict,
         assertViewFailsWithAPIStrict: assertViewFailsWithAPIStrict,
         assertViewSucceedsWithAPIStrict: assertViewSucceedsWithAPIStrict,
     };

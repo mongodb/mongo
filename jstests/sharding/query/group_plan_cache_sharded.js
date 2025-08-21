@@ -24,17 +24,16 @@ const coll = mongosDB[collName];
 
 function runPipeline(predicateValue) {
     return coll
-        .aggregate([
-            {$match: {_id: {$gte: predicateValue}}},
-            {$group: {_id: null, sumResult: {$sum: "$a"}}}
-        ])
+        .aggregate([{$match: {_id: {$gte: predicateValue}}}, {$group: {_id: null, sumResult: {$sum: "$a"}}}])
         .toArray();
 }
 
 // Shard coll on _id.
-st.shardColl(
-    coll, {_id: 1} /* key */, {_id: 0} /* split */, {_id: 0} /* move */, mongosDB.getName());
-const docs = [{_id: -2, a: 1}, {_id: 2, a: 2}];
+st.shardColl(coll, {_id: 1} /* key */, {_id: 0} /* split */, {_id: 0} /* move */, mongosDB.getName());
+const docs = [
+    {_id: -2, a: 1},
+    {_id: 2, a: 2},
+];
 assert.commandWorked(coll.insertMany(docs));
 
 assert.eq(0, coll.getPlanCache().list().length, "Expected 0 cache entries");

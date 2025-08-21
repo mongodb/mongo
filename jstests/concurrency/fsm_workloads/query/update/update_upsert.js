@@ -4,18 +4,13 @@
  * Tests updates that specify upsert=true.
  */
 
-export const $config = (function() {
+export const $config = (function () {
     let states = {
         update: function update(db, collName) {
             const docId = Random.randInt(5) * 4;
-            let updateRes =
-                assert.writeOK(db[collName].update({_id: docId}, {$inc: {x: 1}}, {upsert: true}));
-            assert.eq(1,
-                      updateRes.nMatched + updateRes.nUpserted,
-                      "unexpected matched count: " + updateRes);
-            assert.eq(1,
-                      updateRes.nModified + updateRes.nUpserted,
-                      "unexpected modified count: " + updateRes);
+            let updateRes = assert.writeOK(db[collName].update({_id: docId}, {$inc: {x: 1}}, {upsert: true}));
+            assert.eq(1, updateRes.nMatched + updateRes.nUpserted, "unexpected matched count: " + updateRes);
+            assert.eq(1, updateRes.nModified + updateRes.nUpserted, "unexpected modified count: " + updateRes);
         },
     };
 
@@ -32,7 +27,7 @@ export const $config = (function() {
         threadCount: 10,
         iterations: 20,
         states: states,
-        startState: 'update',
+        startState: "update",
         transitions: transitions,
         teardown: teardown,
     };

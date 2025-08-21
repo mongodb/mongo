@@ -16,13 +16,13 @@ import {
     verifyServerStatusElectionReasonCounterChange,
 } from "jstests/replsets/libs/election_metrics.js";
 
-var name = 'catchup_takeover_two_nodes_ahead';
+var name = "catchup_takeover_two_nodes_ahead";
 var replSet = new ReplSetTest({name: name, nodes: 5});
 var nodes = replSet.startSet();
 var config = replSet.getReplSetConfig();
 // Prevent nodes from syncing from other secondaries.
 config.settings = {
-    chainingAllowed: false
+    chainingAllowed: false,
 };
 replSet.initiate(config);
 replSet.awaitReplication();
@@ -36,7 +36,7 @@ assert.commandWorked(primary.getDB(name).bar.insert({x: 100}, writeConcern));
 // Write something so that node 0 is ahead of node 1.
 stopServerReplication(nodes[1]);
 writeConcern = {
-    writeConcern: {w: 1, wtimeout: replSet.timeoutMS}
+    writeConcern: {w: 1, wtimeout: replSet.timeoutMS},
 };
 assert.commandWorked(primary.getDB(name).bar.insert({y: 100}, writeConcern));
 
@@ -46,15 +46,16 @@ const initialNode2Status = assert.commandWorked(nodes[2].adminCommand({serverSta
 // Step up one of the lagged nodes.
 assert.commandWorked(nodes[2].adminCommand({replSetStepUp: 1}));
 replSet.awaitNodesAgreeOnPrimary();
-assert.eq(ReplSetTest.State.PRIMARY,
-          assert.commandWorked(nodes[2].adminCommand('replSetGetStatus')).myState,
-          nodes[2].host + " was not primary after step-up");
-jsTestLog('node 2 is now primary, but cannot accept writes');
+assert.eq(
+    ReplSetTest.State.PRIMARY,
+    assert.commandWorked(nodes[2].adminCommand("replSetGetStatus")).myState,
+    nodes[2].host + " was not primary after step-up",
+);
+jsTestLog("node 2 is now primary, but cannot accept writes");
 
 // Make sure that node 2 cannot write anything. Because it is lagged and replication
 // has been stopped, it shouldn't be able to become primary.
-assert.commandFailedWithCode(nodes[2].getDB(name).bar.insert({z: 100}, writeConcern),
-                             ErrorCodes.NotWritablePrimary);
+assert.commandFailedWithCode(nodes[2].getDB(name).bar.insert({z: 100}, writeConcern), ErrorCodes.NotWritablePrimary);
 
 // Confirm that the most up-to-date node becomes primary after the default catchup delay.
 replSet.waitForState(0, ReplSetTest.State.PRIMARY, 60 * 1000);
@@ -63,7 +64,11 @@ replSet.waitForState(0, ReplSetTest.State.PRIMARY, 60 * 1000);
 // counter have been incremented in serverStatus.
 const newPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
 verifyServerStatusElectionReasonCounterChange(
-    initialPrimaryStatus.electionMetrics, newPrimaryStatus.electionMetrics, "catchUpTakeover", 1);
+    initialPrimaryStatus.electionMetrics,
+    newPrimaryStatus.electionMetrics,
+    "catchUpTakeover",
+    1,
+);
 
 // Wait until the old primary steps down.
 replSet.awaitSecondaryNodes(replSet.timeoutMS, [nodes[2]]);
@@ -71,9 +76,11 @@ replSet.awaitSecondaryNodes(replSet.timeoutMS, [nodes[2]]);
 // Check that the 'numCatchUpsFailedWithNewTerm' field has been incremented in serverStatus, and
 // that none of the other reasons for catchup concluding has been incremented.
 const newNode2Status = assert.commandWorked(nodes[2].adminCommand({serverStatus: 1}));
-verifyCatchUpConclusionReason(initialNode2Status.electionMetrics,
-                              newNode2Status.electionMetrics,
-                              'numCatchUpsFailedWithNewTerm');
+verifyCatchUpConclusionReason(
+    initialNode2Status.electionMetrics,
+    newNode2Status.electionMetrics,
+    "numCatchUpsFailedWithNewTerm",
+);
 
 // Let the nodes catchup.
 restartServerReplication(nodes.slice(1, 5));

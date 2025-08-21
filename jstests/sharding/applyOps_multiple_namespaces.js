@@ -25,16 +25,18 @@ const lsid = session.getSessionId();
 // test.foo that was already there). Then MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit
 // will see both as affected namespaces. Us not hitting the dassert proves that we fixed the
 // original issue.
-assert.commandWorked(st.s.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {insert: 0, document: {x: 0}},
-        {insert: 1, document: {x: 1}},
-        {insert: 1, document: {x: 2}}
-    ],
-    nsInfo: [{ns: coll1.getFullName()}, {ns: coll2.getFullName()}],
-    lsid: lsid,
-    txnNumber: NumberLong(0),
-}));
+assert.commandWorked(
+    st.s.adminCommand({
+        bulkWrite: 1,
+        ops: [
+            {insert: 0, document: {x: 0}},
+            {insert: 1, document: {x: 1}},
+            {insert: 1, document: {x: 2}},
+        ],
+        nsInfo: [{ns: coll1.getFullName()}, {ns: coll2.getFullName()}],
+        lsid: lsid,
+        txnNumber: NumberLong(0),
+    }),
+);
 
 st.stop();

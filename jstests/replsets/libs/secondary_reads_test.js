@@ -28,20 +28,21 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
         const nodes = replSet.nodeList();
         replSet.initiate({
             _id: name,
-            members: [{_id: 0, host: nodes[0]}, {_id: 1, host: nodes[1], priority: 0, votes: 0}]
+            members: [
+                {_id: 0, host: nodes[0]},
+                {_id: 1, host: nodes[1], priority: 0, votes: 0},
+            ],
         });
         return replSet;
     }
 
-    this.startSecondaryReaders = function(nReaders, readFn) {
-        let read = function() {
+    this.startSecondaryReaders = function (nReaders, readFn) {
+        let read = function () {
             db.getMongo().setSecondaryOk();
             const testDb = db.getSiblingDB(TestData.dbName);
             while (true) {
                 readFn();
-                let signalDoc = testDb.getCollection(TestData.signalColl)
-                                    .find({_id: TestData.testDoneId})
-                                    .itcount();
+                let signalDoc = testDb.getCollection(TestData.signalColl).find({_id: TestData.testDoneId}).itcount();
                 if (signalDoc != 0) {
                     print("signal doc found. quitting...");
                     quit();
@@ -66,33 +67,31 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
     // primary. The write will start a batch on a secondary and immediately pause before completion.
     // The returned function will return once the batch has reached the point where it has applied
     // but not updated the last applied optime.
-    this.pauseSecondaryBatchApplication = function() {
+    this.pauseSecondaryBatchApplication = function () {
         clearRawMongoProgramOutput();
 
-        assert.commandWorked(
-            secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
+        assert.commandWorked(secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
 
-        return function() {
-            assert.soon(function() {
+        return function () {
+            assert.soon(function () {
                 return rawMongoProgramOutput("fail point enabled").match(failPoint);
             });
         };
     };
 
-    this.resumeSecondaryBatchApplication = function() {
-        assert.commandWorked(
-            secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "off"}));
+    this.resumeSecondaryBatchApplication = function () {
+        assert.commandWorked(secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "off"}));
     };
 
-    this.getPrimaryDB = function() {
+    this.getPrimaryDB = function () {
         return primaryDB;
     };
 
-    this.getSecondaryDB = function() {
+    this.getSecondaryDB = function () {
         return secondaryDB;
     };
 
-    this.stopReaders = function() {
+    this.stopReaders = function () {
         print("signaling readers to stop...");
         assert.gt(readers.length, 0, "no readers to stop");
         assert.commandWorked(primaryDB.getCollection(signalColl).insert({_id: testDoneId}));
@@ -104,11 +103,11 @@ export function SecondaryReadsTest(name = "secondary_reads_test") {
         readers = [];
     };
 
-    this.getReplset = function() {
+    this.getReplset = function () {
         return rst;
     };
 
-    this.stop = function() {
+    this.stop = function () {
         if (readers.length > 0) {
             this.stopReaders();
         }

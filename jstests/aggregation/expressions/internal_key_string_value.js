@@ -16,22 +16,23 @@ let docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-let results =
-    coll.aggregate(
-            [{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}])
-        .toArray();
-assert.eq(results,
-          [
-              {_id: 0, a: NumberInt(1), b: BinData(0, "KwIE")},
-              {_id: 1, a: NumberLong(2), b: BinData(0, "KwQE")},
-              {_id: 2, a: 3.0, b: BinData(0, "KwYE")},
-              {_id: 3, a: NumberDecimal("4.000000"), b: BinData(0, "KwgE")},
-              {_id: 4, a: "abc", b: BinData(0, "PGFiYwAE")},
-              {_id: 5, a: ISODate("2024-01-01"), b: BinData(0, "eIAAAYzCUfQABA==")},
-              {_id: 6, a: [1, 2, 3], b: BinData(0, "UCsCKwQrBgAE")},
-              {_id: 7, a: {b: 1, c: 2, d: 3}, b: BinData(0, "Rh5iACsCHmMAKwQeZAArBgAE")},
-          ],
-          results);
+let results = coll
+    .aggregate([{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}])
+    .toArray();
+assert.eq(
+    results,
+    [
+        {_id: 0, a: NumberInt(1), b: BinData(0, "KwIE")},
+        {_id: 1, a: NumberLong(2), b: BinData(0, "KwQE")},
+        {_id: 2, a: 3.0, b: BinData(0, "KwYE")},
+        {_id: 3, a: NumberDecimal("4.000000"), b: BinData(0, "KwgE")},
+        {_id: 4, a: "abc", b: BinData(0, "PGFiYwAE")},
+        {_id: 5, a: ISODate("2024-01-01"), b: BinData(0, "eIAAAYzCUfQABA==")},
+        {_id: 6, a: [1, 2, 3], b: BinData(0, "UCsCKwQrBgAE")},
+        {_id: 7, a: {b: 1, c: 2, d: 3}, b: BinData(0, "Rh5iACsCHmMAKwQeZAArBgAE")},
+    ],
+    results,
+);
 
 // Testing behavior for same numeric values of different types.
 assert(coll.drop());
@@ -44,11 +45,12 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate(
-                  [{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}])
-              .toArray();
+results = coll.aggregate([{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}]).toArray();
 assert.eq(docs.length, results.length, results);
-assert(results.every(result => bsonWoCompare(result.b, results[0].b) === 0), results);
+assert(
+    results.every((result) => bsonWoCompare(result.b, results[0].b) === 0),
+    results,
+);
 
 // Testing behavior for same numeric values of different types inside object.
 assert(coll.drop());
@@ -60,11 +62,12 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate(
-                  [{$sort: {_id: 1}}, {$addFields: {c: {$_internalKeyStringValue: {input: "$a"}}}}])
-              .toArray();
+results = coll.aggregate([{$sort: {_id: 1}}, {$addFields: {c: {$_internalKeyStringValue: {input: "$a"}}}}]).toArray();
 assert.eq(docs.length, results.length, results);
-assert(results.every(result => bsonWoCompare(result.c, results[0].c) === 0), results);
+assert(
+    results.every((result) => bsonWoCompare(result.c, results[0].c) === 0),
+    results,
+);
 
 // Testing behavior for close numeric values.
 assert(coll.drop());
@@ -74,9 +77,7 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate(
-                  [{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}])
-              .toArray();
+results = coll.aggregate([{$sort: {_id: 1}}, {$addFields: {b: {$_internalKeyStringValue: {input: "$a"}}}}]).toArray();
 assert.eq(2, results.length, results);
 assert(bsonWoCompare(results[0].b, results[1].b) !== 0, results);
 
@@ -88,15 +89,14 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results =
-    coll.aggregate([
-            {$sort: {_id: 1}},
-            {
-                $addFields:
-                    {b: {$_internalKeyStringValue: {input: "$a"}}, c: {$toHashedIndexKey: "$a"}}
-            }
-        ])
-        .toArray();
+results = coll
+    .aggregate([
+        {$sort: {_id: 1}},
+        {
+            $addFields: {b: {$_internalKeyStringValue: {input: "$a"}}, c: {$toHashedIndexKey: "$a"}},
+        },
+    ])
+    .toArray();
 assert.eq(2, results.length, results);
 assert(bsonWoCompare(results[0].b, results[1].b) !== 0, results);
 // $toHashedIndexKey hashes large numbers greater than 2^63 to the same result.
@@ -110,18 +110,18 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate([
-                  {$sort: {_id: 1}},
-                  {
-                      $addFields: {
-                          b: {
-                              $_internalKeyStringValue:
-                                  {input: "$a", collation: {locale: "en", strength: 3}}
-                          }
-                      }
-                  }
-              ])
-              .toArray();
+results = coll
+    .aggregate([
+        {$sort: {_id: 1}},
+        {
+            $addFields: {
+                b: {
+                    $_internalKeyStringValue: {input: "$a", collation: {locale: "en", strength: 3}},
+                },
+            },
+        },
+    ])
+    .toArray();
 assert.eq(2, results.length, results);
 assert(bsonWoCompare(results[0].b, results[1].b) !== 0, results);
 
@@ -133,20 +133,23 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate([
-                  {$sort: {_id: 1}},
-                  {
-                      $addFields: {
-                          b: {
-                              $_internalKeyStringValue:
-                                  {input: "$a", collation: {locale: "en", strength: 3}}
-                          }
-                      }
-                  }
-              ])
-              .toArray();
+results = coll
+    .aggregate([
+        {$sort: {_id: 1}},
+        {
+            $addFields: {
+                b: {
+                    $_internalKeyStringValue: {input: "$a", collation: {locale: "en", strength: 3}},
+                },
+            },
+        },
+    ])
+    .toArray();
 assert.eq(docs.length, results.length, results);
-assert(results.every(result => bsonWoCompare(result.c, results[0].c) === 0), results);
+assert(
+    results.every((result) => bsonWoCompare(result.c, results[0].c) === 0),
+    results,
+);
 
 // Testing behavior for strings under case-insensitive collation that doesn't match.
 assert(coll.drop());
@@ -156,18 +159,18 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate([
-                  {$sort: {_id: 1}},
-                  {
-                      $addFields: {
-                          b: {
-                              $_internalKeyStringValue:
-                                  {input: "$a", collation: {locale: "en", strength: 1}}
-                          }
-                      }
-                  }
-              ])
-              .toArray();
+results = coll
+    .aggregate([
+        {$sort: {_id: 1}},
+        {
+            $addFields: {
+                b: {
+                    $_internalKeyStringValue: {input: "$a", collation: {locale: "en", strength: 1}},
+                },
+            },
+        },
+    ])
+    .toArray();
 assert.eq(2, results.length, results);
 assert(bsonWoCompare(results[0].b, results[1].b) !== 0, results);
 
@@ -179,17 +182,20 @@ docs = [
 ];
 assert.commandWorked(coll.insert(docs));
 
-results = coll.aggregate([
-                  {$sort: {_id: 1}},
-                  {
-                      $addFields: {
-                          b: {
-                              $_internalKeyStringValue:
-                                  {input: "$a", collation: {locale: "en", strength: 1}}
-                          }
-                      }
-                  }
-              ])
-              .toArray();
+results = coll
+    .aggregate([
+        {$sort: {_id: 1}},
+        {
+            $addFields: {
+                b: {
+                    $_internalKeyStringValue: {input: "$a", collation: {locale: "en", strength: 1}},
+                },
+            },
+        },
+    ])
+    .toArray();
 assert.eq(docs.length, results.length, results);
-assert(results.every(result => bsonWoCompare(result.b, results[0].b) === 0), results);
+assert(
+    results.every((result) => bsonWoCompare(result.b, results[0].b) === 0),
+    results,
+);

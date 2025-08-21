@@ -25,8 +25,8 @@ const sessionColl = sessionDB.getCollection(collName);
 
 // Returns when the operation matching the 'matchExpr' is blocked, as evaluated by the
 // 'isBlockedFunc'.
-let waitForBlockedOp = function(matchExpr, isBlockedFunc) {
-    assert.soon(function() {
+let waitForBlockedOp = function (matchExpr, isBlockedFunc) {
+    assert.soon(function () {
         let cursor = db.getSiblingDB("admin").aggregate([{$currentOp: {}}, {$match: matchExpr}]);
         if (cursor.hasNext()) {
             let op = cursor.next();
@@ -45,14 +45,14 @@ assert.commandWorked(sessionColl.insert({_id: 2222}));
 // violation. It will block in an infinite write conflict loop until the transaction completes.
 TestData.dbName = dbName;
 TestData.collName = collName;
-let awaitInsert = startParallelShell(function() {
+let awaitInsert = startParallelShell(function () {
     let coll = db.getSiblingDB(TestData.dbName).getCollection(TestData.collName);
     assert.commandWorked(coll.insert({_id: 2222, x: 0}));
 });
 
 // Wait for the counter to reach a high enough number to confirm the operation is retrying
 // constantly.
-waitForBlockedOp({"command.insert": collName}, function(op) {
+waitForBlockedOp({"command.insert": collName}, function (op) {
     return op.writeConflicts > 20;
 });
 
@@ -70,13 +70,13 @@ PrepareHelpers.prepareTransaction(session);
 // transaction completes.
 TestData.dbName = dbName;
 TestData.collName = collName;
-let awaitUpdate = startParallelShell(function() {
+let awaitUpdate = startParallelShell(function () {
     let coll = db.getSiblingDB(TestData.dbName).getCollection(TestData.collName);
     assert.commandWorked(coll.update({_id: 2222}, {$set: {x: 999}}));
 });
 
 // Expect at least one prepare conflict.
-waitForBlockedOp({ns: testColl.getFullName(), op: "update"}, function(op) {
+waitForBlockedOp({ns: testColl.getFullName(), op: "update"}, function (op) {
     return op.prepareReadConflicts > 0;
 });
 

@@ -4,7 +4,9 @@
         {
             "files": ["*.js", "*.mjs"],
             "options": {
-                "tabWidth": 4
+                "tabWidth": 4,
+                "printWidth": 120,
+                "quoteProps": "preserve"
             }
         },
         {

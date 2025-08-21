@@ -12,7 +12,7 @@ const testDB = db.getSiblingDB("test");
 const srcName = "renameSRC";
 const src = testDB.getCollection(srcName);
 
-const longDstName = 'a'.repeat(250);
+const longDstName = "a".repeat(250);
 const dst = testDB.getCollection(longDstName);
 
 src.drop();
@@ -25,7 +25,7 @@ src.createIndex({
     "renameCollection": 1,
     "mongodb": 1,
     "testing": 1,
-    "data": 1
+    "data": 1,
 });
 
 // Newly created index + _id index in original collection (+ hashed _id in case of sharded suite)
@@ -35,12 +35,16 @@ const originalNumberOfIndexes = src.getIndexes().length;
 assert.commandWorked(src.renameCollection(longDstName), "Rename collection with long name failed");
 
 assert.eq(0, src.getIndexes().length, "No indexes expected on already renamed collection");
-assert.eq(originalNumberOfIndexes,
-          dst.getIndexes().length,
-          "Expected exactly same number of indexes of source collection before rename");
+assert.eq(
+    originalNumberOfIndexes,
+    dst.getIndexes().length,
+    "Expected exactly same number of indexes of source collection before rename",
+);
 
 // Renaming a collection over 255 characters fails.
-const longDstNameInvalid = 'a'.repeat(255);
+const longDstNameInvalid = "a".repeat(255);
 db.createCollection(srcName);
-assert.commandFailedWithCode(src.renameCollection(longDstNameInvalid),
-                             [ErrorCodes.InvalidNamespace, ErrorCodes.IllegalOperation]);
+assert.commandFailedWithCode(src.renameCollection(longDstNameInvalid), [
+    ErrorCodes.InvalidNamespace,
+    ErrorCodes.IllegalOperation,
+]);

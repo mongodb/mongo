@@ -12,7 +12,7 @@ import {
     searchPipelineBar,
     searchPipelineFoo,
     vectorSearchPipelineV,
-    vectorSearchPipelineZ
+    vectorSearchPipelineZ,
 } from "jstests/with_mongot/e2e_lib/hybrid_search_on_search_view.js";
 
 /**
@@ -22,11 +22,9 @@ import {
  */
 const createScoreFusionPipeline = (inputPipelines, viewPipeline = null) => {
     const scoreFusionStage = {
-        $scoreFusion:
-            {input: {pipelines: {}, normalization: "sigmoid"}, combination: {method: "avg"}}
+        $scoreFusion: {input: {pipelines: {}, normalization: "sigmoid"}, combination: {method: "avg"}},
     };
-    return createHybridSearchPipeline(
-        inputPipelines, viewPipeline, scoreFusionStage, /**isRankFusion*/ false);
+    return createHybridSearchPipeline(inputPipelines, viewPipeline, scoreFusionStage, /**isRankFusion*/ false);
 };
 
 /**
@@ -50,8 +48,7 @@ const runScoreFusionSearchViewsTest = (inputPipelines, checkCorrectness = true) 
  *     needed.
  */
 const runScoreFusionWithAllMongotInputPipelinesOnSearchViewsTest = (inputPipelines) => {
-    runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inputPipelines,
-                                                                createScoreFusionPipeline);
+    runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inputPipelines, createScoreFusionPipeline);
 };
 
 /* --------------------------------------------------------------------------------------- */
@@ -66,7 +63,7 @@ runScoreFusionSearchViewsTest({
     a: [
         {$match: {$expr: {$eq: ["$m", "bar"]}}},
         {$score: {score: "$x", normalization: "minMaxScaler"}},
-        {$sort: {x: -1}}
+        {$sort: {x: -1}},
     ],
 });
 // score two pipelines (reference collection fields)
@@ -74,13 +71,9 @@ runScoreFusionSearchViewsTest({
     a: [
         {$match: {$expr: {$eq: ["$m", "bar"]}}},
         {$score: {score: "$x", normalization: "minMaxScaler"}},
-        {$sort: {x: -1}}
+        {$sort: {x: -1}},
     ],
-    b: [
-        {$match: {$expr: {$eq: ["$a", "foo"]}}},
-        {$score: {score: "$y", normalization: "sigmoid"}},
-        {$sort: {x: 1}}
-    ],
+    b: [{$match: {$expr: {$eq: ["$a", "foo"]}}}, {$score: {score: "$y", normalization: "sigmoid"}}, {$sort: {x: 1}}],
 });
 // score two pipelines with matches (reference collection fields)
 runScoreFusionSearchViewsTest({
@@ -107,35 +100,39 @@ runScoreFusionSearchViewsTest({
     a: [
         {$match: {"$expr": {$gt: ["$y", 4]}}},
         {$score: {score: {$subtract: [4.0, 2]}, normalization: "sigmoid"}},
-        {$sort: {x: 1}}
+        {$sort: {x: 1}},
     ],
     b: [{$score: {score: {$subtract: [4.0, 2]}, normalization: "minMaxScaler"}}, {$sort: {x: 1}}],
     c: [
         {$match: {"$expr": {$lt: ["$x", 15]}}},
         {$score: {score: {$subtract: [4.0, 2]}, normalization: "sigmoid"}},
-        {$sort: {x: -1}}
+        {$sort: {x: -1}},
     ],
 });
 // limit in input
-runScoreFusionSearchViewsTest({
-    a: [
-        {$match: {x: {$gte: 4}}},
-        {$score: {score: {$subtract: [100, "$y"]}, normalization: "sigmoid"}},
-        {$sort: {x: 1}}
-    ],
-    b: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$limit: 5}, {$sort: {x: 1}}],
-},
-                              /*checkCorrectness=**/ false);
+runScoreFusionSearchViewsTest(
+    {
+        a: [
+            {$match: {x: {$gte: 4}}},
+            {$score: {score: {$subtract: [100, "$y"]}, normalization: "sigmoid"}},
+            {$sort: {x: 1}},
+        ],
+        b: [{$score: {score: "$x", normalization: "minMaxScaler"}}, {$limit: 5}, {$sort: {x: 1}}],
+    },
+    /*checkCorrectness=**/ false,
+);
 // sample
-runScoreFusionSearchViewsTest({
-    a: [
-        {$match: {x: {$gte: 4}}},
-        {$score: {score: {$add: [10, 2]}, normalization: "minMaxScaler", weight: 0.5}},
-        {$sort: {x: 1}}
-    ],
-    b: [{$score: {score: '$x', normalization: "sigmoid"}}, {$sample: {size: 5}}, {$sort: {x: 1}}],
-},
-                              /*checkCorrectness=**/ false);
+runScoreFusionSearchViewsTest(
+    {
+        a: [
+            {$match: {x: {$gte: 4}}},
+            {$score: {score: {$add: [10, 2]}, normalization: "minMaxScaler", weight: 0.5}},
+            {$sort: {x: 1}},
+        ],
+        b: [{$score: {score: "$x", normalization: "sigmoid"}}, {$sample: {size: 5}}, {$sort: {x: 1}}],
+    },
+    /*checkCorrectness=**/ false,
+);
 
 /* --------------------------------------------------------------------------------------- */
 /* Run tests where $scoreFusion has SOME mongot input pipelines. Should not return results that
@@ -143,51 +140,35 @@ runScoreFusionSearchViewsTest({
  */
 
 // search first
-runScoreFusionSearchViewsTest(
-    {
-        a: [searchPipelineFoo],
-        b: [{$score: {score: '$x', normalization: "minMaxScaler"}}],
-    },
-);
+runScoreFusionSearchViewsTest({
+    a: [searchPipelineFoo],
+    b: [{$score: {score: "$x", normalization: "minMaxScaler"}}],
+});
 // search second
-runScoreFusionSearchViewsTest(
-    {
-        a: [{$score: {score: '$x', normalization: "sigmoid"}}],
-        b: [searchPipelineFoo],
-    },
-);
+runScoreFusionSearchViewsTest({
+    a: [{$score: {score: "$x", normalization: "sigmoid"}}],
+    b: [searchPipelineFoo],
+});
 
 // vector search first
-runScoreFusionSearchViewsTest(
-    {
-        a: [vectorSearchPipelineV],
-        b: [{$score: {score: '$x', normalization: "minMaxScaler"}}],
-    },
-);
+runScoreFusionSearchViewsTest({
+    a: [vectorSearchPipelineV],
+    b: [{$score: {score: "$x", normalization: "minMaxScaler"}}],
+});
 
 // vector search second
-runScoreFusionSearchViewsTest(
-    {
-        a: [{$score: {score: '$x', normalization: "sigmoid"}}],
-        b: [vectorSearchPipelineV],
-    },
-);
+runScoreFusionSearchViewsTest({
+    a: [{$score: {score: "$x", normalization: "sigmoid"}}],
+    b: [vectorSearchPipelineV],
+});
 
 // vector search second
-runScoreFusionSearchViewsTest(
-    {
-        a: [
-            {$match: {"$expr": {$gt: ["$x", 4]}}},
-            {$score: {score: '$x', normalization: "sigmoid"}}
-        ],
-        b: [vectorSearchPipelineV],
-        c: [
-            {$match: {"$expr": {$lte: ["$x", 45]}}},
-            {$score: {score: '$y', normalization: "minMaxScaler"}}
-        ],
-        d: [searchPipelineBar],
-    },
-);
+runScoreFusionSearchViewsTest({
+    a: [{$match: {"$expr": {$gt: ["$x", 4]}}}, {$score: {score: "$x", normalization: "sigmoid"}}],
+    b: [vectorSearchPipelineV],
+    c: [{$match: {"$expr": {$lte: ["$x", 45]}}}, {$score: {score: "$y", normalization: "minMaxScaler"}}],
+    d: [searchPipelineBar],
+});
 
 /* --------------------------------------------------------------------------------------- */
 /* Run tests where $scoreFusion has ONLY mongot input pipelines. Should not return any results.

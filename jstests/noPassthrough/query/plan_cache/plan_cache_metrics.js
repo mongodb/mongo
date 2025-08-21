@@ -6,7 +6,7 @@
 import {getPlanCacheSize} from "jstests/libs/query/plan_cache_utils.js";
 
 const conn = MongoRunner.runMongod({});
-const db = conn.getDB('test');
+const db = conn.getDB("test");
 const coll1 = db.query_metrics1;
 const coll2 = db.query_metrics2;
 coll1.drop();
@@ -14,14 +14,14 @@ coll2.drop();
 
 const queryObj = {
     a: {$gte: 99},
-    b: -1
+    b: -1,
 };
 const projectionObj = {
     _id: 0,
-    b: 1
+    b: 1,
 };
 const sortObj = {
-    c: -1
+    c: -1,
 };
 
 function assertCacheLength(coll, length) {
@@ -38,8 +38,7 @@ function verifyPlanCacheSizeIncrease(coll) {
 
     let prevCacheSize = getPlanCacheSize(db);
     // Populate plan cache.
-    assert.eq(
-        1, coll.find(queryObj, projectionObj).sort(sortObj).itcount(), 'unexpected document count');
+    assert.eq(1, coll.find(queryObj, projectionObj).sort(sortObj).itcount(), "unexpected document count");
 
     // Verify that the plan cache entry exists.
     assertCacheLength(coll, 1);
@@ -50,19 +49,19 @@ function verifyPlanCacheSizeIncrease(coll) {
 
     // Verify that the total plan cache memory consumption estimate increases when 'projection'
     // plan cache entry is added.
-    assert.eq(1, coll.find(queryObj, projectionObj).itcount(), 'unexpected document count');
+    assert.eq(1, coll.find(queryObj, projectionObj).itcount(), "unexpected document count");
     assert.gt(getPlanCacheSize(db), prevCacheSize);
 
     // Verify that the total plan cache memory consumption estimate increases when 'sort' plan
     // cache entry is added.
     prevCacheSize = getPlanCacheSize(db);
-    assert.eq(1, coll.find(queryObj).sort(sortObj).itcount(), 'unexpected document count');
+    assert.eq(1, coll.find(queryObj).sort(sortObj).itcount(), "unexpected document count");
     assert.gt(getPlanCacheSize(db), prevCacheSize);
 
     // Verify that the total plan cache memory consumption estimate increases when 'query' plan
     // cache entry is added.
     prevCacheSize = getPlanCacheSize(db);
-    assert.eq(1, coll.find(queryObj).itcount(), 'unexpected document count');
+    assert.eq(1, coll.find(queryObj).itcount(), "unexpected document count");
     assert.gt(getPlanCacheSize(db), prevCacheSize);
     assertCacheLength(coll, 4);
 }

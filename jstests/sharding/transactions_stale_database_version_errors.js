@@ -7,7 +7,7 @@ import {
     assertNoSuchTransactionOnAllShards,
     disableStaleVersionAndSnapshotRetriesWithinTransactions,
     enableStaleVersionAndSnapshotRetriesWithinTransactions,
-    kShardOptionsForDisabledStaleShardVersionRetries
+    kShardOptionsForDisabledStaleShardVersionRetries,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const dbName = "test";
@@ -18,14 +18,16 @@ const st = new ShardingTest({
     mongos: 1,
     other: {
         rsOptions: kShardOptionsForDisabledStaleShardVersionRetries,
-    }
+    },
 });
 
 // TODO (SERVER-101777): This test makes a lot of assumptions about database versions stored in
 // shards that are not the primary shard. This test shuld be re-written thinking about that shards
 // are database authoritative and don't need to refresh anymore.
-const isAuthoritativeShardEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(st.s.getDB('admin'), "ShardAuthoritativeDbMetadataDDL");
+const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB("admin"),
+    "ShardAuthoritativeDbMetadataDDL",
+);
 if (isAuthoritativeShardEnabled) {
     st.stop();
     quit();
@@ -34,10 +36,8 @@ if (isAuthoritativeShardEnabled) {
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 // Set up two unsharded collections in different databases with shard0 as their primary.
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(
-    st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
 const session = st.s.startSession();
 const sessionDB = session.getDatabase(dbName);
@@ -63,10 +63,8 @@ session.startTransaction();
 // Run first statement on different database so distinct still triggers a SDV.
 const dbName2 = "test2";
 const sessionDB2 = session.getDatabase(dbName2);
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName2, primaryShard: st.shard1.shardName}));
-assert.commandWorked(
-    st.s.getDB(dbName2)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName2, primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s.getDB(dbName2)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
 assert.commandWorked(sessionDB2.runCommand({find: collName, filter: {_id: 0}}));
 
@@ -75,7 +73,8 @@ assert.commandWorked(sessionDB2.runCommand({find: collName, filter: {_id: 0}}));
 // Shard0.
 let res = assert.commandFailedWithCode(
     sessionDB.runCommand({distinct: collName, key: "_id", query: {_id: 0}}),
-    ErrorCodes.NoSuchTransaction);
+    ErrorCodes.NoSuchTransaction,
+);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
@@ -89,16 +88,14 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 const otherDbName = "other_test";
 const otherCollName = "bar";
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: otherDbName, primaryShard: st.shard0.shardName}));
-assert.commandWorked(
-    st.s.getDB(otherDbName)[otherCollName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: otherDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.getDB(otherDbName)[otherCollName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
 const sessionOtherDB = session.getDatabase(otherDbName);
 
 // Advance the router's cached last committed opTime for Shard0, so it chooses a read timestamp
 // after the collection is created on shard1, to avoid SnapshotUnavailable.
-assert.commandWorked(sessionOtherDB.runCommand({find: otherCollName}));  // Not database versioned.
+assert.commandWorked(sessionOtherDB.runCommand({find: otherCollName})); // Not database versioned.
 assert.commandWorked(sessionDB[collName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
 session.startTransaction();
@@ -108,8 +105,7 @@ assert.commandWorked(sessionDB.runCommand({distinct: collName, key: "_id", query
 
 // Targets the new database on Shard0 which is stale, so a database versioned request should
 // trigger SDV.
-assert.commandWorked(
-    sessionOtherDB.runCommand({distinct: otherCollName, key: "_id", query: {_id: 0}}));
+assert.commandWorked(sessionOtherDB.runCommand({distinct: otherCollName, key: "_id", query: {_id: 0}}));
 
 assert.commandWorked(session.commitTransaction_forTesting());
 
@@ -121,8 +117,9 @@ assert.commandWorked(st.s.adminCommand({movePrimary: otherDbName, to: st.shard1.
 
 // Disable database metadata refreshes on the stale shard so it will indefinitely return a stale
 // version error.
-assert.commandWorked(st.rs0.getPrimary().adminCommand(
-    {configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "alwaysOn"}));
+assert.commandWorked(
+    st.rs0.getPrimary().adminCommand({configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "alwaysOn"}),
+);
 
 session.startTransaction();
 
@@ -133,15 +130,17 @@ assert.commandWorked(sessionOtherDB.runCommand({find: otherCollName}));
 // metadata, so mongos should exhaust its retries and implicitly abort the transaction.
 res = assert.commandFailedWithCode(
     sessionDB.runCommand({distinct: collName, key: "_id", query: {_id: 0}}),
-    ErrorCodes.StaleDbVersion);
+    ErrorCodes.StaleDbVersion,
+);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
 // Verify all shards aborted the transaction.
 assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-assert.commandWorked(st.rs0.getPrimary().adminCommand(
-    {configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "off"}));
+assert.commandWorked(
+    st.rs0.getPrimary().adminCommand({configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "off"}),
+);
 
 disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 

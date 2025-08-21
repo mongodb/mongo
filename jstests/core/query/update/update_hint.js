@@ -28,16 +28,16 @@ function normalIndexTest() {
     // Hint using index key pattern.
     let updateCmd = {
         update: coll.getName(),
-        updates: [{q: {x: 1}, u: {$set: {y: 1}}, hint: {x: 1}}]
+        updates: [{q: {x: 1}, u: {$set: {y: 1}}, hint: {x: 1}}],
     };
     assertCommandUsesIndex(updateCmd, {x: 1});
 
     // Hint using an index name.
-    updateCmd = {update: coll.getName(), updates: [{q: {x: 1}, u: {$set: {y: 1}}, hint: 'y_-1'}]};
+    updateCmd = {update: coll.getName(), updates: [{q: {x: 1}, u: {$set: {y: 1}}, hint: "y_-1"}]};
     assertCommandUsesIndex(updateCmd, {y: -1});
 
     // Passing a hint should not use the idhack fast-path.
-    updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: 'y_-1'}]};
+    updateCmd = {update: coll.getName(), updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: "y_-1"}]};
     assertCommandUsesIndex(updateCmd, {y: -1});
 }
 
@@ -51,14 +51,14 @@ function sparseIndexTest() {
     // Hint should be respected, even on incomplete indexes.
     let updateCmd = {
         update: coll.getName(),
-        updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: {s: 1}}]
+        updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: {s: 1}}],
     };
     assertCommandUsesIndex(updateCmd, {s: 1});
 
     // Update hinting a sparse index updates only the document in the sparse index.
     updateCmd = {
         update: coll.getName(),
-        updates: [{q: {}, u: {$set: {s: 1}}, hint: {s: 1}, multi: true}]
+        updates: [{q: {}, u: {$set: {s: 1}}, hint: {s: 1}, multi: true}],
     };
     assert.commandWorked(coll.runCommand(updateCmd));
     assert.eq(2, coll.count({s: 1}));
@@ -68,7 +68,7 @@ function sparseIndexTest() {
     assert.commandWorked(coll.insert({x: 2}));
     updateCmd = {
         update: coll.getName(),
-        updates: [{q: {x: 2}, u: {$set: {x: 1}}, hint: {s: 1}, upsert: true}]
+        updates: [{q: {x: 2}, u: {$set: {x: 1}}, hint: {s: 1}, upsert: true}],
     };
     let res = assert.commandWorked(coll.runCommand(updateCmd));
     assert.eq(res.upserted.length, 1);
@@ -95,45 +95,59 @@ function shellHelpersTest() {
 
     // Test bulk writes.
     let bulk = coll.initializeUnorderedBulkOp();
-    bulk.find({x: 1}).hint({s: 1}).update({$set: {y: 1}});
+    bulk.find({x: 1})
+        .hint({s: 1})
+        .update({$set: {y: 1}});
     res = bulk.execute();
     assert.eq(res.nMatched, 2);
     bulk = coll.initializeUnorderedBulkOp();
-    bulk.find({x: 2}).hint({s: 1}).upsert().updateOne({$set: {y: 1}});
+    bulk.find({x: 2})
+        .hint({s: 1})
+        .upsert()
+        .updateOne({$set: {y: 1}});
     res = bulk.execute();
     assert.eq(res.nUpserted, 1);
     bulk = coll.initializeUnorderedBulkOp();
-    bulk.find({x: 2}).hint({s: 1}).upsert().replaceOne({$set: {y: 1}});
+    bulk.find({x: 2})
+        .hint({s: 1})
+        .upsert()
+        .replaceOne({$set: {y: 1}});
     res = bulk.execute();
     assert.eq(res.nUpserted, 1);
 
-    res = coll.bulkWrite([{
-        updateOne: {
-            filter: {x: 2},
-            update: {$set: {y: 2}},
-            hint: {s: 1},
-            upsert: true,
-        }
-    }]);
+    res = coll.bulkWrite([
+        {
+            updateOne: {
+                filter: {x: 2},
+                update: {$set: {y: 2}},
+                hint: {s: 1},
+                upsert: true,
+            },
+        },
+    ]);
     assert.eq(res.upsertedCount, 1);
 
-    res = coll.bulkWrite([{
-        updateMany: {
-            filter: {x: 1},
-            update: {$set: {y: 2}},
-            hint: {s: 1},
-        }
-    }]);
+    res = coll.bulkWrite([
+        {
+            updateMany: {
+                filter: {x: 1},
+                update: {$set: {y: 2}},
+                hint: {s: 1},
+            },
+        },
+    ]);
     assert.eq(res.matchedCount, 2);
 
-    res = coll.bulkWrite([{
-        replaceOne: {
-            filter: {x: 2},
-            replacement: {x: 2, y: 3},
-            hint: {s: 1},
-            upsert: true,
-        }
-    }]);
+    res = coll.bulkWrite([
+        {
+            replaceOne: {
+                filter: {x: 2},
+                replacement: {x: 2, y: 3},
+                hint: {s: 1},
+                upsert: true,
+            },
+        },
+    ]);
     assert.eq(res.upsertedCount, 1);
 }
 
@@ -151,7 +165,7 @@ function failedHintTest() {
     // Command should fail with hints to non-existent indexes.
     updateCmd = {
         update: coll.getName(),
-        updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: {badHint: 1}}]
+        updates: [{q: {_id: 1}, u: {$set: {y: 1}}, hint: {badHint: 1}}],
     };
     assert.commandFailedWithCode(coll.runCommand(updateCmd), ErrorCodes.BadValue);
 }

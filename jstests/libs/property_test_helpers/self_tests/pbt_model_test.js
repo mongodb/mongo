@@ -11,15 +11,9 @@
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
-import {
-    addFieldsConstArb,
-    getAggPipelineModel
-} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {addFieldsConstArb, getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
-import {
-    concreteQueryFromFamily,
-    testProperty
-} from "jstests/libs/property_test_helpers/property_testing_utils.js";
+import {concreteQueryFromFamily, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
@@ -29,8 +23,9 @@ const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
 if (isSlowBuild(db)) {
     jsTestLog(
-        'Skipping self tests on slow build, since many aggregations are required which are not' +
-        'affected by optimization or debug settings.');
+        "Skipping self tests on slow build, since many aggregations are required which are not" +
+            "affected by optimization or debug settings.",
+    );
     MongoRunner.stopMongod(conn);
     quit();
 }
@@ -59,24 +54,26 @@ function testNumDocsAndIndexes(isTS) {
     }
     let numRuns = 100;
     let numQueriesPerRun = 1;
-    testProperty(mockProperty,
-                 {experimentColl},
-                 makeWorkloadModel({
-                     collModel: getCollectionModel({isTS}),
-                     aggModel: getAggPipelineModel(),
-                     numQueriesPerRun
-                 }),
-                 numRuns);
+    testProperty(
+        mockProperty,
+        {experimentColl},
+        makeWorkloadModel({
+            collModel: getCollectionModel({isTS}),
+            aggModel: getAggPipelineModel(),
+            numQueriesPerRun,
+        }),
+        numRuns,
+    );
 
     const avgNumDocs = avg(numDocs);
     assert.eq(numDocs.length, numRuns);
     assert.gt(avgNumDocs, 100);
-    jsTestLog('Average number of documents was: ' + avgNumDocs);
+    jsTestLog("Average number of documents was: " + avgNumDocs);
 
     const avgNumIndexes = avg(numIndexes);
     assert.eq(numIndexes.length, numRuns);
     assert.gt(avgNumIndexes, 4);
-    jsTestLog('Average number of indexes was: ' + avgNumIndexes);
+    jsTestLog("Average number of indexes was: " + avgNumIndexes);
 }
 
 testNumDocsAndIndexes(false /* isTS */);
@@ -88,20 +85,20 @@ function testMatchedDocsMetrics(allowOrs) {
     // Now test that queries return an acceptable number of results on average.
     const testCases = [
         {
-            name: 'single $match queries',
-            aggModel: getMatchArb(allowOrs).map(matchStage => [matchStage]),
-            minimumAcceptedAvgNumDocs: 15
+            name: "single $match queries",
+            aggModel: getMatchArb(allowOrs).map((matchStage) => [matchStage]),
+            minimumAcceptedAvgNumDocs: 15,
         },
         {
-            name: 'deterministic aggregations',
+            name: "deterministic aggregations",
             aggModel: getAggPipelineModel({allowOrs, deterministicBag: true}),
-            minimumAcceptedAvgNumDocs: 30
+            minimumAcceptedAvgNumDocs: 30,
         },
         {
-            name: 'nondeterministic aggregations',
+            name: "nondeterministic aggregations",
             aggModel: getAggPipelineModel({allowOrs, deterministicBag: false}),
-            minimumAcceptedAvgNumDocs: 30
-        }
+            minimumAcceptedAvgNumDocs: 30,
+        },
     ];
 
     for (const {name, aggModel, minimumAcceptedAvgNumDocs} of testCases) {
@@ -121,12 +118,12 @@ function testMatchedDocsMetrics(allowOrs) {
             mockProperty,
             {experimentColl},
             makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
-            numRuns);
+            numRuns,
+        );
 
         const avgNumDocsReturned = avg(numDocsReturned);
         assert.gt(avgNumDocsReturned, minimumAcceptedAvgNumDocs, name);
-        jsTestLog('Average number of documents returned for ' + name +
-                  ' was: ' + avgNumDocsReturned);
+        jsTestLog("Average number of documents returned for " + name + " was: " + avgNumDocsReturned);
     }
 }
 

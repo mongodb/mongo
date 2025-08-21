@@ -27,7 +27,7 @@ import {
 } from "jstests/sharding/libs/last_lts_mongod_commands.js";
 import {
     commandsAddedToMongosSinceLastLTS,
-    commandsRemovedFromMongosSinceLastLTS
+    commandsRemovedFromMongosSinceLastLTS,
 } from "jstests/sharding/libs/last_lts_mongos_commands.js";
 
 function getNewDbName(dbName) {
@@ -64,15 +64,20 @@ function toArray(what) {
 }
 
 function validateTestCase(testCase, validateSendsDbVersion) {
-    assert(testCase.skip || testCase.run,
-           "must specify exactly one of 'skip' or 'run' for test case " + tojson(testCase));
+    assert(
+        testCase.skip || testCase.run,
+        "must specify exactly one of 'skip' or 'run' for test case " + tojson(testCase),
+    );
 
     if (testCase.skip) {
         for (const key of Object.keys(testCase)) {
             assert(
                 key === "skip" || key === "conditional",
                 "if a test case specifies 'skip', it must not specify any other fields besides 'conditional': " +
-                    key + ": " + tojson(testCase));
+                    key +
+                    ": " +
+                    tojson(testCase),
+            );
         }
         return;
     }
@@ -93,50 +98,46 @@ function validateCommandTestCase(testCase, validateSendsDbVersion) {
 
     if (validateSendsDbVersion) {
         // Check that required fields are present.
-        assert(testCase.hasOwnProperty("sendsDbVersion"),
-               "must specify 'sendsDbVersion' for test case " + tojson(testCase));
+        assert(
+            testCase.hasOwnProperty("sendsDbVersion"),
+            "must specify 'sendsDbVersion' for test case " + tojson(testCase),
+        );
     }
 
     // Check that all present fields are of the correct type.
-    assert(typeof (testCase.command) === "function");
-    assert(testCase.runsAgainstAdminDb ? typeof (testCase.runsAgainstAdminDb) === "boolean" : true);
+    assert(typeof testCase.command === "function");
+    assert(testCase.runsAgainstAdminDb ? typeof testCase.runsAgainstAdminDb === "boolean" : true);
     if (validateSendsDbVersion) {
-        assert(typeof (testCase.sendsDbVersion) === "boolean");
+        assert(typeof testCase.sendsDbVersion === "boolean");
     }
-    assert(testCase.explicitlyCreateCollection
-               ? typeof (testCase.explicitlyCreateCollection) === "boolean"
-               : true);
-    assert(testCase.expectNonEmptyCollection
-               ? typeof (testCase.expectNonEmptyCollection) === "boolean"
-               : true);
-    assert(testCase.cleanUp ? typeof (testCase.cleanUp) === "function" : true,
-           "cleanUp must be a function: " + tojson(testCase));
+    assert(testCase.explicitlyCreateCollection ? typeof testCase.explicitlyCreateCollection === "boolean" : true);
+    assert(testCase.expectNonEmptyCollection ? typeof testCase.expectNonEmptyCollection === "boolean" : true);
+    assert(
+        testCase.cleanUp ? typeof testCase.cleanUp === "function" : true,
+        "cleanUp must be a function: " + tojson(testCase),
+    );
 }
 
 function testCommandAfterMovePrimary(testCase, connection, st, dbName, collName) {
     const primaryShardBefore = st.getPrimaryShard(dbName);
     const primaryShardAfter = st.getOther(primaryShardBefore);
-    const dbVersionBefore =
-        st.s0.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+    const dbVersionBefore = st.s0.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
 
     if (testCase.explicitlyCreateCollection) {
         assert.commandWorked(primaryShardBefore.getDB(dbName).runCommand({create: collName}));
     }
     if (testCase.expectNonEmptyCollection) {
-        assert.commandWorked(
-            primaryShardBefore.getDB(dbName).runCommand({insert: collName, documents: [{x: 0}]}));
+        assert.commandWorked(primaryShardBefore.getDB(dbName).runCommand({insert: collName, documents: [{x: 0}]}));
     }
 
     // Ensure all nodes know the dbVersion before the movePrimary.
     assert.commandWorked(st.s0.adminCommand({flushRouterConfig: 1}));
     assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
 
-    if (!FeatureFlagUtil.isPresentAndEnabled(primaryShardBefore,
-                                             "ShardAuthoritativeDbMetadataCRUD")) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(primaryShardBefore, "ShardAuthoritativeDbMetadataCRUD")) {
         assert.commandWorked(primaryShardBefore.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     }
-    if (!FeatureFlagUtil.isPresentAndEnabled(primaryShardAfter,
-                                             "ShardAuthoritativeDbMetadataCRUD")) {
+    if (!FeatureFlagUtil.isPresentAndEnabled(primaryShardAfter, "ShardAuthoritativeDbMetadataCRUD")) {
         assert.commandWorked(primaryShardAfter.adminCommand({_flushDatabaseCacheUpdates: dbName}));
     }
 
@@ -146,8 +147,7 @@ function testCommandAfterMovePrimary(testCase, connection, st, dbName, collName)
     // Run movePrimary through the second mongos.
     assert.commandWorked(st.s1.adminCommand({movePrimary: dbName, to: primaryShardAfter.name}));
 
-    const dbVersionAfter =
-        st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+    const dbVersionAfter = st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
 
     // After the movePrimary, both old and new primary shards should have cleared the dbVersion.
     assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
@@ -155,13 +155,19 @@ function testCommandAfterMovePrimary(testCase, connection, st, dbName, collName)
     assertMatchingDatabaseVersion(primaryShardAfter, dbName, {});
 
     const command = testCase.command(dbName, collName, dbVersionBefore, dbVersionAfter);
-    jsTest.log("testing command " + tojson(command) + " after movePrimary; primary shard before: " +
-               primaryShardBefore + ", database version before: " + tojson(dbVersionBefore) +
-               ", primary shard after: " + primaryShardAfter);
+    jsTest.log(
+        "testing command " +
+            tojson(command) +
+            " after movePrimary; primary shard before: " +
+            primaryShardBefore +
+            ", database version before: " +
+            tojson(dbVersionBefore) +
+            ", primary shard after: " +
+            primaryShardAfter,
+    );
 
     // Run the test case's command.
-    const res =
-        connection.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
+    const res = connection.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
     if (testCase.expectedFailureCode) {
         assert.commandFailedWithCode(res, testCase.expectedFailureCode);
     } else {
@@ -208,8 +214,7 @@ function testCommandAfterDropRecreateDatabase(testCase, connection, st) {
 
     // Create the database by creating a collection in it.
     assert.commandWorked(st.s0.getDB(dbName).createCollection(collName));
-    const dbVersionBefore =
-        st.s0.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+    const dbVersionBefore = st.s0.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
     const primaryShardBefore = st.getPrimaryShard(dbName);
     const primaryShardAfter = st.getOther(primaryShardBefore);
 
@@ -220,18 +225,15 @@ function testCommandAfterDropRecreateDatabase(testCase, connection, st) {
 
     // Drop and recreate the database through the second mongos.
     assert.commandWorked(st.s1.getDB(dbName).dropDatabase());
-    assert.commandWorked(
-        st.s1.adminCommand({enableSharding: dbName, primaryShard: primaryShardAfter.shardName}));
+    assert.commandWorked(st.s1.adminCommand({enableSharding: dbName, primaryShard: primaryShardAfter.shardName}));
 
-    const dbVersionAfter =
-        st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+    const dbVersionAfter = st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
 
     if (testCase.explicitlyCreateCollection) {
         assert.commandWorked(primaryShardAfter.getDB(dbName).runCommand({create: collName}));
     }
     if (testCase.expectNonEmptyCollection) {
-        assert.commandWorked(
-            primaryShardAfter.getDB(dbName).runCommand({insert: collName, documents: [{x: 0}]}));
+        assert.commandWorked(primaryShardAfter.getDB(dbName).runCommand({insert: collName, documents: [{x: 0}]}));
     }
 
     // The only change after the drop/recreate database should be that the old primary shard should
@@ -240,14 +242,19 @@ function testCommandAfterDropRecreateDatabase(testCase, connection, st) {
     assertMatchingDatabaseVersion(primaryShardBefore, dbName, {});
 
     const command = testCase.command(dbName, collName, dbVersionBefore, dbVersionAfter);
-    jsTest.log("testing command " + tojson(command) +
-               " after drop/recreate database; primary shard before: " + primaryShardBefore +
-               ", database version before: " + tojson(dbVersionBefore) +
-               ", primary shard after: " + primaryShardAfter);
+    jsTest.log(
+        "testing command " +
+            tojson(command) +
+            " after drop/recreate database; primary shard before: " +
+            primaryShardBefore +
+            ", database version before: " +
+            tojson(dbVersionBefore) +
+            ", primary shard after: " +
+            primaryShardAfter,
+    );
 
     // Run the test case's command.
-    const res =
-        connection.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
+    const res = connection.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
     if (testCase.expectedFailureCode) {
         assert.commandFailedWithCode(res, testCase.expectedFailureCode);
     } else {
@@ -291,10 +298,8 @@ function testCommandAfterDropRecreateDatabase(testCase, connection, st) {
 
 const allTestCases = {
     mongos: {
-        _clusterQueryWithoutShardKey:
-            {skip: "executed locally on a mongos (not sent to any remote node)"},
-        _clusterWriteWithoutShardKey:
-            {skip: "executed locally on a mongos (not sent to any remote node)"},
+        _clusterQueryWithoutShardKey: {skip: "executed locally on a mongos (not sent to any remote node)"},
+        _clusterWriteWithoutShardKey: {skip: "executed locally on a mongos (not sent to any remote node)"},
         _hashBSONElement: {skip: "executes locally on mongos (not sent to any remote node)"},
         _isSelf: {skip: "executes locally on mongos (not sent to any remote node)"},
         _killOperations: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -312,30 +317,30 @@ const allTestCases = {
         aggregate: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         aggregate: collName,
                         pipeline: [{$match: {x: 1}}],
-                        cursor: {batchSize: 10}
+                        cursor: {batchSize: 10},
                     };
-                }
+                },
             },
             explain: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         explain: {
                             aggregate: collName,
                             pipeline: [{$match: {x: 1}}],
-                            cursor: {batchSize: 10}
-                        }
+                            cursor: {batchSize: 10},
+                        },
                     };
-                }
-            }
+                },
+            },
         },
         analyze: {
-            skip: "unimplemented. Serves only as a stub."
-        },  // TODO SERVER-68055: Extend test to work with analyze
+            skip: "unimplemented. Serves only as a stub.",
+        }, // TODO SERVER-68055: Extend test to work with analyze
         analyzeShardKey: {
             run: {
                 runsAgainstAdminDb: true,
@@ -346,10 +351,10 @@ const allTestCases = {
                 // since the cardinality of the shard key is less than analyzeShardKeyNumRanges
                 // which defaults to 100.
                 expectedFailureCode: 4952606,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {analyzeShardKey: dbName + "." + collName, key: {_id: 1}};
                 },
-            }
+            },
         },
         appendOplogNote: {skip: "unversioned and executes on all shards"},
         authenticate: {skip: "does not forward command to primary shard"},
@@ -363,25 +368,25 @@ const allTestCases = {
             run: {
                 sendsDbVersion: true,
                 runsAgainstAdminDb: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         bulkWrite: 1,
                         ops: [{insert: 0, document: {_id: 1}}],
-                        nsInfo: [{ns: dbName + "." + collName}]
+                        nsInfo: [{ns: dbName + "." + collName}],
                     };
                 },
             },
-            skipMultiversion: true
+            skipMultiversion: true,
         },
         changePrimary: {skip: "reads primary shard from sharding catalog with readConcern: local"},
         checkMetadataConsistency: {
             run: {
                 sendsDbVersion: true,
                 runsAgainstAdminDb: false,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {checkMetadataConsistency: 1};
-                }
-            }
+                },
+            },
         },
         cleanupReshardCollection: {skip: "always targets the config server"},
         cleanupStructuredEncryptionData: {skip: "requires encrypted collections"},
@@ -391,19 +396,19 @@ const allTestCases = {
             run: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {collMod: collName};
                 },
-            }
+            },
         },
         collStats: {
             run: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {collStats: collName};
                 },
-            }
+            },
         },
         commitReshardCollection: {skip: "always targets the config server"},
         commitShardRemoval: {skip: "not on a user database"},
@@ -420,48 +425,48 @@ const allTestCases = {
             run: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {convertToCapped: collName, size: 8192};
                 },
-            }
+            },
         },
         coordinateCommitTransaction: {skip: "unimplemented. Serves only as a stub."},
         count: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {count: collName, query: {x: 1}};
-                }
+                },
             },
             explain: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {explain: {count: collName, query: {x: 1}}};
-                }
-            }
+                },
+            },
         },
         cpuload: {skip: "executes locally on mongos (not sent to any remote node)"},
         create: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {create: collName};
                 },
-            }
+            },
         },
         createIndexes: {
             run: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {createIndexes: collName, indexes: [{key: {a: 1}, name: "index"}]};
                 },
-            }
+            },
         },
         createSearchIndexes: {skip: "executes locally on mongos", conditional: true},
         createRole: {skip: "always targets the config server"},
         createUnsplittableCollection: {
-            skip: "Test command that which functionality will be integrated into createCollection"
+            skip: "Test command that which functionality will be integrated into createCollection",
         },
         createUser: {skip: "always targets the config server"},
         currentOp: {skip: "not on a user database"},
@@ -469,46 +474,46 @@ const allTestCases = {
             run: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {dataSize: dbName + "." + collName};
                 },
-            }
+            },
         },
         dbStats: {
             run: {
                 // dbStats is always broadcast to all shards
                 sendsDbVersion: false,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {dbStats: 1, scale: 1};
-                }
-            }
+                },
+            },
         },
         delete: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]};
-                }
+                },
             },
             explain: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {explain: {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]}};
-                }
-            }
+                },
+            },
         },
         distinct: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {distinct: collName, key: "x"};
-                }
+                },
             },
             explain: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {explain: {distinct: collName, key: "x"}};
-                }
+                },
             },
         },
         drop: {skip: "does not forward command to primary shard"},
@@ -520,10 +525,10 @@ const allTestCases = {
             run: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {dropIndexes: collName, index: "*"};
                 },
-            }
+            },
         },
         dropRole: {skip: "always targets the config server"},
         dropSearchIndex: {skip: "executes locally on mongos", conditional: true},
@@ -536,39 +541,39 @@ const allTestCases = {
         filemd5: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {filemd5: ObjectId(), root: collName};
-                }
-            }
+                },
+            },
         },
         find: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {find: collName, filter: {x: 1}};
-                }
+                },
             },
             explain: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {explain: {find: collName, filter: {x: 1}}};
-                }
-            }
+                },
+            },
         },
         findAndModify: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {findAndModify: collName, query: {_id: 0}, remove: true};
-                }
+                },
             },
             explain: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {explain: {findAndModify: collName, query: {_id: 0}, remove: true}};
-                }
-            }
+                },
+            },
         },
         flushRouterConfig: {skip: "executes locally on mongos (not sent to any remote node)"},
         fsync: {skip: "broadcast to all shards"},
@@ -585,21 +590,22 @@ const allTestCases = {
         getQueryableEncryptionCountInfo: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         getQueryableEncryptionCountInfo: collName,
                         tokens: [
                             {
-                                tokens: [{
-                                    "s": BinData(0,
-                                                 "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ=")
-                                }]
+                                tokens: [
+                                    {
+                                        "s": BinData(0, "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ="),
+                                    },
+                                ],
                             },
                         ],
-                        "queryType": "insert"
+                        "queryType": "insert",
                     };
-                }
-            }
+                },
+            },
         },
         getShardMap: {skip: "executes locally on mongos (not sent to any remote node)"},
         getShardVersion: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -611,10 +617,10 @@ const allTestCases = {
         insert: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {insert: collName, documents: [{_id: 1}]};
                 },
-            }
+            },
         },
         invalidateUserCache: {skip: "executes locally on mongos (not sent to any remote node)"},
         isdbgrid: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -627,10 +633,10 @@ const allTestCases = {
         listCollections: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {listCollections: 1};
-                }
-            }
+                },
+            },
         },
         listCommands: {skip: "executes locally on mongos (not sent to any remote node)"},
         listDatabases: {skip: "does not forward command to primary shard"},
@@ -638,10 +644,10 @@ const allTestCases = {
             run: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {listIndexes: collName};
                 },
-            }
+            },
         },
         listSearchIndexes: {skip: "executes locally on mongos", conditional: true},
         listShards: {skip: "does not forward command to primary shard"},
@@ -653,7 +659,7 @@ const allTestCases = {
         mapReduce: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         mapReduce: collName,
                         map: function mapFunc() {
@@ -662,13 +668,13 @@ const allTestCases = {
                         reduce: function reduceFunc(key, values) {
                             return Array.sum(values);
                         },
-                        out: "inline"
+                        out: "inline",
                     };
-                }
+                },
             },
             explain: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         explain: {
                             mapReduce: collName,
@@ -678,11 +684,11 @@ const allTestCases = {
                             reduce: function reduceFunc(key, values) {
                                 return Array.sum(values);
                             },
-                            out: "inline"
-                        }
+                            out: "inline",
+                        },
                     };
-                }
-            }
+                },
+            },
         },
         mergeAllChunksOnShard: {skip: "does not forward command to primary shard"},
         mergeChunks: {skip: "does not forward command to primary shard"},
@@ -692,43 +698,41 @@ const allTestCases = {
         moveRange: {skip: "does not forward command to primary shard"},
         multicast: {skip: "does not forward command to primary shard"},
         netstat: {skip: "executes locally on mongos (not sent to any remote node)"},
-        oidcListKeys:
-            {skip: "executes locally on mongos (not sent to any remote node)", conditional: true},
-        oidcRefreshKeys:
-            {skip: "executes locally on mongos (not sent to any remote node)", conditional: true},
+        oidcListKeys: {skip: "executes locally on mongos (not sent to any remote node)", conditional: true},
+        oidcRefreshKeys: {skip: "executes locally on mongos (not sent to any remote node)", conditional: true},
         ping: {skip: "executes locally on mongos (not sent to any remote node)"},
         planCacheClear: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {planCacheClear: collName};
-                }
-            }
+                },
+            },
         },
         planCacheClearFilters: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {planCacheClearFilters: collName};
-                }
-            }
+                },
+            },
         },
         planCacheListFilters: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {planCacheListFilters: collName};
-                }
-            }
+                },
+            },
         },
         planCacheSetFilter: {
             run: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {planCacheSetFilter: collName, query: {_id: "A"}, indexes: [{_id: 1}]};
                 },
-            }
+            },
         },
         profile: {skip: "not supported in mongos"},
         reapLogicalSessionCacheNow: {skip: "is a no-op on mongos"},
@@ -743,16 +747,21 @@ const allTestCases = {
                 runsAgainstAdminDb: true,
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         renameCollection: dbName + "." + collName,
-                        to: dbName + "." + collName + "_renamed"
+                        to: dbName + "." + collName + "_renamed",
                     };
                 },
-                cleanUp: function(mongosConn, dbName, collName) {
-                    assert(mongosConn.getDB(dbName).getCollection(collName + "_renamed").drop());
-                }
-            }
+                cleanUp: function (mongosConn, dbName, collName) {
+                    assert(
+                        mongosConn
+                            .getDB(dbName)
+                            .getCollection(collName + "_renamed")
+                            .drop(),
+                    );
+                },
+            },
         },
         repairShardedCollectionChunksHistory: {skip: "always targets the config server"},
         replicateSearchIndexCommand: {skip: "internal command for testing only"},
@@ -777,18 +786,17 @@ const allTestCases = {
                 explicitlyCreateCollection: true,
                 // The command should fail if there is no active index build on the collection.
                 expectedFailureCode: ErrorCodes.IndexNotFound,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         setIndexCommitQuorum: collName,
                         indexNames: ["index"],
-                        commitQuorum: "majority"
+                        commitQuorum: "majority",
                     };
                 },
-            }
+            },
         },
         setFeatureCompatibilityVersion: {skip: "not on a user database"},
-        setProfilingFilterGlobally:
-            {skip: "executes locally on mongos (not sent to any remote node)"},
+        setProfilingFilterGlobally: {skip: "executes locally on mongos (not sent to any remote node)"},
         setParameter: {skip: "executes locally on mongos (not sent to any remote node)"},
         setClusterParameter: {skip: "always targets the config server"},
         setQuerySettings: {skip: "not on a user database"},
@@ -808,10 +816,8 @@ const allTestCases = {
         stopShardDraining: {skip: "not on a user database"},
         stopTrafficRecording: {skip: "executes locally on mongos (not sent to any remote node)"},
         testDeprecation: {skip: "executes locally on mongos (not sent to any remote node)"},
-        testDeprecationInVersion2:
-            {skip: "executes locally on mongos (not sent to any remote node)"},
-        testInternalTransactions:
-            {skip: "executes locally on mongos (not sent to any remote node)"},
+        testDeprecationInVersion2: {skip: "executes locally on mongos (not sent to any remote node)"},
+        testInternalTransactions: {skip: "executes locally on mongos (not sent to any remote node)"},
         testRemoval: {skip: "executes locally on mongos (not sent to any remote node)"},
         testVersion2: {skip: "executes locally on mongos (not sent to any remote node)"},
         testVersions1And2: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -822,24 +828,24 @@ const allTestCases = {
         update: {
             run: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         update: collName,
-                        updates: [{q: {_id: 2}, u: {_id: 2}, upsert: true, multi: false}]
+                        updates: [{q: {_id: 2}, u: {_id: 2}, upsert: true, multi: false}],
                     };
-                }
+                },
             },
             explain: {
                 sendsDbVersion: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {
                         explain: {
                             update: collName,
-                            updates: [{q: {_id: 2}, u: {_id: 2}, upsert: true, multi: false}]
-                        }
+                            updates: [{q: {_id: 2}, u: {_id: 2}, upsert: true, multi: false}],
+                        },
                     };
                 },
-            }
+            },
         },
         updateRole: {skip: "always targets the config server"},
         updateSearchIndex: {skip: "executes locally on mongos", conditional: true},
@@ -850,20 +856,20 @@ const allTestCases = {
             run: {
                 sendsDbVersion: true,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {validate: collName};
                 },
-            }
+            },
         },
         validateDBMetadata: {
             run: {
                 // validateDBMetadata is always broadcast to all shards.
                 sendsDbVersion: false,
                 explicitlyCreateCollection: true,
-                command: function(dbName, collName) {
+                command: function (dbName, collName) {
                     return {validateDBMetadata: 1, apiParameters: {version: "1"}};
                 },
-            }
+            },
         },
         waitForFailPoint: {skip: "executes locally on mongos (not sent to any remote node)"},
         whatsmyuri: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -941,11 +947,11 @@ const allTestCases = {
         _shardsvrCheckMetadataConsistency: {
             run: {
                 runsAgainstAdminDb: false,
-                command: function(dbName, collName, dbVersionBefore, dbVersionAfter) {
+                command: function (dbName, collName, dbVersionBefore, dbVersionAfter) {
                     return {_shardsvrCheckMetadataConsistency: 1};
                 },
                 expectedFailureCode: ErrorCodes.IllegalOperation,
-            }
+            },
         },
         _shardsvrCheckMetadataConsistencyParticipant: {skip: "TODO"},
         _shardsvrCleanupReshardCollection: {skip: "TODO"},
@@ -969,14 +975,14 @@ const allTestCases = {
         _shardsvrDropDatabase: {
             run: {
                 runsAgainstAdminDb: false,
-                command: function(dbName, collName, dbVersionBefore, dbVersionAfter) {
+                command: function (dbName, collName, dbVersionBefore, dbVersionAfter) {
                     return {
                         _shardsvrDropDatabase: dbName,
                         writeConcern: {w: "majority"},
                     };
                 },
                 expectedFailureCode: ErrorCodes.IllegalOperation,
-            }
+            },
         },
         _shardsvrDropDatabaseParticipant: {skip: "TODO"},
         _shardsvrDropIndexes: {skip: "TODO"},
@@ -1008,25 +1014,25 @@ const allTestCases = {
             run: [
                 {
                     runsAgainstAdminDb: false,
-                    command: function(dbName, collName, dbVersionBefore, dbVersionAfter) {
+                    command: function (dbName, collName, dbVersionBefore, dbVersionAfter) {
                         return {
                             _shardsvrResolveView: 1,
                             nss: `${dbName}.${collName}`,
-                            databaseVersion: dbVersionAfter
+                            databaseVersion: dbVersionAfter,
                         };
                     },
                 },
                 {
                     runsAgainstAdminDb: false,
-                    command: function(dbName, collName, dbVersionBefore, dbVersionAfter) {
+                    command: function (dbName, collName, dbVersionBefore, dbVersionAfter) {
                         return {
                             _shardsvrResolveView: 1,
                             nss: `${dbName}.${collName}`,
-                            databaseVersion: dbVersionBefore
+                            databaseVersion: dbVersionBefore,
                         };
                     },
                     expectedFailureCode: ErrorCodes.StaleDbVersion,
-                }
+                },
             ],
         },
         _shardsvrRunSearchIndexCommand: {skip: "TODO"},
@@ -1253,14 +1259,13 @@ const allTestCases = {
         waitForFailPoint: {skip: "TODO", conditional: true},
         whatsmysni: {skip: "TODO"},
         whatsmyuri: {skip: "TODO"},
-    }
+    },
 };
 
 // TODO (SERVER-101777): This test makes a lot of assumptions about database versions stored in
 // shards that are not the primary shard. Hence we turn off all shardAuthoritative feature flags.
 const shardOptions = (() => {
-    if (Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-        Boolean(TestData.multiversionBinVersion)) {
+    if (Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion)) {
         return {};
     }
     return {
@@ -1268,7 +1273,7 @@ const shardOptions = (() => {
             featureFlagShardAuthoritativeDbMetadataDDL: false,
             featureFlagShardAuthoritativeDbMetadataCRUD: false,
             featureFlagShardAuthoritativeCollMetadata: false,
-        }
+        },
     };
 })();
 const st = new ShardingTest({
@@ -1290,9 +1295,9 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
 
     const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 
-    commandsRemovedSinceLastLTS.forEach(function(cmd) {
+    commandsRemovedSinceLastLTS.forEach(function (cmd) {
         testCases[cmd] = {
-            skip: "must define test coverage for latest version backwards compatibility"
+            skip: "must define test coverage for latest version backwards compatibility",
         };
     });
 
@@ -1303,8 +1308,7 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
         // well formed.
         for (const command of Object.keys(listCommandsRes.commands)) {
             const testCase = testCases[command];
-            assert(testCase !== undefined,
-                   "coverage failure: must define a test case for " + command);
+            assert(testCase !== undefined, "coverage failure: must define a test case for " + command);
             validateTestCase(testCase, connection == st.s);
             testCases[command].validated = true;
         }
@@ -1319,13 +1323,13 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
             // removed since the last LTS version so the test case is defined in last stable
             // suites (in which these commands still exist on the mongos), but these test cases
             // won't be run in regular suites, so we skip processing them below as well.
-            if (commandsAddedSinceLastLTS.includes(key) ||
-                commandsRemovedSinceLastLTS.includes(key)) {
+            if (commandsAddedSinceLastLTS.includes(key) || commandsRemovedSinceLastLTS.includes(key)) {
                 continue;
             }
-            assert(testCases[key].validated || testCases[key].conditional,
-                   `you defined a test case for a command '${key}' that does not exist: ${
-                       tojson(testCases[key])}`);
+            assert(
+                testCases[key].validated || testCases[key].conditional,
+                `you defined a test case for a command '${key}' that does not exist: ${tojson(testCases[key])}`,
+            );
         }
     })();
 
@@ -1373,16 +1377,15 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
         // get dropped on the old primary shard after movePrimary.
         const shardedCollNs = dbName + "." + shardedCollName;
         assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
+        assert.commandWorked(st.s0.adminCommand({addShardToZone: st.shard0.shardName, zone: "x < 0"}));
+        assert.commandWorked(st.s0.adminCommand({addShardToZone: st.shard1.shardName, zone: "x >= 0"}));
         assert.commandWorked(
-            st.s0.adminCommand({addShardToZone: st.shard0.shardName, zone: 'x < 0'}));
+            st.s0.adminCommand({updateZoneKeyRange: shardedCollNs, min: {x: MinKey}, max: {x: 0}, zone: "x < 0"}),
+        );
         assert.commandWorked(
-            st.s0.adminCommand({addShardToZone: st.shard1.shardName, zone: 'x >= 0'}));
-        assert.commandWorked(st.s0.adminCommand(
-            {updateZoneKeyRange: shardedCollNs, min: {x: MinKey}, max: {x: 0}, zone: 'x < 0'}));
-        assert.commandWorked(st.s0.adminCommand(
-            {updateZoneKeyRange: shardedCollNs, min: {x: 0}, max: {x: MaxKey}, zone: 'x >= 0'}));
-        assert.commandWorked(
-            st.s0.getDB('admin').admin.runCommand({shardCollection: shardedCollNs, key: {"x": 1}}));
+            st.s0.adminCommand({updateZoneKeyRange: shardedCollNs, min: {x: 0}, max: {x: MaxKey}, zone: "x >= 0"}),
+        );
+        assert.commandWorked(st.s0.getDB("admin").admin.runCommand({shardCollection: shardedCollNs, key: {"x": 1}}));
         assert(containsCollection(st.shard0, dbName, shardedCollName));
         assert(containsCollection(st.shard1, dbName, shardedCollName));
 
@@ -1428,13 +1431,12 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
     })();
 };
 
-doTest(st.s,
-       allTestCases.mongos,
-       commandsAddedToMongosSinceLastLTS,
-       commandsRemovedFromMongosSinceLastLTS);
-doTest(st.rs0.getPrimary(),
-       allTestCases.mongod,
-       commandsAddedToMongodSinceLastLTS,
-       commandsRemovedFromMongodSinceLastLTS);
+doTest(st.s, allTestCases.mongos, commandsAddedToMongosSinceLastLTS, commandsRemovedFromMongosSinceLastLTS);
+doTest(
+    st.rs0.getPrimary(),
+    allTestCases.mongod,
+    commandsAddedToMongodSinceLastLTS,
+    commandsRemovedFromMongodSinceLastLTS,
+);
 
 st.stop();

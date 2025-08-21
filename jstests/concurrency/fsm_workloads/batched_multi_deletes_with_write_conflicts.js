@@ -12,7 +12,7 @@
  */
 import {checkNWouldDelete, getPlanStage, getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
-export const $config = (function() {
+export const $config = (function () {
     // 'data' is passed (copied) to each of the worker threads.
     var data = {
         // Defines the number of subsets of data, which are randomly picked to create conflicts.
@@ -35,12 +35,12 @@ export const $config = (function() {
 
             const expl = db.runCommand({
                 explain: {delete: collName, deletes: [{q: {_id: {$gte: 0}}, limit: 0}]},
-                verbosity: "executionStats"
+                verbosity: "executionStats",
             });
             assert.commandWorked(expl);
 
             const clusterTopology = cluster.getSerializedCluster();
-            if (clusterTopology === '') {
+            if (clusterTopology === "") {
                 assert(getPlanStage(expl, "BATCHED_DELETE"), tojson(expl));
             } else {
                 // Normally, we target both shards; however, in rare cases when the balancer is
@@ -61,21 +61,19 @@ export const $config = (function() {
             assert.commandWorked(db[collName].remove({}));
         }
 
-        assert.commandWorked(
-            db[collName].createIndex({deleter_tid: 1, delete_query_match: 1, subset_id: 1}));
+        assert.commandWorked(db[collName].createIndex({deleter_tid: 1, delete_query_match: 1, subset_id: 1}));
     }
 
     // 'teardown' is run once by the parent thread before the cluster
     // is destroyed, but after the worker threads have been reaped.
     // The 'this' argument is bound as '$config.data'. 'cluster' is provided
     // to allow execution against all mongos and mongod nodes.
-    function teardown(db, collName, cluster) {
-    }
+    function teardown(db, collName, cluster) {}
 
     // 'states' are the different functions callable by a worker
     // thread. The 'this' argument of any exposed function is
     // bound as '$config.data'.
-    var states = (function() {
+    var states = (function () {
         // Helpers
         function getRandomInRange({min, max}) {
             return Math.floor(Math.random() * (max - min + 1) + min);
@@ -85,8 +83,7 @@ export const $config = (function() {
         }
 
         // State functions
-        function init(db, collName) {
-        }
+        function init(db, collName) {}
 
         /**
          * Inserts documents and batch deletes them.
@@ -100,11 +97,9 @@ export const $config = (function() {
         function batchedDelete(db, collName) {
             const coll = db[collName];
 
-            const subsetTemplates =
-                Array(this.numInsertSubsets)
-                    .fill()
-                    .map((_, i) =>
-                             ({deleter_tid: this.tid, delete_query_match: true, subset_id: i + 1}));
+            const subsetTemplates = Array(this.numInsertSubsets)
+                .fill()
+                .map((_, i) => ({deleter_tid: this.tid, delete_query_match: true, subset_id: i + 1}));
 
             // Create array of (subsetSize * numInsertSubsets) docs, by repeating the
             // subsetTemplates baseInsertSize times.
@@ -118,14 +113,23 @@ export const $config = (function() {
 
         // Takes a random subset of documents potentially being batch deleted and updates them.
         function updateConflict(db, collName) {
-            retryOnRetryableError(() => {
-                assert.commandWorked(db[collName].updateMany({
-                    deleter_tid: {$ne: this.tid},  // Exclude self.
-                    delete_query_match: true,      // Select documents that might be being deleted.
-                    subset_id: getRandomUpTo(this.numInsertSubsets)  // Select subset.
+            retryOnRetryableError(
+                () => {
+                    assert.commandWorked(
+                        db[collName].updateMany(
+                            {
+                                deleter_tid: {$ne: this.tid}, // Exclude self.
+                                delete_query_match: true, // Select documents that might be being deleted.
+                                subset_id: getRandomUpTo(this.numInsertSubsets), // Select subset.
+                            },
+                            {$set: {delete_query_match: false}},
+                        ),
+                    );
                 },
-                                                             {$set: {delete_query_match: false}}));
-            }, 100, undefined, TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : []);
+                100,
+                undefined,
+                TestData.runningWithBalancer ? [ErrorCodes.QueryPlanKilled] : [],
+            );
         }
 
         // Takes a random subset of documents potentially being batch deleted and re-delete them.
@@ -133,7 +137,7 @@ export const $config = (function() {
             const deleteResult = db[collName].deleteMany({
                 deleter_tid: {$ne: this.tid},
                 delete_query_match: true,
-                subset_id: getRandomUpTo(this.numInsertSubsets)
+                subset_id: getRandomUpTo(this.numInsertSubsets),
             });
             assert.commandWorked(deleteResult);
         }
@@ -142,7 +146,7 @@ export const $config = (function() {
             init: init,
             batchedDelete: batchedDelete,
             updateConflict: updateConflict,
-            deleteConflict: deleteConflict
+            deleteConflict: deleteConflict,
         };
     })();
 
@@ -152,17 +156,17 @@ export const $config = (function() {
         init: transitionToAll,
         batchedDelete: transitionToAll,
         updateConflict: transitionToAll,
-        deleteConflict: transitionToAll
+        deleteConflict: transitionToAll,
     };
 
     return {
         threadCount: 10,
         iterations: 50,
-        startState: 'init',
+        startState: "init",
         states: states,
         transitions: transitions,
         setup: setup,
         teardown: teardown,
-        data: data
+        data: data,
     };
 })();

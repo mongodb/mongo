@@ -9,7 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     shards: 2,
-    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
+    mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
 });
 st.stopBalancer();
 
@@ -25,8 +25,7 @@ function getNumberOfCursorsMoreThanOneBatch() {
 }
 
 coll.drop();
-assert.commandWorked(
-    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
 assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
 
@@ -58,8 +57,7 @@ assert.eq(getNumberOfCursorsOpened() - initialNumCursorsOpened, 2, cmdRes);
 assert.eq(getNumberOfCursorsMoreThanOneBatch() - initialNumCursorsMoreThanOneBatch, 0, cmdRes);
 
 jsTestLog("Running getMore for cursorId: " + cursorId);
-cmdRes = assert.commandWorked(
-    db.runCommand({getMore: cursorId, collection: coll.getName(), batchSize: 2}));
+cmdRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: coll.getName(), batchSize: 2}));
 // Expect the number of cursors with more than one batch to not have changed.
 assert.eq(getNumberOfCursorsOpened() - initialNumCursorsOpened, 2, cmdRes);
 assert.eq(getNumberOfCursorsMoreThanOneBatch() - initialNumCursorsMoreThanOneBatch, 0, cmdRes);
@@ -70,22 +68,19 @@ assert.eq(getNumberOfCursorsOpened() - initialNumCursorsOpened, 2, cmdRes);
 assert.eq(getNumberOfCursorsMoreThanOneBatch() - initialNumCursorsMoreThanOneBatch, 1, cmdRes);
 
 jsTestLog("Running aggregate command.");
-cmdRes = assert.commandWorked(
-    db.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 2}}));
+cmdRes = assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {batchSize: 2}}));
 cursorId = cmdRes.cursor.id;
 assert.eq(getNumberOfCursorsOpened() - initialNumCursorsOpened, 3, cmdRes);
 assert.eq(getNumberOfCursorsMoreThanOneBatch() - initialNumCursorsMoreThanOneBatch, 1, cmdRes);
 
 jsTestLog("Running getMore on aggregate cursor: " + cursorId);
-cmdRes = assert.commandWorked(
-    db.runCommand({getMore: cursorId, collection: coll.getName(), batchSize: 2}));
+cmdRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: coll.getName(), batchSize: 2}));
 assert.eq(getNumberOfCursorsOpened() - initialNumCursorsOpened, 3, cmdRes);
 assert.eq(getNumberOfCursorsMoreThanOneBatch() - initialNumCursorsMoreThanOneBatch, 1, cmdRes);
 
 // Use a batchSize that's greater than the number of documents and therefore exhaust the cursor.
 jsTestLog("Exhausting cursor with cursorId: " + cursorId);
-cmdRes = assert.commandWorked(
-    db.runCommand({getMore: cursorId, collection: coll.getName(), batchSize: 20}));
+cmdRes = assert.commandWorked(db.runCommand({getMore: cursorId, collection: coll.getName(), batchSize: 20}));
 assert.eq(getNumberOfCursorsOpened() - initialNumCursorsOpened, 3, cmdRes);
 assert.eq(getNumberOfCursorsMoreThanOneBatch() - initialNumCursorsMoreThanOneBatch, 2, cmdRes);
 

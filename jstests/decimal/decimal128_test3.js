@@ -6,46 +6,46 @@ var data = [
     {
         "description": "[basx066] strings without E cannot generate E in result",
         "input": "-00345678.5432",
-        "expected": "-345678.5432"
+        "expected": "-345678.5432",
     },
     {
         "description": "[basx065] strings without E cannot generate E in result",
         "input": "-0345678.5432",
-        "expected": "-345678.5432"
+        "expected": "-345678.5432",
     },
     {
         "description": "[basx064] strings without E cannot generate E in result",
-        "input": "-345678.5432"
+        "input": "-345678.5432",
     },
     {"description": "[basx041] strings without E cannot generate E in result", "input": "-76"},
     {
         "description": "[basx027] conform to rules and exponent will be in permitted range).",
-        "input": "-9.999"
+        "input": "-9.999",
     },
     {
         "description": "[basx026] conform to rules and exponent will be in permitted range).",
-        "input": "-9.119"
+        "input": "-9.119",
     },
     {
         "description": "[basx025] conform to rules and exponent will be in permitted range).",
-        "input": "-9.11"
+        "input": "-9.11",
     },
     {
         "description": "[basx024] conform to rules and exponent will be in permitted range).",
-        "input": "-9.1"
+        "input": "-9.1",
     },
     {
         "description": "[dqbsr531] negatives (Rounded)",
         "input": "-1.1111111111111111111111111111123450",
-        "expected": "-1.111111111111111111111111111112345"
+        "expected": "-1.111111111111111111111111111112345",
     },
     {
         "description": "[basx022] conform to rules and exponent will be in permitted range).",
-        "input": "-1.0"
+        "input": "-1.0",
     },
     {
         "description": "[basx021] conform to rules and exponent will be in permitted range).",
-        "input": "-1"
+        "input": "-1",
     },
     {"description": "[basx601] Zeros", "input": "0.000000000", "expected": "0E-9"},
     {"description": "[basx622] Zeros", "input": "-0.000000000", "expected": "-0E-9"},
@@ -66,7 +66,7 @@ var data = [
     {
         "description": "[basx019] conform to rules and exponent will be in permitted range).",
         "input": "-00.00",
-        "expected": "-0.00"
+        "expected": "-0.00",
     },
     {"description": "[basx607] Zeros", "input": "0.000"},
     {"description": "[basx616] Zeros", "input": "-0.000"},
@@ -76,25 +76,25 @@ var data = [
     {
         "description": "[basx290] some more negative zeros [systematic tests below]",
         "input": "-0.000E-1",
-        "expected": "-0.0000"
+        "expected": "-0.0000",
     },
     {"description": "[basx131] Numbers with E", "input": "0.000E-2", "expected": "0.00000"},
     {
         "description": "[basx291] some more negative zeros [systematic tests below]",
         "input": "-0.000E-2",
-        "expected": "-0.00000"
+        "expected": "-0.00000",
     },
     {"description": "[basx132] Numbers with E", "input": "0.000E-3", "expected": "0.000000"},
     {
         "description": "[basx292] some more negative zeros [systematic tests below]",
         "input": "-0.000E-3",
-        "expected": "-0.000000"
+        "expected": "-0.000000",
     },
     {"description": "[basx133] Numbers with E", "input": "0.000E-4", "expected": "0E-7"},
     {
         "description": "[basx293] some more negative zeros [systematic tests below]",
         "input": "-0.000E-4",
-        "expected": "-0E-7"
+        "expected": "-0E-7",
     },
     {"description": "[basx608] Zeros", "input": "0.00"},
     {"description": "[basx615] Zeros", "input": "-0.00"},
@@ -107,7 +107,7 @@ var data = [
     {
         "description": "[basx294] some more negative zeros [systematic tests below]",
         "input": "-0.00E-2",
-        "expected": "-0.0000"
+        "expected": "-0.0000",
     },
     {"description": "[basx632] Zeros", "input": "0.00E+2", "expected": "0"},
     {"description": "[basx672] Zeros", "input": "0.00E-2", "expected": "0.0000"},
@@ -115,7 +115,7 @@ var data = [
     {
         "description": "[basx295] some more negative zeros [systematic tests below]",
         "input": "-0.00E-3",
-        "expected": "-0.00000"
+        "expected": "-0.00000",
     },
     {"description": "[basx633] Zeros", "input": "0.00E+3", "expected": "0E+1"},
     {"description": "[basx673] Zeros", "input": "0.00E-3", "expected": "0.00000"},
@@ -137,11 +137,11 @@ var data = [
     {
         "description": "[basx063] strings without E cannot generate E in result",
         "input": "+00345678.5432",
-        "expected": "345678.5432"
+        "expected": "345678.5432",
     },
     {
         "description": "[basx018] conform to rules and exponent will be in permitted range).",
-        "input": "-0.0"
+        "input": "-0.0",
     },
     {"description": "[basx609] Zeros", "input": "0.0"},
     {"description": "[basx614] Zeros", "input": "-0.0"},
@@ -153,14 +153,14 @@ var data = [
     {
         "description": "[basx296] some more negative zeros [systematic tests below]",
         "input": "-0.0E-2",
-        "expected": "-0.000"
+        "expected": "-0.000",
     },
     {"description": "[basx642] Zeros", "input": "0.0E+2", "expected": "0E+1"},
     {"description": "[basx662] Zeros", "input": "0.0E-2", "expected": "0.000"},
     {
         "description": "[basx297] some more negative zeros [systematic tests below]",
         "input": "-0.0E-3",
-        "expected": "-0.0000"
+        "expected": "-0.0000",
     },
     {"description": "[basx643] Zeros", "input": "0.0E+3", "expected": "0E+2"},
     {"description": "[basx663] Zeros", "input": "0.0E-3", "expected": "0.0000"},
@@ -181,15 +181,15 @@ var data = [
     {
         "description": "[basx062] strings without E cannot generate E in result",
         "input": "+0345678.5432",
-        "expected": "345678.5432"
+        "expected": "345678.5432",
     },
     {
         "description": "[basx001] conform to rules and exponent will be in permitted range).",
-        "input": "0"
+        "input": "0",
     },
     {
         "description": "[basx017] conform to rules and exponent will be in permitted range).",
-        "input": "-0"
+        "input": "-0",
     },
     {"description": "[basx611] Zeros", "input": "0.", "expected": "0"},
     {"description": "[basx613] Zeros", "input": "-0.", "expected": "-0"},
@@ -201,13 +201,13 @@ var data = [
     {
         "description": "[basx298] some more negative zeros [systematic tests below]",
         "input": "-0E-2",
-        "expected": "-0.00"
+        "expected": "-0.00",
     },
     {"description": "[basx652] Zeros", "input": "0E+2"},
     {
         "description": "[basx299] some more negative zeros [systematic tests below]",
         "input": "-0E-3",
-        "expected": "-0.000"
+        "expected": "-0.000",
     },
     {"description": "[basx653] Zeros", "input": "0E+3"},
     {"description": "[basx654] Zeros", "input": "0E+4"},
@@ -223,51 +223,51 @@ var data = [
     {
         "description": "[basx042] strings without E cannot generate E in result",
         "input": "+12.76",
-        "expected": "12.76"
+        "expected": "12.76",
     },
     {"description": "[basx143] Numbers with E", "input": "+1E+009", "expected": "1E+9"},
     {
         "description": "[basx061] strings without E cannot generate E in result",
         "input": "+345678.5432",
-        "expected": "345678.5432"
+        "expected": "345678.5432",
     },
     {
         "description": "[basx036] conform to rules and exponent will be in permitted range).",
         "input": "0.0000000123456789",
-        "expected": "1.23456789E-8"
+        "expected": "1.23456789E-8",
     },
     {
         "description": "[basx035] conform to rules and exponent will be in permitted range).",
         "input": "0.000000123456789",
-        "expected": "1.23456789E-7"
+        "expected": "1.23456789E-7",
     },
     {
         "description": "[basx034] conform to rules and exponent will be in permitted range).",
-        "input": "0.00000123456789"
+        "input": "0.00000123456789",
     },
     {
         "description": "[basx053] strings without E cannot generate E in result",
-        "input": "0.0000050"
+        "input": "0.0000050",
     },
     {
         "description": "[basx033] conform to rules and exponent will be in permitted range).",
-        "input": "0.0000123456789"
+        "input": "0.0000123456789",
     },
     {
         "description": "[basx016] conform to rules and exponent will be in permitted range).",
-        "input": "0.012"
+        "input": "0.012",
     },
     {
         "description": "[basx015] conform to rules and exponent will be in permitted range).",
-        "input": "0.123"
+        "input": "0.123",
     },
     {
         "description": "[basx037] conform to rules and exponent will be in permitted range).",
-        "input": "0.123456789012344"
+        "input": "0.123456789012344",
     },
     {
         "description": "[basx038] conform to rules and exponent will be in permitted range).",
-        "input": "0.123456789012345"
+        "input": "0.123456789012345",
     },
     {"description": "[basx250] Numbers with E", "input": "0.1265"},
     {"description": "[basx257] Numbers with E", "input": "0.1265E-0", "expected": "0.1265"},
@@ -286,15 +286,15 @@ var data = [
     {"description": "[basx159] Numbers with E", "input": "0.73e-7", "expected": "7.3E-8"},
     {
         "description": "[basx004] conform to rules and exponent will be in permitted range).",
-        "input": "1.00"
+        "input": "1.00",
     },
     {
         "description": "[basx003] conform to rules and exponent will be in permitted range).",
-        "input": "1.0"
+        "input": "1.0",
     },
     {
         "description": "[basx002] conform to rules and exponent will be in permitted range).",
-        "input": "1"
+        "input": "1",
     },
     {"description": "[basx148] Numbers with E", "input": "1E+009", "expected": "1E+9"},
     {"description": "[basx153] Numbers with E", "input": "1E009", "expected": "1E+9"},
@@ -308,7 +308,7 @@ var data = [
     {"description": "[basx150] Numbers with E", "input": "1E9", "expected": "1E+9"},
     {
         "description": "[basx014] conform to rules and exponent will be in permitted range).",
-        "input": "1.234"
+        "input": "1.234",
     },
     {"description": "[basx170] Numbers with E", "input": "1.265"},
     {"description": "[basx177] Numbers with E", "input": "1.265E-0", "expected": "1.265"},
@@ -349,7 +349,7 @@ var data = [
     {
         "description": "[basx397] Engineering notation tests",
         "input": "7E-6",
-        "expected": "0.000007"
+        "expected": "0.000007",
     },
     {"description": "[basx371] Engineering notation tests", "input": "7E7", "expected": "7E+7"},
     {"description": "[basx399] Engineering notation tests", "input": "7E-7"},
@@ -359,11 +359,11 @@ var data = [
     {"description": "[basx403] Engineering notation tests", "input": "7E-9"},
     {
         "description": "[basx007] conform to rules and exponent will be in permitted range).",
-        "input": "10.0"
+        "input": "10.0",
     },
     {
         "description": "[basx005] conform to rules and exponent will be in permitted range).",
-        "input": "10"
+        "input": "10",
     },
     {"description": "[basx165] Numbers with E", "input": "10E+009", "expected": "1.0E+10"},
     {"description": "[basx163] Numbers with E", "input": "10E+09", "expected": "1.0E+10"},
@@ -371,37 +371,37 @@ var data = [
     {
         "description": "[basx305] Engineering notation tests",
         "input": "10e10",
-        "expected": "1.0E+11"
+        "expected": "1.0E+11",
     },
     {
         "description": "[basx345] Engineering notation tests",
         "input": "10e-10",
-        "expected": "1.0E-9"
+        "expected": "1.0E-9",
     },
     {
         "description": "[basx303] Engineering notation tests",
         "input": "10e11",
-        "expected": "1.0E+12"
+        "expected": "1.0E+12",
     },
     {
         "description": "[basx347] Engineering notation tests",
         "input": "10e-11",
-        "expected": "1.0E-10"
+        "expected": "1.0E-10",
     },
     {
         "description": "[basx301] Engineering notation tests",
         "input": "10e12",
-        "expected": "1.0E+13"
+        "expected": "1.0E+13",
     },
     {
         "description": "[basx349] Engineering notation tests",
         "input": "10e-12",
-        "expected": "1.0E-11"
+        "expected": "1.0E-11",
     },
     {
         "description": "[basx351] Engineering notation tests",
         "input": "10e-13",
-        "expected": "1.0E-12"
+        "expected": "1.0E-12",
     },
     {"description": "[basx323] Engineering notation tests", "input": "10e1", "expected": "1.0E+2"},
     {"description": "[basx327] Engineering notation tests", "input": "10e-1", "expected": "1.0"},
@@ -415,19 +415,19 @@ var data = [
     {
         "description": "[basx335] Engineering notation tests",
         "input": "10e-5",
-        "expected": "0.00010"
+        "expected": "0.00010",
     },
     {"description": "[basx313] Engineering notation tests", "input": "10e6", "expected": "1.0E+7"},
     {
         "description": "[basx337] Engineering notation tests",
         "input": "10e-6",
-        "expected": "0.000010"
+        "expected": "0.000010",
     },
     {"description": "[basx311] Engineering notation tests", "input": "10e7", "expected": "1.0E+8"},
     {
         "description": "[basx339] Engineering notation tests",
         "input": "10e-7",
-        "expected": "0.0000010"
+        "expected": "0.0000010",
     },
     {"description": "[basx309] Engineering notation tests", "input": "10e8", "expected": "1.0E+9"},
     {"description": "[basx341] Engineering notation tests", "input": "10e-8", "expected": "1.0E-7"},
@@ -437,27 +437,27 @@ var data = [
     {"description": "[basx343] Engineering notation tests", "input": "10e-9", "expected": "1.0E-8"},
     {
         "description": "[basx008] conform to rules and exponent will be in permitted range).",
-        "input": "10.1"
+        "input": "10.1",
     },
     {
         "description": "[basx009] conform to rules and exponent will be in permitted range).",
-        "input": "10.4"
+        "input": "10.4",
     },
     {
         "description": "[basx010] conform to rules and exponent will be in permitted range).",
-        "input": "10.5"
+        "input": "10.5",
     },
     {
         "description": "[basx011] conform to rules and exponent will be in permitted range).",
-        "input": "10.6"
+        "input": "10.6",
     },
     {
         "description": "[basx012] conform to rules and exponent will be in permitted range).",
-        "input": "10.9"
+        "input": "10.9",
     },
     {
         "description": "[basx013] conform to rules and exponent will be in permitted range).",
-        "input": "11.0"
+        "input": "11.0",
     },
     {"description": "[basx040] strings without E cannot generate E in result", "input": "12"},
     {"description": "[basx190] Numbers with E", "input": "12.65"},
@@ -477,23 +477,23 @@ var data = [
     {
         "description": "[basx044] strings without E cannot generate E in result",
         "input": "012.76",
-        "expected": "12.76"
+        "expected": "12.76",
     },
     {"description": "[basx042] strings without E cannot generate E in result", "input": "12.76"},
     {
         "description": "[basx046] strings without E cannot generate E in result",
         "input": "17.",
-        "expected": "17"
+        "expected": "17",
     },
     {
         "description": "[basx049] strings without E cannot generate E in result",
         "input": "0044",
-        "expected": "44"
+        "expected": "44",
     },
     {
         "description": "[basx048] strings without E cannot generate E in result",
         "input": "044",
-        "expected": "44"
+        "expected": "44",
     },
     {"description": "[basx158] Numbers with E", "input": "44E+9", "expected": "4.4E+10"},
     {"description": "[basx068] examples", "input": "50E-7", "expected": "0.0000050"},
@@ -517,7 +517,7 @@ var data = [
     {"description": "[basx222] Numbers with E", "input": "126.5E+8", "expected": "1.265E+10"},
     {
         "description": "[basx006] conform to rules and exponent will be in permitted range).",
-        "input": "1000"
+        "input": "1000",
     },
     {"description": "[basx230] Numbers with E", "input": "1265"},
     {"description": "[basx237] Numbers with E", "input": "1265E-0", "expected": "1265"},
@@ -535,40 +535,40 @@ var data = [
     {"description": "[basx242] Numbers with E", "input": "1265E+8", "expected": "1.265E+11"},
     {
         "description": "[basx060] strings without E cannot generate E in result",
-        "input": "345678.5432"
+        "input": "345678.5432",
     },
     {
         "description": "[basx059] strings without E cannot generate E in result",
         "input": "0345678.54321",
-        "expected": "345678.54321"
+        "expected": "345678.54321",
     },
     {
         "description": "[basx058] strings without E cannot generate E in result",
-        "input": "345678.543210"
+        "input": "345678.543210",
     },
     {
         "description": "[basx057] strings without E cannot generate E in result",
-        "input": "2345678.543210"
+        "input": "2345678.543210",
     },
     {
         "description": "[basx056] strings without E cannot generate E in result",
-        "input": "12345678.543210"
+        "input": "12345678.543210",
     },
     {
         "description": "[basx031] conform to rules and exponent will be in permitted range).",
-        "input": "123456789.000000"
+        "input": "123456789.000000",
     },
     {
         "description": "[basx030] conform to rules and exponent will be in permitted range).",
-        "input": "123456789.123456"
+        "input": "123456789.123456",
     },
     {
         "description": "[basx032] conform to rules and exponent will be in permitted range).",
-        "input": "123456789123456"
-    }
+        "input": "123456789123456",
+    },
 ];
 
-data.forEach(function(testCase) {
+data.forEach(function (testCase) {
     print(`Test - ${testCase.description}`);
     var output = NumberDecimal(testCase.input).toString();
     if (testCase.expected) {

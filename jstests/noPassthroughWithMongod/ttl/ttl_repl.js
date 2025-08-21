@@ -22,19 +22,19 @@ rt.awaitSecondaryNodes();
 var secondary1 = rt.getSecondary();
 
 // shortcuts
-var primarydb = primary.getDB('d');
-var secondary1db = secondary1.getDB('d');
-var primarycol = primarydb['c'];
-var secondary1col = secondary1db['c'];
+var primarydb = primary.getDB("d");
+var secondary1db = secondary1.getDB("d");
+var primarycol = primarydb["c"];
+var secondary1col = secondary1db["c"];
 
 primarycol.drop();
 primarydb.createCollection(primarycol.getName());
 
 // create new collection. insert 24 docs, aged at one-hour intervalss
-let now = (new Date()).getTime();
+let now = new Date().getTime();
 var bulk = primarycol.initializeUnorderedBulkOp();
 for (let i = 0; i < 24; i++) {
-    bulk.insert({x: new Date(now - (3600 * 1000 * i))});
+    bulk.insert({x: new Date(now - 3600 * 1000 * i)});
 }
 assert.commandWorked(bulk.execute());
 rt.awaitReplication();
@@ -50,11 +50,10 @@ printjson(secondary1col.stats());
 // create TTL index, wait for TTL monitor to kick in, then check that
 // the correct number of docs age out
 var initialExpireAfterSeconds = 20000;
-assert.commandWorked(
-    primarycol.createIndex({x: 1}, {expireAfterSeconds: initialExpireAfterSeconds}));
+assert.commandWorked(primarycol.createIndex({x: 1}, {expireAfterSeconds: initialExpireAfterSeconds}));
 rt.awaitReplication();
 
-sleep(70 * 1000);  // TTL monitor runs every 60 seconds, so wait 70
+sleep(70 * 1000); // TTL monitor runs every 60 seconds, so wait 70
 
 print("Stats after waiting for TTL Monitor:");
 print("Primary:");
@@ -73,7 +72,7 @@ var config = rt.getReplSetConfig();
 config.version = rt.getReplSetConfigFromNode().version + 1;
 reconfig(rt, config);
 
-var secondary2col = secondary.getDB('d')['c'];
+var secondary2col = secondary.getDB("d")["c"];
 
 // check that the new secondary has the correct number of docs
 print("New Secondary stats:");
@@ -89,8 +88,7 @@ rt.awaitReplication();
 function getTTLTime(theCollection, theKey) {
     var indexes = theCollection.getIndexes();
     for (var i = 0; i < indexes.length; i++) {
-        if (friendlyEqual(theKey, indexes[i].key))
-            return indexes[i].expireAfterSeconds;
+        if (friendlyEqual(theKey, indexes[i].key)) return indexes[i].expireAfterSeconds;
     }
     throw "not found";
 }
@@ -101,8 +99,8 @@ assert.eq(10000, getTTLTime(secondary1db.c, {x: 1}));
 
 // Verify the format of TTL collMod oplog entry. The old expiration time should be saved,
 // and index key patterns should be normalized to index names.
-var primaryOplog = primary.getDB('local').oplog.rs.find().sort({$natural: 1}).toArray();
-var collModEntry = primaryOplog.find(op => op.o.collMod);
+var primaryOplog = primary.getDB("local").oplog.rs.find().sort({$natural: 1}).toArray();
+var collModEntry = primaryOplog.find((op) => op.o.collMod);
 
 assert(collModEntry, "collMod entry was not present in the oplog.");
 assert.eq(initialExpireAfterSeconds, collModEntry.o2["indexOptions_old"]["expireAfterSeconds"]);

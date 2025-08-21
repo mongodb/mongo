@@ -5,7 +5,7 @@ function myprint(x) {
     print("chaining output: " + x);
 }
 
-var replTest = new ReplSetTest({name: 'testSet', nodes: 3, useBridge: true});
+var replTest = new ReplSetTest({name: "testSet", nodes: 3, useBridge: true});
 var nodes = replTest.startSet();
 var hostnames = replTest.nodeList();
 replTest.initiate({
@@ -13,42 +13,43 @@ replTest.initiate({
     "members": [
         {"_id": 0, "host": hostnames[0], priority: 2},
         {"_id": 1, "host": hostnames[1], priority: 0},
-        {"_id": 2, "host": hostnames[2], priority: 0}
+        {"_id": 2, "host": hostnames[2], priority: 0},
     ],
-    "settings": {"chainingAllowed": false}
+    "settings": {"chainingAllowed": false},
 });
 
 var primary = replTest.getPrimary();
 // The default WC is majority and stopServerReplication could prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 replTest.awaitReplication();
 
-var breakNetwork = function() {
+var breakNetwork = function () {
     nodes[0].disconnect(nodes[2]);
     primary = replTest.getPrimary();
 };
 
-var checkNoChaining = function() {
+var checkNoChaining = function () {
     primary.getDB("test").foo.insert({x: 1});
 
-    assert.soon(function() {
+    assert.soon(function () {
         return nodes[1].getDB("test").foo.findOne() != null;
     });
 
-    var endTime = (new Date()).getTime() + 10000;
-    while ((new Date()).getTime() < endTime) {
-        assert(nodes[2].getDB("test").foo.findOne() == null, 'Check that 2 does not catch up');
+    var endTime = new Date().getTime() + 10000;
+    while (new Date().getTime() < endTime) {
+        assert(nodes[2].getDB("test").foo.findOne() == null, "Check that 2 does not catch up");
     }
 };
 
-var forceSync = function() {
+var forceSync = function () {
     syncFrom(nodes[2], nodes[1], replTest);
-    assert.soon(function() {
+    assert.soon(function () {
         return nodes[2].getDB("test").foo.findOne() != null;
-    }, 'Check for data after force sync');
+    }, "Check for data after force sync");
 };
 
 // SERVER-12922

@@ -13,24 +13,21 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const rst = new ReplSetTest({
-    nodes: [
-        {},
-        {},
-    ],
+    nodes: [{}, {}],
 });
 const nodes = rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const primary = rst.getPrimary();
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const testDB = primary.getDB("test");
+const coll = testDB.getCollection("test");
 
 // Insert a document that cannot be indexed because it causes a CannotIndexParallelArrays error
 // code.
 const badDoc = {
     _id: 0,
     a: [0, 1],
-    b: [2, 3]
+    b: [2, 3],
 };
 assert.commandWorked(coll.insert(badDoc));
 
@@ -43,8 +40,7 @@ assert.commandWorked(coll.insert(badDoc));
 // builder is able to observe the invalid document.
 // By comparison, IndexBuildTest.pauseIndexBuilds() stalls the index build in the middle of the
 // collection scan.
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'alwaysOn'}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "alwaysOn"}));
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1, b: 1});
 
 // Wait for the index build to start on the secondary.
@@ -52,8 +48,7 @@ const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 const secondaryColl = secondaryDB.getCollection(coll.getName());
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-IndexBuildTest.assertIndexesSoon(
-    secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
 
 // Step down the primary.
 const stepDown = startParallelShell(() => {
@@ -63,19 +58,18 @@ const stepDown = startParallelShell(() => {
 // Expect a failed createIndex command invocation in the parallel shell due to stepdown even though
 // the index build will continue in the background.
 const exitCode = createIdx({checkExitSuccess: false});
-assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
+assert.neq(0, exitCode, "expected shell to exit abnormally due to index build being terminated");
 checkLog.containsJson(primary, 20444);
 
 // Wait for stepdown to complete.
 stepDown();
 
 // Unblock the index build on the old primary.
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'off'}));
+assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "off"}));
 
 const newPrimary = rst.getPrimary();
-const newPrimaryDB = newPrimary.getDB('test');
-const newPrimaryColl = newPrimaryDB.getCollection('test');
+const newPrimaryDB = newPrimary.getDB("test");
+const newPrimaryColl = newPrimaryDB.getCollection("test");
 
 // Ensure the old primary doesn't take over again.
 assert.neq(primary.port, newPrimary.port);
@@ -85,11 +79,11 @@ assert.neq(primary.port, newPrimary.port);
 jsTestLog("waiting for index build to stop on old primary");
 IndexBuildTest.waitForIndexBuildToStop(testDB);
 rst.awaitReplication();
-IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+IndexBuildTest.assertIndexes(coll, 1, ["_id_"]);
 
 // Check that index was not built on the new primary.
 jsTestLog("waiting for index build to stop on new primary");
 IndexBuildTest.waitForIndexBuildToStop(newPrimaryDB);
-IndexBuildTest.assertIndexes(newPrimaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexes(newPrimaryColl, 1, ["_id_"]);
 
 rst.stopSet();

@@ -16,15 +16,13 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    randomManualMigration
-} from "jstests/concurrency/fsm_workload_modifiers/random_manual_migrations.js";
+import {randomManualMigration} from "jstests/concurrency/fsm_workload_modifiers/random_manual_migrations.js";
 
-const $baseConfig = (function() {
+const $baseConfig = (function () {
     let data = {
         numDocs: 100,
         shardKey: {_id: 1},
-        shardKeyField: '_id',
+        shardKeyField: "_id",
         // By default, the collection that will be sharded with concurrent chunk migrations will be
         // the one that the aggregate is run against.
         collWithMigrations: undefined,
@@ -38,7 +36,7 @@ const $baseConfig = (function() {
         },
         // Will be overridden by the extendWorkload below, included just so that our transitions are
         // correct.
-        moveChunk: function(db, collName, connCache) {},
+        moveChunk: function (db, collName, connCache) {},
     };
 
     let transitions = {
@@ -72,7 +70,7 @@ const $baseConfig = (function() {
     return {
         threadCount: 2,
         iterations: 50,
-        startState: 'init',
+        startState: "init",
         data: data,
         states: states,
         transitions: transitions,

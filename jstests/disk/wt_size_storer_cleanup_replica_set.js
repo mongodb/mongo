@@ -8,11 +8,7 @@
  * ]
  */
 
-import {
-    getUriForColl,
-    getUriForIndex,
-    runWiredTigerTool,
-} from "jstests/disk/libs/wt_file_helper.js";
+import {getUriForColl, getUriForIndex, runWiredTigerTool} from "jstests/disk/libs/wt_file_helper.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 1});
@@ -22,7 +18,7 @@ replTest.initiate();
 let primary = replTest.getPrimary();
 const dbpath = primary.dbpath;
 
-const coll = function() {
+const coll = function () {
     return primary.getDB(jsTestName()).test;
 };
 
@@ -30,7 +26,7 @@ assert.commandWorked(coll().insert({a: 1}));
 assert.eq(coll().count(), 1);
 const uri = coll().stats().wiredTiger.uri.split("statistics:")[1];
 
-const assertSizeStorerEntry = function(expected) {
+const assertSizeStorerEntry = function (expected) {
     const filePath = dbpath + (_isWindows() ? "\\" : "/") + jsTestName();
     runWiredTigerTool("-r", "-h", dbpath, "dump", "-j", "-k", uri, "-f", filePath, "sizeStorer");
     const data = JSON.parse(cat(filePath))["table:sizeStorer"][1].data;
@@ -40,15 +36,17 @@ const assertSizeStorerEntry = function(expected) {
 replTest.stop(primary, undefined, {}, {forRestart: true});
 assertSizeStorerEntry(true);
 
-replTest.start(primary,
-               {
-                   setParameter: {
-                       minSnapshotHistoryWindowInSeconds: 0,
-                       // Set storage logComponentVerbosity to one so we see the log id 22237.
-                       logComponentVerbosity: tojson({storage: 1})
-                   }
-               },
-               true /* forRestart */);
+replTest.start(
+    primary,
+    {
+        setParameter: {
+            minSnapshotHistoryWindowInSeconds: 0,
+            // Set storage logComponentVerbosity to one so we see the log id 22237.
+            logComponentVerbosity: tojson({storage: 1}),
+        },
+    },
+    true /* forRestart */,
+);
 primary = replTest.getPrimary();
 
 const collIdent = getUriForColl(coll());

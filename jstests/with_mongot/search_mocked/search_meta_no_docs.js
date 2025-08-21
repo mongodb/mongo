@@ -23,7 +23,7 @@ assert.commandWorked(coll.insert({"_id": 1, "title": "cakes"}));
 const collUUID = getUUIDFromListCollections(testDB, coll.getName());
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 const searchCmd = {
@@ -31,23 +31,24 @@ const searchCmd = {
     collectionUUID: collUUID,
     query: searchQuery,
     $db: dbName,
-    optimizationFlags: {omitSearchDocumentResults: true}
+    optimizationFlags: {omitSearchDocumentResults: true},
 };
 const cursorId = NumberLong(17);
 
 // Verify that $searchMeta evaluates into SEARCH_META variable returned by mongot if no docs are
 // returned.
 {
-    const history = [{
-        expectedCommand: searchCmd,
-        response: {
-            ok: 1,
-            cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: []},
-            vars: {SEARCH_META: {value: 42}}
-        }
-    }];
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
+    const history = [
+        {
+            expectedCommand: searchCmd,
+            response: {
+                ok: 1,
+                cursor: {id: NumberLong(0), ns: coll.getFullName(), nextBatch: []},
+                vars: {SEARCH_META: {value: 42}},
+            },
+        },
+    ];
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId, history: history}));
 
     let cursorMeta = coll.aggregate([{$searchMeta: searchQuery}], {cursor: {}});
     const expectedMeta = [{value: 42}];

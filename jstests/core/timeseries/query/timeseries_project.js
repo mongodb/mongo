@@ -15,10 +15,11 @@ const coll = db[jsTestName()];
 let pipeline = [];
 
 function checkResult({expectedResult, pipeline}) {
-    assert.docEq(expectedResult,
-                 coll.aggregate(pipeline).toArray(),
-                 `Result of pipeline ${tojson(pipeline)} which was executed as ${
-                     tojson(coll.explain().aggregate(pipeline))}`);
+    assert.docEq(
+        expectedResult,
+        coll.aggregate(pipeline).toArray(),
+        `Result of pipeline ${tojson(pipeline)} which was executed as ${tojson(coll.explain().aggregate(pipeline))}`,
+    );
 }
 
 // A $project stage that immediately follows unpacking might be incorporated into the unpacking
@@ -26,8 +27,7 @@ function checkResult({expectedResult, pipeline}) {
 // whether that's a meta, a time or a measurement field.
 (function testAccessingDroppedMetaField() {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
 
     assert.commandWorked(coll.insert({_id: 42, time: ISODate(), meta: 1, a: "a"}));
 
@@ -47,7 +47,7 @@ function checkResult({expectedResult, pipeline}) {
 
 (function testAccessingDroppedTimeField() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 'time'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
 
     assert.commandWorked(coll.insert({_id: 42, time: ISODate(), a: "a"}));
 
@@ -67,7 +67,7 @@ function checkResult({expectedResult, pipeline}) {
 
 (function testAccessingDroppedMeasurementField() {
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 'time'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
 
     assert.commandWorked(coll.insert({_id: 42, time: ISODate(), a: "a"}));
 
@@ -91,13 +91,14 @@ function checkResult({expectedResult, pipeline}) {
 // shouldn't be visible to the rest of the query.
 (function testEmptyIncludeSet() {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
 
-    assert.commandWorked(coll.insertMany([
-        {_id: 42, time: ISODate(), meta: 1},
-        {_id: 43, time: ISODate(), meta: 2},
-    ]));
+    assert.commandWorked(
+        coll.insertMany([
+            {_id: 42, time: ISODate(), meta: 1},
+            {_id: 43, time: ISODate(), meta: 2},
+        ]),
+    );
 
     // With no filters the unpack stage would include no fields.
     checkResult({
@@ -107,8 +108,7 @@ function checkResult({expectedResult, pipeline}) {
 
     // A 'metaField' filter is pushed below unpacking so the unpack stage would include no fields.
     checkResult({
-        pipeline:
-            [{$match: {meta: 2}}, {$replaceRoot: {newRoot: {x: 17}}}, {$addFields: {y: "$time"}}],
+        pipeline: [{$match: {meta: 2}}, {$replaceRoot: {newRoot: {x: 17}}}, {$addFields: {y: "$time"}}],
         expectedResult: [{x: 17}],
     });
 
@@ -120,11 +120,7 @@ function checkResult({expectedResult, pipeline}) {
 
     // A non-trivial event filter would cause the unpack stage to include the field for the filter.
     checkResult({
-        pipeline: [
-            {$match: {_id: 42}},
-            {$replaceRoot: {newRoot: {x: 17}}},
-            {$addFields: {y: "$time", z: "$_id"}}
-        ],
+        pipeline: [{$match: {_id: 42}}, {$replaceRoot: {newRoot: {x: 17}}}, {$addFields: {y: "$time", z: "$_id"}}],
         expectedResult: [{x: 17}],
     });
 })();
@@ -132,22 +128,21 @@ function checkResult({expectedResult, pipeline}) {
 // Test that when $project redefines a field name, the unpacking stage does not overwrite it.
 (function testProjectRedefinesField() {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
 
     const docDate = ISODate();
 
-    assert.commandWorked(
-        coll.insert({_id: 0, time: docDate, meta: 4, a: {b: 1}, b: 3, c: [{}, {}]}));
+    assert.commandWorked(coll.insert({_id: 0, time: docDate, meta: 4, a: {b: 1}, b: 3, c: [{}, {}]}));
     let result = [];
 
     // Check that measurements being unpacked don't overwrite metadata projection pushdown fields.
-    result =
-        coll.aggregate([{
-                $project:
-                    {a: 1, b: "$meta", c: {$multiply: [2, "$meta"]}, d: {$multiply: [2, "$meta"]}}
-            }])
-            .toArray();
+    result = coll
+        .aggregate([
+            {
+                $project: {a: 1, b: "$meta", c: {$multiply: [2, "$meta"]}, d: {$multiply: [2, "$meta"]}},
+            },
+        ])
+        .toArray();
     assert.docEq([{_id: 0, a: {b: 1}, b: 4, c: 8, d: 8}], result);
 
     // Same as above, but keep the rest of the document.
@@ -207,8 +202,7 @@ function checkResult({expectedResult, pipeline}) {
 // the newly defined field with the same name.
 (function testProjectRedefinesAndUsesField() {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
 
     const timestamp = new Date("2019-10-11T14:39:18.670Z");
     const doc = {
@@ -251,8 +245,7 @@ function checkResult({expectedResult, pipeline}) {
 // than the newly defined field with the same name.
 (function testAddFieldsRedefinesAndUsesField() {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "meta"}}));
 
     const timestamp = new Date("2019-10-11T14:39:18.670Z");
     const doc = {
@@ -289,39 +282,36 @@ function checkResult({expectedResult, pipeline}) {
 // outputs correctly.
 (function testIncludeComputedMetaFieldThenProjectWithoutComputedMetaField() {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'tag'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "tag"}}));
 
     const doc = {_id: 0, time: ISODate("2024-01-01T00:00:00.000Z"), tag: {field: "A"}};
     assert.commandWorked(coll.insert(doc));
     let result = {};
 
     // Added field which uses meta should not be in the result.
-    result =
-        coll.aggregate(
-                [{$addFields: {time: {$dateFromParts: {year: "$tag.none"}}}}, {$project: {tag: 1}}])
-            .toArray();
+    result = coll
+        .aggregate([{$addFields: {time: {$dateFromParts: {year: "$tag.none"}}}}, {$project: {tag: 1}}])
+        .toArray();
     assert.docEq([{"tag": {"field": "A"}, "_id": 0}], result);
 
     // Test with non-null value.
-    result = coll.aggregate([{$addFields: {time: {$toLower: "$tag.field"}}}, {$project: {tag: 1}}])
-                 .toArray();
+    result = coll.aggregate([{$addFields: {time: {$toLower: "$tag.field"}}}, {$project: {tag: 1}}]).toArray();
     assert.docEq([{"tag": {"field": "A"}, "_id": 0}], result);
 
     // Testing with $match between $addFields and $project.
-    result = coll.aggregate([
-                     {$addFields: {time: {$dateFromParts: {year: "$tag.none"}}}},
-                     {$match: {tag: {field: "A"}}},
-                     {$project: {tag: 1}}
-                 ])
-                 .toArray();
+    result = coll
+        .aggregate([
+            {$addFields: {time: {$dateFromParts: {year: "$tag.none"}}}},
+            {$match: {tag: {field: "A"}}},
+            {$project: {tag: 1}},
+        ])
+        .toArray();
     assert.docEq([{"tag": {field: "A"}, "_id": 0}], result);
 
     // Test with non-null value.
-    result =
-        coll.aggregate(
-                [{$addFields: {time: "$tag.field"}}, {$match: {time: "A"}}, {$project: {tag: 1}}])
-            .toArray();
+    result = coll
+        .aggregate([{$addFields: {time: "$tag.field"}}, {$match: {time: "A"}}, {$project: {tag: 1}}])
+        .toArray();
     assert.docEq([{"tag": {field: "A"}, "_id": 0}], result);
 
     // Testing with $project after $project.
@@ -333,39 +323,36 @@ function checkResult({expectedResult, pipeline}) {
     assert.docEq([{"_id": 0, "time": ISODate("2024-01-01T00:00:00Z")}], result);
 
     // Test that computedMetaFields that are included by the $project are still included.
-    result = coll.aggregate([
-                     {$addFields: {hi: {$dateFromParts: {year: "$tag.none"}}}},
-                     {$addFields: {bye: {$dateFromParts: {year: "$tag.none"}}}},
-                     {$project: {hi: 1}}
-                 ])
-                 .toArray();
+    result = coll
+        .aggregate([
+            {$addFields: {hi: {$dateFromParts: {year: "$tag.none"}}}},
+            {$addFields: {bye: {$dateFromParts: {year: "$tag.none"}}}},
+            {$project: {hi: 1}},
+        ])
+        .toArray();
     assert.docEq([{"_id": 0, "hi": null}], result);
 
     // Test with non-null value.
-    result = coll.aggregate([
-                     {$addFields: {hi: "$tag.field"}},
-                     {$addFields: {bye: "$tag.field"}},
-                     {$project: {hi: 1}}
-                 ])
-                 .toArray();
+    result = coll
+        .aggregate([{$addFields: {hi: "$tag.field"}}, {$addFields: {bye: "$tag.field"}}, {$project: {hi: 1}}])
+        .toArray();
     assert.docEq([{"_id": 0, "hi": "A"}], result);
 
     // Test that $project that replaces field that is used works.
-    result = coll.aggregate([
-                     {$addFields: {hello: "$tag.field"}},
-                     {$project: {newTime: "$time", time: "$tag.field"}}
-                 ])
-                 .toArray();
+    result = coll
+        .aggregate([{$addFields: {hello: "$tag.field"}}, {$project: {newTime: "$time", time: "$tag.field"}}])
+        .toArray();
 
     assert.docEq([{"_id": 0, newTime: ISODate("2024-01-01T00:00:00.000Z"), time: "A"}], result);
 
     // Test adding fields and including one of them.
-    result = coll.aggregate([
-                     {$addFields: {a: {$toLower: "$tag.field"}}},
-                     {$addFields: {b: {$toUpper: "$tag.field"}}},
-                     {$project: {b: 1}}
-                 ])
-                 .toArray();
+    result = coll
+        .aggregate([
+            {$addFields: {a: {$toLower: "$tag.field"}}},
+            {$addFields: {b: {$toUpper: "$tag.field"}}},
+            {$project: {b: 1}},
+        ])
+        .toArray();
     assert.docEq([{b: "A", "_id": 0}], result);
 })();
 
@@ -373,41 +360,36 @@ function checkResult({expectedResult, pipeline}) {
 // outputs correctly.
 (function testIncludeComputedMetaFieldThenExcludeComputedMetaField() {
     coll.drop();
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'tag'}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time", metaField: "tag"}}));
 
     const doc = {_id: 0, time: ISODate("2024-01-01T00:00:00.000Z"), tag: {field: "A"}};
     assert.commandWorked(coll.insert(doc));
     let result = {};
 
     // Excluded '_computedMetaProjField' should not be included.
-    result = coll.aggregate([
-                     {$addFields: {hello: {$dateFromParts: {year: "$tag.none"}}}},
-                     {$project: {hello: 0}}
-                 ])
-                 .toArray();
-    assert.docEq([{"time": ISODate("2024-01-01T00:00:00Z"), "tag": {"field": "A"}, "_id": 0}],
-                 result);
+    result = coll
+        .aggregate([{$addFields: {hello: {$dateFromParts: {year: "$tag.none"}}}}, {$project: {hello: 0}}])
+        .toArray();
+    assert.docEq([{"time": ISODate("2024-01-01T00:00:00Z"), "tag": {"field": "A"}, "_id": 0}], result);
 
     // Test with non-null value.
-    result = coll.aggregate([{$addFields: {time: {$toLower: "$tag.field"}}}, {$project: {time: 0}}])
-                 .toArray();
+    result = coll.aggregate([{$addFields: {time: {$toLower: "$tag.field"}}}, {$project: {time: 0}}]).toArray();
     assert.docEq([{"tag": {"field": "A"}, "_id": 0}], result);
 
     // Testing with $match between $addFields and $project.
-    result = coll.aggregate([
-                     {$addFields: {time: {$dateFromParts: {year: "$tag.none"}}}},
-                     {$match: {tag: {field: "A"}}},
-                     {$project: {time: 0}}
-                 ])
-                 .toArray();
+    result = coll
+        .aggregate([
+            {$addFields: {time: {$dateFromParts: {year: "$tag.none"}}}},
+            {$match: {tag: {field: "A"}}},
+            {$project: {time: 0}},
+        ])
+        .toArray();
     assert.docEq([{"tag": {field: "A"}, "_id": 0}], result);
 
     // Test with non-null value.
-    result =
-        coll.aggregate(
-                [{$addFields: {time: "$tag.field"}}, {$match: {time: "A"}}, {$project: {time: 0}}])
-            .toArray();
+    result = coll
+        .aggregate([{$addFields: {time: "$tag.field"}}, {$match: {time: "A"}}, {$project: {time: 0}}])
+        .toArray();
     assert.docEq([{"tag": {field: "A"}, "_id": 0}], result);
 
     // Testing with exclude $project after include $project.
@@ -419,35 +401,28 @@ function checkResult({expectedResult, pipeline}) {
     assert.docEq([{"time": ISODate("2024-01-01T00:00:00Z"), "_id": 0}], result);
 
     // Exclude one added field.
-    result = coll.aggregate([
-                     {$addFields: {hi: {$dateFromParts: {year: "$tag.none"}}}},
-                     {$addFields: {bye: {$dateFromParts: {year: "$tag.none"}}}},
-                     {$project: {hi: 0}}
-                 ])
-                 .toArray();
-    assert.docEq(
-        [{"time": ISODate("2024-01-01T00:00:00Z"), "tag": {"field": "A"}, "_id": 0, "bye": null}],
-        result);
+    result = coll
+        .aggregate([
+            {$addFields: {hi: {$dateFromParts: {year: "$tag.none"}}}},
+            {$addFields: {bye: {$dateFromParts: {year: "$tag.none"}}}},
+            {$project: {hi: 0}},
+        ])
+        .toArray();
+    assert.docEq([{"time": ISODate("2024-01-01T00:00:00Z"), "tag": {"field": "A"}, "_id": 0, "bye": null}], result);
 
     // Test with non-null value.
-    result = coll.aggregate([
-                     {$addFields: {hi: "$tag.field"}},
-                     {$addFields: {bye: "$tag.field"}},
-                     {$project: {hi: 0}}
-                 ])
-                 .toArray();
-    assert.docEq(
-        [{"time": ISODate("2024-01-01T00:00:00Z"), "tag": {"field": "A"}, "_id": 0, "bye": "A"}],
-        result);
+    result = coll
+        .aggregate([{$addFields: {hi: "$tag.field"}}, {$addFields: {bye: "$tag.field"}}, {$project: {hi: 0}}])
+        .toArray();
+    assert.docEq([{"time": ISODate("2024-01-01T00:00:00Z"), "tag": {"field": "A"}, "_id": 0, "bye": "A"}], result);
 
     // Test adding fields and excluding one of them.
-    result = coll.aggregate([
-                     {$addFields: {a: {$toLower: "$tag.field"}}},
-                     {$addFields: {b: {$toUpper: "$tag.field"}}},
-                     {$project: {b: 0}}
-                 ])
-                 .toArray();
-    assert.docEq(
-        [{"time": ISODate("2024-01-01T00:00:00Z"), "tag": {"field": "A"}, "_id": 0, "a": "a"}],
-        result);
+    result = coll
+        .aggregate([
+            {$addFields: {a: {$toLower: "$tag.field"}}},
+            {$addFields: {b: {$toUpper: "$tag.field"}}},
+            {$project: {b: 0}},
+        ])
+        .toArray();
+    assert.docEq([{"time": ISODate("2024-01-01T00:00:00Z"), "tag": {"field": "A"}, "_id": 0, "a": "a"}], result);
 })();

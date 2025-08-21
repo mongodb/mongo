@@ -36,9 +36,10 @@ assert.eq(
         {_id: 1, a: 1, b: 2},
         {_id: 4, a: 2, b: 2},
         {_id: 2, a: 1, b: 3},
-        {_id: 5, a: 2, b: 3}
+        {_id: 5, a: 2, b: 3},
     ],
-    coll.find().sort({b: 1, a: 1}).toArray());
+    coll.find().sort({b: 1, a: 1}).toArray(),
+);
 explain = coll.find().sort({b: 1, a: 1}).explain();
 let winningPlan = getWinningPlanFromExplain(explain);
 sortStage = getPlanStage(winningPlan, "SORT");
@@ -53,10 +54,17 @@ assert.eq(
         {_id: 1, a: 1, b: 2, key: [2, 1]},
         {_id: 4, a: 2, b: 2, key: [2, 2]},
         {_id: 2, a: 1, b: 3, key: [3, 1]},
-        {_id: 5, a: 2, b: 3, key: [3, 2]}
+        {_id: 5, a: 2, b: 3, key: [3, 2]},
     ],
-    coll.find({}, {key: {$meta: "sortKey"}}).sort({b: 1, a: 1}).toArray());
-explain = coll.find({}, {key: {$meta: "sortKey"}}).sort({b: 1, a: 1}).explain();
+    coll
+        .find({}, {key: {$meta: "sortKey"}})
+        .sort({b: 1, a: 1})
+        .toArray(),
+);
+explain = coll
+    .find({}, {key: {$meta: "sortKey"}})
+    .sort({b: 1, a: 1})
+    .explain();
 winningPlan = getWinningPlanFromExplain(explain);
 sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);
@@ -64,9 +72,24 @@ assert.eq("simple", sortStage.type, explain);
 
 // When the blokcing sort is covered, operating on index key data, we use the "default" algorithm.
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
-assert.eq([{a: 1, b: 1}, {a: 2, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}, {a: 1, b: 3}, {a: 2, b: 3}],
-          coll.find({a: {$gt: 0}}, {_id: 0, a: 1, b: 1}).sort({b: 1, a: 1}).toArray());
-explain = coll.find({a: {$gt: 0}}, {_id: 0, a: 1, b: 1}).sort({b: 1, a: 1}).explain();
+assert.eq(
+    [
+        {a: 1, b: 1},
+        {a: 2, b: 1},
+        {a: 1, b: 2},
+        {a: 2, b: 2},
+        {a: 1, b: 3},
+        {a: 2, b: 3},
+    ],
+    coll
+        .find({a: {$gt: 0}}, {_id: 0, a: 1, b: 1})
+        .sort({b: 1, a: 1})
+        .toArray(),
+);
+explain = coll
+    .find({a: {$gt: 0}}, {_id: 0, a: 1, b: 1})
+    .sort({b: 1, a: 1})
+    .explain();
 // Verify that the plan involves an IXSCAN but no fetch.
 winningPlan = getWinningPlanFromExplain(explain);
 assert.neq(null, getPlanStage(winningPlan, "IXSCAN"), explain);
@@ -87,15 +110,17 @@ assert.eq(
         {a: 1, b: 2, score: 1.1},
         {a: 2, b: 2, score: 1.1},
         {a: 1, b: 3, score: 1.1},
-        {a: 2, b: 3, score: 1.1}
+        {a: 2, b: 3, score: 1.1},
     ],
-    coll.find({$text: {$search: "keyword"}}, {_id: 0, a: 1, b: 1, score: {$meta: "textScore"}})
+    coll
+        .find({$text: {$search: "keyword"}}, {_id: 0, a: 1, b: 1, score: {$meta: "textScore"}})
         .sort({b: 1, a: 1})
-        .toArray());
-explain =
-    coll.find({$text: {$search: "keyword"}}, {_id: 0, a: 1, b: 1, score: {$meta: "textScore"}})
-        .sort({b: 1, a: 1})
-        .explain();
+        .toArray(),
+);
+explain = coll
+    .find({$text: {$search: "keyword"}}, {_id: 0, a: 1, b: 1, score: {$meta: "textScore"}})
+    .sort({b: 1, a: 1})
+    .explain();
 winningPlan = getWinningPlanFromExplain(explain);
 sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);

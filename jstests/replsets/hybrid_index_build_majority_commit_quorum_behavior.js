@@ -24,7 +24,7 @@ const OplogColl = primary.getDB("local")["oplog.rs"];
 const docFilter = {
     "ns": dbName + ".$cmd",
     "o.commitIndexBuild": {$exists: true},
-    "o.indexes.0.name": indexName
+    "o.indexes.0.name": indexName,
 };
 
 jsTestLog("Do some document writes.");
@@ -40,32 +40,34 @@ function isIndexBuildInProgress(conn, indexName) {
 
 function sanityChecks() {
     // Check to see commitIndexBuild oplog entry is not present.
-    assert.isnull(OplogColl.findOne(docFilter),
-                  "Able to find commitIndexBuild oplog entry. Filter:" + tojson(docFilter));
+    assert.isnull(
+        OplogColl.findOne(docFilter),
+        "Able to find commitIndexBuild oplog entry. Filter:" + tojson(docFilter),
+    );
 
     // Check if the index build is in progress on both the nodes.
     assert.eq(true, isIndexBuildInProgress(primary, indexName));
     assert.eq(true, isIndexBuildInProgress(secondary, indexName));
 
     // Check if 'x_1' index is not yet ready.
-    IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_'], ['x_1']);
+    IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_"], ["x_1"]);
 }
 
 function createIndex(dbName, collName, indexName) {
     jsTestLog("Create index '" + indexName + "'.");
-    assert.commandWorked(db.getSiblingDB(dbName).runCommand({
-        createIndexes: collName,
-        indexes: [{name: indexName, key: {x: 1}}],
-        commitQuorum: "majority"
-    }));
+    assert.commandWorked(
+        db.getSiblingDB(dbName).runCommand({
+            createIndexes: collName,
+            indexes: [{name: indexName, key: {x: 1}}],
+            commitQuorum: "majority",
+        }),
+    );
 }
 
 // Make secondary index build to hang after collection scan phase.
-const insertDumpFailPoint =
-    configureFailPoint(secondary, "hangAfterIndexBuildDumpsInsertsFromBulk");
+const insertDumpFailPoint = configureFailPoint(secondary, "hangAfterIndexBuildDumpsInsertsFromBulk");
 // Start the index build on primary in parallel shell.
-const joinCreateIndexThread =
-    startParallelShell(funWithArgs(createIndex, dbName, collName, indexName), primary.port);
+const joinCreateIndexThread = startParallelShell(funWithArgs(createIndex, dbName, collName, indexName), primary.port);
 
 jsTestLog("Waiting for Collection scan phase to complete");
 insertDumpFailPoint.wait();
@@ -87,14 +89,13 @@ joinCreateIndexThread();
 rst.awaitReplication();
 
 jsTestLog("Check Primary to see if it contains 'commitIndexBuild' oplog entry ");
-assert(OplogColl.findOne(docFilter),
-       "Not able to find a matching oplog entry. Filter:" + tojson(docFilter));
+assert(OplogColl.findOne(docFilter), "Not able to find a matching oplog entry. Filter:" + tojson(docFilter));
 
 // Sanity checks to see if the index build still runs on primary and secondary.
 assert.eq(false, isIndexBuildInProgress(primary, indexName));
 assert.eq(false, isIndexBuildInProgress(secondary, indexName));
 
 // check to see if the index was successfully created.
-IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'x_1']);
+IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", "x_1"]);
 
 rst.stopSet();

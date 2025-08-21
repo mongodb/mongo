@@ -10,8 +10,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const getExtendedRangeCount = (db) => {
-    return assert.commandWorked(db.adminCommand({serverStatus: 1}))
-        .catalogStats.timeseriesExtendedRange;
+    return assert.commandWorked(db.adminCommand({serverStatus: 1})).catalogStats.timeseriesExtendedRange;
 };
 
 const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
@@ -28,20 +27,18 @@ assert.eq(undefined, getExtendedRangeCount(secondary));
 
 assert.commandWorked(primaryDB.createCollection("standard", {timeseries: {timeField: "time"}}));
 assert.commandWorked(primaryDB.createCollection("extended", {timeseries: {timeField: "time"}}));
-assert.commandWorked(
-    primaryDB.standard.insert({time: ISODate("1980-01-01T00:00:00.000Z")}, {w: 2}));
-assert.commandWorked(
-    primaryDB.extended.insert({time: ISODate("2040-01-01T00:00:00.000Z")}, {w: 2}));
+assert.commandWorked(primaryDB.standard.insert({time: ISODate("1980-01-01T00:00:00.000Z")}, {w: 2}));
+assert.commandWorked(primaryDB.extended.insert({time: ISODate("2040-01-01T00:00:00.000Z")}, {w: 2}));
 
 // Make sure the collections got flagged properly during the initial write.
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6679402, {"namespace": "testDB.standard", "timeField": "time"}, 0));
-assert(checkLog.checkContainsWithCountJson(
-    secondary, 6679402, {"namespace": "testDB.standard", "timeField": "time"}, 0));
-assert(checkLog.checkContainsWithCountJson(
-    primary, 6679402, {"namespace": "testDB.extended", "timeField": "time"}, 1));
-assert(checkLog.checkContainsWithCountJson(
-    secondary, 6679402, {"namespace": "testDB.extended", "timeField": "time"}, 1));
+assert(checkLog.checkContainsWithCountJson(primary, 6679402, {"namespace": "testDB.standard", "timeField": "time"}, 0));
+assert(
+    checkLog.checkContainsWithCountJson(secondary, 6679402, {"namespace": "testDB.standard", "timeField": "time"}, 0),
+);
+assert(checkLog.checkContainsWithCountJson(primary, 6679402, {"namespace": "testDB.extended", "timeField": "time"}, 1));
+assert(
+    checkLog.checkContainsWithCountJson(secondary, 6679402, {"namespace": "testDB.extended", "timeField": "time"}, 1),
+);
 
 assert.eq(1, getExtendedRangeCount(primary));
 assert.eq(1, getExtendedRangeCount(secondary));

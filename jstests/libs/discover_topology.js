@@ -1,13 +1,13 @@
 // The tojson() function that is commonly used to build up assertion messages doesn't support the
 // Symbol type, so we just use unique string values instead.
 export var Topology = {
-    kStandalone: 'stand-alone',
-    kRouter: 'mongos router',
-    kReplicaSet: 'replica set',
-    kShardedCluster: 'sharded cluster',
+    kStandalone: "stand-alone",
+    kRouter: "mongos router",
+    kReplicaSet: "replica set",
+    kShardedCluster: "sharded cluster",
 };
 
-export var DiscoverTopology = (function() {
+export var DiscoverTopology = (function () {
     const kDefaultConnectFn = (host) => new Mongo(host, undefined, {gRPC: false});
     // Nodes discovered via isMaster have a MongoRPC port and must not use gRPC.
     const kDisableGRPCConnString = (hostConn) =>
@@ -16,7 +16,7 @@ export var DiscoverTopology = (function() {
     function getDataMemberConnectionStrings(conn) {
         const res = assert.commandWorked(conn.adminCommand({isMaster: 1}));
 
-        if (!res.hasOwnProperty('setName')) {
+        if (!res.hasOwnProperty("setName")) {
             // 'conn' represents a connection to a stand-alone mongod.
             return {type: Topology.kStandalone, mongod: conn.host};
         }
@@ -28,7 +28,7 @@ export var DiscoverTopology = (function() {
             type: Topology.kReplicaSet,
             configsvr: res.configsvr == 2,
             primary: kDisableGRPCConnString(res.primary),
-            nodes: [...res.hosts, ...res.passives].map(host => kDisableGRPCConnString(host))
+            nodes: [...res.hosts, ...res.passives].map((host) => kDisableGRPCConnString(host)),
         };
     }
 
@@ -36,23 +36,24 @@ export var DiscoverTopology = (function() {
         function getConfigServerConnectionString() {
             const shardMap = conn.adminCommand({getShardMap: 1});
 
-            if (!shardMap.hasOwnProperty('map')) {
+            if (!shardMap.hasOwnProperty("map")) {
                 throw new Error(
-                    'Expected "getShardMap" command to return an object with a "map" field: ' +
-                    tojson(shardMap));
+                    'Expected "getShardMap" command to return an object with a "map" field: ' + tojson(shardMap),
+                );
             }
 
-            if (!shardMap.map.hasOwnProperty('config')) {
+            if (!shardMap.map.hasOwnProperty("config")) {
                 throw new Error(
                     'Expected "getShardMap" command to return an object with a "map.config"' +
-                    ' field: ' + tojson(shardMap));
+                        " field: " +
+                        tojson(shardMap),
+                );
             }
 
             return shardMap.map.config;
         }
 
-        const connectFn =
-            options.hasOwnProperty('connectFn') ? options.connectFn : kDefaultConnectFn;
+        const connectFn = options.hasOwnProperty("connectFn") ? options.connectFn : kDefaultConnectFn;
 
         const configsvrConn = connectFn(getConfigServerConnectionString());
         const configsvrHosts = getDataMemberConnectionStrings(configsvrConn);
@@ -73,7 +74,7 @@ export var DiscoverTopology = (function() {
 
         const mongos = {
             type: Topology.kRouter,
-            nodes: mongosUris.servers.map(uriObj => uriObj.server),
+            nodes: mongosUris.servers.map((uriObj) => uriObj.server),
         };
 
         return {
@@ -121,7 +122,7 @@ export var DiscoverTopology = (function() {
      * shard or a replica set shard.
      */
     function findConnectedNodes(conn, options = {connectFn: kDefaultConnectFn}) {
-        const isMongod = assert.commandWorked(conn.adminCommand({isMaster: 1})).msg !== 'isdbgrid';
+        const isMongod = assert.commandWorked(conn.adminCommand({isMaster: 1})).msg !== "isdbgrid";
 
         if (isMongod) {
             return getDataMemberConnectionStrings(conn);
@@ -142,7 +143,7 @@ export var DiscoverTopology = (function() {
             }
             hostList.push(...topology.mongos.nodes);
         } else {
-            throw new Error('Unrecognized topology format: ' + tojson(topology));
+            throw new Error("Unrecognized topology format: " + tojson(topology));
         }
     }
 

@@ -1,4 +1,3 @@
-
 /*
  * Generate uniform distribution transitions matrix for the given states
  *
@@ -13,15 +12,15 @@
 
 export function uniformDistTransitions(states) {
     let stateNames = Object.keys(states);
-    let reachableStateNames = stateNames.filter(stateName => stateName != 'init');
+    let reachableStateNames = stateNames.filter((stateName) => stateName != "init");
     let prob = 1 / reachableStateNames.length;
     let transitions = {};
-    reachableStateNames.forEach(stateName => {
+    reachableStateNames.forEach((stateName) => {
         transitions[stateName] = prob;
     });
 
     let allTransitions = {};
-    stateNames.forEach(stateName => {
+    stateNames.forEach((stateName) => {
         allTransitions[stateName] = transitions;
     });
 

@@ -16,9 +16,7 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {
-    areViewlessTimeseriesEnabled
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getEngine, getQueryPlanner, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
@@ -28,13 +26,15 @@ TimeseriesTest.run((insert) => {
 
     let coll = db[jsTestName()];
 
-    const timeFieldName = 'time';
-    const metaFieldName = 'measurement';
+    const timeFieldName = "time";
+    const metaFieldName = "measurement";
 
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
+    );
 
     insert(coll, {
         _id: 0,
@@ -92,18 +92,18 @@ TimeseriesTest.run((insert) => {
         {
             pred: {$and: [{"arrOfObj.x": {$gte: 104}}, {"arrOfObj.x": {$lt: 102}}]},
             ids: [1, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {pred: {$expr: {$multiply: "$topLevelScalar"}}, ids: [0, 1], usesBlockProcessing: false},
         {
             pred: {$expr: {$multiply: ["$topLevelScalar", 3]}},
             ids: [0, 1],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {
             pred: {$expr: {$gt: [{$multiply: ["$topLevelScalar", 2]}, 0.0]}},
             ids: [0, 1],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {pred: {"topLevelScalar": {$gt: 123}}, ids: [1], usesBlockProcessing: true},
         {pred: {"topLevelScalar": {$gte: 123}}, ids: [0, 1], usesBlockProcessing: true},
@@ -128,34 +128,34 @@ TimeseriesTest.run((insert) => {
         {
             pred: {"time": {$gt: new Date(datePrefix + 100)}},
             ids: [1, 2, 3, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {"time": {$gte: new Date(datePrefix + 100)}},
             ids: [0, 1, 2, 3, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {pred: {"time": {$lt: new Date(datePrefix + 200)}}, ids: [0], usesBlockProcessing: true},
         {
             pred: {"time": {$lte: new Date(datePrefix + 200)}},
             ids: [0, 1],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {pred: {"time": {$eq: new Date(datePrefix + 300)}}, ids: [2], usesBlockProcessing: true},
         {
             pred: {"time": {$ne: new Date(datePrefix + 200)}},
             ids: [0, 2, 3, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {"time": {$gt: new Date(datePrefix + 100), $lt: new Date(datePrefix + 300)}},
             ids: [1],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {"time": {$eq: {"obj": new Date(datePrefix + 100)}}},
             ids: [],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
 
         // Equality to array does not use block processing.
@@ -166,17 +166,16 @@ TimeseriesTest.run((insert) => {
         {
             pred: {"time": {$in: [[new Date("2019-09-27T21:14:45.654Z")]]}},
             ids: [],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {
                 "time": {
-                    $not:
-                        {$in: [[new Date("2019-09-27T21:14:45.654Z"), new Date(datePrefix + 300)]]}
-                }
+                    $not: {$in: [[new Date("2019-09-27T21:14:45.654Z"), new Date(datePrefix + 300)]]},
+                },
             },
             ids: [0, 1, 2, 3, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
 
         // Basic support for boolean operators.
@@ -186,14 +185,14 @@ TimeseriesTest.run((insert) => {
                     {
                         $and: [
                             {"time": {$gte: new Date("2019-09-27T21:14:45.654Z")}},
-                            {"time": {$gt: new Date(datePrefix + 300)}}
-                        ]
+                            {"time": {$gt: new Date(datePrefix + 300)}},
+                        ],
                     },
-                    {"time": {$eq: new Date(datePrefix + 300)}}
-                ]
+                    {"time": {$eq: new Date(datePrefix + 300)}},
+                ],
             },
             ids: [2],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         // Test boolean operators dealing with Nothing values.
         {
@@ -201,58 +200,55 @@ TimeseriesTest.run((insert) => {
                 $nor: [
                     {"time": {$ne: ["arr1", "arr2"]}},
                     {
-                        $and: [
-                            {"time": {$gte: ["arr3", "arr4"]}},
-                            {"time": {$gt: new Date(datePrefix + 300)}}
-                        ]
+                        $and: [{"time": {$gte: ["arr3", "arr4"]}}, {"time": {$gt: new Date(datePrefix + 300)}}],
                     },
-                    {"time": {$eq: new Date(datePrefix + 300)}}
-                ]
+                    {"time": {$eq: new Date(datePrefix + 300)}},
+                ],
             },
             ids: [],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         // Logical operators between scalar and block values.
         {
             pred: {
                 $or: [
                     {$expr: {$regexFind: {input: "$measurement", regex: "^2", options: ""}}},
-                    {"topLevelScalar": {$lte: 200}}
-                ]
+                    {"topLevelScalar": {$lte: 200}},
+                ],
             },
             ids: [0],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {pred: {$expr: {$lt: [101, "$topLevelScalar"]}}, ids: [0, 1], usesBlockProcessing: true},
         {
             pred: {$expr: {$lt: [new Date(datePrefix + 300), "$time"]}},
             ids: [3, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {$expr: {$lte: [new Date(datePrefix + 300), "$time"]}},
             ids: [2, 3, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {$expr: {$gt: [new Date(datePrefix + 300), "$time"]}},
             ids: [0, 1],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {$expr: {$gte: [new Date(datePrefix + 300), "$time"]}},
             ids: [0, 1, 2],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {$expr: {$eq: [new Date(datePrefix + 300), "$time"]}},
             ids: [2],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {$expr: {$ne: [new Date(datePrefix + 300), "$time"]}},
             ids: [0, 1, 3, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
 
         {
@@ -263,15 +259,15 @@ TimeseriesTest.run((insert) => {
                             "$dateDiff": {
                                 "startDate": "$time",
                                 "endDate": new Date(datePrefix + 150),
-                                "unit": "millisecond"
-                            }
+                                "unit": "millisecond",
+                            },
                         },
-                        0
-                    ]
-                }
+                        0,
+                    ],
+                },
             },
             ids: [0],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {
@@ -281,42 +277,41 @@ TimeseriesTest.run((insert) => {
                             "$dateDiff": {
                                 "startDate": new Date(datePrefix + 550),
                                 "endDate": "$time",
-                                "unit": "millisecond"
-                            }
+                                "unit": "millisecond",
+                            },
                         },
-                        -60
-                    ]
-                }
+                        -60,
+                    ],
+                },
             },
             ids: [4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {
                 "$expr": {
                     "$eq": [
                         {"$dateAdd": {"startDate": "$time", "unit": "millisecond", amount: 100}},
-                        new Date(datePrefix + 600)
-                    ]
-                }
+                        new Date(datePrefix + 600),
+                    ],
+                },
             },
             ids: [4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {
                 "$expr": {
                     "$eq": [
                         {
-                            "$dateSubtract":
-                                {"startDate": "$time", "unit": "millisecond", amount: 100}
+                            "$dateSubtract": {"startDate": "$time", "unit": "millisecond", amount: 100},
                         },
-                        new Date(datePrefix)
-                    ]
-                }
+                        new Date(datePrefix),
+                    ],
+                },
             },
             ids: [0],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
 
         // Comparisons with an empty array.
@@ -339,7 +334,7 @@ TimeseriesTest.run((insert) => {
         {
             pred: {"nestedArray.subField": {$exists: true}},
             ids: [0, 1, 4],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
         {pred: {"nestedArray.subField": {$exists: false}}, ids: [2, 3], usesBlockProcessing: false},
         {pred: {"nestedArray.subField": null}, ids: [2, 3], usesBlockProcessing: false},
@@ -350,18 +345,18 @@ TimeseriesTest.run((insert) => {
         {
             pred: {"nestedArray.subField": {$type: "array"}},
             ids: [0, 1, 4],
-            usesBlockProcessing: false
+            usesBlockProcessing: false,
         },
 
         {
             pred: {"sometimesDoublyNestedArray": {$exists: true}},
             ids: [0, 1, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {
             pred: {"sometimesDoublyNestedArray": {$exists: false}},
             ids: [2, 3],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {pred: {"sometimesDoublyNestedArray": null}, ids: [2, 3], usesBlockProcessing: false},
         {pred: {"sometimesDoublyNestedArray": []}, ids: [0, 4], usesBlockProcessing: false},
@@ -374,7 +369,7 @@ TimeseriesTest.run((insert) => {
         {
             pred: {"sometimesDoublyNestedArray": {$type: "array"}},
             ids: [0, 1, 4],
-            usesBlockProcessing: true
+            usesBlockProcessing: true,
         },
         {pred: {"sometimesDoublyNestedArray": [101]}, ids: [1], usesBlockProcessing: false},
         // Tests for fast path-based decompression:
@@ -383,14 +378,17 @@ TimeseriesTest.run((insert) => {
     ];
 
     // $match pushdown requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.
-    const sbeEnabled = checkSbeFullyEnabled(db) &&
-        FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'TimeSeriesInSbe');
+    const sbeEnabled =
+        checkSbeFullyEnabled(db) && FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "TimeSeriesInSbe");
     for (let testCase of kTestCases) {
         const pipe = [{$match: testCase.pred}, {$project: {_id: 1}}];
 
         // Check results.
         {
-            const results = coll.aggregate(pipe).toArray().map((x) => x._id);
+            const results = coll
+                .aggregate(pipe)
+                .toArray()
+                .map((x) => x._id);
             results.sort();
             assert.eq(testCase.ids, results, () => "Test case " + tojson(testCase));
         }
@@ -401,8 +399,12 @@ TimeseriesTest.run((insert) => {
         const engineUsed = getEngine(explain);
         const singleNodeQueryPlanner = getQueryPlanner(getSingleNodeExplain(explain));
         function testCaseAndExplainFn(description) {
-            return () => description + " for test case " + tojson(testCase) +
-                " failed with explain " + tojson(singleNodeQueryPlanner);
+            return () =>
+                description +
+                " for test case " +
+                tojson(testCase) +
+                " failed with explain " +
+                tojson(singleNodeQueryPlanner);
         }
 
         if (sbeEnabled) {
@@ -413,11 +415,15 @@ TimeseriesTest.run((insert) => {
                 assert.eq(engineUsed, "sbe");
 
                 // Check for the fold function.
-                assert(sbePlan.includes("cellFoldValues_F"),
-                       testCaseAndExplainFn("Expected explain to use block processing"));
+                assert(
+                    sbePlan.includes("cellFoldValues_F"),
+                    testCaseAndExplainFn("Expected explain to use block processing"),
+                );
             } else {
-                assert(!sbePlan.includes("cellFoldValues_F"),
-                       testCaseAndExplainFn("Expected explain not to use block processing"));
+                assert(
+                    !sbePlan.includes("cellFoldValues_F"),
+                    testCaseAndExplainFn("Expected explain not to use block processing"),
+                );
             }
         }
     }
@@ -427,7 +433,7 @@ TimeseriesTest.run((insert) => {
         const pipe = [
             {$match: {"topLevelScalarField": {$not: {$in: []}}}},
             {$match: {"measurement": "cpu"}},
-            {$project: {_id: 1}}
+            {$project: {_id: 1}},
         ];
         const res = coll.aggregate(pipe).toArray();
         assert.eq(res.length, coll.count(), res);
@@ -435,19 +441,15 @@ TimeseriesTest.run((insert) => {
 
     // Make sure that the bitmap from the previous stage is forwarded to the next stage
     coll.drop();
-    assert.commandWorked(db.createCollection(coll.getName(), {
-        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
-    }));
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
+    );
 
-    insert(
-        coll,
-        {_id: 0, [timeFieldName]: new Date(datePrefix + 100), [metaFieldName]: "cpu", a: 1, b: 1});
-    insert(
-        coll,
-        {_id: 0, [timeFieldName]: new Date(datePrefix + 200), [metaFieldName]: "cpu", a: 2, b: 0});
-    insert(
-        coll,
-        {_id: 0, [timeFieldName]: new Date(datePrefix + 300), [metaFieldName]: "cpu", a: 1, b: 3});
+    insert(coll, {_id: 0, [timeFieldName]: new Date(datePrefix + 100), [metaFieldName]: "cpu", a: 1, b: 1});
+    insert(coll, {_id: 0, [timeFieldName]: new Date(datePrefix + 200), [metaFieldName]: "cpu", a: 2, b: 0});
+    insert(coll, {_id: 0, [timeFieldName]: new Date(datePrefix + 300), [metaFieldName]: "cpu", a: 1, b: 3});
 
     {
         const pipeline = [
@@ -457,9 +459,9 @@ TimeseriesTest.run((insert) => {
             {
                 $group: {
                     "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
-                    "suma": {"$sum": "$a"}
-                }
-            }
+                    "suma": {"$sum": "$a"},
+                },
+            },
         ];
 
         const res = coll.aggregate(pipeline).toArray();

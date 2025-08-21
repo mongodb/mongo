@@ -23,7 +23,7 @@
  */
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         // Use the workload name as the database name, since the workload name is assumed to be
         // unique.
@@ -37,19 +37,21 @@ export const $config = (function() {
             return [{sortField: -1}, {queryField: 1}];
         },
 
-        opName: 'updated'
+        opName: "updated",
     };
 
-    var states = (function() {
+    var states = (function () {
         function updateOne(db, collName) {
             const updateCmd = {
                 update: collName,
-                updates: [{
-                    q: {queryField: 1},
-                    u: {$set: {sortField: -1, queryField: -1}},
-                    multi: false,
-                    sort: {sortField: -1}
-                }]
+                updates: [
+                    {
+                        q: {queryField: 1},
+                        u: {$set: {sortField: -1, queryField: -1}},
+                        multi: false,
+                        sort: {sortField: -1},
+                    },
+                ],
             };
 
             // Update field 'sortField' to avoid matching the same document again.
@@ -62,8 +64,8 @@ export const $config = (function() {
                 assert.neq(
                     res.nModified,
                     0,
-                    'updateOne should have found and updated a matching document, returned ' +
-                        tojson(res));
+                    "updateOne should have found and updated a matching document, returned " + tojson(res),
+                );
             }
         }
 
@@ -82,10 +84,11 @@ export const $config = (function() {
             var doc = this.newDocForInsert(i);
             // Require that documents inserted by this workload use _id values that can be compared
             // using the default JS comparator.
-            assert.neq(typeof doc._id,
-                       'object',
-                       'default comparator of' +
-                           ' Array.prototype.sort() is not well-ordered for JS objects');
+            assert.neq(
+                typeof doc._id,
+                "object",
+                "default comparator of" + " Array.prototype.sort() is not well-ordered for JS objects",
+            );
             bulk.insert(doc);
         }
         var res = bulk.execute();
@@ -115,10 +118,10 @@ export const $config = (function() {
         threadCount: 10,
         iterations: 50,
         data: data,
-        startState: 'updateOne',
+        startState: "updateOne",
         states: states,
         transitions: transitions,
         setup: setup,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

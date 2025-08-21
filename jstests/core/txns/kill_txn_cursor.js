@@ -11,7 +11,7 @@ const collName = "kill_txn_cursor";
 const testDB = db.getSiblingDB(dbName);
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const session = db.getMongo().startSession(sessionOptions);
 const sessionDb = session.getDatabase(dbName);
@@ -60,7 +60,6 @@ assert.commandWorked(sessionColl.insert({_id: 4}));
 
 jsTest.log("Commit transaction.");
 assert.commandWorked(session.commitTransaction_forTesting());
-assert.sameMembers([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}],
-                   sessionColl.find().toArray());
+assert.sameMembers([{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}], sessionColl.find().toArray());
 
 session.endSession();

@@ -12,8 +12,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 Random.setRandomSeed();
 
-const dbName = 'testDB';
-const collName = 'testColl';
+const dbName = "testDB";
+const collName = "testColl";
 
 // Connections.
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}, other: {chunkSize: 1}});
@@ -25,7 +25,7 @@ const mainDB = mongos.getDB(dbName);
 
 const largeStr = "a".repeat(10000);
 const clusteredCreateOpts = {
-    clusteredIndex: {key: {_id: 1}, unique: true, name: "nameOnId"}
+    clusteredIndex: {key: {_id: 1}, unique: true, name: "nameOnId"},
 };
 
 st.startBalancer();
@@ -47,10 +47,12 @@ function runTest(shardKey) {
     }
     assert.commandWorked(bulk.execute());
 
-    assert.commandWorked(mongos.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
-        key: {[shardKey]: 1},
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            shardCollection: `${dbName}.${collName}`,
+            key: {[shardKey]: 1},
+        }),
+    );
     st.awaitBalancerRound();
 
     // Ensure that each shard has at least one chunk after the split.
@@ -63,7 +65,8 @@ function runTest(shardKey) {
         },
         () => {
             return tojson(mongos.getDB("config").getCollection("chunks").find().toArray());
-        });
+        },
+    );
 
     // Verify that all the documents still exist in the collection.
     assert.eq(coll.find().itcount(), numDocs);

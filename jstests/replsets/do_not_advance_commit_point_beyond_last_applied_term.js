@@ -12,19 +12,19 @@ const dbName = "test";
 const collName = "coll";
 
 // Set up a ReplSetTest where nodes only sync one oplog entry at a time.
-const rst = new ReplSetTest(
-    {nodes: 5, useBridge: true, nodeOptions: {setParameter: "bgSyncOplogFetcherBatchSize=1"}});
+const rst = new ReplSetTest({nodes: 5, useBridge: true, nodeOptions: {setParameter: "bgSyncOplogFetcherBatchSize=1"}});
 rst.startSet();
 const config = rst.getReplSetConfig();
 // Prevent elections.
 config.settings = {
-    electionTimeoutMillis: 12 * 60 * 60 * 1000
+    electionTimeoutMillis: 12 * 60 * 60 * 1000,
 };
 rst.initiate(config);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(rst.getPrimary().adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 rst.awaitReplication();
 
 const nodeA = rst.nodes[0];
@@ -71,8 +71,7 @@ assert.soon(() => {
     // We cannot use getPrimary() here because 2 nodes report they are primary.
     return assert.commandWorked(nodeA.adminCommand({hello: 1})).isWritablePrimary;
 });
-assert.commandWorked(
-    nodeA.getDB(dbName)[collName].insert({term: 3}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(nodeA.getDB(dbName)[collName].insert({term: 3}, {writeConcern: {w: "majority"}}));
 rst.awaitReplication(1000, undefined, [nodeA, nodeC, nodeD], undefined, nodeA);
 assert.eq(1, nodeC.getDB(dbName)[collName].find({term: 3}).itcount());
 assert.eq(1, nodeD.getDB(dbName)[collName].find({term: 3}).itcount());
@@ -86,8 +85,7 @@ jsTest.log("Node E syncs from a majority node and learns the new commit point in
 // The stopReplProducerOnDocument failpoint ensures that Node E stops replicating before
 // applying the document {msg: "new primary"}, which is the first document of term 3. This
 // depends on the oplog fetcher batch size being 1.
-const failPoint =
-    configureFailPoint(nodeE, "stopReplProducerOnDocument", {document: {msg: "new primary"}});
+const failPoint = configureFailPoint(nodeE, "stopReplProducerOnDocument", {document: {msg: "new primary"}});
 nodeE.reconnect([nodeA, nodeC, nodeD]);
 failPoint.wait();
 

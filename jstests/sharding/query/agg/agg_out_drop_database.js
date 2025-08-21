@@ -24,19 +24,18 @@ assert.commandWorked(inputColl.insert({_id: 0}));
 
 const outputCollName = "output_coll";
 
-let failpoint =
-    configureFailPoint(st.rs0.getPrimary(), 'blockBeforeInternalRenameAndBeforeTakingDDLLocks');
+let failpoint = configureFailPoint(st.rs0.getPrimary(), "blockBeforeInternalRenameAndBeforeTakingDDLLocks");
 
 function aggOut(inputCollName, outputCollName) {
     // Make sure the aggregation fails because the database has been dropped
     assert.commandFailedWithCode(
         db.runCommand({aggregate: inputCollName, pipeline: [{$out: outputCollName}], cursor: {}}),
-        ErrorCodes.NamespaceNotFound);
+        ErrorCodes.NamespaceNotFound,
+    );
 }
 
 // Start an aggregation with $out stage, will block before renaming the tmp collection
-const awaitShell =
-    startParallelShell(funWithArgs(aggOut, inputCollName, outputCollName), st.s.port);
+const awaitShell = startParallelShell(funWithArgs(aggOut, inputCollName, outputCollName), st.s.port);
 
 // Wait for the aggregation to arrive right before the rename
 failpoint.wait();

@@ -13,69 +13,74 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
-export const $config = (function() {
+export const $config = (function () {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
-    const prefix = 'view_catalog_cycle_lookup_';
+    const prefix = "view_catalog_cycle_lookup_";
 
     var data = {
-        viewList: ['viewA', 'viewB', 'viewC', 'viewD', 'viewE'].map(viewName => prefix + viewName),
-        getRandomView: function(viewList) {
+        viewList: ["viewA", "viewB", "viewC", "viewD", "viewE"].map((viewName) => prefix + viewName),
+        getRandomView: function (viewList) {
             return viewList[Random.randInt(viewList.length)];
         },
-        getRandomViewPipeline:
-            function() {
-                const lookupViewNs1 = this.getRandomView(this.viewList);
-                const lookupViewNs2 = this.getRandomView(this.viewList);
-                const index = Random.randInt(4);
-                switch (index) {
-                    case 0:
-                        return [{
+        getRandomViewPipeline: function () {
+            const lookupViewNs1 = this.getRandomView(this.viewList);
+            const lookupViewNs2 = this.getRandomView(this.viewList);
+            const index = Random.randInt(4);
+            switch (index) {
+                case 0:
+                    return [
+                        {
                             $lookup: {
                                 from: lookupViewNs1,
-                                localField: 'a',
-                                foreignField: 'b',
-                                as: 'result1'
-                            }
-                        }];
-                    case 1:
-                        return [{
+                                localField: "a",
+                                foreignField: "b",
+                                as: "result1",
+                            },
+                        },
+                    ];
+                case 1:
+                    return [
+                        {
                             $lookup: {
                                 from: lookupViewNs1,
-                                let: { a1: '$a' },
+                                let: {a1: "$a"},
                                 pipeline: [
-                                    { $match: { $expr: { $eq: ["$$a1", "$b"] } } },
+                                    {$match: {$expr: {$eq: ["$$a1", "$b"]}}},
                                     {
                                         $lookup: {
                                             from: lookupViewNs2,
-                                            let: { b1: '$b' },
-                                            pipeline: [{ $match: { $expr: { $eq: ["$$b1", "$b"] } } }],
-                                            as: "result2Inner"
-                                        }
-                                    }
+                                            let: {b1: "$b"},
+                                            pipeline: [{$match: {$expr: {$eq: ["$$b1", "$b"]}}}],
+                                            as: "result2Inner",
+                                        },
+                                    },
                                 ],
-                                as: 'result2'
-                            }
-                        }];
-                    case 2:
-                        return [{
+                                as: "result2",
+                            },
+                        },
+                    ];
+                case 2:
+                    return [
+                        {
                             $graphLookup: {
                                 from: lookupViewNs1,
-                                startWith: '$a',
-                                connectFromField: 'a',
-                                connectToField: 'b',
-                                as: 'result3'
-                            }
-                        }];
-                    case 3:
-                        return [];
-                    default:
-                        assert(false, "Invalid index: " + index);
-                }
-            },
+                                startWith: "$a",
+                                connectFromField: "a",
+                                connectToField: "b",
+                                as: "result3",
+                            },
+                        },
+                    ];
+                case 3:
+                    return [];
+                default:
+                    assert(false, "Invalid index: " + index);
+            }
+        },
     };
 
-    var states = (function() {
+    var states = (function () {
         /**
          * Redefines a view definition by changing the namespace it is a view on. This may lead to
          * a failed command if the given collMod would introduce a cycle. We ignore this error as it
@@ -91,8 +96,7 @@ export const $config = (function() {
 
             const fromName = this.getRandomView(this.viewList);
             const toName = this.getRandomView(this.viewList);
-            const res = db.runCommand(
-                {collMod: fromName, viewOn: toName, pipeline: this.getRandomViewPipeline()});
+            const res = db.runCommand({collMod: fromName, viewOn: toName, pipeline: this.getRandomViewPipeline()});
             assert.commandWorkedOrFailedWithCode(res, [
                 ErrorCodes.GraphContainsCycle,
                 ErrorCodes.ConflictingOperationInProgress,
@@ -113,8 +117,7 @@ export const $config = (function() {
             }
 
             const fromName = this.getRandomView(this.viewList);
-            const res = db.runCommand(
-                {collMod: fromName, viewOn: collName, pipeline: this.getRandomViewPipeline()});
+            const res = db.runCommand({collMod: fromName, viewOn: collName, pipeline: this.getRandomViewPipeline()});
             assert.commandWorkedOrFailedWithCode(res, [
                 ErrorCodes.GraphContainsCycle,
                 ErrorCodes.ConflictingOperationInProgress,
@@ -146,7 +149,7 @@ export const $config = (function() {
                 ErrorCodes.CommandNotSupportedOnView,
                 ErrorCodes.CursorNotFound,
                 ErrorCodes.CommandOnShardedViewNotSupportedOnMongod,
-                ErrorCodes.QueryPlanKilled
+                ErrorCodes.QueryPlanKilled,
             ]);
         }
 
@@ -158,17 +161,18 @@ export const $config = (function() {
     })();
 
     var transitions = {
-        remapViewToView: {remapViewToView: 0.40, remapViewToCollection: 0.10, readFromView: 0.50},
-        remapViewToCollection:
-            {remapViewToView: 0.40, remapViewToCollection: 0.10, readFromView: 0.50},
-        readFromView: {remapViewToView: 0.40, remapViewToCollection: 0.10, readFromView: 0.50},
+        remapViewToView: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},
+        remapViewToCollection: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},
+        readFromView: {remapViewToView: 0.4, remapViewToCollection: 0.1, readFromView: 0.5},
     };
 
     function setup(db, collName, cluster) {
         // TODO SERVER-88936: Remove this field and associated checks once the flag is active on
         // last-lts.
-        this.shouldSkipTest = TestData.runInsideTransaction && cluster.isSharded() &&
-            !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'AllowAdditionalParticipants');
+        this.shouldSkipTest =
+            TestData.runInsideTransaction &&
+            cluster.isSharded() &&
+            !FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), "AllowAdditionalParticipants");
         if (this.shouldSkipTest) {
             return;
         }
@@ -181,8 +185,7 @@ export const $config = (function() {
         // in suites that run multi-document transactions.
         this.originalTransactionLifetimeLimitSeconds = {};
         cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(
-                db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
+            const res = assert.commandWorked(db.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 60}));
             this.originalTransactionLifetimeLimitSeconds[db.getMongo().host] = res.was;
         });
 
@@ -204,13 +207,10 @@ export const $config = (function() {
         cluster.executeOnMongodNodes((db) => {
             // Store the old value of the max subpipeline view depth so we can restore it at the end
             // of the test.
-            const maxSubPipelineViewDepthParam =
-                db.adminCommand({getParameter: 1, internalMaxSubPipelineViewDepth: 1});
+            const maxSubPipelineViewDepthParam = db.adminCommand({getParameter: 1, internalMaxSubPipelineViewDepth: 1});
             assert(maxSubPipelineViewDepthParam.hasOwnProperty("internalMaxSubPipelineViewDepth"));
-            this.oldMaxSubPipelineViewDepth =
-                maxSubPipelineViewDepthParam.internalMaxSubPipelineViewDepth;
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, internalMaxSubPipelineViewDepth: 100}));
+            this.oldMaxSubPipelineViewDepth = maxSubPipelineViewDepthParam.internalMaxSubPipelineViewDepth;
+            assert.commandWorked(db.adminCommand({setParameter: 1, internalMaxSubPipelineViewDepth: 100}));
         });
     }
 
@@ -218,21 +218,24 @@ export const $config = (function() {
         // Restore the old max subpipeline view depth.
         if (this.oldMaxSubPipelineViewDepth) {
             cluster.executeOnMongodNodes((db) => {
-                assert.commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    internalMaxSubPipelineViewDepth: this.oldMaxSubPipelineViewDepth
-                }));
+                assert.commandWorked(
+                    db.adminCommand({
+                        setParameter: 1,
+                        internalMaxSubPipelineViewDepth: this.oldMaxSubPipelineViewDepth,
+                    }),
+                );
             });
         }
 
         // TODO SERVER-89663: We restore the original transaction lifetime limit since there may be
         // concurrent executions that relied on the old value.
         cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                transactionLifetimeLimitSeconds:
-                    this.originalTransactionLifetimeLimitSeconds[db.getMongo().host]
-            }));
+            assert.commandWorked(
+                db.adminCommand({
+                    setParameter: 1,
+                    transactionLifetimeLimitSeconds: this.originalTransactionLifetimeLimitSeconds[db.getMongo().host],
+                }),
+            );
         });
     }
 
@@ -241,7 +244,7 @@ export const $config = (function() {
         iterations: 100,
         data: data,
         states: states,
-        startState: 'readFromView',
+        startState: "readFromView",
         transitions: transitions,
         setup: setup,
         teardown: teardown,

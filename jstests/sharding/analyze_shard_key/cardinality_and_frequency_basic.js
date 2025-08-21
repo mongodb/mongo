@@ -6,9 +6,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    numMostCommonValues
-} from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
+import {numMostCommonValues} from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
 import {
     testAnalyzeCandidateShardKeysShardedCollection,
     testAnalyzeCandidateShardKeysUnshardedCollection,
@@ -21,16 +19,15 @@ const numNodesPerRS = 2;
 // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
 // command with readPreference "secondaryPreferred".
 const writeConcern = {
-    w: numNodesPerRS
+    w: numNodesPerRS,
 };
 
 const setParameterOpts = {
-    analyzeShardKeyNumMostCommonValues: numMostCommonValues
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
 };
 
 {
-    const st =
-        new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
+    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
 
     testAnalyzeCandidateShardKeysUnshardedCollection(st.s, {st}, writeConcern);
     testAnalyzeCandidateShardKeysShardedCollection(st.s, st, writeConcern);
@@ -39,9 +36,9 @@ const setParameterOpts = {
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
-    const rst =
-        new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
+    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();
 

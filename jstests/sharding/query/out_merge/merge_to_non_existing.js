@@ -25,18 +25,19 @@ function testMerge(sourceColl, targetColl, shardedSource) {
     withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         // Skip the combination of merge modes which will fail depending on the contents of the
         // source and target collection, as this will cause the assertion below to trip.
-        if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
-            return;
+        if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail") return;
 
         targetColl.drop();
-        sourceColl.aggregate([{
-            $merge: {
-                into: {db: targetColl.getDB().getName(), coll: targetColl.getName()},
-                whenMatched: whenMatchedMode,
-                whenNotMatched: whenNotMatchedMode,
-                on: "_id"
-            }
-        }]);
+        sourceColl.aggregate([
+            {
+                $merge: {
+                    into: {db: targetColl.getDB().getName(), coll: targetColl.getName()},
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                    on: "_id",
+                },
+            },
+        ]);
         assert.eq(whenNotMatchedMode == "discard" ? 0 : 10, targetColl.find().itcount());
     });
 
@@ -45,29 +46,33 @@ function testMerge(sourceColl, targetColl, shardedSource) {
     withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
         // Skip the combination of merge modes which will fail depending on the contents of the
         // source and target collection, as this will cause the assertion below to trip.
-        if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
-            return;
+        if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail") return;
 
         targetColl.drop();
         assertErrorCode(
             sourceColl,
-            [{
-                $merge: {
-                    into: {db: targetColl.getDB().getName(), coll: targetColl.getName()},
-                    whenMatched: whenMatchedMode,
-                    whenNotMatched: whenNotMatchedMode,
-                    on: "not_allowed"
-                }
-            }],
-            51190);
+            [
+                {
+                    $merge: {
+                        into: {db: targetColl.getDB().getName(), coll: targetColl.getName()},
+                        whenMatched: whenMatchedMode,
+                        whenNotMatched: whenNotMatchedMode,
+                        on: "not_allowed",
+                    },
+                },
+            ],
+            51190,
+        );
     });
 
     // If 'targetColl' is in the same database as 'sourceColl', test that the legacy $out works
     // correctly.
     if (targetColl.getDB() == sourceColl.getDB()) {
-        jsTestLog(`Testing $out from ${sourceColl.getFullName()} ` +
-                  `(${shardedSource ? "sharded" : "unsharded"}) to ${targetColl.getFullName()} ` +
-                  `with legacy syntax`);
+        jsTestLog(
+            `Testing $out from ${sourceColl.getFullName()} ` +
+                `(${shardedSource ? "sharded" : "unsharded"}) to ${targetColl.getFullName()} ` +
+                `with legacy syntax`,
+        );
 
         targetColl.drop();
         sourceColl.aggregate([{$out: targetColl.getName()}]);

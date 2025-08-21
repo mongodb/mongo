@@ -6,26 +6,28 @@ import "jstests/libs/query/sbe_assert_error_override.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {checkSbeCompletelyDisabled} from "jstests/libs/query/sbe_util.js";
 
-const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) ||
-    Boolean(TestData.multiversionBinVersion);
+const isMultiversion =
+    Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
 
 const coll = db.expression_set;
 coll.drop();
 
-assert.commandWorked(coll.insert([
-    {_id: 0, arr1: [1, 2, 3], arr2: [2, 3, 4]},
-    {_id: 1, arr1: [1, 2, 3], arr2: [4, 5, 6]},
-    {_id: 2, arr1: [1, 2, 3], arr2: []},
-    {_id: 3, arr1: [], arr2: [4, 5, 6]},
-    {_id: 4, arr1: [1, 2, 3], arr2: [2, 3]},
-    {_id: 5, arr1: [2, 3], arr2: [2, 3, 4]},
-    {_id: 6, arr1: [1, 2, 3], arr2: [1, 2, 3]},
-    {_id: 7, arr1: [1, 2, 3], arr2: [1, 1, 2, 2, 3, 3]},
-]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 0, arr1: [1, 2, 3], arr2: [2, 3, 4]},
+        {_id: 1, arr1: [1, 2, 3], arr2: [4, 5, 6]},
+        {_id: 2, arr1: [1, 2, 3], arr2: []},
+        {_id: 3, arr1: [], arr2: [4, 5, 6]},
+        {_id: 4, arr1: [1, 2, 3], arr2: [2, 3]},
+        {_id: 5, arr1: [2, 3], arr2: [2, 3, 4]},
+        {_id: 6, arr1: [1, 2, 3], arr2: [1, 2, 3]},
+        {_id: 7, arr1: [1, 2, 3], arr2: [1, 1, 2, 2, 3, 3]},
+    ]),
+);
 
 // The order of the output array elements is undefined for $setUnion, $setDifference and
 // $setIntersection expressions. Hence we do a sort operation to get a consistent order.
-const sortSetFields = doc => {
+const sortSetFields = (doc) => {
     let result = {};
     for (const key in doc) {
         if (doc.hasOwnProperty(key)) {
@@ -36,7 +38,7 @@ const sortSetFields = doc => {
     return result;
 };
 
-const runTest = function(pipeline, expectedResult) {
+const runTest = function (pipeline, expectedResult) {
     pipeline.push({$sort: {_id: 1}});
     const result = coll.aggregate(pipeline).toArray();
     assert.eq(expectedResult, result.map(sortSetFields));
@@ -273,17 +275,17 @@ runTest(
 );
 
 // No sets to union should produce an empty set for all records so we only check the first one.
-assert.eq(coll.aggregate([{$project: {x: {$setUnion: []}}}]).toArray()[0]['x'], []);
+assert.eq(coll.aggregate([{$project: {x: {$setUnion: []}}}]).toArray()[0]["x"], []);
 
 // No sets to intersect should produce an empty set for all records so we only check the first one.
-assert.eq(coll.aggregate([{$project: {x: {$setIntersection: []}}}]).toArray()[0]['x'], []);
+assert.eq(coll.aggregate([{$project: {x: {$setIntersection: []}}}]).toArray()[0]["x"], []);
 
 const operators = [
     ["$setUnion", 17043],
     ["$setIntersection", 17047],
     ["$setDifference", [17048, 17049]],
     ["$setEquals", [17044, 7158100]],
-    ["$setIsSubset", [17042, 17046]]
+    ["$setIsSubset", [17042, 17046]],
 ];
 const badDocuments = [
     {arr1: "123", arr2: [1, 2, 3]},
@@ -308,24 +310,23 @@ const nullMissingDocs = [
 ];
 
 const nullResultOperators = ["$setUnion", "$setIntersection", "$setDifference"];
-const errorCodeOperators = [["$setEquals", 17044], ["$setIsSubset", [17042, 17046]]];
+const errorCodeOperators = [
+    ["$setEquals", 17044],
+    ["$setIsSubset", [17042, 17046]],
+];
 
 for (const operator of nullResultOperators) {
     for (const doc of nullMissingDocs) {
         assert(coll.drop());
         assert.commandWorked(coll.insertOne(doc));
-        const result =
-            coll.aggregate([{$project: {output: {[operator]: ["$arr1", "$arr2"]}}}]).toArray();
-        assert.eq(result[0].output,
-                  null,
-                  `Expected null result for operator ${operator} with document ${tojson(doc)}`);
+        const result = coll.aggregate([{$project: {output: {[operator]: ["$arr1", "$arr2"]}}}]).toArray();
+        assert.eq(result[0].output, null, `Expected null result for operator ${operator} with document ${tojson(doc)}`);
     }
 }
 
 // ToDo: SERVER-107904. Remove check when 9.0 becomes last-lts
 if (isMultiversion && !checkSbeCompletelyDisabled(db)) {
-    jsTest.log.info(
-        "Skipping $setEquals and $setIsSubset tests on null or missing arrays for SBE.");
+    jsTest.log.info("Skipping $setEquals and $setIsSubset tests on null or missing arrays for SBE.");
     quit();
 }
 

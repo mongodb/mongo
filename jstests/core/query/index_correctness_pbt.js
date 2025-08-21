@@ -35,10 +35,12 @@ const correctnessProperty = createCorrectnessProperty(controlColl, experimentCol
 const aggModel = getAggPipelineModel();
 
 // Test with a regular collection.
-testProperty(correctnessProperty,
-             {controlColl, experimentColl},
-             makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
-             numRuns);
+testProperty(
+    correctnessProperty,
+    {controlColl, experimentColl},
+    makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
+    numRuns,
+);
 
 // TODO SERVER-103381 re-enable timeseries PBT testing.
 // Test with a TS collection.

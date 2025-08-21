@@ -3,14 +3,13 @@
 
 const defaultsConn = MongoRunner.runMongod();
 function getDefaultValue(parameterName) {
-    const res =
-        assert.commandWorked(defaultsConn.adminCommand({getParameter: 1, [parameterName]: 1}));
+    const res = assert.commandWorked(defaultsConn.adminCommand({getParameter: 1, [parameterName]: 1}));
     return res[parameterName];
 }
 
 let paramsDict = {};
-const parameters = ['journalCommitInterval', 'syncdelay'];
-parameters.forEach(param => {
+const parameters = ["journalCommitInterval", "syncdelay"];
+parameters.forEach((param) => {
     const defaultValue = getDefaultValue(param);
     const setValue = defaultValue + 1;
     paramsDict[param] = setValue;
@@ -18,7 +17,7 @@ parameters.forEach(param => {
 MongoRunner.stopMongod(defaultsConn);
 
 function runTestOnConn(conn, setParams) {
-    Object.keys(setParams).forEach(param => {
+    Object.keys(setParams).forEach((param) => {
         const res = assert.commandWorked(conn.adminCommand({getParameter: 1, [param]: 1}));
         assert.eq(res[param], setParams[param]);
     });

@@ -22,8 +22,7 @@ import {
  */
 const createRankFusionPipeline = (inputPipelines, viewPipeline = null) => {
     const rankFusionStage = {$rankFusion: {input: {pipelines: {}}}};
-    return createHybridSearchPipeline(
-        inputPipelines, viewPipeline, rankFusionStage, /**isRankFusion*/ true);
+    return createHybridSearchPipeline(inputPipelines, viewPipeline, rankFusionStage, /**isRankFusion*/ true);
 };
 
 /**
@@ -47,8 +46,7 @@ const runRankFusionSearchViewsTest = (inputPipelines, checkCorrectness = true) =
  *     needed.
  */
 const runRankFusionWithAllMongotInputPipelinesOnSearchViewsTest = (inputPipelines) => {
-    runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inputPipelines,
-                                                                createRankFusionPipeline);
+    runHybridSearchWithAllMongotInputPipelinesOnSearchViewsTest(inputPipelines, createRankFusionPipeline);
 };
 
 /* --------------------------------------------------------------------------------------- */
@@ -85,17 +83,21 @@ runRankFusionSearchViewsTest({
     c: [{$match: {x: {$lt: 10}}}, {$sort: {x: -1}}],
 });
 // limit in input
-runRankFusionSearchViewsTest({
-    a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
-    b: [{$limit: 5}, {$sort: {x: 1}}],
-},
-                             /*checkCorrectness=**/ false);
+runRankFusionSearchViewsTest(
+    {
+        a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
+        b: [{$limit: 5}, {$sort: {x: 1}}],
+    },
+    /*checkCorrectness=**/ false,
+);
 // sample
-runRankFusionSearchViewsTest({
-    a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
-    b: [{$sample: {size: 5}}, {$sort: {x: 1}}],
-},
-                             /*checkCorrectness=**/ false);
+runRankFusionSearchViewsTest(
+    {
+        a: [{$match: {x: {$gte: 4}}}, {$sort: {x: 1}}],
+        b: [{$sample: {size: 5}}, {$sort: {x: 1}}],
+    },
+    /*checkCorrectness=**/ false,
+);
 
 /* --------------------------------------------------------------------------------------- */
 /* Run tests where $rankFusion has SOME mongot input pipelines. Should not return results that
@@ -103,35 +105,27 @@ runRankFusionSearchViewsTest({
  */
 
 // search first
-runRankFusionSearchViewsTest(
-    {
-        a: [searchPipelineFoo],
-        b: [{$sort: {x: 1}}],
-    },
-);
+runRankFusionSearchViewsTest({
+    a: [searchPipelineFoo],
+    b: [{$sort: {x: 1}}],
+});
 // search second
-runRankFusionSearchViewsTest(
-    {
-        a: [{$sort: {x: -1}}],
-        b: [searchPipelineFoo],
-    },
-);
+runRankFusionSearchViewsTest({
+    a: [{$sort: {x: -1}}],
+    b: [searchPipelineFoo],
+});
 
 // vector search first
-runRankFusionSearchViewsTest(
-    {
-        a: [vectorSearchPipelineV],
-        b: [{$sort: {x: 1}}],
-    },
-);
+runRankFusionSearchViewsTest({
+    a: [vectorSearchPipelineV],
+    b: [{$sort: {x: 1}}],
+});
 
 // vector search second
-runRankFusionSearchViewsTest(
-    {
-        a: [{$sort: {x: -1}}],
-        b: [vectorSearchPipelineV],
-    },
-);
+runRankFusionSearchViewsTest({
+    a: [{$sort: {x: -1}}],
+    b: [vectorSearchPipelineV],
+});
 
 /* --------------------------------------------------------------------------------------- */
 /* Run tests where $rankFusion has ONLY mongot input pipelines. Should not return any results.

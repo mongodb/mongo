@@ -8,15 +8,14 @@ import {
     getLatestQueryStatsEntry,
     getQueryStatsServerParameters,
     getValueAtPath,
-    runCommandAndValidateQueryStats
+    runCommandAndValidateQueryStats,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const collName = jsTestName();
 
-const queryShapeAggregateFields =
-    ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
+const queryShapeAggregateFields = ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
 
 // The outer fields not nested inside queryShape.
 const queryStatsAggregateKeyFields = [
@@ -40,31 +39,37 @@ const testCases = [
     // Default fields.
     {
         pipeline: [{"$changeStream": {}}],
-        expectedShapifiedPipeline: [{
-            "$changeStream": {
-                startAtOperationTime: "?timestamp",
-                fullDocument: "default",
-                fullDocumentBeforeChange: "off"
-            }
-        }]
+        expectedShapifiedPipeline: [
+            {
+                "$changeStream": {
+                    startAtOperationTime: "?timestamp",
+                    fullDocument: "default",
+                    fullDocumentBeforeChange: "off",
+                },
+            },
+        ],
     },
     // Non default field values.
     {
-        pipeline: [{
-            "$changeStream": {
-                fullDocument: "updateLookup",
-                fullDocumentBeforeChange: "required",
-                showExpandedEvents: true,
-            }
-        }],
-        expectedShapifiedPipeline: [{
-            "$changeStream": {
-                startAtOperationTime: "?timestamp",
-                fullDocument: "updateLookup",
-                fullDocumentBeforeChange: "required",
-                showExpandedEvents: true,
-            }
-        }],
+        pipeline: [
+            {
+                "$changeStream": {
+                    fullDocument: "updateLookup",
+                    fullDocumentBeforeChange: "required",
+                    showExpandedEvents: true,
+                },
+            },
+        ],
+        expectedShapifiedPipeline: [
+            {
+                "$changeStream": {
+                    startAtOperationTime: "?timestamp",
+                    fullDocument: "updateLookup",
+                    fullDocumentBeforeChange: "required",
+                    showExpandedEvents: true,
+                },
+            },
+        ],
     },
     // $changeStream followed by a $match. $changeStream internally creates another $match stage
     // which shouldn't appear in the query shape, but a $match in the user specified pipeline should
@@ -76,12 +81,12 @@ const testCases = [
                 "$changeStream": {
                     startAtOperationTime: "?timestamp",
                     fullDocument: "default",
-                    fullDocumentBeforeChange: "off"
-                }
+                    fullDocumentBeforeChange: "off",
+                },
             },
-            {$match: {a: {$eq: "?string"}}}
-        ]
-    }
+            {$match: {a: {$eq: "?string"}}},
+        ],
+    },
 ];
 
 function assertPipelineField(conn, expectedPipeline) {
@@ -108,13 +113,15 @@ function validateResumeTokenQueryShape(conn, coll) {
     coll.watch([], {startAfter: invalidateResumeToken});
     assert.commandWorked(coll.insert({_id: 2}));
 
-    const expectedShapifiedPipeline = [{
-        "$changeStream": {
-            resumeAfter: {_data: "?string"},
-            fullDocument: "default",
-            fullDocumentBeforeChange: "off"
-        }
-    }];
+    const expectedShapifiedPipeline = [
+        {
+            "$changeStream": {
+                resumeAfter: {_data: "?string"},
+                fullDocument: "default",
+                fullDocumentBeforeChange: "off",
+            },
+        },
+    ];
     assertPipelineField(conn, expectedShapifiedPipeline);
 }
 
@@ -128,7 +135,7 @@ function validateChangeStreamAggKey(conn) {
     validateResumeTokenQueryShape(conn, db[collName]);
 
     // Validate the key for the rest of the pipelines.
-    testCases.forEach(input => {
+    testCases.forEach((input) => {
         const pipeline = input.pipeline;
         const aggCmdObj = {
             aggregate: collName,
@@ -142,7 +149,7 @@ function validateChangeStreamAggKey(conn) {
             collation: {locale: "en_US", strength: 2},
             hint: {"v": 1},
             comment: "",
-            let : {},
+            let: {},
             apiDeprecationErrors: false,
             apiVersion: "1",
             apiStrict: false,
@@ -153,7 +160,7 @@ function validateChangeStreamAggKey(conn) {
             commandName: "aggregate",
             commandObj: aggCmdObj,
             shapeFields: queryShapeAggregateFields,
-            keyFields: queryStatsAggregateKeyFields
+            keyFields: queryStatsAggregateKeyFields,
         });
         assertPipelineField(conn, input.expectedShapifiedPipeline);
     });
@@ -169,7 +176,7 @@ function validateChangeStreamAggKey(conn) {
         mongosOptions: {
             setParameter: {
                 internalQueryStatsRateLimit: -1,
-            }
+            },
         },
     });
     validateChangeStreamAggKey(st.s);

@@ -28,40 +28,38 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
-const collName = 't';
+const collName = "t";
 const dbName = jsTestName();
 
 const testCases = {
     DROP_COLLECTION: 0,
     REPLACE_COLLECTION: 1,
-    REPLACE_METAFIELD: 2
+    REPLACE_METAFIELD: 2,
 };
 
-const validateDeleteIndex =
-    (docsToInsert, deleteQuery, expectedErrorCode, testCase, newMetaField = null) => {
-        const testDB = db.getSiblingDB(dbName);
-        const awaitTestDelete = startParallelShell(funWithArgs(
-            function(docsToInsert,
-                     deleteQuery,
-                     timeFieldName,
-                     metaFieldName,
-                     collName,
-                     expectedErrorCode,
-                     dbName) {
+const validateDeleteIndex = (docsToInsert, deleteQuery, expectedErrorCode, testCase, newMetaField = null) => {
+    const testDB = db.getSiblingDB(dbName);
+    const awaitTestDelete = startParallelShell(
+        funWithArgs(
+            function (docsToInsert, deleteQuery, timeFieldName, metaFieldName, collName, expectedErrorCode, dbName) {
                 const testDB = db.getSiblingDB(dbName);
                 const coll = testDB.getCollection(collName);
 
-                assert.commandWorked(testDB.createCollection(
-                    coll.getName(),
-                    {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+                assert.commandWorked(
+                    testDB.createCollection(coll.getName(), {
+                        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                    }),
+                );
 
                 assert.commandWorked(coll.insert(docsToInsert));
 
-                assert.commandWorked(testDB.adminCommand(
-                    {configureFailPoint: "hangDuringBatchRemove", mode: "alwaysOn"}));
+                assert.commandWorked(
+                    testDB.adminCommand({configureFailPoint: "hangDuringBatchRemove", mode: "alwaysOn"}),
+                );
                 assert.commandFailedWithCode(
                     testDB.runCommand({delete: coll.getName(), deletes: deleteQuery}),
-                    expectedErrorCode);
+                    expectedErrorCode,
+                );
 
                 coll.drop();
             },
@@ -71,52 +69,52 @@ const validateDeleteIndex =
             metaFieldName,
             collName,
             expectedErrorCode,
-            dbName));
-        const coll = testDB.getCollection(collName);
+            dbName,
+        ),
+    );
+    const coll = testDB.getCollection(collName);
 
-        const childOp =
-            waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangDuringBatchRemove")[0];
+    const childOp = waitForCurOpByFailPoint(testDB, coll.getFullName(), "hangDuringBatchRemove")[0];
 
-        // Drop the collection in all test cases.
-        assert(coll.drop());
-        switch (testCase) {
-            case testCases.REPLACE_COLLECTION:
-                assert.commandWorked(testDB.createCollection(coll.getName()));
-                break;
-            case testCases.REPLACE_METAFIELD:
-                assert.commandWorked(testDB.createCollection(
-                    coll.getName(),
-                    {timeseries: {timeField: timeFieldName, metaField: newMetaField}}));
-                break;
-        }
+    // Drop the collection in all test cases.
+    assert(coll.drop());
+    switch (testCase) {
+        case testCases.REPLACE_COLLECTION:
+            assert.commandWorked(testDB.createCollection(coll.getName()));
+            break;
+        case testCases.REPLACE_METAFIELD:
+            assert.commandWorked(
+                testDB.createCollection(coll.getName(), {
+                    timeseries: {timeField: timeFieldName, metaField: newMetaField},
+                }),
+            );
+            break;
+    }
 
-        assert.commandWorked(
-            testDB.adminCommand({configureFailPoint: "hangDuringBatchRemove", mode: "off"}));
+    assert.commandWorked(testDB.adminCommand({configureFailPoint: "hangDuringBatchRemove", mode: "off"}));
 
-        // Wait for testDelete to finish.
-        awaitTestDelete();
-    };
+    // Wait for testDelete to finish.
+    awaitTestDelete();
+};
 
 const objA = {
     [timeFieldName]: ISODate(),
     "measurement": {"A": "cpu"},
-    [metaFieldName]: {a: "A"}
+    [metaFieldName]: {a: "A"},
 };
 
 // Attempt to delete from a collection that has been dropped.
 validateDeleteIndex(
     [objA],
     [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
-    [ErrorCodes.NamespaceNotFound, 8555700, 8555701],  // TODO (SERVER-85548): revisit error codes
-    testCases.DROP_COLLECTION);
+    [ErrorCodes.NamespaceNotFound, 8555700, 8555701], // TODO (SERVER-85548): revisit error codes
+    testCases.DROP_COLLECTION,
+);
 
 // Attempt to delete from a collection that has been replaced with a non-time-series collection.
-validateDeleteIndex([objA],
-                    [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
-                    [
-                        ErrorCodes.NamespaceNotFound,
-                        8555700,
-                        8555701,
-                        10685101
-                    ],  // TODO (SERVER-85548): revisit error codes
-                    testCases.REPLACE_COLLECTION);
+validateDeleteIndex(
+    [objA],
+    [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
+    [ErrorCodes.NamespaceNotFound, 8555700, 8555701, 10685101], // TODO (SERVER-85548): revisit error codes
+    testCases.REPLACE_COLLECTION,
+);

@@ -11,14 +11,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 3, chunkSize: 1});
 
 function verifyOpEntriesOnNodes(expectedOpEntryTemplates, nodes) {
-    const namespaces = [...new Set(expectedOpEntryTemplates.map(t => t.ns))];
+    const namespaces = [...new Set(expectedOpEntryTemplates.map((t) => t.ns))];
     for (const node of nodes) {
-        const foundOpEntries = node.getCollection('local.oplog.rs')
-                                   .find({ns: {$in: namespaces}, op: {$in: ['c', 'n']}})
-                                   .sort({ts: -1})
-                                   .limit(expectedOpEntryTemplates.length)
-                                   .toArray()
-                                   .reverse();
+        const foundOpEntries = node
+            .getCollection("local.oplog.rs")
+            .find({ns: {$in: namespaces}, op: {$in: ["c", "n"]}})
+            .sort({ts: -1})
+            .limit(expectedOpEntryTemplates.length)
+            .toArray()
+            .reverse();
 
         assert.eq(expectedOpEntryTemplates.length, foundOpEntries.length);
         for (let i = 0; i < foundOpEntries.length; ++i) {
@@ -30,27 +31,27 @@ function verifyOpEntriesOnNodes(expectedOpEntryTemplates, nodes) {
     }
 }
 function testMovePrimary() {
-    jsTest.log(
-        'Testing placement entries added by movePrimary() over a new sharding-enabled DB with no data');
+    jsTest.log("Testing placement entries added by movePrimary() over a new sharding-enabled DB with no data");
 
     // Set the initial state
-    const dbName = 'movePrimaryTestDB';
+    const dbName = "movePrimaryTestDB";
     const fromPrimaryShard = st.shard0;
     const fromReplicaSet = st.rs0;
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: fromPrimaryShard.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: fromPrimaryShard.shardName}));
 
     // Move the primary shard.
     const toPrimaryShard = st.shard1;
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: toPrimaryShard.shardName}));
 
     // Verify that the old shard generated the expected event.
-    const expectedEntriesForPrimaryMoved = [{
-        op: 'n',
-        ns: dbName,
-        o: {msg: {movePrimary: dbName}},
-        o2: {movePrimary: dbName, from: fromPrimaryShard.shardName, to: toPrimaryShard.shardName},
-    }];
+    const expectedEntriesForPrimaryMoved = [
+        {
+            op: "n",
+            ns: dbName,
+            o: {msg: {movePrimary: dbName}},
+            o2: {movePrimary: dbName, from: fromPrimaryShard.shardName, to: toPrimaryShard.shardName},
+        },
+    ];
 
     verifyOpEntriesOnNodes(expectedEntriesForPrimaryMoved, [fromReplicaSet.getPrimary()]);
 }

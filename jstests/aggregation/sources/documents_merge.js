@@ -6,10 +6,7 @@
  * @tags: [ requires_fcv_80 ]
  */
 
-import {
-    dropWithoutImplicitRecreate,
-    withEachMergeMode
-} from "jstests/aggregation/extras/merge_helpers.js";
+import {dropWithoutImplicitRecreate, withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 
 const outColl = db[`${jsTest.name()}_out`];
 const outCollName = outColl.getName();
@@ -25,7 +22,7 @@ function assertDocsInsertedCorrectly(docs, pipeline) {
 }
 
 const documentsStage = {
-    $documents: {$map: {input: {$range: [0, expectedTotalDocs]}, in : {x: "$$this"}}}
+    $documents: {$map: {input: {$range: [0, expectedTotalDocs]}, in: {x: "$$this"}}},
 };
 
 function testFn(pipeline, assertFn) {
@@ -41,40 +38,42 @@ function testFn(pipeline, assertFn) {
     assertFn(res);
 }
 
-{  // Tests $merge with non-empty pipeline along with let in whenMatched spec.
+{
+    // Tests $merge with non-empty pipeline along with let in whenMatched spec.
     const pipeline = [
         documentsStage,
         {
             $merge: {
                 into: outCollName,
-                let : {num: 123},
+                let: {num: 123},
                 whenMatched: [{$set: {number: "$$num"}}],
-                on: "x"
-            }
-        }
+                on: "x",
+            },
+        },
     ];
 
-    testFn(pipeline, res => {
-        assert.eq(res.filter(elem => elem.number === 123).length, 1);
+    testFn(pipeline, (res) => {
+        assert.eq(res.filter((elem) => elem.number === 123).length, 1);
     });
 }
 
-{  // Tests $merge with non-empty pipeline in whenMatched spec.
-    const pipeline = [
-        documentsStage,
-        {$merge: {into: outCollName, whenMatched: [{$set: {new: true}}], on: "x"}}
-    ];
+{
+    // Tests $merge with non-empty pipeline in whenMatched spec.
+    const pipeline = [documentsStage, {$merge: {into: outCollName, whenMatched: [{$set: {new: true}}], on: "x"}}];
 
-    testFn(pipeline, res => {
-        assert.eq(res.filter(elem => elem.new === true).length, 1);
+    testFn(pipeline, (res) => {
+        assert.eq(res.filter((elem) => elem.new === true).length, 1);
     });
 }
 
 // Tests each combination of merge modes.
 withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
-    const expectErrorCode = whenMatchedMode === "fail" ? ErrorCodes.DuplicateKey
-        : whenNotMatchedMode === "fail"                ? ErrorCodes.MergeStageNoMatchingDocument
-                                                       : null;
+    const expectErrorCode =
+        whenMatchedMode === "fail"
+            ? ErrorCodes.DuplicateKey
+            : whenNotMatchedMode === "fail"
+              ? ErrorCodes.MergeStageNoMatchingDocument
+              : null;
 
     // Creates an index as $merge requires a unique index with the 'on' identifier field. Then
     // inserts a document allowed to be matched.
@@ -90,8 +89,8 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
                 whenMatched: whenMatchedMode,
                 whenNotMatched: whenNotMatchedMode,
                 on: "x",
-            }
-        }
+            },
+        },
     ];
 
     if (expectErrorCode) {
@@ -108,5 +107,5 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     }
 
     // Asserts if the old document is replaced when 'whenMatchedMode' is "replace".
-    assert.eq(res.filter(elem => elem.old === true).length, whenMatchedMode == "replace" ? 0 : 1);
+    assert.eq(res.filter((elem) => elem.old === true).length, whenMatchedMode == "replace" ? 0 : 1);
 });

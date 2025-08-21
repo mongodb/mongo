@@ -11,14 +11,14 @@ import {
     awaitDbCheckCompletion,
     checkHealthLog,
     clearHealthLog,
-    runDbCheck
+    runDbCheck,
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
 const replSet = new ReplSetTest({
     nodes: 3,
     nodeOptions: {
         setParameter: {dbCheckHealthLogEveryNBatches: 1},
-    }
+    },
 });
 replSet.startSet();
 replSet.initiate();
@@ -27,18 +27,20 @@ const primary = replSet.getPrimary();
 const secondary = replSet.getSecondary();
 const primaryHealthlog = primary.getDB("local").system.healthlog;
 const secondaryHealthlog = secondary.getDB("local").system.healthlog;
-const dbName = 'test';
+const dbName = "test";
 const db = primary.getDB(dbName);
-const collName = 'coll';
+const collName = "coll";
 const coll = db[collName];
-const collName2 = 'coll2';
+const collName2 = "coll2";
 const coll2 = db[collName2];
 
 // Turn off timestamp reaping.
-assert.commandWorked(db.adminCommand({
-    configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
-    mode: "alwaysOn",
-}));
+assert.commandWorked(
+    db.adminCommand({
+        configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+        mode: "alwaysOn",
+    }),
+);
 
 // Create the collection and insert one document.
 assert.commandWorked(coll.insert({_id: 0}));

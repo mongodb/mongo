@@ -21,29 +21,27 @@ assert.commandWorked(coll.createIndex({"indexed": 1}));
 const pipeline = [
     {
         $match: {
-            $and: [{
-                $and: [
-                    {"indexed": {$eq: 1}},
-                    {
-                        $or: [
-                            {$text: {$search: "abcd"}},
-                            {"unindexed": {$eq: 1}},
-                        ]
-                    },
-                ]
-            }]
-        }
+            $and: [
+                {
+                    $and: [
+                        {"indexed": {$eq: 1}},
+                        {
+                            $or: [{$text: {$search: "abcd"}}, {"unindexed": {$eq: 1}}],
+                        },
+                    ],
+                },
+            ],
+        },
     },
 ];
 
-assert.throwsWithCode(function() {
+assert.throwsWithCode(function () {
     coll.aggregate(pipeline);
 }, ErrorCodes.NoQueryExecutionPlans);
 
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
+assert.commandWorked(db.adminCommand({configureFailPoint: "disableMatchExpressionOptimization", mode: "alwaysOn"}));
 
-assert.throwsWithCode(function() {
+assert.throwsWithCode(function () {
     coll.aggregate(pipeline);
 }, ErrorCodes.NoQueryExecutionPlans);
 

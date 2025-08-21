@@ -17,10 +17,10 @@ const st = new ShardingTest({
         setParameter: {
             queryAnalysisSamplerConfigurationRefreshSecs,
             queryAnalysisWriterIntervalSecs,
-            logComponentVerbosity: tojson({sharding: 2})
-        }
+            logComponentVerbosity: tojson({sharding: 2}),
+        },
     },
-    mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}}
+    mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}},
 });
 
 const dbName = "testDb";
@@ -41,8 +41,7 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shar
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.name}));
 const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
-assert.commandWorked(
-    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
+assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
 const expectedSampledQueryDocs = [];
@@ -62,7 +61,7 @@ function runCmd(makeCmdObjFunc, filter, shardNames, explain, expectFilterCapture
             filter: {"cmd.filter": expectedFilter},
             cmdName,
             cmdObj: {filter: expectedFilter, collation},
-            shardNames
+            shardNames,
         });
     }
 }
@@ -176,7 +175,7 @@ function runCmd(makeCmdObjFunc, filter, shardNames, explain, expectFilterCapture
     // Run aggregate commands with filter in the first stage ($geoNear).
     const makeCmdObjFunc = (filter, collation) => {
         const geoNearStage = {
-            $geoNear: {near: {type: "Point", coordinates: [1, 1]}, distanceField: "dist"}
+            $geoNear: {near: {type: "Point", coordinates: [1, 1]}, distanceField: "dist"},
         };
         if (filter !== null) {
             geoNearStage.$geoNear.query = filter;
@@ -210,7 +209,7 @@ function runCmd(makeCmdObjFunc, filter, shardNames, explain, expectFilterCapture
             aggregate: collName,
             pipeline: [{$sort: {x: -1}}, {$match: filter}],
             collation,
-            cursor: {}
+            cursor: {},
         };
     };
 
@@ -238,7 +237,7 @@ function runCmd(makeCmdObjFunc, filter, shardNames, explain, expectFilterCapture
             aggregate: collName,
             pipeline: [{$_internalInhibitOptimization: {}}, {$match: filter}],
             collation,
-            cursor: {}
+            cursor: {},
         };
     };
 
@@ -260,7 +259,12 @@ function runCmd(makeCmdObjFunc, filter, shardNames, explain, expectFilterCapture
 
 const cmdNames = ["find", "count", "distinct", "aggregate"];
 QuerySamplingUtil.assertSoonSampledQueryDocumentsAcrossShards(
-    st, ns, collectionUuid, cmdNames, expectedSampledQueryDocs);
+    st,
+    ns,
+    collectionUuid,
+    cmdNames,
+    expectedSampledQueryDocs,
+);
 
 assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
 

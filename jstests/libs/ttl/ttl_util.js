@@ -23,9 +23,13 @@ export const TTLUtil = class {
         // might have been in progress while the data was inserted. Waiting to see two increases of
         // this metric guarantees that the TTL has started a new pass after test data insertion.
         const ttlPasses = db.serverStatus().metrics.ttl.passes;
-        assert.soon(function() {
-            return db.serverStatus().metrics.ttl.passes > ttlPasses + 1;
-        }, "Expected 2 TTL passes but achieved less than 2 in the given time", timeoutMillis);
+        assert.soon(
+            function () {
+                return db.serverStatus().metrics.ttl.passes > ttlPasses + 1;
+            },
+            "Expected 2 TTL passes but achieved less than 2 in the given time",
+            timeoutMillis,
+        );
 
         // Readers using a "majority" read concern might expect TTL deletes to be visible after
         // waitForPass. TTL writes do not imply 'majority' nor 'j: true', and are made durable by

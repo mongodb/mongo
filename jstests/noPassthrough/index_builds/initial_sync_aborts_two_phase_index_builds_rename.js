@@ -26,8 +26,8 @@ const rst = new ReplSetTest({
             rsConfig: {
                 priority: 0,
             },
-        }
-    ]
+        },
+    ],
 });
 
 rst.startSet();
@@ -38,15 +38,21 @@ const primary = rst.getPrimary();
 const db = primary.getDB(dbName);
 const dbColl = db[collName];
 
-assert.commandWorked(dbColl.insert([{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}]));
+assert.commandWorked(
+    dbColl.insert([
+        {_id: 1, a: 1},
+        {_id: 2, a: 2},
+        {_id: 3, a: 3},
+    ]),
+);
 
 // Forcefully re-sync the secondary.
 let secondary = rst.restart(1, {
     startClean: true,
     setParameter: {
-        'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1
-    }
+        "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 
 // Wait until we block on cloning the collection.
@@ -57,8 +63,9 @@ assert.commandWorked(dbColl.renameCollection("anotherColl"));
 const createIdx = IndexBuildTest.startIndexBuild(primary, "test.anotherColl", {a: 1});
 
 // Finish the collection cloning phase on the initial syncing node.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 rst.awaitSecondaryNodes(null, [secondary]);
 createIdx();

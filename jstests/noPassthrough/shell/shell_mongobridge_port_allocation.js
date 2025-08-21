@@ -15,13 +15,12 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 function checkBridgeOffset(node, processType) {
     const bridgePort = node.port;
     const serverPort = assert.commandWorked(node.adminCommand({getCmdLineOpts: 1})).parsed.net.port;
-    assert.neq(bridgePort,
-               serverPort,
-               node + " is a connection to " + processType + " rather than to mongobridge");
-    assert.eq(bridgePort + MongoBridge.kBridgeOffset,
-              serverPort,
-              "corresponding mongobridge and " + processType +
-                  " ports should be staggered by a multiple of 10");
+    assert.neq(bridgePort, serverPort, node + " is a connection to " + processType + " rather than to mongobridge");
+    assert.eq(
+        bridgePort + MongoBridge.kBridgeOffset,
+        serverPort,
+        "corresponding mongobridge and " + processType + " ports should be staggered by a multiple of 10",
+    );
 }
 
 // We use >5 nodes to ensure that allocating twice as many ports doesn't interfere with having

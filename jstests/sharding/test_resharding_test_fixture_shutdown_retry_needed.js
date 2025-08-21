@@ -49,6 +49,7 @@ reshardingTest.withReshardingInBackground(
         for (let i = 0; i < numRestarts; ++i) {
             reshardingTest.shutdownAndRestartPrimaryOnShard(primaryShard);
         }
-    });
+    },
+);
 
 reshardingTest.teardown();

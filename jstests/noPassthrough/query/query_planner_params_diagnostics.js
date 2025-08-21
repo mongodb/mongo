@@ -4,7 +4,7 @@
 import {
     assertOnDiagnosticLogContents,
     queryPlannerAlwaysFails,
-    runWithFailpoint
+    runWithFailpoint,
 } from "jstests/libs/query/command_diagnostic_utils.js";
 
 const hasEnterpriseModule = getBuildInfo().modules.includes("enterprise");
@@ -40,8 +40,7 @@ function setup(conn) {
  * expectedDiagnosticInfo -  List of strings that are expected to be in the diagnostic log.
  * expectedSecondaryDiagnosticInfo - List of diagnostics relating to secondary collections
  */
-function runTest(
-    {description, command, redact, expectedDiagnosticInfo, expectedSecondaryDiagnosticInfo}) {
+function runTest({description, command, redact, expectedDiagnosticInfo, expectedSecondaryDiagnosticInfo}) {
     // Can't run cases that depend on log redaction without the enterprise module.
     if (!hasEnterpriseModule && redact) {
         return;
@@ -64,18 +63,16 @@ function runTest(
     assertOnDiagnosticLogContents({
         description: description,
         logFile: conn.fullOptions.logFile,
-        expectedDiagnosticInfo: expectedDiagnosticInfo
+        expectedDiagnosticInfo: expectedDiagnosticInfo,
     });
 
     // Only SBE fills out planner params for external collections.
-    const framework =
-        assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}));
-    if (framework.internalQueryFrameworkControl != "forceClassicEngine" &&
-        expectedSecondaryDiagnosticInfo) {
+    const framework = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}));
+    if (framework.internalQueryFrameworkControl != "forceClassicEngine" && expectedSecondaryDiagnosticInfo) {
         assertOnDiagnosticLogContents({
             description: description,
             logFile: conn.fullOptions.logFile,
-            expectedDiagnosticInfo: expectedSecondaryDiagnosticInfo
+            expectedDiagnosticInfo: expectedSecondaryDiagnosticInfo,
         });
     }
 
@@ -110,9 +107,7 @@ runTest({
 runTest({
     description: "agg with a simple $match",
     command: {aggregate: collName, pipeline: [{$match: {a: 1, b: 1}}], cursor: {}},
-    expectedDiagnosticInfo: [
-        ...expectedLogContents,
-    ]
+    expectedDiagnosticInfo: [...expectedLogContents],
 });
 runTest({
     description: "agg with multiple collections",
@@ -120,13 +115,11 @@ runTest({
         aggregate: collName,
         pipeline: [
             {$lookup: {from: "nonExistentColl", as: "res", localField: "a", foreignField: "b"}},
-            {$lookup: {from: otherCollName, as: "res2", localField: "a", foreignField: "c"}}
+            {$lookup: {from: otherCollName, as: "res2", localField: "a", foreignField: "c"}},
         ],
-        cursor: {}
+        cursor: {},
     },
-    expectedDiagnosticInfo: [
-        ...expectedLogContents,
-    ],
+    expectedDiagnosticInfo: [...expectedLogContents],
     expectedSecondaryDiagnosticInfo: [
         "nonExistentColl",
         "exists: false",
@@ -140,53 +133,43 @@ runTest({
 runTest({
     description: "count",
     command: {count: collName, query: {a: 1, b: 1}},
-    expectedDiagnosticInfo: [
-        ...expectedLogContents,
-    ]
+    expectedDiagnosticInfo: [...expectedLogContents],
 });
 
 // Test the delete command.
 runTest({
-    description: 'delete',
+    description: "delete",
     command: {
         delete: collName,
         deletes: [{q: {a: 1, b: 1}, limit: 1}],
     },
-    expectedDiagnosticInfo: [
-        ...expectedLogContents,
-    ]
+    expectedDiagnosticInfo: [...expectedLogContents],
 });
 
 // Test the update command.
 runTest({
-    description: 'update with simple filter',
+    description: "update with simple filter",
     command: {
         update: collName,
         updates: [{q: {a: 1, b: 1}, u: {a: 2, b: 2}}],
     },
-    expectedDiagnosticInfo: [
-        ...expectedLogContents,
-    ]
+    expectedDiagnosticInfo: [...expectedLogContents],
 });
 
 // Test the findAndModify command.
 runTest({
-    description: 'findAndModify remove',
+    description: "findAndModify remove",
     command: {
         findAndModify: collName,
         query: {a: 1, b: 1},
         remove: true,
     },
-    expectedDiagnosticInfo: [
-        ...expectedLogContents,
-    ]
+    expectedDiagnosticInfo: [...expectedLogContents],
 });
 
 // Explain
 runTest({
     description: "explain find",
     command: {explain: {find: collName, filter: {a: 1, b: 1}, limit: 1}},
-    expectedDiagnosticInfo: [
-        ...expectedLogContents,
-    ],
+    expectedDiagnosticInfo: [...expectedLogContents],
 });

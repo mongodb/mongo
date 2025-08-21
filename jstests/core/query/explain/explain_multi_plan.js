@@ -29,38 +29,46 @@ for (var i = 0; i < nDocs; ++i) {
 bulk.execute();
 
 // SERVER-20849: The following commands should not crash the server.
-assert.doesNotThrow(function() {
+assert.doesNotThrow(function () {
     coll.explain("allPlansExecution").update({a: {$gte: 1}}, {$set: {x: 0}});
 });
 
-assert.doesNotThrow(function() {
+assert.doesNotThrow(function () {
     coll.explain("allPlansExecution").remove({a: {$gte: 1}});
 });
 
-assert.doesNotThrow(function() {
+assert.doesNotThrow(function () {
     coll.explain("allPlansExecution").findAndModify({query: {a: {$gte: 1}}, remove: true});
 });
 
-assert.doesNotThrow(function() {
+assert.doesNotThrow(function () {
     coll.explain("allPlansExecution").findAndModify({query: {a: {$gte: 1}}, update: {y: 1}});
 });
 
-assert.doesNotThrow(function() {
-    coll.explain("allPlansExecution").find({a: {$gte: 1}}).finish();
+assert.doesNotThrow(function () {
+    coll.explain("allPlansExecution")
+        .find({a: {$gte: 1}})
+        .finish();
 });
 
-assert.doesNotThrow(function() {
+assert.doesNotThrow(function () {
     coll.explain("allPlansExecution").count({a: {$gte: 1}});
 });
 
-assert.doesNotThrow(function() {
+assert.doesNotThrow(function () {
     coll.explain("allPlansExecution").distinct("a", {a: {$gte: 1}});
 });
 
-var res = coll.explain("queryPlanner").find({a: {$gte: 1}}).finish();
+var res = coll
+    .explain("queryPlanner")
+    .find({a: {$gte: 1}})
+    .finish();
 assert.commandWorked(res);
 assert(hasRejectedPlans(res));
 
-res = coll.explain("executionStats").find({a: {$gte: 1}}).finish();
+res = coll
+    .explain("executionStats")
+    .find({a: {$gte: 1}})
+    .finish();
 assert.commandWorked(res);
 assert(hasRejectedPlans(res));

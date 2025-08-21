@@ -32,16 +32,19 @@ function testCommitAfterRetry(db, lsid, txnNumber) {
 
     jsTest.log(
         "Verify that the client can retry a transaction that failed with a transient " +
-        "transaction error by attaching a higher txnRetryCounter and commit the transaction");
-    configureFailPoint(shard0Primary,
-                       "failCommand",
-                       {
-                           failInternalCommands: true,
-                           failCommands: ["insert"],
-                           errorCode: ErrorCodes.LockBusy,
-                           namespace: kNs
-                       },
-                       {times: 1});
+            "transaction error by attaching a higher txnRetryCounter and commit the transaction",
+    );
+    configureFailPoint(
+        shard0Primary,
+        "failCommand",
+        {
+            failInternalCommands: true,
+            failCommands: ["insert"],
+            errorCode: ErrorCodes.LockBusy,
+            namespace: kNs,
+        },
+        {times: 1},
+    );
     const insertCmdObj0 = {
         insert: kCollName,
         documents: [{x: 0}],
@@ -53,12 +56,13 @@ function testCommitAfterRetry(db, lsid, txnNumber) {
     };
     assert.commandFailedWithCode(
         db.runCommand(Object.assign({}, insertCmdObj0, {txnRetryCounter: txnRetryCounter0})),
-        ErrorCodes.LockBusy);
-    assert.commandWorked(
-        db.runCommand(Object.assign({}, insertCmdObj0, {txnRetryCounter: txnRetryCounter1})));
+        ErrorCodes.LockBusy,
+    );
+    assert.commandWorked(db.runCommand(Object.assign({}, insertCmdObj0, {txnRetryCounter: txnRetryCounter1})));
 
-    jsTest.log("Verify that the client must attach the last used txnRetryCounter in all commands " +
-               "in the transaction");
+    jsTest.log(
+        "Verify that the client must attach the last used txnRetryCounter in all commands " + "in the transaction",
+    );
     const insertCmdObj1 = {
         insert: kCollName,
         documents: [{x: 1}],
@@ -69,17 +73,17 @@ function testCommitAfterRetry(db, lsid, txnNumber) {
     };
     const insertRes0 = assert.commandFailedWithCode(
         db.runCommand(Object.assign({}, insertCmdObj1, {txnRetryCounter: txnRetryCounter0})),
-        ErrorCodes.TxnRetryCounterTooOld);
+        ErrorCodes.TxnRetryCounterTooOld,
+    );
     assert.eq(txnRetryCounter1, insertRes0.txnRetryCounter, insertRes0);
     // txnRetryCounter defaults to 0.
-    const insertRes1 = assert.commandFailedWithCode(db.runCommand(insertCmdObj1),
-                                                    ErrorCodes.TxnRetryCounterTooOld);
+    const insertRes1 = assert.commandFailedWithCode(db.runCommand(insertCmdObj1), ErrorCodes.TxnRetryCounterTooOld);
     assert.eq(txnRetryCounter1, insertRes1.txnRetryCounter, insertRes1);
-    assert.commandWorked(
-        db.runCommand(Object.assign({}, insertCmdObj1, {txnRetryCounter: txnRetryCounter1})));
+    assert.commandWorked(db.runCommand(Object.assign({}, insertCmdObj1, {txnRetryCounter: txnRetryCounter1})));
 
-    jsTest.log("Verify that the client must attach the last used txnRetryCounter in the " +
-               "commitTransaction command");
+    jsTest.log(
+        "Verify that the client must attach the last used txnRetryCounter in the " + "commitTransaction command",
+    );
     const commitCmdObj = {
         commitTransaction: 1,
         lsid: lsid,
@@ -88,28 +92,32 @@ function testCommitAfterRetry(db, lsid, txnNumber) {
     };
     const commitRes = assert.commandFailedWithCode(
         db.adminCommand(Object.assign({}, commitCmdObj, {txnRetryCounter: txnRetryCounter0})),
-        ErrorCodes.TxnRetryCounterTooOld);
+        ErrorCodes.TxnRetryCounterTooOld,
+    );
     assert.eq(txnRetryCounter1, commitRes.txnRetryCounter, commitRes);
 
-    assert.commandWorked(
-        db.adminCommand(Object.assign({}, commitCmdObj, {txnRetryCounter: txnRetryCounter1})));
+    assert.commandWorked(db.adminCommand(Object.assign({}, commitCmdObj, {txnRetryCounter: txnRetryCounter1})));
 }
 
 function testAbortAfterRetry(db, lsid, txnNumber) {
     const txnRetryCounter0 = NumberInt(0);
     const txnRetryCounter1 = NumberInt(1);
 
-    jsTest.log("Verify that the client can retry a transaction that failed with a transient " +
-               "transaction error by attaching a higher txnRetryCounter and abort the transaction");
-    configureFailPoint(shard0Primary,
-                       "failCommand",
-                       {
-                           failInternalCommands: true,
-                           failCommands: ["insert"],
-                           errorCode: ErrorCodes.LockBusy,
-                           namespace: kNs
-                       },
-                       {times: 1});
+    jsTest.log(
+        "Verify that the client can retry a transaction that failed with a transient " +
+            "transaction error by attaching a higher txnRetryCounter and abort the transaction",
+    );
+    configureFailPoint(
+        shard0Primary,
+        "failCommand",
+        {
+            failInternalCommands: true,
+            failCommands: ["insert"],
+            errorCode: ErrorCodes.LockBusy,
+            namespace: kNs,
+        },
+        {times: 1},
+    );
     const insertCmdObj0 = {
         insert: kCollName,
         documents: [{x: 0}],
@@ -120,12 +128,11 @@ function testAbortAfterRetry(db, lsid, txnNumber) {
     };
     assert.commandFailedWithCode(
         db.runCommand(Object.assign({}, insertCmdObj0, {txnRetryCounter: txnRetryCounter0})),
-        ErrorCodes.LockBusy);
-    assert.commandWorked(
-        db.runCommand(Object.assign({}, insertCmdObj0, {txnRetryCounter: txnRetryCounter1})));
+        ErrorCodes.LockBusy,
+    );
+    assert.commandWorked(db.runCommand(Object.assign({}, insertCmdObj0, {txnRetryCounter: txnRetryCounter1})));
 
-    jsTest.log("Verify that the client must attach the last used txnRetryCounter in the " +
-               "abortTransaction command");
+    jsTest.log("Verify that the client must attach the last used txnRetryCounter in the " + "abortTransaction command");
     const abortCmdObj = {
         abortTransaction: 1,
         lsid: lsid,
@@ -134,11 +141,11 @@ function testAbortAfterRetry(db, lsid, txnNumber) {
     };
     const abortRes = assert.commandFailedWithCode(
         db.adminCommand(Object.assign({}, abortCmdObj, {txnRetryCounter: txnRetryCounter0})),
-        ErrorCodes.TxnRetryCounterTooOld);
+        ErrorCodes.TxnRetryCounterTooOld,
+    );
     assert.eq(txnRetryCounter1, abortRes.txnRetryCounter, abortRes);
 
-    assert.commandWorked(
-        db.adminCommand(Object.assign({}, abortCmdObj, {txnRetryCounter: txnRetryCounter1})));
+    assert.commandWorked(db.adminCommand(Object.assign({}, abortCmdObj, {txnRetryCounter: txnRetryCounter1})));
 }
 
 function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilter) {
@@ -157,7 +164,7 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
         txnNumber: txnNumber,
         startTransaction: true,
         autocommit: false,
-        txnRetryCounter: txnRetryCounter1
+        txnRetryCounter: txnRetryCounter1,
     };
     assert.commandWorked(db.runCommand(insertCmdObj));
 
@@ -167,12 +174,11 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
         txnNumber: txnNumber,
         autocommit: false,
     };
-    assert.commandWorked(
-        db.adminCommand(Object.assign({}, commitCmdObj, {txnRetryCounter: txnRetryCounter1})));
+    assert.commandWorked(db.adminCommand(Object.assign({}, commitCmdObj, {txnRetryCounter: txnRetryCounter1})));
 
     jsTest.log("Verify that txnRetryCounter is persisted on all nodes");
     shardRst.awaitReplication();
-    shardRst.nodes.forEach(node => {
+    shardRst.nodes.forEach((node) => {
         const txnDoc = node.getCollection(kConfigTxnNs).findOne(txnDocFilter);
         assert.neq(null, txnDoc);
         assert.eq(txnNumber, txnDoc.txnNum);
@@ -188,18 +194,19 @@ function testPersistence(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilt
     shardRst.startSet({restart: true});
     db = shardRst.getPrimary().getDB(kDbName);
 
-    jsTest.log("Verify that the client must attach the last used txnRetryCounter in " +
-               "commitTransaction command after restart/failover");
+    jsTest.log(
+        "Verify that the client must attach the last used txnRetryCounter in " +
+            "commitTransaction command after restart/failover",
+    );
     const commitRes = assert.commandFailedWithCode(
         db.adminCommand(Object.assign({}, commitCmdObj, {txnRetryCounter: txnRetryCounter0})),
-        ErrorCodes.TxnRetryCounterTooOld);
+        ErrorCodes.TxnRetryCounterTooOld,
+    );
     assert.eq(txnRetryCounter1, commitRes.txnRetryCounter);
-    assert.commandWorked(
-        db.adminCommand(Object.assign({}, commitCmdObj, {txnRetryCounter: txnRetryCounter1})));
+    assert.commandWorked(db.adminCommand(Object.assign({}, commitCmdObj, {txnRetryCounter: txnRetryCounter1})));
 }
 
-function testNoPersistenceOfDefaultTxnRetryCounter(
-    shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilter) {
+function testNoPersistenceOfDefaultTxnRetryCounter(shardRst, lsid, txnNumber, txnDocFilter, oplogEntryFilter) {
     let db = shardRst.getPrimary().getDB(kDbName);
 
     const insertCmdObj = {
@@ -221,10 +228,12 @@ function testNoPersistenceOfDefaultTxnRetryCounter(
     };
     assert.commandWorked(db.adminCommand(Object.assign({}, commitCmdObj)));
 
-    jsTest.log("Verify that txnRetryCounter is not persisted for any of the nodes if " +
-               "txnRetryCounter is the default value");
+    jsTest.log(
+        "Verify that txnRetryCounter is not persisted for any of the nodes if " +
+            "txnRetryCounter is the default value",
+    );
     shardRst.awaitReplication();
-    shardRst.nodes.forEach(node => {
+    shardRst.nodes.forEach((node) => {
         const txnDoc = node.getCollection(kConfigTxnNs).findOne(txnDocFilter);
         assert.neq(null, txnDoc);
         assert.eq(txnNumber, txnDoc.txnNum);
@@ -267,12 +276,12 @@ function testNoPersistenceOfDefaultTxnRetryCounter(
     const txnDocFilter1 = {
         "_id.id": lsid1.id,
         "_id.txnNumber": lsid1.txnNumber,
-        "_id.txnUUID": lsid1.txnUUID
+        "_id.txnUUID": lsid1.txnUUID,
     };
     const oplogEntryFilter1 = {
         "lsid.id": lsid1.id,
         "lsid.txnNumber": lsid1.txnNumber,
-        "lsid.txnUUID": lsid1.txnUUID
+        "lsid.txnUUID": lsid1.txnUUID,
     };
     testPersistence(shard0Rst, lsid1, txnNumber1, txnDocFilter1, oplogEntryFilter1);
 
@@ -284,15 +293,18 @@ function testNoPersistenceOfDefaultTxnRetryCounter(
 })();
 
 (() => {
-    jsTest.log("Test that txnRetryCounter is not persisted in the config.transactions doc if the " +
-               "active txnNumber corresponds to a retryable write");
+    jsTest.log(
+        "Test that txnRetryCounter is not persisted in the config.transactions doc if the " +
+            "active txnNumber corresponds to a retryable write",
+    );
     const lsid = {id: UUID()};
     const txnNumber = NumberLong(7);
     const txnDocFilter = {"_id.id": lsid.id, txnNum: txnNumber};
-    assert.commandWorked(mongosTestDB.runCommand(
-        {insert: kCollName, documents: [{x: 0}], lsid: lsid, txnNumber: txnNumber}));
+    assert.commandWorked(
+        mongosTestDB.runCommand({insert: kCollName, documents: [{x: 0}], lsid: lsid, txnNumber: txnNumber}),
+    );
     shard0Rst.awaitReplication();
-    shard0Rst.nodes.forEach(node => {
+    shard0Rst.nodes.forEach((node) => {
         const txnDoc = node.getCollection(kConfigTxnNs).findOne(txnDocFilter);
         assert.neq(null, txnDoc);
         assert(!txnDoc.hasOwnProperty("txnRetryCounter"));
@@ -300,15 +312,16 @@ function testNoPersistenceOfDefaultTxnRetryCounter(
 })();
 
 (() => {
-    jsTest.log("Test that txnRetryCounter is not persisted in the config.transactions doc if the " +
-               "txnRetryCounter is the default value.");
+    jsTest.log(
+        "Test that txnRetryCounter is not persisted in the config.transactions doc if the " +
+            "txnRetryCounter is the default value.",
+    );
     const sessionUUID = UUID();
     const lsid0 = {id: sessionUUID};
     const txnNumber0 = NumberLong(0);
     const txnDocFilter0 = {"_id.id": lsid0.id};
     const oplogEntryFilter0 = {"lsid.id": lsid0.id};
-    testNoPersistenceOfDefaultTxnRetryCounter(
-        shard0Rst, lsid0, txnNumber0, txnDocFilter0, oplogEntryFilter0);
+    testNoPersistenceOfDefaultTxnRetryCounter(shard0Rst, lsid0, txnNumber0, txnDocFilter0, oplogEntryFilter0);
 })();
 
 st.stop();

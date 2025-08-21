@@ -22,16 +22,16 @@ assert.eq(
     [
         {_id: 1, x: 3, y: 4, b: 5, c: 6, a: 7},
         {_id: 2, x: 3, y: 4, b: 5, c: 6, a: 7},
-        {_id: 3, y: 4, z: 1, x: 3, b: 5, c: 6, a: 7}
+        {_id: 3, y: 4, z: 1, x: 3, b: 5, c: 6, a: 7},
     ],
-    coll.aggregate([
-            {$project: {b: 0, c: 0}},
-            {$addFields: {x: 3, y: 4, b: 5, c: 6, a: 7}},
-            {$sort: {_id: 1}}
-        ])
-        .toArray());
+    coll
+        .aggregate([{$project: {b: 0, c: 0}}, {$addFields: {x: 3, y: 4, b: 5, c: 6, a: 7}}, {$sort: {_id: 1}}])
+        .toArray(),
+);
 
 assert.commandWorked(coll.insert({_id: 4, c: {y: 11, z: 22, a: 33}, a: 1}));
 
-assert.eq([{_id: 1}, {_id: 2, c: 1}, {_id: 3, y: 1, z: 1}, {_id: 4, c: {y: 11, a: 33}, a: 1}],
-          coll.aggregate([{$project: {"c.z": 0}}, {$sort: {_id: 1}}]).toArray());
+assert.eq(
+    [{_id: 1}, {_id: 2, c: 1}, {_id: 3, y: 1, z: 1}, {_id: 4, c: {y: 11, a: 33}, a: 1}],
+    coll.aggregate([{$project: {"c.z": 0}}, {$sort: {_id: 1}}]).toArray(),
+);

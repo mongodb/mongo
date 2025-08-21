@@ -14,8 +14,9 @@ const staleMongosSource = st.s1.getDB(kDbName);
 const staleMongosTarget = st.s2.getDB(kDbName);
 const staleMongosBoth = st.s3.getDB(kDbName);
 
-assert.commandWorked(staleMongosSource.adminCommand(
-    {enableSharding: staleMongosSource.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(
+    staleMongosSource.adminCommand({enableSharding: staleMongosSource.getName(), primaryShard: st.rs0.getURL()}),
+);
 
 const sourceColl = freshMongos.getCollection("source");
 const targetColl = freshMongos.getCollection("target");
@@ -27,8 +28,7 @@ function shardCollWithMongos(mongos, coll) {
     // [0, MaxKey), then move the [0, MaxKey) chunk to shard 1.
     assert.commandWorked(mongos.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
     assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
-    assert.commandWorked(
-        mongos.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
+    assert.commandWorked(mongos.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 }
 
 // Configures the two mongos, staleMongosSource and staleMongosTarget, to be stale on the source
@@ -38,14 +38,10 @@ function setupStaleMongos({shardedSource, shardedTarget}) {
     // Initialize both mongos to believe the collections are unsharded.
     sourceColl.drop();
     targetColl.drop();
-    assert.commandWorked(
-        staleMongosSource[sourceColl.getName()].insert({_id: "insert when unsharded (source)"}));
-    assert.commandWorked(
-        staleMongosSource[targetColl.getName()].insert({_id: "insert when unsharded (source)"}));
-    assert.commandWorked(
-        staleMongosTarget[sourceColl.getName()].insert({_id: "insert when unsharded (target)"}));
-    assert.commandWorked(
-        staleMongosTarget[targetColl.getName()].insert({_id: "insert when unsharded (target)"}));
+    assert.commandWorked(staleMongosSource[sourceColl.getName()].insert({_id: "insert when unsharded (source)"}));
+    assert.commandWorked(staleMongosSource[targetColl.getName()].insert({_id: "insert when unsharded (source)"}));
+    assert.commandWorked(staleMongosTarget[sourceColl.getName()].insert({_id: "insert when unsharded (target)"}));
+    assert.commandWorked(staleMongosTarget[targetColl.getName()].insert({_id: "insert when unsharded (target)"}));
 
     if (shardedSource) {
         // Shard the source collection through the staleMongosTarget mongos, keeping the
@@ -81,7 +77,7 @@ function runMergeTest(whenMatchedMode, whenNotMatchedMode, mongosList) {
         mongosList = [mongosList];
     }
 
-    mongosList.forEach(mongos => {
+    mongosList.forEach((mongos) => {
         targetColl.remove({});
         sourceColl.remove({});
         // Insert several documents into the source and target collection without any conflicts.
@@ -89,13 +85,15 @@ function runMergeTest(whenMatchedMode, whenNotMatchedMode, mongosList) {
         assert.commandWorked(sourceColl.insert([{_id: -1}, {_id: 0}, {_id: 1}]));
         assert.commandWorked(targetColl.insert([{_id: -2}, {_id: 2}, {_id: 3}]));
 
-        mongos[sourceColl.getName()].aggregate([{
-            $merge: {
-                into: targetColl.getName(),
-                whenMatched: whenMatchedMode,
-                whenNotMatched: whenNotMatchedMode
-            }
-        }]);
+        mongos[sourceColl.getName()].aggregate([
+            {
+                $merge: {
+                    into: targetColl.getName(),
+                    whenMatched: whenMatchedMode,
+                    whenNotMatched: whenNotMatchedMode,
+                },
+            },
+        ]);
 
         // If whenNotMatchedMode is "discard", then the documents in the source collection will
         // not get written to the target since none of them match.
@@ -106,8 +104,7 @@ function runMergeTest(whenMatchedMode, whenNotMatchedMode, mongosList) {
 withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     // Skip the combination of merge modes which will fail depending on the contents of the
     // source and target collection, as this will cause the assertion below to trip.
-    if (whenNotMatchedMode == "fail")
-        return;
+    if (whenNotMatchedMode == "fail") return;
 
     // For each mode, test the following scenarios:
     // * Both the source and target collections are sharded.
@@ -210,7 +207,7 @@ function runOutTest(mongosList) {
         mongosList = [mongosList];
     }
 
-    mongosList.forEach(mongos => {
+    mongosList.forEach((mongos) => {
         targetColl.remove({});
         sourceColl.remove({});
         // Insert several documents into the source and target collection without any conflicts.

@@ -20,7 +20,7 @@ assert.commandWorked(coll.insert({x: 3, tags: ["c", "a"]}));
 assert.commandWorked(coll.insert({x: 4, tags: ["b", "c"]}));
 
 function mapToObj() {
-    this.tags.forEach(function(z) {
+    this.tags.forEach(function (z) {
         emit(z, {count: 1});
     });
 }
@@ -40,7 +40,7 @@ outColl.drop();
         mapReduce: coll.getName(),
         map: mapToObj,
         reduce: reduceObjs,
-        out: {merge: outColl.getName()}
+        out: {merge: outColl.getName()},
     });
     assert.commandWorked(res);
     assert.eq(res.result, outColl.getName());
@@ -48,8 +48,8 @@ outColl.drop();
     assert.eq(
         3,
         outColl.find().count(),
-        () =>
-            `expected 3 distinct tags: ['a', 'b', 'c'], found ${tojson(outColl.find().toArray())}`);
+        () => `expected 3 distinct tags: ['a', 'b', 'c'], found ${tojson(outColl.find().toArray())}`,
+    );
     const keys = {};
     for (let result of outColl.find().toArray()) {
         keys[result._id] = result.value.count;
@@ -67,7 +67,7 @@ outColl.drop();
         map: mapToObj,
         reduce: reduceObjs,
         query: {x: {$gt: 2}},
-        out: {merge: outColl.getName()}
+        out: {merge: outColl.getName()},
     });
     assert.commandWorked(res);
     assert.eq(res.result, outColl.getName());
@@ -80,7 +80,7 @@ outColl.drop();
     assert.eq(1, keys.b, () => `Expected 1 occurence of the tag 'b': ${tojson(keys)}`);
     assert.eq(2, keys.c, () => `Expected 2 occurences of the tag 'c': ${tojson(keys)}`);
     outColl.drop();
-}());
+})();
 
 function mapToNumber() {
     for (let tag of this.tags) {
@@ -104,7 +104,7 @@ function reduceNumbers(key, values) {
         map: mapToNumber,
         reduce: reduceNumbers,
         query: {x: {$gt: 2}},
-        out: {merge: outColl.getName()}
+        out: {merge: outColl.getName()},
     });
     assert.commandWorked(res);
     assert.eq(res.result, outColl.getName());
@@ -117,7 +117,7 @@ function reduceNumbers(key, values) {
     assert.eq(1, keys.b, () => `Expected 1 occurence of the tag 'b': ${tojson(keys)}`);
     assert.eq(2, keys.c, () => `Expected 2 occurences of the tag 'c': ${tojson(keys)}`);
     outColl.drop();
-}());
+})();
 
 (function testMapReduceWithManyValuesGrouped() {
     const bulk = coll.initializeUnorderedBulkOp();
@@ -130,14 +130,15 @@ function reduceNumbers(key, values) {
         mapReduce: coll.getName(),
         map: mapToObj,
         reduce: reduceObjs,
-        out: {merge: outColl.getName()}
+        out: {merge: outColl.getName()},
     });
     assert.commandWorked(res);
     assert.eq(res.result, outColl.getName());
-    assert.eq(4,
-              outColl.find().count(),
-              () => `expected 4 distinct tags: ['a', 'b', 'c', 'd'], found ${
-                  tojson(outColl.find().toArray())}`);
+    assert.eq(
+        4,
+        outColl.find().count(),
+        () => `expected 4 distinct tags: ['a', 'b', 'c', 'd'], found ${tojson(outColl.find().toArray())}`,
+    );
     assert.eq("a,b,c,d", outColl.distinct("_id"));
 
     assert.eq(2, outColl.findOne({_id: "a"}).value.count, () => outColl.findOne({_id: "a"}));
@@ -145,7 +146,7 @@ function reduceNumbers(key, values) {
     assert.eq(3, outColl.findOne({_id: "c"}).value.count, () => outColl.findOne({_id: "c"}));
     assert.eq(995, outColl.findOne({_id: "d"}).value.count, () => outColl.findOne({_id: "d"}));
     outColl.drop();
-}());
+})();
 
 (function testHighCardinalityKeySet() {
     let correctValues = {};
@@ -153,11 +154,9 @@ function reduceNumbers(key, values) {
     coll.drop();
     const bulk = coll.initializeUnorderedBulkOp();
     for (let i = 0; i < 20000; i++) {
-        const tag = "Z" + i % 10000;
-        if (!correctValues[tag])
-            correctValues[tag] = 1;
-        else
-            correctValues[tag]++;
+        const tag = "Z" + (i % 10000);
+        if (!correctValues[tag]) correctValues[tag] = 1;
+        else correctValues[tag]++;
         bulk.insert({x: i, tags: [tag]});
     }
     assert.commandWorked(bulk.execute());
@@ -166,18 +165,18 @@ function reduceNumbers(key, values) {
         mapReduce: coll.getName(),
         out: {merge: outColl.getName()},
         map: mapToObj,
-        reduce: reduceObjs
+        reduce: reduceObjs,
     });
     assert.commandWorked(res);
     assert.eq(res.result, outColl.getName());
     let actualValues = {};
-    outColl.find().forEach(function(resultDoc) {
+    outColl.find().forEach(function (resultDoc) {
         actualValues[resultDoc._id] = resultDoc.value.count;
     });
     for (let key in actualValues) {
         assert.eq(correctValues[key], actualValues[key], key);
     }
-}());
+})();
 
 coll.drop();
 outColl.drop();

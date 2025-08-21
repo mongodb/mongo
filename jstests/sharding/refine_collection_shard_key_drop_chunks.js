@@ -8,20 +8,20 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;
 const shard = st.shard0;
-const kDbName = 'db';
-const kCollName = 'foo';
-const kNsName = kDbName + '.' + kCollName;
-const kCachedCollectionsNs = 'config.cache.collections';
-const kCacheChunksNs = 'config.cache.chunks.' + kNsName;
+const kDbName = "db";
+const kCollName = "foo";
+const kNsName = kDbName + "." + kCollName;
+const kCachedCollectionsNs = "config.cache.collections";
+const kCacheChunksNs = "config.cache.chunks." + kNsName;
 const oldKeyDoc = {
     a: 1,
-    b: 1
+    b: 1,
 };
 const newKeyDoc = {
     a: 1,
     b: 1,
     c: 1,
-    d: 1
+    d: 1,
 };
 
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));

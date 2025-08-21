@@ -47,13 +47,13 @@ function testSparseHashedIndex(indexSpec) {
     validateFindCmdOutputAndPlan({
         filter: {a: {$exists: true}},
         expectedOutput: [{a: null}, {a: 1}, {a: 1, b: 6}],
-        expectedStages: ["IXSCAN", "FETCH"]
+        expectedStages: ["IXSCAN", "FETCH"],
     });
 
     validateFindCmdOutputAndPlan({
         filter: {a: 1, b: 6},
         expectedOutput: [{a: 1, b: 6}],
-        expectedStages: ["IXSCAN", "FETCH"]
+        expectedStages: ["IXSCAN", "FETCH"],
     });
 
     // Test {$exists: false} when hashed field is not a prefix and index is sparse.
@@ -61,7 +61,7 @@ function testSparseHashedIndex(indexSpec) {
         filter: {a: {$exists: false}},
         expectedOutput: [{b: 4}, {}],
         expectedStages: ["COLLSCAN"],
-        stagesNotExpected: ["IXSCAN"]
+        stagesNotExpected: ["IXSCAN"],
     });
 }
 
@@ -78,7 +78,10 @@ testSparseHashedIndex({a: "hashed", b: 1});
 /**
  * Tests for partial indexes.
  */
-[{b: "hashed", c: 1}, {b: 1, c: "hashed", d: 1}].forEach((index) => {
+[
+    {b: "hashed", c: 1},
+    {b: 1, c: "hashed", d: 1},
+].forEach((index) => {
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(coll.createIndex(index, {partialFilterExpression: {b: {$gt: 5}}}));
 
@@ -87,6 +90,5 @@ testSparseHashedIndex({a: "hashed", b: 1});
     validateFindCmdOutputAndPlan({filter: {b: 4}, expectedStages: ["COLLSCAN"]});
 
     // Verify that index is used if the query predicate matches the 'partialFilterExpression'.
-    validateFindCmdOutputAndPlan(
-        {filter: {b: 6}, expectedOutput: [{a: 1, b: 6}], expectedStages: ["IXSCAN", "FETCH"]});
+    validateFindCmdOutputAndPlan({filter: {b: 6}, expectedOutput: [{a: 1, b: 6}], expectedStages: ["IXSCAN", "FETCH"]});
 });

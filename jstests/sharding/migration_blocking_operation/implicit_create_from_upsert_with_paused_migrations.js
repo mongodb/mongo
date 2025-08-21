@@ -11,8 +11,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const numShards = 2;
 const st = new ShardingTest({shards: numShards});
 
-assert.commandWorked(
-    st.s.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}));
+assert.commandWorked(st.s.adminCommand({setClusterParameter: {pauseMigrationsDuringMultiUpdates: {enabled: true}}}));
 assert.commandWorked(st.s.adminCommand({getClusterParameter: "pauseMigrationsDuringMultiUpdates"}));
 
 const db = st.s.getDB("testDb");

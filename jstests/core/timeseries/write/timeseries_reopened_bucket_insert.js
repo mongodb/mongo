@@ -13,10 +13,7 @@
  *   assumes_stable_collection_uuid,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isShardedTimeseries} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -27,36 +24,32 @@ const timeField = "time";
 const metaField = "mm";
 const metaTimeIndexName = [[metaField], "1", [timeField], "1"].join("_");
 
-const resetCollection = function() {
+const resetCollection = function () {
     coll.drop();
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField, metaField: metaField}}),
+    );
 };
 
-const checkIfBucketReopened = function(
-    measurement, willCreateBucket = false, willReopenBucket = false) {
+const checkIfBucketReopened = function (measurement, willCreateBucket = false, willReopenBucket = false) {
     let stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
-    const prevBucketCount = TimeseriesTest.getStat(stats.timeseries, 'bucketCount');
-    const prevExpectedReopenedBuckets =
-        TimeseriesTest.getStat(stats.timeseries, 'numBucketsReopened');
+    const prevBucketCount = TimeseriesTest.getStat(stats.timeseries, "bucketCount");
+    const prevExpectedReopenedBuckets = TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened");
 
-    const expectedReopenedBuckets =
-        (willReopenBucket) ? prevExpectedReopenedBuckets + 1 : prevExpectedReopenedBuckets;
-    const expectedBucketCount = (willCreateBucket) ? prevBucketCount + 1 : prevBucketCount;
+    const expectedReopenedBuckets = willReopenBucket ? prevExpectedReopenedBuckets + 1 : prevExpectedReopenedBuckets;
+    const expectedBucketCount = willCreateBucket ? prevBucketCount + 1 : prevBucketCount;
     assert.commandWorked(coll.insert(measurement));
 
     stats = assert.commandWorked(coll.stats());
     assert(stats.timeseries);
-    assert.eq(stats.timeseries['bucketCount'], expectedBucketCount);
+    assert.eq(stats.timeseries["bucketCount"], expectedBucketCount);
     if (TestData.runningWithBalancer || TestData.isRunningFCVUpgradeDowngradeSuite) {
         // When resharding or FCV upgrade is happening in the background, it can cause errors that
         // result in operations being retried and the bucket reopening count being too high.
-        assert.gte(TimeseriesTest.getStat(stats.timeseries, 'numBucketsReopened'),
-                   expectedReopenedBuckets);
+        assert.gte(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), expectedReopenedBuckets);
     } else {
-        assert.eq(TimeseriesTest.getStat(stats.timeseries, 'numBucketsReopened'),
-                  expectedReopenedBuckets);
+        assert.eq(TimeseriesTest.getStat(stats.timeseries, "numBucketsReopened"), expectedReopenedBuckets);
     }
 };
 
@@ -104,17 +97,17 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": "ReopenedBucket1",
-        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
     const missingClosedFlagBucketDoc = {
         "_id": ObjectId("66ffbfe83d997f237a6b200b"),
@@ -122,16 +115,16 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("6700012b1561e0bf72d3880f"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("6700012b1561e0bf72d3880f"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
         },
         "meta": "ReopenedBucket2",
-        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
 
     // Insert closed bucket into the collection using raw ops.
@@ -142,8 +135,7 @@ const checkIfBucketReopened = function(
     checkIfBucketReopened(measurement2, /* willCreateBucket */ false, /* willReopenBucket */ false);
 
     // Insert closed bucket into the collection using raw ops.
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(missingClosedFlagBucketDoc, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(missingClosedFlagBucketDoc, kRawOperationSpec));
     // We expect to reopen buckets with missing 'closed' flags (this means the buckets are open for
     // inserts).
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
@@ -167,17 +159,17 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": {a: 1, b: 1},
-        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
 
     // Insert closed bucket into the collection using raw ops.
@@ -239,17 +231,17 @@ const checkIfBucketReopened = function(
     };
 
     for (let i = 0; i < initialMeasurements.length; ++i) {
-        checkIfBucketReopened(
-            initialMeasurements[i], /* willCreateBucket= */ i == 0, /* willReopenBucket= */ false);
+        checkIfBucketReopened(initialMeasurements[i], /* willCreateBucket= */ i == 0, /* willReopenBucket= */ false);
     }
     // Time forwards will open a new bucket, and close and compress the old one.
     checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
-    assert.eq(2,
-              getTimeseriesCollForRawOps(coll)
-                  .find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
-                  .rawData()
-                  .toArray()
-                  .length);
+    assert.eq(
+        2,
+        getTimeseriesCollForRawOps(coll)
+            .find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
+            .rawData()
+            .toArray().length,
+    );
 
     // We expect to reopen the compressed bucket with time backwards.
     checkIfBucketReopened(backward, /* willCreateBucket= */ false, /* willReopenBucket= */ true);
@@ -280,17 +272,17 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": true
+            "closed": true,
         },
         "meta": "NonSuitableBucket1",
-        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
     const year2000BucketDoc = {
         "_id": ObjectId("39a818243d997f237a6b200a"),
@@ -298,17 +290,17 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("66ffffe825f5121ebf23dbcd"),
-                "time": ISODate("2000-08-26T19:19:00Z")
+                "time": ISODate("2000-08-26T19:19:00Z"),
             },
             "max": {
                 "_id": ObjectId("66ffffe825f5121ebf23dbcd"),
-                "time": ISODate("2000-08-26T19:19:30Z")
+                "time": ISODate("2000-08-26T19:19:30Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": "NonSuitableBucket2",
-        "data": {"_id": BinData(7, "BwBm///oJfUSHr8j280A"), "time": BinData(7, "CQDQwZ444QAAAAA=")}
+        "data": {"_id": BinData(7, "BwBm///oJfUSHr8j280A"), "time": BinData(7, "CQDQwZ444QAAAAA=")},
     };
     const metaMismatchFieldBucketDoc = {
         "_id": ObjectId("66ffbfe83d997f237a6b200b"),
@@ -316,32 +308,29 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": "MetaMismatch",
-        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc, kRawOperationSpec));
     // If an otherwise suitable bucket has the closed flag set, we expect to open a new bucket.
     checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(year2000BucketDoc, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(year2000BucketDoc, kRawOperationSpec));
     // If an otherwise suitable bucket has an incompatible time range with the measurement, we
     // expect to open a new bucket.
     checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(metaMismatchFieldBucketDoc, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(metaMismatchFieldBucketDoc, kRawOperationSpec));
     // If an otherwise suitable bucket has a mismatching meta field, we expect to open a new bucket.
     checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
@@ -371,17 +360,17 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": "Suitable1",
-        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
     const closedBucketDoc2 = {
         "_id": ObjectId("66ffbfe83d997f237a6b200b"),
@@ -389,17 +378,17 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("6700012b1561e0bf72d3880f"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("6700012b1561e0bf72d3880f"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": "Suitable2",
-        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
     const closedBucketDoc3 = {
         "_id": ObjectId("66ffbfe83d997f237a6b200c"),
@@ -407,48 +396,44 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("6700012d1561e0bf72d38811"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("6700012d1561e0bf72d38811"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": "Suitable3",
-        "data": {"_id": BinData(7, "BwBnAAEtFWHgv3LTiBEA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBnAAEtFWHgv3LTiBEA"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
 
-    let metaTimeIndex = coll.getIndexes().filter(function(index) {
+    let metaTimeIndex = coll.getIndexes().filter(function (index) {
         return index.name == metaTimeIndexName;
     });
     assert(metaTimeIndex.length == 1);
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec));
     // We expect to reopen the suitable bucket when inserting the first measurement.
     checkIfBucketReopened(measurement1, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
     // Drop the meta time index.
     assert.commandWorked(coll.dropIndexes([metaTimeIndexName]));
-    metaTimeIndex = coll.getIndexes().filter(function(index) {
+    metaTimeIndex = coll.getIndexes().filter(function (index) {
         return index.name == metaTimeIndexName;
     });
     assert(metaTimeIndex.length == 0);
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec));
     // We have a suitable bucket for the second measurement but it is only visible via query-based
     // reopening which is not supported without the meta and time index.
     checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     // Create a meta and time index for query-based reopening.
-    assert.commandWorked(
-        coll.createIndex({[metaField]: 1, [timeField]: 1}, {name: "generic_meta_time_index_name"}));
+    assert.commandWorked(coll.createIndex({[metaField]: 1, [timeField]: 1}, {name: "generic_meta_time_index_name"}));
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec));
     // Creating an index on meta and time will re-enable us to perform query-based reopening to
     // insert measurement 3 into a suitable bucket.
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
@@ -483,17 +468,17 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("66ffffe825f5121ebf23dbcd"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("66ffffe825f5121ebf23dbcd"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": "Suitable1",
-        "data": {"_id": BinData(7, "BwBm///oJfUSHr8j280A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBm///oJfUSHr8j280A"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
     const closedBucketDoc2 = {
         "_id": ObjectId("66ffbfe83d997f237a6b200b"),
@@ -501,17 +486,17 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("66fff90a25f5121ebf23dbcb"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": "Suitable2",
-        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBm//kKJfUSHr8j28sA"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
     const closedBucketDoc3 = {
         "_id": ObjectId("66ffbfe83d997f237a6b200c"),
@@ -519,18 +504,17 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("6700012b1561e0bf72d3880f"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("6700012b1561e0bf72d3880f"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
             "closed": false,
-
         },
         "meta": "Suitable3",
-        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
     const closedBucketDoc4 = {
         "_id": ObjectId("66ffbfe83d997f237a6b200d"),
@@ -538,33 +522,35 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("6700012d1561e0bf72d38811"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("6700012d1561e0bf72d38811"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
         "meta": "Suitable4",
-        "data": {"_id": BinData(7, "BwBnAAEtFWHgv3LTiBEA"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBnAAEtFWHgv3LTiBEA"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
 
     // Drop the meta time index.
     assert.commandWorked(coll.dropIndexes([metaTimeIndexName]));
-    let metaTimeIndex = coll.getIndexes().filter(function(index) {
+    let metaTimeIndex = coll.getIndexes().filter(function (index) {
         return index.name == metaTimeIndexName;
     });
     assert(metaTimeIndex.length == 0);
 
     // Create a partial index on meta and time.
     assert.commandWorked(
-        coll.createIndex({[metaField]: 1, [timeField]: 1},
-                         {name: "partialMetaTimeIndex", partialFilterExpression: {b: {$lt: 12}}}));
+        coll.createIndex(
+            {[metaField]: 1, [timeField]: 1},
+            {name: "partialMetaTimeIndex", partialFilterExpression: {b: {$lt: 12}}},
+        ),
+    );
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec));
     // We expect no buckets to be reopened because a partial index on meta and time cannot be used
     // for query based reopening.
     checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
@@ -572,28 +558,23 @@ const checkIfBucketReopened = function(
     // Create an index on an arbitrary field.
     assert.commandWorked(coll.createIndex({"a": 1}, {name: "arbitraryIndex"}));
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec));
     // We expect no buckets to be reopened because the index created cannot be used for query-based
     // reopening.
     checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     // Create an index on an arbitrary field in addition to the meta and time fields.
-    assert.commandWorked(
-        coll.createIndex({"a": 1, [metaField]: 1, [timeField]: 1}, {name: "nonSuitableIndex"}));
+    assert.commandWorked(coll.createIndex({"a": 1, [metaField]: 1, [timeField]: 1}, {name: "nonSuitableIndex"}));
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec));
     // We expect no buckets to be reopened because the index created cannot be used for
     // query-based reopening.
     checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     // Create a meta and time index with an additional key on another arbitrary, data field.
-    assert.commandWorked(
-        coll.createIndex({[metaField]: 1, [timeField]: 1, "a": 1}, {name: metaTimeIndexName}));
+    assert.commandWorked(coll.createIndex({[metaField]: 1, [timeField]: 1, "a": 1}, {name: metaTimeIndexName}));
 
-    assert.commandWorked(
-        getTimeseriesCollForRawOps(coll).insert(closedBucketDoc4, kRawOperationSpec));
+    assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc4, kRawOperationSpec));
     // We expect to be able to reopen the suitable bucket when inserting the measurement because as
     // long as an index covers the meta and time field, it can have additional keys.
     checkIfBucketReopened(measurement4, /* willCreateBucket */ false, /* willReopenBucket */ true);
@@ -604,8 +585,7 @@ const checkIfBucketReopened = function(
 (function reopenBucketsWhenSuitableIndexExistsNoMeta() {
     jsTestLog("Entering reopenBucketsWhenSuitableIndexExistsNoMeta...");
     coll.drop();
-    assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField}}));
+    assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField}}));
 
     const measurement1 = {[timeField]: ISODate("2024-11-04T10:14:00Z")};
     const measurement2 = {[timeField]: ISODate("2024-10-04T10:14:00Z")};
@@ -617,16 +597,16 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("67000a6d0d365e9edde2f6d5"),
-                "time": ISODate("2024-11-04T10:14:00Z")
+                "time": ISODate("2024-11-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("67000a6d0d365e9edde2f6d5"),
-                "time": ISODate("2024-11-04T10:14:00Z")
+                "time": ISODate("2024-11-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
-        "data": {"_id": BinData(7, "BwBnAAptDTZent3i9tUA"), "time": BinData(7, "CQBAxqr2kgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBnAAptDTZent3i9tUA"), "time": BinData(7, "CQBAxqr2kgEAAAA=")},
     };
     const closedBucketDoc2 = {
         "_id": ObjectId("66ffbfe83d997f237a6b200b"),
@@ -634,16 +614,16 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("6700012b1561e0bf72d3880f"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("6700012b1561e0bf72d3880f"),
-                "time": ISODate("2024-10-04T10:14:00Z")
+                "time": ISODate("2024-10-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
-        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")}
+        "data": {"_id": BinData(7, "BwBnAAErFWHgv3LTiA8A"), "time": BinData(7, "CQBAogVXkgEAAAA=")},
     };
     const closedBucketDoc3 = {
         "_id": ObjectId("66d832e8b6fd311bf10f7f5d"),
@@ -651,21 +631,21 @@ const checkIfBucketReopened = function(
             "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("670008af0d365e9edde2f6d3"),
-                "time": ISODate("2024-09-04T10:14:00Z")
+                "time": ISODate("2024-09-04T10:14:00Z"),
             },
             "max": {
                 "_id": ObjectId("670008af0d365e9edde2f6d3"),
-                "time": ISODate("2024-09-04T10:14:00Z")
+                "time": ISODate("2024-09-04T10:14:00Z"),
             },
             "count": 1,
-            "closed": false
+            "closed": false,
         },
-        "data": {"_id": BinData(7, "BwBnAAivDTZent3i9tMA"), "time": BinData(7, "CQBA2oa8kQEAAAA=")}
+        "data": {"_id": BinData(7, "BwBnAAivDTZent3i9tMA"), "time": BinData(7, "CQBA2oa8kQEAAAA=")},
     };
 
     // Since the collection was created without a meta field, the index on meta and time shouldn't
     // exist.
-    let metaTimeIndex = coll.getIndexes().filter(function(index) {
+    let metaTimeIndex = coll.getIndexes().filter(function (index) {
         return index.name == metaTimeIndexName;
     });
     assert(metaTimeIndex.length == 0);
@@ -673,39 +653,33 @@ const checkIfBucketReopened = function(
     // If the collection is sharded, there will be an index on control.min.time that can satisfy the
     // reopening query, otherwise we can do some further tests. With moveCollection running in the
     // background, when buckets are closed and reopened may change.
-    if (!isShardedTimeseries(coll) && !TestData.runningWithBalancer &&
-        !TestData.isRunningFCVUpgradeDowngradeSuite) {
+    if (!isShardedTimeseries(coll) && !TestData.runningWithBalancer && !TestData.isRunningFCVUpgradeDowngradeSuite) {
         // Create a partial index on time.
-        assert.commandWorked(coll.createIndex(
-            {[timeField]: 1}, {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}}));
-
         assert.commandWorked(
-            getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec));
+            coll.createIndex({[timeField]: 1}, {name: "partialTimeIndex", partialFilterExpression: {b: {$lt: 12}}}),
+        );
+
+        assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc1, kRawOperationSpec));
         // We expect no buckets to be reopened because a partial index on time cannot be used  for
         // query based reopening.
-        checkIfBucketReopened(
-            measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
+        checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
         // Create an index on an arbitrary field.
         assert.commandWorked(coll.createIndex({"a": 1, [timeField]: 1}, {name: "arbitraryIndex"}));
 
-        assert.commandWorked(
-            getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec));
+        assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc2, kRawOperationSpec));
         // We expect no buckets to be reopened because the index created cannot be used for
         // query-based reopening.
-        checkIfBucketReopened(
-            measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
+        checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
         // Create an index on time.
         assert.commandWorked(coll.createIndex({[timeField]: 1}, {name: "timeIndex"}));
 
-        assert.commandWorked(
-            getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec));
+        assert.commandWorked(getTimeseriesCollForRawOps(coll).insert(closedBucketDoc3, kRawOperationSpec));
         // We expect to be able to reopen the suitable bucket when inserting the measurement because
         // as long as an index covers time field (when the collection has no metaField), it can have
         // additional keys.
-        checkIfBucketReopened(
-            measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
+        checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
     }
 
     jsTestLog("Exiting reopenBucketsWhenSuitableIndexExistsNoMeta.");

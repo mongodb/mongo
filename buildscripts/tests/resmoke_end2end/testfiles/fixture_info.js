@@ -1,6 +1,5 @@
-(function() {
-"use strict";
+(function () {
+    "use strict";
 
-writeFile(TestData.outputLocation,
-          tojson(db.adminCommand("getCmdLineOpts")["parsed"]["setParameter"]));
-}());
+    writeFile(TestData.outputLocation, tojson(db.adminCommand("getCmdLineOpts")["parsed"]["setParameter"]));
+})();

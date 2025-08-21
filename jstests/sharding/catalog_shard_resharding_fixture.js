@@ -8,8 +8,7 @@
 
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
-const reshardingTest =
-    new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true, configShard: true});
+const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true, configShard: true});
 reshardingTest.setup();
 
 const ns = "reshardingDb.coll";
@@ -29,7 +28,7 @@ const docs = [
     {_id: "stays on shard0", oldKey: -10, newKey: -10},
     {_id: "moves to shard0", oldKey: 10, newKey: -10},
     {_id: "moves to shard1", oldKey: -10, newKey: 10},
-    {_id: "stays on shard1", oldKey: 10, newKey: 10}
+    {_id: "stays on shard1", oldKey: 10, newKey: 10},
 ];
 assert.commandWorked(sourceCollection.insert(docs));
 

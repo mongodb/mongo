@@ -27,7 +27,7 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_buil
 // nodes. This is false by default outside of our testing.
 const replTest = new ReplSetTest({
     nodes: 3,
-    nodeOptions: {setParameter: {oplogApplicationEnforcesSteadyStateConstraints: false}}
+    nodeOptions: {setParameter: {oplogApplicationEnforcesSteadyStateConstraints: false}},
 });
 
 const nodes = replTest.startSet();
@@ -58,9 +58,7 @@ assert.eq(numDocs, coll.count(), "unexpected number of documents after bulk inse
 replTest.awaitReplication();
 
 const secondaries = replTest.getSecondaries();
-assert.eq(nodes.length - 1,
-          secondaries.length,
-          "unexpected number of secondaries: " + tojson(secondaries));
+assert.eq(nodes.length - 1, secondaries.length, "unexpected number of secondaries: " + tojson(secondaries));
 
 const standalonePort = allocatePort();
 jsTestLog("Standalone server will listen on port: " + standalonePort);
@@ -78,8 +76,7 @@ function buildIndexOnNodeAsStandalone(node) {
         },
     });
     if (jsTestOptions().keyFile) {
-        assert(jsTest.authenticate(standalone),
-               "Failed authentication during restart: " + standalone.host);
+        assert(jsTest.authenticate(standalone), "Failed authentication during restart: " + standalone.host);
     }
 
     jsTestLog("B. Building index on standalone: " + standalone.host);
@@ -103,20 +100,20 @@ replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, replTest.nodes, replTest.g
 // The primary does not perform the rolling index build procedure. Instead, the createIndex command
 // is issued against the replica set, where both the secondaries have already built the index.
 jsTestLog("E. Build index on the primary as part of the replica set: " + primary.host);
-let awaitIndexBuild = IndexBuildTest.startIndexBuild(
-    primary, coll.getFullName(), {b: 1}, {name: "rolling_index_b_1"});
+let awaitIndexBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {b: 1}, {name: "rolling_index_b_1"});
 IndexBuildTest.waitForIndexBuildToStart(primaryDB, coll.getName(), "rolling_index_b_1");
 
-checkLog.containsJson(primary, 3856203);  // Waiting for the commit quorum to be satisfied.
+checkLog.containsJson(primary, 3856203); // Waiting for the commit quorum to be satisfied.
 
 // The drain phase periodically runs while waiting for the commit quorum to be satisfied.
 insertDocs(coll, numDocs, numDocs * 2);
-checkLog.containsJson(primary, 20689, {index: "rolling_index_b_1"});  // Side writes drained.
+checkLog.containsJson(primary, 20689, {index: "rolling_index_b_1"}); // Side writes drained.
 
 // As the secondaries won't vote, we change the commit quorum to 1. This will allow the primary to
 // proceed with committing the index build.
-assert.commandWorked(primaryDB.runCommand(
-    {setIndexCommitQuorum: collName, indexNames: ["rolling_index_b_1"], commitQuorum: 1}));
+assert.commandWorked(
+    primaryDB.runCommand({setIndexCommitQuorum: collName, indexNames: ["rolling_index_b_1"], commitQuorum: 1}),
+);
 awaitIndexBuild();
 
 replTest.stopSet();

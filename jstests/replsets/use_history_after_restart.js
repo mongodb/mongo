@@ -28,9 +28,9 @@ let replTest = new ReplSetTest({
             minSnapshotHistoryWindowInSeconds: 0,
             // Disable the noop writer to avoid background writes that can unintentionally advance
             // the stable/oldest timestamps.
-            writePeriodicNoops: false
-        }
-    }
+            writePeriodicNoops: false,
+        },
+    },
 });
 let nodes = replTest.startSet();
 replTest.initiate();
@@ -40,8 +40,9 @@ let testDB = primary.getDB("test");
 // Create `existsAtOldestTs`. Insert one document with a majority write concern. The write concern
 // guarantees the stable and oldest timestamp are bumped.
 assert.commandWorked(testDB.createCollection("existsAtOldestTs"));
-assert.commandWorked(testDB.runCommand(
-    {insert: "existsAtOldestTs", documents: [{_id: 0, x: 0}], writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    testDB.runCommand({insert: "existsAtOldestTs", documents: [{_id: 0, x: 0}], writeConcern: {w: "majority"}}),
+);
 
 // Preserving history stops advancing the oldest timestamp. All writes after this point must not be
 // readable after the restart. Either due to a correct response being returned or the server
@@ -49,8 +50,9 @@ assert.commandWorked(testDB.runCommand(
 //
 // Record the response. Treat the response's `opTime` as the `oldestTimestamp` that should be usable
 // for a timestamped read after the restart.
-let fpResp = assert.commandWorked(primary.adminCommand(
-    {configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely", mode: "alwaysOn"}));
+let fpResp = assert.commandWorked(
+    primary.adminCommand({configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely", mode: "alwaysOn"}),
+);
 
 // Insert a second document. This document will not be seen after the restart.
 assert.commandWorked(testDB.runCommand({insert: "existsAtOldestTs", documents: [{x: 1}]}));
@@ -64,8 +66,9 @@ assert.commandWorked(testDB.createCollection("dneAtOldestTs"));
 // Insert a document to the new collection with a majority write concern. This will bump the stable
 // timestamp. Record the response and treat the response's `opTime` as the `stableTimestamp` that
 // should be usable for a timestamped read after the restart.
-let dneInsertResp = assert.commandWorked(testDB["dneAtOldestTs"].runCommand(
-    {insert: "dneAtOldestTs", documents: [{}], writeConcern: {w: "majority"}}));
+let dneInsertResp = assert.commandWorked(
+    testDB["dneAtOldestTs"].runCommand({insert: "dneAtOldestTs", documents: [{}], writeConcern: {w: "majority"}}),
+);
 
 // Restart the node with the `WTPreserveSnapshotHistoryIndefinitely` set. This prevents startup from
 // advancing the oldest timestamp. This allows us to reliably read at the existing `oldestTimestamp`
@@ -73,7 +76,7 @@ let dneInsertResp = assert.commandWorked(testDB["dneAtOldestTs"].runCommand(
 replTest.restart(primary, {
     setParameter: {
         "failpoint.WTPreserveSnapshotHistoryIndefinitely": tojson({mode: "alwaysOn"}),
-    }
+    },
 });
 
 primary = replTest.getPrimary();
@@ -82,7 +85,7 @@ let stableTimestamp = dneInsertResp["opTime"]["ts"];
 jsTestLog({
     "Test Ops": primary.getDB("local")["oplog.rs"].find({ns: /test/}).sort({ts: -1}).toArray(),
     "OldestTimestamp (approximate)": oldestTimestamp,
-    "StableTimestamp (approximate)": stableTimestamp
+    "StableTimestamp (approximate)": stableTimestamp,
 });
 
 // We should successfully read the first insert from `existsAtOldestTs` when reading at the oldest
@@ -90,7 +93,7 @@ jsTestLog({
 let result = primary.getDB("test").runCommand({
     find: "existsAtOldestTs",
     filter: {_id: 0},
-    readConcern: {level: "snapshot", atClusterTime: oldestTimestamp}
+    readConcern: {level: "snapshot", atClusterTime: oldestTimestamp},
 });
 jsTestLog({"ExistsRes": result});
 assert.eq(1, result["cursor"]["firstBatch"].length);
@@ -100,7 +103,7 @@ assert.eq(1, result["cursor"]["firstBatch"].length);
 result = primary.getDB("test").runCommand({
     find: "existsAtOldestTs",
     hint: {x: 1},
-    readConcern: {level: "snapshot", atClusterTime: oldestTimestamp}
+    readConcern: {level: "snapshot", atClusterTime: oldestTimestamp},
 });
 jsTestLog({"Unavailable Index Result": result});
 assert.commandFailedWithCode(result, ErrorCodes.BadValue);
@@ -109,14 +112,15 @@ assert.commandFailedWithCode(result, ErrorCodes.BadValue);
 result = primary.getDB("test").runCommand({
     find: "existsAtOldestTs",
     hint: {x: 1},
-    readConcern: {level: "snapshot", atClusterTime: stableTimestamp}
+    readConcern: {level: "snapshot", atClusterTime: stableTimestamp},
 });
 jsTestLog({"Available Index Result": result});
 assert.eq(2, result["cursor"]["firstBatch"].length);
 
 // Querying `dneAtOldestTs` at the oldest timestamp should fail with a `SnapshotUnavailable` error.
-result = primary.getDB("test").runCommand(
-    {find: "dneAtOldestTs", readConcern: {level: "snapshot", atClusterTime: oldestTimestamp}});
+result = primary
+    .getDB("test")
+    .runCommand({find: "dneAtOldestTs", readConcern: {level: "snapshot", atClusterTime: oldestTimestamp}});
 jsTestLog({"SnapshotUnavailable on dneAtOldestTs": result});
 
 // The collection does not exist at this time so find will return an empty result set.
@@ -124,8 +128,9 @@ assert.commandWorked(result);
 assert.eq(0, result["cursor"]["firstBatch"].length);
 
 // Querying `dneAtOldestTs` at the stable timestamp should succeed with a correct result.
-result = primary.getDB("test").runCommand(
-    {find: "dneAtOldestTs", readConcern: {level: "snapshot", atClusterTime: stableTimestamp}});
+result = primary
+    .getDB("test")
+    .runCommand({find: "dneAtOldestTs", readConcern: {level: "snapshot", atClusterTime: stableTimestamp}});
 jsTestLog({"Available dneAtOldestTs result": result});
 assert.eq(1, result["cursor"]["firstBatch"].length);
 

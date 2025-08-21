@@ -13,14 +13,14 @@
  *  assumes_balancer_off
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         documentsToInsert: 100,
         insertedDocuments: 0,
         generateDocumentToInsert: function generateDocumentToInsert() {
             return {tid: this.tid};
         },
-        shardKey: {tid: 1}
+        shardKey: {tid: 1},
     };
 
     var states = {
@@ -36,12 +36,13 @@ export const $config = (function() {
         },
 
         query: function query(db, collName) {
-            var count = db[collName].find({$where: 'this.tid === ' + this.tid}).itcount();
-            assert.eq(count,
-                      this.insertedDocuments,
-                      '$where query should return the number of documents this ' +
-                          'thread inserted');
-        }
+            var count = db[collName].find({$where: "this.tid === " + this.tid}).itcount();
+            assert.eq(
+                count,
+                this.insertedDocuments,
+                "$where query should return the number of documents this " + "thread inserted",
+            );
+        },
     };
 
     var transitions = {insert: {insert: 0.2, query: 0.8}, query: {insert: 0.8, query: 0.2}};
@@ -55,8 +56,8 @@ export const $config = (function() {
         iterations: 10,
         data: data,
         states: states,
-        startState: 'insert',
+        startState: "insert",
         setup: setup,
-        transitions: transitions
+        transitions: transitions,
     };
 })();

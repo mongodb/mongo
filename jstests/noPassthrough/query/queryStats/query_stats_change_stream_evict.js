@@ -7,15 +7,13 @@
  *   requires_sharding,
  * ]
  */
-import {
-    assertDropAndRecreateCollection,
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     checkChangeStreamEntry,
     getLatestQueryStatsEntry,
     getQueryStats,
     getQueryStatsServerParameters,
-    resetQueryStatsStore
+    resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -34,7 +32,7 @@ function runTest(conn) {
         db: db,
         collectionName: "coll",
         numExecs: 1,
-        numDocsReturned: 0
+        numDocsReturned: 0,
     });
 
     // Reset the store to evict the change streams metric.
@@ -72,7 +70,7 @@ function runTest(conn) {
         mongosOptions: {
             setParameter: {
                 internalQueryStatsRateLimit: -1,
-            }
+            },
         },
     });
     runTest(st.s);

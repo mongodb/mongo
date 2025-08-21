@@ -66,8 +66,7 @@ outputDistinctPlanAndResults(coll, "x", {$or: [{x: {$eq: 5}, z: {$ne: 4}}, {y: {
 
 section("Prefer DISTINCT_SCAN for many duplicate values in the collection");
 coll.drop();
-for (let i = 0; i < 100; ++i)
-    coll.insert({x: i % 2, y: i + 100, z: i + 200});
+for (let i = 0; i < 100; ++i) coll.insert({x: i % 2, y: i + 100, z: i + 200});
 coll.createIndex({x: 1});
 coll.createIndex({x: 1, y: 1});
 coll.createIndex({y: 1, z: 1});
@@ -75,8 +74,7 @@ outputDistinctPlanAndResults(coll, "x", {x: {$gt: -1}, y: {$lt: 250}});
 
 section("Prefer FETCH + filter + IXSCAN for more selective predicate on y");
 coll.drop();
-for (let i = 0; i < 100; ++i)
-    coll.insert({x: i, y: i + 100, z: i + 200});
+for (let i = 0; i < 100; ++i) coll.insert({x: i, y: i + 100, z: i + 200});
 coll.createIndex({x: 1});
 coll.createIndex({x: 1, y: 1});
 coll.createIndex({y: 1, z: 1});
@@ -103,8 +101,7 @@ outputDistinctPlanAndResults(coll, "x", {x: {$gt: 3}, y: 5}, {hint: {x: 1, y: 1}
 
 section("Use hinted IXSCAN, even with preferable DISTINCT_SCAN");
 coll.drop();
-for (let i = 0; i < 100; ++i)
-    coll.insert({x: i % 2, y: i + 100, z: i + 200});
+for (let i = 0; i < 100; ++i) coll.insert({x: i % 2, y: i + 100, z: i + 200});
 coll.createIndex({x: 1});
 coll.createIndex({x: 1, y: 1});
 coll.createIndex({y: 1, z: 1});
@@ -115,8 +112,7 @@ outputDistinctPlanAndResults(coll, "x", {x: {$gt: -1}, y: {$lt: 250}}, {hint: {$
 
 section("Use hinted DISTINCT_SCAN, even with no duplicate values");
 coll.drop();
-for (let i = 0; i < 100; ++i)
-    coll.insert({x: i, y: i + 100, z: i + 200});
+for (let i = 0; i < 100; ++i) coll.insert({x: i, y: i + 100, z: i + 200});
 coll.createIndex({x: 1});
 coll.createIndex({x: 1, y: 1});
 coll.createIndex({y: 1, z: 1});

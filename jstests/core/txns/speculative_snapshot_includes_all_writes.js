@@ -28,7 +28,7 @@ assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "major
 assert.commandWorked(testDB.createCollection(collName2, {writeConcern: {w: "majority"}}));
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 
 function startSessionAndTransaction(readConcernLevel) {
@@ -46,12 +46,15 @@ let checkReads = (session, collExpected, coll2Expected) => {
     assert.sameMembers(coll2Expected, coll2.find().toArray());
 };
 
-const failPoint = configureFailPoint(
-    db, "hangAfterCollectionInserts", {collectionNS: testColl2.getFullName(), first_id: "b"});
+const failPoint = configureFailPoint(db, "hangAfterCollectionInserts", {
+    collectionNS: testColl2.getFullName(),
+    first_id: "b",
+});
 try {
     // The default WC is majority and this test can't satisfy majority writes.
-    assert.commandWorked(testDB.adminCommand(
-        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        testDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+    );
 
     jsTest.log("Prepopulate the collections.");
     assert.commandWorked(testColl.insert([{_id: 0}], {writeConcern: {w: "majority"}}));
@@ -60,8 +63,10 @@ try {
     jsTest.log("Create the uncommitted write.");
     const joinHungWrite = startParallelShell(() => {
         assert.commandWorked(
-            db.getSiblingDB("test").speculative_snapshot_includes_all_writes_2.insert(
-                {_id: "b"}, {writeConcern: {w: "majority"}}));
+            db
+                .getSiblingDB("test")
+                .speculative_snapshot_includes_all_writes_2.insert({_id: "b"}, {writeConcern: {w: "majority"}}),
+        );
     });
 
     failPoint.wait();
@@ -91,7 +96,8 @@ try {
     checkReads(snapshotSession, [{_id: 0}], [{_id: "a"}]);
 
     jsTestLog(
-        "Double-checking that writes performed before the start of a transaction of 'majority' or lower must appear.");
+        "Double-checking that writes performed before the start of a transaction of 'majority' or lower must appear.",
+    );
     checkReads(majoritySession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
     checkReads(localSession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
     checkReads(defaultSession, [{_id: 0}, {_id: 1}], [{_id: "a"}]);
@@ -113,9 +119,11 @@ try {
     failPoint.off();
     // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be majority
     // by setting CWWC to {w: majority}.
-    assert.commandWorked(testDB.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultWriteConcern: {w: "majority"},
-        writeConcern: {w: "majority"}
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: "majority"},
+            writeConcern: {w: "majority"},
+        }),
+    );
 }

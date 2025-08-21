@@ -20,8 +20,8 @@ var res;
 s.shardColl("foo", {count: 1}, {count: ""});
 
 for (var i = 0; i < 50; i++) {
-    db.foo.insert({count: i});       // chunk [MinKey, ""), including numbers
-    db.foo.insert({count: "" + i});  // chunk ["", MaxKey]
+    db.foo.insert({count: i}); // chunk [MinKey, ""), including numbers
+    db.foo.insert({count: "" + i}); // chunk ["", MaxKey]
 }
 
 s.printShardingStatus();
@@ -43,8 +43,8 @@ db.foo.drop();
 s.shardColl("foo", {mapReduce: 1}, {mapReduce: ""});
 
 for (let i = 0; i < 50; i++) {
-    db.foo.insert({mapReduce: i});       // to the chunk including number
-    db.foo.insert({mapReduce: "" + i});  // to the chunk including string
+    db.foo.insert({mapReduce: i}); // to the chunk including number
+    db.foo.insert({mapReduce: "" + i}); // to the chunk including string
 }
 
 s.printShardingStatus();

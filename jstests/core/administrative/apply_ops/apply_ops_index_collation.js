@@ -27,31 +27,35 @@ const uuid = getUUIDFromListCollections(db, coll.getName());
 // An index created using a createIndexes-style oplog entry with a non-simple collation does not
 // inherit the collection default collation.
 let res = db.adminCommand({
-    applyOps: [{
-        op: "c",
-        ns: coll.getFullName(),
-        ui: uuid,
-        o: {
-            createIndexes: coll.getFullName(),
-            indexes: [{
-                v: 2,
-                key: {a: 1},
-                name: "a_1_en",
-                collation: {
-                    locale: "en_US",
-                    caseLevel: false,
-                    caseFirst: "off",
-                    strength: 3,
-                    numericOrdering: false,
-                    alternate: "non-ignorable",
-                    maxVariable: "punct",
-                    normalization: false,
-                    backwards: false,
-                    version: "57.1"
-                }
-            }],
-        }
-    }]
+    applyOps: [
+        {
+            op: "c",
+            ns: coll.getFullName(),
+            ui: uuid,
+            o: {
+                createIndexes: coll.getFullName(),
+                indexes: [
+                    {
+                        v: 2,
+                        key: {a: 1},
+                        name: "a_1_en",
+                        collation: {
+                            locale: "en_US",
+                            caseLevel: false,
+                            caseFirst: "off",
+                            strength: 3,
+                            numericOrdering: false,
+                            alternate: "non-ignorable",
+                            maxVariable: "punct",
+                            normalization: false,
+                            backwards: false,
+                            version: "57.1",
+                        },
+                    },
+                ],
+            },
+        },
+    ],
 });
 
 // It is not possible to test createIndexes in applyOps because that command is not accepted by

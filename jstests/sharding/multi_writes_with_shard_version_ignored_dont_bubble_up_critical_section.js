@@ -18,7 +18,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 var st = new ShardingTest({
     shards: 2,
     rs: {setParameter: {internalQueryExecYieldIterations: 10}},
-    other: {enableBalancer: false}
+    other: {enableBalancer: false},
 });
 
 const dbName = "test";
@@ -27,8 +27,7 @@ const ns = dbName + "." + collName;
 const numDocs = 100;
 let coll = st.s.getCollection(ns);
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 function setupTest() {
     coll.drop();
@@ -41,8 +40,9 @@ function setupTest() {
     // - [numDocs, MaxKey) shard 1. Contains no documents.
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: numDocs}}));
-    assert.commandWorked(st.s.adminCommand(
-        {moveChunk: ns, find: {x: numDocs}, to: st.shard1.shardName, waitForDelete: true}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: ns, find: {x: numDocs}, to: st.shard1.shardName, waitForDelete: true}),
+    );
 
     jsTest.log("Inserting initial data.");
     const bulkOp = coll.initializeOrderedBulkOp();
@@ -55,11 +55,17 @@ function setupTest() {
 
 function runMigration() {
     const awaitResult = startParallelShell(
-        funWithArgs(function(ns, toShard) {
-            jsTest.log("Starting migration.");
-            assert.commandWorked(db.adminCommand({moveChunk: ns, find: {x: -1}, to: toShard}));
-            jsTest.log("Completed migration.");
-        }, ns, st.shard1.shardName), st.s.port);
+        funWithArgs(
+            function (ns, toShard) {
+                jsTest.log("Starting migration.");
+                assert.commandWorked(db.adminCommand({moveChunk: ns, find: {x: -1}, to: toShard}));
+                jsTest.log("Completed migration.");
+            },
+            ns,
+            st.shard1.shardName,
+        ),
+        st.s.port,
+    );
 
     return awaitResult;
 }
@@ -70,11 +76,13 @@ async function updateOperationFn(shardColl, numInitialDocsOnShard0) {
 
     // Send a multi-update with 'shardVersion: IGNORED' directly to the shard, as if we were a
     // router.
-    const result = assert.commandWorked(shardColl.runCommand({
-        update: shardColl.getName(),
-        updates: [{q: {}, u: {$inc: {c: 1}}, multi: true}],
-        shardVersion: ShardVersioningUtil.kIgnoredShardVersion
-    }));
+    const result = assert.commandWorked(
+        shardColl.runCommand({
+            update: shardColl.getName(),
+            updates: [{q: {}, u: {$inc: {c: 1}}, multi: true}],
+            shardVersion: ShardVersioningUtil.kIgnoredShardVersion,
+        }),
+    );
 
     jsTest.log("End multi-update. Result: " + tojson(result));
 
@@ -90,11 +98,13 @@ async function deleteOperationFn(shardColl, numInitialDocsOnShard0) {
 
     // Send a multi-delete with 'shardVersion: IGNORED' directly to the shard, as if we were a
     // router.
-    const result = assert.commandWorked(shardColl.runCommand({
-        delete: shardColl.getName(),
-        deletes: [{q: {}, limit: 0}],
-        shardVersion: ShardVersioningUtil.kIgnoredShardVersion
-    }));
+    const result = assert.commandWorked(
+        shardColl.runCommand({
+            delete: shardColl.getName(),
+            deletes: [{q: {}, limit: 0}],
+            shardVersion: ShardVersioningUtil.kIgnoredShardVersion,
+        }),
+    );
 
     jsTest.log("End multi-delete. Result: " + tojson(result));
 
@@ -107,22 +117,28 @@ async function deleteOperationFn(shardColl, numInitialDocsOnShard0) {
 function runTest(writeOpFn) {
     setupTest();
 
-    let fp1 = configureFailPoint(
-        st.rs0.getPrimary(), 'setYieldAllLocksHang', {namespace: coll.getFullName()});
+    let fp1 = configureFailPoint(st.rs0.getPrimary(), "setYieldAllLocksHang", {namespace: coll.getFullName()});
 
     const awaitWriteResult = startParallelShell(
-        funWithArgs(function(writeOpFn, dbName, collName, numDocs) {
-            const shardColl = db.getSiblingDB(dbName)[collName];
-            writeOpFn(shardColl, numDocs);
-        }, writeOpFn, coll.getDB().getName(), coll.getName(), numDocs), st.rs0.getPrimary().port);
+        funWithArgs(
+            function (writeOpFn, dbName, collName, numDocs) {
+                const shardColl = db.getSiblingDB(dbName)[collName];
+                writeOpFn(shardColl, numDocs);
+            },
+            writeOpFn,
+            coll.getDB().getName(),
+            coll.getName(),
+            numDocs,
+        ),
+        st.rs0.getPrimary().port,
+    );
 
     // Wait for the write op to yield.
     fp1.wait();
     jsTest.log("Multi-write yielded");
 
     // Start chunk migration and wait for it to enter the critical section.
-    let failpointHangMigrationWhileInCriticalSection =
-        configureFailPoint(st.rs0.getPrimary(), 'moveChunkHangAtStep5');
+    let failpointHangMigrationWhileInCriticalSection = configureFailPoint(st.rs0.getPrimary(), "moveChunkHangAtStep5");
     const awaitMigration = runMigration();
     failpointHangMigrationWhileInCriticalSection.wait();
 

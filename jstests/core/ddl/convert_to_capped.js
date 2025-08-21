@@ -24,8 +24,7 @@ assert(!coll.isCapped());
 
 // Command must fail if size is not specified.
 {
-    assert.commandFailedWithCode(testDb.runCommand({convertToCapped: coll.getName()}),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(testDb.runCommand({convertToCapped: coll.getName()}), ErrorCodes.InvalidOptions);
     assert(!coll.isCapped());
 }
 
@@ -33,7 +32,8 @@ assert(!coll.isCapped());
 {
     assert.commandFailedWithCode(
         testDb.runCommand({convertToCapped: coll.getName(), size: 5308156746568725891247}),
-        ErrorCodes.BadValue);
+        ErrorCodes.BadValue,
+    );
     assert(!coll.isCapped());
 }
 
@@ -41,15 +41,17 @@ assert(!coll.isCapped());
 {
     const timeseriesCollName = "timeseriesColl";
 
-    assert.commandWorked(testDb.runCommand(
-        {create: timeseriesCollName, timeseries: {timeField: "time", metaField: "meta"}}));
+    assert.commandWorked(
+        testDb.runCommand({create: timeseriesCollName, timeseries: {timeField: "time", metaField: "meta"}}),
+    );
 
     const timeseriesColl = testDb.getCollection(timeseriesCollName);
     assert(!timeseriesColl.isCapped());
 
-    assert.commandFailedWithCode(
-        testDb.runCommand({convertToCapped: timeseriesColl.getName(), size: 1000}),
-        [ErrorCodes.CommandNotSupportedOnView, ErrorCodes.IllegalOperation]);
+    assert.commandFailedWithCode(testDb.runCommand({convertToCapped: timeseriesColl.getName(), size: 1000}), [
+        ErrorCodes.CommandNotSupportedOnView,
+        ErrorCodes.IllegalOperation,
+    ]);
     assert(!timeseriesColl.isCapped());
 }
 
@@ -58,8 +60,10 @@ assert(!coll.isCapped());
     const viewName = "viewNss";
     assert.commandWorked(testDb.createView(viewName, coll.getName(), [{$match: {x: 1}}]));
 
-    assert.commandFailedWithCode(testDb.runCommand({convertToCapped: viewName, size: 1000}),
-                                 ErrorCodes.CommandNotSupportedOnView);
+    assert.commandFailedWithCode(
+        testDb.runCommand({convertToCapped: viewName, size: 1000}),
+        ErrorCodes.CommandNotSupportedOnView,
+    );
 
     assert(!testDb.getCollection(viewName).isCapped());
     assert(!coll.isCapped());
@@ -69,7 +73,8 @@ assert(!coll.isCapped());
 {
     assert.commandFailedWithCode(
         testDb.runCommand({convertToCapped: "nonExistingColl", size: 1000}),
-        ErrorCodes.NamespaceNotFound);
+        ErrorCodes.NamespaceNotFound,
+    );
 }
 
 // Proper command should work.

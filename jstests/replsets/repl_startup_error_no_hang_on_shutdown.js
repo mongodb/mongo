@@ -9,12 +9,13 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
     name: jsTestName(),
-    nodes: [{
-        setParameter: {
-            "failpoint.throwBeforeRecoveringTenantMigrationAccessBlockers":
-                tojson({mode: "alwaysOn"})
-        }
-    }],
+    nodes: [
+        {
+            setParameter: {
+                "failpoint.throwBeforeRecoveringTenantMigrationAccessBlockers": tojson({mode: "alwaysOn"}),
+            },
+        },
+    ],
 });
 rst.startSet();
 rst.initiate();
@@ -34,8 +35,9 @@ const exitCode = waitProgram(node.pid);
 assert.eq(exitCode, MongoRunner.EXIT_ABRUPT);
 
 assert.soon(
-    function() {
+    function () {
         return rawMongoProgramOutput("Fatal assertion").search(/6111701/) >= 0;
     },
     "Node should have fasserted upon encountering a fatal error during startup",
-    ReplSetTest.kDefaultTimeoutMS);
+    ReplSetTest.kDefaultTimeoutMS,
+);

@@ -11,35 +11,31 @@ for (let i = 1; i <= 10; i++) {
 }
 
 // returns old
-let out =
-    t.findAndModify({sort: {priority: 1}, update: {$set: {inprogress: true}, $inc: {value: 1}}});
+let out = t.findAndModify({sort: {priority: 1}, update: {$set: {inprogress: true}, $inc: {value: 1}}});
 assert.eq(out.value, 0);
 assert.eq(out.inprogress, false);
 assert.commandWorked(t.update({_id: out._id}, {$set: {inprogress: false}}));
 
 // returns new
-out = t.findAndModify(
-    {sort: {priority: 1}, update: {$set: {inprogress: true}, $inc: {value: 1}}, 'new': true});
+out = t.findAndModify({sort: {priority: 1}, update: {$set: {inprogress: true}, $inc: {value: 1}}, "new": true});
 assert.eq(out.value, 2);
 assert.eq(out.inprogress, true);
 assert.commandWorked(t.update({_id: out._id}, {$set: {inprogress: false}}));
 
 // update highest priority
-out = t.findAndModify(
-    {query: {inprogress: false}, sort: {priority: -1}, update: {$set: {inprogress: true}}});
+out = t.findAndModify({query: {inprogress: false}, sort: {priority: -1}, update: {$set: {inprogress: true}}});
 assert.eq(out.priority, 10);
 // update next highest priority
-out = t.findAndModify(
-    {query: {inprogress: false}, sort: {priority: -1}, update: {$set: {inprogress: true}}});
+out = t.findAndModify({query: {inprogress: false}, sort: {priority: -1}, update: {$set: {inprogress: true}}});
 assert.eq(out.priority, 9);
 
 // Use expressions in the 'fields' argument with 'new' false.
 out = t.findAndModify({
     query: {inprogress: false},
     sort: {priority: -1},
-    'new': false,
+    "new": false,
     update: {$set: {inprogress: true}, $inc: {value: 1}},
-    fields: {priority: 1, inprogress: 1, computedField: {$add: ["$value", 2]}}
+    fields: {priority: 1, inprogress: 1, computedField: {$add: ["$value", 2]}},
 });
 assert.eq(out.priority, 8);
 assert.eq(out.inprogress, false);
@@ -51,8 +47,8 @@ out = t.findAndModify({
     query: {inprogress: false},
     sort: {priority: -1},
     update: {$set: {inprogress: true}, $inc: {value: 1}},
-    'new': true,
-    fields: {priority: 1, inprogress: 1, computedField: {$add: ["$value", 2]}}
+    "new": true,
+    fields: {priority: 1, inprogress: 1, computedField: {$add: ["$value", 2]}},
 });
 assert.eq(out.priority, 7);
 assert.eq(out.inprogress, true);
@@ -73,19 +69,19 @@ assert.eq(out, null);
 
 // make sure we fail with conflicting params to findAndModify SERVER-16601
 assert.commandWorked(t.insert({x: 1}));
-assert.throws(function() {
+assert.throws(function () {
     t.findAndModify({query: {x: 1}, update: {y: 2}, remove: true});
 });
-assert.throws(function() {
+assert.throws(function () {
     t.findAndModify({query: {x: 1}, update: {y: 2}, remove: true, sort: {x: 1}});
 });
-assert.throws(function() {
+assert.throws(function () {
     t.findAndModify({query: {x: 1}, update: {y: 2}, remove: true, upsert: true});
 });
-assert.throws(function() {
+assert.throws(function () {
     t.findAndModify({query: {x: 1}, update: {y: 2}, new: true, remove: true});
 });
-assert.throws(function() {
+assert.throws(function () {
     t.findAndModify({query: {x: 1}, upsert: true, remove: true});
 });
 
@@ -105,7 +101,7 @@ function runFindAndModify(shouldMatch, upsert, newParam) {
         update: {$inc: {y: 1}},
         fields: {foo: {$pop: ["bar"]}},
         upsert: upsert,
-        new: newParam
+        new: newParam,
     });
     assert.commandFailedWithCode(res, 31325);
 }
@@ -130,8 +126,7 @@ runFindAndModify(true /* shouldMatch */, false /* upsert */, false /* new */);
 //
 
 assert(t.drop());
-let cmdRes = db.runCommand(
-    {findAndModify: t.getName(), query: {_id: "miss"}, update: {$inc: {y: 1}}, upsert: true});
+let cmdRes = db.runCommand({findAndModify: t.getName(), query: {_id: "miss"}, update: {$inc: {y: 1}}, upsert: true});
 assert.commandWorked(cmdRes);
 assert("value" in cmdRes);
 assert.eq(null, cmdRes.value);
@@ -141,7 +136,7 @@ cmdRes = db.runCommand({
     query: {_id: "missagain"},
     update: {$inc: {y: 1}},
     upsert: true,
-    new: true
+    new: true,
 });
 assert.commandWorked(cmdRes);
 assert("value" in cmdRes);

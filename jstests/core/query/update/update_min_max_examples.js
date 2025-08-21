@@ -61,7 +61,7 @@ assert.docEq(insertdoc, coll.findOne({_id: 7}));
 // $min with positional operator
 insertdoc = {
     _id: 8,
-    y: [{a: 2}, {a: 6}, {a: [9, 1, 1]}]
+    y: [{a: 2}, {a: 6}, {a: [9, 1, 1]}],
 };
 assert.commandWorked(coll.insert(insertdoc));
 res = coll.update({_id: 8, "y.a": 6}, {$min: {"y.$.a": 5}});

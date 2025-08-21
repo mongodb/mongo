@@ -5,12 +5,12 @@
  * This test was designed to reproduce SERVER-22537.
  */
 const options = {
-    setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'
+    setParameter: "internalDocumentSourceCursorBatchSizeBytes=1",
 };
 const conn = MongoRunner.runMongod(options);
-assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
 
-const testDB = conn.getDB('test');
+const testDB = conn.getDB("test");
 
 /**
  * Executes an aggregrate with 'options.pipeline' and confirms that 'options.numResults' were
@@ -30,69 +30,71 @@ function runTest(options) {
         assert.commandWorked(testDB.dest.insert({x: 1}));
     }
 
-    const res = assert.commandWorked(testDB.runCommand({
-        aggregate: 'source',
-        pipeline: options.pipeline,
-        cursor: {
-            batchSize: batchSize,
-        },
-    }));
+    const res = assert.commandWorked(
+        testDB.runCommand({
+            aggregate: "source",
+            pipeline: options.pipeline,
+            cursor: {
+                batchSize: batchSize,
+            },
+        }),
+    );
 
     const cursor = new DBCommandCursor(testDB, res, batchSize);
     assert.eq(options.numResults, cursor.itcount());
 }
 
 runTest({
-        pipeline: [
-            {
-              $lookup: {
-                  from: 'dest',
-                  localField: 'x',
-                  foreignField: 'x',
-                  as: 'matches',
-              }
+    pipeline: [
+        {
+            $lookup: {
+                from: "dest",
+                localField: "x",
+                foreignField: "x",
+                as: "matches",
             },
-            {
-              $unwind: {
-                  path: '$matches',
-              },
+        },
+        {
+            $unwind: {
+                path: "$matches",
             },
-        ],
-        numResults: 5
-    });
+        },
+    ],
+    numResults: 5,
+});
 
 runTest({
-        pipeline: [
-            {
-              $lookup: {
-                  from: 'dest',
-                  let : {x1: "$x"},
-                  pipeline: [
-                      {$match: {$expr: {$eq: ["$$x1", "$x"]}}},
-                      {
+    pipeline: [
+        {
+            $lookup: {
+                from: "dest",
+                let: {x1: "$x"},
+                pipeline: [
+                    {$match: {$expr: {$eq: ["$$x1", "$x"]}}},
+                    {
                         $lookup: {
                             from: "dest",
                             as: "matches2",
-                            let : {x2: "$x"},
-                            pipeline: [{$match: {$expr: {$eq: ["$$x2", "$x"]}}}]
-                        }
-                      },
-                      {
-                        $unwind: {
-                            path: '$matches2',
+                            let: {x2: "$x"},
+                            pipeline: [{$match: {$expr: {$eq: ["$$x2", "$x"]}}}],
                         },
-                      },
-                  ],
-                  as: 'matches1',
-              }
+                    },
+                    {
+                        $unwind: {
+                            path: "$matches2",
+                        },
+                    },
+                ],
+                as: "matches1",
             },
-            {
-              $unwind: {
-                  path: '$matches1',
-              },
+        },
+        {
+            $unwind: {
+                path: "$matches1",
             },
-        ],
-        numResults: 25
-    });
+        },
+    ],
+    numResults: 25,
+});
 
 MongoRunner.stopMongod(conn);

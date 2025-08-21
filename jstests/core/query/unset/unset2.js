@@ -11,7 +11,7 @@ assert.eq(["a", null, "c", null], t.findOne().a);
 t.update({}, {$unset: {"a.0": 1}});
 assert.eq([null, null, "c", null], t.findOne().a);
 t.update({}, {$unset: {"a.4": 1}});
-assert.eq([null, null, "c", null], t.findOne().a);  // no change
+assert.eq([null, null, "c", null], t.findOne().a); // no change
 
 t.drop();
 t.save({a: ["a", "b", "c", "d", "e"]});

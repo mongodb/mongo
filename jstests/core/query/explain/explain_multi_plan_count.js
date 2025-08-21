@@ -27,8 +27,10 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({a: -1, b: 1}));
 assert.commandWorked(coll.insert([{a: 0}, {a: 1}, {a: 2}, {a: 3}]));
 
-const explain =
-    coll.explain("allPlansExecution").find({a: {$in: [1, 3]}, b: {$in: [1, 3]}}).count();
+const explain = coll
+    .explain("allPlansExecution")
+    .find({a: {$in: [1, 3]}, b: {$in: [1, 3]}})
+    .count();
 
 // Check that all plans, both winning and rejected have a structure that excludes the MultiPlanNode
 // and continues with the correct plan child below COUNT.

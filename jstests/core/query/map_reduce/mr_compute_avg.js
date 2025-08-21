@@ -17,18 +17,26 @@
 const coll = db.mr_blog_posts;
 coll.drop();
 
-assert.commandWorked(coll.insert([
-    {
-        _id: "blog 1",
-        author: "x",
-        comments: [{user_id: "a", txt: "asdasdasd"}, {user_id: "b", txt: "asdasdasdasdasdasdas"}]
-    },
-    {
-        _id: "blog 2",
-        author: "y",
-        comments: [{user_id: "b", txt: "asdasdasdaaa"}, {user_id: "c", txt: "asdasdasdaasdasdas"}]
-    }
-]));
+assert.commandWorked(
+    coll.insert([
+        {
+            _id: "blog 1",
+            author: "x",
+            comments: [
+                {user_id: "a", txt: "asdasdasd"},
+                {user_id: "b", txt: "asdasdasdasdasdasdas"},
+            ],
+        },
+        {
+            _id: "blog 2",
+            author: "y",
+            comments: [
+                {user_id: "b", txt: "asdasdasdaaa"},
+                {user_id: "c", txt: "asdasdasdaasdasdas"},
+            ],
+        },
+    ]),
+);
 
 function mapFn() {
     for (let comment of this.comments) {
@@ -51,11 +59,9 @@ outputColl.drop();
 function reformat(cmdResult) {
     let x = {};
     let cursor;
-    if (cmdResult.results)
-        cursor = cmdResult.results;
-    else
-        cursor = outputColl.find();
-    cursor.forEach(result => {
+    if (cmdResult.results) cursor = cmdResult.results;
+    else cursor = outputColl.find();
+    cursor.forEach((result) => {
         x[result._id] = result.value;
     });
     return x;

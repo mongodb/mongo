@@ -17,4 +17,4 @@ import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 // Verify we require admin database
 assert.commandFailed(db.diagdata.runCommand("getDiagnosticData"));
 
-verifyGetDiagnosticData(db.getSiblingDB('admin'));
+verifyGetDiagnosticData(db.getSiblingDB("admin"));

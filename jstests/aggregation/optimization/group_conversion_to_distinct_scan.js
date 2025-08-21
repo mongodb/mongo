@@ -19,9 +19,7 @@
  * ]
  */
 
-import {
-    runGroupConversionToDistinctScanTests
-} from "jstests/libs/query/group_conversion_to_distinct_scan.js";
+import {runGroupConversionToDistinctScanTests} from "jstests/libs/query/group_conversion_to_distinct_scan.js";
 import {prepareCollection} from "jstests/libs/query/group_to_distinct_scan_utils.js";
 
 prepareCollection(db);

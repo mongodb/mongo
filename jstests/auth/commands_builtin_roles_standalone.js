@@ -27,10 +27,10 @@ const opts = {
     auth: "",
     setParameter: {
         trafficRecordingDirectory: dbPath,
-        mongotHost,   // We have to set the mongotHost parameter for the
-                      // $search-relatead tests to pass configuration checks.
-        syncdelay: 0  // Disable checkpoints as this can cause some commands to fail transiently.
-    }
+        mongotHost, // We have to set the mongotHost parameter for the
+        // $search-relatead tests to pass configuration checks.
+        syncdelay: 0, // Disable checkpoints as this can cause some commands to fail transiently.
+    },
 };
 
 // run all tests standalone

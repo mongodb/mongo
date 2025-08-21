@@ -15,16 +15,17 @@ if (!isEnterpriseShell()) {
 }
 
 function runTest(mongosConn, shardConn) {
-    let dbName = 'testdb';
+    let dbName = "testdb";
 
     let clientMongoS = new EncryptedClient(mongosConn, dbName);
 
-    assert.commandWorked(clientMongoS.createEncryptionCollection("basic", {
-        encryptedFields: {
-            "fields":
-                [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}]
-        }
-    }));
+    assert.commandWorked(
+        clientMongoS.createEncryptionCollection("basic", {
+            encryptedFields: {
+                "fields": [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}],
+            },
+        }),
+    );
 
     let clientShard = new EncryptedClient(shardConn, dbName);
 

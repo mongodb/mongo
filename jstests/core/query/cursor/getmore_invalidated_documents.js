@@ -60,7 +60,10 @@ assert.commandWorked(t.insert({a: 1, b: 2}));
 assert.commandWorked(t.insert({a: 2, b: 3}));
 assert.commandWorked(t.insert({a: 2, b: 4}));
 
-cursor = t.find({a: {$in: [1, 2]}}).sort({b: 1}).batchSize(2);
+cursor = t
+    .find({a: {$in: [1, 2]}})
+    .sort({b: 1})
+    .batchSize(2);
 cursor.next();
 cursor.next();
 
@@ -77,7 +80,10 @@ assert.commandWorked(t.insert({a: 1, b: 2}));
 assert.commandWorked(t.insert({a: 2, b: 3}));
 assert.commandWorked(t.insert({a: 2, b: 4}));
 
-cursor = t.find({a: {$in: [1, 2]}}).sort({b: 1}).batchSize(2);
+cursor = t
+    .find({a: {$in: [1, 2]}})
+    .sort({b: 1})
+    .batchSize(2);
 cursor.next();
 cursor.next();
 
@@ -204,7 +210,10 @@ t.insert({a: 1, b: 2});
 t.insert({a: 3, b: 3});
 t.insert({a: 2, b: 1});
 
-cursor = t.find({a: {$in: [1, 2, 3]}}).sort({b: 1}).batchSize(2);
+cursor = t
+    .find({a: {$in: [1, 2, 3]}})
+    .sort({b: 1})
+    .batchSize(2);
 cursor.next();
 cursor.next();
 
@@ -221,7 +230,10 @@ t.insert({a: 1, b: 2});
 t.insert({a: 3, b: 3});
 t.insert({a: 2, b: 1});
 
-cursor = t.find({a: {$in: [1, 2, 3]}}).sort({b: 1}).batchSize(2);
+cursor = t
+    .find({a: {$in: [1, 2, 3]}})
+    .sort({b: 1})
+    .batchSize(2);
 cursor.next();
 cursor.next();
 

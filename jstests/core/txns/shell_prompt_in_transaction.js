@@ -20,7 +20,7 @@ session.startTransaction();
 jsTestLog("Run shell prompt to simulate a user hitting enter.");
 simulatePrompt();
 const doc = {
-    _id: "shell-write"
+    _id: "shell-write",
 };
 assert.commandWorked(coll.insert(doc));
 assert.docEq(doc, coll.findOne());

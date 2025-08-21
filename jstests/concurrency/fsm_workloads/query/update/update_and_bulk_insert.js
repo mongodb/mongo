@@ -14,7 +14,7 @@
  * ]
  *
  */
-export const $config = (function() {
+export const $config = (function () {
     var states = {
         insert: function insert(db, collName) {
             var bulk = db[collName].initializeUnorderedBulkOp();
@@ -29,7 +29,7 @@ export const $config = (function() {
             assert.lte(0, res.nMatched, tojson(res));
             assert.eq(res.nMatched, res.nModified, tojson(res));
             assert.eq(0, res.nUpserted, tojson(res));
-        }
+        },
     };
 
     var transitions = {insert: {insert: 0.2, update: 0.8}, update: {insert: 0.2, update: 0.8}};
@@ -37,8 +37,8 @@ export const $config = (function() {
     return {
         threadCount: 5,
         iterations: 30,
-        startState: 'insert',
+        startState: "insert",
         states: states,
-        transitions: transitions
+        transitions: transitions,
     };
 })();

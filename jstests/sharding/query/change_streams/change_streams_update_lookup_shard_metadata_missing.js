@@ -18,15 +18,14 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    rs: {nodes: 3, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 5}}
+    rs: {nodes: 3, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 5}},
 });
 
 let mongosDB = st.s.getDB(jsTestName());
 let shard0 = st.rs0;
 
 // Ensure that the primary for the test database is shard0.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shard0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shard0.getURL()}));
 
 let mongosColl = mongosDB.test;
 
@@ -57,8 +56,7 @@ mongosColl = st.s.getDB(mongosDB.getName())[mongosColl.getName()];
 // Do a {multi:true} update. This will scatter to all shards and update the document on shard0.
 // Because no metadata is loaded, the shard will return a StaleShardVersion and fetch it, and
 // the operation will be retried until it completes successfully.
-assert.soonNoExcept(
-    () => assert.commandWorked(mongosColl.update({_id: 0}, {$set: {updated: true}}, false, true)));
+assert.soonNoExcept(() => assert.commandWorked(mongosColl.update({_id: 0}, {$set: {updated: true}}, false, true)));
 
 // Resume the change stream with {fullDocument: 'updateLookup'}. Update lookup can successfully
 // identify the document based on its _id alone so long as the _id is unique in the collection, so

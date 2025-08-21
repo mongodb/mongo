@@ -14,13 +14,11 @@ import {
     exactIdDelete,
     initDeleteInTransactionStates,
     multiDelete,
-    verifyDocuments
+    verifyDocuments,
 } from "jstests/concurrency/fsm_workload_helpers/delete_in_transaction_states.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 
@@ -33,18 +31,20 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // migrated back in. The particular error code is replaced with a more generic one, so this is
     // identified by the failed migration's error message.
     $config.data.isMoveChunkErrorAcceptable = (err) => {
-        return err.message &&
+        return (
+            err.message &&
             (err.message.indexOf("CommandFailed") > -1 ||
-             err.message.indexOf("Documents in target range may still be in use") > -1);
+                err.message.indexOf("Documents in target range may still be in use") > -1)
+        );
     };
 
-    $config.states.exactIdDelete = function(db, collName, connCache) {
+    $config.states.exactIdDelete = function (db, collName, connCache) {
         exactIdDelete(db, collName, this.session);
     };
-    $config.states.multiDelete = function(db, collName, connCache) {
+    $config.states.multiDelete = function (db, collName, connCache) {
         multiDelete(db, collName, this.session, this.tid, this.partitionSize);
     };
-    $config.states.verifyDocuments = function(db, collName, connCache) {
+    $config.states.verifyDocuments = function (db, collName, connCache) {
         verifyDocuments(db, collName, this.tid);
     };
 

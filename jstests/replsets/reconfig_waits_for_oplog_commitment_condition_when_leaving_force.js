@@ -19,12 +19,12 @@ const secondary = rst.getSecondary();
 const coll = primary.getDB(dbName)[collName];
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // This makes the test run faster.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: 'setSmallOplogGetMoreMaxTimeMS', mode: 'alwaysOn'}));
+assert.commandWorked(secondary.adminCommand({configureFailPoint: "setSmallOplogGetMoreMaxTimeMS", mode: "alwaysOn"}));
 
 // Create collection.
 assert.commandWorked(coll.insert({}));
@@ -36,7 +36,7 @@ stopServerReplication(secondary);
 // Force reconfig down to a 1 node replica set.
 let twoNodeConfig = rst.getReplSetConfigFromNode();
 let singleNodeConfig = Object.assign({}, twoNodeConfig);
-singleNodeConfig.members = singleNodeConfig.members.slice(0, 1);  // Remove the second node.
+singleNodeConfig.members = singleNodeConfig.members.slice(0, 1); // Remove the second node.
 singleNodeConfig.version++;
 
 jsTestLog("Force reconfig down to a single node.");

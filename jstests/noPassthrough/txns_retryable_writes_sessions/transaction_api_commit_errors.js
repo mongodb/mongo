@@ -8,13 +8,15 @@ const kDbName = "testDb";
 const kCollName = "testColl";
 
 function makeSingleInsertTxn(doc) {
-    return [{
-        dbName: kDbName,
-        command: {
-            insert: kCollName,
-            documents: [doc],
-        }
-    }];
+    return [
+        {
+            dbName: kDbName,
+            command: {
+                insert: kCollName,
+                documents: [doc],
+            },
+        },
+    ];
 }
 
 function runTxn(conn, commandInfos) {
@@ -34,15 +36,16 @@ assert.commandWorked(st.s.getDB(kDbName)[kCollName].insert([{_id: 0}]));
 //
 
 // Retryable error. Note this error is not a NotPrimary error so it won't be rewritten by mongos.
-let commitFailPoint =
-    configureFailPoint(shardPrimary,
-                       "failCommand",
-                       {
-                           errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet,
-                           failCommands: ["commitTransaction"],
-                           failInternalCommands: true,
-                       },
-                       {times: 10});
+let commitFailPoint = configureFailPoint(
+    shardPrimary,
+    "failCommand",
+    {
+        errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet,
+        failCommands: ["commitTransaction"],
+        failInternalCommands: true,
+    },
+    {times: 10},
+);
 let res = assert.commandWorked(runTxn(st.s, makeSingleInsertTxn({_id: 1})));
 commitFailPoint.off();
 
@@ -51,12 +54,12 @@ commitFailPoint = configureFailPoint(
     shardPrimary,
     "failCommand",
     {
-        writeConcernError:
-            {code: NumberInt(ErrorCodes.ReadConcernMajorityNotAvailableYet), errmsg: "foo"},
+        writeConcernError: {code: NumberInt(ErrorCodes.ReadConcernMajorityNotAvailableYet), errmsg: "foo"},
         failCommands: ["commitTransaction"],
         failInternalCommands: true,
     },
-    {times: 10});
+    {times: 10},
+);
 res = assert.commandWorked(runTxn(st.s, makeSingleInsertTxn({_id: 2})));
 commitFailPoint.off();
 
@@ -65,16 +68,17 @@ commitFailPoint.off();
 //
 
 // Non-transient commit error with a non-retryable write concern error.
-commitFailPoint = configureFailPoint(shardPrimary,
-                                     "failCommand",
-                                     {
-                                         errorCode: ErrorCodes.InternalError,
-                                         failCommands: ["commitTransaction"],
-                                         failInternalCommands: true,
-                                     },
-                                     {times: 10});
-res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 3})),
-                                   ErrorCodes.InternalError);
+commitFailPoint = configureFailPoint(
+    shardPrimary,
+    "failCommand",
+    {
+        errorCode: ErrorCodes.InternalError,
+        failCommands: ["commitTransaction"],
+        failInternalCommands: true,
+    },
+    {times: 10},
+);
+res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 3})), ErrorCodes.InternalError);
 commitFailPoint.off();
 
 // No commit error with a non-retryable write concern error.
@@ -86,27 +90,28 @@ commitFailPoint = configureFailPoint(
         failCommands: ["commitTransaction"],
         failInternalCommands: true,
     },
-    {times: 10});
+    {times: 10},
+);
 // The internal transaction test command will rethrow a write concern error as a top-level error.
-res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 4})),
-                                   ErrorCodes.InternalError);
+res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 4})), ErrorCodes.InternalError);
 commitFailPoint.off();
 
 // Non-transient commit error that is normally transient. Note NoSuchTransaction is not transient
 // with a write concern error, which is what this is meant to simulate. Also note the fail command
 // fail point can't take both a write concern error and write concern error so we "cheat" and
 // override the error labels.
-commitFailPoint = configureFailPoint(shardPrimary,
-                                     "failCommand",
-                                     {
-                                         errorCode: ErrorCodes.NoSuchTransaction,
-                                         errorLabels: [],
-                                         failCommands: ["commitTransaction"],
-                                         failInternalCommands: true,
-                                     },
-                                     {times: 10});
-res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 5})),
-                                   ErrorCodes.NoSuchTransaction);
+commitFailPoint = configureFailPoint(
+    shardPrimary,
+    "failCommand",
+    {
+        errorCode: ErrorCodes.NoSuchTransaction,
+        errorLabels: [],
+        failCommands: ["commitTransaction"],
+        failInternalCommands: true,
+    },
+    {times: 10},
+);
+res = assert.commandFailedWithCode(runTxn(st.s, makeSingleInsertTxn({_id: 5})), ErrorCodes.NoSuchTransaction);
 commitFailPoint.off();
 
 st.stop();

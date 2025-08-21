@@ -24,7 +24,7 @@ import {
     getQueryPlanner,
     getRejectedPlan,
     getRejectedPlans,
-    getWinningPlanFromExplain
+    getWinningPlanFromExplain,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -34,8 +34,9 @@ const coll = db.explain_plan_cache;
 
 // Assert the winning plan is cached and rejected are not.
 function assertWinningPlanCacheStatus(explain, status) {
-    const winningPlan = shouldGenerateSbePlan ? getQueryPlanner(explain).winningPlan
-                                              : getWinningPlanFromExplain(explain);
+    const winningPlan = shouldGenerateSbePlan
+        ? getQueryPlanner(explain).winningPlan
+        : getWinningPlanFromExplain(explain);
     assert.eq(winningPlan.isCached, status, explain);
     for (let rejectedPlan of getRejectedPlans(explain)) {
         rejectedPlan = getRejectedPlan(rejectedPlan);
@@ -45,8 +46,9 @@ function assertWinningPlanCacheStatus(explain, status) {
 
 // Assert the winning plan is not cached and a rejected plan using the given name is cached.
 function assertRejectedPlanCached(explain, indexName) {
-    const winningPlan = shouldGenerateSbePlan ? getQueryPlanner(explain).winningPlan
-                                              : getWinningPlanFromExplain(explain);
+    const winningPlan = shouldGenerateSbePlan
+        ? getQueryPlanner(explain).winningPlan
+        : getWinningPlanFromExplain(explain);
     assert(!winningPlan.isCached, explain);
     for (const rejectedPlan of getRejectedPlans(explain)) {
         const inputStage = getRejectedPlan(rejectedPlan).inputStage;
@@ -89,8 +91,7 @@ function predicateTest(explainMode) {
 
     // Nothing should be cached at first.
     assertWinningPlanCacheStatus(coll.find({a: {$eq: 1}}).explain(explainMode), false);
-    assertWinningPlanCacheStatus(
-        getAggPlannerExplain(explainMode, [{$match: {a: 1}}, {$unwind: "$d"}]), false);
+    assertWinningPlanCacheStatus(getAggPlannerExplain(explainMode, [{$match: {a: 1}}, {$unwind: "$d"}]), false);
 
     // Run the query to get it cached.
     for (let i = 0; i < 5; i++) {
@@ -102,8 +103,7 @@ function predicateTest(explainMode) {
     // For both find and agg we should have the winning plan cached. Use different values in the
     // predicates to show the hash is indifferent to the value.
     assertWinningPlanCacheStatus(coll.find({a: {$eq: 2}}).explain(explainMode), true);
-    assertWinningPlanCacheStatus(
-        getAggPlannerExplain(explainMode, [{$match: {a: 2}}, {$unwind: "$d"}]), true);
+    assertWinningPlanCacheStatus(getAggPlannerExplain(explainMode, [{$match: {a: 2}}, {$unwind: "$d"}]), true);
 
     // Test with rooted OR.
     coll.getPlanCache().clear();
@@ -113,29 +113,27 @@ function predicateTest(explainMode) {
     // The query will use sub-planning so don't expect the top-level query to hit the cache when SBE
     // isn't enabled. However when SBE is fully enabled, we cache the full plan.
     assertWinningPlanCacheStatus(
-        coll.find({$or: [{a: {$eq: 4}}, {b: {$eq: 4}}]}).explain(explainMode), isUsingSbePlanCache);
+        coll.find({$or: [{a: {$eq: 4}}, {b: {$eq: 4}}]}).explain(explainMode),
+        isUsingSbePlanCache,
+    );
 
     // Test with a contained OR. The query will be planned as a whole so we do expect it to hit the
     // cache.
     coll.getPlanCache().clear();
     for (let i = 0; i < 5; i++) {
         coll.find({
-                $and: [
-                    {$or: [{a: 10}, {b: {$gt: 99}}]},
-                    {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}
-                ]
-            })
-            .toArray();
+            $and: [{$or: [{a: 10}, {b: {$gt: 99}}]}, {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]}],
+        }).toArray();
     }
     assert.eq(coll.getPlanCache().list().length, 1);
-    assertWinningPlanCacheStatus(coll.find({
-                                         $and: [
-                                             {$or: [{a: 2}, {b: {$gt: 100}}]},
-                                             {$or: [{a: {$in: [6, 2]}}, {b: {$in: [7, 100]}}]}
-                                         ]
-                                     })
-                                     .explain(explainMode),
-                                 true);
+    assertWinningPlanCacheStatus(
+        coll
+            .find({
+                $and: [{$or: [{a: 2}, {b: {$gt: 100}}]}, {$or: [{a: {$in: [6, 2]}}, {b: {$in: [7, 100]}}]}],
+            })
+            .explain(explainMode),
+        true,
+    );
 }
 
 function sortOnlyTest(explainMode) {

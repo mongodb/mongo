@@ -6,7 +6,6 @@
 export function getOldestRequiredTimestampForCrashRecovery(database) {
     const res = database.serverStatus().storageEngine;
     const ts = res.oldestRequiredTimestampForCrashRecovery;
-    assert(ts instanceof Timestamp,
-           'oldestRequiredTimestampForCrashRecovery was not a Timestamp: ' + tojson(res));
+    assert(ts instanceof Timestamp, "oldestRequiredTimestampForCrashRecovery was not a Timestamp: " + tojson(res));
     return ts;
 }

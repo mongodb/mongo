@@ -3,7 +3,7 @@
  * When loaded as a script, it will fail to parse on a SyntaxError, and should retry as a module.
  */
 
-let fn = val => {
+let fn = (val) => {
     return Promise.resolve(val);
 };
 Object.assign({}, await fn(42));

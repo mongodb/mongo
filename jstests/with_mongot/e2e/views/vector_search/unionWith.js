@@ -17,16 +17,14 @@ import {
     createMoviesViewAndIndex,
     enrichedTitleViewPipeline,
     getMoviePlotEmbeddingById,
-    makeMovieVectorQuery
+    makeMovieVectorQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
-import {
-    assertUnionWithSearchSubPipelineAppliedViews
-} from "jstests/with_mongot/e2e_lib/explain_utils.js";
+import {assertUnionWithSearchSubPipelineAppliedViews} from "jstests/with_mongot/e2e_lib/explain_utils.js";
 import {
     assertDocArrExpectedFuzzy,
     buildExpectedResults,
     datasets,
-    validateSearchExplain
+    validateSearchExplain,
 } from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
 // There is currently only one dataset for $vectorSearch, so we must use it for the collection and
@@ -37,29 +35,30 @@ const moviesColl = createMoviesCollAndIndex();
 const moviesWithEnrichedTitleQuery = makeMovieVectorQuery({
     queryVector: getMoviePlotEmbeddingById(6),
     limit: 5,
-    indexName: datasets.MOVIES_WITH_ENRICHED_TITLE.indexName
+    indexName: datasets.MOVIES_WITH_ENRICHED_TITLE.indexName,
 });
 const actionMoviesQuery = makeMovieVectorQuery({
     queryVector: getMoviePlotEmbeddingById(11),
     limit: 2,
-    indexName: datasets.ACTION_MOVIES.indexName
+    indexName: datasets.ACTION_MOVIES.indexName,
 });
-const moviesCollQuery = makeMovieVectorQuery(
-    {queryVector: getMoviePlotEmbeddingById(11), limit: 3, indexName: datasets.MOVIES.indexName});
+const moviesCollQuery = makeMovieVectorQuery({
+    queryVector: getMoviePlotEmbeddingById(11),
+    limit: 3,
+    indexName: datasets.MOVIES.indexName,
+});
 
 // ===============================================================================
 // Case 1: $unionWith on outer and inner views.
 // ===============================================================================
 let pipeline = [
     moviesWithEnrichedTitleQuery,
-    {$unionWith: {coll: actionMovies.getName(), pipeline: [actionMoviesQuery]}}
+    {$unionWith: {coll: actionMovies.getName(), pipeline: [actionMoviesQuery]}},
 ];
 
-validateSearchExplain(
-    moviesWithEnrichedTitle, pipeline, false, enrichedTitleViewPipeline, (explain) => {
-        assertUnionWithSearchSubPipelineAppliedViews(
-            explain, moviesColl, actionMovies.getName(), actionMoviesViewPipeline);
-    });
+validateSearchExplain(moviesWithEnrichedTitle, pipeline, false, enrichedTitleViewPipeline, (explain) => {
+    assertUnionWithSearchSubPipelineAppliedViews(explain, moviesColl, actionMovies.getName(), actionMoviesViewPipeline);
+});
 
 let outerExpected = buildExpectedResults([6, 4, 8, 9, 10], datasets.MOVIES_WITH_ENRICHED_TITLE);
 let innerExpected = buildExpectedResults([11, 5], datasets.MOVIES);
@@ -69,10 +68,7 @@ assertDocArrExpectedFuzzy([...outerExpected, ...innerExpected], results);
 // ===============================================================================
 // Case 2: $unionWith on an outer view and inner collection.
 // ===============================================================================
-pipeline = [
-    moviesWithEnrichedTitleQuery,
-    {$unionWith: {coll: moviesColl.getName(), pipeline: [moviesCollQuery]}}
-];
+pipeline = [moviesWithEnrichedTitleQuery, {$unionWith: {coll: moviesColl.getName(), pipeline: [moviesCollQuery]}}];
 
 validateSearchExplain(moviesWithEnrichedTitle, pipeline, false, enrichedTitleViewPipeline);
 
@@ -88,14 +84,17 @@ assertDocArrExpectedFuzzy([...outerExpected, ...innerExpected], results);
 pipeline = [
     moviesCollQuery,
     {
-        $unionWith:
-            {coll: moviesWithEnrichedTitle.getName(), pipeline: [moviesWithEnrichedTitleQuery]}
-    }
+        $unionWith: {coll: moviesWithEnrichedTitle.getName(), pipeline: [moviesWithEnrichedTitleQuery]},
+    },
 ];
 
 validateSearchExplain(moviesColl, pipeline, false, null, (explain) => {
     assertUnionWithSearchSubPipelineAppliedViews(
-        explain, moviesColl, moviesWithEnrichedTitle.getName(), enrichedTitleViewPipeline);
+        explain,
+        moviesColl,
+        moviesWithEnrichedTitle.getName(),
+        enrichedTitleViewPipeline,
+    );
 });
 
 outerExpected = buildExpectedResults([11, 14, 5], datasets.MOVIES);

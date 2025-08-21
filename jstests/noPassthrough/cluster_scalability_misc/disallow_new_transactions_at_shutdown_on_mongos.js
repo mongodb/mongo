@@ -6,16 +6,17 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 1, mongos: 1});
 
-const pauseAfterImplicitlyAbortAllTransactionsFp =
-    configureFailPoint(st.s0, "pauseAfterImplicitlyAbortAllTransactions");
+const pauseAfterImplicitlyAbortAllTransactionsFp = configureFailPoint(
+    st.s0,
+    "pauseAfterImplicitlyAbortAllTransactions",
+);
 
 st.stopMongos(0, {}, {waitpid: false});
 pauseAfterImplicitlyAbortAllTransactionsFp.wait();
 
 const session = st.s0.startSession();
 session.startTransaction();
-assert.commandFailedWithCode(session.getDatabase("testDB")["testColl"].insert({x: 2}),
-                             ErrorCodes.HostUnreachable);
+assert.commandFailedWithCode(session.getDatabase("testDB")["testColl"].insert({x: 2}), ErrorCodes.HostUnreachable);
 
 pauseAfterImplicitlyAbortAllTransactionsFp.off();
 

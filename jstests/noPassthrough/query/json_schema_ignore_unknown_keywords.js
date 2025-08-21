@@ -5,7 +5,7 @@
 import {assertSchemaMatch} from "jstests/libs/assert_schema_match.js";
 
 const options = {
-    setParameter: "internalQueryIgnoreUnknownJSONSchemaKeywords=1"
+    setParameter: "internalQueryIgnoreUnknownJSONSchemaKeywords=1",
 };
 const conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
@@ -15,8 +15,7 @@ const coll = testDB.getCollection("jstests_json_schema_ignore_unsupported");
 
 assertSchemaMatch(coll, {my_keyword: "ignored", minProperties: 2}, {_id: 0}, false);
 assertSchemaMatch(coll, {my_keyword: "ignored", minProperties: 2}, {_id: 0, a: 1}, true);
-assertSchemaMatch(
-    coll, {properties: {a: {my_keyword: "ignored", minProperties: 1}}}, {a: {b: 1}}, true);
+assertSchemaMatch(coll, {properties: {a: {my_keyword: "ignored", minProperties: 1}}}, {a: {b: 1}}, true);
 
 // Test that the same query knob does not change the behavior for unsupported keywords.
 {
@@ -25,7 +24,7 @@ assertSchemaMatch(
 
     res = coll.runCommand({
         find: coll.getName(),
-        query: {$jsonSchema: {definitions: {numberField: {type: "number"}}}}
+        query: {$jsonSchema: {definitions: {numberField: {type: "number"}}}},
     });
     assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownField]);
 
@@ -37,7 +36,7 @@ assertSchemaMatch(
 
     res = coll.runCommand({
         find: coll.getName(),
-        query: {$jsonSchema: {properties: {a: {$ref: "#/definitions/positiveInt"}}}}
+        query: {$jsonSchema: {properties: {a: {$ref: "#/definitions/positiveInt"}}}},
     });
     assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownField]);
 
@@ -46,7 +45,7 @@ assertSchemaMatch(
 
     res = coll.runCommand({
         find: coll.getName(),
-        query: {$jsonSchema: {$schema: "http://json-schema.org/draft-04/schema#"}}
+        query: {$jsonSchema: {$schema: "http://json-schema.org/draft-04/schema#"}},
     });
     assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownField]);
 }

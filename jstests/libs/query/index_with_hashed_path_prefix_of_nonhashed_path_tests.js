@@ -4,30 +4,30 @@ export const TestCases = [
             {$match: {a: 1}},
             {
                 $group: {
-                    '_id': '$m.m1',
-                }
-            }
+                    "_id": "$m.m1",
+                },
+            },
         ],
-        index: {a: 1, m: 'hashed', 'm.m1': 1},
+        index: {a: 1, m: "hashed", "m.m1": 1},
         indexName: "testIndexName",
         docs: [{_id: 1, a: 1, m: {m1: 2}}],
         results: [{"_id": 2}],
     },
     {
         query: [
-            {$match: {'a.a1': 1}},
+            {$match: {"a.a1": 1}},
             {
                 $group: {
-                    '_id': '$m.m1',
+                    "_id": "$m.m1",
                     // Paths in the accumulators also do not need
                     // getFields and array traversals when reading from a
                     // covered hashed index scan.
                     total: {$sum: "$a.a1"},
-                }
-            }
+                },
+            },
         ],
         // 'a.a1' in the hashed index guarantees 'a.a1' is not an array.
-        index: {'a.a1': 1, m: 'hashed', 'm.m1': 1},
+        index: {"a.a1": 1, m: "hashed", "m.m1": 1},
         indexName: "testIndexName",
         docs: [{_id: 1, a: {a1: 1}, m: {m1: 2}}],
         results: [{"_id": 2, "total": 1}],

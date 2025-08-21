@@ -7,9 +7,7 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    checkServerStatusNumCollsWithInconsistentIndexes
-} from "jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js";
+import {checkServerStatusNumCollsWithInconsistentIndexes} from "jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js";
 
 // This test creates inconsistent indexes.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
@@ -32,16 +30,17 @@ function assertServerStatusNotContainIndexMetrics(conn) {
  * mongod in 'connsWithoutIndexConsistencyMetrics', asserts that its serverStatus output does not
  * contain the index consistency metrics.
  */
-function checkServerStatus(configPrimaryConn,
-                           configSecondaryConn,
-                           connsWithoutIndexConsistencyMetrics,
-                           expectedNumCollsWithInconsistentIndexes) {
+function checkServerStatus(
+    configPrimaryConn,
+    configSecondaryConn,
+    connsWithoutIndexConsistencyMetrics,
+    expectedNumCollsWithInconsistentIndexes,
+) {
     // Sleep to let the periodic check run. Note this won't guarantee the check has run, but should
     // make it likely enough to catch bugs in most test runs.
     sleep(intervalMS * 2);
 
-    checkServerStatusNumCollsWithInconsistentIndexes(configPrimaryConn,
-                                                     expectedNumCollsWithInconsistentIndexes);
+    checkServerStatusNumCollsWithInconsistentIndexes(configPrimaryConn, expectedNumCollsWithInconsistentIndexes);
 
     // A config secondary should always report zero because only primaries run the aggregation to
     // find inconsistent indexes.
@@ -56,7 +55,7 @@ const intervalMS = 500;
 const st = new ShardingTest({
     shards: 2,
     config: 3,
-    configOptions: {setParameter: {"shardedIndexConsistencyCheckIntervalMS": intervalMS}}
+    configOptions: {setParameter: {"shardedIndexConsistencyCheckIntervalMS": intervalMS}},
 });
 const dbName = "testDb";
 const ns1 = dbName + ".testColl1";
@@ -65,11 +64,10 @@ const ns3 = dbName + ".testColl3";
 const ns4 = dbName + ".testColl4";
 const expiration = 1000000;
 const filterExpr = {
-    x: {$gt: 50}
+    x: {$gt: 50},
 };
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns1, key: {_id: "hashed"}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {_id: "hashed"}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns3, key: {_id: "hashed"}}));
@@ -77,8 +75,9 @@ assert.commandWorked(st.s.adminCommand({shardCollection: ns4, key: {_id: "hashed
 
 // Disable the check on one config secondary to verify this means metrics won't be shown in
 // serverStatus.
-assert.commandWorked(st.config2.getDB("admin").runCommand(
-    {setParameter: 1, enableShardedIndexConsistencyCheck: false}));
+assert.commandWorked(
+    st.config2.getDB("admin").runCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}),
+);
 
 let configPrimaryConn = st.config0;
 let configSecondaryConn = st.config1;
@@ -110,24 +109,36 @@ checkServerStatus(configPrimaryConn, configSecondaryConn, connsWithoutIndexConsi
 
 // Create indexes for n3 with the same options but in different orders on each shard, and verify
 // that it is not considered as inconsistent.
-assert.commandWorked(st.shard0.getCollection(ns3).createIndex({x: 1}, {
-    name: "indexWithOptionsOrderedDifferently",
-    partialFilterExpression: filterExpr,
-    expireAfterSeconds: expiration
-}));
-assert.commandWorked(st.shard1.getCollection(ns3).createIndex({x: 1}, {
-    name: "indexWithOptionsOrderedDifferently",
-    expireAfterSeconds: expiration,
-    partialFilterExpression: filterExpr
-}));
+assert.commandWorked(
+    st.shard0.getCollection(ns3).createIndex(
+        {x: 1},
+        {
+            name: "indexWithOptionsOrderedDifferently",
+            partialFilterExpression: filterExpr,
+            expireAfterSeconds: expiration,
+        },
+    ),
+);
+assert.commandWorked(
+    st.shard1.getCollection(ns3).createIndex(
+        {x: 1},
+        {
+            name: "indexWithOptionsOrderedDifferently",
+            expireAfterSeconds: expiration,
+            partialFilterExpression: filterExpr,
+        },
+    ),
+);
 checkServerStatus(configPrimaryConn, configSecondaryConn, connsWithoutIndexConsistencyMetrics, 2);
 
 // Create indexes for n3 with the same key but different options on each shard, and verify that
 // it is considered as inconsistent.
-assert.commandWorked(st.shard0.getCollection(ns3).createIndex(
-    {y: 1}, {name: "indexWithDifferentOptions", expireAfterSeconds: expiration}));
 assert.commandWorked(
-    st.shard1.getCollection(ns3).createIndex({y: 1}, {name: "indexWithDifferentOptions"}));
+    st.shard0
+        .getCollection(ns3)
+        .createIndex({y: 1}, {name: "indexWithDifferentOptions", expireAfterSeconds: expiration}),
+);
+assert.commandWorked(st.shard1.getCollection(ns3).createIndex({y: 1}, {name: "indexWithDifferentOptions"}));
 checkServerStatus(configPrimaryConn, configSecondaryConn, connsWithoutIndexConsistencyMetrics, 3);
 
 // Create indexes where one is missing a property and verify this is considered inconsistent.
@@ -141,10 +152,12 @@ assert.commandWorked(st.shard1.getCollection(ns4).createIndex({y: 1}, {expireAft
 checkServerStatus(configPrimaryConn, configSecondaryConn, connsWithoutIndexConsistencyMetrics, 3);
 
 // Verify fields other than expireAfterSeconds and key are not ignored.
-assert.commandWorked(st.shard0.getCollection(ns4).createIndex(
-    {z: 1}, {expireAfterSeconds: 5, partialFilterExpression: {z: {$gt: 50}}}));
-assert.commandWorked(st.shard1.getCollection(ns4).createIndex(
-    {z: 1}, {expireAfterSeconds: 5, partialFilterExpression: {z: {$lt: 100}}}));
+assert.commandWorked(
+    st.shard0.getCollection(ns4).createIndex({z: 1}, {expireAfterSeconds: 5, partialFilterExpression: {z: {$gt: 50}}}),
+);
+assert.commandWorked(
+    st.shard1.getCollection(ns4).createIndex({z: 1}, {expireAfterSeconds: 5, partialFilterExpression: {z: {$lt: 100}}}),
+);
 checkServerStatus(configPrimaryConn, configSecondaryConn, connsWithoutIndexConsistencyMetrics, 4);
 
 //

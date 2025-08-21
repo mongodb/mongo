@@ -28,9 +28,9 @@ import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_buil
 jsTestLog("1. Boot ReplSet of 2 nodes");
 let rst = new ReplSetTest({
     nodes: [
-        {},                         // primary
-        {rsConfig: {priority: 0}},  // disallow elections on secondary
-    ]
+        {}, // primary
+        {rsConfig: {priority: 0}}, // disallow elections on secondary
+    ],
 });
 rst.startSet();
 rst.initiate();
@@ -51,35 +51,34 @@ for (let i = 0; i < 10; i++) {
 rst.awaitReplication();
 
 jsTestLog("3. Pause Index Build on all nodes after intialization");
-let secFp = configureFailPoint(secondary, 'hangAfterInitializingIndexBuild');
-let primFp = configureFailPoint(primary, 'hangAfterInitializingIndexBuild');
+let secFp = configureFailPoint(secondary, "hangAfterInitializingIndexBuild");
+let primFp = configureFailPoint(primary, "hangAfterInitializingIndexBuild");
 
 jsTestLog("4. Begin Index Build on all nodes");
-let createIndexFn = function(dbName, collName, indexSpec, indexName) {
+let createIndexFn = function (dbName, collName, indexSpec, indexName) {
     jsTestLog("Resumable replicated index build in parallel shell");
-    jsTestLog("nss: " + dbName + "." + collName + ", indexName: " + indexName +
-              " indexSpec: " + tojson(indexSpec));
-    assert.commandWorked(
-        db.getSiblingDB(dbName).getCollection(collName).createIndex(indexSpec, {name: indexName}));
+    jsTestLog("nss: " + dbName + "." + collName + ", indexName: " + indexName + " indexSpec: " + tojson(indexSpec));
+    assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).createIndex(indexSpec, {name: indexName}));
     jsTestLog("Resumable replicated index build in parallel shell - done");
 };
 
 let awaitCreateIndexParallel = startParallelShell(
-    funWithArgs(createIndexFn, dbName, collName, indexSpec, indexName), primary.port);
+    funWithArgs(createIndexFn, dbName, collName, indexSpec, indexName),
+    primary.port,
+);
 primFp.wait();
 
 jsTestLog("5. Obtain buildUUID");
 let buildUUID = extractUUIDFromObject(
-    IndexBuildTest
-        .assertIndexes(coll, 2, ['_id_'], [indexName], {includeBuildUUIDs: true})[indexName]
-        .buildUUID);
+    IndexBuildTest.assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName].buildUUID,
+);
 
 jsTestLog("6. Finish Index Build on Primary, voted for commit quorum");
 primFp.off();
 checkLog.containsJson(primary, 7568000, {
-    buildUUID: function(uuid) {
+    buildUUID: function (uuid) {
         return uuid && uuid["uuid"]["$uuid"] === buildUUID;
-    }
+    },
 });
 
 jsTestLog("7. Reboot Secondary cleanly");
@@ -91,46 +90,45 @@ rst.start(secondary, {noCleanData: true});
 
 jsTestLog("9. Check that Secondary resumed index build");
 checkLog.containsJson(secondary, 4841700, {
-    buildUUID: function(uuid) {
+    buildUUID: function (uuid) {
         return uuid && uuid["uuid"]["$uuid"] === buildUUID;
-    }
+    },
 });
 
 jsTestLog("10. Unclean shutdown of secondary");
-rst.stop(
-    secondary, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true, waitpid: true});
+rst.stop(secondary, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true, waitpid: true});
 
 jsTestLog("11. Boot secondary");
 rst.start(secondary, undefined, /*restart=*/ true);
 
 jsTestLog("12. Check secondary restarts index build");
 checkLog.containsJson(secondary, 20660, {
-    buildUUID: function(uuid) {
+    buildUUID: function (uuid) {
         return uuid && uuid["uuid"]["$uuid"] === buildUUID;
-    }
+    },
 });
 
 jsTestLog("13. Check that Secondary votes for commit quorum");
 checkLog.containsJson(secondary, 7568000, {
-    buildUUID: function(uuid) {
+    buildUUID: function (uuid) {
         return uuid && uuid["uuid"]["$uuid"] === buildUUID;
-    }
+    },
 });
 
 jsTestLog("14. Check that the index build completed successfully on primary");
 checkLog.containsJson(primary, 20663, {
-    buildUUID: function(uuid) {
+    buildUUID: function (uuid) {
         return uuid && uuid["uuid"]["$uuid"] === buildUUID;
     },
-    namespace: coll.getFullName()
+    namespace: coll.getFullName(),
 });
 
 jsTestLog("15. Check that the index build completed successfully on secondary");
 checkLog.containsJson(secondary, 20663, {
-    buildUUID: function(uuid) {
+    buildUUID: function (uuid) {
         return uuid && uuid["uuid"]["$uuid"] === buildUUID;
     },
-    namespace: coll.getFullName()
+    namespace: coll.getFullName(),
 });
 
 jsTestLog("16. Join with parallel shell that ran the index build");

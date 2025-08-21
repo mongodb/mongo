@@ -62,13 +62,18 @@ let testCount = 0;
 // aggregation's resolved views to produce a map counting how many times each namesapce was seen,
 // e.g.: {"test.view1": 1, "test.view2": 1, "test.coll": 1}
 function getShardedViewExceptions(comment) {
-    return primaryShard.getDB(testDBName)
+    return primaryShard
+        .getDB(testDBName)
         .system.profile.find({})
         .toArray()
-        .filter((doc) => doc["command"] && doc["command"]["aggregate"] && doc["resolvedViews"] &&
-                    doc["command"]["comment"] === comment)
-        .flatMap((doc) =>
-                     doc["resolvedViews"].flatMap(resolvedView => resolvedView["dependencyChain"]))
+        .filter(
+            (doc) =>
+                doc["command"] &&
+                doc["command"]["aggregate"] &&
+                doc["resolvedViews"] &&
+                doc["command"]["comment"] === comment,
+        )
+        .flatMap((doc) => doc["resolvedViews"].flatMap((resolvedView) => resolvedView["dependencyChain"]))
         .reduce((prev, curr) => {
             const namespace = "test." + curr;
             if (prev[namespace]) {
@@ -82,8 +87,7 @@ function getShardedViewExceptions(comment) {
 
 function testGraphLookupView({collection, pipeline, expectedResults, expectedExceptions}) {
     const comment = "test " + testCount;
-    assertArrayEq(
-        {actual: collection.aggregate(pipeline, {comment}).toArray(), expected: expectedResults});
+    assertArrayEq({actual: collection.aggregate(pipeline, {comment}).toArray(), expected: expectedResults});
     if (expectedExceptions) {
         // Count how many CommandOnShardedViewNotSupported exceptions we get and verify that they
         // match the number we were expecting.
@@ -91,9 +95,16 @@ function testGraphLookupView({collection, pipeline, expectedResults, expectedExc
         for (const ns in expectedExceptions) {
             const actualCount = actualEx[ns] || 0;
             const expectedCount = expectedExceptions[ns];
-            assert(actualCount == expectedCount,
-                   "expected: " + expectedCount + " exceptions for ns " + ns + ", actually got " +
-                       actualCount + " exceptions.");
+            assert(
+                actualCount == expectedCount,
+                "expected: " +
+                    expectedCount +
+                    " exceptions for ns " +
+                    ns +
+                    ", actually got " +
+                    actualCount +
+                    " exceptions.",
+            );
         }
     }
     testCount++;
@@ -104,12 +115,14 @@ function checkView(viewName, expected) {
 }
 
 function moveChunksByShardKey(collection, shard) {
-    assert.commandWorked(testDB.adminCommand({
-        moveChunk: collection.getFullName(),
-        find: {shard_key: shard},
-        to: sharded[shard].shardName,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            moveChunk: collection.getFullName(),
+            find: {shard_key: shard},
+            to: sharded[shard].shardName,
+            _waitForDelete: true,
+        }),
+    );
 }
 
 // In order to trigger CommandOnShardedViewNotSupportedOnMongod exceptions where a shard cannot
@@ -128,17 +141,21 @@ checkView("emptyViewOnSubjects", subjectsDocs);
 testGraphLookupView({
     collection: docs,
     pipeline: [
-        {$graphLookup: {
-            from: "emptyViewOnSubjects",
-            startWith: "$subject",
-            connectFromField: "parent",
-            connectToField: "name",
-            as: "subjects",
-        }},
-        {$project: {
-            name: 1,
-            subjects: "$subjects.name"
-        }}
+        {
+            $graphLookup: {
+                from: "emptyViewOnSubjects",
+                startWith: "$subject",
+                connectFromField: "parent",
+                connectToField: "name",
+                as: "subjects",
+            },
+        },
+        {
+            $project: {
+                name: 1,
+                subjects: "$subjects.name",
+            },
+        },
     ],
     expectedResults: [
         {_id: 1, name: "Carter", subjects: ["Astrophysics", "Physics", "Science"]},
@@ -156,33 +173,36 @@ testGraphLookupView({
 testGraphLookupView({
     collection: docs,
     pipeline: [
-        {$graphLookup: {
-            from: "emptyViewOnSubjects",
-            startWith: "$subject",
-            connectFromField: "parent",
-            connectToField: "name",
-            as: "subjects",
-            restrictSearchWithMatch: { "name" : {$nin: ["Anthropology", "Archaeology", "Humanities"]} }
-        }},
-        {$project: {
-            name: 1,
-            science: {$gt: [{$size: "$subjects"}, 0]}
-        }}
+        {
+            $graphLookup: {
+                from: "emptyViewOnSubjects",
+                startWith: "$subject",
+                connectFromField: "parent",
+                connectToField: "name",
+                as: "subjects",
+                restrictSearchWithMatch: {"name": {$nin: ["Anthropology", "Archaeology", "Humanities"]}},
+            },
+        },
+        {
+            $project: {
+                name: 1,
+                science: {$gt: [{$size: "$subjects"}, 0]},
+            },
+        },
     ],
     expectedResults: [
         {_id: 1, name: "Carter", science: true},
-        {_id: 2, name: "Jackson",  science: false},
-        {_id: 3, name: "Jones",  science: false},
+        {_id: 2, name: "Jackson", science: false},
+        {_id: 3, name: "Jones", science: false},
         {_id: 4, name: "Mann", science: true},
-        {_id: 5, name: "Mann",  science: true},
+        {_id: 5, name: "Mann", science: true},
     ],
     // Expect only one exception when trying to resolve the view 'emptyViewOnSubjects'.
     expectedExceptions: {"test.docs": 0, "test.subjects": 1},
 });
 
 // Create a view with an empty pipeline on the existing empty view on 'subjects'.
-assert.commandWorked(
-    testDB.createView("emptyViewOnViewOnSubjects", testDB.emptyViewOnSubjects.getName(), []));
+assert.commandWorked(testDB.createView("emptyViewOnViewOnSubjects", testDB.emptyViewOnSubjects.getName(), []));
 checkView("emptyViewOnViewOnSubjects", subjectsDocs);
 
 // Test a $graphLookup that triggers a CommandOnShardedViewNotSupportedOnMongod exception for a view
@@ -190,17 +210,21 @@ checkView("emptyViewOnViewOnSubjects", subjectsDocs);
 testGraphLookupView({
     collection: docs,
     pipeline: [
-        {$graphLookup: {
-            from: "emptyViewOnViewOnSubjects",
-            startWith: "$subject",
-            connectFromField: "parent",
-            connectToField: "name",
-            as: "subjects",
-        }},
-        {$project: {
-            name: 1,
-            subjects: "$subjects.name"
-        }}
+        {
+            $graphLookup: {
+                from: "emptyViewOnViewOnSubjects",
+                startWith: "$subject",
+                connectFromField: "parent",
+                connectToField: "name",
+                as: "subjects",
+            },
+        },
+        {
+            $project: {
+                name: 1,
+                subjects: "$subjects.name",
+            },
+        },
     ],
     expectedResults: [
         {_id: 1, name: "Carter", subjects: ["Astrophysics", "Physics", "Science"]},
@@ -214,35 +238,43 @@ testGraphLookupView({
 });
 
 // Create a view with a pipeline on 'docs' that runs another $graphLookup.
-assert.commandWorked(testDB.createView("physicists", docs.getName(), [
-        {$graphLookup: {
-            from: "emptyViewOnSubjects",
-            startWith: "$subject",
-            connectFromField: "parent",
-            connectToField: "name",
-            as: "subjects",
-        }},
-        {$match: {
-            "subjects.name": "Physics"
-        }},
-        {$project: {
-            name: 1,
-            specialty: "$subject",
-            subjects: "$subjects.name"
-        }}
-]));
+assert.commandWorked(
+    testDB.createView("physicists", docs.getName(), [
+        {
+            $graphLookup: {
+                from: "emptyViewOnSubjects",
+                startWith: "$subject",
+                connectFromField: "parent",
+                connectToField: "name",
+                as: "subjects",
+            },
+        },
+        {
+            $match: {
+                "subjects.name": "Physics",
+            },
+        },
+        {
+            $project: {
+                name: 1,
+                specialty: "$subject",
+                subjects: "$subjects.name",
+            },
+        },
+    ]),
+);
 checkView("physicists", [
     {
         _id: 1,
         name: "Carter",
         specialty: "Astrophysics",
-        subjects: ["Astrophysics", "Physics", "Science"]
+        subjects: ["Astrophysics", "Physics", "Science"],
     },
     {
         _id: 4,
         name: "Mann",
         specialty: "Theoretical Physics",
-        subjects: ["Physics", "Science", "Theoretical Physics"]
+        subjects: ["Physics", "Science", "Theoretical Physics"],
     },
 ]);
 
@@ -251,22 +283,42 @@ checkView("physicists", [
 testGraphLookupView({
     collection: subjects,
     pipeline: [
-        {$graphLookup: {
-            from: "physicists",
-            startWith: "$name",
-            connectFromField: "subjects",
-            connectToField: "specialty",
-            as: "practitioner",
-        }},
+        {
+            $graphLookup: {
+                from: "physicists",
+                startWith: "$name",
+                connectFromField: "subjects",
+                connectToField: "specialty",
+                as: "practitioner",
+            },
+        },
         {$unwind: "$practitioner"},
     ],
     expectedResults: [
-        {_id: 5, shard_key: "shard2", name: "Astrophysics", parent: "Physics",
-         practitioner: {_id: 1, name: "Carter", specialty: "Astrophysics",
-         subjects: ["Astrophysics", "Physics", "Science"]}},
-        {_id: 7, shard_key: "shard2", name: "Theoretical Physics", parent: "Physics",
-        practitioner: {_id: 4, name: "Mann", specialty: "Theoretical Physics",
-        subjects: ["Physics", "Science", "Theoretical Physics"]}},
+        {
+            _id: 5,
+            shard_key: "shard2",
+            name: "Astrophysics",
+            parent: "Physics",
+            practitioner: {
+                _id: 1,
+                name: "Carter",
+                specialty: "Astrophysics",
+                subjects: ["Astrophysics", "Physics", "Science"],
+            },
+        },
+        {
+            _id: 7,
+            shard_key: "shard2",
+            name: "Theoretical Physics",
+            parent: "Physics",
+            practitioner: {
+                _id: 4,
+                name: "Mann",
+                specialty: "Theoretical Physics",
+                subjects: ["Physics", "Science", "Theoretical Physics"],
+            },
+        },
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // another four on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
@@ -274,28 +326,39 @@ testGraphLookupView({
 });
 
 // Create a view with a pipeline on 'physicists' to test resolution of a view on another view.
-assert.commandWorked(testDB.createView("physicist", testDB.physicists.getName(), [
-    {$match: {"specialty": "Astrophysics"}},
-]));
+assert.commandWorked(
+    testDB.createView("physicist", testDB.physicists.getName(), [{$match: {"specialty": "Astrophysics"}}]),
+);
 
 // Test a $graphLookup that triggers a CommandOnShardedViewNotSupportedOnMongod exception for a view
 // on another view.
 testGraphLookupView({
     collection: subjects,
     pipeline: [
-        {$graphLookup: {
-            from: "physicist",
-            startWith: "$name",
-            connectFromField: "subjects",
-            connectToField: "specialty",
-            as: "practitioner",
-        }},
+        {
+            $graphLookup: {
+                from: "physicist",
+                startWith: "$name",
+                connectFromField: "subjects",
+                connectToField: "specialty",
+                as: "practitioner",
+            },
+        },
         {$unwind: "$practitioner"},
     ],
     expectedResults: [
-        {_id: 5, shard_key: "shard2", name: "Astrophysics", parent: "Physics",
-         practitioner: {_id: 1, name: "Carter", specialty: "Astrophysics",
-         subjects: ["Astrophysics", "Physics", "Science"]}},
+        {
+            _id: 5,
+            shard_key: "shard2",
+            name: "Astrophysics",
+            parent: "Physics",
+            practitioner: {
+                _id: 1,
+                name: "Carter",
+                specialty: "Astrophysics",
+                subjects: ["Astrophysics", "Physics", "Science"],
+            },
+        },
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // one on 'subjects' when trying to resolve 'emptyViewOnSubjects'.
@@ -308,20 +371,31 @@ testGraphLookupView({
 testGraphLookupView({
     collection: subjects,
     pipeline: [
-        {$graphLookup: {
-            from: "physicists",
-            startWith: "$name",
-            connectFromField: "subjects",
-            connectToField: "specialty",
-            as: "practitioner",
-            restrictSearchWithMatch: { name: "Mann" }
-        }},
+        {
+            $graphLookup: {
+                from: "physicists",
+                startWith: "$name",
+                connectFromField: "subjects",
+                connectToField: "specialty",
+                as: "practitioner",
+                restrictSearchWithMatch: {name: "Mann"},
+            },
+        },
         {$unwind: "$practitioner"},
     ],
     expectedResults: [
-        {_id: 7, shard_key: "shard2", name: "Theoretical Physics", parent: "Physics",
-         practitioner: {_id: 4, name: "Mann", specialty: "Theoretical Physics",
-         subjects: ["Physics", "Science", "Theoretical Physics"]}},
+        {
+            _id: 7,
+            shard_key: "shard2",
+            name: "Theoretical Physics",
+            parent: "Physics",
+            practitioner: {
+                _id: 4,
+                name: "Mann",
+                specialty: "Theoretical Physics",
+                subjects: ["Physics", "Science", "Theoretical Physics"],
+            },
+        },
     ],
     // Expect one exception when trying to resolve the view 'physicists' on collection 'docs' and
     // another two on 'subjects' when trying to resolve 'emptyViewOnSubjects'.

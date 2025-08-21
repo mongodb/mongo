@@ -23,7 +23,7 @@ assert.commandWorked(coll.insert({"_id": 3, "title": "vegetables"}));
 const collUUID = getUUIDFromListCollections(db, coll.getName());
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 const searchCmd = {
@@ -31,7 +31,7 @@ const searchCmd = {
     collectionUUID: collUUID,
     query: searchQuery,
     apiVersion: "1",
-    $db: jsTestName()
+    $db: jsTestName(),
 };
 
 // Give mongotmock some stuff to return.
@@ -46,21 +46,24 @@ const cursorId = NumberLong(123);
                 cursor: {
                     id: NumberLong(0),
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 2, $searchScore: 0.654}, {_id: 1, $searchScore: 0.321}]
+                    nextBatch: [
+                        {_id: 2, $searchScore: 0.654},
+                        {_id: 1, $searchScore: 0.321},
+                    ],
                 },
-                vars: {SEARCH_META: {value: 1}}
-            }
+                vars: {SEARCH_META: {value: 1}},
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 // The command should succeed. We don't care about the results, if the command succeeded mongotmock
 // received the apiVersion.
-assert.commandWorked(coll.runCommand(
-    {aggregate: coll.getName(), apiVersion: "1", pipeline: [{$search: searchQuery}], cursor: {}}));
+assert.commandWorked(
+    coll.runCommand({aggregate: coll.getName(), apiVersion: "1", pipeline: [{$search: searchQuery}], cursor: {}}),
+);
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();

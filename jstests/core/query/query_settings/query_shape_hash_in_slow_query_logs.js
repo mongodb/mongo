@@ -29,24 +29,29 @@ db.test.insert({x: 4});
 
 // Finds the query shape hash from slow query logs where the query has comment 'queryComment'.
 function getQueryShapeHashFromSlowQueryLog(queryComment) {
-    const slowQueryLogs = assert.commandWorked(db.adminCommand({getLog: 'global'}))
-                              .log
-                              .map((entry) => {
-                                  return JSON.parse(entry);
-                              })
-                              .filter((entry) => {
-                                  return entry.msg == "Slow query" && entry.attr &&
-                                      entry.attr.command && entry.attr.queryShapeHash &&
-                                      entry.attr.command.comment == queryComment;
-                              });
+    const slowQueryLogs = assert
+        .commandWorked(db.adminCommand({getLog: "global"}))
+        .log.map((entry) => {
+            return JSON.parse(entry);
+        })
+        .filter((entry) => {
+            return (
+                entry.msg == "Slow query" &&
+                entry.attr &&
+                entry.attr.command &&
+                entry.attr.queryShapeHash &&
+                entry.attr.command.comment == queryComment
+            );
+        });
 
     // Assert that there is exactly one slow query log with given 'queryComment':
     // - for replica set, only the node that executes the query reports one log.
     // - for sharded cluster, only the mongos reports one log.
-    assert.eq(slowQueryLogs.length,
-              1,
-              "Expected exactly one slow query log with 'queryShapeHash' and this query comment: " +
-                  tojson(queryComment));
+    assert.eq(
+        slowQueryLogs.length,
+        1,
+        "Expected exactly one slow query log with 'queryShapeHash' and this query comment: " + tojson(queryComment),
+    );
     return slowQueryLogs.pop().attr.queryShapeHash;
 }
 
@@ -57,8 +62,8 @@ function testQueryShapeHash(query) {
                 db: db.getName(),
                 coll: collName,
             },
-            allowedIndexes: [{x: 1}, {$natural: 1}]
-        }
+            allowedIndexes: [{x: 1}, {$natural: 1}],
+        },
     };
 
     // Run command to hit slow query logs.
@@ -71,20 +76,26 @@ function testQueryShapeHash(query) {
     qsutils.withQuerySettings(query, querySettings, () => {
         // Make sure query settings are applied.
         const querySettingsQueryShapeHash = qsutils.getQueryShapeHashFromQuerySettings(query);
-        assert(querySettingsQueryShapeHash,
-               `Couldn't find query settings for provided query: ${JSON.stringify(query)}`);
+        assert(
+            querySettingsQueryShapeHash,
+            `Couldn't find query settings for provided query: ${JSON.stringify(query)}`,
+        );
 
         // Make sure query shape hash from the logs matches the one from query settings.
-        assert.eq(slowLogQueryShapeHash,
-                  querySettingsQueryShapeHash,
-                  "Query shape hash from the logs doesn't match the one from query settings");
+        assert.eq(
+            slowLogQueryShapeHash,
+            querySettingsQueryShapeHash,
+            "Query shape hash from the logs doesn't match the one from query settings",
+        );
     });
 }
 
 {
     // Test find.
-    const query = qsutils.makeFindQueryInstance(
-        {filter: {x: 4}, comment: "Query shape hash in slow query logs test. Find query."});
+    const query = qsutils.makeFindQueryInstance({
+        filter: {x: 4},
+        comment: "Query shape hash in slow query logs test. Find query.",
+    });
     testQueryShapeHash(query);
 }
 
@@ -93,7 +104,7 @@ function testQueryShapeHash(query) {
     const query = qsutils.makeDistinctQueryInstance({
         key: "x",
         query: {x: 4},
-        comment: "Query shape hash in slow query logs test. Distinct query."
+        comment: "Query shape hash in slow query logs test. Distinct query.",
     });
     testQueryShapeHash(query);
 }
@@ -103,7 +114,7 @@ function testQueryShapeHash(query) {
     const query = qsutils.makeAggregateQueryInstance({
         pipeline: [{$match: {x: 4}}],
         comment: "Query shape hash in slow query logs test. Aggregate query.",
-        cursor: {}
+        cursor: {},
     });
     testQueryShapeHash(query);
 }

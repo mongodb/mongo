@@ -11,17 +11,16 @@ import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
 export const connectAndHello = (port, isRouter) => {
     jsTestLog(`Attempting to connect to port ${port}`);
     const connStart = Date.now();
-    const conn = new Mongo(`mongodb://127.0.0.1:${port}${isRouter ? '/?loadBalanced=true' : ''}`);
+    const conn = new Mongo(`mongodb://127.0.0.1:${port}${isRouter ? "/?loadBalanced=true" : ""}`);
     assert.neq(null, conn, `Client was unable to connect to port ${port}`);
-    assert.lt(Date.now() - connStart, 10 * 1000, 'Client was unable to connect within 10 seconds');
-    assert.commandWorked(conn.getDB('admin').runCommand({hello: 1}));
+    assert.lt(Date.now() - connStart, 10 * 1000, "Client was unable to connect within 10 seconds");
+    assert.commandWorked(conn.getDB("admin").runCommand({hello: 1}));
 };
 
 export const timeoutEmptyConnection = (ingressPort, egressPort, isRouter) => {
     // Use the connection to set a lower proxy header timeout and validate that empty connections
     // timeout.
-    const conn =
-        new Mongo(`mongodb://127.0.0.1:${ingressPort}${isRouter ? '/?loadBalanced=true' : ''}`);
+    const conn = new Mongo(`mongodb://127.0.0.1:${ingressPort}${isRouter ? "/?loadBalanced=true" : ""}`);
     const proxyTimeoutFailPoint = configureFailPoint(conn, "asioTransportLayer1sProxyTimeout");
 
     // runProgram blocks until the program is complete. nc should be finished when the server times
@@ -55,10 +54,10 @@ export const fuzzingTest = (ingressPort, egressPort, node, isRouter) => {
     for (let i = 0; i < numConnections; i++) {
         jsTestLog("Sending random data to proxy port");
         const pid = _startMongoProgram(
-            'bash',
-            '-c',
-            `head -c ${Math.floor(Math.random() * 5000)} /dev/urandom >/dev/tcp/127.0.0.1/${
-                egressPort}`);
+            "bash",
+            "-c",
+            `head -c ${Math.floor(Math.random() * 5000)} /dev/urandom >/dev/tcp/127.0.0.1/${egressPort}`,
+        );
 
         // Connecting to the to the proxy port still succeeds within a reasonable time
         // limit.
@@ -67,8 +66,10 @@ export const fuzzingTest = (ingressPort, egressPort, node, isRouter) => {
         // Connecting to the default port still succeeds within a reasonable time limit.
         connectAndHello(node.port, isRouter);
 
-        assert.soon(() => !checkProgram(pid).alive,
-                    "Server should have closed connection with invalid proxy protocol header");
+        assert.soon(
+            () => !checkProgram(pid).alive,
+            "Server should have closed connection with invalid proxy protocol header",
+        );
     }
 };
 
@@ -90,8 +91,11 @@ export const testProxyProtocolShardedCluster = (ingressPort, egressPort, version
     const proxy_server = new ProxyProtocolServer(ingressPort, egressPort, version);
     proxy_server.start();
 
-    const st = new ShardingTest(
-        {shards: 1, mongos: 1, mongosOptions: {setParameter: {"loadBalancerPort": egressPort}}});
+    const st = new ShardingTest({
+        shards: 1,
+        mongos: 1,
+        mongosOptions: {setParameter: {"loadBalancerPort": egressPort}},
+    });
 
     testFn(ingressPort, egressPort, st.s, true);
 

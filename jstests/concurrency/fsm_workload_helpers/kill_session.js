@@ -26,14 +26,17 @@ export function killSession(db, collName) {
                 assert.commandFailedWithCode(
                     res,
                     [ErrorCodes.DuplicateKey, ErrorCodes.WriteConcernTimeout],
-                    'unexpected error code: ' + res.code + ': ' + res.message);
+                    "unexpected error code: " + res.code + ": " + res.message,
+                );
             }
 
-            const sessionToKill = db.getSiblingDB("config").system.sessions.aggregate([
-                {$listSessions: {}},
-                {$match: {"_id.id": {$ne: db.getSession().getSessionId().id}}},
-                {$sample: {size: 1}},
-            ]);
+            const sessionToKill = db
+                .getSiblingDB("config")
+                .system.sessions.aggregate([
+                    {$listSessions: {}},
+                    {$match: {"_id.id": {$ne: db.getSession().getSessionId().id}}},
+                    {$sample: {size: 1}},
+                ]);
 
             if (sessionToKill.toArray().length === 0) {
                 break;

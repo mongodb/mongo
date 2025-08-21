@@ -12,25 +12,26 @@ let conn = MongoRunner.runMongod();
 
 const dbpath = conn.dbpath;
 const dbName = jsTestName();
-const collName = 'coll';
+const collName = "coll";
 
-const create = function(conn) {
+const create = function (conn) {
     assert.commandWorked(conn.getDB(dbName).createCollection(collName));
 };
 
-const collUri = function(conn) {
-    return conn.getDB(dbName)[collName]
-        .aggregate([{$collStats: {storageStats: {}}}])
+const collUri = function (conn) {
+    return conn
+        .getDB(dbName)
+        [collName].aggregate([{$collStats: {storageStats: {}}}])
         .toArray()[0]
-        .storageStats.wiredTiger.uri.split('statistics:')[1];
+        .storageStats.wiredTiger.uri.split("statistics:")[1];
 };
 
-const indexUri = function(conn, indexName) {
-    return conn.getDB(dbName)[collName]
-        .aggregate([{$collStats: {storageStats: {}}}])
+const indexUri = function (conn, indexName) {
+    return conn
+        .getDB(dbName)
+        [collName].aggregate([{$collStats: {storageStats: {}}}])
         .toArray()[0]
-        .storageStats.indexDetails[indexName]
-        .uri.split('statistics:')[1];
+        .storageStats.indexDetails[indexName].uri.split("statistics:")[1];
 };
 
 // Create the collection and indexes as a standlone, which will cause the tables to be logged.
@@ -56,8 +57,7 @@ let res = assert.commandWorked(primary.getDB(dbName).runCommand({validate: collN
 assert(!res.valid);
 assert.eq(res.errors.length, 2);
 checkLog.containsJson(primary, 6898101, {uri: collUri(primary), expected: false});
-checkLog.containsJson(
-    primary, 6898101, {index: '_id_', uri: indexUri(primary, '_id_'), expected: false});
+checkLog.containsJson(primary, 6898101, {index: "_id_", uri: indexUri(primary, "_id_"), expected: false});
 
 // Create the collection and indexes as a replica set, which will cause the tables to not be logged.
 assert.commandWorked(primary.getDB(dbName).runCommand({drop: collName}));
@@ -71,6 +71,6 @@ res = assert.commandWorked(conn.getDB(dbName).runCommand({validate: collName}));
 assert(!res.valid);
 assert.eq(res.errors.length, 2);
 checkLog.containsJson(conn, 6898101, {uri: collUri(conn), expected: true});
-checkLog.containsJson(conn, 6898101, {index: '_id_', uri: indexUri(conn, '_id_'), expected: true});
+checkLog.containsJson(conn, 6898101, {index: "_id_", uri: indexUri(conn, "_id_"), expected: true});
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});

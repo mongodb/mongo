@@ -5,12 +5,12 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function setUpUsers(rst) {
     const primaryAdminDB = rst.getPrimary().getDB("admin");
-    assert.commandWorked(
-        primaryAdminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
+    assert.commandWorked(primaryAdminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
     assert.eq(1, primaryAdminDB.auth("admin", "admin"));
 
-    assert.commandWorked(primaryAdminDB.getSiblingDB("test").runCommand(
-        {createUser: "NotTrusted", pwd: "pwd", roles: ["readWrite"]}));
+    assert.commandWorked(
+        primaryAdminDB.getSiblingDB("test").runCommand({createUser: "NotTrusted", pwd: "pwd", roles: ["readWrite"]}),
+    );
     primaryAdminDB.logout();
 
     authutil.asCluster(rst.nodes, "jstests/libs/key1", () => {
@@ -46,8 +46,10 @@ assert.soonNoExcept(() => {
 assert.commandWorked(secondaryAdminDB.adminCommand({replSetMaintenance: 1}));
 
 // The find should fail because the node is unreadable.
-res = assert.commandFailedWithCode(secondaryTestDB.runCommand({find: "foo", filter: {}}),
-                                   ErrorCodes.NotPrimaryOrSecondary);
+res = assert.commandFailedWithCode(
+    secondaryTestDB.runCommand({find: "foo", filter: {}}),
+    ErrorCodes.NotPrimaryOrSecondary,
+);
 assert(!res.hasOwnProperty("$clusterTime"), tojson(res));
 assert(!res.hasOwnProperty("operationTime"), tojson(res));
 
@@ -55,11 +57,10 @@ assert(!res.hasOwnProperty("operationTime"), tojson(res));
 // $clusterTime to emulate situations where valid cluster times would be unable to be verified, e.g.
 // when the signing keys have not been cached but cannot be read from admin.system.keys because the
 // node is in an unreadable state.
-const invalidClusterTimeMetadata = Object.assign(
-    validClusterTimeMetadata,
-    {clusterTime: new Timestamp(validClusterTimeMetadata.clusterTime.getTime() + 100, 0)});
-res = assert.commandWorked(
-    secondaryTestDB.runCommand({hello: 1, $clusterTime: invalidClusterTimeMetadata}));
+const invalidClusterTimeMetadata = Object.assign(validClusterTimeMetadata, {
+    clusterTime: new Timestamp(validClusterTimeMetadata.clusterTime.getTime() + 100, 0),
+});
+res = assert.commandWorked(secondaryTestDB.runCommand({hello: 1, $clusterTime: invalidClusterTimeMetadata}));
 
 assert.commandWorked(secondaryAdminDB.adminCommand({replSetMaintenance: 0}));
 
@@ -69,7 +70,8 @@ assert.hasFields(res, ["$clusterTime", "operationTime"]);
 // A request with invalid cluster time metadata should now be rejected.
 assert.commandFailedWithCode(
     secondaryTestDB.runCommand({hello: 1, $clusterTime: invalidClusterTimeMetadata}),
-    ErrorCodes.TimeProofMismatch);
+    ErrorCodes.TimeProofMismatch,
+);
 
 secondaryAdminDB.logout();
 secondaryTestDB.logout();

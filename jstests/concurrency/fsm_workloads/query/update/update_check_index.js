@@ -8,8 +8,8 @@
  *   requires_non_retryable_writes
  * ]
  */
-export const $config = (function() {
-    var states = (function() {
+export const $config = (function () {
+    var states = (function () {
         function multiUpdate(db, collName) {
             // Set 'c' to some random value.
             var newC = Random.randInt(1000);
@@ -22,11 +22,7 @@ export const $config = (function() {
     var transitions = {multiUpdate: {multiUpdate: 1.0}};
 
     function setup(db, collName, cluster) {
-        assert.commandWorked(db[collName].createIndexes([
-            {a: 1},
-            {b: 1},
-            {c: 1},
-        ]));
+        assert.commandWorked(db[collName].createIndexes([{a: 1}, {b: 1}, {c: 1}]));
 
         let docs = [];
         for (var i = 0; i < 10; i++) {
@@ -41,22 +37,22 @@ export const $config = (function() {
     function teardown(db, collName, cluster) {
         var numIndexKeys = db[collName].find({}, {_id: 0, a: 1}).hint({a: 1}).itcount();
         var numDocs = db[collName].find().itcount();
-        assert.eq(numIndexKeys, numDocs, 'index {a: 1} has wrong number of index keys');
+        assert.eq(numIndexKeys, numDocs, "index {a: 1} has wrong number of index keys");
 
         numIndexKeys = db[collName].find({}, {_id: 0, b: 1}).hint({b: 1}).itcount();
-        assert.eq(numIndexKeys, numDocs, 'index {b: 1} has wrong number of index keys');
+        assert.eq(numIndexKeys, numDocs, "index {b: 1} has wrong number of index keys");
 
         numIndexKeys = db[collName].find({}, {_id: 0, c: 1}).hint({c: 1}).itcount();
-        assert.eq(numIndexKeys, numDocs, 'index {c: 1} has wrong number of index keys');
+        assert.eq(numIndexKeys, numDocs, "index {c: 1} has wrong number of index keys");
     }
 
     return {
         threadCount: 10,
         iterations: 100,
         states: states,
-        startState: 'multiUpdate',
+        startState: "multiUpdate",
         transitions: transitions,
         setup: setup,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

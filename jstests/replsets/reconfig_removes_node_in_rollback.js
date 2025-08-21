@@ -25,8 +25,7 @@ rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 assert.commandWorked(secondTermPrimary.getDB(dbName)[collName].insert({"num2": 123}));
 
 // Enable a failpoint to hang after transitioning to rollback mode.
-const rollbackHangFailPoint =
-    configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
+const rollbackHangFailPoint = configureFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
 
 // Reconnect the isolated node and rollback should start.
 rollbackTest.transitionToSyncSourceOperationsDuringRollback();
@@ -39,8 +38,7 @@ assert.soonNoExcept(() => {
 
 // Enable a failpoint to hang after processing heartbeat reconfig, so we can
 // verify that the old primary was successfully removed while rolling back.
-const postHbReconfigFailPoint =
-    configureFailPoint(rollbackNode, "waitForPostActionCompleteInHbReconfig");
+const postHbReconfigFailPoint = configureFailPoint(rollbackNode, "waitForPostActionCompleteInHbReconfig");
 
 // RollbackTest stopped replication on tie breaker node, need to restart it.
 // Otherwise the new config, which contains only the new primary and the tie
@@ -64,8 +62,7 @@ assert.soonNoExcept(() => {
 }, `failed to wait for fail point ${postHbReconfigFailPoint.failPointName}`);
 
 // Verify the rollback node is removed from replica set config.
-assert.commandFailedWithCode(rollbackNode.adminCommand({replSetGetStatus: 1}),
-                             ErrorCodes.InvalidReplicaSetConfig);
+assert.commandFailedWithCode(rollbackNode.adminCommand({replSetGetStatus: 1}), ErrorCodes.InvalidReplicaSetConfig);
 
 // Now we disable the fail points, allowing the rollback to continue.
 postHbReconfigFailPoint.off();

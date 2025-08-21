@@ -20,7 +20,7 @@ if (TestData.configShard) {
     newNode = ShardingStateTest.addReplSetNode({
         replSet: configRS,
         serverTypeFlag: "configsvr",
-        newNodeParams: "featureFlagTransitionToCatalogShard=true"
+        newNodeParams: "featureFlagTransitionToCatalogShard=true",
     });
 } else {
     newNode = ShardingStateTest.addReplSetNode({replSet: configRS, serverTypeFlag: "configsvr"});

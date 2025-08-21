@@ -11,13 +11,12 @@ const coll = st.s0.getCollection("foo.bar");
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: coll.getDB().getName()}));
 
-jsTest.log('Tests with _id : 1 shard key');
+jsTest.log("Tests with _id : 1 shard key");
 coll.drop();
 assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 st.printShardingStatus();
 
-assert.commandWorked(
-    st.shard0.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 5}}}));
+assert.commandWorked(st.shard0.adminCommand({setParameter: 1, logComponentVerbosity: {query: {verbosity: 5}}}));
 
 // Insert some data
 assert.commandWorked(coll.insert({_id: true, a: true, b: true}));
@@ -43,10 +42,9 @@ assert.eq(1, coll.find({a: true, b: true}).explain(true).executionStats.totalDoc
 explainOut = coll.find({a: true, b: true}, {_id: 1, a: 1}).explain(true);
 assert.eq(0, explainOut.executionStats.totalDocsExamined);
 
-jsTest.log('Tests with _id : hashed shard key');
+jsTest.log("Tests with _id : hashed shard key");
 coll.drop();
-assert.commandWorked(
-    st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
 st.printShardingStatus();
 
 // Insert some data
@@ -62,7 +60,7 @@ assert.commandWorked(coll.dropIndex({a: 1}));
 assert.eq(1, coll.find({_id: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(1, coll.find({_id: true}, {_id: 0}).explain(true).executionStats.totalDocsExamined);
 
-jsTest.log('Tests with compound shard key');
+jsTest.log("Tests with compound shard key");
 coll.drop();
 assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {a: 1, b: 1}}));
 st.printShardingStatus();
@@ -93,9 +91,9 @@ assert.eq(1, coll.find({c: true, d: true}).explain(true).executionStats.totalDoc
 explainOut = coll.find({c: true, d: true}, {a: 1, b: 1, c: 1, d: 1}).explain(true);
 assert.eq(0, explainOut.executionStats.totalDocsExamined);
 
-jsTest.log('Tests with nested shard key');
+jsTest.log("Tests with nested shard key");
 coll.drop();
-assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {'a.b': 1}}));
+assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {"a.b": 1}}));
 st.printShardingStatus();
 
 // Insert some data
@@ -105,18 +103,18 @@ assert.commandWorked(coll.insert({_id: true, a: {b: true}, c: true}));
 assert.commandWorked(coll.createIndex({c: 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 
-explainOut = coll.find({c: true}, {_id: 0, 'a.b': 1, c: 1}).explain(true);
+explainOut = coll.find({c: true}, {_id: 0, "a.b": 1, c: 1}).explain(true);
 assert.eq(1, explainOut.executionStats.totalDocsExamined);
 
 // Index with shard key query - can be covered given the appropriate projection.
 assert.commandWorked(coll.dropIndex({c: 1}));
-assert.commandWorked(coll.createIndex({c: 1, 'a.b': 1}));
+assert.commandWorked(coll.createIndex({c: 1, "a.b": 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 
-explainOut = coll.find({c: true}, {_id: 0, 'a.b': 1, c: 1}).explain(true);
+explainOut = coll.find({c: true}, {_id: 0, "a.b": 1, c: 1}).explain(true);
 assert.eq(0, explainOut.executionStats.totalDocsExamined);
 
-jsTest.log('Tests with bad data with no shard key');
+jsTest.log("Tests with bad data with no shard key");
 coll.drop();
 assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 st.printShardingStatus();
@@ -130,9 +128,13 @@ assert.commandWorked(coll.createIndex({c: 1}));
 let explain = coll.find({c: true}).explain(true);
 assert.eq(1, explain.executionStats.nReturned);
 assert.eq(1, explain.executionStats.totalDocsExamined);
-assert.eq(0,
-          getChunkSkipsFromShard(explain.queryPlanner.winningPlan.shards[0],
-                                 explain.executionStats.executionStages.shards[0]));
+assert.eq(
+    0,
+    getChunkSkipsFromShard(
+        explain.queryPlanner.winningPlan.shards[0],
+        explain.executionStats.executionStages.shards[0],
+    ),
+);
 
 // Index with shard key query - covered and succeeds and returns result
 //
@@ -142,8 +144,12 @@ assert.commandWorked(coll.createIndex({c: 1, a: 1}));
 explain = coll.find({c: true}, {_id: 0, a: 1, c: 1}).explain(true);
 assert.eq(1, explain.executionStats.nReturned);
 assert.eq(0, explain.executionStats.totalDocsExamined);
-assert.eq(0,
-          getChunkSkipsFromShard(explain.queryPlanner.winningPlan.shards[0],
-                                 explain.executionStats.executionStages.shards[0]));
+assert.eq(
+    0,
+    getChunkSkipsFromShard(
+        explain.queryPlanner.winningPlan.shards[0],
+        explain.executionStats.executionStages.shards[0],
+    ),
+);
 
 st.stop();

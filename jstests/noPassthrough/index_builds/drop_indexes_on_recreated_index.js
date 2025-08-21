@@ -18,14 +18,15 @@ const coll = db.getCollection(collName);
 assert.commandWorked(coll.insert({a: 1}));
 
 const indexSpec = {
-    a: 1
+    a: 1,
 };
 
 IndexBuildTest.pauseIndexBuilds(conn);
 
 // Start an index build on {a: 1}.
-let awaitIndexBuild = IndexBuildTest.startIndexBuild(
-    conn, coll.getFullName(), indexSpec, {}, [ErrorCodes.IndexBuildAborted]);
+let awaitIndexBuild = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), indexSpec, {}, [
+    ErrorCodes.IndexBuildAborted,
+]);
 IndexBuildTest.waitForIndexBuildToStart(db, collName, "a_1");
 
 const failPoint = "hangAfterAbortingIndexes";
@@ -38,18 +39,20 @@ TestData.indexSpec = indexSpec;
 
 // Abort {a: 1} while it is being built.
 let awaitDropIndexes = startParallelShell(() => {
-    assert.commandWorked(db.getSiblingDB(TestData.dbName)
-                             .getCollection(TestData.collName)
-                             .dropIndexes(TestData.indexSpec));
+    assert.commandWorked(
+        db.getSiblingDB(TestData.dbName).getCollection(TestData.collName).dropIndexes(TestData.indexSpec),
+    );
 }, conn.port);
 
 // Wait until {a: 1} is aborted, but before the dropIndexes command finishes.
 awaitIndexBuild();
-assert.commandWorked(conn.adminCommand({
-    waitForFailPoint: failPoint,
-    timesEntered: timesEntered + 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    conn.adminCommand({
+        waitForFailPoint: failPoint,
+        timesEntered: timesEntered + 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 // Recreate {a: 1} and let it finish.
 IndexBuildTest.resumeIndexBuilds(conn);

@@ -21,8 +21,8 @@ var config = {
     "members": [
         {"_id": 0, "host": nodes[0]},
         {"_id": 1, "host": nodes[1], arbiterOnly: true},
-        {"_id": 2, "host": nodes[2], arbiterOnly: true}
-    ]
+        {"_id": 2, "host": nodes[2], arbiterOnly: true},
+    ],
 };
 
 replTest.initiate(config);
@@ -33,8 +33,8 @@ var t = db[name];
 
 function doRead(readConcern) {
     readConcern.maxTimeMS = 3000;
-    var res = assert.commandWorked(t.runCommand('find', readConcern));
-    var docs = (new DBCommandCursor(db, res)).toArray();
+    var res = assert.commandWorked(t.runCommand("find", readConcern));
+    var docs = new DBCommandCursor(db, res).toArray();
     assert.gt(docs.length, 0, "no docs returned!");
     return docs[0].state;
 }
@@ -54,8 +54,7 @@ function doCommittedRead() {
 }
 
 jsTest.log("doing write");
-assert.commandWorked(
-    t.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeout: 10 * 1000}}));
+assert.commandWorked(t.save({_id: 1, state: 0}, {writeConcern: {w: "majority", wtimeout: 10 * 1000}}));
 jsTest.log("doing read");
 assert.eq(doDirtyRead(), 0);
 jsTest.log("doing committed read");

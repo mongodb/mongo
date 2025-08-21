@@ -34,45 +34,55 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(sourceCollection, {oldKey:
 ]);
 assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.name}));
 
-assert.commandWorked(st.s0.getDB(dbName).getCollection(collName).insertMany([
-    {
-        _id: 1,
-        member: "abc123",
-        points: 0,
-        _oldKey: -5,
-    },
-    {
-        _id: 2,
-        member: "abc123",
-        points: 59,
-        _oldKey: 10,
-    },
-]));
+assert.commandWorked(
+    st.s0
+        .getDB(dbName)
+        .getCollection(collName)
+        .insertMany([
+            {
+                _id: 1,
+                member: "abc123",
+                points: 0,
+                _oldKey: -5,
+            },
+            {
+                _id: 2,
+                member: "abc123",
+                points: 59,
+                _oldKey: 10,
+            },
+        ]),
+);
 
 const shard0Primary = st.rs0.getPrimary();
 const shard1Primary = st.rs1.getPrimary();
-const hangBeforeUpdateFp =
-    configureFailPoint(shard1Primary, "hangUpdateBeforeWrite", {ns: namespace});
+const hangBeforeUpdateFp = configureFailPoint(shard1Primary, "hangUpdateBeforeWrite", {ns: namespace});
 
 const joinShell = startParallelShell(
-    funWithArgs((nss, collName, databaseVersion) => {
-        const resp = db.adminCommand({
-            _shardsvrCoordinateMultiUpdate: nss,
-            uuid: UUID(),
-            command: {
-                update: collName,
-                updates: [{q: {member: "abc123"}, u: {$set: {points: 50}}, multi: true}]
-            },
-            databaseVersion
-        });
-        assert.commandFailed(resp);
-    }, namespace, collName, ShardVersioningUtil.getDbVersion(st.s, dbName)), shard0Primary.port);
+    funWithArgs(
+        (nss, collName, databaseVersion) => {
+            const resp = db.adminCommand({
+                _shardsvrCoordinateMultiUpdate: nss,
+                uuid: UUID(),
+                command: {
+                    update: collName,
+                    updates: [{q: {member: "abc123"}, u: {$set: {points: 50}}, multi: true}],
+                },
+                databaseVersion,
+            });
+            assert.commandFailed(resp);
+        },
+        namespace,
+        collName,
+        ShardVersioningUtil.getDbVersion(st.s, dbName),
+    ),
+    shard0Primary.port,
+);
 
 hangBeforeUpdateFp.wait();
 
 const newPrimary = st.rs0.getSecondary();
-const waitForPendingUpdateFp =
-    configureFailPoint(newPrimary, "hangDuringMultiUpdateCoordinatorPendingUpdates");
+const waitForPendingUpdateFp = configureFailPoint(newPrimary, "hangDuringMultiUpdateCoordinatorPendingUpdates");
 
 st.rs0.stepUp(newPrimary);
 st.rs0.awaitNodesAgreeOnPrimary();

@@ -16,9 +16,8 @@ admin.runCommand({shardCollection: coll + "", key: {_id: 1}});
 
 var primary = config.databases.find({_id: coll.getDB() + ""}).primary;
 var notPrimary = null;
-config.shards.find().forEach(function(doc) {
-    if (doc._id != primary)
-        notPrimary = doc._id;
+config.shards.find().forEach(function (doc) {
+    if (doc._id != primary) notPrimary = doc._id;
 });
 
 var originalUuid = config.collections.findOne({_id: coll + ""}).uuid;

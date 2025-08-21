@@ -8,9 +8,7 @@ import {
     mongotCommandForQuery,
     mongotMultiCursorResponseForBatch,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 
 const dbName = "test";
 const collName = jsTestName();
@@ -24,15 +22,14 @@ const stWithMock = new ShardingTestWithMongotMock({
     mongos: 1,
     other: {
         rsOptions: {setParameter: {enableTestCommands: 1}},
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const testColl = testDB.getCollection(collName);
 const collNS = testColl.getFullName();
@@ -56,7 +53,7 @@ const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), 
 const mongotQuery = {};
 const protocolVersion = NumberInt(1);
 const cursorOptions = {
-    requiresSearchSequenceToken: true
+    requiresSearchSequenceToken: true,
 };
 const expectedMongotCommand = mongotCommandForQuery({
     query: mongotQuery,
@@ -64,7 +61,7 @@ const expectedMongotCommand = mongotCommandForQuery({
     db: dbName,
     collectionUUID: collUUID0,
     protocolVersion: protocolVersion,
-    cursorOptions: cursorOptions
+    cursorOptions: cursorOptions,
 });
 
 const cursorId = NumberLong(123);
@@ -94,14 +91,14 @@ function testBasicCase(shard0Conn, shard1Conn, mergeType, splitPipelineBeforePro
         pipeline = [
             {$search: mongotQuery},
             {$_internalSplitPipeline: {"mergeType": mergeType}},
-            {$project: {myToken: {$meta: "searchSequenceToken"}}}
+            {$project: {myToken: {$meta: "searchSequenceToken"}}},
         ];
     } else {
         pipeline = [
             {$search: mongotQuery},
             {$project: {myToken: {$meta: "searchSequenceToken"}}},
             {$_internalSplitPipeline: {"mergeType": mergeType}},
-            {$addFields: {"newField": 1}}
+            {$addFields: {"newField": 1}},
         ];
     }
     const mongot0ResponseBatch = [
@@ -110,11 +107,19 @@ function testBasicCase(shard0Conn, shard1Conn, mergeType, splitPipelineBeforePro
         {_id: 4, $searchScore: 1, $searchSequenceToken: "ggggggg=="},
         {_id: 1, $searchScore: 0.99, $searchSequenceToken: "hhhhhhh=="},
     ];
-    const history0 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot0ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
+    const history0 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot0ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
+    ];
 
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history0, cursorId, secondCursorId);
@@ -125,11 +130,19 @@ function testBasicCase(shard0Conn, shard1Conn, mergeType, splitPipelineBeforePro
         {_id: 12, $searchScore: 29, $searchSequenceToken: "ddddddd=="},
         {_id: 14, $searchScore: 28, $searchSequenceToken: "eeeeeee=="},
     ];
-    const history1 = [{
-        expectedCommand: expectedMongotCommand,
-        response: mongotMultiCursorResponseForBatch(
-            mongot1ResponseBatch, NumberLong(0), [{val: 1}], NumberLong(0), collNS, responseOk),
-    }];
+    const history1 = [
+        {
+            expectedCommand: expectedMongotCommand,
+            response: mongotMultiCursorResponseForBatch(
+                mongot1ResponseBatch,
+                NumberLong(0),
+                [{val: 1}],
+                NumberLong(0),
+                collNS,
+                responseOk,
+            ),
+        },
+    ];
     const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
     s1Mongot.setMockResponses(history1, cursorId, secondCursorId);
 
@@ -149,8 +162,7 @@ function testBasicCase(shard0Conn, shard1Conn, mergeType, splitPipelineBeforePro
             obj["newField"] = 1;
         });
     }
-    mockPlanShardedSearchResponse(
-        testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
+    mockPlanShardedSearchResponse(testColl.getName(), mongotQuery, dbName, undefined /*sortSpec*/, stWithMock);
 
     assert.eq(testColl.aggregate(pipeline).toArray(), expectedDocs);
 }

@@ -22,15 +22,13 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_inline.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_inline.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // Use the workload name as a prefix for the collection name,
     // since the workload name is assumed to be unique.
-    $config.data.prefix = 'map_reduce_replace_nonexistent';
+    $config.data.prefix = "map_reduce_replace_nonexistent";
 
     function uniqueCollectionName(prefix, tid) {
         return prefix + tid;
@@ -45,7 +43,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var options = {
             finalize: this.finalizer,
             out: {replace: outCollName},
-            query: {key: {$exists: true}, value: {$exists: true}}
+            query: {key: {$exists: true}, value: {$exists: true}},
         };
 
         var res = db[collName].mapReduce(this.mapper, this.reducer, options);

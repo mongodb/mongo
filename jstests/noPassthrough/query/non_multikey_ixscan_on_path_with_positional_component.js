@@ -8,7 +8,7 @@ import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 // Configure 'internalQueryExecYieldIterations' such that operations will yield on each PlanExecutor
 // iteration.
 const options = {
-    setParameter: {internalQueryExecYieldIterations: 1}
+    setParameter: {internalQueryExecYieldIterations: 1},
 };
 const conn = MongoRunner.runMongod(options);
 assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
@@ -25,7 +25,7 @@ assert.commandWorked(coll.createIndex({"a.0.b": 1, c: 1}));
 const doc = {
     _id: 0,
     a: [{b: 1}],
-    c: 1
+    c: 1,
 };
 assert.commandWorked(coll.insert(doc));
 

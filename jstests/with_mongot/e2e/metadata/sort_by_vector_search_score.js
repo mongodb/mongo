@@ -9,7 +9,7 @@ import {
     getMovieData,
     getMoviePlotEmbeddingById,
     getMovieVectorSearchIndexSpec,
-    makeMovieVectorQuery
+    makeMovieVectorQuery,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {waitUntilDocIsVisibleByQuery} from "jstests/with_mongot/e2e_lib/search_e2e_utils.js";
 
@@ -30,11 +30,10 @@ function runTest(metadataSortFieldName) {
         // Get the embedding for 'Beauty and the Beast', which has _id = 14.
         makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10}),
         {
-            $setWindowFields:
-                {sortBy: {score: {$meta: metadataSortFieldName}}, output: {rank: {$rank: {}}}}
+            $setWindowFields: {sortBy: {score: {$meta: metadataSortFieldName}}, output: {rank: {$rank: {}}}},
         },
         {$sort: {score: {$meta: metadataSortFieldName}, _id: 1}},
-        {$project: {rank: 1, score: {$meta: metadataSortFieldName}, _id: 1}}
+        {$project: {rank: 1, score: {$meta: metadataSortFieldName}, _id: 1}},
     ];
     {
         const results = coll.aggregate(testRankingPipeline).toArray();
@@ -42,7 +41,7 @@ function runTest(metadataSortFieldName) {
         // So far these are all unique movies with unique embeddings, so we should see unique ranks:
         // 1 through 10.
         assert.eq(results.length, 10);
-        assert.eq(results[0]._id, 14, results[0]);  // The one we queried for should be first place.
+        assert.eq(results[0]._id, 14, results[0]); // The one we queried for should be first place.
         for (let i = 0; i < results.length; ++i) {
             // Adjusting for off-by-one, since 'i' is 0-based indexing and rank is 1-based.
             assert.eq(results[i].rank, i + 1, results[i]);
@@ -52,25 +51,26 @@ function runTest(metadataSortFieldName) {
     {
         // Test with a 'partitionBy' argument. We segment the even _ids and the odd _ids, which
         // should create two streams of ranks of approximately equal size.
-        const results =
-            coll.aggregate([
-                    makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 20}),
-                    {
-                        $setWindowFields: {
-                            sortBy: {score: {$meta: metadataSortFieldName}},
-                            partitionBy: {$mod: ['$_id', 2]},
-                            output: {rank: {$rank: {}}}
-                        }
+        const results = coll
+            .aggregate([
+                makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 20}),
+                {
+                    $setWindowFields: {
+                        sortBy: {score: {$meta: metadataSortFieldName}},
+                        partitionBy: {$mod: ["$_id", 2]},
+                        output: {rank: {$rank: {}}},
                     },
-                    {$sort: {score: {$meta: metadataSortFieldName}, _id: 1}},
-                    {$project: {rank: 1, score: 1, _id: 1}}
-                ])
-                .toArray();
+                },
+                {$sort: {score: {$meta: metadataSortFieldName}, _id: 1}},
+                {$project: {rank: 1, score: 1, _id: 1}},
+            ])
+            .toArray();
 
         assert.eq(
             results.length,
             allSeedData.length - 1,
-            "A higher limit, we should see all results now except (a) the duplicate result which we filtered out and (b) the one which had a null query vector");
+            "A higher limit, we should see all results now except (a) the duplicate result which we filtered out and (b) the one which had a null query vector",
+        );
 
         // This should still be the top result.
         assert.eq(results[0]._id, 14, results[0]);
@@ -83,13 +83,13 @@ function runTest(metadataSortFieldName) {
     {
         // Now insert a duplicate record of 'Beauty and the Beast' - we should see two records with
         // rank 1, the rest should be in order now starting at rank 3.
-        assert.commandWorked(coll.insertOne(
-            coll.aggregate([{$match: {_id: 14}}, {$set: {_id: {$const: "duplicate"}}}]).next()));
+        assert.commandWorked(
+            coll.insertOne(coll.aggregate([{$match: {_id: 14}}, {$set: {_id: {$const: "duplicate"}}}]).next()),
+        );
         waitUntilDocIsVisibleByQuery({
             docId: "duplicate",
             coll: coll,
-            queryPipeline:
-                [makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10})]
+            queryPipeline: [makeMovieVectorQuery({queryVector: getMoviePlotEmbeddingById(14), limit: 10})],
         });
 
         const results = coll.aggregate(testRankingPipeline).toArray();

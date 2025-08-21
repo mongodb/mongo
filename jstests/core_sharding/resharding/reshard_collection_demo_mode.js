@@ -32,16 +32,19 @@ const reshardingDelayBeforeRemainingOperationTimeQueryMillisValue = 20000;
 // Explicitly set the resharding params to maintain test duration invariants.
 // Note that we only set and test reshardingDelayBeforeRemainingOperationTimeQueryMillisValue below
 // mainly as reshardingMinimumOperationDurationMillis is covered in CPP tests.
-const setParamCmd = Object.assign({setParameter: 1}, {
-    reshardingMinimumOperationDurationMillis: 0,
-    reshardingDelayBeforeRemainingOperationTimeQueryMillis:
-        reshardingDelayBeforeRemainingOperationTimeQueryMillisValue
-});
+const setParamCmd = Object.assign(
+    {setParameter: 1},
+    {
+        reshardingMinimumOperationDurationMillis: 0,
+        reshardingDelayBeforeRemainingOperationTimeQueryMillis:
+            reshardingDelayBeforeRemainingOperationTimeQueryMillisValue,
+    },
+);
 assert.commandWorked(configPrimary.adminCommand(setParamCmd));
 
 const collName = jsTestName();
 const dbName = db.getName();
-const ns = dbName + '.' + collName;
+const ns = dbName + "." + collName;
 const mongos = db.getMongo();
 const kNumInitialDocs = 10;
 const reshardCmdTest = new ReshardCollectionCmdTest({
@@ -49,7 +52,7 @@ const reshardCmdTest = new ReshardCollectionCmdTest({
     dbName: dbName,
     collName,
     numInitialDocs: kNumInitialDocs,
-    skipDirectShardChecks: true
+    skipDirectShardChecks: true,
 });
 
 const testDemoModeTrue = (mongos) => {
@@ -59,20 +62,24 @@ const testDemoModeTrue = (mongos) => {
     const maxExpectedDurationMs = reshardingDelayBeforeRemainingOperationTimeQueryMillisValue - 1;
     reshardCmdTest.assertReshardCollOk(
         {reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1, demoMode: true},
-        1);  // Expect 1 initial chunk
+        1,
+    ); // Expect 1 initial chunk
 
     assert.lte(
         reshardCmdTest._reshardDuration,
         maxExpectedDurationMs,
         `Resharding with demoMode=true took ${
-            reshardCmdTest._reshardDuration}ms, which is longer than the expected maximum of ${
-            maxExpectedDurationMs}ms.`);
+            reshardCmdTest._reshardDuration
+        }ms, which is longer than the expected maximum of ${maxExpectedDurationMs}ms.`,
+    );
 };
 
 const testDemoModeFalse = (mongos) => {
     jsTestLog(
         "Testing reshardCollection with demoMode: false should take at least reshardingDelayBeforeRemainingOperationTimeQueryMillis" +
-        reshardingDelayBeforeRemainingOperationTimeQueryMillisValue + " seconds to complete");
+            reshardingDelayBeforeRemainingOperationTimeQueryMillisValue +
+            " seconds to complete",
+    );
 
     // Drop the collection to ensure a clean state for this test
     mongos.getDB(dbName)[collName].drop();
@@ -81,17 +88,20 @@ const testDemoModeFalse = (mongos) => {
     const startTime = Date.now();
     reshardCmdTest.assertReshardCollOk(
         {reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 1, demoMode: false},
-        1);  // Expect 1 initial chunk
+        1,
+    ); // Expect 1 initial chunk
 
     const endTime = Date.now();
     const durationMs = endTime - startTime;
     const minExpectedDurationMs = reshardingDelayBeforeRemainingOperationTimeQueryMillisValue;
 
-    assert.gte(durationMs,
-               minExpectedDurationMs,
-               `Resharding with demoMode=false took ${
-                   durationMs}ms, which is shorter than the expected minimum of ${
-                   minExpectedDurationMs}ms.`);
+    assert.gte(
+        durationMs,
+        minExpectedDurationMs,
+        `Resharding with demoMode=false took ${durationMs}ms, which is shorter than the expected minimum of ${
+            minExpectedDurationMs
+        }ms.`,
+    );
 };
 
 testDemoModeTrue(mongos);

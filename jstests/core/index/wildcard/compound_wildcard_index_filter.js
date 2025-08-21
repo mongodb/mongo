@@ -20,11 +20,10 @@ import {WildcardIndexHelpers} from "jstests/libs/query/wildcard_index_helpers.js
 function findFilter(cwiFilter, filterList) {
     for (const filter of filterList) {
         if (bsonWoCompare(cwiFilter.query, filter.query) == 0) {
-            if (filter.indexes.find(keyPattern =>
-                                        bsonWoCompare(cwiFilter.keyPattern, keyPattern) == 0)) {
+            if (filter.indexes.find((keyPattern) => bsonWoCompare(cwiFilter.keyPattern, keyPattern) == 0)) {
                 return filter;
             }
-            if (filter.indexes.find(indexName => cwiFilter.indexName == indexName)) {
+            if (filter.indexes.find((indexName) => cwiFilter.indexName == indexName)) {
                 return filter;
             }
         }
@@ -37,8 +36,8 @@ function findFilter(cwiFilter, filterList) {
  * Utility function to list index filters.
  */
 function getFilters(coll) {
-    const res = assert.commandWorked(coll.runCommand('planCacheListFilters'));
-    assert(res.hasOwnProperty('filters'), 'filters missing from planCacheListFilters result');
+    const res = assert.commandWorked(coll.runCommand("planCacheListFilters"));
+    assert(res.hasOwnProperty("filters"), "filters missing from planCacheListFilters result");
     return res.filters;
 }
 
@@ -46,20 +45,16 @@ function getFilters(coll) {
  * Sets an index filter given a query shape then confirms that the expected index was used
  * to answer a query.
  */
-function assertExpectedIndexAnswersQueryWithFilter(
-    coll, filterQuery, filterIndexes, query, expectedIndexName) {
+function assertExpectedIndexAnswersQueryWithFilter(coll, filterQuery, filterIndexes, query, expectedIndexName) {
     // Clear existing cache filters.
-    assert.commandWorked(coll.runCommand('planCacheClearFilters'), 'planCacheClearFilters failed');
+    assert.commandWorked(coll.runCommand("planCacheClearFilters"), "planCacheClearFilters failed");
 
     // Make sure that the filter is set correctly.
-    assert.commandWorked(
-        coll.runCommand('planCacheSetFilter', {query: filterQuery, indexes: filterIndexes}));
-    assert.eq(1,
-              getFilters(coll).length,
-              'no change in query settings after successfully setting index filters');
+    assert.commandWorked(coll.runCommand("planCacheSetFilter", {query: filterQuery, indexes: filterIndexes}));
+    assert.eq(1, getFilters(coll).length, "no change in query settings after successfully setting index filters");
 
     // Check that expectedIndex index was used over another index.
-    const explain = assert.commandWorked(coll.find(query).explain('executionStats'));
+    const explain = assert.commandWorked(coll.find(query).explain("executionStats"));
 
     WildcardIndexHelpers.assertExpectedIndexIsUsed(explain, expectedIndexName);
 }
@@ -117,11 +112,13 @@ let expectedNumberOfFilters = 0;
 
 // create and validate filters using indexes' key patterns
 for (const cwiFilter of cwiFilterList) {
-    assert.commandWorked(db.runCommand({
-        planCacheSetFilter: collectionName,
-        query: cwiFilter.query,
-        indexes: [cwiFilter.keyPattern],
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            planCacheSetFilter: collectionName,
+            query: cwiFilter.query,
+            indexes: [cwiFilter.keyPattern],
+        }),
+    );
 
     expectedNumberOfFilters += 1;
 
@@ -133,11 +130,13 @@ for (const cwiFilter of cwiFilterList) {
 
 // clear and validate filters using indexes' key patterns
 for (const cwiFilter of cwiFilterList) {
-    assert.commandWorked(db.runCommand({
-        planCacheClearFilters: collectionName,
-        query: cwiFilter.query,
-        indexes: [cwiFilter.keyPattern],
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            planCacheClearFilters: collectionName,
+            query: cwiFilter.query,
+            indexes: [cwiFilter.keyPattern],
+        }),
+    );
 
     expectedNumberOfFilters -= 1;
 
@@ -149,11 +148,13 @@ for (const cwiFilter of cwiFilterList) {
 
 // create and validate filters using indexes' names
 for (const cwiFilter of cwiFilterList) {
-    assert.commandWorked(db.runCommand({
-        planCacheSetFilter: collectionName,
-        query: cwiFilter.query,
-        indexes: [cwiFilter.indexName],
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            planCacheSetFilter: collectionName,
+            query: cwiFilter.query,
+            indexes: [cwiFilter.indexName],
+        }),
+    );
 
     expectedNumberOfFilters += 1;
 
@@ -165,11 +166,13 @@ for (const cwiFilter of cwiFilterList) {
 
 // clear and validate filters using indexes' names
 for (const cwiFilter of cwiFilterList) {
-    assert.commandWorked(db.runCommand({
-        planCacheClearFilters: collectionName,
-        query: cwiFilter.query,
-        indexes: [cwiFilter.indexName],
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            planCacheClearFilters: collectionName,
+            query: cwiFilter.query,
+            indexes: [cwiFilter.indexName],
+        }),
+    );
 
     expectedNumberOfFilters -= 1;
 
@@ -187,5 +190,10 @@ for (const cwiFilter of cwiFilterList) {
 // Test that CWI obey Index Filters.
 for (const cwiFilter of cwiFilterList) {
     assertExpectedIndexAnswersQueryWithFilter(
-        coll, cwiFilter.query, [cwiFilter.keyPattern], cwiFilter.query, cwiFilter.indexName);
+        coll,
+        cwiFilter.query,
+        [cwiFilter.keyPattern],
+        cwiFilter.query,
+        cwiFilter.indexName,
+    );
 }

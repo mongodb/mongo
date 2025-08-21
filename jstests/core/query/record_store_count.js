@@ -56,11 +56,9 @@ function testExplainAndExpectStage({expectedStages, unexpectedStages, hintIndex}
     checkPlan(explain.queryPlanner.winningPlan, expectedStages, unexpectedStages);
 }
 
-if ((!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) ||
-    !FixtureHelpers.isSharded(coll)) {
+if ((!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) || !FixtureHelpers.isSharded(coll)) {
     // In an unsharded collection we can use the COUNT_SCAN stage.
-    testExplainAndExpectStage(
-        {expectedStages: ["COUNT_SCAN"], unexpectedStages: [], hintIndex: {x: 1}});
+    testExplainAndExpectStage({expectedStages: ["COUNT_SCAN"], unexpectedStages: [], hintIndex: {x: 1}});
     quit();
 }
 
@@ -70,18 +68,18 @@ if ((!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) ||
 testExplainAndExpectStage({
     expectedStages: ["COUNT", "SHARDING_FILTER", "FETCH"],
     unexpectedStages: [],
-    hintIndex: {x: 1}
+    hintIndex: {x: 1},
 });
 
 // Add an index which includes the shard key. This means the FETCH should no longer be necesary
 // since the SHARDING_FILTER can get the shard key straight from the index.
 const kNewIndexSpec = {
     x: 1,
-    _id: 1
+    _id: 1,
 };
 assert.commandWorked(coll.createIndex(kNewIndexSpec));
 testExplainAndExpectStage({
     expectedStages: ["COUNT", "SHARDING_FILTER"],
     unexpectedStages: ["FETCH"],
-    hintIndex: kNewIndexSpec
+    hintIndex: kNewIndexSpec,
 });

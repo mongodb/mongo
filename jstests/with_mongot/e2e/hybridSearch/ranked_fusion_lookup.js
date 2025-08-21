@@ -7,7 +7,7 @@ import {createSearchIndex, dropSearchIndex} from "jstests/libs/search.js";
 import {
     getMovieData,
     getMovieSearchIndexSpec,
-    getMovieVectorSearchIndexSpec
+    getMovieVectorSearchIndexSpec,
 } from "jstests/with_mongot/e2e_lib/data/movies.js";
 import {
     assertDocArrExpectedFuzzy,
@@ -47,26 +47,26 @@ let collATestQuery = [
                             $search: {
                                 index: getMovieSearchIndexSpec().name,
                                 text: {query: "ape", path: ["fullplot", "title"]},
-                            }
+                            },
                         },
-                        {$limit: limit}
-                    ]
-                }
-            }
+                        {$limit: limit},
+                    ],
+                },
+            },
         },
     },
-    {$limit: limit}
+    {$limit: limit},
 ];
 
 // Perform an identity $lookup query.
 let results = collA
-                  .aggregate([
-                      {$limit: 1},
-                      {$lookup: {from: collA.getName(), pipeline: collATestQuery, as: "out"}},
-                      {$unwind: "$out"},
-                      {$replaceRoot: {newRoot: "$out"}}
-                  ])
-                  .toArray();
+    .aggregate([
+        {$limit: 1},
+        {$lookup: {from: collA.getName(), pipeline: collATestQuery, as: "out"}},
+        {$unwind: "$out"},
+        {$replaceRoot: {newRoot: "$out"}},
+    ])
+    .toArray();
 
 let expectedResultIds = [6, 1, 2, 3, 4, 5];
 assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), results);
@@ -89,16 +89,16 @@ let collBTestQuery = [
                             $search: {
                                 index: getMovieSearchIndexSpec().name,
                                 text: {query: "romance", path: ["fullplot", "title"]},
-                            }
+                            },
                         },
-                        {$limit: 5}
-                    ]
-                }
-            }
+                        {$limit: 5},
+                    ],
+                },
+            },
         },
     },
     {$lookup: {from: collA.getName(), pipeline: collATestQuery, as: "out"}},
-    {$limit: 10}
+    {$limit: 10},
 ];
 
 createSearchIndex(collB, getMovieSearchIndexSpec());
@@ -137,7 +137,7 @@ let collBResults = [];
 let collAIds = new Set();
 let collAResults = [];
 
-results.forEach(doc => {
+results.forEach((doc) => {
     // Get every part of the document except for the "out" array created by collA's lookup.
     let topLevelDoc = Object.fromEntries(Object.entries(doc).filter(([key]) => key !== "out"));
 
@@ -145,7 +145,7 @@ results.forEach(doc => {
 
     // Process nested documents from collA's lookup.
     if (doc.out && Array.isArray(doc.out)) {
-        doc.out.forEach(nestedDoc => {
+        doc.out.forEach((nestedDoc) => {
             // Add nested document if not already seen.
             if (!collAIds.has(nestedDoc._id)) {
                 collAIds.add(nestedDoc._id);
@@ -159,8 +159,7 @@ results.forEach(doc => {
 let combinedResults = [...collBResults, ...collAResults];
 
 expectedResultIds = [14, 15, 6, 1, 2, 3, 4, 5];
-assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES),
-                          combinedResults);
+assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds, datasets.MOVIES), combinedResults);
 
 dropSearchIndex(collA, {name: getMovieSearchIndexSpec().name});
 dropSearchIndex(collA, {name: getMovieVectorSearchIndexSpec().name});

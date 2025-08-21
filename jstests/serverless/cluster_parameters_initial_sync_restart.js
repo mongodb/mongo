@@ -39,13 +39,17 @@ function setParamsAndValidateCluster(rst) {
     runSetClusterParameter(rst.getPrimary(), strParameter2, tenantId);
 
     // Check that the new values are visible on the majority of the nodes.
-    runGetClusterParameterReplicaSet(rst,
-                                     ["testIntClusterParameter", "testStrClusterParameter"],
-                                     [intParameter1, strParameter1]);
-    runGetClusterParameterReplicaSet(rst,
-                                     ["testIntClusterParameter", "testStrClusterParameter"],
-                                     [intParameter2, strParameter2],
-                                     tenantId);
+    runGetClusterParameterReplicaSet(
+        rst,
+        ["testIntClusterParameter", "testStrClusterParameter"],
+        [intParameter1, strParameter1],
+    );
+    runGetClusterParameterReplicaSet(
+        rst,
+        ["testIntClusterParameter", "testStrClusterParameter"],
+        [intParameter2, strParameter2],
+        tenantId,
+    );
 }
 // Checks that up-to-date cluster parameters are transferred over to newly-added replica set nodes
 // as part of initial sync.
@@ -65,13 +69,21 @@ function checkClusterParameterInitialSync(rst, newNodeOptions) {
     rst.awaitReplication();
 
     // Check that the new node has the latest cluster parameter values.
-    assert(runGetClusterParameterNode(newNode,
-                                      ["testIntClusterParameter", "testStrClusterParameter"],
-                                      [intParameter1, strParameter1]));
-    assert(runGetClusterParameterNode(newNode,
-                                      ["testIntClusterParameter", "testStrClusterParameter"],
-                                      [intParameter2, strParameter2],
-                                      tenantId));
+    assert(
+        runGetClusterParameterNode(
+            newNode,
+            ["testIntClusterParameter", "testStrClusterParameter"],
+            [intParameter1, strParameter1],
+        ),
+    );
+    assert(
+        runGetClusterParameterNode(
+            newNode,
+            ["testIntClusterParameter", "testStrClusterParameter"],
+            [intParameter2, strParameter2],
+            tenantId,
+        ),
+    );
 
     // Check that setClusterParameter properly works with the reconfigured replica set.
     intParameter1.intData = 30;
@@ -97,17 +109,21 @@ function checkClusterParameterRestart(rst) {
     });
 
     // Check that restarted replica set still has the most recent setClusterParameter values.
-    runGetClusterParameterReplicaSet(rst,
-                                     ["testIntClusterParameter", "testStrClusterParameter"],
-                                     [intParameter1, strParameter1]);
-    runGetClusterParameterReplicaSet(rst,
-                                     ["testIntClusterParameter", "testStrClusterParameter"],
-                                     [intParameter2, strParameter2],
-                                     tenantId);
+    runGetClusterParameterReplicaSet(
+        rst,
+        ["testIntClusterParameter", "testStrClusterParameter"],
+        [intParameter1, strParameter1],
+    );
+    runGetClusterParameterReplicaSet(
+        rst,
+        ["testIntClusterParameter", "testStrClusterParameter"],
+        [intParameter2, strParameter2],
+        tenantId,
+    );
 }
 
 const baseOptions = {
-    setParameter: {multitenancySupport: true, featureFlagRequireTenantID: true}
+    setParameter: {multitenancySupport: true, featureFlagRequireTenantID: true},
 };
 
 const rst = new ReplSetTest({

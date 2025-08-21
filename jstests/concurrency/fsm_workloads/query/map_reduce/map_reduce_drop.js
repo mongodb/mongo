@@ -20,7 +20,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         mapper: function mapper() {
             emit(this.key, 1);
@@ -30,10 +30,10 @@ export const $config = (function() {
             // drops to occur during different phases of the mapReduce.
             return 1;
         },
-        numDocs: 250
+        numDocs: 250,
     };
 
-    var states = (function() {
+    var states = (function () {
         function dropColl(db, collName) {
             var mapReduceDb = db.getSiblingDB(this.mapReduceDBName);
 
@@ -73,7 +73,7 @@ export const $config = (function() {
                 finalize: function finalize(key, reducedValue) {
                     return reducedValue;
                 },
-                out: collName + '_out'
+                out: collName + "_out",
             };
 
             try {
@@ -90,11 +90,11 @@ export const $config = (function() {
     var transitions = {
         dropColl: {mapReduce: 1},
         dropDB: {mapReduce: 1},
-        mapReduce: {mapReduce: 0.7, dropDB: 0.05, dropColl: 0.25}
+        mapReduce: {mapReduce: 0.7, dropDB: 0.05, dropColl: 0.25},
     };
 
     function setup(db, collName, cluster) {
-        this.mapReduceDBName = db.getName() + 'map_reduce_drop';
+        this.mapReduceDBName = db.getName() + "map_reduce_drop";
     }
 
     return {
@@ -103,7 +103,7 @@ export const $config = (function() {
         data: data,
         setup: setup,
         states: states,
-        startState: 'mapReduce',
+        startState: "mapReduce",
         transitions: transitions,
     };
 })();

@@ -21,7 +21,7 @@ const benchArgs = {
     ops: [],
     parallel: 1,
     seconds: 1,
-    host: db.getMongo().host
+    host: db.getMongo().host,
 };
 if (jsTest.options().auth) {
     benchArgs["db"] = "admin";
@@ -39,7 +39,7 @@ const opsAndErrors = [
     // The writeCmd: false for update op will get an error.
     {
         op: {ns: coll.getFullName(), op: "insert", doc: [{_id: 0, a: 1}], writeCmd: false},
-        error: writeCmdParamError
+        error: writeCmdParamError,
     },
     // No writeCmd param for update op will get an error.
     {
@@ -49,7 +49,7 @@ const opsAndErrors = [
             query: {_id: 0},
             update: {$inc: {a: 1}},
         },
-        error: writeCmdParamError
+        error: writeCmdParamError,
     },
     // The writeCmd: false for update op will get an error.
     {
@@ -58,9 +58,9 @@ const opsAndErrors = [
             op: "update",
             query: {_id: 0},
             update: {$inc: {a: 1}},
-            writeCmd: false
+            writeCmd: false,
         },
-        error: writeCmdParamError
+        error: writeCmdParamError,
     },
     // No writeCmd param for delete op will get an error.
     {
@@ -69,19 +69,19 @@ const opsAndErrors = [
             op: "delete",
             query: {_id: 0},
         },
-        error: writeCmdParamError
+        error: writeCmdParamError,
     },
     // The writeCmd: false for delete op will get an error.
     {
         op: {ns: coll.getFullName(), op: "delete", query: {_id: 0}, writeCmd: false},
-        error: writeCmdParamError
+        error: writeCmdParamError,
     },
     // No readCmd param for findOne op will get an error.
     {op: {ns: coll.getFullName(), op: "findOne", query: {}}, error: readCmdParamError},
     // The readCmd: false for findOne op will get an error.
     {
         op: {ns: coll.getFullName(), op: "findOne", query: {}, readCmd: false},
-        error: readCmdParamError
+        error: readCmdParamError,
     },
     // No readCmd param for find op will get an error.
     {op: {ns: coll.getFullName(), op: "find", query: {}}, error: readCmdParamError},
@@ -94,9 +94,9 @@ const opsAndErrors = [
             op: "find",
             query: {},
             options: DBQuery.Option.exhaust,
-            readCmd: true
+            readCmd: true,
         },
-        error: exhaustOptionError
+        error: exhaustOptionError,
     },
     // Exhaust query for command op is not supported for benchRun().
     {
@@ -104,13 +104,13 @@ const opsAndErrors = [
             ns: testDB.getName(),
             op: "command",
             command: {"find": coll.getName()},
-            options: DBQuery.Option.exhaust
+            options: DBQuery.Option.exhaust,
         },
-        error: exhaustOptionError
+        error: exhaustOptionError,
     },
 ];
 
-opsAndErrors.forEach(opAndError => {
+opsAndErrors.forEach((opAndError) => {
     benchArgs.ops = [opAndError.op];
 
     assert.throwsWithCode(() => benchRun(benchArgs), opAndError.error);

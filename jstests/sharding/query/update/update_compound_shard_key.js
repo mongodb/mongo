@@ -8,30 +8,25 @@
  */
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    isUpdateDocumentShardKeyUsingTransactionApiEnabled
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {isUpdateDocumentShardKeyUsingTransactionApiEnabled} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 const st = new ShardingTest({mongos: 1, shards: 3});
 
-const updateDocumentShardKeyUsingTransactionApiEnabled =
-    isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
+const updateDocumentShardKeyUsingTransactionApiEnabled = isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
 
-const kDbName = 'update_compound_sk';
-const ns = kDbName + '.coll';
+const kDbName = "update_compound_sk";
+const ns = kDbName + ".coll";
 const session = st.s.startSession({retryWrites: true});
 const sessionDB = session.getDatabase(kDbName);
 
-assert.commandWorked(
-    st.s0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
-assert.commandWorked(
-    st.s.getDB('config').adminCommand({shardCollection: ns, key: {x: 1, y: 1, z: 1}}));
+assert.commandWorked(st.s.getDB("config").adminCommand({shardCollection: ns, key: {x: 1, y: 1, z: 1}}));
 
 let docsToInsert = [
     {_id: 0, x: 4, y: 3, z: 3},
     {_id: 1, x: 100, y: 50, z: 3, a: 5},
-    {_id: 2, x: 100, y: 500, z: 3, a: 5}
+    {_id: 2, x: 100, y: 500, z: 3, a: 5},
 ];
 
 // Make sure that shard0, shard1 and shard2 has _id 0,1 and 2 documents respectively.
@@ -42,10 +37,12 @@ for (let i = 0; i < docsToInsert.length; i++) {
     assert.commandWorked(st.s.getDB(kDbName).coll.insert(docsToInsert[i]));
 }
 
-assert.commandWorked(st.s.adminCommand(
-    {moveChunk: ns, find: {x: 100, y: 50, z: 3}, to: st.shard1.shardName, _waitForDelete: true}));
-assert.commandWorked(st.s.adminCommand(
-    {moveChunk: ns, find: {x: 100, y: 500, z: 3}, to: st.shard2.shardName, _waitForDelete: true}));
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: 100, y: 50, z: 3}, to: st.shard1.shardName, _waitForDelete: true}),
+);
+assert.commandWorked(
+    st.s.adminCommand({moveChunk: ns, find: {x: 100, y: 500, z: 3}, to: st.shard2.shardName, _waitForDelete: true}),
+);
 
 function assertUpdateWorked(query, update, isUpsert, _id) {
     const res = sessionDB.coll.update(query, update, {upsert: isUpsert});
@@ -77,13 +74,17 @@ function assertUpdateWorkedWithNoMatchingDoc(query, update, isUpsert, inTransact
     assert.eq(0, res.nModified);
 
     // Skip find based validation for pipleline update or when inside a transaction.
-    if (Array.isArray(update) || inTransaction)
-        return;
+    if (Array.isArray(update) || inTransaction) return;
 
     // Make sure that the upsert inserted the correct document or update did not insert
     // anything.
-    assert.eq(isUpsert ? 1 : 0,
-              st.s.getDB(kDbName).coll.find(update["$set"] ? update["$set"] : update).itcount());
+    assert.eq(
+        isUpsert ? 1 : 0,
+        st.s
+            .getDB(kDbName)
+            .coll.find(update["$set"] ? update["$set"] : update)
+            .itcount(),
+    );
 }
 
 /**
@@ -107,7 +108,7 @@ function assertWouldChangeOwningShardUpdateResult(res, expectedUpdatedDoc) {
 //
 
 // Test behaviours common to update and upsert.
-[false, true].forEach(function(isUpsert) {
+[false, true].forEach(function (isUpsert) {
     // Full shard key in query matches the update document.
     assertUpdateWorked({x: 4, y: 3, z: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
     assertUpdateWorked({x: 4, _id: 0, z: 3, y: 3}, {x: 4, y: 3, z: 3, a: 0}, isUpsert, 0);
@@ -176,14 +177,19 @@ try {
     // If a WouldChangeOwningShard update is performed not as a retryable write or in a
     // transaction, expect an error.
     assert.eq(updateResult.getWriteError().code, ErrorCodes.IllegalOperation);
-    assert(updateResult.getWriteError().errmsg.includes(
-        "Must run update to shard key field in a multi-statement transaction or with " +
-        "retryWrites: true"));
+    assert(
+        updateResult
+            .getWriteError()
+            .errmsg.includes(
+                "Must run update to shard key field in a multi-statement transaction or with " + "retryWrites: true",
+            ),
+    );
 }
 
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false),
-    [ErrorCodes.IllegalOperation, 31025]);
+assert.commandFailedWithCode(st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false), [
+    ErrorCodes.IllegalOperation,
+    31025,
+]);
 
 //
 // Test upsert-specific behaviours.
@@ -197,7 +203,7 @@ const updateDoc = {
     x: 1110,
     y: 55,
     z: 3,
-    replStyleUpdate: true
+    replStyleUpdate: true,
 };
 const updateRes = st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0}, updateDoc, {upsert: true});
 assertWouldChangeOwningShardUpdateResult(updateRes, updateDoc);
@@ -206,66 +212,78 @@ const updateDocTxn = {
     x: 1110,
     y: 55,
     z: 4,
-    replStyleUpdate: true
+    replStyleUpdate: true,
 };
 withTxnAndAutoRetryOnMongos(session, () => {
-    assertUpdateWorkedWithNoMatchingDoc(
-        {x: 4, y: 0, z: 0}, updateDocTxn, true /*isUpsert*/, true /*inTransaction*/);
+    assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0}, updateDocTxn, true /*isUpsert*/, true /*inTransaction*/);
 });
 assert.eq(1, sessionDB.coll.find(updateDocTxn).itcount());
 
 // Shard key field modifications do not have to specify full shard key.
 // Query on partial shard key.
-assertUpdateWorkedWithNoMatchingDoc({x: 101, y: 50, a: 5},
-                                    {x: 100, y: 55, z: 3, a: 1},
-                                    true /* isUpsert */,
-                                    false /* inTransaction */);
-assertUpdateWorkedWithNoMatchingDoc({x: 102, y: 50, nonExistingField: true},
-                                    {x: 102, y: 55, z: 3, a: 1},
-                                    true /* isUpsert */,
-                                    false /* inTransaction */);
+assertUpdateWorkedWithNoMatchingDoc(
+    {x: 101, y: 50, a: 5},
+    {x: 100, y: 55, z: 3, a: 1},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
+assertUpdateWorkedWithNoMatchingDoc(
+    {x: 102, y: 50, nonExistingField: true},
+    {x: 102, y: 55, z: 3, a: 1},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
 
 // Query on partial shard key with _id.
-assertUpdateWorkedWithNoMatchingDoc({x: 100, y: 50, a: 5, _id: 23},
-                                    {x: 100, y: 55, z: 3, a: 2},
-                                    true /* isUpsert */,
-                                    false /* inTransaction */);
-assertUpdateWorkedWithNoMatchingDoc({x: 100, y: 50, a: 5, _id: 24, nonExistingField: true},
-                                    {x: 100, y: 55, z: 3, a: 3},
-                                    true /* isUpsert */,
-                                    false /* inTransaction */);
+assertUpdateWorkedWithNoMatchingDoc(
+    {x: 100, y: 50, a: 5, _id: 23},
+    {x: 100, y: 55, z: 3, a: 2},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
+assertUpdateWorkedWithNoMatchingDoc(
+    {x: 100, y: 50, a: 5, _id: 24, nonExistingField: true},
+    {x: 100, y: 55, z: 3, a: 3},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
 
 // Query on only _id.
 assertUpdateWorkedWithNoMatchingDoc(
-    {_id: 25}, {z: 3, x: 4, y: 3, a: 4}, true /* isUpsert */, false /* inTransaction */);
+    {_id: 25},
+    {z: 3, x: 4, y: 3, a: 4},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
 assertUpdateWorkedWithNoMatchingDoc(
-    {_id: "nonExisting"}, {z: 3, x: 4, y: 3, a: 5}, true /* isUpsert */, false /* inTransaction */);
+    {_id: "nonExisting"},
+    {z: 3, x: 4, y: 3, a: 5},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
 
 //
 // Update Type Op-style.
 //
 
 // Test behaviours common to update and upsert.
-[false, true].forEach(function(isUpsert) {
+[false, true].forEach(function (isUpsert) {
     // Full shard key in query.
     assertUpdateWorked({x: 4, _id: 0, z: 3, y: 3}, {"$set": {opStyle: 1}}, isUpsert, 0);
     assertUpdateWorked({x: 4, z: 3, y: 3}, {"$set": {opStyle: 2}}, isUpsert, 0);
 
     // Case when upsert needs to insert a new document and the new document should belong in the
     // same shard as the targetted shard. For non-upserts, it will be a no op.
-    assertUpdateWorkedWithNoMatchingDoc(
-        {x: 4, y: 0, z: 0}, {"$set": {x: 1, z: 3, y: 111, a: 90}}, isUpsert);
+    assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0}, {"$set": {x: 1, z: 3, y: 111, a: 90}}, isUpsert);
 });
 
 // Test behaviours specific to non-upsert updates.
 
 // Full shard key in query, matches no document.
-assertUpdateWorkedWithNoMatchingDoc(
-    {x: 4, y: 0, z: 0}, {"$set": {x: 2110, y: 55, z: 3, a: 111}}, false);
+assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0}, {"$set": {x: 2110, y: 55, z: 3, a: 111}}, false);
 
 // Partial shard key in query, but can still target a single shard.
-assertUpdateWorkedWithNoMatchingDoc(
-    {x: 100, y: 51, a: 112}, {"$set": {x: 110, y: 55, z: 3, a: 8}}, false);
+assertUpdateWorkedWithNoMatchingDoc({x: 100, y: 51, a: 112}, {"$set": {x: 110, y: 55, z: 3, a: 8}}, false);
 
 // Query on _id works for update.
 assertUpdateWorked({_id: 0}, {"$set": {opStyle: 6}}, false, 0);
@@ -293,95 +311,102 @@ const upsertDoc = {
     x: 2110,
     y: 55,
     z: 3,
-    opStyle: true
+    opStyle: true,
 };
-const upsertRes =
-    st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0, opStyle: true}, upsertDoc, {upsert: true});
+const upsertRes = st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0, opStyle: true}, upsertDoc, {upsert: true});
 assertWouldChangeOwningShardUpdateResult(upsertRes, upsertDoc);
 
 const upsertDocTxn = {
-    "$set": {x: 2110, y: 55, z: 4, opStyle: true}
+    "$set": {x: 2110, y: 55, z: 4, opStyle: true},
 };
 withTxnAndAutoRetryOnMongos(session, () => {
-    assertUpdateWorkedWithNoMatchingDoc(
-        {x: 4, y: 0, z: 0, opStyle: true}, upsertDocTxn, true, true);
+    assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, opStyle: true}, upsertDocTxn, true, true);
 });
 assert.eq(1, sessionDB.coll.find(upsertDocTxn["$set"]).itcount());
 
 // Shard key field modifications do not have to specify full shard key.
 // Partial shard key updates are successful.
+assertUpdateWorkedWithNoMatchingDoc({x: 14}, {"$set": {opStyle: 5}}, true /* isUpsert */, false /* inTransaction */);
 assertUpdateWorkedWithNoMatchingDoc(
-    {x: 14}, {"$set": {opStyle: 5}}, true /* isUpsert */, false /* inTransaction */);
-assertUpdateWorkedWithNoMatchingDoc({x: 100, y: 51, nonExistingField: true},
-                                    {"$set": {x: 110, y: 55, z: 3, a: 8}},
-                                    true /* isUpsert */,
-                                    false /* inTransaction */);
+    {x: 100, y: 51, nonExistingField: true},
+    {"$set": {x: 110, y: 55, z: 3, a: 8}},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
 assertUpdateWorkedWithNoMatchingDoc(
-    {y: 4}, {"$set": {z: 3, x: 4, y: 3, a: 2}}, true /* isUpsert */, false /* inTransaction */);
+    {y: 4},
+    {"$set": {z: 3, x: 4, y: 3, a: 2}},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
 
 // Upserts that match on _id are successful.
-assertUpdateWorkedWithNoMatchingDoc({_id: 20},
-                                    {"$set": {x: 2, y: 11, z: 10, opStyle: 7}},
-                                    true /* isUpsert */,
-                                    false /* inTransaction */);
-assertUpdateWorkedWithNoMatchingDoc({_id: 21, y: 3},
-                                    {"$set": {z: 3, x: 4, y: 3, a: 1}},
-                                    true /* isUpsert */,
-                                    false /* inTransaction */);
+assertUpdateWorkedWithNoMatchingDoc(
+    {_id: 20},
+    {"$set": {x: 2, y: 11, z: 10, opStyle: 7}},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
+assertUpdateWorkedWithNoMatchingDoc(
+    {_id: 21, y: 3},
+    {"$set": {z: 3, x: 4, y: 3, a: 1}},
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
 //
 // Update with pipeline.
 //
 
 // Test behaviours common to update and upsert.
-[false, true].forEach(function(isUpsert) {
+[false, true].forEach(function (isUpsert) {
     // Full shard key in query.
-    assertUpdateWorked(
-        {_id: 0, x: 4, z: 3, y: 3}, [{$addFields: {pipelineUpdate: isUpsert}}], isUpsert, 0);
-    assert.eq(1,
-              st.s.getDB(kDbName)
-                  .coll.find({_id: 0, x: 4, z: 3, y: 3, pipelineUpdate: isUpsert})
-                  .itcount());
-    assertUpdateWorkedWithNoMatchingDoc(
-        {_id: 15, x: 44, z: 3, y: 3}, [{$addFields: {pipelineUpdate: true}}], isUpsert);
-    assert.eq(isUpsert ? 1 : 0,
-              st.s.getDB(kDbName)
-                  .coll.find({_id: 15, x: 44, z: 3, y: 3, pipelineUpdate: true})
-                  .itcount());
+    assertUpdateWorked({_id: 0, x: 4, z: 3, y: 3}, [{$addFields: {pipelineUpdate: isUpsert}}], isUpsert, 0);
+    assert.eq(1, st.s.getDB(kDbName).coll.find({_id: 0, x: 4, z: 3, y: 3, pipelineUpdate: isUpsert}).itcount());
+    assertUpdateWorkedWithNoMatchingDoc({_id: 15, x: 44, z: 3, y: 3}, [{$addFields: {pipelineUpdate: true}}], isUpsert);
+    assert.eq(
+        isUpsert ? 1 : 0,
+        st.s.getDB(kDbName).coll.find({_id: 15, x: 44, z: 3, y: 3, pipelineUpdate: true}).itcount(),
+    );
 
-    assertUpdateWorkedWithNoMatchingDoc(
-        {x: 45, z: 4, y: 3}, [{$addFields: {pipelineUpdate: true}}], isUpsert);
-    assert.eq(isUpsert ? 1 : 0,
-              st.s.getDB(kDbName).coll.find({x: 45, z: 4, y: 3, pipelineUpdate: true}).itcount());
+    assertUpdateWorkedWithNoMatchingDoc({x: 45, z: 4, y: 3}, [{$addFields: {pipelineUpdate: true}}], isUpsert);
+    assert.eq(isUpsert ? 1 : 0, st.s.getDB(kDbName).coll.find({x: 45, z: 4, y: 3, pipelineUpdate: true}).itcount());
 
     // Case when upsert needs to insert a new document and the new document should belong in the
     // same shard as the targeted shard.
-    assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0},
-                                        [{
-                                            "$project": {
-                                                x: {$literal: 3},
-                                                y: {$literal: 33},
-                                                z: {$literal: 3},
-                                                pipelineUpdate: {$literal: true}
-                                            }
-                                        }],
-                                        isUpsert);
-    assert.eq(isUpsert ? 1 : 0,
-              st.s.getDB(kDbName).coll.find({x: 3, z: 3, y: 33, pipelineUpdate: true}).itcount());
+    assertUpdateWorkedWithNoMatchingDoc(
+        {x: 4, y: 0, z: 0},
+        [
+            {
+                "$project": {
+                    x: {$literal: 3},
+                    y: {$literal: 33},
+                    z: {$literal: 3},
+                    pipelineUpdate: {$literal: true},
+                },
+            },
+        ],
+        isUpsert,
+    );
+    assert.eq(isUpsert ? 1 : 0, st.s.getDB(kDbName).coll.find({x: 3, z: 3, y: 33, pipelineUpdate: true}).itcount());
 });
 
 // Test behaviours specific to non-upsert updates.
 
 // Full shard key in query, matches no document.
-assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0},
-                                    [{
-                                        "$project": {
-                                            x: {$literal: 2111},
-                                            y: {$literal: 55},
-                                            z: {$literal: 3},
-                                            pipelineUpdate: {$literal: true}
-                                        }
-                                    }],
-                                    false);
+assertUpdateWorkedWithNoMatchingDoc(
+    {x: 4, y: 0, z: 0},
+    [
+        {
+            "$project": {
+                x: {$literal: 2111},
+                y: {$literal: 55},
+                z: {$literal: 3},
+                pipelineUpdate: {$literal: true},
+            },
+        },
+    ],
+    false,
+);
 assert.eq(0, st.s.getDB(kDbName).coll.find({x: 2111, z: 3, y: 55, pipelineUpdate: true}).itcount());
 
 // Partial shard key in query targets single shard but doesn't match any document on that shard.
@@ -389,13 +414,11 @@ assertUpdateWorkedWithNoMatchingDoc({_id: 14, z: 4, x: 3}, [{$addFields: {foo: 4
 
 // Partial shard key in query can target a single shard and doesn't try to update shard key
 // value.
-assertUpdateWorkedWithNoMatchingDoc(
-    {x: 46, z: 4}, [{$addFields: {y: 10, pipelineUpdateNoOp: false}}], false);
+assertUpdateWorkedWithNoMatchingDoc({x: 46, z: 4}, [{$addFields: {y: 10, pipelineUpdateNoOp: false}}], false);
 assertUpdateWorked({x: 4, z: 3}, [{$addFields: {pipelineUpdateDoc: false}}], false, 0);
 
 // Shard key field modifications do not have to specify full shard key.
-assert.commandWorked(
-    st.s.getDB(kDbName).coll.update({z: 3, y: 3}, [{$addFields: {foo: 4}}], {upsert: false}));
+assert.commandWorked(st.s.getDB(kDbName).coll.update({z: 3, y: 3}, [{$addFields: {foo: 4}}], {upsert: false}));
 
 // Test upsert-specific behaviours.
 
@@ -406,52 +429,66 @@ assert.commandWorked(
 const upsertProjectDoc = {
     x: 2111,
     y: 55,
-    z: 3
+    z: 3,
 };
-const upsertProjectRes = st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0},
-                                                         [{
-                                                             "$project": {
-                                                                 x: {$literal: 2111},
-                                                                 y: {$literal: 55},
-                                                                 z: {$literal: 3},
-                                                                 pipelineUpdate: {$literal: true}
-                                                             }
-                                                         }],
-                                                         {upsert: true});
+const upsertProjectRes = st.s.getDB(kDbName).coll.update(
+    {x: 4, y: 0, z: 0},
+    [
+        {
+            "$project": {
+                x: {$literal: 2111},
+                y: {$literal: 55},
+                z: {$literal: 3},
+                pipelineUpdate: {$literal: true},
+            },
+        },
+    ],
+    {upsert: true},
+);
 assertWouldChangeOwningShardUpdateResult(upsertProjectRes, upsertProjectDoc);
 
 const upsertProjectTxnDoc = {
     x: 2111,
     y: 55,
-    z: 4
+    z: 4,
 };
 session.startTransaction();
-assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, pipelineUpdate: true},
-                                    [{
-                                        "$project": {
-                                            x: {$literal: 2111},
-                                            y: {$literal: 55},
-                                            z: {$literal: 4},
-                                            pipelineUpdate: {$literal: true}
-                                        }
-                                    }],
-                                    true);
+assertUpdateWorkedWithNoMatchingDoc(
+    {x: 4, y: 0, z: 0, pipelineUpdate: true},
+    [
+        {
+            "$project": {
+                x: {$literal: 2111},
+                y: {$literal: 55},
+                z: {$literal: 4},
+                pipelineUpdate: {$literal: true},
+            },
+        },
+    ],
+    true,
+);
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(1, sessionDB.coll.find(upsertProjectTxnDoc).itcount());
 
-assertUpdateWorkedWithNoMatchingDoc({_id: 18, z: 4, x: 3},
-                                    [{$addFields: {foo: 4}}],
-                                    true /* isUpsert */,
-                                    false /* inTransaction */);
-assertUpdateWorkedWithNoMatchingDoc({_id: 22},
-                                    [{
-                                        "$project": {
-                                            x: {$literal: 2111},
-                                            y: {$literal: 55},
-                                            z: {$literal: 3},
-                                            pipelineUpdate: {$literal: true}
-                                        }
-                                    }],
-                                    true /* isUpsert */,
-                                    false /* inTransaction */);
+assertUpdateWorkedWithNoMatchingDoc(
+    {_id: 18, z: 4, x: 3},
+    [{$addFields: {foo: 4}}],
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
+assertUpdateWorkedWithNoMatchingDoc(
+    {_id: 22},
+    [
+        {
+            "$project": {
+                x: {$literal: 2111},
+                y: {$literal: 55},
+                z: {$literal: 3},
+                pipelineUpdate: {$literal: true},
+            },
+        },
+    ],
+    true /* isUpsert */,
+    false /* inTransaction */,
+);
 st.stop();

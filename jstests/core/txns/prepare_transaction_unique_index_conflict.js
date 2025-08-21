@@ -41,6 +41,7 @@ const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 // violates the unique index, which should cause a prepare conflict.
 assert.commandFailedWithCode(
     testDB.runCommand({insert: collName, documents: [{_id: 3, a: 1}], maxTimeMS: 5000}),
-    ErrorCodes.MaxTimeMSExpired);
+    ErrorCodes.MaxTimeMSExpired,
+);
 
 assert.commandWorked(session.abortTransaction_forTesting());

@@ -6,25 +6,25 @@
 
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {mongotCommandForQuery} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {
-    ShardingTestWithMongotMock
-} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {ShardingTestWithMongotMock} from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     searchShardedExampleCursors1,
-    searchShardedExampleCursors2
+    searchShardedExampleCursors2,
 } from "jstests/with_mongot/search_mocked/lib/search_sharded_example_cursors.js";
 
 const dbName = "test";
 const collName = "internal_search_mongot_remote";
 
-const makeInternalConn = (function createInternalClient(conn) {
+const makeInternalConn = function createInternalClient(conn) {
     const curDB = conn.getDB(dbName);
-    assert.commandWorked(curDB.runCommand({
-        ["hello"]: 1,
-        internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)}
-    }));
+    assert.commandWorked(
+        curDB.runCommand({
+            ["hello"]: 1,
+            internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(7)},
+        }),
+    );
     return conn;
-});
+};
 
 let nodeOptions = {setParameter: {enableTestCommands: 1}};
 
@@ -38,7 +38,7 @@ const stWithMock = new ShardingTestWithMongotMock({
     other: {
         rsOptions: nodeOptions,
         mongosOptions: nodeOptions,
-    }
+    },
 });
 stWithMock.start();
 const st = stWithMock.st;
@@ -49,8 +49,7 @@ const testDb = mongos.getDB(dbName);
 const coll = testDb.getCollection(collName);
 const collNS = coll.getFullName();
 
-assert.commandWorked(
-    mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+assert.commandWorked(mongos.getDB("admin").runCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 // Shard the test collection.
 const splitPoint = 5;
 const docList = [];
@@ -67,14 +66,18 @@ const collUUID0 = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), 
 const collUUID1 = getUUIDFromListCollections(st.rs1.getPrimary().getDB(dbName), collName);
 
 function mockShardZero() {
-    const exampleCursor =
-        searchShardedExampleCursors1(dbName, collNS, collName, mongotCommandForQuery({
-                                         query: mongotQuery,
-                                         collName: collName,
-                                         db: dbName,
-                                         collectionUUID: collUUID0,
-                                         protocolVersion: protocolVersion
-                                     }));
+    const exampleCursor = searchShardedExampleCursors1(
+        dbName,
+        collNS,
+        collName,
+        mongotCommandForQuery({
+            query: mongotQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID0,
+            protocolVersion: protocolVersion,
+        }),
+    );
     const s0Mongot = stWithMock.getMockConnectedToHost(st.rs0.getPrimary());
 
     s0Mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
@@ -82,14 +85,18 @@ function mockShardZero() {
 }
 
 function mockShardOne() {
-    const exampleCursor =
-        searchShardedExampleCursors2(dbName, collNS, collName, mongotCommandForQuery({
-                                         query: mongotQuery,
-                                         collName: collName,
-                                         db: dbName,
-                                         collectionUUID: collUUID1,
-                                         protocolVersion: protocolVersion
-                                     }));
+    const exampleCursor = searchShardedExampleCursors2(
+        dbName,
+        collNS,
+        collName,
+        mongotCommandForQuery({
+            query: mongotQuery,
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID1,
+            protocolVersion: protocolVersion,
+        }),
+    );
     const s1Mongot = stWithMock.getMockConnectedToHost(st.rs1.getPrimary());
 
     s1Mongot.setMockResponses(exampleCursor.historyResults, exampleCursor.resultsID);
@@ -102,7 +109,7 @@ const shardPipelineWithUnknownFields = {
         "mongotQuery": mongotQuery,
         metadataMergeProtocolVersion: protocolVersion,
         unknownField: "cake carrots apple kale",
-    }
+    },
 };
 
 const commandObj = {
@@ -126,8 +133,7 @@ function runAndAssertMongodIgnoresUnknownFieldInSearch(shardDB, expectedDocs, ex
 
     for (let thisCursorTopLevel of cursorArray) {
         let thisCursor = thisCursorTopLevel.cursor;
-        const getMoreRes = assert.commandWorked(
-            shardDB.runCommand({getMore: thisCursor.id, collection: collName}));
+        const getMoreRes = assert.commandWorked(shardDB.runCommand({getMore: thisCursor.id, collection: collName}));
 
         // Verify the results cursor's contents.
         const getMoreResults = getMoreRes.cursor.nextBatch;
@@ -145,9 +151,9 @@ function runAndAssertMongodIgnoresUnknownFieldInSearch(shardDB, expectedDocs, ex
 const expectedDocsOnShardZero = [
     // SortKey and searchScore are included because we're getting results directly from the
     // shard.
-    {_id: 1, val: 1, "$searchScore": .4, "$score": .4, "$sortKey": [.4]},
-    {_id: 2, val: 2, "$searchScore": .3, "$score": .3, "$sortKey": [.3]},
-    {_id: 3, val: 3, "$searchScore": .123, "$score": .123, "$sortKey": [.123]}
+    {_id: 1, val: 1, "$searchScore": 0.4, "$score": 0.4, "$sortKey": [0.4]},
+    {_id: 2, val: 2, "$searchScore": 0.3, "$score": 0.3, "$sortKey": [0.3]},
+    {_id: 3, val: 3, "$searchScore": 0.123, "$score": 0.123, "$sortKey": [0.123]},
 ];
 const expectedMetaResultsOnShardZero = [{metaVal: 1}, {metaVal: 2}, {metaVal: 3}, {metaVal: 4}];
 
@@ -156,20 +162,18 @@ const expectedMetaResultsOnShardZero = [{metaVal: 1}, {metaVal: 2}, {metaVal: 3}
 const shardZeroConn = makeInternalConn(st.rs0.getPrimary());
 const shardZeroDB = shardZeroConn.getDB(dbName);
 mockShardZero();
-runAndAssertMongodIgnoresUnknownFieldInSearch(
-    shardZeroDB, expectedDocsOnShardZero, expectedMetaResultsOnShardZero);
+runAndAssertMongodIgnoresUnknownFieldInSearch(shardZeroDB, expectedDocsOnShardZero, expectedMetaResultsOnShardZero);
 
 // Repeat for the second shard.
 const expectedDocsOnShardOne = [
-    {_id: 5, val: 5, "$searchScore": .4, "$score": .4, "$sortKey": [.4]},
-    {_id: 6, val: 6, "$searchScore": .3, "$score": .3, "$sortKey": [.3]},
-    {_id: 7, val: 7, "$searchScore": .123, "$score": .123, "$sortKey": [.123]}
+    {_id: 5, val: 5, "$searchScore": 0.4, "$score": 0.4, "$sortKey": [0.4]},
+    {_id: 6, val: 6, "$searchScore": 0.3, "$score": 0.3, "$sortKey": [0.3]},
+    {_id: 7, val: 7, "$searchScore": 0.123, "$score": 0.123, "$sortKey": [0.123]},
 ];
 const expectedMetaResultsOnShardOne = [{metaVal: 10}, {metaVal: 11}, {metaVal: 12}, {metaVal: 13}];
 const shardOneConn = makeInternalConn(st.rs1.getPrimary());
 const shardOneDB = shardOneConn.getDB(dbName);
 mockShardOne();
-runAndAssertMongodIgnoresUnknownFieldInSearch(
-    shardOneDB, expectedDocsOnShardOne, expectedMetaResultsOnShardOne);
+runAndAssertMongodIgnoresUnknownFieldInSearch(shardOneDB, expectedDocsOnShardOne, expectedMetaResultsOnShardOne);
 
 stWithMock.stop();

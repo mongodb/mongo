@@ -5,65 +5,66 @@
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 if (determineSSLProvider() !== "openssl") {
-    jsTest.log('Test requires openssl based TLS support');
+    jsTest.log("Test requires openssl based TLS support");
     quit();
 }
 
 // Fails when used without clusterAuthMode == 'X509'
 {
-    const opts = {auth: '', tlsClusterAuthX509ExtensionValue: 'foo'};
-    const errmsg =
-        'net.tls.clusterAuthX509.extensionValue requires a clusterAuthMode which allows for usage of X509';
+    const opts = {auth: "", tlsClusterAuthX509ExtensionValue: "foo"};
+    const errmsg = "net.tls.clusterAuthX509.extensionValue requires a clusterAuthMode which allows for usage of X509";
 
-    jsTest.log('No clusterAuthMode set');
+    jsTest.log("No clusterAuthMode set");
     clearRawMongoProgramOutput();
     assert.throws(() => MongoRunner.runMongod(opts));
     assert(rawMongoProgramOutput(".*").includes(errmsg));
 
-    jsTest.log('clusterAuthMode == keyFile');
+    jsTest.log("clusterAuthMode == keyFile");
     clearRawMongoProgramOutput();
-    opts.clusterAuthMode = 'keyFile';
+    opts.clusterAuthMode = "keyFile";
     assert.throws(() => MongoRunner.runMongod(opts));
     assert(rawMongoProgramOutput(".*").includes(errmsg));
 }
 
-function authAndDo(port, cert, cmd = ';') {
-    jsTest.log('Connecting to localhost using cert: ' + cert);
+function authAndDo(port, cert, cmd = ";") {
+    jsTest.log("Connecting to localhost using cert: " + cert);
     function x509auth(db) {
-        const ext = db.getSiblingDB('$external');
-        assert.commandWorked(ext.runCommand({authenticate: 1, mechanism: 'MONGODB-X509'}));
+        const ext = db.getSiblingDB("$external");
+        assert.commandWorked(ext.runCommand({authenticate: 1, mechanism: "MONGODB-X509"}));
         return ext.adminCommand({connectionStatus: 1});
     }
     clearRawMongoProgramOutput();
-    const shell = runMongoProgram('mongo',
-                                  '--host',
-                                  'localhost',
-                                  '--port',
-                                  port,
-                                  '--tls',
-                                  '--tlsCAFile',
-                                  'jstests/libs/ca.pem',
-                                  '--tlsCertificateKeyFile',
-                                  cert,
-                                  '--eval',
-                                  x509auth + ' x509auth(db); ' + cmd);
+    const shell = runMongoProgram(
+        "mongo",
+        "--host",
+        "localhost",
+        "--port",
+        port,
+        "--tls",
+        "--tlsCAFile",
+        "jstests/libs/ca.pem",
+        "--tlsCertificateKeyFile",
+        cert,
+        "--eval",
+        x509auth + " x509auth(db); " + cmd,
+    );
     assert.eq(shell, 0);
 }
 
 function runTest(conn) {
-    const SERVER_RDN = 'CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US';
-    const SERVER = 'jstests/libs/server.pem';
-    const FOO_MEMBER = 'jstests/ssl/libs/cluster-member-foo.pem';
-    const BAR_MEMBER = 'jstests/ssl/libs/cluster-member-bar.pem';
-    const FOO_MEMBER_ALT = 'jstests/ssl/libs/cluster-member-foo-alt-rdn.pem';
-    const FOO_MEMBER_ALT_RDN = 'CN=Doer,OU=Business,O=Company,L=Fakesville,ST=Example,C=ZZ';
+    const SERVER_RDN = "CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
+    const SERVER = "jstests/libs/server.pem";
+    const FOO_MEMBER = "jstests/ssl/libs/cluster-member-foo.pem";
+    const BAR_MEMBER = "jstests/ssl/libs/cluster-member-bar.pem";
+    const FOO_MEMBER_ALT = "jstests/ssl/libs/cluster-member-foo-alt-rdn.pem";
+    const FOO_MEMBER_ALT_RDN = "CN=Doer,OU=Business,O=Company,L=Fakesville,ST=Example,C=ZZ";
 
-    const admin = conn.getDB('admin');
-    const ext = conn.getDB('$external');
+    const admin = conn.getDB("admin");
+    const ext = conn.getDB("$external");
 
     // Ensure no localhost auth bypass available.
-    assert.commandWorked(admin.runCommand({createUser: 'admin', pwd: 'admin', roles: ['root']}));
-    assert(admin.auth('admin', 'admin'));
+    assert.commandWorked(admin.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
+    assert(admin.auth("admin", "admin"));
 
     // Connect using server.pem which has the same RDN, but no custom extension.
     // This will result in an unknown user condition because we are
@@ -83,7 +84,7 @@ function runTest(conn) {
     // Create a user who would have been a cluster member under name based rules.
     // We should have basic privs, testing with read but not write.
     const readCmd = 'db.getSiblingDB("test").mycoll.find({});';
-    const readRoles = [{db: 'admin', role: 'readAnyDatabase'}];
+    const readRoles = [{db: "admin", role: "readAnyDatabase"}];
     assert.commandWorked(ext.runCommand({createUser: SERVER_RDN, roles: readRoles}));
     authAndDo(conn.port, SERVER, readCmd);
     assert.throws(() => authAndDo(conn.port, SERVER, insertCmd));
@@ -96,14 +97,14 @@ function runTest(conn) {
 
 {
     const opts = {
-        auth: '',
-        tlsMode: 'requireTLS',
-        tlsCertificateKeyFile: 'jstests/ssl/libs/cluster-member-foo.pem',
-        tlsCAFile: 'jstests/libs/ca.pem',
-        clusterAuthMode: 'x509',
-        tlsClusterAuthX509ExtensionValue: 'foo',
+        auth: "",
+        tlsMode: "requireTLS",
+        tlsCertificateKeyFile: "jstests/ssl/libs/cluster-member-foo.pem",
+        tlsCAFile: "jstests/libs/ca.pem",
+        clusterAuthMode: "x509",
+        tlsClusterAuthX509ExtensionValue: "foo",
         setParameter: {
-            enforceUserClusterSeparation: 'true',
+            enforceUserClusterSeparation: "true",
         },
     };
 

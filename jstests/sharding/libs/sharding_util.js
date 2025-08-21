@@ -9,11 +9,11 @@ export function getShards(db) {
 }
 
 export function getShardNames(db) {
-    return getShards(db).map(shard => shard._id);
+    return getShards(db).map((shard) => shard._id);
 }
 
 export function getShardHosts(db) {
-    return getShards(db).map(shard => shard.host);
+    return getShards(db).map((shard) => shard.host);
 }
 
 /**
@@ -47,7 +47,7 @@ export function getShardNamesForCollection(conn, dbName, collName) {
         return new Set([getPrimaryShardIdForDatabase(conn, dbName)]);
     }
     const chunkDocs = findChunksUtil.findChunksByNs(config, ns);
-    return new Set(chunkDocs.map(doc => doc.shard));
+    return new Set(chunkDocs.map((doc) => doc.shard));
 }
 
 export function getNonPrimaryShardName(db) {
@@ -78,7 +78,7 @@ export function createChunks(shardNames, shardKey, min, max) {
         chunks.push({
             min: {[shardKey]: min + chunkSize * i},
             max: {[shardKey]: min + chunkSize * (i + 1)},
-            shard: shardNames[i]
+            shard: shardNames[i],
         });
     }
 

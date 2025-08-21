@@ -38,15 +38,12 @@ assert.commandWorked(sessionColl.insert({_id: 1}));
 
 jsTestLog("Test that transactions are not allowed.");
 session.startTransaction();
-assert.commandFailedWithCode(sessionColl.insert({_id: 2}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(sessionColl.insert({_id: 2}), ErrorCodes.OperationNotSupportedInTransaction);
 // All commands are not allowed including abortTransaction.
-assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.OperationNotSupportedInTransaction);
 
 jsTestLog("Test that retryable writes are allowed.");
-assert.commandWorked(
-    sessionDb.runCommand({insert: "foo", documents: [{_id: 3}], txnNumber: NumberLong(1)}));
+assert.commandWorked(sessionDb.runCommand({insert: "foo", documents: [{_id: 3}], txnNumber: NumberLong(1)}));
 
 // Assert documents inserted.
 assert.docEq([{_id: 1}, {_id: 3}], sessionColl.find().sort({_id: 1}).toArray());

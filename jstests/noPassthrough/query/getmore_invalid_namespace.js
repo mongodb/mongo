@@ -7,8 +7,8 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function performTest(conn) {
-    const dbName = 'getmore_cmd_test';
-    const collName = 'getmore_cmd_invalid_namespace';
+    const dbName = "getmore_cmd_test";
+    const collName = "getmore_cmd_invalid_namespace";
     const db = conn.getDB(dbName);
     const coll = db[collName];
     coll.drop();

@@ -10,33 +10,29 @@ const latest = "latest";
 const testName = "restart_during_downgrading_fcv";
 const dbpath = MongoRunner.dataPath + testName;
 
-const setup = function(conn, configPrimary) {
+const setup = function (conn, configPrimary) {
     const adminDB = conn.getDB("admin");
     if (configPrimary) {
-        assert.commandWorked(
-            configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+        assert.commandWorked(configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
     } else {
-        assert.commandWorked(
-            conn.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+        assert.commandWorked(conn.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
     }
 
-    assert.commandFailed(
-        conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
+    assert.commandFailed(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
     // Check FCV is in downgrading state.
     checkFCV(adminDB, lastLTSFCV, lastLTSFCV);
 };
 
-const runTest = function(conn) {
+const runTest = function (conn) {
     const adminDB = conn.getDB("admin");
     // Check FCV is still in downgrading state.
     checkFCV(adminDB, lastLTSFCV, lastLTSFCV);
     jsTestLog("Set FCV to upgrade");
-    assert.commandWorked(
-        conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
+    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     checkFCV(adminDB, latestFCV);
 };
 
-const runStandaloneTest = function() {
+const runStandaloneTest = function () {
     jsTestLog("Starting standalone test");
     let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
 
@@ -50,7 +46,7 @@ const runStandaloneTest = function() {
     MongoRunner.stopMongod(conn);
 };
 
-const runReplicaSetTest = function() {
+const runReplicaSetTest = function () {
     jsTestLog("Starting replica set test");
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: latest}});
     rst.startSet();
@@ -68,10 +64,10 @@ const runReplicaSetTest = function() {
     rst.stopSet();
 };
 
-const runShardedClusterTest = function() {
+const runShardedClusterTest = function () {
     jsTestLog("Starting sharded cluster test");
     const st = new ShardingTest({
-        shards: {rs0: {nodes: [{binVersion: latest}, {binVersion: latest}, {binVersion: latest}]}}
+        shards: {rs0: {nodes: [{binVersion: latest}, {binVersion: latest}, {binVersion: latest}]}},
     });
     let mongos = st.s;
     const configPrimary = st.configRS.getPrimary();

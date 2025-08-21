@@ -16,26 +16,24 @@ const st = new ShardingTest({
     rs: {nodes: 1},
     other: {
         enableBalancer: false,
-    }
+    },
 });
 
 const mongos = st.s0;
-const configDB = st.getDB('config');
+const configDB = st.getDB("config");
 
-const dbName = 'test';
-const collName = 'collToDrain';
-const ns = dbName + '.' + collName;
+const dbName = "test";
+const collName = "collToDrain";
+const ns = dbName + "." + collName;
 const db = st.getDB(dbName);
 const coll = db.getCollection(collName);
 
 // Shard collection with shard0 as db primary.
-assert.commandWorked(
-    mongos.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(mongos.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
 
 // shard0 owns docs with shard key [MinKey, 0), shard1 owns docs with shard key [0, MaxKey)
-assert.commandWorked(st.s.adminCommand(
-    {moveRange: ns, min: {x: 0}, max: {x: MaxKey}, toShard: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({moveRange: ns, min: {x: 0}, max: {x: MaxKey}, toShard: st.shard1.shardName}));
 
 // Check that there are only 2 chunks before starting draining.
 const chunksBeforeDrain = findChunksUtil.findChunksByNs(configDB, ns).toArray();
@@ -46,10 +44,12 @@ const csrsPrimary = st.configRS.getPrimary();
 configureFailPoint(csrsPrimary, "forceBalancerWarningChecks");
 
 let awaitRemoveShard = startParallelShell(
-    funWithArgs(async function(shardName) {
+    funWithArgs(async function (shardName) {
         const {removeShard} = await import("jstests/sharding/libs/remove_shard_util.js");
         removeShard(db, shardName);
-    }, st.shard1.shardName), st.s.port);
+    }, st.shard1.shardName),
+    st.s.port,
+);
 
 // Test warning when the balancer is disabled.
 // "Draining of removed shards cannot be completed because the balancer is disabled"

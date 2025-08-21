@@ -5,9 +5,9 @@
  *   requires_sharding,
  * ]
  */
-const dbPrefix = jsTestName() + '_DB_';
+const dbPrefix = jsTestName() + "_DB_";
 const dbCount = 2;
-const collPrefix = 'sharded_coll_';
+const collPrefix = "sharded_coll_";
 const collCount = 2;
 
 function getRandomDb(db) {
@@ -21,13 +21,13 @@ function getRandomCollection(db) {
 /*
  * Keep track of dropDB state results: successful dropDatabase or staleDB error.
  */
-const logDropDbResultsDBName = 'successful_drop_db';
-const logDropDbResultsCollName = 'log';
+const logDropDbResultsDBName = "successful_drop_db";
+const logDropDbResultsCollName = "log";
 
 function logFinishedDropDBState(db, isSuccess) {
     db = db.getSiblingDB(logDropDbResultsDBName);
     const coll = db[logDropDbResultsCollName];
-    coll.update({_id: isSuccess ? 'OK' : 'notOK'}, {$inc: {'count': 1}}, {upsert: true});
+    coll.update({_id: isSuccess ? "OK" : "notOK"}, {$inc: {"count": 1}}, {upsert: true});
 }
 
 /*
@@ -37,36 +37,36 @@ function logFinishedDropDBState(db, isSuccess) {
 function getDropDbStateResults(db) {
     db = db.getSiblingDB(logDropDbResultsDBName);
     const coll = db[logDropDbResultsCollName];
-    const countOK = coll.findOne({_id: 'OK'}).count;
-    const notOK = coll.findOne({_id: 'notOK'});
+    const countOK = coll.findOne({_id: "OK"}).count;
+    const notOK = coll.findOne({_id: "notOK"});
     const countNotOK = notOK ? notOK.count : 0;
     // At least one dropDatabase must have succeeded
-    assert.gte(countOK, 1, 'No dropDatabase succeeded, got ' + countNotOK + ' stale db versions');
+    assert.gte(countOK, 1, "No dropDatabase succeeded, got " + countNotOK + " stale db versions");
     return {ok: countOK, notOK: countNotOK};
 }
 
-export const $config = (function() {
-    var states = (function() {
-        function init(db, collName) {
-        }
+export const $config = (function () {
+    var states = (function () {
+        function init(db, collName) {}
 
         function enableSharding(db, collName) {
             let myDb = getRandomDb(db);
-            jsTestLog('Executing enableSharding state: ' + myDb.getName());
+            jsTestLog("Executing enableSharding state: " + myDb.getName());
             assert.commandWorked(myDb.adminCommand({enableSharding: myDb.getName()}));
         }
 
         function shardCollection(db, collName) {
             let coll = getRandomCollection(db);
-            jsTestLog('Executing shardCollection state: ' + coll.getFullName());
+            jsTestLog("Executing shardCollection state: " + coll.getFullName());
             assert.commandWorkedOrFailedWithCode(
                 db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
-                [ErrorCodes.NamespaceNotFound, ErrorCodes.StaleDbVersion]);
+                [ErrorCodes.NamespaceNotFound, ErrorCodes.StaleDbVersion],
+            );
         }
 
         function dropDatabase(db, collName) {
             let myDb = getRandomDb(db);
-            jsTestLog('Executing dropDatabase state: ' + myDb.getName());
+            jsTestLog("Executing dropDatabase state: " + myDb.getName());
             var resOK;
             try {
                 assert.commandWorked(myDb.dropDatabase());
@@ -96,19 +96,24 @@ export const $config = (function() {
         shardCollection: {enableSharding: 0.35, dropDatabase: 0.35, shardCollection: 0.3},
     };
 
-    let teardown = function(db, collName, cluster) {
+    let teardown = function (db, collName, cluster) {
         const dropDbStatesResults = getDropDbStateResults(db);
-        jsTestLog('Finished FSM with ' + dropDbStatesResults.ok + ' successful dropDB and ' +
-                  dropDbStatesResults.notOK + ' stale db exceptions');
+        jsTestLog(
+            "Finished FSM with " +
+                dropDbStatesResults.ok +
+                " successful dropDB and " +
+                dropDbStatesResults.notOK +
+                " stale db exceptions",
+        );
     };
 
     return {
         threadCount: 12,
         iterations: 64,
-        startState: 'init',
+        startState: "init",
         data: {},
         states: states,
         transitions: transitions,
-        teardown: teardown
+        teardown: teardown,
     };
 })();

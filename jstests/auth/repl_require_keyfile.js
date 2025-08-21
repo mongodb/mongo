@@ -5,7 +5,7 @@ const rsTest = new ReplSetTest({nodes: 1});
 
 clearRawMongoProgramOutput();
 
-assert.throws(function() {
+assert.throws(function () {
     rsTest.startSet({auth: "", oplogSize: 10});
 });
 

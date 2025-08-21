@@ -6,13 +6,11 @@
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    AnalyzeShardKeyUtil
-} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
+import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {
     assertAggregateQueryPlans,
     getMongodConns,
-    numMostCommonValues
+    numMostCommonValues,
 } from "jstests/sharding/analyze_shard_key/libs/cardinality_and_frequency_common.js";
 
 const numNodesPerRS = 2;
@@ -22,7 +20,7 @@ const batchSize = 1000;
 // documents to get replicated to all nodes is necessary since mongos runs the analyzeShardKey
 // command with readPreference "secondaryPreferred".
 const writeConcern = {
-    w: numNodesPerRS
+    w: numNodesPerRS,
 };
 
 const defaultSampleSize = 10000;
@@ -42,8 +40,8 @@ const sampleSizeTestCases = [
             // the command fails the validation in the cardinality and frequency step because
             // the requested sample size is less than 'numMostCommonValues'.
             ErrorCodes.InvalidOptions,
-        ]
-    }
+        ],
+    },
 ];
 
 function makeSampleRateTestCases(isUnique) {
@@ -61,7 +59,7 @@ function makeSampleRateTestCases(isUnique) {
                 // The number of sampled documents for the monotonicity step is greater than 0 but
                 // the number of sampled documents for the cardinality and frequency step is 0.
                 isUnique ? 7826506 : 7826507,
-            ]
+            ],
         },
         {
             // The expected sample size is less than 1, which is less than 'numMostCommonValues'.
@@ -73,7 +71,7 @@ function makeSampleRateTestCases(isUnique) {
                 // The number of sampled documents for the monotonicity step is greater than 0 but
                 // the number of sampled documents for the cardinality and frequency step is 0.
                 isUnique ? 7826506 : 7826507,
-            ]
+            ],
         },
     ];
 }
@@ -84,8 +82,7 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
     const dbName = "testDb";
     const collName = "testColl";
     if (st) {
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+        assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
     }
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
@@ -101,8 +98,7 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
     if (isShardedColl) {
         assert(st);
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {a: "hashed"}}));
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: ns, find: {a: 1}, to: st.shard1.shardName}));
+        assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {a: 1}, to: st.shard1.shardName}));
     }
 
     // Insert documents for this collection.
@@ -123,19 +119,19 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
         // The documents for the most common value.
         mostCommonValue0 = -87654321;
         mostCommonRatio0 = 0.5;
-        for (let i = 0; i < (numDocsTotal * mostCommonRatio0); i++) {
+        for (let i = 0; i < numDocsTotal * mostCommonRatio0; i++) {
             bufferOrInsertDoc({a: mostCommonValue0});
         }
         // The documents for the second most common value.
         mostCommonValue1 = -12345678;
         mostCommonRatio1 = 0.25;
-        for (let i = 0; i < (numDocsTotal * mostCommonRatio1); i++) {
+        for (let i = 0; i < numDocsTotal * mostCommonRatio1; i++) {
             bufferOrInsertDoc({a: mostCommonValue1});
         }
     }
     // The other documents.
     let aValue = 1;
-    while ((numDocsInserted + docsBuffer.length) < numDocsTotal) {
+    while (numDocsInserted + docsBuffer.length < numDocsTotal) {
         bufferOrInsertDoc({a: aValue++});
     }
 
@@ -149,16 +145,20 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
         if (!isUnique) {
             const mostCommon0 = metrics.mostCommonValues[0];
             assert.eq(mostCommon0.value, {a: mostCommonValue0}, metrics);
-            AnalyzeShardKeyUtil.assertApprox(mostCommon0.frequency / metrics.numDocsSampled,
-                                             mostCommonRatio0,
-                                             {metrics},
-                                             ratioMaxDiff);
+            AnalyzeShardKeyUtil.assertApprox(
+                mostCommon0.frequency / metrics.numDocsSampled,
+                mostCommonRatio0,
+                {metrics},
+                ratioMaxDiff,
+            );
             const mostCommon1 = metrics.mostCommonValues[1];
             assert.eq(mostCommon1.value, {a: mostCommonValue1}, metrics);
-            AnalyzeShardKeyUtil.assertApprox(mostCommon1.frequency / metrics.numDocsSampled,
-                                             mostCommonRatio1,
-                                             {metrics},
-                                             ratioMaxDiff);
+            AnalyzeShardKeyUtil.assertApprox(
+                mostCommon1.frequency / metrics.numDocsSampled,
+                mostCommonRatio1,
+                {metrics},
+                ratioMaxDiff,
+            );
 
             startIndex += 2;
         }
@@ -178,36 +178,40 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
         }
 
         const shardKey = {a: isHashed ? "hashed" : 1};
-        const monotonicityType =
-            isClusteredColl ? "unknown" : (isHashed ? "not monotonic" : "monotonic");
+        const monotonicityType = isClusteredColl ? "unknown" : isHashed ? "not monotonic" : "monotonic";
 
         const comment = UUID();
 
         // Cannot specify both sampleRate and sampleSize.
-        assert.commandFailedWithCode(conn.adminCommand({
-            analyzeShardKey: ns,
-            key: shardKey,
-            comment,
-            sampleRate: 0.5,
-            sampleSize: 10000,
-            // Skip calculating the read and write distribution metrics since they are not needed by
-            // this test.
-            readWriteDistribution: false
-        }),
-                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(
+            conn.adminCommand({
+                analyzeShardKey: ns,
+                key: shardKey,
+                comment,
+                sampleRate: 0.5,
+                sampleSize: 10000,
+                // Skip calculating the read and write distribution metrics since they are not needed by
+                // this test.
+                readWriteDistribution: false,
+            }),
+            ErrorCodes.InvalidOptions,
+        );
 
         // sampleSize < numTotalDocs (default).
-        jsTest.log("Testing default 'sampleSize': " +
-                   tojsononeline({defaultSampleSize, isHashed, isUnique, isShardedColl}));
+        jsTest.log(
+            "Testing default 'sampleSize': " + tojsononeline({defaultSampleSize, isHashed, isUnique, isShardedColl}),
+        );
 
-        const res = assert.commandWorked(conn.adminCommand({
-            analyzeShardKey: ns,
-            key: shardKey,
-            comment: comment,
-            // Skip calculating the read and write distribution metrics since they are not needed by
-            // this test.
-            readWriteDistribution: false
-        }));
+        const res = assert.commandWorked(
+            conn.adminCommand({
+                analyzeShardKey: ns,
+                key: shardKey,
+                comment: comment,
+                // Skip calculating the read and write distribution metrics since they are not needed by
+                // this test.
+                readWriteDistribution: false,
+            }),
+        );
         jsTest.log("Response for default 'sampleSize': " + tojsononeline({defaultSampleSize, res}));
         const metrics = res.keyCharacteristics;
 
@@ -216,18 +220,21 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
         assert.lte(metrics.numDocsSampled, defaultSampleSize, metrics);
         checkMostCommonValuesFn(metrics);
         assert.eq(metrics.monotonicity.type, monotonicityType, metrics);
-        assertAggregateQueryPlans(mongodConns,
-                                  dbName,
-                                  collName,
-                                  comment,
-                                  // On a replica set, the analyzeShardKey command runs the
-                                  // aggregate commands locally, i.e. the commands do not go
-                                  // through the service entry point so do not get profiled.
-                                  !rst /* expectEntries */);
+        assertAggregateQueryPlans(
+            mongodConns,
+            dbName,
+            collName,
+            comment,
+            // On a replica set, the analyzeShardKey command runs the
+            // aggregate commands locally, i.e. the commands do not go
+            // through the service entry point so do not get profiled.
+            !rst /* expectEntries */,
+        );
 
         for (let {sampleSize, expectedErrCodes} of sampleSizeTestCases) {
-            jsTest.log("Testing custom 'sampleSize': " +
-                       tojsononeline({sampleSize, isHashed, isUnique, isShardedColl}));
+            jsTest.log(
+                "Testing custom 'sampleSize': " + tojsononeline({sampleSize, isHashed, isUnique, isShardedColl}),
+            );
             const comment = UUID();
             const res = conn.adminCommand({
                 analyzeShardKey: ns,
@@ -236,7 +243,7 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
                 comment: comment,
                 // Skip calculating the read and write distribution metrics since they are not
                 // needed by this test.
-                readWriteDistribution: false
+                readWriteDistribution: false,
             });
             jsTest.log("Response custom 'sampleSize': " + tojsononeline({sampleSize, res}));
 
@@ -255,21 +262,23 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
             }
             checkMostCommonValuesFn(metrics);
             assert.eq(metrics.monotonicity.type, monotonicityType, metrics);
-            assertAggregateQueryPlans(mongodConns,
-                                      dbName,
-                                      collName,
-                                      comment,
-                                      // On a replica set, the analyzeShardKey command runs the
-                                      // aggregate commands locally, i.e. the commands do not go
-                                      // through the service entry point so do not get profiled.
-                                      !rst /* expectEntries */);
+            assertAggregateQueryPlans(
+                mongodConns,
+                dbName,
+                collName,
+                comment,
+                // On a replica set, the analyzeShardKey command runs the
+                // aggregate commands locally, i.e. the commands do not go
+                // through the service entry point so do not get profiled.
+                !rst /* expectEntries */,
+            );
         }
 
-        const sampleRateTestCases =
-            isUnique ? sampleSizeTestCasesUnique : sampleSizeTestCasesNotUnique;
+        const sampleRateTestCases = isUnique ? sampleSizeTestCasesUnique : sampleSizeTestCasesNotUnique;
         for (let {sampleRate, expectedErrCodes} of sampleRateTestCases) {
-            jsTest.log("Testing custom 'sampleRate': " +
-                       tojsononeline({sampleRate, isHashed, isUnique, isShardedColl}));
+            jsTest.log(
+                "Testing custom 'sampleRate': " + tojsononeline({sampleRate, isHashed, isUnique, isShardedColl}),
+            );
             const comment = UUID();
             const res = conn.adminCommand({
                 analyzeShardKey: ns,
@@ -278,7 +287,7 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
                 comment: comment,
                 // Skip calculating the read and write distribution metrics since they are not
                 // needed by this test.
-                readWriteDistribution: false
+                readWriteDistribution: false,
             });
             jsTest.log("Response for custom 'sampleRate': " + tojsononeline({sampleRate, res}));
 
@@ -299,14 +308,16 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
             }
             checkMostCommonValuesFn(metrics);
             assert.eq(metrics.monotonicity.type, monotonicityType, metrics);
-            assertAggregateQueryPlans(mongodConns,
-                                      dbName,
-                                      collName,
-                                      comment,
-                                      // On a replica set, the analyzeShardKey command runs the
-                                      // aggregate commands locally, i.e. the commands do not go
-                                      // through the service entry point so do not get profiled.
-                                      !rst /* expectEntries */);
+            assertAggregateQueryPlans(
+                mongodConns,
+                dbName,
+                collName,
+                comment,
+                // On a replica set, the analyzeShardKey command runs the
+                // aggregate commands locally, i.e. the commands do not go
+                // through the service entry point so do not get profiled.
+                !rst /* expectEntries */,
+            );
         }
     }
 
@@ -316,12 +327,11 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
 
 const setParameterOpts = {
     analyzeShardKeyNumMostCommonValues: numMostCommonValues,
-    analyzeShardKeyCharacteristicsDefaultSampleSize: defaultSampleSize
+    analyzeShardKeyCharacteristicsDefaultSampleSize: defaultSampleSize,
 };
 
 {
-    const st =
-        new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
+    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
 
     for (let isShardedColl of [false, true]) {
         runTest(st.s, {isUnique: true, isShardedColl, st});
@@ -332,8 +342,7 @@ const setParameterOpts = {
 }
 
 {
-    const rst =
-        new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
+    const rst = new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

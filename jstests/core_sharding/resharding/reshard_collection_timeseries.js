@@ -25,40 +25,43 @@ const mongos = db.getMongo();
 const sourceCollection = mongos.getCollection(ns);
 const sourceDB = sourceCollection.getDB();
 const shardKeyPattern = {
-    'meta.x': 1
+    "meta.x": 1,
 };
-const chunks = createChunks(shardNames, 'meta.x', -1, 6);
+const chunks = createChunks(shardNames, "meta.x", -1, 6);
 const timeseriesInfo = {
-    timeField: 'ts',
-    metaField: 'meta'
+    timeField: "ts",
+    metaField: "meta",
 };
 const collOptions = {
-    timeseries: timeseriesInfo
+    timeseries: timeseriesInfo,
 };
 
 jsTestLog("Setting up the timeseries collection.");
-assert.commandWorked(
-    sourceDB.adminCommand({enableSharding: sourceDB.getName(), primaryShard: shardNames[0]}));
+assert.commandWorked(sourceDB.adminCommand({enableSharding: sourceDB.getName(), primaryShard: shardNames[0]}));
 
-CreateShardedCollectionUtil.shardCollectionWithChunks(
-    sourceCollection, shardKeyPattern, chunks, collOptions);
+CreateShardedCollectionUtil.shardCollectionWithChunks(sourceCollection, shardKeyPattern, chunks, collOptions);
 
-let timeseriesCollDoc = mongos.getDB("config").getCollection("collections").findOne({
-    _id: getTimeseriesCollForDDLOps(sourceDB, sourceCollection).getFullName()
-});
+let timeseriesCollDoc = mongos
+    .getDB("config")
+    .getCollection("collections")
+    .findOne({
+        _id: getTimeseriesCollForDDLOps(sourceDB, sourceCollection).getFullName(),
+    });
 assert.eq(timeseriesCollDoc.timeseriesFields.timeField, timeseriesInfo.timeField);
 assert.eq(timeseriesCollDoc.timeseriesFields.metaField, timeseriesInfo.metaField);
 assert.eq(timeseriesCollDoc.key, {"meta.x": 1});
 
 const timeseriesCollection = mongos.getCollection(ns);
-assert.commandWorked(timeseriesCollection.insert([
-    {data: 1, ts: new Date(), meta: {x: -1, y: -1}},
-    {data: 6, ts: new Date(), meta: {x: -1, y: -1}},
-    {data: 3, ts: new Date(), meta: {x: -2, y: -2}},
-    {data: 3, ts: new Date(), meta: {x: 4, y: 3}},
-    {data: 9, ts: new Date(), meta: {x: 4, y: 3}},
-    {data: 1, ts: new Date(), meta: {x: 5, y: 4}}
-]));
+assert.commandWorked(
+    timeseriesCollection.insert([
+        {data: 1, ts: new Date(), meta: {x: -1, y: -1}},
+        {data: 6, ts: new Date(), meta: {x: -1, y: -1}},
+        {data: 3, ts: new Date(), meta: {x: -2, y: -2}},
+        {data: 3, ts: new Date(), meta: {x: 4, y: 3}},
+        {data: 9, ts: new Date(), meta: {x: 4, y: 3}},
+        {data: 1, ts: new Date(), meta: {x: 5, y: 4}},
+    ]),
+);
 assert.eq(6, mongos.getCollection(ns).countDocuments({}));
 
 jsTestLog("Resharding the timeseries collection.");
@@ -69,24 +72,29 @@ const reshardCmdTest = new ReshardCollectionCmdTest({
     numInitialDocs: 0,
     skipDirectShardChecks: true,
     skipCollectionSetup: true,
-    timeseries: true
+    timeseries: true,
 });
 
-let newChunks = createChunks(shardNames, 'meta.y', -1, 4);
+let newChunks = createChunks(shardNames, "meta.y", -1, 4);
 newChunks.forEach((_, idx) => {
     newChunks[idx]["recipientShardId"] = newChunks[idx]["shard"];
     delete newChunks[idx]["shard"];
 });
 
-reshardCmdTest.assertReshardCollOkWithPreset({
-    reshardCollection: ns,
-    key: {'meta.y': 1},
-},
-                                             newChunks);
+reshardCmdTest.assertReshardCollOkWithPreset(
+    {
+        reshardCollection: ns,
+        key: {"meta.y": 1},
+    },
+    newChunks,
+);
 
-let timeseriesCollDocPostResharding = mongos.getDB("config").getCollection("collections").findOne({
-    _id: getTimeseriesCollForDDLOps(sourceDB, sourceCollection).getFullName()
-});
+let timeseriesCollDocPostResharding = mongos
+    .getDB("config")
+    .getCollection("collections")
+    .findOne({
+        _id: getTimeseriesCollForDDLOps(sourceDB, sourceCollection).getFullName(),
+    });
 
 // Resharding keeps timeseries fields.
 assert.eq(timeseriesCollDocPostResharding.timeseriesFields.timeField, timeseriesInfo.timeField);

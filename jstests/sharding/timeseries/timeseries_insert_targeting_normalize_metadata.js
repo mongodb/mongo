@@ -13,18 +13,15 @@ const timeFieldName = "time";
 const metaFieldName = "metaField";
 const rawMetaFieldName = "meta";
 
-function testTargetingRespectsNormalizedMetadata(
-    shardingKey, valueToSplitAt, chunk1, chunk2, measurementsToInsert) {
+function testTargetingRespectsNormalizedMetadata(shardingKey, valueToSplitAt, chunk1, chunk2, measurementsToInsert) {
     coll.drop();
-    assert.commandWorked(db.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-    assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: shardingKey}));
     assert.commandWorked(
-        st.splitAt(getTimeseriesCollForDDLOps(db, coll).getFullName(), valueToSplitAt));
-    assert.commandWorked(st.moveChunk(
-        getTimeseriesCollForDDLOps(db, coll).getFullName(), chunk1, st.shard0.shardName));
-    assert.commandWorked(st.moveChunk(
-        getTimeseriesCollForDDLOps(db, coll).getFullName(), chunk2, st.shard1.shardName));
+        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
+    assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: shardingKey}));
+    assert.commandWorked(st.splitAt(getTimeseriesCollForDDLOps(db, coll).getFullName(), valueToSplitAt));
+    assert.commandWorked(st.moveChunk(getTimeseriesCollForDDLOps(db, coll).getFullName(), chunk1, st.shard0.shardName));
+    assert.commandWorked(st.moveChunk(getTimeseriesCollForDDLOps(db, coll).getFullName(), chunk2, st.shard1.shardName));
 
     for (let i = 0; i < measurementsToInsert.length; i++) {
         assert.commandWorked(coll.insert(measurementsToInsert[i]));
@@ -41,8 +38,9 @@ testTargetingRespectsNormalizedMetadata(
     /*measurements=*/
     [
         {[timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"), [metaFieldName]: {a: 1, b: 1}},
-        {[timeFieldName]: ISODate("2025-02-18T12:00:01.000Z"), [metaFieldName]: {b: 1, a: 1}}
-    ]);
+        {[timeFieldName]: ISODate("2025-02-18T12:00:01.000Z"), [metaFieldName]: {b: 1, a: 1}},
+    ],
+);
 
 testTargetingRespectsNormalizedMetadata(
     /*shardingKey=*/ {[metaFieldName + ".nested"]: 1},
@@ -53,12 +51,13 @@ testTargetingRespectsNormalizedMetadata(
     [
         {
             [timeFieldName]: ISODate("2025-02-18T12:00:00.000Z"),
-            [metaFieldName]: {nested: {a: 1, b: 1}}
+            [metaFieldName]: {nested: {a: 1, b: 1}},
         },
         {
             [timeFieldName]: ISODate("2025-02-18T12:00:01.000Z"),
-            [metaFieldName]: {nested: {b: 1, a: 1}}
-        }
-    ]);
+            [metaFieldName]: {nested: {b: 1, a: 1}},
+        },
+    ],
+);
 
 st.stop();

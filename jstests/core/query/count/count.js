@@ -9,12 +9,17 @@
  * ]
  */
 
-const collNamePrefix = 'jstests_count_';
+const collNamePrefix = "jstests_count_";
 let collCount = 0;
 
 let coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandWorked(coll.insert([{_id: 1, i: 1}, {_id: 2, i: 2}]));
+assert.commandWorked(
+    coll.insert([
+        {_id: 1, i: 1},
+        {_id: 2, i: 2},
+    ]),
+);
 assert.eq(1, coll.find({i: 1}).count());
 assert.eq(1, coll.count({i: 1}));
 assert.eq(2, coll.find().count());

@@ -29,38 +29,34 @@ runWithData(
         {_id: 2, a: 1},
         {_id: 3, b: null},
         {_id: 4, b: 2},
-        {_id: 5, 'a': {'b': 3}},
-        {_id: 6, 'a': [{'b': 4}]}
+        {_id: 5, "a": {"b": 3}},
+        {_id: 6, "a": [{"b": 4}]},
     ],
     [
         {a: {$exists: true}},
         {a: {$not: {$exists: false}}},
         {a: {$exists: false}},
         {b: {$exists: true}},
-        {'a.b': {$exists: true}},
-        {'a.b': {$exists: false}},
-    ]);
+        {"a.b": {$exists: true}},
+        {"a.b": {$exists: false}},
+    ],
+);
+
+runWithData([{_id: 1, a: []}], [{"a": {$exists: true}}, {"a": {$exists: false}}]);
+
+runWithData([{_id: 1, a: false}], [{"a": {$exists: true}}, {"a": {$exists: false}}]);
 
 runWithData(
-    [
-        {_id: 1, a: []},
-    ],
-    [{'a': {$exists: true}}, {'a': {$exists: false}}]);
+    [{_id: 1, a: [{"b": 2}, {"a": 1}]}],
+    [{"a.a": {$exists: true}}, {"a.a": {$exists: false}}, {"a.b": {$exists: true}}],
+);
 
-runWithData(
-    [
-        {_id: 1, a: false},
-    ],
-    [{'a': {$exists: true}}, {'a': {$exists: false}}]);
-
-runWithData([{_id: 1, a: [{'b': 2}, {'a': 1}]}],
-            [{'a.a': {$exists: true}}, {'a.a': {$exists: false}}, {'a.b': {$exists: true}}]);
-
-runWithData([{_id: 1, a: [[{b: 1}]]}], [{'a.b': {$exists: false}}, {'a.b': {$exists: true}}]);
+runWithData([{_id: 1, a: [[{b: 1}]]}], [{"a.b": {$exists: false}}, {"a.b": {$exists: true}}]);
 
 runWithData(
     [
         {_id: 1, a: [1]},
         {_id: 2, a: [2]},
     ],
-    [{'a': {$elemMatch: {$exists: true}}}, {'a': {$elemMatch: {$exists: false}}}]);
+    [{"a": {$elemMatch: {$exists: true}}}, {"a": {$elemMatch: {$exists: false}}}],
+);

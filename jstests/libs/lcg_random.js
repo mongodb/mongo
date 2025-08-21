@@ -25,7 +25,7 @@ export class LcgRandom {
 
     // Returns a floating point value in the range [0, 1).
     getRandomFloat() {
-        this._seed = this._seed * 48271 % 2147483647;
+        this._seed = (this._seed * 48271) % 2147483647;
         return (this._seed - 1) / 2147483646;
     }
-}  // class LcgRandom
+} // class LcgRandom

@@ -17,14 +17,10 @@ import {
     assertFooStageAcceptedV1Only,
     fooV1Options,
     fooV2Options,
-    setupCollection
+    setupCollection,
 } from "jstests/multiVersion/genericBinVersion/extensions_api/extension_foo_upgrade_downgrade.js";
-import {
-    testPerformReplSetRollingRestart
-} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
-import {
-    testPerformShardedClusterRollingRestart
-} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
+import {testPerformReplSetRollingRestart} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
+import {testPerformShardedClusterRollingRestart} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
 
 if (!isLinux()) {
     jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");

@@ -14,11 +14,11 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_resume_from_end_of_transaction");
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const txnOptions = {
     readConcern: {level: "snapshot"},
-    writeConcern: {w: "majority"}
+    writeConcern: {w: "majority"},
 };
 
 const session = db.getMongo().startSession(sessionOptions);
@@ -30,15 +30,19 @@ const sessionColl = sessionDb[coll.getName()];
 
 const changeStreamCursor = coll.watch([], {showExpandedEvents: true});
 
-withTxnAndAutoRetryOnMongos(session, () => {
-    assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
-    assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
-}, txnOptions);
+withTxnAndAutoRetryOnMongos(
+    session,
+    () => {
+        assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
+        assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
+    },
+    txnOptions,
+);
 
 const expectedOperationTypes = ["insert", "insert", "endOfTransaction"];
 const events = [];
 
-const getNextEventAndCheckType = function(expectedOperationType) {
+const getNextEventAndCheckType = function (expectedOperationType) {
     assert.soon(() => changeStreamCursor.hasNext());
     const event = changeStreamCursor.next();
     assert.eq(event.operationType, expectedOperationType);
@@ -54,7 +58,7 @@ for (let operationType of expectedOperationTypes) {
 assert.commandWorked(coll.insert({_id: 3, a: 0}));
 getNextEventAndCheckType("insert");
 
-const getNextEvent = function(resumeToken) {
+const getNextEvent = function (resumeToken) {
     const resumeCursor = coll.watch([], {resumeAfter: resumeToken, showExpandedEvents: true});
     assert.soon(() => resumeCursor.hasNext());
     return resumeCursor.next();

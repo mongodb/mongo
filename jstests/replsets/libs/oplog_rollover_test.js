@@ -6,8 +6,11 @@ import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function numInsertOplogEntry(oplog) {
-    print(`Oplog times for ${oplog.getMongo().host}: ${
-        tojsononeline(oplog.find().projection({ts: 1, t: 1, op: 1, ns: 1}).toArray())}`);
+    print(
+        `Oplog times for ${oplog.getMongo().host}: ${tojsononeline(
+            oplog.find().projection({ts: 1, t: 1, op: 1, ns: 1}).toArray(),
+        )}`,
+    );
     let result;
     assert.soon(() => {
         try {
@@ -36,27 +39,29 @@ export function rollOver1MBOplog(replSet) {
     const secondaryOplog = secondary.getDB("local").oplog.rs;
 
     // Verify that the oplog cap maintainer thread is paused.
-    assert.commandWorked(primary.adminCommand({
-        waitForFailPoint: "hangOplogCapMaintainerThread",
-        timesEntered: 1,
-        maxTimeMS: kDefaultWaitForFailPointTimeout
-    }));
-    assert.commandWorked(secondary.adminCommand({
-        waitForFailPoint: "hangOplogCapMaintainerThread",
-        timesEntered: 1,
-        maxTimeMS: kDefaultWaitForFailPointTimeout
-    }));
+    assert.commandWorked(
+        primary.adminCommand({
+            waitForFailPoint: "hangOplogCapMaintainerThread",
+            timesEntered: 1,
+            maxTimeMS: kDefaultWaitForFailPointTimeout,
+        }),
+    );
+    assert.commandWorked(
+        secondary.adminCommand({
+            waitForFailPoint: "hangOplogCapMaintainerThread",
+            timesEntered: 1,
+            maxTimeMS: kDefaultWaitForFailPointTimeout,
+        }),
+    );
 
     const coll = primary.getDB("test").foo;
     // 400KB each so that oplog can keep at most two insert oplog entries.
     const longString = "a".repeat(400 * 1024);
 
     // Insert the first document.
-    const firstInsertTimestamp =
-        assert
-            .commandWorked(coll.runCommand(
-                "insert", {documents: [{_id: 0, longString: longString}], writeConcern: {w: 2}}))
-            .operationTime;
+    const firstInsertTimestamp = assert.commandWorked(
+        coll.runCommand("insert", {documents: [{_id: 0, longString: longString}], writeConcern: {w: 2}}),
+    ).operationTime;
     jsTestLog("First insert timestamp: " + tojson(firstInsertTimestamp));
 
     // Test that oplog entry of the first insert exists on both primary and secondary.
@@ -64,18 +69,16 @@ export function rollOver1MBOplog(replSet) {
     assert.eq(1, numInsertOplogEntry(secondaryOplog));
 
     // Insert the second document.
-    const secondInsertTimestamp =
-        assert
-            .commandWorked(coll.runCommand(
-                "insert", {documents: [{_id: 1, longString: longString}], writeConcern: {w: 2}}))
-            .operationTime;
+    const secondInsertTimestamp = assert.commandWorked(
+        coll.runCommand("insert", {documents: [{_id: 1, longString: longString}], writeConcern: {w: 2}}),
+    ).operationTime;
     jsTestLog("Second insert timestamp: " + tojson(secondInsertTimestamp));
 
     // Test that oplog entries of both inserts exist on both primary and secondary.
     assert.eq(2, numInsertOplogEntry(primaryOplog));
     assert.eq(2, numInsertOplogEntry(secondaryOplog));
 
-    const awaitCheckpointer = function(timestamp) {
+    const awaitCheckpointer = function (timestamp) {
         replSet.waitForCheckpoint(primary, timestamp);
         replSet.waitForCheckpoint(secondary, timestamp);
     };
@@ -90,11 +93,9 @@ export function rollOver1MBOplog(replSet) {
     // The oplog cap maintainer thread will then be unblocked on the creation of the new oplog
     // marker and will start truncating oplog entries. The oplog entry for the first
     // insert will be truncated after the oplog cap maintainer thread finishes.
-    const thirdInsertTimestamp =
-        assert
-            .commandWorked(coll.runCommand(
-                "insert", {documents: [{_id: 2, longString: longString}], writeConcern: {w: 2}}))
-            .operationTime;
+    const thirdInsertTimestamp = assert.commandWorked(
+        coll.runCommand("insert", {documents: [{_id: 2, longString: longString}], writeConcern: {w: 2}}),
+    ).operationTime;
     jsTestLog("Third insert timestamp: " + tojson(thirdInsertTimestamp));
 
     // There is a race between how we calculate the pinnedOplog and checkpointing. The timestamp
@@ -109,10 +110,8 @@ export function rollOver1MBOplog(replSet) {
     assert.eq(3, numInsertOplogEntry(secondaryOplog));
 
     // Let the oplog cap maintainer thread start truncating the oplog.
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+    assert.commandWorked(primary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+    assert.commandWorked(secondary.adminCommand({configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
 }
 
 export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless = false) {
@@ -128,7 +127,7 @@ export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless =
     // which this test does not do.
     let parameters = {
         logComponentVerbosity: tojson({storage: 2}),
-        'failpoint.hangOplogCapMaintainerThread': tojson({mode: 'alwaysOn'})
+        "failpoint.hangOplogCapMaintainerThread": tojson({mode: "alwaysOn"}),
     };
     if (initialSyncMethod) {
         parameters = Object.merge(parameters, {initialSyncMethod: initialSyncMethod});
@@ -140,11 +139,10 @@ export function oplogRolloverTest(storageEngine, initialSyncMethod, serverless =
             syncdelay: 1,
             setParameter: parameters,
         },
-        nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]
+        nodes: [{}, {rsConfig: {priority: 0, votes: 0}}],
     };
 
-    if (serverless)
-        replSetOptions = Object.merge(replSetOptions, {serverless: true});
+    if (serverless) replSetOptions = Object.merge(replSetOptions, {serverless: true});
 
     const replSet = new ReplSetTest(replSetOptions);
     // Set max oplog size to 1MB.

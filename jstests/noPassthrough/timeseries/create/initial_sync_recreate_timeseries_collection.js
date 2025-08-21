@@ -25,8 +25,8 @@ const rst = new ReplSetTest({
             rsConfig: {
                 priority: 0,
             },
-        }
-    ]
+        },
+    ],
 });
 
 rst.startSet();
@@ -43,9 +43,9 @@ rst.awaitReplication();
 let secondary = rst.restart(1, {
     startClean: true,
     setParameter: {
-        'failpoint.initialSyncHangBeforeCopyingDatabases': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1
-    }
+        "failpoint.initialSyncHangBeforeCopyingDatabases": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 
 // Wait until we block on cloning the collection.
@@ -65,8 +65,9 @@ assert(coll.drop());
 assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "time"}}));
 
 // Finish the collection cloning phase on the initial syncing node.
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}));
+assert.commandWorked(
+    secondary.adminCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+);
 
 rst.awaitSecondaryNodes(null, [secondary]);
 

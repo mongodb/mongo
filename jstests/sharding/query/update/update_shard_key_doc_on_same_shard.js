@@ -10,9 +10,7 @@
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    enableCoordinateCommitReturnImmediatelyAfterPersistingDecision
-} from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {enableCoordinateCommitReturnImmediatelyAfterPersistingDecision} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 import {
     assertCanDoReplacementUpdateWhereShardKeyMissingFields,
     assertCannotUpdate_id,
@@ -31,11 +29,10 @@ import {
 const st = new ShardingTest({
     mongos: 1,
     shards: {rs0: {nodes: 3}, rs1: {nodes: 3}},
-    rsOptions:
-        {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}}
+    rsOptions: {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}},
 });
-const kDbName = 'db';
-const ns = kDbName + '.foo';
+const kDbName = "db";
+const ns = kDbName + ".foo";
 const mongos = st.s0;
 const shard0 = st.shard0.shardName;
 
@@ -52,362 +49,500 @@ let sessionDB = session.getDatabase(kDbName);
 // Modify updates
 
 // upsert : false
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 false,
-                                 false,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                                 false);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          false,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
-                          false);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               false,
-                               false,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                               false);
-assertCanUnsetSKField(
-    st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"$unset": {"x": 1}}, false);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x": 300}, {"x": 4}],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    false,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
+    false,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    false,
+);
+assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"$unset": {"x": 1}}, false);
 
 // upsert : true
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 false,
-                                 false,
-                                 [{"x": 900}, {"x": 3}],
-                                 [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                                 true);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          false,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
-                          true);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               false,
-                               false,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                               true);
-assertCanUnsetSKField(
-    st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"$unset": {"x": 1}}, true);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x": 900}, {"x": 3}],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    true,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
+    true,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    true,
+);
+assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"$unset": {"x": 1}}, true);
 
 // failing cases
-assertCannotUpdate_id(
-    st, kDbName, ns, session, sessionDB, false, false, {"_id": 300}, {"$set": {"_id": 600}});
-assertCannotUpdate_idDottedPath(st, kDbName, ns, session, sessionDB, false, false, {"_id.a": 300}, {
-    "$set": {"_id": {"a": 600}}
-});
-assertCannotUpdateWithMultiTrue(
-    st, kDbName, ns, session, sessionDB, false, {"x": 300}, {"$set": {"x": 600}});
-assertCannotUpdateSKToArray(
-    st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"$set": {"x": [300]}});
+assertCannotUpdate_id(st, kDbName, ns, session, sessionDB, false, false, {"_id": 300}, {"$set": {"_id": 600}});
+assertCannotUpdate_idDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    {"_id.a": 300},
+    {
+        "$set": {"_id": {"a": 600}},
+    },
+);
+assertCannotUpdateWithMultiTrue(st, kDbName, ns, session, sessionDB, false, {"x": 300}, {"$set": {"x": 600}});
+assertCannotUpdateSKToArray(st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"$set": {"x": [300]}});
 
 // Replacement updates
 
 // upsert : false
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 false,
-                                 false,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"x": 600}, {"x": 30}],
-                                 false);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          false,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"x": {"a": 600}}, {"x": {"a": 30}}],
-                          false);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               false,
-                               false,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"x": 600, "y": 80}, {"x": 30, "y": 3}],
-                               false);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x": 300}, {"x": 4}],
+    [{"x": 600}, {"x": 30}],
+    false,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"x": {"a": 600}}, {"x": {"a": 30}}],
+    false,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [
+        {"x": 600, "y": 80},
+        {"x": 30, "y": 3},
+    ],
+    false,
+);
 assertCanDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, false, false, {"x": 300, "y": 80}, {"x": 600}, false);
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    {"x": 300, "y": 80},
+    {"x": 600},
+    false,
+);
 // Shard key fields are missing in query.
-assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
-                                                       kDbName,
-                                                       ns,
-                                                       session,
-                                                       sessionDB,
-                                                       false,
-                                                       false,
-                                                       {"x": 300},
-                                                       {"x": 600, "y": 80, "a": 2},
-                                                       false);
+assertCanDoReplacementUpdateWhereShardKeyMissingFields(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    {"x": 300},
+    {"x": 600, "y": 80, "a": 2},
+    false,
+);
 
 // upsert : true
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 false,
-                                 false,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"x": 600}, {"x": 30}],
-                                 true);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          false,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"x": {"a": 600}}, {"x": {"a": 30}}],
-                          true);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               false,
-                               false,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"x": 600, "y": 80}, {"x": 30, "y": 3}],
-                               true);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x": 300}, {"x": 4}],
+    [{"x": 600}, {"x": 30}],
+    true,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"x": {"a": 600}}, {"x": {"a": 30}}],
+    true,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [
+        {"x": 600, "y": 80},
+        {"x": 30, "y": 3},
+    ],
+    true,
+);
 assertCanDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, false, false, {"x": 300, "y": 80}, {"x": 600}, true);
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    {"x": 300, "y": 80},
+    {"x": 600},
+    true,
+);
 // Shard key fields are missing in query.
-assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
-                                                       kDbName,
-                                                       ns,
-                                                       session,
-                                                       sessionDB,
-                                                       false,
-                                                       false,
-                                                       {"x": 300},
-                                                       {"x": 600, "y": 80, "a": 2},
-                                                       true);
+assertCanDoReplacementUpdateWhereShardKeyMissingFields(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    {"x": 300},
+    {"x": 600, "y": 80, "a": 2},
+    true,
+);
 
 // failing cases
-assertCannotUpdate_id(
-    st, kDbName, ns, session, sessionDB, false, false, {"_id": 300}, {"_id": 600});
-assertCannotUpdate_idDottedPath(
-    st, kDbName, ns, session, sessionDB, false, false, {"_id.a": 300}, {"_id": {"a": 600}});
+assertCannotUpdate_id(st, kDbName, ns, session, sessionDB, false, false, {"_id": 300}, {"_id": 600});
+assertCannotUpdate_idDottedPath(st, kDbName, ns, session, sessionDB, false, false, {"_id.a": 300}, {"_id": {"a": 600}});
 assertCannotUpdateWithMultiTrue(st, kDbName, ns, session, sessionDB, false, {"x": 300}, {"x": 600});
-assertCannotUpdateSKToArray(
-    st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"x": [300]});
+assertCannotUpdateSKToArray(st, kDbName, ns, session, sessionDB, false, false, {"x": 300}, {"x": [300]});
 
 // Modify style findAndModify
 
 // upsert : false
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 false,
-                                 true,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                                 false);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          false,
-                          true,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
-                          false);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               false,
-                               true,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                               false);
-assertCanUnsetSKField(
-    st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"$unset": {"x": 1}}, false);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    [{"x": 300}, {"x": 4}],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    false,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
+    false,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    false,
+);
+assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"$unset": {"x": 1}}, false);
 
 // upsert : true
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 false,
-                                 false,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                                 true);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          false,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
-                          true);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               false,
-                               true,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                               true);
-assertCanUnsetSKField(
-    st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"$unset": {"x": 1}}, true);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x": 300}, {"x": 4}],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    true,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
+    true,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    true,
+);
+assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"$unset": {"x": 1}}, true);
 
 // failing cases
-assertCannotUpdate_id(
-    st, kDbName, ns, session, sessionDB, false, true, {"_id": 300}, {"$set": {"_id": 600}});
-assertCannotUpdate_idDottedPath(st, kDbName, ns, session, sessionDB, false, true, {"_id.a": 300}, {
-    "$set": {"_id": {"a": 600}}
-});
-assertCannotUpdateSKToArray(
-    st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"$set": {"x": [300]}});
+assertCannotUpdate_id(st, kDbName, ns, session, sessionDB, false, true, {"_id": 300}, {"$set": {"_id": 600}});
+assertCannotUpdate_idDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    {"_id.a": 300},
+    {
+        "$set": {"_id": {"a": 600}},
+    },
+);
+assertCannotUpdateSKToArray(st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"$set": {"x": [300]}});
 
 // Replacement style findAndModify
 
 // upsert : false
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 false,
-                                 true,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"x": 600}, {"x": 30}],
-                                 false);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          false,
-                          true,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"x": {"a": 600}}, {"x": {"a": 30}}],
-                          false);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               false,
-                               true,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"x": 600, "y": 80}, {"x": 30, "y": 3}],
-                               false);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    [{"x": 300}, {"x": 4}],
+    [{"x": 600}, {"x": 30}],
+    false,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"x": {"a": 600}}, {"x": {"a": 30}}],
+    false,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [
+        {"x": 600, "y": 80},
+        {"x": 30, "y": 3},
+    ],
+    false,
+);
 assertCanDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, false, true, {"x": 300, "y": 80}, {"x": 600}, false);
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    {"x": 300, "y": 80},
+    {"x": 600},
+    false,
+);
 // Shard key fields are missing in query.
-assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
-                                                       kDbName,
-                                                       ns,
-                                                       session,
-                                                       sessionDB,
-                                                       false,
-                                                       true,
-                                                       {"x": 300},
-                                                       {"x": 600, "y": 80, "a": 2},
-                                                       false);
+assertCanDoReplacementUpdateWhereShardKeyMissingFields(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    {"x": 300},
+    {"x": 600, "y": 80, "a": 2},
+    false,
+);
 
 // upsert: true
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 false,
-                                 false,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"x": 600}, {"x": 30}],
-                                 true);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          false,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"x": {"a": 600}}, {"x": {"a": 30}}],
-                          true);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               false,
-                               true,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"x": 600, "y": 80}, {"x": 30, "y": 3}],
-                               true);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x": 300}, {"x": 4}],
+    [{"x": 600}, {"x": 30}],
+    true,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"x": {"a": 600}}, {"x": {"a": 30}}],
+    true,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [
+        {"x": 600, "y": 80},
+        {"x": 30, "y": 3},
+    ],
+    true,
+);
 assertCanDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, false, true, {"x": 300, "y": 80}, {"x": 600}, true);
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    {"x": 300, "y": 80},
+    {"x": 600},
+    true,
+);
 // Shard key fields are missing in query.
-assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
-                                                       kDbName,
-                                                       ns,
-                                                       session,
-                                                       sessionDB,
-                                                       false,
-                                                       true,
-                                                       {"x": 300},
-                                                       {"x": 600, "y": 80, "a": 2},
-                                                       true);
+assertCanDoReplacementUpdateWhereShardKeyMissingFields(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    false,
+    true,
+    {"x": 300},
+    {"x": 600, "y": 80, "a": 2},
+    true,
+);
 
 // failing cases
 assertCannotUpdate_id(st, kDbName, ns, session, sessionDB, false, true, {"_id": 300}, {"_id": 600});
-assertCannotUpdate_idDottedPath(
-    st, kDbName, ns, session, sessionDB, false, true, {"_id.a": 300}, {"_id": {"a": 600}});
-assertCannotUpdateSKToArray(
-    st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"x": [300]});
+assertCannotUpdate_idDottedPath(st, kDbName, ns, session, sessionDB, false, true, {"_id.a": 300}, {"_id": {"a": 600}});
+assertCannotUpdateSKToArray(st, kDbName, ns, session, sessionDB, false, true, {"x": 300}, {"x": [300]});
 
 // Bulk writes retryable writes
 assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(st, kDbName, ns, session, sessionDB, false, false);
@@ -429,352 +564,498 @@ sessionDB = session.getDatabase(kDbName);
 // Modify updates
 
 // upsert : false
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 true,
-                                 false,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                                 false);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          true,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
-                          false);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               true,
-                               false,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                               false);
-assertCanUnsetSKField(
-    st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"$unset": {"x": 1}}, false);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [{"x": 300}, {"x": 4}],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    false,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
+    false,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    false,
+);
+assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"$unset": {"x": 1}}, false);
 
 // upsert : true
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 true,
-                                 false,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                                 true);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          true,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
-                          true);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               true,
-                               false,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                               true);
-assertCanUnsetSKField(
-    st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"$unset": {"x": 1}}, true);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [{"x": 300}, {"x": 4}],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    true,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
+    true,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    true,
+);
+assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"$unset": {"x": 1}}, true);
 
 // failing cases
-assertCannotUpdate_id(
-    st, kDbName, ns, session, sessionDB, true, false, {"_id": 300}, {"$set": {"_id": 600}});
-assertCannotUpdate_idDottedPath(st, kDbName, ns, session, sessionDB, true, false, {"_id.a": 300}, {
-    "$set": {"_id": {"a": 600}}
-});
-assertCannotUpdateWithMultiTrue(
-    st, kDbName, ns, session, sessionDB, true, {"x": 300}, {"$set": {"x": 600}});
-assertCannotUpdateSKToArray(
-    st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"$set": {"x": [300]}});
+assertCannotUpdate_id(st, kDbName, ns, session, sessionDB, true, false, {"_id": 300}, {"$set": {"_id": 600}});
+assertCannotUpdate_idDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    {"_id.a": 300},
+    {
+        "$set": {"_id": {"a": 600}},
+    },
+);
+assertCannotUpdateWithMultiTrue(st, kDbName, ns, session, sessionDB, true, {"x": 300}, {"$set": {"x": 600}});
+assertCannotUpdateSKToArray(st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"$set": {"x": [300]}});
 
 // Replacement updates
 
 // upsert : false
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 true,
-                                 false,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"x": 600}, {"x": 30}],
-                                 false);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          true,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"x": {"a": 600}}, {"x": {"a": 30}}],
-                          false);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               true,
-                               false,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"x": 600, "y": 80}, {"x": 30, "y": 3}],
-                               false);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [{"x": 300}, {"x": 4}],
+    [{"x": 600}, {"x": 30}],
+    false,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"x": {"a": 600}}, {"x": {"a": 30}}],
+    false,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [
+        {"x": 600, "y": 80},
+        {"x": 30, "y": 3},
+    ],
+    false,
+);
 assertCanDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, true, false, {"x": 300, "y": 80}, {"x": 600}, false);
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    {"x": 300, "y": 80},
+    {"x": 600},
+    false,
+);
 // Shard key fields are missing in query.
-assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
-                                                       kDbName,
-                                                       ns,
-                                                       session,
-                                                       sessionDB,
-                                                       true,
-                                                       false,
-                                                       {"x": 300},
-                                                       {"x": 600, "y": 80, "a": 2},
-                                                       false);
+assertCanDoReplacementUpdateWhereShardKeyMissingFields(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    {"x": 300},
+    {"x": 600, "y": 80, "a": 2},
+    false,
+);
 
 // upsert : true
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 true,
-                                 false,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"x": 600}, {"x": 30}],
-                                 true);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          true,
-                          false,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"x": {"a": 600}}, {"x": {"a": 30}}],
-                          true);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               true,
-                               false,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"x": 600, "y": 80}, {"x": 30, "y": 3}],
-                               true);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [{"x": 300}, {"x": 4}],
+    [{"x": 600}, {"x": 30}],
+    true,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"x": {"a": 600}}, {"x": {"a": 30}}],
+    true,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [
+        {"x": 600, "y": 80},
+        {"x": 30, "y": 3},
+    ],
+    true,
+);
 assertCanDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, true, false, {"x": 300, "y": 80}, {"x": 600}, true);
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    {"x": 300, "y": 80},
+    {"x": 600},
+    true,
+);
 // Shard key fields are missing in query.
-assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
-                                                       kDbName,
-                                                       ns,
-                                                       session,
-                                                       sessionDB,
-                                                       true,
-                                                       false,
-                                                       {"x": 300},
-                                                       {"x": 600, "y": 80, "a": 2},
-                                                       true);
+assertCanDoReplacementUpdateWhereShardKeyMissingFields(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    false,
+    {"x": 300},
+    {"x": 600, "y": 80, "a": 2},
+    true,
+);
 
 // failing cases
 assertCannotUpdate_id(st, kDbName, ns, session, sessionDB, true, false, {"_id": 300}, {"_id": 600});
-assertCannotUpdate_idDottedPath(
-    st, kDbName, ns, session, sessionDB, true, false, {"_id.a": 300}, {"_id": {"a": 600}});
+assertCannotUpdate_idDottedPath(st, kDbName, ns, session, sessionDB, true, false, {"_id.a": 300}, {"_id": {"a": 600}});
 assertCannotUpdateWithMultiTrue(st, kDbName, ns, session, sessionDB, true, {"x": 300}, {"x": 600});
-assertCannotUpdateSKToArray(
-    st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"x": [300]});
+assertCannotUpdateSKToArray(st, kDbName, ns, session, sessionDB, true, false, {"x": 300}, {"x": [300]});
 
 // Modify style findAndModify
 
 // upsert : false
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 true,
-                                 true,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                                 false);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          true,
-                          true,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
-                          false);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               true,
-                               true,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                               false);
-assertCanUnsetSKField(
-    st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"$unset": {"x": 1}}, false);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [{"x": 300}, {"x": 4}],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    false,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
+    false,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    false,
+);
+assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"$unset": {"x": 1}}, false);
 
 // upsert : true
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 true,
-                                 true,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                                 true);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          true,
-                          true,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
-                          true);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               true,
-                               true,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
-                               true);
-assertCanUnsetSKField(
-    st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"$unset": {"x": 1}}, true);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [{"x": 300}, {"x": 4}],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    true,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"$set": {"x": {"a": 600}}}, {"$set": {"x": {"a": 30}}}],
+    true,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [{"$set": {"x": 600}}, {"$set": {"x": 30}}],
+    true,
+);
+assertCanUnsetSKField(st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"$unset": {"x": 1}}, true);
 
 // failing cases
-assertCannotUpdate_id(
-    st, kDbName, ns, session, sessionDB, true, true, {"_id": 300}, {"$set": {"_id": 600}});
+assertCannotUpdate_id(st, kDbName, ns, session, sessionDB, true, true, {"_id": 300}, {"$set": {"_id": 600}});
 assertCannotUpdate_idDottedPath(
-    st, kDbName, ns, session, sessionDB, true, true, {"_id.a": 300}, {"$set": {"_id": {"a": 600}}});
-assertCannotUpdateSKToArray(
-    st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"$set": {"x": [300]}});
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    {"_id.a": 300},
+    {"$set": {"_id": {"a": 600}}},
+);
+assertCannotUpdateSKToArray(st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"$set": {"x": [300]}});
 
 // Replacement style findAndModify
 
 // upsert : false
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 true,
-                                 true,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"x": 600}, {"x": 30}],
-                                 false);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          true,
-                          true,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"x": {"a": 600}}, {"x": {"a": 30}}],
-                          false);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               true,
-                               true,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"x": 600, "y": 80}, {"x": 30, "y": 3}],
-                               false);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [{"x": 300}, {"x": 4}],
+    [{"x": 600}, {"x": 30}],
+    false,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"x": {"a": 600}}, {"x": {"a": 30}}],
+    false,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [
+        {"x": 600, "y": 80},
+        {"x": 30, "y": 3},
+    ],
+    false,
+);
 assertCanDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, true, true, {"x": 300, "y": 80}, {"x": 600}, false);
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    {"x": 300, "y": 80},
+    {"x": 600},
+    false,
+);
 // Shard key fields are missing in query.
-assertCanDoReplacementUpdateWhereShardKeyMissingFields(st,
-                                                       kDbName,
-                                                       ns,
-                                                       session,
-                                                       sessionDB,
-                                                       true,
-                                                       true,
-                                                       {"x": 300},
-                                                       {"x": 600, "y": 80, "a": 2},
-                                                       false);
+assertCanDoReplacementUpdateWhereShardKeyMissingFields(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    {"x": 300},
+    {"x": 600, "y": 80, "a": 2},
+    false,
+);
 
 // upsert : true
-assertCanUpdatePrimitiveShardKey(st,
-                                 kDbName,
-                                 ns,
-                                 session,
-                                 sessionDB,
-                                 true,
-                                 true,
-                                 [{"x": 300}, {"x": 4}],
-                                 [{"x": 600}, {"x": 30}],
-                                 true);
-assertCanUpdateDottedPath(st,
-                          kDbName,
-                          ns,
-                          session,
-                          sessionDB,
-                          true,
-                          true,
-                          [{"x.a": 300}, {"x.a": 4}],
-                          [{"x": {"a": 600}}, {"x": {"a": 30}}],
-                          true);
-assertCanUpdatePartialShardKey(st,
-                               kDbName,
-                               ns,
-                               session,
-                               sessionDB,
-                               true,
-                               true,
-                               [{"x": 300, "y": 80}, {"x": 4, "y": 3}],
-                               [{"x": 600, "y": 80}, {"x": 30, "y": 3}],
-                               true);
+assertCanUpdatePrimitiveShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [{"x": 300}, {"x": 4}],
+    [{"x": 600}, {"x": 30}],
+    true,
+);
+assertCanUpdateDottedPath(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [{"x.a": 300}, {"x.a": 4}],
+    [{"x": {"a": 600}}, {"x": {"a": 30}}],
+    true,
+);
+assertCanUpdatePartialShardKey(
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    [
+        {"x": 300, "y": 80},
+        {"x": 4, "y": 3},
+    ],
+    [
+        {"x": 600, "y": 80},
+        {"x": 30, "y": 3},
+    ],
+    true,
+);
 assertCanDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, true, true, {"x": 300, "y": 80}, {"x": 600}, true);
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    {"x": 300, "y": 80},
+    {"x": 600},
+    true,
+);
 // Shard key fields are missing in query.
 assertCanDoReplacementUpdateWhereShardKeyMissingFields(
-    st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"x": 600, "y": 80, "a": 2}, true);
+    st,
+    kDbName,
+    ns,
+    session,
+    sessionDB,
+    true,
+    true,
+    {"x": 300},
+    {"x": 600, "y": 80, "a": 2},
+    true,
+);
 
 // failing cases
 assertCannotUpdate_id(st, kDbName, ns, session, sessionDB, true, true, {"_id": 300}, {"_id": 600});
-assertCannotUpdate_idDottedPath(
-    st, kDbName, ns, session, sessionDB, true, true, {"_id.a": 300}, {"_id": {"a": 600}});
-assertCannotUpdateSKToArray(
-    st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"x": [300]});
+assertCannotUpdate_idDottedPath(st, kDbName, ns, session, sessionDB, true, true, {"_id.a": 300}, {"_id": {"a": 600}});
+assertCannotUpdateSKToArray(st, kDbName, ns, session, sessionDB, true, true, {"x": 300}, {"x": [300]});
 
 // ----Assert correct behavior when collection is hash sharded----
 

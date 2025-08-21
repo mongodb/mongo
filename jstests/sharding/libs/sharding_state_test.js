@@ -4,7 +4,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-export var ShardingStateTest = (function() {
+export var ShardingStateTest = (function () {
     /**
      * Adds a node to the given shard or config server replica set. Also waits for the node
      * to become a steady-state secondary.
@@ -55,12 +55,11 @@ export var ShardingStateTest = (function() {
 
         jsTestLog("[ShardingStateTest] Adding a write to pin the stable timestamp at.");
 
-        const ts =
-            assert
-                .commandWorked(testDB.runCommand({insert: testColl.getName(), documents: [{a: 1}]}))
-                .operationTime;
+        const ts = assert.commandWorked(
+            testDB.runCommand({insert: testColl.getName(), documents: [{a: 1}]}),
+        ).operationTime;
 
-        configureFailPoint(node, 'holdStableTimestampAtSpecificTimestamp', {timestamp: ts});
+        configureFailPoint(node, "holdStableTimestampAtSpecificTimestamp", {timestamp: ts});
 
         jsTestLog("[ShardingStateTest] Adding more data before restarting member.");
         assert.commandWorked(testColl.insert([{b: 2}, {c: 3}]));
@@ -82,13 +81,12 @@ export var ShardingStateTest = (function() {
      */
     function failoverToMember(replSet, node) {
         jsTestLog("[ShardingStateTest] Electing new primary: " + node.host);
-        assert.soonNoExcept(function() {
+        assert.soonNoExcept(function () {
             assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
             return true;
         });
 
-        assert.eq(node,
-                  replSet.awaitNodesAgreeOnWriteablePrimary(node /* expected primary node */));
+        assert.eq(node, replSet.awaitNodesAgreeOnWriteablePrimary(node /* expected primary node */));
     }
 
     /**
@@ -110,11 +108,13 @@ export var ShardingStateTest = (function() {
         const shards = assert.commandWorked(mongos.adminCommand("listShards")).shards;
 
         assert.commandWorked(dbConn.getCollection("sstHashedColl").createIndex({sstKey: "hashed"}));
-        assert.commandWorked(mongos.adminCommand({
-            shardCollection: "sstDB.sstHashedColl",
-            key: {sstKey: "hashed"},
-            numInitialChunks: shards.length,
-        }));
+        assert.commandWorked(
+            mongos.adminCommand({
+                shardCollection: "sstDB.sstHashedColl",
+                key: {sstKey: "hashed"},
+                numInitialChunks: shards.length,
+            }),
+        );
 
         assert.eq(0, dbConn.getCollection("sstHashedColl").find().itcount());
 

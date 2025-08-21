@@ -6,15 +6,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 var st = new ShardingTest({shards: 1, mongos: 2});
 st.stopBalancer();
 
-var admin = st.s0.getDB('admin');
-var coll = st.s0.getCollection('foo.bar');
+var admin = st.s0.getDB("admin");
+var coll = st.s0.getCollection("foo.bar");
 
-assert(admin.runCommand({enableSharding: coll.getDB() + ''}).ok);
-assert(admin.runCommand({shardCollection: coll + '', key: {_id: 1}}).ok);
+assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
+assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
 
 st.printShardingStatus();
 
-jsTest.log('Turning on profiling on ' + st.shard0);
+jsTest.log("Turning on profiling on " + st.shard0);
 
 st.shard0.getDB(coll.getDB().toString()).setProfilingLevel(2);
 

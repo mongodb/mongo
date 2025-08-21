@@ -5,10 +5,11 @@
 import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
-export const checkDecisionIs = function(coordinatorConn, lsid, txnNumber, expectedDecision) {
-    let coordDoc = coordinatorConn.getDB("config")
-                       .getCollection("transaction_coordinators")
-                       .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
+export const checkDecisionIs = function (coordinatorConn, lsid, txnNumber, expectedDecision) {
+    let coordDoc = coordinatorConn
+        .getDB("config")
+        .getCollection("transaction_coordinators")
+        .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
     assert.neq(null, coordDoc);
     assert.eq(expectedDecision, coordDoc.decision.decision);
     if (expectedDecision === "commit") {
@@ -19,24 +20,25 @@ export const checkDecisionIs = function(coordinatorConn, lsid, txnNumber, expect
     return coordDoc.decision.commitTimestamp;
 };
 
-export const checkDocumentDeleted = function(coordinatorConn, lsid, txnNumber) {
-    let coordDoc = coordinatorConn.getDB("config")
-                       .getCollection("transaction_coordinators")
-                       .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
+export const checkDocumentDeleted = function (coordinatorConn, lsid, txnNumber) {
+    let coordDoc = coordinatorConn
+        .getDB("config")
+        .getCollection("transaction_coordinators")
+        .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
     return null === coordDoc;
 };
 
-export const runCommitThroughMongosInParallelThread = function(
-    lsidUUID, txnNumber, mongosHost, errorCode = ErrorCodes.OK) {
-    return new Thread(runCommitThroughMongos,
-                      extractUUIDFromObject(lsidUUID.id),
-                      txnNumber,
-                      mongosHost,
-                      errorCode);
+export const runCommitThroughMongosInParallelThread = function (
+    lsidUUID,
+    txnNumber,
+    mongosHost,
+    errorCode = ErrorCodes.OK,
+) {
+    return new Thread(runCommitThroughMongos, extractUUIDFromObject(lsidUUID.id), txnNumber, mongosHost, errorCode);
 };
 
 // lsidUUID is the UUID value in string format.
-export const runCommitThroughMongos = function(lsidUUID, txnNumber, mongosHost, expectedCode) {
+export const runCommitThroughMongos = function (lsidUUID, txnNumber, mongosHost, expectedCode) {
     const conn = new Mongo(mongosHost);
     const command = {
         commitTransaction: 1,

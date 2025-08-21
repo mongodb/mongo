@@ -16,8 +16,8 @@ function setParam(param, val) {
 // exceed as well.
 const stringSize = 22;
 const nSetBaseline = 20;
-const memLimitArray = nSetBaseline * 5 * stringSize / 2;
-const memLimitSet = (nSetBaseline + 4) * stringSize / 2;
+const memLimitArray = (nSetBaseline * 5 * stringSize) / 2;
+const memLimitSet = ((nSetBaseline + 4) * stringSize) / 2;
 
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < nSetBaseline; i++) {
@@ -34,24 +34,24 @@ assert.commandWorked(bulk.execute());
     assert.doesNotThrow(() => coll.aggregate([{$group: {_id: null, strings: {$push: "$y"}}}]));
 
     // Now lower the limit to test that its configuration is obeyed.
-    const originalVal = setParam('internalQueryMaxPushBytes', memLimitArray);
-    assert.throwsWithCode(() => coll.aggregate([{$group: {_id: null, strings: {$push: "$y"}}}]),
-                          ErrorCodes.ExceededMemoryLimit);
-    setParam('internalQueryMaxPushBytes', originalVal);
-}());
+    const originalVal = setParam("internalQueryMaxPushBytes", memLimitArray);
+    assert.throwsWithCode(
+        () => coll.aggregate([{$group: {_id: null, strings: {$push: "$y"}}}]),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    setParam("internalQueryMaxPushBytes", originalVal);
+})();
 
 (function testInternalQueryMaxPushBytesSettingWindowFunc() {
-    let pipeline = [
-        {$setWindowFields: {sortBy: {_id: 1}, output: {v: {$push: '$y'}}}},
-    ];
+    let pipeline = [{$setWindowFields: {sortBy: {_id: 1}, output: {v: {$push: "$y"}}}}];
     // Test that the default 100MB memory limit isn't reached with our data.
     assert.doesNotThrow(() => coll.aggregate(pipeline));
 
     // Now lower the limit to test that its configuration is obeyed.
-    const originalVal = setParam('internalQueryMaxPushBytes', memLimitArray);
+    const originalVal = setParam("internalQueryMaxPushBytes", memLimitArray);
     assert.throwsWithCode(() => coll.aggregate(pipeline), ErrorCodes.ExceededMemoryLimit);
-    setParam('internalQueryMaxPushBytes', originalVal);
-}());
+    setParam("internalQueryMaxPushBytes", originalVal);
+})();
 
 (function testInternalQueryMaxAddToSetBytesSetting() {
     // Test that the default 100MB memory limit isn't reached with our data.
@@ -59,37 +59,36 @@ assert.commandWorked(bulk.execute());
 
     // Test that $addToSet needs a tighter limit than $push (because some of the strings are the
     // same).
-    const originalVal = setParam('internalQueryMaxAddToSetBytes', memLimitArray);
+    const originalVal = setParam("internalQueryMaxAddToSetBytes", memLimitArray);
     assert.doesNotThrow(() => coll.aggregate([{$group: {_id: null, strings: {$addToSet: "$y"}}}]));
 
-    setParam('internalQueryMaxAddToSetBytes', memLimitSet);
-    assert.throwsWithCode(() => coll.aggregate([{$group: {_id: null, strings: {$addToSet: "$y"}}}]),
-                          ErrorCodes.ExceededMemoryLimit);
-    setParam('internalQueryMaxAddToSetBytes', originalVal);
-}());
+    setParam("internalQueryMaxAddToSetBytes", memLimitSet);
+    assert.throwsWithCode(
+        () => coll.aggregate([{$group: {_id: null, strings: {$addToSet: "$y"}}}]),
+        ErrorCodes.ExceededMemoryLimit,
+    );
+    setParam("internalQueryMaxAddToSetBytes", originalVal);
+})();
 
 (function testInternalQueryMaxAddToSetBytesSettingWindowFunc() {
-    let pipeline = [
-        {$setWindowFields: {sortBy: {_id: 1}, output: {v: {$addToSet: '$y'}}}},
-    ];
+    let pipeline = [{$setWindowFields: {sortBy: {_id: 1}, output: {v: {$addToSet: "$y"}}}}];
     // Test that the default 100MB memory limit isn't reached with our data.
     assert.doesNotThrow(() => coll.aggregate(pipeline));
 
     // Test that $addToSet needs a tighter limit than $concatArrays (because some of the strings are
     // the same).
-    const originalVal = setParam('internalQueryMaxAddToSetBytes', memLimitArray);
+    const originalVal = setParam("internalQueryMaxAddToSetBytes", memLimitArray);
     assert.doesNotThrow(() => coll.aggregate(pipeline));
 
     // Test that a tighter limit for $addToSet is obeyed.
-    setParam('internalQueryMaxAddToSetBytes', memLimitSet);
+    setParam("internalQueryMaxAddToSetBytes", memLimitSet);
     assert.throwsWithCode(() => coll.aggregate(pipeline), ErrorCodes.ExceededMemoryLimit);
-    setParam('internalQueryMaxAddToSetBytes', originalVal);
-}());
+    setParam("internalQueryMaxAddToSetBytes", originalVal);
+})();
 
 (function testInternalQueryTopNAccumulatorBytesSetting() {
     // Capture the default value of 'internalQueryTopNAccumulatorBytes' to reset in between runs.
-    const res = assert.commandWorked(
-        db.adminCommand({getParameter: 1, internalQueryTopNAccumulatorBytes: 1}));
+    const res = assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryTopNAccumulatorBytes: 1}));
     const topNDefault = res["internalQueryTopNAccumulatorBytes"];
 
     // Test that the 'n' family of accumulators behaves similarly.
@@ -111,36 +110,41 @@ assert.commandWorked(bulk.execute());
 
         // Then, verify that the memory limit throws when lowered.
         db.adminCommand({setParameter: 1, internalQueryTopNAccumulatorBytes: 100});
-        assert.throwsWithCode(() => coll.aggregate([{$group: {_id: null, strings: {[op]: spec}}}]),
-                              ErrorCodes.ExceededMemoryLimit);
+        assert.throwsWithCode(
+            () => coll.aggregate([{$group: {_id: null, strings: {[op]: spec}}}]),
+            ErrorCodes.ExceededMemoryLimit,
+        );
     }
-}());
+})();
 
 (function testInternalQueryMaxMapReduceExpressionBytesSetting() {
     const str = "a".repeat(100);
-    const mapPipeline = [{$project: {a: {$map: {input: {$range: [0, 100]}, in : str}}}}];
-    const reducePipeline = [{$project: {a: {$reduce: {input: {$range: [0, 100]}, initialValue: [], in: {$concatArrays: ["$$value", [str]]}}}}}];
+    const mapPipeline = [{$project: {a: {$map: {input: {$range: [0, 100]}, in: str}}}}];
+    const reducePipeline = [
+        {
+            $project: {
+                a: {$reduce: {input: {$range: [0, 100]}, initialValue: [], in: {$concatArrays: ["$$value", [str]]}}},
+            },
+        },
+    ];
 
     // Test that the default 100MB memory limit isn't reached with our data.
     assert.doesNotThrow(() => coll.aggregate(mapPipeline));
     assert.doesNotThrow(() => coll.aggregate(reducePipeline));
 
     // Now lower the limit to test that its configuration is obeyed.
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryMaxMapReduceExpressionBytes: memLimitArray}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxMapReduceExpressionBytes: memLimitArray}));
     assert.throwsWithCode(() => coll.aggregate(mapPipeline), ErrorCodes.ExceededMemoryLimit);
     assert.throwsWithCode(() => coll.aggregate(reducePipeline), ErrorCodes.ExceededMemoryLimit);
-}());
+})();
 
 (function testInternalQueryMaxRangeBytesSetting() {
     // Test that the default 100MB memory limit isn't reached with our data.
     assert.doesNotThrow(() => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]));
 
     // Now lower the limit to test that its configuration is obeyed.
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryMaxRangeBytes: memLimitArray}));
-    assert.throwsWithCode(() => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]),
-                          ErrorCodes.ExceededMemoryLimit);
-}());
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxRangeBytes: memLimitArray}));
+    assert.throwsWithCode(() => coll.aggregate([{$project: {a: {$range: [0, 100]}}}]), ErrorCodes.ExceededMemoryLimit);
+})();
 
 MongoRunner.stopMongod(conn);

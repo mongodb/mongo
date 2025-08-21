@@ -12,7 +12,10 @@ const nodes = replTest.nodeList();
 replTest.startSet();
 replTest.initiate({
     _id: name,
-    members: [{"_id": 0, "host": nodes[0]}, {"_id": 1, "host": nodes[1], arbiterOnly: true}],
+    members: [
+        {"_id": 0, "host": nodes[0]},
+        {"_id": 1, "host": nodes[1], arbiterOnly: true},
+    ],
 });
 
 const primary = replTest.nodes[0];
@@ -39,8 +42,8 @@ const testCases = [
             ping: 1,
             "$clusterTime": {
                 clusterTime: Timestamp(1, 1),
-                signature: {hash: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="), keyId: NumberLong(0)}
-            }
+                signature: {hash: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="), keyId: NumberLong(0)},
+            },
         },
         expectedPrimaryCode: ErrorCodes.OK,
         expectedArbiterCode: ErrorCodes.OK,
@@ -50,8 +53,8 @@ const testCases = [
             hello: 1,
             "$clusterTime": {
                 clusterTime: Timestamp(1, 1),
-                signature: {hash: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="), keyId: NumberLong(0)}
-            }
+                signature: {hash: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAA="), keyId: NumberLong(0)},
+            },
         },
         expectedPrimaryCode: ErrorCodes.OK,
         expectedArbiterCode: ErrorCodes.OK,

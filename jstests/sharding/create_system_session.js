@@ -14,7 +14,7 @@ const kConfig = "config";
 const kSystemSessions = "system.sessions";
 const kNs = kConfig + "." + kSystemSessions;
 const kExpectedShardKey = {
-    _id: 1
+    _id: 1,
 };
 const st = new ShardingTest({
     mongos: 1,
@@ -24,21 +24,21 @@ const st = new ShardingTest({
             setParameter: {
                 // Make refresh behave as if disabled to prevent automatic system.sessions creation
                 disableLogicalSessionCacheRefresh: true,
-            }
+            },
         },
         configOptions: {
             setParameter: {
                 // Make refresh behave as if disabled to prevent automatic system.sessions creation
                 disableLogicalSessionCacheRefresh: true,
-            }
+            },
         },
         rsOptions: {
             setParameter: {
                 // Make refresh behave as if disabled to prevent automatic system.sessions creation
                 disableLogicalSessionCacheRefresh: true,
-            }
-        }
-    }
+            },
+        },
+    },
 });
 
 function cleanUpSystemSessions(st) {
@@ -63,15 +63,17 @@ function runTest(st, createFn) {
 
     // Make sure system.session exists as sharded
     let result = st.config.collections.find({_id: kNs}).toArray();
-    assert.eq(1,
-              result.length,
-              "config.system.collection must exists as sharded, but found " + tojson(result));
-    assert.eq(kExpectedShardKey,
-              result[0].key,
-              "config.system.collection found with incorrect shard key " + tojson(result));
-    assert.neq(true,
-               result[0].unsplittable,
-               "config.system.collection must exists as sharded, but found " + tojson(result));
+    assert.eq(1, result.length, "config.system.collection must exists as sharded, but found " + tojson(result));
+    assert.eq(
+        kExpectedShardKey,
+        result[0].key,
+        "config.system.collection found with incorrect shard key " + tojson(result),
+    );
+    assert.neq(
+        true,
+        result[0].unsplittable,
+        "config.system.collection must exists as sharded, but found " + tojson(result),
+    );
 }
 
 jsTest.log("Creating system.sessions as unsharded");
@@ -101,7 +103,7 @@ jsTest.log("Shard system.sessions as timeseries");
         return db.adminCommand({
             shardCollection: kNs,
             key: {meta: 1},
-            timeseries: {timeField: "time", metaField: "meta"}
+            timeseries: {timeField: "time", metaField: "meta"},
         });
     });
 }

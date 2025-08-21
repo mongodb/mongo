@@ -9,4 +9,5 @@ assert.commandWorked(db.runCommand({createIndexes: coll, indexes: [{key: {x: 1},
 
 assert.commandFailedWithCode(
     db.runCommand({createIndexes: coll, indexes: [{key: {x: 1}, name: "x_2"}]}),
-    ErrorCodes.IndexOptionsConflict);
+    ErrorCodes.IndexOptionsConflict,
+);

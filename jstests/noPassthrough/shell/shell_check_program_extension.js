@@ -3,7 +3,7 @@
  */
 
 if (_isWindows()) {
-    const filename = 'jstests/noPassthrough/libs/testWindowsExtension.bat';
+    const filename = "jstests/noPassthrough/libs/testWindowsExtension.bat";
 
     clearRawMongoProgramOutput();
     const result = runMongoProgram(filename);

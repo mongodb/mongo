@@ -6,8 +6,8 @@ var st = new ShardingTest({name: "multidrop", shards: 1, mongos: 2});
 var mA = st.s0;
 var mB = st.s1;
 
-var coll = mA.getCollection('multidrop.coll');
-var collB = mB.getCollection('multidrop.coll');
+var coll = mA.getCollection("multidrop.coll");
+var collB = mB.getCollection("multidrop.coll");
 
 jsTestLog("Shard and split collection...");
 

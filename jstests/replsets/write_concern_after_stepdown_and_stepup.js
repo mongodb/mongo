@@ -14,19 +14,15 @@ var collName = "stepdownAndBackUp";
 
 var rst = new ReplSetTest({
     name: name,
-    nodes: [
-        {},
-        {},
-        {rsConfig: {priority: 0}},
-    ],
-    useBridge: true
+    nodes: [{}, {}, {rsConfig: {priority: 0}}],
+    useBridge: true,
 });
 var nodes = rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 function waitForPrimary(node) {
-    assert.soon(function() {
-        return node.adminCommand('hello').isWritablePrimary;
+    assert.soon(function () {
+        return node.adminCommand("hello").isWritablePrimary;
     });
 }
 
@@ -45,31 +41,39 @@ var secondaries = rst.getSecondaries();
 assert.eq(nodes[0], primary);
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 rst.awaitReplication();
 
 // Wait for all data bearing nodes to get up to date.
-assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert(
-    {a: 1}, {writeConcern: {w: 3, wtimeout: rst.timeoutMS}}));
+assert.commandWorked(
+    nodes[0]
+        .getDB(dbName)
+        .getCollection(collName)
+        .insert({a: 1}, {writeConcern: {w: 3, wtimeout: rst.timeoutMS}}),
+);
 
 // Stop the secondaries from replicating.
 stopServerReplication(secondaries);
 // Stop the primary from calling into awaitReplication()
-const hangBeforeWaitingForWriteConcern =
-    configureFailPoint(nodes[0], "hangBeforeWaitingForWriteConcern");
+const hangBeforeWaitingForWriteConcern = configureFailPoint(nodes[0], "hangBeforeWaitingForWriteConcern");
 
-jsTestLog("Do w:majority write that won't enter awaitReplication() until after the primary " +
-          "has stepped down and back up");
-var doMajorityWrite = function() {
+jsTestLog(
+    "Do w:majority write that won't enter awaitReplication() until after the primary " + "has stepped down and back up",
+);
+var doMajorityWrite = function () {
     // Run hello command with 'hangUpOnStepDown' set to false to mark this connection as
     // one that shouldn't be closed when the node steps down.  This simulates the scenario where
     // the write was coming from a mongos.
     assert.commandWorked(db.adminCommand({hello: 1, hangUpOnStepDown: false}));
 
-    var res = db.getSiblingDB('wMajorityCheck').stepdownAndBackUp.insert({a: 2}, {
-        writeConcern: {w: 'majority'}
-    });
+    var res = db.getSiblingDB("wMajorityCheck").stepdownAndBackUp.insert(
+        {a: 2},
+        {
+            writeConcern: {w: "majority"},
+        },
+    );
     assert.writeErrorWithCode(res, ErrorCodes.InterruptedDueToReplStateChange);
 };
 
@@ -88,28 +92,36 @@ restartServerReplication(secondaries);
 waitForPrimary(nodes[1]);
 
 jsTest.log("Do a write to the new primary");
-assert.commandWorked(nodes[1].getDB(dbName).getCollection(collName).insert(
-    {a: 3}, {writeConcern: {w: 2, wtimeout: rst.timeoutMS}}));
+assert.commandWorked(
+    nodes[1]
+        .getDB(dbName)
+        .getCollection(collName)
+        .insert({a: 3}, {writeConcern: {w: 2, wtimeout: rst.timeoutMS}}),
+);
 
 jsTest.log("Reconnect the old primary to the rest of the nodes");
 nodes[0].reconnect(nodes[1]);
 nodes[0].reconnect(nodes[2]);
 
-jsTest.log("Wait for the old primary to step down, roll back its write, and apply the " +
-           "new writes from the new primary");
+jsTest.log(
+    "Wait for the old primary to step down, roll back its write, and apply the " + "new writes from the new primary",
+);
 waitForState(nodes[0], ReplSetTest.State.SECONDARY);
 rst.awaitReplication();
 
 // At this point all 3 nodes should have the same data
-assert.soonNoExcept(function() {
-    nodes.forEach(function(node) {
-        assert.eq(null,
-                  node.getDB(dbName).getCollection(collName).findOne({a: 2}),
-                  "Node " + node.host + " contained op that should have been rolled back");
-        assert.neq(null,
-                   node.getDB(dbName).getCollection(collName).findOne({a: 3}),
-                   "Node " + node.host +
-                       " was missing op from branch of history that should have persisted");
+assert.soonNoExcept(function () {
+    nodes.forEach(function (node) {
+        assert.eq(
+            null,
+            node.getDB(dbName).getCollection(collName).findOne({a: 2}),
+            "Node " + node.host + " contained op that should have been rolled back",
+        );
+        assert.neq(
+            null,
+            node.getDB(dbName).getCollection(collName).findOne({a: 3}),
+            "Node " + node.host + " was missing op from branch of history that should have persisted",
+        );
     });
     return true;
 });
@@ -117,8 +129,10 @@ assert.soonNoExcept(function() {
 jsTest.log("Make the original primary become primary once again");
 stepUp(nodes[0]);
 
-jsTest.log("Unblock the thread waiting for replication of the now rolled-back write, ensure " +
-           "that the write concern failed");
+jsTest.log(
+    "Unblock the thread waiting for replication of the now rolled-back write, ensure " +
+        "that the write concern failed",
+);
 hangBeforeWaitingForWriteConcern.off();
 
 joinMajorityWriter();

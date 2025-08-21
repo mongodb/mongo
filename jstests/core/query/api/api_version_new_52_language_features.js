@@ -32,50 +32,62 @@ const stablePipelines = [
     [{$set: {x: {$minN: {input: "$arr", n: 2}}}}],
     [{$set: {x: {$maxN: {input: "$arr", n: 2}}}}],
     [{$set: {x: {$sortArray: {input: "$arr", sortBy: 1}}}}],
-    [{
-        $setWindowFields: {
-            partitionBy: "$a",
-            sortBy: {a: 1},
-            output: {out: {$topN: {output: "$a", n: 2, sortBy: {a: 1}}}}
-        }
-    }],
-    [{
-        $setWindowFields: {
-            partitionBy: "$a",
-            sortBy: {a: 1},
-            output: {out: {$top: {output: "$a", sortBy: {a: 1}}}}
-        }
-    }],
-    [{
-        $setWindowFields: {
-            partitionBy: "$a",
-            sortBy: {a: 1},
-            output: {out: {$bottomN: {output: "$a", n: 2, sortBy: {a: 1}}}}
-        }
-    }],
-    [{
-        $setWindowFields: {
-            partitionBy: "$a",
-            sortBy: {a: 1},
-            output: {out: {$bottom: {output: "$a", sortBy: {a: 1}}}}
-        }
-    }],
-    [{
-        $setWindowFields:
-            {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$minN: {input: "$a", n: 2}}}}
-    }],
-    [{
-        $setWindowFields:
-            {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$maxN: {input: "$a", n: 2}}}}
-    }],
-    [{
-        $setWindowFields:
-            {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$firstN: {input: "$a", n: 2}}}}
-    }],
-    [{
-        $setWindowFields:
-            {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$lastN: {input: "$a", n: 2}}}}
-    }],
+    [
+        {
+            $setWindowFields: {
+                partitionBy: "$a",
+                sortBy: {a: 1},
+                output: {out: {$topN: {output: "$a", n: 2, sortBy: {a: 1}}}},
+            },
+        },
+    ],
+    [
+        {
+            $setWindowFields: {
+                partitionBy: "$a",
+                sortBy: {a: 1},
+                output: {out: {$top: {output: "$a", sortBy: {a: 1}}}},
+            },
+        },
+    ],
+    [
+        {
+            $setWindowFields: {
+                partitionBy: "$a",
+                sortBy: {a: 1},
+                output: {out: {$bottomN: {output: "$a", n: 2, sortBy: {a: 1}}}},
+            },
+        },
+    ],
+    [
+        {
+            $setWindowFields: {
+                partitionBy: "$a",
+                sortBy: {a: 1},
+                output: {out: {$bottom: {output: "$a", sortBy: {a: 1}}}},
+            },
+        },
+    ],
+    [
+        {
+            $setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$minN: {input: "$a", n: 2}}}},
+        },
+    ],
+    [
+        {
+            $setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$maxN: {input: "$a", n: 2}}}},
+        },
+    ],
+    [
+        {
+            $setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$firstN: {input: "$a", n: 2}}}},
+        },
+    ],
+    [
+        {
+            $setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$lastN: {input: "$a", n: 2}}}},
+        },
+    ],
     [{$setWindowFields: {partitionBy: "$a", sortBy: {a: 1}, output: {out: {$locf: "$a"}}}}],
     [{$densify: {field: "val", partitionByFields: ["a"], range: {step: 1, bounds: "partition"}}}],
 ];
@@ -88,10 +100,12 @@ for (const pipeline of stablePipelines) {
     APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, viewName, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
-    assert.commandWorked(testDb.runCommand({
-        aggregate: coll.getName(),
-        pipeline: pipeline,
-        apiVersion: "1",
-        cursor: {},
-    }));
+    assert.commandWorked(
+        testDb.runCommand({
+            aggregate: coll.getName(),
+            pipeline: pipeline,
+            apiVersion: "1",
+            cursor: {},
+        }),
+    );
 }

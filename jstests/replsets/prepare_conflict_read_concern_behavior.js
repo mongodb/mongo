@@ -40,16 +40,16 @@ TestData.authenticationDatabase = "local";
 const replTest = new ReplSetTest({
     nodes: {
         node0: {setParameter: "enableTestCommands=1"},
-        node1: {setParameter: "enableTestCommands=0"}
-    }
+        node1: {setParameter: "enableTestCommands=0"},
+    },
 });
 replTest.startSet();
 replTest.initiate();
 
 const conn = replTest.getPrimary();
 
-const failureTimeout = 1 * 1000;       // 1 second.
-const successTimeout = 5 * 60 * 1000;  // 5 minutes.
+const failureTimeout = 1 * 1000; // 1 second.
+const successTimeout = 5 * 60 * 1000; // 5 minutes.
 const dbName = "test";
 const collName = "prepare_conflict_read_concern_behavior";
 const collName2 = "prepare_conflict_read_concern_behavior2";
@@ -61,10 +61,12 @@ const secondary = replTest.getSecondary();
 const secondaryTestDB = secondary.getDB(dbName);
 
 // Turn off timestamp reaping so that clusterTimeBeforePrepare doesn't get too old.
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
-    mode: "alwaysOn",
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+        mode: "alwaysOn",
+    }),
+);
 
 function runTest() {
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
@@ -77,7 +79,7 @@ function runTest() {
     const sessionDB = session.getDatabase(dbName);
     const sessionColl = sessionDB.getCollection(collName);
 
-    const read = function(read_concern, timeout, db, coll, num_expected) {
+    const read = function (read_concern, timeout, db, coll, num_expected) {
         let res = db.runCommand({
             find: coll,
             filter: {in_prepared_txn: false},
@@ -92,7 +94,7 @@ function runTest() {
         return res;
     };
 
-    const dbHash = function(read_concern, db, timeout = successTimeout) {
+    const dbHash = function (read_concern, db, timeout = successTimeout) {
         let res = db.runCommand({
             dbHash: 1,
             readConcern: read_concern,
@@ -102,12 +104,11 @@ function runTest() {
         return res;
     };
 
-    const mapReduce = function(
-        read_concern, db, outOptions = {inline: 1}, timeout = successTimeout) {
-        let map = function() {
+    const mapReduce = function (read_concern, db, outOptions = {inline: 1}, timeout = successTimeout) {
+        let map = function () {
             emit(this.a, this.a);
         };
-        let reduce = function(key, vals) {
+        let reduce = function (key, vals) {
             return 1;
         };
         let res = db.runCommand({
@@ -121,7 +122,7 @@ function runTest() {
         return res;
     };
 
-    const validate = function(read_concern, db, timeout = successTimeout) {
+    const validate = function (read_concern, db, timeout = successTimeout) {
         let res = db.runCommand({
             validate: collName,
             readConcern: read_concern,
@@ -131,60 +132,61 @@ function runTest() {
         return res;
     };
 
-    assert.commandWorked(
-        testColl.insert({_id: 1, in_prepared_txn: false}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(testColl.insert({_id: 1, in_prepared_txn: false}, {writeConcern: {w: "majority"}}));
     assert.commandWorked(testColl.insert({_id: 2, in_prepared_txn: false}));
     assert.commandWorked(testColl2.insert({_id: 1, in_prepared_txn: false}));
 
     session.startTransaction();
-    const clusterTimeBeforePrepare =
-        assert.commandWorked(sessionColl.runCommand("insert", {documents: [{_id: 3}]}))
-            .operationTime;
+    const clusterTimeBeforePrepare = assert.commandWorked(
+        sessionColl.runCommand("insert", {documents: [{_id: 3}]}),
+    ).operationTime;
     assert.commandWorked(sessionColl.update({_id: 2}, {_id: 2, in_prepared_txn: true}));
     const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-    const clusterTimeAfterPrepare =
-        assert
-            .commandWorked(testColl.runCommand(
-                "insert",
-                {documents: [{_id: 4, in_prepared_txn: false}], writeConcern: {w: "majority"}}))
-            .operationTime;
+    const clusterTimeAfterPrepare = assert.commandWorked(
+        testColl.runCommand("insert", {documents: [{_id: 4, in_prepared_txn: false}], writeConcern: {w: "majority"}}),
+    ).operationTime;
 
-    jsTestLog("prepareTimestamp: " + tojson(prepareTimestamp) +
-              " clusterTimeBeforePrepare: " + tojson(clusterTimeBeforePrepare) +
-              " clusterTimeAfterPrepare: " + tojson(clusterTimeAfterPrepare));
+    jsTestLog(
+        "prepareTimestamp: " +
+            tojson(prepareTimestamp) +
+            " clusterTimeBeforePrepare: " +
+            tojson(clusterTimeBeforePrepare) +
+            " clusterTimeAfterPrepare: " +
+            tojson(clusterTimeAfterPrepare),
+    );
 
     assert.gt(prepareTimestamp, clusterTimeBeforePrepare);
     assert.gt(clusterTimeAfterPrepare, prepareTimestamp);
 
     jsTestLog("Test read with read concern 'majority' doesn't block on a prepared transaction.");
-    assert.commandWorked(read({level: 'majority'}, successTimeout, testDB, collName, 3));
+    assert.commandWorked(read({level: "majority"}, successTimeout, testDB, collName, 3));
 
     jsTestLog("Test read with read concern 'local' doesn't block on a prepared transaction.");
-    assert.commandWorked(read({level: 'local'}, successTimeout, testDB, collName, 3));
+    assert.commandWorked(read({level: "local"}, successTimeout, testDB, collName, 3));
 
     jsTestLog("Test read with read concern 'available' doesn't block on a prepared transaction.");
-    assert.commandWorked(read({level: 'available'}, successTimeout, testDB, collName, 3));
+    assert.commandWorked(read({level: "available"}, successTimeout, testDB, collName, 3));
 
     jsTestLog("Test read with read concern 'linearizable' blocks on a prepared transaction.");
-    assert.commandFailedWithCode(read({level: 'linearizable'}, failureTimeout, testDB, collName),
-                                 ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(
+        read({level: "linearizable"}, failureTimeout, testDB, collName),
+        ErrorCodes.MaxTimeMSExpired,
+    );
 
-    jsTestLog("Test afterClusterTime read after prepareTimestamp blocks on a prepared " +
-              "transaction.");
-    assert.commandFailedWithCode(read({level: 'local', afterClusterTime: clusterTimeAfterPrepare},
-                                      failureTimeout,
-                                      testDB,
-                                      collName),
-                                 ErrorCodes.MaxTimeMSExpired);
+    jsTestLog("Test afterClusterTime read after prepareTimestamp blocks on a prepared " + "transaction.");
+    assert.commandFailedWithCode(
+        read({level: "local", afterClusterTime: clusterTimeAfterPrepare}, failureTimeout, testDB, collName),
+        ErrorCodes.MaxTimeMSExpired,
+    );
 
-    jsTestLog("Test read with afterClusterTime after prepareTimestamp on non-prepared " +
-              "documents doesn't block on a prepared transaction.");
-    assert.commandWorked(read({level: 'local', afterClusterTime: clusterTimeAfterPrepare},
-                              successTimeout,
-                              testDB,
-                              collName2,
-                              1));
+    jsTestLog(
+        "Test read with afterClusterTime after prepareTimestamp on non-prepared " +
+            "documents doesn't block on a prepared transaction.",
+    );
+    assert.commandWorked(
+        read({level: "local", afterClusterTime: clusterTimeAfterPrepare}, successTimeout, testDB, collName2, 1),
+    );
 
     // dbHash does not accept a non local read concern or afterClusterTime and it also sets
     // ignore_prepare=true during its execution. Therefore, dbHash should never get prepare
@@ -193,24 +195,20 @@ function runTest() {
     // primaries.
     jsTestLog("Test dbHash doesn't support afterClusterTime read.");
     assert.commandFailedWithCode(
-        dbHash({level: 'local', afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
-        ErrorCodes.InvalidOptions);
+        dbHash({level: "local", afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
+        ErrorCodes.InvalidOptions,
+    );
 
     jsTestLog("Test dbHash doesn't support read concern other than local.");
-    assert.commandWorked(dbHash({level: 'local'}, secondaryTestDB));
-    assert.commandFailedWithCode(dbHash({level: 'available'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(dbHash({level: 'majority'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(dbHash({level: 'snapshot'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(dbHash({level: 'linearizable'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandWorked(dbHash({level: "local"}, secondaryTestDB));
+    assert.commandFailedWithCode(dbHash({level: "available"}, secondaryTestDB), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(dbHash({level: "majority"}, secondaryTestDB), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(dbHash({level: "snapshot"}, secondaryTestDB), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(dbHash({level: "linearizable"}, secondaryTestDB), ErrorCodes.InvalidOptions);
 
     jsTestLog("Test dbHash on secondary doesn't block on a prepared transaction.");
     assert.commandWorked(dbHash({}, secondaryTestDB));
-    jsTestLog("Test dbHash on primary blocks on collection S lock which conflicts with " +
-              "a prepared transaction.");
+    jsTestLog("Test dbHash on primary blocks on collection S lock which conflicts with " + "a prepared transaction.");
     assert.commandFailedWithCode(dbHash({}, testDB, failureTimeout), ErrorCodes.MaxTimeMSExpired);
 
     // mapReduce does not accept a non local read concern or afterClusterTime and it also sets
@@ -220,18 +218,16 @@ function runTest() {
     // that writes to the same collection if it is run on primaries.
     jsTestLog("Test mapReduce doesn't support afterClusterTime read.");
     assert.commandFailedWithCode(
-        mapReduce({level: 'local', afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
-        ErrorCodes.InvalidOptions);
+        mapReduce({level: "local", afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
+        ErrorCodes.InvalidOptions,
+    );
 
     jsTestLog("Test mapReduce doesn't support read concern other than local or available.");
-    assert.commandWorked(mapReduce({level: 'local'}, secondaryTestDB));
-    assert.commandWorked(mapReduce({level: 'available'}, secondaryTestDB));
-    assert.commandFailedWithCode(mapReduce({level: 'majority'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(mapReduce({level: 'snapshot'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(mapReduce({level: 'linearizable'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandWorked(mapReduce({level: "local"}, secondaryTestDB));
+    assert.commandWorked(mapReduce({level: "available"}, secondaryTestDB));
+    assert.commandFailedWithCode(mapReduce({level: "majority"}, secondaryTestDB), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(mapReduce({level: "snapshot"}, secondaryTestDB), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(mapReduce({level: "linearizable"}, secondaryTestDB), ErrorCodes.InvalidOptions);
 
     jsTestLog("Test mapReduce on secondary doesn't block on a prepared transaction.");
     assert.commandWorked(mapReduce({}, secondaryTestDB));
@@ -246,32 +242,30 @@ function runTest() {
     // on primaries.
     jsTestLog("Test validate doesn't support afterClusterTime read.");
     assert.commandFailedWithCode(
-        validate({level: 'local', afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
-        ErrorCodes.InvalidOptions);
+        validate({level: "local", afterClusterTime: clusterTimeAfterPrepare}, secondaryTestDB),
+        ErrorCodes.InvalidOptions,
+    );
     jsTestLog("Test validate doesn't support read concern other than local.");
-    assert.commandWorked(validate({level: 'local'}, secondaryTestDB));
-    assert.commandFailedWithCode(validate({level: 'available'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(validate({level: 'majority'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(validate({level: 'snapshot'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
-    assert.commandFailedWithCode(validate({level: 'linearizable'}, secondaryTestDB),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandWorked(validate({level: "local"}, secondaryTestDB));
+    assert.commandFailedWithCode(validate({level: "available"}, secondaryTestDB), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(validate({level: "majority"}, secondaryTestDB), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(validate({level: "snapshot"}, secondaryTestDB), ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(validate({level: "linearizable"}, secondaryTestDB), ErrorCodes.InvalidOptions);
 
     jsTestLog("Test validate on secondary doesn't block on a prepared transaction.");
     assert.commandWorked(validate({}, secondaryTestDB));
-    jsTestLog("Test validate on primary blocks on collection X lock which conflicts with " +
-              "a prepared transaction.");
+    jsTestLog("Test validate on primary blocks on collection X lock which conflicts with " + "a prepared transaction.");
     assert.commandFailedWithCode(validate({}, testDB, failureTimeout), ErrorCodes.MaxTimeMSExpired);
 
     jsTestLog("Test read from an update blocks on a prepared transaction.");
-    assert.commandFailedWithCode(testDB.runCommand({
-        update: collName,
-        updates: [{q: {_id: 2}, u: {_id: 2, in_prepared_txn: false, a: 1}}],
-        maxTimeMS: failureTimeout,
-    }),
-                                 ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(
+        testDB.runCommand({
+            update: collName,
+            updates: [{q: {_id: 2}, u: {_id: 2, in_prepared_txn: false, a: 1}}],
+            maxTimeMS: failureTimeout,
+        }),
+        ErrorCodes.MaxTimeMSExpired,
+    );
 
     // Create a second session and start a new transaction to test snapshot reads.
     const session2 = conn.startSession({causalConsistency: false});
@@ -279,51 +273,44 @@ function runTest() {
     const sessionColl2 = sessionDB2.getCollection(collName);
     // This makes future reads in the transaction use a read timestamp after the
     // prepareTimestamp.
-    session2.startTransaction(
-        {readConcern: {level: "snapshot", atClusterTime: clusterTimeAfterPrepare}});
+    session2.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTimeAfterPrepare}});
 
-    jsTestLog("Test read with read concern 'snapshot' and a read timestamp after " +
-              "prepareTimestamp on non-prepared documents doesn't block on a prepared " +
-              "transaction.");
+    jsTestLog(
+        "Test read with read concern 'snapshot' and a read timestamp after " +
+            "prepareTimestamp on non-prepared documents doesn't block on a prepared " +
+            "transaction.",
+    );
     assert.commandWorked(read({}, successTimeout, sessionDB2, collName2, 1));
 
-    jsTestLog("Test read with read concern 'snapshot' and a read timestamp after " +
-              "prepareTimestamp blocks on a prepared transaction.");
-    assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName),
-                                 ErrorCodes.MaxTimeMSExpired);
-    assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    jsTestLog(
+        "Test read with read concern 'snapshot' and a read timestamp after " +
+            "prepareTimestamp blocks on a prepared transaction.",
+    );
+    assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName), ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(session2.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-    jsTestLog("Test read with read concern 'snapshot' and atClusterTime before " +
-              "prepareTimestamp doesn't block on a prepared transaction.");
-    session2.startTransaction(
-        {readConcern: {level: "snapshot", atClusterTime: clusterTimeBeforePrepare}});
+    jsTestLog(
+        "Test read with read concern 'snapshot' and atClusterTime before " +
+            "prepareTimestamp doesn't block on a prepared transaction.",
+    );
+    session2.startTransaction({readConcern: {level: "snapshot", atClusterTime: clusterTimeBeforePrepare}});
     assert.commandWorked(read({}, successTimeout, sessionDB2, collName, 2));
     assert.commandWorked(session2.abortTransaction_forTesting());
 
-    jsTestLog("Test read from a transaction with read concern 'majority' blocks on a prepared" +
-              " transaction.");
+    jsTestLog("Test read from a transaction with read concern 'majority' blocks on a prepared" + " transaction.");
     session2.startTransaction({readConcern: {level: "majority"}});
-    assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName),
-                                 ErrorCodes.MaxTimeMSExpired);
-    assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName), ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(session2.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-    jsTestLog("Test read from a transaction with read concern 'local' blocks on a prepared " +
-              "transaction.");
+    jsTestLog("Test read from a transaction with read concern 'local' blocks on a prepared " + "transaction.");
     session2.startTransaction({readConcern: {level: "local"}});
-    assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName),
-                                 ErrorCodes.MaxTimeMSExpired);
-    assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName), ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(session2.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-    jsTestLog("Test read from a transaction with no read concern specified blocks on a " +
-              "prepared transaction.");
+    jsTestLog("Test read from a transaction with no read concern specified blocks on a " + "prepared transaction.");
     session2.startTransaction();
-    assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName),
-                                 ErrorCodes.MaxTimeMSExpired);
-    assert.commandFailedWithCode(session2.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(read({}, failureTimeout, sessionDB2, collName), ErrorCodes.MaxTimeMSExpired);
+    assert.commandFailedWithCode(session2.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
     session2.endSession();
 
     assert.commandWorked(session.abortTransaction_forTesting());
@@ -334,10 +321,12 @@ try {
     runTest();
 } finally {
     // Turn this failpoint off so that it doesn't impact other tests in the suite.
-    assert.commandWorked(testDB.adminCommand({
-        configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
-        mode: "off",
-    }));
+    assert.commandWorked(
+        testDB.adminCommand({
+            configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+            mode: "off",
+        }),
+    );
 }
 
 replTest.stopSet();

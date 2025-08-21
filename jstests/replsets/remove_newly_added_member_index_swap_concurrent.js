@@ -32,17 +32,17 @@ assert.commandWorked(primaryColl.insert({"starting": "doc"}));
 const newNodeOne = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 
 const newNodeTwo = rst.add({
     rsConfig: {priority: 0},
     setParameter: {
-        'failpoint.initialSyncHangBeforeFinish': tojson({mode: 'alwaysOn'}),
-        'numInitialSyncAttempts': 1,
-    }
+        "failpoint.initialSyncHangBeforeFinish": tojson({mode: "alwaysOn"}),
+        "numInitialSyncAttempts": 1,
+    },
 });
 
 rst.reInitiate();
@@ -52,16 +52,20 @@ let configOnDisk = primary.getDB("local").system.replset.findOne();
 assert.eq(1, configOnDisk.members[1]._id, configOnDisk);
 assert.eq(2, configOnDisk.members[2]._id, configOnDisk);
 
-assert.commandWorked(newNodeOne.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
-assert.commandWorked(newNodeTwo.adminCommand({
-    waitForFailPoint: "initialSyncHangBeforeFinish",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
+assert.commandWorked(
+    newNodeOne.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
+assert.commandWorked(
+    newNodeTwo.adminCommand({
+        waitForFailPoint: "initialSyncHangBeforeFinish",
+        timesEntered: 1,
+        maxTimeMS: kDefaultWaitForFailPointTimeout,
+    }),
+);
 
 jsTestLog("Checking that the 'newlyAdded' field is set on both new nodes");
 assert(isMemberNewlyAdded(primary, 1));
@@ -73,13 +77,12 @@ assertVoteCount(primary, {
     majorityVoteCount: 1,
     writableVotingMembersCount: 1,
     writeMajorityCount: 1,
-    totalMembersCount: 3
+    totalMembersCount: 3,
 });
 
 jsTestLog("Allowing primary to initiate the 'newlyAdded' field removal for the first node");
 let hangDuringAutomaticReconfigFP = configureFailPoint(primaryDb, "hangDuringAutomaticReconfig");
-assert.commandWorked(
-    newNodeOne.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(newNodeOne.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 rst.awaitSecondaryNodes(null, [newNodeOne]);
 
 hangDuringAutomaticReconfigFP.wait();
@@ -121,8 +124,7 @@ assert.eq(2, configOnDisk.members[1]._id, configOnDisk);
 assert(configOnDisk.members[1]["newlyAdded"], configOnDisk);
 
 jsTestLog("Letting the other secondary node finish initial sync");
-assert.commandWorked(
-    newNodeTwo.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+assert.commandWorked(newNodeTwo.adminCommand({configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
 rst.awaitSecondaryNodes(null, [newNodeTwo]);
 
 jsTestLog("Waiting for the second 'newlyAdded' field to be removed (_id 2, index 1)");

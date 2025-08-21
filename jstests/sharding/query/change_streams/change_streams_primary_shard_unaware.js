@@ -23,7 +23,7 @@ function isShardAware(shard, coll) {
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on shard0 and cause it to refresh its sharding metadata.
 const nodeOptions = {
-    setParameter: {enableShardedIndexConsistencyCheck: false}
+    setParameter: {enableShardedIndexConsistencyCheck: false},
 };
 
 const testName = "change_streams_primary_shard_unaware";
@@ -36,17 +36,16 @@ const st = new ShardingTest({
         setParameter: {
             periodicNoopIntervalSecs: 1,
             writePeriodicNoops: true,
-            enableShardedIndexConsistencyCheck: false
+            enableShardedIndexConsistencyCheck: false,
         },
     },
-    other: {configOptions: nodeOptions}
+    other: {configOptions: nodeOptions},
 });
 
 const mongosDB = st.s0.getDB(testName);
 
 // Ensure that shard0 is the primary shard.
-assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
+assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Create unsharded collection on primary shard.
 const mongosColl = mongosDB[testName];
@@ -63,8 +62,7 @@ assert.commandWorked(mongos2Coll.insert({_id: 0, a: 0}));
 assert.commandWorked(mongos2Coll.createIndex({a: 1}));
 
 // Shard the collection.
-assert.commandWorked(
-    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {a: 1}}));
+assert.commandWorked(mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {a: 1}}));
 
 // Restart the primary shard and ensure that it is no longer aware that the collection is
 // sharded.
@@ -77,14 +75,18 @@ const mongos1Coll = mongos1DB[testName];
 // Establish change stream cursor on the second mongos, which is not aware that the
 // collection is sharded.
 let cstMongos1 = new ChangeStreamTest(mongos1DB);
-let cursorMongos1 = cstMongos1.startWatchingChanges(
-    {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: mongos1Coll});
+let cursorMongos1 = cstMongos1.startWatchingChanges({
+    pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+    collection: mongos1Coll,
+});
 assert.eq(0, cursorMongos1.firstBatch.length, "Cursor had changes: " + tojson(cursorMongos1));
 
 // Establish a change stream cursor on the now sharded collection through the first mongos.
 let cst = new ChangeStreamTest(mongosDB);
-let cursor = cst.startWatchingChanges(
-    {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: mongosColl});
+let cursor = cst.startWatchingChanges({
+    pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+    collection: mongosColl,
+});
 assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
 // Ensure that the primary shard is still unaware that the collection is sharded.
@@ -97,12 +99,14 @@ assert.eq(true, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
 // Verify that both cursors are able to pick up an inserted document.
 cst.assertNextChangesEqual({
     cursor: cursor,
-    expectedChanges: [{
-        documentKey: {_id: 1, a: 1},
-        fullDocument: {_id: 1, a: 1},
-        ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
-        operationType: "insert",
-    }]
+    expectedChanges: [
+        {
+            documentKey: {_id: 1, a: 1},
+            fullDocument: {_id: 1, a: 1},
+            ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
+            operationType: "insert",
+        },
+    ],
 });
 let mongos1ChangeDoc = cstMongos1.getOneChange(cursorMongos1);
 assert.docEq({_id: 1, a: 1}, mongos1ChangeDoc.documentKey);
@@ -114,12 +118,14 @@ assert.eq("insert", mongos1ChangeDoc.operationType);
 assert.commandWorked(mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {a: 0}}));
 
 // Move a chunk to the non-primary shard.
-assert.commandWorked(mongosDB.adminCommand({
-    moveChunk: mongosColl.getFullName(),
-    find: {a: -1},
-    to: st.rs1.getURL(),
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    mongosDB.adminCommand({
+        moveChunk: mongosColl.getFullName(),
+        find: {a: -1},
+        to: st.rs1.getURL(),
+        _waitForDelete: true,
+    }),
+);
 
 // Update the document on the primary shard.
 assert.commandWorked(mongosColl.update({_id: 1, a: 1}, {$set: {b: 1}}));
@@ -129,29 +135,35 @@ assert.commandWorked(mongosColl.insert({_id: 2, a: 2}));
 
 // Configure fail-points to simulate a network error on the next "getMore" command invocations for
 // the next two change streams.
-assert.commandWorked(mongosDB.adminCommand({
-    configureFailPoint: "failGetMoreAfterCursorCheckout",
-    mode: {times: 2},
-    data: {errorCode: ErrorCodes.HostUnreachable}
-}));
+assert.commandWorked(
+    mongosDB.adminCommand({
+        configureFailPoint: "failGetMoreAfterCursorCheckout",
+        mode: {times: 2},
+        data: {errorCode: ErrorCodes.HostUnreachable},
+    }),
+);
 
-assert.commandWorked(mongos1DB.adminCommand({
-    configureFailPoint: "failGetMoreAfterCursorCheckout",
-    mode: {times: 2},
-    data: {errorCode: ErrorCodes.HostUnreachable}
-}));
+assert.commandWorked(
+    mongos1DB.adminCommand({
+        configureFailPoint: "failGetMoreAfterCursorCheckout",
+        mode: {times: 2},
+        data: {errorCode: ErrorCodes.HostUnreachable},
+    }),
+);
 
 // Verify that both cursors pick up the first inserted doc regardless of the moveChunk
 // operation and handle the resumable error correctly.
 cst.assertNextChangesEqual({
     cursor: cursor,
-    expectedChanges: [{
-        documentKey: {_id: 1, a: 1},
-        fullDocument: {_id: 1, a: 1, b: 1},
-        ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
-        operationType: "update",
-        updateDescription: {removedFields: [], updatedFields: {b: 1}, truncatedArrays: []}
-    }]
+    expectedChanges: [
+        {
+            documentKey: {_id: 1, a: 1},
+            fullDocument: {_id: 1, a: 1, b: 1},
+            ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
+            operationType: "update",
+            updateDescription: {removedFields: [], updatedFields: {b: 1}, truncatedArrays: []},
+        },
+    ],
 });
 // Should throw if the cursor is made invalid by the call above
 cst.getNextBatch(cursor);
@@ -173,27 +185,33 @@ assert.eq(false, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
 // otherwise the shard will generate the documentKey based on the assumption that the shard key
 // is _id which will cause the cursor establishment to fail due to SERVER-32085.
 let cstMongos2 = new ChangeStreamTest(mongos2DB);
-let cursorMongos2 = cstMongos2.startWatchingChanges(
-    {pipeline: [{$changeStream: {resumeAfter: mongos1ChangeDoc._id}}], collection: mongos2Coll});
-
-cstMongos2.assertNextChangesEqual({
-    cursor: cursorMongos2,
-    expectedChanges: [{
-        documentKey: {_id: -2, a: -2},
-        fullDocument: {_id: -2, a: -2},
-        ns: {db: mongos2DB.getName(), coll: mongos2Coll.getName()},
-        operationType: "insert",
-    }]
+let cursorMongos2 = cstMongos2.startWatchingChanges({
+    pipeline: [{$changeStream: {resumeAfter: mongos1ChangeDoc._id}}],
+    collection: mongos2Coll,
 });
 
 cstMongos2.assertNextChangesEqual({
     cursor: cursorMongos2,
-    expectedChanges: [{
-        documentKey: {_id: 2, a: 2},
-        fullDocument: {_id: 2, a: 2},
-        ns: {db: mongos2DB.getName(), coll: mongos2Coll.getName()},
-        operationType: "insert",
-    }]
+    expectedChanges: [
+        {
+            documentKey: {_id: -2, a: -2},
+            fullDocument: {_id: -2, a: -2},
+            ns: {db: mongos2DB.getName(), coll: mongos2Coll.getName()},
+            operationType: "insert",
+        },
+    ],
+});
+
+cstMongos2.assertNextChangesEqual({
+    cursor: cursorMongos2,
+    expectedChanges: [
+        {
+            documentKey: {_id: 2, a: 2},
+            fullDocument: {_id: 2, a: 2},
+            ns: {db: mongos2DB.getName(), coll: mongos2Coll.getName()},
+            operationType: "insert",
+        },
+    ],
 });
 
 st.stop();

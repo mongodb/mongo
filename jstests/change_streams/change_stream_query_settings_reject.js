@@ -25,12 +25,17 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
     qsutils.removeAllQuerySettings();
     qsutils.assertRejection({
         query: qsutils.makeAggregateQueryInstance(
-            {pipeline: [{$changeStream: {}}, {$match: {operationType: "insert"}}]}, collectionLess),
+            {pipeline: [{$changeStream: {}}, {$match: {operationType: "insert"}}]},
+            collectionLess,
+        ),
         queryPrime: qsutils.makeAggregateQueryInstance(
-            {pipeline: [{$changeStream: {}}, {$match: {operationType: "delete"}}]}, collectionLess),
+            {pipeline: [{$changeStream: {}}, {$match: {operationType: "delete"}}]},
+            collectionLess,
+        ),
         unrelatedQuery: qsutils.makeAggregateQueryInstance(
             {pipeline: [{$changeStream: {}}, {$match: {"fullDocument.string": "value"}}]},
-            collectionLess),
+            collectionLess,
+        ),
     });
 });
 
@@ -42,10 +47,8 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
     // pipeline with the flag set to false.
     qsutils.assertRejection({
         query: qsutils.makeAggregateQueryInstance({pipeline: [{$changeStream: {[flag]: true}}]}),
-        queryPrime:
-            qsutils.makeAggregateQueryInstance({pipeline: [{$changeStream: {[flag]: true}}]}),
-        unrelatedQuery:
-            qsutils.makeAggregateQueryInstance({pipeline: [{$changeStream: {[flag]: false}}]}),
+        queryPrime: qsutils.makeAggregateQueryInstance({pipeline: [{$changeStream: {[flag]: true}}]}),
+        unrelatedQuery: qsutils.makeAggregateQueryInstance({pipeline: [{$changeStream: {[flag]: false}}]}),
     });
 
     // Test that a change stream pipeline with the flag set to false has a different shape than a
@@ -53,8 +56,7 @@ const qsutils = new QuerySettingsUtils(db, coll.getName());
     qsutils.removeAllQuerySettings();
     qsutils.assertRejection({
         query: qsutils.makeAggregateQueryInstance({pipeline: [{$changeStream: {[flag]: false}}]}),
-        queryPrime:
-            qsutils.makeAggregateQueryInstance({pipeline: [{$changeStream: {[flag]: false}}]}),
+        queryPrime: qsutils.makeAggregateQueryInstance({pipeline: [{$changeStream: {[flag]: false}}]}),
         unrelatedQuery: qsutils.makeAggregateQueryInstance({pipeline: [{$changeStream: {}}]}),
     });
 });

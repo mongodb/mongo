@@ -11,24 +11,23 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1});
 
-const dbName = 'test';
+const dbName = "test";
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 const timeseries = {
-    timeField: 'time',
-    metaField: 'hostId',
+    timeField: "time",
+    metaField: "hostId",
 };
 
 jsTestLog("Creating sharded time series");
-assert.commandWorked(
-    st.s.adminCommand({shardCollection: 'test.meta_only', key: {'hostId': 1}, timeseries}));
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.meta_only", key: {"hostId": 1}, timeseries}));
 assert.soon(() => checkLog.checkContainsWithCountJson(st.rs0.getPrimary(), 8864700, {}, 0));
 
-assert.commandWorked(
-    st.s.adminCommand({shardCollection: 'test.time_only', key: {'time': 1}, timeseries}));
+assert.commandWorked(st.s.adminCommand({shardCollection: "test.time_only", key: {"time": 1}, timeseries}));
 assert.soon(() => checkLog.checkContainsWithCountJson(st.rs0.getPrimary(), 8864700, {}, 1));
 
-assert.commandWorked(st.s.adminCommand(
-    {shardCollection: 'test.time_meta_compund', key: {'hostId': 1, 'time': 1}, timeseries}));
+assert.commandWorked(
+    st.s.adminCommand({shardCollection: "test.time_meta_compund", key: {"hostId": 1, "time": 1}, timeseries}),
+);
 assert.soon(() => checkLog.checkContainsWithCountJson(st.rs0.getPrimary(), 8864700, {}, 2));
 
 jsTestLog("Restarting sharded cluster");

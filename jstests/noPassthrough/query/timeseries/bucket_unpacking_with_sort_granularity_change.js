@@ -22,8 +22,9 @@ const on = "alwaysOn";
 const off = "off";
 
 function setAggHang(mode) {
-    assert.commandWorked(adminDB.adminCommand(
-        {configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch", mode: mode}));
+    assert.commandWorked(
+        adminDB.adminCommand({configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch", mode: mode}),
+    );
 }
 
 // Setup scenario.
@@ -63,12 +64,15 @@ const mergeShellExplain = startParallelShell(aggregateExpOptimized, db.getMongo(
 const mergeShellOptimized = startParallelShell(aggregateOptimized, db.getMongo().port);
 
 // Wait for the parallel shells to hit the failpoint.
-assert.soon(() => db.currentOp({
-                        op: "command",
-                        "command.aggregate": dbName,
-                        "command.explain": {$exists: false}
-                    }).inprog.length == 2,
-            () => tojson(db.currentOp().inprog));
+assert.soon(
+    () =>
+        db.currentOp({
+            op: "command",
+            "command.aggregate": dbName,
+            "command.explain": {$exists: false},
+        }).inprog.length == 2,
+    () => tojson(db.currentOp().inprog),
+);
 
 // Reconfigure collection parameters
 assert.commandWorked(db.runCommand({collMod: dbName, timeseries: {granularity: "hours"}}));

@@ -14,8 +14,9 @@ try {
         assert.commandWorked(coll.insert({x: 1}));
         assert.commandWorked(coll.createIndex({"x": 1}));
 
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: 'WTWriteConflictException', mode: {activationProbability: 0.1}}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: {activationProbability: 0.1}}),
+        );
 
         // Will blow up if writeConflictRetry causes duplicate fields to be appended to result
         let res = db.runCommand({dropIndexes: coll.getName(), index: {"x": 1}});
@@ -35,10 +36,8 @@ try {
             assert.eq(oldRes, newRes);
         }
 
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: 'WTWriteConflictException', mode: "off"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}));
     }
 } finally {
-    assert.commandWorked(
-        db.adminCommand({configureFailPoint: 'WTWriteConflictException', mode: "off"}));
+    assert.commandWorked(db.adminCommand({configureFailPoint: "WTWriteConflictException", mode: "off"}));
 }

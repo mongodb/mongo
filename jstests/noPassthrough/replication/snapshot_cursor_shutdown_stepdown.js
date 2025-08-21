@@ -25,18 +25,20 @@ for (let i = 0; i < 4; i++) {
 }
 
 // Create a snapshot read cursor.
-assert.commandWorked(sessionDB.runCommand({
-    find: collName,
-    batchSize: 2,
-    readConcern: {level: "snapshot"},
-    startTransaction: true,
-    autocommit: false,
-    txnNumber: NumberLong(0)
-}));
+assert.commandWorked(
+    sessionDB.runCommand({
+        find: collName,
+        batchSize: 2,
+        readConcern: {level: "snapshot"},
+        startTransaction: true,
+        autocommit: false,
+        txnNumber: NumberLong(0),
+    }),
+);
 
 // It should be possible to shut down the server without hanging. We must skip collection
 // validation, since this will hang.
-const signal = true;  // Use default kill signal.
+const signal = true; // Use default kill signal.
 const forRestart = false;
 rst.stopSet(signal, forRestart, {skipValidation: true});
 
@@ -56,14 +58,16 @@ function testStepdown(stepdownFunc) {
     }
 
     // Create a snapshot read cursor.
-    const res = assert.commandWorked(sessionDB.runCommand({
-        find: collName,
-        batchSize: 2,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(0),
-        startTransaction: true,
-        autocommit: false
-    }));
+    const res = assert.commandWorked(
+        sessionDB.runCommand({
+            find: collName,
+            batchSize: 2,
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
     assert(res.hasOwnProperty("cursor"), tojson(res));
     assert(res.cursor.hasOwnProperty("id"), tojson(res));
     const cursorId = res.cursor.id;

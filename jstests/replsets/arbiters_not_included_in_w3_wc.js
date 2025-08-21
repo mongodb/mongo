@@ -22,8 +22,8 @@ rst.initiate({
         {"_id": 0, "host": nodes[0]},
         {"_id": 1, "host": nodes[1], priority: 0},
         {"_id": 2, "host": nodes[2], priority: 0, votes: 0},
-        {"_id": 3, "host": nodes[3], "arbiterOnly": true}
-    ]
+        {"_id": 3, "host": nodes[3], "arbiterOnly": true},
+    ],
 });
 
 const dbName = "test";
@@ -33,8 +33,7 @@ const primary = rst.getPrimary();
 const testDB = primary.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
-assert.commandWorked(
-    testColl.insert({"a": 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+assert.commandWorked(testColl.insert({"a": 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 jsTestLog("Shutting down the non-voting secondary");
 
@@ -42,7 +41,9 @@ rst.stop(2);
 
 jsTestLog("Issuing a w:3 write and confirming that it times out");
 
-assert.commandFailedWithCode(testColl.insert({"b": 2}, {writeConcern: {w: 3, wtimeout: 5 * 1000}}),
-                             ErrorCodes.WriteConcernTimeout);
+assert.commandFailedWithCode(
+    testColl.insert({"b": 2}, {writeConcern: {w: 3, wtimeout: 5 * 1000}}),
+    ErrorCodes.WriteConcernTimeout,
+);
 
 rst.stopSet();

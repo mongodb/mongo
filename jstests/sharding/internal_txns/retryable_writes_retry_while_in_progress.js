@@ -4,13 +4,11 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-import {
-    withRetryOnTransientTxnErrorIncrementTxnNum
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnErrorIncrementTxnNum} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     makeCommitTransactionCmdObj,
-    makePrepareTransactionCmdObj
+    makePrepareTransactionCmdObj,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 // This test requires running transactions directly against the shard.
@@ -27,7 +25,7 @@ const testColl = testDB.getCollection(kCollName);
 assert.commandWorked(testDB.createCollection(kCollName));
 
 const parentLsid = {
-    id: UUID()
+    id: UUID(),
 };
 let currentParentTxnNumber = 35;
 
@@ -72,8 +70,10 @@ function runTest({prepareBeforeRetry}) {
     assert.commandWorked(testColl.remove({}));
 }
 
-jsTest.log("Test retrying write statement executed in a retryable internal transaction in the " +
-           "original internal transaction while the transaction has not been committed or aborted");
+jsTest.log(
+    "Test retrying write statement executed in a retryable internal transaction in the " +
+        "original internal transaction while the transaction has not been committed or aborted",
+);
 
 runTest({prepareBeforeRetry: false});
 runTest({prepareBeforeRetry: true});

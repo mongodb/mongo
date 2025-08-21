@@ -6,7 +6,7 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 
 const prefix = "HIDDEN_WILDCARD_";
 const isHiddenWildcardIndex = {
-    $regexMatch: {input: "$name", regex: prefix}
+    $regexMatch: {input: "$name", regex: prefix},
 };
 
 /**
@@ -15,8 +15,7 @@ const isHiddenWildcardIndex = {
  */
 const acceptableErrorCodes = [
     // Wildcard prefix overlap.
-    7246204,
-    7246200,
+    7246204, 7246200,
     // Non-wildcard field in compound index can't be multikey.
     7246301,
     // Index already exists with a different name.
@@ -25,8 +24,7 @@ const acceptableErrorCodes = [
     13103,
     // Trying to create a wildcard index on a timeseries collection results in a duplicate wildcard
     // key error or invalid wildcardProjection.
-    7246201,
-    9,
+    7246201, 9,
 ];
 
 /**
@@ -70,7 +68,7 @@ function transformToWildcard(key, subFieldname) {
 function transformIntoWildcardIndexes(keyPattern) {
     let out = [];
     for (const [field, value] of Object.entries(keyPattern)) {
-        if (field.endsWith("$**") || (typeof value === "string")) {
+        if (field.endsWith("$**") || typeof value === "string") {
             // This is either already a wildcard index, or would be an invalid wildcard index, so
             // there's no point in implicitly creating any new indexes from it.
             return [];
@@ -84,11 +82,12 @@ function transformIntoWildcardIndexes(keyPattern) {
  * Returns a list of indexes implicitly created by this suite for the current test (up to now).
  */
 function getHiddenIndexes(dbName, collName) {
-    return db.getSiblingDB(dbName)[collName]
-        .aggregate([
+    return db
+        .getSiblingDB(dbName)
+        [collName].aggregate([
             {$indexStats: {}},
             {$addFields: {isHidden: isHiddenWildcardIndex}},
-            {$match: {isHidden: true}}
+            {$match: {isHidden: true}},
         ])
         .toArray();
 }
@@ -128,7 +127,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
                 // Note: if we try to run 'createIndexes' directly here, we will
                 // re-enter the override method.
                 const wildRes = originalRunCommand.apply(
-                    conn, makeRunCommandArgs({createIndexes: collName, indexes: [index]}));
+                    conn,
+                    makeRunCommandArgs({createIndexes: collName, indexes: [index]}),
+                );
 
                 if (wildRes.ok) {
                     jsTest.log.info("Created implicit wildcard index", {index});
@@ -143,12 +144,10 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
         // If we're listing indexes, we need to make sure we eliminate any of the
         // implicitly created indexes from consideration.
         if (res.cursor.firstBatch) {
-            res.cursor.firstBatch =
-                res.cursor.firstBatch.filter(idx => !idx.name.startsWith(prefix));
+            res.cursor.firstBatch = res.cursor.firstBatch.filter((idx) => !idx.name.startsWith(prefix));
         }
     } else if (cmdName == "insert" && res.ok) {
-        const writeErrors =
-            res.writeErrors ? res.writeErrors.filter(err => err.code === 7246301) : [];
+        const writeErrors = res.writeErrors ? res.writeErrors.filter((err) => err.code === 7246301) : [];
         if (writeErrors.length > 0) {
             // We are trying to make a non-wildcard component of the index multikey.
             // Drop all the implicitly created indexes and try again, since we can't be
@@ -158,9 +157,10 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
             // We must successfully drop our hidden indexes, otherwise we cannot proceed with the
             // test. We're not sure which index was problematic (or if multiple indexes might be
             // problematic) so we just drop them all.
-            const hiddenIndexes = getHiddenIndexes(dbName, collName).map(idx => idx.name);
-            assert.commandWorked(originalRunCommand.apply(
-                conn, makeRunCommandArgs({dropIndexes: collName, index: hiddenIndexes})));
+            const hiddenIndexes = getHiddenIndexes(dbName, collName).map((idx) => idx.name);
+            assert.commandWorked(
+                originalRunCommand.apply(conn, makeRunCommandArgs({dropIndexes: collName, index: hiddenIndexes})),
+            );
 
             // Now run the original command again.
             res = originalRunCommand.apply(conn, makeRunCommandArgs(cmdObj));
@@ -174,28 +174,27 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, m
  * Hides any implicitly created wildcard indexes. Note that tests using {$indexStats} directly have
  * to be manually excluded from the suite, since they won't pass through this override.
  */
-DBCollection.prototype.getIndexes = function(params) {
+DBCollection.prototype.getIndexes = function (params) {
     const res = this.aggregate(
-                        [
-                            {$indexStats: {}},
-                            // Hide the implicitly created index(es) from tests that look
-                            // for indexes.
-                            {$addFields: {isHidden: isHiddenWildcardIndex}},
-                            {$match: {isHidden: false}},
-                            // The information listed in 'spec' is usually returned inline
-                            // at the root level.
-                            {$replaceWith: {$mergeObjects: ["$$ROOT", "$spec"]}},
-                            // This info isn't shown in 'getIndexes'.
-                            {$project: {host: 0, accesses: 0, spec: 0, isHidden: 0}},
-                        ],
-                        params)
-                    .toArray();
+        [
+            {$indexStats: {}},
+            // Hide the implicitly created index(es) from tests that look
+            // for indexes.
+            {$addFields: {isHidden: isHiddenWildcardIndex}},
+            {$match: {isHidden: false}},
+            // The information listed in 'spec' is usually returned inline
+            // at the root level.
+            {$replaceWith: {$mergeObjects: ["$$ROOT", "$spec"]}},
+            // This info isn't shown in 'getIndexes'.
+            {$project: {host: 0, accesses: 0, spec: 0, isHidden: 0}},
+        ],
+        params,
+    ).toArray();
     return res;
 };
 
 DBCollection.prototype.getIndices = DBCollection.prototype.getIndexes;
 DBCollection.prototype.getIndexSpecs = DBCollection.prototype.getIndexes;
 
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicit_wildcard_indexes.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/implicit_wildcard_indexes.js");
 OverrideHelpers.overrideRunCommand(runCommandOverride);

@@ -41,8 +41,10 @@ const assertOpHasPrepareConflict = (db, commandName, opsObj) => {
             }
             return false;
         },
-        () => `Failed to find '${commandName}' command in the ${db.getMongo().host} currentOp()` +
-            ` output: ${tojson(db.currentOp())}`);
+        () =>
+            `Failed to find '${commandName}' command in the ${db.getMongo().host} currentOp()` +
+            ` output: ${tojson(db.currentOp())}`,
+    );
 };
 
 const rst = new ReplSetTest({nodes: 2});
@@ -60,11 +62,13 @@ const collName = "testColl";
 
 // We prevent the replica set from advancing oldest_timestamp. This ensures that the snapshot
 // associated with 'clusterTime' is retained for the duration of this test.
-rst.nodes.forEach(conn => {
-    assert.commandWorked(conn.adminCommand({
-        configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
-        mode: "alwaysOn",
-    }));
+rst.nodes.forEach((conn) => {
+    assert.commandWorked(
+        conn.adminCommand({
+            configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+            mode: "alwaysOn",
+        }),
+    );
 });
 
 const testDB = primary.getDB(dbName);
@@ -95,10 +99,8 @@ const clusterTime = testDB.getSession().getOperationTime();
 // snapshot read concern with 'atClusterTime' to be the timestamp of the second write we did,
 // outside of the transaction.
 
-const dbHashClusterTimePrimaryThread =
-    new Thread(runDBHashFn, primary.host, dbName, tojson(clusterTime));
-const dbHashClusterTimeSecondaryThread =
-    new Thread(runDBHashFn, secondary.host, dbName, tojson(clusterTime));
+const dbHashClusterTimePrimaryThread = new Thread(runDBHashFn, primary.host, dbName, tojson(clusterTime));
+const dbHashClusterTimeSecondaryThread = new Thread(runDBHashFn, secondary.host, dbName, tojson(clusterTime));
 
 dbHashClusterTimePrimaryThread.start();
 dbHashClusterTimeSecondaryThread.start();
@@ -117,12 +119,11 @@ const otherDbName = "prepare_transaction_read_at_cluster_time_secondary_other";
 const otherTestDB = primary.getDB(otherDbName);
 
 assert.commandWorked(otherTestDB.runCommand({create: collName, writeConcern: {w: 2}}));
+assert.commandWorked(otherTestDB.runCommand({collMod: collName, validator: {v: 1}, writeConcern: {w: 2}}));
 assert.commandWorked(
-    otherTestDB.runCommand({collMod: collName, validator: {v: 1}, writeConcern: {w: 2}}));
-assert.commandWorked(otherTestDB.runCommand(
-    {createIndexes: collName, indexes: [{key: {x: 1}, name: 'x_1'}], writeConcern: {w: 2}}));
-assert.commandWorked(
-    otherTestDB.runCommand({dropIndexes: collName, index: 'x_1', writeConcern: {w: 2}}));
+    otherTestDB.runCommand({createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1"}], writeConcern: {w: 2}}),
+);
+assert.commandWorked(otherTestDB.runCommand({dropIndexes: collName, index: "x_1", writeConcern: {w: 2}}));
 
 // Committing or aborting the transaction should unblock the parallel tasks.
 PrepareHelpers.commitTransaction(session, prepareTimestamp);

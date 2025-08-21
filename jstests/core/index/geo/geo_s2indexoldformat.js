@@ -18,11 +18,31 @@ res = t.find({"geo": {"$geoIntersects": {"$geometry": [41, 6]}}});
 assert.eq(res.count(), 2);
 
 // We don't support legacy polygons in 2dsphere.
-assert.writeError(t.insert({geo: [[40, 5], [40, 6], [41, 6], [41, 5]], nonGeo: ["somepoly"]}));
 assert.writeError(
-    t.insert({geo: {a: {x: 40, y: 5}, b: {x: 40, y: 6}, c: {x: 41, y: 6}, d: {x: 41, y: 5}}}));
+    t.insert({
+        geo: [
+            [40, 5],
+            [40, 6],
+            [41, 6],
+            [41, 5],
+        ],
+        nonGeo: ["somepoly"],
+    }),
+);
+assert.writeError(t.insert({geo: {a: {x: 40, y: 5}, b: {x: 40, y: 6}, c: {x: 41, y: 6}, d: {x: 41, y: 5}}}));
 
 // Test "Can't canonicalize query: BadValue bad geo query" error.
-assert.throws(function() {
-    t.findOne({"geo": {"$geoIntersects": {"$geometry": [[40, 5], [40, 6], [41, 6], [41, 5]]}}});
+assert.throws(function () {
+    t.findOne({
+        "geo": {
+            "$geoIntersects": {
+                "$geometry": [
+                    [40, 5],
+                    [40, 6],
+                    [41, 6],
+                    [41, 5],
+                ],
+            },
+        },
+    });
 });

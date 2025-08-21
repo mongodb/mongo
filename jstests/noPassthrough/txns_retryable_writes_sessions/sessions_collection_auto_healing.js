@@ -7,8 +7,7 @@ TestData.disableImplicitSessions = true;
 let timeoutMinutes = 5;
 
 var startSession = {startSession: 1};
-var conn =
-    MongoRunner.runMongod({setParameter: "localLogicalSessionTimeoutMinutes=" + timeoutMinutes});
+var conn = MongoRunner.runMongod({setParameter: "localLogicalSessionTimeoutMinutes=" + timeoutMinutes});
 
 var admin = conn.getDB("admin");
 var config = conn.getDB("config");
@@ -40,7 +39,7 @@ timeoutMinutes = 4;
 conn = MongoRunner.runMongod({
     restart: conn,
     cleanData: false,
-    setParameter: "localLogicalSessionTimeoutMinutes=" + timeoutMinutes
+    setParameter: "localLogicalSessionTimeoutMinutes=" + timeoutMinutes,
 });
 admin = conn.getDB("admin");
 config = conn.getDB("config");

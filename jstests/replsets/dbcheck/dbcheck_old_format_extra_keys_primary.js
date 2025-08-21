@@ -7,10 +7,7 @@
  * ]
  */
 
-import {
-    DbCheckOldFormatKeysTest,
-    defaultNumDocs
-} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
+import {DbCheckOldFormatKeysTest, defaultNumDocs} from "jstests/replsets/libs/dbcheck_old_format_keys_test.js";
 import {
     assertCompleteCoverage,
     checkHealthLog,
@@ -35,7 +32,7 @@ dbCheckTest.createExtraKeysRecordDoesNotMatchOnPrimary(dbName, collName);
 const rst = dbCheckTest.getRst();
 const primary = dbCheckTest.getPrimary();
 
-forEachNonArbiterSecondary(rst, function(node) {
+forEachNonArbiterSecondary(rst, function (node) {
     assert.eq(node.getDB(dbName).getCollection(collName).find({}).count(), defaultNumDocs);
 });
 
@@ -45,11 +42,13 @@ const snapshotSize = 2;
 setSnapshotSize(rst, snapshotSize);
 
 jsTestLog("Running dbCheck extraIndexKeysCheck");
-runDbCheck(rst,
-           primary.getDB(dbName),
-           collName,
-           {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1", maxDocsPerBatch: batchSize},
-           true /*awaitCompletion*/);
+runDbCheck(
+    rst,
+    primary.getDB(dbName),
+    collName,
+    {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1", maxDocsPerBatch: batchSize},
+    true /*awaitCompletion*/,
+);
 
 // Check for record does not match on primary.
 const numBatches = Math.ceil(defaultNumDocs / batchSize);
@@ -58,29 +57,31 @@ checkHealthLog(primaryHealthLog, logQueries.recordDoesNotMatchQuery, defaultNumD
 checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, defaultNumDocs);
 
 checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, numBatches);
-assertCompleteCoverage(primaryHealthLog,
-                       defaultNumDocs,
-                       "a" /*indexName*/,
-                       null /* docSuffix */,
-                       null /* start */,
-                       null /* end */);
+assertCompleteCoverage(
+    primaryHealthLog,
+    defaultNumDocs,
+    "a" /*indexName*/,
+    null /* docSuffix */,
+    null /* start */,
+    null /* end */,
+);
 
 // Verify that the correct num of inconsistent batch entries were found on secondary.
-forEachNonArbiterSecondary(rst, function(node) {
+forEachNonArbiterSecondary(rst, function (node) {
     // The first batch should return IndexKeyOrderViolation error because the keys in this unique
     // index are the same (set to {a: null}).
-    checkHealthLog(
-        node.getDB("local").system.healthlog, logQueries.inconsistentBatchQuery, numBatches - 1);
+    checkHealthLog(node.getDB("local").system.healthlog, logQueries.inconsistentBatchQuery, numBatches - 1);
     checkHealthLog(node.getDB("local").system.healthlog, logQueries.indexKeyOrderViolationQuery, 1);
-    checkHealthLog(
-        node.getDB("local").system.healthlog, logQueries.allErrorsOrWarningsQuery, numBatches);
+    checkHealthLog(node.getDB("local").system.healthlog, logQueries.allErrorsOrWarningsQuery, numBatches);
 
-    assertCompleteCoverage(node.getDB("local").system.healthlog,
-                           defaultNumDocs,
-                           "a" /*indexName*/,
-                           null /* docSuffix */,
-                           null /* start */,
-                           null /* end */);
+    assertCompleteCoverage(
+        node.getDB("local").system.healthlog,
+        defaultNumDocs,
+        "a" /*indexName*/,
+        null /* docSuffix */,
+        null /* start */,
+        null /* end */,
+    );
 });
 
 resetSnapshotSize(rst);

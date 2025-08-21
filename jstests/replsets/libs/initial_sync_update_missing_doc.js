@@ -13,18 +13,17 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 // reInitiate the replica set with a secondary node, which will go through initial sync. This
 // function will hang the secondary in initial sync. turnOffHangBeforeCopyingDatabasesFailPoint
 // must be called after reInitiateSetWithSecondary.
-export var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
+export var reInitiateSetWithSecondary = function (replSet, secondaryConfig) {
     const secondary = replSet.add(secondaryConfig);
     secondary.setSecondaryOk();
 
     // Make the secondary hang after retrieving the last op on the sync source but before
     // copying databases.
-    let failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
+    let failPoint = configureFailPoint(secondary, "initialSyncHangBeforeCopyingDatabases");
 
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
-    assert.commandWorked(secondary.adminCommand(
-        {configureFailPoint: 'skipClearInitialSyncState', mode: 'alwaysOn'}));
+    assert.commandWorked(secondary.adminCommand({configureFailPoint: "skipClearInitialSyncState", mode: "alwaysOn"}));
 
     replSet.reInitiate();
 
@@ -37,15 +36,16 @@ export var reInitiateSetWithSecondary = function(replSet, secondaryConfig) {
 // Must be called after reInitiateSetWithSecondary. Turns off the
 // initialSyncHangBeforeCopyingDatabases fail point so that the secondary will start copying all
 // non-local databases.
-export var turnOffHangBeforeCopyingDatabasesFailPoint = function(secondary) {
-    assert.commandWorked(secondary.getDB('admin').runCommand(
-        {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
+export var turnOffHangBeforeCopyingDatabasesFailPoint = function (secondary) {
+    assert.commandWorked(
+        secondary.getDB("admin").runCommand({configureFailPoint: "initialSyncHangBeforeCopyingDatabases", mode: "off"}),
+    );
 };
 
-export var finishAndValidate = function(replSet, name, numDocuments) {
+export var finishAndValidate = function (replSet, name, numDocuments) {
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();
-    const dbName = 'test';
+    const dbName = "test";
     const primary = replSet.getPrimary();
     const primaryCollection = primary.getDB(dbName).getCollection(name);
     const secondary = replSet.getSecondary();
@@ -54,20 +54,22 @@ export var finishAndValidate = function(replSet, name, numDocuments) {
     if (numDocuments != secondaryCollection.find().itcount()) {
         jsTestLog(`Mismatch, primary collection: ${tojson(primaryCollection.find().toArray())}
 secondary collection: ${tojson(secondaryCollection.find().toArray())}`);
-        throw new Error('Did not sync collection');
+        throw new Error("Did not sync collection");
     }
 
-    assert.eq(0,
-              secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
-              "Oplog buffer was not dropped after initial sync");
+    assert.eq(
+        0,
+        secondary.getDB("local")["temp_oplog_buffer"].find().itcount(),
+        "Oplog buffer was not dropped after initial sync",
+    );
 };
 
-export var updateRemove = function(sessionColl, query) {
+export var updateRemove = function (sessionColl, query) {
     assert.commandWorked(sessionColl.update(query, {x: 2}, {upsert: false}));
     assert.commandWorked(sessionColl.remove(query, {justOne: true}));
 };
 
-export var insertUpdateRemoveLarge = function(sessionColl, query) {
+export var insertUpdateRemoveLarge = function (sessionColl, query) {
     const kSize10MB = 10 * 1024 * 1024;
     const longString = "a".repeat(kSize10MB);
     assert.commandWorked(sessionColl.insert({x: longString}));

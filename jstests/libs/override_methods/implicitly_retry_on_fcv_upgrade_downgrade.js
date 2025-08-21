@@ -15,10 +15,7 @@ const kRetryableCommands = new Set([
     "removeQuerySettings",
 ]);
 
-const kQueryRetryableErrors = [
-    ErrorCodes.ConflictingOperationInProgress,
-    ErrorCodes.QueryPlanKilled,
-];
+const kQueryRetryableErrors = [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.QueryPlanKilled];
 
 function _runCommandWithRetry(conn, commandName, commandObj, func, makeFuncArgs) {
     const kNoRetry = true;
@@ -39,20 +36,26 @@ function _runCommandWithRetry(conn, commandName, commandObj, func, makeFuncArgs)
             // This handles the retry case when run against a standalone, replica set, or mongos
             // where both shards returned the same response.
             if (kQueryRetryableErrors.includes(commandResponse.code)) {
-                jsTest.log.info(`Retrying the '${commandName}' command because a conflicting operation is in progress: (attempt ${attempt})`,
-                                {commandObj, commandResponse});
+                jsTest.log.info(
+                    `Retrying the '${commandName}' command because a conflicting operation is in progress: (attempt ${attempt})`,
+                    {commandObj, commandResponse},
+                );
                 return kRetry;
             }
 
-            jsTest.log.info(`Command '${commandName}' failed with error code: ${
-                                commandResponse.code} and will not be retried.`,
-                            {commandObj, commandResponse});
+            jsTest.log.info(
+                `Command '${commandName}' failed with error code: ${commandResponse.code} and will not be retried.`,
+                {commandObj, commandResponse},
+            );
             return kNoRetry;
         },
-        () => `Timed out while retrying command '${toJsonForLog(commandObj)}', response: ${
-            toJsonForLog(commandResponse)}`,
+        () =>
+            `Timed out while retrying command '${toJsonForLog(commandObj)}', response: ${toJsonForLog(
+                commandResponse,
+            )}`,
         kRetryTimeout,
-        kIntervalBetweenRetries);
+        kIntervalBetweenRetries,
+    );
 
     return commandResponse;
 }

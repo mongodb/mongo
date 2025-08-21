@@ -14,22 +14,31 @@ function testPartialWildcardIndex(indexKeyPattern, indexOptions) {
     coll.drop();
 
     assert.commandWorked(coll.createIndex(indexKeyPattern, indexOptions));
-    assert.commandWorked(coll.insert({x: 5, a: 2}));  // Not in index.
-    assert.commandWorked(coll.insert({x: 6, a: 1}));  // In index.
+    assert.commandWorked(coll.insert({x: 5, a: 2})); // Not in index.
+    assert.commandWorked(coll.insert({x: 6, a: 1})); // In index.
 
     // find() operations that should use the index.
     let explain = coll.explain("executionStats").find({x: 6, a: 1}).finish();
     assert.eq(1, explain.executionStats.nReturned);
     assert(isIxscan(db, getWinningPlanFromExplain(explain)));
-    explain = coll.explain("executionStats").find({x: {$gt: 1}, a: 1}).finish();
+    explain = coll
+        .explain("executionStats")
+        .find({x: {$gt: 1}, a: 1})
+        .finish();
     assert.eq(1, explain.executionStats.nReturned);
     assert(isIxscan(db, getWinningPlanFromExplain(explain)));
-    explain = coll.explain("executionStats").find({x: 6, a: {$lte: 1}}).finish();
+    explain = coll
+        .explain("executionStats")
+        .find({x: 6, a: {$lte: 1}})
+        .finish();
     assert.eq(1, explain.executionStats.nReturned);
     assert(isIxscan(db, getWinningPlanFromExplain(explain)));
 
     // find() operations that should not use the index.
-    explain = coll.explain("executionStats").find({x: 6, a: {$lt: 1.6}}).finish();
+    explain = coll
+        .explain("executionStats")
+        .find({x: 6, a: {$lt: 1.6}})
+        .finish();
     assert.eq(1, explain.executionStats.nReturned);
     assert(isCollscan(db, getWinningPlanFromExplain(explain)));
 
@@ -37,7 +46,10 @@ function testPartialWildcardIndex(indexKeyPattern, indexOptions) {
     assert.eq(1, explain.executionStats.nReturned);
     assert(isCollscan(db, getWinningPlanFromExplain(explain)));
 
-    explain = coll.explain("executionStats").find({a: {$gte: 0}}).finish();
+    explain = coll
+        .explain("executionStats")
+        .find({a: {$gte: 0}})
+        .finish();
     assert.eq(2, explain.executionStats.nReturned);
     assert(isCollscan(db, getWinningPlanFromExplain(explain)));
 }
@@ -52,11 +64,13 @@ testPartialWildcardIndex({"x.$**": 1}, {partialFilterExpression: {a: {$lte: 1.5}
 // Case where the partial filter expression is on a field in the index.
 testPartialWildcardIndex(
     {"$**": 1, other: 1},
-    {partialFilterExpression: {a: {$lte: 1.5}}, wildcardProjection: {other: 0}});
+    {partialFilterExpression: {a: {$lte: 1.5}}, wildcardProjection: {other: 0}},
+);
 
 testPartialWildcardIndex(
     {a: 1, "$**": -1, other: 1},
-    {partialFilterExpression: {a: {$lte: 1.5}}, wildcardProjection: {a: 0, other: 0}});
+    {partialFilterExpression: {a: {$lte: 1.5}}, wildcardProjection: {a: 0, other: 0}},
+);
 
 testPartialWildcardIndex({"a.$**": -1, other: 1}, {partialFilterExpression: {a: {$lte: 1.5}}});
 

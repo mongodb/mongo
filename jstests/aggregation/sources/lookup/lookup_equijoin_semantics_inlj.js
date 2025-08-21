@@ -14,13 +14,13 @@ import {
 runTests({
     localColl: db.lookup_arrays_semantics_local_inlj,
     foreignColl: db.lookup_arrays_semantics_foreign_inlj,
-    currentJoinAlgorithm: JoinAlgorithm.INLJ_Asc
+    currentJoinAlgorithm: JoinAlgorithm.INLJ_Asc,
 });
 
 runTests({
     localColl: db.lookup_arrays_semantics_local_inlj,
     foreignColl: db.lookup_arrays_semantics_foreign_inlj,
-    currentJoinAlgorithm: JoinAlgorithm.INLJ_Dec
+    currentJoinAlgorithm: JoinAlgorithm.INLJ_Dec,
 });
 
 /**
@@ -31,7 +31,7 @@ runTests({
     const testConfig = {
         localColl: db.lookup_arrays_semantics_local_inlj,
         foreignColl: db.lookup_arrays_semantics_foreign_inlj,
-        currentJoinAlgorithm: JoinAlgorithm.INLJ_Hashed
+        currentJoinAlgorithm: JoinAlgorithm.INLJ_Hashed,
     };
 
     (function testVariousDataTypes() {
@@ -56,14 +56,14 @@ runTests({
             {_id: 13, a: new DBRef("collection", "id", "database")},
             {_id: 14, a: null},
         ];
-        docs.forEach(doc => {
+        docs.forEach((doc) => {
             runTest_SingleLocalRecord(testConfig, {
                 testDescription: "Various data types in foreign matching to: " + tojson(doc),
                 localRecord: {b: doc.a},
                 localField: "b",
                 foreignRecords: docs,
                 foreignField: "a",
-                idsExpectedToMatch: [doc._id]
+                idsExpectedToMatch: [doc._id],
             });
         });
 
@@ -75,7 +75,7 @@ runTests({
             localField: "b",
             foreignRecords: docs,
             foreignField: "a",
-            idsExpectedToMatch: []
+            idsExpectedToMatch: [],
         });
     })();
 
@@ -96,7 +96,7 @@ runTests({
             localField: "b",
             foreignRecords,
             foreignField: "a",
-            idsExpectedToMatch: [0, 1]
+            idsExpectedToMatch: [0, 1],
         });
     })();
 
@@ -113,7 +113,7 @@ runTests({
             localField: "b",
             foreignRecords,
             foreignField: "a.b.c",
-            idsExpectedToMatch: [0]
+            idsExpectedToMatch: [0],
         });
     })();
 })();
@@ -125,7 +125,7 @@ runTests({
     const testConfig = {
         localColl: db.lookup_arrays_semantics_local_inlj,
         foreignColl: db.lookup_arrays_semantics_foreign_inlj,
-        currentJoinAlgorithm: JoinAlgorithm.INLJ_Asc
+        currentJoinAlgorithm: JoinAlgorithm.INLJ_Asc,
     };
 
     (function testServer66119() {
@@ -145,7 +145,7 @@ runTests({
             localField: "a.b",
             foreignRecord: {_id: 0, a: 1},
             foreignField: "a",
-            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6]
+            idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6],
         });
     })();
 })();

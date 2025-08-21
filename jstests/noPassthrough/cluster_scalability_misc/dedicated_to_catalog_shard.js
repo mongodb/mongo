@@ -32,12 +32,11 @@ const st = new ShardingTest({
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 });
 
 // TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(),
-                                        "ShardAuthoritativeDbMetadataDDL")) {
+if (FeatureFlagUtil.isPresentAndEnabled(st.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
     st.stop();
     quit();
 }
@@ -54,10 +53,10 @@ const configCS = st.configRS.getURL();
 
     // Restart works. Restart all nodes to verify they don't rely on a majority of nodes being up.
     const configNodes = st.configRS.nodes;
-    configNodes.forEach(node => {
+    configNodes.forEach((node) => {
         st.configRS.restart(node, undefined, undefined, false /* wait */);
     });
-    st.configRS.getPrimary();  // Waits for a stable primary.
+    st.configRS.getPrimary(); // Waits for a stable primary.
 
     // Flushing routing / db cache updates works.
     flushRoutingAndDBCacheUpdates(st.configRS.getPrimary());
@@ -83,7 +82,7 @@ const configCS = st.configRS.getURL();
 // verify it works as expected.
 st.configRS.getPrimary().adminCommand({refreshLogicalSessionCacheNow: 1});
 
-let shardList = st.getDB('config').shards.find().toArray();
+let shardList = st.getDB("config").shards.find().toArray();
 assert.eq(1, shardList.length, tojson(shardList));
 
 st.stop();

@@ -7,11 +7,7 @@
  *   requires_wiredtiger,
  * ]
  */
-import {
-    getUriForColl,
-    getUriForIndex,
-    truncateUriAndRestartMongod
-} from "jstests/disk/libs/wt_file_helper.js";
+import {getUriForColl, getUriForIndex, truncateUriAndRestartMongod} from "jstests/disk/libs/wt_file_helper.js";
 
 // 64 * 1024 * 1024 = 64MB worth of index names ensures that we test against the maximum BSONObj
 // size lmit.
@@ -39,8 +35,7 @@ conn = truncateUriAndRestartMongod(uri, conn);
 coll = conn.getDB("test").getCollection("corrupt");
 
 const missingIndexEntries = "Detected " + kNumDocs + " missing index entries.";
-const missingSizeLimitations =
-    "Not all missing index entry inconsistencies are listed due to size limitations.";
+const missingSizeLimitations = "Not all missing index entry inconsistencies are listed due to size limitations.";
 
 let res = coll.validate();
 assert.commandWorked(res);
@@ -55,8 +50,7 @@ conn = truncateUriAndRestartMongod(uri, conn);
 coll = conn.getDB("test").getCollection("corrupt");
 
 const extraIndexEntries = "Detected " + 2 * kNumDocs + " extra index entries.";
-const extraSizeLimitations =
-    "Not all extra index entry inconsistencies are listed due to size limitations.";
+const extraSizeLimitations = "Not all extra index entry inconsistencies are listed due to size limitations.";
 
 res = coll.validate();
 assert.commandWorked(res);

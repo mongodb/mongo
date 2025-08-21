@@ -12,55 +12,64 @@ function killCurrentOpTest() {
         assert.commandWorked(db.getSiblingDB(dbName).runCommand(insertCmdObj));
     }
 
-    const kVTSKey = 'secret';
+    const kVTSKey = "secret";
     const rst = new ReplSetTest({
         nodes: 3,
         nodeOptions: {
-            auth: '',
+            auth: "",
             setParameter: {
                 multitenancySupport: true,
                 featureFlagSecurityToken: true,
-                testOnlyValidatedTenancyScopeKey: kVTSKey
-            }
-        }
+                testOnlyValidatedTenancyScopeKey: kVTSKey,
+            },
+        },
     });
-    rst.startSet({keyFile: 'jstests/libs/key1'});
+    rst.startSet({keyFile: "jstests/libs/key1"});
     rst.initiate();
 
     const primary = rst.getPrimary();
-    const adminDb = primary.getDB('admin');
+    const adminDb = primary.getDB("admin");
 
     // Prepare an authenticated user for testing.
     // Must be authenticated as a user with ActionType::useTenant in order to use security token
-    assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
-    assert(adminDb.auth('admin', 'pwd'));
+    assert.commandWorked(adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["root"]}));
+    assert(adminDb.auth("admin", "pwd"));
 
     const kTenant = ObjectId();
     const kOtherTenant = ObjectId();
-    const kDbName = 'myDb';
+    const kDbName = "myDb";
     const kCollName = "currOpColl";
 
     // Create a user for kTenant and its security token.
-    const securityToken =
-        _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant}, kVTSKey);
+    const securityToken = _createSecurityToken({user: "userTenant1", db: "$external", tenant: kTenant}, kVTSKey);
 
     primary._setSecurityToken(_createTenantToken({tenant: kTenant}));
-    assert.commandWorked(primary.getDB('$external').runCommand({
-        createUser: "userTenant1",
-        roles:
-            [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
-    }));
+    assert.commandWorked(
+        primary.getDB("$external").runCommand({
+            createUser: "userTenant1",
+            roles: [
+                {role: "dbAdminAnyDatabase", db: "admin"},
+                {role: "readWriteAnyDatabase", db: "admin"},
+            ],
+        }),
+    );
 
     // Create a different tenant to test that one tenant can't see or kill other tenant's op.
-    const securityTokenOtherTenant =
-        _createSecurityToken({user: "userTenant2", db: '$external', tenant: kOtherTenant}, kVTSKey);
+    const securityTokenOtherTenant = _createSecurityToken(
+        {user: "userTenant2", db: "$external", tenant: kOtherTenant},
+        kVTSKey,
+    );
 
     primary._setSecurityToken(_createTenantToken({tenant: kOtherTenant}));
-    assert.commandWorked(primary.getDB('$external').runCommand({
-        createUser: "userTenant2",
-        roles:
-            [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
-    }));
+    assert.commandWorked(
+        primary.getDB("$external").runCommand({
+            createUser: "userTenant2",
+            roles: [
+                {role: "dbAdminAnyDatabase", db: "admin"},
+                {role: "readWriteAnyDatabase", db: "admin"},
+            ],
+        }),
+    );
     primary._setSecurityToken(undefined);
 
     const tokenConn = new Mongo(primary.host);
@@ -71,13 +80,15 @@ function killCurrentOpTest() {
         const findCurrentOpCmd = {
             aggregate: 1,
             pipeline: [{$currentOp: {allUsers: false}}, {$match: {op: "insert"}}],
-            cursor: {}
+            cursor: {},
         };
 
         const createCollFP = configureFailPoint(primary, "hangBeforeLoggingCreateCollection");
 
         const parallelShell = startParallelShell(
-            funWithArgs(operationToKillFunc, securityToken, kDbName, kCollName), primary.port);
+            funWithArgs(operationToKillFunc, securityToken, kDbName, kCollName),
+            primary.port,
+        );
 
         createCollFP.wait();
 
@@ -90,7 +101,8 @@ function killCurrentOpTest() {
         tokenConn._setSecurityToken(securityTokenOtherTenant);
         assert.commandFailedWithCode(
             tokenConn.getDB("admin").runCommand({killOp: 1, op: opIdToKill}),
-            ErrorCodes.Unauthorized);
+            ErrorCodes.Unauthorized,
+        );
 
         // Try to kill the op with a the same tenant / security token. Succeeds.
         tokenConn._setSecurityToken(securityToken);

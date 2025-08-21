@@ -11,8 +11,9 @@
 let t = db.jstests_find9;
 t.drop();
 
-const findCommandBatchSize = assert.commandWorked(db.adminCommand(
-    {getParameter: 1, internalQueryFindCommandBatchSize: 1}))["internalQueryFindCommandBatchSize"];
+const findCommandBatchSize = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryFindCommandBatchSize: 1}),
+)["internalQueryFindCommandBatchSize"];
 const kNumDocs = 60;
 
 let big = new Array(500000).toString();
@@ -21,8 +22,7 @@ for (let i = 0; i < kNumDocs; ++i) {
 }
 
 // Check size limit with a simple query.
-assert.eq(Math.min(findCommandBatchSize, kNumDocs),
-          t.find({}, {a: 1}).objsLeftInBatch());  // Projection resizes the result set.
+assert.eq(Math.min(findCommandBatchSize, kNumDocs), t.find({}, {a: 1}).objsLeftInBatch()); // Projection resizes the result set.
 assert.gt(kNumDocs, t.find().objsLeftInBatch());
 
 // Check size limit on a query with an explicit batch size.

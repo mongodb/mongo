@@ -28,8 +28,8 @@ const rst = new ReplSetTest({
             // threads which attempt to run the drop command are spawned quickly enough. This
             // might not be the case for Evergreen hosts and may need to be tuned accordingly.
             transactionLifetimeLimitSeconds: 20,
-        }
-    }
+        },
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -52,7 +52,7 @@ let prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 const threads = [];
 
 for (let i = 0; i < kNumWriteTickets; ++i) {
-    const thread = new Thread(function(host) {
+    const thread = new Thread(function (host) {
         try {
             const conn = new Mongo(host);
             const db = conn.getDB("test");
@@ -80,7 +80,8 @@ assert.soon(
     },
     () => {
         return `Didn't find ${kNumWriteTickets} drop commands running: ` + tojson(db.currentOp());
-    });
+    },
+);
 
 // Should be able to successfully commit the transaction with the write tickets exhausted.
 jsTestLog("Committing transaction");

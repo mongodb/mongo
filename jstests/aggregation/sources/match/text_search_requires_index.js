@@ -10,14 +10,14 @@ from.drop();
 const textPipeline = [{$match: {$text: {$search: "foo"}}}];
 
 const pipeline = [
-        {
-          $lookup: {
-              pipeline: textPipeline,
-              from: from.getName(),
-              as: "c",
-          }
+    {
+        $lookup: {
+            pipeline: textPipeline,
+            from: from.getName(),
+            as: "c",
         },
-    ];
+    },
+];
 
 assert.commandWorked(coll.insert({_id: 1}));
 assert.commandWorked(from.insert({_id: 100, a: "foo"}));

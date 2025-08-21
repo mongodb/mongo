@@ -36,7 +36,7 @@ let commandObj = {
     from: sourceColl.getFullName(),
     to: destColl.getFullName(),
     indexes: [],
-    collectionOptions: {uuid: optionsArray[0].info.uuid}
+    collectionOptions: {uuid: optionsArray[0].info.uuid},
 };
 // Destination has an extra index.
 assert.commandFailedWithCode(adminDB.runCommand(commandObj), ErrorCodes.CommandFailed);
@@ -54,8 +54,7 @@ assert.commandFailedWithCode(adminDB.runCommand(commandObj), ErrorCodes.CommandF
 
 destColl.drop();
 
-assert.commandWorked(
-    destDB.runCommand({"create": destColl.getName(), capped: true, size: 256, max: 2}));
+assert.commandWorked(destDB.runCommand({"create": destColl.getName(), capped: true, size: 256, max: 2}));
 destIndexes = assert.commandWorked(destDB.runCommand({"listIndexes": destColl.getName()}));
 commandObj.indexes = new DBCommandCursor(db, destIndexes).toArray();
 

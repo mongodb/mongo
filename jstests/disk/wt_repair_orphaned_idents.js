@@ -48,11 +48,13 @@ for (let collName of collNames) {
         assert.commandWorked(localDb[collName].createIndex({_id: 1}));
 
         if (collName == orphanedImportantCollName) {
-            assert.commandWorked(localDb.adminCommand(
-                {renameCollection: "local." + collName, to: "test." + importantCollName}));
+            assert.commandWorked(
+                localDb.adminCommand({renameCollection: "local." + collName, to: "test." + importantCollName}),
+            );
         } else {
-            assert.commandWorked(localDb.adminCommand(
-                {renameCollection: "local." + collName, to: "test.recovered" + recoveredCount}));
+            assert.commandWorked(
+                localDb.adminCommand({renameCollection: "local." + collName, to: "test.recovered" + recoveredCount}),
+            );
         }
         recoveredCount++;
     }

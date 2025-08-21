@@ -29,7 +29,7 @@ const rst = new ReplSetTest({
             rsConfig: {priority: 0},
         },
     ],
-    useBridge: true
+    useBridge: true,
 });
 
 rst.startSet();
@@ -80,7 +80,7 @@ restartServerReplication(node1);
 restartServerReplication(node2);
 
 const newPrimary = rst.getPrimary();
-const lastNode = (newPrimary.host === node1.host) ? node2 : node1;
+const lastNode = newPrimary.host === node1.host ? node2 : node1;
 
 jsTestLog("Writing to new primary " + newPrimary.host);
 const newPrimaryDB = newPrimary.getDB(dbName);
@@ -100,12 +100,15 @@ rst.waitForState(rst.nodes[0], ReplSetTest.State.ROLLBACK);
 // We take a stable checkpoint at the end of rollback so we need the checkpointer to be running.
 jsTestLog("Reenabling checkpointer so rollback can complete");
 
-assert.soonNoExcept(function() {
-    assert.commandWorked(
-        rst.nodes[0].adminCommand({configureFailPoint: 'pauseCheckpointThread', mode: 'off'}));
-    const rbid = assert.commandWorked(node0.adminCommand("replSetGetRBID")).rbid;
-    return rbid > lastRBID;
-}, "rbid did not update", ReplSetTest.kDefaultTimeoutMS);
+assert.soonNoExcept(
+    function () {
+        assert.commandWorked(rst.nodes[0].adminCommand({configureFailPoint: "pauseCheckpointThread", mode: "off"}));
+        const rbid = assert.commandWorked(node0.adminCommand("replSetGetRBID")).rbid;
+        return rbid > lastRBID;
+    },
+    "rbid did not update",
+    ReplSetTest.kDefaultTimeoutMS,
+);
 
 rst.awaitSecondaryNodes(null, [rst.nodes[0]]);
 

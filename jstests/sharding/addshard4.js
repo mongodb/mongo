@@ -16,7 +16,7 @@ r.initiate(config);
 // to pre-allocate files on slow systems
 r.awaitReplication();
 
-var members = config.members.map(function(elem) {
+var members = config.members.map(function (elem) {
     return elem.host;
 });
 var shardName = "addshard4/" + members.join(",");
@@ -27,7 +27,7 @@ print("adding shard " + shardName);
 // First try adding shard with the correct replica set name but incorrect hostname
 // This will make sure that the metadata for this replica set name is cleaned up
 // so that the set can be added correctly when it has the proper hostnames.
-assert.throws(function() {
+assert.throws(function () {
     s.adminCommand({"addshard": invalidShardName});
 });
 
@@ -50,8 +50,9 @@ r42.awaitReplication();
 print("adding shard addshard42");
 
 // Setting CWWC for addShard to work, as implicitDefaultWC is set to w:1.
-assert.commandWorked(s.s.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    s.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 result = s.adminCommand({"addshard": "addshard42/" + config.members[2].host});
 
 printjson(result);

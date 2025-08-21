@@ -8,9 +8,7 @@
  *   requires_non_retryable_writes,
  * ]
  */
-import {
-    testClusteredCollectionHint
-} from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
+import {testClusteredCollectionHint} from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
 
 const replicatedDB = db.getSiblingDB(jsTestName());
 const collName = "coll";

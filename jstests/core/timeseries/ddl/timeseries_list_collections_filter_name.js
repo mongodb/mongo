@@ -7,20 +7,17 @@
  *   requires_timeseries,
  * ]
  */
-import {
-    areViewlessTimeseriesEnabled
-} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
-const timeFieldName = 'time';
+const timeFieldName = "time";
 
 const coll = db[jsTestName()];
 coll.drop();
 
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
-const collections =
-    assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: coll.getName()}}))
-        .cursor.firstBatch;
+const collections = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: coll.getName()}})).cursor
+    .firstBatch;
 assert.eq(1, collections.length);
 const collectionDocument = collections[0];
 
@@ -30,13 +27,13 @@ delete collectionDocument.info.uuid;
 
 const timeseriesOptions = {
     timeField: timeFieldName,
-    granularity: 'seconds',
-    bucketMaxSpanSeconds: 3600
+    granularity: "seconds",
+    bucketMaxSpanSeconds: 3600,
 };
 
 const collectionOptions = {
     name: coll.getName(),
-    type: 'timeseries',
+    type: "timeseries",
     options: {timeseries: timeseriesOptions},
     info: {readOnly: false},
 };

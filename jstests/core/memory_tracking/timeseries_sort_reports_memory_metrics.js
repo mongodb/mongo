@@ -25,15 +25,17 @@ db[timeseriesCollName].drop();
 
 // Get the current value of the query framework server parameter so we can restore it at the end of
 // the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl =
-    assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-        .internalQueryFrameworkControl;
+const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+).internalQueryFrameworkControl;
 
-assert.commandWorked(db.createCollection(
-    timeseriesCollName,
-    {timeseries: {timeField: "time", metaField: "metadata", granularity: "seconds"}}));
+assert.commandWorked(
+    db.createCollection(timeseriesCollName, {
+        timeseries: {timeField: "time", metaField: "metadata", granularity: "seconds"},
+    }),
+);
 
-const bigStr = Array(1025).toString();  // 1KB of ','
+const bigStr = Array(1025).toString(); // 1KB of ','
 const lowMaxMemoryLimit = 5000;
 const nDocs = 50;
 
@@ -43,7 +45,7 @@ for (let i = 1; i <= nDocs; i++) {
         time: new Date(2025, 7, 15, 12, i),
         metadata: {sensor: "A", idx: i},
         value: i,
-        bigStr: bigStr
+        bigStr: bigStr,
     });
 }
 assert.commandWorked(bulk.execute());
@@ -59,7 +61,7 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
             pipeline: pipeline,
             cursor: {batchSize: 10},
             comment: "Memory stats test: Sort on timeseries collection",
-            allowDiskUse: false
+            allowDiskUse: false,
         },
         stageName: "$sort",
         expectedNumGetMores: 5,
@@ -67,8 +69,7 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
 }
 
 {
-    const pipelineWithLimit =
-        [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}, {$limit: nDocs / 10}];
+    const pipelineWithLimit = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}, {$limit: nDocs / 10}];
 
     runMemoryStatsTest({
         db: db,
@@ -78,7 +79,7 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
             pipeline: pipelineWithLimit,
             cursor: {batchSize: 1},
             comment: "Memory stats test: Sort with limit on timeseries collection",
-            allowDiskUse: false
+            allowDiskUse: false,
         },
         stageName: "$sort",
         expectedNumGetMores: 5,
@@ -87,8 +88,9 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
 
 {
     // Set maxMemory low to force spill to disk.
-    const originalMemoryLimit = assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit}));
+    const originalMemoryLimit = assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: lowMaxMemoryLimit}),
+    );
     runMemoryStatsTest({
         db: db,
         collName: timeseriesCollName,
@@ -97,17 +99,19 @@ const pipeline = [{$_internalInhibitOptimization: {}}, {$sort: {time: -1}}];
             pipeline: pipeline,
             cursor: {batchSize: 10},
             comment: "Memory stats spilling test: Sort on timeseries collection",
-            allowDiskUse: true
+            allowDiskUse: true,
         },
         stageName: "$sort",
         expectedNumGetMores: 5,
         skipInUseTrackedMemBytesCheck: true,
     });
     // Restore memory limit.
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: originalMemoryLimit.was}),
+    );
 }
 
 // Clean up.
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
+);

@@ -5,7 +5,7 @@
 const numLines = 300;
 const lineContents = "lots of super fun text\n".repeat(numLines).trim();
 
-let echoTest = function() {
+let echoTest = function () {
     clearRawMongoProgramOutput();
 
     // This will produce `numLines` + 1 lines of output because echo isn't being called with
@@ -15,9 +15,11 @@ let echoTest = function() {
 
     assert.eq(0, exitCode);
 
-    assert.eq(numLines,
-              output.split('\n').length - 1,
-              "didn't wait for program's output buffer to finish being consumed");
+    assert.eq(
+        numLines,
+        output.split("\n").length - 1,
+        "didn't wait for program's output buffer to finish being consumed",
+    );
 };
 
 // The motivating failure for the test was a race in runProgram. Empirically, 10 runs has always

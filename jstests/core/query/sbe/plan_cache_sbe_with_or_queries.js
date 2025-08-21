@@ -13,11 +13,7 @@
 //   featureFlagSbeFull,
 // ]
 
-import {
-    getPlanCacheKeyFromShape,
-    getWinningPlanFromExplain,
-    planHasStage
-} from "jstests/libs/query/analyze_plan.js";
+import {getPlanCacheKeyFromShape, getWinningPlanFromExplain, planHasStage} from "jstests/libs/query/analyze_plan.js";
 
 function getPlanCacheEntries(query, collection, db) {
     const planCacheKey = getPlanCacheKeyFromShape({query, collection, db});
@@ -34,10 +30,17 @@ const coll = db.sbe_subplan;
 coll.drop();
 
 assert.commandWorked(coll.createIndexes([{a: 1, b: -1}, {b: 1}]));
-assert.commandWorked(coll.insertMany([{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}, {a: 2, b: 3}]));
+assert.commandWorked(
+    coll.insertMany([
+        {a: 1, b: 1},
+        {a: 1, b: 2},
+        {a: 2, b: 2},
+        {a: 2, b: 3},
+    ]),
+);
 
 const query = {
-    $or: [{a: 1}, {b: 2}]
+    $or: [{a: 1}, {b: 2}],
 };
 assert.eq(3, coll.find(query).itcount());
 

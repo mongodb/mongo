@@ -25,14 +25,16 @@ const collName = "testColl";
 const ns = dbName + "." + collName;
 const sessionColl = primary.getCollection("config.transactions");
 
-function runInsert(host,
-                   lsidUUIDString,
-                   lsidTxnNumber,
-                   lsidTxnUUIDString,
-                   txnNumber,
-                   dbName,
-                   collName,
-                   isRetryableWrite) {
+function runInsert(
+    host,
+    lsidUUIDString,
+    lsidTxnNumber,
+    lsidTxnUUIDString,
+    txnNumber,
+    dbName,
+    collName,
+    isRetryableWrite,
+) {
     const conn = new Mongo(host);
     const lsid = {id: UUID(lsidUUIDString)};
     if (lsidTxnNumber) {
@@ -46,7 +48,6 @@ function runInsert(host,
         documents: [{x: 2}],
         lsid,
         txnNumber: NumberLong(txnNumber),
-
     };
     if (isRetryableWrite || lsid.txnNumber) {
         cmdObj.stmtId = NumberInt(2);
@@ -72,12 +73,14 @@ function runTest({committedTxnOpts, inProgressTxnOpts, expectInterrupt}) {
         cmdObj0.stmtId = NumberInt(0);
     }
     assert.commandWorked(primary.getDB(dbName).runCommand(cmdObj0));
-    assert.commandWorked(primary.adminCommand({
-        commitTransaction: 1,
-        lsid: committedTxnOpts.lsid,
-        txnNumber: NumberLong(committedTxnOpts.txnNumber),
-        autocommit: false
-    }));
+    assert.commandWorked(
+        primary.adminCommand({
+            commitTransaction: 1,
+            lsid: committedTxnOpts.lsid,
+            txnNumber: NumberLong(committedTxnOpts.txnNumber),
+            autocommit: false,
+        }),
+    );
 
     // Start another transaction. Pause it after it has checked out the session.
     const cmdObj1 = {
@@ -99,12 +102,12 @@ function runTest({committedTxnOpts, inProgressTxnOpts, expectInterrupt}) {
         primary.host,
         extractUUIDFromObject(inProgressTxnOpts.lsid.id),
         inProgressTxnOpts.lsid.txnNumber ? inProgressTxnOpts.lsid.txnNumber.toNumber() : null,
-        inProgressTxnOpts.lsid.txnUUID ? extractUUIDFromObject(inProgressTxnOpts.lsid.txnUUID)
-                                       : null,
+        inProgressTxnOpts.lsid.txnUUID ? extractUUIDFromObject(inProgressTxnOpts.lsid.txnUUID) : null,
         inProgressTxnOpts.txnNumber,
         dbName,
         collName,
-        inProgressTxnOpts.isRetryableWrite);
+        inProgressTxnOpts.isRetryableWrite,
+    );
     let fp = configureFailPoint(primary, "hangDuringBatchInsert", {shouldCheckForInterrupt: true});
     inProgressTxnThread.start();
 
@@ -119,12 +122,14 @@ function runTest({committedTxnOpts, inProgressTxnOpts, expectInterrupt}) {
     } else {
         assert.commandWorked(insertRes);
         if (!inProgressTxnOpts.isRetryableWrite) {
-            assert.commandWorked(primary.adminCommand({
-                commitTransaction: 1,
-                lsid: inProgressTxnOpts.lsid,
-                txnNumber: NumberLong(inProgressTxnOpts.txnNumber),
-                autocommit: false
-            }));
+            assert.commandWorked(
+                primary.adminCommand({
+                    commitTransaction: 1,
+                    lsid: inProgressTxnOpts.lsid,
+                    txnNumber: NumberLong(inProgressTxnOpts.txnNumber),
+                    autocommit: false,
+                }),
+            );
         }
     }
 }
@@ -143,7 +148,7 @@ jsTest.log("Test deleting config.transactions document for an external/client se
             },
             txnNumber: 1,
         },
-        expectInterrupt: true
+        expectInterrupt: true,
     });
 }
 
@@ -160,12 +165,11 @@ jsTest.log("Test deleting config.transactions document for an external/client se
             },
             txnNumber: 1,
         },
-        expectInterrupt: true
+        expectInterrupt: true,
     });
 }
 
-jsTest.log("Test deleting config.transactions document for an internal session for a " +
-           "non-retryable write");
+jsTest.log("Test deleting config.transactions document for an internal session for a " + "non-retryable write");
 
 {
     const parentLsid = {id: UUID()};
@@ -184,7 +188,7 @@ jsTest.log("Test deleting config.transactions document for an internal session f
             },
             txnNumber: parentTxnNumber,
         },
-        expectInterrupt: true
+        expectInterrupt: true,
     });
 }
 
@@ -205,12 +209,11 @@ jsTest.log("Test deleting config.transactions document for an internal session f
             },
             txnNumber: 1,
         },
-        expectInterrupt: true
+        expectInterrupt: true,
     });
 }
 
-jsTest.log("Test deleting config.transactions document for an internal session for the current " +
-           "retryable write");
+jsTest.log("Test deleting config.transactions document for an internal session for the current " + "retryable write");
 
 {
     const parentLsid = {id: UUID()};
@@ -225,7 +228,7 @@ jsTest.log("Test deleting config.transactions document for an internal session f
             txnNumber: 1,
         },
         inProgressTxnOpts: {lsid: parentLsid, txnNumber: parentTxnNumber, isRetryableWrite: true},
-        expectInterrupt: true
+        expectInterrupt: true,
     });
 }
 
@@ -249,12 +252,14 @@ jsTest.log("Test deleting config.transactions document for an internal session f
             },
             txnNumber: 1,
         },
-        expectInterrupt: true
+        expectInterrupt: true,
     });
 }
 
-jsTest.log("Test deleting config.transactions document for an internal transaction for the " +
-           "previous retryable write (i.e. no interrupt is expected)");
+jsTest.log(
+    "Test deleting config.transactions document for an internal transaction for the " +
+        "previous retryable write (i.e. no interrupt is expected)",
+);
 
 {
     const parentLsid = {id: UUID()};
@@ -272,7 +277,7 @@ jsTest.log("Test deleting config.transactions document for an internal transacti
             lsid: parentLsid,
             txnNumber: parentTxnNumber,
         },
-        expectInterrupt: false
+        expectInterrupt: false,
     });
 }
 
@@ -293,7 +298,7 @@ jsTest.log("Test deleting config.transactions document for an internal transacti
             txnNumber: parentTxnNumber,
             isRetryableWrite: true,
         },
-        expectInterrupt: false
+        expectInterrupt: false,
     });
 }
 
@@ -317,7 +322,7 @@ jsTest.log("Test deleting config.transactions document for an internal transacti
             },
             txnNumber: 1,
         },
-        expectInterrupt: false
+        expectInterrupt: false,
     });
 }
 

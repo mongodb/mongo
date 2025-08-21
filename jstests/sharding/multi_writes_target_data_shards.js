@@ -15,7 +15,7 @@ const kCollName = "test_coll";
 const kNs = kDbName + "." + kCollName;
 const kNumDocs = 100;
 const kDataChunkSplit = kNumDocs / 2;
-const kOrphanDocs = 100;  // Number of orphaned documents to create on shard2
+const kOrphanDocs = 100; // Number of orphaned documents to create on shard2
 
 const st = new ShardingTest({shards: 3, other: {enableBalancer: false}});
 
@@ -41,19 +41,20 @@ function setupDataDistribution() {
 
     db.dropDatabase();
 
-    assert.commandWorked(
-        mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
     assert.commandWorked(mongos.adminCommand({shardCollection: kNs, key: {x: 1}}));
 
     // Split at kDataChunkSplit and move the upper chunk to shard1
     assert.commandWorked(mongos.adminCommand({split: kNs, middle: {x: kDataChunkSplit}}));
-    assert.commandWorked(mongos.adminCommand({
-        moveChunk: kNs,
-        find: {x: kDataChunkSplit + 1},
-        to: st.shard1.shardName,
-        _waitForDelete: true
-    }));
+    assert.commandWorked(
+        mongos.adminCommand({
+            moveChunk: kNs,
+            find: {x: kDataChunkSplit + 1},
+            to: st.shard1.shardName,
+            _waitForDelete: true,
+        }),
+    );
 
     // Insert kNumDocs documents distributed across the two shards
     let bulk = coll.initializeUnorderedBulkOp();
@@ -74,12 +75,13 @@ function setupDataDistribution() {
     assert.commandWorked(bulk.execute());
 
     // Verify distribution
-    assert.eq(kNumDocs, coll.countDocuments({}));  // Only shows official sharded docs, not orphans
-    assert.eq(kOrphanDocs,
-              shard2DB[kCollName].countDocuments({isOrphan: true}));  // Confirm orphans
+    assert.eq(kNumDocs, coll.countDocuments({})); // Only shows official sharded docs, not orphans
+    assert.eq(kOrphanDocs, shard2DB[kCollName].countDocuments({isOrphan: true})); // Confirm orphans
 
-    jsTest.log(`Data distribution setup complete: ${kNumDocs} documents across shards 0 and 1, ` +
-               `${kOrphanDocs} orphaned documents on shard2`);
+    jsTest.log(
+        `Data distribution setup complete: ${kNumDocs} documents across shards 0 and 1, ` +
+            `${kOrphanDocs} orphaned documents on shard2`,
+    );
 
     // Ensure the router has latest routing info
     coll.find({}).itcount();
@@ -91,9 +93,11 @@ function setupDataDistribution() {
 function checkUpdatedOrphans(expectedUpdatedCount) {
     const shard2DB = st.shard2.getDB(kDbName);
     const updatedOrphans = shard2DB[kCollName].countDocuments({isOrphan: true, updated: true});
-    assert.eq(expectedUpdatedCount,
-              updatedOrphans,
-              `Expected ${expectedUpdatedCount} updated orphans, found ${updatedOrphans}`);
+    assert.eq(
+        expectedUpdatedCount,
+        updatedOrphans,
+        `Expected ${expectedUpdatedCount} updated orphans, found ${updatedOrphans}`,
+    );
 }
 
 // First set up the data distribution
@@ -142,13 +146,11 @@ jsTest.log("deleteMany targeting one shard should not delete orphans");
     const orphanCountBefore = shard2DB[kCollName].countDocuments({isOrphan: true});
 
     // Delete documents only on shard0
-    assert.commandWorked(coll.deleteMany({x: {$lt: 10}}));  // Delete a few docs from shard0
+    assert.commandWorked(coll.deleteMany({x: {$lt: 10}})); // Delete a few docs from shard0
 
     // Verify orphans were not deleted
     const orphanCountAfter = shard2DB[kCollName].countDocuments({isOrphan: true});
-    assert.eq(orphanCountBefore,
-              orphanCountAfter,
-              "Orphan count changed unexpectedly during single-shard delete");
+    assert.eq(orphanCountBefore, orphanCountAfter, "Orphan count changed unexpectedly during single-shard delete");
 
     // Restore data for subsequent tests
     setupDataDistribution();
@@ -170,19 +172,18 @@ jsTest.log("deleteMany targeting multiple shards should delete orphans");
 
     // Verify orphans were deleted
     const orphanCountAfter = shard2DB[kCollName].countDocuments({isOrphan: true});
-    assert.eq(
-        0, orphanCountAfter, "Expected all orphans to be deleted, but found " + orphanCountAfter);
+    assert.eq(0, orphanCountAfter, "Expected all orphans to be deleted, but found " + orphanCountAfter);
 
     // Restore data for subsequent tests
     setupDataDistribution();
 }
 
 jsTest.log("Enabling onlyTargetDataOwningShardsForMultiWrites feature");
-assert.commandWorked(st.s.adminCommand(
-    {setClusterParameter: {onlyTargetDataOwningShardsForMultiWrites: {enabled: true}}}));
-
 assert.commandWorked(
-    st.s.adminCommand({getClusterParameter: "onlyTargetDataOwningShardsForMultiWrites"}));
+    st.s.adminCommand({setClusterParameter: {onlyTargetDataOwningShardsForMultiWrites: {enabled: true}}}),
+);
+
+assert.commandWorked(st.s.adminCommand({getClusterParameter: "onlyTargetDataOwningShardsForMultiWrites"}));
 
 jsTest.log("With onlyTargetDataOwningShardsForMultiWrites, updateMany should not touch orphans");
 {
@@ -216,12 +217,13 @@ jsTest.log("With onlyTargetDataOwningShardsForMultiWrites, deleteMany should not
 
     // Verify orphans were not deleted
     const orphanCountAfter = shard2DB[kCollName].countDocuments({isOrphan: true});
-    assert.eq(orphanCountBefore,
-              orphanCountAfter,
-              "Expected orphans to remain with onlyTargetDataOwningShardsForMultiWrites enabled");
+    assert.eq(
+        orphanCountBefore,
+        orphanCountAfter,
+        "Expected orphans to remain with onlyTargetDataOwningShardsForMultiWrites enabled",
+    );
 
-    jsTest.log(
-        "Test passed: orphans were not deleted with onlyTargetDataOwningShardsForMultiWrites enabled");
+    jsTest.log("Test passed: orphans were not deleted with onlyTargetDataOwningShardsForMultiWrites enabled");
 }
 
 st.stop();

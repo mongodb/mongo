@@ -10,7 +10,7 @@ const foreignColl = db.lookup_spill_foreign;
 localColl.drop();
 foreignColl.drop();
 
-const memoryLimit = 128;  // Spill at 128 bytes
+const memoryLimit = 128; // Spill at 128 bytes
 
 function setHashLookupMemoryLimit(memoryLimit) {
     const commandResArr = FixtureHelpers.runCommandOnEachPrimary({
@@ -18,7 +18,7 @@ function setHashLookupMemoryLimit(memoryLimit) {
         cmdObj: {
             setParameter: 1,
             internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: memoryLimit,
-        }
+        },
     });
     assert.gt(commandResArr.length, 0, "Setting memory limit on primaries failed");
     assert.commandWorked(commandResArr[0]);
@@ -44,7 +44,7 @@ function runHashLookupSpill() {
     assert.commandWorked(foreignColl.insertMany(foreignDocs));
     const pipeline = [
         {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "b", as: "matched"}},
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ];
 
     const result = localColl.aggregate(pipeline).toArray();
@@ -55,13 +55,12 @@ function runHashLookupSpill() {
     }
 }
 
-const oldMemoryLimit =
-    assert
-        .commandWorked(db.adminCommand({
-            getParameter: 1,
-            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
-        }))
-        .internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill;
+const oldMemoryLimit = assert.commandWorked(
+    db.adminCommand({
+        getParameter: 1,
+        internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1,
+    }),
+).internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill;
 
 try {
     setHashLookupMemoryLimit(memoryLimit);

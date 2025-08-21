@@ -74,13 +74,13 @@ function DataGenerator() {
             text += base64Chars.charAt((seed + (i % 10)) % base64Chars.length);
         }
 
-        if ((text.length % 4) == 1) {
+        if (text.length % 4 == 1) {
             // Special case to avoid winding up with three terminating '=' chars
             // which would be invalid base64 data
             text += "A==";
         }
 
-        while ((text.length % 4) != 0) {
+        while (text.length % 4 != 0) {
             text += "=";
         }
 
@@ -105,7 +105,7 @@ function DataGenerator() {
     function GenBool(seed) {
         var seed = seed || 0;
 
-        return (seed % 2) === 0;
+        return seed % 2 === 0;
     }
     // BSON Type: 9
     // Our ISODate constructor equals the Date BSON type
@@ -121,17 +121,30 @@ function DataGenerator() {
         var millis = seed % 1000;
 
         function pad(number, length) {
-            var str = '' + number;
+            var str = "" + number;
 
             while (str.length < length) {
-                str = '0' + str;
+                str = "0" + str;
             }
 
             return str;
         }
 
-        return ISODate(pad(year, 4) + "-" + pad(month, 2) + "-" + pad(day, 2) + "T" + pad(hour, 2) +
-                       ":" + pad(minute, 2) + ":" + pad(second, 2) + "." + pad(millis, 3));
+        return ISODate(
+            pad(year, 4) +
+                "-" +
+                pad(month, 2) +
+                "-" +
+                pad(day, 2) +
+                "T" +
+                pad(hour, 2) +
+                ":" +
+                pad(minute, 2) +
+                ":" +
+                pad(second, 2) +
+                "." +
+                pad(millis, 3),
+        );
     }
     // BSON Type: 10
     function GenNull(seed) {
@@ -295,7 +308,7 @@ function DataGenerator() {
             // BSON Type: 127
             "MaxKey": MaxKey(),
             // The DBRef type is not a BSON type but is treated specially in the shell:
-            "DBRef": DBRef("bar", 2)
+            "DBRef": DBRef("bar", 2),
         };
     }
 
@@ -315,15 +328,15 @@ function DataGenerator() {
     // Cursor interface
     var i = 0;
     return {
-        "hasNext": function() {
+        "hasNext": function () {
             return i < testData.length;
         },
-        "next": function() {
+        "next": function () {
             if (i >= testData.length) {
                 return undefined;
             }
             return testData[i++];
-        }
+        },
     };
 }
 
@@ -399,8 +412,7 @@ function IndexDataGenerator(options) {
             // Find the character (index into keyChars) that we currently have at this position, set
             // this position to the next character in the keyChars sequence
             var keyCharsIndex = keyChars.search(currentKey[currentKeyIndex]);
-            currentKey = setCharAt(
-                currentKey, currentKeyIndex, keyChars[(keyCharsIndex + 1) % keyChars.length]);
+            currentKey = setCharAt(currentKey, currentKeyIndex, keyChars[(keyCharsIndex + 1) % keyChars.length]);
             currentKeyIndex = currentKeyIndex + 1;
 
             // Loop again if we advanced the character past the end of keyChars and wrapped around,
@@ -417,7 +429,7 @@ function IndexDataGenerator(options) {
 
     function GenSingleFieldIndex(seed) {
         var index = {};
-        index[getNextUniqueKey()] = (seed % 2) == 1 ? 1 : -1;
+        index[getNextUniqueKey()] = seed % 2 == 1 ? 1 : -1;
         return index;
     }
 
@@ -425,7 +437,7 @@ function IndexDataGenerator(options) {
         var index = {};
         var i;
         for (i = 0; i < (seed % 2) + 2; i++) {
-            index[getNextUniqueKey()] = ((seed + i) % 2) == 1 ? 1 : -1;
+            index[getNextUniqueKey()] = (seed + i) % 2 == 1 ? 1 : -1;
         }
         return index;
     }
@@ -437,7 +449,7 @@ function IndexDataGenerator(options) {
         for (i = 0; i < (seed % 2) + 1; i++) {
             key += "." + getNextUniqueKey();
         }
-        index[key] = (seed % 2) == 1 ? 1 : -1;
+        index[key] = seed % 2 == 1 ? 1 : -1;
         return index;
     }
 
@@ -470,9 +482,9 @@ function IndexDataGenerator(options) {
         var i;
         for (i = 0; i < (seed % 2) + 1; i++) {
             // Mod 3 first to make sure the property type doesn't correlate with (seed % 2)
-            var propertyType = (seed % 3 + i) % 2;
+            var propertyType = ((seed % 3) + i) % 2;
             if (propertyType == 0) {
-                attributes["expireAfterSeconds"] = ((seed + i) * 10000) % 9999 + 1000;
+                attributes["expireAfterSeconds"] = (((seed + i) * 10000) % 9999) + 1000;
             }
             if (propertyType == 1) {
                 attributes["sparse"] = true;
@@ -494,13 +506,13 @@ function IndexDataGenerator(options) {
             // When using a 2d index, the following additional index properties are supported:
             // { "bits" : <bit precision>, "min" : <lower bound>, "max" : <upper bound> }
             if (propertyType == 0) {
-                attributes["bits"] = ((seed + i) * 10000) % 100 + 10;
+                attributes["bits"] = (((seed + i) * 10000) % 100) + 10;
             }
             if (propertyType == 1) {
-                attributes["min"] = ((seed + i) * 10000) % 100 + 10;
+                attributes["min"] = (((seed + i) * 10000) % 100) + 10;
             }
             if (propertyType == 2) {
-                attributes["max"] = ((seed + i) * 10000) % 100 + 10;
+                attributes["max"] = (((seed + i) * 10000) % 100) + 10;
             } else {
             }
         }
@@ -557,15 +569,15 @@ function IndexDataGenerator(options) {
     // Cursor interface
     var i = 0;
     return {
-        "hasNext": function() {
+        "hasNext": function () {
             return i < testIndexes.length;
         },
-        "next": function() {
+        "next": function () {
             if (i >= testIndexes.length) {
                 return undefined;
             }
             return testIndexes[i++];
-        }
+        },
     };
 }
 
@@ -593,15 +605,13 @@ function CollectionMetadataGenerator(options) {
 
     for (var option in options) {
         if (options.hasOwnProperty(option)) {
-            if (option === 'capped') {
-                if (typeof (options['capped']) !== 'boolean') {
-                    throw Error(
-                        "\"capped\" options must be boolean in CollectionMetadataGenerator");
+            if (option === "capped") {
+                if (typeof options["capped"] !== "boolean") {
+                    throw Error('"capped" options must be boolean in CollectionMetadataGenerator');
                 }
-                capped = options['capped'];
+                capped = options["capped"];
             } else {
-                throw Error("Unsupported key in options passed to CollectionMetadataGenerator: " +
-                            option);
+                throw Error("Unsupported key in options passed to CollectionMetadataGenerator: " + option);
             }
         }
     }
@@ -615,9 +625,9 @@ function CollectionMetadataGenerator(options) {
     };
 
     return {
-        "get": function() {
+        "get": function () {
             return capped ? cappedCollectionMetadata : {};
-        }
+        },
     };
 }
 
@@ -628,6 +638,6 @@ function CollectionDataGenerator(options) {
     return {
         "data": new DataGenerator(),
         "indexes": new IndexDataGenerator(),
-        "collectionMetadata": new CollectionMetadataGenerator(options)
+        "collectionMetadata": new CollectionMetadataGenerator(options),
     };
 }

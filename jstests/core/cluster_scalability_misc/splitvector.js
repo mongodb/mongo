@@ -29,7 +29,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-let assertChunkSizes = function(splitVec, numDocs, maxChunkSize, msg) {
+let assertChunkSizes = function (splitVec, numDocs, maxChunkSize, msg) {
     splitVec = [{x: -1}].concat(splitVec);
     splitVec.push({x: numDocs + 1});
     for (let i = 0; i < splitVec.length - 1; i++) {
@@ -42,10 +42,7 @@ let assertChunkSizes = function(splitVec, numDocs, maxChunkSize, msg) {
         // need to be exactly a multiple of maxChunkSize.
         if (i < splitVec.length - 2) {
             // We are within one object of the correct chunk size.
-            assert.lt(Math.abs(maxChunkSize - size),
-                      avgObjSize,
-                      "Assertion failed",
-                      {msg: msg + "b", chunk: "A" + i});
+            assert.lt(Math.abs(maxChunkSize - size), avgObjSize, "Assertion failed", {msg: msg + "b", chunk: "A" + i});
         } else {
             assert.gt(maxChunkSize, size, "Assertion failed", {msg: msg + "b", chunk: "A" + i});
         }
@@ -56,7 +53,7 @@ let assertChunkSizes = function(splitVec, numDocs, maxChunkSize, msg) {
 // This is useful for checking that splitPoints have the same format as the original key pattern,
 // even when sharding on a prefix key.
 // Not very efficient, so only call when # of field names is small
-var assertFieldNamesMatch = function(splitPoint, keyPattern) {
+var assertFieldNamesMatch = function (splitPoint, keyPattern) {
     for (var p in splitPoint) {
         if (splitPoint.hasOwnProperty(p)) {
             assert(keyPattern.hasOwnProperty(p), "property " + p + " not in keyPattern");
@@ -69,13 +66,13 @@ var assertFieldNamesMatch = function(splitPoint, keyPattern) {
     }
 };
 
-var resetCollection = function() {
+var resetCollection = function () {
     f.drop();
 };
 
 // Inserts numDocs into the given collection using a bulk operation. Each document's x value is its
 // index within the batch, starting from 1, and the y value is the given filler.
-let bulkInsertDocs = function(coll, numDocs, filler) {
+let bulkInsertDocs = function (coll, numDocs, filler) {
     const bulk = coll.initializeUnorderedBulkOp();
     for (let i = 1; i <= numDocs; i++) {
         bulk.insert({x: i, y: filler});
@@ -85,7 +82,7 @@ let bulkInsertDocs = function(coll, numDocs, filler) {
 
 // Inserts numDocs into the given collection using a bulk operation. Each document's x value is set
 // to the given xVal and the y value is the given filler.
-let bulkInsertDocsFixedX = function(coll, numDocs, filler, xVal) {
+let bulkInsertDocsFixedX = function (coll, numDocs, filler, xVal) {
     const bulk = coll.initializeUnorderedBulkOp();
     for (let i = 1; i <= numDocs; i++) {
         bulk.insert({x: xVal, y: filler});
@@ -103,26 +100,21 @@ resetCollection();
 // Case 1: missing parameters
 
 assert.eq(false, db.runCommand({splitVector: "test.jstests_splitvector"}).ok, "1a");
-assert.eq(
-    false, db.runCommand({splitVector: "test.jstests_splitvector", maxChunkSize: 1}).ok, "1b");
+assert.eq(false, db.runCommand({splitVector: "test.jstests_splitvector", maxChunkSize: 1}).ok, "1b");
 
 // -------------------------
 // Case 2: missing index
 
-assert.eq(
-    false,
-    db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1})
-        .ok,
-    "2");
+assert.eq(false, db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1}).ok, "2");
 
 // -------------------------
 // Case 3: empty collection
 f.createIndex({x: 1});
 assert.eq(
     [],
-    db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1})
-        .splitKeys,
-    "3");
+    db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1}).splitKeys,
+    "3",
+);
 
 // -------------------------
 // Case 4: uniform collection
@@ -131,28 +123,25 @@ resetCollection();
 f.createIndex({x: 1});
 
 let filler;
-var case4 = function() {
+var case4 = function () {
     // Get baseline document size
     filler = "";
-    while (filler.length < 500)
-        filler += "a";
+    while (filler.length < 500) filler += "a";
     f.save({x: 0, y: filler});
     let docSize = db.runCommand({datasize: "test.jstests_splitvector"}).size;
     assert.gt(docSize, 500, "4a");
 
     // Fill collection and get split vector for 1MB maxChunkSize
     let numDocs = 4500;
-    bulkInsertDocs(f, numDocs - 1, filler);  // 1 document was already inserted.
-    let res = db.runCommand(
-        {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
+    bulkInsertDocs(f, numDocs - 1, filler); // 1 document was already inserted.
+    let res = db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
 
     // splitVector aims at getting half-full chunks after split
     let factor = 0.5;
 
     assert.eq(true, res.ok, "4b");
 
-    assert.close(
-        numDocs * docSize / ((1 << 20) * factor), res.splitKeys.length, "num split keys", -1);
+    assert.close((numDocs * docSize) / ((1 << 20) * factor), res.splitKeys.length, "num split keys", -1);
     assertChunkSizes(res.splitKeys, numDocs, (1 << 20) * factor, "4d");
     for (let i = 0; i < res.splitKeys.length; i++) {
         assertFieldNamesMatch(res.splitKeys[i], {x: 1});
@@ -166,14 +155,14 @@ case4();
 resetCollection();
 f.createIndex({x: 1});
 
-var case5 = function() {
+var case5 = function () {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocs(f, 4499, filler);
     let res = db.runCommand({
         splitVector: "test.jstests_splitvector",
         keyPattern: {x: 1},
         maxChunkSize: 1,
-        maxSplitPoints: 1
+        maxSplitPoints: 1,
     });
 
     assert.eq(true, res.ok, "5a");
@@ -190,14 +179,14 @@ case5();
 resetCollection();
 f.createIndex({x: 1});
 
-var case6 = function() {
+var case6 = function () {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocs(f, 1999, filler);
     let res = db.runCommand({
         splitVector: "test.jstests_splitvector",
         keyPattern: {x: 1},
         maxChunkSize: 1,
-        maxChunkObjects: 500
+        maxChunkObjects: 500,
     });
 
     assert.eq(true, res.ok, "6a");
@@ -215,12 +204,11 @@ case6();
 resetCollection();
 f.createIndex({x: 1});
 
-var case7 = function() {
+var case7 = function () {
     // Fill collection and get split vector for 1MB maxChunkSize
     bulkInsertDocsFixedX(f, 2099, filler, 1);
     bulkInsertDocsFixedX(f, 9, filler, 2);
-    let res = db.runCommand(
-        {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
+    let res = db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
 
     assert.eq(true, res.ok, "7a");
     assert.eq(2, res.splitKeys[0].x, "7b");
@@ -237,12 +225,11 @@ case7();
 resetCollection();
 f.createIndex({x: 1});
 
-var case8 = function() {
+var case8 = function () {
     bulkInsertDocsFixedX(f, 9, filler, 1);
     bulkInsertDocsFixedX(f, 2099, filler, 2);
     bulkInsertDocsFixedX(f, 9, filler, 3);
-    let res = db.runCommand(
-        {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
+    let res = db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
 
     assert.eq(true, res.ok, "8a");
     assert.eq(2, res.splitKeys.length, "8b");
@@ -261,7 +248,7 @@ case8();
 resetCollection();
 f.createIndex({x: 1});
 
-var case9 = function() {
+var case9 = function () {
     f.save({x: 1});
     f.save({x: 2});
     f.save({x: 3});
@@ -277,8 +264,7 @@ var case9 = function() {
 
     // TODO SERVER-87574 remove !TestData.testingReplicaSetEndpoint
     if (db.runCommand("hello").msg != "isdbgrid" && !TestData.testingReplicaSetEndpoint) {
-        res = db.adminCommand(
-            {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, force: true});
+        res = db.adminCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, force: true});
 
         assert.eq(true, res.ok, "9a: " + tojson(res));
         assert.eq(1, res.splitKeys.length, "9b: " + tojson(res));

@@ -26,16 +26,21 @@ for (level = 1; level < kJavaScriptMaxDepthLimit - 3; level++) {
     let object = makeNestObj(level);
     let res = db.runCommand({insert: collection.getName(), documents: [makeNestObj(level)]});
     if (!res.ok) {
-        assert.commandFailedWithCode(
-            res, 17280, "Expected insertion to fail only because key is too large to index");
+        assert.commandFailedWithCode(res, 17280, "Expected insertion to fail only because key is too large to index");
         break;
     }
 }
 
-assert.gt(level,
-          kMaxDocumentDepthSoftLimit,
-          "Unable to insert a document nested with " + level +
-              " levels, which is less than the supported limit of " + kMaxDocumentDepthSoftLimit);
-assert.eq(collection.count(),
-          collection.find().hint({a: 1}).itcount(),
-          "Number of documents in collection does not match number of entries in index");
+assert.gt(
+    level,
+    kMaxDocumentDepthSoftLimit,
+    "Unable to insert a document nested with " +
+        level +
+        " levels, which is less than the supported limit of " +
+        kMaxDocumentDepthSoftLimit,
+);
+assert.eq(
+    collection.count(),
+    collection.find().hint({a: 1}).itcount(),
+    "Number of documents in collection does not match number of entries in index",
+);

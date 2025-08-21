@@ -22,15 +22,18 @@ rs.startSet({shardsvr: ""});
 rs.initiate();
 
 const addShardFP = configureFailPoint(cluster.configRS.getPrimary(), "hangAfterLockingNewShard");
-const addShardParallelShell =
-    startParallelShell(funWithArgs(function(url) {
-                           assert.commandWorked(db.adminCommand({addShard: url, name: "newShard"}));
-                       }, rs.getURL()), cluster.s.port);
+const addShardParallelShell = startParallelShell(
+    funWithArgs(function (url) {
+        assert.commandWorked(db.adminCommand({addShard: url, name: "newShard"}));
+    }, rs.getURL()),
+    cluster.s.port,
+);
 addShardFP.wait();
 
 assert.commandFailedWithCode(
     cluster.admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-    ErrorCodes.ConflictingOperationInProgress);
+    ErrorCodes.ConflictingOperationInProgress,
+);
 
 addShardFP.off();
 addShardParallelShell();
@@ -39,16 +42,19 @@ removeShard(cluster, "newShard");
 
 jsTest.log("Running addShard during an fcv change should fail");
 
-const setFcvFP = configureFailPoint(cluster.configRS.getPrimary(),
-                                    "hangTransitionBeforeIsCleaningServerMetadata");
+const setFcvFP = configureFailPoint(cluster.configRS.getPrimary(), "hangTransitionBeforeIsCleaningServerMetadata");
 const setFcvParallelShell = startParallelShell(
-    funWithArgs(function(fcv) {
+    funWithArgs(function (fcv) {
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: fcv, confirm: true}));
-    }, lastLTSFCV), cluster.s.port);
+    }, lastLTSFCV),
+    cluster.s.port,
+);
 setFcvFP.wait();
 
-assert.commandFailedWithCode(cluster.admin.runCommand({addShard: rs.getURL()}),
-                             ErrorCodes.ConflictingOperationInProgress);
+assert.commandFailedWithCode(
+    cluster.admin.runCommand({addShard: rs.getURL()}),
+    ErrorCodes.ConflictingOperationInProgress,
+);
 
 setFcvFP.off();
 setFcvParallelShell();

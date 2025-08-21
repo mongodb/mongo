@@ -148,12 +148,12 @@ const illegalConversionTestDocs = [
     {
         _id: 3,
         input: ObjectId("0123456789abcdef01234567"),
-        target: {type: "binData", subtype: kUUIDSubtype}
+        target: {type: "binData", subtype: kUUIDSubtype},
     },
     {
         _id: 4,
         input: ObjectId("0123456789abcdef01234567"),
-        target: {type: "binData", subtype: kNonUUIDSubtype}
+        target: {type: "binData", subtype: kNonUUIDSubtype},
     },
 
     // Can't convert UUID string to non-UUID BinData.
@@ -161,7 +161,7 @@ const illegalConversionTestDocs = [
         _id: 5,
         input: "867dee52-c331-484e-92d1-c56479b8e67e",
         target: {type: "binData", subtype: kNonUUIDSubtype},
-        format: "uuid"
+        format: "uuid",
     },
 
     // Input is not a valid UUID, base64, hex or utf8 string.
@@ -169,25 +169,25 @@ const illegalConversionTestDocs = [
         _id: 6,
         input: "867dee--52-c331-484e-",
         target: {type: "binData", subtype: kUUIDSubtype},
-        format: "uuid"
+        format: "uuid",
     },
     {
         _id: 7,
         input: "867dee--52-c331-484e-",
         target: {type: "binData", subtype: kNonUUIDSubtype},
-        format: "base64"
+        format: "base64",
     },
     {
         _id: 8,
         input: "867dee--52-c331-484e-",
         target: {type: "binData", subtype: kNonUUIDSubtype},
-        format: "base64url"
+        format: "base64url",
     },
     {
         _id: 9,
         input: "867dee--52-c331-484e-zx",
         target: {type: "binData", subtype: kNonUUIDSubtype},
-        format: "hex"
+        format: "hex",
     },
 
     // When converting from string to BinData, the "auto" format is not allowed, and the "uuid"
@@ -196,25 +196,25 @@ const illegalConversionTestDocs = [
         _id: 10,
         input: "867dee52-c331-484e-92d1-c56479b8e67e",
         target: {type: "binData", subtype: kNonUUIDSubtype},
-        format: "uuid"
+        format: "uuid",
     },
     {
         _id: 11,
         input: "867dee52-c331-484e-92d1-c56479b8e67e",
         target: {type: "binData", subtype: kNonUUIDSubtype},
-        format: "auto"
+        format: "auto",
     },
     {
         _id: 12,
         input: "hn3uUsMxSE6S0cVkebjmfg==",
         target: {type: "binData", subtype: kUUIDSubtype},
-        format: "base64"
+        format: "base64",
     },
     {
         _id: 13,
         input: "hn3uUsMxSE6S0cVkebjmfg==",
         target: {type: "binData", subtype: kUUIDSubtype},
-        format: "auto"
+        format: "auto",
     },
 
     // Forbidden conversions between different binData subtypes
@@ -251,14 +251,14 @@ const invalidArgumentValueDocs = [
         input: "hn3uUsMxSE6S0cVkebjmfg==",
         target: {type: "binData", subtype: -1},
         format: "base64",
-        expectedCode: 4341107
+        expectedCode: 4341107,
     },
     {
         _id: 2,
         input: "hn3uUsMxSE6S0cVkebjmfg==",
         target: {type: "binData", subtype: 1000},
         format: "base64",
-        expectedCode: 4341107
+        expectedCode: 4341107,
     },
     {
         _id: 3,
@@ -266,7 +266,7 @@ const invalidArgumentValueDocs = [
         // User-defined subtypes must be between 128-255.
         target: {type: "binData", subtype: 256},
         format: "base64",
-        expectedCode: 4341107
+        expectedCode: 4341107,
     },
     {
         _id: 4,
@@ -274,12 +274,11 @@ const invalidArgumentValueDocs = [
         // User-defined subtypes must be between 128-255.
         target: {type: "binData", subtype: 127},
         format: "base64",
-        expectedCode: 4341107
+        expectedCode: 4341107,
     },
     // Invalid type.
     {_id: 5, input: 123, target: {type: -2}, expectedCode: ErrorCodes.FailedToParse},
     {_id: 6, input: 123, target: -2, expectedCode: ErrorCodes.FailedToParse},
 ];
 
-runConvertTests(
-    {coll, requiresFCV80, conversionTestDocs, illegalConversionTestDocs, invalidArgumentValueDocs});
+runConvertTests({coll, requiresFCV80, conversionTestDocs, illegalConversionTestDocs, invalidArgumentValueDocs});

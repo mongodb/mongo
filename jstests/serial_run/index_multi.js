@@ -13,7 +13,7 @@ for (var i = 0; i < 1e4; i++) {
 
     for (var j = 0; j < 100; j++) {
         // Skip some of the fields
-        if (Random.rand() < .1) {
+        if (Random.rand() < 0.1) {
             continue;
         }
         // Make 0, 10, etc. multikey indexes
@@ -32,16 +32,21 @@ assert.commandWorked(bulk.execute());
 var specs = [];
 var multikey = [];
 
-var setupDBStr = "var conn = null;" +
+var setupDBStr =
+    "var conn = null;" +
     "assert.soon(function() {" +
     "  try {" +
-    "    conn = new Mongo(\"" + db.getMongo().host + "\");" +
+    '    conn = new Mongo("' +
+    db.getMongo().host +
+    '");' +
     "    return conn;" +
     "  } catch (x) {" +
     "    return false;" +
     "  }" +
     "}, 'Timed out waiting for temporary connection to connect', 30000, 5000);" +
-    "var db = conn.getDB('" + db.getName() + "');";
+    "var db = conn.getDB('" +
+    db.getName() +
+    "');";
 
 var indexJobs = [];
 print("Create 3 triple indexes");
@@ -50,12 +55,20 @@ for (var i = 90; i < 93; i++) {
     spec["field" + i] = 1;
     spec["field" + (i + 1)] = 1;
     spec["field" + (i + 2)] = 1;
-    indexJobs.push(startParallelShell(
-        setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + "));" +
-            "db.results.insert(Object.extend(" +
-            "db.runCommand({ getlasterror: 1 }), " + tojson(spec) + ") );",
-        null,    // port
-        true));  // noconnect
+    indexJobs.push(
+        startParallelShell(
+            setupDBStr +
+                "printjson(db.index_multi.createIndex(" +
+                tojson(spec) +
+                "));" +
+                "db.results.insert(Object.extend(" +
+                "db.runCommand({ getlasterror: 1 }), " +
+                tojson(spec) +
+                ") );",
+            null, // port
+            true,
+        ),
+    ); // noconnect
     specs.push(spec);
     multikey.push(i % 10 == 0 || (i + 1) % 10 == 0 || (i + 2) % 10 == 0);
 }
@@ -65,12 +78,20 @@ for (var i = 30; i < 90; i += 2) {
     var spec = {};
     spec["field" + i] = 1;
     spec["field" + (i + 1)] = 1;
-    indexJobs.push(startParallelShell(
-        setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + "));" +
-            "db.results.insert(Object.extend(" +
-            "db.runCommand({ getlasterror: 1 }), " + tojson(spec) + ") );",
-        null,    // port
-        true));  // noconnect
+    indexJobs.push(
+        startParallelShell(
+            setupDBStr +
+                "printjson(db.index_multi.createIndex(" +
+                tojson(spec) +
+                "));" +
+                "db.results.insert(Object.extend(" +
+                "db.runCommand({ getlasterror: 1 }), " +
+                tojson(spec) +
+                ") );",
+            null, // port
+            true,
+        ),
+    ); // noconnect
     specs.push(spec);
     multikey.push(i % 10 == 0 || (i + 1) % 10 == 0);
 }
@@ -79,12 +100,20 @@ print("Create 30 indexes");
 for (var i = 0; i < 30; i++) {
     var spec = {};
     spec["field" + i] = 1;
-    indexJobs.push(startParallelShell(
-        setupDBStr + "printjson(db.index_multi.createIndex(" + tojson(spec) + "));" +
-            "db.results.insert(Object.extend(" +
-            "db.runCommand({ getlasterror: 1 }), " + tojson(spec) + ") );",
-        null,    // port
-        true));  // noconnect
+    indexJobs.push(
+        startParallelShell(
+            setupDBStr +
+                "printjson(db.index_multi.createIndex(" +
+                tojson(spec) +
+                "));" +
+                "db.results.insert(Object.extend(" +
+                "db.runCommand({ getlasterror: 1 }), " +
+                tojson(spec) +
+                ") );",
+            null, // port
+            true,
+        ),
+    ); // noconnect
     specs.push(spec);
     multikey.push(i % 10 == 0);
 }
@@ -94,19 +123,19 @@ bulk = coll.initializeUnorderedBulkOp();
 for (i = 0; i < 1e4; i++) {
     var criteria = {_id: Random.randInt(1e5)};
     var mod = {};
-    if (Random.rand() < .5) {
-        mod['$set'] = {};
-        mod['$set']['field' + Random.randInt(100)] = Random.rand();
+    if (Random.rand() < 0.5) {
+        mod["$set"] = {};
+        mod["$set"]["field" + Random.randInt(100)] = Random.rand();
     } else {
-        mod['$unset'] = {};
-        mod['$unset']['field' + Random.randInt(100)] = true;
+        mod["$unset"] = {};
+        mod["$unset"]["field" + Random.randInt(100)] = true;
     }
 
     bulk.find(criteria).update(mod);
 }
 assert.commandWorked(bulk.execute());
 
-indexJobs.forEach(function(join) {
+indexJobs.forEach(function (join) {
     join();
 });
 

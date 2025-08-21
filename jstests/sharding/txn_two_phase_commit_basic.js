@@ -10,8 +10,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkDecisionIs,
     checkDocumentDeleted,
-    runCommitThroughMongosInParallelThread
-} from 'jstests/sharding/libs/txn_two_phase_commit_util.js';
+    runCommitThroughMongosInParallelThread,
+} from "jstests/sharding/libs/txn_two_phase_commit_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -23,81 +23,93 @@ let coordinator = st.shard0;
 let participant1 = st.shard1;
 let participant2 = st.shard2;
 
-let expectedParticipantList =
-    [participant1.shardName, participant2.shardName, coordinator.shardName];
+let expectedParticipantList = [participant1.shardName, participant2.shardName, coordinator.shardName];
 
 let lsid = {id: UUID()};
 let txnNumber = 0;
 
-const checkParticipantListMatches = function(
-    coordinatorConn, lsid, txnNumber, expectedParticipantList) {
-    let coordDoc = coordinatorConn.getDB("config")
-                       .getCollection("transaction_coordinators")
-                       .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
+const checkParticipantListMatches = function (coordinatorConn, lsid, txnNumber, expectedParticipantList) {
+    let coordDoc = coordinatorConn
+        .getDB("config")
+        .getCollection("transaction_coordinators")
+        .findOne({"_id.lsid.id": lsid.id, "_id.txnNumber": txnNumber});
     assert.neq(null, coordDoc);
     assert.sameMembers(coordDoc.participants, expectedParticipantList);
 };
 
-const startSimulatingNetworkFailures = function(connArray) {
-    connArray.forEach(function(conn) {
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: "failCommand",
-            mode: {times: 10},
-            data: {
-                errorCode: ErrorCodes.NotWritablePrimary,
-                failCommands: ["prepareTransaction", "abortTransaction", "commitTransaction"]
-            }
-        }));
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: "participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic",
-            mode: {times: 5}
-        }));
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: "participantReturnNetworkErrorForAbortAfterExecutingAbortLogic",
-            mode: {times: 5}
-        }));
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: "participantReturnNetworkErrorForCommitAfterExecutingCommitLogic",
-            mode: {times: 5}
-        }));
+const startSimulatingNetworkFailures = function (connArray) {
+    connArray.forEach(function (conn) {
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "failCommand",
+                mode: {times: 10},
+                data: {
+                    errorCode: ErrorCodes.NotWritablePrimary,
+                    failCommands: ["prepareTransaction", "abortTransaction", "commitTransaction"],
+                },
+            }),
+        );
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic",
+                mode: {times: 5},
+            }),
+        );
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "participantReturnNetworkErrorForAbortAfterExecutingAbortLogic",
+                mode: {times: 5},
+            }),
+        );
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "participantReturnNetworkErrorForCommitAfterExecutingCommitLogic",
+                mode: {times: 5},
+            }),
+        );
     });
 };
 
-const stopSimulatingNetworkFailures = function(connArray) {
-    connArray.forEach(function(conn) {
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: "failCommand",
-            mode: "off",
-        }));
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: "participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic",
-            mode: "off"
-        }));
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: "participantReturnNetworkErrorForAbortAfterExecutingAbortLogic",
-            mode: "off"
-        }));
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: "participantReturnNetworkErrorForCommitAfterExecutingCommitLogic",
-            mode: "off"
-        }));
+const stopSimulatingNetworkFailures = function (connArray) {
+    connArray.forEach(function (conn) {
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "failCommand",
+                mode: "off",
+            }),
+        );
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic",
+                mode: "off",
+            }),
+        );
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "participantReturnNetworkErrorForAbortAfterExecutingAbortLogic",
+                mode: "off",
+            }),
+        );
+        assert.commandWorked(
+            conn.adminCommand({
+                configureFailPoint: "participantReturnNetworkErrorForCommitAfterExecutingCommitLogic",
+                mode: "off",
+            }),
+        );
     });
 };
 
-const setUp = function() {
+const setUp = function () {
     // Create a sharded collection with a chunk on each shard:
     // shard0: [-inf, 0)
     // shard1: [0, 10)
     // shard2: [10, +inf)
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: coordinator.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
-    assert.commandWorked(
-        st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: participant1.shardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 10}, to: participant2.shardName}));
 
     // These forced refreshes are not strictly necessary; they just prevent extra TXN log lines
     // from the shards starting, aborting, and restarting the transaction due to needing to
@@ -108,20 +120,26 @@ const setUp = function() {
     st.refreshCatalogCacheForNs(st.s, ns);
 
     // Start a new transaction by inserting a document onto each shard.
-    assert.commandWorked(st.s.getDB(dbName).runCommand({
-        insert: collName,
-        documents: [{_id: -5}, {_id: 5}, {_id: 15}],
-        lsid: lsid,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false,
-    }));
+    assert.commandWorked(
+        st.s.getDB(dbName).runCommand({
+            insert: collName,
+            documents: [{_id: -5}, {_id: 5}, {_id: 15}],
+            lsid: lsid,
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(0),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 };
 
-const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
-    jsTest.log("Testing two-phase " + (shouldCommit ? "commit" : "abort") +
-               " protocol with simulateNetworkFailures: " + simulateNetworkFailures);
+const testCommitProtocol = function (shouldCommit, simulateNetworkFailures) {
+    jsTest.log(
+        "Testing two-phase " +
+            (shouldCommit ? "commit" : "abort") +
+            " protocol with simulateNetworkFailures: " +
+            simulateNetworkFailures,
+    );
 
     txnNumber++;
     setUp();
@@ -129,13 +147,15 @@ const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
     if (!shouldCommit) {
         // Manually abort the transaction on one of the participants, so that the participant
         // fails to prepare.
-        assert.commandWorked(participant2.adminCommand({
-            abortTransaction: 1,
-            lsid: lsid,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(0),
-            autocommit: false,
-        }));
+        assert.commandWorked(
+            participant2.adminCommand({
+                abortTransaction: 1,
+                lsid: lsid,
+                txnNumber: NumberLong(txnNumber),
+                stmtId: NumberInt(0),
+                autocommit: false,
+            }),
+        );
     }
 
     if (simulateNetworkFailures) {
@@ -145,18 +165,25 @@ const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
     // Turn on failpoints so that the coordinator hangs after each write it does, so that the
     // test can check that the write happened correctly.
     const hangBeforeWaitingForParticipantListWriteConcernFp = configureFailPoint(
-        coordinator, "hangBeforeWaitingForParticipantListWriteConcern", {}, "alwaysOn");
+        coordinator,
+        "hangBeforeWaitingForParticipantListWriteConcern",
+        {},
+        "alwaysOn",
+    );
 
-    const hangBeforeWaitingForDecisionWriteConcernFp =
-        configureFailPoint(coordinator, "hangBeforeWaitingForDecisionWriteConcern", {}, "alwaysOn");
+    const hangBeforeWaitingForDecisionWriteConcernFp = configureFailPoint(
+        coordinator,
+        "hangBeforeWaitingForDecisionWriteConcern",
+        {},
+        "alwaysOn",
+    );
 
     // Run commitTransaction through a parallel shell.
     let commitThread;
     if (shouldCommit) {
         commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host);
     } else {
-        commitThread = runCommitThroughMongosInParallelThread(
-            lsid, txnNumber, st.s.host, ErrorCodes.NoSuchTransaction);
+        commitThread = runCommitThroughMongosInParallelThread(lsid, txnNumber, st.s.host, ErrorCodes.NoSuchTransaction);
     }
     commitThread.start();
 
@@ -168,13 +195,12 @@ const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
     // Check that the coordinator wrote the decision.
     hangBeforeWaitingForDecisionWriteConcernFp.wait();
     checkParticipantListMatches(coordinator, lsid, txnNumber, expectedParticipantList);
-    const commitTimestamp =
-        checkDecisionIs(coordinator, lsid, txnNumber, (shouldCommit ? "commit" : "abort"));
+    const commitTimestamp = checkDecisionIs(coordinator, lsid, txnNumber, shouldCommit ? "commit" : "abort");
     hangBeforeWaitingForDecisionWriteConcernFp.off();
 
     // Check that the coordinator deleted its persisted state.
     commitThread.join();
-    assert.soon(function() {
+    assert.soon(function () {
         return checkDocumentDeleted(coordinator, lsid, txnNumber);
     });
 
@@ -188,11 +214,13 @@ const testCommitProtocol = function(shouldCommit, simulateNetworkFailures) {
         assert.eq(0, st.s.getDB(dbName).getCollection(collName).find().itcount());
     } else {
         jsTest.log("Verify that the transaction was committed on all shards.");
-        const res = assert.commandWorked(st.s.getDB(dbName).runCommand({
-            find: collName,
-            readConcern: {level: "majority", afterClusterTime: commitTimestamp},
-            maxTimeMS: 10000
-        }));
+        const res = assert.commandWorked(
+            st.s.getDB(dbName).runCommand({
+                find: collName,
+                readConcern: {level: "majority", afterClusterTime: commitTimestamp},
+                maxTimeMS: 10000,
+            }),
+        );
         assert.eq(3, res.cursor.firstBatch.length);
     }
 

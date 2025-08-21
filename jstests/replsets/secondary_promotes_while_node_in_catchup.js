@@ -57,22 +57,12 @@ const insertTimestamp = insertResponse.operationTime;
 
 // Set up a hangBeforeRSTLOnDrainComplete failpoint on node 0 to make it hang
 // during drain mode.
-const node0DrainModeFailpoint = configureFailPoint(
-    nodes[0],
-    "hangBeforeRSTLOnDrainComplete",
-    {},
-    "alwaysOn",
-);
+const node0DrainModeFailpoint = configureFailPoint(nodes[0], "hangBeforeRSTLOnDrainComplete", {}, "alwaysOn");
 
 // Wait for node 0 to become aware of the insert via heartbeats.
 assert.soon(() => {
-    const replSetGetStatus = assert.commandWorked(
-        nodes[0].adminCommand({replSetGetStatus: 1}),
-    );
-    return (bsonWoCompare(
-                replSetGetStatus.$clusterTime.clusterTime,
-                insertTimestamp,
-                ) >= 0);
+    const replSetGetStatus = assert.commandWorked(nodes[0].adminCommand({replSetGetStatus: 1}));
+    return bsonWoCompare(replSetGetStatus.$clusterTime.clusterTime, insertTimestamp) >= 0;
 });
 
 // Step up node 0 in a parallel shell.

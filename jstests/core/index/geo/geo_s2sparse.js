@@ -9,7 +9,7 @@
 //   operations_longer_than_stepdown_interval_in_txns,
 // ]
 
-const collNamePrefix = 'geo_s2sparse_';
+const collNamePrefix = "geo_s2sparse_";
 let collCount = 0;
 let coll = db.getCollection(collNamePrefix + collCount++);
 
@@ -21,7 +21,7 @@ const indexSpec = {
     geo: "2dsphere",
     nonGeo: 1,
 };
-const indexName = 'geo_2dsphere_nonGeo_1';
+const indexName = "geo_2dsphere_nonGeo_1";
 
 //
 // V2 indices are "geo sparse" always.
@@ -31,7 +31,7 @@ const indexName = 'geo_2dsphere_nonGeo_1';
 coll.drop();
 coll.createIndex(indexSpec);
 
-const bulkInsertDocs = function(coll, numDocs, makeDocFn) {
+const bulkInsertDocs = function (coll, numDocs, makeDocFn) {
     print("Bulk inserting " + numDocs + " documents");
 
     var bulk = coll.initializeUnorderedBulkOp();
@@ -46,7 +46,7 @@ const bulkInsertDocs = function(coll, numDocs, makeDocFn) {
 
 // Insert N documents with the geo field.
 const N = 1000;
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {geo: point, nonGeo: "point_" + i};
 });
 
@@ -54,7 +54,7 @@ bulkInsertDocs(coll, N, function(i) {
 assert.eq(N, coll.validate().keysPerIndex[indexName]);
 
 // Insert N documents without the geo field.
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {wrongGeo: point, nonGeo: i};
 });
 
@@ -62,7 +62,7 @@ bulkInsertDocs(coll, N, function(i) {
 assert.eq(N, coll.validate().keysPerIndex[indexName]);
 
 // Insert N documents with just the geo field.
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {geo: point};
 });
 
@@ -70,16 +70,16 @@ bulkInsertDocs(coll, N, function(i) {
 assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
 
 // Add some "not geo" stuff.
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {geo: null};
 });
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {geo: []};
 });
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {geo: undefined};
 });
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {geo: {}};
 });
 
@@ -95,7 +95,7 @@ coll.drop();
 coll.createIndex(indexSpec, {"2dsphereIndexVersion": 1});
 
 // Insert N documents with the geo field.
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {geo: point, nonGeo: "point_" + i};
 });
 
@@ -103,7 +103,7 @@ bulkInsertDocs(coll, N, function(i) {
 assert.eq(N, coll.validate().keysPerIndex[indexName]);
 
 // Insert N documents without the geo field.
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {wrongGeo: point, nonGeo: i};
 });
 
@@ -119,10 +119,10 @@ coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 coll.createIndex({geo: "2dsphere", otherGeo: "2dsphere"});
 
-const indexNameOther = 'geo_2dsphere_otherGeo_2dsphere';
+const indexNameOther = "geo_2dsphere_otherGeo_2dsphere";
 
 // Insert N documents with the first geo field.
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {geo: point};
 });
 
@@ -130,7 +130,7 @@ bulkInsertDocs(coll, N, function(i) {
 assert.eq(N, coll.validate().keysPerIndex[indexNameOther]);
 
 // Insert N documents with the second geo field.
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {otherGeo: point};
 });
 
@@ -138,7 +138,7 @@ bulkInsertDocs(coll, N, function(i) {
 assert.eq(N + N, coll.validate().keysPerIndex[indexNameOther]);
 
 // Insert N documents with neither geo field.
-bulkInsertDocs(coll, N, function(i) {
+bulkInsertDocs(coll, N, function (i) {
     return {nonGeo: i};
 });
 

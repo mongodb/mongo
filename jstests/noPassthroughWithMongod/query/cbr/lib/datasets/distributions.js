@@ -41,13 +41,7 @@ export class OnePeakDataset {
     }
 
     predicates() {
-        return [
-            {a: 50},
-            {a: 49},
-            {a: 51},
-            {a: {$gt: 50}},
-            {a: {$lte: 50}},
-        ];
+        return [{a: 50}, {a: 49}, {a: 51}, {a: {$gt: 50}}, {a: {$lte: 50}}];
     }
 }
 

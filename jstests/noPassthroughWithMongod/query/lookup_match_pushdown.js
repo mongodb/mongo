@@ -9,21 +9,32 @@ coll.drop();
 const other = db.lookup_match_pushdown_other;
 other.drop();
 
-assert.commandWorked(
-    db.adminCommand({"configureFailPoint": 'disablePipelineOptimization', "mode": 'off'}));
+assert.commandWorked(db.adminCommand({"configureFailPoint": "disablePipelineOptimization", "mode": "off"}));
 
-assert.commandWorked(coll.insertMany([{_id: 1, x: 5}, {_id: 2, x: 6}]));
 assert.commandWorked(
-    other.insertMany([{_id: 2, y: 5, z: 10}, {_id: 3, y: 5, z: 12}, {_id: 4, y: 6, z: 10}]));
+    coll.insertMany([
+        {_id: 1, x: 5},
+        {_id: 2, x: 6},
+    ]),
+);
+assert.commandWorked(
+    other.insertMany([
+        {_id: 2, y: 5, z: 10},
+        {_id: 3, y: 5, z: 12},
+        {_id: 4, y: 6, z: 10},
+    ]),
+);
 
 // Checks that the order of the pipeline stages matches the expected ordering.
 function checkPipelineAndResults(pipeline, expectedPipeline, expectedResults) {
     // Check pipeline is as expected.
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
     if (expectedPipeline.length > 0) {
-        assert.eq(getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner).stage,
-                  expectedPipeline[0],
-                  explain);
+        assert.eq(
+            getWinningPlanFromExplain(explain.stages[0].$cursor.queryPlanner).stage,
+            expectedPipeline[0],
+            explain,
+        );
     }
     assert.eq(explain.stages.length, expectedPipeline.length, explain);
     for (let i = 1; i < expectedPipeline.length; i++) {
@@ -44,7 +55,7 @@ const expectedResultsEq = [{_id: 1, x: 5, a: {_id: 2, y: 5, z: 10}}];
 const pipelineEq = [
     {$lookup: {as: "a", from: other.getName(), localField: "x", foreignField: "y"}},
     {$unwind: "$a"},
-    {$match: {"a.z": 10, x: {$eq: 5}}}
+    {$match: {"a.z": 10, x: {$eq: 5}}},
 ];
 checkPipelineAndResults(pipelineEq, expectedPipeline, expectedResultsEq);
 
@@ -52,7 +63,7 @@ checkPipelineAndResults(pipelineEq, expectedPipeline, expectedResultsEq);
 const pipelineExprEq = [
     {$lookup: {as: "a", from: other.getName(), localField: "x", foreignField: "y"}},
     {$unwind: "$a"},
-    {$match: {"a.z": 10, $expr: {$eq: ["$x", 5]}}}
+    {$match: {"a.z": 10, $expr: {$eq: ["$x", 5]}}},
 ];
 checkPipelineAndResults(pipelineExprEq, expectedPipeline, expectedResultsEq);
 
@@ -63,7 +74,7 @@ const expectedResultsGt = [{_id: 2, x: 6, a: {_id: 4, y: 6, z: 10}}];
 const pipelineGt = [
     {$lookup: {as: "a", from: other.getName(), localField: "x", foreignField: "y"}},
     {$unwind: "$a"},
-    {$match: {"a.z": 10, x: {$gt: 5}}}
+    {$match: {"a.z": 10, x: {$gt: 5}}},
 ];
 checkPipelineAndResults(pipelineGt, expectedPipeline, expectedResultsGt);
 
@@ -71,6 +82,6 @@ checkPipelineAndResults(pipelineGt, expectedPipeline, expectedResultsGt);
 const pipelineExprGt = [
     {$lookup: {as: "a", from: other.getName(), localField: "x", foreignField: "y"}},
     {$unwind: "$a"},
-    {$match: {"a.z": 10, $expr: {$gt: ["$x", 5]}}}
+    {$match: {"a.z": 10, $expr: {$gt: ["$x", 5]}}},
 ];
 checkPipelineAndResults(pipelineExprGt, expectedPipeline, expectedResultsGt);

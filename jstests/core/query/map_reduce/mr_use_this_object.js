@@ -18,20 +18,22 @@ coll.drop();
 const outputColl = db.mr_use_this_object_out;
 outputColl.drop();
 
-assert.commandWorked(coll.insert([
-    {partner: 1, visits: 9},
-    {partner: 2, visits: 9},
-    {partner: 1, visits: 11},
-    {partner: 1, visits: 30},
-    {partner: 2, visits: 41},
-    {partner: 2, visits: 41}
-]));
+assert.commandWorked(
+    coll.insert([
+        {partner: 1, visits: 9},
+        {partner: 2, visits: 9},
+        {partner: 1, visits: 11},
+        {partner: 1, visits: 30},
+        {partner: 2, visits: 41},
+        {partner: 2, visits: 41},
+    ]),
+);
 
-let mapper = function() {
+let mapper = function () {
     emit(this.partner, {stats: [this.visits]});
 };
 
-const reducer = function(k, v) {
+const reducer = function (k, v) {
     let stats = [];
     let total = 0;
     for (let i = 0; i < v.length; i++) {
@@ -46,16 +48,14 @@ const reducer = function(k, v) {
 assert.commandWorked(coll.mapReduce(mapper, reducer, {out: {merge: outputColl.getName()}}));
 
 let resultAsObj = outputColl.convertToSingleObject("value");
-assert.eq(2,
-          Object.keySet(resultAsObj).length,
-          `Expected 2 keys ("1" and "2") in object ${tojson(resultAsObj)}`);
+assert.eq(2, Object.keySet(resultAsObj).length, `Expected 2 keys ("1" and "2") in object ${tojson(resultAsObj)}`);
 // Use resultsEq() to avoid any assumptions about order.
 assert(resultsEq([9, 11, 30], resultAsObj["1"].stats));
 assert(resultsEq([9, 41, 41], resultAsObj["2"].stats));
 
 assert(outputColl.drop());
 
-mapper = function() {
+mapper = function () {
     let x = "partner";
     let y = "visits";
     emit(this[x], {stats: [this[y]]});
@@ -64,9 +64,7 @@ mapper = function() {
 assert.commandWorked(coll.mapReduce(mapper, reducer, {out: {merge: outputColl.getName()}}));
 
 resultAsObj = outputColl.convertToSingleObject("value");
-assert.eq(2,
-          Object.keySet(resultAsObj).length,
-          `Expected 2 keys ("1" and "2") in object ${tojson(resultAsObj)}`);
+assert.eq(2, Object.keySet(resultAsObj).length, `Expected 2 keys ("1" and "2") in object ${tojson(resultAsObj)}`);
 // Use resultsEq() to avoid any assumptions about order.
 assert(resultsEq([9, 11, 30], resultAsObj["1"].stats));
 assert(resultsEq([9, 41, 41], resultAsObj["2"].stats));

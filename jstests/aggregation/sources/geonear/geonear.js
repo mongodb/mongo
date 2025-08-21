@@ -7,9 +7,9 @@ db[coll].drop();
 db[coll].insert({loc: [0, 0]});
 
 // $geoNear is only allowed as the first stage in a pipeline, nowhere else.
-assert.throws(
-    () => db[coll].aggregate(
-        [{$match: {x: 1}}, {$geoNear: {near: [1, 1], spherical: true, distanceField: 'dis'}}]));
+assert.throws(() =>
+    db[coll].aggregate([{$match: {x: 1}}, {$geoNear: {near: [1, 1], spherical: true, distanceField: "dis"}}]),
+);
 
 const kDistanceField = "dis";
 const kIncludeLocsField = "loc";
@@ -23,8 +23,7 @@ const kIncludeLocsField = "loc";
  */
 function testGeoNearStageOutput({geoNearSpec, limit, batchSize}) {
     const aggOptions = batchSize ? {batchSize: batchSize} : {};
-    const result =
-        db[coll].aggregate([{$geoNear: geoNearSpec}, {$limit: limit}], aggOptions).toArray();
+    const result = db[coll].aggregate([{$geoNear: geoNearSpec}, {$limit: limit}], aggOptions).toArray();
     const errmsg = () => tojson(result);
 
     // Verify that we got the expected number of results.
@@ -70,7 +69,7 @@ function test(db, indexType) {
             includeLocs: kIncludeLocsField,
             spherical: true,
         },
-        limit: 50
+        limit: 50,
     });
 
     // Test $geoNear with an initial batchSize of 1.
@@ -82,9 +81,9 @@ function test(db, indexType) {
             spherical: true,
         },
         limit: 50,
-        batchSize: 1
+        batchSize: 1,
     });
 }
 
-test(db, '2d');
-test(db, '2dsphere');
+test(db, "2d");
+test(db, "2dsphere");

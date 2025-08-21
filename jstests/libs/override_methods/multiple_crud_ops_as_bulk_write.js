@@ -65,10 +65,9 @@ function opCompatibleWithCurrentBatch(dbName, collName, cmdObj) {
     // If bypassDocumentValidation is not set we can continue. If the stored
     // bypassDocumentValidation and the command bypassDocumentValidation are the same we can
     // continue.
-    let cmdBypassDocumentValidation = cmdObj.hasOwnProperty("bypassDocumentValidation") &&
-        (cmdObj.bypassDocumentValidation == true);
-    if (bypassDocumentValidation != null &&
-        (cmdBypassDocumentValidation != bypassDocumentValidation)) {
+    let cmdBypassDocumentValidation =
+        cmdObj.hasOwnProperty("bypassDocumentValidation") && cmdObj.bypassDocumentValidation == true;
+    if (bypassDocumentValidation != null && cmdBypassDocumentValidation != bypassDocumentValidation) {
         return false;
     }
 
@@ -105,9 +104,9 @@ function validateClusterConsistency(originalRunCommand, makeRunCommandArgs) {
     Mongo.prototype.runCommand = normalClusterRunCommand;
 
     // Want to check that every namespace we just altered is the same on both clusters.
-    BulkWriteUtils.getNamespaces().forEach(nsInfo => {
-        let [dbName, ...coll] = nsInfo.ns.split('.');
-        coll = coll.join('.');
+    BulkWriteUtils.getNamespaces().forEach((nsInfo) => {
+        let [dbName, ...coll] = nsInfo.ns.split(".");
+        coll = coll.join(".");
 
         // Using originalRunCommand directly to avoid recursing back into this override file.
         // Need to provide session to the find command since it is automatically applied
@@ -116,21 +115,27 @@ function validateClusterConsistency(originalRunCommand, makeRunCommandArgs) {
         // We use a very large batch size in this find command because getMore is not retryable
         // so we want to minimize the number of test that need to be disabled from kill/stepdown
         // suites.
-        let res = normalClusterRunCommand.apply(normalCluster,
-                                                makeRunCommandArgs({
-                                                    find: coll,
-                                                    sort: {_id: 1},
-                                                    lsid: normalSessionId,
-                                                    batchSize: 18446744073709551614
-                                                },
-                                                                   dbName));
+        let res = normalClusterRunCommand.apply(
+            normalCluster,
+            makeRunCommandArgs(
+                {
+                    find: coll,
+                    sort: {_id: 1},
+                    lsid: normalSessionId,
+                    batchSize: 18446744073709551614,
+                },
+                dbName,
+            ),
+        );
         let cursor0 = new DBCommandCursor(normalCluster.getDB(dbName), res);
 
         res = normalClusterRunCommand.apply(
             bulkWriteCluster,
             makeRunCommandArgs(
                 {find: coll, sort: {_id: 1}, lsid: bulkSessionId, batchSize: 18446744073709551614},
-                dbName));
+                dbName,
+            ),
+        );
         let cursor1 = new DBCommandCursor(bulkWriteCluster.getDB(dbName), res);
 
         let diff = null;
@@ -154,9 +159,11 @@ function validateClusterConsistency(originalRunCommand, makeRunCommandArgs) {
         // own _id and the above assert will have failed. To get around this we remove the _id
         // from any document deemed to be "different" and see if the contents of docsMissingOnFirst
         // and docsMissingOnSecond are the same afterwards.
-        if (diff.docsWithDifferentContents.length == 0 &&
+        if (
+            diff.docsWithDifferentContents.length == 0 &&
             diff.docsMissingOnFirst.length == diff.docsMissingOnSecond.length &&
-            diff.docsMissingOnFirst.length != 0) {
+            diff.docsMissingOnFirst.length != 0
+        ) {
             for (let i in diff.docsMissingOnFirst) {
                 delete diff.docsMissingOnFirst[i]._id;
                 delete diff.docsMissingOnSecond[i]._id;
@@ -165,7 +172,9 @@ function validateClusterConsistency(originalRunCommand, makeRunCommandArgs) {
                 diff.docsMissingOnFirst,
                 diff.docsMissingOnSecond,
                 `crud_ops_as_bulkWrite: The two clusters have different contents for namespace ${
-                    nsInfo.ns} after removing _id`);
+                    nsInfo.ns
+                } after removing _id`,
+            );
         } else {
             assert.eq(
                 diff,
@@ -174,8 +183,8 @@ function validateClusterConsistency(originalRunCommand, makeRunCommandArgs) {
                     docsMissingOnFirst: [],
                     docsMissingOnSecond: [],
                 },
-                `crud_ops_as_bulkWrite: The two clusters have different contents for namespace ${
-                    nsInfo.ns}`);
+                `crud_ops_as_bulkWrite: The two clusters have different contents for namespace ${nsInfo.ns}`,
+            );
         }
     });
     Mongo.prototype.runCommand = newRunCommand;
@@ -186,12 +195,14 @@ function flushBatch(originalRunCommand, makeRunCommandArgs) {
         return;
     }
     try {
-        BulkWriteUtils.flushCurrentBulkWriteBatch(bulkWriteCluster,
-                                                  bulkSessionId,
-                                                  originalRunCommand,
-                                                  makeRunCommandArgs,
-                                                  true /* isMultiOp */,
-                                                  {"errorsOnly": errorsOnly});
+        BulkWriteUtils.flushCurrentBulkWriteBatch(
+            bulkWriteCluster,
+            bulkSessionId,
+            originalRunCommand,
+            makeRunCommandArgs,
+            true /* isMultiOp */,
+            {"errorsOnly": errorsOnly},
+        );
 
         validateClusterConsistency(originalRunCommand, makeRunCommandArgs);
         BulkWriteUtils.resetBulkWriteBatch();
@@ -206,7 +217,7 @@ function flushBatch(originalRunCommand, makeRunCommandArgs) {
 
 function deepCopy(target, source) {
     if (!(target instanceof Object)) {
-        return (source === undefined || source === null) ? target : source;
+        return source === undefined || source === null ? target : source;
     }
 
     if (!(source instanceof Object)) {
@@ -214,15 +225,14 @@ function deepCopy(target, source) {
     }
 
     let res = {};
-    Object.keys(source).forEach(k => {
+    Object.keys(source).forEach((k) => {
         res[k] = deepCopy(target[k], source[k]);
     });
 
     return res;
 }
 
-function runCommandMultiOpBulkWriteOverride(
-    conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
+function runCommandMultiOpBulkWriteOverride(conn, dbName, cmdName, cmdObj, originalRunCommand, makeRunCommandArgs) {
     let cmdCopy = {};
     cmdCopy = deepCopy(cmdCopy, cmdObj);
 
@@ -259,6 +269,5 @@ function runCommandMultiOpBulkWriteOverride(
     return normalClusterRunCommand.apply(normalCluster, makeRunCommandArgs(cmdObj, dbName));
 }
 
-OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js");
+OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js");
 OverrideHelpers.overrideRunCommand(runCommandMultiOpBulkWriteOverride);

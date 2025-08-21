@@ -11,11 +11,11 @@ import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
-const db = conn.getDB('test');
+const db = conn.getDB("test");
 const coll = db.explain_group_stage_exec_stats;
 coll.drop();
 
-const bigStr = Array(1025).toString();  // 1KB of ','
+const bigStr = Array(1025).toString(); // 1KB of ','
 const maxMemoryLimitForGroupStage = 1024 * 300;
 const nDocs = 1000;
 const nGroups = 50;
@@ -36,18 +36,19 @@ const pipeline = [
 const metricsBefore = db.serverStatus().metrics.query.group;
 
 // Set MaxMemory low to force spill to disk.
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: maxMemoryLimitForGroupStage}));
-assert.commandWorked(db.adminCommand({
-    setParameter: 1,
-    internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
-        maxMemoryLimitForGroupStage
-}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: maxMemoryLimitForGroupStage}),
+);
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: maxMemoryLimitForGroupStage,
+    }),
+);
 
 const result = coll.explain("executionStats").aggregate(pipeline);
 
-const groupStage =
-    isSbeEnabled ? getAggPlanStage(result, "group") : getAggPlanStage(result, "$group");
+const groupStage = isSbeEnabled ? getAggPlanStage(result, "group") : getAggPlanStage(result, "$group");
 
 const metricsAfter = db.serverStatus().metrics.query.group;
 
@@ -61,13 +62,14 @@ assert.eq(metricsAfter.spills, expectedSpills + metricsBefore.spills, pipeline);
 
 assert.gt(metricsAfter.spilledDataStorageSize, metricsBefore.spilledDataStorageSize, pipeline);
 
-assert.eq(metricsAfter.spilledDataStorageSize,
-          expectedSpilledDataStorageSize + metricsBefore.spilledDataStorageSize,
-          pipeline);
+assert.eq(
+    metricsAfter.spilledDataStorageSize,
+    expectedSpilledDataStorageSize + metricsBefore.spilledDataStorageSize,
+    pipeline,
+);
 
 assert.gt(metricsAfter.spilledRecords, metricsBefore.spilledRecords, pipeline);
 
-assert.eq(
-    metricsAfter.spilledRecords, expectedSpilledRecords + metricsBefore.spilledRecords, pipeline);
+assert.eq(metricsAfter.spilledRecords, expectedSpilledRecords + metricsBefore.spilledRecords, pipeline);
 
 MongoRunner.stopMongod(conn);

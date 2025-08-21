@@ -21,9 +21,9 @@ const st = new ShardingTest({
             nodes: [{}, {rsConfig: {priority: 0}}],
             // ShardingTest use a higher lock timeout to avoid spurious failures but this test
             // intentionally triggers a timeout, so use a lower value to avoid waiting excessively.
-            setParameter: {maxTransactionLockRequestTimeoutMillis: 100}
-        }
-    }
+            setParameter: {maxTransactionLockRequestTimeoutMillis: 100},
+        },
+    },
 });
 const primary = st.rs0.getPrimary();
 const secondary = st.rs0.getSecondary();
@@ -34,7 +34,7 @@ const adminDB = testDB.getSiblingDB("admin");
 const testColl = testDB.getCollection(collName);
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 let session = primary.startSession(sessionOptions);
 let sessionDb = session.getDatabase(dbName);
@@ -52,27 +52,31 @@ let res = secondarySessionDb.runCommand({
     readConcern: {level: "snapshot"},
     txnNumber: NumberLong(txnNumber),
     startTransaction: true,
-    autocommit: false
+    autocommit: false,
 });
 assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 assert.eq(res.errorLabels, ["TransientTransactionError"], res);
 
-jsTest.log("failCommand with errorLabels but without errorCode or writeConcernError should not " +
-           "interfere with server's error labels attaching");
+jsTest.log(
+    "failCommand with errorLabels but without errorCode or writeConcernError should not " +
+        "interfere with server's error labels attaching",
+);
 txnNumber++;
 // This failCommand should have no effect.
-assert.commandWorked(secondary.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {errorLabels: ["foo"], failCommands: ["insert"]}
-}));
+assert.commandWorked(
+    secondary.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorLabels: ["foo"], failCommands: ["insert"]},
+    }),
+);
 res = secondarySessionDb.runCommand({
     insert: collName,
     documents: [{_id: "insert-1"}],
     readConcern: {level: "snapshot"},
     txnNumber: NumberLong(txnNumber),
     startTransaction: true,
-    autocommit: false
+    autocommit: false,
 });
 assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 // Server should continue to return TransientTransactionError label.
@@ -82,8 +86,11 @@ assert.commandWorked(secondary.adminCommand({configureFailPoint: "failCommand", 
 jsTest.log("Insert as a retryable write on secondary should fail with retryable error labels");
 txnNumber++;
 // Insert as a retryable write.
-res = secondarySessionDb.runCommand(
-    {insert: collName, documents: [{_id: "insert-1"}], txnNumber: NumberLong(txnNumber)});
+res = secondarySessionDb.runCommand({
+    insert: collName,
+    documents: [{_id: "insert-1"}],
+    txnNumber: NumberLong(txnNumber),
+});
 
 assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
 if (isReplicaSetEndpointActive) {
@@ -95,11 +102,13 @@ if (isReplicaSetEndpointActive) {
 secondarySession.endSession();
 
 jsTest.log("failCommand should be able to return errors with TransientTransactionError");
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {errorCode: ErrorCodes.WriteConflict, failCommands: ["insert"]}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorCode: ErrorCodes.WriteConflict, failCommands: ["insert"]},
+    }),
+);
 session.startTransaction();
 jsTest.log("WriteCommandError should have error labels inside transactions.");
 res = sessionColl.insert({_id: "write-fail-point"});
@@ -119,11 +128,13 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 jsTest.log("WriteConflict returned by commitTransaction command is TransientTransactionError");
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "commitTransaction-fail-point"}));
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {errorCode: ErrorCodes.WriteConflict, failCommands: ["commitTransaction"]}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorCode: ErrorCodes.WriteConflict, failCommands: ["commitTransaction"]},
+    }),
+);
 res = session.commitTransaction_forTesting();
 assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
@@ -134,21 +145,23 @@ if (!isReplicaSetEndpointActive) {
     // the router).
     jsTest.log(
         "NotWritablePrimary returned by commitTransaction command is not TransientTransactionError but" +
-        " RetryableWriteError");
+            " RetryableWriteError",
+    );
     // commitTransaction will attempt to perform a noop write in response to a NoSuchTransaction
     // error and non-empty writeConcern. This will throw NotWritablePrimary.
     res = secondarySessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(secondarySession.getTxnNumber_forTesting() + 1),
         autocommit: false,
-        writeConcern: {w: "majority"}
+        writeConcern: {w: "majority"},
     });
     assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
     assert.eq(res.errorLabels, ["RetryableWriteError"], res);
 
     jsTest.log(
         "NotWritablePrimary returned by coordinateCommitTransaction command is not TransientTransactionError" +
-        " but RetryableWriteError");
+            " but RetryableWriteError",
+    );
     // coordinateCommitTransaction will attempt to perform a noop write in response to a
     // NoSuchTransaction error and non-empty writeConcern. This will throw NotWritablePrimary.
     res = secondarySessionDb.adminCommand({
@@ -156,7 +169,7 @@ if (!isReplicaSetEndpointActive) {
         participants: [],
         txnNumber: NumberLong(secondarySession.getTxnNumber_forTesting() + 1),
         autocommit: false,
-        writeConcern: {w: "majority"}
+        writeConcern: {w: "majority"},
     });
     assert.commandFailedWithCode(res, ErrorCodes.NotWritablePrimary);
     assert.eq(res.errorLabels, ["RetryableWriteError"], res);
@@ -164,11 +177,13 @@ if (!isReplicaSetEndpointActive) {
 
 jsTest.log("ShutdownInProgress returned by write commands is TransientTransactionError");
 session.startTransaction();
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {errorCode: ErrorCodes.ShutdownInProgress, failCommands: ["insert"]}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorCode: ErrorCodes.ShutdownInProgress, failCommands: ["insert"]},
+    }),
+);
 res = sessionColl.insert({_id: "commitTransaction-fail-point"});
 assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
 assert(res instanceof WriteCommandError);
@@ -178,14 +193,17 @@ assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.N
 
 jsTest.log(
     "ShutdownInProgress returned by commitTransaction command is not TransientTransactionError" +
-    " but RetryableWriteError");
+        " but RetryableWriteError",
+);
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "commitTransaction-fail-point"}));
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {errorCode: ErrorCodes.ShutdownInProgress, failCommands: ["commitTransaction"]}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorCode: ErrorCodes.ShutdownInProgress, failCommands: ["commitTransaction"]},
+    }),
+);
 res = session.commitTransaction_forTesting();
 assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
 if (isReplicaSetEndpointActive) {
@@ -196,20 +214,24 @@ if (isReplicaSetEndpointActive) {
 }
 assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-jsTest.log("ShutdownInProgress returned by coordinateCommitTransaction command is not" +
-           " TransientTransactionError but RetryableWriteError");
+jsTest.log(
+    "ShutdownInProgress returned by coordinateCommitTransaction command is not" +
+        " TransientTransactionError but RetryableWriteError",
+);
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "coordinateCommitTransaction-fail-point"}));
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {errorCode: ErrorCodes.ShutdownInProgress, failCommands: ["coordinateCommitTransaction"]}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorCode: ErrorCodes.ShutdownInProgress, failCommands: ["coordinateCommitTransaction"]},
+    }),
+);
 res = sessionDb.adminCommand({
     coordinateCommitTransaction: 1,
     participants: [],
     txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-    autocommit: false
+    autocommit: false,
 });
 assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
 if (isReplicaSetEndpointActive) {
@@ -233,25 +255,27 @@ const thread = new Thread(dropCmdFunc, primary.host, dbName, collName);
 thread.start();
 // Wait for the drop to have a pending MODE_X lock on the database.
 assert.soon(
-    function() {
-        return adminDB
-                   .aggregate([
-                       {$currentOp: {}},
-                       isReplicaSetEndpointActive
-                           ? {
-                                 $match: {
-                                     "command._shardsvrParticipantBlock": collName,
-                                     "command.blockType": "ReadsAndWrites"
-                                 }
-                             }
-                           : {$match: {"command.drop": collName, waitingForLock: true}}
-                   ])
-                   .itcount() === 1;
+    function () {
+        return (
+            adminDB
+                .aggregate([
+                    {$currentOp: {}},
+                    isReplicaSetEndpointActive
+                        ? {
+                              $match: {
+                                  "command._shardsvrParticipantBlock": collName,
+                                  "command.blockType": "ReadsAndWrites",
+                              },
+                          }
+                        : {$match: {"command.drop": collName, waitingForLock: true}},
+                ])
+                .itcount() === 1
+        );
     },
-    function() {
-        return "Failed to find drop in currentOp output: " +
-            tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
-    });
+    function () {
+        return "Failed to find drop in currentOp output: " + tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
+    },
+);
 // Start another transaction in a new session, which cannot acquire the database lock in time.
 let sessionOther = primary.startSession(sessionOptions);
 sessionOther.startTransaction();
@@ -259,8 +283,7 @@ res = sessionOther.getDatabase(dbName).getCollection(collName).insert({_id: "loc
 assert.commandFailedWithCode(res, ErrorCodes.LockTimeout);
 assert(res instanceof WriteCommandError);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
-assert.commandFailedWithCode(sessionOther.abortTransaction_forTesting(),
-                             ErrorCodes.NoSuchTransaction);
+assert.commandFailedWithCode(sessionOther.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 assert.commandWorked(session.abortTransaction_forTesting());
 thread.join();
 assert.commandWorked(thread.returnData());
@@ -270,11 +293,13 @@ assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "major
 
 jsTest.log("Network errors for in-progress statements should be transient");
 session.startTransaction();
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {errorCode: ErrorCodes.HostUnreachable, failCommands: ["aggregate"]}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorCode: ErrorCodes.HostUnreachable, failCommands: ["aggregate"]},
+    }),
+);
 res = sessionDb.runCommand({aggregate: collName, pipeline: [{$match: {}}], cursor: {}});
 assert.commandFailedWithCode(res, ErrorCodes.HostUnreachable);
 assert.eq(res.errorLabels, ["TransientTransactionError"]);
@@ -284,15 +309,17 @@ assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mod
 jsTest.log("Network errors for commit should not be transient but RetryableWriteError");
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: "commitTransaction-network-error"}));
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: "alwaysOn",
-    data: {errorCode: ErrorCodes.HostUnreachable, failCommands: ["commitTransaction"]}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        data: {errorCode: ErrorCodes.HostUnreachable, failCommands: ["commitTransaction"]},
+    }),
+);
 res = sessionDb.adminCommand({
     commitTransaction: 1,
     txnNumber: NumberLong(session.getTxnNumber_forTesting()),
-    autocommit: false
+    autocommit: false,
 });
 assert.commandFailedWithCode(res, ErrorCodes.HostUnreachable);
 if (isReplicaSetEndpointActive) {

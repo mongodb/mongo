@@ -25,7 +25,7 @@ const sessionColl = sessionDB.getCollection(collName);
 
 const doc1 = {
     _id: 1,
-    x: 1
+    x: 1,
 };
 
 // Attempting to prepare an already prepared transaction should return successfully with a

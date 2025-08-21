@@ -16,7 +16,7 @@ let rst = new ReplSetTest({
     name: replSetName,
     nodeOptions: {
         shardsvr: "",
-    }
+    },
 });
 
 rst.startSet();
@@ -28,7 +28,7 @@ const config = {
         {_id: 0, host: nodes[0]},
         {_id: 1, host: nodes[1], priority: 0},
         {_id: 2, host: nodes[2], arbiterOnly: true},
-    ]
+    ],
 };
 
 rst.initiate(config);
@@ -39,8 +39,9 @@ let st = new ShardingTest({
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 // We can't run this command on a shard server (configured with --shardsvr) which is why we must run
 // it on mongos.
-assert.commandWorked(st.s.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    st.s.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Even though implicitDefaultWC is set to w:1, addShard will work as CWWC is set.
 assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));

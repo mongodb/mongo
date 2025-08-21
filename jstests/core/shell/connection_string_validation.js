@@ -15,11 +15,7 @@ if (db.getMongo().host.indexOf(":") >= 0) {
     port = db.getMongo().host.substring(idx + 1);
 }
 
-var goodStrings = [
-    "localhost:" + port + "/test",
-    "127.0.0.1:" + port + "/test",
-    "127.0.0.1:" + port + "/",
-];
+var goodStrings = ["localhost:" + port + "/test", "127.0.0.1:" + port + "/test", "127.0.0.1:" + port + "/"];
 
 var missingConnString = /^Missing connection string$/;
 var incorrectType = /^Incorrect type/;
@@ -50,12 +46,12 @@ var badStrings = [
     {s: "mongodb://127.0.0.1:123456/test", r: invalidPort},
     {s: "mongodb://127.0.0.1:65536/test", r: invalidPort},
     {s: "mongodb://::1:65536/test", r: multipleColon},
-    {s: "mongodb://::1:" + port + "/", r: multipleColon}
+    {s: "mongodb://::1:" + port + "/", r: multipleColon},
 ];
 
 function testGoodAsURI(i, uri) {
     uri = "mongodb://" + uri;
-    print("\nTesting good uri " + i + " (\"" + uri + "\") ...");
+    print("\nTesting good uri " + i + ' ("' + uri + '") ...');
     var gotException = false;
     var exception;
     try {
@@ -67,16 +63,16 @@ function testGoodAsURI(i, uri) {
         exception = e;
     }
     if (!gotException) {
-        print("Good uri " + i + " (\"" + uri + "\") correctly validated");
+        print("Good uri " + i + ' ("' + uri + '") correctly validated');
         return;
     }
-    var message = "FAILED to correctly validate goodString " + i + " (\"" + uri +
-        "\"):  exception was \"" + tojson(exception) + "\"";
+    var message =
+        "FAILED to correctly validate goodString " + i + ' ("' + uri + '"):  exception was "' + tojson(exception) + '"';
     doassert(message);
 }
 
 function testBad(i, connectionString, errorRegex, errorCode) {
-    print("\nTesting bad connection string " + i + " (\"" + connectionString + "\") ...");
+    print("\nTesting bad connection string " + i + ' ("' + connectionString + '") ...');
     var gotException = false;
     var gotCorrectErrorText = false;
     var gotCorrectErrorCode = false;
@@ -95,15 +91,12 @@ function testBad(i, connectionString, errorRegex, errorCode) {
         }
     }
     if (gotCorrectErrorText || gotCorrectErrorCode) {
-        print("Bad connection string " + i + " (\"" + connectionString +
-              "\") correctly rejected:\n" + tojson(exception));
+        print("Bad connection string " + i + ' ("' + connectionString + '") correctly rejected:\n' + tojson(exception));
         return;
     }
-    var message = "FAILED to generate correct exception for badString " + i + " (\"" +
-        connectionString + "\"): ";
+    var message = "FAILED to generate correct exception for badString " + i + ' ("' + connectionString + '"): ';
     if (gotException) {
-        message += "exception was \"" + tojson(exception) + "\", it should have matched \"" +
-            errorRegex.toString() + "\"";
+        message += 'exception was "' + tojson(exception) + '", it should have matched "' + errorRegex.toString() + '"';
     } else {
         message += "no exception was thrown";
     }

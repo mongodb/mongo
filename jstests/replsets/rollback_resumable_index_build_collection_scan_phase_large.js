@@ -13,9 +13,7 @@
  *   requires_persistence,
  * ]
  */
-import {
-    RollbackResumableIndexBuildTest
-} from "jstests/replsets/libs/rollback_resumable_index_build.js";
+import {RollbackResumableIndexBuildTest} from "jstests/replsets/libs/rollback_resumable_index_build.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const dbName = "test";
@@ -33,9 +31,12 @@ for (let i = 0; i < numDocuments; i++) {
     docs.push({a: i.toString().repeat(1024 * 256)});
 }
 
-const runRollbackTo = function(rollbackEndFailPointName, rollbackEndFailPointLogIdWithBuildUUID) {
-    assert.commandWorked(rollbackTest.getPrimary().adminCommand(
-        {setParameter: 1, maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB}));
+const runRollbackTo = function (rollbackEndFailPointName, rollbackEndFailPointLogIdWithBuildUUID) {
+    assert.commandWorked(
+        rollbackTest
+            .getPrimary()
+            .adminCommand({setParameter: 1, maxIndexBuildMemoryUsageMegabytes: maxIndexBuildMemoryUsageMB}),
+    );
 
     RollbackResumableIndexBuildTest.run(
         rollbackTest,
@@ -43,25 +44,30 @@ const runRollbackTo = function(rollbackEndFailPointName, rollbackEndFailPointLog
         "_large",
         docs,
         [[{a: 1}]],
-        [{
-            name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
-            logIdWithBuildUUID: 20386
-        }],
+        [
+            {
+                name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
+                logIdWithBuildUUID: 20386,
+            },
+        ],
         // Most documents are at least 0.5 MB, so the index build must have spilled to disk by this
         // point.
-        maxIndexBuildMemoryUsageMB,  // rollbackStartFailPointsIteration
-        [{
-            name: rollbackEndFailPointName,
-            logIdWithBuildUUID: rollbackEndFailPointLogIdWithBuildUUID
-        }],
-        1,  // rollbackEndFailPointsIteration
+        maxIndexBuildMemoryUsageMB, // rollbackStartFailPointsIteration
+        [
+            {
+                name: rollbackEndFailPointName,
+                logIdWithBuildUUID: rollbackEndFailPointLogIdWithBuildUUID,
+            },
+        ],
+        1, // rollbackEndFailPointsIteration
         ["setYieldAllLocksHang"],
         ["collection scan"],
         // The collection scan will scan one additional document past the point specified above due
         // to locks needing to be yielded before the rollback can occur. Thus, we subtract 1 from
         // the difference.
         [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB - 1}],
-        [{a: 1}, {a: 2}]);
+        [{a: 1}, {a: 2}],
+    );
 };
 
 // Rollback to before the index begins to be built.

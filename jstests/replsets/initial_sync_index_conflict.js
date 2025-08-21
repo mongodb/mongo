@@ -9,8 +9,8 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
-const dbName = 'test';
-const collectionName = 'coll';
+const dbName = "test";
+const collectionName = "coll";
 
 // Start one-node repl-set.
 const rst = new ReplSetTest({nodes: 1});
@@ -29,7 +29,7 @@ const secondary = rst.add({
 // While the secondary is hung, we create the same index multiple times to
 // reproduce the interaction between single and two phase index builds on the
 // same index.
-const failPoint = configureFailPoint(secondary, 'initialSyncHangBeforeCopyingDatabases');
+const failPoint = configureFailPoint(secondary, "initialSyncHangBeforeCopyingDatabases");
 rst.reInitiate();
 failPoint.wait();
 
@@ -46,7 +46,7 @@ assert.commandWorked(primaryColl.dropIndex({a: 1}));
 IndexBuildTest.pauseIndexBuilds(primary);
 IndexBuildTest.pauseIndexBuilds(secondary);
 const createIdx = IndexBuildTest.startIndexBuild(primary, primaryColl.getFullName(), {a: 1});
-IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, primaryColl.getName(), 'a_1');
+IndexBuildTest.waitForIndexBuildToScanCollection(primaryDB, primaryColl.getName(), "a_1");
 try {
     // Resume initial sync. The createIndexes oplog entry will be applied.
     failPoint.off();
@@ -59,6 +59,6 @@ try {
     createIdx();
 }
 
-IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", "a_1"]);
 
 rst.stopSet();

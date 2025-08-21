@@ -7,27 +7,27 @@
  * ]
  */
 function setupCollections(db) {
-    assert.commandWorked(db.createCollection('ham'));
-    assert.commandWorked(db['ham'].insert({a: 1}));
-    assert.commandWorked(db['ham'].createIndex({b: 1}));
+    assert.commandWorked(db.createCollection("ham"));
+    assert.commandWorked(db["ham"].insert({a: 1}));
+    assert.commandWorked(db["ham"].createIndex({b: 1}));
 
-    assert.commandWorked(db.createCollection('cheese'));
-    assert.commandWorked(db['cheese'].insert({a: 1}));
-    assert.commandWorked(db['cheese'].createIndex({b: 1}));
+    assert.commandWorked(db.createCollection("cheese"));
+    assert.commandWorked(db["cheese"].insert({a: 1}));
+    assert.commandWorked(db["cheese"].createIndex({b: 1}));
 }
 
 function generateResults(dbpath, opts) {
     MongoRunner.runMongod({dbpath: dbpath, validate: "", setParameter: opts, noCleanData: true});
     let validateLogs = rawMongoProgramOutput("(9437301)")
-                           .split("\n")
-                           .filter(line => line.trim() !== "")
-                           .map(line => JSON.parse(line.split("|").slice(1).join("|")));
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
     return validateLogs;
 }
 
 function runDbTest() {
     // Setup the dbpath for this test.
-    const dbpath = MongoRunner.dataPath + 'modal_validate_specify';
+    const dbpath = MongoRunner.dataPath + "modal_validate_specify";
 
     // Setup DBs and collections
     let conn = MongoRunner.runMongod({dbpath: dbpath});
@@ -41,8 +41,7 @@ function runDbTest() {
     clearRawMongoProgramOutput();
 
     // Verify that command validates everything in the specified collection
-    let validateLogs =
-        generateResults(dbpath, {validateDbName: "test", validateCollectionName: "ham"});
+    let validateLogs = generateResults(dbpath, {validateDbName: "test", validateCollectionName: "ham"});
     jsTestLog("Specific Collection");
     jsTestLog(validateLogs);
     assert.eq(1, validateLogs.length);
@@ -66,17 +65,21 @@ function runDbTest() {
     clearRawMongoProgramOutput();
 
     // Error if collection is non-existant
-    assert.neq(MongoRunner.EXIT_CLEAN,
-               runMongoProgram("mongod",
-                               "--validate",
-                               "--port",
-                               port,
-                               "--dbpath",
-                               dbpath,
-                               "--setParameter",
-                               "validateDbName=test",
-                               "--setParameter",
-                               "validateCollectionName=lettuce"));
+    assert.neq(
+        MongoRunner.EXIT_CLEAN,
+        runMongoProgram(
+            "mongod",
+            "--validate",
+            "--port",
+            port,
+            "--dbpath",
+            dbpath,
+            "--setParameter",
+            "validateDbName=test",
+            "--setParameter",
+            "validateCollectionName=lettuce",
+        ),
+    );
 }
 
 runDbTest();

@@ -19,7 +19,7 @@ const replSet = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
 });
 
 // Allow the createIndexes command to use the index builds coordinator in single-phase mode.
@@ -27,7 +27,7 @@ replSet.startSet();
 replSet.initiate();
 
 const primary = replSet.getPrimary();
-const testDB = primary.getDB('test');
+const testDB = primary.getDB("test");
 const coll = testDB.twoPhaseIndexBuild;
 
 const bulk = coll.initializeUnorderedBulkOp();
@@ -62,37 +62,46 @@ let awaitShell;
 const failPoint = configureFailPoint(testDB, "hangAfterIndexBuildFirstDrain");
 try {
     // Starts parallel shell to run the command that will hang.
-    awaitShell = startParallelShell(function() {
+    awaitShell = startParallelShell(function () {
         // Use the index builds coordinator for a two-phase index build.
-        assert.commandWorked(db.runCommand({
-            createIndexes: 'twoPhaseIndexBuild',
-            indexes: [{key: {a: 1}, name: 'a_1'}],
-            commitQuorum: "majority"
-        }));
+        assert.commandWorked(
+            db.runCommand({
+                createIndexes: "twoPhaseIndexBuild",
+                indexes: [{key: {a: 1}, name: "a_1"}],
+                commitQuorum: "majority",
+            }),
+        );
     }, testDB.getMongo().port);
 
     failPoint.wait();
 
     // Test setting various commit quorums on the index build in our two node replica set.
-    assert.commandFailed(testDB.runCommand(
-        {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 3}));
-    assert.commandFailed(testDB.runCommand({
-        setIndexCommitQuorum: 'twoPhaseIndexBuild',
-        indexNames: ['a_1'],
-        commitQuorum: "someTag"
-    }));
+    assert.commandFailed(
+        testDB.runCommand({setIndexCommitQuorum: "twoPhaseIndexBuild", indexNames: ["a_1"], commitQuorum: 3}),
+    );
+    assert.commandFailed(
+        testDB.runCommand({
+            setIndexCommitQuorum: "twoPhaseIndexBuild",
+            indexNames: ["a_1"],
+            commitQuorum: "someTag",
+        }),
+    );
     // setIndexCommitQuorum should fail as it is illegal to disable commit quorum for in-progress
     // index builds with commit quorum enabled.
-    assert.commandFailed(testDB.runCommand(
-        {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 0}));
+    assert.commandFailed(
+        testDB.runCommand({setIndexCommitQuorum: "twoPhaseIndexBuild", indexNames: ["a_1"], commitQuorum: 0}),
+    );
 
-    assert.commandWorked(testDB.runCommand(
-        {setIndexCommitQuorum: 'twoPhaseIndexBuild', indexNames: ['a_1'], commitQuorum: 2}));
-    assert.commandWorked(testDB.runCommand({
-        setIndexCommitQuorum: 'twoPhaseIndexBuild',
-        indexNames: ['a_1'],
-        commitQuorum: "majority"
-    }));
+    assert.commandWorked(
+        testDB.runCommand({setIndexCommitQuorum: "twoPhaseIndexBuild", indexNames: ["a_1"], commitQuorum: 2}),
+    );
+    assert.commandWorked(
+        testDB.runCommand({
+            setIndexCommitQuorum: "twoPhaseIndexBuild",
+            indexNames: ["a_1"],
+            commitQuorum: "majority",
+        }),
+    );
 } finally {
     failPoint.off();
 }

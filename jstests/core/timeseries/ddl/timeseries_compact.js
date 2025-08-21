@@ -21,8 +21,7 @@ TimeseriesTest.run(() => {
     coll.drop();
 
     const timeFieldName = "time";
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
     const numDocs = 5;
     for (let i = 0; i < numDocs; i++) {

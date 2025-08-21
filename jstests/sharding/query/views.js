@@ -19,8 +19,7 @@ const kOptEither = 2;
 //   kOptTrue if the pipeline is expected to be optimized away
 //   kOptFalse if the pipeline is expected to be present
 //   kOptEither if the call does not know so must accept either of the prior two cases
-function verifyExplainResult(
-    {shardedExplain = null, verbosity = "", optimizedAwayPipeline = kOptFalse} = {}) {
+function verifyExplainResult({shardedExplain = null, verbosity = "", optimizedAwayPipeline = kOptFalse} = {}) {
     assert.commandWorked(shardedExplain);
     assert(shardedExplain.hasOwnProperty("shards"), tojson(shardedExplain));
 
@@ -56,8 +55,7 @@ function verifyExplainResult(
             assert(!root.hasOwnProperty("executionStats"), tojson(shardedExplain));
         } else if (verbosity === "executionStats") {
             assert(root.hasOwnProperty("executionStats"), tojson(shardedExplain));
-            assert(!root.executionStats.hasOwnProperty("allPlansExecution"),
-                   tojson("shardedExplain"));
+            assert(!root.executionStats.hasOwnProperty("allPlansExecution"), tojson("shardedExplain"));
         } else {
             assert.eq(verbosity, "allPlansExecution", tojson(shardedExplain));
             assert(root.hasOwnProperty("executionStats"), tojson(shardedExplain));
@@ -75,13 +73,11 @@ db.dropDatabase();
 
 let coll = db.getCollection("coll");
 
-assert.commandWorked(
-    config.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+assert.commandWorked(config.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 
 assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
-assert.commandWorked(
-    db.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: st.shard1.shardName}));
+assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: st.shard1.shardName}));
 
 for (let i = 0; i < 10; ++i) {
     assert.commandWorked(coll.insert({a: i}));
@@ -98,12 +94,10 @@ const explainVerbosities = ["queryPlanner", "executionStats", "allPlansExecution
 assert.eq(5, view.find({a: {$lte: 8}}).itcount());
 
 let result = db.runCommand({explain: {find: "view", filter: {a: {$lte: 7}}}});
-verifyExplainResult(
-    {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: kOptTrue});
+verifyExplainResult({shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: kOptTrue});
 for (let verbosity of explainVerbosities) {
     result = db.runCommand({explain: {find: "view", filter: {a: {$lte: 7}}}, verbosity: verbosity});
-    verifyExplainResult(
-        {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: kOptTrue});
+    verifyExplainResult({shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: kOptTrue});
 }
 
 //
@@ -113,20 +107,16 @@ assert.eq(5, view.aggregate([{$match: {a: {$lte: 8}}}]).itcount());
 
 // Test that the explain:true flag for the aggregate command results in queryPlanner verbosity.
 result = db.runCommand({aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], explain: true});
-verifyExplainResult(
-    {shardedExplain: result, verbosity: "queryPlanner", optimizedAwayPipeline: kOptTrue});
+verifyExplainResult({shardedExplain: result, verbosity: "queryPlanner", optimizedAwayPipeline: kOptTrue});
 
-result =
-    db.runCommand({explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], cursor: {}}});
-verifyExplainResult(
-    {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: kOptTrue});
+result = db.runCommand({explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], cursor: {}}});
+verifyExplainResult({shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: kOptTrue});
 for (let verbosity of explainVerbosities) {
     result = db.runCommand({
         explain: {aggregate: "view", pipeline: [{$match: {a: {$lte: 8}}}], cursor: {}},
-        verbosity: verbosity
+        verbosity: verbosity,
     });
-    verifyExplainResult(
-        {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: kOptTrue});
+    verifyExplainResult({shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: kOptTrue});
 }
 
 //
@@ -140,12 +130,10 @@ assert.eq(5, view.count({a: {$lte: 8}}));
 // specific configurations of individual nodes in multiversion clusters, we may get either the
 // Classic or SBE explain variant, so here we accept either one ('kOptEither').
 result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}});
-verifyExplainResult(
-    {shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: kOptEither});
+verifyExplainResult({shardedExplain: result, verbosity: "allPlansExecution", optimizedAwayPipeline: kOptEither});
 for (let verbosity of explainVerbosities) {
     result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}, verbosity: verbosity});
-    verifyExplainResult(
-        {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: kOptEither});
+    verifyExplainResult({shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: kOptEither});
 }
 
 //
@@ -158,8 +146,7 @@ assert.eq([4, 5, 6, 7, 8], result.values.sort());
 result = db.runCommand({explain: {distinct: "view", key: "a", query: {a: {$lte: 8}}}});
 verifyExplainResult({shardedExplain: result, verbosity: "allPlansExecution"});
 for (let verbosity of explainVerbosities) {
-    result = db.runCommand(
-        {explain: {distinct: "view", key: "a", query: {a: {$lte: 8}}}, verbosity: verbosity});
+    result = db.runCommand({explain: {distinct: "view", key: "a", query: {a: {$lte: 8}}}, verbosity: verbosity});
     verifyExplainResult({shardedExplain: result, verbosity: verbosity});
 }
 
@@ -167,15 +154,17 @@ for (let verbosity of explainVerbosities) {
 // Confirm cleanupOrphaned command fails.
 //
 result = st.getPrimaryShard(db.getName()).getDB("admin").runCommand({
-    cleanupOrphaned: view.getFullName()
+    cleanupOrphaned: view.getFullName(),
 });
 assert.commandFailedWithCode(result, ErrorCodes.CommandNotSupportedOnView);
 
 //
 //  Confirm getShardVersion command fails.
 //
-assert.commandFailedWithCode(db.adminCommand({getShardVersion: view.getFullName()}),
-                             [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound]);
+assert.commandFailedWithCode(db.adminCommand({getShardVersion: view.getFullName()}), [
+    ErrorCodes.NamespaceNotSharded,
+    ErrorCodes.NamespaceNotFound,
+]);
 
 //
 // Confirm that the comment parameter on a find command is retained when rewritten as an
@@ -184,7 +173,13 @@ assert.commandFailedWithCode(db.adminCommand({getShardVersion: view.getFullName(
 let sdb = st.shard0.getDB(jsTestName());
 assert.commandWorked(sdb.setProfilingLevel(2));
 
-assert.eq(5, view.find({a: {$lte: 8}}).comment("agg_comment").itcount());
+assert.eq(
+    5,
+    view
+        .find({a: {$lte: 8}})
+        .comment("agg_comment")
+        .itcount(),
+);
 
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: sdb,
@@ -192,8 +187,8 @@ profilerHasSingleMatchingEntryOrThrow({
         "command.aggregate": coll.getName(),
         "command.comment": "agg_comment",
         "command.needsMerge": true,
-        "command.pipeline.$mergeCursors": {$exists: false}
-    }
+        "command.pipeline.$mergeCursors": {$exists: false},
+    },
 });
 
 st.stop();

@@ -18,26 +18,25 @@ const rst = new ReplSetTest({
                 votes: 0,
             },
         },
-    ]
+    ],
 });
 const nodes = rst.startSet();
 rst.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
 
 const primary = rst.getPrimary();
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const testDB = primary.getDB("test");
+const coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({a: 1}));
 
-assert.commandWorked(primary.adminCommand(
-    {configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'alwaysOn'}));
+assert.commandWorked(primary.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "alwaysOn"}));
 
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
 checkLog.containsJson(primary, 20384, {
     namespace: coll.getFullName(),
     properties: (desc) => {
-        return desc.name === 'a_1';
+        return desc.name === "a_1";
     },
 });
 
@@ -45,22 +44,21 @@ try {
     // Step down the primary.
     assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
 } finally {
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'hangAfterInitializingIndexBuild', mode: 'off'}));
+    assert.commandWorked(primary.adminCommand({configureFailPoint: "hangAfterInitializingIndexBuild", mode: "off"}));
 }
 
 // Wait for the index build to stop.
 IndexBuildTest.waitForIndexBuildToStop(testDB);
 
 const exitCode = createIdx({checkExitSuccess: false});
-assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
+assert.neq(0, exitCode, "expected shell to exit abnormally due to index build being terminated");
 
 // With two phase index builds, a stepdown will not abort the index build, which should complete
 // after the node becomes primary again.
 rst.awaitReplication();
-IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 
 const secondaryColl = rst.getSecondary().getCollection(coll.getFullName());
-IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"]);
 
 rst.stopSet();

@@ -1,4 +1,3 @@
-
 /**
  * Test that sort queries work properly on dates ouside the 32 bit epoch range,
  *  [1970-01-01 00:00:00 UTC - 2038-01-29 03:13:07 UTC], when a collection scan is used.
@@ -16,13 +15,10 @@
  *     requires_getmore,
  * ]
  */
-import {
-    getTimeseriesCollForRawOps,
-    kRawOperationSpec
-} from "jstests/core/libs/raw_operation_utils.js";
+import {getTimeseriesCollForRawOps, kRawOperationSpec} from "jstests/core/libs/raw_operation_utils.js";
 import {
     getTimeseriesCollForDDLOps,
-    isShardedTimeseries
+    isShardedTimeseries,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
@@ -31,8 +27,11 @@ const dbName = jsTestName();
 const testDB = db.getSiblingDB(dbName);
 
 function getShards() {
-    const shards = testDB.getSiblingDB('config').shards.find({draining: {$ne: true}}).toArray();
-    return shards.map(doc => doc._id);
+    const shards = testDB
+        .getSiblingDB("config")
+        .shards.find({draining: {$ne: true}})
+        .toArray();
+    return shards.map((doc) => doc._id);
 }
 
 if (FixtureHelpers.isMongos(db)) {
@@ -51,22 +50,20 @@ if (FixtureHelpers.isMongos(db)) {
 // Create unindexed collection
 const coll = testDB.timeseries_internal_bounded_sort_extended_range;
 coll.drop();
-assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: 't'}}));
+assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: "t"}}));
 
 // Create collection indexed on time
 const collIndexed = testDB.timeseries_internal_bounded_sort_extended_range_with_index;
 collIndexed.drop();
-assert.commandWorked(
-    testDB.createCollection(collIndexed.getName(), {timeseries: {timeField: 't'}}));
-assert.commandWorked(collIndexed.createIndex({'t': 1}));
+assert.commandWorked(testDB.createCollection(collIndexed.getName(), {timeseries: {timeField: "t"}}));
+assert.commandWorked(collIndexed.createIndex({"t": 1}));
 
 jsTestLog(collIndexed.getIndexes());
 jsTestLog(getTimeseriesCollForRawOps(collIndexed).getIndexes(kRawOperationSpec));
 
 for (const collection of [coll, collIndexed]) {
     let shardList = getShards();
-    if (isShardedTimeseries(collection) && !TestData.hasRandomShardsAddedRemoved &&
-        shardList.length >= 2) {
+    if (isShardedTimeseries(collection) && !TestData.hasRandomShardsAddedRemoved && shardList.length >= 2) {
         // Split and move data to create an interesting scenario: we have some data on each shard,
         // but all the extended-range data is on a non-primary shard. This means view resolution is
         // unaware of the extended-range data, because that happens on the primary shard.
@@ -76,23 +73,36 @@ for (const collection of [coll, collIndexed]) {
         // Our example data has documents between 2000-2003, and these dates are non-wrapping.
         // So this goes on the primary shard, and everything else goes on the non-primary.
         assert.commandWorked(
-            sh.splitAt(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
-                       {'control.min.t': ISODate('2000-01-01')}));
+            sh.splitAt(getTimeseriesCollForDDLOps(testDB, collection).getFullName(), {
+                "control.min.t": ISODate("2000-01-01"),
+            }),
+        );
         assert.commandWorked(
-            sh.splitAt(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
-                       {'control.min.t': ISODate('2003-01-01')}));
+            sh.splitAt(getTimeseriesCollForDDLOps(testDB, collection).getFullName(), {
+                "control.min.t": ISODate("2003-01-01"),
+            }),
+        );
         assert.commandWorked(
-            sh.moveChunk(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
-                         {'control.min.t': ISODate('1969-01-01')},
-                         shardName1));
+            sh.moveChunk(
+                getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
+                {"control.min.t": ISODate("1969-01-01")},
+                shardName1,
+            ),
+        );
         assert.commandWorked(
-            sh.moveChunk(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
-                         {'control.min.t': ISODate('2000-01-01')},
-                         shardName0));
+            sh.moveChunk(
+                getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
+                {"control.min.t": ISODate("2000-01-01")},
+                shardName0,
+            ),
+        );
         assert.commandWorked(
-            sh.moveChunk(getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
-                         {'control.min.t': ISODate('2003-01-01')},
-                         shardName1));
+            sh.moveChunk(
+                getTimeseriesCollForDDLOps(testDB, collection).getFullName(),
+                {"control.min.t": ISODate("2003-01-01")},
+                shardName1,
+            ),
+        );
     }
 }
 
@@ -102,8 +112,7 @@ function insertBucket(start) {
 
     const batchSize = 1000;
 
-    const batch =
-        Array.from({length: batchSize}, (_, j) => ({t: new Date(start + j * intervalMillis)}));
+    const batch = Array.from({length: batchSize}, (_, j) => ({t: new Date(start + j * intervalMillis)}));
 
     assert.commandWorked(coll.insert(batch));
     assert.commandWorked(collIndexed.insert(batch));
@@ -116,8 +125,8 @@ function insertBucket(start) {
 function insertDocuments() {
     // We want to choose the underflow and overflow lower bits in such a way that we
     // encourage wrong results when the upper bytes are removed.
-    const underflowMin = new Date("1969-01-01").getTime();  // Year before the 32 bit epoch
-    const normalMin = new Date("2002-01-01").getTime();     // Middle of the 32 bit epoch
+    const underflowMin = new Date("1969-01-01").getTime(); // Year before the 32 bit epoch
+    const normalMin = new Date("2002-01-01").getTime(); // Middle of the 32 bit epoch
 
     insertBucket(underflowMin);
 
@@ -129,34 +138,32 @@ function insertDocuments() {
         insertBucket(start);
     }
     assert.gt(
-        getTimeseriesCollForRawOps(coll).aggregate([{$count: 'n'}], kRawOperationSpec).next().n,
+        getTimeseriesCollForRawOps(coll)
+            .aggregate([{$count: "n"}], kRawOperationSpec)
+            .next().n,
         1,
-        'Expected more than one bucket');
+        "Expected more than one bucket",
+    );
 }
 
 insertDocuments();
 
-const unpackStage = getAggPlanStages(coll.explain().aggregate(), '$_internalUnpackBucket')[0];
+const unpackStage = getAggPlanStages(coll.explain().aggregate(), "$_internalUnpackBucket")[0];
 
 function assertSorted(result, ascending) {
     let prev = ascending ? {t: -Infinity} : {t: Infinity};
     for (const doc of result) {
         if (ascending) {
-            assert.lt(+prev.t,
-                      +doc.t,
-                      'Found two docs not in ascending time order: ' + tojson({prev, doc}));
+            assert.lt(+prev.t, +doc.t, "Found two docs not in ascending time order: " + tojson({prev, doc}));
         } else {
-            assert.gt(+prev.t,
-                      +doc.t,
-                      'Found two docs not in descending time order: ' + tojson({prev, doc}));
+            assert.gt(+prev.t, +doc.t, "Found two docs not in descending time order: " + tojson({prev, doc}));
         }
 
         prev = doc;
     }
 }
 
-function checkAgainstReferenceBoundedSortUnexpected(
-    collection, reference, pipeline, hint, sortOrder) {
+function checkAgainstReferenceBoundedSortUnexpected(collection, reference, pipeline, hint, sortOrder) {
     const options = hint ? {hint: hint} : {};
 
     const plan = collection.explain().aggregate(pipeline, options);
@@ -169,10 +176,11 @@ function checkAgainstReferenceBoundedSortUnexpected(
         const blocking = getAggPlanStages(plan, "$sort");
         assert.gt(blocking.length, 0, {bounded, blocking, plan});
         if (!TestData.hasRandomShardsAddedRemoved)
-            assert.lt(bounded.length,
-                      FixtureHelpers.numberOfShardsForCollection(
-                          getTimeseriesCollForDDLOps(testDB, coll)),
-                      {bounded, blocking, plan});
+            assert.lt(
+                bounded.length,
+                FixtureHelpers.numberOfShardsForCollection(getTimeseriesCollForDDLOps(testDB, coll)),
+                {bounded, blocking, plan},
+            );
     } else {
         const stages = getAggPlanStages(plan, "$_internalBoundedSort");
         assert.eq([], stages, plan);
@@ -187,8 +195,7 @@ function checkAgainstReferenceBoundedSortUnexpected(
     }
 }
 
-function checkAgainstReferenceBoundedSortExpected(
-    collection, reference, pipeline, hint, sortOrder) {
+function checkAgainstReferenceBoundedSortExpected(collection, reference, pipeline, hint, sortOrder) {
     const options = hint ? {hint: hint} : {};
 
     const plan = collection.explain().aggregate(pipeline, options);
@@ -206,90 +213,78 @@ function checkAgainstReferenceBoundedSortExpected(
 
 function runTest(ascending) {
     const reference = getTimeseriesCollForRawOps(coll)
-                          .aggregate(
-                              [
-                                  unpackStage,
-                                  {$_internalInhibitOptimization: {}},
-                                  {$sort: {t: ascending ? 1 : -1}},
-                              ],
-                              kRawOperationSpec)
-                          .toArray();
+        .aggregate(
+            [unpackStage, {$_internalInhibitOptimization: {}}, {$sort: {t: ascending ? 1 : -1}}],
+            kRawOperationSpec,
+        )
+        .toArray();
     assertSorted(reference, ascending);
 
     // Check plan using collection scan
-    checkAgainstReferenceBoundedSortUnexpected(coll,
-                                               reference,
-                                               [
-                                                   {$sort: {t: ascending ? 1 : -1}},
-                                               ],
-                                               {},
-                                               ascending);
+    checkAgainstReferenceBoundedSortUnexpected(coll, reference, [{$sort: {t: ascending ? 1 : -1}}], {}, ascending);
 
     // Check plan using hinted collection scan
-    checkAgainstReferenceBoundedSortUnexpected(coll,
-                                               reference,
-                                               [
-                                                   {$sort: {t: ascending ? 1 : -1}},
-                                               ],
-                                               {"$natural": ascending ? 1 : -1},
-                                               ascending);
+    checkAgainstReferenceBoundedSortUnexpected(
+        coll,
+        reference,
+        [{$sort: {t: ascending ? 1 : -1}}],
+        {"$natural": ascending ? 1 : -1},
+        ascending,
+    );
 
     const referenceIndexed = getTimeseriesCollForRawOps(collIndexed)
-                                 .aggregate(
-                                     [
-                                         unpackStage,
-                                         {$_internalInhibitOptimization: {}},
-                                         {$sort: {t: ascending ? 1 : -1}},
-                                     ],
-                                     kRawOperationSpec)
-                                 .toArray();
+        .aggregate(
+            [unpackStage, {$_internalInhibitOptimization: {}}, {$sort: {t: ascending ? 1 : -1}}],
+            kRawOperationSpec,
+        )
+        .toArray();
     assertSorted(referenceIndexed, ascending);
 
     // Check plan using index scan. If we've inserted a date before 1-1-1970, we round the min
     // up towards 1970, rather then down, which has the effect of increasing the control.min.t.
     // This means the minimum time in the bucket is likely to be lower than indicated and thus,
     // actual dates may be out of order relative to what's indicated by the bucket bounds.
-    checkAgainstReferenceBoundedSortUnexpected(collIndexed,
-                                               referenceIndexed,
-                                               [
-                                                   {$sort: {t: ascending ? 1 : -1}},
-                                               ],
-                                               {},
-                                               ascending);
+    checkAgainstReferenceBoundedSortUnexpected(
+        collIndexed,
+        referenceIndexed,
+        [{$sort: {t: ascending ? 1 : -1}}],
+        {},
+        ascending,
+    );
 
     // Check plan using hinted index scan
-    checkAgainstReferenceBoundedSortUnexpected(collIndexed,
-                                               referenceIndexed,
-                                               [
-                                                   {$sort: {t: ascending ? 1 : -1}},
-                                               ],
-                                               {"t": 1},
-                                               ascending);
+    checkAgainstReferenceBoundedSortUnexpected(
+        collIndexed,
+        referenceIndexed,
+        [{$sort: {t: ascending ? 1 : -1}}],
+        {"t": 1},
+        ascending,
+    );
 
     // Check plan using hinted collection scan
-    checkAgainstReferenceBoundedSortUnexpected(collIndexed,
-                                               referenceIndexed,
-                                               [
-                                                   {$sort: {t: ascending ? 1 : -1}},
-                                               ],
-                                               {"$natural": ascending ? 1 : -1},
-                                               ascending);
+    checkAgainstReferenceBoundedSortUnexpected(
+        collIndexed,
+        referenceIndexed,
+        [{$sort: {t: ascending ? 1 : -1}}],
+        {"$natural": ascending ? 1 : -1},
+        ascending,
+    );
 
     // The workaround in all cases is to create a reverse index on the time field, though
     // it's necessary to force use of the reversed index.
     const reverseIdxName = "reverseIdx";
     collIndexed.createIndex({t: -1}, {name: reverseIdxName});
 
-    checkAgainstReferenceBoundedSortExpected(collIndexed,
-                                             referenceIndexed,
-                                             [
-                                                 {$sort: {t: ascending ? 1 : -1}},
-                                             ],
-                                             {"t": -1},
-                                             ascending);
+    checkAgainstReferenceBoundedSortExpected(
+        collIndexed,
+        referenceIndexed,
+        [{$sort: {t: ascending ? 1 : -1}}],
+        {"t": -1},
+        ascending,
+    );
 
     collIndexed.dropIndex(reverseIdxName);
 }
 
-runTest(false);  // descending
-runTest(true);   // ascending
+runTest(false); // descending
+runTest(true); // ascending

@@ -24,13 +24,13 @@ TestData.skipCheckRoutingTableConsistency = true;
 var numDocs = 2000;
 var baseName = "shard_insert_getlasterror_w2";
 var testDBName = baseName;
-var testCollName = 'coll';
+var testCollName = "coll";
 var replNodes = 3;
 
 // ~1KB string
-var textString = '';
+var textString = "";
 for (var i = 0; i < 40; i++) {
-    textString += 'abcdefghijklmnopqrstuvwxyz';
+    textString += "abcdefghijklmnopqrstuvwxyz";
 }
 
 // Spin up a sharded cluster, but do not add the shards
@@ -44,13 +44,12 @@ var shardingTestConfig = {
     // hours). For this test, we need a shorter election timeout because it relies on nodes running
     // an election when they do not detect an active primary. Therefore, we are setting the
     // electionTimeoutMillis to its default value.
-    initiateWithDefaultElectionTimeout: true
+    initiateWithDefaultElectionTimeout: true,
 };
 var shardingTest = new ShardingTest(shardingTestConfig);
 
 // TODO (SERVER-100403): Enable this once addShard registers dbs in the shard catalog
-if (FeatureFlagUtil.isPresentAndEnabled(shardingTest.configRS.getPrimary(),
-                                        "ShardAuthoritativeDbMetadataDDL")) {
+if (FeatureFlagUtil.isPresentAndEnabled(shardingTest.configRS.getPrimary(), "ShardAuthoritativeDbMetadataDDL")) {
     shardingTest.stop();
     quit();
 }
@@ -74,14 +73,15 @@ var testDB = mongosConn.getDB(testDBName);
 assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
 
 // Enable sharding on test db and its collection foo
-assert.commandWorked(mongosConn.getDB('admin').runCommand({enablesharding: testDBName}));
+assert.commandWorked(mongosConn.getDB("admin").runCommand({enablesharding: testDBName}));
 testDB[testCollName].createIndex({x: 1});
-assert.commandWorked(mongosConn.getDB('admin').runCommand(
-    {shardcollection: testDBName + '.' + testCollName, key: {x: 1}}));
+assert.commandWorked(
+    mongosConn.getDB("admin").runCommand({shardcollection: testDBName + "." + testCollName, key: {x: 1}}),
+);
 
 // Test case where GLE should return an error
-assert.commandWorked(testDB.foo.insert({_id: 'a', x: 1}));
-assert.writeError(testDB.foo.insert({_id: 'a', x: 1}, {writeConcern: {w: 2, wtimeout: 30000}}));
+assert.commandWorked(testDB.foo.insert({_id: "a", x: 1}));
+assert.writeError(testDB.foo.insert({_id: "a", x: 1}, {writeConcern: {w: 2, wtimeout: 30000}}));
 
 // Add more data
 bulk = testDB.foo.initializeUnorderedBulkOp();
@@ -100,17 +100,21 @@ replSet1.awaitSecondaryNodes(null, [primary]);
 testDB.getMongo().adminCommand({setParameter: 1, logLevel: 1});
 testDB.getMongo().setSecondaryOk();
 print("trying some queries");
-assert.soon(function() {
-    try {
-        testDB.foo.find().next();
-    } catch (e) {
-        print(e);
-        return false;
-    }
-    return true;
-}, "Queries took too long to complete correctly.", 2 * 60 * 1000);
+assert.soon(
+    function () {
+        try {
+            testDB.foo.find().next();
+        } catch (e) {
+            print(e);
+            return false;
+        }
+        return true;
+    },
+    "Queries took too long to complete correctly.",
+    2 * 60 * 1000,
+);
 
 // Shutdown cluster
 shardingTest.stop();
 
-print('shard_insert_getlasterror_w2.js SUCCESS');
+print("shard_insert_getlasterror_w2.js SUCCESS");

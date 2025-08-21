@@ -18,16 +18,19 @@ FixtureHelpers.runCommandOnEachPrimary({
     cmdObj: {
         setParameter: 1,
         "internalQueryMaxScansToExplode": 0,
-    }
+    },
 });
-const scanResult = coll.find({e: {$in: inList}}).sort({s: 1}).explain();
+const scanResult = coll
+    .find({e: {$in: inList}})
+    .sort({s: 1})
+    .explain();
 assert(scanResult.queryPlanner.maxScansToExplodeReached, tojson(scanResult));
 FixtureHelpers.runCommandOnEachPrimary({
     db: testDB.getSiblingDB("admin"),
     cmdObj: {
         setParameter: 1,
         "internalQueryMaxScansToExplode": 200,
-    }
+    },
 });
 coll.drop();
 
@@ -40,9 +43,17 @@ FixtureHelpers.runCommandOnEachPrimary({
     cmdObj: {
         setParameter: 1,
         "internalQueryEnumerationMaxOrSolutions": 1,
-    }
+    },
 });
-const orResult = coll.find({common: 1, $or: [{one: 0, two: 0}, {one: 1, two: 1}]}).explain();
+const orResult = coll
+    .find({
+        common: 1,
+        $or: [
+            {one: 0, two: 0},
+            {one: 1, two: 1},
+        ],
+    })
+    .explain();
 assert(orResult.queryPlanner.maxIndexedOrSolutionsReached, tojson(orResult));
 
 FixtureHelpers.runCommandOnEachPrimary({
@@ -50,7 +61,7 @@ FixtureHelpers.runCommandOnEachPrimary({
     cmdObj: {
         setParameter: 1,
         "internalQueryEnumerationMaxOrSolutions": 10,
-    }
+    },
 });
 
 // Test andLimit.
@@ -59,7 +70,7 @@ FixtureHelpers.runCommandOnEachPrimary({
     cmdObj: {
         setParameter: 1,
         "internalQueryEnumerationMaxIntersectPerAnd": 1,
-    }
+    },
 });
 const andResult = coll.find({common: 1, two: 0, one: 1}).explain();
 assert(andResult.queryPlanner.maxIndexedAndSolutionsReached, tojson(andResult));
@@ -70,7 +81,7 @@ FixtureHelpers.runCommandOnEachPrimary({
     cmdObj: {
         setParameter: 1,
         "internalQueryEnumerationMaxOrSolutions": 1,
-    }
+    },
 });
 const comboResult = coll.find({common: 1, one: 10, $or: [{one: 1}, {two: 2}]}).explain();
 assert(comboResult.queryPlanner.maxIndexedAndSolutionsReached, tojson(comboResult));
@@ -82,13 +93,13 @@ FixtureHelpers.runCommandOnEachPrimary({
     cmdObj: {
         setParameter: 1,
         "internalQueryEnumerationMaxOrSolutions": 10,
-    }
+    },
 });
 FixtureHelpers.runCommandOnEachPrimary({
     db: testDB.getSiblingDB("admin"),
     cmdObj: {
         setParameter: 1,
         "internalQueryEnumerationMaxIntersectPerAnd": 3,
-    }
+    },
 });
 MongoRunner.stopMongod(conn);

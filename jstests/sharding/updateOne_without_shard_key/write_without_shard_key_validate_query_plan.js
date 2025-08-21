@@ -10,9 +10,7 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {
-    WriteWithoutShardKeyTestUtil
-} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
+import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
 
 // Make sure we're testing with no implicit session.
 TestData.disableImplicitSessions = true;
@@ -29,7 +27,7 @@ const docsToInsert = [
     {_id: 2, x: 1, y: 1, z: [1, 2, 3]},
     {_id: 3, x: 2, y: 1, z: [1, 2, 3]},
     {_id: 4, x: 3, y: 1, z: [1, 2, 3]},
-    {_id: 5, x: 4, y: 1, z: [1, 2, 3]}
+    {_id: 5, x: 4, y: 1, z: [1, 2, 3]},
 ];
 const dbConn = st.s.getDB(dbName);
 const profileCollectionShard0 = st.shard0.getDB(dbName).system.profile;
@@ -52,8 +50,7 @@ function runTest(testCase, usingClusteredIndex) {
     if (usingClusteredIndex) {
         if (testCase.hasPositionalProjection) {
             assert.eq(profileDoc.execStats.stage, "PROJECTION_DEFAULT", profileDoc);
-            assert.eq(
-                profileDoc.execStats.inputStage.inputStage.stage, "CLUSTERED_IXSCAN", profileDoc);
+            assert.eq(profileDoc.execStats.inputStage.inputStage.stage, "CLUSTERED_IXSCAN", profileDoc);
         } else {
             if (!profileDoc.execStats.inputStage) {
                 // for queries that use express, there is no inputStage
@@ -62,7 +59,10 @@ function runTest(testCase, usingClusteredIndex) {
                     profileDoc.execStats.stage,
                     expressWriteStages,
                     "Profile doc's execStats did not contain one of the expected values (" +
-                        expressWriteStages + "): " + tojson(profileDoc));
+                        expressWriteStages +
+                        "): " +
+                        tojson(profileDoc),
+                );
             } else {
                 assert.eq(profileDoc.execStats.inputStage.stage, "CLUSTERED_IXSCAN", profileDoc);
             }
@@ -77,8 +77,7 @@ function runTest(testCase, usingClusteredIndex) {
         } else if (testCase.hasPositionalProjection) {
             assert.eq(profileDoc.execStats.stage, "PROJECTION_DEFAULT", profileDoc);
             assert.eq(profileDoc.execStats.inputStage.inputStage.stage, "FETCH", profileDoc);
-            assert.eq(
-                profileDoc.execStats.inputStage.inputStage.inputStage.stage, "IXSCAN", profileDoc);
+            assert.eq(profileDoc.execStats.inputStage.inputStage.inputStage.stage, "IXSCAN", profileDoc);
         } else {
             if (!profileDoc.execStats.inputStage) {
                 // for queries that use express, there is no inputStage
@@ -87,7 +86,10 @@ function runTest(testCase, usingClusteredIndex) {
                     profileDoc.execStats.stage,
                     expressWriteStages,
                     "Profile doc's execStats did not contain one of the expected values (" +
-                        expressWriteStages + "): " + tojson(profileDoc));
+                        expressWriteStages +
+                        "): " +
+                        tojson(profileDoc),
+                );
             } else {
                 assert.eq(profileDoc.execStats.inputStage.stage, "IDHACK", profileDoc);
             }
@@ -105,7 +107,12 @@ function runTest(testCase, usingClusteredIndex) {
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 0.
 WriteWithoutShardKeyTestUtil.setupShardedCollection(
-    st, nss, {x: 1}, [{x: splitPoint}], [{query: {x: splitPoint}, shard: st.shard1.shardName}]);
+    st,
+    nss,
+    {x: 1},
+    [{x: splitPoint}],
+    [{query: {x: splitPoint}, shard: st.shard1.shardName}],
+);
 
 assert.commandWorked(dbConn.getCollection(collName).insert(docsToInsert));
 
@@ -126,16 +133,14 @@ let testCases = [
                 // Account for single_crud_op_as_bulk_write.js override.
                 {"op": "bulkWrite", "command.update": {$exists: true}},
             ],
-            "ns": nss
-        }
+            "ns": nss,
+        },
     },
     {
         logMessage: "Running updateOne without positional update and non-default collation.",
         cmdObj: {
             update: collName,
-            updates: [
-                {q: {y: 1}, u: {$set: {a: 3}}, collation: {locale: "en", strength: 2}},
-            ],
+            updates: [{q: {y: 1}, u: {$set: {a: 3}}, collation: {locale: "en", strength: 2}}],
         },
         profileDocToFind: {
             $or: [
@@ -143,8 +148,8 @@ let testCases = [
                 // Account for single_crud_op_as_bulk_write.js override.
                 {"op": "bulkWrite", "command.update": {$exists: true}},
             ],
-            "ns": nss
-        }
+            "ns": nss,
+        },
     },
     {
         logMessage: "Running updateOne with positional update.",
@@ -159,15 +164,14 @@ let testCases = [
                 // Account for single_crud_op_as_bulk_write.js override.
                 {"op": "bulkWrite", "command.update": {$exists: true}},
             ],
-            "ns": nss
-        }
+            "ns": nss,
+        },
     },
     {
         logMessage: "Running updateOne with positional update and non-default collation.",
         cmdObj: {
             update: collName,
-            updates:
-                [{q: {y: 1, z: 1}, u: {$set: {"z.$": 3}}, collation: {locale: "en", strength: 2}}],
+            updates: [{q: {y: 1, z: 1}, u: {$set: {"z.$": 3}}, collation: {locale: "en", strength: 2}}],
         },
         hasPositionalUpdate: true,
         profileDocToFind: {
@@ -176,8 +180,8 @@ let testCases = [
                 // Account for single_crud_op_as_bulk_write.js override.
                 {"op": "bulkWrite", "command.update": {$exists: true}},
             ],
-            "ns": nss
-        }
+            "ns": nss,
+        },
     },
     {
         logMessage: "Running findAndModify update without positional update.",
@@ -186,18 +190,17 @@ let testCases = [
             query: {y: 1},
             update: {$set: {a: 4}},
         },
-        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName}
+        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
-        logMessage:
-            "Running findAndModify update without positional update and non-default collation.",
+        logMessage: "Running findAndModify update without positional update and non-default collation.",
         cmdObj: {
             findAndModify: collName,
             query: {y: 1},
             update: {$set: {a: 4}},
-            collation: {locale: "en", strength: 2}
+            collation: {locale: "en", strength: 2},
         },
-        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName}
+        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
         logMessage: "Running findAndModify update with positional update.",
@@ -207,43 +210,41 @@ let testCases = [
             update: {$set: {"z.$": 3}},
         },
         hasPositionalUpdate: true,
-        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName}
+        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
-        logMessage:
-            "Running findAndModify update with positional update and non-default collation.",
+        logMessage: "Running findAndModify update with positional update and non-default collation.",
         cmdObj: {
             findAndModify: collName,
             query: {y: 1, z: 1},
             update: {$set: {"z.$": 3}},
-            collation: {locale: "en", strength: 2}
+            collation: {locale: "en", strength: 2},
         },
         hasPositionalUpdate: true,
-        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName}
+        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
         logMessage: "Running findAndModify with positional projection.",
         cmdObj: {
             findAndModify: collName,
             query: {y: 1, z: 1},
-            fields: {'z.$': 1},
+            fields: {"z.$": 1},
             remove: true,
         },
         hasPositionalProjection: true,
-        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName}
+        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
         logMessage: "Running findAndModify with positional projection and non-default collation.",
         cmdObj: {
             findAndModify: collName,
             query: {y: 1, z: 1},
-            fields: {'z.$': 1},
+            fields: {"z.$": 1},
             update: {$set: {a: 3}},
-            collation: {locale: "en", strength: 2}
-
+            collation: {locale: "en", strength: 2},
         },
         hasPositionalProjection: true,
-        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName}
+        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
         logMessage: "Running findAndModify remove.",
@@ -252,7 +253,7 @@ let testCases = [
             query: {y: 1},
             remove: true,
         },
-        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName}
+        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
         logMessage: "Running findAndModify remove and non-default collation.",
@@ -262,7 +263,7 @@ let testCases = [
             collation: {locale: "en", strength: 2},
             remove: true,
         },
-        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName}
+        profileDocToFind: {"op": "command", "ns": nss, "command.findAndModify": collName},
     },
     {
         logMessage: "Running deleteOne.",
@@ -277,8 +278,8 @@ let testCases = [
                 // Account for single_crud_op_as_bulk_write.js override.
                 {"op": "bulkWrite", "command.delete": {$exists: true}},
             ],
-            "ns": nss
-        }
+            "ns": nss,
+        },
     },
     {
         logMessage: "Running deleteOne and non-default collation.",
@@ -293,12 +294,12 @@ let testCases = [
                 // Account for single_crud_op_as_bulk_write.js override.
                 {"op": "bulkWrite", "command.delete": {$exists: true}},
             ],
-            "ns": nss
-        }
-    }
+            "ns": nss,
+        },
+    },
 ];
 
-testCases.forEach(testCase => {
+testCases.forEach((testCase) => {
     jsTestLog(testCase.logMessage);
     runTest(testCase, usingClusteredIndex);
 });

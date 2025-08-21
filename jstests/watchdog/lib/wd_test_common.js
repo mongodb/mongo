@@ -17,7 +17,7 @@ export function testMongoDHang(control, mongod_options) {
     options = Object.extend(mongod_options, options);
 
     const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up');
+    assert.neq(null, conn, "mongod was unable to start up");
 
     // Wait for watchdog to get running
     const admin = conn.getDB("admin");

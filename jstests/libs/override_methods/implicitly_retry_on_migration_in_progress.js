@@ -11,19 +11,18 @@ import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 const kRetryTimeout = 10 * 60 * 1000;
 const kIntervalBetweenRetries = 50;
 
-function _runAndExhaustQueryWithRetryUponMigration(
-    conn, commandName, commandObj, func, makeFuncArgs) {
+function _runAndExhaustQueryWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs) {
     const kQueryRetryableErrors = [
         ErrorCodes.ReshardCollectionInProgress,
         ErrorCodes.ConflictingOperationInProgress,
-        ErrorCodes.QueryPlanKilled
+        ErrorCodes.QueryPlanKilled,
     ];
 
     let queryResponse;
     let attempt = 0;
-    const lsid = commandObj['lsid'];
-    const apiVersion = commandObj['apiVersion'];
-    const apiStrict = commandObj['apiStrict'];
+    const lsid = commandObj["lsid"];
+    const apiVersion = commandObj["apiVersion"];
+    const apiStrict = commandObj["apiStrict"];
 
     assert.soon(
         () => {
@@ -32,16 +31,14 @@ function _runAndExhaustQueryWithRetryUponMigration(
 
             queryResponse = func.apply(conn, makeFuncArgs(commandObj));
 
-            if (commandName === "explain" &&
-                RetryableWritesUtil.shouldRetryExplainCommand(queryResponse)) {
+            if (commandName === "explain" && RetryableWritesUtil.shouldRetryExplainCommand(queryResponse)) {
                 jsTest.log(`Retrying failed explain command`);
                 return stopRetrying;
             }
 
             let latestBatchResponse = queryResponse;
 
-            while (latestBatchResponse.ok === 1 && latestBatchResponse.cursor &&
-                   latestBatchResponse.cursor.id != 0) {
+            while (latestBatchResponse.ok === 1 && latestBatchResponse.cursor && latestBatchResponse.cursor.id != 0) {
                 const ns = queryResponse.cursor.ns;
                 const collName = getCollectionNameFromFullNamespace(ns);
 
@@ -64,8 +61,11 @@ function _runAndExhaustQueryWithRetryUponMigration(
                     queryResponse.cursor.firstBatch.push(...latestBatchResponse.cursor.nextBatch);
                     queryResponse.cursor.id = NumberLong(0);
                 } else {
-                    jsTest.log(`An error occurred while attempting to exhaust the results of ${
-                        commandName} at attempt ${attempt}: ${tojson(latestBatchResponse)}`);
+                    jsTest.log(
+                        `An error occurred while attempting to exhaust the results of ${
+                            commandName
+                        } at attempt ${attempt}: ${tojson(latestBatchResponse)}`,
+                    );
                 }
             }
 
@@ -79,17 +79,16 @@ function _runAndExhaustQueryWithRetryUponMigration(
 
             return stopRetrying;
         },
-        () => "Timed out while retrying command '" + tojson(commandObj) +
-            "', response: " + tojson(queryResponse),
+        () => "Timed out while retrying command '" + tojson(commandObj) + "', response: " + tojson(queryResponse),
         kRetryTimeout,
-        kIntervalBetweenRetries);
+        kIntervalBetweenRetries,
+    );
 
     return queryResponse;
 }
 
 function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs) {
-    const kCommandRetryableErrors =
-        [ErrorCodes.ReshardCollectionInProgress, ErrorCodes.ConflictingOperationInProgress];
+    const kCommandRetryableErrors = [ErrorCodes.ReshardCollectionInProgress, ErrorCodes.ConflictingOperationInProgress];
 
     const kNoRetry = true;
     const kRetry = false;
@@ -106,9 +105,13 @@ function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, fun
                 return kNoRetry;
             }
 
-            let message = "Retrying the " + commandName +
-                " command because a migration operation is in progress (attempt " + attempt +
-                "): " + tojson(commandResponse);
+            let message =
+                "Retrying the " +
+                commandName +
+                " command because a migration operation is in progress (attempt " +
+                attempt +
+                "): " +
+                tojson(commandResponse);
 
             // This handles the retry case when run against a standalone, replica set, or mongos
             // where both shards returned the same response.
@@ -120,20 +123,18 @@ function _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, fun
             jsTestLog("Done retrying " + commandName);
             return kNoRetry;
         },
-        () => "Timed out while retrying command '" + tojson(commandObj) +
-            "', response: " + tojson(commandResponse),
+        () => "Timed out while retrying command '" + tojson(commandObj) + "', response: " + tojson(commandResponse),
         kRetryTimeout,
-        kIntervalBetweenRetries);
+        kIntervalBetweenRetries,
+    );
 
     return commandResponse;
 }
 
-function runCommandWithRetryUponMigration(
-    conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+function runCommandWithRetryUponMigration(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     // These are the query commands that will be retried when failing due to a concurrent chunk or
     // collection migrations.
-    const kQueryCommands =
-        new Set(['find', 'aggregate', 'listIndexes', 'count', 'distinct', 'explain']);
+    const kQueryCommands = new Set(["find", "aggregate", "listIndexes", "count", "distinct", "explain"]);
 
     // These are the DDL commands that can return BackgroundOperationInProgress error codes due to
     // concurrent chunk or collection migrations.
@@ -149,24 +150,21 @@ function runCommandWithRetryUponMigration(
     }
 
     // A transaction can either be issued by the test file or injected by a suite override.
-    const inTransaction = commandObj.hasOwnProperty("autocommit") ||
-        (TestData.networkErrorAndTxnOverrideConfig &&
-         TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions);
+    const inTransaction =
+        commandObj.hasOwnProperty("autocommit") ||
+        (TestData.networkErrorAndTxnOverrideConfig && TestData.networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions);
 
     if (!inTransaction && kQueryCommands.has(commandName)) {
-        return _runAndExhaustQueryWithRetryUponMigration(
-            conn, commandName, commandObj, func, makeFuncArgs);
-
+        return _runAndExhaustQueryWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs);
     } else if (kRetryableDDLCommands.has(commandName)) {
-        return _runDDLCommandWithRetryUponMigration(
-            conn, commandName, commandObj, func, makeFuncArgs);
-
+        return _runDDLCommandWithRetryUponMigration(conn, commandName, commandObj, func, makeFuncArgs);
     } else {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 }
 
 OverrideHelpers.prependOverrideInParallelShell(
-    "jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+    "jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js",
+);
 
 OverrideHelpers.overrideRunCommand(runCommandWithRetryUponMigration);

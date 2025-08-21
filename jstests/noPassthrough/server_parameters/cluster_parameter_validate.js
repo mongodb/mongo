@@ -11,18 +11,23 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 function runTest(conn) {
     let db = conn.getDB("admin");
 
-    assert.commandFailedWithCode(db.adminCommand({
-        setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1), $zip: 1}}
-    }),
-                                 ErrorCodes.DollarPrefixedFieldName);
+    assert.commandFailedWithCode(
+        db.adminCommand({
+            setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1), $zip: 1}},
+        }),
+        ErrorCodes.DollarPrefixedFieldName,
+    );
 
-    assert.commandWorked(db.adminCommand(
-        {setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1)}}}));
+    assert.commandWorked(
+        db.adminCommand({setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1)}}}),
+    );
 
-    assert.commandFailedWithCode(db.adminCommand({
-        setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1), $zip: 1}}
-    }),
-                                 ErrorCodes.DollarPrefixedFieldName);
+    assert.commandFailedWithCode(
+        db.adminCommand({
+            setClusterParameter: {fleCompactionOptions: {maxCompactionSize: NumberInt(1), $zip: 1}},
+        }),
+        ErrorCodes.DollarPrefixedFieldName,
+    );
 }
 
 jsTestLog("Standalone: Testing setClusterParameter");

@@ -5,15 +5,16 @@ import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 import {getExecutionStats, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
-export const testClusteredCollectionBoundedScan = function(coll, clusterKey, checkProfile) {
+export const testClusteredCollectionBoundedScan = function (coll, clusterKey, checkProfile) {
     const batchSize = 100;
     const clusterKeyFieldName = Object.keys(clusterKey)[0];
 
     function initAndPopulate(coll, clusterKey) {
         const clusterKeyFieldName = Object.keys(clusterKey)[0];
         assertDropCollection(coll.getDB(), coll.getName());
-        assert.commandWorked(coll.getDB().createCollection(
-            coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}}));
+        assert.commandWorked(
+            coll.getDB().createCollection(coll.getName(), {clusteredIndex: {key: clusterKey, unique: true}}),
+        );
 
         const bulk = coll.initializeUnorderedBulkOp();
         for (let i = 0; i < batchSize; i++) {
@@ -45,13 +46,16 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey, che
             return;
         }
 
-        const slowQueryLogs = assert.commandWorked(db.adminCommand({getLog: 'global'}))
-                                  .log.map(JSON.parse)
-                                  .filter((entry) => {
-                                      return entry.msg == "Slow query" &&
-                                          !entry?.attr?.command?.explain &&
-                                          entry?.attr?.command?.comment === comment;
-                                  });
+        const slowQueryLogs = assert
+            .commandWorked(db.adminCommand({getLog: "global"}))
+            .log.map(JSON.parse)
+            .filter((entry) => {
+                return (
+                    entry.msg == "Slow query" &&
+                    !entry?.attr?.command?.explain &&
+                    entry?.attr?.command?.comment === comment
+                );
+            });
         assert.gte(slowQueryLogs.length, 1);
         for (let slowQueryLog of slowQueryLogs) {
             assert.eq(slowQueryLog.attr.planSummary, expectedStage, tojson(slowQueryLog));
@@ -60,7 +64,7 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey, che
         profilerHasAtLeastOneMatchingEntryOrThrow({
             profileDB: db,
             filter: {"command.comment": comment, "planSummary": expectedStage},
-            errorMsgFilter: {"command.comment": comment}
+            errorMsgFilter: {"command.comment": comment},
         });
     }
 
@@ -106,10 +110,12 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey, che
         // Use 'batchSize' to avoid selecting "EXPRESS" instead of "CLUSTERED_IXSCAN".
         assert.eq(coll.find(filter).batchSize(20).comment(comment).itcount(), 1);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
-        const expl = assert.commandWorked(coll.getDB().runCommand({
-            explain: {find: coll.getName(), filter: filter, batchSize: 20},
-            verbosity: "executionStats"
-        }));
+        const expl = assert.commandWorked(
+            coll.getDB().runCommand({
+                explain: {find: coll.getName(), filter: filter, batchSize: 20},
+                verbosity: "executionStats",
+            }),
+        );
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
 
@@ -126,19 +132,22 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey, che
         assertDocsExamined(executionStats, 2, 1);
     }
 
-    function testLT(op,
-                    val,
-                    expectedNReturned,
-                    expectedDocsExaminedClassic,
-                    expectedDocsExaminedSbe = expectedDocsExaminedClassic - 1) {
+    function testLT(
+        op,
+        val,
+        expectedNReturned,
+        expectedDocsExaminedClassic,
+        expectedDocsExaminedSbe = expectedDocsExaminedClassic - 1,
+    ) {
         initAndPopulate(coll, clusterKey);
 
         const filter = {[clusterKeyFieldName]: {[op]: val}};
         const comment = "testLT-" + op + "-" + val;
         assert.eq(coll.find(filter).comment(comment).itcount(), expectedNReturned);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
-        const expl = assert.commandWorked(coll.getDB().runCommand(
-            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
+        const expl = assert.commandWorked(
+            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+        );
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
         assert(clusteredIxScan);
@@ -156,23 +165,25 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey, che
 
         // In this case the scans do not hit EOF, so there is an extra cursor->next() call past the
         // end of the range in Classic, making SBE expect one fewer doc examined than Classic.
-        assertDocsExamined(
-            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
+        assertDocsExamined(expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
     }
 
-    function testGT(op,
-                    val,
-                    expectedNReturned,
-                    expectedDocsExaminedClassic,
-                    expectedDocsExaminedSbe = expectedDocsExaminedClassic) {
+    function testGT(
+        op,
+        val,
+        expectedNReturned,
+        expectedDocsExaminedClassic,
+        expectedDocsExaminedSbe = expectedDocsExaminedClassic,
+    ) {
         initAndPopulate(coll, clusterKey);
 
         const filter = {[clusterKeyFieldName]: {[op]: val}};
         const comment = "testGT-" + op + "-" + val;
         assert.eq(coll.find(filter).comment(comment).itcount(), expectedNReturned);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
-        const expl = assert.commandWorked(coll.getDB().runCommand(
-            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
+        const expl = assert.commandWorked(
+            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+        );
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
 
@@ -190,25 +201,27 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey, che
 
         // In this case the scans hit EOF, so there is no extra cursor->next() call in Classic,
         // making Classic and SBE expect the same number of docs examined.
-        assertDocsExamined(
-            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
+        assertDocsExamined(expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
     }
 
-    function testRange(min,
-                       minVal,
-                       max,
-                       maxVal,
-                       expectedNReturned,
-                       expectedDocsExaminedClassic,
-                       expectedDocsExaminedSbe = expectedDocsExaminedClassic - 1) {
+    function testRange(
+        min,
+        minVal,
+        max,
+        maxVal,
+        expectedNReturned,
+        expectedDocsExaminedClassic,
+        expectedDocsExaminedSbe = expectedDocsExaminedClassic - 1,
+    ) {
         initAndPopulate(coll, clusterKey);
 
         const filter = {[clusterKeyFieldName]: {[min]: minVal, [max]: maxVal}};
         const comment = "testRange-" + min + "-" + minVal + "-" + max + "-" + maxVal;
         assert.eq(coll.find(filter).comment(comment).itcount(), expectedNReturned);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
-        const expl = assert.commandWorked(coll.getDB().runCommand(
-            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
+        const expl = assert.commandWorked(
+            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+        );
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
 
@@ -222,8 +235,7 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey, che
 
         // In this case the scans do not hit EOF, so there is an extra cursor->next() call past the
         // end of the range in Classic, making SBE expect one fewer doc examined than Classic.
-        assertDocsExamined(
-            expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
+        assertDocsExamined(expl.executionStats, expectedDocsExaminedClassic, expectedDocsExaminedSbe);
     }
 
     function testIn() {
@@ -233,8 +245,9 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey, che
         const comment = "testIn";
         assert.eq(coll.find(filter).comment(comment).itcount(), 3);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "CLUSTERED_IXSCAN");
-        const expl = assert.commandWorked(coll.getDB().runCommand(
-            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
+        const expl = assert.commandWorked(
+            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+        );
 
         const clusteredIxScan = getPlanStage(expl, "CLUSTERED_IXSCAN");
 
@@ -257,8 +270,9 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey, che
         assert.eq(coll.find(filter).comment(comment).itcount(), 10);
         assertLogAndProfileHaveCorrectStage(coll.getDB(), comment, "COLLSCAN");
 
-        const expl = assert.commandWorked(coll.getDB().runCommand(
-            {explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}));
+        const expl = assert.commandWorked(
+            coll.getDB().runCommand({explain: {find: coll.getName(), filter: filter}, verbosity: "executionStats"}),
+        );
 
         assert(getPlanStage(expl, "COLLSCAN"));
         assert(!getPlanStage(expl, "COLLSCAN").hasOwnProperty("maxRecord"));

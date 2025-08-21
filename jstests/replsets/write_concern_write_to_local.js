@@ -3,13 +3,9 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    restartReplicationOnSecondaries,
-    stopReplicationOnSecondaries
-} from "jstests/libs/write_concern_util.js";
+import {restartReplicationOnSecondaries, stopReplicationOnSecondaries} from "jstests/libs/write_concern_util.js";
 
-const rst = new ReplSetTest(
-    {nodes: [{}, {rsConfig: {priority: 0}}], nodeOptions: {setParameter: {logLevel: 1}}});
+const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}], nodeOptions: {setParameter: {logLevel: 1}}});
 rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
@@ -30,7 +26,11 @@ stopReplicationOnSecondaries(rst, false /* changeReplicaSetDefaultWCToLocal */);
 
 // Advance the primary opTime by doing local dummy write.
 assert.commandWorked(
-    rst.getPrimary().getDB("dummy")["dummy"].insert({x: 'dummy'}, {writeConcern: {w: 1}}));
+    rst
+        .getPrimary()
+        .getDB("dummy")
+        ["dummy"].insert({x: "dummy"}, {writeConcern: {w: 1}}),
+);
 
 jsTestLog("Write to local db on the primary node should succeed.");
 primaryColl.insertOne({x: 4});

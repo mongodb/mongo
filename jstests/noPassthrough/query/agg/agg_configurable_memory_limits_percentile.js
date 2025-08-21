@@ -4,7 +4,7 @@ import {
     testLargeUniformDataset,
     testLargeUniformDataset_WithInfinities,
     testWithMultipleGroups,
-    testWithSingleGroup
+    testWithSingleGroup,
 } from "jstests/aggregation/libs/percentiles_util.js";
 
 // Tests that the accurate methods of percentile (discrete and continuous) function correctly even
@@ -19,13 +19,11 @@ const coll = db.agg_configurable_memory_limit;
 // forced to spill to disk at both the group and accumulator levels.
 (function testGroupAndAccumulatorSpilling() {
     // Force spill at group level for all tests.
-    runSpillingTestsWithServerParameter(
-        {setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 1});
+    runSpillingTestsWithServerParameter({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 1});
 
     // Force spill at accumulator level for all tests (group level spilling will still also occur).
-    runSpillingTestsWithServerParameter(
-        {setParameter: 1, internalQueryMaxPercentileAccumulatorBytes: 1});
-}());
+    runSpillingTestsWithServerParameter({setParameter: 1, internalQueryMaxPercentileAccumulatorBytes: 1});
+})();
 
 function runSpillingTestsWithServerParameter(setParameterObject) {
     assert.commandWorked(db.adminCommand(setParameterObject));
@@ -39,7 +37,7 @@ function runSpillingTestsWithServerParameter(setParameterObject) {
         docs: [{x: 0}, {x: "non-numeric"}, {x: 1}, {x: 2}, {x: 3}, {x: 4}, {x: 5}],
         percentileSpec: {$percentile: {p: [0, 0.5, 1], input: "$x", method: "discrete"}},
         expectedResult: [0, 2, 5],
-        msg: "Non-numeric data should be ignored"
+        msg: "Non-numeric data should be ignored",
     });
 
     testWithSingleGroup({
@@ -47,7 +45,7 @@ function runSpillingTestsWithServerParameter(setParameterObject) {
         docs: [{x: 0}, {x: "non-numeric"}, {x: 1}, {x: 2}, {x: 3}, {x: 4}, {x: 5}],
         percentileSpec: {$percentile: {p: [0, 0.5, 1], input: "$x", method: "continuous"}},
         expectedResult: [0, 2.5, 5],
-        msg: "Non-numeric data should be ignored"
+        msg: "Non-numeric data should be ignored",
     });
 
     testWithSingleGroup({
@@ -55,7 +53,7 @@ function runSpillingTestsWithServerParameter(setParameterObject) {
         docs: [{x: -Infinity}, {x: 0}, {x: 1}, {x: 2}, {x: Infinity}, {x: Infinity}, {x: Infinity}],
         percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: "discrete"}},
         expectedResult: [2, Infinity, -Infinity],
-        msg: "Infinities should not be ignored"
+        msg: "Infinities should not be ignored",
     });
 
     testWithSingleGroup({
@@ -63,7 +61,7 @@ function runSpillingTestsWithServerParameter(setParameterObject) {
         docs: [{x: -Infinity}, {x: 0}, {x: 1}, {x: 2}, {x: Infinity}, {x: Infinity}, {x: Infinity}],
         percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: "continuous"}},
         expectedResult: [2, Infinity, -Infinity],
-        msg: "Infinities should not be ignored"
+        msg: "Infinities should not be ignored",
     });
 
     /**
@@ -82,25 +80,23 @@ function runSpillingTestsWithServerParameter(setParameterObject) {
         {k: 2, x: "not a number"},
         {k: 2, x: Infinity},
         {k: "three", x: 10},
-        {k: "three", x: 20}
+        {k: "three", x: 20},
     ];
 
     testWithMultipleGroups({
         coll: coll,
         docs: multipleGroupsDocs,
         percentileSpec: {$percentile: {p: [0.5], input: "$x", method: "discrete"}},
-        expectedResult: [/* k:0 */[1], /* k:1 */[5], /* k:2 */[Infinity], /* k:"three" */[10]],
-        msg:
-            "Percentile should be calculated for each of several groups, ignoring non-numeric data and including infinities."
+        expectedResult: [/* k:0 */ [1], /* k:1 */ [5], /* k:2 */ [Infinity], /* k:"three" */ [10]],
+        msg: "Percentile should be calculated for each of several groups, ignoring non-numeric data and including infinities.",
     });
 
     testWithMultipleGroups({
         coll: coll,
         docs: multipleGroupsDocs,
         percentileSpec: {$percentile: {p: [0.5], input: "$x", method: "continuous"}},
-        expectedResult: [/* k:0 */[1.5], /* k:1 */[5], /* k:2 */[Infinity], /* k:"three" */[15]],
-        msg:
-            "Percentile should be calculated for each of several groups, ignoring non-numeric data and including infinities."
+        expectedResult: [/* k:0 */ [1.5], /* k:1 */ [5], /* k:2 */ [Infinity], /* k:"three" */ [15]],
+        msg: "Percentile should be calculated for each of several groups, ignoring non-numeric data and including infinities.",
     });
 
     /**
@@ -124,13 +120,11 @@ function runSpillingTestsWithServerParameter(setParameterObject) {
 
     testLargeUniformDataset(coll, samples, sortedSamples, p, accuracyError, "discrete");
 
-    testLargeUniformDataset_WithInfinities(
-        coll, samples, sortedSamples, p, accuracyError, "discrete");
+    testLargeUniformDataset_WithInfinities(coll, samples, sortedSamples, p, accuracyError, "discrete");
 
     testLargeUniformDataset(coll, samples, sortedSamples, p, accuracyError, "continuous");
 
-    testLargeUniformDataset_WithInfinities(
-        coll, samples, sortedSamples, p, accuracyError, "continuous");
+    testLargeUniformDataset_WithInfinities(coll, samples, sortedSamples, p, accuracyError, "continuous");
 }
 
 MongoRunner.stopMongod(conn);

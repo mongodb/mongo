@@ -14,14 +14,14 @@
 //   requires_getmore,
 // ]
 
-const admin = db.getSiblingDB('admin');
+const admin = db.getSiblingDB("admin");
 
 // Get current log level.
 let originalLogLevel = assert.commandWorked(admin.setLogLevel(1)).was.verbosity;
 
 try {
-    const listAllLocalSessions = function() {
-        return admin.aggregate([{'$listLocalSessions': {allUsers: true}}]);
+    const listAllLocalSessions = function () {
+        return admin.aggregate([{"$listLocalSessions": {allUsers: true}}]);
     };
 
     // Start a new session and capture its sessionId.
@@ -34,12 +34,12 @@ try {
     jsTestLog("listAllLocalSessions result: " + tojson(resultArray));
     assert.gte(resultArray.length, 1);
     const resultArrayMine = resultArray
-                                .map(function(sess) {
-                                    return sess._id.id;
-                                })
-                                .filter(function(id) {
-                                    return 0 == bsonWoCompare({x: id}, {x: myid});
-                                });
+        .map(function (sess) {
+            return sess._id.id;
+        })
+        .filter(function (id) {
+            return 0 == bsonWoCompare({x: id}, {x: myid});
+        });
     assert.eq(resultArrayMine.length, 1);
 } finally {
     admin.setLogLevel(originalLogLevel);

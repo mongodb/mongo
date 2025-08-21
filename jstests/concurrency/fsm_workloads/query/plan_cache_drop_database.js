@@ -11,7 +11,7 @@
  *  assumes_against_mongod_not_mongos,
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     function populateData(db, collName) {
         var coll = db[collName];
 
@@ -46,7 +46,7 @@ export const $config = (function() {
         }
     }
 
-    var states = (function() {
+    var states = (function () {
         function count(db, collName) {
             var coll = db.getSiblingDB(this.planCacheDBName)[collName];
 
@@ -54,7 +54,7 @@ export const $config = (function() {
 
             // We can't use assert.commandWorked here because the plan
             // executor can be killed during the count.
-            coll.runCommand('count', cmdObj);
+            coll.runCommand("count", cmdObj);
         }
 
         function dropDB(db, collName) {
@@ -75,7 +75,7 @@ export const $config = (function() {
     var transitions = {count: {count: 0.95, dropDB: 0.05}, dropDB: {count: 0.95, dropDB: 0.05}};
 
     function setup(db, collName, cluster) {
-        this.planCacheDBName = db.getName() + 'plan_cache_drop_database';
+        this.planCacheDBName = db.getName() + "plan_cache_drop_database";
 
         var myDB = db.getSiblingDB(this.planCacheDBName);
         populateData(myDB, collName);
@@ -85,7 +85,7 @@ export const $config = (function() {
         threadCount: 10,
         iterations: 50,
         states: states,
-        startState: 'count',
+        startState: "count",
         transitions: transitions,
         setup: setup,
     };

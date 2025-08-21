@@ -34,9 +34,7 @@ assert.doesNotThrow(() => {
 });
 
 const WARN_ID = 4780400;
-assert.eq(true,
-          checkLog.checkContainsOnceJson(conn, WARN_ID, {}),
-          'Expected log ID ' + WARN_ID + ' was not found');
+assert.eq(true, checkLog.checkContainsOnceJson(conn, WARN_ID, {}), "Expected log ID " + WARN_ID + " was not found");
 
 MongoRunner.stopMongod(conn);
 

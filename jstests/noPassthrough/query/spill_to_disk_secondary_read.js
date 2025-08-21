@@ -43,20 +43,19 @@ const readColl = secondary.getDB("test").foo;
     }
 
     // Set memory limit so low that HashAgg has to spill all records it processes.
-    const oldSetting =
-        assert
-            .commandWorked(secondary.adminCommand({
-                setParameter: 1,
-                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1
-            }))
-            .was;
+    const oldSetting = assert.commandWorked(
+        secondary.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: 1,
+        }),
+    ).was;
     try {
         // The pipeline is silly -- because '$key' contains unique values, it will "group" exactly
         // one record into each bucket and push a single '$string' value -- but it allows us to be
         // more deterministic with spilling behaviour: each input record would create a record
         // inside 'HashAgg' and because of the low memory limit, all of them will have to be
         // spilled. For the spilled bytes, sanity test that the number is "reasonably large".
-        const pipeline = [{$group: {_id: '$key', s: {$push: '$string'}}}];
+        const pipeline = [{$group: {_id: "$key", s: {$push: "$string"}}}];
         const expectedSpilledRecords = cRecords;
         const expectedSpilledBytesAtLeast = cRecords * 10;
 
@@ -66,23 +65,24 @@ const readColl = secondary.getDB("test").foo;
             allowDiskUse: false,
             readConcern: {level: "majority"},
             writeConcern: {"w": "majority"},
-            cursor: {}
+            cursor: {},
         };
-        assert.commandFailedWithCode(readColl.runCommand("aggregate", aggCommand),
-                                     ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
+        assert.commandFailedWithCode(
+            readColl.runCommand("aggregate", aggCommand),
+            ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed,
+        );
         let aggOptions = {
             allowDiskUse: true,
             readConcern: {level: "majority"},
-            writeConcern: {"w": "majority"}
+            writeConcern: {"w": "majority"},
         };
         const res = readColl.aggregate(pipeline, aggOptions).toArray();
-        assert.eq(res.length, cRecords, res);  // the group-by key is unique
+        assert.eq(res.length, cRecords, res); // the group-by key is unique
 
         // In SBE also check the statistics for disk usage. Note: 'explain()' doesn't support the
         // 'writeConcern' option so we test spilling on the secondary but without using the concern.
-        const explainRes =
-            readColl.explain('executionStats').aggregate(pipeline, {allowDiskUse: true});
-        const hashAggGroups = getSbePlanStages(explainRes, 'group');
+        const explainRes = readColl.explain("executionStats").aggregate(pipeline, {allowDiskUse: true});
+        const hashAggGroups = getSbePlanStages(explainRes, "group");
         assert.eq(hashAggGroups.length, 1, explainRes);
         const hashAggGroup = hashAggGroups[0];
         assert(hashAggGroup, explainRes);
@@ -94,10 +94,12 @@ const readColl = secondary.getDB("test").foo;
         assert.eq(hashAggGroup.spills, hashAggGroup.spilledRecords, hashAggGroup);
         assert.gt(hashAggGroup.spilledDataStorageSize, expectedSpilledBytesAtLeast, hashAggGroup);
     } finally {
-        assert.commandWorked(secondary.adminCommand({
-            setParameter: 1,
-            internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: oldSetting
-        }));
+        assert.commandWorked(
+            secondary.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill: oldSetting,
+            }),
+        );
     }
 })();
 
@@ -111,22 +113,22 @@ const readColl = secondary.getDB("test").foo;
     }
 
     // Set memory limit so low that HashLookup has to spill all records it processes.
-    const oldSetting =
-        assert
-            .commandWorked(secondary.adminCommand({
-                setParameter: 1,
-                internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
-            }))
-            .was;
+    const oldSetting = assert.commandWorked(
+        secondary.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1,
+        }),
+    ).was;
     try {
         // The pipeline is silly -- because '$key' contains unique values, it will self-join each
         // record with itself and nothing else -- but it allows us to be more deterministic with
         // the spilling behaviour. For the spilled bytes, sanity test that the number is "reasonably
         // large".
-        const pipeline = [{
-            $lookup:
-                {from: readColl.getName(), localField: "key", foreignField: "key", as: "results"}
-        }];
+        const pipeline = [
+            {
+                $lookup: {from: readColl.getName(), localField: "key", foreignField: "key", as: "results"},
+            },
+        ];
         const expectedSpilledRecordsAtLeast = cRecords;
         const expectedSpilledBytesAtLeast = cRecords * 20;
 
@@ -136,17 +138,16 @@ const readColl = secondary.getDB("test").foo;
         let aggOptions = {
             allowDiskUse: true,
             readConcern: {level: "majority"},
-            writeConcern: {"w": "majority"}
+            writeConcern: {"w": "majority"},
         };
         const res = readColl.aggregate(pipeline, aggOptions).toArray();
-        assert.eq(res.length, cRecords);  // the key for self-join is unique
+        assert.eq(res.length, cRecords); // the key for self-join is unique
 
         // In SBE also check the statistics for disk usage. Note: 'explain()' doesn't support the
         // 'writeConcern' option so we test spilling on the secondary but without using the concern.
-        const explainRes =
-            readColl.explain('executionStats').aggregate(pipeline, {allowDiskUse: true});
+        const explainRes = readColl.explain("executionStats").aggregate(pipeline, {allowDiskUse: true});
 
-        const hLookups = getSbePlanStages(explainRes, 'hash_lookup');
+        const hLookups = getSbePlanStages(explainRes, "hash_lookup");
         assert.eq(hLookups.length, 1, explainRes);
         const hLookup = hLookups[0];
         assert(hLookup, explainRes);
@@ -155,10 +156,12 @@ const readColl = secondary.getDB("test").foo;
         assert.gte(hLookup.spilledRecords, expectedSpilledRecordsAtLeast, hLookup);
         assert.gte(hLookup.spilledBytes, expectedSpilledBytesAtLeast, hLookup);
     } finally {
-        assert.commandWorked(secondary.adminCommand({
-            setParameter: 1,
-            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: oldSetting
-        }));
+        assert.commandWorked(
+            secondary.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: oldSetting,
+            }),
+        );
     }
 })();
 
@@ -180,14 +183,15 @@ const readColl = secondary.getDB("test").foo;
     }
     // Create large partition.
     for (let i = 0; i < largePartitionSize; i++) {
-        assert.commandWorked(
-            insertCollWFs.insert({_id: i + smallPartitionSize, val: i, partition: 2}));
+        assert.commandWorked(insertCollWFs.insert({_id: i + smallPartitionSize, val: i, partition: 2}));
     }
 
-    assert.commandWorked(secondary.adminCommand({
-        setParameter: 1,
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes: largePartitionSize * avgDocSize + 1
-    }));
+    assert.commandWorked(
+        secondary.adminCommand({
+            setParameter: 1,
+            internalDocumentSourceSetWindowFieldsMaxMemoryBytes: largePartitionSize * avgDocSize + 1,
+        }),
+    );
 
     const readCollWFs = secondary.getDB("test").bar;
 
@@ -196,19 +200,19 @@ const readColl = secondary.getDB("test").foo;
             $setWindowFields: {
                 partitionBy: "$partition",
                 sortBy: {partition: 1},
-                output: {arr: {$push: "$val", window: {documents: [-25, 25]}}}
-            }
+                output: {arr: {$push: "$val", window: {documents: [-25, 25]}}},
+            },
         },
-        {$sort: {_id: 1}}
+        {$sort: {_id: 1}},
     ];
 
     let res = readCollWFs
-                  .aggregate(pipeline, {
-                      allowDiskUse: true,
-                      readConcern: {level: "majority"},
-                      writeConcern: {"w": "majority"}
-                  })
-                  .toArray();
+        .aggregate(pipeline, {
+            allowDiskUse: true,
+            readConcern: {level: "majority"},
+            writeConcern: {"w": "majority"},
+        })
+        .toArray();
 })();
 
 replTest.stopSet();

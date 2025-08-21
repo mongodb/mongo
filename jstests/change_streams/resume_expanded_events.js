@@ -22,7 +22,7 @@ const collName = "coll1";
 const test = new ChangeStreamTest(testDB);
 const ns = {
     db: jsTestName(),
-    coll: collName
+    coll: collName,
 };
 
 function runTest(collNameForChangeStream) {
@@ -30,7 +30,7 @@ function runTest(collNameForChangeStream) {
     let cursor = test.startWatchingChanges({
         pipeline,
         collection: collNameForChangeStream,
-        aggregateOptions: {cursor: {batchSize: 0}}
+        aggregateOptions: {cursor: {batchSize: 0}},
     });
 
     // Test the 'create' event.
@@ -42,7 +42,7 @@ function runTest(collNameForChangeStream) {
             ns: ns,
             operationDescription: {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}},
             nsType: "collection",
-        }
+        },
     })[0];
 
     // Test the 'createIndexes' event on an empty collection.
@@ -52,8 +52,8 @@ function runTest(collNameForChangeStream) {
         expectedChanges: {
             operationType: "createIndexes",
             ns: ns,
-            operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]}
-        }
+            operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]},
+        },
     })[0];
 
     // Insert a document so that the collection is not empty so that we can get coverage for
@@ -66,7 +66,7 @@ function runTest(collNameForChangeStream) {
             ns: ns,
             fullDocument: {_id: 1, a: 1, b: 1},
             documentKey: {_id: 1},
-        }
+        },
     })[0];
 
     // Test the 'startIndexBuild' and 'createIndexes' events on a non-empty collection.
@@ -77,15 +77,15 @@ function runTest(collNameForChangeStream) {
             operationType: "startIndexBuild",
             ns: ns,
             operationDescription: {indexes: [{v: 2, key: {b: -1}, name: "b_-1"}]},
-        }
+        },
     })[0];
     const createIndexesEvent2 = test.assertNextChangesEqual({
         cursor: cursor,
         expectedChanges: {
             operationType: "createIndexes",
             ns: ns,
-            operationDescription: {indexes: [{v: 2, key: {b: -1}, name: "b_-1"}]}
-        }
+            operationDescription: {indexes: [{v: 2, key: {b: -1}, name: "b_-1"}]},
+        },
     })[0];
 
     // Test the 'dropIndexes' event.
@@ -95,8 +95,8 @@ function runTest(collNameForChangeStream) {
         expectedChanges: {
             operationType: "dropIndexes",
             ns: ns,
-            operationDescription: {indexes: [{v: 2, key: {b: -1}, name: "b_-1"}]}
-        }
+            operationDescription: {indexes: [{v: 2, key: {b: -1}, name: "b_-1"}]},
+        },
     })[0];
 
     // Insert another document so that we can validate the resuming behavior for the
@@ -109,15 +109,16 @@ function runTest(collNameForChangeStream) {
             ns: ns,
             fullDocument: {_id: 2, a: 2, b: 2},
             documentKey: {_id: 2},
-        }
+        },
     })[0];
 
     function testResume(resumeOption) {
         function testResumeForEvent(event, nextEventDesc) {
-            pipeline = [{
-                $changeStream:
-                    {showExpandedEvents: true, showSystemEvents: true, [resumeOption]: event._id},
-            }];
+            pipeline = [
+                {
+                    $changeStream: {showExpandedEvents: true, showSystemEvents: true, [resumeOption]: event._id},
+                },
+            ];
             cursor = test.startWatchingChanges({pipeline, collection: collNameForChangeStream});
             test.assertNextChangesEqual({cursor: cursor, expectedChanges: nextEventDesc});
         }
@@ -136,5 +137,5 @@ function runTest(collNameForChangeStream) {
     testDB[collName].drop();
 }
 
-runTest(1);  // Runs the test using a whole-db change stream
+runTest(1); // Runs the test using a whole-db change stream
 runTest(collName);

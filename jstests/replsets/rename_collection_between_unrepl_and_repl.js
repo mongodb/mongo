@@ -22,8 +22,10 @@ let targetNs = "local.unreplicated";
 // Ensure that the source collection exists.
 assert.commandWorked(primary.getCollection(sourceNs).insert({"fromRepl": "toUnrepl"}));
 
-assert.commandFailedWithCode(primary.adminCommand({"renameCollection": sourceNs, "to": targetNs}),
-                             ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(
+    primary.adminCommand({"renameCollection": sourceNs, "to": targetNs}),
+    ErrorCodes.IllegalOperation,
+);
 
 /**
  * Part 2: Attempt to rename from an unreplicated to a replicated namespace.
@@ -34,7 +36,9 @@ targetNs = "somedb.alsoReplicated";
 // Ensure that the source collection exists.
 assert.commandWorked(primary.getCollection(sourceNs).insert({"fromUnrepl": "toRepl"}));
 
-assert.commandFailedWithCode(primary.adminCommand({"renameCollection": sourceNs, "to": targetNs}),
-                             ErrorCodes.IllegalOperation);
+assert.commandFailedWithCode(
+    primary.adminCommand({"renameCollection": sourceNs, "to": targetNs}),
+    ErrorCodes.IllegalOperation,
+);
 
 rst.stopSet();

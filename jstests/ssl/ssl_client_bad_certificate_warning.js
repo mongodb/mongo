@@ -3,15 +3,15 @@
 const SERVER_CERT = "jstests/libs/server.pem";
 const CA_CERT = "jstests/libs/ca.pem";
 
-const BAD_CLIENT_CERT = 'jstests/libs/trusted-client.pem';
+const BAD_CLIENT_CERT = "jstests/libs/trusted-client.pem";
 
 function testConnect(outputLog, ...args) {
-    const command = ['mongo', '--host', 'localhost', '--port', mongod.port, '--tls', ...args];
+    const command = ["mongo", "--host", "localhost", "--port", mongod.port, "--tls", ...args];
 
     clearRawMongoProgramOutput();
     const clientPID = _startMongoProgram({args: command});
 
-    assert.soon(function() {
+    assert.soon(function () {
         const output = rawMongoProgramOutput(".*");
         if (output.includes(outputLog)) {
             stopMongoProgramByPid(clientPID);
@@ -24,14 +24,16 @@ function testConnect(outputLog, ...args) {
 function runTests() {
     // --tlsCertificateKeyFile not specifed when mongod was started with --tlsCAFile or
     // --tlsClusterCAFile.
-    testConnect('No SSL certificate provided by peer', '--tlsCAFile', CA_CERT);
+    testConnect("No SSL certificate provided by peer", "--tlsCAFile", CA_CERT);
 
     // Certificate not signed by CA_CERT used.
-    testConnect('SSL peer certificate validation failed',
-                '--tlsCAFile',
-                CA_CERT,
-                '--tlsCertificateKeyFile',
-                BAD_CLIENT_CERT);
+    testConnect(
+        "SSL peer certificate validation failed",
+        "--tlsCAFile",
+        CA_CERT,
+        "--tlsCertificateKeyFile",
+        BAD_CLIENT_CERT,
+    );
 }
 
 // Use tlsClusterCAFile

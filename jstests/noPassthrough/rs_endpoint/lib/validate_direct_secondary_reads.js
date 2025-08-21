@@ -37,9 +37,9 @@ export function validateProfilerCollections(hostDoc, hostDocs, numProfilerDocsPe
     const dbNames = conn.getDBNames();
     for (let dbName of dbNames) {
         numProfilerDocsPerHost[hostDoc.host] += findProfilerDocsAutoRetry(conn, dbName, {
-                                                    ns: {$ne: dbName + ".system.profile"},
-                                                    appName: "MongoDB Shell"
-                                                }).length;
+            ns: {$ne: dbName + ".system.profile"},
+            appName: "MongoDB Shell",
+        }).length;
 
         const profilerDocs = findProfilerDocsAutoRetry(conn, dbName, {
             appName: "MongoDB Shell",
@@ -47,8 +47,12 @@ export function validateProfilerCollections(hostDoc, hostDocs, numProfilerDocsPe
             // field to every read command.
             "command.comment": {$exists: true},
         });
-        jsTest.log("Validating profiler collection for database '" + dbName + "' on host " +
-                   tojsononeline({...hostDoc, numDocs: profilerDocs.length}));
+        jsTest.log(
+            "Validating profiler collection for database '" +
+                dbName +
+                "' on host " +
+                tojsononeline({...hostDoc, numDocs: profilerDocs.length}),
+        );
         if (hostDoc.isExcluded) {
             // Verify that this host did not run any read commands from the shell since it was
             // excluded.
@@ -57,7 +61,7 @@ export function validateProfilerCollections(hostDoc, hostDocs, numProfilerDocsPe
 
         // Verify that this host did not run any read commands from the shell that were supposed to
         // run on other hosts.
-        hostDocs.forEach(otherHostDoc => {
+        hostDocs.forEach((otherHostDoc) => {
             if (otherHostDoc.host == hostDoc.host) {
                 return;
             }
@@ -68,7 +72,7 @@ export function validateProfilerCollections(hostDoc, hostDocs, numProfilerDocsPe
             const filters = [
                 // The runCommand override in set_read_preference_secondary.js attaches a "comment"
                 // field to every read command.
-                {"command.comment": otherHostDoc.comment}
+                {"command.comment": otherHostDoc.comment},
             ];
             if (hostDoc.isPrimary) {
                 // Filter out writes commands since aggregate commands that involve $out and $merge
@@ -81,7 +85,7 @@ export function validateProfilerCollections(hostDoc, hostDocs, numProfilerDocsPe
                         {"command.dbStats": {$exists: true}},
                         {"command.distinct": {$exists: true}},
                         {"command.find": {$exists: true}},
-                    ]
+                    ],
                 });
                 // Filter out reads against the 'config' database since read commands may trigger
                 // routing metadata refresh reads on the primary.

@@ -4,7 +4,7 @@
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-var name = 'initial_sync_document_validation';
+var name = "initial_sync_document_validation";
 var replSet = new ReplSetTest({
     name: name,
     nodes: 2,
@@ -15,7 +15,7 @@ replSet.initiate();
 var primary = replSet.getPrimary();
 var secondary = replSet.getSecondary();
 
-var coll = primary.getDB('test').getCollection(name);
+var coll = primary.getDB("test").getCollection(name);
 assert.commandWorked(coll.insert({_id: 0, x: 1}));
 assert.commandWorked(coll.runCommand("collMod", {"validator": {a: {$exists: true}}}));
 

@@ -15,17 +15,13 @@ const localNs = dbName + "." + localColl;
 const foreignNs = dbName + "." + foreignColl;
 
 const lookupPipeline = [
-    {$lookup: {from: foreignColl,
-                let : {localVar: "$_id"},
-                pipeline: [{$match : {"_id": {$gte: -5}}}],
-                as: "result"}},
-    {$sort: {"_id": 1}}
+    {$lookup: {from: foreignColl, let: {localVar: "$_id"}, pipeline: [{$match: {"_id": {$gte: -5}}}], as: "result"}},
+    {$sort: {"_id": 1}},
 ];
 
 const db = st.s.getDB(dbName);
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 // Create a sharded collection, "local", with one chunk placed in shard0.
 assert.commandWorked(db[localColl].insert({_id: 0}));
@@ -41,10 +37,8 @@ assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {_id: 1
     (function setUp() {
         // Move all chunks from shard0 to shard2 for the foreignNs, making the routing information
         // from shard0 think that shard1 still contains chunks.
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: foreignNs, find: {_id: 0}, to: st.shard1.shardName}));
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: foreignNs, find: {_id: 0}, to: st.shard2.shardName}));
+        assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {_id: 0}, to: st.shard1.shardName}));
+        assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {_id: 0}, to: st.shard2.shardName}));
     })();
 
     const session = st.s.startSession();
@@ -52,13 +46,15 @@ assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {_id: 1
     withRetryOnTransientTxnError(
         () => {
             session.startTransaction();
-            assert.commandWorked(session.getDatabase(dbName).runCommand(
-                {aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
+            assert.commandWorked(
+                session.getDatabase(dbName).runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}),
+            );
             session.abortTransaction();
         },
         () => {
             session.abortTransaction_forTesting();
-        });
+        },
+    );
 }
 
 {
@@ -68,12 +64,10 @@ assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {_id: 1
         // The routing information from shard0 is now up-to-date, because the previous test case has
         // refreshed the filtering metadata and routing information. Let's force shard0 to be stale
         // again by moving chunks outside shard2.
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard1.shardName}));
+        assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard1.shardName}));
     })();
 
-    assert.commandWorked(
-        db.runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
+    assert.commandWorked(db.runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
 }
 
 {
@@ -81,19 +75,15 @@ assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {_id: 1
 
     (function setUp() {
         // First, shard0 needs to acknowledge that owns a chunk in the routing information.
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard0.shardName}));
-        assert.commandWorked(
-            db.runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
+        assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard0.shardName}));
+        assert.commandWorked(db.runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
 
         // After that, let's move chunks outside shard0, so next time we run the aggregation, shard0
         // still think it owns chunks, and try to make a local $lookup.
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard1.shardName}));
+        assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard1.shardName}));
     })();
 
-    assert.commandWorked(
-        db.runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
+    assert.commandWorked(db.runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
 }
 
 {
@@ -103,27 +93,26 @@ assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {_id: 1
 
     (function setUp() {
         // First, shard0 needs to acknowledge that owns a chunk in the routing information.
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard0.shardName}));
-        assert.commandWorked(
-            db.runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
+        assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard0.shardName}));
+        assert.commandWorked(db.runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
 
         // After that, let's move chunks outside shard0, so next time we run the aggregation, shard0
         // still think it owns chunks, and try to make a local $lookup.
-        assert.commandWorked(
-            st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard1.shardName}));
+        assert.commandWorked(st.s.adminCommand({moveChunk: foreignNs, find: {_id: 1}, to: st.shard1.shardName}));
     })();
 
     withRetryOnTransientTxnError(
         () => {
             session.startTransaction();
-            assert.commandWorked(session.getDatabase(dbName).runCommand(
-                {aggregate: localColl, pipeline: lookupPipeline, cursor: {}}));
+            assert.commandWorked(
+                session.getDatabase(dbName).runCommand({aggregate: localColl, pipeline: lookupPipeline, cursor: {}}),
+            );
             session.abortTransaction();
         },
         () => {
             session.abortTransaction_forTesting();
-        });
+        },
+    );
 }
 
 st.stop();

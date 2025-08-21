@@ -13,14 +13,14 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getTimeseriesCollForRawOps} from "jstests/libs/raw_operation_utils.js";
 import {TTLUtil} from "jstests/libs/ttl/ttl_util.js";
 
-const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
+const conn = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
 const testDB = conn.getDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
 TimeseriesTest.run((insert) => {
     const coll = testDB[jsTestName()];
 
-    const timeFieldName = 'tm';
+    const timeFieldName = "tm";
     const metaFieldName = "mm";
     const indexName = "partialTTLIndex";
     const timeSpec = {[timeFieldName]: 1};
@@ -28,47 +28,51 @@ TimeseriesTest.run((insert) => {
     const expireAfterSeconds = NumberLong(10000);
 
     const startDate = new Date();
-    const expiredDate = new Date(startDate - ((expireAfterSeconds / 2) * 1000));
-    const collectionTTLExpiredDate = new Date(startDate - ((expireAfterSeconds * 2) * 1000));
-    const futureDate = new Date(startDate.getTime() + (10000 * 10));
+    const expiredDate = new Date(startDate - (expireAfterSeconds / 2) * 1000);
+    const collectionTTLExpiredDate = new Date(startDate - expireAfterSeconds * 2 * 1000);
+    const futureDate = new Date(startDate.getTime() + 10000 * 10);
 
     assert.lt(expiredDate, startDate);
     assert.gt(futureDate, startDate);
 
     const expiredDoc = {_id: 0, [timeFieldName]: expiredDate, [metaFieldName]: 8, x: 0};
     const expiredDocLowMeta = {_id: 1, [timeFieldName]: expiredDate, [metaFieldName]: 0, x: 1};
-    const collectionTTLExpiredDocLowMeta =
-        {_id: 2, [timeFieldName]: collectionTTLExpiredDate, [metaFieldName]: 0, x: 2};
+    const collectionTTLExpiredDocLowMeta = {
+        _id: 2,
+        [timeFieldName]: collectionTTLExpiredDate,
+        [metaFieldName]: 0,
+        x: 2,
+    };
     const futureDoc = {_id: 3, [timeFieldName]: futureDate, [metaFieldName]: 10, x: 3};
 
     const partialIndexOptions = {
         name: indexName,
         partialFilterExpression: {[metaFieldName]: {$gt: 5}},
-        expireAfterSeconds: expireAfterSecond
+        expireAfterSeconds: expireAfterSecond,
     };
 
-    const checkInsertion = function(coll, doc, expectDeletion) {
+    const checkInsertion = function (coll, doc, expectDeletion) {
         jsTestLog("Inserting doc into collection.");
         const prevCount = getTimeseriesCollForRawOps(testDB, coll).find().rawData().itcount();
-        assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
+        assert.commandWorked(insert(coll, doc), "failed to insert doc: " + tojson(doc));
 
         // Wait for the TTL monitor to process the indexes.
         jsTestLog("Waiting for TTL monitor to process...");
         TTLUtil.waitForPass(testDB);
 
         // Check the number of bucket documents.
-        const expectedCount = (expectDeletion) ? prevCount : prevCount + 1;
+        const expectedCount = expectDeletion ? prevCount : prevCount + 1;
         const bucketDocs = getTimeseriesCollForRawOps(testDB, coll)
-                               .find()
-                               .rawData()
-                               .sort({'control.min._id': 1})
-                               .toArray();
+            .find()
+            .rawData()
+            .sort({"control.min._id": 1})
+            .toArray();
 
         assert.eq(expectedCount, bucketDocs.length, bucketDocs);
         jsTestLog("Doc deleted: " + expectDeletion + ".");
     };
 
-    const testTTLIndex = function(coll) {
+    const testTTLIndex = function (coll) {
         // Inserts a measurement with a time in the past to ensure the measurement will be removed
         // immediately.
         checkInsertion(coll, expiredDoc, true);
@@ -83,8 +87,9 @@ TimeseriesTest.run((insert) => {
 
     {
         coll.drop();
-        assert.commandWorked(testDB.createCollection(
-            coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+        assert.commandWorked(
+            testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+        );
 
         // Create a TTL index on time, with a partial filter expression on the metaField.
         assert.commandWorked(coll.createIndex(timeSpec, partialIndexOptions));
@@ -95,10 +100,12 @@ TimeseriesTest.run((insert) => {
 
     {
         coll.drop();
-        assert.commandWorked(testDB.createCollection(coll.getName(), {
-            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
-            expireAfterSeconds: expireAfterSeconds
-        }));
+        assert.commandWorked(
+            testDB.createCollection(coll.getName(), {
+                timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+                expireAfterSeconds: expireAfterSeconds,
+            }),
+        );
 
         // Create a secondary TTL index on time, with a partial filter expression on the metaField.
         assert.commandWorked(coll.createIndex(timeSpec, partialIndexOptions));

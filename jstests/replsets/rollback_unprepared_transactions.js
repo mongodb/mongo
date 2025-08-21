@@ -9,9 +9,9 @@ import {checkRollbackFiles} from "jstests/replsets/libs/rollback_files.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 // Operations that will be present on both nodes, before the common point.
-const dbName = 'test';
-const collName = 'test.t';
-const collNameShort = 't';
+const dbName = "test";
+const collName = "test.t";
+const collNameShort = "t";
 let CommonOps = (node) => {
     const coll = node.getCollection(collName);
     assert.commandWorked(coll.insert({_id: 0}));

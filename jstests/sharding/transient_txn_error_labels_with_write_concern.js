@@ -4,15 +4,13 @@
  *   uses_transactions,
  * ]
  */
-import {
-    withAbortAndRetryOnTransientTxnError
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withAbortAndRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkWriteConcernTimedOut,
     restartServerReplication,
-    stopServerReplication
+    stopServerReplication,
 } from "jstests/libs/write_concern_util.js";
 
 // This test requires running transactions directly against the shard.
@@ -26,7 +24,7 @@ const collName = "transient_txn_error_labels_with_write_concern";
 const st = new ShardingTest({
     config: TestData.configShard ? undefined : 1,
     mongos: 1,
-    shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}
+    shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}},
 });
 const rst = st.rs0;
 
@@ -35,11 +33,11 @@ assert.eq(primary, rst.nodes[0]);
 const testDB = primary.getDB(dbName);
 
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 const writeConcernMajority = {
     w: "majority",
-    wtimeout: 500
+    wtimeout: 500,
 };
 
 assert.commandWorked(testDB.createCollection(collName, {writeConcern: {w: "majority"}}));
@@ -69,11 +67,13 @@ function runNoSuchTransactionTests(cmd, cmdName) {
     rst.awaitReplication();
     stopServerReplication(rst.getSecondaries());
     // Use a txnNumber that is one higher than the server has tracked.
-    res = sessionDb.adminCommand(Object.assign(Object.assign({}, cmd), {
-        txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
-        autocommit: false,
-        writeConcern: writeConcernMajority
-    }));
+    res = sessionDb.adminCommand(
+        Object.assign(Object.assign({}, cmd), {
+            txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
+            autocommit: false,
+            writeConcern: writeConcernMajority,
+        }),
+    );
     checkWriteConcernTimedOut(res);
     assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
 
@@ -83,11 +83,13 @@ function runNoSuchTransactionTests(cmd, cmdName) {
     jsTest.log("NoSuchTransaction without write concern error is transient");
     restartServerReplication(rst.getSecondaries());
     // Use a txnNumber that is one higher than the server has tracked.
-    res = sessionDb.adminCommand(Object.assign(Object.assign({}, cmd), {
-        txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
-        autocommit: false,
-        writeConcern: {w: "majority"}  // Wait with a long timeout.
-    }));
+    res = sessionDb.adminCommand(
+        Object.assign(Object.assign({}, cmd), {
+            txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
+            autocommit: false,
+            writeConcern: {w: "majority"}, // Wait with a long timeout.
+        }),
+    );
     assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
     assert(!res.hasOwnProperty("writeConcernError"), res);
     assert.eq(res["errorLabels"], ["TransientTransactionError"], res);
@@ -101,12 +103,14 @@ function runNoSuchTransactionTests(cmd, cmdName) {
     // This should not be a TransientTransactionError, since the server has not successfully
     // replicated a write to confirm that it is primary.
     // Use a txnNumber that is one higher than the server has tracked.
-    res = sessionDb.adminCommand(Object.assign(Object.assign({}, cmd), {
-        txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
-        autocommit: false,
-        writeConcern: writeConcernMajority,
-        maxTimeMS: 1000
-    }));
+    res = sessionDb.adminCommand(
+        Object.assign(Object.assign({}, cmd), {
+            txnNumber: NumberLong(session.getTxnNumber_forTesting() + 1),
+            autocommit: false,
+            writeConcern: writeConcernMajority,
+            maxTimeMS: 1000,
+        }),
+    );
 
     failpoint.off();
 
@@ -118,8 +122,7 @@ function runNoSuchTransactionTests(cmd, cmdName) {
 
 runNoSuchTransactionTests({commitTransaction: 1}, "commitTransaction");
 
-runNoSuchTransactionTests({coordinateCommitTransaction: 1, participants: []},
-                          "coordinateCommitTransaction");
+runNoSuchTransactionTests({coordinateCommitTransaction: 1, participants: []}, "coordinateCommitTransaction");
 
 session.endSession();
 

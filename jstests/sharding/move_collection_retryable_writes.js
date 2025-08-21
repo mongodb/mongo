@@ -14,37 +14,45 @@ import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
-    jsTest.log(`Running test for minimumReshardingDuration = ${
-        minimumOperationDurationMS} and reshardInPlace = ${shouldReshardInPlace}`);
+    jsTest.log(
+        `Running test for minimumReshardingDuration = ${
+            minimumOperationDurationMS
+        } and reshardInPlace = ${shouldReshardInPlace}`,
+    );
 
     const reshardingTest = new ReshardingTest({
         numDonors: 1,
         numRecipients: 1,
         reshardInPlace: shouldReshardInPlace,
-        minimumOperationDurationMS: minimumOperationDurationMS
+        minimumOperationDurationMS: minimumOperationDurationMS,
     });
     reshardingTest.setup();
 
     const donorShardNames = reshardingTest.donorShardNames;
-    const sourceCollection = reshardingTest.createUnshardedCollection(
-        {ns: "reshardingDb.coll", primaryShardName: donorShardNames[0]});
+    const sourceCollection = reshardingTest.createUnshardedCollection({
+        ns: "reshardingDb.coll",
+        primaryShardName: donorShardNames[0],
+    });
 
-    assert.commandWorked(sourceCollection.insert([
-        {_id: 0, counter: 0},
-        {_id: 1, counter: 0},
-    ]));
+    assert.commandWorked(
+        sourceCollection.insert([
+            {_id: 0, counter: 0},
+            {_id: 1, counter: 0},
+        ]),
+    );
 
     const mongos = sourceCollection.getMongo();
     const session = mongos.startSession({causalConsistency: false, retryWrites: false});
-    const sessionCollection = session.getDatabase(sourceCollection.getDB().getName())
-                                  .getCollection(sourceCollection.getName());
+    const sessionCollection = session
+        .getDatabase(sourceCollection.getDB().getName())
+        .getCollection(sourceCollection.getName());
     const updateCommand = {
         update: sourceCollection.getName(),
         updates: [
             {q: {_id: 0}, u: {$inc: {counter: 1}}},
             {q: {_id: 1}, u: {$inc: {counter: 1}}},
         ],
-        txnNumber: NumberLong(1)
+        txnNumber: NumberLong(1),
     };
 
     function runRetryableWrite(phase, expectedErrorCode = ErrorCodes.OK) {
@@ -54,10 +62,7 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         assert.eq(2, docs.length, {docs});
 
         for (const doc of docs) {
-            assert.eq(
-                1,
-                doc.counter,
-                {message: `retryable write executed more than once ${phase}`, id: doc._id, docs});
+            assert.eq(1, doc.counter, {message: `retryable write executed more than once ${phase}`, id: doc._id, docs});
         }
     }
 
@@ -67,7 +72,7 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     reshardingTest.withMoveCollectionInBackground({toShard: recipientShardNames[0]}, () => {
         assert.soon(() => {
             const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: sourceCollection.getFullName()
+                ns: sourceCollection.getFullName(),
             });
 
             return coordinatorDoc !== null && coordinatorDoc.state === "applying";

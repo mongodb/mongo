@@ -21,11 +21,10 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.states.aggregate = function aggregate(db, collName) {
         // $out to the same collection so that concurrent aggregate commands would cause congestion.
-        db[collName].runCommand(
-            {aggregate: collName, pipeline: [{$out: "interrupt_temp_out"}], cursor: {}});
+        db[collName].runCommand({aggregate: collName, pipeline: [{$out: "interrupt_temp_out"}], cursor: {}});
     };
 
     // This test sets up aggregations just to tear them down. There's no benefit to using large
@@ -33,11 +32,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // down to 1KB.
     $config.data.docSize = 1024;
     $config.data.killOpsMatchingFilter = function killOpsMatchingFilter(db, filter) {
-        const currentOpOutput =
-            db.getSiblingDB('admin').aggregate([{$currentOp: {}}, {$match: filter}]).toArray();
+        const currentOpOutput = db
+            .getSiblingDB("admin")
+            .aggregate([{$currentOp: {}}, {$match: filter}])
+            .toArray();
         for (let op of currentOpOutput) {
-            assert(op.hasOwnProperty('opid'));
-            assert.commandWorked(db.getSiblingDB('admin').killOp(op.opid));
+            assert(op.hasOwnProperty("opid"));
+            assert.commandWorked(db.getSiblingDB("admin").killOp(op.opid));
         }
     };
     $config.states.killOp = function killOp(db, collName) {
@@ -48,14 +49,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             op: "command",
             active: true,
             $or: [
-                {"ns": db.getName() + ".interrupt_temp_out"},              // For output collection.
-                {"ns": db.getName() + "." + collName},                     // For input collection.
-                {"ns": {$regex: "^" + db.getName() + "\.tmp\.agg_out.*"}}  // For temp during $out.
+                {"ns": db.getName() + ".interrupt_temp_out"}, // For output collection.
+                {"ns": db.getName() + "." + collName}, // For input collection.
+                {"ns": {$regex: "^" + db.getName() + "\.tmp\.agg_out.*"}}, // For temp during $out.
             ],
             "command.drop": {
-                $exists: false
-            }  // Exclude 'drop' command from the filter to make sure that we don't kill the the
-               // drop command which is responsible for dropping the temporary collection.
+                $exists: false,
+            }, // Exclude 'drop' command from the filter to make sure that we don't kill the the
+            // drop command which is responsible for dropping the temporary collection.
         };
         if (TestData.testingReplicaSetEndpoint) {
             // The sharding DDL operations do not have opid.
@@ -77,15 +78,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // Instead, it will be cleaned up on the next step up.
             return;
         }
-        assert.eq(db.getCollectionNames().filter(col => col.includes('tmp.agg_out')).length, 0);
+        assert.eq(db.getCollectionNames().filter((col) => col.includes("tmp.agg_out")).length, 0);
     };
 
     $config.transitions = {
         aggregate: {aggregate: 0.8, killOp: 0.2},
-        killOp: {aggregate: 0.8, killOp: 0.2}
+        killOp: {aggregate: 0.8, killOp: 0.2},
     };
 
-    $config.startState = 'aggregate';
+    $config.startState = "aggregate";
 
     return $config;
 });

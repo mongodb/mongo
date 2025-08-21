@@ -36,13 +36,13 @@ assert.commandWorked(coll.insert({"partner": 1, "visits": 30}));
 assert.commandWorked(coll.insert({"partner": 2, "visits": 41}));
 assert.commandWorked(coll.insert({"partner": 2, "visits": 41}));
 
-let map = function(obj) {
+let map = function (obj) {
     emit(obj.partner, {stats: [obj.visits]});
 };
 
 let notStoredMap = `function() {(${map.toString()})(this);}`;
 
-const reduce = function(k, v) {
+const reduce = function (k, v) {
     var stats = [];
     var total = 0;
     for (var i = 0; i < v.length; i++) {
@@ -54,7 +54,7 @@ const reduce = function(k, v) {
     return {stats: stats, total: total};
 };
 
-const finalize = function(key, reducedValue) {
+const finalize = function (key, reducedValue) {
     reducedValue.avg = reducedValue.total / reducedValue.stats.length;
     return reducedValue;
 };
@@ -73,67 +73,75 @@ function assertCorrect(results) {
 }
 
 // Stored Map.
-assert.commandWorked(testDB.runCommand({
-    mapReduce: coll.getName(),
-    map: function() {
-        // eslint-disable-next-line
-        mr_stored_map(this);
-    },
-    reduce: reduce,
-    finalize: finalize,
-    out: "mr_stored_out"
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        mapReduce: coll.getName(),
+        map: function () {
+            // eslint-disable-next-line
+            mr_stored_map(this);
+        },
+        reduce: reduce,
+        finalize: finalize,
+        out: "mr_stored_out",
+    }),
+);
 
 assertCorrect(out.convertToSingleObject("value"));
 out.drop();
 
 // Stored Reduce.
-assert.commandWorked(testDB.runCommand({
-    mapReduce: coll.getName(),
-    map: notStoredMap,
-    reduce: function(k, v) {
-        // eslint-disable-next-line
-        return mr_stored_reduce(k, v);
-    },
-    finalize: finalize,
-    out: "mr_stored_out"
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        mapReduce: coll.getName(),
+        map: notStoredMap,
+        reduce: function (k, v) {
+            // eslint-disable-next-line
+            return mr_stored_reduce(k, v);
+        },
+        finalize: finalize,
+        out: "mr_stored_out",
+    }),
+);
 
 assertCorrect(out.convertToSingleObject("value"));
 out.drop();
 
 // Stored Finalize.
-assert.commandWorked(testDB.runCommand({
-    mapReduce: coll.getName(),
-    map: notStoredMap,
-    reduce: reduce,
-    finalize: function(key, reducedValue) {
-        // eslint-disable-next-line
-        return mr_stored_finalize(key, reducedValue);
-    },
-    out: "mr_stored_out"
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        mapReduce: coll.getName(),
+        map: notStoredMap,
+        reduce: reduce,
+        finalize: function (key, reducedValue) {
+            // eslint-disable-next-line
+            return mr_stored_finalize(key, reducedValue);
+        },
+        out: "mr_stored_out",
+    }),
+);
 
 assertCorrect(out.convertToSingleObject("value"));
 out.drop();
 
 // All Stored.
-assert.commandWorked(testDB.runCommand({
-    mapReduce: coll.getName(),
-    map: function() {
-        // eslint-disable-next-line
-        mr_stored_map(this);
-    },
-    reduce: function(k, v) {
-        // eslint-disable-next-line
-        return mr_stored_reduce(k, v);
-    },
-    finalize: function(key, reducedValue) {
-        // eslint-disable-next-line
-        return mr_stored_finalize(key, reducedValue);
-    },
-    out: "mr_stored_out"
-}));
+assert.commandWorked(
+    testDB.runCommand({
+        mapReduce: coll.getName(),
+        map: function () {
+            // eslint-disable-next-line
+            mr_stored_map(this);
+        },
+        reduce: function (k, v) {
+            // eslint-disable-next-line
+            return mr_stored_reduce(k, v);
+        },
+        finalize: function (key, reducedValue) {
+            // eslint-disable-next-line
+            return mr_stored_finalize(key, reducedValue);
+        },
+        out: "mr_stored_out",
+    }),
+);
 
 assertCorrect(out.convertToSingleObject("value"));
 out.drop();

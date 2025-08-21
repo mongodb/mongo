@@ -54,21 +54,21 @@ assertSchemaMatch(coll, {properties: {arr: {type: "array"}}}, {arr: []}, true);
 assertSchemaMatch(coll, {properties: {arr: {type: "array"}}}, {arr: {}}, false);
 
 // bsonType "binData".
-assertSchemaMatch(coll,
-                  {properties: {bin: {bsonType: "binData"}}},
-                  {bin: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
-                  true);
+assertSchemaMatch(
+    coll,
+    {properties: {bin: {bsonType: "binData"}}},
+    {bin: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")},
+    true,
+);
 assertSchemaMatch(coll, {properties: {bin: {bsonType: "binData"}}}, {bin: {}}, false);
 
 // type "binData" should fail.
 assert.throws(() => coll.find({$jsonSchema: {properties: {bin: {type: "binData"}}}}).itcount());
 
 // bsonType "undefined".
-assertSchemaMatch(
-    coll, {properties: {u: {bsonType: "undefined"}}, required: ["u"]}, {u: undefined}, true);
+assertSchemaMatch(coll, {properties: {u: {bsonType: "undefined"}}, required: ["u"]}, {u: undefined}, true);
 assertSchemaMatch(coll, {properties: {u: {bsonType: "undefined"}}, required: ["u"]}, {}, false);
-assertSchemaMatch(
-    coll, {properties: {u: {bsonType: "undefined"}}, required: ["u"]}, {u: null}, false);
+assertSchemaMatch(coll, {properties: {u: {bsonType: "undefined"}}, required: ["u"]}, {u: null}, false);
 
 // type "undefined" should fail.
 assert.throws(() => coll.find({$jsonSchema: {properties: {u: {type: "undefined"}}}}).itcount());
@@ -106,8 +106,7 @@ assert.throws(() => coll.find({$jsonSchema: {properties: {b: {type: "date"}}}}).
 // bsonType "null".
 assertSchemaMatch(coll, {properties: {n: {bsonType: "null"}}, required: ["n"]}, {n: null}, true);
 assertSchemaMatch(coll, {properties: {n: {bsonType: "null"}}, required: ["n"]}, {}, false);
-assertSchemaMatch(
-    coll, {properties: {n: {bsonType: "null"}}, required: ["n"]}, {u: undefined}, false);
+assertSchemaMatch(coll, {properties: {n: {bsonType: "null"}}, required: ["n"]}, {u: undefined}, false);
 
 // type "null".
 assertSchemaMatch(coll, {properties: {n: {type: "null"}}, required: ["n"]}, {n: null}, true);
@@ -122,25 +121,28 @@ assertSchemaMatch(coll, {properties: {r: {bsonType: "regex"}}}, {r: "^abc"}, fal
 assert.throws(() => coll.find({$jsonSchema: {properties: {r: {type: "regex"}}}}).itcount());
 
 // bsonType "javascript".
-assertSchemaMatch(coll,
-                  {properties: {code: {bsonType: "javascript"}}},
-                  {code: Code("function() { return true; }")},
-                  true);
+assertSchemaMatch(
+    coll,
+    {properties: {code: {bsonType: "javascript"}}},
+    {code: Code("function() { return true; }")},
+    true,
+);
 assertSchemaMatch(coll, {properties: {code: {bsonType: "javascript"}}}, {code: 1}, false);
 
 // type "javascript" should fail.
 assert.throws(() => coll.find({$jsonSchema: {properties: {code: {type: "javascript"}}}}).itcount());
 
 // bsonType "javascriptWithScope".
-assertSchemaMatch(coll,
-                  {properties: {code: {bsonType: "javascriptWithScope"}}},
-                  {code: Code("function() { return true; }", {scope: true})},
-                  true);
+assertSchemaMatch(
+    coll,
+    {properties: {code: {bsonType: "javascriptWithScope"}}},
+    {code: Code("function() { return true; }", {scope: true})},
+    true,
+);
 assertSchemaMatch(coll, {properties: {code: {bsonType: "javascriptWithScope"}}}, {code: 1}, false);
 
 // type "javascriptWithScope" should fail.
-assert.throws(
-    () => coll.find({$jsonSchema: {properties: {code: {type: "javascriptWithScope"}}}}).itcount());
+assert.throws(() => coll.find({$jsonSchema: {properties: {code: {type: "javascriptWithScope"}}}}).itcount());
 
 // bsonType "int".
 assertSchemaMatch(coll, {properties: {num: {bsonType: "int"}}}, {num: NumberInt(3)}, true);
@@ -160,8 +162,7 @@ assert.throws(() => coll.find({$jsonSchema: {properties: {num: {bsonType: "integ
 assert.throws(() => coll.find({$jsonSchema: {properties: {num: {type: "integer"}}}}).itcount());
 
 // bsonType "timestamp".
-assertSchemaMatch(
-    coll, {properties: {ts: {bsonType: "timestamp"}}}, {ts: Timestamp(0, 1234)}, true);
+assertSchemaMatch(coll, {properties: {ts: {bsonType: "timestamp"}}}, {ts: Timestamp(0, 1234)}, true);
 assertSchemaMatch(coll, {properties: {ts: {bsonType: "timestamp"}}}, {ts: new Date()}, false);
 
 // type "timestamp" should fail.
@@ -211,32 +212,23 @@ assert.throws(() => coll.find({$jsonSchema: {properties: {f: {type: "unknown"}}}
 
 // Specifying both "type" and "bsonType" in the same schema should fail.
 assert.throws(() => coll.find({$jsonSchema: {bsonType: "string", type: "string"}}).itcount());
-assert.throws(() =>
-                  coll.find({$jsonSchema: {properties: {a: {bsonType: "string", type: "string"}}}})
-                      .itcount());
+assert.throws(() => coll.find({$jsonSchema: {properties: {a: {bsonType: "string", type: "string"}}}}).itcount());
 
 // "type" and "bsonType" are both allowed when they are not sibling keywords in the same
 // subschema.
 assertSchemaMatch(coll, {type: "object", properties: {obj: {bsonType: "object"}}}, {obj: {}}, true);
-assertSchemaMatch(
-    coll, {type: "object", properties: {obj: {bsonType: "object"}}}, {obj: []}, false);
-assertSchemaMatch(coll,
-                  {properties: {a: {bsonType: "long"}, b: {type: "null"}}},
-                  {a: NumberLong(3), b: null},
-                  true);
-assertSchemaMatch(
-    coll, {properties: {a: {bsonType: "long"}, b: {type: "null"}}}, {a: NumberLong(3)}, true);
+assertSchemaMatch(coll, {type: "object", properties: {obj: {bsonType: "object"}}}, {obj: []}, false);
+assertSchemaMatch(coll, {properties: {a: {bsonType: "long"}, b: {type: "null"}}}, {a: NumberLong(3), b: null}, true);
+assertSchemaMatch(coll, {properties: {a: {bsonType: "long"}, b: {type: "null"}}}, {a: NumberLong(3)}, true);
 assertSchemaMatch(coll, {properties: {a: {bsonType: "long"}, b: {type: "null"}}}, {b: null}, true);
-assertSchemaMatch(coll,
-                  {properties: {a: {bsonType: "long"}, b: {type: "null"}}},
-                  {b: null},
-                  {a: 3, b: null},
-                  false);
-assertSchemaMatch(coll,
-                  {properties: {a: {bsonType: "long"}, b: {type: "null"}}},
-                  {b: null},
-                  {a: NumberLong(3), b: 3},
-                  false);
+assertSchemaMatch(coll, {properties: {a: {bsonType: "long"}, b: {type: "null"}}}, {b: null}, {a: 3, b: null}, false);
+assertSchemaMatch(
+    coll,
+    {properties: {a: {bsonType: "long"}, b: {type: "null"}}},
+    {b: null},
+    {a: NumberLong(3), b: 3},
+    false,
+);
 
 // Test that the 'type' keyword rejects an array of aliases if one of those aliases is invalid.
 assert.throws(() => coll.find({$jsonSchema: {f: {type: ["number", "objectId"]}}}).itcount());
@@ -254,12 +246,10 @@ assert.throws(() => coll.find({$jsonSchema: {f: {type: ["number", 2]}}}).itcount
 assert.throws(() => coll.find({$jsonSchema: {f: {bsonType: ["number", 2]}}}).itcount());
 
 // Test that the 'type' keyword rejects an array which contains duplicate aliases.
-assert.throws(() =>
-                  coll.find({$jsonSchema: {f: {type: ["number", "string", "number"]}}}).itcount());
+assert.throws(() => coll.find({$jsonSchema: {f: {type: ["number", "string", "number"]}}}).itcount());
 
 // Test that the 'bsonType' keyword rejects an array which contains duplicate aliases.
-assert.throws(
-    () => coll.find({$jsonSchema: {f: {bsonType: ["number", "string", "number"]}}}).itcount());
+assert.throws(() => coll.find({$jsonSchema: {f: {bsonType: ["number", "string", "number"]}}}).itcount());
 
 // Test that the 'type' keyword can accept an array of type aliases.
 assertSchemaMatch(coll, {properties: {f: {type: ["number", "string"]}}}, {f: 1}, true);
@@ -270,12 +260,10 @@ assertSchemaMatch(coll, {properties: {f: {type: ["number", "string"]}}}, {f: {}}
 
 // Test that the 'bsonType' keyword can accept an array of type aliases.
 assertSchemaMatch(coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: 1}, true);
-assertSchemaMatch(
-    coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: ObjectId()}, true);
+assertSchemaMatch(coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: ObjectId()}, true);
 assertSchemaMatch(coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {}, true);
 assertSchemaMatch(coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: [1]}, false);
-assertSchemaMatch(
-    coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: NumberInt(1)}, false);
+assertSchemaMatch(coll, {properties: {f: {bsonType: ["objectId", "double"]}}}, {f: NumberInt(1)}, false);
 
 // Test that the 'type' keyword with an array of types is valid at the top-level.
 assertSchemaMatch(coll, {type: ["object", "string"]}, {}, true);

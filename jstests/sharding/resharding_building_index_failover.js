@@ -32,10 +32,13 @@ const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
 
 // Create an index on oldKey.
 assert.commandWorked(
-    mongos.getCollection(ns).insert([{oldKey: 1, newKey: -1}, {oldKey: 2, newKey: -2}]));
+    mongos.getCollection(ns).insert([
+        {oldKey: 1, newKey: -1},
+        {oldKey: 2, newKey: -2},
+    ]),
+);
 assert.commandWorked(mongos.getCollection(ns).createIndex({oldKey: 1}));
-const hangAfterInitializingIndexBuildFailPoint =
-    configureFailPoint(recipient, "hangAfterInitializingIndexBuild");
+const hangAfterInitializingIndexBuildFailPoint = configureFailPoint(recipient, "hangAfterInitializingIndexBuild");
 
 reshardingTest.withReshardingInBackground(
     {
@@ -58,13 +61,14 @@ reshardingTest.withReshardingInBackground(
         afterReshardingFn: () => {
             const indexes = mongos.getDB("reshardingDb").getCollection("coll").getIndexes();
             let haveNewShardKeyIndex = false;
-            indexes.forEach(index => {
+            indexes.forEach((index) => {
                 if ("newKey" in index["key"]) {
                     haveNewShardKeyIndex = true;
                 }
             });
             assert.eq(haveNewShardKeyIndex, true);
-        }
-    });
+        },
+    },
+);
 
 reshardingTest.teardown();

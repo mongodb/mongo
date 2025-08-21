@@ -12,8 +12,7 @@ var staleMongosB = st.s2;
 
 var admin = mongos.getDB("admin");
 const kDbName = "foo";
-assert.commandWorked(
-    admin.runCommand({enableSharding: kDbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({enableSharding: kDbName, primaryShard: st.shard1.shardName}));
 var coll = mongos.getCollection(kDbName + ".bar");
 var staleCollA = staleMongosA.getCollection(coll + "");
 var staleCollB = staleMongosB.getCollection(coll + "");

@@ -20,16 +20,15 @@ import {runMemoryStatsTest} from "jstests/libs/query/memory_tracking_utils.js";
 
 // Get the current value of the query framework server parameter so we can restore it at the end of
 // the test. Otherwise, the tests run after this will be affected.
-const kOriginalInternalQueryFrameworkControl =
-    assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-        .internalQueryFrameworkControl;
-const kOriginalMemoryLimit =
-    assert
-        .commandWorked(db.adminCommand({
-            getParameter: 1,
-            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1
-        }))
-        .internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill;
+const kOriginalInternalQueryFrameworkControl = assert.commandWorked(
+    db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}),
+).internalQueryFrameworkControl;
+const kOriginalMemoryLimit = assert.commandWorked(
+    db.adminCommand({
+        getParameter: 1,
+        internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1,
+    }),
+).internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill;
 
 const stageName = "hash_lookup";
 
@@ -55,21 +54,21 @@ const peopleDocs = [
     {pID: 1001, name: "Arun"},
     {pID: 1002, name: "Chris"},
     {pID: 1003, name: "Erin Z"},
-    {pID: 1004, name: "Erin L"}
+    {pID: 1004, name: "Erin L"},
 ];
 
 assert.commandWorked(employees.insertMany(employeeDocs));
 assert.commandWorked(people.insertMany(peopleDocs));
 
 try {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 
     {
-        const pipeline = [{
-            $lookup:
-                {from: people.getName(), localField: "personId", foreignField: "pID", as: "matched"}
-        }];
+        const pipeline = [
+            {
+                $lookup: {from: people.getName(), localField: "personId", foreignField: "pID", as: "matched"},
+            },
+        ];
         jsTest.log.info("Running basic pipeline test: " + tojson(pipeline));
 
         runMemoryStatsTest({
@@ -89,7 +88,7 @@ try {
     {
         const pipelineWithLimit = [
             {$lookup: {from: people.getName(), localField: "personId", foreignField: "pID", as: "matches"}},
-            {$limit: 2}
+            {$limit: 2},
         ];
         jsTest.log.info("Running pipeline with $limit: " + tojson(pipelineWithLimit));
 
@@ -104,22 +103,25 @@ try {
             },
             stageName,
             expectedNumGetMores: 1,
-            skipInUseTrackedMemBytesCheck: true,  // $limit will force execution to stop early
+            skipInUseTrackedMemBytesCheck: true, // $limit will force execution to stop early
         });
     }
 
     {
-        const pipeline = [{
-            $lookup:
-                {from: people.getName(), localField: "personId", foreignField: "pID", as: "matches"}
-        }];
+        const pipeline = [
+            {
+                $lookup: {from: people.getName(), localField: "personId", foreignField: "pID", as: "matches"},
+            },
+        ];
         jsTest.log.info("Running pipeline that will spill: " + tojson(pipeline));
 
         // Set a low memory limit to force spilling to disk.
-        assert.commandWorked(db.adminCommand({
-            setParameter: 1,
-            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 100
-        }));
+        assert.commandWorked(
+            db.adminCommand({
+                setParameter: 1,
+                internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 100,
+            }),
+        );
 
         runMemoryStatsTest({
             db: db,
@@ -132,8 +134,7 @@ try {
             },
             stageName,
             expectedNumGetMores: 7,
-            skipInUseTrackedMemBytesCheck:
-                true,  // Since we spill, we don't expect to see inUseTrackedMemBytes
+            skipInUseTrackedMemBytesCheck: true, // Since we spill, we don't expect to see inUseTrackedMemBytes
             // populated, as it should be 0 on each operation.
         });
     }
@@ -141,11 +142,13 @@ try {
     // Clean up
     employees.drop();
     people.drop();
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
-            kOriginalMemoryLimit
-    }));
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: kOriginalMemoryLimit,
+        }),
+    );
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: kOriginalInternalQueryFrameworkControl}),
+    );
 }

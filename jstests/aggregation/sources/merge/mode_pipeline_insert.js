@@ -13,13 +13,24 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 // in the 'target', and the $merge stage 'on' fields in the 'on' parameter. The 'letVars'
 // parameter describes the 'let' argument of the $merge stage and holds variables that can be
 // referenced in the pipeline.
-function makeMergePipeline(
-    {target = "", initialStages = [], updatePipeline = [], on = "_id", letVars = undefined} = {}) {
-    const baseObj = letVars !== undefined ? {let : letVars} : {};
-    return initialStages.concat([{
-        $merge: Object.assign(
-            baseObj, {into: target, on: on, whenMatched: updatePipeline, whenNotMatched: "insert"})
-    }]);
+function makeMergePipeline({
+    target = "",
+    initialStages = [],
+    updatePipeline = [],
+    on = "_id",
+    letVars = undefined,
+} = {}) {
+    const baseObj = letVars !== undefined ? {let: letVars} : {};
+    return initialStages.concat([
+        {
+            $merge: Object.assign(baseObj, {
+                into: target,
+                on: on,
+                whenMatched: updatePipeline,
+                whenNotMatched: "insert",
+            }),
+        },
+    ]);
 }
 
 const source = db[`${jsTest.name()}_source`];
@@ -29,13 +40,12 @@ target.drop();
 
 (function testMergeIntoNonExistentCollection() {
     assert.commandWorked(source.insert({_id: 1, a: 1, b: "a"}));
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline(
-                            {target: target.getName(), updatePipeline: [{$addFields: {x: 1}}]})));
+    assert.doesNotThrow(() =>
+        source.aggregate(makeMergePipeline({target: target.getName(), updatePipeline: [{$addFields: {x: 1}}]})),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [
-            {_id: 1, a: 1, b: "a"},
-        ]
+        expected: [{_id: 1, a: 1, b: "a"}],
     });
 })();
 
@@ -43,20 +53,23 @@ target.drop();
 // matching document is found.
 (function testMergeInsertsDocumentIfMatchNotFound() {
     assert.commandWorked(target.deleteMany({}));
-    assert.doesNotThrow(
-        () => source.aggregate(makeMergePipeline(
-            {target: target.getName(), updatePipeline: [{$addFields: {x: 1, y: 2}}]})));
+    assert.doesNotThrow(() =>
+        source.aggregate(makeMergePipeline({target: target.getName(), updatePipeline: [{$addFields: {x: 1, y: 2}}]})),
+    );
     assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 1, b: "a"}]});
 })();
 
 // Test $merge updates an existing document in the target collection by applying a
 // pipeline-style update.
 (function testMergeUpdatesDocumentIfMatchFound() {
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        target: target.getName(),
-        updatePipeline:
-            [{$project: {x: {$add: ["$a", 1]}, y: {$sum: ["$y", 2]}, z: {$add: ["$y", 2]}}}]
-    })));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                target: target.getName(),
+                updatePipeline: [{$project: {x: {$add: ["$a", 1]}, y: {$sum: ["$y", 2]}, z: {$add: ["$y", 2]}}}],
+            }),
+        ),
+    );
     assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, x: 2, y: 2, z: null}]});
 })();
 
@@ -66,42 +79,83 @@ target.drop();
     assert(source.drop());
     assert(target.drop());
 
-    assert.commandWorked(source.insert([{_id: 1, a: 1}, {_id: 2, a: 2}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, b: 1}));
 
     // Test $addFields stage.
-    assert.doesNotThrow(
-        () => source.aggregate(makeMergePipeline(
-            {target: target.getName(), updatePipeline: [{$addFields: {x: {$add: ["$b", 1]}}}]})));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, b: 1, x: 2}, {_id: 2, a: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({target: target.getName(), updatePipeline: [{$addFields: {x: {$add: ["$b", 1]}}}]}),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, b: 1, x: 2},
+            {_id: 2, a: 2},
+        ],
+    });
 
     // Test $project stage.
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, b: 1}));
-    assert.doesNotThrow(
-        () => source.aggregate(makeMergePipeline(
-            {target: target.getName(), updatePipeline: [{$project: {x: {$add: ["$b", 1]}}}]})));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, x: 2}, {_id: 2, a: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({target: target.getName(), updatePipeline: [{$project: {x: {$add: ["$b", 1]}}}]}),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, x: 2},
+            {_id: 2, a: 2},
+        ],
+    });
 
     // Test $replaceWith stage.
     assert(target.drop());
     assert.commandWorked(
-        target.insert([{_id: 1, b: 1, c: {x: {y: 1}}}, {_id: 2, b: 2, c: {x: {y: 2}}}]));
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline(
-                            {target: target.getName(), updatePipeline: [{$replaceWith: "$c"}]})));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, x: {y: 1}}, {_id: 2, x: {y: 2}}]});
+        target.insert([
+            {_id: 1, b: 1, c: {x: {y: 1}}},
+            {_id: 2, b: 2, c: {x: {y: 2}}},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate(makeMergePipeline({target: target.getName(), updatePipeline: [{$replaceWith: "$c"}]})),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, x: {y: 1}},
+            {_id: 2, x: {y: 2}},
+        ],
+    });
 
     // Test $replaceRoot stage.
     assert(target.drop());
     assert.commandWorked(
-        target.insert([{_id: 1, b: 1, c: {x: {y: 1}}}, {_id: 2, b: 2, c: {x: {y: 2}}}]));
-    assert.doesNotThrow(
-        () => source.aggregate(makeMergePipeline(
-            {target: target.getName(), updatePipeline: [{$replaceRoot: {newRoot: "$c"}}]})));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, x: {y: 1}}, {_id: 2, x: {y: 2}}]});
+        target.insert([
+            {_id: 1, b: 1, c: {x: {y: 1}}},
+            {_id: 2, b: 2, c: {x: {y: 2}}},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({target: target.getName(), updatePipeline: [{$replaceRoot: {newRoot: "$c"}}]}),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, x: {y: 1}},
+            {_id: 2, x: {y: 2}},
+        ],
+    });
 })();
 
 // Test $merge inserts a new document into the target collection if no matching document is
@@ -111,25 +165,36 @@ target.drop();
     assert(target.drop());
     assert.commandWorked(source.insert({_id: 1, a: 1}));
     assert.commandWorked(target.insert({_id: 2, a: 2}));
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline(
-                            {target: target.getName(), updatePipeline: [{$addFields: {x: 1}}]})));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, a: 1}, {_id: 2, a: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(makeMergePipeline({target: target.getName(), updatePipeline: [{$addFields: {x: 1}}]})),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+        ],
+    });
 })();
 
 // Test $merge doesn't modify the target collection if a document has been removed from the
 // source collection.
 (function testMergeDoesNotUpdateDeletedDocument() {
     assert.commandWorked(source.deleteOne({_id: 1}));
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        target: target.getName(),
-        updatePipeline: [{$project: {x: {$add: ["$x", 1]}, a: 1}}]
-    })));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                target: target.getName(),
+                updatePipeline: [{$project: {x: {$add: ["$x", 1]}, a: 1}}],
+            }),
+        ),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
         expected: [
             {_id: 1, a: 1},
             {_id: 2, a: 2},
-        ]
+        ],
     });
 })();
 
@@ -145,18 +210,23 @@ target.drop();
     assert(source.drop());
     assert(target.drop());
     assert.commandWorked(source.insert({_id: 4, a: 2}));
-    assert.commandWorked(target.insert([{_id: 1, x: 1}, {_id: 2, a: 2}]));
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, x: 1},
+            {_id: 2, a: 2},
+        ]),
+    );
     assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
-    const error =
-        assert.throws(() => source.aggregate(makeMergePipeline(
-                          {target: target.getName(), updatePipeline: [{$project: {x: 1, a: 1}}]})));
+    const error = assert.throws(() =>
+        source.aggregate(makeMergePipeline({target: target.getName(), updatePipeline: [{$project: {x: 1, a: 1}}]})),
+    );
     assert.commandFailedWithCode(error, ErrorCodes.DuplicateKey);
     assertArrayEq({
         actual: target.find().toArray(),
         expected: [
             {_id: 1, x: 1},
             {_id: 2, a: 2},
-        ]
+        ],
     });
     assert.commandWorked(target.dropIndex({a: 1}));
 })();
@@ -164,19 +234,27 @@ target.drop();
 // Test $merge fails if it cannot find an index to verify that the 'on' fields will be unique.
 (function testMergeFailsIfOnFieldCannotBeVerifiedForUniquness() {
     // The 'on' fields contains a single document field.
-    let error = assert.throws(() => source.aggregate(makeMergePipeline({
-        target: target.getName(),
-        on: "nonexistent",
-        updatePipeline: [{$project: {x: 1, a: 1}}]
-    })));
+    let error = assert.throws(() =>
+        source.aggregate(
+            makeMergePipeline({
+                target: target.getName(),
+                on: "nonexistent",
+                updatePipeline: [{$project: {x: 1, a: 1}}],
+            }),
+        ),
+    );
     assert.commandFailedWithCode(error, [51190, 51183]);
 
     // The 'on' fields contains multiple document fields.
-    error = assert.throws(() => source.aggregate(makeMergePipeline({
-        target: target.getName(),
-        on: ["nonexistent1", "nonexistent2"],
-        updatePipeline: [{$project: {x: 1, a: 1}}]
-    })));
+    error = assert.throws(() =>
+        source.aggregate(
+            makeMergePipeline({
+                target: target.getName(),
+                on: ["nonexistent1", "nonexistent2"],
+                updatePipeline: [{$project: {x: 1, a: 1}}],
+            }),
+        ),
+    );
     assert.commandFailedWithCode(error, [51190, 51183]);
 })();
 
@@ -195,18 +273,33 @@ target.drop();
     dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({a: 1}, {unique: true}));
     assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
-    assert.commandWorked(source.insert([{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 30}]));
     assert.commandWorked(
-        target.insert([{_id: 1, a: 1, b: 1}, {_id: 4, a: 30, b: 2}, {_id: 5, a: 40, b: 3}]));
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        initialStages: [{$project: {_id: 0}}],
-        target: target.getName(),
-        on: "a",
-        updatePipeline: [{$addFields: {z: 1}}]
-    })));
+        source.insert([
+            {_id: 1, a: 1},
+            {_id: 2, a: 2},
+            {_id: 3, a: 30},
+        ]),
+    );
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 4, a: 30, b: 2},
+            {_id: 5, a: 40, b: 3},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                initialStages: [{$project: {_id: 0}}],
+                target: target.getName(),
+                on: "a",
+                updatePipeline: [{$addFields: {z: 1}}],
+            }),
+        ),
+    );
     assertArrayEq({
         actual: target.find({}, {_id: 0}).toArray(),
-        expected: [{a: 1, b: 1, z: 1}, {a: 2}, {a: 30, b: 2, z: 1}, {a: 40, b: 3}]
+        expected: [{a: 1, b: 1, z: 1}, {a: 2}, {a: 30, b: 2, z: 1}, {a: 40, b: 3}],
     });
 
     // The 'on' fields contains multiple document fields.
@@ -215,18 +308,37 @@ target.drop();
     assert.commandWorked(source.createIndex({a: 1, b: 1}, {unique: true}));
     assert.commandWorked(target.createIndex({a: 1, b: 1}, {unique: true}));
     assert.commandWorked(
-        source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 4}, {_id: 3, a: 30, b: 2}]));
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 4},
+            {_id: 3, a: 30, b: 2},
+        ]),
+    );
     assert.commandWorked(
-        target.insert([{_id: 1, a: 1, b: 1}, {_id: 4, a: 30, b: 2}, {_id: 5, a: 40, b: 3}]));
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        initialStages: [{$project: {_id: 0}}],
-        target: target.getName(),
-        on: ["a", "b"],
-        updatePipeline: [{$addFields: {z: 1}}]
-    })));
+        target.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 4, a: 30, b: 2},
+            {_id: 5, a: 40, b: 3},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                initialStages: [{$project: {_id: 0}}],
+                target: target.getName(),
+                on: ["a", "b"],
+                updatePipeline: [{$addFields: {z: 1}}],
+            }),
+        ),
+    );
     assertArrayEq({
         actual: target.find({}, {_id: 0}).toArray(),
-        expected: [{a: 1, b: 1, z: 1}, {a: 2, b: 4}, {a: 30, b: 2, z: 1}, {a: 40, b: 3}]
+        expected: [
+            {a: 1, b: 1, z: 1},
+            {a: 2, b: 4},
+            {a: 30, b: 2, z: 1},
+            {a: 40, b: 3},
+        ],
     });
     assert.commandWorked(source.dropIndex({a: 1, b: 1}));
     assert.commandWorked(target.dropIndex({a: 1, b: 1}));
@@ -245,21 +357,31 @@ target.drop();
     dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(source.createIndex({"a.b": 1}, {unique: true}));
     assert.commandWorked(target.createIndex({"a.b": 1}, {unique: true}));
-    assert.commandWorked(source.insert([
-        {_id: 1, a: {b: "b"}, c: "x"},
-        {_id: 2, a: {b: "c"}, c: "y"},
-        {_id: 3, a: {b: 30}, b: "c"}
-    ]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: {b: "b"}, c: "x"},
+            {_id: 2, a: {b: "c"}, c: "y"},
+            {_id: 3, a: {b: 30}, b: "c"},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 2, a: {b: "c"}, c: "y"}));
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        initialStages: [{$project: {_id: 0}}],
-        target: target.getName(),
-        on: "a.b",
-        updatePipeline: [{$addFields: {z: 1}}]
-    })));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                initialStages: [{$project: {_id: 0}}],
+                target: target.getName(),
+                on: "a.b",
+                updatePipeline: [{$addFields: {z: 1}}],
+            }),
+        ),
+    );
     assertArrayEq({
         actual: target.find({}, {_id: 0}).toArray(),
-        expected: [{a: {b: "b"}, c: "x"}, {a: {b: "c"}, c: "y", z: 1}, {a: {b: 30}, b: "c"}]
+        expected: [
+            {a: {b: "b"}, c: "x"},
+            {a: {b: "c"}, c: "y", z: 1},
+            {a: {b: 30}, b: "c"},
+        ],
     });
 })();
 
@@ -282,7 +404,7 @@ target.drop();
         initialStages: [{$project: {_id: 0}}],
         target: target.getName(),
         on: "z",
-        updatePipeline: [{$addFields: {z: 1}}]
+        updatePipeline: [{$addFields: {z: 1}}],
     });
 
     // The 'on' field is missing and the index is sparse.
@@ -308,27 +430,32 @@ target.drop();
     let pipeline = makeMergePipeline({
         initialStages: [{$project: {_id: 0}}],
         target: target.getName(),
-        updatePipeline: [{$addFields: {z: 1}}]
+        updatePipeline: [{$addFields: {z: 1}}],
     });
 
     // The _id is a single 'on' field (a default one).
     dropWithoutImplicitRecreate(source.getName());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: "a"}, {_id: 2, a: 2, b: "b"}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: "a"},
+            {_id: 2, a: 2, b: "b"},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, b: "c"}));
     assert.doesNotThrow(() => source.aggregate(pipeline));
     assertArrayEq({
         actual: target.find({}, {_id: 0}).toArray(),
         // There is a matching document in the target with {_id: 1}, but since we cannot match
         // it (no _id in projection), we insert the two documents from the source collection.
-        expected: [{b: "c"}, {a: 1, b: "a"}, {a: 2, b: "b"}]
+        expected: [{b: "c"}, {a: 1, b: "a"}, {a: 2, b: "b"}],
     });
 
     pipeline = makeMergePipeline({
         initialStages: [{$project: {_id: 0}}],
         on: ["_id", "a"],
         target: target.getName(),
-        updatePipeline: [{$addFields: {z: 1}}]
+        updatePipeline: [{$addFields: {z: 1}}],
     });
 
     // The _id is part of the compound 'on' field.
@@ -339,7 +466,7 @@ target.drop();
     assert.doesNotThrow(() => source.aggregate(pipeline));
     assertArrayEq({
         actual: target.find({}, {_id: 0}).toArray(),
-        expected: [{b: "c"}, {a: 1, b: "a"}, {a: 2, b: "b"}]
+        expected: [{b: "c"}, {a: 1, b: "a"}, {a: 2, b: "b"}],
     });
     assert.commandWorked(source.dropIndex({_id: 1, a: -1}));
     assert.commandWorked(target.dropIndex({_id: 1, a: -1}));
@@ -351,10 +478,22 @@ target.drop();
     dropWithoutImplicitRecreate(target.getName());
     assert.commandWorked(db.createCollection(target.getName(), {validator: validator}));
     assert.commandWorked(target.createIndex({a: 1}));
-    assert.commandWorked(target.insert([{_id: 1, z: 5}, {_id: 2, z: 5}]));
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline(
-                            {target: target.getName(), updatePipeline: [{$addFields: {z: 1}}]})));
-    assertArrayEq({actual: target.find().toArray(), expected: [{_id: 1, z: 1}, {_id: 2, z: 1}]});
+    assert.commandWorked(
+        target.insert([
+            {_id: 1, z: 5},
+            {_id: 2, z: 5},
+        ]),
+    );
+    assert.doesNotThrow(() =>
+        source.aggregate(makeMergePipeline({target: target.getName(), updatePipeline: [{$addFields: {z: 1}}]})),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, z: 1},
+            {_id: 2, z: 1},
+        ],
+    });
     assert.eq(2, target.getIndexes().length);
 
     const listColl = db.runCommand({listCollections: 1, filter: {name: target.getName()}});
@@ -372,14 +511,14 @@ target.drop();
     const foreignTargetCollName = jsTest.name() + "_target";
     const foreignPipeline = makeMergePipeline({
         target: {db: foreignDb.getName(), coll: foreignTargetCollName},
-        updatePipeline: [{$addFields: {z: 1}}]
+        updatePipeline: [{$addFields: {z: 1}}],
     });
 
     if (!FixtureHelpers.isMongos(db)) {
         assert.doesNotThrow(() => source.aggregate(foreignPipeline));
         assertArrayEq({
             actual: foreignDb[foreignTargetCollName].find().toArray(),
-            expected: [{_id: 1, a: 1, b: "a"}]
+            expected: [{_id: 1, a: 1, b: "a"}],
         });
     } else {
         // Implicit database creation is prohibited in a cluster.
@@ -393,7 +532,7 @@ target.drop();
     assert.doesNotThrow(() => source.aggregate(foreignPipeline));
     assertArrayEq({
         actual: foreignDb[foreignTargetCollName].find().toArray(),
-        expected: [{_id: 1, a: 1, b: "a", z: 1}]
+        expected: [{_id: 1, a: 1, b: "a", z: 1}],
     });
     assert.commandWorked(foreignDb.dropDatabase());
 })();
@@ -404,15 +543,29 @@ target.drop();
     assert(source.drop());
     assert(target.drop());
 
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 2},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        target: target.getName(),
-        updatePipeline: [{$set: {x: {$add: ["$$new.a", "$$new.b"]}}}]
-    })));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, c: 1, x: 2}, {_id: 2, a: 2, b: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                target: target.getName(),
+                updatePipeline: [{$set: {x: {$add: ["$$new.a", "$$new.b"]}}}],
+            }),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, c: 1, x: 2},
+            {_id: 2, a: 2, b: 2},
+        ],
+    });
 })();
 
 // Test that the default 'let' variable 'new' is always available even when the 'let' argument to
@@ -420,16 +573,30 @@ target.drop();
 (function testMergeCannotUseDefaultLetVariableIfLetIsSpecified() {
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 2},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: {foo: "bar"},
-        target: target.getName(),
-        updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}]
-    })));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, x: 1, y: 1}, {_id: 2, a: 2, b: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {foo: "bar"},
+                target: target.getName(),
+                updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}],
+            }),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, x: 1, y: 1},
+            {_id: 2, a: 2, b: 2},
+        ],
+    });
 })();
 
 // Test that $merge can accept an empty object holding no variables and the default 'new'
@@ -437,51 +604,88 @@ target.drop();
 (function testMergeWithEmptyLetVariables() {
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 2},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
     // Can use an empty object.
-    assert.doesNotThrow(
-        () => source.aggregate(makeMergePipeline(
-            {letVars: {}, target: target.getName(), updatePipeline: [{$set: {x: "foo"}}]})));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({letVars: {}, target: target.getName(), updatePipeline: [{$set: {x: "foo"}}]}),
+        ),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, c: 1, x: "foo"}, {_id: 2, a: 2, b: 2}]
+        expected: [
+            {_id: 1, c: 1, x: "foo"},
+            {_id: 2, a: 2, b: 2},
+        ],
     });
 
     // No default variable 'new' is available.
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: {},
-        target: target.getName(),
-        updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}]
-    })));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, x: 1, y: 1}, {_id: 2, x: 2, y: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {},
+                target: target.getName(),
+                updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}],
+            }),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, x: 1, y: 1},
+            {_id: 2, x: 2, y: 2},
+        ],
+    });
 })();
 
 // Test that $merge will reject a 'let' specification which attempts to redefine 'new'.
 (function testMergeRejectsLetVariablesWhichRedefineNew() {
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 2},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
     // Cannot override 'new' with an arbitrary value.
-    const error = assert.throws(() => source.aggregate(makeMergePipeline({
-        letVars: {new: "$a"},
-        target: target.getName(),
-        updatePipeline: [{$set: {x: "foo"}}]
-    })));
+    const error = assert.throws(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {new: "$a"},
+                target: target.getName(),
+                updatePipeline: [{$set: {x: "foo"}}],
+            }),
+        ),
+    );
     assert.commandFailedWithCode(error, 51273);
 
     // If the user's 'let' explicitly sets 'new' to "$$ROOT", we allow it.
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: {new: "$$ROOT"},
-        target: target.getName(),
-        updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}]
-    })));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, x: 1, y: 1}, {_id: 2, a: 2, b: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {new: "$$ROOT"},
+                target: target.getName(),
+                updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}],
+            }),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, x: 1, y: 1},
+            {_id: 2, a: 2, b: 2},
+        ],
+    });
 })();
 
 // Test that $merge can accept a null value as the 'let' argument and the default variable 'new'
@@ -494,26 +698,45 @@ target.drop();
 (function testMergeWithNullLetVariables() {
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 2},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
     // Can use a null 'let' argument.
-    assert.doesNotThrow(
-        () => source.aggregate(makeMergePipeline(
-            {letVars: null, target: target.getName(), updatePipeline: [{$set: {x: "foo"}}]})));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({letVars: null, target: target.getName(), updatePipeline: [{$set: {x: "foo"}}]}),
+        ),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, c: 1, x: "foo"}, {_id: 2, a: 2, b: 2}]
+        expected: [
+            {_id: 1, c: 1, x: "foo"},
+            {_id: 2, a: 2, b: 2},
+        ],
     });
 
     // Can use the default 'new' variable.
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: null,
-        target: target.getName(),
-        updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}]
-    })));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, x: 1, y: 1}, {_id: 2, x: 2, y: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: null,
+                target: target.getName(),
+                updatePipeline: [{$project: {x: "$$new.a", y: "$$new.b"}}],
+            }),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, x: 1, y: 1},
+            {_id: 2, x: 2, y: 2},
+        ],
+    });
 })();
 
 // Test that constant values can be specified in the 'let' argument and referenced in the update
@@ -522,30 +745,51 @@ target.drop();
     // Non-array constants.
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 2},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: {a: 1, b: "foo", c: true},
-        target: target.getName(),
-        updatePipeline: [{$set: {x: "$$a", y: "$$b", z: "$$c"}}]
-    })));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {a: 1, b: "foo", c: true},
+                target: target.getName(),
+                updatePipeline: [{$set: {x: "$$a", y: "$$b", z: "$$c"}}],
+            }),
+        ),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, c: 1, x: 1, y: "foo", z: true}, {_id: 2, a: 2, b: 2}]
+        expected: [
+            {_id: 1, c: 1, x: 1, y: "foo", z: true},
+            {_id: 2, a: 2, b: 2},
+        ],
     });
 
     // Constant array.
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: {a: [1, 2, 3]},
-        target: target.getName(),
-        updatePipeline: [{$set: {x: {$arrayElemAt: ["$$a", 1]}}}]
-    })));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, c: 1, x: 2}, {_id: 2, a: 2, b: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {a: [1, 2, 3]},
+                target: target.getName(),
+                updatePipeline: [{$set: {x: {$arrayElemAt: ["$$a", 1]}}}],
+            }),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, c: 1, x: 2},
+            {_id: 2, a: 2, b: 2},
+        ],
+    });
 })();
 
 // Test that variables referencing the fields in the source document can be specified in the
@@ -554,45 +798,78 @@ target.drop();
     // Non-array fields.
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 2, b: 2}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 2, b: 2},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: {x: "$a", y: "$b"},
-        target: target.getName(),
-        updatePipeline: [{$set: {z: {$add: ["$$x", "$$y"]}}}]
-    })));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 2}, {_id: 2, a: 2, b: 2}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {x: "$a", y: "$b"},
+                target: target.getName(),
+                updatePipeline: [{$set: {z: {$add: ["$$x", "$$y"]}}}],
+            }),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, c: 1, z: 2},
+            {_id: 2, a: 2, b: 2},
+        ],
+    });
 
     // Array field with expressions in the pipeline.
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: [1, 2, 3]}, {_id: 2, a: [4, 5, 6]}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: [1, 2, 3]},
+            {_id: 2, a: [4, 5, 6]},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: {x: "$a"},
-        target: target.getName(),
-        updatePipeline: [{$set: {z: {$arrayElemAt: ["$$x", 1]}}}]
-    })));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {x: "$a"},
+                target: target.getName(),
+                updatePipeline: [{$set: {z: {$arrayElemAt: ["$$x", 1]}}}],
+            }),
+        ),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, c: 1, z: 2}, {_id: 2, a: [4, 5, 6]}]
+        expected: [
+            {_id: 1, c: 1, z: 2},
+            {_id: 2, a: [4, 5, 6]},
+        ],
     });
 
     // Array field with expressions in the 'let' argument.
     assert(target.drop());
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: {x: {$arrayElemAt: ["$a", 2]}},
-        target: target.getName(),
-        updatePipeline: [{$set: {z: "$$x"}}]
-    })));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {x: {$arrayElemAt: ["$a", 2]}},
+                target: target.getName(),
+                updatePipeline: [{$set: {z: "$$x"}}],
+            }),
+        ),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, c: 1, z: 3}, {_id: 2, a: [4, 5, 6]}]
+        expected: [
+            {_id: 1, c: 1, z: 3},
+            {_id: 2, a: [4, 5, 6]},
+        ],
     });
 })();
 
@@ -601,17 +878,29 @@ target.drop();
 (function testMergeWithDottedPathLetVariables() {
     assert(source.drop());
     assert(target.drop());
-    assert.commandWorked(source.insert([{_id: 1, a: {b: {c: 2}}}, {_id: 2, a: {b: {c: 3}}}]));
+    assert.commandWorked(
+        source.insert([
+            {_id: 1, a: {b: {c: 2}}},
+            {_id: 2, a: {b: {c: 3}}},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        letVars: {x: "$a.b.c"},
-        target: target.getName(),
-        updatePipeline: [{$set: {z: {$pow: ["$$x", 2]}}}]
-    })));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                letVars: {x: "$a.b.c"},
+                target: target.getName(),
+                updatePipeline: [{$set: {z: {$pow: ["$$x", 2]}}}],
+            }),
+        ),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, c: 1, z: 4}, {_id: 2, a: {b: {c: 3}}}]
+        expected: [
+            {_id: 1, c: 1, z: 4},
+            {_id: 2, a: {b: {c: 3}}},
+        ],
     });
 })();
 
@@ -622,36 +911,62 @@ target.drop();
     assert(source.drop());
     assert(target.drop());
     assert.commandWorked(
-        source.insert([{_id: 1, a: 1, b: 1}, {_id: 2, a: 1, b: 2}, {_id: 3, a: 2, b: 3}]));
+        source.insert([
+            {_id: 1, a: 1, b: 1},
+            {_id: 2, a: 1, b: 2},
+            {_id: 3, a: 2, b: 3},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
     // In the $group stage the total field 'a' uses the same name as in the source collection
     // intentionally, to make sure that even when a referenced field is present in the source
     // collection under the same name, the actual value for the variable will be picked up from
     // the computed document.
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        initialStages: [{$group: {_id: "$a", a: {$sum: "$b"}}}],
-        target: target.getName(),
-        updatePipeline: [{$set: {z: "$$new"}}]
-    })));
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                initialStages: [{$group: {_id: "$a", a: {$sum: "$b"}}}],
+                target: target.getName(),
+                updatePipeline: [{$set: {z: "$$new"}}],
+            }),
+        ),
+    );
     assertArrayEq({
         actual: target.find().toArray(),
-        expected: [{_id: 1, c: 1, z: {_id: 1, a: 3}}, {_id: 2, a: 3}]
+        expected: [
+            {_id: 1, c: 1, z: {_id: 1, a: 3}},
+            {_id: 2, a: 3},
+        ],
     });
 
     // Test custom 'let' variables.
     assert(source.drop());
     assert(target.drop());
     assert.commandWorked(
-        source.insert([{_id: 1, a: 1, b: 5}, {_id: 2, a: 1, b: 2}, {_id: 3, a: 2, b: 3}]));
+        source.insert([
+            {_id: 1, a: 1, b: 5},
+            {_id: 2, a: 1, b: 2},
+            {_id: 3, a: 2, b: 3},
+        ]),
+    );
     assert.commandWorked(target.insert({_id: 1, c: 1}));
 
-    assert.doesNotThrow(() => source.aggregate(makeMergePipeline({
-        initialStages: [{$group: {_id: "$a", a: {$sum: "$b"}}}],
-        letVars: {x: {$pow: ["$a", 2]}},
-        target: target.getName(),
-        updatePipeline: [{$set: {z: "$$x"}}]
-    })));
-    assertArrayEq(
-        {actual: target.find().toArray(), expected: [{_id: 1, c: 1, z: 49}, {_id: 2, a: 3}]});
+    assert.doesNotThrow(() =>
+        source.aggregate(
+            makeMergePipeline({
+                initialStages: [{$group: {_id: "$a", a: {$sum: "$b"}}}],
+                letVars: {x: {$pow: ["$a", 2]}},
+                target: target.getName(),
+                updatePipeline: [{$set: {z: "$$x"}}],
+            }),
+        ),
+    );
+    assertArrayEq({
+        actual: target.find().toArray(),
+        expected: [
+            {_id: 1, c: 1, z: 49},
+            {_id: 2, a: 3},
+        ],
+    });
 })();

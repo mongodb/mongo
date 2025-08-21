@@ -17,11 +17,11 @@ const foreignCaseInsensitiveColl = testDB.foreign_collation;
 
 const caseInsensitiveCollation = {
     locale: "en_US",
-    strength: 1
+    strength: 1,
 };
 
 const simpleCollation = {
-    locale: "simple"
+    locale: "simple",
 };
 
 function setup() {
@@ -29,19 +29,19 @@ function setup() {
 
     assert.commandWorked(testDB.createCollection(localColl.getName()));
     assert.commandWorked(testDB.createCollection(foreignColl.getName()));
-    assert.commandWorked(testDB.createCollection(localCaseInsensitiveColl.getName(),
-                                                 {collation: caseInsensitiveCollation}));
-    assert.commandWorked(testDB.createCollection(foreignCaseInsensitiveColl.getName(),
-                                                 {collation: caseInsensitiveCollation}));
+    assert.commandWorked(
+        testDB.createCollection(localCaseInsensitiveColl.getName(), {collation: caseInsensitiveCollation}),
+    );
+    assert.commandWorked(
+        testDB.createCollection(foreignCaseInsensitiveColl.getName(), {collation: caseInsensitiveCollation}),
+    );
 
+    assert.commandWorked(localColl.insert([{_id: "a"}, {_id: "b"}, {_id: "c"}, {_id: "d"}, {_id: "e"}]));
+    assert.commandWorked(localCaseInsensitiveColl.insert([{_id: "a"}, {_id: "b"}, {_id: "c"}, {_id: "d"}, {_id: "e"}]));
+    assert.commandWorked(foreignColl.insert([{_id: "a"}, {_id: "B"}, {_id: "c"}, {_id: "D"}, {_id: "e"}]));
     assert.commandWorked(
-        localColl.insert([{_id: "a"}, {_id: "b"}, {_id: "c"}, {_id: "d"}, {_id: "e"}]));
-    assert.commandWorked(localCaseInsensitiveColl.insert(
-        [{_id: "a"}, {_id: "b"}, {_id: "c"}, {_id: "d"}, {_id: "e"}]));
-    assert.commandWorked(
-        foreignColl.insert([{_id: "a"}, {_id: "B"}, {_id: "c"}, {_id: "D"}, {_id: "e"}]));
-    assert.commandWorked(foreignCaseInsensitiveColl.insert(
-        [{_id: "a"}, {_id: "B"}, {_id: "c"}, {_id: "D"}, {_id: "e"}]));
+        foreignCaseInsensitiveColl.insert([{_id: "a"}, {_id: "B"}, {_id: "c"}, {_id: "D"}, {_id: "e"}]),
+    );
 }
 
 (function testCollationPermutations() {
@@ -52,7 +52,7 @@ function setup() {
         {_id: "b", foreignMatch: [{_id: "B"}]},
         {_id: "c", foreignMatch: [{_id: "c"}]},
         {_id: "d", foreignMatch: [{_id: "D"}]},
-        {_id: "e", foreignMatch: [{_id: "e"}]}
+        {_id: "e", foreignMatch: [{_id: "e"}]},
     ];
 
     const resultSetCaseSensitive = [
@@ -60,7 +60,7 @@ function setup() {
         {_id: "b", foreignMatch: []},
         {_id: "c", foreignMatch: [{_id: "c"}]},
         {_id: "d", foreignMatch: []},
-        {_id: "e", foreignMatch: [{_id: "e"}]}
+        {_id: "e", foreignMatch: [{_id: "e"}]},
     ];
 
     // Executes an aggregation pipeline with both pipeline and localField/foreignField $lookup
@@ -72,15 +72,18 @@ function setup() {
     //    expectedResults: Results expected from the aggregate invocation
     //
     function assertExpectedResultSet(localColl, foreignColl, commandCollation, expectedResults) {
-        const lookupWithPipeline = {$lookup: {from: foreignColl.getName(),
-                                 as: "foreignMatch",
-                                 let: {l_id: "$_id"},
-                                 pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}]}};
+        const lookupWithPipeline = {
+            $lookup: {
+                from: foreignColl.getName(),
+                as: "foreignMatch",
+                let: {l_id: "$_id"},
+                pipeline: [{$match: {$expr: {$eq: ["$_id", "$$l_id"]}}}],
+            },
+        };
 
-        const lookupWithLocalForeignField = {$lookup: {from: foreignColl.getName(),
-         localField: "_id",
-         foreignField: "_id",
-         as: "foreignMatch"}};
+        const lookupWithLocalForeignField = {
+            $lookup: {from: foreignColl.getName(), localField: "_id", foreignField: "_id", as: "foreignMatch"},
+        };
 
         const aggOptions = {};
         if (commandCollation) {
@@ -103,8 +106,7 @@ function setup() {
     for (const local of [localColl, localCaseInsensitiveColl]) {
         for (const foreign of [foreignColl, foreignCaseInsensitiveColl]) {
             // Case insensitive collation results in a case insensitive join.
-            assertExpectedResultSet(
-                local, foreign, caseInsensitiveCollation, resultSetCaseInsensitive);
+            assertExpectedResultSet(local, foreign, caseInsensitiveCollation, resultSetCaseInsensitive);
 
             // Simple collation results in a case sensitive join.
             assertExpectedResultSet(local, foreign, simpleCollation, resultSetCaseSensitive);

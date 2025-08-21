@@ -65,22 +65,23 @@ function inspectFirstCommandForAfterClusterTime(conn, cmdName, isCausal, expectR
         cmds.push(cmdObjsSeen[0]);
     } else {
         assert.lt(1, cmdObjsSeen.length);
-        cmds = cmdObjsSeen.filter(obj => Object.keys(obj)[0] === cmdName);
+        cmds = cmdObjsSeen.filter((obj) => Object.keys(obj)[0] === cmdName);
     }
 
     for (let cmd of cmds) {
         if (isCausal) {
-            assert(cmd.hasOwnProperty("$clusterTime"),
-                   "Expected " + tojson(cmd) + " to have a $clusterTime.");
-            assert(cmd.hasOwnProperty("readConcern"),
-                   "Expected " + tojson(cmd) + " to have a read concern.");
-            assert(cmd.readConcern.hasOwnProperty("afterClusterTime"),
-                   "Expected " + tojson(cmd) + " to have an afterClusterTime.");
+            assert(cmd.hasOwnProperty("$clusterTime"), "Expected " + tojson(cmd) + " to have a $clusterTime.");
+            assert(cmd.hasOwnProperty("readConcern"), "Expected " + tojson(cmd) + " to have a read concern.");
+            assert(
+                cmd.readConcern.hasOwnProperty("afterClusterTime"),
+                "Expected " + tojson(cmd) + " to have an afterClusterTime.",
+            );
         } else {
-            assert(cmd.hasOwnProperty("readConcern"),
-                   "Expected " + tojson(cmd) + " to have a read concern.");
-            assert(!cmd.readConcern.hasOwnProperty("afterClusterTime"),
-                   "Expected " + tojson(cmd) + " to not have an afterClusterTime.");
+            assert(cmd.hasOwnProperty("readConcern"), "Expected " + tojson(cmd) + " to have a read concern.");
+            assert(
+                !cmd.readConcern.hasOwnProperty("afterClusterTime"),
+                "Expected " + tojson(cmd) + " to not have an afterClusterTime.",
+            );
         }
     }
 
@@ -113,7 +114,7 @@ function testCount(conn, isCausal, expectRetry) {
 function testCommit(conn, isCausal, expectRetry) {
     inspectFirstCommandForAfterClusterTime(conn, "find", isCausal, expectRetry, (coll) => {
         assert.eq(0, coll.find({y: 1}).itcount());
-        assert.commandWorked(coll.getDB().runCommand({ping: 1}));  // commits the transaction.
+        assert.commandWorked(coll.getDB().runCommand({ping: 1})); // commits the transaction.
     });
 }
 
@@ -122,7 +123,7 @@ function testCommit(conn, isCausal, expectRetry) {
 // both.
 TestData.networkErrorAndTxnOverrideConfig = {
     wrapCRUDinTransactions: true,
-    retryOnNetworkErrors: true
+    retryOnNetworkErrors: true,
 };
 await import("jstests/libs/override_methods/network_error_and_txn_override.js");
 
@@ -166,14 +167,14 @@ function runTest() {
         mockFirstResponse = {
             ok: 0,
             code: ErrorCodes.NoSuchTransaction,
-            errorLabels: ["TransientTransactionError"]
+            errorLabels: ["TransientTransactionError"],
         };
         testFind(conn, isCausal, true /*expectRetry*/);
 
         mockFirstResponse = {
             ok: 0,
             code: ErrorCodes.NoSuchTransaction,
-            errorLabels: ["TransientTransactionError"]
+            errorLabels: ["TransientTransactionError"],
         };
         testInsert(conn, isCausal, true /*expectRetry*/);
 
@@ -181,7 +182,7 @@ function runTest() {
         mockFirstCommitResponse = {
             ok: 0,
             code: ErrorCodes.NoSuchTransaction,
-            errorLabels: ["TransientTransactionError"]
+            errorLabels: ["TransientTransactionError"],
         };
         testCommit(conn, isCausal, true /*expectRetry*/);
 

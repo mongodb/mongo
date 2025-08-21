@@ -10,15 +10,19 @@ function test_no_leak(dbNameUnrelated, collNameUnrelated, dbNameProblematic, col
     const cstUnrelated = new ChangeStreamTest(dbUnrelated);
     assertDropAndRecreateCollection(dbUnrelated, collNameUnrelated);
 
-    const watchUnrelated = cstUnrelated.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: collNameUnrelated});
+    const watchUnrelated = cstUnrelated.startWatchingChanges({
+        pipeline: [{$changeStream: {}}],
+        collection: collNameUnrelated,
+    });
 
     const dbProblematic = db.getSiblingDB(dbNameProblematic);
     const cstProblematic = new ChangeStreamTest(dbProblematic);
     assertDropAndRecreateCollection(dbProblematic, collNameProblematic);
 
-    const watchProblematic = cstProblematic.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: collNameProblematic});
+    const watchProblematic = cstProblematic.startWatchingChanges({
+        pipeline: [{$changeStream: {}}],
+        collection: collNameProblematic,
+    });
 
     assert.commandWorked(dbUnrelated.getCollection(collNameUnrelated).insert({_id: 2}));
     let expected = {

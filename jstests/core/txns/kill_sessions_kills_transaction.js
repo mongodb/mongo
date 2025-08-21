@@ -13,7 +13,7 @@ const testDB = db.getSiblingDB(dbName);
 const adminDB = db.getSiblingDB("admin");
 const testColl = testDB[collName];
 const sessionOptions = {
-    causalConsistency: false
+    causalConsistency: false,
 };
 
 testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
@@ -46,32 +46,33 @@ session.startTransaction();
 assert.commandWorked(sessionDb.runCommand({find: collName, batchSize: 2}));
 
 // Start a drop, which will hang.
-let awaitDrop = startParallelShell(function() {
-    db.getSiblingDB("test")["kill_sessions_kills_transaction"].drop(
-        {writeConcern: {w: "majority"}});
+let awaitDrop = startParallelShell(function () {
+    db.getSiblingDB("test")["kill_sessions_kills_transaction"].drop({writeConcern: {w: "majority"}});
 });
 
 // Wait for the drop to have a pending MODE_X lock on the database.
 assert.soon(
-    function() {
-        return adminDB
-                   .aggregate([
-                       {$currentOp: {}},
-                       {
-                           $match: {
-                               $or: [
-                                   {'command.drop': collName, waitingForLock: true},
-                                   {'command._shardsvrParticipantBlock': collName},
-                               ]
-                           }
-                       }
-                   ])
-                   .itcount() > 0;
+    function () {
+        return (
+            adminDB
+                .aggregate([
+                    {$currentOp: {}},
+                    {
+                        $match: {
+                            $or: [
+                                {"command.drop": collName, waitingForLock: true},
+                                {"command._shardsvrParticipantBlock": collName},
+                            ],
+                        },
+                    },
+                ])
+                .itcount() > 0
+        );
     },
-    function() {
-        return "Failed to find drop in currentOp output: " +
-            tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
-    });
+    function () {
+        return "Failed to find drop in currentOp output: " + tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
+    },
+);
 
 // killSessions needs to acquire a MODE_IS lock on the collection in order to kill the open
 // cursor. However, the transaction is holding a MODE_IX lock on the collection, which will

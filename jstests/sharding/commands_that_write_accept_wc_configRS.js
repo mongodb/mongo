@@ -32,22 +32,22 @@ const st = new ShardingTest({
     shards: {
         rs0: {
             nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
-            settings: {chainingAllowed: false}
+            settings: {chainingAllowed: false},
         },
         rs1: {
             nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
-            settings: {chainingAllowed: false}
-        }
+            settings: {chainingAllowed: false},
+        },
     },
     configReplSetTestOptions: {settings: {chainingAllowed: false}},
-    mongos: 1
+    mongos: 1,
 });
 
 const mongos = st.s;
 const dbName = "wc-test-configRS";
-const adminDB = mongos.getDB('admin');
+const adminDB = mongos.getDB("admin");
 // A database connection on a local shard, rather than through the mongos.
-const localDB = st.shard0.getDB('localWCTest');
+const localDB = st.shard0.getDB("localWCTest");
 
 // Separate unauthenticated channel for use in confirmFunc().
 // The sharding_auth suite will stealth-authenticate us,
@@ -55,7 +55,7 @@ const localDB = st.shard0.getDB('localWCTest');
 // Since mongos has no 'local' database, we use the test-mode workaround
 // via admin DB found in the implementation of the LogoutCommand.
 const noauthConn = new Mongo(mongos.host);
-noauthConn.getDB('admin').logout();
+noauthConn.getDB("admin").logout();
 
 // We get new databases because we do not want to reuse dropped databases that may be in a
 // bad state. This test calls dropDatabase when config server secondary nodes are down, so the
@@ -64,7 +64,7 @@ noauthConn.getDB('admin').logout();
 let db = mongos.getDB(dbName);
 let noauthDB = noauthConn.getDB(dbName);
 let counter = 0;
-const collName = 'leaves';
+const collName = "leaves";
 let coll = db[collName];
 function getNewDB() {
     db = mongos.getDB(dbName + counter);
@@ -77,9 +77,9 @@ function dropTestData() {
     st.configRS.awaitReplication();
     st.rs0.awaitReplication();
     st.rs1.awaitReplication();
-    db.dropUser('username');
-    db.dropUser('user1');
-    localDB.dropUser('user2');
+    db.dropUser("username");
+    db.dropUser("user1");
+    localDB.dropUser("user2");
     assert(!noauthDB.auth("username", "password"), "auth should have failed");
     getNewDB();
 }
@@ -88,48 +88,47 @@ function dropTestData() {
 const commands = [];
 
 commands.push({
-    req: {createUser: 'username', pwd: 'password', roles: jsTest.basicUserRoles},
-    setupFunc: function() {},
-    confirmFunc: function() {
+    req: {createUser: "username", pwd: "password", roles: jsTest.basicUserRoles},
+    setupFunc: function () {},
+    confirmFunc: function () {
         assert(noauthDB.auth("username", "password"), "auth failed");
         noauthDB.logout();
     },
     requiresMajority: true,
     runsOnShards: false,
     failsOnShards: false,
-    admin: false
+    admin: false,
 });
 
 commands.push({
-    req: {updateUser: 'username', pwd: 'password2', roles: jsTest.basicUserRoles},
-    setupFunc: function() {
-        db.runCommand({createUser: 'username', pwd: 'password', roles: jsTest.basicUserRoles});
+    req: {updateUser: "username", pwd: "password2", roles: jsTest.basicUserRoles},
+    setupFunc: function () {
+        db.runCommand({createUser: "username", pwd: "password", roles: jsTest.basicUserRoles});
     },
-    confirmFunc: function() {
+    confirmFunc: function () {
         assert(!noauthDB.auth("username", "password"), "auth should have failed");
         assert(noauthDB.auth("username", "password2"), "auth failed");
         noauthDB.logout();
     },
     requiresMajority: true,
     runsOnShards: false,
-    admin: false
+    admin: false,
 });
 
 commands.push({
-    req: {dropUser: 'tempUser'},
-    setupFunc: function() {
-        assert.commandWorked(
-            db.runCommand({createUser: 'tempUser', pwd: 'password', roles: jsTest.basicUserRoles}));
+    req: {dropUser: "tempUser"},
+    setupFunc: function () {
+        assert.commandWorked(db.runCommand({createUser: "tempUser", pwd: "password", roles: jsTest.basicUserRoles}));
         assert(noauthDB.auth("tempUser", "password"), "auth failed");
         noauthDB.logout();
     },
-    confirmFunc: function() {
+    confirmFunc: function () {
         assert(!noauthDB.auth("tempUser", "password"), "auth should have failed");
     },
     requiresMajority: true,
     runsOnShards: false,
     failsOnShards: false,
-    admin: false
+    admin: false,
 });
 
 function testInvalidWriteConcern(wc, cmd) {
@@ -143,9 +142,10 @@ function testInvalidWriteConcern(wc, cmd) {
     cmd.setupFunc();
     const res = runCommandCheckAdmin(db, cmd);
     assert.commandFailed(res);
-    assert(!res.writeConcernError,
-           'bad writeConcern on config server had writeConcernError. ' +
-               tojson(res.writeConcernError));
+    assert(
+        !res.writeConcernError,
+        "bad writeConcern on config server had writeConcernError. " + tojson(res.writeConcernError),
+    );
 }
 
 function runCommandFailOnShardsPassOnConfigs(cmd) {
@@ -160,9 +160,10 @@ function runCommandFailOnShardsPassOnConfigs(cmd) {
             const res = runCommandCheckAdmin(db, cmd);
             restartReplicationOnAllShards(st);
             assert.commandFailed(res);
-            assert(!res.writeConcernError,
-                   'command on config servers with a paused replicaset had writeConcernError: ' +
-                       tojson(res));
+            assert(
+                !res.writeConcernError,
+                "command on config servers with a paused replicaset had writeConcernError: " + tojson(res),
+            );
         } else {
             // This command passes and returns a writeConcernError when there is a
             // writeConcernError on the shards.
@@ -183,9 +184,10 @@ function runCommandFailOnShardsPassOnConfigs(cmd) {
         restartReplicationOnAllShards(st);
         assert.commandWorked(res);
         cmd.confirmFunc();
-        assert(!res.writeConcernError,
-               'command on config servers with a paused replicaset had writeConcernError: ' +
-                   tojson(res));
+        assert(
+            !res.writeConcernError,
+            "command on config servers with a paused replicaset had writeConcernError: " + tojson(res),
+        );
     }
 }
 
@@ -199,8 +201,7 @@ function testValidWriteConcern(wc, cmd) {
     // Command with a full cluster should succeed.
     let res = runCommandCheckAdmin(db, cmd);
     assert.commandWorked(res);
-    assert(!res.writeConcernError,
-           'command on a full cluster had writeConcernError: ' + tojson(res));
+    assert(!res.writeConcernError, "command on a full cluster had writeConcernError: " + tojson(res));
 
     cmd.confirmFunc();
 
@@ -229,19 +230,20 @@ function testValidWriteConcern(wc, cmd) {
     assert.commandFailed(res);
     assert(
         !res.writeConcernError,
-        'command on config servers with a paused replicaset had writeConcernError: ' + tojson(res));
+        "command on config servers with a paused replicaset had writeConcernError: " + tojson(res),
+    );
 }
 
 const majorityWC = {
-    w: 'majority',
-    wtimeout: ReplSetTest.kDefaultTimeoutMS
+    w: "majority",
+    wtimeout: ReplSetTest.kDefaultTimeoutMS,
 };
 
 // Config server commands require w: majority writeConcerns.
-const nonMajorityWCs = [{w: 'invalid'}, {w: 2}];
+const nonMajorityWCs = [{w: "invalid"}, {w: 2}];
 
-commands.forEach(function(cmd) {
-    nonMajorityWCs.forEach(function(wc) {
+commands.forEach(function (cmd) {
+    nonMajorityWCs.forEach(function (wc) {
         testInvalidWriteConcern(wc, cmd);
     });
     testValidWriteConcern(majorityWC, cmd);

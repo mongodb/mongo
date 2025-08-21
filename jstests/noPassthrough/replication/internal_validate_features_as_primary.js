@@ -20,10 +20,15 @@ assert.eq(res.internalValidateFeaturesAsMaster, false);
 
 // Use of deprecated parameter shows deprecation message.
 let joinShell = startParallelShell(
-    "db.adminCommand({getParameter: 1, internalValidateFeaturesAsMaster: 1});", conn.port);
+    "db.adminCommand({getParameter: 1, internalValidateFeaturesAsMaster: 1});",
+    conn.port,
+);
 joinShell();
-assert(rawMongoProgramOutput("Use of deprecated server parameter name")
-           .match("\"attr\":{\"deprecatedName\":\"internalValidateFeaturesAsMaster\""));
+assert(
+    rawMongoProgramOutput("Use of deprecated server parameter name").match(
+        '"attr":{"deprecatedName":"internalValidateFeaturesAsMaster"',
+    ),
+);
 MongoRunner.stopMongod(conn);
 
 // internalValidateFeaturesAsMaster can be set via startup parameter.
@@ -41,48 +46,45 @@ assert.eq(res.internalValidateFeaturesAsPrimary, true);
 MongoRunner.stopMongod(conn);
 
 // internalValidateFeaturesAsPrimary cannot be set with --replSet.
-assert.throws(() => MongoRunner.runMongod(
-                  {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=0"}),
-              [],
-              "mongod was unexpectedly able to start up");
+assert.throws(
+    () => MongoRunner.runMongod({replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=0"}),
+    [],
+    "mongod was unexpectedly able to start up",
+);
 
-assert.throws(() => MongoRunner.runMongod(
-                  {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=1"}),
-              [],
-              "mongod was unexpectedly able to start up");
+assert.throws(
+    () => MongoRunner.runMongod({replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=1"}),
+    [],
+    "mongod was unexpectedly able to start up",
+);
 
 // Correct error message is logged based on parameter name.
 conn = MongoRunner.runMongod({});
 joinShell = startParallelShell(() => {
-    assert.throws(
-        () => MongoRunner.runMongod(
-            {replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=0"}));
+    assert.throws(() =>
+        MongoRunner.runMongod({replSet: "replSetName", setParameter: "internalValidateFeaturesAsPrimary=0"}),
+    );
 }, conn.port);
 joinShell();
 let joinShellOutput = rawMongoProgramOutput("Cannot specify both .* and replication.replSet");
-assert(joinShellOutput.match(
-    "Cannot specify both internalValidateFeaturesAsPrimary and replication.replSet"));
-assert(!joinShellOutput.match(
-    "Cannot specify both internalValidateFeaturesAsMaster and replication.replSet"));
+assert(joinShellOutput.match("Cannot specify both internalValidateFeaturesAsPrimary and replication.replSet"));
+assert(!joinShellOutput.match("Cannot specify both internalValidateFeaturesAsMaster and replication.replSet"));
 
 clearRawMongoProgramOutput();
 joinShell = startParallelShell(() => {
-    assert.throws(
-        () => MongoRunner.runMongod(
-            {replSet: "replSetName", setParameter: "internalValidateFeaturesAsMaster=0"}));
+    assert.throws(() =>
+        MongoRunner.runMongod({replSet: "replSetName", setParameter: "internalValidateFeaturesAsMaster=0"}),
+    );
 }, conn.port);
 joinShell();
 joinShellOutput = rawMongoProgramOutput("Cannot specify both .* and replication.replSet");
-assert(joinShellOutput.match(
-    "Cannot specify both internalValidateFeaturesAsMaster and replication.replSet"));
-assert(!joinShellOutput.match(
-    "Cannot specify both internalValidateFeaturesAsPrimary and replication.replSet"));
+assert(joinShellOutput.match("Cannot specify both internalValidateFeaturesAsMaster and replication.replSet"));
+assert(!joinShellOutput.match("Cannot specify both internalValidateFeaturesAsPrimary and replication.replSet"));
 
 MongoRunner.stopMongod(conn);
 
 // internalValidateFeaturesAsPrimary cannot be set via runtime parameter.
 conn = MongoRunner.runMongod({});
 assert.commandFailed(conn.adminCommand({setParameter: 1, internalValidateFeaturesAsPrimary: true}));
-assert.commandFailed(
-    conn.adminCommand({setParameter: 1, internalValidateFeaturesAsPrimary: false}));
+assert.commandFailed(conn.adminCommand({setParameter: 1, internalValidateFeaturesAsPrimary: false}));
 MongoRunner.stopMongod(conn);

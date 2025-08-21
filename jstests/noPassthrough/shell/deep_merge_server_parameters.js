@@ -10,7 +10,7 @@ let st = new ShardingTest({
     configOptions: {
         setParameter: {
             reshardingCriticalSectionTimeoutMillis: 86400000,
-        }
+        },
     },
     shards: 1,
     other: {
@@ -18,23 +18,30 @@ let st = new ShardingTest({
             setParameter: {
                 logComponentVerbosity:
                     "{verbosity: 0, command: {verbosity: 1}, network: {verbosity: 1, asio: {verbosity: 2}}}",
-            }
-        }
-    }
+            },
+        },
+    },
 });
 // Check that reshardingCriticalSectionTimeoutMillis is in config options with the proper value.
-assert(st._otherParams.configOptions.setParameter.hasOwnProperty(
-           "reshardingCriticalSectionTimeoutMillis"),
-       "setParameter does not contain reshardingCriticalSectionTimeoutMillis");
-assert.eq(st._otherParams.configOptions.setParameter.reshardingCriticalSectionTimeoutMillis,
-          86400000,
-          "The value of reshardingCriticalSectionTimeoutMillis is not correct");
+assert(
+    st._otherParams.configOptions.setParameter.hasOwnProperty("reshardingCriticalSectionTimeoutMillis"),
+    "setParameter does not contain reshardingCriticalSectionTimeoutMillis",
+);
+assert.eq(
+    st._otherParams.configOptions.setParameter.reshardingCriticalSectionTimeoutMillis,
+    86400000,
+    "The value of reshardingCriticalSectionTimeoutMillis is not correct",
+);
 // Check that logComponentVerbosity is in config options with the proper value.
-assert(st._otherParams.configOptions.setParameter.hasOwnProperty("logComponentVerbosity"),
-       "setParameter does not contain logComponentVerbosity");
-assert.eq(st._otherParams.configOptions.setParameter.logComponentVerbosity,
-          "{verbosity: 0, command: {verbosity: 1}, network: {verbosity: 1, asio: {verbosity: 2}}}",
-          "The value of logComponentVerbosity is not correct");
+assert(
+    st._otherParams.configOptions.setParameter.hasOwnProperty("logComponentVerbosity"),
+    "setParameter does not contain logComponentVerbosity",
+);
+assert.eq(
+    st._otherParams.configOptions.setParameter.logComponentVerbosity,
+    "{verbosity: 0, command: {verbosity: 1}, network: {verbosity: 1, asio: {verbosity: 2}}}",
+    "The value of logComponentVerbosity is not correct",
+);
 
 st.stop();
 

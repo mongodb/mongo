@@ -17,15 +17,15 @@ const coll = db.getCollection(collName);
 const timeFieldName = "tm";
 const metaFieldName = "mm";
 const timeSpec = {
-    [timeFieldName]: 1
+    [timeFieldName]: 1,
 };
 const metaSpec = {
-    [metaFieldName]: 1
+    [metaFieldName]: 1,
 };
 
 const expireAfterSeconds = NumberLong(400);
 
-const resetTsColl = function(extraOptions = {}) {
+const resetTsColl = function (extraOptions = {}) {
     coll.drop();
 
     let options = {timeseries: {timeField: timeFieldName, metaField: metaFieldName}};
@@ -42,21 +42,20 @@ const resetTsColl = function(extraOptions = {}) {
 
     // TTL indexes on the metafield are not allowed.
     assert.commandFailedWithCode(coll.createIndex(metaSpec, options), ErrorCodes.InvalidOptions);
-}());
+})();
 
 (function partialTTLIndexesShouldSucceed() {
     resetTsColl();
     const options = {
         name: indexName,
         partialFilterExpression: {[metaFieldName]: {$gt: 5}},
-        expireAfterSeconds: expireAfterSeconds
+        expireAfterSeconds: expireAfterSeconds,
     };
 
     // Creating a TTL index on time, with a partial filter expression on the metaField should
     // succeed.
-    assert.commandWorked(coll.createIndex(
-        timeSpec, Object.merge(options, {expireAfterSeconds: expireAfterSeconds})));
-    let indexes = coll.getIndexes().filter(ix => ix.name === indexName);
+    assert.commandWorked(coll.createIndex(timeSpec, Object.merge(options, {expireAfterSeconds: expireAfterSeconds})));
+    let indexes = coll.getIndexes().filter((ix) => ix.name === indexName);
     assert.eq(1, indexes.length, tojson(indexes));
 
     let partialTTLIndex = indexes[0];
@@ -69,14 +68,14 @@ const resetTsColl = function(extraOptions = {}) {
     // Creating an index on time (on a time-series collection created with the expireAfterSeconds
     // parameter) with a partial filter expression on the metaField should succeed.
     assert.commandWorked(coll.createIndex(timeSpec, options));
-    indexes = coll.getIndexes().filter(ix => ix.name === indexName);
+    indexes = coll.getIndexes().filter((ix) => ix.name === indexName);
     assert.eq(1, indexes.length, tojson(indexes));
 
     partialTTLIndex = indexes[0];
     assert.eq(indexName, partialTTLIndex.name, tojson(partialTTLIndex));
     assert.eq(timeSpec, partialTTLIndex.key, tojson(partialTTLIndex));
     assert.eq(expireAfterSeconds, partialTTLIndex.expireAfterSeconds, tojson(partialTTLIndex));
-}());
+})();
 
 (function invalidPartialTTLIndexesShouldFail() {
     resetTsColl();
@@ -85,39 +84,36 @@ const resetTsColl = function(extraOptions = {}) {
     const filterOnData = {
         name: indexName,
         partialFilterExpression: {"data": {$gt: 5}},
-        expireAfterSeconds: expireAfterSeconds
+        expireAfterSeconds: expireAfterSeconds,
     };
     const filterOnMeta = {
         name: indexName,
         partialFilterExpression: {[metaFieldName]: {$gt: 5}},
-        expireAfterSeconds: expireAfterSeconds
+        expireAfterSeconds: expireAfterSeconds,
     };
     const filterOnMetaAndData = {
         name: indexName,
         partialFilterExpression: {[metaFieldName]: {$gt: 5}, "data": {$gt: 5}},
-        expireAfterSeconds: expireAfterSeconds
+        expireAfterSeconds: expireAfterSeconds,
     };
     const filterOnTime = {
         name: indexName,
         partialFilterExpression: {[timeFieldName]: {$gt: currentData}},
-        expireAfterSeconds: expireAfterSeconds
+        expireAfterSeconds: expireAfterSeconds,
     };
     const dataSpec = {"data": 1};
 
     // These cases have a valid index specs on the time field but invalid partialFilterExpressions.
     {
         // A TTL index on time requires partial indexes to be on the metadata field.
-        assert.commandFailedWithCode(coll.createIndex(timeSpec, filterOnData),
-                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(coll.createIndex(timeSpec, filterOnData), ErrorCodes.InvalidOptions);
 
         // A TTL index on time requires partial indexes on the metadata field only, no compound
         // expressions.
-        assert.commandFailedWithCode(coll.createIndex(timeSpec, filterOnMetaAndData),
-                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(coll.createIndex(timeSpec, filterOnMetaAndData), ErrorCodes.InvalidOptions);
 
         // Partial indexes are not allowed to be on the timeField.
-        assert.commandFailedWithCode(coll.createIndex(timeSpec, filterOnTime),
-                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(coll.createIndex(timeSpec, filterOnTime), ErrorCodes.InvalidOptions);
     }
 
     const timeAndMetaSpec = Object.merge(timeSpec, metaSpec);
@@ -125,16 +121,12 @@ const resetTsColl = function(extraOptions = {}) {
     // These cases have valid partialFilterExpressions but invalid index specs.
     {
         // TTL indexes are only allowed on the time field.
-        assert.commandFailedWithCode(coll.createIndex(metaSpec, filterOnMeta),
-                                     ErrorCodes.InvalidOptions);
-        assert.commandFailedWithCode(coll.createIndex(dataSpec, filterOnMeta),
-                                     ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(coll.createIndex(metaSpec, filterOnMeta), ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(coll.createIndex(dataSpec, filterOnMeta), ErrorCodes.InvalidOptions);
 
         // TTL indexes are not allowed on compound indexes (even if a time field exists in the
         // spec).
-        assert.commandFailedWithCode(coll.createIndex(timeAndMetaSpec, filterOnMeta),
-                                     ErrorCodes.CannotCreateIndex);
-        assert.commandFailedWithCode(coll.createIndex(timeAndDataSpec, filterOnMeta),
-                                     ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(coll.createIndex(timeAndMetaSpec, filterOnMeta), ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(coll.createIndex(timeAndDataSpec, filterOnMeta), ErrorCodes.CannotCreateIndex);
     }
-}());
+})();

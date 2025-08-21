@@ -21,14 +21,14 @@ assert.commandWorked(coll.insert({"_id": 3, "title": "vegetables"}));
 const collUUID = getUUIDFromListCollections(db, coll.getName());
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 const searchCmd = {
     search: coll.getName(),
     collectionUUID: collUUID,
     query: searchQuery,
-    $db: "test"
+    $db: "test",
 };
 
 // Give mongotmock some stuff to return.
@@ -43,10 +43,13 @@ const cursorId = NumberLong(123);
                 cursor: {
                     id: cursorId,
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 2, $searchScore: 0.654}, {_id: 1, $searchScore: 0.321}]
+                    nextBatch: [
+                        {_id: 2, $searchScore: 0.654},
+                        {_id: 1, $searchScore: 0.321},
+                    ],
                 },
-                vars: {SEARCH_META: {value: 1}}
-            }
+                vars: {SEARCH_META: {value: 1}},
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -54,30 +57,27 @@ const cursorId = NumberLong(123);
                 cursor: {
                     id: NumberLong(0),
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 3, $searchScore: 0.123}]
+                    nextBatch: [{_id: 3, $searchScore: 0.123}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 // Verify that a $search query sets SEARCH_META results if returned from mongot.
 // Also verify that unset SEARCH_META fields evaluate to missing.
 let cursor = coll.aggregate(
-    [
-        {$search: searchQuery},
-        {$project: {_id: 1, meta: "$$SEARCH_META", missingMeta: "$$SEARCH_META.missing"}}
-    ],
-    {cursor: {}});
+    [{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META", missingMeta: "$$SEARCH_META.missing"}}],
+    {cursor: {}},
+);
 
 const expected = [
     {"_id": 2, "meta": {value: 1}},
     {"_id": 1, "meta": {value: 1}},
-    {"_id": 3, "meta": {value: 1}}
+    {"_id": 3, "meta": {value: 1}},
 ];
 assert.eq(expected, cursor.toArray());
 

@@ -11,7 +11,15 @@ var minError = 0.8e-13;
 
 var canonPoly = {
     type: "Polygon",
-    coordinates: [[[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0], [-1.0, -1.0]]]
+    coordinates: [
+        [
+            [-1.0, -1.0],
+            [1.0, -1.0],
+            [1.0, 1.0],
+            [-1.0, 1.0],
+            [-1.0, -1.0],
+        ],
+    ],
 };
 t.insert({geo: canonPoly});
 
@@ -20,7 +28,15 @@ t.insert({geo: canonPoly});
 
 var outerPoly = {
     type: "Polygon",
-    coordinates: [[[-2.0, -2.0], [2.0, -2.0], [2.0, 2.0], [-2.0, 2.0], [-2.0, -2.0]]]
+    coordinates: [
+        [
+            [-2.0, -2.0],
+            [2.0, -2.0],
+            [2.0, 2.0],
+            [-2.0, 2.0],
+            [-2.0, -2.0],
+        ],
+    ],
 };
 var result = t.find({geo: {$within: {$geometry: outerPoly}}});
 assert.eq(result.itcount(), 1);
@@ -32,7 +48,15 @@ assert.eq(result.itcount(), 1);
 
 var partialPoly = {
     type: "Polygon",
-    coordinates: [[[-2.0, -2.0], [2.0, -2.0], [2.0, 0.0], [-2.0, 0.0], [-2.0, -2.0]]]
+    coordinates: [
+        [
+            [-2.0, -2.0],
+            [2.0, -2.0],
+            [2.0, 0.0],
+            [-2.0, 0.0],
+            [-2.0, -2.0],
+        ],
+    ],
 };
 
 // Should not be within
@@ -52,7 +76,14 @@ assert.eq(result.itcount(), 1);
 
 var sharedPointPoly = {
     type: "Polygon",
-    coordinates: [[[0.0, -2.0], [0.0, -1.0], [1.0, -2.0], [0.0, -2.0]]]
+    coordinates: [
+        [
+            [0.0, -2.0],
+            [0.0, -1.0],
+            [1.0, -2.0],
+            [0.0, -2.0],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: sharedPointPoly}}});
@@ -63,7 +94,14 @@ assert.eq(result.itcount(), 1);
 
 var sharedVertexPoly = {
     type: "Polygon",
-    coordinates: [[[0.0, -2.0], [1.0, -1.0], [1.0, -2.0], [0.0, -2.0]]]
+    coordinates: [
+        [
+            [0.0, -2.0],
+            [1.0, -1.0],
+            [1.0, -2.0],
+            [0.0, -2.0],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: sharedVertexPoly}}});
@@ -74,7 +112,14 @@ assert.eq(result.itcount(), 0);
 
 var almostSharedVertexPoly = {
     type: "Polygon",
-    coordinates: [[[0.0, -2.0], [1.0 - minError, -1.0], [1.0, -2.0], [0.0, -2.0]]]
+    coordinates: [
+        [
+            [0.0, -2.0],
+            [1.0 - minError, -1.0],
+            [1.0, -2.0],
+            [0.0, -2.0],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: almostSharedVertexPoly}}});
@@ -86,7 +131,14 @@ assert.eq(result.itcount(), 0);
 
 var notCloseEnoughSharedVertexPoly = {
     type: "Polygon",
-    coordinates: [[[0.0, -2.0], [1.0 - (10 * minError), -1.0], [1.0, -2.0], [0.0, -2.0]]]
+    coordinates: [
+        [
+            [0.0, -2.0],
+            [1.0 - 10 * minError, -1.0],
+            [1.0, -2.0],
+            [0.0, -2.0],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: notCloseEnoughSharedVertexPoly}}});
@@ -97,7 +149,14 @@ assert.eq(result.itcount(), 1);
 
 var almostSharedPointPoly = {
     type: "Polygon",
-    coordinates: [[[0.0, -2.0], [0.0, (-1.0 - minError)], [1.0, -2.0], [0.0, -2.0]]]
+    coordinates: [
+        [
+            [0.0, -2.0],
+            [0.0, -1.0 - minError],
+            [1.0, -2.0],
+            [0.0, -2.0],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: almostSharedPointPoly}}});
@@ -110,7 +169,14 @@ assert.eq(result.itcount(), 1);
 var errorBound = 0.000152298;
 var notCloseEnoughSharedPointPoly = {
     type: "Polygon",
-    coordinates: [[[0.0, -2.0], [0.0, -1.0 - errorBound], [1.0, -2.0], [0.0, -2.0]]]
+    coordinates: [
+        [
+            [0.0, -2.0],
+            [0.0, -1.0 - errorBound],
+            [1.0, -2.0],
+            [0.0, -2.0],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: notCloseEnoughSharedPointPoly}}});
@@ -126,7 +192,15 @@ assert.eq(result.itcount(), 0);
 // Result: No intersection.
 var fullyCoveredEdgePoly = {
     type: "Polygon",
-    coordinates: [[[-2.0, -0.5], [-1.0, -0.5], [-1.0, 0.5], [-2.0, 0.5], [-2.0, -0.5]]]
+    coordinates: [
+        [
+            [-2.0, -0.5],
+            [-1.0, -0.5],
+            [-1.0, 0.5],
+            [-2.0, 0.5],
+            [-2.0, -0.5],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: fullyCoveredEdgePoly}}});
@@ -137,7 +211,15 @@ assert.eq(result.itcount(), 0);
 // Result: Intersection.
 var coveringEdgePoly = {
     type: "Polygon",
-    coordinates: [[[-2.0, -1.5], [-1.0, -1.5], [-1.0, 1.5], [-2.0, 1.5], [-2.0, -1.5]]]
+    coordinates: [
+        [
+            [-2.0, -1.5],
+            [-1.0, -1.5],
+            [-1.0, 1.5],
+            [-2.0, 1.5],
+            [-2.0, -1.5],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: coveringEdgePoly}}});
@@ -148,13 +230,15 @@ assert.eq(result.itcount(), 1);
 // NOTE: Scales of errors?
 var closebyCoveringEdgePoly = {
     type: "Polygon",
-    coordinates: [[
-        [-2.0, -1.5],
-        [-1.0 - (minError / 1000), -1.5],
-        [-1.0 - (minError / 1000), 1.5],
-        [-2.0, 1.5],
-        [-2.0, -1.5]
-    ]]
+    coordinates: [
+        [
+            [-2.0, -1.5],
+            [-1.0 - minError / 1000, -1.5],
+            [-1.0 - minError / 1000, 1.5],
+            [-2.0, 1.5],
+            [-2.0, -1.5],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: closebyCoveringEdgePoly}}});
@@ -166,13 +250,15 @@ assert.eq(result.itcount(), 1);
 // NOTE: Scales of errors?
 var notCloseEnoughCoveringEdgePoly = {
     type: "Polygon",
-    coordinates: [[
-        [-2.0, -1.5],
-        [-1.0 - (minError / 100), -1.5],
-        [-1.0 - (minError / 100), 1.5],
-        [-2.0, 1.5],
-        [-2.0, -1.5]
-    ]]
+    coordinates: [
+        [
+            [-2.0, -1.5],
+            [-1.0 - minError / 100, -1.5],
+            [-1.0 - minError / 100, 1.5],
+            [-2.0, 1.5],
+            [-2.0, -1.5],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: notCloseEnoughCoveringEdgePoly}}});
@@ -183,7 +269,15 @@ assert.eq(result.itcount(), 0);
 // Result: No intersection.
 var partiallyCoveringEdgePoly = {
     type: "Polygon",
-    coordinates: [[[-2.0, -1.5], [-1.0, -1.5], [-1.0, 0.5], [-2.0, 0.5], [-2.0, -1.5]]]
+    coordinates: [
+        [
+            [-2.0, -1.5],
+            [-1.0, -1.5],
+            [-1.0, 0.5],
+            [-2.0, 0.5],
+            [-2.0, -1.5],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: partiallyCoveringEdgePoly}}});
@@ -192,18 +286,20 @@ assert.eq(result.itcount(), 0);
 // Polygons that intersect at three non-co-linear points should geoIntersect
 var sharedPointsPoly = {
     type: "Polygon",
-    coordinates: [[
-        [0.0, -3.0],
-        [0.0, -1.0],
-        [2.0, -2.0],
-        [1.0, 0.0],
-        [2.0, 2.0],
-        [0.0, 1.0],
-        [0.0, 3.0],
-        [3.0, 3.0],
-        [3.0, -3.0],
-        [0.0, -3.0]
-    ]]
+    coordinates: [
+        [
+            [0.0, -3.0],
+            [0.0, -1.0],
+            [2.0, -2.0],
+            [1.0, 0.0],
+            [2.0, 2.0],
+            [0.0, 1.0],
+            [0.0, 3.0],
+            [3.0, 3.0],
+            [3.0, -3.0],
+            [0.0, -3.0],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: sharedPointsPoly}}});
@@ -215,9 +311,21 @@ assert.eq(result.itcount(), 1);
 var bigHolePoly = {
     type: "Polygon",
     coordinates: [
-        [[-3.0, -3.0], [3.0, -3.0], [3.0, 3.0], [-3.0, 3.0], [-3.0, -3.0]],
-        [[-2.0, -2.0], [2.0, -2.0], [2.0, 2.0], [-2.0, 2.0], [-2.0, -2.0]]
-    ]
+        [
+            [-3.0, -3.0],
+            [3.0, -3.0],
+            [3.0, 3.0],
+            [-3.0, 3.0],
+            [-3.0, -3.0],
+        ],
+        [
+            [-2.0, -2.0],
+            [2.0, -2.0],
+            [2.0, 2.0],
+            [-2.0, 2.0],
+            [-2.0, -2.0],
+        ],
+    ],
 };
 result = t.find({geo: {$within: {$geometry: bigHolePoly}}});
 assert.eq(result.itcount(), 0);
@@ -231,9 +339,21 @@ assert.eq(result.itcount(), 0);
 var internalOverlapPoly = {
     type: "Polygon",
     coordinates: [
-        [[-3.0, -3.0], [3.0, -3.0], [3.0, 3.0], [-3.0, 3.0], [-3.0, -3.0]],
-        [[-2.0, 0.0], [2.0, 0.0], [2.0, 2.0], [-2.0, 2.0], [-2.0, 0.0]]
-    ]
+        [
+            [-3.0, -3.0],
+            [3.0, -3.0],
+            [3.0, 3.0],
+            [-3.0, 3.0],
+            [-3.0, -3.0],
+        ],
+        [
+            [-2.0, 0.0],
+            [2.0, 0.0],
+            [2.0, 2.0],
+            [-2.0, 2.0],
+            [-2.0, 0.0],
+        ],
+    ],
 };
 
 result = t.find({geo: {$geoIntersects: {$geometry: internalOverlapPoly}}});

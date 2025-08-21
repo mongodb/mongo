@@ -13,29 +13,65 @@ coll.drop();
 // linestring) and guarantees some shapes are not inside our index (bigPoly20).
 var bigPoly20 = {
     type: "Polygon",
-    coordinates: [[[10.0, 10.0], [-10.0, 10.0], [-10.0, -10.0], [10.0, -10.0], [10.0, 10.0]]],
+    coordinates: [
+        [
+            [10.0, 10.0],
+            [-10.0, 10.0],
+            [-10.0, -10.0],
+            [10.0, -10.0],
+            [10.0, 10.0],
+        ],
+    ],
 };
 
 var bigPoly20Comp = {
     type: "Polygon",
-    coordinates: [[[10.0, 10.0], [10.0, -10.0], [-10.0, -10.0], [-10.0, 10.0], [10.0, 10.0]]],
+    coordinates: [
+        [
+            [10.0, 10.0],
+            [10.0, -10.0],
+            [-10.0, -10.0],
+            [-10.0, 10.0],
+            [10.0, 10.0],
+        ],
+    ],
 };
 
 var poly10 = {
     type: "Polygon",
-    coordinates: [[[5.0, 5.0], [5.0, -5.0], [-5.0, -5.0], [-5.0, 5.0], [5.0, 5.0]]]
+    coordinates: [
+        [
+            [5.0, 5.0],
+            [5.0, -5.0],
+            [-5.0, -5.0],
+            [-5.0, 5.0],
+            [5.0, 5.0],
+        ],
+    ],
 };
 
 var line10 = {
     type: "LineString",
-    coordinates: [[5.0, 5.0], [5.0, -5.0], [-5.0, -5.0], [-5.0, 5.0], [5.0, 5.0]]
+    coordinates: [
+        [5.0, 5.0],
+        [5.0, -5.0],
+        [-5.0, -5.0],
+        [-5.0, 5.0],
+        [5.0, 5.0],
+    ],
 };
 
 var centerPoint = {type: "Point", coordinates: [0, 0]};
 
 var polarPoint = {type: "Point", coordinates: [85, 85]};
 
-var lineEquator = {type: "LineString", coordinates: [[-20, 0], [20, 0]]};
+var lineEquator = {
+    type: "LineString",
+    coordinates: [
+        [-20, 0],
+        [20, 0],
+    ],
+};
 
 assert.commandWorked(coll.insert({loc: poly10, a: 1, x: 5}));
 assert.commandWorked(coll.insert({loc: poly10, a: 2, x: 5}));
@@ -47,67 +83,72 @@ assert.commandWorked(coll.insert({loc: polarPoint, a: 2, x: 3}));
 assert.commandWorked(coll.insert({loc: lineEquator, a: -1, x: 2}));
 assert.commandWorked(coll.insert({loc: lineEquator, a: 2, x: 2}));
 
-assert.commandWorked(coll.createIndex(
-    {a: 1}, {partialFilterExpression: {loc: {$geoWithin: {$geometry: bigPoly20Comp}}}}));
+assert.commandWorked(
+    coll.createIndex({a: 1}, {partialFilterExpression: {loc: {$geoWithin: {$geometry: bigPoly20Comp}}}}),
+);
 
-var explainResults =
-    coll.find({a: 2, loc: {$geoWithin: {$geometry: bigPoly20Comp}}}).explain("queryPlanner");
+var explainResults = coll.find({a: 2, loc: {$geoWithin: {$geometry: bigPoly20Comp}}}).explain("queryPlanner");
 var winningPlan = getWinningPlanFromExplain(explainResults);
 assert(isIxscan(db, winningPlan));
 coll.drop();
 
+assert.commandWorked(coll.insert({a: 1, name: "Dallas", loc: {type: "Point", coordinates: [-96.808891, 32.779]}}));
 assert.commandWorked(
-    coll.insert({a: 1, name: "Dallas", loc: {type: "Point", coordinates: [-96.808891, 32.779]}}));
-assert.commandWorked(coll.insert(
-    {a: 1, name: "Paris TX", loc: {type: "Point", coordinates: [-95.555513, 33.6609389]}}));
-assert.commandWorked(coll.insert(
-    {a: 2, name: "Houston", loc: {type: "Point", coordinates: [-95.3632715, 29.7632836]}}));
-assert.commandWorked(coll.insert(
-    {a: 1, name: "San Antonio", loc: {type: "Point", coordinates: [-98.4936282, 29.4241219]}}));
+    coll.insert({a: 1, name: "Paris TX", loc: {type: "Point", coordinates: [-95.555513, 33.6609389]}}),
+);
 assert.commandWorked(
-    coll.insert({a: 3, name: "LA", loc: {type: "Point", coordinates: [-118.2436849, 34.0522342]}}));
-assert.commandWorked(coll.insert(
-    {a: 3, name: "Berkeley", loc: {type: "Point", coordinates: [-122.272747, 37.8715926]}}));
+    coll.insert({a: 2, name: "Houston", loc: {type: "Point", coordinates: [-95.3632715, 29.7632836]}}),
+);
 assert.commandWorked(
-    coll.insert({a: 1, name: "NYC", loc: {type: "Point", coordinates: [-74.0059729, 40.7142691]}}));
+    coll.insert({a: 1, name: "San Antonio", loc: {type: "Point", coordinates: [-98.4936282, 29.4241219]}}),
+);
+assert.commandWorked(coll.insert({a: 3, name: "LA", loc: {type: "Point", coordinates: [-118.2436849, 34.0522342]}}));
+assert.commandWorked(
+    coll.insert({a: 3, name: "Berkeley", loc: {type: "Point", coordinates: [-122.272747, 37.8715926]}}),
+);
+assert.commandWorked(coll.insert({a: 1, name: "NYC", loc: {type: "Point", coordinates: [-74.0059729, 40.7142691]}}));
 
 var texasPolygon = {
     type: "Polygon",
-    coordinates: [[
-        [-97.516473, 26.02054],
-        [-106.528371, 31.895644],
-        [-103.034724, 31.932947],
-        [-103.068314, 36.426696],
-        [-100.080033, 36.497382],
-        [-99.975048, 34.506004],
-        [-94.240190, 33.412542],
-        [-94.075400, 29.725640],
-        [-97.516473, 26.02054]
-    ]],
+    coordinates: [
+        [
+            [-97.516473, 26.02054],
+            [-106.528371, 31.895644],
+            [-103.034724, 31.932947],
+            [-103.068314, 36.426696],
+            [-100.080033, 36.497382],
+            [-99.975048, 34.506004],
+            [-94.24019, 33.412542],
+            [-94.0754, 29.72564],
+            [-97.516473, 26.02054],
+        ],
+    ],
 };
 var southWestUSPolygon = {
     type: "Polygon",
-    coordinates: [[
-        [-97.516473, 26.02054],
-        [-106.528371, 31.895644],
+    coordinates: [
         [
-            -118.646927,
-            33.748207,
+            [-97.516473, 26.02054],
+            [-106.528371, 31.895644],
+            [-118.646927, 33.748207],
+            [-119.591751, 34.348991],
+            [-103.068314, 36.426696],
+            [-100.080033, 36.497382],
+            [-99.975048, 34.506004],
+            [-94.24019, 33.412542],
+            [-94.0754, 29.72564],
+            [-97.516473, 26.02054],
         ],
-        [-119.591751, 34.348991],
-        [-103.068314, 36.426696],
-        [-100.080033, 36.497382],
-        [-99.975048, 34.506004],
-        [-94.240190, 33.412542],
-        [-94.075400, 29.725640],
-        [-97.516473, 26.02054]
-    ]]
+    ],
 };
 
 // Create index to cover Texas and Southern California.
-assert.commandWorked(coll.createIndex(
-    {loc: "2dsphere"},
-    {partialFilterExpression: {loc: {$geoWithin: {$geometry: southWestUSPolygon}}}}));
+assert.commandWorked(
+    coll.createIndex(
+        {loc: "2dsphere"},
+        {partialFilterExpression: {loc: {$geoWithin: {$geometry: southWestUSPolygon}}}},
+    ),
+);
 
 // Search for points only located in a smaller region within our larger index, in this case
 // Texas.
@@ -123,9 +164,12 @@ assert.eq(results.length, 3);
 
 // Test index maintenace to make sure a doc is removed from index when it is no longer in the
 // $geoWithin bounds.
-assert.commandWorked(coll.updateMany(
-    {name: "Paris TX"},
-    {$set: {name: "Paris France", loc: {type: "Point", coordinates: [2.360791, 48.885033]}}}));
+assert.commandWorked(
+    coll.updateMany(
+        {name: "Paris TX"},
+        {$set: {name: "Paris France", loc: {type: "Point", coordinates: [2.360791, 48.885033]}}},
+    ),
+);
 command = coll.find({
     loc: {$geoWithin: {$geometry: texasPolygon}},
 });
@@ -139,23 +183,27 @@ assert.eq(results.length, 3);
 // shape. This works because both centersphere and a Geo-JSON polygon define regions using
 // spherical-geometry.
 coll.drop();
-coll.createIndex({loc: "2dsphere"}, {
-    partialFilterExpression:
-        {loc: {$geoWithin: {$centerSphere: [[-74.0064, 40.7142], 10 / 3963.2]}}}
-});
+coll.createIndex(
+    {loc: "2dsphere"},
+    {
+        partialFilterExpression: {loc: {$geoWithin: {$centerSphere: [[-74.0064, 40.7142], 10 / 3963.2]}}},
+    },
+);
 // Point corresponding to UWS of Manhattan.
-coll.insert({loc: [-73.974709, 40.793110]});
+coll.insert({loc: [-73.974709, 40.79311]});
 // Point corresponding to Downtown Brooklyn.
 coll.insert({loc: [-73.985728, 40.705174]});
 // Polygon roughly representing the UWS of Manhattan.
 var uwsPolygon = {
     type: "Polygon",
-    coordinates: [[
-        [-73.987286, 40.771117],
-        [-73.980511, 40.801531],
-        [-73.958801, 40.800751],
-        [-73.987286, 40.771117]
-    ]]
+    coordinates: [
+        [
+            [-73.987286, 40.771117],
+            [-73.980511, 40.801531],
+            [-73.958801, 40.800751],
+            [-73.987286, 40.771117],
+        ],
+    ],
 };
 command = coll.find({loc: {$geoWithin: {$geometry: uwsPolygon}}});
 explainResults = command.explain("queryPlanner");

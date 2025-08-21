@@ -15,7 +15,7 @@ import {
     getAllNodeExplains,
     getPlanStage,
     getWinningPlanFromExplain,
-    hasRejectedPlans
+    hasRejectedPlans,
 } from "jstests/libs/query/analyze_plan.js";
 
 const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
@@ -33,25 +33,30 @@ allDocuments.push({_id: "Trenton", state: "NJ", pop: 5});
 
 let coll = viewsDB.getCollection("coll");
 let bulk = coll.initializeUnorderedBulkOp();
-allDocuments.forEach(function(doc) {
+allDocuments.forEach(function (doc) {
     bulk.insert(doc);
 });
 assert.commandWorked(bulk.execute());
 
 // Create views on the data.
 assert.commandWorked(viewsDB.runCommand({create: "identityView", viewOn: "coll"}));
-assert.commandWorked(viewsDB.runCommand(
-    {create: "largePopView", viewOn: "identityView", pipeline: [{$match: {pop: {$gt: 5}}}]}));
+assert.commandWorked(
+    viewsDB.runCommand({create: "largePopView", viewOn: "identityView", pipeline: [{$match: {pop: {$gt: 5}}}]}),
+);
 let identityView = viewsDB.getCollection("identityView");
 let largePopView = viewsDB.getCollection("largePopView");
 
 function assertIdentityViewDistinctMatchesCollection(key, query) {
-    query = (query === undefined) ? {} : query;
+    query = query === undefined ? {} : query;
     const collDistinct = coll.distinct(key, query);
     const viewDistinct = identityView.distinct(key, query);
-    assert(arrayEq(collDistinct, viewDistinct),
-           "Distinct on a collection did not match distinct on its identity view; got " +
-               tojson(viewDistinct) + " but expected " + tojson(collDistinct));
+    assert(
+        arrayEq(collDistinct, viewDistinct),
+        "Distinct on a collection did not match distinct on its identity view; got " +
+            tojson(viewDistinct) +
+            " but expected " +
+            tojson(collDistinct),
+    );
 }
 
 // Test basic distinct requests on known fields without a query.
@@ -78,37 +83,36 @@ assert.eq([], largePopView.distinct("_id", {state: "FL"}));
 assert.commandWorked(identityView.explain().distinct("_id"));
 assert.commandWorked(largePopView.explain().distinct("pop", {state: "CA"}));
 getAllNodeExplains(largePopView.explain().count({foo: "bar"})).forEach((explainPlan) => {
-    if (explainPlan.hasOwnProperty("stages") && explainPlan.stages[0].hasOwnProperty('$cursor')) {
+    if (explainPlan.hasOwnProperty("stages") && explainPlan.stages[0].hasOwnProperty("$cursor")) {
         explainPlan = explainPlan.stages[0].$cursor;
     }
     assert.eq(explainPlan.queryPlanner.namespace, "views_distinct.coll");
 });
 
 // Distinct with explicit explain modes works on a view.
-getAllNodeExplains(assert.commandWorked(largePopView.explain("queryPlanner").distinct("pop")))
-    .forEach((explainPlan) => {
+getAllNodeExplains(assert.commandWorked(largePopView.explain("queryPlanner").distinct("pop"))).forEach(
+    (explainPlan) => {
         assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_distinct.coll");
         assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
-    });
+    },
+);
 
 let nReturned = 0;
-getAllNodeExplains(largePopView.explain("executionStats").distinct("pop"))
-    .forEach((explainPlan) => {
-        assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_distinct.coll");
-        assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
-        nReturned += explainPlan.stages[0].$cursor.executionStats.nReturned;
-        assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
-    });
+getAllNodeExplains(largePopView.explain("executionStats").distinct("pop")).forEach((explainPlan) => {
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_distinct.coll");
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+    nReturned += explainPlan.stages[0].$cursor.executionStats.nReturned;
+    assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
+});
 assert.eq(nReturned, 2);
 
 nReturned = 0;
-getAllNodeExplains(largePopView.explain("allPlansExecution").distinct("pop"))
-    .forEach((explainPlan) => {
-        assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_distinct.coll");
-        assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
-        nReturned += explainPlan.stages[0].$cursor.executionStats.nReturned;
-        assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
-    });
+getAllNodeExplains(largePopView.explain("allPlansExecution").distinct("pop")).forEach((explainPlan) => {
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_distinct.coll");
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+    nReturned += explainPlan.stages[0].$cursor.executionStats.nReturned;
+    assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
+});
 assert.eq(nReturned, 2);
 
 // Distinct with hints work on views.
@@ -118,9 +122,15 @@ assert.commandWorked(viewsDB.coll.createIndex({pop: 1}));
 // Query settings do not force indexes and therefore 'state' index is not used when filtering on
 // 'pop'.
 if (!isHintsToQuerySettingsSuite) {
-    getAllNodeExplains(largePopView.explain().distinct("pop", {}, {
-        hint: {state: 1}
-    })).forEach((explainPlan) => {
+    getAllNodeExplains(
+        largePopView.explain().distinct(
+            "pop",
+            {},
+            {
+                hint: {state: 1},
+            },
+        ),
+    ).forEach((explainPlan) => {
         assert(getPlanStage(explainPlan.stages[0].$cursor, "FETCH"));
         const ixscan = getPlanStage(explainPlan.stages[0].$cursor, "IXSCAN");
         assert.eq(ixscan.indexName, "state_1");
@@ -128,24 +138,31 @@ if (!isHintsToQuerySettingsSuite) {
     });
 
     getAllNodeExplains(largePopView.explain().distinct("pop")).forEach((explainPlan) => {
-        assert.neq(getWinningPlanFromExplain(explainPlan.stages[0].$cursor.queryPlanner).stage,
-                   "IXSCAN",
-                   tojson(explainPlan));
+        assert.neq(
+            getWinningPlanFromExplain(explainPlan.stages[0].$cursor.queryPlanner).stage,
+            "IXSCAN",
+            tojson(explainPlan),
+        );
     });
 
     // Make sure that the hint produces the right results.
     assert(arrayEq([10, 7], largePopView.distinct("pop", {}, {hint: {state: 1}})));
-    const result = largePopView.runCommand(
-        "distinct", {"key": "a", query: {a: 1, b: 2}, hint: {bad: 1, hint: 1}});
+    const result = largePopView.runCommand("distinct", {"key": "a", query: {a: 1, b: 2}, hint: {bad: 1, hint: 1}});
     assert.commandFailedWithCode(result, ErrorCodes.BadValue, result);
     const regex = new RegExp("hint provided does not correspond to an existing index");
     assert(regex.test(result.errmsg));
 }
 
 // Ensure hint is applied and 'pop' index is used.
-getAllNodeExplains(largePopView.explain().distinct("pop", {}, {
-    hint: {pop: 1}
-})).forEach((explainPlan) => {
+getAllNodeExplains(
+    largePopView.explain().distinct(
+        "pop",
+        {},
+        {
+            hint: {pop: 1},
+        },
+    ),
+).forEach((explainPlan) => {
     const ixscan = getPlanStage(explainPlan.stages[0].$cursor, "IXSCAN");
     assert.eq(ixscan.indexName, "pop_1");
     assert(!hasRejectedPlans(explainPlan));
@@ -154,7 +171,8 @@ getAllNodeExplains(largePopView.explain().distinct("pop", {}, {
 // Distinct commands fail when they try to change the collation of a view.
 assert.commandFailedWithCode(
     viewsDB.runCommand({distinct: "identityView", key: "state", collation: {locale: "en_US"}}),
-    ErrorCodes.OptionNotSupportedOnView);
+    ErrorCodes.OptionNotSupportedOnView,
+);
 
 // Test distinct on nested objects, nested arrays and nullish values.
 coll.drop();
@@ -170,7 +188,7 @@ allDocuments.push({a: null, b: [4, 5, null, undefined], c: [], d: {e: null}});
 allDocuments.push({a: undefined, b: null, c: [null], d: {e: undefined}});
 
 bulk = coll.initializeUnorderedBulkOp();
-allDocuments.forEach(function(doc) {
+allDocuments.forEach(function (doc) {
     bulk.insert(doc);
 });
 assert.commandWorked(bulk.execute());
@@ -185,20 +203,22 @@ assertIdentityViewDistinctMatchesCollection("d.e.f");
 
 // Test distinct on a deeply nested object through arrays.
 coll.drop();
-assert.commandWorked(coll.insert({
-    a: [
-        {b: [{c: [{d: 1}]}]},
-        {b: {c: "not leaf"}},
-        {b: {c: [{d: 2, "not leaf": "not leaf"}]}},
-        {b: [{c: {d: 3}}]},
-        {b: {c: {d: 4}}, "not leaf": "not leaf"},
-        "not leaf",
-        // The documents below should not get traversed by the distinct() because of the
-        // doubly-nested arrays.
-        [[{b: {c: {d: "not leaf"}}}]],
-        [{b: {c: [[{d: "not leaf"}]]}}],
-    ]
-}));
+assert.commandWorked(
+    coll.insert({
+        a: [
+            {b: [{c: [{d: 1}]}]},
+            {b: {c: "not leaf"}},
+            {b: {c: [{d: 2, "not leaf": "not leaf"}]}},
+            {b: [{c: {d: 3}}]},
+            {b: {c: {d: 4}}, "not leaf": "not leaf"},
+            "not leaf",
+            // The documents below should not get traversed by the distinct() because of the
+            // doubly-nested arrays.
+            [[{b: {c: {d: "not leaf"}}}]],
+            [{b: {c: [[{d: "not leaf"}]]}}],
+        ],
+    }),
+);
 assert.commandWorked(coll.insert({a: "not leaf"}));
 assertIdentityViewDistinctMatchesCollection("a");
 assertIdentityViewDistinctMatchesCollection("a.b");

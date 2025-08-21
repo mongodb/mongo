@@ -7,9 +7,7 @@
  * ]
  */
 
-import {
-    runCommandAndValidateQueryStats,
-} from "jstests/libs/query/query_stats_utils.js";
+import {runCommandAndValidateQueryStats} from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();
@@ -25,9 +23,9 @@ const st = new ShardingTest({
         mongosOptions: {
             setParameter: {
                 internalQueryStatsRateLimit: -1,
-            }
-        }
-    }
+            },
+        },
+    },
 });
 
 const sdb = st.s0.getDB(dbName);
@@ -57,15 +55,14 @@ const aggregateCommandObj = {
     collation: {locale: "en_US", strength: 2},
     hint: {"v": 1},
     comment: "",
-    let : {},
+    let: {},
     apiDeprecationErrors: false,
     apiVersion: "1",
     apiStrict: false,
-    $_passthroughToShard: {shard: shardId}
+    $_passthroughToShard: {shard: shardId},
 };
 
-const queryShapeAggregateFields =
-    ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
+const queryShapeAggregateFields = ["cmdNs", "command", "pipeline", "allowDiskUse", "collation", "let"];
 
 // The outer fields not nested inside queryShape.
 const queryStatsAggregateKeyFields = [
@@ -84,7 +81,7 @@ const queryStatsAggregateKeyFields = [
     "explain",
     "cursor.batchSize",
     "$_passthroughToShard",
-    "$_passthroughToShard.shard"
+    "$_passthroughToShard.shard",
 ];
 assert.commandWorked(coll.createIndex({v: 1}));
 
@@ -93,7 +90,7 @@ runCommandAndValidateQueryStats({
     commandName: "aggregate",
     commandObj: aggregateCommandObj,
     shapeFields: queryShapeAggregateFields,
-    keyFields: queryStatsAggregateKeyFields
+    keyFields: queryStatsAggregateKeyFields,
 });
 
 st.stop();

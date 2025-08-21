@@ -6,19 +6,17 @@
  * legacy coordinate pair, indexed with a 2d index.
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.indexedField = 'indexed_insert_2d';
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.indexedField = "indexed_insert_2d";
     // Remove the shard key for 2d indexes, as they are not supported
     delete $config.data.shardKey;
 
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        assert.lt(this.tid, 1 << 16);  // assume tid is a 16 bit nonnegative int
+        assert.lt(this.tid, 1 << 16); // assume tid is a 16 bit nonnegative int
         // split the tid into the odd bits and the even bits
         // for example:
         //  tid:  57 = 00111001
@@ -29,7 +27,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var oddBits = 0;
         var evenBits = 0;
         for (var i = 0; i < 16; ++i) {
-            if (this.tid & 1 << i) {
+            if (this.tid & (1 << i)) {
                 if (i % 2 === 0) {
                     // i is even
                     evenBits |= 1 << (i / 2);
@@ -46,7 +44,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.data.getIndexSpec = function getIndexSpec() {
         var ixSpec = {};
-        ixSpec[this.indexedField] = '2d';
+        ixSpec[this.indexedField] = "2d";
         return ixSpec;
     };
 

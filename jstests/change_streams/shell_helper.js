@@ -6,15 +6,9 @@
 // the oplog entry. When operations get bundled into a transaction, their operationTime is instead
 // based on the commit oplog entry, which would cause this test to fail.
 // @tags: [change_stream_does_not_expect_txns]
-import {
-    assertDropAndRecreateCollection,
-    assertDropCollection
-} from "jstests/libs/collection_drop_recreate.js";
+import {assertDropAndRecreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    assertChangeStreamEventEq,
-    assertInvalidateOp
-} from "jstests/libs/query/change_stream_util.js";
+import {assertChangeStreamEventEq, assertInvalidateOp} from "jstests/libs/query/change_stream_util.js";
 
 const coll = assertDropAndRecreateCollection(db, "change_stream_shell_helper");
 
@@ -84,32 +78,28 @@ jsTestLog("Testing watch() with pipeline");
 changeStreamCursor = coll.watch([{$project: {clusterTime: 1, docId: "$documentKey._id"}}]);
 
 // Store the cluster time of the insert as the timestamp to start from.
-const resumeTime =
-    assert.commandWorked(db.runCommand({insert: coll.getName(), documents: [{_id: 1, x: 1}]}))
-        .operationTime;
+const resumeTime = assert.commandWorked(
+    db.runCommand({insert: coll.getName(), documents: [{_id: 1, x: 1}]}),
+).operationTime;
 jsTestLog("Insert of document with _id 1 got operationTime " + tojson(resumeTime));
 
 const changeForInsert = checkNextChange(changeStreamCursor, {docId: 1});
-jsTestLog("Change stream event for document with _id 1 reports clusterTime " +
-          tojson(changeForInsert.clusterTime));
+jsTestLog("Change stream event for document with _id 1 reports clusterTime " + tojson(changeForInsert.clusterTime));
 
 // We expect the clusterTime returned by the change stream event and the operationTime returned
 // by the insert to be the same.
 assert.eq(changeForInsert.clusterTime, resumeTime);
 
 jsTestLog("Testing watch() with pipeline and resumeAfter");
-changeStreamCursor =
-    coll.watch([{$project: {docId: "$documentKey._id"}}], {resumeAfter: resumeToken});
+changeStreamCursor = coll.watch([{$project: {docId: "$documentKey._id"}}], {resumeAfter: resumeToken});
 checkNextChange(changeStreamCursor, {docId: 1});
 
 jsTestLog("Testing watch() with pipeline and startAfter");
-changeStreamCursor =
-    coll.watch([{$project: {docId: "$documentKey._id"}}], {startAfter: resumeToken});
+changeStreamCursor = coll.watch([{$project: {docId: "$documentKey._id"}}], {startAfter: resumeToken});
 checkNextChange(changeStreamCursor, {docId: 1});
 
 jsTestLog("Testing watch() with pipeline and startAtOperationTime");
-changeStreamCursor =
-    coll.watch([{$project: {docId: "$documentKey._id"}}], {startAtOperationTime: resumeTime});
+changeStreamCursor = coll.watch([{$project: {docId: "$documentKey._id"}}], {startAtOperationTime: resumeTime});
 checkNextChange(changeStreamCursor, {docId: 1});
 
 jsTestLog("Testing watch() with updateLookup");
@@ -137,7 +127,8 @@ if (!FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Only watch the "update" changes of the specific doc since the beginning.
     changeStreamCursor = coll.watch(
         [{$match: {$or: [{_id: resumeToken}, {documentKey: {_id: 1}, operationType: "update"}]}}],
-        {resumeAfter: resumeToken, batchSize: 2});
+        {resumeAfter: resumeToken, batchSize: 2},
+    );
 
     if (TestData.testingReplicaSetEndpoint) {
         // GetMore on mongos doesn't respect batch size due to SERVER-31992.
@@ -166,12 +157,14 @@ if (!FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
 
 jsTestLog("Testing watch() with maxAwaitTimeMS");
 changeStreamCursor = coll.watch([], {maxAwaitTimeMS: 500});
-testCommandIsCalled(() => assert(!changeStreamCursor.hasNext()), (cmdObj) => {
-    assert.eq(
-        "getMore", Object.keys(cmdObj)[0], "expected getMore command, but was: " + tojson(cmdObj));
-    assert(cmdObj.hasOwnProperty("maxTimeMS"), "unexpected getMore command: " + tojson(cmdObj));
-    assert.eq(500, cmdObj.maxTimeMS, "unexpected getMore command: " + tojson(cmdObj));
-});
+testCommandIsCalled(
+    () => assert(!changeStreamCursor.hasNext()),
+    (cmdObj) => {
+        assert.eq("getMore", Object.keys(cmdObj)[0], "expected getMore command, but was: " + tojson(cmdObj));
+        assert(cmdObj.hasOwnProperty("maxTimeMS"), "unexpected getMore command: " + tojson(cmdObj));
+        assert.eq(500, cmdObj.maxTimeMS, "unexpected getMore command: " + tojson(cmdObj));
+    },
+);
 
 jsTestLog("Testing the cursor gets closed when the collection gets dropped");
 changeStreamCursor = coll.watch([{$project: {clusterTime: 0}}]);
@@ -193,7 +186,7 @@ assert.soon(() => changeStreamCursor.hasNext());
 assert(!changeStreamCursor.isExhausted());
 expected = {
     operationType: "drop",
-    ns: {db: db.getName(), coll: coll.getName()}
+    ns: {db: db.getName(), coll: coll.getName()},
 };
 checkNextChange(changeStreamCursor, expected);
 // For single collection change streams, the drop should invalidate the stream.
@@ -202,8 +195,7 @@ const invalidateDoc = assertInvalidateOp({cursor: changeStreamCursor, opType: "d
 if (invalidateDoc) {
     jsTestLog("Testing using the 'startAfter' option from the invalidate entry");
     assert.commandWorked(coll.insert({_id: "After drop"}));
-    let resumedFromInvalidate =
-        coll.watch([], {startAfter: invalidateDoc._id, collation: {locale: "simple"}});
+    let resumedFromInvalidate = coll.watch([], {startAfter: invalidateDoc._id, collation: {locale: "simple"}});
 
     // We should see the new insert after starting over. However, in sharded cluster
     // passthroughs we may see more drop and invalidate notifications before we see the insert.
@@ -215,8 +207,7 @@ if (invalidateDoc) {
         const next = resumedFromInvalidate.next();
         if (next.operationType == "invalidate") {
             // Start again!
-            resumedFromInvalidate =
-                coll.watch([], {startAfter: next._id, collation: {locale: "simple"}});
+            resumedFromInvalidate = coll.watch([], {startAfter: next._id, collation: {locale: "simple"}});
             return false;
         }
         if (next.operationType == "drop") {

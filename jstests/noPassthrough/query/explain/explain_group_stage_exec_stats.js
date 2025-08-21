@@ -6,7 +6,7 @@ import {getAggPlanStage} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
-const testDB = conn.getDB('test');
+const testDB = conn.getDB("test");
 const coll = testDB.explain_group_stage_exec_stats;
 coll.drop();
 
@@ -19,14 +19,15 @@ if (checkSbeRestrictedOrFullyEnabled(testDB)) {
     quit();
 }
 
-const bigStr = Array(1025).toString();  // 1KB of ','
+const bigStr = Array(1025).toString(); // 1KB of ','
 const maxMemoryLimitForGroupStage = 1024 * 300;
-const isAgressivelySpilling = assert
-                                  .commandWorked(testDB.adminCommand({
-                                      getParameter: 1,
-                                      internalQueryEnableAggressiveSpillsInGroup: 1,
-                                  }))
-                                  .internalQueryEnableAggressiveSpillsInGroup == true;
+const isAgressivelySpilling =
+    assert.commandWorked(
+        testDB.adminCommand({
+            getParameter: 1,
+            internalQueryEnableAggressiveSpillsInGroup: 1,
+        }),
+    ).internalQueryEnableAggressiveSpillsInGroup == true;
 const nDocs = 1000;
 const nGroups = 50;
 
@@ -48,8 +49,7 @@ const expectedAccumMemUsages = {
     set: nGroups * 1024,
 };
 
-const expectedTotalMemoryUsage =
-    Object.values(expectedAccumMemUsages).reduce((acc, val) => acc + val, 0);
+const expectedTotalMemoryUsage = Object.values(expectedAccumMemUsages).reduce((acc, val) => acc + val, 0);
 const expectedSpillCount = Math.ceil(expectedTotalMemoryUsage / maxMemoryLimitForGroupStage);
 
 /**
@@ -122,8 +122,7 @@ function checkGroupStages(stage, expectedAccumMemUsages, isExecExplain, expected
 
     // Add some wiggle room to the total memory used compared to the limit parameter since the check
     // for spilling to disk happens after each document is processed.
-    if (expectedSpills > 0)
-        assert.gt(maxMemoryLimitForGroupStage + 4 * 1024, totalAccumMemoryUsageBytes, stage);
+    if (expectedSpills > 0) assert.gt(maxMemoryLimitForGroupStage + 4 * 1024, totalAccumMemoryUsageBytes, stage);
 }
 
 let groupStages = getAggPlanStage(coll.explain("executionStats").aggregate(pipeline), "$group");
@@ -136,19 +135,17 @@ groupStages = getAggPlanStage(coll.explain("queryPlanner").aggregate(pipeline), 
 checkGroupStages(groupStages, {}, false, 0);
 
 // Set MaxMemory low to force spill to disk.
-assert.commandWorked(testDB.adminCommand(
-    {setParameter: 1, ["internalDocumentSourceGroupMaxMemoryBytes"]: maxMemoryLimitForGroupStage}));
+assert.commandWorked(
+    testDB.adminCommand({setParameter: 1, ["internalDocumentSourceGroupMaxMemoryBytes"]: maxMemoryLimitForGroupStage}),
+);
 
-groupStages = getAggPlanStage(
-    coll.explain("executionStats").aggregate(pipeline, {"allowDiskUse": true}), "$group");
+groupStages = getAggPlanStage(coll.explain("executionStats").aggregate(pipeline, {"allowDiskUse": true}), "$group");
 checkGroupStages(groupStages, {}, true, expectedSpillCount);
 
-groupStages = getAggPlanStage(
-    coll.explain("allPlansExecution").aggregate(pipeline, {"allowDiskUse": true}), "$group");
+groupStages = getAggPlanStage(coll.explain("allPlansExecution").aggregate(pipeline, {"allowDiskUse": true}), "$group");
 checkGroupStages(groupStages, {}, true, expectedSpillCount);
 
-groupStages = getAggPlanStage(
-    coll.explain("queryPlanner").aggregate(pipeline, {"allowDiskUse": true}), "$group");
+groupStages = getAggPlanStage(coll.explain("queryPlanner").aggregate(pipeline, {"allowDiskUse": true}), "$group");
 checkGroupStages(groupStages, {}, false, 0);
 
 MongoRunner.stopMongod(conn);

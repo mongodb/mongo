@@ -33,8 +33,7 @@ const isNotAdminCommand = false;
 
 // If the command expects the namespace to be fully qualified, set `isFullyQualified` to true.
 // If the command must be run against the admin database, set `isAdminCommand` to true.
-function assertFailsWithInvalidNamespacesForField(
-    field, command, isFullyQualified, isAdminCommand) {
+function assertFailsWithInvalidNamespacesForField(field, command, isFullyQualified, isAdminCommand) {
     const invalidNamespaces = [];
     invalidNamespaces.push(isFullyQualified ? "mydb." : "");
     invalidNamespaces.push(isFullyQualified ? "mydb.\0" : "\0");
@@ -70,7 +69,11 @@ assert.commandWorked(db.commands_namespace_parsing.insert({a: 1}));
 
 // Test aggregate fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
-    "aggregate", {aggregate: "", pipeline: []}, isNotFullyQualified, isNotAdminCommand);
+    "aggregate",
+    {aggregate: "", pipeline: []},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test aggregate with stages which involve foreign collections fail with an invalid collection
 // name.
@@ -78,191 +81,247 @@ assertFailsWithInvalidNamespacesForField(
     "pipeline.$out",
     {aggregate: "commands_namespace_parsing", pipeline: [{$out: ""}], cursor: {}},
     isNotFullyQualified,
-    isNotAdminCommand);
+    isNotAdminCommand,
+);
 assertFailsWithInvalidNamespacesForField(
     "pipeline.$merge",
     {aggregate: "commands_namespace_parsing", pipeline: [{$merge: ""}], cursor: {}},
     isNotFullyQualified,
-    isNotAdminCommand);
+    isNotAdminCommand,
+);
 
 // Test count fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "count", {count: ""}, isNotFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("count", {count: ""}, isNotFullyQualified, isNotAdminCommand);
 
 // Test distinct fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "distinct", {distinct: "", key: "a"}, isNotFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("distinct", {distinct: "", key: "a"}, isNotFullyQualified, isNotAdminCommand);
 
 // Test mapReduce fails with an invalid input collection name.
-assertFailsWithInvalidNamespacesForField("mapreduce",
-                                         {
-                                             mapreduce: "",
-                                             map: function() {
-                                                 emit(this.a, 1);
-                                             },
-                                             reduce: function(key, values) {
-                                                 return Array.sum(values);
-                                             },
-                                             out: "commands_namespace_parsing_out"
-                                         },
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "mapreduce",
+    {
+        mapreduce: "",
+        map: function () {
+            emit(this.a, 1);
+        },
+        reduce: function (key, values) {
+            return Array.sum(values);
+        },
+        out: "commands_namespace_parsing_out",
+    },
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 // Test mapReduce fails with an invalid output collection name.
-assertFailsWithInvalidNamespacesForField("out",
-                                         {
-                                             mapreduce: "commands_namespace_parsing",
-                                             map: function() {
-                                                 emit(this.a, 1);
-                                             },
-                                             reduce: function(key, values) {
-                                                 return Array.sum(values);
-                                             },
-                                             out: ""
-                                         },
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
-assertFailsWithInvalidNamespacesForField("out.merge",
-                                         {
-                                             mapreduce: "commands_namespace_parsing",
-                                             map: function() {
-                                                 emit(this.a, 1);
-                                             },
-                                             reduce: function(key, values) {
-                                                 return Array.sum(values);
-                                             },
-                                             out: {merge: ""}
-                                         },
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
-assertFailsWithInvalidNamespacesForField("out.reduce",
-                                         {
-                                             mapreduce: "commands_namespace_parsing",
-                                             map: function() {
-                                                 emit(this.a, 1);
-                                             },
-                                             reduce: function(key, values) {
-                                                 return Array.sum(values);
-                                             },
-                                             out: {reduce: ""}
-                                         },
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "out",
+    {
+        mapreduce: "commands_namespace_parsing",
+        map: function () {
+            emit(this.a, 1);
+        },
+        reduce: function (key, values) {
+            return Array.sum(values);
+        },
+        out: "",
+    },
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
+assertFailsWithInvalidNamespacesForField(
+    "out.merge",
+    {
+        mapreduce: "commands_namespace_parsing",
+        map: function () {
+            emit(this.a, 1);
+        },
+        reduce: function (key, values) {
+            return Array.sum(values);
+        },
+        out: {merge: ""},
+    },
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
+assertFailsWithInvalidNamespacesForField(
+    "out.reduce",
+    {
+        mapreduce: "commands_namespace_parsing",
+        map: function () {
+            emit(this.a, 1);
+        },
+        reduce: function (key, values) {
+            return Array.sum(values);
+        },
+        out: {reduce: ""},
+    },
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test find fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "find", {find: ""}, isNotFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("find", {find: ""}, isNotFullyQualified, isNotAdminCommand);
 
 // Test insert fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("insert",
-                                         {insert: "", documents: [{q: {a: 1}, u: {a: 2}}]},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "insert",
+    {insert: "", documents: [{q: {a: 1}, u: {a: 2}}]},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test update fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("update",
-                                         {update: "", updates: [{q: {a: 1}, u: {a: 2}}]},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "update",
+    {update: "", updates: [{q: {a: 1}, u: {a: 2}}]},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test delete fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("delete",
-                                         {delete: "", deletes: [{q: {a: 1}, limit: 1}]},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "delete",
+    {delete: "", deletes: [{q: {a: 1}, limit: 1}]},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test findAndModify fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
-    "findAndModify", {findAndModify: "", update: {a: 2}}, isNotFullyQualified, isNotAdminCommand);
+    "findAndModify",
+    {findAndModify: "", update: {a: 2}},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test getMore fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("collection",
-                                         {getMore: NumberLong("123456"), collection: ""},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "collection",
+    {getMore: NumberLong("123456"), collection: ""},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 if (!runningOnMongos) {
     // Test godinsert fails with an invalid collection name.
     assertFailsWithInvalidNamespacesForField(
-        "godinsert", {godinsert: "", obj: {_id: 1}}, isNotFullyQualified, isNotAdminCommand);
+        "godinsert",
+        {godinsert: "", obj: {_id: 1}},
+        isNotFullyQualified,
+        isNotAdminCommand,
+    );
 }
 
 // Test planCacheListFilters fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
-    "planCacheListFilters", {planCacheListFilters: ""}, isNotFullyQualified, isNotAdminCommand);
+    "planCacheListFilters",
+    {planCacheListFilters: ""},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test planCacheSetFilter fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("planCacheSetFilter",
-                                         {planCacheSetFilter: "", query: {}, indexes: [{a: 1}]},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "planCacheSetFilter",
+    {planCacheSetFilter: "", query: {}, indexes: [{a: 1}]},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test planCacheClearFilters fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
-    "planCacheClearFilters", {planCacheClearFilters: ""}, isNotFullyQualified, isNotAdminCommand);
+    "planCacheClearFilters",
+    {planCacheClearFilters: ""},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test planCacheClear fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
-    "planCacheClear", {planCacheClear: ""}, isNotFullyQualified, isNotAdminCommand);
+    "planCacheClear",
+    {planCacheClear: ""},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 if (!runningOnMongos) {
     // Test cleanupOrphaned fails with an invalid collection name.
     assertFailsWithInvalidNamespacesForField(
-        "cleanupOrphaned", {cleanupOrphaned: ""}, isFullyQualified, isAdminCommand);
+        "cleanupOrphaned",
+        {cleanupOrphaned: ""},
+        isFullyQualified,
+        isAdminCommand,
+    );
 }
 
 if (runningOnMongos) {
     // Test enableSharding fails with an invalid database name.
     assertFailsWithInvalidNamespacesForField(
-        "enableSharding", {enableSharding: ""}, isNotFullyQualified, isAdminCommand);
+        "enableSharding",
+        {enableSharding: ""},
+        isNotFullyQualified,
+        isAdminCommand,
+    );
 
     // Test mergeChunks fails with an invalid collection name.
     assertFailsWithInvalidNamespacesForField(
         "mergeChunks",
         {mergeChunks: "", bounds: [{_id: MinKey()}, {_id: MaxKey()}]},
         isFullyQualified,
-        isAdminCommand);
+        isAdminCommand,
+    );
 
     // Test shardCollection fails with an invalid collection name.
     assertFailsWithInvalidNamespacesForField(
-        "shardCollection", {shardCollection: "", key: {_id: 1}}, isFullyQualified, isAdminCommand);
+        "shardCollection",
+        {shardCollection: "", key: {_id: 1}},
+        isFullyQualified,
+        isAdminCommand,
+    );
 
     // Test split fails with an invalid collection name.
-    assertFailsWithInvalidNamespacesForField(
-        "split", {split: "", find: {}}, isFullyQualified, isAdminCommand);
+    assertFailsWithInvalidNamespacesForField("split", {split: "", find: {}}, isFullyQualified, isAdminCommand);
 
     // Test moveChunk fails with an invalid collection name.
     assertFailsWithInvalidNamespacesForField(
         "moveChunk",
         {moveChunk: "", find: {}, to: "commands_namespace_parsing_out"},
         isNotFullyQualified,
-        isAdminCommand);
+        isAdminCommand,
+    );
 
     // Test movePrimary fails with an invalid database name.
     assertFailsWithInvalidNamespacesForField(
-        "movePrimary", {movePrimary: "", to: "dummy"}, isNotFullyQualified, isAdminCommand);
+        "movePrimary",
+        {movePrimary: "", to: "dummy"},
+        isNotFullyQualified,
+        isAdminCommand,
+    );
 
     // Test updateZoneKeyRange fails with an invalid collection name.
     assertFailsWithInvalidNamespacesForField(
         "updateZoneKeyRange",
         {updateZoneKeyRange: "", min: {_id: MinKey()}, max: {_id: MaxKey()}, zone: "3"},
         isNotFullyQualified,
-        isAdminCommand);
+        isAdminCommand,
+    );
 }
 
 // Test renameCollection fails with an invalid source collection name.
 assertFailsWithInvalidNamespacesForField(
-    "renameCollection", {renameCollection: "", to: "test.b"}, isFullyQualified, isAdminCommand);
+    "renameCollection",
+    {renameCollection: "", to: "test.b"},
+    isFullyQualified,
+    isAdminCommand,
+);
 // Test renameCollection fails with an invalid target collection name.
-assertFailsWithInvalidNamespacesForField(
-    "to", {renameCollection: "test.b", to: ""}, isFullyQualified, isAdminCommand);
+assertFailsWithInvalidNamespacesForField("to", {renameCollection: "test.b", to: ""}, isFullyQualified, isAdminCommand);
 
 // Test drop fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "drop", {drop: ""}, isNotFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("drop", {drop: ""}, isNotFullyQualified, isNotAdminCommand);
 
 // Test create fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "create", {create: ""}, isNotFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("create", {create: ""}, isNotFullyQualified, isNotAdminCommand);
 
 // TODO SERVER-85773: Enale below test for sharded clusters.
 if (!runningOnMongos) {
@@ -271,44 +330,52 @@ if (!runningOnMongos) {
         "cloneCollectionAsCapped",
         {cloneCollectionAsCapped: "", toCollection: "b", size: 1024},
         isNotFullyQualified,
-        isNotAdminCommand);
+        isNotAdminCommand,
+    );
     // Test cloneCollectionAsCapped fails with an invalid target collection name.
     assertFailsWithInvalidNamespacesForField(
         "toCollection",
         {cloneCollectionAsCapped: "commands_namespace_parsing", toCollection: "", size: 1024},
         isNotFullyQualified,
-        isNotAdminCommand);
+        isNotAdminCommand,
+    );
 }
 
 // Test convertToCapped fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
-    "convertToCapped", {convertToCapped: "", size: 1024}, isNotFullyQualified, isNotAdminCommand);
+    "convertToCapped",
+    {convertToCapped: "", size: 1024},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test filemd5 fails with an invalid collection name.
 // Note: for this command, it is OK to pass 'root: ""', so do not use the helper function.
-assert.commandFailedWithCode(db.runCommand({filemd5: ObjectId(), root: "\0"}),
-                             ErrorCodes.InvalidNamespace);
-assert.commandFailedWithCode(db.runCommand({filemd5: ObjectId(), root: "a\0b"}),
-                             ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(db.runCommand({filemd5: ObjectId(), root: "\0"}), ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(db.runCommand({filemd5: ObjectId(), root: "a\0b"}), ErrorCodes.InvalidNamespace);
 
 // Test createIndexes fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("createIndexes",
-                                         {createIndexes: "", indexes: [{key: {a: 1}, name: "a1"}]},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "createIndexes",
+    {createIndexes: "", indexes: [{key: {a: 1}, name: "a1"}]},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test listIndexes fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "listIndexes", {listIndexes: ""}, isNotFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("listIndexes", {listIndexes: ""}, isNotFullyQualified, isNotAdminCommand);
 
 // Test dropIndexes fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
-    "dropIndexes", {dropIndexes: "", index: "*"}, isNotFullyQualified, isNotAdminCommand);
+    "dropIndexes",
+    {dropIndexes: "", index: "*"},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 if (!runningOnMongos) {
     // Test compact fails with an invalid collection name.
-    assertFailsWithInvalidNamespacesForField(
-        "compact", {compact: ""}, isNotFullyQualified, isNotAdminCommand);
+    assertFailsWithInvalidNamespacesForField("compact", {compact: ""}, isNotFullyQualified, isNotAdminCommand);
 }
 
 // Test collMod fails with an invalid collection name.
@@ -316,60 +383,70 @@ assertFailsWithInvalidNamespacesForField(
     "collMod",
     {collMod: "", index: {keyPattern: {a: 1}, expireAfterSeconds: 60}},
     isNotFullyQualified,
-    isNotAdminCommand);
+    isNotAdminCommand,
+);
 
 // Test reIndex fails with an invalid collection name.
 if (!runningOnMongos) {
-    assertFailsWithInvalidNamespacesForField(
-        "reIndex", {reIndex: ""}, isNotFullyQualified, isNotAdminCommand);
+    assertFailsWithInvalidNamespacesForField("reIndex", {reIndex: ""}, isNotFullyQualified, isNotAdminCommand);
 }
 
 // Test collStats fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "collStats", {collStats: ""}, isNotFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("collStats", {collStats: ""}, isNotFullyQualified, isNotAdminCommand);
 
 // Test dataSize fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "dataSize", {dataSize: ""}, isFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("dataSize", {dataSize: ""}, isFullyQualified, isNotAdminCommand);
 
 // Test explain of aggregate fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("aggregate",
-                                         {aggregate: "", pipeline: [], explain: true},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "aggregate",
+    {aggregate: "", pipeline: [], explain: true},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test explain of count fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
-    "explain.count", {explain: {count: ""}}, isNotFullyQualified, isNotAdminCommand);
+    "explain.count",
+    {explain: {count: ""}},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test explain of distinct fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("explain.distinct",
-                                         {explain: {distinct: "", key: "a"}},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "explain.distinct",
+    {explain: {distinct: "", key: "a"}},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test explain of find fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "explain.find", {explain: {find: ""}}, isNotFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("explain.find", {explain: {find: ""}}, isNotFullyQualified, isNotAdminCommand);
 
 // Test explain of findAndModify fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("explain.findAndModify",
-                                         {explain: {findAndModify: "", update: {a: 2}}},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "explain.findAndModify",
+    {explain: {findAndModify: "", update: {a: 2}}},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test explain of delete fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("explain.delete",
-                                         {explain: {delete: "", deletes: [{q: {a: 1}, limit: 1}]}},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "explain.delete",
+    {explain: {delete: "", deletes: [{q: {a: 1}, limit: 1}]}},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test explain of update fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField("explain.update",
-                                         {explain: {update: "", updates: [{q: {a: 1}, u: {a: 2}}]}},
-                                         isNotFullyQualified,
-                                         isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField(
+    "explain.update",
+    {explain: {update: "", updates: [{q: {a: 1}, u: {a: 2}}]}},
+    isNotFullyQualified,
+    isNotAdminCommand,
+);
 
 // Test validate fails with an invalid collection name.
-assertFailsWithInvalidNamespacesForField(
-    "validate", {validate: ""}, isNotFullyQualified, isNotAdminCommand);
+assertFailsWithInvalidNamespacesForField("validate", {validate: ""}, isNotFullyQualified, isNotAdminCommand);

@@ -13,7 +13,7 @@ const testColl = st.s.getDB(dbName).getCollection(collName);
 
 function getConfigShardsDoc(rst) {
     return st.s.getCollection("config.shards").findOne({
-        _id: rst.isConfigServer ? "config" : rst.name
+        _id: rst.isConfigServer ? "config" : rst.name,
     });
 }
 
@@ -23,9 +23,9 @@ const rs0Config = st.rs0.getReplSetConfigFromNode();
 const configShardsDoc0 = getConfigShardsDoc(st.rs0);
 assert.eq(configShardsDoc0.host.split(",").length, 2);
 
-let roleStr = st.rs0.isConfigServer ? 'configsvr' : 'shardsvr';
+let roleStr = st.rs0.isConfigServer ? "configsvr" : "shardsvr";
 let replConfigForNewNode = {rsConfig: {votes: 0, priority: 0}};
-replConfigForNewNode[roleStr] = '';
+replConfigForNewNode[roleStr] = "";
 
 const newNode = st.rs0.add(replConfigForNewNode);
 st.rs0.reInitiate();

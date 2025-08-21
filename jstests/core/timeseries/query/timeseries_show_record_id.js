@@ -15,8 +15,7 @@ TimeseriesTest.run((insert) => {
     const coll = db[jsTestName()];
     coll.drop();
 
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
     Random.setRandomSeed();
 
@@ -27,17 +26,21 @@ TimeseriesTest.run((insert) => {
         const host = TimeseriesTest.getRandomElem(hosts);
         TimeseriesTest.updateUsages(host.fields);
 
-        assert.commandWorked(insert(coll, {
-            measurement: "cpu",
-            time: ISODate(),
-            fields: host.fields,
-            tags: host.tags,
-        }));
+        assert.commandWorked(
+            insert(coll, {
+                measurement: "cpu",
+                time: ISODate(),
+                fields: host.fields,
+                tags: host.tags,
+            }),
+        );
     }
 
     function isRecordId(data) {
-        return isString(data)  // old format
-            || Object.prototype.toString.call(data) === "[object BinData]";
+        return (
+            isString(data) || // old format
+            Object.prototype.toString.call(data) === "[object BinData]"
+        );
     }
 
     function checkRecordId(documents) {

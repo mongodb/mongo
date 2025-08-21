@@ -26,7 +26,8 @@ function getNewView(collName) {
 }
 
 jsTest.log(
-    "Rename existing view should fail with CommandNotSupportedOnView indipendently on the target type (view or collection)");
+    "Rename existing view should fail with CommandNotSupportedOnView indipendently on the target type (view or collection)",
+);
 {
     const srcColl = getNewColl();
     const srcView = getNewView(srcColl.getName());
@@ -36,24 +37,26 @@ jsTest.log(
     assert.commandFailedWithCode(
         db.adminCommand({renameCollection: srcView.getFullName(), to: dstColl.getFullName()}),
         ErrorCodes.CommandNotSupportedOnView,
-        "rename view to existing collection should fail with CommandNotSupportedOnView");
+        "rename view to existing collection should fail with CommandNotSupportedOnView",
+    );
 
     assert.commandFailedWithCode(
-        db.adminCommand(
-            {renameCollection: srcView.getFullName(), to: dstColl.getFullName(), dropTarget: true}),
+        db.adminCommand({renameCollection: srcView.getFullName(), to: dstColl.getFullName(), dropTarget: true}),
         ErrorCodes.CommandNotSupportedOnView,
-        "rename view to existing collection should fail with CommandNotSupportedOnView even if dropTarget is true");
+        "rename view to existing collection should fail with CommandNotSupportedOnView even if dropTarget is true",
+    );
 
     assert.commandFailedWithCode(
         db.adminCommand({renameCollection: srcView.getFullName(), to: dstView.getFullName()}),
         ErrorCodes.CommandNotSupportedOnView,
-        "rename view to existing view should fail with CommandNotSupportedOnView");
+        "rename view to existing view should fail with CommandNotSupportedOnView",
+    );
 
     assert.commandFailedWithCode(
-        db.adminCommand(
-            {renameCollection: srcView.getFullName(), to: dstView.getFullName(), dropTarget: true}),
+        db.adminCommand({renameCollection: srcView.getFullName(), to: dstView.getFullName(), dropTarget: true}),
         ErrorCodes.CommandNotSupportedOnView,
-        "rename view to existing view should fail with CommandNotSupportedOnView even if dropTarget is true");
+        "rename view to existing view should fail with CommandNotSupportedOnView even if dropTarget is true",
+    );
 }
 
 jsTest.log("Rename coll to existing view should fail with NamespaceExists");
@@ -66,11 +69,12 @@ jsTest.log("Rename coll to existing view should fail with NamespaceExists");
     assert.commandFailedWithCode(
         db.adminCommand({renameCollection: srcColl.getFullName(), to: dstView.getFullName()}),
         ErrorCodes.NamespaceExists,
-        "rename collection to existing view should fail with NamespaceExists");
+        "rename collection to existing view should fail with NamespaceExists",
+    );
 
     assert.commandFailedWithCode(
-        db.adminCommand(
-            {renameCollection: srcColl.getFullName(), to: dstView.getFullName(), dropTarget: true}),
+        db.adminCommand({renameCollection: srcColl.getFullName(), to: dstView.getFullName(), dropTarget: true}),
         ErrorCodes.NamespaceExists,
-        "rename collection to existing view should fail with NamespaceExists even if dropTarget is true");
+        "rename collection to existing view should fail with NamespaceExists even if dropTarget is true",
+    );
 }

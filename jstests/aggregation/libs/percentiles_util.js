@@ -14,8 +14,7 @@
 export function testWithSingleGroup({coll, docs, percentileSpec, letSpec, expectedResult, msg}) {
     coll.drop();
     coll.insertMany(docs);
-    const res =
-        coll.aggregate([{$group: {_id: null, p: percentileSpec}}], {let : letSpec}).toArray();
+    const res = coll.aggregate([{$group: {_id: null, p: percentileSpec}}], {let: letSpec}).toArray();
 
     // For $percentile the result should be ordered to match the spec, so assert exact equality.
     assert.eq(expectedResult, res[0].p, msg + `; Result: ${tojson(res)}`);
@@ -27,7 +26,7 @@ export function testWithSingleGroupMedian({coll, docs, medianSpec, expectedResul
 
     let medianArgs = medianSpec["$median"];
     const percentileSpec = {
-        $percentile: {input: medianArgs.input, method: medianArgs.method, p: [0.5]}
+        $percentile: {input: medianArgs.input, method: medianArgs.method, p: [0.5]},
     };
 
     const medianRes = coll.aggregate([{$group: {_id: null, p: medianSpec}}]).toArray();
@@ -43,8 +42,7 @@ export function testWithSingleGroupMedian({coll, docs, medianSpec, expectedResul
 export function testWithMultipleGroups({coll, docs, percentileSpec, expectedResult, msg}) {
     coll.drop();
     coll.insertMany(docs);
-    const res =
-        coll.aggregate([{$group: {_id: "$k", p: percentileSpec}}, {$sort: {_id: 1}}]).toArray();
+    const res = coll.aggregate([{$group: {_id: "$k", p: percentileSpec}}, {$sort: {_id: 1}}]).toArray();
 
     // For $percentile the result should be ordered to match the spec, so assert exact equality.
     for (let i = 0; i < res.length; i++) {
@@ -58,7 +56,7 @@ export function testWithMultipleGroupsMedian({coll, docs, medianSpec, expectedRe
 
     let medianArgs = medianSpec["$median"];
     const percentileSpec = {
-        $percentile: {input: medianArgs.input, method: medianArgs.method, p: [0.5]}
+        $percentile: {input: medianArgs.input, method: medianArgs.method, p: [0.5]},
     };
 
     const medianRes = coll.aggregate([{$group: {_id: null, p: medianSpec}}]).toArray();
@@ -95,12 +93,16 @@ function testWithAccuracyError({coll, docs, percentileSpec, sorted, error, msg})
             const computedRank = findRank(sorted, res[0].p[i]);
             const trueRank = Math.max(0, Math.ceil(p * sorted.length) - 1);
             if (res[0].p[i] != sorted[trueRank]) {
-                assert.lte(Math.abs(trueRank - computedRank),
-                           error * sorted.length,
-                           msg +
-                               `; Error is too high for p: ${p}. Computed: ${
-                                   res[0].p[i]} with rank ${computedRank} but the true value ${
-                                   sorted[trueRank]} has rank ${trueRank} in ${tojson(res)}`);
+                assert.lte(
+                    Math.abs(trueRank - computedRank),
+                    error * sorted.length,
+                    msg +
+                        `; Error is too high for p: ${p}. Computed: ${
+                            res[0].p[i]
+                        } with rank ${computedRank} but the true value ${
+                            sorted[trueRank]
+                        } has rank ${trueRank} in ${tojson(res)}`,
+                );
             }
         } else {
             const computedRank = findRank(sorted, res[0].p[i]);
@@ -108,18 +110,18 @@ function testWithAccuracyError({coll, docs, percentileSpec, sorted, error, msg})
             const cr = Math.ceil(trueRank);
             const fr = Math.floor(trueRank);
             if (cr == trueRank && trueRank == fr) {
-                assert.eq(res[0].p[i],
-                          sorted[trueRank],
-                          msg +
-                              `; Computed: ${res[0].p[i]} but the true value is ${
-                                  sorted[trueRank]} in ${tojson(res)}`);
+                assert.eq(
+                    res[0].p[i],
+                    sorted[trueRank],
+                    msg + `; Computed: ${res[0].p[i]} but the true value is ${sorted[trueRank]} in ${tojson(res)}`,
+                );
             } else {
                 const truePercentile = (cr - trueRank) * sorted[fr] + (trueRank - fr) * sorted[cr];
-                assert.close(res[0].p[i],
-                             truePercentile,
-                             msg +
-                                 `; Computed: ${res[0].p[i]} but the true value is ${
-                                     truePercentile} in ${tojson(res)}`);
+                assert.close(
+                    res[0].p[i],
+                    truePercentile,
+                    msg + `; Computed: ${res[0].p[i]} but the true value is ${truePercentile} in ${tojson(res)}`,
+                );
             }
         }
     }
@@ -136,12 +138,11 @@ export function testLargeUniformDataset(coll, samples, sortedSamples, p, accurac
         percentileSpec: {$percentile: {p: p, input: "$x", method: method}},
         sorted: sortedSamples,
         msg: "Single group of uniformly distributed data",
-        error: accuracyError
+        error: accuracyError,
     });
 }
 
-export function testLargeUniformDataset_WithInfinities(
-    coll, samples, sortedSamples, p, accuracyError, method) {
+export function testLargeUniformDataset_WithInfinities(coll, samples, sortedSamples, p, accuracyError, method) {
     let docs = [];
     for (let i = 0; i < samples.length; i++) {
         docs.push({_id: i * 10, x: samples[i]});
@@ -151,8 +152,7 @@ export function testLargeUniformDataset_WithInfinities(
         }
     }
 
-    let sortedSamplesWithInfinities =
-        Array(5).fill(-Infinity).concat(sortedSamples).concat(Array(5).fill(Infinity));
+    let sortedSamplesWithInfinities = Array(5).fill(-Infinity).concat(sortedSamples).concat(Array(5).fill(Infinity));
 
     testWithAccuracyError({
         coll: coll,
@@ -160,12 +160,11 @@ export function testLargeUniformDataset_WithInfinities(
         percentileSpec: {$percentile: {p: p, input: "$x", method: method}},
         sorted: sortedSamplesWithInfinities,
         msg: "Single group of uniformly distributed data with infinite values",
-        error: accuracyError
+        error: accuracyError,
     });
 }
 
-export function testLargeUniformDataset_Decimal(
-    coll, samples, sortedSamples, p, accuracyError, method) {
+export function testLargeUniformDataset_Decimal(coll, samples, sortedSamples, p, accuracyError, method) {
     let docs = [];
     for (let i = 0; i < samples.length; i++) {
         docs.push({_id: i * 10, x: NumberDecimal(samples[i])});
@@ -180,7 +179,7 @@ export function testLargeUniformDataset_Decimal(
         percentileSpec: {$percentile: {p: p, input: "$x", method: method}},
         sorted: sortedSamples,
         msg: "Single group of uniformly distributed Decimal128 data",
-        error: accuracyError
+        error: accuracyError,
     });
 }
 
@@ -190,7 +189,7 @@ export function testLargeUniformDataset_Decimal(
 export function testWithProject({coll, doc, percentileSpec, letSpec, expectedResult, msg}) {
     coll.drop();
     coll.insert(doc);
-    const res = coll.aggregate([{$project: {p: percentileSpec}}], {let : letSpec}).toArray();
+    const res = coll.aggregate([{$project: {p: percentileSpec}}], {let: letSpec}).toArray();
     // For $percentile the result should be ordered to match the spec, so assert exact equality.
     assert.eq(expectedResult, res[0].p, msg + ` result: ${tojson(res)}`);
 }
@@ -201,7 +200,7 @@ export function testWithProjectMedian({coll, doc, medianSpec, expectedResult, ms
 
     let medianArgs = medianSpec["$median"];
     const percentileSpec = {
-        $percentile: {input: medianArgs.input, method: medianArgs.method, p: [0.5]}
+        $percentile: {input: medianArgs.input, method: medianArgs.method, p: [0.5]},
     };
 
     const medianRes = coll.aggregate([{$project: {p: medianSpec}}]).toArray();
@@ -230,9 +229,7 @@ export function testLargeInput(coll, method) {
     coll.drop();
     coll.insert({x: samples});
     const ps = [0.5, 0.999, 0.0001];
-    const res =
-        coll.aggregate([{$project: {p: {$percentile: {p: ps, input: "$x", method: method}}}}])
-            .toArray();
+    const res = coll.aggregate([{$project: {p: {$percentile: {p: ps, input: "$x", method: method}}}}]).toArray();
 
     for (let i = 0; i < ps.length; i++) {
         let pctl = res[0].p[i];
@@ -253,6 +250,6 @@ export function testLargeNonNumericInput(coll, method) {
         doc: {x: samples},
         percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: method}},
         expectedResult: [null, null, null],
-        msg: "Multiple percentiles on large non-numeric input"
+        msg: "Multiple percentiles on large non-numeric input",
     });
 }

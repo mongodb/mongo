@@ -18,11 +18,11 @@ export function randomManualMigration($config, $super) {
         // When shards are being added and removed, the target shard may no longer exist by the time
         // the migration is issued. We have to check the error messages because chunk migrations can
         // modify the error message and lose the original error code.
-        let acceptDueToDrainingConflict = TestData.shardsAddedRemoved &&
+        let acceptDueToDrainingConflict =
+            TestData.shardsAddedRemoved &&
             (err.code == ErrorCodes.ShardNotFound ||
-             (err.message &&
-              (err.message.includes("ShardNotFound") ||
-               err.message.includes("is currently draining"))));
+                (err.message &&
+                    (err.message.includes("ShardNotFound") || err.message.includes("is currently draining"))));
         return acceptDueToBalancerConflict || acceptDueToDrainingConflict;
     };
 
@@ -40,11 +40,11 @@ export function randomManualMigration($config, $super) {
 
         // Get a chunk from config.chunks - this may be stale by the time we issue the migration but
         // this will be handled in the acceptable errors.
-        const chunksJoinClause =
-            findChunksUtil.getChunksJoinClause(configDB, db.getName() + "." + moveChunkCollName);
-        let chunks = configDB.getCollection("chunks")
-                         .aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
-                         .toArray();
+        const chunksJoinClause = findChunksUtil.getChunksJoinClause(configDB, db.getName() + "." + moveChunkCollName);
+        let chunks = configDB
+            .getCollection("chunks")
+            .aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
+            .toArray();
         // If there are no chunks, return early.
         if (chunks.length == 0) {
             return;
@@ -54,13 +54,10 @@ export function randomManualMigration($config, $super) {
 
         // Get a shard from config.shards rather than the connCache so that we can do a best-effort
         // filter of draining shards.
-        let shards = configDB.getCollection("shards")
-                         .aggregate([
-                             {$match: {"_id": {$ne: fromShard}}},
-                             {$match: {"draining": {$ne: true}}},
-                             {$sample: {size: 1}}
-                         ])
-                         .toArray();
+        let shards = configDB
+            .getCollection("shards")
+            .aggregate([{$match: {"_id": {$ne: fromShard}}}, {$match: {"draining": {$ne: true}}}, {$sample: {size: 1}}])
+            .toArray();
         // If there are no non-draining shards, return early.
         if (shards.length == 0) {
             return;
@@ -72,12 +69,14 @@ export function randomManualMigration($config, $super) {
         const waitForDelete = Random.rand() < 0.5;
         const secondaryThrottle = Random.rand() < 0.5;
         try {
-            ChunkHelper.moveChunk(db,
-                                  moveChunkCollName,
-                                  [chunk.min, chunk.max],
-                                  toShard._id,
-                                  waitForDelete,
-                                  secondaryThrottle);
+            ChunkHelper.moveChunk(
+                db,
+                moveChunkCollName,
+                [chunk.min, chunk.max],
+                toShard._id,
+                waitForDelete,
+                secondaryThrottle,
+            );
         } catch (e) {
             // Failed moveChunks are thrown by the moveChunk helper with the response included as a
             // JSON string in the error's message.

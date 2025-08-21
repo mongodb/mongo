@@ -16,7 +16,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 // Run through the same test twice, once with a hard -9 kill, once with a regular shutdown
 for (var test = 0; test < 2; test++) {
-    var killWith = (test == 0 ? 15 : 9);
+    var killWith = test == 0 ? 15 : 9;
 
     var st = new ShardingTest({shards: 1});
 
@@ -53,8 +53,7 @@ for (var test = 0; test < 2; test++) {
     var exitCode = killWith === 9 ? MongoRunner.EXIT_SIGKILL : MongoRunner.EXIT_CLEAN;
 
     for (let node of st.rs0.nodes) {
-        st.rs0.stop(
-            st.rs0.getNodeId(node), killWith, {allowedExitCode: exitCode}, {forRestart: true});
+        st.rs0.stop(st.rs0.getNodeId(node), killWith, {allowedExitCode: exitCode}, {forRestart: true});
     }
     jsTest.log("Restart shard...");
     st.rs0.startSet({forceLock: true}, true);

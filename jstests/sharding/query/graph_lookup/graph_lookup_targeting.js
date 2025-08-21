@@ -29,7 +29,7 @@ assert.commandWorked(db.adminCommand({enableSharding: kDbName, primaryShard: sha
 const shardProfileDBMap = {
     [shard0]: shard0DB,
     [shard1]: shard1DB,
-    [shard2]: shard2DB
+    [shard2]: shard2DB,
 };
 
 const shardTargetingTest = new ShardTargetingTest(db, shardProfileDBMap);
@@ -46,7 +46,7 @@ const kShardedColl1Docs = [
 const kShardedColl1ChunkList = [
     {min: {a: MinKey}, max: {a: 0}, shard: shard0},
     {min: {a: 0}, max: {a: 100}, shard: shard1},
-    {min: {a: 100}, max: {a: MaxKey}, shard: shard2}
+    {min: {a: 100}, max: {a: MaxKey}, shard: shard2},
 ];
 shardTargetingTest.setupColl({
     collName: kShardedColl1Name,
@@ -54,7 +54,7 @@ shardTargetingTest.setupColl({
     docs: kShardedColl1Docs,
     collType: "sharded",
     shardKey: {a: 1},
-    chunkList: kShardedColl1ChunkList
+    chunkList: kShardedColl1ChunkList,
 });
 
 const kShardedColl2Name = "sharded2";
@@ -68,7 +68,7 @@ const kShardedColl2Docs = [
 const kShardedColl2ChunkList = [
     {min: {a: MinKey}, max: {a: 0}, shard: shard0},
     {min: {a: 0}, max: {a: 100}, shard: shard1},
-    {min: {a: 100}, max: {a: MaxKey}, shard: shard2}
+    {min: {a: 100}, max: {a: MaxKey}, shard: shard2},
 ];
 shardTargetingTest.setupColl({
     collName: kShardedColl2Name,
@@ -76,7 +76,7 @@ shardTargetingTest.setupColl({
     docs: kShardedColl2Docs,
     collType: "sharded",
     shardKey: {a: 1},
-    chunkList: kShardedColl2ChunkList
+    chunkList: kShardedColl2ChunkList,
 });
 
 // Create two unsplittable collections.
@@ -84,7 +84,7 @@ const kUnsplittable1CollName = "unsplittable_1";
 const kUnsplittable1Docs = [
     {_id: -1, a: 0, unsplittable: 1},
     {_id: 0, a: 1, unsplittable: 1},
-    {_id: 1, a: 2, unsplittable: 1}
+    {_id: 1, a: 2, unsplittable: 1},
 ];
 shardTargetingTest.setupColl({
     collName: kUnsplittable1CollName,
@@ -108,7 +108,17 @@ shardTargetingTest.setupColl({
 
 // Inner collection is unsplittable and not on the primary shard. Outer collection is sharded.
 // In this case, we should execute in parallel on the shards.
-let pipeline = [{$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}];
+let pipeline = [
+    {
+        $graphLookup: {
+            from: kUnsplittable1CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
+];
 let expectedResults = [
     {
         _id: -2,
@@ -116,10 +126,17 @@ let expectedResults = [
         links: [
             {_id: -1, a: 0, unsplittable: 1},
             {_id: 0, a: 1, unsplittable: 1},
-            {_id: 1, a: 2, unsplittable: 1}
-        ]
+            {_id: 1, a: 2, unsplittable: 1},
+        ],
     },
-    {_id: -1, a: 0, links: [{_id: 0, a: 1, unsplittable: 1}, {_id: 1, a: 2, unsplittable: 1}]},
+    {
+        _id: -1,
+        a: 0,
+        links: [
+            {_id: 0, a: 1, unsplittable: 1},
+            {_id: 1, a: 2, unsplittable: 1},
+        ],
+    },
     {_id: 0, a: 1, links: [{_id: 1, a: 2, unsplittable: 1}]},
     {_id: 1, a: 2, links: []},
     {_id: 2, a: 101, links: []},
@@ -145,7 +162,17 @@ shardTargetingTest.assertShardTargeting({
 
 // Outer collection is unsplittable and not on the primary shard. Inner collection is sharded.
 // We should target the shard which owns the unsplittable collection.
-pipeline = [{$graphLookup: {from: kShardedColl1Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}];
+pipeline = [
+    {
+        $graphLookup: {
+            from: kShardedColl1Name,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
+];
 expectedResults = [
     {
         _id: -1,
@@ -155,7 +182,7 @@ expectedResults = [
             {_id: 0, a: 1},
             {_id: 1, a: 2},
             {_id: 2, a: 101},
-        ]
+        ],
     },
     {
         _id: 0,
@@ -164,16 +191,16 @@ expectedResults = [
         links: [
             {_id: 1, a: 2},
             {_id: 2, a: 101},
-        ]
+        ],
     },
-    {_id: 1, a: 2, unsplittable: 1, links: [{_id: 2, a: 101}]}
+    {_id: 1, a: 2, unsplittable: 1, links: [{_id: 2, a: 101}]},
 ];
 
 profileFilters = {
     [shard0]: [{ns: kShardedColl1Name, expectedStages: ["$match"]}],
     [shard1]: [
         {ns: kShardedColl1Name, expectedStages: ["$match"]},
-        {ns: kUnsplittable1CollName, expectedStages: ["$graphLookup"]}
+        {ns: kUnsplittable1CollName, expectedStages: ["$graphLookup"]},
     ],
     [shard2]: [{ns: kShardedColl1Name, expectedStages: ["$match"]}],
 };
@@ -189,7 +216,17 @@ shardTargetingTest.assertShardTargeting({
 
 // Both collections are unsplittable and are located on different shards. We should execute the
 // $graphLookup on the shard which owns the outer collection.
-pipeline = [{$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}];
+pipeline = [
+    {
+        $graphLookup: {
+            from: kUnsplittable2CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
+];
 expectedResults = [
     {
         _id: -1,
@@ -199,25 +236,21 @@ expectedResults = [
             {_id: 0, a: -1, unsplittable: 2},
             {_id: -1, a: 1, unsplittable: 2},
             {_id: 1, a: 101, unsplittable: 2},
-        ]
+        ],
     },
     {
         _id: 0,
         a: 1,
         unsplittable: 1,
-        links: [
-            {_id: 1, a: 101, unsplittable: 2},
-        ]
+        links: [{_id: 1, a: 101, unsplittable: 2}],
     },
     {_id: 1, a: 2, unsplittable: 1, links: []},
 ];
 
 profileFilters = {
     [shard0]: [],
-    [shard1]: [
-        {ns: kUnsplittable1CollName, expectedStages: []},
-    ],
-    [shard2]: [{ns: kUnsplittable1CollName, expectedStages: ["$mergeCursors", "$graphLookup"]}]
+    [shard1]: [{ns: kUnsplittable1CollName, expectedStages: []}],
+    [shard2]: [{ns: kUnsplittable1CollName, expectedStages: ["$mergeCursors", "$graphLookup"]}],
 };
 
 shardTargetingTest.assertShardTargeting({
@@ -233,7 +266,17 @@ shardTargetingTest.assertShardTargeting({
     profileFilters: profileFilters,
 });
 
-pipeline = [{$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}];
+pipeline = [
+    {
+        $graphLookup: {
+            from: kUnsplittable1CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
+];
 expectedResults = [
     {
         _id: 0,
@@ -242,8 +285,8 @@ expectedResults = [
         links: [
             {_id: -1, a: 0, unsplittable: 1},
             {_id: 0, a: 1, unsplittable: 1},
-            {_id: 1, a: 2, unsplittable: 1}
-        ]
+            {_id: 1, a: 2, unsplittable: 1},
+        ],
     },
     {_id: -1, a: 1, unsplittable: 2, links: [{_id: 1, a: 2, unsplittable: 1}]},
     {_id: 1, a: 101, unsplittable: 2, links: []},
@@ -280,8 +323,24 @@ shardTargetingTest.assertShardTargeting({
 // stages' inner collections are unsplittable and reside on different shards We should execute the
 // $graphLookups in parallel on the shards.
 pipeline = [
-    {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
-    {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}}
+    {
+        $graphLookup: {
+            from: kUnsplittable1CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
+    {
+        $graphLookup: {
+            from: kUnsplittable2CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links_2",
+        },
+    },
 ];
 expectedResults = [
     {
@@ -290,38 +349,37 @@ expectedResults = [
         links: [
             {_id: -1, a: 0, unsplittable: 1},
             {_id: 0, a: 1, unsplittable: 1},
-            {_id: 1, a: 2, unsplittable: 1}
+            {_id: 1, a: 2, unsplittable: 1},
         ],
         links_2: [
             {_id: -1, a: 1, unsplittable: 2},
             {_id: 1, a: 101, unsplittable: 2},
-        ]
+        ],
     },
     {
         _id: -1,
         a: 0,
-        links: [{_id: 0, a: 1, unsplittable: 1}, {_id: 1, a: 2, unsplittable: 1}],
+        links: [
+            {_id: 0, a: 1, unsplittable: 1},
+            {_id: 1, a: 2, unsplittable: 1},
+        ],
         links_2: [
             {_id: 0, a: -1, unsplittable: 2},
             {_id: -1, a: 1, unsplittable: 2},
             {_id: 1, a: 101, unsplittable: 2},
-        ]
+        ],
     },
     {
         _id: 0,
         a: 1,
         links: [{_id: 1, a: 2, unsplittable: 1}],
-        links_2: [
-            {_id: 1, a: 101, unsplittable: 2},
-        ]
+        links_2: [{_id: 1, a: 101, unsplittable: 2}],
     },
     {_id: 1, a: 2, links: [], links_2: []},
     {_id: 2, a: 101, links: [], links_2: []},
 ];
 profileFilters = {
-    [shard0]: [
-        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
-    ],
+    [shard0]: [{ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]}],
     [shard1]: [
         {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kUnsplittable1CollName, expectedStages: ["$match"]},
@@ -346,8 +404,24 @@ shardTargetingTest.assertShardTargeting({
 });
 
 pipeline = [
-    {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}},
-    {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}
+    {
+        $graphLookup: {
+            from: kUnsplittable2CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links_2",
+        },
+    },
+    {
+        $graphLookup: {
+            from: kUnsplittable1CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
 ];
 shardTargetingTest.assertShardTargeting({
     pipeline: pipeline,
@@ -366,8 +440,24 @@ shardTargetingTest.assertShardTargeting({
 // sharded collection and the other targets an unsplittable inner collection. We should execute both
 // $graphLookup stages in parallel on the shards.
 pipeline = [
-    {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
-    {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}}
+    {
+        $graphLookup: {
+            from: kShardedColl2Name,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
+    {
+        $graphLookup: {
+            from: kUnsplittable1CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links_2",
+        },
+    },
 ];
 expectedResults = [
     {
@@ -383,16 +473,17 @@ expectedResults = [
         links_2: [
             {_id: -1, a: 0, unsplittable: 1},
             {_id: 0, a: 1, unsplittable: 1},
-            {_id: 1, a: 2, unsplittable: 1}
-        ]
+            {_id: 1, a: 2, unsplittable: 1},
+        ],
     },
     {
         _id: -1,
         a: 0,
-        links: [
-            {_id: 0, a: -10},
+        links: [{_id: 0, a: -10}],
+        links_2: [
+            {_id: 0, a: 1, unsplittable: 1},
+            {_id: 1, a: 2, unsplittable: 1},
         ],
-        links_2: [{_id: 0, a: 1, unsplittable: 1}, {_id: 1, a: 2, unsplittable: 1}]
     },
     {
         _id: 0,
@@ -403,7 +494,7 @@ expectedResults = [
             {_id: 1, a: 2},
             {_id: 2, a: -2},
         ],
-        links_2: [{_id: 1, a: 2, unsplittable: 1}]
+        links_2: [{_id: 1, a: 2, unsplittable: 1}],
     },
     {
         _id: 1,
@@ -413,7 +504,7 @@ expectedResults = [
             {_id: -2, a: 0},
             {_id: 0, a: -10},
         ],
-        links_2: []
+        links_2: [],
     },
     {_id: 2, a: 101, links: [], links_2: []},
 ];
@@ -421,7 +512,7 @@ expectedResults = [
 profileFilters = {
     [shard0]: [
         {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
-        {ns: kShardedColl2Name, expectedStages: ["$match"]}
+        {ns: kShardedColl2Name, expectedStages: ["$match"]},
     ],
     [shard1]: [
         {ns: kUnsplittable1CollName, expectedStages: ["$match"]},
@@ -430,7 +521,7 @@ profileFilters = {
     ],
     [shard2]: [
         {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
-        {ns: kShardedColl2Name, expectedStages: ["$match"]}
+        {ns: kShardedColl2Name, expectedStages: ["$match"]},
     ],
 };
 shardTargetingTest.assertShardTargeting({
@@ -446,9 +537,25 @@ shardTargetingTest.assertShardTargeting({
     profileFilters: profileFilters,
 });
 
-pipeline =  [
-    {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
-    {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}}
+pipeline = [
+    {
+        $graphLookup: {
+            from: kShardedColl2Name,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
+    {
+        $graphLookup: {
+            from: kUnsplittable2CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links_2",
+        },
+    },
 ];
 expectedResults = [
     {
@@ -464,19 +571,17 @@ expectedResults = [
         links_2: [
             {_id: -1, a: 1, unsplittable: 2},
             {_id: 1, a: 101, unsplittable: 2},
-        ]
+        ],
     },
     {
         _id: -1,
         a: 0,
-        links: [
-            {_id: 0, a: -10},
-        ],
+        links: [{_id: 0, a: -10}],
         links_2: [
             {_id: 0, a: -1, unsplittable: 2},
             {_id: -1, a: 1, unsplittable: 2},
             {_id: 1, a: 101, unsplittable: 2},
-        ]
+        ],
     },
     {
         _id: 0,
@@ -487,9 +592,7 @@ expectedResults = [
             {_id: 1, a: 2},
             {_id: 2, a: -2},
         ],
-        links_2: [
-            {_id: 1, a: 101, unsplittable: 2},
-        ]
+        links_2: [{_id: 1, a: 101, unsplittable: 2}],
     },
     {
         _id: 1,
@@ -499,24 +602,24 @@ expectedResults = [
             {_id: 0, a: -10},
             {_id: 2, a: -2},
         ],
-        links_2: []
+        links_2: [],
     },
     {_id: 2, a: 101, links: [], links_2: []},
 ];
 profileFilters = {
     [shard0]: [
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
-        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]}
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
     ],
     [shard1]: [
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
-        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]}
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
     ],
     [shard2]: [
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
         {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kUnsplittable2CollName, expectedStages: ["$match"]},
-    ]
+    ],
 };
 
 shardTargetingTest.assertShardTargeting({
@@ -536,8 +639,24 @@ shardTargetingTest.assertShardTargeting({
 // first one's inner collection is unsplittable and the second one's inner collection is sharded. We
 // should execute both $graphLookup stages in parallel on the shards.
 pipeline = [
-    {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}},
-    {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}
+    {
+        $graphLookup: {
+            from: kUnsplittable1CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links_2",
+        },
+    },
+    {
+        $graphLookup: {
+            from: kShardedColl2Name,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
 ];
 expectedResults = [
     {
@@ -553,16 +672,17 @@ expectedResults = [
         links_2: [
             {_id: -1, a: 0, unsplittable: 1},
             {_id: 0, a: 1, unsplittable: 1},
-            {_id: 1, a: 2, unsplittable: 1}
-        ]
+            {_id: 1, a: 2, unsplittable: 1},
+        ],
     },
     {
         _id: -1,
         a: 0,
-        links: [
-            {_id: 0, a: -10},
+        links: [{_id: 0, a: -10}],
+        links_2: [
+            {_id: 0, a: 1, unsplittable: 1},
+            {_id: 1, a: 2, unsplittable: 1},
         ],
-        links_2: [{_id: 0, a: 1, unsplittable: 1}, {_id: 1, a: 2, unsplittable: 1}]
     },
     {
         _id: 0,
@@ -573,7 +693,7 @@ expectedResults = [
             {_id: 1, a: 2},
             {_id: 2, a: -2},
         ],
-        links_2: [{_id: 1, a: 2, unsplittable: 1}]
+        links_2: [{_id: 1, a: 2, unsplittable: 1}],
     },
     {
         _id: 1,
@@ -583,7 +703,7 @@ expectedResults = [
             {_id: -2, a: 0},
             {_id: 0, a: -10},
         ],
-        links_2: []
+        links_2: [],
     },
     {_id: 2, a: 101, links: [], links_2: []},
 ];
@@ -617,8 +737,24 @@ shardTargetingTest.assertShardTargeting({
 });
 
 pipeline = [
-    {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}},
-    {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}
+    {
+        $graphLookup: {
+            from: kUnsplittable2CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links_2",
+        },
+    },
+    {
+        $graphLookup: {
+            from: kShardedColl2Name,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
 ];
 expectedResults = [
     {
@@ -634,19 +770,17 @@ expectedResults = [
         links_2: [
             {_id: -1, a: 1, unsplittable: 2},
             {_id: 1, a: 101, unsplittable: 2},
-        ]
+        ],
     },
     {
         _id: -1,
         a: 0,
-        links: [
-            {_id: 0, a: -10},
-        ],
+        links: [{_id: 0, a: -10}],
         links_2: [
             {_id: 0, a: -1, unsplittable: 2},
             {_id: -1, a: 1, unsplittable: 2},
             {_id: 1, a: 101, unsplittable: 2},
-        ]
+        ],
     },
     {
         _id: 0,
@@ -657,9 +791,7 @@ expectedResults = [
             {_id: 1, a: 2},
             {_id: 2, a: -2},
         ],
-        links_2: [
-            {_id: 1, a: 101, unsplittable: 2},
-        ]
+        links_2: [{_id: 1, a: 101, unsplittable: 2}],
     },
     {
         _id: 1,
@@ -669,7 +801,7 @@ expectedResults = [
             {_id: 0, a: -10},
             {_id: 2, a: -2},
         ],
-        links_2: []
+        links_2: [],
     },
     {_id: 2, a: 101, links: [], links_2: []},
 ];
@@ -721,8 +853,16 @@ assert.commandWorked(coll.insertMany(docsToAdd));
 
 // Establish our cursor. We should not have exhausted our cursor.
 pipeline = [
-    {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
-    {$project: {out: 0}}
+    {
+        $graphLookup: {
+            from: kUnsplittable2CollName,
+            startWith: "$a",
+            connectFromField: "a",
+            connectToField: "_id",
+            as: "links",
+        },
+    },
+    {$project: {out: 0}},
 ];
 let cursor = coll.aggregate(pipeline, {batchSize: 1});
 assert(cursor.hasNext());

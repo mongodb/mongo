@@ -6,15 +6,15 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 let conn = MongoRunner.runMongod();
-let testDB = conn.getDB('test');
+let testDB = conn.getDB("test");
 
 let totalDocs = 0;
-let crudOpsForPhase = function(coll, phase) {
+let crudOpsForPhase = function (coll, phase) {
     let bulk = coll.initializeUnorderedBulkOp();
 
     // Create 1000 documents in a specific range for this phase.
     for (let i = 0; i < 1000; i++) {
-        bulk.insert({i: (phase * 1000) + i});
+        bulk.insert({i: phase * 1000 + i});
     }
     totalDocs += 1000;
 
@@ -26,7 +26,7 @@ let crudOpsForPhase = function(coll, phase) {
     // Update 50 documents.
     // For example, if phase is 2, documents [100, 150) will be updated to [-100, -150).
     let start = (phase - 1) * 100;
-    for (let j = start; j < (100 * phase) - 50; j++) {
+    for (let j = start; j < 100 * phase - 50; j++) {
         bulk.find({i: j}).update({$set: {i: -j}});
     }
     // Delete 25 documents.
@@ -43,19 +43,20 @@ crudOpsForPhase(testDB.hybrid, 0);
 assert.eq(totalDocs, testDB.hybrid.count());
 
 // Hang the build after the first document.
-const collScanFailPoint = configureFailPoint(
-    testDB, "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", {fieldsToMatch: {i: 1}});
+const collScanFailPoint = configureFailPoint(testDB, "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", {
+    fieldsToMatch: {i: 1},
+});
 
 // Start the background build.
-let bgBuild = startParallelShell(function() {
+let bgBuild = startParallelShell(function () {
     assert.commandWorked(db.hybrid.createIndex({i: 1}));
 }, conn.port);
 
 checkLog.containsJson(conn, 20386, {
     where: "before",
-    doc: function(doc) {
+    doc: function (doc) {
         return doc.i === 1;
-    }
+    },
 });
 
 // Phase 1: Collection scan and external sort
@@ -74,8 +75,9 @@ insertDumpFailPoint.wait();
 // Do some updates, inserts and deletes after the bulk builder has finished.
 
 // Hang after yielding
-const yieldFailPoint = configureFailPoint(
-    testDB, "hangDuringIndexBuildDrainYield", {namespace: testDB.hybrid.getFullName()});
+const yieldFailPoint = configureFailPoint(testDB, "hangDuringIndexBuildDrainYield", {
+    namespace: testDB.hybrid.getFullName(),
+});
 
 // Enable pause after first drain.
 const firstDrainFailPoint = configureFailPoint(testDB, "hangAfterIndexBuildFirstDrain");
@@ -96,8 +98,7 @@ yieldFailPoint.off();
 firstDrainFailPoint.wait();
 
 // Enable pause after voting commit.
-const hangAfterVoteCommit =
-    configureFailPoint(testDB, 'hangIndexBuildBeforeSignalPrimaryForCommitReadiness');
+const hangAfterVoteCommit = configureFailPoint(testDB, "hangIndexBuildBeforeSignalPrimaryForCommitReadiness");
 
 // Add inserts that must be consumed in the second drain.
 crudOpsForPhase(testDB.hybrid, 3);

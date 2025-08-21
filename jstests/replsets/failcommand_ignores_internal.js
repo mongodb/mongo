@@ -15,15 +15,17 @@ const findReply = assert.commandWorked(testDB.runCommand({find: "collection", ba
 const cursorId = findReply.cursor.id;
 
 // Test failing twice with a particular error code.
-assert.commandWorked(testDB.adminCommand({
-    configureFailPoint: "failCommand",
-    mode: {times: 2},
-    data: {errorCode: ErrorCodes.BadValue, failCommands: ["getMore"]}
-}));
+assert.commandWorked(
+    testDB.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 2},
+        data: {errorCode: ErrorCodes.BadValue, failCommands: ["getMore"]},
+    }),
+);
 const getMore = {
     getMore: cursorId,
     collection: "collection",
-    batchSize: 1
+    batchSize: 1,
 };
 assert.commandFailedWithCode(testDB.runCommand(getMore), ErrorCodes.BadValue);
 

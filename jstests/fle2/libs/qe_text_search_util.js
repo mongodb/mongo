@@ -1,4 +1,3 @@
-
 class TextFieldBase {
     constructor(lb, ub, caseSensitive, diacriticSensitive, maxContention) {
         this._lb = NumberInt(lb);
@@ -33,10 +32,9 @@ export class SuffixField extends TextFieldBase {
         // for an explanation of this calculation.
         const padded_len = Math.ceil((byte_len + 5) / 16) * 16 - 5;
         if (this._lb > padded_len) {
-            return 1;  // 1 is for just the exact match string
+            return 1; // 1 is for just the exact match string
         }
-        return (Math.min(this._ub, padded_len) - this._lb + 1) +
-            1;  // +1 includes tag for exact match string
+        return Math.min(this._ub, padded_len) - this._lb + 1 + 1; // +1 includes tag for exact match string
     }
 
     calculateExpectedUniqueTagCount(strs) {
@@ -44,8 +42,7 @@ export class SuffixField extends TextFieldBase {
         const uniqueStrs = new Set(strs);
         const paddedStrs = new Set();
         for (const str of strs) {
-            for (let affix_len = this._lb; affix_len <= Math.min(this._ub, str.length);
-                 affix_len++) {
+            for (let affix_len = this._lb; affix_len <= Math.min(this._ub, str.length); affix_len++) {
                 affixSet.add(str.slice(-affix_len));
             }
             const padded_len = Math.ceil((str.length + 5) / 16) * 16 - 5;
@@ -73,8 +70,7 @@ export class PrefixField extends SuffixField {
         const uniqueStrs = new Set(strs);
         const paddedStrs = new Set();
         for (const str of strs) {
-            for (let affix_len = this._lb; affix_len <= Math.min(this._ub, str.length);
-                 affix_len++) {
+            for (let affix_len = this._lb; affix_len <= Math.min(this._ub, str.length); affix_len++) {
                 affixSet.add(str.slice(0, affix_len));
             }
             const padded_len = Math.ceil((str.length + 5) / 16) * 16 - 5;
@@ -97,8 +93,10 @@ export class SubstringField extends TextFieldBase {
     }
 
     createQueryTypeDescriptor() {
-        return Object.assign({"queryType": "substringPreview", "strMaxLength": this._mlen},
-                             super.createQueryTypeDescriptor());
+        return Object.assign(
+            {"queryType": "substringPreview", "strMaxLength": this._mlen},
+            super.createQueryTypeDescriptor(),
+        );
     }
 
     calculateExpectedTagCount(byte_len) {
@@ -112,15 +110,15 @@ export class SubstringField extends TextFieldBase {
         // for an explanation of this calculation.
         const padded_len = Math.ceil((byte_len + 5) / 16) * 16 - 5;
         if (byte_len > this._mlen || this._lb > padded_len) {
-            return 1;  // 1 is for just the exact match string
+            return 1; // 1 is for just the exact match string
         }
         const hi = Math.min(this._ub, padded_len);
         const range = hi - this._lb + 1;
-        const hisum = (hi * (hi + 1)) / 2;              // sum of [1..hi]
-        const losum = (this._lb * (this._lb - 1)) / 2;  // sum of [1..lb)
-        const maxkgram1 = (this._mlen * range) - (hisum - losum) + range;
-        const maxkgram2 = (padded_len * range) - (hisum - losum) + range;
-        return Math.min(maxkgram1, maxkgram2) + 1;  // +1 includes tag for exact match string
+        const hisum = (hi * (hi + 1)) / 2; // sum of [1..hi]
+        const losum = (this._lb * (this._lb - 1)) / 2; // sum of [1..lb)
+        const maxkgram1 = this._mlen * range - (hisum - losum) + range;
+        const maxkgram2 = padded_len * range - (hisum - losum) + range;
+        return Math.min(maxkgram1, maxkgram2) + 1; // +1 includes tag for exact match string
     }
 
     calculateExpectedUniqueTagCount(strs) {
@@ -130,8 +128,7 @@ export class SubstringField extends TextFieldBase {
 
         for (const str of strs) {
             const strSubstringSet = new Set();
-            for (let substr_len = this._lb; substr_len <= Math.min(this._ub, str.length);
-                 substr_len++) {
+            for (let substr_len = this._lb; substr_len <= Math.min(this._ub, str.length); substr_len++) {
                 for (let start = 0; start <= str.length - substr_len; start++) {
                     const sub = str.slice(start, start + substr_len);
                     substringSet.add(sub);
@@ -154,28 +151,28 @@ export class SubstringField extends TextFieldBase {
 
 export class SuffixAndPrefixField {
     constructor(sfxLb, sfxUb, pfxLb, pfxUb, caseSensitive, diacriticSensitive, maxContention) {
-        this._suffixField =
-            new SuffixField(sfxLb, sfxUb, caseSensitive, diacriticSensitive, maxContention);
-        this._prefixField =
-            new PrefixField(pfxLb, pfxUb, caseSensitive, diacriticSensitive, maxContention);
+        this._suffixField = new SuffixField(sfxLb, sfxUb, caseSensitive, diacriticSensitive, maxContention);
+        this._prefixField = new PrefixField(pfxLb, pfxUb, caseSensitive, diacriticSensitive, maxContention);
     }
     createQueryTypeDescriptor() {
-        return [
-            this._suffixField.createQueryTypeDescriptor(),
-            this._prefixField.createQueryTypeDescriptor()
-        ];
+        return [this._suffixField.createQueryTypeDescriptor(), this._prefixField.createQueryTypeDescriptor()];
     }
     calculateExpectedTagCount(byte_len) {
         // subtract 1 since the exact match string is doubly counted in the other call
         // to calculateExpectedTagCount.
-        return this._suffixField.calculateExpectedTagCount(byte_len) +
-            this._prefixField.calculateExpectedTagCount(byte_len) - 1;
+        return (
+            this._suffixField.calculateExpectedTagCount(byte_len) +
+            this._prefixField.calculateExpectedTagCount(byte_len) -
+            1
+        );
     }
 
     calculateExpectedUniqueTagCount(strs) {
-        return this._suffixField.calculateExpectedUniqueTagCount(strs) +
+        return (
+            this._suffixField.calculateExpectedUniqueTagCount(strs) +
             this._prefixField.calculateExpectedUniqueTagCount(strs) -
-            (new Set(strs)).size;  // Remove double count of exact match tokens.
+            new Set(strs).size
+        ); // Remove double count of exact match tokens.
     }
 }
 

@@ -31,9 +31,13 @@ assert.gt(maxResults, 0);
 // section of explain output, and 'numDocs' documents (the entire collection) in the
 // "executionStats" section of the winning plan.
 const numDocs = maxResults + 20;
-assert.commandWorked(coll.insert(Array.from({length: numDocs}, (_, i) => {
-    return {_id: i, a: i};
-})));
+assert.commandWorked(
+    coll.insert(
+        Array.from({length: numDocs}, (_, i) => {
+            return {_id: i, a: i};
+        }),
+    ),
+);
 
 const explain = coll.find({a: {$gte: 0}}).explain("allPlansExecution");
 

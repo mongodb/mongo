@@ -27,20 +27,25 @@ assert.commandWorked(res);
 {
     assert.commandFailedWithCode(
         mongosAdminDB.runCommand({renameCollection: "config.shards", to: "config.joe"}),
-        ErrorCodes.IllegalOperation);
+        ErrorCodes.IllegalOperation,
+    );
 
-    assert.commandFailedWithCode(mongosConfigDB.runCommand({drop: "shards"}),
-                                 ErrorCodes.IllegalOperation);
-
-    assert.commandFailedWithCode(
-        mongosConfigDB.runCommand(
-            {aggregate: "shards", pipeline: [{$out: "shards"}], cursor: {}, writeConcern: {w: 1}}),
-        31321);
+    assert.commandFailedWithCode(mongosConfigDB.runCommand({drop: "shards"}), ErrorCodes.IllegalOperation);
 
     assert.commandFailedWithCode(
-        mongosAdminDB.adminCommand(
-            {reshardCollection: "config.system.sessions", key: {uid: 1}, numInitialChunks: 2}),
-        ErrorCodes.IllegalOperation);
+        mongosConfigDB.runCommand({
+            aggregate: "shards",
+            pipeline: [{$out: "shards"}],
+            cursor: {},
+            writeConcern: {w: 1},
+        }),
+        31321,
+    );
+
+    assert.commandFailedWithCode(
+        mongosAdminDB.adminCommand({reshardCollection: "config.system.sessions", key: {uid: 1}, numInitialChunks: 2}),
+        ErrorCodes.IllegalOperation,
+    );
 }
 
 // Commands that should fail when run on collections in the admin database when
@@ -48,41 +53,46 @@ assert.commandWorked(res);
 {
     assert.commandFailedWithCode(
         mongosAdminDB.runCommand({renameCollection: "admin.system.roles", to: "admin.joe"}),
-        ErrorCodes.IllegalOperation);
+        ErrorCodes.IllegalOperation,
+    );
 
-    assert.commandFailedWithCode(mongosAdminDB.runCommand({drop: "system.healthLog"}),
-                                 ErrorCodes.IllegalOperation);
-
-    assert.commandFailedWithCode(mongosAdminDB.runCommand({
-        aggregate: "system.roles",
-        pipeline: [{$out: "system.roles"}],
-        cursor: {},
-        writeConcern: {w: 1}
-    }),
-                                 17385);
+    assert.commandFailedWithCode(mongosAdminDB.runCommand({drop: "system.healthLog"}), ErrorCodes.IllegalOperation);
 
     assert.commandFailedWithCode(
-        mongosAdminDB.adminCommand(
-            {reshardCollection: "admin.system.roles", key: {uid: 1}, numInitialChunks: 2}),
-        [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded]);
+        mongosAdminDB.runCommand({
+            aggregate: "system.roles",
+            pipeline: [{$out: "system.roles"}],
+            cursor: {},
+            writeConcern: {w: 1},
+        }),
+        17385,
+    );
+
+    assert.commandFailedWithCode(
+        mongosAdminDB.adminCommand({reshardCollection: "admin.system.roles", key: {uid: 1}, numInitialChunks: 2}),
+        [ErrorCodes.NamespaceNotFound, ErrorCodes.NamespaceNotSharded],
+    );
 }
 
 // Mongos commands on the config database that previously failed that should still fail when run
 // directly on the config server
 {
     assert.commandFailedWithCode(
-        configSvrConfigDB.runCommand(
-            {aggregate: "shards", pipeline: [{$out: "shards"}], cursor: {}, writeConcern: {w: 1}}),
-        31321);
+        configSvrConfigDB.runCommand({
+            aggregate: "shards",
+            pipeline: [{$out: "shards"}],
+            cursor: {},
+            writeConcern: {w: 1},
+        }),
+        31321,
+    );
 }
 
 // Mongos commands on the config database that previoulsy failed that should succeed when run
 // directly on the config server
 {
-    const renameRes0 =
-        configSvrAdminDB.runCommand({renameCollection: "config.shards", to: "config.joe"});
-    const renameRes1 =
-        configSvrAdminDB.runCommand({renameCollection: "config.joe", to: "config.shards"});
+    const renameRes0 = configSvrAdminDB.runCommand({renameCollection: "config.shards", to: "config.joe"});
+    const renameRes1 = configSvrAdminDB.runCommand({renameCollection: "config.joe", to: "config.shards"});
 
     if (isReplicaSetEndpointActive) {
         assert.commandFailedWithCode(renameRes0, ErrorCodes.IllegalOperation);
@@ -104,28 +114,28 @@ assert.commandWorked(res);
 // Mongos commands on the admin database that previously failed that should still fail when run
 // directly on the config server
 {
-    assert.commandFailedWithCode(configSvrAdminDB.runCommand({
-        aggregate: "system.roles",
-        pipeline: [{$out: "system.roles"}],
-        cursor: {},
-        writeConcern: {w: 1}
-    }),
-                                 17385);
+    assert.commandFailedWithCode(
+        configSvrAdminDB.runCommand({
+            aggregate: "system.roles",
+            pipeline: [{$out: "system.roles"}],
+            cursor: {},
+            writeConcern: {w: 1},
+        }),
+        17385,
+    );
 }
 // Mongos commands on the admin database that previously failed that should succeed when run
 // directly on the config server.
 // Note: renameCollection and drop will still fail for certain collections in the admin databases.
 {
-    const renameRes0 =
-        configSvrAdminDB.runCommand({renameCollection: "admin.system.roles", to: "admin.joe"});
+    const renameRes0 = configSvrAdminDB.runCommand({renameCollection: "admin.system.roles", to: "admin.joe"});
     if (isReplicaSetEndpointActive) {
         assert.commandFailedWithCode(renameRes0, ErrorCodes.IllegalOperation);
     } else {
         assert.commandWorked(renameRes0);
     }
 
-    const renameRes1 =
-        configSvrAdminDB.runCommand({renameCollection: "admin.joe", to: "admin.system.roles"});
+    const renameRes1 = configSvrAdminDB.runCommand({renameCollection: "admin.joe", to: "admin.system.roles"});
     if (isReplicaSetEndpointActive) {
         assert.commandFailedWithCode(renameRes1, ErrorCodes.IllegalOperation);
     } else {

@@ -12,6 +12,7 @@
 !*.yml
 !*.yaml
 !*.idl
+!*.js
 
 # Opt in specific JS file paths
 !*.mjs

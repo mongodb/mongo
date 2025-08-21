@@ -8,7 +8,7 @@ import {
     assertOnDiagnosticLogContents,
     getDiagnosticLogs,
     getQueryPlannerAlwaysFailsWithNamespace,
-    runWithFailpoint
+    runWithFailpoint,
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
@@ -33,12 +33,7 @@ let connToCheckLogs;
  * Runs 'command' with the queryPlannerAlwaysFails failpoint enabled, finds the resulting
  * ScopedDebugInfo diagnostic log line, and asserts that it contains 'expectedDiagnosticInfo'.
  */
-function runTest({
-    description,
-    command,
-    expectedDiagnosticInfo,
-    redact = false,
-}) {
+function runTest({description, command, expectedDiagnosticInfo, redact = false}) {
     // Can't run cases that depend on log redaction without the enterprise module.
     if (!hasEnterpriseModule && redact) {
         return;
@@ -47,24 +42,20 @@ function runTest({
     const mongosDb = mongosConn.getDB(dbName);
     const checkLogsDb = connToCheckLogs.getDB(dbName);
     if (hasEnterpriseModule) {
-        assert.commandWorked(
-            connToCheckLogs.adminCommand({setParameter: 1, redactClientLogData: redact}));
+        assert.commandWorked(connToCheckLogs.adminCommand({setParameter: 1, redactClientLogData: redact}));
     }
 
     // In addition to the particular diagnostic info expected per test case, all commands should
     // include the following.
-    expectedDiagnosticInfo = expectedDiagnosticInfo.concat([
-        "millis:",
-        "locks: {}",
-        "flowControl: {}",
-    ]);
+    expectedDiagnosticInfo = expectedDiagnosticInfo.concat(["millis:", "locks: {}", "flowControl: {}"]);
     const {failpointName, failpointOpts, errorCode} = getQueryPlannerAlwaysFailsWithNamespace(ns);
 
     // If the knob for diagnostic logging is disabled, ensure that we do not see any diagnostic
     // logging.
     setParameter(checkLogsDb, "enableDiagnosticLogging", false);
-    jsTestLog("Running test case with knob disabled: " +
-              tojson({description, command, expectedDiagnosticInfo, redact}));
+    jsTestLog(
+        "Running test case with knob disabled: " + tojson({description, command, expectedDiagnosticInfo, redact}),
+    );
     runWithFailpoint(checkLogsDb, failpointName, failpointOpts, () => {
         // BulkWrites don't fail if sub-operations fail, but they would still generate the
         // diagnostic log if the knob was enabled.
@@ -75,16 +66,19 @@ function runTest({
         }
     });
 
-    const commandDiagnostics =
-        getDiagnosticLogs({description: description, logFile: connToCheckLogs.fullOptions.logFile});
-    assert.eq(commandDiagnostics.length,
-              0,
-              `${description}: found an unexpected log line containing command diagnostics`);
+    const commandDiagnostics = getDiagnosticLogs({
+        description: description,
+        logFile: connToCheckLogs.fullOptions.logFile,
+    });
+    assert.eq(
+        commandDiagnostics.length,
+        0,
+        `${description}: found an unexpected log line containing command diagnostics`,
+    );
 
     // Now enable the knob and ensure that we do see the expected logs.
     setParameter(checkLogsDb, "enableDiagnosticLogging", true);
-    jsTestLog("Running test case with knob enabled:" +
-              tojson({description, command, expectedDiagnosticInfo, redact}));
+    jsTestLog("Running test case with knob enabled:" + tojson({description, command, expectedDiagnosticInfo, redact}));
     runWithFailpoint(checkLogsDb, failpointName, failpointOpts, () => {
         // BulkWrites don't fail if sub-operations fail, but they still generate the diagnostic log.
         if (!command.bulkWrite) {
@@ -97,7 +91,7 @@ function runTest({
     assertOnDiagnosticLogContents({
         description: description,
         logFile: connToCheckLogs.fullOptions.logFile,
-        expectedDiagnosticInfo: expectedDiagnosticInfo
+        expectedDiagnosticInfo: expectedDiagnosticInfo,
     });
 
     resetFn();
@@ -108,28 +102,28 @@ function runTest({
 // queries.
 const query = {
     a: 1,
-    b: 1
+    b: 1,
 };
 const shardKey = {
     a: 1,
     b: 1,
-    c: 1
+    c: 1,
 };
 
 const defaultExpCtxLog = [
-    'ExpCtxDiagnostics\: {collator: ',
-    'uuid: ',
-    'needsMerge: ',
-    'allowDiskUse: ',
-    'isMapReduceCommand: ',
-    'inLookup: ',
-    'inUnionWith: ',
-    'forcePlanCache: ',
-    'sbeCompatibility: ',
-    'sbeGroupCompatibility: ',
-    'sbeWindowCompatibility: ',
-    'sbePipelineCompatibility: ',
-    'subPipelineDepth: '
+    "ExpCtxDiagnostics\: {collator: ",
+    "uuid: ",
+    "needsMerge: ",
+    "allowDiskUse: ",
+    "isMapReduceCommand: ",
+    "inLookup: ",
+    "inUnionWith: ",
+    "forcePlanCache: ",
+    "sbeCompatibility: ",
+    "sbeGroupCompatibility: ",
+    "sbeWindowCompatibility: ",
+    "sbePipelineCompatibility: ",
+    "subPipelineDepth: ",
 ];
 
 const shardKeyLog = `\'shardKeyPattern\': { a: 1.0, b: 1.0, c: 1.0 }`;
@@ -165,11 +159,10 @@ function runTests(onMongos = false) {
         command: {aggregate: collName, pipeline: [{$match: query}], cursor: {}},
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
-            `\'opDescription\': { aggregate: \\"${
-                collName}\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } } ]`,
+            `\'opDescription\': { aggregate: \\"${collName}\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } } ]`,
             ...defaultExpCtxLog,
             shardKeyLog,
-        ]
+        ],
     });
 
     // Count
@@ -181,7 +174,7 @@ function runTests(onMongos = false) {
             `\'opDescription\': { count: \\"${collName}\\", query: { a: 1.0, b: 1.0 }`,
             ...defaultExpCtxLog,
             shardKeyLog,
-        ]
+        ],
     });
 
     // Distinct
@@ -190,11 +183,10 @@ function runTests(onMongos = false) {
         command: {distinct: collName, key: "a", query: query},
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
-            `\'opDescription\': { distinct: \\"${
-                collName}\\", key: \\"a\\", query: { a: 1.0, b: 1.0 }`,
+            `\'opDescription\': { distinct: \\"${collName}\\", key: \\"a\\", query: { a: 1.0, b: 1.0 }`,
             ...defaultExpCtxLog,
             shardKeyLog,
-        ]
+        ],
     });
 
     // MapReduce
@@ -203,45 +195,45 @@ function runTests(onMongos = false) {
         command: {mapReduce: collName, map: () => emit(0, 0), reduce: () => 1, out: {inline: 1}},
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
-            'isMapReduceCommand: true',
+            "isMapReduceCommand: true",
             ...defaultExpCtxLog,
             shardKeyLog,
-        ]
+        ],
     });
 
     // Delete
     // TODO SERVER-98444: We should be able to see the delete sub-operations under "opDescription".
     runTest({
-        description: 'delete',
+        description: "delete",
         command: {
             delete: collName,
             deletes: [{q: query, limit: 1}],
         },
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"remove\\", ns: \\"${ns}\\"`,
-            '\'opDescription\': ',
+            "'opDescription': ",
             shardKeyLog,
-        ]
+        ],
     });
 
     // Update
     // TODO SERVER-98444: We should be able to see the update sub-operations under "opDescription".
     runTest({
-        description: 'update with simple filter',
+        description: "update with simple filter",
         command: {
             update: collName,
             updates: [{q: query, u: {a: 2, b: 2}}],
         },
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"update\\", ns: \\"${ns}\\"`,
-            '\'opDescription\': ',
+            "'opDescription': ",
             shardKeyLog,
-        ]
+        ],
     });
 
     // FindAndModify
     runTest({
-        description: 'findAndModify remove',
+        description: "findAndModify remove",
         command: {
             findAndModify: collName,
             query: query,
@@ -249,10 +241,9 @@ function runTests(onMongos = false) {
         },
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"${ns}\\"`,
-            `\'opDescription\': { findAndModify: \\"${
-                collName}\\", query: { a: 1.0, b: 1.0 }, remove: true`,
+            `\'opDescription\': { findAndModify: \\"${collName}\\", query: { a: 1.0, b: 1.0 }, remove: true`,
             shardKeyLog,
-        ]
+        ],
     });
 
     // BulkWrite
@@ -261,24 +252,22 @@ function runTests(onMongos = false) {
             bulkWrite: 1,
             ops: [
                 {update: 0, filter: query, updateMods: {b: 1}},
-                {update: 1, filter: query, updateMods: {a: 1}}
+                {update: 1, filter: query, updateMods: {a: 1}},
             ],
-            nsInfo: [
-                {ns: "test.differentNamespace"},
-                {ns: `test.${jsTestName()}`},
-            ],
+            nsInfo: [{ns: "test.differentNamespace"}, {ns: `test.${jsTestName()}`}],
         },
-        description: 'bulkWrite fails',
+        description: "bulkWrite fails",
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"bulkWrite\\"`,
             // Ensure sub-operations are included in the diagnostic log.
-            'update: 1',
-            'filter: { a: 1.0, b: 1.0 }',
-            'updateMods: { a: 1.0 }',
-            onMongos ? (`'test.differentNamespace': omitted: collection isn't sharded`,
-                        `'test.command_diagnostics_sharded': { a: 1.0, b: 1.0, c: 1.0 }`)
-                     : shardKeyLog,
-        ]
+            "update: 1",
+            "filter: { a: 1.0, b: 1.0 }",
+            "updateMods: { a: 1.0 }",
+            onMongos
+                ? (`'test.differentNamespace': omitted: collection isn't sharded`,
+                  `'test.command_diagnostics_sharded': { a: 1.0, b: 1.0, c: 1.0 }`)
+                : shardKeyLog,
+        ],
     });
 
     // Explain
@@ -287,8 +276,7 @@ function runTests(onMongos = false) {
         command: {explain: {find: collName, filter: query, limit: 1}},
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
-            `\'opDescription\': { explain: { find: \\"${
-                collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1`,
+            `\'opDescription\': { explain: { find: \\"${collName}\\", filter: { a: 1.0, b: 1.0 }, limit: 1`,
             ...defaultExpCtxLog,
             shardKeyLog,
         ],
@@ -296,27 +284,26 @@ function runTests(onMongos = false) {
     runTest({
         description: "explain aggregate",
         command: {
-            explain:
-                {aggregate: collName, pipeline: [{$match: query}, {$unwind: "$arr"}], cursor: {}}
+            explain: {aggregate: collName, pipeline: [{$match: query}, {$unwind: "$arr"}], cursor: {}},
         },
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
             `\'opDescription\': { explain: { aggregate: \\"${
-                collName}\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $unwind: `,
+                collName
+            }\\", pipeline: [ { $match: { a: 1.0, b: 1.0 } }, { $unwind: `,
             ...defaultExpCtxLog,
             shardKeyLog,
-        ]
+        ],
     });
     runTest({
         description: "explain distinct",
         command: {explain: {distinct: collName, key: "a", query: query}},
         expectedDiagnosticInfo: [
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
-            `\'opDescription\': { explain: { distinct: \\"${
-                collName}\\", key: \\"a\\", query: { a: 1.0, b: 1.0 } }`,
+            `\'opDescription\': { explain: { distinct: \\"${collName}\\", key: \\"a\\", query: { a: 1.0, b: 1.0 } }`,
             ...defaultExpCtxLog,
             shardKeyLog,
-        ]
+        ],
     });
     runTest({
         description: "explain count",
@@ -325,14 +312,13 @@ function runTests(onMongos = false) {
             `{\'currentOp\': { op: \\"command\\", ns: \\"test.`,
             `\'opDescription\': { explain: { count: \\"${collName}\\", query: { a: 1.0, b: 1.0 }`,
             shardKeyLog,
-        ]
+        ],
     });
 }
 
 jsTestLog("Testing tassert log diagnostics on mongos");
 {
-    const st =
-        new ShardingTest({mongos: 1, shards: 1, other: {mongosOptions: {useLogFiles: true}}});
+    const st = new ShardingTest({mongos: 1, shards: 1, other: {mongosOptions: {useLogFiles: true}}});
     const db = st.s.getDB(dbName);
     const coll = db[collName];
     coll.drop();

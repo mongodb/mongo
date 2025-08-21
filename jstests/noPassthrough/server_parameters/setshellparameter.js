@@ -1,16 +1,15 @@
 // Test --setShellParameter CLI switch.
 
 function test(ssp, succeed) {
-    const result = runMongoProgram('mongo', '--setShellParameter', ssp, '--nodb', '--eval', ';');
-    assert.eq(
-        0 == result, succeed, '--setShellParameter ' + ssp + 'worked/didn\'t-work unexpectedly');
+    const result = runMongoProgram("mongo", "--setShellParameter", ssp, "--nodb", "--eval", ";");
+    assert.eq(0 == result, succeed, "--setShellParameter " + ssp + "worked/didn't-work unexpectedly");
 }
 
 // Allowlisted
-test('disabledSecureAllocatorDomains=foo', true);
+test("disabledSecureAllocatorDomains=foo", true);
 
 // Not allowlisted
-test('enableTestCommands=1', false);
+test("enableTestCommands=1", false);
 
 // Unknown
-test('theAnswerToTheQuestionOfLifeTheUniverseAndEverything=42', false);
+test("theAnswerToTheQuestionOfLifeTheUniverseAndEverything=42", false);

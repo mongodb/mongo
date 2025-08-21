@@ -9,7 +9,7 @@
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 function extractAValues(results) {
-    return results.map(function(res) {
+    return results.map(function (res) {
         if (!res.hasOwnProperty("a")) {
             return {};
         }
@@ -20,16 +20,18 @@ function extractAValues(results) {
 function testNullSemantics(coll) {
     // For the first portion of the test, only insert documents without arrays. This will avoid
     // making the indexes multi-key, which may allow an index to be used to answer the queries.
-    assert.commandWorked(coll.insert([
-        {_id: "a_empty_subobject", a: {}},
-        {_id: "a_null", a: null},
-        {_id: "a_number", a: 4},
-        {_id: "a_subobject_b_not_null", a: {b: "hi"}},
-        {_id: "a_subobject_b_null", a: {b: null}},
-        {_id: "a_subobject_b_undefined", a: {b: undefined}},
-        {_id: "a_undefined", a: undefined},
-        {_id: "no_a"},
-    ]));
+    assert.commandWorked(
+        coll.insert([
+            {_id: "a_empty_subobject", a: {}},
+            {_id: "a_null", a: null},
+            {_id: "a_number", a: 4},
+            {_id: "a_subobject_b_not_null", a: {b: "hi"}},
+            {_id: "a_subobject_b_null", a: {b: null}},
+            {_id: "a_subobject_b_undefined", a: {b: undefined}},
+            {_id: "a_undefined", a: undefined},
+            {_id: "no_a"},
+        ]),
+    );
 
     // Throughout this test we will run queries with a projection which may allow the planner to
     // consider an index-only plan. Checking the results of those queries will test that the
@@ -48,7 +50,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find({a: {$eq: null}}, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), tojson(projectResults));
-    }());
+    })();
 
     // Test the semantics of the query {a: {$ne: null}}.
     (function testBasicNotEqualsNullQuery() {
@@ -68,17 +70,13 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find({a: {$ne: null}}, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), tojson(projectResults));
-    }());
+    })();
 
     // Test the semantics of the query {a: {$in: [null, <number>]}}.
     (function testInNullQuery() {
         const query = {a: {$in: [null, 4]}};
         const noProjectResults = coll.find(query).toArray();
-        const expected = [
-            {_id: "a_null", a: null},
-            {_id: "a_number", a: 4},
-            {_id: "no_a"},
-        ];
+        const expected = [{_id: "a_null", a: null}, {_id: "a_number", a: 4}, {_id: "no_a"}];
 
         const count = coll.count(query);
         assert.eq(count, expected.length);
@@ -87,17 +85,13 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     // Test the semantics of the query {$or: [{a: null}, {a: <number>}]}.
     (function testOrNullQuery() {
         const query = {$or: [{a: null}, {a: 4}]};
         const noProjectResults = coll.find(query).toArray();
-        const expected = [
-            {_id: "a_null", a: null},
-            {_id: "a_number", a: 4},
-            {_id: "no_a"},
-        ];
+        const expected = [{_id: "a_null", a: null}, {_id: "a_number", a: 4}, {_id: "no_a"}];
 
         const count = coll.count(query);
         assert.eq(count, expected.length);
@@ -106,7 +100,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     // Test the semantics of the query {a: {$nin: [null, <number>]}}.
     (function testNotInNullQuery() {
@@ -127,7 +121,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     (function testNotInNullAndRegexQuery() {
         // While $nin: [null, ...] can be indexed, $nin: [<regex>] cannot. Ensure that we get
@@ -149,13 +143,11 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     (function testExistsFalse() {
         const noProjectResults = coll.find({a: {$exists: false}}).toArray();
-        const expected = [
-            {_id: "no_a"},
-        ];
+        const expected = [{_id: "no_a"}];
         assert(resultsEq(noProjectResults, expected), tojson(noProjectResults));
 
         const count = coll.count({a: {$exists: false}});
@@ -163,7 +155,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find({a: {$exists: false}}, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), tojson(projectResults));
-    }());
+    })();
 
     // Test the semantics of the query {"a.b": {$eq: null}}.
     (function testDottedEqualsNull() {
@@ -174,7 +166,7 @@ function testNullSemantics(coll) {
             {_id: "a_number", a: 4},
             {_id: "a_subobject_b_null", a: {b: null}},
             {_id: "a_undefined", a: undefined},
-            {_id: "no_a"}
+            {_id: "no_a"},
         ];
         assert(resultsEq(noProjectResults, expected), tojson(noProjectResults));
 
@@ -182,16 +174,15 @@ function testNullSemantics(coll) {
         assert.eq(count, expected.length);
 
         const projectResults = coll.find({"a.b": {$eq: null}}, projectToOnlyADotB).toArray();
-        assert(resultsEq(projectResults, [{a: {}}, {}, {}, {a: {b: null}}, {}, {}]),
-               tojson(projectResults));
-    }());
+        assert(resultsEq(projectResults, [{a: {}}, {}, {}, {a: {b: null}}, {}, {}]), tojson(projectResults));
+    })();
 
     // Test the semantics of the query {"a.b": {$ne: null}}.
     (function testDottedNotEqualsNull() {
         const noProjectResults = coll.find({"a.b": {$ne: null}}).toArray();
         const expected = [
             {_id: "a_subobject_b_not_null", a: {b: "hi"}},
-            {_id: "a_subobject_b_undefined", a: {b: undefined}}
+            {_id: "a_subobject_b_undefined", a: {b: undefined}},
         ];
         assert(resultsEq(noProjectResults, expected), tojson(noProjectResults));
 
@@ -199,9 +190,8 @@ function testNullSemantics(coll) {
         assert.eq(count, expected.length);
 
         const projectResults = coll.find({"a.b": {$ne: null}}, projectToOnlyADotB).toArray();
-        assert(resultsEq(projectResults, [{a: {b: "hi"}}, {a: {b: undefined}}]),
-               tojson(projectResults));
-    }());
+        assert(resultsEq(projectResults, [{a: {b: "hi"}}, {a: {b: undefined}}]), tojson(projectResults));
+    })();
 
     (function testDottedExistsFalse() {
         const noProjectResults = coll.find({"a.b": {$exists: false}}).toArray();
@@ -219,37 +209,41 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find({"a.b": {$exists: false}}, projectToOnlyADotB).toArray();
         assert(resultsEq(projectResults, [{}, {a: {}}, {}, {}, {}]), tojson(projectResults));
-    }());
+    })();
 
     // Test similar queries, but with an $elemMatch. These queries should have no results since
     // an $elemMatch requires an array.
     (function testElemMatchQueriesWithNoArrays() {
-        for (let elemMatchQuery of [{a: {$elemMatch: {$eq: null}}},
-                                    {a: {$elemMatch: {$ne: null}}},
-                                    {"a.b": {$elemMatch: {$eq: null}}},
-                                    {"a.b": {$elemMatch: {$ne: null}}},
-                                    {a: {$elemMatch: {b: {$eq: null}}}},
-                                    {a: {$elemMatch: {b: {$ne: null}}}},
+        for (let elemMatchQuery of [
+            {a: {$elemMatch: {$eq: null}}},
+            {a: {$elemMatch: {$ne: null}}},
+            {"a.b": {$elemMatch: {$eq: null}}},
+            {"a.b": {$elemMatch: {$ne: null}}},
+            {a: {$elemMatch: {b: {$eq: null}}}},
+            {a: {$elemMatch: {b: {$ne: null}}}},
         ]) {
             const noProjectResults = coll.find(elemMatchQuery).toArray();
-            assert(resultsEq(noProjectResults, []),
-                   `Expected no results for query ${tojson(elemMatchQuery)}, got ` +
-                       tojson(noProjectResults));
+            assert(
+                resultsEq(noProjectResults, []),
+                `Expected no results for query ${tojson(elemMatchQuery)}, got ` + tojson(noProjectResults),
+            );
 
             const count = coll.count(elemMatchQuery);
             assert.eq(count, 0);
 
             let projectResults = coll.find(elemMatchQuery, projectToOnlyA).toArray();
-            assert(resultsEq(projectResults, []),
-                   `Expected no results for query ${tojson(elemMatchQuery)}, got ` +
-                       tojson(projectResults));
+            assert(
+                resultsEq(projectResults, []),
+                `Expected no results for query ${tojson(elemMatchQuery)}, got ` + tojson(projectResults),
+            );
 
             projectResults = coll.find(elemMatchQuery, projectToOnlyADotB).toArray();
-            assert(resultsEq(projectResults, []),
-                   `Expected no results for query ${tojson(elemMatchQuery)}, got ` +
-                       tojson(projectResults));
+            assert(
+                resultsEq(projectResults, []),
+                `Expected no results for query ${tojson(elemMatchQuery)}, got ` + tojson(projectResults),
+            );
         }
-    }());
+    })();
 
     // An index which includes "a" or a sub-path of "a" will become multi-key after this insert.
     const writeResult = coll.insert([
@@ -257,7 +251,7 @@ function testNullSemantics(coll) {
         {_id: "a_empty_array", a: []},
         {
             _id: "a_object_array_b_mix_null_undefined_missing",
-            a: [{b: null}, {b: undefined}, {b: null}, {}]
+            a: [{b: null}, {b: undefined}, {b: null}, {}],
         },
         {_id: "a_object_array_no_b_nulls", a: [{b: 1}, {b: 3}, {b: "string"}]},
         {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
@@ -293,7 +287,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find({a: {$eq: null}}, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), tojson(projectResults));
-    }());
+    })();
 
     // Test the semantics of the query {a: {$ne: null}}.
     (function testBasicNotEqualsNullQuery() {
@@ -306,7 +300,7 @@ function testNullSemantics(coll) {
             {_id: "a_number", a: 4},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_no_b_nulls", a: [{b: 1}, {b: 3}, {b: "string"}]},
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
@@ -325,7 +319,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find({a: {$ne: null}}, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), tojson(projectResults));
-    }());
+    })();
 
     // Test the semantics of the query {a: {$not: {$gte: null}}}.
     (function testBasicNotEqualsGTENullQuery() {
@@ -338,7 +332,7 @@ function testNullSemantics(coll) {
             {_id: "a_number", a: 4},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_no_b_nulls", a: [{b: 1}, {b: 3}, {b: "string"}]},
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
@@ -353,7 +347,7 @@ function testNullSemantics(coll) {
         assert(resultsEq(noProjectResults, expected), tojson(noProjectResults));
         const count = coll.count({a: {$not: {$gte: null}}});
         assert.eq(count, expected.length);
-    }());
+    })();
 
     // Test the semantics of the query {a: {$in: [null, <number>]}}.
     (function testInNullQuery() {
@@ -373,7 +367,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     // Test the semantics of the query {$or: [{a: null}, {a: <number>}]}.
     (function testOrNullQuery() {
@@ -393,7 +387,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     // Test the semantics of the query {a: {$nin: [null, <number>]}}.
     (function testNotInNullQuery() {
@@ -411,7 +405,7 @@ function testNullSemantics(coll) {
             {_id: "a_empty_array", a: []},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_no_b_nulls", a: [{b: 1}, {b: 3}, {b: "string"}]},
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
@@ -428,7 +422,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     // Test the semantics of the query {a: {$nin: [null, []]}}.
     (function testNotInNullAndEmptyArrayQuery() {
@@ -450,7 +444,7 @@ function testNullSemantics(coll) {
             //{_id: "a_empty_array", a: []},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_no_b_nulls", a: [{b: 1}, {b: 3}, {b: "string"}]},
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
@@ -469,7 +463,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     (function testNotInNullAndRegexQuery() {
         const query = {a: {$nin: [null, /^str.*/]}};
@@ -486,7 +480,7 @@ function testNullSemantics(coll) {
             {_id: "a_empty_array", a: []},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_no_b_nulls", a: [{b: 1}, {b: 3}, {b: "string"}]},
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
@@ -501,7 +495,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     // Test the results of similar queries with an $elemMatch.
     (function testElemMatchValue() {
@@ -517,8 +511,7 @@ function testNullSemantics(coll) {
         assert.eq(count, expectedEqualToNull.length);
 
         let projectResults = coll.find({a: {$elemMatch: {$eq: null}}}, projectToOnlyA).toArray();
-        assert(resultsEq(projectResults, extractAValues(expectedEqualToNull)),
-               tojson(projectResults));
+        assert(resultsEq(projectResults, extractAValues(expectedEqualToNull)), tojson(projectResults));
 
         // Test $elemMatch with not equal to null.
         noProjectResults = coll.find({a: {$elemMatch: {$ne: null}}}).toArray();
@@ -526,7 +519,7 @@ function testNullSemantics(coll) {
             {_id: "a_double_array", a: [[]]},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_no_b_nulls", a: [{b: 1}, {b: 3}, {b: "string"}]},
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
@@ -539,9 +532,8 @@ function testNullSemantics(coll) {
         assert(resultsEq(noProjectResults, expectedNotEqualToNull), tojson(noProjectResults));
 
         projectResults = coll.find({a: {$elemMatch: {$ne: null}}}, projectToOnlyA).toArray();
-        assert(resultsEq(projectResults, extractAValues(expectedNotEqualToNull)),
-               tojson(projectResults));
-    }());
+        assert(resultsEq(projectResults, extractAValues(expectedNotEqualToNull)), tojson(projectResults));
+    })();
 
     // Test the semantics of the query {"a.b": {$eq: null}}. The semantics here are to return
     // those documents which have one of the following properties:
@@ -560,7 +552,7 @@ function testNullSemantics(coll) {
             {_id: "no_a"},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
             {_id: "a_object_array_some_b_missing", a: [{b: 3}, {}]},
@@ -571,20 +563,21 @@ function testNullSemantics(coll) {
         assert.eq(count, expected.length);
 
         const projectResults = coll.find({"a.b": {$eq: null}}, projectToOnlyADotB).toArray();
-        assert(resultsEq(projectResults,
-                         [
-                             {a: {}},
-                             {},
-                             {},
-                             {a: {b: null}},
-                             {},
-                             {},
-                             {a: [{b: null}, {b: undefined}, {b: null}, {}]},
-                             {a: [{b: null}, {b: 3}, {b: null}]},
-                             {a: [{b: 3}, {}]},
-                         ]),
-               tojson(projectResults));
-    }());
+        assert(
+            resultsEq(projectResults, [
+                {a: {}},
+                {},
+                {},
+                {a: {b: null}},
+                {},
+                {},
+                {a: [{b: null}, {b: undefined}, {b: null}, {}]},
+                {a: [{b: null}, {b: 3}, {b: null}]},
+                {a: [{b: 3}, {}]},
+            ]),
+            tojson(projectResults),
+        );
+    })();
 
     // Test the semantics of the query {"a.b": {$ne: null}}.
     (function testDottedNotEqualsNull() {
@@ -599,7 +592,7 @@ function testNullSemantics(coll) {
             {_id: "a_value_array_all_nulls", a: [null, null]},
             {_id: "a_value_array_no_nulls", a: [1, "string", 4]},
             {_id: "a_value_array_with_null", a: [1, "string", null, 4]},
-            {_id: "a_value_array_with_undefined", a: [1, "string", undefined, 4]}
+            {_id: "a_value_array_with_undefined", a: [1, "string", undefined, 4]},
         ];
         assert(resultsEq(noProjectResults, expected), tojson(noProjectResults));
 
@@ -607,21 +600,22 @@ function testNullSemantics(coll) {
         assert.eq(count, expected.length);
 
         const projectResults = coll.find({"a.b": {$ne: null}}, projectToOnlyADotB).toArray();
-        assert(resultsEq(projectResults,
-                         [
-                             {a: {b: "hi"}},
-                             {a: {b: undefined}},
-                             {a: [[]]},
-                             {a: []},
-                             {a: [{b: 1}, {b: 3}, {b: "string"}]},
-                             {a: [{b: undefined}, {b: 3}]},
-                             {a: []},
-                             {a: []},
-                             {a: []},
-                             {a: []}
-                         ]),
-               tojson(projectResults));
-    }());
+        assert(
+            resultsEq(projectResults, [
+                {a: {b: "hi"}},
+                {a: {b: undefined}},
+                {a: [[]]},
+                {a: []},
+                {a: [{b: 1}, {b: 3}, {b: "string"}]},
+                {a: [{b: undefined}, {b: 3}]},
+                {a: []},
+                {a: []},
+                {a: []},
+                {a: []},
+            ]),
+            tojson(projectResults),
+        );
+    })();
 
     // Test the semantics of the query {a.b: {$in: [null, <number>]}}.
     (function testDottedInNullQuery() {
@@ -636,7 +630,7 @@ function testNullSemantics(coll) {
             {_id: "no_a"},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
             {_id: "a_object_array_some_b_missing", a: [{b: 3}, {}]},
@@ -646,7 +640,7 @@ function testNullSemantics(coll) {
         assert.eq(count, expected.length);
 
         assert(resultsEq(noProjectResults, expected), noProjectResults);
-    }());
+    })();
 
     // Test the semantics of the query {$or: [{a.b: null}, {a.b: <number>}]}.
     (function testDottedOrNullQuery() {
@@ -661,7 +655,7 @@ function testNullSemantics(coll) {
             {_id: "no_a"},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
             {_id: "a_object_array_some_b_missing", a: [{b: 3}, {}]},
@@ -671,7 +665,7 @@ function testNullSemantics(coll) {
         assert.eq(count, expected.length);
 
         assert(resultsEq(noProjectResults, expected), noProjectResults);
-    }());
+    })();
 
     // Test the semantics of the query {a.b: {$nin: [null, <number>]}}.
     (function testDottedNotInNullQuery() {
@@ -697,7 +691,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     // Test the semantics of the query {a.b: {$nin: [null, <regex>]}}.
     (function testDottedNotInNullAndRegexQuery() {
@@ -722,7 +716,7 @@ function testNullSemantics(coll) {
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
         assert(resultsEq(projectResults, extractAValues(expected)), projectResults);
-    }());
+    })();
 
     // Test the results of similar dotted queries with an $elemMatch. These should have no
     // results since none of our documents have an array at the path "a.b".
@@ -735,7 +729,7 @@ function testNullSemantics(coll) {
 
         results = coll.find({"a.b": {$elemMatch: {$ne: null}}}).toArray();
         assert(resultsEq(results, []), tojson(results));
-    }());
+    })();
 
     // Test null semantics within an $elemMatch object.
     (function testElemMatchObject() {
@@ -745,7 +739,7 @@ function testNullSemantics(coll) {
             {_id: "a_double_array", a: [[]]},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
             {_id: "a_object_array_some_b_nulls", a: [{b: null}, {b: 3}, {b: null}]},
             {_id: "a_object_array_some_b_missing", a: [{b: 3}, {}]},
@@ -755,16 +749,16 @@ function testNullSemantics(coll) {
         const count = coll.count({a: {$elemMatch: {b: {$eq: null}}}});
         assert.eq(count, expectedEqualToNull.length);
 
-        let projectResults =
-            coll.find({a: {$elemMatch: {b: {$eq: null}}}}, projectToOnlyADotB).toArray();
-        assert(resultsEq(projectResults,
-                         [
-                             {a: [[]]},
-                             {a: [{b: null}, {b: undefined}, {b: null}, {}]},
-                             {a: [{b: null}, {b: 3}, {b: null}]},
-                             {a: [{b: 3}, {}]},
-                         ]),
-               tojson(projectResults));
+        let projectResults = coll.find({a: {$elemMatch: {b: {$eq: null}}}}, projectToOnlyADotB).toArray();
+        assert(
+            resultsEq(projectResults, [
+                {a: [[]]},
+                {a: [{b: null}, {b: undefined}, {b: null}, {}]},
+                {a: [{b: null}, {b: 3}, {b: null}]},
+                {a: [{b: 3}, {}]},
+            ]),
+            tojson(projectResults),
+        );
 
         // Test $elemMatch with not equal to null.
         noProjectResults = coll.find({a: {$elemMatch: {b: {$ne: null}}}}).toArray();
@@ -775,28 +769,28 @@ function testNullSemantics(coll) {
             {_id: "a_object_array_some_b_missing", a: [{b: 3}, {}]},
             {
                 _id: "a_object_array_b_mix_null_undefined_missing",
-                a: [{b: null}, {b: undefined}, {b: null}, {}]
+                a: [{b: null}, {b: undefined}, {b: null}, {}],
             },
         ];
         assert(resultsEq(noProjectResults, expectedNotEqualToNull), tojson(noProjectResults));
 
-        projectResults =
-            coll.find({a: {$elemMatch: {b: {$ne: null}}}}, projectToOnlyADotB).toArray();
-        assert(resultsEq(projectResults,
-                         [
-                             {a: [{b: 1}, {b: 3}, {b: "string"}]},
-                             {a: [{b: null}, {b: 3}, {b: null}]},
-                             {a: [{b: undefined}, {b: 3}]},
-                             {a: [{b: 3}, {}]},
-                             {a: [{b: null}, {b: undefined}, {b: null}, {}]}
-                         ]),
-               tojson(projectResults));
-    }());
+        projectResults = coll.find({a: {$elemMatch: {b: {$ne: null}}}}, projectToOnlyADotB).toArray();
+        assert(
+            resultsEq(projectResults, [
+                {a: [{b: 1}, {b: 3}, {b: "string"}]},
+                {a: [{b: null}, {b: 3}, {b: null}]},
+                {a: [{b: undefined}, {b: 3}]},
+                {a: [{b: 3}, {}]},
+                {a: [{b: null}, {b: undefined}, {b: null}, {}]},
+            ]),
+            tojson(projectResults),
+        );
+    })();
 }
 
 // Test without any indexes.
-jsTestLog('Without any indexes');
-const collNamePrefix = 'null_query_semantics_';
+jsTestLog("Without any indexes");
+const collNamePrefix = "null_query_semantics_";
 let collCount = 0;
 let coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
@@ -814,7 +808,7 @@ const keyPatterns = [
     {keyPattern: {"a.b": 1}, options: {partialFilterExpression: {a: {$exists: true}}}},
     {keyPattern: {"a.b": 1, _id: 1}, options: {sparse: true}},
     {keyPattern: {"$**": 1}},
-    {keyPattern: {"a.$**": 1}}
+    {keyPattern: {"a.$**": 1}},
 ];
 
 // Test with a variety of other indexes.
@@ -827,15 +821,18 @@ for (let indexSpec of keyPatterns) {
 }
 
 // Test that you cannot use a $ne: null predicate in a partial filter expression.
-jsTestLog('Cannot use $ne: null predicate in a partial filter - 1');
+jsTestLog("Cannot use $ne: null predicate in a partial filter - 1");
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
-assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: {a: {$ne: null}}}),
-                             ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(
+    coll.createIndex({a: 1}, {partialFilterExpression: {a: {$ne: null}}}),
+    ErrorCodes.CannotCreateIndex,
+);
 
-jsTestLog('Cannot use $ne: null predicate in a partial filter - 2');
+jsTestLog("Cannot use $ne: null predicate in a partial filter - 2");
 coll = db.getCollection(collNamePrefix + collCount++);
 coll.drop();
 assert.commandFailedWithCode(
     coll.createIndex({a: 1}, {partialFilterExpression: {a: {$elemMatch: {$ne: null}}}}),
-    ErrorCodes.CannotCreateIndex);
+    ErrorCodes.CannotCreateIndex,
+);

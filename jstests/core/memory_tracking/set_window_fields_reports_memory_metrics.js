@@ -20,8 +20,7 @@ import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 // TODO SERVER-104607 Delete this block once SBE tests are implemented.
 if (checkSbeFullyEnabled(db)) {
-    jsTest.log.info(
-        "Skipping test for classic '$setWindowFields' stage when SBE is fully enabled.");
+    jsTest.log.info("Skipping test for classic '$setWindowFields' stage when SBE is fully enabled.");
     quit();
 }
 
@@ -41,14 +40,14 @@ for (let i = 0; i < 10; i++) {
     for (const stock of stocks) {
         const basePrice = {"AAPL": 150, "MSFT": 250, "GOOG": 100, "AMZN": 120, "META": 200}[stock];
         const dailyChange = i * 0.5;
-        const volume = 500000 + (i * 10000);
+        const volume = 500000 + i * 10000;
 
         docs.push({
             symbol: stock,
             date: currentDate,
             price: basePrice + dailyChange,
             volume: volume,
-            dayOfWeek: currentDate.getDay()
+            dayOfWeek: currentDate.getDay(),
         });
     }
 }
@@ -70,12 +69,12 @@ const pipeline = [
             pipeline: pipeline,
             comment: "memory stats setWindowFields test",
             cursor: {batchSize: 1},
-            allowDiskUse: false
+            allowDiskUse: false,
         },
         stageName: "$_internalSetWindowFields",
         expectedNumGetMores: 10,
         // This stage does not release memory on EOF.
-        checkInUseTrackedMemBytesResets: false
+        checkInUseTrackedMemBytesResets: false,
     });
 }
 
@@ -83,7 +82,7 @@ const pipeline = [
     const pipelineWithLimit = [
         {$setWindowFields: {sortBy: {date: 1}, output: {movingAvgPrice: {$avg: "$price"}}}},
         {$match: {symbol: "AAPL"}},
-        {$limit: 5}
+        {$limit: 5},
     ];
     jsTest.log.info("Running pipeline " + tojson(pipelineWithLimit));
 
@@ -95,24 +94,21 @@ const pipeline = [
             pipeline: pipelineWithLimit,
             comment: "memory stats setWindowFields test with limit",
             cursor: {batchSize: 1},
-            allowDiskUse: false
+            allowDiskUse: false,
         },
         stageName: "$_internalSetWindowFields",
         expectedNumGetMores: 3,
         // This stage does not release memory on EOF.
-        checkInUseTrackedMemBytesResets: false
+        checkInUseTrackedMemBytesResets: false,
     });
 }
 
 {
-    const originalMemoryLimit =
-        assert
-            .commandWorked(db.adminCommand(
-                {getParameter: 1, internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 1}))
-            .internalDocumentSourceSetWindowFieldsMaxMemoryBytes;
+    const originalMemoryLimit = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 1}),
+    ).internalDocumentSourceSetWindowFieldsMaxMemoryBytes;
 
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 5000}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 5000}));
 
     jsTest.log.info("Running pipeline " + tojson(pipeline));
 
@@ -124,7 +120,7 @@ const pipeline = [
             pipeline: pipeline,
             comment: "memory stats setWindowFields spilling test",
             cursor: {batchSize: 1},
-            allowDiskUse: true
+            allowDiskUse: true,
         },
         stageName: "$_internalSetWindowFields",
         expectedNumGetMores: 10,
@@ -132,8 +128,10 @@ const pipeline = [
     });
 
     // Restore the original memory limit.
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalDocumentSourceSetWindowFieldsMaxMemoryBytes: originalMemoryLimit
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalDocumentSourceSetWindowFieldsMaxMemoryBytes: originalMemoryLimit,
+        }),
+    );
 }

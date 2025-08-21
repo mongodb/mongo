@@ -10,7 +10,7 @@
 
 let res;
 
-const collNamePrefix = 'jstests_uniqueness_';
+const collNamePrefix = "jstests_uniqueness_";
 let collCount = 0;
 let t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
@@ -47,10 +47,9 @@ assert(res.errmsg.match(/E11000/));
 t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
 const key = {
-    _id: 1
+    _id: 1,
 };
-const expectedMessage =
-    'E11000 duplicate key error collection: ' + t + ' index: _id_ dup key: { _id: 1.0 }';
+const expectedMessage = "E11000 duplicate key error collection: " + t + " index: _id_ dup key: { _id: 1.0 }";
 assert.commandWorked(t.insert(key));
 res = t.insert(key);
 assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
@@ -63,13 +62,13 @@ assert.includes(writeError.errmsg, expectedMessage, tojson(res));
 /* - test when object grows */
 t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
-assert.commandWorked(t.save({_id: 'Z'}));
+assert.commandWorked(t.save({_id: "Z"}));
 assert.commandWorked(t.update({}, {k: 2}));
-assert.eq('Z', t.findOne()._id, "uniqueness.js problem with adding back _id");
+assert.eq("Z", t.findOne()._id, "uniqueness.js problem with adding back _id");
 
 /* - test when doesn't grow */
 t = db.getCollection(collNamePrefix + collCount++);
 t.drop();
-assert.commandWorked(t.save({_id: 'Z', k: 3}));
+assert.commandWorked(t.save({_id: "Z", k: 3}));
 assert.commandWorked(t.update({}, {k: 2}));
-assert.eq('Z', t.findOne()._id, "uniqueness.js problem with adding back _id (2)");
+assert.eq("Z", t.findOne()._id, "uniqueness.js problem with adding back _id (2)");

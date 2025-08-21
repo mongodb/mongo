@@ -6,4 +6,6 @@ assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.insert({a: 2}));
 
 assert.commandFailedWithCode(
-    db.runCommand({find: coll.getName(), projection: {score: {$meta: "some garbage"}}}), 17308);
+    db.runCommand({find: coll.getName(), projection: {score: {$meta: "some garbage"}}}),
+    17308,
+);

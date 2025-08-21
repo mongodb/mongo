@@ -39,7 +39,7 @@ reshardingTest.withUnshardCollectionInBackground({toShard: recipientShardNames[0
 });
 
 // Should have unsplittable set to true
-let configDb = sourceCollection.getMongo().getDB('config');
+let configDb = sourceCollection.getMongo().getDB("config");
 let unshardedColl = configDb.collections.findOne({_id: sourceCollectionNs});
 assert.eq(unshardedColl.unsplittable, true);
 let unshardedChunk = configDb.chunks.find({uuid: unshardedColl.uuid}).toArray();

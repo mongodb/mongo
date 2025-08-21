@@ -18,12 +18,23 @@ const coll = db.getSiblingDB("split_match_and_swap_with_sort")[collName];
 coll.drop();
 
 assert.commandWorked(
-    coll.insert([{_id: 1, a: 1, b: 3}, {_id: 2, a: 2, b: 2}, {_id: 3, a: 3, b: 1}]));
+    coll.insert([
+        {_id: 1, a: 1, b: 3},
+        {_id: 2, a: 2, b: 2},
+        {_id: 3, a: 3, b: 1},
+    ]),
+);
 
 {
     const pipeline = [{$sort: {b: 1}}, {$match: {a: {$ne: 2}}}];
 
-    assert.eq([{_id: 3, a: 3, b: 1}, {_id: 1, a: 1, b: 3}], coll.aggregate(pipeline).toArray());
+    assert.eq(
+        [
+            {_id: 3, a: 3, b: 1},
+            {_id: 1, a: 1, b: 3},
+        ],
+        coll.aggregate(pipeline).toArray(),
+    );
 
     const pipelineExplained = coll.explain().aggregate(pipeline);
     const collScanStage = getPlanStage(pipelineExplained, "COLLSCAN");
@@ -35,32 +46,38 @@ assert.commandWorked(
 }
 
 {
-    const pipeline =
-        [{$sort: {b: 1}}, {$match: {$and: [{a: {$ne: 2}}, {$expr: {$ne: ["$a", "$b"]}}]}}];
+    const pipeline = [{$sort: {b: 1}}, {$match: {$and: [{a: {$ne: 2}}, {$expr: {$ne: ["$a", "$b"]}}]}}];
 
-    assert.eq([{_id: 3, a: 3, b: 1}, {_id: 1, a: 1, b: 3}], coll.aggregate(pipeline).toArray());
+    assert.eq(
+        [
+            {_id: 3, a: 3, b: 1},
+            {_id: 1, a: 1, b: 3},
+        ],
+        coll.aggregate(pipeline).toArray(),
+    );
 
     const pipelineExplained = coll.explain().aggregate(pipeline);
     const collScanStage = getAggPlanStage(pipelineExplained, "COLLSCAN");
     assert.neq(null, collScanStage, pipelineExplained);
-    assert.eq({$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]},
-              collScanStage.filter,
-              collScanStage);
+    assert.eq({$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]}, collScanStage.filter, collScanStage);
 }
 
 {
     // SERVER-46233: Normally a $or at the root of a $match expression prevents it from getting
     // split. However, When the $or has only one child, the optimizer should be able to eliminate
     // the $or and then recognize that the simplified result _is_ eligible to be split.
-    const pipeline =
-        [{$sort: {b: 1}}, {$match: {$or: [{$and: [{a: {$ne: 2}}, {$expr: {$ne: ["$a", "$b"]}}]}]}}];
+    const pipeline = [{$sort: {b: 1}}, {$match: {$or: [{$and: [{a: {$ne: 2}}, {$expr: {$ne: ["$a", "$b"]}}]}]}}];
 
-    assert.eq([{_id: 3, a: 3, b: 1}, {_id: 1, a: 1, b: 3}], coll.aggregate(pipeline).toArray());
+    assert.eq(
+        [
+            {_id: 3, a: 3, b: 1},
+            {_id: 1, a: 1, b: 3},
+        ],
+        coll.aggregate(pipeline).toArray(),
+    );
 
     const pipelineExplained = coll.explain().aggregate(pipeline);
     const collScanStage = getAggPlanStage(pipelineExplained, "COLLSCAN");
     assert.neq(null, collScanStage, pipelineExplained);
-    assert.eq({$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]},
-              collScanStage.filter,
-              collScanStage);
+    assert.eq({$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]}, collScanStage.filter, collScanStage);
 }

@@ -27,12 +27,8 @@ coll.update({loc: {$within: {$center: [[10, 20], 1]}}}, {x: true}, true);
 
 coll.update({loc: {$near: [10.0, 20.0], $maxDistance: 1}}, {x: true}, true);
 
-coll.update({loc: {$near: [100, 100], $maxDistance: 1}},
-            {$set: {loc: [100, 100]}, $push: {people: "chris"}},
-            true);
+coll.update({loc: {$near: [100, 100], $maxDistance: 1}}, {$set: {loc: [100, 100]}, $push: {people: "chris"}}, true);
 
-coll.update({loc: {$near: [100, 100], $maxDistance: 1}},
-            {$set: {loc: [100, 100]}, $push: {people: "john"}},
-            true);
+coll.update({loc: {$near: [100, 100], $maxDistance: 1}}, {$set: {loc: [100, 100]}, $push: {people: "john"}}, true);
 
 assert.eq(4, coll.find().itcount());

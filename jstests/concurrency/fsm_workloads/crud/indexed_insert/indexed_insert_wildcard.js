@@ -5,11 +5,9 @@
  * collection scan and an index scan. The collection is indexed with a wildcard index.
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {
-    $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_base.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.setup = function init(db, collName) {
         $super.setup.apply(this, arguments);
     };
@@ -23,20 +21,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             threadIdInArray: [this.tid],
             nestedThreadId: {threadId: this.tid},
             arrayField: [this.tid, "a string", [1, 2, 3]],
-            fieldWithNestedObject: {nestedDoc: {subNestedDoc: {leaf: "a string"}}, leaf: "a string"}
+            fieldWithNestedObject: {nestedDoc: {subNestedDoc: {leaf: "a string"}}, leaf: "a string"},
         };
     };
 
     $config.data.getQuery = function getQuery() {
         // Choose a field to query on (all have the same value, but just gives some variety in what
         // type of queries we run).
-        const possibleFields =
-            ["threadIdA", "threadIdB", "threadIdC", "threadIdInArray", "nestedThreadId.threadId"];
+        const possibleFields = ["threadIdA", "threadIdB", "threadIdC", "threadIdInArray", "nestedThreadId.threadId"];
         const chosenField = possibleFields[Math.floor(Math.random() * possibleFields.length)];
         return {[chosenField]: this.tid};
     };
 
-    $config.data.indexedField = 'indexed_insert_wildcard';
+    $config.data.indexedField = "indexed_insert_wildcard";
 
     $config.data.getIndexSpec = function getIndexSpec() {
         return {"$**": 1};
@@ -44,7 +41,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.data.getIndexName = function getIndexName() {
         // Override default index name '$**_1'.
-        return 'indexed_insert_wildcard_1';
+        return "indexed_insert_wildcard_1";
     };
 
     // Remove the shard key, since a wildcard index cannot be used to index the shard key.

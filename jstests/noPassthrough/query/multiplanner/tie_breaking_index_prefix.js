@@ -10,8 +10,8 @@ import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
 
 const options = {};
 const conn = MongoRunner.runMongod();
-assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
-const db = conn.getDB('tie_breaking_index_prefix');
+assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
+const db = conn.getDB("tie_breaking_index_prefix");
 
 const coll = db.index_prefix;
 coll.drop();
@@ -41,7 +41,7 @@ for (let i = 0; i < 5000; ++i) {
         date: new Date(i),
         timestamp: Timestamp(i, 0),
         string: `abc${1e9 + i}`,
-        object: {'a': i},
+        object: {"a": i},
         objectid: oid,
         array: [i],
     });
@@ -57,7 +57,7 @@ for (let i = 0; i < 5000; ++i) {
         date: new Date(i),
         timestamp: Timestamp(i, 0),
         string: `abc${1e9 + i}`,
-        object: {'a': i},
+        object: {"a": i},
         objectid: oid,
         array: [i],
     });
@@ -66,10 +66,12 @@ for (let i = 0; i < 5000; ++i) {
 assert.commandWorked(coll.insertMany(docs));
 
 function assertIndexScan(isTieBreakingHeuristicEnabled, filter, expectedIndexKeyPatterns) {
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQueryPlanTieBreakingWithIndexHeuristics: isTieBreakingHeuristicEnabled
-    }));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPlanTieBreakingWithIndexHeuristics: isTieBreakingHeuristicEnabled,
+        }),
+    );
 
     const explain = assert.commandWorked(coll.find(filter).explain(true));
 
@@ -78,16 +80,17 @@ function assertIndexScan(isTieBreakingHeuristicEnabled, filter, expectedIndexKey
     assert.eq(expectedIndexKeyPatterns.length, indexScans.length);
 
     for (let i = 0; i < expectedIndexKeyPatterns.length; ++i) {
-        assert.eq(indexScans[i]['keyPattern'], expectedIndexKeyPatterns[i], tojson(explain));
+        assert.eq(indexScans[i]["keyPattern"], expectedIndexKeyPatterns[i], tojson(explain));
     }
 }
 
-function assertIndexScanWithSort(
-    isTieBreakingHeuristicEnabled, filter, sorting, expectedIndexKeyPatterns) {
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQueryPlanTieBreakingWithIndexHeuristics: isTieBreakingHeuristicEnabled
-    }));
+function assertIndexScanWithSort(isTieBreakingHeuristicEnabled, filter, sorting, expectedIndexKeyPatterns) {
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            internalQueryPlanTieBreakingWithIndexHeuristics: isTieBreakingHeuristicEnabled,
+        }),
+    );
 
     const explain = assert.commandWorked(coll.find(filter).sort(sorting).explain(true));
 
@@ -96,7 +99,7 @@ function assertIndexScanWithSort(
     assert.eq(expectedIndexKeyPatterns.length, indexScans.length);
 
     for (let i = 0; i < expectedIndexKeyPatterns.length; ++i) {
-        assert.eq(indexScans[i]['keyPattern'], expectedIndexKeyPatterns[i]);
+        assert.eq(indexScans[i]["keyPattern"], expectedIndexKeyPatterns[i]);
     }
 }
 
@@ -116,7 +119,10 @@ function preferLongestIndexPrefix() {
 }
 
 function preferEquality() {
-    const indexes = [{a: 1, b: 1}, {b: 1, a: 1}];
+    const indexes = [
+        {a: 1, b: 1},
+        {b: 1, a: 1},
+    ];
     const filter = {a: {$gt: 0}, b: "hello"};
     assert.commandWorked(coll.createIndexes(indexes));
 
@@ -129,7 +135,10 @@ function preferEquality() {
 }
 
 function preferClosedIntervalsForType(fieldName, typeSmallValue, typeLargeValue) {
-    const indexes = [{[fieldName]: 1, b: 1}, {b: 1, [fieldName]: 1}];
+    const indexes = [
+        {[fieldName]: 1, b: 1},
+        {b: 1, [fieldName]: 1},
+    ];
     const filterGT = {[fieldName]: {$gt: typeSmallValue}, b: {$gte: "hello", $lt: "hello0"}};
     const filterLT = {[fieldName]: {$lt: typeLargeValue}, b: {$gte: "hello", $lt: "hello0"}};
     assert.commandWorked(coll.createIndexes(indexes));
@@ -146,7 +155,10 @@ function preferClosedIntervalsForType(fieldName, typeSmallValue, typeLargeValue)
 }
 
 function preferShortestIndex() {
-    const indexes = [{a: 1, b: 1, c: 1}, {b: 1, a: 1}];
+    const indexes = [
+        {a: 1, b: 1, c: 1},
+        {b: 1, a: 1},
+    ];
     const filter = {a: 1, b: "hello"};
     assert.commandWorked(coll.createIndexes(indexes));
 
@@ -159,7 +171,10 @@ function preferShortestIndex() {
 }
 
 function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
-    const indexes = [{a: 1, b: 1, c: 1}, {a: 1, b: 1}];
+    const indexes = [
+        {a: 1, b: 1, c: 1},
+        {a: 1, b: 1},
+    ];
     const filter = {a: {$gt: 1}, b: "hello"};
     assert.commandWorked(coll.createIndexes(indexes));
 
@@ -178,7 +193,10 @@ function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
 
 // A tie which is not broken keep the order of the plans the same.
 function notBrokenTie() {
-    const indexes = [{a: 1, b: 1}, {b: 1, a: 1}];
+    const indexes = [
+        {a: 1, b: 1},
+        {b: 1, a: 1},
+    ];
     const filter = {a: 1, b: "hello"};
     assert.commandWorked(coll.createIndexes(indexes));
 
@@ -191,7 +209,10 @@ function notBrokenTie() {
 }
 
 function multiIntervalIndexBounds() {
-    const indexes = [{a: 1, b: 1}, {a: 1, b: 1, c: 1}];
+    const indexes = [
+        {a: 1, b: 1},
+        {a: 1, b: 1, c: 1},
+    ];
     const filter = {a: 1, b: {$gte: "hello"}, c: {$gte: 0}};
     assert.commandWorked(coll.createIndexes(indexes));
 
@@ -204,7 +225,10 @@ function multiIntervalIndexBounds() {
 }
 
 function nonBlockingSort() {
-    const indexes = [{a: 1, b: 1}, {a: 1, b: 1, c: 1}];
+    const indexes = [
+        {a: 1, b: 1},
+        {a: 1, b: 1, c: 1},
+    ];
     const filter = {a: 10, b: {$in: [5, 6]}, c: {$gt: 3}};
     const sorting = {a: -1};
     assert.commandWorked(coll.createIndexes(indexes));
@@ -218,7 +242,10 @@ function nonBlockingSort() {
 }
 
 function blockingSort() {
-    const indexes = [{a: 1, b: 1}, {a: 1, b: 1, c: 1}];
+    const indexes = [
+        {a: 1, b: 1},
+        {a: 1, b: 1, c: 1},
+    ];
     const filter = {a: 10, b: {$in: [5, 6]}, c: {$gt: 3}};
     const sorting = {d: -1};
     assert.commandWorked(coll.createIndexes(indexes));
@@ -246,7 +273,12 @@ function multiIndexScan() {
 
 // SERVER-13211
 function preferLongestPrefixWithIndexesOfSameLength() {
-    const indexes = [{a: 1, b: 1}, {a: 1, c: 1}, {a: 1, d: 1}, {a: 1, h: 1}];
+    const indexes = [
+        {a: 1, b: 1},
+        {a: 1, c: 1},
+        {a: 1, d: 1},
+        {a: 1, h: 1},
+    ];
     const filter = {a: 1, h: 1};
 
     assert.commandWorked(coll.createIndexes(indexes));
@@ -260,20 +292,21 @@ function preferLongestPrefixWithIndexesOfSameLength() {
 
 // Running tests, with index pruning disabled and then enabled.
 function testWithPruningSetting(indexPruningActive) {
-    assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryPlannerEnableIndexPruning: indexPruningActive}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryPlannerEnableIndexPruning: indexPruningActive}),
+    );
 
     preferLongestIndexPrefix();
     preferEquality();
-    preferClosedIntervalsForType('long', NumberLong(0), NumberLong(1000));
-    preferClosedIntervalsForType('double', 0.0, 1000.0);
-    preferClosedIntervalsForType('decimal', NumberDecimal(0), NumberDecimal(1000));
-    preferClosedIntervalsForType('date', new Date(0), new Date(1000));
-    preferClosedIntervalsForType('timestamp', Timestamp(0, 0), Timestamp(1000, 0));
-    preferClosedIntervalsForType('string', `abc${1e9}`, `abc${1e9 + 1000}`);
-    preferClosedIntervalsForType('object', {'a': 0}, {'a': 1000});
-    preferClosedIntervalsForType('objectid', smallObjectID, largeObjectID);
-    preferClosedIntervalsForType('array', [], [1000]);
+    preferClosedIntervalsForType("long", NumberLong(0), NumberLong(1000));
+    preferClosedIntervalsForType("double", 0.0, 1000.0);
+    preferClosedIntervalsForType("decimal", NumberDecimal(0), NumberDecimal(1000));
+    preferClosedIntervalsForType("date", new Date(0), new Date(1000));
+    preferClosedIntervalsForType("timestamp", Timestamp(0, 0), Timestamp(1000, 0));
+    preferClosedIntervalsForType("string", `abc${1e9}`, `abc${1e9 + 1000}`);
+    preferClosedIntervalsForType("object", {"a": 0}, {"a": 1000});
+    preferClosedIntervalsForType("objectid", smallObjectID, largeObjectID);
+    preferClosedIntervalsForType("array", [], [1000]);
     preferShortestIndex();
     preferShortestIndexWithComparisonsInFilter(indexPruningActive);
     notBrokenTie();

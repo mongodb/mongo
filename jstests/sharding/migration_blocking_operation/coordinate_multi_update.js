@@ -17,18 +17,23 @@ const dbName = "test";
 const collName = "coll";
 const namespace = `${dbName}.${collName}`;
 
-assert.commandWorked(st.s0.getDB(dbName).getCollection(collName).insertMany([
-    {
-        _id: 1,
-        member: "abc123",
-        points: 0,
-    },
-    {
-        _id: 2,
-        member: "abc123",
-        points: 59,
-    },
-]));
+assert.commandWorked(
+    st.s0
+        .getDB(dbName)
+        .getCollection(collName)
+        .insertMany([
+            {
+                _id: 1,
+                member: "abc123",
+                points: 0,
+            },
+            {
+                _id: 2,
+                member: "abc123",
+                points: 59,
+            },
+        ]),
+);
 
 function assertCoordinateMultiUpdateReturns(connection, code) {
     const response = connection.adminCommand({
@@ -36,8 +41,8 @@ function assertCoordinateMultiUpdateReturns(connection, code) {
         uuid: UUID(),
         command: {
             update: collName,
-            updates: [{q: {member: "abc123"}, u: {$set: {points: 50}}, multi: true}]
-        }
+            updates: [{q: {member: "abc123"}, u: {$set: {points: 50}}, multi: true}],
+        },
     });
     if (code === ErrorCodes.OK) {
         const res = assert.commandWorked(response);

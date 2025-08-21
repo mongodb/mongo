@@ -5,10 +5,7 @@
  * ]
  */
 import {assertCacheUsage, setUpActiveCacheEntry} from "jstests/libs/query/plan_cache_utils.js";
-import {
-    checkSbeFullFeatureFlagEnabled,
-    checkSbeFullyEnabled,
-} from "jstests/libs/query/sbe_util.js";
+import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -42,13 +39,14 @@ function getAssertCount(count) {
     };
 }
 
-function testFn(
-    aIndexPipeline, aExpectedResultCount, bIndexPipeline, bExpectedResultCount, cacheEntryVersion) {
-    setUpActiveCacheEntry(coll,
-                          aIndexPipeline,
-                          cacheEntryVersion,
-                          "a_1" /* cachedIndexName */,
-                          getAssertCount(aExpectedResultCount));
+function testFn(aIndexPipeline, aExpectedResultCount, bIndexPipeline, bExpectedResultCount, cacheEntryVersion) {
+    setUpActiveCacheEntry(
+        coll,
+        aIndexPipeline,
+        cacheEntryVersion,
+        "a_1" /* cachedIndexName */,
+        getAssertCount(aExpectedResultCount),
+    );
 
     // Now run the other pipeline, which has the same query shape but is faster with a different
     // index. It should trigger re-planning of the query.
@@ -59,7 +57,7 @@ function testFn(
         fromMultiPlanning: true,
         cacheEntryVersion,
         cacheEntryIsActive: true,
-        cachedIndexName: "b_1"
+        cachedIndexName: "b_1",
     });
 
     assert.eq(bExpectedResultCount, coll.aggregate(bIndexPipeline).itcount());
@@ -69,7 +67,7 @@ function testFn(
         fromMultiPlanning: false,
         cacheEntryVersion,
         cacheEntryIsActive: true,
-        cachedIndexName: "b_1"
+        cachedIndexName: "b_1",
     });
 
     coll.getPlanCache().clear();
@@ -96,7 +94,7 @@ testFn(aUnwind, numExpectedResults, bUnwind, numExpectedResults, expectedCacheEn
 if (sbeEnabled) {
     // In classic runtime planning for SBE, we should stop trial run if inefficient plan produces
     // too much data to stash.
-    const hugeString = Array(1024 * 1024 + 1).toString();  // 1MB of ','
+    const hugeString = Array(1024 * 1024 + 1).toString(); // 1MB of ','
     const foreignColl = db.plan_cache_replan_unwind_foreign;
     assert.commandWorked(foreignColl.createIndex({lookupId: 1}));
     const foreignDoc = {lookupId: 0, str: hugeString};
@@ -107,15 +105,17 @@ if (sbeEnabled) {
     assert.commandWorked(coll.updateMany({}, {$set: {lookupId: 0}}));
 
     const lookupUnwind = [
-        { $lookup: { from: foreignColl.getName(), localField: "lookupId", foreignField: "lookupId", as: "data" } },
-        { $unwind: "$data" }
+        {$lookup: {from: foreignColl.getName(), localField: "lookupId", foreignField: "lookupId", as: "data"}},
+        {$unwind: "$data"},
     ];
 
-    setUpActiveCacheEntry(coll,
-                          aIndexPredicate.concat(lookupUnwind),
-                          expectedCacheEntryVersion /*cacheEntryVersion*/,
-                          "a_1" /*cachedIndexName*/,
-                          getAssertCount(numExpectedResults));
+    setUpActiveCacheEntry(
+        coll,
+        aIndexPredicate.concat(lookupUnwind),
+        expectedCacheEntryVersion /*cacheEntryVersion*/,
+        "a_1" /*cachedIndexName*/,
+        getAssertCount(numExpectedResults),
+    );
     assert.eq(numExpectedResults, coll.aggregate(bIndexPredicate.concat(lookupUnwind)).itcount());
     // Assert that replanning did not get triggered (a plan using the {a: 1} index is still in the
     // cache) due to the amount of data that had to get stashed during the trial period growing too
@@ -126,7 +126,7 @@ if (sbeEnabled) {
         fromMultiPlanning: false,
         cacheEntryVersion: expectedCacheEntryVersion,
         cacheEntryIsActive: true,
-        cachedIndexName: "a_1"
+        cachedIndexName: "a_1",
     });
 
     coll.getPlanCache().clear();

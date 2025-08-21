@@ -17,9 +17,25 @@ assert.eq(3, t.find().itcount(), "A1");
 assert.eq(2, t.find().hint({loc: "2d"}).itcount(), "A2");
 assert.eq(2, t.find({loc: {$near: [50, 50]}}).itcount(), "A3");
 
-t.find({loc: {$near: [50, 50]}}).sort({_id: 1}).forEach(printjson);
-assert.eq(1, t.find({loc: {$near: [50, 50]}}).sort({_id: 1}).next()._id, "B1");
-assert.eq(2, t.find({loc: {$near: [50, 50]}}).sort({_id: -1}).next()._id, "B1");
+t.find({loc: {$near: [50, 50]}})
+    .sort({_id: 1})
+    .forEach(printjson);
+assert.eq(
+    1,
+    t
+        .find({loc: {$near: [50, 50]}})
+        .sort({_id: 1})
+        .next()._id,
+    "B1",
+);
+assert.eq(
+    2,
+    t
+        .find({loc: {$near: [50, 50]}})
+        .sort({_id: -1})
+        .next()._id,
+    "B1",
+);
 
 t.insert({_id: 4, loc: []});
 assert.eq(4, t.find().itcount(), "C1");

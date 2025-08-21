@@ -26,7 +26,7 @@ st.s.adminCommand({moveChunk: nsString, find: {key: 0}, to: st.shard1.shardName}
 
 const bulk = st.s.getCollection(nsString).initializeUnorderedBulkOp();
 for (let i = 0; i < numDocs; i++) {
-    bulk.insert({_id: i, key: (i % numKeys), value: i % numKeys});
+    bulk.insert({_id: i, key: i % numKeys, value: i % numKeys});
 }
 assert.commandWorked(bulk.execute());
 
@@ -34,10 +34,10 @@ assert.commandWorked(bulk.execute());
 st.shard0.getCollection(nsString).insert({_id: 0, key: 0, value: 0});
 st.shard1.getCollection(nsString).insert({_id: numDocs, key: numKeys, value: numKeys});
 
-const map = function() {
+const map = function () {
     emit(this.key, this.value);
 };
-const reduce = function(k, values) {
+const reduce = function (k, values) {
     let total = 0;
     for (let i = 0; i < values.length; i++) {
         total += values[i];
@@ -54,8 +54,9 @@ function validateOutput(output) {
 let res = staleMongos1.getCollection(nsString).mapReduce(map, reduce, {out: {inline: 1}});
 validateOutput(res.results);
 
-res = staleMongos2.getCollection(nsString).aggregate(
-    [{$group: {_id: "$key", value: {$sum: "$value"}}}, {$sort: {_id: 1}}]);
+res = staleMongos2
+    .getCollection(nsString)
+    .aggregate([{$group: {_id: "$key", value: {$sum: "$value"}}}, {$sort: {_id: 1}}]);
 validateOutput(res.toArray());
 
 st.stop();

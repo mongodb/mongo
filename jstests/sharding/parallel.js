@@ -12,32 +12,32 @@ var db = s.getDB("test");
 var N = 10000;
 var shards = [s.shard0.shardName, s.shard1.shardName, s.shard2.shardName];
 
-for (var i = 0; i < N; i += (N / 10)) {
+for (var i = 0; i < N; i += N / 10) {
     s.adminCommand({split: "test.foo", middle: {_id: i}});
-    s.s.getDB('admin').runCommand(
-        {moveChunk: "test.foo", find: {_id: i}, to: shards[Math.floor(Math.random() * numShards)]});
+    s.s
+        .getDB("admin")
+        .runCommand({moveChunk: "test.foo", find: {_id: i}, to: shards[Math.floor(Math.random() * numShards)]});
 }
 
 s.startBalancer();
 
 var bulk = db.foo.initializeUnorderedBulkOp();
-for (i = 0; i < N; i++)
-    bulk.insert({_id: i});
+for (i = 0; i < N; i++) bulk.insert({_id: i});
 assert.commandWorked(bulk.execute());
 
-var doCommand = function(dbname, cmd) {
+var doCommand = function (dbname, cmd) {
     x = benchRun({
         ops: [{op: "findOne", ns: dbname + ".$cmd", query: cmd, readCmd: true}],
         host: db.getMongo().host,
         parallel: 2,
-        seconds: 2
+        seconds: 2,
     });
     printjson(x);
     x = benchRun({
         ops: [{op: "findOne", ns: dbname + ".$cmd", query: cmd, readCmd: true}],
         host: s._mongos[1].host,
         parallel: 2,
-        seconds: 2
+        seconds: 2,
     });
     printjson(x);
 };

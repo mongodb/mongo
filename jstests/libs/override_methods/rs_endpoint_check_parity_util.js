@@ -22,8 +22,11 @@ export function isReplicaSet(conn) {
 
 export function isShardedClusterReplicaSetEndpoint(conn) {
     const adminDB = conn.getDB("admin");
-    return FeatureFlagUtil.isEnabled(adminDB, "ReplicaSetEndpoint") &&
-        FixtureHelpers.isReplSet(adminDB) && isConfigShardReplicaSet(adminDB);
+    return (
+        FeatureFlagUtil.isEnabled(adminDB, "ReplicaSetEndpoint") &&
+        FixtureHelpers.isReplSet(adminDB) &&
+        isConfigShardReplicaSet(adminDB)
+    );
 }
 
 export function isShardedClusterDedicatedRouter(conn) {
@@ -31,57 +34,58 @@ export function isShardedClusterDedicatedRouter(conn) {
     return FixtureHelpers.isMongos(adminDB);
 }
 
-const readCommandNames = new Set([
-    "aggregate",
-    "collStats",
-    "count",
-    "dbStats",
-    "distinct",
-    "find",
-]);
+const readCommandNames = new Set(["aggregate", "collStats", "count", "dbStats", "distinct", "find"]);
 
 /**
  * Throws an error if this command should not be run when testing replica set endpoint.
  */
 function checkCanRun(dbName, commandName, commandObj) {
     if (commandName == "setFeatureCompatibilityVersion" && commandObj[commandName] != latestFCV) {
-        throw Error("Cannot downgrade the FCV since the replica set endpoint is only " +
-                    "supported in latest FCV");
+        throw Error("Cannot downgrade the FCV since the replica set endpoint is only " + "supported in latest FCV");
     }
     if (commandName === "transitionToDedicatedConfigServer" || commandName === "addShard") {
-        throw Error("Cannot run " + commandName + " command since the replica set endpoint " +
-                    "is only supported on a single-shard cluster with embedded config servers");
+        throw Error(
+            "Cannot run " +
+                commandName +
+                " command since the replica set endpoint " +
+                "is only supported on a single-shard cluster with embedded config servers",
+        );
     }
-    if (dbName == "config" && commandObj[commandName] == "shards" &&
-        !readCommandNames.has(commandName)) {
-        throw Error("Cannot write to the config.shards collection since that could change the " +
-                    "cluster topology and the replica set endpoint is only supported on " +
-                    "single-shard cluster with embedded config servers");
+    if (dbName == "config" && commandObj[commandName] == "shards" && !readCommandNames.has(commandName)) {
+        throw Error(
+            "Cannot write to the config.shards collection since that could change the " +
+                "cluster topology and the replica set endpoint is only supported on " +
+                "single-shard cluster with embedded config servers",
+        );
     }
-    if (commandName == "setParameter" &&
-        commandObj.hasOwnProperty("internalQueryTopNAccumulatorBytes")) {
-        throw Error("Cannot set 'internalQueryTopNAccumulatorBytes' to too low since it could " +
-                    "cause the CheckRoutingTableConsistency hook to fail");
+    if (commandName == "setParameter" && commandObj.hasOwnProperty("internalQueryTopNAccumulatorBytes")) {
+        throw Error(
+            "Cannot set 'internalQueryTopNAccumulatorBytes' to too low since it could " +
+                "cause the CheckRoutingTableConsistency hook to fail",
+        );
     }
-    if (commandName === "getClusterParameter" || commandName == "auditConfigure" ||
-        commandName == "getAuditConfig") {
+    if (commandName === "getClusterParameter" || commandName == "auditConfigure" || commandName == "getAuditConfig") {
         // TODO (SERVER-83421): Support cluster getClusterParameter command in embedded router.
-        throw Error("Cannot run getClusterParameter command since it is currently not supported " +
-                    "on embedded routers");
+        throw Error(
+            "Cannot run getClusterParameter command since it is currently not supported " + "on embedded routers",
+        );
     }
-    if (commandName === 'cloneCollectionAsCapped') {
+    if (commandName === "cloneCollectionAsCapped") {
         // TODO (SERVER-80416): Support cloneCollectionAsCapped in sharded clusters.
-        throw Error("Cannot run " + commandName + " command since currently running it would lead" +
-                    "to inconsistent metadata and cause the CheckMetadataConsistencyInBackground " +
-                    "hook to fail");
+        throw Error(
+            "Cannot run " +
+                commandName +
+                " command since currently running it would lead" +
+                "to inconsistent metadata and cause the CheckMetadataConsistencyInBackground " +
+                "hook to fail",
+        );
     }
 }
 
 /**
  * Runs the given command against both connections and compare the responses.
  */
-export function runCommandCompareResponsesBase(
-    conn0, conn1, dbName, commandName, commandObj, func, makeFuncArgs) {
+export function runCommandCompareResponsesBase(conn0, conn1, dbName, commandName, commandObj, func, makeFuncArgs) {
     jsTest.log.info("Comparing responses for command with dbName: " + dbName, {commandObj});
     checkCanRun(dbName, commandName, commandObj);
 

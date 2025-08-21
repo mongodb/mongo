@@ -19,13 +19,13 @@
  *   requires_capped
  * ]
  */
-export const $config = (function() {
+export const $config = (function () {
     // TODO: This workload may fail if an iteration multiplier is specified.
-    var data = {prefix: 'convert_to_capped_collection'};
+    var data = {prefix: "convert_to_capped_collection"};
 
-    var states = (function() {
+    var states = (function () {
         function uniqueCollectionName(prefix, tid) {
-            return prefix + '_' + tid;
+            return prefix + "_" + tid;
         }
 
         function init(db, collName) {

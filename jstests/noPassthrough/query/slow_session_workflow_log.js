@@ -45,38 +45,38 @@ function runTest(conn) {
     const prevSlowSessionWorkflowCount = getSlowLogCount(conn);
 
     // Wait, then do a query beyond the 100ms threshold. Make sure the slow loop log line exists.
-    const fp = configureFailPoint(
-        conn, "sessionWorkflowDelayOrFailSendMessage", {millis: sleepMillisInSendResponse});
+    const fp = configureFailPoint(conn, "sessionWorkflowDelayOrFailSendMessage", {millis: sleepMillisInSendResponse});
     coll.find().toArray();
     fp.off();
     let logAndCount = getSlowLogAndCount(conn);
     let slowSessionWorkflowCount = logAndCount.count;
-    assert.gt(slowSessionWorkflowCount,
-              prevSlowSessionWorkflowCount,
-              "Expected to find at least one slow SessionWorkflow log.");
+    assert.gt(
+        slowSessionWorkflowCount,
+        prevSlowSessionWorkflowCount,
+        "Expected to find at least one slow SessionWorkflow log.",
+    );
 
     // Do some sanity checks over the actual contents of the log.
     const slowLoopObj = JSON.parse(logAndCount.log);
     jsTest.log(slowLoopObj);
     let elapsedObj = slowLoopObj.attr.elapsed;
     expectedFields.forEach((expectedField) => {
-        assert(expectedField in elapsedObj,
-               "Expected to find field but couldn't: " + expectedField);
+        assert(expectedField in elapsedObj, "Expected to find field but couldn't: " + expectedField);
     });
     const sendResponseElapsed = elapsedObj.sendResponseMillis;
 
-    assert.gte(sendResponseElapsed,
-               sleepMillisInSendResponse,
-               "The time reported sending a response didn't include the sleep in the failpoint.");
+    assert.gte(
+        sendResponseElapsed,
+        sleepMillisInSendResponse,
+        "The time reported sending a response didn't include the sleep in the failpoint.",
+    );
 
-    assert.commandWorked(
-        conn.adminCommand({setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}));
-    assert.commandWorked(conn.adminCommand({clearLog: 'global'}));
+    assert.commandWorked(conn.adminCommand({setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}));
+    assert.commandWorked(conn.adminCommand({clearLog: "global"}));
 
     // Wait, then do a query beyond the 100ms threshold. Make sure the slow loop log line does not
     // exist this time.
-    const fp2 = configureFailPoint(
-        conn, "sessionWorkflowDelayOrFailSendMessage", {millis: sleepMillisInSendResponse});
+    const fp2 = configureFailPoint(conn, "sessionWorkflowDelayOrFailSendMessage", {millis: sleepMillisInSendResponse});
     coll.find().toArray();
     fp2.off();
     logAndCount = getSlowLogAndCount(conn);

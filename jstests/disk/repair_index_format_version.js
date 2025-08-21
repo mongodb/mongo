@@ -2,11 +2,7 @@
  * Tests that mismatch of index type and index format version will be resolved during startup.
  */
 
-import {
-    alterIndexFormatVersion,
-    getUriForIndex,
-    startMongodOnExistingPath
-} from "jstests/disk/libs/wt_file_helper.js";
+import {alterIndexFormatVersion, getUriForIndex, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "repair_index_format_version";
 const collNamePrefix = "test_";

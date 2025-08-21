@@ -44,40 +44,45 @@ function getCurrentShardVersion() {
 
 // Returns a projection stage with the $_internalOwningShard expression.
 function buildProjectionStageWithOwningShardExpression(
-    shardVersion, owningShardInput = getDefaultOwningShardInput(shardVersion)) {
+    shardVersion,
+    owningShardInput = getDefaultOwningShardInput(shardVersion),
+) {
     return {
         $project: {
             _id: 0,
             shard: {$_internalOwningShard: owningShardInput},
             indexData: "$$ROOT",
-        }
+        },
     };
 }
 
 // Asserts that $_internalOwningShard expression correctly computes the shard id.
 function assertOwningShardExpressionResults(shardVersion, expectedResult) {
     const projectionStage = buildProjectionStageWithOwningShardExpression(shardVersion);
-    assert.eq(sourceColl.aggregate([projectionStage, {$sort: {"indexData._id": 1}}]).toArray(),
-              expectedResult);
+    assert.eq(sourceColl.aggregate([projectionStage, {$sort: {"indexData._id": 1}}]).toArray(), expectedResult);
 }
 
 // Asserts that $_internalOwningShard expression fails when routing information is stale.
 function assertOwningShardExpressionFailure(shardVersion) {
     const projectionStage = buildProjectionStageWithOwningShardExpression(shardVersion);
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: sourceColl.getName(),
-        pipeline: [projectionStage, {$sort: {"indexData._id": 1}}],
-        cursor: {}
-    }),
-                                 ErrorCodes.ShardCannotRefreshDueToLocksHeld);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: sourceColl.getName(),
+            pipeline: [projectionStage, {$sort: {"indexData._id": 1}}],
+            cursor: {},
+        }),
+        ErrorCodes.ShardCannotRefreshDueToLocksHeld,
+    );
 
     // Assert the expression fails while executing on the mongos.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: sourceColl.getName(),
-        pipeline: [{$sort: {_id: 1}}, projectionStage],
-        cursor: {}
-    }),
-                                 6868600);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: sourceColl.getName(),
+            pipeline: [{$sort: {_id: 1}}, projectionStage],
+            cursor: {},
+        }),
+        6868600,
+    );
 }
 
 // Create a sharded source collection with the shard key on '_id' attribute and two chunks.
@@ -88,13 +93,13 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(sourceColl, {_id: 1}, [
 
 // Insert some data.
 const documentOnShard0 = {
-    _id: 1
+    _id: 1,
 };
 const documentOnShard1 = {
-    _id: 50
+    _id: 50,
 };
 const documentOnShard2 = {
-    _id: 100
+    _id: 100,
 };
 assert.commandWorked(sourceColl.insert(documentOnShard0));
 assert.commandWorked(sourceColl.insert(documentOnShard1));
@@ -117,8 +122,8 @@ const shardVersion = getCurrentShardVersion();
 assertOwningShardExpressionResults(shardVersion, expectedResult);
 
 // Flush the router config and assert that every document still belongs to the different shard.
-[shard0, shard1, shard2].forEach(function(shard) {
-    shard.nodes.forEach(function(node) {
+[shard0, shard1, shard2].forEach(function (shard) {
+    shard.nodes.forEach(function (node) {
         assert.commandWorked(node.adminCommand({flushRouterConfig: destinationColl.getFullName()}));
     });
 });
@@ -126,62 +131,83 @@ assertOwningShardExpressionResults(shardVersion, expectedResult);
 
 // Assert that $_internalOwningShard expression will fail when routing information is stale. This is
 // simulated by providing a sharding version with a timestamp from the future.
-const futureShardVersion =
-    Object.assign({}, shardVersion, {t: new Timestamp(Math.pow(2, 32) - 1, 0)});
+const futureShardVersion = Object.assign({}, shardVersion, {t: new Timestamp(Math.pow(2, 32) - 1, 0)});
 assertOwningShardExpressionFailure(futureShardVersion);
 
 // Assert invalid inputs will fail with correct error codes.
 (() => {
     // Missing input.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: sourceColl.getName(),
-        pipeline: [buildProjectionStageWithOwningShardExpression(shardVersion, "")],
-        cursor: {}
-    }),
-                                 6868600);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: sourceColl.getName(),
+            pipeline: [buildProjectionStageWithOwningShardExpression(shardVersion, "")],
+            cursor: {},
+        }),
+        6868600,
+    );
 
     // Missing argument.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: sourceColl.getName(),
-        pipeline: [buildProjectionStageWithOwningShardExpression(
-            shardVersion, {shardKeyVal: {_id: "$_id"}, shardVersion: shardVersion})],
-        cursor: {}
-    }),
-                                 9567001);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: sourceColl.getName(),
+            pipeline: [
+                buildProjectionStageWithOwningShardExpression(shardVersion, {
+                    shardKeyVal: {_id: "$_id"},
+                    shardVersion: shardVersion,
+                }),
+            ],
+            cursor: {},
+        }),
+        9567001,
+    );
 
     // 'ns' wrong type.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: sourceColl.getName(),
-        pipeline: [buildProjectionStageWithOwningShardExpression(
-            shardVersion,
-            {shardKeyVal: {_id: "$_id"}, shardVersion: shardVersion, ns: {doc: "this is a doc"}})],
-        cursor: {}
-    }),
-                                 9567001);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: sourceColl.getName(),
+            pipeline: [
+                buildProjectionStageWithOwningShardExpression(shardVersion, {
+                    shardKeyVal: {_id: "$_id"},
+                    shardVersion: shardVersion,
+                    ns: {doc: "this is a doc"},
+                }),
+            ],
+            cursor: {},
+        }),
+        9567001,
+    );
 
     // 'shardVersion' wrong type.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: sourceColl.getName(),
-        pipeline: [buildProjectionStageWithOwningShardExpression(shardVersion, {
-            shardKeyVal: {_id: "$_id"},
-            shardVersion: "shardVersion",
-            ns: destinationColl.getFullName()
-        })],
-        cursor: {}
-    }),
-                                 9567002);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: sourceColl.getName(),
+            pipeline: [
+                buildProjectionStageWithOwningShardExpression(shardVersion, {
+                    shardKeyVal: {_id: "$_id"},
+                    shardVersion: "shardVersion",
+                    ns: destinationColl.getFullName(),
+                }),
+            ],
+            cursor: {},
+        }),
+        9567002,
+    );
 
     // 'shardKeyVal' wrong type.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: sourceColl.getName(),
-        pipeline: [buildProjectionStageWithOwningShardExpression(shardVersion, {
-            shardKeyVal: "{_id: $_id}",
-            shardVersion: shardVersion,
-            ns: destinationColl.getFullName()
-        })],
-        cursor: {}
-    }),
-                                 6868600);
+    assert.commandFailedWithCode(
+        db.runCommand({
+            aggregate: sourceColl.getName(),
+            pipeline: [
+                buildProjectionStageWithOwningShardExpression(shardVersion, {
+                    shardKeyVal: "{_id: $_id}",
+                    shardVersion: shardVersion,
+                    ns: destinationColl.getFullName(),
+                }),
+            ],
+            cursor: {},
+        }),
+        6868600,
+    );
 })();
 
 st.stop();

@@ -25,7 +25,7 @@ const rst = new ReplSetTest({
                 priority: 0,
                 votes: 0,
             },
-            slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
+            slowms: 30000, // Don't log slow operations on secondary. See SERVER-44821.
         },
         {
             // The arbiter prevents the primary from stepping down due to lack of majority in the
@@ -35,14 +35,14 @@ const rst = new ReplSetTest({
                 arbiterOnly: true,
             },
         },
-    ]
+    ],
 });
 const nodes = rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const testDB = primary.getDB("test");
+const coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({a: 1}));
 
@@ -56,10 +56,12 @@ let secondaryDB = secondary.getDB(testDB.getName());
 const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
 IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
-    jsTestLog('Inspecting db.currentOp() entry for index build: ' + tojson(op));
-    assert.eq(coll.getFullName(),
-              op.ns,
-              'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
+    jsTestLog("Inspecting db.currentOp() entry for index build: " + tojson(op));
+    assert.eq(
+        coll.getFullName(),
+        op.ns,
+        "Unexpected ns field value in db.currentOp() result for index build: " + tojson(op),
+    );
 });
 
 // Wait for the primary to complete the index build and replicate a commit oplog entry.
@@ -72,7 +74,7 @@ assert.commandWorked(secondaryDB.killOp(opId));
 // Expect the secondary to crash. Depending on timing, this can be either because the secondary
 // was waiting for a primary abort when a 'commitIndexBuild' is applied, or because the build
 // fails and tries to request an abort while a 'commitIndexBuild' is being applied.
-assert.soon(function() {
+assert.soon(function () {
     return rawMongoProgramOutput(".*").search(/Fatal assertion.*(7329403|7329407)/) >= 0;
 });
 
@@ -90,13 +92,13 @@ rst.awaitReplication();
 // on the primary and secondary.
 createIdx();
 
-IndexBuildTest.assertIndexes(coll, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 
 // Wait for the secondary node to complete its recovery.
 rst.awaitSecondaryNodes();
 
 // Check that index was created on the secondary despite the attempted killOp().
 const secondaryColl = secondaryDB.getCollection(coll.getName());
-IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
+IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_", "a_1"]);
 
 rst.stopSet();

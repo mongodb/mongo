@@ -8,7 +8,7 @@ export function setTestMayRunDropInParallel(val) {
     testMayRunDropInParallel = !!val;
 }
 
-const kZoneName = 'moveToHereForMigrationPassthrough';
+const kZoneName = "moveToHereForMigrationPassthrough";
 
 export const denylistedNamespaces = [
     /\$cmd/,
@@ -24,36 +24,39 @@ export const denylistedNamespaces = [
 /**
  * Settings for the converting implictily accessed collections to sharded collections.
  */
-export const ImplicitlyShardAccessCollSettings = (function() {
-    let mode = 0;  // Default to hashed shard key.
+export const ImplicitlyShardAccessCollSettings = (function () {
+    let mode = 0; // Default to hashed shard key.
 
     return {
         Modes: {
             kUseHashedSharding: 0,
             kHashedMoveToSingleShard: 1,
         },
-        setMode: function(newMode) {
+        setMode: function (newMode) {
             if (newMode !== 0 && newMode !== 1) {
                 throw new Error("Cannot set mode to unknown mode: " + newMode);
             }
 
             mode = newMode;
         },
-        getMode: function() {
+        getMode: function () {
             return mode;
         },
     };
 })();
 
-export var ShardingOverrideCommon = (function() {
+export var ShardingOverrideCommon = (function () {
     /**
      * Shard a collection
      * @param {*} collection is a shell object
      * @returns nothing
      */
     function shardCollection(collection) {
-        return shardCollectionWithSpec(
-            {db: collection.getDB(), collName: collection.getName(), shardKey: {_id: 'hashed'}});
+        return shardCollectionWithSpec({
+            db: collection.getDB(),
+            collName: collection.getName(),
+            shardKey: {_id: "hashed"},
+        });
     }
 
     /**
@@ -87,14 +90,14 @@ export var ShardingOverrideCommon = (function() {
         let shardCollCmd = {
             shardCollection: fullName,
             key: shardKey,
-            collation: {locale: "simple"}
+            collation: {locale: "simple"},
         };
         if (timeseriesSpec) {
             shardCollCmd["timeseries"] = timeseriesSpec;
         }
         res = db.adminCommand(shardCollCmd);
 
-        let checkResult = function(res, opDescription) {
+        let checkResult = function (res, opDescription) {
             if (res.ok === 0 && testMayRunDropInParallel) {
                 // We ignore ConflictingOperationInProgress error responses from the
                 // "shardCollection" command if it's possible the test was running a "drop" command
@@ -103,35 +106,44 @@ export var ShardingOverrideCommon = (function() {
                 // in a loop. We therefore just let the test continue with the collection being
                 // unsharded.
                 assert.commandFailedWithCode(res, ErrorCodes.ConflictingOperationInProgress);
-                jsTest.log("Ignoring failure while " + opDescription +
-                           " due to a concurrent drop operation: " + tojson(res));
+                jsTest.log(
+                    "Ignoring failure while " + opDescription + " due to a concurrent drop operation: " + tojson(res),
+                );
             } else {
                 assert.commandWorked(res, opDescription + " failed");
             }
         };
 
-        checkResult(res, 'shard ' + fullName);
+        checkResult(res, "shard " + fullName);
 
         // Set the entire chunk range to a single zone, so balancer will be forced to move the
         // evenly distributed chunks to a shard (selected at random).
-        if (res.ok === 1 &&
+        if (
+            res.ok === 1 &&
             ImplicitlyShardAccessCollSettings.getMode() ===
-                ImplicitlyShardAccessCollSettings.Modes.kHashedMoveToSingleShard) {
-            let shardName =
-                db.getSiblingDB('config').shards.aggregate([{$sample: {size: 1}}]).toArray()[0]._id;
+                ImplicitlyShardAccessCollSettings.Modes.kHashedMoveToSingleShard
+        ) {
+            let shardName = db
+                .getSiblingDB("config")
+                .shards.aggregate([{$sample: {size: 1}}])
+                .toArray()[0]._id;
 
-            checkResult(db.adminCommand({addShardToZone: shardName, zone: kZoneName}),
-                        'add ' + shardName + ' to zone ' + kZoneName);
-            checkResult(db.adminCommand({
-                updateZoneKeyRange: fullName,
-                min: {_id: MinKey},
-                max: {_id: MaxKey},
-                zone: kZoneName
-            }),
-                        'set zone for ' + fullName);
+            checkResult(
+                db.adminCommand({addShardToZone: shardName, zone: kZoneName}),
+                "add " + shardName + " to zone " + kZoneName,
+            );
+            checkResult(
+                db.adminCommand({
+                    updateZoneKeyRange: fullName,
+                    min: {_id: MinKey},
+                    max: {_id: MaxKey},
+                    zone: kZoneName,
+                }),
+                "set zone for " + fullName,
+            );
 
             // Wake up the balancer.
-            checkResult(db.adminCommand({balancerStart: 1}), 'turn on balancer');
+            checkResult(db.adminCommand({balancerStart: 1}), "turn on balancer");
         }
     }
 

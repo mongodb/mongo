@@ -19,11 +19,13 @@ function assertSortExistsAfterVectorSearch(aggPipeline) {
     // $vectorSearch must be the first step of the pipeline
     assert(
         getIndexOfStageOnSingleNode(explain, "$vectorSearch") == 0,
-        "'$vectorSearch' is not first step of the pipeline. explain for query: " + tojson(explain));
+        "'$vectorSearch' is not first step of the pipeline. explain for query: " + tojson(explain),
+    );
     // A $sort stage must exist somewhere in the pipeline after $_internalSearchMongotRemote.
-    assert(getIndexOfStageOnSingleNode(explain, "$sort") > 0,
-           "'$sort' does not exist in the pipeline after $search. explain for query: " +
-               tojson(explain));
+    assert(
+        getIndexOfStageOnSingleNode(explain, "$sort") > 0,
+        "'$sort' does not exist in the pipeline after $search. explain for query: " + tojson(explain),
+    );
 }
 
 function assertNoSortExistsAfterVectorSearch(aggPipeline) {
@@ -31,26 +33,32 @@ function assertNoSortExistsAfterVectorSearch(aggPipeline) {
     // $vectorSearch must be the first step of the pipeline
     assert(
         getIndexOfStageOnSingleNode(explain, "$vectorSearch") == 0,
-        "'$vectorSearch' is not first step of the pipeline. explain for query: " + tojson(explain));
+        "'$vectorSearch' is not first step of the pipeline. explain for query: " + tojson(explain),
+    );
     // A $sort stage must not exist somewhere in the pipeline after $_internalSearchMongotRemote.
     assert(
         getIndexOfStageOnSingleNode(explain, "$sort") < 0,
-        "'$sort' does exist in the pipeline after $search. explain for query: " + tojson(explain));
+        "'$sort' does exist in the pipeline after $search. explain for query: " + tojson(explain),
+    );
 }
 
 const coll = db.foo;
 coll.drop();
 
-assert.commandWorked(coll.insertMany(
-    [{a: -1, v: [1, 0, 8, 1, 8]}, {a: 100, v: [2, -2, 1, 4, 4]}, {a: 10, v: [4, 10, -8, 22, 0]}]));
+assert.commandWorked(
+    coll.insertMany([
+        {a: -1, v: [1, 0, 8, 1, 8]},
+        {a: 100, v: [2, -2, 1, 4, 4]},
+        {a: 10, v: [4, 10, -8, 22, 0]},
+    ]),
+);
 
 const indexName = "sort-after-vector-search-test-index";
 // Create vector search index on movie plot embeddings.
 const vectorIndex = {
     name: indexName,
     type: "vectorSearch",
-    definition:
-        {"fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}]}
+    definition: {"fields": [{"type": "vector", "numDimensions": 5, "path": "v", "similarity": "euclidean"}]},
 };
 
 createSearchIndex(coll, vectorIndex);
@@ -85,23 +93,20 @@ assertNoSortExistsAfterVectorSearch([
 // Implicit $sort after $vectorSearch from desugared $setWindowFields should get removed.
 assertNoSortExistsAfterVectorSearch([
     {$vectorSearch: vectorSearchQuery},
-    {$setWindowFields: {sortBy: {score: {$meta: "vectorSearchScore"}}, output: {rank: {$rank: {}}}}}
+    {$setWindowFields: {sortBy: {score: {$meta: "vectorSearchScore"}}, output: {rank: {$rank: {}}}}},
 ]);
 
 // Mixed explicit and implicit $sort after $vectorSearch should both get removed.
 assertNoSortExistsAfterVectorSearch([
     {$vectorSearch: vectorSearchQuery},
     {$sort: {score: {$meta: "vectorSearchScore"}}},
-    {$setWindowFields: {sortBy: {score: {$meta: "vectorSearchScore"}}, output: {rank: {$rank: {}}}}}
+    {$setWindowFields: {sortBy: {score: {$meta: "vectorSearchScore"}}, output: {rank: {$rank: {}}}}},
 ]);
 
 // Cases where optimization should not apply and $sort should remain:
 
 // Explicit $sort that does not sort on 'vectorSearchScore' should not be removed.
-assertSortExistsAfterVectorSearch([
-    {$vectorSearch: vectorSearchQuery},
-    {$sort: {a: 1}},
-]);
+assertSortExistsAfterVectorSearch([{$vectorSearch: vectorSearchQuery}, {$sort: {a: 1}}]);
 
 // $sort with multi-field criteria on 'vectorSearchScore' and another field should not be removed.
 assertSortExistsAfterVectorSearch([

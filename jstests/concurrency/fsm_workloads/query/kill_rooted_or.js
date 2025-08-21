@@ -10,24 +10,17 @@
  *   requires_getmore
  * ]
  */
-import {
-    assertWorkedOrFailedHandleTxnErrors
-} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
+import {assertWorkedOrFailedHandleTxnErrors} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 
-export const $config = (function() {
+export const $config = (function () {
     // Use the workload name as the collection name, since the workload name is assumed to be
     // unique. Note that we choose our own collection name instead of using the collection provided
     // by the concurrency framework, because this workload drops its collection.
-    var uniqueCollectionName = 'kill_rooted_or';
+    var uniqueCollectionName = "kill_rooted_or";
 
     var data = {
         collName: uniqueCollectionName,
-        indexSpecs: [
-            {a: 1},
-            {a: 1, c: 1},
-            {b: 1},
-            {b: 1, c: 1},
-        ],
+        indexSpecs: [{a: 1}, {a: 1, c: 1}, {b: 1}, {b: 1, c: 1}],
         numDocs: 200,
     };
 
@@ -41,8 +34,7 @@ export const $config = (function() {
             } catch (e) {
                 // We expect to see errors caused by the plan executor being killed, because of the
                 // collection getting dropped on another thread.
-                const kAllowedErrorCodes =
-                    [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound];
+                const kAllowedErrorCodes = [ErrorCodes.QueryPlanKilled, ErrorCodes.NamespaceNotFound];
                 if (!kAllowedErrorCodes.includes(e.code)) {
                     throw e;
                 }
@@ -67,51 +59,55 @@ export const $config = (function() {
             // Recreate the index that was dropped. (See populateIndexes() for why we ignore the
             // CannotImplicitlyCreateCollection error.)
             let res = db[this.collName].createIndex(indexSpec);
-            assertWorkedOrFailedHandleTxnErrors(res,
-                                                [
-                                                    ErrorCodes.CannotImplicitlyCreateCollection,
-                                                    ErrorCodes.IndexBuildAborted,
-                                                    ErrorCodes.IndexBuildAlreadyInProgress,
-                                                    ErrorCodes.NoMatchingDocument,
-                                                    ErrorCodes.StaleConfig
-                                                ],
-                                                [
-                                                    ErrorCodes.CannotImplicitlyCreateCollection,
-                                                    ErrorCodes.IndexBuildAborted,
-                                                    ErrorCodes.NoMatchingDocument,
-                                                    ErrorCodes.StaleConfig
-                                                ]);
-        }
+            assertWorkedOrFailedHandleTxnErrors(
+                res,
+                [
+                    ErrorCodes.CannotImplicitlyCreateCollection,
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.IndexBuildAlreadyInProgress,
+                    ErrorCodes.NoMatchingDocument,
+                    ErrorCodes.StaleConfig,
+                ],
+                [
+                    ErrorCodes.CannotImplicitlyCreateCollection,
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.NoMatchingDocument,
+                    ErrorCodes.StaleConfig,
+                ],
+            );
+        },
     };
 
     var transitions = {
         query: {query: 0.8, dropCollection: 0.1, dropIndex: 0.1},
         dropCollection: {query: 1},
-        dropIndex: {query: 1}
+        dropIndex: {query: 1},
     };
 
     function populateIndexes(coll, indexSpecs) {
-        indexSpecs.forEach(indexSpec => {
+        indexSpecs.forEach((indexSpec) => {
             // In sharded configurations, there's a limit to how many times mongos can retry an
             // operation that fails because it wants to implicitly create a collection that is
             // concurrently dropped. Normally, that's fine, but if some jerk keeps dropping our
             // collection (as in the 'dropCollection' state of this test), then we run out of
             // retries and get a CannotImplicitlyCreateCollection error once in a while, which we
             // have to ignore.
-            assertWorkedOrFailedHandleTxnErrors(coll.createIndex(indexSpec),
-                                                [
-                                                    ErrorCodes.CannotImplicitlyCreateCollection,
-                                                    ErrorCodes.IndexBuildAborted,
-                                                    ErrorCodes.IndexBuildAlreadyInProgress,
-                                                    ErrorCodes.NoMatchingDocument,
-                                                    ErrorCodes.StaleConfig
-                                                ],
-                                                [
-                                                    ErrorCodes.CannotImplicitlyCreateCollection,
-                                                    ErrorCodes.IndexBuildAborted,
-                                                    ErrorCodes.NoMatchingDocument,
-                                                    ErrorCodes.StaleConfig
-                                                ]);
+            assertWorkedOrFailedHandleTxnErrors(
+                coll.createIndex(indexSpec),
+                [
+                    ErrorCodes.CannotImplicitlyCreateCollection,
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.IndexBuildAlreadyInProgress,
+                    ErrorCodes.NoMatchingDocument,
+                    ErrorCodes.StaleConfig,
+                ],
+                [
+                    ErrorCodes.CannotImplicitlyCreateCollection,
+                    ErrorCodes.IndexBuildAborted,
+                    ErrorCodes.NoMatchingDocument,
+                    ErrorCodes.StaleConfig,
+                ],
+            );
         });
     }
 
@@ -121,11 +117,11 @@ export const $config = (function() {
         // attempts in the sharded causal consistency configuration. We also ignore that error.
         const bulkInsertResult = coll.insert(Array(numDocs).fill({a: 0, b: 0, c: 0}));
         assert(!bulkInsertResult.hasWriteConcernError(), bulkInsertResult);
-        bulkInsertResult.getWriteErrors().forEach(err => {
+        bulkInsertResult.getWriteErrors().forEach((err) => {
             assert.contains(err.code, [
                 ErrorCodes.CannotImplicitlyCreateCollection,
                 ErrorCodes.NoProgressMade,
-                ErrorCodes.StaleConfig
+                ErrorCodes.StaleConfig,
             ]);
         }, bulkInsertResult);
     }
@@ -140,8 +136,8 @@ export const $config = (function() {
         iterations: 50,
         data: data,
         states: states,
-        startState: 'query',
+        startState: "query",
         transitions: transitions,
-        setup: setup
+        setup: setup,
     };
 })();

@@ -11,15 +11,16 @@ const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
-const coll = testDB.getCollection('ts');
+const coll = testDB.getCollection("ts");
 
-const timeFieldName = 'time';
-const metaFieldName = 'tag';
+const timeFieldName = "time";
+const metaFieldName = "tag";
 
-const resetColl = function() {
+const resetColl = function () {
     coll.drop();
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+    );
     assert.commandWorked(coll.insert({a: 0, [timeFieldName]: new Date(), [metaFieldName]: 1}));
     assert.commandWorked(coll.insert({a: 1, [timeFieldName]: new Date(), [metaFieldName]: 2}));
     assert.commandWorked(coll.insert({a: 2, [timeFieldName]: new Date(), [metaFieldName]: 2}));
@@ -34,7 +35,7 @@ const expectedMetrics = {
     metaUpdate: 0,
 };
 
-const checkServerStatus = function() {
+const checkServerStatus = function () {
     const metrics = assert.commandWorked(testDB.serverStatus()).metrics.timeseries;
 
     for (let [metric, value] of Object.entries(expectedMetrics)) {
@@ -70,8 +71,9 @@ if (!FeatureFlagUtil.isEnabled(testDB, "TimeseriesUpdatesSupport")) {
 
 // Direct bucket update.
 ++expectedMetrics.directUpdated;
-assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll)
-                         .updateOne({meta: 1}, {$set: {meta: 3}}, getRawOperationSpec(testDB)));
+assert.commandWorked(
+    getTimeseriesCollForRawOps(testDB, coll).updateOne({meta: 1}, {$set: {meta: 3}}, getRawOperationSpec(testDB)),
+);
 checkServerStatus();
 
 // User delete that updates the original bucket.
@@ -94,8 +96,7 @@ checkServerStatus();
 
 // Direct bucket delete.
 ++expectedMetrics.directDeleted;
-assert.commandWorked(
-    getTimeseriesCollForRawOps(testDB, coll).deleteOne({meta: 1}, getRawOperationSpec(testDB)));
+assert.commandWorked(getTimeseriesCollForRawOps(testDB, coll).deleteOne({meta: 1}, getRawOperationSpec(testDB)));
 checkServerStatus();
 
 MongoRunner.stopMongod(conn);

@@ -62,39 +62,45 @@ for (var fields = 1; fields < maxFields; fields++) {
         var x = i % 2;
         var y = Math.floor(i / 2);
 
-        var box = [[0, 0], [49, 49]];
-        box[0][0] += (x == 1 ? 50 : 0);
-        box[1][0] += (x == 1 ? 50 : 0);
-        box[0][1] += (y == 1 ? 50 : 0);
-        box[1][1] += (y == 1 ? 50 : 0);
+        var box = [
+            [0, 0],
+            [49, 49],
+        ];
+        box[0][0] += x == 1 ? 50 : 0;
+        box[1][0] += x == 1 ? 50 : 0;
+        box[0][1] += y == 1 ? 50 : 0;
+        box[1][1] += y == 1 ? 50 : 0;
 
         // Now only half of each result comes back
-        assert.eq(totalPts / (4 * 2),
-                  coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).count());
-        assert.eq(totalPts / (4 * 2),
-                  coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).itcount());
+        assert.eq(totalPts / (4 * 2), coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).count());
+        assert.eq(totalPts / (4 * 2), coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).itcount());
     }
 
     // Check that half of points in each half
     for (var i = 0; i < 2; i++) {
-        var box = [[0, 0], [49, 99]];
-        box[0][0] += (i == 1 ? 50 : 0);
-        box[1][0] += (i == 1 ? 50 : 0);
+        var box = [
+            [0, 0],
+            [49, 99],
+        ];
+        box[0][0] += i == 1 ? 50 : 0;
+        box[1][0] += i == 1 ? 50 : 0;
 
-        assert.eq(totalPts / (2 * 2),
-                  coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).count());
-        assert.eq(totalPts / (2 * 2),
-                  coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).itcount());
+        assert.eq(totalPts / (2 * 2), coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).count());
+        assert.eq(totalPts / (2 * 2), coll.find(Object.extend({loc: {$within: {$box: box}}}, queryFields)).itcount());
     }
 
     // Check that all but corner set of points in radius
     var circle = [[0, 0], (100 - 1) * Math.sqrt(2) - 0.25];
 
     // All [99,x] pts are field0 : "abcdefg"
-    assert.eq(totalPts / 2 - totalPts / (100 * 100),
-              coll.find(Object.extend({loc: {$within: {$center: circle}}}, queryFields)).count());
-    assert.eq(totalPts / 2 - totalPts / (100 * 100),
-              coll.find(Object.extend({loc: {$within: {$center: circle}}}, queryFields)).itcount());
+    assert.eq(
+        totalPts / 2 - totalPts / (100 * 100),
+        coll.find(Object.extend({loc: {$within: {$center: circle}}}, queryFields)).count(),
+    );
+    assert.eq(
+        totalPts / 2 - totalPts / (100 * 100),
+        coll.find(Object.extend({loc: {$within: {$center: circle}}}, queryFields)).itcount(),
+    );
 }
 
 MongoRunner.stopMongod(conn);

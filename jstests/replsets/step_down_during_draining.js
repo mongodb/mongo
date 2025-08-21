@@ -13,7 +13,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
-var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
+var replSet = new ReplSetTest({name: "testSet", nodes: 3});
 var nodes = replSet.nodeList();
 replSet.startSet();
 var conf = replSet.getReplSetConfig();
@@ -31,30 +31,29 @@ var verbosity = {
     "setParameter": 1,
     "logComponentVerbosity": {
         "replication": {"verbosity": 3},
-    }
+    },
 };
-replSet.nodes.forEach(function(node) {
+replSet.nodes.forEach(function (node) {
     node.adminCommand(verbosity);
 });
 
 function enableFailPoint(node) {
     jsTest.log("enable failpoint " + node.host);
-    assert.commandWorked(
-        node.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}));
+    assert.commandWorked(node.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
     // Wait for Oplog Applier to hang on the failpoint.
-    checkLog.contains(node,
-                      "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
+    checkLog.contains(node, "rsSyncApplyStop fail point enabled. Blocking until fail point is disabled");
 }
 
 function disableFailPoint(node) {
     jsTest.log("disable failpoint " + node.host);
-    assert.commandWorked(node.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
+    assert.commandWorked(node.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
 }
 
 // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
 // writes.
-assert.commandWorked(primary.adminCommand(
-    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}),
+);
 
 // Do an initial insert to prevent the secondary from going into recovery
 var numDocuments = 20;
@@ -66,31 +65,30 @@ replSet.awaitReplication();
 var secondaries = replSet.getSecondaries();
 secondaries.forEach(enableFailPoint);
 
-const reduceMajorityWriteLatency =
-    FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency");
-var bufferCountBefore = (reduceMajorityWriteLatency)
-    ? secondary.getDB('foo').serverStatus().metrics.repl.buffer.write.count
-    : secondary.getDB('foo').serverStatus().metrics.repl.buffer.count;
+const reduceMajorityWriteLatency = FeatureFlagUtil.isPresentAndEnabled(secondary, "ReduceMajorityWriteLatency");
+var bufferCountBefore = reduceMajorityWriteLatency
+    ? secondary.getDB("foo").serverStatus().metrics.repl.buffer.write.count
+    : secondary.getDB("foo").serverStatus().metrics.repl.buffer.count;
 for (var i = 1; i < numDocuments; ++i) {
     assert.commandWorked(coll.insert({x: i}));
 }
-jsTestLog('Number of documents inserted into collection on primary: ' + numDocuments);
+jsTestLog("Number of documents inserted into collection on primary: " + numDocuments);
 assert.eq(numDocuments, primary.getDB("foo").foo.find().itcount());
 
 assert.soon(
-    function() {
-        var serverStatus = secondary.getDB('foo').serverStatus();
-        var bufferCount = (reduceMajorityWriteLatency)
+    function () {
+        var serverStatus = secondary.getDB("foo").serverStatus();
+        var bufferCount = reduceMajorityWriteLatency
             ? serverStatus.metrics.repl.buffer.write.count
             : serverStatus.metrics.repl.buffer.count;
         var bufferCountChange = bufferCount - bufferCountBefore;
-        jsTestLog('Number of operations buffered on secondary since stopping applier: ' +
-                  bufferCountChange);
+        jsTestLog("Number of operations buffered on secondary since stopping applier: " + bufferCountChange);
         return bufferCountChange == numDocuments - 1;
     },
-    'secondary did not buffer operations for new inserts on primary',
+    "secondary did not buffer operations for new inserts on primary",
     ReplSetTest.kDefaultTimeoutMS,
-    1000);
+    1000,
+);
 
 reconnect(secondary);
 replSet.stepUp(secondary, {awaitReplicationBeforeStepUp: false, awaitWritablePrimary: false});
@@ -115,7 +113,7 @@ assert.eq(secondary, newPrimary);
 
 // Ensure new primary is writable, and wait until the write has been replicated to all nodes, to
 // allow rollback (should it occur), to complete.
-jsTestLog('New primary should be writable after draining is complete');
+jsTestLog("New primary should be writable after draining is complete");
 assert.commandWorked(newPrimary.getDB("foo").flag.insert({sentinel: 1}, {writeConcern: {w: 3}}));
 // Check that all writes reached the secondary's op queue prior to
 // stepping down the original primary and got applied.

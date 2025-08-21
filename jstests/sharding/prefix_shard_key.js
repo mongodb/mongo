@@ -12,10 +12,10 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 // Shard key index does not exactly match shard key, so it is not compatible with $min/$max.
 TestData.skipCheckOrphans = true;
 
-var checkDocCounts = function(expectedShardCount) {
+var checkDocCounts = function (expectedShardCount) {
     for (var shardName in expectedShardCount) {
-        var shard = (shardName == s.shard0.shardName ? s.shard0 : s.shard1);
-        assert.eq(expectedShardCount[shardName], shard.getDB('test').user.find().count());
+        var shard = shardName == s.shard0.shardName ? s.shard0 : s.shard1;
+        assert.eq(expectedShardCount[shardName], shard.getDB("test").user.find().count());
     }
 };
 
@@ -31,7 +31,7 @@ assert.commandWorked(s.s0.adminCommand({enableSharding: "test", primaryShard: s.
 
 var coll = db.foo;
 
-var longStr = 'a';
+var longStr = "a";
 while (longStr.length < 1024 * 128) {
     longStr += longStr;
 }
@@ -43,7 +43,7 @@ for (i = 0; i < 100; i++) {
 assert.commandWorked(bulk.execute());
 
 // no usable index yet, should throw
-assert.throws(function() {
+assert.throws(function () {
     s.adminCommand({shardCollection: coll.getFullName(), key: {num: 1}});
 });
 
@@ -62,7 +62,7 @@ s.startBalancer();
 s.awaitBalance(coll.getName(), db.getName());
 
 // Make sure our initial balance cleanup doesn't interfere with later migrations.
-assert.soon(function() {
+assert.soon(function () {
     print("Waiting for migration cleanup to occur...");
     return coll.count() == coll.find().itcount();
 });
@@ -73,24 +73,28 @@ s.stopBalancer();
 assert.commandWorked(s.s0.adminCommand({split: coll.getFullName(), middle: {num: 50}}));
 
 // test moving
-assert.commandWorked(s.s0.adminCommand({
-    movechunk: coll.getFullName(),
-    find: {num: 20},
-    to: s.getOther(s.getPrimaryShard("test")).name,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    s.s0.adminCommand({
+        movechunk: coll.getFullName(),
+        find: {num: 20},
+        to: s.getOther(s.getPrimaryShard("test")).name,
+        _waitForDelete: true,
+    }),
+);
 
 //******************Part 2********************
 
 // Migrations and splits will still work on a sharded collection that only has multi key
 // index.
 db.user.createIndex({num: 1, x: 1});
-db.adminCommand({shardCollection: 'test.user', key: {num: 1}});
+db.adminCommand({shardCollection: "test.user", key: {num: 1}});
 
 var indexCount = db.user.getIndexes().length;
-assert.eq(2,
-          indexCount,  // indexes for _id_ and num_1_x_1
-          'index count not expected: ' + tojson(db.user.getIndexes()));
+assert.eq(
+    2,
+    indexCount, // indexes for _id_ and num_1_x_1
+    "index count not expected: " + tojson(db.user.getIndexes()),
+);
 
 var array = [];
 for (var item = 0; item < 50; item++) {
@@ -103,15 +107,17 @@ for (var docs = 0; docs < 1000; docs++) {
 
 assert.eq(1000, db.user.find().itcount());
 
-assert.commandWorked(admin.runCommand({
-    movechunk: 'test.user',
-    find: {num: 70},
-    to: s.getOther(s.getPrimaryShard("test")).name,
-    _waitForDelete: true
-}));
+assert.commandWorked(
+    admin.runCommand({
+        movechunk: "test.user",
+        find: {num: 70},
+        to: s.getOther(s.getPrimaryShard("test")).name,
+        _waitForDelete: true,
+    }),
+);
 
 var expectedShardCount = {};
-findChunksUtil.findChunksByNs(config, 'test.user').forEach(function(chunkDoc) {
+findChunksUtil.findChunksByNs(config, "test.user").forEach(function (chunkDoc) {
     var min = chunkDoc.min.num;
     var max = chunkDoc.max.num;
 
@@ -128,12 +134,12 @@ findChunksUtil.findChunksByNs(config, 'test.user').forEach(function(chunkDoc) {
     }
 
     if (max > 0) {
-        expectedShardCount[chunkDoc.shard] += (max - min);
+        expectedShardCount[chunkDoc.shard] += max - min;
     }
 });
 
 checkDocCounts(expectedShardCount);
-assert.commandWorked(admin.runCommand({split: 'test.user', middle: {num: 70}}));
+assert.commandWorked(admin.runCommand({split: "test.user", middle: {num: 70}}));
 checkDocCounts(expectedShardCount);
 
 //******************Part 3********************
@@ -175,19 +181,35 @@ for (i = 0; i < 3; i++) {
     assert.eq(findChunksUtil.findChunksByNs(config, coll2.getFullName()).count(), 2);
 
     // movechunk should move ALL docs since they have same value for skey
-    var moveRes = admin.runCommand(
-        {moveChunk: coll2 + "", find: {skey: 0}, to: s.shard1.shardName, _waitForDelete: true});
+    var moveRes = admin.runCommand({
+        moveChunk: coll2 + "",
+        find: {skey: 0},
+        to: s.shard1.shardName,
+        _waitForDelete: true,
+    });
     assert.eq(moveRes.ok, 1, "movechunk didn't work");
 
     // Make sure our migration eventually goes through before testing individual shards
-    assert.soon(function() {
+    assert.soon(function () {
         print("Waiting for migration cleanup to occur...");
         return coll2.count() == coll2.find().itcount();
     });
 
     // check no orphaned docs on the shards
-    assert.eq(0, s.shard0.getCollection(coll2 + "").find().itcount());
-    assert.eq(25, s.shard1.getCollection(coll2 + "").find().itcount());
+    assert.eq(
+        0,
+        s.shard0
+            .getCollection(coll2 + "")
+            .find()
+            .itcount(),
+    );
+    assert.eq(
+        25,
+        s.shard1
+            .getCollection(coll2 + "")
+            .find()
+            .itcount(),
+    );
 
     // and check total
     assert.eq(25, coll2.find().itcount(), "bad total number of docs after move");

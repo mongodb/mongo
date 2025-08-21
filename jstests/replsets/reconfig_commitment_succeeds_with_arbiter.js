@@ -5,8 +5,7 @@
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Make the secondary unelectable.
-let rst =
-    new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {arbiterOnly: true}}]});
+let rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {arbiterOnly: true}}]});
 rst.startSet();
 rst.initiate();
 

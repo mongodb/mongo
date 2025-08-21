@@ -24,9 +24,10 @@ const coll = db[jsTestName()];
 coll.drop();
 
 const timeFieldName = "time";
-const metaFieldName = 'meta';
-assert.commandWorked(db.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+const metaFieldName = "meta";
+assert.commandWorked(
+    db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}),
+);
 
 // The {meta: 1, time: 1} index gets built by default on the time-series collection. This
 // test assumes that all of the indexes in the collection are not finished to ensure they are
@@ -36,12 +37,14 @@ assert.commandWorked(coll.dropIndex({[metaFieldName]: 1, [timeFieldName]: 1}));
 // Use different metadata fields to guarantee creating three individual buckets in the buckets
 // collection.
 for (let i = 0; i < 3; i++) {
-    assert.commandWorked(coll.insert({
-        _id: i,
-        measurement: "measurement",
-        time: ISODate(),
-        meta: i,
-    }));
+    assert.commandWorked(
+        coll.insert({
+            _id: i,
+            measurement: "measurement",
+            time: ISODate(),
+            meta: i,
+        }),
+    );
 }
 
 ResumableIndexBuildTest.run(
@@ -52,6 +55,7 @@ ResumableIndexBuildTest.run(
     [{name: "hangIndexBuildDuringCollectionScanPhaseAfterInsertion", logIdWithBuildUUID: 20386}],
     /*iteration=*/ 0,
     ["collection scan"],
-    [{numScannedAfterResume: 2}]);
+    [{numScannedAfterResume: 2}],
+);
 
 rst.stopSet();

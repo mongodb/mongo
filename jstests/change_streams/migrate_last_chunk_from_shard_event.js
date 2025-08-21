@@ -12,10 +12,7 @@
  */
 
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {
-    assertChangeStreamEventEq,
-    ChangeStreamTest
-} from "jstests/libs/query/change_stream_util.js";
+import {assertChangeStreamEventEq, ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();
@@ -23,13 +20,13 @@ const collName = "test";
 const collNS = dbName + "." + collName;
 const ns = {
     db: dbName,
-    coll: collName
+    coll: collName,
 };
 const numDocs = 1;
 
 const st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
 });
 
 const mongosConn = st.s;
@@ -64,14 +61,16 @@ function validateShowSystemEventsFalse() {
     prepareCollection();
     let pipeline = [
         {$changeStream: {showExpandedEvents: true, showSystemEvents: false}},
-        {$match: {operationType: {$nin: ["create", "createIndexes"]}}}
+        {$match: {operationType: {$nin: ["create", "createIndexes"]}}},
     ];
-    let cursor = test.startWatchingChanges(
-        {pipeline, collection: collName, aggregateOptions: {cursor: {batchSize: 0}}});
+    let cursor = test.startWatchingChanges({
+        pipeline,
+        collection: collName,
+        aggregateOptions: {cursor: {batchSize: 0}},
+    });
 
     // Migrate a chunk, then insert a new document.
-    assert.commandWorked(
-        db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
     assert.commandWorked(db[collName].insert({_id: numDocs + 1}));
 
     // Confirm that we don't observe the migrateLastChunkFromShard event in the stream, but only see
@@ -83,7 +82,7 @@ function validateShowSystemEventsFalse() {
             ns: ns,
             fullDocument: {_id: numDocs + 1},
             documentKey: {_id: numDocs + 1},
-        }
+        },
     });
 }
 
@@ -94,14 +93,16 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
 
     let pipeline = [
         {$changeStream: {showExpandedEvents: true, showSystemEvents: true}},
-        {$match: {operationType: {$nin: ["create", "createIndexes"]}}}
+        {$match: {operationType: {$nin: ["create", "createIndexes"]}}},
     ];
-    let cursor = test.startWatchingChanges(
-        {pipeline: pipeline, collection: collParam, aggregateOptions: {cursor: {batchSize: 0}}});
+    let cursor = test.startWatchingChanges({
+        pipeline: pipeline,
+        collection: collParam,
+        aggregateOptions: {cursor: {batchSize: 0}},
+    });
 
     // Migrate a chunk from one shard to another.
-    assert.commandWorked(
-        db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(db.adminCommand({moveChunk: collNS, find: {_id: 0}, to: st.shard1.shardName}));
 
     // Confirm that we observe the migrateLastChunkFromShard event, and obtain its resume token.
     const migrateResumeToken = assertMigrateEventObserved(cursor, expectedOutput);
@@ -111,10 +112,11 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
     assert.commandWorked(db[collName].insert({_id: numDocs + 1}));
 
     // Resume after the migrate event and confirm we see the subsequent insert.
-    pipeline = [{
-        $changeStream:
-            {showExpandedEvents: true, showSystemEvents: true, resumeAfter: migrateResumeToken}
-    }];
+    pipeline = [
+        {
+            $changeStream: {showExpandedEvents: true, showSystemEvents: true, resumeAfter: migrateResumeToken},
+        },
+    ];
     cursor = test.startWatchingChanges({pipeline: pipeline, collection: collParam});
 
     test.assertNextChangesEqual({
@@ -124,7 +126,7 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
             ns: ns,
             fullDocument: {_id: numDocs + 1},
             documentKey: {_id: numDocs + 1},
-        }
+        },
     });
 }
 
@@ -136,7 +138,7 @@ validateExpectedEventAndConfirmResumability(collName, {
     ns: ns,
     operationDescription: {
         "shardId": st.shard0.shardName,
-    }
+    },
 });
 
 // Test the behaviour of migrateLastChunkFromShard for a whole-DB stream.
@@ -145,7 +147,7 @@ validateExpectedEventAndConfirmResumability(1, {
     ns: ns,
     operationDescription: {
         "shardId": st.shard0.shardName,
-    }
+    },
 });
 
 // Test the behaviour of migrateLastChunkFromShard when showSystemEvents is false.

@@ -17,8 +17,7 @@ function testConfigureQueryAnalyzer(conn) {
     const otherDbName = "otherTestDb";
 
     const adminDb = conn.getDB("admin");
-    assert.commandWorked(
-        adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
+    assert.commandWorked(adminDb.runCommand({createUser: "super", pwd: "super", roles: ["__system"]}));
     assert(adminDb.auth("super", "super"));
     const testDb = adminDb.getSiblingDB(dbName);
     assert.commandWorked(testDb.createCollection(collName0));
@@ -36,69 +35,73 @@ function testConfigureQueryAnalyzer(conn) {
     assert(adminDb.auth("user_no_priv", "pwd"));
     assert.commandFailedWithCode(
         adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}),
-        ErrorCodes.Unauthorized);
+        ErrorCodes.Unauthorized,
+    );
     assert.commandFailedWithCode(
         adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}),
-        ErrorCodes.Unauthorized);
+        ErrorCodes.Unauthorized,
+    );
     assert(adminDb.logout());
 
     // Set up a user with the 'configureQueryAnalyzer' privilege against ns0.
     assert(adminDb.auth("super", "super"));
-    assert.commandWorked(adminDb.runCommand({
-        createRole: "role_ns0_priv",
-        roles: [],
-        privileges:
-            [{resource: {db: dbName, collection: collName0}, actions: ["configureQueryAnalyzer"]}]
-    }));
-    assert.commandWorked(adminDb.runCommand({
-        createUser: "user_with_explicit_ns0_priv",
-        pwd: "pwd",
-        roles: [{role: "role_ns0_priv", db: "admin"}]
-    }));
+    assert.commandWorked(
+        adminDb.runCommand({
+            createRole: "role_ns0_priv",
+            roles: [],
+            privileges: [{resource: {db: dbName, collection: collName0}, actions: ["configureQueryAnalyzer"]}],
+        }),
+    );
+    assert.commandWorked(
+        adminDb.runCommand({
+            createUser: "user_with_explicit_ns0_priv",
+            pwd: "pwd",
+            roles: [{role: "role_ns0_priv", db: "admin"}],
+        }),
+    );
     assert(adminDb.logout());
     // Verify that the user is authorized to run the configureQueryAnalyzer command against ns0
     // but not ns1.
     assert(adminDb.auth("user_with_explicit_ns0_priv", "pwd"));
-    assert.commandWorked(
-        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
+    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
     assert.commandFailedWithCode(
         adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}),
-        ErrorCodes.Unauthorized);
+        ErrorCodes.Unauthorized,
+    );
     assert(adminDb.logout());
 
     // Set up a user with the 'clusterManager' role.
     assert(adminDb.auth("super", "super"));
-    assert.commandWorked(adminDb.runCommand({
-        createUser: "user_cluster_mgr",
-        pwd: "pwd",
-        roles: [{role: "clusterManager", db: "admin"}]
-    }));
+    assert.commandWorked(
+        adminDb.runCommand({
+            createUser: "user_cluster_mgr",
+            pwd: "pwd",
+            roles: [{role: "clusterManager", db: "admin"}],
+        }),
+    );
     assert(adminDb.logout());
     // Verify that the user is authorized to run the configureQueryAnalyzer command against both
     // ns0 and ns1.
     assert(adminDb.auth("user_cluster_mgr", "pwd"));
-    assert.commandWorked(
-        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
-    assert.commandWorked(
-        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}));
+    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
+    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}));
     assert(adminDb.logout());
 
     // Set up a user with the 'dbAdmin' role.
     assert(adminDb.auth("super", "super"));
-    assert.commandWorked(adminDb.runCommand(
-        {createUser: "user_db_admin", pwd: "pwd", roles: [{role: "dbAdmin", db: dbName}]}));
+    assert.commandWorked(
+        adminDb.runCommand({createUser: "user_db_admin", pwd: "pwd", roles: [{role: "dbAdmin", db: dbName}]}),
+    );
     assert(adminDb.logout());
     // Verify that the user is authorized to run the configureQueryAnalyzer command against both
     // ns0 and ns1 but not against a ns in some other database.
     assert(adminDb.auth("user_db_admin", "pwd"));
-    assert.commandWorked(
-        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
-    assert.commandWorked(
-        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}));
+    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
+    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}));
     assert.commandFailedWithCode(
-        adminDb.runCommand(
-            {"configureQueryAnalyzer": otherDbName + collName0, mode, samplesPerSecond}),
-        ErrorCodes.Unauthorized);
+        adminDb.runCommand({"configureQueryAnalyzer": otherDbName + collName0, mode, samplesPerSecond}),
+        ErrorCodes.Unauthorized,
+    );
     assert(adminDb.logout());
 }
 
@@ -109,17 +112,20 @@ function testRefreshQueryAnalyzerConfiguration(conn) {
     // Verify that a user with the internal role is authorized to run the
     // _refreshQueryAnalyzerConfiguration command.
     assert(adminDb.auth("super", "super"));
-    assert.commandWorked(adminDb.runCommand(
-        {_refreshQueryAnalyzerConfiguration: 1, name: conn.host, numQueriesExecutedPerSecond: 1}));
+    assert.commandWorked(
+        adminDb.runCommand({_refreshQueryAnalyzerConfiguration: 1, name: conn.host, numQueriesExecutedPerSecond: 1}),
+    );
     assert(adminDb.logout());
 
     assert(adminDb.auth("user_no_priv", "pwd"));
-    assert.commandFailedWithCode(adminDb.runCommand({
-        _refreshQueryAnalyzerConfiguration: 1,
-        name: conn.host,
-        numQueriesExecutedPerSecond: 1
-    }),
-                                 ErrorCodes.Unauthorized);
+    assert.commandFailedWithCode(
+        adminDb.runCommand({
+            _refreshQueryAnalyzerConfiguration: 1,
+            name: conn.host,
+            numQueriesExecutedPerSecond: 1,
+        }),
+        ErrorCodes.Unauthorized,
+    );
     assert(adminDb.logout());
 }
 
@@ -131,7 +137,8 @@ function testRefreshQueryAnalyzerConfiguration(conn) {
     st.stop();
 }
 
-if (!jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Remove block
+if (!jsTestOptions().useAutoBootstrapProcedure) {
+    // TODO: SERVER-80318 Remove block
     const rst = new ReplSetTest({nodes: 1, keyFile: "jstests/libs/key1"});
     rst.startSet();
     rst.initiate();

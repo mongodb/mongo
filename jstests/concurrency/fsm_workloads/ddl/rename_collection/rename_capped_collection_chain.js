@@ -7,16 +7,16 @@
  *
  * @tags: [requires_capped]
  */
-export const $config = (function() {
+export const $config = (function () {
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.
-        prefix: 'rename_capped_collection_chain'
+        prefix: "rename_capped_collection_chain",
     };
 
-    var states = (function() {
+    var states = (function () {
         function uniqueCollectionName(prefix, tid, num) {
-            return prefix + tid + '_' + num;
+            return prefix + tid + "_" + num;
         }
 
         function init(db, collName) {

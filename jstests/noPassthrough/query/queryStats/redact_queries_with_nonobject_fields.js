@@ -8,9 +8,9 @@ let options = {
 };
 
 const conn = MongoRunner.runMongod(options);
-const testDB = conn.getDB('test');
+const testDB = conn.getDB("test");
 var collA = testDB[jsTestName()];
-var collB = testDB[jsTestName() + 'Two'];
+var collB = testDB[jsTestName() + "Two"];
 collA.drop();
 collB.drop();
 
@@ -28,8 +28,7 @@ function confirmAggSuccess(collName, pipeline) {
 // Test with non-object fields $limit and $skip.
 confirmAggSuccess(collA.getName(), [{$sort: {bar: -1}}, {$limit: 2}, {$match: {foo: {$lte: 2}}}]);
 confirmAggSuccess(collA.getName(), [{$sort: {bar: -1}}, {$skip: 50}, {$match: {foo: {$lte: 2}}}]);
-confirmAggSuccess(collA.getName(),
-                  [{$sort: {bar: -1}}, {$limit: 2}, {$skip: 50}, {$match: {foo: 0}}]);
+confirmAggSuccess(collA.getName(), [{$sort: {bar: -1}}, {$limit: 2}, {$skip: 50}, {$match: {foo: 0}}]);
 
 // Test non-object field, $unionWith.
 confirmAggSuccess(collA.getName(), [{$unionWith: collB.getName()}]);
@@ -40,11 +39,11 @@ confirmAggSuccess(collA.getName(), [
     {
         $setWindowFields: {
             sortBy: {foo: 1},
-            output: {sum: {$sum: "$bar", window: {documents: ["unbounded", "current"]}}}
-        }
+            output: {sum: {$sum: "$bar", window: {documents: ["unbounded", "current"]}}},
+        },
     },
     {$sort: {foo: 1}},
-    {$limit: 5}
+    {$limit: 5},
 ]);
 // Test find commands containing non-object fields
 assert.commandWorked(testDB.runCommand({find: collA.getName(), limit: 20}));
@@ -56,15 +55,16 @@ collB.findOne();
 collB.findOne({foo: 1});
 
 // Test non-object field $unwind
-confirmAggSuccess(
-    collA.getName(), [{
+confirmAggSuccess(collA.getName(), [
+    {
         "$facet": {
             "productOfJoin": [
                 {"$lookup": {"from": collB.getName(), "pipeline": [{"$match": {}}], "as": "join"}},
                 {"$unwind": "$join"},
-                {"$project": {"str": 1}}
-            ]
-        }
-    }]);
+                {"$project": {"str": 1}},
+            ],
+        },
+    },
+]);
 
 MongoRunner.stopMongod(conn);

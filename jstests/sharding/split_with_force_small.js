@@ -14,12 +14,10 @@ assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
 
-jsTest.log("Insert a bunch of data into the low chunk of a collection," +
-           " to prevent relying on stats.");
+jsTest.log("Insert a bunch of data into the low chunk of a collection," + " to prevent relying on stats.");
 
 var data128k = "x";
-for (var i = 0; i < 7; i++)
-    data128k += data128k;
+for (var i = 0; i < 7; i++) data128k += data128k;
 
 var bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < 1024; i++) {
@@ -51,15 +49,17 @@ for (let i = 0; i < 5; i++) {
 // Make sure we can't split further than 5 (2^5) times
 assert.commandFailed(admin.runCommand({split: coll + "", find: {_id: 0}}));
 
-var chunks = config.chunks.find({'min._id': {$gte: 0, $lt: 32}}).sort({min: 1}).toArray();
+var chunks = config.chunks
+    .find({"min._id": {$gte: 0, $lt: 32}})
+    .sort({min: 1})
+    .toArray();
 printjson(chunks);
 
 // Make sure the chunks grow by 2x (except the first)
 var nextSize = 1;
 for (let i = 0; i < chunks.size; i++) {
     assert.eq(coll.count({_id: {$gte: chunks[i].min._id, $lt: chunks[i].max._id}}), nextSize);
-    if (i != 0)
-        nextSize += nextSize;
+    if (i != 0) nextSize += nextSize;
 }
 
 st.stop();

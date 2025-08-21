@@ -7,10 +7,7 @@
  *   tsan_incompatible,
  * ]
  */
-import {
-    dropWithoutImplicitRecreate,
-    withEachMergeMode
-} from "jstests/aggregation/extras/merge_helpers.js";
+import {dropWithoutImplicitRecreate, withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.batch_writes;
@@ -28,16 +25,17 @@ assert.commandWorked(coll.insert({_id: 1, a: largeArray}));
 withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     // Skip the combination of merge modes which will fail depending on the contents of the
     // source and target collection, as this will cause the aggregation to fail.
-    if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail")
-        return;
+    if (whenMatchedMode == "fail" || whenNotMatchedMode == "fail") return;
 
-    coll.aggregate([{
-        $merge: {
-            into: outColl.getName(),
-            whenMatched: whenMatchedMode,
-            whenNotMatched: whenNotMatchedMode
-        }
-    }]);
+    coll.aggregate([
+        {
+            $merge: {
+                into: outColl.getName(),
+                whenMatched: whenMatchedMode,
+                whenNotMatched: whenNotMatchedMode,
+            },
+        },
+    ]);
     assert.eq(whenNotMatchedMode == "discard" ? 0 : 2, outColl.find().itcount());
     outColl.drop();
 });
@@ -61,7 +59,8 @@ assert.commandWorked(outColl.createIndex({a: 1}, {unique: true}));
 assertErrorCode(
     coll,
     [{$merge: {into: outColl.getName(), whenMatched: "fail", whenNotMatched: "insert"}}],
-    ErrorCodes.DuplicateKey);
+    ErrorCodes.DuplicateKey,
+);
 assert.soon(() => {
     return outColl.find().itcount() == 9;
 });
@@ -73,11 +72,9 @@ assert.soon(() => {
 // preventing a duplicate key error from arising later on.
 assertErrorCode(
     coll,
-    [
-        {$sort: {a: 1}},
-        {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}
-    ],
-    ErrorCodes.DuplicateKey);
+    [{$sort: {a: 1}}, {$merge: {into: outColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}],
+    ErrorCodes.DuplicateKey,
+);
 assert.soon(() => {
     return outColl.find().itcount() == 9;
 });

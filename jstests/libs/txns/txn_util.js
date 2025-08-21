@@ -3,84 +3,77 @@
  */
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
-export var TxnUtil = (function() {
+export var TxnUtil = (function () {
     // Although createCollection and createIndexes are supported inside multi-document
     // transactions, we intentionally exclude them from this list since they are non-
     // idempotent and, for createIndexes, are not supported inside multi-document
     // transactions for all cases.
     const kCmdsSupportingTransactions = new Set([
-        'aggregate',
-        'delete',
-        'find',
-        'findAndModify',
-        'findandmodify',
-        'getMore',
-        'insert',
-        'update',
-        'bulkWrite',
+        "aggregate",
+        "delete",
+        "find",
+        "findAndModify",
+        "findandmodify",
+        "getMore",
+        "insert",
+        "update",
+        "bulkWrite",
     ]);
 
-    const kCmdsThatWrite = new Set([
-        'insert',
-        'update',
-        'findAndModify',
-        'findandmodify',
-        'delete',
-        'bulkWrite',
-    ]);
+    const kCmdsThatWrite = new Set(["insert", "update", "findAndModify", "findandmodify", "delete", "bulkWrite"]);
 
     // Indicates an aggregation command with a pipeline that cannot run in a transaction but can
     // still execute concurrently with other transactions. Pipelines with $changeStream or $out
     // cannot run within a transaction.
     function commandIsNonTxnAggregation(cmdName, cmdObj) {
-        return !("explain" in cmdObj) &&
-            OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj) ||
+        return (
+            (!("explain" in cmdObj) && OverrideHelpers.isAggregationWithOutOrMergeStage(cmdName, cmdObj)) ||
             OverrideHelpers.isAggregationWithChangeStreamStage(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithListClusterCatalog(cmdName, cmdObj) ||
             OverrideHelpers.isAggregationWithInternalListCollections(cmdName, cmdObj) ||
-            OverrideHelpers.isAggregationWithQuerySettings(cmdName, cmdObj);
+            OverrideHelpers.isAggregationWithQuerySettings(cmdName, cmdObj)
+        );
     }
 
     function commandSupportsTxn(dbName, cmdName, cmdObj) {
-        if (cmdName === 'commitTransaction' || cmdName === 'abortTransaction') {
+        if (cmdName === "commitTransaction" || cmdName === "abortTransaction") {
             return true;
         }
 
-        if (!kCmdsSupportingTransactions.has(cmdName) ||
-            commandIsNonTxnAggregation(cmdName, cmdObj)) {
+        if (!kCmdsSupportingTransactions.has(cmdName) || commandIsNonTxnAggregation(cmdName, cmdObj)) {
             return false;
         }
 
         // bulkWrite always operates on the admin DB so cannot check the dbName directly.
         // Operating namespaces are also contained within a 'nsInfo' array in the command.
-        if (cmdName === 'bulkWrite') {
+        if (cmdName === "bulkWrite") {
             // 'nsInfo' does not exist in command.
-            if (!cmdObj['nsInfo']) {
+            if (!cmdObj["nsInfo"]) {
                 return false;
             }
 
             // Loop through 'nsInfo'.
-            for (const ns of cmdObj['nsInfo']) {
-                if (!ns['ns']) {
+            for (const ns of cmdObj["nsInfo"]) {
+                if (!ns["ns"]) {
                     return false;
                 }
-                var db = ns['ns'].split('.', 1)[0];
-                if (db === 'local' || db === 'config' || db === 'system') {
+                var db = ns["ns"].split(".", 1)[0];
+                if (db === "local" || db === "config" || db === "system") {
                     return false;
                 }
                 // Make sure no namespaces are system. collections
-                var coll = ns['ns'].substring(ns['ns'].indexOf('.') + 1);
-                if (coll.startsWith('system.')) {
+                var coll = ns["ns"].substring(ns["ns"].indexOf(".") + 1);
+                if (coll.startsWith("system.")) {
                     return false;
                 }
             }
         } else {
-            if (dbName === 'local' || dbName === 'config' || dbName === 'admin') {
+            if (dbName === "local" || dbName === "config" || dbName === "admin") {
                 return false;
             }
 
             if (kCmdsThatWrite.has(cmdName)) {
-                if (cmdObj[cmdName].startsWith('system.')) {
+                if (cmdObj[cmdName].startsWith("system.")) {
                     return false;
                 }
             }
@@ -94,7 +87,7 @@ export var TxnUtil = (function() {
     }
 
     function commandTypeCanSupportTxn(cmdName) {
-        if (cmdName === 'commitTransaction' || cmdName === 'abortTransaction') {
+        if (cmdName === "commitTransaction" || cmdName === "abortTransaction") {
             return true;
         }
 
@@ -111,14 +104,18 @@ export var TxnUtil = (function() {
     function deepCopyObject(dst, src) {
         for (var k in src) {
             var v = src[k];
-            if (typeof (v) == "object" && v !== null) {
-                if (v.constructor === ObjectId) {  // convert ObjectId properly
+            if (typeof v == "object" && v !== null) {
+                if (v.constructor === ObjectId) {
+                    // convert ObjectId properly
                     eval("v = " + tojson(v));
-                } else if (v instanceof NumberLong) {  // convert NumberLong properly
+                } else if (v instanceof NumberLong) {
+                    // convert NumberLong properly
                     eval("v = " + tojson(v));
-                } else if (v instanceof Date) {  // convert Date properly
+                } else if (v instanceof Date) {
+                    // convert Date properly
                     eval("v = " + tojson(v));
-                } else if (v instanceof Timestamp) {  // convert Timestamp properly
+                } else if (v instanceof Timestamp) {
+                    // convert Timestamp properly
                     eval("v = " + tojson(v));
                 } else if (Object.getPrototypeOf(v) === Object.prototype) {
                     v = deepCopyObject({}, v);
@@ -138,13 +135,11 @@ export var TxnUtil = (function() {
     }
 
     function isTransientTransactionError(res) {
-        return res.hasOwnProperty('errorLabels') &&
-            res.errorLabels.includes('TransientTransactionError');
+        return res.hasOwnProperty("errorLabels") && res.errorLabels.includes("TransientTransactionError");
     }
 
     function isConflictingOperationInProgress(res) {
-        return res != null && res.hasOwnProperty('codeName') &&
-            res.codeName === "ConflictingOperationInProgress";
+        return res != null && res.hasOwnProperty("codeName") && res.codeName === "ConflictingOperationInProgress";
     }
 
     // Runs a function 'func()' in a transaction on database 'db'. Invokes function

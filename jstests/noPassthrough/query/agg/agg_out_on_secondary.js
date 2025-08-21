@@ -33,8 +33,7 @@ const db = replSetConn.getDB(dbName);
 let expectedResults = [];
 // Insert some documents which our pipeline will eventually read from.
 for (let i = 0; i < nDocs; i++) {
-    assert.commandWorked(
-        readColl.insert({_id: i, groupKey: i % 10, num: i}, {writeConcern: {w: 2}}));
+    assert.commandWorked(readColl.insert({_id: i, groupKey: i % 10, num: i}, {writeConcern: {w: 2}}));
     if (i < 10) {
         expectedResults.push({_id: i, sum: i});
     } else {
@@ -53,16 +52,15 @@ assert.eq(db[readCollName].aggregate(pipeline, {comment: comment}).itcount(), 0)
 assert(anyEq(primaryDB[outCollName].find().toArray(), expectedResults));
 
 // Verify that $group was executed on the secondary.
-const secondaryProfile =
-    secondaryDB.system.profile.find({"command.aggregate": "readColl", "command.comment": comment})
-        .itcount();
+const secondaryProfile = secondaryDB.system.profile
+    .find({"command.aggregate": "readColl", "command.comment": comment})
+    .itcount();
 assert.eq(1, secondaryProfile);
 
 // Verify $out's operations were executed on the primary.
-const primaryProfile =
-    primaryDB.system.profile
-        .find({"command.internalRenameIfOptionsAndIndexesMatch": 1, "command.comment": comment})
-        .itcount();
+const primaryProfile = primaryDB.system.profile
+    .find({"command.internalRenameIfOptionsAndIndexesMatch": 1, "command.comment": comment})
+    .itcount();
 assert.eq(1, primaryProfile);
 
 rs.stopSet();

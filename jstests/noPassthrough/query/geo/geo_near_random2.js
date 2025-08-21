@@ -10,7 +10,7 @@ test.insertPts(50000);
 
 const opts = {
     sphere: 0,
-    nToTest: test.nPts * 0.01
+    nToTest: test.nPts * 0.01,
 };
 test.testPt([0, 0], opts);
 test.testPt(test.mkPt(), opts);

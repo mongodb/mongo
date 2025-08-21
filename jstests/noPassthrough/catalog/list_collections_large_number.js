@@ -14,9 +14,8 @@ const validatorObj = {
         bsonType: "object",
         properties: {
             s: {bsonType: "string", description: "x".repeat(4801)},
-
-        }
-    }
+        },
+    },
 };
 const nCollections = 3300;
 jsTestLog(`Creating ${nCollections} collections....`);

@@ -9,28 +9,22 @@
  *
  */
 
-import {
-    checkSbeFullyEnabled,
-} from "jstests/libs/query/sbe_util.js";
-import {
-    extractSortEffort,
-    padNumber,
-    trimPlanToStagesAndIndexes
-} from 'jstests/query_golden/libs/utils.js';
-import {pipelines} from 'jstests/query_golden/test_inputs/plan_stability_pipelines.js';
-import {
-    populateSimplePlanStabilityDataset
-} from "jstests/query_golden/test_inputs/simple_plan_stability_dataset.js";
+import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
+import {extractSortEffort, padNumber, trimPlanToStagesAndIndexes} from "jstests/query_golden/libs/utils.js";
+import {pipelines} from "jstests/query_golden/test_inputs/plan_stability_pipelines.js";
+import {populateSimplePlanStabilityDataset} from "jstests/query_golden/test_inputs/simple_plan_stability_dataset.js";
 
 if (checkSbeFullyEnabled(db)) {
     jsTest.log.info("Skipping the test because CBR only applies to the classic engine.");
     quit();
 }
 
-if (db.getServerBuildInfo().isAddressSanitizerActive() ||
+if (
+    db.getServerBuildInfo().isAddressSanitizerActive() ||
     db.getServerBuildInfo().isLeakSanitizerActive() ||
     db.getServerBuildInfo().isThreadSanitizerActive() ||
-    db.getServerBuildInfo().isUndefinedBehaviorSanitizerActive()) {
+    db.getServerBuildInfo().isUndefinedBehaviorSanitizerActive()
+) {
     jsTest.log.info("Skipping the test because a sanitizer is active.");
     quit();
 }
@@ -94,7 +88,7 @@ pipelines.forEach((pipeline, index) => {
     // We do not use explain() as it loses the errmsg in case of an error.
     const explain = db.runCommand({
         explain: {aggregate: collName, pipeline: pipeline, cursor: {}},
-        verbosity: "executionStats"
+        verbosity: "executionStats",
     });
 
     if (explain.ok !== 1) {
@@ -131,21 +125,23 @@ pipelines.forEach((pipeline, index) => {
 });
 print("],");
 
-print('">>>totals": {' +
-      `"pipelines": ${pipelines.length}, ` +
-      `"plans": ${(totalPlans)}, ` +
-      `"keys": ${padNumber(totalKeys)}, ` +
-      `"docs": ${padNumber(totalDocs)}, ` +
-      `"sorts": ${padNumber(totalSorts)}, ` +
-      `"rows": ${padNumber(totalRows)}, ` +
-      `"errors": ${padNumber(totalErrors)}},`);
+print(
+    '">>>totals": {' +
+        `"pipelines": ${pipelines.length}, ` +
+        `"plans": ${totalPlans}, ` +
+        `"keys": ${padNumber(totalKeys)}, ` +
+        `"docs": ${padNumber(totalDocs)}, ` +
+        `"sorts": ${padNumber(totalSorts)}, ` +
+        `"rows": ${padNumber(totalRows)}, ` +
+        `"errors": ${padNumber(totalErrors)}},`,
+);
 
 const parameters = {
     planRankerMode: null,
     samplingMarginOfError: null,
     samplingConfidenceInterval: null,
     internalQuerySamplingCEMethod: null,
-    internalQuerySamplingBySequentialScan: null
+    internalQuerySamplingBySequentialScan: null,
 };
 
 for (const param in parameters) {

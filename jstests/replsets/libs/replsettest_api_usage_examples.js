@@ -4,7 +4,7 @@ function nodeWithHighestPriorityStepsUp() {
     // Test replica set with different priorities.
     const replTest = new ReplSetTest({
         name: "NodesWithDifferentPriorities",
-        nodes: [{rsConfig: {priority: 5}}, {}, {rsConfig: {priority: 0}}]
+        nodes: [{rsConfig: {priority: 5}}, {}, {rsConfig: {priority: 0}}],
     });
 
     replTest.startSet();
@@ -44,8 +44,12 @@ function manuallyStepUpNodeWhenHighElectionTimeoutSet() {
     // Test some behavior.
     const primary = replTest.getPrimary();
     const primaryDB = primary.getDB("db");
-    assert.commandWorked(primaryDB["collection"].insertMany(
-        [...Array(100).keys()].map(x => ({a: x.toString()})), {ordered: false}));
+    assert.commandWorked(
+        primaryDB["collection"].insertMany(
+            [...Array(100).keys()].map((x) => ({a: x.toString()})),
+            {ordered: false},
+        ),
+    );
 
     // Call `stepUp()` to make another node the primary. This waits for all nodes to reach the same
     // optime before sending the replSetStepUp command to the node, so that the stepup command will
@@ -62,7 +66,7 @@ function manuallyStepUpNodeWhenHighElectionTimeoutSet() {
 function frozenNodesDontTriggerElections() {
     const replTest = new ReplSetTest({
         name: "freezeNode",
-        nodes: [{rsConfig: {priority: 5}}, {rsConfig: {priority: 3}}, {rsConfig: {priority: 0}}]
+        nodes: [{rsConfig: {priority: 5}}, {rsConfig: {priority: 3}}, {rsConfig: {priority: 0}}],
     });
     replTest.startSet();
     replTest.initiate(null, null, {initiateWithDefaultElectionTimeout: true});
@@ -88,7 +92,7 @@ function frozenNodesDontTriggerElections() {
 }
 
 function dumpOplogEntries() {
-    const replTest = new ReplSetTest({name: 'dumpOplogEntries', nodes: 3});
+    const replTest = new ReplSetTest({name: "dumpOplogEntries", nodes: 3});
     replTest.startSet();
 
     // Call `initiate` without `initiateWithDefaultElectionTimeout: true` when not testing election
@@ -100,8 +104,12 @@ function dumpOplogEntries() {
     // Insert some documents.
     const primary = replTest.getPrimary();
     const primaryDB = primary.getDB("db");
-    assert.commandWorked(primaryDB["collection"].insertMany(
-        [...Array(5).keys()].map(x => ({a: x.toString()})), {ordered: false}));
+    assert.commandWorked(
+        primaryDB["collection"].insertMany(
+            [...Array(5).keys()].map((x) => ({a: x.toString()})),
+            {ordered: false},
+        ),
+    );
 
     // Use `dumpOplog()` to print out oplog entries to help with debugging.
     replTest.dumpOplog(primary);

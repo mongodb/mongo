@@ -18,13 +18,17 @@ assert.commandWorked(testDB.dropDatabase());
 testDB.runCommand({create: "foo", viewOn: "bar", pipeline: []});
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(testDB.runCommand({find: "system.views", filter: {}}),
-                             [ErrorCodes.OperationNotSupportedInTransaction, 51071]);
+assert.commandFailedWithCode(testDB.runCommand({find: "system.views", filter: {}}), [
+    ErrorCodes.OperationNotSupportedInTransaction,
+    51071,
+]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(testDB.runCommand({find: "system.profile", filter: {}}),
-                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(
+    testDB.runCommand({find: "system.profile", filter: {}}),
+    ErrorCodes.OperationNotSupportedInTransaction,
+);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 // The following tests a {find: uuid} command which is not supported on mongos or with replica set
@@ -33,8 +37,7 @@ if (FixtureHelpers.isMongos(testDB) || TestData.testingReplicaSetEndpoint) {
     quit();
 }
 
-const collectionInfos =
-    new DBCommandCursor(testDB, assert.commandWorked(testDB.runCommand({listCollections: 1})));
+const collectionInfos = new DBCommandCursor(testDB, assert.commandWorked(testDB.runCommand({listCollections: 1})));
 let systemViewsUUID = null;
 while (collectionInfos.hasNext()) {
     const next = collectionInfos.next();
@@ -45,6 +48,9 @@ while (collectionInfos.hasNext()) {
 assert.neq(null, systemViewsUUID, "did not find UUID for system.views");
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(testDB.runCommand({find: systemViewsUUID, filter: {}}),
-                             [ErrorCodes.OperationNotSupportedInTransaction, 51070, 7195700]);
+assert.commandFailedWithCode(testDB.runCommand({find: systemViewsUUID, filter: {}}), [
+    ErrorCodes.OperationNotSupportedInTransaction,
+    51070,
+    7195700,
+]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);

@@ -38,8 +38,10 @@ const kRetry = false;
 
 function hasBackgroundOpInProgress(res) {
     // Only these are retryable.
-    return res.code === ErrorCodes.BackgroundOperationInProgressForNamespace ||
-        res.code === ErrorCodes.BackgroundOperationInProgressForDatabase;
+    return (
+        res.code === ErrorCodes.BackgroundOperationInProgressForNamespace ||
+        res.code === ErrorCodes.BackgroundOperationInProgressForDatabase
+    );
 }
 
 function runCommandWithRetries(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
@@ -64,9 +66,13 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
                 return kNoRetry;
             }
 
-            let message = "Retrying the " + commandName +
-                " command because a background operation is in progress (attempt " + attempt +
-                "): " + tojson(res);
+            let message =
+                "Retrying the " +
+                commandName +
+                " command because a background operation is in progress (attempt " +
+                attempt +
+                "): " +
+                tojson(res);
 
             // This handles the retry case when run against a standalone, replica set, or mongos
             // where both shards returned the same response.
@@ -118,8 +124,10 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
             // retrying allowlisted commands. Fake a successful response.
             if (shardsWithBackgroundOps.length === 0) {
                 jsTest.log.info(
-                    "done retrying " + commandName +
-                    " command because all shards have responded with acceptable errors");
+                    "done retrying " +
+                        commandName +
+                        " command because all shards have responded with acceptable errors",
+                );
                 res.ok = 1;
                 return kNoRetry;
             }
@@ -127,10 +135,10 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
             jsTest.log.info(message + " on shards", {shardsWithBackgroundOps});
             return kRetry;
         },
-        () => "Timed out while retrying command '" + tojson(commandObj) +
-            "', response: " + tojson(res),
+        () => "Timed out while retrying command '" + tojson(commandObj) + "', response: " + tojson(res),
         kTimeout,
-        kInterval);
+        kInterval,
+    );
     return res;
 }
 

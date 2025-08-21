@@ -14,16 +14,15 @@ assert.commandWorked(testDB.createCollection(collName));
 
 function getMatchingLogLines() {
     const fieldMatcher = {
-        msg:
-            "Use of the listSearchIndexes command is deprecated. Instead use the '$listSearchIndexes' aggregation stage."
+        msg: "Use of the listSearchIndexes command is deprecated. Instead use the '$listSearchIndexes' aggregation stage.",
     };
-    const globalLogs = testDB.adminCommand({getLog: 'global'});
+    const globalLogs = testDB.adminCommand({getLog: "global"});
     return [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
 }
 
 function runDeprecatedCommand() {
     // Run listSearchIndexes. Expect the command to fail as we haven't configured search.
-    assert.commandFailedWithCode(testDB.runCommand({'listSearchIndexes': collName}), 31082);
+    assert.commandFailedWithCode(testDB.runCommand({"listSearchIndexes": collName}), 31082);
 }
 // Assert that deprecation msg is not logged before map reduce command is even run.
 var matchingLogLines = getMatchingLogLines();
@@ -43,8 +42,9 @@ assert.eq(matchingLogLines.length, 1, matchingLogLines);
 
 // Check that the aggregation stage doesn't log.
 assert.commandFailedWithCode(
-    testDB.runCommand({'aggregate': collName, pipeline: [{"$listSearchIndexes": {}}], cursor: {}}),
-    31082);
+    testDB.runCommand({"aggregate": collName, pipeline: [{"$listSearchIndexes": {}}], cursor: {}}),
+    31082,
+);
 matchingLogLines = getMatchingLogLines();
 assert.eq(matchingLogLines.length, 1, matchingLogLines);
 

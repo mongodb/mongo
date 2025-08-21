@@ -16,18 +16,25 @@ const dbName = "test";
 // Create large enough docs so the index build will spill to disk.
 const docCount = 200;
 const docs = [];
-const bigStr = 'x'.repeat(1024 * 1024);
+const bigStr = "x".repeat(1024 * 1024);
 for (let i = 0; i < docCount; ++i) {
     docs.push({a: i, b: -i, padding: bigStr});
 }
 
-const failPoint =
-    [{name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386}];
+const failPoint = [{name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386}];
 const failPointIterations = docCount - 5;
 
 function runTest(initialBinVersion, binVersionAfterRestart, fcv) {
-    jsTestLog("Running test " + jsTestName() + " for bin versions: " + initialBinVersion + " -> " +
-              binVersionAfterRestart + " fcv: " + fcv);
+    jsTestLog(
+        "Running test " +
+            jsTestName() +
+            " for bin versions: " +
+            initialBinVersion +
+            " -> " +
+            binVersionAfterRestart +
+            " fcv: " +
+            fcv,
+    );
     const rst = new ReplSetTest({nodes: 1, nodeOptions: {binVersion: initialBinVersion}});
     rst.startSet();
     rst.initiate();
@@ -43,17 +50,19 @@ function runTest(initialBinVersion, binVersionAfterRestart, fcv) {
 
     const indexSpecs = [[{a: 1}]];
 
-    ResumableIndexBuildTest.run(rst,
-                                dbName,
-                                coll.getName(),
-                                indexSpecs,
-                                failPoint,
-                                failPointIterations,
-                                ["collection scan"],
-                                [{numScannedAfterResume: docCount - failPointIterations}],
-                                [],
-                                [],
-                                {binVersion: binVersionAfterRestart});
+    ResumableIndexBuildTest.run(
+        rst,
+        dbName,
+        coll.getName(),
+        indexSpecs,
+        failPoint,
+        failPointIterations,
+        ["collection scan"],
+        [{numScannedAfterResume: docCount - failPointIterations}],
+        [],
+        [],
+        {binVersion: binVersionAfterRestart},
+    );
 
     rst.stopSet();
 }

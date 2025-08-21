@@ -11,9 +11,7 @@
  * ]
  */
 
-import {
-    ChangeStreamMultitenantReplicaSetTest
-} from "jstests/serverless/libs/change_collection_util.js";
+import {ChangeStreamMultitenantReplicaSetTest} from "jstests/serverless/libs/change_collection_util.js";
 
 function getChangeCollectionEntry(ts) {
     const farOffDate = ISODate("2100-01-01");
@@ -34,11 +32,17 @@ assert.doesNotThrow(() => {
     });
 
     const primary = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-        replSetTest.getPrimary().host, kTenantId, kTenantId.str);
-    replSetTest.awaitReplication();  // Await user creation replication.
+        replSetTest.getPrimary().host,
+        kTenantId,
+        kTenantId.str,
+    );
+    replSetTest.awaitReplication(); // Await user creation replication.
 
     const secondary = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-        replSetTest.getSecondary().host, kTenantId, kTenantId.str);
+        replSetTest.getSecondary().host,
+        kTenantId,
+        kTenantId.str,
+    );
     const primaryChangeCollection = primary.getDB("config")["system.change_collection"];
     const secondaryChangeCollection = secondary.getDB("config")["system.change_collection"];
 
@@ -56,7 +60,10 @@ assert.doesNotThrow(() => {
     replSetTest.stepUp(replSetTest.getSecondary());
 
     const newPrimary = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-        replSetTest.getPrimary().host, kTenantId, kTenantId.str);
+        replSetTest.getPrimary().host,
+        kTenantId,
+        kTenantId.str,
+    );
     const newPrimaryChangeCollection = newPrimary.getDB("config")["system.change_collection"];
     newPrimaryChangeCollection.insert(getChangeCollectionEntry(2));
     newPrimaryChangeCollection.insert(getChangeCollectionEntry(3));
@@ -73,11 +80,17 @@ const replSetTest = new ChangeStreamMultitenantReplicaSetTest({
 });
 
 const primary = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-    replSetTest.getPrimary().host, kTenantId, kTenantId.str);
-replSetTest.awaitReplication();  // Await user creation replication.
+    replSetTest.getPrimary().host,
+    kTenantId,
+    kTenantId.str,
+);
+replSetTest.awaitReplication(); // Await user creation replication.
 
 const secondary = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-    replSetTest.getSecondary().host, kTenantId, kTenantId.str);
+    replSetTest.getSecondary().host,
+    kTenantId,
+    kTenantId.str,
+);
 const primaryChangeCollection = primary.getDB("config")["system.change_collection"];
 const secondaryChangeCollection = secondary.getDB("config")["system.change_collection"];
 
@@ -98,7 +111,10 @@ assert.eq(secondaryChangeCollection.find({}).itcount(), 0);
 replSetTest.stepUp(replSetTest.getSecondary());
 
 const newPrimary = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-    replSetTest.getPrimary().host, kTenantId, kTenantId.str);
+    replSetTest.getPrimary().host,
+    kTenantId,
+    kTenantId.str,
+);
 const newPrimaryChangeCollection = newPrimary.getDB("config")["system.change_collection"];
 
 newPrimaryChangeCollection.insert(getChangeCollectionEntry(0));

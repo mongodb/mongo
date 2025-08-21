@@ -47,7 +47,7 @@ jsTestLog("5. Wait for new node to start cloning");
 s.setSecondaryOk();
 var sc = s.getDB("d")["c"];
 
-wait(function() {
+wait(function () {
     printjson(sc.stats());
     return sc.stats().count > 0;
 });
@@ -55,7 +55,7 @@ wait(function() {
 jsTestLog("6. Start updating documents on primary");
 for (i = N - 1; i >= N - 10000; --i) {
     // If the document is cloned as {a:1}, the {$set:{'a.b':1}} modifier will uassert.
-    mc.update({_id: i}, {$set: {'a.b': 1}}, {writeConcern: {w: 1}});
+    mc.update({_id: i}, {$set: {"a.b": 1}}, {writeConcern: {w: 1}});
     mc.update({_id: i}, {$set: {a: 1}}, {writeConcern: {w: 1}});
 }
 
@@ -66,14 +66,14 @@ for (i = N; i < N * 2; i++) {
 assert.eq(N * 2, mc.find().itcount());
 
 jsTestLog("7. Wait for new node to become SECONDARY");
-wait(function() {
+wait(function () {
     var status = s.getDB("admin").runCommand({replSetGetStatus: 1});
     printjson(status);
-    return status.members && (status.members[1].state == 2);
+    return status.members && status.members[1].state == 2;
 });
 
 jsTestLog("8. Wait for new node to have all the data");
-wait(function() {
+wait(function () {
     return sc.find().itcount() == mc.find().itcount();
 });
 

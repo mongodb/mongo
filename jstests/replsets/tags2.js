@@ -13,9 +13,9 @@ var conf = {
         {_id: 0, host: host + ":" + ports[0], tags: {"backup": "A"}},
         {_id: 1, host: host + ":" + ports[1], tags: {"backup": "B"}},
         {_id: 2, host: host + ":" + ports[2], tags: {"backup": "C"}},
-        {_id: 3, host: host + ":" + ports[3], tags: {"backup": "D"}, arbiterOnly: true}
+        {_id: 3, host: host + ":" + ports[3], tags: {"backup": "D"}, arbiterOnly: true},
     ],
-    settings: {getLastErrorModes: {backedUp: {backup: 2}}}
+    settings: {getLastErrorModes: {backedUp: {backup: 2}}},
 };
 
 print("arbiters can't have tags");
@@ -34,7 +34,7 @@ var primary = replTest.getPrimary();
 var db = primary.getDB("test");
 var wtimeout = ReplSetTest.kDefaultTimeoutMS;
 
-assert.commandWorked(db.foo.insert({x: 1}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 1}, {writeConcern: {w: "backedUp", wtimeout: wtimeout}}));
 
 var nextVersion = replTest.getReplSetConfigFromNode().version + 1;
 conf.version = nextVersion;
@@ -44,7 +44,7 @@ replTest.awaitReplication();
 
 primary = replTest.getPrimary();
 var db = primary.getDB("test");
-assert.commandWorked(db.foo.insert({x: 2}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 2}, {writeConcern: {w: "backedUp", wtimeout: wtimeout}}));
 
 nextVersion++;
 conf.version = nextVersion;
@@ -54,6 +54,6 @@ primary.getDB("admin").runCommand({replSetReconfig: conf});
 
 primary = replTest.getPrimary();
 var db = primary.getDB("test");
-assert.commandWorked(db.foo.insert({x: 3}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
+assert.commandWorked(db.foo.insert({x: 3}, {writeConcern: {w: "backedUp", wtimeout: wtimeout}}));
 
 replTest.stopSet();

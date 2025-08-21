@@ -40,8 +40,7 @@ assert.neq(chunk, null, "all chunks on s.shard0.shardName!");
 printjson(chunk);
 
 // try to move the chunk using an invalid specification method. should fail.
-var res = db.adminCommand(
-    {movechunk: ns, find: {a: 0}, bounds: [chunk.min, chunk.max], to: s.shard0.shardName});
+var res = db.adminCommand({movechunk: ns, find: {a: 0}, bounds: [chunk.min, chunk.max], to: s.shard0.shardName});
 assert.eq(res.ok, 0, "moveChunk shouldn't work with invalid specification method");
 
 // now move a chunk using the lower/upper bound method. should work.

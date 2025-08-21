@@ -13,7 +13,7 @@ const rst = new ReplSetTest({
     name: jsTestName(),
     nodes: 3,
     settings: {chainingAllowed: false, catchUpTimeoutMillis: 0},
-    useBridge: true
+    useBridge: true,
 });
 
 rst.startSet();
@@ -21,7 +21,7 @@ rst.initiate();
 const node0 = rst.getPrimary();
 const node1 = rst.getSecondaries()[0];
 const node2 = rst.getSecondaries()[1];
-const testDB = node0.getDB('test');
+const testDB = node0.getDB("test");
 const collName = jsTestName();
 const coll = testDB[collName];
 
@@ -62,7 +62,7 @@ rst.awaitNodesAgreeOnPrimary(rst.timeoutMS, rst.nodes, node2);
 rst.awaitReplication();
 
 // Verify node0 can replicate new writes.
-assert.commandWorked(node2.getDB('test')[collName].insert({_id: "write 4"}));
+assert.commandWorked(node2.getDB("test")[collName].insert({_id: "write 4"}));
 rst.awaitReplication();
 
 rst.stopSet();

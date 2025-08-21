@@ -21,27 +21,27 @@ function validateMetadataOnShard(shardConn, shardName, namespace) {
     const configDB = shardConn.getDB("config");
 
     // Check collection metadata in the correct shard catalog
-    const localCollMeta =
-        configDB.getCollection("shard.catalog.collections").findOne({_id: namespace});
-    assert(localCollMeta,
-           `No collection metadata found for ${namespace} on ${
-               shardName} in config.shard.catalog.collections`);
-    assert(localCollMeta.uuid,
-           `Collection metadata for ${namespace} on ${shardName} is missing UUID`);
+    const localCollMeta = configDB.getCollection("shard.catalog.collections").findOne({_id: namespace});
+    assert(
+        localCollMeta,
+        `No collection metadata found for ${namespace} on ${shardName} in config.shard.catalog.collections`,
+    );
+    assert(localCollMeta.uuid, `Collection metadata for ${namespace} on ${shardName} is missing UUID`);
 
     const collUUID = localCollMeta.uuid;
 
     // Check chunk metadata in the correct shard catalog using the UUID
-    const localChunks =
-        configDB.getCollection("shard.catalog.chunks").find({uuid: collUUID}).toArray();
-    assert.gt(localChunks.length,
-              0,
-              `No chunk metadata found for UUID ${collUUID} (ns: ${namespace}) on ${
-                  shardName} in config.shard.catalog.chunks`);
+    const localChunks = configDB.getCollection("shard.catalog.chunks").find({uuid: collUUID}).toArray();
+    assert.gt(
+        localChunks.length,
+        0,
+        `No chunk metadata found for UUID ${collUUID} (ns: ${namespace}) on ${
+            shardName
+        } in config.shard.catalog.chunks`,
+    );
 }
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {a: 1}}));
 
 const db = st.s.getDB(dbName);
@@ -54,8 +54,7 @@ assert.commandWorked(bulk.execute());
 
 // Ensure we have multiple chunks
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {a: 50}}));
-assert.commandWorked(st.s.adminCommand(
-    {moveChunk: ns, find: {a: 60}, to: st.shard1.shardName, _waitForDelete: true}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {a: 60}, to: st.shard1.shardName, _waitForDelete: true}));
 
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 

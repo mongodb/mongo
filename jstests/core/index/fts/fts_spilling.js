@@ -40,7 +40,7 @@ function assertSpilledToDisk(textOrStages) {
     // We can't assert individual shards, because some shards may have so little data that they
     // don't spill.
     for (let textOrStage of textOrStages) {
-        totalSpillingStats.usedDisk = (totalSpillingStats.usedDisk || textOrStage.usedDisk);
+        totalSpillingStats.usedDisk = totalSpillingStats.usedDisk || textOrStage.usedDisk;
         totalSpillingStats.spills += textOrStage.spills;
         totalSpillingStats.spilledBytes += textOrStage.spilledBytes;
         totalSpillingStats.spilledRecords += textOrStage.spilledRecords;
@@ -67,35 +67,15 @@ function assertDidNotSpillToDisk(textOrStages) {
 const coll = db.getSiblingDB("test").getCollection("fts_spilling");
 coll.drop();
 
-const words1 = [
-    "red",
-    "orange",
-    "yellow",
-    "green",
-    "blue",
-    "purple",
-];
-const words2 = [
-    "tea",
-    "coffee",
-    "soda",
-    "water",
-    "juice",
-    "fresh",
-];
-const words3 = [
-    "drink",
-    "beverage",
-    "refreshment",
-    "hydration",
-];
+const words1 = ["red", "orange", "yellow", "green", "blue", "purple"];
+const words2 = ["tea", "coffee", "soda", "water", "juice", "fresh"];
+const words3 = ["drink", "beverage", "refreshment", "hydration"];
 
 let price = 0;
 for (let word1 of words1) {
     for (let word2 of words2) {
         for (let word3 of words3) {
-            assert.commandWorked(
-                coll.insertOne({desc: word1 + " " + word2 + " " + word3, price: price}));
+            assert.commandWorked(coll.insertOne({desc: word1 + " " + word2 + " " + word3, price: price}));
             price = (price + 2) % 7;
         }
     }
@@ -106,27 +86,30 @@ const predicate = {
     $text: {$search: "green tea drink"},
     price: {$lte: 5},
 };
-const resultWithoutSpilling = coll.find(predicate, {score: {$meta: "textScore"}})
-                                  .sort({_: {$meta: "textScore"}, _id: 1})
-                                  .toArray();
+const resultWithoutSpilling = coll
+    .find(predicate, {score: {$meta: "textScore"}})
+    .sort({_: {$meta: "textScore"}, _id: 1})
+    .toArray();
 
-const explainWithoutSpilling =
-    coll.find({$text: {$search: "green tea drink"}}, {score: {$meta: "textScore"}})
-        .explain("executionStats");
+const explainWithoutSpilling = coll
+    .find({$text: {$search: "green tea drink"}}, {score: {$meta: "textScore"}})
+    .explain("executionStats");
 assertDidNotSpillToDisk(getTextOrExecutionStats(explainWithoutSpilling));
 
 const originalKnobValue = getServerParameter("internalTextOrStageMaxMemoryBytes");
 try {
     setServerParameter("internalTextOrStageMaxMemoryBytes", 128);
 
-    const result = coll.find(predicate, {score: {$meta: "textScore"}})
-                       .sort({_: {$meta: "textScore"}, _id: 1})
-                       .toArray();
+    const result = coll
+        .find(predicate, {score: {$meta: "textScore"}})
+        .sort({_: {$meta: "textScore"}, _id: 1})
+        .toArray();
     assert.eq(resultWithoutSpilling, result, () => arrayDiff(resultWithoutSpilling, result));
 
-    const explain = coll.find(predicate, {score: {$meta: "textScore"}})
-                        .sort({_: {$meta: "textScore"}, _id: 1})
-                        .explain("executionStats");
+    const explain = coll
+        .find(predicate, {score: {$meta: "textScore"}})
+        .sort({_: {$meta: "textScore"}, _id: 1})
+        .explain("executionStats");
     assertSpilledToDisk(getTextOrExecutionStats(explain));
 } finally {
     setServerParameter("internalTextOrStageMaxMemoryBytes", originalKnobValue);

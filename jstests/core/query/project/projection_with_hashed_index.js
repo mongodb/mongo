@@ -7,29 +7,28 @@
  * ]
  */
 
-import {
-    orderedArrayEq,
-} from "jstests/aggregation/extras/utils.js";
-import {
-    getPlanStage,
-    getShardsFromExplain,
-    getWinningPlanFromExplain,
-} from "jstests/libs/query/analyze_plan.js";
+import {orderedArrayEq} from "jstests/aggregation/extras/utils.js";
+import {getPlanStage, getShardsFromExplain, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
 
 assert.commandWorked(
-    coll.insertMany([{_id: 1, a: {b: 5}}, {_id: 2, a: {b: 2, c: 1}}, {_id: 3, a: {b: 0}}]));
+    coll.insertMany([
+        {_id: 1, a: {b: 5}},
+        {_id: 2, a: {b: 2, c: 1}},
+        {_id: 3, a: {b: 0}},
+    ]),
+);
 
 // Confirm that the hashed index scan produces the same results as the collection scan.
-const resultsCollScan = coll.find({}, {_id: 0, 'a.b': 1}).sort({'a.b': 1});
-assert.commandWorked(coll.createIndex({'a.b': 1, a: 'hashed'}));
-const resultsIndexScan = coll.find({}, {_id: 0, 'a.b': 1}).sort({'a.b': 1});
+const resultsCollScan = coll.find({}, {_id: 0, "a.b": 1}).sort({"a.b": 1});
+assert.commandWorked(coll.createIndex({"a.b": 1, a: "hashed"}));
+const resultsIndexScan = coll.find({}, {_id: 0, "a.b": 1}).sort({"a.b": 1});
 assert(orderedArrayEq(resultsCollScan, resultsIndexScan));
 
 // Check that the index with hashed field is used in the plan.
-const explain = coll.find({}, {_id: 0, 'a.b': 1}).sort({'a.b': 1}).explain();
+const explain = coll.find({}, {_id: 0, "a.b": 1}).sort({"a.b": 1}).explain();
 
 const plan = getWinningPlanFromExplain(explain);
 const project = getPlanStage(plan, "PROJECTION_DEFAULT");

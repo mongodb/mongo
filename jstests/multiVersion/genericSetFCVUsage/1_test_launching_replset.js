@@ -13,13 +13,15 @@ for (let version of ["last-lts", "last-continuous", "latest"]) {
     var nodes = rst.nodes;
 
     // Make sure the started versions are actually the correct versions
-    for (var j = 0; j < nodes.length; j++)
-        assert.binVersion(nodes[j], version);
+    for (var j = 0; j < nodes.length; j++) assert.binVersion(nodes[j], version);
 
     rst.stopSet();
 }
 
-for (let versions of [["last-lts", "latest"], ["last-continuous", "latest"]]) {
+for (let versions of [
+    ["last-lts", "latest"],
+    ["last-continuous", "latest"],
+]) {
     jsTestLog("Testing mixed versions: " + tojson(versions));
 
     // Set up a multi-version replica set
@@ -31,8 +33,7 @@ for (let versions of [["last-lts", "latest"], ["last-continuous", "latest"]]) {
 
     // Make sure we have hosts of all the different versions
     var versionsFound = [];
-    for (var j = 0; j < nodes.length; j++)
-        versionsFound.push(nodes[j].getBinVersion());
+    for (var j = 0; j < nodes.length; j++) versionsFound.push(nodes[j].getBinVersion());
 
     assert.allBinVersions(versions, versionsFound);
 
@@ -44,19 +45,26 @@ if (MongoRunner.areBinVersionsTheSame("last-continuous", "last-lts")) {
     quit();
 }
 
-for (let versions of [["last-lts", "last-continuous"], ["last-continuous", "last-lts"]]) {
+for (let versions of [
+    ["last-lts", "last-continuous"],
+    ["last-continuous", "last-lts"],
+]) {
     jsTestLog("Testing mixed versions: " + tojson(versions));
 
     var rst = new ReplSetTest({nodes: 2});
     rst.startSet({binVersion: versions});
     let err = assert.throws(() => rst.initiate());
-    assert(err.message.includes(
-               "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
-           err);
+    assert(
+        err.message.includes("Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
+        err,
+    );
     rst.stopSet();
 }
 
-for (let versions of [["last-lts", "last-continuous"], ["last-continuous", "last-lts"]]) {
+for (let versions of [
+    ["last-lts", "last-continuous"],
+    ["last-continuous", "last-lts"],
+]) {
     jsTestLog("Testing mixed versions: " + tojson(versions));
 
     const rst = new ReplSetTest({
@@ -67,14 +75,15 @@ for (let versions of [["last-lts", "last-continuous"], ["last-continuous", "last
             {
                 binVersion: versions[1],
             },
-        ]
+        ],
     });
     rst.startSet();
 
     let err = assert.throws(() => rst.initiate());
-    assert(err.message.includes(
-               "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
-           err);
+    assert(
+        err.message.includes("Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
+        err,
+    );
     rst.stopSet();
 }
 

@@ -4,13 +4,7 @@
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {
-    allowTLS,
-    disabled,
-    preferTLS,
-    replShouldFail,
-    replShouldSucceed
-} from "jstests/ssl/libs/ssl_helpers.js";
+import {allowTLS, disabled, preferTLS, replShouldFail, replShouldSucceed} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Limit the amount of time we'll wait on a failure.
 // Apply equally to success tests as well so that

@@ -10,8 +10,7 @@ function testValidate(output) {
     var indexNames = output.keysPerIndex;
 
     for (var i in indexNames) {
-        if (!indexNames.hasOwnProperty(i))
-            continue;
+        if (!indexNames.hasOwnProperty(i)) continue;
         assert.eq(indexNames[i], count, "validate returned an invalid number of indexes");
     }
 }

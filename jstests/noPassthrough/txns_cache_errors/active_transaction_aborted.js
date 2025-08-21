@@ -47,8 +47,8 @@ function testIdleAbort() {
                 transactionLifetimeLimitSeconds: 10,
                 // Disable cache-pressure aborts so we can observer idle-aborts.
                 cachePressureQueryPeriodMilliseconds: 0,
-            }
-        }
+            },
+        },
     });
     replSet.startSet();
     replSet.initiate();
@@ -99,8 +99,8 @@ function testCachePressureAbort() {
                 // Kill a lot of things at once during cache pressure, this improves the odds of an
                 // active-txn being killed.
                 CachePressureAbortSessionKillLimitPerBatch: 10,
-            }
-        }
+            },
+        },
     });
     replSet.startSet();
     replSet.initiate();
@@ -133,11 +133,18 @@ function testCachePressureAbort() {
     // under cache pressure, we don't mind who does it.
     let db = primary.getDB("test");
     let serverTriggered = db.serverStatus().metrics.storage.cancelledCacheEvictions > 0;
-    let wtTriggered = (res.code == ErrorCodes.WriteConflict) &&
+    let wtTriggered =
+        res.code == ErrorCodes.WriteConflict &&
         res.errmsg.includes("-31800: Transaction has the oldest pinned transaction ID");
 
-    jsTestLog("Oldest transaction aborted after " + iter +
-              " inserts. ServerTriggered=" + serverTriggered + " wtTriggered=" + wtTriggered);
+    jsTestLog(
+        "Oldest transaction aborted after " +
+            iter +
+            " inserts. ServerTriggered=" +
+            serverTriggered +
+            " wtTriggered=" +
+            wtTriggered,
+    );
     assert(serverTriggered || wtTriggered);
 
     replSet.stopSet();

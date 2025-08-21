@@ -20,12 +20,11 @@ assert.commandWorked(db.createCollection(t.getName(), {capped: true, size: 100})
 try {
     assert.commandWorked(db._adminCommand({setParameter: 1, notablescan: true}));
 
-    let err = assert.throws(function() {
+    let err = assert.throws(function () {
         t.find({a: 1}).tailable(true).next();
     });
     assert.includes(err.toString(), "tailable");
     assert.includes(err.toString(), "notablescan");
-
 } finally {
     // We assume notablescan was false before this test started and restore that
     // expected value.

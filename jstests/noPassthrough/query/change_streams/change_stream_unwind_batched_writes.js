@@ -24,8 +24,8 @@ function assertWriteVisible(cursor, operationType, documentKey) {
     assert.eq(operationType, changeDoc.operationType, changeDoc);
     assert.eq(documentKey, changeDoc.documentKey, changeDoc);
     // Change stream events for batched writes do not include lsid and txnNumber.
-    assert(!changeDoc.hasOwnProperty('lsid'));
-    assert(!changeDoc.hasOwnProperty('txnNumber'));
+    assert(!changeDoc.hasOwnProperty("lsid"));
+    assert(!changeDoc.hasOwnProperty("txnNumber"));
     return changeDoc;
 }
 
@@ -50,21 +50,23 @@ function runTest(conn) {
     // 'batchedDeletesTargetBatchDocs'.
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchTimeMS: 0}));
     assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetStagedDocBytes: 0}));
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, batchedDeletesTargetBatchDocs: docsPerBatch}));
 
     // Populate the collection, then open a change stream, then mass-delete the collection.
-    assert.commandWorked(coll.insertMany(
-        [...Array(totalNumDocs).keys()].map(x => ({_id: x, txt: "a" + x})), {ordered: false}));
+    assert.commandWorked(
+        coll.insertMany(
+            [...Array(totalNumDocs).keys()].map((x) => ({_id: x, txt: "a" + x})),
+            {ordered: false},
+        ),
+    );
     const changeStreamCursor = coll.watch();
-    const serverStatusBatchesBefore = db.serverStatus()['batchedDeletes']['batches'];
-    const serverStatusDocsBefore = db.serverStatus()['batchedDeletes']['docs'];
+    const serverStatusBatchesBefore = db.serverStatus()["batchedDeletes"]["batches"];
+    const serverStatusDocsBefore = db.serverStatus()["batchedDeletes"]["docs"];
     assert.commandWorked(coll.deleteMany({_id: {$gte: 0}}));
     assert.eq(0, coll.find().itcount());
-    const serverStatusBatchesAfter = db.serverStatus()['batchedDeletes']['batches'];
-    const serverStatusDocsAfter = db.serverStatus()['batchedDeletes']['docs'];
-    assert.eq(serverStatusBatchesAfter,
-              serverStatusBatchesBefore + Math.ceil(totalNumDocs / docsPerBatch));
+    const serverStatusBatchesAfter = db.serverStatus()["batchedDeletes"]["batches"];
+    const serverStatusDocsAfter = db.serverStatus()["batchedDeletes"]["docs"];
+    assert.eq(serverStatusBatchesAfter, serverStatusBatchesBefore + Math.ceil(totalNumDocs / docsPerBatch));
     assert.eq(serverStatusDocsAfter, serverStatusDocsBefore + totalNumDocs);
 
     // Verify the change stream emits events for the batched deletion, and capture the events so we
@@ -85,10 +87,9 @@ function runTest(conn) {
     for (let i = 0; i < changeList.length; ++i) {
         const resumeCursor = coll.watch([], {startAfter: changeList[i]._id});
 
-        for (let x = (i + 1); x < changeList.length; ++x) {
+        for (let x = i + 1; x < changeList.length; ++x) {
             const expectedChangeDoc = changeList[x];
-            assertWriteVisible(
-                resumeCursor, expectedChangeDoc.operationType, expectedChangeDoc.documentKey);
+            assertWriteVisible(resumeCursor, expectedChangeDoc.operationType, expectedChangeDoc.documentKey);
         }
 
         assertNoChanges(resumeCursor);

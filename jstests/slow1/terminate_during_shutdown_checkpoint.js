@@ -20,7 +20,7 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kSeparator = "/";
-const copyDataFiles = function(src, dest) {
+const copyDataFiles = function (src, dest) {
     ls(src).forEach((file) => {
         if (file.endsWith(kSeparator)) {
             return;
@@ -37,7 +37,7 @@ const copyDataFiles = function(src, dest) {
 };
 
 // Multi-document prepared transaction workload executed by the client threads.
-const threadWorkload = function(host, threadId, start, end) {
+const threadWorkload = function (host, threadId, start, end) {
     try {
         const conn = new Mongo(host);
 
@@ -57,8 +57,7 @@ const threadWorkload = function(host, threadId, start, end) {
 
             const docId = Math.floor(Math.random() * (end - start + 1)) + start;
 
-            jsTestLog("ThreadId: " + threadId + ", inserting document with _id " +
-                      docId.toString());
+            jsTestLog("ThreadId: " + threadId + ", inserting document with _id " + docId.toString());
             const insertRes = sessionColl.insert({
                 _id: docId,
                 a: docId,
@@ -95,15 +94,13 @@ const threadWorkload = function(host, threadId, start, end) {
                     jsTestLog("ThreadId: " + threadId + ", committing prepared transaction");
                     PrepareHelpers.commitTransaction(session, prepareTimestamp);
                 } else {
-                    jsTestLog("ThreadId: " + threadId +
-                              ", leaving prepared transaction uncommitted");
+                    jsTestLog("ThreadId: " + threadId + ", leaving prepared transaction uncommitted");
                 }
                 session = undefined;
             }
 
             if (i % 1000 == 0) {
-                jsTestLog("ThreadId: " + threadId + ", Progress: " + (i - start) + "/" +
-                          (end - start));
+                jsTestLog("ThreadId: " + threadId + ", Progress: " + (i - start) + "/" + (end - start));
             }
         }
     } catch (e) {
@@ -114,13 +111,12 @@ const threadWorkload = function(host, threadId, start, end) {
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
-        syncdelay: 10,  // Fast checkpoint intervals.
-        slowms: 30000,  // Don't log slow queries.
-        setParameter:
-            {logComponentVerbosity: tojsononeline({storage: {recovery: 2, wt: {wtCheckpoint: 1}}})},
+        syncdelay: 10, // Fast checkpoint intervals.
+        slowms: 30000, // Don't log slow queries.
+        setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2, wt: {wtCheckpoint: 1}}})},
         wiredTigerEngineConfigString:
-            "debug_mode=(slow_checkpoint=true,table_logging=true),verbose=[checkpoint_cleanup,checkpoint_progress]"
-    }
+            "debug_mode=(slow_checkpoint=true,table_logging=true),verbose=[checkpoint_cleanup,checkpoint_progress]",
+    },
 });
 rst.startSet();
 rst.initiate();
@@ -146,11 +142,7 @@ while (numUncleanShutdowns < kNumUncleanShutdowns) {
     const kNumThreads = 10;
     let threads = [];
     for (let i = 0; i < kNumThreads; i++) {
-        let thread = new Thread(threadWorkload,
-                                primary.host,
-                                i,
-                                i * kOpsPerThread,
-                                kOpsPerThread + (i * kOpsPerThread));
+        let thread = new Thread(threadWorkload, primary.host, i, i * kOpsPerThread, kOpsPerThread + i * kOpsPerThread);
         threads.push(thread);
         thread.start();
     }
@@ -179,11 +171,11 @@ while (numUncleanShutdowns < kNumUncleanShutdowns) {
     jsTestLog("Killed pid: " + pid);
 
     const exitCode = awaitShutdown({checkExitSuccess: false});
-    assert.neq(0, exitCode, 'Expected shell to exit abnormally due to shutdown');
+    assert.neq(0, exitCode, "Expected shell to exit abnormally due to shutdown");
 
     numUncleanShutdowns++;
 
-    threads.forEach(function(thread) {
+    threads.forEach(function (thread) {
         thread.join();
     });
 

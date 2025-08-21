@@ -18,18 +18,21 @@ const expectedChunkPerShardCount = 1;
  * Test that 'shardCollection' command works when there is existing data in collection and does not
  * do pre-splitting.
  */
-[{a: "hashed", rangeField1: 1, rangeField2: 1}, {rangeField1: 1, a: "hashed", rangeField2: 1}]
-    .forEach(function(shardKey) {
-        db.collWithData.drop();
-        db.collWithData.insert({a: 1});
-        db.collWithData.createIndex(shardKey);
+[
+    {a: "hashed", rangeField1: 1, rangeField2: 1},
+    {rangeField1: 1, a: "hashed", rangeField2: 1},
+].forEach(function (shardKey) {
+    db.collWithData.drop();
+    db.collWithData.insert({a: 1});
+    db.collWithData.createIndex(shardKey);
 
-        assert.commandWorked(
-            db.adminCommand({shardcollection: db.collWithData.getFullName(), key: shardKey}));
-        assert.eq(findChunksUtil.countChunksForNs(st.config, db.collWithData.getFullName()),
-                  1,
-                  "sharding non-empty collection should not pre-split");
-    });
+    assert.commandWorked(db.adminCommand({shardcollection: db.collWithData.getFullName(), key: shardKey}));
+    assert.eq(
+        findChunksUtil.countChunksForNs(st.config, db.collWithData.getFullName()),
+        1,
+        "sharding non-empty collection should not pre-split",
+    );
+});
 
 /**
  * Helper function to validate that the chunks ranges have all the shard key fields and each shard
@@ -37,12 +40,11 @@ const expectedChunkPerShardCount = 1;
  */
 function checkValidChunks(coll, shardKey, checkChunksPerShardFn) {
     const chunks = findChunksUtil.findChunksByNs(st.config, coll.getFullName()).toArray();
-    let shardCountsMap =
-        {[st.shard0.shardName]: 0, [st.shard1.shardName]: 0, [st.shard2.shardName]: 0};
+    let shardCountsMap = {[st.shard0.shardName]: 0, [st.shard1.shardName]: 0, [st.shard2.shardName]: 0};
     for (let chunk of chunks) {
         shardCountsMap[chunk.shard]++;
 
-        const assertHasAllShardKeyFields = function(obj) {
+        const assertHasAllShardKeyFields = function (obj) {
             assert.eq(Object.keys(shardKey).length, Object.keys(obj).length, tojson(obj));
             for (let key in obj) {
                 assert(key in shardKey, tojson(obj));
@@ -87,75 +89,84 @@ checkValidChunks(coll, shardKey, (shardCountsMap) => {
 coll = db.hashedDefaultPreSplit;
 assert.commandWorked(mongos.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
 checkValidChunks(coll, shardKey, (shardCountsMap) => {
-    assert.gte(shardCountsMap[st.shard0.shardName],
-               expectedChunkPerShardCount,
-               "Unexpected amount of chunks on " + st.shard0.shardName);
-    assert.gte(shardCountsMap[st.shard1.shardName],
-               expectedChunkPerShardCount,
-               "Unexpected amount of chunks on " + st.shard1.shardName);
-    assert.gte(shardCountsMap[st.shard2.shardName],
-               expectedChunkPerShardCount,
-               "Unexpected amount of chunks on " + st.shard2.shardName);
+    assert.gte(
+        shardCountsMap[st.shard0.shardName],
+        expectedChunkPerShardCount,
+        "Unexpected amount of chunks on " + st.shard0.shardName,
+    );
+    assert.gte(
+        shardCountsMap[st.shard1.shardName],
+        expectedChunkPerShardCount,
+        "Unexpected amount of chunks on " + st.shard1.shardName,
+    );
+    assert.gte(
+        shardCountsMap[st.shard2.shardName],
+        expectedChunkPerShardCount,
+        "Unexpected amount of chunks on " + st.shard2.shardName,
+    );
 });
 
 db.hashedPrefixColl.drop();
 
 // 'presplitHashedZones' cannot be passed without setting up zones.
-assert.commandFailedWithCode(db.adminCommand({
-    shardcollection: db.hashedPrefixColl.getFullName(),
-    key: shardKey,
-    presplitHashedZones: true
-}),
-                             31387);
+assert.commandFailedWithCode(
+    db.adminCommand({
+        shardcollection: db.hashedPrefixColl.getFullName(),
+        key: shardKey,
+        presplitHashedZones: true,
+    }),
+    31387,
+);
 
 // Verify that 'shardCollection' command will fail if the zones are set up incorrectly.
+assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: "hashedPrefix"}));
 assert.commandWorked(
-    st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: 'hashedPrefix'}));
-assert.commandWorked(st.s.adminCommand({
-    updateZoneKeyRange: db.hashedPrefixColl.getFullName(),
-    min: {hashedField: MinKey, rangeField1: MinKey, rangeField2: MinKey},
-    max: {
-        hashedField: MaxKey,
-        rangeField1: MaxKey,
-        rangeField2: MinKey
-    },  // All fields should be MaxKey for a valid zone.
-    zone: 'hashedPrefix'
-}));
-assert.commandFailedWithCode(db.adminCommand({
-    shardcollection: db.hashedPrefixColl.getFullName(),
-    key: shardKey,
-    presplitHashedZones: true
-}),
-                             31412);
+    st.s.adminCommand({
+        updateZoneKeyRange: db.hashedPrefixColl.getFullName(),
+        min: {hashedField: MinKey, rangeField1: MinKey, rangeField2: MinKey},
+        max: {
+            hashedField: MaxKey,
+            rangeField1: MaxKey,
+            rangeField2: MinKey,
+        }, // All fields should be MaxKey for a valid zone.
+        zone: "hashedPrefix",
+    }),
+);
+assert.commandFailedWithCode(
+    db.adminCommand({
+        shardcollection: db.hashedPrefixColl.getFullName(),
+        key: shardKey,
+        presplitHashedZones: true,
+    }),
+    31412,
+);
 
 // Verify that 'shardCollection' command will pre-split chunks if a single zone is set up ranging
 // from MinKey to MaxKey and 'presplitHashedZones' flag is set.
 db.hashedPrefixColl.drop();
+assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: "hashedPrefix"}));
+assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: "hashedPrefix"}));
 assert.commandWorked(
-    st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: 'hashedPrefix'}));
+    st.s.adminCommand({
+        updateZoneKeyRange: db.hashedPrefixColl.getFullName(),
+        min: {hashedField: MinKey, rangeField1: MinKey, rangeField2: MinKey},
+        max: {hashedField: MaxKey, rangeField1: MaxKey, rangeField2: MaxKey},
+        zone: "hashedPrefix",
+    }),
+);
 assert.commandWorked(
-    st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: 'hashedPrefix'}));
-assert.commandWorked(st.s.adminCommand({
-    updateZoneKeyRange: db.hashedPrefixColl.getFullName(),
-    min: {hashedField: MinKey, rangeField1: MinKey, rangeField2: MinKey},
-    max: {hashedField: MaxKey, rangeField1: MaxKey, rangeField2: MaxKey},
-    zone: 'hashedPrefix'
-}));
-assert.commandWorked(db.adminCommand({
-    shardcollection: db.hashedPrefixColl.getFullName(),
-    key: shardKey,
-    presplitHashedZones: true
-}));
+    db.adminCommand({
+        shardcollection: db.hashedPrefixColl.getFullName(),
+        key: shardKey,
+        presplitHashedZones: true,
+    }),
+);
 
 // By default, we create one chunk per shard for each shard that contains at least one zone.
 checkValidChunks(db.hashedPrefixColl, shardKey, (shardCountsMap) => {
     assert.eq(0, shardCountsMap[st.shard0.shardName], "Unexpected amount of chunks on shard0");
-    assert.eq(expectedChunkPerShardCount,
-              shardCountsMap[st.shard1.shardName],
-              "Unexpected amount of chunks on shard1");
-    assert.eq(expectedChunkPerShardCount,
-              shardCountsMap[st.shard2.shardName],
-              "Unexpected amount of chunks on shard2");
+    assert.eq(expectedChunkPerShardCount, shardCountsMap[st.shard1.shardName], "Unexpected amount of chunks on shard1");
+    assert.eq(expectedChunkPerShardCount, shardCountsMap[st.shard2.shardName], "Unexpected amount of chunks on shard2");
 });
 
 //
@@ -167,40 +178,45 @@ checkValidChunks(db.hashedPrefixColl, shardKey, (shardCountsMap) => {
  * zones.
  */
 function createZoneRanges(coll, zoneNames) {
-    let offsetFirstTag = 0, offsetSecondTag = 0;
+    let offsetFirstTag = 0,
+        offsetSecondTag = 0;
 
     // Create zone ranges such that first zone has tag ranges [a, b) and [A, B). Second zone has tag
     // ranges [c, d) and [C, D). Third zone has tag ranges [e, f) and [E, f) so on.
     for (let zoneName of zoneNames) {
-        assert.commandWorked(st.s.adminCommand({
-            updateZoneKeyRange: coll.getFullName(),
-            min: {
-                rangeField1: String.fromCharCode(97 + offsetFirstTag++),
-                hashedField: MinKey,
-                rangeField2: MinKey
-            },
-            max: {
-                rangeField1: String.fromCharCode(97 + offsetFirstTag++),
-                hashedField: MinKey,
-                rangeField2: MinKey
-            },
-            zone: zoneName
-        }));
+        assert.commandWorked(
+            st.s.adminCommand({
+                updateZoneKeyRange: coll.getFullName(),
+                min: {
+                    rangeField1: String.fromCharCode(97 + offsetFirstTag++),
+                    hashedField: MinKey,
+                    rangeField2: MinKey,
+                },
+                max: {
+                    rangeField1: String.fromCharCode(97 + offsetFirstTag++),
+                    hashedField: MinKey,
+                    rangeField2: MinKey,
+                },
+                zone: zoneName,
+            }),
+        );
 
-        assert.commandWorked(st.s.adminCommand({
-            updateZoneKeyRange: coll.getFullName(),
-            min: {
-                rangeField1: String.fromCharCode(65 + offsetSecondTag++),
-                hashedField: MinKey,
-                rangeField2: MinKey
-            },
-            max: {
-                rangeField1: String.fromCharCode(65 + offsetSecondTag++),
-                hashedField: MinKey,
-                rangeField2: MinKey
-            },
-            zone: zoneName
-        }));
+        assert.commandWorked(
+            st.s.adminCommand({
+                updateZoneKeyRange: coll.getFullName(),
+                min: {
+                    rangeField1: String.fromCharCode(65 + offsetSecondTag++),
+                    hashedField: MinKey,
+                    rangeField2: MinKey,
+                },
+                max: {
+                    rangeField1: String.fromCharCode(65 + offsetSecondTag++),
+                    hashedField: MinKey,
+                    rangeField2: MinKey,
+                },
+                zone: zoneName,
+            }),
+        );
     }
 }
 
@@ -208,18 +224,13 @@ function createZoneRanges(coll, zoneNames) {
  * Helper function to set up two zones named 'nonHashedPrefix1' and 'nonHashedPrefix2' on 'shard0'.
  */
 function setUpTwoZonesOnShard0(coll) {
-    assert.commandWorked(
-        st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: 'nonHashedPrefix1'}));
-    assert.commandWorked(
-        st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: 'nonHashedPrefix2'}));
-    assert.commandWorked(
-        st.s.adminCommand({removeShardFromZone: st.shard1.shardName, zone: 'nonHashedPrefix1'}));
-    assert.commandWorked(
-        st.s.adminCommand({removeShardFromZone: st.shard1.shardName, zone: 'nonHashedPrefix2'}));
-    assert.commandWorked(
-        st.s.adminCommand({removeShardFromZone: st.shard2.shardName, zone: 'nonHashedPrefix2'}));
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "nonHashedPrefix1"}));
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "nonHashedPrefix2"}));
+    assert.commandWorked(st.s.adminCommand({removeShardFromZone: st.shard1.shardName, zone: "nonHashedPrefix1"}));
+    assert.commandWorked(st.s.adminCommand({removeShardFromZone: st.shard1.shardName, zone: "nonHashedPrefix2"}));
+    assert.commandWorked(st.s.adminCommand({removeShardFromZone: st.shard2.shardName, zone: "nonHashedPrefix2"}));
 
-    createZoneRanges(coll, ['nonHashedPrefix1', 'nonHashedPrefix2']);
+    createZoneRanges(coll, ["nonHashedPrefix1", "nonHashedPrefix2"]);
 }
 
 /**
@@ -227,23 +238,18 @@ function setUpTwoZonesOnShard0(coll) {
  * shard1. 'nonHashedPrefix2' is assinged to shard1 and shard2.
  */
 function setUpTwoZones(coll) {
-    assert.commandWorked(
-        st.s.adminCommand({removeShardFromZone: st.shard0.shardName, zone: 'nonHashedPrefix2'}));
-    assert.commandWorked(
-        st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: 'nonHashedPrefix1'}));
-    assert.commandWorked(
-        st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: 'nonHashedPrefix1'}));
-    assert.commandWorked(
-        st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: 'nonHashedPrefix2'}));
-    assert.commandWorked(
-        st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: 'nonHashedPrefix2'}));
-    createZoneRanges(coll, ['nonHashedPrefix1', 'nonHashedPrefix2']);
+    assert.commandWorked(st.s.adminCommand({removeShardFromZone: st.shard0.shardName, zone: "nonHashedPrefix2"}));
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "nonHashedPrefix1"}));
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: "nonHashedPrefix1"}));
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard1.shardName, zone: "nonHashedPrefix2"}));
+    assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard2.shardName, zone: "nonHashedPrefix2"}));
+    createZoneRanges(coll, ["nonHashedPrefix1", "nonHashedPrefix2"]);
 }
 
 shardKey = {
     rangeField1: 1,
     hashedField: "hashed",
-    rangeField2: 1
+    rangeField2: 1,
 };
 db.coll.drop();
 setUpTwoZonesOnShard0(db.coll);
@@ -251,36 +257,39 @@ setUpTwoZonesOnShard0(db.coll);
 db.coll.drop();
 // 'presplitHashedZones' cannot be passed without setting up zones.
 assert.commandFailedWithCode(
-    db.adminCommand(
-        {shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}),
-    31387);
+    db.adminCommand({shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}),
+    31387,
+);
 
 // Verify that shardCollection command will fail if the zones are set up incorrectly.
+assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "nonHashedPrefix1"}));
 assert.commandWorked(
-    st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: 'nonHashedPrefix1'}));
-assert.commandWorked(st.s.adminCommand({
-    updateZoneKeyRange: db.coll.getFullName(),
-    min: {rangeField1: "A", hashedField: MinKey, rangeField2: MinKey},
-    max: {rangeField1: "A", hashedField: MaxKey, rangeField2: MinKey},
-    zone: 'nonHashedPrefix1'
-}));
+    st.s.adminCommand({
+        updateZoneKeyRange: db.coll.getFullName(),
+        min: {rangeField1: "A", hashedField: MinKey, rangeField2: MinKey},
+        max: {rangeField1: "A", hashedField: MaxKey, rangeField2: MinKey},
+        zone: "nonHashedPrefix1",
+    }),
+);
 assert.commandFailedWithCode(
-    db.adminCommand(
-        {shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}),
-    31390);
+    db.adminCommand({shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}),
+    31390,
+);
 
 // Verify that 'presplitHashedZones' works correctly when zones are set up.
 db.coll.drop();
 setUpTwoZones(db.coll);
-assert.commandWorked(db.adminCommand(
-    {shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}));
+assert.commandWorked(
+    db.adminCommand({shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}),
+);
 
 // Verify that 'presplitHashedZones' uses the default initial value of 1 chunk per tag on each
 // shard. Setup two zones such that shard1 hosts both zones, and shard0/2 host one zone each.
 db.coll.drop();
 setUpTwoZones(db.coll);
-assert.commandWorked(db.adminCommand(
-    {shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}));
+assert.commandWorked(
+    db.adminCommand({shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}),
+);
 
 // The chunk distribution from zones should be [2, 2+2 (two zones), 2]. The 5 gap chunks should be
 // distributed among three shards.
@@ -297,8 +306,9 @@ checkValidChunks(db.coll, shardKey, (shardCountsMap) => {
 // shard. Setup two zones on shard0.
 db.coll.drop();
 setUpTwoZonesOnShard0(db.coll);
-assert.commandWorked(db.adminCommand(
-    {shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}));
+assert.commandWorked(
+    db.adminCommand({shardcollection: db.coll.getFullName(), key: shardKey, presplitHashedZones: true}),
+);
 
 // Since only Shard0 has chunks, we create on chunk per tag on shard0. The 5 gap chunks should be
 // distributed among three shards.

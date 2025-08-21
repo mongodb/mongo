@@ -6,8 +6,7 @@ function testObjectIdFind(db) {
     let r = db.ed_db_find2_oif;
     r.drop();
 
-    for (let i = 0; i < 3; ++i)
-        r.save({});
+    for (let i = 0; i < 3; ++i) r.save({});
 
     let f = r.find().sort({_id: 1});
     assert.eq(3, f.count());

@@ -30,7 +30,7 @@ const apiParamCombos = [
     {apiVersion: "1", apiStrict: true, apiDeprecationErrors: false},
     {apiVersion: "1", apiStrict: false},
     {apiVersion: "1", apiStrict: false, apiDeprecationErrors: true},
-    {apiVersion: "1", apiStrict: false, apiDeprecationErrors: false}
+    {apiVersion: "1", apiStrict: false, apiDeprecationErrors: false},
 ];
 
 function addApiParams(obj, params) {
@@ -41,15 +41,16 @@ for (const initParams of apiParamCombos) {
     for (const continueParams of apiParamCombos) {
         const findCmd = addApiParams({find: testColl.getName(), batchSize: 1}, initParams);
         const cursorId = assert.commandWorked(testDB.runCommand(findCmd)).cursor.id;
-        const compatibleParams = (continueParams === initParams);
+        const compatibleParams = continueParams === initParams;
 
-        const getMoreCmd =
-            addApiParams({getMore: cursorId, collection: testColl.getName()}, continueParams);
+        const getMoreCmd = addApiParams({getMore: cursorId, collection: testColl.getName()}, continueParams);
 
-        jsTestLog(`Initial params: ${tojson(initParams)}, ` +
-                  `continuing params: ${tojson(continueParams)}, ` +
-                  `compatible: ${tojson(compatibleParams)}, ` +
-                  `command: ${tojson(getMoreCmd)}`);
+        jsTestLog(
+            `Initial params: ${tojson(initParams)}, ` +
+                `continuing params: ${tojson(continueParams)}, ` +
+                `compatible: ${tojson(compatibleParams)}, ` +
+                `command: ${tojson(getMoreCmd)}`,
+        );
         const reply = testDB.runCommand(getMoreCmd);
         jsTestLog(`Reply: ${tojson(reply)}`);
 

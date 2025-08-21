@@ -2,9 +2,8 @@ const dbName = "admin";
 const conn = db.getMongo();
 
 function createAndSetSecurityToken(kTenantId) {
-    if (typeof conn._securityToken == 'undefined' && TestData.hasOwnProperty("tenantId")) {
-        print(
-            `set security token to the connection: "${tojsononeline(conn)}", tenant: ${kTenantId}`);
+    if (typeof conn._securityToken == "undefined" && TestData.hasOwnProperty("tenantId")) {
+        print(`set security token to the connection: "${tojsononeline(conn)}", tenant: ${kTenantId}`);
         const tenantToken = _createTenantToken({tenant: kTenantId});
         conn._setSecurityToken(tenantToken);
     }

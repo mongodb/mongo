@@ -10,9 +10,9 @@ let dbName = "rollback_rename_collection_on_sync_source";
 let otherDbName = "rollback_rename_collection_on_sync_source_other";
 let sourceCollName = "sourceColl";
 let destCollName = "destColl";
-let sourceNs = dbName + '.' + sourceCollName;
-let destNs = dbName + '.' + destCollName;
-let otherDestNs = otherDbName + '.' + destCollName;
+let sourceNs = dbName + "." + sourceCollName;
+let destNs = dbName + "." + destCollName;
+let otherDestNs = otherDbName + "." + destCollName;
 
 let doc1 = {x: 1};
 let doc2 = {x: 2};
@@ -29,9 +29,8 @@ let RollbackOps = (node) => {
 
 let SyncSourceOps = (node, withinDB) => {
     // Rename the original collection on the sync source.
-    let destCollection = (withinDB) ? destNs : otherDestNs;
-    assert.commandWorked(
-        node.getDB(dbName).adminCommand({renameCollection: sourceNs, to: destCollection}));
+    let destCollection = withinDB ? destNs : otherDestNs;
+    assert.commandWorked(node.getDB(dbName).adminCommand({renameCollection: sourceNs, to: destCollection}));
     assert.commandWorked(node.getDB(dbName)[destCollection].insert(doc2));
 };
 
@@ -61,8 +60,7 @@ CommonOps(rollbackTestAcrossDBs.getPrimary());
 let rollbackNodeAcrossDBs = rollbackTestAcrossDBs.transitionToRollbackOperations();
 RollbackOps(rollbackNodeAcrossDBs);
 
-let syncSourceNodeAcrossDBs =
-    rollbackTestAcrossDBs.transitionToSyncSourceOperationsBeforeRollback();
+let syncSourceNodeAcrossDBs = rollbackTestAcrossDBs.transitionToSyncSourceOperationsBeforeRollback();
 SyncSourceOps(syncSourceNodeAcrossDBs, /*withinDB=*/ false);
 
 // Wait for rollback to finish.

@@ -44,30 +44,23 @@ coll.insertMany([
 ]);
 
 section("Unsharded environment uses DISTINCT_SCAN with embedded FETCH");
-outputAggregationPlanAndResults(
-    coll, [{$match: {a: {$gte: "shard0"}, c: {$eq: 1}}}, {$group: {_id: "$a"}}]);
+outputAggregationPlanAndResults(coll, [{$match: {a: {$gte: "shard0"}, c: {$eq: 1}}}, {$group: {_id: "$a"}}]);
 
 // Move "shard_1*" chunk to "other" shard.
+assert.commandWorked(shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {a: 1, b: 1, c: 1}}));
+assert.commandWorked(shardingTest.s.adminCommand({split: coll.getFullName(), middle: {a: "shard1", b: 2, c: 1}}));
 assert.commandWorked(
-    shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {a: 1, b: 1, c: 1}}));
-assert.commandWorked(
-    shardingTest.s.adminCommand({split: coll.getFullName(), middle: {a: "shard1", b: 2, c: 1}}));
-assert.commandWorked(shardingTest.s.adminCommand(
-    {moveChunk: coll.getFullName(), find: {a: "shard1_1", b: 2, c: 0}, to: otherShard}));
+    shardingTest.s.adminCommand({moveChunk: coll.getFullName(), find: {a: "shard1_1", b: 2, c: 0}, to: otherShard}),
+);
 
-section(
-    "Selective query uses DISTINCT_SCAN + shard filtering + embedded FETCH, but no chunk skipping");
-outputAggregationPlanAndResults(
-    coll, [{$match: {a: {$gte: "shard0"}, c: {$eq: 1}}}, {$group: {_id: "$a"}}]);
+section("Selective query uses DISTINCT_SCAN + shard filtering + embedded FETCH, but no chunk skipping");
+outputAggregationPlanAndResults(coll, [{$match: {a: {$gte: "shard0"}, c: {$eq: 1}}}, {$group: {_id: "$a"}}]);
 
-section(
-    "Non-selective query uses DISTINCT_SCAN + shard filtering + embedded FETCH + chunk skipping");
-outputAggregationPlanAndResults(
-    coll, [{$match: {a: {$gte: "shard0"}, c: {$lte: 1}}}, {$group: {_id: "$a"}}]);
+section("Non-selective query uses DISTINCT_SCAN + shard filtering + embedded FETCH + chunk skipping");
+outputAggregationPlanAndResults(coll, [{$match: {a: {$gte: "shard0"}, c: {$lte: 1}}}, {$group: {_id: "$a"}}]);
 
 coll.createIndex({c: 1});
 section("No DISTINCT_SCAN on 'a', shard filtering + FETCH + filter");
-outputAggregationPlanAndResults(
-    coll, [{$match: {a: {$gte: "shard0"}, c: {$eq: 1}}}, {$group: {_id: "$a"}}]);
+outputAggregationPlanAndResults(coll, [{$match: {a: {$gte: "shard0"}, c: {$eq: 1}}}, {$group: {_id: "$a"}}]);
 
 shardingTest.stop();

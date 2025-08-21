@@ -13,35 +13,33 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const rst = new ReplSetTest({
-    nodes: [
-        {},
-    ]
+    nodes: [{}],
 });
 rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const testDB = primary.getDB("test");
+const coll = testDB.getCollection("test");
 
 assert.commandWorked(coll.insert({point: {x: -15.0, y: "abc"}}));
 
-let indexBuilderThreadFP =
-    configureFailPoint(testDB, 'hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort');
+let indexBuilderThreadFP = configureFailPoint(testDB, "hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort");
 
 // Will fail with error code 13026: "geo values must be 'legacy coordinate pairs' for 2d indexes"
-const waitForIndexBuild =
-    IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {point: "2d"}, {}, 13026);
+const waitForIndexBuild = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {point: "2d"}, {}, 13026);
 
 // Wait for the index builder to detect the malformed geo value and to hang before transitioning
 // the index build state to kAwaitPrimaryAbort.
 indexBuilderThreadFP.wait();
 
 // Drop the underlying collection.
-const awaitDropCollection =
-    startParallelShell(funWithArgs(function(collName) {
-                           assert.commandWorked(db.runCommand({drop: collName}));
-                       }, coll.getName()), primary.port);
+const awaitDropCollection = startParallelShell(
+    funWithArgs(function (collName) {
+        assert.commandWorked(db.runCommand({drop: collName}));
+    }, coll.getName()),
+    primary.port,
+);
 
 // Check external abort is reattempted multiple times, meaning it is blocked behind the internal
 // abort.

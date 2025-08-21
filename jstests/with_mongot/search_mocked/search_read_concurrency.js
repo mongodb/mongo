@@ -16,7 +16,7 @@ let threads = [];
 
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 const dbName = jsTestName();
@@ -25,20 +25,26 @@ const collName = jsTestName();
 function launchSearchQuery(mongod, threads, {times}) {
     jsTestLog("Starting " + times + " connections");
     for (let i = 0; i < times; i++) {
-        let thread = new Thread(function(connStr, dbName, collName, searchQuery) {
-            const client = new Mongo(connStr);
-            const db = client.getDB(dbName);
-            const coll = db[collName];
+        let thread = new Thread(
+            function (connStr, dbName, collName, searchQuery) {
+                const client = new Mongo(connStr);
+                const db = client.getDB(dbName);
+                const coll = db[collName];
 
-            // We already set up the mongotmock responses below, so this can be run without doing
-            // anything else.
-            const results = coll.aggregate([{$search: searchQuery}]).toArray();
-            assert.eq(results, [
-                {"_id": 1, "title": "cakes"},
-                {"_id": 2, "title": "cookies and cakes"},
-                {"_id": 3, "title": "vegetables"}
-            ]);
-        }, mongod.host, dbName, collName, searchQuery);
+                // We already set up the mongotmock responses below, so this can be run without doing
+                // anything else.
+                const results = coll.aggregate([{$search: searchQuery}]).toArray();
+                assert.eq(results, [
+                    {"_id": 1, "title": "cakes"},
+                    {"_id": 2, "title": "cookies and cakes"},
+                    {"_id": 3, "title": "vegetables"},
+                ]);
+            },
+            mongod.host,
+            dbName,
+            collName,
+            searchQuery,
+        );
         thread.start();
         threads.push(thread);
     }
@@ -54,12 +60,11 @@ const mongotConn = mongotmock.getConnection();
 let conn = MongoRunner.runMongod({
     setParameter: {
         mongotHost: mongotConn.host,
-        storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions"
-    }
+        storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
+    },
 });
 
-assert.commandWorked(
-    conn.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: numThreads}));
+assert.commandWorked(conn.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: numThreads}));
 
 const db = conn.getDB(dbName);
 const coll = db[collName];
@@ -73,12 +78,15 @@ const searchCmd = {
     search: coll.getName(),
     collectionUUID,
     query: searchQuery,
-    $db: dbName
+    $db: dbName,
 };
 
 // Set up mongotmock with expected responses and turn on the failpoint.
-assert.commandWorked(mongotmock.getConnection().adminCommand(
-    {configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "alwaysOn"}));
+assert.commandWorked(
+    mongotmock
+        .getConnection()
+        .adminCommand({configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "alwaysOn"}),
+);
 
 for (let i = 1; i <= numThreads; ++i) {
     const cursorId = NumberLong(i);
@@ -92,10 +100,10 @@ for (let i = 1; i <= numThreads; ++i) {
                     nextBatch: [
                         {_id: 1, $searchScore: 0.987},
                         {_id: 2, $searchScore: 0.654},
-                    ]
+                    ],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -104,32 +112,34 @@ for (let i = 1; i <= numThreads; ++i) {
                 cursor: {
                     id: NumberLong(0),
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 3, $searchScore: 0.321}]
+                    nextBatch: [{_id: 3, $searchScore: 0.321}],
                 },
-            }
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 // Launch a bunch of blocked search queries.
 launchSearchQuery(conn, threads, {times: numThreads});
 
 // Wait for them to block on the mongot request.
-assert.commandWorked(mongotmock.getConnection().adminCommand({
-    waitForFailPoint: "mongotWaitBeforeRespondingToQuery",
-    timesEntered: NumberLong(numThreads),
-    maxTimeMS: NumberLong(100000)
-}));
+assert.commandWorked(
+    mongotmock.getConnection().adminCommand({
+        waitForFailPoint: "mongotWaitBeforeRespondingToQuery",
+        timesEntered: NumberLong(numThreads),
+        maxTimeMS: NumberLong(100000),
+    }),
+);
 
 // Make sure we can still run another read query concurrently.
 assert(coll.findOne(), "Expected to be able to run a concurrent query");
 
 // Now turn off the fail point and let the $search queries complete.
-assert.commandWorked(mongotmock.getConnection().adminCommand(
-    {configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "off"}));
+assert.commandWorked(
+    mongotmock.getConnection().adminCommand({configureFailPoint: "mongotWaitBeforeRespondingToQuery", mode: "off"}),
+);
 
 for (const thread of threads) {
     thread.join();

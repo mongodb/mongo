@@ -12,7 +12,7 @@ import {getWinningPlanFromExplain, isIxscan} from "jstests/libs/query/analyze_pl
 for (var i = 0; i < 1000; i++) {
     var a = [];
     for (var j = 1; j < 5; j++) {
-        a.push("tag" + (i * j % 50));
+        a.push("tag" + ((i * j) % 50));
     }
     t.save({num: i, tags: a});
 }

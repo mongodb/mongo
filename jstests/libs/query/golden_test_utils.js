@@ -4,11 +4,7 @@
 
 import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/golden_test.js";
 import {code, codeOneLine, line, linebreak, subSection} from "jstests/libs/pretty_md.js";
-import {
-    formatExplainRoot,
-    getEngine,
-    getStableExecutionStats
-} from "jstests/libs/query/analyze_plan.js";
+import {formatExplainRoot, getEngine, getStableExecutionStats} from "jstests/libs/query/analyze_plan.js";
 
 /**
  * Helper that ensures limit and/or skip appear in the explain output if specified. Also prints out
@@ -62,7 +58,7 @@ export function outputFindPlanAndResults(cursor, expected, shouldSortResults = t
         querySection: tojson(cursor._convertToCommand()),
         resultsSection: normalizeArray(results, shouldSortResults),
         explain,
-        expected
+        expected,
     });
 }
 
@@ -75,8 +71,7 @@ export function outputCountPlanAndResults(cmdObj, explain, expected, actualCount
 
     assert.eq(actualCount, executionStages.nCounted);
 
-    outputCommonPlanAndResults(
-        {querySection: tojson(cmdObj), resultsSection: actualCount, explain, expected});
+    outputCommonPlanAndResults({querySection: tojson(cmdObj), resultsSection: actualCount, explain, expected});
 }
 
 /**
@@ -84,8 +79,7 @@ export function outputCountPlanAndResults(cmdObj, explain, expected, actualCount
  * a summary of the explain to markdown. By default the results will be sorted, but the original
  * order can be kept by setting `shouldSortResults` to false.
  */
-export function outputAggregationPlanAndResults(
-    coll, pipeline, options = {}, shouldSortResults = true) {
+export function outputAggregationPlanAndResults(coll, pipeline, options = {}, shouldSortResults = true) {
     const results = coll.aggregate(pipeline, options).toArray();
     const explain = coll.explain().aggregate(pipeline, options);
     const flatPlan = formatExplainRoot(explain);
@@ -123,8 +117,11 @@ export function outputDistinctPlanAndResults(coll, key, filter = {}, options = {
     const explain = assert.commandWorked(coll.getDB().runCommand({explain: cmdArgs}));
     const flatPlan = formatExplainRoot(explain);
 
-    subSection(`Distinct on "${key}", with filter: ${tojson(filter)}${
-        Object.keys(options).length ? `, and options: ${tojson(options)}` : ''}`);
+    subSection(
+        `Distinct on "${key}", with filter: ${tojson(filter)}${
+            Object.keys(options).length ? `, and options: ${tojson(options)}` : ""
+        }`,
+    );
 
     subSection("Distinct results");
     codeOneLine(results);
@@ -141,21 +138,23 @@ export function outputDistinctPlanAndResults(coll, key, filter = {}, options = {
 export function outputPlanCacheStats(coll) {
     let stats = coll.aggregate([{$planCacheStats: {}}]).toArray();
     const fieldsToUse = ["cachedPlan", "planCacheKey", "createdFromQuery", "isActive", "shard"];
-    stats.forEach(entry => {
-        Object.keys(entry).forEach(field => {
+    stats.forEach((entry) => {
+        Object.keys(entry).forEach((field) => {
             if (!fieldsToUse.includes(field)) {
                 delete entry[field];
             }
         });
     });
 
-    if (stats.every(entry => entry.hasOwnProperty('shard'))) {
-        const shards = [...new Set(stats.map(entry => entry.shard))].sort();
-        shards.forEach(shard => {
+    if (stats.every((entry) => entry.hasOwnProperty("shard"))) {
+        const shards = [...new Set(stats.map((entry) => entry.shard))].sort();
+        shards.forEach((shard) => {
             subSection(shard);
-            stats.filter(entry => entry.shard === shard).forEach(entry => {
-                code(tojsonMultiLineSortKeys(entry));
-            });
+            stats
+                .filter((entry) => entry.shard === shard)
+                .forEach((entry) => {
+                    code(tojsonMultiLineSortKeys(entry));
+                });
         });
     } else {
         code(tojsonMultiLineSortKeys(stats));
@@ -168,7 +167,7 @@ export function outputPlanCacheStats(coll) {
  */
 export function runDistinctAndOutputPlanCacheStats(coll, key, filter) {
     subSection(`Distinct on "${key}", with filter: ${tojson(filter)}`);
-    assert.commandWorked(coll.runCommand('distinct', {key: key, query: filter}));
+    assert.commandWorked(coll.runCommand("distinct", {key: key, query: filter}));
     outputPlanCacheStats(coll);
 }
 
@@ -178,7 +177,7 @@ export function runDistinctAndOutputPlanCacheStats(coll, key, filter) {
 export function runAggAndOutputPlanCacheStats(coll, pipeline) {
     subSection("Pipeline:");
     code(tojson(pipeline));
-    assert.commandWorked(coll.runCommand('aggregate', {pipeline: pipeline, cursor: {}}));
+    assert.commandWorked(coll.runCommand("aggregate", {pipeline: pipeline, cursor: {}}));
     outputPlanCacheStats(coll);
 }
 

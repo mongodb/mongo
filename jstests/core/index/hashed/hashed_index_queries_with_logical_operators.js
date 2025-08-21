@@ -28,11 +28,11 @@ assert.commandWorked(coll.insert({a: null, b: 12}));
 function validateFindCmdOutputAndPlan({
     filter,
     projection = {
-        _id: 0
+        _id: 0,
     },
     expectedOutput,
     expectedStages,
-    stagesNotExpected
+    stagesNotExpected,
 }) {
     const cmdObj = {find: coll.getName(), filter: filter, projection: projection};
     if (expectedOutput) {
@@ -47,7 +47,7 @@ function validateFindCmdOutputAndPlan({
         coll: coll,
         cmdObj: cmdObj,
         expectedStages: expectedStages,
-        stagesNotExpected: stagesNotExpected
+        stagesNotExpected: stagesNotExpected,
     });
 }
 
@@ -61,28 +61,31 @@ validateFindCmdOutputAndPlan({
     filter: {$or: [{a: null}, {a: 12, b: 12}]},
     expectedOutput: [{a: null, b: 12}, {a: null}, {a: 12, b: 12}, {b: 12}, {}],
     expectedStages: ["OR"],
-    stagesNotExpected: ["COLLSCAN"]
+    stagesNotExpected: ["COLLSCAN"],
 });
 
 // Verify that {$exists:true} predicates can be answered by the hashed prefix field.
 validateFindCmdOutputAndPlan({
     filter: {a: {$exists: true}, b: 12},
-    expectedOutput: [{a: 12, b: 12}, {a: null, b: 12}],
-    expectedStages: ["FETCH", "IXSCAN"]
+    expectedOutput: [
+        {a: 12, b: 12},
+        {a: null, b: 12},
+    ],
+    expectedStages: ["FETCH", "IXSCAN"],
 });
 
 // Verify that {$exists:false} predicates can be answered by the hashed prefix field.
 validateFindCmdOutputAndPlan({
     filter: {a: {$exists: false}, b: 12},
     expectedOutput: [{b: 12}],
-    expectedStages: ["FETCH", "IXSCAN"]
+    expectedStages: ["FETCH", "IXSCAN"],
 });
 
 // Verify that query can use index for matching 'null'.
 validateFindCmdOutputAndPlan({
     filter: {a: null, b: 12},
     expectedOutput: [{b: 12}, {a: null, b: 12}],
-    expectedStages: ["FETCH", "IXSCAN"]
+    expectedStages: ["FETCH", "IXSCAN"],
 });
 
 // Verify that query cannot use index for $not queries on hashed field.
@@ -107,45 +110,47 @@ validateFindCmdOutputAndPlan({
 // Verify that {$exists:true} queries can use the index and differentiate null from missing.
 validateFindCmdOutputAndPlan({
     filter: {a: {$exists: true}, b: 12},
-    expectedOutput: [{a: 12, b: 12}, {a: null, b: 12}],
-    expectedStages: ["FETCH", "IXSCAN"]
+    expectedOutput: [
+        {a: 12, b: 12},
+        {a: null, b: 12},
+    ],
+    expectedStages: ["FETCH", "IXSCAN"],
 });
 
 // Verify that {$exists:true} predicates behave as expected for hashed non-prefix fields.
 validateFindCmdOutputAndPlan({
     filter: {a: null, b: {$exists: true}},
     expectedOutput: [{a: null, b: 12}, {b: 12}],
-    expectedStages: ["FETCH", "IXSCAN"]
+    expectedStages: ["FETCH", "IXSCAN"],
 });
 
 // Verify that {$exists:false} queries on non-hashed prefixes can use a compound hashed index.
 validateFindCmdOutputAndPlan({
     filter: {a: {$exists: false}, b: 12},
     expectedOutput: [{b: 12}],
-    expectedStages: ["FETCH", "IXSCAN"]
+    expectedStages: ["FETCH", "IXSCAN"],
 });
 
 // Verify that {$exists:false} predicates behave as expected for hashed non-prefix fields.
 validateFindCmdOutputAndPlan({
     filter: {a: null, b: {$exists: false}},
     expectedOutput: [{a: null}, {}],
-    expectedStages: ["FETCH", "IXSCAN"]
+    expectedStages: ["FETCH", "IXSCAN"],
 });
 
 // Verify that query can use index for matching 'null' on non-hashed prefixes.
 validateFindCmdOutputAndPlan({
     filter: {a: null, b: 12},
     expectedOutput: [{b: 12}, {a: null, b: 12}],
-    expectedStages: ["FETCH", "IXSCAN"]
+    expectedStages: ["FETCH", "IXSCAN"],
 });
 
 // Verify that query can use index for matching 'null' on hashed field.
-validateFindCmdOutputAndPlan(
-    {filter: {a: 12, b: null}, expectedOutput: [], expectedStages: ["FETCH", "IXSCAN"]});
+validateFindCmdOutputAndPlan({filter: {a: 12, b: null}, expectedOutput: [], expectedStages: ["FETCH", "IXSCAN"]});
 
 // Verify that $not queries on non-hashed prefixes can use a compound hashed index.
 validateFindCmdOutputAndPlan({
     filter: {a: {$not: {$gt: 12}}, b: 12},
     expectedOutput: [{a: 12, b: 12}, {a: null, b: 12}, {b: 12}],
-    expectedStages: ["IXSCAN"]
+    expectedStages: ["IXSCAN"],
 });

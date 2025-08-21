@@ -11,8 +11,8 @@ TestData.testingDiagnosticsEnabled = false;
 const conn = MongoRunner.runMongod();
 const db = conn.getDB(jsTestName());
 
-const metaField = 'm';
-const timeField = 't';
+const metaField = "m";
+const timeField = "t";
 
 const time1_first = ISODate("2024-01-16T20:48:39.448Z");
 const time1_later = ISODate("2024-01-16T20:48:50.448Z");
@@ -20,7 +20,7 @@ const time2_first = ISODate("2024-02-29T07:55:50.212Z");
 
 let collCount = 0;
 
-const checkAllBucketsCompressed = function(coll) {
+const checkAllBucketsCompressed = function (coll) {
     jsTestLog("Confirm all buckets are compressed.");
     const docs = coll.find().rawData().toArray();
     for (let i = 0; i < docs.length; ++i) {
@@ -29,13 +29,12 @@ const checkAllBucketsCompressed = function(coll) {
     }
 };
 
-const runTest = function(isCorrupted = false) {
+const runTest = function (isCorrupted = false) {
     jsTestLog("runTest(isCorrupted: [" + isCorrupted.toString() + "])");
     const collName = "coll_" + collCount++;
     const coll = db[collName];
 
-    assert.commandWorked(
-        db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
 
     const uncompressedBucket = {
         _id: ObjectId("65a6eb806ffc9fa4280ecac4"),
@@ -66,23 +65,29 @@ const runTest = function(isCorrupted = false) {
                 0: 0,
                 1: 1,
             },
-        }
+        },
     };
 
     jsTestLog("Insert uncompressed bucket document.");
-    assert.commandWorked(getTimeseriesCollForRawOps(db, coll).insertOne(uncompressedBucket,
-                                                                        getRawOperationSpec(db)));
+    assert.commandWorked(getTimeseriesCollForRawOps(db, coll).insertOne(uncompressedBucket, getRawOperationSpec(db)));
     assert.eq(coll.find().itcount(), 2);
     assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 1);
-    assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData()[0].control.version,
-              TimeseriesTest.BucketVersion.kUncompressed);
+    assert.eq(
+        getTimeseriesCollForRawOps(db, coll).find().rawData()[0].control.version,
+        TimeseriesTest.BucketVersion.kUncompressed,
+    );
 
     if (isCorrupted) {
         jsTestLog("Corrupting the bucket by adding an extra data field.");
         // Corrupt the uncompressed bucket by adding an extra data field to it. This
         // will make the bucket uncompressible.
-        let res = assert.commandWorked(getTimeseriesCollForRawOps(db, coll).updateOne(
-            {_id: uncompressedBucket._id}, {$set: {"data.a.3": 6}}, getRawOperationSpec(db)));
+        let res = assert.commandWorked(
+            getTimeseriesCollForRawOps(db, coll).updateOne(
+                {_id: uncompressedBucket._id},
+                {$set: {"data.a.3": 6}},
+                getRawOperationSpec(db),
+            ),
+        );
         jsTestLog(getTimeseriesCollForRawOps(db, coll).find().rawData().toArray());
         assert.eq(res.modifiedCount, 1);
     }
@@ -93,22 +98,25 @@ const runTest = function(isCorrupted = false) {
     const stats = assert.commandWorked(coll.stats());
     jsTestLog(stats.timeseries);
     if (isCorrupted) {
-        assert.eq(0, stats.timeseries['numBucketsReopened']);
-        assert.eq(0, stats.timeseries['numBucketUpdates']);
-        assert.eq(1, stats.timeseries['numBucketsFrozen']);
+        assert.eq(0, stats.timeseries["numBucketsReopened"]);
+        assert.eq(0, stats.timeseries["numBucketUpdates"]);
+        assert.eq(1, stats.timeseries["numBucketsFrozen"]);
     } else {
-        assert.eq(1, stats.timeseries['numBucketsReopened']);
-        assert.eq(1, stats.timeseries['numBucketUpdates']);
-        assert.eq(0, stats.timeseries['numBucketsFrozen']);
+        assert.eq(1, stats.timeseries["numBucketsReopened"]);
+        assert.eq(1, stats.timeseries["numBucketUpdates"]);
+        assert.eq(0, stats.timeseries["numBucketsFrozen"]);
     }
-    assert.eq(1, stats.timeseries['numCommits']);
+    assert.eq(1, stats.timeseries["numCommits"]);
 
     if (isCorrupted) {
         assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 2);
-        jsTestLog(
-            "Remove corrupted bucket to prevent the validate post-hook from seeing it after the test.");
-        assert.commandWorked(getTimeseriesCollForRawOps(db, coll).remove(
-            {_id: ObjectId("65a6eb806ffc9fa4280ecac4")}, getRawOperationSpec(db)));
+        jsTestLog("Remove corrupted bucket to prevent the validate post-hook from seeing it after the test.");
+        assert.commandWorked(
+            getTimeseriesCollForRawOps(db, coll).remove(
+                {_id: ObjectId("65a6eb806ffc9fa4280ecac4")},
+                getRawOperationSpec(db),
+            ),
+        );
     } else {
         assert.eq(getTimeseriesCollForRawOps(db, coll).find().rawData().itcount(), 1);
     }

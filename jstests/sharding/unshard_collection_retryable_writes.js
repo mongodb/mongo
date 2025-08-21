@@ -14,14 +14,17 @@ import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
-    jsTest.log(`Running test for minimumReshardingDuration = ${
-        minimumOperationDurationMS} and reshardInPlace = ${shouldReshardInPlace}`);
+    jsTest.log(
+        `Running test for minimumReshardingDuration = ${
+            minimumOperationDurationMS
+        } and reshardInPlace = ${shouldReshardInPlace}`,
+    );
 
     const reshardingTest = new ReshardingTest({
         numDonors: 2,
         numRecipients: 1,
         reshardInPlace: shouldReshardInPlace,
-        minimumOperationDurationMS: minimumOperationDurationMS
+        minimumOperationDurationMS: minimumOperationDurationMS,
     });
     reshardingTest.setup();
 
@@ -35,22 +38,25 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         ],
     });
 
-    assert.commandWorked(sourceCollection.insert([
-        {_id: 0, oldKey: -10, counter: 0},
-        {_id: 1, oldKey: -5, counter: 0},
-    ]));
+    assert.commandWorked(
+        sourceCollection.insert([
+            {_id: 0, oldKey: -10, counter: 0},
+            {_id: 1, oldKey: -5, counter: 0},
+        ]),
+    );
 
     const mongos = sourceCollection.getMongo();
     const session = mongos.startSession({causalConsistency: false, retryWrites: false});
-    const sessionCollection = session.getDatabase(sourceCollection.getDB().getName())
-                                  .getCollection(sourceCollection.getName());
+    const sessionCollection = session
+        .getDatabase(sourceCollection.getDB().getName())
+        .getCollection(sourceCollection.getName());
     const updateCommand = {
         update: sourceCollection.getName(),
         updates: [
             {q: {oldKey: -10}, u: {$inc: {counter: 1}}},
             {q: {oldKey: -5}, u: {$inc: {counter: 1}}},
         ],
-        txnNumber: NumberLong(1)
+        txnNumber: NumberLong(1),
     };
 
     function checkDocsConsistency() {
@@ -58,15 +64,12 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         assert.eq(2, docs.length, {docs});
 
         for (const doc of docs) {
-            assert.eq(1,
-                      doc.counter,
-                      {message: `retryable write executed more than once`, id: doc._id, docs});
+            assert.eq(1, doc.counter, {message: `retryable write executed more than once`, id: doc._id, docs});
         }
     }
 
     // before resharding
-    let res =
-        RetryableWritesUtil.runRetryableWrite(sessionCollection, updateCommand, ErrorCodes.OK);
+    let res = RetryableWritesUtil.runRetryableWrite(sessionCollection, updateCommand, ErrorCodes.OK);
     assert(res.nModified == 2, res);
     checkDocsConsistency();
 
@@ -74,14 +77,13 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     reshardingTest.withUnshardCollectionInBackground({toShard: recipientShardNames[0]}, () => {
         assert.soon(() => {
             const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: sourceCollection.getFullName()
+                ns: sourceCollection.getFullName(),
             });
 
             return coordinatorDoc !== null && coordinatorDoc.state === "applying";
         });
         // oldKey update will target shard which has the info for the write.
-        res =
-            RetryableWritesUtil.runRetryableWrite(sessionCollection, updateCommand, ErrorCodes.OK);
+        res = RetryableWritesUtil.runRetryableWrite(sessionCollection, updateCommand, ErrorCodes.OK);
         assert(res.nModified == 2, res);
         checkDocsConsistency();
     });
@@ -99,7 +101,10 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     // This write will get targeted towards the recipient shard which does not have info for this
     // write.
     res = RetryableWritesUtil.runRetryableWrite(
-        sessionCollection, updateCommand, ErrorCodes.IncompleteTransactionHistory);
+        sessionCollection,
+        updateCommand,
+        ErrorCodes.IncompleteTransactionHistory,
+    );
     assert(res.writeErrors[0].code == 217, res);
     checkDocsConsistency();
 

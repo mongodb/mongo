@@ -19,14 +19,13 @@ export class ShardingTestWithMongotMock {
             // (24 hours). For this test, we need a shorter election timeout because it relies on
             // nodes running an election when they do not detect an active primary. Therefore, we
             // are setting the electionTimeoutMillis to its default value.
-            initiateWithDefaultElectionTimeout: true
+            initiateWithDefaultElectionTimeout: true,
         });
 
         this._nShards = Object.keys(shardingTestOptions.shards).length;
         this._mongosCount = 1;
         if (shardingTestOptions.hasOwnProperty("mongos")) {
-            assert(Number.isInteger(shardingTestOptions["mongos"],
-                                    "Number of mongos nodes must be an integer"));
+            assert(Number.isInteger(shardingTestOptions["mongos"], "Number of mongos nodes must be an integer"));
             this._mongosCount = shardingTestOptions["mongos"];
         }
 
@@ -76,8 +75,7 @@ export class ShardingTestWithMongotMock {
             for (let j = 0; j < this._shardingTestOptions.shards["rs" + i].nodes; ++j) {
                 let mongotHost = this._mongotMocks[mongotMocksIdx++].getConnection().host;
                 let node = this.st["rs" + i];
-                let newParams = Object.merge(node.nodes[j].fullOptions.setParameter || {},
-                                             {mongotHost: mongotHost});
+                let newParams = Object.merge(node.nodes[j].fullOptions.setParameter || {}, {mongotHost: mongotHost});
                 node.restart(j, {
                     setParameter: newParams,
                     restart: true,
@@ -89,8 +87,7 @@ export class ShardingTestWithMongotMock {
         for (let i = 0; i < this._mongosCount; ++i) {
             let mongotHost = this._mongotMocks[mongotMocksIdx++].getConnection().host;
             let node = this.st["s" + i];
-            let newParams =
-                Object.merge(node.fullOptions.setParameter || {}, {mongotHost: mongotHost});
+            let newParams = Object.merge(node.fullOptions.setParameter || {}, {mongotHost: mongotHost});
             this.st.restartMongos(i, {setParameter: newParams, restart: true});
         }
     }

@@ -18,35 +18,44 @@ coll.drop();
 const nonSimpleCollationOptions = {
     locale: "en_US",
     strength: 2,
-    caseLevel: false
+    caseLevel: false,
 };
 
 assert.commandWorked(db.createCollection(coll.getName(), {collation: nonSimpleCollationOptions}));
 
 // Create an index that doesn't specify the collation option. This should use the default value.
-assert.commandWorked(
-    db.runCommand({createIndexes: coll.getName(), indexes: [{key: {x: 1}, name: "x_1"}]}));
+assert.commandWorked(db.runCommand({createIndexes: coll.getName(), indexes: [{key: {x: 1}, name: "x_1"}]}));
 
-assert.commandWorked(db.runCommand({
-    createIndexes: coll.getName(),
-    indexes: [{key: {x: 1}, name: "x_1_1", collation: {locale: 'simple'}}]
-}));
+assert.commandWorked(
+    db.runCommand({
+        createIndexes: coll.getName(),
+        indexes: [{key: {x: 1}, name: "x_1_1", collation: {locale: "simple"}}],
+    }),
+);
 
 const indexesFound = coll.getIndexes();
-assert.neq(null,
-           IndexCatalogHelpers.findByKeyPattern(indexesFound, {x: 1}, {locale: "simple"}),
-           "Failed to find simple collation index for {x: 1} / Found: " + tojson(indexesFound));
-assert.neq(null,
-           IndexCatalogHelpers.findByKeyPattern(indexesFound, {x: 1}, {
-               locale: "en_US",
-               caseLevel: false,
-               caseFirst: "off",
-               strength: 2,
-               numericOrdering: false,
-               alternate: "non-ignorable",
-               maxVariable: "punct",
-               normalization: false,
-               backwards: false,
-               version: "57.1"
-           }),
-           "Failed to find complex collation index for {x: 1} / Found: " + tojson(indexesFound));
+assert.neq(
+    null,
+    IndexCatalogHelpers.findByKeyPattern(indexesFound, {x: 1}, {locale: "simple"}),
+    "Failed to find simple collation index for {x: 1} / Found: " + tojson(indexesFound),
+);
+assert.neq(
+    null,
+    IndexCatalogHelpers.findByKeyPattern(
+        indexesFound,
+        {x: 1},
+        {
+            locale: "en_US",
+            caseLevel: false,
+            caseFirst: "off",
+            strength: 2,
+            numericOrdering: false,
+            alternate: "non-ignorable",
+            maxVariable: "punct",
+            normalization: false,
+            backwards: false,
+            version: "57.1",
+        },
+    ),
+    "Failed to find complex collation index for {x: 1} / Found: " + tojson(indexesFound),
+);

@@ -17,7 +17,7 @@ const serverParams = {
         internalQueryFrameworkControl: "forceClassicEngine",
         // Needed to avoid spilling to disk, which changes memory metrics.
         allowDiskUseByDefault: false,
-    }
+    },
 };
 
 const dbName = jsTestName();
@@ -36,8 +36,11 @@ function runStandaloneTest(dbName, collName) {
 
 function runShardedTest(dbName, collName) {
     jsTestLog("Running sharded test");
-    const st = new ShardingTest(
-        {shards: 2, rs: {nodes: 1}, other: {mongosOptions: serverParams, rsOptions: serverParams}});
+    const st = new ShardingTest({
+        shards: 2,
+        rs: {nodes: 1},
+        other: {mongosOptions: serverParams, rsOptions: serverParams},
+    });
     const mongos = st.s0;
     const adminDb = mongos.getDB("admin");
     const namespace = dbName + "." + collName;
@@ -62,9 +65,7 @@ function insertData(coll) {
 }
 
 function runTest(conn, db, coll) {
-    checkCurrentOpMemoryTracking("group", conn, db, coll, [
-        {$group: {_id: {$mod: ["$_id", 3]}, count: {$sum: 1}}},
-    ]);
+    checkCurrentOpMemoryTracking("group", conn, db, coll, [{$group: {_id: {$mod: ["$_id", 3]}, count: {$sum: 1}}}]);
 }
 
 function assertCurrentOpOutput(memoryTrackingEnabled, curOpDoc) {
@@ -81,17 +82,18 @@ function assertCurrentOpOutput(memoryTrackingEnabled, curOpDoc) {
 
 function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline) {
     const memoryTrackingEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
-    jsTestLog(`Checking $currentOp for stage ${stageName} with memory tracking ` +
-              (memoryTrackingEnabled ? "enabled" : "disabled"));
+    jsTestLog(
+        `Checking $currentOp for stage ${stageName} with memory tracking ` +
+            (memoryTrackingEnabled ? "enabled" : "disabled"),
+    );
 
     // Run a pipeline with a small batch size, to ensure that a cursor is created and we can call
     // getMore().
     const session = db.getMongo().startSession();
     const sessionDb = session.getDatabase(db.getName());
-    let cursorId = assert
-                       .commandWorked(sessionDb.runCommand(
-                           {aggregate: coll.getName(), pipeline, cursor: {batchSize: 1}}))
-                       .cursor.id;
+    let cursorId = assert.commandWorked(
+        sessionDb.runCommand({aggregate: coll.getName(), pipeline, cursor: {batchSize: 1}}),
+    ).cursor.id;
     assert.neq(cursorId, NumberLong(0));
 
     // Create a failpoint to block the getMore command.
@@ -100,21 +102,30 @@ function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline) {
     // getMore() has to be invoked within the same session in which the cursor was created.
     const sessionId = session.getSessionId();
     let getMoreShell = startParallelShell(
-        funWithArgs(function(dbName, cursorId, collName, sessionId) {
-            const testDb = db.getSiblingDB(dbName);
-            assert.commandWorked(testDb.runCommand(
-                {getMore: cursorId, collection: collName, lsid: sessionId, batchSize: 1}));
-        }, db.getName(), NumberLong(cursorId), coll.getName(), sessionId), conn.port);
+        funWithArgs(
+            function (dbName, cursorId, collName, sessionId) {
+                const testDb = db.getSiblingDB(dbName);
+                assert.commandWorked(
+                    testDb.runCommand({getMore: cursorId, collection: collName, lsid: sessionId, batchSize: 1}),
+                );
+            },
+            db.getName(),
+            NumberLong(cursorId),
+            coll.getName(),
+            sessionId,
+        ),
+        conn.port,
+    );
 
     // Wait for the getMore to be blocked on the failpoint
     failPoint.wait();
 
     // Find the current operation for the getMore blocked command. We need to specify "localOps" to
     // see operations on mongos. This flag has no effect on a standalone mongod.
-    let curOpDocs =
-        db.getSiblingDB("admin")
-            .aggregate([{$currentOp: {localOps: true}}, {$match: {"lsid.id": sessionId.id}}])
-            .toArray();
+    let curOpDocs = db
+        .getSiblingDB("admin")
+        .aggregate([{$currentOp: {localOps: true}}, {$match: {"lsid.id": sessionId.id}}])
+        .toArray();
     assert.eq(curOpDocs.length, 1, "Expected one current operation for the getMore command");
 
     assertCurrentOpOutput(memoryTrackingEnabled, curOpDocs[0]);
@@ -124,12 +135,13 @@ function checkCurrentOpMemoryTracking(stageName, conn, db, coll, pipeline) {
     getMoreShell();
 
     // Now check that we also report memory stats for an idle cursor.
-    curOpDocs = db.getSiblingDB("admin")
-                    .aggregate([
-                        {$currentOp: {localOps: true, idleCursors: true}},
-                        {$match: {"lsid.id": sessionId.id, "type": "idleCursor"}}
-                    ])
-                    .toArray();
+    curOpDocs = db
+        .getSiblingDB("admin")
+        .aggregate([
+            {$currentOp: {localOps: true, idleCursors: true}},
+            {$match: {"lsid.id": sessionId.id, "type": "idleCursor"}},
+        ])
+        .toArray();
     assert.eq(curOpDocs.length, 1, "Expected one idle cursor for unfinished query");
     assertCurrentOpOutput(memoryTrackingEnabled, curOpDocs[0]);
 

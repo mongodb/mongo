@@ -13,8 +13,7 @@ const dbName = "test";
 const collName = "foo";
 const ns = "test.foo";
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 const testColl = st.s.getCollection(ns);
 
 CreateShardedCollectionUtil.shardCollectionWithChunks(testColl, {x: 1}, [
@@ -32,16 +31,24 @@ assert.commandWorked(testColl.runCommand({collMod: "foo", validator: {name: {$ty
 let failpoint = configureFailPoint(st.shard1, "migrateThreadHangAtStep4");
 
 const awaitResult = startParallelShell(
-    funWithArgs(function(ns, toShardName) {
-        assert.commandWorked(
-            db.adminCommand({moveChunk: ns, find: {x: 50}, to: toShardName, _waitForDelete: true}));
-    }, ns, st.shard1.shardName), st.s.port);
+    funWithArgs(
+        function (ns, toShardName) {
+            assert.commandWorked(
+                db.adminCommand({moveChunk: ns, find: {x: 50}, to: toShardName, _waitForDelete: true}),
+            );
+        },
+        ns,
+        st.shard1.shardName,
+    ),
+    st.s.port,
+);
 
 failpoint.wait();
 
 for (let i = 100; i < 200; i++) {
-    assert.commandWorked(testColl.runCommand(
-        {insert: collName, documents: [{x: i, name: "B"}], bypassDocumentValidation: true}));
+    assert.commandWorked(
+        testColl.runCommand({insert: collName, documents: [{x: i, name: "B"}], bypassDocumentValidation: true}),
+    );
 }
 
 for (let i = 50; i < 75; ++i) {
@@ -54,12 +61,12 @@ awaitResult();
 
 const donor = st.shard0.rs.getPrimary().getDB(dbName);
 const recipient = st.shard1.rs.getPrimary().getDB(dbName);
-assert.eq(50,
-          donor.foo.find().itcount(),
-          "Number of documents on the donor shard after moveChunk is incorrect.");
-assert.eq(125,
-          recipient.foo.find().itcount(),
-          "Number of documents on the recipient shard after moveChunk is incorrect.");
+assert.eq(50, donor.foo.find().itcount(), "Number of documents on the donor shard after moveChunk is incorrect.");
+assert.eq(
+    125,
+    recipient.foo.find().itcount(),
+    "Number of documents on the recipient shard after moveChunk is incorrect.",
+);
 assert.eq(175, testColl.find().itcount(), "Number of total documents is incorrect");
 
 st.stop();

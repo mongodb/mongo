@@ -15,30 +15,33 @@ const canParseMissingClusterTimeSignature =
 let st = new ShardingTest({
     mongos: 1,
     shards: 1,
-    keyFile: 'jstests/libs/key1',
-    rs: {setParameter: {"failpoint.alwaysValidateClientsClusterTime": tojson({mode: "alwaysOn"})}}
+    keyFile: "jstests/libs/key1",
+    rs: {setParameter: {"failpoint.alwaysValidateClientsClusterTime": tojson({mode: "alwaysOn"})}},
 });
 
-let adminDB = st.s.getDB('admin');
+let adminDB = st.s.getDB("admin");
 
 assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
 assert.eq(1, adminDB.auth("admin", "admin"));
 
-assert.commandWorked(adminDB.runCommand({
-    createRole: "advanceClusterTimeRole",
-    privileges: [{resource: {cluster: true}, actions: ["advanceClusterTime"]}],
-    roles: []
-}));
+assert.commandWorked(
+    adminDB.runCommand({
+        createRole: "advanceClusterTimeRole",
+        privileges: [{resource: {cluster: true}, actions: ["advanceClusterTime"]}],
+        roles: [],
+    }),
+);
 
 let testDB = adminDB.getSiblingDB("testDB");
 
+assert.commandWorked(testDB.runCommand({createUser: "NotTrusted", pwd: "pwd", roles: ["readWrite"]}));
 assert.commandWorked(
-    testDB.runCommand({createUser: 'NotTrusted', pwd: 'pwd', roles: ['readWrite']}));
-assert.commandWorked(testDB.runCommand({
-    createUser: 'Trusted',
-    pwd: 'pwd',
-    roles: [{role: 'advanceClusterTimeRole', db: 'admin'}, 'readWrite']
-}));
+    testDB.runCommand({
+        createUser: "Trusted",
+        pwd: "pwd",
+        roles: [{role: "advanceClusterTimeRole", db: "admin"}, "readWrite"],
+    }),
+);
 adminDB.logout();
 assert.eq(1, testDB.auth("NotTrusted", "pwd"));
 
@@ -54,12 +57,11 @@ const cmdObj = {
     find: "foo",
     limit: 1,
     singleBatch: true,
-    $clusterTime: clusterTime
+    $clusterTime: clusterTime,
 };
 jsTestLog("running NonTrusted. command: " + tojson(cmdObj));
 res = testDB.runCommand(cmdObj);
-assert.commandFailedWithCode(
-    res, ErrorCodes.TimeProofMismatch, "Command request was: " + tojsononeline(cmdObj));
+assert.commandFailedWithCode(res, ErrorCodes.TimeProofMismatch, "Command request was: " + tojsononeline(cmdObj));
 
 // Make a copy so anything with a reference to the original cluster time isn't affected.
 let clusterTimeCopy = Object.extend({}, clusterTime);
@@ -70,17 +72,19 @@ const cmdObjNoSignature = {
     find: "foo",
     limit: 1,
     singleBatch: true,
-    $clusterTime: clusterTimeCopy
+    $clusterTime: clusterTimeCopy,
 };
 jsTestLog("running NonTrusted. command: " + tojson(cmdObjNoSignature));
 res = testDB.runCommand(cmdObjNoSignature);
 if (canParseMissingClusterTimeSignature) {
     assert.commandFailedWithCode(
-        res, ErrorCodes.KeyNotFound, "Command request was: " + tojsononeline(cmdObjNoSignature));
+        res,
+        ErrorCodes.KeyNotFound,
+        "Command request was: " + tojsononeline(cmdObjNoSignature),
+    );
 } else {
     // Parsing will fail.
-    assert.commandFailedWithCode(
-        res, ErrorCodes.NoSuchKey, "Command request was: " + tojsononeline(cmdObjNoSignature));
+    assert.commandFailedWithCode(res, ErrorCodes.NoSuchKey, "Command request was: " + tojsononeline(cmdObjNoSignature));
 }
 
 testDB.logout();
@@ -108,8 +112,7 @@ if (canParseMissingClusterTimeSignature) {
     assert.commandWorked(res, "Command request was: " + tojsononeline(cmdObjNoSignature));
 } else {
     // Parsing will fail.
-    assert.commandFailedWithCode(
-        res, ErrorCodes.NoSuchKey, "Command request was: " + tojsononeline(cmdObjNoSignature));
+    assert.commandFailedWithCode(res, ErrorCodes.NoSuchKey, "Command request was: " + tojsononeline(cmdObjNoSignature));
 }
 
 testDB.logout();

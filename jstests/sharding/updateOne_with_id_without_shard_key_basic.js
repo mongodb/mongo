@@ -7,7 +7,7 @@
 
 import {
     withRetryOnTransientTxnErrorIncrementTxnNum,
-    withTxnAndAutoRetryOnMongos
+    withTxnAndAutoRetryOnMongos,
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
@@ -30,16 +30,14 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(coll, {x: 1}, [
 assert.commandWorked(coll.insert({x: -1, _id: -1}));
 assert.commandWorked(coll.insert({x: 1, _id: 1}));
 
-let fp = configureFailPoint(st.s, 'hangAfterCompletingWriteWithoutShardKeyWithId');
+let fp = configureFailPoint(st.s, "hangAfterCompletingWriteWithoutShardKeyWithId");
 
 // Test that transactions do not use broadcast protocol per PM-3190.
 let session = st.s.startSession({retryWrites: false});
 withTxnAndAutoRetryOnMongos(session, () => {
     let sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
     let updateCmd = {
-        updates: [
-            {q: {_id: -1}, u: {$inc: {counter: 1}}},
-        ],
+        updates: [{q: {_id: -1}, u: {$inc: {counter: 1}}}],
         txnNumber: NumberLong(0),
     };
     assert.commandWorked(sessionColl.runCommand("update", updateCmd));
@@ -49,18 +47,20 @@ session.endSession();
 // Test that retryable internal transactions do not use broadcast protocol per PM-3190.
 const lsidWithUUID = {
     id: UUID(),
-    txnUUID: UUID()
+    txnUUID: UUID(),
 };
 let txnNumber = 1;
 withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
-    assert.commandWorked(db.runCommand({
-        update: coll.getName(),
-        updates: [{q: {_id: -1}, u: {$inc: {counter: 1}}}],
-        lsid: lsidWithUUID,
-        txnNumber: NumberLong(txnNum),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            update: coll.getName(),
+            updates: [{q: {_id: -1}, u: {$inc: {counter: 1}}}],
+            lsid: lsidWithUUID,
+            txnNumber: NumberLong(txnNum),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 });
 
 const lsidWithUUIDAndTxnNum = {
@@ -70,14 +70,16 @@ const lsidWithUUIDAndTxnNum = {
 };
 txnNumber = 1;
 withRetryOnTransientTxnErrorIncrementTxnNum(txnNumber, (txnNum) => {
-    assert.commandWorked(db.runCommand({
-        update: coll.getName(),
-        updates: [{q: {_id: -5}, u: {$inc: {counter: 1}}}],
-        lsid: lsidWithUUIDAndTxnNum,
-        txnNumber: NumberLong(txnNum),
-        startTransaction: true,
-        autocommit: false
-    }));
+    assert.commandWorked(
+        db.runCommand({
+            update: coll.getName(),
+            updates: [{q: {_id: -5}, u: {$inc: {counter: 1}}}],
+            lsid: lsidWithUUIDAndTxnNum,
+            txnNumber: NumberLong(txnNum),
+            startTransaction: true,
+            autocommit: false,
+        }),
+    );
 });
 
 // Test that non-retryable writes do not use broadcast protocol per PM-3190.
@@ -88,9 +90,7 @@ session = st.s.startSession({retryWrites: false});
 
 let sessionColl = session.getDatabase(db.getName()).getCollection(coll.getName());
 let updateCmd = {
-    updates: [
-        {q: {_id: 1}, u: {$inc: {counter: 1}}},
-    ]
+    updates: [{q: {_id: 1}, u: {$inc: {counter: 1}}}],
 };
 
 assert.commandWorked(sessionColl.runCommand("update", updateCmd));
@@ -101,15 +101,25 @@ session = st.s.startSession({retryWrites: true});
 const lsid = session.getSessionId();
 
 const joinUpdate = startParallelShell(
-    funWithArgs(function(dbName, collName, lsid) {
-        assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).runCommand("update", {
-            updates: [
-                {q: {_id: 1}, u: {$inc: {counter: 1}}},
-            ],
-            lsid: lsid,
-            txnNumber: NumberLong(5)
-        }));
-    }, db.getName(), coll.getName(), lsid), mongos.port);
+    funWithArgs(
+        function (dbName, collName, lsid) {
+            assert.commandWorked(
+                db
+                    .getSiblingDB(dbName)
+                    .getCollection(collName)
+                    .runCommand("update", {
+                        updates: [{q: {_id: 1}, u: {$inc: {counter: 1}}}],
+                        lsid: lsid,
+                        txnNumber: NumberLong(5),
+                    }),
+            );
+        },
+        db.getName(),
+        coll.getName(),
+        lsid,
+    ),
+    mongos.port,
+);
 
 // We should hit the configured failpoint if PM-3190 code is used.
 fp.wait();

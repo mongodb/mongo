@@ -25,16 +25,16 @@ const replTest = new ReplSetTest({
             // us to hang between consecutive insert operations without
             // blocking the ones we already processed from executing.
             internalInsertMaxBatchSize: 1,
-        }
-    }
+        },
+    },
 });
 replTest.startSet();
 replTest.initiate();
 
 const primary = replTest.getPrimary();
-const dbName = 'testDB';
+const dbName = "testDB";
 const testDB = primary.getDB(dbName);
-const collName = 'testColl';
+const collName = "testColl";
 const coll = testDB[collName];
 
 function dropTestCollection() {
@@ -72,10 +72,13 @@ let commands = [];
 commands.push({
     bulkReq: {
         bulkWrite: 1,
-        ops: [{insert: 0, document: {_id: 0}}, {insert: 0, document: {_id: 1}}],
-        nsInfo: [{ns: `${dbName}.${collName}`}]
+        ops: [
+            {insert: 0, document: {_id: 0}},
+            {insert: 0, document: {_id: 1}},
+        ],
+        nsInfo: [{ns: `${dbName}.${collName}`}],
     },
-    bulkConfirmFunc: function(res) {
+    bulkConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
         assert.eq(res.cursor.firstBatch.length, 2);
 
@@ -88,14 +91,14 @@ commands.push({
         assert.eq(res.cursor.firstBatch[1].code, ErrorCodes.DuplicateKey);
     },
     noopMakerReq: {insert: collName, documents: [{_id: 1}]},
-    noopMakerConfirmFunc: function(res) {
+    noopMakerConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq(res.n, 1);
     },
-    confirmFunc: function() {
+    confirmFunc: function () {
         assert.eq(coll.count({_id: 0}), 1);
         assert.eq(coll.count({_id: 1}), 1);
-    }
+    },
 });
 
 // 'bulkWrite' where we are doing a mix of local and non-local writes and the last op is an insert
@@ -108,10 +111,13 @@ localColl.drop();
 commands.push({
     bulkReq: {
         bulkWrite: 1,
-        ops: [{insert: 0, document: {_id: 1}}, {insert: 1, document: {_id: 1}}],
-        nsInfo: [{ns: `${localDBName}.${collName}`}, {ns: `${dbName}.${collName}`}]
+        ops: [
+            {insert: 0, document: {_id: 1}},
+            {insert: 1, document: {_id: 1}},
+        ],
+        nsInfo: [{ns: `${localDBName}.${collName}`}, {ns: `${dbName}.${collName}`}],
     },
-    bulkConfirmFunc: function(res) {
+    bulkConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
         assert.eq(res.cursor.firstBatch.length, 2);
 
@@ -124,14 +130,14 @@ commands.push({
         assert.eq(res.cursor.firstBatch[1].code, ErrorCodes.DuplicateKey);
     },
     noopMakerReq: {insert: collName, documents: [{_id: 1}]},
-    noopMakerConfirmFunc: function(res) {
+    noopMakerConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq(res.n, 1);
     },
-    confirmFunc: function(res) {
+    confirmFunc: function (res) {
         assert.eq(coll.count({_id: 1}), 1);
         assert.eq(localColl.count({_id: 1}), 1);
-    }
+    },
 });
 
 // 'bulkWrite' where the last op is an update that has already been performed.
@@ -140,12 +146,12 @@ commands.push({
         bulkWrite: 1,
         ops: [
             {insert: 0, document: {_id: 0}},
-            {update: 0, filter: {_id: 0}, updateMods: {$set: {x: 1}}}
+            {update: 0, filter: {_id: 0}, updateMods: {$set: {x: 1}}},
         ],
-        nsInfo: [{ns: `${dbName}.${collName}`}]
+        nsInfo: [{ns: `${dbName}.${collName}`}],
     },
     noopMakerReq: {update: collName, updates: [{q: {_id: 0}, u: {$set: {x: 1}}}]},
-    bulkConfirmFunc: function(res) {
+    bulkConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq(res.cursor.firstBatch.length, 2);
 
@@ -158,14 +164,14 @@ commands.push({
         assert.eq(res.cursor.firstBatch[1].n, 1);
         assert.eq(res.cursor.firstBatch[1].nModified, 0);
     },
-    noopMakerConfirmFunc: function(res) {
+    noopMakerConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq(res.n, 1);
         assert.eq(res.nModified, 1);
     },
-    confirmFunc: function() {
+    confirmFunc: function () {
         assert.eq(coll.count({_id: 0, x: 1}), 1);
-    }
+    },
 });
 
 // 'bulkWrite' where the last op is an update where the document to update does not exist.
@@ -174,11 +180,11 @@ commands.push({
         bulkWrite: 1,
         ops: [
             {insert: 0, document: {a: 1}},
-            {update: 0, filter: {a: 1}, updateMods: {$set: {x: 1}}}
+            {update: 0, filter: {a: 1}, updateMods: {$set: {x: 1}}},
         ],
         nsInfo: [{ns: `${dbName}.${collName}`}],
     },
-    bulkConfirmFunc: function(res) {
+    bulkConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq(res.cursor.firstBatch.length, 2);
 
@@ -192,15 +198,15 @@ commands.push({
         assert.eq(res.cursor.firstBatch[1].nModified, 0);
     },
     noopMakerReq: {update: collName, updates: [{q: {a: 1}, u: {b: 2}}]},
-    noopMakerConfirmFunc: function(res) {
+    noopMakerConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq(res.n, 1);
         assert.eq(res.nModified, 1);
     },
-    confirmFunc: function() {
+    confirmFunc: function () {
         assert.eq(coll.find().itcount(), 1);
         assert.eq(coll.count({b: 2}), 1);
-    }
+    },
 });
 
 // 'bulkWrite' where the last op is an update that generates an immutable field error.
@@ -209,11 +215,11 @@ commands.push({
         bulkWrite: 1,
         ops: [
             {insert: 0, document: {_id: 0}},
-            {update: 0, filter: {_id: 1}, updateMods: {$set: {_id: 2}}}
+            {update: 0, filter: {_id: 1}, updateMods: {$set: {_id: 2}}},
         ],
         nsInfo: [{ns: `${dbName}.${collName}`}],
     },
-    bulkConfirmFunc: function(res) {
+    bulkConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
         assert.eq(res.cursor.firstBatch.length, 2);
 
@@ -228,24 +234,27 @@ commands.push({
         assert.eq(res.cursor.firstBatch[1].nModified, 0);
     },
     noopMakerReq: {insert: collName, documents: [{_id: 1}]},
-    noopMakerConfirmFunc: function(res) {
+    noopMakerConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq(res.n, 1);
     },
-    confirmFunc: function() {
+    confirmFunc: function () {
         assert.eq(coll.count({_id: 0}), 1);
         assert.eq(coll.count({_id: 1}), 1);
-    }
+    },
 });
 
 // 'bulkWrite' where the last op is a delete where the document to delete does not exist.
 commands.push({
     bulkReq: {
         bulkWrite: 1,
-        ops: [{insert: 0, document: {x: 1}}, {delete: 0, filter: {x: 1}, multi: false}],
+        ops: [
+            {insert: 0, document: {x: 1}},
+            {delete: 0, filter: {x: 1}, multi: false},
+        ],
         nsInfo: [{ns: `${dbName}.${collName}`}],
     },
-    bulkConfirmFunc: function(res) {
+    bulkConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq(res.cursor.firstBatch.length, 2);
 
@@ -260,13 +269,13 @@ commands.push({
         assert.eq(res2.n, 0);
     },
     noopMakerReq: {delete: collName, deletes: [{q: {x: 1}, limit: 1}]},
-    noopMakerConfirmFunc: function(res) {
+    noopMakerConfirmFunc: function (res) {
         assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq(res.n, 1);
     },
-    confirmFunc: function(res) {
+    confirmFunc: function (res) {
         assert.eq(coll.count({x: 1}), 0);
-    }
+    },
 });
 
 function testCommandWithWriteConcern(cmd) {
@@ -276,7 +285,7 @@ function testCommandWithWriteConcern(cmd) {
 
     dropTestCollection();
 
-    let failpoint = configureFailPoint(testDB, 'hangBetweenProcessingBulkWriteOps', {}, {skip: 1});
+    let failpoint = configureFailPoint(testDB, "hangBetweenProcessingBulkWriteOps", {}, {skip: 1});
 
     async function runBulkReq(host, cmd) {
         const {assertWriteConcernError} = await import("jstests/libs/write_concern_util.js");
@@ -290,7 +299,7 @@ function testCommandWithWriteConcern(cmd) {
         // that the client's last op time would get advanced by that operation, so if we pass
         // this test it means we are correctly advancing this client's optime after the last
         // operation in the batch no-ops.
-        const res = new Mongo(host).getDB('admin').runCommand(cmd.bulkReq);
+        const res = new Mongo(host).getDB("admin").runCommand(cmd.bulkReq);
         try {
             assertWriteConcernError(res);
             cmd.bulkConfirmFunc(res);
@@ -302,8 +311,7 @@ function testCommandWithWriteConcern(cmd) {
     }
 
     // Run in a parallel shell as we expect this to hang.
-    const awaitBulkWrite =
-        startParallelShell(funWithArgs(runBulkReq, primary.host, cmd), replTest.ports[0]);
+    const awaitBulkWrite = startParallelShell(funWithArgs(runBulkReq, primary.host, cmd), replTest.ports[0]);
 
     // Wait to see that the bulkWrite has hit the failpoint.
     failpoint.wait();
@@ -329,7 +337,7 @@ function testCommandWithWriteConcern(cmd) {
     replTest.start(1);
 }
 
-commands.forEach(function(cmd) {
+commands.forEach(function (cmd) {
     testCommandWithWriteConcern(cmd);
 });
 

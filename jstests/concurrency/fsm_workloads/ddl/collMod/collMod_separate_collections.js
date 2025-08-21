@@ -10,12 +10,12 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js";
 
-export const $config = extendWorkload($baseConfig, function($config, $super) {
-    $config.data.prefix = 'collMod_separate_collections';
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    $config.data.prefix = "collMod_separate_collections";
     $config.data.shardKey = {createdAt: 1};
 
     $config.states.init = function init(db, collName) {
-        this.threadCollName = this.prefix + '_' + this.tid;
+        this.threadCollName = this.prefix + "_" + this.tid;
         $super.setup.call(this, db, this.threadCollName);
     };
 
@@ -26,6 +26,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // the separate collections on a per-thread basis.
     };
 
-    $config.startState = 'init';
+    $config.startState = "init";
     return $config;
 });

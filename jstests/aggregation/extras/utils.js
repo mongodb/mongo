@@ -71,7 +71,7 @@ export function _getObjectSubtypeOrUndefined(o) {
  */
 export function _uncheckedCompare(al, ar, valueComparator) {
     // bsonBinaryEqual would return false for NumberDecimal("0.1") and NumberDecimal("0.100").
-    return valueComparator ? valueComparator(al, ar) : (al === ar || bsonWoCompare(al, ar) === 0);
+    return valueComparator ? valueComparator(al, ar) : al === ar || bsonWoCompare(al, ar) === 0;
 }
 
 /**
@@ -82,14 +82,14 @@ export function _uncheckedCompare(al, ar, valueComparator) {
  */
 export function anyEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
     // Helper to log 'msg' iff 'verbose' is true.
-    const debug = msg => verbose ? print(msg) : null;
+    const debug = (msg) => (verbose ? print(msg) : null);
 
     if (al instanceof Object && ar instanceof Object) {
         const alSubtype = _getObjectSubtypeOrUndefined(al);
         if (alSubtype) {
             // One of the supported subtypes, make sure ar is of the same type.
             if (!alSubtype.isSameSubtype(ar)) {
-                debug('anyEq: ar is not instanceof ' + alSubtype.typeName + ' ' + tojson(ar));
+                debug("anyEq: ar is not instanceof " + alSubtype.typeName + " " + tojson(ar));
                 return false;
             }
 
@@ -106,7 +106,7 @@ export function anyEq(al, ar, verbose = false, valueComparator, fieldsToSkip = [
             const arType = _getObjectSubtypeOrUndefined(ar);
             if (arType) {
                 // If al was not of any of the subtypes, but ar is, then types are different.
-                debug('anyEq: al is ' + typeof al + ' but ar is ' + arType.typeName);
+                debug("anyEq: al is " + typeof al + " but ar is " + arType.typeName);
                 return false;
             }
 
@@ -148,30 +148,28 @@ export function customDocumentEq({left, right, verbose, valueComparator, fieldsT
  * from assert.js should be used instead.
  */
 export function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSkip = []) {
-    const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
+    const debug = (msg) => (verbose ? print(msg) : null); // Helper to log 'msg' iff 'verbose' is true.
 
     // Make sure these are both objects.
     if (!(dl instanceof Object)) {
-        debug('documentEq:  dl is not an object ' + tojson(dl));
+        debug("documentEq:  dl is not an object " + tojson(dl));
         return false;
     }
     if (!(dr instanceof Object)) {
-        debug('documentEq:  dr is not an object ' + tojson(dr));
+        debug("documentEq:  dr is not an object " + tojson(dr));
         return false;
     }
 
     // Start by checking for all of dl's properties in dr.
     for (let propertyName in dl) {
         // Skip inherited properties.
-        if (!dl.hasOwnProperty(propertyName))
-            continue;
+        if (!dl.hasOwnProperty(propertyName)) continue;
 
-        if (fieldsToSkip.includes(propertyName))
-            continue;
+        if (fieldsToSkip.includes(propertyName)) continue;
 
         // The documents aren't equal if they don't both have the property.
         if (!dr.hasOwnProperty(propertyName)) {
-            debug('documentEq: dr doesn\'t have property ' + propertyName);
+            debug("documentEq: dr doesn't have property " + propertyName);
             return false;
         }
 
@@ -182,16 +180,14 @@ export function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSki
 
     // Now make sure that dr doesn't have any extras that dl doesn't have.
     for (let propertyName in dr) {
-        if (!dr.hasOwnProperty(propertyName))
-            continue;
+        if (!dr.hasOwnProperty(propertyName)) continue;
 
-        if (fieldsToSkip.includes(propertyName))
-            continue;
+        if (fieldsToSkip.includes(propertyName)) continue;
 
         // If dl doesn't have this they are not equal; if it does, we compared it above and know it
         // to be equal.
         if (!dl.hasOwnProperty(propertyName)) {
-            debug('documentEq: dl is missing property ' + propertyName);
+            debug("documentEq: dl is missing property " + propertyName);
             return false;
         }
     }
@@ -213,16 +209,16 @@ export function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSki
  * equivalent assertion.
  */
 export function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
-    const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
+    const debug = (msg) => (verbose ? print(msg) : null); // Helper to log 'msg' iff 'verbose' is true.
 
     // Check that these are both arrays.
     if (!(al instanceof Array)) {
-        debug('arrayEq: al is not an array: ' + tojson(al));
+        debug("arrayEq: al is not an array: " + tojson(al));
         return false;
     }
 
     if (!(ar instanceof Array)) {
-        debug('arrayEq: ar is not an array: ' + tojson(ar));
+        debug("arrayEq: ar is not an array: " + tojson(ar));
         return false;
     }
 
@@ -236,9 +232,8 @@ export function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip =
     for (let leftElem of al) {
         let foundMatch = false;
         for (let i = 0; i < ar.length; ++i) {
-            if (!matchedElementsInRight.has(i) &&
-                anyEq(leftElem, ar[i], verbose, valueComparator, fieldsToSkip)) {
-                matchedElementsInRight.add(i);  // Don't use the same value each time.
+            if (!matchedElementsInRight.has(i) && anyEq(leftElem, ar[i], verbose, valueComparator, fieldsToSkip)) {
+                matchedElementsInRight.add(i); // Don't use the same value each time.
                 foundMatch = true;
                 break;
             }
@@ -254,12 +249,12 @@ export function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip =
 export function arrayDiff(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
     // Check that these are both arrays.
     if (!(al instanceof Array)) {
-        debug('arrayDiff: al is not an array: ' + tojson(al));
+        debug("arrayDiff: al is not an array: " + tojson(al));
         return false;
     }
 
     if (!(ar instanceof Array)) {
-        debug('arrayDiff: ar is not an array: ' + tojson(ar));
+        debug("arrayDiff: ar is not an array: " + tojson(ar));
         return false;
     }
 
@@ -269,9 +264,8 @@ export function arrayDiff(al, ar, verbose = false, valueComparator, fieldsToSkip
     for (let leftElem of al) {
         let foundMatch = false;
         for (let i = 0; i < ar.length; ++i) {
-            if (!matchedIndexesInRight.has(i) &&
-                anyEq(leftElem, ar[i], verbose, valueComparator, fieldsToSkip)) {
-                matchedIndexesInRight.add(i);  // Don't use the same value each time.
+            if (!matchedIndexesInRight.has(i) && anyEq(leftElem, ar[i], verbose, valueComparator, fieldsToSkip)) {
+                matchedIndexesInRight.add(i); // Don't use the same value each time.
                 foundMatch = true;
                 break;
             }
@@ -293,8 +287,8 @@ export function arrayDiff(al, ar, verbose = false, valueComparator, fieldsToSkip
  * Makes a shallow copy of 'a'.
  */
 export function arrayShallowCopy(a) {
-    assert(a instanceof Array, 'arrayShallowCopy: argument is not an array');
-    return a.slice();  // Makes a copy.
+    assert(a instanceof Array, "arrayShallowCopy: argument is not an array");
+    return a.slice(); // Makes a copy.
 }
 
 /**
@@ -305,7 +299,7 @@ export function arrayShallowCopy(a) {
  * Are non-scalar values references?
  */
 export function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
-    const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
+    const debug = (msg) => (verbose ? print(msg) : null); // Helper to log 'msg' iff 'verbose' is true.
 
     // Make clones of the arguments so that we don't damage them.
     rl = arrayShallowCopy(rl);
@@ -321,8 +315,7 @@ export function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
 
         // Find a match in the other array.
         for (let j = 0; j < rr.length; ++j) {
-            if (!anyEq(rl[i], rr[j], verbose, null, fieldsToSkip))
-                continue;
+            if (!anyEq(rl[i], rr[j], verbose, null, fieldsToSkip)) continue;
 
             debug(`resultsEq: search target found (${tojson(rl[i])}) (${tojson(rr[j])})`);
 
@@ -358,14 +351,12 @@ export function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
  */
 export function orderedArrayEq(al, ar, verbose = false, fieldsToSkip = []) {
     if (al.length != ar.length) {
-        if (verbose)
-            print(`orderedArrayEq:  array lengths do not match ${tojson(al)}, ${tojson(ar)}`);
+        if (verbose) print(`orderedArrayEq:  array lengths do not match ${tojson(al)}, ${tojson(ar)}`);
         return false;
     }
 
     for (let i = 0; i < al.length; ++i) {
-        if (!anyEq(al[i], ar[i], verbose, null, fieldsToSkip))
-            return false;
+        if (!anyEq(al[i], ar[i], verbose, null, fieldsToSkip)) return false;
     }
 
     return true;
@@ -392,7 +383,7 @@ export function assertErrorCode(target, pipe, code, errmsg, options = {}) {
     let cmdWithNS = Object.assign({}, {aggregate: ns}, cmd);
     let resultObj = targetDB.runCommand(cmdWithNS);
     if (resultObj.ok) {
-        let followupBatchSize = 0;  // default
+        let followupBatchSize = 0; // default
         let cursor = new DBCommandCursor(targetDB, resultObj, followupBatchSize);
         let assertThrowsMsg = "expected one of the following error codes: " + tojson(code);
         resultObj = assert.throws(() => cursor.itcount(), [], assertThrowsMsg);
@@ -407,11 +398,14 @@ export function assertErrorCode(target, pipe, code, errmsg, options = {}) {
  */
 export function assertErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
     const response = assert.commandFailedWithCode(
-        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}), code);
+        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}),
+        code,
+    );
     assert.neq(
         -1,
         response.errmsg.indexOf(expectedMessage),
-        "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response));
+        "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response),
+    );
 }
 
 /**
@@ -420,11 +414,14 @@ export function assertErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage
  */
 export function assertAdminDBErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
     const response = assert.commandFailedWithCode(
-        coll.getDB().adminCommand({aggregate: 1, pipeline: pipe, cursor: {}}), code);
+        coll.getDB().adminCommand({aggregate: 1, pipeline: pipe, cursor: {}}),
+        code,
+    );
     assert.neq(
         -1,
         response.errmsg.indexOf(expectedMessage),
-        "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response));
+        "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response),
+    );
 }
 
 /**
@@ -433,11 +430,13 @@ export function assertAdminDBErrCodeAndErrMsgContains(coll, pipe, code, expected
  */
 export function assertErrMsgContains(coll, pipe, expectedMessage) {
     const response = assert.commandFailed(
-        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}));
+        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}),
+    );
     assert.neq(
         -1,
         response.errmsg.indexOf(expectedMessage),
-        "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response));
+        "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response),
+    );
 }
 
 /**
@@ -446,10 +445,9 @@ export function assertErrMsgContains(coll, pipe, expectedMessage) {
  */
 export function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
     const response = assert.commandFailed(
-        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}));
-    assert.eq(-1,
-              response.errmsg.indexOf(expectedMessage),
-              "Error message contained '" + expectedMessage + "'");
+        coll.getDB().runCommand({aggregate: coll.getName(), pipeline: pipe, cursor: {}}),
+    );
+    assert.eq(-1, response.errmsg.indexOf(expectedMessage), "Error message contained '" + expectedMessage + "'");
 }
 
 /**
@@ -457,11 +455,12 @@ export function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
  * the 'actual' array has a matching element in the 'expected' array, without honoring elements
  * order.
  */
-export function assertArrayEq(
-    {actual = [], expected = [], fieldsToSkip = [], extraErrorMsg = ""} = {}) {
+export function assertArrayEq({actual = [], expected = [], fieldsToSkip = [], extraErrorMsg = ""} = {}) {
     assert.eq(arguments.length, 1, "assertArrayEq arguments must be in an object");
-    assert(arrayEq(actual, expected, false, null, fieldsToSkip),
-           `actual=${tojson(actual)}, expected=${tojson(expected)}${extraErrorMsg}`);
+    assert(
+        arrayEq(actual, expected, false, null, fieldsToSkip),
+        `actual=${tojson(actual)}, expected=${tojson(expected)}${extraErrorMsg}`,
+    );
 }
 
 /**
@@ -482,10 +481,9 @@ export function generateCollection({
     coll = null,
     numDocs = 0,
     docSize = 0,
-    template =
-        (itNum) => {
-            return {_id: itNum};
-        }
+    template = (itNum) => {
+        return {_id: itNum};
+    },
 } = {}) {
     assert(coll, "Collection not provided");
 
@@ -499,7 +497,8 @@ export function generateCollection({
         assert.eq(
             docSize,
             Object.bsonsize(doc),
-            `Generated document's size doesn't match requested document's size: ${tojson(doc)}`);
+            `Generated document's size doesn't match requested document's size: ${tojson(doc)}`,
+        );
 
         bulk.insert(doc);
     }
@@ -534,7 +533,11 @@ export function desugarSingleStageAggregation(db, coll, stage) {
  * optional hint that will get passed on to the aggregation stage. It defaults to undefined.
  */
 export function getExplainedPipelineFromAggregation(
-    db, coll, pipeline, {inhibitOptimization = true, postPlanningResults = false, hint} = {}) {
+    db,
+    coll,
+    pipeline,
+    {inhibitOptimization = true, postPlanningResults = false, hint} = {},
+) {
     // Prevent stages from being absorbed into the .find() layer
     if (inhibitOptimization) {
         pipeline.unshift({$_internalInhibitOptimization: {}});
@@ -545,14 +548,13 @@ export function getExplainedPipelineFromAggregation(
     const result = coll.explain().aggregate(pipeline, aggOptions);
 
     assert.commandWorked(result);
-    return getExplainPipelineFromAggregationResult(result,
-                                                   {inhibitOptimization, postPlanningResults});
+    return getExplainPipelineFromAggregationResult(result, {inhibitOptimization, postPlanningResults});
 }
 
-export function getExplainPipelineFromAggregationResult(result, {
-    inhibitOptimization = true,
-    postPlanningResults = false,
-} = {}) {
+export function getExplainPipelineFromAggregationResult(
+    result,
+    {inhibitOptimization = true, postPlanningResults = false} = {},
+) {
     if (Array.isArray(result.stages)) {
         // The first two stages should be the .find() cursor and the inhibit-optimization stage (if
         // enabled); the rest of the stages are what the user's 'stage' expanded to.
@@ -579,10 +581,11 @@ export function getExplainPipelineFromAggregationResult(result, {
                 if (Array.isArray(shardResult.stages)) {
                     shardsPart = shardResult.stages;
                 } else {
-                    assert(shardResult.queryPlanner,
-                           `Expected result.shards[${
-                               tojson(shardName)}] to be a pipeline, or find-like plan: ` +
-                               tojson(result));
+                    assert(
+                        shardResult.queryPlanner,
+                        `Expected result.shards[${tojson(shardName)}] to be a pipeline, or find-like plan: ` +
+                            tojson(result),
+                    );
                     shardsPart = [{$cursor: shardResult}];
                 }
             }

@@ -16,41 +16,52 @@ function assertCommandFailsWithCorrectError(command, code) {
 }
 
 // Aggregate
-assertCommandFailsWithCorrectError(
-    {aggregate: coll.getName(), pipeline: [], cursor: {}, jsonSchema: {}},
-    [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownFieldPossibleMongocryptd]);
+assertCommandFailsWithCorrectError({aggregate: coll.getName(), pipeline: [], cursor: {}, jsonSchema: {}}, [
+    ErrorCodes.FailedToParse,
+    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
+]);
 
 // Find
-assertCommandFailsWithCorrectError(
-    {find: coll.getName(), jsonSchema: {}},
-    [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownFieldPossibleMongocryptd]);
+assertCommandFailsWithCorrectError({find: coll.getName(), jsonSchema: {}}, [
+    ErrorCodes.FailedToParse,
+    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
+]);
 
 // FindAndModify
-assertCommandFailsWithCorrectError(
-    {findAndModify: coll.getName(), query: {_id: 0}, remove: true, jsonSchema: {}},
-    [ErrorCodes.FailedToParse, ErrorCodes.IDLUnknownFieldPossibleMongocryptd]);
+assertCommandFailsWithCorrectError({findAndModify: coll.getName(), query: {_id: 0}, remove: true, jsonSchema: {}}, [
+    ErrorCodes.FailedToParse,
+    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
+]);
 
 // Count
-assertCommandFailsWithCorrectError({count: coll.getName(), jsonSchema: {}},
-                                   ErrorCodes.IDLUnknownFieldPossibleMongocryptd);
+assertCommandFailsWithCorrectError(
+    {count: coll.getName(), jsonSchema: {}},
+    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
+);
 
 // Distinct
-assertCommandFailsWithCorrectError({distinct: coll.getName(), key: "a", jsonSchema: {}},
-                                   ErrorCodes.IDLUnknownFieldPossibleMongocryptd);
+assertCommandFailsWithCorrectError(
+    {distinct: coll.getName(), key: "a", jsonSchema: {}},
+    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
+);
 
 // Write Commands
-assertCommandFailsWithCorrectError({insert: coll.getName(), documents: [{}], jsonSchema: {}},
-                                   ErrorCodes.IDLUnknownFieldPossibleMongocryptd);
+assertCommandFailsWithCorrectError(
+    {insert: coll.getName(), documents: [{}], jsonSchema: {}},
+    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
+);
 assertCommandFailsWithCorrectError(
     {update: coll.getName(), updates: [{q: {}, u: {$inc: {a: 1}}}], jsonSchema: {}},
-    ErrorCodes.IDLUnknownFieldPossibleMongocryptd);
+    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
+);
 assertCommandFailsWithCorrectError(
     {delete: coll.getName(), deletes: [{q: {}, limit: 0}], jsonSchema: {}},
-    ErrorCodes.IDLUnknownFieldPossibleMongocryptd);
+    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
+);
 
 // Explain
 assertCommandFailsWithCorrectError({explain: {count: coll.getName()}, jsonSchema: {}}, [
     ErrorCodes.FailedToParse,
     ErrorCodes.IDLUnknownField,
-    ErrorCodes.IDLUnknownFieldPossibleMongocryptd
+    ErrorCodes.IDLUnknownFieldPossibleMongocryptd,
 ]);

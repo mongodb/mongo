@@ -14,7 +14,7 @@ let st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}, other: {c
 let donor = st.shard0;
 let recipient = st.shard1;
 
-let setUp = function() {
+let setUp = function () {
     assert.commandWorked(st.s.adminCommand({enableSharding: db, primaryShard: donor.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
 };

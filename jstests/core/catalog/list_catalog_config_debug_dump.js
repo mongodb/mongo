@@ -19,8 +19,7 @@ assert.commandWorked(myDB[databasesCollectionName].insertOne({x: 1}));
 
 // In suites with tenantID, the test would replace a simple {$match: {db: myDBName}}
 // with {$match: {db: tenantID + "_" + myDBName}}, hence the workaround with a regex.
-const userDBlist =
-    admin.aggregate([{$listCatalog: {}}, {$match: {db: {$regex: `^${myDBName}\$`}}}]).toArray();
+const userDBlist = admin.aggregate([{$listCatalog: {}}, {$match: {db: {$regex: `^${myDBName}\$`}}}]).toArray();
 assert.gte(userDBlist.length, 2);
 
 let dummyFound = false;
@@ -55,7 +54,7 @@ const configList = admin.aggregate([{$listCatalog: {}}, {$match: {db: "config"}}
 // boolean. Check also a couple collections for the correct value.
 for (let c of configList) {
     assert(c.hasOwnProperty("configDebugDump"));
-    assert.eq("boolean", typeof (c.configDebugDump));
+    assert.eq("boolean", typeof c.configDebugDump);
 
     if (c.name == dummyCollectionName) {
         assert.eq(false, c.configDebugDump);
@@ -72,7 +71,7 @@ for (let c of configList) {
 function testSingleCollectionAggregate(array, expectedValue) {
     assert.eq(1, array.length);
     assert(array[0].hasOwnProperty("configDebugDump"));
-    assert.eq("boolean", typeof (array[0].configDebugDump));
+    assert.eq("boolean", typeof array[0].configDebugDump);
     assert.eq(expectedValue, array[0].configDebugDump);
 }
 

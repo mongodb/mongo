@@ -21,7 +21,7 @@ assert.commandWorked(coll.insert({"_id": 3, "title": "vegetables"}));
 const collUUID = getUUIDFromListCollections(db, coll.getName());
 const searchQuery = {
     query: "cakes",
-    path: "title"
+    path: "title",
 };
 
 // Verify that $searchBeta parses with no errors..
@@ -34,7 +34,7 @@ const searchCmd = {
     search: coll.getName(),
     collectionUUID: collUUID,
     query: searchQuery,
-    $db: "test"
+    $db: "test",
 };
 
 // Give mongotmock some stuff to return.
@@ -49,9 +49,12 @@ const cursorId = NumberLong(123);
                 cursor: {
                     id: cursorId,
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 2, $searchScore: 0.654}, {_id: 1, $searchScore: 0.321}]
-                }
-            }
+                    nextBatch: [
+                        {_id: 2, $searchScore: 0.654},
+                        {_id: 1, $searchScore: 0.321},
+                    ],
+                },
+            },
         },
         {
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
@@ -59,15 +62,14 @@ const cursorId = NumberLong(123);
                 cursor: {
                     id: NumberLong(0),
                     ns: coll.getFullName(),
-                    nextBatch: [{_id: 3, $searchScore: 0.123}]
+                    nextBatch: [{_id: 3, $searchScore: 0.123}],
                 },
-                ok: 1
-            }
+                ok: 1,
+            },
         },
     ];
 
-    assert.commandWorked(
-        mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+    assert.commandWorked(mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
 }
 
 // Verify that a $searchBeta query works end to end.
@@ -78,7 +80,7 @@ let cursor = coll.aggregate([{$searchBeta: searchQuery}], {cursor: {batchSize: 2
 const expected = [
     {"_id": 2, "title": "cookies and cakes"},
     {"_id": 1, "title": "cakes"},
-    {"_id": 3, "title": "vegetables"}
+    {"_id": 3, "title": "vegetables"},
 ];
 assert.eq(expected, cursor.toArray());
 

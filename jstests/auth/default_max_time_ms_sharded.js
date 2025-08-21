@@ -17,8 +17,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function setDefaultReadMaxTimeMs(db, newValue) {
-    assert.commandWorked(
-        adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
+    assert.commandWorked(adminDB.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));
 
     // Currently, the mongos cluster parameter cache is not updated on setClusterParameter. An
     // explicit call to getClusterParameter will refresh the cache.
@@ -29,11 +28,11 @@ let st = new ShardingTest({
     mongos: 1,
     shards: {nodes: 1},
     config: {nodes: 1},
-    other: {keyFile: 'jstests/libs/key1'},
-    mongosOptions: {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}},
+    other: {keyFile: "jstests/libs/key1"},
+    mongosOptions: {setParameter: {"failpoint.skipClusterParameterRefresh": "{'mode':'alwaysOn'}"}},
 });
 
-let adminDB = st.s.getDB('admin');
+let adminDB = st.s.getDB("admin");
 assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));
 assert.eq(1, adminDB.auth("admin", "admin"));
 
@@ -50,15 +49,15 @@ const slowStage = {
     $match: {
         $expr: {
             $function: {
-                body: function() {
+                body: function () {
                     sleep(1000);
                     return true;
                 },
                 args: [],
-                lang: "js"
-            }
-        }
-    }
+                lang: "js",
+            },
+        },
+    },
 };
 
 const aggCommand = {
@@ -75,16 +74,15 @@ const expectedErrorsDueToMaxTimeMS = [ErrorCodes.Interrupted, ErrorCodes.MaxTime
 assert.commandWorked(testDB.runCommand(aggCommand));
 
 // No defaultMaxTimeMS is configured, but the query explicitly sets one, and fails.
-assert.commandFailedWithCode(testDB.runCommand({...aggCommand, maxTimeMS: 100}),
-                             expectedErrorsDueToMaxTimeMS);
+assert.commandFailedWithCode(testDB.runCommand({...aggCommand, maxTimeMS: 100}), expectedErrorsDueToMaxTimeMS);
 
 // Set defaultMaxTimeMS to small value.
 setDefaultReadMaxTimeMs(adminDB, 500);
 
 // Prepare a regular user without the 'bypassDefaultMaxtimeMS' privilege.
-adminDB.createUser({user: 'regularUser', pwd: 'password', roles: ["readAnyDatabase"]});
-const regularUserConn = new Mongo(st.s.host).getDB('admin');
-assert(regularUserConn.auth('regularUser', 'password'), "Auth failed");
+adminDB.createUser({user: "regularUser", pwd: "password", roles: ["readAnyDatabase"]});
+const regularUserConn = new Mongo(st.s.host).getDB("admin");
+assert(regularUserConn.auth("regularUser", "password"), "Auth failed");
 const regularUserDB = regularUserConn.getSiblingDB(dbName);
 
 jsTestLog("Executing query with defaultMaxTimeMS");

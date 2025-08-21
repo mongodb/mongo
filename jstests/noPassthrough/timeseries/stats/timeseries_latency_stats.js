@@ -8,14 +8,13 @@
  */
 const conn = MongoRunner.runMongod();
 
-const testDB = conn.getDB('test');
+const testDB = conn.getDB("test");
 const coll = testDB[jsTestName()];
 
 coll.drop();
 
-const timeFieldName = 'time';
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+const timeFieldName = "time";
+assert.commandWorked(testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
 const getLatencyStats = () => {
     const stats = coll.aggregate([{$collStats: {latencyStats: {}}}]).next();

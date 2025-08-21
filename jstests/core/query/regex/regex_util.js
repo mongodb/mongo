@@ -14,10 +14,10 @@ var TEST_STRINGS = [
     "****word+",
     "\t| |\n\r",
     "Mongo-db",
-    "[{(<>)}]!@#%^&*+\\"
+    "[{(<>)}]!@#%^&*+\\",
 ];
 
-TEST_STRINGS.forEach(function(str) {
+TEST_STRINGS.forEach(function (str) {
     var escaped = RegExp.escape(str);
     var regex = new RegExp(escaped);
     assert(regex.test(str), "Wrong escape for " + str);
